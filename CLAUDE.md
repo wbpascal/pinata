@@ -11,6 +11,7 @@ plan file (`docs/plan/items/<ID>.md`), follow it. This file holds the shared con
 | `Files/Server/2016/` | The **2016** server binaries we reconstruct (Login, WorldManager, Zone×4 identical, Account, AccountLog, Character, GameLog) and their config + `9Data/Shine/*.shn` data tables |
 | `Files/Client/2016/Fiesta.bin` | The matching game client (PE32). `Files/Client/2016/ressystem/*.shn` = client data tables (texts, items…) |
 | `Files/Client/2017/Fiesta.bin` + `Fiesta.pdb` | Slightly newer client (`patch_2017_08_p01`) with its **full private PDB** (GUID matches the exe): official opcode enums, `PROTO_NC_*` packet structs with field names, shared enums/structs, client function names. Read with `tools/protocol-re/pdb.py`; work item C02 |
+| `Files/Server/2016/_Database/` | SQL Server backups from private-server installs (Account, AccountLog, StatisticsData, Character + w00_Character, GameLog + w00_GameLog, OperatorTool) and their `Fixes/*.sql`: stored-procedure source, close to but not the 2016 build. Read with `tools/protocol-re/bak.py`; see `docs/plan/db-backups.md` |
 | `Files/Server/2015`, `Files/Client/2015` | Older versions. Only for diffing; do not document them |
 | `re-data/exports/<bin>/` | **Ghidra exports, already done. Use these, do not re-decompile.** `decomp.c` (all functions, `//==== FUNC <addr> <name>` separators), `strings.tsv` (addr, value, referencing functions), `handlers.json`, `layouts.json` |
 | `re-data/captures/` | Packet captures of real client↔server traffic (`.pcap/.pcapng`) + scenario notes (`.md`). Sensitive: test accounts only. Decoder: `tools/protocol-re/pcap_decode.py` (work item P01) |
@@ -31,6 +32,8 @@ T=tools/protocol-re; E=re-data/exports
 python3 -I $T/clean.py $E/zone $T/names/zone 452590 451a30   # print functions, noise stripped, known names applied
 grep -n "sp_NC_MAP_LOGIN_REQ" $E/zone/strings.tsv            # string -> referencing functions
 python3 -I $T/shn.py Files/Server/2016/9Data/Shine/ItemInfo.shn | head  # decode any .shn data table (server or client)
+python3 -I $T/bak.py Files/Server/2016/_Database/w00_Character.bak proc p_Char_Create  # stored-procedure source from a DB backup
+python3 -I $T/bak.py cover character                        # every {CALL} of a binary vs all DB backups
 python3 -I $T/errcodes.py $E/client Files/Client/2016/ressystem   # client error-code -> message table
 P=Files/Client/2017/Fiesta.pdb
 python3 -I $T/pdb.py $P types '^PROTO_NC_MAP_LOGIN_REQ$'          # 2017 PDB: structs/enums by regex (C-like dump)
@@ -78,7 +81,8 @@ tools/protocol-re/reanalyze.sh <bin> <exe>                   # only if an export
    - a "Not reconstructed / uncertain" section at the end
 3. **Evidence levels** (strongest first): *(captured)*: observed in a real capture
    (`docs/protocol/capture-validation.md`); plain statement = read in the code; *(pdb2017)* = from the 2017
-   PDB and not yet confirmed in a 2016 binary; *(inferred)* = deduced.
+   PDB and not yet confirmed in a 2016 binary; *(db-backup)* = only from the DB backups (`docs/plan/db-backups.md`);
+   *(inferred)* = deduced.
    Mark the non-plain ones. Never invent names. Names come from strings in the binaries, the 2017 PDB, the
    client texts, or are clearly marked as ours. If a capture contradicts your reading, the capture wins; re-read the code.
 4. **Cross-check with the client** for every client-facing packet: find the client handler (see C01's

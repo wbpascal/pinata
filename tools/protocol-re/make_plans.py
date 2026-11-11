@@ -17,6 +17,17 @@ DEPT = {2: "MISC", 3: "USER", 4: "CHAR", 5: "AVATAR", 6: "MAP", 7: "BRIEFINFO", 
         47: "GAMBLE", 49: "COLLECT", 51: "MOVER", 52: "EVENT", 53: "PET"}
 
 ALL = None
+# Shared first step of the DB items (D01-D05); details and the match table are in docs/plan/db-backups.md.
+DB_STEP = ("**Database backups:** read `docs/plan/db-backups.md` first (which backup is which, which version to trust). "
+           "Start with `python3 -I tools/protocol-re/bak.py cover <bin>`: it lists every procedure your server calls, the "
+           "backups and `Fixes/` scripts that have it, and whether the parameter count matches. For every procedure you "
+           "document, print its source (`bak.py Files/Server/2016/_Database/<file>.bak proc <name>`; compare the versions "
+           "when several backups have it) and use it for the tables and columns touched, the result-set column order and "
+           "the meaning of each return code (the Korean header comments list them). The backups come from private servers "
+           "and are not the 2016 build: confirm against the binary (parameter count of the `{CALL …}` string, "
+           "`SQLGetData` order and C types, result codes checked) and mark facts only a backup shows *(db-backup)*. Say "
+           "which version you used, and flag procedures that exist only as private-server work. Name tables and columns "
+           "only as the procedure source spells them.")
 # (bin, parser substring, depts or ALL)
 ITEMS = [
  dict(id="C01", phase=1, title="Client packet-handler inventory", out="docs/knowledge/C01.md + re-data/client-handlers.json",
@@ -207,19 +218,62 @@ ITEMS = [
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
            "and the reply. **Resolve the open question from the Login docs:** which conditions produce result -1/-2, "
-           "the blocked flag (0x47), the flag behind 0x48, and AccountLog's region flag (0x51)."),
+           "the blocked flag (0x47), the flag behind 0x48, and AccountLog's region flag (0x51).",
+      steps=[DB_STEP,
+             "Account server: `Account.bak` has 7 of its 15 procedures. Start the Login open question from "
+             "`usp_User_loginGame` (6 parameters, matches the binary): it returns `@userNo` (-1 when ID/password are wrong "
+             "or the account is deleted), `@authID`, `@block` (re-checked through `usp_User_chkBlock`) and `@isLoginable` "
+             "(group policy, `tUserAuth.bIsLoginAble`), which are likely the sources of the 0x47/0x48 flags *(db-backup)*; "
+             "confirm in the binary. The binary also calls `usp_User_LoginGame` with 5 parameters; SQL Server names are not "
+             "case-sensitive, so against this DB that call would fail: find which code path uses it. Missing: "
+             "`usp_User_LoginNetmarble`, `usp_JPUser_insert`, `usp_TWUser_insert`, `usp_Pcbang_chkIP`, `usp_Event_addCash`, "
+             "`p_UserKey_Get_FromAccount`, `p_UserPlayRemainTime_Get_FromAccount`, `p_UserPlayRemainTime_Set_FromAccount`.",
+             "AccountLog server: `AccountLog.bak` and `StatisticsData.bak` (ODBC `Statistics`) have 8 of its 12 procedures, "
+             "all with the same parameter count. `Fixes/IP Block/p_IPBlock_IsBlock.sql` is a private-server edit; the "
+             "`AccountLog.bak` copy is the one to use. Missing: `p_Event_L20_Get`, `p_Event_L20_Set`, "
+             "`p_SameTimeCharClass_Add`, `usp_AccountLog_GetDateDiffLastlogout`. `OperatorTool.bak` belongs to the separate "
+             "operator tool, not to these servers."]),
  dict(id="D02", phase=2, title="Character server: characters, avatars, save/load", out="docs/pseudocode/db/D02-character.md",
       deps=[], scope=[("character", "", [2, 3, 4, 5, 10, 16, 40, 45])],
       goal="Character/avatar create/delete/list, full character load (NC_CHAR_CHARDATA) and save (CHARSAVE). "
            "Document each stored procedure and the column order (SQLGetData C types: -28 u8, -17 i16, -16 i32, -18 u32, 11 timestamp, 1 string). "
-           "The 130-byte AVATAR record builder `FUN_0046bff0` is already decoded (annotations.json)."),
+           "The 130-byte AVATAR record builder `FUN_0046bff0` is already decoded (annotations.json).",
+      steps=[DB_STEP,
+             "Character server: `Character.bak` (older, 2008 R2) and `w00_Character.bak` (newer, 2017, private-server fixes "
+             "applied) together have 296 of the 311 procedures it calls, 294 with the same parameter count. In your area: "
+             "`usp_CharacterLoading` takes 11 parameters in the binary but 6 in both backups; missing are "
+             "`usp_CharacterLoadingDetailInfo`, `p_Promotion_Get`, `p_Promotion_Set`, `p_IsPromotionUser`. Key map, game "
+             "option, shortcut, chat colour, tutorial and attendance procedures exist only in `w00_Character`. `Fixes/` "
+             "changed `p_Char_Create` (duplicate names), `p_Char_Rename`, `usp_Character_setChangeID` and "
+             "`usp_Tutorial_setCharInfo`: use the `Character.bak` copy or note the difference.",
+             "Write the table list you meet (table → columns as the procedures use them) into `docs/knowledge/D02.md`; "
+             "D03 and D04 build on it."]),
  dict(id="D03", phase=2, title="Character server: items (ITEMDB), economy, pets, house", out="docs/pseudocode/db/D03-character-items.md",
-      deps=["D02"], scope=[("character", "", [13, 35, 36, 43, 47, 49, 53])]),
+      deps=["D02"], scope=[("character", "", [13, 35, 36, 43, 47, 49, 53])],
+      steps=[DB_STEP,
+             "Missing in every backup: pets (`usp_Pet_*`, 5), `usp_LinkScroll_SetDestMap`, "
+             "`p_Item_MiniHouse_Effect_Resource_Del`, `p_MiniHouseURL_Get`, `p_MiniHouseURL_Set`. Gamble/slot machine, card "
+             "collection, safe trade, auto-mon and belonged items exist only in `w00_Character`. The gem enchant procedures "
+             "(`usp_Item_*Enchant*`, author `<KHRISMIZER>`) may be private-server work. `p_Item_BuyAll` and `p_Item_BuyLot` "
+             "match the binary only in `w00_Character` (the older copy has one parameter fewer). `Fixes/` changed "
+             "`usp_ChargeItem_Draw` and `usp_ChargeItem_GetList` (premium inventory slots): compare with `Character.bak`."]),
  dict(id="D04", phase=2, title="Character server: social, guild, quests, skills", out="docs/pseudocode/db/D04-character-social.md",
-      deps=["D02"], scope=[("character", "", [17, 18, 21, 22, 23, 24, 28, 29, 31, 37, 38, 42])]),
+      deps=["D02"], scope=[("character", "", [17, 18, 21, 22, 23, 24, 28, 29, 31, 37, 38, 42])],
+      steps=[DB_STEP,
+             "The two Character backups cover almost all of your scope. Missing in every backup: `p_Guild_SetMoney`, "
+             "`usp_GuildTournament_setRefundNotice`. Private-server reconstructions, not original: `usp_GuildEmblem_*` (3) "
+             "and `usp_GuildAcademy_setHistory` (header copied from `usp_Guild_SetToken`; `usp_GuildEmblem_SetInfo` has a parameter named `@nUnk`), and "
+             "`usp_Guild_getHistoryList` / `usp_Guild_setHistory` (only in `Fixes/`). `usp_Character_setFriendpoint` takes 2 "
+             "parameters in the binary but 3 in `w00_Character`."]),
  dict(id="D05", phase=2, title="GameLog server", out="docs/pseudocode/db/D05-gamelog.md", deps=[], scope=[("gamelog", "", ALL)],
       goal="What is logged (all ~200 log messages), table/procedure per message. Can be summarised in tables rather than "
-           "full pseudocode where handlers are uniform."),
+           "full pseudocode where handlers are uniform.",
+      steps=[DB_STEP,
+             "`GameLog.bak` (older) and `w00_GameLog.bak` (newer) match well: 22 of the 23 procedures the GameLog server "
+             "calls have source with the same parameter count; only `usp_Login_setChannel` is missing, and "
+             "`p_GameLog_Add_TypeL` exists only in `w00_GameLog`. The `p_GameLog_Add_Type1…L` sources show which "
+             "`tGameLog` column each parameter fills, which gives the meaning of the generic log fields. Eight of them "
+             "differ between the two backups (Type1, 4, 5, 6, D, E, H, J): compare both."]),
  dict(id="P01", phase=1, title="Packet capture decoder", out="tools/protocol-re/pcap_decode.py + docs/knowledge/P01.md",
       scope=[], deps=[],
       goal="A pure-Python (stdlib only: no scapy/dpkt/tshark on this machine) tool that turns a capture of real "
