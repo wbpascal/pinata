@@ -589,11 +589,13 @@ Handler `FUN_00413510`
 
 ### `0x3802` NC_PARTY_JOIN_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_JOIN_REQ`, 20 bytes
+**Verified layout** (basis: wm FUN_0041a940)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | target | Name5 |
+| 0 | char[20] | target |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_0041a940`
 
@@ -631,11 +633,13 @@ No payload fields read directly by the handler.
 
 ### `0x3814` NC_PARTY_KICKOFF_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_KICKOFF_REQ`, 20 bytes
+**Verified layout** (basis: wm FUN_0041bb40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | member | Name5 |
+| 0 | char[20] | member |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_0041bb40`
 
@@ -648,11 +652,13 @@ Handler `FUN_0041bb40`
 
 ### `0x3828` NC_PARTY_CHANGEMASTER_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_CHANGEMASTER_REQ`, 20 bytes
+**Verified layout** (basis: wm FUN_0041bf10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | newmaster | Name5 |
+| 0 | char[20] | newmaster |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_0041bf10`
 
@@ -666,12 +672,14 @@ Handler `FUN_0041bf10`
 
 ### `0x384b` NC_PARTY_ITEM_LOOTING_SET †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_ITEM_LOOTING_SET`, 2 bytes
+**Verified layout** (basis: wm FUN_004130f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | lootingtype |  |
-| 1 | u8 | nItemGrade |  |
+| 0 | u8 | lootingtype | 0 free, 1 alternating, 2 looter, 3 dice |
+| 1 | u8 | nItemGrade | 0..3; this grade and above get the type, lower grades 0 |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_004130f0`
 
@@ -682,11 +690,13 @@ Handler `FUN_004130f0`
 
 ### `0x3850` NC_PARTY_FINDER_ADD_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_FINDER_ADD_REQ`, 128 bytes
+**Verified layout** (basis: wm FUN_00415a30)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8[128] | sMsg |  |
+| 0 | char[128] | sMsg | 127 chars kept |
+
+128 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_00415a30`
 
@@ -708,12 +718,14 @@ No payload fields read directly by the handler.
 
 ### `0x3854` NC_PARTY_FINDER_LIST_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_FINDER_LIST_REQ`, 3 bytes
+**Verified layout** (basis: wm FUN_0041a080)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nPageNo |  |
-| 2 | u8 | nCountOfOnePage |  |
+| 2 | u8 | nCountOfOnePage | 0 = ignored; client uses 20 |
+
+3 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_0041a080`
 
@@ -724,11 +736,13 @@ Handler `FUN_0041a080`
 
 ### `0x385a` NC_PARTY_SET_LOOTER_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_SET_LOOTER_REQ`, 20 bytes
+**Verified layout** (basis: wm FUN_0041c0b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sNewLooterCharID | Name5 |
+| 0 | char[20] | sNewLooterCharID |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_0041c0b0`
 
@@ -2178,12 +2192,14 @@ No payload fields read directly by the handler.
 
 ### `0xb008` NC_RAID_LOOTING_TYPE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_LOOTING_TYPE_REQ`, 2 bytes
+**Verified layout** (basis: wm FUN_00417420)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | nItemGrade |  |
 | 1 | u8 | nLootingType |  |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_00417420`
 
@@ -2194,11 +2210,13 @@ Handler `FUN_00417420`
 
 ### `0xb00c` NC_RAID_INVITATION_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_INVITATION_REQ`, 20 bytes
+**Verified layout** (basis: wm FUN_0041f1c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sInvitationCharID | Name5 |
+| 0 | char[20] | sInvitationCharID |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_0041f1c0`
 
@@ -2212,12 +2230,14 @@ Handler `FUN_0041f1c0`
 
 ### `0xb00f` NC_RAID_INVITATION_ANSWER_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_INVITATION_ANSWER_REQ`, 21 bytes
+**Verified layout** (basis: wm FUN_00422400)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | bIsAllow |  |
-| 1 | char[20] | sMasterCharID | Name5 |
+| 1 | char[20] | sMasterCharID |  |
+
+21 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_00422400`
 
@@ -2243,11 +2263,13 @@ No payload fields read directly by the handler.
 
 ### `0xb018` NC_RAID_VANISH_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_VANISH_REQ`, 20 bytes
+**Verified layout** (basis: wm FUN_0041f7b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sVanishCharID | Name5 |
+| 0 | char[20] | sVanishCharID |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_0041f7b0`
 
@@ -2255,18 +2277,20 @@ No payload fields read directly by the handler.
 
 ### `0xb027` NC_RAID_SLOT_MOVE_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_SLOT_MOVE_REQ`, 48 bytes
+**Verified layout** (basis: wm FUN_0041fc70)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | PrePosition.nPartyNo |  |
+| 0 | u16 | PrePosition.nPartyNo | not checked |
 | 2 | u8 | PrePosition.nPartyIndex |  |
 | 3 | u8 | PrePosition.nSlotIndex |  |
-| 4 | u16 | PostPosition.nPartyNo |  |
+| 4 | u16 | PostPosition.nPartyNo | not checked |
 | 6 | u8 | PostPosition.nPartyIndex |  |
 | 7 | u8 | PostPosition.nSlotIndex |  |
-| 8 | char[20] | sPreSlotMoveCharID | Name5 |
-| 28 | char[20] | sPostSlotMoveCharID | Name5 |
+| 8 | char[20] | sPreSlotMoveCharID | not read |
+| 28 | char[20] | sPostSlotMoveCharID | not read |
+
+48 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_0041fc70`
 
@@ -2281,11 +2305,13 @@ Handler `FUN_0041fc70`
 
 ### `0xb02b` NC_RAID_SET_LEADER_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_SET_LEADER_REQ`, 20 bytes
+**Verified layout** (basis: wm FUN_004202c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sNewLeaderCharID | Name5 |
+| 0 | char[20] | sNewLeaderCharID |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_004202c0`
 
@@ -2299,11 +2325,13 @@ Handler `FUN_004202c0`
 
 ### `0xb030` NC_RAID_SET_SUB_LEADER_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_SET_SUB_LEADER_REQ`, 20 bytes
+**Verified layout** (basis: wm FUN_00420660)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sNewSubLeaderCharID | Name5 |
+| 0 | char[20] | sNewSubLeaderCharID |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_00420660`
 
@@ -2317,11 +2345,13 @@ Handler `FUN_00420660`
 
 ### `0xb035` NC_RAID_DEL_SUB_LEADER_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_DEL_SUB_LEADER_REQ`, 20 bytes
+**Verified layout** (basis: wm FUN_00420a00)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sDelSubLeaderCharID | Name5 |
+| 0 | char[20] | sDelSubLeaderCharID |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_00420a00`
 
@@ -2334,11 +2364,13 @@ Handler `FUN_00420a00`
 
 ### `0xb03a` NC_RAID_SET_LOOTER_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_SET_LOOTER_REQ`, 20 bytes
+**Verified layout** (basis: wm FUN_00420e40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sNewLooterCharID | Name5 |
+| 0 | char[20] | sNewLooterCharID |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_00420e40`
 
@@ -2352,13 +2384,14 @@ Handler `FUN_00420e40`
 
 ### `0xb03f` NC_RAID_CHAT_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_CHAT_REQ`, 2 bytes + variable tail
+**Verified layout** (basis: wm FUN_00417630)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | itemLinkDataCount |  |
+| 0 | u8 | itemLinkDataCount | must be 0 |
 | 1 | u8 | nChatLen |  |
-| 2 | u8[nChatLen] | sChat | variable length |
+
+then sChat[nChatLen]; 2 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_00417630`
 
@@ -2369,13 +2402,14 @@ Handler `FUN_00417630`
 
 ### `0xb042` NC_RAID_WARNING_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_WARNING_REQ`, 2 bytes + variable tail
+**Verified layout** (basis: wm FUN_004178a0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | itemLinkDataCount |  |
+| 0 | u8 | itemLinkDataCount | must be 0 |
 | 1 | u8 | nChatLen |  |
-| 2 | u8[nChatLen] | sChat | variable length |
+
+then sChat[nChatLen]; 2 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Handler `FUN_004178a0`
 
@@ -3515,11 +3549,13 @@ Sent from `FUN_00443170` (`FUN_00443170`) · payload 2 bytes · raw header
 
 ### `0x3803` NC_PARTY_JOINPROPOSE_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_JOINPROPOSE_REQ`, 20 bytes
+**Verified layout** (basis: wm FUN_0041a940 / client FUN_004a29d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | mastername | Name5 |
+| 0 | char[20] | mastername |  |
+
+sent to the invitee; 20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent in reply to `0x3802` NC_PARTY_JOIN_REQ † on CParserClient (`FUN_0041a940`) · payload 20 bytes · raw header
 
@@ -3533,13 +3569,15 @@ Sent in reply to `0x3802` NC_PARTY_JOIN_REQ † on CParserClient (`FUN_0041a940`
 
 ### `0x3807` NC_PARTY_JOIN_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_JOIN_ACK`, 23 bytes
+**Verified layout** (basis: wm FUN_0041a940, FUN_004211e0, FUN_0042e8c0 / client FUN_004ac300)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | memberid | Name5 |
-| 20 | u8 | charclass |  |
-| 21 | u16 | err |  |
+| 0 | char[20] | memberid |  |
+| 20 | u8 | charclass | not set on error replies |
+| 21 | u16 | err | 0x4C1 = joined; else ErrMsgTable |
+
+23 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent in reply to `0x3805` NC_PARTY_JOINPROPOSE_REJECT_ACK † on CParserClient (`FUN_00419bb0`) · payload 23 bytes · raw header
 
@@ -3590,12 +3628,14 @@ Sent in reply to `0x6009` NC_CT_LUASCRIPT_SET_WORLD_CMD † on CParserZone (`FUN
 
 ### `0x380b` NC_PARTY_LEAVE_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_LEAVE_ACK`, 22 bytes
+**Verified layout** (basis: wm FUN_0041b350 / client FUN_004ac420)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | memberid | Name5 |
-| 20 | u16 | err |  |
+| 0 | char[20] | memberid |  |
+| 20 | u16 | err | always 0x501 |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent from `FUN_0041b350` (`FUN_0041b350`) · payload 22 bytes · raw header
 
@@ -3610,12 +3650,14 @@ Sent from `FUN_0041b350` (`FUN_0041b350`) · payload 22 bytes · raw header
 
 ### `0x3815` NC_PARTY_KICKOFF_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_KICKOFF_ACK`, 22 bytes
+**Verified layout** (basis: wm FUN_0041bb40, FUN_0041b9d0 / client FUN_004ac600)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | memberid | Name5 |
-| 20 | u16 | err |  |
+| 0 | char[20] | memberid |  |
+| 20 | u16 | err | 0x541 kicked, 0x542, 0x543, 0x544, 0x546 |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent from `FUN_0041b9d0` (`FUN_0041b9d0`) · payload 22 bytes · raw header
 
@@ -3640,12 +3682,14 @@ Sent from `FUN_0041b7d0` (`FUN_0041b7d0`) · payload 0 bytes · raw header
 
 ### `0x3829` NC_PARTY_CHANGEMASTER_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_CHANGEMASTER_ACK`, 22 bytes
+**Verified layout** (basis: wm FUN_0041bf10, FUN_0041b630 / client FUN_004ac860)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | newmaster | Name5 |
-| 20 | u16 | err |  |
+| 0 | char[20] | newmaster |  |
+| 20 | u16 | err | 0x548 ok, 0x542/0x549 not member, 0x543 leader only |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent from `FUN_0041b630` (`FUN_0041b630`) · payload 22 bytes · raw header
 
@@ -3660,11 +3704,13 @@ Sent from `FUN_0041b630` (`FUN_0041b630`) · payload 22 bytes · raw header
 
 ### `0x383d` NC_PARTY_LOGININFO_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_LOGININFO_CMD`, 20 bytes
+**Verified layout** (basis: wm FUN_0041c3b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | memberid | Name5 |
+| 0 | char[20] | memberid |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent from `FUN_0041c3b0` (`FUN_0041c3b0`) · payload 20 bytes · raw header
 
@@ -3678,11 +3724,13 @@ Sent from `FUN_0041c3b0` (`FUN_0041c3b0`) · payload 20 bytes · raw header
 
 ### `0x3847` NC_PARTY_LOGOUTINFO_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_LOGOUTINFO_CMD`, 20 bytes
+**Verified layout** (basis: wm FUN_0041c4e0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | memberid | Name5 |
+| 0 | char[20] | memberid |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent from `FUN_0041c4e0` (`FUN_0041c4e0`) · payload 20 bytes · raw header
 
@@ -3696,12 +3744,14 @@ Sent from `FUN_0041c4e0` (`FUN_0041c4e0`) · payload 20 bytes · raw header
 
 ### `0x384c` NC_PARTY_ITEM_LOOTING_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_ITEM_LOOTING_CMD`, 2 bytes
+**Verified layout** (basis: wm FUN_004130f0 / client FUN_004ac990)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | LootType |  |
 | 1 | u8 | ItemGrade |  |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent in reply to `0x384b` NC_PARTY_ITEM_LOOTING_SET † on CParserClient (`FUN_004130f0`) · payload 2 bytes · raw header
 
@@ -3711,18 +3761,17 @@ Sent in reply to `0x384b` NC_PARTY_ITEM_LOOTING_SET † on CParserClient (`FUN_0
 
 ### `0x3855` NC_PARTY_FINDER_LIST_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_FINDER_LIST_ACK`, 8 bytes + variable tail
+**Verified layout** (basis: wm FUN_0041a080)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nPageNo |  |
 | 2 | u8 | nCountOfOnePage |  |
 | 3 | u8 | bYouAreRegisted |  |
-| 4 | u16 | nMaxPages |  |
+| 4 | u16 | nMaxPages | ceil(total / count) |
 | 6 | u16 | nNumOfList |  |
-| 8 | PROTO_NC_PARTY_FINDER_INFO[nNumOfList] | InfoList | variable length, element PROTO_NC_PARTY_FINDER_INFO |
 
-Element `PROTO_NC_PARTY_FINDER_INFO` (154 bytes): +0 u16 nPastSecond, +2 i32 dRegistTime, +6 char[20] sCharID, +26 u8[128] sMsg
+then nNumOfList × PROTO_NC_PARTY_FINDER_INFO {u16 nPastSecond (always 0), i32 dRegistTime (time32), char sCharID[20], char sMsg[128]} (0x9A each); 8 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent in reply to `0x3854` NC_PARTY_FINDER_LIST_REQ † on CParserClient (`FUN_0041a080`) · payload variable (uVar5)
 
@@ -3737,12 +3786,14 @@ Sent in reply to `0x3854` NC_PARTY_FINDER_LIST_REQ † on CParserClient (`FUN_00
 
 ### `0x385b` NC_PARTY_SET_LOOTER_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_SET_LOOTER_ACK`, 22 bytes
+**Verified layout** (basis: wm FUN_0041c0b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sNewLooterCharID | Name5 |
-| 20 | u16 | nError |  |
+| 0 | char[20] | sNewLooterCharID |  |
+| 20 | u16 | nError | 0x558 only; errors 0x559/0x55A are sent with opcode 0xB05B (bug) |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent in reply to `0x385a` NC_PARTY_SET_LOOTER_REQ † on CParserClient (`FUN_0041c0b0`) · payload 22 bytes · raw header
 
@@ -3757,11 +3808,13 @@ Sent in reply to `0x385a` NC_PARTY_SET_LOOTER_REQ † on CParserClient (`FUN_004
 
 ### `0x385c` NC_PARTY_SET_LOOTER_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_SET_LOOTER_CMD`, 20 bytes
+**Verified layout** (basis: wm FUN_0041c0b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sCommandCharID | Name5 |
+| 0 | char[20] | sCommandCharID |  |
+
+to the new looter; 20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent in reply to `0x385a` NC_PARTY_SET_LOOTER_REQ † on CParserClient (`FUN_0041c0b0`) · payload 20 bytes · raw header
 
@@ -3775,12 +3828,14 @@ Sent in reply to `0x385a` NC_PARTY_SET_LOOTER_REQ † on CParserClient (`FUN_004
 
 ### `0x385d` NC_PARTY_SET_LOOTER_BROAD_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_SET_LOOTER_BROAD_CMD`, 40 bytes
+**Verified layout** (basis: wm FUN_0041c0b0, FUN_0041b4d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sCommandCharID | Name5 |
-| 20 | char[20] | sNewLooterCharID | Name5 |
+| 0 | char[20] | sCommandCharID |  |
+| 20 | char[20] | sNewLooterCharID |  |
+
+40 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent from `FUN_0041b4d0` (`FUN_0041b4d0`) · payload 40 bytes · raw header
 
@@ -3803,13 +3858,15 @@ Fill: +20: FUN_00402140
 
 ### `0x385f` NC_PARTY_ITEM_JOIN_LOOTING_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_ITEM_JOIN_LOOTING_CMD`, 22 bytes
+**Verified layout** (basis: wm FUN_0041b200)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nItemGrade |  |
+| 0 | u8 | nItemGrade | first grade with a non-zero type |
 | 1 | u8 | nLootingType |  |
-| 2 | char[20] | LooterName | Name5 |
+| 2 | char[20] | LooterName |  |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent from `FUN_0041b200` (`FUN_0041b200`) · payload 22 bytes · raw header
 
@@ -4028,12 +4085,14 @@ Sent from `FUN_00435cd0` (`FUN_00435cd0`) · payload 32 bytes · raw header
 
 ### `0x540e` NC_FRIEND_PARTY_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_PARTY_CMD`, 21 bytes
+**Verified layout** (basis: wm FUN_00435ee0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | charid | Name5 |
-| 20 | u8 | is_party |  |
+| 0 | char[20] | charid |  |
+| 20 | u8 | inParty |  |
+
+to each online friend; field names ours (W04 owns the friend list); 21 bytes
 
 Sent from `FUN_00435ee0` (`FUN_00435ee0`) · payload 21 bytes · raw header
 
@@ -7736,12 +7795,14 @@ Sent in reply to `0xa80d` NC_CHAT_RESTRICT_DB_DEL_ALL_ACK † on CParserCharDB (
 
 ### `0xb002` NC_RAID_MAKE_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_MAKE_ACK`, 4 bytes
+**Verified layout** (basis: wm FUN_0041ed50 / client FUN_004b0eb0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nRaidNo |  |
-| 2 | u16 | nError |  |
+| 0 | u16 | nRaidNo | 0xFFFF on error |
+| 2 | u16 | nError | 0x1E80 ok |
+
+4 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent in reply to `0xb001` NC_RAID_MAKE_REQ on CParserClient (`FUN_0041ed50`) · payload 4 bytes
 
@@ -7751,12 +7812,14 @@ Sent in reply to `0xb001` NC_RAID_MAKE_REQ on CParserClient (`FUN_0041ed50`) · 
 
 ### `0xb00d` NC_RAID_INVITATION_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_INVITATION_ACK`, 22 bytes
+**Verified layout** (basis: wm FUN_0041f1c0 / client FUN_004b13c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sInvitationCharID | Name5 |
+| 0 | char[20] | sInvitationCharID |  |
 | 20 | u16 | nError |  |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent in reply to `0xb00c` NC_RAID_INVITATION_REQ on CParserClient (`FUN_0041f1c0`) · payload 22 bytes · raw header
 
@@ -7766,11 +7829,13 @@ Sent in reply to `0xb00c` NC_RAID_INVITATION_REQ on CParserClient (`FUN_0041f1c0
 
 ### `0xb00e` NC_RAID_INVITATION_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_INVITATION_CMD`, 20 bytes
+**Verified layout** (basis: wm FUN_0041f1c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sMasterCharID | Name5 |
+| 0 | char[20] | sMasterCharID |  |
+
+20 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent in reply to `0xb00c` NC_RAID_INVITATION_REQ on CParserClient (`FUN_0041f1c0`) · payload 20 bytes · raw header
 
@@ -7784,14 +7849,15 @@ Sent in reply to `0xb00c` NC_RAID_INVITATION_REQ on CParserClient (`FUN_0041f1c0
 
 ### `0xb041` NC_RAID_CHAT_BROAD_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_CHAT_BROAD_CMD`, 22 bytes + variable tail
+**Verified layout** (basis: wm FUN_00417630)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | itemLinkDataCount |  |
-| 1 | char[20] | sTalkerCharID | Name5 |
+| 1 | char[20] | sTalkerCharID |  |
 | 21 | u8 | nChatLen |  |
-| 22 | u8[nChatLen] | sChat | variable length |
+
+then sChat[nChatLen] (+ itemLinkDataCount × 0x67, always 0); 22 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent in reply to `0xb03f` NC_RAID_CHAT_REQ † on CParserClient (`FUN_00417630`) · payload variable (uVar7)
 
@@ -7806,14 +7872,15 @@ Fill: +1: FUN_00402140
 
 ### `0xb044` NC_RAID_WARNING_BROAD_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_WARNING_BROAD_CMD`, 22 bytes + variable tail
+**Verified layout** (basis: wm FUN_004178a0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | itemLinkDataCount |  |
-| 1 | char[20] | sTalkerCharID | Name5 |
+| 0 | u8 | itemLinkDataCount | always 0 |
+| 1 | char[20] | sTalkerCharID |  |
 | 21 | u8 | nChatLen |  |
-| 22 | u8[nChatLen] | sChat | variable length |
+
+then sChat[nChatLen]; 22 bytes; field names pdb2017, offsets read in the 2016 WM
 
 Sent in reply to `0xb042` NC_RAID_WARNING_REQ † on CParserClient (`FUN_004178a0`) · payload variable (uVar7)
 
@@ -8054,6 +8121,406 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 0 | u8 | echo |  |
 | 1 | u16 | result | 0 = ok |
 
+### `0x3809` NC_PARTY_MEMBER_LIST_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_0041b050)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | membercount |  |
+
+then membercount × {memberid char[20], u8 memberstatus (1 = in game), u8 charclass}; confirmed members only; 1 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x3851` NC_PARTY_FINDER_ADD_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_00415a30)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error | 0x551 no char, 0x552 added, 0x553 updated; client ignores |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x3853` NC_PARTY_FINDER_DELETE_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_00415ad0 / client FUN_004a2c60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error | 0x555 deleted, 0x554 not registered |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x3856` NC_PARTY_FINDER_DELETE_YOUR_MSG_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_004575c0)
+
+Empty payload.
+
+empty; entry expired after 1800 s; 0 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb003` NC_RAID_MAKE_BROAD_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_0041ed50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u16 | nRaidPartyNo[0] |  |
+| 4 | u16 | nRaidPartyNo[1] |  |
+| 6 | u16 | nRaidPartyNo[2] |  |
+| 8 | u16 | nRaidPartyNo[3] |  |
+| 10 | char[20] | sFirstPartyCharID[0] |  |
+| 30 | char[20] | sFirstPartyCharID[1] |  |
+| 50 | char[20] | sFirstPartyCharID[2] |  |
+| 70 | char[20] | sFirstPartyCharID[3] |  |
+| 90 | char[20] | sFirstPartyCharID[4] |  |
+
+110 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb005` NC_RAID_MEMBER_LIST_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_00436170)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | Leaderid |  |
+| 20 | char[20] | SubLeaderid[0] |  |
+| 40 | char[20] | SubLeaderid[1] |  |
+| 60 | char[20] | SubLeaderid[2] |  |
+| 80 | char[20] | SubLeaderid[3] |  |
+| 100 | char[20] | Looterid |  |
+| 120 | u8 | nItemGrade |  |
+| 121 | u8 | nLootingType |  |
+
+then memberarray[20] {memberid char[20], u8 memberstatus}; 0x21E bytes, sent with the long header {0x00, u16 0x220, opcode}; 122 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb009` NC_RAID_LOOTING_TYPE_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_00417420 / client FUN_0049bf70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1E80, 0x1EC3, 0x1EC4 |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb00a` NC_RAID_LOOTING_TYPE_BROAD_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_00417420)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nItemGrade |  |
+| 1 | u8 | nLootingType |  |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb010` NC_RAID_INVITATION_ANSWER_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_00422400)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb011` NC_RAID_INVITATION_ANSWER_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_00422400)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sInvitationCharID |  |
+| 20 | u8 | bIsAllow |  |
+
+to the inviter; 21 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb012` NC_RAID_MEMBER_JOIN_BROAD_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_00422400)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPartyNo |  |
+| 2 | u8 | nPartyIndex |  |
+| 3 | u8 | nSlotIndex |  |
+| 4 | char[20] | sCharID |  |
+
+24 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb015` NC_RAID_LEAVE_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_0041f4d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb016` NC_RAID_LEAVE_BROAD_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_0041f4d0, FUN_0042d8d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPartyNo |  |
+| 2 | u8 | nPartyIndex |  |
+| 3 | u8 | nSlotIndex |  |
+| 4 | char[20] | sCharID |  |
+
+24 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb019` NC_RAID_VANISH_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_0041f7b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sVanishCharID | always zeros |
+| 20 | u16 | nError |  |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb01a` NC_RAID_VANISH_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_0041f7b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID |  |
+
+to the banned member; 20 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb01b` NC_RAID_VANISH_BROAD_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_0041f7b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPartyNo |  |
+| 2 | u8 | nPartyIndex |  |
+| 3 | u8 | nSlotIndex |  |
+| 4 | char[20] | sCommandCharID |  |
+| 24 | char[20] | sVanishCharID |  |
+
+44 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb01e` NC_RAID_LOGININFO_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_00436b90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPartyNo |  |
+| 2 | u8 | nPartyIndex |  |
+| 3 | u8 | nSlotIndex |  |
+| 4 | char[20] | sCharID |  |
+
+24 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb020` NC_RAID_LOGOUTINFO_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_004357d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPartyNo |  |
+| 2 | u8 | nPartyIndex |  |
+| 3 | u8 | nSlotIndex |  |
+| 4 | char[20] | sCharID |  |
+
+24 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb028` NC_RAID_SLOT_MOVE_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_0041fc70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sSlotMoveCharID | always zeros |
+| 20 | u16 | nError |  |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb029` NC_RAID_SLOT_MOVE_BROAD_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_0041fc70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID |  |
+| 20 | u16 | PrePosition.nPartyNo |  |
+| 22 | u8 | PrePosition.nPartyIndex |  |
+| 23 | u8 | PrePosition.nSlotIndex |  |
+| 24 | u16 | PostPosition.nPartyNo |  |
+| 26 | u8 | PostPosition.nPartyIndex |  |
+| 27 | u8 | PostPosition.nSlotIndex |  |
+
+then sPreCharID[5][20], sPostCharID[5][20]; 0xE4 bytes; 28 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb02c` NC_RAID_SET_LEADER_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_004202c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sNewLeaderCharID | zeros on error |
+| 20 | u16 | nError |  |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb02d` NC_RAID_SET_LEADER_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_004202c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID |  |
+
+to the target; 20 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb02e` NC_RAID_SET_LEADER_BROAD_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_004202c0, FUN_00407430)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID | "" when automatic (role hand-over) |
+| 20 | char[20] | sNewLeaderCharID |  |
+| 40 | u16 | nPartyNo |  |
+| 42 | u8 | nPartyIndex |  |
+| 43 | u8 | nSlotIndex |  |
+
+44 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb031` NC_RAID_SET_SUB_LEADER_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_00420660)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sNewSubLeaderCharID | zeros on error |
+| 20 | u16 | nError |  |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb032` NC_RAID_SET_SUB_LEADER_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_00420660)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID |  |
+
+to the target; 20 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb033` NC_RAID_SET_SUB_LEADER_BROAD_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_00420660)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID | "" when automatic (role hand-over) |
+| 20 | char[20] | sNewSubLeaderCharID |  |
+| 40 | u16 | nPartyNo |  |
+| 42 | u8 | nPartyIndex |  |
+| 43 | u8 | nSlotIndex |  |
+
+44 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb036` NC_RAID_DEL_SUB_LEADER_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_00420a00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sDelSubLeaderCharID | zeros on error |
+| 20 | u16 | nError |  |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb037` NC_RAID_DEL_SUB_LEADER_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_00420a00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID |  |
+
+to the target; 20 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb038` NC_RAID_DEL_SUB_LEADER_BROAD_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_00420a00, FUN_00407620)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID | "" when automatic (role hand-over) |
+| 20 | char[20] | sDelSubLeaderCharID |  |
+| 40 | u16 | nPartyNo |  |
+| 42 | u8 | nPartyIndex |  |
+| 43 | u8 | nSlotIndex |  |
+
+44 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb03b` NC_RAID_SET_LOOTER_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_00420e40)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sNewLooterCharID | zeros on error |
+| 20 | u16 | nError |  |
+
+22 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb03c` NC_RAID_SET_LOOTER_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_00420e40)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID |  |
+
+to the target; 20 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb03d` NC_RAID_SET_LOOTER_BROAD_CMD † (S→C)
+
+**Verified layout** (basis: wm FUN_00420e40, FUN_00407800)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID | "" when automatic (role hand-over) |
+| 20 | char[20] | sNewLooterCharID |  |
+| 40 | u16 | nPartyNo |  |
+| 42 | u8 | nPartyIndex |  |
+| 43 | u8 | nSlotIndex |  |
+
+44 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb040` NC_RAID_CHAT_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_00417630 / client FUN_004b2420)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1FC0 no raid, 0x1FC1 prison/item link; client reacts only to 0x1FC2 |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb043` NC_RAID_WARNING_ACK † (S→C)
+
+**Verified layout** (basis: wm FUN_004178a0 / client FUN_004b2450)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1F80 not leader/vice, 0x1F81 no raid, 0x1F82 prison, 0x1F83 item link |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
+
 ### `0x0c60` NC_USER_RETURN_CHECK_REQ (WM→AccountDB)
 
 **Verified layout** (basis: wm FUN_00419860: Pkt_SetOpcode(…,0xc60,6), u16 at payload+0, u32 at payload+2 (order fixed after C02))
@@ -8247,6 +8714,339 @@ W01 name was 'token request (ours)'
 | 14 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 16 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
 
+### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_004211e0, FUN_0042e8c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | partyregnum |  |
+| 2 | u32 | master.chrregnum |  |
+| 6 | u16 | master.zonecharhandle |  |
+| 8 | u16 | master.wmcharhandle |  |
+| 10 | char[20] | master.charname |  |
+| 30 | u8 | master.level |  |
+| 31 | u8 | master.flag | bit0 = invited, not yet accepted |
+| 32 | u8 | master.charclass |  |
+| 33 | u8 | master.ZoneMerchineNo |  |
+| 34 | u32 | member.chrregnum |  |
+| 38 | u16 | member.zonecharhandle |  |
+| 40 | u16 | member.wmcharhandle |  |
+| 42 | char[20] | member.charname |  |
+| 62 | u8 | member.level |  |
+| 63 | u8 | member.flag | bit0 = invited, not yet accepted |
+| 64 | u8 | member.charclass |  |
+| 65 | u8 | member.ZoneMerchineNo |  |
+
+66 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x3808` NC_PARTY_JOIN_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_004211e0, FUN_0042e8c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | partyregnum |  |
+| 2 | u32 | joiner.chrregnum |  |
+| 6 | u16 | joiner.zonecharhandle |  |
+| 8 | u16 | joiner.wmcharhandle |  |
+| 10 | char[20] | joiner.charname |  |
+| 30 | u8 | joiner.level |  |
+| 31 | u8 | joiner.flag | bit0 = invited, not yet accepted |
+| 32 | u8 | joiner.charclass |  |
+| 33 | u8 | joiner.ZoneMerchineNo |  |
+
+34 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x380c` NC_PARTY_LEAVE_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_0041b350)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | partyregnum |  |
+| 2 | u32 | leavemember.chrregnum |  |
+| 6 | u16 | leavemember.zonecharhandle |  |
+| 8 | u16 | leavemember.wmcharhandle |  |
+| 10 | char[20] | leavemember.charname |  |
+| 30 | u8 | leavemember.level |  |
+| 31 | u8 | leavemember.flag | bit0 = invited, not yet accepted |
+| 32 | u8 | leavemember.charclass |  |
+
+level/charclass not initialised; 33 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x3816` NC_PARTY_KICKOFF_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_0041b9d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | partyregnum |  |
+| 2 | u32 | kickoffmemberregnum |  |
+
+6 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x381f` NC_PARTY_DISMISS_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_0041b7d0, FUN_0041bb40, FUN_00436670)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | partyregnum |  |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x382a` NC_PARTY_CHANGEMASTER_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_0041b630)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | partyregnum |  |
+| 2 | u32 | newmaster_chrregnum |  |
+
+6 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x383c` NC_PARTY_LOGIN_CMD † (WM→zone)
+
+**Verified layout** (basis: wm FUN_004132c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | partyregnum |  |
+| 2 | u32 | chrregnum |  |
+
+6 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x3846` NC_PARTY_LOGOUT_CMD † (WM→zone)
+
+**Verified layout** (basis: wm FUN_00413340)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | partyregnum |  |
+| 2 | u32 | chrregnum |  |
+
+6 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x384d` NC_PARTY_ITEM_LOOTING_ZONE_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_004130f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | partyregnum |  |
+| 2 | u8 | nItemGrade |  |
+| 3 | u8 | nLootingType |  |
+| 4 | u32 | LooterNo |  |
+
+8 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x384f` NC_PARTY_MEMBERINFORM_ACK (WM→zone)
+
+**Verified layout** (basis: wm FUN_0042d5a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | PartyRegnum |  |
+| 2 | u8 | NumberOfMember |  |
+
+then n × PROTO_PARTY_MEMBER (0x1F); confirmed members only; also to OPTool; 3 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x385e` NC_PARTY_ZONE_SET_LOOTER_CMD † (WM→zone)
+
+**Verified layout** (basis: wm FUN_0041c0b0, FUN_0041b4d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPartyNo |  |
+| 2 | u32 | nNewLooterCharNo |  |
+
+6 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb004` NC_RAID_ZONE_MAKE_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_0041ed50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPartyNo | first party |
+| 2 | u16 | nRaidNo |  |
+| 4 | u16 | nRaidPartyNo[0] |  |
+| 6 | u16 | nRaidPartyNo[1] |  |
+| 8 | u16 | nRaidPartyNo[2] |  |
+| 10 | u16 | nRaidPartyNo[3] |  |
+| 12 | u32 | FirstPartyCharRegNo[0] |  |
+| 16 | u32 | FirstPartyCharRegNo[1] |  |
+| 20 | u32 | FirstPartyCharRegNo[2] |  |
+| 24 | u32 | FirstPartyCharRegNo[3] |  |
+| 28 | u32 | FirstPartyCharRegNo[4] |  |
+
+32 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb007` NC_RAID_ZONE_DISMISS_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_004312b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb00b` NC_RAID_ZONE_LOOTING_TYPE_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_00417420)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u8 | nItemGrade |  |
+| 3 | u8 | nLootingType |  |
+
+4 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb013` NC_RAID_ZONE_MEMBER_JOIN_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_00422400)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u16 | nPartyNo |  |
+| 4 | u8 | nPartyIndex |  |
+| 5 | u8 | nSlotIndex |  |
+| 6 | u32 | nCharNo |  |
+| 10 | u32 | tInfo.chrregnum |  |
+| 14 | u16 | tInfo.zonecharhandle |  |
+| 16 | u16 | tInfo.wmcharhandle |  |
+| 18 | char[20] | tInfo.charname |  |
+| 38 | u8 | tInfo.level |  |
+| 39 | u8 | tInfo.flag | bit0 = invited, not yet accepted |
+| 40 | u8 | tInfo.charclass |  |
+| 41 | u8 | tInfo.ZoneMerchineNo |  |
+
+42 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb017` NC_RAID_ZONE_LEAVE_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_0041f4d0, FUN_0042d8d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u16 | nPartyNo |  |
+| 4 | u8 | nPartyIndex |  |
+| 5 | u8 | nSlotIndex |  |
+| 6 | u32 | nCharNo |  |
+
+10 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb01c` NC_RAID_ZONE_VANISH_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_0041f7b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u16 | nPartyNo |  |
+| 4 | u8 | nPartyIndex |  |
+| 5 | u8 | nSlotIndex |  |
+| 6 | u32 | nVanishCharNo |  |
+
+10 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb01d` NC_RAID_ZONE_LOGIN_CMD † (WM→zone)
+
+**Verified layout** (basis: wm FUN_00436b90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u32 | nCharNo |  |
+
+6 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb01f` NC_RAID_ZONE_LOGOUT_CMD † (WM→zone)
+
+**Verified layout** (basis: wm FUN_004357d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u32 | nCharNo |  |
+
+6 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb02a` NC_RAID_ZONE_SLOT_MOVE_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_0041fc70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u16 | PrePosition.nPartyNo | from the request |
+| 4 | u8 | PrePosition.nPartyIndex |  |
+| 5 | u8 | PrePosition.nSlotIndex |  |
+
+then Pre u32 nPartySeqCharNo[5], Post {u16, u8, u8, u32[5]}; 0x32 bytes; 6 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb02f` NC_RAID_ZONE_SET_LEADER_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_004202c0, FUN_00407430)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u32 | nNewLeaderCharNo |  |
+| 6 | u16 | nPartyNo |  |
+| 8 | u8 | nPartyIndex |  |
+| 9 | u8 | nSlotIndex |  |
+
+10 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb034` NC_RAID_ZONE_SET_SUB_LEADER_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_00420660)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u32 | nNewSubLeaderCharNo |  |
+| 6 | u16 | nPartyNo |  |
+| 8 | u8 | nPartyIndex |  |
+| 9 | u8 | nSlotIndex |  |
+
+10 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb039` NC_RAID_ZONE_DEL_SUB_LEADER_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_00420a00, FUN_00407620)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u32 | nDelLeaderCharNo |  |
+| 6 | u16 | nPartyNo |  |
+| 8 | u8 | nPartyIndex |  |
+| 9 | u8 | nSlotIndex |  |
+
+10 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0xb03e` NC_RAID_ZONE_SET_LOOTER_CMD (WM→zone)
+
+**Verified layout** (basis: wm FUN_00420e40, FUN_00407800)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u32 | nNewLooterCharNo |  |
+| 6 | u16 | nPartyNo |  |
+| 8 | u8 | nPartyIndex |  |
+| 9 | u8 | nSlotIndex |  |
+
+10 bytes; field names pdb2017, offsets read in the 2016 WM
+
 ### `0x101c` NC_CHAR_ZONE_CHARDATA_REQ † (Zone→WM)
 
 **Verified layout** (basis: wm FUN_00428ba0)
@@ -8268,4 +9068,35 @@ W01 name was 'token request (ours)'
 | 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
 | 6 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 8 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
+
+### `0x384e` NC_PARTY_MEMBERINFORM_REQ † (zone→WM)
+
+**Verified layout** (basis: wm FUN_0042d5a0 (zone), FUN_004274e0 (OPTool))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | partyregnum |  |
+
+2 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x3860` NC_PARTY_ZONE_JOIN_CMD (zone→WM)
+
+**Verified layout** (basis: wm FUN_0042e8c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nMasterCharNo |  |
+| 4 | u32 | nJoinCharNo |  |
+
+8 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x3861` NC_PARTY_ZONE_LEAVE_CMD † (zone→WM)
+
+**Verified layout** (basis: wm FUN_0042cbf0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+
+4 bytes; field names pdb2017, offsets read in the 2016 WM
 

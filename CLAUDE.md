@@ -79,6 +79,12 @@ tools/protocol-re/reanalyze.sh <bin> <exe>                   # only if an export
    - packet fields by name, constants and error codes with meaning
    - state that changes, messages sent to whom, timers
    - a "Not reconstructed / uncertain" section at the end
+   - **original-server bugs**: mark every behaviour that looks unintended (wrong opcode or code, unchecked input,
+     uninitialised bytes, a code the client does not handle, dead checks, …) with the literal tag `(original bug)`
+     where you describe it, and list them all in an "Original-server bugs" section before "Not reconstructed": one
+     table row each with ID (`<item>-B<n>`), handler, 2016 behaviour, effect, likely intent. Describe what the code
+     does; never "fix" it in the pseudocode. X01 collects these into one register for a rebuild
+     (format: `docs/pseudocode/wm/W02-party-raid.md` §9)
 3. **Evidence levels** (strongest first): *(captured)*: observed in a real capture
    (`docs/protocol/capture-validation.md`); plain statement = read in the code; *(pdb2017)* = from the 2017
    PDB and not yet confirmed in a 2016 binary; *(db-backup)* = only from the DB backups (`docs/plan/db-backups.md`);
