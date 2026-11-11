@@ -71,6 +71,7 @@ follow-up for W01 listed in `docs/knowledge/C02.md`").
 | [Z08](items/Z08.md) | Zone: quests, KQ, instances, guild/party/friend zone side | Z01 |
 | [Z09](items/Z09.md) | Zone: world simulation (mobs, AI, spawns, drops, scripts, timers) | Z01, Z03 |
 | [Z10](items/Z10.md) | Zone: certification and the downloaded start script (stage order, run/walk factors, kill switch?) | Z01 |
+| [Z11](items/Z11.md) | Zone: GM ampersand (&) commands (added by Z02: 119 `AmpersandCommand_ac_*` functions) | Z01, Z02 |
 | [D01](items/D01.md) | Account + AccountLog servers (resolves open Login error conditions) | – |
 | [D02](items/D02.md) | Character server: characters, avatars, save/load | – |
 | [D03](items/D03.md) | Character server: items, economy, pets, house | D02 |
@@ -103,7 +104,7 @@ follow-up session.
 1b. C02, then the follow-ups above (C01, W01, L00 first)
 2. Z02, Z03, Z04, W02 (core gameplay)
 3. Z07, Z08, Z05, Z06, W03, W04
-4. D02, D01, D03, D04, D05, Z09, Z10
+4. D02, D01, D03, D04, D05, Z09, Z10, Z11
 5. P02 again with fuller captures, then X01
 
 Large items (Z04, Z05, Z08, D03, D04) will probably need two or three sessions each. Starting a new session

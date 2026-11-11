@@ -153,11 +153,13 @@ ITEMS = [
       scope=[("zone", "ShinePlayer", [9, 18]), ("zone", "GameDBSession", [18])],
       goal="Attack flow (basic attack, skill cast/bash, cast abort), target validation, hit/miss/crit/block, damage formulas "
            "(use SHN tables ActiveSkill, PassiveSkill, DamageLvGapEVP, WeaponAttrib…), abstates (buffs/debuffs, AbState.shn, "
-           "SubAbState.shn), death, experience and level-up, PvP rules."),
+           "SubAbState.shn), death, experience and level-up, PvP rules.",
+      steps=["Open from Z02 (§15): ShinePlayer flag byte `+0x1e78` bit 5 (read by vt 0xf20 = FUN_0055d5a0) blocks walking/running like Fear (bit 2, `SubAbnormalStateFear::sasa_Routine`). Find the abstate that sets it and list what each bit of `+0x1e78` means."]),
  dict(id="Z04", phase=2, title="Zone: items, inventory, equipment, upgrades (client side)",
       out="docs/pseudocode/zone/Z04-items.md", deps=["Z01"], scope=[("zone", "ShinePlayer", [12, 20])],
       goal="Inventory model (bags, slots, stacking), equip/unequip, use item, drop/pickup, enchant/upgrade/sockets, "
-           "dismantle, soul stones, item info packets. Use ItemInfo/ItemInfoServer/ItemUpgrade/RandomOption SHN tables."),
+           "dismantle, soul stones, item info packets. Use ItemInfo/ItemInfoServer/ItemUpgrade/RandomOption SHN tables.",
+      steps=["Open from Z02 (§9.2): the megaphone `0x204B NC_ACT_ROAR_REQ` consumes the item through `UseItemNormal.uib_AfterCast` and queues the text in the ring `g_RoarQueue` (DAT_008598c0, `RoarQueue_Push` FUN_0053f900), index in `p+0x2a79c`. Trace how and to whom the message is sent when the item effect runs (zone broadcast or WM)."]),
  dict(id="Z05", phase=2, title="Zone: item database protocol (ITEMDB, zone↔Character server)",
       out="docs/pseudocode/zone/Z05-itemdb.md", deps=["Z04"], scope=[("zone", "GameDBSession", [13])],
       goal="The 108 ITEMDB replies: how item changes are persisted and confirmed, item creation (item keys), "
@@ -169,18 +171,23 @@ ITEMS = [
       scope=[("zone", "ShinePlayer", [4, 35, 49, 51, 53]), ("zone", "GameDBSession", [4, 35, 49, 53]),
              ("zone", "WorldManagerSession", [4, 51, 53])],
       goal="Stat model (base/derived, the stat pairs in 0x1802), stat points, level/exp tables, revive, titles, "
-           "pets (PET), mounts (MOVER), mini-house, collection cards."),
+           "pets (PET), mounts (MOVER), mini-house, collection cards.",
+      steps=["Open from Z02 (§10): the wedding client handlers are documented in Z02 and read the player's copy of NC_CHAR_WEDDINGDATA_ACK at `p+0x5cc8`. Settle: how `Partner.RegisterNumber` (+0x5ced) is set before 0x204F (Z02 found no handler that reads the proposal target from the packet; 0x1095 NC_CHAR_WEDDING_PARTNER_INFO_RNG?), the meaning of the `Status.Main` / `Status.Sub` values, what the DB answers to 0x1083/0x1089/0x108B/0x108D/0x108F do, `WeddingHall.wh_Reserv` and the hall timetable (`g_WeddingHall` DAT_0086ea38), and FUN_005b92a0 (called after an accepted proposal).",
+             "Open from Z02 (§8): production. 0x2035 NC_ACT_PRODUCE_CAST_REQ starts a cast whose end (0x203B / 0x203C) is handled in the player tick; the 2016 client has no handler for 0x2036/0x2038/0x203A/0x203B and produces through `ProductTask` (0x481D). Document the live production path and say whether the 0x2035 path is dead."]),
  dict(id="Z08", phase=2, title="Zone: quests, kingdom quests, instances, guild/party/friend zone side, holy promise",
       out="docs/pseudocode/zone/Z08-content.md", deps=["Z01"],
       scope=[("zone", "ShinePlayer", [14, 17, 21, 22, 23, 24, 29, 37, 38, 41]),
              ("zone", "GameDBSession", [17, 22, 23, 29, 36, 37, 38]),
-             ("zone", "WorldManagerSession", [14, 17, 22, 24, 29, 31, 37, 38, 41, 44, 52])]),
+             ("zone", "WorldManagerSession", [14, 17, 22, 24, 29, 31, 37, 38, 41, 44, 52])],
+      steps=["Open from Z02 (§6.5): the instance-dungeon gate NPC roles `NPCRole_ID_Portal` (nrb_Role FUN_004c33f0), `NPCRole_Mode_ID_Portal` (FUN_004c35d0), `NPCRole_RandomMulti_Portal` (FUN_004c3850) and the server-menu callbacks `smfm_LinkToDungeon` (FUN_0050f070), `smfm_DeleteInstanceDungeon` (FUN_0050f370). Z02 documents the plain `Gate` role and the ServerMenuActor they build on."]),
  dict(id="Z09", phase=2, title="Zone: world simulation (mobs, NPCs, AI, spawns, drops, scripts, timers)",
       out="docs/pseudocode/zone/Z09-world.md", deps=["Z01", "Z03"], scope=[],
       goal="Everything not driven by a client packet: mob spawning (MobRegen/MobSetting data), AI and behaviours "
            "(MobBehaviorDescript), aggro, movement, drops (MobInfoServer, ItemDrop tables), NPC objects, Lua scripts "
            "(9Data/Shine/LuaScript), map events, the main tick and timers.",
-      steps=["Find subsystems via class names (RTTI) and profiler strings (`grep -n '::' re-data/exports/zone/strings.tsv`).",
+      steps=["Open from Z02 (§15): the NPC AI-script events passed to `so_AIScriptFuncExec` (FUN_004ab3f0): 0x20 = clicked (0x200A), 0x3c = menu answer (0x2073); the map-script interrupts `sim_NPCClick` / `sim_AreaEntry` / `sim_AreaLeave` (Z02 §12) and the Lua chat/jump triggers. Document what the scripts can do with them.",
+             "Open from Z02 (§5): how objects that leave a player's sight disappear on the client (the zone never sends 0x1C0E NC_BRIEFINFO_BRIEFINFODELETE_CMD); check the client's own sight handling and any zone-side cell-change exchange.",
+             "Find subsystems via class names (RTTI) and profiler strings (`grep -n '::' re-data/exports/zone/strings.tsv`).",
              "Start from the main loop / tick functions found in Z01's knowledge file."]),
  dict(id="Z10", phase=2, title="Zone: certification and the downloaded start script",
       out="docs/pseudocode/zone/Z10-certification.md", deps=["Z01"], scope=[],
@@ -214,6 +221,14 @@ ITEMS = [
              "End with a recommendation for a rebuild: which values to hard-code, what to leave out."],
       done="Request/response and cipher documented; both threads explained with their failure behaviour; Lua surface "
            "listed; a recommended stage order with reasons; rebuild recommendation written."),
+ dict(id="Z11", phase=2, title="Zone: GM ampersand (&) commands",
+      out="docs/pseudocode/zone/Z11-gm-commands.md", deps=["Z01", "Z02"], scope=[],
+      goal="A chat line that starts with '&' is an admin command, not chat (Z02 §3.3: `sp_AmpersandCommand` FUN_0041a060 → `so_ply_AdminCommand` FUN_00427a40 → command list DAT_0087c770, `FUN_00487c50`). The zone has 119 command functions `AmpersandCommand_ac_*` (names in `tools/protocol-re/names/zone/Z01.json`). Document every command: the word the GM types, its arguments, the admin level it needs, what it changes and which packets it sends.",
+      steps=["Find where the `AmpersandCommandElement` list is built (registrations that fill DAT_0087c770): command word string, required admin level, handler. The argument parser is `ListIter_AmpCmdArgument`.",
+             "Admin level: player `+0x7fa1` (vt 0x4d4), sent to the client as 0x10C6 at login (Z01 §6); the `AdminLvSet` table is loaded in `zs_start_sleep` (Z01 §2.3). Say how a level is granted and checked.",
+             "Output one table (command, syntax, level, effect, packets) for all commands, plus full pseudocode for the ones that change persistent state (MakeItem, GetMoney, LevelUp, ClearInventory, learnskill, KingdomQuest, Wedding*, KQReward, BonusExp / BonusItem / FieldBonus) or reach other servers (WM, Character DB, GameLog).",
+             "Several commands duplicate OPTool features (Z01 §9) or wrap handlers documented elsewhere (wedding Z02 §10, dice / TaiSai Z06): reference those instead of repeating them."],
+      done="Every `AmpersandCommand_ac_*` function appears in the table; unknown words or levels are marked as such."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
