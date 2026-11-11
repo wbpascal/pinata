@@ -116,7 +116,7 @@ Client_OnClosed(s):                                       @ FUN_00437030
     Send AccountDB    0x0C11 { u32 userNo, u8 worldNo, u16 playMinutes, u16 closeReason }   (raw, 11 bytes)
     Send AccountLogDB 0x0722 { u32 userNo, u8 worldNo, u16 playMinutes, u16 closeReason }
     Send AccountLogDB 0xC803 { u32 userNo, u32 playMinutes }
-    Broadcast to all zones 0x0C19 NC_USER_CONNECTCUT2ZONE_CMD { u8[6] = 0xFF, u32 userNo }
+    Broadcast to all zones 0x0C19 NC_USER_CONNECTCUT2ZONE_CMD { NETPACKETZONEHEADER = all 0xFF, u32 usrregnum }
     Session_Close(s)
 ```
 
@@ -208,10 +208,10 @@ reject:
         for every other session with the same userNo:
             SendRaw(it, 0x0C17 { u16 0x683 })               # client: "same account logged in elsewhere" flag
             it.closeReason = 0x785; it.state = 3; log "CLIENT DOUBLE CONNECT CLOSE2, nUserNo=%d"
-    Broadcast to all zones 0x0C16 NC_USER_KICKOFFFROMWORLD_CMD { u8[6] = 0xFF, u32 userNo }   @ FUN_00439540
+    Broadcast to all zones 0x0C16 NC_USER_KICKOFFFROMWORLD_CMD { NETPACKETZONEHEADER = all 0xFF, u32 usrregnum }   @ FUN_00439540
     clear avatar slots (charNo = -1 in all 6)             @ FUN_004305d0
     s.userKind = 1; s.userKindUntil = 0
-    Send AccountDB 0x0C60 NC_USER_RETURN_CHECK_REQ { u32 userNo, u16 handle }
+    Send AccountDB 0x0C60 NC_USER_RETURN_CHECK_REQ { u16 nHandle = s.handle @+0, u32 nUserNo = s.userNo @+2 }
     # continues in AccountDB 0x0C61 (§3.3); the client waits for 0x0C14
 ```
 
@@ -250,7 +250,10 @@ AvatarListRequest:   Send CharDB 0x0C12 NC_USER_AVATARINFO_REQ { u16 handle, u32
 CharDB 0x0C5F { u16 handle, u8 tutorialSkip }:           @ FUN_0040e260
     s.tutorialSkip = tutorialSkip                          @ FUN_004335f0   (CharDB proc usp_Tutorial_getIsSkip; sent just before 0x0C13)
 
-CharDB 0x0C13 NC_USER_AVATARINFO_ACK { u16 handle, u8 count, AVATAR[count] @+3 }:   @ FUN_0040ede0
+CharDB 0x0C13 NC_USER_AVATARINFO_ACK { NETPACKETHEADER {u16 clienthandle}, u8 numofavatar, AVATAR[numofavatar] @+3 }:   @ FUN_0040ede0
+    # the 2-byte NETPACKETHEADER exists only on this CharDB→WM link; PROTO_NC_USER_AVATARINFO_ACK (pdb2017) omits it like
+    # every S2S prefix. On the client link the WM sends 0x0C14 NC_USER_LOGINWORLD_ACK, whose u16 is a real struct field
+    # (`worldmanager`, pdb2017), not a prefix.
     clear avatar slots
     if count == 0xFF:                                       # DB error
         SendRaw(s, 0x0C15 { u16 0x46 })                     # "DB error"; client leaves LoginWorldNet
@@ -259,7 +262,7 @@ CharDB 0x0C13 NC_USER_AVATARINFO_ACK { u16 handle, u8 count, AVATAR[count] @+3 }
     for each record a: if a.slot < 6:
         if a.tutorialState == 0: a.loginMap = "RouT"      # characters that never finished the tutorial
         s.avatars[a.slot] = a
-    Send client 0x0C14 { u16 handle, u8 count, AVATAR[count] }   # verbatim copy of the DB records (map not patched)
+    Send client 0x0C14 NC_USER_LOGINWORLD_ACK { u16 worldmanager = handle, u8 numofavatar, AVATAR[count] }   # verbatim copy of the DB records (map not patched)
     # client LoginWorldNet FUN_00471720 (and CHairShop FUN_00629720): stores handle as g_WmHandle, loads the list,
     # switches to character select
 ```
@@ -298,7 +301,7 @@ CharDB 0x1405 created { u16 handle, u8 ?, AVATAR @+3 }:  @ FUN_004113c0
         SendRaw(CharDB, 0x1408 NC_AVATAR_ERASEDATA_REQ { u16 handle, u32 charNo, u8 slot })
     else: SendRaw(s, 0x140A { u16 0xC6 })                  # client: "Unable to delete a Guild Master character." (any code but 199)
 
-CharDB 0x1409 NC_AVATAR_ERASEDATA_ACK (failure) { u16 handle, u16 ?, u16 error @+4 }:   @ FUN_00409fa0
+CharDB 0x1409 NC_AVATAR_ERASEDATAFAIL_ACK { u16 handle, u16 ?, u16 error @+4 }:   @ FUN_00409fa0
     send client 0x140A { u16 error }                       # 199 = "You may not delete guild leader."
 
 CharDB 0x140B erased { u16 handle, u32 userNo @+2, u32 charNo @+6, u8 slot @+0xa }:   @ FUN_0040a010
@@ -406,7 +409,7 @@ CharDB 0x107B NC_CHAR_SET_STYLE_DB_ACK / 0x107F NC_CHAR_SET_STYLE_GET_INFO_DB_AC
     if s.CHARDATA == null: return
     s.inLogout = 1
     if mode == 0:     # quit the game
-        Broadcast zones 0x0C19 NC_USER_CONNECTCUT2ZONE_CMD { u8[6] 0xFF, u32 userNo }
+        Broadcast zones 0x0C19 NC_USER_CONNECTCUT2ZONE_CMD { NETPACKETZONEHEADER = all 0xFF, u32 usrregnum }
         s.closeReason = 0x780; CharacterLogout(s); s.state = 3
     elif mode == 1:   # back to character select, the WM connection stays
         s.closeReason = 0x780; CharacterLogout(s); s.linking = 1; s.zoneHandle = 0xFFFF
@@ -429,7 +432,7 @@ summary in `login-server.md` §5.3 lists them the other way round.
 ```pseudo
 Login 0x0C16 NC_USER_KICKOFFFROMWORLD_CMD { …, u32 userNo @+6 }:   @ FUN_00424880
     FUN_00437d50(&g_Clients, userNo)                       # close every session of that user (inferred, like §3.2)
-    Broadcast zones 0x0C16 { u8[6] 0xFF, u32 userNo }
+    Broadcast zones 0x0C16 { NETPACKETZONEHEADER = all 0xFF, u32 usrregnum }
 
 Zone 0x0C1A { …, u32 userNo @+6, u16 wmHandle @+0xa, u16 reason @+0xc }:   @ FUN_00428a40
     s = Clients_GetByHandle(wmHandle); if s.userNo == userNo: SendRaw(s, 0x0C17 { u16 reason })
@@ -491,25 +494,28 @@ is gone). Some look the session up by `charNo` instead (`Clients_FindByCharNo` @
 Filled by the Character server (`CGameDB_Character::GetAvatarInfo`, character `FUN_0046bff0`); the WM stores and
 forwards it without decoding most of it. Offsets used by the WM in **bold**.
 
-| Off | Type | Field (ours) | Source / use |
-|---|---|---|---|
-| **+0x00** | u32 | charNo | -1 = empty slot (WM side) |
-| +0x04 | char[20] | name | renamed by 0x1412 / 0xB40B |
-| +0x18 | u16 | level (inferred) | |
-| **+0x1a** | u8 | slot | 0..5 |
-| **+0x1b** | char[12] | loginMap | "RouT" / "RouT00" forced for tutorial characters |
-| +0x27 | u8 + u8[4] | delete-pending flag + date digits (inferred) | |
-| **+0x2c** | u8 | race (bits 0-1, inferred), class (bits 2-6), gender (bit 7) | class used in logs and 0x1401 checks |
-| +0x2d..+0x2f | u8×3 | hair, hair colour, face (inferred) | |
-| +0x30..+0x5a | u16[…] + nibbles | equipped item ids per slot (0xFFFF = none) and upgrade levels | DB slot switch in `FUN_0046bff0` |
-| **+0x5b** | u32 | instance/return key (inferred) | g_InstanceMaps.Redirect |
-| **+0x5f** | char[12] | returnMap | used instead of loginMap when the instance map is gone |
-| +0x6b, +0x6f | u32, u32 | ? | |
-| **+0x73** | u32 | packed date (6/5/5/4/4-bit fields) | g_InstanceMaps.Redirect |
-| **+0x77** | u8 | renameAllowed (inferred) | 0xB409 requires 1 |
-| **+0x78**, **+0x79** | u8, u32 | rename-item data (inferred) | forwarded in 0xB40A |
-| **+0x7d** | u32 | tutorialState | `usp_Tutorial_getCharInfo`; 3 when no row; 0 = tutorial not done |
-| **+0x81** | u8 | tutorialStep | |
+Official field names are from `PROTO_AVATARINFORMATION` (0x82) in the 2017 PDB *(pdb2017)*; every offset the 2016
+Character and WM code touch matches it (C02 §5). `KQ` = kingdom quest (instance) data.
+
+| Off | Type | Field (ours) | Official name *(pdb2017)* | Source / use |
+|---|---|---|---|---|
+| **+0x00** | u32 | charNo | `chrregnum` | -1 = empty slot (WM side) |
+| +0x04 | char[20] | name | `name (Name5)` | renamed by 0x1412 / 0xB40B |
+| +0x18 | u16 | level (inferred) | `level` | |
+| **+0x1a** | u8 | slot | `slot` | 0..5 |
+| **+0x1b** | char[12] | loginMap | `loginmap (Name3)` | "RouT" / "RouT00" forced for tutorial characters |
+| +0x27 | u8 + u8[4] | delete-pending flag + date digits (inferred) | `delinfo {year, month, day, hour, min}` | |
+| **+0x2c** | u8 | race (bits 0-1, inferred), class (bits 2-6), gender (bit 7) | `shape {race:2, chrclass:5, gender:1}` | class used in logs and 0x1401 checks |
+| +0x2d..+0x2f | u8×3 | hair, hair colour, face (inferred) | `shape.hairtype, haircolor, faceshape` | |
+| +0x30..+0x5a | u16[…] + nibbles | equipped item ids per slot (0xFFFF = none) and upgrade levels | `equip {Equ_Head … Equ_AccShield (20 × u16), upgrade {lefthand, righthand, body, leg, shoes : 4 bits}}` | DB slot switch in `FUN_0046bff0` |
+| **+0x5b** | u32 | instance/return key (inferred) | `nKQHandle` | g_InstanceMaps.Redirect |
+| **+0x5f** | char[12] | returnMap | `sKQMapName (Name3)` | used instead of loginMap when the instance map is gone |
+| +0x6b, +0x6f | u32, u32 | ? | `nKQCoord.x, nKQCoord.y` | |
+| **+0x73** | u32 | packed date (6/5/5/4/4-bit fields) | `dKQDate {year:4, month:4, day:5, hour:5, min:6, sec:6}` | g_InstanceMaps.Redirect |
+| **+0x77** | u8 | renameAllowed (inferred) | `CharIDChangeData.bNeedChangeID` | 0xB409 requires 1 |
+| **+0x78**, **+0x79** | u8, u32 | rename-item data (inferred) | `CharIDChangeData.bInit, CharIDChangeData.nRowNo` | forwarded in 0xB40A |
+| **+0x7d** | u32 | tutorialState | `TutorialInfo.nTutorialState (i32)` | `usp_Tutorial_getCharInfo`; 3 when no row; 0 = tutorial not done |
+| **+0x81** | u8 | tutorialStep | `TutorialInfo.nTutorialStep` | |
 
 ### 6.2 Avatar and character replies
 
@@ -536,7 +542,7 @@ CharDB 0x107B NC_CHAR_SET_STYLE_DB_ACK { u16 code, u16 handle, u32 charNo, u32 s
 CharDB 0x107F NC_CHAR_SET_STYLE_GET_INFO_DB_ACK { u16 handle, u32 charNo, u16 code, u16 counts[12] }:   @ FUN_0040c5f0
     SendRaw(s, 0x107D { u16 code, u16 counts[12] })        # client: beauty shop item counts
 
-CharDB 0x0871 NC_MISC_ITEMSHOP_URL_DB_REQ { u32 charNo, u16 code, u16 len, char url[len] }:   @ FUN_0040e090
+CharDB 0x0871 NC_MISC_ITEMSHOP_URL_DB_ACK { u32 charNo, u16 code, u16 len, char url[len] }:   @ FUN_0040e090
     send client 0x086F NC_MISC_ITEMSHOP_URL_ACK { u16 code, u16 len, char url[len] }
 
 CharDB 0xA005 NC_PROMOTION_DB_REWARD_ACK { …, u32 charNo @+5, u8 n @+0xd, u32 items[n] }:   @ FUN_0040d390
@@ -628,21 +634,24 @@ g_Zones.GetAddress(map, world, &ip, &port): client IP/port from ServerInfo for t
 ### 7.2 Character data for a zone (map login and map change)
 
 ```pseudo
-0x101C NC_CHAR_ZONE_CHARDATA_REQ { u8 ref[6], u16 wmHandle @+6, char charName[20] @+8 }:   @ FUN_00428ba0
-    # ref = the zone's own 6-byte reference (its player handle etc.); every reply starts with it
+0x101C NC_CHAR_ZONE_CHARDATA_REQ { NETPACKETZONEHEADER ref, u16 wldmanhandle @+6, char charid[20] @+8 }:   @ FUN_00428ba0
+    # ref = NETPACKETZONEHEADER { u16 clienthandle; u32 charregistnumber } (official name, pdb2017; the zone's player
+    # reference, docs/knowledge/Z01.md); every reply starts with it. wmHandle = wldmanhandle, charName = charid (pdb2017)
     s = Clients_GetByHandle(wmHandle)
     if s == null or s.CHARDATA == null:
-        SendRaw(zone, 0x101E NC_CHAR_ZONE_CHARDATAFAIL_ACK { ref[4] , u16 ref+4, u16 0x141 }); return
+        SendRaw(zone, 0x101E NC_CHAR_ZONE_CHARDATAFAIL_ACK { ref (6 bytes), u16 err = 0x141 @+6 }); return
+        # 2016 = 8 bytes; the 2017 struct (4 B) is { NETPACKETHEADER clienthandle, err }: 2017 swapped the 6-byte
+        # zone header for the 2-byte one *(pdb2017)*
     if charName != CHARDATA.name:
         log "NC_CHAR_ZONE_CHARDATA_REQ : CharID Not Match [%s/%s]"
-        SendRaw(zone, 0x101E { …, u16 0x590 }); return
+        SendRaw(zone, 0x101E { ref, u16 err = 0x590 }); return
     if s.pendingLink: CHARDATA.map/x/y = s.linkDest; s.pendingLink = 0      # set by 0x180D on the old zone
     for each blob in the table of §6.3, in table order:
         Send zone <op> { ref[6], blob }                    @ FUN_00428ac0 (skipped when the blob is null)
         on send failure: log "ERROR - <NAME> To Zone, nCharNo=%d, CharName=%s" and stop (no reply)
     0x1029 NC_CHAR_ZONE_GUILD_CMD { ref, u32 guildNo }; 0x1098 NC_CHAR_GUILD_ACADEMY_ZONE_CMD { ref, u32 academyGuildNo }
     s.zoneHandle = ref[0..1]; FUN_00439e30(&DAT_006c5468, zone, ref)
-    SendRaw(zone, 0x101D NC_CHAR_ZONE_CHARDATA_ACK { ref[6], u16 wmHandle })   # end of data
+    SendRaw(zone, 0x101D NC_CHAR_ZONE_CHARDATA_ACK { ref, u16 wldmanhandle })   # end of data
 ```
 
 The zone answers the client's `0x1801` only after this sequence (Z01). The log strings name each opcode; where the log
@@ -650,14 +659,15 @@ text and the zone receiver disagree (0x1025 is logged as "SKILL", the null-skill
 "ITEM_CMD", 0x10D3 as "UI_STATE") this table uses the **zone receiver's** name.
 
 ```pseudo
-0x104B NC_CHAR_REGISTNUMBER_REQ { u8 ref[6], u16 wmHandle @+6, char charName[20] @+8, … }:   @ FUN_0042f1e0
+0x104B NC_CHAR_REGISTNUMBER_REQ { NETPACKETZONEHEADER ref, loginreq { u16 wldmanhandle @+6, char charid[20] @+8 } }:   @ FUN_0042f1e0
     s = Clients_GetByHandle(wmHandle)
     if s and s.mapLoginTicket (+0x1dfa0) == 1 and charName == CHARDATA.name:
         s.mapLoginTicket = 0; userNo = s.userNo; charNo = CHARDATA.charNo
     else:
         if s: s.state = 3                                   # unexpected map login: drop the WM session
         userNo = charNo = -1
-    SendRaw(zone, 0x104C NC_CHAR_REGISTNUMBER_ACK { ref[6], u32 userNo, u32 charNo, u16 wmHandle, char charName[20] })
+    SendRaw(zone, 0x104C NC_CHAR_REGISTNUMBER_ACK { ref, u32 usrregnum = userNo, u32 chrregnum = charNo,
+                                                    loginreq { u16 wldmanhandle, char charid[20] } })
     # ticket set by 0x1005 (first login) and 0x180D (link reserve): one map login per ticket
 ```
 
@@ -826,10 +836,12 @@ WM disconnect reasons (`closeReason`, sent to AccountDB/AccountLog in 0x0C11/0x0
 - Feature callees of character login/logout and map login (party, raid, guild, academy, friends, instances, chat ban,
   attendance, reports) are only listed by address; W02–W04 own them.
 - `g_InstanceMaps` (`DAT_0055e15c`) is our name; the redirect test (`FUN_00452580`) was not followed. Its use of
-  AVATAR +0x5b/+0x5f/+0x73 suggests "instance map no longer valid → return map".
+  AVATAR +0x5b/+0x5f/+0x73 suggests "instance map no longer valid → return map". The PDB names these fields
+  `nKQHandle`, `sKQMapName`, `dKQDate` (kingdom-quest instance handle, map, date) *(pdb2017)*, which fits.
 - AVATAR fields marked *(inferred)* and the CHARDATA layout beyond the offsets the WM touches belong to D02.
 - 0x0808 field meaning on the Login side (how the status byte is derived) is in `login-server.md` §5.3, not re-read.
-- The 6-byte `ref` that zones put in front of 0x101C/0x104B is echoed only; its meaning is Z01's.
+- The 6-byte `ref` that zones put in front of 0x101C/0x104B is echoed only. Its official name is
+  `NETPACKETZONEHEADER { u16 clienthandle; u32 charregistnumber }` *(pdb2017)*; its meaning is Z01's.
 - `FUN_004382d0` (after a character delete and OPTool 0x281F) and `FUN_00437d50` (Login kick) were not opened.
 - OPTool queries other than those listed, and client handlers 0x0840 (→ CharDB 0x0841), 0x0846 (→ CharDB 0x0847
   NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_DB_CMD), 0x085F (gold-spammer report → 0x0860 {0x2160 ok, 0x2161 "Can't find the

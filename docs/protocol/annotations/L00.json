@@ -1,0 +1,266 @@
+{
+ "_about": "L00 follow-up of C02 (docs/knowledge/C02.md §9): login layouts from annotations.json with official opcode names (opcodes.json) and field names from the 2017 PDB where the 2016 login code agrees on offsets and sizes (0x0C5A checked in FUN_00406450, 0x0C66/0x0C67 in FUN_004060d0). Overrides the 'login' entries of annotations.json.",
+ "packets": {
+  "login": {
+   "0x0804": {
+    "dir": "C→S",
+    "name": "NC_MISC_HEARTBEAT_REQ",
+    "fields": [],
+    "notes": "answered with bare 0x0805"
+   },
+   "0x0805": {
+    "dir": "S→C",
+    "name": "NC_MISC_HEARTBEAT_ACK",
+    "fields": [],
+    "basis": "FUN_004060b0 sends raw 02 05 08"
+   },
+   "0x0807": {
+    "dir": "S→C",
+    "name": "NC_MISC_SEED_ACK",
+    "basis": "FUN_00409610",
+    "fields": [
+     [
+      0,
+      "u16",
+      "seed",
+      "XOR keystream index starts at seed % 499"
+     ]
+    ],
+    "notes": "sent immediately on accept"
+   },
+   "0x0c65": {
+    "dir": "C→S",
+    "name": "NC_USER_CLIENT_VERSION_CHECK_REQ",
+    "basis": "FUN_004060d0",
+    "fields": [
+     [
+      0,
+      "char[64]",
+      "sVersionKey",
+      "strncmp(64) against lines of Login/ClientVersionKeyInfo.txt (\"20151116141627\") (pdb2017 name)"
+     ]
+    ],
+    "notes": "client FUN_0046eb30 sends it right after receiving the seed, with the hard-coded key \"20151116141627\"; L00 name was 'version check'"
+   },
+   "0x0c67": {
+    "dir": "S→C",
+    "name": "NC_USER_CLIENT_RIGHTVERSION_CHECK_ACK",
+    "basis": "FUN_004060d0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "XTrapServerKeyLength",
+      "always 1 in this build (pdb2017 name)"
+     ],
+     [
+      1,
+      "char[n]",
+      "XTrapServerKey",
+      "always \"\" (pdb2017 name)"
+     ]
+    ],
+    "notes": "client FUN_0046f470: on receipt, opens the login UI and sends 0x0C04; L00 name was 'version OK'"
+   },
+   "0x0c66": {
+    "dir": "S→C",
+    "name": "NC_USER_CLIENT_WRONGVERSION_CHECK_ACK",
+    "basis": "FUN_004060d0",
+    "fields": [],
+    "notes": "Empty struct PROTO_NC_USER_CLIENT_WRONGVERSION_CHECK_ACK (pdb2017). The server sends payload size 1 (Pkt_SetOpcode(…,0xc66,1)) and never writes that byte: C++ sizeof of an empty struct, not a field. Client FUN_0046eec0 shows: 'You client version is different from the Server version. Please restart the client after patching.' L00 name was 'version rejected'"
+   },
+   "0x0c5a": {
+    "dir": "C→S",
+    "name": "NC_USER_US_LOGIN_REQ",
+    "basis": "FUN_00406450; total packet length must be 0x13E",
+    "fields": [
+     [
+      0,
+      "char[260]",
+      "sUserName",
+      "server copies at most 256 bytes; bytes 256..259 are never read (pdb2017 name; 2016 code agrees on offset/size)"
+     ],
+     [
+      260,
+      "char[36]",
+      "sPassword",
+      "(pdb2017 name; 2016 code agrees on offset/size)"
+     ],
+     [
+      296,
+      "char[20]",
+      "spawnapps",
+      "Name5 union; forwarded to AccountDB (0x0C5B) uninterpreted, read as 5 × u32 (pdb2017 name; 2016 code agrees on offset/size)"
+     ]
+    ],
+    "notes": "L00 name was 'user login'"
+   },
+   "0x0c37": {
+    "dir": "C→S",
+    "name": "NC_USER_LOGIN_WITH_OTP_REQ",
+    "basis": "FUN_00406bb0; total packet length must be 0x22",
+    "fields": [
+     [
+      0,
+      "u8[32]",
+      "token",
+      "must exist in the table filled by WM message 0x0C35"
+     ]
+    ],
+    "notes": "L00 name was 'token login'"
+   },
+   "0x0c09": {
+    "dir": "S→C",
+    "name": "NC_USER_LOGINFAIL_ACK",
+    "basis": "FUN_00404590, FUN_00406bb0, FUN_004058c0; client FUN_0046ee40 -> FUN_00416430",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "client shows the text from its global error table (FUN_00416430): 0x42 'An unknown error has occurred.', 0x43/0x46 'DB error', 0x44 'Authentication failed.', 0x45 'Please check ID or Password.', 0x47 'The ID has been blocked.', 0x48 'The World Servers are down for maintenance.', 0x49 'Authentication timed out. Please try to log in again.', 0x4A 'Login failed.', 0x4B 'Please accept the agreement to continue.', 0x51 'You are not in our service area.'; other codes (0x4C, 0x4E, 0x52) -> 'An unidentified error code has occurred.: <code>'"
+     ]
+    ],
+    "notes": "session is closed afterwards; L00 name was 'login failed'"
+   },
+   "0x0c0a": {
+    "dir": "S→C",
+    "name": "NC_USER_LOGIN_ACK",
+    "basis": "FUN_004058c0 (after AccountLog 0x0C5E)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "count",
+      ""
+     ],
+     [
+      1,
+      "WORLD[count]",
+      "worlds",
+      "18 bytes each, see struct WORLD"
+     ]
+    ],
+    "notes": "L00 name was 'world list'"
+   },
+   "0x0c1b": {
+    "dir": "C→S",
+    "name": "NC_USER_WORLD_STATUS_REQ",
+    "fields": [],
+    "notes": "answered with 0x0C1C (same layout as 0x0C0A); L00 name was 'world list refresh'"
+   },
+   "0x0c1c": {
+    "dir": "S→C",
+    "name": "NC_USER_WORLD_STATUS_ACK",
+    "fields": [
+     [
+      0,
+      "u8",
+      "count",
+      ""
+     ],
+     [
+      1,
+      "WORLD[count]",
+      "worlds",
+      ""
+     ]
+    ],
+    "notes": "L00 name was 'world list (refresh)'"
+   },
+   "0x0c0b": {
+    "dir": "C→S",
+    "name": "NC_USER_WORLDSELECT_REQ",
+    "basis": "FUN_00406970",
+    "fields": [
+     [
+      0,
+      "u8",
+      "world_no",
+      ""
+     ]
+    ],
+    "notes": "L00 name was 'world select'"
+   },
+   "0x0c0c": {
+    "dir": "S→C",
+    "name": "NC_USER_WORLDSELECT_ACK",
+    "basis": "FUN_00406970 (failure), FUN_00408870 (success); client FUN_0046ef20",
+    "fields": [
+     [
+      0,
+      "u8",
+      "world_status",
+      "client FUN_0046ef20: 0 'Server is closed', 1 'Server is under maintenance', 2 'You cannot connect to an empty server', 3 'The server has been reserved for a special use', 4 'Login failed due to an unknown error', 5 'Server is full', 6-10 = OK, connect to WM"
+     ],
+     [
+      1,
+      "char[16]",
+      "wm_ip",
+      "client connects to this address"
+     ],
+     [
+      17,
+      "u16",
+      "wm_port",
+      "read by the client (FUN_008c7850); not visibly written by the Login decompile, so it is filled in a way the extractor missed"
+     ],
+     [
+      19,
+      "u16[32]",
+      "validate",
+      "client stores it and sends it to WM in 0x0C0F"
+     ]
+    ],
+    "notes": "L00 name was 'world select result'"
+   },
+   "0x0c04": {
+    "dir": "C→S",
+    "name": "NC_USER_XTRAP_REQ",
+    "basis": "client FUN_0046f470; server FUN_00406230 does not check it",
+    "fields": [
+     [
+      0,
+      "u8",
+      "XTrapClientKeyLength",
+      "29 (pdb2017 name)"
+     ],
+     [
+      1,
+      "char[29]",
+      "XTrapClientKey",
+      "\"33B543B0CA6E7C41E5D1D0651307\" + NUL, hard-coded in the client (pdb2017 name)"
+     ]
+    ],
+    "notes": "L00 name was 'client key (sent after 0x0C67)'"
+   },
+   "0x0c05": {
+    "dir": "S→C",
+    "name": "NC_USER_XTRAP_ACK",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bSuccess",
+      "always 1 (pdb2017 name)"
+     ]
+    ],
+    "notes": "L00 name was '?'"
+   },
+   "0x0c17": {
+    "dir": "S→C",
+    "name": "NC_USER_CONNECTCUT_CMD",
+    "basis": "client FUN_0046eac0; WM FUN_004305a0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "reason",
+      "0x683 = same account logged in elsewhere (client remembers it in a flag)"
+     ]
+    ],
+    "notes": "L00 name was 'kicked / disconnect reason'"
+   }
+  }
+ }
+}

@@ -191,9 +191,14 @@ All paths are relative to `../9Data/Shine/`. `World/%s/…` means a per-world ov
 | Riding, World/MiscDataTable.txt, mob roaming (World/PineScript.txt, MobRoam/%s.txt) | FUN_00450270, FUN_004a82d0, FUN_004b8690 | sun |
 | World/%s/MobRegen/%s.txt, MobRoam/%s.txt, NPCItemList/%s.txt, World/%s.txt | FUN_004b6330, FUN_004b8320, FUN_004c5130, FUN_0044a3d0 | per map (field/NPC load) |
 
-SHN files are decoded by FUN_0062a780 / FUN_0062a9e0 (same cipher as `tools/protocol-re/shn.py`); the two
-numbers passed to the inline loaders (e.g. `ItemDismantle.shn, 0x253a, 0x66`) are the expected record count
-bound and record size *(inferred)*.
+SHN files are decoded by FUN_0062a780 / FUN_0062a9e0 (same cipher as `tools/protocol-re/shn.py`). The two
+numbers passed to FUN_0062a9e0 (e.g. `ItemDismantle.shn, 0x253a, 0x66`) are checked against the file: the first
+must equal the u32 at file offset 0, the second must equal the header row length (+0x2c) − 2, else the load fails.
+The first is the table's `DataVersionKey` and the second `sizeof` the row struct: for all 73 tables that exist both
+as a 2016 server `.shn` and as a 2017 PDB row struct, the file's u32 at 0 equals `<Table>::DataVersion::DataVersionKey`
+(ItemDismantle 9530 = 0x253a, row 0x66 = `sizeof(ItemDismantle)`), and 46 of the 103 FUN_0062a9e0 call sites match a
+PDB key + row size (the rest are server-only tables the client PDB lacks, or small keys shared by several tables).
+Official column names: `pdb.py types '^<Table>$'` (C02 §6; 93 tables have identical columns in 2016).
 
 ---
 
@@ -400,10 +405,8 @@ Payload `{ u16 wmHandle, char charName[20], u8 shnChecksum[49][32] }` (0x636 byt
         return
     if player.mode != 0: log "sp_NC_MAP_LOGIN_REQ : Invalid Mode [CharID=%s]"; return
     send WM 0x104B NC_CHAR_REGISTNUMBER_REQ {
-        u16 handle  = the session's handle (3rd handler argument)     # ref[0..1]
-        u32 -1                                                        # ref[2..5]
-        u16 wmHandle = p.wmHandle
-        char charName[20] = p.charName }                              (0x1c bytes)
+        NETPACKETZONEHEADER { u16 clienthandle = the session's handle (3rd handler argument), u32 charregistnumber = -1 }
+        loginreq { u16 wldmanhandle = p.wmHandle; char charid[20] = p.charName } }   (0x1c bytes)
     reset 4 player containers (+0x7fd8, +0x8e2c, +0xe530, +0xe778) and +0xf758
     player.requestedName (+0x2ab49) = p.charName
     FUN_0050eb10(player+0x2ac38)
@@ -417,7 +420,7 @@ leaves the scene without a message.
 ### 5.3 WM answers
 
 ```pseudo
-WM 0x104C NC_CHAR_REGISTNUMBER_ACK { ref[6], u32 userNo, u32 charNo, u16 wmHandle, char charName[20] }:   @ FUN_0044aa60
+WM 0x104C NC_CHAR_REGISTNUMBER_ACK { ref, u32 usrregnum (userNo), u32 chrregnum (charNo), loginreq { u16 wldmanhandle, char charid[20] } }:   @ FUN_0044aa60
     p = g_Objects.GetObject(ref.handle); if p == null or p is closing: log "Invalid Player [CharID=%s]"; return
     so_SetRegistNumber(p, payload+6):                     @ FUN_0044e900
         if charName != p.requestedName:
@@ -426,19 +429,19 @@ WM 0x104C NC_CHAR_REGISTNUMBER_ACK { ref[6], u32 userNo, u32 charNo, u16 wmHandl
             log "so_SetRegistNumber : Invalid Regnum [CharID=%s]"; so_Disconnect(0x689); return
         FUN_00560730(p)
         p.userNo (+0x7f39) = userNo; p.charNo (+0x7f3d) = charNo; p.wmHandle (+0x2931c) = wmHandle
-        send WM 0x101C NC_CHAR_ZONE_CHARDATA_REQ { u16 p.handle, u32 charNo, u16 wmHandle, char charName[20] }
+        send WM 0x101C NC_CHAR_ZONE_CHARDATA_REQ { NETPACKETZONEHEADER { p.handle, charNo }, u16 wldmanhandle, char charid[20] }
         reset per-login state (FUN_0044e8c0, vt 0xc78(0), vt 0xc80(10), vt 0xc8c, quest containers +0x7fd8)
         p+0x2a9c8 = 0x318; tutorial object (vt 0x5d0) → FUN_005d19b0
 
 WM 0x101F … 0x1130: character blobs (base, shape, quests, skills, items, …) → Z07 (table in W01 §6.3)
 
-WM 0x101E NC_CHAR_ZONE_CHARDATAFAIL_ACK { ref[6], … }:   @ FUN_005a3440
+WM 0x101E NC_CHAR_ZONE_CHARDATAFAIL_ACK { ref, u16 err @+6 }:   @ FUN_005a3440
     p = GetObject(ref.handle); if null or closing: log "Invalid ClientHandle [%d]"; return
     send 0x1804 { u16 = payload u16 at +0 (the ref handle!), u8 0xFF }
     # the code sent is the player's own handle, not the WM's error (0x141 / 0x590); looks like an original bug.
     # The client then just leaves the zone-login scene (no message).
 
-WM 0x101D NC_CHAR_ZONE_CHARDATA_ACK { ref[6], u16 wmHandle }:   @ FUN_005a3590   (end of the blobs)
+WM 0x101D NC_CHAR_ZONE_CHARDATA_ACK { ref, u16 wldmanhandle }:   @ FUN_005a3590   (end of the blobs)
     p = GetObject(ref.handle); if null or closing: log "Invalid Object"; return
     p.vt[0x4b4](wmHandle, …)                              # build the character from the blobs: equipment brief, flags  @ FUN_0055ab60
     tutorial = p.vt[0xdfc]()                              # +0x2ab44; null → log "TutorialInfo Is Null - CharNo : "
@@ -656,7 +659,7 @@ sp_Schedule_Logout(p):                                   @ FUN_00558160
     if !p.vt[0xb2c]():  re-arm (FUN_0042ab50(+0x2a784, 0x558160, …)); return    # pending save/operation (inferred)
     unsummon the mover/pet (FUN_0045d910)
     so_Unmark(0, 1, 9)
-    send WM 0x0C31 NC_USER_POSSIBLE_NEW_CONNECT_CMD { u16 0xFFFF, u32 -1, u16 wmHandle, u32 charNo }
+    send WM 0x0C31 NC_USER_POSSIBLE_NEW_CONNECT_CMD { NETPACKETZONEHEADER {0xFFFF, -1}, u16 nWorldManagerHandle, u32 nCharNo }
         # WM: playingCharNo = -1 → character select allowed again (W01 §7.3)
     som_FreeObject(p.handle, 0, 0x12) else log "sp_Schedule_Kickout : Fail to object free"
     client session state = 3 (close)
@@ -666,7 +669,7 @@ sp_Schedule_Logout(p):                                   @ FUN_00558160
 
 ```pseudo
 sp_RefreshWMSSocket(p):                                  @ FUN_00552190 (vt 0x338)
-    if p.vt[0x334]() == 1: send WM 0x0C31 { u16 0xFFFF, u32 -1, u16 wmHandle, u32 charNo }
+    if p.vt[0x334]() == 1: send WM 0x0C31 { NETPACKETZONEHEADER {0xFFFF, -1}, u16 nWorldManagerHandle, u32 nCharNo }
 ```
 
 ### 8.3 Disconnect and kick
@@ -675,7 +678,7 @@ sp_RefreshWMSSocket(p):                                  @ FUN_00552190 (vt 0x33
 so_Disconnect(p, reason, arg, silent):                   @ FUN_0054f340 (vt 0x5f8)
     if reason != 0x681: log "ShineObjectClass::ShinePlayer::so_Disconnect"
     if !silent:
-        send WM 0x0C1A { u16 0xFFFF, u32 -1, u32 userNo, u16 wmHandle, u16 reason }   (0x0e bytes)
+        send WM 0x0C1A NC_USER_CONNECTCUT2WORLDMANAGER_CMD { NETPACKETZONEHEADER {0xFFFF, -1}, u32 usrregnum, u16 wldmanhandle, u16 reason }   (0x0e bytes)
         # WM: W01 §5.2 (CharacterLogout with that reason)
     so_banning(p, arg)
 
@@ -771,7 +774,8 @@ GameDB 0x0815:                                           @ FUN_00551250   stamp 
     in sight (so_HideExceptMeOff_BriefInfo + BriefInfoExchanger.*_Send)
 
 0x082F NC_MISC_SERVERPARAMETER_REQ:                      @ FUN_005517c0
-    send 0x0830 { u8 DAT_0da5047c, u16 DAT_0da50480 }      # DAT_0da5047c is also used as a level bound elsewhere; source not found
+    send 0x0830 NC_MISC_SERVERPARAMETER_ACK { u8 shoutlevel = DAT_0da5047c, u16 shoutdelay = DAT_0da50480 }
+        # names from the PDB alias at 0x0830 *(pdb2017)*; DAT_0da5047c is also used as a level bound elsewhere; source not found
 
 0x0C23 NC_USER_REGISENUMBER_REQ:                          @ FUN_0056e8b0
     send 0x0C24 { u32 userNo }
@@ -802,7 +806,7 @@ WM → zone:
     p = GetObject(objHandle); if p.charNo == charNo and not closing: p.wmHandle = wmHandle   (so_ply_…REPAIR FUN_00551750)
 0x082B NC_MISC_CONNECTFROMWHERE_ACK { u16 objHandle, u32 charNo, u8 where @+6 }:   @ FUN_0043f2f0
     p.connectFrom (+0x2a7d4) = where
-0x0865 NC_CHAR_GET_CHAT_BLOCK_SPAMER_CMD { char name[20], u32 until @+0x14 }:   @ FUN_005a5710
+0x0865 NC_MISC_SPAMMER_ZONE_CHAT_BAN_CMD { char name[20], u32 until @+0x14 }:   @ FUN_005a5710
     p = FindPlayer(name) else log "wms_NC_MISC_SPAMMER_ZONE_CHAT_BAN_CMD - shineobject null"; p.chatBlockUntil (+0x2aa54) = until
 0x086A NC_MISC_EVENTNPC_STANDSTART_ZONE_CMD { char npcIndex[32] }:   @ FUN_005a57e0
 0x086B NC_MISC_EVENTNPC_STANDEND_ZONE_CMD   { char npcIndex[32] }:   @ FUN_005a5950
@@ -839,9 +843,9 @@ generic RNG handler(packet):                             # ZoneListenSession.zbs
 | 0x10AD / 0x10AE …_BY_NORMAL_USER_RNG | FUN_0045c0b0 / FUN_0045c340 | same as 0x1068 / 0x1069 for the normal-user search |
 | 0x1810 NC_MAP_EXPBONUS_RNG | FUN_0045bf30 | not origin: apply the EXP bonus event (ZoneRingPacketExpBonus success) |
 | 0x1811 NC_MAP_ITEMBONUS_RNG | FUN_0045bff0 | not origin: ZoneRingPacketItemBonus request |
-| 0x1095, 0x10AA, 0x10AB, 0x2055 (wedding) | FUN_005a0a40, FUN_005a0c90, FUN_005a0e00, FUN_005a2b60 | partner info / summon / refresh / couple entrance (Z08) |
+| 0x1095 NC_CHAR_WEDDING_PARTNER_INFO_RNG, 0x10AA, 0x10AB, 0x2055 (wedding) | FUN_005a0a40, FUN_005a0c90, FUN_005a0e00, FUN_005a2b60 | partner info / summon / refresh / couple entrance (Z08) |
 | 0x10B1, 0xA404 (instance dungeon), 0x441F (job dungeon) | FUN_00485120, FUN_00487510, FUN_005bfde0 | find an empty / existing instance in any zone (Z08) |
-| 0x7493, 0x9872, 0x9874, 0x9884, 0x9885 (guild / academy storage) | FUN_00474f10, FUN_00473050, FUN_00473160, FUN_00473270, FUN_00473370 | storage withdraw/deposit across zones (Z08). The handlers of 0x9884 and 0x9885 carry the profiler name "…DEPOSIT_RNG" too (copy-paste in the original) |
+| 0x7493, 0x9872, 0x9874, 0x9884, 0x9885 (guild / academy storage) | FUN_00474f10, FUN_00473050, FUN_00473160, FUN_00473270, FUN_00473370 | storage withdraw/deposit across zones (Z08). The handlers of 0x9884 and 0x9885 carry the profiler name "…DEPOSIT_RNG" too (copy-paste in the original); their names are NC_GUILD_ACADEMY_REWARDSTORAGE_ITEM_INFO_ZONE_RNG / NC_GUILD_ACADEMY_REWARDSTORAGE_REWARD_ZONE_RNG (C02 verdict) |
 | 0x9436 NC_HOLY_PROMISE_CENTRANSFER_RNG | FUN_004839b0 | money transfer to the holy-promise partner (Z08) |
 | 0x0804 / 0x0805 | FUN_0045b3f0 / FUN_00549070 | heartbeat |
 
@@ -876,7 +880,8 @@ generic RNG handler(packet):                             # ZoneListenSession.zbs
 - The main thread (`zs_mainthreadfunction`) and the player tick: periodic save, heartbeat to clients, timers.
   Only the entry points are known here; the tick belongs to Z09/Z07.
 - Player modes other than 0 and 1 are only partly identified (§4.3).
-- 0x203E (walk/run speed) has no name in the binaries; the field meaning comes from the Lua global names.
+- 0x203E (walk/run speed) has no name in the 2016 binaries; the 2017 PDB calls it NC_ACT_MOVESPEED_CMD *(pdb2017)*.
+  The field meaning comes from the Lua global names.
 - `0x0830` values (DAT_0da5047c / DAT_0da50480): no writer found in the decompiled code (probably set by the
   start script).
 - Meaning of `p+0x2a800` (set by 0x0C32, cleared on every handler entry).

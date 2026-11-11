@@ -21,31 +21,31 @@ Heuristic extraction: verify a layout against the cited function before relying 
 
 ### AVATAR (130 bytes)
 
-Basis: Character server FUN_0046bff0 (reads SQL columns in this order with SQLGetData) and WM FUN_0040ede0
+Basis: Character server FUN_0046bff0 (reads SQL columns in this order with SQLGetData) and WM FUN_0040ede0; field names = PROTO_AVATARINFORMATION (pdb2017), every offset agrees (C02 §5)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | char_no | character id |
-| 4 | char[20] | char_name |  |
-| 24 | i16 | level (inferred) | SQL_C_SSHORT column |
+| 0 | u32 | chrregnum | character id; L00 name 'char_no' |
+| 4 | char[20] | name | L00 name 'char_name' |
+| 24 | i16 | level | SQL_C_SSHORT column; L00 name 'level (inferred)' |
 | 26 | u8 | slot | 0..5 |
-| 27 | char[12] | login_map (inferred) | WM substitutes "RouT" when another field is 0 |
-| 39 | u8[5] | delete_time (inferred) | if a 'pending delete' column is set: year+'0', month, day, hour, minute; else byte 39 = 0 |
-| 44 | u8 | race:2 | class:5 | gender:1 (inferred) | bits 0-1, bits 2-6, bit 7 (three separate u8 columns packed) |
-| 45 | u8 | hair (inferred) |  |
-| 46 | u8 | hair_color (inferred) |  |
-| 47 | u8 | face (inferred) |  |
-| 48 | u16[20] | equipment item ids | 0xFFFF = empty. Equip-slot -> offset: 1:48, 24:50, 12:52, 7:54, 10:56, 19:58, 21:60, 22:62, 20:64, 8:66, 27:68, 28:70, 26:72, 11:74, 13:76, 9:78, 17:80, 18:82, 25:84, 29:86 |
-| 88 | u8[3] | upgrade levels | 4-bit nibbles: 88 lo=slot10 hi=slot12; 89 lo=slot7 hi=slot19; 90 lo=slot21 |
-| 91 | u32 | ? | SQL_C_SLONG column |
-| 95 | char[12] | ? (second map name) |  |
-| 107 | u32 | ? | SQL_C_ULONG column |
-| 111 | u32 | ? | SQL_C_ULONG column |
-| 115 | u32 | packed timestamp | bits: year&15 | month<<4 | day<<8 | hour<<13 | minute<<18 | second<<24; top 2 bits kept |
-| 119 | u16 | ? | 0 |
-| 121 | u32 | ? | 0 |
-| 125 | u32 | tutorial_state (inferred) | default 3 when no tutorial row |
-| 129 | u8 | tutorial_step (inferred) |  |
+| 27 | char[12] | loginmap | WM substitutes "RouT" when another field is 0; L00 name 'login_map (inferred)' |
+| 39 | u8[5] | delinfo | if a 'pending delete' column is set: year+'0', month, day, hour, minute; else byte 39 = 0; {year, month, day, hour, min} u8 each; L00 name 'delete_time (inferred)' |
+| 44 | u8 | shape.race|chrclass|gender | bits 0-1, bits 2-6, bit 7 (three separate u8 columns packed); bits race:2@0, chrclass:5@2, gender:1@7; L00 name 'race:2 | class:5 | gender:1 (inferred)' |
+| 45 | u8 | shape.hairtype | L00 name 'hair (inferred)' |
+| 46 | u8 | shape.haircolor | L00 name 'hair_color (inferred)' |
+| 47 | u8 | shape.faceshape | L00 name 'face (inferred)' |
+| 48 | u16[20] | equip | 0xFFFF = empty. Equip-slot -> offset: 1:48, 24:50, 12:52, 7:54, 10:56, 19:58, 21:60, 22:62, 20:64, 8:66, 27:68, 28:70, 26:72, 11:74, 13:76, 9:78, 17:80, 18:82, 25:84, 29:86; PDB order: Equ_Head, Mouth, RightHand, Body, LeftHand, Pant, Boot, AccBoot, AccPant, AccBody, AccHeadA, MiniMon_R, Eye, AccLeftHand, AccRightHand, AccBack, CosEff, AccHip, Minimon, AccShield; L00 name 'equipment item ids' |
+| 88 | u8[3] | equip.upgrade | 4-bit nibbles: 88 lo=slot10 hi=slot12; 89 lo=slot7 hi=slot19; 90 lo=slot21; bits lefthand:4, righthand:4 | body:4, leg:4 | shoes:4; L00 name 'upgrade levels' |
+| 91 | u32 | nKQHandle | SQL_C_SLONG column; L00 name '?' |
+| 95 | char[12] | sKQMapName | L00 name '? (second map name)' |
+| 107 | u32 | nKQCoord.x | SQL_C_ULONG column; L00 name '?' |
+| 111 | u32 | nKQCoord.y | SQL_C_ULONG column; L00 name '?' |
+| 115 | u32 | dKQDate | bits: year&15 | month<<4 | day<<8 | hour<<13 | minute<<18 | second<<24; top 2 bits kept; bits year:4@0, month:4@4, day:5@8, hour:5@13, min:6@18, sec:6@24; L00 name 'packed timestamp' |
+| 119 | u8[2] | CharIDChangeData.bNeedChangeID|bInit | 0; two u8: bNeedChangeID @119 (0xB409 requires 1), bInit @120; L00 name '?' |
+| 121 | u32 | CharIDChangeData.nRowNo | 0; L00 name '?' |
+| 125 | u32 | TutorialInfo.nTutorialState | default 3 when no tutorial row; L00 name 'tutorial_state (inferred)' |
+| 129 | u8 | TutorialInfo.nTutorialStep | L00 name 'tutorial_step (inferred)' |
 
 ## Client → server
 
@@ -310,7 +310,7 @@ No payload fields read directly by the handler.
 | 0 | char[256] | userId | not checked against the pending entry |
 | 256 | u16[32] | validate | from Login 0x0C0C |
 
-0x140 bytes
+0x140 bytes; W01 name was 'world login (ours)'
 
 Handler `FUN_00419860`
 
@@ -485,6 +485,8 @@ Handler `FUN_00418cb0`
 | 21 | u8 | raceClassGender | class = bits 2-6 |
 | 22 | u8[3] | hair/colour/face (inferred) |  |
 
+W01 name was 'character create (ours)'
+
 Handler `FUN_004229f0`
 
 | Off | Type | Checks in handler | Notes |
@@ -505,6 +507,8 @@ Handler `FUN_004229f0`
 |---|---|---|---|
 | 0 | u8 | slot |  |
 
+W01 name was 'character delete (ours)'
+
 Handler `FUN_00412fa0`
 
 | Off | Type | Checks in handler | Notes |
@@ -519,6 +523,8 @@ Handler `FUN_00412fa0`
 |---|---|---|---|
 | 0 | u8 | slot |  |
 | 1 | char[20] | name | 1..16 chars |
+
+W01 name was 'character rename (ours)'
 
 Handler `FUN_0041a640`
 
@@ -2636,9 +2642,11 @@ Sent in reply to `0x086e` NC_MISC_ITEMSHOP_URL_REQ on CParserClient (`FUN_004184
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | wmHandle | client keeps it for 0x1801 |
-| 2 | u8 | count |  |
-| 3 | AVATAR[count] | avatars | verbatim copy of 0x0C13 |
+| 0 | u16 | worldmanager | WM client handle; client keeps it for 0x1801 (pdb2017 name; a real field, not a prefix) |
+| 2 | u8 | numofavatar | (pdb2017 name) |
+| 3 | AVATAR[numofavatar] | avatar | verbatim copy of 0x0C13 (pdb2017 name) |
+
+W01 name was 'avatar list (ours)'
 
 Sent in reply to `0x0c13` NC_USER_AVATARINFO_ACK on CParserCharDB (`FUN_0040ede0`) · payload variable (uVar2 * 0x82 + 3)
 
@@ -2656,6 +2664,8 @@ Sent in reply to `0x0c13` NC_USER_AVATARINFO_ACK on CParserCharDB (`FUN_0040ede0
 |---|---|---|---|
 | 0 | u16 | error | 0x44 bad key, 0x46 DB error; client does not read it |
 
+W01 name was 'world login refused (ours)'
+
 Sent in reply to `0x0c0f` NC_USER_LOGINWORLD_REQ † on CParserClient (`FUN_00419860`) · payload 2 bytes · raw header
 
 ### `0x0c17` NC_USER_CONNECTCUT_CMD †
@@ -2665,6 +2675,8 @@ Sent in reply to `0x0c0f` NC_USER_LOGINWORLD_REQ † on CParserClient (`FUN_0041
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | reason | 0x683 double login, 0x68F OPTool kick, or zone-supplied (0x0C1A) |
+
+W01 name was 'kick reason (ours)'
 
 Sent from `FUN_004305a0` (`FUN_004305a0`) · payload 2 bytes · raw header
 
@@ -2680,6 +2692,8 @@ Sent from `FUN_004305a0` (`FUN_004305a0`) · payload 2 bytes · raw header
 |---|---|---|---|
 | 0 | u16 | result | 0x1E58 ok |
 | 2 | char[32] | token |  |
+
+W01 name was 'return-to-world-select token (ours)'
 
 Sent in reply to `0x0c36` NC_USER_CREATE_OTP_ACK † on CParserLogin (`FUN_00424a70`) · payload 34 bytes · raw header
 
@@ -2703,6 +2717,8 @@ Sent in reply to `0x0c36` NC_USER_CREATE_OTP_ACK † on CParserLogin (`FUN_00424
 |---|---|---|---|
 | 0 | u16 | error | 0x143 bad slot, 0x144 empty slot, 0x145 zone/map not available or char already playing, 0x31EB no selected avatar, CharDB codes via 0x1006 |
 
+W01 name was 'character login failed (ours)'
+
 Sent in reply to `0x1006` NC_CHAR_CHARDATAFAIL_ACK † on CParserCharDB (`FUN_00409e70`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
@@ -2717,6 +2733,8 @@ Sent in reply to `0x1006` NC_CHAR_CHARDATAFAIL_ACK † on CParserCharDB (`FUN_00
 |---|---|---|---|
 | 0 | char[16] | zoneIp |  |
 | 16 | u16 | zonePort |  |
+
+W01 name was 'character login ok (ours)'
 
 Sent in reply to `0x1005` NC_CHAR_CHARDATA_ACK on CParserCharDB (`FUN_00410040`) · payload 18 bytes · raw header
 
@@ -7995,9 +8013,9 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | handle |  |
-| 2 | u8 | count | 0xFF = DB error |
-| 3 | AVATAR[count] | avatars | 0x82 bytes each, see W01 §6.1 |
+| 0 | u16 | netpacketheader.clienthandle | WM client handle; 2-byte NETPACKETHEADER prefix of the CharDB→WM link, not in PROTO_NC_USER_AVATARINFO_ACK |
+| 2 | u8 | numofavatar | 0xFF = DB error (pdb2017 name) |
+| 3 | AVATAR[numofavatar] | avatar | 0x82 bytes each = PROTO_AVATARINFORMATION, W01 §6.1 (pdb2017 name) |
 
 ### `0x0c0d` NC_USER_WILLLOGIN_REQ † (Login→WM)
 
@@ -8012,7 +8030,7 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 263 | u16[32] | validate | XOR of all 32 words = table slot |
 | 327 | u32[5] | extra |  |
 
-0x15B bytes
+0x15B bytes; W01 name was 'world login request (ours)'
 
 ### `0x0802` NC_MISC_S2SCONNECTION_REQ (S2S)
 
@@ -8038,12 +8056,12 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 
 ### `0x0c60` NC_USER_RETURN_CHECK_REQ (WM→AccountDB)
 
-**Verified layout** (basis: wm FUN_00419860)
+**Verified layout** (basis: wm FUN_00419860: Pkt_SetOpcode(…,0xc60,6), u16 at payload+0, u32 at payload+2 (order fixed after C02))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | userNo |  |
-| 4 | u16 | handle |  |
+| 0 | u16 | nHandle | WM client handle, param_1[0x45] (pdb2017 name) |
+| 2 | u32 | nUserNo | param_1[0x49] (pdb2017 name) |
 
 ### `0x0c62` NC_USER_LOGOUT_LAST_DAY_REQ (WM→AccountLogDB)
 
@@ -8114,6 +8132,8 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 7 | u8 | zero |  |
 | 8 | bytes[25] | request | client 0x1401 payload |
 
+W01 name was 'character create request (ours)'
+
 ### `0x1408` NC_AVATAR_ERASEDATA_REQ (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_00412fa0)
@@ -8135,6 +8155,8 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 6 | u8 | slot |  |
 | 7 | char[20] | name |  |
 
+W01 name was 'character rename request (ours)'
+
 ### `0x0808` NC_MISC_USER_COUNT_CMD † (WM→Login)
 
 **Verified layout** (basis: wm FUN_00438d10)
@@ -8144,6 +8166,8 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 0 | u16 | currentUsers |  |
 | 2 | u16 | maxUsers | capacity or OPTool limit |
 
+W01 name was 'world user count (ours)'
+
 ### `0x0c0e` NC_USER_WILLLOGIN_ACK † (WM→Login)
 
 **Verified layout** (basis: wm FUN_00424950)
@@ -8152,6 +8176,8 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 |---|---|---|---|
 | 0 | bytes[347] | request | copy of 0x0C0D |
 | 347 | u8 | ok | always 1 |
+
+W01 name was 'world login accepted (ours)'
 
 ### `0x0c35` NC_USER_CREATE_OTP_REQ † (WM→Login)
 
@@ -8164,14 +8190,17 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 6 | char[256] | userId |  |
 | 262 | u32 | ip |  |
 
+W01 name was 'token request (ours)'
+
 ### `0x0c16` NC_USER_KICKOFFFROMWORLD_CMD (WM→Zone)
 
 **Verified layout** (basis: wm FUN_00439540)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8[6] | 0xFF |  |
-| 6 | u32 | userNo |  |
+| 0 | u16 | netpacketzoneheader.clienthandle | 0xFFFF: not about one zone player (pdb2017 name) |
+| 2 | u32 | netpacketzoneheader.charregistnumber | 0xFFFFFFFF (pdb2017 name) |
+| 6 | u32 | usrregnum | userNo (pdb2017 name) |
 
 ### `0x0c19` NC_USER_CONNECTCUT2ZONE_CMD (WM→Zone)
 
@@ -8179,8 +8208,9 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8[6] | 0xFF |  |
-| 6 | u32 | userNo |  |
+| 0 | u16 | netpacketzoneheader.clienthandle | 0xFFFF: not about one zone player (pdb2017 name) |
+| 2 | u32 | netpacketzoneheader.charregistnumber | 0xFFFFFFFF (pdb2017 name) |
+| 6 | u32 | usrregnum | userNo (pdb2017 name) |
 
 ### `0x101d` NC_CHAR_ZONE_CHARDATA_ACK (WM→Zone)
 
@@ -8188,8 +8218,9 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8[6] | zoneRef |  |
-| 6 | u16 | wmHandle |  |
+| 0 | u16 | netpacketzoneheader.clienthandle | zone's player handle (pdb2017 name for the 6-byte ref, Z01) |
+| 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
+| 6 | u16 | wldmanhandle | (pdb2017 name) |
 
 ### `0x101e` NC_CHAR_ZONE_CHARDATAFAIL_ACK (WM→Zone)
 
@@ -8197,8 +8228,11 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8[6] | zoneRef |  |
-| 6 | u16 | error | 0x141 unknown handle, 0x590 name mismatch |
+| 0 | u16 | netpacketzoneheader.clienthandle | zone's player handle (pdb2017 name for the 6-byte ref, Z01) |
+| 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
+| 6 | u16 | err | 0x141 unknown handle, 0x590 name mismatch (pdb2017 name) |
+
+8 bytes in 2016; the 2017 struct (4 B) is {NETPACKETHEADER clienthandle, err}: 2017 replaced the 6-byte zone header with the 2-byte one
 
 ### `0x104c` NC_CHAR_REGISTNUMBER_ACK (WM→Zone)
 
@@ -8206,11 +8240,12 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8[6] | zoneRef |  |
-| 6 | u32 | userNo | -1 = refused |
-| 10 | u32 | charNo | -1 = refused |
-| 14 | u16 | wmHandle |  |
-| 16 | char[20] | charName |  |
+| 0 | u16 | netpacketzoneheader.clienthandle | zone's player handle (pdb2017 name for the 6-byte ref, Z01) |
+| 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
+| 6 | u32 | usrregnum | userNo; -1 = refused (pdb2017 name) |
+| 10 | u32 | chrregnum | charNo; -1 = refused (pdb2017 name) |
+| 14 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
+| 16 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
 
 ### `0x101c` NC_CHAR_ZONE_CHARDATA_REQ † (Zone→WM)
 
@@ -8218,9 +8253,10 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8[6] | zoneRef | echoed in every reply |
-| 6 | u16 | wmHandle |  |
-| 8 | char[20] | charName | must equal the cached name |
+| 0 | u16 | netpacketzoneheader.clienthandle | zone's player handle (pdb2017 name for the 6-byte ref, Z01) |
+| 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
+| 6 | u16 | wldmanhandle | WM client handle (pdb2017 name) |
+| 8 | char[20] | charid | Name5; must equal the cached name (pdb2017 name) |
 
 ### `0x104b` NC_CHAR_REGISTNUMBER_REQ † (Zone→WM)
 
@@ -8228,7 +8264,8 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8[6] | zoneRef |  |
-| 6 | u16 | wmHandle |  |
-| 8 | char[20] | charName |  |
+| 0 | u16 | netpacketzoneheader.clienthandle | zone's player handle (pdb2017 name for the 6-byte ref, Z01) |
+| 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
+| 6 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
+| 8 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
 

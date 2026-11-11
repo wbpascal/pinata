@@ -11,7 +11,9 @@ python3 tools/protocol-re/clean.py <export>/login tools/protocol-re/names-login.
 This is a behavioural reconstruction, not original source. Names are mine unless they appear in a
 string in the binary. *(inferred)* marks behaviour deduced from context, not read directly. Packet
 layouts are in [`../protocol/packets-login.md`](../protocol/packets-login.md) and
-[`../protocol/annotations.json`](../protocol/annotations.json).
+[`../protocol/annotations.json`](../protocol/annotations.json) (+ [`annotations/L00.json`](../protocol/annotations/L00.json)).
+Opcode names are the official ones from [`../protocol/opcodes.json`](../protocol/opcodes.json); most
+come from the 2017 client PDB (`name_source: pdb2017`, work item C02) and fit the 2016 handlers they label.
 
 ---
 
@@ -49,7 +51,7 @@ LoginServer (single global object, "this" in most functions)
 | +0x10c | `xorIndex` (u16) | +0x10e copy of the starting index |
 | +0x110 | `userNo` (i32) | from AccountDB |
 | +0x114 | `userId` (char[256]) | |
-| +0x214 | `extra` (5 × u32) | from 0x0C5A, forwarded to WM |
+| +0x214 | `spawnapps` (20 bytes, `Name5`) | from 0x0C5A, forwarded to WM. Official name from the 2017 PDB *(pdb2017)*; read as 5 × u32 |
 | +0x228 | `validated` (u16) | set to 1 after a successful account check |
 | +0x2cc | `loginStep` | dispatcher state, see §3.2 |
 
@@ -189,26 +191,27 @@ Every handler first calls `<Peer>_CheckAlive(session)`, which only passes when `
 
 0x0805 NC_MISC_HEARTBEAT_ACK:  no-op (receiving it already refreshed lastRecvTime)   @ LAB_004074a0
 
-0x0C65 version check (payload: char key[64]):           @ FUN_004060d0
+0x0C65 NC_USER_CLIENT_VERSION_CHECK_REQ { char sVersionKey[64] }:   @ FUN_004060d0
     for k in versionKeys[0 .. versionKeyCount-1]:
         if strncmp(payload.key, k, 64) == 0:
             s.someString = ""                              # field at +0x2aa cleared before use
-            Send 0x0C67 { u8 n = strlen("")+1 = 1, char s[1] = "" }
+            Send 0x0C67 NC_USER_CLIENT_RIGHTVERSION_CHECK_ACK { u8 XTrapServerKeyLength = strlen("")+1 = 1, char XTrapServerKey[1] = "" }
             return
-    Send 0x0C66 { u8 ? }                                  # rejected; client is expected to quit
+    Send 0x0C66 NC_USER_CLIENT_WRONGVERSION_CHECK_ACK {}  # rejected; client is expected to quit
+    # payload size 1, byte never written: the PDB struct is empty, the 1 is C++ sizeof of an empty struct
 
-0x0C5A user login (exact length 0x13E):                  @ FUN_00406450
+0x0C5A NC_USER_US_LOGIN_REQ { char sUserName[260]; char sPassword[36]; Name5 spawnapps }   (exact length 0x13E)   @ FUN_00406450
     if len != 0x13E: return
-    Send to AccountDB 0x0C5B {                            # size 0x152
-        u16  clientHandle = s.handle
-        char userId[260]   = payload.userId (max 256)
-        char password[36]  = payload.password
-        char ip[20]        = sprintf("%03d.%03d.%03d.%03d", s.ip)
-        u32  extra[5]      = payload.extra[0..4]
+    Send to AccountDB 0x0C5B NC_USER_US_PASSWORD_CHECK_REQ {   # size 0x152
+        u16  clientHandle  = s.handle               # NETPACKETHEADER
+        char sUserName[260] = payload.sUserName (copies max 256; bytes 256..259 never read)
+        char sPassword[36]  = payload.sPassword
+        char sUserIP[20]    = sprintf("%03d.%03d.%03d.%03d", s.ip)
+        Name5 spawnapps     = payload.spawnapps     # 20 bytes, copied as 5 × u32
     }
     # answer arrives as AccountDB 0x0C5C (§5.1)
 
-0x0C37 token login (exact length 0x22):                  @ FUN_00406bb0
+0x0C37 NC_USER_LOGIN_WITH_OTP_REQ { sOTP[32] }  (exact length 0x22):   @ FUN_00406bb0
     if len != 0x22: return
     g_TokenTable.ExpireOlderThan(now)
     entry = g_TokenTable.Find(payload.token[32])
@@ -227,10 +230,10 @@ Every handler first calls `<Peer>_CheckAlive(session)`, which only passes when `
     Send to AccountLogDB 0x0720 (login-failure log) { userId = "USE OTP", ip, err }
     g_TokenTable.Remove(payload.token)
 
-0x0C1B world list refresh:                               @ FUN_004062f0
-    Send 0x0C1C (same body as 0x0C0A: u8 count + WORLD[count])
+0x0C1B NC_USER_WORLD_STATUS_REQ (world list refresh):    @ FUN_004062f0
+    Send 0x0C1C NC_USER_WORLD_STATUS_ACK (same body as 0x0C0A NC_USER_LOGIN_ACK: u8 count + WORLD[count])
 
-0x0C0B world select (payload: u8 worldNo):               @ FUN_00406970
+0x0C0B NC_USER_WORLDSELECT_REQ { u8 worldno }:           @ FUN_00406970
     if !WorldList.GetWMAddress(worldNo, &reply)          # reply.status = world status byte
        or world status < 5:                               # status meanings: see §8
         Send 0x0C0C { status, zeros… }                    # 0x56-byte raw packet, only status filled
@@ -245,23 +248,23 @@ Every handler first calls `<Peer>_CheckAlive(session)`, which only passes when `
         u32  userNo
         char userId[256]
         u16  validate[32] = rnd[0..30], check
-        u32  extra[5] = s.extra
+        Name5 spawnapps = s.spawnapps
     }
     # WM answers 0x0C0E (§5.3) -> client gets 0x0C0C with WM address and validate[]
 
-0x0C1D:                                                  @ FUN_00406280
+0x0C1D NC_USER_LOGIN_NETMARBLE_REQ:                      @ FUN_00406280
     Send 0x0C09 { 0x4A }; g_Clients.Disconnect(s)        # client-side cancel/exit (inferred)
 
-0x0C20:                                                  @ FUN_004063d0
+0x0C20 NC_USER_LOGIN_OUTSPARK_REQ:                       @ FUN_004063d0
     log "ERROR - ERR_USERLOGIN_OUTSPARK_NOTSUPPORT"
     Send 0x0C09 { 0x4C }; g_Clients.Disconnect(s)        # unsupported external login method
 
-0x0C04 client key { u8 29, char[29] }:                    @ FUN_00406230
+0x0C04 NC_USER_XTRAP_REQ { u8 XTrapClientKeyLength = 29, char XTrapClientKey[29] }:   @ FUN_00406230
     # the client sends "33B543B0CA6E7C41E5D1D0651307" right after 0x0C67 (client FUN_0046f470)
     # this build does NOT check it
-    SendRaw(s, [03, 05 0C, 01])                           # 0x0C05 { u8 1 }; the client ignores 0x0C05
+    SendRaw(s, [03, 05 0C, 01])                           # 0x0C05 NC_USER_XTRAP_ACK { u8 bSuccess = 1 }; the client ignores it
 
-0x0C06, 0x0C18 NC_USER_NORMALLOGOUT_CMD: no-op           @ FUN_00406950 / LAB_004062e0
+0x0C06 NC_USER_LOGIN_REQ, 0x0C18 NC_USER_NORMALLOGOUT_CMD: no-op           @ FUN_00406950 / LAB_004062e0
 ```
 
 ---
@@ -283,15 +286,15 @@ common AccountCheckResult(r):   (r = reply payload; fields: userNo i32, blocked 
     else:                        err = OK
     # error texts confirmed in the client (Fiesta.bin FUN_00416430, see §8)
 
-0x0C5C  reply to 0x0C5B (user login):                    @ FUN_00404590
+0x0C5C NC_USER_US_PASSWORD_CHECK_ACK  reply to 0x0C5B:   @ FUN_00404590
     err = AccountCheckResult(r)
     if err == OK:
-        s.userNo = r.userNo; s.userId = r.userId; s.extra = r.extra; s.validated = 1
-        Send to AccountLogDB 0x0C5D { handle, userNo, s.handle, ip-string, … }   # 0x17B bytes; ban/log check
+        s.userNo = r.userNo; s.userId = r.userId; s.spawnapps = r.spawnapps; s.validated = 1
+        Send to AccountLogDB 0x0C5D NC_USER_US_IS_IP_BLOCK_REQ { handle, userNo, s.handle, ip-string, … }   # 0x17B bytes; ban/log check
         return                                             # continues in AccountLog 0x0C5E (§5.2)
     Send to AccountLogDB 0x0720 { userId, char[16] from reply +0x10C (unidentified), ip, err }   # failed-login log
     g_Clients.SendRaw(s, 0x0C09 { err }); g_Clients.Disconnect(s)
-    Send to AccountLogDB 0xC802 { userId[256], ip-string[16], extra[5] }   # failed-login detail (inferred)
+    Send to AccountLogDB 0xC802 NC_SYSLOG_ACCOUNT_LOGIN_FAILURE { UserName[256], UserIP[16], spawnapps }   # failed-login detail
 
 0x0C08 / 0x0C54  (replies to older login request variants):   @ FUN_00404320
     err = AccountCheckResult(r)
@@ -324,7 +327,7 @@ because the client parser only accepts `0x0C5A` and `0x0C37`. The other variants
 ### 5.2 AccountLogDB replies (CParserAccountLogDB, registered @ FUN_00405e50)
 
 ```pseudo
-0x0C5E  reply to 0x0C5D:                                 @ FUN_004058c0
+0x0C5E NC_USER_US_IS_IP_BLOCK_ACK  reply to 0x0C5D:      @ FUN_004058c0
     s = g_Clients.Get(r.handle)  (at payload +0x161)
     if r.blocked (payload +0x163) == 1:
         Send 0x0C09 { 0x51 }                               # client: "You are not in our service area." (region block)
@@ -333,7 +336,8 @@ because the client parser only accepts `0x0C5A` and `0x0C37`. The other variants
         g_Clients.Register(s)
         Broadcast to all WM 0x0C16 NC_USER_KICKOFFFROMWORLD_CMD { u32 userNo }
         Send 0x0C0A worldList
-        Send AccountLogDB 0xC801 { u32 userNo, extra[5] }   # successful-login log
+        Send AccountLogDB 0xC801 NC_SYSLOG_ACCOUNT_LOGIN_SUCCESS {   # successful-login log, 40 bytes
+            u32 UserNo; char UserIP[16] (zeroed here); Name5 spawnapps }   # 2017 struct is 70 B: adds UserID[30] before spawnapps
 
 0x0C2B / 0x0C3C / 0x0C41 / 0x0C4E:  same shape for the legacy login variants   @ FUN_00405c80 / 405180 / 4054c0 / 4056c0
 ```
@@ -345,7 +349,7 @@ because the client parser only accepts `0x0C5A` and `0x0C37`. The other variants
     validate server id / key from ServerInfo; bind session to its world number
     reply 0x0803 { u16 result }
 
-0x0808 world status update:                              @ FUN_00408580
+0x0808 NC_MISC_USER_COUNT_CMD (world status update):                              @ FUN_00408580
     WorldList.Update(session.worldNo, payload)            # status byte in WORLD entry (≥5 = open)
     if session.firstUpdatePending: clear it; push 0x0C1C world list to every client   @ FUN_00409890
 
@@ -353,14 +357,14 @@ because the client parser only accepts `0x0C5A` and `0x0C37`. The other variants
 0x080C: forward payload verbatim to AccountLogDB         @ FUN_00408620
 0x0823: no-op                                            @ FUN_00408660
 
-0x0C0E  WM accepted a world login:                       @ FUN_00408870
+0x0C0E NC_USER_WILLLOGIN_ACK  WM accepted a world login: @ FUN_00408870
     if !g_Clients.IsValid(r.loginHandle): log "ERROR - CLIENT_HANDLE_ISVALID = %d"; return
     if r.ok == 0: log; g_Clients.Disconnect(r.loginHandle); return
     WorldList.GetWMAddress(r.worldNo, &reply)             # status + WM client IP
     reply.validate[32] = r.validate[32]                   # payload +0x107 (64 bytes)
     g_Clients.SendRaw(r.loginHandle, 0x0C0C reply)        # 0x56 bytes
 
-0x0C35  WM asks for a one-time token (player returns to world select):   @ FUN_00408a20
+0x0C35 NC_USER_CREATE_OTP_REQ  WM asks for a one-time token (player returns to world select):   @ FUN_00408a20
     g_TokenTable.ExpireOlderThan(now)
     if g_TokenTable.ContainsUser(r.userNo):        result = 0x1E5B  # already pending
     else:
@@ -369,7 +373,7 @@ because the client parser only accepts `0x0C5A` and `0x0C37`. The other variants
         if token generation failed:  result = 0x1E59
         elif !g_TokenTable.Insert(entry): result = 0x1E5A
         else: result = 0x1E58                            # OK
-    reply 0x0C36 { u16 wmHandle = r.handle, u16 result, char token[32] }   # 0x27 raw bytes
+    reply 0x0C36 NC_USER_CREATE_OTP_ACK { u16 wmHandle = r.handle, u16 result, char token[32] }   # 0x27 raw bytes
     # WM passes the token to the client, which reconnects to Login and sends 0x0C37 within 10 s
 ```
 
@@ -428,7 +432,7 @@ LoginScene.OnPacket(dept, cmd, payload):                 client @ FUN_0046f4d0
   0x0C66 version bad:   message "You client version is different from the Server version.
                         Please restart the client after patching."               @ FUN_0046eec0
   0x0C05:               ignored
-  0x0C09 {u16 code}:    message ErrorText(code); close login connection           @ FUN_0046ee40
+  0x0C09 {u16 code}:    message ErrMsgTable::GetErrMsg(code); close login connection           @ FUN_0046ee40
   0x0C0A / 0x0C1C:      store world list, show world selection                   @ FUN_0046edd0 / FUN_0046eae0
   0x0C0C {status, ip[16], port, validate[32]}:                                   @ FUN_0046ef20
         status 0  "Server is closed. Please try login later."
@@ -442,7 +446,7 @@ LoginScene.OnPacket(dept, cmd, payload):                 client @ FUN_0046f4d0
   0x2011:               ignored
 ```
 
-Login-related error codes (`ErrorText` = client `FUN_00416430`; the full table of 479 codes is in
+Login-related error codes (`ErrMsgTable::GetErrMsg` = client `FUN_00416430`; the full table of 479 codes is in
 [`../protocol/client-error-codes.json`](../protocol/client-error-codes.json)):
 
 | Code | Sent by Login when | Client text |

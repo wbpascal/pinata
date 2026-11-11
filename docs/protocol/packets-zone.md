@@ -21,31 +21,31 @@ Heuristic extraction: verify a layout against the cited function before relying 
 
 ### AVATAR (130 bytes)
 
-Basis: Character server FUN_0046bff0 (reads SQL columns in this order with SQLGetData) and WM FUN_0040ede0
+Basis: Character server FUN_0046bff0 (reads SQL columns in this order with SQLGetData) and WM FUN_0040ede0; field names = PROTO_AVATARINFORMATION (pdb2017), every offset agrees (C02 §5)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | char_no | character id |
-| 4 | char[20] | char_name |  |
-| 24 | i16 | level (inferred) | SQL_C_SSHORT column |
+| 0 | u32 | chrregnum | character id; L00 name 'char_no' |
+| 4 | char[20] | name | L00 name 'char_name' |
+| 24 | i16 | level | SQL_C_SSHORT column; L00 name 'level (inferred)' |
 | 26 | u8 | slot | 0..5 |
-| 27 | char[12] | login_map (inferred) | WM substitutes "RouT" when another field is 0 |
-| 39 | u8[5] | delete_time (inferred) | if a 'pending delete' column is set: year+'0', month, day, hour, minute; else byte 39 = 0 |
-| 44 | u8 | race:2 | class:5 | gender:1 (inferred) | bits 0-1, bits 2-6, bit 7 (three separate u8 columns packed) |
-| 45 | u8 | hair (inferred) |  |
-| 46 | u8 | hair_color (inferred) |  |
-| 47 | u8 | face (inferred) |  |
-| 48 | u16[20] | equipment item ids | 0xFFFF = empty. Equip-slot -> offset: 1:48, 24:50, 12:52, 7:54, 10:56, 19:58, 21:60, 22:62, 20:64, 8:66, 27:68, 28:70, 26:72, 11:74, 13:76, 9:78, 17:80, 18:82, 25:84, 29:86 |
-| 88 | u8[3] | upgrade levels | 4-bit nibbles: 88 lo=slot10 hi=slot12; 89 lo=slot7 hi=slot19; 90 lo=slot21 |
-| 91 | u32 | ? | SQL_C_SLONG column |
-| 95 | char[12] | ? (second map name) |  |
-| 107 | u32 | ? | SQL_C_ULONG column |
-| 111 | u32 | ? | SQL_C_ULONG column |
-| 115 | u32 | packed timestamp | bits: year&15 | month<<4 | day<<8 | hour<<13 | minute<<18 | second<<24; top 2 bits kept |
-| 119 | u16 | ? | 0 |
-| 121 | u32 | ? | 0 |
-| 125 | u32 | tutorial_state (inferred) | default 3 when no tutorial row |
-| 129 | u8 | tutorial_step (inferred) |  |
+| 27 | char[12] | loginmap | WM substitutes "RouT" when another field is 0; L00 name 'login_map (inferred)' |
+| 39 | u8[5] | delinfo | if a 'pending delete' column is set: year+'0', month, day, hour, minute; else byte 39 = 0; {year, month, day, hour, min} u8 each; L00 name 'delete_time (inferred)' |
+| 44 | u8 | shape.race|chrclass|gender | bits 0-1, bits 2-6, bit 7 (three separate u8 columns packed); bits race:2@0, chrclass:5@2, gender:1@7; L00 name 'race:2 | class:5 | gender:1 (inferred)' |
+| 45 | u8 | shape.hairtype | L00 name 'hair (inferred)' |
+| 46 | u8 | shape.haircolor | L00 name 'hair_color (inferred)' |
+| 47 | u8 | shape.faceshape | L00 name 'face (inferred)' |
+| 48 | u16[20] | equip | 0xFFFF = empty. Equip-slot -> offset: 1:48, 24:50, 12:52, 7:54, 10:56, 19:58, 21:60, 22:62, 20:64, 8:66, 27:68, 28:70, 26:72, 11:74, 13:76, 9:78, 17:80, 18:82, 25:84, 29:86; PDB order: Equ_Head, Mouth, RightHand, Body, LeftHand, Pant, Boot, AccBoot, AccPant, AccBody, AccHeadA, MiniMon_R, Eye, AccLeftHand, AccRightHand, AccBack, CosEff, AccHip, Minimon, AccShield; L00 name 'equipment item ids' |
+| 88 | u8[3] | equip.upgrade | 4-bit nibbles: 88 lo=slot10 hi=slot12; 89 lo=slot7 hi=slot19; 90 lo=slot21; bits lefthand:4, righthand:4 | body:4, leg:4 | shoes:4; L00 name 'upgrade levels' |
+| 91 | u32 | nKQHandle | SQL_C_SLONG column; L00 name '?' |
+| 95 | char[12] | sKQMapName | L00 name '? (second map name)' |
+| 107 | u32 | nKQCoord.x | SQL_C_ULONG column; L00 name '?' |
+| 111 | u32 | nKQCoord.y | SQL_C_ULONG column; L00 name '?' |
+| 115 | u32 | dKQDate | bits: year&15 | month<<4 | day<<8 | hour<<13 | minute<<18 | second<<24; top 2 bits kept; bits year:4@0, month:4@4, day:5@8, hour:5@13, min:6@18, sec:6@24; L00 name 'packed timestamp' |
+| 119 | u8[2] | CharIDChangeData.bNeedChangeID|bInit | 0; two u8: bNeedChangeID @119 (0xB409 requires 1), bInit @120; L00 name '?' |
+| 121 | u32 | CharIDChangeData.nRowNo | 0; L00 name '?' |
+| 125 | u32 | TutorialInfo.nTutorialState | default 3 when no tutorial row; L00 name 'tutorial_state (inferred)' |
+| 129 | u8 | TutorialInfo.nTutorialStep | L00 name 'tutorial_step (inferred)' |
 
 ## Client → server
 
@@ -331,9 +331,11 @@ Handler `FUN_0043e460`
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | ? (passed as last arg to the chat routine) |  |
-| 1 | u8 | length | 0xFF has a special meaning |
-| 2 | char[length] | text |  |
+| 0 | u8 | itemLinkDataCount | passed as last arg to the chat routine (pdb2017 name) |
+| 1 | u8 | len | 0xFF has a special meaning (pdb2017 name) |
+| 2 | char[len] | content | (pdb2017 name) |
+
+Z01 override of the annotations.json entry with the PROTO_NC_ACT_CHAT_REQ field names (C02 §9)
 
 Handler `FUN_0045a400`
 
@@ -2508,6 +2510,8 @@ Sent in reply to `0x0806` NC_MISC_SEED_REQ on ShineObjectClass::ShinePlayer (`FU
 | 0 | u8 | one | 1 |
 | 1 | u16 | minutes | limit / 10 |
 
+Z01 name was 'map time limit (ours)'
+
 Sent from `FUN_00419580` (`FUN_00419580`) · payload 3 bytes
 
 | Off | Type | Value / source |
@@ -3242,6 +3246,8 @@ Fill: +0: ShineObjectClass::ShinePlayer::vfunc[0x664] = FUN_005a3140 (assumed cl
 | 0 | u16 | code | 0x147 SHN checksum mismatch, 0x142 no position, 0x31EC no tutorial map |
 | 2 | u8 | index | checksum index or 0xFF |
 
+Z01 name was 'map login failed (ours)'
+
 Sent in reply to `0x101e` NC_CHAR_ZONE_CHARDATAFAIL_ACK on WorldManagerSession (`FUN_005a3440`, WorldManagerSession::wms_NC_CHAR_ZONE_CHARDATAFAIL_ACK) · payload 3 bytes
 
 | Off | Type | Value / source |
@@ -3256,6 +3262,8 @@ Sent in reply to `0x101e` NC_CHAR_ZONE_CHARDATAFAIL_ACK on WorldManagerSession (
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | objHandle |  |
+
+Z01 name was 'object left sight (ours)'
 
 Sent from `ShineObjectClass::ShineObject::so_LogoutPacketBroadcast` (`FUN_00553a40`) · payload 2 bytes
 
@@ -3275,6 +3283,8 @@ Sent from `ShineObjectClass::ShineObject::so_LogoutPacketBroadcast` (`FUN_00553a
 | 10 | char[16] | zoneIp |  |
 | 26 | u16 | zonePort |  |
 | 28 | u16 | wmHandle |  |
+
+Z01 name was 'link to another zone (ours)'
 
 Sent in reply to `0x180e` NC_MAP_LINKRESERVE_ACK on WorldManagerSession (`FUN_0049b510`, WorldManagerSession::wms_NC_MAP_LINKRESERVE_ACK) · payload 30 bytes
 
@@ -6369,6 +6379,8 @@ Sent from `FUN_0050fc00` (`FUN_0050fc00`) · payload 0 bytes
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | result | from 0x4028 |
+
+Z01 name was 'UI state save result (ours)'
 
 Sent in reply to `0x4028` NC_CHARSAVE_DB_UI_STATE_SAVE_ACK on GameDBSession (`FUN_00551360`, GameDBSession::gds_NC_CHARSAVE_DB_UI_STATE_SAVE_ACK) · payload 2 bytes
 
@@ -10162,8 +10174,10 @@ Empty payload.
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | value1 | DAT_0da5047c |
-| 1 | u16 | value2 | DAT_0da50480 |
+| 0 | u8 | shoutlevel | DAT_0da5047c (also used as a level bound elsewhere) (pdb2017 name) |
+| 1 | u16 | shoutdelay | DAT_0da50480 (pdb2017 name) |
+
+PROTO_NC_MISC_SERVERPARAMETER_ACK, the alias at this opcode value (C02 §2); 3 bytes as in the 2016 send
 
 ### `0x1809` NC_MAP_LINKSAME_CMD † (S→C)
 
@@ -10174,6 +10188,8 @@ Empty payload.
 | 0 | u16 | mapIndex |  |
 | 2 | u32 | x |  |
 | 6 | u32 | y |  |
+
+Z01 name was 'link inside the same zone (ours)'
 
 ### `0x1815` NC_MAP_WING_SAVE_ACK † (S→C)
 
@@ -10216,6 +10232,8 @@ Empty payload.
 | 0 | u16 | walkSpeed |  |
 | 2 | u16 | runSpeed |  |
 
+Z01 name was 'move speed (ours)'
+
 ### `0x0821` NC_MISC_TIMEFROMWORLD_CMD (WM→zone)
 
 **Verified layout** (basis: zone FUN_004511a0)
@@ -10250,9 +10268,9 @@ Empty payload.
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | objHandle | zone object handle of the player (ref[0..1]) |
-| 2 | u32 | charNo | or -1 (ref[2..5]) |
-| 6 | u16 | wmHandle |  |
+| 0 | u16 | netpacketzoneheader.clienthandle | zone object handle of the player (ref[0..1]) |
+| 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (ref[2..5]) |
+| 6 | u16 | wldmanhandle | (pdb2017 name) |
 
 ### `0x104c` NC_CHAR_REGISTNUMBER_ACK (WM→zone)
 
@@ -10260,12 +10278,12 @@ Empty payload.
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | sessionHandle | ref |
-| 2 | u32 | ref2 |  |
-| 6 | u32 | userNo | -1 = refused |
-| 10 | u32 | charNo | -1 = refused |
-| 14 | u16 | wmHandle |  |
-| 16 | char[20] | charName | must match 0x1801 |
+| 0 | u16 | netpacketzoneheader.clienthandle | ref |
+| 2 | u32 | netpacketzoneheader.charregistnumber | ref |
+| 6 | u32 | usrregnum | userNo; -1 = refused (pdb2017 name) |
+| 10 | u32 | chrregnum | charNo; -1 = refused (pdb2017 name) |
+| 14 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
+| 16 | char[20] | loginreq.charid | must match 0x1801 (pdb2017 name) |
 
 ### `0x180e` NC_MAP_LINKRESERVE_ACK (WM→zone)
 
@@ -10288,11 +10306,13 @@ Empty payload.
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | ffff | 0xFFFF |
-| 2 | u32 | minusOne | -1 |
-| 6 | u32 | userNo |  |
-| 10 | u16 | wmHandle |  |
-| 12 | u16 | reason | 0x685/0x686/0x689/0x68B/0x68E … |
+| 0 | u16 | netpacketzoneheader.clienthandle | 0xFFFF (not addressed to one zone player) |
+| 2 | u32 | netpacketzoneheader.charregistnumber | -1 |
+| 6 | u32 | usrregnum | userNo (pdb2017 name) |
+| 10 | u16 | wldmanhandle | (pdb2017 name) |
+| 12 | u16 | reason | 0x685/0x686/0x689/0x68B/0x68E … (pdb2017 name) |
+
+Z01 name was 'player disconnected (ours)'
 
 ### `0x0c31` NC_USER_POSSIBLE_NEW_CONNECT_CMD (zone→WM)
 
@@ -10300,10 +10320,10 @@ Empty payload.
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | ffff | 0xFFFF |
-| 2 | u32 | minusOne | -1 |
-| 6 | u16 | wmHandle |  |
-| 8 | u32 | charNo |  |
+| 0 | u16 | netpacketzoneheader.clienthandle | 0xFFFF |
+| 2 | u32 | netpacketzoneheader.charregistnumber | -1 |
+| 6 | u16 | nWorldManagerHandle | (pdb2017 name) |
+| 8 | u32 | nCharNo | (pdb2017 name) |
 
 ### `0x101c` NC_CHAR_ZONE_CHARDATA_REQ † (zone→WM)
 
@@ -10311,10 +10331,10 @@ Empty payload.
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | objHandle | zone object handle of the player (ref[0..1]) |
-| 2 | u32 | charNo | or -1 (ref[2..5]) |
-| 6 | u16 | wmHandle |  |
-| 8 | char[20] | charName |  |
+| 0 | u16 | netpacketzoneheader.clienthandle | zone object handle of the player (ref[0..1]) |
+| 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (ref[2..5]) |
+| 6 | u16 | wldmanhandle | (pdb2017 name) |
+| 8 | char[20] | charid | Name5 (pdb2017 name) |
 
 ### `0x104b` NC_CHAR_REGISTNUMBER_REQ † (zone→WM)
 
@@ -10322,10 +10342,10 @@ Empty payload.
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | sessionHandle | ref[0..1] |
-| 2 | u32 | minusOne | ref[2..5] = -1 |
-| 6 | u16 | wmHandle | from 0x1801 |
-| 8 | char[20] | charName |  |
+| 0 | u16 | netpacketzoneheader.clienthandle | zone session handle (ref[0..1]) |
+| 2 | u32 | netpacketzoneheader.charregistnumber | -1 (ref[2..5]) |
+| 6 | u16 | loginreq.wldmanhandle | from 0x1801 (pdb2017 name) |
+| 8 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
 
 ### `0x180b` NC_MAP_LINKSTART_CMD † (zone→WM)
 
@@ -10335,6 +10355,8 @@ Empty payload.
 |---|---|---|---|
 | 0 | u16 | wmHandle |  |
 | 2 | u32 | charNo |  |
+
+Z01 name was 'leaving for a link (ours)'
 
 ### `0x180c` NC_MAP_LINKEND_CMD † (zone→WM)
 
@@ -10353,6 +10375,8 @@ Empty payload.
 | 30 | u64 | exp |  |
 | 38 | u64 | money | inferred |
 | 46 | u8 | inGuildTournament |  |
+
+Z01 name was 'map login done (ours)'
 
 ### `0x180d` NC_MAP_LINKRESERVE_REQ † (zone→WM)
 
@@ -10374,7 +10398,7 @@ Empty payload.
 | 55 | u16 | zonePort |  |
 | 57 | u16 | wmHandle2 |  |
 
-0x3b bytes
+0x3b bytes; Z01 name was 'link reserve (ours)'
 
 ### `0x0802` NC_MISC_S2SCONNECTION_REQ (zone→peer)
 

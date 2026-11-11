@@ -1,5 +1,5 @@
 {
- "_about": "Z01: zone core layouts (map login, links, logout, handshakes). Read from the zone handlers (zone export), client-facing ones cross-checked with the client. Names marked (ours) are descriptive.",
+ "_about": "Z01: zone core layouts (map login, links, logout, handshakes). Read from the zone handlers (zone export), client-facing ones cross-checked with the client. Names marked (ours) are descriptive. C02 follow-up: official names applied; the 6-byte ref is NETPACKETZONEHEADER {clienthandle, charregistnumber}.",
  "packets": {
   "zone": {
    "0x0807": {
@@ -17,7 +17,7 @@
    },
    "0x1804": {
     "dir": "S→C",
-    "name": "map login failed (ours)",
+    "name": "NC_MAP_LOGINFAIL_ACK",
     "basis": "zone FUN_00452590 / FUN_005a3590 / FUN_005a3440; client FUN_004778c0",
     "fields": [
      [
@@ -32,7 +32,8 @@
       "index",
       "checksum index or 0xFF"
      ]
-    ]
+    ],
+    "notes": "Z01 name was 'map login failed (ours)'"
    },
    "0x104b": {
     "dir": "zone→WM",
@@ -42,26 +43,26 @@
      [
       0,
       "u16",
-      "sessionHandle",
-      "ref[0..1]"
+      "netpacketzoneheader.clienthandle",
+      "zone session handle (ref[0..1])"
      ],
      [
       2,
       "u32",
-      "minusOne",
-      "ref[2..5] = -1"
+      "netpacketzoneheader.charregistnumber",
+      "-1 (ref[2..5])"
      ],
      [
       6,
       "u16",
-      "wmHandle",
-      "from 0x1801"
+      "loginreq.wldmanhandle",
+      "from 0x1801 (pdb2017 name)"
      ],
      [
       8,
       "char[20]",
-      "charName",
-      ""
+      "loginreq.charid",
+      "Name5 (pdb2017 name)"
      ]
     ]
    },
@@ -73,38 +74,38 @@
      [
       0,
       "u16",
-      "sessionHandle",
+      "netpacketzoneheader.clienthandle",
       "ref"
      ],
      [
       2,
       "u32",
-      "ref2",
-      ""
+      "netpacketzoneheader.charregistnumber",
+      "ref"
      ],
      [
       6,
       "u32",
-      "userNo",
-      "-1 = refused"
+      "usrregnum",
+      "userNo; -1 = refused (pdb2017 name)"
      ],
      [
       10,
       "u32",
-      "charNo",
-      "-1 = refused"
+      "chrregnum",
+      "charNo; -1 = refused (pdb2017 name)"
      ],
      [
       14,
       "u16",
-      "wmHandle",
-      ""
+      "loginreq.wldmanhandle",
+      "(pdb2017 name)"
      ],
      [
       16,
       "char[20]",
-      "charName",
-      "must match 0x1801"
+      "loginreq.charid",
+      "must match 0x1801 (pdb2017 name)"
      ]
     ]
    },
@@ -116,26 +117,26 @@
      [
       0,
       "u16",
-      "objHandle",
+      "netpacketzoneheader.clienthandle",
       "zone object handle of the player (ref[0..1])"
      ],
      [
       2,
       "u32",
-      "charNo",
-      "or -1 (ref[2..5])"
+      "netpacketzoneheader.charregistnumber",
+      "charNo or -1 (ref[2..5])"
      ],
      [
       6,
       "u16",
-      "wmHandle",
-      ""
+      "wldmanhandle",
+      "(pdb2017 name)"
      ],
      [
       8,
       "char[20]",
-      "charName",
-      ""
+      "charid",
+      "Name5 (pdb2017 name)"
      ]
     ]
    },
@@ -147,59 +148,60 @@
      [
       0,
       "u16",
-      "objHandle",
+      "netpacketzoneheader.clienthandle",
       "zone object handle of the player (ref[0..1])"
      ],
      [
       2,
       "u32",
-      "charNo",
-      "or -1 (ref[2..5])"
+      "netpacketzoneheader.charregistnumber",
+      "charNo or -1 (ref[2..5])"
      ],
      [
       6,
       "u16",
-      "wmHandle",
-      ""
+      "wldmanhandle",
+      "(pdb2017 name)"
      ]
     ]
    },
    "0x0c1a": {
     "dir": "zone→WM",
-    "name": "player disconnected (ours)",
+    "name": "NC_USER_CONNECTCUT2WORLDMANAGER_CMD",
     "basis": "zone FUN_0054f340 so_Disconnect",
     "fields": [
      [
       0,
       "u16",
-      "ffff",
-      "0xFFFF"
+      "netpacketzoneheader.clienthandle",
+      "0xFFFF (not addressed to one zone player)"
      ],
      [
       2,
       "u32",
-      "minusOne",
+      "netpacketzoneheader.charregistnumber",
       "-1"
      ],
      [
       6,
       "u32",
-      "userNo",
-      ""
+      "usrregnum",
+      "userNo (pdb2017 name)"
      ],
      [
       10,
       "u16",
-      "wmHandle",
-      ""
+      "wldmanhandle",
+      "(pdb2017 name)"
      ],
      [
       12,
       "u16",
       "reason",
-      "0x685/0x686/0x689/0x68B/0x68E …"
+      "0x685/0x686/0x689/0x68B/0x68E … (pdb2017 name)"
      ]
-    ]
+    ],
+    "notes": "Z01 name was 'player disconnected (ours)'"
    },
    "0x0c31": {
     "dir": "zone→WM",
@@ -209,32 +211,32 @@
      [
       0,
       "u16",
-      "ffff",
+      "netpacketzoneheader.clienthandle",
       "0xFFFF"
      ],
      [
       2,
       "u32",
-      "minusOne",
+      "netpacketzoneheader.charregistnumber",
       "-1"
      ],
      [
       6,
       "u16",
-      "wmHandle",
-      ""
+      "nWorldManagerHandle",
+      "(pdb2017 name)"
      ],
      [
       8,
       "u32",
-      "charNo",
-      ""
+      "nCharNo",
+      "(pdb2017 name)"
      ]
     ]
    },
    "0x180b": {
     "dir": "zone→WM",
-    "name": "leaving for a link (ours)",
+    "name": "NC_MAP_LINKSTART_CMD",
     "basis": "zone FUN_0049ad30 so_LinkTo",
     "fields": [
      [
@@ -249,11 +251,12 @@
       "charNo",
       ""
      ]
-    ]
+    ],
+    "notes": "Z01 name was 'leaving for a link (ours)'"
    },
    "0x180c": {
     "dir": "zone→WM",
-    "name": "map login done (ours)",
+    "name": "NC_MAP_LINKEND_CMD",
     "basis": "zone FUN_00443390",
     "fields": [
      [
@@ -322,11 +325,12 @@
       "inGuildTournament",
       ""
      ]
-    ]
+    ],
+    "notes": "Z01 name was 'map login done (ours)'"
    },
    "0x180d": {
     "dir": "zone→WM",
-    "name": "link reserve (ours)",
+    "name": "NC_MAP_LINKRESERVE_REQ",
     "basis": "zone FUN_0049ad30 so_LinkTo",
     "fields": [
      [
@@ -408,7 +412,7 @@
       ""
      ]
     ],
-    "notes": "0x3b bytes"
+    "notes": "0x3b bytes; Z01 name was 'link reserve (ours)'"
    },
    "0x180e": {
     "dir": "WM→zone",
@@ -467,7 +471,7 @@
    },
    "0x180a": {
     "dir": "S→C",
-    "name": "link to another zone (ours)",
+    "name": "NC_MAP_LINKOTHER_CMD",
     "basis": "zone FUN_0049b510; client FUN_004b4ab0",
     "fields": [
      [
@@ -506,11 +510,12 @@
       "wmHandle",
       ""
      ]
-    ]
+    ],
+    "notes": "Z01 name was 'link to another zone (ours)'"
    },
    "0x1809": {
     "dir": "S→C",
-    "name": "link inside the same zone (ours)",
+    "name": "NC_MAP_LINKSAME_CMD",
     "basis": "zone FUN_0049ad30; client FUN_0049feb0",
     "fields": [
      [
@@ -531,11 +536,12 @@
       "y",
       ""
      ]
-    ]
+    ],
+    "notes": "Z01 name was 'link inside the same zone (ours)'"
    },
    "0x1805": {
     "dir": "S→C",
-    "name": "object left sight (ours)",
+    "name": "NC_MAP_LOGOUT_CMD",
     "basis": "zone FUN_00553a40; client FUN_004bd620",
     "fields": [
      [
@@ -544,7 +550,8 @@
       "objHandle",
       ""
      ]
-    ]
+    ],
+    "notes": "Z01 name was 'object left sight (ours)'"
    },
    "0x0802": {
     "dir": "zone→peer",
@@ -695,7 +702,7 @@
    },
    "0x203e": {
     "dir": "S→C",
-    "name": "move speed (ours)",
+    "name": "NC_ACT_MOVESPEED_CMD",
     "basis": "zone FUN_00443390 (vt 0x514/0x518)",
     "fields": [
      [
@@ -710,7 +717,8 @@
       "runSpeed",
       ""
      ]
-    ]
+    ],
+    "notes": "Z01 name was 'move speed (ours)'"
    },
    "0x0830": {
     "dir": "S→C",
@@ -720,16 +728,17 @@
      [
       0,
       "u8",
-      "value1",
-      "DAT_0da5047c"
+      "shoutlevel",
+      "DAT_0da5047c (also used as a level bound elsewhere) (pdb2017 name)"
      ],
      [
       1,
       "u16",
-      "value2",
-      "DAT_0da50480"
+      "shoutdelay",
+      "DAT_0da50480 (pdb2017 name)"
      ]
-    ]
+    ],
+    "notes": "PROTO_NC_MISC_SERVERPARAMETER_ACK, the alias at this opcode value (C02 §2); 3 bytes as in the 2016 send"
    },
    "0x0c24": {
     "dir": "S→C",
@@ -835,7 +844,7 @@
    },
    "0x4026": {
     "dir": "S→C",
-    "name": "UI state save result (ours)",
+    "name": "NC_CHARSAVE_UI_STATE_SAVE_ACK",
     "basis": "zone FUN_00551360",
     "fields": [
      [
@@ -844,11 +853,12 @@
       "result",
       "from 0x4028"
      ]
-    ]
+    ],
+    "notes": "Z01 name was 'UI state save result (ours)'"
    },
    "0x0810": {
     "dir": "S→C",
-    "name": "map time limit (ours)",
+    "name": "NC_MISC_RESTMINUTE_CMD",
     "basis": "zone FUN_00443390; client FUN_004997a0",
     "fields": [
      [
@@ -863,7 +873,34 @@
       "minutes",
       "limit / 10"
      ]
-    ]
+    ],
+    "notes": "Z01 name was 'map time limit (ours)'"
+   },
+   "0x2001": {
+    "dir": "C→S",
+    "name": "NC_ACT_CHAT_REQ",
+    "basis": "FUN_0045a400",
+    "fields": [
+     [
+      0,
+      "u8",
+      "itemLinkDataCount",
+      "passed as last arg to the chat routine (pdb2017 name)"
+     ],
+     [
+      1,
+      "u8",
+      "len",
+      "0xFF has a special meaning (pdb2017 name)"
+     ],
+     [
+      2,
+      "char[len]",
+      "content",
+      "(pdb2017 name)"
+     ]
+    ],
+    "notes": "Z01 override of the annotations.json entry with the PROTO_NC_ACT_CHAT_REQ field names (C02 §9)"
    }
   }
  }

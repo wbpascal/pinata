@@ -37,8 +37,10 @@ Basis: login FUN_0040a020 + world-list builder (decomp ~line 6719)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | n | 29 |
-| 1 | char[29] | key | "33B543B0CA6E7C41E5D1D0651307" + NUL, hard-coded in the client |
+| 0 | u8 | XTrapClientKeyLength | 29 (pdb2017 name) |
+| 1 | char[29] | XTrapClientKey | "33B543B0CA6E7C41E5D1D0651307" + NUL, hard-coded in the client (pdb2017 name) |
+
+L00 name was 'client key (sent after 0x0C67)'
 
 Handler `FUN_00406230`
 
@@ -52,6 +54,8 @@ No payload fields read directly by the handler.
 |---|---|---|---|
 | 0 | u8 | world_no |  |
 
+L00 name was 'world select'
+
 Handler `FUN_00406970`
 
 | Off | Type | Checks in handler | Notes |
@@ -64,7 +68,7 @@ Handler `FUN_00406970`
 
 Empty payload.
 
-answered with 0x0C1C (same layout as 0x0C0A)
+answered with 0x0C1C (same layout as 0x0C0A); L00 name was 'world list refresh'
 
 Handler `FUN_004062f0`
 
@@ -104,6 +108,8 @@ No payload fields read directly by the handler.
 |---|---|---|---|
 | 0 | u8[32] | token | must exist in the table filled by WM message 0x0C35 |
 
+L00 name was 'token login'
+
 Handler `FUN_00406bb0` · packet length check: != 0x22 (length includes the opcode)
 
 No payload fields read directly by the handler.
@@ -114,10 +120,11 @@ No payload fields read directly by the handler.
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[256] | user_id |  |
-| 256 | u8[4] | unused | not read |
-| 260 | char[36] | password |  |
-| 296 | u32[5] | extra | forwarded to AccountDB (0x0C5B) uninterpreted |
+| 0 | char[260] | sUserName | server copies at most 256 bytes; bytes 256..259 are never read (pdb2017 name; 2016 code agrees on offset/size) |
+| 260 | char[36] | sPassword | (pdb2017 name; 2016 code agrees on offset/size) |
+| 296 | char[20] | spawnapps | Name5 union; forwarded to AccountDB (0x0C5B) uninterpreted, read as 5 × u32 (pdb2017 name; 2016 code agrees on offset/size) |
+
+L00 name was 'user login'
 
 Handler `FUN_00406450` · packet length check: == 0x13e (length includes the opcode)
 
@@ -137,9 +144,9 @@ Handler `FUN_00406450` · packet length check: == 0x13e (length includes the opc
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[64] | version_key | strncmp(64) against lines of Login/ClientVersionKeyInfo.txt ("20151116141627") |
+| 0 | char[64] | sVersionKey | strncmp(64) against lines of Login/ClientVersionKeyInfo.txt ("20151116141627") (pdb2017 name) |
 
-client FUN_0046eb30 sends it right after receiving the seed, with the hard-coded key "20151116141627"
+client FUN_0046eb30 sends it right after receiving the seed, with the hard-coded key "20151116141627"; L00 name was 'version check'
 
 Handler `FUN_004060d0`
 
@@ -173,7 +180,7 @@ Sent from `FUN_00409610` (`FUN_00409610`) · payload 2 bytes · raw header
 |---|---|---|---|
 | 0 | u16 | error | client shows the text from its global error table (FUN_00416430): 0x42 'An unknown error has occurred.', 0x43/0x46 'DB error', 0x44 'Authentication failed.', 0x45 'Please check ID or Password.', 0x47 'The ID has been blocked.', 0x48 'The World Servers are down for maintenance.', 0x49 'Authentication timed out. Please try to log in again.', 0x4A 'Login failed.', 0x4B 'Please accept the agreement to continue.', 0x51 'You are not in our service area.'; other codes (0x4C, 0x4E, 0x52) -> 'An unidentified error code has occurred.: <code>' |
 
-session is closed afterwards
+session is closed afterwards; L00 name was 'login failed'
 
 Sent in reply to `0x0c3f` NC_USER_TW_PASSWORD_CHECK_ACK † on CParserAccountDB (`FUN_00403b50`) · payload 2 bytes · raw header
 
@@ -194,6 +201,8 @@ Sent in reply to `0x0c5c` NC_USER_US_PASSWORD_CHECK_ACK † on CParserAccountDB 
 | 0 | u8 | count |  |
 | 1 | WORLD[count] | worlds | 18 bytes each, see struct WORLD |
 
+L00 name was 'world list'
+
 Sent in reply to `0x0c27` NC_USER_TEENAGER_ACK † on CParserAccountDB (`FUN_00404050`) · payload variable ((uint)*local_2584 * 0x12 + 1)
 
 | Off | Type | Value / source |
@@ -213,6 +222,8 @@ Sent in reply to `0x0c27` NC_USER_TEENAGER_ACK † on CParserAccountDB (`FUN_004
 | 17 | u16 | wm_port | read by the client (FUN_008c7850); not visibly written by the Login decompile, so it is filled in a way the extractor missed |
 | 19 | u16[32] | validate | client stores it and sends it to WM in 0x0C0F |
 
+L00 name was 'world select result'
+
 Sent in reply to `0x0c0b` NC_USER_WORLDSELECT_REQ † on CParserClient (`FUN_00406970`) · payload 83 bytes · raw header
 
 | Off | Type | Value / source |
@@ -230,6 +241,8 @@ Sent in reply to `0x0c0b` NC_USER_WORLDSELECT_REQ † on CParserClient (`FUN_004
 |---|---|---|---|
 | 0 | u16 | reason | 0x683 = same account logged in elsewhere (client remembers it in a flag) |
 
+L00 name was 'kicked / disconnect reason'
+
 Sent from `FUN_00409810` (`FUN_00409810`) · payload 2 bytes · raw header
 
 ### `0x0c1c` NC_USER_WORLD_STATUS_ACK †
@@ -240,6 +253,8 @@ Sent from `FUN_00409810` (`FUN_00409810`) · payload 2 bytes · raw header
 |---|---|---|---|
 | 0 | u8 | count |  |
 | 1 | WORLD[count] | worlds |  |
+
+L00 name was 'world list (refresh)'
 
 Sent in reply to `0x0c1b` NC_USER_WORLD_STATUS_REQ † on CParserClient (`FUN_004062f0`) · payload variable ((uint)*local_201c * 0x12 + 1)
 
@@ -269,11 +284,9 @@ Sent in reply to `0x0c27` NC_USER_TEENAGER_ACK † on CParserAccountDB (`FUN_004
 
 **Verified layout** (basis: FUN_004060d0)
 
-| Off | Type | Field | Notes |
-|---|---|---|---|
-| 0 | u8 | ? | not set by the code |
+Empty payload.
 
-client FUN_0046eec0 shows: 'You client version is different from the Server version. Please restart the client after patching.'
+Empty struct PROTO_NC_USER_CLIENT_WRONGVERSION_CHECK_ACK (pdb2017). The server sends payload size 1 (Pkt_SetOpcode(…,0xc66,1)) and never writes that byte: C++ sizeof of an empty struct, not a field. Client FUN_0046eec0 shows: 'You client version is different from the Server version. Please restart the client after patching.' L00 name was 'version rejected'
 
 Sent in reply to `0x0c65` NC_USER_CLIENT_VERSION_CHECK_REQ † on CParserClient (`FUN_004060d0`) · payload 1 bytes
 
@@ -283,10 +296,10 @@ Sent in reply to `0x0c65` NC_USER_CLIENT_VERSION_CHECK_REQ † on CParserClient 
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | n | always 1 in this build |
-| 1 | char[n] | s | always "" |
+| 0 | u8 | XTrapServerKeyLength | always 1 in this build (pdb2017 name) |
+| 1 | char[n] | XTrapServerKey | always "" (pdb2017 name) |
 
-client FUN_0046f470: on receipt, opens the login UI and sends 0x0C04
+client FUN_0046f470: on receipt, opens the login UI and sends 0x0C04; L00 name was 'version OK'
 
 Sent in reply to `0x0c65` NC_USER_CLIENT_VERSION_CHECK_REQ † on CParserClient (`FUN_004060d0`) · payload variable ((uint)(pcVar4 + (2 - ((int)param_1 + 0x2ab))))
 
@@ -422,5 +435,7 @@ Empty payload.
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | ? | always 1 |
+| 0 | u8 | bSuccess | always 1 (pdb2017 name) |
+
+L00 name was '?'
 

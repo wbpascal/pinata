@@ -529,9 +529,9 @@ def selftest():
         assert F.track(conv, True, e1) == seed % 499 and F.track(conv, True, e2) == i1
         r = F.decode(b"login", True, 0x0C5A, login[2:], False)
         labels = [n.label for n in r.nodes.values()]
-        assert b'user_id: "tester"' in labels and b"password: ********" in labels and not list(r.issues.values()), labels
+        assert b'sUserName: "tester"' in labels and b"sPassword: ********" in labels and not list(r.issues.values()), labels
         r = F.decode(b"login", True, 0x0C5A, login[2:], True)
-        assert b'password: "secret"' in [n.label for n in r.nodes.values()]
+        assert b'sPassword: "secret"' in [n.label for n in r.nodes.values()]
         r = F.decode(b"login", False, 0x0C0A, (struct.pack("<B", 2) + worlds), False)
         w = list(r.nodes.values())[1]
         assert w.label == b"worlds: 2 x WORLD" or w.label.endswith(b"2 x WORLD"), w.label
@@ -552,7 +552,7 @@ def selftest():
         again = [run(i, *f, True) for i, f in reversed(list(enumerate(frames)))][::-1]
         assert first == again, name
         out = b"\n".join(log for log, _ in first)
-        for want in (b"fiesta.xor_index=" + str(seed % 499).encode(), b"fiesta.opcode=3162", b"password: ********",
+        for want in (b"fiesta.xor_index=" + str(seed % 499).encode(), b"fiesta.opcode=3162", b"sPassword: ********",
                      b"fiesta.xor_index=" + str(i2).encode(), b"fiesta.opcode=2052", b'world_name: "World1"',
                      b"EXPERT fiesta.unknown_opcode unknown opcode 0xFFF0", b"(guess)",
                      b"EXPERT fiesta.size_mismatch payload " + str(gen_size + 3).encode() + b" bytes matches no send site",

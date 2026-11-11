@@ -17,7 +17,7 @@ SUMMARY = {
     # ---- login scene (AccountFrameWork @ FUN_0046f4d0), see docs/pseudocode/login-server.md §8
     "0x0807@AccountFrameWork": _SEED + "send 0x0C65 {char[64] client version '20151116141627'} @ FUN_0046eb30",
     "0x0c05@AccountFrameWork": _IGN,
-    "0x0c09@AccountFrameWork": "login failed {u16 code}: message ErrorText(code) (client-error-codes.json); "
+    "0x0c09@AccountFrameWork": "login failed {u16 code}: message ErrMsgTable::GetErrMsg(code) (client-error-codes.json); "
                                "close the login connection",
     "0x0c0a@AccountFrameWork": "world list: store worlds, show world selection @ FUN_0046edd0",
     "0x0c1c@AccountFrameWork": "world list (refresh): store worlds, show world selection @ FUN_0046eae0",

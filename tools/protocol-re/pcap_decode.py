@@ -777,7 +777,7 @@ def selftest():
                 ("zone#1", C2S, 0x0806), ("zone#1", S2C, 0x0807), ("zone#1", C2S, 0x1803)]
         assert got == want, got
         login = dict(ps[3]["fields"])
-        assert login["user_id"] == "tester" and set(login["password"]) == {"*"}, login
+        assert login["sUserName"] == "tester" and set(login["sPassword"]) == {"*"}, login   # L00 names (pdb2017)
         assert ps[1]["payload"] == c2s_bodies[0][2:]
         assert ps[3]["payload"][:260] == c2s_bodies[1][2:262] and ps[3]["payload"][296:] == c2s_bodies[1][298:]
         wl = dict(ps[5]["fields"])
@@ -809,7 +809,7 @@ def selftest():
         j = json.load(open(stem + ".json"))
         assert j["packets"][3]["op"] == "0x0C5A" and b"secret".hex() not in json.dumps(j)
         res2 = decode_capture(path, default_ports(), show_secrets=True)
-        assert dict(res2["packets"][3]["fields"])["password"] == "secret"
+        assert dict(res2["packets"][3]["fields"])["sPassword"] == "secret"
     # gap handling: drop the first half of the long 0x0C0A -> report gap, resync on 0x0C09
     path = os.path.join(tmp, "gap.pcap")
     with open(path, "wb") as f:
