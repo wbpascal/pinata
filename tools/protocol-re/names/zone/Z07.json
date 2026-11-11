@@ -1,0 +1,10 @@
+{
+  "FUN_0044a980": "FreeStat_Spent",
+  "FUN_00517cc0": "FreeStat_Max",
+  "FUN_0055a5d0": "FreeStat_IsDecrease",
+  "FUN_0055a650": "FreeStat_IsLocked",
+  "FUN_0055a660": "FreeStat_Lock",
+  "FUN_0055a670": "FreeStat_Unlock",
+  "FUN_0058a7e0": "FreeStat_ApplyInc",
+  "FUN_0058a9d0": "FreeStat_ApplyDec"
+}
