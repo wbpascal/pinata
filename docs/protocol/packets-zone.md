@@ -638,6 +638,14 @@ Handler `FUN_004c2460`
 
 ### `0x2401` NC_BAT_TARGETTING_REQ
 
+**Verified layout** (basis: zone FUN_0042ffe0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | target | object handle |
+
+ignored while captivated or under StaCannotChangeTarget (392); untargetable mob types 12,13,24,27,29
+
 Handler `FUN_0042ffe0`
 
 | Off | Type | Checks in handler | Notes |
@@ -646,11 +654,11 @@ Handler `FUN_0042ffe0`
 
 ### `0x243e` NC_BAT_ASSIST_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ASSIST_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0042b7a0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | tanker |  |
+| 0 | u16 | tanker | object whose target is wanted |
 
 Handler `FUN_0042b7a0`
 
@@ -660,12 +668,14 @@ Handler `FUN_0042b7a0`
 
 ### `0x2440` NC_BAT_SKILLBASH_OBJ_CAST_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_OBJ_CAST_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_0057fa50)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | skill |  |
-| 2 | u16 | target |  |
+| 0 | u16 | skill | ActiveSkill.shn ID |
+| 2 | u16 | target | object handle |
+
+no inline reply; failure code is sent on the next tick as 0x2434
 
 Handler `FUN_0057fa50`
 
@@ -676,7 +686,7 @@ Handler `FUN_0057fa50`
 
 ### `0x2441` NC_BAT_SKILLBASH_FLD_CAST_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_FLD_CAST_REQ`, 10 bytes
+**Verified layout** (basis: zone FUN_0057f400)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -694,11 +704,11 @@ Handler `FUN_0057f400`
 
 ### `0x2454` NC_BAT_ABSTATE_ERASE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ABSTATE_ERASE_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0042b900)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | abstateIndex |  |
+| 0 | u16 | abstateIndex | AbState.shn AbStataIndex |
 
 Handler `FUN_0042b900`
 
@@ -1432,13 +1442,13 @@ Handler `FUN_00578f90`
 
 ### `0x4811` NC_SKILL_EMPOWALLOC_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_EMPOWALLOC_REQ`, 6 bytes
+**Verified layout** (basis: zone FUN_0044f150)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | skill |  |
-| 2 | u16 | plus.damage|sp|keeptime|cooltime | bits damage:4@0, sp:4@4, keeptime:4@8, cooltime:4@12 |
-| 4 | u16 | minus.damage|sp|keeptime|cooltime | bits damage:4@0, sp:4@4, keeptime:4@8, cooltime:4@12 |
+| 2 | u16 | plus | SKILL_EMPOWER: damage:4, sp:4, keeptime:4, cooltime:4 |
+| 4 | u16 | minus | SKILL_EMPOWER |
 
 Handler `FUN_0044f150`
 
@@ -1450,11 +1460,11 @@ Handler `FUN_0044f150`
 
 ### `0x4822` NC_SKILL_PRODUCTFIELD_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_PRODUCTFIELD_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0046c820)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | mainskill |  |
+| 0 | u16 | mainskill | one of the five production base skills |
 
 Handler `FUN_0046c820`
 
@@ -1464,11 +1474,11 @@ Handler `FUN_0046c820`
 
 ### `0x4824` NC_SKILL_UNLEARN_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_UNLEARN_REQ`, 3 bytes
+**Verified layout** (basis: zone FUN_0057ad80)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | slot |  |
+| 0 | u8 | slot | inventory cell of the skill-erase item |
 | 1 | u16 | skill |  |
 
 Handler `FUN_0057ad80`
@@ -2780,13 +2790,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_CharChargedBuffData` (`FUN_0044e1e0
 
 ### `0x104d` NC_CHAR_DEADMENU_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_DEADMENU_CMD`, 9 bytes
+**Verified layout** (basis: zone FUN_00433be0; client FUN_004a9940)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | Second |  |
-| 4 | u8 | priority |  |
-| 5 | i32 | eMenuType |  |
+| 0 | u32 | reviveWaitSec | field+0x210, 180 without a field |
+| 4 | u8 |  | always 50 |
+| 5 | u32 | canReviveHere | 0/1 |
 
 Sent from `ShineObjectClass::ShinePlayer::so_KilledBy` (`FUN_00433be0`) · payload 9 bytes
 
@@ -3387,14 +3397,14 @@ Sent from `AmpersandCommand::ac_ShowPlayerID` (`FUN_0041f4a0`) · payload variab
 
 ### `0x1c18` NC_BRIEFINFO_ABSTATE_CHANGE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BRIEFINFO_ABSTATE_CHANGE_CMD`, 14 bytes
+**Verified layout** (basis: zone FUN_004056a0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | handle |  |
-| 2 | i32 | info.abstateID |  |
-| 6 | u32 | info.restKeeptime |  |
-| 10 | u32 | info.strength |  |
+| 2 | u32 | abstateIndex |  |
+| 6 | u32 | keepTime | ms |
+| 10 | u32 | strength |  |
 
 Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastSet` (`FUN_004056a0`) · payload 14 bytes
 
@@ -4332,12 +4342,12 @@ Sent from `FUN_00561030` (`FUN_00561030`) · payload 0 bytes
 
 ### `0x2402` NC_BAT_TARGETINFO_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_TARGETINFO_CMD`, 30 bytes
+**Verified layout** (basis: zone FUN_0042b3f0 / FUN_0042b0b0; client FUN_00499fa0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | order |  |
-| 1 | u16 | targethandle |  |
+| 0 | u8 | order | 0 = my target, 1 = my target's target |
+| 1 | u16 | targethandle | 0xFFFF = none |
 | 3 | u32 | targethp |  |
 | 7 | u32 | targetmaxhp |  |
 | 11 | u32 | targetsp |  |
@@ -4345,7 +4355,7 @@ Sent from `FUN_00561030` (`FUN_00561030`) · payload 0 bytes
 | 19 | u32 | targetlp |  |
 | 23 | u32 | targetmaxlp |  |
 | 27 | u8 | targetlevel |  |
-| 28 | u16 | hpchangeorder |  |
+| 28 | u16 | hpchangeorder | the target's HP sequence counter |
 
 Sent from `AxialListTargetInform::ali_Work` (`FUN_0042b0b0`) · payload 30 bytes
 
@@ -4364,7 +4374,7 @@ Sent from `AxialListTargetInform::ali_Work` (`FUN_0042b0b0`) · payload 30 bytes
 
 ### `0x240b` NC_BAT_EXPGAIN_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_EXPGAIN_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_0042d830; client FUN_0049a150)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -4380,68 +4390,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payloa
 
 ### `0x240c` NC_BAT_LEVELUP_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_LEVELUP_CMD`, 235 bytes
+**Verified layout** (basis: zone FUN_0042d830; client FUN_004aa3d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | level |  |
 | 1 | u16 | mobhandle |  |
-| 3 | u64 | newparam.PrevExp |  |
-| 11 | u64 | newparam.NextExp |  |
-| 19 | u32 | newparam.Strength.base |  |
-| 23 | u32 | newparam.Strength.change |  |
-| 27 | u32 | newparam.Constitute.base |  |
-| 31 | u32 | newparam.Constitute.change |  |
-| 35 | u32 | newparam.Dexterity.base |  |
-| 39 | u32 | newparam.Dexterity.change |  |
-| 43 | u32 | newparam.Intelligence.base |  |
-| 47 | u32 | newparam.Intelligence.change |  |
-| 51 | u32 | newparam.Wizdom.base |  |
-| 55 | u32 | newparam.Wizdom.change |  |
-| 59 | u32 | newparam.MentalPower.base |  |
-| 63 | u32 | newparam.MentalPower.change |  |
-| 67 | u32 | newparam.WClow.base |  |
-| 71 | u32 | newparam.WClow.change |  |
-| 75 | u32 | newparam.WChigh.base |  |
-| 79 | u32 | newparam.WChigh.change |  |
-| 83 | u32 | newparam.AC.base |  |
-| 87 | u32 | newparam.AC.change |  |
-| 91 | u32 | newparam.TH.base |  |
-| 95 | u32 | newparam.TH.change |  |
-| 99 | u32 | newparam.TB.base |  |
-| 103 | u32 | newparam.TB.change |  |
-| 107 | u32 | newparam.MAlow.base |  |
-| 111 | u32 | newparam.MAlow.change |  |
-| 115 | u32 | newparam.MAhigh.base |  |
-| 119 | u32 | newparam.MAhigh.change |  |
-| 123 | u32 | newparam.MR.base |  |
-| 127 | u32 | newparam.MR.change |  |
-| 131 | u32 | newparam.MH.base |  |
-| 135 | u32 | newparam.MH.change |  |
-| 139 | u32 | newparam.MB.base |  |
-| 143 | u32 | newparam.MB.change |  |
-| 147 | u32 | newparam.MaxHp |  |
-| 151 | u32 | newparam.MaxSp |  |
-| 155 | u32 | newparam.MaxLp |  |
-| 159 | u32 | newparam.MaxAp |  |
-| 163 | u32 | newparam.MaxHPStone |  |
-| 167 | u32 | newparam.MaxSPStone |  |
-| 171 | u32 | newparam.PwrStone.flag |  |
-| 175 | u32 | newparam.PwrStone.EPPysic |  |
-| 179 | u32 | newparam.PwrStone.EPMagic |  |
-| 183 | u32 | newparam.PwrStone.MaxStone |  |
-| 187 | u32 | newparam.GrdStone.flag |  |
-| 191 | u32 | newparam.GrdStone.EPPysic |  |
-| 195 | u32 | newparam.GrdStone.EPMagic |  |
-| 199 | u32 | newparam.GrdStone.MaxStone |  |
-| 203 | u32 | newparam.PainRes.base |  |
-| 207 | u32 | newparam.PainRes.change |  |
-| 211 | u32 | newparam.RestraintRes.base |  |
-| 215 | u32 | newparam.RestraintRes.change |  |
-| 219 | u32 | newparam.CurseRes.base |  |
-| 223 | u32 | newparam.CurseRes.change |  |
-| 227 | u32 | newparam.ShockRes.base |  |
-| 231 | u32 | newparam.ShockRes.change |  |
+| 3 | struct | newparam | CHAR_PARAMETER_DATA, 0xe8 bytes |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 235 bytes
 
@@ -4517,11 +4472,11 @@ Fill: +3: ShineObjectClass::ShinePlayer::vfunc[0x668] = FUN_005a2e00 (assumed cl
 
 ### `0x240d` NC_BAT_SUMEONELEVELUP_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SUMEONELEVELUP_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_0042d830)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | ply |  |
+| 0 | u16 | handle |  |
 | 2 | u16 | mobhandle |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 4 bytes
@@ -4563,7 +4518,7 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendSPinform` (`FUN_0056daf0`) · p
 
 ### `0x2411` NC_BAT_EXPLOST_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_EXPLOST_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_0042e210; client FUN_004aa7d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -4648,12 +4603,12 @@ Sent from `ShineObjectClass::ShinePlayer::so_skillsmash` (`FUN_0042bd10`) · pay
 
 ### `0x2427` NC_BAT_ABSTATESET_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ABSTATESET_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_004056a0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | handle |  |
-| 2 | i32 | abstate |  |
+| 2 | u32 | abstateIndex |  |
 
 Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastSet` (`FUN_004056a0`) · payload 6 bytes
 
@@ -4664,12 +4619,12 @@ Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastSet` (`FUN_0
 
 ### `0x2428` NC_BAT_ABSTATERESET_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ABSTATERESET_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_00405800)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | handle |  |
-| 2 | i32 | abstate |  |
+| 2 | u32 | abstateIndex |  |
 
 Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastReset` (`FUN_00405800`) · payload 6 bytes
 
@@ -4680,12 +4635,12 @@ Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastReset` (`FUN
 
 ### `0x242a` NC_BAT_ABSTATEINFORM_NOEFFECT_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ABSTATEINFORM_NOEFFECT_CMD`, 8 bytes
+**Verified layout** (basis: zone FUN_00405900)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | i32 | abstate |  |
-| 4 | u32 | keeptime_millisec |  |
+| 0 | u32 | abstateIndex |  |
+| 4 | u32 | keepTime | ms |
 
 Sent from `ShineObjectClass::ShineMobileObject::so_smo_AbStateKeepTimeAdd` (`FUN_0040bd20`) · payload 8 bytes
 
@@ -4804,7 +4759,7 @@ Sent from `ShineObjectClass::ShineMobileObject::so_Bash` (`FUN_0042e950`) · pay
 
 ### `0x2438` NC_BAT_SOMEONESKILLBASH_CASTCUT_CMD
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONESKILLBASH_CASTCUT_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_00579f10 / FUN_00579d50; client FUN_0049a3b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -4844,11 +4799,11 @@ Sent from `ShineObjectClass::ShineMobileObject::so_mobile_DamageOverTime` (`FUN_
 
 ### `0x243d` NC_BAT_CEASE_FIRE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_CEASE_FIRE_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_00566820 (player tick after smo_BashStop))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | handle |  |
+| 0 | u16 | handle | object that stopped attacking |
 
 Sent from `AbnormalStateContainer::AbstateElementInObject::aeo_Set` (`FUN_0040a340`) · payload 2 bytes
 
@@ -4858,11 +4813,11 @@ Sent from `AbnormalStateContainer::AbstateElementInObject::aeo_Set` (`FUN_0040a3
 
 ### `0x243f` NC_BAT_ASSIST_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ASSIST_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_0042b7a0; client FUN_0049a2b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | target |  |
+| 0 | u16 | target | tanker's target handle, 0xFFFF none |
 
 Sent in reply to `0x243e` NC_BAT_ASSIST_REQ on ShineObjectClass::ShinePlayer (`FUN_0042b7a0`, ShineObjectClass::ShinePlayer::sp_NC_BAT_ASSIST_REQ) · payload 2 bytes
 
@@ -4920,15 +4875,15 @@ Sent from `ShineObjectClass::ShinePlayer::so_GainFame` (`FUN_0042df00`) · paylo
 
 ### `0x2447` NC_BAT_SWING_START_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SWING_START_CMD`, 9 bytes
+**Verified layout** (basis: zone FUN_0042f3f0; client FUN_004b9200)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | attacker |  |
 | 2 | u16 | defender |  |
-| 4 | u8 | actioncode |  |
-| 5 | u16 | attackspeed |  |
-| 7 | u8 | damageindex |  |
+| 4 | u8 | actioncode | swing animation |
+| 5 | u16 | attackspeed | ms |
+| 7 | u8 | damageindex | swing counter (low byte) |
 | 8 | u8 | attacksequence |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SwingStart` (`FUN_0042f3f0`) · payload 9 bytes
@@ -4944,19 +4899,20 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SwingStart` (`FUN_0042f3f0`)
 
 ### `0x2448` NC_BAT_SWING_DAMAGE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SWING_DAMAGE_CMD`, 16 bytes
+**Verified layout** (basis: zone FUN_00432f30; client FUN_004a2620)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | attacker |  |
 | 2 | u16 | defender |  |
-| 4 | u8 | flag.iscritical|isresist|ismissed|isshieldblock|isCostumCharged|isDead|isDamege2Heal|isImmune | bits iscritical:1@0, isresist:1@1, ismissed:1@2, isshieldblock:1@3, isCostumCharged:1@4, isDead:1@5, isDamege2Heal:1@6, isImmune:1@7 |
-| 5 | u8 | flag.isCostumShieldCharged | bits isCostumShieldCharged:1@0 |
+| 4 | u16 | flag | bit0 critical, 1 dead, 2 miss, 3 shield block, 4 costume weapon charged, 6 immune, 7 abstate resisted, 8 costume shield charged |
 | 6 | u16 | damage |  |
 | 8 | u32 | resthp |  |
 | 12 | u16 | hpchangeorder |  |
 | 14 | u8 | damageindex |  |
 | 15 | u8 | attacksequence |  |
+
+sent to the attacker's and the defender's client only (owner for pets/servants)
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`) · payload 16 bytes
 
@@ -4974,17 +4930,19 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`
 
 ### `0x2449` NC_BAT_SOMEONESWING_DAMAGE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONESWING_DAMAGE_CMD`, 13 bytes
+**Verified layout** (basis: zone FUN_00432f30; client FUN_004a2850)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | attacker |  |
 | 2 | u16 | defender |  |
-| 4 | u8 | flag.isMissed|isCostumCharged|isCostumShieldCharged | bits isMissed:1@0, isCostumCharged:1@1, isCostumShieldCharged:1@2 |
+| 4 | u8 | flag | bit0 miss, 1 weapon charged, 2 shield charged |
 | 5 | u32 | resthp |  |
 | 9 | u16 | hpchangeorder |  |
 | 11 | u8 | damageindex |  |
-| 12 | u8 | attacksequence |  |
+| 12 | u8 | attacksequence | always 0 |
+
+broadcast to sight except attacker and defender; carries no damage number
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`) · payload 13 bytes
 
@@ -5000,13 +4958,13 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`
 
 ### `0x244b` NC_BAT_PKINPKFIELD_CLIENT_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_PKINPKFIELD_CLIENT_CMD`, 8 bytes
+**Verified layout** (basis: zone FUN_00433be0; client FUN_004a29a0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | attacker |  |
-| 2 | u16 | defender |  |
-| 4 | u32 | pkcount |  |
+| 0 | u16 | killer |  |
+| 2 | u16 | victim |  |
+| 4 | u32 | pkCount |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_KilledBy` (`FUN_00433be0`) · payload 8 bytes
 
@@ -5029,11 +4987,11 @@ Sent from `ShineObjectClass::ShineMob::so_KilledBy` (`FUN_00432760`) · payload 
 
 ### `0x244d` NC_BAT_TARGETCHANGE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_TARGETCHANGE_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_004a4680)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | target |  |
+| 0 | u16 | target | 0xFFFF = cleared |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_TargetChange` (`FUN_004a4680`) · payload 2 bytes
 
@@ -5043,13 +5001,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_TargetChange` (`FUN_004a4680`) 
 
 ### `0x244e` NC_BAT_SKILLBASH_HIT_OBJ_START_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_HIT_OBJ_START_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_0057bef0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | skill |  |
 | 2 | u16 | targetobj |  |
-| 4 | u16 | index |  |
+| 4 | u16 | index | blast index tying START, BLAST and DAMAGE together |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_Volley` (`FUN_004a44a0`) · payload 6 bytes
 
@@ -5068,14 +5026,14 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 
 ### `0x244f` NC_BAT_SOMEONESKILLBASH_HIT_OBJ_START_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONESKILLBASH_HIT_OBJ_START_CMD`, 8 bytes
+**Verified layout** (basis: zone FUN_0057bef0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | caster |  |
-| 2 | u16 | castinfo.skill |  |
-| 4 | u16 | castinfo.targetobj |  |
-| 6 | u16 | castinfo.index |  |
+| 2 | u16 | skill |  |
+| 4 | u16 | targetobj |  |
+| 6 | u16 | index |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_0057bef0`) · payload 8 bytes
 
@@ -5087,7 +5045,7 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 
 ### `0x2450` NC_BAT_SKILLBASH_HIT_FLD_START_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_HIT_FLD_START_CMD`, 12 bytes
+**Verified layout** (basis: zone FUN_0057bef0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -5115,15 +5073,15 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 
 ### `0x2451` NC_BAT_SOMEONESKILLBASH_HIT_FLD_START_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONESKILLBASH_HIT_FLD_START_CMD`, 14 bytes
+**Verified layout** (basis: zone FUN_0057bef0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | caster |  |
-| 2 | u16 | castinfo.skill |  |
-| 4 | u32 | castinfo.targetloc.x |  |
-| 8 | u32 | castinfo.targetloc.y |  |
-| 12 | u16 | castinfo.index |  |
+| 2 | u16 | skill |  |
+| 4 | u32 | targetloc.x |  |
+| 8 | u32 | targetloc.y |  |
+| 12 | u16 | index |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_0057bef0`) · payload 14 bytes
 
@@ -5136,18 +5094,16 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 
 ### `0x2452` NC_BAT_SKILLBASH_HIT_DAMAGE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_HIT_DAMAGE_CMD`, 9 bytes + variable tail
+**Verified layout** (basis: zone FUN_00437110; client FUN_004b79f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | index |  |
-| 2 | u16 | caster |  |
+| 2 | u16 | caster | 0xFFFF if gone |
 | 4 | u8 | targetnum |  |
-| 5 | u16 | kSkillID |  |
-| 7 | u16 | pTarget |  |
-| 9 | PROTO_NC_BAT_SKILLBASH_HIT_DAMAGE_CMD::SkillDamage[targetnum] | target | variable length, element PROTO_NC_BAT_SKILLBASH_HIT_DAMAGE_CMD::SkillDamage |
+| 5 | struct[targetnum] | target | 0xe bytes each: u16 handle, u16 flag, u32 hpchange, u32 resthp, u16 hpchangeorder |
 
-Element `PROTO_NC_BAT_SKILLBASH_HIT_DAMAGE_CMD::SkillDamage` (14 bytes): +0 u16 handle, +2 u8 flag.isdamage|iscritical|ismissed|isshieldblock|isheal|isenchant|isresist|IsCostumWeapon, +3 u8 flag.isDead|isImmune|IsCostumShield, +4 u32 hpchange, +8 u32 resthp, +12 u16 hpchangeorder
+flag: bit0 isdamage, 1 iscritical, 2 ismissed, 3 isshieldblock, 4 isheal, 5 isenchant, 6 isresist, 7 IsCostumWeapon, 8 isDead, 9 isImmune, 10 IsCostumShield. 2016 header is 5 bytes; the 2017 struct adds kSkillID and pTarget before the array.
 
 Sent from `SkillEffectApply::SkillDamageSender::sds_Finish` (`FUN_00437110`) · payload variable ((byte)
 
@@ -5158,7 +5114,7 @@ Sent from `SkillEffectApply::SkillDamageSender::sds_Finish` (`FUN_00437110`) · 
 
 ### `0x2453` NC_BAT_SOULCOLLECT_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOULCOLLECT_CMD`, 3 bytes
+**Verified layout** (basis: zone FUN_0042ffe0 / smo_SoulManage)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -5174,11 +5130,11 @@ Sent in reply to `0x2401` NC_BAT_TARGETTING_REQ on ShineObjectClass::ShinePlayer
 
 ### `0x2455` NC_BAT_ABSTATE_ERASE_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ABSTATE_ERASE_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_0042b900; client FUN_004b0ce0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | err |  |
+| 0 | u16 | err | 0x1C70 ok, 0x1C71 not active, 0x1C72 not removable |
 
 Sent in reply to `0x2454` NC_BAT_ABSTATE_ERASE_REQ on ShineObjectClass::ShinePlayer (`FUN_0042b900`) · payload 2 bytes
 
@@ -5202,7 +5158,7 @@ Sent from `AbnormalStateContainer::AbnormalStateReinforcedMove::ase_PreAttachObj
 
 ### `0x2457` NC_BAT_SKILLBASH_HIT_BLAST_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_HIT_BLAST_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_0057cd40 / FUN_0057cb10; client FUN_004a22e0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6535,6 +6491,13 @@ Sent from `CQuestZone::Send_NC_QUEST_RESET_TIME_ZONE_CMD` (`FUN_005bc570`) · pa
 
 ### `0x4804` NC_SKILL_SKILL_LEARNSUC_CMD †
 
+**Verified layout** (basis: zone FUN_0044ec80; client FUN_004acb60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skillid |  |
+| 2 | u8 | ispassive |  |
+
 Sent in reply to `0x4802` NC_SKILL_SKILLTEACHSUC_ACK on GameDBSession (`FUN_0044ec80`, GameDBSession::gds_NC_SKILL_SKILLTEACHSUC_ACK) · payload 3 bytes
 
 | Off | Type | Value / source |
@@ -6544,7 +6507,7 @@ Sent in reply to `0x4802` NC_SKILL_SKILLTEACHSUC_ACK on GameDBSession (`FUN_0044
 
 ### `0x480f` NC_SKILL_EMPOW_RESET_SUC_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_EMPOW_RESET_SUC_ACK`, 1 bytes
+**Verified layout** (basis: zone FUN_0044ef50; client FUN_004acf20)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6558,11 +6521,11 @@ Sent in reply to `0x480d` NC_SKILL_EMPOW_RESET_DB_SUC_ACK on GameDBSession (`FUN
 
 ### `0x4810` NC_SKILL_EMPOWPOINT_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_EMPOWPOINT_CMD`, 1 bytes
+**Verified layout** (basis: zone FUN_0042d830; client FUN_004ad020)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | restempow |  |
+| 0 | u8 | restempow | unspent empower points |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 1 bytes
 
@@ -6572,12 +6535,12 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payloa
 
 ### `0x4814` NC_SKILL_EMPOWALLOC_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_EMPOWALLOC_ACK`, 4 bytes
+**Verified layout** (basis: zone FUN_00518d20; client FUN_004acf60)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | skill |  |
-| 2 | u16 | err |  |
+| 2 | u16 | err | 0x881 ok, 0x882 mode, 0x883 too many points, 0x884 refused, 0x886 no reset item, 0x889 plus and minus on one line |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_SkillEmpowerSetResult` (`FUN_00518d20`) · payload 4 bytes
 
@@ -6604,7 +6567,7 @@ Sent from `CharaterSkillList::csl_AddMastery` (`FUN_00446730`) · payload 6 byte
 
 ### `0x481e` NC_SKILL_REVIVE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_REVIVE_CMD`, 12 bytes
+**Verified layout** (basis: zone FUN_0057d290; client FUN_004a2da0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6622,11 +6585,11 @@ Sent from `ShineObjectClass::ShinePlayer::sp_ReviveNow` (`FUN_0057d290`) · payl
 
 ### `0x481f` NC_SKILL_SOMEONEREVIVE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_SOMEONEREVIVE_CMD`, 14 bytes
+**Verified layout** (basis: zone FUN_0057d290)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | reviver |  |
+| 0 | u16 | reviver | handle of the revived player |
 | 2 | u32 | hp |  |
 | 6 | u32 | sp |  |
 | 10 | u32 | lp |  |
@@ -6642,7 +6605,7 @@ Sent from `ShineObjectClass::ShinePlayer::sp_ReviveNow` (`FUN_0057d290`) · payl
 
 ### `0x4821` NC_SKILL_COOLTIME_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_COOLTIME_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_00569260; client FUN_0049a9e0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6658,12 +6621,12 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_NewSkillCoolTime` (`FUN_0056926
 
 ### `0x4823` NC_SKILL_PRODUCTFIELD_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_PRODUCTFIELD_ACK`, 4 bytes
+**Verified layout** (basis: zone FUN_0046c820; client FUN_004ad070)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | mainskill |  |
-| 2 | u16 | err |  |
+| 2 | u16 | err | 0xB01 accepted, 0xB04 mode, 0xB12 not a production skill, 0xB13 already learned, 0xB14 two professions already |
 
 Sent in reply to `0x4822` NC_SKILL_PRODUCTFIELD_REQ on ShineObjectClass::ShinePlayer (`FUN_0046c820`, ShineObjectClass::ShinePlayer::sp_NC_SKILL_PRODUCTFIELD_REQ) · payload 4 bytes
 
@@ -6674,12 +6637,12 @@ Sent in reply to `0x4822` NC_SKILL_PRODUCTFIELD_REQ on ShineObjectClass::ShinePl
 
 ### `0x4827` NC_SKILL_UNLEARN_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_UNLEARN_ACK`, 4 bytes
+**Verified layout** (basis: zone FUN_0057ad80 / FUN_0057f200; client FUN_004acd80)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | skill |  |
-| 2 | u16 | err |  |
+| 2 | u16 | err | 0x1501 active removed, 0x1505 passive removed, 0x1502 mode, 0x1503 not learned, 0x702 bad slot/item, 0x703 empty, 0x70A locked |
 
 Sent in reply to `0x4824` NC_SKILL_UNLEARN_REQ on ShineObjectClass::ShinePlayer (`FUN_0057ad80`, ShineObjectClass::ShineObject::sp_NC_SKILL_UNLEARN_REQ) · payload 4 bytes
 
@@ -10182,6 +10145,100 @@ Empty payload.
 
 PDB struct name not checked; fields = STOPEMOTICON_DESCRIPT as echoed in 0x2023
 
+### `0x2408` NC_BAT_UNTARGET_REQ (C→S)
+
+**Verified layout** (basis: zone FUN_0042b6a0)
+
+Empty payload.
+
+### `0x242b` NC_BAT_BASHSTART_CMD (C→S)
+
+**Verified layout** (basis: zone FUN_00430fa0)
+
+Empty payload.
+
+payload not read; attacks the server-side current target. Mode 2 only.
+
+### `0x2432` NC_BAT_BASHSTOP_CMD (C→S)
+
+**Verified layout** (basis: zone FUN_0042e700)
+
+Empty payload.
+
+### `0x2444` NC_BAT_SKILLBASH_CASTABORT_REQ (C→S)
+
+**Verified layout** (basis: zone FUN_0057c480)
+
+Empty payload.
+
+### `0x482a` NC_SKILL_REPLYREVIVE_CMD (C→S)
+
+**Verified layout** (basis: zone FUN_00418a30)
+
+Empty payload.
+
+### `0x4802` NC_SKILL_SKILLTEACHSUC_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0044ec80)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | skillid |  |
+| 8 | u8 | ispassive |  |
+
+### `0x4803` NC_SKILL_SKILLTEACHFAIL_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0044ee70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+
+### `0x480c` NC_SKILL_EMPOW_RESET_DB_FAIL_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0044f080)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+
+### `0x480d` NC_SKILL_EMPOW_RESET_DB_SUC_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0044ef50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+
+### `0x4813` NC_SKILL_EMPOWALLOC_DB_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0044f7d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | zonehandle |  |
+| 2 | u32 | chrregnum |  |
+| 6 | u16 | lockindex |  |
+| 8 | u16 | skill |  |
+| 10 | u16 | err | 0x881 ok; anything else disconnects the player (0x68A) |
+| 12 | u8 | bUseItem |  |
+
+### `0x4826` NC_SKILL_ERASE_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0057b3f0 / FUN_0057f200)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle |  |
+| 2 | u32 | header.charregistnumber |  |
+| 6 | u16 | skill | passive skills as id + 30000 |
+| 8 | u16 | err | 0x1501 ok |
+
 ### `0x0830` NC_MISC_CONNECTFROMWHERE_DB_ACK † (S→C)
 
 **Verified layout** (basis: zone FUN_005517c0)
@@ -10313,6 +10370,51 @@ Z01 name was 'link inside the same zone (ours)'
 |---|---|---|---|
 | 0 | u16 | err | 0x1381 0x1382 0x1383 0x1388 |
 
+### `0x2429` NC_BAT_ABSTATEINFORM_CMD † (S→C)
+
+**Verified layout** (basis: zone FUN_00405900)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | abstateIndex |  |
+| 4 | u32 | keepTime | ms |
+
+### `0x2434` NC_BAT_SKILLBASH_CAST_FAIL_ACK (S→C)
+
+**Verified layout** (basis: zone ShinePlayer::so_Routine FUN_0056c790 (deferred from p+0x7f37); client FUN_004aa840)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xFC0..0xFDC, see Z03-combat §5.2 |
+
+### `0x2435` NC_BAT_SKILLBASH_CAST_SUC_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_005792f0)
+
+Empty payload.
+
+### `0x2445` NC_BAT_SKILLBASH_CASTABORT_ACK (S→C)
+
+**Verified layout** (basis: zone FUN_0057c480; client FUN_0049a540 (payload not read))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x20E8 ok, 0x20E9 riding, 0x20EA wrong mode |
+
+### `0x4829` NC_SKILL_SOMEONEREVAVALTOME_CMD † (S→C)
+
+**Verified layout** (basis: zone FUN_0057ab90; client FUN_00575f30)
+
+Empty payload.
+
+### `0x482b` NC_SKILL_REPLYREVIVEFAIL_CMD † (S→C)
+
+**Verified layout** (basis: zone FUN_00418a30)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1506; the client ignores the packet |
+
 ### `0x0821` NC_MISC_TIMEFROMWORLD_CMD (WM→zone)
 
 **Verified layout** (basis: zone FUN_004511a0)
@@ -10378,6 +10480,75 @@ Z01 name was 'link inside the same zone (ours)'
 | 16 | char[16] | zoneIp |  |
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
+
+### `0x4801` NC_SKILL_SKILLTEACH_REQ † (Z→DB)
+
+**Verified layout** (basis: zone FUN_0046c820 (production skill))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | zonehandle |  |
+| 2 | u32 | chrregnum |  |
+| 6 | u32 | chrregnum2 | same value |
+| 10 | u16 | skill |  |
+| 12 | u8 | ispassive | 0 here |
+| 13 | u16 |  | 0xFFFF here |
+
+### `0x4812` NC_SKILL_EMPOWALLOC_DB_REQ † (Z→DB)
+
+**Verified layout** (basis: zone FUN_0044f150)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | zonehandle |  |
+| 2 | u32 | chrregnum |  |
+| 6 | u16 | lockindex | valid when bUseItem |
+| 8 | u16 | skill |  |
+| 10 | u8 | bUseItem |  |
+| 11 | u16 | empower.skill |  |
+| 13 | u16 | empower.plus | new empower bits |
+| 15 | u16 | empower.minus | new empower bits (same value) |
+| 17 | struct | redistitem | u16 lockindex, u8 count|0x80 partial, then the partly used cell and count u64 item keys |
+
+### `0x4825` NC_SKILL_ERASE_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_0057b060)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle |  |
+| 2 | u32 | header.charregistnumber |  |
+| 6 | u16 | skill |  |
+
+### `0x1073` NC_CHAR_EXP_CHANGED_CMD † (Z→WM)
+
+**Verified layout** (basis: zone FUN_0042d830 / FUN_0042e210)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wmHandle |  |
+| 2 | u32 | charNo |  |
+| 6 | u64 | exp |  |
+
+### `0x1074` NC_CHAR_LEVEL_CHANGED_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_0042d830)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wmHandle |  |
+| 2 | u32 | charNo |  |
+| 6 | u8 | level |  |
+
+### `0x244a` NC_BAT_PKINPKFIELD_WMS_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_00433be0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | killerWmHandle |  |
+| 2 | u32 | killerCharNo |  |
+| 6 | u32 | pkCount |  |
 
 ### `0x1083` NC_CHAR_WEDDING_PROPOSE_REQ (zone→CharDB)
 
