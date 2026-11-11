@@ -48,9 +48,9 @@ SERVER_INFO	"PG_AccDB",	0,	0,	0,	0,	"0.0.0.0",	9000,	100,	100
 SERVER_INFO	"PG_ALDB",	1,	0,	0,	0,	"0.0.0.0",	9311,	100,	100
 SERVER_INFO	"PG_W00_CDB",	2,	0,	0,	0,	"0.0.0.0",	9411,	100,	100
 SERVER_INFO	"PG_W00_GLDB",	3,	0,	0,	0,	"0.0.0.0",	9511,	100,	100
-ODBC_INFO	"Account",	0,	0,	"Driver={SQL Server};Server=.\SQLEXPRESS;UID=sa;PWD=REPLACETHISWITHYOURPASSWORD;Database=Account",	"SET LOCK_TIMEOUT 5000;"
-ODBC_INFO	"AccountLog",	1,	0,	"Driver={SQL Server};Server=.\SQLEXPRESS;UID=sa;PWD=REPLACETHISWITHYOURPASSWORD;Database=AccountLog",	"SET LOCK_TIMEOUT 5000;"
-ODBC_INFO	"Statistics",	2,	0,	"Driver={SQL Server};Server=.\SQLEXPRESS;UID=sa;PWD=REPLACETHISWITHYOURPASSWORD;Database=StatisticsData",	"SET LOCK_TIMEOUT 5000;"
-ODBC_INFO	"w00_Character",	10,	0,	"Driver={SQL Server};Server=.\SQLEXPRESS;UID=sa;PWD=REPLACETHISWITHYOURPASSWORD;Database=w00_Character",	"SET LOCK_TIMEOUT 5000;"
-ODBC_INFO	"w00_GameLog",	11,	0,	"Driver={SQL Server};Server=.\SQLEXPRESS;UID=sa;PWD=REPLACETHISWITHYOURPASSWORD;Database=w00_GameLog",	"SET LOCK_TIMEOUT 5000;"
+ODBC_INFO	"Account",	0,	0,	"Driver={SQL Server};Server=.\SQLEXPRESS;UID=sa;PWD=TestPassword123!;Database=Account",	"SET LOCK_TIMEOUT 5000;"
+ODBC_INFO	"AccountLog",	1,	0,	"Driver={SQL Server};Server=.\SQLEXPRESS;UID=sa;PWD=TestPassword123!;Database=AccountLog",	"SET LOCK_TIMEOUT 5000;"
+ODBC_INFO	"Statistics",	2,	0,	"Driver={SQL Server};Server=.\SQLEXPRESS;UID=sa;PWD=TestPassword123!;Database=StatisticsData",	"SET LOCK_TIMEOUT 5000;"
+ODBC_INFO	"w00_Character",	10,	0,	"Driver={SQL Server};Server=.\SQLEXPRESS;UID=sa;PWD=TestPassword123!;Database=w00_Character",	"SET LOCK_TIMEOUT 5000;"
+ODBC_INFO	"w00_GameLog",	11,	0,	"Driver={SQL Server};Server=.\SQLEXPRESS;UID=sa;PWD=TestPassword123!;Database=w00_GameLog",	"SET LOCK_TIMEOUT 5000;"
 #END
