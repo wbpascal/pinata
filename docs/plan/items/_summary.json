@@ -1,0 +1,194 @@
+[
+ [
+  "C01",
+  1,
+  "Client packet-handler inventory",
+  "\u2013",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "W01",
+  1,
+  "World manager core: sessions, world login, characters, zone handoff",
+  "\u2013",
+  "209",
+  "9029"
+ ],
+ [
+  "Z01",
+  1,
+  "Zone core: process, maps, objects, player session, map login/logout",
+  "\u2013",
+  "83",
+  "5309"
+ ],
+ [
+  "W02",
+  2,
+  "World manager: party and raid",
+  "W01",
+  "28",
+  "3996"
+ ],
+ [
+  "W03",
+  2,
+  "World manager: guild and guild academy",
+  "W01",
+  "132",
+  "4640"
+ ],
+ [
+  "W04",
+  2,
+  "World manager: friends, chat routing, KQ, holy promise, instances, misc",
+  "W01",
+  "150",
+  "8786"
+ ],
+ [
+  "Z02",
+  2,
+  "Zone: movement, chat, emotes, sight/briefinfo, NPC menus, scenario",
+  "Z01",
+  "38",
+  "3498"
+ ],
+ [
+  "Z03",
+  2,
+  "Zone: combat, skills, abstates, damage",
+  "Z01",
+  "19",
+  "2024"
+ ],
+ [
+  "Z04",
+  2,
+  "Zone: items, inventory, equipment, upgrades (client side)",
+  "Z01",
+  "52",
+  "10059"
+ ],
+ [
+  "Z05",
+  2,
+  "Zone: item database protocol (ITEMDB, zone\u2194Character server)",
+  "Z04",
+  "108",
+  "6252"
+ ],
+ [
+  "Z06",
+  2,
+  "Zone: trade, booths, gambling, dice",
+  "Z04",
+  "60",
+  "5339"
+ ],
+ [
+  "Z07",
+  2,
+  "Zone: character stats, progression, pets, mounts, mini-house, collection cards",
+  "Z01",
+  "117",
+  "8335"
+ ],
+ [
+  "Z08",
+  2,
+  "Zone: quests, kingdom quests, instances, guild/party/friend zone side, holy promise",
+  "Z01",
+  "117",
+  "6705"
+ ],
+ [
+  "Z09",
+  2,
+  "Zone: world simulation (mobs, NPCs, AI, spawns, drops, scripts, timers)",
+  "Z01, Z03",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "Z10",
+  2,
+  "Zone: certification and the downloaded start script",
+  "Z01",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "D01",
+  2,
+  "Account and AccountLog servers",
+  "\u2013",
+  "60",
+  "3087"
+ ],
+ [
+  "D02",
+  2,
+  "Character server: characters, avatars, save/load",
+  "\u2013",
+  "76",
+  "6612"
+ ],
+ [
+  "D03",
+  2,
+  "Character server: items (ITEMDB), economy, pets, house",
+  "D02",
+  "125",
+  "16256"
+ ],
+ [
+  "D04",
+  2,
+  "Character server: social, guild, quests, skills",
+  "D02",
+  "120",
+  "11251"
+ ],
+ [
+  "D05",
+  2,
+  "GameLog server",
+  "\u2013",
+  "201",
+  "7338"
+ ],
+ [
+  "P01",
+  1,
+  "Packet capture decoder",
+  "\u2013",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "P02",
+  2,
+  "Capture validation (run once per batch of captures)",
+  "P01, captures in re-data/captures/",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "P03",
+  1,
+  "Wireshark dissector (Lua plugin, generated from the docs)",
+  "P01 (soft: its synthetic capture is a handy test file)",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "X01",
+  3,
+  "Integration and review",
+  "all",
+  "\u2013",
+  "\u2013"
+ ]
+]

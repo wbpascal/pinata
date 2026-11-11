@@ -1,0 +1,903 @@
+{
+ "_about": "W01: World manager core layouts read from the WM handlers (wm export) and cross-checked with the client where client-facing. Names marked (ours) are descriptive.",
+ "packets": {
+  "wm": {
+   "0x0c0d": {
+    "dir": "Login\u2192WM",
+    "name": "world login request (ours)",
+    "basis": "wm FUN_00424950",
+    "fields": [
+     [
+      0,
+      "u16",
+      "loginHandle",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "worldNo",
+      ""
+     ],
+     [
+      3,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      7,
+      "char[256]",
+      "userId",
+      ""
+     ],
+     [
+      263,
+      "u16[32]",
+      "validate",
+      "XOR of all 32 words = table slot"
+     ],
+     [
+      327,
+      "u32[5]",
+      "extra",
+      ""
+     ]
+    ],
+    "notes": "0x15B bytes"
+   },
+   "0x0c0e": {
+    "dir": "WM\u2192Login",
+    "name": "world login accepted (ours)",
+    "basis": "wm FUN_00424950",
+    "fields": [
+     [
+      0,
+      "bytes[347]",
+      "request",
+      "copy of 0x0C0D"
+     ],
+     [
+      347,
+      "u8",
+      "ok",
+      "always 1"
+     ]
+    ]
+   },
+   "0x0c0f": {
+    "dir": "C\u2192S",
+    "name": "world login (ours)",
+    "basis": "wm FUN_00419860 / client FUN_00471980",
+    "fields": [
+     [
+      0,
+      "char[256]",
+      "userId",
+      "not checked against the pending entry"
+     ],
+     [
+      256,
+      "u16[32]",
+      "validate",
+      "from Login 0x0C0C"
+     ]
+    ],
+    "notes": "0x140 bytes"
+   },
+   "0x0c15": {
+    "dir": "S\u2192C",
+    "name": "world login refused (ours)",
+    "basis": "wm FUN_00419860 / FUN_0040ede0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "0x44 bad key, 0x46 DB error; client does not read it"
+     ]
+    ]
+   },
+   "0x0c17": {
+    "dir": "S\u2192C",
+    "name": "kick reason (ours)",
+    "basis": "wm FUN_004305a0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "reason",
+      "0x683 double login, 0x68F OPTool kick, or zone-supplied (0x0C1A)"
+     ]
+    ]
+   },
+   "0x0c60": {
+    "dir": "WM\u2192AccountDB",
+    "name": "NC_USER_RETURN_CHECK_REQ",
+    "basis": "wm FUN_00419860",
+    "fields": [
+     [
+      0,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "handle",
+      ""
+     ]
+    ]
+   },
+   "0x0c61": {
+    "dir": "AccountDB\u2192WM",
+    "name": "NC_USER_RETURN_CHECK_ACK",
+    "basis": "wm FUN_00408740",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "hasHistory",
+      ""
+     ],
+     [
+      7,
+      "i32",
+      "seconds",
+      "compared with UserComeback_/UserNewbie_ server parameters (days)"
+     ]
+    ]
+   },
+   "0x0c62": {
+    "dir": "WM\u2192AccountLogDB",
+    "name": "NC_USER_LOGOUT_LAST_DAY_REQ",
+    "basis": "wm FUN_00408740",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "userNo",
+      ""
+     ]
+    ]
+   },
+   "0x0c63": {
+    "dir": "AccountLogDB\u2192WM",
+    "name": "NC_USER_LOGOUT_LAST_DAY_ACK",
+    "basis": "wm FUN_004093b0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      6,
+      "i32",
+      "secondsSinceLogout",
+      ""
+     ]
+    ]
+   },
+   "0x0c12": {
+    "dir": "WM\u2192CharDB",
+    "name": "NC_USER_AVATARINFO_REQ",
+    "basis": "wm FUN_00408740 / FUN_00412ee0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "userNo",
+      ""
+     ]
+    ]
+   },
+   "0x0c13": {
+    "dir": "CharDB\u2192WM",
+    "name": "NC_USER_AVATARINFO_ACK",
+    "basis": "wm FUN_0040ede0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "count",
+      "0xFF = DB error"
+     ],
+     [
+      3,
+      "AVATAR[count]",
+      "avatars",
+      "0x82 bytes each, see W01 \u00a76.1"
+     ]
+    ]
+   },
+   "0x0c14": {
+    "dir": "S\u2192C",
+    "name": "avatar list (ours)",
+    "basis": "wm FUN_0040ede0 / client FUN_00471720",
+    "fields": [
+     [
+      0,
+      "u16",
+      "wmHandle",
+      "client keeps it for 0x1801"
+     ],
+     [
+      2,
+      "u8",
+      "count",
+      ""
+     ],
+     [
+      3,
+      "AVATAR[count]",
+      "avatars",
+      "verbatim copy of 0x0C13"
+     ]
+    ]
+   },
+   "0x0c34": {
+    "dir": "S\u2192C",
+    "name": "return-to-world-select token (ours)",
+    "basis": "wm FUN_00424a70 / client FUN_004766a0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "result",
+      "0x1E58 ok"
+     ],
+     [
+      2,
+      "char[32]",
+      "token",
+      ""
+     ]
+    ]
+   },
+   "0x0c35": {
+    "dir": "WM\u2192Login",
+    "name": "token request (ours)",
+    "basis": "wm FUN_00417330",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      6,
+      "char[256]",
+      "userId",
+      ""
+     ],
+     [
+      262,
+      "u32",
+      "ip",
+      ""
+     ]
+    ]
+   },
+   "0x1001": {
+    "dir": "C\u2192S",
+    "name": "NC_CHAR_LOGIN_REQ",
+    "basis": "wm FUN_00422be0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "slot",
+      "0..5"
+     ]
+    ]
+   },
+   "0x1002": {
+    "dir": "S\u2192C",
+    "name": "character login failed (ours)",
+    "basis": "wm FUN_00422be0 / FUN_00410040",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "0x143 bad slot, 0x144 empty slot, 0x145 zone/map not available or char already playing, 0x31EB no selected avatar, CharDB codes via 0x1006"
+     ]
+    ]
+   },
+   "0x1003": {
+    "dir": "S\u2192C",
+    "name": "character login ok (ours)",
+    "basis": "wm FUN_00410040 / client FUN_00476190",
+    "fields": [
+     [
+      0,
+      "char[16]",
+      "zoneIp",
+      ""
+     ],
+     [
+      16,
+      "u16",
+      "zonePort",
+      ""
+     ]
+    ]
+   },
+   "0x1004": {
+    "dir": "WM\u2192CharDB",
+    "name": "NC_CHAR_CHARDATA_REQ",
+    "basis": "wm FUN_00422be0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      10,
+      "u32",
+      "time",
+      "day start - 1 day (inferred)"
+     ]
+    ]
+   },
+   "0x1036": {
+    "dir": "WM\u2192CharDB",
+    "name": "NC_CHAR_LOGIN_DB",
+    "basis": "wm FUN_00410040",
+    "fields": [
+     [
+      0,
+      "u32",
+      "charNo",
+      ""
+     ],
+     [
+      4,
+      "char[12]",
+      "map",
+      ""
+     ],
+     [
+      16,
+      "u32",
+      "x",
+      ""
+     ],
+     [
+      20,
+      "u32",
+      "y",
+      ""
+     ],
+     [
+      24,
+      "u64",
+      "money",
+      ""
+     ],
+     [
+      32,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      36,
+      "u32[5]",
+      "extra",
+      ""
+     ]
+    ]
+   },
+   "0x1037": {
+    "dir": "WM\u2192CharDB",
+    "name": "NC_CHAR_LOGOUT_DB",
+    "basis": "wm FUN_00436d50",
+    "fields": [
+     [
+      0,
+      "u32",
+      "charNo",
+      ""
+     ],
+     [
+      4,
+      "char[12]",
+      "map",
+      ""
+     ],
+     [
+      16,
+      "u32",
+      "x",
+      ""
+     ],
+     [
+      20,
+      "u32",
+      "y",
+      ""
+     ],
+     [
+      24,
+      "u16",
+      "playMinutes",
+      ""
+     ],
+     [
+      26,
+      "u8",
+      "closeReason-0x80",
+      ""
+     ],
+     [
+      27,
+      "u64",
+      "money",
+      ""
+     ]
+    ]
+   },
+   "0x1401": {
+    "dir": "C\u2192S",
+    "name": "character create (ours)",
+    "basis": "wm FUN_004229f0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "slot",
+      ""
+     ],
+     [
+      1,
+      "char[20]",
+      "name",
+      "1..20 chars, no space"
+     ],
+     [
+      21,
+      "u8",
+      "raceClassGender",
+      "class = bits 2-6"
+     ],
+     [
+      22,
+      "u8[3]",
+      "hair/colour/face (inferred)",
+      ""
+     ]
+    ]
+   },
+   "0x1402": {
+    "dir": "WM\u2192CharDB",
+    "name": "character create request (ours)",
+    "basis": "wm FUN_004229f0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "worldNo",
+      ""
+     ],
+     [
+      7,
+      "u8",
+      "zero",
+      ""
+     ],
+     [
+      8,
+      "bytes[25]",
+      "request",
+      "client 0x1401 payload"
+     ]
+    ]
+   },
+   "0x1407": {
+    "dir": "C\u2192S",
+    "name": "character delete (ours)",
+    "basis": "wm FUN_00412fa0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "slot",
+      ""
+     ]
+    ]
+   },
+   "0x1408": {
+    "dir": "WM\u2192CharDB",
+    "name": "NC_AVATAR_ERASEDATA_REQ",
+    "basis": "wm FUN_00412fa0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "slot",
+      ""
+     ]
+    ]
+   },
+   "0x140f": {
+    "dir": "C\u2192S",
+    "name": "character rename (ours)",
+    "basis": "wm FUN_0041a640",
+    "fields": [
+     [
+      0,
+      "u8",
+      "slot",
+      ""
+     ],
+     [
+      1,
+      "char[20]",
+      "name",
+      "1..16 chars"
+     ]
+    ]
+   },
+   "0x1411": {
+    "dir": "WM\u2192CharDB",
+    "name": "character rename request (ours)",
+    "basis": "wm FUN_0041a640",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "slot",
+      ""
+     ],
+     [
+      7,
+      "char[20]",
+      "name",
+      ""
+     ]
+    ]
+   },
+   "0x101c": {
+    "dir": "Zone\u2192WM",
+    "name": "NC_CHAR_ZONE_CHARDATA_REQ",
+    "basis": "wm FUN_00428ba0",
+    "fields": [
+     [
+      0,
+      "u8[6]",
+      "zoneRef",
+      "echoed in every reply"
+     ],
+     [
+      6,
+      "u16",
+      "wmHandle",
+      ""
+     ],
+     [
+      8,
+      "char[20]",
+      "charName",
+      "must equal the cached name"
+     ]
+    ]
+   },
+   "0x101d": {
+    "dir": "WM\u2192Zone",
+    "name": "NC_CHAR_ZONE_CHARDATA_ACK",
+    "basis": "wm FUN_00428ba0",
+    "fields": [
+     [
+      0,
+      "u8[6]",
+      "zoneRef",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "wmHandle",
+      ""
+     ]
+    ]
+   },
+   "0x101e": {
+    "dir": "WM\u2192Zone",
+    "name": "NC_CHAR_ZONE_CHARDATAFAIL_ACK",
+    "basis": "wm FUN_00428ba0",
+    "fields": [
+     [
+      0,
+      "u8[6]",
+      "zoneRef",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "error",
+      "0x141 unknown handle, 0x590 name mismatch"
+     ]
+    ]
+   },
+   "0x104b": {
+    "dir": "Zone\u2192WM",
+    "name": "NC_CHAR_REGISTNUMBER_REQ",
+    "basis": "wm FUN_0042f1e0",
+    "fields": [
+     [
+      0,
+      "u8[6]",
+      "zoneRef",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "wmHandle",
+      ""
+     ],
+     [
+      8,
+      "char[20]",
+      "charName",
+      ""
+     ]
+    ]
+   },
+   "0x104c": {
+    "dir": "WM\u2192Zone",
+    "name": "NC_CHAR_REGISTNUMBER_ACK",
+    "basis": "wm FUN_0042f1e0",
+    "fields": [
+     [
+      0,
+      "u8[6]",
+      "zoneRef",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "userNo",
+      "-1 = refused"
+     ],
+     [
+      10,
+      "u32",
+      "charNo",
+      "-1 = refused"
+     ],
+     [
+      14,
+      "u16",
+      "wmHandle",
+      ""
+     ],
+     [
+      16,
+      "char[20]",
+      "charName",
+      ""
+     ]
+    ]
+   },
+   "0x0c16": {
+    "dir": "WM\u2192Zone",
+    "name": "NC_USER_KICKOFFFROMWORLD_CMD",
+    "basis": "wm FUN_00439540",
+    "fields": [
+     [
+      0,
+      "u8[6]",
+      "0xFF",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "userNo",
+      ""
+     ]
+    ]
+   },
+   "0x0c19": {
+    "dir": "WM\u2192Zone",
+    "name": "NC_USER_CONNECTCUT2ZONE_CMD",
+    "basis": "wm FUN_00437030 / FUN_00412df0",
+    "fields": [
+     [
+      0,
+      "u8[6]",
+      "0xFF",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "userNo",
+      ""
+     ]
+    ]
+   },
+   "0x0808": {
+    "dir": "WM\u2192Login",
+    "name": "world user count (ours)",
+    "basis": "wm FUN_00438d10",
+    "fields": [
+     [
+      0,
+      "u16",
+      "currentUsers",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "maxUsers",
+      "capacity or OPTool limit"
+     ]
+    ]
+   },
+   "0x0802": {
+    "dir": "S2S",
+    "name": "NC_MISC_S2SCONNECTION_REQ",
+    "basis": "wm FUN_004246c0 / FUN_004283e0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "echo",
+      "returned in 0x0803"
+     ],
+     [
+      1,
+      "u8",
+      "server_id_to",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "server_id_from",
+      ""
+     ],
+     [
+      3,
+      "u8",
+      "worldNo",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "zoneNo",
+      ""
+     ],
+     [
+      5,
+      "u16",
+      "key",
+      "server_id_to + server_id_from"
+     ]
+    ]
+   },
+   "0x0803": {
+    "dir": "S2S",
+    "name": "NC_MISC_S2SCONNECTION_ACK",
+    "basis": "wm FUN_00424720 / FUN_004283e0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "echo",
+      ""
+     ],
+     [
+      1,
+      "u16",
+      "result",
+      "0 = ok"
+     ]
+    ]
+   }
+  }
+ }
+}

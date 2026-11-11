@@ -1,0 +1,3890 @@
+{
+ "s2c": {
+  "0x0803": [
+   {
+    "op": 2051,
+    "func": "FUN_00404830",
+    "size": 3,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 3,
+      "type": "bytes[3]",
+      "values": [],
+      "exprs": [
+       "memcpy from &local_2320"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0804": [
+   {
+    "op": 2052,
+    "func": "FUN_00405970",
+    "size": 0,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x081e": [
+   {
+    "op": 2078,
+    "func": "FUN_00403830",
+    "size": 40,
+    "size_expr": null,
+    "fields": {
+     "2": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[1]"
+      ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       4368,
+       4369
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "4": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "*(int *)(param_1 + 2)"
+      ],
+      "kind": "write"
+     },
+     "8": {
+      "size": 8183,
+      "type": "char[8183]",
+      "values": [],
+      "exprs": [
+       "_sprintf from \"%09u%09u%09u\""
+      ],
+      "kind": "string"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0830": [
+   {
+    "op": 2096,
+    "func": "FUN_00402ba0",
+    "size": 9,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[1]"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_1 + 2)"
+      ],
+      "kind": "write"
+     },
+     "6": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[4]"
+      ],
+      "kind": "write"
+     },
+     "8": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "(char)uVar2"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0839": [
+   {
+    "op": 2105,
+    "func": "FUN_00402cb0",
+    "size": 15,
+    "size_expr": null,
+    "fields": {
+     "4": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_1 + 3)"
+      ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_1 + 1)"
+      ],
+      "kind": "write"
+     },
+     "8": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_1[5]"
+      ],
+      "kind": "write"
+     },
+     "13": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "*(undefined2 *)((int)param_1 + 0xd)"
+      ],
+      "kind": "write"
+     },
+     "11": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "*(undefined2 *)((int)param_1 + 0xb)"
+      ],
+      "kind": "write"
+     },
+     "9": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       5445
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c08": [
+   {
+    "op": 3080,
+    "func": "FUN_00403720",
+    "size": 31,
+    "size_expr": null,
+    "fields": {
+     "2": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "250": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "254": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "242": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "246": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "234": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "238": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "226": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "230": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "218": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "222": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "210": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "214": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "202": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "206": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "194": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "198": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "186": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "190": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "178": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "182": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "170": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "174": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "162": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "166": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "154": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "158": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "146": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "150": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "138": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "142": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "130": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "134": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "122": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "126": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "114": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "118": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "106": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "110": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "98": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "102": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "90": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "94": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "82": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "86": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "74": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "78": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "66": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "70": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "58": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "62": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "50": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "54": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "42": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "46": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "34": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "38": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "26": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "30": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "18": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "22": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "10": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "14": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "6": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[1]"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [
+     "+2: FUN_00402050",
+     "+2: FUN_00402180",
+     "+2: FUN_00402180"
+    ],
+    "raw": true
+   },
+   {
+    "op": 3080,
+    "func": "FUN_004039c0",
+    "size": 31,
+    "size_expr": null,
+    "fields": {
+     "2": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "250": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "254": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "242": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "246": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "234": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "238": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "226": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "230": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "218": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "222": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "210": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "214": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "202": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "206": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "194": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "198": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "186": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "190": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "178": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "182": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "170": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "174": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "162": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "166": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "154": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "158": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "146": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "150": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "138": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "142": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "130": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "134": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "122": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "126": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "114": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "118": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "106": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "110": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "98": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "102": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "90": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "94": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "82": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "86": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "74": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "78": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "66": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "70": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "58": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "62": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "50": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "54": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "42": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "46": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "34": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "38": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "26": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "30": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "18": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "22": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "10": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "14": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "6": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[1]"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [
+     "+2: FUN_00402050",
+     "+2: FUN_004022c0"
+    ],
+    "raw": true
+   }
+  ],
+  "0x0c27": [
+   {
+    "op": 3111,
+    "func": "FUN_00402610",
+    "size": 313,
+    "size_expr": null,
+    "fields": {
+     "256": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[0x81]"
+      ],
+      "kind": "write"
+     },
+     "258": {
+      "size": 50,
+      "type": "bytes[50]",
+      "values": [],
+      "exprs": [
+       "memset 0"
+      ],
+      "kind": "blob"
+     },
+     "308": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0,
+       1,
+       2,
+       3
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "309": {
+      "size": 4,
+      "type": "i32",
+      "values": [
+       180
+      ],
+      "exprs": [
+       "(int)uVar7 / 0x3c",
+       "local_288"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [
+     "+0: FUN_004022c0"
+    ],
+    "raw": false
+   }
+  ],
+  "0x0c3a": [
+   {
+    "op": 3130,
+    "func": "FUN_00403b20",
+    "size": 31,
+    "size_expr": null,
+    "fields": {
+     "2": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "250": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "254": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "242": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "246": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "234": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "238": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "226": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "230": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "218": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "222": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "210": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "214": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "202": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "206": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "194": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "198": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "186": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "190": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "178": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "182": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "170": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "174": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "162": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "166": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "154": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "158": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "146": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "150": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "138": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "142": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "130": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "134": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "122": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "126": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "114": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "118": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "106": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "110": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "98": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "102": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "90": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "94": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "82": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "86": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "74": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "78": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "66": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "70": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "58": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "62": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "50": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "54": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "42": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "46": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "34": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "38": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "26": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "30": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "18": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "22": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "10": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "14": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "6": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[1]"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [
+     "+2: FUN_00402050",
+     "+2: FUN_004022c0"
+    ],
+    "raw": true
+   }
+  ],
+  "0x0c3f": [
+   {
+    "op": 3135,
+    "func": "FUN_00402d40",
+    "size": 8,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[1]"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       65,
+       68,
+       70
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "4": {
+      "size": 4,
+      "type": "i32",
+      "values": [
+       -1
+      ],
+      "exprs": [
+       "local_1b8"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c4c": [
+   {
+    "op": 3148,
+    "func": "FUN_00403e10",
+    "size": 306,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[1]"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 2,
+      "type": "i16",
+      "values": [
+       65,
+       83,
+       84,
+       85,
+       86,
+       87,
+       88,
+       89,
+       90,
+       91,
+       92,
+       93,
+       94,
+       95
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "4": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       4294967295
+      ],
+      "exprs": [
+       "uStack_1c1a8"
+      ],
+      "kind": "write"
+     },
+     "8": {
+      "size": 24,
+      "type": "char[24]",
+      "values": [],
+      "exprs": [
+       "__mbsnbcpy from (uchar *)_Source"
+      ],
+      "kind": "string"
+     },
+     "32": {
+      "size": 254,
+      "type": "char[254]",
+      "values": [],
+      "exprs": [
+       "__mbsnbcpy from (uchar *)_Source_00"
+      ],
+      "kind": "string"
+     },
+     "286": {
+      "size": 20,
+      "type": "char[20]",
+      "values": [],
+      "exprs": [
+       "__mbsnbcpy from (uchar *)puStack_1c1ac"
+      ],
+      "kind": "string"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0c54": [
+   {
+    "op": 3156,
+    "func": "FUN_00403c80",
+    "size": 31,
+    "size_expr": null,
+    "fields": {
+     "2": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "250": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "254": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "242": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "246": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "234": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "238": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "226": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "230": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "218": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "222": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "210": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "214": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "202": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "206": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "194": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "198": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "186": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "190": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "178": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "182": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "170": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "174": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "162": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "166": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "154": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "158": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "146": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "150": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "138": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "142": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "130": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "134": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "122": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "126": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "114": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "118": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "106": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "110": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "98": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "102": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "90": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "94": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "82": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "86": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "74": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "78": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "66": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "70": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "58": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "62": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "50": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "54": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "42": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "46": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "34": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "38": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "26": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "30": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "18": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "22": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "10": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "14": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "6": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[1]"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [
+     "+2: FUN_00402050",
+     "+2: FUN_004022c0"
+    ],
+    "raw": true
+   }
+  ],
+  "0x0c5c": [
+   {
+    "op": 3164,
+    "func": "FUN_00402fe0",
+    "size": 353,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[1]"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       65,
+       67
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "4": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       4294967295
+      ],
+      "exprs": [
+       "local_28"
+      ],
+      "kind": "write"
+     },
+     "8": {
+      "size": 256,
+      "type": "char[256]",
+      "values": [],
+      "exprs": [
+       "__mbsnbcpy from (uchar *)(param_1 + 2)"
+      ],
+      "kind": "string"
+     },
+     "268": {
+      "size": 32,
+      "type": "char[32]",
+      "values": [],
+      "exprs": [
+       "__mbsnbcpy from (uchar *)(param_1 + 0x84)"
+      ],
+      "kind": "string"
+     },
+     "304": {
+      "size": 20,
+      "type": "char[20]",
+      "values": [],
+      "exprs": [
+       "__mbsnbcpy from (uchar *)(param_1 + 0x96)"
+      ],
+      "kind": "string"
+     },
+     "341": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_1 + 0xa4)"
+      ],
+      "kind": "write"
+     },
+     "333": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_1 + 0xa0)"
+      ],
+      "kind": "write"
+     },
+     "337": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_1 + 0xa2)"
+      ],
+      "kind": "write"
+     },
+     "345": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_1 + 0xa6)"
+      ],
+      "kind": "write"
+     },
+     "349": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_1 + 0xa8)"
+      ],
+      "kind": "write"
+     },
+     "264": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "300": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "323": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       0
+      ],
+      "exprs": [
+       "CONCAT11(local_24,(undefined1)local_200c)"
+      ],
+      "kind": "write"
+     },
+     "325": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [
+       "local_20"
+      ],
+      "kind": "write"
+     },
+     "329": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [
+       "local_1c"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0c61": [
+   {
+    "op": 3169,
+    "func": "FUN_00403220",
+    "size": 11,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_1[1]"
+      ],
+      "kind": "write"
+     },
+     "6": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'",
+       "'\\x01'"
+      ],
+      "kind": "write"
+     },
+     "7": {
+      "size": 4,
+      "type": "i32",
+      "values": [
+       0
+      ],
+      "exprs": [
+       "local_211c"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "local_212c"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2802": [
+   {
+    "op": 10242,
+    "func": "FUN_00404dd0",
+    "size": null,
+    "size_expr": "iVar1 * 7 + 4",
+    "fields": {
+     "8191": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "DAT_00449dc4 ^ (uint)&stack0xfffffffc"
+      ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_1[1]"
+      ],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0044b808"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "(undefined2)iVar1"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2804": [
+   {
+    "op": 10244,
+    "func": "FUN_00404fc0",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       1536
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2806": [
+   {
+    "op": 10246,
+    "func": "FUN_00405070",
+    "size": 4,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_1[1]"
+      ],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0044b808"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2808": [
+   {
+    "op": 10248,
+    "func": "FUN_00405140",
+    "size": 170,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 170,
+      "type": "bytes[170]",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_1[1]",
+       "memset 0"
+      ],
+      "kind": "blob"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0044b808"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ]
+ },
+ "c2s": {
+  "0x0802": {
+   "CPFs": {
+    "fields": {
+     "0": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "1": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "server_id_to"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "id",
+       "server_id_from"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "3": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "w"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "z"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "5": {
+      "type": "u16",
+      "size": 2,
+      "names": [
+       "key"
+      ],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404830",
+    "name": "NC_MISC_S2SCONNECTION_REQ"
+   }
+  },
+  "0x0803": {
+   "CPFs": {
+    "fields": {
+     "1": {
+      "type": "i16",
+      "size": 2,
+      "names": [],
+      "checks": [
+       "== 0"
+      ],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404ce0",
+    "name": null
+   }
+  },
+  "0x2801": {
+   "CPFs": {
+    "fields": {
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404dd0",
+    "name": null
+   }
+  },
+  "0x2805": {
+   "CPFs": {
+    "fields": {
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405070",
+    "name": null
+   }
+  },
+  "0x2807": {
+   "CPFs": {
+    "fields": {
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405140",
+    "name": null
+   }
+  },
+  "0x0823": {
+   "CPFs": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00402510",
+    "name": null
+   }
+  },
+  "0x0c07": {
+   "CParserAccount": {
+    "fields": {
+     "258": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "262": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "266": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "270": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004039c0",
+    "name": null
+   }
+  },
+  "0x0c10": {
+   "CParserAccount": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00402510",
+    "name": null
+   }
+  },
+  "0x0c11": {
+   "CParserAccount": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00402510",
+    "name": null
+   }
+  },
+  "0x140d": {
+   "CParserAccount": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00402510",
+    "name": null
+   }
+  },
+  "0x140e": {
+   "CParserAccount": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00402510",
+    "name": null
+   }
+  },
+  "0x0c1e": {
+   "CParserAccount": {
+    "fields": {
+     "2": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "22": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403720",
+    "name": null
+   }
+  },
+  "0x081d": {
+   "CParserAccount": {
+    "fields": {
+     "2": {
+      "type": "i32",
+      "size": 4,
+      "names": [
+       "UserNo"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403830",
+    "name": "NC_MISC_WEB_DB_KEY_REQ"
+   }
+  },
+  "0x0820": {
+   "CParserAccount": {
+    "fields": {
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [
+       "AddCash"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402530",
+    "name": "NC_MISC_EVENT_HIT3_ADD_CASH"
+   }
+  },
+  "0x0c26": {
+   "CParserAccount": {
+    "fields": {
+     "0": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "256": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402610",
+    "name": null
+   }
+  },
+  "0x0c28": {
+   "CParserAccount": {
+    "fields": {
+     "50": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402a40",
+    "name": null
+   }
+  },
+  "0x082f": {
+   "CParserAccount": {
+    "fields": {
+     "2": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "9": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "d."
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "11": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "d."
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [
+       "nCharNo"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "d."
+      ],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402ba0",
+    "name": null
+   }
+  },
+  "0x0838": {
+   "CParserAccount": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "11": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "9": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402cb0",
+    "name": null
+   }
+  },
+  "0x0c39": {
+   "CParserAccount": {
+    "fields": {
+     "258": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "262": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "266": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "270": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403b20",
+    "name": null
+   }
+  },
+  "0x0c3e": {
+   "CParserAccount": {
+    "fields": {
+     "2": {
+      "type": "char*",
+      "size": 32,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0x20"
+      ]
+     },
+     "38": {
+      "type": "char*",
+      "size": 32,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0x20"
+      ]
+     },
+     "74": {
+      "type": "char*",
+      "size": 16,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0x10"
+      ]
+     },
+     "94": {
+      "type": "char*",
+      "size": 6,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=6"
+      ]
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402d40",
+    "name": "NC_USER_TW_PASSWORD_CHECK_REQ"
+   }
+  },
+  "0x0c4b": {
+   "CParserAccount": {
+    "fields": {
+     "26": {
+      "type": "char*",
+      "size": 36,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0x24"
+      ]
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403e10",
+    "name": null
+   }
+  },
+  "0x0c5b": {
+   "CParserAccount": {
+    "fields": {
+     "326": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "318": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "322": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "330": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "334": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "char*",
+      "size": 256,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0x100"
+      ]
+     },
+     "262": {
+      "type": "char*",
+      "size": 32,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0x20"
+      ]
+     },
+     "298": {
+      "type": "char*",
+      "size": 20,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0x14"
+      ]
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402fe0",
+    "name": null
+   }
+  },
+  "0x0c53": {
+   "CParserAccount": {
+    "fields": {
+     "258": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "262": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "266": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "270": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403c80",
+    "name": null
+   }
+  },
+  "0x0c60": {
+   "CParserAccount": {
+    "fields": {
+     "2": {
+      "type": "u32",
+      "size": 4,
+      "names": [
+       "UserNo"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403220",
+    "name": "NC_USER_RETURN_CHECK_REQ"
+   }
+  },
+  "0x0c64": {
+   "CParserAccount": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [
+       "UserNo"
+      ],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403480",
+    "name": "NC_USER_RETURN_CHECK_REQ"
+   }
+  }
+ }
+}

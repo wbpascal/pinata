@@ -1,0 +1,6793 @@
+{
+ "store": "FUN_00431160",
+ "sendid": "FUN_0044fa10",
+ "zbuf": null,
+ "tables": [
+  {
+   "parser": "CPFs",
+   "arg": "NETPACKET",
+   "ctors": [
+    "0043d2f0"
+   ],
+   "entries": [
+    {
+     "dept": 2,
+     "cmd": 1,
+     "op": 2049,
+     "handler": "FUN_0043c7a0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0802": 0
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 2,
+     "op": 2050,
+     "handler": "FUN_0043c880",
+     "name": "NC_MISC_S2SCONNECTION_REQ",
+     "name_src": "literal",
+     "sends": {
+      "0x0803": 0
+     },
+     "reads": {
+      "0": "undefined1",
+      "1": "byte",
+      "2": "byte",
+      "3": "byte",
+      "4": "byte",
+      "5": "ushort"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 3,
+     "op": 2051,
+     "handler": "FUN_0043cd20",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "1": "short"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 4,
+     "op": 2052,
+     "handler": "LAB_0043cdf0",
+     "sends": {}
+    },
+    {
+     "dept": 2,
+     "cmd": 5,
+     "op": 2053,
+     "handler": "FUN_004503c0",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 10,
+     "cmd": 1,
+     "op": 10241,
+     "handler": "FUN_0043ce10",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2802": 0
+     },
+     "reads": {
+      "0": "ushort"
+     }
+    },
+    {
+     "dept": 10,
+     "cmd": 3,
+     "op": 10243,
+     "handler": "FUN_0043d000",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2804": 0
+     }
+    },
+    {
+     "dept": 10,
+     "cmd": 5,
+     "op": 10245,
+     "handler": "FUN_0043d0b0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2806": 0
+     },
+     "reads": {
+      "0": "ushort"
+     }
+    },
+    {
+     "dept": 10,
+     "cmd": 7,
+     "op": 10247,
+     "handler": "FUN_0043d180",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2808": 0
+     },
+     "reads": {
+      "0": "ushort"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 35,
+     "op": 2083,
+     "handler": "FUN_0043d2d0",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    }
+   ]
+  },
+  {
+   "parser": "CParserCharacter",
+   "arg": "",
+   "ctors": [
+    "0043b040"
+   ],
+   "entries": [
+    {
+     "dept": 5,
+     "cmd": 2,
+     "op": 5122,
+     "handler": "FUN_00404b30",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x1403": 0,
+      "0x1405": 0
+     },
+     "reads": {
+      "13": "undefined4",
+      "17": "undefined4",
+      "21": "undefined4",
+      "25": "undefined4"
+     }
+    },
+    {
+     "dept": 5,
+     "cmd": 8,
+     "op": 5128,
+     "handler": "FUN_00404cd0",
+     "name": "NC_AVATAR_ERASEDATA_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0412": 0,
+      "0x1409": 0,
+      "0x140b": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "int",
+      "11": "int"
+     }
+    },
+    {
+     "dept": 5,
+     "cmd": 17,
+     "op": 5137,
+     "handler": "FUN_00436030",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x1412": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "7": "undefined4",
+      "11": "undefined4",
+      "15": "undefined4",
+      "19": "undefined4",
+      "23": "undefined4"
+     }
+    },
+    {
+     "dept": 5,
+     "cmd": 19,
+     "op": 5139,
+     "handler": "FUN_004054f0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x1414": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "int",
+      "6": "ushort"
+     }
+    },
+    {
+     "dept": 5,
+     "cmd": 21,
+     "op": 5141,
+     "handler": "FUN_00436150",
+     "name": "NC_AVATAR_GUILD_MEMBER_DATA_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x1416": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "ushort"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 18,
+     "op": 3090,
+     "handler": "FUN_004050b0",
+     "name": "NC_USER_AVATARINFO_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0c13": 0,
+      "0x0c5f": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 4,
+     "op": 4100,
+     "handler": "FUN_00438dc0",
+     "name": "NC_CHAR_CHARDATA_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x001d": 1,
+      "0x0045": 1,
+      "0x0139": 1,
+      "0x018d": 1,
+      "0x0405": 1,
+      "0x0844": 0,
+      "0x1005": 0,
+      "0x1006": 0,
+      "0x1007": 0,
+      "0x1008": 0,
+      "0x100a": 0,
+      "0x100b": 1,
+      "0x100c": 0,
+      "0x100d": 0,
+      "0x100e": 0,
+      "0x1010": 0,
+      "0x1012": 0,
+      "0x1017": 1,
+      "0x1019": 0,
+      "0x101a": 0,
+      "0x101b": 0,
+      "0x1097": 0,
+      "0x10ca": 0,
+      "0x10cc": 0,
+      "0x10cf": 0,
+      "0x10d2": 0,
+      "0x10d5": 0,
+      "0x10d8": 0,
+      "0x10dc": 0,
+      "0x10e2": 0,
+      "0x10e5": 0,
+      "0x10e8": 0,
+      "0x1114": 1,
+      "0x111e": 1,
+      "0x1121": 1,
+      "0x46e7": 1,
+      "0x541c": 0,
+      "0x702c": 1,
+      "0x9427": 1,
+      "0x9429": 1,
+      "0x9444": 1,
+      "0xa801": 0
+     },
+     "reads": {
+      "2": "undefined4",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 54,
+     "op": 4150,
+     "handler": "FUN_00405810",
+     "name": "NC_CHAR_LOGIN_DB",
+     "name_src": "handler",
+     "sends": {
+      "0x040a": 0,
+      "0x541c": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 55,
+     "op": 4151,
+     "handler": "FUN_00405b30",
+     "name": "NC_CHAR_LOGOUT_DB",
+     "name_src": "handler",
+     "sends": {
+      "0x040b": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "24": "ushort"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 1,
+     "op": 16385,
+     "handler": "FUN_004064c0",
+     "name": "NC_CHARSAVE_ALL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x4002": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort",
+      "12": "undefined4",
+      "29": "ptr",
+      "77": "ptr"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 3,
+     "op": 16387,
+     "handler": "FUN_00406610",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "6": "ptr"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 4,
+     "op": 16388,
+     "handler": "FUN_00406640",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "6": "ptr"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 13,
+     "op": 16397,
+     "handler": "FUN_00406940",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "6": "ptr"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 5,
+     "op": 16389,
+     "handler": "FUN_00406670",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x4006": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 9,
+     "op": 16393,
+     "handler": "FUN_00406760",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x400a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 7,
+     "op": 16391,
+     "handler": "FUN_00406850",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x4008": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 11,
+     "op": 16395,
+     "handler": "FUN_00406970",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 16,
+     "cmd": 24,
+     "op": 16408,
+     "handler": "FUN_004069a0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "6": "undefined4",
+      "10": "undefined4"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 26,
+     "op": 16410,
+     "handler": "FUN_00406a40",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 28,
+     "op": 16412,
+     "handler": "FUN_00406ae0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 35,
+     "op": 16419,
+     "handler": "FUN_00424140",
+     "name": "NC_CHARSAVE_ITEMACTIONCOOLTIME_REQ",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "2": "undefined4",
+      "6": "ushort"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 39,
+     "op": 16423,
+     "handler": "FUN_00424300",
+     "name": "NC_CHARSAVE_DB_UI_STATE_SAVE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x4028": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "byte"
+     }
+    },
+    {
+     "dept": 17,
+     "cmd": 3,
+     "op": 17411,
+     "handler": "FUN_00406d00",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x043e": 0,
+      "0x4404": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "7": "undefined2",
+      "9": "undefined1"
+     }
+    },
+    {
+     "dept": 17,
+     "cmd": 5,
+     "op": 17413,
+     "handler": "FUN_00406eb0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0440": 0,
+      "0x4406": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort"
+     }
+    },
+    {
+     "dept": 17,
+     "cmd": 9,
+     "op": 17417,
+     "handler": "FUN_00407050",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0440": 0,
+      "0x440a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort"
+     }
+    },
+    {
+     "dept": 17,
+     "cmd": 24,
+     "op": 17432,
+     "handler": "FUN_00407230",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x043e": 0,
+      "0x4419": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort"
+     }
+    },
+    {
+     "dept": 17,
+     "cmd": 26,
+     "op": 17434,
+     "handler": "FUN_00431550",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x043e": 0,
+      "0x0518": 0,
+      "0x0519": 0,
+      "0x051a": 0,
+      "0x051c": 0,
+      "0x051f": 0,
+      "0x441b": 0,
+      "0xc810": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort",
+      "12": "ushort",
+      "13": "undefined2",
+      "15": "undefined1",
+      "16": "uint",
+      "20": "int",
+      "24": "uint",
+      "28": "int",
+      "45": "uint",
+      "49": "uint",
+      "53": "int",
+      "57": "uint",
+      "61": "uint",
+      "65": "uint",
+      "69": "uint",
+      "73": "uint",
+      "77": "char",
+      "78": "byte",
+      "79": "char",
+      "80": "ushort",
+      "82": "byte",
+      "109": "ptr",
+      "117": "undefined2"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 1,
+     "op": 13313,
+     "handler": "FUN_00407420",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x044f": 0,
+      "0x3402": 0,
+      "0x3403": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "32": "ushort",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "ushort",
+      "46": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 103,
+     "op": 13415,
+     "handler": "FUN_00408ba0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x044f": 0,
+      "0x3468": 0,
+      "0x3469": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "32": "ushort",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "ushort",
+      "46": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 4,
+     "op": 13316,
+     "handler": "FUN_00408e20",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x043f": 0,
+      "0x3405": 0,
+      "0x3406": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "32": "ushort",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 7,
+     "op": 13319,
+     "handler": "FUN_00409080",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x043f": 0,
+      "0x3408": 0,
+      "0x3409": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "undefined4",
+      "14": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 10,
+     "op": 13322,
+     "handler": "FUN_00409300",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0448": 0,
+      "0x340b": 0,
+      "0x340c": 0,
+      "0xc80d": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "30": "ushort",
+      "32": "undefined4",
+      "36": "undefined4",
+      "40": "ushort",
+      "44": "ushort",
+      "46": "undefined4",
+      "50": "undefined4",
+      "54": "undefined4",
+      "62": "undefined4",
+      "66": "ushort",
+      "68": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 13,
+     "op": 13325,
+     "handler": "FUN_004096d0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0448": 0,
+      "0x340e": 0,
+      "0x340f": 0,
+      "0xc80d": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "18": "ushort",
+      "20": "ushort",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "undefined4",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 34,
+     "op": 13346,
+     "handler": "FUN_00409a20",
+     "name": "NC_ITEMDB_SELLALL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0449": 0,
+      "0x3423": 0,
+      "0x3424": 0,
+      "0xc80e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "undefined4",
+      "22": "ushort",
+      "24": "undefined4",
+      "28": "ushort",
+      "30": "undefined4",
+      "34": "undefined4",
+      "38": "byte",
+      "39": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 37,
+     "op": 13349,
+     "handler": "FUN_00409ec0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0449": 0,
+      "0x3426": 0,
+      "0x3427": 0,
+      "0xc80e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "18": "ushort",
+      "20": "ushort",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 16,
+     "op": 13328,
+     "handler": "FUN_0040a8f0",
+     "name": "NC_ITEMDB_EQUIP_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0554": 0,
+      "0x3411": 0,
+      "0x3412": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "ushort",
+      "18": "int",
+      "22": "uint",
+      "26": "uint",
+      "30": "ushort",
+      "32": "ushort",
+      "34": "byte",
+      "43": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 19,
+     "op": 13331,
+     "handler": "FUN_0040afc0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x3414": 0,
+      "0x3415": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 22,
+     "op": 13334,
+     "handler": "FUN_0040b140",
+     "name": "NC_ITEMDB_DROPALL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0447": 0,
+      "0x3417": 0,
+      "0x3418": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 25,
+     "op": 13337,
+     "handler": "FUN_0040b4d0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0447": 0,
+      "0x341a": 0,
+      "0x341b": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "18": "ushort",
+      "28": "uint",
+      "32": "uint"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 28,
+     "op": 13340,
+     "handler": "FUN_0040b760",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0446": 0,
+      "0x341d": 0,
+      "0x341e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "30": "ushort",
+      "32": "undefined4",
+      "36": "undefined4",
+      "40": "ushort",
+      "44": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 31,
+     "op": 13343,
+     "handler": "FUN_0040b980",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x3420": 0,
+      "0x3421": 0
+     },
+     "reads": {
+      "4": "ushort",
+      "6": "ushort",
+      "16": "int",
+      "20": "undefined4",
+      "24": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 40,
+     "op": 13352,
+     "handler": "FUN_0040a1e0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x044c": 0,
+      "0x3429": 0,
+      "0x342a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "int",
+      "4": "ushort",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "uint",
+      "20": "uint",
+      "24": "ushort",
+      "26": "ushort",
+      "28": "ushort",
+      "30": "uint"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 43,
+     "op": 13355,
+     "handler": "FUN_0040a4b0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x044c": 0,
+      "0x342c": 0,
+      "0x342d": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "int",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "uint",
+      "20": "uint",
+      "24": "ushort",
+      "26": "uint",
+      "30": "uint",
+      "34": "ushort",
+      "36": "ushort",
+      "38": "ushort",
+      "40": "uint",
+      "44": "uint"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 46,
+     "op": 13358,
+     "handler": "FUN_0040bbb0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0456": 0,
+      "0x342f": 0,
+      "0x3430": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "ushort",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "undefined4",
+      "34": "int"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 49,
+     "op": 13361,
+     "handler": "FUN_0040c000",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0456": 0,
+      "0x3432": 0,
+      "0x3433": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "ushort",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "undefined4",
+      "28": "undefined4",
+      "32": "undefined4",
+      "36": "uint",
+      "40": "uint"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 55,
+     "op": 13367,
+     "handler": "FUN_0040c4b0",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 13,
+     "cmd": 56,
+     "op": 13368,
+     "handler": "FUN_0040c500",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0446": 0,
+      "0x3439": 0,
+      "0x343a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "18": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 122,
+     "op": 13434,
+     "handler": "FUN_0040c700",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0462": 0,
+      "0x347b": 0,
+      "0x347c": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "uint",
+      "14": "byte"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 59,
+     "op": 13371,
+     "handler": "FUN_0040ca80",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x044a": 0,
+      "0x0460": 0,
+      "0x0461": 0,
+      "0x343d": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "8": "undefined4",
+      "10": "ushort",
+      "12": "ushort",
+      "14": "ushort",
+      "16": "byte",
+      "17": "int",
+      "21": "int",
+      "25": "undefined4",
+      "29": "undefined4",
+      "33": "undefined4",
+      "37": "undefined4",
+      "41": "char"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 62,
+     "op": 13374,
+     "handler": "FUN_0040d5e0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0459": 0,
+      "0x3440": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "18": "ushort",
+      "20": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 63,
+     "op": 13375,
+     "handler": "FUN_0040d800",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x045a": 0,
+      "0x3440": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 65,
+     "op": 13377,
+     "handler": "FUN_0040d940",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x3442": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "13": "uint",
+      "17": "int",
+      "21": "undefined2"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 68,
+     "op": 13380,
+     "handler": "FUN_0040da60",
+     "name": "NC_ITEMDB_OPENSTORAGE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x3445": 0,
+      "0x3446": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "byte",
+      "7": "undefined4",
+      "11": "undefined1"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 113,
+     "op": 13425,
+     "handler": "FUN_0040dd30",
+     "name": "NC_ITEMDB_OPEN_GUILD_STORAGE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x3472": 0,
+      "0x3473": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 71,
+     "op": 13383,
+     "handler": "FUN_0040e0d0",
+     "name": "NC_ITEMDB_UPGRADE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x3448": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "19": "byte",
+      "20": "byte",
+      "21": "byte",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "undefined4",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "undefined4",
+      "46": "undefined4",
+      "50": "undefined4",
+      "54": "undefined4",
+      "58": "undefined4",
+      "62": "ushort",
+      "64": "ushort",
+      "66": "ushort",
+      "68": "byte",
+      "69": "byte",
+      "70": "byte",
+      "71": "ushort",
+      "73": "byte",
+      "74": "byte",
+      "75": "byte",
+      "76": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 73,
+     "op": 13385,
+     "handler": "FUN_0040e630",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x344a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 93,
+     "op": 13405,
+     "handler": "LAB_0040e6e0",
+     "sends": {}
+    },
+    {
+     "dept": 13,
+     "cmd": 75,
+     "op": 13387,
+     "handler": "FUN_00431ea0",
+     "name": "NC_ITEMDB_ITEMTOTALINFORM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x344c": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 77,
+     "op": 13389,
+     "handler": "FUN_00432090",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x044f": 1,
+      "0x0462": 1,
+      "0x344e": 0,
+      "0x344f": 0
+     },
+     "reads": {
+      "4": "ushort",
+      "10": "ushort",
+      "34": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 80,
+     "op": 13392,
+     "handler": "FUN_0040eb50",
+     "name": "NC_ITEMDB_GETFROMCHEST_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0445": 0,
+      "0x044c": 0,
+      "0x3451": 0,
+      "0x3452": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "byte",
+      "21": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 83,
+     "op": 13395,
+     "handler": "FUN_0040f510",
+     "name": "NC_ITEMDB_BOOTHTRADE_ALL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x045b": 0,
+      "0x045c": 0,
+      "0x3456": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "ushort",
+      "22": "ushort",
+      "24": "byte",
+      "25": "undefined4",
+      "29": "undefined4",
+      "33": "ushort",
+      "35": "byte",
+      "36": "ushort",
+      "44": "undefined4",
+      "48": "undefined4",
+      "52": "undefined4",
+      "56": "undefined4",
+      "60": "undefined4",
+      "64": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 84,
+     "op": 13396,
+     "handler": "FUN_0040f950",
+     "name": "NC_ITEMDB_BOOTHTRADE_MERGE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x045b": 0,
+      "0x045c": 0,
+      "0x3456": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "ushort",
+      "22": "ushort",
+      "24": "byte",
+      "25": "ushort",
+      "27": "undefined4",
+      "31": "undefined4",
+      "35": "undefined4",
+      "39": "undefined4",
+      "43": "undefined2",
+      "45": "undefined4",
+      "49": "undefined4",
+      "53": "undefined1",
+      "54": "ushort",
+      "56": "ushort",
+      "58": "undefined4",
+      "62": "undefined4",
+      "66": "undefined4",
+      "70": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 85,
+     "op": 13397,
+     "handler": "FUN_0040feb0",
+     "name": "NC_ITEMDB_BOOTHTRADE_LOT_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x045b": 0,
+      "0x045c": 0,
+      "0x3456": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "ushort",
+      "22": "ushort",
+      "24": "byte",
+      "25": "ushort",
+      "27": "undefined4",
+      "31": "undefined4",
+      "59": "ushort",
+      "61": "undefined4",
+      "65": "undefined4",
+      "69": "ushort",
+      "73": "undefined2",
+      "75": "undefined4",
+      "79": "undefined4",
+      "83": "undefined2",
+      "85": "undefined2",
+      "87": "undefined4",
+      "91": "undefined4",
+      "95": "undefined4",
+      "99": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 52,
+     "op": 13364,
+     "handler": "FUN_004104b0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0457": 0,
+      "0x3435": 0,
+      "0x3436": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "ushort",
+      "18": "undefined4",
+      "22": "undefined4",
+      "30": "undefined4",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "undefined4",
+      "46": "undefined4",
+      "50": "ushort",
+      "52": "undefined4",
+      "56": "undefined4",
+      "60": "ushort",
+      "64": "ushort",
+      "66": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 87,
+     "op": 13399,
+     "handler": "FUN_004324f0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x3458": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 89,
+     "op": 13401,
+     "handler": "FUN_004325e0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x345a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "9": "ushort",
+      "11": "undefined4",
+      "15": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 91,
+     "op": 13403,
+     "handler": "FUN_00432770",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0518": 0,
+      "0x0519": 0,
+      "0x051a": 0,
+      "0x051c": 0,
+      "0x051f": 0,
+      "0x345c": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "uint",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "uint",
+      "14": "uint",
+      "18": "int",
+      "22": "uint",
+      "26": "int",
+      "30": "uint",
+      "34": "int",
+      "38": "uint",
+      "42": "byte",
+      "43": "undefined1",
+      "44": "byte",
+      "71": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 158,
+     "op": 13470,
+     "handler": "FUN_00410a80",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0445": 0,
+      "0x044f": 0,
+      "0x349f": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "byte",
+      "19": "undefined4",
+      "45": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 95,
+     "op": 13407,
+     "handler": "FUN_00410fa0",
+     "name": "NC_ITEMDB_DEPOSIT_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x045e": 0,
+      "0x3460": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 97,
+     "op": 13409,
+     "handler": "FUN_00411200",
+     "name": "NC_ITEMDB_WITHDRAW_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x045f": 0,
+      "0x3462": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 99,
+     "op": 13411,
+     "handler": "FUN_004116e0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x3464": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort",
+      "12": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 101,
+     "op": 13413,
+     "handler": "FUN_004118a0",
+     "name": "NC_ITEMDB_CHARGED_WITHDRAW_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x044f": 0,
+      "0x04be": 0,
+      "0x3466": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "undefined4",
+      "28": "byte",
+      "29": "ptr",
+      "55": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 106,
+     "op": 13418,
+     "handler": "FUN_00411c90",
+     "name": "NC_ITEMDB_ITEMBREAK_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0445": 0,
+      "0x346b": 0,
+      "0x346c": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "ushort",
+      "22": "ushort",
+      "24": "byte",
+      "25": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 109,
+     "op": 13421,
+     "handler": "FUN_0040f030",
+     "name": "NC_ITEMDB_CHESTITEM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x346e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 116,
+     "op": 13428,
+     "handler": "FUN_00411460",
+     "name": "NC_ITEMDB_GUILD_STORAGE_WITHDRAW_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x04aa": 0,
+      "0x3475": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 118,
+     "op": 13430,
+     "handler": "FUN_00419c00",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0453": 0,
+      "0x045d": 0,
+      "0x3477": 0
+     },
+     "reads": {
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "byte",
+      "9": "ushort",
+      "11": "short",
+      "13": "undefined4",
+      "17": "undefined4",
+      "21": "ushort",
+      "25": "char"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 125,
+     "op": 13437,
+     "handler": "FUN_0041a230",
+     "name": "NC_ITEMDB_MINIHOUSE_EFFECT_DEMANDGOOD_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x347e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 130,
+     "op": 13442,
+     "handler": "FUN_0041c580",
+     "name": "NC_ITEMDB_GUILD_ACADEMY_REWARD_STORAGE_OPEN_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x3483": 0,
+      "0x3484": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 133,
+     "op": 13445,
+     "handler": "FUN_0041c880",
+     "name": "NC_ITEMDB_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x04aa": 0,
+      "0x3486": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 135,
+     "op": 13447,
+     "handler": "FUN_0041caa0",
+     "name": "NC_ITEMDB_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x04aa": 0,
+      "0x3488": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 127,
+     "op": 13439,
+     "handler": "FUN_0041f660",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x3480": 0,
+      "0x3481": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 139,
+     "op": 13451,
+     "handler": "FUN_0041fad0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0459": 0,
+      "0x348c": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "16": "undefined4",
+      "18": "ushort",
+      "20": "undefined4",
+      "24": "undefined4",
+      "28": "ushort",
+      "32": "ushort",
+      "34": "byte"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 141,
+     "op": 13453,
+     "handler": "FUN_0041fcf0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0459": 0,
+      "0x348e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "ushort",
+      "10": "undefined4",
+      "14": "undefined4",
+      "16": "undefined4",
+      "18": "ushort",
+      "20": "undefined4",
+      "24": "undefined4",
+      "28": "ushort",
+      "32": "ushort",
+      "34": "byte"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 143,
+     "op": 13455,
+     "handler": "FUN_0041ff10",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 198,
+     "op": 13510,
+     "handler": "FUN_0041ffa0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0459": 0,
+      "0x34c7": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "ushort",
+      "10": "undefined4",
+      "14": "undefined4",
+      "16": "undefined4",
+      "18": "ushort",
+      "20": "undefined4",
+      "24": "undefined4",
+      "28": "ushort",
+      "32": "ushort",
+      "34": "byte"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 200,
+     "op": 13512,
+     "handler": "FUN_004201c0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 144,
+     "op": 13456,
+     "handler": "FUN_00420250",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0448": 0,
+      "0x3491": 0,
+      "0x3492": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "34": "ushort",
+      "36": "undefined4",
+      "40": "undefined4",
+      "44": "ushort",
+      "48": "ushort",
+      "50": "undefined4",
+      "54": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 147,
+     "op": 13459,
+     "handler": "FUN_00420710",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0448": 0,
+      "0x3494": 0,
+      "0x3495": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "22": "ushort",
+      "24": "ushort",
+      "26": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 150,
+     "op": 13462,
+     "handler": "FUN_00423500",
+     "name": "NC_ITEMDB_ENCHANT_ADD_GEM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x3497": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "18": "ushort",
+      "20": "undefined4",
+      "24": "undefined4",
+      "28": "ushort",
+      "30": "ushort",
+      "32": "ushort",
+      "33": "undefined1"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 152,
+     "op": 13464,
+     "handler": "FUN_004236e0",
+     "name": "NC_ITEMDB_ENCHANT_REMOVE_GEM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x3499": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "18": "ushort",
+      "20": "undefined4",
+      "24": "undefined4",
+      "30": "ushort",
+      "35": "undefined1"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 154,
+     "op": 13466,
+     "handler": "FUN_00423930",
+     "name": "NC_ITEMDB_ENCHANT_ADD_NEW_SOCKET_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x349b": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "18": "ushort",
+      "20": "undefined4",
+      "24": "undefined4",
+      "30": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 156,
+     "op": 13468,
+     "handler": "FUN_00423b90",
+     "name": "NC_ITEMDB_ENCHANT_SET_GEM_LOT_REQ",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 166,
+     "op": 13478,
+     "handler": "FUN_00426460",
+     "name": "NC_ITEMDB_EQUIP_BELONGED_CANCEL_USE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x34a7": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "ushort",
+      "28": "undefined4"
+     }
+    },
+    {
+     "dept": 18,
+     "cmd": 1,
+     "op": 18433,
+     "handler": "FUN_00411f10",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0432": 0,
+      "0x4802": 0,
+      "0x4803": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort",
+      "12": "byte",
+      "13": "short"
+     }
+    },
+    {
+     "dept": 18,
+     "cmd": 11,
+     "op": 18443,
+     "handler": "FUN_00412370",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x480c": 0,
+      "0x480d": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort"
+     }
+    },
+    {
+     "dept": 18,
+     "cmd": 18,
+     "op": 18450,
+     "handler": "FUN_004124c0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x4813": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "ushort",
+      "11": "undefined2",
+      "13": "byte",
+      "26": "ushort",
+      "28": "undefined4",
+      "32": "undefined4"
+     }
+    },
+    {
+     "dept": 21,
+     "cmd": 16,
+     "op": 21520,
+     "handler": "FUN_004126a0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x5411": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ushort",
+      "4": "undefined4",
+      "8": "undefined4",
+      "12": "ushort"
+     }
+    },
+    {
+     "dept": 21,
+     "cmd": 18,
+     "op": 21522,
+     "handler": "FUN_00436690",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x5413": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "undefined4",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "undefined4"
+     }
+    },
+    {
+     "dept": 21,
+     "cmd": 20,
+     "op": 21524,
+     "handler": "FUN_00437cd0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x5415": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 23,
+     "cmd": 5,
+     "op": 23557,
+     "handler": "FUN_00412790",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0454": 0,
+      "0x5c06": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "undefined4",
+      "28": "undefined4",
+      "32": "undefined4",
+      "36": "undefined4",
+      "40": "undefined4",
+      "44": "undefined4",
+      "48": "ushort",
+      "50": "ushort",
+      "52": "ushort",
+      "54": "ushort",
+      "56": "ushort"
+     }
+    },
+    {
+     "dept": 23,
+     "cmd": 7,
+     "op": 23559,
+     "handler": "FUN_00412960",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0459": 0,
+      "0x045a": 0,
+      "0x5c08": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "ushort",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "ushort",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "ushort",
+      "32": "byte"
+     }
+    },
+    {
+     "dept": 23,
+     "cmd": 9,
+     "op": 23561,
+     "handler": "FUN_00412bd0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x5c0a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "undefined4"
+     }
+    },
+    {
+     "dept": 23,
+     "cmd": 11,
+     "op": 23563,
+     "handler": "FUN_00412c90",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x5c0c": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 86,
+     "op": 4182,
+     "handler": "FUN_00412d60",
+     "name": "NC_CHAR_CLASSCHANGE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0420": 0,
+      "0x1057": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined1",
+      "7": "undefined1"
+     }
+    },
+    {
+     "dept": 24,
+     "cmd": 5,
+     "op": 24581,
+     "handler": "FUN_00412f50",
+     "name": "NC_CT_DB_SET_CMD",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "2": "undefined4",
+      "6": "byte",
+      "7": "byte"
+     }
+    },
+    {
+     "dept": 24,
+     "cmd": 8,
+     "op": 24584,
+     "handler": "FUN_00413050",
+     "name": "NC_CT_SET_CURRENT_DB_CMD",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "2": "undefined4",
+      "6": "byte",
+      "7": "byte",
+      "8": "ushort",
+      "10": "byte",
+      "12": "byte"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 93,
+     "op": 4189,
+     "handler": "FUN_004131a0",
+     "name": "NC_CHAR_STAT_INCPOINT_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x105e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "byte"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 99,
+     "op": 4195,
+     "handler": "FUN_004132d0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0459": 0,
+      "0x045a": 0,
+      "0x1064": 0,
+      "0x1066": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "7": "undefined2",
+      "9": "undefined4",
+      "13": "undefined4",
+      "17": "ushort",
+      "19": "char"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 112,
+     "op": 4208,
+     "handler": "FUN_00414130",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 4,
+     "cmd": 209,
+     "op": 4305,
+     "handler": "FUN_004135e0",
+     "name": "NC_CHAR_FREESTAT_SET_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0459": 0,
+      "0x045a": 0,
+      "0x10d2": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "7": "undefined1",
+      "8": "ushort",
+      "9": "undefined1",
+      "10": "ushort",
+      "11": "undefined1",
+      "12": "ushort",
+      "14": "byte",
+      "24": "ushort"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 179,
+     "op": 4275,
+     "handler": "FUN_00414170",
+     "name": "NC_CHAR_REGNUM_VARIFICATION_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x10b4": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4"
+     }
+    },
+    {
+     "dept": 22,
+     "cmd": 21,
+     "op": 22549,
+     "handler": "FUN_004321d0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0519": 0,
+      "0x051c": 0,
+      "0x5816": 0,
+      "0x5817": 0
+     },
+     "reads": {
+      "0": "int",
+      "4": "int",
+      "8": "int",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "undefined4",
+      "22": "ushort",
+      "34": "byte",
+      "35": "ptr"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 23,
+     "op": 28695,
+     "handler": "FUN_00413b90",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0405": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 25,
+     "op": 28697,
+     "handler": "FUN_00413c30",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x001d": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 27,
+     "op": 28699,
+     "handler": "FUN_00413cb0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0041": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 29,
+     "op": 28701,
+     "handler": "FUN_00413d30",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0006": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 31,
+     "op": 28703,
+     "handler": "FUN_00413db0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0045": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 33,
+     "op": 28705,
+     "handler": "FUN_00413e30",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x018d": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 35,
+     "op": 28707,
+     "handler": "FUN_00413ed0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0139": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 37,
+     "op": 28709,
+     "handler": "FUN_00413f70",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 38,
+     "op": 28710,
+     "handler": "FUN_00413fb0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 39,
+     "op": 28711,
+     "handler": "FUN_00413ff0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 40,
+     "op": 28712,
+     "handler": "FUN_00414030",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 41,
+     "op": 28713,
+     "handler": "FUN_00414070",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 42,
+     "op": 28714,
+     "handler": "FUN_004140b0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 43,
+     "op": 28715,
+     "handler": "FUN_004140f0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 75,
+     "op": 28747,
+     "handler": "FUN_004224d0",
+     "name": "NC_CHAR_OPTION_IMPROVE_DB_SET_SHORTCUTDATA_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x704c": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "byte"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 87,
+     "op": 28759,
+     "handler": "FUN_00422890",
+     "name": "NC_CHAR_OPTION_IMPROVE_DB_INIT_KEYMAP_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7058": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 77,
+     "op": 28749,
+     "handler": "FUN_00422b80",
+     "name": "NC_CHAR_OPTION_IMPROVE_DB_SET_KEYMAP_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x704e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 89,
+     "op": 28761,
+     "handler": "FUN_00422f10",
+     "name": "NC_CHAR_OPTION_IMPROVE_DB_INIT_GAMEOPTION_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x705a": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 28,
+     "cmd": 79,
+     "op": 28751,
+     "handler": "FUN_004231a0",
+     "name": "NC_CHAR_OPTION_IMPROVE_DB_SET_GAMEOPTION_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7050": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 82,
+     "op": 29778,
+     "handler": "FUN_00437e50",
+     "name": "NC_GUILD_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0445": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 84,
+     "op": 29780,
+     "handler": "FUN_00432d90",
+     "name": "NC_GUILD_DB_MEMBER_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7455": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 86,
+     "op": 29782,
+     "handler": "FUN_004332e0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x7457": 0
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 188,
+     "op": 29884,
+     "handler": "FUN_004144e0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x74bd": 0
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 88,
+     "op": 29784,
+     "handler": "FUN_00438440",
+     "name": "NC_GUILD_DB_MAKE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x048c": 0,
+      "0x7459": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "undefined4",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "undefined4",
+      "46": "undefined4",
+      "50": "undefined4",
+      "54": "ushort"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 90,
+     "op": 29786,
+     "handler": "FUN_00414740",
+     "name": "NC_GUILD_DB_DELETE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x048d": 0,
+      "0x745b": 0
+     },
+     "reads": {
+      "4": "undefined4",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 92,
+     "op": 29788,
+     "handler": "FUN_00414900",
+     "name": "NC_GUILD_DB_DISMISS_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x745d": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "7": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 94,
+     "op": 29790,
+     "handler": "FUN_00414a20",
+     "name": "NC_GUILD_DB_MONEY_ADD_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x745f": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 96,
+     "op": 29792,
+     "handler": "FUN_00414b80",
+     "name": "NC_GUILD_DB_MONEY_SUB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7461": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 98,
+     "op": 29794,
+     "handler": "FUN_00414ce0",
+     "name": "NC_GUILD_DB_NOTIFY_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7463": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "ushort",
+      "28": "ptr"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 100,
+     "op": 29796,
+     "handler": "FUN_00414ee0",
+     "name": "NC_GUILD_DB_INTRO_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7465": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 102,
+     "op": 29798,
+     "handler": "FUN_00414ff0",
+     "name": "NC_GUILD_DB_WAR_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7467": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "undefined4",
+      "6": "undefined4",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "ushort"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 238,
+     "op": 29934,
+     "handler": "FUN_00415150",
+     "name": "NC_GUILD_DB_DELETE_CANCEL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x74ef": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 105,
+     "op": 29801,
+     "handler": "FUN_00415270",
+     "name": "NC_GUILD_DB_MEMBER_JOIN_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x746a": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "ushort"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 107,
+     "op": 29803,
+     "handler": "FUN_00415480",
+     "name": "NC_GUILD_DB_MEMBER_LEAVE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x746c": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 109,
+     "op": 29805,
+     "handler": "FUN_00415670",
+     "name": "NC_GUILD_DB_MEMBER_INTRO_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x746e": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 111,
+     "op": 29807,
+     "handler": "FUN_00436a40",
+     "name": "NC_GUILD_DB_MEMBER_GRADE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x04a3": 0,
+      "0x7470": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "ushort",
+      "31": "undefined4",
+      "35": "undefined1"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 113,
+     "op": 29809,
+     "handler": "FUN_00436820",
+     "name": "NC_GUILD_DB_MEMBER_VANISH_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7472": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 104,
+     "op": 29800,
+     "handler": "FUN_00415780",
+     "name": "NC_GUILD_DB_RESULT_WRITE_CMD",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "undefined4",
+      "28": "undefined4",
+      "32": "undefined4",
+      "36": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 133,
+     "op": 29829,
+     "handler": "FUN_004159d0",
+     "name": "NC_GUILD_TOURNAMENT_DB_GET_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7486": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 135,
+     "op": 29831,
+     "handler": "FUN_00415fe0",
+     "name": "NC_GUILD_TOURNAMENT_DB_SET_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7488": 0
+     },
+     "reads": {
+      "2": "undefined4",
+      "6": "byte",
+      "7": "ptr"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 137,
+     "op": 29833,
+     "handler": "FUN_004163b0",
+     "name": "NC_GUILD_TOURNAMENT_DB_JOIN_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x748a": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 139,
+     "op": 29835,
+     "handler": "FUN_004164f0",
+     "name": "NC_GUILD_TOURNAMENT_DB_SET_TYPE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x748c": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 151,
+     "op": 29847,
+     "handler": "FUN_00415cf0",
+     "name": "NC_GUILD_TOURNAMENT_DB_SET_MATCH_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7498": 0
+     },
+     "reads": {
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 153,
+     "op": 29849,
+     "handler": "FUN_00415e70",
+     "name": "NC_GUILD_TOURNAMENT_DB_SET_MATCH_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x749a": 0
+     },
+     "reads": {
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 142,
+     "op": 29838,
+     "handler": "FUN_004161c0",
+     "name": "NC_GUILD_TOURNAMENT_DB_SET_RESULT_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x04ae": 0,
+      "0x748f": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "7": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 170,
+     "op": 29866,
+     "handler": "FUN_004076a0",
+     "name": "NC_GUILD_TOURNAMENT_DB_REWARD_CREATE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x044f": 0,
+      "0x04ab": 0,
+      "0x04ac": 0,
+      "0x04ad": 0,
+      "0x04af": 0,
+      "0x04b0": 0,
+      "0x74ab": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "int"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 229,
+     "op": 29925,
+     "handler": "FUN_00408180",
+     "name": "NC_GUILD_TOURNAMENT_DB_JOIN_NEW_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x74e6": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "byte",
+      "23": "undefined2",
+      "25": "undefined4",
+      "29": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 235,
+     "op": 29931,
+     "handler": "FUN_004083d0",
+     "name": "NC_GUILD_TOURNAMENT_DB_JOIN_LIST_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x74ec": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 231,
+     "op": 29927,
+     "handler": "FUN_00408630",
+     "name": "NC_GUILD_TOURNAMENT_DB_FINAL_SELECTION_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x74e8": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "byte",
+      "5": "ushort"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 246,
+     "op": 29942,
+     "handler": "FUN_00408890",
+     "name": "NC_GUILD_TOURNAMENT_ENTER_LIST_DB_GET_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x74f7": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 249,
+     "op": 29945,
+     "handler": "FUN_00408ae0",
+     "name": "NC_GUILD_TOURNAMENT_REFUND_NOTICE_DB_SET_REQ",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 178,
+     "op": 29874,
+     "handler": "FUN_0041f7e0",
+     "name": "NC_GUILD_DB_RENAME_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x74b3": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 186,
+     "op": 29882,
+     "handler": "FUN_0041f980",
+     "name": "NC_GUILD_DB_RETYPE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x74bb": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 1,
+     "op": 38913,
+     "handler": "FUN_00434030",
+     "name": "NC_GUILD_ACADEMY_START_DB_ALL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9802": 0
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 3,
+     "op": 38915,
+     "handler": "FUN_0041b5b0",
+     "name": "NC_GUILD_ACADEMY_START_DB_GET_RANKING_LIST_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9804": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 5,
+     "op": 38917,
+     "handler": "FUN_0041b9e0",
+     "name": "NC_GUILD_ACADEMY_START_DB_RANK_BALANCE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9806": 0
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 15,
+     "op": 38927,
+     "handler": "FUN_00437300",
+     "name": "NC_GUILD_ACADEMY_DB_MEMBER_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9810": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 20,
+     "op": 38932,
+     "handler": "FUN_0041bbd0",
+     "name": "NC_GUILD_ACADEMY_DB_MEMBER_JOIN_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9815": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "ushort",
+      "31": "undefined1"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 47,
+     "op": 38959,
+     "handler": "FUN_004377c0",
+     "name": "NC_GUILD_ACADEMY_DB_MEMBER_GUILD_JOIN_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9830": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "undefined4",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "undefined4",
+      "46": "undefined4",
+      "50": "ushort"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 25,
+     "op": 38937,
+     "handler": "FUN_00437ab0",
+     "name": "NC_GUILD_ACADEMY_DB_MEMBER_VANISH_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x981a": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 29,
+     "op": 38941,
+     "handler": "FUN_0041be10",
+     "name": "NC_GUILD_ACADEMY_DB_MEMBER_LEAVE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x981e": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 39,
+     "op": 38951,
+     "handler": "FUN_0041c000",
+     "name": "NC_GUILD_ACADEMY_DB_NOTIFY_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9828": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "ptr"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 92,
+     "op": 39004,
+     "handler": "FUN_0041c1e0",
+     "name": "NC_GUILD_ACADEMY_DB_SET_MASTER_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0755": 0,
+      "0x985d": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 127,
+     "op": 39039,
+     "handler": "FUN_0041c3d0",
+     "name": "NC_GUILD_ACADEMY_DB_SET_MASTER_BY_LEAVE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9880": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "undefined4",
+      "28": "undefined4",
+      "32": "undefined4",
+      "36": "undefined4",
+      "40": "undefined4",
+      "44": "undefined4",
+      "48": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 51,
+     "op": 38963,
+     "handler": "FUN_0041ccc0",
+     "name": "NC_GUILD_ACADEMY_DB_GET_REWARD_MONEY_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9834": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 55,
+     "op": 38967,
+     "handler": "FUN_0041cef0",
+     "name": "NC_GUILD_ACADEMY_DB_GET_REWARD_ITEM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9838": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 59,
+     "op": 38971,
+     "handler": "FUN_0041d290",
+     "name": "NC_GUILD_ACADEMY_DB_SET_REWARD_MONEY_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x983c": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "byte"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 63,
+     "op": 38975,
+     "handler": "FUN_0041d4c0",
+     "name": "NC_GUILD_ACADEMY_DB_SET_REWARD_ITEM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9840": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "byte"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 67,
+     "op": 38979,
+     "handler": "FUN_0041d770",
+     "name": "NC_GUILD_ACADEMY_DB_CLEAR_REWARD_MONEY_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9844": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 71,
+     "op": 38983,
+     "handler": "FUN_0041d8b0",
+     "name": "NC_GUILD_ACADEMY_DB_CLEAR_REWARD_ITEM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9848": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 81,
+     "op": 38993,
+     "handler": "FUN_0041d9f0",
+     "name": "NC_GUILD_ACADEMY_DB_CLEAR_REWARD_ITEM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9852": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "ushort",
+      "31": "byte"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 75,
+     "op": 38987,
+     "handler": "FUN_004345f0",
+     "name": "NC_GUILD_ACADEMY_DB_GET_GRADUATE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x984c": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 79,
+     "op": 38991,
+     "handler": "FUN_00434bd0",
+     "name": "NC_GUILD_ACADEMY_DB_GET_RANKING_LIST_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9850": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 87,
+     "op": 38999,
+     "handler": "FUN_0041db80",
+     "name": "NC_GUILD_ACADEMY_DB_RANK_BALANCE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9858": 0
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 84,
+     "op": 38996,
+     "handler": "FUN_0041dcb0",
+     "name": "NC_GUILD_ACADEMY_DB_LEVEL_UP_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9855": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 107,
+     "op": 39019,
+     "handler": "FUN_0041de10",
+     "name": "NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x986c": 0,
+      "0x9882": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "byte"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 135,
+     "op": 39047,
+     "handler": "FUN_0041ecf0",
+     "name": "NC_GUILD_ACADEMY_MEMBER_DB_CHAT_BAN_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9888": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4",
+      "12": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 137,
+     "op": 39049,
+     "handler": "FUN_0041ee80",
+     "name": "NC_GUILD_ACADEMY_MEMBER_DB_SAVE_CHAT_BAN_TIME_CMD",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4"
+     }
+    },
+    {
+     "dept": 31,
+     "cmd": 11,
+     "op": 31755,
+     "handler": "FUN_00436df0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x7c0c": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ptr",
+      "258": "int",
+      "262": "undefined4",
+      "266": "undefined4",
+      "270": "undefined4",
+      "274": "undefined4",
+      "278": "undefined4",
+      "282": "ushort",
+      "284": "undefined4",
+      "288": "undefined4",
+      "292": "undefined4",
+      "296": "undefined4"
+     }
+    },
+    {
+     "dept": 31,
+     "cmd": 13,
+     "op": 31757,
+     "handler": "FUN_00416650",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort"
+     }
+    },
+    {
+     "dept": 31,
+     "cmd": 14,
+     "op": 31758,
+     "handler": "FUN_004166d0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x7c0f": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 31,
+     "cmd": 16,
+     "op": 31760,
+     "handler": "FUN_00437010",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x7c11": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ptr",
+      "258": "int",
+      "262": "undefined4",
+      "266": "undefined4",
+      "270": "undefined4",
+      "274": "undefined4",
+      "278": "undefined4",
+      "282": "ushort",
+      "284": "undefined4",
+      "288": "undefined4",
+      "292": "undefined4",
+      "296": "undefined4"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 18,
+     "op": 2066,
+     "handler": "FUN_004167e0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0812": 0
+     },
+     "reads": {
+      "38": "DWORD",
+      "42": "DWORD"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 19,
+     "op": 2067,
+     "handler": "FUN_004168a0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0813": 0
+     },
+     "reads": {
+      "78": "DWORD",
+      "82": "DWORD"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 20,
+     "op": 2068,
+     "handler": "FUN_00416960",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0814": 0
+     },
+     "reads": {
+      "30": "DWORD",
+      "34": "DWORD"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 21,
+     "op": 2069,
+     "handler": "FUN_00416a20",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0815": 0
+     },
+     "reads": {
+      "50": "DWORD",
+      "54": "DWORD"
+     }
+    },
+    {
+     "dept": 36,
+     "cmd": 1,
+     "op": 36865,
+     "handler": "FUN_00416ae0",
+     "name": "NC_CHARGED_SETBUFF_CMD",
+     "name_src": "handler",
+     "sends": {
+      "0x0439": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4",
+      "12": "ushort",
+      "14": "undefined4",
+      "18": "ushort",
+      "20": "uint",
+      "24": "uint",
+      "28": "undefined4"
+     }
+    },
+    {
+     "dept": 36,
+     "cmd": 2,
+     "op": 36866,
+     "handler": "FUN_00416d30",
+     "name": "NC_CHARGED_RESETBUFF_CMD",
+     "name_src": "handler",
+     "sends": {
+      "0x043a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "ushort",
+      "10": "undefined4"
+     }
+    },
+    {
+     "dept": 36,
+     "cmd": 5,
+     "op": 36869,
+     "handler": "FUN_00416e60",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0459": 0,
+      "0x045a": 0,
+      "0x9007": 0,
+      "0x9009": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "byte"
+     }
+    },
+    {
+     "dept": 36,
+     "cmd": 6,
+     "op": 36870,
+     "handler": "FUN_00417160",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0459": 0,
+      "0x045a": 0,
+      "0x9008": 0,
+      "0x900a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "byte"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 118,
+     "op": 4214,
+     "handler": "FUN_00417460",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x1077": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "7": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 153,
+     "op": 4249,
+     "handler": "FUN_00417860",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x109a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "byte",
+      "7": "undefined4",
+      "12": "ushort",
+      "14": "ushort"
+     }
+    },
+    {
+     "dept": 35,
+     "cmd": 57,
+     "op": 35897,
+     "handler": "FUN_00417ac0",
+     "name": "NC_MINIHOUSE_DB_OWNERBLOG_GET_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x11da": 0,
+      "0x8c3a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 35,
+     "cmd": 59,
+     "op": 35899,
+     "handler": "FUN_00417c80",
+     "name": "NC_MINIHOUSE_DB_OWNERBLOG_SET_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x11da": 0,
+      "0x8c3c": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "byte",
+      "11": "ptr"
+     }
+    },
+    {
+     "dept": 35,
+     "cmd": 89,
+     "op": 35929,
+     "handler": "FUN_00433bb0",
+     "name": "NC_MINIHOUSE_DB_PORTAL_LIST_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x8c5a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort"
+     }
+    },
+    {
+     "dept": 35,
+     "cmd": 93,
+     "op": 35933,
+     "handler": "FUN_00433e80",
+     "name": "NC_MINIHOUSE_DB_PORTAL_ADD_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x8c5e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "ushort",
+      "9": "undefined4",
+      "13": "undefined2",
+      "15": "undefined4",
+      "19": "undefined4"
+     }
+    },
+    {
+     "dept": 35,
+     "cmd": 95,
+     "op": 35935,
+     "handler": "FUN_00417df0",
+     "name": "NC_MINIHOUSE_DB_PORTAL_DEL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x8c60": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort"
+     }
+    },
+    {
+     "dept": 35,
+     "cmd": 91,
+     "op": 35931,
+     "handler": "FUN_00417f50",
+     "name": "NC_MINIHOUSE_DB_VISITER_COUNT_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x8c5c": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 122,
+     "op": 4218,
+     "handler": "FUN_004182b0",
+     "name": "NC_CHAR_SET_STYLE_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0459": 0,
+      "0x045a": 0,
+      "0x107b": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "7": "byte",
+      "8": "byte",
+      "9": "byte"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 126,
+     "op": 4222,
+     "handler": "FUN_00418840",
+     "name": "NC_CHAR_SET_STYLE_GET_INFO_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x107f": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 130,
+     "op": 4226,
+     "handler": "FUN_00418c80",
+     "name": "NC_CHAR_WEDDINGDATA_CMD",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "2": "undefined4",
+      "8": "byte",
+      "9": "uint",
+      "13": "uint",
+      "37": "undefined4",
+      "41": "undefined1",
+      "42": "ushort"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 128,
+     "op": 4224,
+     "handler": "FUN_00418a40",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x1081": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 131,
+     "op": 4227,
+     "handler": "FUN_00418e40",
+     "name": "NC_CHAR_WEDDING_PROPOSE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0658": 0,
+      "0x1084": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 133,
+     "op": 4229,
+     "handler": "FUN_00418fc0",
+     "name": "NC_CHAR_WEDDING_PROPOSE_CANCEL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0659": 0,
+      "0x1086": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 137,
+     "op": 4233,
+     "handler": "FUN_00419250",
+     "name": "NC_CHAR_WEDDING_DIVORCE_BY_AGREE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x065a": 0,
+      "0x108a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 139,
+     "op": 4235,
+     "handler": "FUN_004193d0",
+     "name": "NC_CHAR_WEDDING_DIVORCE_BY_FORCE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x065a": 0,
+      "0x108c": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 141,
+     "op": 4237,
+     "handler": "FUN_00419550",
+     "name": "NC_CHAR_WEDDING_DIVORCE_DO_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x065b": 0,
+      "0x108e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "byte"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 143,
+     "op": 4239,
+     "handler": "FUN_00419730",
+     "name": "NC_CHAR_WEDDING_DIVORCE_CANCEL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x065c": 0,
+      "0x1090": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 145,
+     "op": 4241,
+     "handler": "FUN_00419920",
+     "name": "NC_CHAR_WEDDING_DO_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0660": 0,
+      "0x1092": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 135,
+     "op": 4231,
+     "handler": "FUN_00419140",
+     "name": "NC_CHAR_WEDDING_ESCAPE_DIVORCE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x1088": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 147,
+     "op": 4243,
+     "handler": "FUN_00419af0",
+     "name": "NC_CHAR_WEDDING_PARTNER_INFO_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x1094": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 18,
+     "cmd": 37,
+     "op": 18469,
+     "handler": "FUN_004121b0",
+     "name": "NC_SKILL_ERASE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0433": 0,
+      "0x4826": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort"
+     }
+    },
+    {
+     "dept": 37,
+     "cmd": 30,
+     "op": 37918,
+     "handler": "FUN_0043adc0",
+     "name": "NC_HOLY_PROMISE_DB_SET_UP_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x941f": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "ushort",
+      "25": "undefined1",
+      "26": "undefined4",
+      "30": "undefined4",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "undefined4",
+      "46": "undefined4",
+      "50": "undefined4",
+      "54": "undefined4",
+      "58": "undefined4",
+      "62": "undefined4",
+      "66": "ushort",
+      "67": "undefined1",
+      "68": "undefined4",
+      "72": "uint",
+      "76": "undefined4",
+      "80": "undefined4"
+     }
+    },
+    {
+     "dept": 37,
+     "cmd": 32,
+     "op": 37920,
+     "handler": "FUN_0041a440",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x9421": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "ushort"
+     }
+    },
+    {
+     "dept": 37,
+     "cmd": 34,
+     "op": 37922,
+     "handler": "FUN_00437240",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x9423": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "undefined4"
+     }
+    },
+    {
+     "dept": 37,
+     "cmd": 36,
+     "op": 37924,
+     "handler": "FUN_0041a4f0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x9425": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 37,
+     "cmd": 38,
+     "op": 37926,
+     "handler": "FUN_00438b90",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x9427": 1
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 37,
+     "cmd": 40,
+     "op": 37928,
+     "handler": "FUN_0041a8d0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x9429": 1
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 37,
+     "cmd": 42,
+     "op": 37930,
+     "handler": "FUN_0041a900",
+     "name": "NC_HOLY_PROMISE_DB_REWARD_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x044f": 0,
+      "0x942b": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "byte",
+      "5": "char"
+     }
+    },
+    {
+     "dept": 37,
+     "cmd": 44,
+     "op": 37932,
+     "handler": "FUN_0041ae00",
+     "name": "NC_HOLY_PROMISE_DB_SET_DATE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x942d": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4"
+     }
+    },
+    {
+     "dept": 37,
+     "cmd": 62,
+     "op": 37950,
+     "handler": "FUN_0041aff0",
+     "name": "NC_HOLY_PROMISE_DB_GET_CEN_REWARD_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x943f": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort"
+     }
+    },
+    {
+     "dept": 37,
+     "cmd": 66,
+     "op": 37954,
+     "handler": "FUN_0041b190",
+     "name": "NC_HOLY_PROMISE_DB_WITHDRAW_CEN_REWARD_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9443": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort"
+     }
+    },
+    {
+     "dept": 40,
+     "cmd": 1,
+     "op": 40961,
+     "handler": "FUN_0041ef50",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0xa002": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 40,
+     "cmd": 4,
+     "op": 40964,
+     "handler": "FUN_0041eff0",
+     "name": "NC_PROMOTION_DB_REWARD_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x044f": 0,
+      "0xa005": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "5": "undefined4",
+      "9": "byte",
+      "10": "byte"
+     }
+    },
+    {
+     "dept": 42,
+     "cmd": 4,
+     "op": 43012,
+     "handler": "FUN_00438bc0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0xa805": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4"
+     }
+    },
+    {
+     "dept": 42,
+     "cmd": 8,
+     "op": 43016,
+     "handler": "FUN_00420990",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0xa809": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 42,
+     "cmd": 12,
+     "op": 43020,
+     "handler": "FUN_00420aa0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0xa80d": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 65,
+     "op": 2113,
+     "handler": "FUN_00420b80",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "undefined4",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "ushort",
+      "22": "ushort",
+      "24": "undefined4",
+      "28": "undefined4",
+      "32": "undefined4",
+      "36": "undefined4",
+      "40": "undefined4",
+      "44": "undefined4",
+      "48": "undefined4",
+      "52": "undefined4",
+      "56": "undefined4",
+      "60": "undefined4",
+      "64": "undefined4",
+      "68": "ushort",
+      "70": "ushort"
+     }
+    },
+    {
+     "dept": 43,
+     "cmd": 35,
+     "op": 44067,
+     "handler": "FUN_00420d50",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0xac24": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "byte",
+      "15": "char",
+      "16": "byte",
+      "17": "ushort",
+      "27": "ptr"
+     }
+    },
+    {
+     "dept": 43,
+     "cmd": 37,
+     "op": 44069,
+     "handler": "FUN_004210c0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "14": "undefined4",
+      "18": "ushort"
+     }
+    },
+    {
+     "dept": 43,
+     "cmd": 12,
+     "op": 44044,
+     "handler": "FUN_00421190",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0xac0d": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "ushort"
+     }
+    },
+    {
+     "dept": 43,
+     "cmd": 16,
+     "op": 44048,
+     "handler": "FUN_00435120",
+     "name": "NC_DICE_TAISAI_DB_RECEIPT_INCOME_MONEY_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xac11": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "4": "undefined4",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "undefined4",
+      "14": "undefined4"
+     }
+    },
+    {
+     "dept": 43,
+     "cmd": 23,
+     "op": 44055,
+     "handler": "FUN_00421420",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0xac18": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4"
+     }
+    },
+    {
+     "dept": 43,
+     "cmd": 44,
+     "op": 44076,
+     "handler": "FUN_00421660",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0xac2d": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "ushort",
+      "20": "ushort",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "ushort"
+     }
+    },
+    {
+     "dept": 47,
+     "cmd": 120,
+     "op": 48248,
+     "handler": "FUN_00421a30",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0xbc79": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "byte",
+      "7": "char",
+      "8": "byte",
+      "9": "ushort",
+      "19": "ptr"
+     }
+    },
+    {
+     "dept": 47,
+     "cmd": 122,
+     "op": 48250,
+     "handler": "FUN_00421d60",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "6": "undefined4",
+      "10": "ushort"
+     }
+    },
+    {
+     "dept": 47,
+     "cmd": 108,
+     "op": 48236,
+     "handler": "FUN_00421e30",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0xbc6d": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 71,
+     "op": 2119,
+     "handler": "FUN_00423320",
+     "name": "NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_DB_CMD",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "ushort",
+      "9": "undefined1",
+      "10": "ushort"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 34,
+     "op": 16418,
+     "handler": "FUN_00423420",
+     "name": "NC_CHARSAVE_SET_CHAT_BLOCK_SPAMER_DB_CMD",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4"
+     }
+    },
+    {
+     "dept": 45,
+     "cmd": 17,
+     "op": 46097,
+     "handler": "FUN_00423f30",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0459": 0,
+      "0xb412": 0
+     },
+     "reads": {
+      "10": "ushort",
+      "11": "undefined2",
+      "13": "undefined4",
+      "17": "undefined4",
+      "19": "undefined4",
+      "21": "undefined2",
+      "23": "undefined4",
+      "27": "undefined4",
+      "31": "ushort",
+      "35": "undefined2",
+      "37": "char"
+     }
+    },
+    {
+     "dept": 45,
+     "cmd": 10,
+     "op": 46090,
+     "handler": "FUN_00423cb0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0xb40b": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "undefined4",
+      "34": "ushort"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 99,
+     "op": 2147,
+     "handler": "FUN_00424450",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0864": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "undefined4"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 104,
+     "op": 2152,
+     "handler": "FUN_004245f0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0869": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 219,
+     "op": 4315,
+     "handler": "FUN_004247a0",
+     "name": "NC_CHAR_NEWBIE_GUIDE_VIEW_SET_DB_CMD",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "0": "undefined4",
+      "4": "byte"
+     }
+    },
+    {
+     "dept": 47,
+     "cmd": 6,
+     "op": 48134,
+     "handler": "FUN_004248b0",
+     "name": "NC_GAMBLE_COIN_DB_ADD_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xbc07": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4"
+     }
+    },
+    {
+     "dept": 47,
+     "cmd": 10,
+     "op": 48138,
+     "handler": "FUN_00424a40",
+     "name": "NC_GAMBLE_EXCHANGEDCOIN_DB_INFO_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xbc0b": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 47,
+     "cmd": 17,
+     "op": 48145,
+     "handler": "FUN_00424bb0",
+     "name": "NC_GAMBLE_COIN_DB_BUY_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xbc12": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "undefined4"
+     }
+    },
+    {
+     "dept": 47,
+     "cmd": 21,
+     "op": 48149,
+     "handler": "FUN_00424dd0",
+     "name": "NC_GAMBLE_COIN_DB_SELL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xbc16": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4"
+     }
+    },
+    {
+     "dept": 47,
+     "cmd": 25,
+     "op": 48153,
+     "handler": "FUN_00424fc0",
+     "name": "NC_GAMBLE_COIN_DB_USE_COINITEM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xbc1a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "ushort"
+     }
+    },
+    {
+     "dept": 47,
+     "cmd": 211,
+     "op": 48339,
+     "handler": "FUN_004251a0",
+     "name": "NC_GAMBLE_SLOTMACHINE_DB_RESULT_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xbcd4": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "ptr",
+      "22": "ushort",
+      "27": "ushort",
+      "29": "undefined1",
+      "30": "ushort",
+      "32": "int"
+     }
+    },
+    {
+     "dept": 47,
+     "cmd": 213,
+     "op": 48341,
+     "handler": "FUN_00425490",
+     "name": "NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xbcd6": 0
+     },
+     "reads": {
+      "0": "byte"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 160,
+     "op": 13472,
+     "handler": "FUN_00425900",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0448": 0,
+      "0x044f": 0,
+      "0x34a1": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "ushort",
+      "12": "undefined4",
+      "16": "int",
+      "28": "ushort",
+      "30": "undefined4",
+      "34": "undefined4",
+      "38": "ushort",
+      "40": "ptr",
+      "141": "undefined4",
+      "145": "undefined4",
+      "149": "undefined2",
+      "151": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 162,
+     "op": 13474,
+     "handler": "FUN_00425dd0",
+     "name": "NC_ITEMDB_CAPSULEITEM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x34a3": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 164,
+     "op": 13476,
+     "handler": "FUN_00426050",
+     "name": "NC_ITEMDB_GETFROMCHEST_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0445": 0,
+      "0x044c": 0,
+      "0x34a5": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "ushort",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "undefined4",
+      "24": "undefined4",
+      "28": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 168,
+     "op": 13480,
+     "handler": "FUN_004269b0",
+     "name": "NC_ITEMDB_ITEMINFO_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x34a9": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 170,
+     "op": 13482,
+     "handler": "FUN_00426c20",
+     "name": "NC_ITEMDB_ITEMREBUILD_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x044f": 0,
+      "0x34ab": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "40": "ushort",
+      "42": "undefined4",
+      "46": "undefined4",
+      "50": "ushort",
+      "54": "ptr"
+     }
+    },
+    {
+     "dept": 49,
+     "cmd": 2,
+     "op": 50178,
+     "handler": "FUN_00427040",
+     "name": "NC_COLLECT_PEEPING_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xc403": 0,
+      "0xc404": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "undefined4"
+     }
+    },
+    {
+     "dept": 49,
+     "cmd": 9,
+     "op": 50185,
+     "handler": "FUN_004275c0",
+     "name": "NC_COLLECT_REGIST_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xc40a": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "17": "ushort",
+      "19": "undefined1",
+      "20": "undefined4"
+     }
+    },
+    {
+     "dept": 49,
+     "cmd": 13,
+     "op": 50189,
+     "handler": "FUN_004277a0",
+     "name": "NC_COLLECT_BOOKMARK_REGIST_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xc40e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "ushort"
+     }
+    },
+    {
+     "dept": 49,
+     "cmd": 17,
+     "op": 50193,
+     "handler": "FUN_00427970",
+     "name": "NC_COLLECT_REWARD_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x044f": 0,
+      "0xc412": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "ptr"
+     }
+    },
+    {
+     "dept": 49,
+     "cmd": 20,
+     "op": 50196,
+     "handler": "LAB_00427cf0",
+     "sends": {}
+    },
+    {
+     "dept": 4,
+     "cmd": 235,
+     "op": 4331,
+     "handler": "FUN_00427d90",
+     "name": "NC_CHAR_EVENT_ATTENDANCE_LIST_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x10ec": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "76": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 238,
+     "op": 4334,
+     "handler": "FUN_00428130",
+     "name": "NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x10ef": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 243,
+     "op": 4339,
+     "handler": "FUN_00428290",
+     "name": "NC_CHAR_EVENT_ATTENDANCE_REWARD_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x044f": 0,
+      "0x10f4": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "41": "byte"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 112,
+     "op": 2160,
+     "handler": "FUN_00428bb0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0871": 1,
+      "0x3042": 1,
+      "0x3043": 1
+     },
+     "reads": {
+      "0": "ptr"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 255,
+     "op": 29951,
+     "handler": "FUN_00435630",
+     "name": "NC_GUILD_HISTORY_DB_LIST_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7500": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 145,
+     "op": 39057,
+     "handler": "FUN_00428dd0",
+     "name": "NC_GUILD_ACADEMY_HISTORY_DB_LIST_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x9892": 0
+     },
+     "reads": {
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 38,
+     "cmd": 141,
+     "op": 39053,
+     "handler": "FUN_00428bf0",
+     "name": "NC_GUILD_ACADEMY_MEMBER_DB_CHAT_BAN_CANCEL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x988e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 274,
+     "op": 4370,
+     "handler": "FUN_00429160",
+     "name": "NC_CHAR_TUTORIAL_MAKE_ITEM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x1113": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "3": "undefined4",
+      "7": "undefined4",
+      "11": "undefined1"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 280,
+     "op": 4376,
+     "handler": "FUN_00429ab0",
+     "name": "NC_CHAR_TUTORIAL_STEP_SAVE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x1119": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "undefined4",
+      "12": "ushort"
+     }
+    },
+    {
+     "dept": 4,
+     "cmd": 282,
+     "op": 4378,
+     "handler": "FUN_00429c90",
+     "name": "NC_CHAR_TUTORIAL_FREESTAT_INIT_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x111b": 0
+     },
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 172,
+     "op": 13484,
+     "handler": "FUN_00429e70",
+     "name": "NC_ITEMDB_MOVER_UPGRADE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x079a": 0,
+      "0x34ad": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "ushort",
+      "9": "undefined4",
+      "13": "undefined4",
+      "17": "undefined2",
+      "35": "undefined1",
+      "36": "ushort",
+      "120": "undefined4",
+      "124": "undefined4",
+      "128": "ushort",
+      "130": "ushort",
+      "132": "ptr",
+      "148": "ushort",
+      "149": "undefined2"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 174,
+     "op": 13486,
+     "handler": "FUN_0042a230",
+     "name": "NC_ITEMDB_MOVER_RAREMOVER_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x079b": 0,
+      "0x34af": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "34": "ushort",
+      "35": "undefined2",
+      "119": "undefined4",
+      "123": "undefined4",
+      "127": "undefined2",
+      "145": "undefined1",
+      "146": "ushort",
+      "230": "undefined4",
+      "234": "undefined4",
+      "238": "ushort",
+      "240": "ushort",
+      "242": "ptr",
+      "258": "ushort",
+      "259": "undefined2"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 176,
+     "op": 13488,
+     "handler": "FUN_0042a6d0",
+     "name": "NC_ITEMDB_ITEMMONEY_BUYALL_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x044f": 0,
+      "0x0459": 0,
+      "0x045a": 0,
+      "0x079c": 0,
+      "0x34b2": 0,
+      "0xc814": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "undefined4",
+      "14": "uint",
+      "18": "uint",
+      "22": "ushort",
+      "24": "uint",
+      "28": "undefined4",
+      "32": "byte",
+      "33": "byte",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 177,
+     "op": 13489,
+     "handler": "FUN_0042aeb0",
+     "name": "NC_ITEMDB_ITEMMONEY_BUYLOT_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0459": 0,
+      "0x045a": 0,
+      "0x079c": 0,
+      "0x34b2": 0,
+      "0xc814": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "ushort",
+      "24": "int",
+      "28": "undefined4",
+      "32": "uint",
+      "36": "uint",
+      "40": "ushort",
+      "42": "uint",
+      "46": "byte",
+      "47": "ptr"
+     }
+    },
+    {
+     "dept": 53,
+     "cmd": 13,
+     "op": 54285,
+     "handler": "FUN_0042b6b0",
+     "name": "NC_PET_CREATE_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xd40e": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4",
+      "22": "ushort",
+      "23": "undefined1"
+     }
+    },
+    {
+     "dept": 53,
+     "cmd": 1,
+     "op": 54273,
+     "handler": "FUN_0042b920",
+     "name": "NC_PET_SET_TENDENCY_DB_REQ",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "2": "int",
+      "6": "ushort",
+      "7": "undefined1"
+     }
+    },
+    {
+     "dept": 53,
+     "cmd": 3,
+     "op": 54275,
+     "handler": "FUN_0042ba70",
+     "name": "NC_PET_SET_NAME_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xd404": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "int",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "undefined4",
+      "18": "undefined4"
+     }
+    },
+    {
+     "dept": 53,
+     "cmd": 11,
+     "op": 54283,
+     "handler": "FUN_0042bcc0",
+     "name": "NC_PET_LOAD_INFO_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xd40c": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "int"
+     }
+    },
+    {
+     "dept": 53,
+     "cmd": 15,
+     "op": 54287,
+     "handler": "FUN_0042bf30",
+     "name": "NC_PET_REMOVE_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0xd410": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "int",
+      "6": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 193,
+     "op": 13505,
+     "handler": "FUN_0042c120",
+     "name": "NC_ITEMDB_RANDOMOPTION_CHANGE_CONSUME_AND_COUNTING_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x07f8": 0,
+      "0x34c2": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "int",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "ushort",
+      "133": "undefined1"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 179,
+     "op": 13491,
+     "handler": "FUN_004359c0",
+     "name": "NC_ITEMDB_RANDOMOPTION_CHANGE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x079e": 0,
+      "0x079f": 0,
+      "0x34b4": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 205,
+     "op": 13517,
+     "handler": "FUN_0042c750",
+     "name": "NC_ITEMDB_RANDOMOPTION_RECOVER_COUNT_LIMIT_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0459": 0,
+      "0x045a": 0,
+      "0x07f8": 0,
+      "0x34ce": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "ptr",
+      "119": "undefined4",
+      "123": "undefined4",
+      "127": "ushort",
+      "129": "undefined4",
+      "133": "uint",
+      "137": "uint",
+      "141": "short",
+      "145": "char"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 49,
+     "op": 16433,
+     "handler": "FUN_0042cf90",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 13,
+     "cmd": 181,
+     "op": 13493,
+     "handler": "FUN_0042cfc0",
+     "name": "NC_ITEMDB_CHAT_COLOR_CHANGE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0459": 0,
+      "0x045a": 0,
+      "0x34b6": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "int",
+      "20": "undefined4",
+      "24": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 183,
+     "op": 13495,
+     "handler": "FUN_0042d500",
+     "name": "NC_ITEMDB_TERMEXTEND_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0459": 0,
+      "0x045a": 0,
+      "0x07e8": 0,
+      "0x34b8": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "int",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "ushort",
+      "32": "ptr",
+      "133": "uint",
+      "137": "undefined4"
+     }
+    },
+    {
+     "dept": 16,
+     "cmd": 53,
+     "op": 16437,
+     "handler": "FUN_0042de30",
+     "name": "NC_CHARSAVE_USEITEM_MINIMON_INFO_DB_CMD",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "5": "undefined1"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 185,
+     "op": 13497,
+     "handler": "FUN_0042e060",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x07fd": 0,
+      "0x34ba": 0,
+      "0xc815": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "undefined4",
+      "32": "ushort",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "ushort",
+      "46": "undefined4",
+      "50": "undefined4",
+      "54": "undefined4",
+      "58": "undefined4",
+      "62": "ushort",
+      "64": "ptr"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 187,
+     "op": 13499,
+     "handler": "FUN_0042e380",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x07fd": 0,
+      "0x34bc": 0,
+      "0xc815": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "undefined4",
+      "14": "undefined4",
+      "20": "ushort",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "undefined4",
+      "34": "undefined4",
+      "38": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 189,
+     "op": 13501,
+     "handler": "FUN_0042e6b0",
+     "name": "NC_ITEMDB_CLASS_CHANGE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x07e8": 0,
+      "0x34be": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "int",
+      "20": "byte",
+      "21": "undefined1",
+      "22": "byte",
+      "23": "undefined1",
+      "24": "byte",
+      "25": "byte",
+      "26": "byte",
+      "27": "int",
+      "31": "int",
+      "35": "undefined2",
+      "37": "int"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 191,
+     "op": 13503,
+     "handler": "FUN_0042ef20",
+     "name": "NC_ITEMDB_UES_FRIEND_POINT_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x07f2": 0,
+      "0x34c0": 0,
+      "0x541c": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "ushort",
+      "10": "ushort",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "ushort",
+      "22": "ptr"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 259,
+     "op": 29955,
+     "handler": "FUN_0042f3a0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x7504": 0
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 263,
+     "op": 29959,
+     "handler": "FUN_0042f730",
+     "name": "NC_GUILD_EMBLEM_SAVE_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x7508": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "ushort",
+      "9": "byte",
+      "10": "undefined4"
+     }
+    },
+    {
+     "dept": 29,
+     "cmd": 269,
+     "op": 29965,
+     "handler": "FUN_0042f970",
+     "name": "NC_GUILD_EMBLEM_STATE_DB_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x750e": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 201,
+     "op": 13513,
+     "handler": "FUN_0042fd10",
+     "name": "NC_ITEMDB_MAPLINK_ITEM_CONSUME_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0459": 0,
+      "0x34ca": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "undefined4",
+      "20": "ushort",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "undefined4",
+      "34": "ushort",
+      "36": "uint"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 207,
+     "op": 13519,
+     "handler": "FUN_00430290",
+     "name": "NC_ITEMDB_MAPLINK_ITEM_COMPARE_MAP_REQ",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "0": "undefined4"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 203,
+     "op": 13515,
+     "handler": "FUN_00430380",
+     "name": "NC_ITEMDB_MIX_ITEM_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x34cc": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "ushort",
+      "6": "undefined4",
+      "10": "undefined4",
+      "14": "ushort",
+      "16": "uint",
+      "20": "undefined4",
+      "24": "undefined4",
+      "28": "ushort",
+      "30": "uint",
+      "34": "undefined4",
+      "38": "undefined4",
+      "42": "ushort",
+      "44": "uint",
+      "48": "ushort",
+      "50": "undefined4",
+      "54": "undefined4",
+      "58": "ushort",
+      "60": "ptr",
+      "161": "undefined2"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 209,
+     "op": 13521,
+     "handler": "FUN_00430a10",
+     "name": "NC_ITEMDB_NEW_UPGRADE_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x34d2": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "19": "byte",
+      "20": "byte",
+      "21": "undefined4",
+      "25": "undefined4",
+      "29": "ushort",
+      "31": "byte",
+      "32": "byte",
+      "33": "byte",
+      "34": "ushort"
+     }
+    },
+    {
+     "dept": 13,
+     "cmd": 211,
+     "op": 13523,
+     "handler": "FUN_00430e70",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x34d4": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "undefined4",
+      "4": "ushort",
+      "6": "ushort",
+      "8": "undefined4",
+      "12": "undefined4",
+      "16": "ushort",
+      "18": "byte",
+      "19": "byte",
+      "20": "byte",
+      "21": "byte",
+      "22": "undefined4",
+      "26": "undefined4",
+      "30": "ushort",
+      "32": "byte"
+     }
+    }
+   ]
+  }
+ ],
+ "opnames": {
+  "0x0802": {
+   "NC_MISC_S2SCONNECTION_REQ": 3
+  },
+  "0x0847": {
+   "NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_DB_CMD": 10
+  },
+  "0x0c12": {
+   "NC_USER_AVATARINFO_REQ": 10
+  },
+  "0x1004": {
+   "NC_CHAR_CHARDATA_REQ": 10
+  },
+  "0x1036": {
+   "NC_CHAR_LOGIN_DB": 10
+  },
+  "0x1037": {
+   "NC_CHAR_LOGOUT_DB": 10
+  },
+  "0x1056": {
+   "NC_CHAR_CLASSCHANGE_REQ": 10
+  },
+  "0x105d": {
+   "NC_CHAR_STAT_INCPOINT_DB_REQ": 10
+  },
+  "0x107a": {
+   "NC_CHAR_SET_STYLE_DB_REQ": 10
+  },
+  "0x107e": {
+   "NC_CHAR_SET_STYLE_GET_INFO_DB_REQ": 10
+  },
+  "0x1082": {
+   "NC_CHAR_WEDDINGDATA_CMD": 10
+  },
+  "0x1083": {
+   "NC_CHAR_WEDDING_PROPOSE_REQ": 10
+  },
+  "0x1085": {
+   "NC_CHAR_WEDDING_PROPOSE_CANCEL_REQ": 10
+  },
+  "0x1087": {
+   "NC_CHAR_WEDDING_ESCAPE_DIVORCE_REQ": 10
+  },
+  "0x1089": {
+   "NC_CHAR_WEDDING_DIVORCE_BY_AGREE_REQ": 10
+  },
+  "0x108b": {
+   "NC_CHAR_WEDDING_DIVORCE_BY_FORCE_REQ": 10
+  },
+  "0x108d": {
+   "NC_CHAR_WEDDING_DIVORCE_DO_REQ": 10
+  },
+  "0x108f": {
+   "NC_CHAR_WEDDING_DIVORCE_CANCEL_REQ": 10
+  },
+  "0x1091": {
+   "NC_CHAR_WEDDING_DO_REQ": 10
+  },
+  "0x1093": {
+   "NC_CHAR_WEDDING_PARTNER_INFO_REQ": 10
+  },
+  "0x10b3": {
+   "NC_CHAR_REGNUM_VARIFICATION_REQ": 10
+  },
+  "0x10d1": {
+   "NC_CHAR_FREESTAT_SET_DB_REQ": 10
+  },
+  "0x10db": {
+   "NC_CHAR_NEWBIE_GUIDE_VIEW_SET_DB_CMD": 10
+  },
+  "0x10eb": {
+   "NC_CHAR_EVENT_ATTENDANCE_LIST_DB_REQ": 10
+  },
+  "0x10ee": {
+   "NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_REQ": 10
+  },
+  "0x10f3": {
+   "NC_CHAR_EVENT_ATTENDANCE_REWARD_DB_REQ": 10
+  },
+  "0x1112": {
+   "NC_CHAR_TUTORIAL_MAKE_ITEM_REQ": 10
+  },
+  "0x1118": {
+   "NC_CHAR_TUTORIAL_STEP_SAVE_REQ": 10
+  },
+  "0x111a": {
+   "NC_CHAR_TUTORIAL_FREESTAT_INIT_REQ": 10
+  },
+  "0x1408": {
+   "NC_AVATAR_ERASEDATA_REQ": 10
+  },
+  "0x1415": {
+   "NC_AVATAR_GUILD_MEMBER_DATA_REQ": 10
+  },
+  "0x3410": {
+   "NC_ITEMDB_EQUIP_REQ": 10
+  },
+  "0x3416": {
+   "NC_ITEMDB_DROPALL_REQ": 10
+  },
+  "0x3422": {
+   "NC_ITEMDB_SELLALL_REQ": 10
+  },
+  "0x3444": {
+   "NC_ITEMDB_OPENSTORAGE_REQ": 10
+  },
+  "0x3447": {
+   "NC_ITEMDB_UPGRADE_REQ": 10
+  },
+  "0x344b": {
+   "NC_ITEMDB_ITEMTOTALINFORM_REQ": 10
+  },
+  "0x3450": {
+   "NC_ITEMDB_GETFROMCHEST_REQ": 10
+  },
+  "0x3453": {
+   "NC_ITEMDB_BOOTHTRADE_ALL_REQ": 10
+  },
+  "0x3454": {
+   "NC_ITEMDB_BOOTHTRADE_MERGE_REQ": 10
+  },
+  "0x3455": {
+   "NC_ITEMDB_BOOTHTRADE_LOT_REQ": 10
+  },
+  "0x345f": {
+   "NC_ITEMDB_DEPOSIT_REQ": 10
+  },
+  "0x3461": {
+   "NC_ITEMDB_WITHDRAW_REQ": 10
+  },
+  "0x3465": {
+   "NC_ITEMDB_CHARGED_WITHDRAW_REQ": 10
+  },
+  "0x346a": {
+   "NC_ITEMDB_ITEMBREAK_REQ": 10
+  },
+  "0x346d": {
+   "NC_ITEMDB_CHESTITEM_REQ": 10
+  },
+  "0x3471": {
+   "NC_ITEMDB_OPEN_GUILD_STORAGE_REQ": 10
+  },
+  "0x3474": {
+   "NC_ITEMDB_GUILD_STORAGE_WITHDRAW_REQ": 10
+  },
+  "0x347d": {
+   "NC_ITEMDB_MINIHOUSE_EFFECT_DEMANDGOOD_REQ": 10
+  },
+  "0x3482": {
+   "NC_ITEMDB_GUILD_ACADEMY_REWARD_STORAGE_OPEN_REQ": 10
+  },
+  "0x3485": {
+   "NC_ITEMDB_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_REQ": 10
+  },
+  "0x3487": {
+   "NC_ITEMDB_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_REQ": 10
+  },
+  "0x3496": {
+   "NC_ITEMDB_ENCHANT_ADD_GEM_REQ": 10
+  },
+  "0x3498": {
+   "NC_ITEMDB_ENCHANT_REMOVE_GEM_REQ": 10
+  },
+  "0x349a": {
+   "NC_ITEMDB_ENCHANT_ADD_NEW_SOCKET_REQ": 10
+  },
+  "0x349c": {
+   "NC_ITEMDB_ENCHANT_SET_GEM_LOT_REQ": 10
+  },
+  "0x34a2": {
+   "NC_ITEMDB_CAPSULEITEM_REQ": 10
+  },
+  "0x34a4": {
+   "NC_ITEMDB_GETFROMCHEST_REQ": 10
+  },
+  "0x34a6": {
+   "NC_ITEMDB_EQUIP_BELONGED_CANCEL_USE_REQ": 10
+  },
+  "0x34a8": {
+   "NC_ITEMDB_ITEMINFO_REQ": 10
+  },
+  "0x34aa": {
+   "NC_ITEMDB_ITEMREBUILD_REQ": 10
+  },
+  "0x34ac": {
+   "NC_ITEMDB_MOVER_UPGRADE_REQ": 10
+  },
+  "0x34ae": {
+   "NC_ITEMDB_MOVER_RAREMOVER_REQ": 10
+  },
+  "0x34b0": {
+   "NC_ITEMDB_ITEMMONEY_BUYALL_REQ": 10
+  },
+  "0x34b1": {
+   "NC_ITEMDB_ITEMMONEY_BUYLOT_REQ": 10
+  },
+  "0x34b3": {
+   "NC_ITEMDB_RANDOMOPTION_CHANGE_REQ": 10
+  },
+  "0x34b5": {
+   "NC_ITEMDB_CHAT_COLOR_CHANGE_REQ": 10
+  },
+  "0x34b7": {
+   "NC_ITEMDB_TERMEXTEND_REQ": 10
+  },
+  "0x34bd": {
+   "NC_ITEMDB_CLASS_CHANGE_REQ": 10
+  },
+  "0x34bf": {
+   "NC_ITEMDB_UES_FRIEND_POINT_REQ": 10
+  },
+  "0x34c1": {
+   "NC_ITEMDB_RANDOMOPTION_CHANGE_CONSUME_AND_COUNTING_REQ": 10
+  },
+  "0x34c9": {
+   "NC_ITEMDB_MAPLINK_ITEM_CONSUME_REQ": 10
+  },
+  "0x34cb": {
+   "NC_ITEMDB_MIX_ITEM_REQ": 10
+  },
+  "0x34cd": {
+   "NC_ITEMDB_RANDOMOPTION_RECOVER_COUNT_LIMIT_REQ": 10
+  },
+  "0x34cf": {
+   "NC_ITEMDB_MAPLINK_ITEM_COMPARE_MAP_REQ": 10
+  },
+  "0x34d1": {
+   "NC_ITEMDB_NEW_UPGRADE_REQ": 10
+  },
+  "0x4001": {
+   "NC_CHARSAVE_ALL_REQ": 10
+  },
+  "0x4022": {
+   "NC_CHARSAVE_SET_CHAT_BLOCK_SPAMER_DB_CMD": 10
+  },
+  "0x4023": {
+   "NC_CHARSAVE_ITEMACTIONCOOLTIME_REQ": 10
+  },
+  "0x4027": {
+   "NC_CHARSAVE_DB_UI_STATE_SAVE_REQ": 10
+  },
+  "0x4035": {
+   "NC_CHARSAVE_USEITEM_MINIMON_INFO_DB_CMD": 10
+  },
+  "0x4825": {
+   "NC_SKILL_ERASE_REQ": 10
+  },
+  "0x6005": {
+   "NC_CT_DB_SET_CMD": 10
+  },
+  "0x6008": {
+   "NC_CT_SET_CURRENT_DB_CMD": 10
+  },
+  "0x704b": {
+   "NC_CHAR_OPTION_IMPROVE_DB_SET_SHORTCUTDATA_REQ": 10
+  },
+  "0x704d": {
+   "NC_CHAR_OPTION_IMPROVE_DB_SET_KEYMAP_REQ": 10
+  },
+  "0x704f": {
+   "NC_CHAR_OPTION_IMPROVE_DB_SET_GAMEOPTION_REQ": 10
+  },
+  "0x7057": {
+   "NC_CHAR_OPTION_IMPROVE_DB_INIT_KEYMAP_REQ": 10
+  },
+  "0x7059": {
+   "NC_CHAR_OPTION_IMPROVE_DB_INIT_GAMEOPTION_REQ": 10
+  },
+  "0x7452": {
+   "NC_GUILD_DB_REQ": 10
+  },
+  "0x7454": {
+   "NC_GUILD_DB_MEMBER_REQ": 10
+  },
+  "0x7458": {
+   "NC_GUILD_DB_MAKE_REQ": 10
+  },
+  "0x745a": {
+   "NC_GUILD_DB_DELETE_REQ": 10
+  },
+  "0x745c": {
+   "NC_GUILD_DB_DISMISS_REQ": 10
+  },
+  "0x745e": {
+   "NC_GUILD_DB_MONEY_ADD_REQ": 10
+  },
+  "0x7460": {
+   "NC_GUILD_DB_MONEY_SUB_REQ": 10
+  },
+  "0x7462": {
+   "NC_GUILD_DB_NOTIFY_REQ": 10
+  },
+  "0x7464": {
+   "NC_GUILD_DB_INTRO_REQ": 10
+  },
+  "0x7466": {
+   "NC_GUILD_DB_WAR_REQ": 10
+  },
+  "0x7468": {
+   "NC_GUILD_DB_RESULT_WRITE_CMD": 10
+  },
+  "0x7469": {
+   "NC_GUILD_DB_MEMBER_JOIN_REQ": 10
+  },
+  "0x746b": {
+   "NC_GUILD_DB_MEMBER_LEAVE_REQ": 10
+  },
+  "0x746d": {
+   "NC_GUILD_DB_MEMBER_INTRO_REQ": 10
+  },
+  "0x746f": {
+   "NC_GUILD_DB_MEMBER_GRADE_REQ": 10
+  },
+  "0x7471": {
+   "NC_GUILD_DB_MEMBER_VANISH_REQ": 10
+  },
+  "0x7485": {
+   "NC_GUILD_TOURNAMENT_DB_GET_REQ": 10
+  },
+  "0x7487": {
+   "NC_GUILD_TOURNAMENT_DB_SET_REQ": 10
+  },
+  "0x7489": {
+   "NC_GUILD_TOURNAMENT_DB_JOIN_REQ": 10
+  },
+  "0x748b": {
+   "NC_GUILD_TOURNAMENT_DB_SET_TYPE_REQ": 10
+  },
+  "0x748e": {
+   "NC_GUILD_TOURNAMENT_DB_SET_RESULT_REQ": 10
+  },
+  "0x7497": {
+   "NC_GUILD_TOURNAMENT_DB_SET_MATCH_REQ": 10
+  },
+  "0x7499": {
+   "NC_GUILD_TOURNAMENT_DB_SET_MATCH_REQ": 10
+  },
+  "0x74aa": {
+   "NC_GUILD_TOURNAMENT_DB_REWARD_CREATE_REQ": 10
+  },
+  "0x74b2": {
+   "NC_GUILD_DB_RENAME_REQ": 10
+  },
+  "0x74ba": {
+   "NC_GUILD_DB_RETYPE_REQ": 10
+  },
+  "0x74e5": {
+   "NC_GUILD_TOURNAMENT_DB_JOIN_NEW_REQ": 10
+  },
+  "0x74e7": {
+   "NC_GUILD_TOURNAMENT_DB_FINAL_SELECTION_REQ": 10
+  },
+  "0x74eb": {
+   "NC_GUILD_TOURNAMENT_DB_JOIN_LIST_REQ": 10
+  },
+  "0x74ee": {
+   "NC_GUILD_DB_DELETE_CANCEL_REQ": 10
+  },
+  "0x74f6": {
+   "NC_GUILD_TOURNAMENT_ENTER_LIST_DB_GET_REQ": 10
+  },
+  "0x74f9": {
+   "NC_GUILD_TOURNAMENT_REFUND_NOTICE_DB_SET_REQ": 10
+  },
+  "0x74ff": {
+   "NC_GUILD_HISTORY_DB_LIST_REQ": 10
+  },
+  "0x7507": {
+   "NC_GUILD_EMBLEM_SAVE_DB_REQ": 10
+  },
+  "0x750d": {
+   "NC_GUILD_EMBLEM_STATE_DB_REQ": 10
+  },
+  "0x8c39": {
+   "NC_MINIHOUSE_DB_OWNERBLOG_GET_REQ": 10
+  },
+  "0x8c3b": {
+   "NC_MINIHOUSE_DB_OWNERBLOG_SET_REQ": 10
+  },
+  "0x8c59": {
+   "NC_MINIHOUSE_DB_PORTAL_LIST_REQ": 10
+  },
+  "0x8c5b": {
+   "NC_MINIHOUSE_DB_VISITER_COUNT_REQ": 10
+  },
+  "0x8c5d": {
+   "NC_MINIHOUSE_DB_PORTAL_ADD_REQ": 10
+  },
+  "0x8c5f": {
+   "NC_MINIHOUSE_DB_PORTAL_DEL_REQ": 10
+  },
+  "0x9001": {
+   "NC_CHARGED_SETBUFF_CMD": 10
+  },
+  "0x9002": {
+   "NC_CHARGED_RESETBUFF_CMD": 10
+  },
+  "0x941e": {
+   "NC_HOLY_PROMISE_DB_SET_UP_REQ": 10
+  },
+  "0x942a": {
+   "NC_HOLY_PROMISE_DB_REWARD_REQ": 10
+  },
+  "0x942c": {
+   "NC_HOLY_PROMISE_DB_SET_DATE_REQ": 10
+  },
+  "0x943e": {
+   "NC_HOLY_PROMISE_DB_GET_CEN_REWARD_REQ": 10
+  },
+  "0x9442": {
+   "NC_HOLY_PROMISE_DB_WITHDRAW_CEN_REWARD_REQ": 10
+  },
+  "0x9801": {
+   "NC_GUILD_ACADEMY_START_DB_ALL_REQ": 10
+  },
+  "0x9803": {
+   "NC_GUILD_ACADEMY_START_DB_GET_RANKING_LIST_REQ": 10
+  },
+  "0x9805": {
+   "NC_GUILD_ACADEMY_START_DB_RANK_BALANCE_REQ": 10
+  },
+  "0x980f": {
+   "NC_GUILD_ACADEMY_DB_MEMBER_REQ": 10
+  },
+  "0x9814": {
+   "NC_GUILD_ACADEMY_DB_MEMBER_JOIN_REQ": 10
+  },
+  "0x9819": {
+   "NC_GUILD_ACADEMY_DB_MEMBER_VANISH_REQ": 10
+  },
+  "0x981d": {
+   "NC_GUILD_ACADEMY_DB_MEMBER_LEAVE_REQ": 10
+  },
+  "0x9827": {
+   "NC_GUILD_ACADEMY_DB_NOTIFY_REQ": 10
+  },
+  "0x982f": {
+   "NC_GUILD_ACADEMY_DB_MEMBER_GUILD_JOIN_REQ": 10
+  },
+  "0x9833": {
+   "NC_GUILD_ACADEMY_DB_GET_REWARD_MONEY_REQ": 10
+  },
+  "0x9837": {
+   "NC_GUILD_ACADEMY_DB_GET_REWARD_ITEM_REQ": 10
+  },
+  "0x983b": {
+   "NC_GUILD_ACADEMY_DB_SET_REWARD_MONEY_REQ": 10
+  },
+  "0x983f": {
+   "NC_GUILD_ACADEMY_DB_SET_REWARD_ITEM_REQ": 10
+  },
+  "0x9843": {
+   "NC_GUILD_ACADEMY_DB_CLEAR_REWARD_MONEY_REQ": 10
+  },
+  "0x9847": {
+   "NC_GUILD_ACADEMY_DB_CLEAR_REWARD_ITEM_REQ": 10
+  },
+  "0x984b": {
+   "NC_GUILD_ACADEMY_DB_GET_GRADUATE_REQ": 10
+  },
+  "0x984f": {
+   "NC_GUILD_ACADEMY_DB_GET_RANKING_LIST_REQ": 10
+  },
+  "0x9851": {
+   "NC_GUILD_ACADEMY_DB_CLEAR_REWARD_ITEM_REQ": 10
+  },
+  "0x9854": {
+   "NC_GUILD_ACADEMY_DB_LEVEL_UP_REQ": 10
+  },
+  "0x9857": {
+   "NC_GUILD_ACADEMY_DB_RANK_BALANCE_REQ": 10
+  },
+  "0x985c": {
+   "NC_GUILD_ACADEMY_DB_SET_MASTER_REQ": 10
+  },
+  "0x986b": {
+   "NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_REQ": 10
+  },
+  "0x987f": {
+   "NC_GUILD_ACADEMY_DB_SET_MASTER_BY_LEAVE_REQ": 10
+  },
+  "0x9887": {
+   "NC_GUILD_ACADEMY_MEMBER_DB_CHAT_BAN_REQ": 10
+  },
+  "0x9889": {
+   "NC_GUILD_ACADEMY_MEMBER_DB_SAVE_CHAT_BAN_TIME_CMD": 10
+  },
+  "0x988d": {
+   "NC_GUILD_ACADEMY_MEMBER_DB_CHAT_BAN_CANCEL_REQ": 10
+  },
+  "0x9891": {
+   "NC_GUILD_ACADEMY_HISTORY_DB_LIST_REQ": 10
+  },
+  "0xa004": {
+   "NC_PROMOTION_DB_REWARD_REQ": 10
+  },
+  "0xac10": {
+   "NC_DICE_TAISAI_DB_RECEIPT_INCOME_MONEY_REQ": 10
+  },
+  "0xbc06": {
+   "NC_GAMBLE_COIN_DB_ADD_REQ": 10
+  },
+  "0xbc0a": {
+   "NC_GAMBLE_EXCHANGEDCOIN_DB_INFO_REQ": 10
+  },
+  "0xbc11": {
+   "NC_GAMBLE_COIN_DB_BUY_REQ": 10
+  },
+  "0xbc15": {
+   "NC_GAMBLE_COIN_DB_SELL_REQ": 10
+  },
+  "0xbc19": {
+   "NC_GAMBLE_COIN_DB_USE_COINITEM_REQ": 10
+  },
+  "0xbcd3": {
+   "NC_GAMBLE_SLOTMACHINE_DB_RESULT_REQ": 10
+  },
+  "0xbcd5": {
+   "NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_REQ": 10
+  },
+  "0xc402": {
+   "NC_COLLECT_PEEPING_DB_REQ": 10
+  },
+  "0xc409": {
+   "NC_COLLECT_REGIST_REQ": 10
+  },
+  "0xc40d": {
+   "NC_COLLECT_BOOKMARK_REGIST_DB_REQ": 10
+  },
+  "0xc411": {
+   "NC_COLLECT_REWARD_DB_REQ": 10
+  },
+  "0xd401": {
+   "NC_PET_SET_TENDENCY_DB_REQ": 10
+  },
+  "0xd403": {
+   "NC_PET_SET_NAME_DB_REQ": 10
+  },
+  "0xd40b": {
+   "NC_PET_LOAD_INFO_DB_REQ": 10
+  },
+  "0xd40d": {
+   "NC_PET_CREATE_DB_REQ": 10
+  },
+  "0xd40f": {
+   "NC_PET_REMOVE_DB_REQ": 10
+  }
+ }
+}

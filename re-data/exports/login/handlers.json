@@ -1,0 +1,808 @@
+{
+ "store": "FUN_004086b0",
+ "sendid": "FUN_004123c0",
+ "zbuf": null,
+ "tables": [
+  {
+   "parser": "CParserAccountDB",
+   "arg": "CLoginAccountDBSession",
+   "ctors": [
+    "00404cd0"
+   ],
+   "entries": [
+    {
+     "dept": 2,
+     "cmd": 1,
+     "op": 2049,
+     "handler": "FUN_00403a40",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0802": 0
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 3,
+     "op": 2051,
+     "handler": "FUN_00404fb0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "1": "short"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 4,
+     "op": 2052,
+     "handler": "FUN_00403aa0",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 2,
+     "cmd": 5,
+     "op": 2053,
+     "handler": "LAB_004074a0",
+     "sends": {}
+    },
+    {
+     "dept": 3,
+     "cmd": 8,
+     "op": 3080,
+     "handler": "FUN_00404320",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0720": 0,
+      "0x0c09": 0,
+      "0x0c0a": 0,
+      "0x0c16": 0,
+      "0x0c17": 1
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ptr",
+      "258": "undefined4",
+      "262": "undefined4",
+      "266": "undefined4",
+      "270": "undefined4",
+      "274": "int",
+      "279": "int",
+      "283": "int"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 39,
+     "op": 3111,
+     "handler": "FUN_00404050",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0720": 0,
+      "0x0c0a": 0,
+      "0x0c16": 0,
+      "0x0c17": 1,
+      "0x0c25": 0
+     },
+     "reads": {
+      "0": "ptr",
+      "256": "ushort",
+      "308": "undefined1",
+      "309": "undefined4"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 58,
+     "op": 3130,
+     "handler": "FUN_00404990",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0720": 0,
+      "0x0c09": 0,
+      "0x0c3b": 0,
+      "0xc802": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ptr",
+      "258": "undefined4",
+      "262": "undefined4",
+      "266": "undefined4",
+      "270": "undefined4",
+      "274": "int",
+      "279": "int",
+      "283": "int"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 63,
+     "op": 3135,
+     "handler": "FUN_00403b50",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c09": 0,
+      "0x0c40": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "2": "ushort",
+      "4": "int"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 76,
+     "op": 3148,
+     "handler": "FUN_00403cd0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c09": 0,
+      "0x0c4d": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ushort",
+      "4": "int",
+      "8": "ptr"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 84,
+     "op": 3156,
+     "handler": "FUN_00404320",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0720": 0,
+      "0x0c09": 0,
+      "0x0c0a": 0,
+      "0x0c16": 0,
+      "0x0c17": 1
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ptr",
+      "258": "undefined4",
+      "262": "undefined4",
+      "266": "undefined4",
+      "270": "undefined4",
+      "274": "int",
+      "279": "int",
+      "283": "int"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 92,
+     "op": 3164,
+     "handler": "FUN_00404590",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0720": 0,
+      "0x0c09": 0,
+      "0x0c5d": 0,
+      "0xc802": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "4": "int",
+      "8": "ptr",
+      "268": "ptr",
+      "325": "int",
+      "329": "int",
+      "333": "undefined4",
+      "337": "undefined4",
+      "341": "undefined4",
+      "345": "undefined4",
+      "349": "undefined4"
+     }
+    }
+   ]
+  },
+  {
+   "parser": "CParserAccountLogDB",
+   "arg": "CLoginAccountLogDBSession",
+   "ctors": [
+    "00405e50"
+   ],
+   "entries": [
+    {
+     "dept": 2,
+     "cmd": 1,
+     "op": 2049,
+     "handler": "FUN_00404f50",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0802": 0
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 3,
+     "op": 2051,
+     "handler": "FUN_00404fb0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "1": "short"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 4,
+     "op": 2052,
+     "handler": "FUN_004050e0",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 2,
+     "cmd": 5,
+     "op": 2053,
+     "handler": "LAB_004074a0",
+     "sends": {}
+    },
+    {
+     "dept": 3,
+     "cmd": 43,
+     "op": 3115,
+     "handler": "FUN_00405c80",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0720": 0,
+      "0x0c07": 0,
+      "0x0c09": 0
+     },
+     "reads": {
+      "0": "ptr",
+      "256": "undefined4",
+      "260": "undefined4",
+      "264": "undefined4",
+      "268": "undefined4",
+      "272": "ushort",
+      "274": "byte"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 60,
+     "op": 3132,
+     "handler": "FUN_00405180",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0720": 0,
+      "0x0c09": 0,
+      "0x0c0a": 0,
+      "0x0c16": 0,
+      "0x0c17": 1,
+      "0xc801": 0,
+      "0xc802": 0
+     },
+     "reads": {
+      "2": "ptr",
+      "258": "undefined4",
+      "262": "undefined4",
+      "266": "undefined4",
+      "270": "undefined4",
+      "274": "undefined4",
+      "287": "ushort",
+      "289": "char"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 65,
+     "op": 3137,
+     "handler": "FUN_004054c0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0720": 0,
+      "0x0c09": 0,
+      "0x0c0a": 0,
+      "0x0c16": 0,
+      "0x0c17": 1
+     },
+     "reads": {
+      "4": "undefined4",
+      "8": "ushort",
+      "10": "byte"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 78,
+     "op": 3150,
+     "handler": "FUN_004056c0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0720": 0,
+      "0x0c09": 0,
+      "0x0c0a": 0,
+      "0x0c16": 0,
+      "0x0c17": 1
+     },
+     "reads": {
+      "4": "undefined4",
+      "306": "ushort",
+      "308": "byte"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 94,
+     "op": 3166,
+     "handler": "FUN_004058c0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0720": 0,
+      "0x0c09": 0,
+      "0x0c0a": 0,
+      "0x0c16": 0,
+      "0x0c17": 1,
+      "0xc801": 0,
+      "0xc802": 0
+     },
+     "reads": {
+      "4": "undefined4",
+      "8": "ptr",
+      "333": "undefined4",
+      "337": "undefined4",
+      "341": "undefined4",
+      "345": "undefined4",
+      "349": "undefined4",
+      "353": "ushort",
+      "355": "char"
+     }
+    }
+   ]
+  },
+  {
+   "parser": "CParserClient",
+   "arg": "CLoginClientSession",
+   "ctors": [
+    "00406e30"
+   ],
+   "entries": [
+    {
+     "dept": 2,
+     "cmd": 4,
+     "op": 2052,
+     "handler": "FUN_004060b0",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 2,
+     "cmd": 5,
+     "op": 2053,
+     "handler": "LAB_004074a0",
+     "sends": {}
+    },
+    {
+     "dept": 3,
+     "cmd": 101,
+     "op": 3173,
+     "handler": "FUN_004060d0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c66": 0,
+      "0x0c67": 0
+     },
+     "reads": {
+      "0": "ptr"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 4,
+     "op": 3076,
+     "handler": "FUN_00406230",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c05": 0
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 6,
+     "op": 3078,
+     "handler": "FUN_00406950",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 3,
+     "cmd": 11,
+     "op": 3083,
+     "handler": "FUN_00406970",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0721": 0,
+      "0x0c0c": 0,
+      "0x0c0d": 0,
+      "0x0c10": 0
+     },
+     "reads": {
+      "0": "byte"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 24,
+     "op": 3096,
+     "handler": "LAB_004062e0",
+     "sends": {}
+    },
+    {
+     "dept": 3,
+     "cmd": 27,
+     "op": 3099,
+     "handler": "FUN_004062f0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c1c": 0
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 29,
+     "op": 3101,
+     "handler": "FUN_00406280",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c09": 0
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 32,
+     "op": 3104,
+     "handler": "FUN_004063d0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c09": 0
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 55,
+     "op": 3127,
+     "handler": "FUN_00406bb0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0720": 0,
+      "0x0c09": 0,
+      "0x0c0a": 0,
+      "0x0c16": 0,
+      "0x0c17": 1
+     },
+     "len_checks": [
+      "!= 0x22"
+     ]
+    },
+    {
+     "dept": 3,
+     "cmd": 90,
+     "op": 3162,
+     "handler": "FUN_00406450",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c5b": 0
+     },
+     "len_checks": [
+      "== 0x13e"
+     ],
+     "reads": {
+      "0": "ptr",
+      "260": "ptr",
+      "296": "undefined4",
+      "300": "undefined4",
+      "304": "undefined4",
+      "308": "undefined4",
+      "312": "undefined4"
+     }
+    }
+   ]
+  },
+  {
+   "parser": "CParserOPTool",
+   "arg": "CLoginOPToolSession",
+   "ctors": [
+    "00407ef0"
+   ],
+   "entries": [
+    {
+     "dept": 2,
+     "cmd": 2,
+     "op": 2050,
+     "handler": "FUN_004070c0",
+     "name": "NC_MISC_S2SCONNECTION_REQ",
+     "name_src": "literal",
+     "sends": {
+      "0x0803": 0
+     },
+     "reads": {
+      "0": "undefined1",
+      "1": "char",
+      "2": "byte",
+      "3": "byte",
+      "4": "byte",
+      "5": "ushort"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 4,
+     "op": 2052,
+     "handler": "FUN_00407480",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 2,
+     "cmd": 5,
+     "op": 2053,
+     "handler": "LAB_004074a0",
+     "sends": {}
+    },
+    {
+     "dept": 10,
+     "cmd": 1,
+     "op": 10241,
+     "handler": "FUN_004074b0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2802": 0
+     },
+     "reads": {
+      "0": "ushort"
+     }
+    },
+    {
+     "dept": 10,
+     "cmd": 3,
+     "op": 10243,
+     "handler": "FUN_00407980",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2804": 0
+     }
+    },
+    {
+     "dept": 10,
+     "cmd": 5,
+     "op": 10245,
+     "handler": "FUN_00407dd0",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 10,
+     "cmd": 7,
+     "op": 10247,
+     "handler": "FUN_00407a30",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2808": 0
+     },
+     "reads": {
+      "0": "ushort"
+     }
+    },
+    {
+     "dept": 10,
+     "cmd": 18,
+     "op": 10258,
+     "handler": "FUN_00407c90",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2813": 0
+     },
+     "reads": {
+      "0": "byte"
+     }
+    },
+    {
+     "dept": 10,
+     "cmd": 20,
+     "op": 10260,
+     "handler": "FUN_00407d50",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "byte",
+      "1": "undefined4",
+      "5": "undefined4",
+      "9": "undefined4"
+     }
+    },
+    {
+     "dept": 10,
+     "cmd": 23,
+     "op": 10263,
+     "handler": "FUN_00407dd0",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 10,
+     "cmd": 24,
+     "op": 10264,
+     "handler": "FUN_00407df0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2819": 0
+     }
+    }
+   ]
+  },
+  {
+   "parser": "CParserWorldManager",
+   "arg": "CLoginWorldManagerSession",
+   "ctors": [
+    "00408bc0"
+   ],
+   "entries": [
+    {
+     "dept": 2,
+     "cmd": 2,
+     "op": 2050,
+     "handler": "FUN_00408170",
+     "name": "NC_MISC_S2SCONNECTION_REQ",
+     "name_src": "literal",
+     "sends": {
+      "0x0803": 0
+     },
+     "reads": {
+      "0": "undefined1",
+      "1": "char",
+      "2": "byte",
+      "3": "byte",
+      "4": "byte",
+      "5": "ushort"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 4,
+     "op": 2052,
+     "handler": "FUN_00408560",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 2,
+     "cmd": 5,
+     "op": 2053,
+     "handler": "LAB_004074a0",
+     "sends": {}
+    },
+    {
+     "dept": 2,
+     "cmd": 8,
+     "op": 2056,
+     "handler": "FUN_00408580",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c1c": 1
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 11,
+     "op": 2059,
+     "handler": "FUN_004085e0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "ushort",
+      "2": "ptr"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 12,
+     "op": 2060,
+     "handler": "FUN_00408620",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "0": "ushort",
+      "2": "ptr"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 14,
+     "op": 3086,
+     "handler": "FUN_00408870",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c0c": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "byte",
+      "263": "ptr",
+      "347": "char"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 35,
+     "op": 2083,
+     "handler": "FUN_00408660",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 3,
+     "cmd": 53,
+     "op": 3125,
+     "handler": "FUN_00408a20",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c36": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "int",
+      "6": "ptr",
+      "262": "undefined4"
+     }
+    }
+   ]
+  }
+ ],
+ "opnames": {
+  "0x0802": {
+   "NC_MISC_S2SCONNECTION_REQ": 6
+  }
+ }
+}

@@ -1,0 +1,4847 @@
+{
+ "s2c": {
+  "0x0720": [
+   {
+    "op": 1824,
+    "func": "FUN_00404050",
+    "size": 22,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 1824,
+    "func": "FUN_00404320",
+    "size": 22,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 1824,
+    "func": "FUN_00404590",
+    "size": 278,
+    "size_expr": null,
+    "fields": {
+     "268": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "269": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "270": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "271": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "264": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "265": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "266": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "267": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "260": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "261": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "262": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "263": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "256": {
+      "size": 16,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'",
+       "_strncpy from (char *)(param_2 + 0x87)"
+      ],
+      "kind": "write"
+     },
+     "257": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "258": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "259": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "272": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "*(undefined1 *)(uVar4 + 0x30)"
+      ],
+      "kind": "write"
+     },
+     "273": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "*(undefined1 *)(uVar4 + 0x31)"
+      ],
+      "kind": "write"
+     },
+     "274": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "*(undefined1 *)(uVar4 + 0x32)"
+      ],
+      "kind": "write"
+     },
+     "275": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "*(undefined1 *)(uVar4 + 0x33)"
+      ],
+      "kind": "write"
+     },
+     "276": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "local_6065"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [
+     "+0: FUN_00403560"
+    ],
+    "raw": false
+   },
+   {
+    "op": 1824,
+    "func": "FUN_00404990",
+    "size": 22,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 1824,
+    "func": "FUN_00405180",
+    "size": 22,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 1824,
+    "func": "FUN_004054c0",
+    "size": 22,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 1824,
+    "func": "FUN_004056c0",
+    "size": 22,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 1824,
+    "func": "FUN_004058c0",
+    "size": 22,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 1824,
+    "func": "FUN_00405c80",
+    "size": 22,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 1824,
+    "func": "FUN_00406bb0",
+    "size": 22,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0721": [
+   {
+    "op": 1825,
+    "func": "FUN_00406970",
+    "size": 9,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "param_1[0x44]"
+      ],
+      "kind": "write"
+     },
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_2[1]"
+      ],
+      "kind": "write"
+     },
+     "5": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "param_1[0xc]"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0802": [
+   {
+    "op": 2050,
+    "func": "FUN_00403a40",
+    "size": 7,
+    "size_expr": null,
+    "fields": {
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_00432e54"
+      ],
+      "kind": "write"
+     },
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_00432e58"
+      ],
+      "kind": "write"
+     },
+     "5": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "(ushort)DAT_00432e50"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 2050,
+    "func": "FUN_00404f50",
+    "size": 7,
+    "size_expr": null,
+    "fields": {
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_00432e54"
+      ],
+      "kind": "write"
+     },
+     "5": {
+      "size": 2,
+      "type": "i16",
+      "values": [],
+      "exprs": [
+       "DAT_00432e50 + 1"
+      ],
+      "kind": "write"
+     },
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_00432e58"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0803": [
+   {
+    "op": 2051,
+    "func": "FUN_004070c0",
+    "size": 3,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 3,
+      "type": "bytes[3]",
+      "values": [],
+      "exprs": [
+       "memcpy from &local_2320"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 2051,
+    "func": "FUN_00408170",
+    "size": 3,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 3,
+      "type": "bytes[3]",
+      "values": [],
+      "exprs": [
+       "memcpy from &local_2320"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0804": [
+   {
+    "op": 2052,
+    "func": "FUN_00408f30",
+    "size": 0,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0807": [
+   {
+    "op": 2055,
+    "func": "FUN_00409610",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "*(undefined2 *)((int)param_1 + 0x10a)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c07": [
+   {
+    "op": 3079,
+    "func": "FUN_00405c80",
+    "size": 18,
+    "size_expr": null,
+    "fields": {
+     "2": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "250": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "254": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "242": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "246": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "234": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "238": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "226": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "230": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "218": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "222": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "210": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "214": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "202": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "206": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "194": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "198": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "186": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "190": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "178": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "182": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "170": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "174": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "162": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "166": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "154": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "158": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "146": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "150": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "138": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "142": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "130": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "134": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "122": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "126": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "114": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "118": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "106": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "110": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "98": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "102": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "90": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "94": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "82": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "86": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "74": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "78": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "66": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "70": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "58": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "62": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "50": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "54": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "42": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "46": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "34": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "38": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "26": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "30": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "18": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "22": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "10": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "14": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "6": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_2[0x89]"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [
+     "+2: FUN_00403430",
+     "+2: FUN_004036a0"
+    ],
+    "raw": true
+   }
+  ],
+  "0x0c09": [
+   {
+    "op": 3081,
+    "func": "FUN_00403b50",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       68
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3081,
+    "func": "FUN_00403cd0",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       65
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 3081,
+    "func": "FUN_00404320",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "uVar3"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3081,
+    "func": "FUN_00404590",
+    "size": 2,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3081,
+    "func": "FUN_00404990",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       71,
+       72
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3081,
+    "func": "FUN_00405180",
+    "size": 2,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3081,
+    "func": "FUN_004054c0",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       81
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3081,
+    "func": "FUN_004056c0",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       81
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3081,
+    "func": "FUN_004058c0",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       81
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3081,
+    "func": "FUN_00405c80",
+    "size": 2,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3081,
+    "func": "FUN_00406280",
+    "size": 2,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3081,
+    "func": "FUN_004063d0",
+    "size": 2,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3081,
+    "func": "FUN_00406bb0",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       82
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c0a": [
+   {
+    "op": 3082,
+    "func": "FUN_00404050",
+    "size": null,
+    "size_expr": "(uint)*local_2584 * 0x12 + 1",
+    "fields": {
+     "0": {
+      "size": 0,
+      "type": "bytes[?]",
+      "values": [],
+      "exprs": [
+       "memcpy from local_2584"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 3082,
+    "func": "FUN_00404320",
+    "size": null,
+    "size_expr": "(uint)*local_2150 * 0x12 + 1",
+    "fields": {
+     "0": {
+      "size": 0,
+      "type": "bytes[?]",
+      "values": [],
+      "exprs": [
+       "memcpy from local_2150"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 3082,
+    "func": "FUN_00405180",
+    "size": null,
+    "size_expr": "(uint)*local_6198 * 0x12 + 1",
+    "fields": {
+     "0": {
+      "size": 0,
+      "type": "bytes[?]",
+      "values": [],
+      "exprs": [
+       "memcpy from local_6198"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 3082,
+    "func": "FUN_004054c0",
+    "size": null,
+    "size_expr": "(uint)*local_2150 * 0x12 + 1",
+    "fields": {
+     "0": {
+      "size": 0,
+      "type": "bytes[?]",
+      "values": [],
+      "exprs": [
+       "memcpy from local_2150"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 3082,
+    "func": "FUN_004056c0",
+    "size": null,
+    "size_expr": "(uint)*local_2150 * 0x12 + 1",
+    "fields": {
+     "0": {
+      "size": 0,
+      "type": "bytes[?]",
+      "values": [],
+      "exprs": [
+       "memcpy from local_2150"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 3082,
+    "func": "FUN_004058c0",
+    "size": null,
+    "size_expr": "(uint)*local_6198 * 0x12 + 1",
+    "fields": {
+     "0": {
+      "size": 0,
+      "type": "bytes[?]",
+      "values": [],
+      "exprs": [
+       "memcpy from local_6198"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 3082,
+    "func": "FUN_00406bb0",
+    "size": null,
+    "size_expr": "(uint)*local_2150 * 0x12 + 1",
+    "fields": {
+     "0": {
+      "size": 0,
+      "type": "bytes[?]",
+      "values": [],
+      "exprs": [
+       "memcpy from local_2150"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0c0c": [
+   {
+    "op": 3084,
+    "func": "FUN_00406970",
+    "size": 83,
+    "size_expr": null,
+    "fields": {
+     "13": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "9": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "5": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3084,
+    "func": "FUN_00408870",
+    "size": 83,
+    "size_expr": null,
+    "fields": {
+     "13": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "9": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "5": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 4,
+      "type": "u32",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c0d": [
+   {
+    "op": 3085,
+    "func": "FUN_00406970",
+    "size": 347,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "(undefined2)param_1[0x42]"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_2[1]"
+      ],
+      "kind": "write"
+     },
+     "3": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "param_1[0x44]"
+      ],
+      "kind": "write"
+     },
+     "327": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "param_1[0x85]"
+      ],
+      "kind": "write"
+     },
+     "331": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "param_1[0x86]"
+      ],
+      "kind": "write"
+     },
+     "325": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "(undefined2)local_208c"
+      ],
+      "kind": "write"
+     },
+     "335": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "param_1[0x87]"
+      ],
+      "kind": "write"
+     },
+     "339": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "param_1[0x88]"
+      ],
+      "kind": "write"
+     },
+     "343": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "param_1[0x89]"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [
+     "+7: FUN_004036a0"
+    ],
+    "raw": false
+   }
+  ],
+  "0x0c10": [
+   {
+    "op": 3088,
+    "func": "FUN_00406970",
+    "size": 9,
+    "size_expr": null,
+    "fields": {
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_2[1]"
+      ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "param_1[0x44]"
+      ],
+      "kind": "write"
+     },
+     "5": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "param_1[0xc]"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c16": [
+   {
+    "op": 3094,
+    "func": "FUN_00404050",
+    "size": 10,
+    "size_expr": null,
+    "fields": {
+     "6": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "this[0x44]"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3094,
+    "func": "FUN_00404320",
+    "size": 10,
+    "size_expr": null,
+    "fields": {
+     "6": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 0x8a)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3094,
+    "func": "FUN_00405180",
+    "size": 10,
+    "size_expr": null,
+    "fields": {
+     "6": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 0x8a)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3094,
+    "func": "FUN_004054c0",
+    "size": 10,
+    "size_expr": null,
+    "fields": {
+     "6": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 3)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3094,
+    "func": "FUN_004056c0",
+    "size": 10,
+    "size_expr": null,
+    "fields": {
+     "6": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 3)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3094,
+    "func": "FUN_004058c0",
+    "size": 10,
+    "size_expr": null,
+    "fields": {
+     "6": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 3)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   },
+   {
+    "op": 3094,
+    "func": "FUN_00406bb0",
+    "size": 10,
+    "size_expr": null,
+    "fields": {
+     "6": {
+      "size": 4,
+      "type": "i32",
+      "values": [],
+      "exprs": [
+       "param_1[0x44]"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c17": [
+   {
+    "op": 3095,
+    "func": "FUN_00409810",
+    "size": 2,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c1c": [
+   {
+    "op": 3100,
+    "func": "FUN_004062f0",
+    "size": null,
+    "size_expr": "(uint)*local_201c * 0x12 + 1",
+    "fields": {
+     "0": {
+      "size": 0,
+      "type": "bytes[?]",
+      "values": [],
+      "exprs": [
+       "memcpy from local_201c"
+      ],
+      "kind": "blob"
+     },
+     "8191": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "DAT_00431530 ^ (uint)&stack0xfffffffc"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 3100,
+    "func": "FUN_00409890",
+    "size": null,
+    "size_expr": "(uint)*local_201c * 0x12 + 1",
+    "fields": {
+     "0": {
+      "size": 0,
+      "type": "bytes[?]",
+      "values": [],
+      "exprs": [
+       "memcpy from local_201c"
+      ],
+      "kind": "blob"
+     },
+     "8191": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "DAT_00431530 ^ (uint)&stack0xfffffffc"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0c25": [
+   {
+    "op": 3109,
+    "func": "FUN_00404050",
+    "size": 55,
+    "size_expr": null,
+    "fields": {
+     "50": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_2[0x9b]"
+      ],
+      "kind": "write"
+     },
+     "51": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x137)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c36": [
+   {
+    "op": 3126,
+    "func": "FUN_00408a20",
+    "size": 36,
+    "size_expr": null,
+    "fields": {
+     "2": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "param_2[1]"
+      ],
+      "kind": "write"
+     },
+     "4": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "local_168"
+      ],
+      "kind": "write"
+     },
+     "12": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "local_160"
+      ],
+      "kind": "write"
+     },
+     "16": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "local_15c"
+      ],
+      "kind": "write"
+     },
+     "8": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "local_164"
+      ],
+      "kind": "write"
+     },
+     "24": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "local_154"
+      ],
+      "kind": "write"
+     },
+     "28": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "local_150"
+      ],
+      "kind": "write"
+     },
+     "20": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "local_158"
+      ],
+      "kind": "write"
+     },
+     "32": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "local_14c"
+      ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "uVar3"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c3b": [
+   {
+    "op": 3131,
+    "func": "FUN_00404990",
+    "size": 57,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c40": [
+   {
+    "op": 3136,
+    "func": "FUN_00403b50",
+    "size": 34,
+    "size_expr": null,
+    "fields": {
+     "4": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 3)"
+      ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 1)"
+      ],
+      "kind": "write"
+     },
+     "12": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "*(undefined2 *)(uVar4 + 0x108)"
+      ],
+      "kind": "write"
+     },
+     "8": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "local_49"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x0c4d": [
+   {
+    "op": 3149,
+    "func": "FUN_00403cd0",
+    "size": 332,
+    "size_expr": null,
+    "fields": {
+     "306": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "uVar4"
+      ],
+      "kind": "write"
+     },
+     "310": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "uVar3"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0c5b": [
+   {
+    "op": 3163,
+    "func": "FUN_00406450",
+    "size": 338,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "(undefined2)param_1[0x42]"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 260,
+      "type": "char[260]",
+      "values": [],
+      "exprs": [
+       "__mbsnbcpy from \"\"",
+       "__mbsnbcpy from (uchar *)(param_2 + 1)"
+      ],
+      "kind": "string"
+     },
+     "262": {
+      "size": 36,
+      "type": "char[36]",
+      "values": [],
+      "exprs": [
+       "__mbsnbcpy from \"\"",
+       "__mbsnbcpy from (uchar *)(param_2 + 0x83)"
+      ],
+      "kind": "string"
+     },
+     "298": {
+      "size": 20,
+      "type": "char[20]",
+      "values": [],
+      "exprs": [
+       "__mbsnbcpy from \"\"",
+       "__mbsnbcpy from local_34"
+      ],
+      "kind": "string"
+     },
+     "326": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 0x99)"
+      ],
+      "kind": "write"
+     },
+     "318": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 0x95)"
+      ],
+      "kind": "write"
+     },
+     "322": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 0x97)"
+      ],
+      "kind": "write"
+     },
+     "330": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 0x9b)"
+      ],
+      "kind": "write"
+     },
+     "334": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 0x9d)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0c5d": [
+   {
+    "op": 3165,
+    "func": "FUN_00404590",
+    "size": 379,
+    "size_expr": null,
+    "fields": {
+     "353": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 3)"
+      ],
+      "kind": "write"
+     },
+     "357": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "*(undefined2 *)(uVar4 + 0x108)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [
+     "+0: FUN_00403ed0"
+    ],
+    "raw": false
+   }
+  ],
+  "0x0c66": [
+   {
+    "op": 3174,
+    "func": "FUN_004060d0",
+    "size": 1,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0c67": [
+   {
+    "op": 3175,
+    "func": "FUN_004060d0",
+    "size": null,
+    "size_expr": "(uint)(pcVar4 + (2 - ((int)param_1 + 0x2ab)))",
+    "fields": {
+     "8191": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "DAT_00431530 ^ (uint)&stack0xfffffffc"
+      ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "SUB41(pcVar4 + (1 - ((int)param_1 + 0x2ab)),0)"
+      ],
+      "kind": "write"
+     },
+     "1": {
+      "size": 8190,
+      "type": "bytes[8190]",
+      "values": [],
+      "exprs": [
+       "FID_conflict__memcpy from pcVar5"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2802": [
+   {
+    "op": 10242,
+    "func": "FUN_004074b0",
+    "size": 4,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_2[1]"
+      ],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_00432e50"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "(undefined2)uVar4"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 10242,
+    "func": "FUN_004074b0",
+    "size": null,
+    "size_expr": "uVar4 * 7 + 4",
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_2[1]"
+      ],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_00432e50"
+      ],
+      "kind": "write"
+     },
+     "6": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0043ce60"
+      ],
+      "kind": "write"
+     },
+     "5": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0043ce68"
+      ],
+      "kind": "write"
+     },
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0043ce64"
+      ],
+      "kind": "write"
+     },
+     "7": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "local_200c[0] ^ ((DAT_0043ce6c >> 0x10) << 4 ^ local_200c[0]) & 0xf0",
+       "local_200c[0] ^ ((uint)DAT_0043ce72 << 8 ^ local_200c[0]) & 0x1f00",
+       "local_200c[0] ^ ((uint)DAT_0043ce74 << 0xd ^ local_200c[0]) & 0x3e000",
+       "local_200c[0] ^ ((uint)DAT_0043ce76 << 0x12 ^ local_200c[0]) & 0xfc...",
+       "local_200c[0] ^ ((uint)DAT_0043ce78 << 0x18 ^ local_200c[0]) & 0x3f...",
+       "local_200c[0] ^ (DAT_0043ce6c ^ local_200c[0]) & 0xf"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "(undefined2)uVar4"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2804": [
+   {
+    "op": 10244,
+    "func": "FUN_00407980",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       1536
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2808": [
+   {
+    "op": 10248,
+    "func": "FUN_00407a30",
+    "size": 170,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 170,
+      "type": "bytes[170]",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_2[1]",
+       "memset 0"
+      ],
+      "kind": "blob"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_00432e50"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2813": [
+   {
+    "op": 10259,
+    "func": "FUN_00407c90",
+    "size": 13,
+    "size_expr": null,
+    "fields": {
+     "1": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "*(undefined2 *)(&DAT_00432fa0 + uVar2 * 3)"
+      ],
+      "kind": "write"
+     },
+     "3": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "*(undefined2 *)((int)&DAT_00432fa0 + uVar2 * 0xc + 2)"
+      ],
+      "kind": "write"
+     },
+     "5": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "*(undefined2 *)(&DAT_00432fa4 + uVar2 * 3)"
+      ],
+      "kind": "write"
+     },
+     "9": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "*(undefined2 *)(&DAT_00432fa8 + uVar2 * 3)"
+      ],
+      "kind": "write"
+     },
+     "7": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "*(undefined2 *)((int)&DAT_00432fa4 + uVar2 * 0xc + 2)"
+      ],
+      "kind": "write"
+     },
+     "11": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "*(undefined2 *)((int)&DAT_00432fa8 + uVar2 * 0xc + 2)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0x2819": [
+   {
+    "op": 10265,
+    "func": "FUN_00407df0",
+    "size": 24,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": true
+   }
+  ],
+  "0xc801": [
+   {
+    "op": 51201,
+    "func": "FUN_00405180",
+    "size": 40,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 0x8a)"
+      ],
+      "kind": "write"
+     },
+     "16": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "17": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "18": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "19": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "12": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "13": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "14": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "15": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "8": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "9": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "10": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "11": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "4": {
+      "size": 16,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'",
+       "_strncpy from local_54"
+      ],
+      "kind": "write"
+     },
+     "5": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "6": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "7": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 51201,
+    "func": "FUN_004058c0",
+    "size": 40,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_2 + 3)"
+      ],
+      "kind": "write"
+     },
+     "16": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "17": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "18": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "19": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "12": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "13": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "14": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "15": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "8": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "9": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "10": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "11": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "4": {
+      "size": 16,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'",
+       "_strncpy from local_34"
+      ],
+      "kind": "write"
+     },
+     "5": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "6": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "7": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "20": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x14f)"
+      ],
+      "kind": "write"
+     },
+     "24": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x153)"
+      ],
+      "kind": "write"
+     },
+     "28": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x157)"
+      ],
+      "kind": "write"
+     },
+     "32": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x15b)"
+      ],
+      "kind": "write"
+     },
+     "36": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x15f)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0xc802": [
+   {
+    "op": 51202,
+    "func": "FUN_00404590",
+    "size": 296,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 256,
+      "type": "char[256]",
+      "values": [],
+      "exprs": [
+       "__mbsnbcpy from (uchar *)(param_2 + 5)"
+      ],
+      "kind": "string"
+     },
+     "272": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "273": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "274": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "275": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "268": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "269": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "270": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "271": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "264": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "265": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "266": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "267": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "260": {
+      "size": 16,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'",
+       "_strncpy from local_54"
+      ],
+      "kind": "write"
+     },
+     "261": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "262": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "263": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "280": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x153)"
+      ],
+      "kind": "write"
+     },
+     "284": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x157)"
+      ],
+      "kind": "write"
+     },
+     "276": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x14f)"
+      ],
+      "kind": "write"
+     },
+     "292": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x15f)"
+      ],
+      "kind": "write"
+     },
+     "288": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x15b)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   },
+   {
+    "op": 51202,
+    "func": "FUN_00404990",
+    "size": 296,
+    "size_expr": null,
+    "fields": {
+     "256": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "272": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "273": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "274": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "275": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "268": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "269": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "270": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "271": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "264": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "265": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "266": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "267": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "260": {
+      "size": 16,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'",
+       "_strncpy from local_54"
+      ],
+      "kind": "write"
+     },
+     "261": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "262": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "263": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [
+     "+0: FUN_004036a0"
+    ],
+    "raw": false
+   },
+   {
+    "op": 51202,
+    "func": "FUN_00405180",
+    "size": 296,
+    "size_expr": null,
+    "fields": {
+     "256": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "272": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "273": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "274": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "275": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "268": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "269": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "270": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "271": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "264": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "265": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "266": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "267": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "260": {
+      "size": 16,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'",
+       "_strncpy from local_34"
+      ],
+      "kind": "write"
+     },
+     "261": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "262": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "263": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [
+     "+0: FUN_004036a0"
+    ],
+    "raw": false
+   },
+   {
+    "op": 51202,
+    "func": "FUN_004058c0",
+    "size": 296,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 256,
+      "type": "char[256]",
+      "values": [],
+      "exprs": [
+       "__mbsnbcpy from (uchar *)(param_2 + 5)"
+      ],
+      "kind": "string"
+     },
+     "272": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "273": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "274": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "275": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "268": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "269": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "270": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "271": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "264": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "265": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "266": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "267": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "260": {
+      "size": 16,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'",
+       "_strncpy from local_54"
+      ],
+      "kind": "write"
+     },
+     "261": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "262": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "263": {
+      "size": 1,
+      "type": "char",
+      "values": [],
+      "exprs": [
+       "'\\0'"
+      ],
+      "kind": "write"
+     },
+     "280": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x153)"
+      ],
+      "kind": "write"
+     },
+     "284": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x157)"
+      ],
+      "kind": "write"
+     },
+     "276": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x14f)"
+      ],
+      "kind": "write"
+     },
+     "292": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x15f)"
+      ],
+      "kind": "write"
+     },
+     "288": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)((int)param_2 + 0x15b)"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ]
+ },
+ "c2s": {
+  "0x0803": {
+   "CParserAccountDB": {
+    "fields": {
+     "1": {
+      "type": "i16",
+      "size": 2,
+      "names": [],
+      "checks": [
+       "== 0"
+      ],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404fb0",
+    "name": null
+   },
+   "CParserAccountLogDB": {
+    "fields": {
+     "1": {
+      "type": "i16",
+      "size": 2,
+      "names": [],
+      "checks": [
+       "== 0"
+      ],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404fb0",
+    "name": null
+   }
+  },
+  "0x0c08": {
+   "CParserAccountDB": {
+    "fields": {
+     "274": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "279": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [
+       "== 0"
+      ],
+      "copied": []
+     },
+     "283": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [
+       "== 1"
+      ],
+      "copied": []
+     },
+     "258": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "266": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "262": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "270": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404320",
+    "name": null
+   }
+  },
+  "0x0c27": {
+   "CParserAccountDB": {
+    "fields": {
+     "308": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "309": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "256": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404050",
+    "name": null
+   }
+  },
+  "0x0c3a": {
+   "CParserAccountDB": {
+    "fields": {
+     "274": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "279": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [
+       "== 0"
+      ],
+      "copied": []
+     },
+     "283": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [
+       "== 1"
+      ],
+      "copied": []
+     },
+     "258": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "266": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "262": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "270": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404990",
+    "name": null
+   }
+  },
+  "0x0c3f": {
+   "CParserAccountDB": {
+    "fields": {
+     "4": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [
+       "!= -1"
+      ],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403b50",
+    "name": null
+   }
+  },
+  "0x0c4c": {
+   "CParserAccountDB": {
+    "fields": {
+     "4": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [
+       "== -1"
+      ],
+      "copied": []
+     },
+     "8": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [
+       "== 0x41"
+      ],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403cd0",
+    "name": null
+   }
+  },
+  "0x0c54": {
+   "CParserAccountDB": {
+    "fields": {
+     "274": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "279": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [
+       "== 0"
+      ],
+      "copied": []
+     },
+     "283": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [
+       "== 1"
+      ],
+      "copied": []
+     },
+     "258": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "266": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "262": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "270": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404320",
+    "name": null
+   }
+  },
+  "0x0c5c": {
+   "CParserAccountDB": {
+    "fields": {
+     "4": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "325": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [
+       "== 0"
+      ],
+      "copied": []
+     },
+     "329": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [
+       "== 1"
+      ],
+      "copied": []
+     },
+     "337": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "341": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "333": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "349": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "345": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "char*",
+      "size": 256,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0x100"
+      ]
+     },
+     "268": {
+      "type": "char*",
+      "size": 16,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "_strncpy n=0x10"
+      ]
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404590",
+    "name": null
+   }
+  },
+  "0x0c2b": {
+   "CParserAccountLogDB": {
+    "fields": {
+     "256": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "264": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "260": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "268": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "272": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "274": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405c80",
+    "name": null
+   }
+  },
+  "0x0c3c": {
+   "CParserAccountLogDB": {
+    "fields": {
+     "287": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "289": {
+      "type": "char",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "262": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "258": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "266": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "270": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "274": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405180",
+    "name": null
+   }
+  },
+  "0x0c41": {
+   "CParserAccountLogDB": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004054c0",
+    "name": null
+   }
+  },
+  "0x0c4e": {
+   "CParserAccountLogDB": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "306": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "308": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004056c0",
+    "name": null
+   }
+  },
+  "0x0c5e": {
+   "CParserAccountLogDB": {
+    "fields": {
+     "353": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "355": {
+      "type": "char",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "337": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "341": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "333": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "349": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "345": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "char*",
+      "size": 256,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0x100"
+      ]
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004058c0",
+    "name": null
+   }
+  },
+  "0x0c65": {
+   "CParserClient": {
+    "fields": {
+     "0": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004060d0",
+    "name": null
+   }
+  },
+  "0x0c04": {
+   "CParserClient": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00406230",
+    "name": null
+   }
+  },
+  "0x0c0b": {
+   "CParserClient": {
+    "fields": {
+     "0": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406970",
+    "name": null
+   }
+  },
+  "0x0c1b": {
+   "CParserClient": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_004062f0",
+    "name": null
+   }
+  },
+  "0x0c1d": {
+   "CParserClient": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00406280",
+    "name": null
+   }
+  },
+  "0x0c20": {
+   "CParserClient": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_004063d0",
+    "name": null
+   }
+  },
+  "0x0c37": {
+   "CParserClient": {
+    "fields": {},
+    "len_checks": [
+     "!= 0x22"
+    ],
+    "handler": "FUN_00406bb0",
+    "name": null
+   }
+  },
+  "0x0c5a": {
+   "CParserClient": {
+    "fields": {
+     "304": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "296": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "300": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "308": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "312": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "char*",
+      "size": 256,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0x100"
+      ]
+     },
+     "260": {
+      "type": "char*",
+      "size": 36,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0x24"
+      ]
+     }
+    },
+    "len_checks": [
+     "== 0x13e"
+    ],
+    "handler": "FUN_00406450",
+    "name": null
+   }
+  },
+  "0x0802": {
+   "CParserOPTool": {
+    "fields": {
+     "0": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "1": {
+      "type": "char",
+      "size": 1,
+      "names": [
+       "server_id_to"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "id",
+       "server_id_from"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "3": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "w"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "z"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "5": {
+      "type": "u16",
+      "size": 2,
+      "names": [
+       "key"
+      ],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004070c0",
+    "name": "NC_MISC_S2SCONNECTION_REQ"
+   },
+   "CParserWorldManager": {
+    "fields": {
+     "0": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "1": {
+      "type": "char",
+      "size": 1,
+      "names": [
+       "server_id_to"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "id",
+       "server_id_from"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "3": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "w"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "z"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "5": {
+      "type": "u16",
+      "size": 2,
+      "names": [
+       "key"
+      ],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00408170",
+    "name": "NC_MISC_S2SCONNECTION_REQ"
+   }
+  },
+  "0x2801": {
+   "CParserOPTool": {
+    "fields": {
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004074b0",
+    "name": null
+   }
+  },
+  "0x2805": {
+   "CParserOPTool": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00407dd0",
+    "name": null
+   }
+  },
+  "0x2807": {
+   "CParserOPTool": {
+    "fields": {
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00407a30",
+    "name": null
+   }
+  },
+  "0x2812": {
+   "CParserOPTool": {
+    "fields": {
+     "0": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00407c90",
+    "name": null
+   }
+  },
+  "0x2814": {
+   "CParserOPTool": {
+    "fields": {
+     "1": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "5": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "9": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [
+       "== 0xff"
+      ],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00407d50",
+    "name": null
+   }
+  },
+  "0x2817": {
+   "CParserOPTool": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00407dd0",
+    "name": null
+   }
+  },
+  "0x2818": {
+   "CParserOPTool": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00407df0",
+    "name": null
+   }
+  },
+  "0x0808": {
+   "CParserWorldManager": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00408580",
+    "name": null
+   }
+  },
+  "0x080b": {
+   "CParserWorldManager": {
+    "fields": {
+     "2": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004085e0",
+    "name": null
+   }
+  },
+  "0x080c": {
+   "CParserWorldManager": {
+    "fields": {
+     "2": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00408620",
+    "name": null
+   }
+  },
+  "0x0c0e": {
+   "CParserWorldManager": {
+    "fields": {
+     "347": {
+      "type": "char",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "263": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00408870",
+    "name": null
+   }
+  },
+  "0x0823": {
+   "CParserWorldManager": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00408660",
+    "name": null
+   }
+  },
+  "0x0c35": {
+   "CParserWorldManager": {
+    "fields": {
+     "2": {
+      "type": "i32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "262": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "char*",
+      "size": 0,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00408a20",
+    "name": null
+   }
+  }
+ }
+}

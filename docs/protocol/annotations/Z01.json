@@ -1,0 +1,870 @@
+{
+ "_about": "Z01: zone core layouts (map login, links, logout, handshakes). Read from the zone handlers (zone export), client-facing ones cross-checked with the client. Names marked (ours) are descriptive.",
+ "packets": {
+  "zone": {
+   "0x0807": {
+    "dir": "S→C",
+    "name": "NC_MISC_SEED_ACK",
+    "basis": "zone FUN_00451a30",
+    "fields": [
+     [
+      0,
+      "u16",
+      "seed",
+      "global counter, wraps at 499"
+     ]
+    ]
+   },
+   "0x1804": {
+    "dir": "S→C",
+    "name": "map login failed (ours)",
+    "basis": "zone FUN_00452590 / FUN_005a3590 / FUN_005a3440; client FUN_004778c0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x147 SHN checksum mismatch, 0x142 no position, 0x31EC no tutorial map"
+     ],
+     [
+      2,
+      "u8",
+      "index",
+      "checksum index or 0xFF"
+     ]
+    ]
+   },
+   "0x104b": {
+    "dir": "zone→WM",
+    "name": "NC_CHAR_REGISTNUMBER_REQ",
+    "basis": "zone FUN_00452590",
+    "fields": [
+     [
+      0,
+      "u16",
+      "sessionHandle",
+      "ref[0..1]"
+     ],
+     [
+      2,
+      "u32",
+      "minusOne",
+      "ref[2..5] = -1"
+     ],
+     [
+      6,
+      "u16",
+      "wmHandle",
+      "from 0x1801"
+     ],
+     [
+      8,
+      "char[20]",
+      "charName",
+      ""
+     ]
+    ]
+   },
+   "0x104c": {
+    "dir": "WM→zone",
+    "name": "NC_CHAR_REGISTNUMBER_ACK",
+    "basis": "zone FUN_0044aa60 / FUN_0044e900",
+    "fields": [
+     [
+      0,
+      "u16",
+      "sessionHandle",
+      "ref"
+     ],
+     [
+      2,
+      "u32",
+      "ref2",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "userNo",
+      "-1 = refused"
+     ],
+     [
+      10,
+      "u32",
+      "charNo",
+      "-1 = refused"
+     ],
+     [
+      14,
+      "u16",
+      "wmHandle",
+      ""
+     ],
+     [
+      16,
+      "char[20]",
+      "charName",
+      "must match 0x1801"
+     ]
+    ]
+   },
+   "0x101c": {
+    "dir": "zone→WM",
+    "name": "NC_CHAR_ZONE_CHARDATA_REQ",
+    "basis": "zone FUN_0044e900",
+    "fields": [
+     [
+      0,
+      "u16",
+      "objHandle",
+      "zone object handle of the player (ref[0..1])"
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      "or -1 (ref[2..5])"
+     ],
+     [
+      6,
+      "u16",
+      "wmHandle",
+      ""
+     ],
+     [
+      8,
+      "char[20]",
+      "charName",
+      ""
+     ]
+    ]
+   },
+   "0x101d": {
+    "dir": "WM→zone",
+    "name": "NC_CHAR_ZONE_CHARDATA_ACK",
+    "basis": "zone FUN_005a3590",
+    "fields": [
+     [
+      0,
+      "u16",
+      "objHandle",
+      "zone object handle of the player (ref[0..1])"
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      "or -1 (ref[2..5])"
+     ],
+     [
+      6,
+      "u16",
+      "wmHandle",
+      ""
+     ]
+    ]
+   },
+   "0x0c1a": {
+    "dir": "zone→WM",
+    "name": "player disconnected (ours)",
+    "basis": "zone FUN_0054f340 so_Disconnect",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ffff",
+      "0xFFFF"
+     ],
+     [
+      2,
+      "u32",
+      "minusOne",
+      "-1"
+     ],
+     [
+      6,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      10,
+      "u16",
+      "wmHandle",
+      ""
+     ],
+     [
+      12,
+      "u16",
+      "reason",
+      "0x685/0x686/0x689/0x68B/0x68E …"
+     ]
+    ]
+   },
+   "0x0c31": {
+    "dir": "zone→WM",
+    "name": "NC_USER_POSSIBLE_NEW_CONNECT_CMD",
+    "basis": "zone FUN_00558160 / FUN_00552190",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ffff",
+      "0xFFFF"
+     ],
+     [
+      2,
+      "u32",
+      "minusOne",
+      "-1"
+     ],
+     [
+      6,
+      "u16",
+      "wmHandle",
+      ""
+     ],
+     [
+      8,
+      "u32",
+      "charNo",
+      ""
+     ]
+    ]
+   },
+   "0x180b": {
+    "dir": "zone→WM",
+    "name": "leaving for a link (ours)",
+    "basis": "zone FUN_0049ad30 so_LinkTo",
+    "fields": [
+     [
+      0,
+      "u16",
+      "wmHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      ""
+     ]
+    ]
+   },
+   "0x180c": {
+    "dir": "zone→WM",
+    "name": "map login done (ours)",
+    "basis": "zone FUN_00443390",
+    "fields": [
+     [
+      0,
+      "u16",
+      "wmHandle",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "objHandle",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "charNo",
+      ""
+     ],
+     [
+      8,
+      "char[12]",
+      "map",
+      ""
+     ],
+     [
+      20,
+      "u8",
+      "zoneNo",
+      ""
+     ],
+     [
+      21,
+      "u32",
+      "x",
+      ""
+     ],
+     [
+      25,
+      "u32",
+      "y",
+      ""
+     ],
+     [
+      29,
+      "u8",
+      "always99",
+      "99"
+     ],
+     [
+      30,
+      "u64",
+      "exp",
+      ""
+     ],
+     [
+      38,
+      "u64",
+      "money",
+      "inferred"
+     ],
+     [
+      46,
+      "u8",
+      "inGuildTournament",
+      ""
+     ]
+    ]
+   },
+   "0x180d": {
+    "dir": "zone→WM",
+    "name": "link reserve (ours)",
+    "basis": "zone FUN_0049ad30 so_LinkTo",
+    "fields": [
+     [
+      0,
+      "u16",
+      "objHandle",
+      "zone object handle of the player (ref[0..1])"
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      "or -1 (ref[2..5])"
+     ],
+     [
+      6,
+      "u16",
+      "wmHandle",
+      ""
+     ],
+     [
+      8,
+      "u8",
+      "destZone",
+      ""
+     ],
+     [
+      9,
+      "char[12]",
+      "destMap",
+      ""
+     ],
+     [
+      21,
+      "u32",
+      "x",
+      ""
+     ],
+     [
+      25,
+      "u32",
+      "y",
+      ""
+     ],
+     [
+      29,
+      "u16",
+      "mapIndex",
+      "MapInfo index for the client"
+     ],
+     [
+      31,
+      "u32",
+      "x2",
+      ""
+     ],
+     [
+      35,
+      "u32",
+      "y2",
+      ""
+     ],
+     [
+      39,
+      "char[16]",
+      "zoneIp",
+      ""
+     ],
+     [
+      55,
+      "u16",
+      "zonePort",
+      ""
+     ],
+     [
+      57,
+      "u16",
+      "wmHandle2",
+      ""
+     ]
+    ],
+    "notes": "0x3b bytes"
+   },
+   "0x180e": {
+    "dir": "WM→zone",
+    "name": "NC_MAP_LINKRESERVE_ACK",
+    "basis": "zone FUN_0049b510",
+    "fields": [
+     [
+      0,
+      "u16",
+      "objHandle",
+      "zone object handle of the player (ref[0..1])"
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      "or -1 (ref[2..5])"
+     ],
+     [
+      6,
+      "u16",
+      "mapIndex",
+      ""
+     ],
+     [
+      8,
+      "u32",
+      "x",
+      ""
+     ],
+     [
+      12,
+      "u32",
+      "y",
+      ""
+     ],
+     [
+      16,
+      "char[16]",
+      "zoneIp",
+      ""
+     ],
+     [
+      32,
+      "u16",
+      "zonePort",
+      ""
+     ],
+     [
+      34,
+      "u16",
+      "wmHandle",
+      ""
+     ]
+    ]
+   },
+   "0x180a": {
+    "dir": "S→C",
+    "name": "link to another zone (ours)",
+    "basis": "zone FUN_0049b510; client FUN_004b4ab0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "mapIndex",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "x",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "y",
+      ""
+     ],
+     [
+      10,
+      "char[16]",
+      "zoneIp",
+      ""
+     ],
+     [
+      26,
+      "u16",
+      "zonePort",
+      ""
+     ],
+     [
+      28,
+      "u16",
+      "wmHandle",
+      ""
+     ]
+    ]
+   },
+   "0x1809": {
+    "dir": "S→C",
+    "name": "link inside the same zone (ours)",
+    "basis": "zone FUN_0049ad30; client FUN_0049feb0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "mapIndex",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "x",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "y",
+      ""
+     ]
+    ]
+   },
+   "0x1805": {
+    "dir": "S→C",
+    "name": "object left sight (ours)",
+    "basis": "zone FUN_00553a40; client FUN_004bd620",
+    "fields": [
+     [
+      0,
+      "u16",
+      "objHandle",
+      ""
+     ]
+    ]
+   },
+   "0x0802": {
+    "dir": "zone→peer",
+    "name": "NC_MISC_S2SCONNECTION_REQ",
+    "basis": "zone FUN_005a3210 / FUN_00468770 / FUN_0046a080",
+    "fields": [
+     [
+      0,
+      "u8",
+      "echo",
+      "not set"
+     ],
+     [
+      1,
+      "u8",
+      "serverIdTo",
+      "5 WM, 2 GameDB, 3 GameLog"
+     ],
+     [
+      2,
+      "u8",
+      "serverIdFrom",
+      "6"
+     ],
+     [
+      3,
+      "u8",
+      "worldNo",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "zoneNo",
+      ""
+     ],
+     [
+      5,
+      "u16",
+      "key",
+      "to + from"
+     ]
+    ]
+   },
+   "0x1814": {
+    "dir": "C→S",
+    "name": "NC_MAP_WING_SAVE_REQ",
+    "basis": "zone FUN_00589c80",
+    "fields": [
+     [
+      0,
+      "u8",
+      "slot",
+      ""
+     ]
+    ]
+   },
+   "0x1815": {
+    "dir": "S→C",
+    "name": "NC_MAP_WING_SAVE_ACK",
+    "basis": "zone FUN_00589c80; client FUN_004aeed0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x1141 saved, 0x1143 map forbids, 0x1144 bad slot, 0x1146 state"
+     ]
+    ]
+   },
+   "0x1816": {
+    "dir": "C→S",
+    "name": "NC_MAP_WING_FLY_REQ",
+    "basis": "zone FUN_00589f00",
+    "fields": [
+     [
+      0,
+      "u8",
+      "slot",
+      ""
+     ]
+    ]
+   },
+   "0x1817": {
+    "dir": "S→C",
+    "name": "NC_MAP_WING_FLY_ACK",
+    "basis": "zone FUN_00589f00; client FUN_004aeff0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x1141 ok, 0x1142 no wing, 0x1143 state, 0x1144 empty slot, 0x1145 no stone, 0x1146 mode"
+     ]
+    ]
+   },
+   "0x181a": {
+    "dir": "C→S",
+    "name": "NC_MAP_TOWNPORTAL_REQ",
+    "basis": "zone FUN_0049fe70",
+    "fields": [
+     [
+      0,
+      "u8",
+      "index",
+      "TownPortal.shn row"
+     ]
+    ]
+   },
+   "0x181b": {
+    "dir": "S→C",
+    "name": "NC_MAP_TOWNPORTAL_ACK",
+    "basis": "zone FUN_0049fe70",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x19C1 ok, 0x19C2 state, 0x19C3 index, 0x19C4 level"
+     ]
+    ]
+   },
+   "0x181f": {
+    "dir": "C→S",
+    "name": "NC_MAP_MULTY_LINK_SELECT_REQ",
+    "basis": "zone FUN_0055b430",
+    "fields": [
+     [
+      0,
+      "char[12]",
+      "map",
+      ""
+     ]
+    ]
+   },
+   "0x1820": {
+    "dir": "S→C",
+    "name": "NC_MAP_MULTY_LINK_SELECT_ACK",
+    "basis": "zone FUN_00558e40",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x2028 ok, 0x2029 no NPC, 0x202B far, 0x202C NPC role, 0x202D no link"
+     ]
+    ]
+   },
+   "0x203e": {
+    "dir": "S→C",
+    "name": "move speed (ours)",
+    "basis": "zone FUN_00443390 (vt 0x514/0x518)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "walkSpeed",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "runSpeed",
+      ""
+     ]
+    ]
+   },
+   "0x0830": {
+    "dir": "S→C",
+    "name": "NC_MISC_SERVERPARAMETER_ACK",
+    "basis": "zone FUN_005517c0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "value1",
+      "DAT_0da5047c"
+     ],
+     [
+      1,
+      "u16",
+      "value2",
+      "DAT_0da50480"
+     ]
+    ]
+   },
+   "0x0c24": {
+    "dir": "S→C",
+    "name": "NC_USER_REGISENUMBER_ACK",
+    "basis": "zone FUN_0056e8b0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "userNo",
+      ""
+     ]
+    ]
+   },
+   "0xb410": {
+    "dir": "C→S",
+    "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_ITEM_USE_REQ",
+    "basis": "zone FUN_0051b090",
+    "fields": [
+     [
+      0,
+      "u8",
+      "slot",
+      "inventory slot"
+     ]
+    ]
+   },
+   "0xb413": {
+    "dir": "S→C",
+    "name": "name-change item result (ours)",
+    "basis": "zone FUN_0051b090; client FUN_004b2bc0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x20B1-0x20B6, 0x1A78 errors; 0x20B0 success (DB path)"
+     ]
+    ]
+   },
+   "0x0821": {
+    "dir": "WM→zone",
+    "name": "NC_MISC_TIMEFROMWORLD_CMD",
+    "basis": "zone FUN_004511a0",
+    "fields": [
+     [
+      0,
+      "bytes[36]",
+      "tm",
+      "struct tm"
+     ]
+    ]
+   },
+   "0x082b": {
+    "dir": "WM→zone",
+    "name": "NC_MISC_CONNECTFROMWHERE_ACK",
+    "basis": "zone FUN_0043f2f0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "objHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "where",
+      ""
+     ]
+    ]
+   },
+   "0x0825": {
+    "dir": "WM→zone",
+    "name": "NC_MISC_WHSHANDLEREPAIR_CMD",
+    "basis": "zone FUN_00551670 / FUN_00551750",
+    "fields": [
+     [
+      0,
+      "u16",
+      "objHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "wmHandle",
+      ""
+     ]
+    ]
+   },
+   "0x4026": {
+    "dir": "S→C",
+    "name": "UI state save result (ours)",
+    "basis": "zone FUN_00551360",
+    "fields": [
+     [
+      0,
+      "u16",
+      "result",
+      "from 0x4028"
+     ]
+    ]
+   },
+   "0x0810": {
+    "dir": "S→C",
+    "name": "map time limit (ours)",
+    "basis": "zone FUN_00443390; client FUN_004997a0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "one",
+      "1"
+     ],
+     [
+      1,
+      "u16",
+      "minutes",
+      "limit / 10"
+     ]
+    ]
+   }
+  }
+ }
+}

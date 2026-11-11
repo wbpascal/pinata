@@ -1,0 +1,9623 @@
+{
+ "s2c": {
+  "0x0403": [
+   {
+    "op": 1027,
+    "func": "FUN_00403160",
+    "size": 12,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "*(undefined4 *)(param_1 + 1)"
+      ],
+      "kind": "write"
+     },
+     "4": {
+      "size": 8,
+      "type": "u64",
+      "values": [],
+      "exprs": [
+       "uVar2"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0803": [
+   {
+    "op": 2051,
+    "func": "FUN_00408bd0",
+    "size": 3,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 3,
+      "type": "bytes[3]",
+      "values": [],
+      "exprs": [
+       "memcpy from &local_2320"
+      ],
+      "kind": "blob"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x0804": [
+   {
+    "op": 2052,
+    "func": "FUN_00409d10",
+    "size": 0,
+    "size_expr": null,
+    "fields": {},
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2802": [
+   {
+    "op": 10242,
+    "func": "FUN_00409170",
+    "size": null,
+    "size_expr": "iVar1 * 7 + 4",
+    "fields": {
+     "8191": {
+      "size": 4,
+      "type": "u32",
+      "values": [],
+      "exprs": [
+       "DAT_0044bbec ^ (uint)&stack0xfffffffc"
+      ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_1[1]"
+      ],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0044d688"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 2,
+      "type": "u16",
+      "values": [],
+      "exprs": [
+       "(undefined2)iVar1"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2804": [
+   {
+    "op": 10244,
+    "func": "FUN_00409360",
+    "size": 2,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       1536
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2806": [
+   {
+    "op": 10246,
+    "func": "FUN_00409410",
+    "size": 4,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_1[1]"
+      ],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0044d688"
+      ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 2,
+      "type": "u16",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ],
+  "0x2808": [
+   {
+    "op": 10248,
+    "func": "FUN_004094e0",
+    "size": 170,
+    "size_expr": null,
+    "fields": {
+     "0": {
+      "size": 170,
+      "type": "bytes[170]",
+      "values": [],
+      "exprs": [
+       "(undefined1)param_1[1]",
+       "memset 0"
+      ],
+      "kind": "blob"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0044d688"
+      ],
+      "kind": "write"
+     }
+    },
+    "fills": [],
+    "raw": false
+   }
+  ]
+ },
+ "c2s": {
+  "0x0802": {
+   "CPFs": {
+    "fields": {
+     "0": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "1": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "server_id_to"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "id",
+       "server_id_from"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "3": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "w"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u8",
+      "size": 1,
+      "names": [
+       "z"
+      ],
+      "checks": [],
+      "copied": []
+     },
+     "5": {
+      "type": "u16",
+      "size": 2,
+      "names": [
+       "key"
+      ],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00408bd0",
+    "name": "NC_MISC_S2SCONNECTION_REQ"
+   }
+  },
+  "0x0803": {
+   "CPFs": {
+    "fields": {
+     "1": {
+      "type": "i16",
+      "size": 2,
+      "names": [],
+      "checks": [
+       "== 0"
+      ],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00409080",
+    "name": null
+   }
+  },
+  "0x2801": {
+   "CPFs": {
+    "fields": {
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00409170",
+    "name": null
+   }
+  },
+  "0x2805": {
+   "CPFs": {
+    "fields": {
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00409410",
+    "name": null
+   }
+  },
+  "0x2807": {
+   "CPFs": {
+    "fields": {
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004094e0",
+    "name": null
+   }
+  },
+  "0x0823": {
+   "CPFs": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_004069c0",
+    "name": null
+   }
+  },
+  "0x07e8": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "48": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "56": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "60": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "52": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "64": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004079c0",
+    "name": null
+   }
+  },
+  "0x07e9": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402140",
+    "name": null
+   }
+  },
+  "0x07ea": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004021f0",
+    "name": null
+   }
+  },
+  "0x07eb": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004022a0",
+    "name": null
+   }
+  },
+  "0x07ec": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402360",
+    "name": null
+   }
+  },
+  "0x07ed": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402420",
+    "name": null
+   }
+  },
+  "0x07ee": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004024b0",
+    "name": null
+   }
+  },
+  "0x07ef": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402570",
+    "name": null
+   }
+  },
+  "0x07f0": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402630",
+    "name": null
+   }
+  },
+  "0x07f1": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004026e0",
+    "name": null
+   }
+  },
+  "0x07f2": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004027a0",
+    "name": null
+   }
+  },
+  "0x07f3": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "48": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "56": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "52": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402850",
+    "name": null
+   }
+  },
+  "0x07f4": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "48": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "52": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402920",
+    "name": null
+   }
+  },
+  "0x07f5": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004029f0",
+    "name": null
+   }
+  },
+  "0x07f6": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402a90",
+    "name": null
+   }
+  },
+  "0x07f7": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "56": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "48": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "52": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "60": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402b50",
+    "name": null
+   }
+  },
+  "0x07f8": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "48": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "56": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "52": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402c30",
+    "name": null
+   }
+  },
+  "0x07f9": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402d00",
+    "name": null
+   }
+  },
+  "0x07fa": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402db0",
+    "name": null
+   }
+  },
+  "0x07fb": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "48": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402e60",
+    "name": null
+   }
+  },
+  "0x07fc": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402f20",
+    "name": null
+   }
+  },
+  "0x07fd": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00402fe0",
+    "name": null
+   }
+  },
+  "0x0401": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "48": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "60": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "52": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "56": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "64": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403090",
+    "name": null
+   }
+  },
+  "0x0402": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "52": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "48": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "64": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "56": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "60": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "68": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403160",
+    "name": null
+   }
+  },
+  "0x040a": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "48": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "52": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004032b0",
+    "name": null
+   }
+  },
+  "0x040b": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "31": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "27": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004033d0",
+    "name": null
+   }
+  },
+  "0x040f": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "29": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "33": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "25": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "37": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403490",
+    "name": null
+   }
+  },
+  "0x0410": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "29": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "33": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "25": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "37": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403490",
+    "name": null
+   }
+  },
+  "0x0411": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403560",
+    "name": null
+   }
+  },
+  "0x0412": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403560",
+    "name": null
+   }
+  },
+  "0x0414": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "29": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "28": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004035e0",
+    "name": null
+   }
+  },
+  "0x0415": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004036a0",
+    "name": null
+   }
+  },
+  "0x0419": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403740",
+    "name": null
+   }
+  },
+  "0x041a": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004037c0",
+    "name": null
+   }
+  },
+  "0x041e": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "25": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "29": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403870",
+    "name": null
+   }
+  },
+  "0x041f": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "25": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "29": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403870",
+    "name": null
+   }
+  },
+  "0x0420": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "25": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403930",
+    "name": null
+   }
+  },
+  "0x0428": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "32": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004039e0",
+    "name": null
+   }
+  },
+  "0x0429": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "32": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004039e0",
+    "name": null
+   }
+  },
+  "0x042a": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404040",
+    "name": null
+   }
+  },
+  "0x042b": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "30": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403aa0",
+    "name": null
+   }
+  },
+  "0x042c": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403b60",
+    "name": null
+   }
+  },
+  "0x042d": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403c20",
+    "name": null
+   }
+  },
+  "0x0432": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403cc0",
+    "name": null
+   }
+  },
+  "0x0433": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403cc0",
+    "name": null
+   }
+  },
+  "0x0434": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "28": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "30": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403d70",
+    "name": null
+   }
+  },
+  "0x0437": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "28": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "30": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403e30",
+    "name": null
+   }
+  },
+  "0x0438": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404040",
+    "name": null
+   }
+  },
+  "0x0439": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "22": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403ef0",
+    "name": null
+   }
+  },
+  "0x043a": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403fa0",
+    "name": null
+   }
+  },
+  "0x043c": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404040",
+    "name": null
+   }
+  },
+  "0x043d": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404040",
+    "name": null
+   }
+  },
+  "0x043e": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00403cc0",
+    "name": null
+   }
+  },
+  "0x043f": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004040f0",
+    "name": null
+   }
+  },
+  "0x0440": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404040",
+    "name": null
+   }
+  },
+  "0x0441": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004041c0",
+    "name": null
+   }
+  },
+  "0x0442": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "30": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404270",
+    "name": null
+   }
+  },
+  "0x0445": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004043f0",
+    "name": null
+   }
+  },
+  "0x0446": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "32": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "34": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404330",
+    "name": null
+   }
+  },
+  "0x0447": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "36": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "34": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404490",
+    "name": null
+   }
+  },
+  "0x0448": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "5": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "7": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "17": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "15": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "11": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "19": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404550",
+    "name": null
+   }
+  },
+  "0x0449": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "5": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "7": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "17": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "15": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "11": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "19": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004045f0",
+    "name": null
+   }
+  },
+  "0x044a": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404690",
+    "name": null
+   }
+  },
+  "0x044b": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "30": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "34": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "38": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404730",
+    "name": null
+   }
+  },
+  "0x044c": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404800",
+    "name": null
+   }
+  },
+  "0x044d": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004048a0",
+    "name": null
+   }
+  },
+  "0x044e": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404930",
+    "name": null
+   }
+  },
+  "0x044f": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004049c0",
+    "name": null
+   }
+  },
+  "0x0450": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "32": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "34": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404a70",
+    "name": null
+   }
+  },
+  "0x0451": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "32": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "34": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404b30",
+    "name": null
+   }
+  },
+  "0x0452": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "43": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "35": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "32": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "34": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "38": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "42": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404bf0",
+    "name": null
+   }
+  },
+  "0x0454": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "22": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404ce0",
+    "name": null
+   }
+  },
+  "0x0455": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "32": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "34": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404d90",
+    "name": null
+   }
+  },
+  "0x0456": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "34": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "30": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "38": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "42": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "46": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404e60",
+    "name": null
+   }
+  },
+  "0x0457": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "34": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "38": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "30": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "42": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00404f40",
+    "name": null
+   }
+  },
+  "0x0458": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "25": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "31": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "27": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405010",
+    "name": null
+   }
+  },
+  "0x0459": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004050d0",
+    "name": null
+   }
+  },
+  "0x045a": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405160",
+    "name": null
+   }
+  },
+  "0x045b": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "30": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "34": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004051f0",
+    "name": null
+   }
+  },
+  "0x045c": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "30": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "34": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004051f0",
+    "name": null
+   }
+  },
+  "0x0453": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004052c0",
+    "name": null
+   }
+  },
+  "0x045d": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "22": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405370",
+    "name": null
+   }
+  },
+  "0x0612": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405430",
+    "name": null
+   }
+  },
+  "0x045e": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004054f0",
+    "name": null
+   }
+  },
+  "0x045f": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004054f0",
+    "name": null
+   }
+  },
+  "0x0460": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004055a0",
+    "name": null
+   }
+  },
+  "0x0461": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004055a0",
+    "name": null
+   }
+  },
+  "0x0462": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405660",
+    "name": null
+   }
+  },
+  "0x0464": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "25": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "27": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004056f0",
+    "name": null
+   }
+  },
+  "0x0465": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "25": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "27": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "24": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004056f0",
+    "name": null
+   }
+  },
+  "0x0478": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004057b0",
+    "name": null
+   }
+  },
+  "0x0479": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004057b0",
+    "name": null
+   }
+  },
+  "0x0482": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "28": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405860",
+    "name": null
+   }
+  },
+  "0x0483": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "28": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405860",
+    "name": null
+   }
+  },
+  "0x048c": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405910",
+    "name": null
+   }
+  },
+  "0x048d": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004059d0",
+    "name": null
+   }
+  },
+  "0x04a3": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "13": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405a70",
+    "name": null
+   }
+  },
+  "0x04aa": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405b10",
+    "name": null
+   }
+  },
+  "0x04ab": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405bc0",
+    "name": null
+   }
+  },
+  "0x04ac": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405c70",
+    "name": null
+   }
+  },
+  "0x04ad": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405bc0",
+    "name": null
+   }
+  },
+  "0x04ae": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405d10",
+    "name": null
+   }
+  },
+  "0x04af": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405bc0",
+    "name": null
+   }
+  },
+  "0x04b0": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405bc0",
+    "name": null
+   }
+  },
+  "0x04be": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405db0",
+    "name": null
+   }
+  },
+  "0x04c9": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406280",
+    "name": null
+   }
+  },
+  "0x04ca": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406320",
+    "name": null
+   }
+  },
+  "0x0518": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405e50",
+    "name": null
+   }
+  },
+  "0x0519": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405e50",
+    "name": null
+   }
+  },
+  "0x051a": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405ef0",
+    "name": null
+   }
+  },
+  "0x051b": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004060d0",
+    "name": null
+   }
+  },
+  "0x051c": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00405f90",
+    "name": null
+   }
+  },
+  "0x051d": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406160",
+    "name": null
+   }
+  },
+  "0x051e": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004061f0",
+    "name": null
+   }
+  },
+  "0x051f": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "7": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406030",
+    "name": null
+   }
+  },
+  "0x0554": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004063e0",
+    "name": null
+   }
+  },
+  "0x0658": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406500",
+    "name": null
+   }
+  },
+  "0x0659": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406500",
+    "name": null
+   }
+  },
+  "0x065a": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406470",
+    "name": null
+   }
+  },
+  "0x065b": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406500",
+    "name": null
+   }
+  },
+  "0x065c": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406500",
+    "name": null
+   }
+  },
+  "0x065d": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406500",
+    "name": null
+   }
+  },
+  "0x065e": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406500",
+    "name": null
+   }
+  },
+  "0x065f": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406500",
+    "name": null
+   }
+  },
+  "0x0660": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406500",
+    "name": null
+   }
+  },
+  "0x0752": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406590",
+    "name": null
+   }
+  },
+  "0x0753": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406590",
+    "name": null
+   }
+  },
+  "0x0754": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004066c0",
+    "name": null
+   }
+  },
+  "0x0755": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004066c0",
+    "name": null
+   }
+  },
+  "0x0756": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "9": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406620",
+    "name": null
+   }
+  },
+  "0x0757": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004066c0",
+    "name": null
+   }
+  },
+  "0x0758": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004066c0",
+    "name": null
+   }
+  },
+  "0x0759": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406750",
+    "name": null
+   }
+  },
+  "0x075a": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "9": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "13": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406800",
+    "name": null
+   }
+  },
+  "0x075b": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "11": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "9": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004068b0",
+    "name": null
+   }
+  },
+  "0x075c": {
+   "CParserGameLog": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_00406950",
+    "name": null
+   }
+  },
+  "0x075d": {
+   "CParserGameLog": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_004069c0",
+    "name": null
+   }
+  },
+  "0x075e": {
+   "CParserGameLog": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_004069c0",
+    "name": null
+   }
+  },
+  "0x075f": {
+   "CParserGameLog": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_004069c0",
+    "name": null
+   }
+  },
+  "0x0760": {
+   "CParserGameLog": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_004069c0",
+    "name": null
+   }
+  },
+  "0x0761": {
+   "CParserGameLog": {
+    "fields": {},
+    "len_checks": [],
+    "handler": "FUN_004069c0",
+    "name": null
+   }
+  },
+  "0x05ea": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004069e0",
+    "name": null
+   }
+  },
+  "0x078e": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "5": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "4": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406aa0",
+    "name": null
+   }
+  },
+  "0x078f": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "5": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "4": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406aa0",
+    "name": null
+   }
+  },
+  "0x0790": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "5": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "4": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406aa0",
+    "name": null
+   }
+  },
+  "0x0791": {
+   "CParserGameLog": {
+    "fields": {
+     "22": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406b50",
+    "name": null
+   }
+  },
+  "0x0798": {
+   "CParserGameLog": {
+    "fields": {
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "30": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "char*",
+      "size": 12,
+      "names": [],
+      "checks": [],
+      "copied": [
+       "__mbsnbcpy n=0xc"
+      ]
+     },
+     "0": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "2": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406c00",
+    "name": null
+   }
+  },
+  "0xc804": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406e60",
+    "name": null
+   }
+  },
+  "0xc805": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406ee0",
+    "name": null
+   }
+  },
+  "0xc806": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406f60",
+    "name": null
+   }
+  },
+  "0xc807": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00406fe0",
+    "name": null
+   }
+  },
+  "0xc808": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00407060",
+    "name": null
+   }
+  },
+  "0xc809": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "9": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004070e0",
+    "name": null
+   }
+  },
+  "0xc80a": {
+   "CParserGameLog": {
+    "fields": {
+     "9": {
+      "type": "char",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00407170",
+    "name": null
+   }
+  },
+  "0xc80b": {
+   "CParserGameLog": {
+    "fields": {
+     "9": {
+      "type": "char",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00407260",
+    "name": null
+   }
+  },
+  "0xc80d": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00407320",
+    "name": null
+   }
+  },
+  "0xc80e": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004073b0",
+    "name": null
+   }
+  },
+  "0xc80f": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "11": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00407440",
+    "name": null
+   }
+  },
+  "0xc810": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [
+       "== 0xffff"
+      ],
+      "copied": []
+     },
+     "28": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004074d0",
+    "name": null
+   }
+  },
+  "0xc814": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004075b0",
+    "name": null
+   }
+  },
+  "0xc815": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "14": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "18": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00407640",
+    "name": null
+   }
+  },
+  "0x079a": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "11": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "19": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "21": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "26": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "15": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "22": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004076d0",
+    "name": null
+   }
+  },
+  "0x079b": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "15": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "19": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "11": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "23": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "27": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "10": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "22": {
+      "type": "u8",
+      "size": 1,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004077a0",
+    "name": null
+   }
+  },
+  "0x079c": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "22": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "6": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u16",
+      "size": 2,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00407860",
+    "name": null
+   }
+  },
+  "0x079d": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_00407910",
+    "name": null
+   }
+  },
+  "0x079e": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "48": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "56": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "60": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "52": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "64": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004079c0",
+    "name": null
+   }
+  },
+  "0x079f": {
+   "CParserGameLog": {
+    "fields": {
+     "0": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "8": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "4": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "12": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "20": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "24": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "16": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "32": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "36": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "28": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "44": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "48": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "40": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "56": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "60": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "52": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     },
+     "64": {
+      "type": "u32",
+      "size": 4,
+      "names": [],
+      "checks": [],
+      "copied": []
+     }
+    },
+    "len_checks": [],
+    "handler": "FUN_004079c0",
+    "name": null
+   }
+  }
+ }
+}

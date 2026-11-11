@@ -1,0 +1,450 @@
+{
+ "store": "FUN_00403560",
+ "sendid": "FUN_00412310",
+ "zbuf": null,
+ "tables": [
+  {
+   "parser": "CPFs",
+   "arg": "NETPACKET",
+   "ctors": [
+    "00405290"
+   ],
+   "entries": [
+    {
+     "dept": 2,
+     "cmd": 1,
+     "op": 2049,
+     "handler": "FUN_00404820",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 2,
+     "cmd": 2,
+     "op": 2050,
+     "handler": "FUN_00404830",
+     "name": "NC_MISC_S2SCONNECTION_REQ",
+     "name_src": "literal",
+     "sends": {
+      "0x0803": 0
+     },
+     "reads": {
+      "0": "undefined1",
+      "1": "byte",
+      "2": "byte",
+      "3": "byte",
+      "4": "byte",
+      "5": "ushort"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 3,
+     "op": 2051,
+     "handler": "FUN_00404ce0",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "1": "short"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 4,
+     "op": 2052,
+     "handler": "LAB_00404db0",
+     "sends": {}
+    },
+    {
+     "dept": 2,
+     "cmd": 5,
+     "op": 2053,
+     "handler": "FUN_00404820",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 10,
+     "cmd": 1,
+     "op": 10241,
+     "handler": "FUN_00404dd0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2802": 0
+     },
+     "reads": {
+      "0": "ushort"
+     }
+    },
+    {
+     "dept": 10,
+     "cmd": 3,
+     "op": 10243,
+     "handler": "FUN_00404fc0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2804": 0
+     }
+    },
+    {
+     "dept": 10,
+     "cmd": 5,
+     "op": 10245,
+     "handler": "FUN_00405070",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2806": 0
+     },
+     "reads": {
+      "0": "ushort"
+     }
+    },
+    {
+     "dept": 10,
+     "cmd": 7,
+     "op": 10247,
+     "handler": "FUN_00405140",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x2808": 0
+     },
+     "reads": {
+      "0": "ushort"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 35,
+     "op": 2083,
+     "handler": "FUN_00402510",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    }
+   ]
+  },
+  {
+   "parser": "CParserAccount",
+   "arg": "",
+   "ctors": [
+    "00404520"
+   ],
+   "entries": [
+    {
+     "dept": 3,
+     "cmd": 7,
+     "op": 3079,
+     "handler": "FUN_004039c0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c08": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ptr",
+      "258": "undefined4",
+      "262": "undefined4",
+      "266": "undefined4",
+      "270": "undefined4"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 16,
+     "op": 3088,
+     "handler": "FUN_00402510",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 3,
+     "cmd": 17,
+     "op": 3089,
+     "handler": "FUN_00402510",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 5,
+     "cmd": 13,
+     "op": 5133,
+     "handler": "FUN_00402510",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 5,
+     "cmd": 14,
+     "op": 5134,
+     "handler": "FUN_00402510",
+     "name": null,
+     "name_src": null,
+     "sends": {}
+    },
+    {
+     "dept": 3,
+     "cmd": 30,
+     "op": 3102,
+     "handler": "FUN_00403720",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c08": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ptr",
+      "22": "ptr"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 29,
+     "op": 2077,
+     "handler": "FUN_00403830",
+     "name": "NC_MISC_WEB_DB_KEY_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x081e": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "int"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 32,
+     "op": 2080,
+     "handler": "FUN_00402530",
+     "name": "NC_MISC_EVENT_HIT3_ADD_CASH",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "20": "undefined4",
+      "24": "undefined4"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 38,
+     "op": 3110,
+     "handler": "FUN_00402610",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c27": 0
+     },
+     "reads": {
+      "0": "ptr",
+      "256": "ushort"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 40,
+     "op": 3112,
+     "handler": "FUN_00402a40",
+     "name": null,
+     "name_src": null,
+     "sends": {},
+     "reads": {
+      "50": "undefined4"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 47,
+     "op": 2095,
+     "handler": "FUN_00402ba0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0830": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4",
+      "4": "undefined4",
+      "6": "ushort",
+      "8": "byte",
+      "9": "byte",
+      "10": "byte",
+      "11": "byte"
+     }
+    },
+    {
+     "dept": 2,
+     "cmd": 56,
+     "op": 2104,
+     "handler": "FUN_00402cb0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0839": 0
+     },
+     "reads": {
+      "0": "undefined4",
+      "4": "undefined4",
+      "8": "ushort",
+      "9": "undefined2",
+      "11": "undefined2"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 57,
+     "op": 3129,
+     "handler": "FUN_00403b20",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c3a": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ptr",
+      "258": "undefined4",
+      "262": "undefined4",
+      "266": "undefined4",
+      "270": "undefined4"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 62,
+     "op": 3134,
+     "handler": "FUN_00402d40",
+     "name": "NC_USER_TW_PASSWORD_CHECK_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0c3f": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ptr",
+      "38": "ptr",
+      "74": "ptr",
+      "94": "ptr"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 75,
+     "op": 3147,
+     "handler": "FUN_00403e10",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c4c": 0,
+      "0xffff": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "26": "ptr"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 91,
+     "op": 3163,
+     "handler": "FUN_00402fe0",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c5c": 0,
+      "0xffff": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ptr",
+      "262": "ptr",
+      "298": "ptr",
+      "318": "undefined4",
+      "322": "undefined4",
+      "326": "undefined4",
+      "330": "undefined4",
+      "334": "undefined4"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 83,
+     "op": 3155,
+     "handler": "FUN_00403c80",
+     "name": null,
+     "name_src": null,
+     "sends": {
+      "0x0c54": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "ptr",
+      "258": "undefined4",
+      "262": "undefined4",
+      "266": "undefined4",
+      "270": "undefined4"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 96,
+     "op": 3168,
+     "handler": "FUN_00403220",
+     "name": "NC_USER_RETURN_CHECK_REQ",
+     "name_src": "handler",
+     "sends": {
+      "0x0c61": 0
+     },
+     "reads": {
+      "0": "ushort",
+      "2": "undefined4"
+     }
+    },
+    {
+     "dept": 3,
+     "cmd": 100,
+     "op": 3172,
+     "handler": "FUN_00403480",
+     "name": "NC_USER_RETURN_CHECK_REQ",
+     "name_src": "handler",
+     "sends": {},
+     "reads": {
+      "0": "undefined4"
+     }
+    }
+   ]
+  }
+ ],
+ "opnames": {
+  "0x0802": {
+   "NC_MISC_S2SCONNECTION_REQ": 3
+  },
+  "0x081d": {
+   "NC_MISC_WEB_DB_KEY_REQ": 10
+  },
+  "0x0820": {
+   "NC_MISC_EVENT_HIT3_ADD_CASH": 10
+  },
+  "0x0c3e": {
+   "NC_USER_TW_PASSWORD_CHECK_REQ": 10
+  },
+  "0x0c60": {
+   "NC_USER_RETURN_CHECK_REQ": 10
+  },
+  "0x0c64": {
+   "NC_USER_RETURN_CHECK_REQ": 10
+  }
+ }
+}
