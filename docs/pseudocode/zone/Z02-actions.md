@@ -88,7 +88,7 @@ RememberMove(p, cmd, payload22):                         @ FUN_00434ae0
     if mode ∉ {1,2,6} or flag +0x1e78 bit 2 (feared) or vt 0xf20: return
     if no field: log "…_WALK_REQ : Invalid map"; return
     old = p.pos
-    SetPosition(p, to.x, to.y)                           # no distance or cell check at all
+    SetPosition(p, to.x, to.y)                           # no distance or cell check at all (original bug) Z02-B1
     broadcast to sight 0x2004 NC_ACT_SOMEONEWALK_CMD / 0x2006 NC_ACT_SOMEONERUN_CMD
         { u16 hnd, u32 old.x, old.y, u32 p.pos.x, p.pos.y }        (18 bytes)
     ClearEmoticon(p)
@@ -109,7 +109,7 @@ code was checked for who still sends 0x2003/0x2005; the normal path is 0x2017/0x
         return
     if p.petSystemState (+0x2ab60) == 1: sp_PetSystem_CancelCasting(p)    @ FUN_004d23a0 (sends 0x2048)
     if feared (+0x1e78 bit 2) or vt 0xf20 or (p.mover.active (+0x1ac) and p.mover.state (+0x18c) == 3): return
-    if no field: log "…_STOP_REQ : Invalid map" (sic); return
+    if no field: log "…_STOP_REQ : Invalid map" (sic) (original bug) Z02-B13; return
     run only: if mode == 6 and +0x2a778 ≠ 0: return       # mode 6 with that flag ignores run requests
     p.CancelOnAction()                                    # vt 0x8d0, see §1
     remove the "walk" abstate element (AbstateElementInObject.aeo_Walk / aeo_Run) from p's abstate list (p+0x1cc+0xcb0)
@@ -129,7 +129,7 @@ code was checked for who still sends 0x2003/0x2005; the normal path is 0x2017/0x
 ```
 
 Note: `from` is only used for the 200-unit sanity check; the broadcast `from` is the server's position. The
-`moveattr` word is left as it was in `g_buf` except bit 0 *(the other bits are stale buffer content)*.
+`moveattr` word is left as it was in `g_buf` except bit 0 *(the other bits are stale buffer content)* (original bug) Z02-B2.
 
 Client: `On_NC_ACT_SOMEONEMOVEWALK_CMD` (client @ FUN_004a12a0) ignores packets about the main character, asks for
 brief info of unknown handles (§5), and plays the walk at `speed` (scaled against the distance); `On_NC_ACT_MOVEFAIL_ACK`
@@ -365,7 +365,7 @@ that walk into sight appear.
     obj.so_SendMyBriefInfo(p)                            # obj's appear packet (+ last move) to p
     AbstateList(buf DAT_0074e030, p)                     @ FUN_0043cc00:
         0x1C19 NC_BRIEFINFO_ABSTATE_CHANGE_LIST_CMD { u16 handle = p.handle, u8 count, ABSTATE_INFORMATION[count] (12 bytes) }
-    if count ≠ 0: obj ← that packet                      # as read: the *requester's* abstates go to obj (a player)
+    if count ≠ 0: obj ← that packet                      # as read: the *requester's* abstates go to obj (a player) (original bug) Z02-B3
 ```
 
 ### 5.2 Brief-info exchange (login, regen, teleport)
@@ -666,7 +666,7 @@ sp_GatherCheck(p, type, &picker):                        @ FUN_0046ad70
     return 0x0B0C (no tool)
 
 0x202D NC_ACT_GATHERSTART_REQ { u16 objhandle }:         @ FUN_0046ccb0
-    if mode ∉ {1,2}:            so_SendErrorCode(8, 0x2E, 0x0B04)      # 2-byte error form of 0x202E
+    if mode ∉ {1,2}:            so_SendErrorCode(8, 0x2E, 0x0B04)      # 2-byte error form of 0x202E (original bug) Z02-B4
     if p.gathering ≠ -1:        log "…During other gathering"; → 0x0B05
     obj = GetObject(objhandle); none: log "…Invalid Object"; → 0x0B02
     r = obj.vt[0x720](p, &picker)                        # so_mob_CanGathered; other object types answer their own code
@@ -679,7 +679,7 @@ sp_GatherCheck(p, type, &picker):                        @ FUN_0046ad70
 
 0x2030 NC_ACT_GATHERCANCEL_CMD (no payload):             @ FUN_0046b120
     if mode ∉ {1,2}: return
-    if p.gathering == -1: log "…_GATHERSTART_REQ : During other gathering" (sic); return
+    if p.gathering == -1: log "…_GATHERSTART_REQ : During other gathering" (sic) (original bug) Z02-B13; return
     obj = GetObject(p.gathering); p.gathering = -1
     if !obj: log "…Object Null"; return
     broadcast to sight 0x2031 NC_ACT_SOMEONEGATHERCANCEL_CMD { u16 player, u16 object }
@@ -730,7 +730,7 @@ The 2016 client handles 0x202E, 0x202F, 0x2031, 0x2033, 0x2034 in `GatheringTask
 ```
 
 The 2016 client has **no handler** for 0x2036, 0x2038, 0x203A, 0x203B (C01); production in the 2016 client runs
-through `ProductTask` (0x481D, item dept). These produce handlers are probably legacy *(inferred)*.
+through `ProductTask` (0x481D, item dept). These produce handlers are probably legacy *(inferred)* (original bug) Z02-B5.
 
 ---
 
@@ -758,7 +758,7 @@ Mode 6 = riding (only mode allowed here). `p+0x2a762` i16 inventory slot of the 
     # no 0x2045 on success
 ```
 
-The 2016 client does not handle 0x2045; 0x2046 (@ FUN_004aa1c0) shows "Hunger Gauge is Zero. Your Mover cannot run
+The 2016 client does not handle 0x2045 (original bug) Z02-B6; 0x2046 (@ FUN_004aa1c0) shows "Hunger Gauge is Zero. Your Mover cannot run
 in this status…" when 0.
 
 ### 9.2 0x204B NC_ACT_ROAR_REQ `{ u8 slot, u8 len, u8 content[len] }` (megaphone)
@@ -767,7 +767,7 @@ in this status…" when 0.
 @ FUN_005404d0     errors → 0x204C NC_ACT_ROAR_ACK { u16 err }
     if mode ∉ {1,2,4,6}:                       → 0x0701 "Cannot use the item due to an Abnormal State."
     if no field or FieldList.CanItem (+0x9e) == 0: → 0x0710 "The selected item cannot be used in this area."
-    if open-menu bits 2 or 3 (p+0x18248 & 0x0C): so_SendErrorCode(12, 12, 0x0242) (0x300C)
+    if open-menu bits 2 or 3 (p+0x18248 & 0x0C): so_SendErrorCode(12, 12, 0x0242) (0x300C RELOC_ACK) (original bug) Z02-B7
     if slot ≥ inventory size: log "…wrong slot"; → 0x0702
     if the cell is locked (InventoryLocking +0xfaa8 .vt[4](9, slot, +0x2a772)): → 0x070A
     item = inventory[slot]; if item.id ≠ roar item (DAT_14d504ac): → 0x0702
@@ -822,7 +822,7 @@ ReservResult(rcv, err, t):             rcv ← 0x2054 NC_ACT_WEDDING_HALL_RESERV
     if !q or q is not a player: ProposeResult(p, p.handle, 0x12C8); return
     if q.Main ≠ 0: q ← 0x12C5, p ← 0x12C6; return
     if p.Main ≠ 0: q ← 0x12C6, p ← 0x12C5; return
-    if reply == 0: ProposeResult(q, q.handle, 0x12CA, response_word); return       # refused (no client text)
+    if reply == 0: ProposeResult(q, q.handle, 0x12CA, response_word); return       # refused (no client text) (original bug) Z02-B8
     if !sp_DestroyItemB(q, ring, 1): ProposeResult(q, q.handle, 0x12C7) "You don't have proposal items."; return
     ProposeResult(q, p.handle, 0x12C0, response_word)    # accepted
     FUN_005b92a0(DAT_13388678, q.name, p.name)           # (announcement/record; not traced)
@@ -830,7 +830,7 @@ ReservResult(rcv, err, t):             rcv ← 0x2054 NC_ACT_WEDDING_HALL_RESERV
 
 0x2053 NC_ACT_WEDDING_HALL_RESERV_REQ (no payload):      @ FUN_005a2330 (no profiler string; name from its log text)
     p: mode ∉ {1,2} → 0x1301; Main ≠ 1 → 0x1303 "You haven't proposed yet…"; no wedding-prepare item
-       (vt 0x950 so_ply_WeddingPrepareItem) → 0x1308 "Both you and your partner need a Wedding Application…"   (sent as 0x2052)
+       (vt 0x950 so_ply_WeddingPrepareItem) → 0x1308 "Both you and your partner need a Wedding Application…"   (sent as 0x2052) (original bug) Z02-B9
     t = FindPlayer(p.partnerCharNo); not a player or dist² > 10000 → ReservResult(p, 0x1305, 0)
     if p.ApplicationLimit has passed (FUN_00517990):        ReservResult(p, 0x1304, 0) "3 days have elapsed since the marriage proposal."
     t: same three checks (0x1302 / 0x1303 / 0x1308, sent to p as 0x2052)
@@ -842,7 +842,7 @@ ReservResult(rcv, err, t):             rcv ← 0x2054 NC_ACT_WEDDING_HALL_RESERV
 0x2056 NC_ACT_WEDDING_HALL_GUEST_ENTER_READY_REQ (no payload):   @ FUN_0059fb60
     reply 0x2057 NC_ACT_WEDDING_HALL_GUEST_ENTER_READY_ACK (0xAE bytes: u16 err, GroomID[20], BrideID[20],
           i64 EnterStart, WeddingStart, WeddingEnd, 3 × tm)
-    mode ∉ {1,2}: err 0x1341 (rest of the buffer stale); else WeddingHall FUN_0059ef40 fills it from the current reservation
+    mode ∉ {1,2}: err 0x1341 (rest of the buffer stale: (original bug) Z02-B10); else WeddingHall FUN_0059ef40 fills it from the current reservation
 
 0x2058 NC_ACT_WEDDING_HALL_GUEST_ENTER_REQ (no payload):         @ FUN_0059fcb0 (no mode mask)
     reply 0x2059 NC_ACT_WEDDING_HALL_GUEST_ENTER_ACK { u16 err } only on failure
@@ -875,7 +875,7 @@ ReservResult(rcv, err, t):             rcv ← 0x2054 NC_ACT_WEDDING_HALL_RESERV
 
 0x205E NC_ACT_WEDDING_DIVORCE_REFUSE_CMD (no payload):           @ FUN_005a0440 (profiler string "…COMPULSORY_DIVORCE_REQ", log "…DIVORCE_REFUSE_CMD")
     if p.Main == 2 and p.Sub == 4:
-        DB ← 0x108F NC_CHAR_WEDDING_DIVORCE_CANCEL_REQ { header.clienthandle (not written, stale),
+        DB ← 0x108F NC_CHAR_WEDDING_DIVORCE_CANCEL_REQ { header.clienthandle (not written, stale: (original bug) Z02-B11),
                  header.charregistnumber = partnerCharNo, Partner = p.charNo, u8 IncreseCount = 1 }   # partner first, as read
 ```
 
@@ -921,7 +921,7 @@ player enters or leaves it.
 ```
 
 The same interrupt path carries NPC clicks (`sim_NPCClick`, §6.2). The area is trusted as the client reports it;
-the server does not check the position.
+the server does not check the position (original bug) Z02-B12.
 
 ---
 
@@ -977,6 +977,27 @@ the server does not check the position.
 
 ---
 
+## Original-server bugs
+
+Behaviour of the 2016 zone that looks unintended. A faithful rebuild reproduces it; a fixed rebuild should change it
+deliberately. All items are read in the code; none was observed in a capture.
+
+| ID | Handler | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z02-B1 | 0x2003 / 0x2005 §2.1 | the position is set to the client's `to` with no distance, cell or speed check | a client can teleport anywhere inside the field (unchecked input) | the 0x2017 checks (Near, CellFree, LineBlocked) or drop the handlers |
+| Z02-B2 | 0x2017 / 0x2019 §2.2 | `moveattr` in 0x2018 / 0x201A keeps whatever `g_buf` held except bit 0 | stale bytes on the wire | write the full word |
+| Z02-B3 | 0x1C01 §5.1 | the requester's abstate list (0x1C19 about p) is sent to the looked-up object | the other player gets p's abstates; p never gets obj's | send obj's abstates to p |
+| Z02-B4 | 0x202D §8 | the mode error sends `{u16 0x0B04}` as 0x202E, whose layout is `{picker, object, err}` | client reads 0x0B04 as `picker` and `err` from past the payload | the full 6-byte 0x202E |
+| Z02-B5 | 0x2035 / 0x2039 / produce tick §8 | sends 0x2036, 0x2038, 0x203A, 0x203B | the 2016 client has no handler for any of them | legacy path; remove or route through ProductTask |
+| Z02-B6 | 0x2044 §9.1 | errors reply with 0x2045 | the 2016 client does not handle 0x2045: feeding failures are silent | a handled reply |
+| Z02-B7 | 0x204B §9.2 | the open-menu refusal is sent as 0x300C NC_ITEM_RELOC_ACK | the megaphone gets no answer; the client sees a stray relocation result | 0x204C with a code |
+| Z02-B8 | 0x2051 §10 | a refused proposal sends 0x12CA | no client text: the proposer is not told | a code with a text |
+| Z02-B9 | 0x2053 §10 | the mode / Main / prepare-item errors go out as 0x2052 (PROPOSEREQ_ACK) | the reservation window gets no 0x2054 for these refusals | 0x2054 |
+| Z02-B10 | 0x2056 §10 | on a mode failure 0x2057 carries 0xAC stale bytes after the error code | stale buffer content on the wire | zero the body |
+| Z02-B11 | 0x205E §10 | `header.clienthandle` of 0x108F is not written | the DB gets a stale handle | the player's handle |
+| Z02-B12 | 0x6C06 / 0x6C08 §12 | the area entry/leave is taken from the client without a position check | a client can trigger scenario area events from anywhere (unchecked input) | check the player's position against the area |
+| Z02-B13 | 0x2017 / 0x2019, 0x2030, 0x2035, 0x205E | log / profiler strings name the wrong handler ("…_STOP_REQ", "…_GATHERSTART_REQ", "…GATHERCOMPLETE_REQ", "…COMPULSORY_DIVORCE_REQ") | cosmetic: misleading logs | the handler's own name |
+
 ## 15. Not reconstructed / uncertain
 
 - **Names.** 0x2035's profiler string is `sp_NC_ACT_GATHERCOMPLETE_REQ` (copy-paste in the original); the registered
@@ -989,7 +1010,7 @@ the server does not check the position.
 - `moveattr` in 0x2018/0x201A: only bit 0 is cleared, the rest is whatever `g_buf` held.
 - Which client action still sends 0x2003/0x2005 (the 2016 client ignores their broadcasts).
 - 0x1C01: the requester's abstate list is sent to the *looked-up object* (as read); a player looking up another
-  player therefore sends its own abstates to that player. Possibly a bug in the original.
+  player therefore sends its own abstates to that player (Z02-B3).
 - Sight: how objects that leave sight are removed on the client (no 0x1C0E sender in the zone).
 - `sp_AmpersandCommand`: the per-command behaviour and admin levels of the 119 `&` commands.
 - Roar delivery after the item cast (p+0x2a79c, ring DAT_008598c0); FUN_005b92a0 after an accepted proposal.
@@ -998,4 +1019,4 @@ the server does not check the position.
 - Event numbers 0x20 (click) and 0x3c (menu answer) passed to `so_AIScriptFuncExec` are read from the calls; the
   AI-script side is Z09.
 - `p+0x5cb9` bit 2 (menu without range limit) setter; `FUN_005cc2a0/2d0` events 0x29/0x2a in the class/shape block.
-- 0x2057 on a mode failure carries 0xAC stale bytes after the error code.
+- 0x2057 on a mode failure carries 0xAC stale bytes after the error code (Z02-B10).

@@ -194,7 +194,7 @@ ItemInventory_ii_BuyLot(p, hnd, cell, newLot, slot, money64, fame, coin):   @ FU
 The item goes into **guild storage** (type 4), paid from the guild's token balance.
 
 ```pseudo
-    no guild (p+0x17d00 == -1), storage of another guild:    ack 0x246 (code with dept/cmd 12/12)
+    no guild (p+0x17d00 == -1), storage of another guild:    ack 0x246 (code with dept/cmd 12/12 = RELOC_ACK) (original bug) Z04-B3
     no storage right (vt 0x5f0):                             return
     tokens (FUN_004749e0(storage)) + reserved < lot × price: ack 0x20b
     BINDITEM already in the guild storage:                   ack 0x20d
@@ -205,7 +205,8 @@ The item goes into **guild storage** (type 4), paid from the guild's token balan
 Client `0x3004` (GameFrameWork::On_NC_ITEM_BUY_ACK FUN_004ab770): `0x201` "Item has been purchased." + sound;
 `0x205/0x207/0x20b` "Not enough money to buy the item."; `0x20a` "Inventory is full."; `0x20c` "Not enough Fame to buy
 the item."; `0x20d` "The is item already in possession."; `0x20f` "You cannot trade due to lack of coins.";
-`0x211` "You cannot purchase this. Please check item purchase level."; other codes (0x203, 0x204, 0x20e, 0x210) are silent.
+`0x211` "You cannot purchase this. Please check item purchase level."; other codes (0x203, 0x204, 0x20e, 0x210) are silent
+(original bug) Z04-B6.
 The `0x201` success is sent by Z05 after the DB answer.
 
 ### 2.4 NC_ITEM_SELL_REQ `0x3006` (C→Z) @ FUN_00539020
@@ -214,7 +215,7 @@ Payload *(pdb2017, confirmed)*: `{ u8 slot, u32 lot }` (slot in box 9). Reply `0
 
 ```pseudo
     if mode ∉ {1,2,6} or L.locked() or menuBits & 0x0C:   ack 0x382
-    if no open NPC role:                                     0x3004 ack 0x203   (BUY_ACK!)
+    if no open NPC role:                                     0x3004 ack 0x203   (BUY_ACK!) (original bug) Z04-B1
     if cell (9, slot) is locked:                             ack 0x382
     if slot >= box size:                                     ack 0x384 ("Wrong slot")
     cell = inv[slot]; info = g_ItemData[cell.id]; if info == null: return
@@ -244,7 +245,7 @@ Reply `0x305A NC_ITEM_REPURCHASE_ACK { u16 nError }`.
     if not p.vt[0xe6c]() (repurchase allowed, inferred):       ack 0x3671
     no NPC in range / no open role:                            ack 0x3669
     entry missing, item unknown, no attribute class, lot 0:     ack 0x366a
-    if p.level < ItemInfo.BuyDemandLv:  so_SendErrorCode(12, 4, 0x366b)   # sent as 0x3004 BUY_ACK (quirk); the client's
+    if p.level < ItemInfo.BuyDemandLv:  so_SendErrorCode(12, 4, 0x366b)   # sent as 0x3004 BUY_ACK (original bug) Z04-B2; the client's
                                                                          # 0x305A handler would show "Please check item purchase level."
     lot = min(entry.lot, MaxLot); price = ItemInfo.SellPrice × lot      # bought back at the sell price
     if p.money < price:                                         ack 0x366c
@@ -267,7 +268,7 @@ Payload *(pdb2017, confirmed)*: `{ ITEM_INVEN slot, u32 lot, SHINE_XY_TYPE loc }
 ```pseudo
     if mode ∉ {1,2,6}:                                        ack 0x302
     if no field or FieldList.CanItem (+0x9e) == 0:            ack 0x30e   ("You cannot throw away items in that area.")
-    if menuBits & 0x0C:                                       so_SendErrorCode(12, 12, 0x242)  (as RELOC_ACK)
+    if menuBits & 0x0C:                                       so_SendErrorCode(12, 12, 0x242)  (as RELOC_ACK) (original bug) Z04-B3
     if L.locked() or cell locked:                             ack 0x302
     box by slot.type:
         8 (equipment): refused in KQ maps (FieldList.KQ +0x36 == 2 → 0x30e); box = p+0x7fd8
@@ -281,7 +282,7 @@ Payload *(pdb2017, confirmed)*: `{ ITEM_INVEN slot, u32 lot, SHINE_XY_TYPE loc }
         # undroppable items are destroyed instead, after two confirmations
         if ItemBreaker_ib_Break(p, cell, slot, &err): ack 0x301 else ack err      # §3.2
         return
-    if cell.lot > req.lot:                                    ack 0x303   # only whole stacks can be dropped
+    if cell.lot > req.lot:                                    ack 0x303   # only whole stacks can be dropped; makes DropLot below dead (original bug) Z04-B4
     if ItemDropper_id_Drop(p, cell, req, &err): ack 0x301 else ack err        # 0x13c1 when a menu is already open
 ```
 
@@ -411,7 +412,7 @@ Payload *(pdb2017, confirmed)*: `{ ITEM_INVEN from, ITEM_INVEN to, u32 lot }`. R
     from.slot ≥ size ("Invalid 'from' cell") / to.slot ≥ usable size ("Invalid 'to' cell"):  0x445 / 0x446
     unknown item:                                               0x448
     to cell not empty:                                          0x44c
-    not BelongType_CanMove:                                     ack (12, 12, 0x24a)
+    not BelongType_CanMove:                                     ack (12, 12, 0x24a)   # RELOC_ACK, not SPLIT_ACK (original bug) Z04-B3
     n = req.lot; if n == 0 or n >= from.lot: ack 0x442
     # remember the pending split (p+0x1ea8 = 1, slot record p+0x1eac + p+0x5cac*0xf8: item copy, from, to, lot)
     newKey = ItemKey_Make(itemid, 4)
@@ -497,7 +498,7 @@ Payload *(pdb2017, confirmed)*: `{ u8 slotequip, u8 slotinven }`. Reply `0x3013 
     if mode ∉ {1,2,6} or L.locked():                          ack 0x2c2
     slotequip ≥ equipment size, slotinven ≥ usable inventory size:   ack 0x2c2
     equipment cell slotequip locked, or equipment cell *slotinven* locked:  ack 0x2c2
-        # 2016 tests the lock of (8, slotinven), not (9, slotinven): a copy-paste slip in the original
+        # 2016 tests the lock of (8, slotinven), not (9, slotinven): a copy-paste slip (original bug) Z04-B5
     p.sp_castabort()
     equipment cell empty, or the target inventory cell not empty:   ack 0x2c4
     if slotequip ∈ {10, 12} (left/right hand):
@@ -617,6 +618,7 @@ UseEffect::UseItemRoar::uib_Effect(p) = p.so_ply_RoarItemUseSuccess()   @ FUN_00
         send p: so_SendErrorCode(8, 0x4c, 0x700) = 0x204C NC_ACT_ROAR_ACK { 0x700 }
     else:   # the queue entry was overwritten by later shouts (ring wrapped) or never set
         copy p.name into the debug ring DAT_0085dfb0 and write "Roar Null …" to the debug log; nothing is sent
+        # the megaphone item is already consumed (original bug) Z04-B7
 ```
 
 So the megaphone is a **world-wide** message relayed by the WM, not a zone broadcast; the text format is the
@@ -647,15 +649,15 @@ Payload *(pdb2017, confirmed)*: `{ u64 cen }`. Reply on error `so_SendErrorCode`
 
 The PDB ACK is `{ u64 cen, u16 err }` and the client handlers (FUN_004ac170 / FUN_004ac1c0) read `err` at offset 8
 (`0xf80` success, `0xf83` the text above). `so_SendErrorCode` sends only `{ u16 code }`, so for these error replies the
-client reads past the payload *(inferred mismatch; the success ACK comes from Z05 with the full layout)*.
+client reads past the payload *(inferred mismatch; the success ACK comes from Z05 with the full layout)* (original bug) Z04-B8.
 
 ### 7.2 NC_ITEM_OPENSTORAGEPAGE_REQ `0x3028` (C→Z) @ FUN_00536650
 
 Payload *(pdb2017; the 2016 profiler string wrongly says DEPOSIT_REQ, C02)*: `{ u8 page }`.
 
 ```pseudo
-    if mode ∉ {1,2,6}:                      so_SendErrorCode(12, 7, 0x802)   # sent as 0x3007 (cmd 7 = DROP_REQ's number: quirk)
-    if storage not open:                    so_SendErrorCode(12, 7, 0x803)
+    if mode ∉ {1,2,6}:                      so_SendErrorCode(12, 7, 0x802)   # sent as 0x3007 (cmd 7 = DROP_REQ's number) (original bug) Z04-B9
+    if storage not open:                    so_SendErrorCode(12, 7, 0x803)   # (original bug) Z04-B9
     Storage_RequestPage(p, page, 0)                                          @ FUN_00535ce0 (ours; profiler string "DEPOSIT_REQ")
         if page ≥ 16: so_SendErrorCode(15, 7, 0x804) = 0x3C07 NC_MENU_OPENSTORAGE_FAIL_CMD
         → DB 0x3444 NC_ITEMDB_OPENSTORAGE_REQ { ref, +8 u8 page, +9 u32 userNo, +0xd u8 fromAccountStorageCmd }
@@ -676,7 +678,8 @@ close: clear bit 5 (vt 0xd28 FUN_0054aa10)
 ### 7.4 NC_ITEM_GUILD_STORAGE_WITHDRAW_REQ `0x3026` (C→Z) @ FUN_00537330
 
 Payload *(pdb2017, confirmed)*: `{ u64 cen }` (money from the guild storage). Reply `0x3027 NC_ITEM_GUILD_STORAGE_WITHDRAW_ACK
-{ u64 cen, u16 err }` (12 bytes); on the error paths only `err` (+8) is written, `cen` keeps whatever was left in `g_buf`.
+{ u64 cen, u16 err }` (12 bytes); on the error paths only `err` (+8) is written, `cen` keeps whatever was left in `g_buf`
+(original bug) Z04-B10.
 
 ```pseudo
     if mode ∉ {1,2,6} or L.locked():             err 0x1481
@@ -691,7 +694,7 @@ Client: GuildTask::Recv_NC_ITEM_GUILD_STORAGE_WITHDRAW_ACK (FUN_006b4f90), `0x14
 ### 7.5 Guild-academy reward storage money: NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_REQ `0x302F` / DEPOSIT_REQ `0x3031` (C→Z) @ FUN_00470110 / FUN_00470490
 
 Payload *(pdb2017, confirmed)*: `{ u64 cen }`. Replies `0x3030` / `0x3032 { u64 cen, u16 Error }` (12 bytes; on errors only
-`Error` is written, `cen` is stale buffer content).
+`Error` is written, `cen` is stale buffer content: (original bug) Z04-B10).
 
 ```pseudo
     if mode ∉ {1,2,6}:                 Error 0x17e2 / 0x19a2
@@ -700,7 +703,7 @@ Payload *(pdb2017, confirmed)*: `{ u64 cen }`. Replies `0x3030` / `0x3032 { u64 
     storage = GuildAcademyRewardStorage (FUN_0046f710(DAT_0d026fd8, guildNo, p.vt[0x83c]())); none:  0x17e3 / 0x19a3 ("Storage is closed")
     withdraw: no right (vt 0x874):     0x17e5 ("Only Guild Master may withdraw funds")
               cen = min(cen, storage money FUN_00470990); 0 → 0x17e4 ("Not enough money to withdaw.")
-              (cen == 0 in the request: no reply at all)
+              (cen == 0 in the request: no reply at all) (original bug) Z04-B11
     deposit:  cen = min(cen, p.money); 0 → 0x19a4
     reserve money (withdraw +1, deposit −1) under the lock
     → DB 0x3485 NC_ITEMDB_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_REQ / 0x3487 …_DEPOSIT_REQ
@@ -708,7 +711,8 @@ Payload *(pdb2017, confirmed)*: `{ u64 cen }`. Replies `0x3030` / `0x3032 { u64 
 ```
 
 Client: GuildAcademyTask (FUN_006f54c0): `0x17e0` success; `0x17e6` guild data not found, `0x17e7` "not registered in any guild",
-`0x17e8` DB error come from the DB answer. `0x3032` is in C01's "ignored by this client build" list (no handler).
+`0x17e8` DB error come from the DB answer. `0x3032` is in C01's "ignored by this client build" list (no handler)
+(original bug) Z04-B12.
 
 ---
 
@@ -775,7 +779,7 @@ u16 Error }`, as the PDB; only `Error` is set). The other send site FUN_0059a990
         new end date = attr.vt[0x90](copy, kit value, …)
         UseItemFurnitureEndureKit actor gets the furniture inven + new attribute, then
         UseEffect_UseItemVariationProtocolBase_uib_AfterCast(actor, p, inventory, kit info, slot)   # consumes the kit and updates the furniture
-        any check failing: no reply (silent)
+        any check failing: no reply (silent) (original bug) Z04-B13
         returns 0x1a70 (success, no packet now: the DB answer replies)
 ```
 
@@ -902,7 +906,7 @@ Gem sockets live in the weapon's item cell *(offsets read from the code; meaning
 when a socket is drilled). Only **weapons** (ItemInfo.Class 5) take gems; gems are class 34 ENCHANT items of the same Grade.
 
 The three handlers are registered without a profiler string (`FUN_…`), and they have **no mode mask and no "any lock open"
-check** — only the two cells involved must be unlocked. Errors are sent by small helpers that also log the handler name
+check** — only the two cells involved must be unlocked (original bug) Z04-B14. Errors are sent by small helpers that also log the handler name
 (`FUN_005221d0` / `FUN_00522300` / `FUN_00522430` *(ours: Enchant*_Fail)*): `ACK { u16 err, …rest from the request }` (9 bytes for ADD_GEM).
 
 ### 10.1 NC_ITEM_ENCHANT_ADD_GEM_REQ `0x3040` (C→Z) @ FUN_00522560
@@ -940,7 +944,7 @@ Payload *(pdb2017; 2016 profiler string copy-pasted from REMOVE_GEM, C02)*: `{ I
 Reply `0x3045 { u16 err, ITEM_INVEN equipment, u8 socketCount }`. Codes: 0x20a1 locked, 0x20a2 missing, 0x20a4 not a weapon,
 0x20a3 not the drill item (`g_SocketDrillItemID` DAT_14d504ce), 0x20a5 the weapon already had a socket added (`cell+0x11` ≠ 0,
 inferred meaning). Socket count +1 (and `+0x44` +1), one drill consumed → DB `0x349A NC_ITEMDB_ENCHANT_ADD_NEW_SOCKET_REQ` (0x22 bytes).
-There is no cap check against 3 sockets in the zone handler.
+There is no cap check against 3 sockets in the zone handler (original bug) Z04-B15.
 
 ---
 
@@ -956,7 +960,7 @@ Payload *(pdb2017, confirmed)*: `{ u8 nItemSlotNo, u8 nStuffSlotNo }` (both inve
 NC_ITEM_RANDOMOPTION_CHANGE_ACK { u16 nError, ItemOptionStorage changeAbleOption }` (0x1d bytes, options zero).
 
 ```pseudo
-    if mode ∉ {1,2,6}:   no reply at all
+    if mode ∉ {1,2,6}:   no reply at all (original bug) Z04-B16
     L.locked(), slots out of range or locked, menuBits & 0x0C, p.vt[0xae0]():   0x3249
     item missing / no ItemInfo or ItemInfoServer / no attribute / no RandomOption entry / no option storage:   0x324a
     stuff item id ≠ g_OptionChangeItemID (DAT_14d504d2) or lot 0:                                           0x324a
@@ -973,7 +977,7 @@ The DB answer (Z05) sends the rolled options to the client (`changeAbleOption`) 
 
 ### 11.2 NC_ITEM_RANDOMOPTION_CHANGE_ACCEPT_REQ `0x3061` (C→Z) @ FUN_0051da80
 
-No payload, **no mode check**. Error: `so_SendErrorCode(12, 0x62, 0x324a)` (`0x3062` …ACCEPT_ACK).
+No payload, **no mode check** (original bug) Z04-B16. Error: `so_SendErrorCode(12, 0x62, 0x324a)` (`0x3062` …ACCEPT_ACK).
 
 ```pseudo
     cell = inventory[p+0x2a958]; missing / no ItemInfo(Server) / no attribute:   0x324a
@@ -1058,10 +1062,11 @@ No payload, no mode mask (it is used while dead).
 ```pseudo
     if the field has a map and the revival bit is clear (field+0x20c & 1 == 0):
         so_SendErrorCode(18, 0x3a, 0x701)      # 0x483A — note: dept 18 SKILL, cmd 58; the PDB names cmd 58 of dept 12
-                                                # NC_ITEM_REVIVEITEMUSEFAIL_CMD (0x303A), so 2016 sends it under the wrong dept (quirk)
+                                                # NC_ITEM_REVIVEITEMUSEFAIL_CMD (0x303A), so 2016 sends it under the wrong dept
+                                                # (original bug) Z04-B17
     id = the configured revive item (g_ItemData constant row FUN_00418fe0 → +0x40)
-    unknown id:                                so_SendErrorCode(18, 0x2b, 0x71f)  = 0x482B NC_SKILL_REPLYREVIVEFAIL_CMD
-    slot = sp_FindItemFromInventory(p, id); none:   0x482B { 0x71e }
+    unknown id:                                so_SendErrorCode(18, 0x2b, 0x71f)  = 0x482B NC_SKILL_REPLYREVIVEFAIL_CMD   # client ignores it (original bug) Z04-B17
+    slot = sp_FindItemFromInventory(p, id); none:   0x482B { 0x71e }   # (original bug) Z04-B17
     UseEffect_UseItemNormal_uib_AfterCast(g_ReviveItemActor DAT_132878ec, p, inventory, info, slot)
         # consumes one; on the DB success the actor's uib_Effect revives the player (UseItemJustReviveAtDead → so_ReviveByItem, Z03/Z05)
 ```
@@ -1246,6 +1251,31 @@ sp_HPStoneUse(p):
 SP is the same with `p+0x7f65`, SP (+0x7f6b), `0x500A` / `0x500C`, and its own timers (`p+0x173c0…`).
 
 ---
+
+## Original-server bugs
+
+Behaviour of the 2016 zone item handlers that looks unintended. A faithful rebuild reproduces it; a fixed rebuild should
+change it deliberately. All items are read in the code; none was observed in a capture.
+
+| ID | Handler | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z04-B1 | 0x3006 SELL §2.4 | "no open NPC role" replies 0x3004 BUY_ACK 0x203 | the sell window gets no 0x3005; the code is silent in the buy handler too | 0x3005 with a sell code |
+| Z04-B2 | 0x3059 REPURCHASE §2.5 | the level refusal 0x366b is sent as 0x3004 BUY_ACK | the 0x305A handler, which has the "purchase level" text, never sees it | 0x305A |
+| Z04-B3 | 0x3007 DROP §3.1, guild-token buy §2.3, 0x300D SPLIT §4.2 | errors sent with dept/cmd 12/12 = 0x300C RELOC_ACK (0x242, 0x246, 0x24a) | the requesting window gets no answer; the client sees a stray relocation result | each handler's own ACK |
+| Z04-B4 | 0x3007 DROP §3.1 | `cell.lot > req.lot` is refused (0x303) before the confirmation, so `ii_DropLot` (0x3419) is never reached | dead branch: partial-stack drops are impossible | allow partial drops, or remove DropLot |
+| Z04-B5 | 0x3012 UNEQUIP §5.4 | checks the lock of (8, slotinven) instead of (9, slotinven) | an inventory cell that is locked by another transaction can be the unequip target | test (9, slotinven) |
+| Z04-B6 | 0x3003 BUY §2.1 | codes 0x203, 0x204, 0x20e (not enough coin), 0x210 | silent in the client | codes with texts (0x20e: the coin text) |
+| Z04-B7 | megaphone `uib_Effect` §6.4 | if the roar ring slot was overwritten, the item is consumed and nothing is sent | the player loses the megaphone without a message | keep the text with the cast, or refund |
+| Z04-B8 | 0x301C / 0x301E §7.1 | error replies send only `{u16 code}`; the client reads `err` at +8 of `{u64 cen, u16 err}` | the client reads past the payload | the full 10-byte ACK |
+| Z04-B9 | 0x3028 §7.2 | mode / storage-closed errors are sent as 0x3007 (NC_ITEM_DROP_REQ's number) | a client→server opcode reaches the client; the storage page request gets no answer | 0x3C07 NC_MENU_OPENSTORAGE_FAIL_CMD, as used for page ≥ 16 |
+| Z04-B10 | 0x3026, 0x302F / 0x3031 §7.4, §7.5 | error replies write only the code; `cen` is stale `g_buf` content | stale bytes on the wire | zero `cen` |
+| Z04-B11 | 0x302F §7.5 | `cen == 0` in the request: no reply | the client waits for an answer | a 0x3030 error |
+| Z04-B12 | 0x3031 §7.5 | replies 0x3032 | the 2016 client has no handler | add one, or use a handled reply |
+| Z04-B13 | 0x3033 §8.4 | every failing check inside `MHFurnitureKit_Use` returns without a reply | the repair silently does nothing | a 0x3034 error |
+| Z04-B14 | 0x3040 / 0x3042 / 0x3044 §10 | no player-mode check and no "any lock open" check | enchanting works while dead, riding or during other item transactions (unchecked state) | the usual mode mask and `L.locked()` |
+| Z04-B15 | 0x3044 §10.3 | no check that the weapon has fewer than 3 sockets | a 4th socket would write past the 3-entry socket array *(inferred; the 0x20a5 check may prevent repeats)* | cap at 3 |
+| Z04-B16 | 0x3053 / 0x3061 §11 | 0x3053 sends no reply on a mode failure; 0x3061 has no mode check | silent refusal; options can be accepted in any mode | the error reply; the mode mask |
+| Z04-B17 | 0x3039 §12.3 | the map refusal goes out as 0x483A (dept 18) instead of 0x303A; the other errors as 0x482B, which the client ignores | revive-item failures are invisible to the client | 0x303A NC_ITEM_REVIVEITEMUSEFAIL_CMD |
 
 ## 14. Not reconstructed / uncertain
 

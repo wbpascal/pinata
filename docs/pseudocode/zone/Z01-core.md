@@ -267,7 +267,7 @@ Each outgoing link (WM, GameDB, GameLog) is opened by the zone; the peer sends `
 
 ```pseudo
 0x0801 S2SCONNECTION_RDY (WM / GameDB / GameLog):        @ FUN_005a3210 / FUN_00468770 / FUN_0046a080
-    reply 0x0802 NC_MISC_S2SCONNECTION_REQ { u8 echo (not set), u8 server_id_to, u8 server_id_from = 6,
+    reply 0x0802 NC_MISC_S2SCONNECTION_REQ { u8 echo (not set: (original bug) Z01-B2), u8 server_id_to, u8 server_id_from = 6,
                                              u8 worldNo, u8 zoneNo, u16 key = to + from }
         to = 5 (WM), 2 (GameDB = Character server), 3 (GameLog)
     # the WM checks it (W01 §7.1) and answers 0x0803
@@ -438,7 +438,7 @@ WM 0x101F … 0x1130: character blobs (base, shape, quests, skills, items, …) 
 WM 0x101E NC_CHAR_ZONE_CHARDATAFAIL_ACK { ref, u16 err @+6 }:   @ FUN_005a3440
     p = GetObject(ref.handle); if null or closing: log "Invalid ClientHandle [%d]"; return
     send 0x1804 { u16 = payload u16 at +0 (the ref handle!), u8 0xFF }
-    # the code sent is the player's own handle, not the WM's error (0x141 / 0x590); looks like an original bug.
+    # the code sent is the player's own handle, not the WM's error (0x141 / 0x590) (original bug) Z01-B1
     # The client then just leaves the zone-login scene (no message).
 
 WM 0x101D NC_CHAR_ZONE_CHARDATA_ACK { ref, u16 wldmanhandle }:   @ FUN_005a3590   (end of the blobs)
@@ -590,12 +590,12 @@ WM 0x180E NC_MAP_LINKRESERVE_ACK { ref[6] (objHandle, charNo), copy of the 0x180
         wing.slot[slot] = { u16 mapIndex, u32 x, u32 y }; sp_AttrChange2DB (item attribute save, Z05)
         so_ply_ItemUsePacket(0x700, 9); → 0x1141   "Current location has been saved."
     elif found: → 0x1144   "Selected slot does not have any saved location."
-    # 0x1142 is never sent by this handler
+    # 0x1142 is never sent by this handler: no wing item → no reply (original bug) Z01-B3
 
 0x1816 NC_MAP_WING_FLY_REQ { u8 slot }:                  @ FUN_00589f00
     if mode not in {1,2,6}:                 → 0x1817 { u16 0x1146 }
     if FUN_00596440(p) != 0x700:            → 0x1143   "You cannot teleport to the saved locaion in current state."
-    wing missing (id DAT_14d504b0, class 13) → 0x1142 (client: no text)
+    wing missing (id DAT_14d504b0, class 13) → 0x1142 (client: no text) (original bug) Z01-B3
     slot ≥ count or slot empty (mapIndex == -1) → 0x1144
     stone = inventory item DAT_14d504b4 (Wing Stone); missing → 0x1145   "You do not have Wind Stone."
     use the stone (UseItemNormal.uib_AfterCast); queue a teleport { handle, mapIndex, x, y } in the ring DAT_0086dc30,
@@ -623,7 +623,7 @@ WM 0x180E NC_MAP_LINKRESERVE_ACK { ref[6] (objHandle, charNo), copy of the 0x180
     none: 0x202D
 ```
 
-The client handler of `0x1820` (FUN_008b80a0) reads no payload; the codes have no client text.
+The client handler of `0x1820` (FUN_008b80a0) reads no payload; the codes have no client text (original bug) Z01-B4.
 
 ### 7.4 0x181C NC_MAP_TONORMALCOORD_CMD and so_ply_ToNormalLoc
 
@@ -758,7 +758,7 @@ GameDB answers:
 GameDB 0x0812:                                           @ FUN_00550fc0
     copy 0x5a bytes back, +0x12 time; player = GetObject(+0xc); if cell 0 still holds 0x9C9: its lot += 1 (in memory),
     +0x16 time, send the player 0x0812 (0x5a bytes)
-    # each round trip adds one to that item stack: a debug counter, harmless unless item 0x9C9 sits in cell 0
+    # each round trip adds one to that item stack: a debug counter, harmless unless item 0x9C9 sits in cell 0 (original bug) Z01-B6
 0x0813 NC_MISC_PINGTEST_TOOL_WM_CLIENT_ZONE_DB (client): @ FUN_00550b90   same idea (0x82-byte header, + item), to GameDB
 GameDB 0x0813:                                           @ FUN_00551130   stamp +0x3a/+0x3e, send the player 0x0813 (0x82 bytes; no lot change)
 0x0815 NC_MISC_PINGTEST_TOOL_WM_ZONE_DB (WM):            @ FUN_00550e90   stamp +0x1a/+0x26, forward to GameDB (0x3a + n bytes)
@@ -791,7 +791,7 @@ GameDB 0x0815:                                           @ FUN_00551250   stamp 
         item key (8 bytes), u16 cell = 0x2400 | slot, u8 premium (class ≠ 4), u16 itemId, u32 userNo, u16 objHandle,
         u32 charNo, item key, u16 itemId, u16 lot-after or 0, u16 lockId, u8 last, [item attributes if lot > 1] }
     # the DB answers 0xB412 (Z04/Z07); client 0xB413: 0x20B0 success "Name Change activated…", 0x20B9 already used,
-    # 0x20BA guild master; every code sent here shows "Cannot use the item due to an Abnormal State."
+    # 0x20BA guild master; every code sent here shows "Cannot use the item due to an Abnormal State." (original bug) Z01-B7
 ```
 
 WM → zone:
@@ -867,9 +867,24 @@ generic RNG handler(packet):                             # ZoneListenSession.zbs
 | 0x0810 { u8, u16 } | FUN_004997a0 | map time limit |
 | 0x10D4 { u8 } / 0x182C { u32 } / 0x7C05 { u16, u32 } | FUN_004b33b0 / FUN_0054bb10 / FUN_0049b1b0 | login burst |
 | 0xB413 { u16 code } | FUN_004b2bc0 | name-change item texts (§9) |
-| 0x0830, 0x0C24, 0x4026 | no client handler in C01's table | ignored by this client build |
+| 0x0830, 0x0C24, 0x4026 | no client handler in C01's table | ignored by this client build (original bug) Z01-B5 |
 
 ---
+
+## Original-server bugs
+
+Behaviour of the 2016 zone core that looks unintended. A faithful rebuild reproduces it; a fixed rebuild should change it
+deliberately. All items are read in the code; none was observed in a capture.
+
+| ID | Handler | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z01-B1 | WM 0x101E §5.3 | 0x1804 carries the player's own handle (payload +0) as the code instead of the WM's error | client leaves the zone-login scene without a message; 0x141 / 0x590 never reach it | send the WM error (u16 at +6) |
+| Z01-B2 | 0x0801 §3.3 | the `echo` byte of 0x0802 is not written | one uninitialised byte to WM / GameDB / GameLog | zero it or echo the peer's byte |
+| Z01-B3 | 0x1814 / 0x1816 §7.2 | wing save: no wing item → no reply at all *(inferred from the missing branch)*; wing fly: no wing → 0x1142, which has no client text | the player gets no feedback | a reply with a code the client shows |
+| Z01-B4 | 0x181F §7.3 | 0x1820 codes 0x2028…0x202D | the client reads no payload; failures are silent | client-visible result codes |
+| Z01-B5 | 0x082F, 0x0C23, 0x4028 §9 / §8.4 | sends 0x0830, 0x0C24, 0x4026 to the client | the 2016 client has no handler; the packets are dropped | remove, or add client handling |
+| Z01-B6 | 0x0812 ping test §9 | if inventory cell 0 holds item 0x9C9, every round trip raises its lot by one in memory | a client can grow that stack without limit (saved with the next item save *(inferred)*) | leave the item untouched (debug leftover) |
+| Z01-B7 | 0xB410 §9 | every error code of 0xB413 is shown as "Cannot use the item due to an Abnormal State." | misleading message for slot / item / lot errors | codes the client distinguishes |
 
 ## 12. Not reconstructed / uncertain
 
@@ -885,7 +900,7 @@ generic RNG handler(packet):                             # ZoneListenSession.zbs
 - `0x0830` values (DAT_0da5047c / DAT_0da50480): no writer found in the decompiled code (probably set by the
   start script).
 - Meaning of `p+0x2a800` (set by 0x0C32, cleared on every handler entry).
-- 0x101E sends the player's handle as the 0x1804 code (§5.3); checked twice, kept as read.
+- 0x101E sends the player's handle as the 0x1804 code (§5.3); checked twice, kept as read (Z01-B1).
 - The exact fields of 0x4001 (SaveLocation is 172 lines) are left to Z05/Z07; only the frame is given here.
 - The client-checked table list (which 49 files, their order) is filled by FUN_006311a0 calls in zs_start_sleep;
   only the View/*.shn calls were read. The client side is `DAT_00b533c0` (C01).

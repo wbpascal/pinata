@@ -164,6 +164,7 @@ on 0x0803 NC_MISC_S2SCONNECTION_ACK { u8 echo, u16 result }:   @ FUN_00424720 (L
     #           u16 validate[32] @+0x107, u32 extra[5] @+0x147         (same struct Login builds, login §4)
     slot = XOR of all 32 validate words                   # = the key Login mixed into word 31 (login §4), 0..0x7FF expected
     g_LoginLink.pending[slot] = payload                   # table at g_LoginLink+0x114, 0x15B bytes per slot; newer entry overwrites
+    # the slot is the per-world key, so every pending login of a world shares one slot (original bug) W01-B5
     reply 0x0C0E { WORLDLOGIN copy, u8 ok = 1 }           # Login then sends 0x0C0C to the client
 ```
 
@@ -203,7 +204,7 @@ reject:
         SendRaw(s, 0x0C15 { u16 0x44 })                    # client LoginWorldNet: leaves the scene
         s.closeReason = 0x788                               # ("Authentication failed." per login §8)
         return
-    s.userId = payload.userId                              # taken from the client, NOT compared with the pending entry
+    s.userId = payload.userId                              # taken from the client, NOT compared with the pending entry (original bug) W01-B1
     Clients_KickDoubleLogin(userNo)                        @ FUN_00437dc0
         for every other session with the same userNo:
             SendRaw(it, 0x0C17 { u16 0x683 })               # client: "same account logged in elsewhere" flag
@@ -279,13 +280,13 @@ NameIsValid(name, maxLen):                               (inline in each handler
 
 0x1401 create { u8 slot, char name[20] @+1, u8 shape[4] @+0x15 }:   @ FUN_004229f0
     # shape[0] bits: 0-1 race (inferred), 2-6 class, 7 gender; shape[1..3] hair, hair colour, face (AVATAR +0x2c..+0x2f)
-    if slot >= 6 or !NameIsValid(name, 20): goto fail
+    if slot >= 6 or !NameIsValid(name, 20): goto fail      # 20 chars fill name[20] with no NUL; rename allows 16 (original bug) W01-B4
     if (shape[0] & 0x7c) == 0x68 (class 26):
         if account's highest character level (FUN_00433540) < "ChrLevel_CanCreateSen": goto fail
     SendRaw(CharDB, 0x1402 { u16 handle, u32 userNo, u8 worldNo, u8 0, u8 slot, char name[20], u8 shape[4] })
     return
 fail:
-    SendRaw(s, 0x1404 { u16 0x84 })                        # every failure above reports 0x84 (client: name already taken)
+    SendRaw(s, 0x1404 { u16 0x84 })                        # every failure above reports 0x84 (client: name already taken) (original bug) W01-B2
 
 CharDB 0x1403 create failed { u16 handle, …, u16 error @+0x16 }:   @ FUN_00409f00
     send client 0x1404 { u16 error }          # client: 0x82 failed, 0x83 wrong class, 0x84 name taken, 0x85 max slot, 0x181 name in use
@@ -299,7 +300,7 @@ CharDB 0x1405 created { u16 handle, u8 ?, AVATAR @+3 }:  @ FUN_004113c0
 0x1407 delete { u8 slot }:                                @ FUN_00412fa0
     if slot < 6 and s.avatars[slot].charNo != -1:
         SendRaw(CharDB, 0x1408 NC_AVATAR_ERASEDATA_REQ { u16 handle, u32 charNo, u8 slot })
-    else: SendRaw(s, 0x140A { u16 0xC6 })                  # client: "Unable to delete a Guild Master character." (any code but 199)
+    else: SendRaw(s, 0x140A { u16 0xC6 })                  # client: "Unable to delete a Guild Master character." (any code but 199) (original bug) W01-B3
 
 CharDB 0x1409 NC_AVATAR_ERASEDATAFAIL_ACK { u16 handle, u16 ?, u16 error @+4 }:   @ FUN_00409fa0
     send client 0x140A { u16 error }                       # 199 = "You may not delete guild leader."
@@ -367,7 +368,7 @@ CharDB 0x1005 NC_CHAR_CHARDATA_ACK { u16 handle, … }:    @ FUN_00410040
         FUN_00452e40 / FUN_00454ee0: if the character still belongs to the instance: s+0x1df74 = 1; re-register
         else: c.map/x/y = link.map/x/y; c.dir(+0x56) = 0x5A
     if c.prison (+0x62 u16) != 0: c.map = "EldPri"; c.x = 0x2C0; c.y = 0x3C2       # prison map
-    a = selected avatar (FUN_00433620); if none: SendRaw(s, 0x1002 { u16 0x31EB }); return
+    a = selected avatar (FUN_00433620); if none: SendRaw(s, 0x1002 { u16 0x31EB }); return   # client: "The Map is under maintenance" (original bug) W01-B6
     if a.tutorialState == 0: c.map = "RouT00"; if a.tutorialStep == 0: c.x = 0x194E; c.y = 0x293E
     zone = g_Zones.FindByMap(c.map); addr = g_Zones.GetAddress(c.map, worldNo, &ip[16], &port)   @ FUN_004393e0
     if no zone or no address:          SendRaw(s, 0x1002 { u16 0x145 }); return
@@ -814,7 +815,7 @@ Same role as the Login server's OPTool parser (login §5.4).
 | 0x0807 seed | LoginWorldNet `FUN_00471980` | set cipher seed, send 0x0C0F |
 | 0x0C14 avatar list | LoginWorldNet `FUN_00471720`, CHairShop `FUN_00629720` | store handle + list, go to character select |
 | 0x0C15 {u16} | LoginWorldNet `FUN_008c58b0` | leave the scene (code not read): sent with 0x44 (bad key) and 0x46 (DB error) |
-| 0x0C17 {u16} | Account/CharSelect/CharCreate | only 0x683 (double login) is acted on; 0x68F (OPTool kick) shows nothing special |
+| 0x0C17 {u16} | Account/CharSelect/CharCreate | only 0x683 (double login) is acted on; 0x68F (OPTool kick) shows nothing special (original bug) W01-B7 |
 | 0x0C34 {u16, token[32]} | CharSelect `FUN_004766a0` | 0x1E58 → keep token for the Login reconnect |
 | 0x1002 {u16} | CharSelect `FUN_004769d0` | 0x141 world server, 0x142/0x143 map server, 0x144 empty slot, 0x582..0x595 data errors, else "The Map is under maintenance" (0x145, 0x31EB) |
 | 0x1003 {ip[16], port} | CharSelect `FUN_00476190` | connect to the zone |
@@ -830,6 +831,21 @@ WM disconnect reasons (`closeReason`, sent to AccountDB/AccountLog in 0x0C11/0x0
 0x790 OPTool kick. None of these has an entry in the client error table.
 
 ---
+
+## Original-server bugs
+
+Behaviour of the 2016 WM core that looks unintended. A faithful rebuild reproduces it; a fixed rebuild should change it
+deliberately. All items are read in the code; none was observed in a capture.
+
+| ID | Handler | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| W01-B1 | 0x0C0F §3.2 | `userId` is taken from the client packet, not from the pending Login entry | the session (and the 0x0C35 return-to-world-select token) carries whatever account name the client sent | use the pending entry's userId, or compare |
+| W01-B2 | 0x1401 §4.1 | bad slot, invalid name and the class-26 level rule all reply 0x84 | client says "name already taken" for every refusal | separate codes (0x82 failed, 0x83 wrong class) |
+| W01-B3 | 0x1407 §4.1 | empty or out-of-range slot replies 0xC6 | client says "Unable to delete a Guild Master character." | a generic failure code |
+| W01-B4 | 0x1401 §4.1 | names up to 20 characters are accepted in `char name[20]`; rename (0x140F, 0xB409) allows 16 | a 20-character name has no terminator *(inferred: later string reads run past the field)* | max 16 like rename |
+| W01-B5 | 0x0C0D §3.1 | pending-login slot = XOR of the validate words = the per-world key, so all pending logins of a world use one slot | two clients selecting the same world in quick succession: the first one's 0x0C0F fails with 0x44 *(inferred)* | index by something unique to the login (e.g. the random words) |
+| W01-B6 | CharDB 0x1005 §4.2 | no selected avatar replies 0x1002 code 0x31EB | client shows "The Map is under maintenance" | a code the client explains |
+| W01-B7 | OPTool 0x2829 §9 | kick sends 0x0C17 code 0x68F | the client acts only on 0x683; the kicked player gets no message | a code the client handles |
 
 ## 11. Not reconstructed / uncertain
 

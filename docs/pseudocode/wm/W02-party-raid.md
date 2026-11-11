@@ -105,7 +105,7 @@ Parties_ReserveSlot(&no): take a free slot, mark reservedForRaid, members[*].cha
 Parties_Release(no): clear count and reservedForRaid, activeCount--          @ FUN_00464850
 Party_CheckLevelGap(partyNo, myLevel, targetLevel)                         @ FUN_00464ad0
     min/max level of the members (or myLevel when no party); ok if |min-target| <= 1000 and |max-target| <= 1000
-    # levels are u8, so this never fails in 2016: the level-gap rule (error 0x4D1) is disabled by the 1000 limit (original bug, W02-B6)
+    # levels are u8, so this never fails in 2016: the level-gap rule (error 0x4D1) is disabled by the 1000 limit (original bug) W02-B6
 PartyLoot_SetType(loot, grade, type):  grade > 3 or type > 3 → false;      @ FUN_004646f0
     lootType[0..grade-1] = 0 ; lootType[grade..3] = type ; true
 ```
@@ -121,7 +121,7 @@ Party_SendLooterInfo(partyNo, to):                                          @ FU
                                                  u8 nLootingType = that type, LooterName[20] = looter's member name }
 Party_SendLeave(partyNo, leaver):                                           @ FUN_0041b350
     all zones ← 0x380C NC_PARTY_LEAVE_CMD { u16 partyregnum, PROTO_PARTY_MEMBER leavemember }
-        (chrregnum, zonecharhandle, wmcharhandle, charname set; flag = 0; level/charclass not initialised: original bug, W02-B10)
+        (chrregnum, zonecharhandle, wmcharhandle, charname set; flag = 0; level/charclass not initialised) (original bug) W02-B10
     every confirmed online member (leaver included) ← 0x380B NC_PARTY_LEAVE_ACK { memberid = leaver name, u16 err = 0x501 }
 Party_SendKickoff(partyNo, name):                                           @ FUN_0041b9d0
     m = member with that name; all zones ← 0x3816 NC_PARTY_KICKOFF_CMD { u16 partyregnum, u32 kickoffmemberregnum }
@@ -166,7 +166,7 @@ walks all 20 positions (`Raid_Begin` = {0,0}, `Raid_End` = {4,0}, next = slot+1,
 Raids_Get(raidNo): raidNo < 500 → &g_Raids[raidNo], else log "RaidSystem::FindRaid : INVALID RAID SLOT INDEX : %d", null   @ FUN_00462b10
 Raids_Create(firstPartyNo, &err) → Raid*                                    @ FUN_00462fb0 (return read in the assembly)
     err = 0x1E80; no party registry → 0x1EC1; firstPartyNo == 0xFFFF → 0x1E84
-    raid = first free slot (raidNo == 0xFFFF); none → null, err stays 0x1E80   # client gets the success code (original bug, W02-B5)
+    raid = first free slot (raidNo == 0xFFFF); none → null, err stays 0x1E80   # client gets the success code (original bug) W02-B5
     reserve 3 more party slots (Parties_ReserveSlot); any failure → release the ones taken, err 0x1E85, null
     Raid_Init(slot, {firstPartyNo, r1, r2, r3}, &err)                        @ FUN_00462c60
         raid slot already used → 0x1EC2; raidNo = slot; memberCount = parties[first].memberCount
@@ -226,7 +226,7 @@ Raid_DismissIfEmpty(raidNo):                                                @ FU
     Raid_Dismiss(raid); on success:
         if leaderSession: leaderSession.partyNo = raidNo = 0xFFFF; leaderSession ← 0xB006 NC_RAID_DISMISS_BROAD_CMD (empty)
         all zones ← 0xB007 NC_RAID_ZONE_DISMISS_CMD { u16 nRaidNo }
-    # only the leader is told; the one remaining member (if not the leader) keeps a stale raidNo/partyNo (original bug, W02-B7)
+    # only the leader is told; the one remaining member (if not the leader) keeps a stale raidNo/partyNo (original bug) W02-B7
     #   until its next map login re-derives them (inferred)
 
 Client_SendRaidMemberList(s):                                               @ FUN_00436170 ("CWMClientSession::SendRaidMember")
@@ -373,7 +373,7 @@ Party_Leave(s) → 1:                                                         @ 
                                Party_EnsureLooter(pn); return
       2 (2 members → dissolve): Party_SendLeave(pn, s)
                                all zones ← 0x381F NC_PARTY_DISMISS_CMD { u16 partyregnum }
-                               every other member session (by handle, not charNo-checked; original bug, W02-B8) ← partyNo = 0xFFFF,
+                               every other member session (by handle, not charNo-checked) (original bug) W02-B8 ← partyNo = 0xFFFF,
                                    0x381E NC_PARTY_DISMISS_ACK (empty), Friends_SendPartyState
       3: log
     Party_RemoveMember(pn, s.charNo); Party_EnsureLooter(pn)
@@ -419,7 +419,7 @@ Client_PartyChangeMasterReq(s, p):                                          @ FU
     if Party_MakeMaster(pn, members[i].charNo): Party_SendMasterChanged(pn)  # 0x382A to zones, 0x3829 0x548 to members
 ```
 
-Client (`FUN_004ac860`): 0x548 → "You became the Party Leader." / "% became the Party Leader." (sic; original bug, W02-B12) and updates the
+Client (`FUN_004ac860`): 0x548 → "You became the Party Leader." / "% became the Party Leader." (sic) (original bug) W02-B12 and updates the
 window; 0x542/0x549 → "Selected player is not a party member."; 0x543 → "Adjustment is available to Party Leader only."
 The new master need not be online; the looter is not changed.
 
@@ -444,7 +444,7 @@ Client_PartySetLooterReq(s, p):                                             @ FU
     t = Clients_FindInGameByCharName(p.sNewLooterCharID)                    @ FUN_00437720
     if !t: s ← opcode 0xB05B { "", 0x559 } ; return
     if party.looter == t.charNo: s ← opcode 0xB05B { "", 0x55A } ; return
-    party.looter = t.charNo                                 # t is NOT checked to be a party member (original bug, W02-B2)
+    party.looter = t.charNo                                 # t is NOT checked to be a party member (original bug) W02-B2
     s ← 0x385B NC_PARTY_SET_LOOTER_ACK { sNewLooterCharID = t name, u16 nError = 0x558 }
     t ← 0x385C NC_PARTY_SET_LOOTER_CMD { sCommandCharID = s name }   "{%s designated you to be in charge.}"
     every online member ← 0x385D NC_PARTY_SET_LOOTER_BROAD_CMD { sCommandCharID = s name, sNewLooterCharID = t name }
@@ -453,7 +453,7 @@ Client_PartySetLooterReq(s, p):                                             @ FU
 
 The two error replies are built with opcode bytes `5B B0` (0xB05B, dept 44 cmd 91: no such opcode) instead of
 0x385B, so the client never displays 0x559 "{The character designated to take the loot can not be found.}".
-(original bug, W02-B1) A re-implementation that wants client-visible errors would send 0x385B.
+(original bug) W02-B1 A re-implementation that wants client-visible errors would send 0x385B.
 
 ### 2.9 Party finder: 0x3850 / 0x3852 / 0x3854
 
@@ -504,7 +504,7 @@ Zone_PartyZoneJoin(z, p):                                                   @ FU
     Party_CheckLevelGap fails → "join member(%d) join level"
     joiner pending elsewhere → "join member(%d) join ing"; joiner.partyNo != 0xFFFF → "join member(%d) other party"
     joiner.linking → "join member(%d) zone link"
-    (the guild-only map check is evaluated but its result is ignored) (original bug, W02-B11)
+    (the guild-only map check is evaluated but its result is ignored) (original bug) W02-B11
     !Client_SameKQTeam → "Kingdom Quest Team"
     r = Parties_Invite(master rec flag 0, joiner rec flag 0, master.partyNo)
     error code → "MemberJoin fail(%d)"
@@ -617,7 +617,7 @@ Client_RaidLootingTypeReq(s, p):                                            @ FU
     all zones ← 0xB00B NC_RAID_ZONE_LOOTING_TYPE_CMD { u16 nRaidNo, u8 nItemGrade, u8 nLootingType }
 ```
 
-No leader check: any raid member can change the loot rule (original bug, W02-B4).
+No leader check: any raid member can change the loot rule (original bug) W02-B4.
 
 ### 5.3 0xB00C NC_RAID_INVITATION_REQ { char sInvitationCharID[20] }
 
@@ -709,7 +709,7 @@ Client_RaidSlotMoveReq(s, p):                                               @ FU
     a = Raid_GetMemberCharNo(Pre.idx, Pre.slot); -1 → 0x1EF2
     b = Raid_GetMemberCharNo(Post.idx, Post.slot)
     if b == -1: Raid_MoveMember(raid, a, Post.idx, Post.slot, &err)    (fail → reply err)
-    else:       Raid_SwapMembers(raid, a, b)                            (fail → reply with an uninitialised stack value as nError) (original bug, W02-B9)
+    else:       Raid_SwapMembers(raid, a, b)                            (fail → reply with an uninitialised stack value as nError) (original bug) W02-B9
     update partyNo of a (and b) in their sessions if in game
     reply 0x1E80
     online members ← 0xB029 NC_RAID_SLOT_MOVE_BROAD_CMD { sCommandCharID = s name,
@@ -792,7 +792,7 @@ Client_RaidWarningReq(s, p):                                                @ FU
 ```
 
 Client: 0xB040 shows "Cannot link item in Expedition chat." only for 0x1FC2, which the 2016 WM never sends
-(it sends 0x1FC1), so a refused raid chat is silent (original bug, W02-B3); 0xB043 shows that text for 0x1F83 and `ErrMsgTable` for the rest.
+(it sends 0x1FC1), so a refused raid chat is silent (original bug) W02-B3; 0xB043 shows that text for 0x1F83 and `ErrMsgTable` for the rest.
 `nChatLen` is not bounded by the WM beyond the u8 (the 0x2000-byte packet buffer is large enough).
 
 ---

@@ -199,6 +199,7 @@ Every handler first calls `<Peer>_CheckAlive(session)`, which only passes when `
             return
     Send 0x0C66 NC_USER_CLIENT_WRONGVERSION_CHECK_ACK {}  # rejected; client is expected to quit
     # payload size 1, byte never written: the PDB struct is empty, the 1 is C++ sizeof of an empty struct
+    # (original bug) L00-B1: one uninitialised byte on the wire
 
 0x0C5A NC_USER_US_LOGIN_REQ { char sUserName[260]; char sPassword[36]; Name5 spawnapps }   (exact length 0x13E)   @ FUN_00406450
     if len != 0x13E: return
@@ -216,9 +217,9 @@ Every handler first calls `<Peer>_CheckAlive(session)`, which only passes when `
     g_TokenTable.ExpireOlderThan(now)
     entry = g_TokenTable.Find(payload.token[32])
     if entry == null:
-        g_TokenTable.NoteFailure(s.ip); err = 0x52
+        g_TokenTable.NoteFailure(s.ip); err = 0x52             # no client text (original bug) L00-B4
     elif !g_LoginOpen:
-        err = 0x45
+        err = 0x45                                          # "Please check ID or Password." (original bug) L00-B2
     else:
         s.userNo = entry.userNo; s.userId = entry.userId; s.validated = 1
         g_Clients.Register(s)
@@ -236,6 +237,7 @@ Every handler first calls `<Peer>_CheckAlive(session)`, which only passes when `
 0x0C0B NC_USER_WORLDSELECT_REQ { u8 worldno }:           @ FUN_00406970
     if !WorldList.GetWMAddress(worldNo, &reply)          # reply.status = world status byte
        or world status < 5:                               # status meanings: see §8
+                                                          # status 5 (full) passes, the client refuses it (original bug) L00-B3
         Send 0x0C0C { status, zeros… }                    # 0x56-byte raw packet, only status filled
         return
     Send to AccountDB    0x0C10 { u32 userNo, u8 worldNo, u32 ip }       # "user entering world" (inferred)
@@ -257,11 +259,11 @@ Every handler first calls `<Peer>_CheckAlive(session)`, which only passes when `
 
 0x0C20 NC_USER_LOGIN_OUTSPARK_REQ:                       @ FUN_004063d0
     log "ERROR - ERR_USERLOGIN_OUTSPARK_NOTSUPPORT"
-    Send 0x0C09 { 0x4C }; g_Clients.Disconnect(s)        # unsupported external login method
+    Send 0x0C09 { 0x4C }; g_Clients.Disconnect(s)        # unsupported external login method; no client text (original bug) L00-B4
 
 0x0C04 NC_USER_XTRAP_REQ { u8 XTrapClientKeyLength = 29, char XTrapClientKey[29] }:   @ FUN_00406230
     # the client sends "33B543B0CA6E7C41E5D1D0651307" right after 0x0C67 (client FUN_0046f470)
-    # this build does NOT check it
+    # this build does NOT check it (original bug) L00-B5
     SendRaw(s, [03, 05 0C, 01])                           # 0x0C05 NC_USER_XTRAP_ACK { u8 bSuccess = 1 }; the client ignores it
 
 0x0C06 NC_USER_LOGIN_REQ, 0x0C18 NC_USER_NORMALLOGOUT_CMD: no-op           @ FUN_00406950 / LAB_004062e0
@@ -280,7 +282,7 @@ All replies carry the client's `handle` so the Login server can find the session
 common AccountCheckResult(r):   (r = reply payload; fields: userNo i32, blocked i32, authOk i32, userId…)
     if r.userNo == -1:           err = 0x45     # client: "Please check ID or Password."
     elif r.userNo == -2:         err = 0x4B     # client: "Please accept the agreement to continue."
-    elif !g_LoginOpen:           err = 0x45
+    elif !g_LoginOpen:           err = 0x45     # (original bug) L00-B2
     elif r.blocked != 0:         err = 0x47     # client: "The ID has been blocked."
     elif r.authOk != 1:          err = 0x48     # client: "The World Servers are down for maintenance."
     else:                        err = OK
@@ -313,7 +315,7 @@ common AccountCheckResult(r):   (r = reply payload; fields: userNo i32, blocked 
 0x0C27  (teen-protection variant):                       @ FUN_00404050
     if r.mode == 3: log "WARNING - KEEP_TEENAGER, LOGINABLE VERSION, DB-ERROR User pass…"; r.mode = 2
     Send to client 0x0C25 { string, u8 mode, u32 value }   # 0x3A raw bytes
-    if r.mode == 1: Send AccountLogDB 0x0720 log (err 0x4E)
+    if r.mode == 1: Send AccountLogDB 0x0720 log (err 0x4E; no client text, (original bug) L00-B4)
     else:           g_Clients.Register(s); Broadcast WM 0x0C16; Send 0x0C0A worldList
 
 0x0801 S2SCONNECTION_RDY → reply 0x0802 S2SCONNECTION_REQ { myServerId, myWorld, myZone }   @ FUN_00403a40
@@ -337,7 +339,7 @@ because the client parser only accepts `0x0C5A` and `0x0C37`. The other variants
         Broadcast to all WM 0x0C16 NC_USER_KICKOFFFROMWORLD_CMD { u32 userNo }
         Send 0x0C0A worldList
         Send AccountLogDB 0xC801 NC_SYSLOG_ACCOUNT_LOGIN_SUCCESS {   # successful-login log, 40 bytes
-            u32 UserNo; char UserIP[16] (zeroed here); Name5 spawnapps }   # 2017 struct is 70 B: adds UserID[30] before spawnapps
+            u32 UserNo; char UserIP[16] (zeroed here; (original bug) L00-B6); Name5 spawnapps }   # 2017 struct is 70 B: adds UserID[30] before spawnapps
 
 0x0C2B / 0x0C3C / 0x0C41 / 0x0C4E:  same shape for the legacy login variants   @ FUN_00405c80 / 405180 / 4054c0 / 4056c0
 ```
@@ -409,6 +411,20 @@ client disconnects and connects to WM with 0x0C0F (see WM docs)
 returning from the game to world select:
 WM → Login 0x0C35 → Login 0x0C36 { token } → WM → client → client reconnects to Login → 0x0C37 token
 ```
+
+## Original-server bugs
+
+Behaviour of the 2016 Login server that looks unintended. A faithful rebuild reproduces it; a fixed rebuild should
+change it deliberately. All items are read in the code; none was observed in a capture.
+
+| ID | Handler | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| L00-B1 | 0x0C65 (reject path) | 0x0C66 is sent with a 1-byte payload that is never written | one uninitialised byte on the wire (client ignores it) | empty payload, or zero the byte |
+| L00-B2 | 0x0C37, AccountCheckResult | logins closed (`g_LoginOpen == 0`) report 0x45 | client says "Please check ID or Password." during a closed login | a maintenance code (0x48) |
+| L00-B3 | 0x0C0B | accepts world status 5 (full); only < 5 is refused | AccountDB 0x0C10, AccountLog 0x0721 and WM 0x0C0D are sent for a world the client then refuses to enter ("Server is full") | refuse status 5 too (`< 6`) |
+| L00-B4 | 0x0C37, 0x0C20, 0x0C27 | sends error codes 0x52, 0x4C, 0x4E | no entry in the client table: "An unidentified error code has occurred." | codes the client knows |
+| L00-B5 | 0x0C04 | the client's XTrap key is never compared; `builtinKey` is loaded and unused | any key is accepted (dead check) | compare with `builtinKey`, or drop the exchange |
+| L00-B6 | 0x0C5E success | 0xC801 login-success log has `UserIP` zeroed | the success log has no IP | fill the IP like 0x0720 / 0xC802 |
 
 ## 7. Not reconstructed / uncertain
 

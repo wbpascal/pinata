@@ -719,9 +719,9 @@ sp_NC_BAT_SKILLBASH_OBJ_CAST_REQ(p, pkt):
     if p.IsCaptivated():                              → 0xFD2
     if p.HasAbstate(326 StaEthereal) (vt 0x9e4):       → 0xFC0
     p.CancelOnAction()
-    if p.IsCasting() (cast.castEnd != 0)  or  t = som_GetObject(pkt.target) == null:   → 0xFC4
+    if p.IsCasting() (cast.castEnd != 0)  or  t = som_GetObject(pkt.target) == null:   → 0xFC4   # (original bug) Z03-B2
     if not SameLayer(p, t) or not g_MobData.Attackable(t.mobId, 2):  p.smo_BashStop(); return (0xFCD)
-    if not CanSee(p, t):                              → 0xFC0
+    if not CanSee(p, t):                              → 0xFC0   # (original bug) Z03-B1
     if p.HasAbstate(291) or p.HasAbstate(499):        → 0xFC1
     if t.HasAbstate(499): return (0xFCD)
     r = t.RemainTime(291)                              # target under login protection
@@ -733,7 +733,7 @@ sp_NC_BAT_SKILLBASH_OBJ_CAST_REQ(p, pkt):
     if FindBlockLocate(p → t.pos) != t.pos:           p.smo_BashStop(); → 0xFD1
     s = g_SkillData.Find(pkt.skill)
     if s == null or s.info == null or s.info.SkillTargetState == 2 (TS_NONE):  → 0xFC6     # passive / not castable
-    if s.info.EffectType == 7 (REVIVAL) and not (field.flags (+0x20c) & 2):   → 0xFC0     # no revive on this map
+    if s.info.EffectType == 7 (REVIVAL) and not (field.flags (+0x20c) & 2):   → 0xFC0     # no revive on this map (original bug) Z03-B1
     if t.vt[0xc44]() == 1 and s.<+0x100> == 1:        → 0xFD8                              # revive refused ("Blessing of Teva")
     if p.moveState (+0x18c) == 3 (forced move):
         if s.info.CastTime != 0:                      → 0xFC8
@@ -770,11 +770,11 @@ sp_NC_BAT_SKILLBASH_OBJ_CAST_REQ(p, pkt):
 
 | Code | Client text | Set when |
 |---|---|---|
-| 0xFC0 | Cannot use the skill while in nonbattle mode. | mode ≠ 2; also invisible target, revive not allowed here, caster has StaEthereal |
+| 0xFC0 | Cannot use the skill while in nonbattle mode. | mode ≠ 2; also invisible target, revive not allowed here, caster has StaEthereal (original bug) Z03-B1 |
 | 0xFC1 | Cannot use the skill right after logging in. | caster has StaImmortal / StaAdlFLoussierIMT |
 | 0xFC2 | Cannot use the skill when the target logged in just now. | player target has StaImmortal |
 | 0xFC3 | Cannot use the skill in this field. | `FieldList.CanSkill` = 0 |
-| 0xFC4 | Casting another skill now. | already casting, or target handle unknown |
+| 0xFC4 | Casting another skill now. | already casting, or target handle unknown (original bug) Z03-B2 |
 | 0xFC5 | The skill has been reserved. | not sent by these handlers |
 | 0xFC6 | Incorrect Skill. | unknown / passive skill, or enemy skill on a non-enemy |
 | 0xFC7 | Cannot use the skill due to Silence State. | `smo_SkillBlastOption() == 2` |
@@ -1340,7 +1340,7 @@ sp_NC_SKILL_REPLYREVIVE_CMD(p):
             sp_ReviveNow(p, 1000)                           # full HP (per mille of MaxHP)
             g_ShelterDie[p.charNo].ab_Recover(p);  g_ShelterDie.Free(p.charNo)    # IsSaveDie states come back
             return
-    p.so_SendErrorCode(18, 0x2B, 0x1506)                    # 0x482B NC_SKILL_REPLYREVIVEFAIL_CMD { u16 err }; the client ignores it
+    p.so_SendErrorCode(18, 0x2B, 0x1506)                    # 0x482B NC_SKILL_REPLYREVIVEFAIL_CMD { u16 err }; the client ignores it (original bug) Z03-B3
 
 ShinePlayer::sp_ReviveNow(p, hpRate):                       @ FUN_0057d290
     p.mode = 1;  restore saved shape;  p.HP = MaxHP * hpRate / 1000;  dead flag (+0x1d7c) = 0
@@ -1558,7 +1558,7 @@ Payload *(pdb2017, confirmed)*: `{ u16 mainskill }`. Chooses a production profes
 ```
 
 Client (`FUN_004ad070`): only `0xB04` has a text ("You cannot select the production skill in your current status.");
-`0xB01` is silent, other codes show nothing.
+`0xB01` is silent, other codes show nothing (original bug) Z03-B4.
 
 ### 9.5 NC_SKILL_UNLEARN_REQ `0x4824` (C→Z) @ FUN_0057ad80
 
@@ -1650,6 +1650,18 @@ No packet capture in the repository covers combat (`re-data/captures/` is absent
 marked *(captured)*.
 
 ---
+
+## Original-server bugs
+
+Behaviour of the 2016 zone combat code that looks unintended. A faithful rebuild reproduces it; a fixed rebuild should
+change it deliberately. All items are read in the code; none was observed in a capture.
+
+| ID | Handler | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z03-B1 | 0x2440 / 0x2441 §5.2, §5.5 | 0xFC0 is also used for an invisible target, a map that forbids revival and a caster with StaEthereal | client says "Cannot use the skill while in nonbattle mode." for unrelated refusals | specific codes (0xFC6, 0xFCE, …) |
+| Z03-B2 | 0x2440 §5.2 | an unknown target handle reports 0xFC4 | client says "Casting another skill now." | 0xFCB "Cannot find the target." |
+| Z03-B3 | 0x482A §7.3 | refusal sends 0x482B NC_SKILL_REPLYREVIVEFAIL_CMD | the client accepts and ignores it: a refused revive is silent | a reply the client shows |
+| Z03-B4 | 0x4822 §9.4 | codes 0xB12 (not a production skill), 0xB13 (already learned), 0xB14 (two professions) | no client text: the refusal is silent | codes with texts |
 
 ## 11. Not reconstructed / uncertain
 
