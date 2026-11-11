@@ -29,13 +29,31 @@ Sizes count the handlers in scope and their decompiled lines. Callee logic adds 
 | ID | Item | Depends | Handlers | Lines |
 |---|---|---|---|---|
 | [C01](items/C01.md) | Client packet-handler inventory (names and meaning of server→client packets) | – | client | – |
+| [C02](items/C02.md) | 2017 client PDB: official opcode names, `PROTO_NC_*` structs, shared types, client function names | C01 (soft) | – | – |
 | [W01](items/W01.md) | World manager core: sessions, world login, characters, zone handoff | – | see file | |
 | [Z01](items/Z01.md) | Zone core: process, maps, objects, player session, map login/logout | – | see file | |
 | [P01](items/P01.md) | Packet capture decoder + validator (pure Python, self-testing; needs no captures yet) | – | – | – |
 | [P03](items/P03.md) | Wireshark Lua dissector generated from the docs (live decrypted, named packets while recording) | P01 (soft) | – | – |
 
 C01 has the highest leverage: every later item uses its client cross-reference. Run it first if you
-can only run one item at a time.
+can only run one item at a time. C02 (added after C01, W01, Z01, P01, P03 were done) comes next: the 2017
+PDB names 1347 opcodes that are unnamed today and gives field names for ~2300 packet structs, so run it
+before the phase-2 items.
+
+### Follow-ups for items done before the 2017 PDB arrived
+
+Evaluated 2026-11-11 by comparing the PDB with each item's output. C02 measures and lists the differences
+(`docs/knowledge/C02.md`); the owner then fixes its own files in a short follow-up session ("Execute the
+follow-up for W01 listed in `docs/knowledge/C02.md`").
+
+| Item | Benefit | What changes |
+|---|---|---|
+| C01 | **High** | 645 of 901 client-handled opcodes are unnamed and get the PDB name; 2017 `On_NC_*` handlers (705) and 30909 function names can be ported to the 2016 client (C02 does the port); client class layouts. The 8 `client` names all agree |
+| W01 | **High** | 133 of its 182 scope opcodes are unnamed today and get official names; 174 have a PROTO struct with field names. 27 of its 35 hand layouts match; 8 differ only by the `ref` prefix / 2-byte prefix (confirm). 3 name conflicts (`0x0871`, `0x1409`, `0x10d2`) to settle |
+| L00 | Medium | 32 of 41 login handlers are unnamed; 23 hand layouts get official names and field names (`0x0C5A` `sUserName[260]`, so the `unused` at 256 is the name's tail; `0x0C66` is a 1-byte struct). `login-server.md` "(ours)" names can be replaced |
+| Z01 | Medium | 54 of 65 scope names already agree; 4 conflicts are shared-handler naming (`0x9884`/`0x9885`, `0x0865`, `0x1095`); 24 of 30 hand layouts match, 6 differ by the `ref` prefix. SHN row structs (134 `::DataVersion`) can cross-check its table loaders. ShinePlayer is a server class and not in the PDB |
+| P03 | Medium | Dissector shows generated "guess" fields for most packets; PDB layouts give named fields for ~2300 packets once C02 adds them as a source to `make_dissector.py` |
+| P01 | Low | Decoder picks up names automatically after `regen.sh`; same layout-source change as P03 |
 
 ### Phase 2: subsystems (any order once their dependencies are done; up to ~4 in parallel works well)
 
@@ -82,6 +100,7 @@ follow-up session.
 ## Suggested order with limited budget
 
 1. C01 → W01 → Z01, plus P01 and P03 (both cheap; install the dissector, record capture scenarios 1–5, run P02 early)
+1b. C02, then the follow-ups above (C01, W01, L00 first)
 2. Z02, Z03, Z04, W02 (core gameplay)
 3. Z07, Z08, Z05, Z06, W03, W04
 4. D02, D01, D03, D04, D05, Z09, Z10
@@ -103,6 +122,7 @@ docs/plan/status/<ID>.md                  progress logs
 tools/protocol-re/names/<bin>/<ID>.json   discovered names (merged by clean.py)
 docs/protocol/annotations/<ID>.json       verified packet layouts (merged by packets.py / regen.sh)
 re-data/client-handlers.json              C01: client opcode → handler map
+docs/protocol/pdb-layouts.json            C02: PROTO_NC_* layouts from the 2017 PDB
 ```
 
 ## Regenerating the plans

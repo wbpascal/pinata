@@ -112,3 +112,11 @@ Temporary Items
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,macos,elixir,erlang,phoenix
+
+### Ghidra temporary files ###
+# ~index.dat, *.prp and db.*.gbf are the project itself and stay tracked
+*.lock
+*.lock~
+*.ulock
+re-data/ghidra/**/~index.bak
+re-data/ghidra/**/~journal.*

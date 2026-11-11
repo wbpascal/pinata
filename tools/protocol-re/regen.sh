@@ -7,6 +7,7 @@ python3 "$T/layouts.py" "$E/login" x
 python3 "$T/layouts.py" "$E/wm" x
 python3 "$T/layouts.py" "$E/zone" x "$R/Files/Server/2016/w00_Zone00/5ZoneServer2.exe"
 for s in account accountlog character gamelog; do python3 "$T/layouts.py" "$E/$s" x > /dev/null; done
+python3 -I "$T/pdb.py" "$R/Files/Client/2017/Fiesta.pdb" layouts "$D/pdb-layouts.json"
 python3 -I "$T/catalog.py" "$E" "$D"
 python3 -I "$T/packets.py" "$E" "$D"
 python3 -I "$T/errcodes.py" "$E/client" "$R/Files/Client/2016/ressystem" > "$D/client-error-codes.json"

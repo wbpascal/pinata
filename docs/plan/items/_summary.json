@@ -8,6 +8,14 @@
   "\u2013"
  ],
  [
+  "C02",
+  1,
+  "2017 client PDB: official opcode names, packet structs, types, client function names",
+  "C01 (soft)",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "W01",
   1,
   "World manager core: sessions, world login, characters, zone handoff",

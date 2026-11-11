@@ -10,7 +10,10 @@ How to read the *Value / source* column:
 - Other text: the decompiler expression, shortened.
 - Gaps between offsets are bytes the code did not write (padding, or filled in a way the extractor missed).
 - **Fill**: part of the payload is produced by a helper; for zone, virtual helpers are resolved assuming a `ShinePlayer` receiver.
-- †: name inferred (REQ+1 = ACK, or from a log string), not from the opcode's own handler.
+- †: name not from the opcode's own 2016 handler (2017 client PDB, REQ+1 = ACK guess, or a log string).
+
+- **2017 PDB layout**: the `PROTO_*` struct from the 2017 client PDB (`docs/protocol/pdb-layouts.json`, work item C02),
+  shown when no hand-verified layout exists. A 2017 build: confirm against the 2016 code before relying on it.
 
 Heuristic extraction: verify a layout against the cited function before relying on it.
 
@@ -28,7 +31,7 @@ Basis: login FUN_0040a020 + world-list builder (decomp ~line 6719)
 
 ## Client → server
 
-### `0x0c04` client key (sent after 0x0C67) (hand-named)
+### `0x0c04` NC_USER_XTRAP_REQ †
 
 **Verified layout** (basis: client FUN_0046f470; server FUN_00406230 does not check it)
 
@@ -41,7 +44,7 @@ Handler `FUN_00406230`
 
 No payload fields read directly by the handler.
 
-### `0x0c0b` world select (hand-named)
+### `0x0c0b` NC_USER_WORLDSELECT_REQ †
 
 **Verified layout** (basis: FUN_00406970)
 
@@ -55,7 +58,7 @@ Handler `FUN_00406970`
 |---|---|---|---|
 | 0 | u8 |  |  |
 
-### `0x0c1b` world list refresh (hand-named)
+### `0x0c1b` NC_USER_WORLD_STATUS_REQ †
 
 **Verified layout**
 
@@ -67,19 +70,33 @@ Handler `FUN_004062f0`
 
 No payload fields read directly by the handler.
 
-### `0x0c1d` ?
+### `0x0c1d` NC_USER_LOGIN_NETMARBLE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USER_LOGIN_NETMARBLE_REQ`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | CPCookieLength |  |
+| 2 | u8[CPCookieLength] | CPCookie | variable length |
 
 Handler `FUN_00406280`
 
 No payload fields read directly by the handler.
 
-### `0x0c20` ?
+### `0x0c20` NC_USER_LOGIN_OUTSPARK_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USER_LOGIN_OUTSPARK_REQ`, 85 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8[65] | LogonToken |  |
+| 65 | char[20] | spawnapps | Name5 |
 
 Handler `FUN_004063d0`
 
 No payload fields read directly by the handler.
 
-### `0x0c37` token login (hand-named)
+### `0x0c37` NC_USER_LOGIN_WITH_OTP_REQ †
 
 **Verified layout** (basis: FUN_00406bb0; total packet length must be 0x22)
 
@@ -91,7 +108,7 @@ Handler `FUN_00406bb0` · packet length check: != 0x22 (length includes the opco
 
 No payload fields read directly by the handler.
 
-### `0x0c5a` user login (hand-named)
+### `0x0c5a` NC_USER_US_LOGIN_REQ †
 
 **Verified layout** (basis: FUN_00406450; total packet length must be 0x13E)
 
@@ -114,7 +131,7 @@ Handler `FUN_00406450` · packet length check: == 0x13e (length includes the opc
 | 308 | u32 |  |  |
 | 312 | u32 |  |  |
 
-### `0x0c65` NC_USER_RETURN_CHECK_ACK †
+### `0x0c65` NC_USER_CLIENT_VERSION_CHECK_REQ †
 
 **Verified layout** (basis: FUN_004060d0)
 
@@ -148,7 +165,7 @@ Sent from `FUN_00409610` (`FUN_00409610`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(param_1 + 0x10a)` |
 
-### `0x0c09` login failed (hand-named)
+### `0x0c09` NC_USER_LOGINFAIL_ACK †
 
 **Verified layout** (basis: FUN_00404590, FUN_00406bb0, FUN_004058c0; client FUN_0046ee40 -> FUN_00416430)
 
@@ -164,11 +181,11 @@ Sent in reply to `0x0c3f` NC_USER_TW_PASSWORD_CHECK_ACK † on CParserAccountDB 
 |---|---|---|
 | 0 | u16 | `68` (0x44) |
 
-Sent in reply to `0x0c5c` ? on CParserAccountDB (`FUN_00404590`) · payload 2 bytes · raw header
+Sent in reply to `0x0c5c` NC_USER_US_PASSWORD_CHECK_ACK † on CParserAccountDB (`FUN_00404590`) · payload 2 bytes · raw header
 
 *9 more send sites not shown: FUN_00404990, FUN_00405180, FUN_004054c0, FUN_004056c0, FUN_004058c0, FUN_00405c80, FUN_00406280, FUN_004063d0, FUN_00406bb0*
 
-### `0x0c0a` world list (hand-named)
+### `0x0c0a` NC_USER_LOGIN_ACK †
 
 **Verified layout** (basis: FUN_004058c0 (after AccountLog 0x0C5E))
 
@@ -177,7 +194,7 @@ Sent in reply to `0x0c5c` ? on CParserAccountDB (`FUN_00404590`) · payload 2 by
 | 0 | u8 | count |  |
 | 1 | WORLD[count] | worlds | 18 bytes each, see struct WORLD |
 
-Sent in reply to `0x0c27` ? on CParserAccountDB (`FUN_00404050`) · payload variable ((uint)*local_2584 * 0x12 + 1)
+Sent in reply to `0x0c27` NC_USER_TEENAGER_ACK † on CParserAccountDB (`FUN_00404050`) · payload variable ((uint)*local_2584 * 0x12 + 1)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -185,7 +202,7 @@ Sent in reply to `0x0c27` ? on CParserAccountDB (`FUN_00404050`) · payload vari
 
 *3 more send sites not shown: FUN_004056c0, FUN_004058c0, FUN_00406bb0*
 
-### `0x0c0c` world select result (hand-named)
+### `0x0c0c` NC_USER_WORLDSELECT_ACK †
 
 **Verified layout** (basis: FUN_00406970 (failure), FUN_00408870 (success); client FUN_0046ef20)
 
@@ -196,7 +213,7 @@ Sent in reply to `0x0c27` ? on CParserAccountDB (`FUN_00404050`) · payload vari
 | 17 | u16 | wm_port | read by the client (FUN_008c7850); not visibly written by the Login decompile, so it is filled in a way the extractor missed |
 | 19 | u16[32] | validate | client stores it and sends it to WM in 0x0C0F |
 
-Sent in reply to `0x0c0b` ? on CParserClient (`FUN_00406970`) · payload 83 bytes · raw header
+Sent in reply to `0x0c0b` NC_USER_WORLDSELECT_REQ † on CParserClient (`FUN_00406970`) · payload 83 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -205,7 +222,7 @@ Sent in reply to `0x0c0b` ? on CParserClient (`FUN_00406970`) · payload 83 byte
 | 9 | u32 | `0` |
 | 13 | u32 | `0` |
 
-### `0x0c17` kicked / disconnect reason (hand-named)
+### `0x0c17` NC_USER_CONNECTCUT_CMD †
 
 **Verified layout** (basis: client FUN_0046eac0; WM FUN_004305a0)
 
@@ -215,7 +232,7 @@ Sent in reply to `0x0c0b` ? on CParserClient (`FUN_00406970`) · payload 83 byte
 
 Sent from `FUN_00409810` (`FUN_00409810`) · payload 2 bytes · raw header
 
-### `0x0c1c` world list (refresh) (hand-named)
+### `0x0c1c` NC_USER_WORLD_STATUS_ACK †
 
 **Verified layout**
 
@@ -224,23 +241,31 @@ Sent from `FUN_00409810` (`FUN_00409810`) · payload 2 bytes · raw header
 | 0 | u8 | count |  |
 | 1 | WORLD[count] | worlds |  |
 
-Sent in reply to `0x0c1b` ? on CParserClient (`FUN_004062f0`) · payload variable ((uint)*local_201c * 0x12 + 1)
+Sent in reply to `0x0c1b` NC_USER_WORLD_STATUS_REQ † on CParserClient (`FUN_004062f0`) · payload variable ((uint)*local_201c * 0x12 + 1)
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | bytes[?] | `memcpy from local_201c` |
 | 8191 | u32 | `DAT_00431530 ^ &stack0xfffffffc` |
 
-### `0x0c25` ?
+### `0x0c25` NC_USER_TEENAGER_CMD †
 
-Sent in reply to `0x0c27` ? on CParserAccountDB (`FUN_00404050`) · payload 55 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USER_TEENAGER_CMD`, 55 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8[50] | sUserKey |  |
+| 50 | u8 | nType |  |
+| 51 | u32 | nMinute |  |
+
+Sent in reply to `0x0c27` NC_USER_TEENAGER_ACK † on CParserAccountDB (`FUN_00404050`) · payload 55 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 50 | u8 | `in(0x0c27)+308` |
 | 51 | u32 | `in(0x0c27)+309` |
 
-### `0x0c66` version rejected (hand-named)
+### `0x0c66` NC_USER_CLIENT_WRONGVERSION_CHECK_ACK †
 
 **Verified layout** (basis: FUN_004060d0)
 
@@ -250,9 +275,9 @@ Sent in reply to `0x0c27` ? on CParserAccountDB (`FUN_00404050`) · payload 55 b
 
 client FUN_0046eec0 shows: 'You client version is different from the Server version. Please restart the client after patching.'
 
-Sent in reply to `0x0c65` NC_USER_RETURN_CHECK_ACK † on CParserClient (`FUN_004060d0`) · payload 1 bytes
+Sent in reply to `0x0c65` NC_USER_CLIENT_VERSION_CHECK_REQ † on CParserClient (`FUN_004060d0`) · payload 1 bytes
 
-### `0x0c67` version OK (hand-named)
+### `0x0c67` NC_USER_CLIENT_RIGHTVERSION_CHECK_ACK †
 
 **Verified layout** (basis: FUN_004060d0)
 
@@ -263,7 +288,7 @@ Sent in reply to `0x0c65` NC_USER_RETURN_CHECK_ACK † on CParserClient (`FUN_00
 
 client FUN_0046f470: on receipt, opens the login UI and sends 0x0C04
 
-Sent in reply to `0x0c65` NC_USER_RETURN_CHECK_ACK † on CParserClient (`FUN_004060d0`) · payload variable ((uint)(pcVar4 + (2 - ((int)param_1 + 0x2ab))))
+Sent in reply to `0x0c65` NC_USER_CLIENT_VERSION_CHECK_REQ † on CParserClient (`FUN_004060d0`) · payload variable ((uint)(pcVar4 + (2 - ((int)param_1 + 0x2ab))))
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -271,9 +296,20 @@ Sent in reply to `0x0c65` NC_USER_RETURN_CHECK_ACK † on CParserClient (`FUN_00
 | 1 | bytes[8190] | `FID_conflict__memcpy from pcVar5` |
 | 8191 | u32 | `DAT_00431530 ^ &stack0xfffffffc` |
 
-### `0x2802` ?
+### `0x2802` NC_OPTOOL_S2SCONNECT_LIST_ACK †
 
-Sent in reply to `0x2801` ? on CParserOPTool (`FUN_004074b0`) · payload 4 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_S2SCONNECT_LIST_ACK`, 4 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | echo_data |  |
+| 1 | u8 | my_server_id |  |
+| 2 | u16 | num_of_connections |  |
+| 4 | SERVER_CONN_INFO[num_of_connections] | connection_info | variable length, element SERVER_CONN_INFO |
+
+Element `SERVER_CONN_INFO` (7 bytes): +0 u8 connect_server_world, +1 u8 connect_server_zone, +2 u8 connect_server_id, +3 u32 connect_time.year|month|day|hour|min|sec
+
+Sent in reply to `0x2801` NC_OPTOOL_S2SCONNECT_LIST_REQ † on CParserOPTool (`FUN_004074b0`) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -281,7 +317,7 @@ Sent in reply to `0x2801` ? on CParserOPTool (`FUN_004074b0`) · payload 4 bytes
 | 1 | u8 | `DAT_00432e50` |
 | 2 | u16 | `(undefined2)uVar4` |
 
-Sent in reply to `0x2801` ? on CParserOPTool (`FUN_004074b0`) · payload variable (uVar4 * 7 + 4)
+Sent in reply to `0x2801` NC_OPTOOL_S2SCONNECT_LIST_REQ † on CParserOPTool (`FUN_004074b0`) · payload variable (uVar4 * 7 + 4)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -293,15 +329,29 @@ Sent in reply to `0x2801` ? on CParserOPTool (`FUN_004074b0`) · payload variabl
 | 6 | u8 | `DAT_0043ce60` |
 | 7 | u32 | `local_200c[0] ^ ((DAT_0043ce6c >> 0x10) << 4 ^ local_200c[0]) & 0xf0`; `local_200c[0] ^ (DAT_0043ce72 << 8 ^ local_200c[0]) & 0x1f00`; `local_200c[0] ^ (DAT_0043ce74 << 0xd ^ local_200c[0]) & 0x3e000` |
 
-### `0x2804` ?
+### `0x2804` NC_OPTOOL_CLOSE_SERVER_ACK †
 
-Sent in reply to `0x2803` ? on CParserOPTool (`FUN_00407980`) · payload 2 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_CLOSE_SERVER_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+
+Sent in reply to `0x2803` NC_OPTOOL_CLOSE_SERVER_REQ † on CParserOPTool (`FUN_00407980`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `1536` (0x600) |
 
 ### `0x2808` NC_OPTOOL_CONNECT_BRIF_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_CONNECT_BRIF_ACK`, 170 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | echo_data |  |
+| 1 | u8 | my_server_id |  |
+| 2 | byte[168] | count | nested array ushort[2][2][21] |
 
 Sent in reply to `0x2807` NC_OPTOOL_CONNECT_BRIF_REQ on CParserOPTool (`FUN_00407a30`) · payload 170 bytes
 
@@ -310,9 +360,21 @@ Sent in reply to `0x2807` NC_OPTOOL_CONNECT_BRIF_REQ on CParserOPTool (`FUN_0040
 | 0 | bytes[170] | `in(0x2807)+0`; `memset 0` |
 | 1 | u8 | `DAT_00432e50` |
 
-### `0x2813` ?
+### `0x2813` NC_OPTOOL_LOGIN_USER_RATABLE_GET_ACK †
 
-Sent in reply to `0x2812` ? on CParserOPTool (`FUN_00407c90`) · payload 13 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_LOGIN_USER_RATABLE_GET_ACK`, 13 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nWorldNo |  |
+| 1 | u16 | RateTable.nWMSUS_1 |  |
+| 3 | u16 | RateTable.nWMSUS_2 |  |
+| 5 | u16 | RateTable.nWMSUS_3 |  |
+| 7 | u16 | RateTable.nWMSUS_4 |  |
+| 9 | u16 | RateTable.nWMSUS_5 |  |
+| 11 | u16 | RateTable.nWMSUS_FULL |  |
+
+Sent in reply to `0x2812` NC_OPTOOL_LOGIN_USER_RATABLE_GET_REQ † on CParserOPTool (`FUN_00407c90`) · payload 13 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -323,9 +385,20 @@ Sent in reply to `0x2812` ? on CParserOPTool (`FUN_00407c90`) · payload 13 byte
 | 9 | u16 | `*(undefined2 *)(&DAT_00432fa8 + uVar2 * 3)` |
 | 11 | u16 | `*(undefined2 *)(&DAT_00432fa8 + uVar2 * 0xc + 2)` |
 
-### `0x2819` ?
+### `0x2819` NC_OPTOOL_LOGON_PROCESS_TIME_VIEW_ACK †
 
-Sent in reply to `0x2818` ? on CParserOPTool (`FUN_00407df0`) · payload 24 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_LOGON_PROCESS_TIME_VIEW_ACK`, 24 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Connect_Count |  |
+| 4 | u32 | Connect_Time |  |
+| 8 | u32 | Login_Count |  |
+| 12 | u32 | Login_Time |  |
+| 16 | u32 | IPBlock_Count |  |
+| 20 | u32 | IPBlock_Time |  |
+
+Sent in reply to `0x2818` NC_OPTOOL_LOGON_PROCESS_TIME_VIEW_REQ † on CParserOPTool (`FUN_00407df0`) · payload 24 bytes · raw header
 
 ## Hand-verified packets without a generated section
 
@@ -343,7 +416,7 @@ answered with bare 0x0805
 
 Empty payload.
 
-### `0x0c05` ? (hand-named) (S→C)
+### `0x0c05` NC_USER_XTRAP_ACK † (S→C)
 
 **Verified layout**
 

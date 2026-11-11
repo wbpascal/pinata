@@ -3,7 +3,7 @@
 usage: python3 -I packets.py <export_root> <docs_dir>     (export_root contains <server>/layouts.json)
 writes <docs_dir>/packets-<server>.md for login, wm, zone
 """
-import json, re, sys
+import json, os, re, sys
 
 root, docs = sys.argv[1], sys.argv[2]
 cat = {c["op"]: c for c in json.load(open(f"{docs}/opcodes.json"))}
@@ -15,6 +15,9 @@ for f in sorted(glob.glob(f"{docs}/annotations/*.json")):
     ANN["structs"].update(extra.get("structs", {}))
     for srv, pk in extra.get("packets", {}).items():
         ANN["packets"].setdefault(srv, {}).update(pk)
+# 2017 client PDB layouts (work item C02): shown when no hand annotation exists, above the generated guess
+_pp = f"{docs}/pdb-layouts.json"
+PDB = json.load(open(_pp)) if os.path.exists(_pp) else {"opcodes": {}, "structs": {}}
 CLIENT = {"login": "CParserClient", "wm": "CParserClient", "zone": "ShineObjectClass::ShinePlayer"}
 TITLE = {"login": "Login server", "wm": "World manager", "zone": "Zone server"}
 
@@ -69,6 +72,29 @@ def verified(server, op, direction):
     return rows + [""]
 
 
+def pdb_layout(op, sizes):
+    """PDB struct table for an opcode without a hand annotation; sizes = 2016 payload sizes seen in the code"""
+    e = PDB["opcodes"].get(op)
+    if not e or "size" not in e: return []
+    fits = lambda c, z: z == c["size"] or c["variable"] and z >= c["size"] or not c["fields"] and z == 1  # sizeof(empty) = 1
+    cand = [e] + e.get("alts", [])          # alias names sharing the value: take the one the 2016 sizes fit
+    p = next((c for c in cand if any(fits(c, z) for z in sizes)), e)
+    var = " + variable tail" if p["variable"] else ""
+    rows = [f"**2017 PDB layout** *(pdb2017, unverified for 2016)*: `{p['struct']}`" +
+            (" (struct shared under the base name, inferred)" if p.get("struct_alias") else "") + f", {p['size']} bytes{var}" +
+            ("".join(f" · alias `{c['name']}` = `{c['struct']}` ({c['size']} bytes)" for c in cand if c is not p))]
+    bad = sorted({z for z in sizes if not fits(p, z)})
+    if bad:
+        rows[0] += f" · ⚠ 2016 code uses {', '.join(map(str, bad))} bytes: version drift or extraction error"
+    rows += ["", "| Off | Type | Field | Notes |", "|---|---|---|---|"]
+    rows += [f"| {o} | {t} | {n} | {x.replace('|', '/')} |" for o, t, n, x in p["fields"]] or ["| | | (empty) | |"]
+    used = {f[1].split("[")[0] for f in p["fields"]} & set(PDB["structs"])
+    for sn in sorted(used):
+        st = PDB["structs"][sn]
+        rows.append(f"\nElement `{sn}` ({st['size']} bytes): " + ", ".join(f"+{o} {t} {n}" for o, t, n, _ in st["fields"]))
+    return rows + [""]
+
+
 def render(server):
     L = json.load(open(f"{root}/{server}/layouts.json"))
     H = json.load(open(f"{root}/{server}/handlers.json"))
@@ -96,7 +122,9 @@ def render(server):
            "- Other text: the decompiler expression, shortened.",
            "- Gaps between offsets are bytes the code did not write (padding, or filled in a way the extractor missed).",
            "- **Fill**: part of the payload is produced by a helper; for zone, virtual helpers are resolved assuming a `ShinePlayer` receiver.",
-           "- †: name inferred (REQ+1 = ACK, or from a log string), not from the opcode's own handler.\n",
+           "- †: name not from the opcode's own 2016 handler (2017 client PDB, REQ+1 = ACK guess, or a log string).\n",
+           "- **2017 PDB layout**: the `PROTO_*` struct from the 2017 client PDB (`docs/protocol/pdb-layouts.json`, work item C02),",
+           "  shown when no hand-verified layout exists. A 2017 build: confirm against the 2016 code before relying on it.\n",
            "Heuristic extraction: verify a layout against the cited function before relying on it.\n"]
 
     out.append("## Shared structures (hand-verified)\n")
@@ -112,7 +140,9 @@ def render(server):
         r = parsers.get(CLIENT[server])
         if not r: continue
         out.append(f"### `{op}` {name(op, server)}\n")
-        out += verified(server, op, "C→S"); done.add(("C→S", op))
+        v = verified(server, op, "C→S"); done.add(("C→S", op))
+        lc = [int(c[3:], 0) - 2 for c in r["len_checks"] if c[:3] in ("== ", "!= ")]
+        out += v or pdb_layout(op, lc)
         out.append(f"Handler `{r['handler']}`" + (f" · packet length check: {', '.join(r['len_checks'])} (length includes the opcode)" if r["len_checks"] else ""))
         if not r["fields"]:
             out.append("\nNo payload fields read directly by the handler.\n")
@@ -131,7 +161,8 @@ def render(server):
     for op, sites in sorted(L["s2c"].items()):
         if internal(op): continue
         out.append(f"### `{op}` {name(op, server)}\n")
-        out += verified(server, op, "S→C"); done.add(("S→C", op))
+        v = verified(server, op, "S→C"); done.add(("S→C", op))
+        out += v or pdb_layout(op, [x["size"] for x in sites if x["size"] is not None])
         seen_layouts = set()
         for s in sites[:4]:
             key = json.dumps(sorted((o, f["size"]) for o, f in s["fields"].items()))

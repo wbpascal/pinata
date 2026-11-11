@@ -10,7 +10,10 @@ How to read the *Value / source* column:
 - Other text: the decompiler expression, shortened.
 - Gaps between offsets are bytes the code did not write (padding, or filled in a way the extractor missed).
 - **Fill**: part of the payload is produced by a helper; for zone, virtual helpers are resolved assuming a `ShinePlayer` receiver.
-- †: name inferred (REQ+1 = ACK, or from a log string), not from the opcode's own handler.
+- †: name not from the opcode's own 2016 handler (2017 client PDB, REQ+1 = ACK guess, or a log string).
+
+- **2017 PDB layout**: the `PROTO_*` struct from the 2017 client PDB (`docs/protocol/pdb-layouts.json`, work item C02),
+  shown when no hand-verified layout exists. A 2017 build: confirm against the 2016 code before relying on it.
 
 Heuristic extraction: verify a layout against the cited function before relying on it.
 
@@ -46,13 +49,27 @@ Basis: Character server FUN_0046bff0 (reads SQL columns in this order with SQLGe
 
 ## Client → server
 
-### `0x080d` ?
+### `0x080d` NC_MISC_GAMETIME_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_GAMETIME_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00413050`
 
 No payload fields read directly by the handler.
 
-### `0x080f` ?
+### `0x080f` NC_MISC_CLIENT_DEBUG_MSG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_CLIENT_DEBUG_MSG_CMD`, 4 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wldmanhandle |  |
+| 2 | u16 | msg_size |  |
+| 4 | u8[msg_size] | msg | variable length |
 
 Handler `FUN_00413820`
 
@@ -63,6 +80,44 @@ Handler `FUN_00413820`
 
 ### `0x0813` NC_MISC_PINGTEST_TOOL_WM_CLIENT_ZONE_DB
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_PINGTEST_TOOL_WM_CLIENT_ZONE_DB`, 164 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ID |  |
+| 4 | u16 | hTool |  |
+| 6 | u32 | ToolSendToWM |  |
+| 10 | u32 | ToolRecvFromWM |  |
+| 14 | char[20] | TargetCharName | Name5 |
+| 34 | u16 | hWMClient |  |
+| 36 | u32 | WMSendClient |  |
+| 40 | u32 | WMRecvFromClient |  |
+| 44 | u32 | ClientSendZone |  |
+| 48 | u32 | ClientRecvZone |  |
+| 52 | u16 | hZoneClient |  |
+| 54 | u32 | ZoneSendToDB |  |
+| 58 | u32 | ZoneRecvFromDB |  |
+| 62 | u32 | ZoneSendToClient |  |
+| 66 | u32 | ZoneRecvFromClient |  |
+| 70 | u32 | DBRecvFromZone |  |
+| 74 | u32 | DBSendToZone |  |
+| 78 | u32 | DBSendToODBC |  |
+| 82 | u32 | DBRecvFromODBC |  |
+| 86 | u16 | header.clienthandle |  |
+| 88 | u32 | header.charregistnumber |  |
+| 92 | u16 | buylot.lockindex |  |
+| 94 | u64 | buylot.iteminfo.attritemregnum | SHINE_ITEM_REGISTNUMBER (union: binary, dwrdkey, key) |
+| 102 | u16 | buylot.iteminfo.attr |  |
+| 104 | u16 | buylot.iteminfo.location | ITEM_INVEN (union: Inven, Pos, Type) |
+| 106 | u16 | buylot.itemid |  |
+| 108 | u64 | buylot.price_cen |  |
+| 116 | u32 | buylot.price_fame |  |
+| 120 | u32 | buylot.price_gamblecoin |  |
+| 124 | u32 | buylot.UserNo |  |
+| 128 | u16 | buylot.Vendor |  |
+| 130 | char[30] | buylot.CharID |  |
+| 160 | i32 | buylot.CharLevel |  |
+
 Handler `FUN_00415670`
 
 | Off | Type | Checks in handler | Notes |
@@ -70,43 +125,99 @@ Handler `FUN_00415670`
 | 4 | u16 |  |  |
 | 40 | u32 |  |  |
 
-### `0x081a` ?
+### `0x081a` NC_MISC_APEX_CLIENT_DATA_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_APEX_CLIENT_DATA_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nBuffSize |  |
+| 2 | u8[nBuffSize] | Buff | variable length |
 
 Handler `FUN_00415750`
 
 No payload fields read directly by the handler.
 
-### `0x081b` ?
+### `0x081b` NC_MISC_WEB_KEY_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_WEB_KEY_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_004157d0`
 
 No payload fields read directly by the handler.
 
-### `0x0827` ?
+### `0x0827` NC_MISC_XTRAP2_CLIENT_DATA_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_XTRAP2_CLIENT_DATA_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | DataSize |  |
+| 2 | u8[DataSize] | Data | variable length |
 
 Handler `FUN_00415a10`
 
 No payload fields read directly by the handler.
 
-### `0x0832` ?
+### `0x0832` NC_MISC_CS_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_CS_ACK`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | DataSize |  |
+| 2 | u8[DataSize] | Data | variable length |
 
 Handler `FUN_00415a10`
 
 No payload fields read directly by the handler.
 
-### `0x0834` ?
+### `0x0834` NC_MISC_HACK_SCAN_STORE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_HACK_SCAN_STORE_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nDescSize |  |
+| 2 | u8[nDescSize] | sDesc | variable length |
 
 Handler `FUN_00415bc0`
 
 No payload fields read directly by the handler.
 
-### `0x0836` ?
+### `0x0836` NC_MISC_APEX_CLIENT_CHCSTART_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_APEX_CLIENT_CHCSTART_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | chcstart_result |  |
 
 Handler `FUN_00415790`
 
 No payload fields read directly by the handler.
 
-### `0x0840` ?
+### `0x0840` NC_MISC_CLIENT_LOADING_BUG_DETECT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_CLIENT_LOADING_BUG_DETECT_CMD`, 64 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[12] | sLoadingMapName | Name3 |
+| 12 | u16 | nFailType |  |
+| 14 | u16 | nLoadingFailCnt |  |
+| 16 | char[12] | sFromMapName | Name3 |
+| 28 | char[16] | sFromZoneIP | Name4 |
+| 44 | char[16] | sToZoneIP | Name4 |
+| 60 | u16 | nToZonePort |  |
+| 62 | u16 | nErrorDataCnt |  |
+| 64 | CLBD_ErrorData[nErrorDataCnt] | ErrorData | variable length, element CLBD_ErrorData |
+
+Element `CLBD_ErrorData` (6 bytes): +0 u16 nErrorNo, +2 u32 nErrorData
 
 Handler `FUN_00417140`
 
@@ -130,7 +241,15 @@ Handler `FUN_00417140`
 | 60 | u16 |  |  |
 | 62 | u16 |  |  |
 
-### `0x0846` ?
+### `0x0846` NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsSpamSpread |  |
+| 1 | u8 | bIsSpamBlock |  |
+| 2 | u8 | nSpamFilterRate |  |
 
 Handler `FUN_00417b90`
 
@@ -140,13 +259,25 @@ Handler `FUN_00417b90`
 | 1 | u8 |  |  |
 | 2 | u16 |  |  |
 
-### `0x085f` ?
+### `0x085f` NC_MISC_SPAMMER_REPORT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_SPAMMER_REPORT_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sSpammerName | Name5 |
 
 Handler `FUN_00417ef0`
 
 No payload fields read directly by the handler.
 
-### `0x0861` ?
+### `0x0861` NC_MISC_SPAMMER_CHAT_BAN_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_SPAMMER_CHAT_BAN_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sSpammerName | Name5 |
 
 Handler `FUN_004180f0`
 
@@ -160,11 +291,17 @@ Handler `FUN_004180f0`
 
 ### `0x086e` NC_MISC_ITEMSHOP_URL_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_ITEMSHOP_URL_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
+
 Handler `FUN_00418450`
 
 No payload fields read directly by the handler.
 
-### `0x0c0f` world login (ours) (hand-named)
+### `0x0c0f` NC_USER_LOGINWORLD_REQ †
 
 **Verified layout** (basis: wm FUN_00419860 / client FUN_00471980)
 
@@ -215,19 +352,37 @@ Handler `FUN_00419860`
 
 ### `0x0c18` NC_USER_NORMALLOGOUT_CMD
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USER_NORMALLOGOUT_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | LogoutType |  |
+
 Handler `FUN_00412df0`
 
 | Off | Type | Checks in handler | Notes |
 |---|---|---|---|
 | 0 | u8 |  |  |
 
-### `0x0c1f` ?
+### `0x0c1f` NC_USER_AVATAR_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USER_AVATAR_LIST_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00412ee0`
 
 No payload fields read directly by the handler.
 
-### `0x0c33` ?
+### `0x0c33` NC_USER_WILL_WORLD_SELECT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USER_WILL_WORLD_SELECT_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00417330`
 
@@ -247,7 +402,16 @@ Handler `FUN_00422be0`
 |---|---|---|---|
 | 0 | u8 |  |  |
 
-### `0x1078` ?
+### `0x1078` NC_CHAR_SET_STYLE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_SET_STYLE_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Info.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 |
+| 1 | u8 | Info.hairtype | bits hairtype:8@0 |
+| 2 | u8 | Info.haircolor | bits haircolor:8@0 |
+| 3 | u8 | Info.faceshape | bits faceshape:8@0 |
 
 Handler `FUN_004158a0`
 
@@ -255,7 +419,13 @@ Handler `FUN_004158a0`
 |---|---|---|---|
 | 0 | u32 |  |  |
 
-### `0x107c` ?
+### `0x107c` NC_CHAR_SET_STYLE_GET_INFO_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_SET_STYLE_GET_INFO_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00415960`
 
@@ -263,13 +433,26 @@ No payload fields read directly by the handler.
 
 ### `0x10da` NC_CHAR_NEWBIE_GUIDE_VIEW_SET_CMD
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_NEWBIE_GUIDE_VIEW_SET_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nGuideView |  |
+
 Handler `FUN_004182f0`
 
 | Off | Type | Checks in handler | Notes |
 |---|---|---|---|
 | 0 | u8 |  |  |
 
-### `0x10f1` ?
+### `0x10f1` NC_CHAR_EVENT_ATTENDANCE_REWARD_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_EVENT_ATTENDANCE_REWARD_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nIndex |  |
+| 1 | u8 | nRewardID |  |
 
 Handler `FUN_00418410`
 
@@ -277,7 +460,13 @@ Handler `FUN_00418410`
 |---|---|---|---|
 | 0 | char* |  |  |
 
-### `0x1111` ?
+### `0x1111` NC_CHAR_TUTORIAL_POPUP_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_TUTORIAL_POPUP_ACK`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsSkip |  |
 
 Handler `FUN_00418cb0`
 
@@ -285,7 +474,7 @@ Handler `FUN_00418cb0`
 |---|---|---|---|
 | 0 | u8 |  |  |
 
-### `0x1401` character create (ours) (hand-named)
+### `0x1401` NC_AVATAR_CREATE_REQ †
 
 **Verified layout** (basis: wm FUN_004229f0)
 
@@ -308,7 +497,7 @@ Handler `FUN_004229f0`
 | 17 | u32 |  |  |
 | 21 | u8 |  |  |
 
-### `0x1407` character delete (ours) (hand-named)
+### `0x1407` NC_AVATAR_ERASE_REQ †
 
 **Verified layout** (basis: wm FUN_00412fa0)
 
@@ -322,7 +511,7 @@ Handler `FUN_00412fa0`
 |---|---|---|---|
 | 0 | u8 |  |  |
 
-### `0x140f` character rename (ours) (hand-named)
+### `0x140f` NC_AVATAR_RENAME_REQ †
 
 **Verified layout** (basis: wm FUN_0041a640)
 
@@ -342,7 +531,16 @@ Handler `FUN_0041a640`
 | 13 | u32 |  |  |
 | 17 | u32 |  |  |
 
-### `0x200c` ?
+### `0x200c` NC_ACT_WHISPER_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WHISPER_REQ`, 22 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | char[20] | receiver | Name5 |
+| 21 | u8 | len |  |
+| 22 | u8[len] | content | variable length |
 
 Handler `FUN_0041c610`
 
@@ -357,7 +555,7 @@ Handler `FUN_0041c610`
 | 21 | char | < 0x81 |  |
 | 22 | char* |  |  |
 
-### `0x2010` ?
+### `0x2010` NC_ACT_NOTICE_REQ †
 
 Handler `FUN_00413450`
 
@@ -366,7 +564,15 @@ Handler `FUN_00413450`
 | 1 | u8 |  |  |
 | 2 | char* |  |  |
 
-### `0x2014` ?
+### `0x2014` NC_ACT_PARTYCHAT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_PARTYCHAT_REQ`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | u8 | len |  |
+| 2 | u8[len] | content | variable length |
 
 Handler `FUN_00413510`
 
@@ -375,7 +581,13 @@ Handler `FUN_00413510`
 | 0 | u8 |  |  |
 | 1 | u8 | < 0x81 |  |
 
-### `0x3802` ?
+### `0x3802` NC_PARTY_JOIN_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_JOIN_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | target | Name5 |
 
 Handler `FUN_0041a940`
 
@@ -387,25 +599,37 @@ Handler `FUN_0041a940`
 | 12 | u32 |  |  |
 | 16 | u32 |  |  |
 
-### `0x3804` ?
+### `0x3804` NC_PARTY_JOINPROPOSE_ALLOW_ACK †
 
 Handler `FUN_004211e0`
 
 No payload fields read directly by the handler.
 
-### `0x3805` ?
+### `0x3805` NC_PARTY_JOINPROPOSE_REJECT_ACK †
 
 Handler `FUN_00419bb0`
 
 No payload fields read directly by the handler.
 
-### `0x380a` ?
+### `0x380a` NC_PARTY_LEAVE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_LEAVE_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_0041b990`
 
 No payload fields read directly by the handler.
 
-### `0x3814` ?
+### `0x3814` NC_PARTY_KICKOFF_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_KICKOFF_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | member | Name5 |
 
 Handler `FUN_0041bb40`
 
@@ -416,7 +640,13 @@ Handler `FUN_0041bb40`
 | 12 | i32 |  |  |
 | 16 | i32 |  |  |
 
-### `0x3828` ?
+### `0x3828` NC_PARTY_CHANGEMASTER_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_CHANGEMASTER_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | newmaster | Name5 |
 
 Handler `FUN_0041bf10`
 
@@ -428,7 +658,14 @@ Handler `FUN_0041bf10`
 | 12 | u32 |  |  |
 | 16 | u32 |  |  |
 
-### `0x384b` ?
+### `0x384b` NC_PARTY_ITEM_LOOTING_SET †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_ITEM_LOOTING_SET`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | lootingtype |  |
+| 1 | u8 | nItemGrade |  |
 
 Handler `FUN_004130f0`
 
@@ -437,7 +674,13 @@ Handler `FUN_004130f0`
 | 0 | u8 |  |  |
 | 1 | u8 |  |  |
 
-### `0x3850` ?
+### `0x3850` NC_PARTY_FINDER_ADD_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_FINDER_ADD_REQ`, 128 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8[128] | sMsg |  |
 
 Handler `FUN_00415a30`
 
@@ -445,13 +688,26 @@ Handler `FUN_00415a30`
 |---|---|---|---|
 | 0 | char* |  |  |
 
-### `0x3852` ?
+### `0x3852` NC_PARTY_FINDER_DELETE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_FINDER_DELETE_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00415ad0`
 
 No payload fields read directly by the handler.
 
-### `0x3854` ?
+### `0x3854` NC_PARTY_FINDER_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_FINDER_LIST_REQ`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPageNo |  |
+| 2 | u8 | nCountOfOnePage |  |
 
 Handler `FUN_0041a080`
 
@@ -460,7 +716,13 @@ Handler `FUN_0041a080`
 | 0 | u16 |  |  |
 | 2 | u8 |  |  |
 
-### `0x385a` ?
+### `0x385a` NC_PARTY_SET_LOOTER_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_SET_LOOTER_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sNewLooterCharID | Name5 |
 
 Handler `FUN_0041c0b0`
 
@@ -472,7 +734,14 @@ Handler `FUN_0041c0b0`
 | 12 | i32 |  |  |
 | 16 | i32 |  |  |
 
-### `0x5401` ?
+### `0x5401` NC_FRIEND_SET_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_SET_REQ`, 40 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
+| 20 | char[20] | friendid | Name5 |
 
 Handler `FUN_0041ca90`
 
@@ -489,7 +758,15 @@ Handler `FUN_0041ca90`
 | 32 | u32 |  |  |
 | 36 | u32 |  |  |
 
-### `0x5404` ?
+### `0x5404` NC_FRIEND_SET_CONFIRM_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_SET_CONFIRM_ACK`, 41 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
+| 20 | char[20] | friendid | Name5 |
+| 40 | u8 | accept_friend |  |
 
 Handler `FUN_0041cd70`
 
@@ -507,7 +784,14 @@ Handler `FUN_0041cd70`
 | 36 | i32 |  |  |
 | 40 | u8 |  |  |
 
-### `0x5405` ?
+### `0x5405` NC_FRIEND_DEL_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_DEL_REQ`, 40 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
+| 20 | char[20] | friendid | Name5 |
 
 Handler `FUN_0041d230`
 
@@ -524,25 +808,50 @@ Handler `FUN_0041d230`
 | 32 | u32 |  |  |
 | 36 | u32 |  |  |
 
-### `0x541d` ?
+### `0x541d` NC_FRIEND_POINT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_POINT_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00418e60`
 
 No payload fields read directly by the handler.
 
-### `0x541f` ?
+### `0x541f` NC_FRIEND_FIND_FRIENDS_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_FIND_FRIENDS_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00423110`
 
 No payload fields read directly by the handler.
 
-### `0x5801` ?
+### `0x5801` NC_KQ_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_LIST_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | StartHandle |  |
+| 4 | u32 | EndHandle |  |
 
 Handler `FUN_00413980`
 
 No payload fields read directly by the handler.
 
-### `0x5803` ?
+### `0x5803` NC_KQ_STATUS_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_STATUS_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle |  |
 
 Handler `FUN_00413b20`
 
@@ -550,7 +859,13 @@ Handler `FUN_00413b20`
 |---|---|---|---|
 | 0 | i32 |  |  |
 
-### `0x5805` ?
+### `0x5805` NC_KQ_JOIN_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_JOIN_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle |  |
 
 Handler `FUN_00413cc0`
 
@@ -558,7 +873,13 @@ Handler `FUN_00413cc0`
 |---|---|---|---|
 | 0 | i32 |  |  |
 
-### `0x5807` ?
+### `0x5807` NC_KQ_JOIN_CANCEL_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_JOIN_CANCEL_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle |  |
 
 Handler `FUN_00413d70`
 
@@ -566,43 +887,89 @@ Handler `FUN_00413d70`
 |---|---|---|---|
 | 0 | u32 |  |  |
 
-### `0x5809` ?
+### `0x5809` NC_KQ_SCHEDULE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_SCHEDULE_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | StartHandle |  |
+| 4 | u32 | EndHandle |  |
 
 Handler `FUN_00413e00`
 
 No payload fields read directly by the handler.
 
-### `0x581b` ?
+### `0x581b` NC_KQ_LIST_REFRESH_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_LIST_REFRESH_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00413f80`
 
 No payload fields read directly by the handler.
 
-### `0x5827` ?
+### `0x5827` NC_KQ_VOTE_START_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_START_REQ`, 22 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sTarget | Name5 |
+| 20 | u8 | nVoteType |  |
+| 21 | u8 | nLen |  |
+| 22 | u8[nLen] | sContents | variable length |
 
 Handler `FUN_004185e0`
 
 No payload fields read directly by the handler.
 
-### `0x582a` ?
+### `0x582a` NC_KQ_VOTE_VOTING_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_VOTING_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | eVoteType |  |
 
 Handler `FUN_00418630`
 
 No payload fields read directly by the handler.
 
-### `0x5831` ?
+### `0x5831` NC_KQ_JOIN_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_JOIN_LIST_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nHandle |  |
 
 Handler `FUN_00418680`
 
 No payload fields read directly by the handler.
 
-### `0x5834` ?
+### `0x5834` NC_KQ_VOTE_START_CHECK_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_START_CHECK_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_004186d0`
 
 No payload fields read directly by the handler.
 
-### `0x5837` ?
+### `0x5837` NC_KQ_TEAM_SELECT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_TEAM_SELECT_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTeamType |  |
 
 Handler `FUN_00418e10`
 
@@ -610,49 +977,97 @@ Handler `FUN_00418e10`
 |---|---|---|---|
 | 0 | char* |  |  |
 
-### `0x7004` ?
+### `0x7004` NC_CHAR_OPTION_GET_SHORTCUTSIZE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_SHORTCUTSIZE_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00414000`
 
 No payload fields read directly by the handler.
 
-### `0x7006` ?
+### `0x7006` NC_CHAR_OPTION_GET_VIDEO_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_VIDEO_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00414080`
 
 No payload fields read directly by the handler.
 
-### `0x7008` ?
+### `0x7008` NC_CHAR_OPTION_GET_SOUND_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_SOUND_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00414100`
 
 No payload fields read directly by the handler.
 
-### `0x700a` ?
+### `0x700a` NC_CHAR_OPTION_GET_GAME_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_GAME_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00414180`
 
 No payload fields read directly by the handler.
 
-### `0x700c` ?
+### `0x700c` NC_CHAR_OPTION_GET_WINDOWPOS_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_WINDOWPOS_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00414200`
 
 No payload fields read directly by the handler.
 
-### `0x700e` ?
+### `0x700e` NC_CHAR_OPTION_GET_KEYMAPPING_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_KEYMAPPING_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00414280`
 
 No payload fields read directly by the handler.
 
-### `0x7010` ?
+### `0x7010` NC_CHAR_OPTION_SET_SHORTCUTDATA_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_SET_SHORTCUTDATA_CMD`, 1024 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8[1024] | Data.Data |  |
 
 Handler `FUN_00414300`
 
 No payload fields read directly by the handler.
 
-### `0x7011` ?
+### `0x7011` NC_CHAR_OPTION_SET_SHORTCUTSIZE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_SET_SHORTCUTSIZE_CMD`, 24 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8[24] | Data.Data |  |
 
 Handler `FUN_004143a0`
 
@@ -665,13 +1080,25 @@ Handler `FUN_004143a0`
 | 16 | u32 |  |  |
 | 20 | u32 |  |  |
 
-### `0x7012` ?
+### `0x7012` NC_CHAR_OPTION_SET_VIDEO_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_SET_VIDEO_CMD`, 60 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8[60] | Data.Data |  |
 
 Handler `FUN_00414440`
 
 No payload fields read directly by the handler.
 
-### `0x7013` ?
+### `0x7013` NC_CHAR_OPTION_SET_SOUND_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_SET_SOUND_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8[1] | Data.Data |  |
 
 Handler `FUN_004144d0`
 
@@ -679,25 +1106,52 @@ Handler `FUN_004144d0`
 |---|---|---|---|
 | 0 | u16 |  |  |
 
-### `0x7014` ?
+### `0x7014` NC_CHAR_OPTION_SET_GAME_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_SET_GAME_CMD`, 64 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8[64] | Data.Data |  |
 
 Handler `FUN_00414550`
 
 No payload fields read directly by the handler.
 
-### `0x7015` ?
+### `0x7015` NC_CHAR_OPTION_SET_WINDOWPOS_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_SET_WINDOWPOS_CMD`, 392 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8[392] | Data.Data |  |
 
 Handler `FUN_004145e0`
 
 No payload fields read directly by the handler.
 
-### `0x7016` ?
+### `0x7016` NC_CHAR_OPTION_SET_KEYMAPPING_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_SET_KEYMAPPING_CMD`, 308 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8[308] | Data.Data |  |
 
 Handler `FUN_00414680`
 
 No payload fields read directly by the handler.
 
-### `0x7037` ?
+### `0x7037` NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_REQ`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nShortCutDataCnt |  |
+| 1 | SHORT_CUT_DATA[nShortCutDataCnt] | ShortCutData | variable length, element SHORT_CUT_DATA |
+
+Element `SHORT_CUT_DATA` (7 bytes): +0 u8 nSlotNo, +1 u16 nCodeNo, +3 i32 nValue
 
 Handler `FUN_00414720`
 
@@ -707,13 +1161,31 @@ Handler `FUN_00414720`
 
 ### `0x7039` NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_REQ`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nKeyMapDataCnt |  |
+| 2 | KEY_MAP_DATA[nKeyMapDataCnt] | KeyMapData | variable length, element KEY_MAP_DATA |
+
+Element `KEY_MAP_DATA` (4 bytes): +0 u16 nFunctionNo, +2 u8 nExtendKey, +3 u8 nASCIICode
+
 Handler `FUN_004148f0`
 
 | Off | Type | Checks in handler | Notes |
 |---|---|---|---|
 | 0 | u16 | < 0x60 | nKeyMapDataCnt |
 
-### `0x703b` ?
+### `0x703b` NC_CHAR_OPTION_IMPROVE_SET_GAMEOPTION_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_SET_GAMEOPTION_REQ`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nGameOptionDataCnt |  |
+| 2 | GAME_OPTION_DATA[nGameOptionDataCnt] | GameOptionData | variable length, element GAME_OPTION_DATA |
+
+Element `GAME_OPTION_DATA` (3 bytes): +0 u16 nOptionNo, +2 u8 nValue
 
 Handler `FUN_00414af0`
 
@@ -721,31 +1193,57 @@ Handler `FUN_00414af0`
 |---|---|---|---|
 | 0 | u16 |  |  |
 
-### `0x7043` ?
+### `0x7043` NC_CHAR_OPTION_IMPROVE_INIT_KEYMAP_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_INIT_KEYMAP_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00414820`
 
 No payload fields read directly by the handler.
 
-### `0x7045` ?
+### `0x7045` NC_CHAR_OPTION_IMPROVE_INIT_GAMEOPTION_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_INIT_GAMEOPTION_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00414a20`
 
 No payload fields read directly by the handler.
 
-### `0x705f` ?
+### `0x705f` NC_CHAR_OPTION_LOGIN_BLOCKDATA_ERR †
 
 Handler `FUN_00414bf0`
 
 No payload fields read directly by the handler.
 
-### `0x7403` ?
+### `0x7403` NC_GUILD_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_LIST_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00414cc0`
 
 No payload fields read directly by the handler.
 
-### `0x7405` ?
+### `0x7405` NC_GUILD_MAKE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MAKE_REQ`, 29 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | Name | Name4 |
+| 16 | char[12] | Password | Name3 |
+| 28 | u8 | Type |  |
 
 Handler `FUN_0041d380`
 
@@ -757,13 +1255,26 @@ Handler `FUN_0041d380`
 | 12 | u32 |  |  |
 | 28 | u16 |  |  |
 
-### `0x7407` ?
+### `0x7407` NC_GUILD_DISMISS_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_DISMISS_REQ`, 28 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | Name | Name4 |
+| 16 | char[12] | Password | Name3 |
 
 Handler `FUN_00414d40`
 
 No payload fields read directly by the handler.
 
 ### `0x7409` NC_GUILD_MEMBER_INVITE_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_INVITE_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | ToCharID | Name5 |
 
 Handler `FUN_0041d450`
 
@@ -775,7 +1286,14 @@ Handler `FUN_0041d450`
 | 12 | i32 |  |  |
 | 16 | i32 |  |  |
 
-### `0x740c` ?
+### `0x740c` NC_GUILD_MEMBER_JOIN_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_JOIN_ACK`, 17 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | GuildName | Name4 |
+| 16 | u8 | JoinAck |  |
 
 Handler `FUN_00419db0`
 
@@ -786,19 +1304,39 @@ Handler `FUN_00419db0`
 | 12 | u32 |  |  |
 | 16 | u8 |  |  |
 
-### `0x740e` ?
+### `0x740e` NC_GUILD_MEMBER_VANISH_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_VANISH_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Handler `FUN_0041d6f0`
 
 No payload fields read directly by the handler.
 
-### `0x7410` ?
+### `0x7410` NC_GUILD_NOTIFY_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_NOTIFY_REQ`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNotifyLength |  |
+| 2 | char[nNotifyLength] | sNotify | variable length |
 
 Handler `FUN_00414dc0`
 
 No payload fields read directly by the handler.
 
 ### `0x7416` NC_GUILD_MEMBER_GRADE_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_GRADE_REQ`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | u8 | MemberGrade |  |
 
 Handler `FUN_0041d8e0`
 
@@ -810,43 +1348,87 @@ Handler `FUN_0041d8e0`
 | 16 | u32 |  |  |
 | 20 | u16 |  |  |
 
-### `0x7418` ?
+### `0x7418` NC_GUILD_MY_GUILD_INFO_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MY_GUILD_INFO_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_004217b0`
 
 No payload fields read directly by the handler.
 
-### `0x741a` ?
+### `0x741a` NC_GUILD_MEMBER_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_LIST_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_004218c0`
 
 No payload fields read directly by the handler.
 
-### `0x741c` ?
+### `0x741c` NC_GUILD_MEMBER_LEAVE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_LEAVE_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00415070`
 
 No payload fields read directly by the handler.
 
-### `0x7422` ?
+### `0x7422` NC_GUILD_WAR_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_REQ`, 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | TargetName | Name4 |
 
 Handler `FUN_00414e50`
 
 No payload fields read directly by the handler.
 
-### `0x7424` ?
+### `0x7424` NC_GUILD_WAR_ABLE_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_ABLE_LIST_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_004151b0`
 
 No payload fields read directly by the handler.
 
-### `0x7426` ?
+### `0x7426` NC_GUILD_WAR_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_LIST_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_004151f0`
 
 No payload fields read directly by the handler.
 
-### `0x7473` ?
+### `0x7473` NC_GUILD_CHAT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_CHAT_REQ`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | u8 | len |  |
+| 2 | u8[len] | content | variable length |
 
 Handler `FUN_00415230`
 
@@ -854,7 +1436,13 @@ Handler `FUN_00415230`
 |---|---|---|---|
 | 0 | char* |  |  |
 
-### `0x7476` ?
+### `0x7476` NC_GUILD_NAME_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_NAME_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nNo |  |
 
 Handler `FUN_004152f0`
 
@@ -862,31 +1450,61 @@ Handler `FUN_004152f0`
 |---|---|---|---|
 | 0 | i32 |  |  |
 
-### `0x747a` ?
+### `0x747a` NC_GUILD_TOURNAMENT_JOIN_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_JOIN_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
 
 Handler `FUN_00415340`
 
 No payload fields read directly by the handler.
 
-### `0x747e` ?
+### `0x747e` NC_GUILD_TOURNAMENT_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_LIST_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00415380`
 
 No payload fields read directly by the handler.
 
-### `0x74be` ?
+### `0x74be` NC_GUILD_MY_GUILD_TOKEN_INFO_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MY_GUILD_TOKEN_INFO_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00414ec0`
 
 No payload fields read directly by the handler.
 
-### `0x74c3` ?
+### `0x74c3` NC_GUILD_MY_GUILD_TOURNAMENT_MATCH_TIME_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MY_GUILD_TOURNAMENT_MATCH_TIME_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00414fa0`
 
 No payload fields read directly by the handler.
 
-### `0x74e9` ?
+### `0x74e9` NC_GUILD_TOURNAMENT_JOIN_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_JOIN_LIST_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_004153b0`
 
@@ -894,17 +1512,36 @@ No payload fields read directly by the handler.
 
 ### `0x74fd` NC_GUILD_HISTORY_LIST_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_HISTORY_LIST_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
+
 Handler `FUN_004189c0`
 
 No payload fields read directly by the handler.
 
-### `0x7501` ?
+### `0x7501` NC_GUILD_EMBLEM_CHECK_AVAILABILITY_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_EMBLEM_CHECK_AVAILABILITY_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00418f30`
 
 No payload fields read directly by the handler.
 
-### `0x7505` ?
+### `0x7505` NC_GUILD_EMBLEM_SAVE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_EMBLEM_SAVE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | EmblemInfo.nPTFileNo |  |
+| 1 | u8 | EmblemInfo.nPTIconNo |  |
 
 Handler `FUN_00418f70`
 
@@ -912,7 +1549,16 @@ Handler `FUN_00418f70`
 |---|---|---|---|
 | 0 | char* |  |  |
 
-### `0x7c01` ?
+### `0x7c01` NC_PRISON_ADD_GM_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PRISON_ADD_GM_REQ`, 102 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sImprison | Name5 |
+| 20 | u16 | nMinute |  |
+| 22 | char[16] | sReason |  |
+| 38 | char[64] | sRemark |  |
 
 Handler `FUN_0041de70`
 
@@ -928,19 +1574,40 @@ Handler `FUN_0041de70`
 | 30 | u32 |  |  |
 | 34 | u32 |  |  |
 
-### `0x7c04` ?
+### `0x7c04` NC_PRISON_END_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PRISON_END_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_004155f0`
 
 No payload fields read directly by the handler.
 
-### `0x7c06` ?
+### `0x7c06` NC_PRISON_GET_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PRISON_GET_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00415530`
 
 No payload fields read directly by the handler.
 
-### `0x7c09` ?
+### `0x7c09` NC_PRISON_ALTER_GM_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PRISON_ALTER_GM_REQ`, 102 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sImprison | Name5 |
+| 20 | u16 | nMin |  |
+| 22 | char[16] | sReason |  |
+| 38 | char[64] | sRemark |  |
 
 Handler `FUN_0041e290`
 
@@ -953,7 +1620,17 @@ Handler `FUN_0041e290`
 | 16 | i32 |  |  |
 | 20 | u16 | < 0x7fbd |  |
 
-### `0x8001` ?
+### `0x8001` NC_REPORT_ADD_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_REPORT_ADD_REQ`, 2342 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sHarmer | Name5 |
+| 20 | u8[16] | byReportType |  |
+| 36 | u8[256] | byReason |  |
+| 292 | u16 | nChatLogSize |  |
+| 294 | u8[2048] | byChatLog |  |
 
 Handler `FUN_0041db50`
 
@@ -970,7 +1647,13 @@ Handler `FUN_0041db50`
 | 32 | u32 |  |  |
 | 292 | u16 |  |  |
 
-### `0x8003` ?
+### `0x8003` NC_REPORT_CANCEL_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_REPORT_CANCEL_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nRegNumber |  |
 
 Handler `FUN_004153e0`
 
@@ -978,13 +1661,26 @@ Handler `FUN_004153e0`
 |---|---|---|---|
 | 0 | i32 |  |  |
 
-### `0x8005` ?
+### `0x8005` NC_REPORT_GET_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_REPORT_GET_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_004154c0`
 
 No payload fields read directly by the handler.
 
-### `0x9401` ?
+### `0x9401` NC_HOLY_PROMISE_SET_UP_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_SET_UP_REQ`, 40 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | char[20] | UpCharID | Name5 |
 
 Handler `FUN_00421990`
 
@@ -996,7 +1692,15 @@ Handler `FUN_00421990`
 | 32 | i32 |  |  |
 | 36 | i32 |  |  |
 
-### `0x9405` ?
+### `0x9405` NC_HOLY_PROMISE_SET_UP_CONFIRM_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_SET_UP_CONFIRM_ACK`, 41 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | char[20] | UpCharID | Name5 |
+| 40 | u8 | bAccept |  |
 
 Handler `FUN_00421d10`
 
@@ -1009,13 +1713,25 @@ Handler `FUN_00421d10`
 | 16 | i32 |  |  |
 | 40 | u8 |  |  |
 
-### `0x9406` ?
+### `0x9406` NC_HOLY_PROMISE_DEL_UP_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_DEL_UP_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00415c00`
 
 No payload fields read directly by the handler.
 
-### `0x940a` ?
+### `0x940a` NC_HOLY_PROMISE_DEL_DOWN_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_DEL_DOWN_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | DownCharID | Name5 |
 
 Handler `FUN_0041e570`
 
@@ -1027,67 +1743,134 @@ Handler `FUN_0041e570`
 | 12 | u32 |  |  |
 | 16 | u32 |  |  |
 
-### `0x9807` ?
+### `0x9807` NC_GUILD_ACADEMY_MY_GUILD_ACADEMY_INFO_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MY_GUILD_ACADEMY_INFO_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00421f40`
 
 No payload fields read directly by the handler.
 
-### `0x9809` ?
+### `0x9809` NC_GUILD_ACADEMY_MY_ACADEMY_RANK_INFO_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MY_ACADEMY_RANK_INFO_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00415ce0`
 
 No payload fields read directly by the handler.
 
-### `0x980b` ?
+### `0x980b` NC_GUILD_ACADEMY_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_LIST_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00422060`
 
 No payload fields read directly by the handler.
 
-### `0x980d` ?
+### `0x980d` NC_GUILD_ACADEMY_MEMBER_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_LIST_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00422120`
 
 No payload fields read directly by the handler.
 
-### `0x9811` ?
+### `0x9811` NC_GUILD_ACADEMY_MEMBER_JOIN_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_JOIN_REQ`, 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | sGuildName | Name4 |
 
 Handler `FUN_00415dc0`
 
 No payload fields read directly by the handler.
 
-### `0x9816` ?
+### `0x9816` NC_GUILD_ACADEMY_MEMBER_VANISH_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_VANISH_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Handler `FUN_0041e700`
 
 No payload fields read directly by the handler.
 
-### `0x981b` ?
+### `0x981b` NC_GUILD_ACADEMY_MEMBER_LEAVE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_LEAVE_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00415f30`
 
 No payload fields read directly by the handler.
 
-### `0x981f` ?
+### `0x981f` NC_GUILD_ACADEMY_MASTER_TELEPORT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MASTER_TELEPORT_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sTargetCharID | Name5 |
 
 Handler `FUN_00416010`
 
 No payload fields read directly by the handler.
 
-### `0x9821` ?
+### `0x9821` NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sChatBanTargetCharID | Name5 |
 
 Handler `FUN_004161b0`
 
 No payload fields read directly by the handler.
 
-### `0x9824` ?
+### `0x9824` NC_GUILD_ACADEMY_NOTIFY_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_NOTIFY_REQ`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNotifyLength |  |
+| 2 | char[nNotifyLength] | sNotify | variable length |
 
 Handler `FUN_004163a0`
 
 No payload fields read directly by the handler.
 
 ### `0x9829` NC_GUILD_ACADEMY_MEMBER_GUILD_INVITE_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_GUILD_INVITE_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sInviteTargetCharID | Name5 |
 
 Handler `FUN_0041e930`
 
@@ -1099,7 +1882,15 @@ Handler `FUN_0041e930`
 | 12 | u32 |  |  |
 | 16 | u32 |  |  |
 
-### `0x982c` ?
+### `0x982c` NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_ACK`, 37 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | GuildName | Name4 |
+| 16 | char[20] | sInviteSourceCharID | Name5 |
+| 36 | u8 | JoinAck |  |
 
 Handler `FUN_00416420`
 
@@ -1107,19 +1898,40 @@ Handler `FUN_00416420`
 |---|---|---|---|
 | 36 | u8 |  |  |
 
-### `0x9831` ?
+### `0x9831` NC_GUILD_ACADEMY_GET_REWARD_MONEY_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_GET_REWARD_MONEY_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_004167a0`
 
 No payload fields read directly by the handler.
 
-### `0x9835` ?
+### `0x9835` NC_GUILD_ACADEMY_GET_REWARD_ITEM_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_GET_REWARD_ITEM_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00416880`
 
 No payload fields read directly by the handler.
 
-### `0x9839` ?
+### `0x9839` NC_GUILD_ACADEMY_SET_REWARD_MONEY_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_SET_REWARD_MONEY_REQ`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | NumOfRewardGood |  |
+| 1 | GUILD_ACADEMY_REWARD_MONEY[NumOfRewardGood] | RewardMoney | variable length, element GUILD_ACADEMY_REWARD_MONEY |
+
+Element `GUILD_ACADEMY_REWARD_MONEY` (9 bytes): +0 u8 nLevel, +1 u64 nCen
 
 Handler `FUN_00416960`
 
@@ -1127,7 +1939,16 @@ Handler `FUN_00416960`
 |---|---|---|---|
 | 0 | char* | != 0 |  |
 
-### `0x983d` ?
+### `0x983d` NC_GUILD_ACADEMY_SET_REWARD_ITEM_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_SET_REWARD_ITEM_REQ`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | NumOfRewardGood |  |
+| 1 | GUILD_ACADEMY_REWARD_ITEM[NumOfRewardGood] | RewardItem | variable length, element GUILD_ACADEMY_REWARD_ITEM |
+
+Element `GUILD_ACADEMY_REWARD_ITEM` (16 bytes): +0 u8 nLevel, +1 u16 nItemID, +3 u8 NumOfItemOption, +4 GUILD_ACADEMY_REWARD_ITEM_OPTION[1] ItemOption
 
 Handler `FUN_00416aa0`
 
@@ -1135,25 +1956,49 @@ Handler `FUN_00416aa0`
 |---|---|---|---|
 | 0 | char* | != 0 |  |
 
-### `0x9841` ?
+### `0x9841` NC_GUILD_ACADEMY_CLEAR_REWARD_MONEY_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_CLEAR_REWARD_MONEY_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00416be0`
 
 No payload fields read directly by the handler.
 
-### `0x9845` ?
+### `0x9845` NC_GUILD_ACADEMY_CLEAR_REWARD_ITEM_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_CLEAR_REWARD_ITEM_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_00416d10`
 
 No payload fields read directly by the handler.
 
-### `0x9849` ?
+### `0x9849` NC_GUILD_ACADEMY_GET_GRADUATE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_GET_GRADUATE_REQ`, 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | sGuildName | Name4 |
 
 Handler `FUN_00416e40`
 
 No payload fields read directly by the handler.
 
-### `0x984d` ?
+### `0x984d` NC_GUILD_ACADEMY_GET_RANKING_LIST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_GET_RANKING_LIST_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nRoundTime |  |
 
 Handler `FUN_00416ee0`
 
@@ -1161,13 +2006,27 @@ Handler `FUN_00416ee0`
 |---|---|---|---|
 | 0 | i32 | == 0 |  |
 
-### `0x9859` ?
+### `0x9859` NC_GUILD_ACADEMY_SET_MASTER_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_SET_MASTER_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sName | Name5 |
 
 Handler `FUN_004165a0`
 
 No payload fields read directly by the handler.
 
-### `0x9868` ?
+### `0x9868` NC_GUILD_ACADEMY_CHAT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_CHAT_REQ`, 2 bytes + variable tail · ⚠ 2016 code uses -2 bytes: version drift or extraction error
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | u8 | len |  |
+| 2 | u8[len] | content | variable length |
 
 Handler `FUN_00416f70` · packet length check: == 0 (length includes the opcode)
 
@@ -1177,41 +2036,87 @@ Handler `FUN_00416f70` · packet length check: == 0 (length includes the opcode)
 
 ### `0x988a` NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_CANCEL_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_CANCEL_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sChatBanCancelTargetCharID | Name5 |
+
 Handler `FUN_00418720`
 
 No payload fields read directly by the handler.
 
 ### `0x988f` NC_GUILD_ACADEMY_HISTORY_LIST_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_HISTORY_LIST_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
+
 Handler `FUN_00418b20`
 
 No payload fields read directly by the handler.
 
-### `0xa41b` ?
+### `0xa41b` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGEDEALT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGEDEALT_REQ`, 13 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[12] | sIndunInfo.MapIDClient | Name3 |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
 
 Handler `FUN_0041a420`
 
 No payload fields read directly by the handler.
 
-### `0xa41c` ?
+### `0xa41c` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGETAKEN_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGETAKEN_REQ`, 13 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[12] | sIndunInfo.MapIDClient | Name3 |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
 
 Handler `FUN_00418fb0`
 
 No payload fields read directly by the handler.
 
-### `0xa41d` ?
+### `0xa41d` NC_INSTANCE_DUNGEON_RANK_TAB_HEALINGDONE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_TAB_HEALINGDONE_REQ`, 13 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[12] | sIndunInfo.MapIDClient | Name3 |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
 
 Handler `FUN_004191d0`
 
 No payload fields read directly by the handler.
 
-### `0xa41e` ?
+### `0xa41e` NC_INSTANCE_DUNGEON_RANK_TAB_MYRANK_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_TAB_MYRANK_REQ`, 13 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[12] | sIndunInfo.MapIDClient | Name3 |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
 
 Handler `FUN_004193f0`
 
 No payload fields read directly by the handler.
 
-### `0xa803` ?
+### `0xa803` NC_CHAT_RESTRICT_ADD_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAT_RESTRICT_ADD_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sChatRestrictCharID | Name5 |
 
 Handler `FUN_00422240`
 
@@ -1223,7 +2128,13 @@ Handler `FUN_00422240`
 | 12 | u32 |  |  |
 | 16 | u32 |  |  |
 
-### `0xa807` ?
+### `0xa807` NC_CHAT_RESTRICT_DEL_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAT_RESTRICT_DEL_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sChatRestrictCharID | Name5 |
 
 Handler `FUN_0041ec00`
 
@@ -1235,7 +2146,13 @@ Handler `FUN_0041ec00`
 | 12 | u32 |  |  |
 | 16 | u32 |  |  |
 
-### `0xa80b` ?
+### `0xa80b` NC_CHAT_RESTRICT_DEL_ALL_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAT_RESTRICT_DEL_ALL_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_004170a0`
 
@@ -1243,11 +2160,24 @@ No payload fields read directly by the handler.
 
 ### `0xb001` NC_RAID_MAKE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_MAKE_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
+
 Handler `FUN_0041ed50`
 
 No payload fields read directly by the handler.
 
 ### `0xb008` NC_RAID_LOOTING_TYPE_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_LOOTING_TYPE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nItemGrade |  |
+| 1 | u8 | nLootingType |  |
 
 Handler `FUN_00417420`
 
@@ -1257,6 +2187,12 @@ Handler `FUN_00417420`
 | 1 | u8 |  |  |
 
 ### `0xb00c` NC_RAID_INVITATION_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_INVITATION_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sInvitationCharID | Name5 |
 
 Handler `FUN_0041f1c0`
 
@@ -1268,7 +2204,14 @@ Handler `FUN_0041f1c0`
 | 12 | u32 |  |  |
 | 16 | u32 |  |  |
 
-### `0xb00f` ?
+### `0xb00f` NC_RAID_INVITATION_ANSWER_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_INVITATION_ANSWER_REQ`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsAllow |  |
+| 1 | char[20] | sMasterCharID | Name5 |
 
 Handler `FUN_00422400`
 
@@ -1280,19 +2223,44 @@ Handler `FUN_00422400`
 | 13 | i32 |  |  |
 | 17 | i32 |  |  |
 
-### `0xb014` ?
+### `0xb014` NC_RAID_LEAVE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_LEAVE_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Handler `FUN_0041f4d0`
 
 No payload fields read directly by the handler.
 
-### `0xb018` ?
+### `0xb018` NC_RAID_VANISH_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_VANISH_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sVanishCharID | Name5 |
 
 Handler `FUN_0041f7b0`
 
 No payload fields read directly by the handler.
 
-### `0xb027` ?
+### `0xb027` NC_RAID_SLOT_MOVE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_SLOT_MOVE_REQ`, 48 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | PrePosition.nPartyNo |  |
+| 2 | u8 | PrePosition.nPartyIndex |  |
+| 3 | u8 | PrePosition.nSlotIndex |  |
+| 4 | u16 | PostPosition.nPartyNo |  |
+| 6 | u8 | PostPosition.nPartyIndex |  |
+| 7 | u8 | PostPosition.nSlotIndex |  |
+| 8 | char[20] | sPreSlotMoveCharID | Name5 |
+| 28 | char[20] | sPostSlotMoveCharID | Name5 |
 
 Handler `FUN_0041fc70`
 
@@ -1305,7 +2273,13 @@ Handler `FUN_0041fc70`
 | 6 | u8 |  |  |
 | 7 | u8 |  |  |
 
-### `0xb02b` ?
+### `0xb02b` NC_RAID_SET_LEADER_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_SET_LEADER_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sNewLeaderCharID | Name5 |
 
 Handler `FUN_004202c0`
 
@@ -1317,7 +2291,13 @@ Handler `FUN_004202c0`
 | 12 | i32 |  |  |
 | 16 | i32 |  |  |
 
-### `0xb030` ?
+### `0xb030` NC_RAID_SET_SUB_LEADER_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_SET_SUB_LEADER_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sNewSubLeaderCharID | Name5 |
 
 Handler `FUN_00420660`
 
@@ -1329,7 +2309,13 @@ Handler `FUN_00420660`
 | 12 | i32 |  |  |
 | 16 | i32 |  |  |
 
-### `0xb035` ?
+### `0xb035` NC_RAID_DEL_SUB_LEADER_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_DEL_SUB_LEADER_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sDelSubLeaderCharID | Name5 |
 
 Handler `FUN_00420a00`
 
@@ -1340,7 +2326,13 @@ Handler `FUN_00420a00`
 | 12 | u32 |  |  |
 | 16 | u32 |  |  |
 
-### `0xb03a` ?
+### `0xb03a` NC_RAID_SET_LOOTER_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_SET_LOOTER_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sNewLooterCharID | Name5 |
 
 Handler `FUN_00420e40`
 
@@ -1352,7 +2344,15 @@ Handler `FUN_00420e40`
 | 12 | i32 |  |  |
 | 16 | i32 |  |  |
 
-### `0xb03f` ?
+### `0xb03f` NC_RAID_CHAT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_CHAT_REQ`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | u8 | nChatLen |  |
+| 2 | u8[nChatLen] | sChat | variable length |
 
 Handler `FUN_00417630`
 
@@ -1361,7 +2361,15 @@ Handler `FUN_00417630`
 | 0 | u8 |  |  |
 | 1 | u8 |  |  |
 
-### `0xb042` ?
+### `0xb042` NC_RAID_WARNING_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_WARNING_REQ`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | u8 | nChatLen |  |
+| 2 | u8[nChatLen] | sChat | variable length |
 
 Handler `FUN_004178a0`
 
@@ -1405,20 +2413,42 @@ Sent from `FUN_00430550` (`FUN_00430550`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(param_1 + 0x11c)` |
 
-### `0x080e` ?
+### `0x080e` NC_MISC_GAMETIME_ACK †
 
-Sent in reply to `0x080d` ? on CParserClient (`FUN_00413050`) · payload 3 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_GAMETIME_ACK`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | hour |  |
+| 1 | u8 | minute |  |
+| 2 | u8 | second |  |
+
+Sent in reply to `0x080d` NC_MISC_GAMETIME_REQ † on CParserClient (`FUN_00413050`) · payload 3 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 1 | u8 | `(undefined1)local_18.wMinute` |
 | 2 | u8 | `(undefined1)local_18.wSecond` |
 
-### `0x0810` ?
+### `0x0810` NC_MISC_RESTMINUTE_CMD †
 
-Sent in reply to `0xa403` ? on CParserZone (`FUN_0042bc40`) · payload 3 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_RESTMINUTE_CMD`, 3 bytes
 
-### `0x081c` ?
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | flag |  |
+| 1 | u16 | second |  |
+
+Sent in reply to `0xa403` NC_INSTANCE_DUNGEON_RESET_COUNTDOWN_CMD † on CParserZone (`FUN_0042bc40`) · payload 3 bytes · raw header
+
+### `0x081c` NC_MISC_WEB_KEY_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_WEB_KEY_ACK`, 34 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8[32] | WebKey |  |
 
 Sent in reply to `0x081e` NC_MISC_WEB_DB_KEY_ACK on CParserAccountDB (`FUN_00407e80`) · payload 34 bytes
 
@@ -1426,7 +2456,14 @@ Sent in reply to `0x081e` NC_MISC_WEB_DB_KEY_ACK on CParserAccountDB (`FUN_00407
 |---|---|---|
 | 0 | u16 | `in(0x081e)+0` |
 
-### `0x082e` ?
+### `0x082e` NC_MISC_EVENT_L20_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_EVENT_L20_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nEventNo |  |
+| 1 | u16 | nError |  |
 
 Sent in reply to `0x082d` NC_MISC_EVENT_L20_DB_ACK † on CParserAccountLogDB (`FUN_004091d0`) · payload 3 bytes · raw header
 
@@ -1434,9 +2471,19 @@ Sent in reply to `0x082d` NC_MISC_EVENT_L20_DB_ACK † on CParserAccountLogDB (`
 |---|---|---|
 | 1 | u16 | `in(0x082d)+11` |
 
-### `0x083a` ?
+### `0x083a` NC_MISC_EVENT_DONE_MUNSANG_WM2Z †
 
-Sent in reply to `0x0839` ? on CParserAccountDB (`FUN_00408050`) · payload 13 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_EVENT_DONE_MUNSANG_WM2Z`, 13 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nUserNo |  |
+| 4 | u32 | nCharNo |  |
+| 8 | u8 | nWorldNo |  |
+| 9 | u16 | nError |  |
+| 11 | u16 | nQuestID |  |
+
+Sent in reply to `0x0839` NC_MISC_EVENT_DONE_MUNSANG_ACC2WM † on CParserAccountDB (`FUN_00408050`) · payload 13 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1446,7 +2493,15 @@ Sent in reply to `0x0839` ? on CParserAccountDB (`FUN_00408050`) · payload 13 b
 | 9 | u16 | `in(0x0839)+9` |
 | 11 | u16 | `in(0x0839)+13` |
 
-### `0x0845` ?
+### `0x0845` NC_MISC_GET_CHAT_BLOCK_SPAM_FILTER_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_GET_CHAT_BLOCK_SPAM_FILTER_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsSpamSpread |  |
+| 1 | u8 | bIsSpamBlock |  |
+| 2 | u8 | nSpamFilterRate |  |
 
 Sent from `FUN_00431cd0` (`FUN_00431cd0`) · payload 3 bytes
 
@@ -1456,7 +2511,22 @@ Sent from `FUN_00431cd0` (`FUN_00431cd0`) · payload 3 bytes
 | 1 | u8 | `*(undefined1 *)(param_1 + 0x1ece1)` |
 | 2 | u8 | `*(undefined1 *)(param_1 + 0x1ece2)` |
 
-### `0x0849` ?
+### `0x0849` NC_MISC_SERVER_TIME_NOTIFY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_SERVER_TIME_NOTIFY_CMD`, 37 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | dCurrentTM.tm_sec |  |
+| 4 | i32 | dCurrentTM.tm_min |  |
+| 8 | i32 | dCurrentTM.tm_hour |  |
+| 12 | i32 | dCurrentTM.tm_mday |  |
+| 16 | i32 | dCurrentTM.tm_mon |  |
+| 20 | i32 | dCurrentTM.tm_year |  |
+| 24 | i32 | dCurrentTM.tm_wday |  |
+| 28 | i32 | dCurrentTM.tm_yday |  |
+| 32 | i32 | dCurrentTM.tm_isdst |  |
+| 36 | i8 | nTimeZone |  |
 
 Sent from `FUN_00432e10` (`FUN_00432e10`) · payload 37 bytes
 
@@ -1466,15 +2536,28 @@ Sent from `FUN_00432e10` (`FUN_00432e10`) · payload 37 bytes
 
 Sent from `FUN_00437e30` (`FUN_00437e30`) · payload 37 bytes
 
-### `0x0860` ?
+### `0x0860` NC_MISC_SPAMMER_REPORT_ACK †
 
-Sent in reply to `0x085f` ? on CParserClient (`FUN_00417ef0`) · payload 2 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_SPAMMER_REPORT_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
+Sent in reply to `0x085f` NC_MISC_SPAMMER_REPORT_REQ † on CParserClient (`FUN_00417ef0`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `8544` (0x2160); `8545` (0x2161); `8546` (0x2162); `8547` (0x2163) |
 
-### `0x0862` ?
+### `0x0862` NC_MISC_SPAMMER_CHAT_BAN_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_SPAMMER_CHAT_BAN_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sSpammerName | Name5 |
+| 20 | u16 | nError |  |
 
 Sent in reply to `0x0864` NC_MISC_SPAMMER_SET_DB_CHAT_BAN_ACK on CParserCharDB (`FUN_0040d980`) · payload 22 bytes
 
@@ -1484,7 +2567,13 @@ Fill: +0: FUN_00402140
 |---|---|---|
 | 20 | u16 | `in(0x0864)+28` |
 
-### `0x0867` ?
+### `0x0867` NC_MISC_SPAMMER_RELEASE_CHAT_BAN_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_SPAMMER_RELEASE_CHAT_BAN_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
 
 Sent in reply to `0x0869` NC_MISC_SPAMMER_RELEASE_CHAT_BAN_DB_ACK on CParserCharDB (`FUN_0040dbf0`) · payload 2 bytes
 
@@ -1492,13 +2581,25 @@ Sent in reply to `0x0869` NC_MISC_SPAMMER_RELEASE_CHAT_BAN_DB_ACK on CParserChar
 |---|---|---|
 | 0 | u16 | `in(0x0869)+28` |
 
-### `0x086c` ?
+### `0x086c` NC_MISC_EVENTNPC_STANDSTART_CLIENT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_EVENTNPC_STANDSTART_CLIENT_CMD`, 32 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | sMobIndex | Name8 |
 
 Sent from `FUN_00456c50` (`FUN_00456c50`) · payload 32 bytes
 
 Fill: +0: FUN_004244d0
 
-### `0x086d` ?
+### `0x086d` NC_MISC_EVENTNPC_STANDEND_CLIENT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_EVENTNPC_STANDEND_CLIENT_CMD`, 32 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | sMobIndex | Name8 |
 
 Sent from `FUN_00456e20` (`FUN_00456e20`) · payload 32 bytes
 
@@ -1506,7 +2607,15 @@ Fill: +0: FUN_004244d0
 
 ### `0x086f` NC_MISC_ITEMSHOP_URL_ACK †
 
-Sent in reply to `0x0871` NC_MISC_ITEMSHOP_URL_DB_REQ † on CParserCharDB (`FUN_0040e090`) · payload variable (param_2[4] + 4)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_ITEMSHOP_URL_ACK`, 4 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nLen |  |
+| 4 | char[nLen] | sURL | variable length |
+
+Sent in reply to `0x0871` NC_MISC_ITEMSHOP_URL_DB_ACK † on CParserCharDB (`FUN_0040e090`) · payload variable (param_2[4] + 4)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1521,7 +2630,7 @@ Sent in reply to `0x086e` NC_MISC_ITEMSHOP_URL_REQ on CParserClient (`FUN_004184
 |---|---|---|
 | 0 | u32 | `12353` (0x3041) |
 
-### `0x0c14` avatar list (ours) (hand-named)
+### `0x0c14` NC_USER_LOGINWORLD_ACK †
 
 **Verified layout** (basis: wm FUN_0040ede0 / client FUN_00471720)
 
@@ -1539,7 +2648,7 @@ Sent in reply to `0x0c13` NC_USER_AVATARINFO_ACK on CParserCharDB (`FUN_0040ede0
 | 2 | u8 | `in(0x0c13)+2` |
 | 3 | bytes[8188] | `FID_conflict__memcpy from (void *)(param_2 + 5)` |
 
-### `0x0c15` world login refused (ours) (hand-named)
+### `0x0c15` NC_USER_LOGINWORLDFAIL_ACK †
 
 **Verified layout** (basis: wm FUN_00419860 / FUN_0040ede0)
 
@@ -1547,9 +2656,9 @@ Sent in reply to `0x0c13` NC_USER_AVATARINFO_ACK on CParserCharDB (`FUN_0040ede0
 |---|---|---|---|
 | 0 | u16 | error | 0x44 bad key, 0x46 DB error; client does not read it |
 
-Sent in reply to `0x0c0f` ? on CParserClient (`FUN_00419860`) · payload 2 bytes · raw header
+Sent in reply to `0x0c0f` NC_USER_LOGINWORLD_REQ † on CParserClient (`FUN_00419860`) · payload 2 bytes · raw header
 
-### `0x0c17` kick reason (ours) (hand-named)
+### `0x0c17` NC_USER_CONNECTCUT_CMD †
 
 **Verified layout** (basis: wm FUN_004305a0)
 
@@ -1563,7 +2672,7 @@ Sent from `FUN_004305a0` (`FUN_004305a0`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_1` |
 
-### `0x0c34` return-to-world-select token (ours) (hand-named)
+### `0x0c34` NC_USER_WILL_WORLD_SELECT_ACK †
 
 **Verified layout** (basis: wm FUN_00424a70 / client FUN_004766a0)
 
@@ -1572,7 +2681,7 @@ Sent from `FUN_004305a0` (`FUN_004305a0`) · payload 2 bytes · raw header
 | 0 | u16 | result | 0x1E58 ok |
 | 2 | char[32] | token |  |
 
-Sent in reply to `0x0c36` ? on CParserLogin (`FUN_00424a70`) · payload 34 bytes · raw header
+Sent in reply to `0x0c36` NC_USER_CREATE_OTP_ACK † on CParserLogin (`FUN_00424a70`) · payload 34 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1586,7 +2695,7 @@ Sent in reply to `0x0c36` ? on CParserLogin (`FUN_00424a70`) · payload 34 bytes
 | 26 | u32 | `in(0x0c36)+13` |
 | 30 | u32 | `in(0x0c36)+15` |
 
-### `0x1002` NC_CHAR_LOGIN_ACK †
+### `0x1002` NC_CHAR_LOGINFAIL_ACK †
 
 **Verified layout** (basis: wm FUN_00422be0 / FUN_00410040)
 
@@ -1594,13 +2703,13 @@ Sent in reply to `0x0c36` ? on CParserLogin (`FUN_00424a70`) · payload 34 bytes
 |---|---|---|---|
 | 0 | u16 | error | 0x143 bad slot, 0x144 empty slot, 0x145 zone/map not available or char already playing, 0x31EB no selected avatar, CharDB codes via 0x1006 |
 
-Sent in reply to `0x1006` ? on CParserCharDB (`FUN_00409e70`) · payload 2 bytes · raw header
+Sent in reply to `0x1006` NC_CHAR_CHARDATAFAIL_ACK † on CParserCharDB (`FUN_00409e70`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `in(0x1006)+2` |
 
-### `0x1003` character login ok (ours) (hand-named)
+### `0x1003` NC_CHAR_LOGIN_ACK †
 
 **Verified layout** (basis: wm FUN_00410040 / client FUN_00476190)
 
@@ -1619,7 +2728,7 @@ Sent in reply to `0x1005` NC_CHAR_CHARDATA_ACK on CParserCharDB (`FUN_00410040`)
 | 12 | u32 | `0` |
 | 16 | u16 | `local_22c0[0]` |
 
-### `0x1079` beauty shop result (ours) (hand-named)
+### `0x1079` NC_CHAR_SET_STYLE_ACK †
 
 **Verified layout** (basis: client FUN_00629770)
 
@@ -1633,9 +2742,9 @@ Sent in reply to `0x107b` NC_CHAR_SET_STYLE_DB_ACK † on CParserCharDB (`FUN_00
 |---|---|---|
 | 0 | u16 | `in(0x107b)+0` |
 
-Sent in reply to `0x1078` ? on CParserClient (`FUN_004158a0`) · payload 2 bytes · raw header
+Sent in reply to `0x1078` NC_CHAR_SET_STYLE_REQ † on CParserClient (`FUN_004158a0`) · payload 2 bytes · raw header
 
-### `0x107d` beauty shop item counts (ours) (hand-named)
+### `0x107d` NC_CHAR_SET_STYLE_GET_INFO_ACK †
 
 **Verified layout** (basis: client FUN_00629600)
 
@@ -1656,9 +2765,16 @@ Sent in reply to `0x107f` NC_CHAR_SET_STYLE_GET_INFO_DB_ACK † on CParserCharDB
 | 18 | u32 | `in(0x107f)+11` |
 | 22 | u32 | `in(0x107f)+13` |
 
-Sent in reply to `0x107c` ? on CParserClient (`FUN_00415960`) · payload 26 bytes · raw header
+Sent in reply to `0x107c` NC_CHAR_SET_STYLE_GET_INFO_REQ † on CParserClient (`FUN_00415960`) · payload 26 bytes · raw header
 
-### `0x10d9` ?
+### `0x10d9` NC_CHAR_CLIENT_NEWBIE_GUIDE_VIEW_LIST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_NEWBIE_GUIDE_VIEW_LIST_CMD` (struct shared under the base name, inferred), 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nGuideViewNum |  |
+| 1 | u8[nGuideViewNum] | nGuideViewList | variable length |
 
 Sent from `FUN_00432ce0` (`FUN_00432ce0`) · payload variable (_Size)
 
@@ -1666,7 +2782,25 @@ Sent from `FUN_00432ce0` (`FUN_00432ce0`) · payload variable (_Size)
 |---|---|---|
 | 0 | bytes[8191] | `FID_conflict__memcpy from *(void **)(param_1 + 0x1ecf8)` |
 
-### `0x10ed` NC_CHAR_EVENT_ATTENDANCE_LIST_DB_ACK †
+### `0x10ed` NC_CHAR_EVENT_ATTENDANCE_LIST_CLIENT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_EVENT_ATTENDANCE_LIST_CLIENT_CMD`, 66 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | tEventStart.tm_sec |  |
+| 4 | i32 | tEventStart.tm_min |  |
+| 8 | i32 | tEventStart.tm_hour |  |
+| 12 | i32 | tEventStart.tm_mday |  |
+| 16 | i32 | tEventStart.tm_mon |  |
+| 20 | i32 | tEventStart.tm_year |  |
+| 24 | i32 | tEventStart.tm_wday |  |
+| 28 | i32 | tEventStart.tm_yday |  |
+| 32 | i32 | tEventStart.tm_isdst |  |
+| 36 | u8 | nCurIndex |  |
+| 37 | u8[28] | AttendanceArray |  |
+| 65 | u8 | RewardNum |  |
+| 66 | u8[RewardNum] | RewardList | variable length |
 
 Sent from `FUN_0043bab0` (`FUN_0043bab0`) · payload variable (*(byte *)((int)param_1 + 0x3fb) + 0x42)
 
@@ -1710,11 +2844,25 @@ Sent from `FUN_0043bab0` (`FUN_0043bab0`) · payload variable (*(byte *)((int)pa
 
 Fill: +0: FUN_0043ade0
 
-### `0x10f0` NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_ACK †
+### `0x10f0` NC_CHAR_EVENT_ATTENDANCE_CHECK_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_EVENT_ATTENDANCE_CHECK_CMD`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Sent from `FUN_0043a9b0` (`FUN_0043a9b0`) · payload 1 bytes
 
-### `0x10f2` ?
+### `0x10f2` NC_CHAR_EVENT_ATTENDANCE_REWARD_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_EVENT_ATTENDANCE_REWARD_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nIndex |  |
+| 1 | u8 | nRewardID |  |
+| 2 | u16 | nError |  |
 
 Sent from `FUN_0043a8f0` (`FUN_0043a8f0`) · payload 4 bytes
 
@@ -1724,7 +2872,13 @@ Sent from `FUN_0043a8f0` (`FUN_0043a8f0`) · payload 4 bytes
 | 1 | u8 | `param_3` |
 | 2 | u16 | `param_4` |
 
-### `0x10f5` ?
+### `0x10f5` NC_CHAR_EVENT_ATTENDANCE_CHANGE_DAY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_EVENT_ATTENDANCE_CHANGE_DAY_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nChangeIndex |  |
 
 Sent from `FUN_0043b630` (`FUN_0043b630`) · payload 1 bytes
 
@@ -1732,7 +2886,21 @@ Sent from `FUN_0043b630` (`FUN_0043b630`) · payload 1 bytes
 |---|---|---|
 | 0 | u8 | `param_1` |
 
-### `0x10f6` ?
+### `0x10f6` NC_CHER_EVENT_ATTENDANCE_CHANGE_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHER_EVENT_ATTENDANCE_CHANGE_START_CMD`, 36 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | tEventStart.tm_sec |  |
+| 4 | i32 | tEventStart.tm_min |  |
+| 8 | i32 | tEventStart.tm_hour |  |
+| 12 | i32 | tEventStart.tm_mday |  |
+| 16 | i32 | tEventStart.tm_mon |  |
+| 20 | i32 | tEventStart.tm_year |  |
+| 24 | i32 | tEventStart.tm_wday |  |
+| 28 | i32 | tEventStart.tm_yday |  |
+| 32 | i32 | tEventStart.tm_isdst |  |
 
 Sent from `FUN_0043bde0` (`FUN_0043bde0`) · payload 36 bytes
 
@@ -1746,15 +2914,27 @@ Sent from `FUN_0044fae0` (`FUN_0044fae0`) · payload 9 bytes
 | 4 | u32 | `__mktime32(&local_38)` |
 | 8 | u8 | `1` |
 
-### `0x1110` ?
+### `0x1110` NC_CHAR_TUTORIAL_POPUP_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_TUTORIAL_POPUP_REQ`, 0 bytes · ⚠ 2016 code uses 14 bytes: version drift or extraction error
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Sent in reply to `0x7486` NC_GUILD_TOURNAMENT_DB_GET_ACK on CParserCharDB (`FUN_0040eff0`) · payload 14 bytes · raw header
 
-### `0x111d` ?
+### `0x111d` NC_CHAR_TUTORIAL_DOING_CMD †
 
-Sent in reply to `0x1111` ? on CParserClient (`FUN_00418cb0`) · payload 1 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_TUTORIAL_DOING_CMD`, 0 bytes
 
-### `0x1404` character create failed (ours) (hand-named)
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
+
+Sent in reply to `0x1111` NC_CHAR_TUTORIAL_POPUP_ACK † on CParserClient (`FUN_00418cb0`) · payload 1 bytes
+
+### `0x1404` NC_AVATAR_CREATEFAIL_ACK †
 
 **Verified layout** (basis: client FUN_0040b480)
 
@@ -1762,13 +2942,13 @@ Sent in reply to `0x1111` ? on CParserClient (`FUN_00418cb0`) · payload 1 bytes
 |---|---|---|---|
 | 0 | u16 | error | 0x82 failed, 0x83 wrong class, 0x84 name taken, 0x85 max slot, 0x181 name in use |
 
-Sent in reply to `0x1403` ? on CParserCharDB (`FUN_00409f00`) · payload 2 bytes · raw header
+Sent in reply to `0x1403` NC_AVATAR_CREATEDATAFAIL_ACK † on CParserCharDB (`FUN_00409f00`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `in(0x1403)+22` |
 
-### `0x1406` character created (ours) (hand-named)
+### `0x1406` NC_AVATAR_CREATESUCC_ACK †
 
 **Verified layout** (basis: client FUN_0040b530 / FUN_00662b50)
 
@@ -1777,7 +2957,7 @@ Sent in reply to `0x1403` ? on CParserCharDB (`FUN_00409f00`) · payload 2 bytes
 | 0 | u8 | ? (not read) |  |
 | 1 | AVATAR | avatar | appended to the account's list (max 6) |
 
-Sent in reply to `0x1405` ? on CParserCharDB (`FUN_004113c0`) · payload 131 bytes · raw header
+Sent in reply to `0x1405` NC_AVATAR_CREATEDATASUC_ACK † on CParserCharDB (`FUN_004113c0`) · payload 131 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1793,7 +2973,7 @@ Sent in reply to `0x1405` ? on CParserCharDB (`FUN_004113c0`) · payload 131 byt
 | 100 | u32 | `0` |
 | 104 | u32 | `0` |
 
-### `0x140a` character delete failed (ours) (hand-named)
+### `0x140a` NC_AVATAR_ERASEFAIL_ACK †
 
 **Verified layout** (basis: client FUN_00476860)
 
@@ -1801,15 +2981,15 @@ Sent in reply to `0x1405` ? on CParserCharDB (`FUN_004113c0`) · payload 131 byt
 |---|---|---|---|
 | 0 | u16 | error | 199: 'You may not delete guild leader.'; other: 'Unable to delete a Guild Master character.' |
 
-Sent in reply to `0x1409` NC_AVATAR_ERASEDATA_ACK † on CParserCharDB (`FUN_00409fa0`) · payload 2 bytes · raw header
+Sent in reply to `0x1409` NC_AVATAR_ERASEDATAFAIL_ACK † on CParserCharDB (`FUN_00409fa0`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `in(0x1409)+4` |
 
-Sent in reply to `0x1414` ? on CParserCharDB (`FUN_0040c6e0`) · payload 2 bytes · raw header
+Sent in reply to `0x1414` NC_AVATAR_GUILD_DATA_ACK † on CParserCharDB (`FUN_0040c6e0`) · payload 2 bytes · raw header
 
-### `0x140c` character deleted (ours) (hand-named)
+### `0x140c` NC_AVATAR_ERASESUCC_ACK †
 
 **Verified layout** (basis: client FUN_004768c0)
 
@@ -1817,9 +2997,9 @@ Sent in reply to `0x1414` ? on CParserCharDB (`FUN_0040c6e0`) · payload 2 bytes
 |---|---|---|---|
 | 0 | u8 | slot |  |
 
-Sent in reply to `0x140b` ? on CParserCharDB (`FUN_0040a010`) · payload 1 bytes · raw header
+Sent in reply to `0x140b` NC_AVATAR_ERASEDATASUC_ACK † on CParserCharDB (`FUN_0040a010`) · payload 1 bytes · raw header
 
-### `0x1410` character rename result (ours) (hand-named)
+### `0x1410` NC_AVATAR_RENAME_ACK †
 
 **Verified layout** (basis: client FUN_00476c70)
 
@@ -1829,7 +3009,7 @@ Sent in reply to `0x140b` ? on CParserCharDB (`FUN_0040a010`) · payload 1 bytes
 | 1 | char[20] | new_name |  |
 | 21 | u16 | result | 0xD0 ok, 0xD1 'The name cannot be used.' |
 
-Sent in reply to `0x1412` ? on CParserCharDB (`FUN_0040ff00`) · payload 23 bytes · raw header
+Sent in reply to `0x1412` NC_AVATAR_RENAME_DB_ACK † on CParserCharDB (`FUN_0040ff00`) · payload 23 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1840,13 +3020,29 @@ Sent in reply to `0x1412` ? on CParserCharDB (`FUN_0040ff00`) · payload 23 byte
 | 17 | u32 | `in(0x1412)+23` |
 | 21 | u16 | `in(0x1412)+27` |
 
-### `0x182a` ?
+### `0x182a` NC_MAP_LINKEND_CLIENT_CMD †
 
-Sent in reply to `0x180c` ? on CParserZone (`FUN_0042d8d0`) · payload 1 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MAP_LINKEND_CLIENT_CMD`, 0 bytes
 
-### `0x200d` ?
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
-Sent in reply to `0x200c` ? on CParserClient (`FUN_0041c610`) · payload variable (sVar4 + 0x17 + uVar3)
+Sent in reply to `0x180c` NC_MAP_LINKEND_CMD † on CParserZone (`FUN_0042d8d0`) · payload 1 bytes
+
+### `0x200d` NC_ACT_SOMEONEWHISPER_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEWHISPER_CMD`, 23 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | char[20] | talker | Name5 |
+| 21 | u8 | flag.GMColor | bits GMColor:1@0 |
+| 22 | u8 | len |  |
+| 23 | u8[len] | content | variable length |
+
+Sent in reply to `0x200c` NC_ACT_WHISPER_REQ † on CParserClient (`FUN_0041c610`) · payload variable (sVar4 + 0x17 + uVar3)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1873,9 +3069,16 @@ Sent from `FUN_00432bb0` (`FUN_00432bb0`) · payload variable ((uint)(pcVar4 + (
 | 22 | char | `(char)pcVar3 - ((char)local_1ffc + '\x01')` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x200e` ?
+### `0x200e` NC_ACT_WHISPERFAIL_ACK †
 
-Sent in reply to `0x200c` ? on CParserClient (`FUN_0041c610`) · payload 22 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WHISPERFAIL_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ErrorType |  |
+| 2 | char[20] | receiver | Name5 |
+
+Sent in reply to `0x200c` NC_ACT_WHISPER_REQ † on CParserClient (`FUN_0041c610`) · payload 22 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1886,9 +3089,18 @@ Sent in reply to `0x200c` ? on CParserClient (`FUN_0041c610`) · payload 22 byte
 | 14 | u32 | `in(0x200c)+13` |
 | 18 | u32 | `in(0x200c)+17` |
 
-### `0x200f` ?
+### `0x200f` NC_ACT_WHISPERSUCCESS_ACK †
 
-Sent in reply to `0x200c` ? on CParserClient (`FUN_0041c610`) · payload 22 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WHISPERSUCCESS_ACK`, 22 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | char[20] | receiver | Name5 |
+| 21 | u8 | len |  |
+| 22 | u8[len] | content | variable length |
+
+Sent in reply to `0x200c` NC_ACT_WHISPER_REQ † on CParserClient (`FUN_0041c610`) · payload 22 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1900,7 +3112,7 @@ Sent in reply to `0x200c` ? on CParserClient (`FUN_0041c610`) · payload 22 byte
 | 17 | u32 | `in(0x200c)+17` |
 | 21 | u8 | `in(0x200c)+21`; `local_2026 ^ (*(byte *)(param_1 + 0x18e) ^ local_2026) & 1` |
 
-Sent in reply to `0x200c` ? on CParserClient (`FUN_0041c610`) · payload variable (sVar4 + 0x16 + uVar3)
+Sent in reply to `0x200c` NC_ACT_WHISPER_REQ † on CParserClient (`FUN_0041c610`) · payload variable (sVar4 + 0x16 + uVar3)
 
 Fill: +8191: FUN_0042fc50; +1: FUN_00402140
 
@@ -1910,9 +3122,18 @@ Fill: +8191: FUN_0042fc50; +1: FUN_00402140
 | 21 | u8 | `in(0x200c)+21` |
 | 22 | char[8169] | `__mbsnbcpy from (uchar *)(param_2 + 0xc)` |
 
-### `0x2015` ?
+### `0x2015` NC_ACT_PARTYCHAT_CMD †
 
-Sent in reply to `0x2014` ? on CParserClient (`FUN_00413510`) · payload variable (uVar4 * 0x67 + 0x16 + uVar3)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_PARTYCHAT_CMD`, 22 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | talker | Name5 |
+| 20 | u8 | chat.itemLinkDataCount |  |
+| 21 | u8 | chat.len |  |
+| 22 | u8[chat.len] | chat.content | variable length |
+
+Sent in reply to `0x2014` NC_ACT_PARTYCHAT_REQ † on CParserClient (`FUN_00413510`) · payload variable (uVar4 * 0x67 + 0x16 + uVar3)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1925,13 +3146,28 @@ Sent in reply to `0x2014` ? on CParserClient (`FUN_00413510`) · payload variabl
 | 21 | u8 | `in(0x2014)+1` |
 | 22 | bytes[8169] | `FID_conflict__memcpy from param_2 + 2` |
 
-### `0x2016` ?
+### `0x2016` NC_ACT_PARTYCHAT_ACK †
 
-Sent in reply to `0x2014` ? on CParserClient (`FUN_00413510`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_PARTYCHAT_ACK`, 2 bytes
 
-### `0x2079` ?
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
 
-Sent in reply to `0x207d` ? on CParserZone (`FUN_0042cea0`) · payload variable (_Size + 0x27)
+Sent in reply to `0x2014` NC_ACT_PARTYCHAT_REQ † on CParserClient (`FUN_00413510`) · payload 2 bytes · raw header
+
+### `0x2079` NC_ACT_SCRIPT_MSG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SCRIPT_MSG_CMD`, 39 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u8[32] | sScriptMsgIndex |  |
+| 34 | u8[5] | nlen |  |
+| 39 | u8[rest] | sContent | variable length, count unknown |
+
+Sent in reply to `0x207d` NC_ACT_SCRIPT_MSG_WORLD_CMD † on CParserZone (`FUN_0042cea0`) · payload variable (_Size + 0x27)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1941,17 +3177,34 @@ Sent in reply to `0x207d` ? on CParserZone (`FUN_0042cea0`) · payload variable 
 | 39 | bytes[8152] | `FID_conflict__memcpy from (void *)(param_2 + 0x29)` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x2459` ?
+### `0x2459` NC_BAT_CLIENT_MOB_KILL_ANNOUNCE_CMD †
 
-Sent in reply to `0x2458` ? on CParserZone (`FUN_0042b490`) · payload 4 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_CLIENT_MOB_KILL_ANNOUNCE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | nTextIndex |  |
+
+Sent in reply to `0x2458` NC_BAT_WORLD_MOB_KILL_ANNOUNCE_CMD † on CParserZone (`FUN_0042b490`) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u32 | `in(0x2458)+-1` |
 
-### `0x2802` ?
+### `0x2802` NC_OPTOOL_S2SCONNECT_LIST_ACK †
 
-Sent in reply to `0x2801` ? on CParserOPTool (`FUN_004251a0`) · payload 4 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_S2SCONNECT_LIST_ACK`, 4 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | echo_data |  |
+| 1 | u8 | my_server_id |  |
+| 2 | u16 | num_of_connections |  |
+| 4 | SERVER_CONN_INFO[num_of_connections] | connection_info | variable length, element SERVER_CONN_INFO |
+
+Element `SERVER_CONN_INFO` (7 bytes): +0 u8 connect_server_world, +1 u8 connect_server_zone, +2 u8 connect_server_id, +3 u32 connect_time.year|month|day|hour|min|sec
+
+Sent in reply to `0x2801` NC_OPTOOL_S2SCONNECT_LIST_REQ † on CParserOPTool (`FUN_004251a0`) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1959,7 +3212,7 @@ Sent in reply to `0x2801` ? on CParserOPTool (`FUN_004251a0`) · payload 4 bytes
 | 1 | u8 | `DAT_0049a528` |
 | 2 | u16 | `(undefined2)uVar4` |
 
-Sent in reply to `0x2801` ? on CParserOPTool (`FUN_004251a0`) · payload variable (uVar4 * 7 + 4)
+Sent in reply to `0x2801` NC_OPTOOL_S2SCONNECT_LIST_REQ † on CParserOPTool (`FUN_004251a0`) · payload variable (uVar4 * 7 + 4)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -1971,15 +3224,29 @@ Sent in reply to `0x2801` ? on CParserOPTool (`FUN_004251a0`) · payload variabl
 | 6 | u8 | `DAT_004a3924` |
 | 7 | u32 | `local_200c[0] ^ ((DAT_004a3930 >> 0x10) << 4 ^ local_200c[0]) & 0xf0`; `local_200c[0] ^ (DAT_004a3936 << 8 ^ local_200c[0]) & 0x1f00`; `local_200c[0] ^ (DAT_004a3938 << 0xd ^ local_200c[0]) & 0x3e000` |
 
-### `0x2804` ?
+### `0x2804` NC_OPTOOL_CLOSE_SERVER_ACK †
 
-Sent in reply to `0x2803` ? on CParserOPTool (`FUN_00425860`) · payload 2 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_CLOSE_SERVER_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+
+Sent in reply to `0x2803` NC_OPTOOL_CLOSE_SERVER_REQ † on CParserOPTool (`FUN_00425860`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `1536` (0x600) |
 
 ### `0x2808` NC_OPTOOL_CONNECT_BRIF_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_CONNECT_BRIF_ACK`, 170 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | echo_data |  |
+| 1 | u8 | my_server_id |  |
+| 2 | byte[168] | count | nested array ushort[2][2][21] |
 
 Sent in reply to `0x2807` NC_OPTOOL_CONNECT_BRIF_REQ on CParserOPTool (`FUN_00425950`) · payload 170 bytes
 
@@ -1988,16 +3255,28 @@ Sent in reply to `0x2807` NC_OPTOOL_CONNECT_BRIF_REQ on CParserOPTool (`FUN_0042
 | 0 | bytes[170] | `in(0x2807)+0`; `memset 0` |
 | 1 | u8 | `DAT_0049a528` |
 
-### `0x280a` ?
+### `0x280a` NC_OPTOOL_KQ_SCHEDULE_ACK †
 
-Sent in reply to `0x2809` ? on CParserOPTool (`FUN_00427790`) · payload 7 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_KQ_SCHEDULE_ACK`, 7 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | NumOfTotal |  |
+| 2 | u8 | bPart |  |
+| 3 | u16 | StartDataIndex |  |
+| 5 | u16 | NumOfQuest |  |
+| 7 | PROTO_KQ_INFO[NumOfQuest] | QuestArray | variable length, element PROTO_KQ_INFO |
+
+Element `PROTO_KQ_INFO` (377 bytes): +141 u8 NextStartMode, +142 u16 NextStartDelayMin, +144 u8 RepeatMode, +145 u16 RepeatCount, +147 u16 RewardIndex, +149 u16 DemandMobKill, +151 i32 ScheduleTime, +155 i32 tm_ScheduleTime.tm_sec, +159 i32 tm_ScheduleTime.tm_min, +163 i32 tm_ScheduleTime.tm_hour, +167 i32 tm_ScheduleTime.tm_mday, +171 i32 tm_ScheduleTime.tm_mon, +175 i32 tm_ScheduleTime.tm_year, +179 i32 tm_ScheduleTime.tm_wday, +183 i32 tm_ScheduleTime.tm_yday, +187 i32 tm_ScheduleTime.tm_isdst, +191 u8 RunCounter, +192 PROTO_KQ_MAP_INFO[4] MapLink, +296 u8[32] ScriptLanguage, +328 u8[32] ScriptInitValue, +360 u8 IsTeamPVP, +361 SHINE_XY_TYPE[2] TeamRegenXY
+
+Sent in reply to `0x2809` NC_OPTOOL_KQ_SCHEDULE_REQ † on CParserOPTool (`FUN_00427790`) · payload 7 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 2 | u8 | `3` |
 | 3 | u32 | `0` |
 
-Sent in reply to `0x2809` ? on CParserOPTool (`FUN_00427790`) · payload 3777 bytes
+Sent in reply to `0x2809` NC_OPTOOL_KQ_SCHEDULE_REQ † on CParserOPTool (`FUN_00427790`) · payload 3777 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2006,7 +3285,7 @@ Sent in reply to `0x2809` ? on CParserOPTool (`FUN_00427790`) · payload 3777 by
 | 3 | i16 | `0`; `(short)iVar2 + 1` |
 | 5 | u16 | `10` (0xa); `(undefined2)iVar3` |
 
-Sent in reply to `0x2809` ? on CParserOPTool (`FUN_00427790`) · payload variable (iVar3 * 0x179 + 7)
+Sent in reply to `0x2809` NC_OPTOOL_KQ_SCHEDULE_REQ † on CParserOPTool (`FUN_00427790`) · payload variable (iVar3 * 0x179 + 7)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2014,9 +3293,18 @@ Sent in reply to `0x2809` ? on CParserOPTool (`FUN_00427790`) · payload variabl
 | 3 | i16 | `(short)iVar2 + 1` |
 | 5 | u16 | `(undefined2)iVar3` |
 
-### `0x280d` ?
+### `0x280d` NC_OPTOOL_KQ_MAP_ALLOC_INFO_ACK †
 
-Sent in reply to `0x280c` ? on CParserOPTool (`FUN_00425e20`) · payload variable (iVar1 * 0x28 + 4)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_KQ_MAP_ALLOC_INFO_ACK`, 4 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | nNumOfMapArray |  |
+| 4 | KQ_MAP_ALLOC_TABLE[nNumOfMapArray] | MapArray | variable length, element KQ_MAP_ALLOC_TABLE |
+
+Element `KQ_MAP_ALLOC_TABLE` (40 bytes): +0 u32[10] AllocatedQuest
+
+Sent in reply to `0x280c` NC_OPTOOL_KQ_MAP_ALLOC_INFO_REQ † on CParserOPTool (`FUN_00425e20`) · payload variable (iVar1 * 0x28 + 4)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2024,9 +3312,17 @@ Sent in reply to `0x280c` ? on CParserOPTool (`FUN_00425e20`) · payload variabl
 | 4 | bytes[8187] | `FID_conflict__memcpy from DAT_00579c70` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x2810` ?
+### `0x2810` NC_OPTOOL_ACK_CLIENT_NUM_OF_USER_LIMIT †
 
-Sent in reply to `0x280f` ? on CParserOPTool (`FUN_004263f0`) · payload 9 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_ACK_CLIENT_NUM_OF_USER_LIMIT`, 9 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | WorldNo |  |
+| 1 | i32 | NumOfUserLimit |  |
+| 5 | i32 | NumOfMax |  |
+
+Sent in reply to `0x280f` NC_OPTOOL_REQ_CLIENT_NUM_OF_USER_LIMIT † on CParserOPTool (`FUN_004263f0`) · payload 9 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2034,48 +3330,88 @@ Sent in reply to `0x280f` ? on CParserOPTool (`FUN_004263f0`) · payload 9 bytes
 | 1 | u32 | `DAT_00556bac` |
 | 5 | u32 | `DAT_00556bb8` |
 
-### `0x2816` ?
+### `0x2816` NC_OPTOOL_GUILD_TOURNAMENT_CHANGE_ACK †
 
-Sent in reply to `0x2815` ? on CParserOPTool (`FUN_004264d0`) · payload 2 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_GUILD_TOURNAMENT_CHANGE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+
+Sent in reply to `0x2815` NC_OPTOOL_GUILD_TOURNAMENT_CHANGE_CMD † on CParserOPTool (`FUN_004264d0`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `FUN_0043d830(&DAT_006c4cec,(byte *)(param_2 + 1))` |
 
-### `0x281c` ?
+### `0x281c` NC_OPTOOL_WM_SEND_PACKET_STATISTICS_ACK †
 
-Sent in reply to `0x281b` ? on CParserOPTool (`FUN_004265a0`) · payload 3 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_WM_SEND_PACKET_STATISTICS_ACK`, 3 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bPart |  |
+| 1 | u16 | nDataCount |  |
+| 3 | PROTO_NC_OPTOOL_WM_SEND_PACKET_STATISTICS_ACK::<unnamed-type-Data>[nDataCount] | Data | variable length, element PROTO_NC_OPTOOL_WM_SEND_PACKET_STATISTICS_ACK::<unnamed-type-Data> |
+
+Element `PROTO_NC_OPTOOL_WM_SEND_PACKET_STATISTICS_ACK::<unnamed-type-Data>` (14 bytes): +0 u16 nPacketID, +2 u32 nSendCount, +6 u64 nSendBytes
+
+Sent in reply to `0x281b` NC_OPTOOL_WM_SEND_PACKET_STATISTICS_REQ † on CParserOPTool (`FUN_004265a0`) · payload 3 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u8 | `4` |
 | 1 | u16 | `0` |
 
-### `0x281e` ?
+### `0x281e` NC_OPTOOL_CHARACTER_DELETE_ACK †
 
-Sent in reply to `0x281d` ? on CParserOPTool (`FUN_00426660`) · payload 1 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_CHARACTER_DELETE_ACK`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | status |  |
+
+Sent in reply to `0x281d` NC_OPTOOL_CHARACTER_DELETE_REQ † on CParserOPTool (`FUN_00426660`) · payload 1 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u8 | `0`; `1` |
 
-### `0x2821` ?
+### `0x2821` NC_OPTOOL_GUILD_CHANGE_MEMBER_GRADE_ACK †
 
-Sent in reply to `0x2820` ? on CParserOPTool (`FUN_00427630`) · payload 2 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_GUILD_CHANGE_MEMBER_GRADE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+
+Sent in reply to `0x2820` NC_OPTOOL_GUILD_CHANGE_MEMBER_GRADE_REQ † on CParserOPTool (`FUN_00427630`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `5504` (0x1580); `5505` (0x1581); `5506` (0x1582); `5507` (0x1583) |
 
-### `0x2823` ?
+### `0x2823` NC_OPTOOL_GUILD_TOURNAMENT_SCHEDULE_RESET_ACK †
 
-Sent in reply to `0x2822` ? on CParserOPTool (`FUN_00426990`) · payload 4 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_GUILD_TOURNAMENT_SCHEDULE_RESET_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | nGTNo |  |
+
+Sent in reply to `0x2822` NC_OPTOOL_GUILD_TOURNAMENT_SCHEDULE_RESET_REQ † on CParserOPTool (`FUN_00426990`) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u32 | `local_2140` |
 
-### `0x2825` ?
+### `0x2825` NC_OPTOOL_GUILD_DATA_CHANGE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_GUILD_DATA_CHANGE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
 
 Sent from `FUN_0043f390` (`FUN_0043f390`) · payload 2 bytes · raw header
 
@@ -2083,9 +3419,20 @@ Sent from `FUN_0043f390` (`FUN_0043f390`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x2828` ?
+### `0x2828` NC_OPTOOL_FIND_USER_ACK †
 
-Sent in reply to `0x2827` ? on CParserOPTool (`FUN_00426c50`) · payload 297 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_FIND_USER_ACK`, 297 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nUserNo |  |
+| 4 | u8 | bIsLogin |  |
+| 5 | char[256] | sUserID | Name256Byte |
+| 261 | u32 | nCharNo |  |
+| 265 | char[20] | sCharID | Name5 |
+| 285 | char[12] | sMapName | Name3 |
+
+Sent in reply to `0x2827` NC_OPTOOL_FIND_USER_REQ † on CParserOPTool (`FUN_00426c50`) · payload 297 bytes
 
 Fill: +5: FUN_004097c0
 
@@ -2105,6 +3452,17 @@ Fill: +5: FUN_004097c0
 
 ### `0x282a` NC_OPTOOL_KICK_USER_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_KICK_USER_ACK`, 297 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nUserNo |  |
+| 4 | u8 | bKick |  |
+| 5 | char[256] | sUserID | Name256Byte |
+| 261 | u32 | nCharNo |  |
+| 265 | char[20] | sCharID | Name5 |
+| 285 | char[12] | sMapName | Name3 |
+
 Sent in reply to `0x2829` NC_OPTOOL_KICK_USER_REQ on CParserOPTool (`FUN_00426e20`) · payload 297 bytes
 
 Fill: +5: FUN_004097c0
@@ -2123,7 +3481,13 @@ Fill: +5: FUN_004097c0
 | 289 | u32 | `0`; `*(undefined4 *)(iVar1 + 0x46)` |
 | 293 | u32 | `0`; `*(undefined4 *)(iVar1 + 0x4a)` |
 
-### `0x282c` ?
+### `0x282c` NC_OPTOOL_GUILD_DISMISS_CANCEL_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_GUILD_DISMISS_CANCEL_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
 
 Sent from `FUN_00443170` (`FUN_00443170`) · payload 2 bytes · raw header
 
@@ -2131,9 +3495,15 @@ Sent from `FUN_00443170` (`FUN_00443170`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x3803` ?
+### `0x3803` NC_PARTY_JOINPROPOSE_REQ †
 
-Sent in reply to `0x3802` ? on CParserClient (`FUN_0041a940`) · payload 20 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_JOINPROPOSE_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | mastername | Name5 |
+
+Sent in reply to `0x3802` NC_PARTY_JOIN_REQ † on CParserClient (`FUN_0041a940`) · payload 20 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2143,9 +3513,17 @@ Sent in reply to `0x3802` ? on CParserClient (`FUN_0041a940`) · payload 20 byte
 | 12 | u32 | `*(undefined4 *)(iVar4 + 0x10)`; `in(0x3802)+5` |
 | 16 | u32 | `*(undefined4 *)(iVar4 + 0x14)`; `in(0x3802)+7` |
 
-### `0x3807` ?
+### `0x3807` NC_PARTY_JOIN_ACK †
 
-Sent in reply to `0x3805` ? on CParserClient (`FUN_00419bb0`) · payload 23 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_JOIN_ACK`, 23 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | memberid | Name5 |
+| 20 | u8 | charclass |  |
+| 21 | u16 | err |  |
+
+Sent in reply to `0x3805` NC_PARTY_JOINPROPOSE_REJECT_ACK † on CParserClient (`FUN_00419bb0`) · payload 23 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2156,7 +3534,7 @@ Sent in reply to `0x3805` ? on CParserClient (`FUN_00419bb0`) · payload 23 byte
 | 16 | u32 | `*(undefined4 *)(iVar3 + 0x14)` |
 | 21 | u16 | `1222` (0x4c6) |
 
-Sent in reply to `0x3804` ? on CParserClient (`FUN_004211e0`) · payload 23 bytes · raw header
+Sent in reply to `0x3804` NC_PARTY_JOINPROPOSE_ALLOW_ACK † on CParserClient (`FUN_004211e0`) · payload 23 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2177,16 +3555,29 @@ Fill: +0: FUN_00402140
 | 20 | u8 | `**(byte **)(pvVar8 + 0x568) >> 2 & 0x1f` |
 | 21 | u16 | `1217` (0x4c1) |
 
-### `0x380a` ?
+### `0x380a` NC_PARTY_LEAVE_REQ †
 
-Sent in reply to `0x6009` ? on CParserZone (`FUN_0042cda0`) · payload 6 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_LEAVE_REQ`, 0 bytes · ⚠ 2016 code uses 6 bytes: version drift or extraction error
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
+
+Sent in reply to `0x6009` NC_CT_LUASCRIPT_SET_WORLD_CMD † on CParserZone (`FUN_0042cda0`) · payload 6 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u32 | `in(0x6009)+-1` |
 | 4 | u16 | `in(0x6009)+4` |
 
-### `0x380b` ?
+### `0x380b` NC_PARTY_LEAVE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_LEAVE_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | memberid | Name5 |
+| 20 | u16 | err |  |
 
 Sent from `FUN_0041b350` (`FUN_0041b350`) · payload 22 bytes · raw header
 
@@ -2199,7 +3590,14 @@ Sent from `FUN_0041b350` (`FUN_0041b350`) · payload 22 bytes · raw header
 | 16 | u32 | `*(undefined4 *)(iVar3 + 0x14)` |
 | 20 | u16 | `1281` (0x501) |
 
-### `0x3815` ?
+### `0x3815` NC_PARTY_KICKOFF_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_KICKOFF_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | memberid | Name5 |
+| 20 | u16 | err |  |
 
 Sent from `FUN_0041b9d0` (`FUN_0041b9d0`) · payload 22 bytes · raw header
 
@@ -2212,11 +3610,24 @@ Sent from `FUN_0041b9d0` (`FUN_0041b9d0`) · payload 22 bytes · raw header
 | 16 | i32 | `param_6` |
 | 20 | u16 | `1345` (0x541) |
 
-### `0x381e` ?
+### `0x381e` NC_PARTY_DISMISS_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_DISMISS_ACK`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Sent from `FUN_0041b7d0` (`FUN_0041b7d0`) · payload 0 bytes · raw header
 
-### `0x3829` ?
+### `0x3829` NC_PARTY_CHANGEMASTER_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_CHANGEMASTER_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | newmaster | Name5 |
+| 20 | u16 | err |  |
 
 Sent from `FUN_0041b630` (`FUN_0041b630`) · payload 22 bytes · raw header
 
@@ -2229,7 +3640,13 @@ Sent from `FUN_0041b630` (`FUN_0041b630`) · payload 22 bytes · raw header
 | 16 | u32 | `*(undefined4 *)(iVar1 + 0x14)` |
 | 20 | u16 | `1352` (0x548) |
 
-### `0x383d` ?
+### `0x383d` NC_PARTY_LOGININFO_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_LOGININFO_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | memberid | Name5 |
 
 Sent from `FUN_0041c3b0` (`FUN_0041c3b0`) · payload 20 bytes · raw header
 
@@ -2241,7 +3658,13 @@ Sent from `FUN_0041c3b0` (`FUN_0041c3b0`) · payload 20 bytes · raw header
 | 12 | u32 | `puVar1[3]` |
 | 16 | u32 | `puVar1[4]` |
 
-### `0x3847` ?
+### `0x3847` NC_PARTY_LOGOUTINFO_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_LOGOUTINFO_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | memberid | Name5 |
 
 Sent from `FUN_0041c4e0` (`FUN_0041c4e0`) · payload 20 bytes · raw header
 
@@ -2253,17 +3676,37 @@ Sent from `FUN_0041c4e0` (`FUN_0041c4e0`) · payload 20 bytes · raw header
 | 12 | u32 | `puVar1[3]` |
 | 16 | u32 | `puVar1[4]` |
 
-### `0x384c` ?
+### `0x384c` NC_PARTY_ITEM_LOOTING_CMD †
 
-Sent in reply to `0x384b` ? on CParserClient (`FUN_004130f0`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_ITEM_LOOTING_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | LootType |  |
+| 1 | u8 | ItemGrade |  |
+
+Sent in reply to `0x384b` NC_PARTY_ITEM_LOOTING_SET † on CParserClient (`FUN_004130f0`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 1 | u8 | `in(0x384b)+1` |
 
-### `0x3855` ?
+### `0x3855` NC_PARTY_FINDER_LIST_ACK †
 
-Sent in reply to `0x3854` ? on CParserClient (`FUN_0041a080`) · payload variable (uVar5)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_FINDER_LIST_ACK`, 8 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPageNo |  |
+| 2 | u8 | nCountOfOnePage |  |
+| 3 | u8 | bYouAreRegisted |  |
+| 4 | u16 | nMaxPages |  |
+| 6 | u16 | nNumOfList |  |
+| 8 | PROTO_NC_PARTY_FINDER_INFO[nNumOfList] | InfoList | variable length, element PROTO_NC_PARTY_FINDER_INFO |
+
+Element `PROTO_NC_PARTY_FINDER_INFO` (154 bytes): +0 u16 nPastSecond, +2 i32 dRegistTime, +6 char[20] sCharID, +26 u8[128] sMsg
+
+Sent in reply to `0x3854` NC_PARTY_FINDER_LIST_REQ † on CParserClient (`FUN_0041a080`) · payload variable (uVar5)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2274,9 +3717,16 @@ Sent in reply to `0x3854` ? on CParserClient (`FUN_0041a080`) · payload variabl
 | 6 | u16 | `0`; `local_200d + 1` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x385b` ?
+### `0x385b` NC_PARTY_SET_LOOTER_ACK †
 
-Sent in reply to `0x385a` ? on CParserClient (`FUN_0041c0b0`) · payload 22 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_SET_LOOTER_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sNewLooterCharID | Name5 |
+| 20 | u16 | nError |  |
+
+Sent in reply to `0x385a` NC_PARTY_SET_LOOTER_REQ † on CParserClient (`FUN_0041c0b0`) · payload 22 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2287,9 +3737,15 @@ Sent in reply to `0x385a` ? on CParserClient (`FUN_0041c0b0`) · payload 22 byte
 | 16 | u32 | `0` |
 | 20 | u16 | `1368` (0x558); `1369` (0x559); `1370` (0x55a) |
 
-### `0x385c` ?
+### `0x385c` NC_PARTY_SET_LOOTER_CMD †
 
-Sent in reply to `0x385a` ? on CParserClient (`FUN_0041c0b0`) · payload 20 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_SET_LOOTER_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID | Name5 |
+
+Sent in reply to `0x385a` NC_PARTY_SET_LOOTER_REQ † on CParserClient (`FUN_0041c0b0`) · payload 20 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2299,7 +3755,14 @@ Sent in reply to `0x385a` ? on CParserClient (`FUN_0041c0b0`) · payload 20 byte
 | 12 | u32 | `0` |
 | 16 | u32 | `0` |
 
-### `0x385d` ?
+### `0x385d` NC_PARTY_SET_LOOTER_BROAD_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_SET_LOOTER_BROAD_CMD`, 40 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCommandCharID | Name5 |
+| 20 | char[20] | sNewLooterCharID | Name5 |
 
 Sent from `FUN_0041b4d0` (`FUN_0041b4d0`) · payload 40 bytes · raw header
 
@@ -2316,11 +3779,19 @@ Sent from `FUN_0041b4d0` (`FUN_0041b4d0`) · payload 40 bytes · raw header
 | 32 | u32 | `*(undefined4 *)(iVar3 + 0x18)` |
 | 36 | u32 | `local_21` |
 
-Sent in reply to `0x385a` ? on CParserClient (`FUN_0041c0b0`) · payload 40 bytes · raw header
+Sent in reply to `0x385a` NC_PARTY_SET_LOOTER_REQ † on CParserClient (`FUN_0041c0b0`) · payload 40 bytes · raw header
 
 Fill: +20: FUN_00402140
 
-### `0x385f` ?
+### `0x385f` NC_PARTY_ITEM_JOIN_LOOTING_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_ITEM_JOIN_LOOTING_CMD`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nItemGrade |  |
+| 1 | u8 | nLootingType |  |
+| 2 | char[20] | LooterName | Name5 |
 
 Sent from `FUN_0041b200` (`FUN_0041b200`) · payload 22 bytes · raw header
 
@@ -2332,15 +3803,23 @@ Sent from `FUN_0041b200` (`FUN_0041b200`) · payload 22 bytes · raw header
 | 14 | u32 | `0`; `*(undefined4 *)(pbVar6 + iVar3 + 0x18)` |
 | 18 | u32 | `0`; `*(undefined4 *)(pbVar6 + iVar3 + 0x1c)` |
 
-### `0x5402` ?
+### `0x5402` NC_FRIEND_SET_ACK †
 
-Sent in reply to `0x5401` ? on CParserClient (`FUN_0041ca90`) · payload 42 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_SET_ACK`, 42 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
+| 20 | char[20] | friendid | Name5 |
+| 40 | u16 | err |  |
+
+Sent in reply to `0x5401` NC_FRIEND_SET_REQ † on CParserClient (`FUN_0041ca90`) · payload 42 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 40 | i16 | `2378` (0x94a) |
 
-Sent in reply to `0x5404` ? on CParserClient (`FUN_0041cd70`) · payload 42 bytes · raw header
+Sent in reply to `0x5404` NC_FRIEND_SET_CONFIRM_ACK † on CParserClient (`FUN_0041cd70`) · payload 42 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2356,9 +3835,16 @@ Sent in reply to `0x5404` ? on CParserClient (`FUN_0041cd70`) · payload 42 byte
 | 36 | u32 | `in(0x5404)+17`; `in(0x5404)+7` |
 | 40 | u16 | `2376` (0x948) |
 
-### `0x5403` ?
+### `0x5403` NC_FRIEND_SET_CONFIRM_REQ †
 
-Sent in reply to `0x5401` ? on CParserClient (`FUN_0041ca90`) · payload 40 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_SET_CONFIRM_REQ`, 40 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
+| 20 | char[20] | friendid | Name5 |
+
+Sent in reply to `0x5401` NC_FRIEND_SET_REQ † on CParserClient (`FUN_0041ca90`) · payload 40 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2373,9 +3859,17 @@ Sent in reply to `0x5401` ? on CParserClient (`FUN_0041ca90`) · payload 40 byte
 | 32 | u32 | `in(0x5401)+5` |
 | 36 | u32 | `in(0x5401)+7` |
 
-### `0x5406` ?
+### `0x5406` NC_FRIEND_DEL_ACK †
 
-Sent in reply to `0x5413` ? on CParserCharDB (`FUN_004105d0`) · payload 42 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_DEL_ACK`, 42 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
+| 20 | char[20] | friendid | Name5 |
+| 40 | u16 | err |  |
+
+Sent in reply to `0x5413` NC_FRIEND_DB_DEL_ACK † on CParserCharDB (`FUN_004105d0`) · payload 42 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2391,7 +3885,16 @@ Sent in reply to `0x5413` ? on CParserCharDB (`FUN_004105d0`) · payload 42 byte
 | 36 | u32 | `in(0x5413)+20`; `in(0x5413)+10` |
 | 40 | u16 | `in(0x5413)+46` |
 
-### `0x5407` ?
+### `0x5407` NC_FRIEND_LIST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_LIST_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | numoffriend |  |
+| 1 | PROTO_FRIEND_INFO[numoffriend] | friendinfo | variable length, element PROTO_FRIEND_INFO |
+
+Element `PROTO_FRIEND_INFO` (72 bytes): +0 u32 logininfo.login|year|month|day|hour, +4 char[20] charid, +24 u8 classid, +25 u8 level, +26 u8 isparty, +27 u8 flag, +28 char[12] map, +40 u8[32] statustitle
 
 Sent from `FUN_00430ae0` (`FUN_00430ae0`) · payload variable (*(int *)((int)param_1 + 0x708) * 0x48 + 1)
 
@@ -2400,9 +3903,22 @@ Sent from `FUN_00430ae0` (`FUN_00430ae0`) · payload variable (*(int *)((int)par
 | 0 | u8 | `*(undefined1 *)(param_1 + 0x708)` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x5408` ?
+### `0x5408` NC_FRIEND_ADD_CMD †
 
-Sent in reply to `0x5415` ? on CParserCharDB (`FUN_00410740`) · payload 72 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_ADD_CMD`, 72 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | friendinfo.logininfo.login|year|month|day|hour | bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21 |
+| 4 | char[20] | friendinfo.charid | Name5 |
+| 24 | u8 | friendinfo.classid |  |
+| 25 | u8 | friendinfo.level |  |
+| 26 | u8 | friendinfo.isparty |  |
+| 27 | u8 | friendinfo.flag |  |
+| 28 | char[12] | friendinfo.map | Name3 |
+| 40 | u8[32] | friendinfo.statustitle |  |
+
+Sent in reply to `0x5415` NC_FRIEND_DB_GET_ACK † on CParserCharDB (`FUN_00410740`) · payload 72 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2415,7 +3931,7 @@ Sent in reply to `0x5415` ? on CParserCharDB (`FUN_00410740`) · payload 72 byte
 | 32 | u32 | `0` |
 | 36 | u32 | `0` |
 
-Sent in reply to `0x5411` ? on CParserCharDB (`FUN_00411600`) · payload 72 bytes · raw header
+Sent in reply to `0x5411` NC_FRIEND_DB_SET_ACK † on CParserCharDB (`FUN_00411600`) · payload 72 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2433,7 +3949,7 @@ Sent in reply to `0x5411` ? on CParserCharDB (`FUN_00411600`) · payload 72 byte
 | 36 | u32 | `0`; `*(undefined4 *)(iVar2 + 0x4a)` |
 | 40 | u32 | `CONCAT22(local_35._2_2_,0x2d)` |
 
-Sent in reply to `0x5411` ? on CParserCharDB (`FUN_00411600`) · payload 72 bytes · raw header
+Sent in reply to `0x5411` NC_FRIEND_DB_SET_ACK † on CParserCharDB (`FUN_00411600`) · payload 72 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2452,7 +3968,13 @@ Sent in reply to `0x5411` ? on CParserCharDB (`FUN_00411600`) · payload 72 byte
 | 36 | u32 | `*(undefined4 *)(iVar2 + 0x4a)` |
 | 40 | u16 | `45` (0x2d) |
 
-### `0x540a` ?
+### `0x540a` NC_FRIEND_LOGOUT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_LOGOUT_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
 
 Sent from `FUN_004353a0` (`FUN_004353a0`) · payload 20 bytes · raw header
 
@@ -2464,7 +3986,14 @@ Sent from `FUN_004353a0` (`FUN_004353a0`) · payload 20 bytes · raw header
 | 12 | u32 | `*(undefined4 *)(iVar1 + 0x10)` |
 | 16 | u32 | `*(undefined4 *)(iVar1 + 0x14)` |
 
-### `0x540d` ?
+### `0x540d` NC_FRIEND_MAP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_MAP_CMD`, 32 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
+| 20 | char[12] | map | Name3 |
 
 Sent from `FUN_00435cd0` (`FUN_00435cd0`) · payload 32 bytes · raw header
 
@@ -2479,7 +4008,14 @@ Sent from `FUN_00435cd0` (`FUN_00435cd0`) · payload 32 bytes · raw header
 | 24 | u32 | `*(undefined4 *)(iVar1 + 0x46)` |
 | 28 | u32 | `*(undefined4 *)(iVar1 + 0x4a)` |
 
-### `0x540e` ?
+### `0x540e` NC_FRIEND_PARTY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_PARTY_CMD`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
+| 20 | u8 | is_party |  |
 
 Sent from `FUN_00435ee0` (`FUN_00435ee0`) · payload 21 bytes · raw header
 
@@ -2491,7 +4027,14 @@ Sent from `FUN_00435ee0` (`FUN_00435ee0`) · payload 21 bytes · raw header
 | 12 | u32 | `*(undefined4 *)(iVar1 + 0x10)` |
 | 16 | u32 | `*(undefined4 *)(iVar1 + 0x14)` |
 
-### `0x540f` ?
+### `0x540f` NC_FRIEND_LEVEL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_LEVEL_CMD`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
+| 20 | u8 | level |  |
 
 Sent from `FUN_004355a0` (`FUN_004355a0`) · payload 21 bytes · raw header
 
@@ -2504,23 +4047,45 @@ Sent from `FUN_004355a0` (`FUN_004355a0`) · payload 21 bytes · raw header
 | 16 | u32 | `*(undefined4 *)(iVar1 + 0x14)` |
 | 20 | u8 | `*(undefined1 *)(iVar1 + 0x19)` |
 
-### `0x541e` ?
+### `0x541e` NC_FRIEND_POINT_ACK †
 
-Sent in reply to `0x541d` ? on CParserClient (`FUN_00418e60`) · payload 2 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_POINT_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | friendpoint |  |
+
+Sent in reply to `0x541d` NC_FRIEND_POINT_REQ † on CParserClient (`FUN_00418e60`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `FUN_00433d00(param_1)` |
 
-### `0x5420` ?
+### `0x5420` NC_FRIEND_FIND_FRIENDS_ACK †
 
-Sent in reply to `0x541f` ? on CParserClient (`FUN_00423110`) · payload 4 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_FIND_FRIENDS_ACK`, 4 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+| 2 | u16 | numoffriend |  |
+| 4 | PROTO_FRIEND_INFO[numoffriend] | friendinfo | variable length, element PROTO_FRIEND_INFO |
+
+Element `PROTO_FRIEND_INFO` (72 bytes): +0 u32 logininfo.login|year|month|day|hour, +4 char[20] charid, +24 u8 classid, +25 u8 level, +26 u8 isparty, +27 u8 flag, +28 char[12] map, +40 u8[32] statustitle
+
+Sent in reply to `0x541f` NC_FRIEND_FIND_FRIENDS_REQ † on CParserClient (`FUN_00423110`) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u32 | `14016` (0x36c0); `CONCAT22(0x32,(undefined2)local_2013)`; `CONCAT22(local_2013._2_2_ + 1,(undefined2)local_2013)`; `CONCAT22(local_2013._2_2_,0x36c5)` |
 
-### `0x5424` ?
+### `0x5424` NC_FRIEND_SOMEONE_GET_SPECIALITEM_WORLD_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_SOMEONE_GET_SPECIALITEM_WORLD_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
 
 Sent in reply to `0x5423` NC_FRIEND_SOMEONE_GET_SPECIALITEM_ZONE_CMD on CParserZone (`FUN_0042d0f0`) · payload 20 bytes
 
@@ -2532,17 +4097,44 @@ Sent in reply to `0x5423` NC_FRIEND_SOMEONE_GET_SPECIALITEM_ZONE_CMD on CParserZ
 | 12 | u32 | `in(0x5423)+5` |
 | 16 | u32 | `in(0x5423)+7` |
 
-### `0x5425` ?
+### `0x5425` NC_FRIEND_GET_DIFF_FRIEND_POINT_CMD †
 
-Sent in reply to `0x180c` ? on CParserZone (`FUN_0042d8d0`) · payload 2 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_GET_DIFF_FRIEND_POINT_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | diffpoint |  |
+
+Sent in reply to `0x180c` NC_MAP_LINKEND_CMD † on CParserZone (`FUN_0042d8d0`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | i16 | `sVar5` |
 
-### `0x5802` ?
+### `0x5802` NC_KQ_LIST_ACK †
 
-Sent in reply to `0x5801` ? on CParserClient (`FUN_00413980`) · payload variable (iVar1 * 0x8d + 0x32)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_LIST_ACK`, 50 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | ServerTime |  |
+| 4 | i32 | tm_ServerTime.tm_sec |  |
+| 8 | i32 | tm_ServerTime.tm_min |  |
+| 12 | i32 | tm_ServerTime.tm_hour |  |
+| 16 | i32 | tm_ServerTime.tm_mday |  |
+| 20 | i32 | tm_ServerTime.tm_mon |  |
+| 24 | i32 | tm_ServerTime.tm_year |  |
+| 28 | i32 | tm_ServerTime.tm_wday |  |
+| 32 | i32 | tm_ServerTime.tm_yday |  |
+| 36 | i32 | tm_ServerTime.tm_isdst |  |
+| 40 | u32 | NewStartHandle |  |
+| 44 | u32 | NewEndHandle |  |
+| 48 | u16 | NumOfNewQuest |  |
+| 50 | PROTO_KQ_INFO_CLIENT[NumOfNewQuest] | NewQuestArray | variable length, element PROTO_KQ_INFO_CLIENT |
+
+Element `PROTO_KQ_INFO_CLIENT` (141 bytes): +0 u32 Handle, +4 u8 Status, +5 u16 NumOfJoiner, +7 u16 ID, +9 char[64] Title, +73 u16 LimitTime, +75 i32 StartTime, +79 i32 tm_StartTime.tm_sec, +83 i32 tm_StartTime.tm_min, +87 i32 tm_StartTime.tm_hour, +91 i32 tm_StartTime.tm_mday, +95 i32 tm_StartTime.tm_mon, +99 i32 tm_StartTime.tm_year, +103 i32 tm_StartTime.tm_wday, +107 i32 tm_StartTime.tm_yday, +111 i32 tm_StartTime.tm_isdst, +115 u16 StartWaitTime, +117 u8 MinLevel, +118 u8 MaxLevel, +119 u16 MinPlayers, +121 u16 MaxPlayers, +123 u8 PlayerRepeatMode, +124 u16 PlayerRepeatCount, +126 u8 PlayerRevivalMode, +127 u8 PlayerRevivalCount, +128 u16 DemandQuest, +130 u16 DemandItem, +132 i64 DemandClass, +140 u8 DemandGender
+
+Sent in reply to `0x5801` NC_KQ_LIST_REQ † on CParserClient (`FUN_00413980`) · payload variable (iVar1 * 0x8d + 0x32)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2552,9 +4144,20 @@ Sent in reply to `0x5801` ? on CParserClient (`FUN_00413980`) · payload variabl
 | 48 | u16 | `(undefined2)iVar1` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x5804` ?
+### `0x5804` NC_KQ_STATUS_ACK †
 
-Sent in reply to `0x5803` ? on CParserClient (`FUN_00413b20`) · payload 7 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_STATUS_ACK`, 7 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle |  |
+| 4 | u8 | Status |  |
+| 5 | u16 | NumOfJoiner |  |
+| 7 | Name5[NumOfJoiner] | JoinerNameList | variable length, element Name5 |
+
+Element `Name5` (20 bytes): +0 char[20] Name5
+
+Sent in reply to `0x5803` NC_KQ_STATUS_REQ † on CParserClient (`FUN_00413b20`) · payload 7 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2562,34 +4165,59 @@ Sent in reply to `0x5803` ? on CParserClient (`FUN_00413b20`) · payload 7 bytes
 | 4 | u8 | `10` (0xa) |
 | 5 | u16 | `0` |
 
-### `0x5806` ?
+### `0x5806` NC_KQ_JOIN_ACK †
 
-Sent in reply to `0x5805` ? on CParserClient (`FUN_00413cc0`) · payload 6 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_JOIN_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle |  |
+| 4 | u16 | Error |  |
+
+Sent in reply to `0x5805` NC_KQ_JOIN_REQ † on CParserClient (`FUN_00413cc0`) · payload 6 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | i32 | `in(0x5805)+-1` |
 | 4 | i16 | `2457` (0x999); `2458` (0x99a); `(short)uVar2 + 0x991` |
 
-### `0x5808` ?
+### `0x5808` NC_KQ_JOIN_CANCEL_ACK †
 
-Sent in reply to `0x7c0c` ? on CParserCharDB (`FUN_00410a50`) · payload 6 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_JOIN_CANCEL_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle |  |
+| 4 | u16 | Error |  |
+
+Sent in reply to `0x7c0c` NC_DATA_PRISON_ADD_GM_ACK † on CParserCharDB (`FUN_00410a50`) · payload 6 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u32 | `uVar1` |
 | 4 | u16 | `2465` (0x9a1) |
 
-### `0x580a` ?
+### `0x580a` NC_KQ_SCHEDULE_ACK †
 
-Sent in reply to `0x5809` ? on CParserClient (`FUN_00413e00`) · payload 10 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_SCHEDULE_ACK`, 10 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | NewStartHandle |  |
+| 4 | u32 | NewEndHandle |  |
+| 8 | u16 | NumOfNewQuest |  |
+| 10 | PROTO_KQ_INFO_CLIENT[NumOfNewQuest] | NewQuestArray | variable length, element PROTO_KQ_INFO_CLIENT |
+
+Element `PROTO_KQ_INFO_CLIENT` (141 bytes): +0 u32 Handle, +4 u8 Status, +5 u16 NumOfJoiner, +7 u16 ID, +9 char[64] Title, +73 u16 LimitTime, +75 i32 StartTime, +79 i32 tm_StartTime.tm_sec, +83 i32 tm_StartTime.tm_min, +87 i32 tm_StartTime.tm_hour, +91 i32 tm_StartTime.tm_mday, +95 i32 tm_StartTime.tm_mon, +99 i32 tm_StartTime.tm_year, +103 i32 tm_StartTime.tm_wday, +107 i32 tm_StartTime.tm_yday, +111 i32 tm_StartTime.tm_isdst, +115 u16 StartWaitTime, +117 u8 MinLevel, +118 u8 MaxLevel, +119 u16 MinPlayers, +121 u16 MaxPlayers, +123 u8 PlayerRepeatMode, +124 u16 PlayerRepeatCount, +126 u8 PlayerRevivalMode, +127 u8 PlayerRevivalCount, +128 u16 DemandQuest, +130 u16 DemandItem, +132 i64 DemandClass, +140 u8 DemandGender
+
+Sent in reply to `0x5809` NC_KQ_SCHEDULE_REQ † on CParserClient (`FUN_00413e00`) · payload 10 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u32 | `4294967295` (0xffffffff) |
 | 8 | u16 | `0` |
 
-Sent in reply to `0x5809` ? on CParserClient (`FUN_00413e00`) · payload variable (iVar4 * 0x8d + 10)
+Sent in reply to `0x5809` NC_KQ_SCHEDULE_REQ † on CParserClient (`FUN_00413e00`) · payload variable (iVar4 * 0x8d + 10)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2597,7 +4225,14 @@ Sent in reply to `0x5809` ? on CParserClient (`FUN_00413e00`) · payload variabl
 | 4 | u32 | `*(undefined4 *)(&DAT_0055dfe7 + DAT_0055e15c * 0x179)` |
 | 8 | u16 | `(undefined2)iVar4` |
 
-### `0x580b` ?
+### `0x580b` NC_KQ_NOTIFY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_NOTIFY_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | MsgLength |  |
+| 1 | u8[MsgLength] | Msg | variable length |
 
 Sent from `FUN_00452750` (`FUN_00452750`) · payload variable ((uint)(pcVar2 + (1 - (int)(param_1 + 1))))
 
@@ -2606,7 +4241,22 @@ Sent from `FUN_00452750` (`FUN_00452750`) · payload variable ((uint)(pcVar2 + (
 | 0 | char | `(char)pcVar2 - ((char)param_1 + '\x01')` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x581c` ?
+### `0x581c` NC_KQ_LIST_TIME_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_LIST_TIME_ACK`, 40 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | ServerTime |  |
+| 4 | i32 | tm_ServerTime.tm_sec |  |
+| 8 | i32 | tm_ServerTime.tm_min |  |
+| 12 | i32 | tm_ServerTime.tm_hour |  |
+| 16 | i32 | tm_ServerTime.tm_mday |  |
+| 20 | i32 | tm_ServerTime.tm_mon |  |
+| 24 | i32 | tm_ServerTime.tm_year |  |
+| 28 | i32 | tm_ServerTime.tm_wday |  |
+| 32 | i32 | tm_ServerTime.tm_yday |  |
+| 36 | i32 | tm_ServerTime.tm_isdst |  |
 
 Sent from `FUN_004559e0` (`FUN_004559e0`) · payload 40 bytes · raw header
 
@@ -2614,7 +4264,16 @@ Sent from `FUN_004559e0` (`FUN_004559e0`) · payload 40 bytes · raw header
 |---|---|---|
 | 0 | u32 | `__time32((__time32_t *)0x0)` |
 
-### `0x581d` ?
+### `0x581d` NC_KQ_LIST_ADD_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_LIST_ADD_ACK`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | NumOfAdd |  |
+| 2 | PROTO_KQ_INFO_CLIENT[NumOfAdd] | AddQuestArray | variable length, element PROTO_KQ_INFO_CLIENT |
+
+Element `PROTO_KQ_INFO_CLIENT` (141 bytes): +0 u32 Handle, +4 u8 Status, +5 u16 NumOfJoiner, +7 u16 ID, +9 char[64] Title, +73 u16 LimitTime, +75 i32 StartTime, +79 i32 tm_StartTime.tm_sec, +83 i32 tm_StartTime.tm_min, +87 i32 tm_StartTime.tm_hour, +91 i32 tm_StartTime.tm_mday, +95 i32 tm_StartTime.tm_mon, +99 i32 tm_StartTime.tm_year, +103 i32 tm_StartTime.tm_wday, +107 i32 tm_StartTime.tm_yday, +111 i32 tm_StartTime.tm_isdst, +115 u16 StartWaitTime, +117 u8 MinLevel, +118 u8 MaxLevel, +119 u16 MinPlayers, +121 u16 MaxPlayers, +123 u8 PlayerRepeatMode, +124 u16 PlayerRepeatCount, +126 u8 PlayerRevivalMode, +127 u8 PlayerRevivalCount, +128 u16 DemandQuest, +130 u16 DemandItem, +132 i64 DemandClass, +140 u8 DemandGender
 
 Sent from `FUN_004559e0` (`FUN_004559e0`) · payload variable (uVar4)
 
@@ -2631,13 +4290,29 @@ Sent from `FUN_004559e0` (`FUN_004559e0`) · payload variable ((uint)local_203f 
 |---|---|---|
 | 0 | u16 | `0`; `local_203f + 1` |
 
-### `0x581e` ?
+### `0x581e` NC_KQ_LIST_DELETE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_LIST_DELETE_ACK`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | NumOfDelete |  |
+| 2 | u32[NumOfDelete] | DeleteQuestArray | variable length |
 
 Sent from `FUN_004559e0` (`FUN_004559e0`) · payload variable ((uint)local_4043 * 4 + 2)
 
 Fill: +8191: FUN_0042fc50
 
-### `0x581f` ?
+### `0x581f` NC_KQ_LIST_UPDATE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_LIST_UPDATE_ACK`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | NumOfUpdate |  |
+| 2 | KQ_UPDATE_ITEMS[NumOfUpdate] | UpdateQuestArray | variable length, element KQ_UPDATE_ITEMS |
+
+Element `KQ_UPDATE_ITEMS` (7 bytes): +0 u32 Handle, +4 u8 Status, +5 u16 NumOfJoiner
 
 Sent from `FUN_004559e0` (`FUN_004559e0`) · payload variable ((uint)local_203f * 7 + 2)
 
@@ -2645,7 +4320,18 @@ Sent from `FUN_004559e0` (`FUN_004559e0`) · payload variable ((uint)local_203f 
 |---|---|---|
 | 0 | u16 | `local_203f + 1` |
 
-### `0x5824` ?
+### `0x5824` NC_KQ_JOINING_ALARM_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_JOINING_ALARM_CMD`, 9 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | KQInfo.nHandle |  |
+| 4 | u16 | KQInfo.nID |  |
+| 6 | u8 | KQInfo.nMinLev |  |
+| 7 | u8 | KQInfo.nMaxLev |  |
+| 8 | u8 | MsgLength |  |
+| 9 | u8[MsgLength] | Msg | variable length |
 
 Sent from `FUN_00452930` (`FUN_00452930`) · payload variable ((uint)(pcVar2 + (9 - (int)(param_1 + 1))))
 
@@ -2658,7 +4344,14 @@ Sent from `FUN_00452930` (`FUN_00452930`) · payload variable ((uint)(pcVar2 + (
 | 8 | char | `(char)pcVar2 - ((char)param_1 + '\x01')` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x5825` ?
+### `0x5825` NC_KQ_JOINING_ALARM_END_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_JOINING_ALARM_END_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nHandle |  |
+| 4 | u16 | nID |  |
 
 Sent from `FUN_00452a70` (`FUN_00452a70`) · payload 6 bytes
 
@@ -2667,7 +4360,16 @@ Sent from `FUN_00452a70` (`FUN_00452a70`) · payload 6 bytes
 | 0 | u32 | `*(undefined4 *)(this + param_1 * 0x179 + 4)` |
 | 4 | u16 | `*(undefined2 *)(this + param_1 * 0x179 + 0xb)` |
 
-### `0x5826` ?
+### `0x5826` NC_KQ_JOINING_ALARM_LIST †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_JOINING_ALARM_LIST`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNumOfKQ |  |
+| 2 | KQ_JOINING_ALARM_INFO[nNumOfKQ] | KQList | variable length, element KQ_JOINING_ALARM_INFO |
+
+Element `KQ_JOINING_ALARM_INFO` (8 bytes): +0 u32 nHandle, +4 u16 nID, +6 u8 nMinLev, +7 u8 nMaxLev
 
 Sent from `FUN_00452b60` (`FUN_00452b60`) · payload variable (uVar3)
 
@@ -2676,7 +4378,13 @@ Sent from `FUN_00452b60` (`FUN_00452b60`) · payload variable (uVar3)
 | 0 | u16 | `0`; `local_2013 + 1` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x5828` ?
+### `0x5828` NC_KQ_VOTE_START_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_START_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
 
 Sent from `FUN_00456310` (`FUN_00456310`) · payload 2 bytes
 
@@ -2684,7 +4392,26 @@ Sent from `FUN_00456310` (`FUN_00456310`) · payload 2 bytes
 |---|---|---|
 | 0 | u16 | `12544` (0x3100); `12545` (0x3101); `12547` (0x3103); `12549` (0x3105); `12551` (0x3107); `12553` (0x3109) |
 
-### `0x5829` ?
+### `0x5829` NC_KQ_VOTE_VOTING_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_VOTING_CMD`, 78 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sStarter | Name5 |
+| 20 | char[20] | sTarget | Name5 |
+| 40 | u8 | nVoteType |  |
+| 41 | i32 | tEndTime.tm_sec |  |
+| 45 | i32 | tEndTime.tm_min |  |
+| 49 | i32 | tEndTime.tm_hour |  |
+| 53 | i32 | tEndTime.tm_mday |  |
+| 57 | i32 | tEndTime.tm_mon |  |
+| 61 | i32 | tEndTime.tm_year |  |
+| 65 | i32 | tEndTime.tm_wday |  |
+| 69 | i32 | tEndTime.tm_yday |  |
+| 73 | i32 | tEndTime.tm_isdst |  |
+| 77 | u8 | nLen |  |
+| 78 | u8[nLen] | sContents | variable length |
 
 Sent from `FUN_00456310` (`FUN_00456310`) · payload variable (*(byte *)((int)local_4024 + 0x15) + 0x4e)
 
@@ -2696,7 +4423,13 @@ Fill: +8191: FUN_0042fc50; +0: FUN_00402140; +20: FUN_00402140; +8191: FUN_0042f
 | 40 | u8 | `(undefined1)piVar9[5]` |
 | 77 | u8 | `*(byte *)(local_4024 + 0x15)` |
 
-### `0x582b` ?
+### `0x582b` NC_KQ_VOTE_VOTING_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_VOTING_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
 
 Sent from `FUN_00452ee0` (`FUN_00452ee0`) · payload 2 bytes
 
@@ -2704,7 +4437,17 @@ Sent from `FUN_00452ee0` (`FUN_00452ee0`) · payload 2 bytes
 |---|---|---|
 | 0 | u16 | `12560` (0x3110); `12561` (0x3111); `12562` (0x3112); `12563` (0x3113) |
 
-### `0x582c` ?
+### `0x582c` NC_KQ_VOTE_RESULT_SUC_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_RESULT_SUC_CMD`, 24 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sTarget | Name5 |
+| 20 | u8 | nVoteRate |  |
+| 21 | u8 | nYesNum |  |
+| 22 | u8 | nNoNum |  |
+| 23 | u8 | nCancelNum |  |
 
 Sent from `FUN_00454f60` (`FUN_00454f60`) · payload 24 bytes
 
@@ -2720,7 +4463,16 @@ Sent from `FUN_00454f60` (`FUN_00454f60`) · payload 24 bytes
 | 22 | u8 | `*(undefined1 *)(piVar9 + 0xd)` |
 | 23 | u8 | `*(undefined1 *)(piVar9 + 0xe)` |
 
-### `0x582d` ?
+### `0x582d` NC_KQ_VOTE_RESULT_FAIL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_RESULT_FAIL_CMD`, 23 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sTarget | Name5 |
+| 20 | u8 | nYesNum |  |
+| 21 | u8 | nNoNum |  |
+| 22 | u8 | nCancelNum |  |
 
 Sent from `FUN_00454f60` (`FUN_00454f60`) · payload 23 bytes
 
@@ -2735,7 +4487,13 @@ Sent from `FUN_00454f60` (`FUN_00454f60`) · payload 23 bytes
 | 21 | u8 | `(undefined1)piVar9[3]`; `*(undefined1 *)(piVar9 + 0xd)` |
 | 22 | u8 | `*(undefined1 *)(piVar9 + 0xd)`; `*(undefined1 *)(piVar9 + 0xe)` |
 
-### `0x582e` ?
+### `0x582e` NC_KQ_VOTE_CANCEL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_CANCEL_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sTarget | Name5 |
 
 Sent from `FUN_00454510` (`FUN_00454510`) · payload 20 bytes
 
@@ -2747,7 +4505,16 @@ Sent from `FUN_00454510` (`FUN_00454510`) · payload 20 bytes
 | 12 | u32 | `*(undefined4 *)(this + iVar5 * 0x2c + 0x1c010)` |
 | 16 | u32 | `*(undefined4 *)(this + iVar5 * 0x2c + 0x1c014)` |
 
-### `0x582f` ?
+### `0x582f` NC_KQ_VOTE_BAN_MSG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_BAN_MSG_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nVoteRate |  |
+| 1 | u8 | nYesNum |  |
+| 2 | u8 | nNoNum |  |
+| 3 | u8 | nCancelNum |  |
 
 Sent from `FUN_00454f60` (`FUN_00454f60`) · payload 4 bytes
 
@@ -2758,11 +4525,27 @@ Sent from `FUN_00454f60` (`FUN_00454f60`) · payload 4 bytes
 | 2 | u8 | `*(undefined1 *)(piVar9 + 0xd)` |
 | 3 | u8 | `*(undefined1 *)(piVar9 + 0xe)` |
 
-### `0x5830` ?
+### `0x5830` NC_KQ_VOTE_BAN_MSG_LOGOFF_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_BAN_MSG_LOGOFF_CMD`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Sent from `FUN_004530e0` (`FUN_004530e0`) · payload 1 bytes
 
-### `0x5832` ?
+### `0x5832` NC_KQ_JOIN_LIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_JOIN_LIST_ACK`, 3 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8 | nNum |  |
+| 3 | KQ_JOIN_CHAR_INFO[nNum] | CharInfoList | variable length, element KQ_JOIN_CHAR_INFO |
+
+Element `KQ_JOIN_CHAR_INFO` (23 bytes): +0 u8 nCharLevel, +1 u8 nCharClass, +2 char[20] sCharID, +22 u8 nTeamType
 
 Sent from `FUN_00453bd0` (`FUN_00453bd0`) · payload variable ((uint)local_2011 * 0x17 + 3)
 
@@ -2779,7 +4562,13 @@ Sent from `FUN_004568c0` (`FUN_004568c0`) · payload 3 bytes
 | 0 | u16 | `12570` (0x311a) |
 | 2 | u8 | `local_2011 + 1` |
 
-### `0x5835` ?
+### `0x5835` NC_KQ_VOTE_START_CHECK_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_VOTE_START_CHECK_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
 
 Sent from `FUN_00453340` (`FUN_00453340`) · payload 2 bytes
 
@@ -2787,7 +4576,14 @@ Sent from `FUN_00453340` (`FUN_00453340`) · payload 2 bytes
 |---|---|---|
 | 0 | u16 | `12576` (0x3120); `12577` (0x3121); `12578` (0x3122) |
 
-### `0x5838` ?
+### `0x5838` NC_KQ_TEAM_SELECT_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_TEAM_SELECT_ACK`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8 | nTeamType |  |
 
 Sent from `FUN_004536c0` (`FUN_004536c0`) · payload 3 bytes
 
@@ -2796,7 +4592,14 @@ Sent from `FUN_004536c0` (`FUN_004536c0`) · payload 3 bytes
 | 0 | u16 | `12784` (0x31f0); `12785` (0x31f1); `12790` (0x31f6) |
 | 2 | u8 | `2` |
 
-### `0x5839` ?
+### `0x5839` NC_KQ_TEAM_SELECT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_TEAM_SELECT_CMD`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCharID | Name5 |
+| 20 | u8 | nTeamType |  |
 
 Sent from `FUN_004536c0` (`FUN_004536c0`) · payload 21 bytes
 
@@ -2806,9 +4609,17 @@ Fill: +0: FUN_00402140
 |---|---|---|
 | 20 | u8 | `*(undefined1 *)(this + iVar9 * 0x2c + 0x1c018)` |
 
-### `0x6402` ?
+### `0x6402` NC_ANNOUNCE_W2C_CMD †
 
-Sent in reply to `0x0839` ? on CParserAccountDB (`FUN_00408050`) · payload variable ((uint)(pcVar4 + (3 - (int)(local_2121 + 1))))
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ANNOUNCE_W2C_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | AnnounceMessage.AnnounceType |  |
+| 1 | u8 | AnnounceMessage.SizeOfMessage |  |
+| 2 | u8[AnnounceMessage.SizeOfMessage] | AnnounceMessage.Message | variable length |
+
+Sent in reply to `0x0839` NC_MISC_EVENT_DONE_MUNSANG_ACC2WM † on CParserAccountDB (`FUN_00408050`) · payload variable ((uint)(pcVar4 + (3 - (int)(local_2121 + 1))))
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2822,35 +4633,84 @@ Sent in reply to `0x6401` NC_ANNOUNCE_Z2W_CMD † on CParserZone (`FUN_0042ab50`
 | 0 | u16 | `in(0x6401)+0` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x7003` ?
+### `0x7003` NC_CHAR_OPTION_GET_SHORTCUTDATA_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_SHORTCUTDATA_ACK`, 1025 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess |  |
+| 1 | u8[1024] | Data.Data |  |
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload 1025 bytes
 
-### `0x7005` ?
+### `0x7005` NC_CHAR_OPTION_GET_SHORTCUTSIZE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_SHORTCUTSIZE_ACK`, 25 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess |  |
+| 1 | u8[24] | Data.Data |  |
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload 25 bytes
 
-### `0x7007` ?
+### `0x7007` NC_CHAR_OPTION_GET_VIDEO_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_VIDEO_ACK`, 61 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess |  |
+| 1 | u8[60] | Data.Data |  |
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload 61 bytes
 
-### `0x7009` ?
+### `0x7009` NC_CHAR_OPTION_GET_SOUND_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_SOUND_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess |  |
+| 1 | u8[1] | Data.Data |  |
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload 2 bytes
 
-### `0x700b` ?
+### `0x700b` NC_CHAR_OPTION_GET_GAME_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_GAME_ACK`, 65 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess |  |
+| 1 | u8[64] | Data.Data |  |
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload 65 bytes
 
-### `0x700d` ?
+### `0x700d` NC_CHAR_OPTION_GET_WINDOWPOS_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_WINDOWPOS_ACK`, 393 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess |  |
+| 1 | u8[392] | Data.Data |  |
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload 393 bytes
 
-### `0x700f` ?
+### `0x700f` NC_CHAR_OPTION_GET_KEYMAPPING_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_GET_KEYMAPPING_ACK`, 309 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess |  |
+| 1 | u8[308] | Data.Data |  |
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload 309 bytes
 
-### `0x7032` shortcut list (ours) (hand-named)
+### `0x7032` NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD †
 
 **Verified layout** (basis: client FUN_00476080)
 
@@ -2861,15 +4721,39 @@ Sent from `FUN_00431680` (`FUN_00431680`) · payload 309 bytes
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload variable ((uint)local_2213[0] * 7 + 2)
 
-### `0x7033` ?
+### `0x7033` NC_CHAR_OPTION_IMPROVE_GET_KEYMAP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_GET_KEYMAP_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nKeyMapDataCnt |  |
+| 2 | KEY_MAP_DATA[nKeyMapDataCnt] | KeyMapData | variable length, element KEY_MAP_DATA |
+
+Element `KEY_MAP_DATA` (4 bytes): +0 u16 nFunctionNo, +2 u8 nExtendKey, +3 u8 nASCIICode
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload variable ((uint)local_2213[0] * 4 + 2)
 
-### `0x7034` ?
+### `0x7034` NC_CHAR_OPTION_IMPROVE_GET_GAMEOPTION_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_GET_GAMEOPTION_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nGameOptionDataCnt |  |
+| 2 | GAME_OPTION_DATA[nGameOptionDataCnt] | GameOptionData | variable length, element GAME_OPTION_DATA |
+
+Element `GAME_OPTION_DATA` (3 bytes): +0 u16 nOptionNo, +2 u8 nValue
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload variable ((uint)local_2213[0] * 3 + 2)
 
-### `0x7038` ?
+### `0x7038` NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
 
 Sent in reply to `0x704c` NC_CHAR_OPTION_IMPROVE_DB_SET_SHORTCUTDATA_ACK † on CParserCharDB (`FUN_0040ae30`) · payload 2 bytes
 
@@ -2879,13 +4763,25 @@ Sent in reply to `0x704c` NC_CHAR_OPTION_IMPROVE_DB_SET_SHORTCUTDATA_ACK † on 
 
 ### `0x703a` NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
 Sent in reply to `0x704e` NC_CHAR_OPTION_IMPROVE_DB_SET_KEYMAP_ACK † on CParserCharDB (`FUN_0040af00`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `in(0x704e)+0` |
 
-### `0x703c` ?
+### `0x703c` NC_CHAR_OPTION_IMPROVE_SET_GAMEOPTION_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_SET_GAMEOPTION_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
 
 Sent in reply to `0x7050` NC_CHAR_OPTION_IMPROVE_DB_SET_GAMEOPTION_ACK † on CParserCharDB (`FUN_0040afd0`) · payload 2 bytes
 
@@ -2893,7 +4789,17 @@ Sent in reply to `0x7050` NC_CHAR_OPTION_IMPROVE_DB_SET_GAMEOPTION_ACK † on CP
 |---|---|---|
 | 0 | u16 | `in(0x7050)+0` |
 
-### `0x7044` ?
+### `0x7044` NC_CHAR_OPTION_IMPROVE_INIT_KEYMAP_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_INIT_KEYMAP_ACK`, 4 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | DBKeyMapData.nKeyMapDataCnt |  |
+| 4 | KEY_MAP_DATA[DBKeyMapData.nKeyMapDataCnt] | DBKeyMapData.KeyMapData | variable length, element KEY_MAP_DATA |
+
+Element `KEY_MAP_DATA` (4 bytes): +0 u16 nFunctionNo, +2 u8 nExtendKey, +3 u8 nASCIICode
 
 Sent in reply to `0x7058` NC_CHAR_OPTION_IMPROVE_DB_INIT_KEYMAP_ACK on CParserCharDB (`FUN_0040b0a0`) · payload variable (uVar1 * 4 + 4)
 
@@ -2902,7 +4808,17 @@ Sent in reply to `0x7058` NC_CHAR_OPTION_IMPROVE_DB_INIT_KEYMAP_ACK on CParserCh
 | 0 | u16 | `in(0x7058)+0` |
 | 2 | u16 | `in(0x7058)+6` |
 
-### `0x7046` ?
+### `0x7046` NC_CHAR_OPTION_IMPROVE_INIT_GAMEOPTION_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_INIT_GAMEOPTION_ACK`, 4 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | DBGameOptionData.nGameOptionDataCnt |  |
+| 4 | GAME_OPTION_DATA[DBGameOptionData.nGameOptionDataCnt] | DBGameOptionData.GameOptionData | variable length, element GAME_OPTION_DATA |
+
+Element `GAME_OPTION_DATA` (3 bytes): +0 u16 nOptionNo, +2 u8 nValue
 
 Sent in reply to `0x705a` NC_CHAR_OPTION_IMPROVE_DB_INIT_GAMEOPTION_ACK † on CParserCharDB (`FUN_0040b250`) · payload variable (uVar4 * 3 + 4)
 
@@ -2912,15 +4828,33 @@ Sent in reply to `0x705a` NC_CHAR_OPTION_IMPROVE_DB_INIT_GAMEOPTION_ACK † on C
 | 2 | u16 | `in(0x705a)+6` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x7060` ?
+### `0x7060` NC_CHAR_OPTION_LOGIN_BLOCKDATA_ERR_REQ †
 
-Sent in reply to `0x705f` ? on CParserClient (`FUN_00414bf0`) · payload 4 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_LOGIN_BLOCKDATA_ERR_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+
+Sent in reply to `0x705f` NC_CHAR_OPTION_LOGIN_BLOCKDATA_ERR † on CParserClient (`FUN_00414bf0`) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u32 | `*(undefined4 *)param_1[0x158]` |
 
-### `0x7404` ?
+### `0x7404` NC_GUILD_LIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_LIST_ACK`, 7 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8 | PartMask |  |
+| 3 | u16 | TotalNumOfGuild |  |
+| 5 | u16 | nGuildListCnt |  |
+| 7 | SHINE_GUILD_LIST_NEW[nGuildListCnt] | GuildList | variable length, element SHINE_GUILD_LIST_NEW |
+
+Element `SHINE_GUILD_LIST_NEW` (46 bytes): +0 u32 nGuildNo, +4 char[16] sGuildName, +20 char[20] sMasterCharID, +40 u8 nType, +41 u8 nGrade, +42 u16 nMemberCnt, +44 u16 nMaxMembers
 
 Sent from `FUN_00445660` (`FUN_00445660`) · payload 7 bytes
 
@@ -2945,9 +4879,19 @@ Sent from `FUN_00445660` (`FUN_00445660`) · payload variable (iVar7 * 0x2e + 7)
 | 2 | u8 | `0`; `local_2025 \| 2` |
 | 3 | u32 | `CONCAT22((short)iVar7,(undefined2)local_2024)` |
 
-### `0x7406` ?
+### `0x7406` NC_GUILD_MAKE_ACK †
 
-Sent in reply to `0x7405` ? on CParserClient (`FUN_0041d380`) · payload 27 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MAKE_ACK`, 27 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u32 | No |  |
+| 6 | char[16] | Name | Name4 |
+| 22 | u8 | Type |  |
+| 23 | i32 | dCreateDate |  |
+
+Sent in reply to `0x7405` NC_GUILD_MAKE_REQ † on CParserClient (`FUN_0041d380`) · payload 27 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -2976,9 +4920,15 @@ Sent from `FUN_0044cf10` (`FUN_0044cf10`) · payload 27 bytes · raw header
 | 14 | u32 | `local_110` |
 | 18 | u32 | `local_10c` |
 
-### `0x7408` ?
+### `0x7408` NC_GUILD_DISMISS_ACK †
 
-Sent in reply to `0x7403` ? on CParserClient (`FUN_00414cc0`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_DISMISS_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+
+Sent in reply to `0x7403` NC_GUILD_LIST_REQ † on CParserClient (`FUN_00414cc0`) · payload 2 bytes · raw header
 
 Sent from `FUN_0043e240` (`FUN_0043e240`) · payload 2 bytes · raw header
 
@@ -2987,6 +4937,13 @@ Sent from `FUN_0043e240` (`FUN_0043e240`) · payload 2 bytes · raw header
 | 0 | u16 | `param_2` |
 
 ### `0x740a` NC_GUILD_MEMBER_INVITE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_INVITE_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | ToCharID | Name5 |
+| 20 | u16 | Error |  |
 
 Sent in reply to `0x7409` NC_GUILD_MEMBER_INVITE_REQ on CParserClient (`FUN_0041d450`) · payload 22 bytes · raw header
 
@@ -2999,7 +4956,14 @@ Sent in reply to `0x7409` NC_GUILD_MEMBER_INVITE_REQ on CParserClient (`FUN_0041
 | 16 | u32 | `in(0x7409)+7` |
 | 20 | u16 | `uVar1` |
 
-### `0x740b` ?
+### `0x740b` NC_GUILD_MEMBER_JOIN_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_JOIN_REQ`, 36 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | GuildName | Name4 |
+| 16 | char[20] | FromCharID | Name5 |
 
 Sent from `FUN_00449150` (`FUN_00449150`) · payload 36 bytes · raw header
 
@@ -3015,7 +4979,14 @@ Sent from `FUN_00449150` (`FUN_00449150`) · payload 36 bytes · raw header
 | 28 | u32 | `*(undefined4 *)(iVar3 + 0x10)` |
 | 32 | u32 | `*(undefined4 *)(iVar3 + 0x14)` |
 
-### `0x740d` ?
+### `0x740d` NC_GUILD_MEMBER_JOIN_ERR †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_JOIN_ERR`, 18 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | GuildName | Name4 |
+| 16 | u16 | Error |  |
 
 Sent from `FUN_0044a340` (`FUN_0044a340`) · payload 18 bytes · raw header
 
@@ -3027,9 +4998,16 @@ Sent from `FUN_0044a340` (`FUN_0044a340`) · payload 18 bytes · raw header
 | 12 | u32 | `param_2[3]` |
 | 16 | u16 | `param_3` |
 
-### `0x740f` ?
+### `0x740f` NC_GUILD_MEMBER_VANISH_ACK †
 
-Sent in reply to `0x740e` ? on CParserClient (`FUN_0041d6f0`) · payload 22 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_VANISH_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | u16 | Error |  |
+
+Sent in reply to `0x740e` NC_GUILD_MEMBER_VANISH_REQ † on CParserClient (`FUN_0041d6f0`) · payload 22 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -3040,11 +5018,25 @@ Sent in reply to `0x740e` ? on CParserClient (`FUN_0041d6f0`) · payload 22 byte
 | 16 | u32 | `0` |
 | 20 | u16 | `3319` (0xcf7) |
 
-### `0x7411` ?
+### `0x7411` NC_GUILD_NOTIFY_ACK †
 
-Sent in reply to `0x7410` ? on CParserClient (`FUN_00414dc0`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_NOTIFY_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+
+Sent in reply to `0x7410` NC_GUILD_NOTIFY_REQ † on CParserClient (`FUN_00414dc0`) · payload 2 bytes · raw header
 
 ### `0x7417` NC_GUILD_MEMBER_GRADE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_GRADE_ACK`, 23 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | u8 | MemberGrade |  |
+| 21 | u16 | Error |  |
 
 Sent in reply to `0x7416` NC_GUILD_MEMBER_GRADE_REQ on CParserClient (`FUN_0041d8e0`) · payload 23 bytes · raw header
 
@@ -3058,11 +5050,20 @@ Sent in reply to `0x7416` NC_GUILD_MEMBER_GRADE_REQ on CParserClient (`FUN_0041d
 | 20 | u8 | `in(0x7416)+20` |
 | 21 | u16 | `3309` (0xced) |
 
-### `0x7419` ?
+### `0x7419` NC_GUILD_MY_GUILD_INFO_ACK †
 
-Sent in reply to `0x7418` ? on CParserClient (`FUN_004217b0`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MY_GUILD_INFO_ACK`, 2 bytes + variable tail
 
-Sent in reply to `0x2824` ? on CParserOPTool (`FUN_00427980`) · payload 1069 bytes
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | GUILD_CLIENT[rest] | GuildInfo | variable length, count unknown, element GUILD_CLIENT |
+
+Element `GUILD_CLIENT` (1067 bytes): +0 u32 nNo, +4 char[16] sName, +20 u64 nMoney, +28 u8 nType, +29 u8 nGrade, +30 u32 nFame, +34 u16 nStoneLevel, +36 u64 nExp, +44 i32 dCreateDate, +48 i32 tm_dCreateDate.tm_sec, +52 i32 tm_dCreateDate.tm_min, +56 i32 tm_dCreateDate.tm_hour, +60 i32 tm_dCreateDate.tm_mday, +64 i32 tm_dCreateDate.tm_mon, +68 i32 tm_dCreateDate.tm_year, +72 i32 tm_dCreateDate.tm_wday, +76 i32 tm_dCreateDate.tm_yday, +80 i32 tm_dCreateDate.tm_isdst, +84 u16 nNumMembers, +86 u16 nMaxMembers, +88 u8 nWarStatus, +89 i32 dWarRequestDate, +93 i32 dWarStartDate, +97 i32 dWarEndDate, +101 i32 tm_dWarRequestDate.tm_sec, +105 i32 tm_dWarRequestDate.tm_min, +109 i32 tm_dWarRequestDate.tm_hour, +113 i32 tm_dWarRequestDate.tm_mday, +117 i32 tm_dWarRequestDate.tm_mon, +121 i32 tm_dWarRequestDate.tm_year, +125 i32 tm_dWarRequestDate.tm_wday, +129 i32 tm_dWarRequestDate.tm_yday, +133 i32 tm_dWarRequestDate.tm_isdst, +137 i32 tm_dWarStartDate.tm_sec, +141 i32 tm_dWarStartDate.tm_min, +145 i32 tm_dWarStartDate.tm_hour, +149 i32 tm_dWarStartDate.tm_mday, +153 i32 tm_dWarStartDate.tm_mon, +157 i32 tm_dWarStartDate.tm_year, +161 i32 tm_dWarStartDate.tm_wday, +165 i32 tm_dWarStartDate.tm_yday, +169 i32 tm_dWarStartDate.tm_isdst, +173 i32 tm_dWarEndDate.tm_sec, +177 i32 tm_dWarEndDate.tm_min, +181 i32 tm_dWarEndDate.tm_hour, +185 i32 tm_dWarEndDate.tm_mday, +189 i32 tm_dWarEndDate.tm_mon, +193 i32 tm_dWarEndDate.tm_year, +197 i32 tm_dWarEndDate.tm_wday, +201 i32 tm_dWarEndDate.tm_yday, +205 i32 tm_dWarEndDate.tm_isdst, +209 u32 nWarEnemy, +213 char[16] sWarEnemyName, +229 u8 nWarEnemyGrade, +230 u16[7] MyScore.nKillCount, +244 u32[7] MyScore.nKillScore, +272 u16[7] EnemyScore.nKillCount, +286 u32[7] EnemyScore.nKillScore, +314 u32 nWarWinCount, +318 u32 nWarLoseCount, +322 u32 nWarDrawCount, +326 u8 nDismissStatus, +327 i32 dDismissDate, +331 i32 tm_dDismissDate.tm_sec, +335 i32 tm_dDismissDate.tm_min, +339 i32 tm_dDismissDate.tm_hour, +343 i32 tm_dDismissDate.tm_mday, +347 i32 tm_dDismissDate.tm_mon, +351 i32 tm_dDismissDate.tm_year, +355 i32 tm_dDismissDate.tm_wday, +359 i32 tm_dDismissDate.tm_yday, +363 i32 tm_dDismissDate.tm_isdst, +367 char[128] sIntro, +495 i32 dNotifyDate, +499 i32 tm_dNotifyDate.tm_sec, +503 i32 tm_dNotifyDate.tm_min, +507 i32 tm_dNotifyDate.tm_hour, +511 i32 tm_dNotifyDate.tm_mday, +515 i32 tm_dNotifyDate.tm_mon, +519 i32 tm_dNotifyDate.tm_year, +523 i32 tm_dNotifyDate.tm_wday, +527 i32 tm_dNotifyDate.tm_yday, +531 i32 tm_dNotifyDate.tm_isdst, +535 char[20] sNotifyCharID, +555 char[512] sNotify
+
+Sent in reply to `0x7418` NC_GUILD_MY_GUILD_INFO_REQ † on CParserClient (`FUN_004217b0`) · payload 2 bytes · raw header
+
+Sent in reply to `0x2824` NC_OPTOOL_GUILD_DATA_CHANGE_REQ † on CParserOPTool (`FUN_00427980`) · payload 1069 bytes
 
 Fill: +2: FUN_00426770
 
@@ -3070,9 +5071,20 @@ Fill: +2: FUN_00426770
 |---|---|---|
 | 0 | u16 | `3137` (0xc41) |
 
-### `0x741b` ?
+### `0x741b` NC_GUILD_MEMBER_LIST_ACK †
 
-Sent in reply to `0x741a` ? on CParserClient (`FUN_004218c0`) · payload 6 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_LIST_ACK`, 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | TotalMemberCount |  |
+| 2 | u16 | MemberIndex |  |
+| 4 | u16 | MemberCount |  |
+| 6 | GUILD_MEMBER_CLIENT[MemberCount] | MemberList | variable length, element GUILD_MEMBER_CLIENT |
+
+Element `GUILD_MEMBER_CLIENT` (110 bytes): +0 char[20] sName, +20 u8 nGrade, +21 u32 nFlags, +25 u16 nExpRatio, +27 char[64] sIntro, +91 u32 dLogonInfo.login|year|month|day|hour, +95 u8 nClassID, +96 u8 nLevel, +97 u8 bIsParty, +98 char[12] sMap
+
+Sent in reply to `0x741a` NC_GUILD_MEMBER_LIST_REQ † on CParserClient (`FUN_004218c0`) · payload 6 bytes · raw header
 
 Sent from `FUN_00443e80` (`FUN_00443e80`) · payload variable (uVar1)
 
@@ -3088,9 +5100,15 @@ Sent from `FUN_00443e80` (`FUN_00443e80`) · payload variable (iVar2 * 0x6e + 6)
 |---|---|---|
 | 2 | i16 | `(short)iVar3 + 1` |
 
-### `0x741d` ?
+### `0x741d` NC_GUILD_MEMBER_LEAVE_ACK †
 
-Sent in reply to `0x741c` ? on CParserClient (`FUN_00415070`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_LEAVE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+
+Sent in reply to `0x741c` NC_GUILD_MEMBER_LEAVE_REQ † on CParserClient (`FUN_00415070`) · payload 2 bytes · raw header
 
 Sent from `FUN_0043f310` (`FUN_0043f310`) · payload 2 bytes · raw header
 
@@ -3098,9 +5116,15 @@ Sent from `FUN_0043f310` (`FUN_0043f310`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x7423` ?
+### `0x7423` NC_GUILD_WAR_ACK †
 
-Sent in reply to `0x7422` ? on CParserClient (`FUN_00414e50`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+
+Sent in reply to `0x7422` NC_GUILD_WAR_REQ † on CParserClient (`FUN_00414e50`) · payload 2 bytes · raw header
 
 Sent from `FUN_0043e9d0` (`FUN_0043e9d0`) · payload 2 bytes · raw header
 
@@ -3108,7 +5132,18 @@ Sent from `FUN_0043e9d0` (`FUN_0043e9d0`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x7425` ?
+### `0x7425` NC_GUILD_WAR_ABLE_LIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_ABLE_LIST_ACK`, 5 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8 | PartMask |  |
+| 3 | u16 | NumOfWarInfo |  |
+| 5 | SHINE_GUILD_WAR_ABLE_INFO[NumOfWarInfo] | WarInfoList | variable length, element SHINE_GUILD_WAR_ABLE_INFO |
+
+Element `SHINE_GUILD_WAR_ABLE_INFO` (42 bytes): +0 u32 nNo, +4 char[16] sName, +20 u8 nType, +21 u8 nGrade, +22 u8 nWarStatus, +23 u16 nNumMembers, +25 u8 nWarable, +26 char[16] sTargetName
 
 Sent from `FUN_0043e270` (`FUN_0043e270`) · payload variable ((uint)local_2020 * 0x2a + 5)
 
@@ -3129,7 +5164,18 @@ Fill: +8191: FUN_00428170
 | 2 | u8 | `0`; `local_2021 \| 2` |
 | 3 | u16 | `0`; `(ushort)uVar9` |
 
-### `0x7427` ?
+### `0x7427` NC_GUILD_WAR_LIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_LIST_ACK`, 5 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8 | PartMask |  |
+| 3 | u16 | NumOfWarInfo |  |
+| 5 | SHINE_GUILD_WAR_INFO[NumOfWarInfo] | WarInfoList | variable length, element SHINE_GUILD_WAR_INFO |
+
+Element `SHINE_GUILD_WAR_INFO` (234 bytes): +0 u32 nNo, +4 char[16] sName, +20 u8 nGrade, +21 u8 nWarStatus, +22 u32 nWarStatusRemainSec, +26 i32 dRequestDate, +30 i32 dStartDate, +34 i32 dEndDate, +38 i32 tm_dRequestDate.tm_sec, +42 i32 tm_dRequestDate.tm_min, +46 i32 tm_dRequestDate.tm_hour, +50 i32 tm_dRequestDate.tm_mday, +54 i32 tm_dRequestDate.tm_mon, +58 i32 tm_dRequestDate.tm_year, +62 i32 tm_dRequestDate.tm_wday, +66 i32 tm_dRequestDate.tm_yday, +70 i32 tm_dRequestDate.tm_isdst, +74 i32 tm_dStartDate.tm_sec, +78 i32 tm_dStartDate.tm_min, +82 i32 tm_dStartDate.tm_hour, +86 i32 tm_dStartDate.tm_mday, +90 i32 tm_dStartDate.tm_mon, +94 i32 tm_dStartDate.tm_year, +98 i32 tm_dStartDate.tm_wday, +102 i32 tm_dStartDate.tm_yday, +106 i32 tm_dStartDate.tm_isdst, +110 i32 tm_dEndDate.tm_sec, +114 i32 tm_dEndDate.tm_min, +118 i32 tm_dEndDate.tm_hour, +122 i32 tm_dEndDate.tm_mday, +126 i32 tm_dEndDate.tm_mon, +130 i32 tm_dEndDate.tm_year, +134 i32 tm_dEndDate.tm_wday, +138 i32 tm_dEndDate.tm_yday, +142 i32 tm_dEndDate.tm_isdst, +146 u32 nRequestNo, +150 u16[7] MyScore.nKillCount, +164 u32[7] MyScore.nKillScore, +192 u16[7] EnemyScore.nKillCount, +206 u32[7] EnemyScore.nKillScore
 
 Sent from `FUN_0043e590` (`FUN_0043e590`) · payload variable ((uint)local_2010 * 0xea + 5)
 
@@ -3173,6 +5219,17 @@ Sent from `FUN_0043e590` (`FUN_0043e590`) · payload variable (uVar5)
 
 ### `0x742a` ?
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_SCORE_CMD`, 116 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | GuildName1 | Name4 |
+| 16 | u16[7] | GuildScore1.nKillCount |  |
+| 30 | u32[7] | GuildScore1.nKillScore |  |
+| 58 | char[16] | GuildName2 | Name4 |
+| 74 | u16[7] | GuildScore2.nKillCount |  |
+| 88 | u32[7] | GuildScore2.nKillScore |  |
+
 Sent from `FUN_004497c0` (`FUN_004497c0`) · payload 116 bytes · raw header
 
 | Off | Type | Value / source |
@@ -3186,7 +5243,25 @@ Sent from `FUN_004497c0` (`FUN_004497c0`) · payload 116 bytes · raw header
 | 66 | u32 | `*(undefined4 *)(param_1 + 0xe9)` |
 | 70 | u32 | `*(undefined4 *)(param_1 + 0xed)` |
 
-### `0x742d` ?
+### `0x742d` NC_GUILD_NOTIFY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_NOTIFY_CMD`, 62 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | dNotifyDate |  |
+| 4 | i32 | tm_dNotifyDate.tm_sec |  |
+| 8 | i32 | tm_dNotifyDate.tm_min |  |
+| 12 | i32 | tm_dNotifyDate.tm_hour |  |
+| 16 | i32 | tm_dNotifyDate.tm_mday |  |
+| 20 | i32 | tm_dNotifyDate.tm_mon |  |
+| 24 | i32 | tm_dNotifyDate.tm_year |  |
+| 28 | i32 | tm_dNotifyDate.tm_wday |  |
+| 32 | i32 | tm_dNotifyDate.tm_yday |  |
+| 36 | i32 | tm_dNotifyDate.tm_isdst |  |
+| 40 | char[20] | sNotifyCharID | Name5 |
+| 60 | u16 | nNotifyLength |  |
+| 62 | char[nNotifyLength] | sNotify | variable length |
 
 Sent from `FUN_00444020` (`FUN_00444020`) · payload variable (*(ushort *)((int)param_1 + 0x3c) + 0x3e)
 
@@ -3195,7 +5270,24 @@ Sent from `FUN_00444020` (`FUN_00444020`) · payload variable (*(ushort *)((int)
 | 0 | bytes[?] | `memcpy from param_1` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x742f` ?
+### `0x742f` NC_GUILD_DISMISS_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_DISMISS_CMD`, 57 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | Name | Name4 |
+| 16 | u8 | nDismissStatus |  |
+| 17 | i32 | dDismissDate |  |
+| 21 | i32 | tm_dDismissDate.tm_sec |  |
+| 25 | i32 | tm_dDismissDate.tm_min |  |
+| 29 | i32 | tm_dDismissDate.tm_hour |  |
+| 33 | i32 | tm_dDismissDate.tm_mday |  |
+| 37 | i32 | tm_dDismissDate.tm_mon |  |
+| 41 | i32 | tm_dDismissDate.tm_year |  |
+| 45 | i32 | tm_dDismissDate.tm_wday |  |
+| 49 | i32 | tm_dDismissDate.tm_yday |  |
+| 53 | i32 | tm_dDismissDate.tm_isdst |  |
 
 Sent from `FUN_00444390` (`FUN_00444390`) · payload 57 bytes
 
@@ -3203,7 +5295,13 @@ Sent from `FUN_00444390` (`FUN_00444390`) · payload 57 bytes
 |---|---|---|
 | 0 | bytes[57] | `memcpy from param_1` |
 
-### `0x7430` ?
+### `0x7430` NC_GUILD_DELETE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_DELETE_CMD`, 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | Name | Name4 |
 
 Sent from `FUN_00444440` (`FUN_00444440`) · payload 16 bytes
 
@@ -3211,7 +5309,52 @@ Sent from `FUN_00444440` (`FUN_00444440`) · payload 16 bytes
 |---|---|---|
 | 0 | bytes[16] | `memcpy from param_1` |
 
-### `0x7432` ?
+### `0x7432` NC_GUILD_WAR_TARGET_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_TARGET_CMD`, 234 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | WarInfo.nNo |  |
+| 4 | char[16] | WarInfo.sName | Name4 |
+| 20 | u8 | WarInfo.nGrade |  |
+| 21 | u8 | WarInfo.nWarStatus |  |
+| 22 | u32 | WarInfo.nWarStatusRemainSec |  |
+| 26 | i32 | WarInfo.dRequestDate |  |
+| 30 | i32 | WarInfo.dStartDate |  |
+| 34 | i32 | WarInfo.dEndDate |  |
+| 38 | i32 | WarInfo.tm_dRequestDate.tm_sec |  |
+| 42 | i32 | WarInfo.tm_dRequestDate.tm_min |  |
+| 46 | i32 | WarInfo.tm_dRequestDate.tm_hour |  |
+| 50 | i32 | WarInfo.tm_dRequestDate.tm_mday |  |
+| 54 | i32 | WarInfo.tm_dRequestDate.tm_mon |  |
+| 58 | i32 | WarInfo.tm_dRequestDate.tm_year |  |
+| 62 | i32 | WarInfo.tm_dRequestDate.tm_wday |  |
+| 66 | i32 | WarInfo.tm_dRequestDate.tm_yday |  |
+| 70 | i32 | WarInfo.tm_dRequestDate.tm_isdst |  |
+| 74 | i32 | WarInfo.tm_dStartDate.tm_sec |  |
+| 78 | i32 | WarInfo.tm_dStartDate.tm_min |  |
+| 82 | i32 | WarInfo.tm_dStartDate.tm_hour |  |
+| 86 | i32 | WarInfo.tm_dStartDate.tm_mday |  |
+| 90 | i32 | WarInfo.tm_dStartDate.tm_mon |  |
+| 94 | i32 | WarInfo.tm_dStartDate.tm_year |  |
+| 98 | i32 | WarInfo.tm_dStartDate.tm_wday |  |
+| 102 | i32 | WarInfo.tm_dStartDate.tm_yday |  |
+| 106 | i32 | WarInfo.tm_dStartDate.tm_isdst |  |
+| 110 | i32 | WarInfo.tm_dEndDate.tm_sec |  |
+| 114 | i32 | WarInfo.tm_dEndDate.tm_min |  |
+| 118 | i32 | WarInfo.tm_dEndDate.tm_hour |  |
+| 122 | i32 | WarInfo.tm_dEndDate.tm_mday |  |
+| 126 | i32 | WarInfo.tm_dEndDate.tm_mon |  |
+| 130 | i32 | WarInfo.tm_dEndDate.tm_year |  |
+| 134 | i32 | WarInfo.tm_dEndDate.tm_wday |  |
+| 138 | i32 | WarInfo.tm_dEndDate.tm_yday |  |
+| 142 | i32 | WarInfo.tm_dEndDate.tm_isdst |  |
+| 146 | u32 | WarInfo.nRequestNo |  |
+| 150 | u16[7] | WarInfo.MyScore.nKillCount |  |
+| 164 | u32[7] | WarInfo.MyScore.nKillScore |  |
+| 192 | u16[7] | WarInfo.EnemyScore.nKillCount |  |
+| 206 | u32[7] | WarInfo.EnemyScore.nKillScore |  |
 
 Sent from `FUN_004440d0` (`FUN_004440d0`) · payload 234 bytes
 
@@ -3219,7 +5362,24 @@ Sent from `FUN_004440d0` (`FUN_004440d0`) · payload 234 bytes
 |---|---|---|
 | 0 | bytes[234] | `memcpy from param_1` |
 
-### `0x7433` ?
+### `0x7433` NC_GUILD_WAR_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_START_CMD`, 60 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | WarGuildName | Name4 |
+| 16 | u32 | RequestNo |  |
+| 20 | i32 | EndDate |  |
+| 24 | i32 | tm_EndDate.tm_sec |  |
+| 28 | i32 | tm_EndDate.tm_min |  |
+| 32 | i32 | tm_EndDate.tm_hour |  |
+| 36 | i32 | tm_EndDate.tm_mday |  |
+| 40 | i32 | tm_EndDate.tm_mon |  |
+| 44 | i32 | tm_EndDate.tm_year |  |
+| 48 | i32 | tm_EndDate.tm_wday |  |
+| 52 | i32 | tm_EndDate.tm_yday |  |
+| 56 | i32 | tm_EndDate.tm_isdst |  |
 
 Sent from `FUN_00444180` (`FUN_00444180`) · payload 60 bytes
 
@@ -3227,7 +5387,19 @@ Sent from `FUN_00444180` (`FUN_00444180`) · payload 60 bytes
 |---|---|---|
 | 0 | bytes[60] | `memcpy from param_1` |
 
-### `0x7434` ?
+### `0x7434` NC_GUILD_WAR_END_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_END_CMD`, 34 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | EnemyGuildName | Name4 |
+| 16 | u32 | RequestNo |  |
+| 20 | u32 | EnemyGuildFameAdd |  |
+| 24 | u32 | GuildFameAdd |  |
+| 28 | u32 | GuildTotalFame |  |
+| 32 | u8 | WarResult |  |
+| 33 | u8 | WarStatus |  |
 
 Sent from `FUN_00444230` (`FUN_00444230`) · payload 34 bytes
 
@@ -3235,7 +5407,13 @@ Sent from `FUN_00444230` (`FUN_00444230`) · payload 34 bytes
 |---|---|---|
 | 0 | bytes[34] | `memcpy from param_1` |
 
-### `0x7435` ?
+### `0x7435` NC_GUILD_WAR_COOLDOWN_DONE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_COOLDOWN_DONE_CMD`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Sent from `FUN_004442e0` (`FUN_004442e0`) · payload 1 bytes
 
@@ -3243,7 +5421,22 @@ Sent from `FUN_004442e0` (`FUN_004442e0`) · payload 1 bytes
 |---|---|---|
 | 0 | bytes[1] | `memcpy from param_1` |
 
-### `0x7436` ?
+### `0x7436` NC_GUILD_MEMBER_JOIN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_JOIN_CMD`, 110 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | Member.sName | Name5 |
+| 20 | u8 | Member.nGrade |  |
+| 21 | u32 | Member.nFlags |  |
+| 25 | u16 | Member.nExpRatio |  |
+| 27 | char[64] | Member.sIntro |  |
+| 91 | u32 | Member.dLogonInfo.login|year|month|day|hour | bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21 |
+| 95 | u8 | Member.nClassID |  |
+| 96 | u8 | Member.nLevel |  |
+| 97 | u8 | Member.bIsParty |  |
+| 98 | char[12] | Member.sMap | Name3 |
 
 Sent from `FUN_004444f0` (`FUN_004444f0`) · payload 110 bytes
 
@@ -3251,7 +5444,13 @@ Sent from `FUN_004444f0` (`FUN_004444f0`) · payload 110 bytes
 |---|---|---|
 | 0 | bytes[110] | `memcpy from param_1` |
 
-### `0x7437` ?
+### `0x7437` NC_GUILD_MEMBER_VANISH_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_VANISH_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Sent from `FUN_004445a0` (`FUN_004445a0`) · payload 20 bytes
 
@@ -3259,7 +5458,13 @@ Sent from `FUN_004445a0` (`FUN_004445a0`) · payload 20 bytes
 |---|---|---|
 | 0 | bytes[20] | `memcpy from param_1` |
 
-### `0x7438` ?
+### `0x7438` NC_GUILD_MEMBER_LEAVE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_LEAVE_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Sent from `FUN_00444650` (`FUN_00444650`) · payload 20 bytes
 
@@ -3267,7 +5472,14 @@ Sent from `FUN_00444650` (`FUN_00444650`) · payload 20 bytes
 |---|---|---|
 | 0 | bytes[20] | `memcpy from param_1` |
 
-### `0x7439` ?
+### `0x7439` NC_GUILD_MEMBER_GRADE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_GRADE_CMD`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | u8 | Grade |  |
 
 Sent from `FUN_00444700` (`FUN_00444700`) · payload 21 bytes
 
@@ -3275,7 +5487,13 @@ Sent from `FUN_00444700` (`FUN_00444700`) · payload 21 bytes
 |---|---|---|
 | 0 | bytes[21] | `memcpy from param_1` |
 
-### `0x743d` ?
+### `0x743d` NC_GUILD_MEMBER_LOGON_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_LOGON_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Sent from `FUN_004495a0` (`FUN_004495a0`) · payload 20 bytes · raw header
 
@@ -3287,7 +5505,13 @@ Sent from `FUN_004495a0` (`FUN_004495a0`) · payload 20 bytes · raw header
 | 12 | u32 | `*(undefined4 *)(iVar1 + 0x10)` |
 | 16 | u32 | `*(undefined4 *)(iVar1 + 0x14)` |
 
-### `0x743e` ?
+### `0x743e` NC_GUILD_MEMBER_LOGOFF_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_LOGOFF_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Sent from `FUN_00449620` (`FUN_00449620`) · payload 20 bytes · raw header
 
@@ -3299,7 +5523,14 @@ Sent from `FUN_00449620` (`FUN_00449620`) · payload 20 bytes · raw header
 | 12 | u32 | `*(undefined4 *)(iVar1 + 0x10)` |
 | 16 | u32 | `*(undefined4 *)(iVar1 + 0x14)` |
 
-### `0x7440` ?
+### `0x7440` NC_GUILD_MEMBER_LEVEL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_LEVEL_CMD`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | u8 | Level |  |
 
 Sent from `FUN_004496a0` (`FUN_004496a0`) · payload 21 bytes · raw header
 
@@ -3312,7 +5543,14 @@ Sent from `FUN_004496a0` (`FUN_004496a0`) · payload 21 bytes · raw header
 | 16 | u32 | `*(undefined4 *)(iVar1 + 0x14)` |
 | 20 | u8 | `*(undefined1 *)(iVar1 + 0x19)` |
 
-### `0x7441` ?
+### `0x7441` NC_GUILD_MEMBER_MAP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MEMBER_MAP_CMD`, 32 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | char[12] | sMap | Name3 |
 
 Sent from `FUN_00449720` (`FUN_00449720`) · payload 32 bytes · raw header
 
@@ -3327,7 +5565,17 @@ Sent from `FUN_00449720` (`FUN_00449720`) · payload 32 bytes · raw header
 | 24 | u32 | `*(undefined4 *)(iVar1 + 0x46)` |
 | 28 | u32 | `*(undefined4 *)(iVar1 + 0x4a)` |
 
-### `0x7474` ?
+### `0x7474` NC_GUILD_CHAT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_CHAT_CMD`, 26 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
+| 4 | char[20] | talker | Name5 |
+| 24 | u8 | chat.itemLinkDataCount |  |
+| 25 | u8 | chat.len |  |
+| 26 | u8[chat.len] | chat.content | variable length |
 
 Sent from `FUN_004447b0` (`FUN_004447b0`) · payload variable (local_201c)
 
@@ -3344,9 +5592,15 @@ Sent from `FUN_004447b0` (`FUN_004447b0`) · payload variable (local_201c)
 | 26 | bytes[8165] | `FID_conflict__memcpy from param_2 + 2` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x7475` ?
+### `0x7475` NC_GUILD_CHAT_ACK †
 
-Sent in reply to `0x7473` ? on CParserClient (`FUN_00415230`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_CHAT_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+
+Sent in reply to `0x7473` NC_GUILD_CHAT_REQ † on CParserClient (`FUN_00415230`) · payload 2 bytes · raw header
 
 Sent from `FUN_0043f6b0` (`FUN_0043f6b0`) · payload 2 bytes · raw header
 
@@ -3354,9 +5608,18 @@ Sent from `FUN_0043f6b0` (`FUN_0043f6b0`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x7477` ?
+### `0x7477` NC_GUILD_NAME_ACK †
 
-Sent in reply to `0x2824` ? on CParserOPTool (`FUN_00427980`) · payload 22 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_NAME_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nNo |  |
+| 4 | char[16] | Name | Name4 |
+| 20 | u8 | EmblemInfo.nPTFileNo |  |
+| 21 | u8 | EmblemInfo.nPTIconNo |  |
+
+Sent in reply to `0x2824` NC_OPTOOL_GUILD_DATA_CHANGE_REQ † on CParserOPTool (`FUN_00427980`) · payload 22 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -3378,7 +5641,15 @@ Sent from `FUN_0044ace0` (`FUN_0044ace0`) · payload 22 bytes · raw header
 | 16 | u32 | `0`; `param_3[3]` |
 | 20 | u16 | `65535` (0xffff); `*(undefined2 *)(iVar1 + 0x774)` |
 
-### `0x747b` ?
+### `0x747b` NC_GUILD_TOURNAMENT_JOIN_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_JOIN_ACK`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
+| 4 | u16 | nTeamPosition |  |
+| 6 | u16 | nError |  |
 
 Sent in reply to `0x748a` NC_GUILD_TOURNAMENT_DB_JOIN_ACK † on CParserCharDB (`FUN_0040bd10`) · payload 8 bytes · raw header
 
@@ -3395,7 +5666,17 @@ Sent from `FUN_0043f6e0` (`FUN_0043f6e0`) · payload 8 bytes · raw header
 | 0 | u32 | `param_2` |
 | 6 | u16 | `param_3` |
 
-### `0x7490` ?
+### `0x7490` NC_GUILD_TOURNAMENT_RESULT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_RESULT_CMD`, 12 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed |  |
+| 1 | u16 | nTournamentMapNo |  |
+| 3 | u8 | nStatus |  |
+| 4 | u32 | nWinnerGuildNo |  |
+| 8 | u32 | nLoseGuildNo |  |
 
 Sent from `FUN_0043f8e0` (`FUN_0043f8e0`) · payload 12 bytes · raw header
 
@@ -3406,7 +5687,14 @@ Sent from `FUN_0043f8e0` (`FUN_0043f8e0`) · payload 12 bytes · raw header
 | 4 | u32 | `*(undefined4 *)(param_2 + 4)` |
 | 8 | u32 | `*(undefined4 *)(param_2 + 8)` |
 
-### `0x74ae` ?
+### `0x74ae` NC_GUILD_RENAME_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_RENAME_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
+| 4 | char[16] | sGuildName | Name4 |
 
 Sent in reply to `0x74b3` NC_GUILD_DB_RENAME_ACK on CParserCharDB (`FUN_00410890`) · payload 20 bytes · raw header
 
@@ -3418,7 +5706,14 @@ Sent in reply to `0x74b3` NC_GUILD_DB_RENAME_ACK on CParserCharDB (`FUN_00410890
 | 12 | u32 | `in(0x74b3)+6` |
 | 16 | u32 | `in(0x74b3)+8` |
 
-### `0x74b6` ?
+### `0x74b6` NC_GUILD_RETYPE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_RETYPE_CMD`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
+| 4 | u8 | nType |  |
 
 Sent from `FUN_00444930` (`FUN_00444930`) · payload 5 bytes · raw header
 
@@ -3427,9 +5722,16 @@ Sent from `FUN_00444930` (`FUN_00444930`) · payload 5 bytes · raw header
 | 0 | u32 | `*param_1` |
 | 4 | u8 | `*(undefined1 *)(param_1 + 1)` |
 
-### `0x74bf` ?
+### `0x74bf` NC_GUILD_MY_GUILD_TOKEN_INFO_ACK †
 
-Sent in reply to `0x74be` ? on CParserClient (`FUN_00414ec0`) · payload 10 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MY_GUILD_TOKEN_INFO_ACK`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u64 | nGuildToken |  |
+
+Sent in reply to `0x74be` NC_GUILD_MY_GUILD_TOKEN_INFO_REQ † on CParserClient (`FUN_00414ec0`) · payload 10 bytes · raw header
 
 Sent from `FUN_0043cdd0` (`FUN_0043cdd0`) · payload 10 bytes
 
@@ -3439,7 +5741,14 @@ Sent from `FUN_0043cdd0` (`FUN_0043cdd0`) · payload 10 bytes
 | 2 | u32 | `this[0x448]` |
 | 6 | u32 | `this[0x44c]` |
 
-### `0x74c2` ?
+### `0x74c2` NC_GUILD_WORLD_SET_GUILD_TOKEN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WORLD_SET_GUILD_TOKEN_CMD`, 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nDecreaseGuildToken |  |
+| 8 | u64 | nRestGuildToken |  |
 
 Sent from `FUN_00443060` (`FUN_00443060`) · payload 16 bytes
 
@@ -3447,9 +5756,28 @@ Sent from `FUN_00443060` (`FUN_00443060`) · payload 16 bytes
 |---|---|---|
 | 0 | bytes[16] | `memcpy from param_1` |
 
-### `0x74c4` ?
+### `0x74c4` NC_GUILD_MY_GUILD_TOURNAMENT_MATCH_TIME_ACK †
 
-Sent in reply to `0x74c3` ? on CParserClient (`FUN_00414fa0`) · payload 45 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MY_GUILD_TOURNAMENT_MATCH_TIME_ACK`, 45 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8 | GTCondInfo.nMyGTCondition |  |
+| 3 | i32 | GTCondInfo.nMatchTime |  |
+| 7 | i32 | GTCondInfo.tm_nMatchTime.tm_sec |  |
+| 11 | i32 | GTCondInfo.tm_nMatchTime.tm_min |  |
+| 15 | i32 | GTCondInfo.tm_nMatchTime.tm_hour |  |
+| 19 | i32 | GTCondInfo.tm_nMatchTime.tm_mday |  |
+| 23 | i32 | GTCondInfo.tm_nMatchTime.tm_mon |  |
+| 27 | i32 | GTCondInfo.tm_nMatchTime.tm_year |  |
+| 31 | i32 | GTCondInfo.tm_nMatchTime.tm_wday |  |
+| 35 | i32 | GTCondInfo.tm_nMatchTime.tm_yday |  |
+| 39 | i32 | GTCondInfo.tm_nMatchTime.tm_isdst |  |
+| 43 | u8 | GTCondInfo.nGTGrade |  |
+| 44 | u8 | GTCondInfo.bIsJoin |  |
+
+Sent in reply to `0x74c3` NC_GUILD_MY_GUILD_TOURNAMENT_MATCH_TIME_REQ † on CParserClient (`FUN_00414fa0`) · payload 45 bytes · raw header
 
 Sent from `FUN_0043cea0` (`FUN_0043cea0`) · payload 45 bytes
 
@@ -3457,7 +5785,19 @@ Sent from `FUN_0043cea0` (`FUN_0043cea0`) · payload 45 bytes
 |---|---|---|
 | 0 | u16 | `7016` (0x1b68) |
 
-### `0x74ea` ?
+### `0x74ea` NC_GUILD_TOURNAMENT_JOIN_LIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_JOIN_LIST_ACK`, 9 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8 | PartMask |  |
+| 3 | u32 | nGTNo |  |
+| 7 | u16 | nJoinGuildNum |  |
+| 9 | SHINE_GUILD_LIST_NEW[nJoinGuildNum] | JoinGuildList | variable length, element SHINE_GUILD_LIST_NEW |
+
+Element `SHINE_GUILD_LIST_NEW` (46 bytes): +0 u32 nGuildNo, +4 char[16] sGuildName, +20 char[20] sMasterCharID, +40 u8 nType, +41 u8 nGrade, +42 u16 nMemberCnt, +44 u16 nMaxMembers
 
 Sent in reply to `0x74ec` NC_GUILD_TOURNAMENT_DB_JOIN_LIST_ACK on CParserCharDB (`FUN_0040c010`) · payload variable (iVar3 * 0x2e + 9)
 
@@ -3478,7 +5818,15 @@ Sent from `FUN_004400c0` (`FUN_004400c0`) · payload 9 bytes
 | 3 | u32 | `0` |
 | 7 | u16 | `0` |
 
-### `0x74ed` ?
+### `0x74ed` NC_GUILD_TOURNAMENT_NOTIFY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_NOTIFY_CMD`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | Type |  |
+| 4 | u8 | nRanking |  |
+| 5 | char[16] | sGuildName | Name4 |
 
 Sent from `FUN_00446340` (`FUN_00446340`) · payload 21 bytes
 
@@ -3514,7 +5862,13 @@ Sent from `FUN_00446bd0` (`FUN_00446bd0`) · payload 21 bytes
 | 19 | char | `'\0'` |
 | 20 | char | `'\0'` |
 
-### `0x74f8` ?
+### `0x74f8` NC_GUILD_TOURNAMENT_REFUND_NOTICE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_REFUND_NOTICE_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nRefundMoney |  |
 
 Sent from `FUN_00430e30` (`FUN_00430e30`) · payload 8 bytes
 
@@ -3524,6 +5878,18 @@ Sent from `FUN_00430e30` (`FUN_00430e30`) · payload 8 bytes
 | 4 | i32 | `piVar2[4]` |
 
 ### `0x74fe` NC_GUILD_HISTORY_LIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_HISTORY_LIST_ACK`, 8 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u16 | TotalHistoryCount |  |
+| 4 | u16 | HistoryCount |  |
+| 6 | u16 | HistoryIndex |  |
+| 8 | GUILD_HISTORY[HistoryCount] | HistoryList | variable length, element GUILD_HISTORY |
+
+Element `GUILD_HISTORY` (32 bytes): +0 u32 nHistoryNumber, +4 u16 HistoryOccurDate.nYear, +6 u8 HistoryOccurDate.nMon, +7 u8 HistoryOccurDate.nDay, +8 char[20] sCharName, +28 i32 nMessageType
 
 Sent from `FUN_00443640` (`FUN_00443640`) · payload 8 bytes
 
@@ -3543,7 +5909,13 @@ Sent from `FUN_00448d70` (`FUN_00448d70`) · payload variable (uVar1 * 0x20 + 8)
 | 6 | i16 | `param_2[4]` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x7502` ?
+### `0x7502` NC_GUILD_EMBLEM_CHECK_AVAILABILITY_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_EMBLEM_CHECK_AVAILABILITY_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
 
 Sent from `FUN_00443890` (`FUN_00443890`) · payload 2 bytes
 
@@ -3551,7 +5923,13 @@ Sent from `FUN_00443890` (`FUN_00443890`) · payload 2 bytes
 |---|---|---|
 | 0 | u16 | `14080` (0x3700); `14082` (0x3702); `14083` (0x3703) |
 
-### `0x7506` ?
+### `0x7506` NC_GUILD_EMBLEM_SAVE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_EMBLEM_SAVE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
 
 Sent from `FUN_0044f840` (`FUN_0044f840`) · payload 2 bytes
 
@@ -3561,7 +5939,14 @@ Sent from `FUN_0044f840` (`FUN_0044f840`) · payload 2 bytes
 
 *1 more send sites not shown: FUN_0044fae0*
 
-### `0x7509` ?
+### `0x7509` NC_GUILD_EMBLEM_OFF_MSG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_EMBLEM_OFF_MSG_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nMonth |  |
+| 1 | u8 | nDay |  |
 
 Sent from `FUN_00430bc0` (`FUN_00430bc0`) · payload 2 bytes
 
@@ -3570,7 +5955,15 @@ Sent from `FUN_00430bc0` (`FUN_00430bc0`) · payload 2 bytes
 | 0 | char | `(char)local_38.tm_mon + '\x01'` |
 | 1 | u8 | `(undefined1)local_38.tm_mday` |
 
-### `0x750a` ?
+### `0x750a` NC_GUILD_EMBLEM_INFO_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_EMBLEM_INFO_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | EmblemInfo.nPTFileNo |  |
+| 1 | u8 | EmblemInfo.nPTIconNo |  |
+| 2 | u8 | EmblemState |  |
 
 Sent from `FUN_00430bc0` (`FUN_00430bc0`) · payload 3 bytes
 
@@ -3579,7 +5972,15 @@ Sent from `FUN_00430bc0` (`FUN_00430bc0`) · payload 3 bytes
 | 0 | u16 | `*(undefined2 *)(iVar1 + 0x774)` |
 | 2 | u8 | `*(undefined1 *)(iVar1 + 0x778)` |
 
-### `0x750b` ?
+### `0x750b` NC_GUILD_EMBLEM_INFO_NOTICE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_EMBLEM_INFO_NOTICE_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
+| 4 | u8 | EmblemInfo.nPTFileNo |  |
+| 5 | u8 | EmblemInfo.nPTIconNo |  |
 
 Sent from `FUN_00443b20` (`FUN_00443b20`) · payload 6 bytes
 
@@ -3588,9 +5989,16 @@ Sent from `FUN_00443b20` (`FUN_00443b20`) · payload 6 bytes
 | 0 | i32 | `param_1` |
 | 4 | u16 | `65535` (0xffff); `*(undefined2 *)(iVar1 + 0x774)` |
 
-### `0x7c02` ?
+### `0x7c02` NC_PRISON_ADD_GM_ACK †
 
-Sent in reply to `0x7c0c` ? on CParserCharDB (`FUN_00410a50`) · payload 22 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PRISON_ADD_GM_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sImprison | Name5 |
+| 20 | u16 | err |  |
+
+Sent in reply to `0x7c0c` NC_DATA_PRISON_ADD_GM_ACK † on CParserCharDB (`FUN_00410a50`) · payload 22 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -3601,9 +6009,17 @@ Sent in reply to `0x7c0c` ? on CParserCharDB (`FUN_00410a50`) · payload 22 byte
 | 16 | u32 | `in(0x7c0c)+11` |
 | 20 | u16 | `in(0x7c0c)+0` |
 
-### `0x7c03` ?
+### `0x7c03` NC_PRISON_OK_CMD †
 
-Sent in reply to `0x7c11` ? on CParserCharDB (`FUN_00410b90`) · payload 82 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PRISON_OK_CMD`, 82 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMinute |  |
+| 2 | char[16] | sReason |  |
+| 18 | char[64] | sRemark |  |
+
+Sent in reply to `0x7c11` NC_DATA_PRISON_ALTER_GM_ACK † on CParserCharDB (`FUN_00410b90`) · payload 82 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -3613,17 +6029,33 @@ Sent in reply to `0x7c11` ? on CParserCharDB (`FUN_00410b90`) · payload 82 byte
 | 10 | u32 | `in(0x7c11)+18` |
 | 14 | u32 | `in(0x7c11)+20` |
 
-### `0x7c05` ?
+### `0x7c05` NC_PRISON_END_ACK †
 
-Sent in reply to `0x7c04` ? on CParserClient (`FUN_004155f0`) · payload 6 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PRISON_END_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u32 | nPrisonSecond |  |
+
+Sent in reply to `0x7c04` NC_PRISON_END_REQ † on CParserClient (`FUN_004155f0`) · payload 6 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 2 | u32 | `(undefined4)lVar2` |
 
-### `0x7c07` NC_PRISON_ADD_GM_ACK †
+### `0x7c07` NC_PRISON_GET_ACK †
 
-Sent in reply to `0x7c0f` NC_PRISON_ADD_GM_ACK † on CParserCharDB (`FUN_0040c350`) · payload 84 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PRISON_GET_ACK`, 84 bytes · ⚠ 2016 code uses 4 bytes: version drift or extraction error
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u16 | nMinute |  |
+| 4 | char[16] | sReason |  |
+| 20 | char[64] | sRemark |  |
+
+Sent in reply to `0x7c0f` NC_DATA_PRISON_GET_ACK † on CParserCharDB (`FUN_0040c350`) · payload 84 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -3634,11 +6066,18 @@ Sent in reply to `0x7c0f` NC_PRISON_ADD_GM_ACK † on CParserCharDB (`FUN_0040c3
 | 12 | u32 | `in(0x7c0f)+5` |
 | 16 | u32 | `in(0x7c0f)+7` |
 
-Sent in reply to `0x7c06` ? on CParserClient (`FUN_00415530`) · payload 4 bytes · raw header
+Sent in reply to `0x7c06` NC_PRISON_GET_REQ † on CParserClient (`FUN_00415530`) · payload 4 bytes · raw header
 
-### `0x7c0a` ?
+### `0x7c0a` NC_PRISON_ALTER_GM_ACK †
 
-Sent in reply to `0x7c11` ? on CParserCharDB (`FUN_00410b90`) · payload 22 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PRISON_ALTER_GM_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sImprison | Name5 |
+| 20 | u16 | err |  |
+
+Sent in reply to `0x7c11` NC_DATA_PRISON_ALTER_GM_ACK † on CParserCharDB (`FUN_00410b90`) · payload 22 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -3649,9 +6088,17 @@ Sent in reply to `0x7c11` ? on CParserCharDB (`FUN_00410b90`) · payload 22 byte
 | 16 | u32 | `0`; `in(0x7c11)+11` |
 | 20 | u16 | `3490` (0xda2); `in(0x7c11)+0` |
 
-### `0x8002` ?
+### `0x8002` NC_REPORT_ADD_ACK †
 
-Sent in reply to `0x8008` ? on CParserAccountLogDB (`FUN_004092e0`) · payload 26 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_REPORT_ADD_ACK`, 26 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sHarmer | Name5 |
+| 20 | u32 | nRegNumber |  |
+| 24 | u16 | err |  |
+
+Sent in reply to `0x8008` NC_DATA_REPORT_ADD_ACK † on CParserAccountLogDB (`FUN_004092e0`) · payload 26 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -3663,20 +6110,56 @@ Sent in reply to `0x8008` ? on CParserAccountLogDB (`FUN_004092e0`) · payload 2
 | 20 | u32 | `in(0x8008)+11` |
 | 24 | u16 | `in(0x8008)+0` |
 
-### `0x8004` ?
+### `0x8004` NC_REPORT_CANCEL_ACK †
 
-Sent in reply to `0x800a` ? on CParserAccountLogDB (`FUN_004090c0`) · payload 6 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_REPORT_CANCEL_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nRegNumber |  |
+| 4 | u16 | err |  |
+
+Sent in reply to `0x800a` NC_DATA_REPORT_CANCEL_ACK † on CParserAccountLogDB (`FUN_004090c0`) · payload 6 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u32 | `in(0x800a)+-1` |
 | 4 | u16 | `in(0x800a)+6` |
 
-### `0x8006` ?
+### `0x8006` NC_REPORT_GET_ACK †
 
-Sent in reply to `0x800c` ? on CParserAccountLogDB (`FUN_00409130`) · payload 135 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_REPORT_GET_ACK`, 135 bytes
 
-### `0x9402` ?
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u32 | nRegNumber |  |
+| 6 | u8 | byReportResult |  |
+| 7 | u8[128] | byRemark |  |
+
+Sent in reply to `0x800c` NC_DATA_REPORT_GET_ACK † on CParserAccountLogDB (`FUN_00409130`) · payload 135 bytes · raw header
+
+### `0x9402` NC_HOLY_PROMISE_SET_UP_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_SET_UP_ACK`, 68 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | char[20] | UpInfo.PromiseCharID | Name5 |
+| 22 | u32 | UpInfo.LogonInfo.login|year|month|day|hour | bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21 |
+| 26 | u8 | UpInfo.Level |  |
+| 27 | u8 | UpInfo.Flags |  |
+| 28 | i32 | ResetableDateTime |  |
+| 32 | i32 | tm_ResetableDateTime.tm_sec |  |
+| 36 | i32 | tm_ResetableDateTime.tm_min |  |
+| 40 | i32 | tm_ResetableDateTime.tm_hour |  |
+| 44 | i32 | tm_ResetableDateTime.tm_mday |  |
+| 48 | i32 | tm_ResetableDateTime.tm_mon |  |
+| 52 | i32 | tm_ResetableDateTime.tm_year |  |
+| 56 | i32 | tm_ResetableDateTime.tm_wday |  |
+| 60 | i32 | tm_ResetableDateTime.tm_yday |  |
+| 64 | i32 | tm_ResetableDateTime.tm_isdst |  |
 
 Sent in reply to `0x941f` NC_HOLY_PROMISE_DB_SET_UP_ACK † on CParserCharDB (`FUN_00411ba0`) · payload 68 bytes · raw header
 
@@ -3692,32 +6175,60 @@ Sent in reply to `0x941f` NC_HOLY_PROMISE_DB_SET_UP_ACK † on CParserCharDB (`F
 | 26 | u8 | `in(0x941f)+66` |
 | 27 | u8 | `in(0x941f)+67` |
 
-Sent in reply to `0x9401` ? on CParserClient (`FUN_00421990`) · payload 68 bytes · raw header
+Sent in reply to `0x9401` NC_HOLY_PROMISE_SET_UP_REQ † on CParserClient (`FUN_00421990`) · payload 68 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `5961` (0x1749); `5968` (0x1750) |
 | 28 | u32 | `_Var5` |
 
-Sent in reply to `0x9405` ? on CParserClient (`FUN_00421d10`) · payload 68 bytes · raw header
+Sent in reply to `0x9405` NC_HOLY_PROMISE_SET_UP_CONFIRM_ACK † on CParserClient (`FUN_00421d10`) · payload 68 bytes · raw header
 
-### `0x9404` ?
+### `0x9404` NC_HOLY_PROMISE_SET_UP_CONFIRM_REQ †
 
-Sent in reply to `0x9401` ? on CParserClient (`FUN_00421990`) · payload 40 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_SET_UP_CONFIRM_REQ`, 40 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | char[20] | UpCharID | Name5 |
+
+Sent in reply to `0x9401` NC_HOLY_PROMISE_SET_UP_REQ † on CParserClient (`FUN_00421990`) · payload 40 bytes · raw header
 
 Fill: +20: FUN_00402140
 
-### `0x9407` ?
+### `0x9407` NC_HOLY_PROMISE_DEL_UP_ACK †
 
-Sent in reply to `0x9406` ? on CParserClient (`FUN_00415c00`) · payload 3 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_DEL_UP_ACK`, 3 bytes · ⚠ 2016 code uses 22 bytes: version drift or extraction error
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nDelCmdType |  |
+| 1 | u16 | Error |  |
+
+Sent in reply to `0x9406` NC_HOLY_PROMISE_DEL_UP_REQ † on CParserClient (`FUN_00415c00`) · payload 3 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 1 | u16 | `5976` (0x1758) |
 
-Sent in reply to `0x940a` ? on CParserClient (`FUN_0041e570`) · payload 22 bytes · raw header
+Sent in reply to `0x940a` NC_HOLY_PROMISE_DEL_DOWN_REQ † on CParserClient (`FUN_0041e570`) · payload 22 bytes · raw header
 
-### `0x9414` ?
+### `0x9414` NC_HOLY_PROMISE_LIST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_LIST_CMD`, 29 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | UpInfo.PromiseCharID | Name5 |
+| 20 | u32 | UpInfo.LogonInfo.login|year|month|day|hour | bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21 |
+| 24 | u8 | UpInfo.Level |  |
+| 25 | u8 | UpInfo.Flags |  |
+| 26 | u8 | nPart |  |
+| 27 | u16 | MemberCount |  |
+| 29 | PROTO_HOLY_PROMISE_INFO[MemberCount] | MemberInfo | variable length, element PROTO_HOLY_PROMISE_INFO |
+
+Element `PROTO_HOLY_PROMISE_INFO` (26 bytes): +0 char[20] PromiseCharID, +20 u32 LogonInfo.login|year|month|day|hour, +24 u8 Level, +25 u8 Flags
 
 Sent from `FUN_00434c20` (`FUN_00434c20`) · payload variable (uVar2)
 
@@ -3741,7 +6252,17 @@ Sent from `FUN_00434c20` (`FUN_00434c20`) · payload variable (iVar1 * 0x1a + 0x
 | 26 | u8 | `local_1ff9 & 0xfe`; `local_1ff9 \| 2` |
 | 27 | u16 | `(undefined2)iVar1` |
 
-### `0x9415` ?
+### `0x9415` NC_HOLY_PROMISE_ADD_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_ADD_CMD`, 28 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | char[20] | MemberInfo.PromiseCharID | Name5 |
+| 22 | u32 | MemberInfo.LogonInfo.login|year|month|day|hour | bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21 |
+| 26 | u8 | MemberInfo.Level |  |
+| 27 | u8 | MemberInfo.Flags |  |
 
 Sent in reply to `0x941f` NC_HOLY_PROMISE_DB_SET_UP_ACK † on CParserCharDB (`FUN_00411ba0`) · payload 28 bytes · raw header
 
@@ -3757,7 +6278,13 @@ Sent in reply to `0x941f` NC_HOLY_PROMISE_DB_SET_UP_ACK † on CParserCharDB (`F
 | 26 | u8 | `in(0x941f)+24` |
 | 27 | u8 | `in(0x941f)+25` |
 
-### `0x9416` ?
+### `0x9416` NC_HOLY_PROMISE_LOGIN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_LOGIN_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Sent from `FUN_00451700` (`FUN_00451700`) · payload 20 bytes · raw header
 
@@ -3769,7 +6296,13 @@ Sent from `FUN_00451700` (`FUN_00451700`) · payload 20 bytes · raw header
 | 12 | u32 | `param_1[3]` |
 | 16 | u32 | `param_1[4]` |
 
-### `0x9417` ?
+### `0x9417` NC_HOLY_PROMISE_LOGOUT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_LOGOUT_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Sent from `FUN_00451790` (`FUN_00451790`) · payload 20 bytes · raw header
 
@@ -3781,9 +6314,16 @@ Sent from `FUN_00451790` (`FUN_00451790`) · payload 20 bytes · raw header
 | 12 | u32 | `*(undefined4 *)(iVar2 + 0x10)` |
 | 16 | u32 | `*(undefined4 *)(iVar2 + 0x14)` |
 
-### `0x9418` ?
+### `0x9418` NC_HOLY_PROMISE_DEL_CMD †
 
-Sent in reply to `0x9425` ? on CParserCharDB (`FUN_0040f390`) · payload 21 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_DEL_CMD`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | u8 | nDelCmdType |  |
+
+Sent in reply to `0x9425` NC_HOLY_PROMISE_DB_DEL_CHAR_ACK † on CParserCharDB (`FUN_0040f390`) · payload 21 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -3793,7 +6333,14 @@ Sent in reply to `0x9425` ? on CParserCharDB (`FUN_0040f390`) · payload 21 byte
 | 12 | i32 | `this[0x1dfbc]`; `piVar2[3]` |
 | 16 | i32 | `this[0x1dfc0]`; `piVar2[4]` |
 
-### `0x9419` ?
+### `0x9419` NC_HOLY_PROMISE_LEVEL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_LEVEL_CMD`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | u8 | Level |  |
 
 Sent from `FUN_00451930` (`FUN_00451930`) · payload 21 bytes · raw header
 
@@ -3806,7 +6353,16 @@ Sent from `FUN_00451930` (`FUN_00451930`) · payload 21 bytes · raw header
 | 16 | u32 | `*(undefined4 *)(iVar2 + 0x14)`; `*(undefined4 *)(param_1 + 0x1e1dc)` |
 | 20 | u8 | `1`; `param_2` |
 
-### `0x941a` ?
+### `0x941a` NC_HOLY_PROMISE_REWARD_ITEM_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_REWARD_ITEM_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nNumOfItems |  |
+| 1 | PROTO_NC_HOLY_PROMISE_REWARD_ITEM_CMD::<unnamed-type-RewardList>[nNumOfItems] | RewardList | variable length, element PROTO_NC_HOLY_PROMISE_REWARD_ITEM_CMD::<unnamed-type-RewardList> |
+
+Element `PROTO_NC_HOLY_PROMISE_REWARD_ITEM_CMD::<unnamed-type-RewardList>` (4 bytes): +0 u16 nItemID, +2 u16 nItemLot
 
 Sent in reply to `0x942b` NC_HOLY_PROMISE_DB_REWARD_ACK † on CParserCharDB (`FUN_0040cac0`) · payload variable (uVar5 * 4 + 1)
 
@@ -3815,7 +6371,13 @@ Sent in reply to `0x942b` NC_HOLY_PROMISE_DB_REWARD_ACK † on CParserCharDB (`F
 | 0 | u8 | `in(0x942b)+8` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x9445` ?
+### `0x9445` NC_HOLY_PROMISE_CLIENT_GET_REMAIN_MONEY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_CLIENT_GET_REMAIN_MONEY_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nMoney |  |
 
 Sent from `FUN_00434c20` (`FUN_00434c20`) · payload 8 bytes
 
@@ -3824,9 +6386,18 @@ Sent from `FUN_00434c20` (`FUN_00434c20`) · payload 8 bytes
 | 0 | u32 | `*(undefined4 *)(param_1 + 0x1e1f8)` |
 | 4 | u32 | `*(undefined4 *)(param_1 + 0x1e1fc)` |
 
-### `0x9808` ?
+### `0x9808` NC_GUILD_ACADEMY_MY_GUILD_ACADEMY_INFO_ACK †
 
-Sent in reply to `0x9807` ? on CParserClient (`FUN_00421f40`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MY_GUILD_ACADEMY_INFO_ACK`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | GUILD_ACADEMY_CLIENT[rest] | GuildAcademyInfo | variable length, count unknown, element GUILD_ACADEMY_CLIENT |
+
+Element `GUILD_ACADEMY_CLIENT` (736 bytes): +0 char[20] sAcademyMasterName, +20 u16 nNumAcademyMembers, +22 u16 nMaxAcademyMembers, +24 u32 nAcademyPoint, +28 u32 nAcademyRank, +32 i32 dAcademyBuffUntilTime, +36 char[128] sIntro, +164 i32 dNotifyDate, +168 i32 tm_dNotifyDate.tm_sec, +172 i32 tm_dNotifyDate.tm_min, +176 i32 tm_dNotifyDate.tm_hour, +180 i32 tm_dNotifyDate.tm_mday, +184 i32 tm_dNotifyDate.tm_mon, +188 i32 tm_dNotifyDate.tm_year, +192 i32 tm_dNotifyDate.tm_wday, +196 i32 tm_dNotifyDate.tm_yday, +200 i32 tm_dNotifyDate.tm_isdst, +204 char[20] sNotifyCharID, +224 char[512] sNotify
+
+Sent in reply to `0x9807` NC_GUILD_ACADEMY_MY_GUILD_ACADEMY_INFO_REQ † on CParserClient (`FUN_00421f40`) · payload 2 bytes · raw header
 
 Sent from `FUN_0043cf90` (`FUN_0043cf90`) · payload 14 bytes
 
@@ -3846,13 +6417,34 @@ Fill: +2: FUN_00430d50
 | 0 | u16 | `6584` (0x19b8) |
 | 34 | i32 | `0`; `local_1ff1 - _Var1` |
 
-### `0x980a` ?
+### `0x980a` NC_GUILD_ACADEMY_MY_ACADEMY_RANK_INFO_ACK †
 
-Sent in reply to `0x9809` ? on CParserClient (`FUN_00415ce0`) · payload 14 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MY_ACADEMY_RANK_INFO_ACK`, 14 bytes
 
-### `0x980c` ?
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u32 | nAcademyPoint |  |
+| 6 | u32 | nAcademyRank |  |
+| 10 | i32 | dAcademyBuffUntilTime |  |
 
-Sent in reply to `0x980b` ? on CParserClient (`FUN_00422060`) · payload 11 bytes · raw header
+Sent in reply to `0x9809` NC_GUILD_ACADEMY_MY_ACADEMY_RANK_INFO_REQ † on CParserClient (`FUN_00415ce0`) · payload 14 bytes · raw header
+
+### `0x980c` NC_GUILD_ACADEMY_LIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_LIST_ACK`, 11 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8 | PartMask |  |
+| 3 | u32 | TotalNumOfGuildAcademy |  |
+| 7 | u32 | NumOfGuildAcademy |  |
+| 11 | SHINE_GUILD_ACADEMY_LIST[NumOfGuildAcademy] | GuildAcademyList | variable length, element SHINE_GUILD_ACADEMY_LIST |
+
+Element `SHINE_GUILD_ACADEMY_LIST` (42 bytes): +0 char[16] GuildName, +16 char[20] GuildMasterName, +36 u16 NumOfGuildMembers, +38 u16 NumOfAcademyMembers, +40 u16 NumOfGraduate
+
+Sent in reply to `0x980b` NC_GUILD_ACADEMY_LIST_REQ † on CParserClient (`FUN_00422060`) · payload 11 bytes · raw header
 
 Sent from `FUN_00447ed0` (`FUN_00447ed0`) · payload variable (local_200c * 0x2a + 0xb)
 
@@ -3871,7 +6463,18 @@ Sent from `FUN_00447ed0` (`FUN_00447ed0`) · payload variable (uVar14)
 | 2 | u8 | `0` |
 | 7 | i32 | `0`; `local_200c + 1` |
 
-### `0x980e` ?
+### `0x980e` NC_GUILD_ACADEMY_MEMBER_LIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_LIST_ACK`, 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | TotalAcademyMemberCount |  |
+| 2 | u16 | AcademyMemberIndex |  |
+| 4 | u16 | AcademyMemberCount |  |
+| 6 | GUILD_ACADEMY_MEMBER_CLIENT[AcademyMemberCount] | AcademyMemberList | variable length, element GUILD_ACADEMY_MEMBER_CLIENT |
+
+Element `GUILD_ACADEMY_MEMBER_CLIENT` (109 bytes): +0 char[20] sName, +20 u8 nGrade, +21 char[64] sIntro, +85 u32 dLogonInfo.login|year|month|day|hour, +89 u8 nClassID, +90 u8 nLevel, +91 u8 bIsParty, +92 char[12] sMap, +104 u32 dJoinInfo.login|year|month|day|hour, +108 u8 nJoinLevel
 
 Sent from `FUN_00447110` (`FUN_00447110`) · payload variable (uVar1)
 
@@ -3887,7 +6490,14 @@ Sent from `FUN_00447110` (`FUN_00447110`) · payload variable (iVar2 * 0x6d + 6)
 |---|---|---|
 | 2 | u32 | `CONCAT22(local_2011._2_2_,(short)iVar3 + 1)` |
 
-### `0x9812` ?
+### `0x9812` NC_GUILD_ACADEMY_MEMBER_JOIN_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_JOIN_ACK`, 18 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | GuildName | Name4 |
+| 16 | u16 | Error |  |
 
 Sent from `FUN_0044bb10` (`FUN_0044bb10`) · payload 18 bytes · raw header
 
@@ -3899,7 +6509,22 @@ Sent from `FUN_0044bb10` (`FUN_0044bb10`) · payload 18 bytes · raw header
 | 12 | u32 | `param_2[3]` |
 | 16 | u16 | `param_3` |
 
-### `0x9813` ?
+### `0x9813` NC_GUILD_ACADEMY_MEMBER_JOIN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_JOIN_CMD`, 109 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | Member.sName | Name5 |
+| 20 | u8 | Member.nGrade |  |
+| 21 | char[64] | Member.sIntro |  |
+| 85 | u32 | Member.dLogonInfo.login|year|month|day|hour | bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21 |
+| 89 | u8 | Member.nClassID |  |
+| 90 | u8 | Member.nLevel |  |
+| 91 | u8 | Member.bIsParty |  |
+| 92 | char[12] | Member.sMap | Name3 |
+| 104 | u32 | Member.dJoinInfo.login|year|month|day|hour | bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21 |
+| 108 | u8 | Member.nJoinLevel |  |
 
 Sent from `FUN_00440560` (`FUN_00440560`) · payload 109 bytes
 
@@ -3907,9 +6532,16 @@ Sent from `FUN_00440560` (`FUN_00440560`) · payload 109 bytes
 |---|---|---|
 | 0 | bytes[109] | `memcpy from param_1` |
 
-### `0x9817` ?
+### `0x9817` NC_GUILD_ACADEMY_MEMBER_VANISH_ACK †
 
-Sent in reply to `0x9816` ? on CParserClient (`FUN_0041e700`) · payload 22 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_VANISH_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | u16 | Error |  |
+
+Sent in reply to `0x9816` NC_GUILD_ACADEMY_MEMBER_VANISH_REQ † on CParserClient (`FUN_0041e700`) · payload 22 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -3920,7 +6552,13 @@ Sent in reply to `0x9816` ? on CParserClient (`FUN_0041e700`) · payload 22 byte
 | 16 | u32 | `0` |
 | 20 | u16 | `6047` (0x179f) |
 
-### `0x9818` ?
+### `0x9818` NC_GUILD_ACADEMY_MEMBER_VANISH_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_VANISH_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Sent from `FUN_00440610` (`FUN_00440610`) · payload 20 bytes
 
@@ -3928,9 +6566,15 @@ Sent from `FUN_00440610` (`FUN_00440610`) · payload 20 bytes
 |---|---|---|
 | 0 | bytes[20] | `memcpy from param_1` |
 
-### `0x981c` ?
+### `0x981c` NC_GUILD_ACADEMY_MEMBER_LEAVE_ACK †
 
-Sent in reply to `0x981b` ? on CParserClient (`FUN_00415f30`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_LEAVE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+
+Sent in reply to `0x981b` NC_GUILD_ACADEMY_MEMBER_LEAVE_REQ † on CParserClient (`FUN_00415f30`) · payload 2 bytes · raw header
 
 Sent from `FUN_00441fa0` (`FUN_00441fa0`) · payload 2 bytes · raw header
 
@@ -3938,9 +6582,15 @@ Sent from `FUN_00441fa0` (`FUN_00441fa0`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x9820` ?
+### `0x9820` NC_GUILD_ACADEMY_MASTER_TELEPORT_ACK †
 
-Sent in reply to `0x981f` ? on CParserClient (`FUN_00416010`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MASTER_TELEPORT_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+
+Sent in reply to `0x981f` NC_GUILD_ACADEMY_MASTER_TELEPORT_REQ † on CParserClient (`FUN_00416010`) · payload 2 bytes · raw header
 
 Sent from `FUN_00441fd0` (`FUN_00441fd0`) · payload 2 bytes · raw header
 
@@ -3948,9 +6598,15 @@ Sent from `FUN_00441fd0` (`FUN_00441fd0`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x9822` ?
+### `0x9822` NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_ACK †
 
-Sent in reply to `0x9821` ? on CParserClient (`FUN_004161b0`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+
+Sent in reply to `0x9821` NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_REQ † on CParserClient (`FUN_004161b0`) · payload 2 bytes · raw header
 
 Sent from `FUN_00442030` (`FUN_00442030`) · payload 2 bytes · raw header
 
@@ -3958,7 +6614,14 @@ Sent from `FUN_00442030` (`FUN_00442030`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x9823` ?
+### `0x9823` NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_CMD`, 40 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sChatBanSourceCharID | Name5 |
+| 20 | char[20] | sChatBanTargetCharID | Name5 |
 
 Sent from `FUN_00447a00` (`FUN_00447a00`) · payload 40 bytes · raw header
 
@@ -3975,9 +6638,15 @@ Sent from `FUN_00447a00` (`FUN_00447a00`) · payload 40 bytes · raw header
 | 32 | u32 | `param_2[3]` |
 | 36 | u32 | `param_2[4]` |
 
-### `0x9825` ?
+### `0x9825` NC_GUILD_ACADEMY_NOTIFY_ACK †
 
-Sent in reply to `0x9824` ? on CParserClient (`FUN_004163a0`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_NOTIFY_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+
+Sent in reply to `0x9824` NC_GUILD_ACADEMY_NOTIFY_REQ † on CParserClient (`FUN_004163a0`) · payload 2 bytes · raw header
 
 Sent from `FUN_00442060` (`FUN_00442060`) · payload 2 bytes · raw header
 
@@ -3985,7 +6654,25 @@ Sent from `FUN_00442060` (`FUN_00442060`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x9826` ?
+### `0x9826` NC_GUILD_ACADEMY_NOTIFY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_NOTIFY_CMD`, 62 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | dNotifyDate |  |
+| 4 | i32 | tm_dNotifyDate.tm_sec |  |
+| 8 | i32 | tm_dNotifyDate.tm_min |  |
+| 12 | i32 | tm_dNotifyDate.tm_hour |  |
+| 16 | i32 | tm_dNotifyDate.tm_mday |  |
+| 20 | i32 | tm_dNotifyDate.tm_mon |  |
+| 24 | i32 | tm_dNotifyDate.tm_year |  |
+| 28 | i32 | tm_dNotifyDate.tm_wday |  |
+| 32 | i32 | tm_dNotifyDate.tm_yday |  |
+| 36 | i32 | tm_dNotifyDate.tm_isdst |  |
+| 40 | char[20] | sNotifyCharID | Name5 |
+| 60 | u16 | nNotifyLength |  |
+| 62 | char[nNotifyLength] | sNotify | variable length |
 
 Sent from `FUN_00440930` (`FUN_00440930`) · payload variable (*(ushort *)((int)param_1 + 0x3c) + 0x3e)
 
@@ -3995,6 +6682,13 @@ Sent from `FUN_00440930` (`FUN_00440930`) · payload variable (*(ushort *)((int)
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
 ### `0x982a` NC_GUILD_ACADEMY_MEMBER_GUILD_INVITE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_GUILD_INVITE_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sInviteTargetCharID | Name5 |
+| 20 | u16 | Error |  |
 
 Sent in reply to `0x9829` NC_GUILD_ACADEMY_MEMBER_GUILD_INVITE_REQ on CParserClient (`FUN_0041e930`) · payload 22 bytes · raw header
 
@@ -4007,7 +6701,14 @@ Sent in reply to `0x9829` NC_GUILD_ACADEMY_MEMBER_GUILD_INVITE_REQ on CParserCli
 | 16 | u32 | `in(0x9829)+7` |
 | 20 | u16 | `local_428` |
 
-### `0x982b` ?
+### `0x982b` NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_REQ`, 36 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | GuildName | Name4 |
+| 16 | char[20] | sInviteSourceCharID | Name5 |
 
 Sent from `FUN_0044b300` (`FUN_0044b300`) · payload 36 bytes · raw header
 
@@ -4023,7 +6724,14 @@ Sent from `FUN_0044b300` (`FUN_0044b300`) · payload 36 bytes · raw header
 | 28 | i32 | `piVar2[4]` |
 | 32 | i32 | `piVar2[5]` |
 
-### `0x982d` ?
+### `0x982d` NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_ERR †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_ERR`, 18 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | GuildName | Name4 |
+| 16 | u16 | Error |  |
 
 Sent from `FUN_0044c3b0` (`FUN_0044c3b0`) · payload 18 bytes · raw header
 
@@ -4037,13 +6745,39 @@ Sent from `FUN_0044c3b0` (`FUN_0044c3b0`) · payload 18 bytes · raw header
 
 ### `0x982e` ?
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_CMD`, 130 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sInviteSourceCharID | Name5 |
+| 20 | char[20] | Member.sName | Name5 |
+| 40 | u8 | Member.nGrade |  |
+| 41 | u32 | Member.nFlags |  |
+| 45 | u16 | Member.nExpRatio |  |
+| 47 | char[64] | Member.sIntro |  |
+| 111 | u32 | Member.dLogonInfo.login|year|month|day|hour | bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21 |
+| 115 | u8 | Member.nClassID |  |
+| 116 | u8 | Member.nLevel |  |
+| 117 | u8 | Member.bIsParty |  |
+| 118 | char[12] | Member.sMap | Name3 |
+
 Sent from `FUN_00440b40` (`FUN_00440b40`) · payload 130 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | bytes[130] | `memcpy from param_1` |
 
-### `0x9832` NC_GUILD_ACADEMY_DB_GET_REWARD_MONEY_ACK †
+### `0x9832` NC_GUILD_ACADEMY_GET_REWARD_MONEY_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_GET_REWARD_MONEY_ACK`, 3 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8 | NumOfRewardGood |  |
+| 3 | GUILD_ACADEMY_REWARD_MONEY[NumOfRewardGood] | RewardMoney | variable length, element GUILD_ACADEMY_REWARD_MONEY |
+
+Element `GUILD_ACADEMY_REWARD_MONEY` (9 bytes): +0 u8 nLevel, +1 u64 nCen
 
 Sent from `FUN_00442a20` (`FUN_00442a20`) · payload 3 bytes · raw header
 
@@ -4068,7 +6802,17 @@ Sent from `FUN_00448840` (`FUN_00448840`) · payload variable ((uVar6 & 0xff) * 
 
 Sent from `FUN_00448840` (`FUN_00448840`) · payload 3 bytes · raw header
 
-### `0x9836` NC_GUILD_ACADEMY_DB_GET_REWARD_ITEM_ACK †
+### `0x9836` NC_GUILD_ACADEMY_GET_REWARD_ITEM_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_GET_REWARD_ITEM_ACK`, 3 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8 | NumOfRewardGood |  |
+| 3 | GUILD_ACADEMY_REWARD_ITEM[NumOfRewardGood] | RewardItem | variable length, element GUILD_ACADEMY_REWARD_ITEM |
+
+Element `GUILD_ACADEMY_REWARD_ITEM` (16 bytes): +0 u8 nLevel, +1 u16 nItemID, +3 u8 NumOfItemOption, +4 GUILD_ACADEMY_REWARD_ITEM_OPTION[1] ItemOption
 
 Sent from `FUN_00442ad0` (`FUN_00442ad0`) · payload 3 bytes · raw header
 
@@ -4084,7 +6828,13 @@ Sent from `FUN_00448a30` (`FUN_00448a30`) · payload variable ((uVar9 & 0xff) * 
 |---|---|---|
 | 8191 | u8 | `(byte)iVar6` |
 
-### `0x983a` ?
+### `0x983a` NC_GUILD_ACADEMY_SET_REWARD_MONEY_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_SET_REWARD_MONEY_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
 
 Sent from `FUN_004422b0` (`FUN_004422b0`) · payload 2 bytes · raw header
 
@@ -4092,7 +6842,13 @@ Sent from `FUN_004422b0` (`FUN_004422b0`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x983e` ?
+### `0x983e` NC_GUILD_ACADEMY_SET_REWARD_ITEM_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_SET_REWARD_ITEM_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
 
 Sent from `FUN_00442570` (`FUN_00442570`) · payload 2 bytes · raw header
 
@@ -4100,7 +6856,13 @@ Sent from `FUN_00442570` (`FUN_00442570`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x9842` ?
+### `0x9842` NC_GUILD_ACADEMY_CLEAR_REWARD_MONEY_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_CLEAR_REWARD_MONEY_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
 
 Sent from `FUN_004427a0` (`FUN_004427a0`) · payload 2 bytes · raw header
 
@@ -4108,7 +6870,13 @@ Sent from `FUN_004427a0` (`FUN_004427a0`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x9846` ?
+### `0x9846` NC_GUILD_ACADEMY_CLEAR_REWARD_ITEM_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_CLEAR_REWARD_ITEM_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
 
 Sent from `FUN_00442830` (`FUN_00442830`) · payload 2 bytes · raw header
 
@@ -4116,7 +6884,31 @@ Sent from `FUN_00442830` (`FUN_00442830`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x984a` NC_GUILD_ACADEMY_DB_GET_GRADUATE_ACK †
+### `0x984a` NC_GUILD_ACADEMY_GET_GRADUATE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_GET_GRADUATE_ACK`, 67 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8 | PartMask |  |
+| 3 | u32 | GraduateData.nGuildNo |  |
+| 7 | char[16] | GraduateData.sGuildName | Name4 |
+| 23 | i32 | GraduateData.dGuildMakeDate |  |
+| 27 | i32 | GraduateData.tm_dGuildMakeDate.tm_sec |  |
+| 31 | i32 | GraduateData.tm_dGuildMakeDate.tm_min |  |
+| 35 | i32 | GraduateData.tm_dGuildMakeDate.tm_hour |  |
+| 39 | i32 | GraduateData.tm_dGuildMakeDate.tm_mday |  |
+| 43 | i32 | GraduateData.tm_dGuildMakeDate.tm_mon |  |
+| 47 | i32 | GraduateData.tm_dGuildMakeDate.tm_year |  |
+| 51 | i32 | GraduateData.tm_dGuildMakeDate.tm_wday |  |
+| 55 | i32 | GraduateData.tm_dGuildMakeDate.tm_yday |  |
+| 59 | i32 | GraduateData.tm_dGuildMakeDate.tm_isdst |  |
+| 63 | u16 | GraduateData.nAllGraduateCount |  |
+| 65 | u16 | GraduateData.NumOfEachGraduateData |  |
+| 67 | EACH_GRADUATE_DATA[GraduateData.NumOfEachGraduateData] | GraduateData.EachGraduateData | variable length, element EACH_GRADUATE_DATA |
+
+Element `EACH_GRADUATE_DATA` (103 bytes): +0 char[20] sName, +20 u8 ClassID, +21 u8 nJoinLevel, +22 i32 dJoinDate, +26 i32 tm_dJoinDate.tm_sec, +30 i32 tm_dJoinDate.tm_min, +34 i32 tm_dJoinDate.tm_hour, +38 i32 tm_dJoinDate.tm_mday, +42 i32 tm_dJoinDate.tm_mon, +46 i32 tm_dJoinDate.tm_year, +50 i32 tm_dJoinDate.tm_wday, +54 i32 tm_dJoinDate.tm_yday, +58 i32 tm_dJoinDate.tm_isdst, +62 u8 nGraduateLevel, +63 i32 dGraduateDate, +67 i32 tm_dGraduateDate.tm_sec, +71 i32 tm_dGraduateDate.tm_min, +75 i32 tm_dGraduateDate.tm_hour, +79 i32 tm_dGraduateDate.tm_mday, +83 i32 tm_dGraduateDate.tm_mon, +87 i32 tm_dGraduateDate.tm_year, +91 i32 tm_dGraduateDate.tm_wday, +95 i32 tm_dGraduateDate.tm_yday, +99 i32 tm_dGraduateDate.tm_isdst
 
 Sent from `FUN_0044ddc0` (`FUN_0044ddc0`) · payload 67 bytes · raw header
 
@@ -4178,7 +6970,29 @@ Sent from `FUN_0044de80` (`FUN_0044de80`) · payload variable ((uint)*(ushort *)
 | 65 | u16 | `*(ushort *)(param_2 + 0x43)` |
 | 67 | bytes[8124] | `FID_conflict__memcpy from (void *)(param_2 + 0x45)` |
 
-### `0x984e` NC_GUILD_ACADEMY_DB_GET_RANKING_LIST_ACK †
+### `0x984e` NC_GUILD_ACADEMY_GET_RANKING_LIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_GET_RANKING_LIST_ACK`, 51 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8 | PartMask |  |
+| 3 | i32 | RankData.dAggregationDate |  |
+| 7 | i32 | RankData.tm_dAggregationDate.tm_sec |  |
+| 11 | i32 | RankData.tm_dAggregationDate.tm_min |  |
+| 15 | i32 | RankData.tm_dAggregationDate.tm_hour |  |
+| 19 | i32 | RankData.tm_dAggregationDate.tm_mday |  |
+| 23 | i32 | RankData.tm_dAggregationDate.tm_mon |  |
+| 27 | i32 | RankData.tm_dAggregationDate.tm_year |  |
+| 31 | i32 | RankData.tm_dAggregationDate.tm_wday |  |
+| 35 | i32 | RankData.tm_dAggregationDate.tm_yday |  |
+| 39 | i32 | RankData.tm_dAggregationDate.tm_isdst |  |
+| 43 | u32 | RankData.nAllRankingCount |  |
+| 47 | u32 | RankData.NumOfEachRankingData |  |
+| 51 | GUILD_ACADEMY_EACH_RANKING_DATA[RankData.NumOfEachRankingData] | RankData.EachRankingData | variable length, element GUILD_ACADEMY_EACH_RANKING_DATA |
+
+Element `GUILD_ACADEMY_EACH_RANKING_DATA` (44 bytes): +0 u32 nRanking, +4 char[16] sGuildName, +20 char[20] sName, +40 u32 nPoint
 
 Sent from `FUN_0044d730` (`FUN_0044d730`) · payload 51 bytes
 
@@ -4208,7 +7022,13 @@ Sent from `FUN_0044d9c0` (`FUN_0044d9c0`) · payload 51 bytes
 
 *1 more send sites not shown: FUN_0044d9c0*
 
-### `0x985a` ?
+### `0x985a` NC_GUILD_ACADEMY_SET_MASTER_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_SET_MASTER_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
 
 Sent from `FUN_00442230` (`FUN_00442230`) · payload 2 bytes · raw header
 
@@ -4216,7 +7036,13 @@ Sent from `FUN_00442230` (`FUN_00442230`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x985b` ?
+### `0x985b` NC_GUILD_ACADEMY_SET_MASTER_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_SET_MASTER_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sName | Name5 |
 
 Sent from `FUN_004409e0` (`FUN_004409e0`) · payload 20 bytes
 
@@ -4226,13 +7052,36 @@ Sent from `FUN_004409e0` (`FUN_004409e0`) · payload 20 bytes
 
 ### `0x985e` ?
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_DISMISS_CMD`, 57 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | Name | Name4 |
+| 16 | u8 | nDismissStatus |  |
+| 17 | i32 | dDismissDate |  |
+| 21 | i32 | tm_dDismissDate.tm_sec |  |
+| 25 | i32 | tm_dDismissDate.tm_min |  |
+| 29 | i32 | tm_dDismissDate.tm_hour |  |
+| 33 | i32 | tm_dDismissDate.tm_mday |  |
+| 37 | i32 | tm_dDismissDate.tm_mon |  |
+| 41 | i32 | tm_dDismissDate.tm_year |  |
+| 45 | i32 | tm_dDismissDate.tm_wday |  |
+| 49 | i32 | tm_dDismissDate.tm_yday |  |
+| 53 | i32 | tm_dDismissDate.tm_isdst |  |
+
 Sent from `FUN_004472c0` (`FUN_004472c0`) · payload 57 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | bytes[57] | `memcpy from param_1` |
 
-### `0x985f` ?
+### `0x985f` NC_GUILD_ACADEMY_DELETE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_DELETE_CMD`, 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[16] | Name | Name4 |
 
 Sent from `FUN_00447370` (`FUN_00447370`) · payload 16 bytes
 
@@ -4240,7 +7089,13 @@ Sent from `FUN_00447370` (`FUN_00447370`) · payload 16 bytes
 |---|---|---|
 | 0 | bytes[16] | `memcpy from param_1` |
 
-### `0x9860` ?
+### `0x9860` NC_GUILD_ACADEMY_MEMBER_LEAVE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_LEAVE_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Sent from `FUN_004406c0` (`FUN_004406c0`) · payload 20 bytes
 
@@ -4248,7 +7103,13 @@ Sent from `FUN_004406c0` (`FUN_004406c0`) · payload 20 bytes
 |---|---|---|
 | 0 | bytes[20] | `memcpy from param_1` |
 
-### `0x9861` ?
+### `0x9861` NC_GUILD_ACADEMY_MEMBER_LOGON_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_LOGON_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Sent from `FUN_00447630` (`FUN_00447630`) · payload 20 bytes · raw header
 
@@ -4260,7 +7121,13 @@ Sent from `FUN_00447630` (`FUN_00447630`) · payload 20 bytes · raw header
 | 12 | u32 | `*(undefined4 *)(iVar1 + 0x10)` |
 | 16 | u32 | `*(undefined4 *)(iVar1 + 0x14)` |
 
-### `0x9862` ?
+### `0x9862` NC_GUILD_ACADEMY_MEMBER_LOGOFF_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_LOGOFF_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Sent from `FUN_004476b0` (`FUN_004476b0`) · payload 20 bytes · raw header
 
@@ -4272,7 +7139,14 @@ Sent from `FUN_004476b0` (`FUN_004476b0`) · payload 20 bytes · raw header
 | 12 | u32 | `*(undefined4 *)(iVar1 + 0x10)` |
 | 16 | u32 | `*(undefined4 *)(iVar1 + 0x14)` |
 
-### `0x9863` ?
+### `0x9863` NC_GUILD_ACADEMY_MEMBER_MAP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_MAP_CMD`, 32 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | char[12] | sMap | Name3 |
 
 Sent from `FUN_004477b0` (`FUN_004477b0`) · payload 32 bytes · raw header
 
@@ -4287,7 +7161,14 @@ Sent from `FUN_004477b0` (`FUN_004477b0`) · payload 32 bytes · raw header
 | 24 | u32 | `*(undefined4 *)(iVar1 + 0x46)` |
 | 28 | u32 | `*(undefined4 *)(iVar1 + 0x4a)` |
 
-### `0x9866` ?
+### `0x9866` NC_GUILD_ACADEMY_MEMBER_LEVEL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_LEVEL_CMD`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
+| 20 | u8 | Level |  |
 
 Sent from `FUN_00447730` (`FUN_00447730`) · payload 21 bytes · raw header
 
@@ -4300,7 +7181,17 @@ Sent from `FUN_00447730` (`FUN_00447730`) · payload 21 bytes · raw header
 | 16 | u32 | `*(undefined4 *)(iVar1 + 0x14)` |
 | 20 | u8 | `*(undefined1 *)(iVar1 + 0x19)` |
 
-### `0x9869` ?
+### `0x9869` NC_GUILD_ACADEMY_CHAT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_CHAT_CMD`, 26 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
+| 4 | char[20] | talker | Name5 |
+| 24 | u8 | chat.itemLinkDataCount |  |
+| 25 | u8 | chat.len |  |
+| 26 | u8[chat.len] | chat.content | variable length |
 
 Sent from `FUN_00440770` (`FUN_00440770`) · payload variable (local_201c)
 
@@ -4317,9 +7208,15 @@ Sent from `FUN_00440770` (`FUN_00440770`) · payload variable (local_201c)
 | 26 | bytes[8165] | `FID_conflict__memcpy from param_2 + 2` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x986a` ?
+### `0x986a` NC_GUILD_ACADEMY_CHAT_ACK †
 
-Sent in reply to `0x9868` ? on CParserClient (`FUN_00416f70`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_CHAT_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+
+Sent in reply to `0x9868` NC_GUILD_ACADEMY_CHAT_REQ † on CParserClient (`FUN_00416f70`) · payload 2 bytes · raw header
 
 Sent from `FUN_00442000` (`FUN_00442000`) · payload 2 bytes · raw header
 
@@ -4327,7 +7224,16 @@ Sent from `FUN_00442000` (`FUN_00442000`) · payload 2 bytes · raw header
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x987c` ?
+### `0x987c` NC_GUILD_ACADEMY_WAR_INFO_LIST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_WAR_INFO_LIST_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | NumOfWarInfo |  |
+| 2 | PROTO_NC_GUILD_ACADEMY_WAR_INFO_LIST_CMD::WAR_INFO_LIST[NumOfWarInfo] | WarInfoList | variable length, element PROTO_NC_GUILD_ACADEMY_WAR_INFO_LIST_CMD::WAR_INFO_LIST |
+
+Element `PROTO_NC_GUILD_ACADEMY_WAR_INFO_LIST_CMD::WAR_INFO_LIST` (5 bytes): +0 u32 EnemyGuildNo, +4 u8 WarStatus
 
 Sent from `FUN_00441630` (`FUN_00441630`) · payload variable ((uint)local_2013 * 5 + 2)
 
@@ -4338,7 +7244,14 @@ Sent from `FUN_00441630` (`FUN_00441630`) · payload variable ((uint)local_2013 
 | 6 | u8 | `*(undefined1 *)(iVar4 + 100)` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0x987d` ?
+### `0x987d` NC_GUILD_ACADEMY_WAR_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_WAR_START_CMD`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | EnemyGuildNo |  |
+| 4 | u8 | WarStatus |  |
 
 Sent from `FUN_00447d70` (`FUN_00447d70`) · payload 5 bytes
 
@@ -4346,7 +7259,14 @@ Sent from `FUN_00447d70` (`FUN_00447d70`) · payload 5 bytes
 |---|---|---|
 | 0 | bytes[5] | `memcpy from param_1` |
 
-### `0x987e` ?
+### `0x987e` NC_GUILD_ACADEMY_WAR_END_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_WAR_END_CMD`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | EnemyGuildNo |  |
+| 4 | u8 | WarStatus |  |
 
 Sent from `FUN_00447e20` (`FUN_00447e20`) · payload 5 bytes
 
@@ -4354,7 +7274,14 @@ Sent from `FUN_00447e20` (`FUN_00447e20`) · payload 5 bytes
 |---|---|---|
 | 0 | bytes[5] | `memcpy from param_1` |
 
-### `0x9881` ?
+### `0x9881` NC_GUILD_ACADEMY_SET_MASTER_BY_LEAVE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_SET_MASTER_BY_LEAVE_CMD`, 40 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sOldAcademyMasterName | Name5 |
+| 20 | char[20] | sNewAcademyMasterName | Name5 |
 
 Sent from `FUN_00440a90` (`FUN_00440a90`) · payload 40 bytes
 
@@ -4362,7 +7289,15 @@ Sent from `FUN_00440a90` (`FUN_00440a90`) · payload 40 bytes
 |---|---|---|
 | 0 | bytes[40] | `memcpy from param_1` |
 
-### `0x9883` ?
+### `0x9883` NC_GUILD_ACADEMY_REWARD_WANT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_REWARD_WANT_CMD`, 14 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nWant_Cen |  |
+| 8 | u16 | nWant_ItemID |  |
+| 10 | u32 | nWant_ItemLot |  |
 
 Sent from `FUN_00442ed0` (`FUN_00442ed0`) · payload 14 bytes
 
@@ -4375,13 +7310,26 @@ Sent from `FUN_00442ed0` (`FUN_00442ed0`) · payload 14 bytes
 
 ### `0x988b` NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_CANCEL_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_CANCEL_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+
 Sent from `FUN_00443290` (`FUN_00443290`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x988c` ?
+### `0x988c` NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_CANCEL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_CANCEL_CMD`, 40 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sChatBanCancelSourceCharID | Name5 |
+| 20 | char[20] | sChatBanCancelTargetCharID | Name5 |
 
 Sent from `FUN_00443340` (`FUN_00443340`) · payload 40 bytes
 
@@ -4399,6 +7347,18 @@ Sent from `FUN_00443340` (`FUN_00443340`) · payload 40 bytes
 | 36 | u32 | `param_2[4]` |
 
 ### `0x9890` NC_GUILD_ACADEMY_HISTORY_LIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_HISTORY_LIST_ACK`, 8 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u16 | TotalHistoryCount |  |
+| 4 | u16 | HistoryCount |  |
+| 6 | u16 | HistoryIndex |  |
+| 8 | GUILD_HISTORY[HistoryCount] | HistoryList | variable length, element GUILD_HISTORY |
+
+Element `GUILD_HISTORY` (32 bytes): +0 u32 nHistoryNumber, +4 u16 HistoryOccurDate.nYear, +6 u8 HistoryOccurDate.nMon, +7 u8 HistoryOccurDate.nDay, +8 char[20] sCharName, +28 i32 nMessageType
 
 Sent from `FUN_004437d0` (`FUN_004437d0`) · payload 8 bytes
 
@@ -4418,7 +7378,16 @@ Sent from `FUN_00448f10` (`FUN_00448f10`) · payload variable (uVar1 * 0x20 + 8)
 | 6 | i16 | `param_2[4]` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0xa006` ?
+### `0xa006` NC_PROMOTION_REWARD_ITEM_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PROMOTION_REWARD_ITEM_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nNumOfItems |  |
+| 1 | PROTO_NC_PROMOTION_REWARD_ITEM_CMD::<unnamed-type-RewardList>[nNumOfItems] | RewardList | variable length, element PROTO_NC_PROMOTION_REWARD_ITEM_CMD::<unnamed-type-RewardList> |
+
+Element `PROTO_NC_PROMOTION_REWARD_ITEM_CMD::<unnamed-type-RewardList>` (4 bytes): +0 u16 nItemID, +2 u16 nItemLot
 
 Sent in reply to `0xa005` NC_PROMOTION_DB_REWARD_ACK † on CParserCharDB (`FUN_0040d390`) · payload variable (uVar5 * 4 + 1)
 
@@ -4427,9 +7396,20 @@ Sent in reply to `0xa005` NC_PROMOTION_DB_REWARD_ACK † on CParserCharDB (`FUN_
 | 0 | u8 | `in(0xa005)+13` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0xa415` ?
+### `0xa415` NC_INSTANCE_DUNGEON_RANK_UPDATE_DB_REQ †
 
-Sent in reply to `0xa414` ? on CParserCharDB (`FUN_0040f9f0`) · payload variable ((uint)uVar4 * 6 + 0xf)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_UPDATE_DB_REQ`, 15 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[12] | sIndunInfo.MapIDClient | Name3 |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
+| 13 | u16 | CharListCount |  |
+| 15 | NETPACKETZONEHEADER[CharListCount] | CharList | variable length, element NETPACKETZONEHEADER |
+
+Element `NETPACKETZONEHEADER` (6 bytes): +0 u16 clienthandle, +2 u32 charregistnumber
+
+Sent in reply to `0xa414` NC_INSTANCE_DUNGEON_RANK_SAVE_WORLD_CMD † on CParserCharDB (`FUN_0040f9f0`) · payload variable ((uint)uVar4 * 6 + 0xf)
 
 Fill: +8191: FUN_00437b40
 
@@ -4441,18 +7421,50 @@ Fill: +8191: FUN_00437b40
 | 12 | u8 | `in(0xa414)+12` |
 | 13 | u16 | `0`; `uVar4` |
 
-### `0xa41a` ?
+### `0xa41a` NC_INSTANCE_DUNGEON_RANK_REQ †
 
-Sent in reply to `0xa419` ? on CParserZone (`FUN_00428870`) · payload variable ((uint)local_2013 * 0xd + 2)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_REQ`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMapCount |  |
+| 2 | SHINE_INDUN_INFO[nMapCount] | sIndunInfos | variable length, element SHINE_INDUN_INFO |
+
+Element `SHINE_INDUN_INFO` (13 bytes): +0 char[12] MapIDClient, +12 u8 ModeIDLv
+
+Sent in reply to `0xa419` NC_INSTANCE_DUNGEON_MAP_REGIST_CMD † on CParserZone (`FUN_00428870`) · payload variable ((uint)local_2013 * 0xd + 2)
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `0`; `local_2013 + 1` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0xa421` ?
+### `0xa421` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGEDEALT_ACK †
 
-Sent in reply to `0xa41b` ? on CParserClient (`FUN_0041a420`) · payload 19 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGEDEALT_ACK`, 19 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | shapeInfo1st.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 |
+| 1 | u8 | shapeInfo1st.hairtype | bits hairtype:8@0 |
+| 2 | u8 | shapeInfo1st.haircolor | bits haircolor:8@0 |
+| 3 | u8 | shapeInfo1st.faceshape | bits faceshape:8@0 |
+| 4 | u8 | shapeInfo2nd.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 |
+| 5 | u8 | shapeInfo2nd.hairtype | bits hairtype:8@0 |
+| 6 | u8 | shapeInfo2nd.haircolor | bits haircolor:8@0 |
+| 7 | u8 | shapeInfo2nd.faceshape | bits faceshape:8@0 |
+| 8 | u8 | shapeInfo3th.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 |
+| 9 | u8 | shapeInfo3th.hairtype | bits hairtype:8@0 |
+| 10 | u8 | shapeInfo3th.haircolor | bits haircolor:8@0 |
+| 11 | u8 | shapeInfo3th.faceshape | bits faceshape:8@0 |
+| 12 | u16 | nErr |  |
+| 14 | u32 | nDamageDealtRank |  |
+| 18 | u8 | nDamageDealtCount |  |
+| 19 | SHINE_INDUN_RANK_CLIENT_VALUE[nDamageDealtCount] | damageDealtRanks | variable length, element SHINE_INDUN_RANK_CLIENT_VALUE |
+
+Element `SHINE_INDUN_RANK_CLIENT_VALUE` (32 bytes): +0 char[20] nCharID, +20 u8 nCharClass, +24 u64 nValue
+
+Sent in reply to `0xa41b` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGEDEALT_REQ † on CParserClient (`FUN_0041a420`) · payload 19 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -4463,9 +7475,32 @@ Sent in reply to `0xa41b` ? on CParserClient (`FUN_0041a420`) · payload 19 byte
 | 14 | u32 | `*puVar3` |
 | 18 | u8 | `0`; `local_2001 + 1` |
 
-### `0xa422` ?
+### `0xa422` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGETAKEN_ACK †
 
-Sent in reply to `0xa41c` ? on CParserClient (`FUN_00418fb0`) · payload 19 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGETAKEN_ACK`, 19 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | shapeInfo1st.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 |
+| 1 | u8 | shapeInfo1st.hairtype | bits hairtype:8@0 |
+| 2 | u8 | shapeInfo1st.haircolor | bits haircolor:8@0 |
+| 3 | u8 | shapeInfo1st.faceshape | bits faceshape:8@0 |
+| 4 | u8 | shapeInfo2nd.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 |
+| 5 | u8 | shapeInfo2nd.hairtype | bits hairtype:8@0 |
+| 6 | u8 | shapeInfo2nd.haircolor | bits haircolor:8@0 |
+| 7 | u8 | shapeInfo2nd.faceshape | bits faceshape:8@0 |
+| 8 | u8 | shapeInfo3th.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 |
+| 9 | u8 | shapeInfo3th.hairtype | bits hairtype:8@0 |
+| 10 | u8 | shapeInfo3th.haircolor | bits haircolor:8@0 |
+| 11 | u8 | shapeInfo3th.faceshape | bits faceshape:8@0 |
+| 12 | u16 | nErr |  |
+| 14 | u32 | nDamageTakenRank |  |
+| 18 | u8 | nDamageTakenCount |  |
+| 19 | SHINE_INDUN_RANK_CLIENT_VALUE[nDamageTakenCount] | damageTakenRanks | variable length, element SHINE_INDUN_RANK_CLIENT_VALUE |
+
+Element `SHINE_INDUN_RANK_CLIENT_VALUE` (32 bytes): +0 char[20] nCharID, +20 u8 nCharClass, +24 u64 nValue
+
+Sent in reply to `0xa41c` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGETAKEN_REQ † on CParserClient (`FUN_00418fb0`) · payload 19 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -4476,9 +7511,32 @@ Sent in reply to `0xa41c` ? on CParserClient (`FUN_00418fb0`) · payload 19 byte
 | 14 | u32 | `*(undefined4 *)(iVar1 + 4)` |
 | 18 | u8 | `0`; `local_2001 + 1` |
 
-### `0xa423` ?
+### `0xa423` NC_INSTANCE_DUNGEON_RANK_TAB_HEALINGDONE_ACK †
 
-Sent in reply to `0xa41d` ? on CParserClient (`FUN_004191d0`) · payload 19 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_TAB_HEALINGDONE_ACK`, 19 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | shapeInfo1st.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 |
+| 1 | u8 | shapeInfo1st.hairtype | bits hairtype:8@0 |
+| 2 | u8 | shapeInfo1st.haircolor | bits haircolor:8@0 |
+| 3 | u8 | shapeInfo1st.faceshape | bits faceshape:8@0 |
+| 4 | u8 | shapeInfo2nd.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 |
+| 5 | u8 | shapeInfo2nd.hairtype | bits hairtype:8@0 |
+| 6 | u8 | shapeInfo2nd.haircolor | bits haircolor:8@0 |
+| 7 | u8 | shapeInfo2nd.faceshape | bits faceshape:8@0 |
+| 8 | u8 | shapeInfo3th.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 |
+| 9 | u8 | shapeInfo3th.hairtype | bits hairtype:8@0 |
+| 10 | u8 | shapeInfo3th.haircolor | bits haircolor:8@0 |
+| 11 | u8 | shapeInfo3th.faceshape | bits faceshape:8@0 |
+| 12 | u16 | nErr |  |
+| 14 | u32 | nHealingDoneRank |  |
+| 18 | u8 | nHealingDoneCount |  |
+| 19 | SHINE_INDUN_RANK_CLIENT_VALUE[nHealingDoneCount] | healingDoneRanks | variable length, element SHINE_INDUN_RANK_CLIENT_VALUE |
+
+Element `SHINE_INDUN_RANK_CLIENT_VALUE` (32 bytes): +0 char[20] nCharID, +20 u8 nCharClass, +24 u64 nValue
+
+Sent in reply to `0xa41d` NC_INSTANCE_DUNGEON_RANK_TAB_HEALINGDONE_REQ † on CParserClient (`FUN_004191d0`) · payload 19 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -4489,9 +7547,33 @@ Sent in reply to `0xa41d` ? on CParserClient (`FUN_004191d0`) · payload 19 byte
 | 14 | u32 | `*(undefined4 *)(iVar1 + 8)` |
 | 18 | u8 | `0`; `local_2001 + 1` |
 
-### `0xa424` ?
+### `0xa424` NC_INSTANCE_DUNGEON_RANK_TAB_MYRANK_ACK †
 
-Sent in reply to `0xa41e` ? on CParserClient (`FUN_004193f0`) · payload 62 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_TAB_MYRANK_ACK`, 62 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nErr |  |
+| 2 | u64 | nPrevDamageDealt |  |
+| 10 | u64 | nPrevDamageTaken |  |
+| 18 | u64 | nPrevHealingDone |  |
+| 26 | u8 | nPrevPlayTimeHour |  |
+| 27 | u8 | nPrevPlayTimeMinute |  |
+| 28 | u8 | nPrevPlayTimeSecond |  |
+| 29 | u8 | nPrevPlayTimeYear |  |
+| 30 | u8 | nPrevPlayTimeMonth |  |
+| 31 | u8 | nPrevPlayTimeDay |  |
+| 32 | u64 | nCurrDamageDealt |  |
+| 40 | u64 | nCurrDamageTaken |  |
+| 48 | u64 | nCurrHealingDone |  |
+| 56 | u8 | nCurrPlayTimeHour |  |
+| 57 | u8 | nCurrPlayTimeMinute |  |
+| 58 | u8 | nCurrPlayTimeSecond |  |
+| 59 | u8 | nCurrPlayTimeYear |  |
+| 60 | u8 | nCurrPlayTimeMonth |  |
+| 61 | u8 | nCurrPlayTimeDay |  |
+
+Sent in reply to `0xa41e` NC_INSTANCE_DUNGEON_RANK_TAB_MYRANK_REQ † on CParserClient (`FUN_004193f0`) · payload 62 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -4521,9 +7603,19 @@ Sent in reply to `0xa41e` ? on CParserClient (`FUN_004193f0`) · payload 62 byte
 | 60 | u8 | `*(undefined1 *)(iVar1 + 0x4c)` |
 | 61 | u8 | `*(undefined1 *)(iVar1 + 0x4d)` |
 
-### `0xa425` ?
+### `0xa425` NC_INSTANCE_DUNGEON_RANK_NEW_RANK_MSG †
 
-Sent in reply to `0xa414` ? on CParserCharDB (`FUN_0040f9f0`) · payload 38 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_NEW_RANK_MSG`, 38 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | nCharID | Name5 |
+| 20 | char[12] | sIndunInfo.MapIDClient | Name3 |
+| 32 | u8 | sIndunInfo.ModeIDLv |  |
+| 33 | u8 | rankType |  |
+| 34 | u32 | nRank |  |
+
+Sent in reply to `0xa414` NC_INSTANCE_DUNGEON_RANK_SAVE_WORLD_CMD † on CParserCharDB (`FUN_0040f9f0`) · payload 38 bytes
 
 Fill: +0: FUN_00402140; +0: FUN_00402140
 
@@ -4536,7 +7628,16 @@ Fill: +0: FUN_00402140; +0: FUN_00402140
 | 33 | u8 | `0`; `1` |
 | 34 | u32 | `uVar3` |
 
-### `0xa802` ?
+### `0xa802` NC_CHAT_RESTRICT_LIST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAT_RESTRICT_LIST_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nChatRestrictListCnt |  |
+| 2 | PROTO_CHAT_RESTRICT_INFO[nChatRestrictListCnt] | ChatRestrictData | variable length, element PROTO_CHAT_RESTRICT_INFO |
+
+Element `PROTO_CHAT_RESTRICT_INFO` (22 bytes): +0 char[20] sCharID, +20 u8 bIsGM, +21 u8 bIsDeleted
 
 Sent from `FUN_00430fe0` (`FUN_00430fe0`) · payload variable (*(int *)((int)param_1 + 0x1e290) * 0x16 + 2)
 
@@ -4545,9 +7646,18 @@ Sent from `FUN_00430fe0` (`FUN_00430fe0`) · payload variable (*(int *)((int)par
 | 0 | u16 | `*(undefined2 *)(param_1 + 0x1e290)` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0xa806` ?
+### `0xa806` NC_CHAT_RESTRICT_ADD_ACK †
 
-Sent in reply to `0xa805` ? on CParserCharDB (`FUN_00411db0`) · payload 24 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAT_RESTRICT_ADD_ACK`, 24 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | char[20] | ChatRestrictData.sCharID | Name5 |
+| 22 | u8 | ChatRestrictData.bIsGM |  |
+| 23 | u8 | ChatRestrictData.bIsDeleted |  |
+
+Sent in reply to `0xa805` NC_CHAT_RESTRICT_DB_ADD_ACK † on CParserCharDB (`FUN_00411db0`) · payload 24 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -4560,11 +7670,18 @@ Sent in reply to `0xa805` ? on CParserCharDB (`FUN_00411db0`) · payload 24 byte
 | 22 | u8 | `in(0xa805)+24` |
 | 23 | u8 | `in(0xa805)+25` |
 
-Sent in reply to `0xa803` ? on CParserClient (`FUN_00422240`) · payload 24 bytes · raw header
+Sent in reply to `0xa803` NC_CHAT_RESTRICT_ADD_REQ † on CParserClient (`FUN_00422240`) · payload 24 bytes · raw header
 
-### `0xa80a` ?
+### `0xa80a` NC_CHAT_RESTRICT_DEL_ACK †
 
-Sent in reply to `0xa809` ? on CParserCharDB (`FUN_004112b0`) · payload 22 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAT_RESTRICT_DEL_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | char[20] | sChatRestrictCharID | Name5 |
+
+Sent in reply to `0xa809` NC_CHAT_RESTRICT_DB_DEL_ACK † on CParserCharDB (`FUN_004112b0`) · payload 22 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -4575,7 +7692,7 @@ Sent in reply to `0xa809` ? on CParserCharDB (`FUN_004112b0`) · payload 22 byte
 | 14 | u32 | `0`; `*(undefined4 *)(this + iVar1 + 0x1e2a0)` |
 | 18 | u32 | `0`; `*(undefined4 *)(this + iVar1 + 0x1e2a4)` |
 
-Sent in reply to `0xa807` ? on CParserClient (`FUN_0041ec00`) · payload 22 bytes · raw header
+Sent in reply to `0xa807` NC_CHAT_RESTRICT_DEL_REQ † on CParserClient (`FUN_0041ec00`) · payload 22 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -4585,15 +7702,28 @@ Sent in reply to `0xa807` ? on CParserClient (`FUN_0041ec00`) · payload 22 byte
 | 14 | u32 | `in(0xa807)+5` |
 | 18 | u32 | `in(0xa807)+7` |
 
-### `0xa80e` ?
+### `0xa80e` NC_CHAT_RESTRICT_DEL_ALL_ACK †
 
-Sent in reply to `0xa80d` ? on CParserCharDB (`FUN_0040d5e0`) · payload 2 bytes · raw header
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAT_RESTRICT_DEL_ALL_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
+Sent in reply to `0xa80d` NC_CHAT_RESTRICT_DB_DEL_ALL_ACK † on CParserCharDB (`FUN_0040d5e0`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `in(0xa80d)+0` |
 
 ### `0xb002` NC_RAID_MAKE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_MAKE_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nRaidNo |  |
+| 2 | u16 | nError |  |
 
 Sent in reply to `0xb001` NC_RAID_MAKE_REQ on CParserClient (`FUN_0041ed50`) · payload 4 bytes
 
@@ -4603,13 +7733,26 @@ Sent in reply to `0xb001` NC_RAID_MAKE_REQ on CParserClient (`FUN_0041ed50`) · 
 
 ### `0xb00d` NC_RAID_INVITATION_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_INVITATION_ACK`, 22 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sInvitationCharID | Name5 |
+| 20 | u16 | nError |  |
+
 Sent in reply to `0xb00c` NC_RAID_INVITATION_REQ on CParserClient (`FUN_0041f1c0`) · payload 22 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
 | 20 | i16 | `7892` (0x1ed4); `(short)uVar6` |
 
-### `0xb00e` ?
+### `0xb00e` NC_RAID_INVITATION_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_INVITATION_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sMasterCharID | Name5 |
 
 Sent in reply to `0xb00c` NC_RAID_INVITATION_REQ on CParserClient (`FUN_0041f1c0`) · payload 20 bytes · raw header
 
@@ -4621,9 +7764,18 @@ Sent in reply to `0xb00c` NC_RAID_INVITATION_REQ on CParserClient (`FUN_0041f1c0
 | 12 | u32 | `0` |
 | 16 | u32 | `0` |
 
-### `0xb041` ?
+### `0xb041` NC_RAID_CHAT_BROAD_CMD †
 
-Sent in reply to `0xb03f` ? on CParserClient (`FUN_00417630`) · payload variable (uVar7)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_CHAT_BROAD_CMD`, 22 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | char[20] | sTalkerCharID | Name5 |
+| 21 | u8 | nChatLen |  |
+| 22 | u8[nChatLen] | sChat | variable length |
+
+Sent in reply to `0xb03f` NC_RAID_CHAT_REQ † on CParserClient (`FUN_00417630`) · payload variable (uVar7)
 
 Fill: +1: FUN_00402140
 
@@ -4634,9 +7786,18 @@ Fill: +1: FUN_00402140
 | 22 | bytes[8169] | `FID_conflict__memcpy from param_2 + 2` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0xb044` ?
+### `0xb044` NC_RAID_WARNING_BROAD_CMD †
 
-Sent in reply to `0xb042` ? on CParserClient (`FUN_004178a0`) · payload variable (uVar7)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_WARNING_BROAD_CMD`, 22 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | char[20] | sTalkerCharID | Name5 |
+| 21 | u8 | nChatLen |  |
+| 22 | u8[nChatLen] | sChat | variable length |
+
+Sent in reply to `0xb042` NC_RAID_WARNING_REQ † on CParserClient (`FUN_004178a0`) · payload variable (uVar7)
 
 Fill: +1: FUN_00402140
 
@@ -4692,7 +7853,27 @@ Sent from `FUN_00431dd0` (`FUN_00431dd0`) · payload 20 bytes
 | 0 | i32 | `*(undefined4 *)(iVar8 + 0x480)`; `CONCAT31((int3)local_33c,pcVar11[1])` |
 | 4 | u32 | `*(undefined4 *)(iVar8 + 0x484)`; `CONCAT31(local_2337._1_3_,(char)(local_33c >> 0x18))` |
 
-### `0xd002` ?
+### `0xd002` NC_EVENT_GET_ALL_EVENT_INFO_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_EVENT_GET_ALL_EVENT_INFO_ACK`, 1370 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nAllEventCnt |  |
+| 4 | u16 | nPacketOrder |  |
+| 6 | u16 | EventData.nEventNo |  |
+| 8 | i32 | EventData.dStartTime |  |
+| 12 | i32 | EventData.dEndTime |  |
+| 16 | u16[3] | EventData.nRewardAbstateIndex |  |
+| 22 | u8[255] | EventData.bIsPlayerLevel |  |
+| 277 | u8[64] | EventData.bIsPlayerClass |  |
+| 341 | u8[1024] | EventData.bIsMapID |  |
+| 1365 | u8 | EventData.bIsField_KQ |  |
+| 1366 | u8 | EventData.bIsField_Battle |  |
+| 1367 | u8 | EventData.bIsField_ID |  |
+| 1368 | u8 | EventData.bIsField_Normal |  |
+| 1369 | u8 | bIsFlagAllReady |  |
 
 Sent from `FUN_00401250` (`FUN_00401250`) · payload 1370 bytes
 
@@ -4702,7 +7883,24 @@ Sent from `FUN_00401250` (`FUN_00401250`) · payload 1370 bytes
 | 2 | u32 | `0`; `CONCAT22(sVar2,sVar1)` |
 | 1369 | u8 | `*(undefined1 *)(puVar5 + 0x553)` |
 
-### `0xd004` ?
+### `0xd004` NC_EVENT_ADD_EVENT_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_EVENT_ADD_EVENT_ACK`, 1365 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | EventData.nEventNo |  |
+| 4 | i32 | EventData.dStartTime |  |
+| 8 | i32 | EventData.dEndTime |  |
+| 12 | u16[3] | EventData.nRewardAbstateIndex |  |
+| 18 | u8[255] | EventData.bIsPlayerLevel |  |
+| 273 | u8[64] | EventData.bIsPlayerClass |  |
+| 337 | u8[1024] | EventData.bIsMapID |  |
+| 1361 | u8 | EventData.bIsField_KQ |  |
+| 1362 | u8 | EventData.bIsField_Battle |  |
+| 1363 | u8 | EventData.bIsField_ID |  |
+| 1364 | u8 | EventData.bIsField_Normal |  |
 
 Sent from `FUN_00401ec0` (`FUN_00401ec0`) · payload 1365 bytes
 
@@ -4711,7 +7909,24 @@ Sent from `FUN_00401ec0` (`FUN_00401ec0`) · payload 1365 bytes
 | 0 | u16 | `12808` (0x3208); `12809` (0x3209) |
 | 2 | i16 | `local_668` |
 
-### `0xd006` ?
+### `0xd006` NC_EVENT_UPDATE_EVENT_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_EVENT_UPDATE_EVENT_ACK`, 1365 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | EventData.nEventNo |  |
+| 4 | i32 | EventData.dStartTime |  |
+| 8 | i32 | EventData.dEndTime |  |
+| 12 | u16[3] | EventData.nRewardAbstateIndex |  |
+| 18 | u8[255] | EventData.bIsPlayerLevel |  |
+| 273 | u8[64] | EventData.bIsPlayerClass |  |
+| 337 | u8[1024] | EventData.bIsMapID |  |
+| 1361 | u8 | EventData.bIsField_KQ |  |
+| 1362 | u8 | EventData.bIsField_Battle |  |
+| 1363 | u8 | EventData.bIsField_ID |  |
+| 1364 | u8 | EventData.bIsField_Normal |  |
 
 Sent from `FUN_00401430` (`FUN_00401430`) · payload 1365 bytes
 
@@ -4721,6 +7936,13 @@ Sent from `FUN_00401430` (`FUN_00401430`) · payload 1365 bytes
 
 ### `0xd008` NC_EVENT_DEL_EVENT_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_EVENT_DEL_EVENT_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nEventNo |  |
+
 Sent from `FUN_00401b80` (`FUN_00401b80`) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -4728,7 +7950,14 @@ Sent from `FUN_00401b80` (`FUN_00401b80`) · payload 4 bytes
 | 0 | u16 | `12824` (0x3218); `12825` (0x3219) |
 | 2 | u16 | `param_2` |
 
-### `0xd00a` ?
+### `0xd00a` NC_EVENT_SET_ALL_READY_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_EVENT_SET_ALL_READY_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nEventNo |  |
 
 Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 
@@ -4770,7 +7999,7 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 2 | u8 | count | 0xFF = DB error |
 | 3 | AVATAR[count] | avatars | 0x82 bytes each, see W01 §6.1 |
 
-### `0x0c0d` world login request (ours) (hand-named) (Login→WM)
+### `0x0c0d` NC_USER_WILLLOGIN_REQ † (Login→WM)
 
 **Verified layout** (basis: wm FUN_00424950)
 
@@ -4873,7 +8102,7 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 26 | u8 | closeReason-0x80 |  |
 | 27 | u64 | money |  |
 
-### `0x1402` character create request (ours) (hand-named) (WM→CharDB)
+### `0x1402` NC_AVATAR_CREATEDATA_REQ † (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_004229f0)
 
@@ -4895,7 +8124,7 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 2 | u32 | charNo |  |
 | 6 | u8 | slot |  |
 
-### `0x1411` character rename request (ours) (hand-named) (WM→CharDB)
+### `0x1411` NC_AVATAR_RENAME_DB_REQ † (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_0041a640)
 
@@ -4906,7 +8135,7 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 6 | u8 | slot |  |
 | 7 | char[20] | name |  |
 
-### `0x0808` world user count (ours) (hand-named) (WM→Login)
+### `0x0808` NC_MISC_USER_COUNT_CMD † (WM→Login)
 
 **Verified layout** (basis: wm FUN_00438d10)
 
@@ -4915,7 +8144,7 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 0 | u16 | currentUsers |  |
 | 2 | u16 | maxUsers | capacity or OPTool limit |
 
-### `0x0c0e` world login accepted (ours) (hand-named) (WM→Login)
+### `0x0c0e` NC_USER_WILLLOGIN_ACK † (WM→Login)
 
 **Verified layout** (basis: wm FUN_00424950)
 
@@ -4924,7 +8153,7 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 0 | bytes[347] | request | copy of 0x0C0D |
 | 347 | u8 | ok | always 1 |
 
-### `0x0c35` token request (ours) (hand-named) (WM→Login)
+### `0x0c35` NC_USER_CREATE_OTP_REQ † (WM→Login)
 
 **Verified layout** (basis: wm FUN_00417330)
 

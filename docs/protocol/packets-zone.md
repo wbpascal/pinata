@@ -10,7 +10,10 @@ How to read the *Value / source* column:
 - Other text: the decompiler expression, shortened.
 - Gaps between offsets are bytes the code did not write (padding, or filled in a way the extractor missed).
 - **Fill**: part of the payload is produced by a helper; for zone, virtual helpers are resolved assuming a `ShinePlayer` receiver.
-- †: name inferred (REQ+1 = ACK, or from a log string), not from the opcode's own handler.
+- †: name not from the opcode's own 2016 handler (2017 client PDB, REQ+1 = ACK guess, or a log string).
+
+- **2017 PDB layout**: the `PROTO_*` struct from the 2017 client PDB (`docs/protocol/pdb-layouts.json`, work item C02),
+  shown when no hand-verified layout exists. A 2017 build: confirm against the 2016 code before relying on it.
 
 Heuristic extraction: verify a layout against the cited function before relying on it.
 
@@ -48,6 +51,37 @@ Basis: Character server FUN_0046bff0 (reads SQL columns in this order with SQLGe
 
 ### `0x0812` NC_MISC_PINGTEST_CLIENT_ZONE_DB
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_PINGTEST_CLIENT_ZONE_DB`, 124 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ID |  |
+| 4 | u32 | ClientSendZone |  |
+| 8 | u32 | ClientRecvZone |  |
+| 12 | u16 | hZoneClient |  |
+| 14 | u32 | ZoneSendToDB |  |
+| 18 | u32 | ZoneRecvFromDB |  |
+| 22 | u32 | ZoneSendToClient |  |
+| 26 | u32 | ZoneRecvFromClient |  |
+| 30 | u32 | DBRecvFromZone |  |
+| 34 | u32 | DBSendToZone |  |
+| 38 | u32 | DBSendToODBC |  |
+| 42 | u32 | DBRecvFromODBC |  |
+| 46 | u16 | header.clienthandle |  |
+| 48 | u32 | header.charregistnumber |  |
+| 52 | u16 | buylot.lockindex |  |
+| 54 | u64 | buylot.iteminfo.attritemregnum | SHINE_ITEM_REGISTNUMBER (union: binary, dwrdkey, key) |
+| 62 | u16 | buylot.iteminfo.attr |  |
+| 64 | u16 | buylot.iteminfo.location | ITEM_INVEN (union: Inven, Pos, Type) |
+| 66 | u16 | buylot.itemid |  |
+| 68 | u64 | buylot.price_cen |  |
+| 76 | u32 | buylot.price_fame |  |
+| 80 | u32 | buylot.price_gamblecoin |  |
+| 84 | u32 | buylot.UserNo |  |
+| 88 | u16 | buylot.Vendor |  |
+| 90 | char[30] | buylot.CharID |  |
+| 120 | i32 | buylot.CharLevel |  |
+
 Handler `FUN_005509a0`
 
 | Off | Type | Checks in handler | Notes |
@@ -55,6 +89,44 @@ Handler `FUN_005509a0`
 | 0 | char* |  |  |
 
 ### `0x0813` NC_MISC_PINGTEST_TOOL_WM_CLIENT_ZONE_DB
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_PINGTEST_TOOL_WM_CLIENT_ZONE_DB`, 164 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ID |  |
+| 4 | u16 | hTool |  |
+| 6 | u32 | ToolSendToWM |  |
+| 10 | u32 | ToolRecvFromWM |  |
+| 14 | char[20] | TargetCharName | Name5 |
+| 34 | u16 | hWMClient |  |
+| 36 | u32 | WMSendClient |  |
+| 40 | u32 | WMRecvFromClient |  |
+| 44 | u32 | ClientSendZone |  |
+| 48 | u32 | ClientRecvZone |  |
+| 52 | u16 | hZoneClient |  |
+| 54 | u32 | ZoneSendToDB |  |
+| 58 | u32 | ZoneRecvFromDB |  |
+| 62 | u32 | ZoneSendToClient |  |
+| 66 | u32 | ZoneRecvFromClient |  |
+| 70 | u32 | DBRecvFromZone |  |
+| 74 | u32 | DBSendToZone |  |
+| 78 | u32 | DBSendToODBC |  |
+| 82 | u32 | DBRecvFromODBC |  |
+| 86 | u16 | header.clienthandle |  |
+| 88 | u32 | header.charregistnumber |  |
+| 92 | u16 | buylot.lockindex |  |
+| 94 | u64 | buylot.iteminfo.attritemregnum | SHINE_ITEM_REGISTNUMBER (union: binary, dwrdkey, key) |
+| 102 | u16 | buylot.iteminfo.attr |  |
+| 104 | u16 | buylot.iteminfo.location | ITEM_INVEN (union: Inven, Pos, Type) |
+| 106 | u16 | buylot.itemid |  |
+| 108 | u64 | buylot.price_cen |  |
+| 116 | u32 | buylot.price_fame |  |
+| 120 | u32 | buylot.price_gamblecoin |  |
+| 124 | u32 | buylot.UserNo |  |
+| 128 | u16 | buylot.Vendor |  |
+| 130 | char[30] | buylot.CharID |  |
+| 160 | i32 | buylot.CharLevel |  |
 
 Handler `FUN_00550b90`
 
@@ -64,6 +136,12 @@ Handler `FUN_00550b90`
 
 ### `0x105c` NC_CHAR_STAT_INCPOINT_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_STAT_INCPOINT_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | stat |  |
+
 Handler `FUN_0058ad10`
 
 | Off | Type | Checks in handler | Notes |
@@ -72,11 +150,23 @@ Handler `FUN_0058ad10`
 
 ### `0x1062` NC_CHAR_STAT_DECPOINT_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_STAT_DECPOINT_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | stat |  |
+
 Handler `FUN_0058b3f0`
 
 No payload fields read directly by the handler.
 
-### `0x10bc` ?
+### `0x10bc` NC_CHAR_CLIENT_AUTO_PICK_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CLIENT_AUTO_PICK_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bEnable |  |
 
 Handler `FUN_00566090`
 
@@ -86,6 +176,12 @@ Handler `FUN_00566090`
 
 ### `0x1117` NC_CHAR_TUTORIAL_STEP_ACK
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_TUTORIAL_STEP_ACK`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTutorialStep |  |
+
 Handler `FUN_00576480`
 
 | Off | Type | Checks in handler | Notes |
@@ -94,17 +190,35 @@ Handler `FUN_00576480`
 
 ### `0x1124` NC_CHAR_USEITEM_MINIMON_NORMAL_ITEM_ON_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_NORMAL_ITEM_ON_REQ`, 24 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16[12] | NormalItemList |  |
+
 Handler `FUN_005642e0`
 
 No payload fields read directly by the handler.
 
 ### `0x1128` NC_CHAR_USEITEM_MINIMON_CHARGED_ITEM_ON_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_CHARGED_ITEM_ON_REQ`, 24 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16[12] | ChargedItemList |  |
+
 Handler `FUN_00564460`
 
 No payload fields read directly by the handler.
 
 ### `0x112e` NC_CHAR_CHARGEDBUFF_ERASE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CHARGEDBUFF_ERASE_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nChargedBuffKey |  |
 
 Handler `FUN_005645e0`
 
@@ -195,6 +309,14 @@ Handler `FUN_0055b430`
 
 ### `0x1c01` NC_BRIEFINFO_INFORM_CMD
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BRIEFINFO_INFORM_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMyHnd |  |
+| 2 | u16 | ReceiveNetCommand | NETCOMMAND (union: protocol, command, department) |
+| 4 | u16 | hnd |  |
+
 Handler `FUN_0043e460`
 
 | Off | Type | Checks in handler | Notes |
@@ -223,6 +345,15 @@ Handler `FUN_0045a400`
 
 ### `0x2003` NC_ACT_WALK_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WALK_REQ`, 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | from.x |  |
+| 4 | u32 | from.y |  |
+| 8 | u32 | to.x |  |
+| 12 | u32 | to.y |  |
+
 Handler `FUN_004571a0`
 
 | Off | Type | Checks in handler | Notes |
@@ -241,6 +372,12 @@ Handler `FUN_00457380`
 
 ### `0x2008` NC_ACT_CHANGEMODE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_CHANGEMODE_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | mode |  |
+
 Handler `FUN_00457560`
 
 | Off | Type | Checks in handler | Notes |
@@ -249,6 +386,12 @@ Handler `FUN_00457560`
 
 ### `0x200a` NC_ACT_NPCCLICK_CMD
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_NPCCLICK_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | npchandle |  |
+
 Handler `FUN_004c4b70`
 
 | Off | Type | Checks in handler | Notes |
@@ -256,6 +399,13 @@ Handler `FUN_004c4b70`
 | 0 | u16 |  |  |
 
 ### `0x2012` NC_ACT_STOP_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_STOP_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | loc.x |  |
+| 4 | u32 | loc.y |  |
 
 Handler `FUN_00456ff0`
 
@@ -301,6 +451,12 @@ Handler `FUN_00457fd0`
 
 ### `0x201d` NC_ACT_NPCMENUOPEN_ACK
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_NPCMENUOPEN_ACK`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | ack |  |
+
 Handler `FUN_004c4910`
 
 | Off | Type | Checks in handler | Notes |
@@ -308,6 +464,14 @@ Handler `FUN_004c4910`
 | 0 | char |  |  |
 
 ### `0x201e` NC_ACT_SHOUT_CMD
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SHOUT_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | u8 | len |  |
+| 2 | u8[len] | content | variable length |
 
 Handler `FUN_00458e80`
 
@@ -318,6 +482,12 @@ Handler `FUN_00458e80`
 
 ### `0x2020` NC_ACT_EMOTICON_CMD
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_EMOTICON_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | emoticonid |  |
+
 Handler `FUN_00458740`
 
 | Off | Type | Checks in handler | Notes |
@@ -326,13 +496,25 @@ Handler `FUN_00458740`
 
 ### `0x202d` NC_ACT_GATHERSTART_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_GATHERSTART_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | objhandle |  |
+
 Handler `FUN_0046ccb0`
 
 | Off | Type | Checks in handler | Notes |
 |---|---|---|---|
 | 0 | u16 |  |  |
 
-### `0x2035` NC_ACT_GATHERCOMPLETE_REQ
+### `0x2035` NC_ACT_PRODUCE_CAST_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_PRODUCE_CAST_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | produceskill |  |
 
 Handler `FUN_0046cf90`
 
@@ -342,6 +524,12 @@ Handler `FUN_0046cf90`
 
 ### `0x2044` NC_ACT_RIDE_FEEDING_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_RIDE_FEEDING_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slot |  |
+
 Handler `FUN_0045f9e0`
 
 | Off | Type | Checks in handler | Notes |
@@ -349,6 +537,14 @@ Handler `FUN_0045f9e0`
 | 0 | u8 |  |  |
 
 ### `0x204b` NC_ACT_ROAR_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_ROAR_REQ`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slot |  |
+| 1 | u8 | len |  |
+| 2 | u8[len] | content | variable length |
 
 Handler `FUN_005404d0`
 
@@ -359,6 +555,13 @@ Handler `FUN_005404d0`
 
 ### `0x204f` NC_ACT_WEDDING_PROPOSEREQ_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_PROPOSEREQ_REQ`, 39 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | to |  |
+| 2 | char[37] | propose_word |  |
+
 Handler `FUN_0059f760`
 
 | Off | Type | Checks in handler | Notes |
@@ -366,6 +569,14 @@ Handler `FUN_0059f760`
 | 2 | char[36] |  | copied with _strncpy n=0x24 |
 
 ### `0x2051` NC_ACT_WEDDING_PROPOSEACK_ACK
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_PROPOSEACK_ACK`, 40 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | from |  |
+| 2 | u8 | reply |  |
+| 3 | char[37] | response_word |  |
 
 Handler `FUN_0059f900`
 
@@ -376,6 +587,12 @@ Handler `FUN_0059f900`
 
 ### `0x2067` NC_ACT_ACTIONBYITEM_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_ACTIONBYITEM_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slot |  |
+
 Handler `FUN_00458440`
 
 | Off | Type | Checks in handler | Notes |
@@ -383,6 +600,12 @@ Handler `FUN_00458440`
 | 0 | u8 |  |  |
 
 ### `0x2073` NC_ACT_NPC_MENU_CMD
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_NPC_MENU_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Ack |  |
 
 Handler `FUN_004c2460`
 
@@ -400,6 +623,12 @@ Handler `FUN_0042ffe0`
 
 ### `0x243e` NC_BAT_ASSIST_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ASSIST_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | tanker |  |
+
 Handler `FUN_0042b7a0`
 
 | Off | Type | Checks in handler | Notes |
@@ -407,6 +636,13 @@ Handler `FUN_0042b7a0`
 | 0 | u16 |  |  |
 
 ### `0x2440` NC_BAT_SKILLBASH_OBJ_CAST_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_OBJ_CAST_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skill |  |
+| 2 | u16 | target |  |
 
 Handler `FUN_0057fa50`
 
@@ -416,6 +652,14 @@ Handler `FUN_0057fa50`
 | 2 | u16 |  |  |
 
 ### `0x2441` NC_BAT_SKILLBASH_FLD_CAST_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_FLD_CAST_REQ`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skill |  |
+| 2 | u32 | locate.x |  |
+| 6 | u32 | locate.y |  |
 
 Handler `FUN_0057f400`
 
@@ -427,6 +671,12 @@ Handler `FUN_0057f400`
 
 ### `0x2454` NC_BAT_ABSTATE_ERASE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ABSTATE_ERASE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | abstateIndex |  |
+
 Handler `FUN_0042b900`
 
 | Off | Type | Checks in handler | Notes |
@@ -434,6 +684,13 @@ Handler `FUN_0042b900`
 | 0 | u16 |  |  |
 
 ### `0x3006` NC_ITEM_SELL_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SELL_REQ`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slot |  |
+| 1 | u32 | lot |  |
 
 Handler `FUN_00539020`
 
@@ -444,6 +701,15 @@ Handler `FUN_00539020`
 
 ### `0x3007` NC_ITEM_DROP_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DROP_REQ`, 14 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | slot | ITEM_INVEN (union: Inven, Pos, Type) |
+| 2 | u32 | lot |  |
+| 6 | u32 | loc.x |  |
+| 10 | u32 | loc.y |  |
+
 Handler `FUN_00529f50`
 
 | Off | Type | Checks in handler | Notes |
@@ -451,6 +717,12 @@ Handler `FUN_00529f50`
 | 0 | u32 |  |  |
 
 ### `0x3009` NC_ITEM_PICK_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_PICK_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | itemhandle |  |
 
 Handler `FUN_00530a50`
 
@@ -460,6 +732,13 @@ Handler `FUN_00530a50`
 
 ### `0x300b` NC_ITEM_RELOC_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_RELOC_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | from | ITEM_INVEN (union: Inven, Pos, Type) |
+| 2 | u16 | to | ITEM_INVEN (union: Inven, Pos, Type) |
+
 Handler `FUN_00537170`
 
 | Off | Type | Checks in handler | Notes |
@@ -467,6 +746,14 @@ Handler `FUN_00537170`
 | 2 | u16 |  |  |
 
 ### `0x300d` NC_ITEM_SPLIT_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SPLIT_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | from | ITEM_INVEN (union: Inven, Pos, Type) |
+| 2 | u16 | to | ITEM_INVEN (union: Inven, Pos, Type) |
+| 4 | u32 | lot |  |
 
 Handler `FUN_00539a40`
 
@@ -477,6 +764,12 @@ Handler `FUN_00539a40`
 
 ### `0x300f` NC_ITEM_EQUIP_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_EQUIP_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slot |  |
+
 Handler `FUN_0052b8d0`
 
 | Off | Type | Checks in handler | Notes |
@@ -484,6 +777,13 @@ Handler `FUN_0052b8d0`
 | 0 | u8 |  |  |
 
 ### `0x3010` NC_ITEM_RINGEQUIP_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_RINGEQUIP_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slot |  |
+| 1 | u8 | equip |  |
 
 Handler `FUN_0052c5b0`
 
@@ -494,6 +794,13 @@ Handler `FUN_0052c5b0`
 
 ### `0x3012` NC_ITEM_UNEQUIP_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_UNEQUIP_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slotequip |  |
+| 1 | u8 | slotinven |  |
+
 Handler `FUN_0053a990`
 
 | Off | Type | Checks in handler | Notes |
@@ -503,6 +810,13 @@ Handler `FUN_0053a990`
 
 ### `0x3015` NC_ITEM_USE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_USE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | invenslot |  |
+| 1 | u8 | invenType |  |
+
 Handler `FUN_005416b0`
 
 | Off | Type | Checks in handler | Notes |
@@ -511,6 +825,17 @@ Handler `FUN_005416b0`
 | 1 | u8 |  |  |
 
 ### `0x3017` NC_ITEM_UPGRADE_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_UPGRADE_REQ`, 9 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | equip |  |
+| 1 | u8 | raw |  |
+| 2 | u8 | raw_left |  |
+| 3 | u8 | raw_right |  |
+| 4 | u32 | gift_money |  |
+| 8 | u8 | raw_middle |  |
 
 Handler `FUN_0053d220`
 
@@ -525,6 +850,12 @@ Handler `FUN_0053d220`
 
 ### `0x301c` NC_ITEM_DEPOSIT_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DEPOSIT_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
+
 Handler `FUN_00533dc0`
 
 | Off | Type | Checks in handler | Notes |
@@ -533,6 +864,12 @@ Handler `FUN_00533dc0`
 | 4 | u32 | == 0 |  |
 
 ### `0x301e` NC_ITEM_WITHDRAW_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_WITHDRAW_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
 
 Handler `FUN_005342b0`
 
@@ -543,6 +880,12 @@ Handler `FUN_005342b0`
 
 ### `0x3020` NC_ITEM_CHARGEDINVENOPEN_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHARGEDINVENOPEN_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | page |  |
+
 Handler `FUN_004923c0`
 
 | Off | Type | Checks in handler | Notes |
@@ -550,6 +893,12 @@ Handler `FUN_004923c0`
 | 0 | i16 |  |  |
 
 ### `0x3022` NC_ITEM_CHARGED_WITHDRAW_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHARGED_WITHDRAW_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ItemOrderNo |  |
 
 Handler `FUN_00492660`
 
@@ -559,6 +908,12 @@ Handler `FUN_00492660`
 
 ### `0x3026` NC_ITEM_GUILD_STORAGE_WITHDRAW_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_STORAGE_WITHDRAW_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
+
 Handler `FUN_00537330`
 
 | Off | Type | Checks in handler | Notes |
@@ -566,7 +921,13 @@ Handler `FUN_00537330`
 | 0 | u32 | != 0 |  |
 | 4 | u32 | != 0 |  |
 
-### `0x3028` NC_ITEM_DEPOSIT_REQ
+### `0x3028` NC_ITEM_OPENSTORAGEPAGE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_OPENSTORAGEPAGE_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | page |  |
 
 Handler `FUN_00536650`
 
@@ -576,6 +937,12 @@ Handler `FUN_00536650`
 
 ### `0x302a` NC_ITEM_DISMANTLE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DISMANTLE_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | item |  |
+
 Handler `FUN_005293c0`
 
 | Off | Type | Checks in handler | Notes |
@@ -583,6 +950,12 @@ Handler `FUN_005293c0`
 | 0 | u8 |  |  |
 
 ### `0x302c` NC_ITEM_REWARDINVENOPEN_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_REWARDINVENOPEN_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | page |  |
 
 Handler `FUN_004fc060`
 
@@ -592,11 +965,23 @@ Handler `FUN_004fc060`
 
 ### `0x302f` NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
+
 Handler `FUN_00470110`
 
 No payload fields read directly by the handler.
 
 ### `0x3031` NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
 
 Handler `FUN_00470490`
 
@@ -604,11 +989,25 @@ No payload fields read directly by the handler.
 
 ### `0x3033` NC_ITEM_MH_FURNITURE_ENDURE_KIT_USE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MH_FURNITURE_ENDURE_KIT_USE_REQ`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nInvenSlot |  |
+| 1 | u16 | nFurnitureHnd |  |
+
 Handler `FUN_00571340`
 
 No payload fields read directly by the handler.
 
 ### `0x3035` NC_ITEM_WEAPONENDURE_CHARGE_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_WEAPONENDURE_CHARGE_REQ`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | ChargingSlot |  |
+| 1 | u16 | WeaponSlot | ITEM_INVEN (union: Inven, Pos, Type) |
 
 Handler `FUN_00519470`
 
@@ -617,7 +1016,14 @@ Handler `FUN_00519470`
 | 0 | u8 |  |  |
 | 1 | u16 |  |  |
 
-### `0x303c` NC_ITEM_WEAPONENDURE_CHARGE_REQ
+### `0x303c` NC_ITEM_DICE_GAME_START_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DICE_GAME_START_REQ`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | itemhandle |  |
+| 2 | u8 | IsYes |  |
 
 Handler `FUN_00517d70`
 
@@ -627,6 +1033,13 @@ Handler `FUN_00517d70`
 
 ### `0x3040` NC_ITEM_ENCHANT_ADD_GEM_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_ADD_GEM_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
+| 2 | u16 | gem | ITEM_INVEN (union: Inven, Pos, Type) |
+
 Handler `FUN_00522560`
 
 | Off | Type | Checks in handler | Notes |
@@ -634,6 +1047,14 @@ Handler `FUN_00522560`
 | 0 | u16 |  |  |
 
 ### `0x3042` NC_ITEM_ENCHANT_REMOVE_GEM_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_REMOVE_GEM_REQ`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
+| 2 | u16 | remover | ITEM_INVEN (union: Inven, Pos, Type) |
+| 4 | u8 | gemSocketIndex |  |
 
 Handler `FUN_00522990`
 
@@ -643,7 +1064,14 @@ Handler `FUN_00522990`
 | 2 | u16 |  |  |
 | 4 | u8 |  |  |
 
-### `0x3044` NC_ITEM_ENCHANT_REMOVE_GEM_REQ
+### `0x3044` NC_ITEM_ENCHANT_ADD_NEW_SOCKET_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_ADD_NEW_SOCKET_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
+| 2 | u16 | drill | ITEM_INVEN (union: Inven, Pos, Type) |
 
 Handler `FUN_00522cc0`
 
@@ -653,6 +1081,13 @@ Handler `FUN_00522cc0`
 
 ### `0x3048` NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nCancelItemInvenSlot |  |
+| 1 | u8 | nBelongedItemInvenSlot |  |
+
 Handler `FUN_0051b9a0`
 
 | Off | Type | Checks in handler | Notes |
@@ -661,6 +1096,15 @@ Handler `FUN_0051b9a0`
 | 1 | u8 |  |  |
 
 ### `0x304e` NC_ITEM_USE_ACTIVESKILL_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_USE_ACTIVESKILL_REQ`, 11 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nInvenSlot |  |
+| 1 | u16 | nTargetHnd |  |
+| 3 | u32 | TargetLoc.x |  |
+| 7 | u32 | TargetLoc.y |  |
 
 Handler `FUN_00540b90`
 
@@ -673,6 +1117,13 @@ Handler `FUN_00540b90`
 
 ### `0x3050` NC_ITEM_MINIMON_EQUIP_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MINIMON_EQUIP_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nSlotNo |  |
+| 1 | u8 | nEquipSlot |  |
+
 Handler `FUN_0052d020`
 
 | Off | Type | Checks in handler | Notes |
@@ -681,6 +1132,13 @@ Handler `FUN_0052d020`
 | 1 | u8 |  |  |
 
 ### `0x3051` NC_ITEM_MOVER_UPGRADE_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MOVER_UPGRADE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nMainSlotNo |  |
+| 1 | u8 | nSubSlotNo |  |
 
 Handler `FUN_0051c850`
 
@@ -691,6 +1149,13 @@ Handler `FUN_0051c850`
 
 ### `0x3053` NC_ITEM_RANDOMOPTION_CHANGE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_RANDOMOPTION_CHANGE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nItemSlotNo |  |
+| 1 | u8 | nStuffSlotNo |  |
+
 Handler `FUN_00520e40`
 
 | Off | Type | Checks in handler | Notes |
@@ -698,7 +1163,13 @@ Handler `FUN_00520e40`
 | 0 | u8 |  |  |
 | 1 | u8 |  |  |
 
-### `0x3055` NC_ITEM_CHATC_OLOR_CHANGE_REQ
+### `0x3055` NC_ITEM_CHAT_COLOR_CHANGE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHAT_COLOR_CHANGE_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nSlotNo |  |
 
 Handler `FUN_0051e580`
 
@@ -708,6 +1179,12 @@ Handler `FUN_0051e580`
 
 ### `0x3059` NC_ITEM_REPURCHASE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_REPURCHASE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHaldle |  |
+
 Handler `FUN_00538580`
 
 | Off | Type | Checks in handler | Notes |
@@ -716,6 +1193,12 @@ Handler `FUN_00538580`
 
 ### `0x305e` NC_ITEM_CLASS_CHANGE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CLASS_CHANGE_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nStuffSlotNo |  |
+
 Handler `FUN_0051f5c0`
 
 | Off | Type | Checks in handler | Notes |
@@ -723,6 +1206,13 @@ Handler `FUN_0051f5c0`
 | 0 | u8 |  |  |
 
 ### `0x3064` NC_ITEM_SHIELDENDURE_CHARGE_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SHIELDENDURE_CHARGE_REQ`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | ChargingSlot |  |
+| 1 | u16 | ShieldSlot | ITEM_INVEN (union: Inven, Pos, Type) |
 
 Handler `FUN_00519a10`
 
@@ -733,6 +1223,12 @@ Handler `FUN_00519a10`
 
 ### `0x3067` NC_ITEM_MAPLINK_SCROLL_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MAPLINK_SCROLL_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | targetMap |  |
+
 Handler `FUN_00520130`
 
 | Off | Type | Checks in handler | Notes |
@@ -740,6 +1236,14 @@ Handler `FUN_00520130`
 | 0 | i32 | == 0 |  |
 
 ### `0x3069` NC_ITEM_MIX_ITEM_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MIX_ITEM_REQ`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nSubRaw |  |
+| 1 | u8 | nRawLeft |  |
+| 2 | u8 | nRawRight |  |
 
 Handler `FUN_00521540`
 
@@ -751,6 +1255,13 @@ Handler `FUN_00521540`
 
 ### `0x306d` NC_ITEM_NEW_UPGRADE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_NEW_UPGRADE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | equip |  |
+| 1 | u8 | raw |  |
+
 Handler `FUN_0053e360`
 
 | Off | Type | Checks in handler | Notes |
@@ -759,6 +1270,13 @@ Handler `FUN_0053e360`
 | 1 | u8 |  |  |
 
 ### `0x306f` NC_ITEM_BRACELET_UPGRADE_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_BRACELET_UPGRADE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | equip |  |
+| 1 | u8 | raw |  |
 
 Handler `FUN_0053ec40`
 
@@ -769,13 +1287,25 @@ Handler `FUN_0053ec40`
 
 ### `0x3c02` NC_MENU_SERVERMENU_ACK
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MENU_SERVERMENU_ACK`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | reply |  |
+
 Handler `FUN_0050fe60`
 
 | Off | Type | Checks in handler | Notes |
 |---|---|---|---|
 | 0 | u8 |  |  |
 
-### `0x4025` NC_MISC_DB_UI_STATE_SAVE_REQ
+### `0x4025` NC_CHARSAVE_UI_STATE_SAVE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHARSAVE_UI_STATE_SAVE_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | btMysteryType |  |
 
 Handler `FUN_00562f40`
 
@@ -785,11 +1315,25 @@ Handler `FUN_00562f40`
 
 ### `0x4402` NC_QUEST_SCRIPT_CMD_ACK
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_SCRIPT_CMD_ACK`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nQuestID |  |
+| 2 | u8 | nQSC |  |
+| 3 | u32 | nResult |  |
+
 Handler `FUN_00578340`
 
 No payload fields read directly by the handler.
 
 ### `0x4407` NC_QUEST_GIVE_UP_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_GIVE_UP_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nQuestID |  |
 
 Handler `FUN_00578910`
 
@@ -799,11 +1343,24 @@ Handler `FUN_00578910`
 
 ### `0x440b` NC_QUEST_CLIENT_SCENARIO_DONE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_CLIENT_SCENARIO_DONE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nScenarioID |  |
+
 Handler `FUN_005789f0`
 
 No payload fields read directly by the handler.
 
 ### `0x440f` NC_QUEST_SELECT_START_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_SELECT_START_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNPCID |  |
+| 2 | u16 | nQuestID |  |
 
 Handler `FUN_00578ab0`
 
@@ -811,11 +1368,24 @@ No payload fields read directly by the handler.
 
 ### `0x4411` NC_QUEST_REWARD_SELECT_ITEM_INDEX_CMD
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_REWARD_SELECT_ITEM_INDEX_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nQuestID |  |
+| 2 | u32 | nSelectedItemIndex |  |
+
 Handler `FUN_00578b70`
 
 No payload fields read directly by the handler.
 
 ### `0x4414` NC_QUEST_START_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_START_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nQuestID |  |
 
 Handler `FUN_00578e90`
 
@@ -825,6 +1395,12 @@ Handler `FUN_00578e90`
 
 ### `0x4416` NC_QUEST_READ_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_READ_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nQuestID |  |
+
 Handler `FUN_00578f90`
 
 | Off | Type | Checks in handler | Notes |
@@ -832,6 +1408,14 @@ Handler `FUN_00578f90`
 | 0 | u16 |  |  |
 
 ### `0x4811` NC_SKILL_EMPOWALLOC_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_EMPOWALLOC_REQ`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skill |  |
+| 2 | u16 | plus.damage|sp|keeptime|cooltime | bits damage:4@0, sp:4@4, keeptime:4@8, cooltime:4@12 |
+| 4 | u16 | minus.damage|sp|keeptime|cooltime | bits damage:4@0, sp:4@4, keeptime:4@8, cooltime:4@12 |
 
 Handler `FUN_0044f150`
 
@@ -843,6 +1427,12 @@ Handler `FUN_0044f150`
 
 ### `0x4822` NC_SKILL_PRODUCTFIELD_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_PRODUCTFIELD_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | mainskill |  |
+
 Handler `FUN_0046c820`
 
 | Off | Type | Checks in handler | Notes |
@@ -850,6 +1440,13 @@ Handler `FUN_0046c820`
 | 0 | u16 |  |  |
 
 ### `0x4824` NC_SKILL_UNLEARN_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_UNLEARN_REQ`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slot |  |
+| 1 | u16 | skill |  |
 
 Handler `FUN_0057ad80`
 
@@ -859,6 +1456,12 @@ Handler `FUN_0057ad80`
 
 ### `0x4c01` NC_TRADE_PROPOSE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_PROPOSE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | proposee |  |
+
 Handler `FUN_005925a0`
 
 | Off | Type | Checks in handler | Notes |
@@ -866,6 +1469,12 @@ Handler `FUN_005925a0`
 | 0 | i16 |  |  |
 
 ### `0x4c0d` NC_TRADE_UPBOARD_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_UPBOARD_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slotinven |  |
 
 Handler `FUN_00595280`
 
@@ -875,6 +1484,12 @@ Handler `FUN_00595280`
 
 ### `0x4c11` NC_TRADE_DOWNBOARD_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_DOWNBOARD_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slotboard |  |
+
 Handler `FUN_00594ed0`
 
 | Off | Type | Checks in handler | Notes |
@@ -882,6 +1497,12 @@ Handler `FUN_00594ed0`
 | 0 | u8 |  |  |
 
 ### `0x4c15` NC_TRADE_CENBOARDING_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_CENBOARDING_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
 
 Handler `FUN_005936b0`
 
@@ -892,13 +1513,25 @@ Handler `FUN_005936b0`
 
 ### `0x5001` NC_SOULSTONE_HP_BUY_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SOULSTONE_HP_BUY_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | number |  |
+
 Handler `FUN_00588d20`
 
 | Off | Type | Checks in handler | Notes |
 |---|---|---|---|
 | 0 | u16 |  |  |
 
-### `0x5002` NC_SOULSTONE_HP_BUY_REQ
+### `0x5002` NC_SOULSTONE_SP_BUY_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SOULSTONE_SP_BUY_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | number |  |
 
 Handler `FUN_00588e90`
 
@@ -907,6 +1540,13 @@ Handler `FUN_00588e90`
 | 0 | u16 |  |  |
 
 ### `0x581a` NC_KQ_ENTRYRESPONCE_ACK
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_ENTRYRESPONCE_ACK`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Reply |  |
+| 1 | u32 | EncHandle |  |
 
 Handler `FUN_00496990`
 
@@ -917,6 +1557,15 @@ Handler `FUN_00496990`
 
 ### `0x5c01` NC_WT_LICENSE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_WT_LICENSE_REQ`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | licenseitem | ITEM_INVEN (union: Inven, Pos, Type) |
+| 2 | u16 | weaponitem | ITEM_INVEN (union: Inven, Pos, Type) |
+| 4 | u16 | mobid |  |
+| 6 | u8 | bSet |  |
+
 Handler `FUN_0059e410`
 
 | Off | Type | Checks in handler | Notes |
@@ -925,6 +1574,14 @@ Handler `FUN_0059e410`
 
 ### `0x6001` NC_CT_SET_CURRENT_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CT_SET_CURRENT_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Type |  |
+| 1 | u8 | ElementNo |  |
+| 2 | u16 | MobID |  |
+
 Handler `FUN_005cb100`
 
 | Off | Type | Checks in handler | Notes |
@@ -932,6 +1589,16 @@ Handler `FUN_005cb100`
 | 33 | u16 |  |  |
 
 ### `0x6801` NC_BOOTH_OPEN_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_OPEN_REQ`, 31 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8[30] | signboard.signboard |  |
+| 30 | u8 | flag.issell|itemnum | bits issell:1@0, itemnum:7@1 |
+| 31 | PROTO_NC_BOOTH_OPEN_REQ::BoothItem[flag.issell|itemnum] | items | variable length, element PROTO_NC_BOOTH_OPEN_REQ::BoothItem |
+
+Element `PROTO_NC_BOOTH_OPEN_REQ::BoothItem` (12 bytes): +0 u8 invenslot, +1 u8 boardslot, +2 u64 unitcost, +10 u16 totallot
 
 Handler `FUN_0058e900`
 
@@ -943,6 +1610,12 @@ Handler `FUN_0058e900`
 
 ### `0x6807` NC_BOOTH_ENTRY_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_ENTRY_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | booth |  |
+
 Handler `FUN_0058d600`
 
 | Off | Type | Checks in handler | Notes |
@@ -950,6 +1623,12 @@ Handler `FUN_0058d600`
 | 0 | u16 |  |  |
 
 ### `0x680a` NC_BOOTH_REFRESH_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_REFRESH_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | booth |  |
 
 Handler `FUN_0058d480`
 
@@ -959,6 +1638,14 @@ Handler `FUN_0058d480`
 
 ### `0x680d` NC_BOOTH_ITEMTRADE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_ITEMTRADE_REQ`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | booth |  |
+| 2 | u8 | slot |  |
+| 3 | u16 | itemnum |  |
+
 Handler `FUN_0058da30`
 
 | Off | Type | Checks in handler | Notes |
@@ -966,6 +1653,14 @@ Handler `FUN_0058da30`
 | 0 | u16 |  |  |
 
 ### `0x6813` NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_REQ`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | Category |  |
+| 4 | u8 | bReqOnlyMyClass |  |
+| 5 | u8 | bIsOpeningReq |  |
 
 Handler `FUN_00439c70`
 
@@ -977,6 +1672,13 @@ Handler `FUN_00439c70`
 
 ### `0x6815` NC_BOOTH_SEARCH_BOOTH_POSITION_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SEARCH_BOOTH_POSITION_REQ`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nBoothItemHandle |  |
+| 4 | u16 | nTargetBoothOwnerHandle |  |
+
 Handler `FUN_0043a140`
 
 | Off | Type | Checks in handler | Notes |
@@ -985,6 +1687,12 @@ Handler `FUN_0043a140`
 | 4 | i16 | == -1 |  |
 
 ### `0x6c06` NC_SCENARIO_AREAENTRY_ACK
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_AREAENTRY_ACK`, 32 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | areaindex | Name8 |
 
 Handler `FUN_0050cd90`
 
@@ -1001,6 +1709,12 @@ Handler `FUN_0050cd90`
 
 ### `0x6c08` NC_SCENARIO_AREALEAVE_ACK
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_AREALEAVE_ACK`, 32 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | areaindex | Name8 |
+
 Handler `FUN_0050cf00`
 
 | Off | Type | Checks in handler | Notes |
@@ -1016,6 +1730,12 @@ Handler `FUN_0050cf00`
 
 ### `0x749c` NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | ack |  |
+
 Handler `FUN_004783c0`
 
 | Off | Type | Checks in handler | Notes |
@@ -1023,6 +1743,13 @@ Handler `FUN_004783c0`
 | 0 | char |  |  |
 
 ### `0x74ac` NC_GUILD_RENAME_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_RENAME_REQ`, 17 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nItemSlot |  |
+| 1 | char[16] | sGuildName | Name4 |
 
 Handler `FUN_00473550`
 
@@ -1036,6 +1763,13 @@ Handler `FUN_00473550`
 
 ### `0x74b4` NC_GUILD_RETYPE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_RETYPE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nItemSlot |  |
+| 1 | u8 | nType |  |
+
 Handler `FUN_00473860`
 
 | Off | Type | Checks in handler | Notes |
@@ -1043,7 +1777,13 @@ Handler `FUN_00473860`
 | 0 | u8 |  |  |
 | 1 | u8 |  |  |
 
-### `0x74ca` ?
+### `0x74ca` NC_GUILD_TOURNAMENT_FLAGCAPTURE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_FLAGCAPTURE_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hTargetFlag |  |
 
 Handler `FUN_00475b80`
 
@@ -1051,7 +1791,13 @@ Handler `FUN_00475b80`
 |---|---|---|---|
 | 0 | u16 |  |  |
 
-### `0x74cf` ?
+### `0x74cf` NC_GUILD_TOURNAMENT_USESKILL_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_USESKILL_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wUseSkillNumber |  |
 
 Handler `FUN_00477b20`
 
@@ -1061,6 +1807,12 @@ Handler `FUN_00477b20`
 
 ### `0x74d7` NC_GUILD_TOURNAMENT_OBSERVER_ENTER_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_OBSERVER_ENTER_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed |  |
+
 Handler `FUN_00476c50`
 
 | Off | Type | Checks in handler | Notes |
@@ -1069,6 +1821,12 @@ Handler `FUN_00476c50`
 
 ### `0x8c01` NC_MINIHOUSE_ACTIV_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_ACTIV_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slot |  |
+
 Handler `FUN_00536310`
 
 | Off | Type | Checks in handler | Notes |
@@ -1076,6 +1834,16 @@ Handler `FUN_00536310`
 | 0 | u8 |  |  |
 
 ### `0x8c03` NC_MINIHOUSE_BUILDING_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_BUILDING_REQ`, 133 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | maxvisiter |  |
+| 1 | char[9] | password |  |
+| 10 | char[21] | title |  |
+| 31 | u8 | bItemInfoClose |  |
+| 32 | char[101] | sNotify |  |
 
 Handler `FUN_005769d0`
 
@@ -1089,6 +1857,12 @@ Handler `FUN_005769d0`
 
 ### `0x8c0e` NC_MINIHOUSE_VISITREADY_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_VISITREADY_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | mh_hnd |  |
+
 Handler `FUN_005719f0`
 
 | Off | Type | Checks in handler | Notes |
@@ -1097,13 +1871,26 @@ Handler `FUN_005719f0`
 
 ### `0x8c10` NC_MINIHOUSE_VISIT_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_VISIT_REQ`, 11 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | mh_hnd |  |
+| 2 | char[9] | password |  |
+
 Handler `FUN_00571c50`
 
 | Off | Type | Checks in handler | Notes |
 |---|---|---|---|
 | 0 | u16 |  |  |
 
-### `0x8c12` NC_MINIHOUSE_KICKOUT
+### `0x8c12` NC_MINIHOUSE_KICKOUT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_KICKOUT_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hnd |  |
 
 Handler `FUN_00575500`
 
@@ -1113,6 +1900,12 @@ Handler `FUN_00575500`
 
 ### `0x8c1d` NC_MINIHOUSE_FUNITUREINFOCOMPLETE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FUNITUREINFOCOMPLETE_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | funitureinfocomplete |  |
+
 Handler `FUN_00572670`
 
 | Off | Type | Checks in handler | Notes |
@@ -1121,11 +1914,29 @@ Handler `FUN_00572670`
 
 ### `0x8c1f` NC_MINIHOUSE_REARRANGE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_REARRANGE_REQ`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | furniturecount |  |
+| 1 | PROTO_NC_MINIHOUSE_REARRANGE_REQ::<unnamed-type-rearrange>[furniturecount] | rearrange | variable length, element PROTO_NC_MINIHOUSE_REARRANGE_REQ::<unnamed-type-rearrange> |
+
+Element `PROTO_NC_MINIHOUSE_REARRANGE_REQ::<unnamed-type-rearrange>` (18 bytes): +0 u16 furniturehandle, +2 f32 location.x, +6 f32 location.y, +10 f32 location.z, +14 f32 location.angle
+
 Handler `FUN_00572d50`
 
 No payload fields read directly by the handler.
 
 ### `0x8c22` NC_MINIHOUSE_CREATE_FURNITURE_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | furniturecount |  |
+| 1 | PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ::<unnamed-type-rearrange>[furniturecount] | rearrange | variable length, element PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ::<unnamed-type-rearrange> |
+
+Element `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ::<unnamed-type-rearrange>` (18 bytes): +0 u16 furniturehandle, +2 f32 location.x, +6 f32 location.y, +10 f32 location.z, +14 f32 location.angle
 
 Handler `FUN_00572bf0`
 
@@ -1133,11 +1944,24 @@ No payload fields read directly by the handler.
 
 ### `0x8c25` NC_MINIHOUSE_DELETE_FURNITURE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_DELETE_FURNITURE_REQ`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | furniturecount |  |
+| 1 | u16[furniturecount] | furniturehandle | variable length |
+
 Handler `FUN_00572eb0`
 
 No payload fields read directly by the handler.
 
 ### `0x8c2b` NC_MINIHOUSE_MODIFY_PASSWORD_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_PASSWORD_REQ`, 9 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[9] | password |  |
 
 Handler `FUN_00573200`
 
@@ -1145,11 +1969,23 @@ No payload fields read directly by the handler.
 
 ### `0x8c2e` NC_MINIHOUSE_MODIFY_TITLE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_TITLE_REQ`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[21] | title |  |
+
 Handler `FUN_00573010`
 
 No payload fields read directly by the handler.
 
-### `0x8c32` NC_ACT_INNERMH_RESET_MAX_PLAYER
+### `0x8c32` NC_MINIHOUSE_MODIFY_MAXENTERNUM_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_MAXENTERNUM_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | maxvisiter |  |
 
 Handler `FUN_005733c0`
 
@@ -1159,6 +1995,13 @@ Handler `FUN_005733c0`
 
 ### `0x8c3d` NC_MINIHOUSE_CHAR_ACTION_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_CHAR_ACTION_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Handle |  |
+| 2 | u16 | nFurnitureHnd |  |
+
 Handler `FUN_00574750`
 
 | Off | Type | Checks in handler | Notes |
@@ -1166,7 +2009,14 @@ Handler `FUN_00574750`
 | 0 | u16 |  |  |
 | 2 | u16 |  |  |
 
-### `0x8c40` NC_MINIHOUSE_CHAR_ACTION_REQ
+### `0x8c40` NC_MINIHOUSE_FURNITURE_EFFECT_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EFFECT_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nFurnitureHnd |  |
+| 2 | u16 | nEffectHandle |  |
 
 Handler `FUN_00574a30`
 
@@ -1177,6 +2027,12 @@ Handler `FUN_00574a30`
 
 ### `0x8c43` NC_MINIHOUSE_MODIFY_ITEM_INFO_OPEN_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_ITEM_INFO_OPEN_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bItemInfoClose |  |
+
 Handler `FUN_00573590`
 
 | Off | Type | Checks in handler | Notes |
@@ -1184,6 +2040,13 @@ Handler `FUN_00573590`
 | 0 | u8 |  |  |
 
 ### `0x8c48` NC_MINIHOUSE_MODIFY_NOTIFY_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_NOTIFY_REQ`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nNotifyLen |  |
+| 1 | char[nNotifyLen] | sNotify | variable length |
 
 Handler `FUN_00573750`
 
@@ -1194,17 +2057,37 @@ Handler `FUN_00573750`
 
 ### `0x8c50` NC_MINIHOUSE_PORTAL_OPEN_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_PORTAL_OPEN_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPortalItemID |  |
+
 Handler `FUN_00573930`
 
 No payload fields read directly by the handler.
 
 ### `0x8c53` NC_MINIHOUSE_PORTAL_CLOSE_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_PORTAL_CLOSE_REQ`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
+
 Handler `FUN_00573b20`
 
 No payload fields read directly by the handler.
 
 ### `0x8c62` NC_MINIHOUSE_FURNITURE_EMOTION_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EMOTION_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nFurnitureHnd |  |
+| 2 | u8 | nPosition |  |
+| 3 | u8 | nEmotionNo |  |
 
 Handler `FUN_00575850`
 
@@ -1215,6 +2098,12 @@ Handler `FUN_00575850`
 
 ### `0x986d` NC_GUILD_ACADEMY_REWARD_STORAGE_OPEN_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_REWARD_STORAGE_OPEN_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nOpenType |  |
+
 Handler `FUN_0046f550`
 
 | Off | Type | Checks in handler | Notes |
@@ -1222,6 +2111,12 @@ Handler `FUN_0046f550`
 | 0 | u8 |  |  |
 
 ### `0x986f` NC_GUILD_ACADEMY_REWARD_STORAGE_CLOSE_CMD
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_REWARD_STORAGE_CLOSE_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nCloseType |  |
 
 Handler `FUN_0046f460`
 
@@ -1231,6 +2126,13 @@ Handler `FUN_0046f460`
 
 ### `0xa40d` NC_INSTANCE_DUNGEON_LEVEL_SELECT_MENU_ACK
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_LEVEL_SELECT_MENU_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNPCHandle |  |
+| 2 | i32 | eLevelType |  |
+
 Handler `FUN_00485810`
 
 | Off | Type | Checks in handler | Notes |
@@ -1238,6 +2140,12 @@ Handler `FUN_00485810`
 | 0 | i16 |  |  |
 
 ### `0xac0b` NC_DICE_TAISAI_EXPECT_INCOME_MONEY_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_EXPECT_INCOME_MONEY_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nInvenSlot | ITEM_INVEN (union: Inven, Pos, Type) |
 
 Handler `FUN_00515400`
 
@@ -1247,6 +2155,12 @@ Handler `FUN_00515400`
 
 ### `0xac0f` NC_DICE_TAISAI_RECEIPT_INCOME_MONEY_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_RECEIPT_INCOME_MONEY_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nInvenSlot | ITEM_INVEN (union: Inven, Pos, Type) |
+
 Handler `FUN_00515600`
 
 | Off | Type | Checks in handler | Notes |
@@ -1255,6 +2169,14 @@ Handler `FUN_00515600`
 
 ### `0xac1a` NC_DICE_TAISAI_BETTING_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_BETTING_REQ`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | BettingInfo.nBetting |  |
+| 4 | u32 | BettingInfo.nMoney |  |
+| 8 | u16 | nBettingIndex |  |
+
 Handler `FUN_00515c40`
 
 | Off | Type | Checks in handler | Notes |
@@ -1262,6 +2184,14 @@ Handler `FUN_00515c40`
 | 8 | u16 |  |  |
 
 ### `0xac1d` NC_DICE_TAISAI_BETTING_CANCEL_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_BETTING_CANCEL_REQ`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | BettingCancelInfo.nBetting |  |
+| 4 | u32 | BettingCancelInfo.nMoney |  |
+| 8 | u16 | nBettingCancelIndex |  |
 
 Handler `FUN_00515ee0`
 
@@ -1285,6 +2215,12 @@ Handler `FUN_0051b090`
 
 ### `0xbc0d` NC_GAMBLE_COIN_USE_VIPCARD_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_COIN_VIPCARD_UI_OPEN_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nInvenSlot |  |
+
 Handler `FUN_00616ad0`
 
 | Off | Type | Checks in handler | Notes |
@@ -1292,6 +2228,12 @@ Handler `FUN_00616ad0`
 | 0 | u8 |  |  |
 
 ### `0xbc0f` NC_GAMBLE_COIN_BUY_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_COIN_BUY_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nCoin |  |
 
 Handler `FUN_00616330`
 
@@ -1302,6 +2244,12 @@ Handler `FUN_00616330`
 
 ### `0xbc13` NC_GAMBLE_COIN_SELL_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_COIN_SELL_REQ`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nCoin |  |
+
 Handler `FUN_00616770`
 
 | Off | Type | Checks in handler | Notes |
@@ -1311,6 +2259,12 @@ Handler `FUN_00616770`
 
 ### `0xbc17` NC_GAMBLE_TYPE_AND_WHERE_STAND_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_TYPE_AND_WHERE_STAND_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNpcHandle |  |
+
 Handler `FUN_00616dd0`
 
 | Off | Type | Checks in handler | Notes |
@@ -1318,6 +2272,14 @@ Handler `FUN_00616dd0`
 | 0 | u16 |  |  |
 
 ### `0xbc64` NC_GAMBLE_DICE_TAISAI_GAME_JOIN_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_GAME_JOIN_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNpcHandle |  |
+| 2 | u8 | nWhereStand |  |
+| 3 | u8 | nDirect |  |
 
 Handler `FUN_0061ccc0`
 
@@ -1329,6 +2291,14 @@ Handler `FUN_0061ccc0`
 
 ### `0xbc71` NC_GAMBLE_DICE_TAISAI_BETTING_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_BETTING_REQ`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | BettingInfo.nBetting |  |
+| 4 | u32 | BettingInfo.nMoney |  |
+| 8 | u16 | nBettingIndex |  |
+
 Handler `FUN_0061d470`
 
 | Off | Type | Checks in handler | Notes |
@@ -1337,6 +2307,14 @@ Handler `FUN_0061d470`
 
 ### `0xbc74` NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_REQ`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | BettingCancelInfo.nBetting |  |
+| 4 | u32 | BettingCancelInfo.nMoney |  |
+| 8 | u16 | nBettingCancelIndex |  |
+
 Handler `FUN_0061d6d0`
 
 | Off | Type | Checks in handler | Notes |
@@ -1344,6 +2322,14 @@ Handler `FUN_0061d6d0`
 | 8 | u16 |  |  |
 
 ### `0xbcc8` NC_GAMBLE_SLOTMACHINE_GAME_JOIN_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_GAME_JOIN_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNpcHandle |  |
+| 2 | u8 | nWhereStand |  |
+| 3 | u8 | nDirect |  |
 
 Handler `FUN_0061e400`
 
@@ -1355,11 +2341,26 @@ Handler `FUN_0061e400`
 
 ### `0xbccc` NC_GAMBLE_SLOTMACHINE_START_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_START_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | betting._789|_456 | bits _789:3@0, _456:3@3 |
+| 1 | u8 | betting._123|_741 | bits _123:3@0, _741:3@3 |
+| 2 | u8 | betting._852|_963 | bits _852:3@0, _963:3@3 |
+| 3 | u8 | betting._753|_951 | bits _753:3@0, _951:3@3 |
+
 Handler `FUN_0061e870`
 
 No payload fields read directly by the handler.
 
 ### `0xc401` NC_COLLECT_PEEPING_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_PEEPING_REQ`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charname | Name5 |
 
 Handler `FUN_006272c0`
 
@@ -1373,6 +2374,12 @@ Handler `FUN_006272c0`
 
 ### `0xc408` NC_COLLECT_CARDREGIST_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_CARDREGIST_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | invenslot |  |
+
 Handler `FUN_00628560`
 
 | Off | Type | Checks in handler | Notes |
@@ -1380,6 +2387,13 @@ Handler `FUN_00628560`
 | 0 | u8 |  |  |
 
 ### `0xc40c` NC_COLLECT_BOOKMARK_REGIST_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_BOOKMARK_REGIST_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | BookMarkSlot |  |
+| 2 | u16 | CardID |  |
 
 Handler `FUN_00628b80`
 
@@ -1390,6 +2404,13 @@ Handler `FUN_00628b80`
 
 ### `0xc410` NC_COLLECT_REWARD_REQ
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_REWARD_REQ`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | RewardID |  |
+| 2 | u16 | RewardItem |  |
+
 Handler `FUN_00628ef0`
 
 | Off | Type | Checks in handler | Notes |
@@ -1397,7 +2418,14 @@ Handler `FUN_00628ef0`
 | 0 | u16 |  |  |
 | 2 | u16 |  |  |
 
-### `0xcc01` ?
+### `0xcc01` NC_MOVER_RIDE_ON_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MOVER_RIDE_ON_REQ`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMoverHandle |  |
+| 2 | u8 | nSlot |  |
 
 Handler `FUN_00563270`
 
@@ -1408,6 +2436,13 @@ Handler `FUN_00563270`
 
 ### `0xd406` NC_PET_ASK_NEW_NAME_ACK
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_ASK_NEW_NAME_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nPetHandle |  |
+
 Handler `FUN_004d0d20`
 
 | Off | Type | Checks in handler | Notes |
@@ -1416,6 +2451,13 @@ Handler `FUN_004d0d20`
 | 2 | i16 |  |  |
 
 ### `0xd407` NC_PET_SET_NAME_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_SET_NAME_REQ`, 18 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPetHandle |  |
+| 2 | char[16] | sPetName | Name4 |
 
 Handler `FUN_004d1c80`
 
@@ -1428,6 +2470,12 @@ Handler `FUN_004d1c80`
 | 14 | u32 |  |  |
 
 ### `0xd409` NC_PET_SET_NAME_CANCEL_REQ
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_SET_NAME_CANCEL_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPetHandle |  |
 
 Handler `FUN_004d0e10`
 
@@ -1451,7 +2499,7 @@ Sent in reply to `0x0806` NC_MISC_SEED_REQ on ShineObjectClass::ShinePlayer (`FU
 |---|---|---|
 | 0 | i16 | `(short)DAT_00aa440c` |
 
-### `0x0810` map time limit (ours) (hand-named)
+### `0x0810` NC_MISC_RESTMINUTE_CMD †
 
 **Verified layout** (basis: zone FUN_00443390; client FUN_004997a0)
 
@@ -1469,7 +2517,13 @@ Sent from `FUN_00419580` (`FUN_00419580`) · payload 3 bytes
 
 *3 more send sites not shown: FUN_005e54f0, FUN_005e5690, FUN_005e5840*
 
-### `0x0848` ?
+### `0x0848` NC_MISC_CHAT_BLOCK_SPAMER_BLOCKTIME_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_CHAT_BLOCK_SPAMER_BLOCKTIME_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nBlockTime |  |
 
 Sent from `FUN_005607a0` (`FUN_005607a0`) · payload 4 bytes
 
@@ -1495,7 +2549,13 @@ Sent in reply to `0x0c23` NC_USER_REGISENUMBER_REQ on ShineObjectClass::ShinePla
 
 Sent from `ShineObjectClass::ShineMiniHouse::smh_SendFurnitureInfo` (`FUN_00546930`) · payload 1 bytes · raw header
 
-### `0x1033` ?
+### `0x1033` NC_CHAR_CENCHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CENCHANGE_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeCen` (`FUN_00517f70`) · payload 8 bytes
 
@@ -1504,7 +2564,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeCen` (`FUN_00517f70`) · 
 | 0 | u32 | `*(undefined4 *)(param_1 + 0x7f77)` |
 | 4 | u32 | `*(undefined4 *)(param_1 + 0x7f7b)` |
 
-### `0x1035` ?
+### `0x1035` NC_CHAR_CHANGEPARAMCHANGE_CMD †
 
 Sent from `ShineObjectClass::ShinePlayer::smo_NotifyParameterChange` (`FUN_00503c10`) · payload variable (iVar5)
 
@@ -1514,7 +2574,41 @@ Fill: +0: FUN_004c9660; +0: FUN_004c9660; +0: FUN_004c9660
 |---|---|---|
 | 0 | u8 | `*param_4 + 1` |
 
-### `0x1038` ?
+### `0x1038` NC_CHAR_CLIENT_BASE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_BASE_CMD` (struct shared under the base name, inferred), 105 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum |  |
+| 4 | char[20] | charid | Name5 |
+| 24 | u8 | slotno |  |
+| 25 | u8 | Level |  |
+| 26 | u64 | Experience |  |
+| 34 | u16 | CurPwrStone |  |
+| 36 | u16 | CurGrdStone |  |
+| 38 | u16 | CurHPStone |  |
+| 40 | u16 | CurSPStone |  |
+| 42 | u32 | CurHP |  |
+| 46 | u32 | CurSP |  |
+| 50 | u32 | CurLP |  |
+| 54 | u32 | fame |  |
+| 58 | u64 | Cen |  |
+| 66 | char[12] | logininfo.currentmap | Name3 |
+| 78 | u32 | logininfo.currentcoord.xy.x |  |
+| 82 | u32 | logininfo.currentcoord.xy.y |  |
+| 86 | u8 | logininfo.currentcoord.dir |  |
+| 87 | u8 | statdistribute.Strength |  |
+| 88 | u8 | statdistribute.Constitute |  |
+| 89 | u8 | statdistribute.Dexterity |  |
+| 90 | u8 | statdistribute.Intelligence |  |
+| 91 | u8 | statdistribute.MentalPower |  |
+| 92 | u8 | statdistribute.RedistributePoint |  |
+| 93 | u8 | pkyellowtime |  |
+| 94 | u32 | pkcount |  |
+| 98 | u16 | prisonmin |  |
+| 100 | u8 | adminlevel |  |
+| 101 | u32 | flags | PROTO_NC_CHAR_BASE_CMD::<unnamed-type-flags> (union: bin, str) |
 
 Sent from `ShineObjectClass::ShinePlayer::so_charbasedata` (`FUN_0044d890`) · payload 105 bytes
 
@@ -1526,7 +2620,7 @@ Fill: +0: FUN_0044ac80 (no direct writes found); +66: FUN_004662e0 (no direct wr
 | 70 | u32 | `puVar2[1]` |
 | 74 | u32 | `puVar2[2]` |
 
-### `0x1039` ?
+### `0x1039` NC_CHAR_CLIENT_SHAPE_CMD †
 
 Sent from `ShineObjectClass::ShinePlayer::so_charsharpdata` (`FUN_0044ae80`) · payload 4 bytes
 
@@ -1534,7 +2628,18 @@ Sent from `ShineObjectClass::ShinePlayer::so_charsharpdata` (`FUN_0044ae80`) · 
 |---|---|---|
 | 0 | u32 | `*param_1` |
 
-### `0x103a` ?
+### `0x103a` NC_CHAR_CLIENT_QUEST_DOING_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_QUEST_DOING_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum |  |
+| 4 | u8 | bNeedClear |  |
+| 5 | u8 | nNumOfDoingQuest |  |
+| 6 | PLAYER_QUEST_INFO[nNumOfDoingQuest] | QuestDoingArray | variable length, element PLAYER_QUEST_INFO |
+
+Element `PLAYER_QUEST_INFO` (32 bytes): +0 u16 ID, +2 u8 Status, +3 i64 Data.StartTime, +11 i64 Data.EndTime, +19 u32 Data.RepeatCount, +23 u8 Data.ProgressStep, +24 u8[5] Data.End_NPCMobCount, +29 u8 Data.End_Location|End_Scenario, +30 u16 Data.End_RunningTimeSec
 
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDoing` (`FUN_0044b3c0`) · payload variable (iVar8)
 
@@ -1542,7 +2647,20 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDoing` (`FUN_0044b3c0`) �
 |---|---|---|
 | 4 | u16 | `*(undefined2 *)(param_1 + 1)` |
 
-### `0x103b` ?
+### `0x103b` NC_CHAR_CLIENT_QUEST_DONE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_QUEST_DONE_CMD` (struct shared under the base name, inferred), 12 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum |  |
+| 4 | u16 | nTotalDoneQuest |  |
+| 6 | u16 | nTotalDoneQuestSize |  |
+| 8 | u16 | nDoneQuestCount |  |
+| 10 | u16 | nIndex |  |
+| 12 | PLAYER_QUEST_DONE_INFO[nDoneQuestCount] | QuestDoneArray | variable length, element PLAYER_QUEST_DONE_INFO |
+
+Element `PLAYER_QUEST_DONE_INFO` (10 bytes): +0 u16 ID, +2 i64 tEndTime
 
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDone` (`FUN_0044b500`) · payload variable (iVar7)
 
@@ -1551,7 +2669,20 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDone` (`FUN_0044b500`) ·
 | 4 | u32 | `param_1[1]` |
 | 8 | u32 | `param_1[2]` |
 
-### `0x103d` ?
+### `0x103d` NC_CHAR_CLIENT_SKILL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CLIENT_SKILL_CMD`, 10 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | restempow |  |
+| 1 | u8 | PartMark.bIsStart|bIsEnd|nOrder | bits bIsStart:1@0, bIsEnd:1@1, nOrder:6@2 |
+| 2 | u16 | nMaxNum |  |
+| 4 | u32 | skill.chrregnum |  |
+| 8 | u16 | skill.number |  |
+| 10 | PROTO_SKILLREADBLOCKCLIENT[skill.number] | skill.skill | variable length, element PROTO_SKILLREADBLOCKCLIENT |
+
+Element `PROTO_SKILLREADBLOCKCLIENT` (12 bytes): +0 u16 skillid, +2 u32 cooltime, +6 u8 empow.damage|sp, +7 u8 empow.keeptime|cooltime, +8 u32 mastery
 
 Sent from `ShineObjectClass::ShinePlayer::so_charskilldata` (`FUN_0044bf20`) · payload variable (iVar5)
 
@@ -1564,7 +2695,7 @@ Fill: +4: FUN_00445460 (no direct writes found)
 | 2 | i16 | `sVar2` |
 | 4 | u32 | `*param_1` |
 
-### `0x103e` ?
+### `0x103e` NC_CHAR_CLIENT_PASSIVE_CMD †
 
 Sent from `ShineObjectClass::ShinePlayer::so_charpassivedata` (`FUN_0044e5a0`) · payload variable (iVar1)
 
@@ -1573,7 +2704,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_charpassivedata` (`FUN_0044e5a0`) �
 | 0 | u16 | `*param_1` |
 | 2 | bytes[?] | `FID_conflict__memcpy from param_1 + 1` |
 
-### `0x1048` ?
+### `0x1048` NC_CHAR_CLIENT_GAME_CMD †
 
 Sent from `ShineObjectClass::ShinePlayer::so_Storegamedata` (`FUN_0044c220`) · payload 4 bytes
 
@@ -1581,7 +2712,19 @@ Sent from `ShineObjectClass::ShinePlayer::so_Storegamedata` (`FUN_0044c220`) · 
 |---|---|---|
 | 0 | u32 | `this[0x7fb9]` |
 
-### `0x1049` ?
+### `0x1049` NC_CHAR_CLIENT_CHARTITLE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CLIENT_CHARTITLE_CMD`, 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | CurrentTitle |  |
+| 1 | u8 | CurrentTitleElement |  |
+| 2 | u16 | CurrentTitleMobID |  |
+| 4 | u16 | NumOfTitle |  |
+| 6 | CT_INFO[NumOfTitle] | TitleArray | variable length, element CT_INFO |
+
+Element `CT_INFO` (2 bytes): +0 u8 Type, +1 u8 ElementNo|ElementValue
 
 Sent in reply to `0x1031` NC_CHAR_ZONE_CHARTITLE_CMD on WorldManagerSession (`FUN_005a39f0`, WorldManagerSession::wms_NC_CHAR_ZONE_CHARTITLE_CMD) · payload variable (iVar9)
 
@@ -1593,7 +2736,16 @@ Sent in reply to `0x1031` NC_CHAR_ZONE_CHARTITLE_CMD on WorldManagerSession (`FU
 | 4 | u16 | `*(undefined2 *)(puVar2 + 0x40d)` |
 | 6 | bytes[?] | `FID_conflict__memcpy from (void *)(puVar2 + 0x40f)` |
 
-### `0x104a` ?
+### `0x104a` NC_CHAR_CLIENT_CHARGEDBUFF_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CHARGEDBUFF_CMD` (struct shared under the base name, inferred), 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | NumOfChargedBuff |  |
+| 2 | PROTO_CHARGEDBUFF_INFO[NumOfChargedBuff] | ChargedBuff | variable length, element PROTO_CHARGEDBUFF_INFO |
+
+Element `PROTO_CHARGEDBUFF_INFO` (14 bytes): +0 u32 ChargedBuffKey, +4 u16 ChargedBuffID, +6 u32 UseTime.year|month|date|hour|minute, +10 u32 EndTime.year|month|date|hour|minute
 
 Sent from `ShineObjectClass::ShinePlayer::so_CharChargedBuffData` (`FUN_0044e1e0`) · payload variable (iVar5)
 
@@ -1601,7 +2753,15 @@ Sent from `ShineObjectClass::ShinePlayer::so_CharChargedBuffData` (`FUN_0044e1e0
 |---|---|---|
 | 0 | u16 | `*param_1` |
 
-### `0x104d` ?
+### `0x104d` NC_CHAR_DEADMENU_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_DEADMENU_CMD`, 9 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Second |  |
+| 4 | u8 | priority |  |
+| 5 | i32 | eMenuType |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_KilledBy` (`FUN_00433be0`) · payload 9 bytes
 
@@ -1611,7 +2771,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_KilledBy` (`FUN_00433be0`) · paylo
 | 4 | u8 | `50` (0x32) |
 | 5 | u32 | `0`; `1` |
 
-### `0x1059` ?
+### `0x1059` NC_CHAR_PROMOTE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_PROMOTE_ACK`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | newclass |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ClassChange` (`FUN_004521b0`) · payload 1 bytes
 
@@ -1619,7 +2785,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ClassChange` (`FUN_004521b0`) �
 |---|---|---|
 | 0 | u8 | `0`; `param_1` |
 
-### `0x105a` ?
+### `0x105a` NC_CHAR_SOMEONEPROMOTE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_SOMEONEPROMOTE_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u8 | newclass |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ClassChange` (`FUN_004521b0`) · payload 3 bytes
 
@@ -1628,7 +2801,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ClassChange` (`FUN_004521b0`) �
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 | 2 | u8 | `param_1` |
 
-### `0x105b` ?
+### `0x105b` NC_CHAR_STAT_REMAINPOINT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_STAT_REMAINPOINT_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | remain |  |
 
 Sent from `GameDBSession::gds_NC_CHAR_STAT_DECPOINTFAIL_DB_ACK` (`FUN_0058bd10`) · payload 1 bytes
 
@@ -1636,7 +2815,13 @@ Sent from `GameDBSession::gds_NC_CHAR_STAT_DECPOINTFAIL_DB_ACK` (`FUN_0058bd10`)
 |---|---|---|
 | 0 | u8 | `(char)uVar1 - (char)iVar4` |
 
-### `0x105f` ?
+### `0x105f` NC_CHAR_STAT_INCPOINTSUC_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_STAT_INCPOINTSUC_ACK`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | stat |  |
 
 Sent from `FUN_0058a7e0` (`FUN_0058a7e0`) · payload 1 bytes
 
@@ -1644,7 +2829,13 @@ Sent from `FUN_0058a7e0` (`FUN_0058a7e0`) · payload 1 bytes
 |---|---|---|
 | 0 | u8 | `uVar7` |
 
-### `0x1065` ?
+### `0x1065` NC_CHAR_STAT_DECPOINTSUC_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_STAT_DECPOINTSUC_ACK`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | stat |  |
 
 Sent from `FUN_0058a9d0` (`FUN_0058a9d0`) · payload 1 bytes
 
@@ -1652,7 +2843,14 @@ Sent from `FUN_0058a9d0` (`FUN_0058a9d0`) · payload 1 bytes
 |---|---|---|
 | 0 | u8 | `uVar8` |
 
-### `0x106e` ?
+### `0x106e` NC_CHAR_SOMEONEGUILDCHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_SOMEONEGUILDCHANGE_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u32 | guild |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_BroadcastGuildInfo` (`FUN_0056e5f0`) · payload 6 bytes
 
@@ -1661,7 +2859,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_BroadcastGuildInfo` (`FUN_0056e
 | 0 | i16 | `(short)param_1[1]` |
 | 2 | u32 | `uVar3` |
 
-### `0x106f` ?
+### `0x106f` NC_CHAR_FAMECHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_FAMECHANGE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | fame |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeFame` (`FUN_00518070`) · payload 4 bytes
 
@@ -1669,7 +2873,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeFame` (`FUN_00518070`) ·
 |---|---|---|
 | 0 | u32 | `*(undefined4 *)(param_1 + 0x7f73)` |
 
-### `0x1096` ?
+### `0x1096` NC_CHAR_SOMEONEGUILDACADEMYCHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_SOMEONEGUILDACADEMYCHANGE_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u32 | guild |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_BroadcastGuildAcademyInfo` (`FUN_0056e9b0`) · payload 6 bytes
 
@@ -1678,7 +2889,15 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_BroadcastGuildAcademyInfo` (`FU
 | 0 | i16 | `(short)param_1[1]` |
 | 2 | u32 | `uVar3` |
 
-### `0x10af` ?
+### `0x10af` NC_CHAR_POLYMORPH_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_POLYMORPH_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | player |  |
+| 2 | u16 | polymorph |  |
+| 4 | i32 | AbstateIndex |  |
 
 Sent from `FUN_004a3120` (`FUN_004a3120`) · payload 8 bytes
 
@@ -1688,7 +2907,14 @@ Sent from `FUN_004a3120` (`FUN_004a3120`) · payload 8 bytes
 | 2 | u16 | `65535` (0xffff) |
 | 4 | u32 | `792` (0x318) |
 
-### `0x10bd` ?
+### `0x10bd` NC_CHAR_CLIENT_AUTO_PICK_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CLIENT_AUTO_PICK_ACK`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u8 | bEnable |  |
 
 Sent from `FUN_00560250` (`FUN_00560250`) · payload 3 bytes
 
@@ -1697,7 +2923,14 @@ Sent from `FUN_00560250` (`FUN_00560250`) · payload 3 bytes
 | 0 | u16 | `7680` (0x1e00) |
 | 2 | u8 | `param_1` |
 
-### `0x10be` ?
+### `0x10be` NC_CHAR_CLIENT_AUTO_PICK_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CLIENT_AUTO_PICK_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | player |  |
+| 2 | u8 | bEnable |  |
 
 Sent from `FUN_00560250` (`FUN_00560250`) · payload 3 bytes
 
@@ -1706,7 +2939,13 @@ Sent from `FUN_00560250` (`FUN_00560250`) · payload 3 bytes
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 | 2 | u8 | `param_1` |
 
-### `0x10c6` ?
+### `0x10c6` NC_CHAR_ADMIN_LEVEL_INFORM_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_ADMIN_LEVEL_INFORM_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nAdminLevel |  |
 
 Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePlayer (`FUN_00443390`, ShineObjectClass::ShinePlayer::sp_NC_MAP_LOGINCOMPLETE_CMD) · payload 1 bytes
 
@@ -1714,7 +2953,15 @@ Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePla
 |---|---|---|
 | 0 | u8 | `uVar4` |
 
-### `0x10ce` ?
+### `0x10ce` NC_CHAR_CLIENT_QUEST_READ_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_QUEST_READ_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum |  |
+| 4 | u16 | nNumOfReadQuest |  |
+| 6 | u16[nNumOfReadQuest] | QuestReadIDArray | variable length |
 
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b640`) · payload variable (iVar6)
 
@@ -1723,7 +2970,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b640`) ·
 | 0 | u32 | `*param_1` |
 | 4 | u16 | `*(undefined2 *)(param_1 + 1)` |
 
-### `0x10d4` ?
+### `0x10d4` NC_CHAR_MYSTERYVAULT_UI_STATE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_MYSTERYVAULT_UI_STATE_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | mystery_vault |  |
 
 Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePlayer (`FUN_00443390`, ShineObjectClass::ShinePlayer::sp_NC_MAP_LOGINCOMPLETE_CMD) · payload 1 bytes
 
@@ -1731,7 +2984,17 @@ Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePla
 |---|---|---|
 | 0 | u8 | `(char)param_1[0xaa91]` |
 
-### `0x10d7` ?
+### `0x10d7` NC_CHAR_CLIENT_QUEST_REPEAT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_QUEST_REPEAT_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum |  |
+| 4 | u16 | nNumOfRepeatQuest |  |
+| 6 | PLAYER_QUEST_INFO[nNumOfRepeatQuest] | QuestRepeatArray | variable length, element PLAYER_QUEST_INFO |
+
+Element `PLAYER_QUEST_INFO` (32 bytes): +0 u16 ID, +2 u8 Status, +3 i64 Data.StartTime, +11 i64 Data.EndTime, +19 u32 Data.RepeatCount, +23 u8 Data.ProgressStep, +24 u8[5] Data.End_NPCMobCount, +29 u8 Data.End_Location|End_Scenario, +30 u16 Data.End_RunningTimeSec
 
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b770`) · payload variable (iVar8)
 
@@ -1740,7 +3003,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b770`) ·
 | 0 | u32 | `*param_1` |
 | 4 | i16 | `sVar1` |
 
-### `0x10de` ?
+### `0x10de` NC_CHAR_CLIENT_COININFO_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_COININFO_CMD` (struct shared under the base name, inferred), 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nCoin |  |
+| 8 | u64 | nExchangedCoin |  |
 
 Sent from `FUN_00615d10` (`FUN_00615d10`) · payload 16 bytes
 
@@ -1751,7 +3021,18 @@ Sent from `FUN_00615d10` (`FUN_00615d10`) · payload 16 bytes
 | 8 | i32 | `local_1c` |
 | 12 | i32 | `local_18` |
 
-### `0x10df` ?
+### `0x10df` NC_CHAR_CHANGEBYCONDITION_PARAM_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CHANGEBYCONDITION_PARAM_CMD`, 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSkillID |  |
+| 2 | u16 | nChangeRate |  |
+| 4 | u16 | nParamNum |  |
+| 6 | CHAR_CHANGEBYCONDITION_PARAM[nParamNum] | aParam | variable length, element CHAR_CHANGEBYCONDITION_PARAM |
+
+Element `CHAR_CHANGEBYCONDITION_PARAM` (6 bytes): +0 u8 nFlag, +1 u8 nIndex, +2 u32 nValue
 
 Sent from `FUN_004cbb30` (`FUN_004cbb30`) · payload variable (iVar4)
 
@@ -1761,7 +3042,17 @@ Sent from `FUN_004cbb30` (`FUN_004cbb30`) · payload variable (iVar4)
 | 2 | u16 | `*(undefined2 *)(this + 4)` |
 | 4 | u16 | `0`; `*(short *)(puVar1 + 6) + 1` |
 
-### `0x10e4` ?
+### `0x10e4` NC_CHAR_CLIENT_CARDCOLLECT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CARDCOLLECT_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum |  |
+| 4 | u16 | number |  |
+| 6 | PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform[number] | CardList | variable length, element PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform |
+
+Element `PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform` (11 bytes): +0 i32 RegistTime, +4 u32 SerialNumber, +8 u16 CardID, +10 u8 StarNumber
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`) · payload variable (iVar3)
 
@@ -1769,7 +3060,17 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`
 |---|---|---|
 | 4 | u16 | `0`; `*(short *)(puVar1 + 6) + 1` |
 
-### `0x10e7` ?
+### `0x10e7` NC_CHAR_CLIENT_CARDCOLLECT_BOOKMARK_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum |  |
+| 4 | u16 | number |  |
+| 6 | PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo[number] | ViewList | variable length, element PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo |
+
+Element `PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo` (4 bytes): +0 u16 Slot, +2 u16 CardID
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`) · payload variable (iVar3)
 
@@ -1777,7 +3078,15 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`
 |---|---|---|
 | 4 | u16 | `0`; `*(short *)(puVar1 + 6) + 1` |
 
-### `0x10ea` ?
+### `0x10ea` NC_CHAR_CLIENT_CARDCOLLECT_REWARD_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CARDCOLLECT_REWARD_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum |  |
+| 4 | u16 | number |  |
+| 6 | u16[number] | RewardID | variable length |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`) · payload variable (iVar3)
 
@@ -1785,7 +3094,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`
 |---|---|---|
 | 4 | u16 | `0`; `*(short *)(puVar1 + 6) + 1` |
 
-### `0x1116` ?
+### `0x1116` NC_CHAR_TUTORIAL_STEP_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_TUTORIAL_STEP_REQ`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTutorialStep |  |
 
 Sent from `FUN_005e72f0` (`FUN_005e72f0`) · payload 1 bytes
 
@@ -1793,11 +3108,27 @@ Sent from `FUN_005e72f0` (`FUN_005e72f0`) · payload 1 bytes
 |---|---|---|
 | 0 | u8 | `local_18` |
 
-### `0x1123` ?
+### `0x1123` NC_CHAR_USEITEM_MINIMON_INFO_CLIENT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_INFO_CLIENT_CMD`, 50 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | UseItemMinimonInfo.bNormalItem |  |
+| 1 | u8 | UseItemMinimonInfo.bChargedItem |  |
+| 2 | u16[12] | UseItemMinimonInfo.NormalItemList |  |
+| 26 | u16[12] | UseItemMinimonInfo.ChargedItemList |  |
 
 Sent from `FUN_00561990` (`FUN_00561990`) · payload 50 bytes
 
-### `0x112c` ?
+### `0x112c` NC_CHAR_USEITEM_MINIMON_USE_BROAD_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_USE_BROAD_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nCharHandle |  |
+| 2 | u8 | bUse |  |
 
 Sent from `FUN_00561aa0` (`FUN_00561aa0`) · payload 3 bytes
 
@@ -1806,7 +3137,14 @@ Sent from `FUN_00561aa0` (`FUN_00561aa0`) · payload 3 bytes
 | 0 | u16 | `uVar1` |
 | 2 | u8 | `param_1` |
 
-### `0x112d` ?
+### `0x112d` NC_CHAR_USEITEM_MINIMON_NOTICE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_NOTICE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nErr |  |
+| 2 | u16 | nItemID |  |
 
 Sent from `FUN_00563f60` (`FUN_00563f60`) · payload 4 bytes
 
@@ -1895,7 +3233,7 @@ Fill: +0: ShineObjectClass::ShinePlayer::vfunc[0x664] = FUN_005a3140 (assumed cl
 | 234 | u32 | `*puVar1` |
 | 238 | u32 | `puVar1[1]` |
 
-### `0x1804` map login failed (ours) (hand-named)
+### `0x1804` NC_MAP_LOGINFAIL_ACK †
 
 **Verified layout** (basis: zone FUN_00452590 / FUN_005a3590 / FUN_005a3440; client FUN_004778c0)
 
@@ -1911,7 +3249,7 @@ Sent in reply to `0x101e` NC_CHAR_ZONE_CHARDATAFAIL_ACK on WorldManagerSession (
 | 0 | u16 | `*(undefined2 *)(param_1 + 2)` |
 | 2 | u8 | `255` (0xff) |
 
-### `0x1805` object left sight (ours) (hand-named)
+### `0x1805` NC_MAP_LOGOUT_CMD †
 
 **Verified layout** (basis: zone FUN_00553a40; client FUN_004bd620)
 
@@ -1925,7 +3263,7 @@ Sent from `ShineObjectClass::ShineObject::so_LogoutPacketBroadcast` (`FUN_00553a
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(param_1 + 4)` |
 
-### `0x180a` link to another zone (ours) (hand-named)
+### `0x180a` NC_MAP_LINKOTHER_CMD †
 
 **Verified layout** (basis: zone FUN_0049b510; client FUN_004b4ab0)
 
@@ -1942,7 +3280,13 @@ Sent in reply to `0x180e` NC_MAP_LINKRESERVE_ACK on WorldManagerSession (`FUN_00
 
 Fill: +0: FUN_0049b4c0 (no direct writes found)
 
-### `0x1827` ?
+### `0x1827` NC_MAP_FIELD_ATTRIBUTE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MAP_FIELD_ATTRIBUTE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | eFieldMapType |  |
 
 Sent from `FUN_0054aa20` (`FUN_0054aa20`) · payload 4 bytes
 
@@ -1950,7 +3294,13 @@ Sent from `FUN_0054aa20` (`FUN_0054aa20`) · payload 4 bytes
 |---|---|---|
 | 0 | u32 | `*(byte *)(iVar1 + 0x36)` |
 
-### `0x182b` ?
+### `0x182b` NC_MAP_CAN_USE_REVIVEITEM_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MAP_CAN_USE_REVIVEITEM_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bCanUseReviveItem |  |
 
 Sent from `FUN_005616f0` (`FUN_005616f0`) · payload 1 bytes
 
@@ -1958,7 +3308,13 @@ Sent from `FUN_005616f0` (`FUN_005616f0`) · payload 1 bytes
 |---|---|---|
 | 0 | u8 | `(*(byte *)(iVar1 + 0x20c) & 1) == 1` |
 
-### `0x182c` ?
+### `0x182c` NC_MAP_INDUN_LEVEL_VIEW_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MAP_INDUN_LEVEL_VIEW_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | eLevelType |  |
 
 Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePlayer (`FUN_00443390`, ShineObjectClass::ShinePlayer::sp_NC_MAP_LOGINCOMPLETE_CMD) · payload 4 bytes
 
@@ -1966,7 +3322,16 @@ Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePla
 |---|---|---|
 | 0 | i32 | `iVar13` |
 
-### `0x1c09` ?
+### `0x1c09` NC_BRIEFINFO_MOB_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BRIEFINFO_MOB_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | mobnum |  |
+| 1 | PROTO_NC_BRIEFINFO_REGENMOB_CMD[mobnum] | mobs | variable length, element PROTO_NC_BRIEFINFO_REGENMOB_CMD |
+
+Element `PROTO_NC_BRIEFINFO_REGENMOB_CMD` (153 bytes): +0 u16 handle, +2 u8 mode, +3 u16 mobid, +5 u32 coord.xy.x, +9 u32 coord.xy.y, +13 u8 coord.dir, +14 u8 flagstate, +15 byte[103] flag, +118 char[32] sAnimation, +150 u8 nAnimationLevel, +151 u8 nKQTeamType, +152 u8 bRegenAni
 
 Sent from `FUN_00478e40` (`FUN_00478e40`) · payload variable ((byte)
 
@@ -1978,9 +3343,27 @@ Fill: +1: ShineObjectClass::ShinePlayer::vfunc[0x4c4] = FUN_0055abf0 (assumed cl
 
 ### `0x1c16` ?
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BRIEFINFO_PLAYER_LIST_INFO_APPEAR_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nPlayerCnt |  |
+| 1 | PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD[nPlayerCnt] | PlayerInfo | variable length, element PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD |
+
+Element `PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD` (30 bytes): +0 u16 nHnd, +2 char[20] sID, +22 u8 CharTitle.Type, +23 u8 CharTitle.ElementNo, +24 u16 CharTitle.MobID, +26 u32 nGuildID
+
 Sent from `AmpersandCommand::ac_ShowPlayerID` (`FUN_0041f4a0`) · payload variable (iVar4)
 
-### `0x1c18` ?
+### `0x1c18` NC_BRIEFINFO_ABSTATE_CHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BRIEFINFO_ABSTATE_CHANGE_CMD`, 14 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | i32 | info.abstateID |  |
+| 6 | u32 | info.restKeeptime |  |
+| 10 | u32 | info.strength |  |
 
 Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastSet` (`FUN_004056a0`) · payload 14 bytes
 
@@ -1991,7 +3374,19 @@ Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastSet` (`FUN_0
 | 6 | u32 | `param_2` |
 | 10 | u32 | `param_3` |
 
-### `0x2002` NC_ACT_CHAT_ACK †
+### `0x2002` NC_ACT_SOMEONECHAT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONECHAT_CMD`, 7 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | u16 | handle |  |
+| 3 | u8 | len |  |
+| 4 | u8 | flag.GMColor|chatwin | bits GMColor:1@0, chatwin:1@1 |
+| 5 | u8 | nChatFontColorID |  |
+| 6 | u8 | nChatBalloonColorID |  |
+| 7 | u8[len] | content | variable length |
 
 Sent from `ShineObjectClass::ShineMobileObject::so_Chat` (`FUN_00458c90`) · payload variable (param_5 * 0x67 + 9 + (uint)
 
@@ -2005,7 +3400,17 @@ Sent from `ShineObjectClass::ShineMobileObject::so_Chat` (`FUN_00458c90`) · pay
 | 6 | u8 | `uVar2` |
 | 7 | bytes[?] | `FID_conflict__memcpy from param_2` |
 
-### `0x2004` NC_ACT_WALK_ACK †
+### `0x2004` NC_ACT_SOMEONEWALK_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEWALK_CMD`, 18 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u32 | from.x |  |
+| 6 | u32 | from.y |  |
+| 10 | u32 | to.x |  |
+| 14 | u32 | to.y |  |
 
 Sent in reply to `0x2003` NC_ACT_WALK_REQ on ShineObjectClass::ShinePlayer (`FUN_004571a0`, ShineObjectClass::ShinePlayer::sp_NC_ACT_WALK_REQ) · payload 18 bytes
 
@@ -2017,7 +3422,7 @@ Sent in reply to `0x2003` NC_ACT_WALK_REQ on ShineObjectClass::ShinePlayer (`FUN
 | 10 | u32 | `*puVar7` |
 | 14 | u32 | `puVar7[1]` |
 
-### `0x2006` NC_ACT_RUN_ACK †
+### `0x2006` NC_ACT_SOMEONERUN_CMD †
 
 Sent in reply to `0x2005` NC_ACT_RUN_REQ on ShineObjectClass::ShinePlayer (`FUN_00457380`, ShineObjectClass::ShinePlayer::sp_NC_ACT_RUN_REQ) · payload 18 bytes
 
@@ -2029,7 +3434,14 @@ Sent in reply to `0x2005` NC_ACT_RUN_REQ on ShineObjectClass::ShinePlayer (`FUN_
 | 10 | u32 | `*puVar7` |
 | 14 | u32 | `puVar7[1]` |
 
-### `0x2009` NC_ACT_CHANGEMODE_ACK †
+### `0x2009` NC_ACT_SOMEONECHANGEMODE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONECHANGEMODE_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u8 | mode |  |
 
 Sent in reply to `0x2008` NC_ACT_CHANGEMODE_REQ on ShineObjectClass::ShinePlayer (`FUN_00457560`, ShineObjectClass::ShinePlayer::sp_NC_ACT_CHANGEMODE_REQ) · payload 3 bytes
 
@@ -2038,7 +3450,7 @@ Sent in reply to `0x2008` NC_ACT_CHANGEMODE_REQ on ShineObjectClass::ShinePlayer
 | 0 | u16 | `param_3` |
 | 2 | u8 | `**(undefined1 **)(this + 0xe9c)` |
 
-### `0x2011` ?
+### `0x2011` NC_ACT_NOTICE_CMD †
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_Notice` (`FUN_005977e0`) · payload variable (iVar7)
 
@@ -2046,7 +3458,15 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_Notice` (`FUN_005977e0`) · pay
 |---|---|---|
 | 1 | u8 | `(char)(pcVar4 - (puVar2 + 5))` |
 
-### `0x2013` NC_ACT_STOP_ACK †
+### `0x2013` NC_ACT_SOMEONESTOP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONESTOP_CMD`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u32 | loc.x |  |
+| 6 | u32 | loc.y |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::so_mobile_StopHere` (`FUN_0045a0c0`) · payload 10 bytes
 
@@ -2056,7 +3476,7 @@ Sent from `ShineObjectClass::ShineMobileObject::so_mobile_StopHere` (`FUN_0045a0
 | 2 | u32 | `*puVar8` |
 | 6 | u32 | `puVar8[1]` |
 
-### `0x2018` someone walks (inferred) (hand-named)
+### `0x2018` NC_ACT_SOMEONEMOVEWALK_CMD †
 
 **Verified layout** (basis: FUN_00457c60, FUN_00435ec0)
 
@@ -2084,7 +3504,7 @@ Sent from `ShineObjectClass::ShineMobileObject::so_mobile_SpeedChange` (`FUN_004
 
 *2 more send sites not shown: FUN_0050d520, FUN_005da300*
 
-### `0x201a` someone runs (inferred) (hand-named)
+### `0x201a` NC_ACT_SOMEONEMOVERUN_CMD †
 
 **Verified layout** (basis: FUN_00457fd0, FUN_00435ec0)
 
@@ -2114,7 +3534,14 @@ Fill: +0: FUN_00434ae0 (no direct writes found)
 
 *4 more send sites not shown: FUN_0050d520, FUN_005da040, FUN_005da590, FUN_005dc1f0*
 
-### `0x201b` ?
+### `0x201b` NC_ACT_MOVEFAIL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_MOVEFAIL_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | back.x |  |
+| 4 | u32 | back.y |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_SendMoveFail` (`FUN_00458340`) · payload 8 bytes
 
@@ -2123,7 +3550,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_SendMoveFail` (`FUN_00458340`) 
 | 0 | u32 | `*puVar1` |
 | 4 | u32 | `puVar1[1]` |
 
-### `0x201c` ?
+### `0x201c` NC_ACT_NPCMENUOPEN_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_NPCMENUOPEN_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | mobid |  |
 
 Sent from `ShineObjectClass::ShinePlayer::InteractWithNPC` (`FUN_004c4660`) · payload 2 bytes
 
@@ -2131,7 +3564,17 @@ Sent from `ShineObjectClass::ShinePlayer::InteractWithNPC` (`FUN_004c4660`) · p
 |---|---|---|
 | 0 | u16 | `this[0x17d7e]` |
 
-### `0x201f` ?
+### `0x201f` NC_ACT_SOMEONESHOUT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONESHOUT_CMD`, 23 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | byte[20] | speaker | PROTO_NC_ACT_SOMEONESHOUT_CMD::<unnamed-type-speaker> (union: charID, mobID) |
+| 21 | u8 | flag.GMColor|isMob | bits GMColor:1@0, isMob:1@1 |
+| 22 | u8 | len |  |
+| 23 | u8[len] | content | variable length |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_Shout` (`FUN_00459080`) · payload variable (iVar1)
 
@@ -2169,7 +3612,14 @@ Sent from `FUN_005e5150` (`FUN_005e5150`) · payload variable (byte)
 | 22 | u8 | `(char)uVar6` |
 | 23 | bytes[?] | `FID_conflict__memcpy from _Src` |
 
-### `0x2021` ?
+### `0x2021` NC_ACT_SOMEONEEMOTICON_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEEMOTICON_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u8 | emoticonid |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_DoEmotion` (`FUN_00458860`) · payload 3 bytes
 
@@ -2178,7 +3628,15 @@ Sent from `ShineObjectClass::ShinePlayer::sp_DoEmotion` (`FUN_00458860`) · payl
 | 0 | u16 | `param_1` |
 | 2 | u8 | `param_2` |
 
-### `0x2023` ?
+### `0x2023` NC_ACT_SOMEONEEMOTICONSTOP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEEMOTICONSTOP_CMD`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u8 | emoticon.emoticonid |  |
+| 3 | u16 | emoticon.emoticonframe |  |
 
 Sent in reply to `0x2022` NC_ACT_EMOTICONSTOP_CMD on ShineObjectClass::ShinePlayer (`FUN_00458a70`, ShineObjectClass::ShinePlayer::sp_NC_ACT_EMOTICONSTOP_CMD) · payload 5 bytes
 
@@ -2188,7 +3646,13 @@ Sent in reply to `0x2022` NC_ACT_EMOTICONSTOP_CMD on ShineObjectClass::ShinePlay
 | 2 | u16 | `*(undefined2 *)(uVar1 + 2)` |
 | 4 | u8 | `*(undefined1 *)(uVar1 + 4)` |
 
-### `0x2025` ?
+### `0x2025` NC_ACT_SOMEEONEJUMP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEEONEJUMP_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
 
 Sent in reply to `0x2024` NC_ACT_JUMP_CMD on ShineObjectClass::ShinePlayer (`FUN_0045a250`, ShineObjectClass::ShinePlayer::sp_NC_ACT_JUMP_CMD) · payload 2 bytes
 
@@ -2196,7 +3660,15 @@ Sent in reply to `0x2024` NC_ACT_JUMP_CMD on ShineObjectClass::ShinePlayer (`FUN
 |---|---|---|
 | 0 | u16 | `param_3` |
 
-### `0x2029` ?
+### `0x2029` NC_ACT_SOMEONEPITCHTENT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEPITCHTENT_CMD`, 14 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u16 | camp.minihouse |  |
+| 4 | u8[10] | camp.dummy |  |
 
 Sent in reply to `0x2027` NC_ACT_PITCHTENT_REQ on ShineObjectClass::ShinePlayer (`FUN_00457760`, ShineObjectClass::ShinePlayer::sp_NC_ACT_PITCHTENT_REQ) · payload 14 bytes
 
@@ -2207,7 +3679,36 @@ Sent in reply to `0x2027` NC_ACT_PITCHTENT_REQ on ShineObjectClass::ShinePlayer 
 | 6 | u32 | `*(undefined4 *)(iVar3 + 0x29)` |
 | 10 | u32 | `*(undefined4 *)(iVar3 + 0x2d)` |
 
-### `0x202c` ?
+### `0x202c` NC_ACT_SOMEONEFOLDTENT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEFOLDTENT_CMD`, 45 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u16 | shape.equip.Equ_Head |  |
+| 4 | u16 | shape.equip.Equ_Mouth |  |
+| 6 | u16 | shape.equip.Equ_RightHand |  |
+| 8 | u16 | shape.equip.Equ_Body |  |
+| 10 | u16 | shape.equip.Equ_LeftHand |  |
+| 12 | u16 | shape.equip.Equ_Pant |  |
+| 14 | u16 | shape.equip.Equ_Boot |  |
+| 16 | u16 | shape.equip.Equ_AccBoot |  |
+| 18 | u16 | shape.equip.Equ_AccPant |  |
+| 20 | u16 | shape.equip.Equ_AccBody |  |
+| 22 | u16 | shape.equip.Equ_AccHeadA |  |
+| 24 | u16 | shape.equip.Equ_MiniMon_R |  |
+| 26 | u16 | shape.equip.Equ_Eye |  |
+| 28 | u16 | shape.equip.Equ_AccLeftHand |  |
+| 30 | u16 | shape.equip.Equ_AccRightHand |  |
+| 32 | u16 | shape.equip.Equ_AccBack |  |
+| 34 | u16 | shape.equip.Equ_CosEff |  |
+| 36 | u16 | shape.equip.Equ_AccHip |  |
+| 38 | u16 | shape.equip.Equ_Minimon |  |
+| 40 | u16 | shape.equip.Equ_AccShield |  |
+| 42 | u8 | shape.equip.upgrade.lefthand|righthand | bits lefthand:4@0, righthand:4@4 |
+| 43 | u8 | shape.equip.upgrade.body|leg | bits body:4@0, leg:4@4 |
+| 44 | u8 | shape.equip.upgrade.shoes | bits shoes:4@0 |
 
 Sent in reply to `0x202a` NC_ACT_FOLDTENT_REQ on ShineObjectClass::ShinePlayer (`FUN_00457a90`, ShineObjectClass::ShinePlayer::sp_NC_ACT_FOLDTENT_REQ) · payload 45 bytes
 
@@ -2219,6 +3720,14 @@ Sent from `FUN_0055ae50` (`FUN_0055ae50`) · payload 45 bytes
 
 ### `0x202e` NC_ACT_GATHERSTART_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_GATHERSTART_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | picker |  |
+| 2 | u16 | object |  |
+| 4 | u16 | err |  |
+
 Sent in reply to `0x202d` NC_ACT_GATHERSTART_REQ on ShineObjectClass::ShinePlayer (`FUN_0046ccb0`, ShineObjectClass::ShinePlayer::sp_NC_ACT_GATHERSTART_REQ) · payload 6 bytes
 
 | Off | Type | Value / source |
@@ -2227,7 +3736,15 @@ Sent in reply to `0x202d` NC_ACT_GATHERSTART_REQ on ShineObjectClass::ShinePlaye
 | 2 | i16 | `(short)piVar4[1]` |
 | 4 | i16 | `sVar3` |
 
-### `0x202f` ?
+### `0x202f` NC_ACT_SOMEONEGATHERSTART_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEGATHERSTART_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | player |  |
+| 2 | u16 | object |  |
+| 4 | u16 | picker |  |
 
 Sent in reply to `0x202d` NC_ACT_GATHERSTART_REQ on ShineObjectClass::ShinePlayer (`FUN_0046ccb0`, ShineObjectClass::ShinePlayer::sp_NC_ACT_GATHERSTART_REQ) · payload 6 bytes
 
@@ -2237,7 +3754,14 @@ Sent in reply to `0x202d` NC_ACT_GATHERSTART_REQ on ShineObjectClass::ShinePlaye
 | 2 | i16 | `(short)piVar4[1]` |
 | 4 | u16 | `local_14` |
 
-### `0x2031` ?
+### `0x2031` NC_ACT_SOMEONEGATHERCANCEL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEGATHERCANCEL_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | player |  |
+| 2 | u16 | object |  |
 
 Sent in reply to `0x2030` NC_ACT_GATHERCANCEL_CMD on ShineObjectClass::ShinePlayer (`FUN_0046b120`, ShineObjectClass::ShinePlayer::sp_NC_ACT_GATHERCANCEL_CMD) · payload 4 bytes
 
@@ -2246,7 +3770,14 @@ Sent in reply to `0x2030` NC_ACT_GATHERCANCEL_CMD on ShineObjectClass::ShinePlay
 | 0 | u16 | `*(undefined2 *)(param_1 + 4)` |
 | 2 | u16 | `*(undefined2 *)(uVar1 + 4)` |
 
-### `0x2034` ?
+### `0x2034` NC_ACT_SOMEONEGATHERCOMPLETE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEGATHERCOMPLETE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | player |  |
+| 2 | u16 | object |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_GatherComplete` (`FUN_0046b2f0`) · payload 4 bytes
 
@@ -2255,16 +3786,29 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GatherComplete` (`FUN_0046b2f0`) ·
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 | 2 | i16 | `(short)piVar2[1]` |
 
-### `0x2038` NC_ACT_PRODUCE_CAST_REQ †
+### `0x2038` NC_ACT_SOMEONEPRODUCE_CAST_CMD †
 
-Sent in reply to `0x2035` NC_ACT_GATHERCOMPLETE_REQ on ShineObjectClass::ShinePlayer (`FUN_0046cf90`, ShineObjectClass::ShinePlayer::sp_NC_ACT_GATHERCOMPLETE_REQ) · payload 4 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEPRODUCE_CAST_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | caster |  |
+| 2 | u16 | item |  |
+
+Sent in reply to `0x2035` NC_ACT_PRODUCE_CAST_REQ † on ShineObjectClass::ShinePlayer (`FUN_0046cf90`, ShineObjectClass::ShinePlayer::sp_NC_ACT_GATHERCOMPLETE_REQ) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 | 2 | u16 | `*(undefined2 *)(iVar3 + 4)` |
 
-### `0x203a` ?
+### `0x203a` NC_ACT_SOMEONEPRODUCE_CASTCUT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEPRODUCE_CASTCUT_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | caster |  |
 
 Sent in reply to `0x2039` NC_ACT_PRODUCE_CASTABORT_CMD on ShineObjectClass::ShinePlayer (`FUN_0046b620`, ShineObjectClass::ShinePlayer::sp_NC_ACT_PRODUCE_CASTABORT_CMD) · payload 2 bytes
 
@@ -2272,7 +3816,14 @@ Sent in reply to `0x2039` NC_ACT_PRODUCE_CASTABORT_CMD on ShineObjectClass::Shin
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(param_1 + 4)` |
 
-### `0x203b` ?
+### `0x203b` NC_ACT_PRODUCE_MAKE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_PRODUCE_MAKE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | item |  |
+| 2 | u16 | err |  |
 
 Sent from `ShineObjectClass::ShinePlayer::smo_ply_ItemProduce` (`FUN_0046c2d0`) · payload 4 bytes
 
@@ -2283,7 +3834,14 @@ Sent from `ShineObjectClass::ShinePlayer::smo_ply_ItemProduce` (`FUN_0046c2d0`) 
 | 0 | i16 | `(short)piVar7[1]` |
 | 2 | i16 | `(short)uVar6` |
 
-### `0x203c` ?
+### `0x203c` NC_ACT_SOMEONEPRODUCE_MAKE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEPRODUCE_MAKE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | caster |  |
+| 2 | u16 | item |  |
 
 Sent in reply to `0x3458` NC_ITEMDB_PRODUCE_ACK on GameDBSession (`FUN_0046c610`, GameDBSession::gds_NC_ITEMDB_PRODUCE_ACK) · payload 4 bytes
 
@@ -2292,7 +3850,13 @@ Sent in reply to `0x3458` NC_ITEMDB_PRODUCE_ACK on GameDBSession (`FUN_0046c610`
 | 0 | i16 | `(short)this[1]` |
 | 2 | u16 | `*(undefined2 *)(param_1 + 10)` |
 
-### `0x203f` ?
+### `0x203f` NC_ACT_RIDE_ON_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_RIDE_ON_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ride.horse |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_HorseOn` (`FUN_0045f270`) · payload 2 bytes
 
@@ -2300,7 +3864,14 @@ Sent from `ShineObjectClass::ShinePlayer::sp_HorseOn` (`FUN_0045f270`) · payloa
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(this[0x7f32] + 0x50)` |
 
-### `0x2040` ?
+### `0x2040` NC_ACT_SOMEONERIDE_ON_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONERIDE_ON_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u16 | ride.horse |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_HorseOn` (`FUN_0045f270`) · payload 4 bytes
 
@@ -2309,7 +3880,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_HorseOn` (`FUN_0045f270`) · payloa
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 | 2 | u16 | `*(undefined2 *)(this[0x7f32] + 0x50)` |
 
-### `0x2043` ?
+### `0x2043` NC_ACT_SOMEONERIDE_OFF_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONERIDE_OFF_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_HorseOff` (`FUN_0045f7c0`) · payload 2 bytes
 
@@ -2317,7 +3894,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_HorseOff` (`FUN_0045f7c0`) · paylo
 |---|---|---|
 | 0 | i16 | `(short)param_1[1]` |
 
-### `0x2046` ?
+### `0x2046` NC_ACT_RIDE_HUNGRY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_RIDE_HUNGRY_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hungry |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_SendHorseHungry` (`FUN_0045e510`) · payload 2 bytes
 
@@ -2325,7 +3908,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendHorseHungry` (`FUN_0045e510`) �
 |---|---|---|
 | 0 | i16 | `(short)param_1` |
 
-### `0x2047` ?
+### `0x2047` NC_ACT_CREATECASTBAR †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_CREATECASTBAR`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | millisec |  |
 
 Sent from `FUN_0045d550` (`FUN_0045d550`) · payload 2 bytes
 
@@ -2335,6 +3924,13 @@ Sent from `FUN_0045d550` (`FUN_0045d550`) · payload 2 bytes
 
 ### `0x204a` NC_ACT_REINFORCE_STOP_CMD
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_REINFORCE_STOP_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | loc.x |  |
+| 4 | u32 | loc.y |  |
+
 Sent from `ShineObjectClass::ShinePlayer::smo_ply_ReinforceStopHere` (`FUN_00456ef0`) · payload 8 bytes
 
 | Off | Type | Value / source |
@@ -2342,11 +3938,18 @@ Sent from `ShineObjectClass::ShinePlayer::smo_ply_ReinforceStopHere` (`FUN_00456
 | 0 | u32 | `*puVar1` |
 | 4 | u32 | `puVar1[1]` |
 
-### `0x204e` ?
+### `0x204e` NC_ACT_WEDDING_PROPOSE_WORD_REQ †
 
 Sent from `FUN_00596770` (`FUN_00596770`) · payload 0 bytes
 
-### `0x2050` NC_ACT_WEDDING_PROPOSEREQ_ACK †
+### `0x2050` NC_ACT_WEDDING_PROPOSEACK_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_PROPOSEACK_REQ`, 39 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | from |  |
+| 2 | char[37] | propose_word |  |
 
 Sent in reply to `0x204f` NC_ACT_WEDDING_PROPOSEREQ_REQ on ShineObjectClass::ShinePlayer (`FUN_0059f760`, ShineObjectClass::ShinePlayer::sp_NC_ACT_WEDDING_PROPOSEREQ_REQ) · payload 39 bytes
 
@@ -2356,7 +3959,15 @@ Sent in reply to `0x204f` NC_ACT_WEDDING_PROPOSEREQ_REQ on ShineObjectClass::Shi
 | 2 | char[36] | `_strncpy from (char *)(param_1 + 4)` |
 | 38 | u8 | `0` |
 
-### `0x2052` ?
+### `0x2052` NC_ACT_WEDDING_PROPOSEREQ_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_PROPOSEREQ_ACK`, 41 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | to |  |
+| 2 | u16 | err |  |
+| 4 | char[37] | response_word |  |
 
 Sent from `FUN_0059ebf0` (`FUN_0059ebf0`) · payload 41 bytes
 
@@ -2386,6 +3997,22 @@ Sent from `FUN_0059ec80` (`FUN_0059ec80`) · payload 41 bytes
 
 ### `0x2054` NC_ACT_WEDDING_HALL_RESERV_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_HALL_RESERV_ACK`, 46 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | i64 | ReservedTime |  |
+| 10 | i32 | tm_ReservedTime.tm_sec |  |
+| 14 | i32 | tm_ReservedTime.tm_min |  |
+| 18 | i32 | tm_ReservedTime.tm_hour |  |
+| 22 | i32 | tm_ReservedTime.tm_mday |  |
+| 26 | i32 | tm_ReservedTime.tm_mon |  |
+| 30 | i32 | tm_ReservedTime.tm_year |  |
+| 34 | i32 | tm_ReservedTime.tm_wday |  |
+| 38 | i32 | tm_ReservedTime.tm_yday |  |
+| 42 | i32 | tm_ReservedTime.tm_isdst |  |
+
 Sent from `FUN_0059ed00` (`FUN_0059ed00`) · payload 46 bytes
 
 | Off | Type | Value / source |
@@ -2395,6 +4022,44 @@ Sent from `FUN_0059ed00` (`FUN_0059ed00`) · payload 46 bytes
 | 6 | u32 | `param_4` |
 
 ### `0x2057` NC_ACT_WEDDING_HALL_GUEST_ENTER_READY_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_HALL_GUEST_ENTER_READY_ACK`, 174 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | char[20] | GroomID | Name5 |
+| 22 | char[20] | BrideID | Name5 |
+| 42 | i64 | EnterStart |  |
+| 50 | i64 | WeddingStart |  |
+| 58 | i64 | WeddingEnd |  |
+| 66 | i32 | tm_EnterStart.tm_sec |  |
+| 70 | i32 | tm_EnterStart.tm_min |  |
+| 74 | i32 | tm_EnterStart.tm_hour |  |
+| 78 | i32 | tm_EnterStart.tm_mday |  |
+| 82 | i32 | tm_EnterStart.tm_mon |  |
+| 86 | i32 | tm_EnterStart.tm_year |  |
+| 90 | i32 | tm_EnterStart.tm_wday |  |
+| 94 | i32 | tm_EnterStart.tm_yday |  |
+| 98 | i32 | tm_EnterStart.tm_isdst |  |
+| 102 | i32 | tm_WeddingStart.tm_sec |  |
+| 106 | i32 | tm_WeddingStart.tm_min |  |
+| 110 | i32 | tm_WeddingStart.tm_hour |  |
+| 114 | i32 | tm_WeddingStart.tm_mday |  |
+| 118 | i32 | tm_WeddingStart.tm_mon |  |
+| 122 | i32 | tm_WeddingStart.tm_year |  |
+| 126 | i32 | tm_WeddingStart.tm_wday |  |
+| 130 | i32 | tm_WeddingStart.tm_yday |  |
+| 134 | i32 | tm_WeddingStart.tm_isdst |  |
+| 138 | i32 | tm_WeddingEnd.tm_sec |  |
+| 142 | i32 | tm_WeddingEnd.tm_min |  |
+| 146 | i32 | tm_WeddingEnd.tm_hour |  |
+| 150 | i32 | tm_WeddingEnd.tm_mday |  |
+| 154 | i32 | tm_WeddingEnd.tm_mon |  |
+| 158 | i32 | tm_WeddingEnd.tm_year |  |
+| 162 | i32 | tm_WeddingEnd.tm_wday |  |
+| 166 | i32 | tm_WeddingEnd.tm_yday |  |
+| 170 | i32 | tm_WeddingEnd.tm_isdst |  |
 
 Sent in reply to `0x2056` NC_ACT_WEDDING_HALL_GUEST_ENTER_READY_REQ on ShineObjectClass::ShinePlayer (`FUN_0059fb60`, ShineObjectClass::ShinePlayer::sp_NC_ACT_WEDDING_HALL_GUEST_ENTER_READY_REQ) · payload 174 bytes
 
@@ -2406,6 +4071,12 @@ Fill: +0: FUN_0059ef40 (no direct writes found)
 
 ### `0x2059` NC_ACT_WEDDING_HALL_GUEST_ENTER_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_HALL_GUEST_ENTER_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+
 Sent in reply to `0x2058` NC_ACT_WEDDING_HALL_GUEST_ENTER_REQ on ShineObjectClass::ShinePlayer (`FUN_0059fcb0`, ShineObjectClass::ShinePlayer::sp_NC_ACT_WEDDING_HALL_GUEST_ENTER_REQ) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -2414,13 +4085,20 @@ Sent in reply to `0x2058` NC_ACT_WEDDING_HALL_GUEST_ENTER_REQ on ShineObjectClas
 
 ### `0x2068` NC_ACT_ACTIONBYITEM_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_ACTIONBYITEM_ACK`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+| 2 | u8 | emoticonid |  |
+
 Sent in reply to `0x2067` NC_ACT_ACTIONBYITEM_REQ on ShineObjectClass::ShinePlayer (`FUN_00458440`, ShineObjectClass::ShinePlayer::sp_NC_ACT_ACTIONBYITEM_REQ) · payload 3 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `uVar9` |
 
-### `0x2069` ?
+### `0x2069` NC_ACT_REINFORCERELOC_CMD †
 
 Sent from `ShineObjectClass::ShineMobileObject::so_ReinforceMove` (`FUN_00459600`) · payload 22 bytes
 
@@ -2433,7 +4111,19 @@ Sent from `ShineObjectClass::ShineMobileObject::so_ReinforceMove` (`FUN_00459600
 | 14 | i32 | `iVar4` |
 | 18 | u16 | `(undefined2)param_2` |
 
-### `0x206a` ?
+### `0x206a` NC_ACT_REINFORCEMOVEBYPATH_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_REINFORCEMOVEBYPATH_CMD`, 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | mover |  |
+| 2 | u16 | speed |  |
+| 4 | u8 | direct |  |
+| 5 | u8 | pathlength |  |
+| 6 | SHINE_XY_TYPE[pathlength] | path | variable length, element SHINE_XY_TYPE |
+
+Element `SHINE_XY_TYPE` (8 bytes): +0 u32 x, +4 u32 y
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_ShadowStep` (`FUN_0045ad10`) · payload variable ((byte)
 
@@ -2446,13 +4136,27 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_ShadowStep` (`FUN_0045ad10`)
 
 ### `0x2071` NC_ACT_AUTO_WAY_FINDING_USE_GATE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_AUTO_WAY_FINDING_USE_GATE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
 Sent in reply to `0x2070` NC_ACT_AUTO_WAY_FINDING_USE_GATE_REQ on ShineObjectClass::ShinePlayer (`FUN_00562340`, ShineObjectClass::ShinePlayer::sp_NC_ACT_AUTO_WAY_FINDING_USE_GATE_REQ) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `9216` (0x2400); `9219` (0x2403) |
 
-### `0x2072` ?
+### `0x2072` NC_ACT_NPC_ACTION_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_NPC_ACTION_CMD`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nType |  |
+| 1 | u16 | nNPCHandle |  |
+| 3 | u32 | nECode |  |
 
 Sent from `FUN_00523b10` (`FUN_00523b10`) · payload 7 bytes
 
@@ -2462,7 +4166,14 @@ Sent from `FUN_00523b10` (`FUN_00523b10`) · payload 7 bytes
 | 1 | u16 | `this[0x2aa80]` |
 | 3 | i32 | `piVar2[9]` |
 
-### `0x2074` ?
+### `0x2074` NC_ACT_ANIMATION_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_ANIMATION_START_CMD`, 34 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | char[32] | sAnimationIndex |  |
 
 Sent from `FUN_00553070` (`FUN_00553070`) · payload 34 bytes
 
@@ -2473,7 +4184,14 @@ Sent from `FUN_00553070` (`FUN_00553070`) · payload 34 bytes
 
 Sent from `FUN_005762a0` (`FUN_005762a0`) · payload 34 bytes
 
-### `0x2075` ?
+### `0x2075` NC_ACT_ANIMATION_STOP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_ANIMATION_STOP_CMD`, 34 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | char[32] | sAnimationIndex |  |
 
 Sent from `FUN_00553200` (`FUN_00553200`) · payload 34 bytes
 
@@ -2482,7 +4200,14 @@ Sent from `FUN_00553200` (`FUN_00553200`) · payload 34 bytes
 | 0 | u16 | `*(undefined2 *)(param_1 + 4)` |
 | 2 | char[32] | `_strncpy from (char *)(*(int *)(param_1 + 0x7f32) + 0xc6)` |
 
-### `0x2076` ?
+### `0x2076` NC_ACT_ANIMATION_LEVEL_CHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_ANIMATION_LEVEL_CHANGE_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMonsterHandle |  |
+| 2 | u8 | nAnimationLevel |  |
 
 Sent from `FUN_00553460` (`FUN_00553460`) · payload 3 bytes
 
@@ -2491,7 +4216,13 @@ Sent from `FUN_00553460` (`FUN_00553460`) · payload 3 bytes
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 | 2 | u8 | `param_1` |
 
-### `0x2077` ?
+### `0x2077` NC_ACT_EFFECT_MESSAGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_EFFECT_MESSAGE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nEffectEnum |  |
 
 Sent from `FUN_00560fc0` (`FUN_00560fc0`) · payload 4 bytes
 
@@ -2499,7 +4230,14 @@ Sent from `FUN_00560fc0` (`FUN_00560fc0`) · payload 4 bytes
 |---|---|---|
 | 0 | u32 | `param_1` |
 
-### `0x2078` ?
+### `0x2078` NC_ACT_PLAY_SOUND_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_PLAY_SOUND_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | FileNameLen |  |
+| 2 | u8[FileNameLen] | FileName | variable length |
 
 Sent from `FUN_00561130` (`FUN_00561130`) · payload variable (uVar3 + 4)
 
@@ -2508,15 +4246,38 @@ Sent from `FUN_00561130` (`FUN_00561130`) · payload variable (uVar3 + 4)
 | 0 | u16 | `uVar3` |
 | 2 | bytes[?] | `FID_conflict__memcpy from param_1` |
 
-### `0x2079` ?
+### `0x2079` NC_ACT_SCRIPT_MSG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SCRIPT_MSG_CMD`, 39 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u8[32] | sScriptMsgIndex |  |
+| 34 | u8[5] | nlen |  |
+| 39 | u8[rest] | sContent | variable length, count unknown |
 
 Sent from `FUN_005ea530` (`FUN_005ea530`) · payload 39 bytes
 
-### `0x207a` ?
+### `0x207a` NC_ACT_OBJECT_SOUND_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_OBJECT_SOUND_CMD`, 34 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u8[32] | sSoundFileName |  |
 
 Sent from `FUN_005ea6f0` (`FUN_005ea6f0`) · payload 34 bytes
 
-### `0x207b` ?
+### `0x207b` NC_ACT_OBJECT_EFFECT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_OBJECT_EFFECT_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u32 | nEffectID |  |
 
 Sent from `FUN_005ea8b0` (`FUN_005ea8b0`) · payload 6 bytes
 
@@ -2525,7 +4286,14 @@ Sent from `FUN_005ea8b0` (`FUN_005ea8b0`) · payload 6 bytes
 | 0 | u16 | `uStack_18` |
 | 2 | u32 | `local_1c` |
 
-### `0x207c` ?
+### `0x207c` NC_ACT_EVENT_CODE_ACTION_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_EVENT_CODE_ACTION_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u32 | nActionEventCode |  |
 
 Sent from `FUN_005eaa70` (`FUN_005eaa70`) · payload 6 bytes
 
@@ -2534,7 +4302,7 @@ Sent from `FUN_005eaa70` (`FUN_005eaa70`) · payload 6 bytes
 | 0 | u16 | `uStack_18` |
 | 2 | u32 | `local_1c` |
 
-### `0x2082` ?
+### `0x2082` NC_ACT_SHOW_CINEMATIC †
 
 Sent from `FUN_00561090` (`FUN_00561090`) · payload variable (uVar3 + 4)
 
@@ -2543,11 +4311,26 @@ Sent from `FUN_00561090` (`FUN_00561090`) · payload variable (uVar3 + 4)
 | 0 | u16 | `uVar3` |
 | 2 | bytes[?] | `FID_conflict__memcpy from param_1` |
 
-### `0x2083` ?
+### `0x2083` NC_ACT_END_CINEMATIC †
 
 Sent from `FUN_00561030` (`FUN_00561030`) · payload 0 bytes
 
-### `0x2402` NC_BAT_TARGETTING_ACK †
+### `0x2402` NC_BAT_TARGETINFO_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_TARGETINFO_CMD`, 30 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | order |  |
+| 1 | u16 | targethandle |  |
+| 3 | u32 | targethp |  |
+| 7 | u32 | targetmaxhp |  |
+| 11 | u32 | targetsp |  |
+| 15 | u32 | targetmaxsp |  |
+| 19 | u32 | targetlp |  |
+| 23 | u32 | targetmaxlp |  |
+| 27 | u8 | targetlevel |  |
+| 28 | u16 | hpchangeorder |  |
 
 Sent from `AxialListTargetInform::ali_Work` (`FUN_0042b0b0`) · payload 30 bytes
 
@@ -2564,7 +4347,14 @@ Sent from `AxialListTargetInform::ali_Work` (`FUN_0042b0b0`) · payload 30 bytes
 | 27 | u8 | `0`; `uVar3` |
 | 28 | u16 | `0`; `uVar4` |
 
-### `0x240b` ?
+### `0x240b` NC_BAT_EXPGAIN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_EXPGAIN_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | expgain |  |
+| 4 | u16 | mobhandle |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 6 bytes
 
@@ -2573,7 +4363,70 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payloa
 | 0 | u32 | `param_1` |
 | 4 | u16 | `param_2` |
 
-### `0x240c` ?
+### `0x240c` NC_BAT_LEVELUP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_LEVELUP_CMD`, 235 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | level |  |
+| 1 | u16 | mobhandle |  |
+| 3 | u64 | newparam.PrevExp |  |
+| 11 | u64 | newparam.NextExp |  |
+| 19 | u32 | newparam.Strength.base |  |
+| 23 | u32 | newparam.Strength.change |  |
+| 27 | u32 | newparam.Constitute.base |  |
+| 31 | u32 | newparam.Constitute.change |  |
+| 35 | u32 | newparam.Dexterity.base |  |
+| 39 | u32 | newparam.Dexterity.change |  |
+| 43 | u32 | newparam.Intelligence.base |  |
+| 47 | u32 | newparam.Intelligence.change |  |
+| 51 | u32 | newparam.Wizdom.base |  |
+| 55 | u32 | newparam.Wizdom.change |  |
+| 59 | u32 | newparam.MentalPower.base |  |
+| 63 | u32 | newparam.MentalPower.change |  |
+| 67 | u32 | newparam.WClow.base |  |
+| 71 | u32 | newparam.WClow.change |  |
+| 75 | u32 | newparam.WChigh.base |  |
+| 79 | u32 | newparam.WChigh.change |  |
+| 83 | u32 | newparam.AC.base |  |
+| 87 | u32 | newparam.AC.change |  |
+| 91 | u32 | newparam.TH.base |  |
+| 95 | u32 | newparam.TH.change |  |
+| 99 | u32 | newparam.TB.base |  |
+| 103 | u32 | newparam.TB.change |  |
+| 107 | u32 | newparam.MAlow.base |  |
+| 111 | u32 | newparam.MAlow.change |  |
+| 115 | u32 | newparam.MAhigh.base |  |
+| 119 | u32 | newparam.MAhigh.change |  |
+| 123 | u32 | newparam.MR.base |  |
+| 127 | u32 | newparam.MR.change |  |
+| 131 | u32 | newparam.MH.base |  |
+| 135 | u32 | newparam.MH.change |  |
+| 139 | u32 | newparam.MB.base |  |
+| 143 | u32 | newparam.MB.change |  |
+| 147 | u32 | newparam.MaxHp |  |
+| 151 | u32 | newparam.MaxSp |  |
+| 155 | u32 | newparam.MaxLp |  |
+| 159 | u32 | newparam.MaxAp |  |
+| 163 | u32 | newparam.MaxHPStone |  |
+| 167 | u32 | newparam.MaxSPStone |  |
+| 171 | u32 | newparam.PwrStone.flag |  |
+| 175 | u32 | newparam.PwrStone.EPPysic |  |
+| 179 | u32 | newparam.PwrStone.EPMagic |  |
+| 183 | u32 | newparam.PwrStone.MaxStone |  |
+| 187 | u32 | newparam.GrdStone.flag |  |
+| 191 | u32 | newparam.GrdStone.EPPysic |  |
+| 195 | u32 | newparam.GrdStone.EPMagic |  |
+| 199 | u32 | newparam.GrdStone.MaxStone |  |
+| 203 | u32 | newparam.PainRes.base |  |
+| 207 | u32 | newparam.PainRes.change |  |
+| 211 | u32 | newparam.RestraintRes.base |  |
+| 215 | u32 | newparam.RestraintRes.change |  |
+| 219 | u32 | newparam.CurseRes.base |  |
+| 223 | u32 | newparam.CurseRes.change |  |
+| 227 | u32 | newparam.ShockRes.base |  |
+| 231 | u32 | newparam.ShockRes.change |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 235 bytes
 
@@ -2647,7 +4500,14 @@ Fill: +3: ShineObjectClass::ShinePlayer::vfunc[0x668] = FUN_005a2e00 (assumed cl
 | 227 | u32 | `0` |
 | 231 | u32 | `0` |
 
-### `0x240d` ?
+### `0x240d` NC_BAT_SUMEONELEVELUP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SUMEONELEVELUP_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ply |  |
+| 2 | u16 | mobhandle |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 4 bytes
 
@@ -2656,7 +4516,14 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payloa
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 | 2 | u16 | `param_2` |
 
-### `0x240e` ?
+### `0x240e` NC_BAT_HPCHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_HPCHANGE_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | hp |  |
+| 4 | u16 | hpchangeorder |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_SendHPinform` (`FUN_0056d9a0`) · payload 6 bytes
 
@@ -2665,7 +4532,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendHPinform` (`FUN_0056d9a0`) · p
 | 0 | i32 | `iVar5` |
 | 4 | u16 | `uVar2` |
 
-### `0x240f` ?
+### `0x240f` NC_BAT_SPCHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SPCHANGE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | sp |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_SendSPinform` (`FUN_0056daf0`) · payload 4 bytes
 
@@ -2673,7 +4546,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendSPinform` (`FUN_0056daf0`) · p
 |---|---|---|
 | 0 | u32 | `uVar4` |
 
-### `0x2411` ?
+### `0x2411` NC_BAT_EXPLOST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_EXPLOST_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | explost |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_LostExperienceByKilled` (`FUN_0042e210`) · payload 4 bytes
 
@@ -2682,6 +4561,14 @@ Sent from `ShineObjectClass::ShinePlayer::sp_LostExperienceByKilled` (`FUN_0042e
 | 0 | u32 | `uVar9` |
 
 ### `0x2414` ?
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SMASH_HITTED_ACK`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | attack |  |
+| 2 | u16 | hitted.damage.isdead|iscritical|damage | bits isdead:1@0, iscritical:1@1, damage:14@2 |
+| 4 | u8 | hitted.attackcode |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::so_smash` (`FUN_0042c650`) · payload 5 bytes
 
@@ -2693,6 +4580,13 @@ Sent from `ShineObjectClass::ShineMobileObject::so_smash` (`FUN_0042c650`) · pa
 
 ### `0x2415` ?
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SMASH_MISS_ACK`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | target |  |
+| 2 | u8 | attackcode |  |
+
 Sent from `ShineObjectClass::ShinePlayer::so_smash` (`FUN_0042c910`) · payload variable (iVar7)
 
 | Off | Type | Value / source |
@@ -2702,6 +4596,15 @@ Sent from `ShineObjectClass::ShinePlayer::so_smash` (`FUN_0042c910`) · payload 
 | 4 | u8 | `*(undefined1 *)(param_1 + 0xf)` |
 
 ### `0x2420` ?
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLSMASH_HIT_CMD`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | target |  |
+| 2 | u16 | skill |  |
+| 4 | u16 | damage.isdead|iscritical|damage | bits isdead:1@0, iscritical:1@1, damage:14@2 |
+| 6 | u8 | attackcode |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_skillsmash` (`FUN_0042bd10`) · payload 7 bytes
 
@@ -2714,6 +4617,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_skillsmash` (`FUN_0042bd10`) · pay
 
 ### `0x2422` ?
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLSMASH_MISS_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | target |  |
+| 2 | u8 | attackcode |  |
+
 Sent from `ShineObjectClass::ShinePlayer::so_skillsmash` (`FUN_0042bd10`) · payload 3 bytes
 
 | Off | Type | Value / source |
@@ -2721,7 +4631,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_skillsmash` (`FUN_0042bd10`) · pay
 | 0 | i16 | `(short)param_1[1]` |
 | 2 | u8 | `*(undefined1 *)(param_2 + 1)` |
 
-### `0x2427` ?
+### `0x2427` NC_BAT_ABSTATESET_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ABSTATESET_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | i32 | abstate |  |
 
 Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastSet` (`FUN_004056a0`) · payload 6 bytes
 
@@ -2730,7 +4647,14 @@ Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastSet` (`FUN_0
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 | 2 | u32 | `param_1` |
 
-### `0x2428` ?
+### `0x2428` NC_BAT_ABSTATERESET_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ABSTATERESET_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | i32 | abstate |  |
 
 Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastReset` (`FUN_00405800`) · payload 6 bytes
 
@@ -2739,7 +4663,14 @@ Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastReset` (`FUN
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 | 2 | u32 | `param_1` |
 
-### `0x242a` ?
+### `0x242a` NC_BAT_ABSTATEINFORM_NOEFFECT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ABSTATEINFORM_NOEFFECT_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | abstate |  |
+| 4 | u32 | keeptime_millisec |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::so_smo_AbStateKeepTimeAdd` (`FUN_0040bd20`) · payload 8 bytes
 
@@ -2749,6 +4680,17 @@ Sent from `ShineObjectClass::ShineMobileObject::so_smo_AbStateKeepTimeAdd` (`FUN
 | 4 | i32 | `(iVar9 * 1000) / 10 + param_2` |
 
 ### `0x242d` ?
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_BASH_HITTED_CMD`, 13 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | attacker |  |
+| 2 | u16 | damage.iscritical|damage | bits iscritical:1@0, damage:15@1 |
+| 4 | u8 | flag.actioncode|isresist | bits actioncode:4@0, isresist:1@4 |
+| 5 | u32 | resthp |  |
+| 9 | u16 | attackspeed |  |
+| 11 | u16 | hpchangeorder |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::so_Bash` (`FUN_0042e950`) · payload 13 bytes
 
@@ -2763,6 +4705,17 @@ Sent from `ShineObjectClass::ShineMobileObject::so_Bash` (`FUN_0042e950`) · pay
 
 ### `0x242e` NC_BAT_SOMEONEBASH_HIT_CMD
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONEBASH_HIT_CMD`, 13 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | attacker |  |
+| 2 | u16 | target |  |
+| 4 | u8 | actioncode |  |
+| 5 | u32 | resthp |  |
+| 9 | u16 | attackspeed |  |
+| 11 | u16 | hpchangeorder |  |
+
 Sent from `ShineObjectClass::ShineMobileObject::so_Bash` (`FUN_0042e950`) · payload 13 bytes
 
 | Off | Type | Value / source |
@@ -2775,6 +4728,14 @@ Sent from `ShineObjectClass::ShineMobileObject::so_Bash` (`FUN_0042e950`) · pay
 | 11 | u16 | `uVar3` |
 
 ### `0x242f` ?
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_BASH_MISS_CMD`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | target |  |
+| 2 | u8 | flag.actioncode|ismissed|isshieldblock|isImmune | bits actioncode:4@0, ismissed:1@4, isshieldblock:1@5, isImmune:1@6 |
+| 3 | u16 | attackspeed |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_Bash` (`FUN_0042efb0`) · payload variable (int)
 
@@ -2790,6 +4751,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_Bash` (`FUN_0042efb0`) · payload v
 
 ### `0x2430` ?
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_BASH_MISSED_CMD`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | attacker |  |
+| 2 | u8 | flag.actioncode|ismissed|isshieldblock|isresist|isImmune | bits actioncode:4@0, ismissed:1@4, isshieldblock:1@5, isresist:1@6, isImmune:1@7 |
+| 3 | u16 | attackspeed |  |
+
 Sent from `ShineObjectClass::ShineMobileObject::so_Bash` (`FUN_0042e950`) · payload 5 bytes
 
 | Off | Type | Value / source |
@@ -2799,6 +4768,15 @@ Sent from `ShineObjectClass::ShineMobileObject::so_Bash` (`FUN_0042e950`) · pay
 | 3 | u16 | `uVar3` |
 
 ### `0x2431` ?
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONEBASH_MISS_CMD`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | attacker |  |
+| 2 | u16 | target |  |
+| 4 | u8 | actioncode |  |
+| 5 | u16 | attackspeed |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::so_Bash` (`FUN_0042e950`) · payload 7 bytes
 
@@ -2811,13 +4789,30 @@ Sent from `ShineObjectClass::ShineMobileObject::so_Bash` (`FUN_0042e950`) · pay
 
 ### `0x2438` NC_BAT_SOMEONESKILLBASH_CASTCUT_CMD
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONESKILLBASH_CASTCUT_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | caster |  |
+
 Sent from `ShineObjectClass::ShineMobileObject::sp_castabort` (`FUN_00579d50`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(param_1 + 4)` |
 
-### `0x243c` ?
+### `0x243c` NC_BAT_DOTDAMAGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_DOTDAMAGE_CMD`, 13 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | object |  |
+| 2 | u32 | resthp |  |
+| 6 | u16 | damage |  |
+| 8 | u16 | abstate |  |
+| 10 | u16 | hpchangeorder |  |
+| 12 | u8 | IsMissDamage |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::so_mobile_DamageOverTime` (`FUN_00409cd0`) · payload 13 bytes
 
@@ -2832,7 +4827,13 @@ Sent from `ShineObjectClass::ShineMobileObject::so_mobile_DamageOverTime` (`FUN_
 
 *2 more send sites not shown: FUN_004f1720, FUN_005f10d0*
 
-### `0x243d` ?
+### `0x243d` NC_BAT_CEASE_FIRE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_CEASE_FIRE_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
 
 Sent from `AbnormalStateContainer::AbstateElementInObject::aeo_Set` (`FUN_0040a340`) · payload 2 bytes
 
@@ -2842,9 +4843,23 @@ Sent from `AbnormalStateContainer::AbstateElementInObject::aeo_Set` (`FUN_0040a3
 
 ### `0x243f` NC_BAT_ASSIST_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ASSIST_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | target |  |
+
 Sent in reply to `0x243e` NC_BAT_ASSIST_REQ on ShineObjectClass::ShinePlayer (`FUN_0042b7a0`, ShineObjectClass::ShinePlayer::sp_NC_BAT_ASSIST_REQ) · payload 2 bytes
 
-### `0x2442` NC_BAT_SKILLBASH_FLD_CAST_ACK †
+### `0x2442` NC_BAT_SOMEONESKILLBASH_OBJ_CAST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONESKILLBASH_OBJ_CAST_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skill |  |
+| 2 | u16 | caster |  |
+| 4 | u16 | target |  |
 
 Sent from `FUN_005838a0` (`FUN_005838a0`) · payload 6 bytes
 
@@ -2854,7 +4869,16 @@ Sent from `FUN_005838a0` (`FUN_005838a0`) · payload 6 bytes
 | 2 | u16 | `*(undefined2 *)(this + 4)` |
 | 4 | u16 | `*(undefined2 *)(param_1 + 4)` |
 
-### `0x2443` ?
+### `0x2443` NC_BAT_SOMEONESKILLBASH_FLD_CAST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONESKILLBASH_FLD_CAST_CMD`, 12 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skill |  |
+| 2 | u16 | caster |  |
+| 4 | u32 | loc.x |  |
+| 8 | u32 | loc.y |  |
 
 Sent from `FUN_005835e0` (`FUN_005835e0`) · payload 12 bytes
 
@@ -2865,7 +4889,13 @@ Sent from `FUN_005835e0` (`FUN_005835e0`) · payload 12 bytes
 | 4 | u32 | `*param_1` |
 | 8 | u32 | `param_1[1]` |
 
-### `0x2446` ?
+### `0x2446` NC_BAT_FAMEGAIN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_FAMEGAIN_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | famegain |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_GainFame` (`FUN_0042df00`) · payload 4 bytes
 
@@ -2873,7 +4903,18 @@ Sent from `ShineObjectClass::ShinePlayer::so_GainFame` (`FUN_0042df00`) · paylo
 |---|---|---|
 | 0 | i32 | `param_1` |
 
-### `0x2447` ?
+### `0x2447` NC_BAT_SWING_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SWING_START_CMD`, 9 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | attacker |  |
+| 2 | u16 | defender |  |
+| 4 | u8 | actioncode |  |
+| 5 | u16 | attackspeed |  |
+| 7 | u8 | damageindex |  |
+| 8 | u8 | attacksequence |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SwingStart` (`FUN_0042f3f0`) · payload 9 bytes
 
@@ -2886,7 +4927,21 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SwingStart` (`FUN_0042f3f0`)
 | 7 | u8 | `this[0x1e88]` |
 | 8 | u8 | `this[0x1e80]` |
 
-### `0x2448` ?
+### `0x2448` NC_BAT_SWING_DAMAGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SWING_DAMAGE_CMD`, 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | attacker |  |
+| 2 | u16 | defender |  |
+| 4 | u8 | flag.iscritical|isresist|ismissed|isshieldblock|isCostumCharged|isDead|isDamege2Heal|isImmune | bits iscritical:1@0, isresist:1@1, ismissed:1@2, isshieldblock:1@3, isCostumCharged:1@4, isDead:1@5, isDamege2Heal:1@6, isImmune:1@7 |
+| 5 | u8 | flag.isCostumShieldCharged | bits isCostumShieldCharged:1@0 |
+| 6 | u16 | damage |  |
+| 8 | u32 | resthp |  |
+| 12 | u16 | hpchangeorder |  |
+| 14 | u8 | damageindex |  |
+| 15 | u8 | attacksequence |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`) · payload 16 bytes
 
@@ -2902,7 +4957,19 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`
 | 14 | u8 | `this[0x1e88]` |
 | 15 | u8 | `this[0x1e81]` |
 
-### `0x2449` ?
+### `0x2449` NC_BAT_SOMEONESWING_DAMAGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONESWING_DAMAGE_CMD`, 13 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | attacker |  |
+| 2 | u16 | defender |  |
+| 4 | u8 | flag.isMissed|isCostumCharged|isCostumShieldCharged | bits isMissed:1@0, isCostumCharged:1@1, isCostumShieldCharged:1@2 |
+| 5 | u32 | resthp |  |
+| 9 | u16 | hpchangeorder |  |
+| 11 | u8 | damageindex |  |
+| 12 | u8 | attacksequence |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`) · payload 13 bytes
 
@@ -2916,7 +4983,15 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`
 | 11 | u8 | `this[0x1e88]` |
 | 12 | u8 | `0` |
 
-### `0x244b` ?
+### `0x244b` NC_BAT_PKINPKFIELD_CLIENT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_PKINPKFIELD_CLIENT_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | attacker |  |
+| 2 | u16 | defender |  |
+| 4 | u32 | pkcount |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_KilledBy` (`FUN_00433be0`) · payload 8 bytes
 
@@ -2927,9 +5002,23 @@ Sent from `ShineObjectClass::ShinePlayer::so_KilledBy` (`FUN_00433be0`) · paylo
 
 ### `0x244c` ?
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_MOBSLAYER_CMD`, 3 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | killedmob |  |
+| 2 | u8 | number |  |
+| 3 | u32[number] | slayers | variable length |
+
 Sent from `ShineObjectClass::ShineMob::so_KilledBy` (`FUN_00432760`) · payload variable (iVar11)
 
-### `0x244d` ?
+### `0x244d` NC_BAT_TARGETCHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_TARGETCHANGE_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | target |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_TargetChange` (`FUN_004a4680`) · payload 2 bytes
 
@@ -2937,7 +5026,15 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_TargetChange` (`FUN_004a4680`) 
 |---|---|---|
 | 0 | u16 | `uVar3` |
 
-### `0x244e` ?
+### `0x244e` NC_BAT_SKILLBASH_HIT_OBJ_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_HIT_OBJ_START_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skill |  |
+| 2 | u16 | targetobj |  |
+| 4 | u16 | index |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_Volley` (`FUN_004a44a0`) · payload 6 bytes
 
@@ -2954,7 +5051,16 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 | 0 | u32 | `uVar12` |
 | 4 | u16 | `uVar5` |
 
-### `0x244f` ?
+### `0x244f` NC_BAT_SOMEONESKILLBASH_HIT_OBJ_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONESKILLBASH_HIT_OBJ_START_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | caster |  |
+| 2 | u16 | castinfo.skill |  |
+| 4 | u16 | castinfo.targetobj |  |
+| 6 | u16 | castinfo.index |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_0057bef0`) · payload 8 bytes
 
@@ -2964,7 +5070,16 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 | 2 | u32 | `uVar12` |
 | 6 | u16 | `uVar5` |
 
-### `0x2450` ?
+### `0x2450` NC_BAT_SKILLBASH_HIT_FLD_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_HIT_FLD_START_CMD`, 12 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skill |  |
+| 2 | u32 | targetloc.x |  |
+| 6 | u32 | targetloc.y |  |
+| 10 | u16 | index |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_WarpTo` (`FUN_004a7de0`) · payload 12 bytes
 
@@ -2983,7 +5098,17 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 | 4 | u32 | `CONCAT22(uStack_1a,local_1c)` |
 | 8 | u32 | `CONCAT22(uStack_16,local_18)` |
 
-### `0x2451` ?
+### `0x2451` NC_BAT_SOMEONESKILLBASH_HIT_FLD_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOMEONESKILLBASH_HIT_FLD_START_CMD`, 14 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | caster |  |
+| 2 | u16 | castinfo.skill |  |
+| 4 | u32 | castinfo.targetloc.x |  |
+| 8 | u32 | castinfo.targetloc.y |  |
+| 12 | u16 | castinfo.index |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_0057bef0`) · payload 14 bytes
 
@@ -2994,7 +5119,20 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 | 6 | u32 | `CONCAT22(uStack_1a,local_1c)` |
 | 10 | u32 | `CONCAT22(uStack_16,local_18)` |
 
-### `0x2452` ?
+### `0x2452` NC_BAT_SKILLBASH_HIT_DAMAGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_HIT_DAMAGE_CMD`, 9 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | index |  |
+| 2 | u16 | caster |  |
+| 4 | u8 | targetnum |  |
+| 5 | u16 | kSkillID |  |
+| 7 | u16 | pTarget |  |
+| 9 | PROTO_NC_BAT_SKILLBASH_HIT_DAMAGE_CMD::SkillDamage[targetnum] | target | variable length, element PROTO_NC_BAT_SKILLBASH_HIT_DAMAGE_CMD::SkillDamage |
+
+Element `PROTO_NC_BAT_SKILLBASH_HIT_DAMAGE_CMD::SkillDamage` (14 bytes): +0 u16 handle, +2 u8 flag.isdamage|iscritical|ismissed|isshieldblock|isheal|isenchant|isresist|IsCostumWeapon, +3 u8 flag.isDead|isImmune|IsCostumShield, +4 u32 hpchange, +8 u32 resthp, +12 u16 hpchangeorder
 
 Sent from `SkillEffectApply::SkillDamageSender::sds_Finish` (`FUN_00437110`) · payload variable ((byte)
 
@@ -3003,7 +5141,14 @@ Sent from `SkillEffectApply::SkillDamageSender::sds_Finish` (`FUN_00437110`) · 
 | 0 | u16 | `*(undefined2 *)(param_1 + 4)` |
 | 2 | u16 | `65535` (0xffff); `*(undefined2 *)(*(int *)(param_1 + 0x10) + 4)` |
 
-### `0x2453` ?
+### `0x2453` NC_BAT_SOULCOLLECT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SOULCOLLECT_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | target |  |
+| 2 | u8 | soulnumber |  |
 
 Sent in reply to `0x2401` NC_BAT_TARGETTING_REQ on ShineObjectClass::ShinePlayer (`FUN_0042ffe0`, ShineObjectClass::ShinePlayer::sp_NC_BAT_TARGETTING_REQ) · payload 3 bytes
 
@@ -3014,13 +5159,25 @@ Sent in reply to `0x2401` NC_BAT_TARGETTING_REQ on ShineObjectClass::ShinePlayer
 
 ### `0x2455` NC_BAT_ABSTATE_ERASE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_ABSTATE_ERASE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+
 Sent in reply to `0x2454` NC_BAT_ABSTATE_ERASE_REQ on ShineObjectClass::ShinePlayer (`FUN_0042b900`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | i16 | `sVar3` |
 
-### `0x2456` ?
+### `0x2456` NC_BAT_SUMEONESKILLCUT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SUMEONESKILLCUT_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | caster |  |
 
 Sent from `AbnormalStateContainer::AbnormalStateReinforcedMove::ase_PreAttachObject` (`FUN_004083a0`) · payload 2 bytes
 
@@ -3028,7 +5185,15 @@ Sent from `AbnormalStateContainer::AbnormalStateReinforcedMove::ase_PreAttachObj
 |---|---|---|
 | 0 | i16 | `(short)param_2[1]` |
 
-### `0x2457` ?
+### `0x2457` NC_BAT_SKILLBASH_HIT_BLAST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBASH_HIT_BLAST_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | index |  |
+| 2 | u16 | caster |  |
+| 4 | u16 | nSkillID |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::so_Routine` (`FUN_0056a080`) · payload 6 bytes
 
@@ -3048,7 +5213,18 @@ Sent from `FUN_005796a0` (`FUN_005796a0`) · payload 6 bytes
 
 *2 more send sites not shown: FUN_0057cd40*
 
-### `0x245a` ?
+### `0x245a` NC_BAT_AREADOTDAMAGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_AREADOTDAMAGE_CMD`, 5 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | abstate |  |
+| 2 | u16 | Centerobject |  |
+| 4 | u8 | num |  |
+| 5 | PROTO_NC_BAT_AREADOTDAMAGE_CMD::targetinfo[num] | target | variable length, element PROTO_NC_BAT_AREADOTDAMAGE_CMD::targetinfo |
+
+Element `PROTO_NC_BAT_AREADOTDAMAGE_CMD::targetinfo` (12 bytes): +0 u16 object, +2 u32 resthp, +6 u32 damage, +10 u16 hpchangeorder
 
 Sent from `AbnormalStateContainer::SubAbnormalStateActorAreaDamage::sasa_Routine` (`FUN_0040d640`) · payload variable ((byte)
 
@@ -3058,7 +5234,18 @@ Sent from `AbnormalStateContainer::SubAbnormalStateActorAreaDamage::sasa_Routine
 | 2 | u16 | `(undefined2)local_e40` |
 | 4 | u8 | `local_e1d` |
 
-### `0x245b` ?
+### `0x245b` NC_BAT_REFLECTIONDAMAGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_REFLECTIONDAMAGE_CMD`, 14 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | abstate |  |
+| 2 | u16 | ReflectionObject |  |
+| 4 | u16 | TargetObject |  |
+| 6 | u32 | resthp |  |
+| 10 | u16 | damage |  |
+| 12 | u16 | hpchangeorder |  |
 
 Sent from `ShineMobileObject::smo_ReflectionDamage` (`FUN_0055dbc0`) · payload 14 bytes
 
@@ -3071,7 +5258,13 @@ Sent from `ShineMobileObject::smo_ReflectionDamage` (`FUN_0055dbc0`) · payload 
 | 10 | u16 | `(undefined2)param_1` |
 | 12 | u16 | `uVar3` |
 
-### `0x245c` ?
+### `0x245c` NC_BAT_TOGGLESKILL_ON_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_TOGGLESKILL_ON_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSkillID |  |
 
 Sent from `FUN_00579500` (`FUN_00579500`) · payload 2 bytes
 
@@ -3079,7 +5272,13 @@ Sent from `FUN_00579500` (`FUN_00579500`) · payload 2 bytes
 |---|---|---|
 | 0 | u16 | `**(undefined2 **)(param_1 + 4)` |
 
-### `0x245d` ?
+### `0x245d` NC_BAT_TOGGLESKILL_OFF_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_TOGGLESKILL_OFF_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSkillID |  |
 
 Sent from `FUN_005795d0` (`FUN_005795d0`) · payload 2 bytes
 
@@ -3087,7 +5286,16 @@ Sent from `FUN_005795d0` (`FUN_005795d0`) · payload 2 bytes
 |---|---|---|
 | 0 | u16 | `**(undefined2 **)(param_1 + 4)` |
 
-### `0x245e` ?
+### `0x245e` NC_BAT_SKILLBLAST_LIGHTNINGWAVE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_SKILLBLAST_LIGHTNINGWAVE_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nBIndex |  |
+| 2 | u16 | nSkillID |  |
+| 4 | u16 | nShotHnd |  |
+| 6 | u16 | nTargetHnd |  |
 
 Sent from `FUN_005796a0` (`FUN_005796a0`) · payload 8 bytes
 
@@ -3098,7 +5306,13 @@ Sent from `FUN_005796a0` (`FUN_005796a0`) · payload 8 bytes
 | 4 | i16 | `(short)param_3[1]` |
 | 6 | i16 | `(short)param_4[1]` |
 
-### `0x245f` ?
+### `0x245f` NC_BAT_LPCHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BAT_LPCHANGE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nLP |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_SendLPinform` (`FUN_0056dc20`) · payload 4 bytes
 
@@ -3107,6 +5321,14 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendLPinform` (`FUN_0056dc20`) · p
 | 0 | u32 | `uVar4` |
 
 ### `0x2808` NC_OPTOOL_CONNECT_BRIF_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_CONNECT_BRIF_ACK`, 170 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | echo_data |  |
+| 1 | u8 | my_server_id |  |
+| 2 | byte[168] | count | nested array ushort[2][2][21] |
 
 Sent in reply to `0x2807` NC_OPTOOL_CONNECT_BRIF_REQ on OPToolSession (`FUN_004c82b0`, OPToolSession::opts_NC_OPTOOL_CONNECT_BRIF_REQ) · payload 170 bytes
 
@@ -3117,7 +5339,16 @@ Sent in reply to `0x2807` NC_OPTOOL_CONNECT_BRIF_REQ on OPToolSession (`FUN_004c
 | 66 | u16 | `DAT_0da3d2cc` |
 | 162 | u16 | `*(undefined2 *)(DAT_132828ac + 0x14)` |
 
-### `0x3001` ?
+### `0x3001` NC_ITEM_CELLCHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CELLCHANGE_CMD`, 6 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | exchange | ITEM_INVEN (union: Inven, Pos, Type) |
+| 2 | u16 | location | ITEM_INVEN (union: Inven, Pos, Type) |
+| 4 | u16 | item.itemid |  |
+| 6 | u8[rest] | item.itemattr | variable length, count unknown |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_ChangeCell` (`FUN_00518260`) · payload variable (int)
 
@@ -3140,6 +5371,15 @@ Fill: +6: FUN_006406f0 (no direct writes found)
 
 ### `0x300a` NC_ITEM_PICK_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_PICK_ACK`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | itemid |  |
+| 2 | u32 | lot |  |
+| 6 | u16 | error |  |
+| 8 | u16 | itemhandle |  |
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_itempickresult` (`FUN_005308d0`) · payload 10 bytes
 
 | Off | Type | Value / source |
@@ -3149,7 +5389,15 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_itempickresult` (`FUN_005308d0`
 | 6 | u16 | `833` (0x341); `param_1` |
 | 8 | u16 | `param_2` |
 
-### `0x3014` ?
+### `0x3014` NC_ITEM_SOMEONEPICK_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SOMEONEPICK_CMD`, 26 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | pickerID | Name5 |
+| 20 | u16 | itemID |  |
+| 22 | u32 | nItemLot |  |
 
 Sent from `FUN_0052f0e0` (`FUN_0052f0e0`) · payload 26 bytes
 
@@ -3165,6 +5413,14 @@ Sent from `FUN_0052f0e0` (`FUN_0052f0e0`) · payload 26 bytes
 
 ### `0x3016` NC_ITEM_USE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_USE_ACK`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+| 2 | u16 | useditem |  |
+| 4 | u8 | invenType |  |
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ItemUseResultPacket` (`FUN_0045e610`) · payload 5 bytes
 
 | Off | Type | Value / source |
@@ -3175,13 +5431,26 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ItemUseResultPacket` (`FUN_0045
 
 ### `0x3018` NC_ITEM_UPGRADE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_UPGRADE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+
 Sent in reply to `0x3448` NC_ITEMDB_UPGRADE_ACK on GameDBSession (`FUN_0053b900`, GameDBSession::gds_NC_ITEMDB_UPGRADE_ACK) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(iVar2 + 10)` |
 
-### `0x301b` ?
+### `0x301b` NC_ITEM_PICKOTHER_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_PICKOTHER_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | itemid |  |
+| 2 | u16 | towho |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_partyitemdistribute` (`FUN_0052f630`) · payload 4 bytes
 
@@ -3191,6 +5460,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_partyitemdistribute` (`FUN_0052f630
 | 2 | i16 | `(short)local_20[1]` |
 
 ### `0x301d` NC_ITEM_DEPOSIT_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DEPOSIT_ACK`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
+| 8 | u16 | err |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_DepositAck` (`FUN_005340f0`) · payload 10 bytes
 
@@ -3202,6 +5478,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_DepositAck` (`FUN_005340f0`) ·
 
 ### `0x301f` NC_ITEM_WITHDRAW_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_WITHDRAW_ACK`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
+| 8 | u16 | err |  |
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_WithdrawAck` (`FUN_005345e0`) · payload 10 bytes
 
 | Off | Type | Value / source |
@@ -3211,6 +5494,17 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_WithdrawAck` (`FUN_005345e0`) �
 | 8 | u16 | `*(undefined2 *)(param_1 + 0x10)` |
 
 ### `0x3021` NC_ITEM_CHARGEDINVENOPEN_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHARGEDINVENOPEN_ACK`, 5 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ErrorCode |  |
+| 2 | u8 | nPartMark |  |
+| 3 | u16 | NumOfChargedItem |  |
+| 5 | PROTO_CHARGED_ITEM_INFO[NumOfChargedItem] | ChargedItemInfoList | variable length, element PROTO_CHARGED_ITEM_INFO |
+
+Element `PROTO_CHARGED_ITEM_INFO` (16 bytes): +0 u32 ItemOrderNo, +4 u32 ItemCode, +8 u32 ItemAmount, +12 u32 ItemRegisterDate.year|month|date|hour|minute
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_FillChargedInven` (`FUN_00492f30`) · payload variable (iVar4)
 
@@ -3222,6 +5516,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_FillChargedInven` (`FUN_00492f3
 
 ### `0x3023` NC_ITEM_CHARGED_WITHDRAW_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHARGED_WITHDRAW_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ItemOrderNo |  |
+| 4 | u16 | err |  |
+
 Sent from `FUN_00492110` (`FUN_00492110`) · payload 6 bytes
 
 | Off | Type | Value / source |
@@ -3230,6 +5531,13 @@ Sent from `FUN_00492110` (`FUN_00492110`) · payload 6 bytes
 | 4 | u16 | `param_3` |
 
 ### `0x3027` NC_ITEM_GUILD_STORAGE_WITHDRAW_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_STORAGE_WITHDRAW_ACK`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
+| 8 | u16 | err |  |
 
 Sent in reply to `0x3026` NC_ITEM_GUILD_STORAGE_WITHDRAW_REQ on ShineObjectClass::ShinePlayer (`FUN_00537330`, ShineObjectClass::ShinePlayer::sp_NC_ITEM_GUILD_STORAGE_WITHDRAW_REQ) · payload 10 bytes
 
@@ -3247,7 +5555,16 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_GuildStorageWithdrawAck` (`FUN_
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_GuildStorageWithdrawAck` (`FUN_00537640`) · payload 10 bytes
 
-### `0x3029` NC_ITEM_DEPOSIT_ACK †
+### `0x3029` NC_ITEM_SOMEONEUSE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SOMEONEUSE_CMD`, 12 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | user |  |
+| 2 | u32 | useloc.x |  |
+| 6 | u32 | useloc.y |  |
+| 10 | u16 | useditem |  |
 
 Sent from `FUN_0053f840` (`FUN_0053f840`) · payload 12 bytes
 
@@ -3260,6 +5577,15 @@ Sent from `FUN_0053f840` (`FUN_0053f840`) · payload 12 bytes
 
 ### `0x302d` NC_ITEM_REWARDINVENOPEN_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_REWARDINVENOPEN_ACK`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemcounter |  |
+| 1 | PROTO_ITEMPACKET_INFORM[itemcounter] | itemarray | variable length, element PROTO_ITEMPACKET_INFORM |
+
+Element `PROTO_ITEMPACKET_INFORM` (106 bytes): +0 u8 datasize, +1 u16 location, +3 u16 info.itemid, +5 byte[101] info.itemattr
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_FillRewardInven` (`FUN_004fc310`) · payload variable (iVar2 + 3)
 
 Fill: +0: FUN_00644c80
@@ -3270,6 +5596,13 @@ Fill: +0: FUN_00644c80
 | 1 | u16 | `(uVar5 ^ (ushort)local_18) & 0x3ff ^ uVar5`; `uVar5` |
 
 ### `0x3030` NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_ACK`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
+| 8 | u16 | Error |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_GuildAcademyRewardStorageWithdrawAck` (`FUN_0046f970`) · payload 10 bytes
 
@@ -3289,6 +5622,13 @@ Sent in reply to `0x302f` NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_REQ on S
 
 ### `0x3032` NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_ACK`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
+| 8 | u16 | Error |  |
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_GuildAcademyRewardStorageDepositAck` (`FUN_0046fc80`) · payload 10 bytes
 
 | Off | Type | Value / source |
@@ -3307,6 +5647,13 @@ Sent in reply to `0x3031` NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_REQ on Sh
 
 ### `0x3034` NC_ITEM_MH_FURNITURE_ENDURE_KIT_USE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MH_FURNITURE_ENDURE_KIT_USE_ACK`, 6 bytes · ⚠ 2016 code uses 4 bytes: version drift or extraction error
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | dEndEndureDate.year|month|date|hour|minute | bits year:8@0, month:5@8, date:6@13, hour:6@19, minute:7@25 |
+| 4 | u16 | Error |  |
+
 Sent in reply to `0x348c` NC_ITEMDB_FURNITURE_ENDURE_ACK on GameDBSession (`FUN_00570dc0`, GameDBSession::gds_NC_ITEMDB_FURNITURE_ENDURE_ACK) · payload 6 bytes
 
 | Off | Type | Value / source |
@@ -3324,6 +5671,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_MH_FurnitureEndureUpdate` (`FUN
 
 ### `0x3036` NC_ITEM_WEAPONENDURE_CHARGE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_WEAPONENDURE_CHARGE_ACK`, 8 bytes · ⚠ 2016 code uses 24 bytes: version drift or extraction error
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ChargedNumber |  |
+| 4 | u16 | WeaponSlot | ITEM_INVEN (union: Inven, Pos, Type) |
+| 6 | u16 | Error |  |
+
 Sent in reply to `0x3035` NC_ITEM_WEAPONENDURE_CHARGE_REQ on ShineObjectClass::ShinePlayer (`FUN_00519470`, ShineObjectClass::ShinePlayer::sp_NC_ITEM_WEAPONENDURE_CHARGE_REQ) · payload 8 bytes
 
 | Off | Type | Value / source |
@@ -3338,7 +5693,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_WeaponEndureChangeAck` (`FUN_00
 | 4 | u16 | `*(undefined2 *)(param_1 + 0x10)` |
 | 6 | u16 | `6784` (0x1a80) |
 
-### `0x3037` ?
+### `0x3037` NC_ITEM_WEAPONENDURESET_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_WEAPONENDURESET_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ChargedNumber |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CostumWeaponChargeDecrease_ToClient` (`FUN_0051a500`) · payload 4 bytes
 
@@ -3346,7 +5707,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CostumWeaponChargeDecrease_ToClient
 |---|---|---|
 | 0 | u32 | `*(undefined4 *)(param_1[0xa9fe] + 10)` |
 
-### `0x3038` ?
+### `0x3038` NC_ITEM_ITEMBREAK_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ITEMBREAK_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | slot | ITEM_INVEN (union: Inven, Pos, Type) |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_NoticeItemBreak` (`FUN_00519370`) · payload 2 bytes
 
@@ -3354,7 +5721,14 @@ Sent from `ShineObjectClass::ShinePlayer::sp_NoticeItemBreak` (`FUN_00519370`) �
 |---|---|---|
 | 0 | u16 | `param_2 & 0x3ff ^ param_1 << 10` |
 
-### `0x303b` ?
+### `0x303b` NC_ITEM_DICE_GAME_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DICE_GAME_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | itemhandle |  |
+| 2 | i32 | nGameTimesec |  |
 
 Sent from `ShineObjectClass::ShineDropItem::so_DiceItemPickInit` (`FUN_00531020`) · payload 6 bytes
 
@@ -3363,15 +5737,28 @@ Sent from `ShineObjectClass::ShineDropItem::so_DiceItemPickInit` (`FUN_00531020`
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 | 2 | u32 | `uVar6` |
 
-### `0x303d` NC_ITEM_WEAPONENDURE_CHARGE_ACK †
+### `0x303d` NC_ITEM_DICE_GAME_START_ACK †
 
-Sent in reply to `0x303c` NC_ITEM_WEAPONENDURE_CHARGE_REQ on ShineObjectClass::ShinePlayer (`FUN_00517d70`) · payload 2 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DICE_GAME_START_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+
+Sent in reply to `0x303c` NC_ITEM_DICE_GAME_START_REQ † on ShineObjectClass::ShinePlayer (`FUN_00517d70`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `(undefined2)param_1` |
 
-### `0x303e` ?
+### `0x303e` NC_ITEM_DICE_GAME_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DICE_GAME_START_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | charhandle |  |
+| 2 | i32 | diceresult |  |
 
 Sent from `FUN_00531310` (`FUN_00531310`) · payload 6 bytes
 
@@ -3380,7 +5767,16 @@ Sent from `FUN_00531310` (`FUN_00531310`) · payload 6 bytes
 | 0 | u16 | `param_1` |
 | 2 | u32 | `param_2` |
 
-### `0x303f` ?
+### `0x303f` NC_ITEM_DICE_GAME_RESULT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DICE_GAME_RESULT_CMD`, 28 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+| 2 | char[20] | WinnerID | Name5 |
+| 22 | i32 | diceresult |  |
+| 26 | u16 | PickItemID |  |
 
 Sent from `FUN_0052ee60` (`FUN_0052ee60`) · payload 28 bytes
 
@@ -3397,6 +5793,15 @@ Sent from `FUN_0052ee60` (`FUN_0052ee60`) · payload 28 bytes
 
 ### `0x3041` NC_ITEM_ENCHANT_ADD_GEM_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_ADD_GEM_ACK`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
+| 4 | u16 | GemID |  |
+| 6 | u8 | gemSocketIndex |  |
+
 Sent in reply to `0x3497` NC_ITEMDB_ENCHANT_ADD_GEM_ACK on GameDBSession (`FUN_00522fc0`, GameDBSession::gds_NC_ITEMDB_ENCHANT_ADD_GEM_ACK) · payload 7 bytes
 
 | Off | Type | Value / source |
@@ -3408,6 +5813,14 @@ Sent in reply to `0x3497` NC_ITEMDB_ENCHANT_ADD_GEM_ACK on GameDBSession (`FUN_0
 
 ### `0x3043` NC_ITEM_ENCHANT_REMOVE_GEM_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_REMOVE_GEM_ACK`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
+| 4 | u8 | gemSocketIndex |  |
+
 Sent in reply to `0x3499` NC_ITEMDB_ENCHANT_REMOVE_GEM_ACK on GameDBSession (`FUN_005233d0`, GameDBSession::gds_NC_ITEMDB_ENCHANT_REMOVE_GEM_ACK) · payload 5 bytes
 
 | Off | Type | Value / source |
@@ -3416,7 +5829,15 @@ Sent in reply to `0x3499` NC_ITEMDB_ENCHANT_REMOVE_GEM_ACK on GameDBSession (`FU
 | 2 | u16 | `uVar2` |
 | 4 | u8 | `(undefined1)local_38` |
 
-### `0x3045` NC_ITEM_ENCHANT_REMOVE_GEM_ACK †
+### `0x3045` NC_ITEM_ENCHANT_ADD_NEW_SOCKET_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_ADD_NEW_SOCKET_ACK`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
+| 4 | u8 | socketCount |  |
 
 Sent in reply to `0x349b` NC_ITEMDB_ENCHANT_ADD_NEW_SOCKET_ACK on GameDBSession (`FUN_00523820`, GameDBSession::gds_NC_ITEMDB_ENCHANT_ADD_NEW_SOCKET_ACK) · payload 5 bytes
 
@@ -3426,7 +5847,15 @@ Sent in reply to `0x349b` NC_ITEMDB_ENCHANT_ADD_NEW_SOCKET_ACK on GameDBSession 
 | 2 | u16 | `*(undefined2 *)(param_1 + 0xc)` |
 | 4 | u8 | `*(undefined1 *)(param_1 + 0xe)` |
 
-### `0x3046` ?
+### `0x3046` NC_ITEM_ENCHANT_SET_GEM_LOT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_SET_GEM_LOT_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
+| 2 | u8 | gemSocketIndex |  |
+| 3 | u8 | restCount |  |
 
 Sent from `FUN_00562cb0` (`FUN_00562cb0`) · payload 4 bytes
 
@@ -3438,6 +5867,12 @@ Sent from `FUN_00562cb0` (`FUN_00562cb0`) · payload 4 bytes
 
 ### `0x3049` NC_ITEM_EQUIP_BELONGED_CANCEL_USE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_EQUIP_BELONGED_CANCEL_USE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
 Sent in reply to `0x3048` NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ on ShineObjectClass::ShinePlayer (`FUN_0051b9a0`, ShineObjectClass::ShinePlayer::sp_NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -3446,6 +5881,12 @@ Sent in reply to `0x3048` NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ on ShineObjectCl
 
 ### `0x304b` NC_ITEM_AUTO_ARRANGE_INVEN_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_AUTO_ARRANGE_INVEN_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+
 Sent in reply to `0x304a` NC_ITEM_AUTO_ARRANGE_INVEN_REQ on ShineObjectClass::ShinePlayer (`FUN_0051c360`, ShineObjectClass::ShinePlayer::sp_NC_ITEM_AUTO_ARRANGE_INVEN_REQ) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -3453,6 +5894,17 @@ Sent in reply to `0x304a` NC_ITEM_AUTO_ARRANGE_INVEN_REQ on ShineObjectClass::Sh
 | 0 | u16 | `12456` (0x30a8) |
 
 ### `0x3052` NC_ITEM_MOVER_UPGRADE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MOVER_UPGRADE_ACK`, 108 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8 | bRare |  |
+| 3 | u8 | bUpgrade |  |
+| 4 | u8 | nSlot |  |
+| 5 | u16 | nItemID |  |
+| 7 | byte[101] | ItemAttr | SHINE_ITEM_ATTRIBUTE (union: blot, wlot, dlot, qstitm, amulet, weapon, armor, shield, boot, furniture, decorate, skillscroll, recallscroll, binditem, upsource, itemchest, weapontitlelicence, kingdomquest, minihouseskin, upgraderedgem, upgradebluegem, upgradegoldgem, kqstep, feed, riding, amount, costumweapon, costumshield, actionitem, Enchant, GBCoin, Capsule, MobCard_Unident, MobCard, NoEffect, ActiveSkill, Pet, Bracelet) |
 
 Sent in reply to `0x34ad` NC_ITEMDB_MOVER_UPGRADE_ACK on GameDBSession (`FUN_00468c60`, GameDBSession::gds_NC_ITEMDB_MOVER_UPGRADE_ACK) · payload 108 bytes
 
@@ -3481,13 +5933,30 @@ Sent in reply to `0x3051` NC_ITEM_MOVER_UPGRADE_REQ on ShineObjectClass::ShinePl
 
 ### `0x3054` NC_ITEM_RANDOMOPTION_CHANGE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_RANDOMOPTION_CHANGE_ACK`, 27 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8 | changeAbleOption.fixed.optionnumber | ItemOptionNumber (union: str, bin) |
+| 3 | ItemOptionStorage::Element[8] | changeAbleOption.optionlist | element ItemOptionStorage::Element |
+
+Element `ItemOptionStorage::Element` (3 bytes): +0 u8 itemoption_type, +1 u16 itemoption_value
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_RandOptChangeProcessConsumeAndCountingAckPacket` (`FUN_0051d700`) · payload 27 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `param_1[4]` |
 
-### `0x3056` NC_ITEM_CHATC_OLOR_CHANGE_ACK †
+### `0x3056` NC_ITEM_CHAT_COLOR_CHANGE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHAT_COLOR_CHANGE_ACK`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8 | nChangeColorID |  |
 
 Sent in reply to `0x34b6` NC_ITEMDB_CHAT_COLOR_CHANGE_ACK on GameDBSession (`FUN_00469710`, GameDBSession::gds_NC_ITEMDB_CHAT_COLOR_CHANGE_ACK) · payload 3 bytes
 
@@ -3498,19 +5967,42 @@ Sent in reply to `0x34b6` NC_ITEMDB_CHAT_COLOR_CHANGE_ACK on GameDBSession (`FUN
 
 ### `0x3058` NC_ITEM_TERMEXTEND_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_TERMEXTEND_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
 Sent in reply to `0x3057` NC_ITEM_TERMEXTEND_REQ on ShineObjectClass::ShinePlayer (`FUN_0051eb40`, ShineObjectClass::ShinePlayer::sp_NC_ITEM_TERMEXTEND_REQ) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `13848` (0x3618); `uVar20` |
 
-### `0x305b` ?
+### `0x305b` NC_ITEM_SELL_ITEM_LIST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SELL_ITEM_LIST_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | NumOfSellItem |  |
+| 1 | PROTO_SELL_ITEM_INFO[NumOfSellItem] | SellItemList | variable length, element PROTO_SELL_ITEM_INFO |
+
+Element `PROTO_SELL_ITEM_INFO` (106 bytes): +0 u8 nDataSize, +1 u16 nHandle, +3 u16 ItemInfo.itemid, +5 byte[101] ItemInfo.itemattr
 
 Sent from `FUN_00537970` (`FUN_00537970`) · payload variable (iVar3 + 3)
 
 Fill: +1: FUN_0050e6b0 (no direct writes found)
 
-### `0x305c` ?
+### `0x305c` NC_ITEM_SELL_ITEM_INSERT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SELL_ITEM_INSERT_CMD`, 105 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u16 | ItemInfo.itemid |  |
+| 4 | byte[101] | ItemInfo.itemattr | SHINE_ITEM_ATTRIBUTE (union: blot, wlot, dlot, qstitm, amulet, weapon, armor, shield, boot, furniture, decorate, skillscroll, recallscroll, binditem, upsource, itemchest, weapontitlelicence, kingdomquest, minihouseskin, upgraderedgem, upgradebluegem, upgradegoldgem, kqstep, feed, riding, amount, costumweapon, costumshield, actionitem, Enchant, GBCoin, Capsule, MobCard_Unident, MobCard, NoEffect, ActiveSkill, Pet, Bracelet) |
 
 Sent from `FUN_00537a20` (`FUN_00537a20`) · payload 105 bytes
 
@@ -3520,7 +6012,13 @@ Fill: +2: FUN_006406c0 (no direct writes found)
 |---|---|---|
 | 0 | i16 | `sVar4` |
 
-### `0x305d` ?
+### `0x305d` NC_ITEM_SELL_ITEM_DELETE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SELL_ITEM_DELETE_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
 
 Sent from `FUN_00537a20` (`FUN_00537a20`) · payload 2 bytes
 
@@ -3530,7 +6028,15 @@ Sent from `FUN_00537ba0` (`FUN_00537ba0`) · payload 2 bytes
 |---|---|---|
 | 0 | i16 | `(short)param_1` |
 
-### `0x3060` ?
+### `0x3060` NC_ITEM_OPENCLASSCHANGEMENU_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_OPENCLASSCHANGEMENU_CMD`, 11 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nNewClass |  |
+| 1 | u64 | nTotalPrice |  |
+| 9 | u16 | nError |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_OpenClassChangeMenu` (`FUN_0051fd10`) · payload 11 bytes
 
@@ -3543,6 +6049,12 @@ Sent from `ShineObjectClass::ShinePlayer::sp_OpenClassChangeMenu` (`FUN_0051fd10
 
 ### `0x3062` NC_ITEM_RANDOMOPTION_CHANGE_ACCEPT_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_RANDOMOPTION_CHANGE_ACCEPT_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
 Sent in reply to `0x34b4` NC_ITEMDB_RANDOMOPTION_CHANGE_ACK on GameDBSession (`FUN_00469190`, GameDBSession::gds_NC_ITEMDB_RANDOMOPTION_CHANGE_ACK) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -3550,6 +6062,14 @@ Sent in reply to `0x34b4` NC_ITEMDB_RANDOMOPTION_CHANGE_ACK on GameDBSession (`F
 | 0 | u16 | `*(undefined2 *)(param_1 + 10)` |
 
 ### `0x3065` NC_ITEM_SHIELDENDURE_CHARGE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SHIELDENDURE_CHARGE_ACK`, 8 bytes · ⚠ 2016 code uses 24 bytes: version drift or extraction error
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ChargedNumber |  |
+| 4 | u16 | ShieldSlot | ITEM_INVEN (union: Inven, Pos, Type) |
+| 6 | u16 | Error |  |
 
 Sent in reply to `0x3064` NC_ITEM_SHIELDENDURE_CHARGE_REQ on ShineObjectClass::ShinePlayer (`FUN_00519a10`, ShineObjectClass::ShinePlayer::sp_NC_ITEM_SHIELDENDURE_CHARGE_REQ) · payload 8 bytes
 
@@ -3565,7 +6085,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ShieldEndureChangeAck` (`FUN_00
 | 4 | u16 | `*(undefined2 *)(param_1 + 0x10)` |
 | 6 | u16 | `6784` (0x1a80) |
 
-### `0x3066` ?
+### `0x3066` NC_ITEM_SHIELDENDURESET_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SHIELDENDURESET_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ChargedNumber |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CostumShieldChargeDecrease_ToClient` (`FUN_0051ab10`) · payload 4 bytes
 
@@ -3574,6 +6100,14 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CostumShieldChargeDecrease_ToClient
 | 0 | u32 | `*(undefined4 *)(param_1[0xa9ff] + 10)` |
 
 ### `0x3068` NC_ITEM_MAPLINK_SCROLL_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MAPLINK_SCROLL_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8 | lvFrom |  |
+| 3 | u8 | lvto |  |
 
 Sent from `FUN_00517e40` (`FUN_00517e40`) · payload 4 bytes
 
@@ -3585,6 +6119,12 @@ Sent from `FUN_00517e40` (`FUN_00517e40`) · payload 4 bytes
 
 ### `0x306a` NC_ITEM_MIX_ITEM_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MIX_ITEM_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
 Sent in reply to `0x34cc` NC_ITEMDB_MIX_ITEM_ACK on GameDBSession (`FUN_00469b70`, GameDBSession::gds_NC_ITEMDB_MIX_ITEM_ACK) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -3592,6 +6132,12 @@ Sent in reply to `0x34cc` NC_ITEMDB_MIX_ITEM_ACK on GameDBSession (`FUN_00469b70
 | 0 | u16 | `*(undefined2 *)(param_1 + 10)` |
 
 ### `0x306c` NC_ITEM_RANDOMOPTION_RECOVER_COUNT_LIMIT_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_RANDOMOPTION_RECOVER_COUNT_LIMIT_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
 
 Sent in reply to `0x34ce` NC_ITEMDB_RANDOMOPTION_RECOVER_COUNT_LIMIT_ACK on GameDBSession (`FUN_00469400`, GameDBSession::gds_NC_ITEMDB_RANDOMOPTION_RECOVER_COUNT_LIMIT_ACK) · payload 2 bytes
 
@@ -3601,6 +6147,12 @@ Sent in reply to `0x34ce` NC_ITEMDB_RANDOMOPTION_RECOVER_COUNT_LIMIT_ACK on Game
 
 ### `0x306e` NC_ITEM_NEW_UPGRADE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_NEW_UPGRADE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+
 Sent in reply to `0x34d2` NC_ITEMDB_NEW_UPGRADE_ACK on GameDBSession (`FUN_0053bd20`, GameDBSession::gds_NC_ITEMDB_NEW_UPGRADE_ACK) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -3608,6 +6160,12 @@ Sent in reply to `0x34d2` NC_ITEMDB_NEW_UPGRADE_ACK on GameDBSession (`FUN_0053b
 | 0 | u16 | `*(undefined2 *)(param_1 + 10)` |
 
 ### `0x3070` NC_ITEM_BRACELET_UPGRADE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_BRACELET_UPGRADE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
 
 Sent in reply to `0x34d4` NC_ITEMDB_BRACELET_UPGRADE_ACK on GameDBSession (`FUN_0053c0f0`, GameDBSession::gds_NC_ITEMDB_BRACELET_UPGRADE_ACK) · payload 2 bytes
 
@@ -3619,7 +6177,20 @@ Sent in reply to `0x34d4` NC_ITEMDB_BRACELET_UPGRADE_ACK on GameDBSession (`FUN_
 
 Sent from `FUN_004cf290` (`FUN_004cf290`) · payload 3 bytes · raw header
 
-### `0x3489` ?
+### `0x3489` NC_ITEMDB_MINIHOUSE_PORTAL_EFFECT_DEMANDGOOD_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEMDB_MINIHOUSE_PORTAL_EFFECT_DEMANDGOOD_REQ`, 32 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle |  |
+| 2 | u32 | header.charregistnumber |  |
+| 6 | u16 | lockindex |  |
+| 8 | u64 | nDemandItemRegNum | SHINE_ITEM_REGISTNUMBER (union: binary, dwrdkey, key) |
+| 16 | u16 | nDemandItemID |  |
+| 18 | u32 | nNeedItemLot |  |
+| 22 | u64 | nDemandMoney |  |
+| 30 | u16 | nEffectHandle |  |
 
 Sent in reply to `0x8c56` NC_MINIHOUSE_PORTAL_EFFECT_REQ on ShineObjectClass::ShinePlayer (`FUN_00573cf0`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_PORTAL_EFFECT_REQ) · payload 32 bytes
 
@@ -3635,7 +6206,16 @@ Sent in reply to `0x8c56` NC_MINIHOUSE_PORTAL_EFFECT_REQ on ShineObjectClass::Sh
 | 26 | u32 | `0` |
 | 30 | u16 | `*puVar10` |
 
-### `0x3832` ?
+### `0x3832` NC_PARTY_MEMBERINFORM_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_MEMBERINFORM_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | membernum |  |
+| 1 | PROTO_PARTY_MEMBER_INFORM[membernum] | member | variable length, element PROTO_PARTY_MEMBER_INFORM |
+
+Element `PROTO_PARTY_MEMBER_INFORM` (32 bytes): +0 char[20] charname, +20 u32 hp, +24 u32 sp, +28 u32 lp
 
 Sent from `ShineObjectClass::ShinePlayer::sp_SendMyInform2PartyMember` (`FUN_0056df80`) · payload 33 bytes
 
@@ -3651,7 +6231,16 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendMyInform2PartyMember` (`FUN_005
 | 25 | i32 | `iVar6` |
 | 29 | i32 | `iVar6` |
 
-### `0x3833` ?
+### `0x3833` NC_PARTY_MEMBERCLASS_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_MEMBERCLASS_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | membernum |  |
+| 1 | PROTO_PARTY_MEMBER_CLASS[membernum] | member | variable length, element PROTO_PARTY_MEMBER_CLASS |
+
+Element `PROTO_PARTY_MEMBER_CLASS` (35 bytes): +0 char[20] charid, +20 u8 chrclass, +21 u8 level, +22 u32 maxhp, +26 u32 maxsp, +30 u32 maxlp, +34 u8 inform
 
 Sent from `ShineObjectClass::ShinePlayer::sp_SendMyInform2PartyMember` (`FUN_0056df80`) · payload 36 bytes
 
@@ -3670,7 +6259,16 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendMyInform2PartyMember` (`FUN_005
 | 31 | i32 | `iVar6` |
 | 35 | u8 | `1` |
 
-### `0x3849` ?
+### `0x3849` NC_PARTY_MEMBERLOCATION_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_MEMBERLOCATION_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | membernum |  |
+| 1 | PROTO_NC_PARTY_MEMBERLOCATION_CMD::<unnamed-type-member>[membernum] | member | variable length, element PROTO_NC_PARTY_MEMBERLOCATION_CMD::<unnamed-type-member> |
+
+Element `PROTO_NC_PARTY_MEMBERLOCATION_CMD::<unnamed-type-member>` (28 bytes): +0 char[20] charid, +20 u32 loc.x, +24 u32 loc.y
 
 Sent from `ShineObjectClass::ShinePlayer::sp_SendMyInform2PartyMember` (`FUN_0056df80`) · payload 29 bytes
 
@@ -3685,7 +6283,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendMyInform2PartyMember` (`FUN_005
 | 21 | i32 | `*piVar8` |
 | 25 | i32 | `piVar8[1]` |
 
-### `0x384a` ?
+### `0x384a` NC_PARTY_MEMBERMAPOUT †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PARTY_MEMBERMAPOUT`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | memberid | Name5 |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · payload 20 bytes
 
@@ -3697,7 +6301,18 @@ Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · pa
 | 12 | u32 | `puVar6[3]` |
 | 16 | u32 | `puVar6[4]` |
 
-### `0x3c05` ?
+### `0x3c05` NC_MENU_SHOPOPENSOULSTONE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MENU_SHOPOPENSOULSTONE_CMD`, 24 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | hp.recover |  |
+| 4 | u32 | hp.maxnum |  |
+| 8 | u32 | hp.price |  |
+| 12 | u32 | sp.recover |  |
+| 16 | u32 | sp.maxnum |  |
+| 20 | u32 | sp.price |  |
 
 Sent from `NPCRole_Merchant::nrm_PortionStone` (`FUN_004c2d60`) · payload 24 bytes
 
@@ -3708,7 +6323,20 @@ Sent from `NPCRole_Merchant::nrm_PortionStone` (`FUN_004c2d60`) · payload 24 by
 | 12 | u32 | `*(undefined4 *)(iVar3 + 0x28)` |
 | 20 | u32 | `*(undefined4 *)(iVar3 + 0x30)` |
 
-### `0x3c08` ?
+### `0x3c08` NC_MENU_OPENSTORAGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MENU_OPENSTORAGE_CMD`, 12 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
+| 8 | u8 | maxpage |  |
+| 9 | u8 | curpage |  |
+| 10 | u8 | nOpenType |  |
+| 11 | u8 | itemcounter |  |
+| 12 | PROTO_ITEMPACKET_INFORM[itemcounter] | itemarray | variable length, element PROTO_ITEMPACKET_INFORM |
+
+Element `PROTO_ITEMPACKET_INFORM` (106 bytes): +0 u8 datasize, +1 u16 location, +3 u16 info.itemid, +5 byte[101] info.itemattr
 
 Sent from `ShineObjectClass::ShinePlayer::so_accountstoragefill` (`FUN_0044c530`) · payload variable (iVar6 + 0xe)
 
@@ -3724,11 +6352,17 @@ Fill: +11: FUN_00643b10
 | 11 | u8 | `bVar2` |
 | 12 | u16 | `(uVar3 ^ (ushort)local_18) & 0x3ff ^ uVar3`; `uVar3` |
 
-### `0x3c0f` ?
+### `0x3c0f` NC_MENU_SERVERMENU_CLOSE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MENU_SERVERMENU_CLOSE_CMD`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Sent from `FUN_0050fc00` (`FUN_0050fc00`) · payload 0 bytes
 
-### `0x4026` NC_MISC_DB_UI_STATE_SAVE_ACK †
+### `0x4026` NC_CHARSAVE_UI_STATE_SAVE_ACK †
 
 **Verified layout** (basis: zone FUN_00551360)
 
@@ -3744,9 +6378,25 @@ Sent in reply to `0x4028` NC_CHARSAVE_DB_UI_STATE_SAVE_ACK on GameDBSession (`FU
 
 ### `0x4401` NC_QUEST_SCRIPT_CMD_REQ †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_SCRIPT_CMD_REQ`, 103 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nQuestID |  |
+| 2 | i32 | Command.Cmd |  |
+| 6 | u8 | Command.IsPigeonStartType |  |
+| 7 | byte[96] | Command.Data | STRUCT_QSC::<unnamed-type-Data> (union: STRUCT_QSC_ERROR, STRUCT_QSC_END, STRUCT_QSC_SAY, STRUCT_QSC_SCENARIO, STRUCT_QSC_CALLPS, STRUCT_QSC_CLEAR, STRUCT_QSC_ACCEPT, STRUCT_QSC_CANCEL, STRUCT_QSC_PROGRESS, STRUCT_QSC_FAILED, STRUCT_QSC_DONE, STRUCT_QSC_LINK, STRUCT_QSC_ABORT, STRUCT_QSC_DELETE_ITEM, STRUCT_QSC_CREATE_ITEM, STRUCT_QSC_DROP_ITEM, STRUCT_QSC_GET_ITEM_LOT, STRUCT_QSC_SET_ABSTATE, STRUCT_QSC_RESET_ABSTATE, STRUCT_QSC_IS_ABSTATE, STRUCT_QSC_REMARK, STRUCT_QSC_IF, STRUCT_QSC_GOTO, STRUCT_QSC_MARK, STRUCT_QSC_SET, STRUCT_QSC_ADD, STRUCT_QSC_SUB, STRUCT_QSC_GET_PLAYER_RACE, STRUCT_QSC_GET_PLAYER_CLASS, STRUCT_QSC_GET_PLAYER_LEVEL, STRUCT_QSC_GET_PLAYER_GENDER, STRUCT_QSC_GET_PLAYER_EMPTY_INVENTORY, STRUCT_QSC_REPEAT_QUEST_GIVE_UP) |
+
 Sent from `CQuestZone::Send_NC_QUEST_SCRIPT_CMD_REQ` (`FUN_005ba960`) · payload 103 bytes
 
 ### `0x4408` NC_QUEST_GIVE_UP_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_GIVE_UP_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nQuestID |  |
+| 2 | u16 | ErrorCode |  |
 
 Sent from `CQuestZone::Send_NC_QUEST_GIVE_UP_ACK` (`FUN_005bad20`) · payload 4 bytes
 
@@ -3757,6 +6407,12 @@ Sent from `CQuestZone::Send_NC_QUEST_GIVE_UP_ACK` (`FUN_005bad20`) · payload 4 
 
 ### `0x440c` NC_QUEST_CLIENT_SCENARIO_DONE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_CLIENT_SCENARIO_DONE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nScenarioID |  |
+
 Sent from `CQuestZone::Send_NC_QUEST_CLIENT_SCENARIO_DONE_ACK` (`FUN_005bb0c0`) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -3764,6 +6420,15 @@ Sent from `CQuestZone::Send_NC_QUEST_CLIENT_SCENARIO_DONE_ACK` (`FUN_005bb0c0`) 
 | 0 | u16 | `param_1` |
 
 ### `0x440d` NC_QUEST_NOTIFY_MOB_KILL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_NOTIFY_MOB_KILL_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | NumOfActionQuest |  |
+| 1 | PROTO_NC_QUEST_NOTIFY_MOB_KILL_CMD::MobOfQuest[NumOfActionQuest] | mobofquest | variable length, element PROTO_NC_QUEST_NOTIFY_MOB_KILL_CMD::MobOfQuest |
+
+Element `PROTO_NC_QUEST_NOTIFY_MOB_KILL_CMD::MobOfQuest` (4 bytes): +0 u16 nMobID, +2 u16 nQuestID
 
 Sent from `CQuestZone::Send_NC_QUEST_NOTIFY_MOB_KILL_CMD` (`FUN_005bdb00`) · payload variable (iVar6 * 4 + 3)
 
@@ -3773,6 +6438,12 @@ Sent from `CQuestZone::Send_NC_QUEST_NOTIFY_MOB_KILL_CMD` (`FUN_005bdb00`) · pa
 
 ### `0x440e` ?
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_SCENARIO_RUN_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nScenarioID |  |
+
 Sent from `CQuestZone::Send_NC_QUEST_SCENARIO_RUN_CMD` (`FUN_005bb200`) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -3780,6 +6451,14 @@ Sent from `CQuestZone::Send_NC_QUEST_SCENARIO_RUN_CMD` (`FUN_005bb200`) · paylo
 | 0 | u16 | `param_1` |
 
 ### `0x4410` NC_QUEST_SELECT_START_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_SELECT_START_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNPCID |  |
+| 2 | u16 | nQuestID |  |
+| 4 | u16 | ErrorType |  |
 
 Sent from `CQuestZone::Send_NC_QUEST_SELECT_START_ACK` (`FUN_005bb340`) · payload 6 bytes
 
@@ -3791,13 +6470,26 @@ Sent from `CQuestZone::Send_NC_QUEST_SELECT_START_ACK` (`FUN_005bb340`) · paylo
 
 ### `0x4412` NC_QUEST_REWARD_NEED_SELECT_ITEM_CMD †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_REWARD_NEED_SELECT_ITEM_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nQuestID |  |
+
 Sent from `CQuestZone::Send_NC_QUEST_REWARD_NEED_SELECT_ITEM_CMD` (`FUN_005bb570`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `param_1` |
 
-### `0x4417` NC_QUEST_DB_READ_ACK †
+### `0x4417` NC_QUEST_READ_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_READ_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u16 | nQuestID |  |
 
 Sent from `CQuestZone::Recv_NC_QUEST_DB_READ_ACK` (`FUN_005c06c0`) · payload 4 bytes
 
@@ -3806,7 +6498,16 @@ Sent from `CQuestZone::Recv_NC_QUEST_DB_READ_ACK` (`FUN_005c06c0`) · payload 4 
 | 0 | u16 | `2904` (0xb58) |
 | 2 | u16 | `uVar1` |
 
-### `0x441e` ?
+### `0x441e` NC_QUEST_RESET_TIME_CLIENT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_QUEST_RESET_TIME_CMD` (struct shared under the base name, inferred), 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | tResetYearQuest |  |
+| 4 | i32 | tResetMonthQuest |  |
+| 8 | i32 | tResetWeekQuest |  |
+| 12 | i32 | tResetDayQuest |  |
 
 Sent from `CQuestZone::Send_NC_QUEST_RESET_TIME_ZONE_CMD` (`FUN_005bc570`) · payload 16 bytes
 
@@ -3817,7 +6518,7 @@ Sent from `CQuestZone::Send_NC_QUEST_RESET_TIME_ZONE_CMD` (`FUN_005bc570`) · pa
 | 8 | u32 | `this[0xac]` |
 | 12 | u32 | `this[0xb0]` |
 
-### `0x4804` ?
+### `0x4804` NC_SKILL_SKILL_LEARNSUC_CMD †
 
 Sent in reply to `0x4802` NC_SKILL_SKILLTEACHSUC_ACK on GameDBSession (`FUN_0044ec80`, GameDBSession::gds_NC_SKILL_SKILLTEACHSUC_ACK) · payload 3 bytes
 
@@ -3826,7 +6527,13 @@ Sent in reply to `0x4802` NC_SKILL_SKILLTEACHSUC_ACK on GameDBSession (`FUN_0044
 | 0 | u16 | `*(undefined2 *)(param_1 + 8)` |
 | 2 | u8 | `*(undefined1 *)(param_1 + 10)` |
 
-### `0x480f` ?
+### `0x480f` NC_SKILL_EMPOW_RESET_SUC_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_EMPOW_RESET_SUC_ACK`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | totalempow |  |
 
 Sent in reply to `0x480d` NC_SKILL_EMPOW_RESET_DB_SUC_ACK on GameDBSession (`FUN_0044ef50`, GameDBSession::gds_NC_SKILL_EMPOW_RESET_DB_SUC_ACK) · payload 1 bytes
 
@@ -3834,7 +6541,13 @@ Sent in reply to `0x480d` NC_SKILL_EMPOW_RESET_DB_SUC_ACK on GameDBSession (`FUN
 |---|---|---|
 | 0 | u8 | `uVar2` |
 
-### `0x4810` ?
+### `0x4810` NC_SKILL_EMPOWPOINT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_EMPOWPOINT_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | restempow |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 1 bytes
 
@@ -3842,7 +6555,14 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payloa
 |---|---|---|
 | 0 | u8 | `(char)(iVar10 - iVar7)` |
 
-### `0x4814` ?
+### `0x4814` NC_SKILL_EMPOWALLOC_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_EMPOWALLOC_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skill |  |
+| 2 | u16 | err |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_SkillEmpowerSetResult` (`FUN_00518d20`) · payload 4 bytes
 
@@ -3851,7 +6571,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_SkillEmpowerSetResult` (`FUN_00
 | 0 | u16 | `param_2` |
 | 2 | u16 | `param_1` |
 
-### `0x481d` ?
+### `0x481d` NC_SKILL_SKILLEXP_CLIENT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_SKILLEXP_CLIENT_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skill |  |
+| 2 | u32 | mastery |  |
 
 Sent from `CharaterSkillList::csl_AddMastery` (`FUN_00446730`) · payload 6 bytes
 
@@ -3860,7 +6587,15 @@ Sent from `CharaterSkillList::csl_AddMastery` (`FUN_00446730`) · payload 6 byte
 | 0 | u16 | `param_2` |
 | 2 | u32 | `*(undefined4 *)(puVar4 + 6)` |
 
-### `0x481e` ?
+### `0x481e` NC_SKILL_REVIVE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_REVIVE_CMD`, 12 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | hp |  |
+| 4 | u32 | sp |  |
+| 8 | u32 | lp |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_ReviveNow` (`FUN_0057d290`) · payload 12 bytes
 
@@ -3870,7 +6605,16 @@ Sent from `ShineObjectClass::ShinePlayer::sp_ReviveNow` (`FUN_0057d290`) · payl
 | 4 | u32 | `uVar6` |
 | 8 | u32 | `uVar6` |
 
-### `0x481f` ?
+### `0x481f` NC_SKILL_SOMEONEREVIVE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_SOMEONEREVIVE_CMD`, 14 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | reviver |  |
+| 2 | u32 | hp |  |
+| 6 | u32 | sp |  |
+| 10 | u32 | lp |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_ReviveNow` (`FUN_0057d290`) · payload 14 bytes
 
@@ -3881,7 +6625,14 @@ Sent from `ShineObjectClass::ShinePlayer::sp_ReviveNow` (`FUN_0057d290`) · payl
 | 6 | u32 | `uVar6` |
 | 10 | u32 | `uVar6` |
 
-### `0x4821` ?
+### `0x4821` NC_SKILL_COOLTIME_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_COOLTIME_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skill |  |
+| 2 | u32 | sec |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_NewSkillCoolTime` (`FUN_00569260`) · payload 6 bytes
 
@@ -3892,6 +6643,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_NewSkillCoolTime` (`FUN_0056926
 
 ### `0x4823` NC_SKILL_PRODUCTFIELD_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_PRODUCTFIELD_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | mainskill |  |
+| 2 | u16 | err |  |
+
 Sent in reply to `0x4822` NC_SKILL_PRODUCTFIELD_REQ on ShineObjectClass::ShinePlayer (`FUN_0046c820`, ShineObjectClass::ShinePlayer::sp_NC_SKILL_PRODUCTFIELD_REQ) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -3899,7 +6657,14 @@ Sent in reply to `0x4822` NC_SKILL_PRODUCTFIELD_REQ on ShineObjectClass::ShinePl
 | 0 | u16 | `in(0x4822)+0` |
 | 2 | u16 | `2817` (0xb01); `uVar9` |
 
-### `0x4827` ?
+### `0x4827` NC_SKILL_UNLEARN_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_UNLEARN_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | skill |  |
+| 2 | u16 | err |  |
 
 Sent in reply to `0x4824` NC_SKILL_UNLEARN_REQ on ShineObjectClass::ShinePlayer (`FUN_0057ad80`, ShineObjectClass::ShineObject::sp_NC_SKILL_UNLEARN_REQ) · payload 4 bytes
 
@@ -3908,7 +6673,18 @@ Sent in reply to `0x4824` NC_SKILL_UNLEARN_REQ on ShineObjectClass::ShinePlayer 
 | 0 | u16 | `in(0x4824)+1` |
 | 2 | u16 | `5378` (0x1502) |
 
-### `0x4828` ?
+### `0x4828` NC_SKILL_WARP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_WARP_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | object |  |
+| 2 | u32 | from.x |  |
+| 6 | u32 | from.y |  |
+| 10 | u32 | to.x |  |
+| 14 | u32 | to.y |  |
+| 18 | u16 | skill |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_WarpTo` (`FUN_004a7de0`) · payload 20 bytes
 
@@ -3921,7 +6697,7 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_WarpTo` (`FUN_004a7de0`) · 
 | 14 | u32 | `puVar10[1]` |
 | 18 | u16 | `**(undefined2 **)(param_2 + 4)` |
 
-### `0x482c` ?
+### `0x482c` NC_SKILL_ITEMACTIONCOOLTIME_CMD †
 
 Sent from `FUN_005d0d30` (`FUN_005d0d30`) · payload variable (iVar7)
 
@@ -3938,7 +6714,19 @@ Sent from `FUN_005d1b60` (`FUN_005d1b60`) · payload 10 bytes
 | 4 | u16 | `param_2` |
 | 6 | i32 | `param_1` |
 
-### `0x482d` ?
+### `0x482d` NC_SKILL_JUMP_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_JUMP_CMD`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nObject |  |
+| 2 | u32 | From.x |  |
+| 6 | u32 | From.y |  |
+| 10 | u32 | To.x |  |
+| 14 | u32 | To.y |  |
+| 18 | u8 | nDirect |  |
+| 19 | u16 | SkillID |  |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_JumpTo` (`FUN_0057db20`) · payload 21 bytes
 
@@ -3952,7 +6740,13 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_JumpTo` (`FUN_0057db20`) · 
 | 18 | u8 | `**(undefined1 **)(this + 0x6a)` |
 | 19 | u16 | `**(undefined2 **)(param_2 + 4)` |
 
-### `0x4c02` NC_TRADE_PROPOSE_ACK †
+### `0x4c02` NC_TRADE_PROPOSE_ASK_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_PROPOSE_ASK_REQ`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | proposer |  |
 
 Sent in reply to `0x4c01` NC_TRADE_PROPOSE_REQ on ShineObjectClass::ShinePlayer (`FUN_005925a0`, ShineObjectClass::ShinePlayer::sp_NC_TRADE_PROPOSE_REQ) · payload 2 bytes
 
@@ -3960,11 +6754,24 @@ Sent in reply to `0x4c01` NC_TRADE_PROPOSE_REQ on ShineObjectClass::ShinePlayer 
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 
-### `0x4c09` ?
+### `0x4c09` NC_TRADE_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_START_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | opposite |  |
 
 Sent in reply to `0x4c06` NC_TRADE_PROPOSEYES_ACK on ShineObjectClass::ShinePlayer (`FUN_00592cd0`, ShineObjectClass::ShinePlayer::sp_NC_TRADE_PROPOSEYES_ACK) · payload 2 bytes
 
-### `0x4c0f` ?
+### `0x4c0f` NC_TRADE_UPBOARD_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_UPBOARD_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slotinven |  |
+| 1 | u8 | slotboard |  |
 
 Sent in reply to `0x4c0d` NC_TRADE_UPBOARD_REQ on ShineObjectClass::ShinePlayer (`FUN_00595280`, ShineObjectClass::ShinePlayer::sp_NC_TRADE_UPBOARD_REQ) · payload 2 bytes
 
@@ -3973,7 +6780,15 @@ Sent in reply to `0x4c0d` NC_TRADE_UPBOARD_REQ on ShineObjectClass::ShinePlayer 
 | 0 | u8 | `in(0x4c0d)+0` |
 | 1 | u8 | `local_18` |
 
-### `0x4c10` ?
+### `0x4c10` NC_TRADE_OPPOSITUPBOARD_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_OPPOSITUPBOARD_CMD`, 104 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slotboard |  |
+| 1 | u16 | iteminfo.itemid |  |
+| 3 | byte[101] | iteminfo.itemattr | SHINE_ITEM_ATTRIBUTE (union: blot, wlot, dlot, qstitm, amulet, weapon, armor, shield, boot, furniture, decorate, skillscroll, recallscroll, binditem, upsource, itemchest, weapontitlelicence, kingdomquest, minihouseskin, upgraderedgem, upgradebluegem, upgradegoldgem, kqstep, feed, riding, amount, costumweapon, costumshield, actionitem, Enchant, GBCoin, Capsule, MobCard_Unident, MobCard, NoEffect, ActiveSkill, Pet, Bracelet) |
 
 Sent in reply to `0x4c0d` NC_TRADE_UPBOARD_REQ on ShineObjectClass::ShinePlayer (`FUN_00595280`, ShineObjectClass::ShinePlayer::sp_NC_TRADE_UPBOARD_REQ) · payload variable (iVar9 - (int)
 
@@ -3981,7 +6796,13 @@ Sent in reply to `0x4c0d` NC_TRADE_UPBOARD_REQ on ShineObjectClass::ShinePlayer 
 |---|---|---|
 | 0 | u8 | `local_18` |
 
-### `0x4c13` ?
+### `0x4c13` NC_TRADE_DOWNBOARD_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_DOWNBOARD_ACK`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slotboard |  |
 
 Sent in reply to `0x4c11` NC_TRADE_DOWNBOARD_REQ on ShineObjectClass::ShinePlayer (`FUN_00594ed0`, ShineObjectClass::ShinePlayer::sp_NC_TRADE_DOWNBOARD_REQ) · payload 1 bytes
 
@@ -3989,7 +6810,13 @@ Sent in reply to `0x4c11` NC_TRADE_DOWNBOARD_REQ on ShineObjectClass::ShinePlaye
 |---|---|---|
 | 0 | u8 | `(undefined1)local_14` |
 
-### `0x4c14` ?
+### `0x4c14` NC_TRADE_OPPOSITDOWNBOARD_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_OPPOSITDOWNBOARD_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slotboard |  |
 
 Sent in reply to `0x4c11` NC_TRADE_DOWNBOARD_REQ on ShineObjectClass::ShinePlayer (`FUN_00594ed0`, ShineObjectClass::ShinePlayer::sp_NC_TRADE_DOWNBOARD_REQ) · payload 1 bytes
 
@@ -3997,7 +6824,13 @@ Sent in reply to `0x4c11` NC_TRADE_DOWNBOARD_REQ on ShineObjectClass::ShinePlaye
 |---|---|---|
 | 0 | u8 | `(undefined1)local_14` |
 
-### `0x4c17` ?
+### `0x4c17` NC_TRADE_CENBOARDING_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_CENBOARDING_ACK`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
 
 Sent in reply to `0x4c15` NC_TRADE_CENBOARDING_REQ on ShineObjectClass::ShinePlayer (`FUN_005936b0`, ShineObjectClass::ShinePlayer::sp_NC_TRADE_CENBOARDING_REQ) · payload 8 bytes
 
@@ -4006,7 +6839,13 @@ Sent in reply to `0x4c15` NC_TRADE_CENBOARDING_REQ on ShineObjectClass::ShinePla
 | 0 | u32 | `in(0x4c15)+0` |
 | 4 | u32 | `in(0x4c15)+4` |
 
-### `0x4c18` ?
+### `0x4c18` NC_TRADE_OPPOSITCENBOARDING_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_OPPOSITCENBOARDING_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | cen |  |
 
 Sent in reply to `0x4c15` NC_TRADE_CENBOARDING_REQ on ShineObjectClass::ShinePlayer (`FUN_005936b0`, ShineObjectClass::ShinePlayer::sp_NC_TRADE_CENBOARDING_REQ) · payload 8 bytes
 
@@ -4015,7 +6854,13 @@ Sent in reply to `0x4c15` NC_TRADE_CENBOARDING_REQ on ShineObjectClass::ShinePla
 | 0 | u32 | `in(0x4c15)+0` |
 | 4 | u32 | `in(0x4c15)+4` |
 
-### `0x500b` ?
+### `0x500b` NC_SOULSTONE_HP_SOMEONEUSE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SOULSTONE_HP_SOMEONEUSE_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | player |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_HPStoneUse` (`FUN_00589180`) · payload 2 bytes
 
@@ -4023,7 +6868,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_HPStoneUse` (`FUN_00589180`) · pay
 |---|---|---|
 | 0 | i16 | `(short)param_1[1]` |
 
-### `0x500c` ?
+### `0x500c` NC_SOULSTONE_SP_SOMEONEUSE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SOULSTONE_SP_SOMEONEUSE_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | player |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_SPStoneUse` (`FUN_00588a40`) · payload 2 bytes
 
@@ -4032,6 +6883,15 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SPStoneUse` (`FUN_00588a40`) · pay
 | 0 | i16 | `(short)param_1[1]` |
 
 ### `0x5422` NC_FRIEND_UES_FRIEND_POINT_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_FRIEND_UES_FRIEND_POINT_ACK`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error |  |
+| 2 | u16 | friendpoint |  |
+| 4 | u16 | itemid |  |
+| 6 | u8 | numofitem |  |
 
 Sent in reply to `0x5421` NC_FRIEND_UES_FRIEND_POINT_REQ on ShineObjectClass::ShinePlayer (`FUN_0045a730`, ShineObjectClass::ShinePlayer::sp_NC_FRIEND_UES_FRIEND_POINT_REQ) · payload 7 bytes
 
@@ -4056,7 +6916,17 @@ Sent in reply to `0x34c0` NC_ITEMDB_UES_FRIEND_POINT_ACK on GameDBSession (`FUN_
 | 4 | u16 | `*(undefined2 *)(param_1 + 10)` |
 | 6 | u8 | `*(undefined1 *)(param_1 + 0x10)` |
 
-### `0x5814` ?
+### `0x5814` NC_KQ_SCORE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_SCORE_CMD`, 5 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | num |  |
+| 1 | u32 | base |  |
+| 5 | PROTO_NC_KQ_SCORE_CMD::KQScore[num] | array | variable length, element PROTO_NC_KQ_SCORE_CMD::KQScore |
+
+Element `PROTO_NC_KQ_SCORE_CMD::KQScore` (38 bytes): +0 char[20] charid, +20 u8 flag.medal|gender, +21 u8 flag.chrcls, +22 u32 killpoint, +26 u32 downpoint, +30 u32 contribute, +34 u32 score
 
 Sent from `PineEventScriptNode::SysFuncShineGetObjectList::sfb_Calculate` (`FUN_004e6420`) · payload variable (*pbVar1 * 0x26 + 7)
 
@@ -4068,7 +6938,13 @@ Sent from `FUN_005ec6a0` (`FUN_005ec6a0`) · payload variable ((byte)
 |---|---|---|
 | 1 | i32 | `iVar7` |
 
-### `0x5818` ?
+### `0x5818` NC_KQ_RESTDEADNUM_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_RESTDEADNUM_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | number |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_EscapeFromEmptyKQ` (`FUN_0043fa40`) · payload 1 bytes
 
@@ -4076,7 +6952,21 @@ Sent from `ShineObjectClass::ShinePlayer::sp_EscapeFromEmptyKQ` (`FUN_0043fa40`)
 |---|---|---|
 | 0 | u8 | `cVar3` |
 
-### `0x5821` ?
+### `0x5821` NC_KQ_SCORE_SIMPLE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_SCORE_SIMPLE_CMD`, 18 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | num |  |
+| 1 | u32 | base |  |
+| 5 | u8 | self.rank |  |
+| 6 | u32 | self.kill |  |
+| 10 | u32 | self.down |  |
+| 14 | u32 | self.score |  |
+| 18 | PROTO_NC_KQ_SCORE_SIMPLE_CMD::KQScore[num] | array | variable length, element PROTO_NC_KQ_SCORE_SIMPLE_CMD::KQScore |
+
+Element `PROTO_NC_KQ_SCORE_SIMPLE_CMD::KQScore` (32 bytes): +0 char[20] charid, +20 u32 kill, +24 u32 down, +28 u32 score
 
 Sent from `PineEventScriptNode::SysFuncShineKQTop::sfb_Calculate` (`FUN_004e6760`) · payload variable (iVar6)
 
@@ -4100,7 +6990,14 @@ Sent from `FUN_005ec1f0` (`FUN_005ec1f0`) · payload variable (iVar8)
 | 10 | u32 | `*puVar16` |
 | 14 | u32 | `puVar16[1]` |
 
-### `0x5822` ?
+### `0x5822` NC_KQ_MOBKILLNUMBER_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_MOBKILLNUMBER_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | CurrentMobKill |  |
+| 2 | u16 | DemandMobKill |  |
 
 Sent from `KQContribute::KQContributeList::kqcl_SendMobKill` (`FUN_00499ff0`) · payload 4 bytes
 
@@ -4109,7 +7006,13 @@ Sent from `KQContribute::KQContributeList::kqcl_SendMobKill` (`FUN_00499ff0`) ·
 | 0 | i16 | `(short)iVar5` |
 | 2 | u16 | `param_3` |
 
-### `0x5836` ?
+### `0x5836` NC_KQ_SCORE_INFO_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_SCORE_INFO_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32[2] | nScore |  |
 
 Sent from `FUN_005e3790` (`FUN_005e3790`) · payload 8 bytes
 
@@ -4118,7 +7021,13 @@ Sent from `FUN_005e3790` (`FUN_005e3790`) · payload 8 bytes
 | 0 | u32 | `0` |
 | 4 | u32 | `0` |
 
-### `0x583a` ?
+### `0x583a` NC_KQ_TEAM_TYPE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_TEAM_TYPE_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTeamType |  |
 
 Sent from `FUN_00561560` (`FUN_00561560`) · payload 1 bytes
 
@@ -4126,15 +7035,45 @@ Sent from `FUN_00561560` (`FUN_00561560`) · payload 1 bytes
 |---|---|---|
 | 0 | u8 | `uVar2` |
 
-### `0x583c` ?
+### `0x583c` NC_KQ_SCORE_BOARD_INFO_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_SCORE_BOARD_INFO_CMD`, 20 bytes · ⚠ 2016 code uses 6 bytes: version drift or extraction error
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bUseRound |  |
+| 1 | u8 | nRound |  |
+| 2 | i32 | Red.nWinFlag |  |
+| 6 | i32 | Red.nScore |  |
+| 10 | i32 | Blue.nWinFlag |  |
+| 14 | i32 | Blue.nScore |  |
+| 18 | u16 | KQID |  |
 
 Sent from `FUN_005ed860` (`FUN_005ed860`) · payload 6 bytes
 
-### `0x583d` ?
+### `0x583d` NC_KQ_WINTER_EVENT_2014_SCORE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_KQ_WINTER_EVENT_2014_SCORE_CMD`, 16 bytes · ⚠ 2016 code uses 4 bytes: version drift or extraction error
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | Red.nWinFlag |  |
+| 4 | i32 | Red.nScore |  |
+| 8 | i32 | Blue.nWinFlag |  |
+| 12 | i32 | Blue.nScore |  |
 
 Sent from `FUN_005edcf0` (`FUN_005edcf0`) · payload 4 bytes
 
 ### `0x5c02` NC_WT_LICENSE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_WT_LICENSE_ACK`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | licenseitem | ITEM_INVEN (union: Inven, Pos, Type) |
+| 2 | u16 | weaponitem | ITEM_INVEN (union: Inven, Pos, Type) |
+| 4 | u8 | bSet |  |
+| 5 | u16 | err |  |
 
 Sent in reply to `0x5c08` NC_WT_LICENSE_CLR_ACK on GameDBSession (`FUN_0059d920`, GameDBSession::gds_NC_WT_LICENSE_CLR_ACK) · payload 7 bytes
 
@@ -4153,11 +7092,24 @@ Sent in reply to `0x5c06` NC_WT_LICENSE_SET_ACK on GameDBSession (`FUN_0059dab0`
 | 2 | u16 | `*(undefined2 *)(param_1 + 0xe)` |
 | 5 | u16 | `*(undefined2 *)(param_1 + 8)` |
 
-### `0x5c03` ?
+### `0x5c03` NC_WT_GRADE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_WT_GRADE_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ItemInven | ITEM_INVEN (union: Inven, Pos, Type) |
+| 2 | u8 | Grade |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_weapontitle` (`FUN_0059e190`) · payload 3 bytes
 
-### `0x5c0d` ?
+### `0x5c0d` NC_WT_MOBINC_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_WT_MOBINC_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | mob |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 2 bytes
 
@@ -4166,6 +7118,15 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payloa
 | 0 | i16 | `(short)param_3` |
 
 ### `0x6002` NC_CT_SET_CURRENT_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CT_SET_CURRENT_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Type |  |
+| 1 | u8 | ElementNo |  |
+| 2 | u16 | MobID |  |
+| 4 | u16 | Error |  |
 
 Sent from `CCharacterTitleZone::Send_NC_CT_SET_CURRENT_ACK` (`FUN_005ca9e0`) · payload 6 bytes
 
@@ -4176,7 +7137,16 @@ Sent from `CCharacterTitleZone::Send_NC_CT_SET_CURRENT_ACK` (`FUN_005ca9e0`) · 
 | 2 | u16 | `param_3` |
 | 4 | i16 | `param_4` |
 
-### `0x6003` ?
+### `0x6003` NC_CT_SET_SOMEONECHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CT_SET_SOMEONECHANGE_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hnd |  |
+| 2 | u8 | Type |  |
+| 3 | u8 | ElementNo |  |
+| 4 | u16 | MobID |  |
 
 Sent from `CCharacterTitleZone::Send_NC_CT_SET_CURRENT_ACK` (`FUN_005ca9e0`) · payload 6 bytes
 
@@ -4189,13 +7159,30 @@ Sent from `CCharacterTitleZone::Send_NC_CT_SET_CURRENT_ACK` (`FUN_005ca9e0`) · 
 
 ### `0x6004` NC_CT_SET_CMD †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CT_SET_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Info.Type |  |
+| 1 | u8 | Info.ElementNo|ElementValue | bits ElementNo:6@0, ElementValue:2@6 |
+
 Sent from `CCharacterTitleZone::Send_NC_CT_SET_CMD` (`FUN_005cab90`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `*param_1` |
 
-### `0x6803` ?
+### `0x6803` NC_BOOTH_SOMEONEOPEN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SOMEONEOPEN_CMD`, 45 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u16 | tent.minihouse |  |
+| 4 | u8[10] | tent.dummy |  |
+| 14 | u8 | issell |  |
+| 15 | u8[30] | signboard.signboard |  |
 
 Sent in reply to `0x6801` NC_BOOTH_OPEN_REQ on ShineObjectClass::ShinePlayer (`FUN_0058e900`, ShineObjectClass::ShinePlayer::sp_NC_BOOTH_OPEN_REQ) · payload 45 bytes
 
@@ -4207,11 +7194,40 @@ Sent in reply to `0x6801` NC_BOOTH_OPEN_REQ on ShineObjectClass::ShinePlayer (`F
 | 10 | u32 | `local_128[2]` |
 | 14 | u8 | `*(byte *)(local_120 + 0x1e) & 1` |
 
-### `0x6806` ?
+### `0x6806` NC_BOOTH_SOMEONECLOSE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SOMEONECLOSE_CMD`, 45 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u16 | shape.equip.Equ_Head |  |
+| 4 | u16 | shape.equip.Equ_Mouth |  |
+| 6 | u16 | shape.equip.Equ_RightHand |  |
+| 8 | u16 | shape.equip.Equ_Body |  |
+| 10 | u16 | shape.equip.Equ_LeftHand |  |
+| 12 | u16 | shape.equip.Equ_Pant |  |
+| 14 | u16 | shape.equip.Equ_Boot |  |
+| 16 | u16 | shape.equip.Equ_AccBoot |  |
+| 18 | u16 | shape.equip.Equ_AccPant |  |
+| 20 | u16 | shape.equip.Equ_AccBody |  |
+| 22 | u16 | shape.equip.Equ_AccHeadA |  |
+| 24 | u16 | shape.equip.Equ_MiniMon_R |  |
+| 26 | u16 | shape.equip.Equ_Eye |  |
+| 28 | u16 | shape.equip.Equ_AccLeftHand |  |
+| 30 | u16 | shape.equip.Equ_AccRightHand |  |
+| 32 | u16 | shape.equip.Equ_AccBack |  |
+| 34 | u16 | shape.equip.Equ_CosEff |  |
+| 36 | u16 | shape.equip.Equ_AccHip |  |
+| 38 | u16 | shape.equip.Equ_Minimon |  |
+| 40 | u16 | shape.equip.Equ_AccShield |  |
+| 42 | u8 | shape.equip.upgrade.lefthand|righthand | bits lefthand:4@0, righthand:4@4 |
+| 43 | u8 | shape.equip.upgrade.body|leg | bits body:4@0, leg:4@4 |
+| 44 | u8 | shape.equip.upgrade.shoes | bits shoes:4@0 |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CloseStreetBooth` (`FUN_005932b0`) · payload 45 bytes
 
-### `0x680b` NC_BOOTH_REFRESH_ACK †
+### `0x680b` NC_BOOTH_REFRESH_SELL_ACK †
 
 Sent from `FUN_0058cce0` (`FUN_0058cce0`) · payload 5 bytes
 
@@ -4219,7 +7235,14 @@ Sent from `FUN_0058cce0` (`FUN_0058cce0`) · payload 5 bytes
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0x680f` ?
+### `0x680f` NC_BOOTH_BUYREFRESH_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_BUYREFRESH_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | boothslot |  |
+| 1 | u16 | restlot |  |
 
 Sent from `StreetBoothBuy::sb_Trade` (`FUN_0058ffe0`) · payload 3 bytes
 
@@ -4228,7 +7251,14 @@ Sent from `StreetBoothBuy::sb_Trade` (`FUN_0058ffe0`) · payload 3 bytes
 | 0 | u8 | `(char)local_20` |
 | 1 | i16 | `*psVar1` |
 
-### `0x6812` ?
+### `0x6812` NC_BOOTH_SOMEONEINTERIORSTART_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SOMEONEINTERIORSTART_CMD`, 32 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | boothowner |  |
+| 2 | u8[30] | signboard.signboard |  |
 
 Sent in reply to `0x6810` NC_BOOTH_INTERIORSTART_REQ on ShineObjectClass::ShinePlayer (`FUN_0058e680`, ShineObjectClass::ShinePlayer::sp_NC_BOOTH_INTERIORSTART_REQ) · payload 32 bytes
 
@@ -4239,6 +7269,16 @@ Sent in reply to `0x6810` NC_BOOTH_INTERIORSTART_REQ on ShineObjectClass::ShineP
 
 ### `0x6814` NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_ACK`, 3 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8 | nNumOfItems |  |
+| 3 | BoothItemInfo[nNumOfItems] | ItemList | variable length, element BoothItemInfo |
+
+Element `BoothItemInfo` (118 bytes): +0 u8 bii_nDataSize, +1 u32 bii_nItemHandle, +5 u16 bii_nOwnerHandle, +7 u64 bii_nUnitPrice, +15 u16 bii_ItemInfo.itemid, +17 byte[101] bii_ItemInfo.itemattr
+
 Sent in reply to `0x6813` NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_REQ on ShineObjectClass::ShinePlayer (`FUN_00439c70`, ShineObjectClass::ShinePlayer::sp_NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_REQ) · payload 3 bytes
 
 | Off | Type | Value / source |
@@ -4248,13 +7288,28 @@ Sent in reply to `0x6813` NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_REQ on ShineObje
 
 ### `0x6816` NC_BOOTH_SEARCH_BOOTH_POSITION_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SEARCH_BOOTH_POSITION_ACK`, 12 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nTargetBoothOwnerHandle |  |
+| 4 | u32 | BoothPosition.x |  |
+| 8 | u32 | BoothPosition.y |  |
+
 Sent in reply to `0x6815` NC_BOOTH_SEARCH_BOOTH_POSITION_REQ on ShineObjectClass::ShinePlayer (`FUN_0043a140`, ShineObjectClass::ShinePlayer::sp_NC_BOOTH_SEARCH_BOOTH_POSITION_REQ) · payload 12 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `12753` (0x31d1) |
 
-### `0x6817` ?
+### `0x6817` NC_BOOTH_SEARCH_BOOTH_CLOSED_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SEARCH_BOOTH_CLOSED_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nClosedBoothOwnerHandle |  |
 
 Sent in reply to `0x6810` NC_BOOTH_INTERIORSTART_REQ on ShineObjectClass::ShinePlayer (`FUN_0058e680`, ShineObjectClass::ShinePlayer::sp_NC_BOOTH_INTERIORSTART_REQ) · payload 2 bytes
 
@@ -4262,7 +7317,13 @@ Sent in reply to `0x6810` NC_BOOTH_INTERIORSTART_REQ on ShineObjectClass::ShineP
 |---|---|---|
 | 0 | i16 | `(short)param_1[1]` |
 
-### `0x6c04` ?
+### `0x6c04` NC_SCENARIO_MESSAGENOTICE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_MESSAGENOTICE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | message |  |
 
 Sent from `PineEventScriptNode::BroadcastCode::sa_Step` (`FUN_004f7ae0`) · payload 4 bytes
 
@@ -4270,7 +7331,13 @@ Sent from `PineEventScriptNode::BroadcastCode::sa_Step` (`FUN_004f7ae0`) · payl
 |---|---|---|
 | 0 | u32 | `uVar5` |
 
-### `0x6c05` ?
+### `0x6c05` NC_SCENARIO_AREAENTRY_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_AREAENTRY_REQ`, 32 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | areaindex | Name8 |
 
 Sent from `PineEventScriptNode::ShineInterruptSet::sa_Step` (`FUN_004ec1e0`) · payload 32 bytes
 
@@ -4284,7 +7351,13 @@ Sent from `PineEventScriptNode::ShineInterruptSet::sa_Step` (`FUN_004ec1e0`) · 
 | 24 | u32 | `0` |
 | 28 | u32 | `0` |
 
-### `0x6c07` ?
+### `0x6c07` NC_SCENARIO_AREALEAVE_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_AREALEAVE_REQ`, 32 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | areaindex | Name8 |
 
 Sent from `PineEventScriptNode::ShineInterruptSet::sa_Step` (`FUN_004ec1e0`) · payload 32 bytes
 
@@ -4298,7 +7371,14 @@ Sent from `PineEventScriptNode::ShineInterruptSet::sa_Step` (`FUN_004ec1e0`) · 
 | 24 | u32 | `0` |
 | 28 | u32 | `0` |
 
-### `0x6c09` ?
+### `0x6c09` NC_SCENARIO_DOORSTATE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_DOORSTATE_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | door |  |
+| 2 | u8 | doorstate |  |
 
 Sent from `ShineObjectClass::ShineDoor::so_door_DoorAction` (`FUN_00550770`) · payload 3 bytes
 
@@ -4307,7 +7387,15 @@ Sent from `ShineObjectClass::ShineDoor::so_door_DoorAction` (`FUN_00550770`) · 
 | 0 | u16 | `uVar1` |
 | 2 | u8 | `(undefined1)param_2` |
 
-### `0x6c0a` ?
+### `0x6c0a` NC_SCENARIO_LIGHT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_LIGHT_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | red |  |
+| 1 | u8 | green |  |
+| 2 | u8 | blue |  |
 
 Sent from `PineEventScriptNode::ShineMapLight::sa_Step` (`FUN_004f20f0`) · payload 3 bytes
 
@@ -4317,7 +7405,14 @@ Sent from `PineEventScriptNode::ShineMapLight::sa_Step` (`FUN_004f20f0`) · payl
 | 1 | u8 | `uVar2` |
 | 2 | u8 | `(undefined1)local_118` |
 
-### `0x6c0b` ?
+### `0x6c0b` NC_SCENARIO_OBJTYPECHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_OBJTYPECHANGE_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u8 | type |  |
 
 Sent from `ShineObjectClass::ShineBandit::so_bandit_ChangeType` (`FUN_005508b0`) · payload 3 bytes
 
@@ -4326,7 +7421,15 @@ Sent from `ShineObjectClass::ShineBandit::so_bandit_ChangeType` (`FUN_005508b0`)
 | 0 | u16 | `uVar1` |
 | 2 | u8 | `param_1` |
 
-### `0x6c0c` ?
+### `0x6c0c` NC_SCENARIO_CHATWIN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_CHATWIN_CMD`, 3 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | mob |  |
+| 2 | u8 | len |  |
+| 3 | u8[len] | content | variable length |
 
 Sent from `PineEventScriptNode::ShineChatWindow::sa_Step` (`FUN_004f50f0`) · payload variable (uVar12 & 0xff)
 
@@ -4345,7 +7448,14 @@ Sent from `FUN_005db690` (`FUN_005db690`) · payload variable (byte)
 
 *2 more send sites not shown: FUN_005dbaa0, FUN_005ece70*
 
-### `0x6c0d` ?
+### `0x6c0d` NC_SCENARIO_ANIMATE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_ANIMATE_CMD`, 34 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | char[32] | anicode | Name8 |
 
 Sent from `PineEventScriptNode::ShineAnimate::sa_Step` (`FUN_004f3240`) · payload 34 bytes
 
@@ -4370,7 +7480,14 @@ Sent from `FUN_00553390` (`FUN_00553390`) · payload 34 bytes
 | 26 | u32 | `0` |
 | 30 | u32 | `0` |
 
-### `0x6c0e` ?
+### `0x6c0e` NC_SCENARIO_FOG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_FOG_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | fog |  |
+| 1 | u16 | depth |  |
 
 Sent from `PineEventScriptNode::ShineMapFog::sa_Step` (`FUN_004f2350`) · payload 3 bytes
 
@@ -4379,11 +7496,24 @@ Sent from `PineEventScriptNode::ShineMapFog::sa_Step` (`FUN_004f2350`) · payloa
 | 0 | u8 | `uVar2` |
 | 1 | u16 | `uVar3` |
 
-### `0x6c10` ?
+### `0x6c10` NC_SCENARIO_BRIEFEFFECT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_BRIEFEFFECT_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | effectcode |  |
 
 Sent from `PineEventScriptNode::ShineBriefEffect::sa_Step` (`FUN_004f6ec0`) · payload 1 bytes
 
 ### `0x6c11` NC_SCENARIO_NPCCHAT_CMD
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_NPCCHAT_CMD`, 35 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[33] | DialogIndex |  |
+| 33 | u16 | NPCHandle |  |
 
 Sent from `FUN_005efaa0` (`FUN_005efaa0`) · payload 35 bytes
 
@@ -4394,13 +7524,30 @@ Sent from `FUN_005efaa0` (`FUN_005efaa0`) · payload 35 bytes
 
 ### `0x6c12` NC_SCENARIO_MESSAGE_CMD
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_MESSAGE_CMD`, 17 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[17] | DialogIndex |  |
+
 Sent from `FUN_005ef8f0` (`FUN_005ef8f0`) · payload 17 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | char[16] | `_strncpy from _Source` |
 
-### `0x6c14` ?
+### `0x6c14` NC_SCENARIO_CAMERA_MOVE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_CAMERA_MOVE_CMD`, 15 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | MoveType |  |
+| 1 | u32 | ViewCoord.x |  |
+| 5 | u32 | ViewCoord.y |  |
+| 9 | u16 | AngleXZ |  |
+| 11 | u16 | AngleY |  |
+| 13 | u16 | Dist |  |
 
 Sent from `FUN_004220c0` (`FUN_004220c0`) · payload 15 bytes
 
@@ -4413,7 +7560,15 @@ Sent from `FUN_004220c0` (`FUN_004220c0`) · payload 15 bytes
 | 11 | u16 | `uVar2` |
 | 13 | u16 | `(undefined2)local_a0` |
 
-### `0x6c15` ?
+### `0x6c15` NC_SCENARIO_SCRIPTMESSAGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_SCRIPTMESSAGE_CMD`, 37 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | DialogIndex |  |
+| 32 | u8[5] | nlen |  |
+| 37 | u8[rest] | sContent | variable length, count unknown |
 
 Sent from `FUN_005dcbe0` (`FUN_005dcbe0`) · payload variable (uVar7 + 0x27)
 
@@ -4421,7 +7576,13 @@ Sent from `FUN_005dcbe0` (`FUN_005dcbe0`) · payload variable (uVar7 + 0x27)
 |---|---|---|
 | 0 | char[31] | `_strncpy from pcVar3` |
 
-### `0x6c16` ?
+### `0x6c16` NC_SCENARIO_TIMER_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_TIMER_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSecond |  |
 
 Sent from `FUN_005dd310` (`FUN_005dd310`) · payload 2 bytes
 
@@ -4429,7 +7590,15 @@ Sent from `FUN_005dd310` (`FUN_005dd310`) · payload 2 bytes
 |---|---|---|
 | 0 | u16 | `(undefined2)local_18` |
 
-### `0x6c18` ?
+### `0x6c18` NC_SCENARIO_MAP_OBJECT_CONTROL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_MAP_OBJECT_CONTROL_CMD`, 37 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | sObjectIndex |  |
+| 32 | u8 | IsEnableObject |  |
+| 33 | i32 | eControlType |  |
 
 Sent from `FUN_005e2ad0` (`FUN_005e2ad0`) · payload 37 bytes
 
@@ -4439,7 +7608,15 @@ Sent from `FUN_005e2ad0` (`FUN_005e2ad0`) · payload 37 bytes
 | 32 | u8 | `uVar2` |
 | 33 | i32 | `iVar4` |
 
-### `0x6c19` ?
+### `0x6c19` NC_SCENARIO_DIALOG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_DIALOG_CMD`, 34 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[33] | sFacecutIndex |  |
+| 33 | u8 | nLen |  |
+| 34 | u8[nLen] | sContents | variable length |
 
 Sent from `FUN_005e4a00` (`FUN_005e4a00`) · payload variable (byte)
 
@@ -4460,7 +7637,17 @@ Sent from `FUN_005e4a00` (`FUN_005e4a00`) · payload variable (byte)
 | 33 | u8 | `(char)_Size` |
 | 34 | bytes[?] | `FID_conflict__memcpy from pcVar4` |
 
-### `0x6c1a` ?
+### `0x6c1a` NC_SCENARIO_TOPVIEW_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_TOPVIEW_CMD`, 13 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nMoveType |  |
+| 1 | u32 | CenterPos.x |  |
+| 5 | u32 | CenterPos.y |  |
+| 9 | u16 | nDistance |  |
+| 11 | u16 | nAngle |  |
 
 Sent from `FUN_005e6600` (`FUN_005e6600`) · payload 13 bytes
 
@@ -4472,7 +7659,14 @@ Sent from `FUN_005e6600` (`FUN_005e6600`) · payload 13 bytes
 | 9 | u16 | `uStack_1c` |
 | 11 | u16 | `uStack_1c` |
 
-### `0x6c1b` ?
+### `0x6c1b` NC_SCENARIO_SYSTEM_MESSAGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_SYSTEM_MESSAGE_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nLen |  |
+| 1 | u8[nLen] | sMessage | variable length |
 
 Sent from `FUN_005e6890` (`FUN_005e6890`) · payload variable (iVar8)
 
@@ -4481,7 +7675,13 @@ Sent from `FUN_005e6890` (`FUN_005e6890`) · payload variable (iVar8)
 | 0 | u8 | `(char)_Size` |
 | 1 | bytes[?] | `FID_conflict__memcpy from _Src` |
 
-### `0x6c1c` ?
+### `0x6c1c` NC_SCENARIO_HIDE_OTHER_PLAYER_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_HIDE_OTHER_PLAYER_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsHide |  |
 
 Sent from `FUN_005e6a50` (`FUN_005e6a50`) · payload 1 bytes
 
@@ -4489,7 +7689,14 @@ Sent from `FUN_005e6a50` (`FUN_005e6a50`) · payload 1 bytes
 |---|---|---|
 | 0 | u8 | `local_18` |
 
-### `0x6c1d` ?
+### `0x6c1d` NC_SCENARIO_EFFECT_TIMER_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_EFFECT_TIMER_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTimerFunction |  |
+| 1 | u16 | nSecond |  |
 
 Sent from `FUN_005e6bb0` (`FUN_005e6bb0`) · payload 3 bytes
 
@@ -4498,15 +7705,37 @@ Sent from `FUN_005e6bb0` (`FUN_005e6bb0`) · payload 3 bytes
 | 0 | u8 | `(char)iVar4` |
 | 1 | u16 | `local_18` |
 
-### `0x6c1e` ?
+### `0x6c1e` NC_SCENARIO_DIRECTIONAL_ARROW_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_DIRECTIONAL_ARROW_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | DirectionalPos.x |  |
+| 4 | u32 | DirectionalPos.y |  |
 
 Sent from `FUN_005e8810` (`FUN_005e8810`) · payload 8 bytes
 
-### `0x6c1f` ?
+### `0x6c1f` NC_SCENARIO_DEL_DIRECTIONAL_ARROW_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_DEL_DIRECTIONAL_ARROW_CMD`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Sent from `FUN_005e89d0` (`FUN_005e89d0`) · payload 1 bytes
 
-### `0x6c20` ?
+### `0x6c20` NC_SCENARIO_RANKING_LIST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_RANKING_LIST_CMD`, 1000 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | SCENARIO_RANKING_INFO[20] | PreviousRanking | element SCENARIO_RANKING_INFO |
+| 500 | SCENARIO_RANKING_INFO[20] | CurrentRanking | element SCENARIO_RANKING_INFO |
+
+Element `SCENARIO_RANKING_INFO` (25 bytes): +0 u8 nRanking, +1 char[20] sCharID, +21 u32 nScore
 
 Sent from `FUN_005eaee0` (`FUN_005eaee0`) · payload 1000 bytes
 
@@ -4514,11 +7743,23 @@ Sent from `FUN_005eaee0` (`FUN_005eaee0`) · payload 1000 bytes
 |---|---|---|
 | 0 | bytes[500] | `_memset from 0` |
 
-### `0x6c21` ?
+### `0x6c21` NC_SCENARIO_TIMER_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_TIMER_START_CMD`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Sent from `FUN_005eb5a0` (`FUN_005eb5a0`) · payload 1 bytes
 
-### `0x6c22` ?
+### `0x6c22` NC_SCENARIO_TIMER_END_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_TIMER_END_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nDeleteSec |  |
 
 Sent from `FUN_005eb770` (`FUN_005eb770`) · payload 4 bytes
 
@@ -4526,7 +7767,16 @@ Sent from `FUN_005eb770` (`FUN_005eb770`) · payload 4 bytes
 |---|---|---|
 | 0 | u32 | `(undefined4)local_1c` |
 
-### `0x7483` ?
+### `0x7483` NC_GUILD_TOURNAMENTSTART_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENTSTART_CMD`, 14 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildA |  |
+| 4 | u32 | nGuildB |  |
+| 8 | u16 | nGuildTourNamentType |  |
+| 10 | u32 | nGuildMyRegNumber |  |
 
 Sent from `GuildTournamentSystem::PlayerRegister` (`FUN_0047f970`) · payload 14 bytes
 
@@ -4544,7 +7794,14 @@ Sent from `PineEventScriptNode::ShineBattleStart::sa_Step` (`FUN_004f3cb0`) · p
 | 0 | u32 | `uVar2` |
 | 4 | u32 | `uVar5` |
 
-### `0x748d` ?
+### `0x748d` NC_GUILD_MOBGUILD_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_MOBGUILD_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | mobhandle |  |
+| 2 | u32 | mobguild |  |
 
 Sent from `FUN_00475a80` (`FUN_00475a80`) · payload 6 bytes
 
@@ -4555,6 +7812,18 @@ Sent from `FUN_00475a80` (`FUN_00475a80`) · payload 6 bytes
 
 ### `0x7492` NC_GUILD_STORAGEOPEN_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_STORAGEOPEN_ACK`, 19 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u64 | cen |  |
+| 10 | u64 | nToken |  |
+| 18 | u8 | itemcounter |  |
+| 19 | PROTO_ITEMPACKET_INFORM[itemcounter] | itemarray | variable length, element PROTO_ITEMPACKET_INFORM |
+
+Element `PROTO_ITEMPACKET_INFORM` (106 bytes): +0 u8 datasize, +1 u16 location, +3 u16 info.itemid, +5 byte[101] info.itemattr
+
 Sent from `ShineObjectClass::ShinePlayer::sp_GuildStorageError` (`FUN_00474bf0`) · payload 19 bytes
 
 | Off | Type | Value / source |
@@ -4562,11 +7831,23 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GuildStorageError` (`FUN_00474bf0`)
 | 0 | u16 | `param_1` |
 | 18 | u8 | `0` |
 
-### `0x749b` ?
+### `0x749b` NC_GUILD_TOURNAMENT_RECALL_ENTER_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_RECALL_ENTER_CMD`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Sent from `FUN_00475950` (`FUN_00475950`) · payload 1 bytes
 
 ### `0x749d` NC_GUILD_TOURNAMENT_RECALL_ENTER_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_RECALL_ENTER_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
 
 Sent in reply to `0x749c` NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ on ShineObjectClass::ShinePlayer (`FUN_004783c0`, ShineObjectClass::ShinePlayer::sp_NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ) · payload 2 bytes
 
@@ -4576,6 +7857,12 @@ Sent in reply to `0x749c` NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ on ShineObjectCla
 
 ### `0x74cb` NC_GUILD_TOURNAMENT_FLAGCAPTURE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_FLAGCAPTURE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+
 Sent from `FUN_00475cd0` (`FUN_00475cd0`) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -4584,6 +7871,13 @@ Sent from `FUN_00475cd0` (`FUN_00475cd0`) · payload 2 bytes
 
 ### `0x74cc` NC_GUILD_TOURNAMENT_FLAGCAPTURE_CMD †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_FLAGCAPTURE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u16 | hPlayer |  |
+
 Sent from `FUN_00475d40` (`FUN_00475d40`) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -4591,7 +7885,16 @@ Sent from `FUN_00475d40` (`FUN_00475d40`) · payload 4 bytes
 | 0 | u16 | `param_1` |
 | 2 | u16 | `*(undefined2 *)(this + 4)` |
 
-### `0x74cd` ?
+### `0x74cd` NC_GUILD_TOURNAMENT_FLAGCAPTURE_RESULT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_FLAGCAPTURE_RESULT_CMD`, 48 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CIDPlayer | Name5 |
+| 20 | char[20] | CIDFlag | Name5 |
+| 40 | u32 | gRegGuildNo |  |
+| 44 | u32 | gRegFlagCaptureGuild |  |
 
 Sent from `FUN_0047eae0` (`FUN_0047eae0`) · payload 48 bytes
 
@@ -4610,7 +7913,13 @@ Sent from `FUN_0047eae0` (`FUN_0047eae0`) · payload 48 bytes
 | 40 | u32 | `local_284` |
 | 44 | u32 | `local_274` |
 
-### `0x74ce` ?
+### `0x74ce` NC_GUILD_TOURNAMENT_SKILLPOINT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_SKILLPOINT_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wSkillPoint |  |
 
 Sent from `FUN_0047afa0` (`FUN_0047afa0`) · payload 2 bytes
 
@@ -4620,6 +7929,13 @@ Sent from `FUN_0047afa0` (`FUN_0047afa0`) · payload 2 bytes
 
 ### `0x74d0` NC_GUILD_TOURNAMENT_USESKILL_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_USESKILL_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u16 | wUseSkillNumber |  |
+
 Sent from `FUN_00475bd0` (`FUN_00475bd0`) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -4627,7 +7943,14 @@ Sent from `FUN_00475bd0` (`FUN_00475bd0`) · payload 4 bytes
 | 0 | u16 | `param_1` |
 | 2 | i16 | `(short)param_2` |
 
-### `0x74d1` ?
+### `0x74d1` NC_GUILD_TOURNAMENT_USESKILL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_USESKILL_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | regGuildNumber |  |
+| 4 | u16 | wUseSkillNumber |  |
 
 Sent from `FUN_00475bd0` (`FUN_00475bd0`) · payload 6 bytes
 
@@ -4636,7 +7959,18 @@ Sent from `FUN_00475bd0` (`FUN_00475bd0`) · payload 6 bytes
 | 0 | u32 | `uVar5` |
 | 4 | i16 | `(short)param_2` |
 
-### `0x74d2` ?
+### `0x74d2` NC_GUILD_TOURNAMENT_DICEGAME_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_DICEGAME_START_CMD`, 52 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | AGuildRegNumber |  |
+| 4 | u16 | AGuildDelegate |  |
+| 6 | char[20] | AGuildDelegateName | Name5 |
+| 26 | u32 | BGuildRegNumber |  |
+| 30 | u16 | BGuildDelegate |  |
+| 32 | char[20] | BGuildDelegateName | Name5 |
 
 Sent from `FUN_0047ada0` (`FUN_0047ada0`) · payload 52 bytes
 
@@ -4659,13 +7993,26 @@ Sent from `FUN_0047ada0` (`FUN_0047ada0`) · payload 52 bytes
 
 ### `0x74d4` NC_GUILD_TOURNAMENT_DICEGAME_THROW_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_DICEGAME_THROW_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+
 Sent from `FUN_00475e30` (`FUN_00475e30`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `param_1` |
 
-### `0x74d5` ?
+### `0x74d5` NC_GUILD_TOURNAMENT_DICEGAME_THROW_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_DICEGAME_THROW_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | GuildRegNumber |  |
+| 4 | u32 | unDiceGameResult |  |
 
 Sent from `FUN_00478f50` (`FUN_00478f50`) · payload 8 bytes
 
@@ -4674,7 +8021,13 @@ Sent from `FUN_00478f50` (`FUN_00478f50`) · payload 8 bytes
 | 0 | u32 | `uVar3` |
 | 4 | u32 | `param_2` |
 
-### `0x74d6` ?
+### `0x74d6` NC_GUILD_TOURNAMENT_DICEGAME_BEFORE_END_TIME_MSG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_DICEGAME_BEFORE_END_TIME_MSG_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | unEndTime |  |
 
 Sent from `FUN_0047b540` (`FUN_0047b540`) · payload 4 bytes
 
@@ -4684,13 +8037,35 @@ Sent from `FUN_0047b540` (`FUN_0047b540`) · payload 4 bytes
 
 ### `0x74d8` NC_GUILD_TOURNAMENT_OBSERVER_ENTER_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_OBSERVER_ENTER_ACK`, 11 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u8 | nTournamentSeed |  |
+| 3 | u32 | nGuildRed |  |
+| 7 | u32 | nGuildBlue |  |
+
 Sent from `FUN_004788c0` (`FUN_004788c0`) · payload 11 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `6978` (0x1b42) |
 
-### `0x74dd` ?
+### `0x74dd` NC_GUILD_TOURNAMENT_SCORE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_SCORE_CMD`, 17 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | PartMask |  |
+| 1 | u32 | regNumber |  |
+| 5 | u32 | unAllScore |  |
+| 9 | u32 | unCaptureFlagCount |  |
+| 13 | u32 | unPlayerNum |  |
+| 17 | TOURNAMENT_PLAYER_SCORE[unPlayerNum] | PlayerScore | variable length, element TOURNAMENT_PLAYER_SCORE |
+
+Element `TOURNAMENT_PLAYER_SCORE` (44 bytes): +0 char[20] CharID, +20 u32 unIncreaseScore, +24 u32 unDecreaseScore, +28 u32 unDieCount, +32 u32 unKillCount, +36 u32 unGuildGreade, +40 u32 unCaptureFlag
 
 Sent from `FUN_00479d50` (`FUN_00479d50`) · payload variable (iVar9)
 
@@ -4702,15 +8077,37 @@ Sent from `FUN_00479d50` (`FUN_00479d50`) · payload variable (iVar9)
 | 9 | u32 | `*(undefined4 *)(puVar1 + 9)` |
 | 13 | u32 | `(this[0x1c] - this[0x18]) / 0x2c`; `*(undefined4 *)(puVar1 + 0xd)` |
 
-### `0x74de` ?
+### `0x74de` NC_GUILD_TOURNAMENT_PLAYERDIEMSG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_PLAYERDIEMSG_CMD`, 44 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | VictimCharID | Name5 |
+| 20 | char[20] | MurderCharID | Name5 |
+| 40 | i32 | VictimGuildGrade |  |
 
 Sent from `FUN_0047e640` (`FUN_0047e640`) · payload variable (0x2e,uVar7)
 
-### `0x74df` ?
+### `0x74df` NC_GUILD_TOURNAMENT_PLAYERKILLMSG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_PLAYERKILLMSG_CMD`, 44 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | VictimCharID | Name5 |
+| 20 | char[20] | MurderCharID | Name5 |
+| 40 | i32 | VictimGuildGrade |  |
 
 Sent from `FUN_0047e640` (`FUN_0047e640`) · payload variable (0x2e,uVar7)
 
-### `0x74e0` ?
+### `0x74e0` NC_GUILD_TOURNAMENT_STARTMSG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_STARTMSG_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | nStartBeforeTime |  |
 
 Sent from `PineEventScriptNode::ShineBattleStart::sa_Step` (`FUN_004f3cb0`) · payload 4 bytes
 
@@ -4720,7 +8117,13 @@ Sent from `PineEventScriptNode::ShineBattleStart::sa_Step` (`FUN_004f3cb0`) · p
 
 Sent from `FUN_005e3af0` (`FUN_005e3af0`) · payload 4 bytes
 
-### `0x74e1` ?
+### `0x74e1` NC_GUILD_TOURNAMENT_MANAGERUSERMSG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_MANAGERUSERMSG_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | CharID | Name5 |
 
 Sent from `FUN_004798f0` (`FUN_004798f0`) · payload variable (0x16,*param_1)
 
@@ -4732,7 +8135,18 @@ Sent from `FUN_004798f0` (`FUN_004798f0`) · payload variable (0x16,*param_1)
 | 12 | u32 | `puVar5[3]` |
 | 16 | u32 | `puVar5[4]` |
 
-### `0x74e2` ?
+### `0x74e2` NC_GUILD_TOURNAMENTSTOPMSG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENTSTOPMSG_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | WinnerGuild |  |
+| 4 | u32 | LoseGuild |  |
+| 8 | u32 | AGuildRegNumber |  |
+| 12 | u16 | AGuildScore |  |
+| 14 | u32 | BGuildRegNumber |  |
+| 18 | u16 | BGuildScore |  |
 
 Sent from `PineEventScriptNode::ShineGuildTorunamentResult::sa_Step` (`FUN_004f6290`) · payload 20 bytes
 
@@ -4745,7 +8159,13 @@ Sent from `PineEventScriptNode::ShineGuildTorunamentResult::sa_Step` (`FUN_004f6
 | 14 | u32 | `local_1c` |
 | 18 | u16 | `local_18` |
 
-### `0x74f0` ?
+### `0x74f0` NC_GUILD_TOURNAMENT_ITEM_PICK_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_ITEM_PICK_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | GTIiemID |  |
 
 Sent from `GuildTournamentSystem::CreateItemEffect` (`FUN_0047c1e0`) · payload 2 bytes
 
@@ -4753,7 +8173,13 @@ Sent from `GuildTournamentSystem::CreateItemEffect` (`FUN_0047c1e0`) · payload 
 |---|---|---|
 | 0 | u16 | `(undefined2)local_38` |
 
-### `0x74f1` NC_CHAR_PK_MODE_TOGGLE_REQ †
+### `0x74f1` NC_GUILD_TOURNAMENT_ITEM_EFFECT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_ITEM_EFFECT_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | GTIiemID |  |
 
 Sent from `FUN_00560670` (`FUN_00560670`) · payload 2 bytes
 
@@ -4761,7 +8187,14 @@ Sent from `FUN_00560670` (`FUN_00560670`) · payload 2 bytes
 |---|---|---|
 | 0 | u16 | `param_1` |
 
-### `0x74f2` ?
+### `0x74f2` NC_GUILD_TOURNAMENT_ITEM_FLAG_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_ITEM_FLAG_CMD`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | FlagScoreMultiple |  |
+| 1 | u32 | nGuildRegNo |  |
 
 Sent from `FUN_00479bd0` (`FUN_00479bd0`) · payload 5 bytes
 
@@ -4770,7 +8203,16 @@ Sent from `FUN_00479bd0` (`FUN_00479bd0`) · payload 5 bytes
 | 0 | u8 | `(undefined1)param_1` |
 | 1 | u32 | `*(undefined4 *)this` |
 
-### `0x74f3` ?
+### `0x74f3` NC_GUILD_TOURNAMENT_ITEM_SCAN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_TOURNAMENT_ITEM_SCAN_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNum |  |
+| 2 | PROTO_NC_GUILD_TOURNAMENT_ITEM_SCAN_CMD::Memberinfo[nNum] | Members | variable length, element PROTO_NC_GUILD_TOURNAMENT_ITEM_SCAN_CMD::Memberinfo |
+
+Element `PROTO_NC_GUILD_TOURNAMENT_ITEM_SCAN_CMD::Memberinfo` (8 bytes): +0 u32 loc.x, +4 u32 loc.y
 
 Sent from `FUN_0047a3d0` (`FUN_0047a3d0`) · payload variable (iVar5)
 
@@ -4778,7 +8220,21 @@ Sent from `FUN_0047a3d0` (`FUN_0047a3d0`) · payload variable (iVar5)
 |---|---|---|
 | 0 | u16 | `uVar10` |
 
-### `0x8c05` ?
+### `0x8c05` NC_MINIHOUSE_BUILDING_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_BUILDING_CMD`, 66 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | player |  |
+| 2 | u16 | minihouseinfo.handle |  |
+| 4 | u16 | minihouseinfo.camp.minihouse |  |
+| 6 | u8[10] | minihouseinfo.camp.dummy |  |
+| 16 | char[20] | minihouseinfo.charid | Name5 |
+| 36 | u32 | minihouseinfo.coord.xy.x |  |
+| 40 | u32 | minihouseinfo.coord.xy.y |  |
+| 44 | u8 | minihouseinfo.coord.dir |  |
+| 45 | char[21] | minihouseinfo.title |  |
 
 Sent from `FUN_00576570` (`FUN_00576570`) · payload 66 bytes
 
@@ -4801,13 +8257,33 @@ Fill: +4: FUN_0056e720 (no direct writes found)
 
 ### `0x8c0b` NC_MINIHOUSE_LOGINCOMPLETE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_LOGINCOMPLETE_ACK`, 140 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | error |  |
+| 4 | u8 | maxvisiter |  |
+| 5 | u8 | bItemInfoClose |  |
+| 6 | char[101] | sNotify |  |
+| 107 | char[32] | TargetKey |  |
+| 139 | u8 | playernum |  |
+| 140 | PROTO_NC_MINIHOUSE_LOGINCOMPLETE_ACK::<unnamed-type-player>[playernum] | player | variable length, element PROTO_NC_MINIHOUSE_LOGINCOMPLETE_ACK::<unnamed-type-player> |
+
+Element `PROTO_NC_MINIHOUSE_LOGINCOMPLETE_ACK::<unnamed-type-player>` (3 bytes): +0 u8 level, +1 u16 hnd
+
 Sent in reply to `0x8c0a` NC_MINIHOUSE_LOGINCOMPLETE_REQ on ShineObjectClass::ShinePlayer (`FUN_00571f20`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_LOGINCOMPLETE_REQ) · payload 140 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 139 | u8 | `0` |
 
-### `0x8c0d` ?
+### `0x8c0d` NC_MINIHOUSE_LOGOUTCOMPLETE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_LOGOUTCOMPLETE_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hnd |  |
 
 Sent from `FUN_00570500` (`FUN_00570500`) · payload 2 bytes
 
@@ -4817,17 +8293,32 @@ Sent from `FUN_00570500` (`FUN_00570500`) · payload 2 bytes
 
 ### `0x8c0f` NC_MINIHOUSE_VISITREADY_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_VISITREADY_ACK`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | error |  |
+| 4 | u8 | isPublic |  |
+| 5 | u8 | visitercnt |  |
+| 6 | u8 | maxvisiter |  |
+
 Sent in reply to `0x8c0e` NC_MINIHOUSE_VISITREADY_REQ on ShineObjectClass::ShinePlayer (`FUN_005719f0`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_VISITREADY_REQ) · payload 7 bytes
 
-### `0x8c14` NC_MINIHOUSE_KICKOUT_REQ †
+### `0x8c14` NC_MINIHOUSE_KICKOUT_CMD †
 
-Sent in reply to `0x8c12` NC_MINIHOUSE_KICKOUT on ShineObjectClass::ShinePlayer (`FUN_00575500`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_KICKOUT) · payload 1 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_KICKOUT_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | kick |  |
+
+Sent in reply to `0x8c12` NC_MINIHOUSE_KICKOUT_REQ † on ShineObjectClass::ShinePlayer (`FUN_00575500`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_KICKOUT) · payload 1 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u8 | `1` |
 
-### `0x8c21` ?
+### `0x8c21` NC_MINIHOUSE_REARRANGE_CMD †
 
 Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_0048a560`) · payload 19 bytes
 
@@ -4840,7 +8331,16 @@ Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_
 | 11 | u32 | `*(undefined4 *)(*(int *)(param_2 + 0x10) + 0x19)` |
 | 15 | u32 | `*(undefined4 *)(*(int *)(param_2 + 0x10) + 0x1d)` |
 
-### `0x8c24` ?
+### `0x8c24` NC_MINIHOUSE_CREATE_FURNITURE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | furniturecount |  |
+| 1 | PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD::<unnamed-type-rearrange>[furniturecount] | rearrange | variable length, element PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD::<unnamed-type-rearrange> |
+
+Element `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD::<unnamed-type-rearrange>` (21 bytes): +0 u16 furniturehandle, +2 u16 furnitureid, +4 f32 location.x, +8 f32 location.y, +12 f32 location.z, +16 f32 location.angle, +20 u8 nEndureGrade
 
 Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_0048a560`) · payload 22 bytes
 
@@ -4855,7 +8355,7 @@ Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_
 | 17 | u32 | `*(undefined4 *)(*(int *)(param_2 + 0x10) + 0x1d)` |
 | 21 | u8 | `*(undefined1 *)(*(int *)(param_2 + 0x10) + 0x25)` |
 
-### `0x8c27` ?
+### `0x8c27` NC_MINIHOUSE_DELETE_FURNITURE_CMD †
 
 Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_0048a560`) · payload 3 bytes
 
@@ -4864,11 +8364,17 @@ Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_
 | 0 | u8 | `1` |
 | 1 | u16 | `*(undefined2 *)(*(int *)(param_2 + 0x10) + 0xb)` |
 
-### `0x8c2d` ?
+### `0x8c2d` NC_MINIHOUSE_MODIFY_PASSWORD_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_PASSWORD_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | isPublic |  |
 
 Sent in reply to `0x8c2b` NC_MINIHOUSE_MODIFY_PASSWORD_REQ on ShineObjectClass::ShinePlayer (`FUN_00573200`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_MODIFY_PASSWORD_REQ) · payload 1 bytes
 
-### `0x8c30` ?
+### `0x8c30` NC_MINIHOUSE_MODIFY_TITLE_CMD †
 
 Sent in reply to `0x8c2e` NC_MINIHOUSE_MODIFY_TITLE_REQ on ShineObjectClass::ShinePlayer (`FUN_00573010`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_MODIFY_TITLE_REQ) · payload 21 bytes
 
@@ -4877,7 +8383,14 @@ Sent in reply to `0x8c2e` NC_MINIHOUSE_MODIFY_TITLE_REQ on ShineObjectClass::Shi
 | 0 | bytes[?] | `_strncpy from _Source` |
 | 20 | u8 | `0` |
 
-### `0x8c31` ?
+### `0x8c31` NC_MINIHOUSE_MODIFY_OUTSIDE_TITLE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_OUTSIDE_TITLE_CMD`, 23 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | mh_hnd |  |
+| 2 | char[21] | title |  |
 
 Sent from `ShineObjectClass::ShineMiniHouse::so_mh_SendOutSideTitleCmd` (`FUN_005447b0`) · payload 23 bytes
 
@@ -4887,15 +8400,26 @@ Sent from `ShineObjectClass::ShineMiniHouse::so_mh_SendOutSideTitleCmd` (`FUN_00
 | 2 | char[20] | `_strncpy from (char *)(param_1 + 0x168)` |
 | 22 | u8 | `0` |
 
-### `0x8c34` ?
+### `0x8c34` NC_MINIHOUSE_MODIFY_MAXENTERNUM_CMD †
 
-Sent in reply to `0x8c32` NC_ACT_INNERMH_RESET_MAX_PLAYER on ShineObjectClass::ShinePlayer (`FUN_005733c0`, ShineObjectClass::ShinePlayer::sp_NC_ACT_INNERMH_RESET_MAX_PLAYER) · payload 1 bytes
+Sent in reply to `0x8c32` NC_MINIHOUSE_MODIFY_MAXENTERNUM_REQ † on ShineObjectClass::ShinePlayer (`FUN_005733c0`, ShineObjectClass::ShinePlayer::sp_NC_ACT_INNERMH_RESET_MAX_PLAYER) · payload 1 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u8 | `in(0x8c32)+0` |
 
-### `0x8c3f` ?
+### `0x8c3f` NC_MINIHOUSE_CHAR_ACTION_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_CHAR_ACTION_CMD`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | PreHandle |  |
+| 2 | u16 | NextHandle |  |
+| 4 | u16 | nFurnitureHnd |  |
+| 6 | u16 | ActorHnd |  |
+| 8 | u8 | ActorIdx |  |
+| 9 | u8 | ActeeIdx |  |
 
 Sent in reply to `0x8c3d` NC_MINIHOUSE_CHAR_ACTION_REQ on ShineObjectClass::ShinePlayer (`FUN_00574750`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_CHAR_ACTION_REQ) · payload 10 bytes
 
@@ -4908,18 +8432,31 @@ Sent in reply to `0x8c3d` NC_MINIHOUSE_CHAR_ACTION_REQ on ShineObjectClass::Shin
 | 8 | u8 | `(char)puVar7[2]` |
 | 9 | u8 | `(char)puVar7[3]` |
 
-### `0x8c41` NC_MINIHOUSE_CHAR_ACTION_ACK †
+### `0x8c41` NC_MINIHOUSE_FURNITURE_EFFECT_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EFFECT_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEffectHandle |  |
+| 2 | u16 | err |  |
 
 Sent in reply to `0x347e` NC_ITEMDB_MINIHOUSE_EFFECT_DEMANDGOOD_ACK on GameDBSession (`FUN_0056f360`) · payload 4 bytes
 
-Sent in reply to `0x8c40` NC_MINIHOUSE_CHAR_ACTION_REQ on ShineObjectClass::ShinePlayer (`FUN_00574a30`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_CHAR_ACTION_REQ) · payload 4 bytes
+Sent in reply to `0x8c40` NC_MINIHOUSE_FURNITURE_EFFECT_REQ † on ShineObjectClass::ShinePlayer (`FUN_00574a30`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_CHAR_ACTION_REQ) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `in(0x8c40)+2` |
 | 2 | u16 | `5824` (0x16c0); `5826` (0x16c2) |
 
-### `0x8c45` ?
+### `0x8c45` NC_MINIHOUSE_MODIFY_ITEM_INFO_OPEN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_ITEM_INFO_OPEN_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bItemInfoClose |  |
 
 Sent in reply to `0x8c43` NC_MINIHOUSE_MODIFY_ITEM_INFO_OPEN_REQ on ShineObjectClass::ShinePlayer (`FUN_00573590`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_MODIFY_ITEM_INFO_OPEN_REQ) · payload 1 bytes
 
@@ -4927,7 +8464,14 @@ Sent in reply to `0x8c43` NC_MINIHOUSE_MODIFY_ITEM_INFO_OPEN_REQ on ShineObjectC
 |---|---|---|
 | 0 | u8 | `in(0x8c43)+0` |
 
-### `0x8c4a` ?
+### `0x8c4a` NC_MINIHOUSE_MODIFY_NOTIFY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_NOTIFY_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nNotifyLen |  |
+| 1 | char[nNotifyLen] | sNotify | variable length |
 
 Sent in reply to `0x8c48` NC_MINIHOUSE_MODIFY_NOTIFY_REQ on ShineObjectClass::ShinePlayer (`FUN_00573750`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_MODIFY_NOTIFY_REQ) · payload variable (byte)
 
@@ -4936,7 +8480,16 @@ Sent in reply to `0x8c48` NC_MINIHOUSE_MODIFY_NOTIFY_REQ on ShineObjectClass::Sh
 | 0 | u8 | `*pbVar8` |
 | 1 | bytes[?] | `_strncpy from (char *)(param_1 + 3)` |
 
-### `0x8c4b` ?
+### `0x8c4b` NC_MINIHOUSE_PORTAL_LIST_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_PORTAL_LIST_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPortalCnt |  |
+| 2 | PORTAL_INFO[nPortalCnt] | PortalInfo | variable length, element PORTAL_INFO |
+
+Element `PORTAL_INFO` (6 bytes): +0 u16 nPortalItemID, +2 i32 dEndTime
 
 Sent from `FUN_0056f660` (`FUN_0056f660`) · payload variable (iVar11)
 
@@ -4944,7 +8497,14 @@ Sent from `FUN_0056f660` (`FUN_0056f660`) · payload variable (iVar11)
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(param_1 + 8)` |
 
-### `0x8c4c` ?
+### `0x8c4c` NC_MINIHOUSE_PORTAL_ADD_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_PORTAL_ADD_CMD`, 6 bytes · ⚠ 2016 code uses 12 bytes: version drift or extraction error
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | NewPortal.nPortalItemID |  |
+| 2 | i32 | NewPortal.dEndTime |  |
 
 Sent from `FUN_0056fa10` (`FUN_0056fa10`) · payload 12 bytes
 
@@ -4953,7 +8513,13 @@ Sent from `FUN_0056fa10` (`FUN_0056fa10`) · payload 12 bytes
 | 0 | u16 | `*(undefined2 *)(param_1 + 6)` |
 | 2 | u32 | `*(undefined4 *)(param_1 + 9)` |
 
-### `0x8c4f` ?
+### `0x8c4f` NC_MINIHOUSE_PORTAL_DEL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_PORTAL_DEL_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPortalItemID |  |
 
 Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · payload 2 bytes
 
@@ -4963,13 +8529,28 @@ Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · pay
 
 ### `0x8c57` NC_MINIHOUSE_PORTAL_EFFECT_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_PORTAL_EFFECT_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+
 Sent in reply to `0x8c56` NC_MINIHOUSE_PORTAL_EFFECT_REQ on ShineObjectClass::ShinePlayer (`FUN_00573cf0`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_PORTAL_EFFECT_REQ) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `6608` (0x19d0); `uVar4` |
 
-### `0x8c61` ?
+### `0x8c61` NC_MINIHOUSE_FURNITURE_ENDURE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_ENDURE_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nEndureFurnitureCnt |  |
+| 1 | ENDURE_FURNITURE_INFO[nEndureFurnitureCnt] | EndureFurniture | variable length, element ENDURE_FURNITURE_INFO |
+
+Element `ENDURE_FURNITURE_INFO` (4 bytes): +0 u16 nFurnitureHnd, +2 u8 nEndureGrade, +3 u8 isRePair
 
 Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · payload variable (*(byte *)
 
@@ -4988,6 +8569,15 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_MH_FurnitureEndureUpdate` (`FUN
 
 ### `0x8c63` NC_MINIHOUSE_FURNITURE_EMOTION_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EMOTION_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nFurnitureHnd |  |
+| 2 | u8 | nPosition |  |
+| 3 | u8 | nEmotionNo |  |
+| 4 | u16 | nError |  |
+
 Sent in reply to `0x8c62` NC_MINIHOUSE_FURNITURE_EMOTION_REQ on ShineObjectClass::ShinePlayer (`FUN_00575850`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_FURNITURE_EMOTION_REQ) · payload 6 bytes
 
 | Off | Type | Value / source |
@@ -4997,7 +8587,16 @@ Sent in reply to `0x8c62` NC_MINIHOUSE_FURNITURE_EMOTION_REQ on ShineObjectClass
 | 3 | u8 | `in(0x8c62)+3` |
 | 4 | u16 | `5896` (0x1708); `uVar3` |
 
-### `0x8c64` ?
+### `0x8c64` NC_MINIHOUSE_FURNITURE_EMOTION_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EMOTION_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEmotionCnt |  |
+| 2 | FURNITURE_EMOTION_INFO[nEmotionCnt] | Emotion | variable length, element FURNITURE_EMOTION_INFO |
+
+Element `FURNITURE_EMOTION_INFO` (6 bytes): +0 u16 nPlayerHandle, +2 u16 nFurnitureHnd, +4 u8 nPosition, +5 u8 nEmotionNo
 
 Sent from `FUN_005432d0` (`FUN_005432d0`) · payload variable (iVar9)
 
@@ -5017,13 +8616,26 @@ Sent in reply to `0x8c62` NC_MINIHOUSE_FURNITURE_EMOTION_REQ on ShineObjectClass
 
 ### `0x8c66` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
 Sent in reply to `0x8c65` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_REQ on ShineObjectClass::ShinePlayer (`FUN_00575ae0`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_REQ) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `5912` (0x1718); `uVar3` |
 
-### `0x8c67` ?
+### `0x8c67` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_CMD`, 2 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nCancelEmotionCnt |  |
+| 2 | u16[nCancelEmotionCnt] | nCancelEmotion | variable length |
 
 Sent from `FUN_005431b0` (`FUN_005431b0`) · payload variable (local_18 & 0xffff)
 
@@ -5034,7 +8646,7 @@ Sent in reply to `0x8c65` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_REQ on ShineObje
 | 0 | u16 | `1` |
 | 2 | i16 | `(short)param_1[1]` |
 
-### `0x9003` ?
+### `0x9003` NC_CHARGED_BUFFSTART_CMD †
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ChargedBuff` (`FUN_005970c0`) · payload 14 bytes
 
@@ -5045,7 +8657,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ChargedBuff` (`FUN_005970c0`) �
 | 6 | u32 | `DAT_00aa43b8` |
 | 10 | u8 | `(char)local_138.tm_year + -100`; `uVar5`; `uVar5 & 0x1ffffff \| local_138.tm_min << 0x19` |
 
-### `0x9004` ?
+### `0x9004` NC_CHARGED_BUFFTERMINATE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHARGED_BUFFTERMINATE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ChargedBuffKey |  |
 
 Sent from `ChargedItemEffectList::ChargedItemEffectElement::ciee_Free` (`FUN_00450a50`) · payload 4 bytes
 
@@ -5053,7 +8671,13 @@ Sent from `ChargedItemEffectList::ChargedItemEffectElement::ciee_Free` (`FUN_004
 |---|---|---|
 | 0 | u32 | `param_2 & 0xffff` |
 
-### `0x900b` ?
+### `0x900b` NC_CHARGED_DELETEWEAPONTITLE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHARGED_DELETEWEAPONTITLE_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | licenseitem | ITEM_INVEN (union: Inven, Pos, Type) |
 
 Sent from `UseEffect::UseItemLicenseClear::uib_DirectUse` (`FUN_00599880`) · payload 2 bytes
 
@@ -5061,7 +8685,13 @@ Sent from `UseEffect::UseItemLicenseClear::uib_DirectUse` (`FUN_00599880`) · pa
 |---|---|---|
 | 0 | u16 | `param_2 & 0x3ff \| 0x2400` |
 
-### `0x900c` ?
+### `0x900c` NC_CHARGED_STAT_INITIALIZE_SUC_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHARGED_STAT_INITIALIZE_SUC_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | remain |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_InitFreeStat` (`FUN_00518ab0`) · payload 1 bytes
 
@@ -5069,7 +8699,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_InitFreeStat` (`FUN_00518ab0`) 
 |---|---|---|
 | 0 | u8 | `(char)uVar1 - (char)iVar4` |
 
-### `0x900d` ?
+### `0x900d` NC_CHARGED_SKILLEMPOW_INITIALIZE_SUC_CMD †
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_InitSkillEmpow` (`FUN_00518c00`) · payload 1 bytes
 
@@ -5077,7 +8707,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_InitSkillEmpow` (`FUN_00518c00`
 |---|---|---|
 | 0 | u8 | `cVar2 - (char)iVar4` |
 
-### `0x9010` ?
+### `0x9010` NC_CHARGED_BOOTHSLOTSIZE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHARGED_BOOTHSLOTSIZE_CMD`, 1 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | boothsize |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_SendBoothSize` (`FUN_00535390`) · payload 1 bytes
 
@@ -5085,7 +8721,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_SendBoothSize` (`FUN_00535390`)
 |---|---|---|
 | 0 | u8 | `(char)param_1[0xa9d7]` |
 
-### `0x941b` ?
+### `0x941b` NC_HOLY_PROMISE_REWARD_MONEY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_REWARD_MONEY_CMD`, 28 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | MemberCharID | Name5 |
+| 20 | u64 | nMoney |  |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_HolyPromiseCenFrom` (`FUN_00483aa0`) · payload 28 bytes
 
@@ -5101,6 +8744,13 @@ Sent from `ShineObjectClass::ShinePlayer::sp_HolyPromiseCenFrom` (`FUN_00483aa0`
 
 ### `0x943d` NC_HOLY_PROMISE_GET_CEN_REWARD_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_GET_CEN_REWARD_ACK`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u64 | nMoney |  |
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_HolyPromiseGetCenReward` (`FUN_00483dd0`) · payload 10 bytes
 
 | Off | Type | Value / source |
@@ -5111,6 +8761,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_HolyPromiseGetCenReward` (`FUN_
 
 ### `0x9441` NC_HOLY_PROMISE_WITHDRAW_CEN_REWARD_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_HOLY_PROMISE_WITHDRAW_CEN_REWARD_ACK`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u64 | nMoney |  |
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_HolyPromiseGetCenReward` (`FUN_00484100`) · payload 10 bytes
 
 | Off | Type | Value / source |
@@ -5120,6 +8777,17 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_HolyPromiseGetCenReward` (`FUN_
 | 6 | u32 | `*(undefined4 *)(param_1 + 0xc)` |
 
 ### `0x986e` NC_GUILD_ACADEMY_REWARD_STORAGE_OPEN_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_REWARD_STORAGE_OPEN_ACK`, 11 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u64 | cen |  |
+| 10 | u8 | itemcounter |  |
+| 11 | PROTO_ITEMPACKET_INFORM[itemcounter] | itemarray | variable length, element PROTO_ITEMPACKET_INFORM |
+
+Element `PROTO_ITEMPACKET_INFORM` (106 bytes): +0 u8 datasize, +1 u16 location, +3 u16 info.itemid, +5 byte[101] info.itemattr
 
 Sent from `FUN_004708b0` (`FUN_004708b0`) · payload variable (iVar4 + 0xd)
 
@@ -5140,7 +8808,16 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GuildAcademyRewardStorageError` (`F
 | 6 | u32 | `0` |
 | 10 | u8 | `0` |
 
-### `0xa40c` ?
+### `0xa40c` NC_INSTANCE_DUNGEON_LEVEL_SELECT_MENU_REQ †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_LEVEL_SELECT_MENU_REQ`, 15 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNPCHandle |  |
+| 2 | char[12] | sMapIndex | Name3 |
+| 14 | u8 | nMenuCount |  |
+| 15 | i32[nMenuCount] | eLevelType | variable length |
 
 Sent in reply to `0xa409` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ACK on WorldManagerSession (`FUN_00485540`, WorldManagerSession::wms_NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ACK) · payload variable (iVar1)
 
@@ -5165,6 +8842,18 @@ Sent in reply to `0xa40f` NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_ACK on WorldMana
 
 ### `0xa413` ?
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_INSTANCE_DUNGEON_RANK_SAVE_DB_CMD`, 19 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[12] | sIndunInfo.MapIDClient | Name3 |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
+| 13 | u32 | nPlayTime |  |
+| 17 | u16 | nRankCount |  |
+| 19 | SHINE_INDUN_RANK[nRankCount] | ranks | variable length, element SHINE_INDUN_RANK |
+
+Element `SHINE_INDUN_RANK` (32 bytes): +0 u32 nCharRegNum, +8 u64 nDamageDealt, +16 u64 nDamageTaken, +24 u64 nHealingDone
+
 Sent from `FUN_005ee4d0` (`FUN_005ee4d0`) · payload variable (iVar5)
 
 | Off | Type | Value / source |
@@ -5176,6 +8865,24 @@ Sent from `FUN_005ee4d0` (`FUN_005ee4d0`) · payload variable (iVar5)
 | 17 | u16 | `0`; `*(short *)(puVar2 + 0x13) + 1` |
 
 ### `0xac02` NC_DICE_TAISAI_GAME_JOIN_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_GAME_JOIN_ACK`, 50 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | DiceTaiSaiInfo[7] | DiceHistory | element DiceTaiSaiInfo |
+| 23 | i32 | nGameStatus |  |
+| 27 | i32 | bModeType |  |
+| 31 | u16 | nTimer |  |
+| 33 | u32 | nInterval |  |
+| 37 | u16 | nGetSysRate |  |
+| 39 | u64 | nMaxBetMoney |  |
+| 47 | u16 | nUseMinLv |  |
+| 49 | u8 | nGamerCnt |  |
+| 50 | u16[nGamerCnt] | nGamerHnd | variable length |
+
+Element `DiceTaiSaiInfo` (3 bytes): +0 u8[3] nNumber
 
 Sent from `FUN_005119d0` (`FUN_005119d0`) · payload 50 bytes
 
@@ -5190,7 +8897,13 @@ Sent in reply to `0xac01` NC_DICE_TAISAI_GAME_JOIN_REQ on ShineObjectClass::Shin
 |---|---|---|
 | 0 | u16 | `7296` (0x1c80); `7300` (0x1c84) |
 
-### `0xac03` ?
+### `0xac03` NC_DICE_TAISAI_GAME_JOIN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_GAME_JOIN_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPlayerHnd |  |
 
 Sent from `FUN_00512040` (`FUN_00512040`) · payload 2 bytes
 
@@ -5198,7 +8911,17 @@ Sent from `FUN_00512040` (`FUN_00512040`) · payload 2 bytes
 |---|---|---|
 | 0 | i16 | `(short)param_1[1]` |
 
-### `0xac04` ?
+### `0xac04` NC_DICE_TAISAI_GAME_BETTING_INFO_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_GAME_BETTING_INFO_CMD`, 3 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | PartMask |  |
+| 1 | u16 | nBettingCnt |  |
+| 3 | BettingInfo[nBettingCnt] | Betting | variable length, element BettingInfo |
+
+Element `BettingInfo` (10 bytes): +0 u16 nPlayerHnd, +2 i32 nBetting, +6 u32 nMoney
 
 Sent from `FUN_00511c70` (`FUN_00511c70`) · payload variable (iVar12 + 0xc)
 
@@ -5209,13 +8932,26 @@ Sent from `FUN_00511c70` (`FUN_00511c70`) · payload variable (iVar12 + 0xc)
 
 ### `0xac06` NC_DICE_TAISAI_GAME_LEAVE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_GAME_LEAVE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
 Sent from `FUN_00514860` (`FUN_00514860`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `7312` (0x1c90) |
 
-### `0xac07` ?
+### `0xac07` NC_DICE_TAISAI_GAME_LEAVE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_GAME_LEAVE_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bReserve |  |
+| 1 | u16 | nPlayerHnd |  |
 
 Sent from `FUN_00512460` (`FUN_00512460`) · payload 3 bytes
 
@@ -5224,11 +8960,26 @@ Sent from `FUN_00512460` (`FUN_00512460`) · payload 3 bytes
 | 0 | u8 | `param_2` |
 | 1 | i16 | `(short)param_1[1]` |
 
-### `0xac0a` ?
+### `0xac0a` NC_DICE_TAISAI_BOARD_FOLD_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_BOARD_FOLD_CMD`, 0 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| | | (empty) | |
 
 Sent from `FUN_005143e0` (`FUN_005143e0`) · payload 1 bytes
 
-### `0xac0e` ?
+### `0xac0e` NC_DICE_TAISAI_EXPECT_INCOME_MONEY_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_EXPECT_INCOME_MONEY_ACK`, 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nInvenSlot | ITEM_INVEN (union: Inven, Pos, Type) |
+| 4 | u32 | nGameCnt |  |
+| 8 | u64 | nExpectIncomeMoney |  |
 
 Sent from `FUN_005111a0` (`FUN_005111a0`) · payload 16 bytes
 
@@ -5246,7 +8997,15 @@ Sent in reply to `0xac0b` NC_DICE_TAISAI_EXPECT_INCOME_MONEY_REQ on ShineObjectC
 |---|---|---|
 | 0 | u16 | `7424` (0x1d00); `7427` (0x1d03) |
 
-### `0xac12` ?
+### `0xac12` NC_DICE_TAISAI_RECEIPT_INCOME_MONEY_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_RECEIPT_INCOME_MONEY_ACK`, 12 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nInvenSlot | ITEM_INVEN (union: Inven, Pos, Type) |
+| 4 | u64 | ReceiptIncomeMoney |  |
 
 Sent from `FUN_00511230` (`FUN_00511230`) · payload 12 bytes
 
@@ -5265,6 +9024,13 @@ Sent in reply to `0xac0f` NC_DICE_TAISAI_RECEIPT_INCOME_MONEY_REQ on ShineObject
 
 ### `0xac14` NC_DICE_TAISAI_GAME_MODE_CHANGE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_GAME_MODE_CHANGE_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | i32 | bModeType |  |
+
 Sent in reply to `0xac13` NC_DICE_TAISAI_GAME_MODE_CHANGE_REQ on ShineObjectClass::ShinePlayer (`FUN_00515890`, ShineObjectClass::ShinePlayer::sp_NC_DICE_TAISAI_GAME_MODE_CHANGE_REQ) · payload 6 bytes
 
 | Off | Type | Value / source |
@@ -5273,13 +9039,31 @@ Sent in reply to `0xac13` NC_DICE_TAISAI_GAME_MODE_CHANGE_REQ on ShineObjectClas
 
 ### `0xac15` ?
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_GAME_MODE_CHANGE_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | bModeType |  |
+
 Sent from `FUN_00512660` (`FUN_00512660`) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u32 | `this[0xc734]` |
 
-### `0xac19` ?
+### `0xac19` NC_DICE_TAISAI_RANK_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_RANK_ACK`, 484 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8 | nRankHistoryCnt |  |
+| 3 | DiceRankInfo[20] | RankHistory | element DiceRankInfo |
+| 483 | u8 | nRankCurrCnt |  |
+| 484 | DiceRankInfo[nRankCurrCnt] | RankCurr | variable length, element DiceRankInfo |
+
+Element `DiceRankInfo` (24 bytes): +0 char[20] sCharID, +20 u32 nWinCnt
 
 Sent from `FUN_00514070` (`FUN_00514070`) · payload variable (iVar4)
 
@@ -5297,6 +9081,13 @@ Sent in reply to `0xac16` NC_DICE_TAISAI_RANK_REQ on ShineObjectClass::ShinePlay
 
 ### `0xac1b` NC_DICE_TAISAI_BETTING_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_BETTING_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nBettingIndex |  |
+
 Sent in reply to `0xac1a` NC_DICE_TAISAI_BETTING_REQ on ShineObjectClass::ShinePlayer (`FUN_00515c40`, ShineObjectClass::ShinePlayer::sp_NC_DICE_TAISAI_BETTING_REQ) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -5304,7 +9095,15 @@ Sent in reply to `0xac1a` NC_DICE_TAISAI_BETTING_REQ on ShineObjectClass::ShineP
 | 0 | u16 | `7344` (0x1cb0); `7345` (0x1cb1); `7346` (0x1cb2); `7348` (0x1cb4) |
 | 2 | u16 | `in(0xac1a)+8` |
 
-### `0xac1c` ?
+### `0xac1c` NC_DICE_TAISAI_BETTING_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_BETTING_CMD`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPlayerHnd |  |
+| 2 | i32 | BettingInfo.nBetting |  |
+| 6 | u32 | BettingInfo.nMoney |  |
 
 Sent from `FUN_005131f0` (`FUN_005131f0`) · payload 10 bytes
 
@@ -5316,6 +9115,13 @@ Sent from `FUN_005131f0` (`FUN_005131f0`) · payload 10 bytes
 
 ### `0xac1e` NC_DICE_TAISAI_BETTING_CANCEL_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_BETTING_CANCEL_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nBettingCancelIndex |  |
+
 Sent in reply to `0xac1d` NC_DICE_TAISAI_BETTING_CANCEL_REQ on ShineObjectClass::ShinePlayer (`FUN_00515ee0`, ShineObjectClass::ShinePlayer::sp_NC_DICE_TAISAI_BETTING_CANCEL_REQ) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -5323,7 +9129,15 @@ Sent in reply to `0xac1d` NC_DICE_TAISAI_BETTING_CANCEL_REQ on ShineObjectClass:
 | 0 | u16 | `7360` (0x1cc0); `7361` (0x1cc1); `7362` (0x1cc2); `7364` (0x1cc4) |
 | 2 | u16 | `in(0xac1d)+8` |
 
-### `0xac1f` ?
+### `0xac1f` NC_DICE_TAISAI_BETTING_CANCEL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_BETTING_CANCEL_CMD`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPlayerHnd |  |
+| 2 | i32 | BettingCancelInfo.nBetting |  |
+| 6 | u32 | BettingCancelInfo.nMoney |  |
 
 Sent from `FUN_00513570` (`FUN_00513570`) · payload 10 bytes
 
@@ -5333,7 +9147,13 @@ Sent from `FUN_00513570` (`FUN_00513570`) · payload 10 bytes
 | 2 | i32 | `*param_2` |
 | 6 | i32 | `param_2[1]` |
 
-### `0xac22` ?
+### `0xac22` NC_DICE_TAISAI_DICE_ROLL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_DICE_ROLL_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
 
 Sent from `FUN_005138d0` (`FUN_005138d0`) · payload 2 bytes
 
@@ -5341,7 +9161,14 @@ Sent from `FUN_005138d0` (`FUN_005138d0`) · payload 2 bytes
 |---|---|---|
 | 0 | u16 | `7392` (0x1ce0); `7393` (0x1ce1) |
 
-### `0xac26` ?
+### `0xac26` NC_DICE_TAISAI_DICE_ROLL_RESULT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_DICE_ROLL_RESULT_CMD`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8[3] | nDiceInfo.nNumber |  |
 
 Sent from `FUN_00513d00` (`FUN_00513d00`) · payload 5 bytes
 
@@ -5351,7 +9178,16 @@ Sent from `FUN_00513d00` (`FUN_00513d00`) · payload 5 bytes
 | 2 | u16 | `*(undefined2 *)(param_1 + 0xc756)` |
 | 4 | u8 | `*(undefined1 *)(param_1 + 0xc758)` |
 
-### `0xac27` ?
+### `0xac27` NC_DICE_TAISAI_DICE_ROLL_RESULT_EMOTION_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_DICE_ROLL_RESULT_EMOTION_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nGamerCnt |  |
+| 1 | EmotionInfo[nGamerCnt] | Emotion | variable length, element EmotionInfo |
+
+Element `EmotionInfo` (6 bytes): +0 u16 nGamerHnd, +2 u32 nEmotion
 
 Sent from `FUN_00513e00` (`FUN_00513e00`) · payload variable (local_11 * 6 + 3)
 
@@ -5359,7 +9195,16 @@ Sent from `FUN_00513e00` (`FUN_00513e00`) · payload variable (local_11 * 6 + 3)
 |---|---|---|
 | 0 | u8 | `0`; `local_11` |
 
-### `0xac2a` ?
+### `0xac2a` NC_DICE_TAISAI_LARGE_AMOUNT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_LARGE_AMOUNT_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nGamerCnt |  |
+| 1 | LargeAmountInfo[nGamerCnt] | LargeAmount | variable length, element LargeAmountInfo |
+
+Element `LargeAmountInfo` (6 bytes): +0 u16 nGamerHnd, +2 u32 nMoney
 
 Sent from `FUN_00514280` (`FUN_00514280`) · payload variable (local_18 & 0xff)
 
@@ -5367,7 +9212,14 @@ Sent from `FUN_00514280` (`FUN_00514280`) · payload variable (local_18 & 0xff)
 |---|---|---|
 | 0 | u8 | `0`; `(char)local_18` |
 
-### `0xac2b` ?
+### `0xac2b` NC_DICE_TAISAI_BET_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_BET_START_CMD`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | bModeType |  |
+| 4 | u8[3] | CurrentRollingDice.nNumber |  |
 
 Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · payload 7 bytes
 
@@ -5377,7 +9229,13 @@ Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · pay
 | 4 | u16 | `*(undefined2 *)(param_1 + 0xc756)` |
 | 6 | u8 | `(char)param_1[0x31d6]` |
 
-### `0xb021` ?
+### `0xb021` NC_RAID_MAPOUT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_MAPOUT_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sCharID | Name5 |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · payload 20 bytes
 
@@ -5389,11 +9247,31 @@ Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · pa
 | 12 | u32 | `puVar6[3]` |
 | 16 | u32 | `puVar6[4]` |
 
-### `0xb022` ?
+### `0xb022` NC_RAID_MEMBERINFORM_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_MEMBERINFORM_CMD`, 16 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPartyNo |  |
+| 2 | u8 | nPartyIndex |  |
+| 3 | u8 | nSlotIndex |  |
+| 4 | u32 | hp |  |
+| 8 | u32 | sp |  |
+| 12 | u32 | lp |  |
 
 Sent from `FUN_005cd8f0` (`FUN_005cd8f0`) · payload 16 bytes
 
-### `0xb023` ?
+### `0xb023` NC_RAID_MEMBERCLASS_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_MEMBERCLASS_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nNum |  |
+| 1 | RAID_MEMBERCLASS[nNum] | RaidMembers | variable length, element RAID_MEMBERCLASS |
+
+Element `RAID_MEMBERCLASS` (58 bytes): +0 u16 nPartyNo, +2 u8 nPartyIndex, +3 u8 nSlotIndex, +4 char[20] charid, +24 u8 chrclass, +25 u8 level, +26 u32 maxhp, +30 u32 maxsp, +34 u32 maxlp, +38 u32 hp, +42 u32 sp, +46 u32 lp, +50 u32 loc.x, +54 u32 loc.y
 
 Sent from `FUN_005cd9c0` (`FUN_005cd9c0`) · payload 59 bytes
 
@@ -5405,7 +9283,16 @@ Fill: +1: FUN_005cd5a0 (no direct writes found)
 |---|---|---|
 | 0 | u8 | `1` |
 
-### `0xb026` ?
+### `0xb026` NC_RAID_LOCATION_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_RAID_LOCATION_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nNum |  |
+| 1 | PROTO_NC_RAID_LOCATION_CMD::Memberinfo[nNum] | RaidMembers | variable length, element PROTO_NC_RAID_LOCATION_CMD::Memberinfo |
+
+Element `PROTO_NC_RAID_LOCATION_CMD::Memberinfo` (12 bytes): +0 u16 nPartyNo, +2 u8 nPartyIndex, +3 u8 nSlotIndex, +4 u32 loc.x, +8 u32 loc.y
 
 Sent from `FUN_005cdb50` (`FUN_005cdb50`) · payload 13 bytes
 
@@ -5424,7 +9311,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeCharIDUseAck` (`FUN_0051b
 | 0 | u16 | `*(undefined2 *)(param_1 + 6)` |
 | 2 | u16 | `*(undefined2 *)(param_1 + 10)` |
 
-### `0xbc04` ?
+### `0xbc04` NC_GAMBLE_COIN_CHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_COIN_CHANGE_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nCoin |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_Gamble_ChangeCoin` (`FUN_00617260`) · payload 8 bytes
 
@@ -5433,7 +9326,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_Gamble_ChangeCoin` (`FUN_00617260`)
 | 0 | i32 | `param_1[0xaa9c]` |
 | 4 | i32 | `param_1[0xaa9d]` |
 
-### `0xbc05` ?
+### `0xbc05` NC_GAMBLE_EXCHANGECOIN_CHANGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_EXCHANGECOIN_CHANGE_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nExchangeCoin |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_Gamble_ChangeExchangedCoin` (`FUN_00617360`) · payload 8 bytes
 
@@ -5444,6 +9343,15 @@ Sent from `ShineObjectClass::ShinePlayer::so_Gamble_ChangeExchangedCoin` (`FUN_0
 
 ### `0xbc18` NC_GAMBLE_TYPE_AND_WHERE_STAND_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_TYPE_AND_WHERE_STAND_ACK`, 9 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nNpcHandle |  |
+| 4 | i32 | nGambleType |  |
+| 8 | u8 | nWhereStand |  |
+
 Sent in reply to `0xbc17` NC_GAMBLE_TYPE_AND_WHERE_STAND_REQ on ShineObjectClass::ShinePlayer (`FUN_00616dd0`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_TYPE_AND_WHERE_STAND_REQ) · payload 9 bytes
 
 | Off | Type | Value / source |
@@ -5452,7 +9360,13 @@ Sent in reply to `0xbc17` NC_GAMBLE_TYPE_AND_WHERE_STAND_REQ on ShineObjectClass
 | 2 | u16 | `in(0xbc17)+0` |
 | 8 | u8 | `255` (0xff) |
 
-### `0xbc1b` ?
+### `0xbc1b` NC_GAMBLE_COIN_USE_COINITEM_MESSAGE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_COIN_USE_COINITEM_MESSAGE_CMD`, 8 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nAddCoin |  |
 
 Sent in reply to `0xbc1a` NC_GAMBLE_COIN_DB_USE_COINITEM_ACK on GameDBSession (`FUN_00617c90`, ShineObjectClass::ShinePlayer::gds_NC_GAMBLE_COIN_DB_USE_COINITEM_ACK) · payload 8 bytes
 
@@ -5461,7 +9375,14 @@ Sent in reply to `0xbc1a` NC_GAMBLE_COIN_DB_USE_COINITEM_ACK on GameDBSession (`
 | 0 | u32 | `*(undefined4 *)(param_1 + 8)` |
 | 4 | u32 | `*(undefined4 *)(param_1 + 0xc)` |
 
-### `0xbc1c` ?
+### `0xbc1c` NC_GAMBLE_ENTER_PLAYER_DIRECT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_ENTER_PLAYER_DIRECT_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u8 | nDirect |  |
 
 Sent from `FUN_00553510` (`FUN_00553510`) · payload 3 bytes
 
@@ -5470,7 +9391,14 @@ Sent from `FUN_00553510` (`FUN_00553510`) · payload 3 bytes
 | 0 | u16 | `*(undefined2 *)(this + 4)` |
 | 2 | u8 | `**(undefined1 **)(this + 0x6a)` |
 
-### `0xbc1e` ?
+### `0xbc1e` NC_GAMBLE_PLAYERACT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_PLAYERACT_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | playerhandle |  |
+| 2 | u32 | effect_body |  |
 
 Sent from `CGambleObject::go_PlayerAction` (`FUN_00615180`) · payload 6 bytes
 
@@ -5480,6 +9408,24 @@ Sent from `CGambleObject::go_PlayerAction` (`FUN_00615180`) · payload 6 bytes
 | 2 | u32 | `*(undefined4 *)(iVar1 + 8)` |
 
 ### `0xbc65` NC_GAMBLE_DICE_TAISAI_GAME_JOIN_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_GAME_JOIN_ACK`, 50 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | DiceTaiSaiInfo[7] | DiceHistory | element DiceTaiSaiInfo |
+| 23 | i32 | nGameStatus |  |
+| 27 | i32 | bModeType |  |
+| 31 | u16 | nTimer |  |
+| 33 | u32 | nInterval |  |
+| 37 | u16 | nGetSysRate |  |
+| 39 | u64 | nMaxBetMoney |  |
+| 47 | u16 | nUseMinLv |  |
+| 49 | u8 | nGamerCnt |  |
+| 50 | u16[nGamerCnt] | nGamerHnd | variable length |
+
+Element `DiceTaiSaiInfo` (3 bytes): +0 u8[3] nNumber
 
 Sent from `CGambleDiceTaiSaiObject::go_SendGameInfo` (`FUN_006183d0`) · payload variable (iVar4)
 
@@ -5515,11 +9461,27 @@ Sent in reply to `0xbc64` NC_GAMBLE_DICE_TAISAI_GAME_JOIN_REQ on ShineObjectClas
 |---|---|---|
 | 0 | u16 | `9744` (0x2610); `9747` (0x2613); `9748` (0x2614); `9749` (0x2615); `uVar7` |
 
-### `0xbc66` ?
+### `0xbc66` NC_GAMBLE_DICE_TAISAI_GAME_JOIN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_GAME_JOIN_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPlayerHnd |  |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadEnter` (`FUN_00618a80`) · payload 2 bytes
 
-### `0xbc67` ?
+### `0xbc67` NC_GAMBLE_DICE_TAISAI_GAME_BETTING_INFO_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_GAME_BETTING_INFO_CMD`, 3 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | PartMask |  |
+| 1 | u16 | nBettingCnt |  |
+| 3 | GDT_BettingInfo[nBettingCnt] | Betting | variable length, element GDT_BettingInfo |
+
+Element `GDT_BettingInfo` (10 bytes): +0 u16 nPlayerHnd, +2 i32 nBetting, +6 u32 nMoney
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_SendTaiSaiBettingInfo` (`FUN_006185f0`) · payload variable (iVar12 + 0xc)
 
@@ -5530,13 +9492,26 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_SendTaiSaiBettingInfo` (`FUN_006185f0`
 
 ### `0xbc69` NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
 Sent from `CGambleDiceTaiSaiObject::GDTSO_ExcuteLeaveGame` (`FUN_0061b020`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `9760` (0x2620) |
 
-### `0xbc6a` ?
+### `0xbc6a` NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_CMD`, 3 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bReserve |  |
+| 1 | u16 | nPlayerHnd |  |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadOut` (`FUN_00618c40`) · payload 3 bytes
 
@@ -5545,11 +9520,31 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadOut` (`FUN_00618c40`) 
 | 0 | u8 | `param_2` |
 | 1 | i16 | `(short)param_1[1]` |
 
-### `0xbc6e` ?
+### `0xbc6e` NC_GAMBLE_DICE_TAISAI_ALL_RANK_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_ALL_RANK_ACK`, 3 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8 | nRankAllCnt |  |
+| 3 | GDT_DiceRankInfo[nRankAllCnt] | RankAll | variable length, element GDT_DiceRankInfo |
+
+Element `GDT_DiceRankInfo` (24 bytes): +0 char[20] sCharID, +20 u32 nWinCnt
 
 Sent in reply to `0xbc6d` NC_GAMBLE_DICE_TAISAI_DB_ALL_RANK_ACK on GameDBSession (`FUN_0061da70`, GameDBSession::gds_NC_GAMBLE_DICE_TAISAI_DB_ALL_RANK_ACK) · payload 3 bytes
 
 ### `0xbc70` NC_GAMBLE_DICE_TAISAI_CURR_RANK_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_CURR_RANK_ACK`, 3 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8 | nRankCurrCnt |  |
+| 3 | GDT_DiceRankInfo[nRankCurrCnt] | RankCurr | variable length, element GDT_DiceRankInfo |
+
+Element `GDT_DiceRankInfo` (24 bytes): +0 char[20] sCharID, +20 u32 nWinCnt
 
 Sent in reply to `0xbc6f` NC_GAMBLE_DICE_TAISAI_CURR_RANK_REQ on ShineObjectClass::ShinePlayer (`FUN_0061d2f0`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_DICE_TAISAI_CURR_RANK_REQ) · payload 3 bytes
 
@@ -5559,6 +9554,13 @@ Sent in reply to `0xbc6f` NC_GAMBLE_DICE_TAISAI_CURR_RANK_REQ on ShineObjectClas
 
 ### `0xbc72` NC_GAMBLE_DICE_TAISAI_BETTING_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_BETTING_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nBettingIndex |  |
+
 Sent in reply to `0xbc71` NC_GAMBLE_DICE_TAISAI_BETTING_REQ on ShineObjectClass::ShinePlayer (`FUN_0061d470`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_DICE_TAISAI_BETTING_REQ) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -5566,7 +9568,15 @@ Sent in reply to `0xbc71` NC_GAMBLE_DICE_TAISAI_BETTING_REQ on ShineObjectClass:
 | 0 | u16 | `9776` (0x2630); `9777` (0x2631); `9778` (0x2632); `9779` (0x2633) |
 | 2 | u16 | `in(0xbc71)+8` |
 
-### `0xbc73` ?
+### `0xbc73` NC_GAMBLE_DICE_TAISAI_BETTING_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_BETTING_CMD`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPlayerHnd |  |
+| 2 | i32 | BettingInfo.nBetting |  |
+| 6 | u32 | BettingInfo.nMoney |  |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadBetting` (`FUN_00619080`) · payload 10 bytes
 
@@ -5578,6 +9588,13 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadBetting` (`FUN_0061908
 
 ### `0xbc75` NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | nBettingCancelIndex |  |
+
 Sent in reply to `0xbc74` NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_REQ on ShineObjectClass::ShinePlayer (`FUN_0061d6d0`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_REQ) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -5585,7 +9602,15 @@ Sent in reply to `0xbc74` NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_REQ on ShineObjec
 | 0 | u16 | `9792` (0x2640); `9793` (0x2641); `9794` (0x2642); `9796` (0x2644) |
 | 2 | u16 | `in(0xbc74)+8` |
 
-### `0xbc76` ?
+### `0xbc76` NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_CMD`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPlayerHnd |  |
+| 2 | i32 | BettingCancelInfo.nBetting |  |
+| 6 | u32 | BettingCancelInfo.nMoney |  |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadBettingCancel` (`FUN_00619450`) · payload 10 bytes
 
@@ -5595,7 +9620,13 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadBettingCancel` (`FUN_0
 | 2 | u32 | `*param_2` |
 | 6 | u32 | `param_2[1]` |
 
-### `0xbc77` ?
+### `0xbc77` NC_GAMBLE_DICE_TAISAI_DICE_ROLL_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_DICE_ROLL_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadDiceRoll` (`FUN_00619fc0`) · payload 2 bytes
 
@@ -5603,7 +9634,14 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadDiceRoll` (`FUN_00619f
 |---|---|---|
 | 0 | u16 | `9824` (0x2660); `uVar9` |
 
-### `0xbc7b` ?
+### `0xbc7b` NC_GAMBLE_DICE_TAISAI_DICE_ROLL_RESULT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_DICE_ROLL_RESULT_CMD`, 5 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u8[3] | nDiceInfo.nNumber |  |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadResult_DiceRoll` (`FUN_0061abe0`) · payload 5 bytes
 
@@ -5613,7 +9651,16 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadResult_DiceRoll` (`FUN
 | 2 | u16 | `*(undefined2 *)(param_1 + 0x66)` |
 | 4 | u8 | `*(undefined1 *)(param_1 + 0x68)` |
 
-### `0xbc7c` ?
+### `0xbc7c` NC_GAMBLE_DICE_TAISAI_DICE_ROLL_RESULT_EMOTION_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_DICE_ROLL_RESULT_EMOTION_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nGamerCnt |  |
+| 1 | GDT_EmotionInfo[nGamerCnt] | Emotion | variable length, element GDT_EmotionInfo |
+
+Element `GDT_EmotionInfo` (6 bytes): +0 u16 nGamerHnd, +2 u32 nEmotion
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadEmotion_DiceRoll` (`FUN_0061ad40`) · payload variable (bVar7 * 6 + 3)
 
@@ -5621,7 +9668,16 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadEmotion_DiceRoll` (`FU
 |---|---|---|
 | 0 | u8 | `0`; `bVar7` |
 
-### `0xbc7f` ?
+### `0xbc7f` NC_GAMBLE_DICE_TAISAI_LARGE_AMOUNT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_LARGE_AMOUNT_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nGamerCnt |  |
+| 1 | GDT_LargeAmountInfo[nGamerCnt] | LargeAmount | variable length, element GDT_LargeAmountInfo |
+
+Element `GDT_LargeAmountInfo` (6 bytes): +0 u16 nGamerHnd, +2 u32 nMoney
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadLargeAmount` (`FUN_0061b2c0`) · payload variable (iVar6)
 
@@ -5629,7 +9685,14 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadLargeAmount` (`FUN_006
 |---|---|---|
 | 0 | u8 | `0`; `(char)uVar10` |
 
-### `0xbc80` ?
+### `0xbc80` NC_GAMBLE_DICE_TAISAI_BET_START_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_BET_START_CMD`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | bModeType |  |
+| 4 | u8[3] | CurrentRollingDice.nNumber |  |
 
 Sent from `CGambleDiceTaiSaiObject::go_Routine` (`FUN_006181e0`) · payload 7 bytes
 
@@ -5639,7 +9702,15 @@ Sent from `CGambleDiceTaiSaiObject::go_Routine` (`FUN_006181e0`) · payload 7 by
 | 4 | u16 | `*(undefined2 *)(param_1 + 0x66)` |
 | 6 | u8 | `(char)param_1[0x1a]` |
 
-### `0xbc81` ?
+### `0xbc81` NC_GAMBLE_DICE_TAISAI_TIMER_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_TIMER_CMD`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsStart |  |
+| 1 | u16 | nTimer |  |
+| 3 | u32 | nInterval |  |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadSetTimer` (`FUN_006195d0`) · payload 7 bytes
 
@@ -5651,13 +9722,26 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadSetTimer` (`FUN_006195
 
 ### `0xbcc9` NC_GAMBLE_SLOTMACHINE_GAME_JOIN_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_GAME_JOIN_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | BettingUnit |  |
+| 2 | u16 | nError |  |
+
 Sent in reply to `0xbcc8` NC_GAMBLE_SLOTMACHINE_GAME_JOIN_REQ on ShineObjectClass::ShinePlayer (`FUN_0061e400`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_GAME_JOIN_REQ) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 2 | u16 | `10432` (0x28c0); `10433` (0x28c1); `10436` (0x28c4); `10437` (0x28c5); `10438` (0x28c6); `uVar6` |
 
-### `0xbccb` NC_SLOTMACHINE_GAME_LEAVE_REQ †
+### `0xbccb` NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
 
 Sent in reply to `0xbcca` NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_REQ on ShineObjectClass::ShinePlayer (`FUN_0061e660`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_REQ) · payload 2 bytes
 
@@ -5667,9 +9751,22 @@ Sent in reply to `0xbcca` NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_REQ on ShineObjectCla
 
 ### `0xbccd` NC_GAMBLE_SLOTMACHINE_START_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_START_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_SlotMachineDBResult` (`FUN_00620560`) · payload 2 bytes
 
 ### `0xbccf` NC_GAMBLE_SLOTMACHINE_STOPBUTTON_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_STOPBUTTON_ACK`, 11 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | byte[9] | screen.Card | nested array uchar[3][3] |
 
 Sent in reply to `0xbcce` NC_GAMBLE_SLOTMACHINE_STOPBUTTON_REQ on ShineObjectClass::ShinePlayer (`FUN_0061e980`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_STOPBUTTON_REQ) · payload 11 bytes
 
@@ -5682,6 +9779,16 @@ Sent in reply to `0xbcce` NC_GAMBLE_SLOTMACHINE_STOPBUTTON_REQ on ShineObjectCla
 
 ### `0xbcd1` NC_GAMBLE_SLOTMACHINE_WHEELSTOP_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_WHEELSTOP_ACK`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u16 | bet |  |
+| 4 | u32 | win |  |
+| 8 | u8 | WinLine._789|_456|_123|_741|_852|_963|_753|_951 | bits _789:1@0, _456:1@1, _123:1@2, _741:1@3, _852:1@4, _963:1@5, _753:1@6, _951:1@7 |
+| 9 | u8 | WinLine.all|bonus|jackpot | bits all:1@0, bonus:1@1, jackpot:1@2 |
+
 Sent in reply to `0xbcd0` NC_GAMBLE_SLOTMACHINE_WHEELSTOP_REQ on ShineObjectClass::ShinePlayer (`FUN_0061eaf0`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_WHEELSTOP_REQ) · payload 10 bytes
 
 | Off | Type | Value / source |
@@ -5690,23 +9797,57 @@ Sent in reply to `0xbcd0` NC_GAMBLE_SLOTMACHINE_WHEELSTOP_REQ on ShineObjectClas
 | 4 | u32 | `local_1c` |
 | 8 | u16 | `local_18` |
 
-### `0xbcd8` ?
+### `0xbcd8` NC_GAMBLE_SLOTMACHINE_JACKPOTINFO_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_JACKPOTINFO_CMD`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | JackPotNum |  |
+| 1 | PROTO_NC_GAMBLE_SLOTMACHINE_JACKPOTINFO_CMD::<unnamed-type-JackPotList>[JackPotNum] | JackPotList | variable length, element PROTO_NC_GAMBLE_SLOTMACHINE_JACKPOTINFO_CMD::<unnamed-type-JackPotList> |
+
+Element `PROTO_NC_GAMBLE_SLOTMACHINE_JACKPOTINFO_CMD::<unnamed-type-JackPotList>` (6 bytes): +0 u16 BettingUnit, +2 u32 JackpotPrice
 
 Sent from `SlotMachine::SlotMachineJackPotRanking::smjpr_SendJackPotPriceTo` (`FUN_0061fe80`) · payload variable (iVar2)
 
 Fill: +0: FUN_0061fd70 (no direct writes found)
 
-### `0xbcda` NC_GAMBLE_SLOTMACHINE_JACKPOTRANKING_REQ †
+### `0xbcda` NC_GAMBLE_SLOTMACHINE_JACKPOTRANKING_ACK †
 
-Sent in reply to `0xbcd9` NC_GAMBLE_SLOTMACHINE_WHEELSTOP_REQ on ShineObjectClass::ShinePlayer (`FUN_0061ec60`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_WHEELSTOP_REQ) · payload variable (iVar4)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_JACKPOTRANKING_ACK`, 1 bytes + variable tail
 
-### `0xbcdc` NC_GAMBLE_SLOTMACHINE_JACKPOTRANKING_REQ †
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | ListLen |  |
+| 1 | SLOTMACHINE_JackPotRank[ListLen] | RankList | variable length, element SLOTMACHINE_JackPotRank |
+
+Element `SLOTMACHINE_JackPotRank` (24 bytes): +0 char[20] name, +20 u32 money
+
+Sent in reply to `0xbcd9` NC_GAMBLE_SLOTMACHINE_JACKPOTRANKING_REQ † on ShineObjectClass::ShinePlayer (`FUN_0061ec60`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_WHEELSTOP_REQ) · payload variable (iVar4)
+
+### `0xbcdc` NC_GAMBLE_SLOTMACHINE_WINRANKING_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_WINRANKING_ACK`, 1 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | ListLen |  |
+| 1 | SLOTMACHINE_JackPotRank[ListLen] | RankList | variable length, element SLOTMACHINE_JackPotRank |
+
+Element `SLOTMACHINE_JackPotRank` (24 bytes): +0 char[20] name, +20 u32 money
 
 Sent in reply to `0xbcdb` NC_GAMBLE_SLOTMACHINE_WINRANKING_REQ on ShineObjectClass::ShinePlayer (`FUN_0061ed90`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_WINRANKING_REQ) · payload variable (iVar3)
 
 Fill: +0: ShineObjectClass::ShinePlayer::vfunc[0xf4] = FUN_004a9c90 (assumed class) (no direct writes found)
 
-### `0xbcdd` ?
+### `0xbcdd` NC_GAMBLE_SLOTMACHINE_SOMEONE_GET_JACKPOT_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_SOMEONE_GET_JACKPOT_CMD`, 28 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charid | Name5 |
+| 20 | u64 | price |  |
 
 Sent from `GameDBSession::so_ply_IBurstJackPot` (`FUN_00620410`) · payload 28 bytes
 
@@ -5720,15 +9861,48 @@ Sent from `GameDBSession::so_ply_IBurstJackPot` (`FUN_00620410`) · payload 28 b
 | 20 | u32 | `param_1` |
 | 24 | u32 | `param_2` |
 
-### `0xc405` ?
+### `0xc405` NC_COLLECT_PEEPING_COLLECT_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_PEEPING_COLLECT_ACK`, 28 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charname | Name5 |
+| 20 | u16 | err |  |
+| 22 | u32 | collection.chrregnum |  |
+| 26 | u16 | collection.number |  |
+| 28 | PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform[collection.number] | collection.CardList | variable length, element PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform |
+
+Element `PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform` (11 bytes): +0 i32 RegistTime, +4 u32 SerialNumber, +8 u16 CardID, +10 u8 StarNumber
 
 Sent in reply to `0xc403` NC_COLLECT_PEEPING_DB_COLLECT_ACK on GameDBSession (`FUN_006273e0`, GameDBSession::gds_NC_COLLECT_PEEPING_DB_COLLECT_ACK) · payload variable (iVar5)
 
-### `0xc406` ?
+### `0xc406` NC_COLLECT_PEEPING_COLLECT_BOOKMARK_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_PEEPING_COLLECT_BOOKMARK_ACK`, 28 bytes + variable tail
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | charname | Name5 |
+| 20 | u16 | err |  |
+| 22 | u32 | collectionview.chrregnum |  |
+| 26 | u16 | collectionview.number |  |
+| 28 | PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo[collectionview.number] | collectionview.ViewList | variable length, element PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo |
+
+Element `PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo` (4 bytes): +0 u16 Slot, +2 u16 CardID
 
 Sent in reply to `0xc404` NC_COLLECT_PEEPING_DB_COLLECT_BOOKMARK_ACK on GameDBSession (`FUN_00627550`, GameDBSession::gds_NC_COLLECT_PEEPING_DB_COLLECT_BOOKMARK_ACK) · payload variable (iVar5)
 
-### `0xc407` ?
+### `0xc407` NC_COLLECT_CARDOPEN_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_CARDOPEN_CMD`, 106 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u8 | Slot |  |
+| 3 | u16 | CardInform.itemid |  |
+| 5 | byte[101] | CardInform.itemattr | SHINE_ITEM_ATTRIBUTE (union: blot, wlot, dlot, qstitm, amulet, weapon, armor, shield, boot, furniture, decorate, skillscroll, recallscroll, binditem, upsource, itemchest, weapontitlelicence, kingdomquest, minihouseskin, upgraderedgem, upgradebluegem, upgradegoldgem, kqstep, feed, riding, amount, costumweapon, costumshield, actionitem, Enchant, GBCoin, Capsule, MobCard_Unident, MobCard, NoEffect, ActiveSkill, Pet, Bracelet) |
 
 Sent from `InventoryLocking::InvenCellReleaser_CardOpen::icr_Apply` (`FUN_0048b850`) · payload 106 bytes
 
@@ -5743,7 +9917,17 @@ Sent in reply to `0x34a9` NC_ITEMDB_ITEMINFO_ACK on GameDBSession (`FUN_00528500
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(param_1 + 8)` |
 
-### `0xc40b` ?
+### `0xc40b` NC_COLLECT_CARDREGIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_CARDREGIST_ACK`, 10 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | invenslot |  |
+| 1 | u16 | CardID |  |
+| 3 | u8 | Star |  |
+| 4 | u32 | Serial |  |
+| 8 | u16 | err |  |
 
 Sent from `InventoryLocking::InvenCellReleaser_CardRegist::icr_Apply` (`FUN_0048b700`) · payload 10 bytes
 
@@ -5763,20 +9947,43 @@ Sent in reply to `0xc40a` NC_COLLECT_REGIST_ACK on GameDBSession (`FUN_00627b60`
 | 4 | u32 | `*(undefined4 *)(param_1 + 0xe)` |
 | 8 | u16 | `*(undefined2 *)(param_1 + 0x12)` |
 
-### `0xc40f` ?
+### `0xc40f` NC_COLLECT_BOOKMARK_REGIST_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_BOOKMARK_REGIST_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | BookMarkSlot |  |
+| 2 | u16 | CardID |  |
+| 4 | u16 | err |  |
 
 Sent in reply to `0xc40e` NC_COLLECT_BOOKMARK_REGIST_DB_ACK on GameDBSession (`FUN_006278f0`, GameDBSession::gds_NC_COLLECT_BOOKMARK_REGIST_DB_ACK) · payload 6 bytes
 
-### `0xc413` NC_COLLECT_REWARD_DB_ACK †
+### `0xc413` NC_COLLECT_REWARD_ACK †
 
-Sent in reply to `0xc412` NC_COLLECT_REWARD_DB_REQ on GameDBSession (`FUN_00627a40`, GameDBSession::gds_NC_COLLECT_REWARD_DB_REQ) · payload 4 bytes
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_REWARD_ACK`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | RewardID |  |
+| 2 | u16 | err |  |
+
+Sent in reply to `0xc412` NC_COLLECT_REWARD_DB_ACK † on GameDBSession (`FUN_00627a40`, GameDBSession::gds_NC_COLLECT_REWARD_DB_REQ) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `*(undefined2 *)(param_1 + 8)` |
 | 2 | u16 | `*(undefined2 *)(param_1 + 10)` |
 
-### `0xcc02` ?
+### `0xcc02` NC_MOVER_RIDE_ON_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MOVER_RIDE_ON_CMD`, 4 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMoverHandle |  |
+| 2 | u8 | nSlot |  |
+| 3 | u8 | nGrade |  |
 
 Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 4 bytes
 
@@ -5786,7 +9993,16 @@ Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 4 bytes
 | 2 | u8 | `bVar12` |
 | 3 | u8 | `uVar2` |
 
-### `0xcc04` ?
+### `0xcc04` NC_MOVER_SOMEONE_RIDE_ON_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MOVER_SOMEONE_RIDE_ON_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u16 | nMoverHandle |  |
+| 4 | u8 | nSlot |  |
+| 5 | u8 | nGrade |  |
 
 Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 6 bytes
 
@@ -5797,7 +10013,13 @@ Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 6 bytes
 | 4 | u8 | `bVar12` |
 | 5 | u8 | `uVar2` |
 
-### `0xcc08` ?
+### `0xcc08` NC_MOVER_SOMEONE_RIDE_OFF_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MOVER_SOMEONE_RIDE_OFF_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
 
 Sent from `FUN_0055f620` (`FUN_0055f620`) · payload 2 bytes
 
@@ -5805,7 +10027,13 @@ Sent from `FUN_0055f620` (`FUN_0055f620`) · payload 2 bytes
 |---|---|---|
 | 0 | i16 | `(short)param_1[1]` |
 
-### `0xcc0a` ?
+### `0xcc0a` NC_MOVER_HUNGRY_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MOVER_HUNGRY_CMD`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHungry |  |
 
 Sent from `FUN_0055f0a0` (`FUN_0055f0a0`) · payload 2 bytes
 
@@ -5813,7 +10041,15 @@ Sent from `FUN_0055f0a0` (`FUN_0055f0a0`) · payload 2 bytes
 |---|---|---|
 | 0 | u16 | `param_2` |
 
-### `0xcc0d` ?
+### `0xcc0d` NC_MOVER_MOVESPEED_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MOVER_MOVESPEED_CMD`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMoverHandle |  |
+| 2 | u16 | nWalk |  |
+| 4 | u16 | nRun |  |
 
 Sent from `FUN_00456850` (`FUN_00456850`) · payload 6 bytes
 
@@ -5825,6 +10061,14 @@ Sent from `FUN_00456850` (`FUN_00456850`) · payload 6 bytes
 
 ### `0xd405` NC_PET_ASK_NEW_NAME_REQ †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_ASK_NEW_NAME_REQ`, 7 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPetHandle |  |
+| 2 | u32 | nPetID |  |
+| 6 | u8 | nFirstSummon |  |
+
 Sent from `FUN_004d0c90` (`FUN_004d0c90`) · payload 7 bytes
 
 | Off | Type | Value / source |
@@ -5835,6 +10079,13 @@ Sent from `FUN_004d0c90` (`FUN_004d0c90`) · payload 7 bytes
 
 ### `0xd408` NC_PET_SET_NAME_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_SET_NAME_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u32 | nPetID |  |
+
 Sent from `FUN_004d0af0` (`FUN_004d0af0`) · payload 6 bytes
 
 | Off | Type | Value / source |
@@ -5843,6 +10094,13 @@ Sent from `FUN_004d0af0` (`FUN_004d0af0`) · payload 6 bytes
 | 2 | i32 | `param_1` |
 
 ### `0xd40a` NC_PET_SET_NAME_CANCEL_ACK †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_SET_NAME_CANCEL_ACK`, 6 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+| 2 | u32 | nPetID |  |
 
 Sent from `FUN_004d0b60` (`FUN_004d0b60`) · payload 6 bytes
 
@@ -5853,13 +10111,26 @@ Sent from `FUN_004d0b60` (`FUN_004d0b60`) · payload 6 bytes
 
 ### `0xd411` NC_PET_USE_ITEM_FAIL_ACK †
 
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_USE_ITEM_FAIL_ACK`, 2 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError |  |
+
 Sent from `ShineObjectClass::ShinePlayer::sp_Send_NC_PET_USE_ITEM_FAIL_ACK` (`FUN_004d15a0`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `param_1` |
 
-### `0xd413` ?
+### `0xd413` NC_PET_SET_NAME_CMD †
+
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_SET_NAME_CMD`, 18 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nPetHandle |  |
+| 2 | char[16] | sPetName | Name4 |
 
 Sent from `FUN_004d0bd0` (`FUN_004d0bd0`) · payload 18 bytes
 
@@ -5885,7 +10156,7 @@ Empty payload.
 
 Empty payload.
 
-### `0x0830` NC_MISC_SERVERPARAMETER_ACK † (S→C)
+### `0x0830` NC_MISC_CONNECTFROMWHERE_DB_ACK † (S→C)
 
 **Verified layout** (basis: zone FUN_005517c0)
 
@@ -5894,7 +10165,7 @@ Empty payload.
 | 0 | u8 | value1 | DAT_0da5047c |
 | 1 | u16 | value2 | DAT_0da50480 |
 
-### `0x1809` link inside the same zone (ours) (hand-named) (S→C)
+### `0x1809` NC_MAP_LINKSAME_CMD † (S→C)
 
 **Verified layout** (basis: zone FUN_0049ad30; client FUN_0049feb0)
 
@@ -5936,7 +10207,7 @@ Empty payload.
 |---|---|---|---|
 | 0 | u16 | code | 0x2028 ok, 0x2029 no NPC, 0x202B far, 0x202C NPC role, 0x202D no link |
 
-### `0x203e` move speed (ours) (hand-named) (S→C)
+### `0x203e` NC_ACT_MOVESPEED_CMD † (S→C)
 
 **Verified layout** (basis: zone FUN_00443390 (vt 0x514/0x518))
 
@@ -6011,7 +10282,7 @@ Empty payload.
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
 
-### `0x0c1a` player disconnected (ours) (hand-named) (zone→WM)
+### `0x0c1a` NC_USER_CONNECTCUT2WORLDMANAGER_CMD † (zone→WM)
 
 **Verified layout** (basis: zone FUN_0054f340 so_Disconnect)
 
@@ -6056,7 +10327,7 @@ Empty payload.
 | 6 | u16 | wmHandle | from 0x1801 |
 | 8 | char[20] | charName |  |
 
-### `0x180b` leaving for a link (ours) (hand-named) (zone→WM)
+### `0x180b` NC_MAP_LINKSTART_CMD † (zone→WM)
 
 **Verified layout** (basis: zone FUN_0049ad30 so_LinkTo)
 
@@ -6065,7 +10336,7 @@ Empty payload.
 | 0 | u16 | wmHandle |  |
 | 2 | u32 | charNo |  |
 
-### `0x180c` map login done (ours) (hand-named) (zone→WM)
+### `0x180c` NC_MAP_LINKEND_CMD † (zone→WM)
 
 **Verified layout** (basis: zone FUN_00443390)
 
@@ -6083,7 +10354,7 @@ Empty payload.
 | 38 | u64 | money | inferred |
 | 46 | u8 | inGuildTournament |  |
 
-### `0x180d` link reserve (ours) (hand-named) (zone→WM)
+### `0x180d` NC_MAP_LINKRESERVE_REQ † (zone→WM)
 
 **Verified layout** (basis: zone FUN_0049ad30 so_LinkTo)
 

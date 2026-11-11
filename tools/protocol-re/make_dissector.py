@@ -61,6 +61,8 @@ def gen_data():
            "F.STRUCTS = " + lua({n: {"size": s["size"], "f": [f[:3] for f in s["fields"]]} for n, s in sorted(docs["structs"].items())}),
            "F.L = {\n" + ",\n".join(lua(x) for x in lists) + "}",
            "F.ANN = " + lua(ann).replace("},[", "},\n["),
+           "F.PDB = " + lua({op: [{"size": c["size"], "var": c["variable"], "f": [f[:3] for f in c["fields"]]}
+                                  for c in [v] + v.get("alts", [])] for op, v in sorted(docs["pdb"].items())}).replace("}},[", "}},\n["),
            "F.GEN = " + lua(gen).replace("},[", "},\n[")]
     return "\n".join(out)
 
@@ -150,11 +152,12 @@ function F.decode_ann(p, fields, bo, show_pw)
     if not variable then pos = f[1] end
     local base, dimstr = f[2]:match("^([%w_]+)(.*)$")
     local dims, count = {}, 1
-    for d in dimstr:gmatch("%[([%w_]+)%]") do
+    local esz0 = F.STRUCTS[base] and F.STRUCTS[base].size or INT[base] and INT[base][1] or 1
+    for d in dimstr:gmatch("%[([%w_.]+)%]") do
       local v = tonumber(d)
       if not v then
         variable = true
-        v = type(vals[d]) == "number" and vals[d] or math.max(0, #p - pos)
+        v = type(vals[d]) == "number" and vals[d] or math.floor(math.max(0, #p - pos) / math.max(esz0, 1))
       end
       dims[#dims + 1], count = v, count * v
     end
@@ -235,6 +238,13 @@ function F.decode(kind, c2s, op, p, show_pw)
   local d = c2s and "c2s" or "s2c"
   local ann, gen = F.ANN[kind][d][op], F.GEN[kind][d][op]
   local desc = ann and ann.name ~= "" and ann.name or nil
+  local src = "annotation"
+  if not ann and F.PDB[op] then                 -- 2017 client PDB struct (C02); alias layouts picked by size
+    ann, src = F.PDB[op][1], "pdb2017"
+    for _, c in ipairs(F.PDB[op]) do
+      if c.size == #p or c.var and #p >= c.size then ann = c break end
+    end
+  end
   local r = {name = F.NAMES[op] or desc, nodes = {}, issues = {}}
   if desc and desc ~= r.name then r.desc = desc end
   local function issue(k, ...) r.issues[#r.issues + 1] = {kind = k, text = string.format(...)} end
@@ -245,7 +255,7 @@ function F.decode(kind, c2s, op, p, show_pw)
   end
   if ann then
     local nodes, stop, prob = F.decode_ann(p, ann.f, 0, show_pw)
-    r.nodes, r.source = nodes, "annotation"
+    r.nodes, r.source = nodes, src
     if prob then issue("size", "%s", prob)
     elseif stop ~= #p then issue("size", "payload %d bytes, documented %d", #p, stop) end
   elseif gen and c2s then
@@ -495,7 +505,7 @@ def selftest():
     e3, _ = xor(struct.pack("<H", 0x0804), i2)
     worlds = b"".join(bytes([i]) + f"World{i}".encode().ljust(16, b"\0") + b"\x06" for i in range(2))
     gen_op = next(op for op, s in sorted(docs["layouts"]["wm"][S2C].items())
-                  if ("wm", op, S2C) not in docs["packets"] and s[0]["size"] and op not in (0x0807,))
+                  if ("wm", op, S2C) not in docs["packets"] and op not in docs["pdb"] and s[0]["size"] and s[0]["fields"] and op not in (0x0807,))
     gen_size = docs["layouts"]["wm"][S2C][gen_op][0]["size"]
     zone_pre, _ = xor(struct.pack("<H", 0x0806), 0)
     C, S = "10.0.0.2", "10.0.0.1"
@@ -528,6 +538,11 @@ def selftest():
         assert list(w.children.values())[1].children[2].label == b'world_name: "World1"'
         assert F.decode(b"login", False, 0x0C0A, b"\x05", False).issues[1].kind == b"size"
         assert F.decode(b"login", False, 0xFFF0, b"", False).issues[1].kind == b"unknown"
+        # pdb2017 fallback (C02), as in pcap_decode's selftest
+        pop = next(o for o, v in sorted(docs["pdb"].items()) if ("zone", o, S2C) not in docs["packets"]
+                   and v["size"] > 0 and not v["variable"])
+        r = F.decode(b"zone", False, pop, bytes(docs["pdb"][pop]["size"]), False)
+        assert r.source == b"pdb2017" and not list(r.issues.values()), pop
         # glue, through the mock API: first pass in order, then re-dissection in reverse order must match
         L.execute(MOCK)
         L.globals().P = L.execute(src + "\nreturn proto")

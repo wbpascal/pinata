@@ -38,6 +38,49 @@ ITEMS = [
              "Summarise per scene in `docs/knowledge/C01.md` (dispatcher address, opcode list, notable behaviour)."],
       done="Every client dispatcher found; ≥90 % of opcodes the zone/WM send to clients mapped to a client function; "
            "names fed back into the generated docs."),
+ dict(id="C02", phase=1, title="2017 client PDB: official opcode names, packet structs, types, client function names",
+      out="docs/knowledge/C02.md + docs/protocol/pdb-layouts.json + names/client/C02.json", scope=[], deps=["C01 (soft)"],
+      goal="`Files/Client/2017/Fiesta.pdb` is the full private PDB of a slightly newer client (`patch_2017_08_p01`; GUID "
+           "matches `Files/Client/2017/Fiesta.bin`). It holds the official protocol enums (`PROTOCOL_COMMAND` = dept, "
+           "`PROTOCOL_COMMAND_<DEPT>` = cmd → 2600 opcode names), 2718 `PROTO_NC_*` packet structs with field names, "
+           "offsets and sizes (538 of them DB/server-internal), shared types (`SHINE_ITEM_ATTRIBUTE` + 38 `ShineItemAttr_*`, "
+           "`CHAR_PARAMETER_DATA`, `PROTO_AVATARINFORMATION`, enum `ABSTATEINDEX` (823 abstates), `ChrClassType`, 134 SHN "
+           "row structs `<Table>::DataVersion`) and 30909 client function names. Turn it into evidence every item can use, "
+           "without letting 2017 facts overwrite verified 2016 facts.",
+      steps=["Reader: `python3 -I tools/protocol-re/pdb.py Files/Client/2017/Fiesta.pdb types|publics|json …` (stdlib, ~1 s). "
+             "Opcode table = for each `NC_<X>` in enum `PROTOCOL_COMMAND`, the members of `PROTOCOL_COMMAND_<X>`; "
+             "opcode = dept<<10 | cmd. 11 depts have no cmd enum (KQ, WT, CT, HOLY_PROMISE, AUCTION, …).",
+             "Opcode names: feed them into `catalog.py` as name source `pdb2017`, ranked below `handler`/`client` and above "
+             "`inferred(REQ+1)` and log literals. Measured against `opcodes.json` (2016 binaries): 1347 unnamed opcodes get a "
+             "name, 933 agree, 110 conflict (51 `handler`, 41 `inferred(REQ+1)`, 18 log literals), 182 2016 opcodes are not in "
+             "the 2017 enums, 210 2017 opcodes are not in the 2016 binaries. Conflicts are scattered, not a per-dept shift, so "
+             "check each one in the 2016 code: several `handler` names come from one handler registered for two opcodes "
+             "(e.g. zone `0x9884`/`0x9885` both named `…_DEPOSIT_RNG`), where the PDB name is the better one. Record the "
+             "verdict per conflict in `docs/knowledge/C02.md`.",
+             "Layouts: write `docs/protocol/pdb-layouts.json` (opcode → struct name, size, flattened fields "
+             "`[offset, type, name]`, nested structs and arrays expanded one level) and make `packets.py`, `pcap_decode.py` and "
+             "`make_dissector.py` use it as a source between hand annotations and generated `layouts.json` (label it "
+             "`pdb2017`). Compare each struct size with the 2016 handler's length check / send size (`layouts.json`) and "
+             "list mismatches (version drift) in the knowledge file. Server-internal packets about a player carry a 6-byte "
+             "`ref` prefix that is **not** part of the PROTO struct (`docs/knowledge/Z01.md`): PDB offset = 2016 payload offset − 6.",
+             "Hand annotations already made (L00 `annotations.json`, C01, W01, Z01): 96 of 112 with a PDB struct match the flattened PDB "
+             "offsets; the rest are the `ref` prefix (W01/Z01 S2S packets), the 2-byte prefix in W01 `0x0c13`, `0x0C5A` "
+             "(`sUserName` is 260 bytes, so our `unused` at 256 is the name's tail) and `0x0C66` (1-byte struct). Report per "
+             "owning item; do not edit their files.",
+             "Types catalogue in `docs/knowledge/C02.md`: which PDB types matter to which item (Z03 `ABSTATEINDEX`, Z04/Z05 "
+             "`ShineItemAttr_*` and `SHINE_ITEM_STRUCT`, Z07 `CHAR_PARAMETER_DATA`, W01/D02 `PROTO_AVATARINFORMATION`, SHN "
+             "row structs vs `shn.py` column names, enums such as `ITEM_LOOT_TYPE`, `PLAYER_QUEST_STATUS`, `GUILD_HISTORY_MSG_TYPE`). "
+             "Point to the `pdb.py types REGEX` command instead of copying large dumps.",
+             "Client function names: import `Files/Client/2017/Fiesta.bin` into `re-data/ghidra` as project `client2017` with "
+             "the PDB applied (headless, PDB Universal analyzer, PDB next to the exe) and export it to "
+             "`re-data/exports/client2017/` like the others. Port names to the 2016 client: first the `On_NC_*` handlers "
+             "by opcode (same opcode → same handler in the scene dispatchers of both versions; 838 of C01's 901 handled opcodes "
+             "have a 2017 name, 645 of them unnamed today), then callees and classes by call-graph / byte matching. Write "
+             "`tools/protocol-re/names/client/C02.json`; mark ported names as `pdb2017` in the knowledge file.",
+             "Evidence: a PDB fact applies to 2016 only after a 2016 binary agrees (same opcode in a handler table, same "
+             "size check, same field use). Until then mark it *(pdb2017)* (see `CLAUDE.md` evidence levels)."],
+      done="PDB opcode names in `opcodes.json` with conflicts resolved; `pdb-layouts.json` used by the generated docs, decoder "
+           "and dissector; 2016 client handlers named from the PDB; per-item follow-up list in `docs/knowledge/C02.md`."),
  dict(id="W01", phase=1, title="World manager core: sessions, world login, characters, zone handoff",
       out="docs/pseudocode/wm/W01-core.md", deps=[],
       scope=[("wm", "CParserClient", [2, 3, 4, 5, 45]), ("wm", "CParserLogin", ALL), ("wm", "CParserAccountDB", ALL),
@@ -275,6 +318,10 @@ GENERIC = """## How to work
 2. Read `docs/pseudocode/login-server.md`: it is the format and depth to match.
 3. Read what exists for your area: `docs/knowledge/*.md` of the items you depend on, `docs/plan/status/{id}.md`
    (resume from it if present), the generated `docs/protocol/opcodes-*.md` / `packets-*.md` rows for your opcodes.
+   For each packet, also look up the official name and struct in the 2017 client PDB:
+   `python3 -I tools/protocol-re/pdb.py Files/Client/2017/Fiesta.pdb types '^PROTO_NC_<NAME>$'` (field names, offsets,
+   sizes; also server-internal packets and shared enums/structs). It is a newer build: confirm against the 2016 code
+   and mark unconfirmed PDB facts *(pdb2017)*. Read `docs/knowledge/C02.md` if it exists.
 4. For each handler in the scope table, in order:
    - read it: `python3 -I tools/protocol-re/clean.py re-data/exports/<bin> tools/protocol-re/names/<bin> <addr>`
    - follow the callees that carry the logic (skip logging/profiling/container boilerplate)
