@@ -309,13 +309,13 @@ Handler `FUN_0055b430`
 
 ### `0x1c01` NC_BRIEFINFO_INFORM_CMD
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BRIEFINFO_INFORM_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_0043e460; client GameFrameWork::NcBriefInfoCmd FUN_0049e710)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nMyHnd |  |
-| 2 | u16 | ReceiveNetCommand | NETCOMMAND (union: protocol, command, department) |
-| 4 | u16 | hnd |  |
+| 0 | u16 | nMyHnd | sender's own handle (only logged) |
+| 2 | u16 | ReceiveNetCommand | opcode of the packet that named the unknown handle |
+| 4 | u16 | hnd | handle the client does not know |
 
 Handler `FUN_0043e460`
 
@@ -347,7 +347,7 @@ Handler `FUN_0045a400`
 
 ### `0x2003` NC_ACT_WALK_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WALK_REQ`, 16 bytes
+**Verified layout** (basis: zone FUN_004571a0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -355,6 +355,8 @@ Handler `FUN_0045a400`
 | 4 | u32 | from.y |  |
 | 8 | u32 | to.x |  |
 | 12 | u32 | to.y |  |
+
+from: only a 200-unit sanity check (MOVE*); WALK/RUN_REQ set the position to `to` unchecked
 
 Handler `FUN_004571a0`
 
@@ -365,6 +367,17 @@ Handler `FUN_004571a0`
 
 ### `0x2005` NC_ACT_RUN_REQ
 
+**Verified layout** (basis: zone FUN_00457380)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | from.x |  |
+| 4 | u32 | from.y |  |
+| 8 | u32 | to.x |  |
+| 12 | u32 | to.y |  |
+
+from: only a 200-unit sanity check (MOVE*); WALK/RUN_REQ set the position to `to` unchecked
+
 Handler `FUN_00457380`
 
 | Off | Type | Checks in handler | Notes |
@@ -374,11 +387,11 @@ Handler `FUN_00457380`
 
 ### `0x2008` NC_ACT_CHANGEMODE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_CHANGEMODE_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_00457560)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | mode |  |
+| 0 | u8 | mode | 1 normal / 2 combat stance; others logged and ignored |
 
 Handler `FUN_00457560`
 
@@ -388,7 +401,7 @@ Handler `FUN_00457560`
 
 ### `0x200a` NC_ACT_NPCCLICK_CMD
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_NPCCLICK_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_004c4b70)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -402,12 +415,14 @@ Handler `FUN_004c4b70`
 
 ### `0x2012` NC_ACT_STOP_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_STOP_REQ`, 8 bytes
+**Verified layout** (basis: zone FUN_00456ff0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u32 | loc.x |  |
 | 4 | u32 | loc.y |  |
+
+position is not taken from the client; only checked (200 units, free cell)
 
 Handler `FUN_00456ff0`
 
@@ -417,14 +432,16 @@ Handler `FUN_00456ff0`
 
 ### `0x2017` NC_ACT_MOVEWALK_CMD
 
-**Verified layout** (basis: FUN_00457c60)
+**Verified layout** (basis: zone FUN_00457c60)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | from_x |  |
-| 4 | u32 | from_y |  |
-| 8 | u32 | to_x |  |
-| 12 | u32 | to_y |  |
+| 0 | u32 | from.x |  |
+| 4 | u32 | from.y |  |
+| 8 | u32 | to.x |  |
+| 12 | u32 | to.y |  |
+
+from: only a 200-unit sanity check (MOVE*); WALK/RUN_REQ set the position to `to` unchecked
 
 Handler `FUN_00457c60`
 
@@ -435,14 +452,16 @@ Handler `FUN_00457c60`
 
 ### `0x2019` NC_ACT_MOVERUN_CMD
 
-**Verified layout** (basis: FUN_00457fd0)
+**Verified layout** (basis: zone FUN_00457fd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | from_x |  |
-| 4 | u32 | from_y |  |
-| 8 | u32 | to_x |  |
-| 12 | u32 | to_y |  |
+| 0 | u32 | from.x |  |
+| 4 | u32 | from.y |  |
+| 8 | u32 | to.x |  |
+| 12 | u32 | to.y |  |
+
+from: only a 200-unit sanity check (MOVE*); WALK/RUN_REQ set the position to `to` unchecked
 
 Handler `FUN_00457fd0`
 
@@ -453,11 +472,11 @@ Handler `FUN_00457fd0`
 
 ### `0x201d` NC_ACT_NPCMENUOPEN_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_NPCMENUOPEN_ACK`, 1 bytes
+**Verified layout** (basis: zone FUN_004c4910)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | ack |  |
+| 0 | u8 | ack | 1 = open the role |
 
 Handler `FUN_004c4910`
 
@@ -467,13 +486,13 @@ Handler `FUN_004c4910`
 
 ### `0x201e` NC_ACT_SHOUT_CMD
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SHOUT_CMD`, 2 bytes + variable tail
+**Verified layout** (basis: zone FUN_00458e80)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | itemLinkDataCount |  |
 | 1 | u8 | len |  |
-| 2 | u8[len] | content | variable length |
+| 2 | char[len] | content | followed by itemLinkDataCount × 0x67-byte item links |
 
 Handler `FUN_00458e80`
 
@@ -484,11 +503,11 @@ Handler `FUN_00458e80`
 
 ### `0x2020` NC_ACT_EMOTICON_CMD
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_EMOTICON_CMD`, 1 bytes
+**Verified layout** (basis: zone FUN_00458740)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | emoticonid |  |
+| 0 | u8 | emoticonid | ActionViewInfo.nIndex; CHARGED (type 2) rows refused |
 
 Handler `FUN_00458740`
 
@@ -498,7 +517,7 @@ Handler `FUN_00458740`
 
 ### `0x202d` NC_ACT_GATHERSTART_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_GATHERSTART_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0046ccb0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -512,11 +531,13 @@ Handler `FUN_0046ccb0`
 
 ### `0x2035` NC_ACT_PRODUCE_CAST_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_PRODUCE_CAST_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0046cf90)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | produceskill |  |
+
+profiler string of the handler says GATHERCOMPLETE_REQ (copy-paste)
 
 Handler `FUN_0046cf90`
 
@@ -526,11 +547,11 @@ Handler `FUN_0046cf90`
 
 ### `0x2044` NC_ACT_RIDE_FEEDING_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_RIDE_FEEDING_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_0045f9e0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | slot |  |
+| 0 | u8 | slot | inventory slot of the feed item |
 
 Handler `FUN_0045f9e0`
 
@@ -540,13 +561,13 @@ Handler `FUN_0045f9e0`
 
 ### `0x204b` NC_ACT_ROAR_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_ROAR_REQ`, 2 bytes + variable tail
+**Verified layout** (basis: zone FUN_005404d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | slot |  |
+| 0 | u8 | slot | inventory slot of the megaphone item |
 | 1 | u8 | len |  |
-| 2 | u8[len] | content | variable length |
+| 2 | char[len] | content |  |
 
 Handler `FUN_005404d0`
 
@@ -557,12 +578,12 @@ Handler `FUN_005404d0`
 
 ### `0x204f` NC_ACT_WEDDING_PROPOSEREQ_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_PROPOSEREQ_REQ`, 39 bytes
+**Verified layout** (basis: zone FUN_0059f760)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | to |  |
-| 2 | char[37] | propose_word |  |
+| 0 | u16 | to | not read by the 2016 zone |
+| 2 | char[37] | propose_word | 36 chars forwarded |
 
 Handler `FUN_0059f760`
 
@@ -572,12 +593,12 @@ Handler `FUN_0059f760`
 
 ### `0x2051` NC_ACT_WEDDING_PROPOSEACK_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_PROPOSEACK_ACK`, 40 bytes
+**Verified layout** (basis: zone FUN_0059f900)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | from |  |
-| 2 | u8 | reply |  |
+| 0 | u16 | from | not read by the 2016 zone |
+| 2 | u8 | reply | 0 = refuse |
 | 3 | char[37] | response_word |  |
 
 Handler `FUN_0059f900`
@@ -589,7 +610,7 @@ Handler `FUN_0059f900`
 
 ### `0x2067` NC_ACT_ACTIONBYITEM_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_ACTIONBYITEM_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_00458440)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -603,11 +624,11 @@ Handler `FUN_00458440`
 
 ### `0x2073` NC_ACT_NPC_MENU_CMD
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_NPC_MENU_CMD`, 1 bytes
+**Verified layout** (basis: zone FUN_004c2460)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | Ack |  |
+| 0 | u8 | Ack | passed to the NPC AI script as event 0x3c |
 
 Handler `FUN_004c2460`
 
@@ -1289,11 +1310,11 @@ Handler `FUN_0053ec40`
 
 ### `0x3c02` NC_MENU_SERVERMENU_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MENU_SERVERMENU_ACK`, 1 bytes
+**Verified layout** (basis: zone FUN_0050fe60)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | reply |  |
+| 0 | u8 | reply | menu item index (< 10) |
 
 Handler `FUN_0050fe60`
 
@@ -1690,11 +1711,11 @@ Handler `FUN_0043a140`
 
 ### `0x6c06` NC_SCENARIO_AREAENTRY_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_AREAENTRY_ACK`, 32 bytes
+**Verified layout** (basis: zone FUN_0050cd90)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[32] | areaindex | Name8 |
+| 0 | char[32] | areaindex |  |
 
 Handler `FUN_0050cd90`
 
@@ -1711,11 +1732,11 @@ Handler `FUN_0050cd90`
 
 ### `0x6c08` NC_SCENARIO_AREALEAVE_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SCENARIO_AREALEAVE_ACK`, 32 bytes
+**Verified layout** (basis: zone FUN_0050cf00)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[32] | areaindex | Name8 |
+| 0 | char[32] | areaindex |  |
 
 Handler `FUN_0050cf00`
 
@@ -2523,11 +2544,11 @@ Sent from `FUN_00419580` (`FUN_00419580`) · payload 3 bytes
 
 ### `0x0848` NC_MISC_CHAT_BLOCK_SPAMER_BLOCKTIME_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_CHAT_BLOCK_SPAMER_BLOCKTIME_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_005607a0; client FUN_004b2b50)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | nBlockTime |  |
+| 0 | u32 | nBlockTime | seconds left (≥ 1) |
 
 Sent from `FUN_005607a0` (`FUN_005607a0`) · payload 4 bytes
 
@@ -3412,7 +3433,7 @@ Sent from `ShineObjectClass::ShineMobileObject::so_Chat` (`FUN_00458c90`) · pay
 
 ### `0x2004` NC_ACT_SOMEONEWALK_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEWALK_CMD`, 18 bytes
+**Verified layout** (basis: zone FUN_004571a0; client ignores)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3434,6 +3455,16 @@ Sent in reply to `0x2003` NC_ACT_WALK_REQ on ShineObjectClass::ShinePlayer (`FUN
 
 ### `0x2006` NC_ACT_SOMEONERUN_CMD †
 
+**Verified layout** (basis: zone FUN_00457380; client ignores)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u32 | from.x |  |
+| 6 | u32 | from.y |  |
+| 10 | u32 | to.x |  |
+| 14 | u32 | to.y |  |
+
 Sent in reply to `0x2005` NC_ACT_RUN_REQ on ShineObjectClass::ShinePlayer (`FUN_00457380`, ShineObjectClass::ShinePlayer::sp_NC_ACT_RUN_REQ) · payload 18 bytes
 
 | Off | Type | Value / source |
@@ -3446,7 +3477,7 @@ Sent in reply to `0x2005` NC_ACT_RUN_REQ on ShineObjectClass::ShinePlayer (`FUN_
 
 ### `0x2009` NC_ACT_SOMEONECHANGEMODE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONECHANGEMODE_CMD`, 3 bytes
+**Verified layout** (basis: zone FUN_00457560; client FUN_004a1500)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3470,7 +3501,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_Notice` (`FUN_005977e0`) · pay
 
 ### `0x2013` NC_ACT_SOMEONESTOP_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONESTOP_CMD`, 10 bytes
+**Verified layout** (basis: zone FUN_0045a0c0 (so_mobile_StopHere))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3488,17 +3519,17 @@ Sent from `ShineObjectClass::ShineMobileObject::so_mobile_StopHere` (`FUN_0045a0
 
 ### `0x2018` NC_ACT_SOMEONEMOVEWALK_CMD †
 
-**Verified layout** (basis: FUN_00457c60, FUN_00435ec0)
+**Verified layout** (basis: zone FUN_00457c60; client FUN_004a12a0 / FUN_004b5190)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | object_handle |  |
-| 2 | u32 | from_x |  |
-| 6 | u32 | from_y |  |
-| 10 | u32 | to_x |  |
-| 14 | u32 | to_y | copied from request payload +12 |
-| 18 | u16 | speed | ShinePlayer vfunc 0x518 |
-| 20 | u16 | flags | bit 0 cleared |
+| 0 | u16 | handle |  |
+| 2 | u32 | from.x |  |
+| 6 | u32 | from.y |  |
+| 10 | u32 | to.x |  |
+| 14 | u32 | to.y |  |
+| 18 | u16 | speed | GetWalkSpeed / GetRunSpeed |
+| 20 | u16 | moveattr.direct | bit 0 cleared, rest stale |
 
 Sent from `ShineObjectClass::ShineMobileObject::so_mobile_SpeedChange` (`FUN_00435ec0`) · payload 22 bytes
 
@@ -3516,17 +3547,17 @@ Sent from `ShineObjectClass::ShineMobileObject::so_mobile_SpeedChange` (`FUN_004
 
 ### `0x201a` NC_ACT_SOMEONEMOVERUN_CMD †
 
-**Verified layout** (basis: FUN_00457fd0, FUN_00435ec0)
+**Verified layout** (basis: zone FUN_00457fd0; client FUN_004a12a0 / FUN_004b5190)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | object_handle |  |
-| 2 | u32 | from_x |  |
-| 6 | u32 | from_y |  |
-| 10 | u32 | to_x |  |
-| 14 | u32 | to_y |  |
-| 18 | u16 | speed |  |
-| 20 | u16 | flags | bit 0 cleared |
+| 0 | u16 | handle |  |
+| 2 | u32 | from.x |  |
+| 6 | u32 | from.y |  |
+| 10 | u32 | to.x |  |
+| 14 | u32 | to.y |  |
+| 18 | u16 | speed | GetWalkSpeed / GetRunSpeed |
+| 20 | u16 | moveattr.direct | bit 0 cleared, rest stale |
 
 Sent from `ShineObjectClass::ShineMobileObject::so_mobile_SpeedChange` (`FUN_00435ec0`) · payload 22 bytes
 
@@ -3546,12 +3577,14 @@ Fill: +0: FUN_00434ae0 (no direct writes found)
 
 ### `0x201b` NC_ACT_MOVEFAIL_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_MOVEFAIL_CMD`, 8 bytes
+**Verified layout** (basis: zone FUN_00458340; client FUN_00499b00)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u32 | back.x |  |
 | 4 | u32 | back.y |  |
+
+server position
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_SendMoveFail` (`FUN_00458340`) · payload 8 bytes
 
@@ -3562,11 +3595,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_SendMoveFail` (`FUN_00458340`) 
 
 ### `0x201c` NC_ACT_NPCMENUOPEN_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_NPCMENUOPEN_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_004c4660; client FUN_004b5560)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | mobid |  |
+| 0 | u16 | mobid | NPC mob id (vt 0x708) |
 
 Sent from `ShineObjectClass::ShinePlayer::InteractWithNPC` (`FUN_004c4660`) · payload 2 bytes
 
@@ -3624,7 +3657,7 @@ Sent from `FUN_005e5150` (`FUN_005e5150`) · payload variable (byte)
 
 ### `0x2021` NC_ACT_SOMEONEEMOTICON_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEEMOTICON_CMD`, 3 bytes
+**Verified layout** (basis: zone FUN_00458860)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3640,7 +3673,7 @@ Sent from `ShineObjectClass::ShinePlayer::sp_DoEmotion` (`FUN_00458860`) · payl
 
 ### `0x2023` NC_ACT_SOMEONEEMOTICONSTOP_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEEMOTICONSTOP_CMD`, 5 bytes
+**Verified layout** (basis: zone FUN_00458a70)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3658,7 +3691,7 @@ Sent in reply to `0x2022` NC_ACT_EMOTICONSTOP_CMD on ShineObjectClass::ShinePlay
 
 ### `0x2025` NC_ACT_SOMEEONEJUMP_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEEONEJUMP_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_0045a250)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3672,13 +3705,13 @@ Sent in reply to `0x2024` NC_ACT_JUMP_CMD on ShineObjectClass::ShinePlayer (`FUN
 
 ### `0x2029` NC_ACT_SOMEONEPITCHTENT_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEPITCHTENT_CMD`, 14 bytes
+**Verified layout** (basis: zone FUN_00457760)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | handle |  |
-| 2 | u16 | camp.minihouse |  |
-| 4 | u8[10] | camp.dummy |  |
+| 2 | u16 | camp.minihouse | mini-house skin |
+| 4 | u8[10] | camp.dummy | -1 bytes |
 
 Sent in reply to `0x2027` NC_ACT_PITCHTENT_REQ on ShineObjectClass::ShinePlayer (`FUN_00457760`, ShineObjectClass::ShinePlayer::sp_NC_ACT_PITCHTENT_REQ) · payload 14 bytes
 
@@ -3691,34 +3724,12 @@ Sent in reply to `0x2027` NC_ACT_PITCHTENT_REQ on ShineObjectClass::ShinePlayer 
 
 ### `0x202c` NC_ACT_SOMEONEFOLDTENT_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEFOLDTENT_CMD`, 45 bytes
+**Verified layout** (basis: zone FUN_00457a90)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | handle |  |
-| 2 | u16 | shape.equip.Equ_Head |  |
-| 4 | u16 | shape.equip.Equ_Mouth |  |
-| 6 | u16 | shape.equip.Equ_RightHand |  |
-| 8 | u16 | shape.equip.Equ_Body |  |
-| 10 | u16 | shape.equip.Equ_LeftHand |  |
-| 12 | u16 | shape.equip.Equ_Pant |  |
-| 14 | u16 | shape.equip.Equ_Boot |  |
-| 16 | u16 | shape.equip.Equ_AccBoot |  |
-| 18 | u16 | shape.equip.Equ_AccPant |  |
-| 20 | u16 | shape.equip.Equ_AccBody |  |
-| 22 | u16 | shape.equip.Equ_AccHeadA |  |
-| 24 | u16 | shape.equip.Equ_MiniMon_R |  |
-| 26 | u16 | shape.equip.Equ_Eye |  |
-| 28 | u16 | shape.equip.Equ_AccLeftHand |  |
-| 30 | u16 | shape.equip.Equ_AccRightHand |  |
-| 32 | u16 | shape.equip.Equ_AccBack |  |
-| 34 | u16 | shape.equip.Equ_CosEff |  |
-| 36 | u16 | shape.equip.Equ_AccHip |  |
-| 38 | u16 | shape.equip.Equ_Minimon |  |
-| 40 | u16 | shape.equip.Equ_AccShield |  |
-| 42 | u8 | shape.equip.upgrade.lefthand|righthand | bits lefthand:4@0, righthand:4@4 |
-| 43 | u8 | shape.equip.upgrade.body|leg | bits body:4@0, leg:4@4 |
-| 44 | u8 | shape.equip.upgrade.shoes | bits shoes:4@0 |
+| 2 | u8[43] | shape | brief shapedata restored |
 
 Sent in reply to `0x202a` NC_ACT_FOLDTENT_REQ on ShineObjectClass::ShinePlayer (`FUN_00457a90`, ShineObjectClass::ShinePlayer::sp_NC_ACT_FOLDTENT_REQ) · payload 45 bytes
 
@@ -3730,13 +3741,15 @@ Sent from `FUN_0055ae50` (`FUN_0055ae50`) · payload 45 bytes
 
 ### `0x202e` NC_ACT_GATHERSTART_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_GATHERSTART_ACK`, 6 bytes
+**Verified layout** (basis: zone FUN_0046ccb0; client GatheringTask FUN_00486320)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | picker |  |
+| 0 | u16 | picker | tool item id |
 | 2 | u16 | object |  |
-| 4 | u16 | err |  |
+| 4 | u16 | err | 0xB01 ok, 0xB02, 0xB0C no tool |
+
+early failures (0xB02/0xB04/0xB05) are sent as a 2-byte {err} only
 
 Sent in reply to `0x202d` NC_ACT_GATHERSTART_REQ on ShineObjectClass::ShinePlayer (`FUN_0046ccb0`, ShineObjectClass::ShinePlayer::sp_NC_ACT_GATHERSTART_REQ) · payload 6 bytes
 
@@ -3748,7 +3761,7 @@ Sent in reply to `0x202d` NC_ACT_GATHERSTART_REQ on ShineObjectClass::ShinePlaye
 
 ### `0x202f` NC_ACT_SOMEONEGATHERSTART_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEGATHERSTART_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_0046ccb0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3766,7 +3779,7 @@ Sent in reply to `0x202d` NC_ACT_GATHERSTART_REQ on ShineObjectClass::ShinePlaye
 
 ### `0x2031` NC_ACT_SOMEONEGATHERCANCEL_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEGATHERCANCEL_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_0046b120)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3782,7 +3795,7 @@ Sent in reply to `0x2030` NC_ACT_GATHERCANCEL_CMD on ShineObjectClass::ShinePlay
 
 ### `0x2034` NC_ACT_SOMEONEGATHERCOMPLETE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEGATHERCOMPLETE_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_0046b2f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3798,7 +3811,7 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GatherComplete` (`FUN_0046b2f0`) ·
 
 ### `0x2038` NC_ACT_SOMEONEPRODUCE_CAST_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEPRODUCE_CAST_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_0046cf90)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3814,7 +3827,7 @@ Sent in reply to `0x2035` NC_ACT_PRODUCE_CAST_REQ † on ShineObjectClass::Shine
 
 ### `0x203a` NC_ACT_SOMEONEPRODUCE_CASTCUT_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEPRODUCE_CASTCUT_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_0046b620)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3906,7 +3919,7 @@ Sent from `ShineObjectClass::ShinePlayer::sp_HorseOff` (`FUN_0045f7c0`) · paylo
 
 ### `0x2046` NC_ACT_RIDE_HUNGRY_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_RIDE_HUNGRY_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_0045e510; client FUN_004aa1c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3954,7 +3967,7 @@ Sent from `FUN_00596770` (`FUN_00596770`) · payload 0 bytes
 
 ### `0x2050` NC_ACT_WEDDING_PROPOSEACK_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_PROPOSEACK_REQ`, 39 bytes
+**Verified layout** (basis: zone FUN_0059f760)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3971,13 +3984,13 @@ Sent in reply to `0x204f` NC_ACT_WEDDING_PROPOSEREQ_REQ on ShineObjectClass::Shi
 
 ### `0x2052` NC_ACT_WEDDING_PROPOSEREQ_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_PROPOSEREQ_ACK`, 41 bytes
+**Verified layout** (basis: zone FUN_0059ebf0 / FUN_0059ec80)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | to |  |
-| 2 | u16 | err |  |
-| 4 | char[37] | response_word |  |
+| 2 | u16 | err | 0x12C0 accepted, 0x12C1-0x12CA, also 0x1301-0x1308/0x130A from 0x2053 |
+| 4 | char[37] | response_word | zeros when none |
 
 Sent from `FUN_0059ebf0` (`FUN_0059ebf0`) · payload 41 bytes
 
@@ -4007,21 +4020,13 @@ Sent from `FUN_0059ec80` (`FUN_0059ec80`) · payload 41 bytes
 
 ### `0x2054` NC_ACT_WEDDING_HALL_RESERV_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_HALL_RESERV_ACK`, 46 bytes
+**Verified layout** (basis: zone FUN_0059ed00)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | err |  |
+| 0 | u16 | err | 0x1300 ok, 0x1304 0x1305 0x1306 |
 | 2 | i64 | ReservedTime |  |
-| 10 | i32 | tm_ReservedTime.tm_sec |  |
-| 14 | i32 | tm_ReservedTime.tm_min |  |
-| 18 | i32 | tm_ReservedTime.tm_hour |  |
-| 22 | i32 | tm_ReservedTime.tm_mday |  |
-| 26 | i32 | tm_ReservedTime.tm_mon |  |
-| 30 | i32 | tm_ReservedTime.tm_year |  |
-| 34 | i32 | tm_ReservedTime.tm_wday |  |
-| 38 | i32 | tm_ReservedTime.tm_yday |  |
-| 42 | i32 | tm_ReservedTime.tm_isdst |  |
+| 10 | i32[9] | tm_ReservedTime | localtime() of ReservedTime |
 
 Sent from `FUN_0059ed00` (`FUN_0059ed00`) · payload 46 bytes
 
@@ -4081,11 +4086,11 @@ Fill: +0: FUN_0059ef40 (no direct writes found)
 
 ### `0x2059` NC_ACT_WEDDING_HALL_GUEST_ENTER_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_WEDDING_HALL_GUEST_ENTER_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_0059fcb0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | err |  |
+| 0 | u16 | err | 0x1342 0x1343; only on failure |
 
 Sent in reply to `0x2058` NC_ACT_WEDDING_HALL_GUEST_ENTER_REQ on ShineObjectClass::ShinePlayer (`FUN_0059fcb0`, ShineObjectClass::ShinePlayer::sp_NC_ACT_WEDDING_HALL_GUEST_ENTER_REQ) · payload 2 bytes
 
@@ -4095,11 +4100,11 @@ Sent in reply to `0x2058` NC_ACT_WEDDING_HALL_GUEST_ENTER_REQ on ShineObjectClas
 
 ### `0x2068` NC_ACT_ACTIONBYITEM_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_ACTIONBYITEM_ACK`, 3 bytes
+**Verified layout** (basis: zone FUN_00458440; client FUN_0049bb00)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | error |  |
+| 0 | u16 | error | 0x1C28 ok, 0x1C29 0x1C2A 0x1C2B |
 | 2 | u8 | emoticonid |  |
 
 Sent in reply to `0x2067` NC_ACT_ACTIONBYITEM_REQ on ShineObjectClass::ShinePlayer (`FUN_00458440`, ShineObjectClass::ShinePlayer::sp_NC_ACT_ACTIONBYITEM_REQ) · payload 3 bytes
@@ -4146,11 +4151,11 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_ShadowStep` (`FUN_0045ad10`)
 
 ### `0x2071` NC_ACT_AUTO_WAY_FINDING_USE_GATE_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_AUTO_WAY_FINDING_USE_GATE_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_00562340; client FUN_004b3600)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x2400 ok, 0x2401 mode, 0x2402 no map, 0x2403 no gate, 0x2404 level |
 
 Sent in reply to `0x2070` NC_ACT_AUTO_WAY_FINDING_USE_GATE_REQ on ShineObjectClass::ShinePlayer (`FUN_00562340`, ShineObjectClass::ShinePlayer::sp_NC_ACT_AUTO_WAY_FINDING_USE_GATE_REQ) · payload 2 bytes
 
@@ -6313,15 +6318,15 @@ Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · pa
 
 ### `0x3c05` NC_MENU_SHOPOPENSOULSTONE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MENU_SHOPOPENSOULSTONE_CMD`, 24 bytes
+**Verified layout** (basis: zone FUN_004c2d60)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u32 | hp.recover |  |
-| 4 | u32 | hp.maxnum |  |
+| 4 | u32 | hp.maxnum | row × p+0x2a5a2 / 1000 |
 | 8 | u32 | hp.price |  |
 | 12 | u32 | sp.recover |  |
-| 16 | u32 | sp.maxnum |  |
+| 16 | u32 | sp.maxnum | row × p+0x2a5a4 / 1000 |
 | 20 | u32 | sp.price |  |
 
 Sent from `NPCRole_Merchant::nrm_PortionStone` (`FUN_004c2d60`) · payload 24 bytes
@@ -6364,11 +6369,9 @@ Fill: +11: FUN_00643b10
 
 ### `0x3c0f` NC_MENU_SERVERMENU_CLOSE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MENU_SERVERMENU_CLOSE_CMD`, 0 bytes
+**Verified layout** (basis: zone FUN_0050fc00)
 
-| Off | Type | Field | Notes |
-|---|---|---|---|
-| | | (empty) | |
+Empty payload.
 
 Sent from `FUN_0050fc00` (`FUN_0050fc00`) · payload 0 bytes
 
@@ -10168,6 +10171,17 @@ Empty payload.
 
 Empty payload.
 
+### `0x2022` NC_ACT_EMOTICONSTOP_CMD (C→S)
+
+**Verified layout** (basis: zone FUN_00458a70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | emoticon.emoticonid |  |
+| 1 | u16 | emoticon.emoticonframe |  |
+
+PDB struct name not checked; fields = STOPEMOTICON_DESCRIPT as echoed in 0x2023
+
 ### `0x0830` NC_MISC_CONNECTFROMWHERE_DB_ACK † (S→C)
 
 **Verified layout** (basis: zone FUN_005517c0)
@@ -10223,16 +10237,81 @@ Z01 name was 'link inside the same zone (ours)'
 |---|---|---|---|
 | 0 | u16 | code | 0x2028 ok, 0x2029 no NPC, 0x202B far, 0x202C NPC role, 0x202D no link |
 
-### `0x203e` NC_ACT_MOVESPEED_CMD † (S→C)
+### `0x1c19` NC_BRIEFINFO_ABSTATE_CHANGE_LIST_CMD † (S→C)
 
-**Verified layout** (basis: zone FUN_00443390 (vt 0x514/0x518))
+**Verified layout** (basis: zone FUN_0043cc00)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | walkSpeed |  |
-| 2 | u16 | runSpeed |  |
+| 0 | u16 | handle |  |
+| 2 | u8 | count |  |
+| 3 | ABSTATE_INFORMATION[count] | infoList | ABSTATE_INFORMATION × count |
 
-Z01 name was 'move speed (ours)'
+### `0x2028` NC_ACT_PITCHTENT_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_00457760; client FUN_004aa010)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xA81 ok, 0xA82 mode, 0xA83 near NPC/house, 0xA84 map, 0xA85 no mini-house item, 0xA86 feared |
+
+### `0x202b` NC_ACT_FOLDTENT_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_00457a90; client FUN_00499e50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xA81 ok, 0xA82 not in tent |
+
+### `0x2033` NC_ACT_GATHERCOMPLETE_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_0046b2f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xB01 ok, 0xB02, 0xB04, 0xB06 |
+| 2 | u16 | object | 0xFFFF on error |
+
+### `0x2036` NC_ACT_PRODUCE_CAST_FAIL_ACK (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_0046cf90; not handled by the 2016 client)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xB04 0xB07 0xB08 0xB09 0xB11 |
+
+### `0x203e` NC_ACT_MOVESPEED_CMD † (S→C)
+
+**Verified layout** (basis: zone FUN_00459540)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | walkspeed |  |
+| 2 | u16 | runspeed |  |
+
+### `0x2045` NC_ACT_RIDE_FEEDING_ACK (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_0045f9e0; not handled by the 2016 client)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x10C5 0x10C6 0x10C7; not sent on success |
+
+### `0x204c` NC_ACT_ROAR_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_005404d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x701 0x702 0x703 0x70A 0x710 0x720 |
+
+### `0x205d` NC_ACT_WEDDING_DIVORCE_REQ_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_0059fee0 / FUN_005a0120)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1381 0x1382 0x1383 0x1388 |
 
 ### `0x0821` NC_MISC_TIMEFROMWORLD_CMD (WM→zone)
 
@@ -10299,6 +10378,67 @@ Z01 name was 'move speed (ours)'
 | 16 | char[16] | zoneIp |  |
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
+
+### `0x1083` NC_CHAR_WEDDING_PROPOSE_REQ (zone→CharDB)
+
+**Verified layout** (basis: zone FUN_0059f900)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | accepting player |
+| 2 | u32 | header.charregistnumber |  |
+| 6 | u32 | Partner | proposer charNo |
+
+### `0x1089` NC_CHAR_WEDDING_DIVORCE_BY_AGREE_REQ (zone→CharDB)
+
+**Verified layout** (basis: zone FUN_0059fee0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle |  |
+| 2 | u32 | header.charregistnumber |  |
+| 6 | u32 | Partner |  |
+
+### `0x108b` NC_CHAR_WEDDING_DIVORCE_BY_FORCE_REQ (zone→CharDB)
+
+**Verified layout** (basis: zone FUN_005a0120)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle |  |
+| 2 | u32 | header.charregistnumber |  |
+| 6 | u32 | Partner |  |
+
+### `0x108d` NC_CHAR_WEDDING_DIVORCE_DO_REQ (zone→CharDB)
+
+**Verified layout** (basis: zone FUN_0059fee0 / FUN_005a0120)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle |  |
+| 2 | u32 | header.charregistnumber |  |
+| 6 | u32 | Partner |  |
+| 10 | u8 | Reason | 0 agreement, 1 forced |
+
+### `0x108f` NC_CHAR_WEDDING_DIVORCE_CANCEL_REQ (zone→CharDB)
+
+**Verified layout** (basis: zone FUN_005a0440)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | not written (stale) |
+| 2 | u32 | header.charregistnumber | the partner's charNo (as read) |
+| 6 | u32 | Partner | own charNo |
+| 10 | u8 | IncreseCount | 1 |
+
+### `0x065d` NC_LOG_WEDDING_HALL_RESERVE † (zone→GameLog)
+
+**Verified layout** (basis: zone FUN_005a2330)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | CharRegisterNumber |  |
+| 4 | u32 | PartnerRegisterNumber |  |
 
 ### `0x0c1a` NC_USER_CONNECTCUT2WORLDMANAGER_CMD † (zone→WM)
 
