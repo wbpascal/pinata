@@ -1,0 +1,1439 @@
+{
+ "_about": "Z04: zone item requests (dept 12 ITEM, 20 SOULSTONE) and the zone→DB requests whose layout was read. Client-facing request layouts agree with the 2017 PDB structs; ACK codes from the zone send sites and the 2016 client handlers.",
+ "packets": {
+  "zone": {
+   "0x3003": {
+    "dir": "C→S",
+    "name": "NC_ITEM_BUY_REQ",
+    "basis": "zone FUN_00524a60",
+    "fields": [
+     [
+      0,
+      "u16",
+      "itemid",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "lot",
+      "clamped to MaxLot for stackables"
+     ]
+    ]
+   },
+   "0x3004": {
+    "dir": "S→C",
+    "name": "NC_ITEM_BUY_ACK",
+    "basis": "zone so_SendErrorCode 12/4; client FUN_004ab770",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x201 ok, 0x20a full, 0x20c fame, 0x20d bind item owned, 0x20f item-money short, 0x211 buy level"
+     ]
+    ]
+   },
+   "0x3006": {
+    "dir": "C→S",
+    "name": "NC_ITEM_SELL_REQ",
+    "basis": "zone FUN_00539020",
+    "fields": [
+     [
+      0,
+      "u8",
+      "slot",
+      "inventory slot"
+     ],
+     [
+      1,
+      "u32",
+      "lot",
+      ""
+     ]
+    ]
+   },
+   "0x3005": {
+    "dir": "S→C",
+    "name": "NC_ITEM_SELL_ACK",
+    "basis": "zone 12/5; client FUN_004ab870",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x381 ok, 0x38f bound"
+     ]
+    ]
+   },
+   "0x3007": {
+    "dir": "C→S",
+    "name": "NC_ITEM_DROP_REQ",
+    "basis": "zone FUN_00529f50",
+    "fields": [
+     [
+      0,
+      "ITEM_INVEN",
+      "slot",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "lot",
+      "must cover the whole stack"
+     ],
+     [
+      6,
+      "SHINE_XY_TYPE",
+      "loc",
+      ""
+     ]
+    ]
+   },
+   "0x3008": {
+    "dir": "S→C",
+    "name": "NC_ITEM_DROP_ACK",
+    "basis": "zone 12/8; client FUN_004ab990",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x301 = confirmation menu opened"
+     ]
+    ]
+   },
+   "0x3009": {
+    "dir": "C→S",
+    "name": "NC_ITEM_PICK_REQ",
+    "basis": "zone FUN_00530a50",
+    "fields": [
+     [
+      0,
+      "u16",
+      "itemhandle",
+      ""
+     ]
+    ]
+   },
+   "0x300a": {
+    "dir": "S→C",
+    "name": "NC_ITEM_PICK_ACK",
+    "basis": "zone FUN_005308d0 so_ply_itempickresult; client FUN_004aba00",
+    "fields": [
+     [
+      0,
+      "u16",
+      "itemid",
+      "0xFFFF on error"
+     ],
+     [
+      2,
+      "u32",
+      "lot",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "error",
+      "0x341 ok"
+     ],
+     [
+      8,
+      "u16",
+      "itemhandle",
+      ""
+     ]
+    ]
+   },
+   "0x300b": {
+    "dir": "C→S",
+    "name": "NC_ITEM_RELOC_REQ",
+    "basis": "zone FUN_00537170",
+    "fields": [
+     [
+      0,
+      "ITEM_INVEN",
+      "from",
+      ""
+     ],
+     [
+      2,
+      "ITEM_INVEN",
+      "to",
+      ""
+     ]
+    ]
+   },
+   "0x300c": {
+    "dir": "S→C",
+    "name": "NC_ITEM_RELOC_ACK",
+    "basis": "zone 12/12; client FUN_004ab910",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x241 ok, 0x24a bound item"
+     ]
+    ]
+   },
+   "0x300d": {
+    "dir": "C→S",
+    "name": "NC_ITEM_SPLIT_REQ",
+    "basis": "zone FUN_00539a40",
+    "fields": [
+     [
+      0,
+      "ITEM_INVEN",
+      "from",
+      ""
+     ],
+     [
+      2,
+      "ITEM_INVEN",
+      "to",
+      "must be empty"
+     ],
+     [
+      4,
+      "u32",
+      "lot",
+      "amount moved; < stack"
+     ]
+    ]
+   },
+   "0x300e": {
+    "dir": "S→C",
+    "name": "NC_ITEM_SPLIT_ACK",
+    "basis": "zone 12/14; client FUN_004a8360",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      ""
+     ]
+    ]
+   },
+   "0x300f": {
+    "dir": "C→S",
+    "name": "NC_ITEM_EQUIP_REQ",
+    "basis": "zone FUN_0052b8d0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "slot",
+      "inventory slot"
+     ]
+    ]
+   },
+   "0x3010": {
+    "dir": "C→S",
+    "name": "NC_ITEM_RINGEQUIP_REQ",
+    "basis": "zone FUN_0052c5b0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "slot",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "equip",
+      "15 or 16"
+     ]
+    ]
+   },
+   "0x3011": {
+    "dir": "S→C",
+    "name": "NC_ITEM_EQUIP_ACK",
+    "basis": "zone 12/17; client FUN_004abd20",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x281 ok, 0x293 weapon skin"
+     ]
+    ],
+    "notes": "no PDB struct of that name"
+   },
+   "0x3012": {
+    "dir": "C→S",
+    "name": "NC_ITEM_UNEQUIP_REQ",
+    "basis": "zone FUN_0053a990",
+    "fields": [
+     [
+      0,
+      "u8",
+      "slotequip",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "slotinven",
+      "must be empty"
+     ]
+    ]
+   },
+   "0x3013": {
+    "dir": "S→C",
+    "name": "NC_ITEM_UNEQUIP_ACK",
+    "basis": "zone 12/19; client FUN_004abd80",
+    "fields": [
+     [
+      0,
+      "u16",
+      "code",
+      "0x2c1 ok"
+     ]
+    ]
+   },
+   "0x3015": {
+    "dir": "C→S",
+    "name": "NC_ITEM_USE_REQ",
+    "basis": "zone FUN_005416b0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "invenslot",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "invenType",
+      "8 equipment, 9 inventory"
+     ]
+    ]
+   },
+   "0x3016": {
+    "dir": "S→C",
+    "name": "NC_ITEM_USE_ACK",
+    "basis": "zone FUN_0045e610; client FUN_004abdb0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "0x700 ok"
+     ],
+     [
+      2,
+      "u16",
+      "useditem",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "invenType",
+      ""
+     ]
+    ]
+   },
+   "0x3017": {
+    "dir": "C→S",
+    "name": "NC_ITEM_UPGRADE_REQ",
+    "basis": "zone FUN_0053d220",
+    "fields": [
+     [
+      0,
+      "u8",
+      "equip",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "raw",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "raw_left",
+      "0xFF none"
+     ],
+     [
+      3,
+      "u8",
+      "raw_right",
+      "0xFF none"
+     ],
+     [
+      4,
+      "u32",
+      "gift_money",
+      ""
+     ],
+     [
+      8,
+      "u8",
+      "raw_middle",
+      "0xFF none"
+     ]
+    ]
+   },
+   "0x3018": {
+    "dir": "S→C",
+    "name": "NC_ITEM_UPGRADE_ACK",
+    "basis": "zone 12/24; client FUN_0049a5d0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      ""
+     ]
+    ]
+   },
+   "0x3019": {
+    "dir": "C→S",
+    "name": "NC_ITEM_USEABORT_CMD",
+    "basis": "zone FUN_0053f960",
+    "fields": []
+   },
+   "0x301c": {
+    "dir": "C→S",
+    "name": "NC_ITEM_DEPOSIT_REQ",
+    "basis": "zone FUN_00533dc0",
+    "fields": [
+     [
+      0,
+      "u64",
+      "cen",
+      ""
+     ]
+    ]
+   },
+   "0x301e": {
+    "dir": "C→S",
+    "name": "NC_ITEM_WITHDRAW_REQ",
+    "basis": "zone FUN_005342b0",
+    "fields": [
+     [
+      0,
+      "u64",
+      "cen",
+      ""
+     ]
+    ]
+   },
+   "0x3020": {
+    "dir": "C→S",
+    "name": "NC_ITEM_CHARGEDINVENOPEN_REQ",
+    "basis": "zone FUN_004923c0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "page",
+      "24 entries per page"
+     ]
+    ]
+   },
+   "0x3022": {
+    "dir": "C→S",
+    "name": "NC_ITEM_CHARGED_WITHDRAW_REQ",
+    "basis": "zone FUN_00492660",
+    "fields": [
+     [
+      0,
+      "u32",
+      "ItemOrderNo",
+      ""
+     ]
+    ]
+   },
+   "0x3023": {
+    "dir": "S→C",
+    "name": "NC_ITEM_CHARGED_WITHDRAW_ACK",
+    "basis": "zone FUN_00492110",
+    "fields": [
+     [
+      0,
+      "u32",
+      "ItemOrderNo",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "err",
+      ""
+     ]
+    ]
+   },
+   "0x3025": {
+    "dir": "S→C",
+    "name": "NC_ITEM_BREAKFAIL_CMD",
+    "basis": "zone FUN_0048db00 / FUN_0048d990",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0x1829 = confirmation cancelled"
+     ]
+    ]
+   },
+   "0x3026": {
+    "dir": "C→S",
+    "name": "NC_ITEM_GUILD_STORAGE_WITHDRAW_REQ",
+    "basis": "zone FUN_00537330",
+    "fields": [
+     [
+      0,
+      "u64",
+      "cen",
+      ""
+     ]
+    ]
+   },
+   "0x3027": {
+    "dir": "S→C",
+    "name": "NC_ITEM_GUILD_STORAGE_WITHDRAW_ACK",
+    "basis": "zone FUN_00537330; client FUN_006b4f90",
+    "fields": [
+     [
+      0,
+      "u64",
+      "cen",
+      "stale on errors"
+     ],
+     [
+      8,
+      "u16",
+      "err",
+      "0x1480 ok"
+     ]
+    ]
+   },
+   "0x3028": {
+    "dir": "C→S",
+    "name": "NC_ITEM_OPENSTORAGEPAGE_REQ",
+    "basis": "zone FUN_00536650",
+    "fields": [
+     [
+      0,
+      "u8",
+      "page",
+      "< 16"
+     ]
+    ]
+   },
+   "0x302a": {
+    "dir": "C→S",
+    "name": "NC_ITEM_DISMANTLE_REQ",
+    "basis": "zone FUN_005293c0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "item",
+      "inventory slot"
+     ]
+    ]
+   },
+   "0x302b": {
+    "dir": "S→C",
+    "name": "NC_ITEM_DISMANTLE_ACK",
+    "basis": "zone 12/43",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0x1680 ok"
+     ]
+    ]
+   },
+   "0x302c": {
+    "dir": "C→S",
+    "name": "NC_ITEM_REWARDINVENOPEN_REQ",
+    "basis": "zone FUN_004fc060",
+    "fields": [
+     [
+      0,
+      "u16",
+      "page",
+      ""
+     ]
+    ]
+   },
+   "0x302f": {
+    "dir": "C→S",
+    "name": "NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_REQ",
+    "basis": "zone FUN_00470110",
+    "fields": [
+     [
+      0,
+      "u64",
+      "cen",
+      ""
+     ]
+    ]
+   },
+   "0x3030": {
+    "dir": "S→C",
+    "name": "NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_ACK",
+    "basis": "zone FUN_00470110; client FUN_006f54c0",
+    "fields": [
+     [
+      0,
+      "u64",
+      "cen",
+      ""
+     ],
+     [
+      8,
+      "u16",
+      "Error",
+      "0x17e0 ok"
+     ]
+    ]
+   },
+   "0x3031": {
+    "dir": "C→S",
+    "name": "NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_REQ",
+    "basis": "zone FUN_00470490",
+    "fields": [
+     [
+      0,
+      "u64",
+      "cen",
+      ""
+     ]
+    ]
+   },
+   "0x3032": {
+    "dir": "S→C",
+    "name": "NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_ACK",
+    "basis": "zone FUN_00470490",
+    "fields": [
+     [
+      0,
+      "u64",
+      "cen",
+      ""
+     ],
+     [
+      8,
+      "u16",
+      "Error",
+      ""
+     ]
+    ]
+   },
+   "0x3033": {
+    "dir": "C→S",
+    "name": "NC_ITEM_MH_FURNITURE_ENDURE_KIT_USE_REQ",
+    "basis": "zone FUN_00571340",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nInvenSlot",
+      ""
+     ],
+     [
+      1,
+      "u16",
+      "nFurnitureHnd",
+      ""
+     ]
+    ]
+   },
+   "0x3035": {
+    "dir": "C→S",
+    "name": "NC_ITEM_WEAPONENDURE_CHARGE_REQ",
+    "basis": "zone FUN_00519470",
+    "fields": [
+     [
+      0,
+      "u8",
+      "ChargingSlot",
+      ""
+     ],
+     [
+      1,
+      "ITEM_INVEN",
+      "WeaponSlot",
+      "box 8 or 9"
+     ]
+    ]
+   },
+   "0x3039": {
+    "dir": "C→S",
+    "name": "NC_ITEM_REVIVEITEMUSE_CMD",
+    "basis": "zone FUN_00417580",
+    "fields": []
+   },
+   "0x303c": {
+    "dir": "C→S",
+    "name": "NC_ITEM_DICE_GAME_START_REQ",
+    "basis": "zone FUN_00517d70",
+    "fields": [
+     [
+      0,
+      "u16",
+      "itemhandle",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "IsYes",
+      ""
+     ]
+    ]
+   },
+   "0x303d": {
+    "dir": "S→C",
+    "name": "NC_ITEM_DICE_GAME_START_ACK",
+    "basis": "zone FUN_00517d70",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      ""
+     ]
+    ]
+   },
+   "0x3040": {
+    "dir": "C→S",
+    "name": "NC_ITEM_ENCHANT_ADD_GEM_REQ",
+    "basis": "zone FUN_00522560",
+    "fields": [
+     [
+      0,
+      "ITEM_INVEN",
+      "equipment",
+      ""
+     ],
+     [
+      2,
+      "ITEM_INVEN",
+      "gem",
+      ""
+     ]
+    ]
+   },
+   "0x3042": {
+    "dir": "C→S",
+    "name": "NC_ITEM_ENCHANT_REMOVE_GEM_REQ",
+    "basis": "zone FUN_00522990",
+    "fields": [
+     [
+      0,
+      "ITEM_INVEN",
+      "equipment",
+      ""
+     ],
+     [
+      2,
+      "ITEM_INVEN",
+      "remover",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "gemSocketIndex",
+      ""
+     ]
+    ]
+   },
+   "0x3044": {
+    "dir": "C→S",
+    "name": "NC_ITEM_ENCHANT_ADD_NEW_SOCKET_REQ",
+    "basis": "zone FUN_00522cc0",
+    "fields": [
+     [
+      0,
+      "ITEM_INVEN",
+      "equipment",
+      ""
+     ],
+     [
+      2,
+      "ITEM_INVEN",
+      "drill",
+      ""
+     ]
+    ]
+   },
+   "0x3048": {
+    "dir": "C→S",
+    "name": "NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ",
+    "basis": "zone FUN_0051b9a0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nCancelItemInvenSlot",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "nBelongedItemInvenSlot",
+      ""
+     ]
+    ]
+   },
+   "0x304a": {
+    "dir": "C→S",
+    "name": "NC_ITEM_AUTO_ARRANGE_INVEN_REQ",
+    "basis": "zone FUN_0051c360",
+    "fields": []
+   },
+   "0x304b": {
+    "dir": "S→C",
+    "name": "NC_ITEM_AUTO_ARRANGE_INVEN_ACK",
+    "basis": "zone FUN_0051c360",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0x30a8 ok (sent before the work)"
+     ]
+    ]
+   },
+   "0x304c": {
+    "dir": "C→S",
+    "name": "NC_ITEM_ACCOUNT_STORAGE_OPEN_CMD",
+    "basis": "zone FUN_0051c190",
+    "fields": []
+   },
+   "0x304d": {
+    "dir": "C→S",
+    "name": "NC_ITEM_ACCOUNT_STORAGE_CLOSE_CMD",
+    "basis": "zone FUN_0051c2b0",
+    "fields": []
+   },
+   "0x304e": {
+    "dir": "C→S",
+    "name": "NC_ITEM_USE_ACTIVESKILL_REQ",
+    "basis": "zone FUN_00540b90",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nInvenSlot",
+      ""
+     ],
+     [
+      1,
+      "u16",
+      "nTargetHnd",
+      "0xFFFF = ground"
+     ],
+     [
+      3,
+      "SHINE_XY_TYPE",
+      "TargetLoc",
+      ""
+     ]
+    ]
+   },
+   "0x3050": {
+    "dir": "C→S",
+    "name": "NC_ITEM_MINIMON_EQUIP_REQ",
+    "basis": "zone FUN_0052d020",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nSlotNo",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "nEquipSlot",
+      "25 or 28"
+     ]
+    ]
+   },
+   "0x3051": {
+    "dir": "C→S",
+    "name": "NC_ITEM_MOVER_UPGRADE_REQ",
+    "basis": "zone FUN_0051c850",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nMainSlotNo",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "nSubSlotNo",
+      ""
+     ]
+    ]
+   },
+   "0x3053": {
+    "dir": "C→S",
+    "name": "NC_ITEM_RANDOMOPTION_CHANGE_REQ",
+    "basis": "zone FUN_00520e40",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nItemSlotNo",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "nStuffSlotNo",
+      ""
+     ]
+    ]
+   },
+   "0x3055": {
+    "dir": "C→S",
+    "name": "NC_ITEM_CHAT_COLOR_CHANGE_REQ",
+    "basis": "zone FUN_0051e580",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nSlotNo",
+      ""
+     ]
+    ]
+   },
+   "0x3056": {
+    "dir": "S→C",
+    "name": "NC_ITEM_CHAT_COLOR_CHANGE_ACK",
+    "basis": "zone FUN_0051e580; client FUN_0049da30",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x3600 ok"
+     ],
+     [
+      2,
+      "u8",
+      "nChangeColorID",
+      ""
+     ]
+    ]
+   },
+   "0x3057": {
+    "dir": "C→S",
+    "name": "NC_ITEM_TERMEXTEND_REQ",
+    "basis": "zone FUN_0051eb40",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nExtendItemSlot",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "nTermItemSlot",
+      ""
+     ]
+    ]
+   },
+   "0x3059": {
+    "dir": "C→S",
+    "name": "NC_ITEM_REPURCHASE_REQ",
+    "basis": "zone FUN_00538580",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHaldle",
+      "repurchase list handle"
+     ]
+    ]
+   },
+   "0x305e": {
+    "dir": "C→S",
+    "name": "NC_ITEM_CLASS_CHANGE_REQ",
+    "basis": "zone FUN_0051f5c0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nStuffSlotNo",
+      ""
+     ]
+    ]
+   },
+   "0x3061": {
+    "dir": "C→S",
+    "name": "NC_ITEM_RANDOMOPTION_CHANGE_ACCEPT_REQ",
+    "basis": "zone FUN_0051da80",
+    "fields": []
+   },
+   "0x3064": {
+    "dir": "C→S",
+    "name": "NC_ITEM_SHIELDENDURE_CHARGE_REQ",
+    "basis": "zone FUN_00519a10",
+    "fields": [
+     [
+      0,
+      "u8",
+      "ChargingSlot",
+      ""
+     ],
+     [
+      1,
+      "ITEM_INVEN",
+      "ShieldSlot",
+      ""
+     ]
+    ]
+   },
+   "0x3067": {
+    "dir": "C→S",
+    "name": "NC_ITEM_MAPLINK_SCROLL_REQ",
+    "basis": "zone FUN_00520130",
+    "fields": [
+     [
+      0,
+      "u16",
+      "targetMap.map",
+      "first field of WM_Link; rest of the 4 bytes not read here"
+     ]
+    ]
+   },
+   "0x3068": {
+    "dir": "S→C",
+    "name": "NC_ITEM_MAPLINK_SCROLL_ACK",
+    "basis": "zone FUN_00517e40",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "lvFrom",
+      ""
+     ],
+     [
+      3,
+      "u8",
+      "lvto",
+      ""
+     ]
+    ]
+   },
+   "0x3069": {
+    "dir": "C→S",
+    "name": "NC_ITEM_MIX_ITEM_REQ",
+    "basis": "zone FUN_00521540",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nSubRaw",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "nRawLeft",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "nRawRight",
+      ""
+     ]
+    ]
+   },
+   "0x306b": {
+    "dir": "C→S",
+    "name": "NC_ITEM_RANDOMOPTION_RECOVER_COUNT_LIMIT_REQ",
+    "basis": "zone FUN_0051dd40",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nItemSlotNo",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "nStuffUseLot",
+      ""
+     ]
+    ]
+   },
+   "0x306d": {
+    "dir": "C→S",
+    "name": "NC_ITEM_NEW_UPGRADE_REQ",
+    "basis": "zone FUN_0053e360",
+    "fields": [
+     [
+      0,
+      "u8",
+      "equip",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "raw",
+      ""
+     ]
+    ]
+   },
+   "0x306f": {
+    "dir": "C→S",
+    "name": "NC_ITEM_BRACELET_UPGRADE_REQ",
+    "basis": "zone FUN_0053ec40",
+    "fields": [
+     [
+      0,
+      "u8",
+      "equip",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "raw",
+      ""
+     ]
+    ]
+   },
+   "0x5001": {
+    "dir": "C→S",
+    "name": "NC_SOULSTONE_HP_BUY_REQ",
+    "basis": "zone FUN_00588d20",
+    "fields": [
+     [
+      0,
+      "u16",
+      "number",
+      ""
+     ]
+    ]
+   },
+   "0x5002": {
+    "dir": "C→S",
+    "name": "NC_SOULSTONE_SP_BUY_REQ",
+    "basis": "zone FUN_00588e90",
+    "fields": [
+     [
+      0,
+      "u16",
+      "number",
+      ""
+     ]
+    ]
+   },
+   "0x5005": {
+    "dir": "S→C",
+    "name": "NC_SOULSTONE_BUYFAIL_ACK",
+    "basis": "zone FUN_00588510",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0x741 menu/lock, 0x742 stock limit, 0x743 money"
+     ]
+    ]
+   },
+   "0x5006": {
+    "dir": "S→C",
+    "name": "NC_SOULSTONE_USEFAIL_ACK",
+    "basis": "zone FUN_00589510 so_SendProtocol(20,6)",
+    "fields": [],
+    "notes": "empty payload"
+   },
+   "0x5007": {
+    "dir": "C→S",
+    "name": "NC_SOULSTONE_HP_USE_REQ",
+    "basis": "zone FUN_00589510",
+    "fields": []
+   },
+   "0x5008": {
+    "dir": "S→C",
+    "name": "NC_SOULSTONE_HP_USESUC_ACK",
+    "basis": "zone FUN_00589180",
+    "fields": [],
+    "notes": "empty payload"
+   },
+   "0x5009": {
+    "dir": "C→S",
+    "name": "NC_SOULSTONE_SP_USE_REQ",
+    "basis": "zone FUN_00589000",
+    "fields": []
+   },
+   "0x3463": {
+    "dir": "Z→DB",
+    "name": "NC_ITEMDB_CHARGED_LIST_REQ",
+    "basis": "zone FUN_004923c0 (zone→DB)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.objHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      10,
+      "u16",
+      "first",
+      ""
+     ],
+     [
+      12,
+      "u16",
+      "last",
+      ""
+     ]
+    ]
+   },
+   "0x345f": {
+    "dir": "Z→DB",
+    "name": "NC_ITEMDB_DEPOSIT_REQ",
+    "basis": "zone FUN_00533dc0 (zone→DB)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.objHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "lock",
+      ""
+     ],
+     [
+      8,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      12,
+      "u64",
+      "cen",
+      ""
+     ]
+    ]
+   },
+   "0x3461": {
+    "dir": "Z→DB",
+    "name": "NC_ITEMDB_WITHDRAW_REQ",
+    "basis": "zone FUN_005342b0 (zone→DB)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.objHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "lock",
+      ""
+     ],
+     [
+      8,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      12,
+      "u64",
+      "cen",
+      ""
+     ]
+    ]
+   },
+   "0x3444": {
+    "dir": "Z→DB",
+    "name": "NC_ITEMDB_OPENSTORAGE_REQ",
+    "basis": "zone FUN_00535ce0 (zone→DB)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.objHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "page",
+      ""
+     ],
+     [
+      7,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      11,
+      "u8",
+      "fromAccountStorageCmd",
+      ""
+     ]
+    ]
+   },
+   "0x3413": {
+    "dir": "Z→DB",
+    "name": "NC_ITEMDB_UNEQUIP_REQ",
+    "basis": "zone FUN_0053a990 (zone→DB)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.objHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u64",
+      "key",
+      ""
+     ],
+     [
+      14,
+      "u16",
+      "inven",
+      "0x2400|slot"
+     ],
+     [
+      16,
+      "u16",
+      "lock",
+      ""
+     ],
+     [
+      18,
+      "u16",
+      "equip",
+      "0x2000|slot"
+     ]
+    ]
+   },
+   "0x343f": {
+    "dir": "Z→DB",
+    "name": "NC_ITEMDB_USEALL_REQ",
+    "basis": "zone FUN_00540080 (zone→DB)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.objHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u64",
+      "key",
+      ""
+     ],
+     [
+      14,
+      "u16",
+      "lock",
+      ""
+     ],
+     [
+      16,
+      "u16",
+      "itemid",
+      ""
+     ]
+    ]
+   },
+   "0x6401": {
+    "dir": "Z→WM",
+    "name": "NC_ANNOUNCE_Z2W_CMD",
+    "basis": "zone FUN_005b8d30 (zone→WM), megaphone via FUN_005b91f0",
+    "fields": [
+     [
+      0,
+      "ANNOUNCE_MESSAGE",
+      "AnnounceMessage",
+      "type 11 = roar, text from AnnounceData row 11 \"%s:%s\""
+     ]
+    ],
+    "notes": "(pdb2017 struct; zone writes a type byte and a length-prefixed text, details not decoded)"
+   }
+  }
+ }
+}

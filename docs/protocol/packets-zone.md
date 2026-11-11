@@ -718,11 +718,11 @@ Handler `FUN_0042b900`
 
 ### `0x3006` NC_ITEM_SELL_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SELL_REQ`, 5 bytes
+**Verified layout** (basis: zone FUN_00539020)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | slot |  |
+| 0 | u8 | slot | inventory slot |
 | 1 | u32 | lot |  |
 
 Handler `FUN_00539020`
@@ -734,14 +734,13 @@ Handler `FUN_00539020`
 
 ### `0x3007` NC_ITEM_DROP_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DROP_REQ`, 14 bytes
+**Verified layout** (basis: zone FUN_00529f50)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | slot | ITEM_INVEN (union: Inven, Pos, Type) |
-| 2 | u32 | lot |  |
-| 6 | u32 | loc.x |  |
-| 10 | u32 | loc.y |  |
+| 0 | ITEM_INVEN | slot |  |
+| 2 | u32 | lot | must cover the whole stack |
+| 6 | SHINE_XY_TYPE | loc |  |
 
 Handler `FUN_00529f50`
 
@@ -751,7 +750,7 @@ Handler `FUN_00529f50`
 
 ### `0x3009` NC_ITEM_PICK_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_PICK_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_00530a50)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -765,12 +764,12 @@ Handler `FUN_00530a50`
 
 ### `0x300b` NC_ITEM_RELOC_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_RELOC_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_00537170)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | from | ITEM_INVEN (union: Inven, Pos, Type) |
-| 2 | u16 | to | ITEM_INVEN (union: Inven, Pos, Type) |
+| 0 | ITEM_INVEN | from |  |
+| 2 | ITEM_INVEN | to |  |
 
 Handler `FUN_00537170`
 
@@ -780,13 +779,13 @@ Handler `FUN_00537170`
 
 ### `0x300d` NC_ITEM_SPLIT_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SPLIT_REQ`, 8 bytes
+**Verified layout** (basis: zone FUN_00539a40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | from | ITEM_INVEN (union: Inven, Pos, Type) |
-| 2 | u16 | to | ITEM_INVEN (union: Inven, Pos, Type) |
-| 4 | u32 | lot |  |
+| 0 | ITEM_INVEN | from |  |
+| 2 | ITEM_INVEN | to | must be empty |
+| 4 | u32 | lot | amount moved; < stack |
 
 Handler `FUN_00539a40`
 
@@ -797,11 +796,11 @@ Handler `FUN_00539a40`
 
 ### `0x300f` NC_ITEM_EQUIP_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_EQUIP_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_0052b8d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | slot |  |
+| 0 | u8 | slot | inventory slot |
 
 Handler `FUN_0052b8d0`
 
@@ -811,12 +810,12 @@ Handler `FUN_0052b8d0`
 
 ### `0x3010` NC_ITEM_RINGEQUIP_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_RINGEQUIP_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0052c5b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | slot |  |
-| 1 | u8 | equip |  |
+| 1 | u8 | equip | 15 or 16 |
 
 Handler `FUN_0052c5b0`
 
@@ -827,12 +826,12 @@ Handler `FUN_0052c5b0`
 
 ### `0x3012` NC_ITEM_UNEQUIP_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_UNEQUIP_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0053a990)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | slotequip |  |
-| 1 | u8 | slotinven |  |
+| 1 | u8 | slotinven | must be empty |
 
 Handler `FUN_0053a990`
 
@@ -843,12 +842,12 @@ Handler `FUN_0053a990`
 
 ### `0x3015` NC_ITEM_USE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_USE_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_005416b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | invenslot |  |
-| 1 | u8 | invenType |  |
+| 1 | u8 | invenType | 8 equipment, 9 inventory |
 
 Handler `FUN_005416b0`
 
@@ -859,16 +858,16 @@ Handler `FUN_005416b0`
 
 ### `0x3017` NC_ITEM_UPGRADE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_UPGRADE_REQ`, 9 bytes
+**Verified layout** (basis: zone FUN_0053d220)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | equip |  |
 | 1 | u8 | raw |  |
-| 2 | u8 | raw_left |  |
-| 3 | u8 | raw_right |  |
+| 2 | u8 | raw_left | 0xFF none |
+| 3 | u8 | raw_right | 0xFF none |
 | 4 | u32 | gift_money |  |
-| 8 | u8 | raw_middle |  |
+| 8 | u8 | raw_middle | 0xFF none |
 
 Handler `FUN_0053d220`
 
@@ -883,7 +882,7 @@ Handler `FUN_0053d220`
 
 ### `0x301c` NC_ITEM_DEPOSIT_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DEPOSIT_REQ`, 8 bytes
+**Verified layout** (basis: zone FUN_00533dc0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -898,7 +897,7 @@ Handler `FUN_00533dc0`
 
 ### `0x301e` NC_ITEM_WITHDRAW_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_WITHDRAW_REQ`, 8 bytes
+**Verified layout** (basis: zone FUN_005342b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -913,11 +912,11 @@ Handler `FUN_005342b0`
 
 ### `0x3020` NC_ITEM_CHARGEDINVENOPEN_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHARGEDINVENOPEN_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_004923c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | page |  |
+| 0 | u16 | page | 24 entries per page |
 
 Handler `FUN_004923c0`
 
@@ -927,7 +926,7 @@ Handler `FUN_004923c0`
 
 ### `0x3022` NC_ITEM_CHARGED_WITHDRAW_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHARGED_WITHDRAW_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_00492660)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -941,7 +940,7 @@ Handler `FUN_00492660`
 
 ### `0x3026` NC_ITEM_GUILD_STORAGE_WITHDRAW_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_STORAGE_WITHDRAW_REQ`, 8 bytes
+**Verified layout** (basis: zone FUN_00537330)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -956,11 +955,11 @@ Handler `FUN_00537330`
 
 ### `0x3028` NC_ITEM_OPENSTORAGEPAGE_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_OPENSTORAGEPAGE_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_00536650)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | page |  |
+| 0 | u8 | page | < 16 |
 
 Handler `FUN_00536650`
 
@@ -970,11 +969,11 @@ Handler `FUN_00536650`
 
 ### `0x302a` NC_ITEM_DISMANTLE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DISMANTLE_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_005293c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | item |  |
+| 0 | u8 | item | inventory slot |
 
 Handler `FUN_005293c0`
 
@@ -984,7 +983,7 @@ Handler `FUN_005293c0`
 
 ### `0x302c` NC_ITEM_REWARDINVENOPEN_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_REWARDINVENOPEN_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_004fc060)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -998,7 +997,7 @@ Handler `FUN_004fc060`
 
 ### `0x302f` NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_REQ`, 8 bytes
+**Verified layout** (basis: zone FUN_00470110)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1010,7 +1009,7 @@ No payload fields read directly by the handler.
 
 ### `0x3031` NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_REQ`, 8 bytes
+**Verified layout** (basis: zone FUN_00470490)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1022,7 +1021,7 @@ No payload fields read directly by the handler.
 
 ### `0x3033` NC_ITEM_MH_FURNITURE_ENDURE_KIT_USE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MH_FURNITURE_ENDURE_KIT_USE_REQ`, 3 bytes
+**Verified layout** (basis: zone FUN_00571340)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1035,12 +1034,12 @@ No payload fields read directly by the handler.
 
 ### `0x3035` NC_ITEM_WEAPONENDURE_CHARGE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_WEAPONENDURE_CHARGE_REQ`, 3 bytes
+**Verified layout** (basis: zone FUN_00519470)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | ChargingSlot |  |
-| 1 | u16 | WeaponSlot | ITEM_INVEN (union: Inven, Pos, Type) |
+| 1 | ITEM_INVEN | WeaponSlot | box 8 or 9 |
 
 Handler `FUN_00519470`
 
@@ -1051,7 +1050,7 @@ Handler `FUN_00519470`
 
 ### `0x303c` NC_ITEM_DICE_GAME_START_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DICE_GAME_START_REQ`, 3 bytes
+**Verified layout** (basis: zone FUN_00517d70)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1066,12 +1065,12 @@ Handler `FUN_00517d70`
 
 ### `0x3040` NC_ITEM_ENCHANT_ADD_GEM_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_ADD_GEM_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_00522560)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
-| 2 | u16 | gem | ITEM_INVEN (union: Inven, Pos, Type) |
+| 0 | ITEM_INVEN | equipment |  |
+| 2 | ITEM_INVEN | gem |  |
 
 Handler `FUN_00522560`
 
@@ -1081,12 +1080,12 @@ Handler `FUN_00522560`
 
 ### `0x3042` NC_ITEM_ENCHANT_REMOVE_GEM_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_REMOVE_GEM_REQ`, 5 bytes
+**Verified layout** (basis: zone FUN_00522990)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
-| 2 | u16 | remover | ITEM_INVEN (union: Inven, Pos, Type) |
+| 0 | ITEM_INVEN | equipment |  |
+| 2 | ITEM_INVEN | remover |  |
 | 4 | u8 | gemSocketIndex |  |
 
 Handler `FUN_00522990`
@@ -1099,12 +1098,12 @@ Handler `FUN_00522990`
 
 ### `0x3044` NC_ITEM_ENCHANT_ADD_NEW_SOCKET_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_ADD_NEW_SOCKET_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_00522cc0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
-| 2 | u16 | drill | ITEM_INVEN (union: Inven, Pos, Type) |
+| 0 | ITEM_INVEN | equipment |  |
+| 2 | ITEM_INVEN | drill |  |
 
 Handler `FUN_00522cc0`
 
@@ -1114,7 +1113,7 @@ Handler `FUN_00522cc0`
 
 ### `0x3048` NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0051b9a0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1130,14 +1129,13 @@ Handler `FUN_0051b9a0`
 
 ### `0x304e` NC_ITEM_USE_ACTIVESKILL_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_USE_ACTIVESKILL_REQ`, 11 bytes
+**Verified layout** (basis: zone FUN_00540b90)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | nInvenSlot |  |
-| 1 | u16 | nTargetHnd |  |
-| 3 | u32 | TargetLoc.x |  |
-| 7 | u32 | TargetLoc.y |  |
+| 1 | u16 | nTargetHnd | 0xFFFF = ground |
+| 3 | SHINE_XY_TYPE | TargetLoc |  |
 
 Handler `FUN_00540b90`
 
@@ -1150,12 +1148,12 @@ Handler `FUN_00540b90`
 
 ### `0x3050` NC_ITEM_MINIMON_EQUIP_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MINIMON_EQUIP_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0052d020)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | nSlotNo |  |
-| 1 | u8 | nEquipSlot |  |
+| 1 | u8 | nEquipSlot | 25 or 28 |
 
 Handler `FUN_0052d020`
 
@@ -1166,7 +1164,7 @@ Handler `FUN_0052d020`
 
 ### `0x3051` NC_ITEM_MOVER_UPGRADE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MOVER_UPGRADE_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0051c850)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1182,7 +1180,7 @@ Handler `FUN_0051c850`
 
 ### `0x3053` NC_ITEM_RANDOMOPTION_CHANGE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_RANDOMOPTION_CHANGE_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_00520e40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1198,7 +1196,7 @@ Handler `FUN_00520e40`
 
 ### `0x3055` NC_ITEM_CHAT_COLOR_CHANGE_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHAT_COLOR_CHANGE_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_0051e580)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1212,11 +1210,11 @@ Handler `FUN_0051e580`
 
 ### `0x3059` NC_ITEM_REPURCHASE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_REPURCHASE_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_00538580)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nHaldle |  |
+| 0 | u16 | nHaldle | repurchase list handle |
 
 Handler `FUN_00538580`
 
@@ -1226,7 +1224,7 @@ Handler `FUN_00538580`
 
 ### `0x305e` NC_ITEM_CLASS_CHANGE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CLASS_CHANGE_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_0051f5c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1240,12 +1238,12 @@ Handler `FUN_0051f5c0`
 
 ### `0x3064` NC_ITEM_SHIELDENDURE_CHARGE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SHIELDENDURE_CHARGE_REQ`, 3 bytes
+**Verified layout** (basis: zone FUN_00519a10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | ChargingSlot |  |
-| 1 | u16 | ShieldSlot | ITEM_INVEN (union: Inven, Pos, Type) |
+| 1 | ITEM_INVEN | ShieldSlot |  |
 
 Handler `FUN_00519a10`
 
@@ -1256,11 +1254,11 @@ Handler `FUN_00519a10`
 
 ### `0x3067` NC_ITEM_MAPLINK_SCROLL_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MAPLINK_SCROLL_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_00520130)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | i32 | targetMap |  |
+| 0 | u16 | targetMap.map | first field of WM_Link; rest of the 4 bytes not read here |
 
 Handler `FUN_00520130`
 
@@ -1270,7 +1268,7 @@ Handler `FUN_00520130`
 
 ### `0x3069` NC_ITEM_MIX_ITEM_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MIX_ITEM_REQ`, 3 bytes
+**Verified layout** (basis: zone FUN_00521540)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1288,7 +1286,7 @@ Handler `FUN_00521540`
 
 ### `0x306d` NC_ITEM_NEW_UPGRADE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_NEW_UPGRADE_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0053e360)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1304,7 +1302,7 @@ Handler `FUN_0053e360`
 
 ### `0x306f` NC_ITEM_BRACELET_UPGRADE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_BRACELET_UPGRADE_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_0053ec40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1546,7 +1544,7 @@ Handler `FUN_005936b0`
 
 ### `0x5001` NC_SOULSTONE_HP_BUY_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SOULSTONE_HP_BUY_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_00588d20)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1560,7 +1558,7 @@ Handler `FUN_00588d20`
 
 ### `0x5002` NC_SOULSTONE_SP_BUY_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SOULSTONE_SP_BUY_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_00588e90)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -5342,13 +5340,13 @@ Fill: +6: FUN_006406f0 (no direct writes found)
 
 ### `0x300a` NC_ITEM_PICK_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_PICK_ACK`, 10 bytes
+**Verified layout** (basis: zone FUN_005308d0 so_ply_itempickresult; client FUN_004aba00)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | itemid |  |
+| 0 | u16 | itemid | 0xFFFF on error |
 | 2 | u32 | lot |  |
-| 6 | u16 | error |  |
+| 6 | u16 | error | 0x341 ok |
 | 8 | u16 | itemhandle |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_itempickresult` (`FUN_005308d0`) · payload 10 bytes
@@ -5384,11 +5382,11 @@ Sent from `FUN_0052f0e0` (`FUN_0052f0e0`) · payload 26 bytes
 
 ### `0x3016` NC_ITEM_USE_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_USE_ACK`, 5 bytes
+**Verified layout** (basis: zone FUN_0045e610; client FUN_004abdb0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | error |  |
+| 0 | u16 | error | 0x700 ok |
 | 2 | u16 | useditem |  |
 | 4 | u8 | invenType |  |
 
@@ -5402,7 +5400,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ItemUseResultPacket` (`FUN_0045
 
 ### `0x3018` NC_ITEM_UPGRADE_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_UPGRADE_ACK`, 2 bytes
+**Verified layout** (basis: zone 12/24; client FUN_0049a5d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -5487,7 +5485,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_FillChargedInven` (`FUN_00492f3
 
 ### `0x3023` NC_ITEM_CHARGED_WITHDRAW_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHARGED_WITHDRAW_ACK`, 6 bytes
+**Verified layout** (basis: zone FUN_00492110)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -5503,12 +5501,12 @@ Sent from `FUN_00492110` (`FUN_00492110`) · payload 6 bytes
 
 ### `0x3027` NC_ITEM_GUILD_STORAGE_WITHDRAW_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_STORAGE_WITHDRAW_ACK`, 10 bytes
+**Verified layout** (basis: zone FUN_00537330; client FUN_006b4f90)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u64 | cen |  |
-| 8 | u16 | err |  |
+| 0 | u64 | cen | stale on errors |
+| 8 | u16 | err | 0x1480 ok |
 
 Sent in reply to `0x3026` NC_ITEM_GUILD_STORAGE_WITHDRAW_REQ on ShineObjectClass::ShinePlayer (`FUN_00537330`, ShineObjectClass::ShinePlayer::sp_NC_ITEM_GUILD_STORAGE_WITHDRAW_REQ) · payload 10 bytes
 
@@ -5568,12 +5566,12 @@ Fill: +0: FUN_00644c80
 
 ### `0x3030` NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_ACK`, 10 bytes
+**Verified layout** (basis: zone FUN_00470110; client FUN_006f54c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u64 | cen |  |
-| 8 | u16 | Error |  |
+| 8 | u16 | Error | 0x17e0 ok |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_GuildAcademyRewardStorageWithdrawAck` (`FUN_0046f970`) · payload 10 bytes
 
@@ -5593,7 +5591,7 @@ Sent in reply to `0x302f` NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_REQ on S
 
 ### `0x3032` NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_ACK`, 10 bytes
+**Verified layout** (basis: zone FUN_00470490)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -5710,7 +5708,7 @@ Sent from `ShineObjectClass::ShineDropItem::so_DiceItemPickInit` (`FUN_00531020`
 
 ### `0x303d` NC_ITEM_DICE_GAME_START_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DICE_GAME_START_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_00517d70)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -5852,11 +5850,11 @@ Sent in reply to `0x3048` NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ on ShineObjectCl
 
 ### `0x304b` NC_ITEM_AUTO_ARRANGE_INVEN_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_AUTO_ARRANGE_INVEN_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_0051c360)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | err |  |
+| 0 | u16 | err | 0x30a8 ok (sent before the work) |
 
 Sent in reply to `0x304a` NC_ITEM_AUTO_ARRANGE_INVEN_REQ on ShineObjectClass::ShinePlayer (`FUN_0051c360`, ShineObjectClass::ShinePlayer::sp_NC_ITEM_AUTO_ARRANGE_INVEN_REQ) · payload 2 bytes
 
@@ -5922,11 +5920,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_RandOptChangeProcessConsumeAndC
 
 ### `0x3056` NC_ITEM_CHAT_COLOR_CHANGE_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHAT_COLOR_CHANGE_ACK`, 3 bytes
+**Verified layout** (basis: zone FUN_0051e580; client FUN_0049da30)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x3600 ok |
 | 2 | u8 | nChangeColorID |  |
 
 Sent in reply to `0x34b6` NC_ITEMDB_CHAT_COLOR_CHANGE_ACK on GameDBSession (`FUN_00469710`, GameDBSession::gds_NC_ITEMDB_CHAT_COLOR_CHANGE_ACK) · payload 3 bytes
@@ -6072,7 +6070,7 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CostumShieldChargeDecrease_ToClient
 
 ### `0x3068` NC_ITEM_MAPLINK_SCROLL_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MAPLINK_SCROLL_ACK`, 4 bytes
+**Verified layout** (basis: zone FUN_00517e40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10171,9 +10169,84 @@ Empty payload.
 
 Empty payload.
 
+### `0x3003` NC_ITEM_BUY_REQ (C→S)
+
+**Verified layout** (basis: zone FUN_00524a60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | itemid |  |
+| 2 | u32 | lot | clamped to MaxLot for stackables |
+
+### `0x3019` NC_ITEM_USEABORT_CMD (C→S)
+
+**Verified layout** (basis: zone FUN_0053f960)
+
+Empty payload.
+
+### `0x3039` NC_ITEM_REVIVEITEMUSE_CMD (C→S)
+
+**Verified layout** (basis: zone FUN_00417580)
+
+Empty payload.
+
+### `0x304a` NC_ITEM_AUTO_ARRANGE_INVEN_REQ (C→S)
+
+**Verified layout** (basis: zone FUN_0051c360)
+
+Empty payload.
+
+### `0x304c` NC_ITEM_ACCOUNT_STORAGE_OPEN_CMD (C→S)
+
+**Verified layout** (basis: zone FUN_0051c190)
+
+Empty payload.
+
+### `0x304d` NC_ITEM_ACCOUNT_STORAGE_CLOSE_CMD (C→S)
+
+**Verified layout** (basis: zone FUN_0051c2b0)
+
+Empty payload.
+
+### `0x3057` NC_ITEM_TERMEXTEND_REQ (C→S)
+
+**Verified layout** (basis: zone FUN_0051eb40)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nExtendItemSlot |  |
+| 1 | u8 | nTermItemSlot |  |
+
+### `0x3061` NC_ITEM_RANDOMOPTION_CHANGE_ACCEPT_REQ (C→S)
+
+**Verified layout** (basis: zone FUN_0051da80)
+
+Empty payload.
+
+### `0x306b` NC_ITEM_RANDOMOPTION_RECOVER_COUNT_LIMIT_REQ (C→S)
+
+**Verified layout** (basis: zone FUN_0051dd40)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nItemSlotNo |  |
+| 1 | u8 | nStuffUseLot |  |
+
 ### `0x482a` NC_SKILL_REPLYREVIVE_CMD (C→S)
 
 **Verified layout** (basis: zone FUN_00418a30)
+
+Empty payload.
+
+### `0x5007` NC_SOULSTONE_HP_USE_REQ (C→S)
+
+**Verified layout** (basis: zone FUN_00589510)
+
+Empty payload.
+
+### `0x5009` NC_SOULSTONE_SP_USE_REQ (C→S)
+
+**Verified layout** (basis: zone FUN_00589000)
 
 Empty payload.
 
@@ -10401,6 +10474,80 @@ Empty payload.
 |---|---|---|---|
 | 0 | u16 | err | 0x20E8 ok, 0x20E9 riding, 0x20EA wrong mode |
 
+### `0x3004` NC_ITEM_BUY_ACK † (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 12/4; client FUN_004ab770)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | code | 0x201 ok, 0x20a full, 0x20c fame, 0x20d bind item owned, 0x20f item-money short, 0x211 buy level |
+
+### `0x3005` NC_ITEM_SELL_ACK † (S→C)
+
+**Verified layout** (basis: zone 12/5; client FUN_004ab870)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | code | 0x381 ok, 0x38f bound |
+
+### `0x3008` NC_ITEM_DROP_ACK † (S→C)
+
+**Verified layout** (basis: zone 12/8; client FUN_004ab990)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | code | 0x301 = confirmation menu opened |
+
+### `0x300c` NC_ITEM_RELOC_ACK † (S→C)
+
+**Verified layout** (basis: zone 12/12; client FUN_004ab910)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | code | 0x241 ok, 0x24a bound item |
+
+### `0x300e` NC_ITEM_SPLIT_ACK † (S→C)
+
+**Verified layout** (basis: zone 12/14; client FUN_004a8360)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | code |  |
+
+### `0x3011` NC_ITEM_EQUIP_ACK † (S→C)
+
+**Verified layout** (basis: zone 12/17; client FUN_004abd20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | code | 0x281 ok, 0x293 weapon skin |
+
+no PDB struct of that name
+
+### `0x3013` NC_ITEM_UNEQUIP_ACK † (S→C)
+
+**Verified layout** (basis: zone 12/19; client FUN_004abd80)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | code | 0x2c1 ok |
+
+### `0x3025` NC_ITEM_BREAKFAIL_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_0048db00 / FUN_0048d990)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1829 = confirmation cancelled |
+
+### `0x302b` NC_ITEM_DISMANTLE_ACK † (S→C)
+
+**Verified layout** (basis: zone 12/43)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1680 ok |
+
 ### `0x4829` NC_SKILL_SOMEONEREVAVALTOME_CMD † (S→C)
 
 **Verified layout** (basis: zone FUN_0057ab90; client FUN_00575f30)
@@ -10414,6 +10561,30 @@ Empty payload.
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x1506; the client ignores the packet |
+
+### `0x5005` NC_SOULSTONE_BUYFAIL_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_00588510)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x741 menu/lock, 0x742 stock limit, 0x743 money |
+
+### `0x5006` NC_SOULSTONE_USEFAIL_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_00589510 so_SendProtocol(20,6))
+
+Empty payload.
+
+empty payload
+
+### `0x5008` NC_SOULSTONE_HP_USESUC_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_00589180)
+
+Empty payload.
+
+empty payload
 
 ### `0x0821` NC_MISC_TIMEFROMWORLD_CMD (WM→zone)
 
@@ -10480,6 +10651,79 @@ Empty payload.
 | 16 | char[16] | zoneIp |  |
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
+
+### `0x3413` NC_ITEMDB_UNEQUIP_REQ † (Z→DB)
+
+**Verified layout** (basis: zone FUN_0053a990 (zone→DB))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u64 | key |  |
+| 14 | u16 | inven | 0x2400|slot |
+| 16 | u16 | lock |  |
+| 18 | u16 | equip | 0x2000|slot |
+
+### `0x343f` NC_ITEMDB_USEALL_REQ † (Z→DB)
+
+**Verified layout** (basis: zone FUN_00540080 (zone→DB))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u64 | key |  |
+| 14 | u16 | lock |  |
+| 16 | u16 | itemid |  |
+
+### `0x3444` NC_ITEMDB_OPENSTORAGE_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_00535ce0 (zone→DB))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u8 | page |  |
+| 7 | u32 | userNo |  |
+| 11 | u8 | fromAccountStorageCmd |  |
+
+### `0x345f` NC_ITEMDB_DEPOSIT_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_00533dc0 (zone→DB))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lock |  |
+| 8 | u32 | userNo |  |
+| 12 | u64 | cen |  |
+
+### `0x3461` NC_ITEMDB_WITHDRAW_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_005342b0 (zone→DB))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lock |  |
+| 8 | u32 | userNo |  |
+| 12 | u64 | cen |  |
+
+### `0x3463` NC_ITEMDB_CHARGED_LIST_REQ † (Z→DB)
+
+**Verified layout** (basis: zone FUN_004923c0 (zone→DB))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u32 | userNo |  |
+| 10 | u16 | first |  |
+| 12 | u16 | last |  |
 
 ### `0x4801` NC_SKILL_SKILLTEACH_REQ † (Z→DB)
 
@@ -10549,6 +10793,16 @@ Empty payload.
 | 0 | u16 | killerWmHandle |  |
 | 2 | u32 | killerCharNo |  |
 | 6 | u32 | pkCount |  |
+
+### `0x6401` NC_ANNOUNCE_Z2W_CMD † (Z→WM)
+
+**Verified layout** (basis: zone FUN_005b8d30 (zone→WM), megaphone via FUN_005b91f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | ANNOUNCE_MESSAGE | AnnounceMessage | type 11 = roar, text from AnnounceData row 11 "%s:%s" |
+
+(pdb2017 struct; zone writes a type byte and a length-prefixed text, details not decoded)
 
 ### `0x1083` NC_CHAR_WEDDING_PROPOSE_REQ (zone→CharDB)
 
