@@ -85,7 +85,7 @@ The DB items (D01–D05) don't depend on the zone/WM items and can fill gaps in 
 
 | ID | Item | Depends |
 |---|---|---|
-| [X01](items/X01.md) | Integration: architecture overview, feature → message index, glossary, contradictions, regen | all |
+| [X01](items/X01.md) | Integration: architecture overview, feature → message index, glossary, contradictions, original-server bug register, regen | all |
 
 Exact handler counts and line sizes per item: `docs/plan/items/_summary.json` and the scope table at the top
 of each item file.
