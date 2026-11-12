@@ -1296,6 +1296,9 @@ FUN_00447710 → FUN_00447570 (append to the daily log file); CRT `_localtime32_
 
 ## 13. Coverage boundary
 
+The two remaining open points of §12 (0x986B storage merge, `GTReward_MakeItemAttr`) are D04 scope; they are proposed
+as follow-up item D07 in `docs/plan/status/D04.md` ("Proposed follow-up items").
+
 | Found | Covered by | Argument |
 |---|---|---|
 | Friend list / friend points at load (`p_Friend_GetAll`, `usp_Character_*Friendpoint`, 0x1010, 0x541C) | D02 §4–5, D03 §6.5 | reached from 0x1004 / 0x1036 / 0x34BF, not from dept 21 |
