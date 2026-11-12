@@ -533,6 +533,31 @@ ITEMS = [
       done="Every procedure in scope and every run-time call string has a block (or a note that nothing can be inferred, "
            "with the reason); the schema lists every table the 2016 servers use; each open DB statement of D01–D05 is "
            "confirmed, corrected or left open with a reason."),
+ dict(id="D07", phase=2, title="Character server: D04 residue (academy reward storage, tournament reward items) (added by D04)",
+      out="docs/pseudocode/db/D07-character-reward-items.md", deps=["D04", "D03"], scope=[],
+      goal="D04 documented all 120 social/guild/quest/skill handlers of the Character server but left two item-attribute "
+           "internals summarised (`docs/pseudocode/db/D04-character-social.md` §12): how 0x986B "
+           "NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_REQ picks, merges and moves item stacks in the academy reward storage, and how "
+           "0x74AA NC_GUILD_TOURNAMENT_DB_REWARD_CREATE_REQ turns its ITEM_OPT records into item attributes.",
+      steps=["Read `docs/pseudocode/db/D04-character-social.md` §6.4 (0x74AA), §9.3 (0x986B), §11 and §12, `docs/knowledge/D04.md`, "
+             "and D03's item helpers (`docs/pseudocode/db/D03-character-items.md` §1.2–1.3, §5.3). If W03 is done, take the "
+             "ITEM_OPT field names from its WM sender of 0x74AA (W03 scope row 0x74AB, FUN_0040bef0 in the wm export).",
+             "0x986B `fc_NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_REQ` FUN_0041de10 (character export): trace the stack choose / merge / "
+             "move rule in the academy reward storage (decompiled lines ~107–170 and ~300–397): `AcademyStorage_List`, "
+             "`CGameDB_Item_GetItemOptions`, `ItemAttr_Save`, `p_Item_SetStorageAndOwner(…, 1)`, `Item_DropAll`, `Item_Insert`, "
+             "`ItemAttr_MakeWithLot` FUN_00468000, the attribute-class helpers FUN_0044ff60 / FUN_0044d340 "
+             "(`g_ItemAttrClassContainer`). Derive the exact `EACH_MODIFY_ITEM` entries, `nWantItemCnt` and the want-lot rule of "
+             "the 0x986C answer and of the 0x9882 NC_GUILD_ACADEMY_DB_REWARD_WANT_CMD sent to the WM. Use the disassembly where "
+             "Ghidra's stack names are ambiguous.",
+             "`GTReward_MakeItemAttr` FUN_00467c60: map the 0x21-byte ITEM_OPT record of 0x74AA field by field (bytes 0x00–0x20) "
+             "and the SHINE_ITEM_ATTRIBUTE it builds for every ItemInfo class (+0x66), including the random-option block for "
+             "class 4; check against the 2017 PDB (`PROTO_NC_GUILD_TOURNAMENT_DB_REWARD_CREATE_REQ::ITEM_OPT` if present) and "
+             "`ItemInfo.shn` classes.",
+             "Write the results to your own output file only (do not edit D04's files); record bugs as `D07-B<n>` and say in "
+             "`docs/knowledge/D07.md` which D04 §12 bullets are now closed and what D04's text should be read as instead."],
+      done="The 0x986C / 0x9882 contents are fully derived from the code for every storage situation (no stack, partial "
+           "stack, full storage, item failure); every ITEM_OPT byte and every class branch of FUN_00467c60 is named or marked "
+           "unused."),
  dict(id="P01", phase=1, title="Packet capture decoder", out="tools/protocol-re/pcap_decode.py + docs/knowledge/P01.md",
       scope=[], deps=[],
       goal="A pure-Python (stdlib only: no scapy/dpkt/tshark on this machine) tool that turns a capture of real "
