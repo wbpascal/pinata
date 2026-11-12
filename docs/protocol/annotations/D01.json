@@ -1,0 +1,1412 @@
+{
+ "_about": "D01: Account and AccountLog server link packets (docs/pseudocode/db/D01-account.md). Offsets after the opcode; field names from the 2017 PDB where the 2016 code agrees.",
+ "packets": {
+  "account": {
+   "0x0c5b": {
+    "dir": "Login→AccountDB",
+    "name": "NC_USER_US_PASSWORD_CHECK_REQ",
+    "basis": "account FUN_00402fe0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "Login session handle"
+     ],
+     [
+      2,
+      "char[260]",
+      "sUserName",
+      "first 256 used"
+     ],
+     [
+      262,
+      "char[36]",
+      "sPassword",
+      "first 32 used"
+     ],
+     [
+      298,
+      "char[20]",
+      "sUserIP",
+      "%03d.%03d.%03d.%03d"
+     ],
+     [
+      318,
+      "Name5",
+      "spawnapps",
+      ""
+     ]
+    ],
+    "notes": "pdb2017 field names; offsets checked in the 2016 code"
+   },
+   "0x0c5c": {
+    "dir": "AccountDB→Login",
+    "name": "NC_USER_US_PASSWORD_CHECK_ACK",
+    "basis": "account FUN_00402fe0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "nError",
+      "0x41 ok, 0x43 DB error"
+     ],
+     [
+      4,
+      "i32",
+      "nUserNo",
+      "-1 wrong ID/password or DB error (usp_User_USLoginGame)"
+     ],
+     [
+      8,
+      "char[260]",
+      "sUserName",
+      "copy"
+     ],
+     [
+      268,
+      "char[36]",
+      "sPassword",
+      "copy; Login logs it in 0x0720"
+     ],
+     [
+      304,
+      "char[20]",
+      "sUserIP",
+      "copy"
+     ],
+     [
+      324,
+      "u8",
+      "nAuthID",
+      "tUser.nAuthID"
+     ],
+     [
+      325,
+      "u32",
+      "nBlock",
+      "tUser.bIsBlock after usp_User_chkBlock → Login 0x47"
+     ],
+     [
+      329,
+      "u32",
+      "bLoginAble",
+      "tUserAuth.bIsLoginAble → Login 0x48 when != 1"
+     ],
+     [
+      333,
+      "Name5",
+      "spawnapps",
+      "copy"
+     ]
+    ],
+    "notes": "pdb2017 field names; offsets checked in the 2016 code"
+   },
+   "0x0c07": {
+    "dir": "Login→AccountDB",
+    "name": "NC_USER_PASSWORD_CHECK_REQ",
+    "basis": "account FUN_004039c0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      ""
+     ],
+     [
+      2,
+      "char[256]",
+      "user",
+      ""
+     ],
+     [
+      258,
+      "Name4",
+      "password",
+      "16 bytes"
+     ]
+    ],
+    "notes": "pdb2017 field names; offsets checked in the 2016 code"
+   },
+   "0x0c08": {
+    "dir": "AccountDB→Login",
+    "name": "NC_USER_PASSWORD_CHECK_ACK",
+    "basis": "account FUN_004039c0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      ""
+     ],
+     [
+      2,
+      "char[256]",
+      "id",
+      ""
+     ],
+     [
+      258,
+      "Name4",
+      "password",
+      "echoed only when usrregnum == -1"
+     ],
+     [
+      274,
+      "i32",
+      "usrregnum",
+      "usp_User_loginGame @userNo"
+     ],
+     [
+      278,
+      "u8",
+      "authid",
+      ""
+     ],
+     [
+      279,
+      "u32",
+      "block",
+      ""
+     ],
+     [
+      283,
+      "u32",
+      "loginable",
+      ""
+     ]
+    ],
+    "notes": "raw frame with truncated length byte 0x21 (D01-B1)"
+   },
+   "0x0c39": {
+    "dir": "Login→AccountDB",
+    "name": "NC_USER_GER_PASSWORD_CHECK_REQ",
+    "basis": "account FUN_00403b20",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      ""
+     ],
+     [
+      2,
+      "char[256]",
+      "user",
+      ""
+     ],
+     [
+      258,
+      "Name4",
+      "password",
+      "16 bytes"
+     ]
+    ],
+    "notes": "pdb2017 field names; offsets checked in the 2016 code"
+   },
+   "0x0c3a": {
+    "dir": "AccountDB→Login",
+    "name": "NC_USER_GER_PASSWORD_CHECK_ACK",
+    "basis": "account FUN_00403b20",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      ""
+     ],
+     [
+      2,
+      "char[256]",
+      "id",
+      ""
+     ],
+     [
+      258,
+      "Name4",
+      "password",
+      "echoed only when usrregnum == -1"
+     ],
+     [
+      274,
+      "i32",
+      "usrregnum",
+      "usp_User_loginGame @userNo"
+     ],
+     [
+      278,
+      "u8",
+      "authid",
+      ""
+     ],
+     [
+      279,
+      "u32",
+      "block",
+      ""
+     ],
+     [
+      283,
+      "u32",
+      "loginable",
+      ""
+     ]
+    ],
+    "notes": "raw frame with truncated length byte 0x21 (D01-B1)"
+   },
+   "0x0c53": {
+    "dir": "Login→AccountDB",
+    "name": "NC_USER_CH_PASSWORD_CHECK_REQ",
+    "basis": "account FUN_00403c80",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      ""
+     ],
+     [
+      2,
+      "char[256]",
+      "user",
+      ""
+     ],
+     [
+      258,
+      "Name4",
+      "password",
+      "16 bytes"
+     ]
+    ],
+    "notes": "pdb2017 field names; offsets checked in the 2016 code"
+   },
+   "0x0c54": {
+    "dir": "AccountDB→Login",
+    "name": "NC_USER_CH_PASSWORD_CHECK_ACK",
+    "basis": "account FUN_00403c80",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      ""
+     ],
+     [
+      2,
+      "char[256]",
+      "id",
+      ""
+     ],
+     [
+      258,
+      "Name4",
+      "password",
+      "echoed only when usrregnum == -1"
+     ],
+     [
+      274,
+      "i32",
+      "usrregnum",
+      "usp_User_loginGame @userNo"
+     ],
+     [
+      278,
+      "u8",
+      "authid",
+      ""
+     ],
+     [
+      279,
+      "u32",
+      "block",
+      ""
+     ],
+     [
+      283,
+      "u32",
+      "loginable",
+      ""
+     ]
+    ],
+    "notes": "raw frame with truncated length byte 0x21 (D01-B1)"
+   },
+   "0x0c3e": {
+    "dir": "Login→AccountDB",
+    "name": "NC_USER_TW_PASSWORD_CHECK_REQ",
+    "basis": "account FUN_00402d40",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      ""
+     ],
+     [
+      2,
+      "char[36]",
+      "sUserName",
+      ""
+     ],
+     [
+      38,
+      "char[36]",
+      "sSerial",
+      ""
+     ],
+     [
+      74,
+      "char[20]",
+      "sUID",
+      "atol → user number"
+     ],
+     [
+      94,
+      "char[8]",
+      "sSID",
+      ""
+     ]
+    ],
+    "notes": "pdb2017 field names; offsets checked in the 2016 code"
+   },
+   "0x0c3f": {
+    "dir": "AccountDB→Login",
+    "name": "NC_USER_TW_PASSWORD_CHECK_ACK",
+    "basis": "account FUN_00402d40",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "nError",
+      "0x41 ok, 0x44 auth failed, 0x46 DB error"
+     ],
+     [
+      4,
+      "i32",
+      "nUserNo",
+      ""
+     ]
+    ]
+   },
+   "0x0c60": {
+    "dir": "WM→AccountDB",
+    "name": "NC_USER_RETURN_CHECK_REQ",
+    "basis": "account FUN_00403220",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nUserNo",
+      ""
+     ]
+    ]
+   },
+   "0x0c61": {
+    "dir": "AccountDB→WM",
+    "name": "NC_USER_RETURN_CHECK_ACK",
+    "basis": "account FUN_00403220",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nUserNo",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "bReturnUser",
+      "1 = tReturnUser row exists"
+     ],
+     [
+      7,
+      "i32",
+      "tLastSec",
+      "seconds since last comeback reward, else since account creation"
+     ]
+    ]
+   },
+   "0x0c64": {
+    "dir": "WM→AccountDB",
+    "name": "NC_USER_SET_RETURN_CMD",
+    "basis": "account FUN_00403480",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nUserNo",
+      "usp_ReturnUser_SetUserItem"
+     ]
+    ]
+   },
+   "0x081d": {
+    "dir": "WM→AccountDB",
+    "name": "NC_MISC_WEB_DB_KEY_REQ",
+    "basis": "account FUN_00403830",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nWorldSessionHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nUserNo",
+      ""
+     ]
+    ]
+   },
+   "0x081e": {
+    "dir": "AccountDB→WM",
+    "name": "NC_MISC_WEB_DB_KEY_ACK",
+    "basis": "account FUN_00403830",
+    "fields": [
+     [
+      0,
+      "u16",
+      "Error",
+      "0x1110 ok, 0x1111 DB error"
+     ],
+     [
+      2,
+      "u16",
+      "nWorldSessionHandle",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "nUserNo",
+      ""
+     ],
+     [
+      8,
+      "char[32]",
+      "WebKey",
+      "%09u%09u%09u"
+     ]
+    ]
+   },
+   "0x082f": {
+    "dir": "WM→AccountDB",
+    "name": "NC_MISC_CONNECTFROMWHERE_DB_REQ",
+    "basis": "account FUN_00402ba0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "hZone",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "clienthandle",
+      "NETPACKETZONEHEADER"
+     ],
+     [
+      4,
+      "u32",
+      "charregistnumber",
+      ""
+     ],
+     [
+      8,
+      "u8[4]",
+      "connectip",
+      "usp_Pcbang_chkIP"
+     ]
+    ],
+    "notes": "PDB alias NC_MISC_SERVERPARAMETER_REQ is the zone/client packet"
+   },
+   "0x0830": {
+    "dir": "AccountDB→WM",
+    "name": "NC_MISC_CONNECTFROMWHERE_DB_ACK",
+    "basis": "account FUN_00402ba0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "hZone",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "clienthandle",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "charregistnumber",
+      ""
+     ],
+     [
+      8,
+      "u8",
+      "connectfrom",
+      "usp_Pcbang_chkIP @RET"
+     ]
+    ]
+   },
+   "0x0838": {
+    "dir": "WM→AccountDB",
+    "name": "NC_MISC_EVENT_DONE_MUNSANG_WM2ACC",
+    "basis": "account FUN_00402cb0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nUserNo",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      8,
+      "u8",
+      "nWorldNo",
+      ""
+     ],
+     [
+      9,
+      "u16",
+      "hZone",
+      ""
+     ],
+     [
+      11,
+      "u16",
+      "nQuestID",
+      ""
+     ]
+    ]
+   },
+   "0x0839": {
+    "dir": "AccountDB→WM",
+    "name": "NC_MISC_EVENT_DONE_MUNSANG_ACC2WM",
+    "basis": "account FUN_00402cb0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nUserNo",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      8,
+      "u8",
+      "nWorldNo",
+      ""
+     ],
+     [
+      9,
+      "u16",
+      "nError",
+      "always 0x1545"
+     ],
+     [
+      11,
+      "u16",
+      "hZone",
+      ""
+     ],
+     [
+      13,
+      "u16",
+      "nQuestID",
+      ""
+     ]
+    ]
+   },
+   "0x0c26": {
+    "dir": "→AccountDB",
+    "name": "NC_USER_TEENAGER_REQ",
+    "basis": "account FUN_00402610",
+    "fields": [
+     [
+      0,
+      "char[256]",
+      "sUserID",
+      ""
+     ],
+     [
+      256,
+      "u16",
+      "nHandle",
+      ""
+     ]
+    ]
+   },
+   "0x0c27": {
+    "dir": "AccountDB→",
+    "name": "NC_USER_TEENAGER_ACK",
+    "basis": "account FUN_00402610",
+    "fields": [
+     [
+      0,
+      "char[256]",
+      "sUserID",
+      ""
+     ],
+     [
+      256,
+      "u16",
+      "nHandle",
+      ""
+     ],
+     [
+      258,
+      "u8[50]",
+      "sUserKey",
+      ""
+     ],
+     [
+      308,
+      "u8",
+      "nType",
+      "0 teen with time, 1 teen time used up, 2 adult, 3 DB error"
+     ],
+     [
+      309,
+      "u32",
+      "nMinute",
+      ""
+     ]
+    ]
+   },
+   "0x0c28": {
+    "dir": "→AccountDB",
+    "name": "NC_USER_TEENAGER_SET_CMD",
+    "basis": "account FUN_00402a40",
+    "fields": [
+     [
+      0,
+      "u8[50]",
+      "sUserKey",
+      ""
+     ],
+     [
+      50,
+      "u32",
+      "nUserPlayRemainTime",
+      ""
+     ]
+    ]
+   },
+   "0x0820": {
+    "dir": "→AccountDB",
+    "name": "NC_MISC_EVENT_HIT3_ADD_CASH",
+    "basis": "account FUN_00402530",
+    "fields": [
+     [
+      0,
+      "char[20]",
+      "UserID",
+      ""
+     ],
+     [
+      20,
+      "u64",
+      "AddCash",
+      ""
+     ]
+    ]
+   }
+  },
+  "accountlog": {
+   "0x0720": {
+    "dir": "Login→AccountLogDB",
+    "name": "NC_LOG_USER_LOGINFAIL",
+    "basis": "accountlog FUN_00402470",
+    "fields": [
+     [
+      0,
+      "char[256]",
+      "userid",
+      ""
+     ],
+     [
+      256,
+      "Name4",
+      "userpassword",
+      "stored in tAccountLog.sUserPassword"
+     ],
+     [
+      272,
+      "u8[4]",
+      "userip",
+      ""
+     ],
+     [
+      276,
+      "u16",
+      "error",
+      "client error code"
+     ]
+    ],
+    "notes": "pdb2017 field names; offsets checked in the 2016 code"
+   },
+   "0x0721": {
+    "dir": "Login→AccountLogDB",
+    "name": "NC_LOG_USER_LOGIN",
+    "basis": "accountlog FUN_00402580",
+    "fields": [
+     [
+      0,
+      "u32",
+      "usrregnum",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "worldnum",
+      ""
+     ],
+     [
+      5,
+      "u8[4]",
+      "ip",
+      ""
+     ]
+    ]
+   },
+   "0x0722": {
+    "dir": "→AccountLogDB",
+    "name": "NC_LOG_USER_LOGOUT",
+    "basis": "accountlog FUN_00402640",
+    "fields": [
+     [
+      0,
+      "u32",
+      "usrregnum",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "worldnum",
+      ""
+     ],
+     [
+      5,
+      "u16",
+      "playmin",
+      ""
+     ],
+     [
+      7,
+      "u16",
+      "error",
+      ""
+     ]
+    ]
+   },
+   "0x080a": {
+    "dir": "WM→AccountLogDB",
+    "name": "NC_MISC_CONNECTER_ACK",
+    "basis": "accountlog FUN_004026f0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "worldno",
+      ""
+     ],
+     [
+      1,
+      "u16",
+      "connectercount",
+      ""
+     ],
+     [
+      3,
+      "u16[64]",
+      "nEachClass",
+      ""
+     ]
+    ]
+   },
+   "0x081f": {
+    "dir": "WM→AccountLogDB",
+    "name": "NC_MISC_CHAR_LOGOFF_STATISTICS",
+    "basis": "accountlog FUN_00402990",
+    "fields": [
+     [
+      0,
+      "u8",
+      "WorldNo",
+      ""
+     ],
+     [
+      1,
+      "u32",
+      "UserNo",
+      ""
+     ],
+     [
+      5,
+      "u32",
+      "CharNo",
+      ""
+     ],
+     [
+      9,
+      "u8",
+      "CharClass",
+      ""
+     ],
+     [
+      10,
+      "u8",
+      "CharLevel",
+      ""
+     ],
+     [
+      11,
+      "u64",
+      "CharGetExp",
+      ""
+     ],
+     [
+      19,
+      "u16",
+      "CharPlayMin",
+      ""
+     ]
+    ]
+   },
+   "0x082c": {
+    "dir": "WM→AccountLogDB",
+    "name": "NC_MISC_EVENT_L20_DB_REQ",
+    "basis": "accountlog FUN_00402aa0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nWMHandle",
+      ""
+     ],
+     [
+      2,
+      "char[256]",
+      "sUserID",
+      ""
+     ],
+     [
+      258,
+      "u32",
+      "nUserNo",
+      ""
+     ],
+     [
+      262,
+      "u8",
+      "nEventNo",
+      ""
+     ],
+     [
+      263,
+      "u8",
+      "nWorldNo",
+      ""
+     ],
+     [
+      264,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      268,
+      "u32",
+      "nEventPoint",
+      ""
+     ]
+    ]
+   },
+   "0x082d": {
+    "dir": "AccountLogDB→WM",
+    "name": "NC_MISC_EVENT_L20_DB_ACK",
+    "basis": "accountlog FUN_00402aa0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nWMHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nUserNo",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "nEventNo",
+      ""
+     ],
+     [
+      7,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      11,
+      "u16",
+      "nError",
+      "0x1288 granted, 0x1289 already, 0x128a get error, 0x128b set error"
+     ]
+    ]
+   },
+   "0x0843": {
+    "dir": "WM→AccountLogDB",
+    "name": "NC_MISC_EVENT_LONG_TIME_PLAY_CMD",
+    "basis": "accountlog FUN_004030d0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nUserNo",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "nPlayTime",
+      "minutes"
+     ]
+    ]
+   },
+   "0x0c5d": {
+    "dir": "Login→AccountLogDB",
+    "name": "NC_USER_US_IS_IP_BLOCK_REQ",
+    "basis": "accountlog FUN_004038d0",
+    "fields": [
+     [
+      0,
+      "PROTO_NC_USER_US_PASSWORD_CHECK_ACK",
+      "LoginData",
+      "0x161 bytes"
+     ],
+     [
+      353,
+      "u32",
+      "nUserNo",
+      ""
+     ],
+     [
+      357,
+      "u16",
+      "nClientHandle",
+      ""
+     ],
+     [
+      359,
+      "char[20]",
+      "sUserIP",
+      "p_IPBlock_IsBlock"
+     ]
+    ],
+    "notes": "pdb2017 field names; offsets checked in the 2016 code"
+   },
+   "0x0c5e": {
+    "dir": "AccountLogDB→Login",
+    "name": "NC_USER_US_IS_IP_BLOCK_ACK",
+    "basis": "accountlog FUN_004038d0",
+    "fields": [
+     [
+      0,
+      "PROTO_NC_USER_US_PASSWORD_CHECK_ACK",
+      "LoginData",
+      "copy"
+     ],
+     [
+      353,
+      "u16",
+      "nClientHandle",
+      ""
+     ],
+     [
+      355,
+      "u8",
+      "bUserIPBlock",
+      "1 → Login 0x51: IP in tIPBlock and no prior world login"
+     ]
+    ],
+    "notes": "pdb2017 field names; offsets checked in the 2016 code"
+   },
+   "0x0c62": {
+    "dir": "WM→AccountLogDB",
+    "name": "NC_USER_LOGOUT_LAST_DAY_REQ",
+    "basis": "accountlog FUN_004035e0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nUserNo",
+      ""
+     ]
+    ]
+   },
+   "0x0c63": {
+    "dir": "AccountLogDB→WM",
+    "name": "NC_USER_LOGOUT_LAST_DAY_ACK",
+    "basis": "accountlog FUN_004035e0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nUserNo",
+      ""
+     ],
+     [
+      6,
+      "i32",
+      "tLastSec",
+      ""
+     ]
+    ]
+   },
+   "0x8007": {
+    "dir": "WM→AccountLogDB",
+    "name": "NC_DATA_REPORT_ADD_REQ",
+    "basis": "accountlog FUN_00403a00",
+    "fields": [
+     [
+      0,
+      "u32",
+      "dwReporter",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "hReporter",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "nWorldNo",
+      ""
+     ],
+     [
+      7,
+      "Name5",
+      "sReporterCharID",
+      ""
+     ],
+     [
+      27,
+      "Name5",
+      "sHarmer",
+      ""
+     ],
+     [
+      47,
+      "u8[16]",
+      "byReportType",
+      ""
+     ],
+     [
+      63,
+      "u8[256]",
+      "byReason",
+      ""
+     ],
+     [
+      319,
+      "u16",
+      "nChatLogSize",
+      "clamped to 0x800"
+     ],
+     [
+      321,
+      "u8[2048]",
+      "byChatLog",
+      ""
+     ]
+    ],
+    "notes": "pdb2017 field names; offsets checked in the 2016 code"
+   },
+   "0x8008": {
+    "dir": "AccountLogDB→WM",
+    "name": "NC_DATA_REPORT_ADD_ACK",
+    "basis": "accountlog FUN_00403a00",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0xf40 ok, 0xf41 same harmer within a day, 0xf42 within an hour, 0xf58 DB error"
+     ],
+     [
+      2,
+      "u16",
+      "hReporter",
+      ""
+     ],
+     [
+      4,
+      "Name5",
+      "sHarmer",
+      ""
+     ],
+     [
+      24,
+      "i32",
+      "nRegNumber",
+      ""
+     ]
+    ]
+   },
+   "0x8009": {
+    "dir": "WM→AccountLogDB",
+    "name": "NC_DATA_REPORT_CANCEL_REQ",
+    "basis": "accountlog FUN_004027b0",
+    "fields": [
+     [
+      0,
+      "i32",
+      "nRegNumber",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "hReporter",
+      ""
+     ]
+    ]
+   },
+   "0x800a": {
+    "dir": "AccountLogDB→WM",
+    "name": "NC_DATA_REPORT_CANCEL_ACK",
+    "basis": "accountlog FUN_004027b0",
+    "fields": [
+     [
+      0,
+      "i32",
+      "nRegNumber",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "hReporter",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "err",
+      "0xf40 ok, 0xf50 unknown, 0xf51 older than 1 h, 0xf52 processed, 0xf58 DB"
+     ]
+    ]
+   },
+   "0x800b": {
+    "dir": "WM→AccountLogDB",
+    "name": "NC_DATA_REPORT_GET_REQ",
+    "basis": "accountlog FUN_004028a0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "hReporter",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "dwReporter",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "nWorldNo",
+      ""
+     ]
+    ]
+   },
+   "0x800c": {
+    "dir": "AccountLogDB→WM",
+    "name": "NC_DATA_REPORT_GET_ACK",
+    "basis": "accountlog FUN_004028a0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "hReporter",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "err",
+      "0xf40 found, 0xf60 none, 0xf58 DB"
+     ],
+     [
+      4,
+      "i32",
+      "nRegNumber",
+      ""
+     ],
+     [
+      8,
+      "u8",
+      "byReportResult",
+      ""
+     ],
+     [
+      9,
+      "char[128]",
+      "byRemark",
+      ""
+     ]
+    ]
+   },
+   "0xc801": {
+    "dir": "Login→AccountLogDB",
+    "name": "NC_SYSLOG_ACCOUNT_LOGIN_SUCCESS",
+    "basis": "accountlog FUN_00403310",
+    "fields": [
+     [
+      0,
+      "u32",
+      "UserNo",
+      ""
+     ],
+     [
+      4,
+      "char[16]",
+      "UserIP",
+      ""
+     ],
+     [
+      20,
+      "Name5",
+      "spawnapps",
+      "2016 layout: 2017 inserts UserID[30] before it"
+     ]
+    ]
+   },
+   "0xc802": {
+    "dir": "Login→AccountLogDB",
+    "name": "NC_SYSLOG_ACCOUNT_LOGIN_FAILURE",
+    "basis": "accountlog FUN_004033d0",
+    "fields": [
+     [
+      0,
+      "char[260]",
+      "UserName",
+      ""
+     ],
+     [
+      260,
+      "char[16]",
+      "UserIP",
+      ""
+     ],
+     [
+      276,
+      "Name5",
+      "spawnapps",
+      ""
+     ]
+    ]
+   },
+   "0xc803": {
+    "dir": "WM→AccountLogDB",
+    "name": "NC_SYSLOG_ACCOUNT_LOGOUT",
+    "basis": "accountlog FUN_004034e0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "UserNo",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "LoginKeepTime",
+      "minutes"
+     ]
+    ]
+   },
+   "0xc811": {
+    "dir": "WM→AccountLogDB",
+    "name": "NC_SYSLOG_SERVER_CCU",
+    "basis": "accountlog FUN_00403560",
+    "fields": [
+     [
+      0,
+      "u32",
+      "UserCount",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "WorldNo",
+      ""
+     ]
+    ]
+   }
+  }
+ }
+}
