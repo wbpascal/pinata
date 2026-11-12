@@ -19,7 +19,7 @@ plan file (`docs/plan/items/<ID>.md`), follow it. This file holds the shared con
 | `tools/protocol-re/` | Scripts (see below) |
 | `tools/protocol-re/names/<bin>/*.json` | Known function/global names, one file per work item, merged automatically |
 | `docs/protocol/` | Protocol spec: `README.md` (framing, crypto, flows), `opcodes-*.md`, `packets-*.md` (generated layouts), `opcodes.json`, `client-error-codes.json`, `annotations.json` + `annotations/<ID>.json` (hand-verified layouts) |
-| `docs/pseudocode/` | Reconstructed pseudocode. `login-server.md` is the **reference example** for format and depth |
+| `docs/pseudocode/` | Reconstructed pseudocode. `FORMAT.md` = the format (short); `login-server.md` is the full reference example |
 | `docs/knowledge/<ID>.md` | Findings that other items need: struct/member offsets, subsystem facts, open questions |
 | `docs/plan/` | Master plan, work item plans, `status/<ID>.md` progress logs |
 
@@ -30,7 +30,11 @@ plan file (`docs/plan/items/<ID>.md`), follow it. This file holds the shared con
 ```bash
 T=tools/protocol-re; E=re-data/exports
 python3 -I $T/clean.py $E/zone $T/names/zone 452590 451a30   # print functions, noise stripped, known names applied
-grep -n "sp_NC_MAP_LOGIN_REQ" $E/zone/strings.tsv            # string -> referencing functions
+rg -M 200 -n "sp_NC_MAP_LOGIN_REQ" $E/zone/strings.tsv       # string -> referencing functions (-M: lines are long)
+python3 -I $T/sect.py docs/pseudocode/zone/Z08-content.md      # outline of a big doc (line, size, heading)
+python3 -I $T/sect.py docs/pseudocode/zone/Z08-content.md 5.2 'bugs'  # just those sections (§ number or heading regex)
+jq -c '.tables[] | .parser as $p | .entries[] | select(.handler=="FUN_00487510") | {$p,op,name,sends}' $E/zone/handlers.json
+jq -c '.c2s["0x1801"][]? | {size, fields:(.fields|map_values(.type))}' $E/zone/layouts.json   # also .s2c["0x…"]
 python3 -I $T/shn.py Files/Server/2016/9Data/Shine/ItemInfo.shn | head  # decode any .shn data table (server or client)
 python3 -I $T/bak.py Files/Server/2016/_Database/w00_Character.bak proc p_Char_Create  # stored-procedure source from a DB backup
 python3 -I $T/bak.py cover character                        # every {CALL} of a binary vs all DB backups
@@ -49,6 +53,24 @@ tools/protocol-re/reanalyze.sh <bin> <exe>                   # only if an export
   `open_binary` re-imports and analyzes the binary (zone: several minutes). Prefer the exports for reading
   code. Call `close_binary` when done.
 - Reading raw data at an address: Python over the PE file (see `rtti.py` `PE` class), or REA `read_bytes`.
+
+## Context budget (every tool output stays in the session)
+
+The files here are big: `decomp.c` 15 MB with lines up to 6,700 chars, `strings.tsv` lines up to 2,000 chars,
+`layouts.json` 840 KB, pseudocode docs up to 110 KB. Print only what you need:
+
+- **Code:** read functions only with `clean.py`. Never `cat`/`sed -n`/`head` on `decomp.c`.
+- **Search:** `rg -M 200` (or `grep … | cut -c1-200`) on exports; `rg -o 'FUN_[0-9a-f]{8}'` when you only need
+  the function list. Use `-c`/`-l` first when the hit count is unknown.
+- **Docs** (pseudocode, knowledge, status, protocol `*.md` over ~15 KB): run `sect.py <file>` for the outline,
+  then `sect.py <file> <§|regex>` or `Read` with `offset`/`limit`. Never read a whole one, never `cat` several.
+  `packets-*.md` / `opcodes-*.md`: `rg` the opcode instead.
+- **JSON** (`handlers.json`, `layouts.json`, `opcodes.json`, annotations, client-error-codes): query with `jq`,
+  selecting only the fields you need. Never `cat` them.
+- **Ad-hoc scripts and tools with unknown output size** (`shn.py`, `pdb.py`, `bak.py`, `python3 -`): pipe through
+  `| head -c 4000` or print counts/summaries, not the data.
+- A tool result saved to a file because it was too large: `rg` or `Read` with `limit` in it, never whole.
+- `fd` and `yq` are installed too.
 
 ## Facts already established (do not re-derive)
 
@@ -74,7 +96,7 @@ tools/protocol-re/reanalyze.sh <bin> <exe>                   # only if an export
 
 1. **Read before investigating.** Check `docs/knowledge/*.md`, `docs/plan/status/*.md`, the names files
    and the existing pseudocode for the symbols you touch. Do not redo work another item has recorded.
-2. **Output format** = `docs/pseudocode/login-server.md`:
+2. **Output format** = `docs/pseudocode/FORMAT.md` (short form of `login-server.md`; do not read that whole):
    - structured pseudocode per handler and subsystem, each block citing `@ FUN_xxxxxxxx`
    - packet fields by name, constants and error codes with meaning
    - state that changes, messages sent to whom, timers
