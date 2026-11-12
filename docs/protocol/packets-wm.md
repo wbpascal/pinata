@@ -5294,7 +5294,7 @@ Sent from `FUN_0043e590` (`FUN_0043e590`) · payload variable (uVar5)
 | 39 | u32 | `*(undefined4 *)(iVar1 + 0x6d)` |
 | 151 | u32 | `*(undefined4 *)(iVar1 + 0xc)` |
 
-### `0x742a` ?
+### `0x742a` NC_GUILD_WAR_SCORE_CMD (hand-named)
 
 **2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_WAR_SCORE_CMD`, 116 bytes
 
@@ -6820,7 +6820,7 @@ Sent from `FUN_0044c3b0` (`FUN_0044c3b0`) · payload 18 bytes · raw header
 | 12 | u32 | `param_2[3]` |
 | 16 | u16 | `param_3` |
 
-### `0x982e` ?
+### `0x982e` NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_CMD (hand-named)
 
 **2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_CMD`, 130 bytes
 
@@ -7127,7 +7127,7 @@ Sent from `FUN_004409e0` (`FUN_004409e0`) · payload 20 bytes
 |---|---|---|
 | 0 | bytes[20] | `memcpy from param_1` |
 
-### `0x985e` ?
+### `0x985e` NC_GUILD_ACADEMY_DISMISS_CMD (hand-named)
 
 **2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GUILD_ACADEMY_DISMISS_CMD`, 57 bytes
 
@@ -8084,6 +8084,53 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 2 | u8 | numofavatar | 0xFF = DB error (pdb2017 name) |
 | 3 | AVATAR[numofavatar] | avatar | 0x82 bytes each = PROTO_AVATARINFORMATION, W01 §6.1 (pdb2017 name) |
 
+### `0x7405` NC_GUILD_MAKE_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041d380 / FUN_0044cf10)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name4 | Name |  |
+| 16 | Name3 | Password |  |
+| 28 | u8 | Type |  |
+
+0x1D bytes
+
+### `0x7407` NC_GUILD_DISMISS_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00445950)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name4 | Name |  |
+| 16 | Name3 | Password |  |
+
+### `0x7409` NC_GUILD_MEMBER_INVITE_REQ (C→WM)
+
+**Verified layout** (basis: wm FUN_0041d450)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | ToCharID |  |
+
+### `0x740c` NC_GUILD_MEMBER_JOIN_ACK † (C→WM)
+
+**Verified layout** (basis: wm FUN_00419db0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name4 | GuildName |  |
+| 16 | u8 | JoinAck | 0 = refuse |
+
+### `0x7416` NC_GUILD_MEMBER_GRADE_REQ (C→WM)
+
+**Verified layout** (basis: wm FUN_0041d8e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID |  |
+| 20 | u8 | MemberGrade | not range-checked |
+
 ### `0x0c0d` NC_USER_WILLLOGIN_REQ † (Login→WM)
 
 **Verified layout** (basis: wm FUN_00424950)
@@ -8539,6 +8586,173 @@ to the target; 20 bytes; field names pdb2017, offsets read in the 2016 WM
 | 0 | u16 | handle |  |
 | 2 | u32 | userNo |  |
 
+### `0x7404` NC_GUILD_LIST_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00445660)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error | 0x0C41 ok, 0x1C30 too soon |
+| 2 | u8 | PartMask | bit0 first, bit1 last |
+| 3 | u16 | TotalNumOfGuild |  |
+| 5 | u16 | nGuildListCnt |  |
+| 7 | SHINE_GUILD_LIST_NEW[n] | GuildList | 0x2E: u32 nNo, Name4 sName, Name5 master, u8 nType, u8 nGrade, u16 num, u16 max |
+
+### `0x7406` NC_GUILD_MAKE_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00450750 / FUN_0044a2e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u32 | No | uninitialised on WM-side errors |
+| 6 | Name4 | Name |  |
+| 22 | u8 | Type |  |
+| 23 | i32 | dCreateDate |  |
+
+### `0x740a` NC_GUILD_MEMBER_INVITE_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041d450)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | ToCharID |  |
+| 20 | u16 | Error | 0x0C41 also on success |
+
+### `0x740b` NC_GUILD_MEMBER_JOIN_REQ † (WM→C)
+
+**Verified layout** (basis: wm FUN_00449150)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name4 | GuildName |  |
+| 16 | Name5 | FromCharID |  |
+
+### `0x740d` NC_GUILD_MEMBER_JOIN_ERR † (WM→C)
+
+**Verified layout** (basis: wm FUN_0044a340)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name4 | GuildName |  |
+| 16 | u16 | Error |  |
+
+### `0x7417` NC_GUILD_MEMBER_GRADE_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0044a3a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID |  |
+| 20 | u8 | MemberGrade |  |
+| 21 | u16 | Error |  |
+
+### `0x741b` NC_GUILD_MEMBER_LIST_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00443e80)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | TotalMemberCount |  |
+| 2 | u16 | MemberIndex |  |
+| 4 | u16 | MemberCount |  |
+| 6 | GUILD_MEMBER_CLIENT[n] | MemberList | 0x6E each |
+
+### `0x7425` NC_GUILD_WAR_ABLE_LIST_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0043e270)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error |  |
+| 2 | u8 | PartMask |  |
+| 3 | u16 | NumOfWarInfo |  |
+| 5 | SHINE_GUILD_WAR_ABLE_INFO[n] | WarInfoList | 0x2A |
+
+### `0x742a` NC_GUILD_WAR_SCORE_CMD (hand-named) (WM→C)
+
+**Verified layout** (basis: wm FUN_004497c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name4 | GuildName1 |  |
+| 16 | SHINE_GUILD_SCORE | GuildScore1 |  |
+| 58 | Name4 | GuildName2 |  |
+| 74 | SHINE_GUILD_SCORE | GuildScore2 |  |
+
+client-bound only: members of both warring guilds; no 2016 client handler
+
+### `0x7434` NC_GUILD_WAR_END_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00449f80)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name4 | EnemyGuildName |  |
+| 16 | u32 | RequestNo |  |
+| 20 | u32 | EnemyGuildFameAdd | always 0 |
+| 24 | u32 | GuildFameAdd | always 0 |
+| 28 | u32 | GuildTotalFame |  |
+| 32 | u8 | WarResult | 0 win 1 lose 2 draw |
+| 33 | u8 | WarStatus | 3 |
+
+### `0x7474` NC_GUILD_CHAT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_004447b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
+| 4 | Name5 | talker |  |
+| 24 | u8 | itemLinkDataCount |  |
+| 25 | u8 | len |  |
+| 26 | char[len] | content | then count·0x67 link bytes |
+
+### `0x7477` NC_GUILD_NAME_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0044ace0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nNo |  |
+| 4 | Name4 | Name |  |
+| 20 | GUILD_EMBLEM_INFO | EmblemInfo | 0xFFFF when no emblem |
+
+### `0x9808` NC_GUILD_ACADEMY_MY_GUILD_ACADEMY_INFO_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00444a30 / FUN_0043cf90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error | 0x19B8 info; 0x1898 = rank-info layout sent by 0x9809 (W03-B20) |
+| 2 | GUILD_ACADEMY_CLIENT | GuildAcademyInfo | buff end as seconds left |
+
+two layouts: INFO (Error 0x19B8 + GUILD_ACADEMY_CLIENT, FUN_00444a30) and, from 0x9809 (FUN_0043cf90), a 14-byte RANK layout {u16 Error 0x1898, u32 nAcademyPoint, u32 nAcademyRank, i32 buff seconds left} (W03-B20)
+
+### `0x982e` NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_CMD (hand-named) (WM→C)
+
+**Verified layout** (basis: wm FUN_00440b40 / FUN_00447cc0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sInviteSourceCharID | copied from 0x9830 +6 |
+| 20 | GUILD_MEMBER_CLIENT | Member | 0x6E bytes |
+
+client-bound: guild and academy members; no 2016 client handler (ignored)
+
+### `0x985e` NC_GUILD_ACADEMY_DISMISS_CMD (hand-named) (WM→C)
+
+**Verified layout** (basis: wm FUN_004472c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name4 | Name |  |
+| 16 | u8 | nDismissStatus |  |
+| 17 | i32 | dDismissDate |  |
+| 21 | tm | tm_dDismissDate |  |
+
+client-bound: academy members; no 2016 client handler
+
 ### `0x0c12` NC_USER_AVATARINFO_REQ (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_00408740 / FUN_00412ee0)
@@ -8623,6 +8837,45 @@ W01 name was 'character create request (ours)'
 | 7 | char[20] | name |  |
 
 W01 name was 'character rename request (ours)'
+
+### `0x7468` NC_GUILD_DB_RESULT_WRITE_CMD (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00449f80)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nNo |  |
+| 4 | u32 | nFame |  |
+| 8 | u32 | win |  |
+| 12 | u32 | lose |  |
+| 16 | u32 | draw |  |
+| 20 | u32 | enemyNo |  |
+| 24 | u32 | enemyFame |  |
+| 28 | u32 | enemyWin |  |
+| 32 | u32 | enemyLose |  |
+| 36 | u32 | enemyDraw |  |
+
+### `0x7499` NC_GUILD_TOURNAMENT_DB_SET_MATCH_TIME_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0043f9a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error | not set |
+| 2 | u32 | nGTNo | previous Time_Start |
+| 6 | i32[9] | MatchTime |  |
+
+0x2C bytes, sent by the schedule generator FUN_00444cf0
+
+### `0x750d` NC_GUILD_EMBLEM_STATE_DB_REQ (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0044ea00 / FUN_0042d220)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
+| 4 | i32 | EmblemDeleteDate |  |
+| 8 | u8 | EmblemState | GUILD_EMBLEM_STATE |
 
 ### `0x0808` NC_MISC_USER_COUNT_CMD † (WM→Login)
 
@@ -8713,6 +8966,56 @@ W01 name was 'token request (ours)'
 | 10 | u32 | chrregnum | charNo; -1 = refused (pdb2017 name) |
 | 14 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 16 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
+
+### `0x7481` NC_GUILD_TOURNAMENT_START_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0044ade0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed |  |
+| 1 | u16 | nTournamentMapNo | rand()%3 |
+| 3 | u16 | nExploerTimeMin |  |
+| 5 | u16 | nWaitPlayTimeSec |  |
+| 7 | u16 | nPlayTimeMin |  |
+| 9 | u32 | nNo1 |  |
+| 13 | u32 | nNo2 |  |
+
+### `0x749f` NC_GUILD_STORAGE_WITHDRAW_GRADE_ACK (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0043ca20 / FUN_0043f340)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | NETPACKETZONEHEADER | hdr | uninitialised on errors |
+| 6 | u16 | err | 0x0C41 ok |
+| 8 | u8 | Grade | 99 on errors |
+
+### `0x74c1` NC_GUILD_WORLD_USE_GUILD_TOKEN_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0042ad90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
+| 4 | u64 | nDecrease |  |
+| 12 | u64 | nGuildToken |  |
+
+### `0x74e3` NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_REQ (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0043fe50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hWMChar |  |
+| 2 | u32 | nCharNo |  |
+| 6 | u32 | nGTNo | = Time_Start |
+| 10 | u32 | nGuildNo |  |
+| 14 | u8 | nMinLevel |  |
+| 15 | u16 | nMinMember |  |
+| 17 | u64 | nProposalMoney |  |
+
+broadcast to all zones
 
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→zone)
 
@@ -9068,6 +9371,36 @@ then Pre u32 nPartySeqCharNo[5], Post {u16, u8, u8, u32[5]}; 0x32 bytes; 6 bytes
 | 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
 | 6 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 8 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
+
+### `0x7445` NC_GUILD_ZONE_WAR_KILL_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0044d1b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hWMKiller |  |
+| 2 | u16 | hWMTarget |  |
+
+### `0x7482` NC_GUILD_TOURNAMENT_END_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_00446340)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed |  |
+| 1 | u16 | nTournamentMapNo |  |
+| 3 | u8 | nStatus |  |
+| 4 | u32 | nWinnerGuildNo |  |
+| 8 | u32 | nLoseGuildNo |  |
+
+### `0x74c0` NC_GUILD_ZONE_USE_GUILD_TOKEN_CMD (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042ad90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
+| 4 | u64 | nDecrease |  |
 
 ### `0x384e` NC_PARTY_MEMBERINFORM_REQ † (zone→WM)
 
