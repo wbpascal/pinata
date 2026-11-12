@@ -3847,12 +3847,12 @@ Sent in reply to `0x2039` NC_ACT_PRODUCE_CASTABORT_CMD on ShineObjectClass::Shin
 
 ### `0x203b` NC_ACT_PRODUCE_MAKE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_PRODUCE_MAKE_CMD`, 4 bytes
+**Verified layout** (basis: zone gds_NC_ITEMDB_PRODUCE_ACK FUN_0046c610; no 2016 client handler)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | item |  |
-| 2 | u16 | err |  |
+| 0 | u16 | product |  |
+| 2 | u16 | err | 0xb01 ok |
 
 Sent from `ShineObjectClass::ShinePlayer::smo_ply_ItemProduce` (`FUN_0046c2d0`) · payload 4 bytes
 
@@ -3865,12 +3865,12 @@ Sent from `ShineObjectClass::ShinePlayer::smo_ply_ItemProduce` (`FUN_0046c2d0`) 
 
 ### `0x203c` NC_ACT_SOMEONEPRODUCE_MAKE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_SOMEONEPRODUCE_MAKE_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_0046c610 (broadcast in range); no 2016 client handler)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | caster |  |
-| 2 | u16 | item |  |
+| 0 | u16 | handle | producer |
+| 2 | u16 | product |  |
 
 Sent in reply to `0x3458` NC_ITEMDB_PRODUCE_ACK on GameDBSession (`FUN_0046c610`, GameDBSession::gds_NC_ITEMDB_PRODUCE_ACK) · payload 4 bytes
 
@@ -4171,13 +4171,13 @@ Sent in reply to `0x2070` NC_ACT_AUTO_WAY_FINDING_USE_GATE_REQ on ShineObjectCla
 
 ### `0x2072` NC_ACT_NPC_ACTION_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_NPC_ACTION_CMD`, 7 bytes
+**Verified layout** (basis: zone FUN_00523b10; = PROTO_NC_ACT_NPC_ACTION_CMD; client FUN_004a5a10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nType |  |
+| 0 | u8 | nType | 1 after a purchase |
 | 1 | u16 | nNPCHandle |  |
-| 3 | u32 | nECode |  |
+| 3 | u32 | nECode | ReactionType.shn Ecode |
 
 Sent from `FUN_00523b10` (`FUN_00523b10`) · payload 7 bytes
 
@@ -5308,14 +5308,14 @@ Sent in reply to `0x2807` NC_OPTOOL_CONNECT_BRIF_REQ on OPToolSession (`FUN_004c
 
 ### `0x3001` NC_ITEM_CELLCHANGE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CELLCHANGE_CMD`, 6 bytes + variable tail
+**Verified layout** (basis: zone sp_ChangeCell FUN_00518260; client FUN_004aaa40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | exchange | ITEM_INVEN (union: Inven, Pos, Type) |
-| 2 | u16 | location | ITEM_INVEN (union: Inven, Pos, Type) |
-| 4 | u16 | item.itemid |  |
-| 6 | u8[rest] | item.itemattr | variable length, count unknown |
+| 0 | u16 | exchange | other cell of a move (= location otherwise) |
+| 2 | u16 | location | ITEM_INVEN |
+| 4 | u16 | itemid | 0xFFFF = empty, then nothing follows |
+| 6 | bytes | attributes | class-specific (FUN_006406f0) |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_ChangeCell` (`FUN_00518260`) · payload variable (int)
 
@@ -5428,12 +5428,12 @@ Sent from `ShineObjectClass::ShinePlayer::sp_partyitemdistribute` (`FUN_0052f630
 
 ### `0x301d` NC_ITEM_DEPOSIT_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_DEPOSIT_ACK`, 10 bytes
+**Verified layout** (basis: zone so_ply_DepositAck FUN_005340f0 (DB answer path); client FUN_004ac170)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u64 | cen |  |
-| 8 | u16 | err |  |
+| 0 | u64 | cen | storage money after the answer |
+| 8 | u16 | err | 0xf80 ok |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_DepositAck` (`FUN_005340f0`) · payload 10 bytes
 
@@ -5445,12 +5445,12 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_DepositAck` (`FUN_005340f0`) ·
 
 ### `0x301f` NC_ITEM_WITHDRAW_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_WITHDRAW_ACK`, 10 bytes
+**Verified layout** (basis: zone so_ply_WithdrawAck FUN_005345e0; client FUN_004ac1c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u64 | cen |  |
-| 8 | u16 | err |  |
+| 0 | u64 | cen | storage money |
+| 8 | u16 | err | 0xf80 ok |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_WithdrawAck` (`FUN_005345e0`) · payload 10 bytes
 
@@ -5462,16 +5462,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_WithdrawAck` (`FUN_005345e0`) �
 
 ### `0x3021` NC_ITEM_CHARGEDINVENOPEN_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_CHARGEDINVENOPEN_ACK`, 5 bytes + variable tail
+**Verified layout** (basis: zone so_ply_FillChargedInven FUN_00492f30; client FUN_004ac210)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | ErrorCode |  |
-| 2 | u8 | nPartMark |  |
-| 3 | u16 | NumOfChargedItem |  |
-| 5 | PROTO_CHARGED_ITEM_INFO[NumOfChargedItem] | ChargedItemInfoList | variable length, element PROTO_CHARGED_ITEM_INFO |
-
-Element `PROTO_CHARGED_ITEM_INFO` (16 bytes): +0 u32 ItemOrderNo, +4 u32 ItemCode, +8 u32 ItemAmount, +12 u32 ItemRegisterDate.year|month|date|hour|minute
+| 0 | u16 | err | 0x1041 ok |
+| 2 | u8 | partmark | bit0 first part, bit1 zone list full |
+| 3 | u16 | count |  |
+| 5 | bytes | items | count × PROTO_CHARGED_ITEM_INFO (16 B) |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_FillChargedInven` (`FUN_00492f30`) · payload variable (iVar4)
 
@@ -5638,13 +5636,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_MH_FurnitureEndureUpdate` (`FUN
 
 ### `0x3036` NC_ITEM_WEAPONENDURE_CHARGE_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_WEAPONENDURE_CHARGE_ACK`, 8 bytes · ⚠ 2016 code uses 24 bytes: version drift or extraction error
+**Verified layout** (basis: zone so_ply_WeaponEndureChangeAck FUN_0051a260 (sent with length 0x1A, Z05-B11); client FUN_0066cb20)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u32 | ChargedNumber |  |
-| 4 | u16 | WeaponSlot | ITEM_INVEN (union: Inven, Pos, Type) |
-| 6 | u16 | Error |  |
+| 4 | u16 | WeaponSlot | ITEM_INVEN |
+| 6 | u16 | Error | 0x1a80 ok |
 
 Sent in reply to `0x3035` NC_ITEM_WEAPONENDURE_CHARGE_REQ on ShineObjectClass::ShinePlayer (`FUN_00519470`, ShineObjectClass::ShinePlayer::sp_NC_ITEM_WEAPONENDURE_CHARGE_REQ) · payload 8 bytes
 
@@ -5760,12 +5758,12 @@ Sent from `FUN_0052ee60` (`FUN_0052ee60`) · payload 28 bytes
 
 ### `0x3041` NC_ITEM_ENCHANT_ADD_GEM_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_ADD_GEM_ACK`, 7 bytes
+**Verified layout** (basis: zone FUN_00522fc0 (success); client FUN_004b2d40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | err |  |
-| 2 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
+| 0 | u16 | err | 0x2080 ok |
+| 2 | u16 | equipment | ITEM_INVEN |
 | 4 | u16 | GemID |  |
 | 6 | u8 | gemSocketIndex |  |
 
@@ -5780,12 +5778,12 @@ Sent in reply to `0x3497` NC_ITEMDB_ENCHANT_ADD_GEM_ACK on GameDBSession (`FUN_0
 
 ### `0x3043` NC_ITEM_ENCHANT_REMOVE_GEM_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_REMOVE_GEM_ACK`, 5 bytes
+**Verified layout** (basis: zone FUN_005233d0 (one per removed socket); client FUN_004b2ed0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | err |  |
-| 2 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
+| 0 | u16 | err | 0x2090 ok |
+| 2 | u16 | equipment |  |
 | 4 | u8 | gemSocketIndex |  |
 
 Sent in reply to `0x3499` NC_ITEMDB_ENCHANT_REMOVE_GEM_ACK on GameDBSession (`FUN_005233d0`, GameDBSession::gds_NC_ITEMDB_ENCHANT_REMOVE_GEM_ACK) · payload 5 bytes
@@ -5798,12 +5796,12 @@ Sent in reply to `0x3499` NC_ITEMDB_ENCHANT_REMOVE_GEM_ACK on GameDBSession (`FU
 
 ### `0x3045` NC_ITEM_ENCHANT_ADD_NEW_SOCKET_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_ENCHANT_ADD_NEW_SOCKET_ACK`, 5 bytes
+**Verified layout** (basis: zone FUN_00523820; client FUN_004b3030)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | err |  |
-| 2 | u16 | equipment | ITEM_INVEN (union: Inven, Pos, Type) |
+| 0 | u16 | err | 0x20a0 ok |
+| 2 | u16 | equipment |  |
 | 4 | u8 | socketCount |  |
 
 Sent in reply to `0x349b` NC_ITEMDB_ENCHANT_ADD_NEW_SOCKET_ACK on GameDBSession (`FUN_00523820`, GameDBSession::gds_NC_ITEMDB_ENCHANT_ADD_NEW_SOCKET_ACK) · payload 5 bytes
@@ -5862,16 +5860,16 @@ Sent in reply to `0x304a` NC_ITEM_AUTO_ARRANGE_INVEN_REQ on ShineObjectClass::Sh
 
 ### `0x3052` NC_ITEM_MOVER_UPGRADE_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_MOVER_UPGRADE_ACK`, 108 bytes
+**Verified layout** (basis: zone FUN_00468c60 / FUN_00468e30; = PROTO_NC_ITEM_MOVER_UPGRADE_ACK; client FUN_0049d720)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
-| 2 | u8 | bRare |  |
+| 0 | u16 | nError | 0x3228 ok, 0x322c fail |
+| 2 | u8 | bRare | 0 upgrade, 1 rare mover |
 | 3 | u8 | bUpgrade |  |
 | 4 | u8 | nSlot |  |
 | 5 | u16 | nItemID |  |
-| 7 | byte[101] | ItemAttr | SHINE_ITEM_ATTRIBUTE (union: blot, wlot, dlot, qstitm, amulet, weapon, armor, shield, boot, furniture, decorate, skillscroll, recallscroll, binditem, upsource, itemchest, weapontitlelicence, kingdomquest, minihouseskin, upgraderedgem, upgradebluegem, upgradegoldgem, kqstep, feed, riding, amount, costumweapon, costumshield, actionitem, Enchant, GBCoin, Capsule, MobCard_Unident, MobCard, NoEffect, ActiveSkill, Pet, Bracelet) |
+| 7 | bytes[101] | ItemAttr | SHINE_ITEM_ATTRIBUTE |
 
 Sent in reply to `0x34ad` NC_ITEMDB_MOVER_UPGRADE_ACK on GameDBSession (`FUN_00468c60`, GameDBSession::gds_NC_ITEMDB_MOVER_UPGRADE_ACK) · payload 108 bytes
 
@@ -5981,11 +5979,11 @@ Fill: +2: FUN_006406c0 (no direct writes found)
 
 ### `0x305d` NC_ITEM_SELL_ITEM_DELETE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ITEM_SELL_ITEM_DELETE_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_00537ba0 / FUN_00537a20; client FUN_0049dc50)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nHandle |  |
+| 0 | u16 | nHandle | repurchase list entry |
 
 Sent from `FUN_00537a20` (`FUN_00537a20`) · payload 2 bytes
 
@@ -6297,18 +6295,16 @@ Sent from `NPCRole_Merchant::nrm_PortionStone` (`FUN_004c2d60`) · payload 24 by
 
 ### `0x3c08` NC_MENU_OPENSTORAGE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MENU_OPENSTORAGE_CMD`, 12 bytes + variable tail
+**Verified layout** (basis: zone so_accountstoragefill FUN_0044c530; client FUN_0049a9a0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u64 | cen |  |
-| 8 | u8 | maxpage |  |
+| 0 | u64 | cen | storage money |
+| 8 | u8 | pages | 0x10 |
 | 9 | u8 | curpage |  |
-| 10 | u8 | nOpenType |  |
-| 11 | u8 | itemcounter |  |
-| 12 | PROTO_ITEMPACKET_INFORM[itemcounter] | itemarray | variable length, element PROTO_ITEMPACKET_INFORM |
-
-Element `PROTO_ITEMPACKET_INFORM` (106 bytes): +0 u8 datasize, +1 u16 location, +3 u16 info.itemid, +5 byte[101] info.itemattr
+| 10 | u8 | openType |  |
+| 11 | u8 | count |  |
+| 12 | bytes | items | count items of the page (FUN_00643b10) |
 
 Sent from `ShineObjectClass::ShinePlayer::so_accountstoragefill` (`FUN_0044c530`) · payload variable (iVar6 + 0xe)
 
@@ -10294,6 +10290,295 @@ Empty payload.
 | 11 | u16 | nLockIndex |  |
 | 13 | u16 | nErrorType | 0xAC1 ok |
 
+### `0x340c` NC_ITEMDB_BUYALLFAIL_ACK † (DB→Z)
+
+**Verified layout** (basis: zone FUN_00525740 (also 0x340f/0x3492/0x3495); character sender FUN_00409300 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | error |  |
+| 8 | u16 | lockindex |  |
+
+### `0x3415` NC_ITEMDB_UNEQUIPFAIL_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0053af90; character sender FUN_0040afc0 (err 0x28a) (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | error | zone frees this as the lock (Z05-B5) |
+| 8 | u16 | lockindex |  |
+
+### `0x3417` NC_ITEMDB_DROPALLSUC_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0052ab80 / ShineDropItem_so_ItemDrop FUN_0052a7a0; character FUN_0040b140 (117 bytes))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u64 | item.key |  |
+| 14 | u16 | item.itemID |  |
+| 16 | bytes[101] | item.attr | SHINE_ITEM_ATTRIBUTE |
+
+### `0x3418` NC_ITEMDB_DROPALLFAIL_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0052ae60; character FUN_0040b140 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | error | ignored |
+
+### `0x3424` NC_ITEMDB_SELLALLFAIL_ACK † (DB→Z)
+
+**Verified layout** (basis: zone FUN_00539640 (also 0x3427); character FUN_00409a20 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | error | ignored (Z05-B1) |
+| 8 | u16 | lockindex |  |
+
+### `0x342f` NC_ITEMDB_MERGESUC_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00533630 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | u64 | lotmain | item key |
+| 16 | u16 | MergeResultLot | checked against the zone |
+
+### `0x3432` NC_ITEMDB_SPLIT_N_MERGESUC_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00533a40 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | u64 | FromItemKey |  |
+| 16 | u64 | ToItemKey |  |
+| 24 | u16 | MoveLot |  |
+| 26 | u16 | ResultLotFrom |  |
+| 28 | u16 | ResultLotTo |  |
+
+### `0x3435` NC_ITEMDB_SPLITSUC_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00539740 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | u64 | lotmain |  |
+| 16 | u16 | RemainLot |  |
+
+### `0x343c` NC_ITEMDB_ITEMTRADEFAIL_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00593dd0; character FUN_0040ca80 (one per partner))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | u16 | err | sent to the client as 0x4C23 |
+
+### `0x3440` NC_ITEMDB_USE_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0053fa40 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | u16 | error | 0x700 ok |
+
+### `0x3446` NC_ITEMDB_OPENSTORAGE_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0044c460 → FUN_0044c530 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u8 | curpage |  |
+| 7 | u8 | nOpenType |  |
+| 8 | u64 | cen |  |
+| 16 | u8 | itemcounter |  |
+| 17 | bytes | itemarray | PROTO_ITEMPACKET_TOTAL[] |
+
+### `0x3456` NC_ITEMDB_BOOTHTRADE_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_005914a0 (ref = seller) (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | buyer.objHandle |  |
+| 8 | u32 | buyer.charNo |  |
+| 12 | u16 | boothlockindexSeller |  |
+| 14 | u16 | boothlockindexBuyer |  |
+| 16 | u32 | nBoothTradeType | BOOTH_TRADE_TYPE |
+| 20 | u64 | nItemKey |  |
+| 28 | u16 | nLotTraded |  |
+| 30 | u16 | err | 0xa41 ok |
+
+### `0x3458` NC_ITEMDB_PRODUCE_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0046c610 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | u16 | product |  |
+| 10 | u16 | err | 0xb01 ok |
+
+### `0x3460` NC_ITEMDB_DEPOSIT_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_005340f0 (also 0x3462 WITHDRAW) (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | u64 | cen | new storage money |
+| 16 | u16 | err | 0xf80 ok |
+
+### `0x3466` NC_ITEMDB_CHARGED_WITHDRAW_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00492d90 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | bytes[16] | ChargedItemInfo |  |
+| 24 | u16 | ErrorCode | 0x1041 ok |
+
+### `0x3475` NC_ITEMDB_GUILD_STORAGE_WITHDRAW_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00537640 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | u64 | cen | new guild storage money |
+| 16 | u16 | err | 0x1480 ok |
+
+### `0x347e` NC_ITEMDB_MINIHOUSE_EFFECT_DEMANDGOOD_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0056f360 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | u16 | nEffectHandle |  |
+| 10 | u16 | err | 0x1700 ok, 0x1702-0x1706 mapped to 0x16d1-0x16d5 |
+
+### `0x348e` NC_ITEMDB_WEAPONENDURE_CHARGE_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0051a260 (also 0x34c7 shield) (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | u64 | WeaponKey |  |
+| 16 | u16 | WeaponSlot |  |
+| 18 | u32 | ChargedNumber |  |
+| 22 | u16 | Error | 0x1a80 ok |
+
+### `0x34a9` NC_ITEMDB_ITEMINFO_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00528500 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | clientregnum |  |
+| 4 | u16 | clientzonehandle |  |
+| 6 | u16 | err | 0x2b00 ok |
+| 8 | u16 | FailProtocol | opcode to answer with; 0xC407 = card open |
+
+### `0x34ad` NC_ITEMDB_MOVER_UPGRADE_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00468c60 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nLockIndex |  |
+| 2 | u32 | nCharRegNum |  |
+| 6 | u16 | nHandleNum |  |
+| 8 | u16 | nError | 0x3230 ok |
+| 10 | u8 | bUpgrade |  |
+| 11 | u8 | nSlot |  |
+| 12 | u16 | nItemID |  |
+| 14 | bytes[101] | ItemAttr |  |
+
+### `0x34b6` NC_ITEMDB_CHAT_COLOR_CHANGE_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00469710 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3600 ok |
+| 2 | u16 | nLockIndex |  |
+| 4 | u32 | nCharRegNum | player lookup key |
+| 8 | u64 | nItemKey |  |
+| 16 | u16 | nItemID |  |
+| 18 | u32 | eChatColorItemType |  |
+| 22 | u8 | nChangeColor |  |
+
+### `0x34c0` NC_ITEMDB_UES_FRIEND_POINT_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00469d00 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | error | 0x36c0 ok |
+| 8 | u16 | itemID |  |
+| 10 | u16 | friendpoint |  |
+| 12 | u16 | lockindex |  |
+| 14 | u8 | numofitem |  |
+
+### `0x34ca` NC_ITEMDB_MAPLINK_ITEM_CONSUME_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_004698a0 (handler reads))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nLockIndex |  |
+| 2 | u32 | nCharRegNum |  |
+| 6 | u16 | nHandleNum |  |
+| 8 | char[12] | mapName |  |
+| 20 | u16 | skillID |  |
+| 22 | u32 | skillCoolTime | ms |
+| 26 | u16 | nError | 0x3748 ok |
+
 ### `0x4404` NC_QUEST_DB_SET_INFO_ACK (DB→Z)
 
 **Verified layout** (basis: zone FUN_005bf280)
@@ -10594,6 +10879,17 @@ Empty payload.
 |---|---|---|---|
 | 0 | u16 | err | 0x20E8 ok, 0x20E9 riding, 0x20EA wrong mode |
 
+### `0x3002` NC_ITEM_EQUIPCHANGE_CMD † (S→C)
+
+**Verified layout** (basis: zone sp_ChangeCell FUN_00518260; client FUN_004ab400)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | exchange |  |
+| 2 | u8 | location | equip slot |
+| 3 | u16 | itemid | 0xFFFF = empty |
+| 5 | bytes | attributes | class-specific |
+
 ### `0x3004` NC_ITEM_BUY_ACK † (S→C)
 
 **Verified layout** (basis: zone so_SendErrorCode 12/4; client FUN_004ab770)
@@ -10667,6 +10963,14 @@ no PDB struct of that name
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x1680 ok |
+
+### `0x3c07` NC_MENU_OPENSTORAGE_FAIL_CMD † (S→C)
+
+**Verified layout** (basis: zone FUN_00468980; client FUN_00479fa0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | from the DB |
 
 ### `0x4415` NC_QUEST_START_ACK † (S→C)
 
@@ -11047,6 +11351,20 @@ empty payload
 | 7 | u32 | userNo |  |
 | 11 | u8 | fromAccountStorageCmd |  |
 
+### `0x3450` NC_ITEMDB_GETFROMCHEST_REQ (Z→DB)
+
+**Verified layout** (basis: zone so_ply_ChestBoxOpenAck FUN_00598e90 (= PDB + ref))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u32 | owner |  |
+| 10 | u16 | lockindex |  |
+| 12 | u64 | chest |  |
+| 20 | u8 | relocnum |  |
+| 21 | bytes | reloc | relocnum × {u64 key, u16 new location} |
+
 ### `0x345f` NC_ITEMDB_DEPOSIT_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_00533dc0 (zone→DB))
@@ -11083,6 +11401,17 @@ empty payload
 | 10 | u16 | first |  |
 | 12 | u16 | last |  |
 
+### `0x346d` NC_ITEMDB_CHESTITEM_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_00598c90 (= PDB + ref))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u64 | chest |  |
+| 14 | u16 | location | ITEM_INVEN |
+
 ### `0x347d` NC_ITEMDB_MINIHOUSE_EFFECT_DEMANDGOOD_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_00574a30)
@@ -11108,6 +11437,69 @@ empty payload
 | 2 | u32 | ref.charNo |  |
 | 6 | u32 | guildregnum | guild or academy number |
 | 10 | u8 | nOpenType |  |
+
+### `0x349e` NC_ITEMDB_MYSTERY_VAULT_MAKEITEM_REQ † (Z→DB)
+
+**Verified layout** (basis: zone sp_MysteryVaultMakeItem FUN_005658f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u16 | lockindex |  |
+| 8 | u64 | box key |  |
+| 16 | u16 | box id |  |
+| 18 | u8 | count |  |
+| 19 | bytes | items | count × PROTO_ITEM_CREATE (38 B), then the attribute bytes |
+
+### `0x34a2` NC_ITEMDB_CAPSULEITEM_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_0059aba0 (= PDB + ref))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u64 | nItemReg |  |
+| 14 | u16 | nLocation |  |
+
+### `0x34a4` NC_ITEMDB_GETFROMCAPSULE_REQ † (Z→DB)
+
+**Verified layout** (basis: zone FUN_0059ada0 (= PDB + ref, 30 bytes))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.objHandle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u32 | nOwner |  |
+| 10 | u16 | nLockIndex |  |
+| 12 | u64 | capsule key |  |
+| 20 | u64 | reloc.key |  |
+| 28 | u16 | reloc.newlocation |  |
+
+### `0x34a8` NC_ITEMDB_ITEMINFO_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_00627740 (= PDB))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | clientregnum |  |
+| 4 | u16 | clientzonehandle |  |
+| 6 | u64 | ItemKey |  |
+| 14 | u16 | FailProtocol | 0xC407 for card open |
+
+### `0x34aa` NC_ITEMDB_ITEMREBUILD_REQ (Z→DB)
+
+**Verified layout** (basis: zone so_ply_CollectCardOpen FUN_006281b0 (PDB + attribute bytes))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | clientregnum |  |
+| 4 | u16 | clientzonehandle |  |
+| 6 | u16 | lockindex |  |
+| 8 | u64 | EraseItemKey |  |
+| 16 | bytes[38] | CreateItem | PROTO_ITEM_CREATE {u32 owner, MAPPOS map, u16 location, u64 key, u16 id, u16 attr} |
+| 54 | bytes | attributes | of the created card |
 
 ### `0x401c` NC_CHARSAVE_AUTO_PICK_SAVE_REQ † (Z→DB)
 
@@ -11283,6 +11675,16 @@ empty payload
 | 2 | u32 | ref.charNo |  |
 | 6 | u8 | nItemSlot |  |
 | 7 | Name4 | sGuildName |  |
+
+### `0x74c0` NC_GUILD_ZONE_USE_GUILD_TOKEN_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_00525400 / FUN_005255a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildNo |  |
+| 4 | u32 | nPriceGuildToken |  |
+| 8 | u32 | zero |  |
 
 ### `0x74d9` NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_REQ † (Z→WM)
 
