@@ -143,7 +143,10 @@ ITEMS = [
              "(code 0xDB0 → keeps the value, `FUN_00475fb0`). Give it a layout and a meaning, and a name only if a string "
              "supports one.",
              "C01 found no client handler for `0x5802`, `0x7038`, `0x703a`, `0xa415` although the WM sends them to a "
-             "client: document them as ignored by the 2016 client, not as missing."]),
+             "client: document them as ignored by the 2016 client, not as missing.",
+             "Open from Z06 (§4.1, §8): the gamble system server `CGambleSystemServer` (init FUN_0043c1a0, "
+             "`SendExchangeCoinInit` FUN_0043c2d0): when and how it computes the next daily coin reset and broadcasts "
+             "`0xBC09 NC_GAMBLE_EXCHANGEDCOIN_INIT_CMD` to the zones. The zone side is documented in Z06 §4.1."]),
  dict(id="Z02", phase=2, title="Zone: movement, chat, emotes, sight/briefinfo, NPC menus, scenario",
       out="docs/pseudocode/zone/Z02-actions.md", deps=["Z01"],
       scope=[("zone", "ShinePlayer", [7, 8, 15, 27]), ("zone", "WorldManagerSession", [8])],
@@ -201,7 +204,10 @@ ITEMS = [
              "FUN_0056df80 (party status every tick, Z08 §1.2); the prison release timer behind `so_Prison_Go` / `so_Prison_End` "
              "(FUN_005b94b0 / FUN_005b9730, map EldPri); what the GM events (`g_GMEvents` DAT_14d42940, activation FUN_0046d5c0) "
              "change; the map scripts that run kingdom quests (`ScenarioBookShelf`, `PineEventScriptNode::ShineEndOfKingdomQuest`, "
-             "`ShineQuestResult`, `ShineQuestMobkill`). The KQ and guild-tournament objects themselves are Z16; the quest engine is Z15."]),
+             "`ShineQuestResult`, `ShineQuestMobkill`). The KQ and guild-tournament objects themselves are Z16; the quest engine is Z15.",
+             "Open from Z06 (§8): the drop-item dice game is a drop feature and belongs here: `ShineDropItem::so_DiceItemPickInit` "
+             "FUN_00531020, `sd_DiceGameResult` FUN_00531470, the packets `0x303B` / `0x303E` / `0x303F`, the table "
+             "`BelongDice.shn`, and the party/raid loot distribution FUN_00644f60."]),
  dict(id="Z10", phase=2, title="Zone: certification and the downloaded start script",
       out="docs/pseudocode/zone/Z10-certification.md", deps=["Z01"], scope=[],
       goal="The zone does not start on its own: it downloads an encrypted Lua script from a certification server "
@@ -384,6 +390,24 @@ ITEMS = [
              "Settle Z08-B12 (seed bound 33 vs 32) and the 0x1A41/0x1A42 mode-vs-location order of 0x74AC (read the assembly)."],
       done="KQ lifecycle (make → start → pull-in → play → end → reward) and guild tournament match lifecycle written as "
            "pseudocode; every client packet sent during either event has a layout."),
+ dict(id="Z17", phase=2, title="Zone: item actions and costume weapon/shield charges (added by Z06)",
+      out="docs/pseudocode/zone/Z17-item-actions.md", deps=["Z03", "Z04"], scope=[],
+      goal="Z03 pointed the item-action system and the costume weapon/shield charges to Z06, but they are item and combat "
+           "effects, not trade or gambling, and no item covers them: what an item action is (condition → effect), when it "
+           "fires, its cooldowns, and how costume charges are spent and refilled.",
+      steps=["Read `docs/knowledge/Z03.md` / `Z04.md` first and the parts of `docs/pseudocode/zone/Z03-combat.md` / "
+             "`Z04-items.md` you touch (abstates, skills, item use and equipment are documented there; cite them, do not redo "
+             "them). Known so far: Z04 calls the item-action container on equip (FUN_005d1f20, condition {8,1,10,0}); Z03 "
+             "says item actions feed hit/crit/shield rates; D02 loads/saves the cool times (`0x10CF`, "
+             "`usp_Character_getItemActionCoolTime` / `setItemActionCoolTime`); C02 lists the PDB vs SHN column differences.",
+             "Item actions: the tables `ItemAction*.shn`, `ItemActionCondition`, `ItemActionEffect` (loaders "
+             "FUN_005b59c0…FUN_005b5d80), the player's item-action cooldown container (player `vt 0x5d0`), what triggers a "
+             "check (item use, equip, hit, …), each condition and effect type, and any packet sent to the client.",
+             "Costume weapon/shield charges: `sp_CostumWeaponChargeDecrease_*`, `WeaponChargeOk` FUN_00562160, where a charge "
+             "is spent, what happens at 0, how charges are refilled, and the packets and ITEMDB requests involved (Z05 has the "
+             "DB side)."],
+      done="Item-action lifecycle (load → trigger → condition → effect → cooldown) and costume charge lifecycle written as "
+           "pseudocode; every packet either sends has a layout."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
