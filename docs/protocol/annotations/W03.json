@@ -1,0 +1,902 @@
+{
+ "_about": "W03: guild / academy layouts read from the WM (wm export), names from opcodes.json / 2017 PDB; offsets checked against the 2016 send/read sites.",
+ "packets": {
+  "wm": {
+   "0x7404": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_LIST_ACK",
+    "basis": "wm FUN_00445660",
+    "fields": [
+     [
+      0,
+      "u16",
+      "Error",
+      "0x0C41 ok, 0x1C30 too soon"
+     ],
+     [
+      2,
+      "u8",
+      "PartMask",
+      "bit0 first, bit1 last"
+     ],
+     [
+      3,
+      "u16",
+      "TotalNumOfGuild",
+      ""
+     ],
+     [
+      5,
+      "u16",
+      "nGuildListCnt",
+      ""
+     ],
+     [
+      7,
+      "SHINE_GUILD_LIST_NEW[n]",
+      "GuildList",
+      "0x2E: u32 nNo, Name4 sName, Name5 master, u8 nType, u8 nGrade, u16 num, u16 max"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7405": {
+    "dir": "C\u2192WM",
+    "name": "NC_GUILD_MAKE_REQ",
+    "basis": "wm FUN_0041d380 / FUN_0044cf10",
+    "fields": [
+     [
+      0,
+      "Name4",
+      "Name",
+      ""
+     ],
+     [
+      16,
+      "Name3",
+      "Password",
+      ""
+     ],
+     [
+      28,
+      "u8",
+      "Type",
+      ""
+     ]
+    ],
+    "notes": "0x1D bytes"
+   },
+   "0x7406": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_MAKE_ACK",
+    "basis": "wm FUN_00450750 / FUN_0044a2e0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "Error",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "No",
+      "uninitialised on WM-side errors"
+     ],
+     [
+      6,
+      "Name4",
+      "Name",
+      ""
+     ],
+     [
+      22,
+      "u8",
+      "Type",
+      ""
+     ],
+     [
+      23,
+      "i32",
+      "dCreateDate",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7407": {
+    "dir": "C\u2192WM",
+    "name": "NC_GUILD_DISMISS_REQ",
+    "basis": "wm FUN_00445950",
+    "fields": [
+     [
+      0,
+      "Name4",
+      "Name",
+      ""
+     ],
+     [
+      16,
+      "Name3",
+      "Password",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7409": {
+    "dir": "C\u2192WM",
+    "name": "NC_GUILD_MEMBER_INVITE_REQ",
+    "basis": "wm FUN_0041d450",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "ToCharID",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x740a": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_MEMBER_INVITE_ACK",
+    "basis": "wm FUN_0041d450",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "ToCharID",
+      ""
+     ],
+     [
+      20,
+      "u16",
+      "Error",
+      "0x0C41 also on success"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x740b": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_MEMBER_JOIN_REQ",
+    "basis": "wm FUN_00449150",
+    "fields": [
+     [
+      0,
+      "Name4",
+      "GuildName",
+      ""
+     ],
+     [
+      16,
+      "Name5",
+      "FromCharID",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x740c": {
+    "dir": "C\u2192WM",
+    "name": "NC_GUILD_MEMBER_JOIN_ACK",
+    "basis": "wm FUN_00419db0",
+    "fields": [
+     [
+      0,
+      "Name4",
+      "GuildName",
+      ""
+     ],
+     [
+      16,
+      "u8",
+      "JoinAck",
+      "0 = refuse"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x740d": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_MEMBER_JOIN_ERR",
+    "basis": "wm FUN_0044a340",
+    "fields": [
+     [
+      0,
+      "Name4",
+      "GuildName",
+      ""
+     ],
+     [
+      16,
+      "u16",
+      "Error",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7416": {
+    "dir": "C\u2192WM",
+    "name": "NC_GUILD_MEMBER_GRADE_REQ",
+    "basis": "wm FUN_0041d8e0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "CharID",
+      ""
+     ],
+     [
+      20,
+      "u8",
+      "MemberGrade",
+      "not range-checked"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7417": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_MEMBER_GRADE_ACK",
+    "basis": "wm FUN_0044a3a0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "CharID",
+      ""
+     ],
+     [
+      20,
+      "u8",
+      "MemberGrade",
+      ""
+     ],
+     [
+      21,
+      "u16",
+      "Error",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x741b": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_MEMBER_LIST_ACK",
+    "basis": "wm FUN_00443e80",
+    "fields": [
+     [
+      0,
+      "u16",
+      "TotalMemberCount",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "MemberIndex",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "MemberCount",
+      ""
+     ],
+     [
+      6,
+      "GUILD_MEMBER_CLIENT[n]",
+      "MemberList",
+      "0x6E each"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7425": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_WAR_ABLE_LIST_ACK",
+    "basis": "wm FUN_0043e270",
+    "fields": [
+     [
+      0,
+      "u16",
+      "Error",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "PartMask",
+      ""
+     ],
+     [
+      3,
+      "u16",
+      "NumOfWarInfo",
+      ""
+     ],
+     [
+      5,
+      "SHINE_GUILD_WAR_ABLE_INFO[n]",
+      "WarInfoList",
+      "0x2A"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x742a": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_WAR_SCORE_CMD",
+    "basis": "wm FUN_004497c0",
+    "fields": [
+     [
+      0,
+      "Name4",
+      "GuildName1",
+      ""
+     ],
+     [
+      16,
+      "SHINE_GUILD_SCORE",
+      "GuildScore1",
+      ""
+     ],
+     [
+      58,
+      "Name4",
+      "GuildName2",
+      ""
+     ],
+     [
+      74,
+      "SHINE_GUILD_SCORE",
+      "GuildScore2",
+      ""
+     ]
+    ],
+    "notes": "client-bound only: members of both warring guilds; no 2016 client handler"
+   },
+   "0x7434": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_WAR_END_CMD",
+    "basis": "wm FUN_00449f80",
+    "fields": [
+     [
+      0,
+      "Name4",
+      "EnemyGuildName",
+      ""
+     ],
+     [
+      16,
+      "u32",
+      "RequestNo",
+      ""
+     ],
+     [
+      20,
+      "u32",
+      "EnemyGuildFameAdd",
+      "always 0"
+     ],
+     [
+      24,
+      "u32",
+      "GuildFameAdd",
+      "always 0"
+     ],
+     [
+      28,
+      "u32",
+      "GuildTotalFame",
+      ""
+     ],
+     [
+      32,
+      "u8",
+      "WarResult",
+      "0 win 1 lose 2 draw"
+     ],
+     [
+      33,
+      "u8",
+      "WarStatus",
+      "3"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7445": {
+    "dir": "Zone\u2192WM",
+    "name": "NC_GUILD_ZONE_WAR_KILL_CMD",
+    "basis": "wm FUN_0044d1b0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "hWMKiller",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "hWMTarget",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7468": {
+    "dir": "WM\u2192CharDB",
+    "name": "NC_GUILD_DB_RESULT_WRITE_CMD",
+    "basis": "wm FUN_00449f80",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nNo",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "nFame",
+      ""
+     ],
+     [
+      8,
+      "u32",
+      "win",
+      ""
+     ],
+     [
+      12,
+      "u32",
+      "lose",
+      ""
+     ],
+     [
+      16,
+      "u32",
+      "draw",
+      ""
+     ],
+     [
+      20,
+      "u32",
+      "enemyNo",
+      ""
+     ],
+     [
+      24,
+      "u32",
+      "enemyFame",
+      ""
+     ],
+     [
+      28,
+      "u32",
+      "enemyWin",
+      ""
+     ],
+     [
+      32,
+      "u32",
+      "enemyLose",
+      ""
+     ],
+     [
+      36,
+      "u32",
+      "enemyDraw",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7474": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_CHAT_CMD",
+    "basis": "wm FUN_004447b0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      ""
+     ],
+     [
+      4,
+      "Name5",
+      "talker",
+      ""
+     ],
+     [
+      24,
+      "u8",
+      "itemLinkDataCount",
+      ""
+     ],
+     [
+      25,
+      "u8",
+      "len",
+      ""
+     ],
+     [
+      26,
+      "char[len]",
+      "content",
+      "then count\u00b70x67 link bytes"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7477": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_NAME_ACK",
+    "basis": "wm FUN_0044ace0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nNo",
+      ""
+     ],
+     [
+      4,
+      "Name4",
+      "Name",
+      ""
+     ],
+     [
+      20,
+      "GUILD_EMBLEM_INFO",
+      "EmblemInfo",
+      "0xFFFF when no emblem"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x74c0": {
+    "dir": "Zone\u2192WM",
+    "name": "NC_GUILD_ZONE_USE_GUILD_TOKEN_CMD",
+    "basis": "wm FUN_0042ad90",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      ""
+     ],
+     [
+      4,
+      "u64",
+      "nDecrease",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x74c1": {
+    "dir": "WM\u2192Zone",
+    "name": "NC_GUILD_WORLD_USE_GUILD_TOKEN_CMD",
+    "basis": "wm FUN_0042ad90",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      ""
+     ],
+     [
+      4,
+      "u64",
+      "nDecrease",
+      ""
+     ],
+     [
+      12,
+      "u64",
+      "nGuildToken",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x749f": {
+    "dir": "WM\u2192Zone",
+    "name": "NC_GUILD_STORAGE_WITHDRAW_GRADE_ACK",
+    "basis": "wm FUN_0043ca20 / FUN_0043f340",
+    "fields": [
+     [
+      0,
+      "NETPACKETZONEHEADER",
+      "hdr",
+      "uninitialised on errors"
+     ],
+     [
+      6,
+      "u16",
+      "err",
+      "0x0C41 ok"
+     ],
+     [
+      8,
+      "u8",
+      "Grade",
+      "99 on errors"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x750d": {
+    "dir": "WM\u2192CharDB",
+    "name": "NC_GUILD_EMBLEM_STATE_DB_REQ",
+    "basis": "wm FUN_0044ea00 / FUN_0042d220",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      ""
+     ],
+     [
+      4,
+      "i32",
+      "EmblemDeleteDate",
+      ""
+     ],
+     [
+      8,
+      "u8",
+      "EmblemState",
+      "GUILD_EMBLEM_STATE"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x74e3": {
+    "dir": "WM\u2192Zone",
+    "name": "NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_REQ",
+    "basis": "wm FUN_0043fe50",
+    "fields": [
+     [
+      0,
+      "u16",
+      "hWMChar",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "nGTNo",
+      "= Time_Start"
+     ],
+     [
+      10,
+      "u32",
+      "nGuildNo",
+      ""
+     ],
+     [
+      14,
+      "u8",
+      "nMinLevel",
+      ""
+     ],
+     [
+      15,
+      "u16",
+      "nMinMember",
+      ""
+     ],
+     [
+      17,
+      "u64",
+      "nProposalMoney",
+      ""
+     ]
+    ],
+    "notes": "broadcast to all zones"
+   },
+   "0x7481": {
+    "dir": "WM\u2192Zone",
+    "name": "NC_GUILD_TOURNAMENT_START_CMD",
+    "basis": "wm FUN_0044ade0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nTournamentSeed",
+      ""
+     ],
+     [
+      1,
+      "u16",
+      "nTournamentMapNo",
+      "rand()%3"
+     ],
+     [
+      3,
+      "u16",
+      "nExploerTimeMin",
+      ""
+     ],
+     [
+      5,
+      "u16",
+      "nWaitPlayTimeSec",
+      ""
+     ],
+     [
+      7,
+      "u16",
+      "nPlayTimeMin",
+      ""
+     ],
+     [
+      9,
+      "u32",
+      "nNo1",
+      ""
+     ],
+     [
+      13,
+      "u32",
+      "nNo2",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7482": {
+    "dir": "Zone\u2192WM",
+    "name": "NC_GUILD_TOURNAMENT_END_CMD",
+    "basis": "wm FUN_00446340",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nTournamentSeed",
+      ""
+     ],
+     [
+      1,
+      "u16",
+      "nTournamentMapNo",
+      ""
+     ],
+     [
+      3,
+      "u8",
+      "nStatus",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "nWinnerGuildNo",
+      ""
+     ],
+     [
+      8,
+      "u32",
+      "nLoseGuildNo",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x9808": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_ACADEMY_MY_GUILD_ACADEMY_INFO_ACK",
+    "basis": "wm FUN_00444a30 / FUN_0043cf90",
+    "fields": [
+     [
+      0,
+      "u16",
+      "Error",
+      "0x19B8 info; 0x1898 = rank-info layout sent by 0x9809 (W03-B20)"
+     ],
+     [
+      2,
+      "GUILD_ACADEMY_CLIENT",
+      "GuildAcademyInfo",
+      "buff end as seconds left"
+     ]
+    ],
+    "notes": "two layouts: INFO (Error 0x19B8 + GUILD_ACADEMY_CLIENT, FUN_00444a30) and, from 0x9809 (FUN_0043cf90), a 14-byte RANK layout {u16 Error 0x1898, u32 nAcademyPoint, u32 nAcademyRank, i32 buff seconds left} (W03-B20)"
+   },
+   "0x982e": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_CMD",
+    "basis": "wm FUN_00440b40 / FUN_00447cc0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sInviteSourceCharID",
+      "copied from 0x9830 +6"
+     ],
+     [
+      20,
+      "GUILD_MEMBER_CLIENT",
+      "Member",
+      "0x6E bytes"
+     ]
+    ],
+    "notes": "client-bound: guild and academy members; no 2016 client handler (ignored)"
+   },
+   "0x985e": {
+    "dir": "WM\u2192C",
+    "name": "NC_GUILD_ACADEMY_DISMISS_CMD",
+    "basis": "wm FUN_004472c0",
+    "fields": [
+     [
+      0,
+      "Name4",
+      "Name",
+      ""
+     ],
+     [
+      16,
+      "u8",
+      "nDismissStatus",
+      ""
+     ],
+     [
+      17,
+      "i32",
+      "dDismissDate",
+      ""
+     ],
+     [
+      21,
+      "tm",
+      "tm_dDismissDate",
+      ""
+     ]
+    ],
+    "notes": "client-bound: academy members; no 2016 client handler"
+   },
+   "0x7499": {
+    "dir": "WM\u2192CharDB",
+    "name": "NC_GUILD_TOURNAMENT_DB_SET_MATCH_TIME_REQ",
+    "basis": "wm FUN_0043f9a0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "Error",
+      "not set"
+     ],
+     [
+      2,
+      "u32",
+      "nGTNo",
+      "previous Time_Start"
+     ],
+     [
+      6,
+      "i32[9]",
+      "MatchTime",
+      ""
+     ]
+    ],
+    "notes": "0x2C bytes, sent by the schedule generator FUN_00444cf0"
+   }
+  }
+ },
+ "structs": {}
+}
