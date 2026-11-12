@@ -1487,11 +1487,11 @@ Handler `FUN_0057ad80`
 
 ### `0x4c01` NC_TRADE_PROPOSE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_PROPOSE_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_005925a0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | proposee |  |
+| 0 | u16 | proposee | object handle |
 
 Handler `FUN_005925a0`
 
@@ -1501,7 +1501,7 @@ Handler `FUN_005925a0`
 
 ### `0x4c0d` NC_TRADE_UPBOARD_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_UPBOARD_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_00595280)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1515,7 +1515,7 @@ Handler `FUN_00595280`
 
 ### `0x4c11` NC_TRADE_DOWNBOARD_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_DOWNBOARD_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_00594ed0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1529,7 +1529,7 @@ Handler `FUN_00594ed0`
 
 ### `0x4c15` NC_TRADE_CENBOARDING_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_CENBOARDING_REQ`, 8 bytes
+**Verified layout** (basis: zone FUN_005936b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1621,15 +1621,13 @@ Handler `FUN_005cb100`
 
 ### `0x6801` NC_BOOTH_OPEN_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_OPEN_REQ`, 31 bytes + variable tail
+**Verified layout** (basis: zone FUN_0058e900; = PDB)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8[30] | signboard.signboard |  |
-| 30 | u8 | flag.issell|itemnum | bits issell:1@0, itemnum:7@1 |
-| 31 | PROTO_NC_BOOTH_OPEN_REQ::BoothItem[flag.issell|itemnum] | items | variable length, element PROTO_NC_BOOTH_OPEN_REQ::BoothItem |
-
-Element `PROTO_NC_BOOTH_OPEN_REQ::BoothItem` (12 bytes): +0 u8 invenslot, +1 u8 boardslot, +2 u64 unitcost, +10 u16 totallot
+| 0 | bytes | signboard | 30 |
+| 30 | u8 | flag | bit0 issell, bits1-7 itemnum |
+| 31 | bytes | items[] | 0xC each {u8 invenslot,u8 boardslot,u64 unitcost,u16 totallot} |
 
 Handler `FUN_0058e900`
 
@@ -1669,12 +1667,12 @@ Handler `FUN_0058d480`
 
 ### `0x680d` NC_BOOTH_ITEMTRADE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_ITEMTRADE_REQ`, 5 bytes
+**Verified layout** (basis: zone FUN_0058da30; = PDB)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | booth |  |
-| 2 | u8 | slot |  |
+| 2 | u8 | slot | sell booth: booth slot; buy booth: seller inventory slot |
 | 3 | u16 | itemnum |  |
 
 Handler `FUN_0058da30`
@@ -2200,13 +2198,13 @@ Handler `FUN_00515600`
 
 ### `0xac1a` NC_DICE_TAISAI_BETTING_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_BETTING_REQ`, 10 bytes
+**Verified layout** (basis: zone FUN_00515c40; = PDB)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | i32 | BettingInfo.nBetting |  |
-| 4 | u32 | BettingInfo.nMoney |  |
-| 8 | u16 | nBettingIndex |  |
+| 0 | u32 | nBetting | DICE_TAISAI_BETTING 0–51 |
+| 4 | u32 | nMoney |  |
+| 8 | u16 | nBettingIndex | echoed |
 
 Handler `FUN_00515c40`
 
@@ -2260,7 +2258,7 @@ Handler `FUN_00616ad0`
 
 ### `0xbc0f` NC_GAMBLE_COIN_BUY_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_COIN_BUY_REQ`, 8 bytes
+**Verified layout** (basis: zone FUN_00616330)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3036,12 +3034,12 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b770`) ·
 
 ### `0x10de` NC_CHAR_CLIENT_COININFO_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_COININFO_CMD` (struct shared under the base name, inferred), 16 bytes
+**Verified layout** (basis: zone FUN_00615d10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u64 | nCoin |  |
-| 8 | u64 | nExchangedCoin |  |
+| 0 | u64 | coin |  |
+| 8 | u64 | remaining exchangeable |  |
 
 Sent from `FUN_00615d10` (`FUN_00615d10`) · payload 16 bytes
 
@@ -6715,7 +6713,7 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_JumpTo` (`FUN_0057db20`) · 
 
 ### `0x4c02` NC_TRADE_PROPOSE_ASK_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_PROPOSE_ASK_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_005925a0; client FUN_004ad0b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6729,7 +6727,7 @@ Sent in reply to `0x4c01` NC_TRADE_PROPOSE_REQ on ShineObjectClass::ShinePlayer 
 
 ### `0x4c09` NC_TRADE_START_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_START_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_00592cd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6739,7 +6737,7 @@ Sent in reply to `0x4c06` NC_TRADE_PROPOSEYES_ACK on ShineObjectClass::ShinePlay
 
 ### `0x4c0f` NC_TRADE_UPBOARD_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_UPBOARD_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_00595280)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6755,13 +6753,12 @@ Sent in reply to `0x4c0d` NC_TRADE_UPBOARD_REQ on ShineObjectClass::ShinePlayer 
 
 ### `0x4c10` NC_TRADE_OPPOSITUPBOARD_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_OPPOSITUPBOARD_CMD`, 104 bytes
+**Verified layout** (basis: zone FUN_00595280 (Item_WriteItemStruct FUN_006406c0))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | slotboard |  |
-| 1 | u16 | iteminfo.itemid |  |
-| 3 | byte[101] | iteminfo.itemattr | SHINE_ITEM_ATTRIBUTE (union: blot, wlot, dlot, qstitm, amulet, weapon, armor, shield, boot, furniture, decorate, skillscroll, recallscroll, binditem, upsource, itemchest, weapontitlelicence, kingdomquest, minihouseskin, upgraderedgem, upgradebluegem, upgradegoldgem, kqstep, feed, riding, amount, costumweapon, costumshield, actionitem, Enchant, GBCoin, Capsule, MobCard_Unident, MobCard, NoEffect, ActiveSkill, Pet, Bracelet) |
+| 1 | bytes | iteminfo | SHINE_ITEM_STRUCT, variable |
 
 Sent in reply to `0x4c0d` NC_TRADE_UPBOARD_REQ on ShineObjectClass::ShinePlayer (`FUN_00595280`, ShineObjectClass::ShinePlayer::sp_NC_TRADE_UPBOARD_REQ) · payload variable (iVar9 - (int)
 
@@ -6771,7 +6768,7 @@ Sent in reply to `0x4c0d` NC_TRADE_UPBOARD_REQ on ShineObjectClass::ShinePlayer 
 
 ### `0x4c13` NC_TRADE_DOWNBOARD_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_DOWNBOARD_ACK`, 1 bytes
+**Verified layout** (basis: zone FUN_00594ed0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6785,7 +6782,7 @@ Sent in reply to `0x4c11` NC_TRADE_DOWNBOARD_REQ on ShineObjectClass::ShinePlaye
 
 ### `0x4c14` NC_TRADE_OPPOSITDOWNBOARD_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_OPPOSITDOWNBOARD_CMD`, 1 bytes
+**Verified layout** (basis: zone FUN_00594ed0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6799,7 +6796,7 @@ Sent in reply to `0x4c11` NC_TRADE_DOWNBOARD_REQ on ShineObjectClass::ShinePlaye
 
 ### `0x4c17` NC_TRADE_CENBOARDING_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_CENBOARDING_ACK`, 8 bytes
+**Verified layout** (basis: zone FUN_005936b0; client ignores)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6814,7 +6811,7 @@ Sent in reply to `0x4c15` NC_TRADE_CENBOARDING_REQ on ShineObjectClass::ShinePla
 
 ### `0x4c18` NC_TRADE_OPPOSITCENBOARDING_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_TRADE_OPPOSITCENBOARDING_CMD`, 8 bytes
+**Verified layout** (basis: zone FUN_005936b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -7147,15 +7144,14 @@ Sent from `CCharacterTitleZone::Send_NC_CT_SET_CMD` (`FUN_005cab90`) · payload 
 
 ### `0x6803` NC_BOOTH_SOMEONEOPEN_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SOMEONEOPEN_CMD`, 45 bytes
+**Verified layout** (basis: zone FUN_0058e900)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | handle |  |
-| 2 | u16 | tent.minihouse |  |
-| 4 | u8[10] | tent.dummy |  |
+| 2 | bytes | tent | CHARBRIEFINFO_CAMP 12 |
 | 14 | u8 | issell |  |
-| 15 | u8[30] | signboard.signboard |  |
+| 15 | bytes | signboard | 30 |
 
 Sent in reply to `0x6801` NC_BOOTH_OPEN_REQ on ShineObjectClass::ShinePlayer (`FUN_0058e900`, ShineObjectClass::ShinePlayer::sp_NC_BOOTH_OPEN_REQ) · payload 45 bytes
 
@@ -7202,6 +7198,15 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CloseStreetBooth` (`FUN_005932b0`) 
 
 ### `0x680b` NC_BOOTH_REFRESH_SELL_ACK †
 
+**Verified layout** (basis: zone FUN_0058f260 and error path FUN_0058cce0 (only err written, length 7))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err |  |
+| 2 | u16 | boothhandle |  |
+| 4 | u8 | numofitem |  |
+| 5 | bytes | items[] | {u8 datasize,u8 boothslot,u64 unitcost,SHINE_ITEM_STRUCT} |
+
 Sent from `FUN_0058cce0` (`FUN_0058cce0`) · payload 5 bytes
 
 | Off | Type | Value / source |
@@ -7210,7 +7215,7 @@ Sent from `FUN_0058cce0` (`FUN_0058cce0`) · payload 5 bytes
 
 ### `0x680f` NC_BOOTH_BUYREFRESH_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_BUYREFRESH_CMD`, 3 bytes
+**Verified layout** (basis: zone FUN_0058ffe0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -7226,12 +7231,12 @@ Sent from `StreetBoothBuy::sb_Trade` (`FUN_0058ffe0`) · payload 3 bytes
 
 ### `0x6812` NC_BOOTH_SOMEONEINTERIORSTART_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SOMEONEINTERIORSTART_CMD`, 32 bytes
+**Verified layout** (basis: zone FUN_0058e680 (0x20 bytes, signboard 29 sent))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | boothowner |  |
-| 2 | u8[30] | signboard.signboard |  |
+| 2 | bytes | signboard | 29 |
 
 Sent in reply to `0x6810` NC_BOOTH_INTERIORSTART_REQ on ShineObjectClass::ShinePlayer (`FUN_0058e680`, ShineObjectClass::ShinePlayer::sp_NC_BOOTH_INTERIORSTART_REQ) · payload 32 bytes
 
@@ -7242,15 +7247,13 @@ Sent in reply to `0x6810` NC_BOOTH_INTERIORSTART_REQ on ShineObjectClass::ShineP
 
 ### `0x6814` NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_ACK`, 3 bytes + variable tail
+**Verified layout** (basis: zone FUN_00439c70)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x31C8 ok, 0x31C9–0x31CB, 0x31D8 rate limit |
 | 2 | u8 | nNumOfItems |  |
-| 3 | BoothItemInfo[nNumOfItems] | ItemList | variable length, element BoothItemInfo |
-
-Element `BoothItemInfo` (118 bytes): +0 u8 bii_nDataSize, +1 u32 bii_nItemHandle, +5 u16 bii_nOwnerHandle, +7 u64 bii_nUnitPrice, +15 u16 bii_ItemInfo.itemid, +17 byte[101] bii_ItemInfo.itemattr
+| 3 | bytes | ItemList | BoothItemInfo {u8 size,u32 handle,u16 owner,u64 price,SHINE_ITEM_STRUCT} |
 
 Sent in reply to `0x6813` NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_REQ on ShineObjectClass::ShinePlayer (`FUN_00439c70`, ShineObjectClass::ShinePlayer::sp_NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_REQ) · payload 3 bytes
 
@@ -7261,14 +7264,14 @@ Sent in reply to `0x6813` NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_REQ on ShineObje
 
 ### `0x6816` NC_BOOTH_SEARCH_BOOTH_POSITION_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SEARCH_BOOTH_POSITION_ACK`, 12 bytes
+**Verified layout** (basis: zone FUN_0043a140)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x31C8 ok |
 | 2 | u16 | nTargetBoothOwnerHandle |  |
-| 4 | u32 | BoothPosition.x |  |
-| 8 | u32 | BoothPosition.y |  |
+| 4 | u32 | x |  |
+| 8 | u32 | y |  |
 
 Sent in reply to `0x6815` NC_BOOTH_SEARCH_BOOTH_POSITION_REQ on ShineObjectClass::ShinePlayer (`FUN_0043a140`, ShineObjectClass::ShinePlayer::sp_NC_BOOTH_SEARCH_BOOTH_POSITION_REQ) · payload 12 bytes
 
@@ -7278,7 +7281,7 @@ Sent in reply to `0x6815` NC_BOOTH_SEARCH_BOOTH_POSITION_REQ on ShineObjectClass
 
 ### `0x6817` NC_BOOTH_SEARCH_BOOTH_CLOSED_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_BOOTH_SEARCH_BOOTH_CLOSED_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_005932b0/FUN_0058e680)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -8701,11 +8704,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_InitSkillEmpow` (`FUN_00518c00`
 
 ### `0x9010` NC_CHARGED_BOOTHSLOTSIZE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHARGED_BOOTHSLOTSIZE_CMD`, 1 bytes
+**Verified layout** (basis: zone so_ply_SendBoothSize FUN_00535390)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | boothsize |  |
+| 0 | u8 | size | ≤ 20 |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_SendBoothSize` (`FUN_00535390`) · payload 1 bytes
 
@@ -8858,23 +8861,21 @@ Sent from `FUN_005ee4d0` (`FUN_005ee4d0`) · payload variable (iVar5)
 
 ### `0xac02` NC_DICE_TAISAI_GAME_JOIN_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_GAME_JOIN_ACK`, 50 bytes + variable tail
+**Verified layout** (basis: zone FUN_005119d0; = PDB)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
-| 2 | DiceTaiSaiInfo[7] | DiceHistory | element DiceTaiSaiInfo |
-| 23 | i32 | nGameStatus |  |
-| 27 | i32 | bModeType |  |
+| 0 | u16 | nError | 0x1C80 ok |
+| 2 | bytes | DiceHistory | 7×3 |
+| 23 | u32 | nGameStatus |  |
+| 27 | u32 | bModeType |  |
 | 31 | u16 | nTimer |  |
-| 33 | u32 | nInterval |  |
+| 33 | u32 | nInterval | remaining |
 | 37 | u16 | nGetSysRate |  |
 | 39 | u64 | nMaxBetMoney |  |
 | 47 | u16 | nUseMinLv |  |
 | 49 | u8 | nGamerCnt |  |
-| 50 | u16[nGamerCnt] | nGamerHnd | variable length |
-
-Element `DiceTaiSaiInfo` (3 bytes): +0 u8[3] nNumber
+| 50 | bytes | handles | u16 × n |
 
 Sent from `FUN_005119d0` (`FUN_005119d0`) · payload 50 bytes
 
@@ -9073,11 +9074,11 @@ Sent in reply to `0xac16` NC_DICE_TAISAI_RANK_REQ on ShineObjectClass::ShinePlay
 
 ### `0xac1b` NC_DICE_TAISAI_BETTING_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_DICE_TAISAI_BETTING_ACK`, 4 bytes
+**Verified layout** (basis: zone FUN_00515c40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x1CB0 ok |
 | 2 | u16 | nBettingIndex |  |
 
 Sent in reply to `0xac1a` NC_DICE_TAISAI_BETTING_REQ on ShineObjectClass::ShinePlayer (`FUN_00515c40`, ShineObjectClass::ShinePlayer::sp_NC_DICE_TAISAI_BETTING_REQ) · payload 4 bytes
@@ -9335,14 +9336,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_Gamble_ChangeExchangedCoin` (`FUN_0
 
 ### `0xbc18` NC_GAMBLE_TYPE_AND_WHERE_STAND_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_GAMBLE_TYPE_AND_WHERE_STAND_ACK`, 9 bytes
+**Verified layout** (basis: zone FUN_00616dd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
-| 2 | u16 | nNpcHandle |  |
-| 4 | i32 | nGambleType |  |
-| 8 | u8 | nWhereStand |  |
+| 0 | u16 | nError | 0x2600 ok |
+| 2 | u16 | npc |  |
+| 4 | u32 | type |  |
+| 8 | u8 | seat | 0xFF none |
 
 Sent in reply to `0xbc17` NC_GAMBLE_TYPE_AND_WHERE_STAND_REQ on ShineObjectClass::ShinePlayer (`FUN_00616dd0`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_TYPE_AND_WHERE_STAND_REQ) · payload 9 bytes
 
@@ -10994,6 +10995,30 @@ Empty payload.
 |---|---|---|---|
 | 0 | u16 | err | 0x1506; the client ignores the packet |
 
+### `0x4c04` NC_TRADE_PROPOSENO_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_005925a0/FUN_00592b80; client FUN_004ad220 (err not read))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x6C1–0x6CC |
+
+### `0x4c0e` NC_TRADE_UPBOARDFAIL_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_00595280)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x842–0x851 |
+
+### `0x4c23` NC_TRADE_TRADEFAIL_CMD † (S→C)
+
+**Verified layout** (basis: zone FUN_00594870)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x845/0x849/0x851 or DB error |
+
 ### `0x5005` NC_SOULSTONE_BUYFAIL_ACK † (S→C)
 
 **Verified layout** (basis: zone FUN_00588510)
@@ -11017,6 +11042,30 @@ empty payload
 Empty payload.
 
 empty payload
+
+### `0x6802` NC_BOOTH_OPEN_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_0058e900 (codes from disassembly); client FUN_004a87b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xA41 ok |
+
+### `0x6805` NC_BOOTH_CLOSE_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_005932b0/FUN_0058d320)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xA41 ok, 0xA44 not in booth mode |
+
+### `0x680e` NC_BOOTH_ITEMTRADE_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_0058da30 / sb_Trade; client FUN_004a8620)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xA42–0xA5A |
 
 ### `0x8c04` NC_MINIHOUSE_BUILDING_ACK † (S→C)
 
@@ -11050,6 +11099,16 @@ empty payload
 |---|---|---|---|
 | 0 | u16 | nMapCount |  |
 | 2 | SHINE_INDUN_INFO[] | sIndunInfos | {Name3 MapIDClient, u8 ModeIDLv} 13 bytes |
+
+### `0xac2c` NC_DICE_TAISAI_TIMER_CMD † (S→C)
+
+**Verified layout** (basis: zone FUN_00512bf0; (same command number used Z→DB for DB_ITEM_ID_CHANGE_REQ))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsStart |  |
+| 1 | u16 | nTimer |  |
+| 3 | u32 | nInterval |  |
 
 ### `0xcc03` NC_MOVER_RIDE_ON_FAIL_CMD † (S→C)
 
@@ -11327,6 +11386,23 @@ empty payload
 | 16 | u16 | lock |  |
 | 18 | u16 | equip | 0x2000|slot |
 
+### `0x343b` NC_ITEMDB_ITEMTRADE_REQ † (Z→DB)
+
+**Verified layout** (basis: zone FUN_00594870, tb_FillCen FUN_00593aa0, tb_FillTradeBuffer FUN_00594090; = PDB)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | ref | A |  |
+| 6 | ref | B |  |
+| 12 | u16 | lockindexA |  |
+| 14 | u16 | lockindexB |  |
+| 16 | u8 | cen.from | 'A'/'B'; not written when equal |
+| 17 | u64 | cen.cen | difference |
+| 25 | u64 | result_money_from |  |
+| 33 | u64 | result_money_to |  |
+| 41 | u8 | tradenumber |  |
+| 42 | bytes | tradeitem[] | 0x1A each: {u64 regnum,u16 id,u16 lot,u8 invenloc} × 2 |
+
 ### `0x343f` NC_ITEMDB_USEALL_REQ † (Z→DB)
 
 **Verified layout** (basis: zone FUN_00540080 (zone→DB))
@@ -11565,6 +11641,42 @@ empty payload
 | 48 | u16 | LicenseMobID |  |
 | 50 | u16 | echo.licenseitem |  |
 | 52 | u16 | echo.weaponitem |  |
+
+### `0xac23` NC_DICE_TAISAI_DB_DICE_ROLL_RESULT_REQ † (Z→DB)
+
+**Verified layout** (basis: zone FUN_005161d0; = PDB)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | ref | owner |  |
+| 6 | u64 | nActiveDiceTaiSaiKey |  |
+| 14 | bytes | DiceNum | 3 |
+| 17 | u16 | nResultCnt |  |
+| 19 | bytes | results | {u16 err,u16 lock,u32 charNo,i64 net} × n |
+
+### `0xbc11` NC_GAMBLE_COIN_DB_BUY_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_00616330; = PDB)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | ref | nHeader |  |
+| 6 | u16 | nLockIndex |  |
+| 8 | u64 | nCoin |  |
+| 16 | u64 | nMoney |  |
+| 24 | u32 | nCanExchangeMaxCoin |  |
+| 28 | i32 | tExchangedCoinDate |  |
+
+### `0xbc15` NC_GAMBLE_COIN_DB_SELL_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_00616770; = PDB)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | ref | nHeader |  |
+| 6 | u16 | nLockIndex |  |
+| 8 | u64 | nCoin |  |
+| 16 | u64 | nMoney | after tax |
 
 ### `0xc409` NC_COLLECT_REGIST_REQ (Z→DB)
 
