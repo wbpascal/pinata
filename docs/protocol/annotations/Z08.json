@@ -1,0 +1,1654 @@
+{
+ "_about": "Z08: zone party/raid mirror, quests, kingdom quests, instance dungeons, friend points, weapon/character titles, guild/academy/tournament zone side, holy promise, charged reset, prison, GM events. Offsets are payload offsets; layouts read in the 2016 zone code, names from the 2017 PDB where they agree.",
+ "packets": {
+  "zone": {
+   "0x3832": {
+    "dir": "S\u2192C",
+    "name": "NC_PARTY_MEMBERINFORM_CMD",
+    "basis": "zone FUN_0056df80",
+    "fields": [
+     [
+      0,
+      "u8",
+      "membernum",
+      "1 from the tick sender"
+     ],
+     [
+      1,
+      "char[20]",
+      "charname",
+      ""
+     ],
+     [
+      21,
+      "u32",
+      "hp",
+      ""
+     ],
+     [
+      25,
+      "u32",
+      "sp",
+      ""
+     ],
+     [
+      29,
+      "u32",
+      "lp",
+      ""
+     ]
+    ]
+   },
+   "0x3833": {
+    "dir": "S\u2192C",
+    "name": "NC_PARTY_MEMBERCLASS_CMD",
+    "basis": "zone FUN_0056df80",
+    "fields": [
+     [
+      0,
+      "u8",
+      "count",
+      "1"
+     ],
+     [
+      1,
+      "char[20]",
+      "charname",
+      ""
+     ],
+     [
+      21,
+      "u8",
+      "class",
+      ""
+     ],
+     [
+      22,
+      "u8",
+      "level",
+      ""
+     ],
+     [
+      23,
+      "u32",
+      "maxhp",
+      ""
+     ],
+     [
+      27,
+      "u32",
+      "maxsp",
+      ""
+     ],
+     [
+      31,
+      "u32",
+      "maxlp",
+      ""
+     ],
+     [
+      35,
+      "u8",
+      "flag",
+      "1"
+     ]
+    ]
+   },
+   "0x3849": {
+    "dir": "S\u2192C",
+    "name": "NC_PARTY_MEMBERLOCATION_CMD",
+    "basis": "zone FUN_0056df80",
+    "fields": [
+     [
+      0,
+      "u8",
+      "count",
+      "1"
+     ],
+     [
+      1,
+      "char[20]",
+      "charname",
+      ""
+     ],
+     [
+      21,
+      "u32",
+      "x",
+      ""
+     ],
+     [
+      25,
+      "u32",
+      "y",
+      ""
+     ]
+    ]
+   },
+   "0x3801": {
+    "dir": "WM\u2192Z",
+    "name": "NC_PARTY_FUNDAMENTAL_CMD",
+    "basis": "zone FUN_004cd5c0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "partyregnum",
+      "< 4000"
+     ],
+     [
+      2,
+      "PROTO_PARTY_MEMBER_AND_ZONEMERCHINE",
+      "master",
+      "0x20"
+     ],
+     [
+      34,
+      "PROTO_PARTY_MEMBER_AND_ZONEMERCHINE",
+      "member",
+      "0x20"
+     ]
+    ]
+   },
+   "0x3808": {
+    "dir": "WM\u2192Z",
+    "name": "NC_PARTY_JOIN_CMD",
+    "basis": "zone FUN_004cd730",
+    "fields": [
+     [
+      0,
+      "u16",
+      "partyregnum",
+      ""
+     ],
+     [
+      2,
+      "PROTO_PARTY_MEMBER_AND_ZONEMERCHINE",
+      "joiner",
+      ""
+     ]
+    ]
+   },
+   "0x380c": {
+    "dir": "WM\u2192Z",
+    "name": "NC_PARTY_LEAVE_CMD",
+    "basis": "zone FUN_004cda00",
+    "fields": [
+     [
+      0,
+      "u16",
+      "partyregnum",
+      ""
+     ],
+     [
+      2,
+      "PROTO_PARTY_MEMBER",
+      "leavemember",
+      "only chrregnum (+2) read"
+     ]
+    ]
+   },
+   "0x3816": {
+    "dir": "WM\u2192Z",
+    "name": "NC_PARTY_KICKOFF_CMD",
+    "basis": "zone FUN_004cdb20",
+    "fields": [
+     [
+      0,
+      "u16",
+      "partyregnum",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "kickoffmemberregnum",
+      ""
+     ]
+    ]
+   },
+   "0x381f": {
+    "dir": "WM\u2192Z",
+    "name": "NC_PARTY_DISMISS_CMD",
+    "basis": "zone FUN_004cc060",
+    "fields": [
+     [
+      0,
+      "u16",
+      "partyregnum",
+      ""
+     ]
+    ]
+   },
+   "0x382a": {
+    "dir": "WM\u2192Z",
+    "name": "NC_PARTY_CHANGEMASTER_CMD",
+    "basis": "zone FUN_004cc150",
+    "fields": [
+     [
+      0,
+      "u16",
+      "partyregnum",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "newmaster_chrregnum",
+      ""
+     ]
+    ]
+   },
+   "0x384d": {
+    "dir": "WM\u2192Z",
+    "name": "NC_PARTY_ITEM_LOOTING_ZONE_CMD",
+    "basis": "zone FUN_004cc2a0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "partyregnum",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "nItemGrade",
+      ""
+     ],
+     [
+      3,
+      "u8",
+      "nLootingType",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "LooterNo",
+      ""
+     ]
+    ]
+   },
+   "0x384f": {
+    "dir": "WM\u2192Z",
+    "name": "NC_PARTY_MEMBERINFORM_ACK",
+    "basis": "zone FUN_004cd4b0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "PartyRegnum",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "NumberOfMember",
+      ""
+     ],
+     [
+      3,
+      "PROTO_PARTY_MEMBER[]",
+      "Member",
+      "0x1F each"
+     ]
+    ]
+   },
+   "0x385e": {
+    "dir": "WM\u2192Z",
+    "name": "NC_PARTY_ZONE_SET_LOOTER_CMD",
+    "basis": "zone FUN_004cc010",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nPartyNo",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nNewLooterCharNo",
+      ""
+     ]
+    ]
+   },
+   "0xb004": {
+    "dir": "WM\u2192Z",
+    "name": "NC_RAID_ZONE_MAKE_CMD",
+    "basis": "zone FUN_005a6320",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nPartyNo",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "nRaidNo",
+      ""
+     ],
+     [
+      4,
+      "u16[4]",
+      "nRaidPartyNo",
+      ""
+     ],
+     [
+      12,
+      "u32[5]",
+      "FirstPartyCharRegNo",
+      ""
+     ]
+    ]
+   },
+   "0xb013": {
+    "dir": "WM\u2192Z",
+    "name": "NC_RAID_ZONE_MEMBER_JOIN_CMD",
+    "basis": "zone FUN_005a4e90",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nRaidNo",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "nPartyNo",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "nPartyIndex",
+      ""
+     ],
+     [
+      5,
+      "u8",
+      "nSlotIndex",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      10,
+      "PROTO_PARTY_MEMBER_AND_ZONEMERCHINE",
+      "tInfo",
+      ""
+     ]
+    ]
+   },
+   "0xb017": {
+    "dir": "WM\u2192Z",
+    "name": "NC_RAID_ZONE_LEAVE_CMD",
+    "basis": "zone FUN_005a4f70",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nRaidNo",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "nPartyNo",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "nPartyIndex",
+      ""
+     ],
+     [
+      5,
+      "u8",
+      "nSlotIndex",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "nCharNo",
+      ""
+     ]
+    ]
+   },
+   "0xb02f": {
+    "dir": "WM\u2192Z",
+    "name": "NC_RAID_ZONE_SET_LEADER_CMD",
+    "basis": "zone FUN_005a53d0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nRaidNo",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nNewLeaderCharNo",
+      "not read"
+     ],
+     [
+      6,
+      "u16",
+      "nPartyNo",
+      ""
+     ],
+     [
+      8,
+      "u8",
+      "nPartyIndex",
+      ""
+     ],
+     [
+      9,
+      "u8",
+      "nSlotIndex",
+      ""
+     ]
+    ]
+   },
+   "0x4401": {
+    "dir": "S\u2192C",
+    "name": "NC_QUEST_SCRIPT_CMD_REQ",
+    "basis": "zone FUN_005ba960",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nQuestID",
+      ""
+     ],
+     [
+      2,
+      "STRUCT_QSC",
+      "Command",
+      "0x65 bytes: u32 Cmd, u8 IsPigeonStartType, Data; QSC_ERROR: Data={u32 cmd,u32 0,u16 code}"
+     ]
+    ]
+   },
+   "0x4402": {
+    "dir": "C\u2192S",
+    "name": "NC_QUEST_SCRIPT_CMD_ACK",
+    "basis": "zone FUN_005bf0d0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nQuestID",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "nQSC",
+      "must equal the pending command"
+     ],
+     [
+      3,
+      "u32",
+      "nResult",
+      "SAY/SCENARIO answer"
+     ]
+    ]
+   },
+   "0x4408": {
+    "dir": "S\u2192C",
+    "name": "NC_QUEST_GIVE_UP_ACK",
+    "basis": "zone FUN_005bad20",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nQuestID",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "ErrorCode",
+      "0xB41 ok, 0xB45, 0xB46, 0xB49"
+     ]
+    ]
+   },
+   "0x4415": {
+    "dir": "S\u2192C",
+    "name": "NC_QUEST_START_ACK",
+    "basis": "zone FUN_00578c30",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0xB50 started, 0xB51, 0xB53"
+     ]
+    ]
+   },
+   "0x4417": {
+    "dir": "S\u2192C",
+    "name": "NC_QUEST_READ_ACK",
+    "basis": "zone FUN_005c06c0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0xB58 ok"
+     ],
+     [
+      2,
+      "u16",
+      "nQuestID",
+      ""
+     ]
+    ]
+   },
+   "0x4404": {
+    "dir": "DB\u2192Z",
+    "name": "NC_QUEST_DB_SET_INFO_ACK",
+    "basis": "zone FUN_005bf280",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "nQSC",
+      ""
+     ],
+     [
+      7,
+      "PLAYER_QUEST_INFO",
+      "QuestInfo",
+      "0x20"
+     ],
+     [
+      39,
+      "u16",
+      "ErrorType",
+      "0xB41 ok"
+     ]
+    ]
+   },
+   "0x441b": {
+    "dir": "DB\u2192Z",
+    "name": "NC_QUEST_DB_DONE_ACK",
+    "basis": "zone FUN_005bfb30",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "nQSC",
+      ""
+     ],
+     [
+      7,
+      "PLAYER_QUEST_INFO",
+      "QuestInfo",
+      ""
+     ],
+     [
+      39,
+      "u16",
+      "nLockIndex",
+      ""
+     ],
+     [
+      41,
+      "u16",
+      "ErrorType",
+      ""
+     ]
+    ]
+   },
+   "0x441e": {
+    "dir": "S\u2192C",
+    "name": "NC_QUEST_RESET_TIME_CLIENT_CMD",
+    "basis": "zone FUN_005bc570",
+    "fields": [
+     [
+      0,
+      "i32",
+      "tResetYearQuest",
+      ""
+     ],
+     [
+      4,
+      "i32",
+      "tResetMonthQuest",
+      ""
+     ],
+     [
+      8,
+      "i32",
+      "tResetWeekQuest",
+      ""
+     ],
+     [
+      12,
+      "i32",
+      "tResetDayQuest",
+      ""
+     ]
+    ]
+   },
+   "0xc80f": {
+    "dir": "Z\u2192GameLog",
+    "name": "NC_SYSLOG_CHAR_QUEST_STARTED",
+    "basis": "zone FUN_005bf280",
+    "fields": [
+     [
+      0,
+      "u32",
+      "userNo",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "charNo",
+      ""
+     ],
+     [
+      8,
+      "u16",
+      "questId",
+      ""
+     ],
+     [
+      10,
+      "u8",
+      "zoneNo",
+      ""
+     ],
+     [
+      11,
+      "u16",
+      "value",
+      "FUN_0062fc30(questId)"
+     ]
+    ]
+   },
+   "0x580e": {
+    "dir": "Z\u2192WM",
+    "name": "NC_KQ_Z2W_MAKE_ACK",
+    "basis": "zone FUN_00497790",
+    "fields": [
+     [
+      0,
+      "u32",
+      "hquest",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "err",
+      "0x981 ok, 0x982 dup, 0x983 full, 0x984+i map i missing, 0x988+i map i busy, 0x98C script"
+     ]
+    ]
+   },
+   "0x581a": {
+    "dir": "C\u2192S",
+    "name": "NC_KQ_ENTRYRESPONCE_ACK",
+    "basis": "zone FUN_00496990",
+    "fields": [
+     [
+      0,
+      "u8",
+      "Reply",
+      ""
+     ],
+     [
+      1,
+      "u32",
+      "EncHandle",
+      "KQ handle XOR player wmHandle"
+     ]
+    ]
+   },
+   "0x5833": {
+    "dir": "WM\u2192Z",
+    "name": "NC_KQ_LINK_TO_FORCE_BY_BAN_CMD",
+    "basis": "zone FUN_00497120",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNum",
+      ""
+     ],
+     [
+      4,
+      "Name3[4]",
+      "sMapName",
+      ""
+     ]
+    ]
+   },
+   "0x0441": {
+    "dir": "Z\u2192GameLog",
+    "name": "NC_LOG_GAME_KQ_ENTER",
+    "basis": "zone FUN_00496280",
+    "fields": [
+     [
+      0,
+      "u32",
+      "charNo",
+      ""
+     ],
+     [
+      4,
+      "char[12]",
+      "map",
+      ""
+     ],
+     [
+      16,
+      "u32",
+      "x",
+      ""
+     ],
+     [
+      20,
+      "u32",
+      "y",
+      ""
+     ],
+     [
+      24,
+      "u16",
+      "kqId",
+      ""
+     ],
+     [
+      26,
+      "u32",
+      "kqHandle",
+      ""
+     ]
+    ]
+   },
+   "0xa404": {
+    "dir": "Z\u2192Z ring",
+    "name": "NC_INSTANCE_DUNGEON_FIND_RNG",
+    "basis": "zone FUN_0050f070",
+    "fields": [
+     [
+      0,
+      "ZONERINGLINKAGESTART",
+      "Start",
+      "machine, handle, regnum"
+     ],
+     [
+      7,
+      "i32",
+      "InstanceCategory",
+      ""
+     ],
+     [
+      11,
+      "u32",
+      "IDRegisterNumber",
+      ""
+     ],
+     [
+      15,
+      "ORToken",
+      "Argument",
+      "20-byte key"
+     ],
+     [
+      35,
+      "char[33]",
+      "ServerMapName",
+      ""
+     ],
+     [
+      68,
+      "u16",
+      "Error",
+      "2 on request"
+     ]
+    ]
+   },
+   "0xa408": {
+    "dir": "Z\u2192WM",
+    "name": "NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_REQ",
+    "basis": "zone FUN_004c35d0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nStartZoneNum",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "nDestZoneNum",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nCharRegNum",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "nInDunRegNum",
+      ""
+     ],
+     [
+      10,
+      "i32",
+      "IndunCategory",
+      ""
+     ],
+     [
+      14,
+      "u16",
+      "nNPCHandle",
+      ""
+     ],
+     [
+      16,
+      "ORToken",
+      "Argument",
+      ""
+     ]
+    ]
+   },
+   "0xa409": {
+    "dir": "WM\u2192Z",
+    "name": "NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ACK",
+    "basis": "zone FUN_00485540",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharRegNum",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "nNPCHandle",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "nError",
+      "0 exists, 2 none"
+     ],
+     [
+      8,
+      "i32",
+      "eLevelType",
+      ""
+     ]
+    ]
+   },
+   "0xa40c": {
+    "dir": "S\u2192C",
+    "name": "NC_INSTANCE_DUNGEON_LEVEL_SELECT_MENU_REQ",
+    "basis": "zone FUN_00485540",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nNPCHandle",
+      ""
+     ],
+     [
+      2,
+      "Name3",
+      "sMapIndex",
+      ""
+     ],
+     [
+      14,
+      "u8",
+      "nMenuCount",
+      ""
+     ],
+     [
+      15,
+      "i32[]",
+      "eLevelType",
+      ""
+     ]
+    ]
+   },
+   "0xa40d": {
+    "dir": "C\u2192S",
+    "name": "NC_INSTANCE_DUNGEON_LEVEL_SELECT_MENU_ACK",
+    "basis": "zone FUN_00485810",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nNPCHandle",
+      ""
+     ],
+     [
+      2,
+      "i32",
+      "eLevelType",
+      "< 3"
+     ]
+    ]
+   },
+   "0xa40e": {
+    "dir": "Z\u2192WM",
+    "name": "NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_REQ",
+    "basis": "zone FUN_00485810",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nStartZoneNum",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "nDestZoneNum",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nCharRegNum",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "nInDunRegNum",
+      ""
+     ],
+     [
+      10,
+      "i32",
+      "IndunCategory",
+      ""
+     ],
+     [
+      14,
+      "u16",
+      "nNPCHandle",
+      ""
+     ],
+     [
+      16,
+      "ORToken",
+      "Argument",
+      ""
+     ],
+     [
+      36,
+      "i32",
+      "eLevelType",
+      ""
+     ]
+    ]
+   },
+   "0xa40f": {
+    "dir": "WM\u2192Z",
+    "name": "NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_ACK",
+    "basis": "zone FUN_00485b90",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharRegNum",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "nNPCHandle",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "nError",
+      "0 ok, 1 no instance, 2, 3 full, 5 other level"
+     ],
+     [
+      8,
+      "i32",
+      "eLevelType",
+      ""
+     ],
+     [
+      12,
+      "Name3",
+      "sMapName",
+      ""
+     ]
+    ]
+   },
+   "0xa411": {
+    "dir": "Z\u2192WM",
+    "name": "NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_ECHO_ACK",
+    "basis": "zone FUN_004871a0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nStartZoneNum",
+      ""
+     ],
+     [
+      1,
+      "u32",
+      "nCharRegNum",
+      ""
+     ],
+     [
+      5,
+      "u16",
+      "nNPCHandle",
+      ""
+     ],
+     [
+      7,
+      "u16",
+      "nError",
+      ""
+     ],
+     [
+      9,
+      "i32",
+      "eLevelType",
+      ""
+     ],
+     [
+      13,
+      "Name3",
+      "sMapName",
+      ""
+     ]
+    ]
+   },
+   "0xa418": {
+    "dir": "S\u2192C",
+    "name": "NC_INSTANCE_DUNGEON_RANK_LIST_ACK",
+    "basis": "zone FUN_00564830",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nMapCount",
+      ""
+     ],
+     [
+      2,
+      "SHINE_INDUN_INFO[]",
+      "sIndunInfos",
+      "{Name3 MapIDClient, u8 ModeIDLv} 13 bytes"
+     ]
+    ]
+   },
+   "0x10b1": {
+    "dir": "Z\u2192Z ring",
+    "name": "NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG",
+    "basis": "zone FUN_005a8a70",
+    "fields": [
+     [
+      0,
+      "ZONERINGLINKAGESTART",
+      "Start",
+      "machine own, handle 0xFFFF, regnum"
+     ],
+     [
+      7,
+      "i32",
+      "Category",
+      ""
+     ]
+    ]
+   },
+   "0x5422": {
+    "dir": "S\u2192C",
+    "name": "NC_FRIEND_UES_FRIEND_POINT_ACK",
+    "basis": "zone FUN_0045a730",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "0x36C1 wrong mode, 0x36C4 inventory full"
+     ],
+     [
+      2,
+      "u16",
+      "friendpoint",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "itemid",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "numofitem",
+      ""
+     ]
+    ]
+   },
+   "0x5c01": {
+    "dir": "C\u2192S",
+    "name": "NC_WT_LICENSE_REQ",
+    "basis": "zone FUN_0059e410",
+    "fields": [
+     [
+      0,
+      "u16",
+      "licenseitem",
+      "ITEM_INVEN, bag"
+     ],
+     [
+      2,
+      "u16",
+      "weaponitem",
+      "ITEM_INVEN, kind 8 or 9"
+     ],
+     [
+      4,
+      "u16",
+      "mobid",
+      "used by the clear path"
+     ],
+     [
+      6,
+      "u8",
+      "bSet",
+      ""
+     ]
+    ]
+   },
+   "0x5c02": {
+    "dir": "S\u2192C",
+    "name": "NC_WT_LICENSE_ACK",
+    "basis": "zone FUN_0059dab0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "licenseitem",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "weaponitem",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "bSet",
+      "not written on the set paths (Z08-B11)"
+     ],
+     [
+      5,
+      "u16",
+      "err",
+      "0x9B9 set ok, 0x9E1 clear ok"
+     ]
+    ]
+   },
+   "0x5c05": {
+    "dir": "Z\u2192DB",
+    "name": "NC_WT_LICENSE_SET_REQ",
+    "basis": "zone FUN_0059e410",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      ""
+     ],
+     [
+      8,
+      "u32",
+      "chrregnum",
+      ""
+     ],
+     [
+      12,
+      "Name5",
+      "chrname",
+      ""
+     ],
+     [
+      32,
+      "SHINE_ITEM_REGISTNUMBER",
+      "WeaponItemKey",
+      ""
+     ],
+     [
+      40,
+      "SHINE_ITEM_REGISTNUMBER",
+      "LicenItemKey",
+      ""
+     ],
+     [
+      48,
+      "u16",
+      "LicenseMobID",
+      ""
+     ],
+     [
+      50,
+      "u16",
+      "echo.licenseitem",
+      ""
+     ],
+     [
+      52,
+      "u16",
+      "echo.weaponitem",
+      ""
+     ]
+    ]
+   },
+   "0x6001": {
+    "dir": "C\u2192S",
+    "name": "NC_CT_SET_CURRENT_REQ",
+    "basis": "zone FUN_005cb100",
+    "fields": [
+     [
+      0,
+      "u8",
+      "Type",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "ElementNo",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "MobID",
+      "weapon titles (Type 10)"
+     ]
+    ]
+   },
+   "0x6002": {
+    "dir": "S\u2192C",
+    "name": "NC_CT_SET_CURRENT_ACK",
+    "basis": "zone FUN_005cb100",
+    "fields": [
+     [
+      0,
+      "u8",
+      "Type",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "ElementNo",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "MobID",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "Error",
+      "0xA01 ok, 0xA02 not owned, 0xA03 mode, 0xA04 10 s"
+     ]
+    ]
+   },
+   "0x74af": {
+    "dir": "Z\u2192WM",
+    "name": "NC_GUILD_WORLD_RENAME_REQ",
+    "basis": "zone FUN_00473550",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "nItemSlot",
+      ""
+     ],
+     [
+      7,
+      "Name4",
+      "sGuildName",
+      ""
+     ]
+    ]
+   },
+   "0x74cb": {
+    "dir": "S\u2192C",
+    "name": "NC_GUILD_TOURNAMENT_FLAGCAPTURE_ACK",
+    "basis": "zone FUN_00477d90",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0x1B40 ok, 0x1B42\u20260x1B52"
+     ]
+    ]
+   },
+   "0x74d0": {
+    "dir": "S\u2192C",
+    "name": "NC_GUILD_TOURNAMENT_USESKILL_ACK",
+    "basis": "zone FUN_00475bd0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "wUseSkillNumber",
+      "0xFFFF on error"
+     ]
+    ]
+   },
+   "0x74d1": {
+    "dir": "S\u2192C",
+    "name": "NC_GUILD_TOURNAMENT_USESKILL_CMD",
+    "basis": "zone FUN_00475bd0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "guildNo",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "skill",
+      ""
+     ]
+    ]
+   },
+   "0x74d9": {
+    "dir": "Z\u2192WM",
+    "name": "NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_REQ",
+    "basis": "zone FUN_00476c50",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nTournamentSeed",
+      ""
+     ],
+     [
+      1,
+      "u16",
+      "nPlayerHnd",
+      ""
+     ]
+    ]
+   },
+   "0x74e4": {
+    "dir": "Z\u2192WM",
+    "name": "NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_ACK",
+    "basis": "zone FUN_004766f0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "Error",
+      "0x1C40 ok"
+     ],
+     [
+      2,
+      "u16",
+      "hWMChar",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      8,
+      "u32",
+      "nGTNo",
+      ""
+     ],
+     [
+      12,
+      "u32",
+      "nGuildNo",
+      ""
+     ],
+     [
+      16,
+      "u8",
+      "nMinLevel",
+      "not copied from 0x74E6"
+     ],
+     [
+      17,
+      "u16",
+      "nMinMember",
+      "not copied from 0x74E6"
+     ],
+     [
+      19,
+      "u64",
+      "nProposalMoney",
+      ""
+     ]
+    ]
+   },
+   "0x9441": {
+    "dir": "S\u2192C",
+    "name": "NC_HOLY_PROMISE_WITHDRAW_CEN_REWARD_ACK",
+    "basis": "zone FUN_00484100",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x1C68 ok, 0x1C6C inventory locked"
+     ],
+     [
+      2,
+      "u64",
+      "nMoney",
+      ""
+     ]
+    ]
+   },
+   "0x9443": {
+    "dir": "DB\u2192Z",
+    "name": "NC_HOLY_PROMISE_DB_WITHDRAW_CEN_REWARD_ACK",
+    "basis": "zone FUN_00484040",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "nError",
+      ""
+     ],
+     [
+      8,
+      "u64",
+      "nMoney",
+      ""
+     ]
+    ]
+   },
+   "0x3482": {
+    "dir": "Z\u2192DB",
+    "name": "NC_ITEMDB_GUILD_ACADEMY_REWARD_STORAGE_OPEN_REQ",
+    "basis": "zone FUN_0046f550",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.handle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "guildregnum",
+      "guild or academy number"
+     ],
+     [
+      10,
+      "u8",
+      "nOpenType",
+      ""
+     ]
+    ]
+   },
+   "0x7c14": {
+    "dir": "Z\u2192WM",
+    "name": "NC_ZONE_PRISON_GO_ACK",
+    "basis": "zone FUN_005a4470",
+    "fields": [
+     [
+      0,
+      "bytes[0x174]",
+      "request",
+      "copy of 0x7C13"
+     ],
+     [
+      372,
+      "u16",
+      "err",
+      "0xDC0 not found, 0xDC1/0xDC2 so_Prison_Go result"
+     ]
+    ]
+   },
+   "0x900c": {
+    "dir": "S\u2192C",
+    "name": "NC_CHARGED_STAT_INITIALIZE_SUC_CMD",
+    "basis": "zone FUN_00518ab0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "freePoints",
+      ""
+     ]
+    ]
+   },
+   "0x900d": {
+    "dir": "S\u2192C",
+    "name": "NC_CHARGED_SKILLEMPOW_INITIALIZE_SUC_CMD",
+    "basis": "zone FUN_00518c00",
+    "fields": [
+     [
+      0,
+      "u8",
+      "freePoints",
+      ""
+     ]
+    ]
+   }
+  }
+ }
+}
