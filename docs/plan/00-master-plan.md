@@ -92,6 +92,7 @@ The DB items (D01–D05) don't depend on the zone/WM items and can fill gaps in 
 | ID | Item | Depends |
 |---|---|---|
 | [X01](items/X01.md) | Integration: architecture overview, feature → message index, glossary, contradictions, original-server bug register, regen | all |
+| [X02](items/X02.md) | Confidence review: rate every section, adversarially re-check load-bearing claims, write targeted capture scenarios (with DB/SHN/GM setups and predictions). **Recurring:** re-run after P02 processes those captures | all phase-2 items, X01 (soft) |
 
 Exact handler counts and line sizes per item: `docs/plan/items/_summary.json` and the scope table at the top
 of each item file.
@@ -112,6 +113,7 @@ follow-up session.
 3. Z07, Z08, Z05, Z06, W03, W04
 4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, then D06
 5. P02 again with fuller captures, then X01
+6. X02 → user records its scenarios → P02 → X02 again (repeat until the low ratings are gone or not worth a capture)
 
 Large items (Z04, Z05, Z08, D03, D04) will probably need two or three sessions each. Starting a new session
 with the same plan file resumes from the status file.

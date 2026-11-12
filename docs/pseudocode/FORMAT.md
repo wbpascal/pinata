@@ -13,6 +13,7 @@ example, use `python3 -I tools/protocol-re/sect.py docs/pseudocode/login-server.
 …
 ## Original-server bugs
 ## N. Not reconstructed / uncertain
+## N+1. Coverage boundary
 ```
 
 Number the sections (`## 5.`, `### 5.2`), because other items cite them as `§5.2`.
@@ -53,3 +54,13 @@ Tag the behaviour in place with `(original bug) <ID>-B<n>` and add one row per b
 ## Not reconstructed / uncertain
 
 Bullets: what is unknown, why, and where to look next (functions, tables, other servers).
+
+## Coverage boundary
+
+Everything you found but did not cover, each with the argument why it is outside this item. Running out of context is
+not a reason; that goes to the status file as remaining work. (Rows below are made-up examples of the form.)
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| `FUN_004a1230` mob drop roll | Z09 (scope: "drops") | reached from 0x2401 only after the kill; drop logic is world simulation |
+| zone↔WM `0x3C12` relay | **new item proposed** (status file) | no item lists dept 0x0F; does not fit any existing scope |

@@ -599,6 +599,54 @@ ITEMS = [
              "partner; `docs/knowledge/Z02.md` §1 corrects Z01). Collect every such section (grep `docs/knowledge/*.md` for "
              "`Correction`), apply them in the overview and the bug register (mark superseded entries), and list them in a "
              "\"Superseded statements\" table in `docs/pseudocode/README.md` so readers of the older files are warned."]),
+ dict(id="X02", phase=3, title="Confidence review and targeted capture/DB experiments",
+      out="docs/review/confidence.md + docs/plan/capture-scenarios.md", deps=["all phase-2 items", "X01 (soft)"], scope=[],
+      goal="User review of finished items has corrected several assumptions per item, so the static analysis is only "
+           "low-to-medium confidence. Re-check the claims everything else depends on, give each section a confidence "
+           "rating, and turn whatever static reading cannot settle into concrete capture scenarios (beyond the 13 in "
+           "`capture-guide.md`), many of them set up with direct database edits so an effect shows up in one short "
+           "session.",
+      steps=["Learn from past mistakes first. Collect every correction made so far: the `Correction` sections in "
+             "`docs/knowledge/*.md`, the corrected or contradicted entries in `docs/protocol/capture-validation.md`, and "
+             "`git log -p` on `docs/pseudocode` and `docs/knowledge` (commits after an item's first commit are mostly "
+             "corrections after user review). Group them into error classes (for example: a field's meaning guessed from "
+             "its size, the wrong branch of a switch, a PDB 2017 fact taken for 2016, a struct offset off by the `ref` "
+             "prefix, a callee assumed to do what its name says, a client handler not checked). Write the classes with "
+             "counts to `docs/review/confidence.md` §1. They decide what to re-check.",
+             "Rate every pseudocode section (per `docs/pseudocode/**/*.md` heading, and per `docs/knowledge/*.md` struct "
+             "table): **high** = read in code and confirmed by a capture or by the client handler; **medium** = read in code "
+             "only; **low** = *(inferred)*, *(pdb2017)* only, or one of the error classes from §1 applies. One table per "
+             "file in §2: section, rating, reason, what would raise it.",
+             "Adversarial re-check of the load-bearing claims, worst first: claims many other items cite (shared structs, "
+             "the `ref` prefix, player-object offsets, ITEMDB message order, zone↔WM handoff), every low rating in a "
+             "client-facing packet, and every instance of an error class from §1. For each, re-read the function with "
+             "`clean.py`, then try to disprove the claim, not confirm it (check the other branches, the callers, the client "
+             "side, and the 2015 binaries if behaviour looks odd). Record the result in §3: confirmed / corrected (with the "
+             "correct statement and `@ FUN_…`) / still open. Do not edit other items' files; corrections go to "
+             "`docs/knowledge/X02.md` §0 in the same table format as `docs/knowledge/Z07.md` §0, so X01 and the owners pick "
+             "them up.",
+             "Capture scenarios: for every claim still medium or low after the re-check, write a scenario in "
+             "`docs/plan/capture-scenarios.md` (numbered from 14, continuing `capture-guide.md`). Each has: claims it tests "
+             "(doc + section), setup, exact steps for the user, the **prediction** (opcodes in order with the field values "
+             "our docs expect), and what result would disprove it. Group scenarios so one session covers several claims; "
+             "order by claims settled per minute of user time.",
+             "Database setups: where a state is slow to reach in play (high level, rare item, full inventory, guild with "
+             "N members, quest at step K, money near the cap, expired item, banned/blocked account, character in a "
+             "deleted or odd state), give the SQL that puts a test character in that state. Use only real table, column "
+             "and procedure names, read from the backups (`bak.py`, `docs/plan/db-backups.md`) and checked against the "
+             "2016 binaries' `{CALL …}` strings; never guess a column. Each setup states which server must be stopped or "
+             "which character must be logged out first (find where the Character/Account server caches the row), a "
+             "`SELECT` to save the old values and the `UPDATE` that restores them, and a warning to run it on the test "
+             "server only. Also use GM commands (`docs/pseudocode/zone/Z11-*.md`) where they reach the state faster than "
+             "SQL, and boundary values (0, max, max+1, negative, wrong type id) to test the checks the docs describe.",
+             "Also list in `capture-scenarios.md` the experiments that need a modified SHN table or server config "
+             "(`Files/Server/2016/9Data`) instead of SQL, with the exact row/key to change.",
+             "Link the new scenarios from `docs/plan/capture-guide.md` (one line under the scenarios table; that is the only "
+             "edit to another file). After the user records them, P02 validates them as usual; then re-run X02 to update the "
+             "ratings."],
+      done="Every pseudocode section has a rating; all high-traffic claims re-checked with results in §3 and corrections in "
+           "`docs/knowledge/X02.md`; every remaining medium/low client-facing claim has a scenario with a prediction; DB "
+           "setups use only verified names and come with restore statements."),
 ]
 
 
@@ -640,10 +688,21 @@ GENERIC = """## How to work
      if available; otherwise search the client export) and resolve codes via `docs/protocol/client-error-codes.json`
    - record new names (`names/<bin>/{id}.json`) and verified layouts (`docs/protocol/annotations/{id}.json`)
 5. Beyond the handlers, document the subsystem itself: data structures, tables loaded, timers, invariants.
+   **Be exhaustive within your item.** The scope table is the starting point, not the boundary: follow every callee,
+   branch, error path, timer, table and packet these handlers reach, plus the matching client handlers and DB procedures,
+   until what remains clearly belongs to another item. Before you finish, sweep for what you missed: `rg` your subsystem's
+   strings, SHN tables and opcodes (`opcodes.json`) for functions you never opened, check every caller and callee of the
+   functions you documented, and every unnamed `FUN_` left in your text. Stopping early because the handlers are
+   "done" is the most common gap in past items; reviews keep finding uncovered cases that were in scope.
 6. Every ~10 handlers, update `docs/plan/status/{id}.md` (done / remaining). Before you run low on context,
    write the status so a fresh session can continue.
 7. At the end: run `tools/protocol-re/regen.sh`, write `docs/knowledge/{id}.md` (facts others need), add an
    "uncertain / not reconstructed" section to your output, and mark the item done in the status file.
+8. Also end your output with a "Coverage boundary" section: one row per thing you found but did not cover (function,
+   packet, table, behaviour) with an argument why it is out of bounds for this item: either the existing item that
+   covers it (ID and the line of its plan or scope table that includes it) or, if no item does, a proposed new item
+   (title, scope, why it does not fit here) added to `docs/plan/status/{id}.md` under "Proposed follow-up items" for the
+   user to accept. "Too large" or "ran out of context" is not out of bounds: that is unfinished work for the status file.
 
 ## Rules
 
