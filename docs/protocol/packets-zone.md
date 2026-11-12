@@ -136,11 +136,11 @@ Handler `FUN_00550b90`
 
 ### `0x105c` NC_CHAR_STAT_INCPOINT_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_STAT_INCPOINT_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_0058ad10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | stat |  |
+| 0 | u8 | stat | 0 STR, 1 END, 2 DEX, 3 INT, 4 SPR |
 
 Handler `FUN_0058ad10`
 
@@ -150,11 +150,11 @@ Handler `FUN_0058ad10`
 
 ### `0x1062` NC_CHAR_STAT_DECPOINT_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_STAT_DECPOINT_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_0058b3f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | stat |  |
+| 0 | u8 | stat | consumes one restat item |
 
 Handler `FUN_0058b3f0`
 
@@ -162,7 +162,7 @@ No payload fields read directly by the handler.
 
 ### `0x10bc` NC_CHAR_CLIENT_AUTO_PICK_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CLIENT_AUTO_PICK_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_005654d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -176,7 +176,7 @@ Handler `FUN_00566090`
 
 ### `0x1117` NC_CHAR_TUTORIAL_STEP_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_TUTORIAL_STEP_ACK`, 1 bytes
+**Verified layout** (basis: zone FUN_00576480)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -190,11 +190,11 @@ Handler `FUN_00576480`
 
 ### `0x1124` NC_CHAR_USEITEM_MINIMON_NORMAL_ITEM_ON_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_NORMAL_ITEM_ON_REQ`, 24 bytes
+**Verified layout** (basis: zone FUN_00561d90)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16[12] | NormalItemList |  |
+| 0 | u16[12] | NormalItemList | -1 = empty |
 
 Handler `FUN_005642e0`
 
@@ -202,11 +202,11 @@ No payload fields read directly by the handler.
 
 ### `0x1128` NC_CHAR_USEITEM_MINIMON_CHARGED_ITEM_ON_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_CHARGED_ITEM_ON_REQ`, 24 bytes
+**Verified layout** (basis: zone FUN_00561f40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16[12] | ChargedItemList |  |
+| 0 | u16[12] | ChargedItemList | -1 = empty |
 
 Handler `FUN_00564460`
 
@@ -214,11 +214,11 @@ No payload fields read directly by the handler.
 
 ### `0x112e` NC_CHAR_CHARGEDBUFF_ERASE_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CHARGEDBUFF_ERASE_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_005645e0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | nChargedBuffKey |  |
+| 0 | u16 | index | 2016 reads u16 (2017 PDB: u32 nChargedBuffKey) |
 
 Handler `FUN_005645e0`
 
@@ -1852,11 +1852,11 @@ Handler `FUN_00476c50`
 
 ### `0x8c01` NC_MINIHOUSE_ACTIV_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_ACTIV_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_00536310)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | slot |  |
+| 0 | u8 | slot | > 10 |
 
 Handler `FUN_00536310`
 
@@ -1866,7 +1866,7 @@ Handler `FUN_00536310`
 
 ### `0x8c03` NC_MINIHOUSE_BUILDING_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_BUILDING_REQ`, 133 bytes
+**Verified layout** (basis: zone FUN_005769d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1888,7 +1888,7 @@ Handler `FUN_005769d0`
 
 ### `0x8c0e` NC_MINIHOUSE_VISITREADY_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_VISITREADY_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_005719f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1902,7 +1902,7 @@ Handler `FUN_005719f0`
 
 ### `0x8c10` NC_MINIHOUSE_VISIT_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_VISIT_REQ`, 11 bytes
+**Verified layout** (basis: zone FUN_00571c50)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1917,11 +1917,11 @@ Handler `FUN_00571c50`
 
 ### `0x8c12` NC_MINIHOUSE_KICKOUT_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_KICKOUT_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_00575500)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | hnd |  |
+| 0 | u16 | hnd | player handle |
 
 Handler `FUN_00575500`
 
@@ -1931,7 +1931,7 @@ Handler `FUN_00575500`
 
 ### `0x8c1d` NC_MINIHOUSE_FUNITUREINFOCOMPLETE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FUNITUREINFOCOMPLETE_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_00572670)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -1988,7 +1988,7 @@ No payload fields read directly by the handler.
 
 ### `0x8c2b` NC_MINIHOUSE_MODIFY_PASSWORD_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_PASSWORD_REQ`, 9 bytes
+**Verified layout** (basis: zone FUN_00573200)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -2000,7 +2000,7 @@ No payload fields read directly by the handler.
 
 ### `0x8c2e` NC_MINIHOUSE_MODIFY_TITLE_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_TITLE_REQ`, 21 bytes
+**Verified layout** (basis: zone FUN_00573010)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -2012,7 +2012,7 @@ No payload fields read directly by the handler.
 
 ### `0x8c32` NC_MINIHOUSE_MODIFY_MAXENTERNUM_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_MAXENTERNUM_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_005733c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -2026,11 +2026,11 @@ Handler `FUN_005733c0`
 
 ### `0x8c3d` NC_MINIHOUSE_CHAR_ACTION_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_CHAR_ACTION_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_00574750)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | Handle |  |
+| 0 | u16 | Handle | MiniHouseObjAni row |
 | 2 | u16 | nFurnitureHnd |  |
 
 Handler `FUN_00574750`
@@ -2042,12 +2042,12 @@ Handler `FUN_00574750`
 
 ### `0x8c40` NC_MINIHOUSE_FURNITURE_EFFECT_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EFFECT_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_00574a30)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nFurnitureHnd |  |
-| 2 | u16 | nEffectHandle |  |
+| 2 | u16 | nEffectHandle | MiniHouseFurnitureObjEffect row |
 
 Handler `FUN_00574a30`
 
@@ -2058,7 +2058,7 @@ Handler `FUN_00574a30`
 
 ### `0x8c43` NC_MINIHOUSE_MODIFY_ITEM_INFO_OPEN_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_ITEM_INFO_OPEN_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_00573590)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -2072,12 +2072,12 @@ Handler `FUN_00573590`
 
 ### `0x8c48` NC_MINIHOUSE_MODIFY_NOTIFY_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_NOTIFY_REQ`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_00573750)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | nNotifyLen |  |
-| 1 | char[nNotifyLen] | sNotify | variable length |
+| 1 | char[n] | sNotify |  |
 
 Handler `FUN_00573750`
 
@@ -2088,7 +2088,7 @@ Handler `FUN_00573750`
 
 ### `0x8c50` NC_MINIHOUSE_PORTAL_OPEN_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_PORTAL_OPEN_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_00573930)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -2112,7 +2112,7 @@ No payload fields read directly by the handler.
 
 ### `0x8c62` NC_MINIHOUSE_FURNITURE_EMOTION_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EMOTION_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_00575850)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -2387,11 +2387,11 @@ No payload fields read directly by the handler.
 
 ### `0xc401` NC_COLLECT_PEEPING_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_PEEPING_REQ`, 20 bytes
+**Verified layout** (basis: zone FUN_006272c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | charname | Name5 |
+| 0 | char[20] | charname |  |
 
 Handler `FUN_006272c0`
 
@@ -2405,7 +2405,7 @@ Handler `FUN_006272c0`
 
 ### `0xc408` NC_COLLECT_CARDREGIST_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_CARDREGIST_REQ`, 1 bytes
+**Verified layout** (basis: zone FUN_00628560)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -2419,12 +2419,12 @@ Handler `FUN_00628560`
 
 ### `0xc40c` NC_COLLECT_BOOKMARK_REGIST_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_BOOKMARK_REGIST_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_00628b80)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | BookMarkSlot |  |
-| 2 | u16 | CardID |  |
+| 2 | u16 | CardID | -1 = clear |
 
 Handler `FUN_00628b80`
 
@@ -2435,12 +2435,12 @@ Handler `FUN_00628b80`
 
 ### `0xc410` NC_COLLECT_REWARD_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_REWARD_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_00628ef0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | RewardID |  |
-| 2 | u16 | RewardItem |  |
+| 2 | u16 | RewardItem | item id |
 
 Handler `FUN_00628ef0`
 
@@ -2451,12 +2451,12 @@ Handler `FUN_00628ef0`
 
 ### `0xcc01` NC_MOVER_RIDE_ON_REQ †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MOVER_RIDE_ON_REQ`, 3 bytes
+**Verified layout** (basis: zone FUN_00563270)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nMoverHandle |  |
-| 2 | u8 | nSlot |  |
+| 2 | u8 | nSlot | seat |
 
 Handler `FUN_00563270`
 
@@ -2467,11 +2467,11 @@ Handler `FUN_00563270`
 
 ### `0xd406` NC_PET_ASK_NEW_NAME_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_ASK_NEW_NAME_ACK`, 4 bytes
+**Verified layout** (basis: zone FUN_004d0d20)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x34C0 = will name |
 | 2 | u16 | nPetHandle |  |
 
 Handler `FUN_004d0d20`
@@ -2483,12 +2483,12 @@ Handler `FUN_004d0d20`
 
 ### `0xd407` NC_PET_SET_NAME_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_SET_NAME_REQ`, 18 bytes
+**Verified layout** (basis: zone FUN_004d1c80)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nPetHandle |  |
-| 2 | char[16] | sPetName | Name4 |
+| 2 | char[16] | sPetName | 4..16 chars |
 
 Handler `FUN_004d1c80`
 
@@ -2502,7 +2502,7 @@ Handler `FUN_004d1c80`
 
 ### `0xd409` NC_PET_SET_NAME_CANCEL_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_SET_NAME_CANCEL_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_004d0e10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -2747,7 +2747,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_Storegamedata` (`FUN_0044c220`) · 
 
 ### `0x1049` NC_CHAR_CLIENT_CHARTITLE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_CLIENT_CHARTITLE_CMD`, 6 bytes + variable tail
+**Verified layout** (basis: zone FUN_005a39f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -2755,9 +2755,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_Storegamedata` (`FUN_0044c220`) · 
 | 1 | u8 | CurrentTitleElement |  |
 | 2 | u16 | CurrentTitleMobID |  |
 | 4 | u16 | NumOfTitle |  |
-| 6 | CT_INFO[NumOfTitle] | TitleArray | variable length, element CT_INFO |
-
-Element `CT_INFO` (2 bytes): +0 u8 Type, +1 u8 ElementNo|ElementValue
+| 6 | {u8,u8}[n] | titles | type, element |
 
 Sent in reply to `0x1031` NC_CHAR_ZONE_CHARTITLE_CMD on WorldManagerSession (`FUN_005a39f0`, WorldManagerSession::wms_NC_CHAR_ZONE_CHARTITLE_CMD) · payload variable (iVar9)
 
@@ -2850,11 +2848,11 @@ Sent from `GameDBSession::gds_NC_CHAR_STAT_DECPOINTFAIL_DB_ACK` (`FUN_0058bd10`)
 
 ### `0x105f` NC_CHAR_STAT_INCPOINTSUC_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_STAT_INCPOINTSUC_ACK`, 1 bytes
+**Verified layout** (basis: zone FUN_0058a7e0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | stat |  |
+| 0 | u8 | stat | first stat that rose |
 
 Sent from `FUN_0058a7e0` (`FUN_0058a7e0`) · payload 1 bytes
 
@@ -2864,11 +2862,11 @@ Sent from `FUN_0058a7e0` (`FUN_0058a7e0`) · payload 1 bytes
 
 ### `0x1065` NC_CHAR_STAT_DECPOINTSUC_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_STAT_DECPOINTSUC_ACK`, 1 bytes
+**Verified layout** (basis: zone FUN_0058a9d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | stat |  |
+| 0 | u8 | stat | first stat that fell |
 
 Sent from `FUN_0058a9d0` (`FUN_0058a9d0`) · payload 1 bytes
 
@@ -2924,13 +2922,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_BroadcastGuildAcademyInfo` (`FU
 
 ### `0x10af` NC_CHAR_POLYMORPH_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_POLYMORPH_CMD`, 8 bytes
+**Verified layout** (basis: zone FUN_004a59d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | player |  |
-| 2 | u16 | polymorph |  |
-| 4 | i32 | AbstateIndex |  |
+| 2 | u16 | polymorph | 0xFFFF = none |
+| 4 | u32 | AbstateIndex | 0x318 = none |
 
 Sent from `FUN_004a3120` (`FUN_004a3120`) · payload 8 bytes
 
@@ -3156,7 +3154,7 @@ Sent from `FUN_00561990` (`FUN_00561990`) · payload 50 bytes
 
 ### `0x112c` NC_CHAR_USEITEM_MINIMON_USE_BROAD_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_USE_BROAD_CMD`, 3 bytes
+**Verified layout** (basis: zone FUN_00561aa0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -8269,11 +8267,11 @@ Sent from `FUN_00570500` (`FUN_00570500`) · payload 2 bytes
 
 ### `0x8c0f` NC_MINIHOUSE_VISITREADY_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_VISITREADY_ACK`, 7 bytes
+**Verified layout** (basis: zone FUN_005719f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | i32 | error |  |
+| 0 | i32 | error | 0x1181 ok |
 | 4 | u8 | isPublic |  |
 | 5 | u8 | visitercnt |  |
 | 6 | u8 | maxvisiter |  |
@@ -8282,11 +8280,11 @@ Sent in reply to `0x8c0e` NC_MINIHOUSE_VISITREADY_REQ on ShineObjectClass::Shine
 
 ### `0x8c14` NC_MINIHOUSE_KICKOUT_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_KICKOUT_CMD`, 1 bytes
+**Verified layout** (basis: zone FUN_00575500)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | kick |  |
+| 0 | u8 | kick | 1 |
 
 Sent in reply to `0x8c12` NC_MINIHOUSE_KICKOUT_REQ † on ShineObjectClass::ShinePlayer (`FUN_00575500`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_KICKOUT) · payload 1 bytes
 
@@ -8342,15 +8340,21 @@ Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_
 
 ### `0x8c2d` NC_MINIHOUSE_MODIFY_PASSWORD_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_MODIFY_PASSWORD_CMD`, 1 bytes
+**Verified layout** (basis: zone FUN_00573200)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | isPublic |  |
+| 0 | u8 | isPublic | 1 on 0x11D6, 0 on 0x11D7 |
 
 Sent in reply to `0x8c2b` NC_MINIHOUSE_MODIFY_PASSWORD_REQ on ShineObjectClass::ShinePlayer (`FUN_00573200`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_MODIFY_PASSWORD_REQ) · payload 1 bytes
 
 ### `0x8c30` NC_MINIHOUSE_MODIFY_TITLE_CMD †
+
+**Verified layout** (basis: zone FUN_00573010)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[21] | title |  |
 
 Sent in reply to `0x8c2e` NC_MINIHOUSE_MODIFY_TITLE_REQ on ShineObjectClass::ShinePlayer (`FUN_00573010`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_MODIFY_TITLE_REQ) · payload 21 bytes
 
@@ -8378,6 +8382,12 @@ Sent from `ShineObjectClass::ShineMiniHouse::so_mh_SendOutSideTitleCmd` (`FUN_00
 
 ### `0x8c34` NC_MINIHOUSE_MODIFY_MAXENTERNUM_CMD †
 
+**Verified layout** (basis: zone FUN_005733c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | maxvisiter |  |
+
 Sent in reply to `0x8c32` NC_MINIHOUSE_MODIFY_MAXENTERNUM_REQ † on ShineObjectClass::ShinePlayer (`FUN_005733c0`, ShineObjectClass::ShinePlayer::sp_NC_ACT_INNERMH_RESET_MAX_PLAYER) · payload 1 bytes
 
 | Off | Type | Value / source |
@@ -8386,7 +8396,7 @@ Sent in reply to `0x8c32` NC_MINIHOUSE_MODIFY_MAXENTERNUM_REQ † on ShineObject
 
 ### `0x8c3f` NC_MINIHOUSE_CHAR_ACTION_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_CHAR_ACTION_CMD`, 10 bytes
+**Verified layout** (basis: zone FUN_00574750)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -8410,12 +8420,12 @@ Sent in reply to `0x8c3d` NC_MINIHOUSE_CHAR_ACTION_REQ on ShineObjectClass::Shin
 
 ### `0x8c41` NC_MINIHOUSE_FURNITURE_EFFECT_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EFFECT_ACK`, 4 bytes
+**Verified layout** (basis: zone FUN_00574a30)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nEffectHandle |  |
-| 2 | u16 | err |  |
+| 2 | u16 | err | 0x16C0 ok, 0x16C1…0x16CF |
 
 Sent in reply to `0x347e` NC_ITEMDB_MINIHOUSE_EFFECT_DEMANDGOOD_ACK on GameDBSession (`FUN_0056f360`) · payload 4 bytes
 
@@ -8505,11 +8515,11 @@ Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · pay
 
 ### `0x8c57` NC_MINIHOUSE_PORTAL_EFFECT_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_PORTAL_EFFECT_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_00573cf0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | Error |  |
+| 0 | u16 | Error | 0x19D0 ok, 0x19D1…0x19DF |
 
 Sent in reply to `0x8c56` NC_MINIHOUSE_PORTAL_EFFECT_REQ on ShineObjectClass::ShinePlayer (`FUN_00573cf0`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_PORTAL_EFFECT_REQ) · payload 2 bytes
 
@@ -8545,14 +8555,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_MH_FurnitureEndureUpdate` (`FUN
 
 ### `0x8c63` NC_MINIHOUSE_FURNITURE_EMOTION_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EMOTION_ACK`, 6 bytes
+**Verified layout** (basis: zone FUN_00575850)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nFurnitureHnd |  |
 | 2 | u8 | nPosition |  |
 | 3 | u8 | nEmotionNo |  |
-| 4 | u16 | nError |  |
+| 4 | u16 | nError | 0x1708 ok |
 
 Sent in reply to `0x8c62` NC_MINIHOUSE_FURNITURE_EMOTION_REQ on ShineObjectClass::ShinePlayer (`FUN_00575850`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_FURNITURE_EMOTION_REQ) · payload 6 bytes
 
@@ -8565,14 +8575,15 @@ Sent in reply to `0x8c62` NC_MINIHOUSE_FURNITURE_EMOTION_REQ on ShineObjectClass
 
 ### `0x8c64` NC_MINIHOUSE_FURNITURE_EMOTION_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EMOTION_CMD`, 2 bytes + variable tail
+**Verified layout** (basis: zone FUN_00575850)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nEmotionCnt |  |
-| 2 | FURNITURE_EMOTION_INFO[nEmotionCnt] | Emotion | variable length, element FURNITURE_EMOTION_INFO |
-
-Element `FURNITURE_EMOTION_INFO` (6 bytes): +0 u16 nPlayerHandle, +2 u16 nFurnitureHnd, +4 u8 nPosition, +5 u8 nEmotionNo
+| 0 | u16 | nEmotionCnt | 1 |
+| 2 | u16 | nPlayerHandle |  |
+| 4 | u16 | nFurnitureHnd |  |
+| 6 | u8 | nPosition |  |
+| 7 | u8 | nEmotionNo |  |
 
 Sent from `FUN_005432d0` (`FUN_005432d0`) · payload variable (iVar9)
 
@@ -8592,11 +8603,11 @@ Sent in reply to `0x8c62` NC_MINIHOUSE_FURNITURE_EMOTION_REQ on ShineObjectClass
 
 ### `0x8c66` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_00575ae0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x1718 ok |
 
 Sent in reply to `0x8c65` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_REQ on ShineObjectClass::ShinePlayer (`FUN_00575ae0`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_REQ) · payload 2 bytes
 
@@ -8606,12 +8617,12 @@ Sent in reply to `0x8c65` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_REQ on ShineObje
 
 ### `0x8c67` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_CMD`, 2 bytes + variable tail
+**Verified layout** (basis: zone FUN_00575ae0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nCancelEmotionCnt |  |
-| 2 | u16[nCancelEmotionCnt] | nCancelEmotion | variable length |
+| 0 | u16 | nCancelEmotionCnt | 1 |
+| 2 | u16 | player |  |
 
 Sent from `FUN_005431b0` (`FUN_005431b0`) · payload variable (local_18 & 0xffff)
 
@@ -9895,7 +9906,7 @@ Sent in reply to `0x34a9` NC_ITEMDB_ITEMINFO_ACK on GameDBSession (`FUN_00528500
 
 ### `0xc40b` NC_COLLECT_CARDREGIST_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_CARDREGIST_ACK`, 10 bytes
+**Verified layout** (basis: zone FUN_00628560 / FUN_00627b60)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -9903,7 +9914,7 @@ Sent in reply to `0x34a9` NC_ITEMDB_ITEMINFO_ACK on GameDBSession (`FUN_00528500
 | 1 | u16 | CardID |  |
 | 3 | u8 | Star |  |
 | 4 | u32 | Serial |  |
-| 8 | u16 | err |  |
+| 8 | u16 | err | 0x2B90 ok, 0x2B91…0x2B95 |
 
 Sent from `InventoryLocking::InvenCellReleaser_CardRegist::icr_Apply` (`FUN_0048b700`) · payload 10 bytes
 
@@ -9925,24 +9936,24 @@ Sent in reply to `0xc40a` NC_COLLECT_REGIST_ACK on GameDBSession (`FUN_00627b60`
 
 ### `0xc40f` NC_COLLECT_BOOKMARK_REGIST_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_BOOKMARK_REGIST_ACK`, 6 bytes
+**Verified layout** (basis: zone FUN_006278f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | BookMarkSlot |  |
 | 2 | u16 | CardID |  |
-| 4 | u16 | err |  |
+| 4 | u16 | err | 0x2BA0 ok, 0x2BA1 unregistered |
 
 Sent in reply to `0xc40e` NC_COLLECT_BOOKMARK_REGIST_DB_ACK on GameDBSession (`FUN_006278f0`, GameDBSession::gds_NC_COLLECT_BOOKMARK_REGIST_DB_ACK) · payload 6 bytes
 
 ### `0xc413` NC_COLLECT_REWARD_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_COLLECT_REWARD_ACK`, 4 bytes
+**Verified layout** (basis: zone FUN_00628ef0 / FUN_00627a40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | RewardID |  |
-| 2 | u16 | err |  |
+| 2 | u16 | err | 0x2BA9…0x2BAC |
 
 Sent in reply to `0xc412` NC_COLLECT_REWARD_DB_ACK † on GameDBSession (`FUN_00627a40`, GameDBSession::gds_NC_COLLECT_REWARD_DB_REQ) · payload 4 bytes
 
@@ -9953,7 +9964,7 @@ Sent in reply to `0xc412` NC_COLLECT_REWARD_DB_ACK † on GameDBSession (`FUN_00
 
 ### `0xcc02` NC_MOVER_RIDE_ON_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MOVER_RIDE_ON_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_0055f380)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -9971,7 +9982,7 @@ Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 4 bytes
 
 ### `0xcc04` NC_MOVER_SOMEONE_RIDE_ON_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MOVER_SOMEONE_RIDE_ON_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_0055f380)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10055,11 +10066,11 @@ Sent from `FUN_004d0c90` (`FUN_004d0c90`) · payload 7 bytes
 
 ### `0xd408` NC_PET_SET_NAME_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_SET_NAME_ACK`, 6 bytes
+**Verified layout** (basis: zone FUN_004d0af0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x34D0 |
 | 2 | u32 | nPetID |  |
 
 Sent from `FUN_004d0af0` (`FUN_004d0af0`) · payload 6 bytes
@@ -10071,11 +10082,11 @@ Sent from `FUN_004d0af0` (`FUN_004d0af0`) · payload 6 bytes
 
 ### `0xd40a` NC_PET_SET_NAME_CANCEL_ACK †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_PET_SET_NAME_CANCEL_ACK`, 6 bytes
+**Verified layout** (basis: zone FUN_004d0b60)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x34D0 |
 | 2 | u32 | nPetID |  |
 
 Sent from `FUN_004d0b60` (`FUN_004d0b60`) · payload 6 bytes
@@ -10123,6 +10134,18 @@ Sent from `FUN_004d0bd0` (`FUN_004d0bd0`) · payload 18 bytes
 ### `0x0806` NC_MISC_SEED_REQ (C→S)
 
 **Verified layout**
+
+Empty payload.
+
+### `0x1093` NC_CHAR_WEDDING_PARTNER_INFO_REQ (C→S)
+
+**Verified layout** (basis: zone FUN_005a0570)
+
+Empty payload.
+
+### `0x10b0` NC_CHAR_DEPOLYMORPH_CMD (C→S)
+
+**Verified layout** (basis: zone FUN_004a59d0)
 
 Empty payload.
 
@@ -10250,6 +10273,18 @@ Empty payload.
 
 Empty payload.
 
+### `0x10d2` NC_CHAR_FREESTAT_SET_DB_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0058be50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | ref |
+| 2 | u32 | charNo | ref |
+| 6 | u8[5] | nFreeStat |  |
+| 11 | u16 | nLockIndex |  |
+| 13 | u16 | nErrorType | 0xAC1 ok |
+
 ### `0x4802` NC_SKILL_SKILLTEACHSUC_ACK (DB→Z)
 
 **Verified layout** (basis: zone FUN_0044ec80)
@@ -10322,6 +10357,46 @@ Empty payload.
 | 1 | u16 | shoutdelay | DAT_0da50480 (pdb2017 name) |
 
 PROTO_NC_MISC_SERVERPARAMETER_ACK, the alias at this opcode value (C02 §2); 3 bytes as in the 2016 send
+
+### `0x1061` NC_CHAR_STAT_INCPOINTFAIL_ACK † (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 4/0x61)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xAC2 no points, 0xAC3 invalid stat, 0xAC7 mode/locked |
+
+### `0x1067` NC_CHAR_STAT_DECPOINTFAIL_ACK † (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 4/0x67)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xAC3 invalid, 0xAC5 already 0, 0xAC6 no restat item, 0xAC7 locked |
+
+### `0x1125` NC_CHAR_USEITEM_MINIMON_NORMAL_ITEM_ON_ACK † (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 4/0x125)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nErr | 0x3628 ok, 0x3629 no minimon, 0x362A/0x362C invalid item, 0x362B empty list |
+
+### `0x1129` NC_CHAR_USEITEM_MINIMON_CHARGED_ITEM_ON_ACK † (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 4/0x129)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nErr | 0x3638 ok, 0x3639 no minimon, 0x363B empty list |
+
+### `0x112f` NC_CHAR_CHARGEDBUFF_ERASE_ACK † (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 4/0x12F)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nErr | 0x3658 ok, 0x3659 status, 0x365A no data, 0x365B bad index, 0x365C not removable |
 
 ### `0x1809` NC_MAP_LINKSAME_CMD † (S→C)
 
@@ -10586,6 +10661,46 @@ Empty payload.
 
 empty payload
 
+### `0x8c04` NC_MINIHOUSE_BUILDING_ACK † (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 35/4)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1182 status, 0x1185 already, 0x1193, 0x1195 zone, 0x1196 later, 0x1199 near NPC, 0x119A skill |
+
+### `0x8c11` NC_MINIHOUSE_VISIT_ACK † (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 35/0x11)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1181 ok, 0x119B password, 0x11A0 too far |
+
+### `0x8c3e` NC_MINIHOUSE_CHAR_ACTION_ACK † (S→C)
+
+**Verified layout** (basis: zone FUN_00574750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x14C0 ok |
+
+### `0xcc03` NC_MOVER_RIDE_ON_FAIL_CMD † (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 51/3)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x306A…0x3070 |
+
+### `0xcc07` NC_MOVER_RIDE_OFF_FAIL_CMD † (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 51/7)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3080 (sent on success), 0x3081, 0x3082 |
+
 ### `0x0821` NC_MISC_TIMEFROMWORLD_CMD (WM→zone)
 
 **Verified layout** (basis: zone FUN_004511a0)
@@ -10651,6 +10766,23 @@ empty payload
 | 16 | char[16] | zoneIp |  |
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
+
+### `0x10d1` NC_CHAR_FREESTAT_SET_DB_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_0058ad10 / FUN_0058b3f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | ref |
+| 2 | u32 | charNo | ref |
+| 6 | u8 | nMaxStat |  |
+| 7 | u8[5] | nFreeStat | target values |
+| 12 | u16 | nLockIndex | not written by INC |
+| 14 | u8 | nItemNum | 0 INC, 1 DEC |
+| 15 | u8 | isDelete | DEC only |
+| 16 | u64 | itemKey | DEC only |
+| 24 | u16 | itemId | DEC only |
+| 26 | u8 | count | 1 |
 
 ### `0x3413` NC_ITEMDB_UNEQUIP_REQ † (Z→DB)
 
@@ -10725,6 +10857,30 @@ empty payload
 | 10 | u16 | first |  |
 | 12 | u16 | last |  |
 
+### `0x347d` NC_ITEMDB_MINIHOUSE_EFFECT_DEMANDGOOD_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_00574a30)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | ref |
+| 2 | u32 | charNo | ref |
+| 6 | u16 | lockindex |  |
+| 8 | u64 | nDemandItemRegNum |  |
+| 16 | u16 | nDemandItemID | 0xFFFF none |
+| 18 | u32 | nNeedItemLot |  |
+| 22 | u64 | nDemandMoney |  |
+| 30 | u16 | nEffectHandle |  |
+
+### `0x401c` NC_CHARSAVE_AUTO_PICK_SAVE_REQ † (Z→DB)
+
+**Verified layout** (basis: zone FUN_005654d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | bEnable |  |
+| 2 | u32 | charNo |  |
+
 ### `0x4801` NC_SKILL_SKILLTEACH_REQ † (Z→DB)
 
 **Verified layout** (basis: zone FUN_0046c820 (production skill))
@@ -10763,6 +10919,31 @@ empty payload
 | 0 | u16 | header.clienthandle |  |
 | 2 | u32 | header.charregistnumber |  |
 | 6 | u16 | skill |  |
+
+### `0xc409` NC_COLLECT_REGIST_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_00628560)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | clientregnum |  |
+| 4 | u16 | clientzonehandle |  |
+| 6 | u16 | lockindex |  |
+| 8 | u64 | CardKey |  |
+| 16 | u8 | invenslot |  |
+| 17 | u16 | CardID |  |
+| 19 | u8 | Star |  |
+| 20 | u32 | Serial |  |
+
+### `0xd403` NC_PET_SET_NAME_DB_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_004d1110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMasterHandle |  |
+| 2 | u32 | nPetRegNum |  |
+| 6 | char[16] | sPetName |  |
 
 ### `0x1073` NC_CHAR_EXP_CHANGED_CMD † (Z→WM)
 
@@ -10803,6 +10984,20 @@ empty payload
 | 0 | ANNOUNCE_MESSAGE | AnnounceMessage | type 11 = roar, text from AnnounceData row 11 "%s:%s" |
 
 (pdb2017 struct; zone writes a type byte and a length-prefixed text, details not decoded)
+
+### `0x1095` NC_CHAR_WEDDING_PARTNER_INFO_RNG † (ring)
+
+**Verified layout** (basis: zone FUN_005a0570 / FUN_005a0a40)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.zoneNo |  |
+| 1 | u16 | start.handle |  |
+| 3 | u32 | start.charNo |  |
+| 7 | u8 | Level |  |
+| 8 | u8 | Connected |  |
+| 9 | u16 | CurrentMap | MapInfo index |
+| 11 | u32 | RegisterNumber | partner charNo |
 
 ### `0x1083` NC_CHAR_WEDDING_PROPOSE_REQ (zone→CharDB)
 
