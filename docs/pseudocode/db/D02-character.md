@@ -450,11 +450,13 @@ SaveStat(b):      p_Char_SaveStat(chrregnum, PwrStone, GrdStone, HPStone(u16), S
     for each: p_Char_SetStateWithSetItemAndRestTime(chrregnum, abstateid, strength, pasttime, resttime, restcount,
               empower 4 × 4 bits, setitem[4] {index, value}, CasterInfo.nLevel, CasterInfo.nAttackPower, out)   @ FUN_00460ee0
               # call string built at run time ("{CALL " + name + "(?,…)}" @ FUN_00460bf0); failures logged
-    Send 0x4008 { hdr12 } when the helper reports success (DelStateAll failure or any row failure → no reply, inferred
-    from the helper's result flag)
+    Send 0x4008 { hdr12 } only when DelStateAll and every row succeeded (helper @ FUN_00406070 returns 0 after the
+    DelStateAll error, else a flag that starts at 1 and is cleared by any failed row; asm 0x4060e2 / 0x406278). n = 0 → ACK
 0x4009 NC_CHARSAVE_SKILL_REQ { hdr12, u16 n, PROTO_SKILLREADBLOCK[n] (16 bytes) }                       @ FUN_00406760
     for each: p_Skill_Set(chrregnum, skillid, 0, mastery, savetime (i64), cooltime, empow ×4, out) else log   @ FUN_00405f00
-    Send 0x400A { hdr12 } when the helper reports success (inferred, same pattern)
+    Send 0x400A { hdr12 } only when every row was saved (helper @ FUN_00405f00 keeps a flag at [ebp-0x228], set to 1
+    before the loop and to 0 by a failed p_Skill_Set; asm 0x405f24 / 0x405fd8; Ghidra merges it with the charNo
+    local). n = 0 → ACK. p_Skill_Set counts as failed when its out return code ≠ 0 (FUN_00452c70)
 0x400B NC_CHARSAVE_TITLE_REQ { hdr12, u16 NumOfValues, NumOfValues × { u8 type, u32, u32 } (9 bytes) }  @ FUN_00406970 → FUN_00406370
     if NumOfValues > 128: log "ERROR - CharSaveTitle: NumOfValues"; return
     for each with 0 < type < 0x80: p_Char_SetTitle(chrregnum, type, …) via FUN_0046d560 else log      # no reply
@@ -541,17 +543,45 @@ until `0x10D2` arrives.
         (no GameLog link → log "…GameLog Send Fail…")
 ```
 
-`usp_Character_setStatPoint` (w00_Character, "Ko Dong Gyun 2010.10.21", source cut at 8 KB) *(db-backup)*:
-- `nRet` -1011 charNo ≤ 0, -1012 a negative stat, -1013 Σ stats > `@nMaxStatPoint`, -1021 `@nDeleteCount` ≠ the sum of
-  the decreases against the stored `tCharacter.nStrength…nMentalPower`, -1093 the stat UPDATE failed, -1022 lowering an
-  item's lot failed (`p_Item_SetOption`), further codes in the cut part.
-- The restat items are consumed **inside the procedure**, not by the keys the zone sent: for one item it takes the first
-  `tItem` of `@nItemID` in inventory (`nStorageType = 9`) by `nStorage` order and either lowers its `tItemOptions.nOptionData`
-  of `@nOptionType` by one or deletes it (`p_Item_Delete`); for several it walks the same order with a cursor. The
-  `itemKey`s in `DecItemInfo` only reach the GameLog. When the zone locked a different cell than the one the DB consumes
-  (two stacks of the restat item), the zone's view and the DB disagree until the next load *(inferred)*.
-- So `nErrorType` 0xAC1 = saved; 0xAC2 = more points than `nMaxStat`; 0x1097 = decrease count ≠ items; 0x1094 / 0x1096 /
-  0xAC6 = item step failed; 0xAC4 = other DB error. The zone shows none of them as text (Z07 §2.4).
+`usp_Character_setStatPoint` (Character.bak and w00_Character, identical; "Ko Dong Gyun 2010.10.21") *(db-backup)*,
+`@nRet` and what the binary turns it into:
+
+```pseudo
+usp_Character_setStatPoint(@nCharNo, @nMaxStatPoint, @nStrength…@nMentalPower (tinyint), @nItemID, @nOptionType,
+                           @nDeleteCount, out @nRet)
+    @nCharNo <= 0                              → -1011   (no reply)
+    any stat < 0                               → -1012   (no reply; dead check: the stats are tinyint)
+    Σ stats > @nMaxStatPoint                   → -1013   → 0xAC2
+    no tCharacter row with bDeleted = 0        → -1014   (no reply)
+    decrease = Σ max(stored − new, 0) over the 5 stats (raising is checked only against @nMaxStatPoint)
+    @nDeleteCount != decrease                  → -1021   → 0x1097
+    BEGIN TRAN; UPDATE tCharacter SET nStrength…nMentalPower = the new values
+    error or @@ROWCOUNT != 1                   → -1093, rollback   (no reply)
+    @nDeleteCount = 1:
+        TOP 1 tItem ⋈ tItemOptions of nOwner = @nCharNo, nStorageType 9 (inventory), nItemID = @nItemID, by nStorage
+            (the join does not filter nOptionType)                                         (original bug) D02-B22
+        nOptionData > 1 → p_Item_SetOption(key, @nOptionType, nOptionData − 1); failure → -1022 → 0x1096
+        else            → p_Item_Delete(key); failure → -1023 → 0x1094
+        no such item: the variables stay NULL, so p_Item_Delete(NULL) deletes nothing and returns 0: the stats are
+            lowered and no item is consumed                                                 (original bug) D02-B20
+    @nDeleteCount > 1:
+        same rows into #tDeleteItem; total = Σ nOptionData
+        total < @nDeleteCount                  → -1024, rollback   → 0xAC6
+        total = @nDeleteCount: DELETE tItem of all those keys; error → -1023 → 0x1094
+        total > @nDeleteCount: cursor CUR_DELETE over the rows by nStorage: delete whole stacks while the remaining
+            count ≥ the stack's lot, then p_Item_SetOption(key, @nOptionType, lot − remaining) on the next; -1023 /
+            -1022 as above. Those error RETURNs leave CUR_DELETE open and allocated (original bug) D02-B21
+    COMMIT; @nRet = 0                          → 0xAC1
+```
+
+- -1091, -1092 and -1094, which the binary also maps to "no reply", are not produced by this source. The 2016 copy may
+  have had other checks *(inferred)*.
+- The restat items are consumed **inside the procedure**, not by the keys the zone sent. The `itemKey`s in `DecItemInfo`
+  only reach the GameLog. When the zone locked a different cell than the one the DB consumes (two stacks of the restat
+  item), the zone's view and the DB disagree until the next load *(inferred)*.
+- So `nErrorType` 0xAC1 = saved; 0xAC2 = more points than `nMaxStat`; 0x1097 = decrease count ≠ items; 0x1096 = lowering
+  a stack's lot failed; 0x1094 = deleting an item failed; 0xAC6 = too few restat items (or no lot option type in the
+  binary's table); 0xAC4 = other DB error. The zone shows none of them as text (Z07 §2.4).
 
 ```pseudo
 0x111A NC_CHAR_TUTORIAL_FREESTAT_INIT_REQ { u32 nCharNo, u8 nMaxStat, u8 nFreeStat[5] }               @ FUN_00429c90
@@ -863,7 +893,7 @@ Where the two differ, the version used is named.
 | 0x0841 | `usp_CharacterLoading` (binary 11, both backups 6), `usp_CharacterLoadingDetailInfo` (–) |
 | dept 16 | `p_Char_SaveLevelExpFrame`, `p_Char_SaveLocation`, `p_Char_SaveStat`, `p_Quest_Set`, `p_Char_DelStateAll`, `p_Char_SetStateWithSetItemAndRestTime` (run-time string; w00 and Character.bak, no header), `p_Skill_Set`, `p_Char_SetTitle`, `p_Char_SavePKCount`, `usp_Character_setRestExpExecTime`, `usp_Character_setAutoPick`, `usp_SpamBlock_setTime`, `usp_Character_setItemActionCoolTime` (w00), `usp_Character_setMysteryBolt`, `usp_Character_setBuffScroll` / `setChargedbuffScroll` / `usp_Item_setAutoMon` (w00) |
 | 0x1056 / 0x105D / 0x1063 / 0x1070 / 0x10B3 | `p_Char_ChangeClass`, `p_Char_StatPoint_Inc`, `usp_ChargeItem_UseStatPointDecLotChange` / `DecDel`, `p_Char_FameSet`, `usp_Char_chkCharNo` (w00) |
-| 0x10D1 / 0x111A | `usp_Character_setStatPoint` (both, source cut at 8 KB), `p_Char_StatPoint_Dec` |
+| 0x10D1 / 0x111A | `usp_Character_setStatPoint` (both, identical), `p_Char_StatPoint_Dec` |
 | 0x1112 / 0x1118 | `p_Char_GetShape`, `p_Char_CreateSetDefaultData`, item create, `usp_Tutorial_setCharInfo` |
 | 0x0847 / 0x0863 / 0x0868 / 0x10DB | `usp_SpamFilter_set`, `usp_Character_setChatBan` (w00 matches; Character.bak copies have 1 and 2 parameters), `usp_InGameGuide_setGuideNo` (w00) |
 | 0x1076 / 0x1099 / 0x107A / 0x107E | item lists (D03), `p_Char_GetShape`, `p_Char_SetShape`, `p_Item_Delete`, `p_Item_SetOption` |
@@ -895,6 +925,9 @@ Where the two differ, the version used is named.
 | D02-B17 | 0x1087 | 0x1088 `Partner` not written | stale u32 to the zone | echo Partner |
 | D02-B18 | 0xA004 | the promotion reward table is never loaded | the promotion reward never grants anything; `p_Promotion_Get/Set` are dead code | load the table |
 | D02-B19 | 0x1004 §4.1 | `p_Char_GetAllData` read with 37 columns; both backups return 36 | with those procedures the "return map" override is silently skipped (db-backup mismatch; the 2016 DB may have had the column) | – |
+| D02-B20 | 0x10D1 (`usp_Character_setStatPoint`, db-backup) | with `@nDeleteCount` = 1 and no restat item of `@nItemID` in the inventory, `p_Item_Delete(NULL)` deletes nothing and returns 0 | the stats are lowered without consuming an item (the zone checks the item first, Z07 §2) | return an error when no item is found |
+| D02-B21 | 0x10D1 (`usp_Character_setStatPoint`, db-backup) | the −1022 / −1023 RETURNs inside the `CUR_DELETE` loop skip `CLOSE` / `DEALLOCATE` | the cursor stays on the worker's ODBC connection; if cursors default to GLOBAL, the next multi-item restat on it fails at `DECLARE` (inferred) | close the cursor before RETURN, or a LOCAL cursor |
+| D02-B22 | 0x10D1 (`usp_Character_setStatPoint`, db-backup) | the item ⋈ `tItemOptions` join does not filter `nOptionType = @nOptionType` | an item with more than one option row is counted (and picked) by another option's value | filter the lot option type |
 
 ## 16. Not reconstructed / uncertain
 
@@ -911,8 +944,8 @@ Where the two differ, the version used is named.
 - `p_Char_GetAllData` 37th column: name and meaning unknown (the 2016 procedure is lost).
 - `usp_CharacterLoading` (11 parameters) and `usp_CharacterLoadingDetailInfo`, `p_IsPromotionUser`, `p_Promotion_Get`,
   `p_Promotion_Set`, `usp_Pet_getInfo`: no source; semantics from the binary only.
-- `usp_Character_setStatPoint` source is cut at 8 KB (`bak.py` does not reassemble pages): the multi-item path and the
-  −1023 / −1024 meanings are inferred from the binary's code mapping.
+- `usp_Character_setStatPoint` does not produce −1091 / −1092 / −1094, which the binary handles: the 2016 procedure
+  may have differed there.
 - `0x0804` heartbeat (`LAB_0043cdf0`) not decompiled; assumed to answer 0x0805 like the other servers.
 - `0x0812`–`0x0815` field names: the 2017 PDB structs are larger than the 2016 packets.
 - The SOAP item-shop client (`cUKItemShop`, gSOAP) setup and pool size (FUN_0043f690) were not followed; the URL length
