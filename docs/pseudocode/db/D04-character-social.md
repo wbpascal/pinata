@@ -329,8 +329,8 @@ SetCharTitles(charNo, n, CT_INFO list[n]) -> bool                               
     SetCharTitleCurrent(charNo, CurrentTitle, CurrentTitleElement, CurrentTitleMobID)          @ FUN_0046d5c0
         # the current title is kept in three type-0 rows: p_Char_SetTitle(charNo, 0, 0, CurrentTitle),
         # (charNo, 0, 1, CurrentTitleElement), (charNo, 0, 2, CurrentTitleMobID)
-        # returns (last call failed) + 1, never 0: the handler's failure log "m_DBFChar.SetCharTitleCurrent" is dead and
-        # failures of the three calls are not reported (original bug) D04-B11
+        # returns 1 only if all three calls succeeded (results OR-ed; disassembly `neg / sbb / lea eax,[ecx+1]`);
+        # failure → log "ERROR - fc_NC_CT_SET_CURRENT_DB_CMD: m_DBFChar.SetCharTitleCurrent"; never reported to the zone
     for t in (UseTitle, UseAbleTitle): if 0 < t.Type < 0x80:
         SetCharTitle(charNo, t) = p_Char_SetTitle(charNo, t.Type, t.ElementNo, t.ElementValue)    @ FUN_0046d500
         failure logged "ERROR - fc_NC_CT_SET_CURRENT_DB_CMD: m_DBFChar.SetCharTitles, nCharNo=%d"; no answer
@@ -610,11 +610,14 @@ GuildTournament_Set(nGTNo, list of {u16 nType, i32 nData})      # wrapper SQL_p_
     rows = p_GuildTournament_GetLastMatch()   # (db-backup) nGTNo, nType, nData of the highest nGTNo, ORDER BY nType
     failed: Error 0xD41, log "ERROR - fc_NC_GUILD_TOURNAMENT_DB_GET_REQ, nGTNo=%d, nRet=%d"
     else: ack.nGTNo = the stored tournament's number (not the request's)
-          per row (type, data): 0 → nMatchType = data
-                                nMatchType < 2: 1000…1999 → TournamentTree[type−1000].nGuildNo
-                                nMatchType ≥ 2: 2000…2999 → TournamentTree[type−2000].nGuildNo, 3000…3999 →
+          per row (type, data), rows ordered by nType so the type-0 row comes first:
+                                0 → nMatchType = data
+                                nMatchType < 2: 1000…1999 → TournamentTree[type−1000].nGuildNo; 2000…3999 dropped
+                                    (so the nResult values 0x7487 stores as 3000+i are never read back in this mode)
+                                nMatchType ≥ 2: 1…1999 dropped; 2000…2999 → TournamentTree[type−2000].nGuildNo, 3000…3999 →
                                                 TournamentTree[type−3000].nResult
                                 ≥ 4000 → MatchTime[type−4000]
+          # 2000+i rows are written only by 0x7497 SET_MATCH (first 16 slots); who decides the second-round layout is Z16 / W03's
           # no index bound: a stored type ≥ 1031 / 4009 … writes past the tree / MatchTime arrays (trusts the table)
           n = count of usp_GuildTournament_getRegistList(request nGTNo) rows (each row read as U32, I64, U8, U8 and dropped)
           ack.nGuildTournamentJoinCnt = n; nLastWinnerGuildNo stays 0
@@ -782,8 +785,11 @@ Emblem`, `_SetInfo` has a parameter named `@nUnk`); the columns below are what t
 0x750D NC_GUILD_EMBLEM_STATE_DB_REQ { u32 nGuildNo, i32 EmblemDeleteDate @4, u8 EmblemState @8 }   (9)   @ FUN_0042f970
     usp_GuildEmblem_GetInfo(nGuildNo) → file, icon (0xFF if no row), create, delete, state
     usp_GuildEmblem_SetInfo(nGuildNo, file, icon, create, delete = EmblemDeleteDate ? TIMESTAMP(localtime(it)) : 1900-01-01,
-        state = EmblemState 0 or 3 → 0, 0xFF or 4 → 0xFF, 1 → 1, 2 → 2, other → an uninitialised stack byte)
-    failure logged; Send 0x750E NC_GUILD_EMBLEM_STATE_DB_ACK { nGuildNo, EmblemDeleteDate, EmblemState } (echo)      (9)
+        state = EmblemState 0 or 3 → 0, 0xFF or 4 → 0xFF, 1 → 1, 2 → 2, other → an uninitialised stack byte
+        (original bug) D04-B11)
+    # no GetInfo row: SetInfo still runs with file / icon 0xFF and an all-zero create TIMESTAMP (year 0)
+    failure: logged, **no answer** (as 0x7507)
+    ok: Send 0x750E NC_GUILD_EMBLEM_STATE_DB_ACK { nGuildNo, EmblemDeleteDate, EmblemState } (echo)                  (9)
 ```
 
 ## 7. Prison (dept 31, `NC_DATA_PRISON_*`), requests from the WM
@@ -1089,25 +1095,32 @@ wrapper returns ok = call ok and `nRet == 0`; failures are logged with the handl
 
 0x986B NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_REQ { hdr, u32 nCharNo @6, u32 nGuildNo @0xA, u8 nLevel @0xE }  (0xF)  @ FUN_0041de10
     # from the zone when an academy member reaches a level; pays the academy's configured reward for that level
-    answer = PROTO_NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_ACK { hdr, u16 Error, nCharNo, nGuildNo, u64 nWantMoney,
+    answer = PROTO_NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_ACK { hdr, u16 Error @6, nCharNo, nGuildNo, u64 nWantMoney,
              u32 nWantItemCnt, GUILD_ACADEMY_REWARD_ITEM WantItem, u64 nSubAcademyMoney, u64 nStorageMoney,
-             u8 nModifyItemCnt, EACH_MODIFY_ITEM[n] (9 each) }
-    usp_GuildAcademy_getReward(nGuildNo, nLevel) failed → send the answer as is (logged)
-    rows (u8 type, u64 data, u16 itemId): type 1 → reward cen; else the reward item and its option
-    nothing configured (no cen, item 0xFFFF) → send
-    usp_GuildAcademy_getMoney(nGuildNo) → the academy's money (row u64) ; failure → send (logged)
-    item reward: AcademyStorage_List(nGuildNo) (D03 §5.3) → the academy reward storage; find a stack of that item to grow
-        (ItemAttr_Save with the new lot, CGameDB_Item_GetItemOptions) or move / create one in the member's reward storage:
-        p_Item_SetStorageAndOwner(…, 1) / Item_DropAll / Item_Insert(MakeItemKeyEx(itemId, 0xB, 0, g), attr, 1);
-        failures set Error 1099 (0x44B); each changed item is listed in ModifyItem
-    cen reward: pay min(reward, academy money): usp_GuildAcademy_withdrawMoney(nGuildNo, nCharNo, amount)
-        # (db-backup) moves cen from tGuildAcademy.nMoney to the character; −1511/−1512/−1514/−1524/−1525/−1527/−1593 errors;
-        # the six handled results are mapped to answer codes, others send at once (logged)
-        nSubAcademyMoney = amount, nStorageMoney = money left; nWantMoney / nWantItemCnt = what could not be paid
+             u8 nModifyItemCnt, EACH_MODIFY_ITEM[n] (9 each) };  Error = 0x18A0 (success)
+    usp_GuildAcademy_getReward(nGuildNo, nLevel) failed → Error 0x188D, send (logged)
+    rows (u8 type, u64 data, u16 itemId): type 1 → reward cen = data; type 3 → reward item lot (low 16 + 16 bits of data);
+        other types → the item's option; a non-cen row with item 0xFFFF or two rows with different item ids →
+        Error 0x18A1, send (log "DB reward item setting abnormal")
+    nothing configured (no cen, item 0xFFFF) → send (0x18A0, nothing paid)
+    usp_GuildAcademy_getMoney(nGuildNo) → the academy's money (row u64); failure → 0x18A1, send
+    item reward: AcademyStorage_List(nGuildNo) (D03 §5.3) fails → 0x18A1, send (log "academy inventory fetch failed");
+        checking a storage item fails → 0x18A1, send; then find stacks of that item in the academy reward storage and
+        move / grow / create the member's item: ItemAttr_Save with the new lot (CGameDB_Item_GetItemOptions),
+        p_Item_SetStorageAndOwner(…, 1) / Item_DropAll / Item_Insert(MakeItemKeyEx(itemId, 0xB, 0, g),
+        ItemAttr_MakeWithLot FUN_00468000, 1); the attribute-class helpers FUN_0044ff60 / FUN_0044d340 build the option
+        block; failures → Error 1099 (0x44B); each changed item is listed in ModifyItem; what is missing → nWantItemCnt
+    cen reward: amount = min(reward, academy money); usp_GuildAcademy_withdrawMoney(nGuildNo, nCharNo, amount)
+        # (db-backup) moves cen from tGuildAcademy.nMoney to the character
+        failure: nRet 1 → 0xF99, 2 → 0xF9A, 3 → 0xF9B, 4 → 0xF9C, 5 → 0xF9D, 6 → 0xF9E, other → 0xF98; send at once
+        # the w00 procedure returns only negative codes (−1511/−1512/−1514/−1524/−1525/−1527/−1593), so with it every
+        # failure is 0xF98: the 2016 procedure returned 1–6 (db-backup mismatch)
+        nSubAcademyMoney = amount, nStorageMoney = money left, nWantMoney = reward − amount
     Send 0x986C NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_ACK (0x3D + 9n)
-    if something was missing (want money / want items): build 0x9882 NC_GUILD_ACADEMY_DB_REWARD_WANT_CMD { nCharNo,
-        nGuildNo, u64 nWant_Cen, u16 nWant_ItemID, u32 nWant_ItemLot } (0x16) and send it to the WM (SendToWorldManager)
-    # the exact error-code assignment of this answer and the storage-item merge are only partly reconstructed (§12)
+    if that send returned 1 and (nWantMoney ≠ 0 or the wanted lot ≠ 0): Send to the WM (SendToWorldManager)
+        0x9882 NC_GUILD_ACADEMY_DB_REWARD_WANT_CMD { nCharNo, nGuildNo, u64 nWant_Cen, u16 nWant_ItemID (only copied when
+        the lot ≠ 0), u32 nWant_ItemLot }                                                                          (0x16)
+    # the exact rule for choosing / merging stacks in the storage is not traced instruction by instruction (§12)
 ```
 
 ## 10. Chat block list (dept 42 CHAT_RESTRICT), requests from the WM
@@ -1252,7 +1265,7 @@ FUN_00447710 → FUN_00447570 (append to the daily log file); CRT `_localtime32_
 | D04-B8 | 0x5C05 | GameLog 0x0454 sent on failure too | log shows licences that were never stored | log only on 0x9B9 |
 | D04-B9 | 0x5C05 | log fields @0x16/@0x18 read 4 bytes past the 0x36-byte request | stale bytes in the GameLog | real fields / drop them |
 | D04-B10 | 0x5C07 | unhandled `p_Item_ClrWeaponTitle` results (−1 call failure, SQL errors) keep 0x9E1 | zone applies a clear that did not happen | default to an error code |
-| D04-B11 | 0x6008 | `SetCharTitleCurrent` returns 1 or 2, never 0 | failures of the three title rows are never logged | return the AND of the results |
+| D04-B11 | 0x750D | `EmblemState` values other than 0/1/2/3/4/0xFF store an uninitialised stack byte | random emblem state in the DB | reject unknown states |
 | D04-B12 | 0x7017… GET old options | `bSuccess 0` answers carry the uninitialised data buffer | stack bytes to the WM / client | zero the buffer |
 | D04-B13 | 0x704D / 0x704F | ack `nCharNo` never written | the WM finds no (or the wrong) client; no 0x703A | copy nCharNo |
 | D04-B14 | 0x7057 / 0x7059 | get-procedure failure after a successful init sends no answer | WM / client wait forever | answer with the error code |
@@ -1268,16 +1281,13 @@ FUN_00447710 → FUN_00447570 (append to the daily log file); CRT `_localtime32_
 
 ## 12. Not reconstructed / uncertain
 
-- **0x986B academy reward**: the flow (getReward → getMoney → storage item merge / create → withdrawMoney → 0x986C, 0x9882
-  to the WM) is clear; the exact `Error` values of 0x986C (besides 1099 for item failures), the six mapped
-  `withdrawMoney` results and the stack merge rule were not traced instruction by instruction. Next step: read FUN_0041de10
-  lines 120–230 and 300–397 with `clean.py`.
+- **0x986B academy reward**: flow and error codes are reconstructed; the rule that picks and merges stacks in the academy
+  reward storage (FUN_0041de10 decompiled lines ~107–170 and ~300–397) is summarised, not traced line by line. The 2016
+  `usp_GuildAcademy_withdrawMoney` returned 1–6 (mapped to 0xF99–0xF9E); their meanings are unknown.
 - `GTReward_MakeItemAttr` FUN_00467c60: the tail of ITEM_OPT (bytes 0x0D–0x20) feeding random options for class-4 items is
   not mapped field by field.
 - `usp_GuildTournament_setRegist` (−1424 → 0x1C47 has no backup meaning; the w00 body is truncated), `setRefundNotice`
   and `p_Guild_SetMoney` (missing) — D06.
-- 0x7485's key ranges were read from Ghidra's flattened branches; the split by `nMatchType` (< 2 / ≥ 2) should be confirmed
-  in the disassembly before a rebuild relies on it.
 - Client texts: the guild (0x0C41…), academy (0x1780…), tournament (0x0D40…, 0x1C40…), quest, skill, holy-promise success
   and chat-block delete codes have no entry in the client error table; which reach the client and with what text is W03 /
   W04 / Z08's to check. The holy-promise 0x1741 text ("User is already logged on.") does not fit its DB meaning (ring).
@@ -1300,5 +1310,6 @@ FUN_00447710 → FUN_00447570 (append to the daily log file); CRT `_localtime32_
 | Zone side of quest / KQ / WT / CT / tournament join / holy cen reward / academy reward | Z08 (§3, §4, §7, §8, §9) | zone side |
 | Skill DB answers in the zone | Z03 §9 | zone side |
 | Guild tournament system, KQ map scripts | Z16 / Z09 | game logic, not persistence |
-| Missing / truncated procedures (`p_Guild_SetMoney`, `usp_GuildTournament_setRefundNotice`, `setRegist` body) | D06 ("missing procedures") | DB reconstruction |
+| Missing / truncated / mismatched procedures (`p_Guild_SetMoney`, `usp_GuildTournament_setRefundNotice` named in D06's scope; `setRegist` body, `getRegistList` columns, `withdrawMoney` 1–6 results, private `usp_GuildEmblem_*` / `usp_GuildAcademy_setHistory`) | D06 (scope names the first two; its clause on every inferred / db-backup statement takes the rest, listed in `docs/knowledge/D04.md` "For D06") | DB reconstruction, not binary behaviour |
+| Who writes the tournament's second-round keys 2000+i besides 0x7497 | Z16 / W03 (proposal in the status file) | game logic of the tournament |
 | GameLog packets 0x043E… / 0x04A3… / 0x0755 / 0xC810 | D05 | GameLog server side |
