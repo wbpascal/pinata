@@ -1,7 +1,7 @@
 """Render per-packet field documentation from layouts.json + handlers.json + opcodes.json.
 
 usage: python3 -I packets.py <export_root> <docs_dir>     (export_root contains <server>/layouts.json)
-writes <docs_dir>/packets-<server>.md for login, wm, zone
+writes <docs_dir>/packets-<server>.md for login, wm, zone (client packets) and account, accountlog (server links)
 """
 import json, os, re, sys
 
@@ -19,7 +19,9 @@ for f in sorted(glob.glob(f"{docs}/annotations/*.json")):
 _pp = f"{docs}/pdb-layouts.json"
 PDB = json.load(open(_pp)) if os.path.exists(_pp) else {"opcodes": {}, "structs": {}}
 CLIENT = {"login": "CParserClient", "wm": "CParserClient", "zone": "ShineObjectClass::ShinePlayer"}
-TITLE = {"login": "Login server", "wm": "World manager", "zone": "Zone server"}
+TITLE = {"login": "Login server", "wm": "World manager", "zone": "Zone server",
+         "account": "Account server", "accountlog": "AccountLog server"}
+LINKS = ("account", "accountlog")   # no client parser: every handler and send is a server link
 
 
 def internal(op):
@@ -60,9 +62,11 @@ def fmtv(f):
 
 
 def verified(server, op, direction):
+    """direction None = any (server-link pages show the annotation's own direction)"""
     a = ANN["packets"].get(server, {}).get(op)
-    if not a or a["dir"] != direction: return []
-    rows = ["**Verified layout**" + (f" (basis: {a['basis']})" if a.get("basis") else "") + "\n"]
+    if not a or direction and a["dir"] != direction: return []
+    rows = ["**Verified layout**" + (f" ({a['dir']})" if not direction else "") +
+            (f" (basis: {a['basis']})" if a.get("basis") else "") + "\n"]
     if a["fields"]:
         rows.append("| Off | Type | Field | Notes |\n|---|---|---|---|")
         rows += [f"| {o} | {t} | {n} | {x} |" for o, t, n, x in a["fields"]]
@@ -127,23 +131,28 @@ def render(server):
            "  shown when no hand-verified layout exists. A 2017 build: confirm against the 2016 code before relying on it.\n",
            "Heuristic extraction: verify a layout against the cited function before relying on it.\n"]
 
-    out.append("## Shared structures (hand-verified)\n")
+    link = server in LINKS
+    adir = lambda op: ANN["packets"].get(server, {}).get(op, {}).get("dir")
+    if not link: out.append("## Shared structures (hand-verified)\n")
     for sn, st in ANN["structs"].items():
-        if server == "login" and sn != "WORLD" or server != "login" and sn == "WORLD": continue
+        if link or server == "login" and sn != "WORLD" or server != "login" and sn == "WORLD": continue
         out.append(f"### {sn} ({st['size']} bytes)\n\nBasis: {st['basis']}\n\n| Off | Type | Field | Notes |\n|---|---|---|---|")
         out += [f"| {o} | {t} | {n} | {x} |" for o, t, n, x in st["fields"]]
         out.append("")
     # ---------------- C -> S
-    out.append("## Client → server\n")
+    out.append("## Received on server links\n" if link else "## Client → server\n")
     done = set()
     for op, parsers in sorted(L["c2s"].items()):
-        r = parsers.get(CLIENT[server])
+        pname = next(iter(parsers), None) if link else CLIENT[server]
+        r = parsers.get(pname)
         if not r: continue
         out.append(f"### `{op}` {name(op, server)}\n")
-        v = verified(server, op, "C→S"); done.add(("C→S", op))
+        d = adir(op) if link else "C→S"
+        v = verified(server, op, None if link else "C→S"); done.add((d, op))
         lc = [int(c[3:], 0) - 2 for c in r["len_checks"] if c[:3] in ("== ", "!= ")]
         out += v or pdb_layout(op, lc)
-        out.append(f"Handler `{r['handler']}`" + (f" · packet length check: {', '.join(r['len_checks'])} (length includes the opcode)" if r["len_checks"] else ""))
+        out.append(f"Handler `{r['handler']}`" + (f" ({pname})" if link else "") +
+                   (f" · packet length check: {', '.join(r['len_checks'])} (length includes the opcode)" if r["len_checks"] else ""))
         if not r["fields"]:
             out.append("\nNo payload fields read directly by the handler.\n")
             continue
@@ -157,11 +166,11 @@ def render(server):
         out.append("")
 
     # ---------------- S -> C
-    out.append("## Server → client\n")
+    out.append("## Sent on server links\n" if link else "## Server → client\n")
     for op, sites in sorted(L["s2c"].items()):
-        if internal(op): continue
+        if not link and internal(op): continue
         out.append(f"### `{op}` {name(op, server)}\n")
-        v = verified(server, op, "S→C"); done.add(("S→C", op))
+        v = verified(server, op, None if link else "S→C"); done.add((adir(op) if link else "S→C", op))
         out += v or pdb_layout(op, [x["size"] for x in sites if x["size"] is not None])
         seen_layouts = set()
         for s in sites[:4]:
@@ -193,12 +202,15 @@ def render(server):
             out.append(f"### `{op}` {name(op, server)} ({d})\n")
             out += verified(server, op, d)
     open(f"{docs}/packets-{server}.md", "w").write("\n".join(out) + "\n")
+    if link:
+        print(f"{server}: {len(L['c2s'])} received, {len(L['s2c'])} sent, {len(rest)} hand-verified only")
+        return
     n_c2s = sum(1 for p in L["c2s"].values() if CLIENT[server] in p)
     n_s2c = sum(1 for op in L["s2c"] if not internal(op))
     print(f"{server}: {n_c2s} client→server, {n_s2c} server→client packets documented")
 
 
-for s in ("login", "wm", "zone"):
+for s in ("login", "wm", "zone") + LINKS:
     render(s)
 
 
