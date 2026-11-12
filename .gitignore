@@ -292,3 +292,7 @@ pyrightconfig.json
 *.ulock
 re-data/ghidra/**/~index.bak
 re-data/ghidra/**/~journal.*
+
+### Claude settings and worktrees ###
+.claude/worktrees
+.claude/settings.local.json
