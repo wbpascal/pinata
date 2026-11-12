@@ -20,13 +20,14 @@ Start a fresh agent session in this repository and give it one plan file:
 
 > Execute the work item described in `docs/plan/items/Z03.md`.
 
-`CLAUDE.md` is loaded automatically. It holds the shared conventions, the data locations
+`AGENTS.md` is loaded automatically (Codex and OMP read it directly; `CLAUDE.md` is a symlink to it for
+Claude Code). It holds the shared conventions, the data locations
 (`re-data/exports`, `re-data/ghidra`) and the facts already established, so no session re-decompiles or
 re-derives anything. If a session runs out of budget, start another one with the same sentence. It
 resumes from `docs/plan/status/<ID>.md`.
 
 Items in the same phase can run in parallel: they write disjoint files (see "Shared files" in
-`CLAUDE.md`). Dependencies are soft. An item can start before its dependencies finish, but it will
+`AGENTS.md`). Dependencies are soft. An item can start before its dependencies finish, but it will
 produce better results after them, so respect the order when you can.
 
 ## Phases and items
@@ -112,7 +113,7 @@ of each item file.
 Static analysis tells us what the code *can* send. Captures confirm what it *does* send. How to record
 them, which scenarios, and privacy notes: [`capture-guide.md`](capture-guide.md). Put captures and their
 notes in `re-data/captures/`, then run P02. Capture-confirmed facts are the strongest evidence level
-(see `CLAUDE.md`). P02 reports contradictions per owning work item, so the owner can fix them in a
+(see `AGENTS.md`). P02 reports contradictions per owning work item, so the owner can fix them in a
 follow-up session.
 
 ## Suggested order with limited budget

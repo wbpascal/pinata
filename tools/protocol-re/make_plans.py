@@ -89,7 +89,7 @@ ITEMS = [
              "have a 2017 name, 645 of them unnamed today), then callees and classes by call-graph / byte matching. Write "
              "`tools/protocol-re/names/client/C02.json`; mark ported names as `pdb2017` in the knowledge file.",
              "Evidence: a PDB fact applies to 2016 only after a 2016 binary agrees (same opcode in a handler table, same "
-             "size check, same field use). Until then mark it *(pdb2017)* (see `CLAUDE.md` evidence levels)."],
+             "size check, same field use). Until then mark it *(pdb2017)* (see `AGENTS.md` evidence levels)."],
       done="PDB opcode names in `opcodes.json` with conflicts resolved; `pdb-layouts.json` used by the generated docs, decoder "
            "and dissector; 2016 client handlers named from the PDB; per-item follow-up list in `docs/knowledge/C02.md`."),
  dict(id="W01", phase=1, title="World manager core: sessions, world login, characters, zone handoff",
@@ -612,7 +612,7 @@ ITEMS = [
              "One table row per bug: ID, server and handler (`@ FUN_…`, link to the pseudocode section), the 2016 behaviour, "
              "the visible effect, the likely intent, evidence level (read in code / *(inferred)* / *(captured)*) and the "
              "owning item. Keep the items' IDs (`<item>-B<n>`). Sources: each item's \"Original-server bugs\" section and "
-             "every `(original bug)` tag (CLAUDE.md convention; W02-party-raid.md §9 is the reference). Items done before "
+             "every `(original bug)` tag (AGENTS.md convention; W02-party-raid.md §9 is the reference). Items done before "
              "that convention (L00, W01, Z01–Z03, C01, C02, P01, P03) left free-text notes instead: grep "
              "`docs/pseudocode/**/*.md` and `docs/knowledge/*.md` for `bug`, `sic`, `never reach`, `uninitialised`, "
              "`not initialised`, `ignored`, `copy-paste`, `typo` and give those entries IDs `<item>-B<n>`. Include "
@@ -694,7 +694,7 @@ def entries(bin_, parser, depts):
 
 GENERIC = """## How to work
 
-1. `CLAUDE.md` is already in your context (do not re-read it); follow its **Context budget** section. Read
+1. `AGENTS.md` is already in your context (do not re-read it); follow its **Context budget** section. Read
    `docs/plan/00-master-plan.md`.
 2. Read `docs/pseudocode/FORMAT.md`: the format and depth to match (not the whole `login-server.md`).
 3. Read what exists for your area: `docs/plan/status/{id}.md` (resume from it if present), the `docs/knowledge/*.md`
@@ -732,15 +732,13 @@ GENERIC = """## How to work
    covers it (ID and the line of its plan or scope table that includes it) or, if no item does, a proposed new item
    (title, scope, why it does not fit here) added to `docs/plan/status/{id}.md` under "Proposed follow-up items" for the
    user to accept. "Too large" or "ran out of context" is not out of bounds: that is unfinished work for the status file.
-9. **Review with fresh context** before marking the item done. Spawn one reviewer agent (Agent tool, a new
-   general-purpose agent, not a fork: it must not share your reading of the code). Give it this plan file, your output
-   files, and the output of `coverage.py {id} --all`, and ask it to find what is missing or wrong, not to confirm:
-   - for each coverage gap: in scope and must be documented, or correctly outside (which item covers it)?
-   - each "Coverage boundary" row: does the named item's plan or scope table really include it? Is the argument sound?
-   - scope-table handlers, packets, error codes and client cross-checks that are thin or absent
-   - re-read 5–10 of your claims in the code (`clean.py`), preferring *(inferred)* ones and field meanings, and report any
-     that the code contradicts
-   - it returns a numbered findings list and edits nothing.
+9. **Review with fresh context** before marking the item done. The reviewer must not share your reading of the code.
+   The review task is `docs/plan/review-prompt.md` (with `<ID>` = `{id}`).
+   - If your agent tool can start a fresh-context subagent (not a fork of your session), give it that file's text with
+     `<ID>` replaced by `{id}`, and wait for its numbered findings list.
+   - Otherwise stop here: set the status file to "awaiting review" and end the session. The user runs the review as a
+     separate session ("Review work item {id} as described in `docs/plan/review-prompt.md`") and then resumes this item,
+     whose session finds the findings under "Review findings" in `docs/plan/status/{id}.md`.
    Fix every finding in your files, or write in `docs/plan/status/{id}.md` under "Review" why you reject it. Re-run
    `coverage.py {id}` and `regen.sh`, record the before/after coverage line in the status file, then mark the item done.
 

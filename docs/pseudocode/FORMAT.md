@@ -41,7 +41,7 @@ Number the sections (`## 5.`, `### 5.2`), because other items cite them as `§5.
 Per handler: opcode + official name + payload fields, `@ FUN_…` of every function the logic comes from, length and
 input checks, state changes, every packet sent (to whom, with field values), error codes with meaning and the client
 text (`docs/protocol/client-error-codes.json`), timers. Mark *(inferred)*, *(pdb2017)*, *(db-backup)*, *(captured)*
-as defined in `CLAUDE.md`.
+as defined in `AGENTS.md`.
 
 ## Original-server bugs
 
