@@ -12,3 +12,4 @@ python3 -I "$T/catalog.py" "$E" "$D"
 python3 -I "$T/packets.py" "$E" "$D"
 python3 -I "$T/errcodes.py" "$E/client" "$R/Files/Client/2016/ressystem" > "$D/client-error-codes.json"
 python3 -I "$T/make_dissector.py"
+python3 -I "$T/coverage.py" --overview

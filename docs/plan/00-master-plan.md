@@ -5,6 +5,15 @@ AccountLog, Character, GameLog) as structured pseudocode. Each block cites the o
 packet is cross-checked with the 2016 client. Format and depth follow `docs/pseudocode/login-server.md`
 (Login is **done**).
 
+## Progress
+
+[`progress.md`](progress.md): how far along each server component is (handlers documented, functions cited, gaps, items done), generated
+by `tools/protocol-re/coverage.py --overview` from the docs in the tree, so it is the same in every branch with the same
+docs. Every item runs it via `regen.sh` at its end. **After merging item branches, run
+`python3 -I tools/protocol-re/coverage.py --overview` and commit**: the merge keeps one side's file (`.gitattributes`
+`merge=ours`, so it never conflicts) and the regeneration makes it correct for the merged docs. One-time setup per
+clone: `git config merge.ours.driver true` (without it the file conflicts; resolve by running the same command).
+
 ## How to run a work item
 
 Start a fresh agent session in this repository and give it one plan file:

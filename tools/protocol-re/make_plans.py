@@ -641,6 +641,9 @@ ITEMS = [
              "SQL, and boundary values (0, max, max+1, negative, wrong type id) to test the checks the docs describe.",
              "Also list in `capture-scenarios.md` the experiments that need a modified SHN table or server config "
              "(`Files/Server/2016/9Data`) instead of SQL, with the exact row/key to change.",
+             "Items finished before the plan files had the \"Coverage boundary\" and review steps (status files without a "
+             "\"Review\" section): run `coverage.py <ID>` for each, and add their uncovered, unargued gaps to "
+             "`docs/review/confidence.md` §4 per item, so a follow-up session of that item can close them.",
              "Link the new scenarios from `docs/plan/capture-guide.md` (one line under the scenarios table; that is the only "
              "edit to another file). After the user records them, P02 validates them as usual; then re-run X02 to update the "
              "ratings."],
@@ -692,7 +695,9 @@ GENERIC = """## How to work
    branch, error path, timer, table and packet these handlers reach, plus the matching client handlers and DB procedures,
    until what remains clearly belongs to another item. Before you finish, sweep for what you missed: `rg` your subsystem's
    strings, SHN tables and opcodes (`opcodes.json`) for functions you never opened, check every caller and callee of the
-   functions you documented, and every unnamed `FUN_` left in your text. Stopping early because the handlers are
+   functions you documented, and every unnamed `FUN_` left in your text, and run
+   `python3 -I tools/protocol-re/coverage.py {id}` (functions reachable from your handlers that no doc cites yet,
+   largest first; cite each one you cover as `FUN_…` so it counts). Stopping early because the handlers are
    "done" is the most common gap in past items; reviews keep finding uncovered cases that were in scope.
 6. Every ~10 handlers, update `docs/plan/status/{id}.md` (done / remaining). Before you run low on context,
    write the status so a fresh session can continue.
@@ -703,6 +708,17 @@ GENERIC = """## How to work
    covers it (ID and the line of its plan or scope table that includes it) or, if no item does, a proposed new item
    (title, scope, why it does not fit here) added to `docs/plan/status/{id}.md` under "Proposed follow-up items" for the
    user to accept. "Too large" or "ran out of context" is not out of bounds: that is unfinished work for the status file.
+9. **Review with fresh context** before marking the item done. Spawn one reviewer agent (Agent tool, a new
+   general-purpose agent, not a fork: it must not share your reading of the code). Give it this plan file, your output
+   files, and the output of `coverage.py {id} --all`, and ask it to find what is missing or wrong, not to confirm:
+   - for each coverage gap: in scope and must be documented, or correctly outside (which item covers it)?
+   - each "Coverage boundary" row: does the named item's plan or scope table really include it? Is the argument sound?
+   - scope-table handlers, packets, error codes and client cross-checks that are thin or absent
+   - re-read 5–10 of your claims in the code (`clean.py`), preferring *(inferred)* ones and field meanings, and report any
+     that the code contradicts
+   - it returns a numbered findings list and edits nothing.
+   Fix every finding in your files, or write in `docs/plan/status/{id}.md` under "Review" why you reject it. Re-run
+   `coverage.py {id}` and `regen.sh`, record the before/after coverage line in the status file, then mark the item done.
 
 ## Rules
 

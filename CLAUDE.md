@@ -44,6 +44,7 @@ python3 -I $T/pdb.py $P types '^PROTO_NC_MAP_LOGIN_REQ$'          # 2017 PDB: st
 python3 -I $T/pdb.py $P types '^PROTOCOL_COMMAND_MAP$'            # official opcode names of one dept (enum value = cmd)
 python3 -I $T/pdb.py $P publics 'On_NC_'                         # 2017 client function names + addresses
 tools/protocol-re/regen.sh                                   # rebuild ALL generated docs (after adding names/annotations)
+python3 -I $T/coverage.py Z08                                # item coverage: reachable functions no doc cites yet (--overview: docs/plan/progress.md)
 tools/protocol-re/reanalyze.sh <bin> <exe>                   # only if an export is missing or broken (slow)
 ```
 
