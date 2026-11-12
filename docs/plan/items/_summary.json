@@ -216,6 +216,14 @@
   "7338"
  ],
  [
+  "D06",
+  2,
+  "Database behaviour the backups do not give us (added by D02; run last, before X01)",
+  "D01, D02, D03, D04, D05",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "P01",
   1,
   "Packet capture decoder",

@@ -286,6 +286,11 @@ ITEMS = [
              "and ceremony flow (who sends `0x1091 NC_CHAR_WEDDING_DO_REQ`: grep `= 0x1091;` in the zone export), "
              "FUN_0059ef40, FUN_005b92a0 (called after an accepted proposal), player vt 0x40c / 0x410 / 0x418 / 0x960, "
              "`ZoneRingPacketRefreshWeddingInfo`. Z02 §10 has the client requests.",
+             "Open question from D02 (`docs/pseudocode/db/D02-character.md` §11 end and §16): the Character DB stores "
+             "sub-status 6 (= 2 + 4) for \"partner applied for divorce by agreement\" and adds 4 on divorce cancel (1 → 5, "
+             "3 → 7), while Z07 §5.1 reads Sub values 1–4. Find out how the zone handles 5–7 when the `0x1081` Status byte "
+             "(`nStatus | nSubStatus << 4`) arrives (masks bit 2, treats them as \"none\", or mis-handles them; "
+             "`FUN_0059f2d0` area), and record the answer in `docs/knowledge/Z13.md`.",
              "Pets: the summon/unsummon flow (`so_PetSystem_Unsummon` FUN_004d2990 and its callees FUN_004d1ff0, FUN_004d2520, "
              "FUN_004d25d0; the pet item's UseEffect actor, Z04 §6.3), pet states 1/2/8 at `p+0x2ab60`, who sends 0xD405 "
              "ASK_NEW_NAME_REQ and 0xD401 SET_TENDENCY (mind/stress), the resummon after a map link (`p+0x2aba8`, WM 0xD412), "
@@ -456,6 +461,54 @@ ITEMS = [
              "`p_GameLog_Add_TypeL` exists only in `w00_GameLog`. The `p_GameLog_Add_Type1…L` sources show which "
              "`tGameLog` column each parameter fills, which gives the meaning of the generic log fields. Eight of them "
              "differ between the two backups (Type1, 4, 5, 6, D, E, H, J): compare both."]),
+ dict(id="D06", phase=2, title="Database behaviour the backups do not give us (added by D02; run last, before X01)",
+      out="docs/pseudocode/db/D06-db-inferred.md", deps=["D01", "D02", "D03", "D04", "D05"], scope=[],
+      goal="D01–D05 describe what each DB server does around its stored procedures and take the procedure bodies from the "
+           "private-server backups (`docs/plan/db-backups.md`). Some procedures the 2016 binaries call have no source "
+           "anywhere or a different parameter count, and several statements about what the database does are only "
+           "*(inferred)*. A rebuild has to write these procedures itself. Collect every such gap, infer as far as the "
+           "evidence allows what each procedure reads, writes and returns, and the table schema behind it, and write the "
+           "result as a spec a rebuild can implement.",
+      steps=["Scope, taken at the end of D02 (re-run `python3 -I tools/protocol-re/bak.py cover <bin>` for `account`, "
+             "`accountlog`, `character`, `gamelog` first; it may have changed). No source anywhere: account "
+             "`p_UserKey_Get_FromAccount`, `p_UserPlayRemainTime_Get_FromAccount`, `p_UserPlayRemainTime_Set_FromAccount`, "
+             "`usp_Event_addCash`, `usp_JPUser_insert`, `usp_Pcbang_chkIP`, `usp_TWUser_insert`, `usp_User_LoginNetmarble`; "
+             "accountlog `p_Event_L20_Get`, `p_Event_L20_Set`, `p_SameTimeCharClass_Add`, "
+             "`usp_AccountLog_GetDateDiffLastlogout`; character `p_Guild_SetMoney`, `p_IsPromotionUser`, "
+             "`p_Item_MiniHouse_Effect_Resource_Del`, `p_MiniHouseURL_Get`, `p_MiniHouseURL_Set`, `p_Promotion_Get`, "
+             "`p_Promotion_Set`, `usp_CharacterLoadingDetailInfo`, `usp_GuildTournament_setRefundNotice`, "
+             "`usp_LinkScroll_SetDestMap`, `usp_Pet_getInfo`, `usp_Pet_setCreate`, `usp_Pet_setDelete`, `usp_Pet_setName`, "
+             "`usp_Pet_setTendency`; gamelog `usp_Login_setChannel`. Parameter count differs from the backups: account "
+             "`usp_User_LoginGame` (5 vs 6), character `usp_Character_setFriendpoint` (2 vs 3), `usp_CharacterLoading` "
+             "(11 vs 6).",
+             "Also in scope: call strings built at run time (character `SQL_BuildCallString` FUN_00460bf0, e.g. "
+             "`p_Char_SetStateWithSetItemAndRestTime`; `docs/knowledge/D02.md`), which `cover` does not see: find every "
+             "caller and check each name against the backups. And every *(inferred)* or *(db-backup)* statement about "
+             "database behaviour in the D01–D05 outputs (their \"Not reconstructed / uncertain\" sections, "
+             "`docs/plan/status/D0*.md`, `docs/knowledge/D0*.md`) where the backup's procedure may not be the 2016 one: e.g. "
+             "D02's `p_Char_GetAllData` 37th column (D02-B19), the result codes −1091 / −1092 / −1094 the Character server "
+             "handles for `usp_Character_setStatPoint` but the source does not produce, the 2016 `tCharacterLoading` columns.",
+             "The table schema: merge the table → column lists of `docs/knowledge/D01.md`–`D05.md` into one schema, with types "
+             "from the ODBC bind and fetch types (C type −16 i32, −28 u8, −17 u16, −18 u32, −25 i64, −27 u64, 1 string, "
+             "−2 binary, 11 timestamp; `docs/knowledge/D02.md` lists the getters), keys and the constraint names "
+             "`bak.py names` shows.",
+             "Evidence for a procedure without source, strongest first: the call site (parameter count, C and SQL types, bind "
+             "direction 1 in / 2 in-out / 4 out, the result columns the code fetches and their order; read the wrapper "
+             "`SQL_<procedure>` and its callers, and the assembly with `/usr/bin/objdump -d -M intel` when the decompiler "
+             "loses arguments); how the handler maps the return codes (client texts via `docs/protocol/client-error-codes.json`); "
+             "procedures of the same family in the backups (same prefix, author header, tables); the 2017 PDB struct the "
+             "result goes into; captures; the 2015 binaries for an older call (diffing only).",
+             "Several versions of a procedure: compare `bak.py proc` of Character.bak, w00_Character.bak and `Fixes/*.sql` "
+             "with what the 2016 binary passes, and say which version a rebuild should follow and why.",
+             "If Docker or a Windows SQL Server is available, restoring the backups (SQL Server 2017 or newer) gives the real "
+             "schema, defaults and constraints, which `bak.py` cannot extract. Record in the status file whether it was done.",
+             "One block per procedure instead of per handler: signature with types and directions, tables and columns read "
+             "and written, return codes and result rows, the calling handlers (`@ FUN_…`, link to the D0x section), and for "
+             "each statement what it is inferred from. Do not edit D01–D05 outputs; corrections go into "
+             "`docs/knowledge/D06.md` under \"Corrections\"."],
+      done="Every procedure in scope and every run-time call string has a block (or a note that nothing can be inferred, "
+           "with the reason); the schema lists every table the 2016 servers use; each open DB statement of D01–D05 is "
+           "confirmed, corrected or left open with a reason."),
  dict(id="P01", phase=1, title="Packet capture decoder", out="tools/protocol-re/pcap_decode.py + docs/knowledge/P01.md",
       scope=[], deps=[],
       goal="A pure-Python (stdlib only: no scapy/dpkt/tshark on this machine) tool that turns a capture of real "

@@ -82,6 +82,7 @@ follow-up for W01 listed in `docs/knowledge/C02.md`").
 | [D03](items/D03.md) | Character server: items, economy, pets, house | D02 |
 | [D04](items/D04.md) | Character server: social, guild, quests, skills | D02 |
 | [D05](items/D05.md) | GameLog server | – |
+| [D06](items/D06.md) | Database behaviour the backups do not give us: missing procedures, schema, inferred DB statements of D01–D05 (added by D02; run last, before X01) | D01–D05 |
 | [P02](items/P02.md) | Capture validation: confirm/correct layouts and message order with real traffic. **Recurring:** run after each batch of captures and after each phase | P01, captures |
 
 The DB items (D01–D05) don't depend on the zone/WM items and can fill gaps in parallel runs.
@@ -109,7 +110,7 @@ follow-up session.
 1b. C02, then the follow-ups above (C01, W01, L00 first)
 2. Z02, Z03, Z04, W02 (core gameplay)
 3. Z07, Z08, Z05, Z06, W03, W04
-4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16
+4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, then D06
 5. P02 again with fuller captures, then X01
 
 Large items (Z04, Z05, Z08, D03, D04) will probably need two or three sessions each. Starting a new session

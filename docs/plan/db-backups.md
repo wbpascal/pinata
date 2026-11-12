@@ -42,7 +42,12 @@ python3 -I $T/bak.py $B/Character.bak names '^t'              # object names (ta
   has a parameter named `@nUnk`, so it is a private-server reconstruction. An original header does not prove the body was
   not edited either (the `Fixes/Duplicate Names/p_Char_Create.sql` fix keeps the 2004 header), and a missing `KR` does not
   prove a procedure is third-party (see the end of this page).
-- Source longer than one 8 KB page is not reassembled; it prints cut off and is flagged `TRUNCATED?`.
+- Source longer than one 8 KB page is rejoined from its LOB fragments (added by D02; it fixed `usp_Character_setStatPoint`
+  and others). `TRUNCATED?` means only that the text does not end in `END`/`RETURN`/`GO`; most flagged definitions are
+  complete (they end in `SET @nRet = 1` or a bare `SELECT`). Really cut off: `usp_Character_setChatBan` (Character.bak;
+  a NUL character inside the text; w00 has it whole) and `IndexOptimize` (w00, third-party maintenance script, stops
+  after two fragments; not investigated). Comments in Latin-1 / Latin Extended characters (Korean saved through the
+  wrong code page, umlauts) are read as text since D02.
 - `N versions` = several stored copies (old pages, `ALTER`s). Compare them.
 - Table **columns** are not extracted. Read them from the procedure source (`INSERT`/`SELECT` lists) or from the `Fixes/`
   table scripts. For the full schema and data, restore a backup into SQL Server 2017 or newer (not done yet; it needs Docker
