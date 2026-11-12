@@ -152,6 +152,30 @@
   "\u2013"
  ],
  [
+  "Z14",
+  2,
+  "Zone: instance dungeons, zone-ring storage handlers, raid internals (added by Z08)",
+  "Z08",
+  "6",
+  "445"
+ ],
+ [
+  "Z15",
+  2,
+  "Zone: quest script engine (added by Z08)",
+  "Z08",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "Z16",
+  2,
+  "Zone: kingdom quest element and guild tournament system (added by Z08)",
+  "Z08",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "D01",
   2,
   "Account and AccountLog servers",

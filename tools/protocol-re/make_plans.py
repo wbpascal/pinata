@@ -196,7 +196,12 @@ ITEMS = [
       steps=["Open from Z02 (§15): the NPC AI-script events passed to `so_AIScriptFuncExec` (FUN_004ab3f0): 0x20 = clicked (0x200A), 0x3c = menu answer (0x2073); the map-script interrupts `sim_NPCClick` / `sim_AreaEntry` / `sim_AreaLeave` (Z02 §12) and the Lua chat/jump triggers. Document what the scripts can do with them.",
              "Open from Z02 (§5): how objects that leave a player's sight disappear on the client (the zone never sends 0x1C0E NC_BRIEFINFO_BRIEFINFODELETE_CMD); check the client's own sight handling and any zone-side cell-change exchange.",
              "Find subsystems via class names (RTTI) and profiler strings (`grep -n '::' re-data/exports/zone/strings.tsv`).",
-             "Start from the main loop / tick functions found in Z01's knowledge file."]),
+             "Start from the main loop / tick functions found in Z01's knowledge file.",
+             "Open from Z08 (`docs/knowledge/Z08.md` §2): the player routine that calls `sp_SendMyInform2PartyMember` "
+             "FUN_0056df80 (party status every tick, Z08 §1.2); the prison release timer behind `so_Prison_Go` / `so_Prison_End` "
+             "(FUN_005b94b0 / FUN_005b9730, map EldPri); what the GM events (`g_GMEvents` DAT_14d42940, activation FUN_0046d5c0) "
+             "change; the map scripts that run kingdom quests (`ScenarioBookShelf`, `PineEventScriptNode::ShineEndOfKingdomQuest`, "
+             "`ShineQuestResult`, `ShineQuestMobkill`). The KQ and guild-tournament objects themselves are Z16; the quest engine is Z15."]),
  dict(id="Z10", phase=2, title="Zone: certification and the downloaded start script",
       out="docs/pseudocode/zone/Z10-certification.md", deps=["Z01"], scope=[],
       goal="The zone does not start on its own: it downloads an encrypted Lua script from a certification server "
@@ -293,6 +298,87 @@ ITEMS = [
              "the client task UIs do with the result codes that have no text (0xAC*, 0x36**, 0x16C*, 0x19D*, 0x2B9*)."],
       done="Every ShineMiniHouse slot Z07 lists is documented or marked unused; the wedding hall timetable and ceremony "
            "flow, the pet summon flow and the mover lifecycle are written as pseudocode."),
+ dict(id="Z14", phase=2, title="Zone: instance dungeons, zone-ring storage handlers, raid internals (added by Z08)",
+      out="docs/pseudocode/zone/Z14-instances.md", deps=["Z08"],
+      scope=[("zone", "ZoneListenSession", [29, 38, 41])],
+      goal="Z08 documented the client and WM handlers around instance dungeons, raids and guild/academy storage, but not "
+           "the managers behind them. Z01 (`Z01-core.md` §10, table of ZoneListenSession handlers) handed the zone-ring "
+           "handlers to Z08, which documented only their senders. Reconstruct the instance cluster manager, every "
+           "ring handler in the scope table plus the two listed below, and the raid record and status packets.",
+      steps=["Read `docs/pseudocode/zone/Z08-content.md` §1, §2, §5, §8, §10 and §15 and `docs/knowledge/Z08.md` first.",
+             "Two more ZoneListenSession handlers outside the depts of the scope table: `0x10B1 NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG` "
+             "FUN_00485120 and `0x441F` (job dungeon) FUN_005bfde0. Z08 §5.2 has their senders (`ZoneRingPacketEmtpyInstanceDungeon`, "
+             "`ZoneRingPacketFindInstanceDungeon`, `ZoneRingPacketFindJobDungeon`); document the request, how the ring forwards it "
+             "(`ZONERINGLINKAGESTART`, zcs_Send) and the Success/Failure callbacks on the originating zone.",
+             "`MapClusterManager::ClusterManager` (`g_MapClusterMgr` DAT_0d742b30) and `MapCluster`: how instances are created "
+             "(cm_FindEmpty / FindEmptyByRegnum / FindNotFull / AddTutorialMapCluster), the owner key `{category, regnum}`, "
+             "`mc_ChangeCategory` (FUN_00485210, raid creation), `mc_DeleteInstanceDungeon` and the `DeleteDungeon` visitor, "
+             "`mc_Routine` (empty-instance timeout, limit time `mc_GetLimitTime`, limit items `mc_SetLimitItem`), films "
+             "(`mc_PlayAllFilm`, `mc_AllDropFilm`), `FUN_00486d80` (find-or-create used by the IDGate path), job dungeons "
+             "(`so_ply_2JobDungeon`, `so_ply_FindJobDungeon`). Settle Z08's inference that map data type 3 = instance.",
+             "The instance-dungeon data rows read by `IDInfo_Find` FUN_00484470 (fields +0x15…+0x6d, Z08 §5.1): which file and "
+             "loader, column names (PDB row struct if one exists, `docs/knowledge/Z01.md` last section), and the Indun level table "
+             "`g_IndunLevelData` DAT_0d026c30.",
+             "Raid internals: the shared `Raid` record (FUN_0063d…/FUN_0063e…, compare the WM's `Raid` class in W02), `RaidTask` "
+             "(`g_RaidTask` DAT_14d50830) and the raid status senders FUN_005cd8f0, FUN_005cd9c0, FUN_005cda50, FUN_005cdb50, "
+             "FUN_005cdc00, FUN_005cd5a0 (0xB020…0xB026 to the client; check the client handlers).",
+             "Guild academy reward storage: `so_ply_GuildAcademyRewardStorageRewardZoneRng` FUN_0046e750 (0x986C body), the storage "
+             "close FUN_0046f7f0, withdraw grade vt 0x870 FUN_0046dea0; and the guild storage record `g_GuildStorage` "
+             "(FUN_004751f0, FUN_00474970) behind the 0x7493 ring handler.",
+             "Check Z08-B9 (level-select flag left set) and Z08-B5 against the eject path once the cluster lookup is understood."],
+      done="Every handler in the scope table and the two extra ring handlers documented; the cluster manager lifecycle "
+           "(create, own, change owner, timeout, delete) written as pseudocode; raid status packets have layouts."),
+ dict(id="Z15", phase=2, title="Zone: quest script engine (added by Z08)",
+      out="docs/pseudocode/zone/Z15-quest-engine.md", deps=["Z08"], scope=[],
+      goal="Z08 §3 documented the quest packets and DB answers and listed the script commands by number, but not the "
+           "engine that runs them. Reconstruct the quest data, the script interpreter and the reward path well enough that a "
+           "rebuild can run the original quest scripts.",
+      steps=["Read `docs/pseudocode/zone/Z08-content.md` §3 and §15 first. The 2017 PDB has the shared quest library "
+             "(`CQuest`, `CQuestData`, `STRUCT_QSC` and its `Data` union, `QUEST_SCRIPT_COMMAND`, `PLAYER_QUEST_INFO`, "
+             "`PLAYER_QUEST_DATA`); the client runs the same library, so compare the client functions (`pdb.py publics 'CQuest'`).",
+             "Quest data: which file the zone loads (Z01 §2.3 loader list), the row layout read through `QuestData_Find` "
+             "FUN_00635ff0 (fields Z08 used: +0x12 repeatable, +0x19/+0x1d/+0x1e/+0x20/+0x58/+0x5e start/end NPC flags), "
+             "and how a quest's script is stored and found (`QuestScriptRun` FUN_005c0080, runner at CQuestZone+0xb8, "
+             "`QuestScript_Next` FUN_006387f0).",
+             "The interpreter: every `QUEST_SCRIPT_COMMAND` with its `Data` fields: IF/GOTO/MARK/SET/ADD/SUB and the script "
+             "variables (CQuestZone+0xd0…), the GET_PLAYER_* getters (quest vt 0x64…0x78), SET/RESET/IS_ABSTATE, GET_ITEM_LOT, "
+             "SCENARIO (`QuestPlayer_ScenarioRun` / `ScenarioDone_Server`, 0x440C), CALLPS (`PsStart` / `PsEnd`).",
+             "Conditions and diary updates: FUN_0062fee0 (accept), FUN_006300d0 (done), FUN_00630570 (select start), "
+             "FUN_006304d0 (give up), FUN_006304a0 (status), FUN_0062f3b0/4b0/550/5b0/680 and FUN_006302b0 (status changes), "
+             "the 40-entry limit, daily/weekly/monthly/yearly repeat and the reset times of 0x441C.",
+             "Rewards: `QuestCheckReward`, `QuestCheckSelectReward`, `QuestCheckRewardInven`, `QuestTakeReward` FUN_005bbe60 "
+             "and the 0x441A NC_QUEST_DB_DONE_REQ body (money, exp, fame, character-title element, item creates, inventory lock "
+             "`icl_QuestReward` / `InvenCellReleaser_QuestReward`).",
+             "Other entry points: NPC click (`QuestPlayer_NPCClick` / `NPCClickCheck`, from Z02's NPC menu path), mob kill "
+             "(`QuestActionMobKill`, `QuestPlayer_NPCMobKill`, `ShineQuestDiary_sqd_MobDead`, 0x440D NOTIFY_MOB_KILL), party "
+             "quest checks (`PartyManufacture_pm_QuestCheck_*`), quest items (`sp_QuestItemGet`, `IsQuestDropItem`), the GM "
+             "commands `&queststart`, `&questread`, `&questcomplete`, `&questrecieve`, `&questgiveup` (Z11 lists them).",
+             "Settle Z08-B6 (silent give-up refusal) and give the meaning of every quest error number 0xB41…0xC10."],
+      done="Every script command and every condition function documented; quest data file and row layout named; the "
+           "reward path from DONE to 0x441B written as pseudocode."),
+ dict(id="Z16", phase=2, title="Zone: kingdom quest element and guild tournament system (added by Z08)",
+      out="docs/pseudocode/zone/Z16-events.md", deps=["Z08"], scope=[],
+      goal="Z08 §4 and §8 documented the kingdom-quest (KQ) and guild-tournament packets. The per-event state behind them "
+           "(KQ element, players, scores, rewards; the tournament system attached to a map) is not reconstructed.",
+      steps=["Read `docs/pseudocode/zone/Z08-content.md` §4, §8 and §15 and `docs/knowledge/Z08.md` first. Map scripts "
+             "themselves (ScenarioBookShelf, `PineEventScriptNode::*`) belong to Z09; document here only the KQ/GT objects "
+             "they call.",
+             "KQ: `KingdomQuest::KQElement` (`kqe_QuestStart`, `kqe_ReviveNumber`, `kqe_SetLimitTime`), `KQPlayerInfoList` "
+             "(add/remove, knock-down counters, `kqpil_PlayerInformFunc`), `KingdomQuestContainer` (`g_KingdomQuests`, "
+             "`kqc_MapUseCheck`), `KQContribute::KQContributeList` (`g_KQContribute`: `kqcl_NewKQ`, `kqpl_EndOfKQ`, how scores "
+             "are counted), the end of a KQ and the reward request `0x5815 NC_KQ_REWARD_REQ` (who sends it: `cQuestResult`, "
+             "`cQuestResult_Individual`, `PineEventScriptNode::ShineQuestResult`, `cEndOfKingdomQuest`), the KQ client packets "
+             "sent during the event (grep `= 0x58` sends in the zone export), and the GM commands `&kingdomquest` / "
+             "`&EndOfKingdomQuest` / `&Reroadkingdomquest`.",
+             "Guild tournament: `FieldMap_fm_GetGuildTournamentSystem` and the GT system class (flag capture end callback "
+             "FUN_00477c00, `FUN_00479510` flag check, guild skills `FUN_0047b9a0`, dice game `FUN_0047af20`, observers "
+             "FUN_004788c0, member grades FUN_0047ccd0), the seed table DAT_0d55a3e0 / DAT_0d55a860, "
+             "`wms_GuildTournamantStart`, `so_ply_Summon2GuildTournament` FUN_00478750, the join check FUN_00476860 "
+             "(0x74E3 → 0x74E5), the match end and result reporting to the WM (W03 has the WM side), and the client packets "
+             "0x74xx sent during a match.",
+             "Settle Z08-B12 (seed bound 33 vs 32) and the 0x1A41/0x1A42 mode-vs-location order of 0x74AC (read the assembly)."],
+      done="KQ lifecycle (make → start → pull-in → play → end → reward) and guild tournament match lifecycle written as "
+           "pseudocode; every client packet sent during either event has a layout."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
@@ -356,7 +442,11 @@ ITEMS = [
              "`usp_GuildTournament_setRefundNotice`. Private-server reconstructions, not original: `usp_GuildEmblem_*` (3) "
              "and `usp_GuildAcademy_setHistory` (header copied from `usp_Guild_SetToken`; `usp_GuildEmblem_SetInfo` has a parameter named `@nUnk`), and "
              "`usp_Guild_getHistoryList` / `usp_Guild_setHistory` (only in `Fixes/`). `usp_Character_setFriendpoint` takes 2 "
-             "parameters in the binary but 3 in `w00_Character`."]),
+             "parameters in the binary but 3 in `w00_Character`.",
+             "Open from Z08 (`docs/knowledge/Z08.md` §2): the quest procedures behind 0x4403 SET_INFO, 0x4405 CLEAR, 0x4409 "
+             "GIVE_UP, 0x4418 READ and 0x441A DONE (success code 0xB41; the zone's diary status values are `PLAYER_QUEST_STATUS`), "
+             "WT licence 0x5C05 / 0x5C07 (success 0x9B9 / 0x9E1), guild tournament join 0x74E5 (success 0x1C40), holy promise "
+             "0x943E / 0x9442 (success 0x1C68): give each its error codes so Z08's tables can be completed."]),
  dict(id="D05", phase=2, title="GameLog server", out="docs/pseudocode/db/D05-gamelog.md", deps=[], scope=[("gamelog", "", ALL)],
       goal="What is logged (all ~200 log messages), table/procedure per message. Can be summarised in tables rather than "
            "full pseudocode where handlers are uniform.",
