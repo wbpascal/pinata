@@ -232,6 +232,14 @@
   "\u2013"
  ],
  [
+  "D07",
+  2,
+  "Character server: D04 residue (academy reward storage, tournament reward items) (added by D04)",
+  "D04, D03",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "P01",
   1,
   "Packet capture decoder",

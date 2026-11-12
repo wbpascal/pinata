@@ -93,6 +93,7 @@ follow-up for W01 listed in `docs/knowledge/C02.md`").
 | [D04](items/D04.md) | Character server: social, guild, quests, skills | D02 |
 | [D05](items/D05.md) | GameLog server | – |
 | [D06](items/D06.md) | Database behaviour the backups do not give us: missing procedures, schema, inferred DB statements of D01–D05 (added by D02; run last, before X01) | D01–D05 |
+| [D07](items/D07.md) | Character server: D04 residue — academy reward storage merge (0x986B) and tournament reward item attributes (0x74AA) (added by D04) | D04, D03 |
 | [P02](items/P02.md) | Capture validation: confirm/correct layouts and message order with real traffic. **Recurring:** run after each batch of captures and after each phase | P01, captures |
 
 The DB items (D01–D05) don't depend on the zone/WM items and can fill gaps in parallel runs.
