@@ -12,8 +12,11 @@ They are the strongest evidence level in this project ("confirmed by capture").
     install Npcap with loopback support if it is missing)
   - client and server on **different machines** → the network adapter that carries the game traffic
 - Capture filter (enter it before starting):
-  `tcp port 9010 or tcp port 9110 or tcp portrange 9210-9221`
+  `tcp port 9010 or tcp port 9110 or tcp portrange 9210-9221 or tcp port 9411`
   If your server config uses other ports (`9Data/ServerInfo/ServerInfo.txt`, type-20 rows), adjust it.
+  Port 9411 is the Character DB server (`PG_W00_CDB`): Zone/WM ↔ Character traffic (item, storage, trade writes;
+  D03). It runs between servers, so it shows up only on the loopback adapter of the PC that runs the servers. The
+  decoder and `fiesta.lua` do not classify this port yet (they know login/WM/zone only); record it anyway.
 - Start the capture **before** launching the client. The decoder needs each connection's first server
   packet (the seed) to decrypt client→server traffic.
 - Save as **pcapng** (Wireshark's default) and copy the file to this repo: `re-data/captures/`.
@@ -85,5 +88,9 @@ Values you know (level, money, item names, coordinates shown in the UI) are what
 | 13 | Level up; spend stat points | progression |
 
 Two accounts on two clients (or two machines) are needed for 6, 10 and 11.
+
+For scenarios 8–10, keep port 9411 in the filter and, if possible, note the `tItem` / `tItemOptions` rows of the items you use
+before and after (SQL). Targeted item checks (account storage, capsules/chests, premium list, pets, dice/gamble/cards, forced
+failures): `docs/knowledge/D03.md` "For capture scenarios (X02)".
 
 After adding captures, run work item **P02** ("Execute the work item described in `docs/plan/items/P02.md`").
