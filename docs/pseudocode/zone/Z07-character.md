@@ -964,6 +964,10 @@ path") should read: the result/broadcast packets are unused by the 2016 client, 
 
 ## 12. Not reconstructed / uncertain
 
+Follow-up work items: **Z12** (stat calculation, level/exp, login blob parsing) and **Z13** (mini-house object, wedding
+hall, pets, mounts); the DB-side questions went to D02 / D03 and the ITEMDB answers to Z05 (see `docs/knowledge/Z07.md` §4).
+Corrections this item makes to Z01/Z02/Z03 are listed in `docs/knowledge/Z07.md` §0.
+
 - `so_allparametercalculate` (vt 0x57c) itself: the layer formula is Z03 §2; only layer 0 (base) and 15 (total) were confirmed
   here via 0x1802. Level-up side effects (stat points FUN_0058bd10, reward table DAT_14d42940) not read.
 - Blob bodies (`so_charskilldata`, `so_StoreInventoryFromServer`, quests, abstates, charged buffs, chest info, game data):

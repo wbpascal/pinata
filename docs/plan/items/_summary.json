@@ -136,6 +136,22 @@
   "\u2013"
  ],
  [
+  "Z12",
+  2,
+  "Zone: stat calculation, level/exp, login data parsing (added by Z07)",
+  "Z03, Z07",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "Z13",
+  2,
+  "Zone: mini-house object, wedding hall, pets and mounts internals (added by Z07)",
+  "Z07",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "D01",
   2,
   "Account and AccountLog servers",

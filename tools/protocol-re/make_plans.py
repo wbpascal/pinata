@@ -163,9 +163,17 @@ ITEMS = [
  dict(id="Z05", phase=2, title="Zone: item database protocol (ITEMDB, zone↔Character server)",
       out="docs/pseudocode/zone/Z05-itemdb.md", deps=["Z04"], scope=[("zone", "GameDBSession", [13])],
       goal="The 108 ITEMDB replies: how item changes are persisted and confirmed, item creation (item keys), "
-           "consistency/rollback behaviour. Pair each with the request the zone sends and the client-facing result."),
+           "consistency/rollback behaviour. Pair each with the request the zone sends and the client-facing result.",
+      steps=["Open from Z07 (§11): production is live in 2016 (the client's `ProductTask` sends 0x2035); the cast end calls "
+             "`smo_ply_ItemProduce` FUN_0046c2d0, which sends DB 0x3457. Document 0x3458 NC_ITEMDB_PRODUCE_ACK and what the "
+             "2016 client sees (it has no handler for 0x203B/0x203C; it does handle 0x481D in `ProductTask`).",
+             "Open from Z07 (§6.10): mini-house furniture/portal effects lock items and money and send 0x347D / 0x3489 "
+             "(layout in `annotations/Z07.json`); document their answers 0x347E / 0x348A and how the effect is applied."]),
  dict(id="Z06", phase=2, title="Zone: trade, booths, gambling, dice", out="docs/pseudocode/zone/Z06-economy.md", deps=["Z04"],
-      scope=[("zone", "ShinePlayer", [19, 26, 43, 47]), ("zone", "GameDBSession", [43, 47]), ("zone", "WorldManagerSession", [47])]),
+      scope=[("zone", "ShinePlayer", [19, 26, 43, 47]), ("zone", "GameDBSession", [43, 47]), ("zone", "WorldManagerSession", [47])],
+      steps=["Open from Z07 (§1.2): WM `0x10DD NC_CHAR_ZONE_COININFO_CMD` (handler FUN_00617830, profiler string says "
+             "GAMBLE_ZONE_PREVMAPNAME) passes the gamble coin data to player vt 0xb00 (FUN_00615d10); document that method "
+             "with the coin state it fills."]),
  dict(id="Z07", phase=2, title="Zone: character stats, progression, pets, mounts, mini-house, collection cards",
       out="docs/pseudocode/zone/Z07-character.md", deps=["Z01"],
       scope=[("zone", "ShinePlayer", [4, 35, 49, 51, 53]), ("zone", "GameDBSession", [4, 35, 49, 53]),
@@ -229,6 +237,62 @@ ITEMS = [
              "Output one table (command, syntax, level, effect, packets) for all commands, plus full pseudocode for the ones that change persistent state (MakeItem, GetMoney, LevelUp, ClearInventory, learnskill, KingdomQuest, Wedding*, KQReward, BonusExp / BonusItem / FieldBonus) or reach other servers (WM, Character DB, GameLog).",
              "Several commands duplicate OPTool features (Z01 §9) or wrap handlers documented elsewhere (wedding Z02 §10, dice / TaiSai Z06): reference those instead of repeating them."],
       done="Every `AmpersandCommand_ac_*` function appears in the table; unknown words or levels are marked as such."),
+ dict(id="Z12", phase=2, title="Zone: stat calculation, level/exp, login data parsing (added by Z07)",
+      out="docs/pseudocode/zone/Z12-stats.md", deps=["Z03", "Z07"], scope=[],
+      goal="Z07 documented the packets around stats and login but not the code that computes stats or reads the login "
+           "data. Reconstruct the full stat model (every stat-matrix layer, max HP/SP/LP, stones), the level/exp tables and "
+           "level-up side effects, and how the zone parses each WM login blob into the player object.",
+      steps=["Read `docs/pseudocode/zone/Z07-character.md` §1–§2 and `docs/knowledge/Z07.md` first; Z03 §2 has the matrix "
+             "formula `Total = (L0+L1)·L12·L10·L4·L14/10¹² + L5+L7+L9+L11+L13` and Z07 §1.5 confirmed layer 0 = base, 15 = total.",
+             "`so_allparametercalculate` (vt 0x57c, FUN_0054f190): what fills each layer (class base stats per level from "
+             "class data `p.vt[0x49c]() + 0x10858`, stat points via FUN_00517b60, items, upgrades, passives, abstates, titles, "
+             "charged buffs `p+0x2a5a0`), and the order. MaxHP FUN_0054a670, MaxSP FUN_0055a8b0, MaxLP vt 0xd94, HP/SP stone "
+             "maxima (`p+0x2a5a2/a4`). Which packets the refresh `vt 0x528` and `smo_NotifyParameterChange` (vt 0x34) send.",
+             "Level/exp: `g_LevelExp` (DAT_0da504a8, u64 per level; Z07 found that the per-stat cap DAT_0da504a9 lies inside "
+             "its level-0 entry: explain), the stat-point table DAT_0da50968 (loader, file, columns), exp gain and level-up "
+             "side effects (FUN_0058bd10, reward table DAT_14d42940), level-up packets. Check Z03's output first so exp on kill "
+             "is not documented twice.",
+             "Login blob parsing (dispatch table in Z07 §1.2): `so_charsharpdata` FUN_0044ae80, `so_StoreQuestDoing/Done/Read` "
+             "FUN_0044b3c0 / FUN_0044b500 / FUN_0044b640 / FUN_0044b770, `so_CharAbstateData` FUN_0044e0e0, `so_charskilldata` "
+             "FUN_0044bf20, `so_CharChargedBuffData` FUN_0044e1e0, `so_charpassivedata` FUN_0044e5a0, "
+             "`so_StoreInventoryFromServer` FUN_0044ddf0, `so_Storegamedata` FUN_0044c220, `so_ply_Getchestinform` FUN_0044c8a0, "
+             "and the builder `vt 0x4b4` FUN_0055ab60. Give each body layout (compare the PDB `PROTO_NC_CHAR_*_CMD` structs and "
+             "W01 §6.3) and the player members it fills.",
+             "Smaller open points from Z07 §12: 0x10D3 NC_CHAR_ZONE_SINGLE_OPTION_CMD fields (FUN_0059d510, FUN_00560340, "
+             "FUN_00560a10, vt 0xae8), the 0x10B8 LINK_FROM record (FUN_00444970, FUN_00570b30), the title progress reset rule "
+             "FUN_0062e120 (0x1031)."],
+      done="Every stat-matrix layer has a named source; level/exp tables and level-up documented; every login blob has a "
+           "body layout and the members it fills."),
+ dict(id="Z13", phase=2, title="Zone: mini-house object, wedding hall, pets and mounts internals (added by Z07)",
+      out="docs/pseudocode/zone/Z13-objects.md", deps=["Z07"], scope=[],
+      goal="Z07 documented the client requests and DB answers of these subsystems; the object methods and timers behind "
+           "them are not reconstructed. Document them so a rebuild can implement the objects.",
+      steps=["Read `docs/pseudocode/zone/Z07-character.md` §5, §6, §8, §9 and §12 and `docs/knowledge/Z07.md` first.",
+             "ShineMiniHouse (type 3; vtable slot list in Z07 §6.1): enter/out/visit rules and password (vt 0x7c, 0x88, 0x90, "
+             "0x98), LOGINCOMPLETE fill vt 0xa0 (player-list element layout), furniture create/rearrange/delete (vt 0xb8–0xc0) and "
+             "their releasers `InvenCellReleaser_FurnitureReloc` / `FurnitureCellClear` (0x8C21 / 0x8C24 / 0x8C27), "
+             "`smh_SendFurnitureInfo` (0x8C08 / 0x8C09), settings setters (vt 0xe4–0xf8, the limits behind the result codes), "
+             "portals (vt 0x10c–0x124) and `so_Routine` (portal timeout), endurance (`MiniHouseEndure.shn`, item cell +0x25), "
+             "`so_MH_EffectApply` FUN_005751f0 and `so_MH_PortalEffectApply` (player vt 0x128), the in-house dice game state "
+             "(vt 0x2a0, player vt 0x170 / 0x190 / 0x194), furniture emotions (house vt 0x2d8, player vt 0x2b0, 0x2c0, "
+             "0x2cc–0x2d4), the house box fill (player vt 0xcc FUN_00570260), and the 0x8C3F field mapping against "
+             "`MiniHouseObjAni` (Z07 §6.9).",
+             "Wedding hall and married state: `g_WeddingHall` (DAT_0086ea38) and `WeddingHall.wh_Reserv`, the hall timetable "
+             "and ceremony flow (who sends `0x1091 NC_CHAR_WEDDING_DO_REQ`: grep `= 0x1091;` in the zone export), "
+             "FUN_0059ef40, FUN_005b92a0 (called after an accepted proposal), player vt 0x40c / 0x410 / 0x418 / 0x960, "
+             "`ZoneRingPacketRefreshWeddingInfo`. Z02 §10 has the client requests.",
+             "Pets: the summon/unsummon flow (`so_PetSystem_Unsummon` FUN_004d2990 and its callees FUN_004d1ff0, FUN_004d2520, "
+             "FUN_004d25d0; the pet item's UseEffect actor, Z04 §6.3), pet states 1/2/8 at `p+0x2ab60`, who sends 0xD405 "
+             "ASK_NEW_NAME_REQ and 0xD401 SET_TENDENCY (mind/stress), the resummon after a map link (`p+0x2aba8`, WM 0xD412), "
+             "the `ShinePet` object.",
+             "Mounts: mover creation (which item or NPC allocates a `ShineMover`), `so_smv_GetOff` (vt 0xcbc FUN_0055f620), "
+             "seat reservations (`+0x1ee0`), the mover script hook FUN_0055f0a0, `sp_HorseItemSave`, the 0xCC0C LINKDATA restore "
+             "FUN_0045ddf0, hunger (link to Z02 §9.1).",
+             "Smaller open points from Z07 §12: minimon list kinds (`MinimonInfo.shn` / `MinimonAutoUseItem.shn` columns, "
+             "codes 0x362A / 0x362C), the return values of `cca_IsRewardCondition` FUN_00628d60 (read the assembly), and what "
+             "the client task UIs do with the result codes that have no text (0xAC*, 0x36**, 0x16C*, 0x19D*, 0x2B9*)."],
+      done="Every ShineMiniHouse slot Z07 lists is documented or marked unused; the wedding hall timetable and ceremony "
+           "flow, the pet summon flow and the mover lifecycle are written as pseudocode."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
@@ -262,7 +326,14 @@ ITEMS = [
              "changed `p_Char_Create` (duplicate names), `p_Char_Rename`, `usp_Character_setChangeID` and "
              "`usp_Tutorial_setCharInfo`: use the `Character.bak` copy or note the difference.",
              "Write the table list you meet (table → columns as the procedures use them) into `docs/knowledge/D02.md`; "
-             "D03 and D04 build on it."]),
+             "D03 and D04 build on it.",
+             "Open from Z07 (§5): the zone never sets the wedding partner itself; `Partner.RegisterNumber` arrives only in "
+             "`0x1081 NC_CHAR_WEDDINGDATA_ACK`. Find how the Character server chooses and stores the partner before a proposal "
+             "(0x1080 / 0x1083 and their procedures), and when the divorce requests 0x1089 / 0x108B / 0x108D answer "
+             "Success 0 (the zone has already taken the 250 000 / 750 000 fee and does not refund it, Z07-B11).",
+             "Open from Z07 (§2): stats are saved with `0x10D1 NC_CHAR_FREESTAT_SET_DB_REQ` only (both raise and lower; the "
+             "zone never sends 0x105D / 0x1063). Document the procedure, the meaning of `nErrorType` (0xAC1 ok) and how the "
+             "restat item in `DecItemInfo` is consumed."]),
  dict(id="D03", phase=2, title="Character server: items (ITEMDB), economy, pets, house", out="docs/pseudocode/db/D03-character-items.md",
       deps=["D02"], scope=[("character", "", [13, 35, 36, 43, 47, 49, 53])],
       steps=[DB_STEP,
@@ -271,7 +342,13 @@ ITEMS = [
              "collection, safe trade, auto-mon and belonged items exist only in `w00_Character`. The gem enchant procedures "
              "(`usp_Item_*Enchant*`, author `<KHRISMIZER>`) may be private-server work. `p_Item_BuyAll` and `p_Item_BuyLot` "
              "match the binary only in `w00_Character` (the older copy has one parameter fewer). `Fixes/` changed "
-             "`usp_ChargeItem_Draw` and `usp_ChargeItem_GetList` (premium inventory slots): compare with `Character.bak`."]),
+             "`usp_ChargeItem_Draw` and `usp_ChargeItem_GetList` (premium inventory slots): compare with `Character.bak`.",
+             "Open from Z07 (§7): after `0xC412 NC_COLLECT_REWARD_DB_ACK` the zone does not add the RewardID to its rewarded "
+             "list, so a player can request the same card reward again in one session. Say whether the 0xC411 procedure "
+             "refuses an already-given RewardID (if not, it is an original bug to add to Z07's list via X01). 0xC411 also "
+             "carries a new item key and attribute (0x77 bytes in 2016; the 2017 struct is 8 bytes).",
+             "Open from Z07 (§9): pet create/load/rename (0xD40D / 0xD40B / 0xD403) and their result codes 0x3408 / 0x3420 / "
+             "0x3418 as the zone expects them."]),
  dict(id="D04", phase=2, title="Character server: social, guild, quests, skills", out="docs/pseudocode/db/D04-character-social.md",
       deps=["D02"], scope=[("character", "", [17, 18, 21, 22, 23, 24, 28, 29, 31, 37, 38, 42])],
       steps=[DB_STEP,
@@ -373,7 +450,12 @@ ITEMS = [
              "`docs/pseudocode/**/*.md` and `docs/knowledge/*.md` for `bug`, `sic`, `never reach`, `uninitialised`, "
              "`not initialised`, `ignored`, `copy-paste`, `typo` and give those entries IDs `<item>-B<n>`. Include "
              "client-side mismatches (server sends a code or opcode the client does not handle) and client text typos. "
-             "Do not change the owning items' files; if an entry needs more evidence, list it as a gap."]),
+             "Do not change the owning items' files; if an entry needs more evidence, list it as a gap.",
+             "Corrections between items: later items record corrections to earlier ones in their knowledge file instead of "
+             "editing them (e.g. `docs/knowledge/Z07.md` §0 corrects Z02-B5 and Z02 §10 on the produce path and the wedding "
+             "partner; `docs/knowledge/Z02.md` §1 corrects Z01). Collect every such section (grep `docs/knowledge/*.md` for "
+             "`Correction`), apply them in the overview and the bug register (mark superseded entries), and list them in a "
+             "\"Superseded statements\" table in `docs/pseudocode/README.md` so readers of the older files are warned."]),
 ]
 
 
