@@ -4789,12 +4789,14 @@ Sent from `FUN_00431680` (`FUN_00431680`) · payload 309 bytes
 
 ### `0x7032` NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD †
 
-**Verified layout** (basis: client FUN_00476080)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD`, 2 bytes + variable tail
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | count |  |
-| 2 | u8[7][count] | entries | FUN_006153c0 per entry |
+| 0 | u16 | nShortCutDataCnt |  |
+| 2 | SHORT_CUT_DATA[nShortCutDataCnt] | ShortCutData | variable length, element SHORT_CUT_DATA |
+
+Element `SHORT_CUT_DATA` (7 bytes): +0 u8 nSlotNo, +1 u16 nCodeNo, +3 i32 nValue
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload variable ((uint)local_2213[0] * 7 + 2)
 
@@ -8115,6 +8117,15 @@ client sender needs adminlevel 100 and no prison
 | 0 | u16 | numoffriend |  |
 | 2 | {u32 charregnum,u16 friendpoint,u16 diffpoint}[n] | pointinfo | 8 each |
 
+### `0x702c` NC_CHAR_OPTION_IMPROVE_DB_GET_DATA_TYPE_CMD † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040acb0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u32 | DataType | CHAR_OPTION_DATA_TYPE 0/1/2 → session +0x1ECD8 |
+
 ### `0x200c` NC_ACT_WHISPER_REQ † (C→WM)
 
 **Verified layout** (basis: wm FUN_0041c610)
@@ -8170,6 +8181,39 @@ size 0x29
 
 size 0x28
 
+### `0x7037` NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00414720)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nShortCutDataCnt |  |
+| 1 | SHORT_CUT_DATA[n] | ShortCutData | 7 each: u8 nSlotNo, u16 nCodeNo, i32 nValue |
+
+→ CharDB 0x704B {u32 nCharNo, u8 n, data}
+
+### `0x7039` NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_REQ (C→WM)
+
+**Verified layout** (basis: wm FUN_004148f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nKeyMapDataCnt | ≥ 0x60 → logged, dropped |
+| 2 | KEY_MAP_DATA[n] | KeyMapData | 4 each: u16 nFunctionNo, u8 nExtendKey, u8 nASCIICode |
+
+→ CharDB 0x704D
+
+### `0x703b` NC_CHAR_OPTION_IMPROVE_SET_GAMEOPTION_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00414af0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nGameOptionDataCnt | unchecked (W04-B22) |
+| 2 | GAME_OPTION_DATA[n] | GameOptionData | 3 each: u16 nOptionNo, u8 nValue |
+
+→ CharDB 0x704F
+
 ### `0x7405` NC_GUILD_MAKE_REQ † (C→WM)
 
 **Verified layout** (basis: wm FUN_0041d380 / FUN_0044cf10)
@@ -8216,6 +8260,44 @@ size 0x28
 |---|---|---|---|
 | 0 | Name5 | CharID |  |
 | 20 | u8 | MemberGrade | not range-checked |
+
+### `0x7c01` NC_PRISON_ADD_GM_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041de70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sImprison |  |
+| 20 | u16 | nMinute | 1..32700 (add); ≤ 32700 (alter) |
+| 22 | char[16] | sReason | must be non-empty |
+| 38 | char[64] | sRemark |  |
+
+needs adminlevel ≠ 0
+
+### `0x7c09` NC_PRISON_ALTER_GM_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041e290)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sImprison |  |
+| 20 | u16 | nMinute | 1..32700 (add); ≤ 32700 (alter) |
+| 22 | char[16] | sReason | must be non-empty |
+| 38 | char[64] | sRemark |  |
+
+needs adminlevel ≠ 0
+
+### `0x8001` NC_REPORT_ADD_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041db50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sHarmer |  |
+| 20 | u8[16] | byReportType |  |
+| 36 | u8[256] | byReason |  |
+| 292 | u16 | nChatLogSize | unchecked (W04-B29) |
+| 294 | u8[n] | byChatLog |  |
 
 ### `0x0c0d` NC_USER_WILLLOGIN_REQ † (Login→WM)
 
@@ -8663,6 +8745,43 @@ to the target; 20 bytes; field names pdb2017, offsets read in the 2016 WM
 | 0 | u16 | nHandle | WM client handle, param_1[0x45] (pdb2017 name) |
 | 2 | u32 | nUserNo | param_1[0x49] (pdb2017 name) |
 
+### `0x8007` NC_DATA_REPORT_ADD_REQ † (WM→AccountLog)
+
+**Verified layout** (basis: wm FUN_0041db50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | dwReporter | charNo |
+| 4 | u16 | hReporter |  |
+| 6 | u8 | nWorldNo |  |
+| 7 | Name5 | sReporterCharID |  |
+| 27 | Name5 | sHarmer |  |
+| 47 | u8[16] | byReportType |  |
+| 63 | u8[256] | byReason |  |
+| 319 | u16 | nChatLogSize |  |
+| 321 | u8[n] | byChatLog |  |
+
+raw long frame, len 0x143 + n
+
+### `0x8009` NC_DATA_REPORT_CANCEL_REQ † (WM→AccountLog)
+
+**Verified layout** (basis: wm FUN_004153e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | nRegNumber |  |
+| 4 | u16 | hReporter |  |
+
+### `0x800b` NC_DATA_REPORT_GET_REQ † (WM→AccountLog)
+
+**Verified layout** (basis: wm FUN_004154c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hReporter |  |
+| 2 | u32 | dwReporter |  |
+| 6 | u8 | nWorldNo |  |
+
 ### `0x0c62` NC_USER_LOGOUT_LAST_DAY_REQ (WM→AccountLogDB)
 
 **Verified layout** (basis: wm FUN_00408740)
@@ -9035,6 +9154,166 @@ size 3
 
 size 0x15
 
+### `0x7003` NC_CHAR_OPTION_GET_SHORTCUTDATA_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[1024] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x7005` NC_CHAR_OPTION_GET_SHORTCUTSIZE_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[24] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x7007` NC_CHAR_OPTION_GET_VIDEO_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[60] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x7009` NC_CHAR_OPTION_GET_SOUND_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[1] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x700b` NC_CHAR_OPTION_GET_GAME_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[64] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x700d` NC_CHAR_OPTION_GET_WINDOWPOS_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[392] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x700f` NC_CHAR_OPTION_GET_KEYMAPPING_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[308] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x7032` NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00431680)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | count | length computed from the low byte only |
+| 2 | entries[n] | data | 7 bytes each |
+
+session cache blob, sent once after CharDB 0x1005
+
+### `0x7033` NC_CHAR_OPTION_IMPROVE_GET_KEYMAP_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00431680)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | count | length computed from the low byte only |
+| 2 | entries[n] | data | 4 bytes each |
+
+session cache blob, sent once after CharDB 0x1005
+
+### `0x7034` NC_CHAR_OPTION_IMPROVE_GET_GAMEOPTION_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00431680)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | count | length computed from the low byte only |
+| 2 | entries[n] | data | 3 bytes each |
+
+session cache blob, sent once after CharDB 0x1005
+
+### `0x7038` NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040ae30)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2100/0x2108/0x2118 ok, +1 failure |
+
+client: no handler for 0x7038/0x703A, 0x703C accepted and ignored
+
+### `0x703a` NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040af00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2100/0x2108/0x2118 ok, +1 failure |
+
+client: no handler for 0x7038/0x703A, 0x703C accepted and ignored
+
+### `0x703c` NC_CHAR_OPTION_IMPROVE_SET_GAMEOPTION_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040afd0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2100/0x2108/0x2118 ok, +1 failure |
+
+client: no handler for 0x7038/0x703A, 0x703C accepted and ignored
+
+### `0x7044` NC_CHAR_OPTION_IMPROVE_INIT_KEYMAP_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b0a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2110 ok, 0x2111 failed |
+| 2 | u16 | nKeyMapDataCnt |  |
+| 4 | KEY_MAP_DATA[n] | KeyMapData | 4 each |
+
+### `0x7046` NC_CHAR_OPTION_IMPROVE_INIT_GAMEOPTION_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b250)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2120 ok, 0x2121 failed |
+| 2 | u16 | nGameOptionDataCnt |  |
+| 4 | GAME_OPTION_DATA[n] | GameOptionData | 3 each |
+
 ### `0x7404` NC_GUILD_LIST_ACK † (WM→C)
 
 **Verified layout** (basis: wm FUN_00445660)
@@ -9166,6 +9445,92 @@ client-bound only: members of both warring guilds; no 2016 client handler
 | 0 | u32 | nNo |  |
 | 4 | Name4 | Name |  |
 | 20 | GUILD_EMBLEM_INFO | EmblemInfo | 0xFFFF when no emblem |
+
+### `0x7c02` NC_PRISON_ADD_GM_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041de70 / FUN_00410a50 / FUN_0042dea0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sImprison |  |
+| 20 | u16 | err | 0xD80 ok, 0xD81–0xD88 |
+
+raw {0x18, op}
+
+### `0x7c03` NC_PRISON_OK_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00410b90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMinute |  |
+| 2 | char[16] | sReason |  |
+| 18 | char[64] | sRemark |  |
+
+to the prisoner after a GM alter
+
+### `0x7c05` NC_PRISON_END_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004155f0 / FUN_00458270)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xDA8 released, 0xDA9 still running, 0xDAA not a prisoner |
+| 2 | u32 | nPrisonSecond | WM sends milliseconds for 0xDA9 (W04-B24); 0 / 0xFFFFFFFF otherwise |
+
+### `0x7c07` NC_PRISON_GET_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040c350 / FUN_00415530)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xDB0 ok, 0xDB1 not in prison (4-byte form), 0xDB2 DB error |
+| 2 | u16 | nMinute | CHARDATA.prisonmin |
+| 4 | char[16] | sReason | absent in the 4-byte form |
+| 20 | char[64] | sRemark |  |
+
+old catalog name NC_PRISON_ADD_GM_ACK came from a debug string
+
+### `0x7c0a` NC_PRISON_ALTER_GM_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041e290 / FUN_00410b90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sImprison |  |
+| 20 | u16 | err | 0xDA0 ok, 0xDA1–0xDA7 |
+
+raw {0x18, op}
+
+### `0x8002` NC_REPORT_ADD_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041db50 / FUN_004092e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sHarmer |  |
+| 20 | u32 | nRegNumber | 0 on WM refusals |
+| 24 | u16 | err | 0xF40 ok, 0xF41–0xF48, 0xF58 |
+
+### `0x8004` NC_REPORT_CANCEL_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004153e0 / FUN_004090c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nRegNumber |  |
+| 4 | u16 | err | 0xF40 ok; 0xF50, 0xF53, DB codes |
+
+### `0x8006` NC_REPORT_GET_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00409130)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xF40, 0xF58, 0xF60 |
+| 2 | u32 | nRegNumber |  |
+| 6 | u8 | byReportResult | 0 registering, 1 done, 2 held |
+| 7 | u8[128] | byRemark |  |
 
 ### `0x9808` NC_GUILD_ACADEMY_MY_GUILD_ACADEMY_INFO_ACK † (WM→C)
 
@@ -9313,6 +9678,16 @@ size 0xD
 
 size 0xA
 
+### `0x7060` NC_CHAR_OPTION_LOGIN_BLOCKDATA_ERR_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00414bf0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+
+no 2016 Character handler (W04-B23)
+
 ### `0x7468` NC_GUILD_DB_RESULT_WRITE_CMD (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_00449f80)
@@ -9360,6 +9735,40 @@ size 0xA
 | 0 | u32 | nGuildNo |  |
 | 4 | i32 | EmblemDeleteDate |  |
 | 8 | u8 | EmblemState | GUILD_EMBLEM_STATE |
+
+### `0x7c0d` NC_DATA_PRISON_UPDATE_MIN_CMD † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00458270 / FUN_004578a0 / FUN_004584e0 / FUN_00458790)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nImprisonRegNum | charNo |
+| 4 | u16 | nMinute |  |
+
+### `0x7c0e` NC_DATA_PRISON_GET_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00415530)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nCharHandle | WM session handle |
+| 2 | u32 | nCharRegNum |  |
+
+### `0x7c10` NC_DATA_PRISON_ALTER_GM_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0041e290)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nGmHandler |  |
+| 2 | Name256Byte | sGmUserID |  |
+| 258 | u32 | nImprisonRegNum | 0 = by name |
+| 262 | Name5 | sImprison |  |
+| 282 | u16 | nMinute | never written (W04-B25) |
+| 284 | char[16] | sReason | never written |
+| 300 | char[64] | sRemark | never written |
+
+0x16C; 0x7C0B same layout, all fields written
 
 ### `0x0808` NC_MISC_USER_COUNT_CMD † (WM→Login)
 
@@ -9688,6 +10097,34 @@ size 8
 | 17 | u64 | nProposalMoney |  |
 
 broadcast to all zones
+
+### `0x7c12` NC_ZONE_PRISON_END_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00458270 / FUN_004586e0 / FUN_004584e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nCharZoneHandle |  |
+| 2 | u32 | nCharRegNum |  |
+
+### `0x7c13` NC_ZONE_PRISON_GO_REQ (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0041de70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nGmHandler |  |
+| 2 | u32 | nGmRegNum |  |
+| 6 | Name256Byte | sGmUserID |  |
+| 262 | Name5 | sCharID |  |
+| 282 | u16 | nCharSessHandle |  |
+| 284 | u16 | nCharZoneHandle |  |
+| 286 | u32 | nCharRegNum |  |
+| 290 | u16 | nMinute |  |
+| 292 | char[16] | sReason |  |
+| 308 | char[64] | sRemark |  |
+
+0x174
 
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→zone)
 
@@ -10125,6 +10562,40 @@ forwarded as 0x380A (W04-B19)
 |---|---|---|---|
 | 0 | u32 | nGuildNo |  |
 | 4 | u64 | nDecrease |  |
+
+### `0x7c14` NC_ZONE_PRISON_GO_ACK † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042dea0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_NC_ZONE_PRISON_GO_REQ | req | echo |
+| 372 | u16 | err | 0xDC0 ok, 0xDC1 charNo mismatch, 0xDC2 so_Prison_Go failed |
+
+0x176
+
+### `0x9001` NC_CHARGED_SETBUFF_CMD (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042a5b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | CharRegistNumber |  |
+| 4 | u64 | ItemKey |  |
+| 12 | u16 | ItemId |  |
+| 14 | PROTO_CHARGEDBUFF_INFO | ChargedBuff | 14 bytes, appended to session blob +0x650 |
+| 28 | u32 | nUserNo |  |
+
+### `0x9002` NC_CHARGED_RESETBUFF_CMD (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042a6d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | CharRegistNumber |  |
+| 4 | u32 | ChargedBuffKey | matched |
+| 8 | u16 | ChargedBuffID | not compared |
+| 10 | u32 | nUserNo |  |
 
 ### `0x384e` NC_PARTY_MEMBERINFORM_REQ † (zone→WM)
 

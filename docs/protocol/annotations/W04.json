@@ -1627,6 +1627,1068 @@
      ]
     ],
     "notes": "forwarded as 0x380A (W04-B19)"
+   },
+   "0x7037": {
+    "dir": "C→WM",
+    "name": "NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_REQ",
+    "basis": "wm FUN_00414720",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nShortCutDataCnt",
+      ""
+     ],
+     [
+      1,
+      "SHORT_CUT_DATA[n]",
+      "ShortCutData",
+      "7 each: u8 nSlotNo, u16 nCodeNo, i32 nValue"
+     ]
+    ],
+    "notes": "→ CharDB 0x704B {u32 nCharNo, u8 n, data}"
+   },
+   "0x7039": {
+    "dir": "C→WM",
+    "name": "NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_REQ",
+    "basis": "wm FUN_004148f0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nKeyMapDataCnt",
+      "≥ 0x60 → logged, dropped"
+     ],
+     [
+      2,
+      "KEY_MAP_DATA[n]",
+      "KeyMapData",
+      "4 each: u16 nFunctionNo, u8 nExtendKey, u8 nASCIICode"
+     ]
+    ],
+    "notes": "→ CharDB 0x704D"
+   },
+   "0x703b": {
+    "dir": "C→WM",
+    "name": "NC_CHAR_OPTION_IMPROVE_SET_GAMEOPTION_REQ",
+    "basis": "wm FUN_00414af0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nGameOptionDataCnt",
+      "unchecked (W04-B22)"
+     ],
+     [
+      2,
+      "GAME_OPTION_DATA[n]",
+      "GameOptionData",
+      "3 each: u16 nOptionNo, u8 nValue"
+     ]
+    ],
+    "notes": "→ CharDB 0x704F"
+   },
+   "0x7032": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD",
+    "basis": "wm FUN_00431680",
+    "fields": [
+     [
+      0,
+      "u16",
+      "count",
+      "length computed from the low byte only"
+     ],
+     [
+      2,
+      "entries[n]",
+      "data",
+      "7 bytes each"
+     ]
+    ],
+    "notes": "session cache blob, sent once after CharDB 0x1005"
+   },
+   "0x7033": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_IMPROVE_GET_KEYMAP_CMD",
+    "basis": "wm FUN_00431680",
+    "fields": [
+     [
+      0,
+      "u16",
+      "count",
+      "length computed from the low byte only"
+     ],
+     [
+      2,
+      "entries[n]",
+      "data",
+      "4 bytes each"
+     ]
+    ],
+    "notes": "session cache blob, sent once after CharDB 0x1005"
+   },
+   "0x7034": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_IMPROVE_GET_GAMEOPTION_CMD",
+    "basis": "wm FUN_00431680",
+    "fields": [
+     [
+      0,
+      "u16",
+      "count",
+      "length computed from the low byte only"
+     ],
+     [
+      2,
+      "entries[n]",
+      "data",
+      "3 bytes each"
+     ]
+    ],
+    "notes": "session cache blob, sent once after CharDB 0x1005"
+   },
+   "0x7038": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_ACK",
+    "basis": "wm FUN_0040ae30",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x2100/0x2108/0x2118 ok, +1 failure"
+     ]
+    ],
+    "notes": "client: no handler for 0x7038/0x703A, 0x703C accepted and ignored"
+   },
+   "0x703a": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_ACK",
+    "basis": "wm FUN_0040af00",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x2100/0x2108/0x2118 ok, +1 failure"
+     ]
+    ],
+    "notes": "client: no handler for 0x7038/0x703A, 0x703C accepted and ignored"
+   },
+   "0x703c": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_IMPROVE_SET_GAMEOPTION_ACK",
+    "basis": "wm FUN_0040afd0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x2100/0x2108/0x2118 ok, +1 failure"
+     ]
+    ],
+    "notes": "client: no handler for 0x7038/0x703A, 0x703C accepted and ignored"
+   },
+   "0x7044": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_IMPROVE_INIT_KEYMAP_ACK",
+    "basis": "wm FUN_0040b0a0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x2110 ok, 0x2111 failed"
+     ],
+     [
+      2,
+      "u16",
+      "nKeyMapDataCnt",
+      ""
+     ],
+     [
+      4,
+      "KEY_MAP_DATA[n]",
+      "KeyMapData",
+      "4 each"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7046": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_IMPROVE_INIT_GAMEOPTION_ACK",
+    "basis": "wm FUN_0040b250",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x2120 ok, 0x2121 failed"
+     ],
+     [
+      2,
+      "u16",
+      "nGameOptionDataCnt",
+      ""
+     ],
+     [
+      4,
+      "GAME_OPTION_DATA[n]",
+      "GameOptionData",
+      "3 each"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7003": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_GET_SHORTCUTDATA_ACK",
+    "basis": "wm FUN_0040b390…FUN_0040b750",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bSuccess",
+      "copied from CharDB"
+     ],
+     [
+      1,
+      "u8[1024]",
+      "Data",
+      "stale DB stack when bSuccess 0 (D04-B12)"
+     ]
+    ],
+    "notes": "raw long frame {0x00, u16 len, u16 op}"
+   },
+   "0x7005": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_GET_SHORTCUTSIZE_ACK",
+    "basis": "wm FUN_0040b390…FUN_0040b750",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bSuccess",
+      "copied from CharDB"
+     ],
+     [
+      1,
+      "u8[24]",
+      "Data",
+      "stale DB stack when bSuccess 0 (D04-B12)"
+     ]
+    ],
+    "notes": "raw long frame {0x00, u16 len, u16 op}"
+   },
+   "0x7007": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_GET_VIDEO_ACK",
+    "basis": "wm FUN_0040b390…FUN_0040b750",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bSuccess",
+      "copied from CharDB"
+     ],
+     [
+      1,
+      "u8[60]",
+      "Data",
+      "stale DB stack when bSuccess 0 (D04-B12)"
+     ]
+    ],
+    "notes": "raw long frame {0x00, u16 len, u16 op}"
+   },
+   "0x7009": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_GET_SOUND_ACK",
+    "basis": "wm FUN_0040b390…FUN_0040b750",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bSuccess",
+      "copied from CharDB"
+     ],
+     [
+      1,
+      "u8[1]",
+      "Data",
+      "stale DB stack when bSuccess 0 (D04-B12)"
+     ]
+    ],
+    "notes": "raw long frame {0x00, u16 len, u16 op}"
+   },
+   "0x700b": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_GET_GAME_ACK",
+    "basis": "wm FUN_0040b390…FUN_0040b750",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bSuccess",
+      "copied from CharDB"
+     ],
+     [
+      1,
+      "u8[64]",
+      "Data",
+      "stale DB stack when bSuccess 0 (D04-B12)"
+     ]
+    ],
+    "notes": "raw long frame {0x00, u16 len, u16 op}"
+   },
+   "0x700d": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_GET_WINDOWPOS_ACK",
+    "basis": "wm FUN_0040b390…FUN_0040b750",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bSuccess",
+      "copied from CharDB"
+     ],
+     [
+      1,
+      "u8[392]",
+      "Data",
+      "stale DB stack when bSuccess 0 (D04-B12)"
+     ]
+    ],
+    "notes": "raw long frame {0x00, u16 len, u16 op}"
+   },
+   "0x700f": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_OPTION_GET_KEYMAPPING_ACK",
+    "basis": "wm FUN_0040b390…FUN_0040b750",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bSuccess",
+      "copied from CharDB"
+     ],
+     [
+      1,
+      "u8[308]",
+      "Data",
+      "stale DB stack when bSuccess 0 (D04-B12)"
+     ]
+    ],
+    "notes": "raw long frame {0x00, u16 len, u16 op}"
+   },
+   "0x702c": {
+    "dir": "CharDB→WM",
+    "name": "NC_CHAR_OPTION_IMPROVE_DB_GET_DATA_TYPE_CMD",
+    "basis": "wm FUN_0040acb0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "DataType",
+      "CHAR_OPTION_DATA_TYPE 0/1/2 → session +0x1ECD8"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7060": {
+    "dir": "WM→CharDB",
+    "name": "NC_CHAR_OPTION_LOGIN_BLOCKDATA_ERR_REQ",
+    "basis": "wm FUN_00414bf0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      ""
+     ]
+    ],
+    "notes": "no 2016 Character handler (W04-B23)"
+   },
+   "0x7c01": {
+    "dir": "C→WM",
+    "name": "NC_PRISON_ADD_GM_REQ",
+    "basis": "wm FUN_0041de70",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sImprison",
+      ""
+     ],
+     [
+      20,
+      "u16",
+      "nMinute",
+      "1..32700 (add); ≤ 32700 (alter)"
+     ],
+     [
+      22,
+      "char[16]",
+      "sReason",
+      "must be non-empty"
+     ],
+     [
+      38,
+      "char[64]",
+      "sRemark",
+      ""
+     ]
+    ],
+    "notes": "needs adminlevel ≠ 0"
+   },
+   "0x7c09": {
+    "dir": "C→WM",
+    "name": "NC_PRISON_ALTER_GM_REQ",
+    "basis": "wm FUN_0041e290",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sImprison",
+      ""
+     ],
+     [
+      20,
+      "u16",
+      "nMinute",
+      "1..32700 (add); ≤ 32700 (alter)"
+     ],
+     [
+      22,
+      "char[16]",
+      "sReason",
+      "must be non-empty"
+     ],
+     [
+      38,
+      "char[64]",
+      "sRemark",
+      ""
+     ]
+    ],
+    "notes": "needs adminlevel ≠ 0"
+   },
+   "0x7c02": {
+    "dir": "WM→C",
+    "name": "NC_PRISON_ADD_GM_ACK",
+    "basis": "wm FUN_0041de70 / FUN_00410a50 / FUN_0042dea0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sImprison",
+      ""
+     ],
+     [
+      20,
+      "u16",
+      "err",
+      "0xD80 ok, 0xD81–0xD88"
+     ]
+    ],
+    "notes": "raw {0x18, op}"
+   },
+   "0x7c0a": {
+    "dir": "WM→C",
+    "name": "NC_PRISON_ALTER_GM_ACK",
+    "basis": "wm FUN_0041e290 / FUN_00410b90",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sImprison",
+      ""
+     ],
+     [
+      20,
+      "u16",
+      "err",
+      "0xDA0 ok, 0xDA1–0xDA7"
+     ]
+    ],
+    "notes": "raw {0x18, op}"
+   },
+   "0x7c03": {
+    "dir": "WM→C",
+    "name": "NC_PRISON_OK_CMD",
+    "basis": "wm FUN_00410b90",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nMinute",
+      ""
+     ],
+     [
+      2,
+      "char[16]",
+      "sReason",
+      ""
+     ],
+     [
+      18,
+      "char[64]",
+      "sRemark",
+      ""
+     ]
+    ],
+    "notes": "to the prisoner after a GM alter"
+   },
+   "0x7c05": {
+    "dir": "WM→C",
+    "name": "NC_PRISON_END_ACK",
+    "basis": "wm FUN_004155f0 / FUN_00458270",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0xDA8 released, 0xDA9 still running, 0xDAA not a prisoner"
+     ],
+     [
+      2,
+      "u32",
+      "nPrisonSecond",
+      "WM sends milliseconds for 0xDA9 (W04-B24); 0 / 0xFFFFFFFF otherwise"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7c07": {
+    "dir": "WM→C",
+    "name": "NC_PRISON_GET_ACK",
+    "basis": "wm FUN_0040c350 / FUN_00415530",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0xDB0 ok, 0xDB1 not in prison (4-byte form), 0xDB2 DB error"
+     ],
+     [
+      2,
+      "u16",
+      "nMinute",
+      "CHARDATA.prisonmin"
+     ],
+     [
+      4,
+      "char[16]",
+      "sReason",
+      "absent in the 4-byte form"
+     ],
+     [
+      20,
+      "char[64]",
+      "sRemark",
+      ""
+     ]
+    ],
+    "notes": "old catalog name NC_PRISON_ADD_GM_ACK came from a debug string"
+   },
+   "0x7c0e": {
+    "dir": "WM→CharDB",
+    "name": "NC_DATA_PRISON_GET_REQ",
+    "basis": "wm FUN_00415530",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nCharHandle",
+      "WM session handle"
+     ],
+     [
+      2,
+      "u32",
+      "nCharRegNum",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7c0d": {
+    "dir": "WM→CharDB",
+    "name": "NC_DATA_PRISON_UPDATE_MIN_CMD",
+    "basis": "wm FUN_00458270 / FUN_004578a0 / FUN_004584e0 / FUN_00458790",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nImprisonRegNum",
+      "charNo"
+     ],
+     [
+      4,
+      "u16",
+      "nMinute",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7c10": {
+    "dir": "WM→CharDB",
+    "name": "NC_DATA_PRISON_ALTER_GM_REQ",
+    "basis": "wm FUN_0041e290",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nGmHandler",
+      ""
+     ],
+     [
+      2,
+      "Name256Byte",
+      "sGmUserID",
+      ""
+     ],
+     [
+      258,
+      "u32",
+      "nImprisonRegNum",
+      "0 = by name"
+     ],
+     [
+      262,
+      "Name5",
+      "sImprison",
+      ""
+     ],
+     [
+      282,
+      "u16",
+      "nMinute",
+      "never written (W04-B25)"
+     ],
+     [
+      284,
+      "char[16]",
+      "sReason",
+      "never written"
+     ],
+     [
+      300,
+      "char[64]",
+      "sRemark",
+      "never written"
+     ]
+    ],
+    "notes": "0x16C; 0x7C0B same layout, all fields written"
+   },
+   "0x7c12": {
+    "dir": "WM→Zone",
+    "name": "NC_ZONE_PRISON_END_CMD",
+    "basis": "wm FUN_00458270 / FUN_004586e0 / FUN_004584e0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nCharZoneHandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nCharRegNum",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x7c13": {
+    "dir": "WM→Zone",
+    "name": "NC_ZONE_PRISON_GO_REQ",
+    "basis": "wm FUN_0041de70",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nGmHandler",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "nGmRegNum",
+      ""
+     ],
+     [
+      6,
+      "Name256Byte",
+      "sGmUserID",
+      ""
+     ],
+     [
+      262,
+      "Name5",
+      "sCharID",
+      ""
+     ],
+     [
+      282,
+      "u16",
+      "nCharSessHandle",
+      ""
+     ],
+     [
+      284,
+      "u16",
+      "nCharZoneHandle",
+      ""
+     ],
+     [
+      286,
+      "u32",
+      "nCharRegNum",
+      ""
+     ],
+     [
+      290,
+      "u16",
+      "nMinute",
+      ""
+     ],
+     [
+      292,
+      "char[16]",
+      "sReason",
+      ""
+     ],
+     [
+      308,
+      "char[64]",
+      "sRemark",
+      ""
+     ]
+    ],
+    "notes": "0x174"
+   },
+   "0x7c14": {
+    "dir": "Zone→WM",
+    "name": "NC_ZONE_PRISON_GO_ACK",
+    "basis": "wm FUN_0042dea0",
+    "fields": [
+     [
+      0,
+      "PROTO_NC_ZONE_PRISON_GO_REQ",
+      "req",
+      "echo"
+     ],
+     [
+      372,
+      "u16",
+      "err",
+      "0xDC0 ok, 0xDC1 charNo mismatch, 0xDC2 so_Prison_Go failed"
+     ]
+    ],
+    "notes": "0x176"
+   },
+   "0x8001": {
+    "dir": "C→WM",
+    "name": "NC_REPORT_ADD_REQ",
+    "basis": "wm FUN_0041db50",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sHarmer",
+      ""
+     ],
+     [
+      20,
+      "u8[16]",
+      "byReportType",
+      ""
+     ],
+     [
+      36,
+      "u8[256]",
+      "byReason",
+      ""
+     ],
+     [
+      292,
+      "u16",
+      "nChatLogSize",
+      "unchecked (W04-B29)"
+     ],
+     [
+      294,
+      "u8[n]",
+      "byChatLog",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x8002": {
+    "dir": "WM→C",
+    "name": "NC_REPORT_ADD_ACK",
+    "basis": "wm FUN_0041db50 / FUN_004092e0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sHarmer",
+      ""
+     ],
+     [
+      20,
+      "u32",
+      "nRegNumber",
+      "0 on WM refusals"
+     ],
+     [
+      24,
+      "u16",
+      "err",
+      "0xF40 ok, 0xF41–0xF48, 0xF58"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x8004": {
+    "dir": "WM→C",
+    "name": "NC_REPORT_CANCEL_ACK",
+    "basis": "wm FUN_004153e0 / FUN_004090c0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nRegNumber",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "err",
+      "0xF40 ok; 0xF50, 0xF53, DB codes"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x8006": {
+    "dir": "WM→C",
+    "name": "NC_REPORT_GET_ACK",
+    "basis": "wm FUN_00409130",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0xF40, 0xF58, 0xF60"
+     ],
+     [
+      2,
+      "u32",
+      "nRegNumber",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "byReportResult",
+      "0 registering, 1 done, 2 held"
+     ],
+     [
+      7,
+      "u8[128]",
+      "byRemark",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x8007": {
+    "dir": "WM→AccountLog",
+    "name": "NC_DATA_REPORT_ADD_REQ",
+    "basis": "wm FUN_0041db50",
+    "fields": [
+     [
+      0,
+      "u32",
+      "dwReporter",
+      "charNo"
+     ],
+     [
+      4,
+      "u16",
+      "hReporter",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "nWorldNo",
+      ""
+     ],
+     [
+      7,
+      "Name5",
+      "sReporterCharID",
+      ""
+     ],
+     [
+      27,
+      "Name5",
+      "sHarmer",
+      ""
+     ],
+     [
+      47,
+      "u8[16]",
+      "byReportType",
+      ""
+     ],
+     [
+      63,
+      "u8[256]",
+      "byReason",
+      ""
+     ],
+     [
+      319,
+      "u16",
+      "nChatLogSize",
+      ""
+     ],
+     [
+      321,
+      "u8[n]",
+      "byChatLog",
+      ""
+     ]
+    ],
+    "notes": "raw long frame, len 0x143 + n"
+   },
+   "0x8009": {
+    "dir": "WM→AccountLog",
+    "name": "NC_DATA_REPORT_CANCEL_REQ",
+    "basis": "wm FUN_004153e0",
+    "fields": [
+     [
+      0,
+      "i32",
+      "nRegNumber",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "hReporter",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x800b": {
+    "dir": "WM→AccountLog",
+    "name": "NC_DATA_REPORT_GET_REQ",
+    "basis": "wm FUN_004154c0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "hReporter",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "dwReporter",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "nWorldNo",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x9001": {
+    "dir": "Zone→WM",
+    "name": "NC_CHARGED_SETBUFF_CMD",
+    "basis": "wm FUN_0042a5b0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "CharRegistNumber",
+      ""
+     ],
+     [
+      4,
+      "u64",
+      "ItemKey",
+      ""
+     ],
+     [
+      12,
+      "u16",
+      "ItemId",
+      ""
+     ],
+     [
+      14,
+      "PROTO_CHARGEDBUFF_INFO",
+      "ChargedBuff",
+      "14 bytes, appended to session blob +0x650"
+     ],
+     [
+      28,
+      "u32",
+      "nUserNo",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x9002": {
+    "dir": "Zone→WM",
+    "name": "NC_CHARGED_RESETBUFF_CMD",
+    "basis": "wm FUN_0042a6d0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "CharRegistNumber",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "ChargedBuffKey",
+      "matched"
+     ],
+     [
+      8,
+      "u16",
+      "ChargedBuffID",
+      "not compared"
+     ],
+     [
+      10,
+      "u32",
+      "nUserNo",
+      ""
+     ]
+    ],
+    "notes": ""
    }
   }
  },

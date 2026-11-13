@@ -972,6 +972,380 @@ Zone 0x6009 NC_CT_LUASCRIPT_SET_WORLD_CMD { u32 nCharNo, CT_INFO CTInfo { u8 Typ
 
 ---
 
+## 8. Character options (dept 28 CHAR_OPTION)
+
+The WM is a pure relay between the client and the Character server (DB side: D04 §5). Two generations exist
+(`CHAR_OPTION_DATA_TYPE` *(pdb2017)*: 0 `CODT_NO_RECV`, 1 `CODT_BINARY_DATA` (old blobs), 2 `CODT_IMPROVE_DATA` (rows)).
+All client handlers below start with `Client_CheckAlive` and need CHARDATA (+0x560); they send nothing back themselves.
+The CharDB requests use the raw long frame `{0x00, u16 len, u16 opcode, payload}` (old) or `CSendPacket` (improved).
+
+### 8.1 Session cache and the login push
+
+| Session field | Name (from the log strings of FUN_00431680) | Filled by | Notes |
+|---|---|---|---|
+| +0x670 … +0x6A4 (7 ptr/size pairs) | `m_pCharOptionDataBinary_{ShortCutData, ShortCutSize, Video, Sound, Game, WindowPos, KeyMapping}` | **nothing** in 2016 (only zeroed by `FUN_00430600` and freed by `FUN_00434530`) | the old blobs reach the client directly through §8.3 |
+| +0x6A8 / +0x6AC | `m_pCharOptionDataImprove_ShortCutData` = `{u16 n, SHORT_CUT_DATA[n] (7)}` | CharDB 0x702D | |
+| +0x6B0 / +0x6B4 | `m_pCharOptionDataImprove_KeyMap` = `{u16 n, KEY_MAP_DATA[n] (4)}` | CharDB 0x702E, 0x7058 | |
+| +0x6B8 / +0x6BC | `m_pCharOptionDataImprove_GameOption` = `{u16 n, GAME_OPTION_DATA[n] (3)}` | CharDB 0x702F; **freed** by 0x705A | |
+| +0x1ECD8 | data type (`CHAR_OPTION_DATA_TYPE`) | CharDB 0x702C | |
+| +0x1ECDC | "push pending" | set to 1 by CharDB 0x1005 (W01 §4) | |
+
+```pseudo
+CharDB 0x702C NC_CHAR_OPTION_IMPROVE_DB_GET_DATA_TYPE_CMD { u32 nCharNo, u32 DataType }          @ FUN_0040acb0
+    s = Clients_FindByCharNo(nCharNo); s: s.+0x1ECD8 = DataType
+CharDB 0x702D …_IMPROVE_DB_GET_SHORTCUTDATA_CMD { u32 nCharNo, u16 n, SHORT_CUT_DATA[n] }        @ FUN_0040ad00
+CharDB 0x702E …_IMPROVE_DB_GET_KEYMAP_CMD       { u32 nCharNo, u16 n, KEY_MAP_DATA[n] }          @ FUN_0040ad70
+CharDB 0x702F …_IMPROVE_DB_GET_GAMEOPTION_CMD   { u32 nCharNo, u16 n, GAME_OPTION_DATA[n] }      @ FUN_0040add0
+    s = Clients_FindByCharNo(nCharNo); s: Session_StoreBlob(payload+4, 2 + n·size) into +0x6A8 / +0x6B0 / +0x6B8
+    # no answer; these arrive during the character load, before 0x1005 (D02 §4 step 20)
+
+CWMClientSession::SendToClient_CharOptionData(s)                                                 @ FUN_00431680
+    # called once, from CharDB 0x1005 NC_CHAR_CHARDATA_ACK (FUN_00410040, W01 §4) right after it sets +0x1ECDC = 1
+    if s.+0x1ECDC == 0: return;  s.+0x1ECDC = 0
+    type 2 (improved), each only if its blob is set and size ≥ 1:
+        Send s 0x7032 NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD = blob +0x6A8   (len = 2 + 7·(low byte of n))
+        Send s 0x7033 NC_CHAR_OPTION_IMPROVE_GET_KEYMAP_CMD       = blob +0x6B0   (len = 2 + 4·(low byte of n))
+        Send s 0x7034 NC_CHAR_OPTION_IMPROVE_GET_GAMEOPTION_CMD   = blob +0x6B8   (len = 2 + 3·(low byte of n))
+        # a send failure logs "ERROR - CWMClientSession::SendToClient_CharOptionData, m_pCharOptionDataImprove_<x>,
+        # nCharNo=%d" and stops. The length uses only the count's low byte (the PDB count is u16); the DB limits keep
+        # the counts below 256 in practice (key map ≤ 95)
+    type 1 (binary): would send 0x7003 / 0x7005 / 0x7007 / 0x7009 / 0x700B / 0x700D / 0x700F from +0x670…+0x6A4,
+        but those slots are never filled in 2016: dead path. Type 0: nothing.
+```
+
+Client (game scene): 0x7032 resets the shortcut bar and adds each entry, 0x7033 loads the key map (and from then on
+ignores 0x700F), 0x7034 loads the game options (C01 §client table). The cache is not updated by the SET requests below
+and is read only by this push, so after login it is dead weight until logout frees it.
+
+### 8.2 Client requests
+
+```pseudo
+0x7001 NC_CHAR_OPTION_GET_ALL_REQ                     @ LAB_00413fd0   no-op (not a function; the parser returns)
+0x7002 NC_CHAR_OPTION_GET_SHORTCUTDATA_REQ            @ FUN_00413fe0   no-op (empty function)
+
+0x7004 / 0x7006 / 0x7008 / 0x700A / 0x700C / 0x700E NC_CHAR_OPTION_GET_<kind>_REQ {}
+        @ FUN_00414000 / FUN_00414080 / FUN_00414100 / FUN_00414180 / FUN_00414200 / FUN_00414280
+    Send CharDB raw { 0x00, u16 8, u16 op, PROTO_NC_CHAR_OPTION_DB_GET_<kind>_REQ { u16 WorldManagerHandle = s.+0x114,
+        u32 nCharNo } }                                                                          (11 bytes)
+        op: SHORTCUTSIZE 0x7019, VIDEO 0x701B, SOUND 0x701D, GAME 0x701F, WINDOWPOS 0x7021, KEYMAPPING 0x7023
+    # the client sends 0x7004 and 0x700C after NC_MAP_LOGIN_ACK (C01). There is no WM route to 0x7017
+    # (short-cut data): 0x7002 is a no-op, so the 0x400-byte blob only reaches the client in the character load
+
+0x7010 / 0x7011 / 0x7012 / 0x7013 / 0x7014 / 0x7015 / 0x7016 NC_CHAR_OPTION_SET_<kind>_CMD { u8 Data[size] }
+        @ FUN_00414300 / FUN_004143a0 / FUN_00414440 / FUN_004144d0 / FUN_00414550 / FUN_004145e0 / FUN_00414680
+    Send CharDB raw { 0x00, u16 4 + size + 2, u16 op, { u32 nCharNo, u8 Data[size] } }  # no answer (D04 §5.1)
+        SHORTCUTDATA 0x7025 (0x400), SHORTCUTSIZE 0x7026 (0x18), VIDEO 0x7027 (0x3C), SOUND 0x7028 (1),
+        GAME 0x7029 (0x40), WINDOWPOS 0x702A (0x188), KEYMAPPING 0x702B (0x134)
+    # fixed-size copies; the packet length is not checked (a short packet sends receive-buffer bytes)
+
+0x7037 NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_REQ { u8 nShortCutDataCnt, SHORT_CUT_DATA[n] { u8 nSlotNo,
+        u16 nCodeNo, i32 nValue } }                                                              @ FUN_00414720
+    Send CharDB 0x704B { u32 nCharNo, u8 n, SHORT_CUT_DATA[n] }   (5 + 7n; n ≤ 255 fits the 8 KB packet)
+0x7039 NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_REQ { u16 nKeyMapDataCnt, KEY_MAP_DATA[n] { u16 nFunctionNo, u8 nExtendKey,
+        u8 nASCIICode } }                                                                        @ FUN_004148f0
+    n ≥ 0x60: log "ERROR - CParserClient::fc_NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_REQ : nKeyMapDataCnt(%d)", drop
+    else Send CharDB 0x704D { u32 nCharNo, u16 n, KEY_MAP_DATA[n] }   (6 + 4n)
+0x703B NC_CHAR_OPTION_IMPROVE_SET_GAMEOPTION_REQ { u16 nGameOptionDataCnt, GAME_OPTION_DATA[n] { u16 nOptionNo,
+        u8 nValue } }                                                                            @ FUN_00414af0
+    Send CharDB 0x704F { u32 nCharNo, u16 n, GAME_OPTION_DATA[n] }   (6 + 3n)
+    # (original bug) W04-B22: n is not checked: n·3 bytes (up to 196 605) are copied into the 8 KB stack packet
+    # before Pkt_SetOpcode checks the size; n above ≈ 2730 smashes the WM stack (any logged-in player)
+0x7043 NC_CHAR_OPTION_IMPROVE_INIT_KEYMAP_REQ {}       → Send CharDB 0x7057 { u32 nCharNo }      @ FUN_00414820
+0x7045 NC_CHAR_OPTION_IMPROVE_INIT_GAMEOPTION_REQ {}   → Send CharDB 0x7059 { u32 nCharNo }      @ FUN_00414a20
+0x705F NC_CHAR_OPTION_LOGIN_BLOCKDATA_ERR {}           → Send CharDB 0x7060 NC_CHAR_OPTION_LOGIN_BLOCKDATA_ERR_REQ
+        { u32 nCharNo } (pdb2017 name)                                                           @ FUN_00414bf0
+    # (original bug) W04-B23: the 2016 Character server registers no handler for 0x7060: the client's report that
+    # its stored option blocks are broken has no effect
+```
+
+### 8.3 CharDB answers
+
+```pseudo
+CharDB 0x7018 / 0x701A / 0x701C / 0x701E / 0x7020 / 0x7022 / 0x7024 NC_CHAR_OPTION_DB_GET_<kind>_ACK
+        { u16 WorldManagerHandle, u8 bSuccess, u8 Data[size] }
+        @ FUN_0040b390 / FUN_0040b440 / FUN_0040b4f0 / FUN_0040b580 / FUN_0040b610 / FUN_0040b6a0 / FUN_0040b750
+    s = Clients_GetByHandle(WorldManagerHandle); none: drop
+    Send s raw { 0x00, u16 1 + size + 2, u16 opcode − 0x15 (0x7003 / 0x7005 / 0x7007 / 0x7009 / 0x700B / 0x700D / 0x700F),
+        PROTO_NC_CHAR_OPTION_GET_<kind>_ACK { u8 bSuccess, u8 Data[size] } }
+    # bSuccess and Data are copied as received; with bSuccess 0 Data is the Character server's stale stack (D04-B12)
+    # These come both from the client's GET requests (§8.2) and unasked from the character load (old format:
+    # 0x7018, 0x701A, 0x7020, 0x7022, 0x7024; D02 §4 step 20). The client handles 0x7003…0x700F in the
+    # character-select scene (C01): present + matching 6-byte header → load, else defaults; 0x7007 / 0x7009 ignored
+
+CharDB 0x704C / 0x704E / 0x7050 NC_CHAR_OPTION_IMPROVE_DB_SET_<x>_ACK { u16 nError, u32 nCharNo }
+        @ FUN_0040ae30 / FUN_0040af00 / FUN_0040afd0
+    s = Clients_FindByCharNo(nCharNo); none: drop
+    Send s 0x7038 / 0x703A / 0x703C NC_CHAR_OPTION_IMPROVE_SET_<x>_ACK { u16 nError }
+        # 0x2100 / 0x2108 / 0x2118 ok, 0x2101 / 0x2109 / 0x2119 a row failed (D04 §5.2)
+    # 0x704E / 0x7050 carry an unwritten nCharNo (D04-B13), so 0x703A / 0x703C normally reach nobody.
+    # The 2016 client has no handler for 0x7038 / 0x703A (C01: ignored, not missing) and accepts 0x703C without action
+
+CharDB 0x7058 NC_CHAR_OPTION_IMPROVE_DB_INIT_KEYMAP_ACK { u16 nError, u32 nCharNo, u16 n, KEY_MAP_DATA[n] }   @ FUN_0040b0a0
+    s = Clients_FindByCharNo(nCharNo); none: drop
+    n ≥ 0x60: log "ERROR - CParserCharDB::fc_NC_CHAR_OPTION_IMPROVE_DB_INIT_KEYMAP_ACK : nCharNo(%d), nKeyMapDataCnt(%d)";
+        no answer (unreachable: the DB caps n at 95)
+    Session_StoreBlob({n, data}) into +0x6B0
+    Send s 0x7044 NC_CHAR_OPTION_IMPROVE_INIT_KEYMAP_ACK { u16 nError, u16 n, KEY_MAP_DATA[n] }   (4 + 4n)
+        # entries copied field by field only when nError == 0x2110 (the DB sends n = 0 with 0x2111)
+    # client (FUN_0049ca00): 0x2110 → writes each key into the key-remapping window and refreshes it; else ignored
+
+CharDB 0x705A NC_CHAR_OPTION_IMPROVE_DB_INIT_GAMEOPTION_ACK { u16 nError, u32 nCharNo, u16 n, GAME_OPTION_DATA[n] }  @ FUN_0040b250
+    s = Clients_FindByCharNo(nCharNo); none: drop
+    free blob +0x6B8 (FUN_00430750: free, ptr = size = 0)     # unlike 0x7058 the new data is not cached (harmless, §8.1)
+    Send s 0x7046 NC_CHAR_OPTION_IMPROVE_INIT_GAMEOPTION_ACK { u16 nError, u16 n, GAME_OPTION_DATA[n] }   (4 + 3n)
+    # client (FUN_004a5980): 0x2120 → MachineOpt::SetGameOpt(n, data) and refreshes the option window
+```
+
+No CharDB failure answer exists for 0x7057 / 0x7059 when the read-back fails (D04-B14): the client then waits forever.
+
+---
+
+## 9. Prison (dept 31)
+
+### 9.1 `CPrisonServer` (the WM's release timer)
+
+`CPrisonServer` (class name from its RTTI vftable) is a lazily built singleton (`CPrisonServer_Instance` FUN_004589b0,
+init FUN_004588d0, `g_PrisonServer` DAT_006d4ce4 → DAT_006d4cf0, destructor FUN_00458850). It holds one
+`std::map<session*, i64 remainingMs>` (tree at +4; node +0x10 key, +0x18 i64 remaining; internals FUN_00458130 find,
+FUN_00458050 / FUN_004581f0 insert, FUN_00457dc0 erase, FUN_004585d0 erase range, FUN_00457b00 equal range, FUN_004581a0
+clear; MSVC `std::_Tree` helpers below them: FUN_00457b90 insert-rebalance, FUN_00457990 / FUN_004579e0 iterator
+increment / decrement, FUN_00457a40 / FUN_00457aa0 rotations; `atexit` destructor FUN_00482990). Only online prisoners whose client asked 0x7C06 (§9.2) are in it; CHARDATA.prisonmin (+0x62) is the minute count
+the rest of the WM tests.
+
+```pseudo
+CPrisonServer_Add(s, minutes) → inserted                                                       @ FUN_00458670
+    s and CHARDATA set: insert { s, minutes·60000 + 30000 }      # 30 s grace; an existing entry is kept (returns false)
+CPrisonServer_Update(s, minutes) → bool                                                        @ FUN_004584e0
+    in map: remaining = minutes·60000 + 30000; return 1
+    else (not a timed prisoner): CHARDATA.prisonmin = 0
+        Send CharDB raw 0x7C0D NC_DATA_PRISON_UPDATE_MIN_CMD { u32 nImprisonRegNum = charNo, u16 nMinute 0 }
+        Send s's zone raw 0x7C12 NC_ZONE_PRISON_END_CMD { u16 nCharZoneHandle = s.+0x118, u32 nCharRegNum }
+        return 0
+CPrisonServer_Release(s)                                                                       @ FUN_00458270
+    in map:
+        Send s raw 0x7C05 NC_PRISON_END_ACK { u16 err 0x0DA8, u32 nPrisonSecond 0 }   # opcode/code read in the asm
+        Send s's zone 0x7C12 { zoneHandle, charNo }          # zone: so_Prison_End (Z08 §12)
+        CHARDATA.prisonmin = 0
+        Send CharDB 0x7C0D { charNo, 0 }                     # DB: nPrisonMin 0, login position Rou (D04 §7)
+        erase
+CPrisonServer_Remove(s)                                                                        @ FUN_004586e0
+    CHARDATA.prisonmin = 0;  in map: Send s's zone 0x7C12 { zoneHandle, charNo }; erase     # no DB write, no client msg
+CPrisonServer_IsPrisoner(s, charNo) = in map and s.CHARDATA.charNo == charNo                    @ FUN_00458490
+CPrisonServer_EndRequest(s) → i64                                                              @ FUN_00458430
+    not in map → −1;  remaining ≤ 30000 → Release(s), 0;  else remaining (ms)
+CPrisonServer_SaveOnLogout(s)            # from CharacterLogout (W01 §5.4, FUN_00436d50)       @ FUN_00458790
+    in map: Send CharDB 0x7C0D { charNo, ceil(remaining / 60000) }; erase
+    # W01 §5.4 calls this "remove from a name registry (inferred)"; it is the prison-minute save
+
+CPrisonServer_Tick()          # every main-loop pass (W01 main tick FUN_00406760)              @ FUN_00458360
+    now = timeGetTime(); now < next: return
+    next = now + 2000; elapsed = now − last; last = now
+    for each entry: remaining −= elapsed
+        remaining ≤ 0: Release(s)
+        else Prison_UpdateMinutes(s, remaining)                                                @ FUN_004578a0
+            m = ceil(remaining / 60000)
+            m < CHARDATA.prisonmin: CHARDATA.prisonmin = m; m % 3 == 0 → Send CharDB 0x7C0D { charNo, m }
+            # so the DB copy is refreshed every 3 minutes; a crash loses at most 3 minutes of served time
+```
+
+### 9.2 Client requests (CParserClient)
+
+The GM forms send `{ Name5 sImprison @0, u16 nMinute @0x14, char sReason[16] @0x16, char sRemark[64] @0x26 }` (0x66,
+`PROTO_NC_PRISON_ADD_GM_REQ` / `_ALTER_GM_REQ`, offsets confirmed). Both answers are raw
+`{0x18, u16 op, Name5 sImprison, u16 err}` (`PROTO_NC_PRISON_ADD_GM_ACK` / `_ALTER_GM_ACK`, 0x16).
+
+```pseudo
+0x7C01 NC_PRISON_ADD_GM_REQ                                                                    @ FUN_0041de70
+    CHARDATA.adminlevel (+0x64) == 0          → 0x7C02 err 0x0D85 "You do not have the authority to imprison."
+    nMinute == 0 or nMinute > 32700 (0x7FBC)  → 0x0D83 "Invalid Imprisonment time."
+    sImprison empty                           → 0x0D86 "Please enter the character ID."
+    sReason empty                             → 0x0D84 "Enter the reason for imprisonment."
+    # any non-zero admin level may imprison (0x2010 notices need 100). No check that the target is not a GM.
+    t = Clients_FindByCharName(sImprison)
+    t == null (offline / other world):
+        Send CharDB 0x7C0B NC_DATA_PRISON_ADD_GM_REQ { u16 nGmHandler = s.+0x114, Name256Byte sGmUserID = s.userId (+0x128, Copy256 FUN_004097c0),
+            u32 nImprisonRegNum 0 (= by name), sImprison, nMinute, sReason, sRemark }      (0x16C)   → §9.3
+    t online and t.CHARDATA.prisonmin ≠ 0, or CPrisonServer_IsPrisoner(t, t.charNo):
+        → 0x7C02 err 0x0D82 "The character is already in prison."
+    else:
+        Send t's zone (g_Zones[t.+0x117]) 0x7C13 NC_ZONE_PRISON_GO_REQ { u16 nGmHandler, u32 nGmRegNum = s.charNo,
+            Name256Byte sGmUserID, Name5 sCharID = sImprison, u16 nCharSessHandle = t.+0x114,
+            u16 nCharZoneHandle = t.+0x118, u32 nCharRegNum = t.charNo, u16 nMinute, sReason[16], sRemark[64] } (0x174)
+        zone missing or send failed → 0x7C02 err 0x0D88 "Imprisonment request has failed. (linking or out of the zone)"
+        # the zone links the player to "EldPri" and answers 0x7C14 (Z08 §12)
+
+0x7C04 NC_PRISON_END_REQ {}                    # client: its prison timer ran out (inferred)   @ FUN_004155f0
+    r = CPrisonServer_EndRequest(s)
+    r == 0:  nothing more (Release already sent 0x7C05 0x0DA8 and freed the player)
+    r == −1: Send raw 0x7C05 NC_PRISON_END_ACK { u16 err 0x0DAA, u32 nPrisonSecond 0xFFFFFFFF }   # not a prisoner
+    else:    Send raw 0x7C05 { u16 err 0x0DA9, u32 nPrisonSecond = r }
+    # (original bug) W04-B24: r is in milliseconds. The client (FUN_0049b1b0) passes the value to
+    # PrisonTimeWin::ResetTime, which takes seconds (0x7C03 passes minutes·60; the zone sends minutes·60 in its own
+    # 0x7C05 at map login, Z01). The window then shows 1000 × the remaining time. Client: 0x0DA8 / 0x0DAA → timer 0
+
+0x7C06 NC_PRISON_GET_REQ {}          # the client sends it after NC_MAP_LOGIN_ACK (C01)          @ FUN_00415530
+    no CHARDATA or CHARDATA.prisonmin == 0:
+        Send raw 0x7C07 NC_PRISON_GET_ACK (short form) { u16 err 0x0DB1, u16 nMinute 0 }        (4)
+    else: Send CharDB raw 0x7C0E NC_DATA_PRISON_GET_REQ { u16 nCharHandle = s.+0x114, u32 nCharRegNum = charNo }
+        send failure: OutputDebugString "=SEND_TO_CHAR_DB(PROTO_NC_DATA_PRISON_GET_REQ) FAIL"
+
+0x7C09 NC_PRISON_ALTER_GM_REQ                                                                  @ FUN_0041e290
+    adminlevel == 0      → 0x7C0A err 0x0DA5 "You do not have the authority to make the change."
+    nMinute > 32700      → 0x0DA3 "Incorrect imprisonment time."        # 0 is allowed: release
+    sImprison empty      → 0x0DA6 "Please enter the character ID."
+    sReason empty        → 0x0DA4 "Please enter the reason for changing the condition of imprisonment."
+    t = Clients_FindByCharName(sImprison)
+    t online and (no CHARDATA or prisonmin == 0) → 0x0DA2 "Not in prison."
+    Send CharDB 0x7C10 NC_DATA_PRISON_ALTER_GM_REQ { nGmHandler, sGmUserID, nImprisonRegNum = t ? t.charNo : 0, sImprison,
+        nMinute ?, sReason ?, sRemark ? }                                                          (0x16C)  → §9.3
+    # (original bug) W04-B25: nMinute, sReason and sRemark are never copied into 0x7C10 (checked in the asm: the
+    # stores end at sImprison, packet +0x11A… is stale stack). The DB stores a random minute count and history text,
+    # and the echo in 0x7C11 applies that count to the online prisoner
+```
+
+### 9.3 Zone and CharDB answers
+
+```pseudo
+Zone 0x7C14 NC_ZONE_PRISON_GO_ACK { the 0x7C13 fields, u16 err @0x174 }   (0x176)   (CParserZone)  @ FUN_0042dea0
+    # W01's scope lists this handler (W01 part 5) and hands it to W04. Zone err (Z08 code FUN_005a4470): 0x0DC0 ok,
+    # 0x0DC1 charNo mismatch at the handle, 0x0DC2 so_Prison_Go failed; no answer if the handle is unknown
+    err == 0x0DC0:
+        t = Clients_GetByHandle(nCharSessHandle)
+        t and t.charNo == nCharRegNum and not CPrisonServer_Add(t, nMinute) (already timed)
+            and GM g = Clients_GetByHandle(nGmHandler) with g.charNo == nGmRegNum:
+                Send g raw 0x7C02 { sCharID, err 0x0D82 }; return
+        Send CharDB 0x7C0B { nGmHandler, sGmUserID, nImprisonRegNum = nCharRegNum, sCharID, nMinute, sReason, sRemark }
+        # sent also when t is gone; the timer then starts at the next 0x7C06
+    else: g (handle + charNo check) → Send g raw 0x7C02 { sCharID, err 0x0D88 }
+        # the player may already be in EldPri (err 0x0DC1 / 0x0DC2 do not undo the zone side)
+
+CharDB 0x7C0C NC_DATA_PRISON_ADD_GM_ACK { u16 err, u16 nGmHandler, u32 nImprisonRegNum, Name5 sImprison, u16 nMinute,
+        sReason, sRemark }   (0x6E, D04 §7)                                                       @ FUN_00410a50
+    err == 0x0D80 and nImprisonRegNum ≠ 0 and t = Clients_FindByCharNo(nImprisonRegNum):
+        t.CHARDATA.prisonmin = nMinute
+        kq = t.+0x258C; KQ_LeaveJoinList(t) → Send t raw 0x5808 NC_KQ_JOIN_CANCEL_ACK { u16 0x09A1, u32 kq } (§6.4)
+    err ≠ 0x0D80 and nImprisonRegNum ≠ 0 and t online: CPrisonServer_Remove(t)   # zone 0x7C12 if timed; prisonmin = 0
+    g = Clients_GetByHandle(nGmHandler) → Send g raw 0x7C02 NC_PRISON_ADD_GM_ACK { sImprison, err }
+    # client: 0x0D80 silent, 0x0D81 "Character ID does not exist.", 0x0D82 "…already in prison.", 0x0D87
+    # "Imprisonment request has failed." Neither 0x7C0C nor 0x7C14 tells the prisoner: the client learns it from
+    # the zone's 0x7C05 at the EldPri map login (Z01) and its own 0x7C06
+    # The handle is not checked against the GM's charNo (unlike 0x7C14): if the GM left, another session that got
+    # the same handle receives the answer (inferred, harmless)
+
+CharDB 0x7C0F NC_DATA_PRISON_GET_ACK { u16 nCharHandle, u16 err, char sReason[16], char sRemark[64] }  @ FUN_0040c350
+    s = Clients_GetByHandle(nCharHandle); none: drop
+    err == 0x0DB0: CPrisonServer_Add(s, CHARDATA.prisonmin)          # starts the release timer
+    Send s raw 0x7C07 NC_PRISON_GET_ACK { u16 err, u16 nMinute = CHARDATA.prisonmin, char sReason[16], char sRemark[64] } (0x54)
+    send failure: OutputDebugString "NC_PRISON_ADD_GM_ACK Send Fail"   # the C01 catalog name came from this string
+    # (original bug) W04-B26: err 0x0DB2 (DB read failed) does not start the timer although prisonmin ≠ 0; the
+    # prisoner is never released by the WM in this session (0x7C04 then answers 0x0DAA)
+
+CharDB 0x7C11 NC_DATA_PRISON_ALTER_GM_ACK { same layout as 0x7C0C }                              @ FUN_00410b90
+    g = Clients_GetByHandle(nGmHandler)
+    err == 0x0DA0 and nImprisonRegNum ≠ 0 and t = Clients_FindByCharNo(nImprisonRegNum):
+        t.CHARDATA.prisonmin = nMinute
+        nMinute == 0: CPrisonServer_Release(t)          # 0x7C05 0x0DA8, zone 0x7C12, DB 0x7C0D 0
+        else if not CPrisonServer_Update(t, nMinute) and g: # t online but not timed: Update released it
+            Send g raw 0x7C0A { sImprison, err 0x0DA2 "Not in prison." }; return   # no 0x7C03
+        Send t raw 0x7C03 NC_PRISON_OK_CMD { u16 nMinute, char sReason[16], char sRemark[64] }       (0x52)
+    g: Send g raw 0x7C0A NC_PRISON_ALTER_GM_ACK { sImprison, err }
+    # 0x7C03 client (FUN_004aec50): "Remaining Time: %d minutes The charge: %s Details: %s", timer = nMinute·60 s;
+    # nMinute ≠ 0: in a party → sends 0x380A (party leave *(inferred)*, W02), else system text "Not part of a Party."
+    # 0x7C0A client (FUN_004aee00): 0x0DA1 "Character ID does not exist.", 0x0DA2 "Not in prison.", 0x0DA3–0x0DA6 above;
+    # (original bug) W04-B27: the DB failure code is 0x0DA7, but the client's alter switch maps 0x0D87 (the add code)
+    # to "Imprisonment request has failed." and shows nothing for 0x0DA7
+```
+
+**0x7C07 (C01 open item).** Official name `NC_PRISON_GET_ACK` *(pdb2017)*; the 2016 string `PROTO_NC_DATA_PRISON_GET_REQ`
+at the 0x7C06 send site and the 0x7C06 → 0x7C0E → 0x7C0F → 0x7C07 chain support the GET name; `NC_PRISON_ADD_GM_ACK`
+was a copy-pasted debug string. Layout `{ u16 err, u16 nMinute, char sReason[16], char sRemark[64] }` (0x54), or the
+4-byte short form `{0x0DB1, 0}` when the player is not in prison. Meaning: the prison state at map login. The client
+handles it only in the character-select scene (FUN_00475fb0: err 0x0DB0 → keeps nMinute and sets a flag; reason and
+remark are ignored); the game scene has no handler.
+
+---
+
+## 10. Player reports (dept 32 REPORT)
+
+The WM forwards to the AccountLog DB server (D01; codes from D01 knowledge). Raw headers throughout.
+
+```pseudo
+0x8001 NC_REPORT_ADD_REQ { Name5 sHarmer, u8 byReportType[16] @0x14, u8 byReason[256] @0x24, u16 nChatLogSize @0x124,
+        u8 byChatLog[nChatLogSize] @0x126 }                                                     @ FUN_0041db50
+    no CHARDATA: drop
+    reply(err) = Send raw 0x8002 NC_REPORT_ADD_ACK { Name5 sHarmer, u32 nRegNumber 0, u16 err }   (0x1A)
+    CHARDATA.prisonmin ≠ 0          → reply 0x0F48 (no client text)
+    sHarmer empty                   → 0x0F44 "Please enter the character ID."
+    Name5_Equal(sHarmer, own name)  → 0x0F43 "Cannot report oneself."
+    byReportType empty (strlen)     → 0x0F47 (no client text)
+    byReason empty                  → 0x0F45 "Please enter the reason for reporting."
+    last = s.+0x1DFA8 (tick of the last successful report)
+    last ≠ 0 and GetTickCount() − last > 3 600 000 → 0x0F42 "Reporting is restricted to once an hour."
+    # (original bug) W04-B28: the test is inverted (asm: `jbe` to the send path): reports within the hour after a
+    # success are forwarded, every report later than one hour is refused until the next login. The AccountLog server
+    # does its own once-an-hour / once-a-day checks (0x0F42 / 0x0F41), which keep the intended limit
+    Send AccountLog raw long frame { 0x00, u16 0x143 + n, u16 0x8007, PROTO_NC_DATA_REPORT_ADD_REQ {
+        u32 dwReporter = charNo, u16 hReporter = s.+0x114, u8 nWorldNo = g_WorldNo, Name5 sReporterCharID = CHARDATA+4,
+        Name5 sHarmer, byReportType[16], byReason[256], u16 nChatLogSize, byChatLog[n] } }
+    # (original bug) W04-B29: nChatLogSize is not checked against 2048 or the packet length; up to 65 535 bytes are
+    # copied into a ~2.3 KB stack buffer: any player can crash the WM
+
+0x8003 NC_REPORT_CANCEL_REQ { u32 nRegNumber }                                                  @ FUN_004153e0
+    reply(err) = Send raw 0x8004 NC_REPORT_CANCEL_ACK { u32 nRegNumber, u16 err }
+    CHARDATA and prisonmin ≠ 0 → reply 0x0F53;  nRegNumber == 0 → reply 0x0F50 (unknown report)
+    else Send AccountLog raw 0x8009 NC_DATA_REPORT_CANCEL_REQ { i32 nRegNumber, u16 hReporter = s.+0x114 }
+0x8005 NC_REPORT_GET_REQ {}                                                                     @ FUN_004154c0
+    CHARDATA set: Send AccountLog raw 0x800B NC_DATA_REPORT_GET_REQ { u16 hReporter, u32 dwReporter = charNo, u8 nWorldNo }
+
+AccountLog 0x8008 NC_DATA_REPORT_ADD_ACK { u16 err, u16 hReporter, Name5 sHarmer, i32 nRegNumber }  @ FUN_004092e0
+    s = Clients_GetByHandle(hReporter): Send s 0x8002 { sHarmer, nRegNumber, err }
+        err == 0x0F40: s.+0x1DFA8 = GetTickCount()
+AccountLog 0x800A NC_DATA_REPORT_CANCEL_ACK { i32 nRegNumber, u16 hReporter, u16 err }           @ FUN_004090c0
+    s = Clients_GetByHandle(hReporter): Send s 0x8004 { nRegNumber, err }
+AccountLog 0x800C NC_DATA_REPORT_GET_ACK { u16 hReporter, u16 err, i32 nRegNumber, u8 byReportResult, u8 byRemark[128] }
+                                                                                                 @ FUN_00409130
+    s = Clients_GetByHandle(hReporter): Send s 0x8006 NC_REPORT_GET_ACK { u16 err, u32 nRegNumber, u8 byReportResult,
+        u8 byRemark[128] }   (0x87)
+```
+
+Client: 0x8002 (FUN_004ae700) 0x0F40 → report window gets nRegNumber; texts for 0x0F41 "Reporting same character is
+resticted to once a day.", 0x0F42, 0x0F43, 0x0F44, 0x0F45, 0x0F46 "There is no chatting log." (never sent by the WM),
+0x0F58 "Failed to report. (DB Error)"; 0x0F47 and 0x0F48 show nothing (original bug) W04-B30. 0x8004 (FUN_004aea60):
+0x0F40 "Completed cancelling the report.", anything else "Failed to cancel the report.". 0x8006 (FUN_004ae800): 0x0F40 →
+status window (byReportResult 0 "Registering the report…" with a Cancel button, 1 "Reporting completed.", 2 "Hold the
+report."), 0x0F60 (none) → empty form ("Send", "Abuser:"), 0x0F58 "Failed to register the report.".
+
+---
+
+## 11. Charged (premium) buffs (dept 36, CParserZone)
+
+The WM keeps the character's charged-buff list in session blob +0x650 = `{u16 n, PROTO_CHARGEDBUFF_INFO[n]}`
+(14 bytes: u32 ChargedBuffKey, u16 ChargedBuffID, ShineDateTime UseTime, ShineDateTime EndTime), loaded from CharDB
+0x101B and handed to every zone the character enters as 0x1032 NC_CHAR_ZONE_CHARGEDBUFF_CMD (W01 §6.3). The zone
+(`ShinePlayer_so_ply_ChargedBuff` FUN_005970c0, `ciee_Free` FUN_00450a50) sends each change to both the Character
+server (D03 §9: DB write + log) and the WM, so the copy stays current across zone changes.
+
+```pseudo
+Zone 0x9001 NC_CHARGED_SETBUFF_CMD { u32 CharRegistNumber, u64 ItemKey @4, u16 ItemId @0xC,
+        PROTO_CHARGEDBUFF_INFO ChargedBuff @0xE, u32 nUserNo @0x1C }   (0x20)                      @ FUN_0042a5b0
+    s = Clients_FindByCharNo(CharRegistNumber) with CHARDATA; none: return
+    blob +0x650 set: new = malloc(size + 14); copy; append ChargedBuff; n += 1; free old; size += 14
+    else: blob = { 1, ChargedBuff } (16 bytes)
+    # no duplicate-key check (the zone refuses "This effect is already set" before sending)
+
+Zone 0x9002 NC_CHARGED_RESETBUFF_CMD { u32 CharRegistNumber, u32 ChargedBuffKey, u16 ChargedBuffID, u32 nUserNo } (0xE)
+                                                                                                 @ FUN_0042a6d0
+    s = Clients_FindByCharNo(CharRegistNumber) with CHARDATA; none: return
+    no blob: LogLevel(4, "FAILED - fc_NC_CHARGED_RESETBUFF_CMD1, 유료버퍼없는데 지우기요청옴, nCharNo=%d, nKey=%d")
+        # Korean: "no paid buff, but a delete request came"
+    i = first entry with ChargedBuffKey (ChargedBuffID is not compared)
+    not found: LogLevel(4, "FAILED - fc_NC_CHARGED_RESETBUFF_CMD2, …")
+    n == 1: free the blob (ptr = size = 0)
+    else: new blob of size − 14 without entry i, n − 1
+```
+
+---
+
 ## Original-server bugs
 
 (Running list; the sweep part completes it.)
@@ -998,11 +1372,30 @@ Zone 0x6009 NC_CT_LUASCRIPT_SET_WORLD_CMD { u32 nCharNo, CT_INFO CTInfo { u8 Typ
 | W04-B19 | zone 0x6009 | forwarded to the player's zone as 0x380A (dept 14) instead of 0x600A NC_CT_LUASCRIPT_SET_ZONE_CMD (dept 24), which no zone handles either | Lua title grants for a player on another zone are lost | send 0x600A and handle it on the zone |
 | W04-B20 | 0x5401 | `charid` of the request is not compared with the sender's name; it is echoed to the target in 0x5403 | a player can send friend requests under any name (the confirm then fails with 0x94E) | use the session's own name |
 | W04-B21 | 0x541F | candidates cut at ≈ 113 in table order before the level sort; error 0x36C6 (own list full) has no client text | on busy worlds close-level players are missed; a full list gets no feedback | sort over all, then cut; use 0x36C1 |
+| W04-B22 | 0x703B | `nGameOptionDataCnt` unchecked; `n·3` bytes copied into the 8 KB stack packet before the size check | any player can crash the WM (n above ≈ 2730) | reject n above the option count / packet length |
+| W04-B23 | 0x705F | forwarded as 0x7060 NC_CHAR_OPTION_LOGIN_BLOCKDATA_ERR_REQ, which the 2016 Character server does not register | the client's "option data broken" report has no effect | Character server resets the option blocks |
+| W04-B24 | 0x7C04 | 0x7C05 code 0x0DA9 carries the remaining time in milliseconds; the client and the zone use seconds | the prison window shows 1000 × the remaining time | send remaining / 1000 |
+| W04-B25 | 0x7C09 | 0x7C10 nMinute, sReason, sRemark never written (stale stack; asm checked) | GM alters store random minutes / text in the DB; 0x7C11 applies the random minutes to the online prisoner and shows them in 0x7C03 | copy the fields like 0x7C01 does |
+| W04-B26 | 0x7C0F | err 0x0DB2 (DB read failed) does not register the prisoner in `CPrisonServer` though prisonmin ≠ 0 | no release timer this session; 0x7C04 answers 0x0DAA | start the timer from prisonmin regardless |
+| W04-B27 | 0x7C11 → 0x7C0A | DB failure code 0x0DA7; the client's alter handler maps 0x0D87 instead | GM sees no message when the alter fails in the DB | send 0x0D87 or map 0x0DA7 in the client |
+| W04-B28 | 0x8001 | one-hour limit inverted (`now − last ≤ 1 h` → forward; later → 0x0F42) | after the first report a player may report freely for an hour, then never again until relog (the DB's own limits still apply) | refuse when `now − last < 1 h` |
+| W04-B29 | 0x8001 | `nChatLogSize` unchecked (≤ 65 535) copied into a ≈ 2.3 KB stack buffer | any player can crash the WM | cap at 2048 and at the packet length |
+| W04-B30 | 0x8001 | refusals 0x0F47 (empty report type) and 0x0F48 (reporter in prison) have no client text | the report silently fails | use a code the client shows |
 
 (W04-B6 is reserved; not used.)
 
 ## Not reconstructed / uncertain (running list)
 
+- Prison: the zone answer 0x7C14 with err 0x0DC1 / 0x0DC2 tells the GM 0x0D88 but nothing undoes a partly done
+  `so_Prison_Go`; 0x7C0C failure → `CPrisonServer_Remove` sends 0x7C12, whose effect on a player already in EldPri
+  is Z08's (`so_Prison_End`). Z08 §12 describes 0x0DC0 as the default / not-found code; its code (FUN_005a4470)
+  sets 0x0DC0 = ok, 0x0DC1 = charNo mismatch, 0x0DC2 = `so_Prison_Go` failed (for the sweep's knowledge file).
+- 0x7C07 arrives while the client may already have left the character-select scene (it sends 0x7C06 together with
+  scene state 0xF); the game scene has no 0x7C07 handler, so whether the minutes are ever used is open (C01).
+- The client's 0x7C04 trigger (timer at 0 *(inferred)*) is not traced in the client.
+- Old character options: why `m_pCharOptionDataBinary_*` (+0x670…+0x6A4) exist but are never filled (the type-1
+  branch of `SendToClient_CharOptionData` is dead); probably left from before the Character server pushed the old
+  blobs itself *(inferred)*.
 - KQ schedule (`KQ_TickSchedule` FUN_00455e40 → FUN_00452160 next-occurrence, FUN_004555d0 add) and the KQ data /
   map-allocation / vote-rate / vote-allowed / team tables at CKQ+0x1B9D4…+0x1BB08: who loads them (SHN or DB) and the
   row layouts beyond the fields used in §6 are not read. `KQ_AllocMaps` FUN_00453eb0 and its slot finder FUN_00451fd0
