@@ -10783,6 +10783,20 @@ Z01 name was 'link inside the same zone (ours)'
 | 2 | u8 | count |  |
 | 3 | ABSTATE_INFORMATION[count] | infoList | ABSTATE_INFORMATION × count |
 
+### `0x201F` NC_ACT_SOMEONESHOUT_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_00459250 (ShineMob::smo_Shout), FUN_00459080 (ShineMobileObject::smo_Shout); client handler reads offset 1 as u16 for mobs (re-data/client-handlers.json 0x201f); 2017 PDB PROTO_NC_ACT_SOMEONESHOUT_CMD agrees)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount | 0 for mobs; link count for players |
+| 1 | char[20] | speaker | union: charID (player name, or a script-given name) / mobID (vt 0x708) when isMob |
+| 21 | u8 | flag | bit 0 GMColor (vt 0xef4), bit 1 isMob (mob version: speaker string empty); other bits stale in the mob version |
+| 22 | u8 | len | content length |
+| 23 | char[len] | content | text, then itemLinkDataCount × 0x67-byte item links (player version only) |
+
+to the whole map instance (target 0xFFFF) or one object. The mob version sends len + 0x1A bytes including the opcode, one stale byte more than the packet (Z09-B10).
+
 ### `0x2028` NC_ACT_PITCHTENT_ACK † (S→C)
 
 **Verified layout** (basis: zone FUN_00457760; client FUN_004aa010)

@@ -127,6 +127,44 @@
       "mob+0x22ec"
      ]
     ]
+   },
+   "0x201F": {
+    "dir": "S→C",
+    "name": "NC_ACT_SOMEONESHOUT_CMD",
+    "basis": "zone FUN_00459250 (ShineMob::smo_Shout), FUN_00459080 (ShineMobileObject::smo_Shout); client handler reads offset 1 as u16 for mobs (re-data/client-handlers.json 0x201f); 2017 PDB PROTO_NC_ACT_SOMEONESHOUT_CMD agrees",
+    "fields": [
+     [
+      0,
+      "u8",
+      "itemLinkDataCount",
+      "0 for mobs; link count for players"
+     ],
+     [
+      1,
+      "char[20]",
+      "speaker",
+      "union: charID (player name, or a script-given name) / mobID (vt 0x708) when isMob"
+     ],
+     [
+      21,
+      "u8",
+      "flag",
+      "bit 0 GMColor (vt 0xef4), bit 1 isMob (mob version: speaker string empty); other bits stale in the mob version"
+     ],
+     [
+      22,
+      "u8",
+      "len",
+      "content length"
+     ],
+     [
+      23,
+      "char[len]",
+      "content",
+      "text, then itemLinkDataCount × 0x67-byte item links (player version only)"
+     ]
+    ],
+    "notes": "to the whole map instance (target 0xFFFF) or one object. The mob version sends len + 0x1A bytes including the opcode, one stale byte more than the packet (Z09-B10)."
    }
   }
  }

@@ -10,7 +10,9 @@ Time unit: `g_Now` (DAT_14d41a70) counts **tenths of a second** (Z02 §1); "`g_N
 This file is written in parts (status: `docs/plan/status/Z09.md`). Sections so far: §1 main loop and global timers,
 §2 the player tick, §3 GM events, §4 prison (no zone timer), §5 mob object core (data, spawn, routines, NPC, bandit),
 §6 mob AI 1 (brain, target selectors, aggro, battle / recover, calls for help), §7 mob AI 2a (tactic state machine,
-weapons, attack sequences, captivated players, the dead `so_attack` / `so_Bash` path).
+weapons, attack sequences, captivated players, the dead `so_attack` / `so_Bash` path), §8 mob AI 2b (script-ordered
+skills and weapon rates, cross-counter, hit / heal rules of the non-player classes, skill blast delay, mob chat, mob
+shout, servant explosions, boss-field hooks, the charmed player's target selector).
 
 ---
 
@@ -507,7 +509,7 @@ Other mob tables loaded elsewhere and read in this part:
 | +0x1e74 | rule set: `RulesOfEngagementNormalPY` (no weapon or first weapon `HitType` 0) or `…NormalMA` |
 | +0x1e78 | flag byte: bit 0 invalid position, bit 2 Fear, bit 3 killed, bit 4 blast armed, bit 7 (vt 0xbf0) |
 | +0x1e8c…+0x1e9c | movement detector (FUN_0055d610): +0x1e8c 1 = moving, +0x1e90/94 last position, +0x1e98 time of the last change, +0x1e9c next check |
-| +0x1ea8 / +0x1eac | `g_Now + t` / `t`, t from the per-mob-ID behaviour object DAT_0084cc8c[mobId].vt[0]() (ms → tenths; 10⁹ when the ID is beyond DAT_0084cc84) (part 3) |
+| +0x1ea8 / +0x1eac | wander-chat timer `g_Now + t` / `t`, t = `MobChat` PIECE element of the mob ID (DAT_0084cc8c[mobId].vt[0](), ms → tenths; 10⁹ ms without a PIECE row) (§8.6) |
 | +0x1ec0 | spawning breeder (MobBreeder, part 6; −1 for NPC.txt NPCs) |
 | +0x1ec4 / +0x1ec8 | HP / SP |
 | +0x1ecc | the mob's own brief-info packet 0x1C08 `NC_BRIEFINFO_REGENMOB_CMD`; its payload pointer is +0x1f74 (§5.3) |
@@ -536,10 +538,13 @@ Other mob tables loaded elsewhere and read in this part:
 | +0x24b0 | battle state: 0 idle, 1 battle (`sm_DuringBattle`), 2 recover (`sm_DuringRecover`) (§6.5) |
 | +0x24b1 / +0x24b5 | family ring (prev / next mob of the same family; self when alone); vt 0x744 returns +0x24b1 |
 | +0x24bc, +0x24c0, +0x24c4 | rescue flags (bit 0 healed / not asking, bit 1 called by a dying friend, bit 2 help chat said), → friend to help (0), friend's last seen HP (60000) (§6.6) |
+| +0x24c8 / +0x24cc | script weapon rates `vector<u16>` (§8.2) |
 | +0x24d8 / +0x24da | u16 roaming flags `IsRoaming & 1 | (RoamingNumber & 0x7f) << 1` / RoamingDistance |
 | +0x24dc / +0x24e0 / +0x24e4 / +0x24e5 | last broadcast target / current target (vt 0xa04) / target-dirty flag / target order (vt 0xa08) |
 | +0x24e8 | NPCAction trigger entry for this mob ID (map DAT_14d50784, FUN_005c4420), or 0 |
 | +0x24ec | lifetime timer `{acc, period, active u8, start}` (vt 0xabc FUN_0055e5b0) |
+| +0x24fc | abstate level at death (`smo_BossAbstateSet` / `sm_BossAbstateGet`, §8.9) |
+| +0x2500 | resting until (vt 0xb34 / 0xb38, §7.1) |
 | +0x2504 / +0x2508 | script overrides MaxHP / MonEXP (0 = table) |
 | +0x250c | u8 drops enabled (1; `cSetNPCIsItemDrop` → vt 0xbb0 `so_mob_IsItemDropSetAtScript` FUN_004aa810) |
 | +0x250d | copy of the mob's MobResist row (0x34 bytes) |
@@ -547,6 +552,7 @@ Other mob tables loaded elsewhere and read in this part:
 | +0x255c | → MobConditionServer vector of the mob ID (or 0) |
 | +0x2560 / +0x2564 | spawn time / "regen animation over" flag (AI waits for it) |
 | NPC +0x2568 | u8 "from NPC.txt" (`so_npc_FromTable` vt 0xa80 FUN_004b19b0) |
+| servant +0x2568…+0x2580 | servant row, master, follow target, explosion state / next time / count left (§8.8) |
 | bandit +0x2666 | → bandit brief (`+0xc2` u8 object type, §5.10) |
 
 ### 5.3 Spawn: `so_mob_Regenerate` and `so_mob_RegenComplete`
@@ -1246,9 +1252,7 @@ The Lua bindings themselves (argument reading FUN_005f7680 / FUN_005f7ad0, resul
 
 ### 6.9 Not in this section
 
-- `MobTargetPlayerCaptivate` (vt FUN_004add20 `ali_Work`: player-only candidates without StaHide, not in a state
-  `vt 0xf20`, same layer; FUN_004abde0 init with radius 600; FUN_004abe10 scan) belongs to the charm abstate of the
-  player (part 4 with the tactics, or Z03 if the abstate is theirs).
+- `MobTargetPlayerCaptivate` (`ali_Work` FUN_004add20, `mts_Initialize` FUN_004abde0, `mt_SelectTarget` FUN_004abe10): §8.10.
 - `FamilyMobManagement::FamilyMobManager` (`fmm_Initialize` FUN_004b5050, `fmm_Dead` FUN_004b5120, `fmm_Remove`
   FUN_004b5a40, `fmm_Regist` FUN_004b5cf0) is a per-breeder-group table `{u16 mobId, u16 limit (default 60000), u16
   dead count}`: `fmm_Dead` counts a death and returns `count >= limit`. All callers are `MobBreeder` /
@@ -1266,8 +1270,8 @@ The Lua bindings themselves (argument reading FUN_005f7680 / FUN_005f7ad0, resul
   FUN_004f2d10 (part 15), `AxialListMagicFieldAggro` (`alns_ValidObject` FUN_0057a980, `almfa_AppendAggro` FUN_0057aad0;
   part 8), the tactic base `MobActionElement::mae_Action` FUN_004aa880 (part 4).
 - `MobChatManager` (`DAT_0084cc84`; `mcm_HelpReqChat`, `mcm_HelpAckChat`, `mcm_DetectBattleChat`, `mcm_DamageChat`) and
-  the per-mob-ID objects `DAT_0084cc8c` (= `MobChatManager`+8 *(inferred)*; they give the `+0x1ea8` delay of §5.2) are part 4
-  (MobChat).
+  the per-mob-ID objects `DAT_0084cc8c` (= `MobChatManager`+8, the PIECE array; they give the `+0x1ea8` delay of §5.2):
+  §8.6.
 
 ---
 
@@ -1788,10 +1792,441 @@ FUN_0042efb0, packets 0x242C–0x2431, Z03 §3.5) has no caller at all. The live
 `smo_SwingDamage`) and `smo_SkillBash_Casting`. This corrects Z03 §3.5 ("reached from `so_attack` … and the `&`
 commands") and narrows Z03 §7.1 (0x2406 / 0x2407 exist only in this dead path).
 
-### 7.9 Open for part 4b (§8)
+### 7.9 Continued in §8
 
-`so_mob_SkillRegistAtScript` / `SkillBlastAtScript` / `SkillParameterSetAtScript`, `mab_SkillRegistAtScript`
-(Attack +0xc/+0x10/+0x14), `so_mob_SetWeaponAsScript` FUN_004ab5e0 (vt 0xb74), `sm_scene_SetWeaponRate` (the +0x24c8
-vector), `cMobWeaponRate`, `ShineMobWeaponRate::sa_Step`; `MobChat`; `MobExplosionElement`; `smo_BossAbstateSet` /
-`sm_BossAbstateGet`; `sm_IBuffToBuffee`; `smo_Shout`; cross-counter; `so_mobile_ICanDamageTo` / `smo_ICanHealTo`;
-`smo_SkillBlastTick`; the `MobTargetPlayerCaptivate` selector functions.
+The script-driven skills and weapon rates, mob chat, servant explosions, boss-field hooks, the cross-counter and the
+hit / heal rules of the non-player classes are §8.
+
+---
+
+## 8. Mob AI 2b: script control, chat, servant explosions, boss hooks, hit rules
+
+Part 4b. Helpers as in §7.1. `RandomRing(n)` *(ours)*: the next value of a pre-filled ring of random numbers below `n`
+(`DAT_14d720d0 + n × 0x8008`: 0x4000 u16 values, index at +0x8000, mask at +0x8004); only for `1 ≤ n ≤ 100`, else 0.
+A mob's weapon vector (`MobDataBox` entry +8, §5.1) holds 0xC-byte slots `{→ MobWeapon row, u16 skill ID (+4), u8 present (+8)}`;
+"the weapon of skill `k`" below means the first slot whose skill ID is `k`.
+
+### 8.1 Skills ordered by scripts
+
+Three virtuals let Lua scripts make a mob use a skill. The base versions (`ShineObject::…`, all non-mob classes including
+players: `so_mob_SkillRegistAtScript` FUN_005d27f0, `so_mob_SkillBlastAtScript` FUN_005d2c80,
+`so_mob_SkillParameterSetAtScript` FUN_005d2fc0, `so_mob_SkillParameterSet` FUN_005d2e40) return false; the mob versions belong to `ShineMob` and are inherited by NPC, bandit, pet and servant.
+
+```pseudo
+ShineMob::so_mob_SkillRegistAtScript(m, target, skillId)     (vt 0xb7c)        @ FUN_005d2840
+    if m.param.flags (+0xfc0+0xcce) & 4: return false            # "cannot attack" abstate bit (Z03)
+    if m is casting (vt 0xea0, cast block +0x1d84 ≠ 0): return false
+    sp_castabort(m)                                              # vt 0xed4 FUN_00579d50: no-op here (it acts only while casting)
+    Attack = m+0x227c;  maa_SkillFromScriptClear(Attack)         # FUN_004b9470: skill 0xFFFF, weapon −1, target 0
+    *Attack.cell = target                                        # FUN_004b89a0 (returns Attack)
+    i = weapon index of skillId;  if none: return false
+    return Attack.vt[0x18](target, skillId, i)                   # mab_SkillRegistAtScript FUN_004b9400:
+                                                                 #   +0x14 = target, +0xc = skillId, +0x10 = i; true
+    # the tactic state is NOT changed: the order waits for the next MobActionAttack::mab_Think (§7.3)
+```
+
+`MobActionAttack::mab_Think` (§7.3) then calls **`so_mob_SetWeaponAsScript`** (vt 0xb74) instead of `so_mob_SelectWeapon`
+while `+0xc ≠ 0xFFFF`, and uses `+0x14` as the weapon target (clearing the order) once a weapon is chosen:
+
+```pseudo
+ShineMob::so_mob_SetWeaponAsScript(m, i8)                    (vt 0xb74)        @ FUN_004ab5e0
+    i = i8 & 0xFF                                     # (the 0xFFFFFFFF "none" test after the mask can never hit)
+    sk = SkillDataBox_Find(skill ID of weapon slot i)
+    if sk and m.SP (vt 0x4ec) >= sk.SP (+0xa0): weapon (+0x1fa8) = i; return i
+    weapon = −1; return −1
+ShinePlayer / other classes: FUN_004d8e20 returns −1
+```
+
+(original bug) **Z09-B11**: when the mob lacks the SP for the ordered skill, `SetWeaponAsScript` gives −1 and
+`mab_Think` returns `this` before the order is consumed (§7.3: "if i < 0: return this"); the order is only cleared when a
+weapon was chosen. Each tick the mob re-enters the same branch, so it neither attacks nor uses another weapon until its
+SP reaches the skill's cost, as long as it keeps its target in the Attack state. Weapon slot 0 (the normal attack, no
+skill row) can never be ordered this way for the same reason.
+
+```pseudo
+ShineMob::so_mob_SkillBlastAtScript(m, target, skillId)      (vt 0xb84)        @ FUN_005d2cd0
+    if m.param.flags & 4: return false
+    if target == null or no weapon of skillId: return false
+    m.weapon (+0x1fa8) = i
+    sm_UseWeapon(m, target)                            # §7.4: cast starts at once (no range, cooldown or casting check;
+                                                       #   cooldown vt 0x718 is not armed)
+    m.tactic (+0x22e4) = WaitSkillEnd.set(swing time (vt 0x71c), next = Targetting, target)   # mawse_SetNextAction FUN_004b92c0
+    return true                                        # even when sm_UseWeapon refused for lack of SP
+
+ShineMob::so_mob_SkillParameterSetAtScript(m, p)             (vt 0xb94)        @ FUN_005d3010
+    FUN_004a9d50(m, …): stat matrix +0x10a0 MinWC = p[0], +0x10a4 MaxWC = p[1], +0x10ac TH = (u16) p[2],
+                        +0x10b4 MinMA = p[3], +0x10b8 MaxMA = p[4], +0x10c0 MH = (u16) p[5];  return true
+ShineMob::so_mob_SkillParameterSet(m, skillId)               (vt 0xb90)        @ FUN_005d2e90
+    the same six values from the MobWeapon row of skillId (MinWC +0x53, MaxWC +0x57, TH +0x5b, MinMA +0x5d, MaxMA +0x61,
+    MH +0x65); false when the mob has no such weapon
+```
+
+Callers (all Lua C functions, documented in part 10): `cNPCSkillUse(caster, target, skillName)` FUN_005ef5c0 → vt 0xb7c;
+`cSkillBlast(caster, target, skillName, range)` FUN_005f0960 → vt 0xb84 after `dist² ≤ range²` (range 0 → 1000);
+`cSkillDamageCalculate(caster, skillName, target, params)` FUN_005f1370 → vt 0xb94 when `params` is a table, else vt 0xb90,
+then returns the skill's computed damage. Skill names resolve through `FUN_0063cc80(&DAT_13286d08, name)`.
+
+### 8.2 Weapon rates set by scripts
+
+`weapon rate(m, i)` (§7.4, FUN_004aa060) prefers the vector **+0x24c8 / +0x24cc** (`vector<u16>`, per mille) over
+`MobWeapon.BlastRate`; it is only read by `so_mob_SelectWeapon` for mobs without a `MobAttackSequence`. The vector is
+replaced as a whole and lives until the mob object is reused (the respawn in §5.3 does not reset it *(inferred: no write
+to +0x24c8 found outside FUN_0050dfa0)*).
+
+```pseudo
+ShineMob::sm_scene_SetWeaponRate(m, rates)                                     @ FUN_0050e0c0
+    m.weaponRates (+0x24c8) = rates                    # std::vector<u16> assignment FUN_0050dfa0
+
+PineEventScriptNode::ShineMobWeaponRate::sa_Step(node, ctx)                    @ FUN_004fa8c0
+    # map-script command:  mobweaponrate <mob> <rate0> <rate1> … (up to 8)      e.g. Kingkong.ps "mobweaponrate Kingkong 1000 200 100 0."
+    o = os_ShineObject(node, ctx);  require o to be a ShineMob (class-chain test)
+    rates = []
+    for k in 0..7: operand node+0x30+4k; stop when absent, when it fails to evaluate, or when its value is 0
+        rates.append(value)
+    sm_scene_SetWeaponRate(o, rates)
+
+cMobWeaponRate(handle, r0, r1, …)                    (Lua)                     @ FUN_005f3e30
+    o = GetObject(handle) as ShineMob; if none: return
+    rates = []
+    for a = 1 .. 9: if arg a is not a number or (u16) arg a == 0: break; rates.append((u16) arg a)
+    sm_scene_SetWeaponRate(o, rates)
+```
+
+(original bug) **Z09-B8**: `cMobWeaponRate` starts its loop at Lua argument **1**, which is the handle, so the stored
+vector is `[handle, r0, r1, …]`: every rate moves up one weapon. The 2016 scripts call it as
+`cMobWeaponRate(Handle, 1000, 200, 100, 0)` (`LuaScript/KQ/MiniDragon`, `HMiniDragon`, `Kingkong`, the same numbers as the
+PineScript `mobweaponrate` lines); the result is weapon 0 = handle (≥ 1000, so always), **weapon 1 = 1000 (always)**,
+weapon 2 = 200, weapon 3 = 100. Because `so_mob_SelectWeapon` tries the last weapon first, the boss now uses skill 1 every
+time it is off cooldown, and its normal attack only in between.
+
+(original bug) **Z09-B12**: both setters treat a rate of 0 as the end of the list (Pine: `value == 0 → break`; Lua:
+`(u16) arg == 0 → break`). The weapons after it fall back to their `MobWeapon.BlastRate` instead of being switched off:
+`mobweaponrate Kingkong 1000 200 100 0` leaves the fourth weapon (KQ_MiniDragon `KQ_MD_AtkSkil1_3`, BlastRate 200) at 20 %.
+
+### 8.3 Cross-counter (`so_smo_CrossCounterDamage`, vt 0x9ac)
+
+Called by `smo_SkillBash_Blast_Obj` (Z03 §5) when the attacker's skill is a counter skill: `dmg = t.so_smo_CrossCounterDamage(attacker)`;
+−1 = nothing to counter (the skill misses), otherwise the attacker deals `2 × dmg` as fixed damage.
+
+```pseudo
+ShineMobileObject::so_smo_CrossCounterDamage(t, a)                             @ FUN_004a5360   (base; doors, movers)
+    if t.flags1e78 & 0x10 (skill blast armed, second phase pending) and t.cast.skill (+0x1d98) has an effect object (+0x70):
+        ctx = damage context (t, a, skill, empower +0x1dac, t.position)          # FUN_0042abf0
+        if effect.vt[0x20](ctx):                       # the effect applies to a
+            dmg = effect.vt[0x1c](ctx)                 # damage t's skill would have dealt to a
+            t.flags1e78 &= ~0x10;  t.cast (+0x1d84) = 0     # t's skill is cancelled
+            return dmg
+    return −1
+
+ShinePlayer::so_smo_CrossCounterDamage(p, a)                                   @ FUN_004a54b0
+    if (d = base(p, a)) >= 0: return d
+    if p's attack schedule (+0x173d0) is running and its current target handle == a.handle (vt 0x344):  # FUN_00576000 / FUN_005776d0
+        p.vt[0x588](); a.vt[0x588]()                   # both "in battle" (§6.5)
+        dmg = p.rules (+0x1e74).vt[0x1c](ctx);  hit = rules.vt[0x18](ctx)     # normal-attack damage and hit rate
+        if rand(1000) <= hit: advance the schedule past this swing (FUN_00577780); return max(dmg, 1)
+    return −1
+
+ShineMob::so_smo_CrossCounterDamage(m, a)          (pet, NPC, bandit, servant too)  @ FUN_004a56a0
+    if (d = base(m, a)) >= 0: return d
+    if m.flags24ac & 4 (between swing start and hit of a normal attack, §7.3):
+        m.vt[0x588](); a.vt[0x588]()
+        dmg = m.rules.vt[0x1c](ctx);  m.flags24ac &= ~4
+        m.tactic = Targetting
+        m.vt[0xed8]()                                  # FUN_0042adf0: 0x243D NC_BAT_CEASE_FIRE_CMD { u16 handle } to sight
+        return max(dmg, 1)
+    return −1
+```
+
+A mob's swing is countered unconditionally (no hit roll, unlike the player branch); the pending `MobActionSwingDamage`
+is abandoned because the state is reset to Targetting.
+
+### 8.4 Who may hit or heal whom (non-player classes)
+
+`so_mobile_ICanDamageTo(a, d)` (vt 0x980) and `smo_ICanHealTo(a, d)` (vt 0xe94). The base test and the player versions are
+Z03 §3.3 / §5; these are the other classes:
+
+```pseudo
+ShineMob::so_mobile_ICanDamageTo(m, d)         (mob, NPC, bandit)              @ FUN_00435140
+    if not base(m, d) (FUN_00434f30): return false
+    d = d.vt[0x9b0]() or d                         # a pet or servant counts as its master
+    if d is a pet (kind 12): return false
+    if d is a player (2) or mover (11):
+        if d.vt[0xc70]() == 1: return false        # GM-invincible
+        if the field has a guild tournament (fm_GetGuildTournamentSystem) and d.guild (vt 0x828) == m.guild: return false
+    return m.vt[0xe60](d) != 1                     # not on the same side (§6)
+
+ShinePet::so_mobile_ICanDamageTo                                               @ FUN_004350f0   → false (pets never hit)
+ShinePet::smo_ICanHealTo                                                       @ FUN_00435770   → false
+
+ShineServant::so_mobile_ICanDamageTo(s, d, why)                                @ FUN_00436790
+    if s.+0x2594 bit 0 (vt 0xdec FUN_0054af90: "independent" servant): return ShineMob rule (above)
+    return s.master (+0x256c) ? master.vt[0x980](d, why) : false              # otherwise the master's (player) rules
+ShineServant::smo_ICanHealTo(s, d)                                             @ FUN_004356b0
+    return s.master ? master.vt[0xe94](d) : false
+ShineServant same side (vt 0xe60)  FUN_0054b100: master ? master.vt[0xe60](d) : ShineMob_IsSameSide(s, d)
+
+ShineMobileObject::smo_ICanHealTo(a, d)        (base: doors, movers)           @ FUN_004352d0
+    return not a.vt[0x980](d, "smo_ICanHealTo")    # whatever a may not attack, a may heal
+ShineMob::smo_ICanHealTo(m, d)                 (mob, NPC, bandit)              @ FUN_004357c0
+    return base(m, d) and m.vt[0xe60](d) == 1      # not attackable and on the same side
+
+ShineMover::so_mobile_ICanDamageTo(v, d)                                       @ FUN_004368c0
+    the ShinePlayer rule set (Z03 §3.3) with the mover as attacker, in this order:
+    base; d = owner or d;
+    d player / mover: GM-invincible → false; StaImmortal (291) or StaAdlFLoussierIMT (499) on either side → false;
+        d or v captivated (vt 0xf20) → true;
+        **if the field has no kingdom-quest object (field+0x10 == 0): false**;
+        KQ type 4: party / raid / guild / guild-war rules as for players;
+        freePK (+0x54) → true; same party → false; IsPartyBattle (row +0x69) → true; same raid → false;
+        different guilds: tournament enemy → true, EnemyGuild (row +0x63) and guild war → true;
+        vt 0xe0c(d) (KQ team enemy) → true; else false
+    d mob / bandit / NPC: not same side (vt 0xe60, FUN_0054b130 = the rider's answer through vt 0xcb0),
+        not the mover's guild, and d has a mob row (vt 0x70c) → true
+```
+
+The mover differs from the player version in one place: outside kingdom-quest maps it never may damage a player or
+mover (the player version falls through to the free-PK / party / guild rules). Whether this is meant (movers as KQ
+vehicles) is open (§8.11).
+
+### 8.5 `smo_SkillBlastTick` (vt 0xf14): delay between a skill's blast and its damage
+
+Used by `SkillBlastEffectContainer::sbec_Store` FUN_00438380 (Z03 §5: the effect is queued at `g_Now + tick`).
+
+| Class | Function | Value (tenths) |
+|---|---|---|
+| base (door, mover) | FUN_004358e0 | 0 |
+| player | FUN_00435930 | `skill.server.HitTime (+0x4b) × 10 / 1000`; 100000 without a skill |
+| mob, NPC, bandit, pet, servant | FUN_004359b0 | the **current weapon's `MobWeapon.HitTime` (+0x4d)** × 10 / 1000 when the weapon index is valid, else as the player (99999 without a skill) |
+
+This corrects Z03 §5 ("mobs 0"): only doors and movers use 0.
+
+### 8.6 Mob chat (`MobChat::MobChatManager`, `DAT_0084cc84`)
+
+Data: `World/<world>/MobChat.txt`, falling back to `World/MobChat.txt` (2016: only the fallback exists), loaded by
+**`MobChatManager::mcm_Load`** FUN_004af640, called once at start-up right after `mdb_Load` (call at 0x5add9b, argument =
+the world folder name DAT_14d460bc). If neither file reads: log "MobChat::MobChatManager::mcm_Load : Error in Script read"
+(the server continues with empty tables).
+
+Seven tables, identical columns `MobIndex (mob InxName), Rate0 u32, Rate1 u32, Script0…Script3 char[65]`:
+
+| Table (code name) | Array (manager +) | Element class, slot | Fired by | 2016 rows |
+|---|---|---|---|---|
+| `PIECE` | +0x08 (DAT_0084cc8c) | `MobChatElementWander` (0x130 bytes): vt 0 interval, vt 4 `mceb_WanderChat` | idle timer +0x1ea8 in `MobActionWander::mab_Think` FUN_004bb790 (§7.2) | 330 |
+| `ATTACK` | +0x0c | `MobChatElement` (0x128), vt 8 `mceb_AttackChat` | normal attack (weapon 0) in `sm_UseWeapon` (§7.4) | 330 |
+| `DAMAGED` | +0x10 | vt 0xc `mceb_DamageChat` | every hit, `ShineMob::so_DamagedBy` FUN_00431750 (Z03) | 330 |
+| `DEAD` | +0x14 | vt 0x10 `mceb_KilledChat` | `ShineMob::so_KilledBy` FUN_00432760, after the kill bookkeeping | 330 |
+| `HELPMAIN` | +0x18 | vt 0x14 `mceb_HelpReqChat` | the mob calling for help, `sm_DuringBattle` FUN_00568d30 (§6.6, once per fight: rescue flag bit 2) | 32 |
+| `HELPSUB` | +0x1c | vt 0x18 `mceb_HelpAckChat` | a helper answering, `so_RescueRoutine` FUN_00569050 (§6.6, flag bit 1) | 32 |
+| `RACERESCU` | +0x20 | vt 0x1c `mceb_DetectBattleChat` | a helper noticing a fight, `so_RescueRoutine` (§6.6) | **0 loaded** (file: 32 `RACERESCUE` rows) |
+
+```pseudo
+MobChatManager::mcm_Load(mgr, world)                                           @ FUN_004af640
+    mgr.count (+0) = maxMobId (DAT_14d4509c) + 1
+    7 arrays of count pointers, every slot = &mgr+4    # a static MobChatElementBase (vftable 0x6c1f94): every chat is a
+                                                       #   no-op, interval FUN_004ae540 = 1 000 000 000
+    for every MobInfo row r (r < DAT_14d45098):
+        e = g_MobData entry of r.ID; if none: log "…mcm_Load : Null inf" (fatal log)
+        for each of the 7 table names (char[20], compared as 5 dwords: TableNameCompareArgument FUN_006470f0):
+            rec = record of that table with MobIndex == MobInfo.InxName (FUN_00647c00); if none: continue
+            if slot already set: log "…mcm_Load : Duplicate entry"          # cannot happen: each mob is visited once
+            slot[r.ID] = new element(rec)                                    # FUN_004aeb20 copies the record
+            PIECE only: range = Rate1 − Rate0; mult = 1; while range > 99: range /= 2, mult *= 2
+                        element +0x128 = range, +0x12c = mult
+            (a record of an unknown table logs "Invalid Flag": unreachable, the names are fixed)
+    element.lines (+0x124) = number of Script columns before the first one that starts with '-' (0…4)
+
+MobChatManager::mcm_<X>Chat(mgr, m)                (Wander FUN_004ae570, Attack FUN_004ae640, Damage FUN_004ae710,
+                                                    Killed FUN_004ae7e0, HelpReq FUN_004ae8b0, HelpAck FUN_004ae980,
+                                                    DetectBattle FUN_004aea50)
+    id = m.mobId (vt 0x70c row → u16 ID); if id < mgr.count: array_X[id].vt[slot_X](m)
+
+MobChatElement::mceb_<event>Chat(e, m)             (ATTACK … RACERESCU; FUN_004aedd0, FUN_004aef00, FUN_004af030,
+                                                    FUN_004af160, FUN_004af290, FUN_004af3c0: identical bodies)
+    if e.lines == 0: return
+    if rand(1000) <= e.Rate0 (+0x18):                  # Rate0 = chance in per mille (data: 10…100); Rate1 unused
+        text = e.Script[RandomRing(e.lines)]
+        m.so_Chat(0xFFFF, text, strlen(text), chatwin 0, links 0)          # vt 0x530 → 0x2002 below
+
+MobChatElementWander::mceb_WanderChat(e, m)                                    @ FUN_004aecb0
+    the same without the Rate0 roll (the timer already decided)
+MobChatElementWander::mceb_MobChatInterval(e)      (vt 0)                      @ FUN_004aebb0
+    e.lines == 0 ? 10⁹ : Rate0 + RandomRing(range) × mult       # milliseconds; e.g. 1 800 000 … 3 400 000 = 30–57 min
+```
+
+The interval is drawn **once per spawn**: `so_mob_RegenComplete` (§5.3) arms the periodic timer +0x1ea8/+0x1eac with
+`interval / 100` tenths; it then repeats with the same period while the mob wanders. (This resolves the "behaviour object
+`DAT_0084cc8c`" of §5.2 / §6.9: it is the PIECE array.) The destructor FUN_004af4f0 frees every non-default element.
+
+The line goes out as **0x2002 NC_ACT_SOMEONECHAT_CMD** (`ShineMobileObject::so_Chat` FUN_00458c90, layout in Z02 §3.1)
+to everyone in sight of the mob: `handle` = the mob, `flag` GMColor = vt 0xef4 (0 for mobs), font / balloon colour from
+vt 0xe2c / 0xe34. The client shows it like a player's chat line over the mob *(inferred: same handler as player chat)*.
+
+(original bug) **Z09-B9**: the loader looks up the table name `"RACERESCU"` (9 letters), but `MobChat.txt` declares
+`#Table RACERESCUE`; the file parser stores table names with `strncpy(…, 20)` (FUN_00646100) and the lookup compares all
+20 bytes, so the table is never found and the 32 `RACERESCUE` rows are ignored: `mcm_DetectBattleChat` always hits the
+default no-op element.
+
+### 8.7 Mob shout and scripted mob chat
+
+```pseudo
+ShineMob::smo_Shout(m, target, speaker, content, len)   (vt 0x534; mob, NPC, bandit, pet, servant)   @ FUN_00459250
+    0x201F NC_ACT_SOMEONESHOUT_CMD {
+        u8 itemLinkDataCount = 0,
+        speaker (20 bytes): speaker != "" ? speaker[20] : u16 mobID (vt 0x708) in the first two bytes,
+        u8 flag: isMob (bit 1) = (speaker == ""), GMColor (bit 0) = vt 0xef4 (0); other bits = stale buffer bits,
+        u8 len, u8 content[len] }
+    size sent = len + 0x1A                       # (original bug) Z09-B10: one byte more than the packet (the player
+                                                 #   version FUN_00459080 sends len + 0x19); the extra byte is stale buffer
+    target == 0xFFFF ? so_AllInMap1(m, …)        # the whole map instance
+                     : send only to GetObject(target)   ("…ShineMob::so_Shout : Packet Too Long" when the length is refused)
+ShineObject::smo_Shout                                                          @ FUN_00459030   (non-mobile objects: no-op)
+```
+
+The client reads `speaker` as a u16 mob ID when `isMob` is set (client handler reads offset 1 as u16, C01 table
+`re-data/client-handlers.json` 0x201f) and shows the mob's name. Callers: the Lua `cMobShout` FUN_005dbcd0 (part 12) and the
+map-script node `ShineNPCShout` FUN_004eecd0 (part 15).
+
+```pseudo
+cMobChat(handle, scriptName, key, chatwin)           (Lua)                       @ FUN_005e2560
+    o = GetObject(handle); set = script-string set scriptName (FUN_0064ce70(&DAT_150e04e8, name): "Invalid script name")
+    text = set.ScrString(key) (FUN_0048ce60; "" when missing)
+    o.so_Chat(0xFFFF, text, strlen(text), chatwin & 0xFF, 0)        # vt 0x530 → 0x2002 to sight
+    return 0 values
+```
+
+### 8.8 Servant explosions (`MobExplosionElement`)
+
+Only `ShineServant` (object kind 10, summoned by a player's skill) uses these; the servant object itself is part 8.
+State at servant **+0x2574** = one of five singletons (`PTR_vftable_0084c9c0` Base, `…c4` Enemy, `…c8` Target, `…cc` Always,
+`…d0` TargetAll; one slot each, `meb_Routine(servant, row) → next state`). Servant members used: +0x2568 → servant row,
++0x256c master, +0x2570 follow target (vt 0xf78 FUN_00557110), +0x257c next explosion time, +0x2580 i16 explosions left,
++0x1fbc death time. Row fields *(ours; the table is identified in part 8)*: +0x54 lifetime ms (0 = unlimited), +0x5c
+explosion kind, +0x60 trigger radius, +0x64 u16 skill ID (0xFFFF none), +0x68 blast mode, +0x6c u16 explosion count,
++0x70 delay / interval ms.
+
+```pseudo
+ShineServant::so_mob_RegenComplete(s, arg)                                      @ FUN_00442c50
+    ShineMob::so_mob_RegenComplete(s, arg)   (§5.3);  master = follow = 0
+    s.deathTime (+0x1fbc) = row.lifetime ? g_Now + lifetime/100 : 0
+    state by row.kind: 1, 4 → Enemy;  2 → Target;  3 → ss_ExplosionReady(s);  5 → TargetAll;  else → Base
+
+ShineServant::ss_ExplosionReady(s)                                              @ FUN_0057b5d0
+    s.nextBlast = g_Now + row.interval/100;  s.left = row.count;  return Always
+
+ShineServant::so_Routine(s, …)                                                  @ FUN_0056c070
+    if s not dead:
+        if no master (vt 0x9b0 FUN_00557090: +0x256c not removed, mode 1/2/4, same field): s.vt[0x33c](0,1,3); FreeObject(s, 9); return
+        if deathTime and deathTime < g_Now: mode = 3; s.vt[0x33c](0,1,3); FreeObject(s, 10); return
+    ShineMob::so_Routine(s, …)                       (§5.4: tactics, AI)
+    if alive (mode ∉ {0, 3}): s.state = s.state.meb_Routine(s, row)
+
+Base::meb_Routine                                    FUN_0057b660   → Base (never explodes)
+Enemy::meb_Routine(s, row)                           FUN_0057b6b0
+    if no master: meb_Vanish(s, 0); → Base
+    scan row.radius around s with AxialListNearScanSkillEnemy (DAT_13286090; s as caster)
+    any enemy found → ss_ExplosionReady(s) (Always) else stay
+Target::meb_Routine                                  FUN_0057b830
+    if no master: Vanish(0); → Base
+    f = follow target; if f present, not removed (vt 0x300), mode ∉ {0, 3} and not dead (vt 0x28 `IsDead` FUN_005557a0: flag +0x1d7c or HP 0):
+        if dist²(s, f) <= radius²: → ss_ExplosionReady(s)    else stay
+    else Vanish(0) (stays Target until removed)
+TargetAll::meb_Routine                               FUN_0057bb20
+    if no master: Vanish(0); → Base
+    scan radius with AxialListScanSkillTarget (DAT_13284318); ready if it found ≥ 2 objects, or one that is not the master
+Always::meb_Routine                                  FUN_0057b9d0
+    if no master: Vanish(0); → Base
+    if s.left <= 0: Vanish(3); → Base
+    if s.nextBlast <= g_Now:
+        if meb_Explosion(s, row, master): s.left −= 1
+        if s.left < 1: Vanish(1); → Base
+        s.nextBlast = g_Now + row.interval/100
+    stay
+
+MobExplosionBase::meb_Vanish(s, sec)                                            @ FUN_004a4110
+    s.vt[0xf7c](sec)       # ShineServant SetSuicide FUN_004a3490: state = Base, deathTime = g_Now + sec × 10,
+                           #   vt 0x24, AxialListMobSuicide::alms_SelfKill(s) (part 8)
+
+MobExplosionBase::meb_Explosion(s, row, master) → bool                          @ FUN_004a7960
+    sds_Initialize(damage sender DAT_0087efc4)                        (Z03 §5)
+    if not s or not master or row.skill == 0xFFFF or not (sk = SkillDataBox_Find(row.skill)): return false
+    stat matrix ← the servant's MobWeapon row of that skill (as so_mob_SkillParameterSet, §8.1)
+    row.blastMode: 1 smo_SkillBash_Blast_Trap_Loc(s, s.pos, sk)   (FUN_005835e0)
+                   2 smo_SkillBash_Blast_Trap_Obj(s, s, sk)       (FUN_005838a0)
+                   3 Trap_Loc at the follow target's position;  4 Trap_Obj on the follow target;  else nothing
+    if s has StaEntrapHide (abstate 77): reset it (vt 0x650), clear its brief bit, broadcast the reset   # the trap shows itself
+    sds_Finish({time g_Now, skill sk, credited attacker = master, position s.pos, …})   # sends the damage results (Z03)
+    return true
+ShineServant::so_serv_LastExplosionReady(s)                                     @ FUN_00552f80
+    if row and not s.IsDead (vt 0x28): nextBlast = g_Now; left = 1; if row.kind ≠ 0: state = Always   # one last blast at once
+```
+
+### 8.9 Boss-field hooks on mobs
+
+**Abstate level at death** (`smo_BossAbstateSet`, vt 0xf64; called by `ShineMobileObject::so_KilledBy` FUN_00432240 before
+the abstates are cleared):
+
+```pseudo
+ShineMob::smo_BossAbstateSet(m)                                                 @ FUN_005d3ab0
+    m.bossAbstate (+0x24fc) = 0
+    c = ListOfMobStateCheckAtDead[m.mobId]   (DAT_14d6fcb8, FUN_005d2580; 0x14-byte entries {DropType, vector<abstate index>, …};
+                                              loaded from MobAbStateDropSetting.shn by lomscad_Load FUN_005d5970, part 16)
+    if c: m.bossAbstate = macad_AbstateCheck(c, m.abstates (+0x1cc))          # FUN_005d3880
+macad_AbstateCheck:
+    list empty → 0
+    DropType 0: number of m's abstates whose index is in the list               # e.g. WereBear: StaPuryImpactStun, StaBoneArrow, StaDeeper
+    DropType 1: the strength (element +0x18) of the first of m's abstates equal to the single listed abstate, else 0
+ShineMobileObject::smo_BossAbstateSet                                           @ FUN_005d25e0   (players, doors, movers: no-op)
+ShineMob::sm_BossAbstateGet(m) = m.bossAbstate                                  @ FUN_005d2620
+```
+
+The only reader is `ItemDropFromMob::DropItemListForSpecies::dilfs_ItemDrop` FUN_0048ef80, which picks drop list
+`[bossAbstate]` of the species (part 7). 2016 data: 6 mobs, DropType 0 (MaxCount 2 or 3) and one DropType 1 (MaxCount 10).
+
+**Buff from a "buffer" mob** (`sm_IBuffToBuffee`, called by `ShineMob::so_Routine` §5.4 when the MobDataBox entry flag
++0x28 bit 0 is set; `sbbt_Load` FUN_005d4580 sets it for every ConditionMob):
+
+```pseudo
+ShineMob::sm_IBuffToBuffee(m)                                                   @ FUN_005d48c0
+    if g_Pulse5s >= g_Now: return                      # once per 5 s (§1.4)
+    b = ServentBuffBossTable.sbbt_FindBuffer(m.mobId)  # DAT_14d6fca4, FUN_005d47f0: the StateMob.shn row whose
+                                                       #   ConditionMobInx is m: {target mob ID, abstate index, abstate, strength}
+    if b: so_AllInMap1(m, AxialListMobStateSet{targetMob, abstate, strength, keep 6000 ms})    # FUN_004eb880
+AxialListMobStateSet::work(o)                                                   @ FUN_004f0fc0 → FUN_004eb8d0
+    if o is a mob (kind 5) and (targetMob == 0xFFFF or o.mobId == targetMob):
+        abstate data == null ? reset the abstate on o
+                             : o.so_AbnormalState_Set(o, abstate, strength, data, g_Now, 0, 0, 6000 ms, how 9, 0)
+                               → brief bit, broadcast set, vt 0x3f0 inform, recalc (vt 0x528)
+```
+
+So while a condition mob lives, every target mob in the same map instance carries the abstate (renewed every 5 s for 6 s);
+2016 `StateMob.shn` (6 rows): B_CrackerGuardian / B_CrackerLooter → B_CrackerHumar (StaCrackerWCUpRate / ACUpRate 1),
+BH_Looter / BH_Guardian → BH_Humar (strength 2), BH_Helga → BH_KaraTemplerAC (StaMobACPlus), BH_HelgaBall →
+BH_KaraTemplerMR (StaMobMRPlus).
+
+### 8.10 `MobTargetPlayerCaptivate`: the target selector of a charmed player
+
+Built in the player constructor at p+0x2a9d0 and used by the captivated-player brain (§7.7).
+
+```pseudo
+mts_Initialize(sel, owner, arg)                                                 @ FUN_004abde0
+    sel+0xc = owner;  sel+0x14 = arg;  scan radius (+0x10) = 600;  result block → sel+0x38
+mt_SelectTarget(sel, p)                (vt 0x28)                                @ FUN_004abe10
+    sel.found (+0x40) = 0;  if p: ShineObject_ScanSight(p, sel)        # calls ali_Work per object in sight
+ali_Work(sel, p, o)                    (vt 0)                                   @ FUN_004add20
+    skip unless mdb_CanIKill(o.mobId (vt 0x708), 1 = by a mob) and o.side (vt 0x8cc) ≠ 0
+    if o has StaImmortal (291) or StaAdlFLoussierIMT (499): copy o's name to the debug ring DAT_0085dfb0; skip
+    skip if o is dead (mode 3) or not placed (mode 0), has StaHide (75), is not a player, or is captivated itself (vt 0xf20)
+    if same layer and o can be seen from p's sub-layer:
+        sel.found = o; sel+0x38 = o.handle; sel+0x3c = o.identity (vt 0x344); stop the scan
+```
+
+The charmed player therefore attacks the first visible, uncharmed, unprotected **player** in scan order (radius 600 is set
+but `ShineObject_ScanSight` FUN_00553c20 calls `so_AllOfRange_Class1` with range 0, i.e. the whole sight list, and
+`ali_Work` has no distance test, so the radius is not applied *(inferred: range 0 = sight)*).
+
+### 8.11 Open points of this section
+
+- The servant row table behind +0x2568 (fields +0x54…+0x70) and `vt 0x33c` / `FreeObject` reasons 9 / 10: part 8.
+- `ShineMover::so_mobile_ICanDamageTo` refuses all player targets outside kingdom-quest maps; whether movers ever attack
+  (and whether that is intended) is not checked here (movers: part 8).
+- The scanner classes `AxialListNearScanSkillEnemy` / `AxialListScanSkillTarget` belong to Z03's skill targeting.
