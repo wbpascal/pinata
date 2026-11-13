@@ -10834,6 +10834,58 @@ never sent by the 2016 zone: the batch counter is never incremented (original bu
 
 corrects Z02 §5 ('no zone code sends 0x1C0E'); client queues the handle in CharMgr.m_kmapDeletedChar (pdb2017) unless char+0x9be, removes minimap/decal/KQ marks
 
+### `0x1C0F` NC_BRIEFINFO_BUILDDOOR_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone BriefInformationDoor ctor FUN_00549260 (length 0x32), ShineDoor::so_door_Build FUN_0043f7b0 / so_door_DoorAction FUN_00550770 fill it, sent by ShineDoor::so_SendMyBriefInfo FUN_00555b60; client On_NC_BRIEFINFO_BUILDDOOR_CMD FUN_004a0a60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | door handle (20638…21637) |
+| 2 | u16 | mobid | MobInfo ID of the door model |
+| 4 | SHINE_COORD_TYPE | coord | x, y (u32 each), u8 dir (2° units) |
+| 13 | u8 | doorstate | DA_CLOSE 0, DA_OPEN 1, DA_BREAK 2 (client: 0 closed, 1/2 open, other ignored) |
+| 14 | Name8 | blockindex | 32-byte .sbi door block name; empty until the first so_door_DoorAction (Z09-B33) |
+| 46 | u16 | scale | ‰, client divides by 1000 |
+
+Z09 §13.1
+
+### `0x1C10` NC_BRIEFINFO_DOOR_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone BriefInfoExchangeDoor::bixd_Send FUN_0043d7d0 (length 3 + 0x30·n), bixd_Exchange FUN_0043ff60; client On_NC_BRIEFINFO_DOOR_CMD FUN_004a0b00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | doornum | ≤ 28 per packet |
+| 1 | NC_BRIEFINFO_BUILDDOOR_CMD[doornum] | doors | 0x30 bytes each |
+
+Z09 §13.1
+
+### `0x1C11` NC_BRIEFINFO_EFFECTBLAST_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone BriefInformationEffect ctor FUN_005491f0 (length 0x32), ShineEffectObject::so_effect_EffectBlast FUN_004b1540 / FUN_004b1770; client On_NC_BRIEFINFO_EFFECTBLAST_CMD FUN_004bd900 → EffectObjectMgr::AddEffectObject FUN_004c4560)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | effect object handle (19388…20387) |
+| 2 | Name8 | effectname | 32-byte effect file name |
+| 34 | SHINE_COORD_TYPE | coord | x, y, u8 dir |
+| 43 | u16 | detach | followed object's handle, 0xFFFF = placed at coord |
+| 45 | u16 | scale | ‰ |
+| 47 | u8 | flag | bit 0 loop |
+
+Z09 §13.2
+
+### `0x1C12` NC_BRIEFINFO_EFFECT_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone BriefInfoExchangeEffect::bixe_Send FUN_0043d900 (length 3 + 0x30·n); client On_NC_BRIEFINFO_EFFECT_CMD FUN_004bd920)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | effectnum | ≤ 28 per packet |
+| 1 | NC_BRIEFINFO_EFFECTBLAST_CMD[effectnum] | effects | 0x30 bytes each |
+
+Z09 §13.2
+
 ### `0x1c19` NC_BRIEFINFO_ABSTATE_CHANGE_LIST_CMD (S→C)
 
 **Verified layout** (basis: zone FUN_0043cc00)
@@ -10998,6 +11050,21 @@ player tick, on change (+0x172dc)
 **Verified layout** (basis: zone FUN_005792f0)
 
 Empty payload.
+
+### `0x243C` NC_BAT_DOTDAMAGE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone AxialListMobSuicide::alms_SelfKill FUN_004f1720 (broadcast in sight, length 0xF); client FUN_004b5740)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | object | the self-killed mob |
+| 2 | u32 | resthp | 0 |
+| 6 | u16 | damage | HP read after so_KilledBy |
+| 8 | u16 | abstate | 0x318 = none |
+| 10 | u16 | hpchangeorder | vt 0x7e8 |
+| 12 | u8 | IsMissDamage | 0 |
+
+only the self-kill send site of Z09 (cMobSuicide / ShineSuicide / servant vanish, §13.3); the DoT send sites belong to Z03
 
 ### `0x2445` NC_BAT_SKILLBASH_CASTABORT_ACK (S→C)
 
@@ -11274,6 +11341,17 @@ empty payload
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0xA42–0xA5A |
+
+### `0x6C09` NC_SCENARIO_DOORSTATE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone ShineDoor::so_door_DoorAction FUN_00550770 (broadcast to the map); client On_NC_SCENARIO_DOORSTATE_CMD FUN_004a3510)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | door | door handle |
+| 2 | u8 | doorstate | DA_CLOSE 0 / DA_OPEN 1 (DA_BREAK 2 never sent) |
+
+the client switches its own door block by the name stored from the last 0x1C0F/0x1C10 (Z09-B33); Z09 §13.1
 
 ### `0x6C0B` NC_SCENARIO_OBJTYPECHANGE_CMD (hand-named) (S→C)
 

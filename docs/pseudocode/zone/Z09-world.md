@@ -25,7 +25,8 @@ range queries, 0x1C0E on moves). §10 spawns (MobHatchery / breeder groups / bre
 time, families, the 1-s regen event, script and Lua spawners, KQ / instant regen tables) and the treasure-chest maker.
 §11 drops (tables, roll, drop objects, loot rights, party/raid loot, dice game). §12 magic fields (ground-effect skills:
 spread, tick, damage / heal / aggro, 0x1C0C / 0x1C0D) and axial flags (map anchors that run the map cinema and the
-guild tournament).
+guild tournament). §13 doors (script-built gates, 0x1C0F / 0x1C10 / 0x6C09), effect objects (0x1C11 /
+0x1C12) and servants (skill summons: `MiscDataTable` SkillBreedMob, master link, roaming, flags, vanish).
 
 ---
 
@@ -136,7 +137,7 @@ ShineObjectEachList.soel_Routine(list)                              @ FUN_0054f7
 | ShineDropItem | `ShineDropItem::so_Routine` | later part (drops) |
 | ShineMiniHouse | FUN_00567400 | Z06 §3.4 / Z13 |
 | ShineMagicField | `ShineMagicField::so_Routine` FUN_0056d7e0 | §12.4 |
-| ShineEffectObject, ShineDoor, ShineServant | `…::so_Routine` | later part (objects) |
+| ShineEffectObject, ShineDoor, ShineServant | FUN_00569ef0, FUN_00567280, FUN_0056c070 | §13.2, §13.1, §8.8 |
 | ShineBandit | `ShineBandit::so_Routine` FUN_0056c630 | §5.10 |
 | ShineMobileObject (base of all movers) | FUN_0056a080 (cast completion: Z03 §5) | §5.5 |
 | ShinePlayer | FUN_0056c790 | §2 |
@@ -2100,9 +2101,13 @@ ShineMover::so_mobile_ICanDamageTo(v, d)                                       @
         not the mover's guild, and d has a mob row (vt 0x70c) → true
 ```
 
-The mover differs from the player version in one place: outside kingdom-quest maps it never may damage a player or
-mover (the player version falls through to the free-PK / party / guild rules). Whether this is meant (movers as KQ
-vehicles) is open (§8.11).
+**Correction (part 8b):** the test written above as "field has no kingdom-quest object (field+0x10 == 0)" reads
+`fm_MapInfo` (FieldMap +0x10, the map's MapInfo row) *(pdb2016)*: only a field without a MapInfo row (none in practice)
+refuses; `MapInfo.KingdomMap` (+0x3a) == 4 selects the KQ branch. So the mover follows the player rule set (Z03 §3.3)
+step for step, and movers may hit players on PK fields, party-battle maps and in guild wars like their riders do.
+In the KQ branch the raid test compares the mover's own raid number with itself (`this->vt 0xa84` twice), so any mover
+whose rider is in a raid counts every target that is also in a raid as "same raid" (original bug) Z09-B31; the player
+version FUN_004361a0 has the same self-compare in its KQ branch (Z03 did not record it).
 
 ### 8.5 `smo_SkillBlastTick` (vt 0xf14): delay between a skill's blast and its damage
 
@@ -2349,9 +2354,8 @@ but `ShineObject::so_AllOfRange_Simple` FUN_00553c20 calls `so_AllOfRange` with 
 
 ### 8.11 Open points of this section
 
-- The servant row table behind +0x2568 (fields +0x54…+0x70) and `vt 0x33c` / `FreeObject` reasons 9 / 10: part 8.
-- `ShineMover::so_mobile_ICanDamageTo` refuses all player targets outside kingdom-quest maps; whether movers ever attack
-  (and whether that is intended) is not checked here (movers: part 8).
+- The servant row table behind +0x2568 and `vt 0x33c` / `FreeObject` reasons 9 / 10: settled in §13.3 / §12 (part 8b).
+- ~~`ShineMover::so_mobile_ICanDamageTo` refuses all player targets outside KQ maps~~: misread, settled in §8.4 (part 8b).
 - The scanner classes `AxialListNearScanSkillEnemy` / `AxialListScanSkillTarget` belong to Z03's skill targeting.
 
 ---
@@ -3128,7 +3132,7 @@ smb_ObjectRegen(ctx, o, h, node) → bool @ FUN_004e3180
     argument logs "smb_ObjectRegen" with its index
     o.kind (vt 0x4d0) 4 / 5 (NPC / mob): vt 0x6e0 Regenerate(map, x, y, dir, h, mobId, 0, −1, 0, 0, −1, 1, 0, 0);
         failure: free(h, reason 200), return false
-    kind 7: vt 0x6dc (map, x, y, dir, h, mobId, 1000, 0, 0)   # the door kind *(inferred from SysFuncShineDoorBuild; part 8)*
+    kind 7: vt 0x6dc `ShineDoor::so_door_Build`(map, x, y, dir, h, mobId, scale 1000, layer 0)   # doors (§13.1)
     other kinds: log "smb_ObjectRegen : Invalid ObjType"
 smb_ObjectChange(ctx, o, h, node)       @ FUN_004e3540   arg 0 = handle of an existing object, arg 1 = mob name: spawn o
     at that object's map / position / direction (same kind rules; "Null map" when it has none); the old object is
@@ -3937,3 +3941,394 @@ the axial-flag pool (§1.3), not from the map. Flags are never freed while the s
 - The client byte +0x213 == 0x42 / vt 0xd4 in `On_NC_BRIEFINFO_MAGICFIELDSPREAD_CMD` (a caster animation) was not traced.
 - `almfd_BattleField` / `slmfd_GuildWarMap` are filled and never read: maybe a planned guild-war rule.
 - `smo_MagicFieldSpread`'s `vt 0x648` / `vt 0x64c` (abstate on the caster, NOTTARGET) are the cast-side helpers of Z03.
+
+---
+
+## 13. Other world objects 2: doors, effect objects, servants
+
+Part 8b. Three object classes that scripts and skills put on a map. Doors and effect objects are passive (no AI);
+servants are mobs summoned by a skill and owned by their caster. Movers (kind 11) belong to Z13; only their hit rule
+is here (§8.4, corrected in this part). Object kinds and handle ranges (Z01 knowledge, pool table): door 7 (handles
+20638…21637, 1000 slots), effect 9 (19388…20387, 1000), servant 10 (21638…22137, 500).
+
+### 13.1 `ShineDoor` (kind 7, 0x1f14 bytes): script-built gates
+
+Members *(pdb2016)* on top of `ShineMobileObject`:
+
+| Offset | Member | Use |
+|---|---|---|
+| +0x1ea8 | `sd_DoorBriefInfo` (`BriefInformationDoor` 0x47: `bid_pack`, `bid_array[51]`, `bid_nc`, `bid_BriefInfo` +0x1eeb) | ready-made 0x1C0F packet; the object's position pointers (+0x66 / +0x6a) point into its `coord` |
+| +0x1eef | `sd_Locate` (`LoginLocation`: map Name3, x, y, dir) | `so_LoginLocation` (vt 0x4bc) |
+| +0x1f04 | `sd_MobDataBox` | the door's MobInfo entry (model, `so_mobile_GetIdxName` vt 0x894 = `InxName`) |
+| +0x1f08 | `sd_HP` | set to MobInfo.MaxHP at build, **never read** |
+| +0x1f0c | `sd_Retrate` | 1 = remove at the next tick (`so_RetrateFromMap` vt 0x3f4) |
+| +0x1f10 | `sd_BlockInfo` (`MapDoorBlockElement*`) | **never written or read** (only zeroed by the pool) |
+
+Packets *(pdb2016)*: 0x1C0F `NC_BRIEFINFO_BUILDDOOR_CMD` = `PROTO_NC_BRIEFINFO_BUILDDOOR_CMD` (0x30: u16 `handle`, u16
+`mobid`, `SHINE_COORD_TYPE coord` (x, y, u8 dir), u8 `doorstate` +0xd, `Name8 blockindex` +0xe (32 bytes), u16 `scale`
++0x2e); 0x1C10 `NC_BRIEFINFO_DOOR_CMD` { u8 `doornum`, BUILDDOOR[doornum] }; 0x6C09 `NC_SCENARIO_DOORSTATE_CMD`
+{ u16 `door`, u8 `doorstate` } (`MapBlock::DoorAction`: `DA_CLOSE 0`, `DA_OPEN 1`, `DA_BREAK 2`).
+
+```pseudo
+ShineDoor::ShineDoor()                                                          @ FUN_0055af50
+    ShineMobileObject ctor; BriefInformationDoor ctor (FUN_00549260: packet 0x1C0F, length 0x32, scale 1000); sd_Locate.map = ""
+
+ShineDoor::so_door_Build(map Name3*, x, y, dirDeg, handle, mobId, scale, u64 layer) → FM_MarkingError   (vt 0x6dc) @ FUN_0043f7b0
+    lastMoveCmd (+0x168) = 0
+    sd_Locate = { map, x, y, dir = dirDeg/2 (+180 if negative) }      # 2-degree units, as for mobs
+    brief.coord = (x, y, dir);  brief.doorstate = 0 (closed);  brief.blockindex = ""     # the block name stays empty
+    sd_MobDataBox = mobdatabox[mobId]; none → assert "…so_door_Build : Not in MobDataBox", return FM_BLOCKED (3)
+    r = so_MapMarking(1) (§5.7); r ≠ FM_MARKSUCCESS → return r                      # caller frees the slot
+    sd_HP = row.MaxHP;  brief.handle = handle; brief.mobid = mobId; brief.scale = scale
+    so_SetLayerRegNum(layer)
+    vt 0x6f8 so_door_BuildComplete(handle)
+    if MoveManager kind (+0x18c) ≠ 3: clear the MoveManager (kind, speed, duration, …), dest = current position
+    return FM_MARKSUCCESS (0)
+
+ShineDoor::so_door_BuildComplete(handle)                     (vt 0x6f8)          @ FUN_004422a0
+    so_InitAIScript (vt 0xc14, ShineObject::so_InitAIScript FUN_00558c80: script pointer 0, the 8 function names "")
+    lastMoveCmd = 0;  mode byte (*(+0xe9c)) = 1;  sd_Retrate = 0;  sub-layer word (+0x76 → +0/+4) = 0
+    briefdoor batch count = 0
+    sight² (g_SightDistSq) = 0 without map / MapInfo; −1 for OSS_WIDE sight or fm_CameraState (+0x124) == 1; else MapInfo.Sight²
+    so_AllInMap(so_ExchageBriefInfo FUN_00441460)            # Z02 §5.2: every player in sight gets 0x1C0F
+    +0x1e78 &= ~2
+
+ShineDoor::so_door_DoorAction(blockName, action) → 1         (vt 0x318)          @ FUN_00550770
+    brief.doorstate = action;  brief.blockindex = blockName (32 bytes)
+    mbi_DoorAction(field.fm_BlockInfo, brief.blockindex, action)                    (§9.2: changes .shbd)
+    broadcast to every player of the map (so_AllInMap, AxialListPacketBroadcast):
+        0x6C09 NC_SCENARIO_DOORSTATE_CMD { door = own handle, doorstate = action }
+    # (other classes: vt 0x318 is a folded "return 0" body, CGambleObject::GDTSO_SetDiceProbability FUN_004021b0)
+
+ShineDoor::so_Routine(list, h)                                (vt 0x4ac)         @ FUN_00567280
+    if position outside fm_XSize / fm_YSize: assert "fm_IsInFieldSize : Door"; +0x1e78 |= 1 (invalid position)
+    if so_RemakeHandle(h) ≠ own handle: assert "…so_handle is invalid!!!", fix the handle
+    if sd_Retrate: so_Unmark(0, 1, 3) (0x1805 to the map, §12.6), som_FreeObject(handle, REMOVE_NOW, reason 6)
+    if either slanted-list node is invalid: FieldMap::fm_Relink(field)     # same tail as every object routine (§9.6)
+    return 1
+ShineDoor::so_RetrateFromMap()  (vt 0x3f4)  sd_Retrate = 1                                   @ FUN_00495e50
+    # vt 0x3f4 callers: map clear (`AxialListObjectClear::ali_Work` FUN_00495940), `so_RetreatFromMapByImmeditely`,
+    #   vanish iterators (`AxialListMobVanish::almv_Vanish` FUN_004283a0 / `::ali_Work` FUN_004283c0,
+    #   `AxialListMobIndexVanish::ali_Work` FUN_005f0050, `AxialListVanishDropItem::ali_Work` FUN_00428a00), cNPCVanish FUN_005d8be0, &releasenpc (Z11)
+ShineDoor::so_RemakeHandle(i) = i < 1000 ? i + 20638 : 0xFFFF                                @ FUN_00555ba0
+ShineDoor::so_ObjectType() = 7                                                               @ FUN_00643150
+ShineDoor::so_FillBriefInformation(dst)  (vt 0x4c4) copy the 0x30-byte brief into a 0x1C10 batch slot @ FUN_00555c00
+ShineDoor::so_SendMyBriefInfo(rcv)       (vt 0x4c8) rcv ← 0x1C0F (rcv.vt[0x2fc] sender, vt 0xc)     @ FUN_00555b60
+ShineDoor::so_LoginLocation = &sd_Locate (FUN_00555b90);  so_mobile_GetIdxName = row.InxName (FUN_00555bf0)
+
+BriefInfoExchangeDoor::bixd_Exchange(batch, rcv, door)                           @ FUN_0043ff60
+    only for rcv kind 2 (player); copies rcv's name (vt 0x56c) into the `namestring` ring and never uses it
+    if batch.doornum > 27: bixd_Send(rcv); doornum = 0
+    door.vt[0x4c4](&batch.doors[doornum]); doornum++
+BriefInfoExchangeDoor::bixd_Send(batch, rcv)                                     @ FUN_0043d7d0
+    if doornum and rcv is a player in a mode ≠ 0: rcv ← 0x1C10 { doornum, doors } (length 3 + 0x30·n)
+```
+
+The other inherited slots keep the `ShineMobileObject` behaviour: `so_KilledBy` is the base one, but no class may hit
+a door (the player and mob damage rules of Z03 §3.3 / §8.4 accept only players, movers, mobs, bandits and NPCs as
+targets), so doors are indestructible and `sd_HP` is dead data. Nothing passes `DA_BREAK`.
+
+**Who builds and switches doors.** Every caller allocates a pool slot of kind 7 first and frees it (reason 0x17) when
+the build fails.
+
+```pseudo
+cDoorBuild(mapName, mobIndexName, x, y, dirDeg, scale) → handle | nothing        @ FUN_005dc5f0
+    field = fc_FindMap(mapName); needs fm_GetCenterObject(field) (the map's axial flag, §12.7)
+    mobId = mdb_2MobID(mobIndexName) (≠ 0xFFFF); slot = som_AllocObject(kind 7)
+    so_door_Build(field (its Name3 fm_MapID), x, y, dir, slot, mobId, scale, layer 0)
+    success: push slot handle, return 1;  failure: free slot (0x17), return 0
+cDoorAction(handle, blockName, "open" | "close") → 1 | nothing                   @ FUN_005dc840
+    o = som_GetObject(handle); o.kind must be 7; blockName and the word must be strings
+    "close" → o.so_door_DoorAction(blockName, DA_CLOSE); "open" → DA_OPEN; any other word: no action, still returns 1
+PineEventScriptNode::ShineDoorBuild::sa_Step                                     @ FUN_004f9440
+    slot = AllocObject(7) ("…ShineDoorBuild::sa_Step : Too many mob"); OtherStatement::os_ObjectRegen(…, slot) (§10.8 / part 14)
+    failure: free (0x17)
+PineEventScriptNode::SysFuncShineDoorBuild::sfb_Calculate → handle or 0xFFFF     @ FUN_004e3990
+    slot = AllocObject(7); ScriptMobBreeder::smb_ObjectRegen (§10.8) → kind 7 builds with scale 1000
+    failure: List::l_Free(slot) (FUN_004b1300), result 0xFFFF
+PineEventScriptNode::ShineDoorOpen::sa_Step / ShineDoorClose::sa_Step            @ FUN_004ed970 / FUN_004edb30
+    o = os_ShineObject(stack) (statement's object argument); if o.kind == 7: evaluate the block-name argument
+    → o.so_door_DoorAction(name, DA_OPEN / DA_CLOSE); else assert "…ShineDoorOpen::sa_Step : Invalid object"
+    (the Close node logs the Open node's text: copy-paste, harmless)
+&doorbuild (AmpersandCommand::ac_DoorBuild FUN_0041aa50): GM command, Z11
+```
+
+The 2016 Lua scripts always build and close a door in one go (`cDoorBuild` then `cDoorAction(h, block, "close")`,
+e.g. `ID/GraveYardH/Functions/Progress.lua`, `Promote/Job2_Gamb/Functions/Progress.lua`) and open it later; `WarHH`
+opens doors and locks that the map file placed.
+
+**Client** (2016 `GameFrameWork` handlers, names from the 2017 PDB *(pdb2017)*):
+
+- 0x1C0F `On_NC_BRIEFINFO_BUILDDOOR_CMD` (FUN_004a0a60): unless the handle is the player's own, `CharMgr::AddMob`
+  (FUN_00648290) creates a door character from `mobid` at `coord`, scale `scale`/1000, **stores `blockindex` in the
+  character (+0x9bf)** and shows the closed (doorstate 0) or open (1, 2) pose; then updates the client's own copy of the
+  door block (FUN_0067a700 → FUN_0067aa10: block found by case-insensitive name; closed for 0, open for 1 / 2, other
+  values ignored; "Error Door Block Data" message box when the block's width is not a multiple of 8).
+- 0x1C10 `On_NC_BRIEFINFO_DOOR_CMD` (FUN_004a0b00): the same per entry (without the own-handle check).
+- 0x6C09 `On_NC_SCENARIO_DOORSTATE_CMD` (FUN_004a3510): finds the character (asks 0x1C01 when unknown), plays the
+  close (state 0) or open (1 / 2) animation (FUN_0063f490) and updates the client block **by the name stored at
+  +0x9bf**; other states are ignored.
+
+Because `so_door_Build` sends the brief with an empty `blockindex` and 0x6C09 carries no name, every client that saw
+the door appear before its first `so_door_DoorAction` keeps the name "" and its door block is never switched by
+0x6C09 (the lookup matches no block); only clients that get the brief later (entering sight, 0x1C01) learn the name.
+The server's `.shbd` and those clients' collision then disagree until they leave and re-enter sight (original bug)
+Z09-B33.
+
+### 13.2 `ShineEffectObject` (kind 9, 0x1d3 bytes): a visual effect placed by a script
+
+Derives from `ShineObject` (not mobile: no HP, no MoveManager). Members *(pdb2016)*: +0x167 `seo_EffectBriefInfo`
+(`BriefInformationEffect` 0x47, payload pointer `bie_BriefInfo` +0x1aa), +0x1ae `seo_VanishTime` (tick), +0x1b2
+`seo_LoginLoc`, +0x1c7 `seo_Detach` (object followed, raw pointer), +0x1cb `seo_DetachCheck` (`Metronome`).
+
+Packets *(pdb2016)*: 0x1C11 `NC_BRIEFINFO_EFFECTBLAST_CMD` = `PROTO_NC_BRIEFINFO_EFFECTBLAST_CMD` (0x30: u16 `handle`,
+`Name8 effectname` +2 (32 bytes), `SHINE_COORD_TYPE coord` +0x22, u16 `detach` +0x2b (followed object's handle,
+0xFFFF none), u16 `scale` +0x2d, u8 `flag` +0x2f bit 0 `loop`); 0x1C12 `NC_BRIEFINFO_EFFECT_CMD` { u8 `effectnum`,
+EFFECTBLAST[effectnum] }.
+
+```pseudo
+ShineEffectObject::ShineEffectObject()                                          @ FUN_00559130
+    ShineObject ctor; BriefInformationEffect ctor (FUN_005491f0: packet 0x1C11, length 0x32, scale 1000); Metronome
+
+so_effect_EffectBlast(handle, map, obj, Name8 name, ms, scale, loop)      (vt 0x6e4: on an object)    @ FUN_004b1540
+so_effect_EffectBlast(handle, map, x, y, dirDeg, Name8 name, ms, scale, loop) (vt 0x6e8: at a spot) @ FUN_004b1770
+    seo_Detach = obj (spot version: null)
+    seo_VanishTime = g_Now + ms·10/1000                   # ms → tenths
+    seo_DetachCheck = every 50 ticks (5 s), first at g_Now + 50
+    brief = { handle, effectname = name, detach = obj.handle (spot: 0xFFFF), scale, flag.loop = loop & 1 }
+    object version: brief.coord = obj's position and direction; seo_LoginLoc = obj.vt[0x4bc]() with that position
+                    (the `map` argument is ignored: the effect goes on obj's map)
+    spot version:   brief.coord = (x, y, dirDeg/2 (+180 if negative)); seo_LoginLoc = { map, x, y, dir }
+    r = so_MapMarking(1); r ≠ 0 → return r                 # caller frees the slot
+    vt 0x6f0 so_effect_BlastComplete(handle); return 0
+
+ShineEffectObject::so_effect_BlastComplete(handle)            (vt 0x6f0)         @ FUN_004423e0
+    so_InitAIScript (no script); sub-layer word = 0; briefeffect batch count = 0; sight² as for doors (§13.1)
+    so_AllInMap(so_ExchageBriefInfo)                       # every player in sight gets 0x1C11
+
+ShineEffectObject::so_Routine(list, h)                        (vt 0x4ac)         @ FUN_00569ef0
+    if position outside the field: assert "fm_IsInFieldSize : Effect"; seo_VanishTime = 0
+    if seo_DetachCheck due: next += 50
+        if seo_Detach and dist²(self, seo_Detach) > 100: so_MoveTo(detach.x, detach.y, 5)   # keep up within 10 units
+    if seo_VanishTime <= g_Now: so_Unmark(0, 1, 3) (0x1805 to the map); som_FreeObject(handle, REMOVE_NOW, reason 5)
+    if so_AIScript.AIScript (+0x7e): LuaScriptScenario::lss_Routine(script, Entrance name, LuaArgumentMobAI(handle, field))
+        # runs even in the tick that freed the object; a script is only present if one was attached later (part 9a)
+    return 1
+ShineEffectObject::so_RetrateFromMap() (vt 0x3f4): seo_VanishTime = 0  (removed next tick)  @ FUN_00495cc0
+so_RemakeHandle(i) = i < 1000 ? i + 19388 : 0xFFFF (FUN_00555450);  so_ObjectType() = 9 (FUN_00643070)
+so_LoginLocation = &seo_LoginLoc (FUN_00555440);  so_FillBriefInformation: copy the 0x30-byte brief (FUN_005554a0)
+so_SendMyBriefInfo (vt 0x4c8) = the drop item's body FUN_00555280: rcv ← 0x1C11
+BriefInfoExchangeEffect::bixe_Exchange / bixe_Send                               @ FUN_004400a0 / FUN_0043d900
+    as for doors (§13.1) without the name copy; 0x1C12 { effectnum, effects } (length 3 + 0x30·n, ≤ 28 per packet)
+```
+
+`seo_Detach` is a raw pointer that nothing clears: when the followed object is removed first, the effect keeps
+following whatever the pool slot holds next (a re-used slot or the freed object's last position) until its own
+vanish time (original bug) Z09-B34 *(effect inferred; no crash, the pool memory stays allocated)*. The client
+attaches the effect to the `detach` character itself, so this only shifts the server-side position used for later
+briefs.
+
+**Creators** (all allocate a kind-9 slot, free it on failure):
+
+```pseudo
+cEffectRegen_Object(mapName, effectName, handle, seconds, loop, scale) → handle | nothing   @ FUN_005e4f30
+    needs two strings and a non-zero existing handle; scale 0 → 1000
+    vt 0x6e4(slot, mapName, obj, effectName, seconds × 1000, scale, loop); failure: free (reason 0x32)
+cEffectRegen_XY(mapName, effectName, x, y, dirDeg, seconds, loop, scale) → handle | nothing  @ FUN_005f0b50
+    scale 0 → 1000; vt 0x6e8(slot, map, x, y, dir, effectName, seconds × 1000, scale, loop); failure: free (0x32)
+    # argument order read from the disassembly (0x5f0cc4…): the decompile swaps arguments 7 and 8
+PineEventScriptNode::ShineEffectObject::sa_Step  (var = ShineEffectObject(handle, name, ms, scale))   @ FUN_004f2570
+    o = GetObject(handle) ("…: no Object" / "…: no effect"); slot = AllocObject(9) ("…: Too many Effect")
+    if o has a field: vt 0x6e4(slot, script map name, o, name, ms, scale, loop 0); var = slot; failure: free (0x1f)
+    if o has no field: nothing; the allocated slot is not freed here, but its first `so_Routine` finds a vanish
+        time in the past (0 or the previous occupant's) and frees it (reason 5) *(inferred: pool memory not reset)*
+PineEventScriptNode::ShineEffectLocate::sa_Step (var = ShineEffectLocate(name, x, y, dir, ms, scale)) @ FUN_004f28e0
+    slot = AllocObject(9); vt 0x6e8(slot, script map name, x, y, dir, name, ms, scale, loop 0); var = slot; failure: free (0x20)
+```
+
+Lua takes seconds, Pine milliseconds. The FH documentation *(fh-doc)* gives the same order for `cEffectRegen_XY`
+but only five arguments for `cEffectRegen_Object` (Scale as the 5th); the code and the 2016 scripts use six (5th =
+loop, 6th = scale: `KQ/EmperorSlime` `cEffectRegen_Object(MapIndex, effect, Handle, 3600000, 1, 1000)`). That script
+passes 3600000 as if it were milliseconds: × 1000 and then × 10 overflow 32 bits, and the effect lasts ≈ 45 h instead
+of 1 h (a script data mistake, not a server bug). Lua users: the roulette of `Promote/Job2_Gamb`, AI scripts
+(`E_XTreeBig`, `E_MomSlime`) and KQ boss effects.
+
+**Client** (`On_NC_BRIEFINFO_EFFECTBLAST_CMD` FUN_004bd900 / `On_NC_BRIEFINFO_EFFECT_CMD` FUN_004bd920 →
+`EffectObjectMgr::AddEffectObject` *(pdb2017)* FUN_004c4560): loads the effect file named `effectname`; `detach`
+0xFFFF → placed at `coord` (direction × 2°), else attached to that character (no effect when the character is
+unknown); scale `scale`/1000; `loop` bit kept; an effect already registered under the same handle is replaced. It
+disappears with the object's 0x1805 logout broadcast (§12.6).
+
+### 13.3 `ShineServant` (kind 10, 0x2598 bytes): mobs summoned by a skill
+
+A `ShineMob` with a master. Members (+0x2568…+0x2594, *(pdb2016)*) and the explosion states: §8.8. This section adds
+the summon, the master link, the overrides and the end of life.
+
+**Table: `World/MiscDataTable.txt`, table `SkillBreedMob`** (`MiscDataTable::mdt_Load` FUN_004a82d0 at `zs_start_sun`;
+read error → "Error in read MiscDataTable.txt", ShineExit). The loader reads five tables in order: `SkillBreedMob`
+(`mdt_SkillBreedMob` FUN_004a6880, this section), then `AbStateReset`, `Neutralization`, `Polymorph`,
+`StateCondition` (`mdt_AbStateReset` FUN_004a6580 / `mdt_Neutralization` FUN_004a64c0 / `mdt_Polymorph`
+FUN_004a63e0 / `mdt_StateCondition` FUN_004a3550: skill side effects, see Coverage
+boundary). Skill rows are `MiscData_Skill` (0x80, ≤ 100, kept sorted by skill ID; `mdt_SkillBufferAlloc`
+FUN_004a3d90 finds or adds the row of a skill name: unknown skill "Imvalid skill name" / > 100 "Too many Data" →
+ShineExit; new rows from `mds_Init` FUN_004a2e50: BreedMob 0xFFFF, Polymorph 0xFFFF, all else 0 / none).
+
+| Column (type) | Member | Values |
+|---|---|---|
+| Skill (String[33]) | `mds_SkillID` | row key |
+| MobIndex (String[33]) | `mds_BreedMob` +2 | mob to summon (unknown → "Imvalid mob name", ShineExit) |
+| SummonNum (BYTE) | `mds_SummonNumber` +4 | servants per cast |
+| AI (Index) | `mds_AI` +8 | `Root` 0 `SAI_ROOT`, `Chase` 1, `Rampage` 2, `Roam` 3 |
+| RegenLoc (Index) | `mds_RegenLoc` +0xc | `Caster` 0 `RL_CASTER`, `Target` 1 |
+| RegenDistance (WORD) | `mds_RegenDistance` +0x78 | ring radius around the spawn point, 0 = same spot |
+| MobRoam (Index) | `mds_RoamingType` +0x7c | `-` 0, `Straight` 1, `Random` 2 |
+| LifeTime (DWRD) | `mds_LifeTime_MilliSec` +0x54 | ms, 0 = until the master leaves |
+| AbState (String[33]) | `mds_Abstate` +0x10 | abstate put on the servant at summon (`-` = none) |
+| TriggerObject (Index) | `mds_ExploseTriggerObject` +0x5c | `-` `Enemy` `Target` `Always` `CasterTarget` `TargetAll` (§8.8) |
+| TriggerRange (DWRD) | `mds_ExploseTriggerRange` +0x60 | |
+| Delay (WORD) | `mds_ExplosionDelay` +0x70 | ms between blasts |
+| ExplNo (WORD) | `mds_ExplosionNumber` +0x6c | number of blasts |
+| Explosion (String[33]) | `ExploseEffectSkill` +0x64 | skill fired (`-` = 0xFFFF) |
+| ExplosionWhere (Index) | `ExploseEffectSkillTo` +0x68 | `-` `MyLoc` `MyObj` `TargetLoc` `TargetObj` |
+| Debuff (Index) | `mds_Dead.ByDebuff` +0x58 bit 0 | `Dead` = the servant can be killed by a dispel (vt 0x984 `so_MiscTable` in `ShineMobileObject::so_Dispel` FUN_0042bf70, Z03) |
+| MultiTarget (Index) | `mds_MultiSummonType` +0x74 | `-` `MST_NONE`, `Multi` `MST_MULTI` |
+
+2016 rows: traps (`Entrap01…10`, Root + StaEntrapHide + Enemy trigger), homing arrows (`SlowShot*`, Chase + Target
+trigger), summons (`Summon01` 3 skeletons, Rampage), fire poles (Roam + Always, blasts every 7–10 s), the light fields
+and orbs of class skills (Root, no explosion) and many boss summons.
+
+```pseudo
+MiscDataTable::mdt_SkillBlast_Summon(caster, target, skillId, pos, multiType)    @ FUN_004a7530
+    # callers (Z03 skill blast): SkillBlastEffect::sbe_BlastObject FUN_00583bc0 and sbe_BlastLocate FUN_00584160
+    #   (multiType MST_NONE, target null for the location version); AxialListScanSkillTarget::alsst_SkillBlast
+    #   FUN_00582de0 and alsst_SkillBlast_RandomTarget FUN_00583180 (MST_MULTI, per hit target, first hit step only)
+    if not caster or not pos: return
+    row = bsearch(skillId) or the default row mdt_DefSkill (BreedMob 0xFFFF)
+    if row.BreedMob == 0xFFFF or row.MultiSummonType ≠ multiType: return      # Multi rows only from the multi-target blast
+    if caster has no field: assert "…Map name null"; return
+    for i in 0 … SummonNumber−1:
+        slot = som_AllocObject(kind 10) ("…: Too many mob" → stop)
+        s.vt[0x9b4] so_serv_ServantMissionSet(row)  (FUN_0044a970: ss_MiscTable = row)
+        mdt_Summon_RegenLoc(row, i, caster, pos, &at, &dir) fails → "…Get regenLocation fail", stop   # slot stays allocated, see below
+        r = s.vt[0x6e0] so_mob_Regenerate(caster.field, at, dir·2, slot, row.BreedMob, brief 0, regnum −1,
+                                           family 0, breeder 0, level −1, 1, caster's layer)
+        r ≠ 0: free(slot, reason 0x26); stop
+        if the field has a Lua script: fm_LuaScriptFuncExec(field, 0x90, LuaArgumentServantSummon(field, s, caster))   # part 9a
+        if s has STA_IMMORTAL (spawn protection *(inferred)*): reset it (vt 0x650(0x123), bit reset, broadcast reset)
+        s.vt[0xc54] so_serv_SetRoamingData(row.RoamingType, dir, (180/SummonNumber)/2, caster.x, caster.y)
+        t = target;  if row.TriggerObject == ETO_CASTERTARGET or no target: t = caster.vt[0x75c]() (its current target)
+        if row.AI == SAI_CHASE and t and t ≠ caster:
+            s.so_mob_AppendAggro(t, 100000);  s.vt[0x98c] so_serv_SetTarget(t);  reset STA_IMMORTAL again
+        s.vt[0x988] so_serv_SetMaster(caster, row)
+        if row.Abstate set and as_FromIndex finds it: s.vt[0x638](s, abstate, 1, …, g_Now, keep 4200000000)
+            → bit set + broadcast set (keep −0x5a91600)
+```
+
+When `mdt_Summon_RegenLoc` fails, the slot allocated in that round is neither regenerated nor freed here; the next
+`ShineServant::so_Routine` (§8.8) finds no master and frees it with reason 9 *(inferred: assumes the pool cleared
+`ss_Master` and the mode of the previous occupant; not checked)*. The remaining servants of that cast are not made.
+
+```pseudo
+MiscDataTable::mdt_Summon_RegenLoc(row, i, caster, pos, out at, out dir) → bool  @ FUN_004a2f50
+    (null row / caster / at / dir → assert "…MiscData_Skill NULL" / "Caster NULL" / "pRegenLoc NULL" / "pDirect NULL", false)
+    at = RL_CASTER ? caster position : pos (RL_TARGET); other → "…mds_RegenLoc type default", false
+    dir = caster's direction
+    if RegenDistance == 0: return true                     # all servants on one spot
+    dir = sr_ShineDirectCheck(dir + i × (180 / SummonNumber))   # spread evenly on a circle (2° units)
+    goal = at + RegenDistance × (sin, cos)(dir) / 1024
+    if so_FindBlockLocateFrom(caster, at, goal, RegenDistance, &p, mbi_IsMoveBlock) and p ≠ at: at = p; return true
+    return false                                          # also when the free spot found is the centre itself
+
+ShineServant::ShineServant()   ShineMob ctor; ss_MiscTable = &ShineObject::so_MiscTableDef           @ FUN_0055b340
+ShineServant::so_mob_Regenerate(… same 14 args as ShineMob …)  (vt 0x6e0)                          @ FUN_004b4780
+    r = ShineMob::so_mob_Regenerate(…) (§5.3); then vt 0xabc(mobdatabox[mobId].p_MobLifeTime)   # MobLifeTime row (§5.1)
+    (wrong index → "MobDataBox::operator [] :Invalid mob index"); return r
+ShineServant::so_mob_RegenComplete           (vt 0x6f4)  §8.8 (deathTime from the row, explosion state)
+
+ShineServant::so_serv_SetMaster(master, row)                 (vt 0x988)          @ FUN_004a3c50
+    if not master: return
+    ss_Master = master;  so_mob_SetGuildRegNum (vt 0x900) = master's guild (vt 0x828)
+    ss_AIType = row.AI;  tactic state (+0x22e4) by AI:
+        SAI_ROOT → MobActionNoBrain (never moves or attacks)
+        SAI_CHASE → mant_SetTarget(+0x2294, ss_TargetOfSummon) if a target is set (else unchanged)
+        SAI_RAMPAGE → MobActionWander.maw_MetronomeReset (+0x2260) (normal mob AI: targets by aggro, §7.2)
+        SAI_ROAM → MobActionRoaming.mar_Init (+0x24d8)
+ShineServant::so_serv_SetTarget(t)  (vt 0x98c): ss_TargetOfSummon = t; +0x1d8c = t; state = mant_SetTarget(t)   @ FUN_00557120
+ShineServant::so_serv_TargetOfSummonMob (vt 0xf78) = ss_TargetOfSummon                                @ FUN_00557110
+
+ShineServant::so_serv_SetRoamingData(type, dir, spread, cx, cy)   (vt 0xc54)    @ FUN_0054a7c0
+    ss_RoamingType = type; ss_RoamingDirect = dir; ss_RoamingDirectArea = spread; ss_RoamingCenterLoc = (cx, cy)
+    ss_RoamingDirectMin / Max = dir ∓ spread (all through sr_ShineDirectCheck, 0…179)
+ShineServant::so_serv_ServantRoaming(&dir, &dist) → bool          (vt 0xc58)    @ FUN_0054a840
+    # asked by mab_RandomDirectWalk (§7.2) before it picks a random direction; ShineMob answers false
+    RT_NONE: false
+    RT_STRAIGHT: dir = ss_RoamingDirect; true                       # keeps walking away along the summon direction
+    RT_RANDOM: r = Random(dist) + sqrt(…); a = RoamingDirect ± Random(DirectArea) (sign from rndbox[2])
+        dir = direction from the servant to centre + r·(sin, cos)(a)/1024; dist = min(dist, distance to that point); true
+ShineServant::so_serv_GetRoamingType (vt 0xc5c) = ss_RoamingType                                        @ FUN_0054a9f0
+
+ShineServant::so_serv_InitFlag  (vt 0xde4)  ss_Flag.MobCanDamageTo = 0   (called by ShineMob::so_mob_RegenComplete FUN_004424f0 and ShinePet::spt_RegenComplete FUN_00442eb0) @ FUN_0054af60
+ShineServant::so_serv_SetMobCanDamageTo(b) (vt 0xde8) / so_serv_GetMobCanDamageTo (vt 0xdec)   @ FUN_0054af70 / FUN_0054af90
+ShineServant::so_serv_SetFlag(name, v)     (vt 0xde0): name "MobCanDamageTo" → SetMobCanDamageTo(v); other names ignored   @ FUN_0054afa0
+cSetServantFlag(handle, flagName, value) → nothing                                @ FUN_005e4be0
+    o = GetObject(handle); o.vt[0xde0](flagName, value)   # other classes: no-op slot
+```
+
+With `MobCanDamageTo` set the servant uses the mob hit rule instead of its master's (§8.4).
+
+**Everything else answers for the master** (null master → the mob value):
+
+| Slot | Function | Servant |
+|---|---|---|
+| 0x4d8 | `so_GetLevel` FUN_00557000 | master's level, else `sm_MobLevel` (+0x1f94) |
+| 0x510 | `so_AttackRange` FUN_00557020 | 0 for `SAI_CHASE` (the homing servant only explodes), else ShineMob's |
+| 0x560 | `so_PartyRegistNumber_InAttack` FUN_004811c0 | master's party (vt 0x550), else 0xFFFF |
+| 0x564 / 0x568 | `so_GetCharRegistNumber_ItemLooter` FUN_00481200 / `so_GetZoneHandle_ItemLooter` FUN_00481230 | master's char number / handle (drops of its kills go to the master, §11) |
+| 0x5c4 | `so_GetExperienceFromMob` FUN_0042adc0 | forwards the EXP to the master (vt 0x5c4) |
+| 0x72c | `so_mobile_IsEnemy` FUN_004308b0 | master's answer; no master → false |
+| 0x8cc | `so_mobile_BattleCamp` FUN_00556f70 | master's camp; else from `sm_MobIsPlayerSide` (+0x2548, −1 → MobInfo.IsPlayerSide +0x67): 0 / 3 → BC_MOB 1, 1 / 2 → BC_CHAR 2 |
+| 0x9b8 | `so_mob_CanBeAttackedByPlayer` FUN_004a5c90 | player.vt[0x980](master) (a player may hit the servant iff it may hit the master); no master → true. Caller: `sp_NC_BAT_BASHSTART_CMD` FUN_00430fa0 (Z03) |
+| 0xe08 | `so_GetKQTeamType` FUN_00557190 | master's KQ team; else the brief's team byte (+0x1f74 → +0x93) |
+| 0xe60 | `so_IsAlliance` FUN_0054b100 | §8.4 |
+| 0xf68 | `sm_IsPlayerSide` FUN_00557150 | master is a player; else +0x2548 / MobInfo.IsPlayerSide (asked by `ShineMob::so_IsAlliance` FUN_0054b050) |
+| 0x700 | `so_mob_AppendAggro` FUN_0042d630 | §6.2 |
+| 0x980 / 0xe94 | hit / heal rules | §8.4 |
+| 0x984 | `so_MiscTable` FUN_005572e0 | `ss_MiscTable` |
+| 0x4a4 | `so_RemakeHandle` FUN_00557040 | i < 500 ? i + 21638 : 0xFFFF |
+
+**End of life.** `so_Routine` (§8.8) frees the servant with reason 9 when the master is gone (`so_serv_FindMaster`)
+and with reason 10 at `deathTime`. Early ends go through vt 0xf7c:
+
+```pseudo
+ShineServant::sm_serv_VanishReserv(sec)                      (vt 0xf7c)          @ FUN_004a3490
+    ss_ExplosionManager = Base;  deathTime (+0x1fbc) = g_Now + sec × 10
+    vt 0x24 so_YouHaveAlreadyDead (FUN_00555780: dead flag +0x1d7c = 1)
+    if it has a mob row: AxialListMobSuicide{alms_MobID = row.ID}.alms_SelfKill(self)
+ShineServant::sm_TooLongChase()  (vt 0xf74, from the chase states §7.3) = vt 0xf7c(0)          @ FUN_004a3480
+cVanishReserv(handle, sec) → nothing                                              @ FUN_005ede60
+    o = GetObject(handle), not empty (vt 0x300); o.vt[0xc28]() (as mobile object) .vt[0xf7c](sec)   # no-op on non-servants
+
+AxialListMobSuicide::alms_SelfKill(m)                                            @ FUN_004f1720
+    if m.so_AmIAlreadyDead (vt 0x28: dead flag or HP 0): return
+    hp = m.HP (vt 0x4e8); m.vt[0x5bc] so_KilledBy(m, hp, 1000, 1)         # killed by itself
+    broadcast in sight (so_AllOfRange): 0x243C NC_BAT_DOTDAMAGE_CMD {
+        object = m.handle, resthp = 0, damage = m.HP after the kill, abstate = 0x318 (MAX_ABSTATEINDEX: none),
+        hpchangeorder = vt 0x7e8, IsMissDamage = 0 }
+    so_DamageLog("alms_SelfKill"); m.vt[0x8d4] so_mobile_DeadCheck(4)
+AxialListMobSuicide::ali_Work(it, me, o) → continue                              @ FUN_004f18b0
+    if o is a mob (kind 5) and (alms_MobID == 0xFFFF or o's mob ID == alms_MobID): alms_SelfKill(o)
+    # range users: cMobSuicide FUN_005e28c0 (part 10), Pine ShineSuicide FUN_004f1980 (part 15)
+```
+
+`sm_serv_VanishReserv` sets the dead flag before it calls `alms_SelfKill`, which returns at once for a dead object:
+a vanishing servant never gets the self-kill and its 0x243C death packet; it just stops (dead flag: no longer a
+target, explosions stop) and disappears with 0x1805 at `deathTime` (original bug) Z09-B32 *(likely intent: kill
+first, then mark)*.
+
+### 13.4 Open points of this section
+
+- The `namestring` copy in `bixd_Exchange` (receiver's name into a ring) has no reader; leftover debug code.
+- `MiscDataTable`'s other tables (`AbStateReset`, `Neutralization`, `Polymorph`, `StateCondition`, `mdt_PostSkillBlast`
+  FUN_004a3a90, `mdt_ArgumentLoad` FUN_004a6110, `mdt_FindAbStateAlways` FUN_004a2ef0) are skill side effects; see
+  the coverage boundary of the sweep part.
+- Lua event 0x90 (`LuaArgumentServantSummon`): the map-script function it calls is part 9a.
