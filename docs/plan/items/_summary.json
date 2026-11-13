@@ -56,6 +56,14 @@
   "8786"
  ],
  [
+  "W05",
+  2,
+  "World manager: process services left out of W01-core (added by W04)",
+  "W01",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "Z02",
   2,
   "Zone: movement, chat, emotes, sight/briefinfo, NPC menus, scenario",

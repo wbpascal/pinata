@@ -4789,12 +4789,14 @@ Sent from `FUN_00431680` (`FUN_00431680`) · payload 309 bytes
 
 ### `0x7032` NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD †
 
-**Verified layout** (basis: client FUN_00476080)
+**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD`, 2 bytes + variable tail
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | count |  |
-| 2 | u8[7][count] | entries | FUN_006153c0 per entry |
+| 0 | u16 | nShortCutDataCnt |  |
+| 2 | SHORT_CUT_DATA[nShortCutDataCnt] | ShortCutData | variable length, element SHORT_CUT_DATA |
+
+Element `SHORT_CUT_DATA` (7 bytes): +0 u8 nSlotNo, +1 u16 nCodeNo, +3 i32 nValue
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload variable ((uint)local_2213[0] * 7 + 2)
 
@@ -8074,6 +8076,55 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 2 | u32 | userNo |  |
 | 6 | i32 | secondsSinceLogout |  |
 
+### `0x2010` NC_ACT_NOTICE_REQ † (C/Zone/OPTool→WM)
+
+**Verified layout** (basis: wm FUN_00413450 / FUN_0042a920 / FUN_00425c90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount | ignored |
+| 1 | u8 | len |  |
+| 2 | char[len] | content |  |
+
+client sender needs adminlevel 100 and no prison
+
+### `0x0844` NC_MISC_GET_CHAT_BLOCK_SPAM_FILTER_DB_CMD † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040d660)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wmHandle | session lookup |
+| 2 | u32 | nUserNo | must match s.userNo |
+| 6 | u32 | nCharNo | must match CHARDATA.charNo |
+| 10 | u8 | bIsSpamSpread |  |
+| 11 | u8 | bIsSpamBlock |  |
+| 12 | u8 | nSpamFilterRate |  |
+
+stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
+
+### `0x0864` NC_MISC_SPAMMER_SET_DB_CHAT_BAN_ACK (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040d980)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGMCharNo |  |
+| 4 | Name5 | sSpammerName |  |
+| 24 | u32 | nChatBan |  |
+| 28 | u16 | nError | 0x2168 ok |
+
+### `0x0869` NC_MISC_SPAMMER_RELEASE_CHAT_BAN_DB_ACK (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040dbf0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGMCharNo |  |
+| 4 | Name5 | sSpammerName |  |
+| 24 | u32 | nChatBan |  |
+| 28 | u16 | nError | 0x2170 ok |
+
 ### `0x0c13` NC_USER_AVATARINFO_ACK (CharDB→WM)
 
 **Verified layout** (basis: wm FUN_0040ede0)
@@ -8083,6 +8134,261 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 0 | u16 | netpacketheader.clienthandle | WM client handle; 2-byte NETPACKETHEADER prefix of the CharDB→WM link, not in PROTO_NC_USER_AVATARINFO_ACK |
 | 2 | u8 | numofavatar | 0xFF = DB error (pdb2017 name) |
 | 3 | AVATAR[numofavatar] | avatar | 0x82 bytes each = PROTO_AVATARINFORMATION, W01 §6.1 (pdb2017 name) |
+
+### `0x1010` NC_CHAR_FRIEND_CMD † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040a570)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wmHandle |  |
+| 2 | u16 | count | > 100 clamped |
+| 4 | {u32 charNo, Name5 name, u8 flag}[n] | friends | 25 bytes each |
+
+### `0x10ec` NC_CHAR_EVENT_ATTENDANCE_LIST_DB_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0043bab0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u16 | nError | 0x2C00 ok |
+| 6 | i32 | tConnect | echo |
+| 10 | u8 | AttendanceNum |  |
+| 11 | tm (9×i32)[28] | AttendanceArray |  |
+| 1019 | u8 | RewardNum |  |
+| 1020 | u8[RewardNum] | RewardList | AR_IDs already claimed |
+
+### `0x10ef` NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0043a9b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u16 | nError | 0x2C08 ok, 0x2C09 DB error, 0x2C0A already |
+
+### `0x10f4` NC_CHAR_EVENT_ATTENDANCE_REWARD_DB_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0043ad90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u8 | nIndex |  |
+| 5 | u8 | nRewardID |  |
+| 6 | u16 | nError | relayed in 0x10F2 |
+
+### `0x541c` NC_FRIEND_DB_POINT_CMD † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040e5b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | numoffriend |  |
+| 2 | {u32 charregnum,u16 friendpoint,u16 diffpoint}[n] | pointinfo | 8 each |
+
+### `0x702c` NC_CHAR_OPTION_IMPROVE_DB_GET_DATA_TYPE_CMD † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040acb0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u32 | DataType | CHAR_OPTION_DATA_TYPE 0/1/2 → session +0x1ECD8 |
+
+### `0xa801` NC_CHAT_RESTRICT_DB_LIST_CMD † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040d4b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSessionHandle | not in the PDB struct |
+| 2 | u16 | nChatRestrictListCnt | > 100 → 100 |
+| 4 | PROTO_CHAT_RESTRICT_DB_INFO[n] | ChatRestrictData | 0x1A each: u32 nCharNo, Name5 sCharID, u8 bIsGM, u8 bIsDeleted |
+
+size 4 + n·26
+
+### `0xa805` NC_CHAT_RESTRICT_DB_ADD_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_00411db0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C00 ok |
+| 2 | u16 | nSessionHandle |  |
+| 4 | Name5 | sCharID |  |
+| 24 | u8 | bIsGM |  |
+| 25 | u8 | bIsDeleted |  |
+| 26 | u32 | nChatRestrictCharNo |  |
+
+size 0x1E
+
+### `0xa809` NC_CHAT_RESTRICT_DB_DEL_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_004112b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C10 ok |
+| 2 | u16 | nSessionHandle |  |
+| 4 | u32 | nChatRestrictCharNo |  |
+
+size 8
+
+### `0xa80d` NC_CHAT_RESTRICT_DB_DEL_ALL_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040d5e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C20 ok |
+| 2 | u16 | nSessionHandle |  |
+
+size 4
+
+### `0x0840` NC_MISC_CLIENT_LOADING_BUG_DETECT_CMD † (C→WM)
+
+**Verified layout** (basis: wm FUN_00417140)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name3 | sLoadingMapName |  |
+| 12 | u16 | nFailType |  |
+| 14 | u16 | nLoadingFailCnt |  |
+| 16 | Name3 | sFromMapName |  |
+| 28 | Name4 | sFromZoneIP |  |
+| 44 | Name4 | sToZoneIP |  |
+| 60 | u16 | nToZonePort |  |
+| 62 | u16 | nErrorDataCnt | unchecked (W04-B59) |
+| 64 | CLBD_ErrorData[n] | ErrorData | {u16 nErrorNo, u32 nErrorData}, 6 bytes each |
+
+forwarded to CharDB as 0x0841
+
+### `0x0846` NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_CMD † (C→WM)
+
+**Verified layout** (basis: wm FUN_00417b90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsSpamSpread |  |
+| 1 | u8 | bIsSpamBlock |  |
+| 2 | u8 | nSpamFilterRate |  |
+
+session copy not updated (W04-B60)
+
+### `0x085f` NC_MISC_SPAMMER_REPORT_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00417ef0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sSpammerName |  |
+
+### `0x0861` NC_MISC_SPAMMER_CHAT_BAN_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_004180f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sSpammerName | GM only (adminlevel 50..100) |
+
+### `0x10f1` NC_CHAR_EVENT_ATTENDANCE_REWARD_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0043aac0; client FUN_004a5d10)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nIndex | week w: w·7−1; day count: 27 |
+| 1 | u8 | nRewardID | AttendReward AR_ID |
+
+### `0x200c` NC_ACT_WHISPER_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041c610)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount | unchecked |
+| 1 | Name5 | receiver |  |
+| 21 | u8 | len | ≥ 0x81 → 0x200E 0x0F6B |
+| 22 | char[len] | content | then itemLinkDataCount × 0x67 item links |
+
+### `0x2014` NC_ACT_PARTYCHAT_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00413510)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount | unchecked |
+| 1 | u8 | len | ≥ 0x81 → 0x07C2 |
+| 2 | char[len] | content | then item links |
+
+### `0x5401` NC_FRIEND_SET_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041ca90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid | not checked against the sender |
+| 20 | Name5 | friendid | target, by name |
+
+size 0x28, length not checked
+
+### `0x5404` NC_FRIEND_SET_CONFIRM_ACK † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041cd70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid | answering player |
+| 20 | Name5 | friendid | requester, looked up by name |
+| 40 | u8 | accept_friend | 1 accept, else refuse |
+
+size 0x29
+
+### `0x5405` NC_FRIEND_DEL_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041d230)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid |  |
+| 20 | Name5 | friendid |  |
+
+size 0x28
+
+### `0x7037` NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00414720)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nShortCutDataCnt |  |
+| 1 | SHORT_CUT_DATA[n] | ShortCutData | 7 each: u8 nSlotNo, u16 nCodeNo, i32 nValue |
+
+→ CharDB 0x704B {u32 nCharNo, u8 n, data}
+
+### `0x7039` NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_REQ (C→WM)
+
+**Verified layout** (basis: wm FUN_004148f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nKeyMapDataCnt | ≥ 0x60 → logged, dropped |
+| 2 | KEY_MAP_DATA[n] | KeyMapData | 4 each: u16 nFunctionNo, u8 nExtendKey, u8 nASCIICode |
+
+→ CharDB 0x704D
+
+### `0x703b` NC_CHAR_OPTION_IMPROVE_SET_GAMEOPTION_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00414af0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nGameOptionDataCnt | unchecked (W04-B22) |
+| 2 | GAME_OPTION_DATA[n] | GameOptionData | 3 each: u16 nOptionNo, u8 nValue |
+
+→ CharDB 0x704F
 
 ### `0x7405` NC_GUILD_MAKE_REQ † (C→WM)
 
@@ -8131,6 +8437,147 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 0 | Name5 | CharID |  |
 | 20 | u8 | MemberGrade | not range-checked |
 
+### `0x7c01` NC_PRISON_ADD_GM_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041de70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sImprison |  |
+| 20 | u16 | nMinute | 1..32700 (add); ≤ 32700 (alter) |
+| 22 | char[16] | sReason | must be non-empty |
+| 38 | char[64] | sRemark |  |
+
+needs adminlevel ≠ 0
+
+### `0x7c09` NC_PRISON_ALTER_GM_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041e290)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sImprison |  |
+| 20 | u16 | nMinute | 1..32700 (add); ≤ 32700 (alter) |
+| 22 | char[16] | sReason | must be non-empty |
+| 38 | char[64] | sRemark |  |
+
+needs adminlevel ≠ 0
+
+### `0x8001` NC_REPORT_ADD_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041db50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sHarmer |  |
+| 20 | u8[16] | byReportType |  |
+| 36 | u8[256] | byReason |  |
+| 292 | u16 | nChatLogSize | unchecked (W04-B29) |
+| 294 | u8[n] | byChatLog |  |
+
+### `0x9401` NC_HOLY_PROMISE_SET_UP_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00421990)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID | not read |
+| 20 | Name5 | UpCharID | wanted master |
+
+size 0x28
+
+### `0x9405` NC_HOLY_PROMISE_SET_UP_CONFIRM_ACK † (C→WM)
+
+**Verified layout** (basis: wm FUN_00421d10)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID | apprentice |
+| 20 | Name5 | UpCharID | not read |
+| 40 | u8 | bAccept |  |
+
+size 0x29
+
+### `0x9406` NC_HOLY_PROMISE_DEL_UP_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00415c00)
+
+Empty payload.
+
+no body
+
+### `0x940a` NC_HOLY_PROMISE_DEL_DOWN_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041e570)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | DownCharID |  |
+
+### `0xa41b` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGEDEALT_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041a420)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name3 | sIndunInfo.MapIDClient |  |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
+
+### `0xa41c` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGETAKEN_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00418fb0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name3 | sIndunInfo.MapIDClient |  |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
+
+### `0xa41d` NC_INSTANCE_DUNGEON_RANK_TAB_HEALINGDONE_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_004191d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name3 | sIndunInfo.MapIDClient |  |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
+
+### `0xa41e` NC_INSTANCE_DUNGEON_RANK_TAB_MYRANK_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_004193f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name3 | sIndunInfo.MapIDClient |  |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
+
+### `0xa803` NC_CHAT_RESTRICT_ADD_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00422240)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sChatRestrictCharID |  |
+
+size 0x14, not checked
+
+### `0xa807` NC_CHAT_RESTRICT_DEL_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041ec00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sChatRestrictCharID |  |
+
+size 0x14, not checked
+
+### `0xa80b` NC_CHAT_RESTRICT_DEL_ALL_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_004170a0)
+
+Empty payload.
+
+no payload read
+
 ### `0x0c0d` NC_USER_WILLLOGIN_REQ † (Login→WM)
 
 **Verified layout** (basis: wm FUN_00424950)
@@ -8145,6 +8592,73 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 | 327 | u32[5] | extra |  |
 
 0x15B bytes; W01 name was 'world login request (ours)'
+
+### `0xd001` NC_EVENT_GET_ALL_EVENT_INFO_REQ † (OPTool→WM)
+
+**Verified layout** (basis: wm FUN_004270f0)
+
+Empty payload.
+
+no payload read
+
+### `0xd003` NC_EVENT_ADD_EVENT_REQ † (OPTool→WM)
+
+**Verified layout** (basis: wm FUN_00427130)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+| 2 | i32 | dStartTime |  |
+| 6 | i32 | dEndTime |  |
+| 10 | u16[3] | nRewardAbstateIndex |  |
+| 16 | u8[255] | bIsPlayerLevel |  |
+| 271 | u8[64] | bIsPlayerClass |  |
+| 335 | u8[1024] | bIsMapID |  |
+| 1359 | u8 | bIsField_KQ |  |
+| 1360 | u8 | bIsField_Battle |  |
+| 1361 | u8 | bIsField_ID |  |
+| 1362 | u8 | bIsField_Normal |  |
+
+size 0x553 (GM_EVENT_DATA); nEventNo ignored
+
+### `0xd005` NC_EVENT_UPDATE_EVENT_REQ † (OPTool→WM)
+
+**Verified layout** (basis: wm FUN_00427170)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+| 2 | i32 | dStartTime |  |
+| 6 | i32 | dEndTime |  |
+| 10 | u16[3] | nRewardAbstateIndex |  |
+| 16 | u8[255] | bIsPlayerLevel |  |
+| 271 | u8[64] | bIsPlayerClass |  |
+| 335 | u8[1024] | bIsMapID |  |
+| 1359 | u8 | bIsField_KQ |  |
+| 1360 | u8 | bIsField_Battle |  |
+| 1361 | u8 | bIsField_ID |  |
+| 1362 | u8 | bIsField_Normal |  |
+
+size 0x553
+
+### `0xd007` NC_EVENT_DEL_EVENT_REQ † (OPTool→WM)
+
+**Verified layout** (basis: wm FUN_004271b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+
+### `0xd009` NC_EVENT_SET_ALL_READY_REQ † (OPTool→WM)
+
+**Verified layout** (basis: wm FUN_004271f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+| 2 | u8 | bIsFlagAllReady | 1 = active on the zones |
+
+size 3
 
 ### `0x0802` NC_MISC_S2SCONNECTION_REQ (S2S)
 
@@ -8577,6 +9091,43 @@ to the target; 20 bytes; field names pdb2017, offsets read in the 2016 WM
 | 0 | u16 | nHandle | WM client handle, param_1[0x45] (pdb2017 name) |
 | 2 | u32 | nUserNo | param_1[0x49] (pdb2017 name) |
 
+### `0x8007` NC_DATA_REPORT_ADD_REQ † (WM→AccountLog)
+
+**Verified layout** (basis: wm FUN_0041db50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | dwReporter | charNo |
+| 4 | u16 | hReporter |  |
+| 6 | u8 | nWorldNo |  |
+| 7 | Name5 | sReporterCharID |  |
+| 27 | Name5 | sHarmer |  |
+| 47 | u8[16] | byReportType |  |
+| 63 | u8[256] | byReason |  |
+| 319 | u16 | nChatLogSize |  |
+| 321 | u8[n] | byChatLog |  |
+
+raw long frame, len 0x143 + n
+
+### `0x8009` NC_DATA_REPORT_CANCEL_REQ † (WM→AccountLog)
+
+**Verified layout** (basis: wm FUN_004153e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | nRegNumber |  |
+| 4 | u16 | hReporter |  |
+
+### `0x800b` NC_DATA_REPORT_GET_REQ † (WM→AccountLog)
+
+**Verified layout** (basis: wm FUN_004154c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hReporter |  |
+| 2 | u32 | dwReporter |  |
+| 6 | u8 | nWorldNo |  |
+
 ### `0x0c62` NC_USER_LOGOUT_LAST_DAY_REQ (WM→AccountLogDB)
 
 **Verified layout** (basis: wm FUN_00408740)
@@ -8585,6 +9136,632 @@ to the target; 20 bytes; field names pdb2017, offsets read in the 2016 WM
 |---|---|---|---|
 | 0 | u16 | handle |  |
 | 2 | u32 | userNo |  |
+
+### `0x0845` NC_MISC_GET_CHAT_BLOCK_SPAM_FILTER_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00431cd0; client FUN_004a5820)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsSpamSpread | client: SetSpamFilteredTextShow |
+| 1 | u8 | bIsSpamBlock | client: check boxes |
+| 2 | u8 | nSpamFilterRate | client: SetSpamBlockRate |
+
+sent on every map login once 0x0844 arrived
+
+### `0x0860` NC_MISC_SPAMMER_REPORT_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00417ef0; client FUN_0049cb10)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2160 ok (no text), 0x2161 not found, 0x2162 target in prison, 0x2163 already reported |
+
+### `0x0862` NC_MISC_SPAMMER_CHAT_BAN_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004180f0, FUN_0040d980; client FUN_004b3520)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sSpammerName |  |
+| 20 | u16 | nError | 0x2168 ok, 0x2169 DB error, 0x216A not found, 0x216B already banned |
+
+### `0x0867` NC_MISC_SPAMMER_RELEASE_CHAT_BAN_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040dbf0; client FUN_004b35b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2170 ok, 0x2172 not found |
+
+### `0x086c` NC_MISC_EVENTNPC_STANDSTART_CLIENT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00456c50, FUN_00456e20, FUN_00457110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name8 | sMobIndex | NpcSchedule.shn Mob_Inx |
+
+### `0x086d` NC_MISC_EVENTNPC_STANDEND_CLIENT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00456c50, FUN_00456e20, FUN_00457110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name8 | sMobIndex | NpcSchedule.shn Mob_Inx |
+
+### `0x10ed` NC_CHAR_EVENT_ATTENDANCE_LIST_CLIENT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0043bab0; client FUN_0049d030)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | tm (9×i32) | tEventStart |  |
+| 36 | u8 | nCurIndex | 28 = no running event |
+| 37 | u8[28] | AttendanceArray | 1 = day marked |
+| 65 | u8 | RewardNum |  |
+| 66 | u8[RewardNum] | RewardList |  |
+
+size 0x42 + RewardNum
+
+### `0x10f0` NC_CHAR_EVENT_ATTENDANCE_CHECK_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0043a9b0; client FUN_004b39f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | (empty struct) | never written (W04-B63) |
+
+### `0x10f2` NC_CHAR_EVENT_ATTENDANCE_REWARD_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0043a8f0; client FUN_004bbc70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nIndex |  |
+| 1 | u8 | nRewardID |  |
+| 2 | u16 | nError | 0x2C10 ok; 0x2C12 / 0x2C13 WM refusals; the client ignores it (W04-B64) |
+
+### `0x10f5` NC_CHAR_EVENT_ATTENDANCE_CHANGE_DAY_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0043b630; client FUN_0049d080)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nChangeIndex | new day index (28 at the end) |
+
+### `0x10f6` NC_CHER_EVENT_ATTENDANCE_CHANGE_START_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0043bde0; client FUN_0049d0a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | tm (9×i32) | tEventStart |  |
+
+0x24 bytes, to every playing client
+
+### `0x200d` NC_ACT_SOMEONEWHISPER_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041c610, FUN_00432bb0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount |  |
+| 1 | Name5 | talker | sender CHARDATA name |
+| 21 | u8 | flag | bit0 GMColor = sender bIsGM; bits 1-7 stale |
+| 22 | u8 | len |  |
+| 23 | char[len] | content | then item links (0x67 each) |
+
+size 0x17 + len + count·0x67. Also sent by Spam_AlertGMs FUN_00432bb0 (gold-spammer alert to GMs) with itemLinkDataCount unwritten (W04-B54), talker = reported character, content = SpamerReport.shn SR_Message
+
+### `0x200e` NC_ACT_WHISPERFAIL_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041c610)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ErrorType | 0x0F69 not found, 0x0F6A prison (sender or receiver), 0x0F6B too long (client ignores), 0x0F6C receiver in GT arena |
+| 2 | Name5 | receiver | as requested |
+
+### `0x200f` NC_ACT_WHISPERSUCCESS_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041c610)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount | stale on the len==0 path |
+| 1 | Name5 | receiver | receiver's stored name |
+| 21 | u8 | len |  |
+| 22 | char[len] | content | then item links |
+
+### `0x2011` NC_ACT_NOTICE_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00413450)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemLinkDataCount | never written (stale) |
+| 1 | u8 | len |  |
+| 2 | char[len] | content |  |
+
+broadcast raw to every client session
+
+### `0x2015` NC_ACT_PARTYCHAT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00413510)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | talker |  |
+| 20 | u8 | itemLinkDataCount |  |
+| 21 | u8 | len |  |
+| 22 | char[len] | content | then item links |
+
+### `0x2016` NC_ACT_PARTYCHAT_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00413510)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error | 0x07C0 ok, 0x07C1 not in party, 0x07C2 too long |
+
+### `0x2079` NC_ACT_SCRIPT_MSG_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0042cea0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u8[32] | sScriptMsgIndex |  |
+| 34 | u8[5] | nlen |  |
+| 39 | u8[Σnlen] | sContent |  |
+
+### `0x2459` NC_BAT_CLIENT_MOB_KILL_ANNOUNCE_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0042b490)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nTextIndex | MobKillAnnounceType |
+
+### `0x5402` NC_FRIEND_SET_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041ca90, FUN_0041cd70, FUN_00411600)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid | client shows only if = own name |
+| 20 | Name5 | friendid |  |
+| 40 | u16 | err | 0x941 ok … 0x94E; W04 §5.3 |
+
+size 0x2A
+
+### `0x5403` NC_FRIEND_SET_CONFIRM_REQ † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041ca90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid | = request friendid (the receiver) |
+| 20 | Name5 | friendid | = request charid (the requester) |
+
+size 0x28
+
+### `0x5406` NC_FRIEND_DEL_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041d230, FUN_004105d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid |  |
+| 20 | Name5 | friendid |  |
+| 40 | u16 | err | 0x951 ok, 0x952 DB error, 0x953 not found, 0x954 prison (silent) |
+
+size 0x2A
+
+### `0x5407` NC_FRIEND_LIST_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00430ae0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | numoffriend |  |
+| 1 | PROTO_FRIEND_INFO[n] | friendinfo | 0x48 each, raw copy of the session list |
+
+### `0x5408` NC_FRIEND_ADD_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00411600, FUN_00410740)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_FRIEND_INFO | friendinfo | from 0x5411: logininfo bit0 = 1, bits 1-31 stale; statustitle '-' then stale |
+
+size 0x48
+
+### `0x5409` NC_FRIEND_LOGIN_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00436900)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid |  |
+| 20 | Name3 | map |  |
+
+size 0x20
+
+### `0x540b` NC_FRIEND_REFUSE_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041cd70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | friendid | the refusing player |
+
+size 0x14
+
+### `0x541e` NC_FRIEND_POINT_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00418e60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | friendpoint | session +0x1ED94 |
+
+size 2
+
+### `0x5420` NC_FRIEND_FIND_FRIENDS_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00423110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error | 0x36C0 ok, 0x36C5 cooldown, 0x36C6 own list full |
+| 2 | u16 | numoffriend | ≤ 50 |
+| 4 | PROTO_FRIEND_INFO[n] | friendinfo | sorted by level difference |
+
+### `0x5424` NC_FRIEND_SOMEONE_GET_SPECIALITEM_WORLD_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0042d0f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid |  |
+
+broadcast in game, arena skipped
+
+### `0x5804` NC_KQ_STATUS_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00413b20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle | echoed |
+| 4 | u8 | Status | 10 = not found |
+| 5 | u16 | NumOfJoiner |  |
+| 7 | Name5[n] | JoinerNameList | '' for joiners without CHARDATA |
+
+### `0x5806` NC_KQ_JOIN_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00413cc0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle | echoed |
+| 4 | u16 | Error | 0x991 ok, 0x992-0x998 KQ_Join, 0x999 prison, 0x99A already joined |
+
+size 6
+
+### `0x5808` NC_KQ_JOIN_CANCEL_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00413d70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle | echoed |
+| 4 | u16 | Error | 0x9A1 ok, 0x9A2 not in a KQ |
+
+size 6
+
+### `0x5824` NC_KQ_JOINING_ALARM_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00452930)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nHandle |  |
+| 4 | u16 | nID |  |
+| 6 | u8 | nMinLev |  |
+| 7 | u8 | nMaxLev |  |
+| 8 | u8 | MsgLength | strlen |
+| 9 | char[n] | Msg | WM text #0 with the title |
+
+to every client session
+
+### `0x5825` NC_KQ_JOINING_ALARM_END_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00452a70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nHandle |  |
+| 4 | u16 | nID |  |
+
+to every client session
+
+### `0x5826` NC_KQ_JOINING_ALARM_LIST † (WM→C)
+
+**Verified layout** (basis: wm FUN_00452b60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNumOfKQ |  |
+| 2 | KQ_JOINING_ALARM_INFO[n] | KQList | 8 each, Status-2 KQs |
+
+### `0x5828` NC_KQ_VOTE_START_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00456310)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3100 ok, 0x3101-0x3109 |
+
+### `0x5829` NC_KQ_VOTE_VOTING_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00456310)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sStarter |  |
+| 20 | Name5 | sTarget |  |
+| 40 | u8 | nVoteType | from request |
+| 41 | tm | tEndTime | 0x24 |
+| 77 | u8 | nLen |  |
+| 78 | char[nLen] | sContents |  |
+
+### `0x582b` NC_KQ_VOTE_VOTING_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00452ee0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3110 ok, 0x3111-0x3113 |
+
+### `0x582c` NC_KQ_VOTE_RESULT_SUC_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00454f60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sTarget |  |
+| 20 | u8 | nVoteRate | required % |
+| 21 | u8 | nYesNum |  |
+| 22 | u8 | nNoNum |  |
+| 23 | u8 | nCancelNum | ballots not cast |
+
+size 0x18
+
+### `0x582d` NC_KQ_VOTE_RESULT_FAIL_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00454f60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sTarget |  |
+| 20 | u8 | nYesNum |  |
+| 21 | u8 | nNoNum |  |
+| 22 | u8 | nCancelNum |  |
+
+size 0x17
+
+### `0x582e` NC_KQ_VOTE_CANCEL_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00454510)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sTarget |  |
+
+size 0x14
+
+### `0x5832` NC_KQ_JOIN_LIST_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004568c0, FUN_00453bd0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3118 ok, 0x3119 unknown KQ, 0x311A cooldown |
+| 2 | u8 | nNum |  |
+| 3 | KQ_JOIN_CHAR_INFO[n] | CharInfoList | {u8 level,u8 class,Name5,u8 team} 0x17 each |
+
+### `0x5835` NC_KQ_VOTE_START_CHECK_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00453340)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3120 ok, 0x3121 running, 0x3122 cooldown |
+
+### `0x5838` NC_KQ_TEAM_SELECT_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004536c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x31F0 ok, 0x31F1-0x31F7 |
+| 2 | u8 | nTeamType | 2 unless ok |
+
+size 3
+
+### `0x5839` NC_KQ_TEAM_SELECT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_004536c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sCharID |  |
+| 20 | u8 | nTeamType |  |
+
+size 0x15
+
+### `0x7003` NC_CHAR_OPTION_GET_SHORTCUTDATA_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[1024] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x7005` NC_CHAR_OPTION_GET_SHORTCUTSIZE_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[24] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x7007` NC_CHAR_OPTION_GET_VIDEO_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[60] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x7009` NC_CHAR_OPTION_GET_SOUND_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[1] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x700b` NC_CHAR_OPTION_GET_GAME_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[64] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x700d` NC_CHAR_OPTION_GET_WINDOWPOS_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[392] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x700f` NC_CHAR_OPTION_GET_KEYMAPPING_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b390…FUN_0040b750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bSuccess | copied from CharDB |
+| 1 | u8[308] | Data | stale DB stack when bSuccess 0 (D04-B12) |
+
+raw long frame {0x00, u16 len, u16 op}
+
+### `0x7032` NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00431680)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | count | length computed from the low byte only |
+| 2 | entries[n] | data | 7 bytes each |
+
+session cache blob, sent once after CharDB 0x1005
+
+### `0x7033` NC_CHAR_OPTION_IMPROVE_GET_KEYMAP_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00431680)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | count | length computed from the low byte only |
+| 2 | entries[n] | data | 4 bytes each |
+
+session cache blob, sent once after CharDB 0x1005
+
+### `0x7034` NC_CHAR_OPTION_IMPROVE_GET_GAMEOPTION_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00431680)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | count | length computed from the low byte only |
+| 2 | entries[n] | data | 3 bytes each |
+
+session cache blob, sent once after CharDB 0x1005
+
+### `0x7038` NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040ae30)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2100/0x2108/0x2118 ok, +1 failure |
+
+client: no handler for 0x7038/0x703A, 0x703C accepted and ignored
+
+### `0x703a` NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040af00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2100/0x2108/0x2118 ok, +1 failure |
+
+client: no handler for 0x7038/0x703A, 0x703C accepted and ignored
+
+### `0x703c` NC_CHAR_OPTION_IMPROVE_SET_GAMEOPTION_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040afd0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2100/0x2108/0x2118 ok, +1 failure |
+
+client: no handler for 0x7038/0x703A, 0x703C accepted and ignored
+
+### `0x7044` NC_CHAR_OPTION_IMPROVE_INIT_KEYMAP_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b0a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2110 ok, 0x2111 failed |
+| 2 | u16 | nKeyMapDataCnt |  |
+| 4 | KEY_MAP_DATA[n] | KeyMapData | 4 each |
+
+### `0x7046` NC_CHAR_OPTION_IMPROVE_INIT_GAMEOPTION_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040b250)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2120 ok, 0x2121 failed |
+| 2 | u16 | nGameOptionDataCnt |  |
+| 4 | GAME_OPTION_DATA[n] | GameOptionData | 3 each |
 
 ### `0x7404` NC_GUILD_LIST_ACK † (WM→C)
 
@@ -8718,6 +9895,220 @@ client-bound only: members of both warring guilds; no 2016 client handler
 | 4 | Name4 | Name |  |
 | 20 | GUILD_EMBLEM_INFO | EmblemInfo | 0xFFFF when no emblem |
 
+### `0x7c02` NC_PRISON_ADD_GM_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041de70 / FUN_00410a50 / FUN_0042dea0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sImprison |  |
+| 20 | u16 | err | 0xD80 ok, 0xD81–0xD88 |
+
+raw {0x18, op}
+
+### `0x7c03` NC_PRISON_OK_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00410b90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMinute |  |
+| 2 | char[16] | sReason |  |
+| 18 | char[64] | sRemark |  |
+
+to the prisoner after a GM alter
+
+### `0x7c05` NC_PRISON_END_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004155f0 / FUN_00458270)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xDA8 released, 0xDA9 still running, 0xDAA not a prisoner |
+| 2 | u32 | nPrisonSecond | WM sends milliseconds for 0xDA9 (W04-B24); 0 / 0xFFFFFFFF otherwise |
+
+### `0x7c07` NC_PRISON_GET_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040c350 / FUN_00415530)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xDB0 ok, 0xDB1 not in prison (4-byte form), 0xDB2 DB error |
+| 2 | u16 | nMinute | CHARDATA.prisonmin |
+| 4 | char[16] | sReason | absent in the 4-byte form |
+| 20 | char[64] | sRemark |  |
+
+old catalog name NC_PRISON_ADD_GM_ACK came from a debug string
+
+### `0x7c0a` NC_PRISON_ALTER_GM_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041e290 / FUN_00410b90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sImprison |  |
+| 20 | u16 | err | 0xDA0 ok, 0xDA1–0xDA7 |
+
+raw {0x18, op}
+
+### `0x8002` NC_REPORT_ADD_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041db50 / FUN_004092e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sHarmer |  |
+| 20 | u32 | nRegNumber | 0 on WM refusals |
+| 24 | u16 | err | 0xF40 ok, 0xF41–0xF48, 0xF58 |
+
+### `0x8004` NC_REPORT_CANCEL_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004153e0 / FUN_004090c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nRegNumber |  |
+| 4 | u16 | err | 0xF40 ok; 0xF50, 0xF53, DB codes |
+
+### `0x8006` NC_REPORT_GET_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00409130)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0xF40, 0xF58, 0xF60 |
+| 2 | u32 | nRegNumber |  |
+| 6 | u8 | byReportResult | 0 registering, 1 done, 2 held |
+| 7 | u8[128] | byRemark |  |
+
+### `0x9402` NC_HOLY_PROMISE_SET_UP_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00421990/FUN_00421d10/FUN_00411ba0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error | 0x1740/0x1751 ok |
+| 2 | Name5 | UpInfo.PromiseCharID |  |
+| 22 | DATE | UpInfo.LogonInfo | bit0 online |
+| 26 | u8 | UpInfo.Level |  |
+| 27 | u8 | UpInfo.Flags |  |
+| 28 | i32 | ResetableDateTime | only 0x174A/0x1750 |
+| 32 | tm | tm_ResetableDateTime | only 0x174A/0x1750 |
+
+size 0x44; unwritten bytes on refusals (W04-B32)
+
+### `0x9403` NC_HOLY_PROMISE_SET_UP_CONFIRM_ING † (WM→C)
+
+**Verified layout** (basis: wm FUN_00421990)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | UpCharID |  |
+
+### `0x9404` NC_HOLY_PROMISE_SET_UP_CONFIRM_REQ † (WM→C)
+
+**Verified layout** (basis: wm FUN_00421990)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID | requester |
+| 20 | Name5 | UpCharID | receiver (master) |
+
+### `0x9407` NC_HOLY_PROMISE_DEL_UP_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00410d30/FUN_00415c00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nDelCmdType | 0 leave, 1 level gap, 2 master deleted |
+| 1 | u16 | Error |  |
+
+### `0x940b` NC_HOLY_PROMISE_DEL_DOWN_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00410fe0/FUN_0041e570)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | DownCharID | zeroed for 0x1760 |
+| 20 | u16 | Error |  |
+
+### `0x9414` NC_HOLY_PROMISE_LIST_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00434c20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | UpInfo.PromiseCharID |  |
+| 20 | DATE | UpInfo.LogonInfo | bit0 online |
+| 24 | u8 | UpInfo.Level |  |
+| 25 | u8 | UpInfo.Flags |  |
+| 26 | u8 | nPart | bit0 first, bit1 last |
+| 27 | u16 | MemberCount |  |
+| 29 | PROTO_HOLY_PROMISE_INFO[n] | MemberInfo | 0x1A each |
+
+### `0x9415` NC_HOLY_PROMISE_ADD_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00411ba0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error | DBError |
+| 2 | Name5 | MemberInfo.PromiseCharID |  |
+| 22 | DATE | MemberInfo.LogonInfo | bit0 online |
+| 26 | u8 | MemberInfo.Level |  |
+| 27 | u8 | MemberInfo.Flags |  |
+
+### `0x9416` NC_HOLY_PROMISE_LOGIN_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00451700)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID |  |
+
+### `0x9417` NC_HOLY_PROMISE_LOGOUT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00451790)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID |  |
+
+### `0x9418` NC_HOLY_PROMISE_DEL_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00410d30/FUN_00410fe0/FUN_0040f390)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID |  |
+| 20 | u8 | nDelCmdType | 0/1/2 |
+
+### `0x9419` NC_HOLY_PROMISE_LEVEL_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00451930)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID |  |
+| 20 | u8 | Level |  |
+
+### `0x941a` NC_HOLY_PROMISE_REWARD_ITEM_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040cac0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nNumOfItems |  |
+| 1 | {u16 id,u16 lot}[n] | RewardList |  |
+
+### `0x9445` NC_HOLY_PROMISE_CLIENT_GET_REMAIN_MONEY_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00434c20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nMoney |  |
+
 ### `0x9808` NC_GUILD_ACADEMY_MY_GUILD_ACADEMY_INFO_ACK † (WM→C)
 
 **Verified layout** (basis: wm FUN_00444a30 / FUN_0043cf90)
@@ -8752,6 +10143,175 @@ client-bound: guild and academy members; no 2016 client handler (ignored)
 | 21 | tm | tm_dDismissDate |  |
 
 client-bound: academy members; no 2016 client handler
+
+### `0xa421` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGEDEALT_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041a420)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_AVATAR_SHAPE_INFO | shapeInfo1st |  |
+| 4 | PROTO_AVATAR_SHAPE_INFO | shapeInfo2nd |  |
+| 8 | PROTO_AVATAR_SHAPE_INFO | shapeInfo3th |  |
+| 12 | u16 | nErr | 0x3A00 ok, 0x3A01 cooldown 3 s |
+| 14 | u32 | nRank | own rank |
+| 18 | u8 | nCount |  |
+| 19 | SHINE_INDUN_RANK_CLIENT_VALUE[n] | ranks | 0x20 each |
+
+size 0x13 + 0x20·n
+
+### `0xa422` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGETAKEN_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00418fb0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_AVATAR_SHAPE_INFO | shapeInfo1st |  |
+| 4 | PROTO_AVATAR_SHAPE_INFO | shapeInfo2nd |  |
+| 8 | PROTO_AVATAR_SHAPE_INFO | shapeInfo3th |  |
+| 12 | u16 | nErr | 0x3A00 ok, 0x3A01 cooldown 3 s |
+| 14 | u32 | nRank | own rank |
+| 18 | u8 | nCount |  |
+| 19 | SHINE_INDUN_RANK_CLIENT_VALUE[n] | ranks | 0x20 each |
+
+size 0x13 + 0x20·n
+
+### `0xa423` NC_INSTANCE_DUNGEON_RANK_TAB_HEALINGDONE_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004191d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_AVATAR_SHAPE_INFO | shapeInfo1st |  |
+| 4 | PROTO_AVATAR_SHAPE_INFO | shapeInfo2nd |  |
+| 8 | PROTO_AVATAR_SHAPE_INFO | shapeInfo3th |  |
+| 12 | u16 | nErr | 0x3A00 ok, 0x3A01 cooldown 3 s |
+| 14 | u32 | nRank | own rank |
+| 18 | u8 | nCount |  |
+| 19 | SHINE_INDUN_RANK_CLIENT_VALUE[n] | ranks | 0x20 each |
+
+size 0x13 + 0x20·n
+
+### `0xa424` NC_INSTANCE_DUNGEON_RANK_TAB_MYRANK_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004193f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nErr |  |
+| 2 | u64 | nPrevDamageDealt |  |
+| 10 | u64 | nPrevDamageTaken |  |
+| 18 | u64 | nPrevHealingDone |  |
+| 26 | u8[6] | nPrevPlayTime h,m,s,year,month,day |  |
+| 32 | u64 | nCurrDamageDealt |  |
+| 40 | u64 | nCurrDamageTaken |  |
+| 48 | u64 | nCurrHealingDone |  |
+| 56 | u8[6] | nCurrPlayTime h,m,s,year,month,day |  |
+
+size 0x3E
+
+### `0xa425` NC_INSTANCE_DUNGEON_RANK_NEW_RANK_MSG † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040f9f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | nCharID |  |
+| 20 | SHINE_INDUN_INFO | sIndunInfo |  |
+| 33 | u8 | rankType | 0 dealt 1 taken 2 healing |
+| 34 | u32 | nRank | 1..20 |
+
+dead in 2016 (W04-B43)
+
+### `0xa802` NC_CHAT_RESTRICT_LIST_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00430fe0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nChatRestrictListCnt |  |
+| 2 | PROTO_CHAT_RESTRICT_INFO[n] | ChatRestrictData | 0x16 each: Name5 sCharID, u8 bIsGM, u8 bIsDeleted |
+
+size 2 + n·22; sent once at the first map login after the DB list arrived
+
+### `0xa806` NC_CHAT_RESTRICT_ADD_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00422240, FUN_00411db0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C00 ok, 0x1C01 prisoner, 0x1C02 self, 0x1C03 listed or full, 0x1C05…0x1C0A from the DB |
+| 2 | Name5 | sCharID |  |
+| 22 | u8 | bIsGM |  |
+| 23 | u8 | bIsDeleted |  |
+
+size 0x18; bIsGM/bIsDeleted uninitialised on every error (W04-B48)
+
+### `0xa80a` NC_CHAT_RESTRICT_DEL_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041ec00, FUN_004112b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C10 ok, 0x1C11 not in the list, 0x1C12 charNo not in the list, 0x1C13…0x1C16 DB |
+| 2 | Name5 | sChatRestrictCharID |  |
+
+size 0x16
+
+### `0xa80e` NC_CHAT_RESTRICT_DEL_ALL_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040d5e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C20 ok, 0x1C21/0x1C22 DB |
+
+size 2
+
+### `0x0841` NC_MISC_DB_CLIENT_LOADING_BUG_DETECT_CMD † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00417140)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | CHARDATA.charNo |
+| 4 | i32 | nWorldTime | time(NULL) |
+| 8 | bytes[0x40] | (0x0840 body) | copied field by field |
+| 72 | CLBD_ErrorData[n] | ErrorData |  |
+
+size 0x48 + 6·n
+
+### `0x0847` NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_DB_CMD (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00417b90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nUserNo | s+0x124 |
+| 4 | u32 | nCharNo |  |
+| 8 | u8 | bIsSpamSpread |  |
+| 9 | u8 | bIsSpamBlock |  |
+| 10 | u8 | nSpamFilterRate |  |
+
+### `0x0863` NC_MISC_SPAMMER_SET_DB_CHAT_BAN_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_004180f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGMCharNo |  |
+| 4 | Name5 | sSpammerName |  |
+| 24 | u32 | nChatBan | 0x0FFFFFFF |
+
+### `0x0868` NC_MISC_SPAMMER_RELEASE_CHAT_BAN_DB_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0042c3b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGMCharNo |  |
+| 4 | Name5 | sSpammerName |  |
+| 24 | u32 | nChatBan | 0 |
 
 ### `0x0c12` NC_USER_AVATARINFO_REQ (WM→CharDB)
 
@@ -8801,6 +10361,41 @@ client-bound: academy members; no 2016 client handler
 | 26 | u8 | closeReason-0x80 |  |
 | 27 | u64 | money |  |
 
+### `0x10eb` NC_CHAR_EVENT_ATTENDANCE_LIST_DB_REQ (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0043a7f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | tm (9×i32) | tmEventStartDate | localtime(eventStart) |
+| 40 | tm (9×i32) | tmEventEndDate | localtime(eventEnd) |
+| 76 | i32 | tConnect | time(NULL) at first map login |
+
+### `0x10ee` NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_REQ (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0043bde0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | tm (9×i32) | tCheckTime | localtime(start of the current day) |
+
+### `0x10f3` NC_CHAR_EVENT_ATTENDANCE_REWARD_DB_REQ (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0043aac0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | 0 without CHARDATA |
+| 4 | u8 | nIndex |  |
+| 5 | tm (9×i32) | tmEventDay | localtime(DayStart(nIndex)) |
+| 41 | u8 | nRewardID |  |
+| 42 | tm (9×i32) | tmCheckStartDay |  |
+| 78 | tm (9×i32) | tmCheckEndDay |  |
+
+0x72 bytes
+
 ### `0x1402` NC_AVATAR_CREATEDATA_REQ † (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_004229f0)
@@ -8838,6 +10433,42 @@ W01 name was 'character create request (ours)'
 
 W01 name was 'character rename request (ours)'
 
+### `0x5410` NC_FRIEND_DB_SET_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0041cd70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle_charno | requester |
+| 2 | u16 | handle_friendno | accepter |
+| 4 | u32 | charno | requester |
+| 8 | u32 | friendno | accepter |
+| 12 | u8 | flag | 0 |
+
+size 0xD
+
+### `0x5414` NC_FRIEND_DB_GET_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00436900)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle_char |  |
+| 2 | u32 | charno |  |
+| 6 | u32 | friendno | offline friend |
+
+size 0xA
+
+### `0x7060` NC_CHAR_OPTION_LOGIN_BLOCKDATA_ERR_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00414bf0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+
+no 2016 Character handler (W04-B23)
+
 ### `0x7468` NC_GUILD_DB_RESULT_WRITE_CMD (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_00449f80)
@@ -8867,6 +10498,15 @@ W01 name was 'character rename request (ours)'
 
 0x2C bytes, sent by the schedule generator FUN_00444cf0
 
+### `0x74ee` NC_GUILD_DB_DELETE_CANCEL_REQ (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_004431a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nNo |  |
+| 4 | u16 | hTool | OPTool session handle |
+
 ### `0x750d` NC_GUILD_EMBLEM_STATE_DB_REQ (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_0044ea00 / FUN_0042d220)
@@ -8876,6 +10516,86 @@ W01 name was 'character rename request (ours)'
 | 0 | u32 | nGuildNo |  |
 | 4 | i32 | EmblemDeleteDate |  |
 | 8 | u8 | EmblemState | GUILD_EMBLEM_STATE |
+
+### `0x7c0d` NC_DATA_PRISON_UPDATE_MIN_CMD † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00458270 / FUN_004578a0 / FUN_004584e0 / FUN_00458790)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nImprisonRegNum | charNo |
+| 4 | u16 | nMinute |  |
+
+### `0x7c0e` NC_DATA_PRISON_GET_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00415530)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nCharHandle | WM session handle |
+| 2 | u32 | nCharRegNum |  |
+
+### `0x7c10` NC_DATA_PRISON_ALTER_GM_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0041e290)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nGmHandler |  |
+| 2 | Name256Byte | sGmUserID |  |
+| 258 | u32 | nImprisonRegNum | 0 = by name |
+| 262 | Name5 | sImprison |  |
+| 282 | u16 | nMinute | never written (W04-B25) |
+| 284 | char[16] | sReason | never written |
+| 300 | char[64] | sRemark | never written |
+
+0x16C; 0x7C0B same layout, all fields written
+
+### `0xa41a` NC_INSTANCE_DUNGEON_RANK_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00428870)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMapCount |  |
+| 2 | SHINE_INDUN_INFO[n] | sIndunInfos |  |
+
+no 2016 Character-server handler
+
+### `0xa804` NC_CHAT_RESTRICT_DB_ADD_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00422240)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSessionHandle |  |
+| 2 | u32 | nUserNo | session +0x124 |
+| 6 | Name5 | sChatRestrictCharID |  |
+
+size 0x1A
+
+### `0xa808` NC_CHAT_RESTRICT_DB_DEL_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0041ec00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSessionHandle |  |
+| 2 | u32 | nUserNo |  |
+| 6 | u32 | nChatRestrictCharNo | from the WM list |
+
+size 0x0A
+
+### `0xa80c` NC_CHAT_RESTRICT_DB_DEL_ALL_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_004170a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSessionHandle |  |
+| 2 | u32 | nUserNo |  |
+
+size 6
 
 ### `0x0808` NC_MISC_USER_COUNT_CMD † (WM→Login)
 
@@ -8911,6 +10631,278 @@ W01 name was 'world login accepted (ours)'
 | 262 | u32 | ip |  |
 
 W01 name was 'token request (ours)'
+
+### `0x2802` NC_OPTOOL_S2SCONNECT_LIST_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_004251a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | echo_data |  |
+| 1 | u8 | my_server_id | 5 |
+| 2 | u16 | num_of_connections |  |
+| 4 | SERVER_CONN_INFO[n] | connection_info | 7 bytes: u8 world, u8 zone, u8 server type, SHINE_DATETIME |
+
+### `0x2804` NC_OPTOOL_CLOSE_SERVER_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00425860)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error | always 0x0600 |
+
+### `0x2808` NC_OPTOOL_CONNECT_BRIF_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00425950)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | echo_data |  |
+| 1 | u8 | my_server_id | 5 |
+| 2 | u16[21][2][2] | count | [server type][world][zone] |
+
+### `0x280a` NC_OPTOOL_KQ_SCHEDULE_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00427790)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | NumOfTotal |  |
+| 2 | u8 | bPart | bit0 first, bit1 last |
+| 3 | u16 | StartDataIndex |  |
+| 5 | u16 | NumOfQuest | ≤ 10 |
+| 7 | PROTO_KQ_INFO[n] | QuestArray | 0x179 each |
+
+### `0x280d` NC_OPTOOL_KQ_MAP_ALLOC_INFO_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00425e20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | nNumOfMapArray |  |
+| 4 | KQ_MAP_ALLOC_TABLE[n] | MapArray | 0x28 each |
+
+### `0x2810` NC_OPTOOL_ACK_CLIENT_NUM_OF_USER_LIMIT † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_004263f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | WorldNo |  |
+| 1 | i32 | NumOfUserLimit |  |
+| 5 | i32 | NumOfMax | client capacity |
+
+### `0x2816` NC_OPTOOL_GUILD_TOURNAMENT_CHANGE_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_004264d0 / FUN_0043d830)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error | 0x1400 ok, 0x1401 Time_Start differs, 0x1402 times not increasing, 0x1403 phase time passed, 0x1404 match gap too short, 0x1405 nMatchType > 9 |
+
+### `0x281c` NC_OPTOOL_WM_SEND_PACKET_STATISTICS_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_004265a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bPart | always 4 |
+| 1 | u16 | nDataCount | always 0 |
+
+### `0x281e` NC_OPTOOL_CHARACTER_DELETE_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00426660)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | status | 0 character in game, 1 not in game |
+
+### `0x2821` NC_OPTOOL_GUILD_CHANGE_MEMBER_GRADE_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00427630)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error | 0x1580 ok, 0x1581 no guild, 0x1582 no member, 0x1583 old grade differs |
+
+### `0x2823` NC_OPTOOL_GUILD_TOURNAMENT_SCHEDULE_RESET_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00426990)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | nGTNo | computed scheduled start time (time_t) |
+
+### `0x2825` NC_OPTOOL_GUILD_DATA_CHANGE_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00427980 / FUN_0043f390)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error | 0x1640 ok, 0x1641 nNo 0, 0x1642 no guild, 0x1643 max below members; also 0x1E4A/0x1E4B from 0x282B |
+
+### `0x2828` NC_OPTOOL_FIND_USER_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00426c50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nUserNo |  |
+| 4 | u8 | bIsLogin |  |
+| 5 | Name256Byte | sUserID |  |
+| 261 | u32 | nCharNo | -1 when not in game |
+| 265 | Name5 | sCharID |  |
+| 285 | Name3 | sMapName | CHARDATA+0x42 |
+
+rest stale when not found
+
+### `0x282a` NC_OPTOOL_KICK_USER_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00426e20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nUserNo |  |
+| 4 | u8 | bKick |  |
+| 5 | Name256Byte | sUserID |  |
+| 261 | u32 | nCharNo |  |
+| 265 | Name5 | sCharID |  |
+| 285 | Name3 | sMapName |  |
+
+### `0x282c` NC_OPTOOL_GUILD_DISMISS_CANCEL_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00443170)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1E49 nNo 0; CharDB result via 0x74EF |
+
+### `0xd002` NC_EVENT_GET_ALL_EVENT_INFO_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00401250)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3200 |
+| 2 | u16 | nAllEventCnt |  |
+| 4 | u16 | nPacketOrder | 1-based; 0 with no event |
+| 6 | u16 | nEventNo |  |
+| 8 | i32 | dStartTime |  |
+| 12 | i32 | dEndTime |  |
+| 16 | u16[3] | nRewardAbstateIndex |  |
+| 22 | u8[255] | bIsPlayerLevel |  |
+| 277 | u8[64] | bIsPlayerClass |  |
+| 341 | u8[1024] | bIsMapID |  |
+| 1365 | u8 | bIsField_KQ |  |
+| 1366 | u8 | bIsField_Battle |  |
+| 1367 | u8 | bIsField_ID |  |
+| 1368 | u8 | bIsField_Normal |  |
+| 1369 | u8 | bIsFlagAllReady |  |
+
+size 0x55A; one packet per event; with no event one packet whose event part is stale stack (W04-B52)
+
+### `0xd004` NC_EVENT_ADD_EVENT_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00401ec0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3208 ok, 0x3209 too many |
+| 2 | u16 | nEventNo |  |
+| 4 | i32 | dStartTime |  |
+| 8 | i32 | dEndTime |  |
+| 12 | u16[3] | nRewardAbstateIndex |  |
+| 18 | u8[255] | bIsPlayerLevel |  |
+| 273 | u8[64] | bIsPlayerClass |  |
+| 337 | u8[1024] | bIsMapID |  |
+| 1361 | u8 | bIsField_KQ |  |
+| 1362 | u8 | bIsField_Battle |  |
+| 1363 | u8 | bIsField_ID |  |
+| 1364 | u8 | bIsField_Normal |  |
+
+size 0x555; nEventNo = the number assigned
+
+### `0xd006` NC_EVENT_UPDATE_EVENT_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00401430)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3210 ok, 0x3211 zone broadcast failed, 0x3212 no such event |
+| 2 | u16 | nEventNo |  |
+| 4 | i32 | dStartTime |  |
+| 8 | i32 | dEndTime |  |
+| 12 | u16[3] | nRewardAbstateIndex |  |
+| 18 | u8[255] | bIsPlayerLevel |  |
+| 273 | u8[64] | bIsPlayerClass |  |
+| 337 | u8[1024] | bIsMapID |  |
+| 1361 | u8 | bIsField_KQ |  |
+| 1362 | u8 | bIsField_Battle |  |
+| 1363 | u8 | bIsField_ID |  |
+| 1364 | u8 | bIsField_Normal |  |
+
+size 0x555; echo of the request
+
+### `0xd008` NC_EVENT_DEL_EVENT_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00401b80)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3218 ok, 0x3219 no such event |
+| 2 | u16 | nEventNo |  |
+
+size 4
+
+### `0xd00a` NC_EVENT_SET_ALL_READY_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_004016f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3220 ok, 0x3221 zone broadcast failed (then a second 0x3220), 0x3222 no such event |
+| 2 | u16 | nEventNo |  |
+
+size 4
+
+### `0x083a` NC_MISC_EVENT_DONE_MUNSANG_WM2Z † (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00408050)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nUserNo | from 0x0839 |
+| 4 | u32 | nCharNo |  |
+| 8 | u8 | nWorldNo |  |
+| 9 | u16 | nError | Account server always 0x1545 |
+| 11 | u16 | nQuestID |  |
+
+13 bytes, raw header {0x0F, 0x3A, 0x08}; sent to the zone hZone of 0x0839; the 2016 zone has no handler (W04-B56)
+
+### `0x0865` NC_MISC_SPAMMER_ZONE_CHAT_BAN_CMD † (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0040d980, FUN_0040dbf0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sSpammerName |  |
+| 20 | u32 | nChatBan | 0 = released |
+
+### `0x086a` NC_MISC_EVENTNPC_STANDSTART_ZONE_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00456c50, FUN_00456e20, FUN_00457110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name8 | sMobIndex | NpcSchedule.shn Mob_Inx |
+
+### `0x086b` NC_MISC_EVENTNPC_STANDEND_ZONE_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00456c50, FUN_00456e20, FUN_00457110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name8 | sMobIndex | NpcSchedule.shn Mob_Inx |
 
 ### `0x0c16` NC_USER_KICKOFFFROMWORLD_CMD (WM→Zone)
 
@@ -8967,6 +10959,49 @@ W01 name was 'token request (ours)'
 | 14 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 16 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
 
+### `0x5833` NC_KQ_LINK_TO_FORCE_BY_BAN_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_004531a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNum |  |
+| 4 | Name3[4] | sMapName | MapLink[i] instance map |
+
+size 0x34
+
+### `0x583b` NC_KQ_PLAYER_DISJOIN_CMD † (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00453b10)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nHandle | KQ |
+| 4 | u32 | nCharNum |  |
+
+all zones
+
+### `0x6006` NC_CT_CHARTTING_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0041c610 / FUN_00413510)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | zoneHandle | session +0x118 |
+| 2 | u32 | charNo |  |
+
+### `0x6007` NC_CT_ADD_FRIEND_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00411600)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | zoneHandle | session +0x118 |
+| 2 | u32 | charNo |  |
+| 6 | u16 | NumberOfFriends | list count |
+
+size 8
+
 ### `0x7481` NC_GUILD_TOURNAMENT_START_CMD (WM→Zone)
 
 **Verified layout** (basis: wm FUN_0044ade0)
@@ -9016,6 +11051,117 @@ W01 name was 'token request (ours)'
 | 17 | u64 | nProposalMoney |  |
 
 broadcast to all zones
+
+### `0x7c12` NC_ZONE_PRISON_END_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00458270 / FUN_004586e0 / FUN_004584e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nCharZoneHandle |  |
+| 2 | u32 | nCharRegNum |  |
+
+### `0x7c13` NC_ZONE_PRISON_GO_REQ (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0041de70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nGmHandler |  |
+| 2 | u32 | nGmRegNum |  |
+| 6 | Name256Byte | sGmUserID |  |
+| 262 | Name5 | sCharID |  |
+| 282 | u16 | nCharSessHandle |  |
+| 284 | u16 | nCharZoneHandle |  |
+| 286 | u32 | nCharRegNum |  |
+| 290 | u16 | nMinute |  |
+| 292 | char[16] | sReason |  |
+| 308 | char[64] | sRemark |  |
+
+0x174
+
+### `0x9435` NC_HOLY_PROMISE_MYUPPER_ACK (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0042b8c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.zoneHandle | echo |
+| 2 | u32 | ref.charNo | echo |
+| 6 | u32 | nUpCharNo | −1 none |
+
+### `0xa402` NC_INSTANCE_DUNGEON_DELETE_DUNGEON_CMD † (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0042ba20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Category |  |
+| 1 | u32 | RegisterNumber |  |
+| 5 | u32 | ReaderRegisterNumber | leader charNo or −1 |
+
+### `0xa409` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ACK (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0042c630/FUN_0042c7d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharRegNum |  |
+| 4 | u16 | nNPCHandle |  |
+| 6 | u16 | nError | 2 = no dest zone too |
+| 8 | i32 | eLevelType | 3 when no dest zone |
+
+### `0xa40f` NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_ACK (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0042c8e0/FUN_0042cac0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharRegNum |  |
+| 4 | u16 | nNPCHandle |  |
+| 6 | u16 | nError |  |
+| 8 | i32 | eLevelType |  |
+| 12 | Name3 | sMapName |  |
+
+### `0xbc09` NC_GAMBLE_EXCHANGEDCOIN_INIT_CMD † (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0043c2d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | dChackDate | the reset time just reached (time_t) |
+
+broadcast to all zones
+
+### `0xd00b` NC_EVENT_ADD_UPDATE_EVENT_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00401430, FUN_004016f0, FUN_004010c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+| 2 | i32 | dStartTime |  |
+| 6 | i32 | dEndTime |  |
+| 10 | u16[3] | nRewardAbstateIndex |  |
+| 16 | u8[255] | bIsPlayerLevel |  |
+| 271 | u8[64] | bIsPlayerClass |  |
+| 335 | u8[1024] | bIsMapID |  |
+| 1359 | u8 | bIsField_KQ |  |
+| 1360 | u8 | bIsField_Battle |  |
+| 1361 | u8 | bIsField_ID |  |
+| 1362 | u8 | bIsField_Normal |  |
+
+size 0x553
+
+### `0xd00c` NC_EVENT_DEL_EVENT_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_004016f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+
+size 2
 
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→zone)
 
@@ -9350,6 +11496,15 @@ then Pre u32 nPartySeqCharNo[5], Post {u16, u8, u8, u32[5]}; 0x32 bytes; 6 bytes
 
 10 bytes; field names pdb2017, offsets read in the 2016 WM
 
+### `0x0866` NC_MISC_SPAMMER_RELEASE_CHAT_BAN_REQ † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042c3b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGMCharNo | GM adminlevel 50..100 |
+| 4 | Name5 | sSpammerName |  |
+
 ### `0x101c` NC_CHAR_ZONE_CHARDATA_REQ † (Zone→WM)
 
 **Verified layout** (basis: wm FUN_00428ba0)
@@ -9371,6 +11526,58 @@ then Pre u32 nPartySeqCharNo[5], Post {u16, u8, u8, u32[5]}; 0x32 bytes; 6 bytes
 | 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
 | 6 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 8 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
+
+### `0x207d` NC_ACT_SCRIPT_MSG_WORLD_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042cea0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u8[32] | sScriptMsgIndex |  |
+| 34 | u8[5] | nlen |  |
+| 39 | u8[Σnlen] | sContent |  |
+
+re-broadcast as 0x2079 with the same layout
+
+### `0x244a` NC_BAT_PKINPKFIELD_WMS_CMD (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042b3b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wldmanhandle |  |
+| 2 | u32 | chrregnum |  |
+| 6 | u32 | pkcount | stored at CHARDATA+0x5E |
+
+### `0x2458` NC_BAT_WORLD_MOB_KILL_ANNOUNCE_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042b490)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nTextIndex | MobKillAnnounceType |
+
+### `0x4820` NC_SKILL_PASSIVESKILL_LEARN_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042a870)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wmshandle |  |
+| 2 | u32 | chrregnum |  |
+| 6 | u16 | passiveskillid | appended to the passive blob |
+
+### `0x6009` NC_CT_LUASCRIPT_SET_WORLD_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042cda0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | CT_INFO | CTInfo | u8 Type, u8 ElementNo:6 ElementValue:2 |
+
+forwarded as 0x380A (W04-B19)
 
 ### `0x7445` NC_GUILD_ZONE_WAR_KILL_CMD † (Zone→WM)
 
@@ -9401,6 +11608,142 @@ then Pre u32 nPartySeqCharNo[5], Post {u16, u8, u8, u32[5]}; 0x32 bytes; 6 bytes
 |---|---|---|---|
 | 0 | u32 | nGuildNo |  |
 | 4 | u64 | nDecrease |  |
+
+### `0x7c14` NC_ZONE_PRISON_GO_ACK † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042dea0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_NC_ZONE_PRISON_GO_REQ | req | echo |
+| 372 | u16 | err | 0xDC0 ok, 0xDC1 charNo mismatch, 0xDC2 so_Prison_Go failed |
+
+0x176
+
+### `0x9001` NC_CHARGED_SETBUFF_CMD (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042a5b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | CharRegistNumber |  |
+| 4 | u64 | ItemKey |  |
+| 12 | u16 | ItemId |  |
+| 14 | PROTO_CHARGEDBUFF_INFO | ChargedBuff | 14 bytes, appended to session blob +0x650 |
+| 28 | u32 | nUserNo |  |
+
+### `0x9002` NC_CHARGED_RESETBUFF_CMD (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042a6d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | CharRegistNumber |  |
+| 4 | u32 | ChargedBuffKey | matched |
+| 8 | u16 | ChargedBuffID | not compared |
+| 10 | u32 | nUserNo |  |
+
+### `0x9434` NC_HOLY_PROMISE_MYUPPER_REQ † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042b8c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.zoneHandle |  |
+| 2 | u32 | ref.charNo |  |
+
+### `0xa401` NC_INSTANCE_DUNGEON_EMPTY_DUNGEON_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042ba20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Category | 0 party, 3 raid |
+| 1 | u32 | RegisterNumber | party/raid no |
+
+### `0xa403` NC_INSTANCE_DUNGEON_RESET_COUNTDOWN_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042bc40)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Category |  |
+| 1 | u32 | RegisterNumber |  |
+
+### `0xa408` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_REQ † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042c630)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nStartZoneNum |  |
+| 1 | u8 | nDestZoneNum |  |
+| 2 | u32 | nCharRegNum |  |
+| 6 | u32 | nInDunRegNum |  |
+| 10 | i32 | IndunCategory |  |
+| 14 | u16 | nNPCHandle |  |
+| 16 | ORToken | Argument | 20 bytes |
+
+### `0xa40b` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ECHO_ACK † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042c7d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nStartZoneNum |  |
+| 1 | u32 | nCharRegNum |  |
+| 5 | u16 | nNPCHandle |  |
+| 7 | u16 | nError |  |
+| 9 | i32 | eLevelType |  |
+
+### `0xa40e` NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_REQ † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042c8e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nStartZoneNum |  |
+| 1 | u8 | nDestZoneNum |  |
+| 2 | u32 | nCharRegNum |  |
+| 6 | u32 | nInDunRegNum |  |
+| 10 | i32 | IndunCategory |  |
+| 14 | u16 | nNPCHandle |  |
+| 16 | ORToken | Argument |  |
+| 36 | i32 | eLevelType |  |
+
+### `0xa411` NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_ECHO_ACK † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042cac0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nStartZoneNum |  |
+| 1 | u32 | nCharRegNum |  |
+| 5 | u16 | nNPCHandle |  |
+| 7 | u16 | nError |  |
+| 9 | i32 | eLevelType |  |
+| 13 | Name3 | sMapName |  |
+
+### `0xa419` NC_INSTANCE_DUNGEON_MAP_REGIST_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_00428870)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMapCount | ≤ 32 |
+| 2 | SHINE_INDUN_INFO[n] | sIndunInfos | 0xD each |
+
+### `0xbc1d` NC_GAMBLE_WORLD_PREVMAPNAME_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042c570)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nWldHandle |  |
+| 2 | Name3 | sPrevMapName | stored at session +0x1ED04 |
+| 14 | u32 | nCharNo | must match the session's character |
+
+size 0x12, not checked
 
 ### `0x384e` NC_PARTY_MEMBERINFORM_REQ † (zone→WM)
 
