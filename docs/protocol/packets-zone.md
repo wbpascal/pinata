@@ -10849,6 +10849,27 @@ Z01 name was 'link inside the same zone (ours)'
 |---|---|---|---|
 | 0 | u16 | err | 0x1381 0x1382 0x1383 0x1388 |
 
+### `0x240E` NC_BAT_HPCHANGE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_0056d9a0 (sp_SendHPinform); client FUN_0049a1b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | hp | current HP minus vt 0x65c, floored at 0 |
+| 4 | u16 | hpchangeorder | ++obj+0x1d78 (vt 0x7e8) |
+
+sent from the player tick whenever the value differs from the last sent (+0x172d8)
+
+### `0x240F` NC_BAT_SPCHANGE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_0056daf0 (sp_SendSPinform); client FUN_0049a240)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | sp | current SP |
+
+player tick, on change (+0x172dc)
+
 ### `0x2429` NC_BAT_ABSTATEINFORM_CMD † (S→C)
 
 **Verified layout** (basis: zone FUN_00405900)
@@ -10879,6 +10900,16 @@ Empty payload.
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x20E8 ok, 0x20E9 riding, 0x20EA wrong mode |
+
+### `0x245F` NC_BAT_LPCHANGE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_0056dc20 (sp_SendLPinform); client FUN_0049d840)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nLP | current LP (vt 0xd90) |
+
+player tick, on change; also sent to every object targeting the player (so_ply_Send2WhoTargetMe)
 
 ### `0x3002` NC_ITEM_EQUIPCHANGE_CMD † (S→C)
 
