@@ -4117,7 +4117,7 @@ Sent in reply to `0x2067` NC_ACT_ACTIONBYITEM_REQ on ShineObjectClass::ShinePlay
 
 ### `0x2069` NC_ACT_REINFORCERELOC_CMD
 
-**Verified layout** (basis: zone ShineMobileObject_so_ReinforceMove FUN_00459600; client FUN_004a4180)
+**Verified layout** (basis: zone ShineMobileObject::so_ReinforceMove FUN_00459600; client FUN_004a4180; no PROTO struct in pdb2016 (R2))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -4233,7 +4233,7 @@ Sent from `FUN_00553200` (`FUN_00553200`) · payload 34 bytes
 
 ### `0x2076` NC_ACT_ANIMATION_LEVEL_CHANGE_CMD
 
-**Verified layout** (basis: zone FUN_00553460; client FUN_004a6740)
+**Verified layout** (basis: zone ShineMob::so_mob_SetAnimationLevel FUN_00553460; client FUN_004a6740)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6658,7 +6658,7 @@ Sent in reply to `0x4824` NC_SKILL_UNLEARN_REQ on ShineObjectClass::ShinePlayer 
 
 ### `0x4828` NC_SKILL_WARP_CMD
 
-**Verified layout** (basis: zone ShineMobileObject_smo_WarpTo FUN_004a7de0; client FUN_004a3ea0)
+**Verified layout** (basis: zone ShineMobileObject::smo_WarpTo FUN_004a7de0; client FUN_004a3ea0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10786,7 +10786,7 @@ Z01 name was 'link inside the same zone (ours)'
 
 ### `0x1C0A` NC_BRIEFINFO_DROPEDITEM_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone ctor FUN_005492d0 (header 0x1C0A, len 0x11) at drop+0x167, filled by ShineDropItem_so_ItemDrop FUN_0052a7a0; sent by FUN_00555280 (drop vt 0x4c8) from ShineObject_so_drpitm_BriefInfo FUN_00567ff0; PDB PROTO_NC_BRIEFINFO_DROPEDITEM_CMD size 0xf)
+**Verified layout** (basis: zone ctor BriefInformationDropItem::BriefInformationDropItem FUN_005492d0 (header 0x1C0A, len 0x11) at drop+0x167, filled by ShineDropItem::so_ItemDrop FUN_0052a7a0; sent by ShineDropItem::so_SendMyBriefInfo FUN_00555280 (drop vt 0x4c8) from ShineObject::so_drpitm_BriefInfo FUN_00567ff0; PDB PROTO_NC_BRIEFINFO_DROPEDITEM_CMD size 0xf; pdb2016 agrees (R2))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10795,13 +10795,13 @@ Z01 name was 'link inside the same zone (ours)'
 | 4 | u32 | location.x | drop position after the spiral placement |
 | 8 | u32 | location.y |  |
 | 12 | u16 | dropmobhandle | handle of the dropper (mob / player) |
-| 14 | u8 | attr | bits 0-2 always 0; bit 3 = the receiving player may pick it (drop vt 0x538 so_drpitm_CanLootingBitSet, recomputed per receiver before each send) |
+| 14 | u8 | attr | bits rareness:3@0 (always 0), looting:1@3 (pdb2016) = the receiving player may pick it (drop vt 0x538 so_drpitm_CanLootingBitSet, recomputed per receiver before each send) |
 
 one shared buffer per drop: the pickable bit is rewritten for each receiver just before the send; re-broadcast to the sight when the owner-only time ends and when a dice winner fails to pick
 
 ### `0x1C0E` NC_BRIEFINFO_BRIEFINFODELETE_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone static packet built at FUN_006951d0 (buffer 0x74df98, opcode 0x1C0E, payload pointer DAT_0074e028); sent by AxialListBriefDeleteAtMove FUN_004bdfe0 (smo_OldObjectDelete FUN_004be0d0) and AxialListBriefDeleteAllOfRange FUN_005535c0 (player vt 0xdc4 / 0xdd0); client FUN_004b99f0)
+**Verified layout** (basis: zone static packet `briefinfodelete` built by its dynamic initializer FUN_006951d0 (buffer 0x74df98, opcode 0x1C0E, payload pointer DAT_0074e028); sent by AxialListBriefDeleteAtMove::ali_Work FUN_004bdfe0 (ShineMobileObject::smo_OldObjectDelete FUN_004be0d0) and AxialListBriefDeleteAllOfRange::ali_Work FUN_005535c0 (player vt 0xdc4 / 0xdd0); client FUN_004b99f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10821,13 +10821,13 @@ corrects Z02 §5 ('no zone code sends 0x1C0E'); client queues the handle in Char
 
 ### `0x201F` NC_ACT_SOMEONESHOUT_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone FUN_00459250 (ShineMob::smo_Shout), FUN_00459080 (ShineMobileObject::smo_Shout); client handler reads offset 1 as u16 for mobs (re-data/client-handlers.json 0x201f); 2017 PDB PROTO_NC_ACT_SOMEONESHOUT_CMD agrees)
+**Verified layout** (basis: zone ShineMob::so_Shout FUN_00459250, ShineMobileObject::so_Shout FUN_00459080; client handler reads offset 1 as u16 for mobs (re-data/client-handlers.json 0x201f); 2017 PDB PROTO_NC_ACT_SOMEONESHOUT_CMD agrees)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | itemLinkDataCount | 0 for mobs; link count for players |
 | 1 | char[20] | speaker | union: charID (player name, or a script-given name) / mobID (vt 0x708) when isMob |
-| 21 | u8 | flag | bit 0 GMColor (vt 0xef4), bit 1 isMob (mob version: speaker string empty); other bits stale in the mob version |
+| 21 | u8 | flag | bits GMColor:1@0 (vt 0xef4), isMob:1@1 (pdb2016; mob version: speaker string empty); other bits stale in the mob version |
 | 22 | u8 | len | content length |
 | 23 | char[len] | content | text, then itemLinkDataCount × 0x67-byte item links (player version only) |
 
@@ -10885,7 +10885,7 @@ to the whole map instance (target 0xFFFF) or one object. The mob version sends l
 
 ### `0x2049` NC_ACT_REINFORCE_RUN_CMD (S→C)
 
-**Verified layout** (basis: zone FUN_00566ab0 (player vt 0xe98, called by so_MoveByServer FUN_00569510 with cmd 0x49); client FUN_004aa210)
+**Verified layout** (basis: zone ShinePlayer::smo_ply_ReinforceRun FUN_00566ab0 (player vt 0xe98, called by ShineMobileObject::so_MoveByServer FUN_00569510 with cmd 0x49); client FUN_004aa210)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10896,7 +10896,7 @@ to the moved player only; client runs the main character there when its ground i
 
 ### `0x204A` NC_ACT_REINFORCE_STOP_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone ShinePlayer_smo_ply_ReinforceStopHere FUN_00456ef0 (player vt 0xa50); client FUN_00499f10)
+**Verified layout** (basis: zone ShinePlayer::smo_ply_ReinforceStopHere FUN_00456ef0 (player vt 0xa50); client FUN_00499f10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10907,7 +10907,7 @@ to the player only, after every server-side stop (mm_Step stop, block-check roll
 
 ### `0x204D` NC_ACT_REINFORCE_WALK_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone FUN_00566ab0 with cmd 0x4D (no 2016 caller passes 0x4D, see Z09 §9.3); client FUN_004aa320)
+**Verified layout** (basis: zone ShinePlayer::smo_ply_ReinforceRun FUN_00566ab0 with cmd 0x4D (no 2016 caller passes 0x4D, see Z09 §9.3); client FUN_004aa320; no PROTO struct in pdb2016 (R2))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10932,7 +10932,7 @@ to the player only, after every server-side stop (mm_Step stop, block-check roll
 
 ### `0x240E` NC_BAT_HPCHANGE_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone FUN_0056d9a0 (sp_SendHPinform); client FUN_0049a1b0)
+**Verified layout** (basis: zone ShinePlayer::sp_SendHPinform FUN_0056d9a0; client FUN_0049a1b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10943,7 +10943,7 @@ sent from the player tick whenever the value differs from the last sent (+0x172d
 
 ### `0x240F` NC_BAT_SPCHANGE_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone FUN_0056daf0 (sp_SendSPinform); client FUN_0049a240)
+**Verified layout** (basis: zone ShinePlayer::sp_SendSPinform FUN_0056daf0; client FUN_0049a240)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10984,7 +10984,7 @@ Empty payload.
 
 ### `0x244A` NC_BAT_REALLYKILL_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone FUN_0056baa0 (ShineMob_so_Routine), FUN_0056a9e0 (ShineNPC_so_Routine), FUN_00553760; client FUN_004a28e0)
+**Verified layout** (basis: zone ShineMob::so_Routine FUN_0056baa0, ShineNPC::so_Routine FUN_0056a9e0, ShineMob::so_mob_SendReallyKill FUN_00553760; client FUN_004a28e0; pdb2016 lists 0x244A under two names, NC_BAT_PKINPKFIELD_WMS_CMD (Zone/WM enum) and NC_BAT_REALLYKILL_CMD (alt, struct {dead, attacker} = this layout); the zone sends the REALLYKILL layout (R2))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10995,7 +10995,7 @@ Empty payload.
 
 ### `0x245F` NC_BAT_LPCHANGE_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone FUN_0056dc20 (sp_SendLPinform); client FUN_0049d840)
+**Verified layout** (basis: zone ShinePlayer::sp_SendLPinform FUN_0056dc20; client FUN_0049d840)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -11074,7 +11074,7 @@ no PDB struct of that name
 
 ### `0x301B` NC_ITEM_PICKOTHER_ACK (hand-named) (S→C)
 
-**Verified layout** (basis: zone ShinePlayer_sp_partyitemdistribute FUN_0052f630 / sp_RaidItemsidtribute FUN_0052f8a0)
+**Verified layout** (basis: zone ShinePlayer::sp_partyitemdistribute FUN_0052f630 / ShinePlayer::sp_RaidItemsidtribute FUN_0052f8a0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -11101,7 +11101,7 @@ to the player who clicked, only when the receiver is someone else; the 2016 clie
 
 ### `0x303B` NC_ITEM_DICE_GAME_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone ShineDropItem_so_DiceItemPickInit FUN_00531020; client GameFrameWork::On_NC_ITEM_DICE_GAME_CMD FUN_0049c530)
+**Verified layout** (basis: zone ShineDropItem::so_DiceItemPickInit FUN_00531020; client GameFrameWork::On_NC_ITEM_DICE_GAME_CMD FUN_0049c530)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -11112,7 +11112,7 @@ to every party/raid member within 1000 units of the picker (2..20 players); the 
 
 ### `0x303E` NC_ITEM_DICE_GAME_START_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone FUN_00531310 (sd_DiceMyGameResultBroadCast); client FUN_004b26c0)
+**Verified layout** (basis: zone ShineDropItem::sd_DiceMyGameResultBroadCast FUN_00531310; client FUN_004b26c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -11123,7 +11123,7 @@ to every participant on the roller's map who is still in the party/raid; client 
 
 ### `0x303F` NC_ITEM_DICE_GAME_RESULT_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone FUN_0052ee60 (sd_DiceGameSendMsgResult) from FUN_00531470 (sd_DiceGameResult); client FUN_004b2750)
+**Verified layout** (basis: zone ShineDropItem::sd_DiceGameSendMsgResult FUN_0052ee60 from ShineDropItem::sd_DiceGameResult FUN_00531470; client FUN_004b2750)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -11158,7 +11158,7 @@ Empty payload.
 
 ### `0x482D` NC_SKILL_JUMP_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone ShineMobileObject_smo_JumpTo FUN_0057db20; client FUN_0049cf60)
+**Verified layout** (basis: zone ShineMobileObject::smo_JumpTo FUN_0057db20; client FUN_0049cf60)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -11252,7 +11252,7 @@ empty payload
 
 ### `0x6C0B` NC_SCENARIO_OBJTYPECHANGE_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone FUN_005508b0 (ShineBandit_so_bandit_ChangeType); client FUN_004a3580)
+**Verified layout** (basis: zone ShineBandit::so_bandit_ChangeType FUN_005508b0; client FUN_004a3580)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -11263,12 +11263,12 @@ sent to the whole map
 
 ### `0x748D` NC_GUILD_MOBGUILD_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone FUN_00476110 (so_mob_SetGuildRegNum), FUN_00475a80 (mb_SendMyGuildInfo); client FUN_004ba6b0)
+**Verified layout** (basis: zone ShineMob::so_mob_SetGuildRegNum FUN_00476110, ShineMob::mb_SendMyGuildInfo FUN_00475a80; client FUN_004ba6b0; field names from pdb2016 PROTO_NC_GUILD_MOBGUILD_CMD (R2))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | handle | mob |
-| 2 | u32 | guildNo | mob+0x22ec |
+| 0 | u16 | mobhandle | mob |
+| 2 | u32 | mobguild | mob+0x22ec |
 
 ### `0x8c04` NC_MINIHOUSE_BUILDING_ACK (S→C)
 
