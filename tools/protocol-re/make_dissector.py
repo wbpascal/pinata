@@ -313,7 +313,6 @@ local function register()
   end
 end
 proto.prefs_changed = register
-register()
 
 -- convs: running XOR index per connection; starts: XOR start index per C->S PDU, computed once on the first pass
 local convs, starts = {}, {}
@@ -410,6 +409,7 @@ function proto.dissector(tvb, pinfo, tree)
   dissect_tcp_pdus(tvb, tree, 3, get_len, dissect_pdu, true)   -- every PDU is >= 3 bytes (len + opcode)
   return tvb:len()
 end
+register()   -- after proto.dissector: DissectorTable:add rejects a Proto without a dissector
 '''
 
 # Minimal stand-in for the Wireshark Lua API, enough to run the glue above in the self-test.
@@ -421,7 +421,7 @@ ProtoField = setmetatable({}, {__index = function() return function(abbr) return
 ProtoExpert = {new = function(abbr) return {abbr = abbr} end}
 Pref = {string = function(_, d) return d end, bool = function(_, d) return d end}
 REG = {}
-DissectorTable = {get = function() return {add = function(_, p, pr) REG[p] = pr end, remove = function(_, p) REG[p] = nil end} end}
+DissectorTable = {get = function() return {add = function(_, p, pr) assert(pr.dissector, "DissectorTable_add: a Protocol that does not have a dissector cannot be added to a table"); REG[p] = pr end, remove = function(_, p) REG[p] = nil end} end}
 function Proto(name) return {name = name, prefs = {}} end
 local Tvb, Range, Item = {}, {}, {}
 Tvb.__index, Range.__index, Item.__index = Tvb, Range, Item

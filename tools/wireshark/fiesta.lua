@@ -7737,7 +7737,6 @@ local function register()
   end
 end
 proto.prefs_changed = register
-register()
 
 -- convs: running XOR index per connection; starts: XOR start index per C->S PDU, computed once on the first pass
 local convs, starts = {}, {}
@@ -7834,3 +7833,4 @@ function proto.dissector(tvb, pinfo, tree)
   dissect_tcp_pdus(tvb, tree, 3, get_len, dissect_pdu, true)   -- every PDU is >= 3 bytes (len + opcode)
   return tvb:len()
 end
+register()   -- after proto.dissector: DissectorTable:add rejects a Proto without a dissector
