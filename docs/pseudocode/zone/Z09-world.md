@@ -29,6 +29,8 @@ guild tournament). §13 doors (script-built gates, 0x1C0F / 0x1C10 / 0x6C09), ef
 0x1C12) and servants (skill summons: `MiscDataTable` SkillBreedMob, master link, roaming, flags, vanish). §14 the Lua
 engine (script objects, AI / pet / map scripts, object and map script events, argument objects, Lua triggers, the Lua
 observer, player observers, script timers, script server menus and casting bars, the table of all 248 Lua functions).
+§15 script interrupts of Pine map scripts (kinds, events, `waitinterrupt`, unit interrupts, `&scrint`) and script
+areas (`.aid`, the client's area tests 0x6C05…0x6C08, area and map counters).
 
 ---
 
@@ -4726,3 +4728,339 @@ names for the NA build *(fh-doc)*; the 2016 zone registers only these.
 - `cTimer_Obj` sends through the player's data stream (vt 0x2f8), the other timer functions through the game stream
   (vt 0x2fc); what separates the two streams is Z01's.
 - `cmc_AllowMode` 0x78 refuses player modes 3–6 for casting bars; the mode names are Z02's.
+
+## 15. Scripts 2: script interrupts and script areas
+
+Part 9b of the plan. A **script interrupt** is an event a map script waits for: an NPC click, a player entering an
+area, a death, a timer, an HP threshold, a GM call. Only **Pine** map scripts (`.ps` scenario books, `PSFilm`) have
+them; Lua map scripts get their events through the `LuaField` / `LuaAi` functions of §14.3 instead. In 2016 33 scenario
+books under `9Data/Shine/ScenarioBookShelf/` (guild tournament, KQs, instance dungeons, job change, wedding, OX field,
+quest maps) use them. The Pine statements themselves (`interruptset`, `waitinterrupt`, `interrupterase`,
+`interruptclear`) are documented here because they are the whole API; the rest of the Pine engine is part 14, the
+`Movie::*` film objects part 16.
+
+### 15.1 Objects *(pdb2016)*
+
+| Object | Layout | Role |
+|---|---|---|
+| `Movie::CinemaComplex` (field+0x44 `fm_Multiflex`, 0x12e798) | `List<Movie::FilmCase>` + `cc_FilmCase[8]`, `cc_PSFilm[8]`, `cc_LuaFilm[8]` | the films (running scripts) of a map instance; part 16 |
+| `Movie::FilmCase` (0x108) | +0 `fc_ScriptName`, +0x100 `fc_ScriptID`, +0x104 `fc_Film` | one list entry |
+| `Movie::FilmBase` / `PSFilm` / `LuaFilm` (0x12df4) | +4 `fb_Theater` | vt[1] `fb_ScriptInterrupt`, vt[2] `fb_SetInterruptClear`: PSFilm FUN_00507ae0 / FUN_00508f00; `FilmBase` and `LuaFilm` have the folded no-op FUN_00509900 in both slots |
+| `Movie::Theater` (0x12df0) | +0 `t_SenarioType`, +4 `t_LuaScript`, +8 `t_Screen` (Pine process stack), +0x1023c `t_TimeLimit`, **+0x1024c `t_InterruptManager`**, +0x12ce4 `t_ScriptName`, +0x12de4 `t_ScriptID`, +0x12de8 `t_Field`, +0x12dec `t_CenterFlag` (the map's `ShineAxialFlag`, §12.7) | the run state of one script |
+| `ScriptInterrupt::ScriptInterruptManager` (0x2a98) | `List<ScriptInterruptArgument>` (0x18, 20 entries) + +0x18 `sim_ArgArray[20]` | the interrupts of one theater; ctor FUN_0050d270 (`l_MakeList` FUN_0050d0f0 with 20, then binds slot i to `sim_ArgArray[i]`), dtor FUN_00509a90 / FUN_0050c070 |
+| `ScriptInterrupt::ScriptInterruptArgument` (0x220) | +0 `sib_Instance` (the kind singleton), +4 `sib_InterruptBlock` (`PineScriptToken`, 256 chars: the name of the block to call), +0x104 `sib_InterruptBlast` (u8: event seen, not yet consumed), +0x108 `sib_BlastNumber` (fires left), +0x10c `sib_InterruptIndex` (`Name4`, 16 chars: the script's name for the interrupt), +0x11c `sib_Argument` (union, 0x104, below) | one interrupt; ctor FUN_005098c0, `operator=` FUN_00509a10 |
+| kind singletons `si_AreaEntry`, `si_AreaLeave`, `si_NPCClickHandle`, `si_NPCClickIndex`, `si_NPCClickAny`, `si_ObjectDeadHandle`, `si_ObjectDeadIndex`, `si_Interval`, `si_HPLow`, `si_HPUpper`, `si_HPFull`, `si_MobEliminate`, `si_PlayerEliminate`, `si_GuildEliminate`, `si_TimeOut`, `si_KillEnemy`, `si_TargetChange`, `si_PlayerDead`, `si_PickUpItemIndex`, `si_Admin` | 4 bytes (vftable only) | one class per kind, derived from `ScriptInterruptBase` (pure vt[0]) |
+
+`sib_Argument` members used per kind (union `ScriptInterruptArgument::<sib_Argument>`): `area {char areaname[32],
+u16 player +0x20, int num +0x24}`, `npcclickhandle {u16 npchandle, u16 clicker}`, `npcclickindex {char npcindex[32],
+u16 npchandle}`, `npcclickany {u16 npchandle}`, `objdeadhandle {u16 victim}`, `objdeadindex {char mobindex[32], u16
+victim}`, `interval {int tick, u32 nexttick}`, `hplow` / `hpupper {u16 objhandle, int hprate +4, u32 maxhp +8}`,
+`killenemy` / `HPRecover` / `detectenemy {u16 mobhandle}`, `targetchange {u16 mobhandle, u16 targethandle}`,
+`playerdead {u16 victim}`, `guild {u32 regnum, u32 DelayTime, u32 StartTime}`, `pickupitem {u16 itemindex, u16
+owner}`, `admin {char callblock[256], u16 admin +0x100}`. Event data (`InterruptHappenArgument`, 0x104):
+`npcclick {char index[32], u16 npc}`, `area {char areaname[32], u16 player}`, `objdead {u16 victim, char
+victimindex[32], u16 murdurer +0x22, char murdurerindex[32]}`, `targetchange {u16 mobhandle, u16 targethandle}`,
+`pickupitem {u16 itemindex, u16 owner}`, `admin {char callblock[256], u16 admin}`, `Event {InterruptEventArgument*
+pEvent}`, `HPRecover {u16 mobhandle}`.
+
+Container and destructor boilerplate (no logic): `~ScriptInterruptArgument` FUN_005098f0, `List<ScriptInterruptArgument>`
+dtors FUN_005099b0 / FUN_005099d0 and `l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` FUN_0050bf50 / FUN_0050bf90 / FUN_0050bfd0 /
+FUN_0050c020 (copy with `operator=`; the interrupt code itself only uses `l_AllocZ` and `l_Free`), `ListEraser<…>` dtor
+FUN_004f8a00, `InterruptEventArgument` / `InterruptEventWinGuild` dtors FUN_00478d50 / FUN_00478ee0, `ScriptInteruptWinGuild`
+dtor FUN_0050d0c0, the atexit destructors of the two singletons FUN_0069e840 / FUN_0069e850. The rest of
+`Movie::CinemaComplex` (ctor FUN_00509330, dtors FUN_00507d40 / FUN_005086a0, `cc_SetArgument` FUN_005086d0,
+`cc_IsDuringPlay` FUN_00508fc0, `cc_PlayFilm`, `cc_DropFilm`) is part 16.
+
+Kind vtable (`ScriptInterruptBase`, 10 slots; unused slots = no-op FUN_00509900):
+
+| Slot | Method | Classes with a body |
+|---|---|---|
+| 0x00 | `sib_BlastCheck(arg, outBlock, outArgument, timeLimit, list, listIndex, centerFlag)` → fired? | every kind (§15.4) |
+| 0x04 | `sib_AreaEntry(arg, happen)` | AreaEntry FUN_0050bbf0 |
+| 0x08 | `sib_AreaLeave` | AreaLeave FUN_0050bcd0 |
+| 0x0c | `sib_NPCClicked` | NPCClickHandle FUN_0050b580, NPCClickIndex FUN_0050b600, NPCClickAny FUN_0050b710 |
+| 0x10 | `sib_ObjectDead` | ObjectDeadHandle FUN_0050b980, ObjectDeadIndex FUN_0050ba00, KillEnemy FUN_0050ba90, PlayerDead FUN_0050bb10 |
+| 0x14 | `sib_TargetChange` | TargetChange FUN_0050b880 |
+| 0x18 | `sib_ItemPickedUp` | PickUpItemIndex FUN_0050bed0 |
+| 0x1c | `sib_AdminInterrupt` | Admin FUN_0050b780 |
+| 0x20 | `sib_HPFull` | HPFull FUN_0050b900 |
+| 0x24 | `InterruptEvent(arg, InterruptEventArgument*)` | `ScriptInteruptWinGuild` FUN_00509910 (§15.6) |
+
+### 15.2 Setting an interrupt: Pine `interruptset`
+
+Script form: `interruptset <flag> <index> <count> [a0 [a1 [a2]]].`, e.g. `interruptset HPLow "BossHPLow" 1 Boss 500
+"onBoss_HP50Percent".` (node members: +0x24 flag identifier, +0x30 index, +0x34 count, +0x38/+0x3c/+0x40 up to three
+argument expressions; a missing one gives an empty token).
+
+```pseudo
+PineEventScriptNode::ShineInterruptSet::sa_Step(node, stack)          @ FUN_004ec1e0 (ctor FUN_004e85e0, clone FUN_004e91a0)
+    flag  = lower(node.flag token)                                   # PineScriptToken::pst_ToLower FUN_004d6240: flags are case-blind
+    if !eval(node.index): assert "…ShineInterruptSet::sa_Step : No Index"; pop; return
+    index = Name4(first 16 chars of the index)                       # "" is allowed and common
+    if !eval(node.count): assert "…ShineInterruptSet::sa_Step : No num"; pop; return
+    count = number(count);  a[0..2] = eval(argument expressions)
+    t = stack.theater
+    switch flag (table below)                                        # each setter calls sim_Alloc
+    pop                                                              # continue with the next statement
+
+ScriptInterruptManager::sim_Alloc(m, index, kind, block, count) -> arg | null      @ FUN_00509b10
+    slot = m.list.vt[2] l_AllocZ()                                   # appended at the END of the list
+    if !slot: assert "ScriptInterrupt::ScriptInterruptManager::sim_Alloc : Too many ScriptInterrupt"; return null
+        # max 20 interrupts per running script; the 21st is silently not set
+    slot.sib_Instance = kind; slot.sib_InterruptBlock = block (256 bytes); slot.sib_InterruptBlast = 0
+    slot.sib_BlastNumber = count; slot.sib_InterruptIndex = index
+    # sib_Argument is NOT cleared: kinds that set only part of it see the previous user's bytes (Z09-B44)
+```
+
+| Flag | Kind (class) | Setter `@` | a0 / a1 / a2 | Stored | Use in 2016 scripts |
+|---|---|---|---|---|---|
+| `areaentry` | AreaEntry | `Theater::t_SetInterruptAreaEntry` FUN_004e7fe0 | area name / block | `area.areaname` (32, zero-padded); then **0x6C05 NC_SCENARIO_AREAENTRY_REQ `{char areaindex[32] = a0}`** to every object in the map of `t_CenterFlag` (`so_AllInMap1(flag, AxialListPacketBroadcast, 0)`; no flag → assert "Movie::Theater::t_AllInMap : Null flag", nothing sent) | 5 |
+| `arealeave` | AreaLeave | `t_SetInterruptAreaLeave` FUN_004e8050 | area / block | same, packet **0x6C07 NC_SCENARIO_AREALEAVE_REQ** | 0 |
+| `npcclickhandle` | NPCClickHandle | `t_SetInterruptNPCClickHandle` FUN_004e80c0 | NPC handle / block | `npcclickhandle.npchandle` | 58 |
+| `npcclickindex` | NPCClickIndex | `t_SetInterruptNPCClickIndex` FUN_004e8110 | NPC index / block | `npcclickindex.npcindex` | 0 |
+| `npcclickany` | NPCClickAny | `sim_Alloc` | block | — | 1 |
+| `millisec` / `sec` / `minute` / `hour` | Interval | `t_SetInterruptTimeInterval` FUN_004e8180 → `sim_InterruptSet_SecondInterval` FUN_004e7dd0 (unit 'm' / 'S' / 'M' / 'H') | n / block | `tick` = n·10/1000, n·10, n·600, n·36000 tenths; `nexttick = g_Now + tick` (any other unit letter keeps the slot's old `tick`; no caller passes one) | `sec` 113 |
+| `hplow` | HPLow | `t_SetInterruptHPLow` FUN_004e81c0 | object handle / rate (‰) / block | `objhandle`, `hprate`, `maxhp = 0` | 151 |
+| `hpupper` | HPUpper | `t_SetInterruptHPUpper` FUN_004e8460 | same | same | 0 |
+| `mobeliminate` | MobEleminate | `sim_Alloc` | block | — | 6 |
+| `playereliminate` | PlayerEleminate | `sim_Alloc` | block | — | 128 |
+| `guildeliminate` | GuildEleminate | `t_SetInterruptGuildEliminate` FUN_004e8230 | guild regnum / block / delay (tenths) | `guild.regnum`, `DelayTime`, `StartTime = 0` | 4 (`600`) |
+| `timeout` | TimeOut | `sim_Alloc` | block | — | 141 |
+| `deadhandle` | ObjectDeadHandle | `t_SetInterruptDeadHandle` FUN_004e8290 | handle / block | `victim` | 63 |
+| `deadindex` | ObjectDeadIndex | `t_SetInterruptDeadIndex` FUN_004e82e0 → `sim_InterruptSet_ObjectDeadIndex` FUN_004e7eb0 | mob index or `_NONE_` / block | index ≠ "_NONE_": `mobindex` = a0, `victim = 0`; "_NONE_": only `victim = 0xFFFF` (= any death) | 50 (none with `_NONE_`) |
+| `killenemy` | KillEnemy | `t_SetInterruptKillEnemy` FUN_004e8310 | handle / block | `mobhandle` | 0 |
+| `targetchange` | TargetChange | `t_SetInterruptTargetChange` FUN_004e8360 | mob handle / block | `mobhandle` | 5 |
+| `playerdead` | PlayerDead | `sim_Alloc` | block | — | 16 |
+| `admin` | Admin | `t_SetInterruptAdmin` FUN_004e84d0 | — | block empty, **count forced to 9 999 999** | 7 |
+| `pickupitemindex` | PickUpItemIndex | `t_SetInterruptPickUpItemIndex` FUN_004e8400 | item InxName / block | `itemindex` = ItemInfo ID (`itemdatabox.idb_btree[name]`; unknown name → 0xFFFF) | 10 |
+| `hpfull` | HPFull | `t_SetInterruptHPFull` FUN_004e83b0 | mob handle / block | `mobhandle` | 0 |
+| anything else | a registered *unit* (§15.6) | `sim_InterruptSet_Unit` FUN_0050d3b0 | block | index = the **flag** name, not the script's index; unknown flag → assert "…ShineInterruptSet::sa_Step : Invalid flag" | `WinGuild` 2 |
+
+Usage counts: `interruptset` lines in the 2016 `.ps` files (first word after the statement, case folded).
+
+### 15.3 Events: who raises them
+
+Every event goes to all films of the map instance; each film's interrupts check whether the event is theirs and, if
+so, only **mark** themselves (`sib_InterruptBlast = 1`, plus the value they pass on). Nothing runs until the script
+reaches `waitinterrupt` (§15.4).
+
+```pseudo
+Movie::CinemaComplex::cc_ScriptInterrupt(cinema, simFunction, happen)         @ FUN_005088a0
+    for each FilmCase fc in cinema (list order): fc.fc_Film.vt[1](simFunction, happen)
+Movie::PSFilm::fb_ScriptInterrupt(film, simFunction, happen)                   @ FUN_00507ae0
+    simFunction(&film.fb_Theater.t_InterruptManager (film+0x10250), happen)    # LuaFilm: no-op
+FieldMap::fm_ScriptInterrupt(field, simFunction, happen)                        @ FUN_00419380
+    jmp cc_ScriptInterrupt(field.fm_Multiflex (+0x44), …)
+
+ScriptInterruptManager::sim_<event>(m, happen)     # all walk m's list in order and call the kind's event slot
+    sim_AreaEntry FUN_0050ca60 (vt 4), sim_AreaLeave FUN_0050cb70 (vt 8), sim_NPCClick FUN_0050c3f0 (vt 0xc),
+    sim_ObjectDead FUN_0050c950 (vt 0x10), sim_TargetChange FUN_0050c730 (vt 0x14), sim_PickUpItem FUN_0050cc80 (vt 0x18),
+    sim_AdminInterrupt FUN_0050c500 (vt 0x1c), sim_MobHPFull FUN_0050c840 (vt 0x20),
+    sim_UnitEvent FUN_0050c610 (vt 0x24, passes happen.Event.pEvent)
+```
+
+| Event | Raised by | `happen` | Documented |
+|---|---|---|---|
+| `sim_NPCClick` | `ShinePlayer::sp_NC_ACT_NPCCLICK_CMD` FUN_004c4b70 (0x200A), player in an allowed mode and on a field, **before** the NPC lookup | `npc` = packet handle; `index[32]` = **uninitialised stack** (Z09-B42) | Z02 §6.2 |
+| `sim_AreaEntry` / `sim_AreaLeave` | `sp_NC_SCENARIO_AREAENTRY_ACK` FUN_0050cd90 (0x6C06) / `…AREALEAVE_ACK` FUN_0050cf00 (0x6C08) | `areaname` = packet (32 bytes), `player` = sender | Z02 §12 |
+| `sim_ObjectDead` | `ShineMobileObject::so_KilledBy` FUN_00432240, only with a killer, victim on a field | `victim`, `victimindex` = victim vt 0x894 `so_mobile_GetIdxName` (MobInfo InxName; "" for players, FUN_00555110), `murdurer`, `murdurerindex` | Z03 §7.1 |
+| `sim_TargetChange` | `ShineMob::sm_SetTarget` FUN_004b8930 on a change to a real target (not 0xFFFF) | `mobhandle`, `targethandle` | §6.5 |
+| `sim_MobHPFull` | `ShineMob::sm_DuringRecover` FUN_0056b710 when HP and SP reach their targets | `mobhandle` | §6.5 |
+| `sim_PickUpItem` | `ShinePlayer::so_ply_itempickresult` FUN_005308d0 on success (0x341) | `itemindex` = item ID, `owner` = player | Z05 §3.2 |
+| `sim_AdminInterrupt` | GM command `&scrint <block>` (`AmpersandCommand::ac_ScriptInterrupt` FUN_0041abe0, stored by `ac_Store("&scrint", 10, …)` FUN_0041a310; the 10 is presumably the required admin level *(inferred)*): exactly one argument ("Called block needed"), GM on a map ("Null map") | `callblock` = the argument, `admin` = GM handle | here |
+| `sim_UnitEvent` | `GuildTournamentSystem::GuildGroup::SendWinEventToScript` FUN_0047a580, through `fm_ScriptInterrupt` on the map of the group's manager user | `pEvent` → `InterruptEventWinGuild {RegNo = m_GuildNumber}` | Z16 (caller) |
+
+What each kind does with its event:
+
+```pseudo
+NPCClickHandle::sib_NPCClicked(a, h)   @ FUN_0050b580:  if a.npchandle == h.npc: blast
+NPCClickIndex::sib_NPCClicked(a, h)    @ FUN_0050b600:  if a.npcindex == h.index (32 bytes): a.npchandle = h.npc; blast
+    # h.index is never filled by the click handler (original bug) Z09-B42: an npcclickindex interrupt never fires
+NPCClickAny::sib_NPCClicked(a, h)      @ FUN_0050b710:  a.npchandle = h.npc; blast               # every click
+AreaEntry::sib_AreaEntry / AreaLeave::sib_AreaLeave(a, h)   @ FUN_0050bbf0 / FUN_0050bcd0
+    if a.areaname == h.areaname (32 bytes): a.player = h.player; a.num = 100; blast
+ObjectDeadHandle::sib_ObjectDead       @ FUN_0050b980:  if a.victim == h.victim: blast
+ObjectDeadIndex::sib_ObjectDead        @ FUN_0050ba00
+    if a.victim == 0xFFFF or Name8::operator==(a.mobindex, h.victimindex) (FUN_00427d80):
+        a.victim = h.victim; blast
+    # "_NONE_" matches the first death only: afterwards a.victim is a handle and a.mobindex holds whatever the slot
+    # held before (sim_Alloc does not clear it) (original bug) Z09-B44
+KillEnemy::sib_ObjectDead              @ FUN_0050ba90:  if a.mobhandle == h.murdurer: blast
+PlayerDead::sib_ObjectDead             @ FUN_0050bb10
+    if ShineObjectHandleUnion::sohu_HandleSplit(h.victim) (FUN_00633650) == pool 2 (handles 8000…9499 = players):
+        a.victim = h.victim; blast
+TargetChange::sib_TargetChange         @ FUN_0050b880:  if a.mobhandle == h.mobhandle: a.targethandle = h.targethandle; blast
+PickUpItemIndex::sib_ItemPickedUp      @ FUN_0050bed0:  if a.itemindex == h.itemindex: a.owner = h.owner; blast
+HPFull::sib_HPFull                     @ FUN_0050b900:  if a.mobhandle == h.mobhandle: blast
+Admin::sib_AdminInterrupt              @ FUN_0050b780:  a.callblock = h.callblock; a.admin = h.admin; blast
+```
+
+A blast flag stays set until a `waitinterrupt` consumes it; a second event of the same kind before that only
+overwrites the stored value (one firing, the last handle).
+
+### 15.4 Waiting: `waitinterrupt` and the per-kind checks
+
+Script form, the same in every 2016 book: an endless loop `waitinterrupt InterruptBlock "InterruptArg". call
+InterruptBlock.` The node stores into the two script variables the block name and the event value, and the script
+then calls the block by name.
+
+```pseudo
+PineEventScriptNode::ShineWaitInterrupt::sa_Step(node, stack, state)        @ FUN_004ecd10 (ctor FUN_004e8620)
+    if state == 0:                                                   # first step of this statement
+        state = 1
+        stack.ps_Shine.block    = variable named by node+0x24 (Identify::i_GetVariable)
+        stack.ps_Shine.argument = ps_FindVariable(eval(node+0x30))  # the variable whose name is the string
+    t = stack.ps_Shine.theater
+    if sim_InterruptBlast(&t.t_InterruptManager, block, argument, &t.t_TimeLimit, t.t_CenterFlag, t.t_Field.fm_KQHandle):
+        return ps_Pop(stack)                                         # go on: the next statement calls the block
+    return 1                                                         # stay on this statement; checked again next step
+
+ScriptInterruptManager::sim_InterruptBlast(m, outBlock, outArgument, timeLimit, centerFlag, kqHandle) -> bool   @ FUN_0050c100
+    for each interrupt a in m (list order = order of interruptset):
+        if a.sib_Instance.vt[0] sib_BlastCheck(a, outBlock, outArgument, timeLimit, m, a's list index, centerFlag):
+            return true                                              # at most ONE interrupt fires per step
+    return false                                                     # kqHandle is passed but unused
+```
+
+So the list order is the priority: an interrupt set earlier wins when two are ready in the same step; the other stays
+marked and fires on a later step.
+
+Common shape of `sib_BlastCheck` ("fire"): copy `a.sib_InterruptBlock` into `outBlock`; for kinds with a value,
+clear `outArgument` and append the value as decimal text (`CeaseFireSender::CeaseFireSender` FUN_004d6300 = empty
+token, `PineScriptToken::pst_MergeNumber` FUN_004d7310); `a.sib_BlastNumber -= 1`, and when it drops below 1 free the
+slot (list vt 0xc `l_Free`); clear the blast flag; return true. Kinds without a value **leave `InterruptArg` as it
+was** (the last value of another interrupt).
+
+| Kind | `sib_BlastCheck` | Fires when | `InterruptArg` | Notes |
+|---|---|---|---|---|
+| AreaEntry | FUN_00509f70 | blast and `num > 0`: `num -= 1`; player object exists, mode ∉ {0, 3}, on a field, and `FieldMap::fm_AreaEntry(field, areaname, x, y)` (§15.7) | unchanged | the server re-tests the position with its own `.aid` up to 100 times (one per step) after the client's report. The blast flag is **not cleared** on firing (original bug) Z09-B43 |
+| AreaLeave | FUN_0050a0f0 | same with `fm_AreaLeave` (not inside) | unchanged | Z09-B43 too |
+| NPCClickHandle | FUN_00509e50 | blast | NPC handle | |
+| NPCClickIndex | FUN_0050a270 | blast | NPC handle | never blasts (Z09-B42) |
+| NPCClickAny | FUN_0050a390 | blast | NPC handle | |
+| ObjectDeadHandle | FUN_0050a4b0 | blast | the handle | |
+| ObjectDeadIndex | FUN_0050a5d0 | blast | victim handle | |
+| KillEnemy | FUN_0050af40 | blast | unchanged | |
+| PlayerDead | FUN_0050b170 | blast | victim handle | |
+| TargetChange | FUN_0050b050 | blast | new target handle | |
+| PickUpItemIndex | FUN_0050bdb0 | blast | picker handle | |
+| HPFull | FUN_00509d50 | blast | unchanged | |
+| Admin | FUN_0050b290 | blast | GM handle | `outBlock` = the **GM's** block name, not the stored one; the slot is freed after **every** firing (the 9 999 999 count is never used) |
+| Interval | FUN_0050ab90 | `g_Now ≥ nexttick`; then `nexttick += tick` | unchanged | catch-up: after a long gap it fires on consecutive steps until `nexttick` passes `g_Now` |
+| HPLow | FUN_0050aca0 | object gone → **fire and free** (whatever the count); else `rate = HP (vt 0x4e8) × 1000 / maxhp`, `maxhp` = vt 0x4f0 read at the first check and kept; `rate ≤ hprate` | unchanged | fires on every step while the HP stays low until the count runs out; maxhp 0 → rate 0 |
+| HPUpper | FUN_0050b3e0 | same, `rate ≥ hprate` | unchanged | a vanished object also fires it |
+| MobEliminate | FUN_0050a6f0 | no live mob left in the map: `so_AllInMap1(centerFlag, AxialListMobCounter{SearchAll, max 1}, 1)` counts 0 | unchanged | §15.7 counter rules |
+| PlayerEliminate | FUN_0050a860 | no live player left (`ala_SearchPly`) | unchanged | |
+| GuildEliminate | FUN_0050a9d0 | no live player of `guild.regnum` in the map; `StartTime` = first tick seen empty; fires when `g_Now ≥ StartTime + DelayTime`; a guild member present resets `StartTime = 0` | unchanged | the guild tournament's "other side left" rule |
+| TimeOut | FUN_0050ae40 | `Movie::TimeLimit::tl_LeftTick(timeLimit)` FUN_00507f60 ≤ 0 | unchanged | `tl_LeftTick` also broadcasts 0x0810 NC_MISC_RESTMINUTE_CMD when the rest minute changes (part 16) |
+| unit (WinGuild) | `ScriptInterruptUnitBase::sib_BlastCheck` FUN_00509c30 | blast (after unit vt 0x2c, a no-op for WinGuild) | unit vt 0x30 `UpdateArgument`: the winning guild's number | §15.6 |
+
+### 15.5 Removing interrupts
+
+```pseudo
+PineEventScriptNode::ShineInterruptErase::sa_Step(node, stack)      @ FUN_004ecb80   ("interrupterase <index>.")
+    if !eval(node+0x30): assert "PineEventScriptNode::ShineInterruptErase::sa_Step"; pop; return
+    sim_InterruptErase(&theater.t_InterruptManager, Name4(first 16 chars))
+ScriptInterruptManager::sim_InterruptErase(m, index)                  @ FUN_0050c260
+    free every interrupt whose sib_InterruptIndex equals index (16 bytes)     # "" erases all unnamed ones
+PineEventScriptNode::ShineInterruptClear::sa_Step                     @ FUN_004f8b30   ("interruptclear [all].")
+Movie::PSFilm::fb_SetInterruptClear(film)                             @ FUN_00508f00   (film vt[2])
+    free all interrupts of the theater (ListEraser over the list)
+    # vt[2] is called by Movie::CinemaComplex::cc_PlayFilm FUN_005089a0 and cc_DropFilm FUN_00509150 (part 16)
+```
+
+A unit interrupt is stored under its flag name ("winguild", lower case), so `interrupterase` with the index the script
+wrote does not find it. No 2016 script erases one.
+
+### 15.6 Unit interrupts: the registry and `WinGuild`
+
+`ScriptInterrupt::ScriptInterruptRegisterManager` (`GetInstance()::_ins`, `std::vector<ScriptInterruptUnitBase*>
+m_vecInterrupts`) is a name → kind registry for kinds that are not built into `ShineInterruptSet`. The static
+initializer `ScriptInterrupt::testInter` (FUN_00698320) registers the only one, the singleton
+`ScriptInterruptUnit<ScriptInteruptWinGuild>::GetInstance()::_Instance` (class `ScriptInteruptWinGuild`, 8 bytes:
+vftable + `RegNo`).
+
+```pseudo
+ScriptInterruptManager::sim_InterruptSet_Unit(m, flagName, args, count) -> bool          @ FUN_0050d3b0
+    unit = ScriptInterruptRegisterManager::GetInterruptByName(registry, flagName as C string)   @ FUN_0050c380
+        # first unit whose vt 0x34 GetName() _stricmp-equals the name; WinGuild: "WinGuild" (FUN_0050d090)
+    if !unit: return false                                           # caller asserts "Invalid flag"
+    sim_Alloc(m, index = flagName, unit, block = args[0], count); return true
+ScriptInteruptWinGuild::InterruptEvent(w, a, event)                  @ FUN_00509910  (vt 0x24, from sim_UnitEvent)
+    if a.sib_InterruptBlast != 1 and event.vt[1]() == 1 (EAT_GuildNo; folded body FUN_00557bb0 returns 1):
+        a.sib_InterruptBlast = 1
+        w.RegNo = event.RegNo                       # stored in the shared singleton, not in the interrupt
+ScriptInteruptWinGuild::UpdateArgument(w, outArgument)               @ FUN_0050d0a0  (vt 0x30)
+    outArgument = decimal(w.RegNo)
+```
+
+The winning guild number lives in one global object for all maps: when two guild-tournament maps report a winner
+before their scripts reach `waitinterrupt`, both scripts read the later number (original bug) Z09-B45. Used by
+`GuildTournament.ps` / `GuildTournament1.ps` (`interruptset WinGuild "" 1 "WinnerGuildCheck".`).
+
+### 15.7 Script areas (`.aid`) and area queries
+
+Each map's optional `<map>.aid` (23 files in 2016, 1–11 areas each, 32 circles and 62 rectangles) is loaded into
+`MapBlockInformation.mbi_AreaData` (§9.2) by `AreaInfoData::Load` FUN_0062d990.
+
+```pseudo
+AreaInfoData { +4 IAreaData* m_pData[256], +0x404 u32 m_uiTotalDataCnt }   (ctor FUN_0062d870, dtor FUN_0062d950 / FUN_0062dc40)
+IAreaData { +0 vftable (vt[0] IntersectTest(x, y)), +4 Name8 Name (32), +0x24 int nAreaType (0 CIRCLE, 1 SQUARE) }
+AreaInfoData::Load(d, path) -> bool                                  @ FUN_0062d990
+    missing file → false (no error); RemoveAll (FUN_0062d910)
+    read u32 count; for i < count and i < 256:
+        read char name[32], u32 type
+        type 0: AE_Circle (0x34) { f32 fCenterX, fCenterY, fRadius }
+        type 1: AE_Square (0x3c) { f32 fCenterX, fCenterY, fRadiusU, fRadiusV, fAngle (file: degrees → radians) }
+        other: slot left null and nothing skipped (the file is misread from there; no 2016 file has one)
+AreaInfoData::GetData(d, name) -> area | null                        @ FUN_0062d8a0
+    linear search by the 32-byte name; stops at the first null slot
+AE_Circle::IntersectTest(x, y)  = (x−cx)² + (y−cy)² < r²                              @ FUN_0062d740
+AE_Square::IntersectTest(x, y)                                                       @ FUN_0062d7a0
+    dx, dy = x−cx, y−cy;  u = dy·sin(a) + dx·cos(a);  v = dy·cos(a) − dx·sin(a)
+    inside = |v| ≤ fRadiusV and |u| ≤ fRadiusU                       # half-widths; edges count as inside
+FieldMap::fm_AreaEntry(field, name, x, y) = area exists and IntersectTest(x, y)        @ FUN_00427e80
+FieldMap::fm_AreaLeave(field, name, x, y) = area exists and !IntersectTest(x, y)       @ FUN_00509950
+    # an unknown area name is neither entered nor left
+```
+
+The client keeps its own copy of the areas: `GameFrameWork::On_NC_SCENARIO_AREAENTRY_REQ` / `…AREALEAVE_REQ`
+(client FUN_004be410 / FUN_004be450) queue `AreaInfoMgr::AddRequestAreaTest(area, 1 entry | 2 leave)` (client
+FUN_00661010); `AreaInfoMgr::Update` (client FUN_00661130, every frame) tests the own position with
+`World::TestArea` and, at the first frame the condition holds, sends 0x6C06 / 0x6C08 **once** and drops the request.
+So one `interruptset AreaEntry` gives at most one report per player that was on the map when it was set; a player who
+arrives later never got the request (inferred from the code; no 2016 script re-sends it). A leave request is answered
+at once by a player who is outside when it arrives.
+
+Area and map counters used by the interrupts and by other script functions (all are `AxialListIterator`s run over a
+map with `so_AllInMap1`, §12; `ali_Work` returning false stops the walk):
+
+| Class `@` | Built by | Counts / collects |
+|---|---|---|
+| `AxialListMobCounter` (0x18: `almc_MobID`, `almc_GuildRegNum`, `almc_Counter`, `almc_MaxCount`, `almc_Search`), ctor FUN_004e2c70, `ali_Work` FUN_00427f10, `almc_HowMany` FUN_00461b70 | MobEliminate / PlayerEliminate / GuildEliminate checks (built inline), Pine `SysFunc*` (part 14c) | search chosen by the ctor: mob ID ≠ 0xFFFF → `ala_SearchMob` FUN_00427f30 (vt 0x708 mob ID equal, mode 0/1/2); else type `ALMC_PLAYER` 0 → `ala_SearchPly` FUN_00428020 (kind 2, mode 1/2/4/6), `ALMC_GUILD` 2 → `ala_SearchGld` FUN_004280a0 (player as before and vt 0x828 guild = regnum), otherwise `ala_SearchAll` FUN_00427fa0 (vt 0x89c `so_IsMob`, sub-layer ≠ 3 hidden, kind ≠ 10 servant, mode 0/1/2). Walk stops once `almc_Counter > almc_MaxCount` |
+| `AxialListMobInAreaCounter` (0x40: the same + `almc_Areaname`, `almc_AreaInfo`, `almc_Field`), ctor FUN_004e2d00 | Pine `SysFuncShinePlayerInArea::sfb_Calculate` FUN_004e6150 (part 14c) | the same four searches FUN_00429370 / FUN_004293f0 / FUN_00429470 / FUN_004294f0, each also requiring `ala_InArea` FUN_00428260 (area looked up once from the first object's field; unknown area → nothing counts) |
+| `AxialListAreaObjectList` (0x20: `alaol_Map`, `alaol_Area`, `alaol_ObjectType`, vector), ctor FUN_0042a390, `ali_Work` FUN_0042a7c0, `alaol_GetList` FUN_0042a970, `alaol_GetCount` FUN_00429df0 | Lua `cGetAreaObjectList` FUN_005f4620 (part 11), `cDePolymorph_Area` FUN_005f30d0 (part 10) | objects of kind `alaol_ObjectType` (vt 0x4d0) inside the area and not dead (mode ≠ 3) |
+| `AxialListBanArea` (0x30: `alba_Map`, `alba_BanArea`, `alba_ToWhereMap`, `alba_ToWhereCoord`, vector), ctor FUN_0042a100, `ali_Work` FUN_0042a570, `alba_Banish` FUN_00429f70 | Pine `ShineBanFromArea::sa_Step` FUN_004f99c0 (part 15a) | players (kind 2) with `so_AdministratorLevel` (vt 0x4d4) 0 inside the area; `alba_Banish` then moves each with vt 0x890 `so_ply_BriefLink(toMap, toCoord)` |
+
+Lua `cGetAreaObject` FUN_005dca40 and `cIsInArea` FUN_005ead70 (part 11) call `fm_AreaEntry` directly. The mini-house
+functions (`ShineMiniHouse::so_mh_CompulsionMoveTo` FUN_00543a40, `so_mh_CreateFurniture` FUN_00544f00,
+`so_mh_ReArrangeFurniture` FUN_00546150, `smh_SendFurnitureInfo` FUN_00546930) read the furniture areas
+(`FURNITURE_ARE1…6`) of the same data: Z13.
+
+### 15.8 Answers to the open questions (Z02 §5 / §12 / §15)
+
+- **NPC clicks** reach scripts two ways: the clicked object's own AI script (event `NPCClick`, 0x20, §14.3) and every
+  Pine film of the map (`sim_NPCClick`). Lua map scripts see clicks only through the object's script.
+- **Area entry / leave** are Pine-only. The client reports, but the server does re-check: the report only arms the
+  interrupt, which fires when `fm_AreaEntry` / `fm_AreaLeave` agrees with the server's own `.aid` geometry for the
+  reported player (up to 100 polls). Z02-B12 ("the server does not check the position") is therefore too strong: a
+  false report can make a player who is really inside count as the one who entered, but it cannot fire the
+  interrupt for a player outside the area.
+- The **map-script interrupts** never run script code at event time; a film reacts only at its next
+  `waitinterrupt` step, one interrupt per step.
+
+### 15.9 Open points of this section
+
+- How often a film steps (and so how long the 100 area re-checks last) is part 16 (`Movie::Theater` / `fc_Routine`).
+- `so_AllInMap1`'s last argument (0 for the area requests, 1 for the counters) is passed through to the map's
+  `fm_fp_AllInMap2` broadcast function; its meaning is not read here.

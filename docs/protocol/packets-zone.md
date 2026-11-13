@@ -11346,6 +11346,26 @@ empty payload
 |---|---|---|---|
 | 0 | u16 | err | 0xA42–0xA5A |
 
+### `0x6C05` NC_SCENARIO_AREAENTRY_REQ (hand-named) (S→C)
+
+**Verified layout** (basis: zone PineEventScriptNode::ShineInterruptSet::sa_Step FUN_004ec1e0 (interruptset areaentry), sent to every object in the map of the theater's centre flag; client GameFrameWork::On_NC_SCENARIO_AREAENTRY_REQ FUN_004be410 → AreaInfoMgr::AddRequestAreaTest(area, 1))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | areaindex | area name from the map's .aid (strncpy, zero-padded); Name8 in PROTO_NC_SCENARIO_AREAENTRY_REQ |
+
+the client tests its own position every frame and answers 0x6C06 when inside once, then drops the request
+
+### `0x6C07` NC_SCENARIO_AREALEAVE_REQ (hand-named) (S→C)
+
+**Verified layout** (basis: zone PineEventScriptNode::ShineInterruptSet::sa_Step FUN_004ec1e0 (interruptset arealeave), sent to every object in the map of the theater's centre flag; client GameFrameWork::On_NC_SCENARIO_AREALEAVE_REQ FUN_004be450 → AreaInfoMgr::AddRequestAreaTest(area, 2))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | areaindex | area name from the map's .aid (strncpy, zero-padded); Name8 in PROTO_NC_SCENARIO_AREALEAVE_REQ |
+
+the client tests its own position every frame and answers 0x6C08 when outside once, then drops the request
+
 ### `0x6C09` NC_SCENARIO_DOORSTATE_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone ShineDoor::so_door_DoorAction FUN_00550770 (broadcast to the map); client On_NC_SCENARIO_DOORSTATE_CMD FUN_004a3510)
