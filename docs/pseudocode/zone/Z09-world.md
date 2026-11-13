@@ -33,7 +33,11 @@ observer, player observers, script timers, script server menus and casting bars,
 areas (`.aid`, the client's area tests 0x6C05…0x6C08, area and map counters). §16 NPCAction proximity triggers
 (`World/NPCAction.txt` conditions and actions, `MobSetting/Action/` trigger files, the neighbourhood scan, player
 observers, damage absorption by protector mobs). §17 the Lua functions that control objects (moves, animations,
-damage / kill / revive, abstates, mob settings, map rules, links and parties, player items / money / stats / view slots).
+damage / kill / revive, abstates, mob settings, map rules, links and parties, player items / money / stats / view slots). §18 the
+Lua query functions (time / random, object state, positions and areas, searches and lists, object effects, sounds, map
+marks). §19 the Lua message functions (`ScriptMsg.shn` messages, dialogs, notices, shouts, camera, fog, screen effects,
+timers, sounds). §20 the Pine map-script language, reading side (`World/PineScript.txt`, tokens, the string value
+model, expressions, variables, the process stack; `MobBehaviorDescript/` is unused).
 
 ---
 
@@ -1387,8 +1391,7 @@ The Lua bindings themselves (argument reading FUN_005f7680 / FUN_005f7ad0, resul
   `{charNo, → object, time, damage}` (pets resolve to their owner through vt 0x9b0; only kind-2 objects = players are
   counted); when full, the oldest entry is overwritten. `el_FindLooter` FUN_004822f0 is part 7.
 - `MobBehaviorDescript/` (`DefaultBehavior.ps` and 7 `KQ/*.ps`): PineScript text (`whoistarget`, `permillage`, `chat`,
-  `whokillme`); no zone string names the folder or a `.ps` path of it. Whether the PineScript loader (part 14) reads it
-  stays open.
+  `whokillme`); no zone string names the folder or a `.ps` path of it: the 2016 zone does not read it (§20.1).
 - Other aggro sources, documented with their owners: the map-script node `PineEventScriptNode::ShineAggro::sa_Step`
   FUN_004f2d10 (part 15), `AxialListMagicFieldAggro` (`alns_ValidObject` FUN_0057a980, `almfa_AppendAggro` FUN_0057aad0;
   part 8), the tactic base `MobActionElement::mae_Action` FUN_004aa880 (part 4).
@@ -4717,11 +4720,20 @@ names for the NA build *(fh-doc)*; the 2016 zone registers only these.
 | §17 (part 10: object / mob control) | 57 | `cActByEventCode` 005eaa70, `cAnimate` 005dd690, `cAnimateForcedly` 005dd8a0, `cCharTitleAddValue` 005ded30, `cDamaged` 005f10d0, `cDePolymorph` 005e9210, `cDePolymorph_Area` 005f30d0, `cFollow` 005dc1f0, `cFreeStatInit` 005e7dc0, `cHeal` 005de540, `cHideOtherPlayer` 005e6a50, `cInvenItemDestroy` 005d63d0, `cItemErase` 005ecb40, `cKillObject` 005e6d40, `cLevelUp` 005e7590, `cLinkTo` 005dde20, `cLinkToAll` 005df4b0, `cLocationRotate` 005ed000, `cMapObjectControl` 005e2ad0, `cMobDetectRange` 005e80b0, `cMobIDFind` 005eee50, `cMove2Where` 005df6e0, `cMoveStop` 005edf90, `cPartyJoin` 005e3460, `cPartyLeave` 005e3610, `cResetAbstate` 005ef120, `cRevivalAll` 005ec100, `cRunTo` 005da040, `cRunToUntilBlock` 005da590, `cSetAbstate` 005d97a0, `cSetAbstateInArea` 005e2c40, `cSetAbstate_Range` 005f2560, `cSetCanUseReviveItem` 005e8520, `cSetCanUseReviveSkill` 005e8660, `cSetDeadDelayTime` 005de090, `cSetFreeBattle` 005ebfe0, `cSetMobAttr` 005e13d0, `cSetNPCParam` 005f0320, `cSetObjectDirect` 005e8fa0, `cSetReviveDelayTime` 005e8740, `cSetSightState` 005e7b80, `cSetTeamBattle` 005e83e0, `cStaticDamage` 005de8c0, `cStaticDamage_smo` 005e48f0, `cStaticMoverSpeed` 005debb0, `cStaticRunSpeed` 005ed3c0, `cStaticSpeed` 005dea30, `cStaticWalkSpeed` 005ed500, `cTargetChangeNull` 005d6b80, `cUseMoney` 005e6450, `cVanishAll` 005f0150, `cVanishTimer` 005e5840, `cViewSlotEquip` 005e3c00, `cViewSlotUnEquipAll` 005e3d40, `cWaitIdle` 005e7f70, `cWalkTo` 005da300, `cWillMovement` 005df340 |
 | part 11 (queries, lists) | 60 | `cAbstateRestTime` 005ef750, `cCurSec` 005d8cd0, `cCurrentSecond` 005d8d60, `cDistanceSquar` 005d88c0, `cFindAttackBlockLocate` 005ee1a0, `cFindNearPlayer` 005f37d0, `cFindNearestMobList` 005e6eb0, `cGetAbstate` 005e5e20, `cGetAdminLevel` 005e42a0, `cGetAreaObject` 005dca40, `cGetAreaObjectList` 005f4620, `cGetAroundCoord` 005de220, `cGetBaseClass` 005deee0, `cGetCharNo` 005e4110, `cGetCoord_Circle` 005d6720, `cGetCurMapIndex` 005e59b0, `cGetCurrentSkillInfo` 005f2070, `cGetDirect` 005de400, `cGetItemIndex` 005e5cf0, `cGetItemLot` 005dad80, `cGetLevel` 005e0c90, `cGetMapName` 005e8d50, `cGetMaster` 005e32c0, `cGetMobID` 005e47b0, `cGetMoveState` 005e2f30, `cGetNPCHandle` 005d8df0, `cGetNearObjListByCoord` 005f4ef0, `cGetNearestObjByCoord` 005f3a50, `cGetObjectMode` 005d6880, `cGetPlayerList` 005f4410, `cGetPlayerName` 005d9240, `cGetRegistNumber` 005d6500, `cGetRunSpeed` 005ed140, `cGetScriptString` 005e8b30, `cGetTargetList` 005f0e40, `cGetWalkSpeed` 005ed280, `cGetWhoKillMe` 005ee350, `cIsEquipItem` 005e23b0, `cIsInArea` 005ead70, `cIsInMap` 005ef2c0, `cIsMovable` 005da9c0, `cIsNoAttacOrNoMove` 005eac30, `cIsObjectAlreadyDead` 005ee090, `cIsObjectDead` 005d94f0, `cMapMark` 005df860, `cMapMark_FieldSight` 005e0640, `cMapMark_Obj` 005dffc0, `cNearObjectList` 005f22e0, `cObjectCount` 005e26c0, `cObjectEffect` 005ea8b0, `cObjectFind` 005f33d0, `cObjectHP` 005d9630, `cObjectLocate` 005d9ef0, `cObjectLocateDirection` 005e4d80, `cObjectSound` 005ea6f0, `cObjectType` 005f04b0, `cPermileRate` 005da8b0, `cPlayerExist` 005d8aa0, `cRandom` 005ed640, `cRandomInt` 005eed70 |
 | §19 (part 12: messages, dialogs, effects) | 36 | `cCameraMove` 005dbe30, `cCameraMove_Obj` 005e7920, `cDelDirectionalArrow` 005e89d0, `cDirectionalArrow` 005e8810, `cEffectMsg` 005e4540, `cEffectMsg_AllInMap` 005e4670, `cEffectTimer` 005e6bb0, `cEmoticon` 005e3e60, `cEmotion` 005e3e60, `cEndCinematicText` 005eeb30, `cMapFog` 005e6260, `cMessage` 005ef8f0, `cMobDialog` 005db690, `cMobDialog_FileName` 005e4a00, `cMobDialog_Obj` 005db860, `cMobDialog_Range` 005dbaa0, `cMobDialog_String` 005ece70, `cNPCChat` 005efaa0, `cNPCChatTest` 005db4b0, `cNPCMenuOpen` 005dcf50, `cNotice` 005e15b0, `cNoticeRedWarningCode` 005e5ff0, `cNoticeString` 005e16e0, `cNotice_Obj` 005e8e50, `cPlaySound` 005e4410, `cScriptMessage` 005dcbe0, `cScriptMessage_Obj` 005dcd80, `cScriptMessage_Range` 005f27e0, `cScriptMsg` 005ebb40, `cScriptMsg_World` 005eb970, `cShowCinematicText` 005eec40, `cSimpleChatScriptMsg` 005ea530, `cSomebodyShout` 005e5150, `cStartMsg_AllInMap` 005e3af0, `cSystemMessage_Obj` 005e6890, `cTopView` 005e6600 |
-| part 13 (rest) | 0 |  |
+| part 13 (rest) | 0 | none: checked in part 13 (the 248 `lua_setglobal` names of FUN_005f5350 = the 248 names of this table, and every address is cited as `FUN_…` in a pseudocode or knowledge file) |
 | Z13 (pets) | 8 | `cPet_ChangeMind` 005ea1d0, `cPet_GetActionRecord` 005e9d00, `cPet_GetMind` 005e9520, `cPet_GetRunSpeed` 005e9b10, `cPet_GetStress` 005e9720, `cPet_GetWalkSpeed` 005e9920, `cPet_SaveTendency` 005ea410, `cPet_Unsummon` 005d65a0 |
 | Z14 (instance dungeons, scores) | 8 | `cScoreBoard` 005ed860, `cScoreBoard_AllInMap` 005edad0, `cScoreInfo` 005e3790, `cScoreInfo_AllInMap` 005e3970, `cScoreResultList` 005ec6a0, `cScoreTopList` 005ec1f0, `cSendRankingList` 005eaee0, `cWinter_Event_ScoreBoard_AllInMap` 005edcf0 |
 | Z15 (quests, rewards, tutorial) | 11 | `cClassChangeOpen` 005ed720, `cGetQuestHero_ItemUse` 005d9140, `cGetQuestHero_NPC` 005d8f60, `cGetTutorialInfo` 005e7450, `cProgressTutorial` 005e72f0, `cQuestMobKill` 005d6010, `cQuestMobKill_AllInMap` 005d6150, `cQuestResult` 005e30d0, `cQuestResult_Individual` 005ecca0, `cReward` 005df060, `cRewardItem_CharInven` 005d6a10 |
 | Z16 (kingdom quests) | 7 | `cEndOfKingdomQuest` 005df1f0, `cGetKQLimitSecond` 005e5390, `cGetKQTeamType` 005e81c0, `cIsKQJoiner` 005e82d0, `cKQRewardIndex` 005e4000, `cShowKQTimerWithLife` 005e54f0, `cShowKQTimerWithLife_Obj` 005e5690 |
+
+FiestaHeroes' `fiesta.lua` *(fh-doc)* has 272 names; 245 of them are registered by the 2016 zone. Not in 2016 (part 13):
+`cViewEquip` is the 2016 `cViewSlotEquip` under another name, `InstanceDungeonClear` is a Lua function the script
+defines (`cc_DropFilm` calls it, §14.4 / part 16), and the other 25 are C functions the NA private server added (FH marks
+most "Hook only"): `cAddFame`, `cAddMoney`, `cFinishKey`, `cGainFame`, `cGainMoney`, `cGetClass`, `cGetExactClass`,
+`cGetExactTime`, `cGetExp`, `cGetItemPower`, `cGetTarget`, `cHasSubAbstate`, `cKickout`, `cObjectSP`, `cPartyMembers`,
+`cPartyMembersZone`, `cPlayerStatSkilled`, `cPlayerStatTotal`, `cPostDiscord`, `cRevive`, `cRoar`, `cSendRoar`,
+`cSendShout`, `cShout`, `cStartKey`. They are not documented (no 2016 code). The 2016 names FH lacks: `cEmoticon`
+(alias), `cViewSlotEquip`, `tonumber`.
 
 ### 14.10 Open points of this section
 
@@ -6393,3 +6405,324 @@ this section: `docs/protocol/annotations/Z09.json`.
 - §16.5 / C01: 0x2011 is shown by the 2016 game scene (§19.3); corrected in §16.5 and the annotation.
 - Open: which `TextData` / sound a `cEffectMsg` type plays (client `EffectMsg` table, C-side); whether a 2016 client
   dialog opened by `cNPCMenuOpen` answers with 0x2073 or 0x201D (client NPC dialog code, C01).
+
+---
+
+## 20. Scripts 7: the Pine map-script language 1 — files, tokens, expressions, the process stack
+
+Pine (`PineEventScript`, files `*.ps`) is the zone's older map-script language: kingdom quests, job changes, wedding,
+the guild tournament and some instance dungeons run as Pine "films" (`Movie::PSFilm`, §15, part 16). This section is
+the reading side: which files exist, how a file is turned into tokens, the value model (every value is a 256-byte
+string), expressions, variables and the process stack a running script uses. Statements, blocks and conditions are
+§21 (part 14b), the `SysFunc*` / `OtherStatement` nodes and `ScenarioBookShelf` §22 (part 14c), the `Shine*` action
+nodes parts 15a–15d. All class and member names are *(pdb2016)*; there are no packets in this section.
+
+### 20.1 Files
+
+- `9Data/Shine/World/PineScript.txt` (option-file format, `OptionReader`; read three times, by three loaders):
+  - table `PineScript`, column `ScriptName` (String[32]): one record per script book, a path below
+    `9Data/Shine/ScenarioBookShelf/` without extension (`KQ/KingSlime/KingSlime`, `Quest/Quest`, `Guild/GuildTournament`,
+    `Wedding/Wedding`, `ID/GraveYard/GraveYard`, …; 70 records in 2016). A trailing comment `; LuaScript` marks the
+    books that were rewritten in Lua; the loader decides the type itself. Loader: `ScenarioBookShelf::sbs_LoadScripts`
+    FUN_00509750 (book path format `../9Data/Shine/ScenarioBookShelf/%s.%s`, `sb_GetFileName` FUN_00507440; §22).
+  - table `DialogFile`, column `ScriptName`: the script-string files `9Data/Shine/Script/<name>.txt` (`KQKingSlime`,
+    `JobChange1`, `Wedding`, `GraveYard`, …) loaded by `KQScriptManager::kqsm_Load` FUN_0064cee0 into `kqscriptmanager`
+    (the sets read by `ss_String`, §18.4 / §19; loader in §22).
+  - table `RoamingData`, column `RoamingFile`: read by `MobRoaming::MobRoamingSet::mrs_Load` FUN_004b8690 (§10.6). The
+    2016 file has **no** `RoamingData` table: `or_Select` finds nothing and the loader returns without loading a path
+    (no error), so `mrs_Get` finds no preloaded roaming path in 2016.
+- `9Data/Shine/ScenarioBookShelf/**/*.ps`: the Pine scripts (46 files in 2016, Korean comments, CP949).
+- `9Data/Shine/MobBehaviorDescript/` (`DefaultBehavior.ps`, 7 `KQ/*.ps`): **not read by the 2016 zone** (answers §6.9).
+  No string of the zone binary contains "behavior" (any case, ASCII or UTF-16), and the only `.ps` path format is the
+  ScenarioBookShelf one above. The files are leftovers: `DefaultBehavior.ps` uses the words `whoistarget` and
+  `getname`, which appear nowhere in the binary (no statement could parse them); the `KQ/*.ps` files are older copies
+  of KQ book scripts (`KingSlime.ps` = regen layers with `mobregen` / `call`).
+
+### 20.2 Reading a file: `PineEventScript::pes_Load`
+
+```pseudo
+PineEventScript { Script pes_Script }                      # 0xc; ctor FUN_004e1960 → Script ctor FUN_004e1690
+Script : ScriptAtom { List<Block>* s_BlockList; ListArray<Block>* s_BlockArray }
+    # ctor: block array of 4 Blocks (0x118 bytes each, Block ctor/dtor, §21), list over it; grows by 4
+
+pes_Load(path, int* lineOut) → ok                          @ FUN_004d6c40
+    fp = fopen(path, "r")                                  # text mode
+    TokenReader tr on the stack: tr_CharReader = {fp, cr_Line = lineOut, cr_UngetBuffer = −1},
+        tr_UngetToken = "", tr_Buffer = "", tr_Line = lineOut;  *lineOut = 1
+    if !fp: return 0
+    ok = pes_Script.sa_Load(&tr)                           # vt 0
+    fclose(fp); return ok                                  # *lineOut = line reached (the caller logs it, §22)
+    # (original bug) Z09-B78: the reader stores a reason in tr_ErrCode ("Unexpected EOF", "String over line",
+    #   "File end in string", "Number read fail"), but nothing ever reads tr_ErrCode: a load error is reported with
+    #   the line number only
+
+Script::sa_Load(tr) → ok                                   @ FUN_004e1830
+    loop:
+        t = tr_GetToken(tr); if t == null: return 1        # end of file = success
+        if t != "open": return 0
+        unget t
+        b = next free Block of s_BlockList (none: l_Enlargement(4); still none → return 0)
+        if !b.sa_Load(tr): return 0                         # Block::sa_Load: "open [name] … close", §21
+    # tr_GetToken also returns null on a token error, so a broken token after the last block (e.g. an unterminated
+    # string) ends the file "successfully" and the rest is ignored (part of Z09-B78)
+```
+
+A script file is therefore a list of blocks `open [name] … close` (the top level only checks the token `open`, as
+written, case-sensitive; the block syntax is §21). Only `pes_Load`'s caller (`ScenarioBookPS::sb_Load` FUN_005076b0, §22) uses
+it.
+
+### 20.3 Characters and tokens: `PineScriptReader`
+
+```pseudo
+CharacterReader { _iobuf* cr_fp; int* cr_Line; int cr_UngetBuffer }               # 0xc
+TokenReader { CharacterReader tr_CharReader; PineScriptToken tr_UngetToken; PineScriptToken tr_Buffer;
+              int tr_BufPnt; char* tr_ErrCode; int* tr_Line }                       # 0x218
+PineScriptToken { uchar pst_Buffer[256] }                                           # every token and every value
+
+cr_GetCh() → c                                             @ FUN_004d6730
+    c = fgetc; '\n' → ++*cr_Line, return '\n'
+    ';' → skip to the end of the line (++*cr_Line at '\n') and read on      # ';' starts a comment anywhere
+cr_SkipSpace()                                             @ FUN_004d6770
+    take the unget char or read one (same comment rule); repeat while c ≤ 0x20 and c ≠ EOF; keep c as unget char
+
+tr_GetToken(out) → out | null                              @ FUN_004da340
+    if tr_UngetToken ≠ "": out = tr_UngetToken; tr_UngetToken = ""; return out      # one token of look-back
+    cr_SkipSpace; c = next char; EOF → tr_ErrCode = "Unexpected EOF", return null
+    tr_Buffer = c
+    c == '"'          → tr_ReadString      @ FUN_004d67f0: read to the closing '"' (kept: the token is "\"text\"");
+                                              '\n' → "String over line", EOF → "File end in string" (null)
+    c is a digit      → tr_ReadNumber      @ FUN_004d8a60: read digits; stop at a non-alnum char (pushed back);
+                                              a letter or '_' right after the digits → "Number read fail" (null)
+    c is alnum or '_' → tr_ReadIdent       @ FUN_004d8b30: read [0-9A-Za-z_]*
+    else              → a one-character operator token (every punctuation char is its own token:
+                        "<=" is '<' '=', "=!=" is '=' '!' '=')
+tr_isAlNum(c) @ FUN_004d6900 = [0-9A-Za-z_]; tr_IsOper(c) @ FUN_004d6940 = its negation (EOF included)
+~TokenReader @ FUN_004d67e0: fclose(cr_fp) when set
+```
+
+- No sign and no decimal point: `-5` is the operator `-` and the number `5`, `1.5` is `1`, `.`, `5`. Statements end
+  with the token `.` in the scripts (`wait sec 10.`) *(inferred from the files; read by the statements, §21)*.
+- (original bug) Z09-B76: the three readers append to the 256-byte `tr_Buffer` with no length check: a string, number
+  or name longer than 255 characters writes past the buffer into `tr_BufPnt` / `tr_ErrCode` / `tr_Line` of the
+  reader on `pes_Load`'s stack. The 2016 scripts stay far below (longest string 48 characters).
+- (original bug) Z09-B77: the comment rule also applies inside strings: in `"a;b"` the `;b"` and the rest of the line
+  are skipped and the string goes on with the next line (no "String over line" error, the newline was eaten by the
+  comment skip). No 2016 script has a `;` inside a string.
+
+`PineScriptToken` helpers (all on the 256-byte buffer, none bounds-checked):
+
+| Function | Address | Effect |
+|---|---|---|
+| ctor(`uchar*`) | FUN_004d62c0 | strcpy |
+| ctor(`int`) | FUN_004d62e0 | `sprintf("%d")` |
+| `pst_ToLower` | FUN_004d6240 | ASCII A–Z → a–z (keyword arguments of the action nodes are compared after this) |
+| `pst_RemoveQuatator` | FUN_004d6310 | `"text"` → `text` (only when the first and last chars are `"`); returns 1 when done |
+| `pst_GetNumber(cut)` | FUN_004d6360 | **the value of the trailing decimal digits** (`"abc12"` → 12, `"-3"` → 3, `"abc"` → 0); `cut` ≠ 0 removes them from the token |
+| `pst_GetChar` / `pst_SetChar` | FUN_004d63c0 / FUN_004d63d0 | byte read / write by index (used by `SysFuncShineRemoveFisrt`) |
+| `pst_Merge(tok)` | FUN_004d63e0 | strcat |
+| `pst_MergeString(char*)` | FUN_004d72a0 | strcat through a 256-byte stack copy |
+| `pst_MergeNumber(n)` | FUN_004d7310 | strcat of `sprintf("%d", n)` (results of conditions and system functions) |
+| `operator==` / `!=` | FUN_004d6420 / FUN_004d6470 | strcmp, case-sensitive |
+| `operator+=` `-=` `*=` | FUN_004d7390 / FUN_004d74b0 / FUN_004d75d0 | `this = prefix(this) + sprintf("%d", num(this) op num(other))`: the trailing digits of both are the operands, the non-digit prefix of `this` is kept |
+| `operator/=` | FUN_004d76f0 | same with `/` (C integer division); `num(other)` = 0 (also: no digits) → returns **null** (the expression fails) |
+
+### 20.4 Values and numbers
+
+Every Pine value is a `PineScriptToken` string. Numbers are not a separate type: an arithmetic operator or a numeric
+comparison reads each side with `pst_GetNumber`, i.e. the run of decimal digits at the end of the string. A name with a
+number suffix stays a name: `"Mob1" + 1` = `"Mob2"` (the prefix of the left side is kept). Handles, counts and HP rates
+are stored as decimal strings (`pst_MergeNumber`); the action nodes read them back with `pst_GetNumber`.
+
+- (original bug) Z09-B79: there are no negative numbers. `pst_GetNumber` ignores a `-`, so a negative result such as
+  `0 - 1` = `"-1"` is read back as 1 by every comparison and by the next operation; `+=` keeps the `"-"` as the
+  prefix: `"-1" + 1` = `"-2"`. Every subtraction that can go below zero is affected. The 2016 scripts subtract
+  constants in brackets (`(120 - 60)`) and one counter that stops at 0 (`KQ/GordonMaster.ps`: `NextTeleportHP -
+  200` from 800, loop ends on `=!= 0`): nothing goes negative in 2016.
+- (original bug) Z09-B81: concatenation (`%`, `pst_Merge*`) and the arithmetic operators append to the 256-byte token
+  without a length check: a value longer than 255 characters overwrites what follows the token (the stack frame of
+  the expression, or the next variable of the variable stack). Values built from player names in a loop (the KQ result
+  lists `#(S % Count) = @CharName(…)`, `AxialListKQResult`) are the risky ones.
+
+### 20.5 Expressions: `Express`, `Term`, `Identify`, atoms
+
+Grammar, as the loaders read it (`sa_Load`, ScriptAtom vt 0):
+
+```text
+Express   := Term [ CalcOp Express ]                          # right-recursive
+CalcOp    := '+' (9) | '-' (10) | '*' (11) | '/' (12) | '%' (13 = concatenate)
+Term      := '#' Term                                         # indirection: the variable named by the term's value
+           | Identify | Number | String | SystemFunction | '(' Express ')'
+Identify  := '#' Express | Id                                 # (inside a Term the '#' case is taken by Term)
+Id        := token whose first char is [A-Za-z_]              # a variable name
+Number    := token of digits only
+String    := token starting with '"' (quotes removed)
+SystemFunction := '@' name ArgumentList                       # 0x34 bytes, ctor FUN_004d7cf0; form from the scripts
+                                                              #   (`@CharName(PlayerHandle)`) (inferred), loader §21
+ArgumentList   := '(' { Express } ')'                         # at most 10, no separators
+CompareOp := "==" (1) | "!=" (2) | '<' (3) | '>' (4) | "<=" (5) | ">=" (6) | "===" (7) | "=!=" (8)
+```
+
+```pseudo
+Express { Term e_Term; CalculateOperator e_Oper; Express* e_Express }               # 0x11c; ctor FUN_004d7db0
+Express::sa_Load(tr)                                      @ FUN_004d8530
+    if !e_Term.sa_Load: return 0
+    if !e_Oper.sa_Load: return 1                              # no operator: the term alone
+    e_Express = new Express; return e_Express.sa_Load
+Express::sa_Calculate(out, ps)                            @ FUN_004d8640
+    if !e_Term.sa_Calculate(out, ps): return null
+    if !e_Express: return out
+    rhs = e_Express.sa_Calculate(…)                            # the whole rest of the expression
+    switch e_Oper.co_OperType: 9 out += rhs, 10 out −= rhs, 11 out *= rhs, 12 out /= rhs (null on 0), 13 out = out ‖ rhs
+    # (original bug) Z09-B80: no precedence and right-associative: a - b - c = a - (b - c), a / b * c = a / (b * c),
+    #   a * b + c = a * (b + c). The 2016 scripts put brackets everywhere it would matter; only `60 * 60 * 1000` chains
+~Express @ FUN_004d7de0 (deletes e_Express, the term's parts)
+
+CalculateOperator::sa_Load(tr)                            @ FUN_004db250
+    t = token; first char '%' → 13, '*' → 11, '+' → 9, '-' → 10, '/' → 12; else unget t, return 0
+    { PineScriptToken co_Oper; int co_OperType }                                       # 0x108 (both operator classes)
+
+Term { Term* t_Term; ScriptAtom* t_Atom }                                              # 0xc
+Term::sa_Load(tr)                                          @ FUN_004dbde0
+    t = token (none: 0)
+    t == "#" → t_Term = new Term; return t_Term.sa_Load
+    unget t; try in turn, each a new atom that is deleted when its sa_Load fails:
+        Identify (vt FUN_004db410), Number (FUN_004db370), String (FUN_004db330), SystemFunction
+    all failed: t = token; t == "(" → Express; then the token must be ")" → 1; else delete, t_Atom = null, 0
+    # (original bug) Z09-B83: when the token is not "(" it is not pushed back: a failed Term eats one token. Harmless
+    #   where the whole statement fails, wrong where a caller treats a failed term as "no further argument" (§21)
+Term::sa_Calculate(out, ps)                                @ FUN_004da2e0
+    t_Atom → t_Atom.sa_Calculate(out, ps)
+    t_Term → name = t_Term.sa_Calculate(out, ps); out = ps_FindVariable(ps, name)        # '#X' = value of variable "value of X"
+    neither → null
+~Term @ FUN_004d7d30
+
+Identify { Id* i_Id; Express* i_Exp }                                                  # 0xc; ctor FUN_004d6500, dtor FUN_004dad20
+Identify::sa_Load(tr)                                      @ FUN_004db410
+    t = token (none: 0); t ≠ "#" → unget, i_Id = new Id, return i_Id.sa_Load; else i_Exp = new Express, return i_Exp.sa_Load
+Identify::sa_Calculate(out, ps)                            @ FUN_004d6650      # vt 8 (value use)
+    i_Id  → Id::sa_Calculate (the variable's value)
+    i_Exp → out = value of the expression                     # the computed NAME, not the variable's value (see open points)
+Identify::i_GetToken(out, ps)                              @ FUN_004d9ea0      # keyword-style arguments of the action nodes
+    i_Id  → out = the identifier itself (the word as written: "all", "sec", …)
+    i_Exp → out = value of the variable named by the expression
+Identify::i_GetVariable(ps) → PineScriptToken*             @ FUN_004d9f60      # write target of the action nodes
+    i_Id  → ps_FindVariable(ps, the identifier)
+    i_Exp → ps_FindVariable(ps, value of the expression)      # `#(S % Count) = …` writes variable "S"+Count
+    expression failed → null
+
+Id { PineScriptToken i_Identify }                                                       # 0x104
+Id::sa_Load(tr)          @ FUN_004db3c0   token; first char a letter or '_' → 1; else unget, 0
+Id::sa_Calculate(out,ps) @ FUN_004da2b0   out = *ps_FindVariable(ps, i_Identify)   (the null check after it is dead)
+Number { PineScriptToken n_Number }   sa_Load @ FUN_004db370: token of digits only (else unget, 0)
+String { PineScriptToken s_String }   sa_Load @ FUN_004db330: token starting with '"' → pst_RemoveQuatator; else unget, 0
+Number::sa_Calculate @ FUN_004d6710 = String's vt 8 too (same body): out = the stored token
+```
+
+Compare operators (used by `Condition`, §21) are read by `CompareOperator::sa_Load` FUN_004db1b0 from the first char:
+`!` → `co_Excremation` FUN_004dabb0 (needs `=`: `!=` = 2), `<` / `>` → `co_NotEqual` FUN_004dac50 (`<=` 5 / `>=` 6;
+without `=` the token is pushed back: `<` 3 / `>` 4), `=` → `co_Equal` FUN_004daa50 (`=` then `=` or `!`; a third `=`
+gives `===` 7 / `=!=` 8, otherwise the token is pushed back and only `==` (1) is accepted; a lone `=` is not a compare
+operator). Their meaning (`Condition::sa_Calculate` FUN_004d87a0; result written as `"1"` / `"0"` with
+`pst_MergeNumber`):
+
+| Type | Text | Test |
+|---|---|---|
+| 1 / 2 | `==` / `!=` | `num(left) == / != num(right)` (trailing digits) |
+| 3 / 4 / 5 / 6 | `<` / `>` / `<=` / `>=` | numeric, same reading (so `"-3" < "2"` is false: Z09-B79) |
+| 7 | `===` | string equality (case-sensitive): 1 / 0 |
+| 8 | `=!=` | string compare: 0 when equal, else the strcmp sign as a u16 (`1` or `65535`): "not equal" is any non-zero |
+
+2016 usage (lines of the ScenarioBookShelf scripts): `===` 27, `=!=` 13, `==` 43, `!=` 7, `<=` 10, `>=` 13.
+
+`ArgumentList { ScriptAtom* al_Express[10] }` (0x2c): `sa_Load` FUN_004db570 reads `(`, then up to 10 expressions until
+`)` (a failed expression fails the list; after 10 the next token must be `)`); a first token other than `(` is pushed
+back (0). `al_GetArgument(i, out, ps)` FUN_004d64c0: `out = ""`, then the value of argument `i` when `i < 10` and it
+exists (a missing argument gives `""`).
+
+`ScriptAtom` vtable (all node classes, §21–§22 too): vt 0 `sa_Load(tr)`, vt 4 `sa_Step(arg, ps, &ip)` (statements),
+vt 8 `sa_Calculate(out, ps)` (values), vt 0xc "is this the block named …" (blocks). The defaults are folded `return 0`
+bodies (FUN_00401a80 / FUN_00449600 / FUN_004a9c90): an atom that is not a statement steps as "done", one that is not a
+value calculates to null, one that is not a block never matches. `ScriptAtom` itself has `_purecall` at vt 0.
+
+### 20.6 Variables and the process stack: `PineScriptStack`
+
+```pseudo
+ProcessStack {                                                        # 0x10234, one per Pine film
+    { ScriptAtom* node; int ip } ps_Stack[32]                         # call stack of nodes; ip = the node's own cursor
+    int ps_StackPoint
+    VariableStack ps_VarStack                                         # { VarArray vs_Stack[128]; int vs_StackPoint }
+                                                                      #   VarArray = { token varname; token varcontent }
+    Script* ps_Script
+    ps_Shine { u32 waittick; int player; int mobnum; Movie::Theater* theater; MobBreeder* mobbreeder; int hprate;
+               PineScriptToken* block; PineScriptToken* argument; ShineObject* currentmob; ShineScript* shinescript }
+    PineScriptToken ps_ScriptName
+}
+ctor @ FUN_004d8c00 (built by Movie::PSFilm and Movie::LuaFilm ctors; VarArray ctor FUN_004d69e0 empties both tokens)
+dtor @ FUN_004d6b20
+
+ps_Ready(script)                       @ FUN_004d6b40   # Movie::Theater::t_PlayFilm (part 16)
+    ps_StackPoint = 0; ps_Stack[0] = {script, ip 0}; ps_Script = script
+    ps_Shine.argument = block = shinescript = currentmob = null; ps_VarStack.vs_StackPoint = 0      # variables dropped
+    # waittick, player, mobnum, theater, mobbreeder, hprate are left as they were (set by the film, part 16)
+ps_Step(arg) → r                       @ FUN_004d6b90   # Movie::Theater::t_Routine, every film step
+    top = ps_Stack[ps_StackPoint]; top.node == null → 0
+    return top.node.sa_Step(arg, this, &top.ip)        # vt 4; the meaning of r and of ip per node: §21
+ps_Push(node) → ok                     @ FUN_004d6be0   # StateIf / StateCall
+    ps_StackPoint > 30 → 0 (depth limit 32: nothing pushed)
+    ps_Stack[++ps_StackPoint] = {node, ip 0}; 1
+ps_Pop() → ok                          @ FUN_004d6c20   # every statement node when it is done (94 callers)
+    ps_StackPoint == 0 → 0; else --ps_StackPoint, 1
+ps_ExitBlock(name) → found             @ FUN_004d8c70   # StateBreak ("break \"main\".")
+    walk from the top: if node.vt 0xc(name) → that entry's ip = 9999 (= finished), return 1
+    else pop and test the next; at the bottom (sp 0) without a match → return 0     # the stack is then fully unwound
+ps_PushVariable(name) → content*       @ FUN_004d6bd0   = vs_Push (no caller outside the class; `var` uses vs_Push via §21)
+ps_FindVariable(name) → content*       @ FUN_004d8ce0
+    name == null → assert "Null variable", return &deftkn
+    vs_FindVariable(name) or &deftkn                    # deftkn: one static empty token
+vs_Push(name) → content*               @ FUN_004d6a90
+    vs_StackPoint ≥ 127 → assert "Variable stack overflow" (name), null      # 127 usable of 128 slots
+    vs_Stack[vs_StackPoint++] = {name, (content kept)}; return &content
+    # the content of a reused slot is not cleared here (the `var` statement sets it, §21)
+vs_FindVariable(name) → content*       @ FUN_004d69f0
+    search from the newest slot down (an inner `var` hides an outer one of the same name), case-sensitive
+    not found → assert "PineScriptStack::VariableStack::vs_FindVariable : Variable not found" (name), null
+```
+
+- Scope: `Block::sa_Step` FUN_004d81b0 saves `vs_StackPoint` when a block starts (ip 0) and restores it when its last
+  statement is done, so the variables a block declares (`StateVarDeclear::sa_Step` FUN_004da040: `vs_Push(name)`, then
+  the initial value = its expression) disappear at the block's `close`; `ps_Ready` empties the whole stack (§21).
+- (original bug) Z09-B82: a missing variable returns the address of the static `deftkn` (`ps_FindVariable`'s local
+  static, destructor FUN_0069e080). The action nodes write their results through `i_GetVariable` (e.g. a handle into
+  the named variable); when the variable was not declared they write into `deftkn`, and from then on every lookup of
+  any missing variable, in every film, returns that value instead of `""`. Each miss also writes an assert log line.
+
+### 20.7 `ScriptParameterPaser`: typed arguments for four nodes
+
+Used only by the action nodes `SaveLinkto`, `RegisterGTPortal`, `GTRegisterNPC`, `GTMobRegenKey` (§22).
+
+```pseudo
+ScriptParameterPaser { Express** m_ppExpress; ProcessStack* m_pPS; std::string m_strErrorMsg; PineScriptToken m_tkn }  # 0x128
+ctor(express array, ps) @ FUN_004dd650; dtor FUN_004dd680 / FUN_004e0970; SetErrorMsg(text) @ FUN_004e2380 (prefix of the assert text)
+GetByObject(i, ShineObject*& o) → ok  @ FUN_004e2510
+    m_tkn = m_ppExpress[i].sa_Calculate(m_pPS); failed → assert "<ErrorMsg>Parameter Index : <i>", false
+    o = som_GetObject(&shineobjmanager, (u16)pst_GetNumber(m_tkn)); return o ≠ null       # no assert when missing
+GetByDWARD(i, u32& v) → ok            @ FUN_004e2780   same, v = pst_GetNumber(m_tkn)
+GetByString(i, std::string& s) → ok   @ FUN_004e29d0   same, s = m_tkn
+# index i is not range-checked and m_ppExpress[i] is called without a null test: whether a node can pass a missing
+# argument is checked with the nodes (§22)
+```
+
+### 20.8 Logging
+
+`PineScriptLog` (DAT_14d458e6) is a `DebugLoggingNull`: its static initialiser FUN_0069a2a0 only writes a line to
+`Dbg.txt` and calls `EraseOldLogList("PineScript")` (exit destructor FUN_0069fdf0); it logs nothing. The script tracer
+`PineScriptTracer::ScriptTracer::operator<<` FUN_004b8c50 is an empty body. Pine errors therefore surface only as
+`AssertClass::ac_AssertFail` lines (variable not found, stack overflow, parameter index) and as the load-error line of
+§22.
+
+### 20.9 Open points of this section
+
+- `Identify::sa_Calculate` on a `#expr` form returns the computed name, while `i_GetToken` / `i_GetVariable` resolve
+  the variable. A `Term` never builds that case (it handles `#` itself); whether a statement calls vt 8 on an
+  `Identify` it loaded with `#` is checked in §21 / §22.
+- What `sa_Step`'s result and `ip` mean per node: §21.
