@@ -4199,12 +4199,14 @@ Sent from `FUN_00523b10` (`FUN_00523b10`) · payload 7 bytes
 
 ### `0x2074` NC_ACT_ANIMATION_START_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ACT_ANIMATION_START_CMD`, 34 bytes
+**Verified layout** (basis: zone ShinePlayer::sp_CreateCastingBar FUN_005762a0 (Lua cCastingBar); client FUN_0049d120 (Char::ActAction))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nHandle |  |
-| 2 | char[32] | sAnimationIndex |  |
+| 0 | u16 | nHandle | the casting player |
+| 2 | char[32] | sAnimationIndex | animation name from the script, also stored in the player's brief info |
+
+sight incl. the player, Z09 §14.6
 
 Sent from `FUN_00553070` (`FUN_00553070`) · payload 34 bytes
 
@@ -4217,12 +4219,14 @@ Sent from `FUN_005762a0` (`FUN_005762a0`) · payload 34 bytes
 
 ### `0x2075` NC_ACT_ANIMATION_STOP_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ACT_ANIMATION_STOP_CMD`, 34 bytes
+**Verified layout** (basis: zone ShinePlayer::sp_Schedule_CastingBar FUN_00576100, sp_CastingBarFree FUN_00570bd0; client FUN_0049d150 (stops the current action only if its name equals sAnimationIndex))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nHandle |  |
-| 2 | char[32] | sAnimationIndex |  |
+| 0 | u16 | nHandle | the player |
+| 2 | char[32] | sAnimationIndex | the running animation at the timer end; always "" from sp_CastingBarFree (Z09-B37) |
+
+sight incl. the player, Z09 §14.6
 
 Sent from `FUN_00553200` (`FUN_00553200`) · payload 34 bytes
 
@@ -11363,6 +11367,36 @@ the client switches its own door block by the name stored from the last 0x1C0F/0
 | 2 | u8 | type | 5 acts as a mob, 4 as an NPC (inferred) |
 
 sent to the whole map
+
+### `0x6C16` NC_SCENARIO_TIMER_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cTimer FUN_005dd310 (all players of a map), cTimer_Obj FUN_005dd4b0 (one player); client GameFrameWork::On_NC_SCENARIO_TIMER_CMD FUN_0049d100)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSecond | Lua argument 2; the client resets the instance-dungeon time window (IDTimeWin::ResetTime) |
+
+Lua script timer, Z09 §14.6
+
+### `0x6C21` NC_SCENARIO_TIMER_START_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cTimerStart FUN_005eb5a0; client FUN_004a62c0 (EventTimeWin::Start + show))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | (unused) | PROTO struct is empty (C++ size 1); the byte is not written, stale buffer content |
+
+to one player (handle) or every player of a map (map name), Z09 §14.6
+
+### `0x6C22` NC_SCENARIO_TIMER_END_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cTimerEnd FUN_005eb770; client FUN_0049d4a0 (EventTimeWin::Stop))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nDeleteSec | Lua argument 2 |
+
+to one player or every player of a map, Z09 §14.6
 
 ### `0x748D` NC_GUILD_MOBGUILD_CMD (hand-named) (S→C)
 

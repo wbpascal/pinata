@@ -766,6 +766,88 @@
      ]
     ],
     "notes": "only the self-kill send site of Z09 (cMobSuicide / ShineSuicide / servant vanish, §13.3); the DoT send sites belong to Z03"
+   },
+   "0x6C16": {
+    "dir": "S→C",
+    "name": "NC_SCENARIO_TIMER_CMD",
+    "basis": "zone cTimer FUN_005dd310 (all players of a map), cTimer_Obj FUN_005dd4b0 (one player); client GameFrameWork::On_NC_SCENARIO_TIMER_CMD FUN_0049d100",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nSecond",
+      "Lua argument 2; the client resets the instance-dungeon time window (IDTimeWin::ResetTime)"
+     ]
+    ],
+    "notes": "Lua script timer, Z09 §14.6"
+   },
+   "0x6C21": {
+    "dir": "S→C",
+    "name": "NC_SCENARIO_TIMER_START_CMD",
+    "basis": "zone cTimerStart FUN_005eb5a0; client FUN_004a62c0 (EventTimeWin::Start + show)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unused)",
+      "PROTO struct is empty (C++ size 1); the byte is not written, stale buffer content"
+     ]
+    ],
+    "notes": "to one player (handle) or every player of a map (map name), Z09 §14.6"
+   },
+   "0x6C22": {
+    "dir": "S→C",
+    "name": "NC_SCENARIO_TIMER_END_CMD",
+    "basis": "zone cTimerEnd FUN_005eb770; client FUN_0049d4a0 (EventTimeWin::Stop)",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nDeleteSec",
+      "Lua argument 2"
+     ]
+    ],
+    "notes": "to one player or every player of a map, Z09 §14.6"
+   },
+   "0x2074": {
+    "dir": "S→C",
+    "name": "NC_ACT_ANIMATION_START_CMD",
+    "basis": "zone ShinePlayer::sp_CreateCastingBar FUN_005762a0 (Lua cCastingBar); client FUN_0049d120 (Char::ActAction)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandle",
+      "the casting player"
+     ],
+     [
+      2,
+      "char[32]",
+      "sAnimationIndex",
+      "animation name from the script, also stored in the player's brief info"
+     ]
+    ],
+    "notes": "sight incl. the player, Z09 §14.6"
+   },
+   "0x2075": {
+    "dir": "S→C",
+    "name": "NC_ACT_ANIMATION_STOP_CMD",
+    "basis": "zone ShinePlayer::sp_Schedule_CastingBar FUN_00576100, sp_CastingBarFree FUN_00570bd0; client FUN_0049d150 (stops the current action only if its name equals sAnimationIndex)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandle",
+      "the player"
+     ],
+     [
+      2,
+      "char[32]",
+      "sAnimationIndex",
+      "the running animation at the timer end; always \"\" from sp_CastingBarFree (Z09-B37)"
+     ]
+    ],
+    "notes": "sight incl. the player, Z09 §14.6"
    }
   }
  }

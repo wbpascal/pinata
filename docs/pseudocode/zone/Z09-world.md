@@ -26,7 +26,9 @@ time, families, the 1-s regen event, script and Lua spawners, KQ / instant regen
 §11 drops (tables, roll, drop objects, loot rights, party/raid loot, dice game). §12 magic fields (ground-effect skills:
 spread, tick, damage / heal / aggro, 0x1C0C / 0x1C0D) and axial flags (map anchors that run the map cinema and the
 guild tournament). §13 doors (script-built gates, 0x1C0F / 0x1C10 / 0x6C09), effect objects (0x1C11 /
-0x1C12) and servants (skill summons: `MiscDataTable` SkillBreedMob, master link, roaming, flags, vanish).
+0x1C12) and servants (skill summons: `MiscDataTable` SkillBreedMob, master link, roaming, flags, vanish). §14 the Lua
+engine (script objects, AI / pet / map scripts, object and map script events, argument objects, Lua triggers, the Lua
+observer, player observers, script timers, script server menus and casting bars, the table of all 248 Lua functions).
 
 ---
 
@@ -358,13 +360,16 @@ in its send buffer go out at the next `so_PacketBufferFlush`. At most 1000 packe
 
 ### 2.6 Script triggers held by the player
 
-`p+0x2a948 … +0x2a94c` is a vector of 0x18-byte trigger entries `{ vtable, → owner object, … }` added by
-FUN_00576d50 / FUN_00577b50 (Lua `cTriggerRegist` and the chat/jump triggers; script part).
+`p+0x2a948 … +0x2a94c` is `ShinePlayer::observers_`, a vector of 0x18-byte `Observer` entries `{ vtable, master_
+(owner object), next_ (IObserver), birth_, tick_ }` added by `registerObsersver` (vt 0xa2c FUN_00577f90) for the
+NPCAction proximity triggers; class, event names and producers in §14.8 (the Lua chat / jump triggers are a separate
+mechanism, §14.5).
 
 ```pseudo
 ShinePlayer::notifyObservers(p, kind, a, b)       vt 0xa38                    @ FUN_00577c10
     for each entry e: r = e.vt[4](0, p, kind, a, b, 0, 0); if r & 2: destroy e and remove it
-    # kinds seen: 0 every tick, 6 every tick after the skill check, 7 moved (Z02 §2), 4 emotion (Z02 §4)
+    # kind = IObserver::Event: 0 EV_IDLE every tick, 6 EV_TICK_PARTY after the skill check, 7 EV_LOCATION moved,
+    # 4 EV_EMOTION; all values and producers in §14.8
 ShinePlayer::unregisterObsersvers(p, owner)       vt 0xa34                    @ FUN_00577ba0
     remove the entries whose owner == owner
 range check (so_Routine): for each entry whose owner is not closing:
@@ -591,7 +596,7 @@ sub-struct). Column "Member" = the PDB name; "Meaning" = what the 2016 code does
 | +0x66 → / +0x6a → | `so_LocateInfo.location` / `.direct` | position `{x, y}` / u8 direction (degrees / 2) |
 | +0x6e / +0x76 → | `so_layer.templyr` / `so_layer.layer` (`SubLayer::Layer {l_Main, l_Sub +4}`) | sub-layer (`so_SubLayer_CanSee`, Z02 §5): `l_Sub` 0 normal, 3 hidden (StaGMHideMode) |
 | +0x7a | `so_Field` | → FieldMap |
-| +0x7e | `so_AIScript` (`LuaAi`, 0xe4): `AIScript` (+0x7e, `LuaScriptScenario*`), then 8 `std::string` function names `Entrance` +0x82, `NPCClick` +0x9e, `NPCMenu` +0xba, `MobDamaged` +0xd6, `ObjectDied` +0xf2, `NPCAction` +0x10e, `MobAttack` +0x12a, `RankingValue` +0x146 | AI Lua script of the mob type (`g_AIScriptMobContainer` DAT_14d712d0, keyed by MobInfoServer.ID); `Entrance` = MobInfo.InxName; the others are set by scripts (part 9a); all cleared by vt 0xc14 `so_InitAIScript` FUN_00558c80 |
+| +0x7e | `so_AIScript` (`LuaAi`, 0xe4): `AIScript` (+0x7e, `LuaScriptScenario*`), then 8 `std::string` function names `Entrance` +0x82, `NPCClick` +0x9e, `NPCMenu` +0xba, `MobDamaged` +0xd6, `ObjectDied` +0xf2, `NPCAction` +0x10e, `MobAttack` +0x12a, `RankingValue` +0x146 | AI Lua script of the mob type (`g_AIScriptMobContainer` DAT_14d712d0, keyed by MobInfoServer.ID); `Entrance` = MobInfo.InxName; the others are set by scripts (`cAIScriptFunc`, §14.3); all cleared by vt 0xc14 `so_InitAIScript` FUN_00558c80 |
 | +0x180 | `smo_DeadCheck` (`DC_DeadCause`: 0 LIVE, 1 DOT, 2 ATTACK, 3 ATTACK2, 4 SELFKILL, 5 SKILL) | cause of death |
 | +0x184 / +0x186 | `smo_WhoKillMe` / `smo_WhoClickMe` | killer handle (`ShineMobileObject::so_KilledBy`) / last clicker |
 | +0x18c…+0x1cb | `smo_MoveManager` | MoveManager (§9.1): +0x18c state, +0x1ac active |
@@ -4331,4 +4336,393 @@ first, then mark)*.
 - `MiscDataTable`'s other tables (`AbStateReset`, `Neutralization`, `Polymorph`, `StateCondition`, `mdt_PostSkillBlast`
   FUN_004a3a90, `mdt_ArgumentLoad` FUN_004a6110, `mdt_FindAbStateAlways` FUN_004a2ef0) are skill side effects; see
   the coverage boundary of the sweep part.
-- Lua event 0x90 (`LuaArgumentServantSummon`): the map-script function it calls is part 9a.
+- Lua event 0x90 (`LuaArgumentServantSummon`): the map event `ServantSummon`, §14.3.
+
+---
+
+## 14. Scripts 1: the Lua engine, script events, triggers, observers, timers
+
+Part 9a of the plan. The zone embeds **Lua 5.2** (the "Lua 5.2" version string; `luaL_loadfilex`, `lua_pcallk`,
+`lua_tonumberx`; `luaL_openlibs` opens base, bit32, coroutine, debug, io, math, os, package, string and table). Every
+script file gets its **own `lua_State`**; there is no shared global state between files. `LUA_PATH` gets
+`../9Data/Shine/LuaScript/?.lua` appended at start (`ZoneServer::zs_ServiceThreadFunction` FUN_005a9d90, Z01 §2), so
+scripts `require` their helpers (`common.lua`, `ID/<map>/Functions/*.lua`) from that root. Lua arguments are read with
+the plain Lua API (`lua_type`, `lua_tonumberx`, `lua_tolstring`); handles are passed as Lua numbers.
+
+### 14.1 Script objects (`LuaScript`, 8 bytes) *(pdb2016)*
+
+| Class | vt[1] (`ls_FuncSet`) | Use |
+|---|---|---|
+| `LuaScript` { +0 vftable, +4 `ls_LuaObject` (`lua_State*`) } | pure | base |
+| `LuaScriptScenario` | FUN_005f5350: registers the 248 game functions of §14.9 (`lua_pushcclosure` + `lua_setglobal`) | AI scripts, pet scripts, map scripts (scenario books) |
+| `LuaScriptSecurity` (`g_LUA_SCRIPT_SECURITY` DAT_14d6fdf0) | FUN_005d7ca0: the start-stage functions | the downloaded start script, Z01 §2.1 / §2.2 |
+
+```pseudo
+LuaScript::LuaScript / ~LuaScript                        @ FUN_005d6000 / FUN_005d7ff0 (lua_close if open)
+LuaScript::ls_FromFile(s, path) -> bool                    @ FUN_005d6cc0
+    if s.L: lua_close(s.L)
+    s.L = luaL_newstate(); luaL_openlibs(s.L)
+    if !s.vt[1]() (ls_FuncSet): return false                # functions are registered BEFORE the file runs
+    return luaL_loadfilex(s.L, path) == 0 and lua_pcallk(s.L, 0, 0, 0) == 0   # runs the file's top level once
+LuaScript::ls_FromString(s, text) -> bool                  @ FUN_005d6d40
+    same, but runs the text first and registers the functions after it (start script, Z01)
+LuaScript::ls_FunctionCall(s, funcName, arg) -> bool       @ FUN_005d7bc0
+    lua_getglobal(s.L, funcName)
+    nargs = arg.vt[1](s.L)                                  # lad_ArgumentSet: pushes the arguments (§14.4)
+    nres  = arg.vt[3]()                                     # = arg.lad_ReturnNumber (0 or 1)
+    if lua_pcallk(s.L, nargs, nres, 0) != 0: return false
+        # the error value stays on the Lua stack: nothing pops it (original bug) Z09-B40. In Lua 5.2 every
+        # later call grows the stack to fit, so each failure costs one slot of that state for good; after
+        # LUAI_MAXSTACK (1 000 000) failures in one state every call fails with "stack overflow" (inferred)
+    arg.vt[2](s.L)                                          # lad_ReturnSet, below
+    return true
+LuaScriptScenario::lss_FuncExec(s, funcName, arg) -> int   @ FUN_00461a90
+LuaScriptScenario::lss_Routine(s, funcName, arg)           @ FUN_00507200   (same, returns nothing)
+    if !ls_FunctionCall(s, funcName, arg):
+        text = funcName + <2-byte separator> + LuaScriptScenario::ls_Pointer           # last cExecCheck marker
+        AssertClass::ac_AssertFail("LuaScriptScenario::lss_FuncExec : function call error" | "…lss_Routine : …", text)
+        LuaScriptObserver::lso_Send(&g_LuaScriptObserver, "function call error", text)  # §14.7
+    return ok (lss_FuncExec only)
+```
+
+`LuaScriptScenario::ls_Pointer` (DAT_14d6fcf0, `char[256]`) holds the text of the last `cExecCheck(name)` call
+(§14.6); scripts call it at the top of each function so that an error message names the function that ran last.
+
+### 14.2 Where the script objects come from
+
+| Source | Loader | Key / use |
+|---|---|---|
+| `../9Data/Shine/LuaScript/AIScript/<MobInfo.InxName>.lua` (23 files in 2016) | `AIScriptMobContainer::aismc_Load` FUN_006264b0 (start stage "tough", Z01 §2.3) | `g_AIScriptMobContainer` DAT_14d712d0 = `std::map<u16 MobInfo.ID, LuaScriptScenario*>`: one script per mob type that has a file (`fopen` test; a missing file means no script). Load error → assert "AIScriptMobContainer::aismc_Load : AIScript load error" and `ShineExit`. `ShineMob::so_mob_RegenComplete` gives each spawned mob / NPC the script of its ID (§5.2 `so_AIScript`) |
+| `../9Data/Shine/LuaScript/PetSystem/<name>.lua` | `AIScriptPetContainer::aispc_Load` FUN_00626630; names from its ctor FUN_006270e0: `PAT_DUMMY` 0 → "PetDummy", `PAT_BASE` 1 → "PetBase" (`aispc_GetFileName` FUN_00626440) | `g_AIScriptPetContainer` DAT_14d712e0, `std::map<PET_AI_TYPE, LuaScriptScenario*>`; same error handling. Users (`ShinePet::spt_RegenComplete`, `&` reload) → Z13 |
+| `../9Data/Shine/LuaScript/<book>.lua` | `ScenarioBookShelf::ScenarioBookLua::sb_Load` FUN_00507800 (file name `ScenarioBook::sb_GetFileName` FUN_00507440: extension "lua" → `LuaScript/`, else `ScenarioBookShelf/`) | the map scripts (`ID/*`, `KQ/*`, `Tutorial`, `Promote/*`): one state per scenario book; reached by name through `scenarioshelf` (`sbs_GetScenarioBook`; the shelf itself is part 14c) and attached to a map by `cSetFieldScript` or to an object by `cSetAIScript` (§14.6) |
+
+Consequences for a rebuild:
+- All mobs of one type **share one Lua state**: script globals are per mob type, not per mob. The 2016 scripts keep
+  per-instance data in tables keyed by the handle passed as the first argument.
+- A map script and the objects it controls usually share the scenario book's state: `cSetFieldScript(map, handle)`
+  attaches the AI script of an object to the map, and `cSetAIScript(book, handle)` gives an object the book's state.
+
+### 14.3 Script events: object events (`LuaAi`) and map events (`LuaField`) *(pdb2016)*
+
+An object holds `so_AIScript` (`ShineObject::LuaAi`, obj+0x7e, 0xe4 bytes: script pointer + 8 `std::string`s, §5.2);
+a map holds `fm_LuaScript` (`FieldMap::LuaField`, field+0x128, 0xc8 bytes: script pointer + 7 strings). Each string
+is the **name of the Lua function** to call for one event. The "event numbers" the callers pass (0x20 click, 0x3c
+menu answer, Z02 §6) are the **byte offsets of these strings** inside the struct. A script fills them with
+`cAIScriptFunc` / `cFieldScriptFunc` (§14.6); the event names below are the keys those functions accept.
+
+Object events (`ShineObject` vt 0xb68 `so_AIScriptFuncExec(offset, arg)` FUN_004ab3f0 "… 3", unless noted):
+
+| Key (`cAIScriptFunc`) | Offset | Fired by | Argument (§14.4) | Lua call |
+|---|---|---|---|---|
+| `Entrance` | 0x04 | every tick of the owner: `ShineMob::so_Routine` (§5.4), `ShineNPC::so_Routine` (§5.9), `ShineEffectObject::so_Routine` (§13.2), `ShinePet::so_Routine` (Z13), through `lss_Routine` directly. `so_AILearn` sets it to "Entrance" (mobs: `MobInfo.InxName`, §6.8) | `LuaArgumentMobAI` | `f(handle, mapName)` → result: 2 = run the built-in AI (§5.4) |
+| `NPCClick` | 0x20 | 0x200A NC_ACT_NPCCLICK_CMD on a mob (kind 5), door (7) or NPC with a script (Z02 §6.2) | `LuaArgumentNPCClick(npc, p, "")` | `f(npcHandle, playerHandle, charNo, "")` |
+| `NPCMenu` | 0x3c | 0x2073 NC_ACT_NPC_MENU_CMD (Z02 §6.4; `Ack` = the chosen line); end of a script casting bar (§14.6, select 0) | `LuaArgumentNPCMenu(npc, p, select)` | `f(npcHandle, playerHandle, charNo, select)` |
+| `MobDamaged` | 0x58 | `ShineMob::so_DamagedBy` FUN_00431750, after HP is lowered, when the name is set | `LuaArgumentMobDamaged(map, attacker, MaxHP, HP, mob)` | `f(mapName, attackerHandle, maxHP, curHP, mobHandle)` |
+| `ObjectDied` | 0x74 | `ShineMobileObject::so_KilledBy` FUN_00432240 on the dead object itself, when the name is set | `LuaArgumentObjectDied(map, killer, dead)` | `f(mapName, killerHandle, deadHandle)` |
+| `NPCAction` | 0x90 | `NPCAction::CallLuaAction::exe` FUN_005c1720 (proximity triggers, part 9c) | `LuaArgumentNPCAction(map, npc, player)` | `f(mapName, npcHandle, playerHandle, charNo)` |
+| `MobAttack` | 0xac | `ShineMobileObject::smo_SwingDamage` FUN_00432f30 (melee), `SkillBlastEffect::sbe_BlastObject` FUN_00583bc0 / `sbe_BlastLocate` FUN_00584160 (skills) on the attacker, when the name is set | `LuaArgumentMobAttack(map, attacker)` | `f(mapName, attackerHandle)` |
+| `RankingValue` | 0xc8 | **never fired** (the ranking event is the map's, below) | – | – |
+
+Other entry points into an object's script:
+- vt 0xb64 `so_AIScriptFuncExec(funcName, arg)` FUN_004aa1b0 ("…2"): a named function; used by the Lua triggers
+  (§14.5) and by server-menu answers (`ServerMenuFuncter::smfm_LuaFuncExec`, §14.6).
+- vt 0xb6c `so_AIScriptFuncExec(funcName, text)` FUN_004aa0b0: one string argument (`LuaArgumentFuncExec`); only the
+  GM command `&luafuncexec <function> <text>` (`AmpersandCommand::ac_LuaFuncExec` FUN_00419760) on the GM's current
+  target (player vt 0x75c `so_CurrentTargetObject`).
+- vt 0xb70 `so_LuaFunctionSet(offset, name)` FUN_004ab4f0: stores a name (refused without a script); vt 0xc14
+  `so_InitAIScript` FUN_00558c80 clears pointer and names.
+- All three return 0 when the object has no script. **None of them checks that the name is set**: a click on a mob
+  or door that has a script without `NPCClick`, a menu answer or casting-bar end without `NPCMenu` call Lua with
+  the empty name; the call fails, is logged as "function call error" and leaves an error value on the stack
+  (Z09-B40) (original bug) Z09-B41 (callers of 0x58 / 0x74 / 0xac do check).
+
+Map events (`FieldMap::fm_LuaScriptFuncExec(field, offset, arg)` FUN_00463ae0: returns 0 without a script or with an
+empty name, else `lss_FuncExec`):
+
+| Key (`cFieldScriptFunc`) | Offset | Fired by | Argument | Lua call |
+|---|---|---|---|---|
+| `MapLogin` | 0x04 | 0x1803 NC_MAP_LOGINCOMPLETE_CMD `ShinePlayer::sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 (Z01) | `LuaArgumentPlayerLogin(map, p)` | `f(mapName, playerHandle)` |
+| `ItemUse` | 0x20 | `ShinePlayer::smo_ply_ItemUse` FUN_0053fd10 (Z04) | `LuaArgumentPlayerItemUse(map, p, itemID)` | `f(mapName, playerHandle, itemID)` |
+| `Tutorial` | 0x3c | `ShinePlayer::sp_NC_CHAR_TUTORIAL_STEP_ACK` FUN_00576480 (sender 0), `GameDBSession::gds_NC_CHAR_TUTORIAL_STEP_SAVE_ACK` FUN_00468a60 (sender 1) (Z07) | `LuaArgumentTutorialStep(map, p, sender, step)` | `f(mapName, playerHandle, sender, step)` |
+| `MapLogout` | 0x58 | `ShinePlayer::so_Unmark` FUN_00558900 (the player leaves the map) | `LuaArgumentPlayerLogout(map, p)` (same pushes as login) | `f(mapName, playerHandle)` |
+| `ObjectDied` | 0x74 | `ShineMobileObject::so_KilledBy` FUN_00432240, when the map's name is set | `LuaArgumentObjectDied(map, killer, dead)` | `f(mapName, killerHandle, deadHandle)` |
+| `ServantSummon` | 0x90 | `MiscDataTable::mdt_SkillBlast_Summon` FUN_004a7530 (servant created, §13.3) | `LuaArgumentServantSummon(map, servant, master)` | `f(mapName, servantHandle, servantIdxName, masterHandle)` (idx name: vt 0x894 `so_mobile_GetIdxName`) |
+| `RankingValue` | 0xac | damage, kills and heals in a map whose name is set (table below) | `LuaArgumentRankingValue(map, p, dealt, taken, healed)` | `f(mapName, playerHandle, dealt, taken, healed)` (three u64 as Lua numbers) |
+
+`RankingValue` producers (read from the pushes at the call sites; amounts are the event's value):
+
+| Caller | Player credited | dealt / taken / healed |
+|---|---|---|
+| `ShineMob::so_DamagedBy` FUN_00431750 | the attacking player | damage / 0 / 0 |
+| `ShineMob::so_KilledBy` FUN_00432760 | the killing player | killing blow / 0 / 0 |
+| `ShinePlayer::so_DamagedBy` FUN_00431500 | the damaged player | 0 / damage / 0 |
+| `ShinePlayer::so_KilledBy` FUN_00433be0 | the dead player | 0 / last damage / 0 |
+| `SkillEffectApply::SkillDamageSender::sds_TemplateStore` FUN_005803c0 | the caster | damage / 0 / 0 (damage skill); 0 / 0 / heal (heal skill) |
+| `ShineMobileObject::so_mobile_HPHealOverTime` FUN_0040e910 | the caster; the healed player | **heal / 0 / 0**; 0 / 0 / heal |
+| `ShinePlayer::sp_HPStoneUse` FUN_00589180, `sp_UseAmountHP` FUN_0059c500, `so_ply_ItemEffect` FUN_0059c730 | the player | **heal / 0 / heal** |
+
+Heal-over-time and item heals add the healed amount to *dealt* too (original bug) Z09-B39 *(likely intent: healed
+only, as the skill-heal branch does)*. No 2016 script registers a `RankingValue` function, so the event is unused
+with the shipped data (the instance-dungeon ranking lists use `cScore*`, Z14).
+
+### 14.4 Argument objects (`LuaScriptArgument::*`) *(pdb2016)*
+
+Base `LuaArgumentDefault` (0xc bytes): +0 vftable, +4 `lad_ReturnNumber` (0 or 1), +8 `lad_ReturnValue`. vtable:
+[0] destructor, [1] `lad_ArgumentSet(L)` → number of pushed arguments, [2] `lad_ReturnSet` FUN_005d6dd0, [3] return
+`lad_ReturnNumber`, [4] `lad_GetReturnValue` FUN_005d6dc0.
+
+```pseudo
+lad_ReturnSet(a, L):                                     @ FUN_005d6dd0
+    a.lad_ReturnValue = -1
+    if a.lad_ReturnNumber == 1:
+        if lua_isnumber(L, -1): a.lad_ReturnValue = (int) lua_tonumber(L, -1)
+        lua_settop(L, -2)                                 # pops the one result
+```
+
+Common pushes: `mapName` = the map's 12-byte `fm_MapID` as a string ("" without a map), a missing object or player
+pushes −1, `charNo` = `so_GetCharRegistNumber` (player vt 0x344).
+
+| Class (ctor, ArgumentSet) | Members | Pushes | Results |
+|---|---|---|---|
+| `LuaArgumentMobAI` (FUN_005d6ef0, FUN_005d6f20) | +0xc `lamai_HostHandle`, +0x10 `lamai_Map` | handle, mapName | 1 |
+| `LuaArgumentInstanceDungeon` (FUN_005d6e20, FUN_005d6e40) | +0xc `laid_FieldMap` | mapName | 1; users `Movie::Theater::t_Routine` ("Main") and `Movie::CinemaComplex::cc_DropFilm` ("InstanceDungeonClear") → part 16 |
+| `LuaArgumentFuncExec` (FUN_005d6eb0, FUN_005d6ed0) | +0xc `lafe_Arg` | the string | 0 |
+| `LuaArgumentNPCClick` (FUN_005d6fa0, FUN_005d6fd0) | +0xc `lanc_NPC`, +0x10 `lanc_Player`, +0x14 `lanc_String` | npc handle, player handle, charNo, string (all −1 and "" if either object is null) | 0 |
+| `LuaArgumentItemUse` (FUN_005d70b0, FUN_005d70e0) | +0xc NPC, +0x10 player, +0x14 `lanc_UseItem` | npc, player, charNo, item ID | 0 |
+| `LuaArgumentNPCMenu` (FUN_005d71e0, FUN_005d7210) | +0xc `lanm_NPC`, +0x10 `lanm_Player`, +0x14 `lanm_SelectMenu` | npc, player, charNo, select | 0 |
+| `LuaArgumentPlayerLogin` / `…PlayerLogout` / `…MobAttack` (FUN_005d7310 / FUN_005d7630 / FUN_005d7870; one ArgumentSet FUN_005d78a0) | +0xc map, +0x10 player / object | mapName, handle | 0 |
+| `LuaArgumentPlayerItemUse` (FUN_005d7340, FUN_005d7370) | +0xc map, +0x10 player, +0x14 `lapiu_ItemID` | mapName, player, item ID | 0 |
+| `LuaArgumentMobDamaged` (FUN_005d7410, FUN_005d7450) | +0xc map, +0x10 `lamd_Object` (attacker), +0x14 `lamd_nMaxHP`, +0x18 `lamd_nCurHP`, +0x1c `lamd_Defender` | mapName, attacker, MaxHP, HP, defender | 0 |
+| `LuaArgumentTutorialStep` (FUN_005d7540, FUN_005d7570) | +0xc map, +0x10 object, +0x14 `lats_nSender`, +0x15 `lats_nStep` | mapName, handle, sender, step | 0 |
+| `LuaArgumentObjectDied` (FUN_005d7660, FUN_005d7690) | +0xc map, +0x10 `laod_KillerObject`, +0x14 `laod_DeadObject` | mapName, killer, dead | 0 |
+| `LuaArgumentNPCAction` (FUN_005d7740, FUN_005d7780) | +0xc map, +0x10 NPC, +0x14 player | mapName, npc, player, charNo | 0 |
+| `LuaArgumentServantSummon` (FUN_005d7930, FUN_005d7960) | +0xc `lass_pMap`, +0x10 `lass_pServant`, +0x14 `lass_pMaster` | mapName, servant, servant idx name, master | 0 |
+| `LuaArgumentRankingValue` (FUN_005d7a40, FUN_005d7a90) | +0xc map, +0x10 player, +0x18 / +0x20 / +0x28 u64 dealt / taken / healed | mapName, player, dealt, taken, healed | 0 |
+
+`LuaArgumentDefault` itself (no arguments) is the static `LuaScriptArgument::lsa_NoLuaArgument` (DAT_00870de8).
+
+### 14.5 Lua triggers (`LuaFuncTrigger`): chat, jump and item use near an object
+
+Three global vectors of `TriggerElement` (0x4c bytes: +0 vftable, +4 `te_NPC` (`ShineObject*`), +8 `te_Function`
+`char[64]`, +0x48 `te_RangeSquar`): `LuaFuncTrigger::g_FuncTrigger_Chat` DAT_0d5745c8, `g_FuncTrigger_Jump`
+DAT_0d5745b8, `g_FuncTrigger_UseItem` DAT_0d5745a8 (emptied by their static initializers FUN_00696460 / FUN_006964c0 /
+FUN_00696520). The classes `TriggerChat` / `TriggerJump` / `TriggerUseItem` share the layout (ctors FUN_004901f0 /
+FUN_00490230 / FUN_00490270).
+
+```pseudo
+cTriggerRegist(objHandle, kind, funcName, range)          @ FUN_005f4c50
+    obj = som_GetObject(objHandle); require obj, kind, funcName and range ≥ 0, else return nothing
+    element = { te_NPC = obj, te_Function = funcName (strncpy 63), te_RangeSquar = range² }
+    kind "Chat" → g_FuncTrigger_Chat; "Jump" → g_FuncTrigger_Jump; "ItemUse" → g_FuncTrigger_UseItem; else return nothing
+    push_back; return 1
+
+FuncTrigger<T>::ft_Find(list, player, out) -> count       @ FUN_00541470 (one body for all three lists)
+    out = every element e with TriggerElement::te_TriggerEvent(e, player)   @ FUN_004901c0
+          (e.te_NPC and player set and so_DistanceSquar(e.te_NPC, player) < e.te_RangeSquar)
+
+producers (Z02 §2.4 / §3.1, Z04):
+    0x2024 NC_ACT_JUMP_CMD      sp_NC_ACT_JUMP_CMD FUN_0045a250:  for e in ft_Find(Jump):  TriggerJump::tj_PullTheTrigger(e, p)        @ FUN_00490830
+    0x2001 NC_ACT_CHAT_REQ      sp_NC_ACT_CHAT_REQ FUN_0045a400:  for e in ft_Find(Chat):  TriggerChat::tc_PullTheTrigger(e, p, text) @ FUN_00490720
+    item use                    sp_NC_ITEM_USE_REQ FUN_005416b0:  for e in ft_Find(UseItem): TriggerUseItem::tui_PullTheTrigger(e, p, item.ID) @ FUN_00490910
+pull(e, p, x):
+    if e.te_NPC: e.te_NPC.so_AIScriptFuncExec(e.te_Function, arg)          # vt 0xb64: the NPC's own script
+        arg = LuaArgumentNPCClick(npc, p, chat text | "")  or  LuaArgumentItemUse(npc, p, itemID)
+        → f(npcHandle, playerHandle, charNo, text | itemID)
+```
+
+Nothing ever removes an element (only the static initializers clear the vectors): a trigger outlives its object, and
+because objects are pooled (`som_FreeObject`) the stored pointer later designates whatever object reuses that slot;
+registering twice fires twice (original bug) Z09-B36. No 2016 script calls `cTriggerRegist`, so the feature is idle
+with the shipped data.
+
+### 14.6 Lua functions of the script infrastructure
+
+All return nothing (0 results) on a missing or wrong argument, else push `1` unless stated.
+
+```pseudo
+cAIScriptFunc(handle, event, funcName)                    @ FUN_005f05f0
+    obj = som_GetObject(handle); event ∈ {"Entrance" 4, "NPCClick" 0x20, "NPCMenu" 0x3c, "MobDamaged" 0x58,
+        "ObjectDied" 0x74, "NPCAction" 0x90, "MobAttack" 0xac, "RankingValue" 0xc8}, else return nothing
+    if obj.so_LuaFunctionSet(offset, funcName) (vt 0xb70: false without a script): return 1
+
+cFieldScriptFunc(mapName, event, funcName)                @ FUN_005e0f90
+    field = FieldContainer::fc_FindMap(&fieldlist, mapName)
+    event ∈ {"MapLogin" 4, "ItemUse" 0x20, "Tutorial" 0x3c, "MapLogout" 0x58, "ObjectDied" 0x74,
+        "ServantSummon" 0x90, "RankingValue" 0xac}
+    if FieldMap::fm_LuaFunctionSet(field, offset, funcName) (FUN_00465250, false without a map script): return 1
+
+cSetFieldScript(mapName [, handle | bookName | nil])       @ FUN_005e0dd0
+    field = fc_FindMap(mapName)
+    arg 2: none → script = null;  number → the AI script of som_GetObject(handle) (object must exist);
+           string → scenarioshelf.sbs_GetScenarioBook(name).vt[0x10]() (the book's LuaScriptScenario; must exist)
+    FieldMap::fm_LuaScriptLearn(field, script)             @ FUN_004651b0
+        field.fm_LuaScript.LuaScript = script; if script == null: all 7 event names = ""
+        # a new script keeps the old names
+    return 1
+    (FieldMap::fm_GetLuaScript FUN_004012c0 returns &field.fm_LuaScript)
+
+cSetAIScript(bookName, handle)                            @ FUN_005dc050
+    book = sbs_GetScenarioBook(bookName); obj = som_GetObject(handle)
+    obj.so_AILearn(book.vt[0x10]())                       # vt 0xb60 (§6.8): Entrance = "Entrance" / InxName
+    return 1
+cAIScriptSet(handle [, sourceHandle])                     @ FUN_005eef50
+    obj = som_GetObject(handle)
+    arg 2 not a number: obj.so_AILearn(null)               # clears the script and all names (vt 0xc14)
+    else src = som_GetObject(sourceHandle); src.so_AITraining(obj)   # vt 0xb5c: obj learns src's script
+    return 1
+
+cServerMenu(playerHandle, npcHandle, title, text1, func1 [, text2, func2 …])   @ FUN_005dab40
+    p = som_GetObject(playerHandle).vt[0xbbc]() (the object as a player, else null)
+    sp_ServerMenuTitle(p, title)
+    for each (text, func) pair while both are strings:
+        data = ServerMenuArgument.sma_LuaInterface { u16 smli_NPCHandle = npcHandle, char smli_LuaFunction[20] = strncpy(func, 20) }
+        sp_ServerMenuItem(p, ServerMenuFuncter::smfm_LuaFuncExec, text, data)
+    sp_ServerMenuOpen(p, priority 0, npc 0xFFFF, no position, range 1000)          # 0x3C01, Z02 §6.5
+    return 1
+ServerMenuFuncter::smfm_LuaFuncExec(p, data)              @ FUN_0050f290   (the player chose that line)
+    npc = som_GetObject(data.smli_NPCHandle); if npc:
+        npc.so_AIScriptFuncExec(data.smli_LuaFunction, LuaArgumentNPCClick(npc, p, ""))   # vt 0xb64
+    # the function name is not terminated when it has 20 characters (strncpy into an uninitialised
+    # stack copy); 2016 scripts use short names ("LinkToVillage", "GateDummy")
+
+cCastingBar(playerHandle, npcHandle, ms, animation)        @ FUN_005dd120
+    p = som_GetObject(playerHandle).vt[0xbbc](); npc must exist
+    ShinePlayer::sp_CreateCastingBar(p, npcHandle, ms, animation)                  @ FUN_005762a0
+        npc = som_GetObject(npcHandle); require npc, animation, dist²(npc, p) < 20001
+        require (0x78 & (1 << p.mode)) == 0                # modes 3, 4, 5, 6 refuse (cmc_AllowMode 0x78)
+        p.so_ply_AllCastCancel() (vt 0x8d0); p.so_mobile_StopHere() (vt 0xa48)
+        p.sp_CastingBarTargetHandle (+0x2aacc) = npcHandle; brief.sAnimation = animation (32)
+        TimeScheduler::ts_Set(p.sp_TimerStr, sp_Schedule_CastingBar, TSCW_MISC, ms)
+        sight incl. p ← 0x2074 NC_ACT_ANIMATION_START_CMD { u16 nHandle = p, char sAnimationIndex[32] = animation }
+        p ← 0x2047 NC_ACT_CREATECASTBAR { u16 millisec = ms }
+    return 1
+ShinePlayer::sp_Schedule_CastingBar(p)                     @ FUN_00576100   (timer end)
+    if p.sp_CastingBarTargetHandle != 0xFFFF and npc = som_GetObject(it) and dist² < 20001 and mode allowed (as above):
+        npc.so_AIScriptFuncExec(0x3c NPCMenu, LuaArgumentNPCMenu(npc, p, 0))       # the NPC's script gets "menu 0"
+        sight incl. p ← 0x2075 NC_ACT_ANIMATION_STOP_CMD { nHandle = p, sAnimationIndex = brief.sAnimation }
+        sp_CastingBarTargetHandle = 0xFFFF; brief.sAnimation = ""
+    # otherwise nothing is reset or sent: the handle and the animation stay (original bug) Z09-B38
+ShinePlayer::sp_CastingBarFree(p)                          @ FUN_00570bd0   (only caller: so_ply_AllCastCancel FUN_0055a310, Z03)
+    if p.sp_CastingBarTargetHandle != 0xFFFF:
+        handle = 0xFFFF; clear p.sp_TimerStr (no callback)
+        p ← 0x2048 NC_ACT_CANCELCASTBAR (so_SendProtocol(8, 0x48), no payload)
+        brief.sAnimation = ""; sight incl. p ← 0x2075 { p, sAnimationIndex = brief.sAnimation }  # already ""
+        # (original bug) Z09-B37: the name is cleared before it is copied, so 0x2075 carries ""
+```
+
+Client (2016): 0x2074 `On_NC_ACT_ANIMATION_START_CMD` FUN_0049d120 plays the named action on the character; 0x2075
+`On_NC_ACT_ANIMATION_STOP_CMD` FUN_0049d150 stops the current action **only if its name equals `sAnimationIndex`**;
+0x2047 shows the cast bar (FUN_00499c10), 0x2048 removes it (FUN_004d8f90). With Z09-B37 a cancelled script cast
+leaves the character in the animation on every client.
+
+```pseudo
+cTimer(mapName, seconds)                                  @ FUN_005dd310
+    field = fc_FindMap(mapName); centre = FieldMap::fm_GetCenterObject(field); require centre
+    every player of the map (so_AllInMap) ← 0x6C16 NC_SCENARIO_TIMER_CMD { u16 nSecond = seconds }; return 1
+cTimer_Obj(playerHandle, seconds)                          @ FUN_005dd4b0
+    obj must be a player (vt 0x4d0 == 2): obj ← 0x6C16 { u16 nSecond } through so_GetDataSocketStream (vt 0x2f8); return 1
+cTimerStart(handle | mapName)                              @ FUN_005eb5a0   (returns nothing in all cases)
+    number ≠ 0xFFFF: a player that is not empty (vt 0x300 so_IsEmpty) ← 0x6C21 NC_SCENARIO_TIMER_START_CMD
+    string: every player of the map ← 0x6C21
+    # payload 1 byte: PROTO_NC_SCENARIO_TIMER_START_CMD is empty (C++ size 1); the byte is not written (stale)
+cTimerEnd(handle | mapName, seconds)                       @ FUN_005eb770   (returns nothing)
+    same targets ← 0x6C22 NC_SCENARIO_TIMER_END_CMD { u32 nDeleteSec = seconds }
+```
+
+Client: 0x6C16 `GameFrameWork::On_NC_SCENARIO_TIMER_CMD` FUN_0049d100 resets the instance-dungeon time window
+(`IDTimeWin::ResetTime(nSecond)`); 0x6C21 FUN_004a62c0 starts and shows the event stop-watch (`EventTimeWin::Start`);
+0x6C22 FUN_0049d4a0 stops it (`EventTimeWin::Stop(nDeleteSec)`: the window disappears after that many seconds).
+
+```pseudo
+tonumber(s)        @ FUN_005d81c0   replaces Lua's tonumber: atof(lua_tolstring(1)) → number (nil argument → nothing)
+cExecCheck(name)   @ FUN_005d82a0   strcpy(LuaScriptScenario::ls_Pointer, name)         # no length limit:
+                   # a name of 256+ characters runs into g_LUA_SCRIPT_SECURITY (DAT_14d6fdf0, the start-script
+                   # state) right behind the buffer (original bug) Z09-B35; 2016 names are short
+cDebugLog(text)    @ FUN_005d8350   lso_Send(&g_LuaScriptObserver, "QuestEvent : " + text)   (§14.7)
+cAssertLog(text)   @ FUN_005d63a0   AssertClass::ac_AssertFail("", text)                    (server assert log)
+```
+
+### 14.7 The Lua observer (`g_LuaScriptObserver`, DAT_0087ef88)
+
+`LuaScriptObserver` { +0 `lso_Observer` (`ShinePlayer*`), +4 `iso_RegistNumber` } (ctor FUN_005d5ef0 via the static
+initializer FUN_00694f60: null, 0xFFFFFFFF). One GM at a time receives the Lua error and debug texts:
+
+```pseudo
+&luaobserver [x]   AmpersandCommand::ac_LuaObserver FUN_00419730:  empty argument → observer = null, else observer = the GM
+LuaScriptObserver::operator=(o, p)                        @ FUN_005d5f00   (o.lso_Observer = p; o.iso_RegistNumber = p ? p.charNo : 0xFFFFFFFF)
+LuaScriptObserver::lso_Send(o, text, detail)              @ FUN_005d5f30
+    if o.lso_Observer and not so_IsEmpty (vt 0x300) and its charNo == o.iso_RegistNumber:
+        o.lso_Observer.so_ply_Notice(detail ? text + "[" + detail + "]" : text)   # vt 0x784, a GM notice
+        return true
+    o = (null, 0xFFFFFFFF); return false                  # the GM left: stop observing
+```
+
+### 14.8 Player observers (`Observer`, `IObserver`) *(pdb2016)*
+
+`ShinePlayer::observers_` (p+0x2a948, `std::vector<Observer>`, §2.6) holds `Observer` objects (0x18 bytes): +0 vftable,
++4 `master_` (`ShineObject*`, the watching object), +8 `next_` (`IObserver*`, the watcher logic), +0xc `birth_`
+(`g_Now` at creation), +0x10 `tick_` (`Metronome {m_NextTick, m_TickInterval}`). The only `IObserver` implementation is
+`NPCAction::Trigger` (proximity triggers, part 9c).
+
+```pseudo
+Observer::Observer(master, next)                          @ FUN_005cc5d0   (birth_ = g_Now; tick_ = (g_Now, 0)); default ctor FUN_005cc720
+Observer::notify(o, _, player, ev, a, b, …)               @ FUN_005cc680
+    if o.master_ == null: return 2                        # bit 1 = remove me
+    if o.next_: return o.next_.vt[1](o.master_, player, ev, a, b, o.birth_, &o.tick_)
+    return 0
+Observer::needToAttach(o)                                 @ FUN_005cc6d0   (master and next set: next.vt[2]())
+Observer::SetTick(o)                                      @ FUN_005cc6f0   (tick_ = Metronome(birth_, next.vt[3]()) = the trigger's condition tick)
+Observer::operator==(a, b)                                @ FUN_005cc650   (same master_ and next_); ~Observer FUN_0043cb40
+ShinePlayer::registerObsersver(p, o)      vt 0xa2c        @ FUN_00577f90   (SetTick, push_back; base ShineObject version FUN_00575fb0 does nothing)
+ShinePlayer::unregisterObsersver(p, o)    vt 0xa30        @ FUN_00577b50   (std::remove of the equal entries)
+ShinePlayer::unregisterObsersvers(p, master) vt 0xa34     @ FUN_00577ba0   (all entries of that master, §2.6)
+ShinePlayer::hasObserver(p, master)       vt 0xa3c        @ FUN_00576d50   (true if an entry == Observer(master, null) under
+                                                                              operator==, i.e. same master_ and next_ == null; part 9c)
+ShinePlayer::notifyObservers(p, ev, a, b) vt 0xa38        @ FUN_00577c10   (§2.6)
+```
+
+`IObserver::Event` values and their producers (`notifyObservers(ev, a, b)`):
+
+| Event | Value | Producer | a |
+|---|---|---|---|
+| `EV_IDLE` | 0 | `ShinePlayer::so_Routine` every tick (§2.1) | 0 |
+| `EV_DIE` | 1 | `ShinePlayer::so_KilledBy` FUN_00433be0 | 0 |
+| `EV_SKILL` | 2 | **no producer** | – |
+| `EV_ABSTATE` | 3 | `ShinePlayer::so_AbnormalState_Set` FUN_004162d0 / `…_Set_CharAllMode` FUN_004165c0 | their 2nd argument (the abstate) |
+| `EV_EMOTION` | 4 | `ShinePlayer::sp_DoEmotion` FUN_00458860 (Z02 §4) | emotion |
+| `EV_DAMAGE` | 5 | `ShinePlayer::so_ply_CheckDamageAbsorption` FUN_00579860 | 0 |
+| `EV_TICK_PARTY` | 6 | `ShinePlayer::so_Routine` after the skill check (§2.1) | 0 |
+| `EV_LOCATION` | 7 | `ShineObject::so_MoveTo` FUN_00452a70 (Z02 §2) | 0 |
+| `EV_ATTACKMOB` | 8 | `ShineMobileObject::smo_SwingDamage` FUN_00432f30, `SkillDamageSender::sds_TemplateStore` FUN_005803c0 | target handle |
+
+Who registers observers (`NeighborhoodChecker::ali_Work` FUN_005c2fe0 via `hasObserver` / vt 0xa2c,
+`NPCAction::doTriggers_` FUN_005c4880) and what the triggers do with the events is part 9c.
+
+### 14.9 The Lua function table (`LuaScriptScenario::ls_FuncSet` FUN_005f5350)
+
+248 registrations (247 functions: `cEmoticon` and `cEmotion` are the same function 005e3e60; `tonumber` replaces
+Lua's own). The table lists every Lua name with its function address and where it is (or will be) documented; the
+part split is the status file's plan (parts 10–13 may still move a function). FiestaHeroes' `fiesta.lua` lists 272
+names for the NA build *(fh-doc)*; the 2016 zone registers only these.
+
+| Documented in | n | Lua name, address (section / item when done) |
+|---|---|---|
+| already documented | 45 | `cAddCharacterTitle` 005eb310 W04, `cAggroList` 005f3250 §6.8, `cAggroListSize` 005f2f70 §6.8, `cAggroReset` 005e1280 §6.8, `cAggroSet` 005d9370 §6.8, `cCastTeleport` 005e5b10 §9.3, `cDoorAction` 005dc840 §13.1, `cDoorBuild` 005dc5f0 §13.1, `cDropFilm` 005d6b00 §9.2, `cDropItem` 005d9a30 §11.8, `cEffectRegen_Object` 005e4f30 §13.2, `cEffectRegen_XY` 005f0b50 §13.2, `cGroupRegen` 005efc60 §10.6, `cGroupRegenInstance` 005ddaa0 §10.6, `cGroupRegenInstance_XY` 005ddc40 §10.6, `cIndunRankResult` 005ee4d0 W04, `cMagicFieldSpread` 005f17c0 §12.2, `cMobChat` 005e2560 §8.7, `cMobRegen_Circle` 005e1ea0 §10.7, `cMobRegen_Obj` 005d8690 §10.7, `cMobRegen_Rectangle` 005e2100 §10.7, `cMobRegen_XY` 005d8440 §10.7, `cMobRegen_XY_Layer` 005e7680 §10.7, `cMobShout` 005dbcd0 §8.7, `cMobSuicide` 005e28c0 §13.3, `cMobWeaponRate` 005f3e30 §8.2, `cMoveLayer` 005e7c90 Z06, `cNPCRegen` 005de700 §5.9, `cNPCSkillUse` 005ef5c0 §8.1, `cNPCVanish` 005d8be0 §13.1, `cPet_IsMasterCalling` 005e9320 Z02, `cRegenGroupActiv` 005efdc0 §10.6, `cRewardItem` 005e17e0 Z05, `cRewardItem_AllInMap` 005e1b30 Z05, `cSaveTutorialInfo` 005e70b0 D05, `cSendGameLogDataType_4` 005f1a10 D05, `cSendGameLogDataType_5` 005f1d40 D05, `cSetItemDropMobID` 005ebea0 §11.8, `cSetNPCIsItemDrop` 005daf40 §11.8, `cSetNPCResist` 005db0a0 §5.8, `cSetServantFlag` 005e4be0 §13.3, `cSkillBlast` 005f0960 §8.1, `cSkillDamageCalculate` 005f1370 §8.1, `cTargetHandle` 005ef430 §6.8, `cVanishReserv` 005ede60 §13.3 |
+| this section (§14.6) | 16 | `cAIScriptFunc` 005f05f0, `cAIScriptSet` 005eef50, `cAssertLog` 005d63a0, `cCastingBar` 005dd120, `cDebugLog` 005d8350, `cExecCheck` 005d82a0, `cFieldScriptFunc` 005e0f90, `cServerMenu` 005dab40, `cSetAIScript` 005dc050, `cSetFieldScript` 005e0dd0, `cTimer` 005dd310, `cTimerEnd` 005eb770, `cTimerStart` 005eb5a0, `cTimer_Obj` 005dd4b0, `cTriggerRegist` 005f4c50, `tonumber` 005d81c0 |
+| part 10 (object / mob control) | 57 | `cActByEventCode` 005eaa70, `cAnimate` 005dd690, `cAnimateForcedly` 005dd8a0, `cCharTitleAddValue` 005ded30, `cDamaged` 005f10d0, `cDePolymorph` 005e9210, `cDePolymorph_Area` 005f30d0, `cFollow` 005dc1f0, `cFreeStatInit` 005e7dc0, `cHeal` 005de540, `cHideOtherPlayer` 005e6a50, `cInvenItemDestroy` 005d63d0, `cItemErase` 005ecb40, `cKillObject` 005e6d40, `cLevelUp` 005e7590, `cLinkTo` 005dde20, `cLinkToAll` 005df4b0, `cLocationRotate` 005ed000, `cMapObjectControl` 005e2ad0, `cMobDetectRange` 005e80b0, `cMobIDFind` 005eee50, `cMove2Where` 005df6e0, `cMoveStop` 005edf90, `cPartyJoin` 005e3460, `cPartyLeave` 005e3610, `cResetAbstate` 005ef120, `cRevivalAll` 005ec100, `cRunTo` 005da040, `cRunToUntilBlock` 005da590, `cSetAbstate` 005d97a0, `cSetAbstateInArea` 005e2c40, `cSetAbstate_Range` 005f2560, `cSetCanUseReviveItem` 005e8520, `cSetCanUseReviveSkill` 005e8660, `cSetDeadDelayTime` 005de090, `cSetFreeBattle` 005ebfe0, `cSetMobAttr` 005e13d0, `cSetNPCParam` 005f0320, `cSetObjectDirect` 005e8fa0, `cSetReviveDelayTime` 005e8740, `cSetSightState` 005e7b80, `cSetTeamBattle` 005e83e0, `cStaticDamage` 005de8c0, `cStaticDamage_smo` 005e48f0, `cStaticMoverSpeed` 005debb0, `cStaticRunSpeed` 005ed3c0, `cStaticSpeed` 005dea30, `cStaticWalkSpeed` 005ed500, `cTargetChangeNull` 005d6b80, `cUseMoney` 005e6450, `cVanishAll` 005f0150, `cVanishTimer` 005e5840, `cViewSlotEquip` 005e3c00, `cViewSlotUnEquipAll` 005e3d40, `cWaitIdle` 005e7f70, `cWalkTo` 005da300, `cWillMovement` 005df340 |
+| part 11 (queries, lists) | 60 | `cAbstateRestTime` 005ef750, `cCurSec` 005d8cd0, `cCurrentSecond` 005d8d60, `cDistanceSquar` 005d88c0, `cFindAttackBlockLocate` 005ee1a0, `cFindNearPlayer` 005f37d0, `cFindNearestMobList` 005e6eb0, `cGetAbstate` 005e5e20, `cGetAdminLevel` 005e42a0, `cGetAreaObject` 005dca40, `cGetAreaObjectList` 005f4620, `cGetAroundCoord` 005de220, `cGetBaseClass` 005deee0, `cGetCharNo` 005e4110, `cGetCoord_Circle` 005d6720, `cGetCurMapIndex` 005e59b0, `cGetCurrentSkillInfo` 005f2070, `cGetDirect` 005de400, `cGetItemIndex` 005e5cf0, `cGetItemLot` 005dad80, `cGetLevel` 005e0c90, `cGetMapName` 005e8d50, `cGetMaster` 005e32c0, `cGetMobID` 005e47b0, `cGetMoveState` 005e2f30, `cGetNPCHandle` 005d8df0, `cGetNearObjListByCoord` 005f4ef0, `cGetNearestObjByCoord` 005f3a50, `cGetObjectMode` 005d6880, `cGetPlayerList` 005f4410, `cGetPlayerName` 005d9240, `cGetRegistNumber` 005d6500, `cGetRunSpeed` 005ed140, `cGetScriptString` 005e8b30, `cGetTargetList` 005f0e40, `cGetWalkSpeed` 005ed280, `cGetWhoKillMe` 005ee350, `cIsEquipItem` 005e23b0, `cIsInArea` 005ead70, `cIsInMap` 005ef2c0, `cIsMovable` 005da9c0, `cIsNoAttacOrNoMove` 005eac30, `cIsObjectAlreadyDead` 005ee090, `cIsObjectDead` 005d94f0, `cMapMark` 005df860, `cMapMark_FieldSight` 005e0640, `cMapMark_Obj` 005dffc0, `cNearObjectList` 005f22e0, `cObjectCount` 005e26c0, `cObjectEffect` 005ea8b0, `cObjectFind` 005f33d0, `cObjectHP` 005d9630, `cObjectLocate` 005d9ef0, `cObjectLocateDirection` 005e4d80, `cObjectSound` 005ea6f0, `cObjectType` 005f04b0, `cPermileRate` 005da8b0, `cPlayerExist` 005d8aa0, `cRandom` 005ed640, `cRandomInt` 005eed70 |
+| part 12 (messages, dialogs, effects) | 36 | `cCameraMove` 005dbe30, `cCameraMove_Obj` 005e7920, `cDelDirectionalArrow` 005e89d0, `cDirectionalArrow` 005e8810, `cEffectMsg` 005e4540, `cEffectMsg_AllInMap` 005e4670, `cEffectTimer` 005e6bb0, `cEmoticon` 005e3e60, `cEmotion` 005e3e60, `cEndCinematicText` 005eeb30, `cMapFog` 005e6260, `cMessage` 005ef8f0, `cMobDialog` 005db690, `cMobDialog_FileName` 005e4a00, `cMobDialog_Obj` 005db860, `cMobDialog_Range` 005dbaa0, `cMobDialog_String` 005ece70, `cNPCChat` 005efaa0, `cNPCChatTest` 005db4b0, `cNPCMenuOpen` 005dcf50, `cNotice` 005e15b0, `cNoticeRedWarningCode` 005e5ff0, `cNoticeString` 005e16e0, `cNotice_Obj` 005e8e50, `cPlaySound` 005e4410, `cScriptMessage` 005dcbe0, `cScriptMessage_Obj` 005dcd80, `cScriptMessage_Range` 005f27e0, `cScriptMsg` 005ebb40, `cScriptMsg_World` 005eb970, `cShowCinematicText` 005eec40, `cSimpleChatScriptMsg` 005ea530, `cSomebodyShout` 005e5150, `cStartMsg_AllInMap` 005e3af0, `cSystemMessage_Obj` 005e6890, `cTopView` 005e6600 |
+| part 13 (rest) | 0 |  |
+| Z13 (pets) | 8 | `cPet_ChangeMind` 005ea1d0, `cPet_GetActionRecord` 005e9d00, `cPet_GetMind` 005e9520, `cPet_GetRunSpeed` 005e9b10, `cPet_GetStress` 005e9720, `cPet_GetWalkSpeed` 005e9920, `cPet_SaveTendency` 005ea410, `cPet_Unsummon` 005d65a0 |
+| Z14 (instance dungeons, scores) | 8 | `cScoreBoard` 005ed860, `cScoreBoard_AllInMap` 005edad0, `cScoreInfo` 005e3790, `cScoreInfo_AllInMap` 005e3970, `cScoreResultList` 005ec6a0, `cScoreTopList` 005ec1f0, `cSendRankingList` 005eaee0, `cWinter_Event_ScoreBoard_AllInMap` 005edcf0 |
+| Z15 (quests, rewards, tutorial) | 11 | `cClassChangeOpen` 005ed720, `cGetQuestHero_ItemUse` 005d9140, `cGetQuestHero_NPC` 005d8f60, `cGetTutorialInfo` 005e7450, `cProgressTutorial` 005e72f0, `cQuestMobKill` 005d6010, `cQuestMobKill_AllInMap` 005d6150, `cQuestResult` 005e30d0, `cQuestResult_Individual` 005ecca0, `cReward` 005df060, `cRewardItem_CharInven` 005d6a10 |
+| Z16 (kingdom quests) | 7 | `cEndOfKingdomQuest` 005df1f0, `cGetKQLimitSecond` 005e5390, `cGetKQTeamType` 005e81c0, `cIsKQJoiner` 005e82d0, `cKQRewardIndex` 005e4000, `cShowKQTimerWithLife` 005e54f0, `cShowKQTimerWithLife_Obj` 005e5690 |
+
+### 14.10 Open points of this section
+
+- `RankingValue` (map event 0xac): no 2016 script sets it, so its intended meaning of the three values is not
+  confirmed by data (Z09-B39 is read from the call sites only).
+- `hasObserver` compares with `next_ == null`: whether the registered NPCAction observers can ever match is part 9c.
+- `cTimer_Obj` sends through the player's data stream (vt 0x2f8), the other timer functions through the game stream
+  (vt 0x2fc); what separates the two streams is Z01's.
+- `cmc_AllowMode` 0x78 refuses player modes 3–6 for casting bars; the mode names are Z02's.
