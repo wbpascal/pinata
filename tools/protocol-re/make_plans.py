@@ -719,46 +719,56 @@ def entries(bin_, parser, depts):
 
 GENERIC = """## How to work
 
-1. `AGENTS.md` is already in your context (do not re-read it); follow its **Context budget** section. Read
-   `docs/plan/00-master-plan.md`.
+**One part per session.** Context is re-read on every turn, so a long session costs far more than several short ones.
+{parts} At the start, read `docs/plan/status/{id}.md` (its **State** line and **Working notes**) and take the first part
+not done (no status file: part 1). Do only that part, close it (step 6) and end the session, even if context is left.
+
+1. `AGENTS.md` is already in your context (do not re-read it); follow its **Context budget** section. Part 1 only: read
+   `docs/plan/00-master-plan.md`. Later parts: the status file's working notes replace it; do not re-derive what they record.
 2. Read `docs/pseudocode/FORMAT.md`: the format and depth to match (not the whole `login-server.md`).
-3. Read what exists for your area: `docs/plan/status/{id}.md` (resume from it if present), the `docs/knowledge/*.md`
-   of the items you depend on, and the `opcodes-*.md` / `packets-*.md` rows of your opcodes
-   (`rg -i -M 300 '0x<op>' docs/protocol/packets-<bin>.md`). For docs over ~15 KB and every `§` reference above, run
-   `python3 -I tools/protocol-re/sect.py <file>` for the outline, then `sect.py <file> <§|regex>` for what you need.
+3. Read what exists for this part: the `docs/knowledge/*.md` sections of the items you depend on that touch it, and the
+   `opcodes-*.md` / `packets-*.md` rows of its opcodes (one `rg -i -M 300 -e 0x<op> -e 0x<op> …
+   docs/protocol/packets-<bin>.md` for all of them). For docs over ~15 KB and every `§` reference above, run
+   `python3 -I tools/protocol-re/sect.py <file>` for the outline, then `sect.py <file> <§|regex>` for what you need. This
+   includes your own output file: from part 2 on, never read it whole; use its outline and the sections you extend.
    For each packet, also look up the official name and struct in the 2017 client PDB:
-   `python3 -I tools/protocol-re/pdb.py Files/Client/2017/Fiesta.pdb types '^PROTO_NC_<NAME>$'` (field names, offsets,
-   sizes; also server-internal packets and shared enums/structs). It is a newer build: confirm against the 2016 code
-   and mark unconfirmed PDB facts *(pdb2017)*. Read `docs/knowledge/C02.md` if it exists.
-4. For each handler in the scope table, in order:
-   - read it: `python3 -I tools/protocol-re/clean.py re-data/exports/<bin> tools/protocol-re/names/<bin> <addr>`
-     (the only way to read code; never `sed`/`cat` on `decomp.c`). Its registration and sends:
-     `jq -c '.tables[].entries[] | select(.handler=="<FUN_…>")' re-data/exports/<bin>/handlers.json`
-   - follow the callees that carry the logic (skip logging/profiling/container boilerplate)
-   - write its pseudocode block (`@ FUN_…`), with field names, checks, state changes, replies, error codes
+   `python3 -I tools/protocol-re/pdb.py Files/Client/2017/Fiesta.pdb types '^PROTO_NC_(<NAME>|<NAME>)$'` (one regex for
+   several; field names, offsets, sizes; also server-internal packets and shared enums/structs). It is a newer build:
+   confirm against the 2016 code and mark unconfirmed PDB facts *(pdb2017)*. Read `docs/knowledge/C02.md` if it exists.
+4. For the handlers of this part, in scope-table order, a few related handlers (one opcode family) at a time:
+   - read them together: `python3 -I tools/protocol-re/clean.py re-data/exports/<bin> tools/protocol-re/names/<bin>
+     <addr> <addr> …` (the only way to read code; never `sed`/`cat` on `decomp.c`). Registrations and sends of all of
+     them in one query: `jq -c '.tables[].entries[] | select(.handler|IN("<FUN_…>","<FUN_…>"))' re-data/exports/<bin>/handlers.json`
+   - follow the callees that carry the logic (skip logging/profiling/container boilerplate), again several per `clean.py` call
+   - write their pseudocode blocks (`@ FUN_…`), with field names, checks, state changes, replies, error codes
    - for client-facing packets, check the client handler (C01's `re-data/client-handlers.json` / `docs/knowledge/C01.md`
      if available; otherwise search the client export) and resolve codes via `docs/protocol/client-error-codes.json`
    - record new names (`names/<bin>/{id}.json`) and verified layouts (`docs/protocol/annotations/{id}.json`)
-5. Beyond the handlers, document the subsystem itself: data structures, tables loaded, timers, invariants.
+5. Beyond the handlers, document the subsystem itself: data structures, tables loaded, timers, invariants. Write each
+   in the part that first reaches it and note it in the working notes so later parts link to it instead of re-reading.
    **Be exhaustive within your item.** The scope table is the starting point, not the boundary: follow every callee,
    branch, error path, timer, table and packet these handlers reach, plus the matching client handlers and DB procedures,
-   until what remains clearly belongs to another item. Before you finish, sweep for what you missed: `rg` your subsystem's
-   strings, SHN tables and opcodes (`opcodes.json`) for functions you never opened, check every caller and callee of the
-   functions you documented, and every unnamed `FUN_` left in your text, and run
+   until what remains clearly belongs to another item. The sweep part then checks for what was missed: `rg` your
+   subsystem's strings, SHN tables and opcodes (`opcodes.json`) for functions never opened, check every caller and callee
+   of the documented functions, and every unnamed `FUN_` left in the text, and run
    `python3 -I tools/protocol-re/coverage.py {id}` (functions reachable from your handlers that no doc cites yet,
    largest first; cite each one you cover as `FUN_…` so it counts). Stopping early because the handlers are
    "done" is the most common gap in past items; reviews keep finding uncovered cases that were in scope.
-6. Every ~10 handlers, update `docs/plan/status/{id}.md` (done / remaining). Before you run low on context,
-   write the status so a fresh session can continue.
-7. At the end: run `tools/protocol-re/regen.sh`, write `docs/knowledge/{id}.md` (facts others need), add an
-   "uncertain / not reconstructed" section to your output, and mark the item done in the status file.
+6. Close the part: update `docs/plan/status/{id}.md`. Its first line is `**State:** part <n> of <total> done` (or
+   `**State:** done` after the review part). Then: done handlers per part, remaining work, and **Working notes**: only what
+   later parts need and cannot cheaply re-read (struct and member offsets, helper names and meanings, shared state, open
+   questions for a later part, next free bug ID `{id}-B<n>`). Keep the notes short; every later session reads them.
+   Commit on the current branch (`{id} part <n>: <what>`), then end the session. If context runs low before the part is
+   done, finish the handler in hand, record the rest of the part as remaining, commit and end the same way.
+7. Sweep part, at the end: run `tools/protocol-re/regen.sh`, write `docs/knowledge/{id}.md` (facts others need), add the
+   original-server bugs table and an "uncertain / not reconstructed" section to your output.
 8. Also end your output with a "Coverage boundary" section: one row per thing you found but did not cover (function,
    packet, table, behaviour) with an argument why it is out of bounds for this item: either the existing item that
    covers it (ID and the line of its plan or scope table that includes it) or, if no item does, a proposed new item
    (title, scope, why it does not fit here) added to `docs/plan/status/{id}.md` under "Proposed follow-up items" for the
    user to accept. "Too large" or "ran out of context" is not out of bounds: that is unfinished work for the status file.
-9. **Review with fresh context** before marking the item done. The reviewer must not share your reading of the code.
-   The review task is `docs/plan/review-prompt.md` (with `<ID>` = `{id}`).
+9. Review part: **review with fresh context** before marking the item done. The reviewer must not share your reading
+   of the code. The review task is `docs/plan/review-prompt.md` (with `<ID>` = `{id}`).
    - If your agent tool can start a fresh-context subagent (not a fork of your session), give it that file's text with
      `<ID>` replaced by `{id}`, and wait for its numbered findings list.
    - Otherwise stop here: set the status file to "awaiting review" and end the session. The user runs the review as a
@@ -772,9 +782,46 @@ GENERIC = """## How to work
 - Only write your own files: `{out}`, `docs/knowledge/{id}.md`, `docs/plan/status/{id}.md`,
   `tools/protocol-re/names/<bin>/{id}.json`, `docs/protocol/annotations/{id}.json`.
 - Mark deductions *(inferred)*. Never invent names; derive them from strings, client texts, or label them as ours.
-- If the scope is too large for one session, finish complete handlers. Never leave a half-documented one.
-  List the rest in the status file.
+- Never leave a half-documented handler at the end of a session; list unfinished ones in the status file.
 """
+
+
+PART_LINES = 2500  # handler-body lines per session part; W04 (~8.8k) ran with a median context of 200–250k in one session
+
+
+def parts_of(rows):
+    """Split scope rows into session parts: whole departments (one subsystem across all parsers), packed in dept order
+    up to PART_LINES; a department larger than 1.5 × PART_LINES is split by opcode. Returns ({(bin, parser, op): part},
+    [(dept label, handlers, lines)])."""
+    groups = {}
+    for bin_, (p, e, n, sz) in rows:
+        groups.setdefault((bin_, e["dept"]), []).append((bin_, p, e, sz))
+    chunks = []
+    for (bin_, d), g in sorted(groups.items()):
+        g.sort(key=lambda r: r[2]["op"])
+        if sum(r[3] for r in g) <= 1.5 * PART_LINES:
+            chunks.append(g); continue
+        cur = []
+        for r in g:
+            if cur and sum(x[3] for x in cur) + r[3] > PART_LINES:
+                chunks.append(cur); cur = []
+            cur.append(r)
+        chunks.append(cur)
+    packed = []
+    for c in chunks:
+        if packed and sum(r[3] for r in packed[-1]) + sum(r[3] for r in c) <= PART_LINES:
+            packed[-1] += c
+        else:
+            packed.append(list(c))
+    part, summary = {}, []
+    for i, c in enumerate(packed, 1):
+        depts = []
+        for bin_, p, e, sz in c:
+            part[bin_, p, e["op"]] = i
+            lab = f"{e['dept']} {DEPT.get(e['dept'], '?')}"
+            if lab not in depts: depts.append(lab)
+        summary.append((", ".join(depts), len(c), sum(r[3] for r in c)))
+    return part, summary
 
 
 def render(it):
@@ -785,21 +832,38 @@ def render(it):
     if it.get("steps"):
         lines += ["## Item-specific guidance\n"] + [f"- {s}" for s in it["steps"]] + [""]
     if it.get("done"): lines += ["## Done when\n", it["done"] + "\n"]
+    nparts = 0
     if it["scope"]:
+        scoped = [(bin_, parser, depts, entries(bin_, parser, depts)) for bin_, parser, depts in it["scope"]]
+        part, parts = parts_of([(bin_, r) for bin_, _, _, rows in scoped for r in rows])
+        nparts = len(parts)
+        lines.append("## Parts (one session each, see \"How to work\")\n")
+        lines.append("| Part | Depts | Handlers | Lines |\n|---|---|---|---|")
+        for i, (dl, n, sz) in enumerate(parts, 1):
+            lines.append(f"| {i} | {dl} | {n} | {sz} |")
+        if nparts == 1:  # small item: a separate sweep session would cost more than it saves
+            lines[-1] = lines[-1].replace("| 1 | ", "| 1 | handlers, then sweep and close (steps 5, 7, 8): ", 1)
+            lines += ["| 2 | review (step 9) | | |", ""]
+        else:
+            lines += [f"| {nparts + 1} | sweep and close (steps 5, 7, 8) | | |", f"| {nparts + 2} | review (step 9) | | |", ""]
         lines.append("## Scope: registered handlers\n")
         total, tl = 0, 0
-        for bin_, parser, depts in it["scope"]:
-            rows = entries(bin_, parser, depts)
+        for bin_, parser, depts, rows in scoped:
             if not rows: continue
             dlabel = "all depts" if depts is ALL else ", ".join(f"{d} {DEPT.get(d, '?')}" for d in depts)
             lines.append(f"### `{bin_}` · {parser or 'all parsers'} · {dlabel}\n")
-            lines.append("| Opcode | Dept/Cmd | Name (from binaries) | Handler | Lines | Parser |\n|---|---|---|---|---|---|")
+            lines.append("| Opcode | Dept/Cmd | Name (from binaries) | Handler | Lines | Parser | Part |\n|---|---|---|---|---|---|---|")
             for p, e, n, sz in rows:
-                lines.append(f"| `0x{e['op']:04x}` | {e['dept']}/{e['cmd']} | {n or '?'} | `{e['handler']}` | {sz} | {p.split('::')[-1]} |")
+                lines.append(f"| `0x{e['op']:04x}` | {e['dept']}/{e['cmd']} | {n or '?'} | `{e['handler']}` | {sz} | {p.split('::')[-1]} | {part[bin_, p, e['op']]} |")
                 total += 1; tl += sz
             lines.append("")
         lines.insert(2, f"**Size:** {total} handlers, ~{tl} decompiled lines in handler bodies (callees add more)\n")
-    lines.append(GENERIC.format(id=it["id"], out=it["out"]))
+    parts_txt = ("Part 1 is the handlers plus the sweep, part 2 the review (see the **Parts** table)." if nparts == 1 else
+                 f"Parts 1–{nparts} are in the **Parts** table (column *Part* of the scope table); part {nparts + 1} is the "
+                 f"sweep, part {nparts + 2} the review." if nparts else
+                 "This item has no scope table: in the first session, split the work into parts of similar size (about "
+                 f"{PART_LINES} decompiled lines each, plus a sweep part and a review part) and write the list into the status file.")
+    lines.append(GENERIC.format(id=it["id"], out=it["out"], parts=parts_txt))
     return "\n".join(lines)
 
 

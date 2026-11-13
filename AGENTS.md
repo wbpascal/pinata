@@ -46,19 +46,26 @@ python3 -I $T/pdb.py $P publics 'On_NC_'                         # 2017 client f
 tools/protocol-re/regen.sh                                   # rebuild ALL generated docs (after adding names/annotations)
 python3 -I $T/coverage.py Z08                                # item coverage: reachable functions no doc cites yet (--overview: docs/plan/progress.md)
 tools/protocol-re/reanalyze.sh <bin> <exe>                   # only if an export is missing or broken (slow)
+tools/protocol-re/item.sh <ID> [--auto]                      # run a work item, one part per fresh lean session (from its worktree)
 ```
 
 - `handlers.json`: every `pft_Store(dept, cmd, handler)` registration per parser class: opcode, handler, name, sends.
 - `layouts.json`: generated packet field layouts (`s2c` send sites, `c2s` handler reads).
 - REA MCP tools (Ghidra 12.1.4 provider) work for targeted questions (xrefs, callers, data reads). Each
   `open_binary` re-imports and analyzes the binary (zone: several minutes). Prefer the exports for reading
-  code. Call `close_binary` when done.
+  code. Call `close_binary` when done. Sessions started by `item.sh` have no MCP servers: use the exports, `objdump`
+  or Python over the PE file instead.
 - Reading raw data at an address: Python over the PE file (see `rtti.py` `PE` class), or REA `read_bytes`.
 
 ## Context budget (every tool output stays in the session)
 
 The files here are big: `decomp.c` 15 MB with lines up to 6,700 chars, `strings.tsv` lines up to 2,000 chars,
-`layouts.json` 840 KB, pseudocode docs up to 110 KB. Print only what you need:
+`layouts.json` 840 KB, pseudocode docs up to 110 KB. Print only what you need, in few calls:
+
+- **Fewer, larger calls.** Every turn re-reads the whole context, so ten 1 KB calls cost far more than one 10 KB call.
+  Read related functions in one `clean.py` call (several addresses), search several patterns in one `rg -e A -e B`,
+  select several handlers in one `jq` (`select(.handler|IN("FUN_a","FUN_b"))`), and send independent calls in parallel
+  in the same turn. Outputs up to ~20 KB are fine when you need all of it.
 
 - **Code:** read functions only with `clean.py`. Never `cat`/`sed -n`/`head` on `decomp.c`.
 - **Search:** `rg -M 200` (or `grep … | cut -c1-200`) on exports; `rg -o 'FUN_[0-9a-f]{8}'` when you only need

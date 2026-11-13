@@ -16,18 +16,40 @@ clone: `git config merge.ours.driver true` (without it the file conflicts; resol
 
 ## How to run a work item
 
-Start a fresh agent session in this repository and give it one plan file:
+An item runs as a series of short sessions, **one part per session**. Each plan's **Parts** table lists the parts:
+handler groups of about 2,500 decompiled lines, then a sweep part and a review part. Every turn re-reads the whole
+context, so several short sessions cost much less than one long one (W04 in one long session: ~15M weighted tokens,
+median context 200–250k). Each session reads `docs/plan/status/<ID>.md`, does the first open part, writes the
+status (`**State:** part n of m done` plus short working notes for later parts), commits, and stops.
 
-> Execute the work item described in `docs/plan/items/Z03.md`.
+**Tutorial (Claude Code)**
 
-`AGENTS.md` is loaded automatically (Codex and OMP read it directly; `CLAUDE.md` is a symlink to it for
-Claude Code). It holds the shared conventions, the data locations
-(`re-data/exports`, `re-data/ghidra`) and the facts already established, so no session re-decompiles or
-re-derives anything. If a session runs out of budget, start another one with the same sentence. It
-resumes from `docs/plan/status/<ID>.md`.
+1. Commit everything the item needs on `master`, then create a worktree for the item (herdr workspace or
+   `git worktree add ../fiesta-rea-<ID> -b <ID>`) and open a terminal in its root.
+2. Start the next part:
+   - `tools/protocol-re/item.sh <ID>`: one interactive session. When it has committed its part, close it with
+     `/exit` and run the command again for the next part. Do not type "continue" or use `/resume`: that keeps
+     the large context and undoes the saving.
+   - `tools/protocol-re/item.sh <ID> --auto`: headless, one session per part, until the status says done. It
+     prints a short summary after each part and stops when a session commits nothing or the item awaits review.
+3. Options as environment variables: `MODEL` (default `opus`), `EFFORT` (`high`), `PERM` (`auto`; use
+   `PERM=manual` interactively to approve actions yourself). Example: `EFFORT=medium tools/protocol-re/item.sh Z09`.
+4. After a usage limit or a crash: do not resume the old session. Check `git status` in the worktree (commit or
+   discard what the cut-off part left), then run `item.sh` again. It continues from the status file.
+5. When the status says done: merge the branch into `master` (see Progress above for `progress.md`).
 
-Items in the same phase can run in parallel: they write disjoint files (see "Shared files" in
-`AGENTS.md`). Dependencies are soft. An item can start before its dependencies finish, but it will
+`item.sh` starts lean sessions: no plugins, no MCP servers (no REA; use the exports, `objdump` or Python over the
+PE), no web or artifact tools. That cuts the start context from 35–56k to ~16k tokens, which every turn re-reads.
+
+**Other agents** (Codex, OMP): start a fresh session in the worktree per part with
+> Execute the next part of `docs/plan/items/<ID>.md` as its "How to work" section describes (one part per session).
+
+`AGENTS.md` is loaded automatically (`CLAUDE.md` is a symlink to it for Claude Code). It holds the shared conventions,
+the data locations (`re-data/exports`, `re-data/ghidra`) and the facts already established, so no session
+re-decompiles or re-derives anything.
+
+Items in the same phase can run in parallel: they write disjoint files (see "Shared files" in `AGENTS.md`). Parallel
+sessions share one usage limit. Dependencies are soft. An item can start before its dependencies finish, but it will
 produce better results after them, so respect the order when you can.
 
 ## Phases and items
