@@ -11063,6 +11063,28 @@ to the player only, after every server-side stop (mm_Step stop, block-check roll
 |---|---|---|---|
 | 0 | u16 | err | 0x1381 0x1382 0x1383 0x1388 |
 
+### `0x207A` NC_ACT_OBJECT_SOUND_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cObjectSound FUN_005ea6f0 (to sight); client On_NC_ACT_OBJECT_SOUND_CMD FUN_0049d4d0; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle | object (Lua arg 1) |
+| 2 | char[32] | sSoundFileName | 32 bytes copied from the Lua string regardless of its length (Z09-B64) |
+
+Lua-only; client plays the file at the object's position (Z09 §18.6)
+
+### `0x207B` NC_ACT_OBJECT_EFFECT_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cObjectEffect FUN_005ea8b0 (cLuaBroadcast to sight); client GameFrameWork::On_NC_ACT_OBJECT_EFFECT_CMD FUN_004b6fa0; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle | object (Lua arg 1) |
+| 2 | u32 | nEffectID | Lua arg 2; the client reads it as u16 = ActionEffectInfo row |
+
+Lua-only; to the object's sight incl. itself (Z09 §18.6)
+
 ### `0x207C` NC_ACT_EVENT_CODE_ACTION_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone cActByEventCode FUN_005eaa70 via cLuaBroadcast FUN_005d8030; client FUN_004a6300)
@@ -11471,6 +11493,17 @@ sight without the mob; the client stops the current animation first (Z09 §17.2)
 | 0 | u16 | nSecond | Lua argument 2; the client resets the instance-dungeon time window (IDTimeWin::ResetTime) |
 
 Lua script timer, Z09 §14.6
+
+### `0x6C17` NC_SCENARIO_MAPMARK_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cMapMark FUN_005df860, cMapMark_Obj FUN_005dffc0, cMapMark_FieldSight FUN_005e0640; client On_NC_SCENARIO_MAPMARK_CMD FUN_0049d1c0 → MiniMapWin::AddMapMark FUN_0054ead0; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNum | mark count |
+| 2 | IconInfo[nNum] | IconList | 15 bytes each: u16 nGroup (+0), u32 nCoord.x (+2), u32 nCoord.y (+6), u8 eMapIcon MiniMapIconType (+10), u32 nKeepTime ms (+11) |
+
+to the map, to the players in sight of (x, y), or to one player; the client replaces a mark with the same nGroup (Z09 §18.6)
 
 ### `0x6C18` NC_SCENARIO_MAP_OBJECT_CONTROL_CMD (hand-named) (S→C)
 

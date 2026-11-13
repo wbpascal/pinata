@@ -5796,3 +5796,304 @@ cViewSlotUnEquipAll(playerHandle)                          @ FUN_005e3d40   (2 /
 - `cSetAbstateInArea`'s range is `BMPInfo.AreaCenter_X` (the first member, read as `pSVar4->_padding_`): bitmaps whose
   centre is not their half size reach only part of the bitmap *(inferred from the member order)*.
 - `cViewSlotEquip`: how the view slots are stored across logout (`ItemEquipment` view-slot members) is Z05 / Z07.
+
+## 18. Scripts 5: Lua functions that query objects, maps and lists
+
+The 60 functions of the §14.9 row "part 11". Common rules as in §17 (1-based Lua slots, `GetObject` =
+`ShineObjectManager::som_GetObject` FUN_0054fd10, "returns nothing" = 0 results, numbers rounded, usage counts =
+calls / files in the 2016 `9Data/Shine/LuaScript` tree). Unsigned values are pushed as unsigned (`+ 2^32` when the
+int is negative). Function names are *(pdb2016)*; FiestaHeroes' signatures *(fh-doc)* were compared, and where they
+differ the code is given.
+
+Search visitors used below (`ali_Work(centre, object, dist²)`, returning false stops the walk; map walks use
+`so_AllInMap(fm_GetCenterObject(map), visitor, 0)`, range walks `so_AllOfRange(centre, stamp, pos, range, fan = null,
+visitor, includeSelf, 0xFFFF)`, where range 0 means the map's sight range (§16, `so_AllOfRange` FUN_0054bc80)):
+
+| Visitor `@` | Collects |
+|---|---|
+| `AxialListObjectCollect` ctor FUN_0042a1e0, `ali_Work` FUN_0042a650, `aloc_Home` FUN_004288b0 / `aloc_Next` FUN_00429db0 / `aloc_Get` FUN_00429dd0, dtor FUN_0042a2b0 | every object (vector `aloc_List`, cursor `aloc_Finger`) |
+| `AxialListPlayerList` ctor FUN_0042a2f0, `ali_Work` FUN_0042a700, `alpl_GetList` FUN_0042a940, `alpl_GetCount` FUN_00429de0, dtor FUN_0042a330 | players (kind 2, any mode, dead included) |
+| `AxialListNearObjectList` ctor FUN_0042a450, `ali_Work` FUN_0042a8f0, dtor FUN_0042a470 (§17.4) | kind == `alnol_ObjectType` and mode ≠ 3 |
+| `AxialListAreaObjectList` (§15.7) | kind == type, in the `.aid` area, mode ≠ 3 |
+| `AxialListNearScanObjectType` ctor FUN_004c1b40, `alns_ValidObject` FUN_004c1b80, `ali_Work` FUN_004c2080 | kind == `alnsot_nObjectType`, not `so_AmIAlreadyDead` (vt 0x28) when `alnsot_DeadCheck`, mode ≠ 0 and ≠ 3; at most 200 (`alns_buffer[200]` of `AxialListNearScan`) |
+| `AxialListEnemyInAray` (an `AxialListNearScan` 0x64c: `alena_Mob` +0x648; vt set inline), `alns_ValidObject` FUN_005f0d80, base `AxialListNearScan::ali_Work` FUN_004c1cf0, `alns_GetMember` FUN_004c17f0, ctor FUN_004c17c0, dtor FUN_005d6cb0 | `alena_Mob.so_mobile_IsEnemy` (vt 0x72c, Z03 §3.3) objects with mode ≠ 0 and ≠ 3, without `STA_IMMORTAL` (291) and `STA_ADLFLOUSSIERIMT` (499) (vt 0x3e4 `so_AbnormalState_IsSet`); at most 200 |
+| `AxialListFindNearPlayer` ctor FUN_00428990, `ali_Work` FUN_00429fb0, `alfnp_GetNearPlayer` FUN_004289c0 | nearest object that has a `CharClass` (vt 0x49c `so_CharacterClass` FUN_00555590), is not dead (mode ≠ 3) and whose base class (`cc_ClassType`, below) is in the list; start `alfnp_MinDist` 99 999 999 (strictly closer wins) |
+| `AxialListNPCSearch` ctor FUN_004299d0, `ali_Work` FUN_00429ab0 | first object whose mob row (vt 0x70c `so_mob_DataBox`) `InxName` equals `alns_Name` (32 bytes, `strncpy`); stops the walk |
+
+`AllOfRangeArgument::operator unsigned long` FUN_00427ef0 is the walk stamp (`++aora_argument`).
+
+### 18.1 Time and random numbers
+
+```pseudo
+cCurSec() → seconds                                       @ FUN_005d8cd0   (62 / 9)
+    returns g_Now / 10 (integer seconds of the zone clock, §1)
+cCurrentSecond() → seconds                                @ FUN_005d8d60   (544 / 136)
+    returns g_Now / 10.0 (with the tenth: e.g. 1234.5)
+cRandom(min, max) → n                                     @ FUN_005ed640   (12 / 2)
+    min, max truncated to int; RandomBox::rb_random FUN_0063ccf0 → cWell512Random::well512_GetRandom(min, max)
+        FUN_0063cab0: max ≤ min (unsigned) → min; else min + (round(well512() × 1e11) mod (max − min + 1))
+    returns n in [min, max]
+cRandomInt(min, max) → n                                  @ FUN_005eed70   (105 / 47)
+    n = max − min + 1
+    if n > 1 and (max − min) < 100 (unsigned): returns min + RandomRing(n) value (ring DAT_14d720d0 + n×0x8008, §8 notes)
+    else returns min
+    # (original bug) Z09-B62: a range of more than 100 values (or max < min) always gives min; RandomRing only has
+    #   rings up to 100. 2016 scripts use it with list sizes (`cRandomInt(1, #PlayerAggroList)`, 34 calls), which
+    #   return 1 once a list has more than 100 entries
+cPermileRate(rate) → 1 | nothing                           @ FUN_005da8b0   (3 / 3)
+    rate truncated; returns 1 when well512_GetRandom(1000) FUN_0063cb10 (0…999) < rate, else nothing (probability rate/1000)
+```
+
+### 18.2 Object state
+
+```pseudo
+cObjectType(handle) → kind                                @ FUN_005f04b0   (5 / 5)
+    returns vt 0x4d0 (player 2, NPC 4, mob 5, door 7, bandit 8, effect 9, servant 10, mover 11, pet 12; §7 notes)
+cGetObjectMode(playerHandle) → name                       @ FUN_005d6880   (2 / 2)
+    handle a number ≠ 0xFFFF, object kind 2; vt 0x484 mode → "linking" 0, "normal" 1, "fight" 2, "corpse" 3, "house" 4,
+        "booth" 5, "riding" 6, "logoutwait" 7; other modes and non-players: nothing
+cIsObjectDead(handle) → 1 | nothing                        @ FUN_005d94f0   (338 / 87)
+    no argument: nothing; object missing or mode 3 (dead): returns 1; else nothing
+cIsObjectAlreadyDead(handle) → boolean                    @ FUN_005ee090   (5 / 4)
+    returns true when the object is missing or `so_AmIAlreadyDead` (vt 0x28, the +0x1d7c flag of §13) is set; else false
+cPlayerExist(handle) → 1 | nothing                         @ FUN_005d8aa0   (6 / 4)
+    returns 1 when the object exists and mode ≠ 3 (any kind, despite the name)
+cObjectHP(handle) → hp, maxHP                             @ FUN_005d9630   (71 / 39)
+    returns vt 0x4e8 so_GetHP, vt 0x4f0 so_MaxHP (non-mobile objects: folded `return 0`)
+cGetLevel(handle) → level                                 @ FUN_005e0c90   (4 / 3)
+    vt 0x4d8 so_GetLevel (player: Level clamped to 1…150 FUN_005598a0; mob: sm_MobLevel FUN_00556630); 0 → nothing
+cGetBaseClass(handle) → class                              @ FUN_005deee0   (10 / 5)
+    c = so_CharacterClass (vt 0x49c); c == null → nothing; returns c.cc_ClassType (CharClass vt 0x48): Fighter line
+        1 (FUN_00557bb0, folded name), Cleric line 6 (CharClassCleric::cc_ClassType FUN_00449780), Archer line 11
+        (FUN_00449820), Mage line 16 (FUN_004498e0), Joker line 21 (FUN_0063e440), Sentinel line 26 (FUN_0063e470),
+        `CharClassMob` 0 (folded `return 0`) = the base class ID of the class's line
+cGetCharNo(playerHandle) → charNo                         @ FUN_005e4110   (8 / 8)
+    not so_IsEmpty, kind 2: returns so_GetCharRegistNumber (vt 0x344, basedata.chrregnum)
+cGetRegistNumber(handle) → regnum                         @ FUN_005d6500   (3 / 2)
+    handle a number ≠ 0xFFFF; vt 0x344 so_GetCharRegistNumber: player chrregnum FUN_00559a30, mob sm_MobRegnum FUN_00556820 (§5); −1 → nothing
+cGetMobID(handle) → mobId                                 @ FUN_005e47b0   (8 / 3)
+    vt 0x708 so_mob_MobID FUN_00556ab0; players: folded `return 0xFFFF` FUN_005550b0 → nothing
+cGetPlayerName(handle) → name                             @ FUN_005d9240   (11 / 11)
+    always returns a string: "" without an argument, for a missing or dead (mode 3) object; else
+        NameString[vt 0x56c so_CharName] (player: basedata.charid FUN_00559780; mob / NPC: the MobInfo Name FUN_00556530)
+cGetAdminLevel(handle) → level                            @ FUN_005e42a0   (1 / 1)
+    not so_IsEmpty: returns vt 0x4d4 (player: so_AdministratorLevel = basedata.adminlevel FUN_00559740; others: folded `return false` → 0)
+cGetMaster(handle) → masterHandle                         @ FUN_005e32c0   (8 / 6)
+    kind 10 (servant): vt 0x9b0 master (§13.3); kind 12 (pet): ShinePet::spt_FindMaster (Z13); other kinds: nothing
+    returns master.so_handle (+4) when found
+cGetWhoKillMe(handle) → killerHandle                      @ FUN_005ee350   (2 / 2)
+    object dead (mode 3): k = so_mobile_WhoIsKillMe (vt 0x80c, smo_WhoKillMe FUN_00555740); returns k when GetObject(k)
+        still exists, else nothing
+cGetCurrentSkillInfo(mobHandle) → skillIndex, readySec     @ FUN_005f2070   (3 / 1)
+    handle a number; m = ShineDynamicCast<ShineMob> (mobs, NPCs, servants); w = so_mob_CurSelectWeapon (vt 0x740,
+        sm_ReadyWeapon.weaponindex FUN_004a9cf0) ≥ 0; skill = weapon slot w of the mob row (vt 0x70c +8, 0xC-byte
+        slots, skill u16 at +4, §8 notes) ≠ 0 and known to SkillDataBox
+    returns skill row InxName, sm_ReadyWeapon.nextblast[w] / 10.0 (the zone-clock second the weapon fires; compare
+        with cCurrentSecond)
+cGetMoveState(handle) → state, seconds                    @ FUN_005e2f30   (17 / 10)
+    s = smo_GetMoveState (vt 0xd50, FUN_0055d690), t = smo_GetMoveStateStartTime (vt 0xd54, FUN_0055d6a0)
+    s ≠ MS_MAX (2) and t ≠ 0: returns s (MS_HALT 0 / MS_MOVE 1, the movement detector of §5), (g_Now − t) / 10
+        (integer seconds in this state)
+    # FiestaHeroes lists three results *(fh-doc)*; the 2016 code returns two
+cGetWalkSpeed(handle) / cGetRunSpeed(handle) → speed      @ FUN_005ed280 / FUN_005ed140   (0 / 0, 2 / 2)
+    returns vt 0x514 so_WalkSpeed / vt 0x518 so_RunSpeed (with the static speeds of §17.5)
+cIsMovable(handle) → 1 | nothing                          @ FUN_005da9c0   (2 / 1)
+    no argument: nothing
+    o found and (so_parameter (vt 0x430).flag.cannotmove_stun or .cannotmove_entangle) (Parameter::Container +0xcce
+        bits 0 / 1): nothing
+    else returns 1
+    # (original bug) Z09-B67: a missing object returns 1 (movable); the found-object test is skipped
+cIsNoAttacOrNoMove(handle) → 1 | nothing                   @ FUN_005eac30   (2 / 1)
+    handle not a number, or object missing: returns 1
+    Parameter::Container::IsNoAttacOrNoMove FUN_004c8e80 (stun, entangle or cannotattack bit): returns 1; else nothing
+cGetAbstate(handle, abstateIndex) → strength, restSec     @ FUN_005e5e20   (6 / 4)
+    idx = dic_abstate.as_BTreeIndex[name] (≠ −1)
+    st = so_AbnormalState_Strength (vt 0x3e8) FUN_00555a60 (aeo_Strength, 0 when not set)
+    rest = so_AbnormalState_RestTime (vt 0x3ec) FUN_00555a90 ((aeo_Tick.terminate − g_Now) / 10, seconds)
+    st ≠ 0 and rest ≠ 0: returns st, rest; else nothing (a state with less than 1 s left counts as absent)
+cAbstateRestTime(handle, abstateIndex) → restSec          @ FUN_005ef750   (9 / 7)
+    handle ≠ 0xFFFF, name known: rest as above; returns rest when > 0, else nothing
+```
+
+### 18.3 Positions, maps and areas
+
+```pseudo
+cObjectLocate(handle) → x, y                              @ FUN_005d9ef0   (191 / 58)
+cObjectLocateDirection(handle) → x, y, dirDeg             @ FUN_005e4d80   (unused)
+    direction byte < 180 (else nothing); dirDeg = byte × 2
+cGetDirect(handle) → dirDeg                               @ FUN_005de400   (10 / 6)
+    returns (u16)(direction byte × 2)
+cDistanceSquar(h1, h2) | (x1, y1, x2, y2) → d²            @ FUN_005d88c0   (124 / 44)
+    arg 3 a number: returns (x1 − x2)² + (y1 − y2)² (doubles, no rounding)
+    else both handles given: so_DistanceSquar(GetObject(h2), GetObject(h1)) FUN_004028f0; a missing object → 99 999 999
+    (the handle form pushes the value twice and returns 1: harmless)
+cGetAroundCoord(handle, dirDeg, dist) → x, y              @ FUN_005de220   (33 / 18)
+    p = o.position; DirectDistanceTable::ddt_GetFoward(&ddt, (dirDeg mod 360) / 2, dist, &p) FUN_004a2db0 (negative
+        directions wrap); returns the point dist units from o in that direction
+    # argument order from the disassembly (Ghidra swaps the two ftol results)
+cGetCoord_Circle(x, y, radius) → x, y                     @ FUN_005d6720   (9 / 5)
+    all three numbers (type 3); MobRegenLoc_Circular(x, y, radius).mrlc_Get FUN_004b0e80 (random point in the circle, §10.4)
+cFindAttackBlockLocate(handle, x, y) → boolean            @ FUN_005ee1a0   (4 / 2)
+    no argument: false.  o missing or so_IsEmpty: false
+    ok = ShineObject::so_FindBlockLocate(o, (x, y), 10000, &out, MapBlock::MapBlockInformation::mbi_IsAttackBlock)
+        FUN_004beb40 (walk o → (x, y) until an attack-block cell, §9.2)
+    returns ok and out == (x, y): true when the straight line from o to (x, y) (≤ 10 010 units) crosses no
+        attack-block cell (KDWater: may the water balloon reach the player)
+    # Ghidra drops the out == (x, y) compare; read from the disassembly (0x5ee2ef…0x5ee303)
+cGetCurMapIndex(handle) → mapIndex                        @ FUN_005e59b0   (21 / 12)
+    o.so_Field ≠ null and fm_MapID (12-byte Name3) not empty: returns the map index string
+cGetMapName(mapIndex) → name                              @ FUN_005e8d50   (2 / 2)
+    FieldContainer::fc_FindMap; returns fm_MapInfo.Name (the display name of MapInfo.shn)
+cIsInMap(handle, mapIndex) → 1 | nothing                  @ FUN_005ef2c0   (14 / 11)
+    returns 1 when o.so_Field == fc_FindMap(mapIndex)
+cIsInArea(handle, mapIndex, areaName) → boolean           @ FUN_005ead70   (13 / 3)
+    handle ≠ 0xFFFF, object, map found: FieldMap::fm_AreaEntry(map, areaName, o.x, o.y) FUN_00427e80 (§15.7)
+    returns true / false (always one boolean)
+cGetAreaObject(mapIndex, areaName, handle) → 1 | nothing  @ FUN_005dca40   (13 / 9)
+    arg 3 present, map has an axial flag: returns 1 when fm_AreaEntry(map, areaName (Name8), o.x, o.y)
+    # neither area test checks that o is on that map: only its coordinates are tested against the map's area
+```
+
+### 18.4 Items and script strings
+
+```pseudo
+cGetItemIndex(itemId) → itemIndex                         @ FUN_005e5cf0   (unused)
+    ItemDataBox[itemId].data.InxName when shorter than 31 characters
+cGetItemLot(playerHandle, itemIndex) → lot, 0             @ FUN_005dad80   (11 / 7)
+    vt 0xbc0 ShinePlayer::so_GetItemLot FUN_0055da60 (non-players: folded `UseItemBase::uib_DirectUse` → nothing):
+        inventory locked (sp_Item.invenlocklist vt 0x10 true, e.g. during a trade): fails → nothing
+        id = idb_2itemid(name) (unknown → nothing); lot = ItemBag::ib_GetItemLot(ci_Inventory, id)
+            + ib_GetItemLot(ci_Equipment, id)  (bag + worn items; quest box, mini-house and action boxes not counted)
+    returns lot (u64), 0  (the second result is the lock flag, always 0 when a lot is returned)
+cIsEquipItem(playerHandle, itemIndex) → 0 | 1             @ FUN_005e23b0   (2 / 2)
+    id known: returns vt 0xd30 ShinePlayer::so_ply_IsEquipItem(ItemInfo.Equip, id) FUN_00560f30 = 1 when the
+        equipment slot of that item's Equip type holds this item ID; non-players: folded `return 0` (FUN_00449600)
+cGetScriptString(scriptFile, key [, a1 … a5]) → text      @ FUN_005e8b30   (6 / 2)
+    set = "ETC" → shinescriptetc; "MenuString" → shinescriptmenusting (both loaded at start, `zs_start_yellow`, Z01);
+        else KQScriptManager::operator[] FUN_0064ce70 (the KQ script string files, §8.7; unknown → assert, nothing)
+    fmt = ShineScript::ss_String(set, key) FUN_0048ce60 (`ScrString` table of the option file, "" when missing)
+    char buf[256] = 0; sprintf(buf, fmt, a1, a2, a3, a4, a5)   (missing arguments are null strings); returns buf
+    # (original bug) Z09-B66: sprintf into the 256-byte stack buffer is unbounded; a long text or long arguments
+    #   overrun it (the arguments come from scripts, e.g. the map name in the server-menu title)
+```
+
+### 18.5 Searches and lists
+
+The list functions return the handles as separate results (`{ f(...) }` in the scripts).
+
+```pseudo
+cGetNPCHandle(mapIndex, npcIndex) → handle                @ FUN_005d8df0   (1 / 1)
+    map with axial flag: walk with AxialListNPCSearch(npcIndex); returns the first object (NPC, mob, …) whose MobInfo
+        InxName matches; nothing when none
+cObjectCount(mapIndex, kind) → n                          @ FUN_005e26c0   (41 / 18)
+    unknown map / no axial flag / no name: returns 0
+    walk AxialListNearScanObjectType(kind, deadCheck 1) over the map; n = members (≤ 200)
+    kind 5 (mob): count only members whose mob row is missing or whose MobInfo.IsNPC (+0x52, `struct MobInfo`) ≠ 1
+        (mob-kind objects whose MobInfo row is flagged as NPC are not counted)
+    returns n
+    # (original bug) Z09-B63: the count saturates at 200 (the scan buffer); "more than 200 of a kind" reads as 200
+cGetPlayerList(mapIndex) → h1, h2, …                      @ FUN_005f4410   (234 / 34)
+    walk AxialListPlayerList over the map; lua_checkstack(count) (fails: assert "cGetPlayerList Lua Stack Lack -",
+        nothing); returns every player's handle (dead players included)
+cGetAreaObjectList(mapIndex, areaName, kind) → h1, …      @ FUN_005f4620   (36 / 20)
+    AxialListAreaObjectList(map, area, kind) over the map (§15.7); lua_checkstack first ("cGetAreaObjectList Lua
+        Stack Lack -"); returns the handles
+cFindNearestMobList(mapIndex [, mobIndex]) → h1, …        @ FUN_005e6eb0   (1 / 1)
+    walk AxialListObjectCollect over the map; for each kind-5 object (mob; NPCs are kind 4) whose so_mob_MobID equals
+        mdb_2MobID(mobIndex) (no index: every mob): lua_pushinteger(handle)
+    then lua_checkstack(count) (fails: assert "cFindNearestMobList Lua Stack Lack -", returns nothing); returns count
+    # not sorted by distance, despite the name
+    # (original bug) Z09-B59: the handles are pushed before lua_checkstack; a C function only has LUA_MINSTACK (20)
+    #   free slots, so more than about 20 matching mobs write past the Lua stack (heap corruption) before the check
+cNearObjectList(centreHandle, range, kind) → h1, …        @ FUN_005f22e0   (16 / 9)
+    range ≠ 0 and kind ≠ 0; AxialListNearObjectList(kind) over so_AllOfRange(c, range, includeSelf 0) (kind matches,
+        not dead); lua_checkstack first ("cNearObjectList Lua Stack Lack -"); returns the handles (walk order)
+    (the list accessor is a folded body named `RollBackPosCallBackEvent::GetLinkData`, the count `alpl_GetCount`)
+cGetTargetList(handle, x, y, range) → h1, …               @ FUN_005f0e40   (3 / 3)
+    o = GetObject(handle); scan AxialListEnemyInAray { alena_Mob = o } over so_AllOfRange(o, centre (x, y), range,
+        includeSelf 0): o's enemies around (x, y), alive, without STA_IMMORTAL / STA_ADLFLOUSSIERIMT, ≤ 200
+    returns their handles (no argument / no object: nothing)
+    # (original bug) Z09-B60: no lua_checkstack at all; more than about 20 targets overrun the Lua stack (as B59)
+cFindNearPlayer(handle, range, classList) → handle        @ FUN_005f37d0   (5 / 3)
+    classList must be a table (type 5), else nothing
+    list = []; for each (key, value) of classList (lua_next): v = (int)value; if v ≠ 0: list.push(v); pop value
+    AxialListFindNearPlayer(list) over so_AllOfRange(o, range, includeSelf 0)
+    returns the nearest live object (in practice a player) whose base class (cc_ClassType: 1, 6, 11, 16, 21, 26) is
+        in the list; nothing when none
+    # (original bug) Z09-B61: the value is popped only when it is non-zero (`lua_settop(-2)` inside the `v ≠ 0`
+    #   branch, 0x5f393a); a 0 in classList leaves it on the stack, so the next lua_next uses it as the key
+    #   (Lua error "invalid key to 'next'" or a wrong walk)
+cObjectFind(centreHandle, range, value, method) → handle  @ FUN_005f33d0   (36 / 10)
+    c = GetObject(centreHandle); collect every object within range of c (so_AllOfRange, **includeSelf 1**)
+    method (32 bytes, Name8 compare):
+        "so_ObjectType":        keep objects whose kind (vt 0x4d0) == (int)value
+        "so_mobile_GetIdxName": keep objects whose vt 0x894 so_mobile_GetIdxName == value (mob: MobInfo InxName
+                                FUN_00556b60; other objects "" FUN_00555110)
+        other: keep none
+    returns the kept object with the smallest so_DistanceSquar(c, x) < range² (signed compare); nothing when none
+    # the centre itself is a candidate (distance 0) and wins when it matches
+cGetNearestObjByCoord(mapIndex, x, y, range, value, method) → handle   @ FUN_005f3a50   (unused)
+    the same over so_AllOfRange(map axial flag, centre (x, y), range, includeSelf 1); distance from (x, y)
+cGetNearObjListByCoord(mapIndex, x, y, range, value, method [, max]) → h1, …   @ FUN_005f4ef0   (3 / 3)
+    the same filter; entries ObjectWithDistanceSquare {owds_pObject, owds_dwDistanceSquare} (8 bytes, distance from
+        (x, y)); std::sort with CompareDistanceSquare (nearest first)
+    max = (int)arg 7, 0 → unlimited; lua_checkstack(min(count, max)) ("cGetNearObjListByCoord Lua Stack Lack -")
+    returns the first max handles
+    # x / y order checked in the disassembly (0x5f4fae…0x5f4fcf)
+    # (original bug) Z09-B68: the method (and, for so_mobile_GetIdxName, the value) string is not checked; a
+    #   missing argument passes a null pointer to strncpy / the compare (crash) in cObjectFind and both ByCoord
+    #   functions
+```
+
+FiestaHeroes documents cObjectFind as "the first matching object"; the code returns the nearest one *(fh-doc vs code)*.
+
+### 18.6 Effects, sounds and map marks (client packets)
+
+```pseudo
+cObjectEffect(handle, effectId) → 1 | nothing             @ FUN_005ea8b0   (1 / 1)
+    both numbers; cLuaBroadcast(o, 0xFFFF = sight incl. o, …)
+    0x207B NC_ACT_OBJECT_EFFECT_CMD { u16 nHandle = handle; u32 nEffectID = effectId }   (6 bytes)
+    returns 1 when sent
+cObjectSound(handle, soundFile) → 1 | nothing             @ FUN_005ea6f0   (2 / 2)
+    handle a number, soundFile a string; to sight:
+    0x207A NC_ACT_OBJECT_SOUND_CMD { u16 nHandle; char sSoundFileName[32] = 32 bytes copied from the Lua string }  (34 bytes)
+    # (original bug) Z09-B64: always 32 bytes are copied: for a shorter name the bytes after its terminator are
+    #   whatever follows the Lua string in memory; a name of 32+ characters arrives unterminated
+cMapMark(mapIndex, marks) → 1 | nothing                   @ FUN_005df860   (17 / 12)
+cMapMark_Obj(playerHandle, marks) → 1 | nothing           @ FUN_005dffc0   (2 / 2)
+cMapMark_FieldSight(mapIndex, x, y, marks) → 1 | nothing  @ FUN_005e0640   (1 / 1)
+    marks must be a table; for each entry e (lua_next), fields read by name, each must have the right type:
+        Group (number), x (number), y (number), IconIndex (string), KeepTime (number)
+        IconIndex → MiniMapIconType *(pdb2016)*: "MobNormal" 27, "MobChief" 25, "Gate" 5 (MMIT_NPCLink), "RedFlag" 16,
+            "BlueFlag" 17, "MobDmg" 26, "Templer" 12, "Mine" 6, "Normal" 13, "LinkTown" 23; cMapMark also knows
+            "NotDamaged" 28, "AlreadyDamaged" 29, "MobChrLocFlag" 30, "Kingdom" 4
+        a missing / mistyped field or unknown icon name: stop, return nothing, send nothing
+    0x6C17 NC_SCENARIO_MAPMARK_CMD { u16 nNum; IconInfo[nNum] { u16 nGroup; SHINE_XY_TYPE nCoord (u32 x, u32 y);
+        u8 eMapIcon; u32 nKeepTime } }   (15 bytes per mark, payload 2 + 15·n)
+    cMapMark:            AxialListPacketBroadcast to every player in the map (so_AllInMap of the axial flag)
+    cMapMark_FieldSight: AxialListPacketBroadcast over so_AllOfRange(map axial flag, centre (x, y), range 0 = map
+                         sight, includeSelf 0): the players in sight of (x, y)
+    cMapMark_Obj:        kind 2 only; pp_SetPacketLen (too long: assert "cMapMark_Obj : Packet Too Long", nothing
+                         sent, still returns 1); else to the player (vt 0x2f8 send object)
+    returns 1
+    # (original bug) Z09-B65: the entries are written into g_buf while reading the table and the length is checked
+    #   only afterwards (pp_SetPacketLen / the broadcaster's constructor): a large table writes past the send buffer
+```
+
+The client (`GameFrameWork::On_NC_ACT_OBJECT_EFFECT_CMD` FUN_004b6fa0) reads `nEffectID` as a u16 and plays
+`ActionEffectInfo` row `nEffectID & 0xFFFF` on the object (nothing when the handle is not known to it).
+`On_NC_ACT_OBJECT_SOUND_CMD` FUN_0049d4d0 plays `sSoundFileName` at the object's position (`SoundMgr`).
+`On_NC_SCENARIO_MAPMARK_CMD` FUN_0049d1c0 → `MiniMapWin::AddMapMark` FUN_0054ead0 (also the full map,
+`FullMapWin::AddMapMark`): per mark it creates a `MapMarkWin` at (x, y) with an icon (5, 16 and 17 have their own
+textures, every other value the default mark), expiry = now + nKeepTime / 1000 (milliseconds), and stores it by
+`nGroup`: a new mark replaces the one with the same group. Layouts in `docs/protocol/annotations/Z09.json`.
+
+The two copies `cMapMark_Obj` / `cMapMark_FieldSight` know only the first ten icon names, so a script that uses
+"Kingdom" or a `Mob*Damaged` icon with them sends nothing; 2016 scripts use them with the shared names only
+*(inferred: older copy of the list, not tagged as a bug)*.
+
+### 18.7 Answers and open points
+
+- Every part-11 row of §14.9 is documented here. Part 12 starts with the message / dialog functions.
+- Several functions treat a missing object as a positive answer (`cIsObjectDead`, `cIsObjectAlreadyDead`: dead;
+  `cIsNoAttacOrNoMove`: cannot act). Only `cIsMovable`'s case is contradictory (B67).
