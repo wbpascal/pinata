@@ -3495,7 +3495,7 @@ Sent in reply to `0x2008` NC_ACT_CHANGEMODE_REQ on ShineObjectClass::ShinePlayer
 
 ### `0x2011` NC_ACT_NOTICE_CMD
 
-**Verified layout** (basis: zone ShinePlayer::so_ply_Notice FUN_005977e0 (disassembly); client: accepted and ignored in every scene (C01))
+**Verified layout** (basis: zone ShinePlayer::so_ply_Notice FUN_005977e0 (disassembly); client GameFrameWork::On_NC_ACT_NOTICE_CMD FUN_004b5420 (shown as "[Notice] %s"; other scenes ignore it))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -3503,7 +3503,7 @@ Sent in reply to `0x2008` NC_ACT_CHANGEMODE_REQ on ShineObjectClass::ShinePlayer
 | 1 | u8 | len | strlen(text) & 0xFF |
 | 2 | char[len] | text | no terminating NUL on the wire; total size = len + 4 |
 
-sent by NPCAction NoticeAction (no 2016 trigger uses it) and the Lua observer (§14.7); no struct in either PDB
+sent by Lua cNotice / cNoticeString / cNotice_Obj (§19.3), NPCAction NoticeAction (§16.5) and the Lua observer (§14.7); client copies len bytes into a 128-byte buffer (len > 127 overruns it); no struct in either PDB
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_Notice` (`FUN_005977e0`) · payload variable (iVar7)
 
@@ -4263,11 +4263,13 @@ Sent from `FUN_00553460` (`FUN_00553460`) · payload 3 bytes
 
 ### `0x2077` NC_ACT_EFFECT_MESSAGE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ACT_EFFECT_MESSAGE_CMD`, 4 bytes
+**Verified layout** (basis: zone ShinePlayer::so_ply_EffectMsg FUN_00560fc0, cEffectMsg_AllInMap FUN_005e4670; client FUN_0049d890)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | nEffectEnum |  |
+| 0 | u32 | nEffectEnum | < 15 (EFFECT_MSG_TYPE, fh-doc) |
+
+client EffectMsg::Play
 
 Sent from `FUN_00560fc0` (`FUN_00560fc0`) · payload 4 bytes
 
@@ -4277,12 +4279,14 @@ Sent from `FUN_00560fc0` (`FUN_00560fc0`) · payload 4 bytes
 
 ### `0x2078` NC_ACT_PLAY_SOUND_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ACT_PLAY_SOUND_CMD`, 2 bytes + variable tail
+**Verified layout** (basis: zone ShinePlayer::so_ply_PlaySound FUN_00561130; client FUN_004ba560)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | FileNameLen |  |
-| 2 | u8[FileNameLen] | FileName | variable length |
+| 0 | u16 | FileNameLen | ≤ 256 |
+| 2 | char[len] | FileName | no NUL |
+
+game stream, one player
 
 Sent from `FUN_00561130` (`FUN_00561130`) · payload variable (uVar3 + 4)
 
@@ -4293,14 +4297,16 @@ Sent from `FUN_00561130` (`FUN_00561130`) · payload variable (uVar3 + 4)
 
 ### `0x2079` NC_ACT_SCRIPT_MSG_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ACT_SCRIPT_MSG_CMD`, 39 bytes + variable tail
+**Verified layout** (basis: zone cScriptMsg FUN_005ebb40 / cSimpleChatScriptMsg FUN_005ea530 (WM re-sends 0x207D as 0x2079, W04); client FUN_004bc020)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nHandle |  |
-| 2 | u8[32] | sScriptMsgIndex |  |
-| 34 | u8[5] | nlen |  |
-| 39 | u8[rest] | sContent | variable length, count unknown |
+| 0 | u16 | nHandle | speaker (chat bubble for SM_Pos 0); 0xFFFF = none |
+| 2 | char[32] | sScriptMsgIndex | index into the client's ScriptMsg.shn (SM_Inx); 32 bytes copied from the Lua string whatever its length (Z09-B72) |
+| 34 | u8[5] | nlen | string lengths (Z09-B75) |
+| 39 | char[Σnlen] | sContent | strings back to back, no NUL |
+
+to one player, the speaker's sight, a map, or (via WM 0x207D) the world
 
 Sent from `FUN_005ea530` (`FUN_005ea530`) · payload 39 bytes
 
@@ -4349,6 +4355,15 @@ Sent from `FUN_005eaa70` (`FUN_005eaa70`) · payload 6 bytes
 
 ### `0x2082` NC_ACT_SHOW_CINEMATIC
 
+**Verified layout** (basis: zone ShinePlayer::so_ply_ShowCinematicText FUN_00561090; client FUN_004ba400)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | len | ≤ 256 |
+| 2 | char[len] | text | no NUL |
+
+no struct in either PDB; client letter-box TextScreenEffect
+
 Sent from `FUN_00561090` (`FUN_00561090`) · payload variable (uVar3 + 4)
 
 | Off | Type | Value / source |
@@ -4357,6 +4372,12 @@ Sent from `FUN_00561090` (`FUN_00561090`) · payload variable (uVar3 + 4)
 | 2 | bytes[?] | `FID_conflict__memcpy from param_1` |
 
 ### `0x2083` NC_ACT_END_CINEMATIC
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_EndCinematicText FUN_00561030; client FUN_004a6980)
+
+Empty payload.
+
+no payload
 
 Sent from `FUN_00561030` (`FUN_00561030`) · payload 0 bytes
 
@@ -10954,17 +10975,17 @@ Z09 §13.2
 
 ### `0x201F` NC_ACT_SOMEONESHOUT_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone ShineMob::so_Shout FUN_00459250, ShineMobileObject::so_Shout FUN_00459080; client handler reads offset 1 as u16 for mobs (re-data/client-handlers.json 0x201f); 2017 PDB PROTO_NC_ACT_SOMEONESHOUT_CMD agrees)
+**Verified layout** (basis: zone ShineMob::so_Shout FUN_00459250, ShineMobileObject::so_Shout FUN_00459080; client handler reads offset 1 as u16 for mobs (re-data/client-handlers.json 0x201f); 2017 PDB PROTO_NC_ACT_SOMEONESHOUT_CMD agrees; Lua cSomebodyShout FUN_005e5150)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | itemLinkDataCount | 0 for mobs; link count for players |
+| 0 | u8 | itemLinkDataCount | 0 for mobs; link count for players; never written by Lua cSomebodyShout (stale, Z09-B71) |
 | 1 | char[20] | speaker | union: charID (player name, or a script-given name) / mobID (vt 0x708) when isMob |
 | 21 | u8 | flag | bits GMColor:1@0 (vt 0xef4), isMob:1@1 (pdb2016; mob version: speaker string empty); other bits stale in the mob version |
 | 22 | u8 | len | content length |
 | 23 | char[len] | content | text, then itemLinkDataCount × 0x67-byte item links (player version only) |
 
-to the whole map instance (target 0xFFFF) or one object. The mob version sends len + 0x1A bytes including the opcode, one stale byte more than the packet (Z09-B10).
+to the whole map instance (target 0xFFFF) or one object. The mob version sends len + 0x1A bytes including the opcode, one stale byte more than the packet (Z09-B10). The client shows nothing for len 0 or > 128.
 
 ### `0x2028` NC_ACT_PITCHTENT_ACK (S→C)
 
@@ -11431,6 +11452,16 @@ empty payload
 |---|---|---|---|
 | 0 | u16 | err | 0xA42–0xA5A |
 
+### `0x6C04` NC_SCENARIO_MESSAGENOTICE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cNoticeRedWarningCode FUN_005e5ff0; client FUN_004ae4a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | message | 0x2020 Started, 0x2021 Remain30sec, 0x2022 BeAwakened, 0x2023 Remain1min (TextData2 texts in the client) |
+
+map-wide; also sent by the Pine node BroadcastCode
+
 ### `0x6C05` NC_SCENARIO_AREAENTRY_REQ (hand-named) (S→C)
 
 **Verified layout** (basis: zone PineEventScriptNode::ShineInterruptSet::sa_Step FUN_004ec1e0 (interruptset areaentry), sent to every object in the map of the theater's centre flag; client GameFrameWork::On_NC_SCENARIO_AREAENTRY_REQ FUN_004be410 → AreaInfoMgr::AddRequestAreaTest(area, 1))
@@ -11473,6 +11504,18 @@ the client switches its own door block by the name stored from the last 0x1C0F/0
 
 sent to the whole map
 
+### `0x6C0C` NC_SCENARIO_CHATWIN_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cMobDialog FUN_005db690 / _Obj FUN_005db860 / _Range FUN_005dbaa0 / _String FUN_005ece70; client FUN_0049b0c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | mob | mob ID from the mob InxName (mdb_2MobID) |
+| 2 | u8 | len | text length (< 256; < 255 for cMobDialog_String) |
+| 3 | char[len] | content | script string, no NUL |
+
+client opens the NPC script dialog of that mob
+
 ### `0x6C0D` NC_SCENARIO_ANIMATE_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone ShineMob::so_SetForcedAnimation FUN_00553390 (cAnimateForcedly); client FUN_004a3610)
@@ -11483,6 +11526,64 @@ sent to the whole map
 | 2 | char[32] | anicode | Name8; bytes zeroed, then strncpy 32 |
 
 sight without the mob; the client stops the current animation first (Z09 §17.2). Also sent by Pine ShineAnimate (part 15)
+
+### `0x6C0E` NC_SCENARIO_FOG_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cMapFog FUN_005e6260; client FUN_004a35b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | fog | 0 = off; client SetFogDepth(fog / constant) |
+| 1 | u16 | depth |  |
+
+map-wide, not stored on the server
+
+### `0x6C11` NC_SCENARIO_NPCCHAT_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cNPCChat FUN_005efaa0; client FUN_004bb040)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[33] | DialogIndex | index into the client's ScriptMsg.shn (SM_Inx); strncpy 32: byte 32 never written (Z09-B73) |
+| 33 | u16 | NPCHandle | the speaking object |
+
+client: message + speech balloon + chat line "[name] : text"
+
+### `0x6C12` NC_SCENARIO_MESSAGE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cMessage FUN_005ef8f0; client FUN_004b6f60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[17] | DialogIndex | index into the client's ScriptMsg.shn (SM_Inx); strncpy 16: byte 16 never written (Z09-B73) |
+
+cLuaBroadcast: sight of the object or one player; client shows SM_Msg without speaker
+
+### `0x6C14` NC_SCENARIO_CAMERA_MOVE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cCameraMove FUN_005dbe30 / cCameraMove_Obj FUN_005e7920; client FUN_004a5df0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | MoveType | 0 camera back, 1 move (CS_NONE / CS_MOVING); signed check lets negatives through (Z09-B74) |
+| 1 | SHINE_XY_TYPE | ViewCoord | u32 x, u32 y |
+| 9 | u16 | AngleXZ |  |
+| 11 | u16 | AngleY |  |
+| 13 | u16 | Dist | also the brief-info range around ViewCoord (cCameraMove) |
+
+cCameraMove also sets FieldMap.fm_CameraState and exchanges brief info around the camera point
+
+### `0x6C15` NC_SCENARIO_SCRIPTMESSAGE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cScriptMessage FUN_005dcbe0 / _Obj FUN_005dcd80 / _Range FUN_005f27e0; client FUN_004bbd60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | DialogIndex | index into the client's ScriptMsg.shn (SM_Inx); strncpy 31: byte 31 never written (Z09-B73) |
+| 32 | u8[5] | nlen | length of each of the five script strings (strlen & 0xFF, Z09-B75) |
+| 37 | char[Σnlen] | sContent | the five strings back to back, no NUL |
+
+map-wide, to one player or to the players in range; client formats SM_Msg with the five strings and does not check the index (unknown index + content = client crash)
 
 ### `0x6C16` NC_SCENARIO_TIMER_CMD (hand-named) (S→C)
 
@@ -11517,6 +11618,42 @@ to the map, to the players in sight of (x, y), or to one player; the client repl
 
 to every object of the map (so_AllInMap of the axial flag); no zone state, late joiners do not get it (Z09 §17.2)
 
+### `0x6C19` NC_SCENARIO_DIALOG_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cMobDialog_FileName FUN_005e4a00; client FUN_0049d6a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[33] | sFacecutIndex | face-cut image name (game\NPCFaceCut\<name>.png/.tga), zero-padded |
+| 33 | u8 | nLen | text length (< 256) |
+| 34 | char[nLen] | sContents | no NUL |
+
+map-wide
+
+### `0x6C1A` NC_SCENARIO_TOPVIEW_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cTopView FUN_005e6600; client FUN_004a6bf0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nMoveType | 0 off, 1 on |
+| 1 | SHINE_XY_TYPE | CenterPos | must lie within sight²/2 of the object for type 1 |
+| 9 | u16 | nDistance |  |
+| 11 | u16 | nAngle |  |
+
+data stream, one player; the client's top-view flag gates the 0x6C1D timer window
+
+### `0x6C1B` NC_SCENARIO_SYSTEM_MESSAGE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cSystemMessage_Obj FUN_005e6890; client FUN_004ba610)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nLen | < 256 |
+| 1 | char[nLen] | sMessage | script string, no NUL |
+
+sent on the data stream to one player; client adds a system message when not empty
+
 ### `0x6C1C` NC_SCENARIO_HIDE_OTHER_PLAYER_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone cHideOtherPlayer FUN_005e6a50; client FUN_004a6d60)
@@ -11526,6 +11663,35 @@ to every object of the map (so_AllInMap of the axial flag); no zone state, late 
 | 0 | u8 | bIsHide | 1 hide the other players, 0 show them |
 
 to one player through its data stream (vt 0x2f8) (Z09 §17.2)
+
+### `0x6C1D` NC_SCENARIO_EFFECT_TIMER_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cEffectTimer FUN_005e6bb0; client FUN_0049d8f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTimerFunction | EFFECT_TIMER_FUNC (pdb2017): 0 ETF_TIMER, 1 ETF_REMOVE |
+| 1 | u16 | nSecond |  |
+
+data stream, one object (non-players: nothing)
+
+### `0x6C1E` NC_SCENARIO_DIRECTIONAL_ARROW_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cDirectionalArrow FUN_005e8810; client FUN_004bc2f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | SHINE_XY_TYPE | DirectionalPos | u32 x, u32 y |
+
+data stream; client effects MarketSearchMe1-3 at the ground point
+
+### `0x6C1F` NC_SCENARIO_DEL_DIRECTIONAL_ARROW_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cDelDirectionalArrow FUN_005e89d0; client EffectMgr::RemoveClientEff FUN_0068d420)
+
+Empty payload.
+
+no payload
 
 ### `0x6C21` NC_SCENARIO_TIMER_START_CMD (hand-named) (S→C)
 
@@ -11555,6 +11721,16 @@ to one player or every player of a map, Z09 §14.6
 |---|---|---|---|
 | 0 | u16 | mobhandle | mob |
 | 2 | u32 | mobguild | mob+0x22ec |
+
+### `0x74E0` NC_GUILD_TOURNAMENT_STARTMSG_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cStartMsg_AllInMap FUN_005e3af0; client GuildTask FUN_006b38b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | s32 | nStartBeforeTime | always 5; the client acts only on 5 (count-down effect + sound) |
+
+map-wide; also the Pine node ShineBattleStart
 
 ### `0x8c04` NC_MINIHOUSE_BUILDING_ACK (S→C)
 

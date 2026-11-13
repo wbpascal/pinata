@@ -4716,7 +4716,7 @@ names for the NA build *(fh-doc)*; the 2016 zone registers only these.
 | this section (§14.6) | 16 | `cAIScriptFunc` 005f05f0, `cAIScriptSet` 005eef50, `cAssertLog` 005d63a0, `cCastingBar` 005dd120, `cDebugLog` 005d8350, `cExecCheck` 005d82a0, `cFieldScriptFunc` 005e0f90, `cServerMenu` 005dab40, `cSetAIScript` 005dc050, `cSetFieldScript` 005e0dd0, `cTimer` 005dd310, `cTimerEnd` 005eb770, `cTimerStart` 005eb5a0, `cTimer_Obj` 005dd4b0, `cTriggerRegist` 005f4c50, `tonumber` 005d81c0 |
 | §17 (part 10: object / mob control) | 57 | `cActByEventCode` 005eaa70, `cAnimate` 005dd690, `cAnimateForcedly` 005dd8a0, `cCharTitleAddValue` 005ded30, `cDamaged` 005f10d0, `cDePolymorph` 005e9210, `cDePolymorph_Area` 005f30d0, `cFollow` 005dc1f0, `cFreeStatInit` 005e7dc0, `cHeal` 005de540, `cHideOtherPlayer` 005e6a50, `cInvenItemDestroy` 005d63d0, `cItemErase` 005ecb40, `cKillObject` 005e6d40, `cLevelUp` 005e7590, `cLinkTo` 005dde20, `cLinkToAll` 005df4b0, `cLocationRotate` 005ed000, `cMapObjectControl` 005e2ad0, `cMobDetectRange` 005e80b0, `cMobIDFind` 005eee50, `cMove2Where` 005df6e0, `cMoveStop` 005edf90, `cPartyJoin` 005e3460, `cPartyLeave` 005e3610, `cResetAbstate` 005ef120, `cRevivalAll` 005ec100, `cRunTo` 005da040, `cRunToUntilBlock` 005da590, `cSetAbstate` 005d97a0, `cSetAbstateInArea` 005e2c40, `cSetAbstate_Range` 005f2560, `cSetCanUseReviveItem` 005e8520, `cSetCanUseReviveSkill` 005e8660, `cSetDeadDelayTime` 005de090, `cSetFreeBattle` 005ebfe0, `cSetMobAttr` 005e13d0, `cSetNPCParam` 005f0320, `cSetObjectDirect` 005e8fa0, `cSetReviveDelayTime` 005e8740, `cSetSightState` 005e7b80, `cSetTeamBattle` 005e83e0, `cStaticDamage` 005de8c0, `cStaticDamage_smo` 005e48f0, `cStaticMoverSpeed` 005debb0, `cStaticRunSpeed` 005ed3c0, `cStaticSpeed` 005dea30, `cStaticWalkSpeed` 005ed500, `cTargetChangeNull` 005d6b80, `cUseMoney` 005e6450, `cVanishAll` 005f0150, `cVanishTimer` 005e5840, `cViewSlotEquip` 005e3c00, `cViewSlotUnEquipAll` 005e3d40, `cWaitIdle` 005e7f70, `cWalkTo` 005da300, `cWillMovement` 005df340 |
 | part 11 (queries, lists) | 60 | `cAbstateRestTime` 005ef750, `cCurSec` 005d8cd0, `cCurrentSecond` 005d8d60, `cDistanceSquar` 005d88c0, `cFindAttackBlockLocate` 005ee1a0, `cFindNearPlayer` 005f37d0, `cFindNearestMobList` 005e6eb0, `cGetAbstate` 005e5e20, `cGetAdminLevel` 005e42a0, `cGetAreaObject` 005dca40, `cGetAreaObjectList` 005f4620, `cGetAroundCoord` 005de220, `cGetBaseClass` 005deee0, `cGetCharNo` 005e4110, `cGetCoord_Circle` 005d6720, `cGetCurMapIndex` 005e59b0, `cGetCurrentSkillInfo` 005f2070, `cGetDirect` 005de400, `cGetItemIndex` 005e5cf0, `cGetItemLot` 005dad80, `cGetLevel` 005e0c90, `cGetMapName` 005e8d50, `cGetMaster` 005e32c0, `cGetMobID` 005e47b0, `cGetMoveState` 005e2f30, `cGetNPCHandle` 005d8df0, `cGetNearObjListByCoord` 005f4ef0, `cGetNearestObjByCoord` 005f3a50, `cGetObjectMode` 005d6880, `cGetPlayerList` 005f4410, `cGetPlayerName` 005d9240, `cGetRegistNumber` 005d6500, `cGetRunSpeed` 005ed140, `cGetScriptString` 005e8b30, `cGetTargetList` 005f0e40, `cGetWalkSpeed` 005ed280, `cGetWhoKillMe` 005ee350, `cIsEquipItem` 005e23b0, `cIsInArea` 005ead70, `cIsInMap` 005ef2c0, `cIsMovable` 005da9c0, `cIsNoAttacOrNoMove` 005eac30, `cIsObjectAlreadyDead` 005ee090, `cIsObjectDead` 005d94f0, `cMapMark` 005df860, `cMapMark_FieldSight` 005e0640, `cMapMark_Obj` 005dffc0, `cNearObjectList` 005f22e0, `cObjectCount` 005e26c0, `cObjectEffect` 005ea8b0, `cObjectFind` 005f33d0, `cObjectHP` 005d9630, `cObjectLocate` 005d9ef0, `cObjectLocateDirection` 005e4d80, `cObjectSound` 005ea6f0, `cObjectType` 005f04b0, `cPermileRate` 005da8b0, `cPlayerExist` 005d8aa0, `cRandom` 005ed640, `cRandomInt` 005eed70 |
-| part 12 (messages, dialogs, effects) | 36 | `cCameraMove` 005dbe30, `cCameraMove_Obj` 005e7920, `cDelDirectionalArrow` 005e89d0, `cDirectionalArrow` 005e8810, `cEffectMsg` 005e4540, `cEffectMsg_AllInMap` 005e4670, `cEffectTimer` 005e6bb0, `cEmoticon` 005e3e60, `cEmotion` 005e3e60, `cEndCinematicText` 005eeb30, `cMapFog` 005e6260, `cMessage` 005ef8f0, `cMobDialog` 005db690, `cMobDialog_FileName` 005e4a00, `cMobDialog_Obj` 005db860, `cMobDialog_Range` 005dbaa0, `cMobDialog_String` 005ece70, `cNPCChat` 005efaa0, `cNPCChatTest` 005db4b0, `cNPCMenuOpen` 005dcf50, `cNotice` 005e15b0, `cNoticeRedWarningCode` 005e5ff0, `cNoticeString` 005e16e0, `cNotice_Obj` 005e8e50, `cPlaySound` 005e4410, `cScriptMessage` 005dcbe0, `cScriptMessage_Obj` 005dcd80, `cScriptMessage_Range` 005f27e0, `cScriptMsg` 005ebb40, `cScriptMsg_World` 005eb970, `cShowCinematicText` 005eec40, `cSimpleChatScriptMsg` 005ea530, `cSomebodyShout` 005e5150, `cStartMsg_AllInMap` 005e3af0, `cSystemMessage_Obj` 005e6890, `cTopView` 005e6600 |
+| §19 (part 12: messages, dialogs, effects) | 36 | `cCameraMove` 005dbe30, `cCameraMove_Obj` 005e7920, `cDelDirectionalArrow` 005e89d0, `cDirectionalArrow` 005e8810, `cEffectMsg` 005e4540, `cEffectMsg_AllInMap` 005e4670, `cEffectTimer` 005e6bb0, `cEmoticon` 005e3e60, `cEmotion` 005e3e60, `cEndCinematicText` 005eeb30, `cMapFog` 005e6260, `cMessage` 005ef8f0, `cMobDialog` 005db690, `cMobDialog_FileName` 005e4a00, `cMobDialog_Obj` 005db860, `cMobDialog_Range` 005dbaa0, `cMobDialog_String` 005ece70, `cNPCChat` 005efaa0, `cNPCChatTest` 005db4b0, `cNPCMenuOpen` 005dcf50, `cNotice` 005e15b0, `cNoticeRedWarningCode` 005e5ff0, `cNoticeString` 005e16e0, `cNotice_Obj` 005e8e50, `cPlaySound` 005e4410, `cScriptMessage` 005dcbe0, `cScriptMessage_Obj` 005dcd80, `cScriptMessage_Range` 005f27e0, `cScriptMsg` 005ebb40, `cScriptMsg_World` 005eb970, `cShowCinematicText` 005eec40, `cSimpleChatScriptMsg` 005ea530, `cSomebodyShout` 005e5150, `cStartMsg_AllInMap` 005e3af0, `cSystemMessage_Obj` 005e6890, `cTopView` 005e6600 |
 | part 13 (rest) | 0 |  |
 | Z13 (pets) | 8 | `cPet_ChangeMind` 005ea1d0, `cPet_GetActionRecord` 005e9d00, `cPet_GetMind` 005e9520, `cPet_GetRunSpeed` 005e9b10, `cPet_GetStress` 005e9720, `cPet_GetWalkSpeed` 005e9920, `cPet_SaveTendency` 005ea410, `cPet_Unsummon` 005d65a0 |
 | Z14 (instance dungeons, scores) | 8 | `cScoreBoard` 005ed860, `cScoreBoard_AllInMap` 005edad0, `cScoreInfo` 005e3790, `cScoreInfo_AllInMap` 005e3970, `cScoreResultList` 005ec6a0, `cScoreTopList` 005ec1f0, `cSendRankingList` 005eaee0, `cWinter_Event_ScoreBoard_AllInMap` 005edcf0 |
@@ -5317,7 +5317,8 @@ RestoreRateAction::exe ("RestoreRate")           @ FUN_005c15f0
 NoticeAction::exe ("Notice")                     @ FUN_005c1700
     player.so_ply_Notice(content_)   (vt 0x784 FUN_005977e0):
         0x2011 NC_ACT_NOTICE_CMD { u8 unk (never written: (original bug) Z09-B54), u8 len = strlen & 0xFF, char text[len] }
-        # the client accepts 0x2011 in every scene and ignores it (C01): the notice is never shown
+        # the 2016 game scene shows it as an announce line "[Notice] %s" (GameFrameWork::On_NC_ACT_NOTICE_CMD
+        #   FUN_004b5420, §19.3; corrected in part 12: C01 lists it as ignored, which holds only for the other scenes)
 CallLuaAction::exe ("CallLua")                   @ FUN_005c1720
     if me has an AI script and its "NPCAction" function name is not empty:
         me.so_AIScriptFuncExec(0x90, LuaArgumentNPCAction(map, me, player))   (vt 0xb68, §14.3: f(mapName, npc, player, charNo))
@@ -6097,3 +6098,298 @@ The two copies `cMapMark_Obj` / `cMapMark_FieldSight` know only the first ten ic
 - Every part-11 row of §14.9 is documented here. Part 12 starts with the message / dialog functions.
 - Several functions treat a missing object as a positive answer (`cIsObjectDead`, `cIsObjectAlreadyDead`: dead;
   `cIsNoAttacOrNoMove`: cannot act). Only `cIsMovable`'s case is contradictory (B67).
+
+## 19. Scripts 6: Lua functions for messages, dialogs and screen effects
+
+The 36 functions of the §14.9 row "part 12" (35 bodies: `cEmoticon` = `cEmotion`). Common rules as in §17 (1-based
+Lua slots, `GetObject`, "returns nothing" = 0 results, numbers rounded, usage = calls / files in the 2016
+`9Data/Shine/LuaScript` tree, `cLuaBroadcast`, map lookup `fc_FindMap` FUN_00466a60 + `fm_GetCenterObject`). Function
+names are *(pdb2016)*; FiestaHeroes' signatures *(fh-doc)* were compared (several are listed there without arguments:
+`cEffectTimer`, `cMobDialog_String`, `cSomebodyShout`, `cTopView`); the code is given.
+
+Helpers used below:
+
+- **Two send paths per player.** `vt 0x2f8` = `so_GetDataSocketStream` (player FUN_00559860 → `sp_SocketContainer.datastream`,
+  live from `so_FirstActionAfterSocketConnect` FUN_00554870 on), `vt 0x2fc` = `so_GetGameSocketStream` (FUN_00559870 →
+  `gamestream`, live only from `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 until `so_LinkTo` FUN_0049ad30 sets it back to
+  the dummy). Both lead to the same client connection; a packet sent on the game stream before the map login completes
+  or after a link-out is dropped. Non-players return `ShineObject::so_dummypacketcontainer` for both
+  (`ShineObject::so_GetDataSocketStream` FUN_00554fa0): a send to them does nothing. Below, "→ p (data)" / "→ p (game)".
+- **Script strings.** `set = KQScriptManager::operator[](&kqscriptmanager, fileName)` FUN_0064ce70 (null for an unknown
+  file), `ShineScript::ss_String(set, key)` FUN_0048ce60 ("" when the key is missing; §18.4). The texts live in the
+  script-string files of `cGetScriptString` (§18.4).
+- **Mob names.** `MobDataBox::mdb_2MobID(&mobdatabox, inxName)` FUN_00419080 (0xFFFF when unknown; the function then
+  sends nothing).
+- **`ScriptMsg.shn` (client).** Every "message index" below is a `SM_Inx` (32 bytes) of the client table `ScriptMsg.shn`
+  (columns `SM_ID`, `SM_Inx`, `SM_Msg` (512, may hold `%s`), `SM_Pos`, `R`, `G`, `B`, `SM_Size`, `SM_LifeTime` (ms)). The
+  server never reads this table. The client looks the index up with `ScriptMsgTab::GetScriptMsgInfo` FUN_00424d00 and
+  shows it with `ScriptMsgCtrl::AddMsg(info, text, handle)` FUN_00439cf0: text = the given text, or `SM_Msg` when none;
+  colour R/G/B; lifetime `SM_LifeTime / 1000` s (a default when 0); `SM_Pos` 0 = chat bubble over `handle`
+  (`OnChat`), 1 = announce, 2 = remain, 3 = autorun, 4 = face-cut message (`FaceCutMsg.shn` row by index), 5 = box
+  announce. An unknown index is ignored.
+- **Formatted script messages** (`0x6C15`, `0x2079`, `0x207D`): the script passes up to five strings (Lua slots after
+  the index; a missing or non-string slot gives length 0). The server writes `nlen[5]` = each string's length as a u8
+  and the five strings back to back, without separators or a terminating NUL. The client re-splits the content by
+  `nlen` and formats `SM_Msg` with them (`printf`-style `%s`).
+  # (original bug) Z09-B75: each length is stored as `strlen & 0xFF` and only that many bytes are copied: a string
+  #   of 256+ characters is cut to its length mod 256 (the text stays consistent, but is shortened)
+
+### 19.1 Script messages from `ScriptMsg.shn`
+
+```pseudo
+cScriptMessage(mapName, msgIndex, s1…s5)                      @ FUN_005dcbe0   (90 / 27)
+    map, its axial flag and msgIndex (string) must exist, else nothing
+    0x6C15 NC_SCENARIO_SCRIPTMESSAGE_CMD { char DialogIndex[32] = strncpy(msgIndex, 31); u8 nlen[5];
+        char sContent[Σ nlen] }   (payload 0x25 + Σ nlen)
+    to every object of the map (AxialListPacketBroadcast + so_AllInMap; players only receive)
+    returns nothing
+    # (original bug) Z09-B73: strncpy(…, 31) never writes DialogIndex[31]: an index of 31+ characters keeps the byte
+    #   the shared send buffer held there (the client's lookup fails unless it happens to be 0)
+cScriptMessage_Obj(handle, msgIndex, s1…s5)                   @ FUN_005dcd80   (11 / 5)
+    o = GetObject(handle), kind 2 (player), msgIndex a string, else nothing
+    same packet → o (game); pp_SetPacketLen refuses (assert "cScriptMessage_Obj : Packet Too Long") → nothing
+    returns nothing
+cScriptMessage_Range(handle, range, msgIndex, s1…s5)          @ FUN_005f27e0   (1 / 1)
+    o = GetObject(handle); range ≠ 0 and msgIndex a string, else nothing
+    players = AxialListNearObjectList(kind 2) over so_AllOfRange(o, o.pos, range, include self 0)
+        (§18: kind 2, mode ≠ 3: dead players are skipped; the list getter is a folded body named
+         RollBackPosCallBackEvent::GetLinkData)
+    same packet → each listed player (game)       (strings from slot 4 on)
+    returns nothing
+
+cScriptMsg(target, speaker, msgIndex, s1…s5)                  @ FUN_005ebb40   (70 / 11)
+    slot 1 nil → nothing; speaker = slot 2 as a number, 0xFFFF when nil; msgIndex (slot 3) must be a string
+    0x2079 NC_ACT_SCRIPT_MSG_CMD { u16 nHandle = speaker; char sScriptMsgIndex[32] = 32 bytes copied from msgIndex;
+        u8 nlen[5]; char sContent[Σ nlen] }   (payload 0x27 + Σ nlen)
+    # (original bug) Z09-B72: the 32 bytes are copied whatever the string's length (same pattern as B64): bytes after
+    #   a short index's NUL are whatever follows the Lua string; an index of 32+ characters arrives unterminated
+    target is a number (lua_type 3): p = GetObject(target), ≠ 0xFFFF, kind 2, not leaving (so_IsEmpty) → p (game)
+    target is a string (lua_type 4): a map name; map and axial flag must exist
+        speaker given and found: to the players in sight of the speaker (so_AllOfRange(flag, speaker.pos, range 0 =
+            map sight, include self 0), AxialListPacketBroadcast)
+        else: to the whole map
+    any other type: nothing; returns nothing
+cScriptMsg_World(speaker, msgIndex, s1…s5)                    @ FUN_005eb970   (4 / 1)
+    speaker = slot 1 (0xFFFF when nil); msgIndex (slot 2) a string
+    0x207D NC_ACT_SCRIPT_MSG_WORLD_CMD (same layout as 0x2079, same 32-byte copy, B72) → World Manager
+        (sock2wldman); the WM re-sends it as 0x2079 to every player of the world (W04 §2.4)
+    returns nothing
+cSimpleChatScriptMsg(handle, msgIndex)                        @ FUN_005ea530   (1 / 1)
+    slot 1 a number and slot 2 a string (lua_type 3 / 4), o = GetObject(handle), else nothing
+    0x2079 { nHandle = handle; sScriptMsgIndex = 32 bytes (B72); nlen = 0 × 5 }  (payload 0x27)
+    cLuaBroadcast(o, 0xFFFF): sight of o incl. o; returns 1 when sent
+cMessage(handle, msgIndex [, toHandle])                       @ FUN_005ef8f0   (1 / 1)
+    o = GetObject(handle), msgIndex a string; toHandle = slot 3 if a number, else 0xFFFF
+    0x6C12 NC_SCENARIO_MESSAGE_CMD { char DialogIndex[17] = strncpy(msgIndex, 16) }   (17 bytes)
+    # (original bug) Z09-B73: DialogIndex[16] is never written (stale buffer byte for 16+ character indexes)
+    cLuaBroadcast(o, toHandle); returns 1 when sent
+cNPCChat(handle, msgIndex [, toHandle])                       @ FUN_005efaa0   (3 / 2)
+    o = GetObject(handle), msgIndex a string; toHandle = slot 3 if a number, else 0xFFFF
+    0x6C11 NC_SCENARIO_NPCCHAT_CMD { char DialogIndex[33] = strncpy(msgIndex, 32); u16 NPCHandle = handle }  (35 bytes)
+    # (original bug) Z09-B73: DialogIndex[32] is never written
+    cLuaBroadcast(o, toHandle); returns 1 when sent
+```
+
+Client (`GameFrameWork`, 2016): `On_NC_SCENARIO_SCRIPTMESSAGE_CMD` FUN_004bbd60 → `AddMsg(info, formatted, 0xFFFF)`
+(no speaker); it reads `sContent` up to the next NUL (the server sends none, so stale bytes after the packet are read,
+then cut by `nlen`) and formats with `info.SM_Msg` **without checking that the index exists**: a non-empty content with
+an unknown index crashes the client (client bug). `On_NC_ACT_SCRIPT_MSG_CMD` FUN_004bc020: same, checks the index, uses
+`nHandle` as the speaker (chat bubble for `SM_Pos` 0). `On_NC_SCENARIO_MESSAGE_CMD` FUN_004b6f60: `AddMsg(info, —,
+0xFFFF)` (plain `SM_Msg`). `On_NC_SCENARIO_NPCCHAT_CMD` FUN_004bb040: `AddMsg(info, —, NPCHandle)`, and when the NPC is
+known to the client, a speech balloon (character vt 0x54) and a chat line `"[%s] : %s"` (name, `SM_Msg`); unknown
+handle: debug message "SCENARIO_NPCCHAT_CMD Error. There's no NpcHandle".
+
+### 19.2 Dialog windows and face cuts
+
+```pseudo
+cMobDialog(mapName, mobInxName, scriptFile, key)              @ FUN_005db690   (157 / 54)
+    map + axial flag, mobId = mdb_2MobID(mobInxName) ≠ 0xFFFF, set = scriptFile, text = ss_String(set, key);
+    strlen(text) < 256, else nothing
+    0x6C0C NC_SCENARIO_CHATWIN_CMD { u16 mob = mobId; u8 len; char content[len] }  (no NUL)
+    to the whole map; returns nothing
+cMobDialog_Obj(handle, mobInxName, scriptFile, key)           @ FUN_005db860   (6 / 3)
+    o = GetObject(handle): not leaving, kind 2, on a map with an axial flag; same checks and packet → o (data)
+cMobDialog_Range(handle, mobInxName, range, scriptFile, key)  @ FUN_005dbaa0   (2 / 1)
+    o = GetObject(handle) (any kind), not so_IsEmpty (a dead mob refuses); same checks and packet
+    → so_AllOfRange(o, o.pos, range (0 = map sight), include self 0) with AxialListPacketBroadcast
+    (its log name string is "cMobDialog_Obj", copied)
+cMobDialog_String(mapName, mobInxName, text)                  @ FUN_005ece70   (0 / 0)
+    as cMobDialog with a literal text; strlen(text) < 255 (one less than the others)
+cMobDialog_FileName(mapName, faceCut, scriptFile, key)        @ FUN_005e4a00   (1 / 1)
+    map + flag, set, text < 256 as above
+    0x6C19 NC_SCENARIO_DIALOG_CMD { char sFacecutIndex[33] = faceCut (zeroed, strncpy 32: always terminated);
+        u8 nLen; char sContents[nLen] }
+    to the whole map; returns nothing
+```
+
+Client: `On_NC_SCENARIO_CHATWIN_CMD` FUN_0049b0c0 opens the NPC script dialog of mob `mob` with the text
+(`NpcDialogWin::OpenNpcScriptDialog` FUN_005f6820, the mob's own face cut) and shows the window;
+`On_NC_SCENARIO_DIALOG_CMD` FUN_0049d6a0 does the same with the image `game\NPCFaceCut\<sFacecutIndex>.png` / `.tga`
+(FUN_005f6980). Both copy at most `len` bytes into a zeroed 2 KB buffer.
+
+### 19.3 Notices, system messages, NPC chat and shouts
+
+```pseudo
+cNotice(mapName, scriptFile, key)                             @ FUN_005e15b0   (88 / 37)
+    map + flag, set and key must exist; text = ss_String(set, key)
+    so_AllInMap(flag, AxialListWall(text))          AxialListWall ctor FUN_004281a0, ali_Work FUN_004281c0:
+        every object: vt 0x784 so_ply_Notice(text) (players only; folded no-op for the rest)
+        → 0x2011 NC_ACT_NOTICE_CMD to each player (game), layout §16.5
+    returns nothing
+cNoticeString(mapName, text)                                  @ FUN_005e16e0   (5 / 3)
+    as cNotice with slot 2 as the text, which is not checked
+    # (original bug) Z09-B70: a missing / non-string slot 2 gives so_ply_Notice a null text; its strcpy crashes the
+    #   zone as soon as the map holds a player
+cNotice_Obj(handle, scriptFile, key)                          @ FUN_005e8e50   (34 / 5)
+    o = GetObject(handle), not leaving, kind 2, set + key strings: o.so_ply_Notice(ss_String(set, key))
+cSystemMessage_Obj(handle, scriptFile, key)                   @ FUN_005e6890   (44 / 4)
+    o = GetObject(handle) (kind not checked), set and key; text = ss_String(set, key); strlen < 256
+    0x6C1B NC_SCENARIO_SYSTEM_MESSAGE_CMD { u8 nLen; char sMessage[nLen] } → o (data)   (non-players: dummy stream)
+cNoticeRedWarningCode(mapName, code)                          @ FUN_005e5ff0   (16 / 2)
+    strlen(slot 2) is taken before any check   # (original bug) Z09-B70: a nil slot 2 crashes the zone
+    code (≥ 2 characters) → value: "Started" 0x2020, "Remain1min" 0x2023, "Remain30sec" 0x2021,
+        "BeAwakened" 0x2022; any other string: return nothing
+    0x6C04 NC_SCENARIO_MESSAGENOTICE_CMD { u32 message = value } to the whole map (map + flag must exist)
+    returns true (a boolean, the only one in this section); else nothing
+cNPCChatTest(handle, text [, toHandle])                       @ FUN_005db4b0   (4 / 2)
+    o = GetObject(handle), text a string; toHandle = slot 3 if a number, else 0xFFFF
+    buf[256] (stack) = strcpy(text)    # (original bug) Z09-B69: no length check: a text of 256+ characters
+                                       #   overruns the stack buffer
+    o.so_Chat(toHandle, buf, strlen, chatwin = (toHandle ≠ 0xFFFF), links 0)   (vt 0x530, ShineMobileObject::so_Chat
+        FUN_00458c90, Z02 §3.1: 0x2002 NC_ACT_SOMEONECHAT_CMD to sight, or to toHandle only; len is a u8)
+    non-mobile objects: ShineObject::so_Chat no-op; returns nothing
+cSomebodyShout(mapName, mobInxName, scriptFile, key)          @ FUN_005e5150   (0 / 0)
+    map + flag, set, mobId ≠ 0xFFFF, text = ss_String(set, key), strlen < 256
+    0x201F NC_ACT_SOMEONESHOUT_CMD (layout §8.7): speaker.mobID = mobId, flag = (flag & ~1) | 2 (isMob, no GM
+        colour), len, content; size = len + 0x17 (correct, unlike B10)
+    # (original bug) Z09-B71: itemLinkDataCount (byte 0), speaker bytes 2…19 and flag bits 2…7 are never written; the
+    #   client reads itemLinkDataCount × 0x67 bytes of item links after the content, so a stale non-zero byte makes it
+    #   parse past the packet
+    to the whole map; returns 1 when so_AllInMap returns true
+```
+
+Client: **0x2011 is shown** by the game scene: `GameFrameWork::On_NC_ACT_NOTICE_CMD` FUN_004b5420 (2016 client) copies
+`len` bytes (`len` ≠ 0) into a 128-byte stack buffer, formats it with TextData `0x3830508A` "[Notice] %s" and adds the
+line to the announce and author message lists; the text "Admin level is 100" also sets a flag in the frame work. (A
+`len` over 127 overruns that client buffer: client bug; the zone sends up to 255.) This corrects §16.5 and the C01
+table, which list 0x2011 as ignored (only the non-game scenes ignore it). `On_NC_SCENARIO_SYSTEM_MESSAGE_CMD`
+FUN_004ba610 adds `sMessage` as a system message (`AddSysMsg`) when not empty; FiestaHeroes' "doesn't do anything" for
+`cSystemMessage_Obj` is wrong for the 2016 pair. `On_NC_SCENARIO_MESSAGENOTICE_CMD` FUN_004ae4a0 re-opens the guild-war
+inform window and sets its text from `TextData2`: 0x2020 "Experiment tube has been cracked!", 0x2023 "Experiment subject
+will be awakened in 1 minute!", 0x2021 "… in 30 seconds!", 0x2022 "Warning!  Experiment subject has been awakened!";
+another value leaves the window showing its old text. `On_NC_ACT_SOMEONESHOUT_CMD` FUN_004a0ec0 shows nothing for
+`len` 0 or > 128.
+
+### 19.4 Camera, top view, fog
+
+```pseudo
+cCameraMove(mapName, x, y, angleXZ, angleY, dist, moveType)   @ FUN_005dbe30   (153 / 15)
+    map + flag must exist; slots 2–7 read as numbers (moveType as an integer)
+    if moveType < 2 (signed):
+        field.fm_CameraState = moveType          # CS_NONE 0 / CS_MOVING 1 (FieldMap::CameraState)
+        0x6C14 NC_SCENARIO_CAMERA_MOVE_CMD { u8 MoveType; SHINE_XY_TYPE ViewCoord = (x, y); u16 AngleXZ = angleXZ;
+            u16 AngleY = angleY; u16 Dist = dist }   (15 bytes) to the whole map
+        flag.so_CameraMoveSendBriefInfo((x, y), dist)   vt 0xc24, ShineObject::so_CameraMoveSendBriefInfo FUN_00441e00:
+            AxialListCameraMove (ali_Work FUN_00441b90) collects every player of the map; alcm_SendBriefInfo
+            FUN_00441c50, per player: reset the brief-info batches, sight² as g_SightDistSq (unlimited while
+            fm_CameraState is CS_MOVING), so_AllOfRange(player, (x, y), dist, so_ExchageBriefInfo FUN_00441460),
+            send the batches (bixall_Send) and the player's own abstates (asl_SendAfterLogin)
+    returns nothing
+    # (original bug) Z09-B74: the "< 2" test is signed: a negative moveType is stored as the camera state (sight stays
+    #   normal, since only 1 counts) and sent as MoveType 0x80…0xFF, which the client ignores
+cCameraMove_Obj(handle, x, y, angleXZ, angleY, dist, moveType) @ FUN_005e7920  (4 / 1)
+    o = GetObject(handle), not leaving, kind 2; moveType < 2 (signed, B74): same 0x6C14 → o (game);
+    then o.so_ply_SendBriefInfo_MoveLayer() (vt 0xdd8 FUN_00441ed0, §9.6: sight exchange around the player)
+    the map camera state is not touched, so objects near a far camera point are not sent (inferred: the 2016 use
+    keeps the camera near the player)
+cTopView(handle, moveType, x, y, distance, angle)             @ FUN_005e6600   (6 / 3)
+    o = GetObject(handle) (any kind); sight² as g_SightDistSq for o (0 without map, unlimited with OSS_WIDE or a
+    moving camera)
+    if moveType == 1 and dist²(o, (x, y)) > sight² / 2: nothing
+    0x6C1A NC_SCENARIO_TOPVIEW_CMD { u8 nMoveType; SHINE_XY_TYPE CenterPos = (x, y); u16 nDistance = distance;
+        u16 nAngle = angle }   (13 bytes) → o (data)
+cMapFog(mapName, fog, depth)                                  @ FUN_005e6260   (1 / 1)
+    map + flag, slots 2 and 3 numbers: 0x6C0E NC_SCENARIO_FOG_CMD { u8 fog; u16 depth } to the whole map; returns 1
+    no server state: a player who enters the map later does not get it (its log name string is
+    "PineEventScriptNode::ShineMapFog::sa_Step", copied from the map-script node)
+```
+
+Client: `On_NC_SCENARIO_CAMERA_MOVE_CMD` FUN_004a5df0 (only with its `CameraEffect` object): MoveType 0 → camera back
+to the player (effect mode 4); 1 → ground point of `ViewCoord`, `CameraEffect::SetAngle(AngleXZ, AngleY)`, distance
+`Dist`, mode 3; other values ignored. `On_NC_SCENARIO_TOPVIEW_CMD` FUN_004a6bf0: 0 → camera back and top-view flag
+(GameFrameWork+0x13e0) cleared; 1 → ground point `CenterPos`, angle `nAngle` with a fixed pitch, distance `nDistance`,
+flag set. `On_NC_SCENARIO_FOG_CMD` FUN_004a35b0: stores `depth` and sets `World::SetFogDepth(fog / constant)` (0 = off).
+2016 use: `cCameraMove` in instance dungeons (War*, AdlF), the class-change gamble and kingdom quests (gate openings, then `cCameraMove(map, 0, 0, 0, 0, 0,
+0)` to reset); `cTopView` and `cEffectTimer` in the Oluming / Xiaoming mini games.
+
+### 19.5 Screen effects, timers, sounds, emotions, NPC menu
+
+```pseudo
+cEffectMsg(handle, type)                                      @ FUN_005e4540   (18 / 12)
+    o = GetObject(handle), not leaving; type < 15: o.so_ply_EffectMsg(type) (vt 0xd88, players only)
+    ShinePlayer::so_ply_EffectMsg FUN_00560fc0: type < 15 → 0x2077 NC_ACT_EFFECT_MESSAGE_CMD { u32 nEffectEnum } → p (game)
+cEffectMsg_AllInMap(mapName, type)                            @ FUN_005e4670   (6 / 4)
+    map + flag, type < 15: 0x2077 to the whole map
+    type = EFFECT_MSG_TYPE (fh-doc): 0 WIN, 1 LOSE, 2 DRAW, 3 START, 4 COUNT_8_SEC, 5 SUCCESS, 6 FAIL,
+        7 START_OLYMPIC, 8 GOAL_OLYMPIC, 9 SOCCER_WIN, 10 SOCCER_LOSE, 11 SOCCER_DRAW, 12 SOCCER_KICK_OFF,
+        13 SOCCER_GOAL, 14 WATER_START (15 values; the client's EffectMsg has 15 slots (pdb2017))
+cEffectTimer(handle, function, seconds)                       @ FUN_005e6bb0   (6 / 3)
+    o = GetObject(handle) (any kind); function = integer < 2 (signed, B74)
+    0x6C1D NC_SCENARIO_EFFECT_TIMER_CMD { u8 nTimerFunction (EFFECT_TIMER_FUNC (pdb2017): 0 ETF_TIMER, 1 ETF_REMOVE);
+        u16 nSecond } → o (data); returns nothing
+cStartMsg_AllInMap(mapName)                                   @ FUN_005e3af0   (2 / 2)
+    map + flag: 0x74E0 NC_GUILD_TOURNAMENT_STARTMSG_CMD { s32 nStartBeforeTime = 5 } to the whole map
+cDirectionalArrow(handle, x, y)                               @ FUN_005e8810   (1 / 1)
+    o = GetObject(handle), not leaving, kind 2:
+    0x6C1E NC_SCENARIO_DIRECTIONAL_ARROW_CMD { SHINE_XY_TYPE DirectionalPos = (x, y) } → o (data)
+cDelDirectionalArrow(handle)                                  @ FUN_005e89d0   (3 / 2)
+    same checks: 0x6C1F NC_SCENARIO_DEL_DIRECTIONAL_ARROW_CMD {} → o (data)
+cPlaySound(handle, soundName)                                 @ FUN_005e4410   (3 / 2)
+    o: not leaving, kind 2; name a string: o.so_ply_PlaySound(name) (vt 0xd7c)
+    ShinePlayer::so_ply_PlaySound FUN_00561130: len = strlen (u16); len ≤ 256:
+        0x2078 NC_ACT_PLAY_SOUND_CMD { u16 FileNameLen; char FileName[len] (no NUL) } → p (game); longer: nothing
+cShowCinematicText(handle, text)                              @ FUN_005eec40   (0 / 0)
+    o: not leaving, kind 2; text a string: o.so_ply_ShowCinematicText(text) (vt 0xd80)
+    ShinePlayer::so_ply_ShowCinematicText FUN_00561090: len ≤ 256 → 0x2082 NC_ACT_SHOW_CINEMATIC { u16 len;
+        char text[len] } → p (game)   (no struct in either PDB)
+cEndCinematicText(handle)                                     @ FUN_005eeb30   (0 / 0)
+    o: not leaving, kind 2: vt 0xd84 ShinePlayer::so_ply_EndCinematicText FUN_00561030 → 0x2083 NC_ACT_END_CINEMATIC {}
+cEmotion(handle, actionIndex) = cEmoticon                     @ FUN_005e3e60   (6 / 4 and 1 / 1)
+    p = GetObject(handle) as a player (vt 0xbbc), not leaving; id = u8(actionIndex)
+    if some ActionViewInfo row (gActionViewInfo, the server's ActionViewInfo.shn) has nIndex == id:
+        p.sp_DoEmotion(handle, id)   (vt 0xa40 FUN_00458860, Z02 §4: mode 1/2/6 only, 0x2021 to sight, brief
+            emoticon, observer EV_EMOTION, pet dance)
+    unlike the client request 0x2020 NC_ACT_EMOTICON_CMD (Z02 §4) the charged-emote check (eActionType 2) is skipped
+    returns nothing
+cNPCMenuOpen(npcHandle, playerHandle)                         @ FUN_005dcf50   (9 / 9)
+    both slots non-nil, both objects exist, npc.vt 0x708 (mob ID) ≠ 0xFFFF, else nothing
+    player.so_ply_SendMenuOpenReq(npc)   (vt 0xc2c; non-players: folded no-op)
+        ShinePlayer::so_ply_SendMenuOpenReq FUN_00560a40: sp_EndOfTrade(p, 1) (FUN_004c25b0, Z02 §6.4);
+        sp_NPCProcess.npchandle = npc.handle; .npcid = npc mob ID
+        0x201C NC_ACT_NPCMENUOPEN_REQ { u16 mobid } → p (game)       (Z02 §6.2; client opens that NPC's dialog)
+    returns 1 (also when the second object is not a player)
+```
+
+`cNPCMenuOpen` sets no role entry (`sp_NPCProcess.npc`) and no range check, unlike `InteractWithNPC` (Z02 §6.2), so a
+`0x201D` answer is dropped ("not during npc process"); the menu answer reaches the script through `0x2073` (which uses
+`npchandle`) and the NPC's `NPCMenu` event (§14.3) *(inferred from the 2016 use: class-change master and mini-game
+NPCs open their menu from their `NPCClick` function)*.
+
+Client: `On_NC_ACT_EFFECT_MESSAGE_CMD` FUN_0049d890 → `EffectMsg::Play(nEffectEnum)` (a full-screen animated word
+with its sound). `On_NC_SCENARIO_EFFECT_TIMER_CMD` FUN_0049d8f0: 0 → `PuzzleTimeWin::ResetTime(nSecond)`, the window is
+shown only while the top-view flag of 0x6C1A is set; 1 → window closed. `GuildTask::Recv_NC_GUILD_TOURNAMENT_STARTMSG_CMD`
+FUN_006b38b0: only `nStartBeforeTime == 5` starts the full-screen count-down effect and its sound (the same packet as
+the guild-tournament start). `On_NC_SCENARIO_DIRECTIONAL_ARROW_CMD` FUN_004bc2f0 places the look-at effects
+"MarketSearchMe1/2/3" at the ground point (client effect key 1; an existing arrow is moved); 0x6C1F →
+`EffectMgr::RemoveClientEff` FUN_0068d420 (key 1 *(inferred)*). `On_NC_ACT_PLAY_SOUND_CMD` FUN_004ba560 plays the named
+file through `SoundMgr::PlayInterfaceSound` when not empty. `On_NC_ACT_SHOW_CINEMATIC` FUN_004ba400 starts the
+letter-box `TextScreenEffect` with the text; `On_NC_ACT_END_CINEMATIC` FUN_004a6980 stops it. Layouts of all packets of
+this section: `docs/protocol/annotations/Z09.json`.
+
+### 19.6 Answers and open points
+
+- Every part-12 row of §14.9 is documented here. 2016 scripts never call `cMobDialog_String`, `cSomebodyShout`,
+  `cShowCinematicText`, `cEndCinematicText`.
+- §16.5 / C01: 0x2011 is shown by the 2016 game scene (§19.3); corrected in §16.5 and the annotation.
+- Open: which `TextData` / sound a `cEffectMsg` type plays (client `EffectMsg` table, C-side); whether a 2016 client
+  dialog opened by `cNPCMenuOpen` answers with 0x2073 or 0x201D (client NPC dialog code, C01).
