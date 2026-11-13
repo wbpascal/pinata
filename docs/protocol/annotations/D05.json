@@ -4518,7 +4518,7 @@
       "tGameLog.nMapY"
      ]
     ],
-    "notes": "payload 0x1c; procedure p_GameLog_Add_Type7, nType = cmd (910-912); struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+    "notes": "payload 0x1c; procedure p_GameLog_Add_Type7, nType = cmd (910-912); struct zeroed first; pdb2017 field names, offsets checked in the 2016 code; zone sender AxialListMobKillLog_ali_Work FUN_00429590 via FUN_00556d70 (mob's first combat), one packet per player in the map"
    },
    "0x078f": {
     "dir": "Zone/WM/Character\u2192GameLog",
@@ -4568,7 +4568,7 @@
       "tGameLog.nMapY"
      ]
     ],
-    "notes": "payload 0x1c; procedure p_GameLog_Add_Type7, nType = cmd (910-912); struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+    "notes": "payload 0x1c; procedure p_GameLog_Add_Type7, nType = cmd (910-912); struct zeroed first; pdb2017 field names, offsets checked in the 2016 code; zone sender AxialListMobKillLog_ali_Work FUN_00429590 via ShineMob_so_KilledBy FUN_00432760, one packet per player in the map"
    },
    "0x0790": {
     "dir": "Zone/WM/Character\u2192GameLog",

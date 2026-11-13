@@ -1,4 +1,7 @@
 {
+  "FUN_00428340": "AxialListMobKillLog_ctor",
+  "FUN_00428480": "AxialListIterator_dtor",
+  "FUN_00429590": "AxialListMobKillLog_ali_Work",
   "FUN_005a25a0": "WeddingHall_wh_Start",
   "FUN_006144a0": "Send_NC_LOG_GAME_DATA_TYPE_4",
   "FUN_006145c0": "Send_NC_LOG_GAME_DATA_TYPE_5",

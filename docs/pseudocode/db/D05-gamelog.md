@@ -129,13 +129,16 @@ Every CParserGameLog handler of this part has the same shape:
 
 ```pseudo
 fc_NC_LOG_GAME_<X>(parser, pkt):                        # pkt = u16 opcode + payload; p = pkt + 2
-    if !Parser_CheckAlive(parser, pkt): return          @ FUN_00408a60
+    if !Parser_CheckAlive(parser, pkt): return 0        @ FUN_00408a60
         # session +0xdc == 0 (link not authenticated): log "…dep=%d, cmd=%d" and drop the packet (D01 §1.1)
+        # CheckAlive returns 0 (xor eax,eax @ 0x408abe), the handler passes it on: CParser_Dispatch (§7.2) sets work = 3 and
+        # drops the remaining frames of the job; SessionWorker_Run logs nothing because the session state is 0
     st = {}                                             # stack struct of the procedure (§1.2); a few handlers memset it first
     st.nType = opcode & 0x3FF                           # the command number; item handlers use a constant instead (§2.3)
     st.<column> = p.<field> …                           # straight copies, u8/u16 zero-extended; no other logic
     st.sMap = _mbsnbcpy(p.MapName, 12)                  # MAPPOS map name → 16-byte buffer
     SQL_<proc>(parser.worker.db(+0x124c), &st)          # §1.2; result ignored
+    return 1                                            # every log and SYSLOG handler (mov eax,1 e.g. @ 0x403540)
 ```
 
 - **No length check.** The handler never looks at the packet length; a shorter packet fills columns with whatever the receive
@@ -246,7 +249,7 @@ and the zone functions that use the GameLog session pool `0x14d43958`), with the
 | `0x0451` | NC_LOG_GAME_ITEM_STORE_OUT | `FUN_00404b30` | p_GameLog_Add_Type9 | 520 (0x208) | std; nItemKey ← itemkey u64 @0x18; nInt1 ← iteminvenfrom ITEM_INVEN @0x20; nInt2 ← iteminvento ITEM_INVEN @0x22 | none found | nType = …_STORE_OUT_INVEN_EXT (pdb2017) |
 | `0x0452` | NC_LOG_GAME_ITEM_UPGRADE | `FUN_00404bf0` | p_GameLog_Add | 82 | nCharNo, sMap, nMapX, nMapY as std; nItemKey ← itemkey u64 @0x18; then the GameLog view (D05-B2, see below): nMapZ ← u16 @0x20; nInt1 ← u8 @0x22; nInt2 ← u8 @0x23; nInt3 ← u16 @0x24; nTargetID ← u16 @0x26; nTargetCharNo ← u16 @0x28; nBigint1 ← u8 @0x2a (low dword) + u16 @0x2b (high dword) | zone FUN_0053b900, FUN_0053bd20, FUN_0053c0f0 (Z05 §8.1) | reads a 0x2D-byte layout; zone sends 0x2B (D05-B2) |
 | `0x0453` | NC_LOG_GAME_ITEM_PRODUCT | `FUN_004052c0` | p_GameLog_Add | 83 | nCharNo ← chrregnum u32 @0x0; nItemKey ← itemkey u64 @0x4; nTargetID ← itemid u16 @0xc; nInt1 ← itemlot_inc u16 @0xe; nInt2 ← itemlot_before u16 @0x10; nInt3 ← itemlot_last u16 @0x12; sMap = ""; nMapX = 0; nMapY = 0; nMapZ = 0; nTargetCharNo = 0; nBigint1 = 0 | character FUN_00419c00 (D03 §6.6) | struct zeroed first |
-| `0x0454` | NC_LOG_GAME_ITEM_TITLE | `FUN_00404ce0` | p_GameLog_Add_TypeG | 84 | nCharNo ← chrregnum u32 @0x0; nItemKey ← WeaponItemKey u64 @0x4; nBigint1 ← LicenseItemKey u64 @0xc; nInt1 ← LicenseMobID u16 @0x14; nTargetID ← (2016 only) u16 @0x16 u16 @0x16; nInt2 ← (2016 only) u16 @0x18 u16 @0x18; sMap = ""; nMapX = 0; nMapY = 0; nMapZ = 0 | character FUN_00412790 (D04 §4.1; 0x1A bytes, D04-B9) | struct zeroed first |
+| `0x0454` | NC_LOG_GAME_ITEM_TITLE | `FUN_00404ce0` | p_GameLog_Add_TypeG | 84 | nCharNo ← chrregnum u32 @0x0; nItemKey ← WeaponItemKey u64 @0x4; nBigint1 ← LicenseItemKey u64 @0xc; nInt1 ← LicenseMobID u16 @0x14; nTargetID ← (2016 only) u16 @0x16; nInt2 ← (2016 only) u16 @0x18; sMap = ""; nMapX = 0; nMapY = 0; nMapZ = 0 | character FUN_00412790 (D04 §4.1; 0x1A bytes, D04-B9) | struct zeroed first |
 
 Notes on single rows:
 
@@ -271,7 +274,8 @@ Notes on single rows:
 ### 2.4 Commands no 2016 server sends
 
 No 2016 Zone, WM, Character or Login function builds these packets (searched: `layouts.json` send sites of all four binaries,
-and every zone function that references the GameLog session pool `0x14d43958`). Their handlers are live but unreachable from
+every zone function that references the GameLog session pool `0x14d43958`, including the one that builds its opcode at run
+time, `AxialListMobKillLog_ali_Work` FUN_00429590 (§4.2, 0x078E/0x078F only)). Their handlers are live but unreachable from
 the 2016 servers *(inferred: a send built through an unrecognised path would be missed)*:
 
 0x0401, 0x0402 (so 0x0403 is never sent), 0x0414 HIT, 0x0415 MOVE, 0x0419 PRISON, 0x041A PRISON_RELEASE, 0x041F LEVEL_DOWN,
@@ -371,16 +375,17 @@ equals the size the handler reads (and the 2017 PDB struct size), so no part-2 r
 - **0x04A3 GUILD_M_GRADE** writes `nType = 0xA3` as a constant instead of `opcode & 0x3FF` (same value).
 - **0x0554 ITEM_PUT_ON_BELONGED** writes `nType = 521` (`0x209`), the 2017 `NC_LOG_GAME_ITEM_PUT_ON_BELONGED_EXT` *(pdb2017)*,
   continuing the 510–520 item numbers of §2.3. Two senders: the Character server's item-belong path (D03 §3.1) and the zone's
-  `ShinePlayer_sp_HorseItemSave` (`zone FUN_0045e810`, called e.g. after mount feeding, Z02 §9.1): when the mount item in the
+  `ShinePlayer_sp_HorseItemSave` (`zone FUN_0045e810`, called e.g. after mount feeding, Z02 §9.1; owned by Z13, whose plan lists `sp_HorseItemSave`): when the mount item in the
   ride slot has a belong type listed in `g_BelongType`, the zone marks the item bound (`item +0x12 = 1`) and logs
   `{ charNo, itemkey, iteminvenfrom = iteminvento = ride slot | 0x2400 }` (inventory type 9) before saving the item attributes.
 - **0x05EA REGENLOCATESAVE_CMD**: the zone (`ShinePlayer_so_ply_ToNormalLoc`, Z01 §7.4) logs a forced relocation:
   `SaveMap/SaveLocate` → `sMap/nMapX/nMapY`, `KQHandle → nInt2`, `InvalidLocate.x → nMapZ`, `InvalidLocate.y → nInt1`,
   `Flag → nInt3`. The map name is copied as three dwords with a zero 13th byte (struct zeroed first).
 - **0x0612 ITEM_CW_BREAKATZERO**: zone `ShinePlayer_smo_ply_CostumWeaponChargeDecrease` (`FUN_00520840`) and its shield twin
-  `FUN_00520aa0` (charges are Z06's): when the costume item's charge counter reaches 0 the zone deletes the item from equip
+  `FUN_00520aa0` (charges are Z17's: Z17 plan "Costume weapon/shield charges"; Z06 handed them over): when the costume item's charge counter reaches 0 the zone deletes the item from equip
   slot 13 (or 11), then logs `{ charNo, itemkey, mappos = current map + x/y }`. nType 530 = cmd.
-- **Wedding hall** (zone, Z08 owns the wedding flow): 0x065D from the reservation handler (Z02 §10), 0x065E from
+- **Wedding hall** (zone; the hall and its timetable are Z07's open wedding question, Z07 plan line 13; the 0x2055 handler is in
+  Z01's scope table): 0x065D from the reservation handler (Z02 §10), 0x065E from
   `WeddingHall_wh_Start` (`zone FUN_005a25a0`, our name from its log text "WeddingHall::wh_Start"; logged after the film
   starts, with the two partner numbers), 0x065F from `wh_Cancel`, which the compiler inlined into
   `ZoneListenSession_zls_NC_ACT_WEDDING_COUPLE_ENTRANCE_RNG` (`zone FUN_005a2b60`): sent when the couple-entrance answer
@@ -407,7 +412,8 @@ all but SET_MASTER).
 
 Same skeleton as §1.3 (CheckAlive, copy, one procedure; no length check, D05-B1). 33 registrations, 26 handler functions.
 Columns, `std` (MAPPOS → `sMap`, `nMapX`, `nMapY`, `nMapZ = 0`) and the sender column as in §2.3. Every
-handler here except 0x075A zeroes its struct first, so columns not named stay 0 / `""`.
+handler here except 0x075A, DATA_TYPE_5 `FUN_00402420` and DATA_TYPE_D `FUN_004029f0` zeroes its struct first, so columns not
+named stay 0 / `""` (the last two write every field, so nothing stale reaches the row).
 
 ### 4.1 Guild academy rewards, MK2, mover, item money, random options
 
@@ -416,9 +422,9 @@ handler here except 0x075A zeroes its struct first, so columns not named stay 0 
 | `0x075A` | NC_LOG_GUILD_ACADEMY_SET_REWARD_MONEY | `FUN_00406800` | p_GameLog_Add_TypeD | 858 | nInt1 ← nGuildNo u32 @0x0; nCharNo ← nCharNo u32 @0x4; nInt2 ← nLevel u8 @0x8; nItemKey ← nMoney u64 @0x9 | none found | struct not zeroed, but every TypeD column is written |
 | `0x075B` | NC_LOG_GUILD_ACADEMY_SET_REWARD_ITEM | `FUN_004068b0` | p_GameLog_Add_TypeA | 859 | nInt1 ← nGuildNo u32 @0x0; nCharNo ← nCharNo u32 @0x4; nInt2 ← nLevel u8 @0x8; nInt3 ← nItemID u16 @0x9; nTargetID ← nItemLot u16 @0xb | none found | the lot goes to `nTargetID`, where other rows keep the item id (§9) |
 | `0x075C` | NC_LOG_GUILD_ACADEMY_CLEAR_REWARD_MONEY | `FUN_00406950` | p_GameLog_Add_TypeA | **0** | nothing: zeroed struct, no field read | none found | (original bug) D05-B8: an all-zero row |
-| `0x078E` | NC_LOG_GAME_MK2_START | `FUN_00406aa0` | p_GameLog_Add_Type7 | 910 | nCharNo ← chrregnum u32 @0x0; nInt1 ← nLevel u8 @0x4; nInt2 ← nClass u8 @0x5; nTargetCharNo ← mobid u16 @0x6; sMap/nMapX/nMapY ← mappos @0x8 | none found | one handler for 910–912 |
-| `0x078F` | NC_LOG_GAME_MK2_SUCCESS | `FUN_00406aa0` | p_GameLog_Add_Type7 | 911 | as 0x078E | none found |  |
-| `0x0790` | NC_LOG_GAME_MK2_FAIL | `FUN_00406aa0` | p_GameLog_Add_Type7 | 912 | as 0x078E | none found |  |
+| `0x078E` | NC_LOG_GAME_MK2_START | `FUN_00406aa0` | p_GameLog_Add_Type7 | 910 | nCharNo ← chrregnum u32 @0x0; nInt1 ← nLevel u8 @0x4; nInt2 ← nClass u8 @0x5; nTargetCharNo ← mobid u16 @0x6; sMap/nMapX/nMapY ← mappos @0x8 | zone `AxialListMobKillLog_ali_Work` FUN_00429590 from FUN_00556d70 (mob enters combat, vt 0x588; §4.2) | one handler for 910–912 |
+| `0x078F` | NC_LOG_GAME_MK2_SUCCESS | `FUN_00406aa0` | p_GameLog_Add_Type7 | 911 | as 0x078E | zone `AxialListMobKillLog_ali_Work` FUN_00429590 from `ShineMob_so_KilledBy` FUN_00432760 (§4.2) | one row per player in the map |
+| `0x0790` | NC_LOG_GAME_MK2_FAIL | `FUN_00406aa0` | p_GameLog_Add_Type7 | 912 | as 0x078E | none found (`FUN_00428340` has only the two callers above) |  |
 | `0x0791` | NC_LOG_GAME_MK2_DEAD | `FUN_00406b50` | p_GameLog_Add_TypeH | 913 | nTargetCharNo ← mobid u16 @0x0; sMap/nMapX/nMapY ← mappos @0x2; nCharNo ← nCharNo u32 @0x16 (killer) | zone `ShineMob_so_KilledBy` FUN_00432760 (Z03 §8.1) | killer 0 when not a player |
 | `0x0798` | NC_LOG_GAME_MK_DROP_ITEM | `FUN_00406c00` | p_GameLog_Add_TypeB | 920 | nTargetID ← nItemID u16 @0x0; nInt1 ← nLot u16 @0x2; nItemKey ← nItemKey u64 @0x4; nTargetCharNo ← mobid u16 @0xc; sMap/nMapX/nMapY ← mappos @0xe; nCharNo = 0 | zone `ShineDropItem_so_ItemDrop` FUN_0052a7a0 (Z05 §3.1) | §4.2 |
 | `0x079A` | NC_LOG_MOVER_UPGRADE | `FUN_004076d0` | p_GameLog_Add | 922 | nCharNo ← nCharNo u32 @0x0; nMapX ← nMain_FailCount u16 @0x4; nMapY ← nConsum_FailCount u16 @0x6; nTargetCharNo ← nMain_ID u16 @0x8; nTargetID ← nMain_Grade u8 @0xa; nItemKey ← nMain_Key u64 @0xb; nInt2 ← nConsum_ID u16 @0x13; nInt3 ← nConsum_Grade u8 @0x15; nBigint1 ← nConsum_Key u64 @0x16 | character `fc_NC_ITEMDB_MOVER_UPGRADE_REQ` FUN_00429e70 (D03 §6.3) | sMap `""`, nInt1 0; fail counters in the coordinate columns |
@@ -437,7 +443,30 @@ and MISC 0x0823 (§5). The 2017 PDB has structs for all five *(pdb2017)*; no 201
 - **0x0791 MK2_DEAD** (zone, Z03 §8.1): sent from `ShineMob_so_KilledBy` when the mob's data has a kill-log record
   (`MobData +0x20`, first u32 = the mob id; Z03 calls it the `MobKillLog` row) after the drop and the quest checks:
   `{ u16 mobId, MAPPOS (map name copied as three dwords, mob position), u32 killerCharNo }` (0x1A); the killer is the
-  `nCharNo` of the killer when it is a player (`vt 0x4d0` = 2), else 0. A map-wide notice follows (Z03).
+  `nCharNo` of the killer when it is a player (`vt 0x4d0` = 2), else 0. It is followed by one 0x078F MK2_SUCCESS GameLog
+  packet per player in the map (below); Z03 §8.1 reads that call as a "map-wide notice 0x38f", which it is not.
+- **0x078E MK2_START / 0x078F MK2_SUCCESS** (zone): built by a map visitor whose opcode is set at run time, so a search for
+  literal opcode stores misses it.
+  ```pseudo
+  AxialListMobKillLog(this, dept, cmd, mobId): this+4 = dept, +8 = cmd, +0xc = mobId     @ zone FUN_00428340 (vftable AxialListMobKillLog)
+  AxialListMobKillLog::ali_Work(this, obj):        # called by ShineObject_so_AllInMap1 for every object of the map instance  @ zone FUN_00429590
+      if obj.vt 0x4d0 != 2: return 1                                   # players only
+      g_buf.opcode = dept << 10 | cmd
+      { chrregnum = obj.vt 0x344 (charNo), nLevel = u8 obj.vt 0x4d8, nClass = u8 obj.vt 0x4dc, mobid = this.mobId,
+        mappos = { MapName ← *(obj+0x7a) (12 bytes), x/y ← *(obj+0x66) } }          # the player's map and position
+      SetPacketLen(0x1e) (0x1C payload = PDB size); too long → "AxialListMobKillLog::ali_Work : Packet Too Long"
+      send to SessionPool_Pick(GameLog pool 0x14d43958); return 1
+  # FUN_00428480 resets the vftable to AxialListIterator (destructor)
+  ```
+  - **MK2_START (910)**: zone `FUN_00556d70`, vtable slot 0x588 of ShineMob, ShineNPC, ShinePet, ShineBandit, ShineServant (no
+    direct caller). It runs on both attacker and target of every hit (`ShineMobileObject_so_smash` / `so_skillsmash` /
+    `smo_SwingDamage`, `ShinePlayer_so_smo_CrossCounterDamage`) and sets the last-fight time `+0xfb8 = g_Now`. The first time
+    (flag `+0x24b0` = 0) and only when the mob data (`+0x1f90`) has a kill-log row (`MobData +0x20`, first u32 = mob id, the
+    same test as 0x0791), it sends AxialListMobKillLog(1, 0x38e, mobId) to every player in the map. The flag is then set to 1,
+    so each mob logs MK2_START once.
+  - **MK2_SUCCESS (911)**: `ShineMob_so_KilledBy` FUN_00432760, right after the 0x0791 send: AxialListMobKillLog(1, 0x38f,
+    mobId) to every player in the map.
+  - MK2_FAIL (912) has no sender: `FUN_00428340` has only these two callers.
 - **0x0798 MK_DROP_ITEM** (zone): `ShineDropItem_so_ItemDrop` sends it when the dropped item's `ItemInfo` entry has a
   record at `+0x18` whose first u32 is the item id (*inferred*: the `ItemDropLog.shn` row, Z01 §2.3):
   `{ u16 itemId, u16 lot (ItemAttr class vt 0x1c), u64 itemKey, u16 dropper vt 0x344 (PDB: mobid), MAPPOS (drop position) }`
@@ -493,7 +522,7 @@ fc_NC_LOG_GAME_DATA_TYPE_<x>(parser, pkt):       @ FUN_00402140 (1) … FUN_0040
 
 Every sender's payload size equals the PDB size. The `nType` values 2000–2040 are not `PROTOCOL_COMMAND_LOG` members in the 2017
 PDB; 926–933 are *(pdb2017)*. Together with §2.3/§3.1 the `tGameLog.nType` value space is: the NC_LOG command number,
-510–521 (item `…_INVEN_EXT`), and these DATA_TYPE values.
+510–521 (item `…_INVEN_EXT`), these DATA_TYPE values, and the script values of §4.4 (2026, 2027, 2045–2050).
 
 ### 4.4 Zone script and tutorial senders
 
@@ -511,7 +540,18 @@ Send_NC_LOG_GAME_DATA_TYPE_x: static packet buffer, opcode + fields, SetPacketLe
     0x14d43958); too long → log "Send_NC_LOG_GAME_DATA_TYPE_x : Packet Too Long"
 ```
 
-Which scripts call `cSendGameLogDataType_4/5` and with which nType is in the zone's script files, not in the binary.
+The script functions are registered by the zone's `c*` script-function table `FUN_005f5350` (strings at `005f70af`,
+`005f70cd`, `005f6767`). The 2016 script files in `Files/Server/2016/9Data/Shine/LuaScript/` call them like this (names are
+the scripts' own):
+
+| Script | Function | nType | Other fields |
+|---|---|---|---|
+| `AIScript/E_XTreeBig.lua` (Christmas tree event; constants at lines 152–157) | `cSendGameLogDataType_5` | 2045 `NC_LOG_GAME_CHRISTMAS_DECO_TRY_BIG_TREE` (line 1219), 2046 `…_DECO_TRY_SMALL_TREE` (1639), 2047 `…_DECO_COMPLETE_BIG_TREE` (678), 2048 `…_DECO_COMPLETE_SMALL_TREE` (1655), 2049 `NC_LOG_GAME_CHRISTMAS_START_DEFENCE` (713), 2050 `…_SUCC_DEFENCE` (765) | nCharNo 0; nInt1 = `cGetMobID(NPCHandle)` for 2046/2048, else 0; nInt2 0 |
+| `AIScript/E_Ski_CongressNPC.lua` (ski event; constants at lines 22–30) | `cSendGameLogDataType_4` | 2026 `GameResultLogType` (lines 1025, 1135, 1173, 1259), 2027 `SeasonbRewardLogType` (1046) | nCharNo = player; sMap ""; nMapX/nMapY 0; for 2026 nMapZ = result `GRT_SeasonEnd` 1 / `GRT_StanbyTimeout` 2 / `GRT_RunTimeout` 3 / `GRT_Goal` 4, nInt1–3 = the result values passed after it (ranking/record); for 2027 nMapZ 0, nInt1 = ranking, nInt2 = title type, nInt3 = title element |
+| `Tutorial/Tutorial.lua` | `cSaveTutorialInfo` | 2025 only from line 151 (state 1); lines 75 and 165 pass state 0 and log nothing | nInt1 1, nInt2 = step |
+
+The script files are the private-server set shipped with the 2016 binaries; scripts not in this folder may use other values
+*(inferred)*.
 
 ## 5. Server-link handlers (CPFs, registered @ FUN_00409640 CPFs_ctor)
 
@@ -574,6 +614,7 @@ at startup (main, FUN_00401f90; part 4):
     RotatingLog_Open(g_SyslogFile (main +0x2098c4 = DAT_00656a4c), dir = "C:/data/gamigo-dwh/current/", mode 4 (hourly),
                      name = sprintf("_fiesta_Gamelog_World%d.log", my world (main +0x504)))          @ FUN_0040f6b0
         CreateDirectoryPath(dir): CreateDirectoryA for every prefix ending in '/' or '\' (not after ':'), then the whole  @ FUN_0040ed70
+            # result ignored: a missing directory does not stop the start
         line queue: chunked deque of strings (+0x33c), CreateThread(RotatingLog_WriterThread)
         thread creation fails → the server does not start (main returns)
 
@@ -594,6 +635,7 @@ RotatingLog_WriterThread(log):                                                  
             close the old file; stamp = "%04d%02d%02d%02d" (mode 4; modes 1–6 = year … second, other = "")
             rollover = start of the next hour; path = dir + stamp + name; fopen(path, "a+")
             fopen fails → the thread ends (running = 0): later lines are dropped, nothing is logged
+                # never retried, the server keeps running: (original bug) D05-B11
         pop the line (copied into a 512-byte buffer with "%s"), fprintf("%s\n"), fflush
     close the file; running = 0
 ```
@@ -939,9 +981,10 @@ dead weight in the GameLog server; the zone owns the behaviour of these tables (
 | D05-B7 | 0x2803 OPTOOL_CLOSE_SERVER_REQ `FUN_00409360` | no CheckAlive; replies 0x2804 `{0x0600}` and sets `DAT_00656a3c`, which no code reads (the Account server's copy, D01 §2, is the same) | an operator tool is told the server closes, but it keeps running; any peer, even unauthenticated, gets the same answer | stop the main loop / service on the flag, and require an authenticated link |
 | D05-B8 | 0x075C GUILD_ACADEMY_CLEAR_REWARD_MONEY `FUN_00406950` | zeroes the TypeA struct and calls the procedure without copying anything (no nType, no field) | each packet writes an all-zero `tGameLog` row (nType 0); no 2016 server sends it, so latent | `nType = 860`, `nInt1 = nGuildNo`, `nCharNo = nCharNo` like 0x075A |
 | D05-B9 | heartbeat `CSession_Manager_HeartbeatTick` FUN_00409ee0 (§7.2) | only sessions in state 1 (authenticated by 0x0802) are checked; a peer that connects and never sends a valid 0x0802 keeps its session forever | each such connection holds one of the `SERVER_INFO` max sessions (100); enough of them make every later accept fail with "ACCEPT NO SESSION BUFFER" and log packets are lost | time out state-0 sessions too (e.g. no 0x0802 within some seconds) |
-| D05-B10 | `WinService_ReportStart` FUN_00411ee0 / `DataServer_ServiceStart` FUN_00401f90 (§7.1) | when the start fails (syslog directory, IOCP threads, workers, ServerInfo row, listen socket, main thread) ServiceMain returns with the status still `SERVICE_START_PENDING`; threads already started keep running | the SCM shows the service as "starting" until its timeout, the half-started process stays alive without a listener; the cause is only in the DebugMessage log | report `SERVICE_STOPPED` with an exit code and stop the started threads |
+| D05-B10 | `WinService_ReportStart` FUN_00411ee0 / `DataServer_ServiceStart` FUN_00401f90 (§7.1) | when the start fails (syslog writer allocation or thread, IOCP threads, workers, ServerInfo row, listen socket, main thread) ServiceMain returns with the status still `SERVICE_START_PENDING`; threads already started keep running | the SCM shows the service as "starting" until its timeout, the half-started process stays alive without a listener; the cause is only in the DebugMessage log | report `SERVICE_STOPPED` with an exit code and stop the started threads |
+| D05-B11 | `RotatingLog_WriterThread` FUN_0040f250 (§6.1) | `RotatingLog_Open` FUN_0040f6b0 ignores the `CreateDirectoryPath` result; when an `fopen(path, "a+")` fails (missing or unwritable directory at start, full disk or locked file at an hourly rollover) the writer thread ends and sets running = 0; `RotatingLog_Write` then drops every line, nothing is logged and nothing retries | all NC_SYSLOG lines are lost silently for the rest of the process life, while the server keeps running normally | log the failure and retry the open at the next line or rollover |
 
-Next free ID: D05-B11.
+Next free ID: D05-B12.
 
 ## 9. Not reconstructed / uncertain
 
@@ -956,14 +999,15 @@ Next free ID: D05-B11.
 - 0x04B0 G_REWARD_MONEY_DIVISION has no 2017 PDB struct; its field names (guild, old, new) are ours, taken from the shared
   handler and the sender (D04 §6.4).
 - 0x065F HALL_CANCEL: that a zero flag in the couple-entrance answer means "not entered" is inferred from the `wh_Cancel` log
-  text; Z08 owns the wedding flow.
+  text; the wedding hall is Z07's open question (Z07 plan line 13).
 - 0x075B SET_REWARD_ITEM stores the u16 at 0x0B (`nItemLot` in the 2017 PDB) in `nTargetID` and the u16 at 0x09 (`nItemID`)
   in `nInt3`, the reverse of the usual "item id → nTargetID". No 2016 sender exists to tell whether the 2016 layout had the lot
   first or the handler swaps them.
 - 0x0798 MK_DROP_ITEM: the drop is logged only for items with an `ItemInfo +0x18` record; that this is the `ItemDropLog` table,
   and that the zone's u16 at 0x0C (dropper `vt 0x344`) is the mob id as the PDB names it, are inferred.
 - 0x079F RANDOMOPTION_CHANGE_AFTER has no 2017 PDB struct; its layout is the 0x079E/0x0401 one (same handler, same sender).
-- The nType values the zone scripts pass to `cSendGameLogDataType_4/5` (§4.4) are in the script files, not in the binary.
+- The nType values of §4.4 come from the 2016 script folder; scripts loaded from elsewhere could log other values. The
+  per-argument meaning of 2026's nInt1–3 is read from the argument names only.
 - NC_SYSLOG: the meaning of AttackerType/TargetType values beyond 0/1 and the unit of `PlayTime` ("in-game-minutes") come from
   the format strings only; the senders (W01, Z03) own the values.
 - Framework (§7): the scriptor's directive keywords (table at `+0x3fc`, read by FUN_0040b650) and the exact behaviour after the
@@ -980,13 +1024,14 @@ Next free ID: D05-B11.
 |---|---|---|
 | Sender functions of every log packet (zone, WM, Character) | Z01/Z03/Z05/Z08, W01, D02/D03/D04 (cited per row in §2.3) | they build the packet as part of their own feature; D05 only records what the GameLog server stores |
 | `usp_Login_setChannel` body, `tGameLog` schema | D06 (scope: "missing procedures, schema") | not in any backup |
-| Zone senders `FUN_0045e810` (horse item belong), `FUN_00520840`/`FUN_00520aa0` (costume charges), `FUN_005a25a0`/`FUN_005a2b60` (wedding hall) | Z02 §9.1 / Z06 (costume charges) / Z08 (wedding) | only the log packet they build is D05's (§3.2); the game logic around it belongs to the zone items |
+| Zone senders `FUN_0045e810` (horse item belong), `FUN_00520840`/`FUN_00520aa0` (costume charges), `FUN_005a25a0`/`FUN_005a2b60` (wedding hall) | Z13 (plan line 16: `sp_HorseItemSave`) / Z17 (plan line 13: costume weapon/shield charges) / Z01 (scope row 0x2055 `FUN_005a2b60`, Z01 plan line 94) and Z07 (wedding hall `wh_Start`, Z07 plan line 13) | only the log packet they build is D05's (§3.2); the game logic around it belongs to the zone items |
 | The 23 no-op registrations (§3.3) | D05 (done) | `fc_ReturnTrue`: nothing to reconstruct beyond "ignored" |
 | DataServer framework beyond the worker (main, service, listener, IOCP, framing, heartbeat, diagnostics) | D05 (done, §7) | documented in part 4; D01 §1 has the same code for Account/AccountLog but only the worker part |
-| Zone script functions `cSendGameLogDataType_4/5` (FUN_005f1a10, FUN_005f1d40) and `cSaveTutorialInfo` (FUN_005e70b0), their `Send_NC_LOG_GAME_DATA_TYPE_4/5/F/G` builders (FUN_006144a0, FUN_006145c0, FUN_006146a0, FUN_006147f0) | Z01 §2.2 (Lua globals) / Z05 §5.3, §8.2 / Z07 (tutorial) | only the log packet is D05's (§4.3, §4.4); the scripts and the tutorial state belong to the zone items |
+| Zone script functions `cSendGameLogDataType_4/5` (FUN_005f1a10, FUN_005f1d40) and `cSaveTutorialInfo` (FUN_005e70b0), their `Send_NC_LOG_GAME_DATA_TYPE_4/5/F/G` builders (FUN_006144a0, FUN_006145c0, FUN_006146a0, FUN_006147f0) | Z10 (plan line 14: "any other `lua_setglobal` registrations", i.e. the `c*` table `FUN_005f5350`) and Z09 (Lua scripts, 9Data/Shine/LuaScript) / Z05 §5.3, §8.2 | only the log packet is D05's (§4.3, §4.4); the scripts and the tutorial state belong to the zone items |
+| Zone MK2 kill-log visitor `AxialListMobKillLog` (ctor FUN_00428340, `ali_Work` FUN_00429590, dtor FUN_00428480) and its MK2_START trigger FUN_00556d70 (vt 0x588) | Z03 (kill and combat flow, `so_KilledBy`) / Z09 (mob objects and their vtables) | D05 documents the packet and the trigger condition (§4.2); the combat bookkeeping at vt 0x588 belongs to the zone items |
 | Zone senders `ShineMob_so_KilledBy` FUN_00432760, `ShinePlayer_so_KilledBy` FUN_00433be0, `ShineDropItem_so_ItemDrop` FUN_0052a7a0, `ShinePlayer_so_LinkTo` FUN_0049ad30, `CQuestZone_Recv_NC_QUEST_DB_SET_INFO_ACK` FUN_005bf280 | Z03 §8.1 / Z05 §3.1 / Z01 / Z08 | they build 0x0791/0x0798/0xC809–0xC80F as a side effect of their own feature |
 | WM syslog senders FUN_004113c0, FUN_0040a010, FUN_00410040, FUN_00436d50, FUN_0042e160 | W01 | 0xC804–0xC808 are built by the WM's character life-cycle handlers |
-| CPFs server-link handlers (§5): handshake rules, session list | D01 §2 (same code) | GameLog differences recorded in §5; the shared framework is D01's |
+| CPFs server-link handlers (§5): handshake rules, session list | D05 (done, §5) | in D05's scope table (part 3); D01 §2 documents the same code for Account/AccountLog |
 | Rotating text log internals: deque growth (FUN_0040ef00 allocates 0x1c-byte `std::string` blocks), string helpers (FUN_0040b130 assign, FUN_0040b040 substring assign, FUN_0040f160 queue front copy) | D05 (done, §6.1) | MSVC `std::deque<std::string>` / `std::string` code; the behaviour is in §6.1, the helpers hold no protocol logic |
 | Shared game-data library linked into the binary (0x414190–0x416870, 0x417da0–0x418ed0: `ItemDataBox`, `ItemOptionsData::OptionCardStack`, `CardDeck` lists, `ItemAttributeClass`/`ItemAttrCls_*`, `BinaryDataBox<…>` for ten item tables, `MapDataBox`) | Z01 (Goal: "SHN data loading (list every table and its loader)") / Z04 (Goal: "Use ItemInfo/ItemInfoServer/ItemUpgrade/RandomOption SHN tables") | dead code in the GameLog server (§7.5): no caller outside the library except the start-up ItemInfo load; the zone uses the same tables for real and owns their meaning |
 | `ItemInfo.shn` loaded at start (`ItemDataBox_Load` FUN_00410a40, SHN reader FUN_0042faa0) | Z01 / Z04 (as above); SHN format: `tools/protocol-re/shn.py` | loaded but never read by GameLog code (§7.1); nothing to reconstruct beyond "must exist or the server does not start" |
