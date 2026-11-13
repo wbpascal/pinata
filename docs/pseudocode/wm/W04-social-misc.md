@@ -173,8 +173,8 @@ sends 0x207D from its script engine (Z15) to make a world-wide script message.
 
 ### 2.5 Gold-spammer alert to GMs (0x200D, reached from W01's 0x085F)
 
-The handler of client 0x085F NC_MISC_SPAMMER_REPORT_REQ *(pdb2017 name)* `FUN_00417ef0` is W01's (W01 §11 "Not reconstructed" only lists
-its reply codes 0x2160…0x2163); it ends in a whisper-shaped alert that only this section documents. Table: `SpamerReport.shn`, loaded by
+The handler of client 0x085F NC_MISC_SPAMMER_REPORT_REQ *(pdb2017 name)* `FUN_00417ef0` (W01 hand-off, full block in §17.4)
+ends in a whisper-shaped alert that this section documents. Table: `SpamerReport.shn`, loaded by
 W01's FUN_00404100 into the data object DAT_006c5220 (= WM +0x22B1F8; the same object later loads `GBHouse.shn`, §15.1).
 Row 0 only: `SR_Term` u32 @+0 (2016 data: 3600 s), `SR_Number` u16 @+4 (5), `SR_Message` char[128] @+6
 ("Gold spammer has been reported"); getters FUN_0043a280 / FUN_0043a2a0 / FUN_0043a2c0 (0 / null when the table is empty).
@@ -2100,7 +2100,12 @@ FUN_004010c0 from W01's `Zone_S2SConnectionReq_0802` FUN_004283e0: zone ← 0xD0
 
 ---
 
-## 17. Account-server event relay 0x083A (C01 open item)
+## 17. Dept-2 MISC relays, attendance event, NPC schedule (W01 hand-offs)
+
+W01 (W01-core §6.3 end, §7.1, §7.6, §11) handed these handlers and subsystems to W04; they are not in W04's scope table.
+Packet names are *(pdb2017)* unless a 2016 log string gives them (`fc_NC_MISC_SPAMMER_*`, `cEvent_Attendance::…`).
+
+### 17.1 Account-server event relay 0x083A (C01 open item)
 
 C01 §5 left open which send of `FUN_00408050` carries 0x083A. The handler is W01's (§7.6: AccountDB 0x0839
 NC_MISC_EVENT_DONE_MUNSANG_ACC2WM); the packet names below are *(pdb2017)*: no 2016 string names them, except the
@@ -2123,6 +2128,337 @@ AccountDB 0x0839 { u32 nUserNo, u32 nCharNo, u8 nWorldNo, u16 nError @+9, u16 hZ
   table has no cmd 58) and never sends 0x0837 NC_MISC_EVENT_DONE_MUNSANG_Z2WM, which starts it (the WM relays 0x0837 to
   the Account server as 0x0838 in W01's `FUN_0042b7d0`). The Account server's 0x0838 handler answers with a fixed
   nError = 0x1545 and touches no database, so the WM's 0x1541 announcement branch cannot run either.
+
+### 17.2 Chat spam filter settings (0x0844 / 0x0845 / 0x0846)
+
+The player's chat spam-filter options live in the client session (offsets ours):
++0x1ECE0 u8 bIsSpamSpread, +0x1ECE1 u8 bIsSpamBlock, +0x1ECE2 u8 nSpamFilterRate, +0x1ECE3 u8 loaded.
+`loaded` is cleared in `Client_CharLogin_1001` FUN_00422be0 and `CWMClientSession_TutorialLoginProcess` FUN_004371a0 (W01).
+This is not the chat-block (spam block time) blob at +0x1ECE4 of W01-core §6.3 (0x10CA), and not the block list of §14.
+
+```pseudo
+CharDB 0x0844 NC_MISC_GET_CHAT_BLOCK_SPAM_FILTER_DB_CMD { u16 wmHandle, u32 nUserNo @+2, u32 nCharNo @+6,
+        u8 bIsSpamSpread @+0xA, u8 bIsSpamBlock @+0xB, u8 nSpamFilterRate @+0xC }      # pushed in the character stream (D02 §4, step 21)   @ FUN_0040d660
+    s = Clients_GetByHandle(wmHandle); needs CHARDATA, s.userNo (+0x124) == nUserNo and CHARDATA.charNo == nCharNo
+    s.spamFilter = { spread, block, rate }; s.spamFilterLoaded = 1                     # no reply
+
+CWMClientSession::ChatBlockSpamFilterRefresh(s)    (name from its log string)          @ FUN_00431cd0
+    # called from W01's 0x180C map-login-done handler on every map login (W01-core §7.3)
+    if s.spamFilterLoaded == 1:
+        Send s 0x0845 NC_MISC_GET_CHAT_BLOCK_SPAM_FILTER_CMD { u8 bIsSpamSpread, u8 bIsSpamBlock, u8 nSpamFilterRate }
+        on send failure log "ERROR - CWMClientSession::ChatBlockSpamFilterRefresh, nCharNo=%d"
+
+0x0846 NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_CMD { u8 bIsSpamSpread, u8 bIsSpamBlock, u8 nSpamFilterRate }   @ FUN_00417b90
+    needs Client_CheckAlive and CHARDATA (no inGame check, no value check)
+    Send CharDB 0x0847 NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_DB_CMD { u32 nUserNo = s.userNo, u32 nCharNo,
+                                                                   u8 spread, u8 block, u8 rate }   # 11 bytes; D02: usp_SpamFilter_set, no reply
+    # s.spamFilter is NOT updated (original bug) W04-B60: the next map login pushes the old values back in 0x0845
+```
+
+Client 0x0845 (`GameFrameWork::On_NC_MISC_GET_CHAT_BLOCK_SPAM_FILTER_CMD` FUN_004a5820): byte 0 → `SetSpamFilteredTextShow`,
+byte 1 → two chat-window check boxes, byte 2 → `SetSpamBlockRate`. The client sends 0x0846 from
+`NcMistSetChatBlockSpamFilterCmd` *(pdb2017 name)*. D02 stores the filter per user (`usp_SpamFilter_get(nUserNo)`), so it
+is shared by all characters of the account (D02 §4).
+
+### 17.3 Client loading-failure report (0x0840 → CharDB 0x0841)
+
+```pseudo
+0x0840 NC_MISC_CLIENT_LOADING_BUG_DETECT_CMD { char sLoadingMapName[12], u16 nFailType @+0xC, u16 nLoadingFailCnt @+0xE,
+        char sFromMapName[12] @+0x10, char sFromZoneIP[16] @+0x1C, char sToZoneIP[16] @+0x2C, u16 nToZonePort @+0x3C,
+        u16 nErrorDataCnt @+0x3E, CLBD_ErrorData ErrorData[nErrorDataCnt] @+0x40 { u16 nErrorNo, u32 nErrorData } }   @ FUN_00417140
+    needs Client_CheckAlive and CHARDATA (no length check)
+    Send CharDB 0x0841 NC_MISC_DB_CLIENT_LOADING_BUG_DETECT_CMD {
+        u32 nCharNo = CHARDATA.charNo, i32 nWorldTime = time(NULL),
+        the 0x40 request bytes copied field by field, then nErrorDataCnt × 6 bytes }   # size 0x48 + 6·n
+    # nErrorDataCnt is not checked against the request length or the 0x1FFB-byte packet buffer (original bug) W04-B59:
+    # n > 1351 writes past the stack buffer (stack cookie → WM crash); the copy also reads past the request
+```
+
+Fire-and-forget: the Character server logs the report (`usp_CharacterLoading`, D02 §5). D02 §16 lists the sender of
+0x0841 as unknown; it is this handler.
+
+### 17.4 Gold-spammer report and GM chat ban (0x085F … 0x0869)
+
+The report path (0x085F) ends in the GM alert of §2.5. The chat ban is a CHARDATA single-option field: `nChatBan` u32 at
+single-option blob +10 (session +0x658, §1.1; W01-core §6.3 0x10D2). The zone keeps its own copy (`chatBlockUntil`,
+player +0x2aa54, set by 0x0865, Z01 §9) and refuses chat while it is non-zero (Z02 §3.1). Only a GM with CHARDATA.adminlevel
+(+0x64) in 50…100 can ban or release; the ban is set from the client (0x0861), the release from the zone's
+`&releasechatban` GM command (zone FUN_00421a60, level 0x32; Z11), which sends 0x0866.
+
+```pseudo
+0x085F NC_MISC_SPAMMER_REPORT_REQ { Name5 sSpammerName }                                @ FUN_00417ef0
+    needs Client_CheckAlive and CHARDATA (any player may report; reporter == target is not refused)
+    t = Clients_FindByCharName(sSpammerName)
+    nError = 0x2160 (ok)
+    if t is null / has no CHARDATA / t.CHARDATA.charNo == −1 / t.userNo == −1:   nError = 0x2161
+    elif Client_GetPrison(t) ≠ 0 (FUN_00409a10: CHARDATA.prisonmin):  nError = 0x2162
+    elif Spam_AlreadyReported(t, reporterCharNo) == 1 (§2.5):                       nError = 0x2163
+    elif Spam_AddReport(t, reporterCharNo) == 0 (§2.5; may alert the GMs with 0x200D): nError = 0x2163
+    Send s 0x0860 NC_MISC_SPAMMER_REPORT_ACK { u16 nError }
+    # Spam_AddReport fails only when the target has no report ring buffers; that is answered "already reported"
+    #   (original bug) W04-B62
+
+0x0861 NC_MISC_SPAMMER_CHAT_BAN_REQ { Name5 sSpammerName }                              @ FUN_004180f0
+    needs Client_CheckAlive, CHARDATA and adminlevel 50…100, else nothing
+    t = Clients_FindByCharName(sSpammerName)
+    if t online with CHARDATA and t.singleOption.nChatBan ≠ 0:
+        Send s 0x0862 NC_MISC_SPAMMER_CHAT_BAN_ACK { Name5 sSpammerName, u16 nError = 0x216B }   # already banned
+    else (offline, unknown or not banned):
+        Send CharDB 0x0863 NC_MISC_SPAMMER_SET_DB_CHAT_BAN_REQ { u32 nGMCharNo = GM CHARDATA.charNo,
+                                                                Name5 sSpammerName, u32 nChatBan = 0x0FFFFFFF }   # 0x1C bytes
+
+0x0866 NC_MISC_SPAMMER_RELEASE_CHAT_BAN_REQ { u32 nGMCharNo, Name5 sSpammerName }   (CParserZone)   @ FUN_0042c3b0
+    needs Zone_CheckAlive; GM = Clients_FindByCharNo(nGMCharNo) with CHARDATA and adminlevel 50…100, else nothing
+    Send CharDB 0x0868 NC_MISC_SPAMMER_RELEASE_CHAT_BAN_DB_REQ { u32 nGMCharNo, Name5 sSpammerName, u32 nChatBan = 0 }
+
+CharDB 0x0864 NC_MISC_SPAMMER_SET_DB_CHAT_BAN_ACK { u32 nGMCharNo, Name5 sSpammerName @+4, u32 nChatBan @+0x18,
+        u16 nError @+0x1C }                                                             @ FUN_0040d980
+CharDB 0x0869 NC_MISC_SPAMMER_RELEASE_CHAT_BAN_DB_ACK (same layout)                     @ FUN_0040dbf0
+    needs CharDB_CheckAlive
+    if nError == success (0x2168 for 0x0864, 0x2170 for 0x0869):
+        t = Clients_FindByCharName(sSpammerName)
+        if t online with CHARDATA:
+            zone = Zones_Get(t.zoneNo (+0x117))
+            if zone is null: stop (no GM reply)                                         # (original bug) W04-B61
+            if SendPacket(zone, 0x0865 NC_MISC_SPAMMER_ZONE_CHAT_BAN_CMD { Name5 sSpammerName, u32 nChatBan }) fails:
+                log "ERROR - CParserCharDB::fc_NC_MISC_SPAMMER_SET_DB_CHAT_BAN_ACK SpammerNo[%d] Zone[%d]"
+                    (…RELEASE_CHAT_BAN_DB_ACK… for 0x0869); stop (no GM reply)          # W04-B61
+            t.singleOption.nChatBan = nChatBan                                          # only after the zone got it
+        # offline target: only the database changes; the next character login loads it (0x10D2, W01)
+    GM = Clients_FindByCharNo(nGMCharNo) with CHARDATA and adminlevel 50…100, else stop
+    0x0864: Send GM 0x0862 NC_MISC_SPAMMER_CHAT_BAN_ACK { Name5 sSpammerName, u16 nError }
+    0x0869: Send GM 0x0867 NC_MISC_SPAMMER_RELEASE_CHAT_BAN_ACK { u16 nError }
+    send failure → log "ERROR - CParserCharDB::fc_NC_MISC_SPAMMER_SET_DB_CHAT_BAN_ACK GM[%d]" (… RELEASE … for 0x0869)
+```
+
+nError values (D02 §9, 0x0863 / 0x0868): 0x2168 ban ok, 0x2169 DB error, 0x216A name not found; 0x2170 release ok,
+0x2172 name not found (a failed release sends no 0x0869 at all, D02-B12). `nChatBan` 0x0FFFFFFF works as a flag: the zone
+only tests it for ≠ 0 (Z02 §3.1), so the ban is permanent until released.
+
+Client cross-check (GameFrameWork, senders `NcMiscSpammerReportReq` / `NcMiscSpammerChatBanReq` *(pdb2017 names)*):
+- 0x0860 (FUN_0049cb10): 0x2160 shows nothing; other codes show their error text: 0x2161 "Can't find the character",
+  0x2162 "Gold spammer has reported" (sent when the target is already in prison), 0x2163 "This gold spammer has already reported".
+- 0x0862 (FUN_004b3520): 0x2168 → "[%s] is not allowed to chat now" with the name; else the error text (0x216A "Can't find
+  the character", 0x216B "This character is already blocked to chat"; 0x2169 has no entry in `client-error-codes.json`).
+- 0x0867 (FUN_004b35b0): 0x2170 → "Backing out chatting block"; else the error text (0x2172 "Can't find the character").
+
+### 17.5 Attendance event (`cEvent_Attendance`, `g_Attendance` DAT_006c53b4 = WM +0x22B38C)
+
+Class and method names come from the log strings (`cEvent_Attendance::Recv_NC_CHAR_EVENT_ATTENDANCE_LIST_DB_ACK`,
+`EA_Schedule_Process`, `EA_Event_Check_GetReward`, `EA_Event_Set_RewardData`); field names are ours. An event lasts
+28 "days" of `AS_CheckTerm` minutes; a player who stays online `AS_JoinKeepTime` minutes in a day gets that day marked
+(Character server `usp_Attendance_setCall`); week and day-count rewards are claimed from the client window.
+
+Tables (loaded by W01's FUN_00404100 into the data object DAT_006c5220 = WM +0x22B1F8, then the object is built):
+
+| Table | Row layout (offsets in the row) | 2016 data |
+|---|---|---|
+| `AttendSchedule.shn` (data +0xCC, rows at *(+0x100)+0x28) | AS_StartYear u16 @0, AS_StartMonth u8 @2, AS_StartDay u8 @3, AS_StartHour u8 @4, AS_StartMinute u8 @5, AS_JoinKeepTime u16 @6 (minutes), AS_CheckTerm u16 @8 (minutes per day) | 1 row: 2015-11-09 00:00, 60, 1440 |
+| `AttendReward.shn` (data +0x10C, rows at *(+0x140)+0x28; `Shn_LoadChecked(…, 0x98, 0x26)` FUN_0043a620) | AR_ID u8 @0, AR_Type u32 @1 (0 = week, 1 = day count), AR_Count u8 @5 (week number / days), AR_ItemInx char[32] @6 | 7 rows: 0…3 week 1…4 (`Attend_Week_n`), 4…6 day counts 20 / 24 / 28 |
+
+Getters: schedule count / row FUN_0043a600 / FUN_0043a5f0, reward count / row FUN_0043a6c0 / FUN_0043a660, reward by AR_ID
+FUN_0043a670 (all over the generic SHN row getter FUN_00458ae0).
+
+Object (constructor FUN_0043b3e0, destructor FUN_0043b4e0, both from the WM object's ctor / dtor):
+
+| Offset | Field | Notes |
+|---|---|---|
+| +0 | u32 scheduleRow | current AttendSchedule row |
+| +4 | u8 curDay | 0…27 running; 28 (0x1C) = no running event (ctor value) |
+| +8 | time32 eventStart | 0 = no event ever started |
+| +0xC | time32 dayEnd[28] | dayEnd[i] = eventStart + (i+1)·CheckTerm·60, DST-corrected; `DayStart(i)` FUN_0043a7c0 = eventStart for i = 0, dayEnd[i−1] else, 0 for i > 27 |
+| +0x78 | (= dayEnd[27]) eventEnd | |
+| +0x7C | time32 nextTick | once-per-second throttle |
+| +0x80 | time32 nextEventStart | start of the next (future) schedule row, 0 = none |
+| +0x84 | i32 joinKeepSec | AS_JoinKeepTime·60 |
+| +0x88 / +0x8C | `std::list<{time32 due, session*}>` waitList, count | sorted by `due` |
+| +0x94…+0x9C | `std::vector<row*>` weekRewards (AR_Type 0) | filled by `EA_Event_Set_RewardData` FUN_0043b9c0 |
+| +0xA4…+0xAC | `std::vector<row*>` dayRewards (AR_Type 1) | ″ |
+
+Session fields (ours): +0x1ED10 firstMapLogin flag (`Session_GetFirstMapLogin` / `Set` FUN_00432f50 / FUN_00432f60; set to 1
+by `Client_CharLogin_1001`), +0x1ED14 rewardPending, +0x1E28C playingCharNo (W01; −1 = not playing).
+
+```pseudo
+Attend_LoadSchedule(this, row r)    (startup with r = 0, and from the tick)            @ FUN_0043b090
+    n = schedule row count; if r >= n: nextEventStart = 0; return 0     # at startup 0 = "*FATAL ERROR* - Attend Schedule"
+    for r … n−1:
+        t = Tm_MakeTimeLocal({AS_Start…}) (mktime with DST normalisation, FUN_0043a6e0)
+        if now < t: nextEventStart = t; clear waitList; return 1            # first future row
+        scheduleRow = r; eventStart = t; nextEventStart = 0
+        dayEnd[i] = t + CheckTerm·60·(i+1) for i < 28
+        if CheckTerm % 1440 == 0: from the first boundary whose isdst differs from the start, shift the rest by ∓3600
+        curDay = Attend_DayIndex(now) (FUN_0043a790: first i with now < dayEnd[i]; 28 if before start or after the end)
+        joinKeepSec = AS_JoinKeepTime·60
+    clear waitList; return 1                                              # the last started row wins
+
+EA_Event_Set_RewardData(this)                                                          @ FUN_0043b9c0
+    clear both vectors; for each AttendReward row: AR_Type 0 → weekRewards, 1 → dayRewards, other → return 0 (fatal)
+    a null row → log "…EA_Event_Set_RewardData : Data NULL", return 0
+
+Attend_InsertPlayer(this, s, time32 from)    ("Player Insert")                         @ FUN_0043b880
+    needs s with CHARDATA, s.playingCharNo ≠ −1 and curDay ≤ 27, else 0
+    due = from + joinKeepSec; if dayEnd[curDay] <= due: due = dayEnd[curDay] + joinKeepSec   # too late today → next day
+    walk waitList: erase nodes whose session is null or has no CHARDATA, erase s's old node (same charNo),
+                   insert {due, s} before the first node with node.due >= due
+    none found: push_back; return 1
+
+Attend_RemovePlayer(this, charNo)   (W01 CharacterLogout, when playingCharNo ≠ −1)      @ FUN_0043b620 → FUN_0043b580
+    erase every node whose session is null, has no CHARDATA, or whose CHARDATA.charNo == charNo
+
+EA_Schedule_Process(this)    (W01 main loop FUN_00406760, every pass)                  @ FUN_0043bde0
+    if now < nextTick: return; nextTick = now + 1
+    if curDay < 28:
+        for at most the current node count, front node first:
+            dead session / no CHARDATA / playingCharNo == −1: erase
+            elif now < node.due: break
+            else:
+                Send CharDB 0x10EE NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_REQ { u32 nCharNo, tm tCheckTime = localtime(DayStart(curDay)) }
+                if curDay + 1 < 28: node.due = dayEnd[curDay] + joinKeepSec; move the node to the back
+                else: erase
+        if dayEnd[curDay] <= now:
+            curDay += 1
+            Attend_SendChangeDay(curDay)                                               @ FUN_0043b630
+                # 0x10F5 NC_CHAR_EVENT_ATTENDANCE_CHANGE_DAY_CMD { u8 nChangeIndex = curDay } to every waitList session
+                # (dead nodes and playingCharNo == −1 erased); the final step sends nChangeIndex = 28
+        if eventEnd <= now: Attend_EndEvent (FUN_0043b2f0): curDay = 28; clear waitList
+    elif nextEventStart ≠ 0 and nextEventStart <= now:
+        Attend_LoadSchedule(this, scheduleRow)
+        pkt 0x10F6 NC_CHER_EVENT_ATTENDANCE_CHANGE_START_CMD { tm tEventStart = localtime(eventStart) }   # 0x24 bytes
+        for every client with CHARDATA and playingCharNo ≠ −1:
+            if Attend_InsertPlayer(s, eventStart): Send s pkt
+            else log "…EA_Schedule_Process : Player Insert Fail nCharNo( %d )"
+
+First map login (W01 0x180C map-login-done, FUN_0042d8d0), when s.firstMapLogin == 1:
+    Session_SendSupportReward(s)                                                       @ FUN_00433ab0
+        if s.userKindUntil (+0x1ED58) < now: s.userKind (+0x1ED54) = 1 (normal); s.userKindUntil = 0   # W01-core §3.3
+        Send zone[s.zoneNo] 0x1120 NC_CHAR_SUPPORT_REWARD_CMD { u32 nCharNo, u32 eUserType = s.userKind }   # zone: Z07 §1.2
+    Attend_RequestList(charNo)                                                         @ FUN_0043a7f0
+        if eventStart ≠ 0:   # also after the event has ended
+            Send CharDB 0x10EB NC_CHAR_EVENT_ATTENDANCE_LIST_DB_REQ { u32 nCharNo, tm tmEventStartDate = localtime(eventStart),
+                     tm tmEventEndDate = localtime(eventEnd), i32 tConnect = time(NULL) }   # 0x50 bytes
+    s.firstMapLogin = 0
+
+CharDB 0x10EC NC_CHAR_EVENT_ATTENDANCE_LIST_DB_ACK { u32 nCharNo, u16 nError @+4, i32 tConnect @+6, u8 AttendanceNum @+0xA,
+        tm AttendanceArray[28] @+0xB, u8 RewardNum @+0x3FB, u8 RewardList[RewardNum] @+0x3FC }      @ FUN_0040dfd0 → FUN_0043bab0
+    nError ≠ 0x2C00: log "…Recv_NC_CHAR_EVENT_ATTENDANCE_LIST_DB_ACK : Error( %d )"; stop
+    s = Clients_FindByCharNo(nCharNo) with CHARDATA and playingCharNo ≠ −1, else stop
+    pkt 0x10ED NC_CHAR_EVENT_ATTENDANCE_LIST_CLIENT_CMD {
+        tm tEventStart @0 = localtime(eventStart); u8 nCurIndex @0x24 = curDay
+        u8 AttendanceArray[28] @0x25 = 0; for each of the AttendanceNum DB times t (Tm_MakeTimeLocal):
+            if t >= eventStart: the day i < 28 with t < dayEnd[i] gets 1
+        u8 RewardNum @0x41; u8 RewardList[RewardNum] @0x42 = copied }               # size 0x42 + RewardNum
+    if curDay < 28:
+        if AttendanceArray[curDay] == 1 (already marked today):
+            if curDay == 27: send the list, no insert
+            else from = dayEnd[curDay]                                                # wait for tomorrow
+        else from = tConnect                                                         # time of the 0x10EB request
+        if Attend_InsertPlayer(s, from) == 0: log "… Player Insert Fail nCharNo( %d )"; stop (no list)
+        Send s pkt
+    else (no running event):
+        if EA_Event_Check_GetReward(pkt payload) == 1: Send s pkt                    @ FUN_0043ade0
+        # otherwise the client gets nothing (event over, nothing left to claim)
+
+EA_Event_Check_GetReward(this, p) → 1 if a reward can still be claimed                @ FUN_0043ade0
+    for each week row i (weekRewards[i], AR_Count = week w):
+        if all 7 days (w−1)·7 … w·7−1 of p.AttendanceArray are 1:
+            if p.RewardNum == 0: return 1
+            if p.RewardList[i] ≠ row.AR_ID … checked RewardNum times against the same element i   (original bug) W04-B65
+                → return 1
+    total = number of marked days
+    best = the dayRewards row with the largest AR_Count ≤ total (none → return 0)
+    return best.AR_ID not in p.RewardList ? 1 : 0                                     # lower day tiers are not checked
+    a null row pointer → log "…EA_Event_Check_GetReward : Data NULL", return 0
+
+CharDB 0x10EF NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_ACK { u32 nCharNo, u16 nError }         @ FUN_0040e010 → FUN_0043a9b0
+    nError == 0x2C08: s = Clients_FindByCharNo with CHARDATA and playingCharNo ≠ −1 →
+        Send s 0x10F0 NC_CHAR_EVENT_ATTENDANCE_CHECK_CMD { u8 = never written (stale) }   (original bug) W04-B63
+    else log "ERROR - cEvent_Attendance::Rece_NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_ACK : Error( %d )"
+        # 0x2C09 DB error, 0x2C0A already marked (D02 §12)
+
+0x10F1 NC_CHAR_EVENT_ATTENDANCE_REWARD_REQ { u8 nIndex, u8 nRewardID }                  @ FUN_00418410 → FUN_0043aac0
+    needs Client_CheckAlive only (no CHARDATA check: nCharNo = 0 without one)
+    reply(code) = Send s 0x10F2 NC_CHAR_EVENT_ATTENDANCE_REWARD_ACK { u8 nIndex, u8 nRewardID, u16 nError = code }   @ FUN_0043a8f0
+    if eventStart == 0: reply(0x2C12)
+    row = reward with AR_ID == nRewardID, none → reply(0x2C12)
+    AR_Type 0 (week w = AR_Count): nIndex must be w·7 − 1, else reply(0x2C13)
+        checkStart = DayStart((w−1)·7); checkEnd = DayStart(w·7 − 1)
+    AR_Type 1 (day count): nIndex must be 27, else reply(0x2C13); checkStart = eventStart; checkEnd = eventEnd
+    other AR_Type → reply(0x2C12)
+    checkStart < eventStart or checkEnd > eventEnd → reply(0x2C12)
+    s.rewardPending == 1 → reply(0x2C12)                                              # one request at a time
+    s.rewardPending = 1
+    Send CharDB 0x10F3 NC_CHAR_EVENT_ATTENDANCE_REWARD_DB_REQ { u32 nCharNo, u8 nIndex, tm tmEventDay = localtime(DayStart(nIndex)),
+             u8 nRewardID, tm tmCheckStartDay, tm tmCheckEndDay }                    # 0x72 bytes; the DB counts and gives the item (D02 §12)
+
+CharDB 0x10F4 NC_CHAR_EVENT_ATTENDANCE_REWARD_DB_ACK { u32 nCharNo, u8 nIndex, u8 nRewardID, u16 nError }   @ FUN_0040e050 → FUN_0043ad90
+    s = Clients_FindByCharNo(nCharNo) (no CHARDATA check); s.rewardPending = 0
+    Send s 0x10F2 { nIndex, nRewardID, nError }                                       # D02 §12: 0x2C10 ok, 0x2C11 / 0x2C16 / … errors
+```
+
+With the 2016 data the only event ran 2015-11-09 … 2015-12-07, so in 2016 `curDay` is always 28: every first map login
+still sends 0x10EB, and the client gets 0x10ED only while a week or day reward is unclaimed.
+
+Client cross-check (GameFrameWork, `AttendCheckWin`; codes 0x2C00…0x2C16 have no entries in `client-error-codes.json`):
+- 0x10ED (FUN_0049d030): `AttendCheckWin::SetEvtState(tEventStart, nCurIndex, AttendanceArray, RewardList, RewardNum)` and
+  enables the attendance icon.
+- 0x10F0 (FUN_004b39f0): announces "Attendance Checked!" and "Attendance has been confirmed", marks today; when the window
+  reports all days done it requests the month reward itself (`NcCharEventAttendRewardReq` FUN_004a5d10 → 0x10F1
+  { nIndex = 27, nRewardID = month reward id }); otherwise it activates the icon. The payload byte is not read.
+- 0x10F2 (FUN_004bbc70): **nError is never read**: for any reply whose nRewardID is a known AttendReward row it marks the
+  reward as taken and shows "%d week's attendance check reward has been received." (type 0) or "%d day's attendance check
+  reward has been received." (type 1), also for 0x2C12 / 0x2C13 / DB errors (original bug) W04-B64.
+- 0x10F5 (FUN_0049d080): `AttendCheckWin::ChangeDay(nChangeIndex)`. 0x10F6 (FUN_0049d0a0): resets the window to the new
+  start date with no marks and deactivates the icon.
+
+### 17.6 NPC schedule (`CNpcScheduleServer`, DAT_006c536c = WM +0x22B344)
+
+Class and method names come from the log strings (`CNpcScheduleServer::enss_NPCStandStart` / `enss_NPCStandEnd` /
+`enss_NPCStandState`). Event NPCs appear and disappear on a fixed cycle; the WM only keeps time and tells the zones
+(and, for flagged rows, the players).
+
+`NpcSchedule.shn` (the object starts with its SHN table; `NpcSched_Load` FUN_00457510 = `Shn_LoadChecked(…, 0x83, 0x2A)`,
+fatal "*FATAL ERROR* - DATA FILE - NPC SCHEDULE DATA READ FAILED" in W01's FUN_00404100). Row: Mob_Inx char[32] @0,
+NS_Year u16 @0x20, NS_Month u8 @0x22, NS_Day u8 @0x23, NS_Hour u8 @0x24, NS_Minute u8 @0x25, NS_CycleHour u16 @0x26,
+NS_LifeHour u8 @0x28, NS_IsMsg u8 @0x29. **The 2016 table has no rows**, so none of this runs with the 2016 data.
+
+Entries (+0x40 count, +0x44 array of 0x30 bytes, built by `NpcSched_BuildEntries` FUN_00457290 after loading):
++0 char mobIndex[32], +0x20 u8 standing, +0x24 time32 start, +0x28 time32 end, +0x2C u8 isMsg.
+
+```pseudo
+NpcSched_BuildEntries(this)                                                            @ FUN_00457290
+    for each row: mobIndex = Mob_Inx; standing = 0; isMsg = NS_IsMsg
+        start = mktime(NS_Year, NS_Month, NS_Day, NS_Hour, NS_Minute); end = start + NS_LifeHour hours
+        while end <= now: start += NS_CycleHour hours; end = start + NS_LifeHour hours
+        # NS_CycleHour = 0 with a past end never terminates: the WM hangs at startup (original bug) W04-B66
+
+NpcSched_Tick(this)    (W01 main loop FUN_00406760, every pass)                         @ FUN_004574d0
+    for each entry e: enss_NPCStandStart(e); enss_NPCStandEnd(e)
+
+enss_NPCStandStart(e)                                                                  @ FUN_00456c50
+    if e.standing or now < e.start: return
+    Zones_Broadcast(0x086A NC_MISC_EVENTNPC_STANDSTART_ZONE_CMD { Name8 sMobIndex = e.mobIndex })   # fail → log "…Zone broadcast fail"
+    if e.isMsg == 1: Clients_BroadcastInGame(0x086C NC_MISC_EVENTNPC_STANDSTART_CLIENT_CMD { Name8 sMobIndex }, skipArena = 0)
+    e.standing = 1
+
+enss_NPCStandEnd(this, e)                                                              @ FUN_00456e20
+    if not e.standing or now < e.end: return
+    Zones_Broadcast(0x086B NC_MISC_EVENTNPC_STANDEND_ZONE_CMD { Name8 sMobIndex })
+    if e.isMsg == 1: Clients_BroadcastInGame(0x086D NC_MISC_EVENTNPC_STANDEND_CLIENT_CMD { Name8 sMobIndex }, 0)
+    row = first table row whose Mob_Inx equals e.mobIndex (32-byte compare FUN_00456bb0)   # duplicates: the first row's
+                                                                                       #   cycle / life is used (original bug) W04-B67
+    (no row found → return with standing still 1)
+    e.standing = 0
+    while e.start <= now: e.start += NS_CycleHour hours                              # same endless loop for 0 (W04-B66)
+    e.end = e.start + NS_LifeHour hours
+
+enss_NPCStandState(this, zoneNo)   (W01 zone registration handler FUN_004283e0, new zone)   @ FUN_00457110
+    for each entry with standing ≠ 0: SendPacket(zone, 0x086A { sMobIndex })        # zone missing → stop
+    # clients that log in later get no 0x086C (it is a one-time announcement)
+```
+
+Zone side: 0x086A / 0x086B → `NPCManager.nm_StandNPC` start / end (Z01 §9, FUN_005a57e0 / FUN_005a5950). Client 0x086C
+(FUN_004b6cc0) / 0x086D (FUN_004b6e10): looks the index up in MobInfo and announces "%s has appeared" / "%s has disappeared"
+with the mob's name.
 
 ## 18. Original-server bugs
 
@@ -2185,6 +2521,15 @@ AccountDB 0x0839 { u32 nUserNo, u32 nCharNo, u8 nWorldNo, u16 nError @+9, u16 hZ
 | W04-B56 | AccountDB 0x0839 (W01) / 0x083A | the munsang event chain is dead: the zone neither sends 0x0837 nor handles 0x083A; the Account server always answers nError 0x1545, so the 0x1541 announcement never runs | no effect in 2016 (feature switched off or half removed) | rebuild: drop it, or implement both ends |
 | W04-B57 | `KQ_TickSchedule` | `KQ_NextOccurrences` loops adding NextStartDeleyMin until ≥ now; 0 never ends | a KingdomQuest.shn row with NextStartDeleyMin = 0 hangs the WM main loop (2016 data has none) | reject 0 at load |
 | W04-B58 | `CKQServer::SetDoneSkip` reason 3 | uses WM texts #3 and #4, which MsgWorldManager.shn (3 rows) does not have | the team-imbalance cancellation notices are empty (and the in-game client ignores 0x580B anyway) | add the rows |
+| W04-B59 | client 0x0840 | `nErrorDataCnt` unchecked; `6·n` bytes copied into the 8 KB stack packet (and read past the request) before the size check | any in-game client can crash the WM with n > 1351 | reject n above what the request length holds |
+| W04-B60 | client 0x0846 | the new spam-filter values go to the DB only; the session copy (+0x1ECE0) keeps the old ones | every map change pushes the old settings back to the client (0x0845) until the next character login | update the session copy too |
+| W04-B61 | CharDB 0x0864 / 0x0869 | on success with the target online, a missing zone link or a failed 0x0865 send returns before the GM reply | the ban/release is in the DB but the GM gets no answer and the online target is not muted / unmuted until relog | still answer the GM (with an error) |
+| W04-B62 | client 0x085F | reporter == target is not refused; a failed `Spam_AddReport` is answered 0x2163 "already reported" | a player can report their own character; misleading text | refuse self-reports; distinct code |
+| W04-B63 | CharDB 0x10EF → client 0x10F0 | the 1-byte payload of NC_CHAR_EVENT_ATTENDANCE_CHECK_CMD (an empty struct) is never written | one stale stack byte on the wire (the client ignores it) | write 0 |
+| W04-B64 | 0x10F1 / 0x10F4 → client 0x10F2 | the client handler never reads nError: error replies (0x2C12, 0x2C13, DB errors) are shown as "reward has been received" and the reward is marked as taken | the player thinks a reward was given; the window state is wrong until the next 0x10ED | client: test nError; or the WM: send no 0x10F2 on errors |
+| W04-B65 | `EA_Event_Check_GetReward` (after the event) | the claimed-week test compares `RewardList[weekRowIndex]` RewardNum times instead of scanning the list; only the highest reached day tier is checked | the list is resent for an already claimed week, or suppressed while a lower day tier is unclaimed | scan the whole RewardList for every row |
+| W04-B66 | `NpcSched_BuildEntries` / `enss_NPCStandEnd` | the next-occurrence loops add NS_CycleHour until the time passes now; 0 never ends | a NpcSchedule.shn row with NS_CycleHour 0 and a past end hangs the WM (2016 table is empty) | reject 0 at load |
+| W04-B67 | `enss_NPCStandEnd` | the cycle / life hours are taken from the first row with the same Mob_Inx | two schedules for the same NPC both use the first row's timing | use the entry's own row index |
 
 (W04-B6 is reserved; not used.)
 
@@ -2240,10 +2585,19 @@ AccountDB 0x0839 { u32 nUserNo, u32 nCharNo, u8 nWorldNo, u16 nError @+9, u16 hZ
 - GM events (§16): the OPTool side (what it shows for 0x3211 / 0x3221, whether it ever sends a flag other than 0/1)
   is not available; the zone's use of the records is Z08 §13 / Z09.
 
+- Attendance (§17.5): an empty `AttendSchedule.shn` makes `Attend_LoadSchedule` return 0, which W01's loader treats as
+  fatal ("*FATAL ERROR* - Attend Schedule"), so the WM needs at least one row; whether that was intended is unknown. How the
+  Character server stores and counts the call dates (`usp_Attendance_*`, w00 backup only) is D02 §12's.
+- Attendance: the client's choice of `nIndex` for week rewards (it must be the week's last day, w·7−1) and its "all days done"
+  test (`AttendCheckWin` vtable +0x104) were not traced further than the handlers in §17.5.
+- NPC schedule (§17.6): with no rows in the 2016 table, nothing about it can be checked against data or captures.
+- Chat ban: `nChatBan` = 0x0FFFFFFF is a constant, not a time; that the zone and client treat any non-zero value as
+  "banned" is read in Z02 §3.1, not in the client.
+
 ## 20. Coverage boundary
 
-Found while reconstructing this item but documented elsewhere. Work that W01 handed to W04 (dept-2 chat-block /
-spammer handlers, attendance, NPC schedule) is **not** listed here: it is open work of this item (status file, part 6b).
+Found while reconstructing this item but documented elsewhere. The work W01 handed to W04 (dept-2 spam filter /
+spammer handlers, attendance, NPC schedule) is done in §17.2–§17.6.
 
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
@@ -2260,3 +2614,8 @@ spammer handlers, attendance, NPC schedule) is **not** listed here: it is open w
 | zone handlers of 0xD00B / 0xD00C GM events (zone FUN_0046ddf0 / FUN_0046dae0) | Z08 §13 | zone side of §16 |
 | Character-server procedures behind 0x5410, 0x7C0B, 0x9420…0x9443, 0xA800…0xA80C, char options | D04 (plan title: "social, guild, quests, skills") and D02 | DB side; this doc cites D04 where it relies on it |
 | client handlers of every client-facing packet here | C01 (inventory) | cited per packet; texts from `client-error-codes.json` |
+| zone `&releasechatban` FUN_00421a60 (sends 0x0866), zone 0x0865 handler FUN_005a5710 | Z11 (plan: "GM ampersand (&) commands"); Z01 §9 | zone GM command and zone message handler |
+| zone 0x086A / 0x086B handlers FUN_005a57e0 / FUN_005a5950 (`nm_StandNPC`) | Z01 §9 | zone side of §17.6 |
+| zone 0x1120 NC_CHAR_SUPPORT_REWARD_CMD handler FUN_005a5c70 | Z07 §1.2 | zone side of `Session_SendSupportReward` (§17.5) |
+| Character-server handlers / procedures for 0x0841, 0x0844, 0x0847, 0x0863, 0x0868, 0x10EB, 0x10EE, 0x10F3 | D02 §4, §5, §9, §12 | DB side of §17.2–§17.5 |
+| W01 callers of §17: 0x180C map-login-done FUN_0042d8d0, zone registration FUN_004283e0, CharacterLogout FUN_00436d50, main loop FUN_00406760, loader FUN_00404100 | W01 (W01-core §5.4, §7.1, §7.3, §2) | they only call the W04 functions named in §17 |

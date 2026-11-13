@@ -4766,6 +4766,846 @@
      ]
     ],
     "notes": "13 bytes, raw header {0x0F, 0x3A, 0x08}; sent to the zone hZone of 0x0839; the 2016 zone has no handler (W04-B56)"
+   },
+   "0x0840": {
+    "dir": "C→WM",
+    "name": "NC_MISC_CLIENT_LOADING_BUG_DETECT_CMD",
+    "basis": "wm FUN_00417140",
+    "fields": [
+     [
+      0,
+      "Name3",
+      "sLoadingMapName",
+      ""
+     ],
+     [
+      12,
+      "u16",
+      "nFailType",
+      ""
+     ],
+     [
+      14,
+      "u16",
+      "nLoadingFailCnt",
+      ""
+     ],
+     [
+      16,
+      "Name3",
+      "sFromMapName",
+      ""
+     ],
+     [
+      28,
+      "Name4",
+      "sFromZoneIP",
+      ""
+     ],
+     [
+      44,
+      "Name4",
+      "sToZoneIP",
+      ""
+     ],
+     [
+      60,
+      "u16",
+      "nToZonePort",
+      ""
+     ],
+     [
+      62,
+      "u16",
+      "nErrorDataCnt",
+      "unchecked (W04-B59)"
+     ],
+     [
+      64,
+      "CLBD_ErrorData[n]",
+      "ErrorData",
+      "{u16 nErrorNo, u32 nErrorData}, 6 bytes each"
+     ]
+    ],
+    "notes": "forwarded to CharDB as 0x0841"
+   },
+   "0x0841": {
+    "dir": "WM→CharDB",
+    "name": "NC_MISC_DB_CLIENT_LOADING_BUG_DETECT_CMD",
+    "basis": "wm FUN_00417140",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      "CHARDATA.charNo"
+     ],
+     [
+      4,
+      "i32",
+      "nWorldTime",
+      "time(NULL)"
+     ],
+     [
+      8,
+      "bytes[0x40]",
+      "(0x0840 body)",
+      "copied field by field"
+     ],
+     [
+      72,
+      "CLBD_ErrorData[n]",
+      "ErrorData",
+      ""
+     ]
+    ],
+    "notes": "size 0x48 + 6·n"
+   },
+   "0x0844": {
+    "dir": "CharDB→WM",
+    "name": "NC_MISC_GET_CHAT_BLOCK_SPAM_FILTER_DB_CMD",
+    "basis": "wm FUN_0040d660",
+    "fields": [
+     [
+      0,
+      "u16",
+      "wmHandle",
+      "session lookup"
+     ],
+     [
+      2,
+      "u32",
+      "nUserNo",
+      "must match s.userNo"
+     ],
+     [
+      6,
+      "u32",
+      "nCharNo",
+      "must match CHARDATA.charNo"
+     ],
+     [
+      10,
+      "u8",
+      "bIsSpamSpread",
+      ""
+     ],
+     [
+      11,
+      "u8",
+      "bIsSpamBlock",
+      ""
+     ],
+     [
+      12,
+      "u8",
+      "nSpamFilterRate",
+      ""
+     ]
+    ],
+    "notes": "stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1"
+   },
+   "0x0845": {
+    "dir": "WM→C",
+    "name": "NC_MISC_GET_CHAT_BLOCK_SPAM_FILTER_CMD",
+    "basis": "wm FUN_00431cd0; client FUN_004a5820",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bIsSpamSpread",
+      "client: SetSpamFilteredTextShow"
+     ],
+     [
+      1,
+      "u8",
+      "bIsSpamBlock",
+      "client: check boxes"
+     ],
+     [
+      2,
+      "u8",
+      "nSpamFilterRate",
+      "client: SetSpamBlockRate"
+     ]
+    ],
+    "notes": "sent on every map login once 0x0844 arrived"
+   },
+   "0x0846": {
+    "dir": "C→WM",
+    "name": "NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_CMD",
+    "basis": "wm FUN_00417b90",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bIsSpamSpread",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "bIsSpamBlock",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "nSpamFilterRate",
+      ""
+     ]
+    ],
+    "notes": "session copy not updated (W04-B60)"
+   },
+   "0x0847": {
+    "dir": "WM→CharDB",
+    "name": "NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_DB_CMD",
+    "basis": "wm FUN_00417b90",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nUserNo",
+      "s+0x124"
+     ],
+     [
+      4,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      8,
+      "u8",
+      "bIsSpamSpread",
+      ""
+     ],
+     [
+      9,
+      "u8",
+      "bIsSpamBlock",
+      ""
+     ],
+     [
+      10,
+      "u8",
+      "nSpamFilterRate",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x085f": {
+    "dir": "C→WM",
+    "name": "NC_MISC_SPAMMER_REPORT_REQ",
+    "basis": "wm FUN_00417ef0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sSpammerName",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x0860": {
+    "dir": "WM→C",
+    "name": "NC_MISC_SPAMMER_REPORT_ACK",
+    "basis": "wm FUN_00417ef0; client FUN_0049cb10",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x2160 ok (no text), 0x2161 not found, 0x2162 target in prison, 0x2163 already reported"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x0861": {
+    "dir": "C→WM",
+    "name": "NC_MISC_SPAMMER_CHAT_BAN_REQ",
+    "basis": "wm FUN_004180f0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sSpammerName",
+      "GM only (adminlevel 50..100)"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x0862": {
+    "dir": "WM→C",
+    "name": "NC_MISC_SPAMMER_CHAT_BAN_ACK",
+    "basis": "wm FUN_004180f0, FUN_0040d980; client FUN_004b3520",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sSpammerName",
+      ""
+     ],
+     [
+      20,
+      "u16",
+      "nError",
+      "0x2168 ok, 0x2169 DB error, 0x216A not found, 0x216B already banned"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x0863": {
+    "dir": "WM→CharDB",
+    "name": "NC_MISC_SPAMMER_SET_DB_CHAT_BAN_REQ",
+    "basis": "wm FUN_004180f0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGMCharNo",
+      ""
+     ],
+     [
+      4,
+      "Name5",
+      "sSpammerName",
+      ""
+     ],
+     [
+      24,
+      "u32",
+      "nChatBan",
+      "0x0FFFFFFF"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x0864": {
+    "dir": "CharDB→WM",
+    "name": "NC_MISC_SPAMMER_SET_DB_CHAT_BAN_ACK",
+    "basis": "wm FUN_0040d980",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGMCharNo",
+      ""
+     ],
+     [
+      4,
+      "Name5",
+      "sSpammerName",
+      ""
+     ],
+     [
+      24,
+      "u32",
+      "nChatBan",
+      ""
+     ],
+     [
+      28,
+      "u16",
+      "nError",
+      "0x2168 ok"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x0865": {
+    "dir": "WM→Zone",
+    "name": "NC_MISC_SPAMMER_ZONE_CHAT_BAN_CMD",
+    "basis": "wm FUN_0040d980, FUN_0040dbf0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sSpammerName",
+      ""
+     ],
+     [
+      20,
+      "u32",
+      "nChatBan",
+      "0 = released"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x0866": {
+    "dir": "Zone→WM",
+    "name": "NC_MISC_SPAMMER_RELEASE_CHAT_BAN_REQ",
+    "basis": "wm FUN_0042c3b0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGMCharNo",
+      "GM adminlevel 50..100"
+     ],
+     [
+      4,
+      "Name5",
+      "sSpammerName",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x0867": {
+    "dir": "WM→C",
+    "name": "NC_MISC_SPAMMER_RELEASE_CHAT_BAN_ACK",
+    "basis": "wm FUN_0040dbf0; client FUN_004b35b0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x2170 ok, 0x2172 not found"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x0868": {
+    "dir": "WM→CharDB",
+    "name": "NC_MISC_SPAMMER_RELEASE_CHAT_BAN_DB_REQ",
+    "basis": "wm FUN_0042c3b0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGMCharNo",
+      ""
+     ],
+     [
+      4,
+      "Name5",
+      "sSpammerName",
+      ""
+     ],
+     [
+      24,
+      "u32",
+      "nChatBan",
+      "0"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x0869": {
+    "dir": "CharDB→WM",
+    "name": "NC_MISC_SPAMMER_RELEASE_CHAT_BAN_DB_ACK",
+    "basis": "wm FUN_0040dbf0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGMCharNo",
+      ""
+     ],
+     [
+      4,
+      "Name5",
+      "sSpammerName",
+      ""
+     ],
+     [
+      24,
+      "u32",
+      "nChatBan",
+      ""
+     ],
+     [
+      28,
+      "u16",
+      "nError",
+      "0x2170 ok"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x086a": {
+    "dir": "WM→Zone",
+    "name": "NC_MISC_EVENTNPC_STANDSTART_ZONE_CMD",
+    "basis": "wm FUN_00456c50, FUN_00456e20, FUN_00457110",
+    "fields": [
+     [
+      0,
+      "Name8",
+      "sMobIndex",
+      "NpcSchedule.shn Mob_Inx"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x086b": {
+    "dir": "WM→Zone",
+    "name": "NC_MISC_EVENTNPC_STANDEND_ZONE_CMD",
+    "basis": "wm FUN_00456c50, FUN_00456e20, FUN_00457110",
+    "fields": [
+     [
+      0,
+      "Name8",
+      "sMobIndex",
+      "NpcSchedule.shn Mob_Inx"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x086c": {
+    "dir": "WM→C",
+    "name": "NC_MISC_EVENTNPC_STANDSTART_CLIENT_CMD",
+    "basis": "wm FUN_00456c50, FUN_00456e20, FUN_00457110",
+    "fields": [
+     [
+      0,
+      "Name8",
+      "sMobIndex",
+      "NpcSchedule.shn Mob_Inx"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x086d": {
+    "dir": "WM→C",
+    "name": "NC_MISC_EVENTNPC_STANDEND_CLIENT_CMD",
+    "basis": "wm FUN_00456c50, FUN_00456e20, FUN_00457110",
+    "fields": [
+     [
+      0,
+      "Name8",
+      "sMobIndex",
+      "NpcSchedule.shn Mob_Inx"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x10eb": {
+    "dir": "WM→CharDB",
+    "name": "NC_CHAR_EVENT_ATTENDANCE_LIST_DB_REQ",
+    "basis": "wm FUN_0043a7f0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      4,
+      "tm (9×i32)",
+      "tmEventStartDate",
+      "localtime(eventStart)"
+     ],
+     [
+      40,
+      "tm (9×i32)",
+      "tmEventEndDate",
+      "localtime(eventEnd)"
+     ],
+     [
+      76,
+      "i32",
+      "tConnect",
+      "time(NULL) at first map login"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x10ec": {
+    "dir": "CharDB→WM",
+    "name": "NC_CHAR_EVENT_ATTENDANCE_LIST_DB_ACK",
+    "basis": "wm FUN_0043bab0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "nError",
+      "0x2C00 ok"
+     ],
+     [
+      6,
+      "i32",
+      "tConnect",
+      "echo"
+     ],
+     [
+      10,
+      "u8",
+      "AttendanceNum",
+      ""
+     ],
+     [
+      11,
+      "tm (9×i32)[28]",
+      "AttendanceArray",
+      ""
+     ],
+     [
+      1019,
+      "u8",
+      "RewardNum",
+      ""
+     ],
+     [
+      1020,
+      "u8[RewardNum]",
+      "RewardList",
+      "AR_IDs already claimed"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x10ed": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_EVENT_ATTENDANCE_LIST_CLIENT_CMD",
+    "basis": "wm FUN_0043bab0; client FUN_0049d030",
+    "fields": [
+     [
+      0,
+      "tm (9×i32)",
+      "tEventStart",
+      ""
+     ],
+     [
+      36,
+      "u8",
+      "nCurIndex",
+      "28 = no running event"
+     ],
+     [
+      37,
+      "u8[28]",
+      "AttendanceArray",
+      "1 = day marked"
+     ],
+     [
+      65,
+      "u8",
+      "RewardNum",
+      ""
+     ],
+     [
+      66,
+      "u8[RewardNum]",
+      "RewardList",
+      ""
+     ]
+    ],
+    "notes": "size 0x42 + RewardNum"
+   },
+   "0x10ee": {
+    "dir": "WM→CharDB",
+    "name": "NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_REQ",
+    "basis": "wm FUN_0043bde0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      4,
+      "tm (9×i32)",
+      "tCheckTime",
+      "localtime(start of the current day)"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x10ef": {
+    "dir": "CharDB→WM",
+    "name": "NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_ACK",
+    "basis": "wm FUN_0043a9b0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "nError",
+      "0x2C08 ok, 0x2C09 DB error, 0x2C0A already"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x10f0": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_EVENT_ATTENDANCE_CHECK_CMD",
+    "basis": "wm FUN_0043a9b0; client FUN_004b39f0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(empty struct)",
+      "never written (W04-B63)"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x10f1": {
+    "dir": "C→WM",
+    "name": "NC_CHAR_EVENT_ATTENDANCE_REWARD_REQ",
+    "basis": "wm FUN_0043aac0; client FUN_004a5d10",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nIndex",
+      "week w: w·7−1; day count: 27"
+     ],
+     [
+      1,
+      "u8",
+      "nRewardID",
+      "AttendReward AR_ID"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x10f2": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_EVENT_ATTENDANCE_REWARD_ACK",
+    "basis": "wm FUN_0043a8f0; client FUN_004bbc70",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nIndex",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "nRewardID",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "nError",
+      "0x2C10 ok; 0x2C12 / 0x2C13 WM refusals; the client ignores it (W04-B64)"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x10f3": {
+    "dir": "WM→CharDB",
+    "name": "NC_CHAR_EVENT_ATTENDANCE_REWARD_DB_REQ",
+    "basis": "wm FUN_0043aac0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      "0 without CHARDATA"
+     ],
+     [
+      4,
+      "u8",
+      "nIndex",
+      ""
+     ],
+     [
+      5,
+      "tm (9×i32)",
+      "tmEventDay",
+      "localtime(DayStart(nIndex))"
+     ],
+     [
+      41,
+      "u8",
+      "nRewardID",
+      ""
+     ],
+     [
+      42,
+      "tm (9×i32)",
+      "tmCheckStartDay",
+      ""
+     ],
+     [
+      78,
+      "tm (9×i32)",
+      "tmCheckEndDay",
+      ""
+     ]
+    ],
+    "notes": "0x72 bytes"
+   },
+   "0x10f4": {
+    "dir": "CharDB→WM",
+    "name": "NC_CHAR_EVENT_ATTENDANCE_REWARD_DB_ACK",
+    "basis": "wm FUN_0043ad90",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "nIndex",
+      ""
+     ],
+     [
+      5,
+      "u8",
+      "nRewardID",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "nError",
+      "relayed in 0x10F2"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x10f5": {
+    "dir": "WM→C",
+    "name": "NC_CHAR_EVENT_ATTENDANCE_CHANGE_DAY_CMD",
+    "basis": "wm FUN_0043b630; client FUN_0049d080",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nChangeIndex",
+      "new day index (28 at the end)"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x10f6": {
+    "dir": "WM→C",
+    "name": "NC_CHER_EVENT_ATTENDANCE_CHANGE_START_CMD",
+    "basis": "wm FUN_0043bde0; client FUN_0049d0a0",
+    "fields": [
+     [
+      0,
+      "tm (9×i32)",
+      "tEventStart",
+      ""
+     ]
+    ],
+    "notes": "0x24 bytes, to every playing client"
    }
   }
  },

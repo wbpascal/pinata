@@ -8088,6 +8088,43 @@ Sent from `FUN_004016f0` (`FUN_004016f0`) · payload 4 bytes
 
 client sender needs adminlevel 100 and no prison
 
+### `0x0844` NC_MISC_GET_CHAT_BLOCK_SPAM_FILTER_DB_CMD † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040d660)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wmHandle | session lookup |
+| 2 | u32 | nUserNo | must match s.userNo |
+| 6 | u32 | nCharNo | must match CHARDATA.charNo |
+| 10 | u8 | bIsSpamSpread |  |
+| 11 | u8 | bIsSpamBlock |  |
+| 12 | u8 | nSpamFilterRate |  |
+
+stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
+
+### `0x0864` NC_MISC_SPAMMER_SET_DB_CHAT_BAN_ACK (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040d980)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGMCharNo |  |
+| 4 | Name5 | sSpammerName |  |
+| 24 | u32 | nChatBan |  |
+| 28 | u16 | nError | 0x2168 ok |
+
+### `0x0869` NC_MISC_SPAMMER_RELEASE_CHAT_BAN_DB_ACK (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040dbf0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGMCharNo |  |
+| 4 | Name5 | sSpammerName |  |
+| 24 | u32 | nChatBan |  |
+| 28 | u16 | nError | 0x2170 ok |
+
 ### `0x0c13` NC_USER_AVATARINFO_ACK (CharDB→WM)
 
 **Verified layout** (basis: wm FUN_0040ede0)
@@ -8107,6 +8144,40 @@ client sender needs adminlevel 100 and no prison
 | 0 | u16 | wmHandle |  |
 | 2 | u16 | count | > 100 clamped |
 | 4 | {u32 charNo, Name5 name, u8 flag}[n] | friends | 25 bytes each |
+
+### `0x10ec` NC_CHAR_EVENT_ATTENDANCE_LIST_DB_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0043bab0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u16 | nError | 0x2C00 ok |
+| 6 | i32 | tConnect | echo |
+| 10 | u8 | AttendanceNum |  |
+| 11 | tm (9×i32)[28] | AttendanceArray |  |
+| 1019 | u8 | RewardNum |  |
+| 1020 | u8[RewardNum] | RewardList | AR_IDs already claimed |
+
+### `0x10ef` NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0043a9b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u16 | nError | 0x2C08 ok, 0x2C09 DB error, 0x2C0A already |
+
+### `0x10f4` NC_CHAR_EVENT_ATTENDANCE_REWARD_DB_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0043ad90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u8 | nIndex |  |
+| 5 | u8 | nRewardID |  |
+| 6 | u16 | nError | relayed in 0x10F2 |
 
 ### `0x541c` NC_FRIEND_DB_POINT_CMD † (CharDB→WM)
 
@@ -8175,6 +8246,61 @@ size 8
 | 2 | u16 | nSessionHandle |  |
 
 size 4
+
+### `0x0840` NC_MISC_CLIENT_LOADING_BUG_DETECT_CMD † (C→WM)
+
+**Verified layout** (basis: wm FUN_00417140)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name3 | sLoadingMapName |  |
+| 12 | u16 | nFailType |  |
+| 14 | u16 | nLoadingFailCnt |  |
+| 16 | Name3 | sFromMapName |  |
+| 28 | Name4 | sFromZoneIP |  |
+| 44 | Name4 | sToZoneIP |  |
+| 60 | u16 | nToZonePort |  |
+| 62 | u16 | nErrorDataCnt | unchecked (W04-B59) |
+| 64 | CLBD_ErrorData[n] | ErrorData | {u16 nErrorNo, u32 nErrorData}, 6 bytes each |
+
+forwarded to CharDB as 0x0841
+
+### `0x0846` NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_CMD † (C→WM)
+
+**Verified layout** (basis: wm FUN_00417b90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsSpamSpread |  |
+| 1 | u8 | bIsSpamBlock |  |
+| 2 | u8 | nSpamFilterRate |  |
+
+session copy not updated (W04-B60)
+
+### `0x085f` NC_MISC_SPAMMER_REPORT_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00417ef0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sSpammerName |  |
+
+### `0x0861` NC_MISC_SPAMMER_CHAT_BAN_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_004180f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sSpammerName | GM only (adminlevel 50..100) |
+
+### `0x10f1` NC_CHAR_EVENT_ATTENDANCE_REWARD_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0043aac0; client FUN_004a5d10)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nIndex | week w: w·7−1; day count: 27 |
+| 1 | u8 | nRewardID | AttendReward AR_ID |
 
 ### `0x200c` NC_ACT_WHISPER_REQ † (C→WM)
 
@@ -9010,6 +9136,109 @@ raw long frame, len 0x143 + n
 |---|---|---|---|
 | 0 | u16 | handle |  |
 | 2 | u32 | userNo |  |
+
+### `0x0845` NC_MISC_GET_CHAT_BLOCK_SPAM_FILTER_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00431cd0; client FUN_004a5820)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsSpamSpread | client: SetSpamFilteredTextShow |
+| 1 | u8 | bIsSpamBlock | client: check boxes |
+| 2 | u8 | nSpamFilterRate | client: SetSpamBlockRate |
+
+sent on every map login once 0x0844 arrived
+
+### `0x0860` NC_MISC_SPAMMER_REPORT_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00417ef0; client FUN_0049cb10)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2160 ok (no text), 0x2161 not found, 0x2162 target in prison, 0x2163 already reported |
+
+### `0x0862` NC_MISC_SPAMMER_CHAT_BAN_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004180f0, FUN_0040d980; client FUN_004b3520)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sSpammerName |  |
+| 20 | u16 | nError | 0x2168 ok, 0x2169 DB error, 0x216A not found, 0x216B already banned |
+
+### `0x0867` NC_MISC_SPAMMER_RELEASE_CHAT_BAN_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040dbf0; client FUN_004b35b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2170 ok, 0x2172 not found |
+
+### `0x086c` NC_MISC_EVENTNPC_STANDSTART_CLIENT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00456c50, FUN_00456e20, FUN_00457110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name8 | sMobIndex | NpcSchedule.shn Mob_Inx |
+
+### `0x086d` NC_MISC_EVENTNPC_STANDEND_CLIENT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00456c50, FUN_00456e20, FUN_00457110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name8 | sMobIndex | NpcSchedule.shn Mob_Inx |
+
+### `0x10ed` NC_CHAR_EVENT_ATTENDANCE_LIST_CLIENT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0043bab0; client FUN_0049d030)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | tm (9×i32) | tEventStart |  |
+| 36 | u8 | nCurIndex | 28 = no running event |
+| 37 | u8[28] | AttendanceArray | 1 = day marked |
+| 65 | u8 | RewardNum |  |
+| 66 | u8[RewardNum] | RewardList |  |
+
+size 0x42 + RewardNum
+
+### `0x10f0` NC_CHAR_EVENT_ATTENDANCE_CHECK_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0043a9b0; client FUN_004b39f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | (empty struct) | never written (W04-B63) |
+
+### `0x10f2` NC_CHAR_EVENT_ATTENDANCE_REWARD_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0043a8f0; client FUN_004bbc70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nIndex |  |
+| 1 | u8 | nRewardID |  |
+| 2 | u16 | nError | 0x2C10 ok; 0x2C12 / 0x2C13 WM refusals; the client ignores it (W04-B64) |
+
+### `0x10f5` NC_CHAR_EVENT_ATTENDANCE_CHANGE_DAY_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0043b630; client FUN_0049d080)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nChangeIndex | new day index (28 at the end) |
+
+### `0x10f6` NC_CHER_EVENT_ATTENDANCE_CHANGE_START_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0043bde0; client FUN_0049d0a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | tm (9×i32) | tEventStart |  |
+
+0x24 bytes, to every playing client
 
 ### `0x200d` NC_ACT_SOMEONEWHISPER_CMD † (WM→C)
 
@@ -10039,6 +10268,51 @@ size 0x16
 
 size 2
 
+### `0x0841` NC_MISC_DB_CLIENT_LOADING_BUG_DETECT_CMD † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00417140)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | CHARDATA.charNo |
+| 4 | i32 | nWorldTime | time(NULL) |
+| 8 | bytes[0x40] | (0x0840 body) | copied field by field |
+| 72 | CLBD_ErrorData[n] | ErrorData |  |
+
+size 0x48 + 6·n
+
+### `0x0847` NC_MISC_SET_CHAT_BLOCK_SPAM_FILTER_DB_CMD (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00417b90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nUserNo | s+0x124 |
+| 4 | u32 | nCharNo |  |
+| 8 | u8 | bIsSpamSpread |  |
+| 9 | u8 | bIsSpamBlock |  |
+| 10 | u8 | nSpamFilterRate |  |
+
+### `0x0863` NC_MISC_SPAMMER_SET_DB_CHAT_BAN_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_004180f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGMCharNo |  |
+| 4 | Name5 | sSpammerName |  |
+| 24 | u32 | nChatBan | 0x0FFFFFFF |
+
+### `0x0868` NC_MISC_SPAMMER_RELEASE_CHAT_BAN_DB_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0042c3b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGMCharNo |  |
+| 4 | Name5 | sSpammerName |  |
+| 24 | u32 | nChatBan | 0 |
+
 ### `0x0c12` NC_USER_AVATARINFO_REQ (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_00408740 / FUN_00412ee0)
@@ -10086,6 +10360,41 @@ size 2
 | 24 | u16 | playMinutes |  |
 | 26 | u8 | closeReason-0x80 |  |
 | 27 | u64 | money |  |
+
+### `0x10eb` NC_CHAR_EVENT_ATTENDANCE_LIST_DB_REQ (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0043a7f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | tm (9×i32) | tmEventStartDate | localtime(eventStart) |
+| 40 | tm (9×i32) | tmEventEndDate | localtime(eventEnd) |
+| 76 | i32 | tConnect | time(NULL) at first map login |
+
+### `0x10ee` NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_REQ (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0043bde0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | tm (9×i32) | tCheckTime | localtime(start of the current day) |
+
+### `0x10f3` NC_CHAR_EVENT_ATTENDANCE_REWARD_DB_REQ (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0043aac0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | 0 without CHARDATA |
+| 4 | u8 | nIndex |  |
+| 5 | tm (9×i32) | tmEventDay | localtime(DayStart(nIndex)) |
+| 41 | u8 | nRewardID |  |
+| 42 | tm (9×i32) | tmCheckStartDay |  |
+| 78 | tm (9×i32) | tmCheckEndDay |  |
+
+0x72 bytes
 
 ### `0x1402` NC_AVATAR_CREATEDATA_REQ † (WM→CharDB)
 
@@ -10569,6 +10878,31 @@ size 4
 | 11 | u16 | nQuestID |  |
 
 13 bytes, raw header {0x0F, 0x3A, 0x08}; sent to the zone hZone of 0x0839; the 2016 zone has no handler (W04-B56)
+
+### `0x0865` NC_MISC_SPAMMER_ZONE_CHAT_BAN_CMD † (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0040d980, FUN_0040dbf0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sSpammerName |  |
+| 20 | u32 | nChatBan | 0 = released |
+
+### `0x086a` NC_MISC_EVENTNPC_STANDSTART_ZONE_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00456c50, FUN_00456e20, FUN_00457110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name8 | sMobIndex | NpcSchedule.shn Mob_Inx |
+
+### `0x086b` NC_MISC_EVENTNPC_STANDEND_ZONE_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00456c50, FUN_00456e20, FUN_00457110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name8 | sMobIndex | NpcSchedule.shn Mob_Inx |
 
 ### `0x0c16` NC_USER_KICKOFFFROMWORLD_CMD (WM→Zone)
 
@@ -11161,6 +11495,15 @@ then Pre u32 nPartySeqCharNo[5], Post {u16, u8, u8, u32[5]}; 0x32 bytes; 6 bytes
 | 9 | u8 | nSlotIndex |  |
 
 10 bytes; field names pdb2017, offsets read in the 2016 WM
+
+### `0x0866` NC_MISC_SPAMMER_RELEASE_CHAT_BAN_REQ † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042c3b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGMCharNo | GM adminlevel 50..100 |
+| 4 | Name5 | sSpammerName |  |
 
 ### `0x101c` NC_CHAR_ZONE_CHARDATA_REQ † (Zone→WM)
 
