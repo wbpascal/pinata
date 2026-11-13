@@ -11,8 +11,9 @@ The GameLog server is a write-only sink. Zone, WM and Character servers send one
 fields into a parameter struct and calls one `p_GameLog_Add*` procedure, which inserts one `tGameLog` row. Nothing is read back,
 nothing is answered (one exception: 0x0402 → 0x0403), no state is kept between packets.
 
-Parts: §1–§2 = part 1 (framework, procedures, dept-1 commands 1–84), §3 = part 2 (dept-1 commands 85–857). Later parts add the
-rest of dept 1, MISC/OPTOOL and the NC_SYSLOG dept 50 (see `docs/plan/status/D05.md`).
+Parts: §1–§2 = part 1 (framework, procedures, dept-1 commands 1–84), §3 = part 2 (dept-1 commands 85–857), §4–§6 = part 3
+(rest of dept 1, MISC/OPTOOL server link, NC_SYSLOG dept 50), §7 = part 4 (process framework: start, service, sockets, framing,
+heartbeat, diagnostics), §8–§10 bugs, open points, coverage boundary.
 
 ## 1. Process and storage
 
@@ -28,7 +29,7 @@ DataServer (GameLog)
 │              + #INCLUDE ../9Data/ServerInfo/ServerInfo.txt                          @ FUN_00401370 DataServer_ReadDefineScriptor
 ├── ODBC     : row id 11 ("w00_GameLog", database w00_GameLog) is the only one opened    @ FUN_0040a290 SessionWorker_DBInit
 │              (missing row: "DB_Init FAILED, Scriptor BASE ODBC info. not found.")
-├── also     : ../9Data/Shine/MapInfo.shn, ItemInfo.shn (framework; no part-1 handler uses them)
+├── also     : ../9Data/Shine/ItemInfo.shn only (MapInfo.shn is read only by server type 2; no handler uses either, §7.1)
 ├── parsers  : CPFs (server link, ctor FUN_00409640), CParserGameLog (ctor FUN_00407c30, 191 registrations)
 └── workers  : "<NUMBER OF %d SESSION WORKER STARTED>"; each runs SessionWorker_Run       @ FUN_0040a380
 ```
@@ -630,6 +631,301 @@ without the trailing `CharID`/`UserID` strings and levels *(pdb2017 has them)*; 
 Not registered in 2016 (go to `fc_dummyfunction`, §5): 50/1–3 `ACCOUNT_LOGIN_SUCCESS/FAILURE/LOGOUT`, 50/12 `CHAR_LOOT`,
 50/17 `SERVER_CCU`, 50/23 `NC_GAMIGO_NEW_TUTORIAL_STORE_STEP` *(pdb2017 names)*.
 
+## 7. Process framework (part 4 sweep)
+
+The same "DataServer" code as the Account / AccountLog servers (D01 §1, which documents only the worker and the helpers). All
+helper names in this section are ours unless a string is quoted; class names (`CSession`, `CSession_Manager`, `CPacket`,
+`CIOBuffer`, `WinService`, `Database`, `AssertClass`, `ShineLog`, `IOBufferContainer`) come from RTTI or log strings. The
+process object is the global `g_DataServer` = `DAT_0044d188` (ctor `DataServer_ctor` FUN_00401900).
+
+| `g_DataServer` + | Meaning |
+|---|---|
+| 0x4f8 / 0x4fc | service name / display name (the two `MY_SERVER` strings: "PG_W00_GLDB", "_2015_GameLog") *(inferred: read by `DataServer_ReadDefineScriptor`)* |
+| 0x500 / 0x504 / 0x508 | my server type (3) / world / zone (`MY_SERVER` integers) |
+| 0x51c | IOCP object (handle + worker-thread table) |
+| 0x54c | `CSession_Manager` (session pool; ctor FUN_0040a250); 0x558 = its listener (`mgr + 0xc`) |
+| 0x9838 | session-worker pool (§1.1) |
+| 0x209890 | "started as a service" flag, set to 1 once the syslog file object is open |
+| 0x209894 / 0x2098a4 | local start / stop time (SYSTEMTIME, logged with the UTC time by FUN_004010f0 / FUN_00401230) |
+| 0x2098b4 / 0x2098b8 / 0x2098bc | stop requested / main thread running / main thread handle |
+| 0x2098c4 | NC_SYSLOG file object (§6.1) |
+
+### 7.1 Start, Windows service, shutdown
+
+```pseudo
+DataServer_WinMain(…, cmdline):                                           @ FUN_004020b0 (called by the CRT entry)
+    Exception_Install(): SetUnhandledExceptionFilter(Exception_Filter)    @ FUN_00412880 (§7.4)
+    rc = DataServer_Main(g_DataServer, cmdline); log "< END OF MAIN = %d >"
+
+DataServer_Main(cmdline):                                                 @ FUN_00401de0
+    chdir(directory of the exe)
+    log "-------…", "Launching the server....."
+    DebugMessage_WriteExecUpdateInfo(DAT_00434898)  →  .\DebugMessage\ExecUpdateInfo.txt =
+        "US - 2015년 11월 05일 - 11시 42분 26초"   (build stamp: US build of 2015-11-05 11:42:26)   @ FUN_0040fc10
+    DataServer_LogStartTime()                                             @ FUN_004010f0
+    if !DataServer_ReadDefineScriptor(): return −1                        @ FUN_00401370 (§1.1)
+    if !DataServer_ReadGameData():       return −4                        @ FUN_00401510
+    if !DataServer_ServiceCommand(cmdline): return −2                     @ FUN_004019e0
+    WinService_Run(name = +0x4f8, start = FUN_00402120 → DataServer_ServiceStart,
+                   stop = FUN_00402130 → DataServer_ServiceStop)          @ FUN_004120d0
+        StartServiceCtrlDispatcherA({name, WinService_ServiceMain}); fails (not started by the SCM) → returns
+    return 0
+    # the server only runs as a Windows service; started from a console, the dispatcher fails and main ends with 0 (inferred
+    # from the API: StartServiceCtrlDispatcher fails with 1063 outside the SCM)
+
+DataServer_ReadGameData():                                                @ FUN_00401510
+    ItemDataBox_LoadIfExists(DAT_006574a0, "../../9Data/Shine/ItemInfo.shn"), else "../9Data/Shine/ItemInfo.shn"
+        (fopen test, then ItemDataBox_Load: SHN rows → id index + name hash)   @ FUN_00410d00 / FUN_00410a40
+        both missing → log "*FAILED GLOBAL GAME DATA READ - ItemInfo.shn"; return 0
+    if my type (+0x500) == 2: MapDataBox_Load(DAT_00656f80, "../../9Data/Shine/MapInfo.shn" / "../9Data/…")  @ FUN_004105c0
+        # never for the GameLog server (type 3)
+    return 1
+    # no GameLog code reads DAT_006574a0 after the load: the item table only costs start-up time and memory
+
+DataServer_ServiceCommand(cmdline):                                       @ FUN_004019e0
+    args = up to 5 tokens of cmdline split at " \t,\""
+    no args: if WinService_QueryStatus(name) succeeds (service installed)  @ FUN_00411db0
+                 → log "Service start(no parameter)"; return 1      (continue: run as the service)
+             else args[0] = "UPLOAD"                                  (not installed yet: install it)
+    "UPLOAD": WinService_Install(name, display name, exe path)          @ FUN_00411b70
+                 CreateServiceA(SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START, SERVICE_ERROR_IGNORE)
+                 → "Service upload only ok." / "Service upload failed."
+    "REMOVE": WinService_Remove(name) (OpenService + DeleteService)       @ FUN_00411c70
+                 → "Service remove ok." / "Service remove failed."
+    other  : "Service unknown command."
+    every non-start case: log + MessageBoxA(text, caption = display name); return 0 (main returns −2)
+
+WinService_ServiceMain():                                                 @ FUN_00411fa0
+    WinService_ReportStart():                                             @ FUN_00411ee0
+        event = CreateEvent(auto-reset); RegisterServiceCtrlHandlerA(name, WinService_CtrlHandler FUN_00411eb0)
+        SetServiceStatus(START_PENDING, controls = STOP | SHUTDOWN, wait hint 1000)
+        if !DataServer_ServiceStart(): return     # status stays START_PENDING (original bug) D05-B10
+        SetServiceStatus(RUNNING)
+    loop: wait for the event; control = code stored by the handler (+0x24); STOP (1) or SHUTDOWN (5) → leave; other codes ignored
+    WinService_ReportStop(): SetServiceStatus(STOP_PENDING, wait hint 5000); DataServer_ServiceStop(); SetServiceStatus(STOPPED)  @ FUN_00411d20
+
+DataServer_ServiceStart():                                                @ FUN_00401f90
+    RotatingLog_Open(syslog file, "C:/data/gamigo-dwh/current/", hourly, "_fiesta_Gamelog_World%d.log")   (§6.1)
+        fails → return 0
+    +0x209890 = 1
+    IOCP_StartThreads(5 × CPU count, wait until all run)                    @ FUN_0040ec80
+        CreateIoCompletionPort; one IOCP_WorkerThread each (FUN_0040eb90); log "<NUMBER OF %d IOCP WORKTHREAD STARTED, %d CPU DETECTED>"
+        fewer threads than asked → return 0
+    SessionWorkerPool_Start(count −1 → min(10 × CPU + 1, 81), wait)        @ FUN_0040abe0
+        per worker: CSessionWorker (0x1268 bytes, ctor FUN_0040a6d0), SessionWorker_Start FUN_0040a580 (thread SessionWorker_Run,
+        wait while state 1; ok when state 2 = DB connected); any failure → stop all, return 0
+        log "<NUMBER OF %d SESSION WORKER STARTED>"
+    DataServer_StartAcceptor():                                           @ FUN_004015b0
+        row = SERVER_INFO with (type, world, zone) = (+0x500, +0x504, +0x508)   ServerInfo_LookupServer @ FUN_004100e0
+            (ServerInfo_FindServer FUN_0040ff60 / ServerInfo_GetServer FUN_0040feb0: scriptor record kind 3 = SERVER_INFO
+             {name, type, world, zone, int, ip, port, backlog, max sessions})
+            none → log "FATAL ERROR - Can't found ServerInfo on funcition 'DataServer::Start_Acceptor()', …"; return 0
+            (2016 ServerInfo.txt: SERVER_INFO "PG_W00_GLDB", 3, 0, 0, 0, "0.0.0.0", 9511, 100, 100)
+        SessionManager_Init(IOCP, max sessions)                           @ FUN_004119b0
+            pre-creates max-sessions CSession objects (CSession_Manager_NewSession FUN_00409f40: 0x154 bytes, CSession_ctor FUN_00409c00)
+            fails → "*FAILED SESSION MANAGER INIT*"; else "<SUCCESSED SESSION MANAGER INIT>"
+        ip == "" → Listener_StartOnLocalAddress (first address of the host; "ERROR - FAILED TO GET LISTEN SOCKET IP ADDRESS")  @ FUN_004112f0
+        else Listener_Start(ip, port, backlog)                            @ FUN_00411250
+            Listener_Bind: socket, SO_REUSEADDR, non-blocking (FIONBIO), bind, listen     @ FUN_00411020
+            Listener_StartThread (Listener_AcceptThread)                  @ FUN_004111a0
+            log "<SUCCSSED LISTEN AT IP=%s, Port=%d, BacklogCount=%d >"
+        failure → "*FAILED START LISTEN SOCKET*"; return 0
+    DataServer_StartMainThread(): CreateThread(DataServer_MainThread), wait until it runs   @ FUN_00401d60
+        fails → "*FAILED CREATE MAIN THREAD*"
+    log "SERVER WORK START ----…"; return 1
+
+DataServer_MainThread():                                                  @ FUN_004016d0
+    log "<MAIN THREAD START>"; +0x2098b8 = 1
+    every 1000 ms until +0x2098b4 (stop requested): CSession_Manager_HeartbeatTick()   (§7.2)
+    Listener_Stop (shutdown + closesocket, wait for the accept thread)    @ FUN_00410fb0   "<SUCCESSED STOP LISTEN SOCKET>" / "*FAILED …*"
+    SessionWorkerPool_Stop(−1): workers in state 2 → 3, wait until all are 0   @ FUN_0040a800   "<SESSION WORKER ALL STOPPED>"
+    SessionManager_CloseAll: Session_Close on every used session           @ FUN_00411510   "<SESSION DISCONNECTED>"
+    IOCP_Close (stop the IOCP threads, CloseHandle)                        @ FUN_0040ec60   "<IOCP CLOSED>"
+    SessionManager_Destroy                                                @ FUN_00411a90   "<SESSION CLOSED>"
+    DataServer_LogStopTime(); "<MAIN THREAD STOP>"; +0x2098b8 = 0
+    +0x209890 != 0 → "<SERVER MANUAL STOPPED>", return    else "<SERVER SELF STOPPED>", _exit(0)
+    # +0x209890 is set before this thread starts and never cleared, so the _exit branch is dead code
+
+DataServer_ServiceStop():  +0x2098b4 = 1; wait (5 ms steps) until the main thread clears +0x2098b8      @ FUN_004010c0
+```
+
+The `NC_OPTOOL_CLOSE_SERVER_REQ` flag (`DAT_00656a3c`, §5, D05-B7) is not part of this loop: only the SCM can stop the server.
+
+### 7.2 Sessions: accept, receive, framing, heartbeat, close
+
+`CSession` (0x154 bytes, one per accepted link, pooled):
+
+| + | Meaning |
+|---|---|
+| 0x08 | `CSocket_IOCP` (socket handle at +8; peer address at +0xc: port +0xe, IPv4 +0x10) |
+| 0xbc | `CPacket` receive buffer: base +0xc0, capacity +0xc4 (0x2000), read cursor +0xc8, used bytes +0xd0 |
+| 0xdc | state: 0 = connected, not authenticated; 1 = authenticated by 0x0802 (§5); 2 = (D01) |
+| 0xe0 / 0xe4 / 0xe8 / 0xec | peer server type / world / zone / connect SYSTEMTIME (§5) |
+| 0xfc / 0x100 | `timeGetTime` of the last receive / last write completion |
+| 0x104 / 0x108 / 0x10c | opcode, payload length and work state (1 running, 2 done, 3 failed) of the packet being handled (log only) |
+| 0x110 | time the heartbeat request was sent (0 = none pending) |
+| 0x114 | send lock (CRITICAL_SECTION) |
+| 0x134 / 0x148 | OVERLAPPED used to post a close; its kind = 2 |
+
+```pseudo
+Listener_AcceptThread(listener):                                          @ FUN_00410df0
+    until stop: select(listen socket, timeout) → accept → AcceptorApp_OnAccept → CSession_Manager_OnAccept(sock, addr)
+        returns null → log "*Accept_Process Error!*", closesocket
+        select error → log "*Listen Socket Error!*"; Sleep 10 ms (1 ms after an accept)
+
+CSession_Manager_OnAccept(sock, addr):                                    @ FUN_00409ff0 (CSession_Manager slot 2)
+    under the session-list lock:
+    s = SessionManager_TakeFree()                                         @ FUN_004118d0 / FUN_00411970
+        none (max sessions in use) → log "* ACCEPT NO SESSION BUFFER - ERROR *" (once until a session is free again); return null
+    s.socket = sock; s.addr = addr; s.state = 0; s.lastRecv = now; s.heartbeatSent = 0
+    Socket_RegisterToIOCP(s) (associate + first ReadFile)                 @ FUN_00412d20
+        fails → "ERROR - Socket_Register_To_IOCP Step #1|#2, Socket=%d, %s", log "* ACCEPT SOCKET IOCP REGISTER - ERROR *",
+                release s, return null
+    CSession_SendConnectionRdy(s): raw frame {02 01 08} = 0x0801 NC_MISC_S2SCONNECTION_RDY      @ FUN_00409e40
+        fails → "* NC_MISC_S2SCONNECTION_RDY - SEND ERROR *", release s, return null
+    # the peer answers with 0x0802 S2SCONNECTION_REQ (§5)
+
+IOCP_WorkerThread(t):                                                     @ FUN_0040eb90
+    log "<IOCP WORKTHREAD #%d RUNNING>"
+    loop: GetQueuedCompletionStatus(1000 ms)
+        failed with an OVERLAPPED (not timeout 0x102 / aborted 0x3e3) → IOCPManagerApp_OnError → CSession_Manager_OnClose  @ FUN_0040a230
+        ok → IOCPManagerApp_OnCompletion(ov, bytes)                       @ FUN_0040a1d0
+               CSession_OnIOCompletion(s, ov, bytes) == 0 → CSession_Manager_OnClose(s)
+    "<IOCP WORKTHREAD #%d FREE>"
+
+CSession_OnIOCompletion(s, ov, bytes):                                    @ FUN_00409b30
+    kind 0 (read):
+        s.lastRecv = now
+        bytes == 0 (peer closed) → Session_Close; return 0
+        used += bytes
+        if !CSession_QueueReceivedPackets(s): Session_Close; return 0
+        free = CPacket_FreeSpace(rx)                                      @ FUN_00413e00
+        free ≤ 0 → log "ERROR - Socket buffer full, some protocol too large then socket buffer"; Session_Close; return 0
+        CSocket_IOCP_Read(rx.base + used, free)                           @ FUN_00413120
+            (0 bytes asked → "ERROR - CSocket_IOCP::Receive, …"; error other than 997 → "CSocket_IOCP::Read, ERROR=%d, …", no close)
+    kind 1 (write done): s.lastSend = now; CSocket_IOCP_WriteCallback (free the sent buffer, start the next queued one;
+        "MISSMATCH - WriteCallback, …", "m_pFirstBuf = NULL - WriteCallback, …" on inconsistencies)   @ FUN_00413420
+    kind 2 (posted close): Session_Close; return 0
+
+CSession_QueueReceivedPackets(s):                                         @ FUN_004099d0
+    while CPacket_HasPacket(rx) == 1:                                     @ FUN_00413b80
+        JobQueue_Push(g_JobQueue DAT_004569c0, s, frame, frame length)    @ FUN_0040a9d0
+            # one 2 MB buffer of {session, frame} records under a lock; full → returns 0; the IOCP thread Sleep(2)s and retries
+        CPacket_Advance(rx)                                               @ FUN_00413cc0
+    HasPacket == 2 (bad frame) → log "패킷 오류 확인 From (%25s world=%3d zone=%3d, %5d=%15s:%5d) (DEP=%d,CMD=%d,LEN=%d,WORK=%d) at"
+                                 ("packet error check"); return 0 (the session is closed)
+    CPacket_Compact(rx) (move the unread tail to the start)              @ FUN_00413cf0; return 1
+
+CPacket_HasPacket(rx):  frame = the bytes at the read cursor                @ FUN_00413b80
+    header (CPacket_HeaderKind FUN_00413b40): first byte != 0 and > 2 bytes buffered → short frame, length = b0 + 1
+                                              first byte == 0 and > 4 bytes buffered → long frame, length = u16 @1 + 3
+                                              otherwise → 0 (wait for more)
+    length (CPacket_FrameLength FUN_00413be0) ≤ 2 or > capacity (0x2000) → 2 (bad frame)
+    return length ≤ buffered bytes ? 1 : 0
+    # opcode = u16 after the length (CPacket_Opcode FUN_00413d70), payload length = b0 or the u16 (CPacket_PayloadLength
+    # FUN_00413c20). Same framing as the client protocol (docs/protocol/README.md), no cipher on server links.
+
+CParser_Dispatch(parser, job):                                            @ FUN_00409770 (CParser / CParserGameLog slot 0)
+    s = parser.session (+8)
+    for each frame in the job:
+        s.curOpcode = opcode; s.curLen = payload length; s.work = 1
+        handler = parser.table[opcode & 0x3ff][opcode >> 10]               # pft table: 1024 cmd rows × 64 depts, default fc_dummyfunction
+        if !handler(frame + 2 (the opcode), payload length): s.work = 3; return       # SessionWorker_Run logs "*Work failed …" (§1.1)
+        s.work = 2
+    bad frame → log "패킷 오류 확인 …" (no close)
+
+pft_Store(table, dept, cmd, fn):                                          @ FUN_00407ad0
+    row = table[cmd] (allocated on first use, 64 slots of the default handler)
+    row[dept] already set → AssertClass_ac_AssertFail("…pft_Store : Duplicate protocol set") and AssertClass_ExitLog:
+        the process ends (_exit(0)) while the parser is constructed (§7.4)
+    row[dept] = fn
+
+CSession_Manager_HeartbeatTick():  (main thread, every second)            @ FUN_00409ee0
+    under the session-list lock, for every used session with state == 1:
+        if !CSession_CheckHeartbeat(s): CSession_PostClose(s)              @ FUN_004099b0 (PostQueuedCompletionStatus, kind 2)
+    # state-0 sessions (connected, never authenticated) are never checked: (original bug) D05-B9
+
+CSession_CheckHeartbeat(s):                                               @ FUN_00409d10
+    now − s.lastRecv < 30 000 ms → s.heartbeatSent = 0; return 1
+    s.heartbeatSent == 0 → s.heartbeatSent = now; Send 0x0804 NC_MISC_HEARTBEAT_REQ {} (CSendPacket, under the send lock);
+                           return the send result
+    now − s.heartbeatSent ≥ 180 000 ms → log "ERROR - HEARTBEAT OVERTIME, NOW DISSCONNECT WITH %s" (peer type name); return 0
+    return 1
+    # any received frame resets the timer (lastRecv is set on every read completion); the peer's 0x0805 ACK is a no-op (§5)
+
+CSession_Manager_OnClose(s):                                              @ FUN_0040a0d0 (CSession_Manager slot 3)
+    under the session-list lock:
+    if s.state != 0: log "Closed    from %p (%-25s world=%3d zone=%3d, %- 5d=%15s:%- 5d) (% 3d/% 3d개) (DEP=%d,CMD=%d,LEN=%d,WORK=%d)"
+                     (peer, address, sessions in use / max, last packet)
+    SessionManager_Release(s): back to the free list                      @ FUN_00411710 / FUN_004115d0
+```
+
+Send buffers: `CSocket_IOCP_Send` (§1.1) copies each chunk into a pooled `CIOBuffer` (0x2010 bytes, 0x2000 data):
+`IOBuffer_Alloc` FUN_00417690 takes one from 16 spin-locked free lists (round robin), else from 16 × 512 buffers pre-allocated by
+`IOBufferContainer_ctor` FUN_00417600 (allocation failure there → `AssertClass_ExitLog("IOBufferContainer::IOBufferContainer")`),
+else from the heap; `IOBuffer_Free` FUN_00417780 pushes it back on a free list (buffers are never returned to the heap). Write
+errors are logged with `ShineLog_Write` (§7.4).
+
+### 7.3 ODBC connection
+
+`Database_Connect(connection string)` FUN_00417c70 (class `Database`, ctor FUN_00417ab0, dtor FUN_00417c00): one process-wide ODBC
+environment (`DAT_006621ac`, reference count `DAT_006621b0`, freed with the last connection), one connection handle per
+`Database` (disconnected and freed first if already open), `SQLDriverConnect` with the `ODBC_INFO` connection string, no prompt.
+Each session worker opens its own (`SessionWorker_DBInit`, §1.1), so the number of SQL connections = number of workers
+(≤ 81). `ServerInfo_FindODBC` FUN_00410030 finds the `ODBC_INFO` row (scriptor record kind 4) by id (11) and the second integer
+column (`DAT_0044d68c`, next to `g_MyServerType`; 0 in the 2016 config).
+
+### 7.4 Diagnostics: debug log, crash dump, asserts, scriptor report
+
+```pseudo
+Log(level, category, fmt, …) = DebugMessage_Write                         @ FUN_0040fcd0 → FUN_0040fa80
+    (also LogMsg FUN_0040fc90, LogMsgLevel FUN_0040fcb0 with category "Msg")
+    level 0 → nothing
+    line = sprintf("%06d %s%s\n", counter++, TimeString() ("yyyy-mm-dd hh:mm:ss ", FUN_0040f8e0), message (≤ 1024))
+    append to ".\DebugMessage\<category>_<yyyy-mm-dd>.txt" (MakeSureDirectoryPathExists; file opened and closed per line)
+    # the counter DAT_00657df8 is incremented without a lock from all threads (inferred harmless: numbering only)
+
+ShineLog_Write(log, fmt, …):                                              @ FUN_00417850 (name: ShineLog_SetName FUN_004177e0, default "ShineLog")
+    used only for "CSocket_IOCP::Write %#x(%#x) err=%d" (log object DAT_0044ae90)
+    file ".\Log\<name>_<yyyy-mm-dd> <hh>.txt" (hourly) or ".\Log\<name>_<yyyy-mm-dd>.txt" (daily); reopened when the name changes;
+    line "%06d <yyyy-mm-dd> <hh:mm:ss:mmm>\t<message>"
+
+Exception_Filter(exception):  (unhandled exception)                       @ FUN_00412590
+    load DBGHELP.DLL from the exe directory, else the system one
+    Exception_WriteCallStack → "CallStack.txt" (exception name table FUN_00416a20, stack walk FUN_00416cd0 / FUN_004170d0)  @ FUN_00412370
+    optional hook DAT_006586e0 (never set in this binary (inferred))
+    MiniDumpWriteDump(…, type 0x40) into "<exe path> <TimeStringForFile()>.mdmp" (FUN_0040f9a0: "yyyy-mm-dd tt hhmmss")
+    log "EXCEPTION - Saved dump file to '%s'" / "… Failed to create|save dump file …" / "DBGHELP.DLL NOT FOUND|TOO OLD"
+    # what happens after the dump depends on the filter's return value (not decompiled; inferred: the process ends)
+
+AssertClass (DAT_0044a6a8):
+    ac_AssertFail(msg, value) → append "%s : AssertClass::ac_AssertFail : %s[%d]" to "Assert<yyyymmdd><hh>.txt"   @ FUN_00412970 / FUN_00412920 / FUN_004128a0
+    AssertClass_ExitLog(where) → append "%s : AssertClass::ac_AssertFail : %s" to "ExitLog<yyyymmdd><hh>.txt"; _exit(0)   @ FUN_004129c0
+    callers: duplicate pft_Store (§7.2), IOBufferContainer allocation, SHN read failures
+             ("BinaryDataBox<T>::bdb_ReadData : readfail", "Code:%X:%d\tSHN:%X:%d" when the file header does not match the expected one, FUN_00410120)
+```
+
+The config reader ("scriptor", `Scriptor_ReadFile` FUN_0040e7c0) reads `DataServerInfo_GameLog.txt` and its `#INCLUDE`s: `#DEFINE`
+blocks declare record formats (`<STRING>`, `<INTEGER>` …), data lines are matched against them, directives are handled by
+`Scriptor_Directive` FUN_0040cd60 (a 7-entry keyword table: block-comment on/off and settings that redefine
+separator characters *(inferred: the keyword strings are not in the export)*). Every step is reported with
+`Scriptor_Report` FUN_0040cb40 into an in-memory list ("FILE PROCESSING - %s", "Include - %s", "%s - UNKNOWNED.",
+"FILE OPEN ERROR(Code = %d) - %s", totals "TOTAL Format|Data %d Defined, %d Errors" by `Scriptor_Summary` FUN_0040d5f0). Records
+are read by kind (3 = SERVER_INFO and 4 = ODBC_INFO are checked by the code; that the kind is the `#DEFINE` order, 0 = MY_SERVER,
+1 = NATION_NAME, 2 = WORLD_NAME, is *(inferred)*) and column (accessors FUN_0040cc10 / FUN_0040cc20 / FUN_0040cc70). This is the generic Shine config reader; its
+error handling is what `DataServer_ReadDefineScriptor` (§1.1) checks.
+
+### 7.5 Linked-in code that no GameLog path uses
+
+The binary links the shared game-data library: `BinaryDataBox<ItemInfo | ItemInfoServer | ItemOptions | GradeItemOption |
+ItemDropLog | ItemSort | ItemInvenDel | ItemMoney | ShineReward | FriendPointReward | MapInfo>`, `ItemDataBox` (operator[] with
+"Invalid Item index"), `ItemOptionsData::OptionCardStack` (random-option cards, `CardDeck` lists), `ItemAttributeClass` and its
+`ItemAttrCls_*` subclasses, `MapDataBox`, `DBRecord`/`BinaryData` (name hash, FUN_004141e0 is the only part used, by
+`ItemDataBox_Load`). Apart from the ItemInfo load (§7.1) none of it has a caller outside the library: the call graph of the export
+shows calls into 0x414190–0x416870 and 0x417da0–0x418ed0 only from the ItemInfo/MapInfo loaders, the static constructors of the
+`BinaryDataBox` globals and the shared empty destructor `CSendPacket_dtor` FUN_004183c0 (identical-code folding). It is therefore
+dead weight in the GameLog server; the zone owns the behaviour of these tables (§10).
+
 ## 8. Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -642,8 +938,10 @@ Not registered in 2016 (go to `fc_dummyfunction`, §5): 50/1–3 `ACCOUNT_LOGIN_
 | D05-B6 | 0x0462 MONEY_CHANGE `FUN_00405660` | zeroes the struct, copies only the three money values; `nType` and `nCharNo` stay 0 (`chrregnum` @0 is never read) | every money-change row (sent on each money change by the Character server) has nType 0 and no character | `nType = 98`, `nCharNo = chrregnum` like every other handler |
 | D05-B7 | 0x2803 OPTOOL_CLOSE_SERVER_REQ `FUN_00409360` | no CheckAlive; replies 0x2804 `{0x0600}` and sets `DAT_00656a3c`, which no code reads (the Account server's copy, D01 §2, is the same) | an operator tool is told the server closes, but it keeps running; any peer, even unauthenticated, gets the same answer | stop the main loop / service on the flag, and require an authenticated link |
 | D05-B8 | 0x075C GUILD_ACADEMY_CLEAR_REWARD_MONEY `FUN_00406950` | zeroes the TypeA struct and calls the procedure without copying anything (no nType, no field) | each packet writes an all-zero `tGameLog` row (nType 0); no 2016 server sends it, so latent | `nType = 860`, `nInt1 = nGuildNo`, `nCharNo = nCharNo` like 0x075A |
+| D05-B9 | heartbeat `CSession_Manager_HeartbeatTick` FUN_00409ee0 (§7.2) | only sessions in state 1 (authenticated by 0x0802) are checked; a peer that connects and never sends a valid 0x0802 keeps its session forever | each such connection holds one of the `SERVER_INFO` max sessions (100); enough of them make every later accept fail with "ACCEPT NO SESSION BUFFER" and log packets are lost | time out state-0 sessions too (e.g. no 0x0802 within some seconds) |
+| D05-B10 | `WinService_ReportStart` FUN_00411ee0 / `DataServer_ServiceStart` FUN_00401f90 (§7.1) | when the start fails (syslog directory, IOCP threads, workers, ServerInfo row, listen socket, main thread) ServiceMain returns with the status still `SERVICE_START_PENDING`; threads already started keep running | the SCM shows the service as "starting" until its timeout, the half-started process stays alive without a listener; the cause is only in the DebugMessage log | report `SERVICE_STOPPED` with an exit code and stop the started threads |
 
-Next free ID: D05-B9.
+Next free ID: D05-B11.
 
 ## 9. Not reconstructed / uncertain
 
@@ -668,8 +966,15 @@ Next free ID: D05-B9.
 - The nType values the zone scripts pass to `cSendGameLogDataType_4/5` (§4.4) are in the script files, not in the binary.
 - NC_SYSLOG: the meaning of AttackerType/TargetType values beyond 0/1 and the unit of `PlayTime` ("in-game-minutes") come from
   the format strings only; the senders (W01, Z03) own the values.
+- Framework (§7): the scriptor's directive keywords (table at `+0x3fc`, read by FUN_0040b650) and the exact behaviour after the
+  crash dump were not decompiled in detail; both are generic Shine library code with no GameLog-specific behaviour. The
+  `MY_SERVER` string at `+0x4f8` being the service name is inferred from the service calls (the reader FUN_00401370 fills it).
+- `IOCP_StopThreads` FUN_0040ea60 and the session-pool free/destroy helpers (FUN_004115d0, FUN_00411570, FUN_00411820) were read
+  only as far as their names say; they hold no protocol behaviour.
+- Whether the 2016 deployment ran the GameLog server as an installed service (the only mode the code supports, §7.1) and with
+  which account: not in the binary.
 
-## 10. Coverage boundary (parts 1–3; the sweep part completes it)
+## 10. Coverage boundary
 
 | Found | Covered by | Argument |
 |---|---|---|
@@ -677,9 +982,14 @@ Next free ID: D05-B9.
 | `usp_Login_setChannel` body, `tGameLog` schema | D06 (scope: "missing procedures, schema") | not in any backup |
 | Zone senders `FUN_0045e810` (horse item belong), `FUN_00520840`/`FUN_00520aa0` (costume charges), `FUN_005a25a0`/`FUN_005a2b60` (wedding hall) | Z02 §9.1 / Z06 (costume charges) / Z08 (wedding) | only the log packet they build is D05's (§3.2); the game logic around it belongs to the zone items |
 | The 23 no-op registrations (§3.3) | D05 (done) | `fc_ReturnTrue`: nothing to reconstruct beyond "ignored" |
-| DataServer framework beyond the worker (listener, IOCP, service, main loop, scriptor parser) | D05 sweep part (part 4) | reached from no part-1 handler; same code as D01 §1 |
+| DataServer framework beyond the worker (main, service, listener, IOCP, framing, heartbeat, diagnostics) | D05 (done, §7) | documented in part 4; D01 §1 has the same code for Account/AccountLog but only the worker part |
 | Zone script functions `cSendGameLogDataType_4/5` (FUN_005f1a10, FUN_005f1d40) and `cSaveTutorialInfo` (FUN_005e70b0), their `Send_NC_LOG_GAME_DATA_TYPE_4/5/F/G` builders (FUN_006144a0, FUN_006145c0, FUN_006146a0, FUN_006147f0) | Z01 §2.2 (Lua globals) / Z05 §5.3, §8.2 / Z07 (tutorial) | only the log packet is D05's (§4.3, §4.4); the scripts and the tutorial state belong to the zone items |
 | Zone senders `ShineMob_so_KilledBy` FUN_00432760, `ShinePlayer_so_KilledBy` FUN_00433be0, `ShineDropItem_so_ItemDrop` FUN_0052a7a0, `ShinePlayer_so_LinkTo` FUN_0049ad30, `CQuestZone_Recv_NC_QUEST_DB_SET_INFO_ACK` FUN_005bf280 | Z03 §8.1 / Z05 §3.1 / Z01 / Z08 | they build 0x0791/0x0798/0xC809–0xC80F as a side effect of their own feature |
 | WM syslog senders FUN_004113c0, FUN_0040a010, FUN_00410040, FUN_00436d50, FUN_0042e160 | W01 | 0xC804–0xC808 are built by the WM's character life-cycle handlers |
 | CPFs server-link handlers (§5): handshake rules, session list | D01 §2 (same code) | GameLog differences recorded in §5; the shared framework is D01's |
-| Rotating text log internals: deque growth (FUN_0040ef00), string helpers (FUN_0040b130, FUN_0040b040, FUN_0040f160) | D05 sweep (part 4) | generic container code reached from §6.1; the behaviour is documented, the helpers are boilerplate |
+| Rotating text log internals: deque growth (FUN_0040ef00 allocates 0x1c-byte `std::string` blocks), string helpers (FUN_0040b130 assign, FUN_0040b040 substring assign, FUN_0040f160 queue front copy) | D05 (done, §6.1) | MSVC `std::deque<std::string>` / `std::string` code; the behaviour is in §6.1, the helpers hold no protocol logic |
+| Shared game-data library linked into the binary (0x414190–0x416870, 0x417da0–0x418ed0: `ItemDataBox`, `ItemOptionsData::OptionCardStack`, `CardDeck` lists, `ItemAttributeClass`/`ItemAttrCls_*`, `BinaryDataBox<…>` for ten item tables, `MapDataBox`) | Z01 (Goal: "SHN data loading (list every table and its loader)") / Z04 (Goal: "Use ItemInfo/ItemInfoServer/ItemUpgrade/RandomOption SHN tables") | dead code in the GameLog server (§7.5): no caller outside the library except the start-up ItemInfo load; the zone uses the same tables for real and owns their meaning |
+| `ItemInfo.shn` loaded at start (`ItemDataBox_Load` FUN_00410a40, SHN reader FUN_0042faa0) | Z01 / Z04 (as above); SHN format: `tools/protocol-re/shn.py` | loaded but never read by GameLog code (§7.1); nothing to reconstruct beyond "must exist or the server does not start" |
+| MSVC CRT / STL / EH runtime (0x41b780–0x432f50 except the SHN reader 0x42f700–0x431270; `std::string`, `std::bad_alloc`, `_sprintf`, `__mbstok` …) | none needed | compiler runtime, no server behaviour |
+| Exception call-stack writer internals (FUN_00416a20, FUN_00416cd0, FUN_004170d0, FUN_00417520) | D05 (done, §7.4, summary) | generic crash-report code; only its output files matter for an operator |
+| Scriptor internals (FUN_0040b3f0 tokenizer, FUN_0040b650 keyword match, FUN_0040e2c0 #WRITE/#READ of formats, FUN_0040d260/FUN_0040cf70 data/format definitions, FUN_0040ca40/FUN_0040cac0 index arrays) | D05 (done, §7.4, summary) | generic Shine config reader, the same in every server; the GameLog-specific part is the config content (§1.1, §7.1) |
