@@ -8,5 +8,8 @@
   "DAT_0da28adc": "mbsa.mbsa_Struct",
   "DAT_0da28ad8": "mbsa.mbsa_map",
   "FUN_004ad7b0": "MobTargetBout::mts_ViewAggroList",
-  "FUN_006951d0": "`dynamic_initializer_for_'briefinfodelete''"
+  "FUN_006951d0": "`dynamic_initializer_for_'briefinfodelete''",
+  "FUN_005977e0": "ShineObjectClass::ShinePlayer::so_ply_Notice",
+  "FUN_0054bc80": "ShineObjectClass::ShineObject::so_AllOfRange",
+  "FUN_0054baf0": "ShineObjectClass::ShineObject::so_AllOfRange"
 }

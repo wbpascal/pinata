@@ -876,6 +876,32 @@
      ]
     ],
     "notes": "the client tests its own position every frame and answers 0x6C08 when outside once, then drops the request"
+   },
+   "0x2011": {
+    "dir": "S→C",
+    "name": "NC_ACT_NOTICE_CMD",
+    "basis": "zone ShinePlayer::so_ply_Notice FUN_005977e0 (disassembly); client: accepted and ignored in every scene (C01)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "unk",
+      "never written: whatever the shared send buffer held (Z09-B54)"
+     ],
+     [
+      1,
+      "u8",
+      "len",
+      "strlen(text) & 0xFF"
+     ],
+     [
+      2,
+      "char[len]",
+      "text",
+      "no terminating NUL on the wire; total size = len + 4"
+     ]
+    ],
+    "notes": "sent by NPCAction NoticeAction (no 2016 trigger uses it) and the Lua observer (§14.7); no struct in either PDB"
    }
   }
  }

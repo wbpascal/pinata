@@ -30,7 +30,9 @@ guild tournament). §13 doors (script-built gates, 0x1C0F / 0x1C10 / 0x6C09), ef
 engine (script objects, AI / pet / map scripts, object and map script events, argument objects, Lua triggers, the Lua
 observer, player observers, script timers, script server menus and casting bars, the table of all 248 Lua functions).
 §15 script interrupts of Pine map scripts (kinds, events, `waitinterrupt`, unit interrupts, `&scrint`) and script
-areas (`.aid`, the client's area tests 0x6C05…0x6C08, area and map counters).
+areas (`.aid`, the client's area tests 0x6C05…0x6C08, area and map counters). §16 NPCAction proximity triggers
+(`World/NPCAction.txt` conditions and actions, `MobSetting/Action/` trigger files, the neighbourhood scan, player
+observers, damage absorption by protector mobs).
 
 ---
 
@@ -754,7 +756,7 @@ ShineMob::so_Routine(m, _, handle)                                              
     MobConditionServer step (FUN_00554420, §5.6)
     ShineMobileObject::so_Routine(m)                           # §5.5 (abstates, movement, casts)
     if flags1e78 & 1:  so_Unmark(0, 1, 3); som_FreeObject(m, reason 7); return
-    if mode != 3 and m.npcAction (+0x24e8):                    # NPCAction proximity triggers (part 9)
+    if mode != 3 and m.npcAction (+0x24e8):                    # NPCAction proximity triggers (§16)
         so_AllOfRange(m, range = MobInfoServer.DetectCha, NeighborhoodChecker(m.npcAction))   @ FUN_005c2ee0 / FUN_005c2fe0
     regen animation over? (FUN_0055e760): if no RegenAni row or g_Now > spawnTime + RegenTime/1000·10: regenAniOver = 1
     if m has StaImmortal (291) or StaAdlFLoussierIMT (499):
@@ -2828,7 +2830,7 @@ problem, not code.)*
 
 Not zone data: `MobNoFadeIn.shn` (`MobInx` list of projectile-like mobs) is loaded only by the client
 (`MobNoFadeInTab::IsNoFadeIn` client FUN_004c4190): mobs that appear without the fade-in. `MobSetting/Action/*.txt`
-(`Trigger { ConditionID, ActionID }`) is loaded by the NPCAction trigger loader `NPCAction::Util::loadTriggers` FUN_005c4420 (part 9). `MobRegenAni.shn`:
+(`Trigger { ConditionID, ActionID }`) is loaded by the NPCAction trigger loader `NPCAction::Util::loadTriggers` FUN_005c4420 (§16.1). `MobRegenAni.shn`:
 §5.1 / §5.3.
 
 ### 10.2 Objects
@@ -4421,7 +4423,7 @@ Object events (`ShineObject` vt 0xb68 `so_AIScriptFuncExec(offset, arg)` FUN_004
 | `NPCMenu` | 0x3c | 0x2073 NC_ACT_NPC_MENU_CMD (Z02 §6.4; `Ack` = the chosen line); end of a script casting bar (§14.6, select 0) | `LuaArgumentNPCMenu(npc, p, select)` | `f(npcHandle, playerHandle, charNo, select)` |
 | `MobDamaged` | 0x58 | `ShineMob::so_DamagedBy` FUN_00431750, after HP is lowered, when the name is set | `LuaArgumentMobDamaged(map, attacker, MaxHP, HP, mob)` | `f(mapName, attackerHandle, maxHP, curHP, mobHandle)` |
 | `ObjectDied` | 0x74 | `ShineMobileObject::so_KilledBy` FUN_00432240 on the dead object itself, when the name is set | `LuaArgumentObjectDied(map, killer, dead)` | `f(mapName, killerHandle, deadHandle)` |
-| `NPCAction` | 0x90 | `NPCAction::CallLuaAction::exe` FUN_005c1720 (proximity triggers, part 9c) | `LuaArgumentNPCAction(map, npc, player)` | `f(mapName, npcHandle, playerHandle, charNo)` |
+| `NPCAction` | 0x90 | `NPCAction::CallLuaAction::exe` FUN_005c1720 (proximity triggers, §16.5) | `LuaArgumentNPCAction(map, npc, player)` | `f(mapName, npcHandle, playerHandle, charNo)` |
 | `MobAttack` | 0xac | `ShineMobileObject::smo_SwingDamage` FUN_00432f30 (melee), `SkillBlastEffect::sbe_BlastObject` FUN_00583bc0 / `sbe_BlastLocate` FUN_00584160 (skills) on the attacker, when the name is set | `LuaArgumentMobAttack(map, attacker)` | `f(mapName, attackerHandle)` |
 | `RankingValue` | 0xc8 | **never fired** (the ranking event is the map's, below) | – | – |
 
@@ -4664,7 +4666,7 @@ LuaScriptObserver::lso_Send(o, text, detail)              @ FUN_005d5f30
 `ShinePlayer::observers_` (p+0x2a948, `std::vector<Observer>`, §2.6) holds `Observer` objects (0x18 bytes): +0 vftable,
 +4 `master_` (`ShineObject*`, the watching object), +8 `next_` (`IObserver*`, the watcher logic), +0xc `birth_`
 (`g_Now` at creation), +0x10 `tick_` (`Metronome {m_NextTick, m_TickInterval}`). The only `IObserver` implementation is
-`NPCAction::Trigger` (proximity triggers, part 9c).
+`NPCAction::Trigger` (proximity triggers, §16).
 
 ```pseudo
 Observer::Observer(master, next)                          @ FUN_005cc5d0   (birth_ = g_Now; tick_ = (g_Now, 0)); default ctor FUN_005cc720
@@ -4679,7 +4681,7 @@ ShinePlayer::registerObsersver(p, o)      vt 0xa2c        @ FUN_00577f90   (SetT
 ShinePlayer::unregisterObsersver(p, o)    vt 0xa30        @ FUN_00577b50   (std::remove of the equal entries)
 ShinePlayer::unregisterObsersvers(p, master) vt 0xa34     @ FUN_00577ba0   (all entries of that master, §2.6)
 ShinePlayer::hasObserver(p, master)       vt 0xa3c        @ FUN_00576d50   (true if an entry == Observer(master, null) under
-                                                                              operator==, i.e. same master_ and next_ == null; part 9c)
+                                                                              operator==, i.e. same master_ and next_ == null; the marker of §16.3)
 ShinePlayer::notifyObservers(p, ev, a, b) vt 0xa38        @ FUN_00577c10   (§2.6)
 ```
 
@@ -4698,7 +4700,7 @@ ShinePlayer::notifyObservers(p, ev, a, b) vt 0xa38        @ FUN_00577c10   (§2.
 | `EV_ATTACKMOB` | 8 | `ShineMobileObject::smo_SwingDamage` FUN_00432f30, `SkillDamageSender::sds_TemplateStore` FUN_005803c0 | target handle |
 
 Who registers observers (`NeighborhoodChecker::ali_Work` FUN_005c2fe0 via `hasObserver` / vt 0xa2c,
-`NPCAction::doTriggers_` FUN_005c4880) and what the triggers do with the events is part 9c.
+`NPCAction::doTriggers_` FUN_005c4880) and what the triggers do with the events: §16.3 / §16.4.
 
 ### 14.9 The Lua function table (`LuaScriptScenario::ls_FuncSet` FUN_005f5350)
 
@@ -4724,7 +4726,8 @@ names for the NA build *(fh-doc)*; the 2016 zone registers only these.
 
 - `RankingValue` (map event 0xac): no 2016 script sets it, so its intended meaning of the three values is not
   confirmed by data (Z09-B39 is read from the call sites only).
-- `hasObserver` compares with `next_ == null`: whether the registered NPCAction observers can ever match is part 9c.
+- `hasObserver` compares with `next_ == null`: answered in §16.3 (it matches the marker `Observer(me, null)` that
+  `ali_Work` registers).
 - `cTimer_Obj` sends through the player's data stream (vt 0x2f8), the other timer functions through the game stream
   (vt 0x2fc); what separates the two streams is Z01's.
 - `cmc_AllowMode` 0x78 refuses player modes 3–6 for casting bars; the mode names are Z02's.
@@ -5064,3 +5067,324 @@ functions (`ShineMiniHouse::so_mh_CompulsionMoveTo` FUN_00543a40, `so_mh_CreateF
 - How often a film steps (and so how long the 100 area re-checks last) is part 16 (`Movie::Theater` / `fc_Routine`).
 - `so_AllInMap1`'s last argument (0 for the area requests, 1 for the counters) is passed through to the map's
   `fm_fp_AllInMap2` broadcast function; its meaning is not read here.
+
+---
+
+## 16. Scripts 3: NPCAction proximity triggers
+
+Part 9c of the plan. An **NPCAction trigger** is a data-driven reaction of a mob or NPC to players near it: open the
+map-link menu of a gate when a player walks up, buff or dispel a player who performs an emote next to a tree, take the
+damage a player receives (multi-protect totems), feed a guild-tournament item box to the right team. No script runs
+(except the `CallLua` action): a trigger is one **condition** and a list of **actions**, both taken from
+`World/NPCAction.txt`, attached to a mob type by a file `MobSetting/Action/<MobInxName>.txt`. The mob's routine scans
+its surroundings; for each player newly in range it tests the conditions once and, for the event-driven ones, leaves an
+**observer** on the player (`ShinePlayer::observers_`, §2.6 / §14.8) that the player's own events (emotes, abstates,
+damage, death, attacks, the tick) feed until the player walks out of range. All names *(pdb2016)*.
+
+### 16.1 Data files and loading
+
+`ZoneServer_zs_start_sleep` FUN_005b67c0 (Z01 §2) loads, in this order and ignoring every return value:
+
+```pseudo
+loadFromOptionReader<CondGen_OptionReader, Manager<ICondition>>(&conditionManager, "../9Data/Shine/World/NPCAction.txt")   @ FUN_005b5800
+loadFromOptionReader<ActionGen_OptionReader, Manager<IAction>>(&actionManager,    "../9Data/Shine/World/NPCAction.txt")    @ FUN_005b58e0
+NPCAction::Util::loadTriggers()                                                                                          @ FUN_005c4420
+
+loadFromOptionReader<Gen, Manager>(mgr, file):              # both managers
+    OptionReader.or_Read(file) (fails → return false, manager stays empty)
+    n = Gen.size() = or_SelectCountFrom(Gen::tableName_)    @ FUN_005c2840 / FUN_005c16b0
+    Manager::generate_n(n, Gen)                             @ FUN_005b4170 / FUN_005b4210   (deletes old entries; vector of n
+                                                                pointers; row i → Gen() = createCondition_ / action factory)
+```
+
+`Gen::tableName_` are static strings set by the dynamic initialisers FUN_0069b1c0 (`"NPCCondition"`), FUN_0069b1a0
+(`"NPCAction"`) and FUN_0069b280 (`"Trigger"`). `conditionManager` DAT_14d50794 and `actionManager` DAT_14d507a4 are
+`Manager<T>` = one `std::vector<T*> container_`. **The ID columns are not read**: a trigger's `ConditionID` /
+`ActionID` *n* is the *n*-th row of the table (`container_[n−1]`), so the rows must stay in ID order (they do in 2016).
+
+| Table (file `World/NPCAction.txt`) | Row struct *(pdb2016)* | Columns |
+|---|---|---|
+| `NPCCondition` (20 rows) | `CondGen_OptionReader::ConditionData_` 0x95 | `u8 ConditionID`, `char ConditionA[33]` +0x01, `char TypeA[33]` +0x22, `u32 AX` +0x43, `u32 AY` +0x47, `char ConditionB[33]` +0x4b, `char TypeB[33]` +0x6c, `u32 BX` +0x8d, `u32 BY` +0x91 |
+| `NPCAction` (50 rows) | `ActionGen_OptionReader::ActionData_` 0x4b | `u8 ActionID`, `char ActionIndex[33]` +0x01, `char Type[33]` +0x22, `u32 X` +0x43, `u32 Y` +0x47 |
+| `Trigger` (one file per mob type, 57 files in `MobSetting/Action/`) | `TriggerGen_OptionReader::TriggerData_` 8 | `u32 ConditionID`, `u32 ActionID` |
+
+**Condition factory** `CondGen_OptionReader::operator()` FUN_005c2e60 → `createCondition_(name = ConditionA, type =
+TypeA, AX, AY, row, termLow = 0, termHigh = 0)` FUN_005c29c0. Names compared with `strncmp(…, 33)`:
+
+```pseudo
+if name == "Term":                           # a time window around another condition
+    termLow = AX; termHigh = AY; name = ConditionB; type = TypeB; AX = BX; AY = BY
+    while name == "Term": (same assignments)  # (original bug) Z09-B51: never ends if ConditionB is also "Term"
+# terms are milliseconds in the file, stored as ticks: t × 10 / 1000
+"AbState"         → ABStateCondition { index_ = dic_abstate[type] (fatal "CondGen_OptionReader : Invalid ABState" if unknown), termLow_, termHigh_ }
+"LvGap"           → LvGapCondition { low_ = (u8)AX, high_ = (u8)AY }
+"Class"           → ClassCondition { classID_ = ClassName.shn row whose acEngName (16 chars) == type }   (gClassName DAT_1328bc50;
+                                      fatal "CondGen_OptionReader : Invalid Class Name" if none)
+"Skill"           → SkillCondition { skillID_ = skillnametree[type] (fatal "Invalid Skill"), terms }   @ FUN_005c27b0
+"Die"             → DeadCondition
+"Emotion"         → EmotionCondition { emoticonID_ = (u8)AX, terms }                                    @ FUN_005c2800
+"Default", "None" → NoneCondition { termLow_, termHigh_ }
+"GTITeam"         → GT_TeamCondition { m_Team = AX }            (m_DelayTime +8 never written and never read)
+"DmgAbsorb"       → DamageApplyCondition
+"CheckCycleParty" → CheckCyclePartyCondition { m_Tick = AX }    (milliseconds; converted when the observer's Metronome is set)
+"AttackMob"       → AttackMobCondition
+"Location"        → LocationCondition { m_nInDistance = AX, m_nOutDistance = AY }   (no 2016 row uses it)
+anything else     → assert "CondGen_OptionReader::createCondition_ : Unsupported Condition" (not fatal), then a
+                    NoneCondition with the terms   # (original bug) Z09-B52: an unknown name becomes "fire at once"
+```
+
+**Action factory** `ActionGen_OptionReader::operator()` FUN_005c18c0 (compare order as listed; strings read from the
+disassembly, the decompiler lost the compares):
+
+| `ActionIndex` | Object | Built from |
+|---|---|---|
+| `Dispell` | `DispelAction { index_ }` | `dic_abstate[Type]` (fatal "ActionGen_OptionReader-Dispell : Invalid ABState") |
+| `Link` | `InteractAction` | – |
+| `Emotion` | `EmotionlAction { emoticonID_ }` | `(u8)X` |
+| `AbState` | `AbStateAction { index_, strength_ }` | `dic_abstate[Type]` (fatal "…-Abstate : Invalid ABState"); strength = X, 0 and 1 → 1 |
+| `Skill` | `SkillAction { skillIndex_ }` | `skillnametree[Type]` (fatal "ActionGen_OptionReader : Invalid Skill"); ctor FUN_005c0fe0 fatal "SkillAction::SkillAction : Invalid skill index" if `skilldatabox` has no row |
+| `Notice` | `NoticeAction { std::string content_ }` | `Type` (ctor FUN_005c17f0) |
+| `Die` | `DieAction` | – |
+| `GTIEffect` | `GTItemAction` | – |
+| `DmgAbsorb` | `DamageAbsorbAction` | – |
+| `Ball` | `BallAction` | – |
+| `RestoreRate` | `RestoreRateAction { nValue = X, eType }` | `Type == "HP"` → `eType = RT_SP` (1); any other `Type` (incl. `"SP"`) → `RT_HP` (0); the "Unsupported Action" exit is only reachable if `Type` equals both. (original bug) Z09-B46: HP and SP are swapped |
+| `CallLua` | `CallLuaAction` | – |
+| anything else | – | assert + `ShineExit("ActionGen_OptionReader : Unsupported Action")` |
+
+`NoneAction` exists (vtable: no-op `exe`) but the factory never builds it. All actions share the destructor
+FUN_005c1680 (`NoticeAction`: FUN_005c1870); `IAction::~IAction` FUN_005c0ee0. Conditions share FUN_005c2470
+(`NoneCondition` scalar deleting destructor); `Trigger`'s is FUN_005c32b0. Reader ctors / dtors: `CondGen_OptionReader`
+FUN_005c0ef0 (also used for the action reader), `~TriggerGen_OptionReader` FUN_005c3160.
+
+**Triggers.** `NPCAction::Util::loadTriggers` FUN_005c4420:
+
+```pseudo
+for each file f in "../9Data/Shine/MobSetting/Action/*.txt" (_findfirst32; none → fatal "ZoneServer::zs_start_old : Invalid file path"):
+    v = vector<Trigger>; if !loadFromOptionReader<TriggerGen_OptionReader, Trigger>(v, path): skip   @ FUN_005c4120
+    name = f without its extension (cut at the last '.')
+    mobId = mobdatabox.mdb_2MobID(name)                     @ FUN_00419080   (0xFFFF if no MobInfo row has that InxName)
+    triggerDic.insert(mobId, v)                             # std::map<u16, vector<Trigger>> DAT_14d50784; a key already
+                                                            # present keeps its first vector
+TriggerGen_OptionReader::TriggerGen_OptionReader(reader)    @ FUN_005c4b90
+    if or_SelectCountFrom("Trigger") < 1: fatal "TriggerGen_OptionReader : Invalid Table"
+    walk the rows in order; consecutive rows with the same ConditionID form ONE Trigger:
+        condition_ = conditionManager[ConditionID−1]  (0 / out of range / null → fatal "…Invalid condition(0|1). ConditionID")
+        actions_  += actionManager[ActionID−1]         (fatal "…Invalid action(0|1). ActionID")
+    so "1 27 / 1 28" is one trigger with two actions; a ConditionID that comes back after another one starts a new trigger
+TriggerGen_OptionReader::size → number of triggers built   @ FUN_005c47c0;  operator() copies trigger i   @ FUN_005c4a10
+```
+
+Condition and action objects are shared: every trigger that names row *n* points to the same object, for every mob
+type. They hold only configuration; per-player state lives in the observer (§16.3).
+
+Five 2016 file names are not mob names (`B_Slime`, `KDSoccer_Ball`, `KDSoccer_Ball_14`, `KDSoccer_Invincible`,
+`KDSoccer_SpeedUp`): they all map to key 0xFFFF (the first one read wins) and no mob ever uses them. Data residue,
+harmless.
+
+Mob link: `ShineMob::so_mob_RegenComplete` FUN_004424f0 sets `m.triggers_` (+0x24e8) = `&triggerDic[mobId]` or null
+(§5.3); the `ShineMob` ctor FUN_0055b140 clears it. NPCs (`ShineNPC` derives from `ShineMob`) get it the same way.
+
+### 16.2 Objects *(pdb2016)*
+
+| Class | Size | Members | vtable (slot: function) |
+|---|---|---|---|
+| `IObserver` | 4 | – | 0 dtor, 1 `notify`, 2 `needToAttach`, 3 `GetConditionTick` (base: 0) |
+| `NPCAction::ICondition : IObserver` | 4 | – | + 4 `check(player)` |
+| `NPCAction::Trigger : IObserver` | 0x18 | +4 `condition_`, +8 `std::vector<IAction*> actions_` | 1 `notify` FUN_005c47e0, 2 `needToAttach` FUN_005c49d0 (= `condition_.needToAttach()`), 3 `GetConditionTick` FUN_005c49f0 (= `condition_.GetConditionTick()`); ctor FUN_005c49b0, dtor FUN_005c30f0 (frees only the pointer vector) |
+| `NPCAction::IAction` | 4 | – | 0 dtor, 1 `exe(me, player)` |
+| `NPCAction::doTriggers_` | 8 | +0 `me_`, +4 `target_` | functor, ctor FUN_005c47a0, `operator()` FUN_005c4880 |
+| `NeighborhoodChecker : AxialListIterator` | 8 | +4 `triggerCollection_` (`vector<Trigger>*`) | 0 `ali_Work` FUN_005c2fe0; ctor FUN_005c2ee0, dtor FUN_005c2f00 |
+| `Observer` (on the player) | 0x18 | §14.8 | – |
+
+The other `std::` instantiations of `vector<Trigger>` / the `triggerDic` tree (FUN_005c2f60 `for_each`, FUN_005c3120…
+FUN_005c4320, FUN_005c4ab0 `push_back`, FUN_004e7210 `vector<IAction*>::_Ufill`) are container boilerplate.
+
+### 16.3 Running the triggers
+
+```pseudo
+ShineMob::so_Routine / ShineNPC::so_Routine (§5.4 / §5.9), every tick, if mode ≠ 3 (dead) and m.triggers_ ≠ null:
+    so_AllOfRange(m, m.pos, range = MobInfoServer.DetectCha (row +0x3b), NeighborhoodChecker(m.triggers_))   @ FUN_0054bc80
+        # range 0 = the map's sight (99999999 with wide sight or a moving camera) — see Z09-B49
+
+NeighborhoodChecker::ali_Work(chk, me, o, dist²)                         @ FUN_005c2fe0   (returns 1: keep walking)
+    if o == null or o.so_IsEmpty() (vt 0x300) or o.kind (vt 0x4d0) ≠ 2 (player): return
+    if o.hasObserver(me) (vt 0xa3c, §14.8): return           # this player was already handled and has not left range
+    o.registerObsersver(Observer(me, null))   (vt 0xa2c)     # the "already handled" marker (next_ = null)
+    for each trigger t in chk.triggerCollection_: doTriggers_(me, o)(t)
+
+NPCAction::doTriggers_::operator()(f, t)                                 @ FUN_005c4880
+    if t.condition_ == null or t.condition_.check(f.target_) (vt 0x10):  # entry test
+        for each a in t.actions_: a.exe(f.me_, f.target_)
+    if t.needToAttach():                                                 # event-driven condition
+        f.target_.registerObsersver(Observer(f.me_, t))                  # birth_ = g_Now; tick_ = Metronome(birth_, GetConditionTick ms)
+```
+
+`so_IsEmpty` (vt 0x300): player FUN_00559880 = about to disconnect (`sp_WillDisconnect`, or the socket session reports
+closed); mob / NPC / servant FUN_00556610 = mode 3 (dead).
+
+**Event delivery.** `ShinePlayer::notifyObservers(ev, a, b)` (§2.6) calls each observer; `Observer::notify` (§14.8)
+returns 0 for the marker and otherwise `Trigger::notify(me, player, ev, a, b, birth_, &tick_)`:
+
+```pseudo
+NPCAction::Trigger::notify(t, me, player, ev, a, b, birth, tick)        @ FUN_005c47e0
+    if t.condition_ == null: assert "NPCAction::Trigger::notify : null condition_"; return IObserver::notify(…)
+    r = t.condition_.notify(me, player, ev, a, b, birth, tick)
+    if r & 1: for each a in t.actions_: a.exe(me, player)       # fire
+    return r                                                     # r & 2: notifyObservers destroys this observer
+```
+
+**Leaving range.** In `ShinePlayer::so_Routine` (§2.1, after the `EV_IDLE` notify and before `EV_TICK_PARTY`), each
+observer whose owner is null or `so_IsEmpty` (dead mob, leaving player), or whose owner is farther than
+`owner.so_getDetectRange()` (vt 0xa54: mobs FUN_00556c00 = the same `DetectCha`; base FUN_005551a0 = 1000), triggers
+`unregisterObsersvers(owner)`: **all** entries of that owner go, the marker included. The next mob scan that finds the
+player again runs the entry tests again. So: entry tests fire once per approach; event observers live from approach to
+departure, the owner's death, or their own "remove" answer (bit 2). The marker answers the part-9a question: `hasObserver`
+looks for `next_ == null`, and that entry is exactly the marker `ali_Work` registers.
+
+(original bug) Z09-B49: with `DetectCha` 0 (2016: `IDLeviathanGate01`, `DT_RadionOre`) the scan covers the whole sight,
+but the leave test compares d² with 0², so the player's next tick removes the marker and the mob's next tick runs the
+entry tests again: `IDLeviathanGate01`'s `Default → Link` trigger calls `InteractWithNPC` for every player in sight on
+every tick, and `DT_RadionOre`'s `AttackMob` observer only exists between the mob's scan and the player's next range
+check *(inferred effect)*.
+
+### 16.4 Conditions
+
+`check` = entry test (`doTriggers_`); `attach` = `needToAttach` (observer kept on the player); `notify` = answer to the
+player's events (1 fire, 2 remove, 3 both, 0 nothing). Every `notify` first returns 2 when `me` or the player is null or
+`so_IsEmpty` (`AttackMob` checks only the player). Terms (`termLow`, `termHigh`, ticks) count from the observer's `birth_`;
+`elapsed = g_Now − birth_`.
+
+| Condition (file name) | check | attach | notify (event, a = event argument) @ |
+|---|---|---|---|
+| `NoneCondition` (`Default`, `None`, `Term`+`None`) | no term: true; with a term: false  @ FUN_005c24a0 | only with a term @ FUN_005c1f00 | `EV_IDLE` only: no term → 3; `elapsed < termLow` → 0; `elapsed > termHigh` and `termLow < termHigh` → 2 (window missed); else 3 (fire once). @ FUN_005c1e70 |
+| `ABStateCondition` (`AbState`) | player has the abstate (vt 0x3e4 `so_AbnormalState_IsSet`) @ FUN_005c2510 | yes (FUN_005af8d0, folded `return true`) | `EV_ABSTATE` with `a == index_`: no term → 1 (fire, keep); with a term: `elapsed < termLow` → 0; in the window (`elapsed ≤ termHigh`, or `termHigh ≤ termLow`) → fire on match, keep; after the window → 2. @ FUN_005c1f20 |
+| `SkillCondition` (`Skill`) | false (FUN_00615e70, folded `return false`) | yes | as AbState with `EV_SKILL`, `a == skillID_` @ FUN_005c1fb0. (original bug) Z09-B50: nothing produces `EV_SKILL` (§14.8), so this never fires |
+| `EmotionCondition` (`Emotion`) | false | yes | as AbState with `EV_EMOTION`, `a == emoticonID_` @ FUN_005c2090 (window logic read in the disassembly; the decompile is wrong) |
+| `DeadCondition` (`Die`) | false | yes | `EV_DIE` → 1 @ FUN_005c2040 (the player died near the mob) |
+| `LvGapCondition` (`LvGap`) | `low_ ≤ level (vt 0x4d8) ≤ high_` (`high_ < low_`: no upper bound) @ FUN_005c25f0 | no @ FUN_005c25e0 | `IObserver::notify` @ FUN_005c25d0 (never called) |
+| `ClassCondition` (`Class`) | player's `CharClass` (vt 0x49c `so_CharacterClass`) `cc_IsDescendantsOf(classID_)` (vt 0x54) or `cc_ClassType() == classID_` (vt 0x38) @ FUN_005c26e0 | no (LvGap's) | LvGap's |
+| `GT_TeamCondition` (`GTITeam`) | player on a guild-tournament map (`fm_GetGuildTournamentSystem`) and `GuildTournamentSystem::GetGuildRegIndex(player) == m_Team` @ FUN_005c2890 | no (FUN_004b8d20, folded `return false`) | same test on `EV_IDLE` → 1 @ FUN_005c2920 (unreachable: never attached) |
+| `DamageApplyCondition` (`DmgAbsorb`) | false | yes | `EV_DAMAGE`: `master = me.vt 0x9b0` (servants: `so_serv_FindMaster`; every other class returns null → 2); fire (1) if master is the player, or (master's raid ≠ −1 and same raid as the player), or (master not in a raid, master's party ≠ −1 and same party); else 0 @ FUN_005c2120 |
+| `CheckCyclePartyCondition` (`CheckCycleParty`) | false | yes; `GetConditionTick` = `m_Tick` (FUN_0045ff90, folded `return this+4`) | `EV_TICK_PARTY` and the observer's `Metronome` due (`m_Tick` ms, re-armed each time): same master / raid / party test as `DmgAbsorb` → 1 @ FUN_005c2220 |
+| `AttackMobCondition` (`AttackMob`) | false | yes | `EV_ATTACKMOB` with `a == me.handle` → 1 (the player hit this mob) @ FUN_005c2330 |
+| `LocationCondition` (`Location`) | false | yes | `EV_LOCATION`: d = `ddt_Distance(me − player)`; `d > m_nOutDistance` → 2; `d ≤ m_nInDistance` → 1 @ FUN_005c2390 (no 2016 row) |
+
+`Metronome::operator unsigned char` FUN_004011c0 (due when `m_NextTick < g_Now`, then `m_NextTick += m_TickInterval`),
+`Metronome::m_SetInterval(start, ms)` FUN_00401190 (interval = ms × 10 / 1000), ctor FUN_005ad7f0.
+
+### 16.5 Actions
+
+`exe(me, player)`; `me` = the mob / NPC that owns the trigger.
+
+```pseudo
+InteractAction::exe ("Link")                     @ FUN_005c0f10
+    player.InteractWithNPC(me)   (vt 0xa20, Z02 §6.2: quest dialog, role action or 0x201C NC_ACT_NPCMENUOPEN_REQ)
+    # used by the map-link gates: walking up to a gate opens its menu as if the player had clicked it
+DispelAction::exe ("Dispell")                    @ FUN_005c0f30
+    player.so_AbnormalState_Reset(index_)   (vt 0x650, Z03)
+EmotionlAction::exe ("Emotion")                  @ FUN_005c0f50
+    player.so_mobile_StopHere() (vt 0xa48, 0x2013 to sight); player.smo_ply_ReinforceStopHere() (vt 0xa50)
+    player.sp_DoEmotion(player.handle, emoticonID_)   (vt 0xa40, Z02 §4: 0x2021 to sight; raises EV_EMOTION again)
+AbStateAction::exe ("AbState")                   @ FUN_005c0fa0
+    player.so_AbnormalState_Set_Simple(caster = me, index_, strength_, 1)   (vt 0x644, Z03)
+SkillAction::exe ("Skill")                       @ FUN_005c1070
+    if skillIndex_.sdi_Activ: target = (sdi_Activ.First == TARGET_ME) ? me : player
+        me.sm_UseSkillSimple(skillIndex_, target, 0)   (vt 0xa44 FUN_0057d880, the cast wrapper Z03 names next to `smo_SkillBash_Casting`)
+DieAction::exe ("Die")                           @ FUN_005c10c0
+    if me.mode ≠ 3 and player's layer l_Sub ∈ {0, 1}:
+        me.so_KilledBy(killer = player, dmg = me.HP, aggroRate 0, dropArg 1)   (vt 0x5bc, Z03: kill credit, quest kill, drops)
+GTItemAction::exe ("GTIEffect")                  @ FUN_005c1120
+    if both set, player's layer l_Sub ∈ {0, 1}, me.mode ≠ 3 and the player's map has a GuildTournamentSystem:
+        GuildTournamentSystem::CreateItemEffect(gts, me, player, 0)   (Z16)
+DamageAbsorbAction::exe ("DmgAbsorb")            @ FUN_005c11a0   (§16.6)
+BallAction::exe ("Ball")                         @ FUN_005c1390
+    if me.mode == 3 or me is moving (vt 0x610): return
+    speed = player.so_mobile_MoveSpeed() (vt 0x7b0); if 0: return
+    dist = (RandomBox[100] + 50) × speed / 100            # 50…149 % of the player's speed
+    if rb_1000() < speed: dest = me.pos + a vector of length dist turned by rb_largerandom(360)°   # random kick
+    else: dest = me.pos + (me.pos − player.pos) scaled to dist   (same spot: y += dist)            # pushed away
+    if so_FindBlockLocate(me, dest, dist, &spot, mbi_IsMoveBlock) (§9.2):
+        me.so_ReinforceMove(spot, speed × 2, 1, 0, 0)   (vt 0xa28, §9.3: a forced move, no animation)
+    # (vector arithmetic garbled in the decompile; helper names VectorWithLength / vwl_Scale / v_Rotation)
+RestoreRateAction::exe ("RestoreRate")           @ FUN_005c15f0
+    switch eType:
+        RT_HP: player.so_mobile_HPHealOverTime(me, MaxHP × nValue / 1000, 0x318)   (vt 0x734)
+               # falls through (original bug) Z09-B47
+        RT_SP: player.so_mobile_SPHealOverTime(me, MaxSP × nValue / 1000)            (vt 0x738)
+    # with Z09-B46: a "RestoreRate HP" row restores SP only; a "RestoreRate SP" row restores HP and SP
+NoticeAction::exe ("Notice")                     @ FUN_005c1700
+    player.so_ply_Notice(content_)   (vt 0x784 FUN_005977e0):
+        0x2011 NC_ACT_NOTICE_CMD { u8 unk (never written: (original bug) Z09-B54), u8 len = strlen & 0xFF, char text[len] }
+        # the client accepts 0x2011 in every scene and ignores it (C01): the notice is never shown
+CallLuaAction::exe ("CallLua")                   @ FUN_005c1720
+    if me has an AI script and its "NPCAction" function name is not empty:
+        me.so_AIScriptFuncExec(0x90, LuaArgumentNPCAction(map, me, player))   (vt 0xb68, §14.3: f(mapName, npc, player, charNo))
+```
+
+### 16.6 Damage absorption (`DmgAbsorb`)
+
+The only producer of `EV_DAMAGE` is the player's damage filter, called by the swing and skill damage paths of Z03
+(`ShineMobileObject::smo_SwingDamage` FUN_00432f30, `SkillDamageSender::sds_TemplateStore` FUN_005803c0, through vt 0xbe8):
+
+```pseudo
+ShinePlayer::so_ply_CheckDamageAbsorption(p, dmg) → damage still to apply      @ FUN_00579860
+    p.smo_SetFlagDamageAbsorb(0)   (vt 0xbf0, smo_Flag bit 7)
+    if dmg < 1: sp_nDamageAbsorb = 0; sp_nRemainingDamageAbsorb = 0; return dmg
+    sp_nDamageAbsorb = dmg (vt 0xbdc); sp_nRemainingDamageAbsorb = dmg (vt 0xbe4)
+    p.notifyObservers(EV_DAMAGE)                   # every DmgAbsorb trigger of a protector in range fires
+    sp_nDamageAbsorb = 0
+    return sp_nRemainingDamageAbsorb               # vt 0xbe0
+
+DamageAbsorbAction::exe(me, p)                                                     @ FUN_005c11a0
+    if me null, me.mode == 3, me.so_AmIAlreadyDead (vt 0x28), p null, p.mode == 3 or p dead: return
+    absorb = p.so_ply_GetDamageAbsorb()  (vt 0xbd8 FUN_0055a720); if absorb < 1: return
+    left = me.HP − me.so_batobj_GetDamage() (vt 0x65c, damage already queued)
+    if absorb < left:
+        me.so_DamagedBy(me, absorb, 1000)          # the protector takes all of it (attacker = itself)
+        p.so_ply_SetRemainingDamageAbsorb(0); flag = 1
+    else:
+        me.so_KilledBy(me, left, 1000, 1)          # it dies, the rest goes through
+        p.so_ply_SetRemainingDamageAbsorb(absorb − left); flag = 0
+    p.smo_SetFlagDamageAbsorb(flag)                # smo_SwingDamage skips its own 0x2448 when the flag is set (Z03)
+    so_AllOfRange(me, me.pos, range 0 = sight, AxialListPacketBroadcast, except me.handle *(inferred: last argument)*):
+        0x2449 NC_BAT_SOMEONESWING_DAMAGE_CMD { u16 attacker = p.handle, u16 defender = me.handle,
+                 u8 flag (bits 0–2 cleared; bits 3–7 left from the previous packet in the shared buffer: (original bug) Z09-B53),
+                 u32 resthp = me.HP, u16 hpchangeorder = me.so_mobile_GetHPChangeOrder() (vt 0x7e8),
+                 u8 damageindex = 1, u8 attacksequence = 0 }           # 13 bytes; client FUN_004a2850 (layout in `packets-zone.md`)
+```
+
+(original bug) Z09-B48: every protector reads `sp_nDamageAbsorb`, the **original** amount, not what the previous one
+left: with two protectors in range both take the full damage, and if the second one dies its `absorb − left`
+overwrites the first one's 0, so the player is hurt although the first protector absorbed everything.
+
+### 16.7 What the 2016 data uses
+
+| Mob types (file names) | Trigger (condition → actions) | Effect |
+|---|---|---|
+| 17 gates (`DetectCha` 50–150; `IDLeviathanGate01` 0, see B49): `MapLinkGate`, `MapLinkGate01`, `IDMapLinkGate00…03`, `IDLeviathanGate01`, `KarenGate`, `C_Gate01`, `T_Gate01/02`, `Gate_AdlF`, `Gate_Lab`, `DT_EntranceGate`, `DT_ExitGate`, `WarBL_EntranceGate`, `WarH_EntranceGate` | `Default` → `Link` | walking into `DetectCha` (50–150) opens the gate's menu |
+| `BallCake01`, `BallWater`, `E_Ski_Snowman`, `E_SkiFlag_Blue/Gold/Red`, `Egg2014_BigEgg` | `Default` → `CallLua` | the mob's AI script `NPCAction` function runs (event mini-games); the four `KDSoccer_*` files (same trigger, two with `Die`) name no mob and are never used |
+| `E_Ski_IDHoneying` | `Default` → `Ball` | pushed away by the player |
+| `GTI_BoxAll` / `GTI_BoxTeamA` / `GTI_BoxTeamB` | `Default` / `GTITeam 0` / `GTITeam 1` → `GTIEffect`, `Die` | guild-tournament item box: effect for (the right team's) player, then the box dies |
+| `SpUpShoes`, `SpImShield` | `Default` → action 35 / 36, `Die` | KQ pick-ups; rows 35 / 36 are `AbState StaOrbAtkRateUp` strength 5 / 6, while the KQ buffs `StaKQSpUpBuff` / `StaKQSpImBuff` are rows 40 / 41: the files most likely still point at the row numbers from before rows 34–38 were inserted *(inferred; data, not code)* |
+| `ChristmasTree`, `E_SixYear_Dance` | `Emotion 23/24/25/26` → dispel the other event buffs, set one (`StaEventHpUp`, `SpUp`, `AllStatsUp`, `Speed`, `AcUp`) | emote next to the tree to choose a buff |
+| `B_Slime` (unused name), `LightField01…05`, `MultiProtect`, `MultiProtect02/03` | `DmgAbsorb` → `DmgAbsorb` (+ `CheckCycleParty 1500 ms` → `AbState StaMultiHeal` strength 1/2/3 for MultiProtect) | the summoned protector takes its master's / party's damage (only servants have a master) |
+| `LightOrb01…10` | `CheckCycleParty` → `AbState StaOrbAtkRateUp` strength 4…13 | party aura every 1.5 s |
+| `DT_RadionOre` | `AttackMob` → `AbState StaRadionBuff`, `RestoreRate HP 1000`, `RestoreRate SP 1000` | hitting the ore buffs and refills (with B46/B47: HP once, SP twice) |
+
+Unused rows: conditions 2–11 (`LvGap`, `Class`, `AbState`, `Term`+`Skill`, `Term`+`None`, `Term`+`Emotion`, `Die`,
+`Emotion 12`) and actions 2–16 (incl. all `Notice` rows), 19 (`StaEventAllStatsUp`) and 39–41 (the KQ buffs). No row
+uses `Location`.
+
+### 16.8 Answers to open questions
+
+- **9a / §14.8:** `hasObserver`'s `next_ == null` compare matches the marker `Observer(me, null)` that `ali_Work`
+  registers before running the triggers; it is how a mob remembers which players it already handled (§16.3).
+- **Z02 §4:** `sp_DoEmotion`'s `vt 0xa38(4, id, 0)` is `notifyObservers(EV_EMOTION, id)`: the emote triggers of §16.4.
+- **Z02 §15 / §14.3:** the `NPCAction` object-script event (0x90) is raised only by the `CallLua` action.
+
+### 16.9 Open points of this section
+
+- `GuildTournamentSystem::CreateItemEffect` (what a guild-tournament box gives) is Z16.
+- Whether a hit on `DT_RadionOre` ever meets its `AttackMob` observer (B49) depends on the object walk order between
+  the ore and the player in the same tick; not traced.

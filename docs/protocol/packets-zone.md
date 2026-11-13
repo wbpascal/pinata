@@ -3495,6 +3495,16 @@ Sent in reply to `0x2008` NC_ACT_CHANGEMODE_REQ on ShineObjectClass::ShinePlayer
 
 ### `0x2011` NC_ACT_NOTICE_CMD
 
+**Verified layout** (basis: zone ShinePlayer::so_ply_Notice FUN_005977e0 (disassembly); client: accepted and ignored in every scene (C01))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | unk | never written: whatever the shared send buffer held (Z09-B54) |
+| 1 | u8 | len | strlen(text) & 0xFF |
+| 2 | char[len] | text | no terminating NUL on the wire; total size = len + 4 |
+
+sent by NPCAction NoticeAction (no 2016 trigger uses it) and the Lua observer (§14.7); no struct in either PDB
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_Notice` (`FUN_005977e0`) · payload variable (iVar7)
 
 | Off | Type | Value / source |
