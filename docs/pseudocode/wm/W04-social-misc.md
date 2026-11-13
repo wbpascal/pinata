@@ -326,7 +326,7 @@ The rest of the KQ subsystem (schedule load, status machine, map allocation) is 
             if remove (FUN_00449100) succeeds:
                 Members_Broadcast 0x7438 NC_GUILD_MEMBER_LEAVE_CMD { Name5 } (FUN_00444650); g.nNumMembers = M.count
                 stop the guild scan
-        SendRaw CharDB 0x9424 NC_HOLY_PROMISE_DB_DEL_CHAR_REQ { u32 nCharNo }    # answer 0x9425: part 4
+        SendRaw CharDB 0x9424 NC_HOLY_PROMISE_DB_DEL_CHAR_REQ { u32 nCharNo }    # answer 0x9425: §12.4
         Zones_BroadcastRaw 0x10B2 NC_CHAR_WEDDING_CANCEL_WEDDING { u32 nCharNo }
         for the first guild g whose academy table holds nCharNo (FUN_00441000):
             if remove (FUN_0044b840) succeeds:
@@ -1346,6 +1346,418 @@ Zone 0x9002 NC_CHARGED_RESETBUFF_CMD { u32 CharRegistNumber, u32 ChargedBuffKey,
 
 ---
 
+## 12. Holy promise (master / apprentice, dept 37)
+
+The WM keeps each online character's relation in its session and relays everything else to the Character server
+(`docs/pseudocode/db/D04-character-social.md` §8 has the procedures, tables and the DB codes). The client calls the
+relation "Monarch" / master and apprentice; the zone side is Z08 §9 (cen reward, 0x9432 / 0x9435). Codes: 0x1740 ok,
+0x1751 ok (re-join of an existing row, D04), the rest are client error-table texts (quoted below).
+
+### 12.1 The relation object in the session (`HP` = session +0x1DFB0, all offsets *ours*)
+
+| HP offset (session) | Field | Notes |
+|---|---|---|
+| +0x000 (+0x1DFB0) | `PROTO_HOLY_PROMISE_INFO` master (0x1A): Name5 PromiseCharID, DATE LogonInfo (+0x14, bit 0 = online), u8 Level (+0x18), u8 Flags (+0x19) | name "" = no master |
+| +0x01C (+0x1DFCC) | i32 memberCount (≤ 20) | |
+| +0x020 (+0x1DFD0) | `PROTO_HOLY_PROMISE_INFO` member[20] (0x1A each) | the apprentices |
+| +0x228 (+0x1E1D8) | u32 listLoaded: 1 after 0x9429; the next map login sends the list and clears it | |
+| +0x22C (+0x1E1DC) | u32 masterCharNo (−1 none, as loaded from the DB) | **not reset** by `HP_ClearMaster` (W04-B34) |
+| +0x230 (+0x1E1E0) | u16 masterWmHandle (0xFFFF = offline) | |
+| +0x232 / +0x236 / +0x23A (+0x1E1E2 / +0x1E1E6 / +0x1E1EA) | DATE RegDate / **RejoinableDate** / **MemberAcceptableDate** of this character's own row | both locks are local-time hours |
+| +0x240 (+0x1E1F0) | u32 remainMoneyPending (set by 0x9444) | |
+| +0x248 (+0x1E1F8) | u64 remainMoney (cen the master can still collect, D04 §8) | |
+| +0x250 (+0x1E200) | u32 memberCharNo[20] | |
+| +0x2A0 (+0x1E250) | u16 memberWmHandle[20] (0xFFFF offline) | |
+
+A DATE is `PROTO_HOLY_PROMISE_DATE` `{login:1, year:11, month:4, day:5, hour:5}` *(pdb2017; bit use confirmed)*;
+the WM converts it with `mktime` (year − 1900, month − 1, minutes/seconds 0) and builds new ones from `localtime`.
+
+```pseudo
+HP_HasMaster(hp) = master.PromiseCharID != ""                                       @ FUN_0045d0b0 (asm: returns 1 when non-empty)
+HP_FindByCharNo(hp, charNo, &idx): masterCharNo == charNo → hp (idx −1); member i → &member[i] (idx i); else null   @ FUN_00451170
+HP_FindByName(hp, name, &idx): same, by Name5 (master first)                      @ FUN_0045d150
+HP_CheckCanAddMember(hp, charNo): 2 if charNo is hp's master or already a member; 1 if memberCount > 19; else 0   @ FUN_004511d0
+HP_SetMaster(hp, INFO_DB info, charNo, handle): master = info (INFO part, HPInfo_Copy FUN_0045d2a0); masterCharNo,
+    masterWmHandle; RegDate / RejoinableDate / MemberAcceptableDate = info's three dates          @ FUN_00451040
+HP_ClearMaster(hp): master name = "", LogonInfo = now (login bit 0) (HPInfo_Clear FUN_0045d010); masterWmHandle = 0xFFFF
+    # masterCharNo and the dates are kept (original bug) W04-B34                                  @ FUN_00451090
+HP_AddOrUpdateMember(hp, INFO info, charNo, handle): count > 20 → 0; same name → overwrite entry, charNo, handle → 2;
+    count > 19 → 0; else append → 1                                                              @ FUN_00451370
+HP_RemoveMember(hp, name): remove by name, close the gap in all three arrays                       @ FUN_004510b0
+HP_SetOffline(hp, name): the master or member with that name: LogonInfo = local time now, login bit 0
+    (FUN_0045d1f0)                                                                                 @ FUN_0045d2e0
+HP_SetLevel(hp, name, level): the master or member with that name gets Level = level              @ FUN_0045d380
+HP_SendToMembers(hp, pkt): SendRaw to every member whose handle is an in-game session            @ FUN_00451220
+Clients_GetInGameByHandle(h): slot with that handle, in use and session +0x704 inGame ≠ 0       @ FUN_00438180
+```
+
+### 12.2 Loading, presence, level change (not handlers)
+
+The Character server pushes 0x9427, 0x9429 and 0x9444 while it loads the character (D02 §4 step 11); W01's map
+login 0x180C and logout and level change call the functions below.
+
+```pseudo
+CharDB 0x9427 NC_HOLY_PROMISE_DB_GET_UP_ACK { u32 nCharNo, u16 DBError, INFO_DB UpMemberInfo @6 }  (0x30)   @ FUN_0040c8d0
+    s = Clients_FindByCharNo(nCharNo) (any session; the character is still loading); none → return
+    DBError != 0x1740: HP_ClearMaster(s.HP); return            # nothing logged
+    m = Clients_FindInGameByCharNo(UpMemberInfo.PromiseCharNo); handle = 0xFFFF
+    if m:  UpMemberInfo.LogonInfo |= 1 (online); handle = m.wmHandle
+           e = HP_FindByCharNo(m.HP, s.charNo); if e: e.LogonInfo |= 1; HP_AddOrUpdateMember(m.HP, e, s.charNo, s.wmHandle)
+    HP_SetMaster(s.HP, UpMemberInfo, UpMemberInfo.PromiseCharNo, handle)
+    # no master: the DB wrapper sends PromiseCharNo −1 and an empty name (D04), so HasMaster is false
+
+CharDB 0x9429 NC_HOLY_PROMISE_DB_GET_MEMBER_ACK { u32 nCharNo, u16 DBError, u8 nPart, u8 nMemberCount,
+        INFO_DB MemberInfo[n] @8 }                                                                       @ FUN_0040c9c0
+    s = Clients_FindByCharNo(nCharNo); none → return
+    DBError != 0x1740: Log "ERROR - NC_HOLY_PROMISE_DB_GET_MEMBER_ACK, DB ERROR =%d, nCharNo=%d"; return
+    HP_LoadMembers(s.HP, pkt)                                                                             @ FUN_00451490
+        nPart bit 0 (first part): memberCount = 0 (FUN_0045d0a0)
+        per entry: add or update by name (charNo = entry.PromiseCharNo, handle 0xFFFF); more than 20 → return 0
+    ok → s.HP.listLoaded = 1; 0 → Log "ERROR - NC_HOLY_PROMISE_DB_GET_MEMBER_ACK, nCharNo=%d's MEMBER OVER MAX"
+
+CharDB 0x9444 NC_HOLY_PROMISE_DB_GET_REMAIN_MONEY_CMD { u32 nCharNo, u64 nMoney }  (0xC)              @ FUN_0040cc30
+    s = Clients_FindByCharNo(nCharNo): s.HP.remainMoney = nMoney; s.HP.remainMoneyPending = 1
+
+Client_SendHolyPromiseOnMapLogin(s)          from 0x180C map login (W01 §5.4)                         @ FUN_00434c20
+    if remainMoneyPending == 1: pending = 0
+        if remainMoney != 0: s ← 0x9445 NC_HOLY_PROMISE_CLIENT_GET_REMAIN_MONEY_CMD { u64 nMoney }  (8)
+             send failed → return (the list below is skipped)
+             # client FUN_004b0920: "%s, You've done a great job to help your trainee as a master." + the amount
+             # and "You can receive your reward at Elderine whenever you want it."
+    if listLoaded == 0: return
+    listLoaded = 0
+    HP_RefreshOnline(s.HP, s)                                                                             @ FUN_00451610
+        masterCharNo ∉ {−1, 0} and m = FindInGameByCharNo(masterCharNo):
+            master.LogonInfo |= 1; masterWmHandle = m.wmHandle
+            e = HP_FindByCharNo(m.HP, s.charNo); e: e.LogonInfo |= 1; HP_AddOrUpdateMember(m.HP, e, s.charNo, s.wmHandle)
+        each member i online (FindInGameByCharNo(memberCharNo[i])) = a:
+            member[i].LogonInfo |= 1; memberWmHandle[i] = a.wmHandle; a.HP.master.LogonInfo |= 1; a.HP.masterWmHandle = s.wmHandle
+    s ← 0x9414 NC_HOLY_PROMISE_LIST_CMD { INFO UpInfo = HP.master, u8 nPart, u16 MemberCount, INFO MemberInfo[n] }  (0x1D + 0x1A·n)
+        nPart bit 0 first, bit 1 last; a part is closed when 0x1D + n·0x1A > 0x1F96 (never with ≤ 20 members)
+    HP_SendLogin(s.HP, s.name)                                                                            @ FUN_00451700
+        0x9416 NC_HOLY_PROMISE_LOGIN_CMD { Name5 CharID = s.name }  (0x14) → the master (if masterWmHandle valid) and every member
+    # client: 0x9414 FUN_0050fb40 fills the window; 0x9416 / 0x9417 FUN_0050fba0 / FUN_0050fbd0 mark the name on/offline
+
+HP_OnLogout(s.HP, s)                         from CharacterLogout (W01 §5.4)                          @ FUN_00451790
+    masterWmHandle valid: m = Clients_GetInGameByHandle; none (or s has no CHARDATA) → masterWmHandle = 0xFFFF
+        else HP_SetOffline(m.HP, s.name); e = HP_FindByCharNo(m.HP, s.charNo) as a member → m.memberWmHandle[idx] = 0xFFFF
+    each member handle valid: a = GetInGameByHandle; none → handle = 0xFFFF; else HP_SetOffline(a.HP, s.name),
+        a.HP.masterWmHandle = 0xFFFF
+    0x9417 NC_HOLY_PROMISE_LOGOUT_CMD { Name5 CharID = s.name } → master (if handle still valid) and every member
+
+0x1074 level change (W01 §7):  if HP_HasMaster(s.HP): HP_OnLevelChange(s.HP, s, level); HP_RequestReward(s)   @ FUN_0042e160
+    # a character without a master skips both: its apprentices never learn its new level (original bug) W04-B37
+HP_OnLevelChange(hp, s, level)                                                                           @ FUN_00451930
+    if masterWmHandle valid:
+        m = GetInGameByHandle: HP_SetLevel(m.HP, s.name, level)
+        if hp.master.Level < level + 10:          # cached master level, see W04-B37
+            → CharDB 0x9420 NC_HOLY_PROMISE_DB_DEL_UP_REQ { u32 nCharNo = s.charNo, u32 nUpCharNo = masterCharNo,
+                                                             u8 nDelCmdType 1 (level gap) }   (answer 0x9421, §12.3)
+        # an offline master: no check at all, the gap can grow until both are online
+    each member online: HP_SetLevel(a.HP, s.name, level)
+    0x9419 NC_HOLY_PROMISE_LEVEL_CMD { Name5 CharID = s.name, u8 Level }  (0x15) → master and members
+    # client FUN_0049b9d0: HolyPromiseWin::SetLevelChange
+HP_RequestReward(s)                                                                                       @ FUN_00451290
+    → CharDB 0x942A NC_HOLY_PROMISE_DB_REWARD_REQ { u32 nCharNo, u8 nClass = (shape byte 0 >> 2) & 0x1F, u8 nLevel = CHARDATA.level }  (6)
+```
+
+### 12.3 Client requests and their CharDB answers
+
+```pseudo
+0x9401 NC_HOLY_PROMISE_SET_UP_REQ { Name5 CharID, Name5 UpCharID @0x14 }  (0x28; CharID not read)   @ FUN_00421990
+    # s asks UpCharID to become its master; every refusal is s ← 0x9402 { Error, … } (below)
+    HP_HasMaster(s.HP)                       → 0x1749 "You've already registered a master."
+    now < s.RejoinableDate                   → 0x174A + ResetableDateTime / tm_ResetableDateTime = that date
+                                               (client: "Master registration will be available after %s.", strftime "%m-%d. %H:%M")
+    t = Clients_FindInGameByCharName(UpCharID); t or t.CHARDATA or s.CHARDATA missing → 0x174B "Master cannot be found."
+    t.charNo == s.charNo                     → 0x176E "You can not specify yourself as a supporter."
+    t.level < s.level + 10                   → 0x174C "Your character needs to be 10 levels lower than the requested master."
+    r = HP_CheckCanAddMember(t.HP, s.charNo): 1 → 0x174D "The master is unable to accept additional apprentices."
+                                              2 → 0x174E "You're already registered as an apprentice."
+    now < t.MemberAcceptableDate             → 0x1750 "24 hours must pass before a master can receive a new apprentice."
+                                               (ResetableDateTime filled; the client shows only the table text)
+    else:
+        s ← 0x9403 NC_HOLY_PROMISE_SET_UP_CONFIRM_ING { Name5 UpCharID = t.name }  (0x14)   # "You've asked %s to be your master."
+        t ← 0x9404 NC_HOLY_PROMISE_SET_UP_CONFIRM_REQ { Name5 CharID = s.name, Name5 UpCharID = t.name }  (0x28)
+            # client: "%s is requesting you as a master. Do you wish to accept?" → 0x9405
+    refusal: s ← 0x9402 NC_HOLY_PROMISE_SET_UP_ACK { u16 Error, INFO UpInfo (name zeroed, LogonInfo/Level/Flags not written),
+             i32 ResetableDateTime, tm tm_ResetableDateTime }  (0x44)
+             # the date fields are written only for 0x174A / 0x1750 (original bug) W04-B32
+    # no pending-request state is kept anywhere
+
+0x9405 NC_HOLY_PROMISE_SET_UP_CONFIRM_ACK { Name5 CharID, Name5 UpCharID @0x14, u8 bAccept @0x28 }  (0x29)   @ FUN_00421d10
+    # sent by the would-be master m = this session; CharID names the apprentice
+    a = Clients_FindInGameByCharName(CharID); a, a.CHARDATA and m.CHARDATA required, else return
+    # UpCharID is not read, no pending request is checked, and none of 0x9401's checks (level gap, locks, own name)
+    # are repeated: any player can make any master-less online player its apprentice (original bug) W04-B31
+    HP_HasMaster(a.HP) → a ← 0x9402 { 0x174E, name zeroed, rest not written }; return
+    bAccept == 0       → a ← 0x9402 { 0x1748 "Apprenticeship request has been denied." }; return
+    → CharDB 0x941E NC_HOLY_PROMISE_DB_SET_UP_REQ (0x54) {
+        (packet names zeroed first, FUN_0041e540)
+        ReqInfo = { PromiseCharID = a.name, LogonInfo |= 1 (the other bits are stale stack; the DB ignores them), Level = a.level, Flags 0, PromiseCharNo = a.charNo,
+                    RegDate / RejoinableDate / MemberAcceptableDate = a's three dates }
+        UpInfo  = { PromiseCharID = m.name, LogonInfo |= 1 (same), Level = m.level, Flags 0, PromiseCharNo = m.charNo, RegDate 0,
+                    RejoinableDate / MemberAcceptableDate = **a's** dates (the DB reads only the charNos and Flags) } }
+
+CharDB 0x941F NC_HOLY_PROMISE_DB_SET_UP_ACK { INFO_DB ReqInfo, INFO_DB UpInfo @0x2A, u16 DBError @0x54 }  (0x56)   @ FUN_00411ba0
+    a = FindInGameByCharNo(ReqInfo.PromiseCharNo); m = FindInGameByCharNo(UpInfo.PromiseCharNo)
+    if DBError ∈ {0x1740, 0x1751}:
+        a: HP_SetMaster(a.HP, UpInfo, UpInfo.PromiseCharNo, m ? m.wmHandle : 0xFFFF)
+           DBError 0x1740 and a.level < 10 → CharDB 0x942A REWARD_REQ { a.charNo, a.class, nLevel 1 }   # level-1 reward row
+        m: HP_AddOrUpdateMember(m.HP, ReqInfo, ReqInfo.PromiseCharNo, a ? a.wmHandle : 0xFFFF)
+        all zones ← 0x9432 NC_HOLY_PROMISE_MY_UP_ZONE { u32 nCharNo = a, u32 nUpCharNo = m }   (zone: empty handler, Z08 §9)
+    a ← 0x9402 { Error = DBError, UpInfo = UpInfo's INFO part, ResetableDateTime / tm not written (W04-B32) }
+        # client FUN_004af970: 0x1740/0x1751 → HolyPromiseWin::SetHignHolyPromise, "You've been added as %s's apprentice.";
+        # else the error text (0x1741 "User is already logged on." for the DB's ring check, 0x1742, 0x1743, 0x1749)
+    m ← 0x9415 NC_HOLY_PROMISE_ADD_CMD { u16 Error = DBError, INFO MemberInfo = ReqInfo's INFO part }  (0x1C)
+        # client FUN_004afe90: ok → AddPromise, "%s has been registered as your apprentice."; else the error text
+
+0x9406 NC_HOLY_PROMISE_DEL_UP_REQ {}   (apprentice leaves)                                               @ FUN_00415c00
+    s.CHARDATA required
+    !HP_HasMaster → s ← 0x9407 { u8 nDelCmdType (not written, original bug W04-B33), u16 Error 0x1758 "Master's User ID cannot be found." }
+    masterCharNo ∉ {0, −1} → CharDB 0x9420 NC_HOLY_PROMISE_DB_DEL_UP_REQ { s.charNo, masterCharNo, nDelCmdType 0 }  (9)
+    # masterCharNo 0/−1 with a master name: no answer at all
+
+CharDB 0x9421 NC_HOLY_PROMISE_DB_DEL_UP_ACK { u32 nCharNo, u32 nUpCharNo, u8 nDelCmdType, u16 DBError @9 }  (0xB)   @ FUN_00410d30
+    a = FindInGameByCharNo(nCharNo)
+    if DBError == 0x1740:
+        m = FindInGameByCharNo(nUpCharNo); e = HP_FindByCharNo(m.HP, nCharNo):
+            m ← 0x9418 NC_HOLY_PROMISE_DEL_CMD { Name5 CharID = e.name, u8 nDelCmdType }  (0x15); HP_RemoveMember(m.HP, e)
+        if a:
+            # rejoin lock: only for a voluntary leave (type 0) and only when the master is online or was online in the last
+            # 5 days (master.LogonInfo + 120 h > now)
+            if nDelCmdType == 0 and (master online or now < master.LogonInfo + 5 days):
+                → CharDB 0x942C NC_HOLY_PROMISE_DB_SET_DATE_REQ { nCharNo, RejoinableDate = local now + 24 h,
+                                                                  MemberAcceptableDate = a's current one }  (0xC)
+            HP_ClearMaster(a.HP)
+        all zones ← 0x9432 { nCharNo, nUpCharNo −1 }
+    a ← 0x9407 NC_HOLY_PROMISE_DEL_UP_ACK { u8 nDelCmdType, u16 Error = DBError }  (3)
+        # client FUN_004afb60: ≠ 0x1740 → error text (0x1744); type 0 "Apprenticeship has been terminated.", 1 "Your relationship
+        # with %s has been terminated due to your level increase.", 2 "…because your masters character has been deleted."; then DelUpHolyPromise
+    # client 0x9418 FUN_004afda0: type 1 "…terminated due to discrepancy in character levels.", 2 "%s has deleted their
+    # character…", 0: own master's name → "Apprenticeship has been terminated." else "%s has been removed from apprenticeship."
+
+0x940A NC_HOLY_PROMISE_DEL_DOWN_REQ { Name5 DownCharID }  (0x14; master releases an apprentice)       @ FUN_0041e570
+    s.CHARDATA required
+    e = HP_FindByName(s.HP, DownCharID, &idx); none or idx −1 (the name is s's own master)
+        → s ← 0x940B { Name5 DownCharID = zeroed, u16 Error 0x1760 "Apprentice's User ID cannot be found." }
+    → CharDB 0x9422 NC_HOLY_PROMISE_DB_DEL_DOWN_REQ { u32 nCharNo = s.charNo, u32 nDownCharNo = memberCharNo[idx], Name5 DownCharID }  (0x1C)
+
+CharDB 0x9423 NC_HOLY_PROMISE_DB_DEL_DOWN_ACK { u32 nCharNo, u32 nDownCharNo, Name5 DownCharID, u16 DBError @0x1C }  (0x1E)   @ FUN_00410fe0
+    m = FindInGameByCharNo(nCharNo)
+    if DBError == 0x1740:
+        a = FindInGameByCharNo(nDownCharNo); a and HP_FindByCharNo(a.HP, nCharNo) is a's master (idx −1):
+            a ← 0x9418 { CharID = a's master name, nDelCmdType 0 }; HP_ClearMaster(a.HP)
+        if m:
+            # acceptance lock, same 5-day rule on the apprentice's LogonInfo when the apprentice is offline
+            if a online or (e = HP_FindByCharNo(m.HP, nDownCharNo) and now < e.LogonInfo + 5 days):
+                → CharDB 0x942C { nCharNo, RejoinableDate = m's current one, MemberAcceptableDate = local now + 24 h }
+            HP_RemoveMember(m.HP, DownCharID)
+        all zones ← 0x9432 { nDownCharNo, −1 }
+    m ← 0x940B NC_HOLY_PROMISE_DEL_DOWN_ACK { Name5 DownCharID, u16 Error = DBError }  (0x16)
+        # client FUN_004afaa0: ok → "%s has been removed from apprenticeship." + DelHolyPromise; else error text (0x1744)
+
+CharDB 0x942D NC_HOLY_PROMISE_DB_SET_DATE_ACK { u32 nCharNo, DATE RejoinableDate, DATE MemberAcceptableDate, u16 DBError }  (0xE)   @ FUN_0040cbe0
+    s = FindInGameByCharNo: s.RejoinableDate / s.MemberAcceptableDate = the packet's dates
+    # DBError (0x1752 on failure) is not checked (original bug) W04-B38: the lock holds in memory until the next login
+
+CharDB 0x942B NC_HOLY_PROMISE_DB_REWARD_ACK { u32 nCharNo, u8 nClass, u8 nLevel, u16 DBError, u8 nNumOfItems @8,
+        {u16 id, u16 lot}[n] @9 }                                                                         @ FUN_0040cac0
+    s = FindInGameByCharNo(nCharNo) (the apprentice, owner of the reward box items, D04); nNumOfItems == 0 → nothing
+    s ← 0x941A NC_HOLY_PROMISE_REWARD_ITEM_CMD { u8 nNumOfItems, {u16 id, u16 lot}[n] }  (1 + 4n)   # DBError not forwarded
+        # client FUN_004aff60: "You've received %s(%d) to your Monarch." per item
+```
+
+### 12.4 Character deletion and the zone query
+
+```pseudo
+CharDB 0x9425 NC_HOLY_PROMISE_DB_DEL_CHAR_ACK { u32 nCharNo, u16 DBError }  (6)   (asked by OPTool 0x281F, §4.3)   @ FUN_0040f390
+    # DBError (0x1745 on failure) is not checked
+    for every session s with CHARDATA:
+        s.HP.masterCharNo == nCharNo (s was the deleted character's apprentice):
+            all zones ← 0x9432 { s.charNo, −1 }; s ← 0x9418 { CharID = master name, nDelCmdType 2 }; HP_ClearMaster(s.HP)
+        e = HP_FindByCharNo(s.HP, nCharNo) (any index):
+            s ← 0x9418 { CharID = e.name, nDelCmdType 2 }; HP_RemoveMember(s.HP, e)
+        # masterCharNo survives HP_ClearMaster, so the second test matches the cleared master again: a second 0x9418 with an
+        # empty name ("…has deleted their character" twice) (original bug) W04-B35
+
+OPTool 0x9425 (same body, OPTool parser)                                                                  @ FUN_00427cb0
+    same as above, but the second test requires idx == −1: the deleted character is never removed from its master's member
+    list, and the apprentice gets the duplicate message (original bug) W04-B36
+    # reachable only if an operator tool itself sends 0x9425 to the WM (inferred; the CharDB answer arrives on the CharDB parser)
+
+Zone 0x9434 NC_HOLY_PROMISE_MYUPPER_REQ { ref {u16 zoneHandle, u32 charNo} }  (6)                       @ FUN_0042b8c0
+    s = Clients_FindByCharNo(ref.charNo)
+    reply 0x9435 NC_HOLY_PROMISE_MYUPPER_ACK { ref (echo), u32 nUpCharNo = s ? s.HP.masterCharNo : −1 }  (0xA)
+    # stale after a release in the same session (W04-B34); the 2016 zone ignores the value (Z08 §9)
+```
+
+## 13. Instance dungeons (dept 41)
+
+The zone side (gates, level-select menus, the cluster manager) is Z08 §5. The WM only relays between zones, tells group
+members about the empty-dungeon countdown, and holds an in-memory instance ranking that the 2016 Character server never
+feeds (§13.3).
+
+### 13.1 Empty-dungeon countdown and reset (CParserZone)
+
+The zone's `MapClusterManager::MapCluster::mc_Routine` (zone FUN_004868d0) sends 0xA401 when an instance has had no
+players for 20 s and arms a 300-s timer; it sends 0xA403 when players are back or when it deletes the instance
+(`mc_DeleteInstanceDungeon` FUN_00486710, `mc_AllDropFilm` FUN_00485290). Read only as far as these sends; the
+cluster timers are Z08's.
+
+```pseudo
+0xA401 NC_INSTANCE_DUNGEON_EMPTY_DUNGEON_CMD { u8 Category, u32 RegisterNumber }  (5)                    @ FUN_0042ba20
+    leader = −1        # W02 helpers: Party_GetMemberCount FUN_00464dc0 (−1 for partyNo > 3999), Raids_Get FUN_00462f90
+    Category 0 (party): party = RegisterNumber (u16); each member slot: s = Clients_GetByHandle(member.wmHandle) with CHARDATA,
+        same charNo and not pending (Party_IsPending) → s ← 0x0810 NC_MISC_RESTMINUTE_CMD { u8 1, u16 300 }  (3)
+        leader = member[0].charNo (the party master, W02 §1) if the party exists
+    Category 3 (raid): raid = Raids_Get(RegisterNumber); each member (Clients_FindByCharNo, CHARDATA) ← 0x0810 { 1, 300 };
+        leader = raid.leaderCharNo (+0x10)
+    other categories: nobody is told; leader stays −1
+    all zones ← 0xA402 NC_INSTANCE_DUNGEON_DELETE_DUNGEON_CMD { u8 Category, u32 RegisterNumber, u32 ReaderRegisterNumber = leader }  (9)
+        # the zone holding the leader opens the "ID_DeleteNow" menu (Z08 §5.3); leader −1 → no menu
+    # client 0x0810 FUN_004997a0: type 1 → KQuestTimeWin::ResetTime(300) (seconds: Z01 sends limit/10)
+
+0xA403 NC_INSTANCE_DUNGEON_RESET_COUNTDOWN_CMD { u8 Category, u32 RegisterNumber }  (5)                  @ FUN_0042bc40
+    same member loops (party only if Party_GetMemberCount ≠ −1) → 0x0810 { 1, 0 } (clears the timer window); nothing to the zones
+```
+
+### 13.2 Level-select relay (ModeIDGate, Z08 §5.3)
+
+```pseudo
+0xA408 NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_REQ { u8 nStartZoneNum, u8 nDestZoneNum, u32 nCharRegNum @2, u32 nInDunRegNum @6,
+        i32 IndunCategory @0xA, u16 nNPCHandle @0xE, ORToken Argument @0x10 }  (0x24)                     @ FUN_0042c630
+    Clients_FindByCharNo(nCharRegNum) required (else nothing)
+    dest = Zones_Get(nDestZoneNum)
+    none → sender ← 0xA409 NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ACK { nCharRegNum, nNPCHandle, u16 nError 2, i32 eLevelType 3 }  (0xC)
+        # zone A reads nError 2 as "no instance yet" and offers every level; the join then fails (original bug) W04-B45
+    else dest ← 0xA40A …_CHECK_ECHO_REQ { nStartZoneNum (from the packet), nCharRegNum, nInDunRegNum, IndunCategory,
+        nNPCHandle, Argument }  (0x23)
+
+0xA40B …_CHECK_ECHO_ACK { u8 nStartZoneNum, u32 nCharRegNum @1, u16 nNPCHandle @5, u16 nError @7, i32 eLevelType @9 }  (0xD)   @ FUN_0042c7d0
+    FindByCharNo(nCharRegNum) and z = Zones_Get(nStartZoneNum) required
+    z ← 0xA409 { nCharRegNum, nNPCHandle, nError, eLevelType }  (0xC)
+
+0xA40E …_JOIN_REQ { as 0xA408, i32 eLevelType @0x24 }  (0x28)                                            @ FUN_0042c8e0
+    FindByCharNo(nCharRegNum) required
+    no dest zone → sender ← 0xA40F …_JOIN_ACK { nCharRegNum, nNPCHandle, nError 2, eLevelType 3, Name3 sMapName "" }  (0x18)
+        # zone A: 2 → system text "RecallDisableField"
+    else dest ← 0xA410 …_JOIN_ECHO_REQ { nStartZoneNum, nCharRegNum, nInDunRegNum, IndunCategory, nNPCHandle, Argument, eLevelType }  (0x27)
+
+0xA411 …_JOIN_ECHO_ACK { u8 nStartZoneNum, u32 nCharRegNum @1, u16 nNPCHandle @5, u16 nError @7, i32 eLevelType @9, Name3 sMapName @0xD }  (0x19)   @ FUN_0042cac0
+    FindByCharNo and Zones_Get(nStartZoneNum) required → that zone ← 0xA40F { nCharRegNum, nNPCHandle, nError, eLevelType, sMapName }  (0x18)
+```
+
+The WM adds no state and no checks of its own: a character that logs out mid-flow drops the answer (zone A then keeps
+its request flag, Z08-B9).
+
+### 13.3 Instance ranking (`g_IndunRank`, DAT_006c5568, all names *ours*)
+
+Three ranks per dungeon *(pdb2017 `E_INDUN_RANK_TYPE`)*: 0 damage dealt, 1 damage taken, 2 healing done.
+
+| Offset | Field |
+|---|---|
+| +0x000 | u8 mapCount (≤ 32) |
+| +0x001 | `SHINE_INDUN_INFO` map[32] (0xD: Name3 MapIDClient, u8 ModeIDLv) |
+| +0x1A8 | board[32], 0x7A8 each: `PROTO_AVATAR_SHAPE_INFO` top-3 shapes ×3 ranks (+0x00 dealt 1st…3rd, +0x0C taken, +0x18 healing), u8 count dealt / taken / healing (+0x24/+0x25/+0x26), `SHINE_INDUN_RANK_CLIENT_VALUE` (0x20: Name5, u8 class @0x14, u64 value @0x18) dealt[20] @+0x28, taken[20] @+0x2A8, healing[20] @+0x528 |
+
+Per character, session +0x1EDA8 holds 32 `my rank` records of 0x50, indexed like the boards (`Client_GetMyRank`
+FUN_00433da0, by index FUN_00433de0; cleared at character login by FUN_00433e80): +0x00/+0x04/+0x08 u32 rank dealt /
+taken / healing, +0x10/+0x18/+0x20 u64 previous day's values, +0x28 u8 h, m, s and +0x2B u8 year−1900, month−1, day of
+the previous best time, +0x30/+0x38/+0x40 u64 current values, +0x48 h, m, s, +0x4B y, m, d. Session +0x1F7A8 / +0x1F7AC
+/ +0x1F7B0 / +0x1F7B4: earliest next tab request (dealt / taken / healing / my rank; getters FUN_00433e00…FUN_00433e30,
+setters FUN_00433e40…FUN_00433e70, reset to 0 at login).
+
+```pseudo
+IndunRank_FindOrAddMap(info) → index                                                                    @ FUN_00402460 (asm read)
+    0xFF if info is null, mapCount ≥ 32 or the name is empty; the index of the equal {name, level}; else appends the map
+    and returns the new index         # every lookup below goes through this, also with client-supplied names
+IndunRank_GetBoard(info) = &board[FindOrAddMap(info)] (null for 0xFF)                                   @ FUN_00402560
+IndunRank_InsertDealt / Taken / Healing(info, VALUE v, shape) → rank 1…20 or 0      @ FUN_004025a0 / FUN_00402890 / FUN_00402bb0
+    zero value → 0. Keeps the list sorted by value (descending), one entry per name: an equal name with a higher value
+    stops (0); otherwise the new entry goes before the first entry ≤ its value, the player's old entry (if lower) is
+    removed, and the list is cut at 20. A new rank 1…3 updates the three shapes (shifting the lower ones down).
+Board accessors (each looks the map up with FindOrAddMap; null / 0 for 0xFF):
+    shape setters (0xA41F) dealt 1st/2nd/3rd FUN_00402f70 / FUN_00402fb0 / FUN_00402ff0, taken FUN_00403030 / FUN_00403070 /
+    FUN_004030b0, healing FUN_004030f0 / FUN_00403130 / FUN_00403170; list setters FUN_004031b0 / FUN_00403220 / FUN_00403290
+    (count capped at 20); shape getters dealt FUN_00403300 / FUN_00403340 / FUN_00403380, taken FUN_004033c0 / FUN_00403400 /
+    FUN_00403440, healing FUN_00403480 / FUN_004034c0 / FUN_00403500; entry i FUN_00403540 / FUN_00403590 / FUN_004035e0;
+    count FUN_00403630 / FUN_00403670 / FUN_004036b0. Entry copy (VALUE, 0x20) FUN_00402180. Construction
+    FUN_00402ed0 (+ per-board ctor / dtor FUN_004022c0 / FUN_00402360, table dtor FUN_004023f0).
+Session tab cooldowns: getters FUN_00433e00 / FUN_00433e10 / FUN_00433e20 / FUN_00433e30, setters FUN_00433e40 /
+    FUN_00433e50 / FUN_00433e60 / FUN_00433e70 (dealt / taken / healing / my rank).
+
+IndunRank_DailyReset()                       from the WM main loop FUN_00406760                         @ FUN_004021c0
+    now < g_IndunRankNextReset (DAT_0049a024, 0 at start) → return
+    tm = tomorrow 00:00 local; g_IndunRankNextReset = mktime(tm)
+    for every client session in use:
+        clear all mapCount boards (memset 0x7A8 each)   # repeated per session, and never done without a session (W04-B44)
+        Client_RotateMyRank(s, tm)                                                                    @ FUN_00433fe0
+            each of the 32 records: previous = current (values, time, date); current values / time = 0;
+            current date = tm's (tomorrow's) date        # the day after the one that starts (W04-B44)
+```
+
+```pseudo
+Client 0xA41B NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGEDEALT_REQ { SHINE_INDUN_INFO sIndunInfo }  (0xD)      @ FUN_0041a420
+Client 0xA41C …_DAMAGETAKEN_REQ (same)                                                                   @ FUN_00418fb0
+Client 0xA41D …_HEALINGDONE_REQ (same)                                                                   @ FUN_004191d0
+    now < s.tabNext[type] → s ← 0xA421 / 0xA422 / 0xA423 { …, u16 nErr 0x3A01 @0xC }  (0x13; nothing else written, W04-B40)
+        # client FUN_004b47c0 (and siblings): 0x3A01 → system text TextData3 0x938F63DA (empty in the 2016 client table)
+    s.tabNext[type] = now + 3 s
+    reply 0xA421 NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGEDEALT_ACK (resp. 0xA422 TAKEN, 0xA423 HEALINGDONE) {
+        PROTO_AVATAR_SHAPE_INFO shapeInfo1st / 2nd / 3th = the board's three shapes for that rank,
+        u16 nErr 0x3A00, u32 nRank = s.myRank[map].rank of that type, u8 nCount, SHINE_INDUN_RANK_CLIENT_VALUE[nCount] }  (0x13 + 0x20·n)
+    # board and my-rank lookups dereference the result unchecked: once 32 distinct names are in g_IndunRank (any client can
+    # add names with these requests), a request for a 33rd name reads through a null pointer and crashes the WM
+    # (original bug) W04-B39
+    # client: 0x3A00 → IDRankingWin::SetRankInfo(rank, count, entries, shapes)
+
+Client 0xA41E …_TAB_MYRANK_REQ { SHINE_INDUN_INFO }  (0xD)                                               @ FUN_004193f0
+    cooldown as above (s.tabNext[3]) → 0xA424 { nErr 0x3A01 } (0x3E, rest not written)
+    e = Client_GetMyRank(s, info) (unchecked, W04-B39)
+    reply 0xA424 NC_INSTANCE_DUNGEON_RANK_TAB_MYRANK_ACK { u16 nErr 0x3A00, u64 nPrevDamageDealt / Taken / HealingDone = e+0x10…,
+        u8 nPrevPlayTimeHour / Minute / Second / Year / Month / Day = e+0x28…, u64 nCurr… = e+0x30…, u8 nCurrPlayTime… = e+0x48… }  (0x3E)
+
+Zone 0xA419 NC_INSTANCE_DUNGEON_MAP_REGIST_CMD { u16 nMapCount, SHINE_INDUN_INFO sIndunInfos[n] }  (2 + 0xD·n)   @ FUN_00428870
+    # sent by every zone at connect (Z01 §5 fc_IndunMapRegist); taken only if nMapCount ≤ 32 and none was taken before
+    g_IndunMapCount (DAT_00557d10) = n; g_IndunMaps (DAT_00557d14) = the entries   # written here only, read nowhere else
+    → CharDB 0xA41A NC_INSTANCE_DUNGEON_RANK_REQ { u16 nMapCount, SHINE_INDUN_INFO[n] }  (same bytes)
+    # the 2016 Character server registers no 0xA41A handler, so 0xA41F never comes back (original bug) W04-B43
+```
+
+CharDB answers. The 2016 Character server registers none of 0xA413 / 0xA415 / 0xA41A and sends none of these packets
+(no send sites in its export). The zone's `cIndunRankResult` (zone FUN_005ee4d0) result packet 0xA413 goes to the Character
+server too and is dropped there (C01). So the four handlers below are dead in 2016, the boards and my-rank records stay
+empty, and the tab replies above always show empty lists (W04-B43).
+
+```pseudo
+CharDB 0xA41F NC_INSTANCE_DUNGEON_RANK_ACK { SHINE_INDUN_INFO, 9 shapes @0xD, u8 counts @0x31…0x33, 3 × VALUE[20] @0x34 / 0x2B4 / 0x534 }  (0x7B4)   @ FUN_0040e8e0
+    board(sIndunInfo) = the packet (shapes, lists with count ≤ 20)
+
+CharDB 0xA414 NC_INSTANCE_DUNGEON_RANK_SAVE_WORLD_CMD { SHINE_INDUN_INFO sIndunInfo, u32 nPlayTime @0xD (s), u16 nRankCount @0x11,
+        SHINE_INDUN_RANK ranks[n] @0x13 (0x20: u32 nCharRegNum, u64 nDamageDealt @8, nDamageTaken @0x10, nHealingDone @0x18) }   @ FUN_0040f9f0
+    per rank: s = Clients_FindByCharNo(nCharRegNum) with CHARDATA and shape (+0x568), else skip
+        for type 0, 1, 2: r = IndunRank_Insert<type>(info, {s.name, class = (shape byte 0 >> 2) & 0x1F, value}, s.shape)
+            1 ≤ r ≤ 20 → every in-game player ← 0xA425 NC_INSTANCE_DUNGEON_RANK_NEW_RANK_MSG { Name5 nCharID = s.name,
+                SHINE_INDUN_INFO, u8 rankType, u32 nRank = r }  (0x26)  (Clients_BroadcastInGame(pkt, 0))
+                # client FUN_004b74f0: system message with the name (" (Hero)" suffix) and the rank
+        Client_UpdateMyRank(s, info, rank, nPlayTime)                                                   @ FUN_00433ea0
+            current values = max(current, new) each; best time (h = t/3600, m = t%3600/60, s = t%60) kept if faster or unset
+    → CharDB 0xA415 NC_INSTANCE_DUNGEON_RANK_UPDATE_DB_REQ { SHINE_INDUN_INFO, u16 CharListCount, {u16 wmHandle, u32 charNo}[n] }
+        # n = every in-game character of the world, not the ranked ones (original bug) W04-B41
+        # C01 listed 0xA415 as sent to a client: it goes to the Character server
+
+CharDB 0xA416 NC_INSTANCE_DUNGEON_RANK_UPDATE_DB_ACK { SHINE_INDUN_INFO, u16 CharListCount @0xD,
+        SHINE_INDUN_RANK_RANKING[n] @0xF (0x10: u16 clienthandle, u32 dealt / taken / healing rank @4/@8/@0xC) }   @ FUN_0040ecd0
+    per entry: s = Clients_GetByHandle(clienthandle); e = Client_GetMyRank(s, info): e's three ranks = the entry's
+
+CharDB 0xA420 NC_INSTANCE_DUNGEON_RANK_MYRANK_CMD { u32 nCharRegNum, u16 nMyRankCount, SHINE_INDUN_RANK_MYRANK[n] @6 (0x60) }   @ FUN_0040e9f0
+    s = Clients_FindByCharNo; all 32 records: current date = today, previous date = yesterday, both times 0
+    per entry: e = Client_GetMyRank(s, entry.sIndunInfo): ranks = nCurr…Rank, current / previous values,
+        times from nCurrPlayTime / nPrevPlayTime (−1 = 0:00:00; minutes = t / 60 without % 60, original bug W04-B42),
+        dates from nCurrPlayDate / nPrevPlayDate (localtime; −1 keeps the previous entry's date)
+```
+
 ## Original-server bugs
 
 (Running list; the sweep part completes it.)
@@ -1381,6 +1793,21 @@ Zone 0x9002 NC_CHARGED_RESETBUFF_CMD { u32 CharRegistNumber, u32 ChargedBuffKey,
 | W04-B28 | 0x8001 | one-hour limit inverted (`now − last ≤ 1 h` → forward; later → 0x0F42) | after the first report a player may report freely for an hour, then never again until relog (the DB's own limits still apply) | refuse when `now − last < 1 h` |
 | W04-B29 | 0x8001 | `nChatLogSize` unchecked (≤ 65 535) copied into a ≈ 2.3 KB stack buffer | any player can crash the WM | cap at 2048 and at the packet length |
 | W04-B30 | 0x8001 | refusals 0x0F47 (empty report type) and 0x0F48 (reporter in prison) have no client text | the report silently fails | use a code the client shows |
+| W04-B31 | 0x9405 | the would-be master's confirm is taken without a pending request, without checking `UpCharID` against the sender, and without 0x9401's checks (level gap, rejoin / acceptance locks, own name) | any player can make any online player without a master its apprentice; only the DB's ring / capacity / has-master checks remain | keep the pending request (from 0x9401) and require the sender to be its `UpCharID` |
+| W04-B32 | 0x9401, 0x9405, 0x941F → 0x9402 | refusals write only the code (and a zeroed name); UpInfo LogonInfo / Level / Flags, `ResetableDateTime` and the 36-byte `tm` are stale stack, except for 0x174A / 0x1750 | stack bytes on the wire; the client reads the date only for 0x174A | zero the packet |
+| W04-B33 | 0x9406 | 0x9407 for "no master" (0x1758) leaves `nDelCmdType` unwritten | one stale byte; the client reads only the code on errors | write 0 |
+| W04-B34 | `HP_ClearMaster` (0x9421, 0x9423, 0x9425, 0x9427) | the master name and handle are cleared but `masterCharNo` (session +0x1E1DC) and the dates stay | 0x9434 still reports the old master; 0x9401 refuses the old master as an apprentice (0x174E) until relog; enables W04-B35 | set masterCharNo to −1 |
+| W04-B35 | CharDB 0x9425 | after clearing the apprentice's master, the member search matches the stale `masterCharNo` (index −1) and sends a second 0x9418 type 2 with the now empty name; DBError is not checked | the apprentice reads "…has deleted their character" twice, once without a name; a failed DB delete still ends the relations in memory | search members only (index ≥ 0) and check DBError |
+| W04-B36 | OPTool 0x9425 | the member branch requires index == −1 (inverted) | masters keep a deleted apprentice in their list until relog; the apprentice gets the duplicate message | `idx != −1` |
+| W04-B37 | 0x1074 level change → `HP_OnLevelChange` | called only when the levelling character has a master; the level-gap test uses the apprentice's cached copy of the master's level and runs only while the master is online | a master's apprentices never see its new level (no 0x9419); the gap test compares against the master's login-time level and can cut a relation that is still valid, or never test while the master is offline | notify apprentices regardless of having a master; test against the master's current level |
+| W04-B38 | CharDB 0x942D | DBError (0x1752) not checked | the session's lock dates change although the DB kept the old ones; they revert at the next login | apply only on 0x1740 |
+| W04-B39 | client 0xA41B…0xA41E | map names from the client are added to `g_IndunRank` (≤ 32); for a 33rd name the board / my-rank pointer is null and dereferenced | any client can crash the WM with 33 requests (3-s cooldown per tab) | look up without adding; refuse unknown maps |
+| W04-B40 | client 0xA41B…0xA41E | the cooldown reply (0x3A01) writes only nErr into a 0x13 / 0x3E-byte packet | stale bytes on the wire (the client reads only nErr) | zero the packet |
+| W04-B41 | CharDB 0xA414 | 0xA415 lists every in-game character of the world instead of the ranked ones; no size check (6 bytes each) | wrong ranking update request; a large world overruns the 0x2000-byte packet buffer *(inferred)* (dead in 2016, W04-B43) | list the ranked characters |
+| W04-B42 | CharDB 0xA420 | minutes = seconds / 60 without % 60 | stored best times show minutes above 59 (dead in 2016) | `% 3600 / 60` as in `Client_UpdateMyRank` |
+| W04-B43 | 0xA419 → 0xA41A, 0xA414…0xA420 | the WM asks the Character server for rankings (0xA41A) and expects 0xA414 / 0xA41F / 0xA420 / 0xA416 from it; the 2016 Character server handles and sends none of them (the zone's 0xA413 result is dropped there as well) | the instance-ranking window is always empty, no new-rank messages | implement the Character-server side or drop the feature |
+| W04-B44 | `IndunRank_DailyReset` | the boards are cleared inside the loop over sessions (once per session, never with no session online); the new "current" date is the day after the one that starts | (dead data in 2016) wrong dates in the my-rank tab | clear once; use today's date |
+| W04-B45 | 0xA408 | a missing destination zone is answered with nError 2, which zone A reads as "no instance yet" | the player gets the level menu, then the join fails with "RecallDisableField" | a distinct error code |
 
 (W04-B6 is reserved; not used.)
 
@@ -1418,3 +1845,16 @@ Zone 0x9002 NC_CHARGED_RESETBUFF_CMD { u32 CharRegistNumber, u32 ChargedBuffKey,
   database itself *(inferred)*. Zones are not told of a guild rename or grade change by these paths.
 - The client flag set by the notice text "Admin level is 100" (client `this+0x91`).
 - 0x281C `bPart = 4` with no data: the 2016 WM keeps no send statistics; the tool's reading of bPart 4 is unknown.
+- Holy promise: the client text for 0x1741 (the DB's ring check, "User is already logged on.") does not fit; D04 noted the
+  same mismatch. 0x9405 builds UpInfo's two lock dates from the apprentice's session; the DB ignores them (D04 §8), so
+  the effect is nil, but the intent is unclear.
+- Holy promise: `HP_LoadMembers` stops at 20 entries and then leaves `listLoaded` 0, so no 0x9414 list and no 0x9416
+  login notice are sent that session; the DB caps members at 20 (`nMAXPROMISEMEMBER`), so this should not happen.
+- 0xA401 for guild (1) and individual (2) instances: no member is told and the delete prompt goes nowhere (leader −1);
+  whether the 2016 zones create such instances at all is Z08's.
+- 0xA419 is accepted from the first zone only and never cleared on zone disconnect; harmless because `g_IndunMaps` is
+  not read anywhere in the WM.
+- `IndunRank_Insert*`: the very first entry of an empty list returns a rank from a local that Ghidra shows as unset
+  when the loop does not run; not checked in the asm (dead in 2016, W04-B43).
+- 0x3A01 cooldown text: TextData3 0x938F63DA is an empty string in the 2016 client table; whether a newer client fills it
+  is open.

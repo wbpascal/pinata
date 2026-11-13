@@ -8299,6 +8299,81 @@ needs adminlevel ≠ 0
 | 292 | u16 | nChatLogSize | unchecked (W04-B29) |
 | 294 | u8[n] | byChatLog |  |
 
+### `0x9401` NC_HOLY_PROMISE_SET_UP_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00421990)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID | not read |
+| 20 | Name5 | UpCharID | wanted master |
+
+size 0x28
+
+### `0x9405` NC_HOLY_PROMISE_SET_UP_CONFIRM_ACK † (C→WM)
+
+**Verified layout** (basis: wm FUN_00421d10)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID | apprentice |
+| 20 | Name5 | UpCharID | not read |
+| 40 | u8 | bAccept |  |
+
+size 0x29
+
+### `0x9406` NC_HOLY_PROMISE_DEL_UP_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00415c00)
+
+Empty payload.
+
+no body
+
+### `0x940a` NC_HOLY_PROMISE_DEL_DOWN_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041e570)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | DownCharID |  |
+
+### `0xa41b` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGEDEALT_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041a420)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name3 | sIndunInfo.MapIDClient |  |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
+
+### `0xa41c` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGETAKEN_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00418fb0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name3 | sIndunInfo.MapIDClient |  |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
+
+### `0xa41d` NC_INSTANCE_DUNGEON_RANK_TAB_HEALINGDONE_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_004191d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name3 | sIndunInfo.MapIDClient |  |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
+
+### `0xa41e` NC_INSTANCE_DUNGEON_RANK_TAB_MYRANK_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_004193f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name3 | sIndunInfo.MapIDClient |  |
+| 12 | u8 | sIndunInfo.ModeIDLv |  |
+
 ### `0x0c0d` NC_USER_WILLLOGIN_REQ † (Login→WM)
 
 **Verified layout** (basis: wm FUN_00424950)
@@ -9532,6 +9607,134 @@ raw {0x18, op}
 | 6 | u8 | byReportResult | 0 registering, 1 done, 2 held |
 | 7 | u8[128] | byRemark |  |
 
+### `0x9402` NC_HOLY_PROMISE_SET_UP_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00421990/FUN_00421d10/FUN_00411ba0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error | 0x1740/0x1751 ok |
+| 2 | Name5 | UpInfo.PromiseCharID |  |
+| 22 | DATE | UpInfo.LogonInfo | bit0 online |
+| 26 | u8 | UpInfo.Level |  |
+| 27 | u8 | UpInfo.Flags |  |
+| 28 | i32 | ResetableDateTime | only 0x174A/0x1750 |
+| 32 | tm | tm_ResetableDateTime | only 0x174A/0x1750 |
+
+size 0x44; unwritten bytes on refusals (W04-B32)
+
+### `0x9403` NC_HOLY_PROMISE_SET_UP_CONFIRM_ING † (WM→C)
+
+**Verified layout** (basis: wm FUN_00421990)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | UpCharID |  |
+
+### `0x9404` NC_HOLY_PROMISE_SET_UP_CONFIRM_REQ † (WM→C)
+
+**Verified layout** (basis: wm FUN_00421990)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID | requester |
+| 20 | Name5 | UpCharID | receiver (master) |
+
+### `0x9407` NC_HOLY_PROMISE_DEL_UP_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00410d30/FUN_00415c00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nDelCmdType | 0 leave, 1 level gap, 2 master deleted |
+| 1 | u16 | Error |  |
+
+### `0x940b` NC_HOLY_PROMISE_DEL_DOWN_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00410fe0/FUN_0041e570)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | DownCharID | zeroed for 0x1760 |
+| 20 | u16 | Error |  |
+
+### `0x9414` NC_HOLY_PROMISE_LIST_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00434c20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | UpInfo.PromiseCharID |  |
+| 20 | DATE | UpInfo.LogonInfo | bit0 online |
+| 24 | u8 | UpInfo.Level |  |
+| 25 | u8 | UpInfo.Flags |  |
+| 26 | u8 | nPart | bit0 first, bit1 last |
+| 27 | u16 | MemberCount |  |
+| 29 | PROTO_HOLY_PROMISE_INFO[n] | MemberInfo | 0x1A each |
+
+### `0x9415` NC_HOLY_PROMISE_ADD_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00411ba0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error | DBError |
+| 2 | Name5 | MemberInfo.PromiseCharID |  |
+| 22 | DATE | MemberInfo.LogonInfo | bit0 online |
+| 26 | u8 | MemberInfo.Level |  |
+| 27 | u8 | MemberInfo.Flags |  |
+
+### `0x9416` NC_HOLY_PROMISE_LOGIN_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00451700)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID |  |
+
+### `0x9417` NC_HOLY_PROMISE_LOGOUT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00451790)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID |  |
+
+### `0x9418` NC_HOLY_PROMISE_DEL_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00410d30/FUN_00410fe0/FUN_0040f390)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID |  |
+| 20 | u8 | nDelCmdType | 0/1/2 |
+
+### `0x9419` NC_HOLY_PROMISE_LEVEL_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00451930)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID |  |
+| 20 | u8 | Level |  |
+
+### `0x941a` NC_HOLY_PROMISE_REWARD_ITEM_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040cac0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nNumOfItems |  |
+| 1 | {u16 id,u16 lot}[n] | RewardList |  |
+
+### `0x9445` NC_HOLY_PROMISE_CLIENT_GET_REMAIN_MONEY_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00434c20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | nMoney |  |
+
 ### `0x9808` NC_GUILD_ACADEMY_MY_GUILD_ACADEMY_INFO_ACK † (WM→C)
 
 **Verified layout** (basis: wm FUN_00444a30 / FUN_0043cf90)
@@ -9566,6 +9769,85 @@ client-bound: guild and academy members; no 2016 client handler (ignored)
 | 21 | tm | tm_dDismissDate |  |
 
 client-bound: academy members; no 2016 client handler
+
+### `0xa421` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGEDEALT_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041a420)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_AVATAR_SHAPE_INFO | shapeInfo1st |  |
+| 4 | PROTO_AVATAR_SHAPE_INFO | shapeInfo2nd |  |
+| 8 | PROTO_AVATAR_SHAPE_INFO | shapeInfo3th |  |
+| 12 | u16 | nErr | 0x3A00 ok, 0x3A01 cooldown 3 s |
+| 14 | u32 | nRank | own rank |
+| 18 | u8 | nCount |  |
+| 19 | SHINE_INDUN_RANK_CLIENT_VALUE[n] | ranks | 0x20 each |
+
+size 0x13 + 0x20·n
+
+### `0xa422` NC_INSTANCE_DUNGEON_RANK_TAB_DAMAGETAKEN_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00418fb0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_AVATAR_SHAPE_INFO | shapeInfo1st |  |
+| 4 | PROTO_AVATAR_SHAPE_INFO | shapeInfo2nd |  |
+| 8 | PROTO_AVATAR_SHAPE_INFO | shapeInfo3th |  |
+| 12 | u16 | nErr | 0x3A00 ok, 0x3A01 cooldown 3 s |
+| 14 | u32 | nRank | own rank |
+| 18 | u8 | nCount |  |
+| 19 | SHINE_INDUN_RANK_CLIENT_VALUE[n] | ranks | 0x20 each |
+
+size 0x13 + 0x20·n
+
+### `0xa423` NC_INSTANCE_DUNGEON_RANK_TAB_HEALINGDONE_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004191d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_AVATAR_SHAPE_INFO | shapeInfo1st |  |
+| 4 | PROTO_AVATAR_SHAPE_INFO | shapeInfo2nd |  |
+| 8 | PROTO_AVATAR_SHAPE_INFO | shapeInfo3th |  |
+| 12 | u16 | nErr | 0x3A00 ok, 0x3A01 cooldown 3 s |
+| 14 | u32 | nRank | own rank |
+| 18 | u8 | nCount |  |
+| 19 | SHINE_INDUN_RANK_CLIENT_VALUE[n] | ranks | 0x20 each |
+
+size 0x13 + 0x20·n
+
+### `0xa424` NC_INSTANCE_DUNGEON_RANK_TAB_MYRANK_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004193f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nErr |  |
+| 2 | u64 | nPrevDamageDealt |  |
+| 10 | u64 | nPrevDamageTaken |  |
+| 18 | u64 | nPrevHealingDone |  |
+| 26 | u8[6] | nPrevPlayTime h,m,s,year,month,day |  |
+| 32 | u64 | nCurrDamageDealt |  |
+| 40 | u64 | nCurrDamageTaken |  |
+| 48 | u64 | nCurrHealingDone |  |
+| 56 | u8[6] | nCurrPlayTime h,m,s,year,month,day |  |
+
+size 0x3E
+
+### `0xa425` NC_INSTANCE_DUNGEON_RANK_NEW_RANK_MSG † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040f9f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | nCharID |  |
+| 20 | SHINE_INDUN_INFO | sIndunInfo |  |
+| 33 | u8 | rankType | 0 dealt 1 taken 2 healing |
+| 34 | u32 | nRank | 1..20 |
+
+dead in 2016 (W04-B43)
 
 ### `0x0c12` NC_USER_AVATARINFO_REQ (WM→CharDB)
 
@@ -9769,6 +10051,17 @@ no 2016 Character handler (W04-B23)
 | 300 | char[64] | sRemark | never written |
 
 0x16C; 0x7C0B same layout, all fields written
+
+### `0xa41a` NC_INSTANCE_DUNGEON_RANK_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00428870)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMapCount |  |
+| 2 | SHINE_INDUN_INFO[n] | sIndunInfos |  |
+
+no 2016 Character-server handler
 
 ### `0x0808` NC_MISC_USER_COUNT_CMD † (WM→Login)
 
@@ -10125,6 +10418,49 @@ broadcast to all zones
 | 308 | char[64] | sRemark |  |
 
 0x174
+
+### `0x9435` NC_HOLY_PROMISE_MYUPPER_ACK (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0042b8c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.zoneHandle | echo |
+| 2 | u32 | ref.charNo | echo |
+| 6 | u32 | nUpCharNo | −1 none |
+
+### `0xa402` NC_INSTANCE_DUNGEON_DELETE_DUNGEON_CMD † (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0042ba20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Category |  |
+| 1 | u32 | RegisterNumber |  |
+| 5 | u32 | ReaderRegisterNumber | leader charNo or −1 |
+
+### `0xa409` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ACK (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0042c630/FUN_0042c7d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharRegNum |  |
+| 4 | u16 | nNPCHandle |  |
+| 6 | u16 | nError | 2 = no dest zone too |
+| 8 | i32 | eLevelType | 3 when no dest zone |
+
+### `0xa40f` NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_ACK (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0042c8e0/FUN_0042cac0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharRegNum |  |
+| 4 | u16 | nNPCHandle |  |
+| 6 | u16 | nError |  |
+| 8 | i32 | eLevelType |  |
+| 12 | Name3 | sMapName |  |
 
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→zone)
 
@@ -10596,6 +10932,96 @@ forwarded as 0x380A (W04-B19)
 | 4 | u32 | ChargedBuffKey | matched |
 | 8 | u16 | ChargedBuffID | not compared |
 | 10 | u32 | nUserNo |  |
+
+### `0x9434` NC_HOLY_PROMISE_MYUPPER_REQ † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042b8c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.zoneHandle |  |
+| 2 | u32 | ref.charNo |  |
+
+### `0xa401` NC_INSTANCE_DUNGEON_EMPTY_DUNGEON_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042ba20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Category | 0 party, 3 raid |
+| 1 | u32 | RegisterNumber | party/raid no |
+
+### `0xa403` NC_INSTANCE_DUNGEON_RESET_COUNTDOWN_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042bc40)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Category |  |
+| 1 | u32 | RegisterNumber |  |
+
+### `0xa408` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_REQ † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042c630)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nStartZoneNum |  |
+| 1 | u8 | nDestZoneNum |  |
+| 2 | u32 | nCharRegNum |  |
+| 6 | u32 | nInDunRegNum |  |
+| 10 | i32 | IndunCategory |  |
+| 14 | u16 | nNPCHandle |  |
+| 16 | ORToken | Argument | 20 bytes |
+
+### `0xa40b` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ECHO_ACK † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042c7d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nStartZoneNum |  |
+| 1 | u32 | nCharRegNum |  |
+| 5 | u16 | nNPCHandle |  |
+| 7 | u16 | nError |  |
+| 9 | i32 | eLevelType |  |
+
+### `0xa40e` NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_REQ † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042c8e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nStartZoneNum |  |
+| 1 | u8 | nDestZoneNum |  |
+| 2 | u32 | nCharRegNum |  |
+| 6 | u32 | nInDunRegNum |  |
+| 10 | i32 | IndunCategory |  |
+| 14 | u16 | nNPCHandle |  |
+| 16 | ORToken | Argument |  |
+| 36 | i32 | eLevelType |  |
+
+### `0xa411` NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_ECHO_ACK † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042cac0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nStartZoneNum |  |
+| 1 | u32 | nCharRegNum |  |
+| 5 | u16 | nNPCHandle |  |
+| 7 | u16 | nError |  |
+| 9 | i32 | eLevelType |  |
+| 13 | Name3 | sMapName |  |
+
+### `0xa419` NC_INSTANCE_DUNGEON_MAP_REGIST_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_00428870)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMapCount | ≤ 32 |
+| 2 | SHINE_INDUN_INFO[n] | sIndunInfos | 0xD each |
 
 ### `0x384e` NC_PARTY_MEMBERINFORM_REQ † (zone→WM)
 
