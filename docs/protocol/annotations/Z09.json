@@ -902,6 +902,174 @@
      ]
     ],
     "notes": "sent by NPCAction NoticeAction (no 2016 trigger uses it) and the Lua observer (§14.7); no struct in either PDB"
+   },
+   "0x111A": {
+    "dir": "Z→DB",
+    "name": "NC_CHAR_TUTORIAL_FREESTAT_INIT_REQ",
+    "basis": "zone cFreeStatInit FUN_005e7dc0; character server FUN_00429c90 (D02)",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      "so_GetCharRegistNumber"
+     ],
+     [
+      4,
+      "u8",
+      "nMaxStat",
+      "never written: stale g_buf byte (Z09-B58); D02 ignores it"
+     ],
+     [
+      5,
+      "u8[5]",
+      "nFreeStat",
+      "spent points STR..SPR (so_GetStatDistStr)"
+     ]
+    ],
+    "notes": "answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile"
+   },
+   "0x1812": {
+    "dir": "S→C",
+    "name": "NC_MAP_FREEPKZONE_ON_CMD",
+    "basis": "zone cSetFreeBattle FUN_005ebfe0 (AxialListProtocolSend 6/0x12); client FUN_004b4eb0",
+    "fields": [],
+    "notes": "no payload; client shows 'This area is enabled for PvP.' (Z09 §17.6)"
+   },
+   "0x1813": {
+    "dir": "S→C",
+    "name": "NC_MAP_FREEPKZONE_OFF_CMD",
+    "basis": "zone cSetFreeBattle FUN_005ebfe0",
+    "fields": [],
+    "notes": "no payload"
+   },
+   "0x1828": {
+    "dir": "S→C",
+    "name": "NC_MAP_KQTEAMBATTLEZONE_ON_CMD",
+    "basis": "zone cSetTeamBattle FUN_005e83e0",
+    "fields": [],
+    "notes": "no payload; KQ IsTeamPVP = 1"
+   },
+   "0x1829": {
+    "dir": "S→C",
+    "name": "NC_MAP_KQTEAMBATTLEZONE_OFF_CMD",
+    "basis": "zone cSetTeamBattle FUN_005e83e0",
+    "fields": [],
+    "notes": "no payload; KQ IsTeamPVP = 0"
+   },
+   "0x182B": {
+    "dir": "S→C",
+    "name": "NC_MAP_CAN_USE_REVIVEITEM_CMD",
+    "basis": "zone cSetCanUseReviveItem FUN_005e8520, ShinePlayer::so_ply_SendCanUseReviveItem FUN_005616f0; client FUN_0049d9a0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bCanUseReviveItem",
+      "FieldMap.fm_FieldFlag.ff_CanUseReviveItem (+0x20c bit 0)"
+     ]
+    ],
+    "notes": "map-wide from the Lua setter, per player from so_ply_SendCanUseReviveItem (Z09 §17.6)"
+   },
+   "0x207C": {
+    "dir": "S→C",
+    "name": "NC_ACT_EVENT_CODE_ACTION_CMD",
+    "basis": "zone cActByEventCode FUN_005eaa70 via cLuaBroadcast FUN_005d8030; client FUN_004a6300",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandle",
+      "object"
+     ],
+     [
+      2,
+      "u32",
+      "nActionEventCode",
+      "client plays action (code/10000)*10000 with sub (code/100 mod 100)*100"
+     ]
+    ],
+    "notes": "sight incl. the object (Z09 §17.2)"
+   },
+   "0x6C0D": {
+    "dir": "S→C",
+    "name": "NC_SCENARIO_ANIMATE_CMD",
+    "basis": "zone ShineMob::so_SetForcedAnimation FUN_00553390 (cAnimateForcedly); client FUN_004a3610",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      "mob"
+     ],
+     [
+      2,
+      "char[32]",
+      "anicode",
+      "Name8; bytes zeroed, then strncpy 32"
+     ]
+    ],
+    "notes": "sight without the mob; the client stops the current animation first (Z09 §17.2). Also sent by Pine ShineAnimate (part 15)"
+   },
+   "0x6C18": {
+    "dir": "S→C",
+    "name": "NC_SCENARIO_MAP_OBJECT_CONTROL_CMD",
+    "basis": "zone cMapObjectControl FUN_005e2ad0 (len 0x27 with opcode); client FUN_004a6650; pdb2016 struct",
+    "fields": [
+     [
+      0,
+      "char[32]",
+      "sObjectIndex",
+      "map object name (Lua arg 2)"
+     ],
+     [
+      32,
+      "u8",
+      "IsEnableObject",
+      "Lua arg 3; client type 0: 0 = hide, else show; type 1: fade target"
+     ],
+     [
+      33,
+      "u32",
+      "eControlType",
+      "MAP_OBJECT_CONTROL_TYPE: 0 MOCT_NORMAL, 1 MOCT_ALPHA (Lua arg 4)"
+     ]
+    ],
+    "notes": "to every object of the map (so_AllInMap of the axial flag); no zone state, late joiners do not get it (Z09 §17.2)"
+   },
+   "0x6C1C": {
+    "dir": "S→C",
+    "name": "NC_SCENARIO_HIDE_OTHER_PLAYER_CMD",
+    "basis": "zone cHideOtherPlayer FUN_005e6a50; client FUN_004a6d60",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bIsHide",
+      "1 hide the other players, 0 show them"
+     ]
+    ],
+    "notes": "to one player through its data stream (vt 0x2f8) (Z09 §17.2)"
+   },
+   "0xBC1C": {
+    "dir": "S→C",
+    "name": "NC_GAMBLE_ENTER_PLAYER_DIRECT_CMD",
+    "basis": "zone ShineObject::so_DirectInfoBroadcast FUN_00553510 (cSetObjectDirect FUN_005e8fa0, mob skill facing); client MHDiceGameTask FUN_007069b0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandle",
+      "object"
+     ],
+     [
+      2,
+      "u8",
+      "nDirect",
+      "so_LocateInfo.direct (0..179)"
+     ]
+    ],
+    "notes": "face-direction broadcast reused outside the gamble house; only the dice-game task handles it on the client (Z09 §17.2)"
    }
   }
  }

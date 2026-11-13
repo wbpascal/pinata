@@ -10766,6 +10766,22 @@ PROTO_NC_MISC_SERVERPARAMETER_ACK, the alias at this opcode value (C02 §2); 3 b
 
 Z01 name was 'link inside the same zone (ours)'
 
+### `0x1812` NC_MAP_FREEPKZONE_ON_CMD (S→C)
+
+**Verified layout** (basis: zone cSetFreeBattle FUN_005ebfe0 (AxialListProtocolSend 6/0x12); client FUN_004b4eb0)
+
+Empty payload.
+
+no payload; client shows 'This area is enabled for PvP.' (Z09 §17.6)
+
+### `0x1813` NC_MAP_FREEPKZONE_OFF_CMD (S→C)
+
+**Verified layout** (basis: zone cSetFreeBattle FUN_005ebfe0)
+
+Empty payload.
+
+no payload
+
 ### `0x1815` NC_MAP_WING_SAVE_ACK (S→C)
 
 **Verified layout** (basis: zone FUN_00589c80; client FUN_004aeed0)
@@ -10797,6 +10813,32 @@ Z01 name was 'link inside the same zone (ours)'
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | code | 0x2028 ok, 0x2029 no NPC, 0x202B far, 0x202C NPC role, 0x202D no link |
+
+### `0x1828` NC_MAP_KQTEAMBATTLEZONE_ON_CMD (S→C)
+
+**Verified layout** (basis: zone cSetTeamBattle FUN_005e83e0)
+
+Empty payload.
+
+no payload; KQ IsTeamPVP = 1
+
+### `0x1829` NC_MAP_KQTEAMBATTLEZONE_OFF_CMD (S→C)
+
+**Verified layout** (basis: zone cSetTeamBattle FUN_005e83e0)
+
+Empty payload.
+
+no payload; KQ IsTeamPVP = 0
+
+### `0x182B` NC_MAP_CAN_USE_REVIVEITEM_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cSetCanUseReviveItem FUN_005e8520, ShinePlayer::so_ply_SendCanUseReviveItem FUN_005616f0; client FUN_0049d9a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bCanUseReviveItem | FieldMap.fm_FieldFlag.ff_CanUseReviveItem (+0x20c bit 0) |
+
+map-wide from the Lua setter, per player from so_ply_SendCanUseReviveItem (Z09 §17.6)
 
 ### `0x1C0A` NC_BRIEFINFO_DROPEDITEM_CMD (hand-named) (S→C)
 
@@ -11020,6 +11062,17 @@ to the player only, after every server-side stop (mm_Step stop, block-check roll
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x1381 0x1382 0x1383 0x1388 |
+
+### `0x207C` NC_ACT_EVENT_CODE_ACTION_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cActByEventCode FUN_005eaa70 via cLuaBroadcast FUN_005d8030; client FUN_004a6300)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle | object |
+| 2 | u32 | nActionEventCode | client plays action (code/10000)*10000 with sub (code/100 mod 100)*100 |
+
+sight incl. the object (Z09 §17.2)
 
 ### `0x240E` NC_BAT_HPCHANGE_CMD (hand-named) (S→C)
 
@@ -11398,6 +11451,17 @@ the client switches its own door block by the name stored from the last 0x1C0F/0
 
 sent to the whole map
 
+### `0x6C0D` NC_SCENARIO_ANIMATE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone ShineMob::so_SetForcedAnimation FUN_00553390 (cAnimateForcedly); client FUN_004a3610)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | mob |
+| 2 | char[32] | anicode | Name8; bytes zeroed, then strncpy 32 |
+
+sight without the mob; the client stops the current animation first (Z09 §17.2). Also sent by Pine ShineAnimate (part 15)
+
 ### `0x6C16` NC_SCENARIO_TIMER_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone cTimer FUN_005dd310 (all players of a map), cTimer_Obj FUN_005dd4b0 (one player); client GameFrameWork::On_NC_SCENARIO_TIMER_CMD FUN_0049d100)
@@ -11407,6 +11471,28 @@ sent to the whole map
 | 0 | u16 | nSecond | Lua argument 2; the client resets the instance-dungeon time window (IDTimeWin::ResetTime) |
 
 Lua script timer, Z09 §14.6
+
+### `0x6C18` NC_SCENARIO_MAP_OBJECT_CONTROL_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cMapObjectControl FUN_005e2ad0 (len 0x27 with opcode); client FUN_004a6650; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[32] | sObjectIndex | map object name (Lua arg 2) |
+| 32 | u8 | IsEnableObject | Lua arg 3; client type 0: 0 = hide, else show; type 1: fade target |
+| 33 | u32 | eControlType | MAP_OBJECT_CONTROL_TYPE: 0 MOCT_NORMAL, 1 MOCT_ALPHA (Lua arg 4) |
+
+to every object of the map (so_AllInMap of the axial flag); no zone state, late joiners do not get it (Z09 §17.2)
+
+### `0x6C1C` NC_SCENARIO_HIDE_OTHER_PLAYER_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone cHideOtherPlayer FUN_005e6a50; client FUN_004a6d60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bIsHide | 1 hide the other players, 0 show them |
+
+to one player through its data stream (vt 0x2f8) (Z09 §17.2)
 
 ### `0x6C21` NC_SCENARIO_TIMER_START_CMD (hand-named) (S→C)
 
@@ -11460,6 +11546,17 @@ to one player or every player of a map, Z09 §14.6
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x14C0 ok |
+
+### `0xBC1C` NC_GAMBLE_ENTER_PLAYER_DIRECT_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone ShineObject::so_DirectInfoBroadcast FUN_00553510 (cSetObjectDirect FUN_005e8fa0, mob skill facing); client MHDiceGameTask FUN_007069b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle | object |
+| 2 | u8 | nDirect | so_LocateInfo.direct (0..179) |
+
+face-direction broadcast reused outside the gamble house; only the dice-game task handles it on the client (Z09 §17.2)
 
 ### `0xa418` NC_INSTANCE_DUNGEON_RANK_LIST_ACK (S→C)
 
@@ -11742,6 +11839,18 @@ to one player or every player of a map, Z09 §14.6
 | 16 | u64 | itemKey | DEC only |
 | 24 | u16 | itemId | DEC only |
 | 26 | u8 | count | 1 |
+
+### `0x111A` NC_CHAR_TUTORIAL_FREESTAT_INIT_REQ (hand-named) (Z→DB)
+
+**Verified layout** (basis: zone cFreeStatInit FUN_005e7dc0; character server FUN_00429c90 (D02))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | so_GetCharRegistNumber |
+| 4 | u8 | nMaxStat | never written: stale g_buf byte (Z09-B58); D02 ignores it |
+| 5 | u8[5] | nFreeStat | spent points STR..SPR (so_GetStatDistStr) |
+
+answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 
 ### `0x3413` NC_ITEMDB_UNEQUIP_REQ (Z→DB)
 

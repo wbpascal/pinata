@@ -32,7 +32,8 @@ observer, player observers, script timers, script server menus and casting bars,
 §15 script interrupts of Pine map scripts (kinds, events, `waitinterrupt`, unit interrupts, `&scrint`) and script
 areas (`.aid`, the client's area tests 0x6C05…0x6C08, area and map counters). §16 NPCAction proximity triggers
 (`World/NPCAction.txt` conditions and actions, `MobSetting/Action/` trigger files, the neighbourhood scan, player
-observers, damage absorption by protector mobs).
+observers, damage absorption by protector mobs). §17 the Lua functions that control objects (moves, animations,
+damage / kill / revive, abstates, mob settings, map rules, links and parties, player items / money / stats / view slots).
 
 ---
 
@@ -4713,7 +4714,7 @@ names for the NA build *(fh-doc)*; the 2016 zone registers only these.
 |---|---|---|
 | already documented | 45 | `cAddCharacterTitle` 005eb310 W04, `cAggroList` 005f3250 §6.8, `cAggroListSize` 005f2f70 §6.8, `cAggroReset` 005e1280 §6.8, `cAggroSet` 005d9370 §6.8, `cCastTeleport` 005e5b10 §9.3, `cDoorAction` 005dc840 §13.1, `cDoorBuild` 005dc5f0 §13.1, `cDropFilm` 005d6b00 §9.2, `cDropItem` 005d9a30 §11.8, `cEffectRegen_Object` 005e4f30 §13.2, `cEffectRegen_XY` 005f0b50 §13.2, `cGroupRegen` 005efc60 §10.6, `cGroupRegenInstance` 005ddaa0 §10.6, `cGroupRegenInstance_XY` 005ddc40 §10.6, `cIndunRankResult` 005ee4d0 W04, `cMagicFieldSpread` 005f17c0 §12.2, `cMobChat` 005e2560 §8.7, `cMobRegen_Circle` 005e1ea0 §10.7, `cMobRegen_Obj` 005d8690 §10.7, `cMobRegen_Rectangle` 005e2100 §10.7, `cMobRegen_XY` 005d8440 §10.7, `cMobRegen_XY_Layer` 005e7680 §10.7, `cMobShout` 005dbcd0 §8.7, `cMobSuicide` 005e28c0 §13.3, `cMobWeaponRate` 005f3e30 §8.2, `cMoveLayer` 005e7c90 Z06, `cNPCRegen` 005de700 §5.9, `cNPCSkillUse` 005ef5c0 §8.1, `cNPCVanish` 005d8be0 §13.1, `cPet_IsMasterCalling` 005e9320 Z02, `cRegenGroupActiv` 005efdc0 §10.6, `cRewardItem` 005e17e0 Z05, `cRewardItem_AllInMap` 005e1b30 Z05, `cSaveTutorialInfo` 005e70b0 D05, `cSendGameLogDataType_4` 005f1a10 D05, `cSendGameLogDataType_5` 005f1d40 D05, `cSetItemDropMobID` 005ebea0 §11.8, `cSetNPCIsItemDrop` 005daf40 §11.8, `cSetNPCResist` 005db0a0 §5.8, `cSetServantFlag` 005e4be0 §13.3, `cSkillBlast` 005f0960 §8.1, `cSkillDamageCalculate` 005f1370 §8.1, `cTargetHandle` 005ef430 §6.8, `cVanishReserv` 005ede60 §13.3 |
 | this section (§14.6) | 16 | `cAIScriptFunc` 005f05f0, `cAIScriptSet` 005eef50, `cAssertLog` 005d63a0, `cCastingBar` 005dd120, `cDebugLog` 005d8350, `cExecCheck` 005d82a0, `cFieldScriptFunc` 005e0f90, `cServerMenu` 005dab40, `cSetAIScript` 005dc050, `cSetFieldScript` 005e0dd0, `cTimer` 005dd310, `cTimerEnd` 005eb770, `cTimerStart` 005eb5a0, `cTimer_Obj` 005dd4b0, `cTriggerRegist` 005f4c50, `tonumber` 005d81c0 |
-| part 10 (object / mob control) | 57 | `cActByEventCode` 005eaa70, `cAnimate` 005dd690, `cAnimateForcedly` 005dd8a0, `cCharTitleAddValue` 005ded30, `cDamaged` 005f10d0, `cDePolymorph` 005e9210, `cDePolymorph_Area` 005f30d0, `cFollow` 005dc1f0, `cFreeStatInit` 005e7dc0, `cHeal` 005de540, `cHideOtherPlayer` 005e6a50, `cInvenItemDestroy` 005d63d0, `cItemErase` 005ecb40, `cKillObject` 005e6d40, `cLevelUp` 005e7590, `cLinkTo` 005dde20, `cLinkToAll` 005df4b0, `cLocationRotate` 005ed000, `cMapObjectControl` 005e2ad0, `cMobDetectRange` 005e80b0, `cMobIDFind` 005eee50, `cMove2Where` 005df6e0, `cMoveStop` 005edf90, `cPartyJoin` 005e3460, `cPartyLeave` 005e3610, `cResetAbstate` 005ef120, `cRevivalAll` 005ec100, `cRunTo` 005da040, `cRunToUntilBlock` 005da590, `cSetAbstate` 005d97a0, `cSetAbstateInArea` 005e2c40, `cSetAbstate_Range` 005f2560, `cSetCanUseReviveItem` 005e8520, `cSetCanUseReviveSkill` 005e8660, `cSetDeadDelayTime` 005de090, `cSetFreeBattle` 005ebfe0, `cSetMobAttr` 005e13d0, `cSetNPCParam` 005f0320, `cSetObjectDirect` 005e8fa0, `cSetReviveDelayTime` 005e8740, `cSetSightState` 005e7b80, `cSetTeamBattle` 005e83e0, `cStaticDamage` 005de8c0, `cStaticDamage_smo` 005e48f0, `cStaticMoverSpeed` 005debb0, `cStaticRunSpeed` 005ed3c0, `cStaticSpeed` 005dea30, `cStaticWalkSpeed` 005ed500, `cTargetChangeNull` 005d6b80, `cUseMoney` 005e6450, `cVanishAll` 005f0150, `cVanishTimer` 005e5840, `cViewSlotEquip` 005e3c00, `cViewSlotUnEquipAll` 005e3d40, `cWaitIdle` 005e7f70, `cWalkTo` 005da300, `cWillMovement` 005df340 |
+| §17 (part 10: object / mob control) | 57 | `cActByEventCode` 005eaa70, `cAnimate` 005dd690, `cAnimateForcedly` 005dd8a0, `cCharTitleAddValue` 005ded30, `cDamaged` 005f10d0, `cDePolymorph` 005e9210, `cDePolymorph_Area` 005f30d0, `cFollow` 005dc1f0, `cFreeStatInit` 005e7dc0, `cHeal` 005de540, `cHideOtherPlayer` 005e6a50, `cInvenItemDestroy` 005d63d0, `cItemErase` 005ecb40, `cKillObject` 005e6d40, `cLevelUp` 005e7590, `cLinkTo` 005dde20, `cLinkToAll` 005df4b0, `cLocationRotate` 005ed000, `cMapObjectControl` 005e2ad0, `cMobDetectRange` 005e80b0, `cMobIDFind` 005eee50, `cMove2Where` 005df6e0, `cMoveStop` 005edf90, `cPartyJoin` 005e3460, `cPartyLeave` 005e3610, `cResetAbstate` 005ef120, `cRevivalAll` 005ec100, `cRunTo` 005da040, `cRunToUntilBlock` 005da590, `cSetAbstate` 005d97a0, `cSetAbstateInArea` 005e2c40, `cSetAbstate_Range` 005f2560, `cSetCanUseReviveItem` 005e8520, `cSetCanUseReviveSkill` 005e8660, `cSetDeadDelayTime` 005de090, `cSetFreeBattle` 005ebfe0, `cSetMobAttr` 005e13d0, `cSetNPCParam` 005f0320, `cSetObjectDirect` 005e8fa0, `cSetReviveDelayTime` 005e8740, `cSetSightState` 005e7b80, `cSetTeamBattle` 005e83e0, `cStaticDamage` 005de8c0, `cStaticDamage_smo` 005e48f0, `cStaticMoverSpeed` 005debb0, `cStaticRunSpeed` 005ed3c0, `cStaticSpeed` 005dea30, `cStaticWalkSpeed` 005ed500, `cTargetChangeNull` 005d6b80, `cUseMoney` 005e6450, `cVanishAll` 005f0150, `cVanishTimer` 005e5840, `cViewSlotEquip` 005e3c00, `cViewSlotUnEquipAll` 005e3d40, `cWaitIdle` 005e7f70, `cWalkTo` 005da300, `cWillMovement` 005df340 |
 | part 11 (queries, lists) | 60 | `cAbstateRestTime` 005ef750, `cCurSec` 005d8cd0, `cCurrentSecond` 005d8d60, `cDistanceSquar` 005d88c0, `cFindAttackBlockLocate` 005ee1a0, `cFindNearPlayer` 005f37d0, `cFindNearestMobList` 005e6eb0, `cGetAbstate` 005e5e20, `cGetAdminLevel` 005e42a0, `cGetAreaObject` 005dca40, `cGetAreaObjectList` 005f4620, `cGetAroundCoord` 005de220, `cGetBaseClass` 005deee0, `cGetCharNo` 005e4110, `cGetCoord_Circle` 005d6720, `cGetCurMapIndex` 005e59b0, `cGetCurrentSkillInfo` 005f2070, `cGetDirect` 005de400, `cGetItemIndex` 005e5cf0, `cGetItemLot` 005dad80, `cGetLevel` 005e0c90, `cGetMapName` 005e8d50, `cGetMaster` 005e32c0, `cGetMobID` 005e47b0, `cGetMoveState` 005e2f30, `cGetNPCHandle` 005d8df0, `cGetNearObjListByCoord` 005f4ef0, `cGetNearestObjByCoord` 005f3a50, `cGetObjectMode` 005d6880, `cGetPlayerList` 005f4410, `cGetPlayerName` 005d9240, `cGetRegistNumber` 005d6500, `cGetRunSpeed` 005ed140, `cGetScriptString` 005e8b30, `cGetTargetList` 005f0e40, `cGetWalkSpeed` 005ed280, `cGetWhoKillMe` 005ee350, `cIsEquipItem` 005e23b0, `cIsInArea` 005ead70, `cIsInMap` 005ef2c0, `cIsMovable` 005da9c0, `cIsNoAttacOrNoMove` 005eac30, `cIsObjectAlreadyDead` 005ee090, `cIsObjectDead` 005d94f0, `cMapMark` 005df860, `cMapMark_FieldSight` 005e0640, `cMapMark_Obj` 005dffc0, `cNearObjectList` 005f22e0, `cObjectCount` 005e26c0, `cObjectEffect` 005ea8b0, `cObjectFind` 005f33d0, `cObjectHP` 005d9630, `cObjectLocate` 005d9ef0, `cObjectLocateDirection` 005e4d80, `cObjectSound` 005ea6f0, `cObjectType` 005f04b0, `cPermileRate` 005da8b0, `cPlayerExist` 005d8aa0, `cRandom` 005ed640, `cRandomInt` 005eed70 |
 | part 12 (messages, dialogs, effects) | 36 | `cCameraMove` 005dbe30, `cCameraMove_Obj` 005e7920, `cDelDirectionalArrow` 005e89d0, `cDirectionalArrow` 005e8810, `cEffectMsg` 005e4540, `cEffectMsg_AllInMap` 005e4670, `cEffectTimer` 005e6bb0, `cEmoticon` 005e3e60, `cEmotion` 005e3e60, `cEndCinematicText` 005eeb30, `cMapFog` 005e6260, `cMessage` 005ef8f0, `cMobDialog` 005db690, `cMobDialog_FileName` 005e4a00, `cMobDialog_Obj` 005db860, `cMobDialog_Range` 005dbaa0, `cMobDialog_String` 005ece70, `cNPCChat` 005efaa0, `cNPCChatTest` 005db4b0, `cNPCMenuOpen` 005dcf50, `cNotice` 005e15b0, `cNoticeRedWarningCode` 005e5ff0, `cNoticeString` 005e16e0, `cNotice_Obj` 005e8e50, `cPlaySound` 005e4410, `cScriptMessage` 005dcbe0, `cScriptMessage_Obj` 005dcd80, `cScriptMessage_Range` 005f27e0, `cScriptMsg` 005ebb40, `cScriptMsg_World` 005eb970, `cShowCinematicText` 005eec40, `cSimpleChatScriptMsg` 005ea530, `cSomebodyShout` 005e5150, `cStartMsg_AllInMap` 005e3af0, `cSystemMessage_Obj` 005e6890, `cTopView` 005e6600 |
 | part 13 (rest) | 0 |  |
@@ -5388,3 +5389,410 @@ uses `Location`.
 - `GuildTournamentSystem::CreateItemEffect` (what a guild-tournament box gives) is Z16.
 - Whether a hit on `DT_RadionOre` ever meets its `AttackMob` observer (B49) depends on the object walk order between
   the ore and the player in the same tick; not traced.
+
+## 17. Scripts 4: Lua functions that control objects
+
+The 57 functions of the §14.9 row "part 10" (registered by `LuaScriptScenario::ls_FuncSet` FUN_005f5350). Common
+rules, as in §14.6: arguments are 1-based Lua stack slots; a handle is resolved with `ShineObjectManager::som_GetObject`
+FUN_0054fd10 (`GetObject` below); "returns nothing" = 0 results (Lua sees `nil`), "returns 1" = pushes the number 1
+(`lua_pushnumber` FUN_005f8110) unless stated. Numbers are rounded (`ROUND` / `_ftol2`). Usage counts are calls / files in the 2016
+`9Data/Shine/LuaScript` tree. FiestaHeroes' signatures *(fh-doc)* were compared; where they differ, the code is given.
+
+Helpers used below:
+
+- `so_IsEmpty` (vt 0x300): true for a player that is leaving and for a dead mob (§16, working notes); most functions
+  refuse such an object.
+- `vt 0xbbc` = the object as a player (`ShineMobileObject::so_ShineMobileObject` FUN_00450350 `return this` for players;
+  folded `return 0` FUN_00570b00 for mobs and NPCs); `vt 0x4d0` = object kind (player 2, mob 5, §8 notes).
+- `cLuaBroadcast(o, toHandle, packet, len)` @ FUN_005d8030: `toHandle == 0xFFFF` → `so_AllOfRange(o, sight, include
+  self 1)`; else the packet goes only to `toHandle`, which must be a live player (kind 2, mode ≠ 0, not empty); returns
+  false (and sends nothing) otherwise.
+- Map-wide functions find the map with `FieldContainer::fc_FindMap(&fieldlist, mapName)` and walk it with
+  `so_AllInMap(FieldMap::fm_GetCenterObject(field), iterator, 0)` (the map's axial flag, §12.7); without the flag
+  they do nothing.
+
+### 17.1 Moving objects
+
+```pseudo
+cWalkTo(handle, x, y [, rate = 1000])                      @ FUN_005da300   (3 calls / 1 file)
+    o = GetObject(handle); if o == null or o.so_IsEmpty: push false; return 1     # the only boolean result here
+    speed = o.so_WalkSpeed (vt 0x514) × rate / 1000
+    o.so_mobile_MoveReserve (vt 0x660)((x, y), speed, kind 1 walk, backwards 0)   # §9.1
+    payload = { u16 handle, u32 from.x, from.y = o.pos, u32 to.x = x, to.y = y, u16 speed, u16 moveattr (bit 0
+        cleared, other bits = stale g_buf, as Z02-B2) }
+    o.so_SetMovePacket (vt 0xbb8)(0x18, payload)                                   # remembered for newcomers (§9.3)
+    sight (not o) ← 0x2018 NC_ACT_SOMEONEMOVEWALK_CMD (payload); push true
+cRunTo(handle, x, y [, rate = 1000])                       @ FUN_005da040   (97 / 32)
+    o = GetObject(handle); no empty / mode test (a dead object is moved too)
+    the same with so_RunSpeed (vt 0x518), kind 2 run, so_SetMovePacket(0x1a), 0x201A NC_ACT_SOMEONEMOVERUN_CMD; returns 1
+cRunToUntilBlock(handle, x, y [, rate = 1000])            @ FUN_005da590   (3 / 3)
+    o must exist and mode ≠ 3 (dead)
+    q = so_FindBlockLocate(o, (x, y), |(x, y) − o.pos|, out, MapBlock::MapBlockInformation::mbi_IsMoveBlock)   # §9.3:
+        # the last free point on the straight line to (x, y)   (the length comes from VectorClass::VectorWithLength
+        # FUN_00462a70; `AxialListMobCounter::almc_HowMany` FUN_00461b70 is a folded body reading vwl_Length)
+    if found: run there as cRunTo (0x201A); returns 1;  else returns nothing
+cFollow(handle, targetHandle [, gap = 100] [, maxDist = 1000])   @ FUN_005dc1f0   (33 / 23)
+    o (mode ≠ 3) and target must exist, else returns nothing; gap 0 → 100, maxDist 0 → 1000
+    d² = so_DistanceSquar(o, target) (FUN_004028f0)
+    if d² < gap²: returns 1                                 # close enough, no move
+    if d² > maxDist²: returns nothing                       # too far: the script gives up
+    p = o.pos + (target.pos − o.pos) × (√d² − gap) / √d²    # the point `gap` units before the target
+    run there at so_RunSpeed (×1000 / 1000), 0x201A as cRunTo; returns 1
+    # the decompile shows gap / maxDist as a speed rate; the disassembly (0x5dc3a0…0x5dc3f7) compares them as distances
+    # and scripts call it so: cFollow(guard, leader, 100, 1000), pets cFollow(pet, master, PetFollowGap, PetFollowStop)
+cMoveStop(handle)                                          @ FUN_005edf90   (2 / 2)
+    o not empty: o.so_mobile_StopHere (vt 0xa48, §9.3); returns nothing
+cMove2Where(handle) → x, y                                 @ FUN_005df6e0   (4 / 3)
+    o.so_mobile_Move2Where (vt 0x60c): mobile objects `&MoveManager.mm_goalPos` FUN_005555d0 (the last destination,
+        also after the move ended); a player on a mover asks the mover (FUN_005596c0)
+    returns 2 numbers (x, y); nothing for an unknown handle
+cWaitIdle(handle)                                          @ FUN_005e7f70   (1 / 1)
+    returns 1 if o.vt[0x8c4]() (mobs `ShineMob::so_scene_IsIdle` FUN_0050def0: no cast running; players the folded
+        `return true` FUN_005af8d0), else nothing
+cWillMovement(handle)                                      @ FUN_005df340   (8 / 3)
+    m = o as mobile object (vt 0xb8c); returns 1 when m.smo_Param.flag (Parameter::Container +0xcce) has neither
+        cannotmove_stun (bit 0) nor cannotmove_entangle (bit 1) and not m.so_mobile_IsInFear (vt 0x9e8); else nothing
+cSetObjectDirect(handle, dir [, includeSelf])               @ FUN_005e8fa0   (10 / 6)
+cSetObjectDirect(handle, x, y [, includeSelf])
+    o not empty; arg 2 must be a number
+    arg 3 none / nil      → direction = arg 2 (0…179, the 2° unit of §9)
+    arg 3 boolean         → direction = arg 2, includeSelf = arg 3
+    arg 3 anything else   → direction = DirectDistanceTable::ddt_DirectSR(x − o.x, y − o.y) (face the point),
+                            includeSelf = arg 4 when given
+    *o.so_LocateInfo.direct = direction
+    ShineObject::so_DirectInfoBroadcast(o, includeSelf)    @ FUN_00553510
+        sight ← 0xBC1C NC_GAMBLE_ENTER_PLAYER_DIRECT_CMD { u16 nHandle, u8 nDirect }   (the face-direction packet, §7.4)
+    returns nothing
+cLocationRotate(x, y, angle) → x', y'                      @ FUN_005ed000   (4 / 2)
+    v = (x, y); VectorClass::Vector::v_Rotation(v, angle)   @ FUN_0045ffa0
+        angle < 0 → + a multiple of 180; x' = (cos·x − sin·y) >> 10, y' = (sin·x + cos·y) >> 10
+        (ShineRadian::sr_sin1024 / sr_cos1024: 1024-scaled tables)
+    returns 2 numbers (`v_GetX` FUN_0045ff80 and the folded y getter FUN_0045ff90). SubFunc.lua turns offsets with it.
+```
+
+The script moves above have no block test of their own (only `cRunToUntilBlock` looks for walls); scripts pick free
+points. Speeds: `so_WalkSpeed` / `so_RunSpeed` return the static speed of §17.5 when one is set (vt 0xe84 / 0xe88 →
+0xe8c / 0xe90, `ShineMob::so_WalkSpeed` FUN_00556740 / `so_RunSpeed` FUN_005567b0, `ShinePlayer::so_WalkSpeed`
+FUN_00559960 / `so_RunSpeed` FUN_005599c0).
+
+### 17.2 Animations, actions, visibility
+
+```pseudo
+cAnimate(handle, action, animation = "")                   @ FUN_005dd690   (113 / 35)
+    o = GetObject(handle); action must be a string, else returns nothing
+    action == "start": o.so_SetAnimation (vt 0xc30)(animation[32])
+        ShinePlayer::so_SetAnimation @ FUN_00553070 / ShineMob::so_SetAnimation @ FUN_00553140:
+            sight (not o) ← 0x2074 NC_ACT_ANIMATION_START_CMD { u16 handle, char sAnimationIndex[32] }
+            remember it in the brief info (player: bic_BriefInfo.sAnimation; mob: vt 0xe48
+            `so_SetAnimationBriefInfo` FUN_00556cd0) so that newcomers see it (Z02 §5)
+    action == "stop": o.so_ResetAnimation (vt 0xc34)                        @ FUN_00553200 / FUN_005532d0
+            sight (not o) ← 0x2075 NC_ACT_ANIMATION_STOP_CMD { u16 handle, char[32] = the remembered animation };
+            the remembered animation = ""
+    returns 1 for every action string (also unknown ones, which do nothing)
+cAnimateForcedly(handle, action, animation)                @ FUN_005dd8a0   (unused in 2016)
+    arg 1 must be a number; "start" with an animation: o.vt[0xc38]                    # returns 1
+        ShineMob::so_SetForcedAnimation @ FUN_00553390: sight (not o) ← 0x6C0D NC_SCENARIO_ANIMATE_CMD
+            { u16 handle, Name8 anicode (32 bytes, zero-filled then strncpy) }; not remembered
+        players: folded no-op FUN_00549070
+    "stop": so_ResetAnimation as above (returns nothing);  other: returns nothing
+cActByEventCode(handle, eventCode)                         @ FUN_005eaa70   (7 / 1, PetBaseIdleActionFunc.lua)
+    both numbers; o exists
+    cLuaBroadcast(o, 0xFFFF, 0x207C NC_ACT_EVENT_CODE_ACTION_CMD { u16 nHandle, u32 nActionEventCode }) (sight incl. o)
+    returns 1 (nothing for an unknown handle)
+cSetSightState(handle, state)                              @ FUN_005e7b80   (6 / 1, Tutorial.lua)
+    o not empty, state < 2: ShineObject::so_SetSightState FUN_0054aff0: o.so_eSightState = state
+        (OBJECT_SIGHT_STATE: OSS_NONE 0, OSS_WIDE 1): with OSS_WIDE every range query of o (range 0) uses
+        99,999,999 instead of the map's sight (§9.6), so o sees and is seen map-wide; returns nothing
+cHideOtherPlayer(handle, hide)                             @ FUN_005e6a50   (6 / 3)
+    o ← (through its data stream vt 0x2f8) 0x6C1C NC_SCENARIO_HIDE_OTHER_PLAYER_CMD { u8 bIsHide = hide }
+    returns nothing; non-players have a dummy stream (ShineObject::so_GetDataSocketStream FUN_00554fa0)
+cMapObjectControl(mapName, objectName, enable, controlType)   @ FUN_005e2ad0   (8 / 4)
+    every object in the map ← 0x6C18 NC_SCENARIO_MAP_OBJECT_CONTROL_CMD {
+        char sObjectIndex[32] = objectName, u8 IsEnableObject = enable, u32 eControlType = controlType
+        (MAP_OBJECT_CONTROL_TYPE: MOCT_NORMAL 0, MOCT_ALPHA 1) }      # 37 bytes, as the 2016 PDB struct
+    returns nothing. The zone keeps no state: a player entering later does not get it.
+cVanishTimer(mapName)                                      @ FUN_005e5840   (18 / 9)
+    every object in the map ← 0x0810 NC_MISC_RESTMINUTE_CMD { u8 1, u16 0 }   # rest minutes 0: ends the map timer display (Z01 §6)
+    returns 1
+```
+
+Client handlers (C01 map): `0x2074` FUN_0049d120 plays the named animation; `0x2075` FUN_0049d150 stops it only if the
+object's current animation has that name; `0x6C0D` FUN_004a3610 first stops the current animation (FUN_004c27a0)
+and then plays the new one, which is what makes it "forced"; `0x207C` FUN_004a6300 splits the code into
+`code / 10000 × 10000` and `(code / 100 mod 100) × 100` and plays that action on the object (pet idle / attack / dance
+/ die codes in PetBaseIdleActionFunc.lua); `0x6C18` FUN_004a6650 finds the map object by name: type 0 shows /
+hides it (enable 0 → hidden flag), type 1 fades it (FUN_0066d610); `0x6C1C` FUN_004a6d60 hides (1) or shows (0)
+the other players; `0x0810` FUN_004997a0 (Z01). `0xBC1C` has a handler only in `MHDiceGameTask` (C01 §4, the gamble
+house dice table); the main game dispatcher has none, so a `cSetObjectDirect` turn outside that task is not shown
+*(inferred from C01's dispatcher map; whether that task exists outside the gamble house was not checked)*.
+
+### 17.3 Damage, healing, killing, revival
+
+```pseudo
+cDamaged(handle, damage [, attackerHandle])                @ FUN_005f10d0   (41 / 14)
+    o = GetObject(handle); damage == 0 → returns nothing
+    no arg 3 (not a number): o.so_LostHP (vt 0x500)(damage)       # mob FUN_005569d0 / player FUN_00559c10:
+        HP −= damage, but at least 1 is left: "environment" damage never kills
+    else a = GetObject(attackerHandle) (unknown → returns nothing, nothing applied)
+        damage < o.HP: o.so_DamagedBy (vt 0x5c0)(a, damage, aggroRate 1000, 1)    # Z03 §7: aggro, hit list, AI events
+        else:          o.so_KilledBy (vt 0x5bc)(a, o.HP, aggroRate 0, lot 1)       # death, drops, exp (Z03 §7, §11)
+    sight incl. o ← 0x243C NC_BAT_DOTDAMAGE_CMD { u16 object = handle, u32 resthp = o.HP after, u16 damage,
+        u16 abstate = 0x1C1, u16 hpchangeorder = vt 0x7e8, u8 IsMissDamage = 0 }
+    returns 1
+    # (original bug) Z09-B57: abstate 0x1C1 = 449 = STA_MOBACPLUS; alms_SelfKill (§13.3) and the DOT code send
+    #   0x318 (MAX_ABSTATEINDEX, "none") there. The client (FUN_004b5740) looks the index up and plays that abstate's
+    #   view effect when it has one, so script damage shows STA_MOBACPLUS's effect, if any.
+cKillObject(handle [, killerHandle])                       @ FUN_005e6d40   (9 / 8)
+    o = GetObject(handle); k = killerHandle given ? GetObject(killerHandle) : null
+    o.so_KilledBy(k, o.HP, 0, 1)                           # a mob killed twice is safe: ShineMob::so_KilledBy returns
+                                                           #   when smo_Flag bit 3 (+0x1e78 & 8, "already killed") is set
+    o.vt[0xdf0]()    # mob: ShineMob::so_mob_SendReallyKill FUN_00553760 = sight incl. o ← 0x244A NC_BAT_REALLYKILL_CMD
+                     #   { u16 dead, u16 attacker = sm_ReallyDead.attacker } now and senddeadpacket = 1 (§5.4);
+                     #   players: folded no-op FUN_00417480
+    returns nothing
+cHeal(handle, amount)                                      @ FUN_005de540   (16 / 14)
+    o exists, amount ≠ 0: o.so_Heal (vt 0x4e4)(amount)    # mob FUN_00556840 / player FUN_00559ab0:
+        HP += amount × Parameter.HealRate (+0xcd6, ‰) / 1000, capped at MaxHP (vt 0x4f0)
+    so_AllOfRange(o, sight, ShineObject::so_ply_Send2WhoTargetMe)   # the new HP to everyone targeting o (§2.4)
+    returns 1  (a player's own HP packet follows from the player tick, §2.4)
+cStaticDamage(playerHandle, damage)                        @ FUN_005de8c0   (58 / 3)
+    p = object as player (else returns nothing); p.smo_admindamage (+0x1e7c) = damage; returns 1
+cStaticDamage_smo(handle, damage)                          @ FUN_005e48f0   (1 / 1)
+    any mobile object: ShineMobileObject::so_smo_StaticDamage (vt 0xddc) FUN_0055d6b0: smo_admindamage = damage
+    returns nothing
+    # smo_admindamage (default −1, set by the ShineMobileObject ctor FUN_005591c0; GM &staticdamage FUN_0041dfd0,
+    #   &godmode 1000000) is the fixed damage of every normal swing (Z03 §4.2 smo_SwingDamage / so_Bash: ≥ 1 skips
+    #   the hit and damage rolls); skills ignore it
+cRevivalAll(mapName)                                       @ FUN_005ec100   (unused in 2016)
+    AxialListRevival::ali_Work FUN_0042a4b0 collects every player (kind 2) of the map; alr_Revive FUN_00429f40 runs
+    ShinePlayer::sp_ReviveReqProcess FUN_00451bd0 for each (Z07 §3.1: only dead players revive, at their revive point)
+    returns nothing
+cSetDeadDelayTime(handle, ticks)                           @ FUN_005de090   (4 / 4)
+    o as mobile (vt 0xc28) → vt 0xc3c: mobs ShineMob::so_mob_SetDeadDelayTime FUN_00556c60 (sm_DeadDelayTime, §5.2:
+        extra time the corpse stays); players folded no-op; returns 1
+```
+
+### 17.4 Abnormal states
+
+```pseudo
+cSetAbstate(handle, abstateName, strength, keepMs [, setterHandle])   @ FUN_005d97a0   (291 / 91)
+    o = GetObject(handle); idx = dic_abstate.as_BTreeIndex[abstateName] (unknown → returns nothing)
+    row = AbnormalStateDictionary::AbState::as_FromIndex(idx)
+    setter = o; arg 5 a number → setter = GetObject(arg 5) when it exists (a following `lua_type == 0` test is dead:
+        lua_isnumber FUN_005f77a0 already passed)
+    ok = o.so_AbnormalState_Set (vt 0x638)(setter, idx, strength, row, g_Now, 0, 0, keepMs,
+                                           EF_JUSTENCHANTPINESCRIPT 9, null)          # Z03 §6.2
+    if ok: so_AbnormalState_BitSet(o, idx); so_AbnormalState_BroadcastSet(o, idx, keepMs, g_NewAbstateStrength);
+        o.so_AbnormalState_Inform (vt 0x3f0)(idx, keepMs, 1); o.so_RecalcAbstateParamReady (vt 0x528)
+        returns 1
+    else returns nothing
+    # g_NewAbstateStrength (DAT_00875220) = the strength aeo_Set really applied (stacking may raise it, Z03 §6.2)
+cSetAbstate_Range(centreHandle, range, objectType, abstateName, strength, keepMs)   @ FUN_005f2560   (13 / 10)
+    c = GetObject(centreHandle); range ≠ 0, objectType ≠ 0 (u8), name known, row exists
+    list = AxialListNearObjectList(objectType) over so_AllOfRange(c, range, include self 0)
+        (ali_Work FUN_0042a8f0: kind == objectType and mode ≠ 3)
+    for each t in list: same as cSetAbstate with setter = c
+    returns nothing
+    # (original bug) Z09-B56: the strength register is replaced by g_NewAbstateStrength after every success
+    #   (0x5f2753), so the 2nd, 3rd … objects get the strength that was applied to the previous one, not `strength`
+cSetAbstateInArea(mapName, abstateName, strength, keepMs, bmpName, x, y)   @ FUN_005e2c40   (4 / 2)
+    field, centre flag, abstate idx, bmp = BmpDataBox::bdb_GetBmpDataInfo(&bmpdatabox, bmpName) (FUN_00439520;
+        `BMP.shn` row → bitmap, the same bitmaps as area skills, §12.5 / Z01) must exist
+    scan = AxialListSetAbstateInArea (0x654: AxialListNearScan buffer of 200, alsa_pBmpInfo, alsa_nCenterLocation)
+    AxialListSetAbstateInArea::alsa_Init(scan, bmp, (x, y))                @ FUN_004c1bf0
+    so_AllOfRange(flag, range = bmp.AreaCenter_X (first BMPInfo member), centre (x, y), include self 1)
+    AxialListSetAbstateInArea::ali_Work(scan, me, o, d²)                   @ FUN_004c21a0
+        keep o when it is a player (vt 0xbbc), mode ∉ {0, 3}, < 200 kept, and the bitmap cell
+        AreaBMP[CenterX + (o.y − y)][CenterY + (x − o.x)] is inside AreaSize_X × AreaSize_Y and ≠ 0
+    AxialListNearScan::alns_Sort (FUN_00401460, qsort by distance)
+    AxialListSetAbstateInArea::alsa_SetAbstate(scan, idx, strength, keepMs, setter null)   @ FUN_004c1c20
+        for each kept player: vt 0x638(null, idx, strength, row, g_Now, 0, 0, keepMs, 9, null);
+            then always BitSet, BroadcastSet, Inform, vt 0x528;  strength = g_NewAbstateStrength
+    returns nothing
+    # (original bug) Z09-B55: the result of vt 0x638 is not checked (0x4c1c88): a refused state (dead player, weaker
+    #   than one already held) is still flagged in the brief bits and announced to the player and the sight; and,
+    #   as in B56, every player after the first gets the previous player's applied strength
+    # only players are affected (ali_Work requires vt 0xbbc); NPCs and mobs inside the area are skipped
+cResetAbstate(handle, abstateName)                         @ FUN_005ef120   (175 / 52)
+    o exists, name known: o.so_AbnormalState_Reset (vt 0x650)(idx)   (Z03 §6.3); returns 1
+    # args 3 and 4 are read and ignored
+cDePolymorph(handle)                                       @ FUN_005e9210   (1 / 1)
+    o not empty, kind 2: ShinePlayer::so_ply_DePorymorph (vt 0xe1c) FUN_004a3120 = the 0x10B0 request path of Z07 §3.4
+        (no polymorph abstate: brief polymorph = 0xFFFF, sight incl. p ← 0x10AF { p, 0xFFFF, 0x318 }, reset 0x61 /
+        0x123; else erase that abstate); returns nothing
+cDePolymorph_Area(mapName, areaName)                       @ FUN_005f30d0   (unused in 2016)
+    AxialListAreaObjectList(field, areaName, kind 2) over the map (§15.7); vt 0xe1c for each player found (the loop
+    stops at the first null entry); returns nothing
+```
+
+### 17.5 Mob and NPC settings
+
+```pseudo
+cSetMobAttr(handle, attribute, value)                      @ FUN_005e13d0   (unused in 2016)
+    o kind 5 (mob; NPCs are kind 4 and refused)
+    "MobAggro":    ShineMob::so_mob_MobAggro (vt 0x728) FUN_00556bb0: sm_Flag.MobAggro = value
+        # read back by so_mobile_MobAggroRate (vt 0x904) FUN_00556bd0 in MobTargetAggresive::ali_Work (§6.3.1):
+        #   false = aggressive mobs of the other side ignore this mob
+    "CanRecovery": ShineMob::so_mob_CanRecover (vt 0x724) FUN_00556b90: sm_Flag bit 1 (PDB name HealAtPiece) = value
+        # read by sm_DuringBattle at the end of a fight: battle state = flag & 2, i.e. 2 = recover, 0 = idle (§6.5)
+    returns 1;  other attributes: returns nothing.  Both bits are set again at every spawn (§5.3)
+cSetNPCParam(handle, name, value)                          @ FUN_005f0320   (64 / 13)
+    value ≥ 0 (int); o.so_mob_ParamSetAtScript (vt 0xb80)(name, value) (§5.8: HP, MaxHP, MobEXP, AC, MR, WalkSpeed,
+        RunSpeed, HPRegen; players: folded `CGambleObject::GDTSO_SetDiceProbability` FUN_004021b0)
+    returns 1 when accepted, else nothing
+cMobDetectRange(handle, range)                             @ FUN_005e80b0   (6 / 5)
+    range a number: o.vt[0x8bc](range) (ShineMob::so_scene_DetectRange FUN_0050dd30, §5.8); returns nothing
+cMobIDFind(mobIndexName) → id                              @ FUN_005eee50   (unused)
+    MobDataBox::mdb_2MobID(&mobdatabox, name) (0xFFFF when unknown, §5.1); returns the id
+cTargetChangeNull(playerHandle, targetHandle)              @ FUN_005d6b80   (3 / 2)
+    p = object as player, not empty, kind 2; if p.so_CurrentTargetHandle (vt 0x754) == targetHandle:
+        ShinePlayer::so_ply_TargetChange (vt 0x998)(null)   (Z03 §2.3: the player's target is dropped); returns nothing
+cStaticWalkSpeed(handle, on, speed)                        @ FUN_005ed500   (8 / 6)
+cStaticRunSpeed(handle, on, speed)                         @ FUN_005ed3c0   (8 / 6)
+    any object: ShineMobileObject::so_smo_SetStaticWalkSpeed (vt 0xe7c) FUN_005558f0 / so_smo_SetStaticRunSpeed
+        (vt 0xe80) FUN_00555910: smo_bStaticWalkSpeed / smo_bStaticRunSpeed = (on == true), smo_nStatic…Speed = speed
+        (u16); read through so_smo_IsStatic…Speed / so_smo_GetStatic…Speed (FUN_00555930 / FUN_00555940 /
+        FUN_00555950 …) by so_WalkSpeed / so_RunSpeed (§17.1); returns nothing
+        # FiestaHeroes lists (Handle, Speed) *(fh-doc)*; the code reads (handle, boolean, speed)
+cStaticSpeed(playerHandle, speed)                          @ FUN_005dea30   (2 / 2)
+    p = object as player; speed < 1000 → 1000
+    ShinePlayer::sp_SetTotalMoveSpeed FUN_00560150: Parameter PureCharParam.MoveSpeed (+0x100c) = speed;
+        Parameter::Container::c_MakeTotal (the run speed is Total.MoveSpeed (+0x1c00) × chrrunspeed / 1000); returns 1
+cStaticMoverSpeed(playerHandle, speed)                     @ FUN_005debb0   (1 / 1)
+    p = object as player; speed < 1000 → 1000; ShinePlayer::sp_SetMoverRunSpeed FUN_00560130 (again min 1000):
+        sp_RideCast.runspd = speed (the mount run speed of mode 6, so_RunSpeed); returns 1
+```
+
+Neither speed setter sends a packet; a moving object keeps its speed until the next move, and a player's new
+`MoveSpeed` reaches the client with the next parameter-change pass (`so_mobile_SpeedChange`, §9.3) *(inferred:
+`c_MakeTotal` marks the change; not traced)*.
+
+### 17.6 Map rules
+
+```pseudo
+cSetFreeBattle(mapName, on)                                @ FUN_005ebfe0   (unused in 2016)
+    field.fm_PKField (+0x54) = on
+    every object in the map ← AxialListProtocolSend(6, on ? 0x12 : 0x13): 0x1812 NC_MAP_FREEPKZONE_ON_CMD /
+        0x1813 NC_MAP_FREEPKZONE_OFF_CMD (no payload); returns nothing
+cSetTeamBattle(mapName, on)                                @ FUN_005e83e0   (1 / 1)
+    kq = KingdomQuest::KingdomQuestContainer::kqc_SearchHandle(&kqcontainer, field.fm_KQHandle) (none → nothing)
+    kq.kqe_kqinfo.IsTeamPVP = on (read by ShineObject::so_IsTeamPVPKQ FUN_0055d6c0, Z16)
+    every object in the map ← 0x1828 NC_MAP_KQTEAMBATTLEZONE_ON_CMD / 0x1829 …_OFF_CMD (no payload); returns nothing
+cSetCanUseReviveItem(mapName, on)                          @ FUN_005e8520   (1 / 1)
+    field.fm_FieldFlag.ff_CanUseReviveItem (+0x20c bit 0) = on
+    every object in the map ← 0x182B NC_MAP_CAN_USE_REVIVEITEM_CMD { u8 bCanUseReviveItem }; returns nothing
+cSetCanUseReviveSkill(mapName, on)                         @ FUN_005e8660   (1 / 1)
+    ff_CanUseReviveSkill (+0x20c bit 1) = on; no packet; returns nothing
+cSetReviveDelayTime(mapName, seconds)                      @ FUN_005e8740   (1 / 1)
+    field.fm_ReviveDelaySec (+0x210) = seconds; returns nothing
+```
+
+Readers: `ff_CanUseReviveItem` gates `sp_NC_ITEM_REVIVEITEMUSE_CMD` (FUN_00417580) and is re-sent to each player by
+`ShinePlayer::so_ply_SendCanUseReviveItem` FUN_005616f0 (0x182B); `ff_CanUseReviveSkill` gates the revive skills
+(`sp_NC_SKILL_REPLYREVIVE_CMD` FUN_00418a30, `sp_NC_BAT_SKILLBASH_FLD_CAST_REQ` FUN_0057f400 / `…OBJ_CAST_REQ`
+FUN_0057fa50) and the rebirth flag of the death menu; `fm_ReviveDelaySec` is the wait of 0x104D NC_CHAR_DEADMENU_CMD
+(`ShinePlayer::so_KilledBy` FUN_00433be0, Z03 §7). Map defaults (FieldMap init): both flags 1, 180 s; the job-change
+dungeon (`so_ply_2JobDungeon` FUN_0049f880) clears both. Client: `0x1812` FUN_004b4eb0 shows "This area is enabled
+for PvP." and sets the own PK flag; `0x182B` FUN_0049d9a0 passes the flag to the revive UI; `0x1813` / `0x1828` /
+`0x1829` are handled inline in the game dispatcher (not traced).
+
+### 17.7 Moving players between maps, parties
+
+```pseudo
+cLinkTo(handle, mapName, x, y)                             @ FUN_005dde20   (51 / 40)
+    o = GetObject(handle); attr = FieldOption::fo_GetFieldAttr(&fieldlist.fc_FieldOption, mapName) (the server map
+        row); its client map (mapidclient) must be in MapInfo (mapdatabox)
+    link = NPCManager::LinkInformTemplete { linktoserver = mapName (12 + NUL), linktoclient = client map name
+        (12 + NUL), coordx = x, coordy = y }        # index, direct, Party are left as stack garbage; so_LinkTo
+                                                     # (FUN_0049ad30) reads only the map names and coordinates
+    if o.mode == 4 (camp): o.so_ply_ReinforceFoldtent (vt 0x488) FUN_0055ae50   # fold the mini-house tent first:
+        mode 1, restore the saved look, sight ← 0x202C
+    o.so_LinkToReserv (vt 0x3fc)(link, tryUntilSuccess 0)    @ FUN_00495f00 (players; other kinds: no-op FUN_00495eb0)
+        ShinePlayer::sp_LinkReservStore FUN_005518c0 copies the record into the 128-entry ring `queue_linkreserv`
+        (MemoryQueue<NPCManager::LinkInformTemplete>); sp_Linkreserv = its slot; sp_MiscFlag.LinkReserv_link = 1
+        # the player tick performs the link (§2.3: so_LinkTo(target, 6, 9, 10))
+    returns 1
+cLinkToAll(mapName, toMap, x, y)                           @ FUN_005df4b0   (35 / 35)
+    the same record for every object in mapName: AxialListLinkToLua (ctor FUN_00428930; ali_Work
+        `AxialListLinkTo::ali_Work` FUN_00428950: fold a camp, then so_LinkToReserv(link, 0)); returns 1
+cPartyJoin(masterHandle, joinerHandle)                     @ FUN_005e3460   (2 / 2)
+    both live players (kind 2, not empty), joiner in no party (so_PartyRegistNumber vt 0x550 == −1)
+    joiner.so_ply_PartyZoneJoinCmd (vt 0xd58)(master's charNo)          @ FUN_004cd910
+        → WM 0x3860 NC_PARTY_ZONE_JOIN_CMD { u32 nMasterCharNo, u32 nJoinCharNo }   (W02 §3.2)
+    returns nothing
+cPartyLeave(handle)                                        @ FUN_005e3610   (3 / 2)
+    live player in a party: → WM 0x3861 NC_PARTY_ZONE_LEAVE_CMD { u32 nCharNo }   (W02 §3.3; the assert text says
+        "cPartyJoin : Packet Too Long", a copy); returns nothing
+cVanishAll(mapName [, mobIndexName])                       @ FUN_005f0150   (38 / 20)
+    no arg 2: AxialListMobVanish { almv_MobID = 0xFFFF } over the map: ali_Work FUN_004283c0 calls vt 0x3f4
+        `so_RetrateFromMap` (removed next tick, §13.1) on every kind-5 object (mobs; NPCs, servants, doors stay)
+        returns 1
+    with arg 2: AxialListMobIndexVanish(name, &n) (FUN_005eff60; n = 0) over the map: ali_Work FUN_005f0050 removes
+        every object whose data entry (vt 0x70c, the MobInfo row) InxName equals name, n += 1; returns n
+```
+
+### 17.8 Player items, money, stats, titles, equipment view
+
+```pseudo
+cInvenItemDestroy(playerHandle, itemIndexName, count)      @ FUN_005d63d0   (9 / 8)
+    p = object as player, not empty, kind 2; itemId = ItemDataBox::idb_2itemid(name) (≠ 0xFFFF); count ≠ 0
+    ShinePlayer::sp_DestroyItem(p, p.handle, itemId, count, null) @ FUN_00527b60 (the `sp_DestroyItemB` of Z02 /
+        Z08: counts the unlocked inventory lots; count ≤ 0 = all; more than owned → assert "Try to delete too many
+        lot", false; else locks the cells and sends DB 0x3459 NC_ITEMDB_DESTROY_REQ, Z05)
+    returns 1 when the request was sent, else nothing
+cItemErase(mapName, itemIndexName)                         @ FUN_005ecb40   (unused in 2016)
+    AxialListObjectCollect (ali_Work FUN_0042a650 collects every object) over the map; for each o:
+        o.so_scene_EraseItem (vt 0x8b8)(itemId, −1)
+            players ShinePlayer::so_scene_EraseItem FUN_0050dba0: sp_DestroyItem(p, h, itemId, −1 = all lots) from the
+                inventory, then sp_DestroyItem(p, h, itemId, p.itembag, inventory type 8) FUN_00527a70 (first matching
+                cell of type 8 *(inferred: the equipped items)*)
+            drop items `ShineDropItem::so_scene_EraseItem` FUN_0050dc70 (§11.4); others: folded no-op FUN_00509900
+    returns nothing
+cUseMoney(handle, amount)                                  @ FUN_005e6450   (3 / 3)
+    o exists; money = o.so_ply_CurrentMoney (vt 0x434, u64); require money ≥ amount (u32)
+    o.so_ply_IncDecMoney (vt 0x794)(amount, decrease 0)     @ FUN_0052ffc0 (Z05 §3.3: Cen −= amount; DB 0x347A;
+        vt 0x448 so_ply_ChangeCen to the client)
+    returns 1;  not enough money: returns nothing.  Non-players: CurrentMoney folded 0 → fails unless amount 0
+cLevelUp(handle)                                           @ FUN_005e7590   (1 / 1)
+    o.vt[0xe00]: ShinePlayer::so_ply_LevelUpAtLua FUN_00561530:
+        sp_GainExp(p, nextexp[level] − Experience, 0xFFFF, 0xFFFF)    # exactly the exp to the next level (Z03 §8.3)
+    others: no-op; returns nothing
+cFreeStatInit(handle)                                      @ FUN_005e7dc0   (unused in 2016)
+    o not empty, not already locked (vt 0xac8 sp_CharFreeStat_IsLock FUN_0055a650), stat block (vt 0x424
+        so_GetStatDistStr: the 5 spent stat points)
+    → DB 0x111A NC_CHAR_TUTORIAL_FREESTAT_INIT_REQ { u32 nCharNo, u8 nMaxStat, u8 nFreeStat[5] = spent STR…SPR }
+        (D02: decrements the stat points in the DB, answers 0x111B; Z07 §2: then so_ply_InitFreeStat and unlock)
+    vt 0xacc sp_CharFreeStat_Lock FUN_0055a660: sp_bCharFreeStatLock = 1; returns nothing
+    # (original bug) Z09-B58: nMaxStat (payload byte 4) is never written: stale g_buf content; D02 does not read it
+cCharTitleAddValue(playerHandle, titleType, value)         @ FUN_005ded30   (9 / 6)
+    p = object as player; t = p.so_GetCharacterTitle (vt 0x420); 0 < titleType < 128; value (u64) ≠ 0
+    CCharacterTitleZone::TitleAddValue(t, titleType, value) FUN_005cbc80: m_TitleValues[type].TitleValue += value,
+        bTitleSave = 1, CheckNewTitle FUN_005cb5f0 (Z07, titles); returns 1
+cViewSlotEquip(playerHandle, itemIndexName)                @ FUN_005e3c00   (7 / 7)
+    live player; item known: ShinePlayer::so_ply_ViewSlot_Equip (vt 0xd64)(itemId)   @ FUN_0052b110
+        require ItemInfo + ItemInfoServer rows and CharClassDataBox::ccdb_CheckClass(UseClass, p's class)
+        slot = EquipEnumChanger::eec_EquipLocation(row) (NONE → nothing)
+        hide the real items that conflict (eec_ConflictWithNewEquip / …OldEquip, unless already covered by a view
+            slot): so_ply_EquipmentChange (vt 0xd60)(0xFFFF, slot, null, 1)
+        clear conflicting view slots (eec_ConflictWithNew/OldViewSlot) with so_ply_ViewSlot_UnEquip (vt 0xd68)
+        so_ply_EquipmentChange(itemId, slot, null, 1)        # sight sees the item worn (Z05 §5.1 FUN_0052ce60)
+        ItemEquipment::ie_ViewSlot_Set(slot, slot, itemId) and the extra slots of the item (eec_GetEquipSlotList)
+            set to 0xFFFF; so_briefequipset (vt 0x5c8)
+    returns nothing.  A "view slot" shows an item the player does not own (costume preview); nothing is stored in
+    the DB *(inferred: no DB packet in the path)*
+cViewSlotUnEquipAll(playerHandle)                          @ FUN_005e3d40   (2 / 2)
+    live player: ShinePlayer::so_ply_ViewSlot_UnEquipAll (vt 0xd6c)(1) FUN_0052b510: slots 1…29: clear each used view
+        slot and send 0xFFFF for it (or for every slot when none is in use), then re-send every real equipped item
+        (so_ply_EquipmentChange(itemId, slot, cell, 1)); so_briefequipset; returns nothing
+```
+
+### 17.9 Answers and open points
+
+- Every part-10 row of §14.9 is now documented here; part 11 starts with the query functions.
+- `cAnimate` on a player: `so_SetAnimation` broadcasts with include-self 0, so the player's own client does not get
+  0x2074 (the casting bar of §14.6 does include the player). 2016 scripts animate NPCs and mobs; whether a script
+  animates a player was not checked.
+- `0xBC1C` (`cSetObjectDirect`, mob skill facing §7.4) is handled only by the client's `MHDiceGameTask`; see §17.2.
+- `cSetAbstateInArea`'s range is `BMPInfo.AreaCenter_X` (the first member, read as `pSVar4->_padding_`): bitmaps whose
+  centre is not their half size reach only part of the bitmap *(inferred from the member order)*.
+- `cViewSlotEquip`: how the view slots are stored across logout (`ItemEquipment` view-slot members) is Z05 / Z07.
