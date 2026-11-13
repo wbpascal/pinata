@@ -8,7 +8,7 @@ there and here are ours). Evidence markers as in `AGENTS.md`: plain = read in th
 Time unit: `g_Now` (DAT_14d41a70) counts **tenths of a second** (Z02 §1); "`g_Now + 50`" = 5 s.
 
 This file is written in parts (status: `docs/plan/status/Z09.md`). Sections so far: §1 main loop and global timers,
-§2 the player tick, §3 GM events, §4 prison (no zone timer).
+§2 the player tick, §3 GM events, §4 prison (no zone timer), §5 mob object core (data, spawn, routines, NPC, bandit).
 
 ---
 
@@ -112,10 +112,11 @@ ShineObjectEachList.soel_Routine(list)                              @ FUN_0054f7
 | ShineAxialFlag | `ShineAxialFlag_so_Routine` | later part (objects) |
 | ShineDropItem | `ShineDropItem_so_Routine` | later part (drops) |
 | ShineMiniHouse | FUN_00567400 | Z06 §3.4 / Z13 |
-| ShineMagicField, ShineEffectObject, ShineDoor, ShineServant, ShineBandit | `…_so_Routine` | later part (objects) |
-| ShineMobileObject (base of all movers) | FUN_0056a080 (cast completion: Z03 §5) | later part (mobs) |
+| ShineMagicField, ShineEffectObject, ShineDoor, ShineServant | `…_so_Routine` | later part (objects) |
+| ShineBandit | `ShineBandit_so_Routine` FUN_0056c630 | §5.10 |
+| ShineMobileObject (base of all movers) | FUN_0056a080 (cast completion: Z03 §5) | §5.5 |
 | ShinePlayer | FUN_0056c790 | §2 |
-| ShineMob, ShineNPC | `ShineMob_so_Routine`, `ShineNPC_so_Routine` | later part (mobs) |
+| ShineMob, ShineNPC | `ShineMob_so_Routine` FUN_0056baa0, `ShineNPC_so_Routine` FUN_0056a9e0 | §5.4, §5.9 |
 | ShineMover, ShinePet | `…_so_Routine` | Z13 |
 
 ### 1.4 Other global containers
@@ -411,3 +412,454 @@ first set to mode 1 with 30 % HP) and stores the minutes in `p+0x7f9f`; `so_Pris
 clears them, resets the action timer and links the player to `RouN` (or the given map/coordinates). Its only caller is
 the WM command `0x7C12 NC_ZONE_PRISON_END_CMD` (FUN_005a60f0). No zone routine counts the minutes down: the release
 timer lives in the WM (W04) and the minutes reach the client at login (0x7C05, Z01). *(Answers Z08 knowledge §2.)*
+
+---
+
+## 5. Mob object core (`ShineMob`, `ShineNPC`, `ShineBandit`)
+
+Class tree and pools: Z01 knowledge §2–§3 (mob type 5, NPC 4, bandit 8, servant 10, pet 12 all derive from `ShineMob`).
+Mob death, experience and drops are in Z03 §8.1–§8.2; aggro, brain and targets are part 3 (§6); weapons and skills part 4;
+movement part 5; regen breeders part 6. This section covers the data the mob is built from, spawning, the per-tick
+routine and the NPC and bandit variants.
+
+### 5.1 Mob data: `MobDataBox` (`g_MobData` DAT_14d44a38)
+
+`MobDataBox::mdb_Load` @ FUN_00641e60 (start stage `home`, Z01-core §2.3) loads eleven SHN tables into `BinaryDataBox`es
+inside the box, checks that MobInfo, MobInfoServer, MobSpecies and QuestSpecies have the same row count and the same ID in
+every row ("MobDataBox::mdb_Load : Mob number mismatch" / "DataOrder mismatch", fatal), then builds one **entry per mob ID**
+(`box+0x65c`, `(maxID + 1) × 0x34` bytes; max ID at `box+0x664`; name → ID index at `box+0x668`, `FUN_0063cc30(&DAT_14d450a0, name)`):
+
+| Entry offset | Content | Filled by |
+|---|---|---|
+| +0x00 | → MobInfo row (client table, 2017 PDB `struct MobInfo`, layout holds for 2016: `ID +0, InxName[32] +2, Name[32] +0x22, Level +0x42, MaxHP +0x46, WalkSpeed +0x4a, RunSpeed +0x4e, IsNPC +0x52, Size +0x53, WeaponType +0x57, ArmorType +0x5b, GradeType +0x5f, Type +0x63, IsPlayerSide +0x67, AbsoluteSize +0x68`) | mdb_Load |
+| +0x04 | → MobInfoServer row (0xa7 bytes, see below) | mdb_Load |
+| +0x08 / +0x0c | MobWeapon list: array of `{ → MobWeapon row, u16 skill index, u32 abstate index (0x318 = none) }` (0xc each) / count | `mdb_SkillStore` @ FUN_00642630 |
+| +0x10 | → MobSpecies row (`ID u16, MobName[33], 3 more names`) | mdb_Load |
+| +0x14 | u16 MobResist row index (from MobInfoServer.ResIndex; 0xFFFF = "-") | mdb_Load, `MobResist` table DAT_150ba618 (FUN_00644e80) |
+| +0x18 | → QuestSpecies row (`ID u16, MobGroupName[33] × 5`) | mdb_Load |
+| +0x1c | → MobKillAnnounce row (`MobID u32, TextIndex u32`), or 0 | mdb_Load |
+| +0x20 | → MobKillLog row (`MobID u32`), or 0 | mdb_Load |
+| +0x24 | u32 MobLifeTime.LifeTime (seconds), 0 = none | mdb_Load |
+| +0x28 | two flag bits, cleared at load (not traced) | — |
+| +0x2c | → MobRegenAni row (`MobIDX[32], RegenTime u16 +0x20 (ms), GroupAbStateIDX[32] +0x22, IsAggro u8 +0x42`), or 0 | mdb_SkillStore |
+| +0x30 | GroupAbState group number of the RegenAni row (−1 = none) | mdb_SkillStore |
+
+`mdb_SkillStore(skillNames, abstateNames)` @ FUN_00642630 (start stage `sleep`, "MobDataBox link") runs over MobWeapon twice
+(count, then fill), resolving `Skill` (+0x25, "-" = none) and `StaName` (+0x71) by name; unknown names are logged and the
+weapon keeps 0xFFFF / 0x318. GroupAbState rows are grouped by `GroupAbStateIDX` into a multimap `box+0xa6c` (group number →
+row; `AbstateIDX` +0x20, `Strength` u8 +0x40). Each MobRegenAni row is attached to its mob (duplicates and unknown names are
+fatal) and its group is looked up by name.
+
+MobInfoServer.shn (2016, 0xa7 bytes; column names from the SHN header): `ID u32 +0, InxName[32] +4, Visible u8 +0x24,
+AC u16 +0x25, TB +0x27, MR +0x29, MB +0x2b, EnemyDetectType u32 +0x2d, MobKillInx u32 +0x31, MonEXP u32 +0x35, EXPRange u16
++0x39, DetectCha u16 +0x3b, ResetInterval u8 +0x3d, CutInterval u16 +0x3e, CutNonAT u32 +0x40, FollowCha u32 +0x44,
+PceHPRcvDly u16 +0x48, PceHPRcv +0x4a, AtkHPRcvDly +0x4c, AtkHPRcv +0x4e, Str +0x50, Dex +0x52, Con +0x54, Int +0x56, Men +0x58,
+MobRaceType u32 +0x5a, Rank u8 +0x5e, FamilyArea u32 +0x5f, FamilyRescArea u32 +0x63, FamilyRescCount u8 +0x67, BloodingResi
+u16 +0x68, StunResi +0x6a, MoveSpeedResi +0x6c, FearResi +0x6e, ResIndex[32] +0x70, KQKillPoint u16 +0x90, Return2Regen u8 +0x92,
+IsRoaming u8 +0x93, RoamingNumber u8 +0x94, RoamingDistance u16 +0x95, RoamingRestTime u16 +0x97, MaxSP u16 +0x99, BroadAtDead
+u8 +0x9b, TurnSpeed u16 +0x9c, WalkChase u16 +0x9e, AllCanLoot u8 +0xa0, DmgByHealMin u16 +0xa1, DmgByHealMax u16 +0xa3,
+RegenInterval u16 +0xa5`. `EnemyDetectType` values = enum `EnemyDetect` *(pdb2017)*: 0 ED_BOUT, 1 ED_AGGRESSIVE, 2 ED_NOBRAIN,
+3 ED_AGGRESSIVE2, 4 ED_AGGREESIVEALL, 5 ED_ENEMYALLDETECT (2016 data: 220 / 1872 / 728 / 12 / 1 / 9 rows; the NOBRAIN rows
+are shop NPCs and gates). The columns used by this section are named below; the AI columns are read in part 3.
+
+`MobDataBox::mdb_CanIKill(mobId, identity)` @ FUN_006424c0 — may this kind of attacker kill the mob:
+
+```pseudo
+    if mobId == 0xFFFF: return true
+    k = MobInfoServer.MobKillInx                               # enum MobKillType (pdb2017): 0 MKT_DEFAULT, 1 MKT_ONLYSCRIPT, 2 MKT_MOB
+    if k >= 3: log "…Invalid MobKillType"; return false
+    row = MobKillAble[k]                                       # MobKillAble.shn { MobKillInx, Cheat u8, Mob u8, User u8 }
+    identity 0 → row.Cheat, 1 → row.Mob, 2 → row.User, 3 → true, other → log "Unknown identity", true
+```
+
+2016 rows: DEFAULT {1,1,1}, ONLYSCRIPT {0,0,0}, MOB {0,1,0}. Callers: player attacks and skills, `so_mobile_ICanDamageTo`,
+the mob target selectors and the magic-field damage (Z03, part 3).
+
+Other mob tables loaded elsewhere and read in this part:
+
+- `MobConditionServer.shn` → `MobConditionChecker::MCC_DataRead` @ FUN_004b0460 into the map DAT_1328bcd0 (mob ID →
+  vector of conditions, `FUN_004b0140(&DAT_1328bcd0, mobId)`; §5.6). Only `MC_Type` 0 is accepted (enum
+  `MobCondition_Type` *(pdb2017)*: `MCT_HP = 0` is the only member); any other type fails with "Memory Alloc Fail" and the
+  whole table is dropped. Consecutive rows of the same mob form one vector, in file order.
+- `MobDeadCount` (`mdc_Clear` @ FUN_004b07b0, `mdc_Count` @ FUN_004b0820, `mdc_DeadCountGet` @ FUN_004b08f0, created by
+  FUN_004b09f0): one u16 counter per mob ID, incremented by `ShineMob::so_KilledBy` (Z03 §8.1); readers are the map
+  scripts (part 14–16).
+- `MobAutoAction.shn` belongs to `BossFieldContent::MobAutomaticActionList::maal_Load` @ FUN_005d49f0 (part 16).
+
+### 5.2 Mob members (offsets from the object start; *(ours)* names)
+
+| Offset | Meaning |
+|---|---|
+| +0x4e / +0x52 / +0x56 | layer ids / "visible in all layers" flag (Z03 `SameLayer`); NPC.txt NPCs set +0x56 = 1 (FUN_0054aae0) |
+| +0x66 → | position `{x, y}`; +0x6a → u8 direction (degrees / 2) |
+| +0x76 → +4 | sub-layer (`so_SubLayer_CanSee`, Z02 §5): 0 normal, 3 hidden (StaGMHideMode) |
+| +0x7a | → FieldMap |
+| +0x7e / +0x82 | AI Lua script of the mob type (map DAT_14d712d0, keyed by MobInfoServer.ID) / std::string function name = MobInfo.InxName; 7 more strings follow (+0x9e … +0x146), cleared by vt 0xc14 FUN_00558c80 |
+| +0x18c…+0x1b8 | MoveManager (part 5): +0x18c state, +0x1ac active |
+| +0x184 | killer handle (`ShineMobileObject::so_KilledBy`) |
+| +0xe9c → | mode byte (`GetMode` vt 0x484): 0 while spawning, 2 alive, 3 dead |
+| +0xea0 / +0xea4 | timestamps set to g_Now at spawn (recovery timers, part 3) |
+| +0xea8 / +0xeac | MaxHP (vt 0x4f0) / MaxSP (vt 0x4f4) |
+| +0xfc0 | stat matrix (Z03 knowledge §2); base layer from MobInfoServer (§5.3) |
+| +0x1d84 | cast block (Z03 §5) |
+| +0x1e74 | rule set: `RulesOfEngagementNormalPY` (no weapon or first weapon `HitType` 0) or `…NormalMA` |
+| +0x1e78 | flag byte: bit 0 invalid position, bit 2 Fear, bit 3 killed, bit 4 blast armed, bit 7 (vt 0xbf0) |
+| +0x1e8c…+0x1e9c | movement detector (FUN_0055d610): +0x1e8c 1 = moving, +0x1e90/94 last position, +0x1e98 time of the last change, +0x1e9c next check |
+| +0x1ea8 / +0x1eac | `g_Now + t` / `t`, t from the per-mob-ID behaviour object DAT_0084cc8c[mobId].vt[0]() (ms → tenths; 10⁹ when the ID is beyond DAT_0084cc84) (part 3) |
+| +0x1ec0 | spawning breeder (MobBreeder, part 6; −1 for NPC.txt NPCs) |
+| +0x1ec4 / +0x1ec8 | HP / SP |
+| +0x1ecc | the mob's own brief-info packet 0x1C08 `NC_BRIEFINFO_REGENMOB_CMD`; its payload pointer is +0x1f74 (§5.3) |
+| +0x1f78 | char map[12] (vt 0x4bc), the map the mob is spawned on |
+| +0x1f84…+0x1f8c | spawn x, y, dir copied from the brief (vt 0xf6c) |
+| +0x1f90 | → MobDataBox entry (vt 0x70c) |
+| +0x1f94 | u8 level (MobInfo.Level unless the spawn gives one) |
+| +0x1f98 | vector (one u32 per MobWeapon of the mob, zeroed at spawn) (part 4) |
+| +0x1fa8 | −1 at spawn |
+| +0x1fac / +0x1fb0 | record from the bsearch table DAT_0d76e9e8 (0x1bec-byte records keyed by mob ID, FUN_0043f6e0) / 0 (part 4) |
+| +0x1fb4 / +0x1fb6 | 0xFFFF / 0 at spawn |
+| +0x1fb8 / +0x1fba | death broadcast sent / killer handle (Z03 §8.1) |
+| +0x1fbc / +0x1fc0 | death time / extra corpse time (vt 0xc3c, `cSetDeadDelayTime`) |
+| +0x1fc4 / +0x1fc8 | brain context: tick argument / self |
+| +0x2234 | target selector (vt +8 per tick, +0x14 reset) (part 3) |
+| +0x2238 | aggro container (FUN_004b8c80 at spawn) (part 3) |
+| +0x2260 / +0x227c | MobActionWander / MobActionAttack tactic elements (part 3/4) |
+| +0x22e4 | current tactic state (`MobActionWander`, `MobActionRoaming` 0x84cfc4, `MobActionNoBrain` 0x84cfc8) |
+| +0x22e8 | regen slot of the breeder (+0x4c = time of the last spawn) |
+| +0x22ec | guild number shown with the mob (`so_mob_SetGuildRegNum`, §5.8) |
+| +0x22f0 | HitMeList (Z03 §8.2) |
+| +0x249c/+0x24a0, +0x24a4/+0x24a8 | spawn point and return point (both = spawn position) |
+| +0x24ac | flags (bit 0, 1 set at spawn; 2, 3 cleared) |
+| +0x24ae | first attacker handle (0xFFFF) |
+| +0x24b0 | battle state: 0 idle, 1 battle (`sm_DuringBattle`), 2 recover (`sm_DuringRecover`) (part 3) |
+| +0x24b1 / +0x24b5 | family ring (prev / next mob of the same family; self when alone); vt 0x744 returns +0x24b1 |
+| +0x24bc, +0x24c0, +0x24c4 | rescue state (bit 0 set), rescue routine pointer (0), 60000 (part 3) |
+| +0x24d8 / +0x24da | u16 roaming flags `IsRoaming & 1 | (RoamingNumber & 0x7f) << 1` / RoamingDistance |
+| +0x24dc / +0x24e0 / +0x24e4 / +0x24e5 | last broadcast target / current target (vt 0xa04) / target-dirty flag / target order (vt 0xa08) |
+| +0x24e8 | NPCAction trigger entry for this mob ID (map DAT_14d50784, FUN_005c4420), or 0 |
+| +0x24ec | lifetime timer `{acc, period, active u8, start}` (vt 0xabc FUN_0055e5b0) |
+| +0x2504 / +0x2508 | script overrides MaxHP / MonEXP (0 = table) |
+| +0x250c | u8 drops enabled (1; `cSetNPCIsItemDrop` → vt 0xbb0 `so_mob_IsItemDropSetAtScript` FUN_004aa810) |
+| +0x250d | copy of the mob's MobResist row (0x34 bytes) |
+| +0x2544 | 6 at spawn; +0x2548 −1; +0x254c / +0x2550 / +0x2554 script WalkSpeed / RunSpeed / HPRegen (−1 = table); +0x2558 u16 0xFFFF |
+| +0x255c | → MobConditionServer vector of the mob ID (or 0) |
+| +0x2560 / +0x2564 | spawn time / "regen animation over" flag (AI waits for it) |
+| NPC +0x2568 | u8 "from NPC.txt" (`so_npc_FromTable` vt 0xa80 FUN_004b19b0) |
+| bandit +0x2666 | → bandit brief (`+0xc2` u8 object type, §5.10) |
+
+### 5.3 Spawn: `so_mob_Regenerate` and `so_mob_RegenComplete`
+
+Every spawner (breeders, scripts, NPCManager, GM commands) allocates a pool slot and calls vt 0x6e0:
+
+```pseudo
+ShineMob::so_mob_Regenerate(m, map[12], x, y, dirDeg, handle, mobId, briefArg, breeder, familyLeader,
+                            regenSlot, level, _, layerA, layerB) → 0 | marking error      @ FUN_004b41b0
+    m.breeder (+0x1ec0) = breeder;  m.map (+0x1f78) = map;  mode = 0;  m+0x2544 = 6
+    m.vt[0xf70](handle, mobId, briefArg)        # brief: FUN_004b1120 → FUN_004b0d20: handle, mobid, flagstate 0,
+                                                #   sAnimation "", nAnimationLevel 0, bRegenAni 0; entry = g_MobData[mobId]
+    m.pos = (x, y);  m.dir = (dirDeg / 2, +180 if negative)
+    entry = g_MobData[mobId]   (null when the ID is out of range or the row ID differs: "MobDataBox::operator [] :Invalid mob index")
+    m.level = level >= 1 ? level : MobInfo.Level
+    m.roaming (+0x24d8/+0x24da) from MobInfoServer.IsRoaming / RoamingNumber / RoamingDistance
+    m+0x1eb8 = 0;  aggro list reset unless the current target is a pet (type 12)
+    sm_SetBrain(m)                                                                  # part 3
+    m.vt[0xf6c]()                                # spawn x/y/dir copied from the brief
+    m.regenSlot (+0x22e8) = regenSlot
+    if (r = so_MapMarking(m, 0)) != 0: return r                                     # §5.7
+    brief.flag (vt 0x4a0, 0x63 bytes) = template DAT_13272928
+    remove every abnormal state (ListEraser over +0xcb0 of the abstate container)
+    if entry.regenAni == null:
+        regenAniOver = 1
+        if g_AbState[291] (StaImmortal): set 291, strength 1, keep 5000 ms, how 8   # 5 s spawn protection
+    else:
+        brief.bRegenAni (+0x94) = 1;  regenAniOver = 0
+        for each GroupAbState row of entry.regenGroup:   set that state (strength = row.Strength,
+                                                        keep = MobRegenAni.RegenTime)   ("…as_FromIndex : Invalid skill idx" if ≥ 0x318)
+    m.layer = (layerA, layerB);  m+0x163 = 0
+    m.vt[0x6f4](handle)                          # so_mob_RegenComplete, below
+    m.HP = MaxHP();  m.SP = MaxSP()
+    stat matrix base layer from MobInfoServer (FUN_0043c550)
+    m+0x1fb4 = 0xFFFF;  m+0x1fb6 = 0;  weapon vector resized to entry.weaponCount and zeroed;  m+0x1fa8 = −1
+    family ring: with a leader, insert m after the leader's ring position (logs "…Null FamilyList - Leader / member");
+                 else m.prev = m.next = m
+    m.rules (+0x1e74) = (no weapon list or weapon[0].HitType == 0) ? RulesOfEngagementNormalPY : RulesOfEngagementNormalMA
+    m.corpseExtra (+0x1fc0) = 0
+    m.conditions (+0x255c) = MobConditionServer vector of mobId
+    movement detector reset (FUN_0055d5e0)
+    return 0
+```
+
+`MaxHP()` (vt 0x4f0, FUN_005568b0) = `(override +0x2504 or MobInfo.MaxHP) × stat +0xa1c / 1000`, at least 1, cached in
++0xea8 (the NPC version FUN_00557c10 has no minimum). `MaxSP()` (vt 0x4f4, FUN_00556920) = MobInfoServer.MaxSP → +0xeac.
+
+Base stat layer (FUN_0043c550, from a zero template): STR = Str, END = Con, DEX = Dex, INT = Int, SPR = Men, stat 7 AC = AC,
+9 TB = TB, 12 MR = MR, 14 MB = MB, the three rate stats 19–21 = 1000, everything else 0.
+
+```pseudo
+ShineMob::so_mob_RegenComplete(m, handle)   (vt 0x6f4; NPC: FUN_00442ba0 just calls this)     @ FUN_004424f0
+    overrides MaxHP / MonEXP = 0;  dropsEnabled = 1;  resist block = MobResist row (or zeros)
+    m+0x1e88 = 2;  m+0x2544 = 6;  speed / HP-regen overrides = −1;  m+0x168 = 0;  m+0x2284 = 0;  guild = 0;  firstAttacker = 0xFFFF
+    AI script: m.script = DAT_14d712d0[MobInfoServer.ID] (or none), m.funcName = MobInfo.InxName
+    MobActionAttack.maa_SkillFromScriptClear(m+0x227c)
+    brief.nKQTeamType (+0x93) = 2 (none)  (vt 0xe04)
+    if MobInfoServer.Visible == 0:                             # "so_mob_RegenComplete2": hidden mobs (InvisibleMan, EventManagerA/Z …)
+        sub-layer = 3;  set StaGMHideMode (288), keep eternal                      # nobody is told
+    else:                                                      # "so_mob_RegenComplete1"
+        sub-layer = 0
+        g_SightDistSq = MapInfo.Sight² of the field (−1 = unlimited on special fields; 0 without a field)
+        so_AllOfRange_Class0(m, so_ExchageBriefInfo)           # brief info both ways with everything in sight (Z02 §5)
+    deathSent = 0;  killer = 0xFFFF
+    tactic state = roaming flag ? MobActionRoaming (and +0x24d9 = 0) : MobActionWander.maw_MetronomeReset()
+    if EnemyDetectType == 2 (ED_NOBRAIN): tactic state = MobActionNoBrain
+    brain context = { self, handle };  mode = 2 (alive)
+    stat matrix reset, base layer, c_MakeTotal;  HitMeList cleared
+    move state cleared (+0x18c…+0x1b8), invalid-position bit cleared, cast cleared
+    m+0xea0 = m+0xea4 = g_Now;  spawn point = return point = position;  battle state = 0
+    m+0x1fac = DAT_0d76e9e8.find(mobId);  m+0x24e8 = NPCAction trigger of mobId
+    killer handle (+0x184) = −1;  so_RecalcAbstateParam;  rescue state reset;  m+0x24c4 = 60000
+    m+0x1d70 = (+0xfbc).vt[0x3c]();  smo_ply_WeaponTitleSet(0xFFFF)
+    m+0x1ea8 = g_Now + behaviour[mobId].vt[0]() / 100
+    regenSlot.lastSpawn = g_Now
+    flags1e78 &= ~(bit1 | bit3 | bit4);  target selector reset;  target / last target / dirty = 0;  flags1e78 bit 7 = 0
+    brief.bRegenAni = 0 (after the brief went out);  m.spawnTime (+0x2560) = g_Now
+```
+
+The brief packet goes out with `bRegenAni = 1` for mobs with a MobRegenAni row. The client handler of 0x1C08
+(`GameFrameWork::On_NC_BRIEFINFO_REGENMOB_CMD`, client FUN_004a9a90) adds the mob and its minimap mark, adds a KQ mob mark
+on KQ maps and a KQ team mark when `+0x93 nKQTeamType ≠ 2`, and plays the "Regen" effect for a mob whose MobInfo.IsNPC is 0.
+2016 confirms the 2017 PDB offsets of `PROTO_NC_BRIEFINFO_REGENMOB_CMD` from +0x72 on with the `flag` union 4 bytes shorter:
+`sAnimation[32] +0x72, nAnimationLevel +0x92, nKQTeamType +0x93, bRegenAni +0x94` (2017: +0x76…+0x98).
+
+### 5.4 `ShineMob::so_Routine` (every tick)
+
+```pseudo
+ShineMob::so_Routine(m, _, tickArg)                                              @ FUN_0056baa0
+    if mode == 0: return 1                                     # not spawned yet
+    if the position is outside the field: log "fm_IsInFieldSize : Mob"; flags1e78 |= 1
+    MobConditionServer step (FUN_00554420, §5.6)
+    ShineMobileObject::so_Routine(m)                           # §5.5 (abstates, movement, casts)
+    if flags1e78 & 1:  so_Unmark(0, 1, 3); som_FreeObject(m, reason 7); return
+    if mode != 3 and m.npcAction (+0x24e8):                    # NPCAction proximity triggers (part 9)
+        so_AllOfRange_Class1(m, range = MobInfoServer.DetectCha, NeighborhoodChecker(m.npcAction))   @ FUN_005c2ee0 / FUN_005c2fe0
+    regen animation over? (FUN_0055e760): if no RegenAni row or g_Now > spawnTime + RegenTime/1000·10: regenAniOver = 1
+    if m has StaImmortal (291) or StaAdlFLoussierIMT (499):
+        run the AI Lua function only (below); return           # no AI while protected
+    if battle state == 1: sm_DuringBattle(m)  elif == 2: sm_DuringRecover(m)        # part 3
+    if flags1e78 & 4 (Fear): run the AI Lua function only; return
+    if m.rescue (+0x24c0): so_RescueRoutine(m)                                       # part 3
+    if mode == 3 (dead):
+        if not deathSent:
+            to sight (incl. players only, AllOfRange_Class1 … 1):
+                0x244A NC_BAT_REALLYKILL_CMD { u16 dead = m.handle, u16 attacker = m.killer (+0x1fba) }   # size 6
+            deathSent = 1
+        if m.deadAt and g_Now − m.deadAt >= (m.corpseExtra · 5 + 50) · 2:          # = 10 s + corpseExtra seconds
+            so_Unmark(0, 1, 3); som_FreeObject(m, reason 8)                         # respawn is the breeder's job (part 6)
+        run the AI Lua function; return
+    if m.entry == null: return
+    if MobInfo row flag bit 0 of entry+0x28: sm_IBuffToBuffee(m)                     # part 4
+    r = 2
+    if m.script and g_AIScriptOn (DAT_14d41a7c, set by FUN_004511a0):
+        r = LuaScriptScenario.lss_Routine(m.script, m.funcName, ctx{handle, field})  @ FUN_00507200 (ctx FUN_005d6ef0, result ctx+8)
+            # calls the global Lua function named like the mob (MobInfo.InxName);
+            # error → "LuaScriptScenario::lss_Routine : function call error"
+    if regenAniOver and alive and HP != 0 and (not MoveManager.active or move state != 3):
+        brain context = { self, tickArg }
+        if r == 2:                                             # 2 = "let the built-in AI run"
+            m.tactic (+0x22e4) = m.tactic.vt[0](&context)      # one step of the tactic state machine (part 3)
+            m.targetSelector.vt[8]()
+        if m.target and m.target.HP == 0: m.vt[0xa08](0)       # target-dirty
+        if m.target != m.lastTarget or dirty:
+            m.lastTarget = m.target;  so_mobile_Broadcast2ndTarget(m, target, 1) (Z03 §2.3);  dirty = 0
+    if lifetime timer (+0x24ec) expired (accumulates the tick step DAT_14d41a74, FUN_00592020):
+        stop it;  m.so_KilledBy(m, MaxHP())                    # the mob kills itself: normal death path (Z03 §8.1)
+    slanted-list relink check (scope guard, §1.3)
+```
+
+"Run the AI Lua function only" is the same `lss_Routine` call without the brain step; its return value is ignored there.
+The tick argument is the second argument of the routine thunk (not traced further). Lifetime: `vt 0xabc(seconds)`
+(FUN_0055e5b0; 0 stops the timer) is called by the breeders and the `cMobRegen_*` script functions with
+MobLifeTime.LifeTime (part 6); the period is `seconds × 10` tenths. `ShineServant` has its own timed suicide
+(vt 0xf7c FUN_004a3490: deadAt = g_Now + n·10, `AxialListMobSuicide::alms_SelfKill`; part 8).
+
+`vt 0xdf0` (FUN_00553760) sends the same 0x244A immediately and sets `deathSent`; it is used by `cKillObject` (part 10).
+Client: `GameFrameWork::ON_NC_BAT_REALLYKILL_CMD` (client FUN_004a28e0) looks up `dead` and `attacker`; without the
+attacker it plays the death at once (`vt 0x280`), otherwise it lets the attacker's running attack sequence finish the
+death (`Char::ModifyExistDyingSeq`), and counts a tutorial mob kill when the attacker is the own character and the dead
+one is a mob. Name: the 2017 PDB gives 0x244A two names; the 2016 zone sends the 4-byte `PROTO_NC_BAT_REALLYKILL_CMD
+{ ushort dead; ushort attacker; }` here (C02 §alias table).
+
+### 5.5 `ShineMobileObject::so_Routine`: the part before the cast (all mobile objects)
+
+```pseudo
+ShineMobileObject::so_Routine(o)                                                @ FUN_0056a080
+    SetItemData_SkillEffect.se_Clear(&g_SetEffect)
+    flags1e78 &= ~4                                            # Fear is re-set by the abstate tick if still on
+    if mode == 0 or mode == 3: return 1                        # nothing runs for dead or unspawned objects
+    if sub-layer not in {2, 3}: sub-layer = 0                  # transient sub-layers last one tick
+    AbstateListInObject.asl_Routine(o+0x1cc, o)                # abstate expiry and periodic effects (Z03 §6)
+    if o.paramDirty (+0xe94):                                  # set when abstates change parameters
+        so_RecalcAbstateParam (vt 0x360);  vt 0x368 (player: so_RecalcLastParam);  vt 0xda4
+        smo_NotifyParameterChange(1) (vt 0x34);  so_mobile_SpeedChange (vt 0x7bc);  paramDirty = 0
+        if stat flags +0xcce & 7 (cannot move / attack / cast): vt 0x8d0 (player: CancelOnAction)
+    if mode == 4:                                              # player-only state (Z01-core §4.3); mobs have no-op slots
+        if Fear or captivated (vt 0xf20): vt 0x488();  return
+    if Fear and not (+0xcce & 1) and not (+0xcce & 2): smo_RunInFear(o)               # part 5
+    if captivated: vt 0xf24()                                  # player FUN_005601e0; mobs no-op
+    if o.move.active (+0x1ac) and not IsDead: MoveManager.mm_Step(o+0x18c, 0)        # part 5
+    else: o.move.state (+0x18c) = 0
+    movement detector (FUN_0055d610): every 0.2 s compare the position (FUN_00554ee0) with the last one;
+        moving (+0x1e8c) flips 0↔1 and +0x1e98 = g_Now when it changes
+    if o.cast.castEnd (+0x1d84): cast completion — Z03 §5 ("ShineMobileObject::so_Routine … fires the cast")
+```
+
+### 5.6 MobConditionServer: animation levels
+
+```pseudo
+MobCondition step (in ShineMob::so_Routine)                                     @ FUN_00554420
+    if m.conditions:
+        lv = m.vt[0xd44]()                                     # brief.nAnimationLevel (+0x92), FUN_0054aa90
+        if lv < len(conditions) and conditions[lv].vt[4](m):   # MobHPcondition::check @ FUN_004b0040
+            m.vt[0xd40](lv + 1)                                # FUN_00553460
+
+MobHPcondition { u8 AniLv +4, u32 MC_ValueMin +8, u32 MC_ValueMax +0xc }.check(m):
+    m has a data row (vt 0x708 = mob ID ≠ 0xFFFF, FUN_00556ab0) and lv < AniLv and HP < MaxHP · MC_ValueMax / 100
+
+set animation level (m, lv):                                                    @ FUN_00553460
+    to sight: 0x2076 NC_ACT_ANIMATION_LEVEL_CHANGE_CMD { u16 nMonsterHandle = m.handle, u8 nAnimationLevel = lv }   # size 5
+    brief.nAnimationLevel = lv
+```
+
+`MC_ValueMin` is stored but never tested; the levels only go up (reset with the brief at the next spawn). 2016 data: two
+mobs, `WarL_Pore` (60 % → 1, 30 % → 2) and `WarL_BrainWash` (80/59/39/19 % → 1…4). The client
+(`GameFrameWork::On_NC_ACT_ANIMATION_LEVEL_CHANGE_CMD`, client FUN_004a6740) stores the level in the character
+(+0xb60), which picks the animation set (client table MobConditionView *(pdb2017)*: `MobInx, AniType, AniLv, EventCode`).
+Layout matches `PROTO_NC_ACT_ANIMATION_LEVEL_CHANGE_CMD` *(pdb2017)*.
+
+### 5.7 Placing the mob: `so_MapMarking` → `FieldMap::fm_Marking`
+
+```pseudo
+ShineMob::so_MapMarking(m, force) → 0 | 3                                       @ FUN_004665f0
+    field = the FieldMap whose map name equals m.map (ListSearchSame over g_FieldList)
+    if none: return (no marking; caller treats non-zero as failure)
+    spacing = MobInfoServer.RegenInterval (0 → 1; no server row → 25)
+    return FieldMap.fm_Marking(field, m, spacing, 0, force)
+
+FieldMap::fm_Marking(f, o, spacing, dropArg, force)                             @ FUN_00452fd0
+    o.field = f
+    if o.pos is outside f (x ≥ width or y ≥ height): note f in the "bad field" ring DAT_0085dfb0; return 3
+    if x or y ≥ 0xFFFFFF: log "fm_Marking : Invalid coordinate"; return 3
+    add o to the 5×5 slanted coordinate lists of f (index = coord·5 / size, max 4);
+        on failure: o.vt[0x8a0](0), MapRearrangeObserver "MapMarking", fm_Relink
+    if force: o.marked (+0x162) = 1; return 0
+    DropLocationManager.dlm_home(dropArg)                      # spiral search around the wanted point
+    loop:
+        if the cell is not blocked (FUN_0049df70 on the block map) and
+           no object within `spacing` collides (so_AllOfRange_Class0(o, spacing, so_collesioncheck)):
+            o.marked = 1; return 0
+        next spiral point (FUN_00460910; at most 32 levels, "DropLocationManager::dlm_Getloc");
+        none left: log "FieldMap::fm_Marking : Fail mark"; return 3
+        outside the field: return 3
+        ShineObject_SetPosition(o, point);  dlm_next
+    final check of the last point: free → marked = 1, return 0;  else return 3
+```
+
+So mobs of one breeder never stand on top of each other: each spawn moves outward until it is `RegenInterval` (25 for
+2804 of 2842 mobs) away from every other object. NPC.txt NPCs and the GM/Lua NPC spawns use the same path (vt 0x6e0).
+
+### 5.8 Small mob services
+
+| Function | What |
+|---|---|
+| `so_SetHP(h)` vt 0xaac @ FUN_00552d40 | HP = min(h, MaxHP()) |
+| `so_recoverhp(n)` vt 0x5b4 @ FUN_0042ceb0 / `so_recoversp(n)` vt 0x5b8 @ FUN_0042cf30 | HP / SP += n, capped at +0xea8 / +0xeac (no packet; callers: `sm_DuringRecover`, GM `&HPChange/&SPChange`, house/mover recovery) |
+| `so_mob_GetMonEXP()` vt 0xb9c @ FUN_004aa2f0 | returns the script override +0x2508; `ExperienceDistribute::lid_Call` uses MonEXP when it is 0 (Z03 §8.2) |
+| `so_mob_ParamSetAtScript(name, value)` vt 0xb80 @ FUN_005d29c0 (Lua `cSetNPCParam`) | "HP" → HP; "MaxHP" → +0x2504; "MobEXP" → +0x2508; "AC" → stat matrix L0 AC (+0xfdc); "MR" → L0 MR (+0xff0); "WalkSpeed" → +0x254c; "RunSpeed" → +0x2550; "HPRegen" → +0x2554; other names → false. No recalculation and no packet: a new MaxHP shows in the next brief/HP packet, AC/MR only after the next `c_MakeTotal` *(inferred)* |
+| `so_mob_SetMobResist(offset, value)` vt 0xba0 @ FUN_004a9d00 (Lua `cSetNPCResist` @ FUN_005db0a0) | writes the u16 at resist block + offset. `cSetNPCResist(handle, {name = value, …})` maps `ResDot 0x20, ResStun 0x22, ResMoveSpeed 0x24, ResFear 0x26, ResBinding 0x28, ResReverse 0x2a, ResMesmerize 0x2c, ResSeverBone 0x2e, ResKnockBack 0x30, ResTBMinus 0x32` (the MobResist column offsets); unknown keys are skipped; returns 1 (true) to Lua, nothing for a missing object or a non-table argument |
+| resist roll vt 0x634 @ FUN_00416660 | `rand(1000) < value`, value by the AbState row's `SubDispelIndex` (+0xf8): 1 ResStun, 2 ResMoveSpeed, 3 ResFear, 4 ResDot, 7 ResReverse, 8 ResBinding, 9 ResMesmerize, 10 ResSeverBone, 11 ResKnockBack, 12 ResTBMinus, other 0; always 0 when the mob has no MobResist row. This is the "isresist" roll of Z03 §5/§6 |
+| `so_scene_DetectRange(r)` vt 0x8bc @ FUN_0050dd30 | target selector +0x10 = r (map-script node `ShineMobDetectRange`) |
+| `so_scene_Duplicate(n)` vt 0x8c0 @ FUN_0050dda0 | allocates **one** object of the same type (log text on failure "PineEventScriptNode::ShineMobRegen::sa_Step : Too many mob"), then calls its `so_mob_Regenerate(m.field, m.x, m.y, m.dir, handle, m.mobId, vt 0x6d0() (0 for mobs), −1, 0, 0, −1, 1, 0, 0)` `n` times. (original bug) Z09-B1: the same object is spawned `n` times, so at most one copy appears. (original bug) Z09-B3: `m.dir` is the stored byte (degrees / 2) and is halved again |
+| `so_scene_IsIdle()` vt 0x8c4 @ FUN_0050def0 | true when no cast is running |
+| `sm_scene_SetWeaponRate(rates)` @ FUN_0050e0c0 | stores weapon rates at +0x24c8 (FUN_0050dfa0; part 4) |
+| `so_mob_SetGuildRegNum(g)` vt 0x900 @ FUN_00476110 | +0x22ec = g; to sight: 0x748D NC_GUILD_MOBGUILD_CMD { u16 handle, u32 guildNo } (size 8); `mb_SendMyGuildInfo` @ FUN_00475a80 sends the same to one newcomer when g ≠ 0 (Z02 §5). Client `ON_NC_GUILD_MOBGUILD_CMD` (client FUN_004ba6b0) keeps a map handle → guildNo in `CGuildMonster` (replacing an older entry). Used for guild-tournament / guild objects (Z08/Z16) |
+| `so_mob_IsItemDropSetAtScript(b)` vt 0xbb0 @ FUN_004aa810 | dropsEnabled = b |
+| `so_SendInform2Admin(gm)` vt 0x8d8 @ FUN_0058e5d0 | only calls `ShineMobileObject::so_SendInform2Admin` (the GM object-info dump; GM commands item) |
+
+### 5.9 `ShineNPC` and `NPCManager`
+
+`NPCManager` = `g_NPCRoleTable` DAT_0da29a60: 1024 entries of 12 bytes `{ → NPC.txt row, → NPCRole, u16 handle }`, +0x3000
+= number of NPC.txt rows (the static part). Row and role classes: Z02 §6.1.
+
+```pseudo
+NPCManager::nm_SetNPC(nm)   (start stage `open`)                               @ FUN_004c6560
+    for each static entry:
+        mobId = g_MobData.index(row.MobName);  unknown → log "nm_SetNPC : Invalid mob id"; next
+        npc = som_AllocObject(type 4)  (none → "Too many npc")
+        r = npc.so_mob_Regenerate(row.Map, row.x, row.y, row.Direct, handle, mobId, 0, breeder −1, 0, 0, level −1, 1, 0, 0)
+        npc.so_npc_FromTable()                                 # +0x2568 = 1
+        if r != 0: som_FreeObject(reason 0x22); next
+        npc.allLayers (+0x56) = 1;  entry.handle = handle;  entry.role.vt[0x2c](npc, row + 0x54)   # role init with RoleArg
+        if NpcSchedule.shn has a row whose index (32 chars) equals row.MobName: so_Unmark(npc, 0, 1, 3)
+                                                              # scheduled event NPCs stay off the map until WM 0x086A (Z01-core §10)
+    qsort the static part by handle (FUN_004c52f0)            # NPCRoleTable_Find bsearches it, then scans the dynamic part
+
+NPCManager::nm_DynamicRegenerateNPC(nm, from, name[32], map, x, y, dir)        @ FUN_004c6cd0
+        # callers: GM command `&RegenNPC` (FUN_00421e50) and Lua `cNPCRegen` (FUN_005de700)
+    from == null → "PFrom is not set: "; from's field option missing → "Unable to get Field Optionj: "
+    mobId = index(name)  (unknown → "…Invalid mob id")
+    find the static entry with MobName == name and Map == from's map ("i == nm_BufferPoint: " when none)
+    npc = som_AllocObject(type 4) ("…Too many npc")
+    x, y, dir = −1 → the row's values
+    npc.allLayers = 1;  r = npc.so_mob_Regenerate(map, x, y, dir, handle, mobId, 0, −1, 0, 0, −1, 1, 0, 0);  npc.so_npc_FromTable()
+    r != 0 → log "NPCRegenResult != FM_MARKSUCCESS: ", free (reason 0x2c)
+    else: put { row, role, handle } into the first slot at index ≥ count whose handle is 0xFFFF
+          (original bug) Z09-B2: when no slot is free the loop ends at index 0x400 and the entry is written there anyway,
+          over `count` and the words after the table; the "nm_BufferArray Full" branch (free, reason 0x2d) is unreachable
+
+NPC role entry release (FUN_004c5310): clear the dynamic entry with that handle (row, role = 0, handle = 0xFFFF);
+    static entries are never released.
+```
+
+```pseudo
+ShineNPC::so_Routine(n)                                                         @ FUN_0056a9e0
+    if n.fromTable and mode != 2: log "ShineNPC::so_Routine : NPC from table is killed"; mode = 2   # table NPCs cannot stay dead
+    if outside the field: log "fm_IsInFieldSize : NPC"; flags1e78 |= 1
+    smo_MoveByScenario(n)                                      # scripted walking (part 5)
+    ShineMobileObject::so_Routine(n)                           # §5.5
+    if mode != 3:
+        NPCAction proximity triggers as for mobs (+0x24e8, range DetectCha)
+        AI Lua function (no brain: NPCs have no tactic step)
+        if flags1e78 & 1: release role entry; so_Unmark(0, 1, 3); som_FreeObject(reason 0xc)
+    else (dead, only NPCs not from the table):
+        once: to sight 0x244A NC_BAT_REALLYKILL_CMD { n.handle, n.killer }
+        if g_Now − n.deadAt > 49 (5 s): release role entry; so_Unmark; som_FreeObject(reason 0xb)
+        slanted-list relink when a node is invalid (FieldMap.fm_Relink)
+
+ShineNPC::so_KilledBy(n, …)                                                     @ FUN_004b1a10
+    if not n.fromTable: ShineMob::so_KilledBy(n, …)            # Z03 §8.1
+    else: log "ShineNPC::so_KilledBy : NPC from table is killed" (file log DAT_0da28d68); nothing else
+
+ShineNPC::so_NPCRevive(n, gm)   (vt 0xa7c, GM `&NPCRevive` FUN_004231a0)        @ FUN_00452430
+    tell the GM "Changed from <mode> to 2";  mode = 2;  so_AllOfRange_Class0(n, so_BroadcastBriefInfo)
+
+ShineNPC::so_mob_Regenerate @ FUN_004b4bc0: fromTable = 0, then ShineMob::so_mob_Regenerate (§5.3).
+```
+
+### 5.10 `ShineBandit` (scenario objects that switch between NPC and mob)
+
+```pseudo
+brief for bandits (vt 0xf70 FUN_004b11a0(handle, _, src)):  copy the brief from src (FUN_004b0bf0) into +0x2666,
+    handle, type (+0xc2) = 4, +0xbe = 0, +0xc3 = 0;  spawn x/y/dir from +0x16/+0x1a/+0x1e of it (vt 0xf6c FUN_004b10c0)
+
+ShineBandit::so_Routine(b, _, tickArg)                                         @ FUN_0056c630
+    if b.type (+0x2666 → +0xc2) == 5 or invalid position: return ShineMob::so_Routine(b, _, tickArg)   # acts as a mob
+    if outside the field: log "fm_IsInFieldSize : Bandit"; so_Unmark(0, 1, 3); som_FreeObject(reason 6); return
+    smo_MoveByScenario(b);  ShineMobileObject::so_Routine(b)  # no AI while it is an NPC
+
+ShineBandit::so_bandit_ChangeType(b, t)   (vt 0x898; map-script nodes ShineChange2Mob / ShineChange2NPC, part 15)   @ FUN_005508b0
+    b.type = t
+    to the whole map (so_AllInMap1): 0x6C0B NC_SCENARIO_OBJTYPECHANGE_CMD { u16 handle, u8 type }   # size 5
+```
+
+The client (`GameFrameWork::On_NC_SCENARIO_OBJTYPECHANGE_CMD`, client FUN_004a3580) stores `type` in the character
+(+0x78c). Layout matches `PROTO_NC_SCENARIO_OBJTYPECHANGE_CMD` *(pdb2017)*. Which value each script node passes
+(5 = mob, 4 = NPC *(inferred from the routine test and the spawn value)*) is read in part 15. The bandit name for
+`vt 0x4a0` is `+0x2666 + 0x5b` (FUN_00556f20).

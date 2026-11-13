@@ -4221,12 +4221,12 @@ Sent from `FUN_00553200` (`FUN_00553200`) · payload 34 bytes
 
 ### `0x2076` NC_ACT_ANIMATION_LEVEL_CHANGE_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_ACT_ANIMATION_LEVEL_CHANGE_CMD`, 3 bytes
+**Verified layout** (basis: zone FUN_00553460; client FUN_004a6740)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nMonsterHandle |  |
-| 2 | u8 | nAnimationLevel |  |
+| 2 | u8 | nAnimationLevel | MobConditionServer level; client stores it at char+0xb60 |
 
 Sent from `FUN_00553460` (`FUN_00553460`) · payload 3 bytes
 
@@ -10901,6 +10901,17 @@ Empty payload.
 |---|---|---|---|
 | 0 | u16 | err | 0x20E8 ok, 0x20E9 riding, 0x20EA wrong mode |
 
+### `0x244A` NC_BAT_REALLYKILL_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_0056baa0 (ShineMob_so_Routine), FUN_0056a9e0 (ShineNPC_so_Routine), FUN_00553760; client FUN_004a28e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | dead | handle of the dead mob/NPC |
+| 2 | u16 | attacker | killer handle (mob+0x1fba), 0xFFFF when none |
+
+2017 PDB alias of 0x244A (the zone→WM direction is NC_BAT_PKINPKFIELD_WMS_CMD, Z03). Sent once to sight when the mob's mode becomes 3.
+
 ### `0x245F` NC_BAT_LPCHANGE_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone FUN_0056dc20 (sp_SendLPinform); client FUN_0049d840)
@@ -11097,6 +11108,26 @@ empty payload
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0xA42–0xA5A |
+
+### `0x6C0B` NC_SCENARIO_OBJTYPECHANGE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_005508b0 (ShineBandit_so_bandit_ChangeType); client FUN_004a3580)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | bandit |
+| 2 | u8 | type | 5 acts as a mob, 4 as an NPC (inferred) |
+
+sent to the whole map
+
+### `0x748D` NC_GUILD_MOBGUILD_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_00476110 (so_mob_SetGuildRegNum), FUN_00475a80 (mb_SendMyGuildInfo); client FUN_004ba6b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | mob |
+| 2 | u32 | guildNo | mob+0x22ec |
 
 ### `0x8c04` NC_MINIHOUSE_BUILDING_ACK † (S→C)
 
