@@ -690,6 +690,7 @@ CharDB 0x541C NC_FRIEND_DB_POINT_CMD { u16 numoffriend, { u32 charregnum, u16 fr
 
 0x541D NC_FRIEND_POINT_REQ {}  (needs CHARDATA)                                          @ FUN_00418e60
     Send s 0x541E NC_FRIEND_POINT_ACK { u16 friendpoint = s.friendPoint }
+    # client `On_NC_FRIEND_POINT_ACK` FUN_0049ad90: FriendWin::SetFriendPoint(friendpoint) if the friend window exists
 
 0x541F NC_FRIEND_FIND_FRIENDS_REQ {}  (needs CHARDATA)                                  @ FUN_00423110
     # reply 0x5420 NC_FRIEND_FIND_FRIENDS_ACK { u16 error, u16 numoffriend, PROTO_FRIEND_INFO[n] }
@@ -861,6 +862,14 @@ Notices and alarms:
     KQ_SendJoiningAlarmEnd(i)       @ FUN_00452a70: Status ≠ 2: every client session ← 0x5825 { u32 nHandle, u16 nID }
     KQ_SendJoiningAlarmList(s)      @ FUN_00452b60 (map login, W01 §7): s ← 0x5826 { u16 n, KQ_JOINING_ALARM_INFO[n] }
                                     for every Status-2 KQ
+    # client (minimap = frame +0x234):
+    #   0x5824 `ON_NC_KQ_JOINING_ALARM_CMD` FUN_004b6050: only if MiniMapWin::ConfirmKQAlarmInfo(Handle) accepts it;
+    #     eligible = MinLevel ≤ own level ≤ MaxLevel; eligible → opens play-guide window 0xA9 and shows Msg (cut at
+    #     MsgLength) as an announcement; adds the alarm { Handle, ID, eligible } to the minimap either way
+    #   0x5825 `ON_NC_KQ_JOINING_ALARM_END_CMD` FUN_0049bb70: removes the alarm by Handle (and clears the minimap's
+    #     KQ flag when it is the KQ open in the KQ window)
+    #   0x5826 `ON_NC_KQ_JOINING_ALARM_LIST` FUN_0049bbf0: resets the minimap alarms and adds every entry with the same
+    #     level test (no announcement)
     WM texts: `WM_GetMsg(n)` FUN_00404570 = row n of `MsgWorldManager.shn` (WM +0xC40C0, column Desc; loaded first by
     W01's FUN_00404100, fatal if missing); n ≥ row count → "" (PTR_DAT_00497038). 2016 rows:
         #0 "Recruitment for Kingdom Quest - '%s' has begun."
@@ -909,6 +918,9 @@ blob), so the KQ notices are not shown in game *(inferred from C01's table)*.
     none: Send 0x5804 NC_KQ_STATUS_ACK { Handle, u8 Status = 10, u16 NumOfJoiner = 0 }
     else: Send 0x5804 { Handle, k.Status, k.NumOfJoiner, Name5 JoinerNameList[n] = name of each joiner's session
           (KQ_GetJoinerName by wmHandle; "" when that handle has no CHARDATA) }
+    # client `KingdomQuestWin::SetKQuestStatus` FUN_005ef680: stores Handle (+0), NumOfJoiner (+5) and the n names
+    # (+7, 20 bytes each) in the KQ window and redraws it; it never reads Status (+4), so "10 = no such KQ" only shows
+    # as an empty joiner list
 
 0x5805 NC_KQ_JOIN_REQ { u32 Handle }                                                    @ FUN_00413cc0
     # reply 0x5806 NC_KQ_JOIN_ACK { u32 Handle, u16 Error }
@@ -971,6 +983,11 @@ KQ_SendListDiff(s)                                                              
     updates: Send 0x581F NC_KQ_LIST_UPDATE_ACK { u16 n, KQ_UPDATE_ITEMS { u32 Handle, u8 Status, u16 NumOfJoiner }[n] }
     new ones: Send 0x581D NC_KQ_LIST_ADD_ACK { u16 n, PROTO_KQ_INFO_CLIENT[n] }, split when the size passes 0x1D25
     s's copy = cur (FUN_00454c30); any failed send aborts without updating the copy
+    # client (GameFrameWork, KQ window = frame +0x2F0):
+    #   0x581C `On_NC_KQ_LIST_TIME_ACK` FUN_0049add0: SetServerTime on the KQ window (if open) and on mhRepairObjWin
+    #   0x581D `On_NC_KQ_LIST_ADD_ACK` FUN_0049ae00: KingdomQuestWin::AddKQuest(packet)
+    #   0x581E `On_NC_KQ_LIST_DELETE_ACK` FUN_0049ae20: DeleteKQuestInfo(Handle[i]) for each, then UpdateAllList
+    #   0x581F `On_NC_KQ_LIST_UPDATE_ACK` FUN_0049ae70: KingdomQuestWin::UpdateListState(packet)
 ```
 
 ### 6.5 Vote ban, team choice, joiner list
@@ -1003,9 +1020,13 @@ are not balanced" *(the last mapping inferred from the remaining text id)*.
                                            u8 nLen, sContents[nLen] }  (0x4E + nLen)
             and gets ballotOpen = 1, outstanding += 1
     # nLen is not checked against the request length (reads past a short packet)
+    # client `On_NC_KQ_VOTE_VOTING_CMD` FUN_004a6390: fills VoteWin with proposer sStarter, target sTarget, reason type
+    # nVoteType (+0x28), end time tEndTime (+0x29, mktime), reason text sContents (+0x4E, nLen bytes) and shows the
+    # ballot window; the player's choice goes back as 0x582A
 
 0x582A NC_KQ_VOTE_VOTING_REQ { u32 eVoteType (KQ_VOTING_TYPE: 0 cancel, 1 yes, 2 no) }  @ FUN_00418630 → FUN_00452ee0
     reply 0x582B NC_KQ_VOTE_VOTING_ACK { u16 nError }
+    s has no CHARDATA (+0x560) or is not in game (+0x704 == 0): return, no reply
     not in a KQ / not a joiner → 0x3111;  no vote running or voter's team ≠ voteTeam → 0x3112;  ballot not open → 0x3113
     ok: ballotOpen = 0; Send 0x3110; eVoteType 1: outstanding −1, yes +1;  2: outstanding −1, no +1;  other: nothing
         (the ballot is used up but stays counted as "outstanding" = void)
@@ -1025,6 +1046,22 @@ KQ_TickVote (every second, per KQ)                                              
         success: target.banned = 1; target (online, inGame == 1) ← 0x582F NC_KQ_VOTE_BAN_MSG_CMD { u8 nVoteRate,
                  u8 nYesNum, u8 nNoNum, u8 nCancelNum }
         reset the vote
+    # client: the client loads its own KQVoteMajorityRate.shn (FUN_004695e0 → DAT_00a81200; 2016 rows {70, 50}, same
+    # as the server's) and looks up the row whose rate equals nVoteRate (by value, not by index):
+    #   0x582C `On_NC_KQ_VOTE_RESULT_SUC_CMD` FUN_004b7000: nothing when sTarget is the own character (it gets 0x582F);
+    #     row 0 → announcement + system text TextData3 0x2477878c "%s has been banned according to voting result of For
+    #     (%d votes), Against (%d votes), Void (%d votes). More than 70%% of participants have decided in favor of it.";
+    #     later rows → 0x2119557b "%s has been the subject of voting more than twice. More than half the participants
+    #     voted for the player being banned." + 0x26195f84 "Voting result: For (%d votes), Against (%d votes), Void (%d
+    #     votes)"; no matching row (e.g. need 0 because the server table is empty) → nothing shown
+    #   0x582D `On_NC_KQ_VOTE_RESULT_FAIL_CMD` FUN_004b7250: announcement (not for the target) + system text 0x25292a38
+    #     "Voting result for %s: … Voting has been cancelled because not enough players participated."
+    #     (original bug) W04-B68: the WM sends 0x582D for every failed vote, also when enough players voted and the
+    #     majority was against; the client always says "not enough players participated"
+    #   0x582F `On_NC_KQ_VOTE_BAN_MSG_CMD` FUN_004b4300: row 0 → TextData2 0x90a79cda "Voting result: For (%d votes),
+    #     Against (%d votes), Void (%d votes). More than 70%% of participants voted "For." You will therefore be banned
+    #     from the current Kingdom Quest!"; later rows → 0x19484a1d "You have already been the cause for voting by the
+    #     participants of the Kingdom Quest more than twice. More than half the participants voted for you being banned."
 
 0x5834 NC_KQ_VOTE_START_CHECK_REQ {}                                    @ FUN_004186d0 → FUN_00453340
     only if s inGame, in a known KQ with Status 4 (else no reply):
@@ -1049,6 +1086,8 @@ KQ_TickVote (every second, per KQ)                                              
     # (original bug) W04-B18: nTeamType is not range-checked: values ≥ 2 index count[] past the KQ's two bytes (writes
     # into the next KQs' team counters, up to 255 bytes on) and store an invalid team. "≥ MaxPlayers / 2" also keeps a
     # team one short of half. If s is not in the joiner list, an uninitialised 0x5839 goes to every joiner.
+    # client `On_NC_KQ_TEAM_SELECT_CMD` FUN_0049d950: KingdomQuestTeamList::SetElement(sCharID, nTeamType) + UpdateList
+    # on the KQ window's team list (window +0x1C3F8)
 
 KQ_OnMapLogin(s, map)            from 0x180C (W01 §7 "g_InstanceMaps.OnEnter")           @ FUN_00456b20
     s.bannedWhileAway == 1: Send s 0x5830 NC_KQ_VOTE_BAN_MSG_LOGOFF_CMD {}; clear       # "Banned by the voting result…"
@@ -1357,7 +1396,7 @@ CharDB 0x7C11 NC_DATA_PRISON_ALTER_GM_ACK { same layout as 0x7C0C }             
         Send t raw 0x7C03 NC_PRISON_OK_CMD { u16 nMinute, char sReason[16], char sRemark[64] }       (0x52)
     g: Send g raw 0x7C0A NC_PRISON_ALTER_GM_ACK { sImprison, err }
     # 0x7C03 client (FUN_004aec50): "Remaining Time: %d minutes The charge: %s Details: %s", timer = nMinute·60 s;
-    # nMinute ≠ 0: in a party → sends 0x380A (party leave *(inferred)*, W02), else system text "Not part of a Party."
+    # nMinute ≠ 0: in a party → sends 0x380A NC_PARTY_LEAVE_REQ *(pdb2017 name)* {} (2 bytes; 2016 WM handler CParserClient FUN_0041b990, W02), else system text "Not part of a Party."
     # 0x7C0A client (FUN_004aee00): 0x0DA1 "Character ID does not exist.", 0x0DA2 "Not in prison.", 0x0DA3–0x0DA6 above;
     # (original bug) W04-B27: the DB failure code is 0x0DA7, but the client's alter switch maps 0x0D87 (the add code)
     # to "Imprisonment request has failed." and shows nothing for 0x0DA7
@@ -1590,7 +1629,10 @@ HP_RequestReward(s)                                                             
     else:
         s ← 0x9403 NC_HOLY_PROMISE_SET_UP_CONFIRM_ING { Name5 UpCharID = t.name }  (0x14)   # "You've asked %s to be your master."
         t ← 0x9404 NC_HOLY_PROMISE_SET_UP_CONFIRM_REQ { Name5 CharID = s.name, Name5 UpCharID = t.name }  (0x28)
-            # client: "%s is requesting you as a master. Do you wish to accept?" → 0x9405
+            # client `On_NC_HOLY_PROMISE_SET_UP_CONFIRM_REQ` FUN_004afc30: while a dice game is running
+            # (MHDiceGameTask::IsDicegamePlaying) the packet is dropped and no 0x9405 is sent; otherwise
+            # HolyPromiseWin::SetID(CharID, UpCharID) and a yes/no box with TextData 0x37490f2e "%s is requesting you
+            # as a master. Do you wish to accept?" (CharID) → 0x9405
     refusal: s ← 0x9402 NC_HOLY_PROMISE_SET_UP_ACK { u16 Error, INFO UpInfo (name zeroed, LogonInfo/Level/Flags not written),
              i32 ResetableDateTime, tm tm_ResetableDateTime }  (0x44)
              # the date fields are written only for 0x174A / 0x1750 (original bug) W04-B32
@@ -2065,7 +2107,7 @@ FUN_004010c0 from W01's `Zone_S2SConnectionReq_0802` FUN_004283e0: zone ← 0xD0
     else: record = request with nEventNo = nextEventNo (the request's number is ignored), flag 0; nextEventNo++;
         push_back; reply { 0x3208 ERR_EVENT_ADD_EVENT_NOERR, request with the assigned nEventNo }
     # not active yet: zones are told only by 0xD009. nextEventNo is an i16: after 0x7FFF it goes negative and reaches
-    # −1 after 65 535 additions per WM run; then every add is refused (inferred limit, never reached in practice)
+    # −1 after 65 534 additions per WM run (`GMEventManager_Construct` FUN_00401dd0 starts it at 1); then every add is refused (inferred limit, never reached in practice)
 
 0xD005 NC_EVENT_UPDATE_EVENT_REQ { GM_EVENT_DATA }  (0x553)                 @ FUN_00427170 → GMEM_UpdateEvent FUN_00401430
     reply 0xD006 NC_EVENT_UPDATE_EVENT_ACK { u16 nError, request echoed }  (0x555)
@@ -2530,6 +2572,7 @@ with the mob's name.
 | W04-B65 | `EA_Event_Check_GetReward` (after the event) | the claimed-week test compares `RewardList[weekRowIndex]` RewardNum times instead of scanning the list; only the highest reached day tier is checked | the list is resent for an already claimed week, or suppressed while a lower day tier is unclaimed | scan the whole RewardList for every row |
 | W04-B66 | `NpcSched_BuildEntries` / `enss_NPCStandEnd` | the next-occurrence loops add NS_CycleHour until the time passes now; 0 never ends | a NpcSchedule.shn row with NS_CycleHour 0 and a past end hangs the WM (2016 table is empty) | reject 0 at load |
 | W04-B67 | `enss_NPCStandEnd` | the cycle / life hours are taken from the first row with the same Mob_Inx | two schedules for the same NPC both use the first row's timing | use the entry's own row index |
+| W04-B68 | `KQ_TickVote` → client 0x582D | one failure packet for every failed vote; the client's only text for it is "Voting has been cancelled because not enough players participated" | an outvoted ban request is reported as lacking participants | a separate code or packet for "majority against" |
 
 (W04-B6 is reserved; not used.)
 
@@ -2550,8 +2593,10 @@ with the mob's name.
 - KingdomQuest.shn NextStartMode / RepeatMode / RepeatCount / PlayerRepeat* / PlayerRevival* / DemandQuest / DemandItem /
   DemandMobKill / RewardIndex / ScriptLanguage are copied into PROTO_KQ_INFO for the zones; the WM itself does not
   enforce them (Z08 §4 for the zone side).
-- 0x582A voter index: Ghidra shows the voter's joiner index as `extraout_EDX` after `KQ_IsVoteRunning`; read as the
-  index returned by `KQ_FindJoinerByName` *(inferred)*.
+- 0x582A voter index: Ghidra shows the voter's joiner index as `extraout_EDX` after `KQ_IsVoteRunning`. The disassembly
+  settles it: `mov %eax,%edx` at 0x452fee keeps `KQ_FindJoinerByName`'s result, `KQ_IsVoteRunning` (0x452d40–0x452d6b)
+  never writes EDX, and `add %edx,%eax` at 0x45301e indexes the joiner array with it (no longer uncertain; kept here
+  for the Ghidra artefact).
 - A banned KQ player stays in the joiner list and gets 0x5833 every second while online; whether the zone ignores the
   repeats once the player has left the KQ maps is Z08's (§4).
 - KQ handles: 0x5819 NC_KQ_ENTRYRESPONCE_REQ (Z08 question) is not sent by the 2016 WM (no send site); the client
@@ -2605,17 +2650,17 @@ spammer handlers, attendance, NPC schedule) is done in §17.2–§17.6.
 | Account server 0x0838 `fc_NC_MISC_EVENT_DONE_MUNSANG_WM2ACC` (account FUN_00402cb0) | D01 (scope row `0x0838` … `FUN_00402cb0`; D01-account.md) | Account-server binary |
 | ServerParam `std::map` internals FUN_00459d00, FUN_00459220, FUN_004590b0, FUN_004599a0, FUN_00459a80; `LogLevel` FUN_00407ae0 | W01 (plan: "startup/config"; `ServerParam_GetInt` and `LogLevel` are W01 names) | library code behind W01 helpers; behaviour summarised in §1.2 |
 | `Party_IsConfirmed` FUN_00464d50 (party chat) | W02 (`W02.json` names it; plan title "party and raid") | party state is W02's |
-| WM data loader FUN_00404100 (all SHN tables), `WM_GetMsg` table object | W01 (plan: "startup/config") | only the KQ, SpamerReport, GBHouse and MsgWorldManager rows are used here and are documented in §2.5, §6.1, §6.2, §15.1 |
-| client-SHN name list FUN_0045d8c0 (49 file names: Abstate.shn … ChargedDeletableBuff.shn) | W01 (plan: "startup/config") | no caller in the export (constructor of a global); not reached from any W04 handler |
-| 0x0849 date/time broadcast FUN_00437e30 (main loop, once a minute) | W01 (plan: "WM process … session lifecycle") | main-loop service, not part of a W04 subsystem |
-| session teardown callers FUN_00437660, FUN_00437fd0, FUN_00438630 (→ session destructor FUN_004352e0), FUN_00438a60 (→ reset FUN_00434530) | W01 (plan: "session lifecycle") | they reach W04 code only through the session destructor (`ChatRestrict_Destroy`, §14.1) |
+| WM data loader FUN_00404100 (all SHN tables), `WM_GetMsg` table object | W01 goal "startup/config" — **not covered by W01-core** (W01 is done and never cites it): proposed follow-up W05 (status file) | only the KQ, SpamerReport, GBHouse and MsgWorldManager rows are used here and are documented in §2.5, §6.1, §6.2, §15.1 |
+| client-SHN name list FUN_0045d8c0 (49 file names: Abstate.shn … ChargedDeletableBuff.shn) | W01 goal "startup/config" — **not covered by W01-core** (W01 is done and never cites it): proposed follow-up W05 (status file) | no caller in the export (constructor of a global); not reached from any W04 handler |
+| 0x0849 date/time broadcast FUN_00437e30 (main loop, once a minute) | W01 goal "Reconstruct the WM process" — **not covered by W01-core** (W01 is done and never cites it): proposed follow-up W05 (status file) | main-loop service, not part of a W04 subsystem |
+| session teardown callers FUN_00437660, FUN_00437fd0, FUN_00438630 (→ session destructor FUN_004352e0), FUN_00438a60 (→ reset FUN_00434530) | W01 goal "session lifecycle" — **not covered by W01-core** (W01 is done and never cites it): proposed follow-up W05 (status file) | they reach W04 code only through the session destructor (`ChatRestrict_Destroy`, §14.1) |
 | zone handlers of 0x580D / 0x580F / 0x5811 (zone FUN_00497790 / FUN_00499240 / FUN_004972c0) and the KQ maps | Z08 (scope rows `0x580d`, `0x580f`, `0x5811`) | zone side of the KQ |
-| zone senders of 0xA401 / 0xA403 (`mc_Routine` FUN_004868d0 / FUN_00486710, `mc_AllDropFilm` FUN_00485290) | Z08 (plan title: "instances") | zone instance logic; Z08 §5 does not cite them yet (noted in `docs/knowledge/W04.md`) |
+| zone senders of 0xA401 / 0xA403 (`mc_Routine` FUN_004868d0 / FUN_00486710, `mc_AllDropFilm` FUN_00485290) | Z14 (plan goal: "`mc_Routine` (empty-instance timeout …), films (`mc_PlayAllFilm`, `mc_AllDropFilm`)") | zone instance logic; Z08 (done) does not cite them (noted in `docs/knowledge/W04.md`) |
 | zone handlers of 0xD00B / 0xD00C GM events (zone FUN_0046ddf0 / FUN_0046dae0) | Z08 §13 | zone side of §16 |
 | Character-server procedures behind 0x5410, 0x7C0B, 0x9420…0x9443, 0xA800…0xA80C, char options | D04 (plan title: "social, guild, quests, skills") and D02 | DB side; this doc cites D04 where it relies on it |
 | client handlers of every client-facing packet here | C01 (inventory) | cited per packet; texts from `client-error-codes.json` |
-| zone `&releasechatban` FUN_00421a60 (sends 0x0866), zone 0x0865 handler FUN_005a5710 | Z11 (plan: "GM ampersand (&) commands"); Z01 §9 | zone GM command and zone message handler |
+| zone `&releasechatban` command (in the zone's GM-command parser FUN_00425b70, string 006a8d3c) and its 0x0866 send helper FUN_00421a60, zone 0x0865 handler FUN_005a5710 | Z11 (plan: "GM ampersand (&) commands"); Z01 §9 | zone GM command and zone message handler |
 | zone 0x086A / 0x086B handlers FUN_005a57e0 / FUN_005a5950 (`nm_StandNPC`) | Z01 §9 | zone side of §17.6 |
 | zone 0x1120 NC_CHAR_SUPPORT_REWARD_CMD handler FUN_005a5c70 | Z07 §1.2 | zone side of `Session_SendSupportReward` (§17.5) |
 | Character-server handlers / procedures for 0x0841, 0x0844, 0x0847, 0x0863, 0x0868, 0x10EB, 0x10EE, 0x10F3 | D02 §4, §5, §9, §12 | DB side of §17.2–§17.5 |
-| W01 callers of §17: 0x180C map-login-done FUN_0042d8d0, zone registration FUN_004283e0, CharacterLogout FUN_00436d50, main loop FUN_00406760, loader FUN_00404100 | W01 (W01-core §5.4, §7.1, §7.3, §2) | they only call the W04 functions named in §17 |
+| W01 callers of §17: 0x180C map-login-done FUN_0042d8d0, zone registration FUN_004283e0, CharacterLogout FUN_00436d50, main loop FUN_00406760, loader FUN_00404100 | W01 (W01-core §5.4, §7.1, §7.3) for the first three; main loop and loader: W01 goal "startup/config" — **not covered by W01-core** (W01 is done and never cites it): proposed follow-up W05 (status file) | they only call the W04 functions named in §17 |
