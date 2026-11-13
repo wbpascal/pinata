@@ -21,9 +21,9 @@ plan file (`docs/plan/items/<ID>.md`), follow it. This file holds the shared con
 | `re-data/ghidra/` | Persistent Ghidra 12.1.4 projects (`<bin>` = project name). Run extra Ghidra scripts against them with `-process -noanalysis` instead of re-importing. The PDB projects (`<bin>-pdb`, `client2017`) are local only: rebuild them with `re-data/ghidra/README.md` |
 | `tools/protocol-re/` | Scripts (see below) |
 | `tools/protocol-re/names/<bin>/*.json` | Known function/global names, one file per work item, merged automatically |
-| `docs/protocol/` | Protocol spec: `README.md` (framing, crypto, flows), `opcodes-*.md`, `packets-*.md` (generated layouts), `opcodes.json`, `client-error-codes.json`, `annotations.json` + `annotations/<ID>.json` (hand-verified layouts) |
+| `docs/protocol/` | Protocol spec: `README.md` (framing, crypto, flows), `opcodes-*.md`, `packets-*.md` (generated layouts), `opcodes.json`, `client-error-codes.json`, `annotations.json` + `annotations/<ID>.json` (hand-verified layouts), `pdb2016-layouts.json` (2016 server PDB layouts, ranked below annotations and above the 2017 `pdb-layouts.json`; other definitions of a type in `alts` with `"variant": true`) |
 | `docs/pseudocode/` | Reconstructed pseudocode. `FORMAT.md` = the format (short); `login-server.md` is the full reference example |
-| `docs/knowledge/<ID>.md` | Findings that other items need: struct/member offsets, subsystem facts, open questions |
+| `docs/knowledge/<ID>.md` | Findings that other items need: struct/member offsets, subsystem facts, open questions. S01 TSVs: `S01-renames.tsv` (our name → official), `S01-player-offsets.tsv` (`p+0x…` → `ShinePlayer` member), `S01-shn-structs.tsv` (SHN file → server row struct) |
 | `docs/plan/` | Master plan, work item plans, `status/<ID>.md` progress logs |
 
 `<bin>` export names: `login`, `wm`, `zone`, `account`, `accountlog`, `character`, `gamelog`, `client`; with PDB: `<bin>-pdb` (five servers), `client2017`.
