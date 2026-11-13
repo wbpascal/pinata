@@ -101,7 +101,8 @@ def pdb_layout(op, sizes):
     title = "**2016 PDB layout** *(pdb2016)*" if label == "pdb2016" else "**2017 PDB layout** *(pdb2017, unverified for 2016)*"
     rows = [f"{title}: `{p['struct']}`" +
             (" (struct shared under the base name, inferred)" if p.get("struct_alias") else "") + f", {p['size']} bytes{var}" +
-            ("".join(f" · alias `{c['name']}` = `{c['struct']}` ({c['size']} bytes)" for c in cand if c is not p))]
+            ("".join(f" · other definition of `{c['struct']}` in the 2016 PDB ({c['size']} bytes, S01 §2.4)" if c.get("variant")
+                     else f" · alias `{c['name']}` = `{c['struct']}` ({c['size']} bytes)" for c in cand if c is not p))]
     bad = sorted({z for z in sizes if not fits(p, z)})
     if bad:
         rows[0] += f" · ⚠ 2016 code uses {', '.join(map(str, bad))} bytes: " + (

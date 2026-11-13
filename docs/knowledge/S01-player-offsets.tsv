@@ -1,0 +1,202 @@
+offset	kind	PDB member (ShineObjectClass::ShinePlayer, Zone.pdb 2016)	type	items citing p+offset
+0x4	exact	so_handle.sohu_Handle	u16	Z01
+0x4e	exact	so_slantedlist.LayerRegistInfo.LayerRegNumberUnion	u64	Z07
+0x66	exact	so_LocateInfo.location	u32	Z01 Z04
+0x6a	exact	so_LocateInfo.direct	u32	Z01
+0x76	exact	so_layer.layer	u32	Z01
+0x7a	exact	so_Field	u32	Z01 Z04
+0x168	exact	smo_MovePacketBuffer.movecommand	u16	Z02
+0x16a	exact	smo_MovePacketBuffer.movepacket.handle	u16	Z02
+0x18c	exact	smo_MoveManager.mm_state	i32	Z02 Z04
+0x1cc	exact	smo_Abstate.abstatelist.asl_Element	AbnormalStateContainer::AbstateElementInObject[28]	Z02
+0xe94	exact	smo_Abstate.parameterchange	u8	Z07
+0xe9c	exact	smo_Mode.mode	u32	Z01 Z02 Z06
+0xea0	exact	smo_Recover.lasthp	u32	Z02
+0xea4	exact	smo_Recover.lastsp	u32	Z02
+0xfbc	exact	smo_CharClass	u32	Z07
+0xfc0	exact	smo_Param.PureCharParam.Str	i32	Z03 Z07
+0x1bb4	exact	smo_Param.Total.Str	i32	Z07
+0x1c00	exact	smo_Param.Total.MoveSpeed	i32	Z01
+0x1d7c	exact	smo_BattleObject.alreadydead	u8	Z07
+0x1d84	exact	smo_SkillCast.scs_BlastTime	u32	Z02 Z04 Z07
+0x1d98	exact	smo_SkillCast.scs_ProduceSkill.sklidx	u32	Z07
+0x1d9c	exact	smo_SkillCast.scs_ProduceSkill.prdidx	u32	Z07
+0x1ea8	exact	sp_ItemLotInspector.ili_Action	i32	Z04 Z05
+0x1eac	exact	sp_ItemLotInspector.ili_Array	ItemLotInspector::InspectNote[64]	Z04
+0x5cac	exact	sp_ItemLotInspector.ili_ArrayPointer.value	u32	Z04
+0x5cb4	exact	sp_ScriptCommand	u32	Z08
+0x5cb8	exact	sp_MiscFlag.JustRevive|JustLink|DataRecieve|SoloingMode|AccountStorage_opened|AStorageAnywhere_opened|LinkReserv_link|InAdminImmortal	u8	Z01 Z02 Z04 Z05 Z07
+0x5cb9	exact	sp_MiscFlag.TryLinkUntilSuccess|TeleportReserv|BeSummoned|IsAutoPickUp|LockRefundReq|LockRefundCanCelReq|SomeClericReviveMe|bModeIDReqWait	u8	Z02 Z05 Z07 Z08
+0x5cba	exact	sp_MiscFlag.bMoverUpgradeWait|bItemBuyWait	u8	Z05
+0x5cc8	exact	sp_WeddingData.header.clienthandle	u16	Z02 Z07
+0x5ced	exact	sp_WeddingData.Partner.RegisterNumber	u32	Z07
+0x5cf4	exact	sp_MH_InnerInfo.MHFlag	u16	Z07
+0x5cf6	exact	sp_MH_InnerInfo.MHRegNum	u16	Z06 Z07
+0x5cf8	exact	sp_MH_InnerInfo.isCastMiniHouse	u8	Z07
+0x5d00	exact	sp_MiniGame.nGameType	i32	Z06
+0x5d08	exact	sp_MiniGame.RoomLeavePos.sMapName	char[13]	Z06
+0x5d20	exact	sp_MiniGame.GameInfo	byte[224]	Z06
+0x5e06	exact	sp_hGuildTorunamentFlagHandle	u16	Z08
+0x5e0c	exact	sp_bCharFreeStatLock	u8	Z07
+0x5e0e	exact	nTournamentSeed	u8	Z08
+0x5e10	exact	sp_SocketSession	u32	Z01
+0x7e28	exact	sp_SocketContainer.gamestream	u32	Z01
+0x7e2c	exact	sp_SocketContainer.datastream	u32	Z01
+0x7e34	exact	sp_CharBriefInfo.bic_pack.pp_Buffer	u32	Z02
+0x7f32	exact	sp_CharBriefInfo.bic_BriefInfo	u32	Z01 Z02
+0x7f36	exact	sp_CeaseFireSender.cfs_Flag	u8	Z03
+0x7f37	exact	sp_SkillFinish.scf_ErrorType	u16	Z03
+0x7f39	exact	sp_CharData.usrregnum	u32	Z01
+0x7f3d	exact	sp_CharData.toclient.basedata.chrregnum	u32	Z01 Z07
+0x7f41	exact	sp_CharData.toclient.basedata.charid	char[20]	Z01
+0x7f56	exact	sp_CharData.toclient.basedata.Level	u8	Z06
+0x7f57	exact	sp_CharData.toclient.basedata.Experience	u64	Z01
+0x7f63	exact	sp_CharData.toclient.basedata.CurHPStone	u16	Z04
+0x7f65	exact	sp_CharData.toclient.basedata.CurSPStone	u16	Z04
+0x7f67	exact	sp_CharData.toclient.basedata.CurHP	u32	Z01
+0x7f77	exact	sp_CharData.toclient.basedata.Cen	u64	Z01 Z05 Z06
+0x7f7f	exact	sp_CharData.toclient.basedata.logininfo.currentmap	char[12]	Z01 Z06
+0x7f8b	exact	sp_CharData.toclient.basedata.logininfo.currentcoord.xy.x	u32	Z01
+0x7f94	exact	sp_CharData.toclient.basedata.statdistribute.Strength	u8	Z07 Z08
+0x7f98	exact	sp_CharData.toclient.basedata.statdistribute.MentalPower	u8	Z07
+0x7f99	exact	sp_CharData.toclient.basedata.statdistribute.RedistributePoint	u8	Z07
+0x7f9f	exact	sp_CharData.toclient.basedata.prisonmin	u16	Z01
+0x7fa1	exact	sp_CharData.toclient.basedata.adminlevel	u8	Z01
+0x7fa6	exact	sp_CharData.toclient.shape.race|chrclass|gender	u8	Z04
+0x7fb9	exact	sp_GameData.client.partyno	u16	Z08
+0x7fc0	exact	sp_Target.to_Type	u8	Z03
+0x7fd8	vfptr	sp_Item.itembag.ci_Equipment (object start, vfptr)		Z04 Z08
+0x8e2c	vfptr	sp_Item.itembag.ci_Inventory (object start, vfptr)		Z01 Z04 Z08
+0xe778	vfptr	sp_Item.itembag.ci_MiniHouse (object start, vfptr)		Z05 Z07
+0xf758	vfptr	sp_Item.itembag.ci_ActionBox (object start, vfptr)		Z02 Z04
+0xfaa8	vfptr	sp_Item.invenlocklist (object start, vfptr)		Z01 Z03 Z04 Z05
+0xfaac	exact	sp_Item.invenlocklist.icl_Index	u16	Z03 Z04 Z05 Z07
+0x173b4	exact	sp_HPStoneManager.StoneTick	u32	Z04
+0x173b8	exact	sp_HPStoneManager.StoneReservationTick	u32	Z04
+0x173bc	exact	sp_HPStoneManager.PointStoneCheck	u32	Z04
+0x173c0	exact	sp_SPStoneManager.StoneTick	u32	Z04
+0x173cc	exact	sp_DuringItemEquip	u8	Z04 Z05
+0x173d0	exact	sp_NormalAttackDamageTick.nadt_DamageTime._Myproxy	u32	Z03
+0x173e8	vfptr	sp_QuestDiary.sqd_QuestDiary (object start, vfptr)		Z02 Z05 Z08
+0x17ce8	exact	sp_QuestDiary.sqd_QuestDiary.m_bWaitResult	i32	Z02
+0x17d00	exact	sp_GuildStorageManager.storagehandle	u16	Z04
+0x17d02	exact	sp_GuildAcademyRewardStorageManager.storagehandle	u16	Z04
+0x17d06	exact	sp_bOpenGuildRewardStorageWindow	u8[3]	Z05 Z08
+0x17d0c	exact	sp_SkillList.csl_Skill._Myfirst	u32	Z01 Z02 Z03
+0x17d30	exact	sp_Passive.cpl_Passive.bs_bitlist	u32	Z03 Z04
+0x17d4c	exact	sp_tradestr.proposee.chrhandle	u16	Z06
+0x17d4e	exact	sp_tradestr.proposee.chrregnum	u32	Z06
+0x17d52	exact	sp_tradestr.proposer.chrhandle	u16	Z06
+0x17d54	exact	sp_tradestr.proposer.chrregnum	u32	Z06
+0x17d58	exact	sp_tradestr.proposetime	u32	Z06
+0x17d5c	exact	sp_tradestr.lockindex	u16	Z06
+0x17d5e	exact	sp_tradestr.waitingTradeResFromDB	u8	Z06
+0x17d5f	exact	sp_tradeboard.tb_opposit	u32	Z01 Z04 Z06
+0x17d63	exact	sp_tradeboard.tb_Bit.lock	u8	Z06
+0x17d64	exact	sp_tradeboard.tb_Bit.decide	u8	Z06
+0x17d71	exact	sp_tradeboard.tb_cen	u64	Z06
+0x17d7c	exact	sp_NPCProcess.npchandle	u16	Z01
+0x17d7e	exact	sp_NPCProcess.npcid	u16	Z04
+0x17d80	exact	sp_NPCProcess.npc	u32	Z04
+0x17d84	exact	sp_NPCProcess.currentmenu.cm_NPC	u32	Z02 Z04 Z06
+0x17d90	exact	sp_NPCProcess.servermenuactor.x	u32	Z02 Z06
+0x18248	exact	sp_NPCProcess.duplicatemenustate.dmc_Control	u16	Z02 Z04 Z06 Z08
+0x18250	exact	sp_AccountStorage.cen	u64	Z04 Z05
+0x18258	vfptr	sp_AccountStorage.storage (object start, vfptr)		Z02 Z04 Z05
+0x28760	vfptr	sp_RewardStorage (object start, vfptr)		Z04
+0x29244	exact	sp_LastPartyParam.pmi_PartySlot	u32	Z08
+0x29248	exact	sp_LastPartyParam.pmi_LastHP	i32	Z08
+0x29278	exact	sp_pickitem.itemid	u16	Z04 Z05
+0x2927c	exact	sp_pickitem.itemlot	u32	Z04 Z05
+0x2928d	exact	sp_LastUpgrade.upgrade_item_regnum	u64	Z04 Z05
+0x29299	exact	sp_LastUpgrade.left_item_id	u16	Z04
+0x292ac	exact	sp_MiniHouse.mhs_Backup.bib_BriefInfo.equip.Equ_Head	u16	Z05 Z06 Z07
+0x292d7	exact	sp_MiniHouse.mhs_Backup.bib_Backuped	u8	Z02 Z06 Z07
+0x29310	exact	sp_MiniHouse.mhs_BoothSlot	i32	Z06
+0x29314	exact	sp_MiniHouse.mhs_Activ	u8	Z07
+0x2931c	exact	sp_extra.pecd_worldmanagerhandle	u16	Z01
+0x29334	exact	sp_LastItemPickup	u32	Z04
+0x29338	exact	sp_LastItemPickupByRaid	u32	Z04
+0x29340	exact	sp_Booth.lastrefresh	u32	Z06
+0x29344	exact	sp_Booth.boardpnt	u32	Z06
+0x29348	vfptr	sp_Booth.boardsell.sb_SignBoard (object start, vfptr)		Z06
+0x294b8	vfptr	sp_Booth.boardbuy.sb_SignBoard (object start, vfptr)		Z06
+0x29620	exact	sp_SpeedNotice.sn_NetCommand	u16	Z01
+0x2962c	exact	sp_LastEffect	u32	Z07
+0x29634	exact	sp_MoverUpgradeEffect	u32	Z07
+0x29638	exact	sp_CharacterTitle.m_pCharacterTitleData	u32	Z01 Z02 Z05 Z07
+0x2a308	exact	sp_GatherStruct.rawobjecthandle	u16	Z02
+0x2a31c	exact	m_nMyGuildNo	u32	Z08
+0x2a334	exact	sp_ChargedItem.ci_List.l_MaxSize	u16	Z07
+0x2a338	exact	sp_ChargedItem.ci_List.l_Array	u32	Z07
+0x2a5a0	exact	sp_ChargedItem.ci_Effect.cec_SilverWingCoolTime_Minute	u8	Z04 Z06 Z07
+0x2a5a2	exact	sp_ChargedItem.ci_Effect.cec_HPStoneLimit	u16	Z02 Z04 Z07
+0x2a5a4	exact	sp_ChargedItem.ci_Effect.cec_SPStoneLimit	u16	Z02 Z07
+0x2a5aa	exact	sp_ChargedItem.ci_Effect.cec_MoreInven	u8	Z06
+0x2a5ac	exact	sp_ChargedItem.ci_Effect.cec_StreetBoothSlot	u8	Z06
+0x2a5ad	exact	sp_ChargedItem.ci_Effect.cec_LighteningPickParts	u8	Z02
+0x2a5ae	exact	sp_ChargedItem.ci_Effect.cec_MaxHPRate	u16	Z04
+0x2a5ce	exact	sp_ChargedItem.ci_bRecalcParam	u8	Z07
+0x2a5d0	exact	sp_ChargedInven.isopen	u8	Z04 Z05
+0x2a5d4	exact	sp_ChargedInven.inven.m_ChargedItemBF	PROTO_CHARGED_ITEM_INFO[24]	Z04 Z05
+0x2a758	exact	sp_ChargedInven.ItemOrderNo	u32	Z04 Z05
+0x2a75c	exact	sp_LastBoothSlotSend	u8	Z06
+0x2a760	exact	sp_RideCast.castslot	i16	Z04 Z07
+0x2a762	exact	sp_RideCast.rideslot	i16	Z02 Z07
+0x2a764	exact	sp_RideCast.info	u32	Z02
+0x2a768	exact	sp_RideCast.castend	u32	Z07
+0x2a772	exact	sp_RideCast.horselockindex	u16	Z04
+0x2a778	exact	sp_RideCast.hungry	u8	Z02
+0x2a77c	exact	sp_RideCast.eMoverSystemType	i32	Z07
+0x2a784	exact	sp_TimerStr.ts_Limit	u32	Z02 Z03 Z07 Z08
+0x2a798	exact	sp_NormalLogoutTick	u32	Z01 Z05 Z07
+0x2a79c	exact	sp_RoarFlag	u16	Z02 Z04
+0x2a7a4	exact	sp_SparrowFly	u16	Z01
+0x2a7c6	exact	sp_LastUsedItem	u16	Z04 Z05
+0x2a7d4	exact	sp_ConnectFrom	u8	Z01
+0x2a800	exact	sp_isPossibleNewConnect	u8	Z01 Z05
+0x2a90c	exact	sp_SoulCollect.scs_TargetObject	u32	Z03
+0x2a944	exact	sp_WillDisconnect	u8	Z01
+0x2a958	exact	sp_tempDataForItemSlot	u8	Z04
+0x2a959	exact	sp_tempDataForRandOptChange.iti_registnum	u64	Z04
+0x2a961	exact	sp_tempDataForRandOptChange.iti_itemstruct.itemid	u16	Z05
+0x2a9c8	exact	sp_nPolymorphAbstateIndex	i32	Z01 Z07
+0x2aa2c	exact	sp_SpamChatTimeInfo.pChatTime	u32	Z02
+0x2aa30	exact	sp_SpamChatTimeInfo.nChatTimePos	i32	Z02
+0x2aa40	exact	tAutoSaveTime	u32	Z01
+0x2aa48	exact	sp_NextCharTitleChangeTime	u32	Z08
+0x2aa4c	exact	sp_ReviveReqProcessTime	u32	Z03
+0x2aa54	exact	sp_Spammer_ChatBan	u32	Z01
+0x2aa58	exact	sp_Gamble_PrevMapName	char[12]	Z06
+0x2aa68	exact	sp_Gamble_nTotalExchangedCoin	u64	Z06
+0x2aa70	exact	sp_Gamble_nCurCoin	u64	Z06
+0x2aa78	exact	sp_Gamble_JoinType	i32	Z06
+0x2aa7c	exact	sp_Gamble_SessionCloseingTime	u32	Z06
+0x2aa80	exact	nReactionNpcHandle	u16	Z05
+0x2aa94	exact	sp_CardCollectAlbum._Myfirst	u32	Z07
+0x2aab4	exact	sp_CardCollectReward._Myfirst	u32	Z07
+0x2aac4	exact	sp_RebirthState.bIsRebirth	u8	Z07
+0x2aac8	exact	sp_RebirthState.nHealRate	i32	Z07
+0x2ab18	exact	sp_ArrangeInvenCnt	u16	Z04 Z05
+0x2ab1c	exact	sp_ArrangeInvenDelayCheckTime	u32	Z04
+0x2ab3c	exact	sp_dLastBoothSearchOpeningTime	i32	Z06
+0x2ab40	exact	sp_dLastBoothSearchReqTime	i32	Z06
+0x2ab44	exact	sp_TutorialInfo.nTutorialState	i32	Z01 Z07
+0x2ab49	exact	sp_LoginCharID	char[20]	Z01
+0x2ab60	exact	sp_PetInfo.nSummonState	i32	Z01 Z04 Z05 Z06 Z07
+0x2ab74	exact	sp_PetInfo.nSummonSlot	u16	Z07
+0x2ab80	exact	sp_PetInfo.nHandle	u16	Z07
+0x2ab88	exact	sp_PetInfo.sName	char[16]	Z07
+0x2ab98	exact	sp_PetInfo.nMindMil	u32	Z05 Z07
+0x2aba0	exact	sp_PetInfo.nMindDiffMil	i32	Z05
+0x2aba4	exact	sp_PetInfo.nStressDiffMil	i32	Z05
+0x2aba8	exact	sp_PetInfoLink.bDoResummon	u8	Z07
+0x2abc0	exact	sp_PetInfoLink.nRegNum	u32	Z07
+0x2abcc	exact	sp_Pet_HouseTick.m_NextTick	u32	Z02
+0x2abd4	exact	sp_Pet_BoothTick.m_NextTick	u32	Z06
+0x2abd8	exact	sp_Pet_BoothTick.m_TickInterval	u32	Z06
+0x2abec	exact	sp_UseItemMinimon.bNormalItem	u8	Z07
+0x2abed	exact	sp_UseItemMinimon.bChargedItem	u8	Z07
+0x2abee	exact	sp_UseItemMinimon.NormalItemList	u16[12]	Z07
+0x2ac06	exact	sp_UseItemMinimon.ChargedItemList	u16[12]	Z07
+0x2ac38	vfptr	sp_SellItemManager (object start, vfptr)		Z01 Z04
