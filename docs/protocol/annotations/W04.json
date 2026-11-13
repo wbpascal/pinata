@@ -1,0 +1,786 @@
+{
+ "_about": "W04 hand-verified layouts (offsets read in the 2016 WM; names pdb2017)",
+ "packets": {
+  "wm": {
+   "0x200c": {
+    "dir": "C→WM",
+    "name": "NC_ACT_WHISPER_REQ",
+    "basis": "wm FUN_0041c610",
+    "fields": [
+     [
+      0,
+      "u8",
+      "itemLinkDataCount",
+      "unchecked"
+     ],
+     [
+      1,
+      "Name5",
+      "receiver",
+      ""
+     ],
+     [
+      21,
+      "u8",
+      "len",
+      "≥ 0x81 → 0x200E 0x0F6B"
+     ],
+     [
+      22,
+      "char[len]",
+      "content",
+      "then itemLinkDataCount × 0x67 item links"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x200d": {
+    "dir": "WM→C",
+    "name": "NC_ACT_SOMEONEWHISPER_CMD",
+    "basis": "wm FUN_0041c610",
+    "fields": [
+     [
+      0,
+      "u8",
+      "itemLinkDataCount",
+      ""
+     ],
+     [
+      1,
+      "Name5",
+      "talker",
+      "sender CHARDATA name"
+     ],
+     [
+      21,
+      "u8",
+      "flag",
+      "bit0 GMColor = sender bIsGM; bits 1-7 stale"
+     ],
+     [
+      22,
+      "u8",
+      "len",
+      ""
+     ],
+     [
+      23,
+      "char[len]",
+      "content",
+      "then item links (0x67 each)"
+     ]
+    ],
+    "notes": "size 0x17 + len + count·0x67"
+   },
+   "0x200e": {
+    "dir": "WM→C",
+    "name": "NC_ACT_WHISPERFAIL_ACK",
+    "basis": "wm FUN_0041c610",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ErrorType",
+      "0x0F69 not found, 0x0F6A prison (sender or receiver), 0x0F6B too long (client ignores), 0x0F6C receiver in GT arena"
+     ],
+     [
+      2,
+      "Name5",
+      "receiver",
+      "as requested"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x200f": {
+    "dir": "WM→C",
+    "name": "NC_ACT_WHISPERSUCCESS_ACK",
+    "basis": "wm FUN_0041c610",
+    "fields": [
+     [
+      0,
+      "u8",
+      "itemLinkDataCount",
+      "stale on the len==0 path"
+     ],
+     [
+      1,
+      "Name5",
+      "receiver",
+      "receiver's stored name"
+     ],
+     [
+      21,
+      "u8",
+      "len",
+      ""
+     ],
+     [
+      22,
+      "char[len]",
+      "content",
+      "then item links"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2010": {
+    "dir": "C/Zone/OPTool→WM",
+    "name": "NC_ACT_NOTICE_REQ",
+    "basis": "wm FUN_00413450 / FUN_0042a920 / FUN_00425c90",
+    "fields": [
+     [
+      0,
+      "u8",
+      "itemLinkDataCount",
+      "ignored"
+     ],
+     [
+      1,
+      "u8",
+      "len",
+      ""
+     ],
+     [
+      2,
+      "char[len]",
+      "content",
+      ""
+     ]
+    ],
+    "notes": "client sender needs adminlevel 100 and no prison"
+   },
+   "0x2011": {
+    "dir": "WM→C",
+    "name": "NC_ACT_NOTICE_CMD",
+    "basis": "wm FUN_00413450",
+    "fields": [
+     [
+      0,
+      "u8",
+      "itemLinkDataCount",
+      "never written (stale)"
+     ],
+     [
+      1,
+      "u8",
+      "len",
+      ""
+     ],
+     [
+      2,
+      "char[len]",
+      "content",
+      ""
+     ]
+    ],
+    "notes": "broadcast raw to every client session"
+   },
+   "0x2014": {
+    "dir": "C→WM",
+    "name": "NC_ACT_PARTYCHAT_REQ",
+    "basis": "wm FUN_00413510",
+    "fields": [
+     [
+      0,
+      "u8",
+      "itemLinkDataCount",
+      "unchecked"
+     ],
+     [
+      1,
+      "u8",
+      "len",
+      "≥ 0x81 → 0x07C2"
+     ],
+     [
+      2,
+      "char[len]",
+      "content",
+      "then item links"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2015": {
+    "dir": "WM→C",
+    "name": "NC_ACT_PARTYCHAT_CMD",
+    "basis": "wm FUN_00413510",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "talker",
+      ""
+     ],
+     [
+      20,
+      "u8",
+      "itemLinkDataCount",
+      ""
+     ],
+     [
+      21,
+      "u8",
+      "len",
+      ""
+     ],
+     [
+      22,
+      "char[len]",
+      "content",
+      "then item links"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2016": {
+    "dir": "WM→C",
+    "name": "NC_ACT_PARTYCHAT_ACK",
+    "basis": "wm FUN_00413510",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "0x07C0 ok, 0x07C1 not in party, 0x07C2 too long"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x207d": {
+    "dir": "Zone→WM",
+    "name": "NC_ACT_SCRIPT_MSG_WORLD_CMD",
+    "basis": "wm FUN_0042cea0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandle",
+      ""
+     ],
+     [
+      2,
+      "u8[32]",
+      "sScriptMsgIndex",
+      ""
+     ],
+     [
+      34,
+      "u8[5]",
+      "nlen",
+      ""
+     ],
+     [
+      39,
+      "u8[Σnlen]",
+      "sContent",
+      ""
+     ]
+    ],
+    "notes": "re-broadcast as 0x2079 with the same layout"
+   },
+   "0x2079": {
+    "dir": "WM→C",
+    "name": "NC_ACT_SCRIPT_MSG_CMD",
+    "basis": "wm FUN_0042cea0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandle",
+      ""
+     ],
+     [
+      2,
+      "u8[32]",
+      "sScriptMsgIndex",
+      ""
+     ],
+     [
+      34,
+      "u8[5]",
+      "nlen",
+      ""
+     ],
+     [
+      39,
+      "u8[Σnlen]",
+      "sContent",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x244a": {
+    "dir": "Zone→WM",
+    "name": "NC_BAT_PKINPKFIELD_WMS_CMD",
+    "basis": "wm FUN_0042b3b0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "wldmanhandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "chrregnum",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "pkcount",
+      "stored at CHARDATA+0x5E"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2458": {
+    "dir": "Zone→WM",
+    "name": "NC_BAT_WORLD_MOB_KILL_ANNOUNCE_CMD",
+    "basis": "wm FUN_0042b490",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nTextIndex",
+      "MobKillAnnounceType"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2459": {
+    "dir": "WM→C",
+    "name": "NC_BAT_CLIENT_MOB_KILL_ANNOUNCE_CMD",
+    "basis": "wm FUN_0042b490",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nTextIndex",
+      "MobKillAnnounceType"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x4820": {
+    "dir": "Zone→WM",
+    "name": "NC_SKILL_PASSIVESKILL_LEARN_CMD",
+    "basis": "wm FUN_0042a870",
+    "fields": [
+     [
+      0,
+      "u16",
+      "wmshandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "chrregnum",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "passiveskillid",
+      "appended to the passive blob"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x6006": {
+    "dir": "WM→Zone",
+    "name": "NC_CT_CHARTTING_CMD",
+    "basis": "wm FUN_0041c610 / FUN_00413510",
+    "fields": [
+     [
+      0,
+      "u16",
+      "zoneHandle",
+      "session +0x118"
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2802": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_S2SCONNECT_LIST_ACK",
+    "basis": "wm FUN_004251a0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "echo_data",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "my_server_id",
+      "5"
+     ],
+     [
+      2,
+      "u16",
+      "num_of_connections",
+      ""
+     ],
+     [
+      4,
+      "SERVER_CONN_INFO[n]",
+      "connection_info",
+      "7 bytes: u8 world, u8 zone, u8 server type, SHINE_DATETIME"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2804": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_CLOSE_SERVER_ACK",
+    "basis": "wm FUN_00425860",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "always 0x0600"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2808": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_CONNECT_BRIF_ACK",
+    "basis": "wm FUN_00425950",
+    "fields": [
+     [
+      0,
+      "u8",
+      "echo_data",
+      ""
+     ],
+     [
+      1,
+      "u8",
+      "my_server_id",
+      "5"
+     ],
+     [
+      2,
+      "u16[21][2][2]",
+      "count",
+      "[server type][world][zone]"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x280a": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_KQ_SCHEDULE_ACK",
+    "basis": "wm FUN_00427790",
+    "fields": [
+     [
+      0,
+      "u16",
+      "NumOfTotal",
+      ""
+     ],
+     [
+      2,
+      "u8",
+      "bPart",
+      "bit0 first, bit1 last"
+     ],
+     [
+      3,
+      "u16",
+      "StartDataIndex",
+      ""
+     ],
+     [
+      5,
+      "u16",
+      "NumOfQuest",
+      "≤ 10"
+     ],
+     [
+      7,
+      "PROTO_KQ_INFO[n]",
+      "QuestArray",
+      "0x179 each"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x280d": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_KQ_MAP_ALLOC_INFO_ACK",
+    "basis": "wm FUN_00425e20",
+    "fields": [
+     [
+      0,
+      "i32",
+      "nNumOfMapArray",
+      ""
+     ],
+     [
+      4,
+      "KQ_MAP_ALLOC_TABLE[n]",
+      "MapArray",
+      "0x28 each"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2810": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_ACK_CLIENT_NUM_OF_USER_LIMIT",
+    "basis": "wm FUN_004263f0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "WorldNo",
+      ""
+     ],
+     [
+      1,
+      "i32",
+      "NumOfUserLimit",
+      ""
+     ],
+     [
+      5,
+      "i32",
+      "NumOfMax",
+      "client capacity"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x281c": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_WM_SEND_PACKET_STATISTICS_ACK",
+    "basis": "wm FUN_004265a0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bPart",
+      "always 4"
+     ],
+     [
+      1,
+      "u16",
+      "nDataCount",
+      "always 0"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x281e": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_CHARACTER_DELETE_ACK",
+    "basis": "wm FUN_00426660",
+    "fields": [
+     [
+      0,
+      "u8",
+      "status",
+      "0 character in game, 1 not in game"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2816": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_GUILD_TOURNAMENT_CHANGE_ACK",
+    "basis": "wm FUN_004264d0 / FUN_0043d830",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "0x1400 ok, 0x1401 Time_Start differs, 0x1402 times not increasing, 0x1403 phase time passed, 0x1404 match gap too short, 0x1405 nMatchType > 9"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2821": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_GUILD_CHANGE_MEMBER_GRADE_ACK",
+    "basis": "wm FUN_00427630",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "0x1580 ok, 0x1581 no guild, 0x1582 no member, 0x1583 old grade differs"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2823": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_GUILD_TOURNAMENT_SCHEDULE_RESET_ACK",
+    "basis": "wm FUN_00426990",
+    "fields": [
+     [
+      0,
+      "i32",
+      "nGTNo",
+      "computed scheduled start time (time_t)"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2825": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_GUILD_DATA_CHANGE_ACK",
+    "basis": "wm FUN_00427980 / FUN_0043f390",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "0x1640 ok, 0x1641 nNo 0, 0x1642 no guild, 0x1643 max below members; also 0x1E4A/0x1E4B from 0x282B"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x2828": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_FIND_USER_ACK",
+    "basis": "wm FUN_00426c50",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nUserNo",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "bIsLogin",
+      ""
+     ],
+     [
+      5,
+      "Name256Byte",
+      "sUserID",
+      ""
+     ],
+     [
+      261,
+      "u32",
+      "nCharNo",
+      "-1 when not in game"
+     ],
+     [
+      265,
+      "Name5",
+      "sCharID",
+      ""
+     ],
+     [
+      285,
+      "Name3",
+      "sMapName",
+      "CHARDATA+0x42"
+     ]
+    ],
+    "notes": "rest stale when not found"
+   },
+   "0x282a": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_KICK_USER_ACK",
+    "basis": "wm FUN_00426e20",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nUserNo",
+      ""
+     ],
+     [
+      4,
+      "u8",
+      "bKick",
+      ""
+     ],
+     [
+      5,
+      "Name256Byte",
+      "sUserID",
+      ""
+     ],
+     [
+      261,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      265,
+      "Name5",
+      "sCharID",
+      ""
+     ],
+     [
+      285,
+      "Name3",
+      "sMapName",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x282c": {
+    "dir": "WM→OPTool",
+    "name": "NC_OPTOOL_GUILD_DISMISS_CANCEL_ACK",
+    "basis": "wm FUN_00443170",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x1E49 nNo 0; CharDB result via 0x74EF"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x74ee": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_DB_DELETE_CANCEL_REQ",
+    "basis": "wm FUN_004431a0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nNo",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "hTool",
+      "OPTool session handle"
+     ]
+    ],
+    "notes": ""
+   }
+  }
+ },
+ "structs": {}
+}
