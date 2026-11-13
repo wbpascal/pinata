@@ -8,7 +8,8 @@ there and here are ours). Evidence markers as in `AGENTS.md`: plain = read in th
 Time unit: `g_Now` (DAT_14d41a70) counts **tenths of a second** (Z02 §1); "`g_Now + 50`" = 5 s.
 
 This file is written in parts (status: `docs/plan/status/Z09.md`). Sections so far: §1 main loop and global timers,
-§2 the player tick, §3 GM events, §4 prison (no zone timer), §5 mob object core (data, spawn, routines, NPC, bandit).
+§2 the player tick, §3 GM events, §4 prison (no zone timer), §5 mob object core (data, spawn, routines, NPC, bandit),
+§6 mob AI 1 (brain, target selectors, aggro, battle / recover, calls for help).
 
 ---
 
@@ -520,7 +521,8 @@ Other mob tables loaded elsewhere and read in this part:
 | +0x1fb8 / +0x1fba | death broadcast sent / killer handle (Z03 §8.1) |
 | +0x1fbc / +0x1fc0 | death time / extra corpse time (vt 0xc3c, `cSetDeadDelayTime`) |
 | +0x1fc4 / +0x1fc8 | brain context: tick argument / self |
-| +0x2234 | target selector (vt +8 per tick, +0x14 reset) (part 3) |
+| +0x1fcc | `MobAggroManager` (aggro list, 10 entries) followed by one selector object per `EnemyDetectType` (+0x2124 … +0x21fc, §6.1) |
+| +0x2234 | → active target selector (§6.1; vt +8 per tick, +0x14 reset) |
 | +0x2238 | aggro container (FUN_004b8c80 at spawn) (part 3) |
 | +0x2260 / +0x227c | MobActionWander / MobActionAttack tactic elements (part 3/4) |
 | +0x22e4 | current tactic state (`MobActionWander`, `MobActionRoaming` 0x84cfc4, `MobActionNoBrain` 0x84cfc8) |
@@ -529,10 +531,10 @@ Other mob tables loaded elsewhere and read in this part:
 | +0x22f0 | HitMeList (Z03 §8.2) |
 | +0x249c/+0x24a0, +0x24a4/+0x24a8 | spawn point and return point (both = spawn position) |
 | +0x24ac | flags (bit 0, 1 set at spawn; 2, 3 cleared) |
-| +0x24ae | first attacker handle (0xFFFF) |
-| +0x24b0 | battle state: 0 idle, 1 battle (`sm_DuringBattle`), 2 recover (`sm_DuringRecover`) (part 3) |
+| +0x24ae | current fight target handle (`so_mob_CurrentTarget` vt 0xb78, §6.5); 0xFFFF at spawn |
+| +0x24b0 | battle state: 0 idle, 1 battle (`sm_DuringBattle`), 2 recover (`sm_DuringRecover`) (§6.5) |
 | +0x24b1 / +0x24b5 | family ring (prev / next mob of the same family; self when alone); vt 0x744 returns +0x24b1 |
-| +0x24bc, +0x24c0, +0x24c4 | rescue state (bit 0 set), rescue routine pointer (0), 60000 (part 3) |
+| +0x24bc, +0x24c0, +0x24c4 | rescue flags (bit 0 healed / not asking, bit 1 called by a dying friend, bit 2 help chat said), → friend to help (0), friend's last seen HP (60000) (§6.6) |
 | +0x24d8 / +0x24da | u16 roaming flags `IsRoaming & 1 | (RoamingNumber & 0x7f) << 1` / RoamingDistance |
 | +0x24dc / +0x24e0 / +0x24e4 / +0x24e5 | last broadcast target / current target (vt 0xa04) / target-dirty flag / target order (vt 0xa08) |
 | +0x24e8 | NPCAction trigger entry for this mob ID (map DAT_14d50784, FUN_005c4420), or 0 |
@@ -863,3 +865,405 @@ The client (`GameFrameWork::On_NC_SCENARIO_OBJTYPECHANGE_CMD`, client FUN_004a35
 (+0x78c). Layout matches `PROTO_NC_SCENARIO_OBJTYPECHANGE_CMD` *(pdb2017)*. Which value each script node passes
 (5 = mob, 4 = NPC *(inferred from the routine test and the spawn value)*) is read in part 15. The bandit name for
 `vt 0x4a0` is `+0x2666 + 0x5b` (FUN_00556f20).
+
+---
+
+## 6. Mob AI 1: brain, target selectors, aggro, rescue
+
+The mob's AI has two layers. The **target selector** (`MobTarget*`, one object per mob, chosen by `EnemyDetectType`)
+keeps the aggro list and answers "whom do I fight". The **tactic state machine** (`MobTacticElement::*`, `+0x22e4`,
+part 4) decides what to do each tick and asks the selector. This section covers the selector, the aggro list, the
+battle / recover states and the call for help. Tactics, weapons and skills are part 4; movement is part 5.
+
+### 6.1 Brain objects in the mob (`MobAggroManager` at +0x1fcc)
+
+The mob constructor part FUN_0054ee00 builds, at `mob+0x1fcc`, a `MobAggroManager` (FUN_004bda50: a
+`List<MobTargetStruct>` with **10 preallocated nodes** of 0x20 bytes) and right after it one selector object of every
+class. `sm_SetBrain` points `+0x2234` at one of them:
+
+| Mob offset | Class (constructor) | `EnemyDetectType` *(enum names pdb2017)* | 2016 rows |
+|---|---|---|---|
+| +0x2124 | `MobTargetBout` (FUN_004bd2c0) | 0 ED_BOUT, and every unknown value | 220 |
+| +0x213c | `MobTargetAggresive` (FUN_004bd2e0) | 1 ED_AGGRESSIVE | 1872 |
+| +0x2174 | `MobTargetNoBrain` (FUN_004bd410) | 2 ED_NOBRAIN | 728 |
+| +0x218c | `MobTargetAggresive2` (FUN_004bd340) | 3 ED_AGGRESSIVE2 | 12 |
+| +0x21c4 | `MobTargetAggresiveALL` (FUN_004bd2e0, vftable replaced) | 4 ED_AGGREESIVEALL | 1 |
+| +0x21fc | `MobTargetAggresiveNoLevel` (same) | 5 ED_ENEMYALLDETECT | 9 |
+
+`MobTargetPlayerCaptivate` is not in the mob; its only vftable write is in FUN_0055bc80 at `player+0x2a9d0`
+(`param_1[0xaa74]`), i.e. a player-owned selector; its use with the charm state StaKarenCaptivate is *(inferred)* (§6.9).
+
+```pseudo
+ShineMob::sm_SetBrain(m)                                                        @ FUN_004b2480
+    t = m.enemyDetect (+0x2544)                    # 6 = "use the table" (set at spawn, §5.3)
+    if t == 6: t = MobInfoServer.EnemyDetectType
+    sel = selector object for t (table above); unknown t → MobTargetBout and
+          log "ShineObjectClass::ShineMob::sm_SetBrain Not Case EnemyDetectType"
+    m.targetSelector (+0x2234) = sel.vt[0x10](m, &m.aggroManager)     # mts_Initialize, returns sel
+```
+
+Callers: `so_mob_Regenerate` (§5.3), the teleport FUN_005793e0 (`ShineMob::smo_Teleport` log string; part 5) and the
+two setters below. `ShineObject::so_mob_SetEnemyDetect` exists as vt 0xba4 FUN_004aa630 (value 0…5, other → 6) and vt
+0xba8 FUN_004aa3a0 (name `"ED_BOUT"` … `"ED_ENEMYALLDETECT"`, other → 6, null → 6 without re-brain); both call
+`sm_SetBrain`. No caller of either slot was found in the 2016 zone (players / base objects: empty FUN_004aa5e0).
+
+**Selector object layout** (all classes, base `MobTargetSelector` FUN_004a9b40, which is also an `AxialListIterator`):
+
+| Offset | Meaning |
+|---|---|
+| +0x04 | → current target entry (`MobTargetStruct`); `&DAT_0da28aac` = the empty entry (no target) |
+| +0x08 | squared search radius during a scan; best distance² found so far |
+| +0x0c | → mob |
+| +0x10 | `MobInfoServer.DetectCha` (detection radius) |
+| +0x14 | → `MobAggroManager` (the aggro list, mob+0x1fcc) |
+| +0x18 … +0x20 | built-in entry `{u16 handle, identity, → object}` filled by a scan (`ali_Work`) |
+| +0x2c | Aggresive classes: a second container (FUN_0058a630; not used by the code read here) |
+
+**`MobTargetStruct`** (0x20, list entry): `+0 u16 handle, +4 identity (vt 0x344: player = character number, mob =
+spawning breeder; protects against reused handles), +8 → object, +0xc s32 aggro points, +0x10 time of the last
+aggro (g_Now), +0x14 SpyNet intelligence report (`SpyNet::IntelligenceOffice::io_ReadReport`, part 4), +0x18 report
+mask`. An entry with 0 aggro counts as free.
+
+**Selector vtable** (byte offsets; names from profiler strings unless marked):
+
+| Slot | Bout / NoBrain / Aggresive* | Meaning |
+|---|---|---|
+| 0x00 | `ali_Work` FUN_004a9e20 (Aggresive, ALL, NoLevel), FUN_004aa020 (Aggresive2), FUN_004add20 (Captivate) | one candidate of a range scan (§6.3) |
+| 0x08 | `mts_Routine` FUN_004ac940 | per tick: expire entries (§6.2); called from `ShineMob::so_Routine` (§5.4) |
+| 0x0c | `mt_InitRegen` FUN_004aced0 | `mob = arg`; erase all entries |
+| 0x10 | FUN_004abf00 → `mts_Initialize` FUN_004abe40 | `(mob, aggroManager)`: store both, radius = DetectCha, target = none; returns the selector |
+| 0x14 | `mts_AggroClear` FUN_004ad6f0 | erase all entries (battle over, §6.6) |
+| 0x18 | FUN_004ad7b0 *(ViewAggroList; it carries the profiler string "MobTargetBout::mts_AppendAggroPoint")* | GM list (§6.8) |
+| 0x1c | `mts_AppendAggroPoint` FUN_004ad9a0 | §6.2 |
+| 0x20 | `mts_DecreaseAggroPoint` FUN_004ac3d0 | §6.2 |
+| 0x24 | `mts_InitThink` FUN_004abf20 | target = none; radius = DetectCha; +8 = DetectCha² |
+| 0x28 | `mt_SelectTarget`: Bout FUN_004acfc0, Aggresive/2/NoLevel FUN_004ad290, ALL FUN_004ab1b0, NoBrain FUN_004ac0d0, base FUN_004ac000 | §6.3; called by the tactics (part 4) |
+| 0x2c | `mts_StoreAggroList` FUN_005d5250 (base FUN_005d30d0 returns −1) | append the handle of every entry with an object to a `vector<u16>`; returns the count |
+| 0x30 | FUN_004bd630 | run a `SlayerCollect` iterator over the list (the kill-credit list of 0x244C NC_BAT_MOBSLAYER_CMD, Z03 §8.1 *(inferred)*) |
+| 0x34 | `mts_AggroAdjust` FUN_004a7c50 | §6.2 |
+| 0x38 | `mts_GetTopAggroTarget`: Bout/NoBrain FUN_004aa8d0, Aggresive* FUN_004aab80, ALL FUN_004aaf30 | §6.4 |
+| 0x3c | "target is protected": Aggresive* FUN_004a9b90 (StaAdlFLoussierIMT 499, StaImmortal 291, StaHide 75), ALL FUN_004a9cb0 (291, 499) | no caller found in the code read here (part 4) |
+| 0x40 | "level gap too big": FUN_004a9b70 `mobLevel − candLevel > 10`; NoLevel FUN_004021b0 always false | used by `ali_Work` |
+
+Abstate numbers are `AbStataIndex` values (Z03 §1): 75 StaHide, 77 StaEntrapHide, 291 StaImmortal, 335 StaKarenCaptivate,
+499 StaAdlFLoussierIMT, 562 StaWarLBrainWash.
+
+### 6.2 The aggro list
+
+```pseudo
+MobTargetBout::mts_AppendAggroPoint(sel, obj, points)            (vt 0x1c)      @ FUN_004ad9a0
+    e = entry with e.handle == obj.handle
+    if e:
+        if e.identity == obj.identity (vt 0x344): e.aggro += points; e.time = g_Now
+        else:                                     # handle reused by another object
+            e.identity = obj.identity; e.time = g_Now; e.obj = obj; e.aggro = points
+    else:
+        e = a new node from the list's free nodes (10 in total), else the first entry with aggro == 0
+        if none: return                           # list full: an 11th attacker is not recorded
+        e = { handle, identity, aggro = points, obj, time = g_Now, mask = (obj.intelligence (vt 0x480 = obj+0xeb0) +0x100) & e.+0x1c }
+    mts_TargetChange(sel, e)
+
+MobTargetSelector::mts_TargetChange(sel, e)                                     @ FUN_004ac4e0
+    if e.aggro > sel.target.aggro * 0x466 / 1024 (≈ 1.1 ×):        # 10 % hysteresis
+        sel.target = e
+        mob.vt[0x8f8]()                           # FUN_004abd30: if not tactic.vt[0x1c](): tactic = tactic.vt[0x10](ctx)  (re-plan, part 4)
+
+MobTargetBout::mts_DecreaseAggroPoint(sel, obj, permille)        (vt 0x20)      @ FUN_004ac3d0
+    for e in list (MobTarget_AggroClear::lid_Call @ FUN_004ac2c0):
+        if e.handle == obj.handle and e.identity == obj.identity:
+            e.aggro −= e.aggro * permille / 1000;  if e.aggro < 1: e.aggro = 1     # stays in the list with 1 point
+    sel.target = none;  sel.+8 = 0                # the next tick selects again
+    # iterator object MobTarget_AggroClear {obj, permille}: ctor FUN_004ac180, dtor FUN_004ac230
+
+MobTargetBout::mts_AggroAdjust(sel, obj, permille) → sel        (vt 0x34)      @ FUN_004a7c50
+    e = entry of obj (same handle and identity): e.aggro = e.aggro * permille / 1000
+
+MobTargetBout::mts_Routine(sel)                  (vt 0x08, every mob tick)     @ FUN_004ac940
+    an = MobTarget_EnemyAnalysis(mob, list)                                     @ FUN_004ac5b0
+        keepTime = MobInfoServer.CutNonAT / 1000 * 10       # ms → tenths, whole seconds only
+        keepDist² = MobInfoServer.CutInterval²              # (null data: "MobTarget_EnemyAnalysis::MobTarget_EnemyAnalysis : Null info", both 0)
+    for e in list (lid_Call @ FUN_004ac800):
+        o = som_GetObject(e.handle)
+        if g_Now <= e.time + keepTime and o and dist²(mob, o) <= keepDist²:
+            SpyNet::IntelligenceOffice::io_ReadReport(&e.report, mob, o.intelligence)   # part 4
+        else: free the entry (mtea_free @ FUN_004ac750 → list.vt[0xc])               # forgotten
+    # dtor of the iterator: FUN_004ac6c0
+```
+
+So an attacker is forgotten after `CutNonAT` ms without new aggro or when it is farther than `CutInterval` from the mob.
+
+The callers that add or remove aggro (all through the mob's vtable):
+
+```pseudo
+ShineMob::so_mob_AppendAggro(m, a, points)       (vt 0x700)                    @ FUN_0042d470
+    if a == null or m.vt[0xe60](a) == 1: return              # same side (vt 0x8cc equal; FUN_0054b050)
+    if the field has a guild-tournament system and m.guild (vt 0x828) != −1 and a.guild == m.guild: return
+    if not regenAniOver (§5.4) and not MobRegenAni.IsAggro (entry+0x2c → +0x42): return   # no aggro while spawning
+    m.targetSelector.AppendAggroPoint(a, points)
+    if a.owner (vt 0x9b0; servant FUN_00557090: its living master on the same field): the owner is added too
+        (same points *(inferred)*: the decompiled call lost its arguments)
+    share = points > 0 ? max(points / 4, 1) : points
+    for every other mob f in m's family ring (+0x24b5 chain, §5.3): f.targetSelector.AppendAggroPoint(a, share)
+
+ShineServant::so_mob_AppendAggro(s, a, points)   (vt 0x700)                    @ FUN_0042d630
+    only if s.so_mobile_IsEnemy(a) (vt 0x72c): ShineMob::so_mob_AppendAggro(s, a, points)
+
+ShineMob::so_mob_DecreaseAggro(m, a, permille)   (vt 0x704)                    @ FUN_0042d380
+    m.targetSelector.DecreaseAggroPoint(a, permille);  the same for every mob of the family ring
+
+ShineMob::so_mob_AggroAdjust(m, a, permille)     (vt 0x990)                    @ FUN_004a4b30
+    m.targetSelector.AggroAdjust(a, permille).vt[0x28](m)    # scale, then select a target again
+
+ShinePlayer::smo_ply_AggroAdjust(p, permille, range)   (vt 0xebc)              @ FUN_004a4a40
+    so_AllOfRange_Class1(p, range (0 = sight), AxialListAggroAdjust{permille})
+        → every object o: o.vt[0x990](p, permille)           # ali_Work @ FUN_004a4990
+```
+
+Who calls them: `so_DamagedBy` / `so_KilledBy` (`dmg × aggroRate / 1000`, Z03 §7 / §8.1), a miss (1 point, Z03 §3),
+skills with `AbsoluteAggro` / `AggroPerDamage` (Z03 §5), `smo_SwingDamage` and `so_Bash` with an aggro decrease
+(vt 0x704), the Lua functions (§6.8), the magic-field aggro iterator `AxialListMagicFieldAggro` (part 8) and
+`smo_ply_AggroAdjust`, which `ShineMobileObject::so_Routine` (FUN_0056a080, §5.5) calls for a player while the skill in
+its cast block (+0x1d98) has the flag at +200: `(permille = skill +0xcc, range = skill +0xd4)` (aggro-reducing skills
+*(inferred)*; the skill columns are Z03's).
+
+### 6.3 Selecting a target (`mt_SelectTarget`, vt 0x28)
+
+All variants walk the aggro list the same way and skip entries in this order:
+
+```pseudo
+for e in list:
+    if not mdb_CanIKill(e.obj.mobId (vt 0x708; players 0xFFFF → yes), identity 1 = mob): e.aggro = 0; continue
+    if e.obj is dead (vt 0x28):                                          e.aggro = 0; continue
+    if e.obj has StaImmortal (291) or StaAdlFLoussierIMT (499):          continue   # kept, but not chosen
+    if e.obj has StaKarenCaptivate (335) or StaWarLBrainWash (562):      continue
+    … variant rule …
+```
+
+```pseudo
+MobTargetBout::mt_SelectTarget(sel)                                            @ FUN_004acfc0   (Bout, NoBrain via mts_InitThink)
+    sel.target = entry with the highest aggro (> 0), else none (sel.+8 = 0)
+    # Bout mobs never look for targets themselves: they fight only who hit them
+
+MobTargetAggresive::mt_SelectTarget(sel, m)                                    @ FUN_004ad290   (Aggresive, Aggresive2, NoLevel)
+    for each entry: w = e.aggro
+        if e.obj is not in Fear (vt 0x9e8 = flags1e78 bit 2):
+            d² = DistanceSquare(m, e.obj);  if d² > 500²: w /= 2;  if d² > 1000²: w = 0
+        else: w = 1                                       # a fleeing target counts 1 point
+    if some w > 0: sel.target = entry with the highest w;  return
+    if m.vt[0x6ec]() != 0: sel.target = none; sel.+8 = 0; return
+        # FUN_00556ad0: squared distance from the spawn point (vt 0x614 = +0x249c) when it is > 3000², else 0
+    # scan for a new enemy (§6.3.1)
+    sel.+8 = DetectCha²;  sel.target = none
+    centre = m.vt[0x8f4](DetectCha)                       # FUN_004abcd0: the mob's position moved 0.4 × DetectCha
+                                                          # forward along its direction (FUN_004a2db0)
+    so_AllOfRange_Class1(m, centre, DetectCha, sel)       # sel.ali_Work for each object
+    if found: m.so_mob_AppendAggro(found, m.level × 5)    # the new enemy enters the list with level × 5 points
+
+MobTargetAggresiveALL select                                                    @ FUN_004ab1b0
+    sel.target = the FIRST entry that passes the skip rules (not the highest aggro)
+    if none and within 3000 of the spawn point: sel.+8 = DetectCha²; scan with sel over the field's sight range
+        (FUN_00553c20: so_AllOfRange_Class1 with range 0 = the map's sight radius); the found object becomes the
+        target directly (sel.+4 = built-in entry), without aggro points
+    else sel.+8 = 0
+
+MobTargetNoBrain::mt_SelectTarget(sel)  = sel.vt[0x24]() (mts_InitThink): never a target         @ FUN_004ac0d0
+MobTargetSelector::mt_SelectTarget(sel, m): scan around m.vt[0x8f4]() within DetectCha with sel   @ FUN_004ac000
+```
+
+#### 6.3.1 Scan candidate test (`MobTargetSelector::ali_Work`, slot 0)
+
+```pseudo
+MobTargetSelector::ali_Work(sel, m, o, d²) → continue                          @ FUN_004a9e20
+    accept o only if all hold:
+        mdb_CanIKill(o.mobId, 1)
+        o.side (vt 0x8cc) != 0                          # player 2; mob 1 (IsPlayerSide 0/3) or 2 (1/2), override +0x2548; NPC 3 (IsPlayerSide 0) or 2
+        m.so_mobile_ICanDamageTo(o, "MobTargetAggresive::ali_Work")   (vt 0x980, Z03)
+        o.vt[0x904]()                                   # player 1; mob: flags +0x24ac bit 0
+        o has neither StaImmortal nor StaAdlFLoussierIMT
+        o.mode not in {3 dead, 0 spawning}
+        Layer_Match(o, m) and so_SubLayer_CanSee(o, m)  (Z02 §5)
+        not hidden (FUN_004a9be0): o has StaHide (75) or StaEntrapHide (77) and m is not ED_AGGREESIVEALL
+        not sel.vt[0x40](m.level, o.level)              # aggressive mobs ignore targets more than 10 levels below them
+        d² < sel.+8                                     # nearest wins
+    accepted: sel.+8 = d²;  built-in entry = { o.handle, o.identity, o };  sel.target = built-in entry
+    always returns "continue" (all objects are visited)
+
+FUN_004aa020 (MobTargetAggresive2): skip players whose byte +0x2a7f6 is set (vt 0x9e0; mobs 0), else as above
+```
+
+### 6.4 Top aggro (`so_mob_GetTopAggroTarget`, vt 0xc18)
+
+`ShineMob::so_mob_GetTopAggroTarget(m)` @ FUN_0042fea0 returns `m.targetSelector.vt[0x38](m)` (0 without a selector;
+`ShineObject` FUN_0042fe50 returns 0). Bout FUN_004aa8d0: object of the highest-aggro entry; Aggresive FUN_004aab80: the
+same with the distance weighting of §6.3; ALL FUN_004aaf30: the first valid entry. The entries are filtered as in §6.3
+(failing `mdb_CanIKill` or dead → aggro set to 0). Callers: the skill-blast random target `AxialListScanSkillTarget::
+alsst_SkillBlast_RandomTarget` FUN_00583180 and the skill target scan FUN_0057e660 (Z03 / part 4).
+
+### 6.5 Current target and battle state
+
+- `ShineMob::so_mob_CurrentTarget` (vt 0xb78) @ FUN_005d2790 returns the u16 at **+0x24ae** (`ShineObject` FUN_005d2740:
+  0xFFFF). It is the mob's current fight target (correction of §5.2's "first attacker"): `so_DamagedBy` fills it with
+  the attacker when it is 0xFFFF (Z03 §7), the tactic `MobActionTargetting::mab_Think` (part 4) sets it through
+  FUN_004b8930, which on a change raises the map-script interrupt `sim_TargetChange { mob handle, target handle }`
+  (FUN_0050c730; not for 0xFFFF). `so_mob_RegenComplete` resets it to 0xFFFF.
+- vt 0x754 (FUN_00556b00) = `tactic.vt[8]()` = handle of the tactic's target (base `MobActionBase` 0xFFFF; the
+  fighting tactics return their target *(inferred)*, part 4); vt 0x75c (FUN_00556b10)
+  = `tactic.vt[0xc]()` = the target object.
+- **Battle state** `+0x24b0`: 0 idle, 1 battle, 2 recover. `vt 0x588` FUN_00556d70 is "I am fighting":
+  `m.lastBattle (+0xfb8) = g_Now`; on the change 0 → 1, if the mob has a MobKillLog row, a map-wide notice
+  `AxialListMobKillLog(1, 0x38e, mobId)` (the MK2_START announcement, D05 / Z03 §8.1); state = 1. It is called by every
+  attack path: `so_attack`, `so_smash`, `so_skillsmash`, `so_Bash`, `smo_SwingDamage`, `smo_SkillBlast`, both
+  `so_smo_CrossCounterDamage` and the tactic `MobActionWaitSkillEnd` (Z03 / part 4).
+- `vt 0x58c` FUN_00555570: in battle = `g_Now <= lastBattle + 100` (10 s).
+
+```pseudo
+ShineMob::sm_DuringBattle(m)                     (battle state 1, each tick)  @ FUN_00568d30
+    if not regenAniOver: return
+    if m.vt[0x58c]():                                       # fought within the last 10 s
+        if m.HP < MobInfo.MaxHP * 0x19a / 1024 (≈ 40 %):
+            t = som_GetObject(m.vt[0x754]())
+            if t:
+                if not rescueFlags (+0x24bc) bit 2: MobChatManager::mcm_HelpReqChat(m); set bit 2     # part 4
+                sm_Scream4Rescue(m, t, MobInfoServer.FamilyRescArea, MobInfoServer.FamilyRescCount, 1)
+            rescueFlags bit 0 = 0
+        return
+    # 10 s without fighting: the battle is over
+    if m is on a field and its position is blocked in either block bitmap of the map (FUN_0049df00 / FUN_0049df70,
+       cell = coord × 8 / 50; outside the bitmap counts as blocked):
+        m.vt[0xf28]()                                       # FUN_0055d5b0 → vt 0xf2c(spawn point +0x249c): back to the spawn point (part 5)
+    rescueFlags bit 2 = 0                                   # may chat again
+    battle state = flags24ac & 2                            # 2 = recover (bit 1 is set at spawn, §5.3), else 0
+    m.+0x1fb0 = 0                                           # (part 4)
+    HitMeList reset (FUN_00482e80): attacker units, the per-character damage list (+0x198) and the total (+0x1a8)
+    m.targetSelector.vt[0x14]()                             # mts_AggroClear: the mob forgets everyone
+
+ShineMob::sm_DuringRecover(m)                    (battle state 2, each tick)  @ FUN_0056b710
+    if not regenAniOver or g_Now <= m.lastHPRecover (+0xea0) + 30: return          # one step every 3 s
+    if mode == 3: battle state = 0; return
+    m.so_recoverhp(scriptHPRegen (+0x2554) >= 0 ? scriptHPRegen : MaxHP / 10);  lastHPRecover = g_Now   (vt 0x5b4)
+    m.so_recoversp(MaxSP / 10);  lastSPRecover (+0xea4) = g_Now                                          (vt 0x5b8)
+    if HP >= MaxHP (+0xea8) and SP >= MaxSP (+0xeac):
+        battle state = 0
+        if on a field: cc_ScriptInterrupt(field.cinema (+0x44), sim_ObjectDead (FUN_0050c840), { u16 m.handle })
+            # (original bug) Z09-B5: a mob that has finished healing is reported to the map scripts as "object dead"
+        rescueFlags bit 0 = 1
+    so_AllOfRange_Class0(m, sight, so_ply_Send2WhoTargetMe)  # every player whose target is m gets 0x2402 NC_BAT_TARGETINFO_CMD (Z03 §2.4)
+```
+
+So a mob regains 10 % HP and SP every 3 s after a fight (or the script value per step), and the players who target it
+see the bar fill. During battle the mob does not regenerate (the `PceHPRcv*` / `AtkHPRcv*` columns are not read by the
+code of this section; part 4 checks the tactics).
+
+### 6.6 Calling for help (`sm_Scream4Rescue`, `so_RescueRoutine`)
+
+```pseudo
+ShineMob::sm_Scream4Rescue(m, target, range, count, flag)                       @ FUN_00568bf0
+    race = MobInfoServer.MobRaceType;  if race == 0 or range <= 0: return
+    if target == null: log "ShineObjectClass::ShineMob::sm_Scream4Rescue : Target not found"; return
+    so_AllOfRange_Class1(m, m.pos, range, AxialListRescueRequest{ target, target.handle, race, count, flag })
+
+AxialListRescueRequest::ali_Work(req, m, o) → continue                          @ FUN_00568ad0
+    if req.count < 1: return stop
+    if o.MobInfoServer.MobRaceType == race and (o.vt[0x754]() == 0xFFFF or == req.target.handle):   # idle or already on it
+        o.vt[0x764](m, flag)           # FUN_00556b30: o.rescueOf (+0x24c0) = m; rescueFlags bit 1 = flag
+        req.count −= 1
+
+ShineMob::so_RescueRoutine(h)                    (each tick while h.rescueOf != 0, §5.4)          @ FUN_00569050
+    v = h.rescueOf
+    if v.mode != 2 (alive) or v.vt[0x754]() == 0xFFFF: h.rescueOf = 0; h.lastSeenHP (+0x24c4) = 60000; return
+    t = som_GetObject(v's target handle);  if t == null: log "…so_RescueRoutine : Null target"; same reset; return
+    if v.HP < h.lastSeenHP:                             # the friend was hurt since the last look
+        h.so_mob_AppendAggro(t, 1)                      # the helper joins with 1 aggro point (and spreads it to its own family)
+        h.lastSeenHP = v.HP
+        if not rescueFlags bit 2: (bit 1 ? MobChatManager::mcm_HelpAckChat : mcm_DetectBattleChat)(h); set bit 2
+```
+
+Two kinds of calls: **every hit** on a mob (`so_DamagedBy`, Z03 §7) calls `sm_Scream4Rescue(attacker,
+FamilyArea, 999, 0)`: all idle mobs of the same `MobRaceType` within `FamilyArea` start watching (2016 data: 676 mob
+types have a FamilyArea, mostly 350). **Below 40 % HP** in battle the mob calls `(target, FamilyRescArea,
+FamilyRescCount, 1)` every tick (count 1…5 helpers). The helper attacks only after its friend loses HP again.
+(original bug) Z09-B4: `lastSeenHP` starts at 60000 and is reset to 60000, so for a friend with more than 60000 HP
+(155 mob types with a MobRaceType in 2016 data) the helper joins only once that friend is below 60000 HP.
+
+### 6.7 Target-type checks for mob weapons (`so_mob_CanMyTarget`, `so_ply_CanMyTarget`, friends, NPCs)
+
+These answer "may weapon `i` of the attacker's list be used on this object" from `MobWeapon.AtkType` (+0x4f; enum
+`ATKTYPE` *(pdb2017)*: 0 SKLTP_DAMAGE, 1 SKLTP_HEAL, 2 SKLTP_ABSTATE, 3 SKLTP_SPECIAL, 4 SKLTP_DISPEL). `list` is the
+attacker's MobDataBox entry (+8 = weapon list, §5.1); a non-null result is the object itself. Callers are the tactics
+(`MobActionAttack` vt 0x760, `MobActionTargetting` vt 0x748 / 0x750, part 4).
+
+```pseudo
+ShineMob::so_mob_CanMyTarget(me, list, i)        (vt 0x74c, "use it on myself")               @ FUN_004ade40
+    HEAL: me if HP < MaxHP / 2
+    ABSTATE: me if one of the weapon skill's 4 abstates (ActiveSkill +0x40, 3 ints each, 0x318 = none) is not on me
+             (FUN_0042b060 = abstate slot lookup in me+0xe7c)
+    DISPEL: me if I have a bad abstate (asl_IsHereBad)
+    DAMAGE / SPECIAL: null
+ShineMob::so_ply_CanMyTarget(o, attacker, i)     (vt 0x760, mob o as target)                  @ FUN_004ae010
+    o.vt[0x4d0]() == 4 (object kind 4): null
+    DAMAGE: o if not same side;  HEAL: o if same side;  ABSTATE: not same side and an abstate missing (as above)
+    DISPEL: same side → o if it has a bad abstate; else → o if it has a good one;  SPECIAL: null
+ShinePlayer::so_ply_CanMyTarget(p, attacker, i)  (vt 0x760)                                    @ FUN_004ae280
+    DAMAGE: p;  ABSTATE: p if an abstate is missing;  DISPEL: p if it has a good abstate;  HEAL / SPECIAL: null
+ShineObject versions (FUN_004accd0, FUN_004ace80): null
+
+ShineMob::so_mob_FindMyRaceTarget(m, list, i)    (vt 0x748)                                    @ FUN_004acbd0
+    so_AllOfRange_Class1(m, 500, AxialListNearFriend{list, i}) → first hit, or 0
+    AxialListNearFriend::ali_Work @ FUN_004aca50: skip dead; o.race (vt 0x714) != 0 and == m.race:
+        result = o.so_mob_CanMyTarget(list, i); stop at the first result
+    (base ShineObject FUN_004acb80: 0)
+ShineObject::so_mob_CanNPCTarget(m)              (vt 0x750, mob version)                        @ FUN_004acd70
+    so_AllOfRange_Class1(m, 500, AxialListNPCTargetFind{ mobId 0xbc (188), n = 1 }) → result
+    AxialListNPCTargetFind::ali_Work @ FUN_004abd80: for objects with mob ID 188: the first one is taken; for later ones
+        (n in 1…100) a value from the per-n random ring DAT_14d720d0 (0x8008-byte blocks) decides whether it replaces
+        the choice (reservoir-style pick *(inferred)*); n += 1
+    (base FUN_004acd20: 0)
+```
+
+`MOBATTACKTARGET` *(pdb2017)*: `MAT_ENEMY 0, MAT_ME 1, MAT_MYRACE 2, MAT_NONE 3, MAT_NPC 4` = `MobWeapon.MopAttackTarget`
+(+0x69); the mapping to the four functions above (ME → vt 0x74c, MYRACE → vt 0x748, NPC → vt 0x750) is part 4's tactic code.
+Mob ID 188 is the only NPC type a mob can pick as a target (MobInfo row 188; the escort / defence NPC *(inferred)*).
+
+### 6.8 Script and GM access to aggro and AI
+
+| Function | Behaviour |
+|---|---|
+| `cAggroSet(mob, obj, n)` FUN_005d9370 | `mob.vt[0x700](obj, n or 1)` |
+| `cAggroReset(mob, obj)` FUN_005e1280 | `mob.vt[0x704](obj, 1000)`: obj's aggro drops to 1 |
+| `cAggroListSize(mob)` FUN_005f2f70 | count from `vt 0xb88` |
+| `cAggroList(mob)` FUN_005f3250 | pushes every handle of `vt 0xb88`; returns their number |
+| `cIsInBattle(mob)` FUN_005ef430 | if `so_mob_CurrentTarget` (vt 0xb78) is an object within 999999999 distance² and the mob is not dead: returns that handle |
+| `so_mob_GetAggroList(m, vec)` vt 0xb88 FUN_005d4dd0 | clears vec, `selector.vt[0x2c](vec)` (base FUN_005d4d50: −1) |
+| GM `&viewaggrolist` (level 50, FUN_004196f0) | target = `gm.vt[0x75c]()` or the GM; if on a field: `target.so_mob_ViewAggroList(gm)` |
+| `so_mob_ViewAggroList(m, gm)` vt 0x6fc FUN_0042d2a0 | `selector.vt[0x18](gm)`: GM notice per entry `"%d) %s : %d"` (index, name, aggro); without a selector a fixed notice (DAT_006aa168) |
+| `so_AILearn(o, script)` vt 0xb60 FUN_005d5430 / mob FUN_005d5500 | null → vt 0xc14 (clear); else `o.script (+0x7e) = script`, function name (+0x82) = `"Entrance"`, for mobs `MobInfo.InxName` |
+| `so_AITraining(o, other)` vt 0xb5c FUN_005d2680 | `other.so_AILearn(o.script)` (copy the AI script) |
+| `so_EscapeFromTarget(o)` vt 0x64c FUN_00435ba0 | `AxialListTargetChange{o.handle, null}` over sight: every player (kind 2, vt 0x4d0) whose target (vt 0xa04) is o gets `so_ply_TargetChange(null)` (vt 0x998, Z03 §2.3 → 0x244D) (ali_Work FUN_00435ac0). Callers: magic-field damage, `smo_MagicFieldSpread`, `smo_SkillBash_Blast_Obj` |
+
+The Lua bindings themselves (argument reading FUN_005f7680 / FUN_005f7ad0, result push FUN_005f8110) are part 9;
+`cSetAIScript` / `cAIScriptSet` (callers of vt 0xb60 / 0xb5c) are listed for part 10.
+
+### 6.9 Not in this section
+
+- `MobTargetPlayerCaptivate` (vt FUN_004add20 `ali_Work`: player-only candidates without StaHide, not in a state
+  `vt 0xf20`, same layer; FUN_004abde0 init with radius 600; FUN_004abe10 scan) belongs to the charm abstate of the
+  player (part 4 with the tactics, or Z03 if the abstate is theirs).
+- `FamilyMobManagement::FamilyMobManager` (`fmm_Initialize` FUN_004b5050, `fmm_Dead` FUN_004b5120, `fmm_Remove`
+  FUN_004b5a40, `fmm_Regist` FUN_004b5cf0) is a per-breeder-group table `{u16 mobId, u16 limit (default 60000), u16
+  dead count}`: `fmm_Dead` counts a death and returns `count >= limit`. All callers are `MobBreeder` /
+  `MobBreederGroup` (part 6), which documents it with the regen data.
+- `HitMeList::EnemyList::el_Store` FUN_00482070 (attacker units: kind 0 single `{charNo vt 0x564, u16 vt 0x568}`, 1 party
+  `vt 0x560`, 2 raid `vt 0xa84 → +4`; compare `e_ObjCompare` FUN_004816b0; when the list is full the unit with the
+  least damage is replaced (`ListMaximumSearch`), else log "HitMeList::EnemyList::el_Store") is called only from the
+  death path FUN_00483030 (Z03 §8.1). The per-character damage list FUN_00482f00 (Z03's "Add"): up to 100 entries
+  `{charNo, → object, time, damage}` (pets resolve to their owner through vt 0x9b0; only kind-2 objects = players are
+  counted); when full, the oldest entry is overwritten. `el_FindLooter` FUN_004822f0 is part 7.
+- `MobBehaviorDescript/` (`DefaultBehavior.ps` and 7 `KQ/*.ps`): PineScript text (`whoistarget`, `permillage`, `chat`,
+  `whokillme`); no zone string names the folder or a `.ps` path of it. Whether the PineScript loader (part 14) reads it
+  stays open.
+- Other aggro sources, documented with their owners: the map-script node `PineEventScriptNode::ShineAggro::sa_Step`
+  FUN_004f2d10 (part 15), `AxialListMagicFieldAggro` (`alns_ValidObject` FUN_0057a980, `almfa_AppendAggro` FUN_0057aad0;
+  part 8), the tactic base `MobActionElement::mae_Action` FUN_004aa880 (part 4).
+- `MobChatManager` (`DAT_0084cc84`; `mcm_HelpReqChat`, `mcm_HelpAckChat`, `mcm_DetectBattleChat`, `mcm_DamageChat`) and
+  the per-mob-ID objects `DAT_0084cc8c` (= `MobChatManager`+8 *(inferred)*; they give the `+0x1ea8` delay of §5.2) are part 4
+  (MobChat).
