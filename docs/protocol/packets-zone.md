@@ -10787,6 +10787,21 @@ Z01 name was 'link inside the same zone (ours)'
 |---|---|---|---|
 | 0 | u16 | code | 0x2028 ok, 0x2029 no NPC, 0x202B far, 0x202C NPC role, 0x202D no link |
 
+### `0x1C0A` NC_BRIEFINFO_DROPEDITEM_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone ctor FUN_005492d0 (header 0x1C0A, len 0x11) at drop+0x167, filled by ShineDropItem_so_ItemDrop FUN_0052a7a0; sent by FUN_00555280 (drop vt 0x4c8) from ShineObject_so_drpitm_BriefInfo FUN_00567ff0; PDB PROTO_NC_BRIEFINFO_DROPEDITEM_CMD size 0xf)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | drop object handle |
+| 2 | u16 | itemid | dropped item ID |
+| 4 | u32 | location.x | drop position after the spiral placement |
+| 8 | u32 | location.y |  |
+| 12 | u16 | dropmobhandle | handle of the dropper (mob / player) |
+| 14 | u8 | attr | bits 0-2 always 0; bit 3 = the receiving player may pick it (drop vt 0x538 so_drpitm_CanLootingBitSet, recomputed per receiver before each send) |
+
+one shared buffer per drop: the pickable bit is rewritten for each receiver just before the send; re-broadcast to the sight when the owner-only time ends and when a dice winner fails to pick
+
 ### `0x1C0E` NC_BRIEFINFO_BRIEFINFODELETE_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone static packet built at FUN_006951d0 (buffer 0x74df98, opcode 0x1C0E, payload pointer DAT_0074e028); sent by AxialListBriefDeleteAtMove FUN_004bdfe0 (smo_OldObjectDelete FUN_004be0d0) and AxialListBriefDeleteAllOfRange FUN_005535c0 (player vt 0xdc4 / 0xdd0); client FUN_004b99f0)
@@ -11060,6 +11075,17 @@ no PDB struct of that name
 |---|---|---|---|
 | 0 | u16 | code | 0x2c1 ok |
 
+### `0x301B` NC_ITEM_PICKOTHER_ACK (hand-named) (S→C)
+
+**Verified layout** (basis: zone ShinePlayer_sp_partyitemdistribute FUN_0052f630 / sp_RaidItemsidtribute FUN_0052f8a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | itemid | picked item |
+| 2 | u16 | towho | handle of the member who receives it |
+
+to the player who clicked, only when the receiver is someone else; the 2016 client has no handler (C01: dropped)
+
 ### `0x3025` NC_ITEM_BREAKFAIL_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone FUN_0048db00 / FUN_0048d990)
@@ -11075,6 +11101,41 @@ no PDB struct of that name
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x1680 ok |
+
+### `0x303B` NC_ITEM_DICE_GAME_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone ShineDropItem_so_DiceItemPickInit FUN_00531020; client GameFrameWork::On_NC_ITEM_DICE_GAME_CMD FUN_0049c530)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | itemhandle | the drop |
+| 2 | s32 | nGameTimesec | BelongDice.shn DiceTimeLimit (15), default 15 when the table is empty |
+
+to every party/raid member within 1000 units of the picker (2..20 players); the client opens RollingDiceWin with this item and timer
+
+### `0x303E` NC_ITEM_DICE_GAME_START_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_00531310 (sd_DiceMyGameResultBroadCast); client FUN_004b26c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | charhandle | player who rolled or passed |
+| 2 | s32 | diceresult | 1..100 (distinct per game), 0xFFFE = passed / timed out |
+
+to every participant on the roller's map who is still in the party/raid; client prints '%s rolled the dice and the result was %d.' or '%s decided to give up the chance to roll the dice.'
+
+### `0x303F` NC_ITEM_DICE_GAME_RESULT_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_0052ee60 (sd_DiceGameSendMsgResult) from FUN_00531470 (sd_DiceGameResult); client FUN_004b2750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error | 0x2008 winner / 0x2009 everyone passed |
+| 2 | char[20] | WinnerID | winner name (vt 0x56c); empty for 0x2009 |
+| 22 | s32 | diceresult | winning roll; 0 for 0x2009 |
+| 26 | u16 | PickItemID | drop+0x195 item ID at send time |
+
+to every participant still in the party/raid; client: 0x2008 → '%s acquired the %s item by rolling %d with the dice.' if PickItemID is a known item, else the error text
 
 ### `0x3c07` NC_MENU_OPENSTORAGE_FAIL_CMD † (S→C)
 

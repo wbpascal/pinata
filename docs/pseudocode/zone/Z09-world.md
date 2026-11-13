@@ -3053,3 +3053,363 @@ class mask), attribute from the reward row, random options (`rot_FillOption`) wh
 - The arguments 5, 12, 13 of `mh_MobBreed` and the `mbg_RegenLoc` out value are unused; the group key "Def" is stored
   but never compared.
 - Who reserves the 30-s event next to `EventMobRegen` (object 0x86fae8) was not followed (Z01).
+
+---
+
+## 11. Drops: mob drop tables, drop items, loot rights, party/raid loot, the dice game
+
+Mob death calls the drop roll from `ShineMob::so_KilledBy` (Z03 §8.1); this section covers everything after that call: the
+drop tables, the roll, the `ShineDropItem` object (owner time, expiry, pickable bit), who may pick it up, the party / raid
+distribution and the drop-item dice game. The pickup request itself (`0x3009 NC_ITEM_PICK_REQ` and `so_ply_PickupItem`)
+is Z04 §3.3; `0x303C NC_ITEM_DICE_GAME_START_REQ` is Z04 §12.4; the DB side of picking is Z05.
+
+### 11.1 Data files
+
+| File | Loader | Held in | Use |
+|---|---|---|---|
+| `World/<server>/ItemDropTable.txt`, else `World/ItemDropTable.txt` (table `ItemGroup`) | `dic_Load` @ FUN_0048fa30 (part of `DropItemManager::dim_Load`) | per mob ID: 100 record pointers at `cluster+0x10854 + mobId*0x190` | drop lists per mob |
+| `World/<server>/ItemDropGroup.txt`, else `World/ItemDropGroup.txt` (table `ItemDropGroup`) | same function | map name → `DropItemListInGroup` (`DAT_0d55bc30`, sorted by the 20-byte name, lookup FUN_0048e890) | items of a drop group |
+| `BelongDice.shn` (one column `DiceTimeLimit`, 2016 value 15) | FUN_005b3150 → `DAT_132723c4` | first row, byte column | dice time in seconds (default 15) |
+| `ItemDropLog.shn` (one column `ItemID`, 57 items) | `idb_Load` @ FUN_00649780 | `g_ItemData[id]` slot 6 (+0x18) | items whose drop is logged to GameLog (0x0798, D05) |
+| `MobAbStateDropSetting.shn` | `lomscad_Load` @ FUN_005d5970 | §8.9 | selects the drop list by the mob's abstates |
+| `ItemInfoServer.shn` columns `DropGroupA` +0x39, `DropGroupB` +0x61, `RandomOptionDropGroup` +0x89, `Vanish` +0xaa, `looting` +0xae (ms) | Z04 | `g_ItemData[id]` slot 1 | group membership, random options, drop timers |
+
+Both text files are tried in the server's own sub-directory first (the `%s` is the 16-byte server name block passed to
+the loader); a missing file in both places logs `DropItemManager::dim_Load : Error in …` and ends with the fatal path
+`FUN_0063c7c0("…dic_Load")` *(inferred: the same abort helper every loader uses)*.
+
+**ItemGroup record** (0x61c bytes, column offsets from the file header, all read by the code at these offsets):
+
+```pseudo
++0x000 MapArea  char[33]   breeder-group filter: "-" = any; else must equal the killing mob's breeder-group name (first 20 bytes)
++0x021 MobId    char[33]   mob InxName → mob ID (FUN_00419080 on g_MobData); unknown names are skipped silently
++0x042 MinLevel u16, +0x044 MaxLevel u16      only in the checksum
++0x046 AbStateCnt u8       slot 0..99 of the mob's 100 lists (chosen at drop time by sm_BossAbstateGet, §8.9)
++0x047 MinCen, +0x04b MaxCen, +0x04f CenRate u32   only in the checksum
++0x053 TradeBoxA/B/C name[20] + Rate u32 (×3)      not read
++0x09b 45 × DropEntry (0x1d bytes):
+         +0x00 DrItem  name[20]   drop-group name ("-" = empty slot)
+         +0x14 DrItemR u32        rate in millionths
+         +0x18 UpGradeMin u8, +0x19 UpGradeMax u8
+         +0x1a Rule    char       only 'r' entries are rolled ("R : ratio, M : Minute" says the header; 'M' has no code)
+         +0x1b Num     s16        −1 unlimited; n > 0: decremented on each drop; 0: never drops
++0x5b4 ExcItem1..5 name[20]   not read
++0x618 CheckSum u32 = MinLevel + MaxLevel + AbStateCnt + MinCen + MaxCen + CenRate   (else "Checksum error in DropTable", fatal)
+```
+
+Load rules: a second record for the same (mob, AbStateCnt) is fatal ("AbstateNum is duplicate"), AbStateCnt > 99 is fatal
+("AbstateNum is too big"). Every non-"-" DrItem name creates an empty group entry in `DAT_0d55bc30` (FUN_0048f8e0).
+
+**ItemDropGroup record**: `+0x00 ItemGroupIdx name[20]`, `+0x14 ItemID char[40]`, `+0x3c MinQtty u16`, `+0x3e MaxQtty
+u16`, `+0x40 Upgrade00..15 u16[16]`, `+0x60 CheckSum` (= sum of the 18 words; else "Checksum error in ItemGroup at", fatal).
+Rows whose group name was not referenced by ItemDropTable are ignored. For a referenced group, FUN_0048e6b0 adds items:
+
+```pseudo
+dilig_AppendByName(group, ItemID, row):                    @ FUN_0048e6b0
+    id = item with InxName == ItemID (FUN_00418ff0)
+    found: dilig_AppendItem(group, id, row)                @ FUN_0048e1d0
+    else:  ItemID is a drop-group name: for every item whose ItemInfoServer.DropGroupA (+0x39) or DropGroupB (+0x61)
+           equals it (20 bytes), dilig_AppendItem(group, item, row)
+dilig_AppendItem: entry[n] (0x66 bytes at group+0x14) = { u16 itemId, copy of the row (FUN_0048dfd0) }; n (+0x27ec) < 100,
+                  else "dilig_AppendItem : Too many item" (fatal)
+```
+
+2016 data: 1485 ItemGroup records, all with MapArea "-" and AbStateCnt 0 (so only list 0 is used for normal mobs;
+MobAbStateDropSetting mobs fall back to nothing when their count selects an empty list, §8.9), TradeBox/Cen/Exc unused,
+Upgrade range 1–5 on 143 entries; Num 1 on 297 entries (all weapon-title licences, e.g. `TRUMPYLicence`).
+ItemDropGroup: 970 rows / 959 groups, every row `Upgrade00 = 1000`, MinQtty 1, MaxQtty 1–10.
+
+### 11.2 The drop roll
+
+```pseudo
+DropIndexCluster::dic_ItemDrop(cluster, killer, mobData, breeder, mob, looter, lotFactor):   @ FUN_0048f690 (thiscall)
+    # called from ShineMob::so_KilledBy (Z03 §8.1) when mob.dropsEnabled (+0x250c, Lua cSetNPCIsItemDrop) == 1;
+    # mobData = the row of mob+0x2558 (Lua cSetItemDropMobID, vt 0xbb4 FUN_004a9d20) if set, else the mob's own row
+    if mobData null or mobId ≥ mob count or killer / mob null: return
+    if killer.kind (vt 0x4d0) == 5 (a mob): return             # mobs killing mobs drop nothing
+    name = "-";  if breeder: name = breeder.group.GroupIndex (FUN_0048e040: *(breeder+0) + 0x1918)
+    species = cluster+0x10854 [mobData.id] (0x190 bytes = 100 record pointers)
+    dilfs_ItemDrop(species, name, killer, mob, looter, lotFactor)
+
+DropItemListForSpecies::dilfs_ItemDrop(species, name, killer, mob, looter, lotFactor):        @ FUN_0048ef80
+    bonus    = killer.vt[0x498]().+0x16 − 1000          # player: charged-effect block p+0x2a5a0, +0x16 = drop-rate ‰
+                                                         # (1000 by default, template DAT_132728f8; ChargedEffect.shn
+                                                         #  EffectEnum 16 "SNS_DropUp" 1100 *(inferred)*); mobs: 1000 → 0
+    d = killer.level − mob.level (vt 0x4d8, u8)
+    gate     = (d < 0 ? 1000 : (10 − d) × 100) + bonus   # killer ≥ 11 levels above the mob: gate ≤ 0, nothing drops
+    mapRate  = mob has a field ? max(field+0x4c.+4, 0) : 1000      # field-specific rate ‰ (source not traced, §11.9)
+    if killer.vt[0x944]() == 1 (player: connectFrom +0x2a7d4 == 1, WM 0x082B): mapRate += 200   # *(inferred)* PC-room bonus
+    abRate   = Σ over killer's abstates of SubActor.vt[0x48](state)   # drop-up abstates (FUN_00401240 → g_AbActiveInfo)
+    list = species[ sm_BossAbstateGet(mob) ]  (§8.9; 0 for normal mobs);  null: return
+    dilfs_Drop(list, name, killer, mob, looter, {bonus, gate, mapRate, abRate}, lotFactor)
+
+dilfs_Drop(rec, name, …):                                   @ FUN_0048eb90
+    if rec.MapArea ≠ "-" and rec.MapArea[0..19] ≠ name: return
+    for i in 0..44: if rec.entry[i].DrItem ≠ "-" and Rule == 'r': dilfs_DropByRate(i, rec, …)
+
+dilfs_DropByRate(i, rec, killer, mob, r, looter, lotFactor):   @ FUN_0048e920
+    if rand(1000) ≥ r.gate: return                          # one gate roll per entry
+    if rand(1000000) ≥ (r.abRate + r.mapRate + r.bonus) × DrItemR / 1000: return
+    if Num == 0: return;  if Num ≠ −1: Num −= 1             # the count lives in the shared table record (original bug) Z09-B20
+    group = DAT_0d55bc30[DrItem]; none: return
+    dilig_Drop(group, killer, mob, looter, lotFactor, UpGradeMin, UpGradeMax)
+```
+
+So with neutral bonuses a list entry drops with probability `gate/1000 × DrItemR/1 000 000`; every entry is rolled
+independently, so one kill can drop several items (up to 45).
+
+```pseudo
+DropItemListInGroup::dilig_Drop(group, killer, mob, looter, lotFactor, upMin, upMax):         @ FUN_0048e260
+    if group.count (+0x27ec) == 0: return
+    k = RandomRing(count) (uniform 0..count−1; 0 when count > 100);  id = entry[k].itemId
+    item = { key = ItemKey_Make(id, 3, server ids) (FUN ItemKey_Make), id, attr zeroed }
+    cls = ItemAttr class of id (g_ItemAttrCls)
+    if !cls.vt[0x2c](&item, &entry[k].row, rand(1000), mob.mobId (vt 0x708)): return   # builds the attributes from the group
+                                                         # row (MinQtty..MaxQtty, Upgrade00..15 weights) *(inferred)*
+    if ItemInfo/ItemInfoServer missing: return
+    if ItemInfoServer.RandomOptionDropGroup (+0x89) names a RandomOption table: rot_FillOption(cls.vt[0x70](&item), table)
+    lot = cls.vt[0x1c](&item) × lotFactor;  capped at ItemInfo +0x6a (max lot);  cls.vt[0x20](&item, lot)
+    up = random in [upMin, upMax] (FUN_0063ccf0), capped at ItemInfo +0xf0;  Item_ForcedUpgrade(&item, cls, up, &log)
+    killer.vt[0x344]()  (result unused)
+    ShineObject::so_IsDropping(mob, &item, 1, looter, killer.handle, killer.charNo, cls, 1)     # §11.3
+```
+
+`lotFactor` is the 4th argument of `so_KilledBy`: 1 on the combat paths (Z03 §7: `so_KilledBy(a, hp, hp, 1)`) and the
+script kills seen (`…, 1000, 1)`); gathering (`sp_GatherComplete(p, how)` FUN_0046b2f0, Z02 §8) calls
+`so_KilledBy(p, hp, 0, how')` (read from the disassembly: `GetHP` takes no argument) with `how'` = `how` for resources of
+MobInfo.Type 8/9/10 and 1 otherwise. 0x2032 passes `how` = 2, so a gather the client completes drops **double lots**
+(this answers the Z02 open point "gather loot"; the timer path's `how` is Z02's). The aggro share is 0 (aggroRate 0).
+
+### 11.3 Creating the drop object
+
+```pseudo
+ShineObject::so_IsDropping(dropper, item, flag, looter, …):                                   @ FUN_004b0a20
+    o = som_AllocObject(type 1 drop item); none: log "so_IsDropping : itembuf full"; return false
+    r = o.so_ItemDrop(handle, dropper, item, flag, looter)   (vt 0x544; pushes 5 arguments, the callee takes 6)
+    r ≠ 0x301: log "so_IsDropping : Drop mark fail"; return false       # the allocated object is not freed here
+    DropItemAnalyzer.dia_Set(DAT_0cf15b40, dropper.mobId, item.id)  @ FUN_00460670       # counts per (mob, item); no reader found
+    if dropper.field: note field+0xc in the ring DAT_0085dfb0 (FUN_00418ec0; same ring as fm_Marking, §5.7)
+    return true
+
+ShineDropItem::so_ItemDrop(o, handle, dropper, item, flag, looter, questOnly):              @ FUN_0052a7a0 (vt 0x544)
+    dropper has no field: log "Dropper have no map"; return 0x305
+    ItemInfo missing:     log "No Item Data"; return 0x305
+    DiceReset(o, 0)                                           # FUN_0052f020, §11.6
+    o.looter (+0x208) = *looter (12 bytes, §11.4);  o.map key (+0x275) = dropper's field key; +0x289 = 0
+    o.pos = dropper.pos (also +0x281 / +0x285);  o.item (+0x18d) = item (0x6f bytes: u64 key, u16 id +0x195, attr)
+    o.flag (+0x204) = flag
+    o.ownerUntil (+0x1fc) = g_Now + ItemInfoServer.looting (+0xae) / 100     # ms → tenths of a second (20 s in the data)
+    o.vanishAt   (+0x200) = g_Now + ItemInfoServer.Vanish  (+0xaa) / 100     # 60 s in the data
+    if so_MapMarking(o, 0) fails (no free spot): return 0x305
+        # FUN_00466470 → fm_Marking(field, o, spacing 25, dropArg 0): spiral search from the dropper's position (§5.7)
+    o.layer = dropper.layer;  o.vt[0xe20](questOnly) → +0x28a
+    brief (0x1C0A, buffer +0x167, payload +0x189): { handle, itemid, x, y, dropmobhandle = dropper.handle, attr = 0 }
+    sight broadcast: so_AllOfRange_Class0(o, …, so_drpitm_BriefInfo)        @ FUN_00567ff0
+        for each player in range: o.so_drpitm_CanLootingBitSet(p) (vt 0x538 FUN_0052a420, attr bit 3 = CanLooting(p)); p ← brief
+    if ItemDropLog has a row for the item (g_ItemData slot 6 first u32 == id):
+        GameLog ← 0x0798 { u16 itemId, u16 lot, u64 key, u16 dropper.vt[0x344](), map key, x, y }  (0x22 bytes; D05)
+    return 0x301
+```
+
+**questOnly (+0x28a)** is set to 1 only by `ShinePlayer::sp_QuestItemGet` FUN_00528240 (quest drops, Z15) and 0 by the
+player's own drop (Z05 §3.1). `so_IsDropping` pushes only five arguments, so for every drop made through it (mob drops,
+`sp_KQItemDrop`, Pine `ShineItemDrop`, Lua `cDropItem`) the sixth is the word on top of its frame, the security cookie
+`DAT_00873bd8 ^ ebp`; the byte stored is its low byte (original bug) Z09-B21. When that byte happens to be 1, the drop is
+pickable only by players whose quest wants the item and ignores party loot rules (§11.4).
+
+`0x1C0A NC_BRIEFINFO_DROPEDITEM_CMD` is the object's appear packet (Z02 §5 "+0x167"); newcomers get it through
+`so_SendMyBriefInfo` FUN_00555280 (vt 0x4c8) with the attr byte last written for some other player
+*(inferred: the bit is only rewritten by so_drpitm_BriefInfo, not by the sight-entry path)*. The client keeps the item
+in `DropItemMgr` with `m_bPickable` from that bit *(pdb2017)*.
+
+### 11.4 `ShineDropItem` object and loot rights
+
+| Offset | Field |
+|---|---|
+| +0x167 | brief packet 0x1C0A (header, length 0x11, built by FUN_005492d0 in the ctor); +0x189 pointer to its payload (vt 0x4c4 FUN_00555250 copies it); +0x66 position pointer (= payload +4) |
+| +0x18d | the item (u64 key, +0x195 u16 itemId, 0xFFFF = empty, +0x197 attr 0x65 bytes); vt 0x548 FUN_00555310 returns it, vt 0x54c / `so_RetrateFromMap` FUN_00495c40 / FUN_00555340 clear it |
+| +0x1fc / +0x200 | owner-only until / vanish at (tenths) |
+| +0x204 | flag from `so_IsDropping` (1) / player drop (0); not read by the code found |
+| +0x208 | looter `ShineMultiTypeHandle` (12 bytes, below) |
+| +0x214 | dice `PeriodTimer` (active byte +0x21c, vt 0xaa8 FUN_0052edb0 "dice running") |
+| +0x225 | 20 × { u16 player handle (0xFFFF ends), u16 roll (0 = not yet, 1..100, 0xFFFE = passed) } |
+| +0x275 | field key (12 bytes; vt 0x4bc FUN_005552b0) |
+| +0x28a | questOnly (vt 0xe20 FUN_00555320 set / 0xe24 FUN_00555330 get) |
+
+Destructor FUN_00555f10 (vt 4).
+
+`ShineMultiTypeHandle` (name from the log strings) `{ u32 kind, u32 id, u32 looterCharNo }`: kind 0 one player (id =
+charNo), 1 party (id = party number, +8 = the party's looter), 2 raid (id = raid number, +8 = raid looter), 3 nobody
+(id −1). Init FUN_004c1460 / clear FUN_004c1480 → {3, −1}; set FUN_004c14a0 / FUN_004c14d0 / FUN_004c14f0; "nobody"
+test FUN_004c1470 (id == −1); "one player" FUN_004c1490 (vt 0x540 `so_drpitm_IsIndividualType` FUN_0052a630); looter charNo of a party / raid handle
+FUN_004c1510 (−1 for other kinds).
+
+```pseudo
+HitMeList::EnemyList::el_FindLooter(list) → handle:                    @ FUN_004822f0
+    e = the entry with the largest damage (+0x10; first one on ties; none → {3, −1})
+    kind 2 raid:  {2, raidNo, raid looter (FUN_0063d060)}      # raid not found: looter −1
+    kind 1 party: {1, partyNo, party's looter (party slot +0xb8, FUN_0042ab10)}
+    kind 0:       player = som_FindPlayer(e.charNo); found → {0, charNo}; gone → {3, −1} (free for all at once)
+
+ShineMultiTypeHandle::IsCanItemPick(h, p, item, drop):                 @ FUN_004c15e0   (CanLooting, vt 0x53c @ FUN_0052a4e0)
+    h.id == −1: true
+    kind 2: p must be in raid h.id; rule = drop.questOnly ? 0 : CLooting rule of the raid for the item (FUN_00644f60);
+            rule > 3: log "…Not Find Raid Loot Type", false;  rule 2 ("particular person"): p.charNo == h.looterCharNo; else true
+    kind 1: same with p's party (party slot +0xb8); "…Not Find Party Loot Type"
+            (a player no longer in the party / raid falls through to the next line)
+    otherwise: h.id == p.charNo
+so_drpitm_CanLooting(drop, p):  item ID valid in g_ItemData and IsCanItemPick(...) and (questOnly ≠ 1 or p.vt[0xe28](itemId))
+                                # vt 0xe28 = CQuestZone_IsQuestDropItem on the player's quest diary (FUN_00561790)
+
+CLooting::GetItemLootingTypeConVert(rules[4], itemInfo):               @ FUN_00644f60
+    ItemInfo +0x62 == 3: 0                                   # *(inferred)* one item class always free
+    by ItemInfo.ItemGradeType (+0x76): 0 → rules[0] (regular), 1 → rules[1] (named), 2 or 5 → rules[2] (rare / set),
+                                       3 → rules[3] (unique), 4 → 0; other → log "…undefine GradeType", 0
+    # rules = PARTY_LOOT / RAID loot types from WM (W02 §1: 0 free for all, 1 alternating, 2 particular person, 3 dice)
+```
+
+The rule chosen here also drives the pickup handler (Z04 §3.3 rules 0–3).
+
+```pseudo
+ShineDropItem::so_Routine(o):                                           @ FUN_0056ad00 (vt 0x4ac)
+    handle check (FUN_005552c0: handle = 0x2904 + pool index, pool 10500..13499): mismatch → log, repair
+    if o.item.id == 0xFFFF (taken):  DiceReset(o, 1); o.vt[0x33c](0, 1, 3); som_FreeObject(o, reason 0xd); relink; return
+    if dice timer fires (PeriodTimer_Advance): sd_DiceGameResult(o, 1)  (§11.6)
+    if o.looter.id ≠ −1 and g_Now ≥ ownerUntil:  o.looter = {3, −1}; re-broadcast 0x1C0A with fresh pickable bits
+    if g_Now > vanishAt:  DiceReset(o, 1); clear item; o.vt[0x33c](0, 1, 3); som_FreeObject(o, reason 0xe)
+    slanted-list relink
+```
+
+`so_LogoutPacketBroadcast` FUN_00553b30 (vt 0x14): 0x1805 `{ u16 handle }` to the whole map
+(`AxialListPacketBroadcast4ItemPickUp`); `so_scene_EraseItem` FUN_0050dc70 (vt 0x8b8, map scripts): clears the item if
+its ID matches. `ShineObject::so_ItemDrop` FUN_0052a6f0 (base vt 0x544) only logs and returns 0x303.
+
+### 11.5 Party / raid distribution (loot rule 1, and money)
+
+```pseudo
+ShinePlayer::sp_partyitemdistribute(p, drop, item, handle):                                   @ FUN_0052f630
+    party = p's party; number ≥ 4000: log "Too large party handle"; return
+    n = member count; n ∉ 2..5: log "Invalid party member number"; return
+    near = members within 1000 units of p (DistanceSquare < 1000001); picker = the one with the oldest last pickup
+           (vt 0x41c FUN_0055a090 = p+0x29334, set by so_ply_PickupItem; a member never picking has 0 → first)
+    money item (g_MoneyItemID): share = max(amount / |near|, 1)
+        for slot in 0..4: slot.vt[0x790](share)      # all 5 slots, absent / far / unused ones included (original bug) Z09-B22
+        drop.vt[0x54c]()  (removed)
+    else: picker null: log "Null picker"
+          picker ≠ p: p ← 0x301B NC_ITEM_PICKOTHER_ACK { u16 itemid, u16 towho = picker.handle }   # no client handler (C01)
+          picker.so_ply_PickupItem(drop, item, handle)  (vt 0x798, Z04 §3.3)
+
+ShinePlayer::sp_RaidItemsidtribute(p, drop):                                                  @ FUN_0052f8a0
+    near = raid members within 1000 units (FUN_005ce6d0 → FUN_005ce000(list, raidNo, p, 1000), max 20)
+    money: share = amount / |near|; the remainder is given 1 each to the first members; drop removed
+    else: picker = oldest last pickup among near; 0x301B to p if someone else; picker.so_ply_PickupItem(drop, item, handle)
+```
+
+The party version gives each member at least 1 coin even when the amount is smaller than the member count
+(original bug) Z09-B23; the raid version splits exactly.
+
+### 11.6 Dice game on a drop (loot rule 3)
+
+Entry from the pickup handler (Z04 §3.3, rule 3, FUN_0052ec70):
+
+```pseudo
+PickupDiceRule(p, drop):                                     @ FUN_0052ec70
+    item = drop.vt[0x548](); none: p.so_ply_itempickresult(0x343)
+    p's party / raid already runs a dice game (party slot +0xcc FUN_006452d0, raid slot +0xcc FUN_0063d4a0): result 0x34d
+        "You cannot acquire other items while rolling the dice."
+    drop is owned by one player (vt 0x540): normal pickup (vt 0x798)
+    drop.so_DiceItemPickInit(p) (vt 0xaa0) == 1: result 0x34e ("The game continues with dice acquisition." *(inferred
+        from the client text list of 0x300A)*)
+    else: false → the caller answers 0x2003 (Z04 §3.3)
+
+ShineDropItem::so_DiceItemPickInit(drop, p):                 @ FUN_00531020 (vt 0xaa0)
+    raid: players = raid members within 1000 units (FUN_005ce6d0); need ≥ 2; raid dice flag = 1 (FUN_0063d470)
+    party: number < 4000 ("Too large party handle"), member count 2..5 ("Invalid party member number");
+           players = members within 1000 units (DistanceSquare < 1000001); need ≥ 2; party dice flag = 1 (FUN_00645300)
+    no party / raid: players = none (the game starts with nobody; it ends on the timer with 0x2009)
+    start: dice timer active, period = DiceTimeLimit × 10 tenths (BelongDice.shn, 15 s; 15 when the table is empty)
+           participants (+0x225) = players (max 20, list FUN_005cd530 / FUN_005cd580), rolls 0
+           each player ← 0x303B NC_ITEM_DICE_GAME_CMD { u16 itemhandle = drop.handle, s32 nGameTimesec = DiceTimeLimit }
+    return true
+
+0x303C handler (Z04 §12.4) → DiceJoin(drop, p, isYes, &err):  @ FUN_00531690 (vt 0xaa4)
+    err = 0x2000;  p is not a ShinePlayer (RTTI check): err 0x2002 "This character cannot roll the dice."
+    p not among the participants: err 0x2003 "You are not authorized to roll the dice."
+    already decided: err 0x2005 "The dice are already rolling."
+    roll = isYes ? sd_GetPlayerDiceGameResult(drop) : 0xFFFE
+           # FUN_0052edc0: rand(1000) % 100 + 1, retried up to 30 times until no participant has it, else the first
+           # free value 1..99 (log "sd_GetPlayerDiceGameResult" and 0 if none)
+    sd_DiceMyGameResultBroadCast(drop, p.handle, roll)        @ FUN_00531310
+        every participant on the same field as p who is still in the drop's party / raid (FUN_004c1530)
+        ← 0x303E NC_ITEM_DICE_GAME_START_CMD { u16 charhandle, s32 diceresult }
+    sd_DiceGameResult(drop, 0)
+
+sd_DiceGameResult(drop, timeout):                            @ FUN_00531470
+    repeat (at most 20 rounds; then log "ShineDropItem::sd_DiceGameResult" and stop):
+        for each participant: no longer in the party / raid → roll = 0xFFFE
+            timeout and roll 0 → roll = 0xFFFE, broadcast 0x303E { handle, 0xFFFE }
+            not timeout and roll 0 → return (still waiting)
+        best = highest roll ≠ 0xFFFE (first on ties; rolls are distinct)
+        none: sd_DiceGameSendMsgResult(0x2009, name "", 0, 0); DiceReset(drop, 1); return
+              # client 0x2009 "Everyone has decided to give up the chance to roll the dice."
+        w = the winner object; w and drop on the same field (field +0x10 id):
+            if !w.so_ply_PickupItem(...) (vt 0x798 fails, e.g. inventory full):
+                drop.looter = {0, w.charNo}; sd_DropTimeReStart (FUN_0052ef50: owner/vanish timers restart from now);
+                re-broadcast 0x1C0A
+            sd_DiceGameSendMsgResult(0x2008, w.name (vt 0x56c), roll, …); DiceReset(drop, 1); return
+        else: that roll = 0xFFFE, next round
+
+sd_DiceGameSendMsgResult(drop, code, name, roll):            @ FUN_0052ee60
+    every participant still in the party / raid ← 0x303F NC_ITEM_DICE_GAME_RESULT_CMD
+        { u16 error = code, char WinnerID[20], s32 diceresult, u16 PickItemID = drop.item.id }
+    # client: 0x2008 → "%s acquired the %s item by rolling %d with the dice." when PickItemID is a known item;
+    #         other codes → the error text
+
+DiceReset(drop, clearFlag):                                  @ FUN_0052f020
+    dice timer off; for the first participant still found: if clearFlag, clear the dice flag of its raid (FUN_0063d470) or
+    party (FUN_00645300); every slot = { 0xFFFF, 0 }
+```
+
+Client (2016): `0x303B` opens `RollingDiceWin` with the item and the time (FUN_0049c530); `0x303E` prints "%s rolled the dice
+and the result was %d." or "%s decided to give up the chance to roll the dice." for 0xFFFE (FUN_004b26c0); `0x303D` prints
+the error text unless 0x2000 (FUN_0049c570).
+
+Notes: if the winner's pickup succeeds, the item leaves the drop only after the DB answer (Z05), so `PickItemID` is still
+the item ID when 0x303F is built *(inferred)*. A successful pickup does not touch the dice flag; it is cleared by
+`DiceReset(…, 1)`, which looks only at the first participant still found, so a party whose first participants all left
+keeps the flag set until another drop resets it (only possible through that same path) *(inferred)*.
+
+### 11.7 `DropLocationManager` (spiral placement)
+
+`dlm_Load` FUN_00460980 builds 32 rings of offsets (`SameDistanceCluster`, 12 bytes each: count, capacity, points):
+ring 0 is the single point (0, 0); odd ring r gets 6 points from `sdc_Setdelta(ring, (r+1)/2 × 1024, 0)`, even ring r
+gets `r/2 × 6` points from `r/2` calls `sdc_Setdelta(ring, x, (r/2+1) × 0x4400 / 20)` with x stepping by 1024
+(FUN_004607f0, not opened: the rings form widening bands around the centre *(inferred)*; overflow log
+"DropLoc::SameDistanceCluster::sdc_Setdelta : Buffer overflow").
+`dlm_home(start)` FUN_00460bb0 sets ring = start, index 0; `dlm_next` FUN_00460c20 moves to the next point and, when a ring
+is exhausted, shuffles one random point of the next ring to the front (FUN_00427c30 on the random ring); false after ring
+31. `sdc_Getdelta` FUN_00460910 scales the offset by `spacing / 1024`. `fm_Marking` (§5.7) is the only user, with
+`start = 0` for drops (so the first candidate is the dropper's own spot) and spacing 25.
+
+### 11.8 Other drop entry points (owned elsewhere)
+
+| Entry | Owner | Note |
+|---|---|---|
+| `ShinePlayer::sp_QuestItemGet` FUN_00528240 | Z15 | quest drop, looter = the player, questOnly 1 |
+| `ShinePlayer::sp_KQItemDrop` FUN_00496f00 | Z16 | KQ reward drop through `so_IsDropping` |
+| Pine `ShineItemDrop::sa_Step` FUN_004eff00 | part 15 | |
+| Lua `cDropItem` FUN_005d9a30 | part 13 | |
+| Lua `cSetItemDropMobID(handle, mobName)` FUN_005ebea0 | here | mob+0x2558 = mob ID of `mobName` (0xFFFF if unknown), so the mob drops another mob's table; handle −1 pushes false |
+| Lua `cSetNPCIsItemDrop(handle, 0/1)` FUN_005daf40 | here | vt 0xbb0 → +0x250c; other values: nothing, returns 0 |
+| GM `&mobbreed … ItemDropMobIndex …`, `ac_MobItemDrop` | Z11 | |
+| Player drop `0x3007` → DB `0x3417` | Z04 §3.1 / Z05 §3.1 | same `so_ItemDrop` with questOnly 0 |
+
+### 11.9 Open points of this section
+
+- `field+0x4c` (+4) = the map drop-rate ‰ read by `dilfs_ItemDrop`; who fills it (FieldList column, GM command or event)
+  was not traced (no Field.txt column sits at that offset).
+- `ItemAttr` class vt 0x2c (how MinQtty/MaxQtty and the `Upgrade00..15` weights become the item's lot and upgrade) was not
+  read; the per-class functions are Z04's item model.
+- vt 0x33c(0, 1, 3) on removal is assumed to be the sight-removal broadcast (0x1C0E path of §9.6) *(inferred)*.
+- `DropItemAnalyzer` (DAT_0cf15b40, 256 buckets × 500 `{mobId, itemId, count}`) has no reader in the zone.
+- `+0x204` (flag 1 from `so_IsDropping`) is never read by the drop functions found.

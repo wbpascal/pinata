@@ -380,6 +380,142 @@
       ""
      ]
     ]
+   },
+   "0x1C0A": {
+    "dir": "S→C",
+    "name": "NC_BRIEFINFO_DROPEDITEM_CMD",
+    "basis": "zone ctor FUN_005492d0 (header 0x1C0A, len 0x11) at drop+0x167, filled by ShineDropItem_so_ItemDrop FUN_0052a7a0; sent by FUN_00555280 (drop vt 0x4c8) from ShineObject_so_drpitm_BriefInfo FUN_00567ff0; PDB PROTO_NC_BRIEFINFO_DROPEDITEM_CMD size 0xf",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      "drop object handle"
+     ],
+     [
+      2,
+      "u16",
+      "itemid",
+      "dropped item ID"
+     ],
+     [
+      4,
+      "u32",
+      "location.x",
+      "drop position after the spiral placement"
+     ],
+     [
+      8,
+      "u32",
+      "location.y",
+      ""
+     ],
+     [
+      12,
+      "u16",
+      "dropmobhandle",
+      "handle of the dropper (mob / player)"
+     ],
+     [
+      14,
+      "u8",
+      "attr",
+      "bits 0-2 always 0; bit 3 = the receiving player may pick it (drop vt 0x538 so_drpitm_CanLootingBitSet, recomputed per receiver before each send)"
+     ]
+    ],
+    "notes": "one shared buffer per drop: the pickable bit is rewritten for each receiver just before the send; re-broadcast to the sight when the owner-only time ends and when a dice winner fails to pick"
+   },
+   "0x303B": {
+    "dir": "S→C",
+    "name": "NC_ITEM_DICE_GAME_CMD",
+    "basis": "zone ShineDropItem_so_DiceItemPickInit FUN_00531020; client GameFrameWork::On_NC_ITEM_DICE_GAME_CMD FUN_0049c530",
+    "fields": [
+     [
+      0,
+      "u16",
+      "itemhandle",
+      "the drop"
+     ],
+     [
+      2,
+      "s32",
+      "nGameTimesec",
+      "BelongDice.shn DiceTimeLimit (15), default 15 when the table is empty"
+     ]
+    ],
+    "notes": "to every party/raid member within 1000 units of the picker (2..20 players); the client opens RollingDiceWin with this item and timer"
+   },
+   "0x303E": {
+    "dir": "S→C",
+    "name": "NC_ITEM_DICE_GAME_START_CMD",
+    "basis": "zone FUN_00531310 (sd_DiceMyGameResultBroadCast); client FUN_004b26c0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "charhandle",
+      "player who rolled or passed"
+     ],
+     [
+      2,
+      "s32",
+      "diceresult",
+      "1..100 (distinct per game), 0xFFFE = passed / timed out"
+     ]
+    ],
+    "notes": "to every participant on the roller's map who is still in the party/raid; client prints '%s rolled the dice and the result was %d.' or '%s decided to give up the chance to roll the dice.'"
+   },
+   "0x303F": {
+    "dir": "S→C",
+    "name": "NC_ITEM_DICE_GAME_RESULT_CMD",
+    "basis": "zone FUN_0052ee60 (sd_DiceGameSendMsgResult) from FUN_00531470 (sd_DiceGameResult); client FUN_004b2750",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "0x2008 winner / 0x2009 everyone passed"
+     ],
+     [
+      2,
+      "char[20]",
+      "WinnerID",
+      "winner name (vt 0x56c); empty for 0x2009"
+     ],
+     [
+      22,
+      "s32",
+      "diceresult",
+      "winning roll; 0 for 0x2009"
+     ],
+     [
+      26,
+      "u16",
+      "PickItemID",
+      "drop+0x195 item ID at send time"
+     ]
+    ],
+    "notes": "to every participant still in the party/raid; client: 0x2008 → '%s acquired the %s item by rolling %d with the dice.' if PickItemID is a known item, else the error text"
+   },
+   "0x301B": {
+    "dir": "S→C",
+    "name": "NC_ITEM_PICKOTHER_ACK",
+    "basis": "zone ShinePlayer_sp_partyitemdistribute FUN_0052f630 / sp_RaidItemsidtribute FUN_0052f8a0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "itemid",
+      "picked item"
+     ],
+     [
+      2,
+      "u16",
+      "towho",
+      "handle of the member who receives it"
+     ]
+    ],
+    "notes": "to the player who clicked, only when the receiver is someone else; the 2016 client has no handler (C01: dropped)"
    }
   }
  }
