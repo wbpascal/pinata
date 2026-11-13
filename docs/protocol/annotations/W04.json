@@ -779,6 +779,854 @@
      ]
     ],
     "notes": ""
+   },
+   "0x5401": {
+    "dir": "C→WM",
+    "name": "NC_FRIEND_SET_REQ",
+    "basis": "wm FUN_0041ca90",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "charid",
+      "not checked against the sender"
+     ],
+     [
+      20,
+      "Name5",
+      "friendid",
+      "target, by name"
+     ]
+    ],
+    "notes": "size 0x28, length not checked"
+   },
+   "0x5402": {
+    "dir": "WM→C",
+    "name": "NC_FRIEND_SET_ACK",
+    "basis": "wm FUN_0041ca90, FUN_0041cd70, FUN_00411600",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "charid",
+      "client shows only if = own name"
+     ],
+     [
+      20,
+      "Name5",
+      "friendid",
+      ""
+     ],
+     [
+      40,
+      "u16",
+      "err",
+      "0x941 ok … 0x94E; W04 §5.3"
+     ]
+    ],
+    "notes": "size 0x2A"
+   },
+   "0x5403": {
+    "dir": "WM→C",
+    "name": "NC_FRIEND_SET_CONFIRM_REQ",
+    "basis": "wm FUN_0041ca90",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "charid",
+      "= request friendid (the receiver)"
+     ],
+     [
+      20,
+      "Name5",
+      "friendid",
+      "= request charid (the requester)"
+     ]
+    ],
+    "notes": "size 0x28"
+   },
+   "0x5404": {
+    "dir": "C→WM",
+    "name": "NC_FRIEND_SET_CONFIRM_ACK",
+    "basis": "wm FUN_0041cd70",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "charid",
+      "answering player"
+     ],
+     [
+      20,
+      "Name5",
+      "friendid",
+      "requester, looked up by name"
+     ],
+     [
+      40,
+      "u8",
+      "accept_friend",
+      "1 accept, else refuse"
+     ]
+    ],
+    "notes": "size 0x29"
+   },
+   "0x5405": {
+    "dir": "C→WM",
+    "name": "NC_FRIEND_DEL_REQ",
+    "basis": "wm FUN_0041d230",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "charid",
+      ""
+     ],
+     [
+      20,
+      "Name5",
+      "friendid",
+      ""
+     ]
+    ],
+    "notes": "size 0x28"
+   },
+   "0x5406": {
+    "dir": "WM→C",
+    "name": "NC_FRIEND_DEL_ACK",
+    "basis": "wm FUN_0041d230, FUN_004105d0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "charid",
+      ""
+     ],
+     [
+      20,
+      "Name5",
+      "friendid",
+      ""
+     ],
+     [
+      40,
+      "u16",
+      "err",
+      "0x951 ok, 0x952 DB error, 0x953 not found, 0x954 prison (silent)"
+     ]
+    ],
+    "notes": "size 0x2A"
+   },
+   "0x5407": {
+    "dir": "WM→C",
+    "name": "NC_FRIEND_LIST_CMD",
+    "basis": "wm FUN_00430ae0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "numoffriend",
+      ""
+     ],
+     [
+      1,
+      "PROTO_FRIEND_INFO[n]",
+      "friendinfo",
+      "0x48 each, raw copy of the session list"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x5408": {
+    "dir": "WM→C",
+    "name": "NC_FRIEND_ADD_CMD",
+    "basis": "wm FUN_00411600, FUN_00410740",
+    "fields": [
+     [
+      0,
+      "PROTO_FRIEND_INFO",
+      "friendinfo",
+      "from 0x5411: logininfo bit0 = 1, bits 1-31 stale; statustitle '-' then stale"
+     ]
+    ],
+    "notes": "size 0x48"
+   },
+   "0x5409": {
+    "dir": "WM→C",
+    "name": "NC_FRIEND_LOGIN_CMD",
+    "basis": "wm FUN_00436900",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "charid",
+      ""
+     ],
+     [
+      20,
+      "Name3",
+      "map",
+      ""
+     ]
+    ],
+    "notes": "size 0x20"
+   },
+   "0x540b": {
+    "dir": "WM→C",
+    "name": "NC_FRIEND_REFUSE_CMD",
+    "basis": "wm FUN_0041cd70",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "friendid",
+      "the refusing player"
+     ]
+    ],
+    "notes": "size 0x14"
+   },
+   "0x5410": {
+    "dir": "WM→CharDB",
+    "name": "NC_FRIEND_DB_SET_REQ",
+    "basis": "wm FUN_0041cd70",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle_charno",
+      "requester"
+     ],
+     [
+      2,
+      "u16",
+      "handle_friendno",
+      "accepter"
+     ],
+     [
+      4,
+      "u32",
+      "charno",
+      "requester"
+     ],
+     [
+      8,
+      "u32",
+      "friendno",
+      "accepter"
+     ],
+     [
+      12,
+      "u8",
+      "flag",
+      "0"
+     ]
+    ],
+    "notes": "size 0xD"
+   },
+   "0x5414": {
+    "dir": "WM→CharDB",
+    "name": "NC_FRIEND_DB_GET_REQ",
+    "basis": "wm FUN_00436900",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle_char",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "charno",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "friendno",
+      "offline friend"
+     ]
+    ],
+    "notes": "size 0xA"
+   },
+   "0x541c": {
+    "dir": "CharDB→WM",
+    "name": "NC_FRIEND_DB_POINT_CMD",
+    "basis": "wm FUN_0040e5b0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "numoffriend",
+      ""
+     ],
+     [
+      2,
+      "{u32 charregnum,u16 friendpoint,u16 diffpoint}[n]",
+      "pointinfo",
+      "8 each"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x541e": {
+    "dir": "WM→C",
+    "name": "NC_FRIEND_POINT_ACK",
+    "basis": "wm FUN_00418e60",
+    "fields": [
+     [
+      0,
+      "u16",
+      "friendpoint",
+      "session +0x1ED94"
+     ]
+    ],
+    "notes": "size 2"
+   },
+   "0x5420": {
+    "dir": "WM→C",
+    "name": "NC_FRIEND_FIND_FRIENDS_ACK",
+    "basis": "wm FUN_00423110",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "0x36C0 ok, 0x36C5 cooldown, 0x36C6 own list full"
+     ],
+     [
+      2,
+      "u16",
+      "numoffriend",
+      "≤ 50"
+     ],
+     [
+      4,
+      "PROTO_FRIEND_INFO[n]",
+      "friendinfo",
+      "sorted by level difference"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x5424": {
+    "dir": "WM→C",
+    "name": "NC_FRIEND_SOMEONE_GET_SPECIALITEM_WORLD_CMD",
+    "basis": "wm FUN_0042d0f0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "charid",
+      ""
+     ]
+    ],
+    "notes": "broadcast in game, arena skipped"
+   },
+   "0x6007": {
+    "dir": "WM→Zone",
+    "name": "NC_CT_ADD_FRIEND_CMD",
+    "basis": "wm FUN_00411600",
+    "fields": [
+     [
+      0,
+      "u16",
+      "zoneHandle",
+      "session +0x118"
+     ],
+     [
+      2,
+      "u32",
+      "charNo",
+      ""
+     ],
+     [
+      6,
+      "u16",
+      "NumberOfFriends",
+      "list count"
+     ]
+    ],
+    "notes": "size 8"
+   },
+   "0x1010": {
+    "dir": "CharDB→WM",
+    "name": "NC_CHAR_FRIEND_CMD",
+    "basis": "wm FUN_0040a570",
+    "fields": [
+     [
+      0,
+      "u16",
+      "wmHandle",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "count",
+      "> 100 clamped"
+     ],
+     [
+      4,
+      "{u32 charNo, Name5 name, u8 flag}[n]",
+      "friends",
+      "25 bytes each"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x5804": {
+    "dir": "WM→C",
+    "name": "NC_KQ_STATUS_ACK",
+    "basis": "wm FUN_00413b20",
+    "fields": [
+     [
+      0,
+      "u32",
+      "Handle",
+      "echoed"
+     ],
+     [
+      4,
+      "u8",
+      "Status",
+      "10 = not found"
+     ],
+     [
+      5,
+      "u16",
+      "NumOfJoiner",
+      ""
+     ],
+     [
+      7,
+      "Name5[n]",
+      "JoinerNameList",
+      "'' for joiners without CHARDATA"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x5806": {
+    "dir": "WM→C",
+    "name": "NC_KQ_JOIN_ACK",
+    "basis": "wm FUN_00413cc0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "Handle",
+      "echoed"
+     ],
+     [
+      4,
+      "u16",
+      "Error",
+      "0x991 ok, 0x992-0x998 KQ_Join, 0x999 prison, 0x99A already joined"
+     ]
+    ],
+    "notes": "size 6"
+   },
+   "0x5808": {
+    "dir": "WM→C",
+    "name": "NC_KQ_JOIN_CANCEL_ACK",
+    "basis": "wm FUN_00413d70",
+    "fields": [
+     [
+      0,
+      "u32",
+      "Handle",
+      "echoed"
+     ],
+     [
+      4,
+      "u16",
+      "Error",
+      "0x9A1 ok, 0x9A2 not in a KQ"
+     ]
+    ],
+    "notes": "size 6"
+   },
+   "0x5824": {
+    "dir": "WM→C",
+    "name": "NC_KQ_JOINING_ALARM_CMD",
+    "basis": "wm FUN_00452930",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nHandle",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "nID",
+      ""
+     ],
+     [
+      6,
+      "u8",
+      "nMinLev",
+      ""
+     ],
+     [
+      7,
+      "u8",
+      "nMaxLev",
+      ""
+     ],
+     [
+      8,
+      "u8",
+      "MsgLength",
+      "strlen"
+     ],
+     [
+      9,
+      "char[n]",
+      "Msg",
+      "WM text #0 with the title"
+     ]
+    ],
+    "notes": "to every client session"
+   },
+   "0x5825": {
+    "dir": "WM→C",
+    "name": "NC_KQ_JOINING_ALARM_END_CMD",
+    "basis": "wm FUN_00452a70",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nHandle",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "nID",
+      ""
+     ]
+    ],
+    "notes": "to every client session"
+   },
+   "0x5826": {
+    "dir": "WM→C",
+    "name": "NC_KQ_JOINING_ALARM_LIST",
+    "basis": "wm FUN_00452b60",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nNumOfKQ",
+      ""
+     ],
+     [
+      2,
+      "KQ_JOINING_ALARM_INFO[n]",
+      "KQList",
+      "8 each, Status-2 KQs"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x5828": {
+    "dir": "WM→C",
+    "name": "NC_KQ_VOTE_START_ACK",
+    "basis": "wm FUN_00456310",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x3100 ok, 0x3101-0x3109"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x5829": {
+    "dir": "WM→C",
+    "name": "NC_KQ_VOTE_VOTING_CMD",
+    "basis": "wm FUN_00456310",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sStarter",
+      ""
+     ],
+     [
+      20,
+      "Name5",
+      "sTarget",
+      ""
+     ],
+     [
+      40,
+      "u8",
+      "nVoteType",
+      "from request"
+     ],
+     [
+      41,
+      "tm",
+      "tEndTime",
+      "0x24"
+     ],
+     [
+      77,
+      "u8",
+      "nLen",
+      ""
+     ],
+     [
+      78,
+      "char[nLen]",
+      "sContents",
+      ""
+     ]
+    ],
+    "notes": ""
+   },
+   "0x582b": {
+    "dir": "WM→C",
+    "name": "NC_KQ_VOTE_VOTING_ACK",
+    "basis": "wm FUN_00452ee0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x3110 ok, 0x3111-0x3113"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x582c": {
+    "dir": "WM→C",
+    "name": "NC_KQ_VOTE_RESULT_SUC_CMD",
+    "basis": "wm FUN_00454f60",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sTarget",
+      ""
+     ],
+     [
+      20,
+      "u8",
+      "nVoteRate",
+      "required %"
+     ],
+     [
+      21,
+      "u8",
+      "nYesNum",
+      ""
+     ],
+     [
+      22,
+      "u8",
+      "nNoNum",
+      ""
+     ],
+     [
+      23,
+      "u8",
+      "nCancelNum",
+      "ballots not cast"
+     ]
+    ],
+    "notes": "size 0x18"
+   },
+   "0x582d": {
+    "dir": "WM→C",
+    "name": "NC_KQ_VOTE_RESULT_FAIL_CMD",
+    "basis": "wm FUN_00454f60",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sTarget",
+      ""
+     ],
+     [
+      20,
+      "u8",
+      "nYesNum",
+      ""
+     ],
+     [
+      21,
+      "u8",
+      "nNoNum",
+      ""
+     ],
+     [
+      22,
+      "u8",
+      "nCancelNum",
+      ""
+     ]
+    ],
+    "notes": "size 0x17"
+   },
+   "0x582e": {
+    "dir": "WM→C",
+    "name": "NC_KQ_VOTE_CANCEL_CMD",
+    "basis": "wm FUN_00454510",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sTarget",
+      ""
+     ]
+    ],
+    "notes": "size 0x14"
+   },
+   "0x5832": {
+    "dir": "WM→C",
+    "name": "NC_KQ_JOIN_LIST_ACK",
+    "basis": "wm FUN_004568c0, FUN_00453bd0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x3118 ok, 0x3119 unknown KQ, 0x311A cooldown"
+     ],
+     [
+      2,
+      "u8",
+      "nNum",
+      ""
+     ],
+     [
+      3,
+      "KQ_JOIN_CHAR_INFO[n]",
+      "CharInfoList",
+      "{u8 level,u8 class,Name5,u8 team} 0x17 each"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x5835": {
+    "dir": "WM→C",
+    "name": "NC_KQ_VOTE_START_CHECK_ACK",
+    "basis": "wm FUN_00453340",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x3120 ok, 0x3121 running, 0x3122 cooldown"
+     ]
+    ],
+    "notes": ""
+   },
+   "0x5838": {
+    "dir": "WM→C",
+    "name": "NC_KQ_TEAM_SELECT_ACK",
+    "basis": "wm FUN_004536c0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nError",
+      "0x31F0 ok, 0x31F1-0x31F7"
+     ],
+     [
+      2,
+      "u8",
+      "nTeamType",
+      "2 unless ok"
+     ]
+    ],
+    "notes": "size 3"
+   },
+   "0x5839": {
+    "dir": "WM→C",
+    "name": "NC_KQ_TEAM_SELECT_CMD",
+    "basis": "wm FUN_004536c0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sCharID",
+      ""
+     ],
+     [
+      20,
+      "u8",
+      "nTeamType",
+      ""
+     ]
+    ],
+    "notes": "size 0x15"
+   },
+   "0x583b": {
+    "dir": "WM→Zone",
+    "name": "NC_KQ_PLAYER_DISJOIN_CMD",
+    "basis": "wm FUN_00453b10",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nHandle",
+      "KQ"
+     ],
+     [
+      4,
+      "u32",
+      "nCharNum",
+      ""
+     ]
+    ],
+    "notes": "all zones"
+   },
+   "0x5833": {
+    "dir": "WM→Zone",
+    "name": "NC_KQ_LINK_TO_FORCE_BY_BAN_CMD",
+    "basis": "wm FUN_004531a0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNum",
+      ""
+     ],
+     [
+      4,
+      "Name3[4]",
+      "sMapName",
+      "MapLink[i] instance map"
+     ]
+    ],
+    "notes": "size 0x34"
+   },
+   "0x6009": {
+    "dir": "Zone→WM",
+    "name": "NC_CT_LUASCRIPT_SET_WORLD_CMD",
+    "basis": "wm FUN_0042cda0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      4,
+      "CT_INFO",
+      "CTInfo",
+      "u8 Type, u8 ElementNo:6 ElementValue:2"
+     ]
+    ],
+    "notes": "forwarded as 0x380A (W04-B19)"
    }
   }
  },

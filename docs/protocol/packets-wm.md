@@ -8096,6 +8096,25 @@ client sender needs adminlevel 100 and no prison
 | 2 | u8 | numofavatar | 0xFF = DB error (pdb2017 name) |
 | 3 | AVATAR[numofavatar] | avatar | 0x82 bytes each = PROTO_AVATARINFORMATION, W01 §6.1 (pdb2017 name) |
 
+### `0x1010` NC_CHAR_FRIEND_CMD † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040a570)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wmHandle |  |
+| 2 | u16 | count | > 100 clamped |
+| 4 | {u32 charNo, Name5 name, u8 flag}[n] | friends | 25 bytes each |
+
+### `0x541c` NC_FRIEND_DB_POINT_CMD † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040e5b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | numoffriend |  |
+| 2 | {u32 charregnum,u16 friendpoint,u16 diffpoint}[n] | pointinfo | 8 each |
+
 ### `0x200c` NC_ACT_WHISPER_REQ † (C→WM)
 
 **Verified layout** (basis: wm FUN_0041c610)
@@ -8116,6 +8135,40 @@ client sender needs adminlevel 100 and no prison
 | 0 | u8 | itemLinkDataCount | unchecked |
 | 1 | u8 | len | ≥ 0x81 → 0x07C2 |
 | 2 | char[len] | content | then item links |
+
+### `0x5401` NC_FRIEND_SET_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041ca90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid | not checked against the sender |
+| 20 | Name5 | friendid | target, by name |
+
+size 0x28, length not checked
+
+### `0x5404` NC_FRIEND_SET_CONFIRM_ACK † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041cd70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid | answering player |
+| 20 | Name5 | friendid | requester, looked up by name |
+| 40 | u8 | accept_friend | 1 accept, else refuse |
+
+size 0x29
+
+### `0x5405` NC_FRIEND_DEL_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041d230)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid |  |
+| 20 | Name5 | friendid |  |
+
+size 0x28
 
 ### `0x7405` NC_GUILD_MAKE_REQ † (C→WM)
 
@@ -8703,6 +8756,285 @@ broadcast raw to every client session
 |---|---|---|---|
 | 0 | u32 | nTextIndex | MobKillAnnounceType |
 
+### `0x5402` NC_FRIEND_SET_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041ca90, FUN_0041cd70, FUN_00411600)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid | client shows only if = own name |
+| 20 | Name5 | friendid |  |
+| 40 | u16 | err | 0x941 ok … 0x94E; W04 §5.3 |
+
+size 0x2A
+
+### `0x5403` NC_FRIEND_SET_CONFIRM_REQ † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041ca90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid | = request friendid (the receiver) |
+| 20 | Name5 | friendid | = request charid (the requester) |
+
+size 0x28
+
+### `0x5406` NC_FRIEND_DEL_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041d230, FUN_004105d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid |  |
+| 20 | Name5 | friendid |  |
+| 40 | u16 | err | 0x951 ok, 0x952 DB error, 0x953 not found, 0x954 prison (silent) |
+
+size 0x2A
+
+### `0x5407` NC_FRIEND_LIST_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00430ae0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | numoffriend |  |
+| 1 | PROTO_FRIEND_INFO[n] | friendinfo | 0x48 each, raw copy of the session list |
+
+### `0x5408` NC_FRIEND_ADD_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00411600, FUN_00410740)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_FRIEND_INFO | friendinfo | from 0x5411: logininfo bit0 = 1, bits 1-31 stale; statustitle '-' then stale |
+
+size 0x48
+
+### `0x5409` NC_FRIEND_LOGIN_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00436900)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid |  |
+| 20 | Name3 | map |  |
+
+size 0x20
+
+### `0x540b` NC_FRIEND_REFUSE_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041cd70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | friendid | the refusing player |
+
+size 0x14
+
+### `0x541e` NC_FRIEND_POINT_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00418e60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | friendpoint | session +0x1ED94 |
+
+size 2
+
+### `0x5420` NC_FRIEND_FIND_FRIENDS_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00423110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error | 0x36C0 ok, 0x36C5 cooldown, 0x36C6 own list full |
+| 2 | u16 | numoffriend | ≤ 50 |
+| 4 | PROTO_FRIEND_INFO[n] | friendinfo | sorted by level difference |
+
+### `0x5424` NC_FRIEND_SOMEONE_GET_SPECIALITEM_WORLD_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_0042d0f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | charid |  |
+
+broadcast in game, arena skipped
+
+### `0x5804` NC_KQ_STATUS_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00413b20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle | echoed |
+| 4 | u8 | Status | 10 = not found |
+| 5 | u16 | NumOfJoiner |  |
+| 7 | Name5[n] | JoinerNameList | '' for joiners without CHARDATA |
+
+### `0x5806` NC_KQ_JOIN_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00413cc0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle | echoed |
+| 4 | u16 | Error | 0x991 ok, 0x992-0x998 KQ_Join, 0x999 prison, 0x99A already joined |
+
+size 6
+
+### `0x5808` NC_KQ_JOIN_CANCEL_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00413d70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle | echoed |
+| 4 | u16 | Error | 0x9A1 ok, 0x9A2 not in a KQ |
+
+size 6
+
+### `0x5824` NC_KQ_JOINING_ALARM_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00452930)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nHandle |  |
+| 4 | u16 | nID |  |
+| 6 | u8 | nMinLev |  |
+| 7 | u8 | nMaxLev |  |
+| 8 | u8 | MsgLength | strlen |
+| 9 | char[n] | Msg | WM text #0 with the title |
+
+to every client session
+
+### `0x5825` NC_KQ_JOINING_ALARM_END_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00452a70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nHandle |  |
+| 4 | u16 | nID |  |
+
+to every client session
+
+### `0x5826` NC_KQ_JOINING_ALARM_LIST † (WM→C)
+
+**Verified layout** (basis: wm FUN_00452b60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNumOfKQ |  |
+| 2 | KQ_JOINING_ALARM_INFO[n] | KQList | 8 each, Status-2 KQs |
+
+### `0x5828` NC_KQ_VOTE_START_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00456310)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3100 ok, 0x3101-0x3109 |
+
+### `0x5829` NC_KQ_VOTE_VOTING_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00456310)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sStarter |  |
+| 20 | Name5 | sTarget |  |
+| 40 | u8 | nVoteType | from request |
+| 41 | tm | tEndTime | 0x24 |
+| 77 | u8 | nLen |  |
+| 78 | char[nLen] | sContents |  |
+
+### `0x582b` NC_KQ_VOTE_VOTING_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00452ee0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3110 ok, 0x3111-0x3113 |
+
+### `0x582c` NC_KQ_VOTE_RESULT_SUC_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00454f60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sTarget |  |
+| 20 | u8 | nVoteRate | required % |
+| 21 | u8 | nYesNum |  |
+| 22 | u8 | nNoNum |  |
+| 23 | u8 | nCancelNum | ballots not cast |
+
+size 0x18
+
+### `0x582d` NC_KQ_VOTE_RESULT_FAIL_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00454f60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sTarget |  |
+| 20 | u8 | nYesNum |  |
+| 21 | u8 | nNoNum |  |
+| 22 | u8 | nCancelNum |  |
+
+size 0x17
+
+### `0x582e` NC_KQ_VOTE_CANCEL_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00454510)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sTarget |  |
+
+size 0x14
+
+### `0x5832` NC_KQ_JOIN_LIST_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004568c0, FUN_00453bd0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3118 ok, 0x3119 unknown KQ, 0x311A cooldown |
+| 2 | u8 | nNum |  |
+| 3 | KQ_JOIN_CHAR_INFO[n] | CharInfoList | {u8 level,u8 class,Name5,u8 team} 0x17 each |
+
+### `0x5835` NC_KQ_VOTE_START_CHECK_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00453340)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3120 ok, 0x3121 running, 0x3122 cooldown |
+
+### `0x5838` NC_KQ_TEAM_SELECT_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_004536c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x31F0 ok, 0x31F1-0x31F7 |
+| 2 | u8 | nTeamType | 2 unless ok |
+
+size 3
+
+### `0x5839` NC_KQ_TEAM_SELECT_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_004536c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sCharID |  |
+| 20 | u8 | nTeamType |  |
+
+size 0x15
+
 ### `0x7404` NC_GUILD_LIST_ACK † (WM→C)
 
 **Verified layout** (basis: wm FUN_00445660)
@@ -8954,6 +9286,32 @@ W01 name was 'character create request (ours)'
 | 7 | char[20] | name |  |
 
 W01 name was 'character rename request (ours)'
+
+### `0x5410` NC_FRIEND_DB_SET_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0041cd70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle_charno | requester |
+| 2 | u16 | handle_friendno | accepter |
+| 4 | u32 | charno | requester |
+| 8 | u32 | friendno | accepter |
+| 12 | u8 | flag | 0 |
+
+size 0xD
+
+### `0x5414` NC_FRIEND_DB_GET_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00436900)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle_char |  |
+| 2 | u32 | charno |  |
+| 6 | u32 | friendno | offline friend |
+
+size 0xA
 
 ### `0x7468` NC_GUILD_DB_RESULT_WRITE_CMD (WM→CharDB)
 
@@ -9238,6 +9596,28 @@ rest stale when not found
 | 14 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 16 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
 
+### `0x5833` NC_KQ_LINK_TO_FORCE_BY_BAN_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_004531a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNum |  |
+| 4 | Name3[4] | sMapName | MapLink[i] instance map |
+
+size 0x34
+
+### `0x583b` NC_KQ_PLAYER_DISJOIN_CMD † (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00453b10)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nHandle | KQ |
+| 4 | u32 | nCharNum |  |
+
+all zones
+
 ### `0x6006` NC_CT_CHARTTING_CMD (WM→Zone)
 
 **Verified layout** (basis: wm FUN_0041c610 / FUN_00413510)
@@ -9246,6 +9626,18 @@ rest stale when not found
 |---|---|---|---|
 | 0 | u16 | zoneHandle | session +0x118 |
 | 2 | u32 | charNo |  |
+
+### `0x6007` NC_CT_ADD_FRIEND_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00411600)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | zoneHandle | session +0x118 |
+| 2 | u32 | charNo |  |
+| 6 | u16 | NumberOfFriends | list count |
+
+size 8
 
 ### `0x7481` NC_GUILD_TOURNAMENT_START_CMD (WM→Zone)
 
@@ -9692,6 +10084,17 @@ re-broadcast as 0x2079 with the same layout
 | 0 | u16 | wmshandle |  |
 | 2 | u32 | chrregnum |  |
 | 6 | u16 | passiveskillid | appended to the passive blob |
+
+### `0x6009` NC_CT_LUASCRIPT_SET_WORLD_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042cda0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | CT_INFO | CTInfo | u8 Type, u8 ElementNo:6 ElementValue:2 |
+
+forwarded as 0x380A (W04-B19)
 
 ### `0x7445` NC_GUILD_ZONE_WAR_KILL_CMD † (Zone→WM)
 
