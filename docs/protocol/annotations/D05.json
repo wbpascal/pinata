@@ -2337,6 +2337,2048 @@
      ]
     ],
     "notes": "CSendPacket, 12 bytes"
+   },
+   "0x0455": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ITEM_MOB_DROP",
+    "basis": "gamelog FUN_00404d90",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ],
+     [
+      24,
+      "u64",
+      "itemkey",
+      "tGameLog.nItemKey"
+     ],
+     [
+      32,
+      "u16",
+      "itemid",
+      "tGameLog.nTargetID"
+     ],
+     [
+      34,
+      "u16",
+      "itemlot",
+      "tGameLog.nInt1"
+     ],
+     [
+      36,
+      "u16",
+      "dropmobid",
+      "tGameLog.nInt2"
+     ]
+    ],
+    "notes": "payload 0x26 bytes as read by GameLog; procedure p_GameLog_Add_TypeJ, nType 85; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0456": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ITEM_MERGE",
+    "basis": "gamelog FUN_00404e60",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ],
+     [
+      24,
+      "u16",
+      "itemid",
+      "tGameLog.nTargetID"
+     ],
+     [
+      26,
+      "u64",
+      "itemkeyadd",
+      "tGameLog.nItemKey"
+     ],
+     [
+      34,
+      "u64",
+      "itemkeysub",
+      "tGameLog.nBigint1"
+     ],
+     [
+      42,
+      "u16",
+      "itemlot",
+      "tGameLog.nInt1"
+     ],
+     [
+      44,
+      "u16",
+      "itemlotadd",
+      "tGameLog.nInt2"
+     ],
+     [
+      46,
+      "u16",
+      "itemlotsub",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0x30 bytes as read by GameLog; procedure p_GameLog_Add_TypeF, nType 86; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0457": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ITEM_SPLIT",
+    "basis": "gamelog FUN_00404f40",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ],
+     [
+      24,
+      "u16",
+      "itemid",
+      "tGameLog.nTargetID"
+     ],
+     [
+      26,
+      "u64",
+      "itemkey",
+      "tGameLog.nItemKey"
+     ],
+     [
+      34,
+      "u64",
+      "itemkeynew",
+      "tGameLog.nBigint1"
+     ],
+     [
+      42,
+      "u16",
+      "itemlotsplit",
+      "tGameLog.nInt1"
+     ],
+     [
+      44,
+      "u16",
+      "itemlotremain",
+      "tGameLog.nInt2"
+     ]
+    ],
+    "notes": "payload 0x2e bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType 87; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0458": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ITEM_SOULSTONEBUY",
+    "basis": "gamelog FUN_00405010",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ],
+     [
+      24,
+      "u8",
+      "flag",
+      "tGameLog.nInt1"
+     ],
+     [
+      25,
+      "u16",
+      "number",
+      "tGameLog.nInt2"
+     ],
+     [
+      27,
+      "u64",
+      "price",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x23 bytes as read by GameLog; procedure p_GameLog_Add_TypeK, nType 88; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0459": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ITEM_USELOT",
+    "basis": "gamelog FUN_004050d0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u64",
+      "itemkey",
+      "tGameLog.nItemKey"
+     ],
+     [
+      12,
+      "u16",
+      "itemid",
+      "tGameLog.nInt1"
+     ],
+     [
+      14,
+      "u16",
+      "itemlot",
+      "tGameLog.nInt2"
+     ]
+    ],
+    "notes": "payload 0x10 bytes as read by GameLog; procedure p_GameLog_Add_TypeD, nType 89; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x045a": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ITEM_USEALL",
+    "basis": "gamelog FUN_00405160",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u64",
+      "itemkey",
+      "tGameLog.nItemKey"
+     ],
+     [
+      12,
+      "u16",
+      "itemid",
+      "tGameLog.nInt1"
+     ]
+    ],
+    "notes": "payload 0xe bytes as read by GameLog; procedure p_GameLog_Add_TypeD, nType 90; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x045b": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ITEM_BOOTH_BUY",
+    "basis": "gamelog FUN_004051f0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum_buyer",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "chrregnum_seller",
+      "tGameLog.nTargetCharNo"
+     ],
+     [
+      8,
+      "u64",
+      "itemkey",
+      "tGameLog.nItemKey"
+     ],
+     [
+      16,
+      "u16",
+      "itemid",
+      "tGameLog.nTargetID"
+     ],
+     [
+      18,
+      "u16",
+      "tradelot",
+      "tGameLog.nInt1"
+     ],
+     [
+      20,
+      "u64",
+      "money",
+      "tGameLog.nInt2 (low 32 bits)"
+     ],
+     [
+      28,
+      "u16",
+      "newlot",
+      "tGameLog.nInt3"
+     ],
+     [
+      30,
+      "u64",
+      "newmoney",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x26 bytes as read by GameLog; procedure p_GameLog_Add, nType 91; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x045c": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ITEM_BOOTH_SELL",
+    "basis": "gamelog FUN_004051f0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum_seller",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "chrregnum_buyer",
+      "tGameLog.nTargetCharNo"
+     ],
+     [
+      8,
+      "u64",
+      "itemkey",
+      "tGameLog.nItemKey"
+     ],
+     [
+      16,
+      "u16",
+      "itemid",
+      "tGameLog.nTargetID"
+     ],
+     [
+      18,
+      "u16",
+      "tradelot",
+      "tGameLog.nInt1"
+     ],
+     [
+      20,
+      "u64",
+      "money",
+      "tGameLog.nInt2 (low 32 bits)"
+     ],
+     [
+      28,
+      "u16",
+      "newlot",
+      "tGameLog.nInt3"
+     ],
+     [
+      30,
+      "u64",
+      "newmoney",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x26 bytes as read by GameLog; procedure p_GameLog_Add, nType 92; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x045d": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ITEM_PRODUCT_STUFF",
+    "basis": "gamelog FUN_00405370",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u64",
+      "itemkey",
+      "tGameLog.nItemKey"
+     ],
+     [
+      12,
+      "u16",
+      "itemid",
+      "tGameLog.nTargetID"
+     ],
+     [
+      14,
+      "u64",
+      "itemkey_stuff",
+      "tGameLog.nBigint1"
+     ],
+     [
+      22,
+      "u16",
+      "itemid_stuff",
+      "tGameLog.nTargetCharNo"
+     ],
+     [
+      24,
+      "u16",
+      "itemlot_stuff_use",
+      "tGameLog.nInt1"
+     ],
+     [
+      26,
+      "u16",
+      "itemlot_stuff_before",
+      "tGameLog.nInt2"
+     ],
+     [
+      28,
+      "u16",
+      "itemlot_stuff_last",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0x1e bytes as read by GameLog; procedure p_GameLog_Add, nType 93; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x045e": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_MONEY_DEPOSIT",
+    "basis": "gamelog FUN_004054f0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "deposit_money",
+      "tGameLog.nInt1"
+     ],
+     [
+      8,
+      "u32",
+      "userregnum",
+      "tGameLog.nInt2"
+     ],
+     [
+      12,
+      "u64",
+      "user_result_money",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x14 bytes as read by GameLog; procedure p_GameLog_Add_TypeK, nType 94; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x045f": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_MONEY_WITHDRAW",
+    "basis": "gamelog FUN_004054f0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "withdraw_money",
+      "tGameLog.nInt1"
+     ],
+     [
+      8,
+      "u32",
+      "userregnum",
+      "tGameLog.nInt2"
+     ],
+     [
+      12,
+      "u64",
+      "user_result_money",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x14 bytes as read by GameLog; procedure p_GameLog_Add_TypeK, nType 95; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0460": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_MONEY_TRADE_INCOME",
+    "basis": "gamelog FUN_004055a0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "chrregnum_from",
+      "tGameLog.nInt1"
+     ],
+     [
+      8,
+      "u64",
+      "cen",
+      "tGameLog.nBigint1"
+     ],
+     [
+      16,
+      "u64",
+      "result_money",
+      "tGameLog.nItemKey"
+     ]
+    ],
+    "notes": "payload 0x18 bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType 96; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0461": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_MONEY_TRADE_OUTGO",
+    "basis": "gamelog FUN_004055a0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "chrregnum_to",
+      "tGameLog.nInt1"
+     ],
+     [
+      8,
+      "u64",
+      "cen",
+      "tGameLog.nBigint1"
+     ],
+     [
+      16,
+      "u64",
+      "result_money",
+      "tGameLog.nItemKey"
+     ]
+    ],
+    "notes": "payload 0x18 bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType 97; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0462": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_MONEY_CHANGE",
+    "basis": "gamelog FUN_00405660",
+    "fields": [
+     [
+      4,
+      "u64",
+      "prev_cen",
+      "tGameLog.nItemKey"
+     ],
+     [
+      12,
+      "u64",
+      "last_cen",
+      "tGameLog.nBigint1"
+     ],
+     [
+      20,
+      "u64",
+      "adv_cen",
+      "tGameLog.nInt1 (low 32 bits)"
+     ]
+    ],
+    "notes": "payload 0x1c bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType not set (0); struct zeroed first; pdb2017 field names, offsets checked in the 2016 code; chrregnum @0x0 is not read (D05-B6)"
+   },
+   "0x0464": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ENCHANNT",
+    "basis": "gamelog FUN_004056f0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ],
+     [
+      24,
+      "u8",
+      "enchanteid",
+      "tGameLog.nInt1"
+     ],
+     [
+      25,
+      "u16",
+      "enchantecount",
+      "tGameLog.nInt2"
+     ],
+     [
+      27,
+      "u16",
+      "enchantetotalcount",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0x1d bytes as read by GameLog; procedure p_GameLog_Add_Type4, nType 100; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0465": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_DISENCHANT",
+    "basis": "gamelog FUN_004056f0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ],
+     [
+      24,
+      "u8",
+      "disenchanteid",
+      "tGameLog.nInt1"
+     ],
+     [
+      25,
+      "u16",
+      "disenchantecount",
+      "tGameLog.nInt2"
+     ],
+     [
+      27,
+      "u16",
+      "disenchantetotalcount",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0x1d bytes as read by GameLog; procedure p_GameLog_Add_Type4, nType 101; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0478": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_FRIEND_ADD",
+    "basis": "gamelog FUN_004057b0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ],
+     [
+      24,
+      "u32",
+      "addchrregnum",
+      "tGameLog.nTargetCharNo"
+     ]
+    ],
+    "notes": "payload 0x1c bytes as read by GameLog; procedure p_GameLog_Add_TypeH, nType 120; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0479": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_FRIEND_DELETE",
+    "basis": "gamelog FUN_004057b0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ],
+     [
+      24,
+      "u32",
+      "delchrregnum",
+      "tGameLog.nTargetCharNo"
+     ]
+    ],
+    "notes": "payload 0x1c bytes as read by GameLog; procedure p_GameLog_Add_TypeH, nType 121; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0482": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_MAS_PUP_ADD",
+    "basis": "gamelog FUN_00405860",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ],
+     [
+      24,
+      "u32",
+      "addchrregnum",
+      "tGameLog.nTargetCharNo"
+     ],
+     [
+      28,
+      "u8",
+      "type",
+      "tGameLog.nTargetID"
+     ]
+    ],
+    "notes": "payload 0x1d bytes as read by GameLog; procedure p_GameLog_Add_TypeI, nType 130; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0483": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_MAS_PUP_DELETE",
+    "basis": "gamelog FUN_00405860",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ],
+     [
+      24,
+      "u32",
+      "delchrregnum",
+      "tGameLog.nTargetCharNo"
+     ],
+     [
+      28,
+      "u8",
+      "type",
+      "tGameLog.nTargetID"
+     ]
+    ],
+    "notes": "payload 0x1d bytes as read by GameLog; procedure p_GameLog_Add_TypeI, nType 131; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x048c": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_GUILD_CREATE",
+    "basis": "gamelog FUN_00405910",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "guildregnum",
+      "tGameLog.nTargetID"
+     ],
+     [
+      8,
+      "u64",
+      "money_use",
+      "tGameLog.nInt1 (low 32 bits)"
+     ],
+     [
+      16,
+      "u64",
+      "money_last",
+      "tGameLog.nBigint1"
+     ],
+     [
+      24,
+      "Name4",
+      "sGuildName",
+      "tGameLog.sMap"
+     ]
+    ],
+    "notes": "payload 0x28 bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType 140; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x048d": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_GUILD_DELETE",
+    "basis": "gamelog FUN_004059d0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "guildregnum",
+      "tGameLog.nTargetID"
+     ],
+     [
+      4,
+      "Name4",
+      "sGuildName",
+      "tGameLog.sMap"
+     ]
+    ],
+    "notes": "payload 0x14 bytes as read by GameLog; procedure p_GameLog_Add_TypeI, nType 141; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x04a3": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_GUILD_M_GRADE",
+    "basis": "gamelog FUN_00405a70",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "guildregnum",
+      "tGameLog.nInt1"
+     ],
+     [
+      8,
+      "u32",
+      "chrregnum_grade",
+      "tGameLog.nTargetCharNo"
+     ],
+     [
+      12,
+      "u8",
+      "guildmembergrade_old",
+      "tGameLog.nInt2"
+     ],
+     [
+      13,
+      "u8",
+      "guildmembergrade_new",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0xe bytes as read by GameLog; procedure p_GameLog_Add_TypeA, nType 163; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x04aa": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_GUILD_K_MONEY_WITHDRAW",
+    "basis": "gamelog FUN_00405b10",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "withdraw_money",
+      "tGameLog.nInt1"
+     ],
+     [
+      8,
+      "u32",
+      "guildregnum",
+      "tGameLog.nTargetID"
+     ],
+     [
+      12,
+      "u64",
+      "guild_result_money",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x14 bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType 170; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x04ab": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_GUILD_G_REWARD_MONEY",
+    "basis": "gamelog FUN_00405bc0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "guildregnum",
+      "tGameLog.nTargetID"
+     ],
+     [
+      4,
+      "u64",
+      "old_money",
+      "tGameLog.nItemKey"
+     ],
+     [
+      12,
+      "u64",
+      "new_money",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x14 bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType 171; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x04ac": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_GUILD_4_REWARD_FAME",
+    "basis": "gamelog FUN_00405c70",
+    "fields": [
+     [
+      0,
+      "u32",
+      "guildregnum",
+      "tGameLog.nTargetID"
+     ],
+     [
+      4,
+      "u32",
+      "old_fame",
+      "tGameLog.nInt2"
+     ],
+     [
+      8,
+      "u32",
+      "new_fame",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0xc bytes as read by GameLog; procedure p_GameLog_Add_TypeA, nType 172; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x04ad": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_GUILD_G_REWARD_EXP",
+    "basis": "gamelog FUN_00405bc0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "guildregnum",
+      "tGameLog.nTargetID"
+     ],
+     [
+      4,
+      "u64",
+      "old_exp",
+      "tGameLog.nItemKey"
+     ],
+     [
+      12,
+      "u64",
+      "new_exp",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x14 bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType 173; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x04ae": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_GUILD_4_TOURNAMENT_RESULT",
+    "basis": "gamelog FUN_00405d10",
+    "fields": [
+     [
+      0,
+      "u32",
+      "guildtournament_no",
+      "tGameLog.nInt1"
+     ],
+     [
+      4,
+      "u32",
+      "position",
+      "tGameLog.nInt2"
+     ],
+     [
+      8,
+      "u32",
+      "guildregnum",
+      "tGameLog.nTargetID"
+     ],
+     [
+      12,
+      "u32",
+      "result",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0x10 bytes as read by GameLog; procedure p_GameLog_Add_TypeA, nType 174; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x04af": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_GUILD_G_REWARD_TOKEN",
+    "basis": "gamelog FUN_00405bc0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "guildregnum",
+      "tGameLog.nTargetID"
+     ],
+     [
+      4,
+      "u64",
+      "old_token",
+      "tGameLog.nItemKey"
+     ],
+     [
+      12,
+      "u64",
+      "new_token",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x14 bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType 175; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x04b0": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_GUILD_G_REWARD_MONEY_DIVISION",
+    "basis": "gamelog FUN_00405bc0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "u32 @0x0",
+      "tGameLog.nTargetID"
+     ],
+     [
+      4,
+      "u64",
+      "u64 @0x4",
+      "tGameLog.nItemKey"
+     ],
+     [
+      12,
+      "u64",
+      "u64 @0xc",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x14 bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType 176; struct zeroed first; no 2017 PDB struct (the enum member exists, pdb2017); read like 0x04AB: guild, u64 old, u64 new (D04 \u00a76.4)"
+   },
+   "0x04be": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_CHARGE_WITHDRAW",
+    "basis": "gamelog FUN_00405db0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "ChargedItemOrderNo",
+      "tGameLog.nInt1"
+     ],
+     [
+      8,
+      "u32",
+      "ChargedItemCode",
+      "tGameLog.nInt2"
+     ],
+     [
+      12,
+      "u32",
+      "ChargedItemAmount",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0x10 bytes as read by GameLog; procedure p_GameLog_Add_Type4, nType 190; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x04c9": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_MINIHOUSE_BUILDING",
+    "basis": "gamelog FUN_00406280",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ]
+    ],
+    "notes": "payload 0x18 bytes as read by GameLog; procedure p_GameLog_Add_Type1, nType 201; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x04ca": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_MINIHOUSE_VISIT",
+    "basis": "gamelog FUN_00406320",
+    "fields": [
+     [
+      0,
+      "u32",
+      "owner_chrregnum",
+      "tGameLog.nTargetCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "visitor_chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      8,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      20,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      24,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ]
+    ],
+    "notes": "payload 0x1c bytes as read by GameLog; procedure p_GameLog_Add_TypeH, nType 202; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0518": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_QUEST_REWARD_EXP",
+    "basis": "gamelog FUN_00405e50",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u16",
+      "questid",
+      "tGameLog.nInt1"
+     ],
+     [
+      6,
+      "u64",
+      "old_exp",
+      "tGameLog.nItemKey"
+     ],
+     [
+      14,
+      "u64",
+      "new_exp",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x16 bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType 280; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0519": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_QUEST_REWARD_MONEY",
+    "basis": "gamelog FUN_00405e50",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u16",
+      "questid",
+      "tGameLog.nInt1"
+     ],
+     [
+      6,
+      "u64",
+      "old_money",
+      "tGameLog.nItemKey"
+     ],
+     [
+      14,
+      "u64",
+      "new_money",
+      "tGameLog.nBigint1"
+     ]
+    ],
+    "notes": "payload 0x16 bytes as read by GameLog; procedure p_GameLog_Add_TypeG, nType 281; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x051a": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_QUEST_REWARD_ITEM",
+    "basis": "gamelog FUN_00405ef0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u16",
+      "questid",
+      "tGameLog.nInt1"
+     ],
+     [
+      6,
+      "u64",
+      "itemkey",
+      "tGameLog.nItemKey"
+     ],
+     [
+      14,
+      "u16",
+      "itemid",
+      "tGameLog.nTargetID"
+     ]
+    ],
+    "notes": "payload 0x10 bytes as read by GameLog; procedure p_GameLog_Add_TypeJ, nType 282; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x051b": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_QUEST_REWARD_ABSTATE",
+    "basis": "gamelog FUN_004060d0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u16",
+      "questid",
+      "tGameLog.nInt1"
+     ],
+     [
+      6,
+      "u16",
+      "abstateid",
+      "tGameLog.nTargetID"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_Type3, nType 283; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x051c": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_QUEST_REWARD_FAME",
+    "basis": "gamelog FUN_00405f90",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u16",
+      "questid",
+      "tGameLog.nInt1"
+     ],
+     [
+      6,
+      "u32",
+      "old_fame",
+      "tGameLog.nInt2"
+     ],
+     [
+      10,
+      "u32",
+      "new_fame",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0xe bytes as read by GameLog; procedure p_GameLog_Add_Type4, nType 284; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x051d": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_QUEST_REWARD_PET",
+    "basis": "gamelog FUN_00406160",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u16",
+      "questid",
+      "tGameLog.nInt1"
+     ],
+     [
+      6,
+      "u32",
+      "petid",
+      "tGameLog.nTargetID"
+     ]
+    ],
+    "notes": "payload 0xa bytes as read by GameLog; procedure p_GameLog_Add_Type3, nType 285; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x051e": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_QUEST_REWARD_MINIHOUSE",
+    "basis": "gamelog FUN_004061f0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u16",
+      "questid",
+      "tGameLog.nInt1"
+     ],
+     [
+      6,
+      "u8",
+      "minihouseid",
+      "tGameLog.nTargetID"
+     ]
+    ],
+    "notes": "payload 0x7 bytes as read by GameLog; procedure p_GameLog_Add_Type3, nType 286; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x051f": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_QUEST_REWARD_TITLE",
+    "basis": "gamelog FUN_00406030",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u16",
+      "questid",
+      "tGameLog.nInt1"
+     ],
+     [
+      6,
+      "u8",
+      "ct_type",
+      "tGameLog.nInt2"
+     ],
+     [
+      7,
+      "u8",
+      "ct_elementno",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_Type4, nType 287; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0554": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ITEM_PUT_ON_BELONGED",
+    "basis": "gamelog FUN_004063e0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u64",
+      "itemkey",
+      "tGameLog.nItemKey"
+     ],
+     [
+      12,
+      "ITEM_INVEN",
+      "iteminvenfrom",
+      "tGameLog.nInt1"
+     ],
+     [
+      14,
+      "ITEM_INVEN",
+      "iteminvento",
+      "tGameLog.nInt2"
+     ]
+    ],
+    "notes": "payload 0x10 bytes as read by GameLog; procedure p_GameLog_Add_TypeD, nType 521 (0x209); pdb2017 field names, offsets checked in the 2016 code; nType = NC_LOG_GAME_ITEM_PUT_ON_BELONGED_EXT (pdb2017)"
+   },
+   "0x05ea": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_REGENLOCATESAVE_CMD",
+    "basis": "gamelog FUN_004069e0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "ChrRegNum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "Name3",
+      "SaveMap",
+      "tGameLog.sMap"
+     ],
+     [
+      16,
+      "u32",
+      "SaveLocate.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      20,
+      "u32",
+      "SaveLocate.y",
+      "tGameLog.nMapY"
+     ],
+     [
+      24,
+      "u32",
+      "KQHandle",
+      "tGameLog.nInt2"
+     ],
+     [
+      28,
+      "u32",
+      "InvalidLocate.x",
+      "tGameLog.nMapZ"
+     ],
+     [
+      32,
+      "u32",
+      "InvalidLocate.y",
+      "tGameLog.nInt1"
+     ],
+     [
+      36,
+      "u16",
+      "Flag",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0x26 bytes as read by GameLog; procedure p_GameLog_Add_Type4, nType 490; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0612": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GAME_ITEM_CW_BREAKATZERO",
+    "basis": "gamelog FUN_00405430",
+    "fields": [
+     [
+      0,
+      "u32",
+      "chrregnum",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u64",
+      "itemkey",
+      "tGameLog.nItemKey"
+     ],
+     [
+      12,
+      "Name3",
+      "mappos.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      24,
+      "u32",
+      "mappos.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      28,
+      "u32",
+      "mappos.y",
+      "tGameLog.nMapY"
+     ]
+    ],
+    "notes": "payload 0x20 bytes as read by GameLog; procedure p_GameLog_Add_Type9, nType 530; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0658": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_WEDDING_PROPOSE_EXE",
+    "basis": "gamelog FUN_00406500",
+    "fields": [
+     [
+      0,
+      "u32",
+      "CharRegisterNumber",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "PartnerRegisterNumber",
+      "tGameLog.nTargetCharNo"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_TypeH, nType 600; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0659": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_WEDDING_PROPOSE_CANCEL",
+    "basis": "gamelog FUN_00406500",
+    "fields": [
+     [
+      0,
+      "u32",
+      "CharRegisterNumber",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "PartnerRegisterNumber",
+      "tGameLog.nTargetCharNo"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_TypeH, nType 601; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x065a": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_WEDDING_DIVORCE_REQ",
+    "basis": "gamelog FUN_00406470",
+    "fields": [
+     [
+      0,
+      "u32",
+      "CharRegisterNumber",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "PartnerRegisterNumber",
+      "tGameLog.nTargetCharNo"
+     ],
+     [
+      8,
+      "u8",
+      "DivorceType",
+      "tGameLog.nInt1"
+     ]
+    ],
+    "notes": "payload 0x9 bytes as read by GameLog; procedure p_GameLog_Add_Type3, nType 602; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x065b": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_WEDDING_DIVORCE_EXE",
+    "basis": "gamelog FUN_00406500",
+    "fields": [
+     [
+      0,
+      "u32",
+      "CharRegisterNumber",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "PartnerRegisterNumber",
+      "tGameLog.nTargetCharNo"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_TypeH, nType 603; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x065c": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_WEDDING_DIVORCE_CANCEL",
+    "basis": "gamelog FUN_00406500",
+    "fields": [
+     [
+      0,
+      "u32",
+      "CharRegisterNumber",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "PartnerRegisterNumber",
+      "tGameLog.nTargetCharNo"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_TypeH, nType 604; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x065d": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_WEDDING_HALL_RESERVE",
+    "basis": "gamelog FUN_00406500",
+    "fields": [
+     [
+      0,
+      "u32",
+      "CharRegisterNumber",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "PartnerRegisterNumber",
+      "tGameLog.nTargetCharNo"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_TypeH, nType 605; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x065e": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_WEDDING_HALL_START",
+    "basis": "gamelog FUN_00406500",
+    "fields": [
+     [
+      0,
+      "u32",
+      "CharRegisterNumber",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "PartnerRegisterNumber",
+      "tGameLog.nTargetCharNo"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_TypeH, nType 606; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x065f": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_WEDDING_HALL_CANCEL",
+    "basis": "gamelog FUN_00406500",
+    "fields": [
+     [
+      0,
+      "u32",
+      "CharRegisterNumber",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "PartnerRegisterNumber",
+      "tGameLog.nTargetCharNo"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_TypeH, nType 607; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0660": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_WEDDING_WEDDING_EXE",
+    "basis": "gamelog FUN_00406500",
+    "fields": [
+     [
+      0,
+      "u32",
+      "CharRegisterNumber",
+      "tGameLog.nCharNo"
+     ],
+     [
+      4,
+      "u32",
+      "PartnerRegisterNumber",
+      "tGameLog.nTargetCharNo"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_TypeH, nType 608; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0752": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GUILD_ACADEMY_JOIN",
+    "basis": "gamelog FUN_00406590",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      "tGameLog.nInt1"
+     ],
+     [
+      4,
+      "u32",
+      "nCharNo",
+      "tGameLog.nCharNo"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_Type5, nType 850; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0753": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GUILD_ACADEMY_LEAVE",
+    "basis": "gamelog FUN_00406590",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      "tGameLog.nInt1"
+     ],
+     [
+      4,
+      "u32",
+      "nCharNo",
+      "tGameLog.nCharNo"
+     ]
+    ],
+    "notes": "payload 0x8 bytes as read by GameLog; procedure p_GameLog_Add_Type5, nType 851; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0754": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GUILD_ACADEMY_VANISH",
+    "basis": "gamelog FUN_004066c0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      "tGameLog.nInt1"
+     ],
+     [
+      4,
+      "u32",
+      "nVanishCharNo",
+      "tGameLog.nCharNo"
+     ],
+     [
+      8,
+      "u32",
+      "nTargetCharNo",
+      "tGameLog.nInt2"
+     ]
+    ],
+    "notes": "payload 0xc bytes as read by GameLog; procedure p_GameLog_Add_Type5, nType 852; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0755": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GUILD_ACADEMY_SET_MASTER",
+    "basis": "gamelog FUN_004066c0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      "tGameLog.nInt1"
+     ],
+     [
+      4,
+      "u32",
+      "nSetCharNo",
+      "tGameLog.nCharNo"
+     ],
+     [
+      8,
+      "u32",
+      "nNewMasterCharNo",
+      "tGameLog.nInt2"
+     ]
+    ],
+    "notes": "payload 0xc bytes as read by GameLog; procedure p_GameLog_Add_Type5, nType 853; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0756": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GUILD_ACADEMY_GRADUATE",
+    "basis": "gamelog FUN_00406620",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      "tGameLog.nInt1"
+     ],
+     [
+      4,
+      "u32",
+      "nCharNo",
+      "tGameLog.nCharNo"
+     ],
+     [
+      8,
+      "u8",
+      "nLevel",
+      "tGameLog.nInt2"
+     ],
+     [
+      9,
+      "u8",
+      "nClass",
+      "tGameLog.nInt3"
+     ]
+    ],
+    "notes": "payload 0xa bytes as read by GameLog; procedure p_GameLog_Add_TypeA, nType 854; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0757": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GUILD_ACADEMY_GUILD_INVITE",
+    "basis": "gamelog FUN_004066c0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      "tGameLog.nInt1"
+     ],
+     [
+      4,
+      "u32",
+      "nInveteCharNo",
+      "tGameLog.nCharNo"
+     ],
+     [
+      8,
+      "u32",
+      "nTargetCharNo",
+      "tGameLog.nInt2"
+     ]
+    ],
+    "notes": "payload 0xc bytes as read by GameLog; procedure p_GameLog_Add_Type5, nType 855; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0758": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GUILD_ACADEMY_CHAT_BAN",
+    "basis": "gamelog FUN_004066c0",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      "tGameLog.nInt1"
+     ],
+     [
+      4,
+      "u32",
+      "nChatBanCharNo",
+      "tGameLog.nCharNo"
+     ],
+     [
+      8,
+      "u32",
+      "nTargetCharNo",
+      "tGameLog.nInt2"
+     ]
+    ],
+    "notes": "payload 0xc bytes as read by GameLog; procedure p_GameLog_Add_Type5, nType 856; pdb2017 field names, offsets checked in the 2016 code"
+   },
+   "0x0759": {
+    "dir": "Zone/WM/Character\u2192GameLog",
+    "name": "NC_LOG_GUILD_ACADEMY_MASTER_TELEPORT",
+    "basis": "gamelog FUN_00406750",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGuildNo",
+      "tGameLog.nInt1"
+     ],
+     [
+      4,
+      "u32",
+      "nTeleportCharNo",
+      "tGameLog.nCharNo"
+     ],
+     [
+      8,
+      "u32",
+      "nTargetCharNo",
+      "tGameLog.nInt2"
+     ],
+     [
+      12,
+      "Name3",
+      "ToMapPosition.MapName",
+      "tGameLog.sMap"
+     ],
+     [
+      24,
+      "u32",
+      "ToMapPosition.x",
+      "tGameLog.nMapX"
+     ],
+     [
+      28,
+      "u32",
+      "ToMapPosition.y",
+      "tGameLog.nMapY"
+     ]
+    ],
+    "notes": "payload 0x20 bytes as read by GameLog; procedure p_GameLog_Add_Type2, nType 857; struct zeroed first; pdb2017 field names, offsets checked in the 2016 code"
    }
   }
  }
