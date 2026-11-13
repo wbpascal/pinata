@@ -4119,6 +4119,20 @@ Sent in reply to `0x2067` NC_ACT_ACTIONBYITEM_REQ on ShineObjectClass::ShinePlay
 
 ### `0x2069` NC_ACT_REINFORCERELOC_CMD †
 
+**Verified layout** (basis: zone ShineMobileObject_so_ReinforceMove FUN_00459600; client FUN_004a4180)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle |  |
+| 2 | u32 | from.x | position before the move |
+| 6 | u32 | from.y |  |
+| 10 | u32 | to.x |  |
+| 14 | u32 | to.y |  |
+| 18 | u16 | speed |  |
+| 20 | u16 | moveattr | bit 0 = 'backwards' (facing kept: the client turns towards `from`); other bits stale g_buf content |
+
+no PDB struct; layout = PROTO_NC_ACT_SOMEONEMOVEWALK_CMD. Broadcast to sight (incl. the mover); used for knock-back / pull (Z03) and StaBodyForce shots
+
 Sent from `ShineObjectClass::ShineMobileObject::so_ReinforceMove` (`FUN_00459600`) · payload 22 bytes
 
 | Off | Type | Value / source |
@@ -6646,16 +6660,16 @@ Sent in reply to `0x4824` NC_SKILL_UNLEARN_REQ on ShineObjectClass::ShinePlayer 
 
 ### `0x4828` NC_SKILL_WARP_CMD †
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_SKILL_WARP_CMD`, 20 bytes
+**Verified layout** (basis: zone ShineMobileObject_smo_WarpTo FUN_004a7de0; client FUN_004a3ea0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | object |  |
 | 2 | u32 | from.x |  |
 | 6 | u32 | from.y |  |
-| 10 | u32 | to.x |  |
+| 10 | u32 | to.x | position after the block search |
 | 14 | u32 | to.y |  |
-| 18 | u16 | skill |  |
+| 18 | u16 | skill | skill ID |
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_WarpTo` (`FUN_004a7de0`) · payload 20 bytes
 
@@ -10773,6 +10787,16 @@ Z01 name was 'link inside the same zone (ours)'
 |---|---|---|---|
 | 0 | u16 | code | 0x2028 ok, 0x2029 no NPC, 0x202B far, 0x202C NPC role, 0x202D no link |
 
+### `0x1C0E` NC_BRIEFINFO_BRIEFINFODELETE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone static packet built at FUN_006951d0 (buffer 0x74df98, opcode 0x1C0E, payload pointer DAT_0074e028); sent by AxialListBriefDeleteAtMove FUN_004bdfe0 (smo_OldObjectDelete FUN_004be0d0) and AxialListBriefDeleteAllOfRange FUN_005535c0 (player vt 0xdc4 / 0xdd0); client FUN_004b99f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hnd | handle of the object that left the receiver's sight |
+
+corrects Z02 §5 ('no zone code sends 0x1C0E'); client queues the handle in CharMgr.m_kmapDeletedChar (pdb2017) unless char+0x9be, removes minimap/decal/KQ marks
+
 ### `0x1c19` NC_BRIEFINFO_ABSTATE_CHANGE_LIST_CMD † (S→C)
 
 **Verified layout** (basis: zone FUN_0043cc00)
@@ -10846,6 +10870,37 @@ to the whole map instance (target 0xFFFF) or one object. The mob version sends l
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x10C5 0x10C6 0x10C7; not sent on success |
+
+### `0x2049` NC_ACT_REINFORCE_RUN_CMD † (S→C)
+
+**Verified layout** (basis: zone FUN_00566ab0 (player vt 0xe98, called by so_MoveByServer FUN_00569510 with cmd 0x49); client FUN_004aa210)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | xy.x | destination |
+| 4 | u32 | xy.y |  |
+
+to the moved player only; client runs the main character there when its ground is free (only while main char +0x20 or +0x2c > 0)
+
+### `0x204A` NC_ACT_REINFORCE_STOP_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone ShinePlayer_smo_ply_ReinforceStopHere FUN_00456ef0 (player vt 0xa50); client FUN_00499f10)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | loc.x | server position |
+| 4 | u32 | loc.y |  |
+
+to the player only, after every server-side stop (mm_Step stop, block-check rollback, teleport)
+
+### `0x204D` NC_ACT_REINFORCE_WALK_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_00566ab0 with cmd 0x4D (no 2016 caller passes 0x4D, see Z09 §9.3); client FUN_004aa320)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | xy.x |  |
+| 4 | u32 | xy.y |  |
 
 ### `0x204c` NC_ACT_ROAR_ACK † (S→C)
 
@@ -11042,6 +11097,20 @@ no PDB struct of that name
 **Verified layout** (basis: zone FUN_0057ab90; client FUN_00575f30)
 
 Empty payload.
+
+### `0x482D` NC_SKILL_JUMP_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone ShineMobileObject_smo_JumpTo FUN_0057db20; client FUN_0049cf60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nObject |  |
+| 2 | u32 | From.x |  |
+| 6 | u32 | From.y |  |
+| 10 | u32 | To.x |  |
+| 14 | u32 | To.y |  |
+| 18 | u8 | nDirect | direction (2° units) |
+| 19 | u16 | SkillID |  |
 
 ### `0x482b` NC_SKILL_REPLYREVIVEFAIL_CMD † (S→C)
 

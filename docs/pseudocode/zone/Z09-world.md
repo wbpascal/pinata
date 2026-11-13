@@ -12,7 +12,9 @@ This file is written in parts (status: `docs/plan/status/Z09.md`). Sections so f
 §6 mob AI 1 (brain, target selectors, aggro, battle / recover, calls for help), §7 mob AI 2a (tactic state machine,
 weapons, attack sequences, captivated players, the dead `so_attack` / `so_Bash` path), §8 mob AI 2b (script-ordered
 skills and weapon rates, cross-counter, hit / heal rules of the non-player classes, skill blast delay, mob chat, mob
-shout, servant explosions, boss-field hooks, the charmed player's target selector).
+shout, servant explosions, boss-field hooks, the charmed player's target selector). §9 movement (MoveManager, block
+bitmaps and doors, server-driven moves, random spots, Navigator, MobRoam, scenario moves) and sight (coordinate lists,
+range queries, 0x1C0E on moves).
 
 ---
 
@@ -2230,3 +2232,425 @@ but `ShineObject_ScanSight` FUN_00553c20 calls `so_AllOfRange_Class1` with range
 - `ShineMover::so_mobile_ICanDamageTo` refuses all player targets outside kingdom-quest maps; whether movers ever attack
   (and whether that is intended) is not checked here (movers: part 8).
 - The scanner classes `AxialListNearScanSkillEnemy` / `AxialListScanSkillTarget` belong to Z03's skill targeting.
+
+---
+
+## 9. Movement, map blocks, path finding and sight
+
+Every mobile object (player, mob, NPC, servant, pet, mover, bandit) moves the same way: a `MoveManager` at obj+0x18c
+interpolates the position from a start point to a destination at a fixed speed, one step per tick, and every step goes
+through the block bitmaps and the sight update. Client-driven moves (Z02 §2) and all server-driven moves (tactics §7,
+fear, scripts, skills) start it with `MoveStart` (vt 0x660).
+
+### 9.1 `MoveManager` (obj+0x18c)
+
+| Off (in MoveManager) | obj | Meaning |
+|---|---|---|
+| +0x00 | +0x18c | move kind: 0 idle, 1 walk, 2 run, 3 server push (`so_ReinforceMove`; kept through resets, see `Reset`) |
+| +0x04 | +0x190 | owner object |
+| +0x08 | +0x194 | speed (units per second; vt 0x7b0 reads it) |
+| +0x0c / +0x10 | +0x198 | start point |
+| +0x14 / +0x18 | +0x1a0 | destination (vt 0x60c returns its address; a player on a mover returns the mover's) |
+| +0x1c | +0x1a8 | start time (`timeGetTime`, ms) |
+| +0x20 | +0x1ac | duration in ms = distance × 1000 / speed (min 1); **non-zero = moving** (vt 0x610 `IsMoving` FUN_005555c0) |
+| +0x24 / +0x28 | | last / previous step time (ms) |
+| +0x2c | | ms of the move already applied |
+| +0x30 / +0x34 | | \|dx\| / dx > 0; +0x38 / +0x3c \|dy\| / dy > 0 |
+
+```pseudo
+MoveStart(o, dest, speed, kind, backwards)  (vt 0x660, all classes)        @ FUN_00555970
+    o.direction (*o+0x6a, 0..179 in 2° steps) = Direction(backwards ? pos − dest : dest − pos)   @ FUN_00401330
+    mm_MoveStart(o+0x18c, dest, speed, kind)                                 @ FUN_004bdcc0
+        if speed ≤ 0: return;  if !dest: log "Where am I to go?"; return
+        if dest == o.pos: return                                             # nothing is (re)started
+        kind, start = o.pos, start/last/prev step time = now, applied = 0, destination = dest
+        mm_RecalcSpeed(speed)                                                @ FUN_004bdbe0
+            |dx|, |dy|, signs; duration = Distance(dx, dy) × 1000 / speed (≥ 1); speed stored
+            speed ≤ 0: log "mm_RecalcSpeed : speed zero"
+Reset(mm)  (inlined in many places)                                          @ FUN_0043f780
+    if kind ≠ 3: kind = 0; times, duration, applied, speed = 0; destination = o.pos
+Arrive(mm)                                                                   @ FUN_0043cc60
+    times, duration, applied, speed = 0; destination = o.pos                 # kind is left as it was
+
+mm_Step(mm, force)            # called by so_Routine every tick while moving (§5.5), by STOP_REQ (Z02 §2.3) with force=1
+                                                                             @ FUN_004be7e0
+    if duration == 0: kind = 0; return
+    p = o.GetParam (vt 0x430)
+    if kind == 3:  stop if p.flags (+0xcce) & 2
+    else:          if p.flags & 1 or p.flags & 2: Reset(unless kind 3); StopHere (vt 0xa48); vt 0xa50; return
+                   stop if o.IsInGambleGame (vt 0xb24; players at a gamble seat, Z06)
+    stop = Reset; so_mobile_StopHere (vt 0xa48); vt 0xa50 (player: 0x204A REINFORCE_STOP to itself); return
+    now = timeGetTime(); elapsed = min(now − start, duration)
+    if !force and duration ≥ 100 and (lastStep − now) < 100 (unsigned) and now − start < 100: return
+        # (original bug) Z09-B15: the throttle subtracts the wrong way round; as unsigned it is true only when
+        # lastStep == now, so steps are practically never skipped (intent: skip when < 100 ms since the last step)
+    prevStep = lastStep; lastStep = now
+    applied = (elapsed − applied < 100) ? elapsed : applied + 100
+    loop while applied ≤ elapsed:                       # walks the time in slices of at most 100 ms
+        point = (applied == duration) ? destination : start ± |d| × applied / duration (per axis)
+        if o.IsInFear (vt 0x9e8, +0x1e78 bit 2) and (no map or BlockA(point) or BlockB(point)): stop (see above); return
+        if !o.smo_BlockCheck(point) (vt 0xf40, §9.2): return
+        old = o.pos
+        smo_NewObjBriefInfoChange(o, point)             # §9.6: objects that come into sight
+        SetPosition(o, point)                           # Z02 §2 (re-sorts the coordinate lists, §9.5; script hook 7)
+        smo_OldObjectDelete(o, old)                     # §9.6: objects that leave sight → 0x1C0E
+        if applied == elapsed: if elapsed == duration: Arrive(mm); return
+        applied += min(100, elapsed − applied)
+```
+
+Stat flags in `GetParam()+0xcce` (bit 0 and bit 1 stop every move except kind 3, bit 1 stops kind 3 too) are set by
+abstates (Z03 §6; §5.5 calls them "cannot move / attack / cast"). Pushes (kind 3) therefore survive a root but not a stun
+*(inferred from the bits)*.
+
+**Stops.**
+
+```pseudo
+so_mobile_StopHere(o)  (vt 0xa48)                                            @ FUN_0045a0c0
+    Reset(o.mm) (unless kind 3); o.lastMoveCmd (+0x168) = 0                  # newcomers no longer see a move (Z02 §5)
+    broadcast to sight 0x2013 NC_ACT_SOMEONESTOP_CMD { u16 handle, u32 pos.x, pos.y }
+    # a ShineMover (kind 11) broadcasts around the object vt 0xcb0 returns instead (nothing if none)
+ShinePlayer.smo_ply_ReinforceStopHere(p)  (vt 0xa50; other classes no-op FUN_00417480)   @ FUN_00456ef0
+    p ← 0x204A NC_ACT_REINFORCE_STOP_CMD { u32 loc.x, loc.y = p.pos }        # client: put the main character there
+```
+
+### 9.2 Block bitmaps and the per-class block checks
+
+Each map has a `MapBlockInformation` (field+0x14), loaded once per map name by `MapBlockInformationBox::mbib_Load`
+(FUN_0049e940; table of ≤ 256 maps × 0xb50 bytes, "Too many block info") → `mbi_Load` FUN_0049e3b0:
+
+| File (`9Data/Shine/BlockInfo/`) | Read into | Content |
+|---|---|---|
+| `<map>.shab` (optional, 8 maps in 2016) | +0x18 | `u32 bytesPerRow, u32 rows`, then rows × bytesPerRow bytes; bit set = blocked. Read first; missing file is not an error |
+| `<map>.shbd` (required: "Map block information not found" stops the server) | +0x14 | same format; **after loading, every byte of .shab is OR-ed into .shbd** |
+| `<map>.aid` (optional) | +0x24 | `AreaInfoData` (FUN_0062d990): `u32 n` (≤ 256), then per area `char name[32], u32 type`; type 0 `AE_Circle` + 3 × 4 bytes, type 1 `AE_Square` + 5 × 4 bytes (the last one is an angle in degrees converted to radians). Script areas (part 9) |
+| `<map>.sbi` (optional) | +0x430 | door blocks (`MapDoorArray::mda_Load` FUN_0049dd30): `u32 n` (≤ 31, "Too many doors"), n × `MapDoorBlockElement` (FUN_0049dc20: `char name[32], u32 x0, y0, x1, y1` in cells, `u32 len, u32 offset`; x1−x0+1 must be a multiple of 8, len = (x1−x0+1)/8 × (y1−y0+1)), then all door images (2 × len per door: closed image, open image) |
+
+Cell size: 50/8 = **6.25 units**; map size in units = bytesPerRow × 50 (x) and rows × 6.25 (y) (`mbi_Load` returns
+both; all 158 `.shbd` of 2016 are square). Also built at load: the `BlockDistribute` quadtree (+0x42c, §9.4).
+
+```pseudo
+BlockA(map, x, y)  = .shab bit at cell (x·8/50, y·8/50); outside the map → blocked; no .shab → free     @ FUN_0049df00
+BlockB(map, x, y)  = .shbd|.shab bit; outside → blocked                                               @ FUN_0049df70
+mbi_OccupCellCheck(map, x, y, r)                                                                      @ FUN_0049e230
+    true when any cell in the (2r+1)² square around (x, y) is inside the map and free in .shbd   # Z02 CellFree uses r = 1
+mbi_DoorAction(map, name[32], action)                                                                 @ FUN_0049ec60
+    find the door element whose 32-byte name matches (mda_DoorAction FUN_0049eb60 / mdbe_DoorAction FUN_0049ea40)
+    mdbe_DoorAction2(door, map, action)                                                               @ FUN_0049e080
+        action 1 (open):  copy the open image over the door's rectangle of .shbd
+        else (close):     OR the closed image into it ("Null block" when the rectangle is outside the map)
+mda_CloseAllDoor(doors, map): mdbe_DoorAction2(each, 0) ("Close error")                               @ FUN_0049e1e0
+    callers: bdm_Find (map load), &bigbang (Z11), guild-tournament start, KQ start / destroy (Z16), instance dungeon
+    reuse (FUN_005a8c20, FUN_0049ee70 dungeon timeout: also clears the map), FUN_00419340, FUN_005d6b00
+```
+
+Doors are opened by `ShineDoor::so_door_DoorAction` FUN_00550770 (part 8). Only `.shbd` changes, so `.shab` areas can
+never be opened.
+
+**Block checks during a move** (vt 0xf40 `smo_BlockCheck(point)` in `mm_Step`; vt 0xf44 after a client stop):
+
+```pseudo
+ShineMobileObject.smo_BlockCheck / smo_StopBlockCheck: return true            @ FUN_004be3a0 / FUN_004be5c0
+    # mobs, NPCs, servants, pets never test blocks while moving: their paths are checked when planned (§7, §9.3)
+ShinePlayer.smo_BlockCheck(p, point)                                          @ FUN_004bec00
+    if no map: Reset; StopHere; ReinforceStopHere (0x204A); return false
+    if !BlockA(point) and !BlockB(point) (g_MoveBlockCheck FUN_004be3f0): lastGood (+0x2a918/+0x2a91c) = p.pos; return true
+    if dist²(p.pos, lastGood) > 899:                  # more than ~30 units into blocked cells
+        if (point ± 10 on x or y) all four blocked (g_FindEmpty FUN_004be4c0; a free one becomes lastGood):
+            SetPosition(p, lastGood); Reset; StopHere; ReinforceStopHere; return false
+    return true                                      # the step onto the blocked cell is accepted
+ShinePlayer.smo_StopBlockCheck(p)  (Z02 "StopBlockCheck")                      @ FUN_004bee40
+    if p.pos ≠ lastGood:
+        no map: Reset; StopHere; ReinforceStopHere; return false
+        if p.pos blocked: SetPosition(p, lastGood); Reset; StopHere; ReinforceStopHere
+    return true
+ShineMover.smo_BlockCheck(m, point)                                           @ FUN_004bf020
+    same as the player with lastGood at +0x2021/+0x2025 (smv_MoveBlockCheck FUN_004be610, smv_MoveFindEmpty
+    FUN_004be6e0); on rollback: StopHere only (no 0x204A)
+```
+
+So a player is only pulled back after more than ~30 units inside blocked cells, and only if no free cell lies within 10
+units of the point; the client is told with 0x2013 + 0x204A.
+
+**Straight-line and "how far can I go" helpers.**
+
+```pseudo
+so_FindBlockLocateFrom(from, to, maxDist, out, blockedFn)                     @ FUN_004be1c0
+    if Distance(from, to) > maxDist + 10: return false
+    out = from; n = Distance/8 + 1
+    for k = 1..n: q = from + (to − from)·k/n; if blockedFn(q): break; out = q
+    return true                                      # out = last free point on the line (from if the first step is blocked)
+so_FindBlockLocate(o, to, maxDist, out, fn) = so_FindBlockLocateFrom(o.pos, …) @ FUN_004beb40
+FieldMap.fm_FindBlockLocation(from, maxDist, to, out, fn)                     @ FUN_004630f0
+    same walk with n = Distance/16 + 1; returns 2 = too far, 1 = stopped at a block, 0 = reached `to`
+FieldMap.fm_IsStraightPath(a, b, fn) / Navigator::VirtualMap::vm_IsStreight(a, b)   @ FUN_004636e0 / FUN_005ca2f0
+    true if dist² < 25; else false if the midpoint is blocked (fn / BlockA), else both halves recursively
+```
+
+`vm_IsStreight` and the Navigator test **only .shab** (BlockA): mob paths ignore `.shbd` walls (and closed doors) unless
+the map also has a `.shab`; the per-step check does not run for mobs either. All 8 maps with a `.shab` and the 150
+without are treated so *(inferred consequence; whether the 150 maps then let mobs walk through walls was not checked in a
+capture)*.
+
+### 9.3 Server-driven moves
+
+```pseudo
+so_MoveByServer(o, dest, cmd, lastCmd, kind, logArg)  (vt 0x5b0)              @ FUN_00569510
+    o.SendMoveSpeed(1) (vt 0xd4c; player FUN_00459540: 0x203E MOVESPEED to itself, Z02 §2.2)
+    speed = kind == 2 ? GetRunSpeed (vt 0x518) : GetWalkSpeed (vt 0x514)
+    MoveStart(o, dest, speed, kind, 0)
+    g = (8<<10 | cmd) { u16 handle, u32 pos.x, pos.y, u32 dest.x, dest.y, u16 speed, u16 moveattr (bit 0 cleared) }
+    o.lastMoveCmd = lastCmd; remembered payload = g's 22 bytes          # note: lastCmd, not cmd
+    broadcast g to sight
+    o.vt[0xe98](dest, lastCmd, logArg)                                  # player: smo_ply_ReinforceRun FUN_00566ab0
+        p ← (8<<10 | lastCmd) { u32 dest.x, dest.y }                    # 0x2049 REINFORCE_RUN (lastCmd 0x49)
+        if dist²(p.pos, dest) > 1,000,000: log both points and logArg
+```
+
+Callers: `mab_RunTo` (§7.3, cmd 0x1A), `smo_RunInFear`, `so_mobile_SpeedChange` (players), the map-script node
+`ShinePlayerWalk` FUN_004f6d40 (part 15). All pass lastCmd 0x49 for a run *(as read at the fear / speed-change sites)*.
+(original bug) Z09-B14: the remembered command is `lastCmd` (0x49), so a player who comes into sight of an object moved
+this way gets `ResendLastMove` (Z02 §5) as **0x2049 NC_ACT_REINFORCE_RUN_CMD** with the 22-byte move payload; the client
+reads its first 8 bytes (`handle | from.x<<16`, …) as a destination for its *own* character. The client obeys only
+while its main character has the state checked at `MainChar+0x20 / +0x2c` (not identified) *(effect inferred from the
+client handler FUN_004aa210)*.
+
+```pseudo
+smo_RunInFear(o)  (from so_Routine when feared and not rooted, §5.5)          @ FUN_00569360
+    if o rides a mover (vt 0xc74): return
+    if o.cast skill (+0x1d88) ≠ 0x7213: o.castEnd (+0x1d84) = 0       # drop any cast except skill 0x7213
+    if moving: mm_Step(o.mm, 0); return
+    dir = next value of the fear ring DAT_14f722d0 (index DAT_14f7a2d0) × 180 / 64
+    target = o.pos + 320 units in direction dir
+    if so_FindBlockLocate(o, target, 450, &q, BlockB): so_MoveByServer(o, q, 0x1A, 0x49, run, 2)
+so_mobile_SpeedChange(o)  (vt 0x7bc, from so_Routine when parameters changed)  @ FUN_00435ec0
+    if kind == 1 and speed ≠ GetWalkSpeed: MoveStart(o, destination, walk speed); RememberMove 0x18;
+        broadcast 0x2018 SOMEONEMOVEWALK { handle, pos, destination, speed, moveattr }
+    if kind == 2 and speed ≠ GetRunSpeed:  MoveStart(o, destination, run speed)
+        player: so_MoveByServer(destination, 0x1A, 0x49, 2, 0)           # also 0x2049 to the player
+        others: RememberMove 0x1A; broadcast 0x201A SOMEONEMOVERUN
+    # MoveStart(dest, speed, kind 1 / 2, backwards 0): the decompile shows (1, 0) as arguments of GetWalkSpeed;
+    #   the disassembly (0x435f75 / 0x43609c) pushes them for vt 0x660
+so_ReinforceMove(o, dest, speed, backwards, out)  (vt 0xa28, base)            @ FUN_00459600
+    if no map: log "…sp_NC_ACT_STOP_REQ : Invalid map" (copied text); return
+    if o+0x1c8e & 2: return
+    o.CancelOnAction (vt 0x8d0); o.vt[0xed8] (player smo_BashStop, mob SendCeaseFire)
+    if !mbi_OccupCellCheck(map, dest, 1): return
+    MoveStart(o, dest, speed, kind 3, backwards)
+    broadcast to sight (players only, flag 1) 0x2069 NC_ACT_REINFORCERELOC_CMD
+        { u16 handle, u32 pos.x, pos.y, u32 dest.x, dest.y, u16 speed, u16 moveattr: bit 0 = backwards }
+    out (if given) = the 22 payload bytes
+ShinePlayer.so_ReinforceMove(p, dest, speed, backwards, _, clearFlag)  (vt 0xa28 player)   @ FUN_004597f0
+    base version; if clearFlag: p+0x7f36 = 0 (FUN_00566800); sp_SkillShiftCancel(p)
+    p.lastMoveCmd = 0x69 with the payload (newcomers see the push); ClearEmoticon
+```
+
+Callers of vt 0xa28: `smo_ShootMeTo` (below), the skill knock-back / pull handler FUN_00401db0 and FUN_005c1390 (Z03
+skill effects). Client 0x2069 (FUN_004a4180): `ClearTraceMove`, sets walk/run speed to `speed`, moves the character to
+`to`; with bit 0 it keeps facing `from` (pushed backwards).
+
+```pseudo
+smo_ShootMeTo(o, dest)  (skill bash "shoot me" to a location)                 @ FUN_00459940
+    t = AbState 391 StaBodyForce row's keep time (+0x30 → +0x2b), default 1000
+    set abstate 391 (vt 0x638), brief bit, broadcast, inform (vt 0x3f0); same for 350 StaCannotControl
+    speed = Distance(o.pos, dest) × 1000 / t (100 if t == 0); o.so_ReinforceMove(dest, speed, 0, 0, 1)
+smo_WarpTo(o, dest, skillRow)  (dash / blink skills)                          @ FUN_004a7de0
+    dest.x += 5
+    if !so_FindBlockLocate(o, dest, skillRow+0xdc, &q, BlockB): return
+    kind = 0; StopHere; NewObjBriefInfoChange(q); SetPosition(q); OldObjectDelete(old)
+    o ← 0x2450 NC_BAT_SKILLBASH_HIT_FLD_START_CMD { u16 skillId, u32 dest.x, dest.y, u16 counter++ (DAT_0087efe4 & 0x7fff) }
+        # to the warping object only; the log text on failure says "smo_SkillBash_BlastA" (copied)
+    broadcast to sight (players) 0x4828 NC_SKILL_WARP_CMD { u16 object, from (old), to (q), u16 skill }
+    Reset(o.mm)
+smo_WarpForward(o, skillRow): dest = o.pos + skillRow+0xdc units in o's direction; smo_WarpTo   @ FUN_004a83e0 / FUN_004a2db0
+smo_JumpTo(o, target, skillRow, _)  (skill blast "jump")                      @ FUN_0057db20
+    v = target − o.pos scaled to (row+0x248 == 1 ? |v| − row+0x24c : |v| + row+0x204)   # land short of / beyond the target
+    land = o.pos + v
+    if so_FindBlockLocateFrom(target, land, that length, &q, BlockB) and the straight walk o.pos → q has no BlockA cell:
+        StopHere; NewObj/SetPosition/OldObj; broadcast 0x482D NC_SKILL_JUMP_CMD { u16 nObject, From, To, u8 nDirect, u16 SkillID }
+        Reset(o.mm); return true
+    return false
+```
+
+`smo_ShadowStep` FUN_0045ad10 (0x206A REINFORCEMOVEBYPATH, Z03 §5) builds its curved path with `RadianMoveTrack`:
+`rmt_Calculate` FUN_00460450 turns the angle between the facing and the target into an arc and `rmt_MakePath`
+FUN_00460250 splits it recursively (≤ 30 levels, ≤ 19 direction steps per piece) into points whose chords pass
+`FieldMap_fm_IsStreight` (both arc directions are tried).
+
+**Teleports.**
+
+```pseudo
+ShineMob.smo_Teleport(m, xy)  (vt 0x6d4 for non-players)                      @ FUN_005793e0
+    StopHere; so_Unmark (vt 0x33c, 0, 1, 3); m.pos = xy; spawn point (+0x249c/+0x24a0) = xy; sm_SetBrain (§6.1)
+    if fm_Marking(map, m) fails: log "smo_Teleport : Fail"; mode = 3 (dead); +0x1ec4 = 0
+    if m has a brief packet (+0x1f90 → +4 → +0x24): full brief exchange around m (FUN_00441f60, so_ExchageBriefInfo)
+ShinePlayer.smo_Teleport(p, xy)  (vt 0x6d4 player)                            @ FUN_0057d1d0
+    kind = 0; StopHere; SetPosition; ShinePlayer_ReExchangeBriefInfo; OldObjectDelete(old); Reset; SendMoveFail (vt 0xa4c)
+smo_Teleport()  (vt 0x6d8, random spot)                                       @ FUN_0057a8b0
+    q = BlockDistribute random free spot of the map (FUN_00438960, §9.4); vt 0x6d4(q)
+    callers: so_Routine (§5.5 table), ShineTeleport script node FUN_004f4cc0, cCastTeleport FUN_005e5b10, ac_CastTeleport FUN_004229b0, FUN_00428730
+SetPositionWithSight(o, x, y, dir)  (vt 0xc98, only if o+0x162)               @ FUN_0045a000
+    NewObjBriefInfoChange; direction = dir; SetPosition; OldObjectDelete
+```
+
+### 9.4 `BlockDistribute`: random free spots
+
+`BlockDistributeManager::bdm_Find` FUN_00438f70 (global DAT_008b7018, ≤ 64 maps, "Too many BlockDistribute") closes all
+doors of the map, then builds a quadtree (`BlockingDistribute` ctor FUN_00438c80, nodes from the pool DAT_008b7008,
+"Too small size" above 59999 units): a node splits into four until both spans are under 100 units; a leaf counts 1 if
+its centre is free in `.shbd`; every node keeps its child count (+0x18) and free-leaf count (+0x1a); empty children are
+dropped. The tree is built over x ∈ [0, map height] and y ∈ [0, map width] (the arguments are passed swapped; harmless
+because every 2016 map is square).
+
+```pseudo
+RandomFreeSpot(tree)                                                         @ FUN_00438960
+    node = root
+    while node has children:
+        pick a child weighted by its free-leaf count (Random 0..999 against the per-mille shares; 10 tries, else the first child)
+    return the leaf's centre
+```
+
+Used by `smo_Teleport` vt 0x6d8, `&linkto` (Z11) and the script statement `os_ObjectRegen` FUN_004f8c40 (part 14).
+
+### 9.5 Mob paths: Navigator and MobRoam
+
+**Navigator** (`Navigator::MapNavigator` at field+0xa4, grid step at +0xc, `PathFindBuffer` at +4; used only when
+`g_UseNavigator` DAT_0084cfb4 is set, §7.3):
+
+```pseudo
+mn_PathFind(nav, from, to, outPath)                                           @ FUN_005c9ee0
+    if to is blocked (vm_IsBlocked = BlockA FUN_005ca230): mn_ExitFromBlock FUN_005c8ab0 moves `to` to the first free
+        point on growing squares (1..49 units); none → return −1
+    PathAnalyzer.pa_Analyze FUN_005c9870: points [from, first block on from→to (vm_FindBlock FUN_005ca470 via
+        fm_FindBlockLocation), first block on to→from, to]  (2 points when the line is free)
+    2 points: outPath = straight line; return 2
+    4 points: outPath = [from, …] + mn_Search(block A → block B) + [to]
+        mn_Search FUN_005c9c90: best-first search on the grid around block A (PathFindBuffer FUN_005c8800: a
+            (2r+1)² array of 0x14-byte cells {stamp, parent x, parent y, h, g}, FUN_005c88f0 index), 8 neighbours
+            (wl_StoreNeighbor FUN_005c9a90, free cells only, g+1, h = Distance to the goal FUN_005ca210), open list
+            sorted by h (wl_Push FUN_005c9980 / wl_Pop FUN_005c90d0); gives up when the best h exceeds the start h + 30;
+            on reaching the goal nm_MakePath FUN_005c94a0 follows the parents (≤ 1000) and converts cells back to points
+        then the path is shortened: binary search for the furthest point still in straight line (vm_IsStreight) from
+        the start, which replaces the second point
+    return number of points or −1
+```
+
+**MobRoam** (`MobRoaming::MobRoamingSet`, `mrs_Load` FUN_004b8320): a roaming path is
+`9Data/Shine/World/<map>/MobRoam/<name>.txt` or else `9Data/Shine/MobRoam/<name>.txt` (28 files in 2016), table
+`Roaming` with columns `WORD ID, DWRD X, DWRD Y, STRING[32] EventIndex` (0x2a-byte records). Loaded on demand by the
+breeders (`MobHatchery::mh_Load` FUN_004b6330, `mh_ScriptBreed` FUN_004b3e40: part 6) and cached by name
+(`mrs_Get` FUN_004b7a00). The breeder hands the vector to the mob with vt 0xa14:
+
+```pseudo
+so_mob_RoamingPathSet(m, path): m+0x1eb8 = path; if path: index (+0x1ebc) = 1            @ FUN_004b7400
+sm_NextPathPoint(m, &dx, &dy, &dist, &advanced)  (used by mab_RandomDirectWalk, §7.2)   @ FUN_004b7480
+    no path or index ≥ count: return false
+    p = path[index & 0x7fff]
+    if Distance(m, p) ≤ 100: AdvanceIndex(m+0x1ebc, path); p = new point; clear "was chasing" (+0x24ac bit 3); advanced = 1
+    dx, dy, dist = p − m.pos; spawn point (+0x249c/+0x24a0) = p              # leash and "go home" follow the path
+    return true
+AdvanceIndex(idx, path)                                                     @ FUN_004b71f0
+    bit 15 set (walking back): index−1; at 0 → index = 1 forward
+    else index+1; at the end: walk back (bit 15, index = count − 2)
+        EventIndex of the reached point (first 20 bytes): "-" nothing; "return" → walk back from here;
+        "rotate" → index 0 (loop)
+ShineMob_SpawnPointFromPath (vt 0xf50): spawn point = current path point          @ FUN_004b7690
+```
+
+**Scenario moves** (NPCs and bandits moved by map scripts):
+
+```pseudo
+so_scene_MovePathSet(o, x, y, kind)  (vt 0x8ac; ShineAct / ShineWalk script nodes, part 15)   @ FUN_0050d450
+    append {x, y, kind} to the queue o+0x1db0 (16 × 12 bytes, count +0x1e70); full → ignored
+smo_MoveByScenario(o)  (from ShineNPC / ShineBandit so_Routine, §5.9 / §5.10)               @ FUN_0050d520
+    if queue empty or moving: return
+    pop the first entry; kind 1: MoveStart(walk speed, 1), RememberMove + broadcast 0x2018; else run speed, 2, 0x201A
+```
+
+### 9.6 Sight: how objects appear and disappear (answers Z02 §5)
+
+The coordinate lists: each object has two `CoordedNode`s, obj+0x16 (`ObjectXCoordNode`, key = x, FUN_00587d00) and
+obj+0x22 (`ObjectYCoordNode`, key = y, FUN_00587d30), each `{vptr, next +4, prev +8}`. Every map keeps two sentinel
+objects (field+0x20 at (0, 0) and field+0x24 at (0xFFFFFF, 0xFFFFFF)) and five anchors (field+0x28…+0x38) on the
+diagonal at (w/10 + i·w/5, h/10 + i·w/5) — the "slanted" entry points.
+
+```pseudo
+cn_Rearrange(node, map, o)  (SetPosition, for both nodes)                     @ FUN_005883a0
+    if o's key is still between its neighbours: return
+    cn_RemoveList FUN_00553900 then cn_AppendList FUN_00587d60 (walk from the old neighbours to the new place,
+        ≤ 10000 steps, consistency checks "Infinite Loop!!!", "Pointer is wandering", "List damaged", "Next & Prev split")
+    failure: o.vt[0x8a0](9 | 10); MapRearrangeObserver.mro_Set; fm_Relink(map)
+fm_Relink(map)                                                                @ FUN_00462bd0
+    reset the nodes of every object of every class container (DAT_00754474 → DAT_132828a4) on this map;
+    relink the sentinels (cn_MakeLink2 FUN_00588220) and the five anchors (cn_AppendList), then fm_Marking every
+    object again (§5.7)
+```
+
+`so_AllOfRange_Class0/1(o, stamp, centre, range, …, work, includeSelf, skipHandle)` FUN_0054baf0 / FUN_0054bc80: range
+0 means the sight radius = MapInfo.Sight (field+0x10 → +0x48), 99,999,999 when o+0x163 == 1 or field+0x124 == 1. It
+calls the map's query function field+0x88; for normal maps `so_AllOfRangeNomal_Class2` FUN_0054c900:
+
+```pseudo
+    walk o's X list both ways while |Δx| < range, stamping each object (obj+0x2e + depth·4 = stamp; nesting depth DAT_0074d71c)
+    walk o's Y list both ways while |Δy| < range; for each stamped object with handle ≠ skipHandle and dist² < range²
+        (and inside the cone when a direction is given: dot product ≥ cos(angle/2)):
+        if same layer (obj+0x4e/+0x52) or either object's +0x56 flag ("all layers"): if !work(o, other, dist²): stop
+    includeSelf: work(o, o, 0)
+    > 10000 steps on one list: log "Too many loop" and stop; a node pointing at itself: o.vt[0x8a0](1..4) and fm_Relink
+```
+
+(Mini-house maps use `so_AllOfRangeMiniHouse_Class4` FUN_00553f60 *(inferred from the name; not read)*.)
+
+**Appear and disappear on every step.** `mm_Step`, `smo_WarpTo`, `smo_JumpTo`, `ShinePlayer.smo_Teleport` and vt 0xc98
+wrap `SetPosition` like this:
+
+```pseudo
+smo_NewObjBriefInfoChange(o, newPos)                                          @ FUN_004bdef0
+    so_AllOfRange_Class1(o, around newPos, sight, AxialListBriefExchangerAtMove)
+    ali_Work(o, other)                                                        @ FUN_004bdde0
+        s = MapInfo.Sight² (0xFFFFFFFF on unlimited maps); if dist²(o's *old* position, other) < s: skip   # already in sight
+        if SubLayer_CanSee(o, other): o.so_SendMyBriefInfo(other) (vt 0x4c8, Z02 §5) + o's abstate list 0x1C19 to other
+        if SubLayer_CanSee(other, o): other.so_SendMyBriefInfo(o) + other's abstates to o
+smo_OldObjectDelete(o, oldPos)                                                @ FUN_004be0d0
+    so_AllOfRange_Class1(o, around oldPos, sight, AxialListBriefDeleteAtMove)
+    ali_Work(o, other)                                                        @ FUN_004bdfe0
+        if other is an NPC (kind 4): skip                                     # NPCs are never removed by moving
+        if dist²(o's *new* position, other) < s: skip                          # still in sight
+        if SubLayer_CanSee(o, other): other ← 0x1C0E NC_BRIEFINFO_BRIEFINFODELETE_CMD { u16 hnd = o.handle }
+        if SubLayer_CanSee(other, o): o ← 0x1C0E { hnd = other.handle }
+```
+
+So **the zone does send 0x1C0E** (correction of Z02 §5 / knowledge "no 0x1C0E sender"). The packet is a static buffer
+built at start-up (FUN_006951d0: buffer 0x74df98, opcode 0x1C0E, payload pointer DAT_0074e028). The same packet goes
+out from `AxialListBriefDeleteAllOfRange::ali_Work` FUN_005535c0 (both directions, skipped for objects with the +0x56
+"all layers" flag) through the player's vt 0xdc4 (FUN_00553650, objects in sight) and vt 0xdd0 (FUN_005536f0, whole
+map), which the four layer-move entries vt 0xdbc…0xdcc call before changing the layer (Z06 §2 lists them); after the
+change vt 0xdd8 FUN_00441ed0 recomputes `g_SightDistSq`, runs `so_ExchageBriefInfo` over the sight range, flushes the
+batches (FUN_0043fc80) and sends the abstates (`asl_SendAfterLogin`). Other ways out of the client: 0x1805 logout
+broadcast (Z01 §3.2) and the death/corpse removal of mobs (§5.4).
+
+Note the distance used here is the plain MapInfo.Sight², not the crowd-reduced `g_SightDistSq` used by the full
+exchanges (Z02 §5.2): in crowded places an object can be announced by the full exchange at a smaller radius and then be
+deleted/announced at the map radius by moves *(inferred from the two formulas; not observed)*.
+
+(original bug) Z09-B13: in both delete workers the second send ("tell o that other left") calls
+`o.sendObject.pcb_Append(other, packet)` with **other** as the first argument (the exchanger passes `o`). The packet still
+lands in o's buffer, but when that buffer is full (> 0x17ff bytes) `PacketContainer_pcb_Append` FUN_004c8b20 flushes it
+to `other.GetClientSession()` (vt 0xa70): to the other player's client, or to no session (0) when other is a mob.
+
+Client (C01): `On_NC_BRIEFINFO_BRIEFINFODELETE_CMD` FUN_004b99f0 removes NPC/resource/gate effects, puts the handle into
+`CharMgr.m_kmapDeletedChar` (CharMgr+0x18 *(pdb2017)*) unless char+0x9be is set, removes a mover's effect, the minimap
+mark, decals and the KQ team mark. No client-side distance culling was looked for: the server drives it.
+
+### 9.7 Collision for placement
+
+`so_collesioncheck(o, other)` FUN_00452b00 (the `fm_Marking` spacing test, §5.7) answers "keep looking" (true) unless
+`other` takes part in collisions (vt 0x4b8) and is of the same class (vt 0x4b8 values equal and ≠ 3) *(the vt 0x4b8
+value is a bool here: players FUN_00557240 = mode ≠ 3 (alive); mobs FUN_00556540 = always for MobInfoServer +0x5f ∈
+{1, 2}, else mode ≠ 3)*.
+
+### 9.8 Open points of this section
+
+- `MainChar+0x20 / +0x2c` (client 0x2049 guard) and player byte +0x7f36 (cleared by pushes) are not identified.
+- The meaning of `GetParam()+0xcce` bits 0/1 (which abstates set them): Z03 §6.
+- `so_AllOfRangeMiniHouse_Class4` (mini-house interiors) and field+0x88 selection (FUN_00464bc0 map init): Z06/Z01.
+- Callers of vt 0xc98 (`SetPositionWithSight`) were not listed (sweep).
