@@ -147,6 +147,34 @@ ITEMS = [
              "Open from Z06 (§4.1, §8): the gamble system server `CGambleSystemServer` (init FUN_0043c1a0, "
              "`SendExchangeCoinInit` FUN_0043c2d0): when and how it computes the next daily coin reset and broadcasts "
              "`0xBC09 NC_GAMBLE_EXCHANGEDCOIN_INIT_CMD` to the zones. The zone side is documented in Z06 §4.1."]),
+ dict(id="W05", phase=2, title="World manager: process services left out of W01-core (added by W04)",
+      out="docs/pseudocode/wm/W05-process.md", deps=["W01"], scope=[],
+      goal="W01's goal includes the WM process (startup/config, session lifecycle), but `W01-core.md` documents only "
+           "the bootstrap, cleanup and accept ticks (§2) and never cites the main loop, the data loader or the session "
+           "teardown chain. W02–W04 document the subsystems these call, not the functions themselves. Reconstruct the main "
+           "loop, the table loader, the timed broadcasts and how a client session is torn down and reset.",
+      steps=["Read `docs/pseudocode/wm/W01-core.md` §1, §2, §5.4 and `docs/knowledge/W01.md` first, and the coverage-boundary "
+             "rows of `docs/pseudocode/wm/W04-social-misc.md` §20 that name W05.",
+             "Main loop FUN_00406760: the order and period of every tick it runs. Most are documented by other items; cite them, "
+             "do not redo them (`KQ_Tick` W04 §6.2, `CPrisonServer_Tick` W04 §9.1, `CGambleSystemServer_SendExchangeCoinInit` "
+             "W04 §15.1, `EA_Schedule_Process` W04 §17.5, `NpcSched_Tick` W04 §17.6, `IndunRank_DailyReset` W04 §13.3, "
+             "`GuildManager_Tick` W03, `PartyFinder_ExpireTick` W02, `Login_WorldStatus_0808` / `Zones_TimeSync_0821` W01 §2). "
+             "Not documented yet: the once-a-minute 0x0849 date/time broadcast FUN_00437e30 (layout, receivers, client "
+             "handler) and FUN_0043a120.",
+             "Data loader FUN_00404100: every SHN table and config file the WM loads, in order, with the object offset each lands "
+             "at, the fatal / non-fatal failures, and which item uses each table (W04 already documents the KQ, SpamerReport, "
+             "GBHouse and MsgWorldManager rows: §2.5, §6.1, §6.2, §15.1). Also the client-SHN name list FUN_0045d8c0 (49 file "
+             "names, no caller in the export: settle what uses it, e.g. a hash or version check).",
+             "Session teardown and reset: FUN_00437660, FUN_00437fd0, FUN_00438630 (→ session destructor FUN_004352e0), "
+             "FUN_00438a60 (→ reset FUN_00434530): which event triggers each (disconnect, kick, return to character select, "
+             "duplicate login), what each releases (blobs, lists, party/guild/friend/KQ state; link to the W02–W04 functions "
+             "it calls, e.g. `ChatRestrict_Destroy` W04 §14.1) and what it tells the other links.",
+             "Then `python3 -I tools/protocol-re/coverage.py W01 --all`: W01's remaining gaps that are core rather than "
+             "feature code (zone registration chain under 0x0802 FUN_00465ef0 / FUN_00465d60 / FUN_00465e10 / FUN_00460ba0, "
+             "world login FUN_004129f0, `Session_Close` callees FUN_00466180 / FUN_00466060, map-login-done FUN_00432e10 / "
+             "FUN_00432ce0, …) belong here; gaps inside W02–W04 subsystems go to those items' coverage boundary instead."],
+      done="Main loop, data loader, 0x0849 broadcast and the session teardown/reset chain written as pseudocode; every core "
+           "gap from `coverage.py W01` either documented here or assigned to another item with a reason."),
  dict(id="Z02", phase=2, title="Zone: movement, chat, emotes, sight/briefinfo, NPC menus, scenario",
       out="docs/pseudocode/zone/Z02-actions.md", deps=["Z01"],
       scope=[("zone", "ShinePlayer", [7, 8, 15, 27]), ("zone", "WorldManagerSession", [8])],
