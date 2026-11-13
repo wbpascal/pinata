@@ -402,6 +402,234 @@ send site in `layouts.json`, no opcode store in the four other binaries).
 QUEST_REWARD_ABSTATE, 0x051D QUEST_REWARD_PET, 0x051E QUEST_REWARD_MINIHOUSE, 0x0752–0x0754 and 0x0756–0x0759 (guild academy,
 all but SET_MASTER).
 
+## 4. NC_LOG handlers, commands 858–1021 (CParserGameLog, part 3)
+
+Same skeleton as §1.3 (CheckAlive, copy, one procedure; no length check, D05-B1). 33 registrations, 26 handler functions.
+Columns, `std` (MAPPOS → `sMap`, `nMapX`, `nMapY`, `nMapZ = 0`) and the sender column as in §2.3. Every
+handler here except 0x075A zeroes its struct first, so columns not named stay 0 / `""`.
+
+### 4.1 Guild academy rewards, MK2, mover, item money, random options
+
+| Opcode | Name | Handler | Procedure | nType | Columns ← fields | Sender (2016) | Note |
+|---|---|---|---|---|---|---|---|
+| `0x075A` | NC_LOG_GUILD_ACADEMY_SET_REWARD_MONEY | `FUN_00406800` | p_GameLog_Add_TypeD | 858 | nInt1 ← nGuildNo u32 @0x0; nCharNo ← nCharNo u32 @0x4; nInt2 ← nLevel u8 @0x8; nItemKey ← nMoney u64 @0x9 | none found | struct not zeroed, but every TypeD column is written |
+| `0x075B` | NC_LOG_GUILD_ACADEMY_SET_REWARD_ITEM | `FUN_004068b0` | p_GameLog_Add_TypeA | 859 | nInt1 ← nGuildNo u32 @0x0; nCharNo ← nCharNo u32 @0x4; nInt2 ← nLevel u8 @0x8; nInt3 ← nItemID u16 @0x9; nTargetID ← nItemLot u16 @0xb | none found | the lot goes to `nTargetID`, where other rows keep the item id (§9) |
+| `0x075C` | NC_LOG_GUILD_ACADEMY_CLEAR_REWARD_MONEY | `FUN_00406950` | p_GameLog_Add_TypeA | **0** | nothing: zeroed struct, no field read | none found | (original bug) D05-B8: an all-zero row |
+| `0x078E` | NC_LOG_GAME_MK2_START | `FUN_00406aa0` | p_GameLog_Add_Type7 | 910 | nCharNo ← chrregnum u32 @0x0; nInt1 ← nLevel u8 @0x4; nInt2 ← nClass u8 @0x5; nTargetCharNo ← mobid u16 @0x6; sMap/nMapX/nMapY ← mappos @0x8 | none found | one handler for 910–912 |
+| `0x078F` | NC_LOG_GAME_MK2_SUCCESS | `FUN_00406aa0` | p_GameLog_Add_Type7 | 911 | as 0x078E | none found |  |
+| `0x0790` | NC_LOG_GAME_MK2_FAIL | `FUN_00406aa0` | p_GameLog_Add_Type7 | 912 | as 0x078E | none found |  |
+| `0x0791` | NC_LOG_GAME_MK2_DEAD | `FUN_00406b50` | p_GameLog_Add_TypeH | 913 | nTargetCharNo ← mobid u16 @0x0; sMap/nMapX/nMapY ← mappos @0x2; nCharNo ← nCharNo u32 @0x16 (killer) | zone `ShineMob_so_KilledBy` FUN_00432760 (Z03 §8.1) | killer 0 when not a player |
+| `0x0798` | NC_LOG_GAME_MK_DROP_ITEM | `FUN_00406c00` | p_GameLog_Add_TypeB | 920 | nTargetID ← nItemID u16 @0x0; nInt1 ← nLot u16 @0x2; nItemKey ← nItemKey u64 @0x4; nTargetCharNo ← mobid u16 @0xc; sMap/nMapX/nMapY ← mappos @0xe; nCharNo = 0 | zone `ShineDropItem_so_ItemDrop` FUN_0052a7a0 (Z05 §3.1) | §4.2 |
+| `0x079A` | NC_LOG_MOVER_UPGRADE | `FUN_004076d0` | p_GameLog_Add | 922 | nCharNo ← nCharNo u32 @0x0; nMapX ← nMain_FailCount u16 @0x4; nMapY ← nConsum_FailCount u16 @0x6; nTargetCharNo ← nMain_ID u16 @0x8; nTargetID ← nMain_Grade u8 @0xa; nItemKey ← nMain_Key u64 @0xb; nInt2 ← nConsum_ID u16 @0x13; nInt3 ← nConsum_Grade u8 @0x15; nBigint1 ← nConsum_Key u64 @0x16 | character `fc_NC_ITEMDB_MOVER_UPGRADE_REQ` FUN_00429e70 (D03 §6.3) | sMap `""`, nInt1 0; fail counters in the coordinate columns |
+| `0x079B` | NC_LOG_MOVER_RAREMOVER | `FUN_004077a0` | p_GameLog_Add | 923 | nCharNo ← nCharNo u32 @0x0; nTargetCharNo ← nRare_ID u16 @0x8; nTargetID ← nRare_Grade u8 @0xa; nItemKey ← nRare_Key u64 @0xb; nInt1 ← nConsum_Num u8 @0x13; nInt2 ← nConsum_ID u16 @0x14; nInt3 ← nConsum_Grade u8 @0x16; nBigint1 ← nConsum_Key u64 @0x17 | character `fc_NC_ITEMDB_MOVER_RAREMOVER_REQ` FUN_0042a230 (D03 §6.3) | `nRare_FailCount` @0x4 and `nConsum_FailCount` @0x6 are not stored |
+| `0x079C` | NC_LOG_ITEMMONEY_BUY | `FUN_00407860` | p_GameLog_Add_TypeA | 924 | nCharNo ← nCharNo u32 @0x0; nTargetCharNo ← nNPCNo u16 @0x4; nTargetID ← nItemID u16 @0x6; nItemKey ← nItemkey u64 @0x8; nInt1 ← nItemLot u32 @0x10; nInt2 ← nMoneyID u16 @0x14; nInt3 ← nMoneyLot u32 @0x16 | character FUN_0042a6d0, FUN_0042aeb0 (D03 §2.6) |  |
+| `0x079D` | NC_LOG_RANDOMOPTION_CHANGE | `FUN_00407910` | p_GameLog_Add_TypeF | **packet** | nType ← nType u32 @0x0; nCharNo ← nCharNo u32 @0x4; nTargetID ← nTargetID u32 @0x8; nItemKey ← nItemKey u64 @0xc; nInt2 ← nInt2 u32 @0x14; nInt3 ← nInt3 u32 @0x18; nBigint1 ← nBigint1 u64 @0x1c | none found | sMap `""`, coordinates and nInt1 0 |
+| `0x079E` | NC_LOG_RANDOMOPTION_CHANGE_BEFORE | `FUN_004079c0` | p_GameLog_Add | **packet** | the whole `p_GameLog_Add` row, 0x44 bytes, as 0x0401 (§2.1) | character `fc_NC_ITEMDB_RANDOMOPTION_CHANGE_REQ` FUN_004359c0 (D03 §6.4) | §4.2 |
+| `0x079F` | NC_LOG_RANDOMOPTION_CHANGE_AFTER | `FUN_004079c0` | p_GameLog_Add | **packet** | as 0x079E | as 0x079E | no 2017 PDB struct; the handler is 0x079E's |
+
+**Not stored** (registered to `fc_CheckAliveOnly` `FUN_004069c0`, ours: `return CheckAlive(parser, pkt)`, nothing else):
+0x075D CLEAR_REWARD_ITEM, 0x075E REWARD_MONEY, 0x075F REWARD_ITEM, 0x0760 REWARD_ITEM_PAY, 0x0761 LEVEL_UP (guild academy),
+and MISC 0x0823 (§5). The 2017 PDB has structs for all five *(pdb2017)*; no 2016 server sends them.
+
+### 4.2 Notes on the part-3 rows
+
+- **0x0791 MK2_DEAD** (zone, Z03 §8.1): sent from `ShineMob_so_KilledBy` when the mob's data has a kill-log record
+  (`MobData +0x20`, first u32 = the mob id; Z03 calls it the `MobKillLog` row) after the drop and the quest checks:
+  `{ u16 mobId, MAPPOS (map name copied as three dwords, mob position), u32 killerCharNo }` (0x1A); the killer is the
+  `nCharNo` of the killer when it is a player (`vt 0x4d0` = 2), else 0. A map-wide notice follows (Z03).
+- **0x0798 MK_DROP_ITEM** (zone): `ShineDropItem_so_ItemDrop` sends it when the dropped item's `ItemInfo` entry has a
+  record at `+0x18` whose first u32 is the item id (*inferred*: the `ItemDropLog.shn` row, Z01 §2.3):
+  `{ u16 itemId, u16 lot (ItemAttr class vt 0x1c), u64 itemKey, u16 dropper vt 0x344 (PDB: mobid), MAPPOS (drop position) }`
+  (0x22). `nCharNo` is written 0 by the handler: the packet has no character.
+- **0x079E / 0x079F** (Character, D03 §6.4): after a random-option change the Character server sends the old options as two
+  0x079E rows and the new ones as two 0x079F rows (option kinds 0–8 with `sMap = "1"`, kinds 9–14 with `sMap = "2"`), in the
+  `p_GameLog_Add` layout with `nType = 926 / 927` (the commands). The GameLog handler is the generic one (the same function as
+  0x07E8 DATA_TYPE_0): every column from the packet, `sMap` = 12 bytes + 4 zero bytes.
+- **0x079A MOVER_UPGRADE** puts the two fail counters into `nMapX/nMapY` (the packet has no position) and leaves `nInt1` 0;
+  0x079B RAREMOVER drops both counters and stores `nConsum_Num` in `nInt1`. Payload sizes match the Character senders
+  (0x1E, 0x1F, 0x1A for 0x079C).
+
+### 4.3 NC_LOG_GAME_DATA_TYPE_0…L: one command per procedure
+
+Commands 1000–1021 are a raw interface to the procedures: `PROTO_NC_LOG_GAME_DATA_TYPE_<x>` *(pdb2017)* is exactly the
+parameter list of `p_GameLog_Add_Type<x>` (§1.2) in procedure order, without the output `nLogNo`, and the handler copies every
+field 1:1 into the column of the same name. **`nType` is taken from the packet** (offset 0), so the sender chooses the
+`tGameLog.nType` value; names are `u32`, `sMap` is a 12-byte `Name3`, `nItemKey`/`nBigint1` are u64. Each handler zeroes its
+struct and writes `sMap[12..15] = 0`, so the map name is always terminated.
+
+```pseudo
+fc_NC_LOG_GAME_DATA_TYPE_<x>(parser, pkt):       @ FUN_00402140 (1) … FUN_00402fe0 (L), FUN_004079c0 (0)
+    if !Parser_CheckAlive(parser, pkt): return
+    st = {}                                      # memset; Type5/TypeD handlers write every field instead
+    st.<column> = p.<column> for every field     # sMap: 3 dwords, 13th byte 0
+    SQL_p_GameLog_Add_Type<x>(db, &st)           # Type0 = p_GameLog_Add
+```
+
+| Opcode | Cmd | Handler | Procedure | Payload (= PDB size) | 2016 senders and the nType values they write |
+|---|---|---|---|---|---|
+| `0x07E8` | TYPE_0 | `FUN_004079c0` | p_GameLog_Add | 0x44 | Character `fc_NC_ITEMDB_TERMEXTEND_REQ` FUN_0042d500: nType 2030 (0x7EE); `fc_NC_ITEMDB_CLASS_CHANGE_REQ` FUN_0042e6b0: nType 930 (0x3A2 = `NC_LOG_CLASS_CHANGE_REQ` *(pdb2017)*) (D03 §6.5) |
+| `0x07E9` | TYPE_1 | `FUN_00402140` | …_Type1 | 0x20 | none found |
+| `0x07EA` | TYPE_2 | `FUN_004021f0` | …_Type2 | 0x28 | none found |
+| `0x07EB` | TYPE_3 | `FUN_004022a0` | …_Type3 | 0x2C | none found |
+| `0x07EC` | TYPE_4 | `FUN_00402360` | …_Type4 | 0x2C | zone `Send_NC_LOG_GAME_DATA_TYPE_4` FUN_006144a0, called only by the script function `cSendGameLogDataType_4` (FUN_005f1a10): nType chosen by the script (§4.4) |
+| `0x07ED` | TYPE_5 | `FUN_00402420` | …_Type5 | 0x10 | zone `Send_NC_LOG_GAME_DATA_TYPE_5` FUN_006145c0: script `cSendGameLogDataType_5` (FUN_005f1d40), and `cSaveTutorialInfo` (FUN_005e70b0): nType 2025 (0x7E9) (§4.4) |
+| `0x07EE` | TYPE_6 | `FUN_004024b0` | …_Type6 | 0x2C | none found |
+| `0x07EF` | TYPE_7 | `FUN_00402570` | …_Type7 | 0x2C | none found |
+| `0x07F0` | TYPE_8 | `FUN_00402630` | …_Type8 | 0x24 | none found |
+| `0x07F1` | TYPE_9 | `FUN_004026e0` | …_Type9 | 0x30 | none found |
+| `0x07F2` | TYPE_A | `FUN_004027a0` | …_TypeA | 0x24 | Character `fc_NC_ITEMDB_UES_FRIEND_POINT_REQ` FUN_0042ef20: nType 929 (0x3A1 = `NC_LOG_UES_FRIEND_POINT` *(pdb2017)*) (D03 §6.5) |
+| `0x07F3` | TYPE_B | `FUN_00402850` | …_TypeB | 0x3C | none found |
+| `0x07F4` | TYPE_C | `FUN_00402920` | …_TypeC | 0x38 | none found |
+| `0x07F5` | TYPE_D | `FUN_004029f0` | …_TypeD | 0x18 | none found |
+| `0x07F6` | TYPE_E | `FUN_00402a90` | …_TypeE | 0x30 | none found |
+| `0x07F7` | TYPE_F | `FUN_00402b50` | …_TypeF | 0x40 | zone `Send_NC_LOG_GAME_DATA_TYPE_F` FUN_006146a0 from the enchant ACKs (Z05 §8.2): ADD_GEM FUN_00522fc0 nType 2020 (0x7E4), REMOVE_GEM FUN_005233d0 2021 (0x7E5, one row per removed socket), ADD_NEW_SOCKET FUN_00523820 2022 (0x7E6) |
+| `0x07F8` | TYPE_G | `FUN_00402c30` | …_TypeG | 0x3C | zone `Send_NC_LOG_GAME_DATA_TYPE_G` FUN_006147f0 from `EQUIP_BELONGED_CANCEL_USE_ACK` FUN_0051bfa0 (Z05 §5.3): nType 2000; Character FUN_0042c120: nType 928 (0x3A0 = `NC_LOG_RANDOMOPTION_USE_CONSUME_ITEM_TO_TARGET_ITEM`, sMap "UseBijouH"), FUN_0042c750: nType 933 (0x3A5 = `NC_LOG_RANDOMOPTION_RECOVER_COUNT_LIMIT`, sMap "RORecover") (D03 §6.4) |
+| `0x07F9` | TYPE_H | `FUN_00402d00` | …_TypeH | 0x24 | none found |
+| `0x07FA` | TYPE_I | `FUN_00402db0` | …_TypeI | 0x28 | none found |
+| `0x07FB` | TYPE_J | `FUN_00402e60` | …_TypeJ | 0x34 | none found |
+| `0x07FC` | TYPE_K | `FUN_00402f20` | …_TypeK | 0x30 | none found (the zone `0x7fc` hits are vtable offsets) |
+| `0x07FD` | TYPE_L | `FUN_00402fe0` | …_TypeL | 0x2C | Character `fc_NC_ITEMDB_REPURCHASE_ALL_REQ` FUN_0042e060, `…_LOT_REQ` FUN_0042e380: nType 2040 (0x7F8) (D03 §2.2) |
+
+Every sender's payload size equals the PDB size. The `nType` values 2000–2040 are not `PROTOCOL_COMMAND_LOG` members in the 2017
+PDB; 926–933 are *(pdb2017)*. Together with §2.3/§3.1 the `tGameLog.nType` value space is: the NC_LOG command number,
+510–521 (item `…_INVEN_EXT`), and these DATA_TYPE values.
+
+### 4.4 Zone script and tutorial senders
+
+```pseudo
+cSendGameLogDataType_4(L):         # script function; args read as numbers unless noted        @ FUN_005f1a10
+    Send_NC_LOG_GAME_DATA_TYPE_4(nType = arg1, nCharNo = arg2, sMap = strncpy(arg3 string, 12) or "",
+                                 nMapX = arg4, nMapY = arg5, nMapZ = arg6, nInt1 = arg7, nInt2 = arg8, nInt3 = arg9)
+    # an argument of the wrong type becomes 0; floats are rounded                          @ FUN_006144a0
+cSendGameLogDataType_5(L):  Send_NC_LOG_GAME_DATA_TYPE_5(arg1 nType, arg2 nCharNo, arg3 nInt1, arg4 nInt2)   @ FUN_005f1d40 → FUN_006145c0
+cSaveTutorialInfo(L): handle = arg1, state = arg2, step = arg3                             @ FUN_005e70b0
+    p = object(handle); store {state, step} in the player's tutorial record (vt 0xdfc)
+    send 0x1118 and 0x111C (tutorial save) to two other server pools (owned by the zone/character items)
+    if state == 1: Send_NC_LOG_GAME_DATA_TYPE_5(2025, p.charNo, nInt1 = 1, nInt2 = step)
+Send_NC_LOG_GAME_DATA_TYPE_x: static packet buffer, opcode + fields, SetPacketLen, send to SessionPool_Pick(GameLog pool
+    0x14d43958); too long → log "Send_NC_LOG_GAME_DATA_TYPE_x : Packet Too Long"
+```
+
+Which scripts call `cSendGameLogDataType_4/5` and with which nType is in the zone's script files, not in the binary.
+
+## 5. Server-link handlers (CPFs, registered @ FUN_00409640 CPFs_ctor)
+
+The D01 §2 handlers with the same code; `my_type` = `g_MyServerType` (`DAT_0044d688`) = 3 from the config (§1.1).
+Unregistered commands of every parser go to `fc_dummyfunction` (`FUN_00408af0`: log "fc_dummyfunction, Protocol = 0x%04x,
+dep=%d, cmd=%d, length=%d From (…)", ignore).
+
+```pseudo
+0x0801 NC_MISC_S2SCONNECTION_RDY, 0x0805 NC_MISC_HEARTBEAT_ACK: fc_ReturnTrue (no-op)          @ FUN_004063d0
+0x0804 NC_MISC_HEARTBEAT_REQ (no CheckAlive):                                                  @ LAB_00409150
+    Session_SendRaw(session, {02 05 08}, 3)            # static frame DAT_0044a0b0: length 2, opcode 0x0805 HEARTBEAT_ACK
+                                                       @ FUN_00409970 (under the send lock)
+0x0823 NC_MISC_START_THE_BOOM_CMD: return CheckAlive()  (fc_CheckAliveOnly)                    @ FUN_004069c0
+
+0x0802 NC_MISC_S2SCONNECTION_REQ { u8 echo_data, u8 server_to_id, u8 server_from_id, u8 world, u8 zone, u16 key }   @ FUN_00408bd0
+    ok = 1
+    if session.state(+0xdc) not in {0, 2} and session.type(+0xe0) != 3: ok = 0; log (already connected) "IP=%s:%d, SOCKET=%d"
+    if server_to_id != g_MyServerType and ok: ok = 0; log (wrong type) + "NC_MISC_S2SCONNECTION_REQ <server_from id=%d w=%d z=%d,
+        server_id_to=%d, key=%d, my_type=%d>"
+    if ok and key != (u16)(server_to_id + server_from_id): log (wrong key) + "<server_id_from=…>"; Session_Close; return
+    if !ok: Session_Close(session); return                                                    @ FUN_00412c70
+        # Session_Close = CSocket_IOCP_Shutdown(SD_SEND) @ FUN_00413240 (WSAENOTCONN ignored, other errors logged
+        #   "ERROR - CSocket_IOCP::Shutdown : …") + CSocket_IOCP_Close @ FUN_00413360 (closesocket, socket = −1, failure logged
+        #   "ERROR - CSocket_IOCP::Close : …"; then frees the queued send buffers FUN_00413320 under the send lock)
+    session.type/world/zone (+0xe0/+0xe4/+0xe8) = server_from_id / world / zone
+    Send 0x0803 NC_MISC_S2SCONNECTION_ACK { u8 echo_data, u16 error = 0 }   # CSendPacket on the stack; CSendPacket_dtor FUN_004183c0 is empty
+    send failed: log; Session_Close
+    else: session.state = 1 (authenticated: CheckAlive passes from now on); fields set again; connectTime(+0xec) = GetLocalTime();
+          log "Connected from …" with ServerTypeName(type) (FUN_0040b240: SERVER_ID_* string table, index > 20 or < 0 → 10)
+
+0x0803 NC_MISC_S2SCONNECTION_ACK { u8 echo_data, u16 error }:  if error == 0: session.state = 1; log "Connected to …"   @ FUN_00409080
+    # the GameLog server never connects out; registered by the shared base
+
+0x2801 NC_OPTOOL_S2SCONNECT_LIST_REQ { u8 echo_data }   (CheckAlive)                                @ FUN_00409170
+    under the session-list lock (0x44d6d4, FUN_00411350/FUN_00411370), for each session with state 1:
+        SERVER_CONN_INFO { u8 connect_server_world, u8 connect_server_zone, u8 connect_server_id, u32 connect_time }
+        connect_time = SHINE_DATETIME bits: year&0xF | month<<4 | day<<8 | hour<<13 | minute<<18 | second<<24
+    Send 0x2802 { u8 echo_data, u8 my_server_id = 3, u16 num_of_connections, entries } (4 + 7n)
+    # the entry order is world, zone, id (as SERVER_CONN_INFO (pdb2017)); D01 §2 lists the type first
+0x2803 NC_OPTOOL_CLOSE_SERVER_REQ  (no CheckAlive)                                                   @ FUN_00409360
+    Send 0x2804 NC_OPTOOL_CLOSE_SERVER_ACK { u16 error = 0x0600 }
+    g_CloseServerRequested (DAT_00656a3c) = 1          # no code reads it: the server keeps running (original bug) D05-B7
+0x2805 NC_OPTOOL_MAP_USER_LIST_REQ { u8 echo_data } (CheckAlive):  Send 0x2806 { echo_data, my_server_id = 3, u16 0 }   @ FUN_00409410
+0x2807 NC_OPTOOL_CONNECT_BRIF_REQ { u8 echo_data } (CheckAlive):                                     @ FUN_004094e0
+    Send 0x2808 (0xAA, zeroed) { echo_data, my_server_id = 3, u16 count[21][2][2] }:
+        for each session with state 1: t = type (> 20 → 10), w = world (> 1 → 0), z = zone (> 1 → 0); count[t][w][z]++
+```
+
+## 6. NC_SYSLOG handlers: text log for the data warehouse (dept 50, CParserGameLog)
+
+The fourteen dept-50 handlers do not touch the database. Each formats one line and hands it to a rotating text log.
+
+### 6.1 The log file
+
+Helper names in this section (`RotatingLog_*`, `LineQueue_Push`, `CreateDirectoryPath`, `Syslog_WriteLine`) are ours; the
+binary has no strings for them.
+
+```pseudo
+at startup (main, FUN_00401f90; part 4):
+    RotatingLog_Open(g_SyslogFile (main +0x2098c4 = DAT_00656a4c), dir = "C:/data/gamigo-dwh/current/", mode 4 (hourly),
+                     name = sprintf("_fiesta_Gamelog_World%d.log", my world (main +0x504)))          @ FUN_0040f6b0
+        CreateDirectoryPath(dir): CreateDirectoryA for every prefix ending in '/' or '\' (not after ':'), then the whole  @ FUN_0040ed70
+        line queue: chunked deque of strings (+0x33c), CreateThread(RotatingLog_WriterThread)
+        thread creation fails → the server does not start (main returns)
+
+Syslog_WriteLine(msg):                                                                            @ FUN_00406cc0
+    local = GetLocalTime(); host = gethostname(255 bytes); utc = GetSystemTime()
+    line = sprintf("%s %s %s %s %s - %s",
+                   "<Mon> <d> <hh:mm:ss>" (English month abbreviation, day not padded, local time),
+                   host, "<yyyy>-<mm>-<dd>T<hh>:<mm>:<ss>.<mmm>Z" (UTC), "GAMELOG", "GAMELOG", msg)     # 512-byte buffer
+    RotatingLog_Write(g_SyslogFile, line)                                                          @ FUN_0040f1f0
+        dropped unless the writer thread runs (+0x38c = 1) and no stop was requested (+0x38d)
+        under the queue lock (+0x36c): append a std::string copy (FUN_0040f120) with LineQueue_Push FUN_0040f040; lineCount(+0x368)++
+
+RotatingLog_WriterThread(log):                                                                    @ FUN_0040f250
+    log.running = 1
+    loop until a stop is requested and the queue is empty: Sleep(1); then for every queued line:
+        now = GetLocalTime()
+        no file open, or now ≥ rollover (RotatingLog_IsBeforeRollover FUN_0040edf0 compares yyyyMMddhhmmss numbers):
+            close the old file; stamp = "%04d%02d%02d%02d" (mode 4; modes 1–6 = year … second, other = "")
+            rollover = start of the next hour; path = dir + stamp + name; fopen(path, "a+")
+            fopen fails → the thread ends (running = 0): later lines are dropped, nothing is logged
+        pop the line (copied into a 512-byte buffer with "%s"), fprintf("%s\n"), fflush
+    close the file; running = 0
+```
+
+So one file per hour, e.g. `C:/data/gamigo-dwh/current/2016031514_fiesta_Gamelog_World0.log` *(inferred example)*. The
+directory name and the line format (an RFC 5424-like header plus an SD element `[fiesta@onson key="value" …]`) point to
+gamigo's data-warehouse import *(inferred)*.
+
+### 6.2 The fourteen messages
+
+Every handler: `if !CheckAlive: return`; `msg = sprintf(format, fields)` into a 256-byte buffer; `Syslog_WriteLine(msg)`. All
+numbers print with `%d` (u32 values above 2³¹ print negative) except `%I64d` amounts. The 2016 packets are the PDB structs
+without the trailing `CharID`/`UserID` strings and levels *(pdb2017 has them)*; sizes below are the 2016 senders'.
+
+| Opcode | Name | Handler | Payload read (2016 size) | Message (`fiesta@onson` attributes) | Sender (2016) |
+|---|---|---|---|---|---|
+| `0xC804` | NC_SYSLOG_CHAR_CREATED | `FUN_00406e60` | UserNo u32 @0, CharNo u32 @4, CharClass u8 @8 (9) | `CHAR_CREATED [… account-id char-id char-type]` | WM `CharDB_AvatarCreated_1405` FUN_004113c0 (W01) |
+| `0xC805` | NC_SYSLOG_CHAR_DELETED | `FUN_00406ee0` | UserNo, CharNo, CharClass u8 @8 (9) | `CHAR_DELETED [… account-id char-id char-type]` | WM `CharDB_AvatarErased_140B` FUN_0040a010 (W01) |
+| `0xC806` | NC_SYSLOG_CHAR_ENTER_GAME | `FUN_00406f60` | UserNo, CharNo (8) | `CHAR_ENTER_GAME [… account-id char-id]` | WM `CharDB_CharDataAck_1005` FUN_00410040 (W01) |
+| `0xC807` | NC_SYSLOG_CHAR_LEAVE_GAME | `FUN_00406fe0` | UserNo, CharNo, PlayTime u32 @8 (12) | `CHAR_LEAVE_GAME [… account-id char-id in-game-minutes]` | WM `Client_CharacterLogout` FUN_00436d50 (W01) |
+| `0xC808` | NC_SYSLOG_CHAR_LEVEL_UP | `FUN_00407060` | UserNo, CharNo, CharLev u8 @8 (9) | `CHAR_LEVEL_UP [… account-id char-id level]` | WM `Zone_LevelChanged_1074` FUN_0042e160 (W01) |
+| `0xC809` | NC_SYSLOG_CHAR_ZONE_TRANSITION | `FUN_004070e0` | UserNo, CharNo, DestZoneNo u8 @8, SrcZoneNo u8 @9, CharLev u8 @0xa (11) | `CHAR_ZONE_TRANSITION [… account-id char-id dest-zone-id src-zone-id level]` | zone `ShinePlayer_so_LinkTo` FUN_0049ad30 (Z01) |
+| `0xC80A` | NC_SYSLOG_CHAR_DEATH | `FUN_00407170` | UserNo, CharNo, ZoneNo u8 @8, AttackerType u8 @9, AttackerID u32 @0xa, DeathCoord x u32 @0xe, y u32 @0x12 (0x16) | AttackerType 0: `CHAR_DEATH [… account-id char-id opponent-id longitude latitude zone-id]`; 1: same with `from-id`; other: without an attacker | zone `ShinePlayer_so_KilledBy` FUN_00433be0 (Z03) |
+| `0xC80B` | NC_SYSLOG_CHAR_VICTORY | `FUN_00407260` | UserNo, CharNo, ZoneNo u8 @8, TargetType u8 @9, TargetID u32 @0xa, KillCoord x/y @0xe/@0x12 (0x16) | TargetType 0: `CHAR_VICTORY [… account-id char-id zone-id opponent-id longitude latitude]`; other: `victim-id` instead of `opponent-id` | zone `ShineMob_so_KilledBy` FUN_00432760 (mob kill: TargetType 1, TargetID = mob id, the killer's zone number from `ServerInfo_GetMine`), `ShinePlayer_so_KilledBy` FUN_00433be0 (Z03) |
+| `0xC80D` | NC_SYSLOG_CHAR_ITEM_BUY | `FUN_00407320` | UserNo, CharNo, ItemNo u16 @8, BuyMoney u64 @0xa, Vendor u16 @0x12 (0x14) | `CHAR_ITEM_BUY [… account-id char-id item-id amount vendor-id]` | Character FUN_00409300, FUN_004096d0 (D03 §2.1) |
+| `0xC80E` | NC_SYSLOG_CHAR_ITEM_SELL | `FUN_004073b0` | as ITEM_BUY (SellMoney) (0x14) | `CHAR_ITEM_SELL [… account-id char-id item-id amount vendor-id]` | Character FUN_00409a20, FUN_00409ec0 (D03 §2.2) |
+| `0xC80F` | NC_SYSLOG_CHAR_QUEST_STARTED | `FUN_00407440` | UserNo, CharNo, QuestID u16 @8, ZoneNo u8 @0xa, QuestStartNPC u16 @0xb (0xd) | `CHAR_QUEST_STARTED [… account-id char-id quest-id zone-id npc-id]` | zone `CQuestZone_Recv_NC_QUEST_DB_SET_INFO_ACK` FUN_005bf280 (Z08) |
+| `0xC810` | NC_SYSLOG_CHAR_QUEST_FINISHED | `FUN_004074d0` | UserNo, CharNo, QuestID u16 @8, RewardMoney u64 @0xa, RewardItemNo u16 @0x12, ClearTime u64 @0x14 (low dword printed), QuestEndNPC u16 @0x1c (0x1e) | RewardItemNo = 0xFFFF: `CHAR_QUEST_FINISHED [… account-id char-id npc-id quest-id amount time-needed]`; else with `item-id` before `time-needed` | Character FUN_00431550 (D04 §1.2) |
+| `0xC814` | NC_SYSLOG_CHAR_ITEMMONEY_BUY | `FUN_004075b0` | UserNo, CharNo, ItemNo u16 @8, ItemLot u32 @0xa, ItemMoneyNo u16 @0xe, ItemMoneyLot u32 @0x10, Vendor u16 @0x14 (0x16) | `CHAR_ITEMMONEY_BUY [… account-id char-id item-id item-amount money-id money-amount vendor-id]` | Character FUN_0042a6d0, FUN_0042aeb0 (D03 §2.6) |
+| `0xC815` | NC_SYSLOG_CHAR_ITEM_REBUY | `FUN_00407640` | as ITEM_BUY (0x14) | `CHAR_ITEM_REBUY [… account-id char-id item-id amount vendor-id]` | Character FUN_0042e060, FUN_0042e380 (D03 §2.2: amount = nPrice, high dword 0) |
+
+`…` stands for `fiesta@onson`; attribute values are quoted: `account-id="%d"`. Example *(inferred, built from the formats)*:
+`Mar 15 14:02:07 GLHOST 2016-03-15T13:02:07.512Z GAMELOG GAMELOG - CHAR_LEVEL_UP [fiesta@onson account-id="1001" char-id="2002" level="31"]`.
+
+Not registered in 2016 (go to `fc_dummyfunction`, §5): 50/1–3 `ACCOUNT_LOGIN_SUCCESS/FAILURE/LOGOUT`, 50/12 `CHAR_LOOT`,
+50/17 `SERVER_CCU`, 50/23 `NC_GAMIGO_NEW_TUTORIAL_STORE_STEP` *(pdb2017 names)*.
+
 ## 8. Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -412,8 +640,10 @@ all but SET_MASTER).
 | D05-B4 | 0x044F ITEM_CREATE `FUN_004049c0` | `sMap` = constant `"RouN"`, coordinates 0 | every created item looks created in RouN | leave the map empty (the packet has none) |
 | D05-B5 | `SQL_p_GameLog_Add_TypeL` `FUN_0041b4c0` | the failure line starts `"TA,"` and omits `nBigint1` | lost TypeL rows look like TypeA rows in `GameLog_<date>.txt`, without their 64-bit value | `"TL, …, %I64d"` |
 | D05-B6 | 0x0462 MONEY_CHANGE `FUN_00405660` | zeroes the struct, copies only the three money values; `nType` and `nCharNo` stay 0 (`chrregnum` @0 is never read) | every money-change row (sent on each money change by the Character server) has nType 0 and no character | `nType = 98`, `nCharNo = chrregnum` like every other handler |
+| D05-B7 | 0x2803 OPTOOL_CLOSE_SERVER_REQ `FUN_00409360` | no CheckAlive; replies 0x2804 `{0x0600}` and sets `DAT_00656a3c`, which no code reads (the Account server's copy, D01 §2, is the same) | an operator tool is told the server closes, but it keeps running; any peer, even unauthenticated, gets the same answer | stop the main loop / service on the flag, and require an authenticated link |
+| D05-B8 | 0x075C GUILD_ACADEMY_CLEAR_REWARD_MONEY `FUN_00406950` | zeroes the TypeA struct and calls the procedure without copying anything (no nType, no field) | each packet writes an all-zero `tGameLog` row (nType 0); no 2016 server sends it, so latent | `nType = 860`, `nInt1 = nGuildNo`, `nCharNo = nCharNo` like 0x075A |
 
-Next free ID: D05-B7.
+Next free ID: D05-B9.
 
 ## 9. Not reconstructed / uncertain
 
@@ -429,8 +659,17 @@ Next free ID: D05-B7.
   handler and the sender (D04 §6.4).
 - 0x065F HALL_CANCEL: that a zero flag in the couple-entrance answer means "not entered" is inferred from the `wh_Cancel` log
   text; Z08 owns the wedding flow.
+- 0x075B SET_REWARD_ITEM stores the u16 at 0x0B (`nItemLot` in the 2017 PDB) in `nTargetID` and the u16 at 0x09 (`nItemID`)
+  in `nInt3`, the reverse of the usual "item id → nTargetID". No 2016 sender exists to tell whether the 2016 layout had the lot
+  first or the handler swaps them.
+- 0x0798 MK_DROP_ITEM: the drop is logged only for items with an `ItemInfo +0x18` record; that this is the `ItemDropLog` table,
+  and that the zone's u16 at 0x0C (dropper `vt 0x344`) is the mob id as the PDB names it, are inferred.
+- 0x079F RANDOMOPTION_CHANGE_AFTER has no 2017 PDB struct; its layout is the 0x079E/0x0401 one (same handler, same sender).
+- The nType values the zone scripts pass to `cSendGameLogDataType_4/5` (§4.4) are in the script files, not in the binary.
+- NC_SYSLOG: the meaning of AttackerType/TargetType values beyond 0/1 and the unit of `PlayTime` ("in-game-minutes") come from
+  the format strings only; the senders (W01, Z03) own the values.
 
-## 10. Coverage boundary (parts 1–2; the sweep part completes it)
+## 10. Coverage boundary (parts 1–3; the sweep part completes it)
 
 | Found | Covered by | Argument |
 |---|---|---|
@@ -439,3 +678,8 @@ Next free ID: D05-B7.
 | Zone senders `FUN_0045e810` (horse item belong), `FUN_00520840`/`FUN_00520aa0` (costume charges), `FUN_005a25a0`/`FUN_005a2b60` (wedding hall) | Z02 §9.1 / Z06 (costume charges) / Z08 (wedding) | only the log packet they build is D05's (§3.2); the game logic around it belongs to the zone items |
 | The 23 no-op registrations (§3.3) | D05 (done) | `fc_ReturnTrue`: nothing to reconstruct beyond "ignored" |
 | DataServer framework beyond the worker (listener, IOCP, service, main loop, scriptor parser) | D05 sweep part (part 4) | reached from no part-1 handler; same code as D01 §1 |
+| Zone script functions `cSendGameLogDataType_4/5` (FUN_005f1a10, FUN_005f1d40) and `cSaveTutorialInfo` (FUN_005e70b0), their `Send_NC_LOG_GAME_DATA_TYPE_4/5/F/G` builders (FUN_006144a0, FUN_006145c0, FUN_006146a0, FUN_006147f0) | Z01 §2.2 (Lua globals) / Z05 §5.3, §8.2 / Z07 (tutorial) | only the log packet is D05's (§4.3, §4.4); the scripts and the tutorial state belong to the zone items |
+| Zone senders `ShineMob_so_KilledBy` FUN_00432760, `ShinePlayer_so_KilledBy` FUN_00433be0, `ShineDropItem_so_ItemDrop` FUN_0052a7a0, `ShinePlayer_so_LinkTo` FUN_0049ad30, `CQuestZone_Recv_NC_QUEST_DB_SET_INFO_ACK` FUN_005bf280 | Z03 §8.1 / Z05 §3.1 / Z01 / Z08 | they build 0x0791/0x0798/0xC809–0xC80F as a side effect of their own feature |
+| WM syslog senders FUN_004113c0, FUN_0040a010, FUN_00410040, FUN_00436d50, FUN_0042e160 | W01 | 0xC804–0xC808 are built by the WM's character life-cycle handlers |
+| CPFs server-link handlers (§5): handshake rules, session list | D01 §2 (same code) | GameLog differences recorded in §5; the shared framework is D01's |
+| Rotating text log internals: deque growth (FUN_0040ef00), string helpers (FUN_0040b130, FUN_0040b040, FUN_0040f160) | D05 sweep (part 4) | generic container code reached from §6.1; the behaviour is documented, the helpers are boilerplate |
