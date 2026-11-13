@@ -14,7 +14,8 @@ weapons, attack sequences, captivated players, the dead `so_attack` / `so_Bash` 
 skills and weapon rates, cross-counter, hit / heal rules of the non-player classes, skill blast delay, mob chat, mob
 shout, servant explosions, boss-field hooks, the charmed player's target selector). §9 movement (MoveManager, block
 bitmaps and doors, server-driven moves, random spots, Navigator, MobRoam, scenario moves) and sight (coordinate lists,
-range queries, 0x1C0E on moves).
+range queries, 0x1C0E on moves). §10 spawns (MobHatchery / breeder groups / breeders, MobRegen files, adaptive regen
+time, families, the 1-s regen event, script and Lua spawners, KQ / instant regen tables) and the treasure-chest maker.
 
 ---
 
@@ -512,7 +513,7 @@ Other mob tables loaded elsewhere and read in this part:
 | +0x1e78 | flag byte: bit 0 invalid position, bit 2 Fear, bit 3 killed, bit 4 blast armed, bit 7 (vt 0xbf0) |
 | +0x1e8c…+0x1e9c | movement detector (FUN_0055d610): +0x1e8c 1 = moving, +0x1e90/94 last position, +0x1e98 time of the last change, +0x1e9c next check |
 | +0x1ea8 / +0x1eac | wander-chat timer `g_Now + t` / `t`, t = `MobChat` PIECE element of the mob ID (DAT_0084cc8c[mobId].vt[0](), ms → tenths; 10⁹ ms without a PIECE row) (§8.6) |
-| +0x1ec0 | spawning breeder (MobBreeder, part 6; −1 for NPC.txt NPCs) |
+| +0x1ec0 | `breeder` argument of vt 0x6e0: **0** for breeder spawns (the global DAT_0da2932c passed by `mb_regen` is never written, §10.4), −1 for NPC.txt NPCs and script / Lua spawns; it does not identify the breeder |
 | +0x1ec4 / +0x1ec8 | HP / SP |
 | +0x1ecc | the mob's own brief-info packet 0x1C08 `NC_BRIEFINFO_REGENMOB_CMD`; its payload pointer is +0x1f74 (§5.3) |
 | +0x1f78 | char map[12] (vt 0x4bc), the map the mob is spawned on |
@@ -531,7 +532,7 @@ Other mob tables loaded elsewhere and read in this part:
 | +0x2238 | tactic set (InMove … Turning, §7.1), bound to the target cell +0x24e0 by FUN_004b8c80 at spawn |
 | +0x2260 / +0x227c | MobActionWander / MobActionAttack tactic elements (§7.1) |
 | +0x22e4 | current tactic state (`MobActionWander`, `MobActionRoaming` 0x84cfc4, `MobActionNoBrain` 0x84cfc8) |
-| +0x22e8 | regen slot of the breeder (+0x4c = time of the last spawn) |
+| +0x22e8 | the spawning `MobBreeder` (§10.2; +0x4c = spawn time set by RegenComplete, +0x50 = death time set by `so_KilledBy`), 0 for other spawns |
 | +0x22ec | guild number shown with the mob (`so_mob_SetGuildRegNum`, §5.8) |
 | +0x22f0 | HitMeList (Z03 §8.2) |
 | +0x249c/+0x24a0, +0x24a4/+0x24a8 | spawn point and return point (both = spawn position) |
@@ -2654,3 +2655,401 @@ value is a bool here: players FUN_00557240 = mode ≠ 3 (alive); mobs FUN_005565
 - The meaning of `GetParam()+0xcce` bits 0/1 (which abstates set them): Z03 §6.
 - `so_AllOfRangeMiniHouse_Class4` (mini-house interiors) and field+0x88 selection (FUN_00464bc0 map init): Z06/Z01.
 - Callers of vt 0xc98 (`SetPositionWithSight`) were not listed (sweep).
+
+## 10. Spawns: MobHatchery, breeder groups, breeders, script spawners
+
+Mobs placed by the map data respawn through *breeders*. Scripts, Lua and GM commands either create breeders too
+(timed, counted) or spawn a mob once without a breeder. The spawn itself is `so_mob_Regenerate` (§5.3); the death and
+removal of the mob is §5.4. Mob roaming paths handed over at spawn: §9.5.
+
+### 10.1 Data files
+
+`MobRegen/<map>.txt` (one per map instance of Field.txt; the zone also tries `World/<…>/MobRegen/<map>.txt` first, see
+§10.3). Script-file format (`#table`, `#columntype`, rows packed by column type: INDEX = 20 bytes, STRING[n] = n bytes):
+
+| Table | Column (offset in the packed row) |
+|---|---|
+| `MobRegenGroup` | `GroupIndex` INDEX +0, `IsFamily` STRING[1] +0x14 ('Y' / 'N'), `CenterX` +0x15, `CenterY` +0x19, `Width` +0x1d, `Height` +0x21, `RangeDegree` +0x25 (DWRD each); row 0x29 bytes |
+| `MobRegen` | `RegenIndex` INDEX +0 (= GroupIndex), `MobIndex` STRING[33] +0x14, `MobNum` BYTE +0x35, `KillNum` BYTE +0x36, then 12 DWRD from +0x37: `RegStandard`, `RegMin`, `RegMax`, `RegDelta0`, `RegSec0`, `RegDelta1`, `RegSec1`, `RegDelta2`, `RegSec2`, `RegDelta3`, `RegSec3`, `RegDelta4` (seconds); row 0x67 bytes |
+
+Region: `Height == 0` → a circle of radius `RangeDegree` around the centre (`Width` ignored); otherwise a rectangle of
+half-extents `Width` × `Height`, rotated by `RangeDegree` degrees. `KillNum` is the family kill limit (§10.5).
+
+`MobRegen/KingdomQuest/*.txt` and `MobRegen/Instant/*.txt`: same two tables, loaded whole at start-up into the
+`KQRegenTable` (§10.6) and spawned only by scripts. *(Data note: `KD_Kingkong.txt`, `KDKingkong2.txt`, `KDKingkong3.txt`
+and the root file `MobRegen/KingdomQuest.txt` have no `KillNum` column; because rows are packed by the declared types
+their regen times sit one byte earlier than the code reads them (+0x37), so those rows get garbled regen times. Data
+problem, not code.)*
+
+Not zone data: `MobNoFadeIn.shn` (`MobInx` list of projectile-like mobs) is loaded only by the client
+(`MobNoFadeInTab::IsNoFadeIn` client FUN_004c4190): mobs that appear without the fade-in. `MobSetting/Action/*.txt`
+(`Trigger { ConditionID, ActionID }`) is loaded by the NPCAction trigger loader FUN_005c4420 (part 9). `MobRegenAni.shn`:
+§5.1 / §5.3.
+
+### 10.2 Objects
+
+```pseudo
+g_MobHatchery  DAT_0da28ad0 → MobHatchery
+    +0x19b8000  ObjectManager of MobBreederGroup (List: +4 capacity, +8 entries {ptr, u16 next, u16 prev, u8 used},
+                +0xc free head, +0xe used head, +0x14 count); groups are 0x19b8 bytes, inline → 4096 groups *(inferred
+                from 0x19b8000 / 0x19b8)*. Group-list alloc overrides FUN_004b2260 / FUN_004b22a0 (vt slots, `l_AllocA` /
+                `l_AllocZ` of the list) set the group key to "Def".
+
+MobBreederGroup (ctor `mb_SetGroup` FUN_004b3ce0, vftable MobRegenClass::MobBreederGroup; copy FUN_004b2af0)
+    +0x00  List<MobBreeder> header (capacity 64, count u16 +0x14)
+    +0x18  64 × MobBreeder (0x64 bytes each)          "Too many mob in regengroup" when full
+    +0x1918 name[20] (GroupIndex)        +0x192c IsFamily char ('Y' for file / script groups; 0/1 for mh_MobBreed)
+    +0x192d 12 × u32 regen times (copy of the MobRegen row, only for the GM view)
+    +0x195d map[12]                      +0x196c key[20] ("Def"; written, never compared)
+    +0x1980 CenterX, +0x1984 CenterY, +0x1988 Width, +0x198c Height, +0x1990 RangeDegree
+    +0x1994 / +0x1998 half-width / half-height,  +0x199c / +0x19a0 cos / sin of RangeDegree × 1024   (rectangle)
+    +0x19a4 radius, +0x19a8 radius²                                                                (circle)
+    +0x19ac value copied out by mbg_RegenLoc (overwritten by the caller: unused)
+    +0x19b0 family leader breeder (file / script loaders)    +0x19b4 MobRoaming set of the group (§9.5) or 0
+    l_AllocA / l_AllocZ (FUN_004b20a0 / FUN_004b2180) clear the breeder's family links; l_Free (FUN_004b5c00) clears them,
+    calls fmm_Remove(breeder) (§10.5) and frees the slot (FUN_004b1300)
+
+MobBreeder (0x64 bytes; ctor LAB_004b0e40: mobId 0, level −1, count −1, active 1)
+    +0x00 → group          +0x04 u8 active (cRegenGroupActiv)      +0x06 u16 mobId      +0x08 level (−1 = MobInfo)
+    +0x0c RegStandard  +0x10 RegMin  +0x14 RegMax  +0x18 RegDelta0  +0x1c RegSec0  +0x20 RegDelta1  +0x24 RegSec1
+    +0x28 RegDelta2  +0x2c RegSec2  +0x30 RegDelta3  +0x34 RegSec3  +0x38 RegDelta4
+    +0x3c u16 handle of the current mob (0xFFFF none)    +0x40 next spawn time (g_Now)    +0x44 u8 waiting (1 = timer
+    armed, 0 = mob out)    +0x48 current regen time (s)    +0x4c spawn time (set by so_mob_RegenComplete)    +0x50 death
+    time (set by ShineMob::so_KilledBy)    +0x54 spawns left (−1 = unlimited)    +0x58 previous / +0x5c next in the family
+    chain (head = leader, +0x58 == 0)    +0x60 bandit flag (≠ 0: the pool object is a ShineBandit, kind 8; else ShineMob 5)
+```
+
+`mb_Set(b, group, mobId, times[12], count)` FUN_004b3110: copies the 12 times, `+0x48 = RegStandard`, `+0x44 = 1`,
+`+0x40 = RegDelta2 × 10`, `+0x54 = count`; the handle +0x3c is set neither here nor by the ctor (harmless: the first
+spawn overwrites it; a stale value can at most count one extra family death before `fmm_Initialize` resets the counts). `mb_Setregentime(b, sec)` FUN_004b1b90
+sets all 12 times to `sec` (a fixed regen time). `mb_SetLeader(b, leader)` FUN_004b2400 appends `b` at the end of the
+leader's family chain.
+
+### 10.3 Loading the map's regen file
+
+Called once per map instance hosted by this zone, from the field set-up FUN_00464bc0 (`FieldContainer::fc_MakeField`
+FUN_004650a0 ← Field.txt loader FUN_004655f0), after the block files:
+
+```pseudo
+MobHatchery::mh_Load(h, fieldRow, map[12])                                           @ FUN_004b6330
+    f = new ScriptFile
+    if f.open("../9Data/Shine/World/<fieldRow.MapIDClient>/MobRegen/<map>.txt"):    # argument order from the pushes (inferred)
+        return            # (original bug) Z09-B17: an override file is opened and then nothing is parsed
+    if not f.open("../9Data/Shine/MobRegen/<map>.txt"): return                       # map without mobs
+    for each row g of table "MobRegenGroup":
+        if g.CenterX ≥ 0xFFFFFF or g.CenterY ≥ 0xFFFFFF: log "mh_Load : Invalid LoginLoc"; continue
+        grp = new group  (none: FATAL "MobHatchery::mh_Load : Too many MobRegenGroup")
+        mbg_Set(grp, g.GroupIndex, map, g.IsFamily, &g.CenterX)                     # below
+        grp.roam (+0x19b4) = MobRoamingSet.mrs_Load(&DAT_0da29330, fieldRow, g)      # §9.5
+    for each row r of table "MobRegen":
+        (current row DAT_0da28adc, map DAT_0da28ad8)
+        if ForEach(group, mbg_StoreData) found no group: log "RegenMob without RegenGroup in <map>",
+            "RegenGroup is <r.RegenIndex>", FATAL "MobHatchery::mh_Load"
+
+mbg_Set(grp, name, map, family, region)                                              @ FUN_004b1f30
+    grp.name = name; grp.IsFamily = family; grp.map = map; grp.region = region (5 u32); grp.leader = 0
+    if Height == 0: radius = RangeDegree; radius² = RangeDegree²
+    else: halfW = Width; halfH = Height
+          a = RangeDegree as an UNSIGNED 32-bit value × 0.01745329 (rad)   # (original bug) Z09-B16: negative angles
+          cos1024 = ftol(cos(a)·1024); sin1024 = ftol(sin(a)·1024)         #   become 2³²−n degrees (−2° → 353.9°)
+
+mbg_StoreData(grp)  (ForEach functor; true = keep searching)                        @ FUN_004b5e70
+    if r.RegenIndex ≠ grp.name or map ≠ grp.map: return true
+    grp.times = r.times (12 u32)
+    if r.RegStandard ≥ 604800 (7 days; negatives included): log "Minus regen time" (twice), return true
+        # → no other group matches → FATAL "RegenMob without RegenGroup" (a bad regen time stops the zone)
+    repeat r.MobNum times:
+        b = new breeder in grp  (none: log + FATAL "mbg_StoreData : Too many mob in regengroup")
+        mobId = g_MobData.IdByName(r.MobIndex) (FUN_0063cc30 on DAT_14d450a0); unknown: log "Wrong mob name", mobId = 1
+        if grp.IsFamily == 'Y':
+            first breeder → grp.leader; later ones → mb_SetLeader(b, grp.leader)
+            fmm_Regist(g_FamilyMobManager, grp.leader, mobId, r.KillNum)            # §10.5
+        mb_Set(b, grp, mobId, r.times, −1 unlimited) (failure → free b; it never fails)
+    return false (stop)
+```
+
+So every MobRegen row adds `MobNum` breeders of one mob to its group; a family group (`IsFamily = Y`) becomes one chain
+whose leader spawns and respawns the whole family together. The first spawn is due at `g_Now = RegDelta2 × 10`, i.e.
+at the first regen tick after start-up (g_Now is far larger) *(inferred: probably meant as an initial delay)*.
+
+### 10.4 The regen tick: `EventMobRegen`
+
+The static object `EventMobRegen` (DAT_14d41eb4, vftable 0x6c25fc, ctor FUN_004b0e00 from a static initialiser) is put
+into the event-reserve list (§1.4) by `zs_start_open` with first run `g_Now + 10` and **repeat 10 (1 s)**. (The other
+event reserved there repeats every 300 tenths = 30 s; Z01 §2.2 says "300 s and 10 s": both values are tenths.)
+
+```pseudo
+EventMobRegen::erb_happen()                                                          @ FUN_004b56a0
+    ForEach(g_MobHatchery+0x19b8000, mbg_Routine)
+
+mbg_Routine(grp, list, idx)                                                          @ FUN_004b55a0
+    if grp.count == 0: list.vt[0xc](idx)          # empty group (all script breeders used up) is freed
+    else ForEach(grp, mb_Routine)
+
+mb_Routine(b, grp, idx)                                                              @ FUN_004b52c0
+    if b.count == 0:                              # limited breeder used up
+        if som_GetObject(b.handle) == 0: grp.vt[0xc](idx)       # free the breeder (l_Free) once its mob is gone
+        return
+    if b.handle ≠ 0xFFFF and som_GetObject(b.handle) == 0:      # its mob has disappeared (killed, expired, removed)
+        b.handle = 0xFFFF
+        leader = head of b's family chain (follow +0x58)
+        if fmm_Dead(g_FamilyMobManager, leader, b.mobId):        # kill limit of this mob reached (§10.5)
+            log "mb_Routine - FAMILYANIHILATED"
+            for m in leader's chain: o = som_GetObject(m.handle)
+                if o and o.mode ≠ 3 and not o.IsDead (vt 0x28): o.so_KilledBy(o, o.GetHP())   # vt 0x5bc: killed by itself
+    if b is not a leader (+0x58 ≠ 0) or not b.active: return     # members are handled by their leader
+    if b.waiting == 0:                            # the family is out
+        if any m in chain (from b) still has an object: return
+        life = (b.deathTime − b.spawnTime) / 10   (unsigned division, then compared as signed seconds)
+        delta = life < RegSec0 ? RegDelta0 : life < RegSec1 ? RegDelta1 : life > RegSec3 ? RegDelta4
+              : life > RegSec2 ? RegDelta3 : 0                     # RegDelta2 is never used here
+        t = b.regen + delta;  b.regen = (t < RegMin or t > RegMax) ? (the violated bound) : t   (unsigned compares)
+        b.waiting = 1;  b.nextAt = g_Now + b.regen × 10
+    elif b.nextAt < g_Now:                        # time to spawn the family
+        fmm_Initialize(g_FamilyMobManager, b)     # dead counts of this family back to 0
+        for m in chain from b: m.waiting = 0; m.handle = mb_regen(m, b); if m.count > 0: m.count −= 1
+```
+
+Adaptive regen time: a mob killed quickly (lived `< RegSec0` s) shortens its next regen time by `RegDelta0` (negative in
+the data), one that lived long lengthens it, always within `[RegMin, RegMax]`, starting from `RegStandard`. Only the
+leader's times and timestamps count for a family. `deathTime` is written only by `so_KilledBy`: a mob that vanished
+without a kill leaves the previous value, `deathTime < spawnTime` makes the unsigned division huge, and the mob counts
+as long-lived (`RegDelta4`) *(inferred from the arithmetic)*.
+
+```pseudo
+mb_regen(b, leader) → handle | 0xFFFF                                                @ FUN_004b2cf0
+    h, o = som_AllocObject(kind 8 if b.bandit else 5)      none: log "MobBreeder::mb_regen : Too many mob", return 0xFFFF
+    if b == leader:
+        pos = mbg_RegenLoc(grp)                            # always succeeds; the "free reason 0x23" branch is dead
+        familyLeaderObj = 0
+    else:
+        familyLeaderObj = som_GetObject(leader.handle)
+        if familyLeaderObj == 0: return 0xFFFF             # (original bug) Z09-B18: o stays allocated, never freed
+        pos = familyLeaderObj.SpawnPoint (vt 0x614)        # members spawn on the leader's spawn point
+    dirDeg = RandomRing(72) × 5                            # ring DAT_14fb2310: 0, 5, … 355
+    if grp.roam: pos = first point of the roaming path (FUN_004b77c0)
+    if pos.x ≥ 0xFFFFFF or pos.y ≥ 0xFFFFFF: log "mb_regen : Invalid locate" + group name, free(o, reason 0x24), return 0xFFFF
+    if o.so_mob_Regenerate(grp.map, pos, dirDeg, h, b.mobId, briefArg = b.bandit, breeder = DAT_0da2932c (always 0),
+                           familyLeaderObj, regenSlot = b, level = b.level, 1, 0, 0) ≠ 0:   # §5.3
+        free(o, reason 0x25), return 0xFFFF
+    o.vt[0xa14](grp.roam)                                  # roaming path (§9.5)
+    o.SetLifeTime(MobLifeTime of the mob, entry[9]) (vt 0xabc, §5.4) when the mob has a data entry
+    return h
+
+mbg_RegenLoc(grp, &pos, &out) → 1                                                    @ FUN_004b1d60
+    out = grp+0x19ac
+    circle (Height == 0): pos = RandomPointInCircle(Center, radius)                 (FUN_004b0e80)
+    rectangle: if halfW < 1: log "mbg_RegenLoc : Width Zero" + group name; dx = dy = 0
+               else dx = rand() % (2·halfW) − halfW;  dy = rand() % (2·halfH) − halfH       (CRT rand FUN_006594b2)
+               pos.x = CenterX + (cos1024·dx + sin1024·dy) / 1024;  pos.y = CenterY + (cos1024·dy − sin1024·dx) / 1024
+
+RandomPointInCircle(c{x, y, r}, &pos)                                                @ FUN_004b0e80
+    k = RandomRing(3):  frac = k==0 ? RandomRing(64) : k==1 ? 64 + RandomRing(32) : 96 + RandomRing(32)   # of 128
+    d = r·frac / 128;  a = RandomRing(64) · 180 / 64        # 64 directions in the 0..179 (2°) unit
+    pos = (c.x + cos(a)·d / 1024, c.y + sin(a)·d / 1024)    # FUN_005790e0 / FUN_00579110: ×1024 tables (DAT_13283770)
+    # a third of the spawns fall in the inner half radius, a third in 0.5–0.75 r, a third in 0.75–1 r (≈ area-uniform)
+```
+
+A spawn that fails (`0xFFFF`) leaves `handle = 0xFFFF`; the next tick sees the family "out" and re-arms the timer, so a
+failed spawn is retried one regen period later.
+
+### 10.5 `FamilyMobManagement::FamilyMobManager` (`g_FamilyMobManager` DAT_0da29314)
+
+A vector of `{ MobBreeder* leader, vector<{u16 mobId, u16 limit, u16 dead}> }` (0x14-byte records).
+
+```pseudo
+fmm_Regist(fm, leader, mobId, limit)        @ FUN_004b5cf0   add the leader record if new (FUN_004b5b30); add {mobId, limit or
+                                                             60000 when 0, 0} unless that mobId is already listed
+fmm_Dead(fm, leader, mobId) → bool          @ FUN_004b5120   ++dead of that mobId; return dead ≥ limit (false when not listed)
+fmm_Initialize(fm, leader)                  @ FUN_004b5050   every dead count of the leader's record = 0 (FUN_004b12d0)
+fmm_Remove(fm, breeder)                     @ FUN_004b5a40   erase the record whose leader is this breeder (from l_Free)
+```
+
+Only file families register limits (`KillNum`; 0 → 60000 = never). Example data: `R_Helga01` group `boss` (Helga,
+`KillNum 1`) and `AdlThorn01` `21c` (IncubusRock, `KillNum 1`): when that mob disappears once, every other living mob of
+its family dies with it. Script families from `mb_MobBreed` register `limit 3` (§10.6); `mbg_ScriptDataStore` registers
+none, so `fmm_Dead` is always false for them.
+
+### 10.6 Breeders created by scripts, Lua and GM commands
+
+```pseudo
+MobHatchery::mh_MobBreed(h, map, pos, _ (0), mobId, _, mobNum, regenSec, family, count, key[20], bandit, _, _, level)
+                                                                                     @ FUN_004b6960
+    grp = new group (none: return 0)  → mbg_MobBreed(grp, …)
+
+mbg_MobBreed(grp, map, pos, outArg, mobId, _, mobNum, regenSec, family, count, key, bandit, _, _, level) → last breeder | 0
+                                                                                     @ FUN_004b6770
+    grp.IsFamily = family; grp.map = map
+    mbg_SetRegenLoc(grp, pos)    @ FUN_004b1c90: circle of radius 50 around pos (radius² 2500), rectangle fields 0
+    grp+0x19ac = outArg; grp.key = key
+    if mobNum < 1: log "mbg_MobBreed : Minus mobnum"; mobNum = −mobNum
+    repeat mobNum times:
+        b = new breeder (none: return 0)
+        leader = first breeder when family ≠ 0
+        if not mb_MobBreed(b, grp, mobId, regenSec, count, leader, bandit, level): free b, return 0
+    return b
+    # an empty group (mobNum 0) is freed by the next mbg_Routine
+
+mb_MobBreed(b, grp, mobId, regenSec, count, leader, bandit, level) → bool            @ FUN_004b6150
+    b.level = level; b.group = grp; b.mobId = mobId
+    g_MobData[mobId] missing: log "mb_MobBreed : Invalid mob index", return false
+    if leader and leader ≠ b: insert b right after the leader in the chain; fmm_Regist(leader, mobId, 3)
+    mb_Setregentime(b, regenSec)        # fixed regen time, no adaptation (Min = Max = Standard)
+    b.handle = 0xFFFF; b.count = count; b.waiting = 1; b.nextAt = regenSec × 10 (≈ now: spawns on the next tick); b.bandit = bandit
+```
+
+Callers: GM `ac_MobBreed` FUN_0041b510 (all arguments from the command; family, count, regen, level) and FUN_0041b790
+(one mob, count 1, regen 0) (Z11); Pine node `ShineSummonMob::sa_Step` FUN_004ef160 (mobNum from the node, regen 0,
+no family, count 1, level −1: each mob spawns once around the script object's position) (part 15). With `count 1` the
+breeder spawns once; after its mob is gone the breeder, then the empty group, is freed.
+
+```pseudo
+MobHatchery::mh_ScriptBreed(h, map, regenRow, groupRow, key[20])                    @ FUN_004b3e40
+    grp = new group (none: log "mh_ScriptBreed : Too many MobRegenGroup", return)
+    mbg_Set(grp, regenRow.RegenIndex, map, groupRow.IsFamily, &groupRow.CenterX)   # §10.3
+    grp.roam = MobRoamingSet.mrs_Get(&DAT_0da29330, regenRow.RegenIndex)          # cached roaming path by group name
+    mbg_ScriptDataStore(grp, regenRow, key)
+
+mbg_ScriptDataStore(grp, r, key)                                                     @ FUN_004b3820
+    grp.times = r.times; grp.key = key
+    mobId = IdByName(r.MobIndex); missing or row mismatch: log "Invalid mob name" (and "MobDataBox::operator [] :Invalid
+        mob index"), return
+    repeat r.MobNum: b = new breeder (none: log "Too many mob in regengroup", stop)
+        mb_Set(b, grp, mobId, r.times, count 1)                 # adaptive times, but one spawn per breeder
+        family 'Y': first → grp.leader, others mb_SetLeader      # no fmm_Regist: no kill limit
+    # the "Wrong mob name" branch inside the loop is dead (the name was checked before)
+```
+
+The roaming paths that script groups find with `mrs_Get` are preloaded at start-up (stage zs_start_sun) by FUN_004b8690
+*(ours: `MobRoamingSet_LoadScriptPaths`)*: every `RoamingFile` (string, column type 2 checked: "sbs_LoadScripts : Type
+error") of table `RoamingData` in `World/PineScript.txt` is loaded with `mrs_Load` (FATAL "Roaming Data(in
+PineScript.txt)not found" when missing; FATAL "Option read error" without the file).
+
+Callers of `mh_ScriptBreed`: Pine node `ShineRegenGroup::sa_Step` FUN_004ee0f0 (optional x/y override of the group
+centre, restored afterwards; part 15), Lua `cGroupRegenInstance(map, regenIndex)` FUN_005ddaa0 and
+`cGroupRegenInstance_XY(map, regenIndex, x, y)` FUN_005ddc40 (centre replaced by x, y for this call; both return 1 / push
+true). All pass key "Def" and take the rows from the `PineScriptMobRegenerator`:
+
+```pseudo
+g_PineScriptMobRegenerator DAT_13249728 = { entries (0x90 each: group row 0x29 + MobRegen row 0x67 at +0x29), u16 capacity
+    +4 (doubles when full; "psmr_Store : Memory overflow"), u16 count +6, name index +8 }
+psmr_find(psmr, file, regenIndex) → entry | 0                                        @ FUN_004e7bd0
+    key = "<file>:<regenIndex>" (psmr_makeindex FUN_004e7640); not cached → psmr_Load(psmr, file); look up again
+psmr_Load(psmr, file)                                                                @ FUN_004e7990
+    t = bsearch(file (12 bytes), g_KQRegenTables DAT_0da28ff0, count DAT_0da29310)     # loaded at start-up, below
+    for each MobRegen row r of t not yet cached: g = the MobRegenGroup row with GroupIndex = r.RegenIndex
+        (ScriptFile_FindRecord); missing: log "psmr_Load : Group name not found"; else psmr_Store(psmr, r, g, key) @ FUN_004e7790
+KQRegenTable::kqrt_Load (all)  FUN_004b3220: every MobRegen/KingdomQuest/*.txt, then every MobRegen/Instant/*.txt
+    ("Path Invalid" FATAL when a directory is missing) → FUN_004b26b0 per file: name without extension (12 bytes) + parsed
+    ScriptFile, ≤ 50 files ("Too many kq regen table" FATAL), "Error found" FATAL when the file cannot be parsed; sorted
+    by name (FUN_004b1290). Start-up stage zs_start_tough (Z01 §2.2).
+```
+
+The Lua callers use the map's base name (map record +0xc → name) as the file name: `cGroupRegenInstance("Tower01",
+"…")` spawns the group `…` of `MobRegen/Instant/Tower01.txt` on that map instance.
+
+Group control from Lua (both find the group with FUN_004b2320: `(map[12], name[20])` over the hatchery's group list):
+
+```pseudo
+cGroupRegen(map, groupName)          @ FUN_005efc60   for every breeder b of the group: mb_regen(b, b) (FUN_004b30c0)
+                                                      → one extra mob per breeder at a random group spot; the handles
+                                                      are not stored (untracked, never respawned); push 1
+cRegenGroupActiv(map, groupName, on = 1)  @ FUN_005efdc0   every breeder.active = on (functor MobBreedRegenEnable
+                                                      FUN_004b1d40 via FUN_004b3060); push 1. Inactive leaders neither
+                                                      re-arm nor spawn; deaths are still counted
+```
+
+### 10.7 Direct spawns from Lua (`cMobRegen_*`)
+
+All allocate a pool `ShineMob` (kind 5), call `so_mob_Regenerate(map, x, y, dir, h, mobId, briefArg 0, breeder −1,
+leader 0, slot 0, level −1, flag 0, layerA, layerB)`, set the MobLifeTime (vt 0xabc) and push the handle (one return
+value); on a failed Regenerate they log and free the slot (reason 0x16) and return nothing. No breeder: the mob never
+respawns. Map = `FUN_00466a60(name)` (field by name) whose centre object exists (`fm_GetCenterObject`).
+
+| Lua function | Arguments | Position / direction |
+|---|---|---|
+| `cMobRegen_XY` FUN_005d8440 | map, mob, x, y, dir | as given ("som_AllocObject fail", "map regen fail") |
+| `cMobRegen_Obj` FUN_005d8690 | mob, handle | the object's map and position; direction = `*(newMob+0x6a)`, the **new** pool object's stale direction (original bug) Z09-B19 |
+| `cMobRegen_Circle` FUN_005e1ea0 | map, mob, x, y, r | `RandomPointInCircle`; dir = RandomRing(90) × 4 |
+| `cMobRegen_Rectangle` FUN_005e2100 | map, mob, x, y, w, h, deg | `FUN_004b0f90` / `FUN_004b1000` (same rotated rectangle as §10.4; here `deg` is signed); dir = RandomRing(90) × 4; log "cMobRegen_Rectangl Fail" |
+| `cMobRegen_XY_Layer` FUN_005e7680 | map, mob, x, y, dir, a6, a7, handle | layers = `ref.vt[0xdb8](a6, a7)` of the object `handle`: only players implement it (FUN_0054ab40: the player's private layer +0x7f3d when a7 == 1; 0 for 2) *(partly inferred)*; others (0, 0) |
+
+### 10.8 `ScriptMobBreeder` (Pine `SysFunc` helpers)
+
+```pseudo
+smb_ShineObject(ctx, handle)            @ FUN_004e3080   som_GetObject or log "smb_ShineObject : NO Object"
+smb_ObjectRegen(ctx, o, h, node) → bool @ FUN_004e3180
+    args (Pine expression evaluator FUN_004d64c0): 0 mob name, 1 x, 2 y, 3 dir, 4 (evaluated; its use is not visible in
+    the decompile); map = the script's map (FUN_004e3010 on ctx+0x10118, "smb_ObjectRegen" 0 when none); a failing
+    argument logs "smb_ObjectRegen" with its index
+    o.kind (vt 0x4d0) 4 / 5 (NPC / mob): vt 0x6e0 Regenerate(map, x, y, dir, h, mobId, 0, −1, 0, 0, −1, 1, 0, 0);
+        failure: free(h, reason 200), return false
+    kind 7: vt 0x6dc (map, x, y, dir, h, mobId, 1000, 0, 0)   # the door kind *(inferred from SysFuncShineDoorBuild; part 8)*
+    other kinds: log "smb_ObjectRegen : Invalid ObjType"
+smb_ObjectChange(ctx, o, h, node)       @ FUN_004e3540   arg 0 = handle of an existing object, arg 1 = mob name: spawn o
+    at that object's map / position / direction (same kind rules; "Null map" when it has none); the old object is
+    not removed here
+```
+
+Callers: `SysFuncShineMobRegen` FUN_004e3850 (allocates kind 5; "Too many mob"; on failure frees the slot again with
+FUN_004b1300 after smb already freed it *(effect of the second free not checked)*), `SysFuncShineDoorBuild`,
+`SysFuncShineNPCStand`, `SysFuncShineChange2Mob/Door/NPC` (part 14).
+
+### 10.9 GM view
+
+`MobHatchery::mh_View(h, gm)` FUN_004b3a60 (`&mobhatchery`, Z11) → `mh_View` per group FUN_004b3370: groups of the GM's
+map print `"%s [%d/%d/%d]%d/%d/%d/%d/%d/%d/%d/%d/%d %s"` (name, the 12 times, map) as a GM chat line (vt 0x784) and to
+the hatchery log, then `mb_View` FUN_004b2880 per breeder: `"  Mob[%d] RgNum[%d] Hnd[%d[%s]] NxtRg[%d/%d[%d]]"` (mobId,
+spawns left, handle, alive mark, waiting, nextAt, g_Now).
+
+### 10.10 Treasure chests: `MagicContainer` and `TreasureChestMaker`
+
+Not a world object: the content generator for "item chest" items (item class 15), used when such an item is bought
+(Z04 §`ii_BuyAll` → `sp_MagicContainerMake`) and for KQ rewards (`sp_KQReward` FUN_0052da70, Z16).
+
+`World/TreasureReward.txt` (`MagicContainer::mc_Load` FUN_0049c7f0 into DAT_0d67a1f0, stage zs_start_tough):
+
+| Table | Columns |
+|---|---|
+| `Container` | `ItemID` DWRD +0 (replaced by the item ID of `CardInx`), `Index` WORD +4, `CardInx` [33] +6, `MinLot` +0x27, `MaxLot` +0x29 (number of contents, ≤ 7), `DummyInx` [33] +0x2b ('-' = none) |
+| `Content` | `ItemID` +0 (replaced by the ID of `RewardInx`), `Index` +4, `RewardInx` [33] +6, `RewardLot` WORD +0x27, `UpgradeLow` +0x29, `UpgradeHigh` +0x2a, `RewardRate` DWRD +0x2b (per million), `CheckSum` WORD +0x2f (must equal ItemID) |
+
+Load checks (each FATAL): table empty, unknown card ("Invalid card"), more than 7 contents, unknown dummy, checksum,
+unknown reward, rates of a container not summing to 1 000 000 ("TotalRate not 1000"). The container item gets the
+item-use function "UsePresentBox"; the dummy card gets "UseSkill" and an `ItemConversionMap` entry dummy → container
+(DAT_0d67a168, ≤ 32, "icm_Store : Too many item map").
+
+```pseudo
+ShinePlayer::sp_MagicContainerMake(p, item, priceLo, priceHi)                       @ FUN_0049c050
+    item class (attribute class vt 0x28) ≠ 15: return
+    chest = TreasureChestMaker(item.id, kind 6, 0)   @ FUN_00595a40: ItemData.class must be 15 ("Not ItemChest"), key =
+            ItemKey_Make(id, 6, zone, world); +1000 count = 1 (the chest itself)
+    c = Container row with ItemID = item.id ("sp_MagicContainerMake : Null Container" → return)
+    n = MinLot + RandomRing(MaxLot − MinLot + 1)
+    repeat n: roll = Random_Next(g_Rng, 1 000 000); walk the Content rows of c.Index subtracting RewardRate until
+              roll ≤ rate ("Content Null" / "Content Null2" when none); new item: lot RewardLot ("-L%d"), upgrade
+              in [UpgradeLow, UpgradeHigh] ("-U%d", RandomRing(High − Low + 1) when < 100) via attribute vt 0x14;
+              key kind 6; tcm_ItemMake(iti) FUN_00595ba0 appends it (≤ 8, "Too many content")
+    cell = first empty inventory cell (box 9, FUN_004879d0); none or tcm_PutInto == 0: return (nothing sent)
+    Character DB ← 0x344D NC_ITEMDB_CREATEITEMLIST_REQ {      # PROTO_NC_ITEMDB_CREATEITEMLIST_REQ (pdb2017) matches
+        header { u16 clienthandle = p.handle, u32 charNo }, u32 owner = charNo, u16 lockindex = L.index,
+        u16 map = map id of p's map, u64 price = (priceLo, priceHi),
+        itemlist (tcm_PutInto FUN_00595f50): u8 count, per item { u8 len, u16 inven, item data }: first = the chest
+            in the free cell (0x2400 | slot), the others "inside the chest" (inven 0x2800) }
+    L.vt[0x40](reserve the cell), L.vt[0x48](lock, priceLo) (money reservation), L.index++, p.vt[0xb40]()
+    # the "Packet Too Long" log of this function names sp_KQReward (copied code); the answer 0x344E / 0x344F is Z05 §9.2
+```
+
+`tcm_ItemMake(ShineReward, clsmask)` FUN_00595d00 (KQ rewards): item from an item group (`igc_Getitem` DAT_0d56c4a0 by
+class mask), attribute from the reward row, random options (`rot_FillOption`) when ItemInfo names a RandomOption row.
+
+### 10.11 Open points of this section
+
+- `som_GetObject(handle)` alone decides "my mob still lives" in `mb_Routine`; whether a pool handle can be reused by
+  another object before the 1-s regen tick sees the death (and so delay that breeder) depends on the pool's reuse
+  order (not checked).
+- `+0x60` (bandit) and the timestamps `+0x4c` / `+0x50` are not set by the breeder ctor or `mb_Set`; file breeders rely
+  on the hatchery memory being zero *(inferred: no bandit groups appear in practice)*.
+- The arguments 5, 12, 13 of `mh_MobBreed` and the `mbg_RegenLoc` out value are unused; the group key "Def" is stored
+  but never compared.
+- Who reserves the 30-s event next to `EventMobRegen` (object 0x86fae8) was not followed (Z01).
