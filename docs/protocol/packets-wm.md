@@ -9013,7 +9013,7 @@ raw long frame, len 0x143 + n
 
 ### `0x200d` NC_ACT_SOMEONEWHISPER_CMD † (WM→C)
 
-**Verified layout** (basis: wm FUN_0041c610)
+**Verified layout** (basis: wm FUN_0041c610, FUN_00432bb0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -9023,7 +9023,7 @@ raw long frame, len 0x143 + n
 | 22 | u8 | len |  |
 | 23 | char[len] | content | then item links (0x67 each) |
 
-size 0x17 + len + count·0x67
+size 0x17 + len + count·0x67. Also sent by Spam_AlertGMs FUN_00432bb0 (gold-spammer alert to GMs) with itemLinkDataCount unwritten (W04-B54), talker = reported character, content = SpamerReport.shn SR_Message
 
 ### `0x200e` NC_ACT_WHISPERFAIL_ACK † (WM→C)
 
@@ -10555,6 +10555,20 @@ size 4
 | 2 | u16 | nEventNo |  |
 
 size 4
+
+### `0x083a` NC_MISC_EVENT_DONE_MUNSANG_WM2Z † (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00408050)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nUserNo | from 0x0839 |
+| 4 | u32 | nCharNo |  |
+| 8 | u8 | nWorldNo |  |
+| 9 | u16 | nError | Account server always 0x1545 |
+| 11 | u16 | nQuestID |  |
+
+13 bytes, raw header {0x0F, 0x3A, 0x08}; sent to the zone hZone of 0x0839; the 2016 zone has no handler (W04-B56)
 
 ### `0x0c16` NC_USER_KICKOFFFROMWORLD_CMD (WM→Zone)
 

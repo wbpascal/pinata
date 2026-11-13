@@ -54,6 +54,14 @@ W01-core §9 lists the OPTool opcodes in one line each; §4 below is the full re
 0x1FFB at +5); `Pkt_SetOpcode` checks the size *after* the handler has already written the payload. Any payload byte a
 handler does not write is therefore stale stack data.
 
+Library code reached from this item's handlers (no behaviour of its own; listed so later readers do not reopen it):
+W01's `ServerParam_GetInt` (FUN_00459f10) looks the name up in a `std::map<std::string, int>`: `operator[]`
+FUN_00459d00 = lower-bound walk FUN_00459220 + string compare FUN_004590b0, and on a miss inserts a 0 entry
+(FUN_004599a0 make node, FUN_00459a80 insert/rebalance), so an unknown parameter name reads as 0. The `PrisonMap`
+of §9.1 is a `std::map` too; FUN_00457950 / FUN_00457970 are its right-most / left-most node walks used by
+`PrisonMap_Erase`. `LogLevel` FUN_00407ae0 (W01) formats a log line with the level byte and prefix of a 0x41-byte
+table entry.
+
 ---
 
 ## 2. Chat routing (dept 8 ACT)
@@ -162,6 +170,44 @@ anything else (0x07C2) "An Error has occurred in party chatting.". 0x2015 is sho
 
 Client `On_NC_ACT_SCRIPT_MSG_CMD` (FUN_004bc020) formats the script message (index string + arguments). The zone
 sends 0x207D from its script engine (Z15) to make a world-wide script message.
+
+### 2.5 Gold-spammer alert to GMs (0x200D, reached from W01's 0x085F)
+
+The handler of client 0x085F NC_MISC_SPAMMER_REPORT_REQ *(pdb2017 name)* `FUN_00417ef0` is W01's (W01 §11 "Not reconstructed" only lists
+its reply codes 0x2160…0x2163); it ends in a whisper-shaped alert that only this section documents. Table: `SpamerReport.shn`, loaded by
+W01's FUN_00404100 into the data object DAT_006c5220 (= WM +0x22B1F8; the same object later loads `GBHouse.shn`, §15.1).
+Row 0 only: `SR_Term` u32 @+0 (2016 data: 3600 s), `SR_Number` u16 @+4 (5), `SR_Message` char[128] @+6
+("Gold spammer has been reported"); getters FUN_0043a280 / FUN_0043a2a0 / FUN_0043a2c0 (0 / null when the table is empty).
+
+Per reported session (names ours): +0x1ECEC → u32 reportTime[SR_Number], +0x1ECF0 → u32 reporterCharNo[SR_Number]
+(ring buffers), +0x1ECF4 i32 ringIndex.
+
+```pseudo
+Spam_AlreadyReported(t, reporterCharNo)                                                @ FUN_00432b10
+    any slot i < SR_Number with reporterCharNo[i] == reporterCharNo and now < reportTime[i] + SR_Term → 1 (reply 0x2163)
+
+Spam_AddReport(t, reporterCharNo)                                                      @ FUN_00435200
+    needs CHARDATA, reporterCharNo ≠ −1 and both ring buffers, else 0 (the handler replies 0x2163)
+    reportTime[ringIndex] = now; reporterCharNo[ringIndex] = reporterCharNo
+    ringIndex = (ringIndex + 1) % SR_Number
+    if now − reportTime[ringIndex] ≤ SR_Term:          # the oldest of the last SR_Number reports is younger than SR_Term
+        Spam_AlertGMs(t.CHARDATA.charid)                                               # every further report re-alerts
+    return 1
+
+Spam_AlertGMs(Name5 name)                                                              @ FUN_00432bb0
+    msg = SR_Message (none → nothing sent)
+    pkt 0x200D NC_ACT_SOMEONEWHISPER_CMD {               # size 0x17 + strlen(msg)
+        u8 itemLinkDataCount = never written: stale stack byte (original bug) W04-B54
+        Name5 talker = name of the reported character
+        u8 flag: bit0 (GM colour) = 1, bits 1–7 stale
+        u8 len = strlen(msg); content = msg }
+    Clients_SendToGMs(pkt, minAdminLevel = 1)                                          @ FUN_00437bd0
+        # every in-game session (+0x704 == 1) with CHARDATA, CHARDATA.adminlevel (+0x64) ≥ 1 and inArena ≠ 1
+```
+
+The client (§2.1) shows it as a GM-coloured whisper "from" the reported character and adds that name to the GM's
+whisper list. With a non-zero stale count it also reads `count × 0x67` item-link bytes after the text, past the end of the
+packet (W04-B54).
 
 ---
 
@@ -303,7 +349,7 @@ The rest of the KQ subsystem (schedule load, status machine, map allocation) is 
 0x2811 NC_OPTOOL_KQ_DELETE_CMD { u32 Handle }                                    @ FUN_00425d70
     i = KQ_FindIndexByHandle(Handle)
     if i == -1: log "FAILED - fc_NC_OPTOOL_KQ_DELETE_CMD, Handle=%d, NOT FOUND."
-    else entries[i].Status = 0x0B                                               # meaning of 0x0B: part 2
+    else entries[i].Status = 0x0B          # nothing else: removal waits for KQ_TickPurge (§6.2, W04-B55)
 
 0x2826 NC_OPTOOL_KQ_ALL_RESET_CMD {}                                             @ FUN_00426c10
     log "--- NO SUPPORT - KQ ALL RESET---"                                       # not implemented
@@ -691,8 +737,36 @@ Offsets from the object (W01 named the global; `CKQ::Add` string). Names ours un
 
 Player session: +0x258C i32 joinedKQ (handle, −1 none); +0x2590 u32 listTimeSent; +0x2594 a private copy of the
 last KQ list sent (count + PROTO_KQ_INFO[]) used for diffs; +0x1DF68 u32 wantsListRefresh, +0x1DF6C i32 lastRefresh;
-+0x1DF70 i32 voteSuggestNextTime; +0x1DF74 u32 bannedWhileAway (0x5830 at next map login; setter not read);
++0x1DF70 i32 voteSuggestNextTime; +0x1DF74 u32 bannedWhileAway (set below, 0x5830 at the next map login, then 0);
 +0x1DF78 i32 joinListTime.
+
+**Construction and tables.** The object lives at WM +0xC4134. Constructor `CKQ_Construct` FUN_00455460: list init
+(FUN_0045cfd0), five SHN table objects (FUN_00458a70), 30 000 joiner records (300 × 100), slot-owner pointer, now /
+next-tick / last-minute = 0, `joinerCount[300]` = 0, vote state reset FUN_00452cb0 (voteTeam 2, starter / target −1,
+rest 0); destructor FUN_00453da0. W01's data loader FUN_00404100 reads the tables into it at start-up; any failure is
+fatal ("*FATAL ERROR* - KINGDOM QUEST … DATA READ FAILED"). The loader FUN_00458f00 checks the SHN header key and the
+row size (header row size − 2) and refuses a mismatch.
+
+| Offset | File (loader) | Header key / row size | Columns used (row offset) |
+|---|---|---|---|
+| +0x1B9D4 | `KingdomQuest.shn` (FUN_00451b40) | 0x2535 / 0xB4 | ID u16 +0, Title[64] +2, LimitTime +0x42, ST_Year/Month/Day/Hour/Minute/Second +0x44…+0x49, StartWaitTime +0x4A, NextStartMode +0x4C, NextStartDeleyMin u16 +0x4D, RepeatMode +0x4F, RepeatCount +0x50, MinLevel +0x52, MaxLevel +0x53, MinPlayers +0x54, MaxPlayers +0x56, PlayerRepeatMode +0x58, PlayerRepeatCount +0x59, PlayerRevivalMode +0x5B, PlayerRevivalCount +0x5C, DemandQuest +0x5D, DemandItem +0x5F, DemandMobKill +0x61, RewardIndex u32 +0x62, MapLink u16[4] +0x66, ScriptLanguage[32] +0x6E, InitValue[32] +0x8E, UseClass u32 +0xAE, DemandGender u8[2] +0xB2 (column names from the file) |
+| +0x1BA14 | `KingdomQuestMap.shn` (FUN_00453e70) | 0x2085 / 0x16B | NumOfMap, BaseMap[32], Map[10][32], Clear[10]; on success FUN_00451ee0 (re)allocates the slot-owner array (+0x1BB14, 10 × −1 per row) |
+| +0x1BA54 | `KQVoteMajorityRate.shn` (FUN_00451b60) | 1 / 1 | VoteAgreeRate (2016 data: 70, 50) |
+| +0x1BA94 | `KQIsVote.shn` (FUN_00451b80 `CKQServer::ReadIsVote`) | 5 / 3 | ID, IsVote. Also checks that IDs are unique ("Same ID Exist - Line %d, %d") and that every KingdomQuest ID has a row ("Need IsVote Data - %d"); both only log, the load still succeeds |
+| +0x1BAD4 | `KQTeam.shn` (FUN_00451d80) | 0xF1 / 0x16 | ID, MaxMemberGap +2, IsTeamPVP +3, KQTeamDivideType u16 +4, RegenXRed/YRed/XBlue/YBlue u32 +6…+0x12 |
+
+**Rejoin after a reconnect** (called from W01's CharDB 0x1005 `CharDB_CharDataAck_1005` FUN_00410040 when
+`KQ_CanReturnToMap` accepts the saved map link of blob 0x101A, session +0x648):
+
+```pseudo
+KQ_RejoinOnCharData(s)                                                                 @ FUN_00452e40
+    i = KQ by the link's handle; j = KQ_FindJoinerByName(i, s.CHARDATA.charid); either missing → 0
+    s.joinedKQ = handle; joiner[i][j].wmHandle = s.handle                    # the new session handle
+KQ_IsJoinerBanned(s)                                                                   @ FUN_00454ee0
+    joiner[i][j].banned == 1 (KQ or joiner not found → true; no session data → false)
+FUN_00410040: banned → s.bannedWhileAway = 1; KQ_LeaveJoinList (§6.4); the character stays on its normal map
+              else → CHARDATA map / x / y = the instance link (W01 §4.2)
+```
 
 **Status** (byte kq+4; names ours): 0 scheduled, 1 making (0x580D sent), 2 recruiting, 3 starting (10-s countdown),
 4 running, 5 ended (0x5810), 6 cancelled (`CKQServer::SetDoneSkip`), 8 make failed, 9 make timed out, 0x0B removed
@@ -714,8 +788,26 @@ KQ_Tick(kq)        called from the WM main loop FUN_00406760                    
     if now < nextTick: return;  store now and localtime; nextTick = now + 1 s
     KQ_TickMakeTimeout   @ FUN_00452270: Status 1 and now ≥ StartTime + 1 min → Status 9; free its map slots
                                          (no 0x5811 is sent)
-    KQ_TickSchedule      @ FUN_00455e40: once per new minute, for each KQ data row compute the next occurrence
-                                         (FUN_00452160) and add it (FUN_004555d0) — not expanded (see "Not reconstructed")
+    KQ_TickSchedule      @ FUN_00455e40: once per new minute (local time, seconds cut; stored at +0x1BB48):
+        for each KingdomQuest.shn row:
+            base = this month (current year / month), day ST_Day, ST_Hour:ST_Minute:00   # ST_Year, ST_Month, ST_Second unused
+            KQ_NextOccurrences(base, NextStartDeleyMin, nowMinute)                       @ FUN_00452160
+                add NextStartDeleyMin minutes to base until base ≥ nowMinute (mktime normalises); return that time
+                and the one after it (2 entries; mktime failure → 0 entries)
+                # NextStartDeleyMin == 0 with base < now never ends (original bug) W04-B57 (2016 data: 60…360)
+            KQ_AddScheduled(row, times)                                                  @ FUN_004555d0
+                for each time T: skip if a KQ with this ID and ScheduleTime (+0x97) == T exists; else build a
+                PROTO_KQ_INFO: Handle = nextHandle (+0x1BB44, then +1), Status 0, NumOfJoiner 0, ID, Title,
+                LimitTime, StartTime = ScheduleTime = T (+ both `tm`s), StartWaitTime, Min/MaxLevel, Min/MaxPlayers,
+                PlayerRepeatMode/Count, PlayerRevivalMode/Count, DemandQuest, DemandItem,
+                DemandClass = u64 class mask of UseClass (FUN_00465a90 over W01's UseClassTypeInfo table DAT_006c54ac),
+                DemandGender = gender[1]·2 + gender[0], NextStartMode, NextStartDelayMin, RepeatMode, RepeatCount,
+                RewardIndex (low 16 bits), DemandMobKill, MapLink[4] empty, ScriptLanguage, ScriptInitValue,
+                from the KQTeam row if any: IsTeamPVP, TeamRegenXY[2] (else 0)          # names: PROTO_KQ_INFO (pdb2017)
+                count < 300 → KQInfo_Copy into kq[count++] (the handle-exists branch never triggers: new handle);
+                else log only
+        # result: each row always has its next two start times listed; NextStartMode, RepeatMode and RepeatCount are
+        # copied but never read by the WM (inferred: zone or unused)
     KQ_TickMake          @ FUN_00455980: Status 0 and StartTime ≤ now:
                              KQ_AllocMaps (FUN_00453eb0): for each of the row's 4 map indices (0xFFFF = unused) take a
                              free instance slot (FUN_00451fd0) and fill MapLink[j]; any failure → 0
@@ -738,9 +830,17 @@ KQ_Tick(kq)        called from the WM main loop FUN_00406760                    
                                                                                          @ FUN_00454a10
             else: RunCounter == 10: notice WM text #1 (Title, 10) to the joiners (0x580B, below)
                   broadcast 0x5825 (Status ≠ 2); RunCounter −= 1
-    KQ_TickPurge         @ FUN_00454080: a KQ with Status 5…10 whose ID has a later-starting KQ also in 5…10 → Status 0x0B;
-                         the removal pass (FUN_00452040, FUN_004526e0, FUN_00451ab0) is guarded by a local Ghidra
-                         shows unset (uncertain, see "Not reconstructed")
+    KQ_TickPurge         @ FUN_00454080 (read from the disassembly; Ghidra drops the flag store at 0x454100):
+        marked = 0
+        for each KQ i with Status 5…10: if some KQ with the same ID and Status 5…10 starts later → Status 0x0B; marked = 1
+        if marked:                                         # only then; see W04-B55
+            for each KQ with Status 0x0B (index not advanced after a removal):
+                KQ_FreeMapSlots FUN_00452040; KQ_ClearJoinersKQ FUN_004526e0 (joiners' joinedKQ = −1)
+                KQ_Remove FUN_00451ab0: FUN_0045ce20 removes kq[i] (count −1, entries shifted down), then the
+                    joinerCount, joiner and red/blue arrays are shifted the same way
+        # Status-0x0B entries made elsewhere (OPTool 0x2811, a late 0x580E) do not set `marked`: they stay in the
+        # array and count toward the 300 limit until some other KQ is purged; after 0x2811 the KQ also keeps its map
+        # slots and its joiners keep joinedKQ, and no 0x5811 reaches the zones (original bug) W04-B55
     KQ_RefreshOneClient  @ FUN_00455dd0: among sessions with wantsListRefresh == 1 pick the one with the oldest
                          lastRefresh (< now); lastRefresh = now; KQ_SendListDiff (§6.3)    # one client per second
     KQ_TickVote          @ FUN_00454f60 (§6.5)
@@ -749,7 +849,7 @@ CKQServer::SetDoneSkip(i, reason)                                               
     Status 6; log "DEBUG - CKQServer::SetDoneSkip, HANDLE=%d"
     broadcast zones 0x5811 NC_KQ_W2Z_DESTROY_CMD { u32 hquest } (FUN_00452880); free its map slots (FUN_00452040)
     reason 2: notice WM text #2 (Title, NumOfJoiner, MinPlayers) to the joiners
-    reason 3: notices WM text #3 and #4 to the joiners
+    reason 3: notices WM text #3 and #4 to the joiners  # both empty in 2016 (table has 3 rows) (original bug) W04-B58
     joiners' joinedKQ = −1 (FUN_004526e0; joiner list itself kept); broadcast 0x5825
 
 Notices and alarms:
@@ -761,7 +861,12 @@ Notices and alarms:
     KQ_SendJoiningAlarmEnd(i)       @ FUN_00452a70: Status ≠ 2: every client session ← 0x5825 { u32 nHandle, u16 nID }
     KQ_SendJoiningAlarmList(s)      @ FUN_00452b60 (map login, W01 §7): s ← 0x5826 { u16 n, KQ_JOINING_ALARM_INFO[n] }
                                     for every Status-2 KQ
-    (WM texts #0…#4: `FUN_00404570(&g_WM, n)`, a message table loaded by W01's config; contents not traced)
+    WM texts: `WM_GetMsg(n)` FUN_00404570 = row n of `MsgWorldManager.shn` (WM +0xC40C0, column Desc; loaded first by
+    W01's FUN_00404100, fatal if missing); n ≥ row count → "" (PTR_DAT_00497038). 2016 rows:
+        #0 "Recruitment for Kingdom Quest - '%s' has begun."
+        #1 "Kingdom Quest - %s will begin in  %d seconds."
+        #2 "Kingdom Quest - %s has been canceled due to lack of participants(%d/%d)."
+        #3, #4 missing → empty text
 ```
 
 The 2016 in-game client has no 0x580B handler (C01 lists 0x580B only in the character-select scene, as the option
@@ -1393,6 +1498,10 @@ HP_SendToMembers(hp, pkt): SendRaw to every member whose handle is an in-game se
 Clients_GetInGameByHandle(h): slot with that handle, in use and session +0x704 inGame ≠ 0       @ FUN_00438180
 ```
 
+The relation object is built and torn down with the session (W01): constructor FUN_0045d430 (20 member-name strings
+of 0x1A bytes at +0x20, then `HPInfo_Clear`), destructor FUN_0045d470 / its thunk FUN_00450ff0, plain clear
+FUN_0045d280, and FUN_0045d140 (an `HPInfo_Clear` thunk: name = "", LogonInfo = local time now).
+
 ### 12.2 Loading, presence, level change (not handlers)
 
 The Character server pushes 0x9427, 0x9429 and 0x9444 while it loads the character (D02 §4 step 11); W01's map
@@ -1989,9 +2098,33 @@ FUN_004010c0 from W01's `Zone_S2SConnectionReq_0802` FUN_004283e0: zone ← 0xD0
 - dStartTime / dEndTime are not checked by the WM: a record is sent as soon as it is active; time windows are the
   zone's (Z08 §13 / Z09).
 
-## Original-server bugs
+---
 
-(Running list; the sweep part completes it.)
+## 17. Account-server event relay 0x083A (C01 open item)
+
+C01 §5 left open which send of `FUN_00408050` carries 0x083A. The handler is W01's (§7.6: AccountDB 0x0839
+NC_MISC_EVENT_DONE_MUNSANG_ACC2WM); the packet names below are *(pdb2017)*: no 2016 string names them, except the
+Account server's handler `fc_NC_MISC_EVENT_DONE_MUNSANG_WM2ACC` (account FUN_00402cb0).
+
+```pseudo
+AccountDB 0x0839 { u32 nUserNo, u32 nCharNo, u8 nWorldNo, u16 nError @+9, u16 hZone @+0xB, u16 nQuestID @+0xD }   @ FUN_00408050
+    needs AccDB_CheckAlive and an in-game session with nCharNo, else nothing
+    if nError == 0x1541:
+        Clients_BroadcastInGame(0x6402 NC_ANNOUNCE_W2C_CMD { u8 type = 2, char text[] = sprintf(
+            "'%s'님이 문화상품권을 획득하였습니다. 축하합니다.", charid) }, skipArena = 0)
+            # CP949 text: "'%s' has obtained a culture gift certificate. Congratulations." (our translation)
+    zone = g_Zones session hZone; if found:
+        SendRaw(zone, 0x083A NC_MISC_EVENT_DONE_MUNSANG_WM2Z { u32 nUserNo, u32 nCharNo, u8 nWorldNo,
+                                                               u16 nError, u16 nQuestID })    # 13 bytes, raw header 0x0F
+```
+
+- **0x083A goes to the zone only**; clients get 0x6402. That is why the 2016 client has no 0x083A handler.
+- The chain is dead in 2016 (original bug) W04-B56: the 2016 zone registers no handler for 0x083A (its dept-2
+  table has no cmd 58) and never sends 0x0837 NC_MISC_EVENT_DONE_MUNSANG_Z2WM, which starts it (the WM relays 0x0837 to
+  the Account server as 0x0838 in W01's `FUN_0042b7d0`). The Account server's 0x0838 handler answers with a fixed
+  nError = 0x1545 and touches no database, so the WM's 0x1541 announcement branch cannot run either.
+
+## 18. Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
@@ -2047,10 +2180,15 @@ FUN_004010c0 from W01's `Zone_S2SConnectionReq_0802` FUN_004283e0: zone ← 0xD0
 | W04-B51 | OPTool 0xD009 | after a failed zone broadcast it replies 0x3221 and then 0x3220, and sets the flag anyway; 0xD005 also keeps the change after 0x3211 | the tool sees failure and success for one request; WM and zones disagree about the event | one reply; leave the record unchanged on failure |
 | W04-B52 | OPTool 0xD001 | with no event, the single 0xD002 carries 0x554 stale stack bytes as event data | stack contents sent to the tool (nAllEventCnt 0 tells it to ignore them) | zero the packet |
 | W04-B53 | OPTool 0xD005 / 0xD007 / 0xD009 | when the "not found" reply cannot be sent, the log line reads nEventNo through the vector's end pointer | reads past the last record; with an empty vector (null pointer) the WM faults, but only after a failed send to the tool | log the requested number |
+| W04-B54 | client 0x085F (W01) → GM alert 0x200D | `Spam_AlertGMs` never writes itemLinkDataCount (payload byte 0); flag bits 1–7 stale | GM clients read `count × 0x67` bytes of item links past the end of the packet; garbage links or a client fault | write count = 0 |
+| W04-B55 | `KQ_TickPurge` (OPTool 0x2811, late 0x580E) | the removal pass runs only when this pass marked a KQ; entries set to Status 0x0B elsewhere are not removed | deleted KQs stay in the array (300 cap) until another KQ is purged; after 0x2811 they also keep their map slots and joiners' joinedKQ, and the zones get no 0x5811 | remove every Status-0x0B entry each tick; 0x2811 should free slots and tell the zones like `SetDoneSkip` |
+| W04-B56 | AccountDB 0x0839 (W01) / 0x083A | the munsang event chain is dead: the zone neither sends 0x0837 nor handles 0x083A; the Account server always answers nError 0x1545, so the 0x1541 announcement never runs | no effect in 2016 (feature switched off or half removed) | rebuild: drop it, or implement both ends |
+| W04-B57 | `KQ_TickSchedule` | `KQ_NextOccurrences` loops adding NextStartDeleyMin until ≥ now; 0 never ends | a KingdomQuest.shn row with NextStartDeleyMin = 0 hangs the WM main loop (2016 data has none) | reject 0 at load |
+| W04-B58 | `CKQServer::SetDoneSkip` reason 3 | uses WM texts #3 and #4, which MsgWorldManager.shn (3 rows) does not have | the team-imbalance cancellation notices are empty (and the in-game client ignores 0x580B anyway) | add the rows |
 
 (W04-B6 is reserved; not used.)
 
-## Not reconstructed / uncertain (running list)
+## 19. Not reconstructed / uncertain
 
 - Prison: the zone answer 0x7C14 with err 0x0DC1 / 0x0DC2 tells the GM 0x0D88 but nothing undoes a partly done
   `so_Prison_Go`; 0x7C0C failure → `CPrisonServer_Remove` sends 0x7C12, whose effect on a player already in EldPri
@@ -2062,15 +2200,11 @@ FUN_004010c0 from W01's `Zone_S2SConnectionReq_0802` FUN_004283e0: zone ← 0xD0
 - Old character options: why `m_pCharOptionDataBinary_*` (+0x670…+0x6A4) exist but are never filled (the type-1
   branch of `SendToClient_CharOptionData` is dead); probably left from before the Character server pushed the old
   blobs itself *(inferred)*.
-- KQ schedule (`KQ_TickSchedule` FUN_00455e40 → FUN_00452160 next-occurrence, FUN_004555d0 add) and the KQ data /
-  map-allocation / vote-rate / vote-allowed / team tables at CKQ+0x1B9D4…+0x1BB08: who loads them (SHN or DB) and the
-  row layouts beyond the fields used in §6 are not read. `KQ_AllocMaps` FUN_00453eb0 and its slot finder FUN_00451fd0
-  only as far as §6.2.
-- `KQ_TickPurge` FUN_00454080: the removal pass for Status-0x0B entries (FUN_00451ab0) depends on a local that Ghidra
-  shows as never written; check the asm whether it runs.
-- The WM message texts #0…#4 (`FUN_00404570(&g_WM, n)`) used for KQ alarms/notices: source table not traced.
-- Who sets session +0x1DF74 (0x5830 "banned while away"); FUN_00410040 (W01) also calls `KQ_LeaveJoinList` and
-  `KQ_CanReturnToMap`.
+- `KQ_AllocMaps` FUN_00453eb0 and its slot finder FUN_00451fd0 are read only as far as §6.2 (first free slot of each
+  map row; `Clear` flags of KingdomQuestMap.shn not followed).
+- KingdomQuest.shn NextStartMode / RepeatMode / RepeatCount / PlayerRepeat* / PlayerRevival* / DemandQuest / DemandItem /
+  DemandMobKill / RewardIndex / ScriptLanguage are copied into PROTO_KQ_INFO for the zones; the WM itself does not
+  enforce them (Z08 §4 for the zone side).
 - 0x582A voter index: Ghidra shows the voter's joiner index as `extraout_EDX` after `KQ_IsVoteRunning`; read as the
   index returned by `KQ_FindJoinerByName` *(inferred)*.
 - A banned KQ player stays in the joiner list and gets 0x5833 every second while online; whether the zone ignores the
@@ -2105,3 +2239,24 @@ FUN_004010c0 from W01's `Zone_S2SConnectionReq_0802` FUN_004283e0: zone ← 0xD0
   from its name and D02, not from the GameDB / Character procedure bodies.
 - GM events (§16): the OPTool side (what it shows for 0x3211 / 0x3221, whether it ever sends a flag other than 0/1)
   is not available; the zone's use of the records is Z08 §13 / Z09.
+
+## 20. Coverage boundary
+
+Found while reconstructing this item but documented elsewhere. Work that W01 handed to W04 (dept-2 chat-block /
+spammer handlers, attendance, NPC schedule) is **not** listed here: it is open work of this item (status file, part 6b).
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| AccountDB 0x0839 handler FUN_00408050, zone 0x0837 relay FUN_0042b7d0 | W01 (plan scope row `0x0839` … `FUN_00408050`; W01 §7.6) | handler bodies are W01's; §17 here only settles C01's 0x083A question |
+| Account server 0x0838 `fc_NC_MISC_EVENT_DONE_MUNSANG_WM2ACC` (account FUN_00402cb0) | D01 (scope row `0x0838` … `FUN_00402cb0`; D01-account.md) | Account-server binary |
+| ServerParam `std::map` internals FUN_00459d00, FUN_00459220, FUN_004590b0, FUN_004599a0, FUN_00459a80; `LogLevel` FUN_00407ae0 | W01 (plan: "startup/config"; `ServerParam_GetInt` and `LogLevel` are W01 names) | library code behind W01 helpers; behaviour summarised in §1.2 |
+| `Party_IsConfirmed` FUN_00464d50 (party chat) | W02 (`W02.json` names it; plan title "party and raid") | party state is W02's |
+| WM data loader FUN_00404100 (all SHN tables), `WM_GetMsg` table object | W01 (plan: "startup/config") | only the KQ, SpamerReport, GBHouse and MsgWorldManager rows are used here and are documented in §2.5, §6.1, §6.2, §15.1 |
+| client-SHN name list FUN_0045d8c0 (49 file names: Abstate.shn … ChargedDeletableBuff.shn) | W01 (plan: "startup/config") | no caller in the export (constructor of a global); not reached from any W04 handler |
+| 0x0849 date/time broadcast FUN_00437e30 (main loop, once a minute) | W01 (plan: "WM process … session lifecycle") | main-loop service, not part of a W04 subsystem |
+| session teardown callers FUN_00437660, FUN_00437fd0, FUN_00438630 (→ session destructor FUN_004352e0), FUN_00438a60 (→ reset FUN_00434530) | W01 (plan: "session lifecycle") | they reach W04 code only through the session destructor (`ChatRestrict_Destroy`, §14.1) |
+| zone handlers of 0x580D / 0x580F / 0x5811 (zone FUN_00497790 / FUN_00499240 / FUN_004972c0) and the KQ maps | Z08 (scope rows `0x580d`, `0x580f`, `0x5811`) | zone side of the KQ |
+| zone senders of 0xA401 / 0xA403 (`mc_Routine` FUN_004868d0 / FUN_00486710, `mc_AllDropFilm` FUN_00485290) | Z08 (plan title: "instances") | zone instance logic; Z08 §5 does not cite them yet (noted in `docs/knowledge/W04.md`) |
+| zone handlers of 0xD00B / 0xD00C GM events (zone FUN_0046ddf0 / FUN_0046dae0) | Z08 §13 | zone side of §16 |
+| Character-server procedures behind 0x5410, 0x7C0B, 0x9420…0x9443, 0xA800…0xA80C, char options | D04 (plan title: "social, guild, quests, skills") and D02 | DB side; this doc cites D04 where it relies on it |
+| client handlers of every client-facing packet here | C01 (inventory) | cited per packet; texts from `client-error-codes.json` |

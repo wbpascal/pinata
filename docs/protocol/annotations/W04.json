@@ -37,7 +37,7 @@
    "0x200d": {
     "dir": "WM→C",
     "name": "NC_ACT_SOMEONEWHISPER_CMD",
-    "basis": "wm FUN_0041c610",
+    "basis": "wm FUN_0041c610, FUN_00432bb0",
     "fields": [
      [
       0,
@@ -70,7 +70,7 @@
       "then item links (0x67 each)"
      ]
     ],
-    "notes": "size 0x17 + len + count·0x67"
+    "notes": "size 0x17 + len + count·0x67. Also sent by Spam_AlertGMs FUN_00432bb0 (gold-spammer alert to GMs) with itemLinkDataCount unwritten (W04-B54), talker = reported character, content = SpamerReport.shn SR_Message"
    },
    "0x200e": {
     "dir": "WM→C",
@@ -4728,6 +4728,44 @@
      ]
     ],
     "notes": "size 2"
+   },
+   "0x083a": {
+    "dir": "WM→Zone",
+    "name": "NC_MISC_EVENT_DONE_MUNSANG_WM2Z",
+    "basis": "wm FUN_00408050",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nUserNo",
+      "from 0x0839"
+     ],
+     [
+      4,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      8,
+      "u8",
+      "nWorldNo",
+      ""
+     ],
+     [
+      9,
+      "u16",
+      "nError",
+      "Account server always 0x1545"
+     ],
+     [
+      11,
+      "u16",
+      "nQuestID",
+      ""
+     ]
+    ],
+    "notes": "13 bytes, raw header {0x0F, 0x3A, 0x08}; sent to the zone hZone of 0x0839; the 2016 zone has no handler (W04-B56)"
    }
   }
  },
