@@ -32,6 +32,10 @@ status (`**State:** part n of m done` plus short working notes for later parts),
      the large context and undoes the saving.
    - `tools/protocol-re/item.sh <ID> --auto`: headless, one session per part, until the status says done. It
      prints a short summary after each part and stops when a session commits nothing or the item awaits review.
+     **Inside Herdr** (recommended), `--auto` opens each part as an interactive session in a new tab of the current
+     space (`<ID> part <n>`), so you can watch it and step in. When the session has committed and gone idle, the tab
+     closes and the next part starts. If a session goes idle without a commit, or blocks or exits, its tab stays
+     open and the loop stops: finish or close that tab, then run `item.sh <ID> --auto` again.
 3. Options as environment variables: `MODEL` (default `opus`), `EFFORT` (`high`), `PERM` (`auto`; use
    `PERM=manual` interactively to approve actions yourself). Example: `EFFORT=medium tools/protocol-re/item.sh Z09`.
 4. After a usage limit or a crash: do not resume the old session. Check `git status` in the worktree (commit or
