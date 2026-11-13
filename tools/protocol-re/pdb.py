@@ -5,6 +5,7 @@
   python3 -I pdb.py Files/Client/2017/Fiesta.pdb publics [REGEX]     # VA<TAB>mangled<TAB>demangled-ish
   python3 -I pdb.py Files/Client/2017/Fiesta.pdb json OUT.json       # everything as JSON (types + publics)
   python3 -I pdb.py Files/Client/2017/Fiesta.pdb layouts OUT.json    # opcode -> name + flattened PROTO layout (C02)
+  python3 -I pdb.py A.pdb layouts2016 OUT.json B.pdb ...             # same, merged over several server PDBs (S01)
   python3 -I pdb.py Files/Client/2017/Fiesta.pdb selftest            # asserts a few known facts
 
 Publics need the matching PE next to the PDB (same basename, .bin or .exe) for section bases.
@@ -173,12 +174,26 @@ class Types:
         return 0
 
     def all_udts(self):
-        """name -> complete (non-forward) type index."""
-        self.complete = {}
+        """name -> complete (non-forward) type index (the first definition in the PDB).
+        self.variants: name -> [ti, ...] when the PDB holds several *different* complete definitions of one name
+        (translation units compiled against different headers; S01 part 3 found them in the 2016 server PDBs, e.g.
+        CWMClientSession 0x1f7b0 / 0x1f7b8). The first one is not necessarily the one the code uses."""
+        self.complete, alldefs = {}, {}
         for ti in range(self.ti0, self.ti1):
             u = self.udt(ti) if self.rec[ti][0] in (0x1504, 0x1505, 0x1506, 0x1507) else None
             if u and not u[4]:
                 self.complete.setdefault(u[1], ti)
+                alldefs.setdefault(u[1], []).append(ti)
+        self.variants = {}
+        for n, tis in alldefs.items():
+            if len(tis) > 1:
+                shapes = {}
+                for ti in tis:
+                    d = self.describe(ti)
+                    shapes.setdefault((d['size'], tuple((f['name'], f.get('offset'), f.get('value'), f.get('type'))
+                                                        for f in d['fields'])), ti)
+                if len(shapes) > 1:
+                    self.variants[n] = list(shapes.values())
         return self.complete
 
     def describe(self, ti):
@@ -233,13 +248,17 @@ COUNT = re.compile(r'num|cnt|count|len|size', re.I)
 
 def opcodes(t, comp):
     """-> {opcode: [names]}, declaration order (some enums give two names one value: the later is an alias).
-    Dept of a cmd enum = its 'NC_<X>_NULL = 0' member (enum names differ: KINGDOMQUEST = KQ)."""
+    Dept of a cmd enum = its 'NC_<X>_NULL = 0' member (enum names differ: KINGDOMQUEST = KQ; dept 45/46 enums
+    are PROTOCOL_USER_CONNECTION / PROTOCOL_AUCTION, no _COMMAND_ infix: S01 review)."""
     dept = {f['name']: f['value'] for f in t.describe(comp['PROTOCOL_COMMAND'])['fields']}
     out = {}
     for n in comp:
-        if not n.startswith('PROTOCOL_COMMAND_'):
+        if not n.startswith('PROTOCOL_') or n == 'PROTOCOL_COMMAND':
             continue
-        fs = t.describe(comp[n])['fields']
+        d = t.describe(comp[n])
+        if d['kind'] != 'enum':
+            continue
+        fs = d['fields']
         null = next((f['name'][:-5] for f in fs if f['name'].endswith('_NULL') and f['value'] == 0), None)
         if null not in dept:
             continue                          # LOG_EASY_LOG_SYS (log codes >= 2000), empty enums
@@ -280,6 +299,9 @@ class Flat:
         out, prev_bf = [], None
         ti = self.full(ti)
         for f in self.t.fields(self.t.udt(ti)[3]):
+            if f[0] == 'base':                # inherited members, unprefixed (C++ access); S01 part 3
+                out += self.fields(f[1], base + f[2], prefix)
+                continue
             if f[0] != 'member':
                 continue
             _, name, mt, off = f
@@ -348,7 +370,7 @@ class Flat:
             self.structs[u[1]] = {'size': u[2], 'fields': f}
         return u[1]
 
-def layouts(t, comp):
+def layouts(t, comp, about=None):
     ops, fl = opcodes(t, comp), Flat(t, comp)
 
     def entry(n):
@@ -361,6 +383,10 @@ def layouts(t, comp):
             u, fs = t.udt(ti), fl.fields(ti)
             # an empty C++ struct has sizeof 1; the packet carries no field, so document 0 bytes
             e.update(struct=u[1], size=u[2] if fs else 0, variable=fl.variable(fs), fields=fs)
+            for vti in getattr(t, 'variants', {}).get(u[1], [])[1:]:   # other definitions of the same struct name
+                vfs = fl.fields(vti)
+                e.setdefault('variants', []).append({'name': n, 'struct': u[1], 'size': t.udt(vti)[2] if vfs else 0,
+                                                     'variable': fl.variable(vfs), 'fields': vfs, 'variant': True})
         return e
 
     out = {}
@@ -369,8 +395,12 @@ def layouts(t, comp):
         if len(ns) > 1:                       # two names, one value: often two packets (directions/links)
             e['aliases'] = ns[1:]
             e['alts'] = [a for a in map(entry, ns[1:]) if a['struct']]
+        if e.get('variants'):                 # decoders pick an alt by size: a second definition is one more candidate
+            e['alts'] = e.get('alts', []) + e.pop('variants')
+        for a in e.get('alts', []):
+            a.pop('variants', None)
         out['0x%04x' % op] = e
-    return {'_about': 'Generated by tools/protocol-re/pdb.py layouts from Files/Client/2017/Fiesta.pdb (work item C02). '
+    return {'_about': about or 'Generated by tools/protocol-re/pdb.py layouts from Files/Client/2017/Fiesta.pdb (work item C02). '
                       'Evidence level pdb2017: a 2017 build; confirm against 2016 code. Offsets are PROTO struct '
                       'offsets: server-internal packets about a player carry a 6-byte ref prefix in 2016 that the '
                       'struct does not include (docs/knowledge/Z01.md). Field types follow annotations.json; '
@@ -378,6 +408,67 @@ def layouts(t, comp):
                       'Empty structs are documented as size 0 (C++ sizeof 1). "alts": layouts of alias names '
                       'sharing the value; decoders pick the one whose size fits the payload.',
             'opcodes': out, 'structs': dict(sorted(fl.structs.items()))}
+
+ABOUT2016 = ('Generated by tools/protocol-re/pdb.py layouts2016 from the 2016 server PDBs in Files/Server/NA2016 '
+             '(work item S01; same builds as Files/Server/2016). Evidence level pdb2016 (counts as read in the 2016 code). '
+             'Merged from %s: per opcode the first PDB (in that order) whose own PROTO struct exists; a struct only '
+             'reached through the CLIENT_/ZONE_ name alias is used only when no PDB has the exact struct. "pdbs" = the '
+             'PDBs whose opcode enums carry the value; "disagreements" = exact structs that differ between PDBs. '
+             'Offsets are PROTO struct offsets. Server-internal packets about a player carry a 6-byte ref '
+             '(NETPACKETZONEHEADER clienthandle, charregistnumber; docs/knowledge/Z01.md): about 215 structs declare it '
+             'as their first member (header.clienthandle, ...), the others do not include it. Field types follow annotations.json; a dimension that '
+             'is a field name means "count taken from that field" (guessed by name). Empty structs are size 0. '
+             '"alts": alias names sharing the value, and ("variant": true) other definitions of the same PROTO struct that a '
+             'PDB holds (translation units compiled against different headers, docs/knowledge/S01.md §2.4); decoders pick '
+             'the one whose size fits the payload. "used_variant": true = the primary layout is the definition the 2016 '
+             'zone sends (0x0452, 0x10AE, 0x5C05), not the first one in the PDB.')
+
+# Opcodes whose PROTO struct has two definitions in Zone.pdb: size of the one the 2016 code sends (S01 §2.4, review):
+# 0x0452 zone sends 0x2B (D05-B2), 0x10AE zone FUN_0045c0b0 sends 0x33 incl. the 2-byte opcode, 0x5C05 zone
+# FUN_0059e410 sends 0x36. That definition becomes the primary layout, the other stays an alt with "variant": true.
+USED_VARIANT2016 = {'0x0452': 43, '0x10ae': 49, '0x5c05': 54}
+
+def merge_layouts(parts):
+    """[(label, layouts())] -> one layouts dict (pdb2016): exact structs first, disagreements listed"""
+    shape = lambda e: (e.get('size'), [f[:3] for f in e.get('fields') or []])   # notes differ by PDB (union names)
+    out, structs, dis = {}, {}, []
+    for op in sorted(set().union(*(L['opcodes'] for _, L in parts))):
+        es = [(lab, L['opcodes'][op]) for lab, L in parts if op in L['opcodes']]
+        exact = [(l, e) for l, e in es if e['struct'] and not e.get('struct_alias')]
+        lab, pick = (exact or [x for x in es if x[1]['struct']] or es)[0]
+        out[op] = dict(pick, pdbs=[l for l, _ in es])
+        alts, variants = {}, []               # alias layouts: each PDB holds only the structs its code uses
+        for _, e in es:
+            for a in e.get('alts', []):
+                if not a.get('variant'):
+                    alts.setdefault(a['name'], a)
+                elif shape(a) != shape(pick) and all(shape(a) != shape(v) for v in variants):
+                    variants.append(a)        # another definition of the picked struct (same name, other header)
+        used = USED_VARIANT2016.get(op)
+        if used is not None and out[op]['size'] != used:
+            v = next(v for v in variants if v['size'] == used)
+            prim = {k: out[op][k] for k in ('size', 'variable', 'fields') if k in out[op]}
+            variants[variants.index(v)] = dict(v, **prim)
+            out[op].update({k: v[k] for k in ('size', 'variable', 'fields') if k in v}, used_variant=True)
+        if alts or variants:
+            out[op]['alts'] = [alts[n] for n in pick.get('aliases', []) if n in alts] + variants
+        if variants:
+            dis.append({'op': op, 'kind': 'variants', 'pdbs': {
+                l: sorted({e['size']} | {a['size'] for a in e.get('alts', []) if a.get('variant')}) for l, e in es if e['struct']}})
+        if len({e['name'] for _, e in es}) > 1:
+            dis.append({'op': op, 'kind': 'name', 'pdbs': {l: e['name'] for l, e in es}})
+        diff = [(l, e) for l, e in es if e['struct'] and shape(e) != shape(pick)]
+        if diff:
+            dis.append({'op': op, 'kind': 'struct' if any(not e.get('struct_alias') for _, e in diff) else 'alias only',
+                        'pdbs': {l: [e['struct'], e['size']] for l, e in [(lab, pick)] + diff}})
+    for lab, L in parts:
+        for n, st in L['structs'].items():
+            if n not in structs:
+                structs[n] = st
+            elif shape(st) != shape(structs[n]):
+                dis.append({'struct': n, 'kind': 'element struct', 'pdbs': lab})
+    return {'_about': ABOUT2016 % ', '.join(l for l, _ in parts), 'opcodes': out,
+            'structs': dict(sorted(structs.items())), 'disagreements': dis}
 
 # ---- CLI -----------------------------------------------------------------------------------
 def fmt_udt(d):
@@ -398,7 +489,11 @@ def main(a):
         rx = re.compile(a[2] if len(a) > 2 else '.')
         for n in sorted(comp):
             if rx.search(n):
-                sys.stdout.write(fmt_udt(t.describe(comp[n])) + '\n')
+                vs = t.variants.get(n, [comp[n]])
+                for k, ti in enumerate(vs):     # several different definitions of one name: print each (S01)
+                    if len(vs) > 1:
+                        sys.stdout.write('// definition %d of %d of %s (different headers per translation unit)\n' % (k + 1, len(vs), n))
+                    sys.stdout.write(fmt_udt(t.describe(ti)) + '\n')
     elif cmd == 'publics':
         rx = re.compile(a[2] if len(a) > 2 else '.')
         for va, m, fn in publics(msf, pe):
@@ -413,11 +508,18 @@ def main(a):
         assert (0x47a9a0, '?On_NC_MAP_LOGIN_ACK@ZoneLoginNetFrameWork@@QAEHHPAX@Z', True) in publics(msf, pe)
         L = layouts(t, comp)['opcodes']
         assert L['0x5801']['name'] == 'NC_KQ_LIST_REQ'      # enum PROTOCOL_COMMAND_KINGDOMQUEST
+        assert L['0xb411']['name'] == 'NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ITEM_USE_REQ'   # enum PROTOCOL_USER_CONNECTION (S01 review)
         assert L['0x1804']['fields'] == [[0, 'u16', 'err', ''], [2, 'u8', 'nWrongDataFileIndex', '']], L['0x1805']
         assert L['0x2001']['fields'][-1] == [2, 'u8[len]', 'content', 'variable length'], L['0x2001']
         print('ok')
     elif cmd == 'layouts':        # docs/protocol/pdb-layouts.json
         json.dump(layouts(t, comp), open(a[2], 'w'), indent=1)
+    elif cmd == 'layouts2016':    # docs/protocol/pdb2016-layouts.json: pdb.py <pdb> layouts2016 OUT [more PDBs]
+        parts = []
+        for p in [a[0]] + a[3:]:
+            tp = Types(MSF(p).stream(2)); cp = tp.all_udts()
+            parts.append((os.path.splitext(os.path.basename(p))[0], layouts(tp, cp)))
+        json.dump(merge_layouts(parts), open(a[2], 'w'), indent=1)
     elif cmd == 'json':
         out = {'types': {n: t.describe(ti) for n, ti in sorted(comp.items())},
                'publics': [{'va': '%08x' % va, 'name': m, 'func': fn} for va, m, fn in publics(msf, pe)]}

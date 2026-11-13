@@ -19,7 +19,8 @@ public class ExportAll extends GhidraScript {
             for (Function f : currentProgram.getFunctionManager().getFunctions(true)) {
                 if (monitor.isCancelled()) break;
                 DecompileResults r = d.decompileFunction(f, 60, monitor);
-                w.println("//==== FUNC " + f.getEntryPoint() + " " + f.getName());
+                // qualified name (PDB exports: Class::Method), no spaces so "FUNC <addr> <name>" stays splittable
+                w.println("//==== FUNC " + f.getEntryPoint() + " " + f.getName(true).replace(" ", ""));
                 if (r != null && r.decompileCompleted()) w.println(r.getDecompiledFunction().getC());
                 else w.println("// decompile failed");
             }

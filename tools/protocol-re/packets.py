@@ -18,6 +18,20 @@ for f in sorted(glob.glob(f"{docs}/annotations/*.json")):
 # 2017 client PDB layouts (work item C02): shown when no hand annotation exists, above the generated guess
 _pp = f"{docs}/pdb-layouts.json"
 PDB = json.load(open(_pp)) if os.path.exists(_pp) else {"opcodes": {}, "structs": {}}
+# 2016 server PDBs (work item S01, same builds): preferred over the 2017 client PDB
+_p16 = f"{docs}/pdb2016-layouts.json"
+PDB16 = json.load(open(_p16)) if os.path.exists(_p16) else {"opcodes": {}, "structs": {}}
+
+
+def pdb_source(op):
+    """-> (entry, label, element structs): pdb2016 unless its struct is only a name-alias guess and pdb2017 has the
+    opcode's own struct (0x182a: 2016 code sends 1 byte = the empty 2017 struct, not the 47-byte alias)"""
+    a, b = PDB16["opcodes"].get(op), PDB["opcodes"].get(op)
+    if a and a.get("struct") and not (a.get("struct_alias") and b and b.get("struct") and not b.get("struct_alias")):
+        return a, "pdb2016", PDB16["structs"]
+    if b and b.get("struct"):
+        return b, "pdb2017", PDB["structs"]
+    return None, None, {}
 CLIENT = {"login": "CParserClient", "wm": "CParserClient", "zone": "ShineObjectClass::ShinePlayer"}
 TITLE = {"login": "Login server", "wm": "World manager", "zone": "Zone server",
          "account": "Account server", "accountlog": "AccountLog server"}
@@ -33,7 +47,7 @@ def name(op, server=None):
     c = cat.get(op, {})
     a = ANN["packets"].get(server, {}).get(op, {}) if server else {}
     n = c.get("name") or (a.get("name") + " (hand-named)" if a.get("name") else "?")
-    return n + (" †" if c.get("name_source") not in (None, "handler", "client") else "")
+    return n + (" †" if c.get("name_source") not in (None, "pdb2016", "handler", "client") else "")
 
 
 def tidy(e, in_op, pk):
@@ -78,23 +92,32 @@ def verified(server, op, direction):
 
 def pdb_layout(op, sizes):
     """PDB struct table for an opcode without a hand annotation; sizes = 2016 payload sizes seen in the code"""
-    e = PDB["opcodes"].get(op)
+    e, label, structs = pdb_source(op)
     if not e or "size" not in e: return []
     fits = lambda c, z: z == c["size"] or c["variable"] and z >= c["size"] or not c["fields"] and z == 1  # sizeof(empty) = 1
     cand = [e] + e.get("alts", [])          # alias names sharing the value: take the one the 2016 sizes fit
     p = next((c for c in cand if any(fits(c, z) for z in sizes)), e)
     var = " + variable tail" if p["variable"] else ""
-    rows = [f"**2017 PDB layout** *(pdb2017, unverified for 2016)*: `{p['struct']}`" +
+    title = "**2016 PDB layout** *(pdb2016)*" if label == "pdb2016" else "**2017 PDB layout** *(pdb2017, unverified for 2016)*"
+    rows = [f"{title}: `{p['struct']}`" +
             (" (struct shared under the base name, inferred)" if p.get("struct_alias") else "") + f", {p['size']} bytes{var}" +
-            ("".join(f" · alias `{c['name']}` = `{c['struct']}` ({c['size']} bytes)" for c in cand if c is not p))]
+            ("".join(f" · other definition of `{c['struct']}` in the 2016 PDB ({c['size']} bytes, S01 §2.4)" if c.get("variant")
+                     else f" · alias `{c['name']}` = `{c['struct']}` ({c['size']} bytes)" for c in cand if c is not p))]
     bad = sorted({z for z in sizes if not fits(p, z)})
     if bad:
-        rows[0] += f" · ⚠ 2016 code uses {', '.join(map(str, bad))} bytes: version drift or extraction error"
+        rows[0] += f" · ⚠ 2016 code uses {', '.join(map(str, bad))} bytes: " + (
+            "same build, so an extraction error or the code does not send this struct" if label == "pdb2016"
+            else "version drift or extraction error")
+    b = PDB["opcodes"].get(op)
+    if label == "pdb2016" and b and b.get("struct"):
+        shape = lambda c: (c["size"], [f[:3] for f in c["fields"]])
+        if shape(b) != shape(e):
+            rows[0] += f" · 2017 client PDB differs: `{b['struct']}`, {b['size']} bytes (S01 §2)"
     rows += ["", "| Off | Type | Field | Notes |", "|---|---|---|---|"]
     rows += [f"| {o} | {t} | {n} | {x.replace('|', '/')} |" for o, t, n, x in p["fields"]] or ["| | | (empty) | |"]
-    used = {f[1].split("[")[0] for f in p["fields"]} & set(PDB["structs"])
+    used = {f[1].split("[")[0] for f in p["fields"]} & set(structs)
     for sn in sorted(used):
-        st = PDB["structs"][sn]
+        st = structs[sn]
         rows.append(f"\nElement `{sn}` ({st['size']} bytes): " + ", ".join(f"+{o} {t} {n}" for o, t, n, _ in st["fields"]))
     return rows + [""]
 
@@ -126,9 +149,11 @@ def render(server):
            "- Other text: the decompiler expression, shortened.",
            "- Gaps between offsets are bytes the code did not write (padding, or filled in a way the extractor missed).",
            "- **Fill**: part of the payload is produced by a helper; for zone, virtual helpers are resolved assuming a `ShinePlayer` receiver.",
-           "- †: name not from the opcode's own 2016 handler (2017 client PDB, REQ+1 = ACK guess, or a log string).\n",
-           "- **2017 PDB layout**: the `PROTO_*` struct from the 2017 client PDB (`docs/protocol/pdb-layouts.json`, work item C02),",
-           "  shown when no hand-verified layout exists. A 2017 build: confirm against the 2016 code before relying on it.\n",
+           "- Names: official enum names from the 2016 server PDBs (work item S01) where the value is in them.",
+           "- †: name neither from the 2016 server PDBs nor from the opcode's own 2016 handler (2017 client PDB, REQ+1 = ACK guess, or a log string).\n",
+           "- **2016 PDB layout**: the `PROTO_*` struct from the 2016 server PDBs (`docs/protocol/pdb2016-layouts.json`, work item S01,",
+           "  same build), shown when no hand-verified layout exists. Otherwise **2017 PDB layout**: the struct from the 2017 client",
+           "  PDB (`docs/protocol/pdb-layouts.json`, work item C02), a newer build: confirm against the 2016 code before relying on it.\n",
            "Heuristic extraction: verify a layout against the cited function before relying on it.\n"]
 
     link = server in LINKS

@@ -7,3 +7,4 @@
 *.pdb filter=lfs diff=lfs merge=lfs -text
 # generated from the tree; on merge keep ours, then regenerate (coverage.py --overview). Needs: git config merge.ours.driver true
 docs/plan/progress.md merge=ours
+pdb filter=lfs diff=lfs merge=lfs -text

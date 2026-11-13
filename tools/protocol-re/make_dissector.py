@@ -61,7 +61,7 @@ def gen_data():
            "F.STRUCTS = " + lua({n: {"size": s["size"], "f": [f[:3] for f in s["fields"]]} for n, s in sorted(docs["structs"].items())}),
            "F.L = {\n" + ",\n".join(lua(x) for x in lists) + "}",
            "F.ANN = " + lua(ann).replace("},[", "},\n["),
-           "F.PDB = " + lua({op: [{"size": c["size"], "var": c["variable"], "f": [f[:3] for f in c["fields"]]}
+           "F.PDB = " + lua({op: [{"size": c["size"], "var": c["variable"], "f": [f[:3] for f in c["fields"]], "src": v["src"]}
                                   for c in [v] + v.get("alts", [])] for op, v in sorted(docs["pdb"].items())}).replace("}},[", "}},\n["),
            "F.GEN = " + lua(gen).replace("},[", "},\n[")]
     return "\n".join(out)
@@ -239,8 +239,8 @@ function F.decode(kind, c2s, op, p, show_pw)
   local ann, gen = F.ANN[kind][d][op], F.GEN[kind][d][op]
   local desc = ann and ann.name ~= "" and ann.name or nil
   local src = "annotation"
-  if not ann and F.PDB[op] then                 -- 2017 client PDB struct (C02); alias layouts picked by size
-    ann, src = F.PDB[op][1], "pdb2017"
+  if not ann and F.PDB[op] then                 -- 2016 server PDB (S01) else 2017 client PDB (C02) struct; alias layouts by size
+    ann, src = F.PDB[op][1], F.PDB[op][1].src
     for _, c in ipairs(F.PDB[op]) do
       if c.size == #p or c.var and #p >= c.size then ann = c break end
     end
@@ -538,11 +538,12 @@ def selftest():
         assert list(w.children.values())[1].children[2].label == b'world_name: "World1"'
         assert F.decode(b"login", False, 0x0C0A, b"\x05", False).issues[1].kind == b"size"
         assert F.decode(b"login", False, 0xFFF0, b"", False).issues[1].kind == b"unknown"
-        # pdb2017 fallback (C02), as in pcap_decode's selftest
-        pop = next(o for o, v in sorted(docs["pdb"].items()) if ("zone", o, S2C) not in docs["packets"]
-                   and v["size"] > 0 and not v["variable"])
-        r = F.decode(b"zone", False, pop, bytes(docs["pdb"][pop]["size"]), False)
-        assert r.source == b"pdb2017" and not list(r.issues.values()), pop
+        # pdb2016 (S01) / pdb2017 (C02) fallback, as in pcap_decode's selftest
+        for want in ("pdb2016", "pdb2017"):
+            pop = next(o for o, v in sorted(docs["pdb"].items()) if ("zone", o, S2C) not in docs["packets"]
+                       and v["src"] == want and v["size"] > 0 and not v["variable"])
+            r = F.decode(b"zone", False, pop, bytes(docs["pdb"][pop]["size"]), False)
+            assert r.source == want.encode() and not list(r.issues.values()), (pop, r.source, [(i.kind, i.text) for i in r.issues.values()])
         # glue, through the mock API: first pass in order, then re-dissection in reverse order must match
         L.execute(MOCK)
         L.globals().P = L.execute(src + "\nreturn proto")

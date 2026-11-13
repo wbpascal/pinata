@@ -1,0 +1,200 @@
+shn	row_struct	pdbs	DataVersionKey	key_2016	key_NA2016	row_bytes	struct_size	columns_vs_members	rows_2016	rows_NA2016	NA_content_differs
+AbState	AbnormalStateInfo	zone	4042	4042	4042	289	289	same	777	777	
+AbStateSaveTypeInfo	AbStateSaveTypeInfo	zone	22	22	22	7	7	same	4	4	
+AccUpgrade	AccUpgrade	zone	81	81	81	14	14	same	60	60	
+AccUpGradeInfo	AccUpGradeInfo	zone	3999	3999	3999	112	112	same	3540	3540	
+ActionEffectAbState	ActionEffectAbState	zone	21	21	21	38	38	same	0	0	
+ActionEffectItem	ActionEffectItem	zone	14	14	14	5	5	same	372	372	
+ActionRangeFactor	ActionRangeFactor	zone	45	45	45	12	12	same	8	8	
+ActionViewInfo	ActionViewInfo	zone	587	587	587	114	114	same	105	105	
+ActiveSkill	ActiveSkillInfo	zone	86355	86355	86355	671	671	same	2791	2791	yes
+ActiveSkillGroup	ActiveSkillGroup	zone	18	18	18	36	36	same	2198	2151	yes
+ActiveSkillInfoServer	ActiveSkillInfoServer	zone	1040	1040	1040	78	78	same	2791	2791	
+AdminLvSet	AdminLvSet	zone	5	5	5	20	20	same	54	54	
+AnnounceData	ANNOUNCE_DATA	zone	571	571	571	264	264	same	14	14	
+AreaSkill	AreaSkill	zone	152	152	152	70	70	same	92	92	
+AttendReward	AttendReward	wm	152	152	152	38	38	same	7	7	
+AttendSchedule	AttendSchedule	wm	92	92	92	10	10	same	1	1	
+BadNameFilter	BadNameFilter	zone,wm	18	18	18	36	36	same	1175	1175	
+BelongDice	BelongDice	zone	1	1	1	1	1	same	1	1	
+BelongTypeInfo	BelongTypeInfo	zone,account,accountlog	70	70	70	10	10	same	11	11	
+BMP	BMP	zone	44	44	44	64	64	same	52	52	
+BRAccUpgrade	BRAccUpgrade	zone	81	81	81	14	14	same	45	45	
+BRAccUpgradeInfo	BRAccUpgradeInfo	zone	6860	6860	6860	80	80	same	6	6	
+CharacterTitleData	CHARACTER_TITLE_DATA	zone	2456	2456	2456	172	172	same	128	128	
+CharacterTitleStateServer	CharacterTitleStateServer	zone	100	100	100	38	38	same	823	823	
+ChargedDeletableBuff	ChargedDeletableBuff	zone	1	1	1	32	32	same	4	4	
+ChargedEffect	ChargedItemEffect	zone	141	141	141	43	43	same	4542	4546	yes
+ChatColor	ChatColor	zone	22	22	22	4	4	same	22	22	
+ClassName	ClassName	zone	196	196	196	53	53	same	28	28	
+CollectCard	CollectCard	zone	126	126	126	42	42	same	334	334	
+CollectCardDropRate	CollectCardDropRate	zone	7	7	7	4	4	same	334	334	
+CollectCardGroupDesc	-	-		76	76	68		-	187	187	
+CollectCardMobGroup	CollectCardMobGroup	zone	18	18	18	36	36	same	1180	1180	
+CollectCardReward	CollectCardReward	zone	273	273	273	74	74	same	18	18	
+CollectCardStarRate	CollectCardStarRate	zone	16	16	16	7	7	same	12	12	
+CollectCardTitle	CollectCardTitle	zone	44	44	44	36	36	same	52	52	
+ColorInfo	-	-		44	44	7		-	52	52	
+DamageLvGapEVP	DamageLvGapEVP	zone	7	7	7	4	4	same	24	24	
+DamageLvGapPVE	DamageLvGapPVE	zone	7	7	7	4	4	same	24	24	
+DamageLvGapPVP	DamageLvGapPVP	zone	56776	56776	56776	301	301	same	151	151	
+DiceDividind	DICE_Dividind	zone	2686	2686	2686	31	31	same	1	1	
+DiceGame	ShineObjectClass::DICE_GAME	zone	2097	2097	2097	44	44	same (single/array column or loader-side struct)	5	5	
+DiceRate	DICE_RATE	zone	10	10	10	4	4	same (single/array column or loader-side struct)	216	216	
+EnchantSocketRate	EnchantSocketRate	zone	34	34	34	10	10	same	5	5	
+ErrorCodeTable	-	-		81	81	68		-	709	709	
+FaceInfo	-	-		1119	1119	58		-	48	48	
+FieldLvCondition	FieldLvCondition	zone	32	32	32	38	38	same	74	74	
+FriendPointReward	FriendPointReward	zone,wm,account,accountlog	27	27	27	40	40	same	97	97	
+Gather	GatherInfo	zone	959	959	959	174	174	same	6	6	
+GBBanTime	GBBanGame	zone	35	35	35	12	12	same	1	1	
+GBDiceDividind	DICE_Dividind	zone	2686	2686	2686	31	31	same	1	1	
+GBDiceGame	GB_DICE_GAME	zone	37	37	37	8	8	same	1	1	
+GBDiceRate	GB_DICE_RATE	zone	10	10	10	4	4	same (single/array column or loader-side struct)	216	216	
+GBEventCode	GBEventCode	zone	35	35	35	12	12	same	14	14	
+GBExchangeMaxCoin	GBExchangeMaxCoin	zone	10	10	10	5	5	same	125	125	
+GBHouse	GBHouse	zone,wm	40	40	40	11	11	same	1	1	
+GBJoinGameMember	GBJoinGameMember	zone	12	12	12	6	6	same	2	2	
+GBReward	GBReward	zone	103	103	103	40	40	same	1	1	
+GBSMAll	GBSMAll	zone	26	26	26	5	5	same	9	9	
+GBSMBetCoin	GBSMBetCoin	zone	7	7	7	6	6	same	3	3	
+GBSMCardRate	GBSMCardRate	zone	7	7	7	6	6	same	9	9	
+GBSMCenter	GBSMCenter	zone	7	7	7	3	3	same	1	1	
+GBSMGroup	GBSMGroup	zone	18	18	18	5	5	same	12	12	
+GBSMJPRate	GBSMJackpotRate	zone	27	27	27	12	12	same	4	4	
+GBSMLine	GBSMLine	zone	16	16	16	4	4	same	11	11	
+GBSMNPC	GBSMNPC	zone	18	18	18	36	36	same	24	24	
+GBTaxRate	GBTaxRate	zone	56	56	56	12	12	same	2	2	
+GradeItemOption	GradeItemOption	zone,account,accountlog	616	616	616	62	62	same	3857	3857	
+GroupAbState	GroupAbState	zone,account,accountlog	51	51	51	65	65	same	9	9	
+GTIBreedSubject	GTIBreedSubject	zone	44	44	44	65	65	same	6	6	
+GTIGetRate	GTIGetRate	zone	70	70	70	7	7	same	20	20	
+GTIGetRateGap	GTIGetRateGap	zone	7	7	7	3	3	same	3	3	
+GTIServer	GTIServer	zone	383	383	383	76	76	same	23	23	
+GTWinScore	GTWinScore	zone	1	1	1	2	2	same	1	1	
+GuildAcademy	GUILD_ACADEMY_DATA	wm	218	218	218	38	38	same	1	1	
+GuildAcademyLevelUp	GUILD_ACADEMY_LEVELUP	wm	47	47	47	9	9	same	51	51	
+GuildAcademyRank	GUILD_ACADEMY_RANK	wm	264	264	264	38	38	same	4	4	
+GuildGradeData	GUILD_GRADE_DATA	wm	1242	1242	1242	21	21	same	5	5	
+GuildGradeScoreData	GUILD_GRADE_SCORE_DATA	wm	701	701	701	14	14	same (single/array column or loader-side struct)	7	7	
+GuildLevelScoreData	GUILD_LEVEL_SCORE_DATA	wm	18	18	18	4	4	same	3	3	
+GuildTournament	GUILD_TOURNAMENT_SCHEDULE	wm	990	990	990	29	29	same	7	7	
+GuildTournamentLvGap	GUILD_TOURNAMENT_LVGAP	zone	23	23	23	8	8	same	6	6	
+GuildTournamentMasterBuff	GUILD_TOURNAMENT_MASTERBUFF	zone	44	44	44	34	34	same	1	1	
+GuildTournamentOccupy	GUILD_TOURNAMENT_OCCUPY	zone	18	18	18	6	6	same	1	1	
+GuildTournamentRequire	GUILD_TOURNAMENT_REQUIRE	wm	24	24	24	7	7	same	1	1	
+GuildTournamentReward	GUILD_TOURNAMENT_REWARD	wm	549	549	549	38	38	same	37	37	
+GuildTournamentScore	GUILD_TOURNAMENT_SCORE	zone	879	879	879	16	16	same	7	7	
+GuildTournamentSkill	GUILD_TOURNAMENT_SKILL	zone	251	251	251	46	46	same	6	6	
+HairColorInfo	-	-		197	197	62		-	36	36	
+HairInfo	-	-		14925	14925	488		-	70	70	
+HolyPromiseReward	-	-		673	673	70		-	275	275	
+ItemAction	ItemAction	zone	64	64	64	12	12	same	1114	1114	
+ItemActionCondition	ItemActionCondition	zone	279	279	279	30	30	same bytes; each TYPE_LIST_TWO_INX (29) column = 2 members (enum + ulong)	322	322	
+ItemActionEffect	ItemActionEffect	zone	154	154	154	22	22	same bytes; each TYPE_LIST_TWO_INX (29) column = 2 members (enum + ulong)	202	202	
+ItemDismantle	ItemDismantle	zone	9530	9530	9530	102	102	same	13	13	
+ItemDropLog	ItemDropLog	zone,account,accountlog	11	11	11	4	4	same	57	57	
+ItemInfo	ItemInfo	zone,wm,account,accountlog	19303	19303	19303	378	378	same	14989	14999	yes
+ItemInfoServer	ItemInfoServer	zone,account,accountlog	4770	4770	4770	222	222	same	14989	14999	yes
+ItemInvenDel	ItemInvenDel	zone,account,accountlog	18	18	18	36	36	same	19	19	
+ItemMerchantInfo	MerchantLocation	zone	5	5	5	5	5	same	10	10	
+ItemMix	ItemMix	zone	44	44	44	64	64	same	98	98	
+ItemMoney	ItemMoney	zone,account,accountlog	55	55	55	66	66	same	540	540	
+ItemOptions	ItemOptions	zone,wm,account,accountlog	1582	1582	1582	25	25	same	18	18	
+ItemPackage	-	-		145	145	68		-	27	27	
+ItemServerEquipTypeInfo	ItemServerEquipTypeInfo	zone	1001	1001	1001	29	29	same	34	34	
+ItemShop	ItemShop	zone	61	61	61	40	40	same	3926	3930	yes
+ItemSort	ItemSort	zone,account,accountlog	1	1	1	32	32	same	59	59	
+ItemUpgrade	AccUpgrade	zone	81	81	81	14	14	same	72	72	
+ItemUseEffect	ItemUseEffect	zone	571	571	571	86	86	same	240	240	
+JobEquipInfo	JobEquipInfo	zone	1184	1184	1184	228	228	same	5	5	
+KingdomQuest	KINGDOM_QUEST	wm	9525	9525	9525	180	180	same	57	57	
+KingdomQuestMap	KINGDOM_QUEST_MAP	wm	8325	8325	8325	363	363	same	38	38	
+KingdomQuestRew	KINGDOM_QUEST_REW	zone	12969	12969	12969	128	128	same	64	64	
+KQIsVote	KQIsVote	wm	5	5	5	3	3	same	30	30	
+KQItem	KQItem	zone,account,accountlog	34	34	34	38	38	same	2	2	
+KQTeam	KQTeam	wm	241	241	241	22	22	same	8	8	
+KQVoteMajorityRate	KQVoteMajorityRate	wm	1	1	1	1	1	same	2	2	
+LCGroupRate	LCGroupRate	zone	22	22	22	9	9	same	58	58	
+LCReward	LCReward	zone	51	51	51	34	34	same	525	525	
+MapBuff	MapBuff	zone	103	103	103	48	48	same	5	5	
+MapInfo	MapInfo	zone,account,accountlog	504	504	504	76	76	same	138	138	
+MapLinkPoint	-	-		43	43	14		-	16851	16851	
+MapWayPoint	-	-		37	37	11		-	14886	14886	
+MarketSearchInfo	MarketSearchInfo	zone	18	18	18	8	8	same	34	34	
+MiniHouse	MiniHouse	zone	488	488	488	111	111	same	356	356	
+MiniHouseDummy	-	-		2158	2158	187		-	1	1	
+MiniHouseEndure	MiniHouseEndure	zone	251	251	251	10	10	same	4	4	
+MiniHouseFurniture	MiniHouseFurniture	zone	1017	1017	1017	148	148	same	89	89	
+MiniHouseFurnitureObjEffect	MiniHouseFurnitureObjEffect	zone	4627	4627	4627	210	210	same	13	13	
+MiniHouseObjAni	MiniHouseObjAni	zone	625	625	625	39	39	same	183	183	
+MinimonAutoUseItem	MinimonAutoUseItem	zone	44	44	44	36	36	same	221	221	
+MinimonInfo	MinimonInfo	zone	51	51	51	40	40	same	534	534	
+MobAbStateDropSetting	MobAbStateDropSetting	zone	88	88	88	71	71	same	6	6	
+MobAutoAction	MobAutoAction	zone	352	352	352	81	81	same	4	4	
+MobConditionServer	MobConditionServer	zone	96	96	96	45	45	same	6	6	
+MobInfo	MobInfo	zone,account,accountlog	1193	1193	1193	108	108	same	2842	2878	yes
+MobInfoServer	MobInfoServer	zone,account,accountlog	7409	7409	7409	167	167	same	2842	2878	yes
+MobKillAble	MobKillAble	zone,account,accountlog	22	22	22	7	7	same	3	3	
+MobKillAnnounce	MobKillAnnounce	zone,account,accountlog	37	37	37	8	8	same	7	7	
+MobKillLog	MobKillLog	zone,account,accountlog	11	11	11	4	4	same	33	33	
+MobLifeTime	MobLifeTime	zone,account,accountlog	7	7	7	34	34	same	47	47	
+MobNoFadeIn	-	-		1	1	32		-	19	52	yes
+MobRegenAni	MobRegenAni	zone,account,accountlog	102	102	102	67	67	same	11	11	
+MobResist	MobResist	zone	286	286	286	52	52	same	37	37	
+MobSpecies	MobSpecies	zone,account,accountlog	591	591	591	134	134	same	2842	2878	yes
+MobWeapon	MobWeapon	zone,account,accountlog	2556	2556	2556	152	152	same	5818	5815	yes
+MoverAbility	MoverAbility	zone	904	904	904	97	97	same	0	0	
+MoverHG	MoverHG	zone	149	149	149	74	74	same	461	461	
+MoverItem	MoverItem	zone	44	44	44	64	64	same	461	461	
+MoverMain	MoverMain	zone	186	186	186	51	51	same	461	461	
+MoverUpgradeEffect	MoverUpgradeEffect	zone	541	541	541	75	75	same	6	6	
+MoverUseSkill	MoverUseSkill	zone	44	44	44	64	64	same	0	0	
+MsgWorldManager	MSG_WORLD_MANAGER	wm	30	30	30	1	1	same (single/array column or loader-side struct)	3	3	
+MultiHitType	MultiHitType	zone	172	172	172	42	42	same	182	182	
+MysteryVaultServer	MysteryVaultServer	zone	150	150	150	72	72	same	250	250	
+NpcSchedule	NpcSchedule	zone,wm	131	131	131	42	42	same	0	0	
+PartyBonusByLvDiff	PartyBonusByLvDiff	zone	7	7	7	4	4	same	31	31	
+PartyBonusByMember	PartyBonusByMember	zone	7	7	7	3	3	same	21	21	
+PartyBonusLimit	PartyBonusLimit	zone	10	10	10	5	5	same	151	151	
+PassiveSkill	PassiveSkillInfo	zone	8436	8436	8436	254	254	same	503	503	
+Produce	ProduceInfo	zone	6309	6309	6309	438	438	same	216	216	
+PSkillSetAbstate	PSkillSetAbstate	zone	169	169	169	71	71	same	16	16	
+PupCase	PupCase	zone	25	25	25	9	9	same	40	40	
+PupCaseDesc	PupCaseDesc	zone	615	615	615	112	112	same	153	153	
+PupFactorCondition	PupFactorCondition	zone	94	94	94	17	17	same	64	64	
+PupMain	PupMain	zone	145	145	145	70	70	same	3	3	
+PupMind	PupMind	zone	12	12	12	6	6	same	4	4	
+PupPriority	PupPriority	zone	5	5	5	5	5	same	5	5	
+PupServer	PupServer	zone	35	35	35	36	36	same	3	3	
+QuestData	-	-		151126022	150994950			-			yes
+QuestDialog	QUEST_DIALOG	zone	30	30	30	3	5	struct ID is ulong; 2016 file ID WORD (row 3), NA2016 file ID DWORD (row 5); no server loads it	16871	25222	yes
+QuestScript	-	-		30	30	3		-	106	106	
+QuestSpecies	QuestSpecies	zone,account,accountlog	886	886	886	167	167	same	2842	2878	yes
+RaceNameInfo	-	-		148	148	37		-	4	4	
+RandomOption	RandomOption	zone	93	93	93	49	49	same	11456	11456	
+RandomOptionCount	RandomOptionCount	zone	18	18	18	37	37	same	5928	5928	
+RareMoverEachRate	RareMoverEachRate	zone	7	7	7	34	34	same	1	1	
+RareMoverRate	RareMoverRate	zone	1	1	1	2	2	same	19	19	
+RareMoverSubRate	RareMoverSubRate	zone	1	1	1	2	2	same	6	6	
+ReactionType	ReactionType	zone	61	61	61	40	40	same	1	1	
+Riding	RIDING	zone	5585	5585	5585	346	346	same	2	2	
+SetEffect	SetEffect	zone	16	16	16	35	35	same	1043	1043	
+SetItem	SetItem	zone	90	90	90	65	65	same	442	442	
+SetItemEffect	SetItemEffect	zone	652	652	652	241	241	same	235	235	
+ShineReward	ShineReward	zone,wm,account,accountlog	2415	2415	2415	66	66	same	435	435	
+SingleData	SingleData	zone,wm	7	7	7	34	34	same	41	41	
+SpamerPenalty	SpamerPenalty	zone	18	18	18	5	5	same	10	10	
+SpamerPenaltyRule	SpamerPenaltyRule	zone	5	5	5	3	3	same	1	1	
+SpamerReport	SpamerReport	wm	284	284	284	134	134	same	1	1	
+StateField	StateField	zone	57	57	57	48	48	same	6	6	
+StateItem	StateItem	zone	77	77	77	70	70	same	60	60	
+StateMob	StateMob	zone	154	154	154	100	100	same	6	6	
+SubAbState	SubAbStateInfo	zone	1068	1068	1068	79	79	same	2041	2041	
+TermExtendMatch	TermExtendMatch	zone,account,accountlog	44	44	44	64	64	same	312	312	
+ToggleSkill	ToggleSkill	zone	29	29	29	38	38	same	6	6	
+TownPortal	TownPortal	zone	213	213	213	43	43	same	8	8	
+UpgradeInfo	UpGradeInfo	zone	2603	2603	2603	62	62	same	9780	9780	
+UseClassTypeInfo	UseClassTypeInfo	zone,wm	1162	1162	1162	31	31	same	39	39	
+WeaponAttrib	WeaponAttrib	zone,account,accountlog	308	308	308	13	13	same	14	14	
+WeaponTitleData	WEAPON_TITLE_DATA	zone,account,accountlog	1728	1728	1728	64	64	same	1971	1971	

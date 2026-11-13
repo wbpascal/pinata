@@ -278,12 +278,19 @@ def load_docs():
     for (srv, op, d) in packets:
         if srv in known and d in known[srv]:
             known[srv][d].add(op)
-    # 2017 client PDB layouts (work item C02): fallback below hand annotations, above layouts.json
-    pp = os.path.join(DOCS, "pdb-layouts.json")
-    pdb = json.load(open(pp)) if os.path.exists(pp) else {"opcodes": {}, "structs": {}}
-    for n, st in pdb["structs"].items():
-        structs.setdefault(n, st)
-    pdb = {int(k, 16): v for k, v in pdb["opcodes"].items() if "fields" in v}
+    # PDB layouts, fallback below hand annotations and above layouts.json: the 2016 server PDBs (work item S01, same
+    # build, "pdb2016") first, then the 2017 client PDB (work item C02, "pdb2017"). A pdb2016 struct that is only a
+    # name-alias guess yields to pdb2017's own struct (0x182a). Each entry carries its label in "src".
+    pdb = {}
+    for fn, lab in (("pdb2016-layouts.json", "pdb2016"), ("pdb-layouts.json", "pdb2017")):
+        pp = os.path.join(DOCS, fn)
+        pj = json.load(open(pp)) if os.path.exists(pp) else {"opcodes": {}, "structs": {}}
+        for n, st in pj["structs"].items():
+            structs.setdefault(n, st)
+        for k, v in pj["opcodes"].items():
+            op, old = int(k, 16), pdb.get(int(k, 16))
+            if "fields" in v and (old is None or old.get("struct_alias") and not v.get("struct_alias")):
+                pdb[op] = dict(v, src=lab)
     errs = {int(k, 16): v.get("text") or v.get("literal") for k, v in
             json.load(open(os.path.join(DOCS, "client-error-codes.json"))).items()}
     return dict(structs=structs, packets=packets, names=names, known=known, layouts=layouts, errors=errs, pdb=pdb)
@@ -408,7 +415,7 @@ def decode_packet(kind, d, op, payload, docs):
     issues, ann = [], docs["packets"].get((kind, op, d))
     src = "annotation"
     if ann is None and op in docs.get("pdb", {}):
-        ann, src = pdb_pick(docs["pdb"][op], len(payload)), "pdb2017"
+        ann, src = pdb_pick(docs["pdb"][op], len(payload)), docs["pdb"][op].get("src", "pdb2017")
     name = (ann or {}).get("name") or docs["names"].get(op)
     lay = docs["layouts"].get(kind, {}).get(d, {}).get(op)
     for c in (lay or {}).get("len_checks", []) if d == C2S else []:
@@ -575,7 +582,7 @@ def write_decoded(res, f):
             ci += 1
         f.write(f"[{p['i']:5}] f{p['frame']:<6} +{p['time']:.6f}  {p['dir']}  {p['stream']:<8} "
                 f"0x{p['op']:04X}  {p['name'] or '?'}  ({len(p['payload'])} B)\n")
-        tag = {"generated": " (gen)", "pdb2017": " (pdb2017)"}.get(p["source"], "")
+        tag = {"generated": " (gen)", "pdb2016": " (pdb2016)", "pdb2017": " (pdb2017)"}.get(p["source"], "")
         for name, v in p["fields"]:
             f.write(f"          {name}{tag} = {fmt_val(v)}\n")
         unc = [i for i in range(len(p["payload"])) if i not in p["covered"]]
@@ -630,7 +637,7 @@ def write_report(res, rows, f):
         notes = s["decrypt"] + s["problems"] + [f"{d}: gap of {n} bytes at offset {o}" for d in (C2S, S2C) for o, n in s["gaps"][d]]
         if notes:
             f.write(f"\n**{s['id']}**\n\n" + "".join(f"- {n}\n" for n in notes))
-    f.write("\n## Packet types\n\nsource: `annotation` = hand-verified layout, `pdb2017` = 2017 client PDB struct (pdb-layouts.json), `generated` = layouts.json, "
+    f.write("\n## Packet types\n\nsource: `annotation` = hand-verified layout, `pdb2016` = 2016 server PDB struct (pdb2016-layouts.json), `pdb2017` = 2017 client PDB struct (pdb-layouts.json), `generated` = layouts.json, "
             "`–` = no layout documented. *Undoc ≠0* = payload offsets that no documented field covers but were nonzero.\n\n")
     f.write("| Server | Dir | Opcode | Name | Count | Sizes seen | Doc size | Source | Undoc ≠0 | Issues |\n"
             "|---|---|---|---|---|---|---|---|---|---|\n")
@@ -788,6 +795,12 @@ def selftest():
         pop = next(o for o, v in sorted(docs["pdb"].items()) if ("zone", o, S2C) not in docs["packets"]
                    and v["size"] > 0 and not v["variable"])
         r = decode_packet("zone", S2C, pop, bytes(docs["pdb"][pop]["size"]), docs)
+        assert r["source"] == docs["pdb"][pop]["src"] and not r["issues"], r
+        assert docs["pdb"][0x1801]["src"] == "pdb2016" and docs["pdb"][0x1801]["size"] == 1590     # Name8[49] checksum
+        assert docs["pdb"][0x182a]["src"] == "pdb2017" and docs["pdb"][0x182a]["size"] == 0       # alias guess yields
+        p17 = next(o for o, v in sorted(docs["pdb"].items()) if v["src"] == "pdb2017" and ("zone", o, S2C) not in docs["packets"]
+                   and v["size"] > 0 and not v["variable"])
+        r = decode_packet("zone", S2C, p17, bytes(docs["pdb"][p17]["size"]), docs)
         assert r["source"] == "pdb2017" and not r["issues"], r
         assert pdb_pick(docs["pdb"][0x0830], 3)["name"] == "NC_MISC_SERVERPARAMETER_ACK"   # alias layout by size
         f = decode_ann(b"\x02\x01\x00\x02\x00", [[0, "u8", "a.num", ""], [1, "u16[a.num]", "arr", ""]], {}, docs)

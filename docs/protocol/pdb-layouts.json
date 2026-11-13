@@ -26330,6 +26330,180 @@
    "variable": false,
    "fields": [
     [
+     0,
+     "u32",
+     "KQInfo.Handle",
+     ""
+    ],
+    [
+     4,
+     "u8",
+     "KQInfo.Status",
+     ""
+    ],
+    [
+     5,
+     "u16",
+     "KQInfo.NumOfJoiner",
+     ""
+    ],
+    [
+     7,
+     "u16",
+     "KQInfo.ID",
+     ""
+    ],
+    [
+     9,
+     "char[64]",
+     "KQInfo.Title",
+     ""
+    ],
+    [
+     73,
+     "u16",
+     "KQInfo.LimitTime",
+     ""
+    ],
+    [
+     75,
+     "i32",
+     "KQInfo.StartTime",
+     ""
+    ],
+    [
+     79,
+     "i32",
+     "KQInfo.tm_StartTime.tm_sec",
+     ""
+    ],
+    [
+     83,
+     "i32",
+     "KQInfo.tm_StartTime.tm_min",
+     ""
+    ],
+    [
+     87,
+     "i32",
+     "KQInfo.tm_StartTime.tm_hour",
+     ""
+    ],
+    [
+     91,
+     "i32",
+     "KQInfo.tm_StartTime.tm_mday",
+     ""
+    ],
+    [
+     95,
+     "i32",
+     "KQInfo.tm_StartTime.tm_mon",
+     ""
+    ],
+    [
+     99,
+     "i32",
+     "KQInfo.tm_StartTime.tm_year",
+     ""
+    ],
+    [
+     103,
+     "i32",
+     "KQInfo.tm_StartTime.tm_wday",
+     ""
+    ],
+    [
+     107,
+     "i32",
+     "KQInfo.tm_StartTime.tm_yday",
+     ""
+    ],
+    [
+     111,
+     "i32",
+     "KQInfo.tm_StartTime.tm_isdst",
+     ""
+    ],
+    [
+     115,
+     "u16",
+     "KQInfo.StartWaitTime",
+     ""
+    ],
+    [
+     117,
+     "u8",
+     "KQInfo.MinLevel",
+     ""
+    ],
+    [
+     118,
+     "u8",
+     "KQInfo.MaxLevel",
+     ""
+    ],
+    [
+     119,
+     "u16",
+     "KQInfo.MinPlayers",
+     ""
+    ],
+    [
+     121,
+     "u16",
+     "KQInfo.MaxPlayers",
+     ""
+    ],
+    [
+     123,
+     "u8",
+     "KQInfo.PlayerRepeatMode",
+     ""
+    ],
+    [
+     124,
+     "u16",
+     "KQInfo.PlayerRepeatCount",
+     ""
+    ],
+    [
+     126,
+     "u8",
+     "KQInfo.PlayerRevivalMode",
+     ""
+    ],
+    [
+     127,
+     "u8",
+     "KQInfo.PlayerRevivalCount",
+     ""
+    ],
+    [
+     128,
+     "u16",
+     "KQInfo.DemandQuest",
+     ""
+    ],
+    [
+     130,
+     "u16",
+     "KQInfo.DemandItem",
+     ""
+    ],
+    [
+     132,
+     "i64",
+     "KQInfo.DemandClass",
+     ""
+    ],
+    [
+     140,
+     "u8",
+     "KQInfo.DemandGender",
+     ""
+    ],
+    [
      141,
      "u8",
      "KQInfo.NextStartMode",
@@ -44507,6 +44681,180 @@
    "variable": false,
    "fields": [
     [
+     0,
+     "u32",
+     "KQInfo.Handle",
+     ""
+    ],
+    [
+     4,
+     "u8",
+     "KQInfo.Status",
+     ""
+    ],
+    [
+     5,
+     "u16",
+     "KQInfo.NumOfJoiner",
+     ""
+    ],
+    [
+     7,
+     "u16",
+     "KQInfo.ID",
+     ""
+    ],
+    [
+     9,
+     "char[64]",
+     "KQInfo.Title",
+     ""
+    ],
+    [
+     73,
+     "u16",
+     "KQInfo.LimitTime",
+     ""
+    ],
+    [
+     75,
+     "i32",
+     "KQInfo.StartTime",
+     ""
+    ],
+    [
+     79,
+     "i32",
+     "KQInfo.tm_StartTime.tm_sec",
+     ""
+    ],
+    [
+     83,
+     "i32",
+     "KQInfo.tm_StartTime.tm_min",
+     ""
+    ],
+    [
+     87,
+     "i32",
+     "KQInfo.tm_StartTime.tm_hour",
+     ""
+    ],
+    [
+     91,
+     "i32",
+     "KQInfo.tm_StartTime.tm_mday",
+     ""
+    ],
+    [
+     95,
+     "i32",
+     "KQInfo.tm_StartTime.tm_mon",
+     ""
+    ],
+    [
+     99,
+     "i32",
+     "KQInfo.tm_StartTime.tm_year",
+     ""
+    ],
+    [
+     103,
+     "i32",
+     "KQInfo.tm_StartTime.tm_wday",
+     ""
+    ],
+    [
+     107,
+     "i32",
+     "KQInfo.tm_StartTime.tm_yday",
+     ""
+    ],
+    [
+     111,
+     "i32",
+     "KQInfo.tm_StartTime.tm_isdst",
+     ""
+    ],
+    [
+     115,
+     "u16",
+     "KQInfo.StartWaitTime",
+     ""
+    ],
+    [
+     117,
+     "u8",
+     "KQInfo.MinLevel",
+     ""
+    ],
+    [
+     118,
+     "u8",
+     "KQInfo.MaxLevel",
+     ""
+    ],
+    [
+     119,
+     "u16",
+     "KQInfo.MinPlayers",
+     ""
+    ],
+    [
+     121,
+     "u16",
+     "KQInfo.MaxPlayers",
+     ""
+    ],
+    [
+     123,
+     "u8",
+     "KQInfo.PlayerRepeatMode",
+     ""
+    ],
+    [
+     124,
+     "u16",
+     "KQInfo.PlayerRepeatCount",
+     ""
+    ],
+    [
+     126,
+     "u8",
+     "KQInfo.PlayerRevivalMode",
+     ""
+    ],
+    [
+     127,
+     "u8",
+     "KQInfo.PlayerRevivalCount",
+     ""
+    ],
+    [
+     128,
+     "u16",
+     "KQInfo.DemandQuest",
+     ""
+    ],
+    [
+     130,
+     "u16",
+     "KQInfo.DemandItem",
+     ""
+    ],
+    [
+     132,
+     "i64",
+     "KQInfo.DemandClass",
+     ""
+    ],
+    [
+     140,
+     "u8",
+     "KQInfo.DemandGender",
+     ""
+    ],
+    [
      141,
      "u8",
      "KQInfo.NextStartMode",
@@ -44666,6 +45014,180 @@
    "size": 379,
    "variable": true,
    "fields": [
+    [
+     0,
+     "u32",
+     "KQInfo.Handle",
+     ""
+    ],
+    [
+     4,
+     "u8",
+     "KQInfo.Status",
+     ""
+    ],
+    [
+     5,
+     "u16",
+     "KQInfo.NumOfJoiner",
+     ""
+    ],
+    [
+     7,
+     "u16",
+     "KQInfo.ID",
+     ""
+    ],
+    [
+     9,
+     "char[64]",
+     "KQInfo.Title",
+     ""
+    ],
+    [
+     73,
+     "u16",
+     "KQInfo.LimitTime",
+     ""
+    ],
+    [
+     75,
+     "i32",
+     "KQInfo.StartTime",
+     ""
+    ],
+    [
+     79,
+     "i32",
+     "KQInfo.tm_StartTime.tm_sec",
+     ""
+    ],
+    [
+     83,
+     "i32",
+     "KQInfo.tm_StartTime.tm_min",
+     ""
+    ],
+    [
+     87,
+     "i32",
+     "KQInfo.tm_StartTime.tm_hour",
+     ""
+    ],
+    [
+     91,
+     "i32",
+     "KQInfo.tm_StartTime.tm_mday",
+     ""
+    ],
+    [
+     95,
+     "i32",
+     "KQInfo.tm_StartTime.tm_mon",
+     ""
+    ],
+    [
+     99,
+     "i32",
+     "KQInfo.tm_StartTime.tm_year",
+     ""
+    ],
+    [
+     103,
+     "i32",
+     "KQInfo.tm_StartTime.tm_wday",
+     ""
+    ],
+    [
+     107,
+     "i32",
+     "KQInfo.tm_StartTime.tm_yday",
+     ""
+    ],
+    [
+     111,
+     "i32",
+     "KQInfo.tm_StartTime.tm_isdst",
+     ""
+    ],
+    [
+     115,
+     "u16",
+     "KQInfo.StartWaitTime",
+     ""
+    ],
+    [
+     117,
+     "u8",
+     "KQInfo.MinLevel",
+     ""
+    ],
+    [
+     118,
+     "u8",
+     "KQInfo.MaxLevel",
+     ""
+    ],
+    [
+     119,
+     "u16",
+     "KQInfo.MinPlayers",
+     ""
+    ],
+    [
+     121,
+     "u16",
+     "KQInfo.MaxPlayers",
+     ""
+    ],
+    [
+     123,
+     "u8",
+     "KQInfo.PlayerRepeatMode",
+     ""
+    ],
+    [
+     124,
+     "u16",
+     "KQInfo.PlayerRepeatCount",
+     ""
+    ],
+    [
+     126,
+     "u8",
+     "KQInfo.PlayerRevivalMode",
+     ""
+    ],
+    [
+     127,
+     "u8",
+     "KQInfo.PlayerRevivalCount",
+     ""
+    ],
+    [
+     128,
+     "u16",
+     "KQInfo.DemandQuest",
+     ""
+    ],
+    [
+     130,
+     "u16",
+     "KQInfo.DemandItem",
+     ""
+    ],
+    [
+     132,
+     "i64",
+     "KQInfo.DemandClass",
+     ""
+    ],
+    [
+     140,
+     "u8",
+     "KQInfo.DemandGender",
+     ""
+    ],
     [
      141,
      "u8",
@@ -61105,6 +61627,30 @@
    "variable": false,
    "fields": [
     [
+     0,
+     "char[20]",
+     "ReqInfo.PromiseCharID",
+     "Name5"
+    ],
+    [
+     20,
+     "u32",
+     "ReqInfo.LogonInfo.login|year|month|day|hour",
+     "bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21"
+    ],
+    [
+     24,
+     "u8",
+     "ReqInfo.Level",
+     ""
+    ],
+    [
+     25,
+     "u8",
+     "ReqInfo.Flags",
+     ""
+    ],
+    [
      26,
      "u32",
      "ReqInfo.PromiseCharNo",
@@ -61127,6 +61673,30 @@
      "u32",
      "ReqInfo.MemberAcceptableDate.login|year|month|day|hour",
      "bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21"
+    ],
+    [
+     42,
+     "char[20]",
+     "UpInfo.PromiseCharID",
+     "Name5"
+    ],
+    [
+     62,
+     "u32",
+     "UpInfo.LogonInfo.login|year|month|day|hour",
+     "bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21"
+    ],
+    [
+     66,
+     "u8",
+     "UpInfo.Level",
+     ""
+    ],
+    [
+     67,
+     "u8",
+     "UpInfo.Flags",
+     ""
     ],
     [
      68,
@@ -61161,6 +61731,30 @@
    "variable": false,
    "fields": [
     [
+     0,
+     "char[20]",
+     "ReqInfo.PromiseCharID",
+     "Name5"
+    ],
+    [
+     20,
+     "u32",
+     "ReqInfo.LogonInfo.login|year|month|day|hour",
+     "bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21"
+    ],
+    [
+     24,
+     "u8",
+     "ReqInfo.Level",
+     ""
+    ],
+    [
+     25,
+     "u8",
+     "ReqInfo.Flags",
+     ""
+    ],
+    [
      26,
      "u32",
      "ReqInfo.PromiseCharNo",
@@ -61183,6 +61777,30 @@
      "u32",
      "ReqInfo.MemberAcceptableDate.login|year|month|day|hour",
      "bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21"
+    ],
+    [
+     42,
+     "char[20]",
+     "UpInfo.PromiseCharID",
+     "Name5"
+    ],
+    [
+     62,
+     "u32",
+     "UpInfo.LogonInfo.login|year|month|day|hour",
+     "bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21"
+    ],
+    [
+     66,
+     "u8",
+     "UpInfo.Level",
+     ""
+    ],
+    [
+     67,
+     "u8",
+     "UpInfo.Flags",
+     ""
     ],
     [
      68,
@@ -61396,6 +62014,30 @@
      4,
      "u16",
      "DBError",
+     ""
+    ],
+    [
+     6,
+     "char[20]",
+     "UpMemberInfo.PromiseCharID",
+     "Name5"
+    ],
+    [
+     26,
+     "u32",
+     "UpMemberInfo.LogonInfo.login|year|month|day|hour",
+     "bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21"
+    ],
+    [
+     30,
+     "u8",
+     "UpMemberInfo.Level",
+     ""
+    ],
+    [
+     31,
+     "u8",
+     "UpMemberInfo.Flags",
      ""
     ],
     [
@@ -71179,6 +71821,542 @@
     ]
    ]
   },
+  "0xb401": {
+   "name": "NC_USER_CONNECTION_SET_ACCLOG_UP_CMD",
+   "struct": null
+  },
+  "0xb402": {
+   "name": "NC_USER_CONNECTION_SET_WORLD_DOWN_CMD",
+   "struct": null
+  },
+  "0xb403": {
+   "name": "NC_USER_CONNECTION_GET_LOGIN_USER_REQ",
+   "struct": null
+  },
+  "0xb404": {
+   "name": "NC_USER_CONNECTION_GET_LOGIN_USER_ACK",
+   "struct": null
+  },
+  "0xb405": {
+   "name": "NC_USER_CONNECTION_SET_USER_WORLD_LOGIN_CMD",
+   "struct": null
+  },
+  "0xb406": {
+   "name": "NC_USER_CONNECTION_SET_USER_WORLD_LOGOUT_CMD",
+   "struct": null
+  },
+  "0xb409": {
+   "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_REQ",
+   "struct": "PROTO_NC_USER_CONNECTION_CHANGE_CHAR_ID_REQ",
+   "size": 21,
+   "variable": false,
+   "fields": [
+    [
+     0,
+     "u8",
+     "nSlotNo",
+     ""
+    ],
+    [
+     1,
+     "char[20]",
+     "sNewID",
+     "Name5"
+    ]
+   ]
+  },
+  "0xb40a": {
+   "name": "NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_REQ",
+   "struct": "PROTO_NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_REQ",
+   "size": 35,
+   "variable": false,
+   "fields": [
+    [
+     0,
+     "u16",
+     "hWMChar",
+     ""
+    ],
+    [
+     2,
+     "u32",
+     "nRowNo",
+     ""
+    ],
+    [
+     6,
+     "u32",
+     "nUserNo",
+     ""
+    ],
+    [
+     10,
+     "u32",
+     "nCharNo",
+     ""
+    ],
+    [
+     14,
+     "char[20]",
+     "sNewID",
+     "Name5"
+    ],
+    [
+     34,
+     "u8",
+     "bInit",
+     ""
+    ]
+   ]
+  },
+  "0xb40b": {
+   "name": "NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK",
+   "struct": "PROTO_NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK",
+   "size": 32,
+   "variable": false,
+   "fields": [
+    [
+     0,
+     "u16",
+     "hWMChar",
+     ""
+    ],
+    [
+     2,
+     "u16",
+     "nError",
+     ""
+    ],
+    [
+     4,
+     "u32",
+     "nUserNo",
+     ""
+    ],
+    [
+     8,
+     "u32",
+     "nCharNo",
+     ""
+    ],
+    [
+     12,
+     "char[20]",
+     "sNewID",
+     "Name5"
+    ]
+   ]
+  },
+  "0xb40c": {
+   "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_ACK",
+   "struct": "PROTO_NC_USER_CONNECTION_CHANGE_CHAR_ID_ACK",
+   "size": 23,
+   "variable": false,
+   "fields": [
+    [
+     0,
+     "u16",
+     "nError",
+     ""
+    ],
+    [
+     2,
+     "u8",
+     "nSlotNo",
+     ""
+    ],
+    [
+     3,
+     "char[20]",
+     "sNewID",
+     "Name5"
+    ]
+   ]
+  },
+  "0xb40d": {
+   "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_CMD",
+   "struct": "PROTO_NC_USER_CONNECTION_CHANGE_CHAR_ID_CMD",
+   "size": 41,
+   "variable": false,
+   "fields": [
+    [
+     0,
+     "u8",
+     "bInit",
+     ""
+    ],
+    [
+     1,
+     "char[20]",
+     "sOldID",
+     "Name5"
+    ],
+    [
+     21,
+     "char[20]",
+     "sNewID",
+     "Name5"
+    ]
+   ]
+  },
+  "0xb40e": {
+   "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_ACADEMY_MASTER_CMD",
+   "struct": "PROTO_NC_USER_CONNECTION_CHANGE_CHAR_ID_ACADEMY_MASTER_CMD",
+   "size": 20,
+   "variable": false,
+   "fields": [
+    [
+     0,
+     "char[20]",
+     "sMasterID",
+     "Name5"
+    ]
+   ]
+  },
+  "0xb40f": {
+   "name": "NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD",
+   "struct": "PROTO_NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD",
+   "size": 45,
+   "variable": false,
+   "fields": [
+    [
+     0,
+     "u32",
+     "nCharNo",
+     ""
+    ],
+    [
+     4,
+     "u8",
+     "bInit",
+     ""
+    ],
+    [
+     5,
+     "char[20]",
+     "sOldID",
+     "Name5"
+    ],
+    [
+     25,
+     "char[20]",
+     "sNewID",
+     "Name5"
+    ]
+   ]
+  },
+  "0xb410": {
+   "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_ITEM_USE_REQ",
+   "struct": "PROTO_NC_USER_CONNECTION_CHANGE_CHAR_ID_ITEM_USE_REQ",
+   "size": 1,
+   "variable": false,
+   "fields": [
+    [
+     0,
+     "u8",
+     "nInvenSlot",
+     ""
+    ]
+   ]
+  },
+  "0xb411": {
+   "name": "NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ITEM_USE_REQ",
+   "struct": "PROTO_NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ITEM_USE_REQ",
+   "size": 38,
+   "variable": false,
+   "fields": [
+    [
+     0,
+     "u64",
+     "nCharIDChangeItemKey",
+     "SHINE_ITEM_REGISTNUMBER (union: binary, dwrdkey, key)"
+    ],
+    [
+     8,
+     "u16",
+     "nCharIDChangeItemSlot",
+     "ITEM_INVEN (union: Inven, Pos, Type)"
+    ],
+    [
+     10,
+     "u8",
+     "bInit",
+     ""
+    ],
+    [
+     11,
+     "u16",
+     "nUsedItemID",
+     ""
+    ],
+    [
+     13,
+     "u32",
+     "nUserNo",
+     ""
+    ],
+    [
+     17,
+     "u16",
+     "CommonData.header.clienthandle",
+     ""
+    ],
+    [
+     19,
+     "u32",
+     "CommonData.header.charregistnumber",
+     ""
+    ],
+    [
+     23,
+     "u64",
+     "CommonData.attr.attritemregnum",
+     "SHINE_ITEM_REGISTNUMBER (union: binary, dwrdkey, key)"
+    ],
+    [
+     31,
+     "u16",
+     "CommonData.attr.itemid",
+     ""
+    ],
+    [
+     33,
+     "u16",
+     "CommonData.attr.attr",
+     ""
+    ],
+    [
+     35,
+     "u16",
+     "CommonData.lockindex",
+     ""
+    ],
+    [
+     37,
+     "u8",
+     "CommonData.isClear",
+     ""
+    ]
+   ]
+  },
+  "0xb412": {
+   "name": "NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ITEM_USE_ACK",
+   "struct": "PROTO_NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ITEM_USE_ACK",
+   "size": 12,
+   "variable": false,
+   "fields": [
+    [
+     0,
+     "u16",
+     "Header.clienthandle",
+     ""
+    ],
+    [
+     2,
+     "u32",
+     "Header.charregistnumber",
+     ""
+    ],
+    [
+     6,
+     "u16",
+     "nError",
+     ""
+    ],
+    [
+     8,
+     "u16",
+     "lockindex",
+     ""
+    ],
+    [
+     10,
+     "u16",
+     "nUsedItemID",
+     ""
+    ]
+   ]
+  },
+  "0xb413": {
+   "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_ITEM_USE_ACK",
+   "struct": "PROTO_NC_USER_CONNECTION_CHANGE_CHAR_ID_ITEM_USE_ACK",
+   "size": 4,
+   "variable": false,
+   "fields": [
+    [
+     0,
+     "u16",
+     "nError",
+     ""
+    ],
+    [
+     2,
+     "u16",
+     "nUsedItemID",
+     ""
+    ]
+   ]
+  },
+  "0xb801": {
+   "name": "NC_AUCTION_NOTIFY_STORAGE_BOX_EXIST_ITEM_CMD",
+   "struct": null
+  },
+  "0xb802": {
+   "name": "NC_AUCTION_EXPIRATION_TIME_REQ",
+   "struct": null
+  },
+  "0xb803": {
+   "name": "NC_AUCTION_EXPIRATION_TIME_ACK",
+   "struct": null
+  },
+  "0xb804": {
+   "name": "NC_AUCTION_NOTIFY_EXPIRATION_ITEM_CMD",
+   "struct": null
+  },
+  "0xb805": {
+   "name": "NC_AUCTION_NOTIFY_WORLD_SELL_ITEM_CMD",
+   "struct": null
+  },
+  "0xb806": {
+   "name": "NC_AUCTION_NOTIFY_SELL_ITEM_CMD",
+   "struct": null
+  },
+  "0xb807": {
+   "name": "NC_AUCTION_SEARCH_REQ",
+   "struct": null
+  },
+  "0xb808": {
+   "name": "NC_AUCTION_DB_SEARCH_REQ",
+   "struct": null
+  },
+  "0xb809": {
+   "name": "NC_AUCTION_DB_SEARCH_ACK",
+   "struct": null
+  },
+  "0xb80a": {
+   "name": "NC_AUCTION_SEARCH_ACK",
+   "struct": null
+  },
+  "0xb80b": {
+   "name": "NC_AUCTION_BUY_REQ",
+   "struct": null
+  },
+  "0xb80c": {
+   "name": "NC_AUCTION_DB_BUY_REQ",
+   "struct": null
+  },
+  "0xb80d": {
+   "name": "NC_AUCTION_DB_BUY_ACK",
+   "struct": null
+  },
+  "0xb80e": {
+   "name": "NC_AUCTION_BUY_ACK",
+   "struct": null
+  },
+  "0xb80f": {
+   "name": "NC_AUCTION_MY_REGISTER_GOOD_LIST_REQ",
+   "struct": null
+  },
+  "0xb810": {
+   "name": "NC_AUCTION_DB_MY_REGISTER_GOOD_LIST_REQ",
+   "struct": null
+  },
+  "0xb811": {
+   "name": "NC_AUCTION_DB_MY_REGISTER_GOOD_LIST_ACK",
+   "struct": null
+  },
+  "0xb812": {
+   "name": "NC_AUCTION_MY_REGISTER_GOOD_LIST_ACK",
+   "struct": null
+  },
+  "0xb813": {
+   "name": "NC_AUCTION_REGISTER_GOOD_REQ",
+   "struct": null
+  },
+  "0xb814": {
+   "name": "NC_AUCTION_DB_REGISTER_GOOD_REQ",
+   "struct": null
+  },
+  "0xb815": {
+   "name": "NC_AUCTION_DB_REGISTER_GOOD_ACK",
+   "struct": null
+  },
+  "0xb816": {
+   "name": "NC_AUCTION_REGISTER_GOOD_ACK",
+   "struct": null
+  },
+  "0xb817": {
+   "name": "NC_AUCTION_REGISTER_CANCEL_GOOD_REQ",
+   "struct": null
+  },
+  "0xb818": {
+   "name": "NC_AUCTION_DB_REGISTER_CANCEL_GOOD_REQ",
+   "struct": null
+  },
+  "0xb819": {
+   "name": "NC_AUCTION_DB_REGISTER_CANCEL_GOOD_ACK",
+   "struct": null
+  },
+  "0xb81a": {
+   "name": "NC_AUCTION_REGISTER_CANCEL_GOOD_ACK",
+   "struct": null
+  },
+  "0xb81b": {
+   "name": "NC_AUCTION_MY_STORAGE_BOX_REQ",
+   "struct": null
+  },
+  "0xb81c": {
+   "name": "NC_AUCTION_DB_MY_STORAGE_BOX_REQ",
+   "struct": null
+  },
+  "0xb81d": {
+   "name": "NC_AUCTION_DB_MY_STORAGE_BOX_ACK",
+   "struct": null
+  },
+  "0xb81e": {
+   "name": "NC_AUCTION_MY_STORAGE_BOX_ACK",
+   "struct": null
+  },
+  "0xb81f": {
+   "name": "NC_AUCTION_MY_STORAGE_ITEM_DETAIL_INFO_REQ",
+   "struct": null
+  },
+  "0xb820": {
+   "name": "NC_AUCTION_DB_MY_STORAGE_ITEM_DETAIL_INFO_REQ",
+   "struct": null
+  },
+  "0xb821": {
+   "name": "NC_AUCTION_DB_MY_STORAGE_ITEM_DETAIL_INFO_SUC_ACK",
+   "struct": null
+  },
+  "0xb822": {
+   "name": "NC_AUCTION_DB_MY_STORAGE_ITEM_DETAIL_INFO_FAIL_ACK",
+   "struct": null
+  },
+  "0xb823": {
+   "name": "NC_AUCTION_MY_STORAGE_ITEM_DETAIL_INFO_SUC_ACK",
+   "struct": null
+  },
+  "0xb824": {
+   "name": "NC_AUCTION_MY_STORAGE_ITEM_DETAIL_INFO_FAIL_ACK",
+   "struct": null
+  },
+  "0xb825": {
+   "name": "NC_AUCTION_STORAGE_BOX_WITHDRAW_REQ",
+   "struct": null
+  },
+  "0xb826": {
+   "name": "NC_AUCTION_DB_STORAGE_BOX_WITHDRAW_REQ",
+   "struct": null
+  },
+  "0xb827": {
+   "name": "NC_AUCTION_DB_STORAGE_BOX_WITHDRAW_ACK",
+   "struct": null
+  },
+  "0xb828": {
+   "name": "NC_AUCTION_STORAGE_BOX_WITHDRAW_ACK",
+   "struct": null
+  },
   "0xbc01": {
    "name": "NC_GAMBLE_ZONE_PREVMAPNAME_CMD",
    "struct": "PROTO_NC_GAMBLE_ZONE_PREVMAPNAME_CMD",
@@ -78095,6 +79273,18 @@
    "size": 21,
    "fields": [
     [
+     0,
+     "u8",
+     "nResult",
+     ""
+    ],
+    [
+     1,
+     "u32",
+     "nGuildNo",
+     ""
+    ],
+    [
      5,
      "char[16]",
      "sGuildName",
@@ -79010,6 +80200,30 @@
    "size": 42,
    "fields": [
     [
+     0,
+     "char[20]",
+     "PromiseCharID",
+     "Name5"
+    ],
+    [
+     20,
+     "u32",
+     "LogonInfo.login|year|month|day|hour",
+     "bits login:1@0, year:11@1, month:4@12, day:5@16, hour:5@21"
+    ],
+    [
+     24,
+     "u8",
+     "Level",
+     ""
+    ],
+    [
+     25,
+     "u8",
+     "Flags",
+     ""
+    ],
+    [
      26,
      "u32",
      "PromiseCharNo",
@@ -79171,6 +80385,180 @@
   "PROTO_KQ_INFO": {
    "size": 377,
    "fields": [
+    [
+     0,
+     "u32",
+     "Handle",
+     ""
+    ],
+    [
+     4,
+     "u8",
+     "Status",
+     ""
+    ],
+    [
+     5,
+     "u16",
+     "NumOfJoiner",
+     ""
+    ],
+    [
+     7,
+     "u16",
+     "ID",
+     ""
+    ],
+    [
+     9,
+     "char[64]",
+     "Title",
+     ""
+    ],
+    [
+     73,
+     "u16",
+     "LimitTime",
+     ""
+    ],
+    [
+     75,
+     "i32",
+     "StartTime",
+     ""
+    ],
+    [
+     79,
+     "i32",
+     "tm_StartTime.tm_sec",
+     ""
+    ],
+    [
+     83,
+     "i32",
+     "tm_StartTime.tm_min",
+     ""
+    ],
+    [
+     87,
+     "i32",
+     "tm_StartTime.tm_hour",
+     ""
+    ],
+    [
+     91,
+     "i32",
+     "tm_StartTime.tm_mday",
+     ""
+    ],
+    [
+     95,
+     "i32",
+     "tm_StartTime.tm_mon",
+     ""
+    ],
+    [
+     99,
+     "i32",
+     "tm_StartTime.tm_year",
+     ""
+    ],
+    [
+     103,
+     "i32",
+     "tm_StartTime.tm_wday",
+     ""
+    ],
+    [
+     107,
+     "i32",
+     "tm_StartTime.tm_yday",
+     ""
+    ],
+    [
+     111,
+     "i32",
+     "tm_StartTime.tm_isdst",
+     ""
+    ],
+    [
+     115,
+     "u16",
+     "StartWaitTime",
+     ""
+    ],
+    [
+     117,
+     "u8",
+     "MinLevel",
+     ""
+    ],
+    [
+     118,
+     "u8",
+     "MaxLevel",
+     ""
+    ],
+    [
+     119,
+     "u16",
+     "MinPlayers",
+     ""
+    ],
+    [
+     121,
+     "u16",
+     "MaxPlayers",
+     ""
+    ],
+    [
+     123,
+     "u8",
+     "PlayerRepeatMode",
+     ""
+    ],
+    [
+     124,
+     "u16",
+     "PlayerRepeatCount",
+     ""
+    ],
+    [
+     126,
+     "u8",
+     "PlayerRevivalMode",
+     ""
+    ],
+    [
+     127,
+     "u8",
+     "PlayerRevivalCount",
+     ""
+    ],
+    [
+     128,
+     "u16",
+     "DemandQuest",
+     ""
+    ],
+    [
+     130,
+     "u16",
+     "DemandItem",
+     ""
+    ],
+    [
+     132,
+     "i64",
+     "DemandClass",
+     ""
+    ],
+    [
+     140,
+     "u8",
+     "DemandGender",
+     ""
+    ],
     [
      141,
      "u8",

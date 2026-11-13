@@ -296,3 +296,12 @@ re-data/ghidra/**/~journal.*
 ### Claude settings and worktrees ###
 .claude/worktrees
 .claude/settings.local.json
+
+# Third-party docs (work item S01), kept local: git clone --depth 1 https://github.com/FiestaHeroes/Documentation re-data/external/fiestaheroes
+re-data/external/
+
+# Ghidra projects built with a PDB (S01 *-pdb, C02 client2017): local only, rebuild per re-data/ghidra/README.md
+re-data/ghidra/*-pdb.gpr
+re-data/ghidra/*-pdb.rep/
+re-data/ghidra/client2017.gpr
+re-data/ghidra/client2017.rep/

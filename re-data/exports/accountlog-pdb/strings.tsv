@@ -1,0 +1,1126 @@
+0042e36c	System Time(UTC) 	00401200@ViewStartInfo,00401340@ViewStopInfo,
+0042e380	Msg	0040589d@DB_Init,004058d8@DB_Init,004050fb@IOCP_Process,0040593e@DB_Init,004020ad@WinMain,0040e8b2@Socket_Register_To_IOCP,0040e920@Socket_Register_To_IOCP,004040ad@fc_dummyfunction,004039a3@fc_NC_USER_US_IS_IP_BLOCK_REQ,004041dd@fc_NC_MISC_S2SCONNECTION_REQ,00404279@fc_NC_MISC_S2SCONNECTION_REQ,004042c5@fc_NC_MISC_S2SCONNECTION_REQ,00404353@fc_NC_MISC_S2SCONNECTION_REQ,00404395@fc_NC_MISC_S2SCONNECTION_REQ,0040448b@fc_NC_MISC_S2SCONNECTION_REQ,00404584@fc_NC_MISC_S2SCONNECTION_REQ,0040c950@GetNewActiveSession,0040e9cb@IOCP_Process,00401c02@ParseCmd,00401c6b@ParseCmd,004011ed@ViewStartInfo,0040120a@ViewStartInfo,00405a1a@SessionWorkThread,00405b8f@SessionWorkThread,00405b25@SessionWorkThread,00402a70@fc_NC_MISC_CHAR_LOGOFF_STATISTICS,004052e9@CheckHeartBeat,0040132d@ViewStopInfo,0040134a@ViewStopInfo,00403b58@fc_NC_DATA_REPORT_ADD_REQ,0040f364@Send,0040f4a5@Send,0040f61d@Send,0040f5d8@Send,0040f598@Send,0040c300@Listen,0040e325@SetSize,00402bc3@fc_NC_MISC_EVENT_L20_DB_REQ,00402cd7@fc_NC_MISC_EVENT_L20_DB_REQ,0040c359@Listen,004013b7@ReadDefineScriptor,00401425@ReadDefineScriptor,00401465@ReadDefineScriptor,004014c2@ReadDefineScriptor,004014ec@ReadDefineScriptor,0040d561@MinidumpCallStack,00403c72@fc_NC_USER_IS_IP_BLOCK_REQ,0040e418@ID,0040ec9b@Receive,0040ecff@Receive,00403d6d@fc_NC_USER_GER_IS_IP_BLOCK_REQ,0040b4cb@_DEBUGMSG,00401d46@Start_MainThread,0040b4ee@_DEBUGMSGVC,00404df8@Parser,0040edce@Shutdown,00401dec@Start,00401e0c@Start,00401e22@Start,00401e84@Start,00401557@Start_Acceptor,0040159e@Start_Acceptor,004015f8@Start_Acceptor,00401626@Start_Acceptor,00405638@ActiveSession,00405674@ActiveSession,004036aa@fc_NC_USER_LOGOUT_LAST_DAY_REQ,00403728@fc_NC_USER_LOGOUT_LAST_DAY_REQ,0040d656@TopLevelFilter,0040d696@TopLevelFilter,00404643@fc_NC_MISC_S2SCONNECTION_ACK,0040d7d7@TopLevelFilter,0040d81a@TopLevelFilter,0040d85d@TopLevelFilter,0040164f@MainThread,004016c8@MainThread,004016ee@MainThread,00401712@MainThread,00401736@MainThread,0040175a@MainThread,0040177a@MainThread,004017a8@MainThread,004017c7@MainThread,00402e7e@fc_NC_USER_TW_IS_IP_BLOCK_REQ,00414ee8@p_Set_Event_Long_Time_Play,00414f7e@p_Set_Event_Long_Time_Play,00414fb7@p_Set_Event_Long_Time_Play,0040bebd@AcceptThread,0040bf44@AcceptThread,00402fa1@fc_NC_USER_JP_IS_IP_BLOCK_REQ,0040eeff@Close,00405762@InactiveSession,0040203a@OnStart_Service,0040f0e8@WriteCallback,0040502d@PacketStroe,00413018@ViewDBError,0041306f@ViewDBError,00403fcf@CheckConnectionValidation,00402851@fc_NC_DATA_REPORT_CANCEL_REQ,
+0042e384	%s%s	00405939@DB_Init,0040399e@fc_NC_USER_US_IS_IP_BLOCK_REQ,004011e8@ViewStartInfo,00401205@ViewStartInfo,00409a43@IncludeFile,00401328@ViewStopInfo,00401345@ViewStopInfo,00402cd2@fc_NC_MISC_EVENT_L20_DB_REQ,004013b2@ReadDefineScriptor,004014e7@ReadDefineScriptor,00403c6d@fc_NC_USER_IS_IP_BLOCK_REQ,00403d68@fc_NC_USER_GER_IS_IP_BLOCK_REQ,00401d41@Start_MainThread,00401599@Start_Acceptor,00401621@Start_Acceptor,00402e79@fc_NC_USER_TW_IS_IP_BLOCK_REQ,00402f9c@fc_NC_USER_JP_IS_IP_BLOCK_REQ,
+0042e38c	Local  Time      	004011e3@ViewStartInfo,00401323@ViewStopInfo,
+0042e3a0	%s %s	0040116c@ViewStartInfo,004011d1@ViewStartInfo,0040b28a@GetCurrentTimeString2,004012ac@ViewStopInfo,00401311@ViewStopInfo,
+0042e3a8	*FAILED SCRIPTOR READ* 	004014e2@ReadDefineScriptor,
+0042e3c0	*FAILED GetMyServerInfo*	004014b8@ReadDefineScriptor,
+0042e3e0	FATAL ERROR - Can't found ServerInfo on funcition 'DataServer::ReadDefineScriptor()', need check scriptor data.	0040145b@ReadDefineScriptor,
+0042e450	%s	00405898@DB_Init,004058d3@DB_Init,004050f6@IOCP_Process,004020a8@WinMain,0040e8ad@Socket_Register_To_IOCP,0040e91b@Socket_Register_To_IOCP,004040a8@fc_dummyfunction,004041d8@fc_NC_MISC_S2SCONNECTION_REQ,00404274@fc_NC_MISC_S2SCONNECTION_REQ,004042c0@fc_NC_MISC_S2SCONNECTION_REQ,0040434e@fc_NC_MISC_S2SCONNECTION_REQ,00404390@fc_NC_MISC_S2SCONNECTION_REQ,00404486@fc_NC_MISC_S2SCONNECTION_REQ,0040457f@fc_NC_MISC_S2SCONNECTION_REQ,0040c94b@GetNewActiveSession,0040e9c6@IOCP_Process,00401bfd@ParseCmd,00401c66@ParseCmd,00405a15@SessionWorkThread,00405b8a@SessionWorkThread,00405b20@SessionWorkThread,00402a6b@fc_NC_MISC_CHAR_LOGOFF_STATISTICS,004052e4@CheckHeartBeat,00403b53@fc_NC_DATA_REPORT_ADD_REQ,0040f35f@Send,0040f4a0@Send,0040f618@Send,0040f5d3@Send,0040f593@Send,0040c2fb@Listen,0040e320@SetSize,0040abf8@ls_LogSystemProcess,00402bbe@fc_NC_MISC_EVENT_L20_DB_REQ,0040c354@Listen,00401420@ReadDefineScriptor,00401460@ReadDefineScriptor,004014bd@ReadDefineScriptor,0040d55c@MinidumpCallStack,0040e413@ID,0040ec96@Receive,0040ecfa@Receive,00410541@GetFaultReason,00404df3@Parser,0040edc9@Shutdown,00401de7@Start,00401e07@Start,00401e1d@Start,00401e7f@Start,00401552@Start_Acceptor,004015f3@Start_Acceptor,00405633@ActiveSession,0040566f@ActiveSession,004036a5@fc_NC_USER_LOGOUT_LAST_DAY_REQ,00403723@fc_NC_USER_LOGOUT_LAST_DAY_REQ,0040d651@TopLevelFilter,0040d691@TopLevelFilter,0040463e@fc_NC_MISC_S2SCONNECTION_ACK,0040d7d2@TopLevelFilter,0040d815@TopLevelFilter,0040d858@TopLevelFilter,0040164a@MainThread,004016c3@MainThread,004016e9@MainThread,0040170d@MainThread,00401731@MainThread,00401755@MainThread,00401775@MainThread,004017a3@MainThread,004017c2@MainThread,00414ee3@p_Set_Event_Long_Time_Play,00414f79@p_Set_Event_Long_Time_Play,00414fb2@p_Set_Event_Long_Time_Play,0040beb8@AcceptThread,0040bf3f@AcceptThread,0040eefa@Close,0040575d@InactiveSession,00402035@OnStart_Service,0040f0e3@WriteCallback,00405028@PacketStroe,00413013@ViewDBError,0041306a@ViewDBError,00403fca@CheckConnectionValidation,0040284c@fc_NC_DATA_REPORT_CANCEL_REQ,
+0042e454	<I AM THE %s, %s, WorldNo=%d, ZoneNo=%d>	0040140e@ReadDefineScriptor,
+0042e480	<SUCCESSED SCRIPTOR READ> 	004013ad@ReadDefineScriptor,
+0042e49c	DataServerInfo_AccountLog.txt	00401394@ReadDefineScriptor,004013a0@ReadDefineScriptor,
+0042e4bc	*FAILED GLOBAL GAME DATA READ - MapInfo.shn	00401e7a@Start,
+0042e4e8	../9Data/Shine/MapInfo.shn	00401e67@Start,
+0042e504	../../9Data/Shine/MapInfo.shn	00401e54@Start,
+0042e524	<NUMBER OF %d IOCP WORKTHREAD STARTED, %d CPU DETECTED>	00401fe2@OnStart_Service,
+0042e55c	*FAILED SESSION MANAGER INIT* 	0040161c@Start_Acceptor,
+0042e57c	*FAILED START LISTEN SOCKET* 	004015ee@Start_Acceptor,
+0042e59c	<SUCCESSED SESSION MANAGER INIT> 	00401594@Start_Acceptor,
+0042e5c0	FATAL ERROR - Can't found ServerInfo on funcition 'DataServer::Start_Acceptor()', need check scriptor data.	0040154d@Start_Acceptor,
+0042e62c	*FAILED STOP LISTEN SOCKET* 	004016be@MainThread,
+0042e64c	<SUCCESSED STOP LISTEN SOCKET>	004016b7@MainThread,
+0042e66c	<SERVER SELF STOPPED>	004017bd@MainThread,
+0042e684	<SERVER MANUAL STOPPED>	0040179e@MainThread,
+0042e69c	<MAIN THREAD STOP>	00401770@MainThread,
+0042e6b0	<SESSION CLOSED>	00401750@MainThread,
+0042e6c4	<IOCP CLOSED>	0040172c@MainThread,
+0042e6d4	<SESSION DISCONNECTED>	00401708@MainThread,
+0042e6ec	<SESSION WORKER ALL STOPPED>	004016e4@MainThread,
+0042e70c	<MAIN THREAD START>	00401645@MainThread,
+0042e720	Service unknown command.	00401bd8@ParseCmd,
+0042e73c	Service remove failed.	00401bce@ParseCmd,
+0042e754	Service remove ok.	00401bc4@ParseCmd,
+0042e768	Service upload failed.	00401bba@ParseCmd,
+0042e780	Service upload only ok.	00401bb0@ParseCmd,
+0042e798	Service start(no parameter)	00401ba6@ParseCmd,00401c61@ParseCmd,
+0042e7bc	REMOVE	004019a5@ParseCmd,
+0042e7c4	UPLOAD	00401993@ParseCmd,
+0042e7cc	*FAILED CREATE MAIN THREAD* 	00401d3c@Start_MainThread,
+0042e7ec	Launching the server.....	00401e18@Start,
+0042e808	-------------------------------------------------------	00401e02@Start,
+0042e840	-	00436200@?,00401df8@Start,
+0042e848	SERVER WORK START ---------------------------------------------------	00402030@OnStart_Service,
+0042e890	C:/data/gamigo-dwh/current/	00401f83@OnStart_Service,
+0042e8ac	_fiesta_Accountlog.log	00401f6a@OnStart_Service,
+0042e8c4	< END OF MAIN = %d >	00402096@WinMain,
+0042e8dc	%d.%d.%d.%d	00402537@fc_NC_LOG_USER_LOGINFAIL,004025fa@fc_NC_LOG_USER_LOGIN,
+0042e8e8	fc_NC_DATA_REPORT_CANCEL_REQ	00402847@fc_NC_DATA_REPORT_CANCEL_REQ,
+0042e908	ERROR - fc_NC_MISC_CHAR_LOGOFF_STATISTICS, WorldNo=%d, UserNo=%d, CharNo=%d, CharClass=%d, CharLevel=%d, CharGetExp=%I64d, CharPlayMin=%d	00402a59@fc_NC_MISC_CHAR_LOGOFF_STATISTICS,
+0042e994	ERR_EVENT_L20_DB_SET_ERR - �������� ����	00402cbf@fc_NC_MISC_EVENT_L20_DB_REQ,
+0042e9c0	ERR_EVENT_L20_DB_SET_ERR - ��������	00402ca5@fc_NC_MISC_EVENT_L20_DB_REQ,
+0042e9e8	ERROR - fc_NC_MISC_EVENT_L20_DB_REQ, SetEventL20,%d, UserID=%s(%d), CharNo=%d, WorldNo=%d, nRet=%d	00402c7c@fc_NC_MISC_EVENT_L20_DB_REQ,
+0042ea50	ERROR - fc_NC_MISC_EVENT_L20_DB_REQ, GetEventL20,%d, UserID=%s(%d), CharNo=%d, WorldNo=%d	00402ba5@fc_NC_MISC_EVENT_L20_DB_REQ,
+0042eaac	FAILED - IPBLOCK Chack, IP=	00403999@fc_NC_USER_US_IS_IP_BLOCK_REQ,00403c68@fc_NC_USER_IS_IP_BLOCK_REQ,00403d63@fc_NC_USER_GER_IS_IP_BLOCK_REQ,00402e74@fc_NC_USER_TW_IS_IP_BLOCK_REQ,00402f97@fc_NC_USER_JP_IS_IP_BLOCK_REQ,
+0042eac8	%s %s %s %s %s - %s	004032db@SaveSysLog,
+0042eadc	ACCOUNTLOG	00403285@SaveSysLog,
+0042eae8	%d-%02d-%02dT%02d:%02d:%02d.%03dZ	0040327a@SaveSysLog,
+0042eb0c	%s %d %02d:%02d:%02d	0040320f@SaveSysLog,
+0042eb28	ACCOUNT_LOGIN_SUCCESS [fiesta@onson account-id="%d" ipv4="%s" client-version="%s"]	00403396@fc_NC_SYSLOG_ACCOUNT_LOGIN_SUCCESS,
+0042eb80	ACCOUNT_LOGIN_FAILURE [fiesta@onson login-name="%s" ipv4="%s" client-version="%s"]	00403498@fc_NC_SYSLOG_ACCOUNT_LOGIN_FAILURE,
+0042ebd8	ACCOUNT_LOGOUT [fiesta@onson account-id="%d" in-game-minutes="%d"]	00403524@fc_NC_SYSLOG_ACCOUNT_LOGOUT,
+0042ec1c	SERVER_CCU [fiesta@onson number="%d" world-name="%d"]	004035a5@fc_NC_SYSLOG_SERVER_CCU,
+0042ec58	Error - CPFsAccountLog::fc_NC_USER_LOGOUT_LAST_DAY_REQ : UserNo %d	00403711@fc_NC_USER_LOGOUT_LAST_DAY_REQ,
+0042eca0	ERROR - CPFsAccountLog::fc_NC_USER_LOGOUT_LAST_DAY_REQ usp_AccountLog_GetDateDiffLastlogout nUserNo = %d	00403693@fc_NC_USER_LOGOUT_LAST_DAY_REQ,
+0042ed14	PROTOCOLFUNCTIONTEMPLETE<T>::pft_Store	0040384a@pft_Store,
+0042ed40	PROTOCOLFUNCTIONTEMPLETE<T>::pft_Store : Duplicate protocol set	0040383b@pft_Store,
+0042ed80	fc_NC_DATA_REPORT_ADD_REQ	00403b4e@fc_NC_DATA_REPORT_ADD_REQ,
+0042eda8	ERROR - ���� ������ �������� ���� ����, ���� ������ ����, dep=%d, cmd=%d	00403fb8@CheckConnectionValidation,
+0042edf8	fc_dummyfunction, Protocol = 0x%04x, dep=%d, cmd=%d, length=%d From (%-25s world=%3d zone=%3d, %- 5d=%15s:%- 5d)	00404096@fc_dummyfunction,
+0042ee70	Connected from %p (%-25s world=%3d zone=%3d, %- 5d=%15s:%- 5d) (% 3d/% 3d��)	0040456d@fc_NC_MISC_S2SCONNECTION_REQ,
+0042eec0	CProtocol_Functions::fc_NC_MISC_S2SCONNECTION_REQ - �������� ������ ����, ���� ������ ���� - %s 	00404474@fc_NC_MISC_S2SCONNECTION_REQ,
+0042ef28	NC_MISC_S2SCONNECTION_REQ <server_id_from=%d, server_id_to=%d, key=%d, my_type=%d>	0040437b@fc_NC_MISC_S2SCONNECTION_REQ,
+0042ef80	���������� ������ ������ ������ ����, ���� ������ ���� - %s (������������)	0040433c@fc_NC_MISC_S2SCONNECTION_REQ,
+0042efd0	NC_MISC_S2SCONNECTION_REQ <server_from id=%d w=%d z=%d, server_id_to=%d, key=%d, my_type=%d>	004042ab@fc_NC_MISC_S2SCONNECTION_REQ,
+0042f030	���������� ������ ������ ���� ������ ���� ����, ���� ������ ���� - %s (������������)	00404262@fc_NC_MISC_S2SCONNECTION_REQ,
+0042f088	�������� ���� ��������, �� ���������� �� ����, ���� ������ ���� - %s	004041c6@fc_NC_MISC_S2SCONNECTION_REQ,
+0042f0d0	IP=%s:%d, SOCKET=%d	004041ae@fc_NC_MISC_S2SCONNECTION_REQ,0040424a@fc_NC_MISC_S2SCONNECTION_REQ,00404324@fc_NC_MISC_S2SCONNECTION_REQ,0040445c@fc_NC_MISC_S2SCONNECTION_REQ,
+0042f0e8	Connected to   %p (%-25s world=%3d zone=%3d, %- 5d=%15s:%- 5d) (% 3d/% 3d��)	0040462c@fc_NC_MISC_S2SCONNECTION_ACK,
+0042f140	���� ���� ���� From (%25s world=%3d zone=%3d, %5d=%15s:%5d) (DEP=%d,CMD=%d,LEN=%d,WORK=%d) at	00404de1@Parser,00405016@PacketStroe,
+0042f1b0	ERROR - Socket buffer full, some protocol too large then socket buffer size.	004050f1@IOCP_Process,0040e9c1@IOCP_Process,
+0042f218	ERROR - HEARTBEAT OVERTIME, NOW DISSCONNECT WITH %s	004052d2@CheckHeartBeat,
+0042f268	* NC_MISC_S2SCONNECTION_RDY - SEND ERROR *	0040566a@ActiveSession,
+0042f294	* ACCEPT SOCKET IOCP REGISTER - ERROR *	0040562e@ActiveSession,
+0042f2c0	Closed    from %p (%-25s world=%3d zone=%3d, %- 5d=%15s:%- 5d) (% 3d/% 3d��) (DEP=%d,CMD=%d,LEN=%d,WORK=%d)	0040574b@InactiveSession,
+0042f344	DB_Init FAILED = 	00405934@DB_Init,
+0042f358	DB_Init FAILED, Scriptor DB_ID_STATICSTICS ODBC info. not found.	004058ce@DB_Init,
+0042f39c	DB_Init FAILED, Scriptor BASE ODBC info. not found.	00405893@DB_Init,
+0042f3d0	<SESSION WORKER #%d FREE>	00405b78@SessionWorkThread,
+0042f3f0	*Work failed   (%-25s world=%3d zone=%3d, %- 5d=%15s:%- 5d) (DEP=%d,CMD=%d,LEN=%d,WORK=%d, WorkerID=%d)	00405b0e@SessionWorkThread,
+0042f458	<SESSION WORKER #%d INIT DB FAILED - STOP ******>	004059f9@SessionWorkThread,
+0042f4a4	<NUMBER OF %d SESSION WORKER STARTED>	00406428@Start,
+0042f4d8	string too long	004068d2@assign,004069e0@assign,0040b555@append,0040b570@append,
+0042f4e8	invalid string position	00406895@assign,0040b534@append,00406641@erase,
+0042f500	%d	00411884@iac_itemcreate,004118a5@iac_itemcreate,00411986@iac_itemcreate,00411a10@iac_itemcreate,00411ce3@iac_itemcreate,00411568@iac_itemcreate,00411528@iac_itemcreate,00411647@iac_itemcreate,004115a8@iac_itemcreate,004116cc@iac_itemcreate,004116f7@iac_itemcreate,00411718@iac_itemcreate,004117e4@iac_itemcreate,00411805@iac_itemcreate,
+0042f504	CLIENT	00443310@?,
+0042f50c	LAUNCHER	0044330c@?,
+0042f518	UNKNOWN	004432e8@?,00406ab4@GetShineServerIDShortName,
+0042f520	WEB	004432e4@?,
+0042f524	OPTOOL	004432e0@?,
+0042f52c	PATCH	004432dc@?,
+0042f534	ZONE	004432d8@?,
+0042f53c	WORLDMANAGER	004432d4@?,
+0042f54c	LOGIN	004432d0@?,
+0042f554	DB_GAMELOG	004432cc@?,
+0042f560	DB_CHARACTER	004432c8@?,
+0042f570	DB_ACCOUNTLOG	004432c4@?,
+0042f580	DB_ACCOUNT	004432c0@?,
+0042f58c	SERVER_ID_CLIENT	004432b8@?,
+0042f5a0	SERVER_ID_LAUNCHER	004432b4@?,
+0042f5b4	SERVER_ID_18	004432b0@?,00443308@?,
+0042f5c4	SERVER_ID_17	004432ac@?,00443304@?,
+0042f5d4	SERVER_ID_16	004432a8@?,00443300@?,
+0042f5e4	SERVER_ID_15	004432a4@?,004432fc@?,
+0042f5f4	SERVER_ID_14	004432a0@?,004432f8@?,
+0042f604	SERVER_ID_13	0044329c@?,004432f4@?,
+0042f614	SERVER_ID_12	00443298@?,004432f0@?,
+0042f624	SERVER_ID_11	00443294@?,004432ec@?,
+0042f634	SERVER_ID_UNKNOWN	00443290@?,00406a94@GetShineServerIDName,
+0042f648	SERVER_ID_WEB	0044328c@?,
+0042f658	SERVER_ID_OPTOOL	00443288@?,
+0042f66c	SERVER_ID_PATCH	00443284@?,
+0042f67c	SERVER_ID_ZONE	00443280@?,
+0042f68c	SERVER_ID_WORLDMANAGER	0044327c@?,
+0042f6a4	SERVER_ID_LOGIN	00443278@?,
+0042f6b4	SERVER_ID_DB_GAMELOG	00443274@?,
+0042f6cc	SERVER_ID_DB_CHARACTER	00443270@?,
+0042f6e4	SERVER_ID_DB_ACCOUNTLOG	0044326c@?,
+0042f6fc	SERVER_ID_DB_ACCOUNT	00443268@?,
+0042f720	"	00407153@GetTokenString,004071de@GetTokenString,
+0042f734	FORMAT DEFINNING, EOF Come.	00408a14@MakeFormat,
+0042f750	%s - FORMAT DEFINING, UNKNOWNED PARAMATER.	00408952@MakeFormat,
+0042f77c	DATA DEFINNING, EOF Come	00408ade@GetDataToken,
+0042f798	%x	00408c2e@MakeData,0042b6e2@Final,
+0042f79c	TOTAL Data %d Defined, %d Errors	00408fea@ReadScriptDone,
+0042f7c0	TOTAL Format %d Defined, %d Errors	00408fba@ReadScriptDone,
+0042f7e4	 	0040d3ec@MinidumpCallStack,0040d6d9@TopLevelFilter,00410257@EHInternalGetStackTraceString,00408ebb@ReadScriptDone,00408f9c@ReadScriptDone,00409006@ReadScriptDone,0040a080@ReadScript,
+0042f7e8	Include Data %d Defined, %d Errors	00408e9f@ReadScriptDone,
+0042f80c	Include Format %d Defined, %d Errors	00408e63@ReadScriptDone,
+0042f834	%s - WRITE DATA ERROR	00409f67@ProcCmd,
+0042f84c	%s - WRITE DATA OK	00409f51@ProcCmd,
+0042f860	%s - WRITE FORMAT ERROR	00409e5d@ProcCmd,
+0042f878	%s - WRITE FORMAT OK	00409e0e@ProcCmd,
+0042f890	%s - WRITE OK	00409d05@ProcCmd,
+0042f8a0	%s - WRITE ERROR	00409cec@ProcCmd,
+0042f8b4	%s - READ ERROR	00409c50@ProcCmd,
+0042f8c4	%s - READ OK	00409c16@ProcCmd,
+0042f8d4	INCLUDE OPEN ERROR(Code = %d) - %s 	0040a1c9@ReadScript,
+0042f8f8	FILE OPEN ERROR(Code = %d) - %s 	0040a1bb@ReadScript,
+0042f91c	%s - UNKNOWNED.	0040a13b@ReadScript,
+0042f92c	Include - %s 	0040a098@ReadScript,
+0042f940	---------------------------------------------------------------	0040a087@ReadScript,0040a0b4@ReadScript,0040a1a2@ReadScript,0040a1eb@ReadScript,
+0042f980	FILE PROCESSING - %s 	0040a058@ReadScript,
+0042f998	================================================================================	0040a047@ReadScript,0040a074@ReadScript,
+0042f9e9		004361c4@?,00436304@?,00420934@_wincmdln,00420966@_wincmdln,0042096d@_wincmdln,0040adfa@ls_LogSystemProcess,00409613@Clear,0040b342@_DebugMessageNew2,0042092f@_wincmdln,
+0042f9ec	#SEPRATOR	004433e8@?,
+0042f9f8	#REMARKLINE	004433ec@?,
+0042fa04	#REMARKSTART	004433f0@?,
+0042fa14	#REMARKEND	004433f4@?,
+0042fa20	#END	004433b4@?,
+0042fa28	#DEFINE	004433b8@?,
+0042fa30	#INCLUDE	004433bc@?,
+0042fa3c	#CLEAR	004433c0@?,
+0042fa44	#CLEARFORMAT	004433c4@?,
+0042fa54	#CLEARDATA	004433c8@?,
+0042fa60	#READ	004433cc@?,
+0042fa68	#WRITE	004433d0@?,
+0042fa70	#WRITEFORMAT	004433d4@?,
+0042fa80	#WRITEDATA	004433d8@?,
+0042fa8c	<ID>	00443368@?,
+0042fa94	[ID]	0044336c@?,
+0042fa9c	<INTEGER>	00443370@?,
+0042faa8	[INTEGER]	00443374@?,
+0042fab4	<HEX>	00443378@?,
+0042fabc	[HEX]	0044337c@?,
+0042fac4	<FLOAT>	00443380@?,
+0042facc	[FLOAT]	00443384@?,
+0042fad4	<STRING>	00443388@?,
+0042fae0	[STRING]	0044338c@?,
+0042faec	<FILENAME>	00443390@?,
+0042faf8	[FILENAME]	00443394@?,
+0042fb04	<SHORTKEY>	00443398@?,
+0042fb10	[SHORTKEY]	0044339c@?,
+0042fb1c	<ARRAYSRT>	004433a0@?,
+0042fb28	[ARRAYSRT]	004433a4@?,
+0042fb34	<ARRAYEND>	004433a8@?,
+0042fb40	[ARRAYEND]	004433ac@?,
+0042fb4c	#ENDDEFINE	004433b0@?,
+0042fb58	<IOCP WORKTHREAD #%d FREE>	0040a46f@WorkThread,
+0042fb74	<IOCP WORKTHREAD #%d RUNNING>	0040a3d9@WorkThread,
+0042fb94	a+	004149c5@p_AccountLog_TextLogWrite,0040ae5c@ls_LogSystemProcess,0040b401@_DebugMessageNew2,004136a6@SLS_AddLog,004136ce@SLS_AddLog,
+0042fb98	%s%s%s	0040ae51@ls_LogSystemProcess,
+0042fba0	%04d	0040ade3@ls_LogSystemProcess,
+0042fba8	%04d%02d	0040adc9@ls_LogSystemProcess,
+0042fbb4	%04d%02d%02d	0040e093@ac_DateTime,0040e1cb@ShineExit,0040ada4@ls_LogSystemProcess,
+0042fbc4	%04d%02d%02d%02d	0040ad77@ls_LogSystemProcess,
+0042fbd8	%04d%02d%02d%02d%02d	0040ad44@ls_LogSystemProcess,
+0042fbf0	%04d%02d%02d%02d%02d%02d	0040ad12@ls_LogSystemProcess,
+0042fc0c	%s\n	0040ac97@ls_LogSystemProcess,
+0042fc10	ErrorCode=%d	0040b0f0@GetLastErrorStr,
+0042fc20	ErrorCode=%d\r\n	0040b0e9@GetLastErrorStr,
+0042fc30	%s %s 	0040b1a5@GetCurrentTimeString,
+0042fc38	%02d:%02d:%02d	0040e0ac@ac_DateTime,0040b18c@GetCurrentTimeString,0041499c@p_AccountLog_TextLogWrite,0040b24c@GetCurrentTimeString2,0040e1e7@ShineExit,0040b3c1@_DebugMessageNew2,
+0042fc48	%04d-%02d-%02d	0040b163@GetCurrentTimeString,00414973@p_AccountLog_TextLogWrite,0040b223@GetCurrentTimeString2,0040b398@_DebugMessageNew2,0041358c@SLS_AddLog,
+0042fc58	tt hhmmss	0040b266@GetCurrentTimeString2,
+0042fc64	.\DebugMessage\%s_%s.txt	0040b3e0@_DebugMessageNew2,
+0042fc80	%06d %s%s\n	0040b314@_DebugMessageNew2,
+0042fc8c	w	0040d45e@MinidumpCallStack,0040b47f@_ExecUpdateInfoMsg,
+0042fc90	.\DebugMessage\ExecUpdateInfo.txt	0040b45e@_ExecUpdateInfoMsg,
+0042fcb4	false	00433138@?,
+0042fcbc	true	00433140@?,
+0042fcd0	BinaryDataBox<T>::bdb_ReadData	0040b9d5@bdb_ReadData,
+0042fcf0	Code:%X:%d\tSHN:%X:%d	0040b9b4@bdb_ReadData,
+0042fd08	BinaryDataBox<T>::bdb_ReadData : readfail	0040b97c@bdb_ReadData,
+0042fd34	MapDataBox::mdb_Load	0040bb73@mdb_Load,
+0042fd4c	MobDataBox::ReadData : memory leak for BTree	0040bb64@mdb_Load,
+0042fd84	rb	00429d7e@Read,0040bdf8@CheckReadData,0040e020@ItemDataBox,
+0042fd88	*Listen Socket Error!*	0040beb3@AcceptThread,
+0042fda0	*Accept_Process Error!*	0040bf3a@AcceptThread,
+0042fdb8	<SUCCSSED LISTEN AT IP=%s, Port=%d, BacklogCount=%d >	0040c2e9@Listen,
+0042fdf0	ERROR - FAILED TO GET LISTEN SOCKET IP ADDRESS	0040c34f@Listen,
+0042fe4c	* ACCEPT NO SESSION BUFFER - ERROR *	0040c946@GetNewActiveSession,
+0042fe88	EXCEPTION - Failed to Call Stack file '%s' (error %d)	0040d544@MinidumpCallStack,
+0042fec0	--------------------------------------------------------------------------\n	0040d4b8@MinidumpCallStack,
+0042ff0c	CallStack.txt	0040d439@MinidumpCallStack,
+0042ff1c	EXCEPTION - Failed to create dump file '%s' (error %d)	0040d846@TopLevelFilter,
+0042ff54	EXCEPTION - Failed to save dump file to '%s' (error %d)	0040d803@TopLevelFilter,
+0042ff8c	EXCEPTION - Saved dump file to '%s'	0040d7b6@TopLevelFilter,
+0042ffb8	EXCEPTION - DBGHELP.DLL TOO OLD	0040d68c@TopLevelFilter,
+0042ffd8	MiniDumpWriteDump	00443814@?,0040d67a@TopLevelFilter,
+0042ffec	EXCEPTION - DBGHELP.DLL NOT FOUND	0040d64c@TopLevelFilter,
+00430010	DBGHELP.DLL	00443810@?,0040d5fb@TopLevelFilter,0040d63f@TopLevelFilter,
+0043001c	ItemDataBox::operator [] :Invalid Item index	00411ad5@iac_itemcreate,00412504@iac_wptitle_Getlicencemob,
+00430090	../9Data/Shine/ItemInfo.shn	0040e025@ItemDataBox,0040e03b@ItemDataBox,0040e015@ItemDataBox,
+004300ac	Assert%s%02d.txt	0040e0bc@ac_DateTime,
+004300c0	%s : AssertClass::ac_AssertFail : %s[%s]\n	0040e115@ac_AssertFail,
+004300ec	a	0040e0f5@ac_AssertFail,0040e145@ac_AssertFail,0040e217@ShineExit,
+004300f0	%s : AssertClass::ac_AssertFail : %s[%d]\n	0040e165@ac_AssertFail,
+0043011c	%s : AssertClass::ac_AssertFail : %s\n	0040e233@ShineExit,
+00430144	ExitLog%s%02d.txt	0040e203@ShineExit,
+00430158	ERROR - CSendPacket::SetSize=%d, Current/Old Dep=%d, Cmd=%d	0040e30e@SetSize,
+00430198	FATAL - ERROR, CSendPacket::ID, Dep=%d, Cmd=%d, nDataSize=%d, pData=%p	0040e401@ID,
+004301f0	ERROR - Socket_Register_To_IOCP Step #2, Socket=%d, %s	0040e909@Socket_Register_To_IOCP,
+00430228	ERROR - Socket_Register_To_IOCP Step #1, Socket=%d, %s	0040e89b@Socket_Register_To_IOCP,
+00430290	CSocket_IOCP::Read, ERROR=%d, m_Socket=%d, pBuffer=%p, dwNumBytes:%d, ReadBytes:%d	0040ece8@Receive,
+004302e8	ERROR - CSocket_IOCP::Receive, m_Socket(%d), dwNumBytes(%d), IP(%d.%d.%d.%d)	0040ec84@Receive,
+00430338	ERROR - CSocket_IOCP::Shutdown : ret(%d), GetLastError(%d), WsaError(%d)	0040edb7@Shutdown,
+00430398	ERROR - CSocket_IOCP::Close : ret(%d), GetLastError(%d), WsaError(%d)	0040eee8@Close,
+004303e0	CSocket_IOCP::Write %#x(%#x) err=%d	0040f48e@Send,0040f4b9@Send,0040f0fc@WriteCallback,
+00430404	Send IOBuffer Full::dwSize=%d, BUFFER_SIZE=%d	0040f606@Send,
+00430434	CSocket_IOCP::Write, INVALID m_Socket=%d	0040f5c1@Send,
+00430460	CSocket_IOCP::Write dwSize=%d	0040f581@Send,
+00430480	CSocket_IOCP::WriteCallback %#x(%#x) err=%d	0040f0d1@WriteCallback,
+004304b0	MISSMATCH - WriteCallback, dwTransferred=%d, FirstBFSize=%d, IP=%s:%d, SOCKET=%d, m_nPendingWrite=%d	0040f017@WriteCallback,
+00430518	m_pFirstBuf = NULL - WriteCallback, IP=%s:%d, SOCKET=%d, dwTransferred=%d, m_nPendingWrite=%d	0040efbf@WriteCallback,
+00430578	WARNING - CSocket_IOCP::Send, OVERMAX SIZE,TYPE_1, PacketSize=%d, Netcmd=%d,%d	0040f34d@Send,
+004305c8	WARNING - CSocket_IOCP::Send, OVERMAX SIZE,TYPE_0, PacketSize=%d, Netcmd=%d,%d	0040f31d@Send,
+0043065c	Microsoft C++ Exception	0040fe5d@EHConvertSimpleException,
+00430674	EXCEPTION_INVALID_HANDLE	0040fe56@EHConvertSimpleException,
+00430690	EXCEPTION_INVALID_DISPOSITION	0040fe4f@EHConvertSimpleException,
+004306b0	EXCEPTION_STACK_OVERFLOW	0040fe48@EHConvertSimpleException,
+004306cc	EXCEPTION_NONCONTINUABLE_EXCEPTION	0040fe41@EHConvertSimpleException,
+004306f0	EXCEPTION_ILLEGAL_INSTRUCTION	0040fe3a@EHConvertSimpleException,
+00430710	EXCEPTION_IN_PAGE_ERROR	0040fe33@EHConvertSimpleException,
+00430728	EXCEPTION_PRIV_INSTRUCTION	0040fe2c@EHConvertSimpleException,
+00430744	EXCEPTION_INT_OVERFLOW	0040fe25@EHConvertSimpleException,
+0043075c	EXCEPTION_INT_DIVIDE_BY_ZERO	0040fe1e@EHConvertSimpleException,
+0043077c	EXCEPTION_FLT_UNDERFLOW	0040fe17@EHConvertSimpleException,
+00430794	EXCEPTION_FLT_STACK_CHECK	0040fe10@EHConvertSimpleException,
+004307b0	EXCEPTION_FLT_OVERFLOW	0040fe09@EHConvertSimpleException,
+004307c8	EXCEPTION_FLT_INVALID_OPERATION	0040fe02@EHConvertSimpleException,
+004307e8	EXCEPTION_FLT_INEXACT_RESULT	0040fdfb@EHConvertSimpleException,
+00430808	EXCEPTION_FLT_DIVIDE_BY_ZERO	0040fdf4@EHConvertSimpleException,
+00430828	EXCEPTION_FLT_DENORMAL_OPERAND	0040fded@EHConvertSimpleException,
+00430848	EXCEPTION_ARRAY_BOUNDS_EXCEEDED	0040fde6@EHConvertSimpleException,
+00430868	EXCEPTION_ACCESS_VIOLATION	0040fdb0@EHConvertSimpleException,
+00430884	EXCEPTION_GUARD_PAGE	0040fda9@EHConvertSimpleException,
+0043089c	EXCEPTION_SINGLE_STEP	0040fda2@EHConvertSimpleException,
+004308b4	EXCEPTION_BREAKPOINT	0040fd9b@EHConvertSimpleException,
+004308cc	EXCEPTION_DATATYPE_MISALIGNMENT	0040fd94@EHConvertSimpleException,
+004308ec	 %s, line %04d	004103db@EHInternalGetStackTraceString,0041082b@GetFaultReason,
+004308fc	 %s, line %04d+%04d byte(s)	004103bd@EHInternalGetStackTraceString,0041080d@GetFaultReason,
+00430918	,	00436228@?,00410359@EHInternalGetStackTraceString,004106c8@GetFaultReason,004107ad@GetFaultReason,
+0043091c	 %s 	004102d5@EHInternalGetStackTraceString,00410746@GetFaultReason,
+00430924	 %s()+%04d byte(s)	004102bd@EHInternalGetStackTraceString,0041072e@GetFaultReason,
+00430938	, 	0041016a@EHInternalGetStackTraceString,004101ce@EHInternalGetStackTraceString,
+0043093c	 (0x%08X 0x%08X 0x%08X 0x%08X)	00410149@EHInternalGetStackTraceString,
+0043095c	%04X:%08X	004100ef@EHInternalGetStackTraceString,
+00430968	 at: < %04X:%08X >	00410653@GetFaultReason,
+0043097c	<UNKNOWN>	004105d7@GetFaultReason,
+00430988	\nIn module: 	0041059e@GetFaultReason,
+00430998	 >	0041058b@GetFaultReason,
+0043099c	NTDLL.DLL	0041056f@GetFaultReason,
+004309a8	< 	0041051d@GetFaultReason,
+004309ac	 caused an: 	004104ee@GetFaultReason,
+004309bc	Bad parameter to GetFaultReason\n	00410464@GetFaultReason,
+004309e0	GetFirstStackTraceString - invalid pExPtrs!\n	00410885@GetFirstStackTraceString,
+004328f0	%d/%d	004114bb@iac_Setoption,
+00432904	-n1	0041196e@iac_itemcreate,
+00432908	-o	00411ddf@iac_itemcreate,00411e21@iac_itemcreate,00411ed1@iac_itemcreate,00411f8f@iac_itemcreate,
+004329ec	ERROR - %s, SQLError = %d = SQL_ERROR	00413058@ViewDBError,
+00432a14	ERROR - %s, SQLError = %d = unknown return value	0041303c@ViewDBError,
+00432a48	ERROR - %s, state = %s error_num = %d error_str = %s	00413001@ViewDBError,
+00432a88	IOBufferContainer::IOBufferContainer	00413322@IOBufferContainer,
+00432ab0	ShineLog	00413507@SLS_SetLogName,
+00432abc	%s\%s_%04d-%02d-%02d %02d.txt	0041363f@SLS_AddLog,
+00432adc	%s\%s_%04d-%02d-%02d.txt	00413600@SLS_AddLog,
+00432af8	.\Log	004135f5@SLS_AddLog,004136be@SLS_AddLog,00413634@SLS_AddLog,
+00432b00	%02d:%02d:%02d:%03d	004135bd@SLS_AddLog,
+00432b14	%06d %s %s\t%s\n	00413752@SLS_AddLog,
+00432b24	Socket_IOCP_Write	0042d130@`dynamic_initializer_for_'gSocket_IOCP_Write'',
+00432b38	ZoneLinktoError	0042d190@`dynamic_initializer_for_'gZoneLinktoErrorLog'',
+00432b60	ItemOptionsData::OptionCardStack::ocs_selectnumber : Too large value	004139c0@ocs_selectnumber,
+00432ba8	ItemOptionsData::OptionCardStack::ocs_selectnumber : Error in random select	00413952@ocs_selectnumber,
+00432c24	ItemOptionsData::OptionCardStack::ocs_make : Invalid Option	00413ca7@ocs_make,
+00432c60	ItemOptionsData::OptionCardStack::ocs_make : Option not found	00413c89@ocs_make,
+00432ca0	ItemOptionsData::OptionCardStack::ocs_make : Error in selecting	00413c6b@ocs_make,
+00432ce0	ItemOptionsData::OptionCardStack::ocs_make : Error in card recycle	00413bc5@ocs_make,
+00432d6c	%s %s> %s	004149fc@p_AccountLog_TextLogWrite,
+00432d78	AccountLog_%s.txt	004149b4@p_AccountLog_TextLogWrite,
+00432d8c	 %d, %d, %d, %d, %d, %s, %s, %s, %I64d \n	00414ba4@p_AccountLog_Add,
+00432db8	{CALL p_AccountLog_Add(?,?,?,?,?,?,?,?,?)}	00414b58@p_AccountLog_Add,
+00432de4	{CALL usp_Log_setLogout(?,?,?,?,?,?,?,?)}	00414cce@usp_Log_setLogout,
+00432e10	{CALL p_IPBlock_IsBlock(?,?,?)}	00414d64@p_IPBlock_IsBlock,00414df4@p_IPBlock_IsBlock_US,
+00432e30	CSQLPAccountLog::p_IPBlock_IsBlock_US	00414e0e@p_IPBlock_IsBlock_US,
+00432e58	ERROR - CSQLPAccountLog::p_Set_Event_Long_Time_Play, SQLError = %d = SQL_ERROR	00414fe2@p_Set_Event_Long_Time_Play,
+00432ea8	ERROR - CSQLPAccountLog::p_Set_Event_Long_Time_Play, SQLError = %d = unknown return value	00414fa0@p_Set_Event_Long_Time_Play,
+00432f08	ERROR - CSQLPAccountLog::p_Set_Event_Long_Time_Play, state = %s error_num = %d error_str = %s	00414f67@p_Set_Event_Long_Time_Play,
+00432f68	ERROR - CSQLPAccountLog::p_Set_Event_Long_Time_Play, ret(%d), nRet(%d)	00414ed1@p_Set_Event_Long_Time_Play,
+00432fb0	{CALL usp_EventiPad_setTicket(?,?,?)}	00414ea6@p_Set_Event_Long_Time_Play,
+00432fd8	{CALL usp_AccountLog_GetDateDiffLastlogout(?,?)}	0041506b@usp_AccountLog_GetDateDiffLastlogout,
+00433014	{CALL p_Report_Add(?,?,?,?,?,?,?,?)}	004151b9@p_Report_Add,
+0043303c	{CALL p_Report_Del(?,?)}	0041523b@p_Report_Del,
+00433058	{CALL p_Report_Get(?,?)}	004152be@p_Report_Get,
+00433074	{CALL p_Event_L20_Get(?,?,?,?,?,?)}	0041541a@p_Event_L20_Get,
+00433098	{CALL p_Event_L20_Set(?,?,?,?,?,?)}	0041550a@p_Event_L20_Set,
+004330bc	{CALL p_SameTimeChar_Add(?,?,?)}	004155ab@p_SameTimeChar_Add,
+004330e0	CSQLPStatistics::p_SameTimeCharClass_Add	00415659@p_SameTimeCharClass_Add,
+0043310c	{CALL p_SameTimeCharClass_Add(?,?,?,?)}	0041563f@p_SameTimeCharClass_Add,
+0043314c	x-token	00433d74@?,
+00433154	ietf-token	00433d6c@?,
+00433160	base64	00433d64@?,
+00433168	quoted-printable	00433d5c@?,
+0043317c	binary	00433d54@?,
+00433184	8bit	00433d4c@?,
+0043318c	7bit	00433d44@?,
+00433194	HTTP Version not supported	00433d34@?,
+004331b0	Gateway Time-out	00433d2c@?,
+004331c4	Service Unavailable	00433d24@?,
+004331d8	Bad Gateway	00433d1c@?,
+004331e4	Not Implemented	00433d14@?,
+004331f4	Internal Server Error	00433d0c@?,
+0043320c	Expectation Failed	00433d04@?,
+00433220	Requested range not satisfiable	00433cfc@?,
+00433240	Unsupported Media Type	00433cf4@?,
+00433258	Request-URI Too Large	00433cec@?,
+00433270	Request Entity Too Large	00433ce4@?,
+0043328c	Precondition Failed	00433cdc@?,
+004332a0	Length Required	00433cd4@?,
+004332b0	Gone	00433ccc@?,
+004332b8	Conflict	00433cc4@?,
+004332c4	Request Time-out	00433cbc@?,
+004332d8	Proxy Authentication Required	00433cb4@?,
+004332f8	Not Acceptable	00433cac@?,
+00433308	Method Not Allowed	00433ca4@?,
+0043331c	Not Found	00433c9c@?,
+00433328	Forbidden	00433c94@?,
+00433334	Payment Required	00433c8c@?,
+00433348	Unauthorized	00433c84@?,
+00433358	Bad Request	00433c7c@?,
+00433364	Temporary Redirect	00433c74@?,
+00433378	Use Proxy	00433c6c@?,
+00433384	Not Modified	00433c64@?,
+00433394	See Other	00433c5c@?,
+004333a0	Found	00433c54@?,
+004333a8	Moved Permanently	00433c4c@?,
+004333bc	Multiple Choices	00433c44@?,
+004333d0	Partial Content	00433c3c@?,
+004333e0	Reset Content	00433c34@?,
+004333f0	No Content	00433c2c@?,
+004333fc	Non-Authoritative Information	00433c24@?,
+0043341c	Accepted	00433c1c@?,
+00433428	Created	00433c14@?,
+00433430	OK	00433c0c@?,
+00433434	No Address	004338f0@?,
+00433440	No Data	004338e8@?,
+00433448	No Recovery	004338e0@?,
+00433454	Try Again	004338d8@?,
+00433460	Host not found	004338d0@?,
+00433470	yuml	00433bfc@?,
+00433478	thorn	00433bf4@?,
+00433480	yacute	00433bec@?,
+00433488	uuml	00433be4@?,
+00433490	ucirc	00433bdc@?,
+00433498	uacute	00433bd4@?,
+004334a0	ugrave	00433bcc@?,
+004334a8	oslash	00433bc4@?,
+004334b0	divide	00433bbc@?,
+004334b8	ouml	00433bb4@?,
+004334c0	otilde	00433bac@?,
+004334c8	ocirc	00433ba4@?,
+004334d0	oacute	00433b9c@?,
+004334d8	ograve	00433b94@?,
+004334e0	ntilde	00433b8c@?,
+004334e8	eth	00433b84@?,
+004334ec	iuml	00433b7c@?,
+004334f4	icirc	00433b74@?,
+004334fc	iacute	00433b6c@?,
+00433504	igrave	00433b64@?,
+0043350c	euml	00433b5c@?,
+00433514	ecirc	00433b54@?,
+0043351c	eacute	00433b4c@?,
+00433524	egrave	00433b44@?,
+0043352c	ccedil	00433b3c@?,
+00433534	aelig	00433b34@?,
+0043353c	aring	00433b2c@?,
+00433544	auml	00433b24@?,
+0043354c	atilde	00433b1c@?,
+00433554	acirc	00433b14@?,
+0043355c	aacute	00433b0c@?,
+00433564	agrave	00433b04@?,
+0043356c	szlig	00433afc@?,
+00433574	THORN	00433af4@?,
+0043357c	Yacute	00433aec@?,
+00433584	Uuml	00433ae4@?,
+0043358c	Ucirc	00433adc@?,
+00433594	Uacute	00433ad4@?,
+0043359c	Ugrave	00433acc@?,
+004335a4	Oslash	00433ac4@?,
+004335ac	times	00433abc@?,
+004335b4	Ouml	00433ab4@?,
+004335bc	Otilde	00433aac@?,
+004335c4	Ocirc	00433aa4@?,
+004335cc	Oacute	00433a9c@?,
+004335d4	Ograve	00433a94@?,
+004335dc	Ntilde	00433a8c@?,
+004335e4	ETH	00433a84@?,
+004335e8	Iuml	00433a7c@?,
+004335f0	Icirc	00433a74@?,
+004335f8	Iacute	00433a6c@?,
+00433600	Igrave	00433a64@?,
+00433608	Euml	00433a5c@?,
+00433610	Ecirc	00433a54@?,
+00433618	Eacute	00433a4c@?,
+00433620	Egrave	00433a44@?,
+00433628	Ccedil	00433a3c@?,
+00433630	AElig	00433a34@?,
+00433638	Aring	00433a2c@?,
+00433640	Auml	00433a24@?,
+00433648	Atilde	00433a1c@?,
+00433650	Acirc	00433a14@?,
+00433658	Aacute	00433a0c@?,
+00433660	Agrave	00433a04@?,
+00433668	iquest	004339fc@?,
+00433670	frac34	004339f4@?,
+00433678	frac12	004339ec@?,
+00433680	frac14	004339e4@?,
+00433688	raquo	004339dc@?,
+00433690	ordm	004339d4@?,
+00433698	sup1	004339cc@?,
+004336a0	cedil	004339c4@?,
+004336a8	middot	004339bc@?,
+004336b0	para	004339b4@?,
+004336b8	micro	004339ac@?,
+004336c0	acute	004339a4@?,
+004336c8	sup3	0043399c@?,
+004336d0	sup2	00433994@?,
+004336d8	plusmn	0043398c@?,
+004336e0	deg	00433984@?,
+004336e4	macr	0043397c@?,
+004336ec	reg	00433974@?,
+004336f0	shy	0043396c@?,
+004336f4	not	00433964@?,
+004336f8	laquo	0043395c@?,
+00433700	ordf	00433954@?,
+00433708	copy	0043394c@?,
+00433710	uml	00433944@?,
+00433714	sect	0043393c@?,
+0043371c	brvbar	00433934@?,
+00433724	yen	0043392c@?,
+00433728	curren	00433924@?,
+00433730	pound	0043391c@?,
+00433738	cent	00433914@?,
+00433740	iexcl	0043390c@?,
+00433748	nbsp	00433904@?,
+00433750	http://schemas.xmlsoap.org/soap/envelope/	
+0043377c	http://schemas.xmlsoap.org/soap/encoding/	
+004337a8	http://www.w3.org/2003/05/soap-envelope	
+004337d0	http://www.w3.org/2003/05/soap-encoding	
+004337f8	http://www.w3.org/2003/05/soap-rpc	
+0043381c	\n\t\t\t\t\t\t\t\t\t	
+00433830	ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/	
+00433874		
+00433878	>XXX?456789:;<=XXXXXXX	
+00433d80	==	004361e0@?,
+00433d84	!	004361dc@?,
+00433d88	/	00436210@?,
+00433d8c	>	00436220@?,
+00433d90	--	004361fc@?,
+00433d94	<	00436218@?,
+00433dbc	*	004361f4@?,
+00433ddc	generic	00444b8c@?,
+00433e00	iostream	00444b94@?,
+00433e28	system	00444ba0@?,
+00433e4c	iostream stream error	0041599b@message,
+00433e70	CorExitProcess	00416128@__crtCorExitProcess,
+00433e80	mscoree.dll	00416119@__crtCorExitProcess,
+00433e98	bad allocation	00416452@operator_new,
+00433ebc	Unknown exception	004173d5@what,
+00434408	��������������������������������������������������������������������������������������������������������������������������������	
+00434588	��������������������������������������������������������������������������������������������������������������������������������	
+00434708	\t\n\r !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~	
+00434788	=	004361d0@?,
+00434790	Visual C++ CRT: Not enough memory to complete call to strerror.	0041c007@strerror,0041c02a@strerror,
+004347e0	bad exception	0041ca15@FindHandler,
+004347f0	KERNEL32.DLL	0041d23b@_mtinit,0041cfce@_initptd,
+0043480c	FlsFree	0041d27e@_mtinit,
+00434814	FlsSetValue	0041d271@_mtinit,
+00434820	FlsGetValue	0041d264@_mtinit,
+0043482c	FlsAlloc	0041d25c@_mtinit,
+00434840	(null)	004451e4@?,0041dc91@_output_l,0041e170@_output_l,
+00434850	(null)	004451e0@?,0041e18f@_output_l,0041e19e@_output_l,0041dd87@_output_l,0041dd8d@_output_l,
+00434858		0041d959@_output_l,
+004348b4	runtime error 	004351e4@?,
+004348d4	\r\n	004351dc@?,
+004348dc	TLOSS error\r\n	004351d4@?,
+004348f8	SING error\r\n	004351cc@?,
+00434914	DOMAIN error\r\n	004351c4@?,
+00434938	R6033\r\n- Attempt to use MSIL code from this assembly during native code initialization\nThis indicates a bug in your application. It is most likely the result of calling an MSIL-compiled (/clr) function from a native constructor or from DllMain.\r\n	004351bc@?,
+00434b28	R6032\r\n- not enough space for locale information\r\n	004351b4@?,
+00434b90	R6031\r\n- Attempt to initialize the CRT more than once.\nThis indicates a bug in your application.\r\n	004351ac@?,
+00434c58	R6030\r\n- CRT not initialized\r\n	004351a4@?,
+00434c98	R6028\r\n- unable to initialize heap\r\n	0043519c@?,
+00434ce8	R6027\r\n- not enough space for lowio initialization\r\n	00435194@?,
+00434d58	R6026\r\n- not enough space for stdio initialization\r\n	0043518c@?,
+00434dc8	R6025\r\n- pure virtual function call\r\n	00435184@?,
+00434e18	R6024\r\n- not enough space for _onexit/atexit table\r\n	0043517c@?,
+00434e88	R6019\r\n- unable to open console device\r\n	00435174@?,
+00434ee0	R6018\r\n- unexpected heap error\r\n	0043516c@?,
+00434f28	R6017\r\n- unexpected multithread lock error\r\n	00435164@?,
+00434f88	R6016\r\n- not enough space for thread data\r\n	0043515c@?,
+00434fe0	R6010\r\n- abort() has been called\r\n	00435154@?,
+00435028	R6009\r\n- not enough space for environment\r\n	0043514c@?,
+00435080	R6008\r\n- not enough space for arguments\r\n	00435144@?,0041eb89@_GET_RTERRMSG,
+004350d8	R6002\r\n- floating point support not loaded\r\n	0043513c@?,
+004351e8	Microsoft Visual C++ Runtime Library	0041ecc4@_NMSG_WRITE,
+00435234	\n\n	0041ec93@_NMSG_WRITE,
+0043523c	...	0041ec7e@_NMSG_WRITE,
+00435244	<program name unknown>	0041ec3d@_NMSG_WRITE,
+00435274	Runtime Error!\n\nProgram: 	0041ebfc@_NMSG_WRITE,
+004352a8	HH:mm:ss	004459b8@?,
+004352bc	dddd, MMMM dd, yyyy	004459b4@?,
+004352e4	MM/dd/yy	004459b0@?,
+004352f8	PM	004459ac@?,
+00435300	AM	004459a8@?,
+00435308	December	004459a4@?,
+0043531c	November	004459a0@?,
+00435330	October	0044599c@?,
+00435340	September	00445998@?,
+00435354	August	00445994@?,
+00435364	July	00445990@?,
+00435370	June	0044598c@?,
+0043537c	April	00445984@?,
+00435388	March	00445980@?,
+00435394	February	0044597c@?,
+004353a8	January	00445978@?,
+004353b8	Dec	00445974@?,
+004353c0	Nov	00445970@?,
+004353c8	Oct	0044596c@?,
+004353d0	Sep	00445968@?,
+004353d8	Aug	00445964@?,
+004353e0	Jul	00445960@?,
+004353e8	Jun	0044595c@?,
+004353f0	May	00445958@?,00445988@?,
+004353f8	Apr	00445954@?,
+00435400	Mar	00445950@?,
+00435408	Feb	0044594c@?,
+00435410	Jan	00445948@?,
+00435418	Saturday	00445944@?,
+0043542c	Friday	00445940@?,
+0043543c	Thursday	0044593c@?,
+00435450	Wednesday	00445938@?,
+00435464	Tuesday	00445934@?,
+00435474	Monday	00445930@?,
+00435484	Sunday	0044592c@?,
+00435494	Sat	00445928@?,
+0043549c	Fri	00445924@?,
+004354a4	Thu	00445920@?,
+004354ac	Wed	0044591c@?,
+004354b4	Tue	00445918@?,
+004354bc	Mon	00445914@?,
+004354c4	Sun	00445910@?,
+004354cc	HH:mm:ss	00445900@?,
+004354d8	dddd, MMMM dd, yyyy	004458fc@?,
+004354ec	MM/dd/yy	004458f8@?,
+004354f8	PM	004458f4@?,
+004354fc	AM	004458f0@?,
+00435500	December	004458ec@?,
+0043550c	November	004458e8@?,
+00435518	October	004458e4@?,
+00435520	September	004458e0@?,
+0043552c	August	004458dc@?,
+00435534	July	004458d8@?,
+0043553c	June	004458d4@?,
+00435544	April	004458cc@?,
+0043554c	March	004458c8@?,
+00435554	February	004458c4@?,
+00435560	January	004458c0@?,
+00435568	Dec	004458bc@?,
+0043556c	Nov	004458b8@?,
+00435570	Oct	004458b4@?,
+00435574	Sep	004458b0@?,
+00435578	Aug	004458ac@?,
+0043557c	Jul	004458a8@?,
+00435580	Jun	004458a4@?,
+00435584	May	004458a0@?,004458d0@?,
+00435588	Apr	0044589c@?,
+0043558c	Mar	00445898@?,
+00435590	Feb	00445894@?,
+00435594	Jan	00445890@?,
+00435598	Saturday	0044588c@?,
+004355a4	Friday	00445888@?,
+004355ac	Thursday	00445884@?,
+004355b8	Wednesday	00445880@?,
+004355c4	Tuesday	0044587c@?,
+004355cc	Monday	00445878@?,
+004355d4	Sunday	00445874@?,
+004355dc	Sat	00445870@?,
+004355e0	Fri	0044586c@?,
+004355e4	Thu	00445868@?,
+004355e8	Wed	00445864@?,
+004355ec	Tue	00445860@?,
+004355f0	Mon	0044585c@?,
+004355f4	Sun	00445858@?,
+004355f8	TZ	0041fbd1@_tzset_nolock,
+004355fc	SunMonTueWedThuFriSat	
+00435614	JanFebMarAprMayJunJulAugSepOctNovDec	
+004356e0	ccs	0042174a@_openfile,
+004356e4	UTF-8	00421773@_openfile,
+004356ec	UTF-16LE	00421792@_openfile,
+004356f8	UNICODE	004217b1@_openfile,
+00435700	e+000	00423638@_cftoe2_l,
+00435708		
+00435764	_nextafter	
+00435770	_logb	
+00435778	_yn	
+0043577c	_y1	
+00435780	_y0	
+00435784	frexp	
+0043578c	fmod	
+00435794	_hypot	
+0043579c	_cabs	
+004357a4	ldexp	
+004357ac	modf	0042beb4@__libm_error_support,
+004357b4	fabs	
+004357bc	floor	0042bea8@__libm_error_support,
+004357c4	ceil	0042be9c@__libm_error_support,
+004357cc	tan	0042bed2@__libm_error_support,
+004357d0	cos	0042bec9@__libm_error_support,
+004357d4	sin	0042bec0@__libm_error_support,
+004357d8	sqrt	
+004357e0	atan2	
+004357e8	atan	0042be93@__libm_error_support,
+004357f0	acos	0042be0c@__libm_error_support,
+004357f8	asin	0042be03@__libm_error_support,
+00435800	tanh	
+00435808	cosh	
+00435810	sinh	
+00435818	log10	0042bd93@__libm_error_support,0042bdb7@__libm_error_support,0042be81@__libm_error_support,
+00435820	log	0042bdc3@__libm_error_support,0042bdcf@__libm_error_support,0042be78@__libm_error_support,
+00435824	pow	00424c04@_umatherr,0042bd13@__libm_error_support,0042bddb@__libm_error_support,0042be15@__libm_error_support,0042be2b@__libm_error_support,00445c3c@?,
+00435828	exp	0042bd51@__libm_error_support,0042bd8a@__libm_error_support,0042be8a@__libm_error_support,
+0043582c	Illegal byte sequence	00445e08@?,
+00435844	Directory not empty	00445e04@?,
+00435858	Function not implemented	00445e00@?,
+00435874	No locks available	00445dfc@?,
+00435888	Filename too long	00445df8@?,
+0043589c	Resource deadlock avoided	00445df0@?,
+004358b8	Result too large	00445de8@?,
+004358cc	Domain error	00445de4@?,
+004358dc	Broken pipe	00445de0@?,
+004358e8	Too many links	00445ddc@?,
+004358f8	Read-only file system	00445dd8@?,
+00435910	Invalid seek	00445dd4@?,
+00435920	No space left on device	00445dd0@?,
+00435938	File too large	00445dcc@?,
+00435948	Inappropriate I/O control operation	00445dc4@?,
+0043596c	Too many open files	00445dc0@?,
+00435980	Too many open files in system	00445dbc@?,
+004359a0	Invalid argument	00445db8@?,
+004359b4	Is a directory	00445db4@?,
+004359c4	Not a directory	00445db0@?,
+004359d4	No such device	00445dac@?,
+004359e4	Improper link	00445da8@?,
+004359f4	File exists	00445da4@?,
+00435a00	Resource device	00445da0@?,
+00435a10	Unknown error	00445d9c@?,00445dc8@?,00445dec@?,00445df4@?,00445e0c@?,
+00435a20	Bad address	00445d98@?,
+00435a2c	Permission denied	00445d94@?,
+00435a40	Not enough space	00445d90@?,
+00435a54	Resource temporarily unavailable	00445d8c@?,
+00435a78	No child processes	00445d88@?,
+00435a8c	Bad file descriptor	00445d84@?,
+00435aa0	Exec format error	00445d80@?,
+00435ab4	Arg list too long	00445d7c@?,
+00435ac8	No such device or address	00445d78@?,
+00435ae4	Input/output error	00445d74@?,
+00435af8	Interrupted function call	00445d70@?,
+00435b14	No such process	00445d6c@?,
+00435b24	No such file or directory	00445d68@?,
+00435b40	Operation not permitted	00445d64@?,
+00435b58	No error	00445d60@?,
+00435b78	UTF-16LE	
+00435b8c	UNICODE	
+00435b9c	GetProcessWindowStation	00425fa1@__crtMessageBoxW,
+00435bb4	GetUserObjectInformationW	00425f88@__crtMessageBoxW,
+00435bd0	GetLastActivePopup	00425f78@__crtMessageBoxW,
+00435be4	GetActiveWindow	00425f68@__crtMessageBoxW,
+00435bf4	MessageBoxW	00425f4f@__crtMessageBoxW,
+00435c00	USER32.DLL	00425f34@__crtMessageBoxW,
+00435c18	 Complete Object Locator'	00436318@?,
+00435c34	 Class Hierarchy Descriptor'	00436314@?,
+00435c54	 Base Class Array'	00436310@?,
+00435c68	 Base Class Descriptor at (	0043630c@?,
+00435c84	 Type Descriptor'	00436308@?,
+00435c98	`local static thread guard'	00436300@?,
+00435cb4	`managed vector copy constructor iterator'	004362fc@?,
+00435ce0	`vector vbase copy constructor iterator'	004362f8@?,
+00435d0c	`vector copy constructor iterator'	004362f4@?,
+00435d30	`dynamic atexit destructor for '	004362f0@?,
+00435d54	`dynamic initializer for '	004362ec@?,
+00435d70	`eh vector vbase copy constructor iterator'	004362e8@?,
+00435d9c	`eh vector copy constructor iterator'	004362e4@?,
+00435dc4	`managed vector destructor iterator'	004362e0@?,
+00435dec	`managed vector constructor iterator'	004362dc@?,
+00435e14	`placement delete[] closure'	004362d8@?,
+00435e34	`placement delete closure'	004362d4@?,
+00435e50	`omni callsig'	004362d0@?,
+00435e60	 delete[]	004362cc@?,
+00435e6c	 new[]	004362c8@?,
+00435e74	`local vftable constructor closure'	004362c4@?,
+00435e98	`local vftable'	004362c0@?,
+00435ea8	`RTTI	004362bc@?,
+00435eb0	`EH	004362b8@?,
+00435eb4	`udt returning'	004362b4@?,
+00435ec4	`copy constructor closure'	004362b0@?,
+00435ee0	`eh vector vbase constructor iterator'	004362ac@?,
+00435f08	`eh vector destructor iterator'	004362a8@?,
+00435f28	`eh vector constructor iterator'	004362a4@?,
+00435f4c	`virtual displacement map'	004362a0@?,
+00435f68	`vector vbase constructor iterator'	0043629c@?,
+00435f8c	`vector destructor iterator'	00436298@?,
+00435fac	`vector constructor iterator'	00436294@?,
+00435fcc	`scalar deleting destructor'	00436290@?,
+00435fec	`default constructor closure'	0043628c@?,
+0043600c	`vector deleting destructor'	00436288@?,
+0043602c	`vbase destructor'	00436284@?,
+00436040	`string'	00436280@?,
+0043604c	`local static guard'	0043627c@?,
+00436064	`typeof'	00436278@?,
+00436070	`vcall'	00436274@?,
+00436078	`vbtable'	00436270@?,
+00436084	`vftable'	0043626c@?,
+00436090	^=	00436268@?,
+00436094	|=	00436264@?,
+00436098	&=	00436260@?,
+0043609c	<<=	0043625c@?,
+004360a0	>>=	00436258@?,
+004360a4	%=	00436254@?,
+004360a8	/=	00436250@?,
+004360ac	-=	0043624c@?,
+004360b0	+=	00436248@?,
+004360b4	*=	00436244@?,
+004360b8	||	00436240@?,
+004360bc	&&	0043623c@?,
+004360c0	|	00436238@?,
+004360c4	^	00436234@?,
+004360c8	~	00436230@?,
+004360cc	()	0043622c@?,
+004360d0	>=	00436224@?,
+004360d4	<=	0043621c@?,
+004360d8	%	00436214@?,
+004360dc	->*	0043620c@?,
+004360e0	&	00436208@?,
+004360e4	+	00436204@?,
+004360e8	++	004361f8@?,
+004360ec	->	004361f0@?,
+004360f0	operator	004361ec@?,
+004360fc	[]	004361e8@?,
+00436100	!=	004361e4@?,
+00436104	<<	004361d8@?,
+00436108	>>	004361d4@?,
+0043610c	 delete	004361cc@?,
+00436114	 new	004361c8@?,
+0043611c	__unaligned	004361c0@?,
+00436128	__restrict	004361bc@?,
+00436134	__ptr64	004361b8@?,
+0043613c	__eabi	004361b4@?,
+00436144	__clrcall	004361b0@?,
+00436150	__fastcall	004361ac@?,
+0043615c	__thiscall	004361a8@?,
+00436168	__stdcall	004361a4@?,
+00436174	__pascal	004361a0@?,
+00436180	__cdecl	0043619c@?,
+00436188	__based(	00436198@?,
+0043631c	CONOUT$	00428265@__initconout,
+0043632c	1#QNAN	00428826@$I10_OUTPUT,
+00436334	1#INF	00428809@$I10_OUTPUT,
+0043633c	1#IND	004287f9@$I10_OUTPUT,
+00436344	1#SNAN	004287d1@$I10_OUTPUT,
+00436364	ChargedDeletableBuff.shn	0042ada2@CShnDataFileCheckSum,0042ad9d@CShnDataFileCheckSum,
+00436380	MinimonAutoUseItem.shn	0042ad8d@CShnDataFileCheckSum,0042ad82@CShnDataFileCheckSum,
+00436398	MinimonInfo.shn	0042ad4d@CShnDataFileCheckSum,
+004363a8	TermExtendMatch.shn	0042ad11@CShnDataFileCheckSum,
+004363bc	ChatColor.shn	0042acdf@CShnDataFileCheckSum,
+004363cc	PupMain.shn	0042acbb@CShnDataFileCheckSum,
+004363d8	ItemMoney.shn	0042ac89@CShnDataFileCheckSum,
+004363e8	MarketSearchInfo.shn	0042ac40@CShnDataFileCheckSum,
+00436400	SingleData.shn	0042ac01@CShnDataFileCheckSum,
+00436410	ItemViewEquipTypeInfo.shn	0042abfd@CShnDataFileCheckSum,0042abf8@CShnDataFileCheckSum,
+0043642c	GTIView.shn	0042abc9@CShnDataFileCheckSum,
+00436438	CollectCardView.shn	0042ab8d@CShnDataFileCheckSum,
+0043644c	ProduceView.shn	0042ab5d@CShnDataFileCheckSum,
+0043645c	PassiveSkillView.shn	0042ab14@CShnDataFileCheckSum,
+00436474	NPCViewInfo.shn	0042aae4@CShnDataFileCheckSum,
+00436484	MobViewInfo.shn	0042aab4@CShnDataFileCheckSum,
+00436494	MapViewInfo.shn	0042aa84@CShnDataFileCheckSum,
+004364a4	ItemViewInfo.shn	0042aa47@CShnDataFileCheckSum,
+004364b8	ItemShopView.shn	0042aa0a@CShnDataFileCheckSum,
+004364cc	EffectViewInfo.shn	0042a9bf@CShnDataFileCheckSum,
+004364e0	CharacterTitleStateView.shn	0042a9bd@CShnDataFileCheckSum,0042a9b8@CShnDataFileCheckSum,
+004364fc	ActiveSkillView.shn	0042a971@CShnDataFileCheckSum,
+00436510	AbStateView.shn	0042a941@CShnDataFileCheckSum,
+00436520	MapWayPoint.shn	0042a911@CShnDataFileCheckSum,
+00436530	MapLinkPoint.shn	0042a8d4@CShnDataFileCheckSum,
+00436544	ActionViewInfo.shn	0042a889@CShnDataFileCheckSum,
+00436558	DiceDividind.shn	0042a84c@CShnDataFileCheckSum,
+0043656c	MiniHouseEndure.shn	0042a810@CShnDataFileCheckSum,
+00436580	MiniHouseFurnitureObjEffect.shn	0042a80e@CShnDataFileCheckSum,0042a809@CShnDataFileCheckSum,
+004365a0	WeaponTitleData.shn	0042a7c2@CShnDataFileCheckSum,
+004365b4	WeaponAttrib.shn	0042a785@CShnDataFileCheckSum,
+004365c8	UpgradeInfo.shn	0042a755@CShnDataFileCheckSum,
+004365d8	SubAbstate.shn	0042a716@CShnDataFileCheckSum,
+004365e8	Riding.shn	0042a6e3@CShnDataFileCheckSum,
+004365f4	PassiveSkill.shn	0042a6a6@CShnDataFileCheckSum,
+00436608	MobInfo.shn	0042a682@CShnDataFileCheckSum,
+00436614	MiniHouseObjAni.shn	0042a646@CShnDataFileCheckSum,
+00436628	MiniHouseFurniture.shn	0042a641@CShnDataFileCheckSum,0042a63c@CShnDataFileCheckSum,
+00436640	MiniHouse.shn	0042a5ff@CShnDataFileCheckSum,
+00436650	MapInfo.shn	0042a5db@CShnDataFileCheckSum,
+0043665c	ItemInfo.shn	0042a5aa@CShnDataFileCheckSum,
+0043666c	ItemDismantle.shn	0042a56c@CShnDataFileCheckSum,
+00436680	GradeItemOption.shn	0042a530@CShnDataFileCheckSum,
+00436694	Gather.shn	0042a4fd@CShnDataFileCheckSum,
+004366a0	ClassName.shn	0042a4cb@CShnDataFileCheckSum,
+004366b0	ChargedEffect.shn	0042a48d@CShnDataFileCheckSum,
+004366c4	CharacterTitleData.shn	0042a488@CShnDataFileCheckSum,0042a483@CShnDataFileCheckSum,
+004366dc	ActiveSkill.shn	0042a454@CShnDataFileCheckSum,
+004366ec	Abstate.shn	0042a439@CShnDataFileCheckSum,
+00436700	0%x	0042b6d3@Final,
+00436704	00	0042b6bb@Final,
+00436708	0123456789abcdefghijklmnopqrstuvwxyz	
+00436730		
+00436758	0123456789abcdefghijklmnopqrstuvwxyz	
+00436780		
+004368b8	exp10	0042be56@__libm_error_support,
+00439ff4	WS2_32.dll	
+0043a002	Sleep	
+0043a00a	GetCurrentDirectoryA	
+0043a022	GetSystemTime	
+0043a032	GetTimeFormatA	
+0043a044	GetDateFormatA	
+0043a056	GetLocalTime	
+0043a066	GetSystemInfo	
+0043a076	GetModuleFileNameA	
+0043a08c	CreateThread	
+0043a09c	InitializeCriticalSection	
+0043a0b8	DeleteCriticalSection	
+0043a0d0	EnterCriticalSection	
+0043a0e8	LeaveCriticalSection	
+0043a100	PostQueuedCompletionStatus	
+0043a11e	WaitForSingleObject	
+0043a132	KERNEL32.dll	
+0043a142	MessageBoxA	
+0043a14e	USER32.dll	
+0043a15a	ODBC32.dll	
+0043a168	timeGetTime	
+0043a174	WINMM.dll	
+0043a180	MakeSureDirectoryPathExists	
+0043a19e	SymInitialize	
+0043a1ae	SymSetOptions	
+0043a1be	SymGetOptions	
+0043a1ce	SymCleanup	
+0043a1dc	SymGetLineFromAddr64	
+0043a1f4	SymGetSymFromAddr64	
+0043a20a	StackWalk64	
+0043a218	SymFunctionTableAccess64	
+0043a234	SymGetModuleBase64	
+0043a248	dbghelp.dll	
+0043a256	ReadFile	
+0043a262	WriteFile	
+0043a26e	SetFilePointer	
+0043a280	SetLastError	
+0043a290	GetLastError	
+0043a2a0	SystemTimeToFileTime	
+0043a2b8	CloseHandle	
+0043a2c6	GetFileSize	
+0043a2d4	CreateFileA	
+0043a2e2	SetCurrentDirectoryA	
+0043a2fa	CreateIoCompletionPort	
+0043a314	GetQueuedCompletionStatus	
+0043a330	CreateDirectoryA	
+0043a344	FormatMessageA	
+0043a356	GetCurrentProcessId	
+0043a36c	GetCurrentProcess	
+0043a380	SetEvent	
+0043a38c	CreateEventA	
+0043a39c	MultiByteToWideChar	
+0043a3b2	WideCharToMultiByte	
+0043a3c8	GetCurrentThreadId	
+0043a3de	GetProcAddress	
+0043a3f0	LoadLibraryA	
+0043a400	SetUnhandledExceptionFilter	
+0043a41e	ReadProcessMemory	
+0043a432	OutputDebugStringA	
+0043a448	GetCurrentThread	
+0043a45c	GetACP	
+0043a466	IsBadReadPtr	
+0043a476	CreateFileW	
+0043a484	lstrcpynA	
+0043a490	lstrlenA	
+0043a49c	GetModuleHandleA	
+0043a4b0	HeapFree	
+0043a4bc	HeapAlloc	
+0043a4c8	GetProcessHeap	
+0043a4da	InterlockedExchange	
+0043a4f0	SwitchToThread	
+0043a502	InterlockedCompareExchange	
+0043a520	InterlockedIncrement	
+0043a538	InterlockedDecrement	
+0043a550	EncodePointer	
+0043a560	DecodePointer	
+0043a570	RtlUnwind	
+0043a57c	GetModuleHandleW	
+0043a590	ExitProcess	
+0043a59e	SetEnvironmentVariableA	
+0043a5b8	GetSystemTimeAsFileTime	
+0043a5d2	RaiseException	
+0043a5e4	GetCommandLineA	
+0043a5f6	HeapSetInformation	
+0043a60c	GetStartupInfoW	
+0043a61e	GetFullPathNameA	
+0043a632	GetCPInfo	
+0043a63e	GetConsoleCP	
+0043a64e	GetConsoleMode	
+0043a660	LCMapStringW	
+0043a670	TlsAlloc	
+0043a67c	TlsGetValue	
+0043a68a	TlsSetValue	
+0043a698	TlsFree	
+0043a6a2	TerminateProcess	
+0043a6b6	UnhandledExceptionFilter	
+0043a6d2	IsDebuggerPresent	
+0043a6e6	InitializeCriticalSectionAndSpinCount	
+0043a70e	LoadLibraryW	
+0043a71e	GetStdHandle	
+0043a72e	GetModuleFileNameW	
+0043a744	IsProcessorFeaturePresent	
+0043a760	HeapSize	
+0043a76c	GetOEMCP	
+0043a778	IsValidCodePage	
+0043a78a	GetTimeZoneInformation	
+0043a7a4	FreeEnvironmentStringsW	
+0043a7be	GetEnvironmentStringsW	
+0043a7d8	SetHandleCount	
+0043a7ea	GetFileType	
+0043a7f8	HeapCreate	
+0043a806	QueryPerformanceCounter	
+0043a820	GetTickCount	
+0043a830	GetDriveTypeW	
+0043a840	FlushFileBuffers	
+0043a854	SetStdHandle	
+0043a864	GetStringTypeW	
+0043a876	WriteConsoleW	
+0043a886	HeapReAlloc	
+0043a894	GetCurrentDirectoryW	
+0043a8ac	SetEndOfFile	
+0043a8bc	CompareStringW	
+0043a8ce	wsprintfA	
+0043a8da	CloseServiceHandle	
+0043a8f0	CreateServiceA	
+0043a902	OpenSCManagerA	
+0043a914	DeleteService	
+0043a924	OpenServiceA	
+0043a934	SetServiceStatus	
+0043a948	QueryServiceStatus	
+0043a95e	RegisterServiceCtrlHandlerA	
+0043a97c	StartServiceCtrlDispatcherA	
+0043a998	ADVAPI32.dll	
+00443010	.?AV?$PROTOCOLFUNCTIONTEMPLETE@P8CPFs@@AEHPAUNETPACKET@@H@Z@@	
+00443058	.?AVCParserAccountLog@@	
+00443078	.?AVCParser@@	
+00443090	.?AVCPacket_Parser_Interface@@	
+004430bc	.?AVCIOCP_Process_Interfece@@	
+004430e4	.?AVCSession@@	
+004430fc	.?AVCSocket_Session@@	
+0044311c	.?AVCSocket_Acceptor_Process_Interface@@	
+00443150	.?AVCSession_Manager@@	
+00443170	.?AVCSocket_Session_Manager@@	
+00443198	.?AVCIOCP_Process_Manager_App@@	
+004431c0	.?AVCSocket_Acceptor_Process_Manager_App@@	
+004431f4	.?AVCSessionWorker@@	
+00443214	.?AVbad_alloc@std@@	
+00443230	.?AVexception@std@@	
+00443248		
+00443404	.?AV?$BinaryDataBox@UMapInfo@@@@	
+00443430	.?AVBinaryData@@	
+0044344c	.?AVCDataReader@@	
+00443468	.?AVCSocket_Acceptor_Process_Manager@@	
+00443498	.?AVCIOCP_Process_Manager@@	
+004434c0	.?AV?$Singleton@VWinService@@@@	
+004434e8	.?AVWinService@@	
+00443504	.?AVString@@	
+0044351c	.?AVItemBelongAttribute@@	
+00443540	.?AVCItemAuthorityBase@@	
+00443564	.?AV?$BinaryDataBox@UItemInfo@@@@	
+00443590	.?AV?$BinaryDataBox@UItemInfoServer@@@@	
+004435c0	.?AV?$BinaryDataBox@UGradeItemOption@@@@	
+004435f4	.?AV?$BinaryDataBox@UItemDropLog@@@@	
+00443624	.?AV?$BinaryDataBox@UItemSort@@@@	
+00443650	.?AV?$BinaryDataBox@UItemInvenDel@@@@	
+00443680	.?AV?$BinaryDataBox@UItemMoney@@@@	
+00443714	.?AVDBRecord@@	
+0044372c	.?AVDatabase@@	
+00443744	.?AVCIOCP_Process_Socket_Session@@	
+00443770	.?AVCPacket_Parser_Socket_Session@@	
+0044379c	.?AVCIOCP_Process_Socket@@	
+004437c0	.?AVCPacket@@	
+004437d8	.PAVInvalidPacketException@CPacket@@	
+00443808	.PAX	
+0044389c	.?AVItemAttributeClass@@	
+004438c0	.?AVItemAttrCls_ByteLot@@	
+004438e4	.?AVItemAttrCls_WordLot@@	
+00443908	.?AVItemAttrCls_DwrdLot@@	
+0044392c	.?AVItemAttrCls_QuestLot@@	
+00443950	.?AVItemAttrCls_NotLot@@	
+00443974	.?AVItemAttrCls_Amulet@@	
+00443998	.?AVItemAttrCls_Weapon@@	
+004439bc	.?AVItemAttrCls_Armor@@	
+004439dc	.?AVItemAttrCls_Shield@@	
+00443a00	.?AVItemAttrCls_Boot@@	
+00443a20	.?AVItemAttrCls_Furniture@@	
+00443a44	.?AVItemAttrCls_Decoration@@	
+00443a6c	.?AVItemAttrCls_SkillScroll@@	
+00443a94	.?AVItemAttrCls_RecallScroll@@	
+00443abc	.?AVItemAttrCls_BindItem@@	
+00443ae0	.?AVItemAttrCls_UpSource@@	
+00443b04	.?AVItemAttrCls_ItemChest@@	
+00443b28	.?AVItemAttrCls_WeaponTitlaLicence@@	
+00443b58	.?AVItemAttrCls_KingdomQuestItem@@	
+00443b84	.?AVItemAttrCls_MiniHouseSkin@@	
+00443bac	.?AVItemAttrCls_UpgradeRedGem@@	
+00443bd4	.?AVItemAttrCls_UpgradeBlueGem@@	
+00443c00	.?AVItemAttrCls_UpgradeGoldGem@@	
+00443c2c	.?AVItemAttrCls_KQStep@@	
+00443c50	.?AVItemAttrCls_Feed@@	
+00443c70	.?AVItemAttrCls_Riding@@	
+00443c94	.?AVItemAttrCls_Amount@@	
+00443cb8	.?AVItemAttrCls_CostumWeapon@@	
+00443ce0	.?AVItemAttrCls_CostumShield@@	
+00443d08	.?AVItemAttrCls_ActionItem@@	
+00443d30	.?AVItemAttrCls_Enchant@@	
+00443d54	.?AVItemAttrCls_GBCoin@@	
+00443d78	.?AVItemAttrCls_Capsule@@	
+00443d9c	.?AVItemAttrCls_CardCollect_Close@@	
+00443dc8	.?AVItemAttrCls_CardCollect@@	
+00443df0	.?AVItemAttrCls_ActiveSkill@@	
+00443e18	.?AVItemAttrCls_Pet@@	
+00443e38	.?AVItemAttrCls_Bracelet@@	
+00443e5c	.?AVItemAttrCls_NoEffect@@	
+00443e84	.?AVCIOBuffer@@	
+004448f0	.?AV?$BinaryDataBox@UShineReward@@@@	
+00444920	.?AV?$BinaryDataBox@UItemOptions@@@@	
+00444950	.?AV?$BinaryDataBox@UFriendPointReward@@@@	
+00444984	.?AV?$ListIteratorDefault@UCard@CardDeck@@@@	
+004449bc	.?AVRewardData@@	
+004449d8	.?AVItemOptionsData@@	
+004449f8	.?AVFPRewardData@@	
+00444a14	.?AV?$ListEraser@UCard@CardDeck@@@@	
+00444a40	.?AV?$List@UCard@CardDeck@@@@	
+00444a68	.?AVCSQLPReport@@	
+00444a84	.?AVlogic_error@std@@	
+00444aa4	.?AVlength_error@std@@	
+00444ac4	.?AVout_of_range@std@@	
+00444ae8	.?AVerror_category@std@@	
+00444b0c	.?AV_Generic_error_category@std@@	
+00444b38	.?AV_Iostream_error_category@std@@	
+00444b64	.?AV_System_error_category@std@@	
+00444bb0	Copyright (c) 1992-2004 by P.J. Plauger, licensed by Dinkumware, Ltd. ALL RIGHTS RESERVED.	
+00444c28	.?AVtype_info@@	
+00444c50	.	00444c58@?,
+00444c54	.	00444c88@?,
+00444f30		0041b6ce@_read_nolock,0041b6dc@_read_nolock,0041921d@__initstdio,
+004451b8	.?AVbad_exception@std@@	
+00445550		0041f55e@_setmbcp,
+00445658		0041f57a@_setmbcp,
+0044575c		
+00445854	C	00445a18@?,00445a28@?,00445a38@?,00445a48@?,00445a58@?,0041f666@__addlocaleref,0041f6fd@__removelocaleref,0041f842@__freetlocinfo,
+00445ad8	PST	00445b58@?,
+00445b18	PDT	00445b5c@?,
+00445d54	.	
+00446130	�	0042b655@Final,
+00446178	.?AVCMD5Checksum@@	
+00650e48		0040b0cc@GetLastErrorStr,0040b0f5@GetLastErrorStr,0040b103@GetLastErrorStr,
+00651248		0040b1aa@GetCurrentTimeString,0040b1bc@GetCurrentTimeString,
+006512c8		0040b28f@GetCurrentTimeString2,0040b2a1@GetCurrentTimeString2,
+00651738		004100f4@EHInternalGetStackTraceString,004101b3@EHInternalGetStackTraceString,004103fd@EHInternalGetStackTraceString,0041029d@EHInternalGetStackTraceString,004103a1@EHInternalGetStackTraceString,004103cd@EHInternalGetStackTraceString,004103eb@EHInternalGetStackTraceString,004104d2@GetFaultReason,004104f3@GetFaultReason,004104f9@GetFaultReason,0041084d@GetFaultReason,0041070e@GetFaultReason,004107f7@GetFaultReason,0041081d@GetFaultReason,0041083b@GetFaultReason,00410624@GetFaultReason,0041014e@EHInternalGetStackTraceString,0041016f@EHInternalGetStackTraceString,004101ab@EHInternalGetStackTraceString,004101d3@EHInternalGetStackTraceString,0041025c@EHInternalGetStackTraceString,00410290@EHInternalGetStackTraceString,004102c2@EHInternalGetStackTraceString,004102da@EHInternalGetStackTraceString,0041035e@EHInternalGetStackTraceString,00410384@EHInternalGetStackTraceString,004104c4@GetFaultReason,00410522@GetFaultReason,00410546@GetFaultReason,0041055e@GetFaultReason,00410590@GetFaultReason,004105a3@GetFaultReason,004105dc@GetFaultReason,0041061c@GetFaultReason,00410658@GetFaultReason,0041066b@GetFaultReason,004106cd@GetFaultReason,00410701@GetFaultReason,00410733@GetFaultReason,0041074b@GetFaultReason,004107b2@GetFaultReason,004107df@GetFaultReason,
+00651f38		0041068d@GetFaultReason,00410207@EHInternalGetStackTraceString,004101fa@EHInternalGetStackTraceString,00410231@EHInternalGetStackTraceString,00410680@GetFaultReason,004106a1@GetFaultReason,
+00652338		00410185@EHInternalGetStackTraceString,00410197@EHInternalGetStackTraceString,00410497@GetFaultReason,004104b0@GetFaultReason,004105f4@GetFaultReason,00410606@GetFaultReason,
+009a7e4c		
+009a7ff0		00444c5c@?,00444c60@?,00444c64@?,00444c68@?,00444c6c@?,00444c70@?,00444c74@?,00444c78@?,00444c7c@?,
+009a7ff4		00444c8c@?,00444c90@?,00444c94@?,00444c98@?,00444c9c@?,00444ca0@?,00444ca4@?,
+009a84b0		0041ec0b@_NMSG_WRITE,0041ec9e@_NMSG_WRITE,0041ecb2@_NMSG_WRITE,0041ecc9@_NMSG_WRITE,0041ec06@_NMSG_WRITE,
+009a8bb8		00420c0b@_setargv,00420c2f@_setargv,00420c06@_setargv,
+009a9b00		00444cb0@?,00444cb8@?,
+ffdff1ac		
+ffdffc00		

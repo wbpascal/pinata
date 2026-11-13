@@ -92,6 +92,48 @@ ITEMS = [
              "size check, same field use). Until then mark it *(pdb2017)* (see `AGENTS.md` evidence levels)."],
       done="PDB opcode names in `opcodes.json` with conflicts resolved; `pdb-layouts.json` used by the generated docs, decoder "
            "and dissector; 2016 client handlers named from the PDB; per-item follow-up list in `docs/knowledge/C02.md`."),
+ dict(id="S01", phase=1, title="2016 server PDBs (NA2016): official names, types and packet layouts for the exact build",
+      out="docs/knowledge/S01.md + docs/protocol/pdb2016-layouts.json + names/<bin>/S01.json", scope=[], deps=["C02"],
+      goal="`Files/Server/NA2016/` holds the **same builds** as `Files/Server/2016/` (identical PE timestamps and RSDS "
+           "GUID/age) plus the full private PDBs of Login, WorldManager, Zone, Account and AccountLog (no PDB for Character "
+           "and GameLog). The PDBs therefore describe the 2016 code exactly: function and global names, class layouts "
+           "(`ShineObjectClass::ShinePlayer` 0x2c058 bytes, absent from the 2017 client PDB), enums, and 2016 `PROTO_NC_*` "
+           "packet structs (Zone 1286, WM 1218; e.g. `PROTO_NC_MAP_LOGIN_REQ` has `Name8[49] checksum`, 2017 has 50). "
+           "Make that the top name/type/layout source and give every finished item a follow-up list.",
+      steps=["Already done when the plan was written (2026-11-13): `re-data/exports/<bin>-pdb/` (login, wm, zone, account, "
+             "accountlog) = the **unpatched 2016 exes** analysed with the NA2016 PDB loaded (`reanalyze.sh <bin>-pdb <exe> "
+             "<pdb>`); every old function address is kept, separators carry qualified names (`CParserClient::fc_NC_…`). "
+             "`tools/protocol-re/pdb_names.py` wrote `names/<bin>/S01.json` (official names for addresses no item had "
+             "named; item files still win) and `docs/knowledge/S01-renames.tsv` (our name → official name per item). "
+             "The old exports stay the input of `extract.py`/`layouts.py` (they pattern-match `FUN_`/`DAT_` names).",
+             "Do not analyse the NA2016 exes: their `.reloc` section was replaced by a `custom` section holding private-server "
+             "hook patches (WM: jmp hooks at 004135b4, 00414b51, 00417765, 00417a58, 0041c7ae, …; Zone: 00458d66 and 00459158 "
+             "clamp a count to 0x20, plus byte edits at 00470265 and 00598580). Decode each patch (target code in the "
+             "`custom` section, VA = image base + section RVA) and record what it changes: each is a hint at an original bug. "
+             "List them in `docs/knowledge/S01.md` with the owning item, for X01's bug register.",
+             "Packet layouts: write `docs/protocol/pdb2016-layouts.json` with `pdb.py <server pdb> layouts` for all five PDBs "
+             "(merge; a dept present in several PDBs should agree, list disagreements) and make `regen.sh`, `packets.py`, "
+             "`pcap_decode.py` and `make_dissector.py` prefer it over `pdb-layouts.json` (label `pdb2016`, ranked below hand "
+             "annotations, above `pdb2017`). Opcode names: add the server enums to `catalog.py` the same way (`pdb2016` above "
+             "`handler`/`client`). Report opcode/struct differences 2016 vs 2017 in the knowledge file.",
+             "Per-item follow-up table in `docs/knowledge/S01.md` (same format as the C02 table in the master plan): per "
+             "finished item, how many of its names get official names (`S01-renames.tsv`), which of its hand layouts / "
+             "member offsets differ from the PDB (Z01's ShinePlayer offsets vs `pdb.py … types '^ShineObjectClass::ShinePlayer$'`), "
+             "which of its `(ours)` names and `(pdb2017)` facts the 2016 PDB settles. Do not edit other items' files.",
+             "Types catalogue: which server types matter to which item (ShinePlayer/ShineMobileObject/ShineNPC members, "
+             "item/abstate/skill classes, WM session and guild classes, SHN row structs vs `shn.py` column names). Point to "
+             "`pdb.py <pdb> types REGEX` instead of copying dumps.",
+             "Third-party docs (local only, gitignored): `re-data/external/fiestaheroes/` = clone of "
+             "github.com/FiestaHeroes/Documentation (doc.fiestaheroes.com, documents the NA2016 set): Lua API "
+             "(`docs/Lua Scripting/documentation.md`, `static/files/fiesta.lua`, 243 of 245 names occur in the zone strings), "
+             "86 SHN table pages, DB tables, GM commands. Map each to the items that should cross-check it (Z09 Lua/AI, Z11 GM "
+             "commands, Z07/Z12/Z17 SHN columns, D0x tables). Evidence label *(fh-doc)*: third-party interpretation, below "
+             "code.",
+             "Data: `Files/Server/NA2016/9Data` differs from `Files/Server/2016/9Data` in ~37 files of content (the other ~1100 "
+             "differ only by CRLF). List them; say which set the binaries' loaders accept if the code shows it (column counts, "
+             "file names). The NA2016 DB backups add one Character procedure and `Options.bak` (tables only): note, nothing more."],
+      done="`pdb2016-layouts.json` and server opcode names used by the generated docs; NA2016 patches decoded; per-item "
+           "follow-up table and types catalogue in `docs/knowledge/S01.md`; `regen.sh` run."),
  dict(id="W01", phase=1, title="World manager core: sessions, world login, characters, zone handoff",
       out="docs/pseudocode/wm/W01-core.md", deps=[],
       scope=[("wm", "CParserClient", [2, 3, 4, 5, 45]), ("wm", "CParserLogin", ALL), ("wm", "CParserAccountDB", ALL),

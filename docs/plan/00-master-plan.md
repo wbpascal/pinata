@@ -66,6 +66,7 @@ Sizes count the handlers in scope and their decompiled lines. Callee logic adds 
 |---|---|---|---|---|
 | [C01](items/C01.md) | Client packet-handler inventory (names and meaning of server→client packets) | – | client | – |
 | [C02](items/C02.md) | 2017 client PDB: official opcode names, `PROTO_NC_*` structs, shared types, client function names | C01 (soft) | – | – |
+| [S01](items/S01.md) | 2016 server PDBs (NA2016): official names, types, `PROTO_NC_*` layouts of the exact build; per-item follow-ups | C02 | – | – |
 | [W01](items/W01.md) | World manager core: sessions, world login, characters, zone handoff | – | see file | |
 | [Z01](items/Z01.md) | Zone core: process, maps, objects, player session, map login/logout | – | see file | |
 | [P01](items/P01.md) | Packet capture decoder + validator (pure Python, self-testing; needs no captures yet) | – | – | – |
@@ -75,6 +76,11 @@ C01 has the highest leverage: every later item uses its client cross-reference. 
 can only run one item at a time. C02 (added after C01, W01, Z01, P01, P03 were done) comes next: the 2017
 PDB names 1347 opcodes that are unnamed today and gives field names for ~2300 packet structs, so run it
 before the phase-2 items.
+
+S01 (added 2026-11-13) has the highest leverage of all remaining work: `Files/Server/NA2016` turned out to be the same
+server builds with their private PDBs (Login, WM, Zone, Account, AccountLog). The `<bin>-pdb` exports and
+`names/<bin>/S01.json` already exist; run S01 for the layouts, patch analysis and the per-item follow-up table, then
+continue the open phase-2 items with the PDB exports as their main reading source.
 
 ### Follow-ups for items done before the 2017 PDB arrived
 
@@ -148,6 +154,7 @@ follow-up session.
 
 1. C01 → W01 → Z01, plus P01 and P03 (both cheap; install the dissector, record capture scenarios 1–5, run P02 early)
 1b. C02, then the follow-ups above (C01, W01, L00 first)
+1c. S01, then its follow-ups (`docs/knowledge/S01.md`) for finished items
 2. Z02, Z03, Z04, W02 (core gameplay)
 3. Z07, Z08, Z05, Z06, W03, W04
 4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, W05, then D06

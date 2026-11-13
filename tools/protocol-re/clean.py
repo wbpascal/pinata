@@ -31,10 +31,8 @@ NOISE = re.compile(r"""^\s*(?:
   | \s*
 )$""", re.X)
 
-def rename(t):
-    for k, v in names.items():
-        t = re.sub(r"\b" + re.escape(k) + r"\b", v, t)
-    return t
+def rename(t):  # one pass: every names key is a plain identifier (FUN_/DAT_/...)
+    return re.sub(r"\b\w+\b", lambda m: names.get(m.group(0), m.group(0)), t)
 
 for a in addrs:
     a = f"{int(a, 16):08x}"

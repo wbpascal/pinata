@@ -10,10 +10,12 @@ How to read the *Value / source* column:
 - Other text: the decompiler expression, shortened.
 - Gaps between offsets are bytes the code did not write (padding, or filled in a way the extractor missed).
 - **Fill**: part of the payload is produced by a helper; for zone, virtual helpers are resolved assuming a `ShinePlayer` receiver.
-- †: name not from the opcode's own 2016 handler (2017 client PDB, REQ+1 = ACK guess, or a log string).
+- Names: official enum names from the 2016 server PDBs (work item S01) where the value is in them.
+- †: name neither from the 2016 server PDBs nor from the opcode's own 2016 handler (2017 client PDB, REQ+1 = ACK guess, or a log string).
 
-- **2017 PDB layout**: the `PROTO_*` struct from the 2017 client PDB (`docs/protocol/pdb-layouts.json`, work item C02),
-  shown when no hand-verified layout exists. A 2017 build: confirm against the 2016 code before relying on it.
+- **2016 PDB layout**: the `PROTO_*` struct from the 2016 server PDBs (`docs/protocol/pdb2016-layouts.json`, work item S01,
+  same build), shown when no hand-verified layout exists. Otherwise **2017 PDB layout**: the struct from the 2017 client
+  PDB (`docs/protocol/pdb-layouts.json`, work item C02), a newer build: confirm against the 2016 code before relying on it.
 
 Heuristic extraction: verify a layout against the cited function before relying on it.
 
@@ -21,7 +23,7 @@ Heuristic extraction: verify a layout against the cited function before relying 
 
 ### `0x0802` NC_MISC_S2SCONNECTION_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_S2SCONNECTION_REQ`, 7 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MISC_S2SCONNECTION_REQ`, 7 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -43,9 +45,9 @@ Handler `FUN_00404830` (CPFs)
 | 4 | u8 |  | z |
 | 5 | u16 |  | key |
 
-### `0x0803` NC_MISC_S2SCONNECTION_ACK †
+### `0x0803` NC_MISC_S2SCONNECTION_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_S2SCONNECTION_ACK`, 3 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MISC_S2SCONNECTION_ACK`, 3 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -90,7 +92,7 @@ Handler `FUN_00402530` (CParserAccount)
 | 20 | u32 |  | AddCash |
 | 24 | u32 |  |  |
 
-### `0x0823` NC_MISC_START_THE_BOOM_CMD †
+### `0x0823` NC_MISC_START_THE_BOOM_CMD
 
 **2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_START_THE_BOOM_CMD`, 64 bytes
 
@@ -131,7 +133,7 @@ Handler `FUN_00402ba0` (CParserAccount)
 | 10 | u8 |  | d. |
 | 11 | u8 |  | d. |
 
-### `0x0838` NC_MISC_EVENT_DONE_MUNSANG_WM2ACC †
+### `0x0838` NC_MISC_EVENT_DONE_MUNSANG_WM2ACC
 
 **Verified layout** (WM→AccountDB) (basis: account FUN_00402cb0)
 
@@ -153,7 +155,7 @@ Handler `FUN_00402cb0` (CParserAccount)
 | 9 | u16 |  |  |
 | 11 | u16 |  |  |
 
-### `0x0c07` NC_USER_PASSWORD_CHECK_REQ †
+### `0x0c07` NC_USER_PASSWORD_CHECK_REQ
 
 **Verified layout** (Login→AccountDB) (basis: account FUN_004039c0)
 
@@ -176,9 +178,9 @@ Handler `FUN_004039c0` (CParserAccount)
 | 266 | u32 |  |  |
 | 270 | u32 |  |  |
 
-### `0x0c10` NC_USER_LOGIN_DB †
+### `0x0c10` NC_USER_LOGIN_DB
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USER_LOGIN_DB`, 9 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_USER_LOGIN_DB`, 9 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -190,9 +192,9 @@ Handler `FUN_00402510` (CParserAccount)
 
 No payload fields read directly by the handler.
 
-### `0x0c11` NC_USER_LOGOUT_DB †
+### `0x0c11` NC_USER_LOGOUT_DB
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USER_LOGOUT_DB`, 9 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_USER_LOGOUT_DB`, 9 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -205,9 +207,9 @@ Handler `FUN_00402510` (CParserAccount)
 
 No payload fields read directly by the handler.
 
-### `0x0c1e` NC_USER_LOGIN_NETMARBLE_DB_REQ †
+### `0x0c1e` NC_USER_LOGIN_NETMARBLE_DB_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USER_LOGIN_NETMARBLE_DB_REQ`, 278 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_USER_LOGIN_NETMARBLE_DB_REQ`, 278 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -223,7 +225,7 @@ Handler `FUN_00403720` (CParserAccount)
 | 2 | char* |  |  |
 | 22 | char* |  |  |
 
-### `0x0c26` NC_USER_TEENAGER_REQ †
+### `0x0c26` NC_USER_TEENAGER_REQ
 
 **Verified layout** (→AccountDB) (basis: account FUN_00402610)
 
@@ -239,7 +241,7 @@ Handler `FUN_00402610` (CParserAccount)
 | 0 | char* |  |  |
 | 256 | u16 |  |  |
 
-### `0x0c28` NC_USER_TEENAGER_SET_CMD †
+### `0x0c28` NC_USER_TEENAGER_SET_CMD
 
 **Verified layout** (→AccountDB) (basis: account FUN_00402a40)
 
@@ -254,7 +256,7 @@ Handler `FUN_00402a40` (CParserAccount)
 |---|---|---|---|
 | 50 | u32 |  |  |
 
-### `0x0c39` NC_USER_GER_PASSWORD_CHECK_REQ †
+### `0x0c39` NC_USER_GER_PASSWORD_CHECK_REQ
 
 **Verified layout** (Login→AccountDB) (basis: account FUN_00403b20)
 
@@ -301,9 +303,9 @@ Handler `FUN_00402d40` (CParserAccount)
 | 74 | char[16] |  | copied with __mbsnbcpy n=0x10 |
 | 94 | char[6] |  | copied with __mbsnbcpy n=6 |
 
-### `0x0c4b` NC_USER_JP_PASSWORD_CHECK_REQ †
+### `0x0c4b` NC_USER_JP_PASSWORD_CHECK_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USER_JP_PASSWORD_CHECK_REQ`, 336 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_USER_JP_PASSWORD_CHECK_REQ`, 336 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -320,7 +322,7 @@ Handler `FUN_00403e10` (CParserAccount)
 | 0 | u16 |  |  |
 | 26 | char[36] |  | copied with __mbsnbcpy n=0x24 |
 
-### `0x0c53` NC_USER_CH_PASSWORD_CHECK_REQ †
+### `0x0c53` NC_USER_CH_PASSWORD_CHECK_REQ
 
 **Verified layout** (Login→AccountDB) (basis: account FUN_00403c80)
 
@@ -343,7 +345,7 @@ Handler `FUN_00403c80` (CParserAccount)
 | 266 | u32 |  |  |
 | 270 | u32 |  |  |
 
-### `0x0c5b` NC_USER_US_PASSWORD_CHECK_REQ †
+### `0x0c5b` NC_USER_US_PASSWORD_CHECK_REQ
 
 **Verified layout** (Login→AccountDB) (basis: account FUN_00402fe0)
 
@@ -387,7 +389,7 @@ Handler `FUN_00403220` (CParserAccount)
 | 0 | u16 |  |  |
 | 2 | u32 |  | UserNo |
 
-### `0x0c64` NC_USER_SET_RETURN_CMD †
+### `0x0c64` NC_USER_SET_RETURN_CMD
 
 **Verified layout** (WM→AccountDB) (basis: account FUN_00403480)
 
@@ -401,9 +403,9 @@ Handler `FUN_00403480` (CParserAccount)
 |---|---|---|---|
 | 0 | u32 |  | UserNo |
 
-### `0x140d` NC_USP_USER_CHARACTER_INSERT †
+### `0x140d` NC_USP_USER_CHARACTER_INSERT
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USP_USER_CHARACTER_INSERT`, 50 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_USP_USER_CHARACTER_INSERT`, 50 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -417,9 +419,9 @@ Handler `FUN_00402510` (CParserAccount)
 
 No payload fields read directly by the handler.
 
-### `0x140e` NC_USP_USER_CHARACTER_DELETE †
+### `0x140e` NC_USP_USER_CHARACTER_DELETE
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USP_USER_CHARACTER_DELETE`, 9 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_USP_USER_CHARACTER_DELETE`, 9 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -431,9 +433,9 @@ Handler `FUN_00402510` (CParserAccount)
 
 No payload fields read directly by the handler.
 
-### `0x2801` NC_OPTOOL_S2SCONNECT_LIST_REQ †
+### `0x2801` NC_OPTOOL_S2SCONNECT_LIST_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_S2SCONNECT_LIST_REQ`, 1 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_OPTOOL_S2SCONNECT_LIST_REQ`, 1 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -445,9 +447,9 @@ Handler `FUN_00404dd0` (CPFs)
 |---|---|---|---|
 | 0 | u16 |  |  |
 
-### `0x2805` NC_OPTOOL_MAP_USER_LIST_REQ †
+### `0x2805` NC_OPTOOL_MAP_USER_LIST_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_MAP_USER_LIST_REQ`, 1 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_OPTOOL_MAP_USER_LIST_REQ`, 1 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -461,7 +463,7 @@ Handler `FUN_00405070` (CPFs)
 
 ### `0x2807` NC_OPTOOL_CONNECT_BRIF_REQ
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_CONNECT_BRIF_REQ`, 1 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_OPTOOL_CONNECT_BRIF_REQ`, 1 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -475,9 +477,9 @@ Handler `FUN_00405140` (CPFs)
 
 ## Sent on server links
 
-### `0x0803` NC_MISC_S2SCONNECTION_ACK †
+### `0x0803` NC_MISC_S2SCONNECTION_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MISC_S2SCONNECTION_ACK`, 3 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MISC_S2SCONNECTION_ACK`, 3 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -520,7 +522,7 @@ Sent in reply to `0x081d` NC_MISC_WEB_DB_KEY_REQ on CParserAccount (`FUN_0040383
 | 4 | i32 | `in(0x081d)+0` |
 | 8 | char[8183] | `_sprintf from "%09u%09u%09u"` |
 
-### `0x0830` NC_MISC_CONNECTFROMWHERE_DB_ACK †
+### `0x0830` NC_MISC_CONNECTFROMWHERE_DB_ACK
 
 **Verified layout** (AccountDB→WM) (basis: account FUN_00402ba0)
 
@@ -540,7 +542,7 @@ Sent in reply to `0x082f` NC_MISC_SERVERPARAMETER_REQ on CParserAccount (`FUN_00
 | 6 | u16 | `in(0x082f)+6` |
 | 8 | char | `(char)uVar2` |
 
-### `0x0839` NC_MISC_EVENT_DONE_MUNSANG_ACC2WM †
+### `0x0839` NC_MISC_EVENT_DONE_MUNSANG_ACC2WM
 
 **Verified layout** (AccountDB→WM) (basis: account FUN_00402cb0)
 
@@ -553,7 +555,7 @@ Sent in reply to `0x082f` NC_MISC_SERVERPARAMETER_REQ on CParserAccount (`FUN_00
 | 11 | u16 | hZone |  |
 | 13 | u16 | nQuestID |  |
 
-Sent in reply to `0x0838` NC_MISC_EVENT_DONE_MUNSANG_WM2ACC † on CParserAccount (`FUN_00402cb0`) · payload 15 bytes · raw header
+Sent in reply to `0x0838` NC_MISC_EVENT_DONE_MUNSANG_WM2ACC on CParserAccount (`FUN_00402cb0`) · payload 15 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -564,7 +566,7 @@ Sent in reply to `0x0838` NC_MISC_EVENT_DONE_MUNSANG_WM2ACC † on CParserAccoun
 | 11 | u16 | `in(0x0838)+9` |
 | 13 | u16 | `in(0x0838)+11` |
 
-### `0x0c08` NC_USER_PASSWORD_CHECK_ACK †
+### `0x0c08` NC_USER_PASSWORD_CHECK_ACK
 
 **Verified layout** (AccountDB→Login) (basis: account FUN_004039c0)
 
@@ -580,7 +582,7 @@ Sent in reply to `0x0838` NC_MISC_EVENT_DONE_MUNSANG_WM2ACC † on CParserAccoun
 
 raw frame with truncated length byte 0x21 (D01-B1)
 
-Sent in reply to `0x0c1e` NC_USER_LOGIN_NETMARBLE_DB_REQ † on CParserAccount (`FUN_00403720`) · payload 31 bytes · raw header
+Sent in reply to `0x0c1e` NC_USER_LOGIN_NETMARBLE_DB_REQ on CParserAccount (`FUN_00403720`) · payload 31 bytes · raw header
 
 Fill: +2: FUN_00402050; +2: FUN_00402180; +2: FUN_00402180
 
@@ -596,7 +598,7 @@ Fill: +2: FUN_00402050; +2: FUN_00402180; +2: FUN_00402180
 | 26 | u32 | `0` |
 | 30 | u32 | `0` |
 
-### `0x0c27` NC_USER_TEENAGER_ACK †
+### `0x0c27` NC_USER_TEENAGER_ACK
 
 **Verified layout** (AccountDB→) (basis: account FUN_00402610)
 
@@ -608,7 +610,7 @@ Fill: +2: FUN_00402050; +2: FUN_00402180; +2: FUN_00402180
 | 308 | u8 | nType | 0 teen with time, 1 teen time used up, 2 adult, 3 DB error |
 | 309 | u32 | nMinute |  |
 
-Sent in reply to `0x0c26` NC_USER_TEENAGER_REQ † on CParserAccount (`FUN_00402610`) · payload 313 bytes
+Sent in reply to `0x0c26` NC_USER_TEENAGER_REQ on CParserAccount (`FUN_00402610`) · payload 313 bytes
 
 Fill: +0: FUN_004022c0
 
@@ -619,7 +621,7 @@ Fill: +0: FUN_004022c0
 | 308 | u8 | `0`; `1`; `2`; `3` |
 | 309 | i32 | `180` (0xb4); `uVar7 / 0x3c`; `local_288` |
 
-### `0x0c3a` NC_USER_GER_PASSWORD_CHECK_ACK †
+### `0x0c3a` NC_USER_GER_PASSWORD_CHECK_ACK
 
 **Verified layout** (AccountDB→Login) (basis: account FUN_00403b20)
 
@@ -635,7 +637,7 @@ Fill: +0: FUN_004022c0
 
 raw frame with truncated length byte 0x21 (D01-B1)
 
-Sent in reply to `0x0c39` NC_USER_GER_PASSWORD_CHECK_REQ † on CParserAccount (`FUN_00403b20`) · payload 31 bytes · raw header
+Sent in reply to `0x0c39` NC_USER_GER_PASSWORD_CHECK_REQ on CParserAccount (`FUN_00403b20`) · payload 31 bytes · raw header
 
 Fill: +2: FUN_00402050; +2: FUN_004022c0
 
@@ -651,7 +653,7 @@ Fill: +2: FUN_00402050; +2: FUN_004022c0
 | 26 | u32 | `0` |
 | 30 | u32 | `0` |
 
-### `0x0c3f` NC_USER_TW_PASSWORD_CHECK_ACK †
+### `0x0c3f` NC_USER_TW_PASSWORD_CHECK_ACK
 
 **Verified layout** (AccountDB→Login) (basis: account FUN_00402d40)
 
@@ -669,9 +671,9 @@ Sent in reply to `0x0c3e` NC_USER_TW_PASSWORD_CHECK_REQ on CParserAccount (`FUN_
 | 2 | u16 | `65` (0x41); `68` (0x44); `70` (0x46) |
 | 4 | i32 | `-1`; `local_1b8` |
 
-### `0x0c4c` NC_USER_JP_PASSWORD_CHECK_ACK †
+### `0x0c4c` NC_USER_JP_PASSWORD_CHECK_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_USER_JP_PASSWORD_CHECK_ACK`, 306 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_USER_JP_PASSWORD_CHECK_ACK`, 306 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -682,7 +684,7 @@ Sent in reply to `0x0c3e` NC_USER_TW_PASSWORD_CHECK_REQ on CParserAccount (`FUN_
 | 32 | char[254] | sChannel |  |
 | 286 | char[20] | sUserIP |  |
 
-Sent in reply to `0x0c4b` NC_USER_JP_PASSWORD_CHECK_REQ † on CParserAccount (`FUN_00403e10`) · payload 306 bytes
+Sent in reply to `0x0c4b` NC_USER_JP_PASSWORD_CHECK_REQ on CParserAccount (`FUN_00403e10`) · payload 306 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -693,7 +695,7 @@ Sent in reply to `0x0c4b` NC_USER_JP_PASSWORD_CHECK_REQ † on CParserAccount (`
 | 32 | char[254] | `__mbsnbcpy from (uchar *)_Source_00` |
 | 286 | char[20] | `__mbsnbcpy from (uchar *)puStack_1c1ac` |
 
-### `0x0c54` NC_USER_CH_PASSWORD_CHECK_ACK †
+### `0x0c54` NC_USER_CH_PASSWORD_CHECK_ACK
 
 **Verified layout** (AccountDB→Login) (basis: account FUN_00403c80)
 
@@ -709,7 +711,7 @@ Sent in reply to `0x0c4b` NC_USER_JP_PASSWORD_CHECK_REQ † on CParserAccount (`
 
 raw frame with truncated length byte 0x21 (D01-B1)
 
-Sent in reply to `0x0c53` NC_USER_CH_PASSWORD_CHECK_REQ † on CParserAccount (`FUN_00403c80`) · payload 31 bytes · raw header
+Sent in reply to `0x0c53` NC_USER_CH_PASSWORD_CHECK_REQ on CParserAccount (`FUN_00403c80`) · payload 31 bytes · raw header
 
 Fill: +2: FUN_00402050; +2: FUN_004022c0
 
@@ -725,7 +727,7 @@ Fill: +2: FUN_00402050; +2: FUN_004022c0
 | 26 | u32 | `0` |
 | 30 | u32 | `0` |
 
-### `0x0c5c` NC_USER_US_PASSWORD_CHECK_ACK †
+### `0x0c5c` NC_USER_US_PASSWORD_CHECK_ACK
 
 **Verified layout** (AccountDB→Login) (basis: account FUN_00402fe0)
 
@@ -744,7 +746,7 @@ Fill: +2: FUN_00402050; +2: FUN_004022c0
 
 pdb2017 field names; offsets checked in the 2016 code
 
-Sent in reply to `0x0c5b` NC_USER_US_PASSWORD_CHECK_REQ † on CParserAccount (`FUN_00402fe0`) · payload 353 bytes
+Sent in reply to `0x0c5b` NC_USER_US_PASSWORD_CHECK_REQ on CParserAccount (`FUN_00402fe0`) · payload 353 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -785,9 +787,9 @@ Sent in reply to `0x0c60` NC_USER_RETURN_CHECK_REQ on CParserAccount (`FUN_00403
 | 6 | char | `'\0'`; `'\x01'` |
 | 7 | i32 | `0`; `local_211c` |
 
-### `0x2802` NC_OPTOOL_S2SCONNECT_LIST_ACK †
+### `0x2802` NC_OPTOOL_S2SCONNECT_LIST_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_S2SCONNECT_LIST_ACK`, 4 bytes + variable tail
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_OPTOOL_S2SCONNECT_LIST_ACK`, 4 bytes + variable tail
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -798,7 +800,7 @@ Sent in reply to `0x0c60` NC_USER_RETURN_CHECK_REQ on CParserAccount (`FUN_00403
 
 Element `SERVER_CONN_INFO` (7 bytes): +0 u8 connect_server_world, +1 u8 connect_server_zone, +2 u8 connect_server_id, +3 u32 connect_time.year|month|day|hour|min|sec
 
-Sent in reply to `0x2801` NC_OPTOOL_S2SCONNECT_LIST_REQ † on CPFs (`FUN_00404dd0`) · payload variable (iVar1 * 7 + 4)
+Sent in reply to `0x2801` NC_OPTOOL_S2SCONNECT_LIST_REQ on CPFs (`FUN_00404dd0`) · payload variable (iVar1 * 7 + 4)
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -807,23 +809,23 @@ Sent in reply to `0x2801` NC_OPTOOL_S2SCONNECT_LIST_REQ † on CPFs (`FUN_00404d
 | 2 | u16 | `(undefined2)iVar1` |
 | 8191 | u32 | `DAT_00449dc4 ^ &stack0xfffffffc` |
 
-### `0x2804` NC_OPTOOL_CLOSE_SERVER_ACK †
+### `0x2804` NC_OPTOOL_CLOSE_SERVER_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_CLOSE_SERVER_ACK`, 2 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_OPTOOL_CLOSE_SERVER_ACK`, 2 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | error |  |
 
-Sent in reply to `0x2803` NC_OPTOOL_CLOSE_SERVER_REQ † on CPFs (`FUN_00404fc0`) · payload 2 bytes
+Sent in reply to `0x2803` NC_OPTOOL_CLOSE_SERVER_REQ on CPFs (`FUN_00404fc0`) · payload 2 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
 | 0 | u16 | `1536` (0x600) |
 
-### `0x2806` NC_OPTOOL_MAP_USER_LIST_ACK †
+### `0x2806` NC_OPTOOL_MAP_USER_LIST_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_MAP_USER_LIST_ACK`, 4 bytes + variable tail
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_OPTOOL_MAP_USER_LIST_ACK`, 4 bytes + variable tail
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -834,7 +836,7 @@ Sent in reply to `0x2803` NC_OPTOOL_CLOSE_SERVER_REQ † on CPFs (`FUN_00404fc0`
 
 Element `NC_OPTOOL_MAP_USER_LIST_INFO` (16 bytes): +0 u16 map_id, +2 char[12] map_name, +14 u16 num_of_user
 
-Sent in reply to `0x2805` NC_OPTOOL_MAP_USER_LIST_REQ † on CPFs (`FUN_00405070`) · payload 4 bytes
+Sent in reply to `0x2805` NC_OPTOOL_MAP_USER_LIST_REQ on CPFs (`FUN_00405070`) · payload 4 bytes
 
 | Off | Type | Value / source |
 |---|---|---|
@@ -842,9 +844,9 @@ Sent in reply to `0x2805` NC_OPTOOL_MAP_USER_LIST_REQ † on CPFs (`FUN_00405070
 | 1 | u8 | `DAT_0044b808` |
 | 2 | u16 | `0` |
 
-### `0x2808` NC_OPTOOL_CONNECT_BRIF_ACK †
+### `0x2808` NC_OPTOOL_CONNECT_BRIF_ACK
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_OPTOOL_CONNECT_BRIF_ACK`, 170 bytes
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_OPTOOL_CONNECT_BRIF_ACK`, 170 bytes
 
 | Off | Type | Field | Notes |
 |---|---|---|---|

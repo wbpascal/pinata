@@ -8,6 +8,9 @@ python3 "$T/layouts.py" "$E/wm" x
 python3 "$T/layouts.py" "$E/zone" x "$R/Files/Server/2016/w00_Zone00/5ZoneServer2.exe"
 for s in account accountlog character gamelog; do python3 "$T/layouts.py" "$E/$s" x > /dev/null; done
 python3 -I "$T/pdb.py" "$R/Files/Client/2017/Fiesta.pdb" layouts "$D/pdb-layouts.json"
+N=$R/Files/Server/NA2016   # 2016 server PDBs (S01): same builds; merged, preferred over the 2017 client PDB
+python3 -I "$T/pdb.py" "$N/Zone00/Zone.pdb" layouts2016 "$D/pdb2016-layouts.json" "$N/WorldManager/WorldManager.pdb" \
+    "$N/Login/Login.pdb" "$N/Account/Account.pdb" "$N/AccountLog/AccountLog.pdb"
 python3 -I "$T/catalog.py" "$E" "$D"
 python3 -I "$T/packets.py" "$E" "$D"
 python3 -I "$T/errcodes.py" "$E/client" "$R/Files/Client/2016/ressystem" > "$D/client-error-codes.json"
