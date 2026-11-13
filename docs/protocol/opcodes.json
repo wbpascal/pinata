@@ -24844,8 +24844,8 @@
   "op": "0xb409",
   "dept": 45,
   "cmd": 9,
-  "name": null,
-  "name_source": null,
+  "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_REQ",
+  "name_source": "pdb2016",
   "received_by": [
    "wm:CParserClient:FUN_00417c90"
   ]
@@ -24854,8 +24854,8 @@
   "op": "0xb40a",
   "dept": 45,
   "cmd": 10,
-  "name": null,
-  "name_source": null,
+  "name": "NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_REQ",
+  "name_source": "pdb2016",
   "received_by": [
    "character:CParserCharacter:FUN_00423cb0"
   ]
@@ -24865,7 +24865,7 @@
   "dept": 45,
   "cmd": 11,
   "name": "NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK",
-  "name_source": "handler",
+  "name_source": "pdb2016",
   "received_by": [
    "wm:CParserCharDB:FUN_0040d740"
   ]
@@ -24874,8 +24874,8 @@
   "op": "0xb40c",
   "dept": 45,
   "cmd": 12,
-  "name": null,
-  "name_source": null,
+  "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_ACK",
+  "name_source": "pdb2016",
   "received_by": [],
   "client": [
    "CharSelectFrameWork:FUN_00476de0"
@@ -24885,8 +24885,8 @@
   "op": "0xb40d",
   "dept": 45,
   "cmd": 13,
-  "name": null,
-  "name_source": null,
+  "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_CMD",
+  "name_source": "pdb2016",
   "received_by": [],
   "client": [
    "GameFrameWork:FUN_0049c660"
@@ -24896,8 +24896,8 @@
   "op": "0xb40e",
   "dept": 45,
   "cmd": 14,
-  "name": null,
-  "name_source": null,
+  "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_ACADEMY_MASTER_CMD",
+  "name_source": "pdb2016",
   "received_by": [],
   "client": [
    "ITask:GuildAcademyTask:FUN_006f46c0"
@@ -24908,7 +24908,7 @@
   "dept": 45,
   "cmd": 15,
   "name": "NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD",
-  "name_source": "handler",
+  "name_source": "pdb2016",
   "received_by": [
    "zone:WorldManagerSession:FUN_0044caa0"
   ]
@@ -24918,7 +24918,7 @@
   "dept": 45,
   "cmd": 16,
   "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_ITEM_USE_REQ",
-  "name_source": "handler",
+  "name_source": "pdb2016",
   "received_by": [
    "zone:ShineObjectClass::ShinePlayer:FUN_0051b090"
   ]
@@ -24927,8 +24927,8 @@
   "op": "0xb411",
   "dept": 45,
   "cmd": 17,
-  "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_ITEM_USE_ACK",
-  "name_source": "inferred(REQ+1)",
+  "name": "NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ITEM_USE_REQ",
+  "name_source": "pdb2016",
   "received_by": [
    "character:CParserCharacter:FUN_00423f30"
   ]
@@ -24938,7 +24938,7 @@
   "dept": 45,
   "cmd": 18,
   "name": "NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ITEM_USE_ACK",
-  "name_source": "handler",
+  "name_source": "pdb2016",
   "received_by": [
    "zone:GameDBSession:FUN_0051b6d0"
   ]
@@ -24947,8 +24947,8 @@
   "op": "0xb413",
   "dept": 45,
   "cmd": 19,
-  "name": null,
-  "name_source": null,
+  "name": "NC_USER_CONNECTION_CHANGE_CHAR_ID_ITEM_USE_ACK",
+  "name_source": "pdb2016",
   "received_by": [],
   "client": [
    "GameFrameWork:FUN_004b2bc0"

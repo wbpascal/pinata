@@ -9286,7 +9286,7 @@ Element `PROTO_NC_RAID_LOCATION_CMD::Memberinfo` (12 bytes): +0 u16 nPartyNo, +2
 
 Sent from `FUN_005cdb50` (`FUN_005cdb50`) · payload 13 bytes
 
-### `0xb413` name-change item result (ours) (hand-named)
+### `0xb413` NC_USER_CONNECTION_CHANGE_CHAR_ID_ITEM_USE_ACK
 
 **Verified layout** (basis: zone FUN_0051b090; client FUN_004b2bc0)
 

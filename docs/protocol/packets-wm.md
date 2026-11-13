@@ -2418,7 +2418,14 @@ Handler `FUN_004178a0`
 | 0 | u8 |  |  |
 | 1 | u8 |  |  |
 
-### `0xb409` ?
+### `0xb409` NC_USER_CONNECTION_CHANGE_CHAR_ID_REQ
+
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_USER_CONNECTION_CHANGE_CHAR_ID_REQ`, 21 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nSlotNo |  |
+| 1 | char[20] | sNewID | Name5 |
 
 Handler `FUN_00417c90`
 
@@ -7895,7 +7902,7 @@ Fill: +1: FUN_00402140
 | 22 | bytes[8169] | `FID_conflict__memcpy from param_2 + 2` |
 | 8191 | u32 | `DAT_00498aec ^ &stack0xfffffffc` |
 
-### `0xb40c` rename-by-item result (ours) (hand-named)
+### `0xb40c` NC_USER_CONNECTION_CHANGE_CHAR_ID_ACK
 
 **Verified layout** (basis: client FUN_00476de0)
 
@@ -7917,7 +7924,15 @@ Sent in reply to `0xb40b` NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK on CParserCha
 | 15 | u32 | `in(0xb40b)+11` |
 | 19 | u32 | `in(0xb40b)+13` |
 
-### `0xb40d` ?
+### `0xb40d` NC_USER_CONNECTION_CHANGE_CHAR_ID_CMD
+
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_USER_CONNECTION_CHANGE_CHAR_ID_CMD`, 41 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bInit |  |
+| 1 | char[20] | sOldID | Name5 |
+| 21 | char[20] | sNewID | Name5 |
 
 Sent from `FUN_00431dd0` (`FUN_00431dd0`) · payload 41 bytes
 
@@ -7931,7 +7946,13 @@ Sent from `FUN_00431dd0` (`FUN_00431dd0`) · payload 41 bytes
 | 33 | i32 | `0`; `local_31c`; `local_320` |
 | 37 | i32 | `0`; `local_318`; `local_31c` |
 
-### `0xb40e` ?
+### `0xb40e` NC_USER_CONNECTION_CHANGE_CHAR_ID_ACADEMY_MASTER_CMD
+
+**2016 PDB layout** *(pdb2016)*: `PROTO_NC_USER_CONNECTION_CHANGE_CHAR_ID_ACADEMY_MASTER_CMD`, 20 bytes
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[20] | sMasterID | Name5 |
 
 Sent from `FUN_00431dd0` (`FUN_00431dd0`) · payload 20 bytes
 
