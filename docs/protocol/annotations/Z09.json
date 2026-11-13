@@ -516,6 +516,64 @@
      ]
     ],
     "notes": "to the player who clicked, only when the receiver is someone else; the 2016 client has no handler (C01: dropped)"
+   },
+   "0x1C0C": {
+    "dir": "S→C",
+    "name": "NC_BRIEFINFO_MAGICFIELDSPREAD_CMD",
+    "basis": "zone BriefInformationMagicField ctor FUN_00549330 (length 0x12), filled in ShineMagicField::so_mgcfld_MagicFieldSpread FUN_0057ea30 / _Friend FUN_0057ee80, sent by vt 0x4c8 (folded FUN_00555280); client GameFrameWork::On_NC_BRIEFINFO_MAGICFIELDSPREAD_CMD FUN_004a09b0 → MagicField::AddMagicField FUN_00611a60; layout = pdb2016 PROTO struct",
+    "fields": [
+     [
+      0,
+      "u16",
+      "handle",
+      "magic field handle (0x4FA4 + pool index)"
+     ],
+     [
+      2,
+      "u16",
+      "caster",
+      "caster handle"
+     ],
+     [
+      4,
+      "u16",
+      "skillid",
+      "ActiveSkill ID of the field skill"
+     ],
+     [
+      6,
+      "SHINE_XY_TYPE",
+      "location",
+      "field centre (u32 x, u32 y)"
+     ],
+     [
+      14,
+      "u16",
+      "radious",
+      "ActiveSkill.Area / 2 (the client does not use it)"
+     ]
+    ],
+    "notes": "16 bytes; to every player in sight at the spread and to players walking into sight (Z09 §12.6)"
+   },
+   "0x1C0D": {
+    "dir": "S→C",
+    "name": "NC_BRIEFINFO_MAGICFIELDINFO_CMD",
+    "basis": "zone BriefInfoExchanger::BriefInfoExchangeMagicField::bixmfm_Send FUN_0043db60 (length 3 + 16·n); client On_NC_BRIEFINFO_MAGICFIELDINFO_CMD FUN_00499a90",
+    "fields": [
+     [
+      0,
+      "u8",
+      "magicfields",
+      "record count (≤ 28)"
+     ],
+     [
+      1,
+      "NC_BRIEFINFO_MAGICFIELDSPREAD_CMD[magicfields]",
+      "magicfield",
+      "16 bytes each"
+     ]
+    ],
+    "notes": "never sent by the 2016 zone: the batch counter is never incremented (original bug Z09-B27)"
    }
   }
  }

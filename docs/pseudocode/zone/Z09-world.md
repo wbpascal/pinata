@@ -23,6 +23,9 @@ shout, servant explosions, boss-field hooks, the charmed player's target selecto
 bitmaps and doors, server-driven moves, random spots, Navigator, MobRoam, scenario moves) and sight (coordinate lists,
 range queries, 0x1C0E on moves). §10 spawns (MobHatchery / breeder groups / breeders, MobRegen files, adaptive regen
 time, families, the 1-s regen event, script and Lua spawners, KQ / instant regen tables) and the treasure-chest maker.
+§11 drops (tables, roll, drop objects, loot rights, party/raid loot, dice game). §12 magic fields (ground-effect skills:
+spread, tick, damage / heal / aggro, 0x1C0C / 0x1C0D) and axial flags (map anchors that run the map cinema and the
+guild tournament).
 
 ---
 
@@ -129,10 +132,11 @@ ShineObjectEachList.soel_Routine(list)                              @ FUN_0054f7
 | Class | so_Routine | Section |
 |---|---|---|
 | ShineObject (base) | FUN_0064c820 `return 1` | — |
-| ShineAxialFlag | `ShineAxialFlag::so_Routine` | later part (objects) |
+| ShineAxialFlag | `ShineAxialFlag::so_Routine` FUN_00569e00 | §12.7 |
 | ShineDropItem | `ShineDropItem::so_Routine` | later part (drops) |
 | ShineMiniHouse | FUN_00567400 | Z06 §3.4 / Z13 |
-| ShineMagicField, ShineEffectObject, ShineDoor, ShineServant | `…::so_Routine` | later part (objects) |
+| ShineMagicField | `ShineMagicField::so_Routine` FUN_0056d7e0 | §12.4 |
+| ShineEffectObject, ShineDoor, ShineServant | `…::so_Routine` | later part (objects) |
 | ShineBandit | `ShineBandit::so_Routine` FUN_0056c630 | §5.10 |
 | ShineMobileObject (base of all movers) | FUN_0056a080 (cast completion: Z03 §5) | §5.5 |
 | ShinePlayer | FUN_0056c790 | §2 |
@@ -3569,6 +3573,367 @@ is exhausted, shuffles one random point of the next ring to the front (`RandomBo
   an unused hook.
 - `ItemAttr` class vt 0x2c (how MinQtty/MaxQtty and the `Upgrade00..15` weights become the item's lot and upgrade) was not
   read; the per-class functions are Z04's item model.
-- vt 0x33c(0, 1, 3) on removal is assumed to be the sight-removal broadcast (0x1C0E path of §9.6) *(inferred)*.
+- **Settled in part 8a:** vt 0x33c(0, 1, 3) on removal is `ShineObject::so_Unmark(REMOVE_NOW, 1, 3)` FUN_00553970 →
+  `so_BroadcastLogout` → `so_Logout` → vt 0x14, for drop items `ShineDropItem::so_LogoutPacketBroadcast` FUN_00553b30
+  (0x1805 to the whole map, §11.4), then the object leaves the coordinate lists (§12.4 has the full chain).
 - `dropitemanalyzer` (DAT_0cf15b40, 256 buckets × 500 `{mobId, itemId, count}`) has no reader in the zone.
 - `+0x204` (flag 1 from `so_IsDropping`) is never read by the drop functions found.
+
+---
+
+## 12. Other world objects 1: magic fields and axial flags
+
+Part 8a. Two object classes without a mover: `ShineMagicField` (object kind 6, pool 20388–20637 = 250 objects, handle
+= 0x4FA4 + pool index, `ShineMagicField::so_RemakeHandle` FUN_00555ca0 / `ShineObjectHandleUnion::sohu_SetMagicFieldHandle`
+FUN_00548f80) are the ground areas left by "field" skills (Frost Nova, Inferno, God's Benevolence, boss breaths), and
+`ShineAxialFlag` (kind 0, pool 13500–17083, handle 0x34BC + index, `ShineAxialFlag::so_RemakeHandle` FUN_005562c0)
+are the invisible anchor objects of each map's coordinate lists (§9.6). All names *(pdb2016)*.
+
+### 12.1 `ShineMagicField` members (0x1c8 bytes)
+
+`ShineMagicField::ShineMagicField` FUN_0055afd0 / `~ShineMagicField` FUN_00555c20 (`vector_deleting_destructor` FUN_00556090):
+
+| Offset | Member | Meaning |
+|---|---|---|
+| +0x000 | `ShineObject` | base (handle +4, `so_LocateInfo` +0x66 {location*, direct*}, layer +0x6e, `so_Field` +0x7a) |
+| +0x167 | `smfm_MagicFieldBriefInfo` (`BriefInformationMagicField`, 0x27) | ready packet 0x1C0C: `ProtocolPacket bimfm_Pack` +0, buffer `bimfm_Array[19]` +0xc (2-byte opcode + 16-byte body), `bimfm_nc` +0x1f, `bimfm_BriefInfo` +0x23 → the body. Built by `BriefInformationMagicField::BriefInformationMagicField` FUN_00549330 (length 0x12, opcode 0x1C0C) |
+| +0x190 | `smfm_VanishTick` | `g_Now` at which the field disappears |
+| +0x194 | `smfm_Cener` (sic) | centre (x, y) |
+| +0x19c | `smfm_Tick` (`Metronome {m_NextTick, m_TickInterval}`) | effect tick |
+| +0x1a4 | `smfm_Empower` (`SKILL_EMPOWER`, 2 bytes: 4-bit damage / sp / keeptime / cooltime) | the caster's skill empowerment |
+| +0x1a8 | `smfm_CasterInform` (`MagicFieldOwnerInform`, 0x14) | `mfoi_Object` +0 caster, `mfoi_Regnum` +4 its `so_GetCharRegistNumber` (vt 0x344), `mfoi_CharClass` +8 (class, vt 0x49c → vt 0x38), `mfoi_CastCoord` +9 the caster's position at the spread |
+| +0x1bc | `smfm_skillindex` | `SkillDataBox::SkillDataIndex*` of the field skill |
+| +0x1c0 | `smfm_MagicFieldType` | 1 = damage field (`…MagicFieldSpread`), 2 = heal field (`…_Friend`) |
+| +0x1c1 | `smfm_RsDirect` | caster direction at the spread (rotation start) |
+| +0x1c4 | `smfm_RsTick` | rotation start = spread time + `MAGICFIELD_DELAY_START_TIME` |
+
+The constructor points `so_LocateInfo.location` at `bimfm_BriefInfo->location` (the packet body is the position storage)
+and `so_LocateInfo.direct` at `ShineObject::so_TempLocation.dir` (DAT_132729c0), a static byte shared by every magic field
+(always 0). Overridden virtual slots: 0x4a4 `so_RemakeHandle`, 0x4ac `so_Routine`, 0x4c8 `so_SendMyBriefInfo` (folded body
+of `ShineDropItem::so_SendMyBriefInfo` FUN_00555280: sends the packet at +0x167, the same offset in both classes), 0x4d0
+`so_ObjectType` FUN_00555c90 = 6, 0x8 `so_BriefInfoRange` = 2 (`BIR_SIGHT`, folded FUN_00647230), 0x7d8 / 0x7dc the two
+spread functions, 0xb98 `so_mgcfld_FirstTickDelay`. The base versions are no-ops: `ShineObject::so_mgcfld_MagicFieldSpread`
+FUN_004879b0 (also slot 0x7dc of all other classes), `ShineObject::so_mgcfld_FirstTickDelay` FUN_00552ec0.
+
+**Skill data.** The field parameters are decoded `SkillSpecial` entries of the skill (`ActiveSkill.shn`
+`SpecialIndexA…E` / `SpecialValueA…E`, decoded into `SkillDataIndex` `EnumStruct {exist, value}` members, Z03 §5.1),
+values in milliseconds (the code converts `value × 10 / 1000` to `g_Now` tenths):
+
+| `SkillSpecial` | Member | Use |
+|---|---|---|
+| 13 `SS_MAGICFIELD_TICK` | `sdi_MAGICFIELD_TICK` +0x108 | tick interval; a field without it never ticks (shown only) |
+| 14 `SS_MAGICFIELD_KEEP` | `sdi_MAGICFIELD_KEEP` +0x110 | lifetime of a **damage** field (and its presence selects slot 0x7d8) |
+| 49 `SS_MAGICFIELDPARTY` | `sdi_MAGICFIELD_PARTY` +0x1b8 | lifetime of a **heal** field (slot 0x7dc) |
+| 64 `SS_MAGICFIELD_DELAY_START_TIME` | `sdi_MAGICFIELD_DELAY_START_TIME` +0x230 | delay before the first tick and the rotation start |
+| 66 `SS_BMP_MAGICFIELD_ROTATIONSPEED_RIGHT` | `sdi_BMP_MAGICFIELD_ROTATIONSPEED_RIGHT` +0x238 | the area bitmap turns clockwise *(inferred from "RIGHT")* |
+| 1 `SS_HEALAMOUNT` | `sdi_HEALAMOUNT` +0x78 | heal per tick (heal field) |
+| 51 `SS_SETABSTATEFRIEND` | `sdi_SETABSTATEFRIEND` +0x1c8 | abstate ID put on every healed target |
+
+In the 2016 `ActiveSkill.shn`: damage fields `FrostNova01…20`, `Inferno…`, `ThunderBolt…`, the `*FlowerWide` traps
+(tick 3 s, keep 12 s), boss skills (`Chimera_Skill_W…`, `Eglack…`, `DNepilim_Skill_W`, `WarH_SFocalor…` with a 3-s
+delay, `WarH_FAvanas…` with rotation, `ArenaCrystal_Skill01_W`); heal field `CrossDrop01…03` "God's Benevolence"
+(party 15 s, tick 1 s, `HEALAMOUNT` 240 / 252 / 267, `SETABSTATEFRIEND` 8964). `DT_Airi_FrostNova01_W` /
+`DT_Airi_Inferno01_W` have `KEEP` but no `TICK`: they only show. The field radius is `ActiveSkill.Area / 2`.
+
+### 12.2 Who creates a field
+
+```pseudo
+(1) skill cast completion, in ShineMobileObject::so_Routine                               @ FUN_0056a080 (Z03 §5)
+    after the cast checks (target state vt 0x7e4, use check vt 0xedc, IsNoAttack / silence) and the aggro rate block:
+    if skill.EffectType is SE_TELEPORT or SE_VOLLEY: their own paths
+    elif skill has MAGICFIELD_KEEP or MAGICFIELD_PARTY: smo_MagicFieldSpread(o, skill)
+
+ShineMobileObject::smo_MagicFieldSpread(o, skill)                                         @ FUN_0057c880
+    s = o.smo_SkillCast.scs_ProduceSkill.sklidx
+    if s.SETABSTATEME: o.vt[0x648](&s.SETABSTATEME, &s.ABKEEPTIME)                         # abstate on the caster
+    if s.NOTTARGET:    o.vt[0x648](&s.NOTTARGET, &s.ABKEEPTIME); o.vt[0x64c]()
+    if skill == null: assert "…smo_MagicFieldSpread : SkillDataIndex NULL"; return
+    if skill.MAGICFIELD_KEEP: f = som_AllocObject(kind 6)  (none: assert "… : Too many FieldObject")
+        f.so_mgcfld_MagicFieldSpread (vt 0x7d8)(f.handle, o, s, &cast.scs_BattleSkill.locate, &cast.scs_Empower)
+    if skill.MAGICFIELD_PARTY: f = som_AllocObject(kind 6) …
+        f.so_mgcfld_MagicFieldSpread_Friend (vt 0x7dc)(same arguments)                    # a skill with both makes two fields
+    SkillResultBuffer.bufferpoint = 0; smo_SkillResultPacket(o, s, &locate); o.smo_Flag.InSkillShift = 0
+    to sight (incl. o): 0x2457 NC_BAT_SKILLBASH_HIT_BLAST_CMD { u16 index = o.smo_SkillIndexLastCasting,
+                                                               u16 caster = o.handle, u16 skill = cast.scs_Skill }   (Z03 §5)
+    skilleffectapplyer.sbec_Store(index, s, o, target = null, &locate, −1, o.vt[0xefc](), 0, 1)
+
+(2) abstate actor "MagicField"                                                             @ FUN_00408d80
+AbnormalStateContainer::SubAbnormalStateActorMagicField::sasa_Routine(actor, elem, victim, index)
+    (sasa_IndexString FUN_00401760 = "MagicField"; the actor of the SubAbState kinds listed in Z03 §6.1)
+    if elem.strength row has effect SAA_SETACTIVESKILL:
+        skill = skilldatabox[that effect's value];  f = som_AllocObject(kind 6);  either missing: return 0
+        caster = aeo_GetCaster(elem);  none: som_FreeObject(f, REMOVE_NOW, 4); return 0
+        if skill.MAGICFIELD_KEEP:    f.vt[0x7d8](f.handle, caster, skill, victim.position, &empower 0)
+        elif skill.MAGICFIELD_PARTY: f.vt[0x7dc](…same…)
+        else: som_FreeObject(f, REMOVE_NOW, 4); return 0
+    return SubAbnormalStateActor::sasa_Routine(actor, elem, victim, index)       @ FUN_00406d50 (Z03 §6)
+    # a field appears at the victim's feet each time the abstate's routine runs (rate: Z03 §6)
+
+(3) Lua cMagicFieldSpread(casterHandle, x, y, dir, skillName, firstTickDelay)               @ FUN_005f17c0
+    caster = som_GetObject(arg1) (none: return 0 values)
+    skill = skilldatabox[skillnametree[arg5]] (unknown: return 0); f = som_AllocObject(kind 6) (none: return 0)
+    f.vt[0x7d8](f.handle, caster, skill, &(x, y), &empower 0)       # always the damage slot, even for a heal skill
+    if arg6 == 1: f.so_mgcfld_FirstTickDelay (vt 0xb98)            # first tick one interval later
+    push f.handle; return 1                                          # arg4 is read and ignored
+```
+
+Scripts: `AIScript/Chimera.lua` (`cMagicFieldSpread(ChimeraHandle, …MagicFieldLocX, …LocY, 0, …MagicFieldSkill, 1)`),
+`KQ/KDArena/Functions/Routine.lua` (arena crystal, last argument 0). FiestaHeroes lists the function without arguments
+*(fh-doc)*.
+
+### 12.3 Spreading: `so_mgcfld_MagicFieldSpread` (damage) and `…_Friend` (heal)
+
+```pseudo
+ShineMagicField::so_mgcfld_MagicFieldSpread(f, handle, caster, s, xy, empower)              @ FUN_0057ea30
+    if caster == null or s == null: return                             # the object stays allocated and unplaced
+    start = g_Now − TICK×10/1000
+    f.smfm_skillindex = s;  f.smfm_VanishTick = g_Now + KEEP×10/1000
+    if caster.so_GetItemActionObserves (vt 0x5d0, players only) and s has ActiveSkillGroups:
+        if EventRunBySkillGroupIndex(results, s, kind 2 (keep time), caster, caster):
+            VanishTick += (GetRateAppliValue(results, KEEP) − KEEP)×10/1000     # item-action bonus on the duration (Z04/Z06)
+    if s.MAGICFIELD_DELAY_START_TIME: start += DELAY×10/1000
+    f.smfm_Tick = { m_TickInterval = TICK×10/1000, m_NextTick = start + interval }   # = g_Now (+ delay): first tick at once
+    f.so_Field = caster.so_Field;  f.position = xy
+    if fm_Marking(f.so_Field, f, 0, 0, 1) ≠ FM_MARKSUCCESS:                            # §5.7
+        assert "…so_mgcfld_MagicFieldSpread : Mark err"; som_FreeObject(f, REMOVE_NOW, 4); return
+    f.layer = caster.layer (8 bytes at *(+0x76));  f.smfm_Cener = xy;  f.smfm_Empower = *empower
+    f.smfm_CasterInform = { caster, caster.so_GetCharRegistNumber(), caster class, caster position }
+    f.smfm_MagicFieldType = 1
+    f.smfm_RsTick = g_Now + DELAY×10/1000;  f.smfm_RsDirect = caster direction
+    so_SetLayerRegNum(f, so_GetLayerRegNum(caster))
+    packet 0x1C0C body = { handle, caster = caster.handle, skillid = s.sdi_Activ.ID, location = xy,
+                           radious = s.sdi_Activ.Area / 2 }
+    so_AllOfRange(f, f.position, range 0 = sight, so_ExchageBriefInfo)        # tells everyone in sight (§12.6)
+    so_AllOfRange(f, f.smfm_Cener, Area/2, includeSelf 1, AxialListMagicFieldAggro{f, &f.smfm_CasterInform})
+    almfa_AppendAggro                                                          # §12.5
+
+ShineMagicField::so_mgcfld_MagicFieldSpread_Friend(f, …)                                  @ FUN_0057ee80
+    caster == null: assert "…_Friend : Caster NULL"; s == null: assert "…_Friend : SkillDataIndex NULL"; return
+    f.smfm_VanishTick = g_Now + MAGICFIELD_PARTY×10/1000
+    item-action bonus: VanishTick += (GetRateAppliValue(results, KEEP) − KEEP)×10/1000
+        # (original bug) Z09-B28: the heal field's lifetime is PARTY, but the bonus is computed on KEEP
+        # (0 for heal skills such as CrossDrop), so a duration bonus never lengthens a heal field
+    same tick / delay / marking / owner / rotation / packet setup (Mark err message is the damage one's),
+    smfm_MagicFieldType = 2, smfm_skillindex set only after a successful marking
+    so_AllOfRange(f, sight, so_ExchageBriefInfo)                               # no aggro pass
+```
+
+### 12.4 The field tick: `ShineMagicField::so_Routine` (vt 0x4ac)
+
+```pseudo
+ShineMagicField::so_Routine(f, list, index)                                                @ FUN_0056d7e0
+    f.vt[0x4a4](index)                                     # so_RemakeHandle; result unused
+    if g_Now < f.smfm_VanishTick:
+        if f.smfm_Tick.m_NextTick < g_Now:
+            m_NextTick += m_TickInterval                   # from the old value: a late field catches up one tick per routine
+            if f.smfm_skillindex == null: return 0
+            if skill has MAGICFIELD_TICK and f.smfm_CasterInform.mfoi_Object ≠ null:
+                type 1: smfm_MagicFieldDamage(f);  type 2: smfm_MagicFieldHeal(f)
+    else:
+        f.so_Unmark (vt 0x33c)(REMOVE_NOW, broadcast 1, 3)  → ShineObject::so_Unmark FUN_00553970:
+            vt 0x310 (no-op here); so_BroadcastLogout (vt 0x51c, FUN_0054f290) → so_Logout FUN_0054b780:
+                if f is linked in the coordinate lists: close a booth with its handle (never for fields);
+                so_LogoutPacketBroadcast (vt 0x14, FUN_00553a40): to sight 0x1805 { u16 handle } (Z01 §3.2)
+            remove f from both coordinate lists; so_bIsMapMarking = 0
+        som_FreeObject(f.handle, REMOVE_NOW, reason 0xf)
+    return 1
+
+ShineMagicField::so_mgcfld_FirstTickDelay(f)   (vt 0xb98)       @ FUN_00552f00
+    f.smfm_Tick.m_NextTick = g_Now + m_TickInterval
+```
+
+The caster pointer is re-validated at every tick (below): when the caster logged out, died and was freed, or its pool slot
+holds another object (`so_IsEmpty` vt 0x300, or `so_GetCharRegistNumber` ≠ `mfoi_Regnum`), `mfoi_Object` is cleared and
+the field does nothing for the rest of its life (it still shows until `VanishTick`).
+
+### 12.5 Damage, heal and aggro
+
+```pseudo
+ShineMagicField::smfm_MagicFieldDamage(f)                                                  @ FUN_00568810
+    c = f.smfm_CasterInform.mfoi_Object
+    if c and (c.so_IsEmpty() or c.so_GetCharRegistNumber() ≠ mfoi_Regnum): mfoi_Object = null
+    if mfoi_Object == null: return
+    scan = AxialListMagicFieldDamage { almfd_Owner = &f.smfm_CasterInform,
+            almfd_BattleField = map.fm_PKField, slmfd_GuildWarMap = map.fm_FieldOption.attack.EnemyGuild,   # both never read
+            slmfd_FieldCenter = f.position }
+    if s.sdi_Area is empty (no area bitmap):
+        allas_Init(scan) FUN_004c19f0 (allas_pArea = null: plain near scan);  centre = f.smfm_Cener, range = Area/2
+    else:
+        if s.BMP_MAGICFIELD_ROTATIONSPEED_RIGHT:
+            d = smfm_GetRotationDirect(f);  to = f.position + 50·(sin d, cos d)    (sr_sin1024 / sr_cos1024)
+            allas_Init(scan, s.sdi_Area[0], from = f.position, to, d)
+        else:
+            allas_Init(scan, s.sdi_Area[0], from = mfoi_CastCoord, to = f.smfm_Cener, dir = *f.direct (always 0))
+        centre = allas_GetEffectCoord(scan), range = sdi_Area[0].AreaSize (+0x34)
+    so_AllOfRange(f, centre, range, scan, includeSelf 1)
+    almfd_ApplyDamage(scan, s, &f.smfm_Empower, f)
+    if mfoi_Object: c.so_mob_SkillParameterSet_WeaponIndex (vt 0xc40)(c.so_mob_CurSelectWeapon (vt 0x740)())
+        # mobs: restore the stat matrix of the current weapon after the field skill's (§8.1); players: no-op
+
+ShineMagicField::smfm_GetRotationDirect(f)                                                 @ FUN_00579a50
+    Δ = g_Now − f.smfm_RsTick
+    return u8( f.smfm_RsDirect + (ROTATIONSPEED × Δ / 10) / 2 )      # direction byte in 2° units: speed in °/s *(inferred)*
+
+AxialListMagicFieldDamage::alns_ValidObject(scan, t)       (scan filter; class AxialListLimitAreaScan → NearScan)   @ FUN_005680c0
+    require t.so_GetHP() ≠ 0, t.so_Field, owner c ≠ null, t ≠ c
+    (mdb_CanIKill(t.mobId, c is a mob ? MKID_MOB : MKID_USER) is computed and not used here)
+    if c and t are players: c.so_mobile_ICanDamageTo(t, "…alns_ValidObject") — result unused
+    require c.so_mobile_ICanDamageTo(t, "…alns_ValidObject2")            (vt 0x980, §8.4 / Z03)
+    require not c.so_IsAlliance(t)                                       (vt 0xe60)
+    if c.so_mobile_GetGuildRegnum() (vt 0x828) ≠ 0: require t's guild ≠ c's guild
+
+AxialListMagicFieldDamage::almfd_ApplyDamage(scan, s, empower, f)                         @ FUN_005682c0
+    ctx = EngageArgument { att = c, def, sklinfo = s, empower, attackloc = f.position, damagerate 1000, crirateadd 0,
+                           pMultiHitArg null, nBMPDamageRate 1000 }
+    for i, t in scan.alns_buffer[0 .. alns_bp):                         # entries {member, distancesquar}
+        if t == null: stop
+        if not mdb_CanIKill(t.so_mob_MobID(), c is a mob ? MKID_MOB : MKID_USER): stop
+        if so_FindBlockLocate(f, t.position, 10000, mbi_IsAttackBlock) moves the point (an attack block between): stop
+            # (original bug) Z09-B26: "stop" leaves the whole loop: every target after the first unkillable one or the
+            # first one behind a wall gets no damage and no abstate this tick (checked in the disassembly: both
+            # branches jump to the function exit 0x5685ee)
+        c.so_mob_SkillParameterSet (vt 0xb90)(s.ID)                     # mobs: stats of the MobWeapon row (§8.1)
+        if s.sdi_DamageRule.roe_IsDamageSkill (vt 0x20, FUN_004ff840 = ActiveSkillInfoServer.UsualAttack) == 1:
+            ctx.def = t; ctx.nBMPDamageRate = scan.alns_GetBMPDamageRate(i)          # area bitmap cell × 10, else 1000
+            dmg = s.sdi_DamageRule.roe_CalcDamage (vt 0x1c, FUN_00505c00, Z03 §4.5)(ctx)
+            t.so_mobile_DamageOverTime (vt 0x730, FUN_00409cd0)(c, dmg, MAX_ABSTATEINDEX 0x318, 1, 0)
+                # Z03 §6: abstate hooks, HP loss/kill, to sight 0x243C NC_BAT_DOTDAMAGE_CMD with abstate 0xFFFF
+        if s.sdi_Activ.Last ∈ {TARGET_ENEMY 0, TARGET_ALL 5, TARGET_ENEMYUSER 7}:
+            for each of the skill's 4 abstate slots (sdi_Abstate[k] {abstateidx, strength, rate}):
+                if idx ≠ MAX and rand1000 < rate and (as = dic_abstate.as_FromIndex(idx)) and not t.so_AbnormalState_Resist(as) (vt 0x634):
+                    if t.so_AbnormalState_Set (vt 0x638)(c, idx, strength, as, g_Now, 0, 0, 0, 5, &f.position):
+                        so_AbnormalState_BitSet(t, idx)
+                        if as.subabstate[strength].assa_info: t.so_AbnormalState_Inform (vt 0x3f0)(idx, KeepTime, 1);
+                            so_AbnormalState_BroadcastSet(t, idx, KeepTime, strength)        (Z03 §6)
+
+ShineMagicField::smfm_MagicFieldHeal(f)                                                    @ FUN_0056d6b0
+    caster check as above (but the pointer is not cleared on failure; the tick just does nothing)
+    scan = AxialListMagicFieldHeal { almfh_Owner, almfh_FieldCenter = f.position }      (an AxialListNearScan, no bitmap)
+    so_AllOfRange(f, f.smfm_Cener, Area/2, scan, includeSelf 1);  almfh_ApplyHeal(scan, s, &f.smfm_Empower, f)
+
+AxialListMagicFieldHeal::alns_ValidObject(scan, t)                                         @ FUN_00568620
+    require t.so_GetHP() ≠ 0, t.so_Field, owner c ≠ null   (checked in the disassembly; the decompile drops the return)
+    if c.so_GetCharRegistNumber() == t.so_GetCharRegistNumber(): accept                # the caster itself
+    if c.so_mobile_IsEnemy (vt 0x72c)(t) == 1: reject
+    if t.so_GetRaidNumber (vt 0x554) ≠ 0xFFFF: accept iff c's raid number == t's
+    elif t.so_PartyRegistNumber_InAttack (vt 0x560) ≠ 0xFFFF: accept iff c's party == t's
+    else reject                                          # only the caster, its party or its raid; mobs return 0xFFFF
+
+AxialListMagicFieldHeal::almfh_ApplyHeal(scan, s, empower, f)                             @ FUN_0056d2c0
+    owner null: assert "…almfd_ApplyDamage - MagicField Owner NULL" (copy-pasted labels); s or s.sdi_Activ null: return
+    for each scanned t:
+        if not c.smo_ICanHealTo (vt 0xe94)(t): next                       (§8.4)
+        ctx = EngageArgument(c, t, s, empower, f.position)
+        heal = s.HEALAMOUNT
+        if c.so_GetItemActionObserves and EventRunBySkillGroupIndex(results, s, SEIT_HEAL_RATE_INCREASE, c, t):
+            heal = GetRateAppliValue(results, heal)
+        heal = setitemskilleffect[SET_HEALRATE] × heal / 1000
+            # (original bug) Z09-B30: `setitemskilleffect` (Z03 g_SetEffect) is a scratch global that a cast fills
+            # with its caster's set-item effects and every ShineMobileObject::so_Routine resets to 1000 (§5.5); the
+            # field tick runs outside both, so it reads whatever the last processed mobile object left there
+            # *(inferred from the call order)*, not the field caster's set bonus
+        if empower.damage: heal += s.sdi_Activ.nIMPT[empower.damage + 3]
+        if so_FindBlockLocate(f, t.position, 10000, mbi_IsAttackBlock) moves the point: stop     # Z09-B26, heal side
+        t.so_mobile_HPHealOverTime (vt 0x734, FUN_0040e910)(c, heal, MAX_ABSTATEINDEX)        (Z03 §6)
+        if s.SETABSTATEFRIEND:
+            as = dic_abstate.as_FromID(value); if as == null or as.index == null: next   # also skips the rolls below
+            t.so_AbnormalState_Set_Simple (vt 0x644)(c, as.index.AbStataIndex, 1, 1)
+        if s.sdi_Activ.Last ∈ {TARGET_ME, TARGET_PARTY, TARGET_FRIEND, TARGET_ALL, TARGET_GROUP}:
+            the 4 abstate rolls as in the damage path, but BitSet / Inform / BroadcastSet run even when
+            so_AbnormalState_Set returned false
+            # (original bug) Z09-B29: a refused abstate (stronger one present, immune) is still flagged in the brief
+            # bits and announced to sight with its full KeepTime
+
+AxialListMagicFieldAggro::alns_ValidObject(scan, t)                                        @ FUN_0057a980
+    require t.so_GetHP() ≠ 0, t.so_IsMob() (vt 0x89c: 1 for ShineMob and ShineServant (folded FUN_005af8d0), ShineBandit
+        `so_IsMob` FUN_00556e90 (its mob form, §5.10); 0 for players, NPCs and the rest), c.so_mobile_ICanDamageTo(t),
+        no attack block between f and t
+AxialListMagicFieldAggro::almfa_AppendAggro(scan)                                          @ FUN_0057aad0
+    for each t: t.so_mob_AppendAggro (vt 0x700)(c, 1)        # every mob in the field notices the caster once (§6.2)
+```
+
+`AxialListLimitAreaScan` (the bitmap filter shared with area skills, Z03): `allas_Init(area, from, to, dir)` FUN_004c1a00
+puts the bitmap centre on `from` (EffectTarget `IPT_ME`) or `to` (`IPT_TARGET` / `IPT_SPOT`) and, for directional
+bitmaps (`bIsDirection`), takes the direction from→to (or `dir` when both are equal); `ali_Work` FUN_004c1e20 keeps an
+object (mode ≠ 0 and ≠ 3, `alns_ValidObject`, < 200 entries) whose position, rotated into the bitmap frame, falls on a
+non-zero `AreaBMP` cell and stores that cell value as the target's damage rate (`alns_GetBMPDamageRate` FUN_004c1b10 =
+cell × 10 ‰, 1000 without a bitmap); `allas_GetEffectCoord` FUN_004c1ae0 = the bitmap centre. Without a bitmap it is a
+plain `AxialListNearScan` (all valid objects, ≤ 200).
+
+### 12.6 Packets and the client
+
+```pseudo
+0x1C0C NC_BRIEFINFO_MAGICFIELDSPREAD_CMD { u16 handle; u16 caster; u16 skillid; SHINE_XY_TYPE location; u16 radious }   (16 bytes)
+    stored at f+0x167; sent by f.so_SendMyBriefInfo (vt 0x4c8):
+      - at the spread to every player in sight (so_ExchageBriefInfo → bixc_Exchange → f.so_SendMyBriefInfo, Z02 §5.2)
+      - to a player walking into sight (AxialListBriefExchangerAtMove, §9.6)
+0x1C0D NC_BRIEFINFO_MAGICFIELDINFO_CMD { u8 magicfields; NC_BRIEFINFO_MAGICFIELDSPREAD_CMD magicfield[] }   (batch, ≤ 28)
+    batch `briefmagfld` (BriefInfoExchanger::BriefInfoExchangeMagicField, buffer 464 bytes)
+    bixmfm_Exchange(batch, me, field)  (so_ExchageBriefInfo case 6: a player's full exchange meets a field)   @ FUN_004402d0
+        if same layer (or either −1) and so_SubLayer_CanSee(field, me) and me is a player:
+            if batch.magicfields > 27: bixmfm_Send(batch, me); magicfields = 0
+            field.vt[0x4c4](&batch.magicfield[magicfields])     # ShineObject default: empty body (folded FUN_00549070)
+            # magicfields is never incremented
+    bixmfm_Send(batch, me): if magicfields ≠ 0 and me is a player in a mode ≠ 0: me ← 0x1C0D (3 + 16·n bytes)   @ FUN_0043db60
+        (profiler label "BriefInfoExchangeItem::bixi_Send", copy-pasted)
+    # (original bug) Z09-B27: ShineMagicField does not override the brief copy (vt 0x4c4) and bixmfm_Exchange never
+    # counts, so 0x1C0D is never sent. Fields are announced only by the spread and by moves into sight (§9.6, which
+    # also covers teleports): a player who enters the map (login, map link) or changes layer next to an active field
+    # does not see it until one of them moves out of and back into sight (the field still hits them)
+0x1805 { u16 handle } at vanish (§12.4)
+```
+
+Client (2016 `GameFrameWork`; names *(pdb2017)* from C02): `On_NC_BRIEFINFO_MAGICFIELDSPREAD_CMD` FUN_004a09b0 looks up the
+skill (`skillid`) and the caster; when the caster is known and the skill's client row byte +0x213 is 0x42 it calls the
+caster's vt 0xd4(1) (an animation switch, not traced); then `MagicField::AddMagicField` FUN_00611a60 creates the effect
+from the skill's view row (two effect names at +0x1c7 / +0x207, a scale from +0x21f when +0x21b == 14) and keeps the
+packet in a list. `On_NC_BRIEFINFO_MAGICFIELDINFO_CMD` FUN_00499a90 calls `AddMagicField` for each of the `magicfields`
+records. 0x1805 (FUN_004bd620) calls `MagicField::DeleteMagicField(handle)` FUN_00611960. The client ignores `radious`
+(the effect file sets the size). Damage and heals arrive as 0x243C / HP-heal packets of the targets (Z03).
+
+### 12.7 `ShineAxialFlag`: the map anchors (0x188 bytes)
+
+| Offset | Member | Meaning |
+|---|---|---|
+| +0x167 | `safm_allofrange_this` | what the flag stands for in a list walk: 0 for the two sentinels, the flag itself for the five anchors |
+| +0x16b | `safm_Screen` | `Movie::CinemaComplex*` run by this flag (anchor 2 only) |
+| +0x16f | `safm_DefaultCoord` (`SHINE_COORD_TYPE`, 9) | position storage (`so_LocateInfo` points here) |
+| +0x178 | `safm_vecRoutions` (`vector<RoutionInterface*>`) | extra per-tick objects (the guild tournament) |
+
+```pseudo
+ShineAxialFlag::ShineAxialFlag(a)              @ FUN_00559050: vector and screen empty; location → safm_DefaultCoord, direct → its dir
+ShineAxialFlag::~ShineAxialFlag(a)             @ FUN_00556220 (vector_deleting_destructor FUN_005578b0): frees the vector storage
+ShineAxialFlag::so_SlantedFlag(a, x, y, map, self)   (vt 0x590)   @ FUN_00556270
+    a.position = (x, y); dir = 0; a.safm_allofrange_this = self; a.so_Field = map
+ShineAxialFlag::so_AllOfRange_Getthis(a)       (vt 0x66c)   @ FUN_005562a0: return a.safm_allofrange_this
+    # every other class returns itself (folded ShineMobileObject::so_ShineMobileObject FUN_00450350); the list walks of
+    # so_AllOfRangeNomal / so_AllInMapNomal stop at a 0 (the sentinels) and so_Logout FUN_0054b780 uses it to see
+    # whether the object is linked
+ShineAxialFlag::so_safm_SetCinema(a, cc)       (vt 0x670)   @ FUN_005562b0: a.safm_Screen = cc
+ShineAxialFlag::so_DefaultCoord(a)             (vt 0xc)     @ FUN_0054a100: &a.safm_DefaultCoord
+ShineAxialFlag::so_BroadcastLogout(a)          (vt 0x51c)   @ FUN_00549d90: assert only (flags never leave a map)
+so_ObjectType (vt 0x4d0) = 0 and so_BriefInfoRange (vt 8) = 0 (folded bodies): brief exchanges skip flags.
+
+ShineAxialFlag::so_Routine(a)                  (vt 0x4ac)   @ FUN_00569e00
+    if a.safm_Screen: List<…>::l_4AllInList(a.safm_Screen, Movie::FilmCase::fc_Routine)    # the map's cinema (part 16)
+    for each r in a.safm_vecRoutions: r.vt[4]()                                              # e.g. GuildTournamentSystem (Z16)
+    return 1
+```
+
+Creation, in `FieldMap::fm_Init` FUN_00464bc0 (map load): `zero` = flag at (0, 0) and `infinite` = flag at
+(0xFFFFFF, 0xFFFFFF), both with `self` = 0, linked as the ends of both coordinate lists; five anchors `flag[0..4]` at
+(w/10 + i·w/5, h/10 + i·w/5) with `self` = the flag, appended to both lists (§9.6); then `fm_Multiflex` = a new
+`Movie::CinemaComplex` (0x12E798 bytes; failure: "FieldMap::fm_Init : Memory Leak", `ShineExit`), and
+`flag[2].so_safm_SetCinema(cc_SetArgument(fm_Multiflex, map, flag[2]))`. `FieldMap::fm_CreateGuildTournamentSystem`
+FUN_00464830 creates the map's `GuildTournamentSystem` (0x1E8 bytes), sets the cinema again and pushes the system into
+`flag[2].safm_vecRoutions`. `FieldMap::fm_Relink` FUN_00462bd0 re-places the sentinels and anchors with `so_SlantedFlag`.
+So the per-map cinema (scripted scenes, part 16) and the guild tournament run once per tick from the object routine of
+the axial-flag pool (§1.3), not from the map. Flags are never freed while the server runs (the pool is freed in
+`ShineObjectManager::~ShineObjectManager` FUN_0054f8b0).
+
+### 12.8 Open points of this section
+
+- Which SubAbState kinds use the "MagicField" actor and how often its `sasa_Routine` runs: Z03 §6.1 (the actor table).
+- The client byte +0x213 == 0x42 / vt 0xd4 in `On_NC_BRIEFINFO_MAGICFIELDSPREAD_CMD` (a caster animation) was not traced.
+- `almfd_BattleField` / `slmfd_GuildWarMap` are filled and never read: maybe a planned guild-war rule.
+- `smo_MagicFieldSpread`'s `vt 0x648` / `vt 0x64c` (abstate on the caster, NOTTARGET) are the cast-side helpers of Z03.

@@ -10799,6 +10799,31 @@ Z01 name was 'link inside the same zone (ours)'
 
 one shared buffer per drop: the pickable bit is rewritten for each receiver just before the send; re-broadcast to the sight when the owner-only time ends and when a dice winner fails to pick
 
+### `0x1C0C` NC_BRIEFINFO_MAGICFIELDSPREAD_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone BriefInformationMagicField ctor FUN_00549330 (length 0x12), filled in ShineMagicField::so_mgcfld_MagicFieldSpread FUN_0057ea30 / _Friend FUN_0057ee80, sent by vt 0x4c8 (folded FUN_00555280); client GameFrameWork::On_NC_BRIEFINFO_MAGICFIELDSPREAD_CMD FUN_004a09b0 → MagicField::AddMagicField FUN_00611a60; layout = pdb2016 PROTO struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | magic field handle (0x4FA4 + pool index) |
+| 2 | u16 | caster | caster handle |
+| 4 | u16 | skillid | ActiveSkill ID of the field skill |
+| 6 | SHINE_XY_TYPE | location | field centre (u32 x, u32 y) |
+| 14 | u16 | radious | ActiveSkill.Area / 2 (the client does not use it) |
+
+16 bytes; to every player in sight at the spread and to players walking into sight (Z09 §12.6)
+
+### `0x1C0D` NC_BRIEFINFO_MAGICFIELDINFO_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone BriefInfoExchanger::BriefInfoExchangeMagicField::bixmfm_Send FUN_0043db60 (length 3 + 16·n); client On_NC_BRIEFINFO_MAGICFIELDINFO_CMD FUN_00499a90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | magicfields | record count (≤ 28) |
+| 1 | NC_BRIEFINFO_MAGICFIELDSPREAD_CMD[magicfields] | magicfield | 16 bytes each |
+
+never sent by the 2016 zone: the batch counter is never incremented (original bug Z09-B27)
+
 ### `0x1C0E` NC_BRIEFINFO_BRIEFINFODELETE_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone static packet `briefinfodelete` built by its dynamic initializer FUN_006951d0 (buffer 0x74df98, opcode 0x1C0E, payload pointer DAT_0074e028); sent by AxialListBriefDeleteAtMove::ali_Work FUN_004bdfe0 (ShineMobileObject::smo_OldObjectDelete FUN_004be0d0) and AxialListBriefDeleteAllOfRange::ali_Work FUN_005535c0 (player vt 0xdc4 / 0xdd0); client FUN_004b99f0)
