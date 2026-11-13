@@ -8126,6 +8126,56 @@ client sender needs adminlevel 100 and no prison
 | 0 | u32 | nCharNo |  |
 | 4 | u32 | DataType | CHAR_OPTION_DATA_TYPE 0/1/2 → session +0x1ECD8 |
 
+### `0xa801` NC_CHAT_RESTRICT_DB_LIST_CMD † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040d4b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSessionHandle | not in the PDB struct |
+| 2 | u16 | nChatRestrictListCnt | > 100 → 100 |
+| 4 | PROTO_CHAT_RESTRICT_DB_INFO[n] | ChatRestrictData | 0x1A each: u32 nCharNo, Name5 sCharID, u8 bIsGM, u8 bIsDeleted |
+
+size 4 + n·26
+
+### `0xa805` NC_CHAT_RESTRICT_DB_ADD_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_00411db0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C00 ok |
+| 2 | u16 | nSessionHandle |  |
+| 4 | Name5 | sCharID |  |
+| 24 | u8 | bIsGM |  |
+| 25 | u8 | bIsDeleted |  |
+| 26 | u32 | nChatRestrictCharNo |  |
+
+size 0x1E
+
+### `0xa809` NC_CHAT_RESTRICT_DB_DEL_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_004112b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C10 ok |
+| 2 | u16 | nSessionHandle |  |
+| 4 | u32 | nChatRestrictCharNo |  |
+
+size 8
+
+### `0xa80d` NC_CHAT_RESTRICT_DB_DEL_ALL_ACK † (CharDB→WM)
+
+**Verified layout** (basis: wm FUN_0040d5e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C20 ok |
+| 2 | u16 | nSessionHandle |  |
+
+size 4
+
 ### `0x200c` NC_ACT_WHISPER_REQ † (C→WM)
 
 **Verified layout** (basis: wm FUN_0041c610)
@@ -8374,6 +8424,34 @@ no body
 | 0 | Name3 | sIndunInfo.MapIDClient |  |
 | 12 | u8 | sIndunInfo.ModeIDLv |  |
 
+### `0xa803` NC_CHAT_RESTRICT_ADD_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_00422240)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sChatRestrictCharID |  |
+
+size 0x14, not checked
+
+### `0xa807` NC_CHAT_RESTRICT_DEL_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_0041ec00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | sChatRestrictCharID |  |
+
+size 0x14, not checked
+
+### `0xa80b` NC_CHAT_RESTRICT_DEL_ALL_REQ † (C→WM)
+
+**Verified layout** (basis: wm FUN_004170a0)
+
+Empty payload.
+
+no payload read
+
 ### `0x0c0d` NC_USER_WILLLOGIN_REQ † (Login→WM)
 
 **Verified layout** (basis: wm FUN_00424950)
@@ -8388,6 +8466,73 @@ no body
 | 327 | u32[5] | extra |  |
 
 0x15B bytes; W01 name was 'world login request (ours)'
+
+### `0xd001` NC_EVENT_GET_ALL_EVENT_INFO_REQ † (OPTool→WM)
+
+**Verified layout** (basis: wm FUN_004270f0)
+
+Empty payload.
+
+no payload read
+
+### `0xd003` NC_EVENT_ADD_EVENT_REQ † (OPTool→WM)
+
+**Verified layout** (basis: wm FUN_00427130)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+| 2 | i32 | dStartTime |  |
+| 6 | i32 | dEndTime |  |
+| 10 | u16[3] | nRewardAbstateIndex |  |
+| 16 | u8[255] | bIsPlayerLevel |  |
+| 271 | u8[64] | bIsPlayerClass |  |
+| 335 | u8[1024] | bIsMapID |  |
+| 1359 | u8 | bIsField_KQ |  |
+| 1360 | u8 | bIsField_Battle |  |
+| 1361 | u8 | bIsField_ID |  |
+| 1362 | u8 | bIsField_Normal |  |
+
+size 0x553 (GM_EVENT_DATA); nEventNo ignored
+
+### `0xd005` NC_EVENT_UPDATE_EVENT_REQ † (OPTool→WM)
+
+**Verified layout** (basis: wm FUN_00427170)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+| 2 | i32 | dStartTime |  |
+| 6 | i32 | dEndTime |  |
+| 10 | u16[3] | nRewardAbstateIndex |  |
+| 16 | u8[255] | bIsPlayerLevel |  |
+| 271 | u8[64] | bIsPlayerClass |  |
+| 335 | u8[1024] | bIsMapID |  |
+| 1359 | u8 | bIsField_KQ |  |
+| 1360 | u8 | bIsField_Battle |  |
+| 1361 | u8 | bIsField_ID |  |
+| 1362 | u8 | bIsField_Normal |  |
+
+size 0x553
+
+### `0xd007` NC_EVENT_DEL_EVENT_REQ † (OPTool→WM)
+
+**Verified layout** (basis: wm FUN_004271b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+
+### `0xd009` NC_EVENT_SET_ALL_READY_REQ † (OPTool→WM)
+
+**Verified layout** (basis: wm FUN_004271f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+| 2 | u8 | bIsFlagAllReady | 1 = active on the zones |
+
+size 3
 
 ### `0x0802` NC_MISC_S2SCONNECTION_REQ (S2S)
 
@@ -9849,6 +9994,51 @@ size 0x3E
 
 dead in 2016 (W04-B43)
 
+### `0xa802` NC_CHAT_RESTRICT_LIST_CMD † (WM→C)
+
+**Verified layout** (basis: wm FUN_00430fe0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nChatRestrictListCnt |  |
+| 2 | PROTO_CHAT_RESTRICT_INFO[n] | ChatRestrictData | 0x16 each: Name5 sCharID, u8 bIsGM, u8 bIsDeleted |
+
+size 2 + n·22; sent once at the first map login after the DB list arrived
+
+### `0xa806` NC_CHAT_RESTRICT_ADD_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_00422240, FUN_00411db0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C00 ok, 0x1C01 prisoner, 0x1C02 self, 0x1C03 listed or full, 0x1C05…0x1C0A from the DB |
+| 2 | Name5 | sCharID |  |
+| 22 | u8 | bIsGM |  |
+| 23 | u8 | bIsDeleted |  |
+
+size 0x18; bIsGM/bIsDeleted uninitialised on every error (W04-B48)
+
+### `0xa80a` NC_CHAT_RESTRICT_DEL_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0041ec00, FUN_004112b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C10 ok, 0x1C11 not in the list, 0x1C12 charNo not in the list, 0x1C13…0x1C16 DB |
+| 2 | Name5 | sChatRestrictCharID |  |
+
+size 0x16
+
+### `0xa80e` NC_CHAT_RESTRICT_DEL_ALL_ACK † (WM→C)
+
+**Verified layout** (basis: wm FUN_0040d5e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x1C20 ok, 0x1C21/0x1C22 DB |
+
+size 2
+
 ### `0x0c12` NC_USER_AVATARINFO_REQ (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_00408740 / FUN_00412ee0)
@@ -10063,6 +10253,41 @@ no 2016 Character handler (W04-B23)
 
 no 2016 Character-server handler
 
+### `0xa804` NC_CHAT_RESTRICT_DB_ADD_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_00422240)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSessionHandle |  |
+| 2 | u32 | nUserNo | session +0x124 |
+| 6 | Name5 | sChatRestrictCharID |  |
+
+size 0x1A
+
+### `0xa808` NC_CHAT_RESTRICT_DB_DEL_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_0041ec00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSessionHandle |  |
+| 2 | u32 | nUserNo |  |
+| 6 | u32 | nChatRestrictCharNo | from the WM list |
+
+size 0x0A
+
+### `0xa80c` NC_CHAT_RESTRICT_DB_DEL_ALL_REQ † (WM→CharDB)
+
+**Verified layout** (basis: wm FUN_004170a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSessionHandle |  |
+| 2 | u32 | nUserNo |  |
+
+size 6
+
 ### `0x0808` NC_MISC_USER_COUNT_CMD † (WM→Login)
 
 **Verified layout** (basis: wm FUN_00438d10)
@@ -10242,6 +10467,94 @@ rest stale when not found
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nError | 0x1E49 nNo 0; CharDB result via 0x74EF |
+
+### `0xd002` NC_EVENT_GET_ALL_EVENT_INFO_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00401250)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3200 |
+| 2 | u16 | nAllEventCnt |  |
+| 4 | u16 | nPacketOrder | 1-based; 0 with no event |
+| 6 | u16 | nEventNo |  |
+| 8 | i32 | dStartTime |  |
+| 12 | i32 | dEndTime |  |
+| 16 | u16[3] | nRewardAbstateIndex |  |
+| 22 | u8[255] | bIsPlayerLevel |  |
+| 277 | u8[64] | bIsPlayerClass |  |
+| 341 | u8[1024] | bIsMapID |  |
+| 1365 | u8 | bIsField_KQ |  |
+| 1366 | u8 | bIsField_Battle |  |
+| 1367 | u8 | bIsField_ID |  |
+| 1368 | u8 | bIsField_Normal |  |
+| 1369 | u8 | bIsFlagAllReady |  |
+
+size 0x55A; one packet per event; with no event one packet whose event part is stale stack (W04-B52)
+
+### `0xd004` NC_EVENT_ADD_EVENT_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00401ec0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3208 ok, 0x3209 too many |
+| 2 | u16 | nEventNo |  |
+| 4 | i32 | dStartTime |  |
+| 8 | i32 | dEndTime |  |
+| 12 | u16[3] | nRewardAbstateIndex |  |
+| 18 | u8[255] | bIsPlayerLevel |  |
+| 273 | u8[64] | bIsPlayerClass |  |
+| 337 | u8[1024] | bIsMapID |  |
+| 1361 | u8 | bIsField_KQ |  |
+| 1362 | u8 | bIsField_Battle |  |
+| 1363 | u8 | bIsField_ID |  |
+| 1364 | u8 | bIsField_Normal |  |
+
+size 0x555; nEventNo = the number assigned
+
+### `0xd006` NC_EVENT_UPDATE_EVENT_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00401430)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3210 ok, 0x3211 zone broadcast failed, 0x3212 no such event |
+| 2 | u16 | nEventNo |  |
+| 4 | i32 | dStartTime |  |
+| 8 | i32 | dEndTime |  |
+| 12 | u16[3] | nRewardAbstateIndex |  |
+| 18 | u8[255] | bIsPlayerLevel |  |
+| 273 | u8[64] | bIsPlayerClass |  |
+| 337 | u8[1024] | bIsMapID |  |
+| 1361 | u8 | bIsField_KQ |  |
+| 1362 | u8 | bIsField_Battle |  |
+| 1363 | u8 | bIsField_ID |  |
+| 1364 | u8 | bIsField_Normal |  |
+
+size 0x555; echo of the request
+
+### `0xd008` NC_EVENT_DEL_EVENT_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_00401b80)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3218 ok, 0x3219 no such event |
+| 2 | u16 | nEventNo |  |
+
+size 4
+
+### `0xd00a` NC_EVENT_SET_ALL_READY_ACK † (WM→OPTool)
+
+**Verified layout** (basis: wm FUN_004016f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x3220 ok, 0x3221 zone broadcast failed (then a second 0x3220), 0x3222 no such event |
+| 2 | u16 | nEventNo |  |
+
+size 4
 
 ### `0x0c16` NC_USER_KICKOFFFROMWORLD_CMD (WM→Zone)
 
@@ -10461,6 +10774,46 @@ broadcast to all zones
 | 6 | u16 | nError |  |
 | 8 | i32 | eLevelType |  |
 | 12 | Name3 | sMapName |  |
+
+### `0xbc09` NC_GAMBLE_EXCHANGEDCOIN_INIT_CMD † (WM→Zone)
+
+**Verified layout** (basis: wm FUN_0043c2d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | dChackDate | the reset time just reached (time_t) |
+
+broadcast to all zones
+
+### `0xd00b` NC_EVENT_ADD_UPDATE_EVENT_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00401430, FUN_004016f0, FUN_004010c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+| 2 | i32 | dStartTime |  |
+| 6 | i32 | dEndTime |  |
+| 10 | u16[3] | nRewardAbstateIndex |  |
+| 16 | u8[255] | bIsPlayerLevel |  |
+| 271 | u8[64] | bIsPlayerClass |  |
+| 335 | u8[1024] | bIsMapID |  |
+| 1359 | u8 | bIsField_KQ |  |
+| 1360 | u8 | bIsField_Battle |  |
+| 1361 | u8 | bIsField_ID |  |
+| 1362 | u8 | bIsField_Normal |  |
+
+size 0x553
+
+### `0xd00c` NC_EVENT_DEL_EVENT_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_004016f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEventNo |  |
+
+size 2
 
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→zone)
 
@@ -11022,6 +11375,18 @@ forwarded as 0x380A (W04-B19)
 |---|---|---|---|
 | 0 | u16 | nMapCount | ≤ 32 |
 | 2 | SHINE_INDUN_INFO[n] | sIndunInfos | 0xD each |
+
+### `0xbc1d` NC_GAMBLE_WORLD_PREVMAPNAME_CMD † (Zone→WM)
+
+**Verified layout** (basis: wm FUN_0042c570)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nWldHandle |  |
+| 2 | Name3 | sPrevMapName | stored at session +0x1ED04 |
+| 14 | u32 | nCharNo | must match the session's character |
+
+size 0x12, not checked
 
 ### `0x384e` NC_PARTY_MEMBERINFORM_REQ † (zone→WM)
 

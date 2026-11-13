@@ -36,6 +36,8 @@ W01-core §9 lists the OPTool opcodes in one line each; §4 below is the full re
 | +0x704 | inGame (1 after character login) | W01 |
 | +0x708 | friend list | part 2 (friends); 0x281F uses `FUN_0045c6f0` find / `FUN_0045c630` remove on it |
 | +0x1E280 | **inArena** (u32): 1 while the character fights in the guild-tournament arena (zone 0x74C8 / 0x74C9, W03 §8.3) | chat filters below |
+| +0x1E290 … +0x1ECBF | chat block list (count, info[100], listFresh, charNo[100]) | §14.1 |
+| +0x1ED04 | gamble-house return map (Name3) | §15.2 |
 
 ### 1.2 Helpers (named here)
 
@@ -1758,6 +1760,235 @@ CharDB 0xA420 NC_INSTANCE_DUNGEON_RANK_MYRANK_CMD { u32 nCharRegNum, u16 nMyRank
         dates from nCurrPlayDate / nPrevPlayDate (localtime; −1 keeps the previous entry's date)
 ```
 
+## 14. Chat block list (dept 42 CHAT_RESTRICT)
+
+An account-wide list of blocked characters (DB table `tChatBlock {nUserNo, nCharNo}`, D04 §10). The WM keeps a copy in
+the session, answers duplicate / self / prisoner checks itself, relays add / delete to the Character server and pushes
+the list to the client once per character login. **Nothing in the WM filters chat with it**: whispers (§2.1), notices
+and party chat are delivered regardless. The 2016 client filters on its side: `ChatBlockListWin::IsRestrictID`
+(client FUN_0047e030) and `CChatRestrict::Get` (FUN_0072bf70) are checked in `On_NC_ACT_SOMEONECHAT_CMD`
+(FUN_004a0bb0) and `On_NC_ACT_SOMEONESHOUT_CMD` (FUN_004a0ec0); which other chat kinds it filters is C01's.
+
+### 14.1 The list in the session (`CR` = session +0x1E290, all names ours)
+
+| Offset (from session) | Field | Notes |
+|---|---|---|
+| +0x1E290 | i32 count | ≤ 100 |
+| +0x1E294 | `PROTO_CHAT_RESTRICT_INFO`[100] (0x16 each: Name5 sCharID, u8 bIsGM, u8 bIsDeleted) *(pdb2017; layout read)* | the part sent to the client |
+| +0x1EB2C | u32 listFresh | 1 after CharDB 0xA801; cleared when 0xA802 has been pushed |
+| +0x1EB30 | u32 charNo[100] | parallel to the info array |
+
+- Built by `ChatRestrict_Construct` FUN_0045cd10 (count = 0, listFresh = 0) in the session constructor (W01), freed by
+  `ChatRestrict_Destroy` FUN_0045cd40 in the session destructor FUN_004352e0. At character login (`Client_CharLogin_1001`
+  FUN_00422be0, and the tutorial login FUN_004371a0) only count is set to 0 (`FriendList_Clear` FUN_0045c320, the same
+  one-line function serves both lists); listFresh is left as it was.
+- Lookups (all compare the 20 name bytes exactly, case-sensitive): `ChatRestrict_HasName` FUN_0045cc30,
+  `ChatRestrict_IndexOfName` FUN_0045cc90 (−1 if absent), `ChatRestrict_IndexOfCharNo` FUN_0045cce0 (−1),
+  `ChatRestrict_IsListedOrFull` FUN_0045cbd0 (true if the name is listed **or** count > 99).
+- `ChatRestrict_AddOrUpdate(info, charNo)` FUN_0045ca20: count > 100 → 0; name already listed → overwrite that entry and its
+  charNo, 2; count > 99 → 0; else append, count++, 1. `ChatRestrict_RemoveCharNo(charNo)` FUN_0045cb10: remove the entry
+  and close the gap in both arrays.
+
+```pseudo
+CharDB 0xA801 NC_CHAT_RESTRICT_DB_LIST_CMD { u16 nSessionHandle, u16 nChatRestrictListCnt,
+        PROTO_CHAT_RESTRICT_DB_INFO[n] @4 (0x1A: u32 nCharNo, Name5 sCharID, u8 bIsGM, u8 bIsDeleted) }      @ FUN_0040d4b0
+    # (pdb2017 has no nSessionHandle in this struct; the 2016 WM reads it at +0)
+    # sent by the Character server during the 0x1004 character load, only if the list is not empty (D02 §4 step 18)
+    s = Clients_GetByHandle(nSessionHandle); none → return (no CHARDATA check)
+    n > 100: log "ERROR - OVER MAX CHAT RESTRICT, nCharNo=%d, Chat Restrict count=%d"; n = 100
+    CR.count = n; CR.listFresh = 1; copy each entry: info ← {sCharID, bIsGM, bIsDeleted}, charNo[i] ← nCharNo
+    # no reply; the client gets the list at the first map login:
+
+Session_PushChatRestrictListOnce(s)                                                                    @ FUN_00435170
+    # called from zone 0x180C map login done (`Zone_MapLoginDone_180C` FUN_0042d8d0, W01) on every map login
+    if CR.count ≠ 0 and CR.listFresh:
+        s ← 0xA802 NC_CHAT_RESTRICT_LIST_CMD { u16 nChatRestrictListCnt = count,
+                PROTO_CHAT_RESTRICT_INFO[count] }   (2 + count·22)                                     @ FUN_00430fe0
+        CR.listFresh = 0
+    # client On_NC_CHAT_RESTRICT_LIST_CMD FUN_004a3f60: replaces its CChatRestrict list and refreshes the block window
+```
+
+### 14.2 Client requests and the CharDB answers
+
+nUserNo below is session +0x124 (the account number, W01); nSessionHandle the session's wmHandle (+0x114). The client
+(`GameFrameWork::NcChatRestrictAddReq` FUN_004b0640) sends 0xA803 only for a name not already in its own list.
+
+```pseudo
+0xA803 NC_CHAT_RESTRICT_ADD_REQ { Name5 sChatRestrictCharID }  (0x14, length not checked)              @ FUN_00422240
+    no session / no CHARDATA → return
+    reply on refusal: s ← 0xA806 NC_CHAT_RESTRICT_ADD_ACK { u16 nError, Name5 = the requested name, u8 bIsGM, u8 bIsDeleted }  (0x18)
+        # bIsGM / bIsDeleted are never written: stale stack bytes, (original bug) W04-B48
+    CHARDATA.prisonmin (+0x62) ≠ 0 (in prison, §9)            → 0x1C01   (client: silent)
+    name == own CHARDATA.charid (Name5_Equal FUN_004020c0)     → 0x1C02   (client: silent)
+    ChatRestrict_IsListedOrFull(name)                          → 0x1C03   client text "You can only block a maximum of 100
+        players. Please remove a user from your block list." — also for a name already listed, (original bug) W04-B46
+    (dead: the helper returns a bool, so its "== 2" branch that would send 0x1C04 "You already blocked this user." never runs)
+    else CharDB ← 0xA804 NC_CHAT_RESTRICT_DB_ADD_REQ { u16 nSessionHandle, u32 nUserNo, Name5 sChatRestrictCharID }  (0x1A)
+
+CharDB 0xA805 NC_CHAT_RESTRICT_DB_ADD_ACK { u16 nError, u16 nSessionHandle, PROTO_CHAT_RESTRICT_INFO @4,
+        u32 nChatRestrictCharNo @0x1A }  (0x1E)                                                         @ FUN_00411db0
+    s = Clients_GetByHandle(nSessionHandle); none → return
+    nError == 0x1C00: ChatRestrict_AddOrUpdate(info, nChatRestrictCharNo) (result ignored: with a full list the entry is
+            dropped but the client is still told 0x1C00, (original bug) W04-B47)
+        s ← 0xA806 { 0x1C00, info (name, bIsGM, bIsDeleted) }
+    else: s ← 0xA806 { nError, info.sCharID, stale bIsGM / bIsDeleted (W04-B48) }
+        # DB codes (D04 §10): 0x1C05 bad user, 0x1C06 bad name, 0x1C07 "You already blocked this user.",
+        # 0x1C08 "You can only block a maximum of 100 players. …", 0x1C09 no such character, 0x1C0A DB error
+    # client On_NC_CHAT_RESTRICT_ADD_ACK FUN_004b06f0: 0x1C00 → "You have blocked %s." (text 0x3e738588), adds the entry,
+    # refreshes the window; 0x1C03 / 0x1C04 / 0x1C07 / 0x1C08 → their error text; every other code silent
+
+0xA807 NC_CHAT_RESTRICT_DEL_REQ { Name5 sChatRestrictCharID }  (0x14, length not checked)              @ FUN_0041ec00
+    no session / no CHARDATA → return
+    name not in CR, or its charNo[i] == −1 → s ← 0xA80A NC_CHAT_RESTRICT_DEL_ACK { 0x1C11, Name5 = requested name }  (0x16)
+    else CharDB ← 0xA808 NC_CHAT_RESTRICT_DB_DEL_REQ { u16 nSessionHandle, u32 nUserNo, u32 nChatRestrictCharNo = charNo[i] }  (0x0A)
+
+CharDB 0xA809 NC_CHAT_RESTRICT_DB_DEL_ACK { u16 nError, u16 nSessionHandle, u32 nChatRestrictCharNo }  (8)   @ FUN_004112b0
+    s = Clients_GetByHandle(nSessionHandle); none → return
+    i = ChatRestrict_IndexOfCharNo(nChatRestrictCharNo)
+    found: name = entry i's sCharID; nError == 0x1C10 → ChatRestrict_RemoveCharNo
+    not found: nError = 0x1C12, name = 20 zero bytes
+    s ← 0xA80A { nError, name }
+    # DB codes (D04 §10): 0x1C10 ok, 0x1C13 DB error, 0x1C14 bad user, 0x1C15 bad name, 0x1C16 no such character
+    # client On_NC_CHAT_RESTRICT_DEL_ACK FUN_0049bac0: only 0x1C10 → remove by name, refresh; every other code silent
+
+0xA80B NC_CHAT_RESTRICT_DEL_ALL_REQ {}                                                                  @ FUN_004170a0
+    no session / no CHARDATA → return
+    CharDB ← 0xA80C NC_CHAT_RESTRICT_DB_DEL_ALL_REQ { u16 nSessionHandle, u32 nUserNo }  (6)
+
+CharDB 0xA80D NC_CHAT_RESTRICT_DB_DEL_ALL_ACK { u16 nError, u16 nSessionHandle }  (4)                   @ FUN_0040d5e0
+    s = Clients_GetByHandle(nSessionHandle); none → return
+    nError == 0x1C20 → CR.count = 0 (FUN_0045c320)
+    s ← 0xA80E NC_CHAT_RESTRICT_DEL_ALL_ACK { u16 nError }  (2)
+    # DB: 0x1C20 ok (also "nothing to delete"), 0x1C21 DB error, 0x1C22 bad user. Client On_NC_CHAT_RESTRICT_DEL_ALL_ACK
+    # FUN_004a4030: 0x1C20 → clears its list and window; others silent
+```
+
+## 15. Gamble house: daily coin reset and the return map (dept 47)
+
+The zone side (coins, exchange limit, the house) is Z06 §4. The WM has two parts: the daily reset of the
+"exchanged coins" counters, and a per-session copy of the map a player returns to when leaving the gamble house.
+
+### 15.1 `CGambleSystemServer` (daily reset of the exchanged-coin counter; names from its log strings)
+
+The object is a single i32 `nextReset` (time_t, local time) at WM +0x22B538 = `g_GambleSystemServer` DAT_006c5560,
+set to 0 by `CGambleSystemServer_Construct` FUN_0043c180 in the WM constructor. The reset time of day comes from
+`GBHouse.shn` (loaded by W01's data loader FUN_00404100 into the data object DAT_006c5220, fatal "GAMBLE HOUSE DATA READ
+FAILED" if missing): row 0 (`Data_GBHouseRow` FUN_0043a340), columns `GB_ResetTimeHour` (+8), `GB_ResetTimeMin` (+9),
+`GB_ResetTimeSec` (+10). The 2016 table holds one row `{GB_GameMoney 10, GB_ExchangeTax 20, 6, 0, 0}`: reset at
+06:00:00 server local time.
+
+```pseudo
+CGambleSystemServer_SendExchangeCoinInit(this)                                                          @ FUN_0043c2d0
+    # called from W01's main loop FUN_00406760 on every pass (next to CPrisonServer_Tick, §9.1)
+    if this.nextReset == 0: CGambleSystemServer_InitSendExchangeCoinInitTime(this)                       @ FUN_0043c1a0
+        row = GBHouse row 0; none → log "DEBUG - CGambleSystemServer::InitSendExchangeCoinInitTime : Gamble house
+            data error", nextReset stays 0
+        t = today at GB_ResetTimeHour:Min:Sec (localtime + mktime)
+        nextReset = t if t ≥ now, else the same time tomorrow (tm_mday + 1, mktime)
+    if nextReset ≤ now:
+        all zones ← 0xBC09 NC_GAMBLE_EXCHANGEDCOIN_INIT_CMD { i32 dChackDate = nextReset }  (4)   (Zones_Broadcast)
+            broadcast failure → log "… SendExchangeCoinInit : Zone broadcast fail" (nothing retried)
+        nextReset = localtime(nextReset) with tm_mday + 1 → mktime    # one day later, DST-safe
+    # with GBHouse row 0 missing, nextReset stays 0 and the second step broadcasts { 0 } and then one day after
+    # 1970-01-01 on every pass until it reaches today, (original bug) W04-B49 (needs an empty GBHouse.shn)
+```
+
+- Started after 06:00 the WM broadcasts nothing until the next day's 06:00; no reset is sent at start-up. A zone
+  that is down at 06:00 misses the broadcast (no catch-up).
+- The zone (Z06 §4.1) sets every online player's exchanged count to 0 (or asks GameDB with `dChackDate` if the
+  inventory is busy).
+- Character load: `Client_CharLogin_1001` FUN_00422be0 (and the tutorial login FUN_004371a0) put `nextReset − 1 day`
+  (`CGambleSystemServer_GetNextResetTime` FUN_0043c2c0, localtime, tm_mday − 1, mktime) = the last reset into CharDB
+  0x1004 NC_CHAR_CHARDATA_REQ's last field (`tExchangedCoinSumDate`, D02 §4; W01 §4.2 describes it as "stored day-start
+  time − 1 day"). The Character server sums only exchanges after that time *(inferred from the name)*. Before the
+  first main-loop pass nextReset is 0, so a login in that window sends 1969-12-31.
+
+### 15.2 Return map (CParserZone)
+
+```pseudo
+Zone 0xBC1D NC_GAMBLE_WORLD_PREVMAPNAME_CMD { u16 nWldHandle, Name3 sPrevMapName @2, u32 nCharNo @0xE }  (0x12, not checked)
+                                                                                                         @ FUN_0042c570
+    # zone: sp_Gamble_PrevMapNameSave2World (Z06 §4.1), part of the save to the WM before a map change
+    s = Clients_GetByHandle(nWldHandle); s has CHARDATA and CHARDATA.charNo == nCharNo:
+        session +0x1ED04 (12 bytes) = sPrevMapName (raw copy, no terminator check)
+    else ignored
+```
+
+The stored name goes back to the next zone in W01's `Zone_CharDataReq_101C` FUN_00428ba0 as 0xBC01
+NC_GAMBLE_ZONE_PREVMAPNAME_CMD (only if not empty, then cleared; W01 §6.3 table); FUN_00434530 (session reset, W01)
+clears it.
+
+## 16. GM events (dept 52 EVENT, CParserOPTool)
+
+The operator tool defines timed events (reward abstates for players matching level / class / map / field-type masks);
+the WM holds them in memory and pushes the active ones to the zones, which store them (Z08 §13); their effects are Z09's. Nothing is stored in
+a database: a WM restart loses every event. No handler checks the packet length (OPTool_CheckAlive only).
+
+### 16.1 `GMEventManager` (`g_GMEventManager` DAT_006c5488 = WM +0x22B460; names from its log strings)
+
+| Offset | Field |
+|---|---|
+| +0 / +4 / +8 | `std::vector` of records: begin / end / capacity end |
+| +0x10 | i16 nextEventNo, 1 at start (`GMEventManager_Construct` FUN_00401dd0); −1 = no more numbers |
+
+Record (0x554 bytes) = `GM_EVENT_DATA` (0x553, *(pdb2017)*, size confirmed by the 2016 copies) + u8 bIsFlagAllReady
+@0x553. `GM_EVENT_DATA`: u16 nEventNo, i32 dStartTime @2, i32 dEndTime @6, u16 nRewardAbstateIndex[3] @0xA,
+u8 bIsPlayerLevel[255] @0x10, u8 bIsPlayerClass[64] @0x10F, u8 bIsMapID[1024] @0x14F, u8 bIsField_KQ @0x54F,
+bIsField_Battle @0x550, bIsField_ID @0x551, bIsField_Normal @0x552. The WM never reads any field but nEventNo.
+`GMEventVec_PushBack` FUN_00401e50 / `GMEventVec_Reserve` FUN_00401d50 (grows by half, "vector<T> too long"),
+`GMEventManager_Destroy` FUN_00401df0.
+
+"Active" means bIsFlagAllReady == 1: only those are sent to the zones, at zone connect (`GMEventManager_GMEM_SendAllEventInfo`
+FUN_004010c0 from W01's `Zone_S2SConnectionReq_0802` FUN_004283e0: zone ← 0xD00B per active event) and when they change.
+
+### 16.2 Handlers
+
+```pseudo
+0xD001 NC_EVENT_GET_ALL_EVENT_INFO_REQ {}                                   @ FUN_004270f0 → GMEM_GetAllEventInfo FUN_00401250
+    per record, in vector order: op ← 0xD002 NC_EVENT_GET_ALL_EVENT_INFO_ACK { u16 nError 0x3200, u16 nAllEventCnt = n,
+        u16 nPacketOrder = 1…n, GM_EVENT_DATA, u8 bIsFlagAllReady }  (0x55A)
+    n == 0: one 0xD002 { 0x3200, 0, 0, … } whose GM_EVENT_DATA / flag are stale stack bytes, (original bug) W04-B52
+    send failure → log "ERROR - GMEventManager::GMEM_GetAllEventInfo : …"
+
+0xD003 NC_EVENT_ADD_EVENT_REQ { GM_EVENT_DATA }  (0x553)                    @ FUN_00427130 → GMEM_AddEvent FUN_00401ec0
+    reply 0xD004 NC_EVENT_ADD_EVENT_ACK { u16 nError, GM_EVENT_DATA }  (0x555)
+    nextEventNo == −1 → { 0x3209 ERR_EVENT_ADD_EVENT_TOOMANY, request echoed }
+    else: record = request with nEventNo = nextEventNo (the request's number is ignored), flag 0; nextEventNo++;
+        push_back; reply { 0x3208 ERR_EVENT_ADD_EVENT_NOERR, request with the assigned nEventNo }
+    # not active yet: zones are told only by 0xD009. nextEventNo is an i16: after 0x7FFF it goes negative and reaches
+    # −1 after 65 535 additions per WM run; then every add is refused (inferred limit, never reached in practice)
+
+0xD005 NC_EVENT_UPDATE_EVENT_REQ { GM_EVENT_DATA }  (0x553)                 @ FUN_00427170 → GMEM_UpdateEvent FUN_00401430
+    reply 0xD006 NC_EVENT_UPDATE_EVENT_ACK { u16 nError, request echoed }  (0x555)
+    no record with that nEventNo → 0x3212
+    else: wasActive = record.flag == 1; record's 0x553 bytes = request (flag kept)
+        wasActive: all zones ← 0xD00B NC_EVENT_ADD_UPDATE_EVENT_CMD { record }  (0x553)
+            broadcast failed → log, reply 0x3211 (the record is already changed)
+        reply 0x3210
+    # if that reply cannot be sent, the log prints nEventNo read through the vector's end pointer, (original bug) W04-B53
+
+0xD007 NC_EVENT_DEL_EVENT_REQ { u16 nEventNo }                              @ FUN_004271b0 → GMEM_DelEvent FUN_00401b80
+    reply 0xD008 NC_EVENT_DEL_EVENT_ACK { u16 nError, u16 nEventNo }  (4)
+    not found → 0x3219 (send-failure log reads past the end as above, W04-B53)
+    else erase (later records move down), reply 0x3218
+    # an active record is erased without 0xD00C to the zones: they keep running it, (original bug) W04-B50
+
+0xD009 NC_EVENT_SET_ALL_READY_REQ { u16 nEventNo, u8 bIsFlagAllReady }      @ FUN_004271f0 → GMEM_SetAllReady FUN_004016f0
+    reply 0xD00A NC_EVENT_SET_ALL_READY_ACK { u16 nError, u16 nEventNo }  (4)
+    not found → 0x3222 (send-failure log past the end, W04-B53)
+    flag == new value → (nothing sent to zones)
+    flag == 1 (new ≠ 1): all zones ← 0xD00C NC_EVENT_DEL_EVENT_CMD { u16 nEventNo }  (2)
+    flag ≠ 1 (any new value ≠ flag, also e.g. 2): all zones ← 0xD00B { record }
+        # a value other than 0/1 is pushed to the zones but counts as inactive for later updates and zone connects
+    broadcast failed → log "DEBUG - GMEventManager::GMEM_SetAllReady : … Zone broadcast fail", reply 0x3221 and continue
+    record.flag = new value; reply 0x3220
+    # after a failed broadcast the tool gets two replies, 0x3221 then 0x3220, (original bug) W04-B51
+```
+
+- The zone handlers of 0xD00B / 0xD00C (zone FUN_0046ddf0 / FUN_0046dae0) are Z08 §13.
+- dStartTime / dEndTime are not checked by the WM: a record is sent as soon as it is active; time windows are the
+  zone's (Z08 §13 / Z09).
+
 ## Original-server bugs
 
 (Running list; the sweep part completes it.)
@@ -1808,6 +2039,14 @@ CharDB 0xA420 NC_INSTANCE_DUNGEON_RANK_MYRANK_CMD { u32 nCharRegNum, u16 nMyRank
 | W04-B43 | 0xA419 → 0xA41A, 0xA414…0xA420 | the WM asks the Character server for rankings (0xA41A) and expects 0xA414 / 0xA41F / 0xA420 / 0xA416 from it; the 2016 Character server handles and sends none of them (the zone's 0xA413 result is dropped there as well) | the instance-ranking window is always empty, no new-rank messages | implement the Character-server side or drop the feature |
 | W04-B44 | `IndunRank_DailyReset` | the boards are cleared inside the loop over sessions (once per session, never with no session online); the new "current" date is the day after the one that starts | (dead data in 2016) wrong dates in the my-rank tab | clear once; use today's date |
 | W04-B45 | 0xA408 | a missing destination zone is answered with nError 2, which zone A reads as "no instance yet" | the player gets the level menu, then the join fails with "RecallDisableField" | a distinct error code |
+| W04-B46 | 0xA803 | `ChatRestrict_IsListedOrFull` returns one bool for "already listed" and "list full"; both answer 0x1C03, the 0x1C04 branch is dead | blocking an already blocked name shows "You can only block a maximum of 100 players…" | 0x1C04 "You already blocked this user." for a listed name, 0x1C03 only when full |
+| W04-B47 | CharDB 0xA805 | success is relayed as 0x1C00 even when `ChatRestrict_AddOrUpdate` could not store the entry (list full, e.g. two adds in flight at 99) | client and DB list the name, the WM list does not; a later 0xA807 for it fails with 0x1C11 (silent) | check the result, or reserve the slot on 0xA803 |
+| W04-B48 | 0xA803, CharDB 0xA805 | the refusal replies 0xA806 never write bIsGM / bIsDeleted | two stale stack bytes on the wire (the client ignores the entry on errors) | zero the packet |
+| W04-B49 | `CGambleSystemServer_SendExchangeCoinInit` | if GBHouse row 0 is missing, nextReset stays 0 and is then advanced one day per main-loop pass from 1970 | thousands of 0xBC09 broadcasts with past dates, each resetting all exchanged counts (needs an empty GBHouse.shn) | do nothing while the init fails |
+| W04-B50 | OPTool 0xD007 | deleting an active event (flag 1) does not send 0xD00C to the zones | the zones keep applying a deleted event until they restart | send 0xD00C as 0xD009 does |
+| W04-B51 | OPTool 0xD009 | after a failed zone broadcast it replies 0x3221 and then 0x3220, and sets the flag anyway; 0xD005 also keeps the change after 0x3211 | the tool sees failure and success for one request; WM and zones disagree about the event | one reply; leave the record unchanged on failure |
+| W04-B52 | OPTool 0xD001 | with no event, the single 0xD002 carries 0x554 stale stack bytes as event data | stack contents sent to the tool (nAllEventCnt 0 tells it to ignore them) | zero the packet |
+| W04-B53 | OPTool 0xD005 / 0xD007 / 0xD009 | when the "not found" reply cannot be sent, the log line reads nEventNo through the vector's end pointer | reads past the last record; with an empty vector (null pointer) the WM faults, but only after a failed send to the tool | log the requested number |
 
 (W04-B6 is reserved; not used.)
 
@@ -1858,3 +2097,11 @@ CharDB 0xA420 NC_INSTANCE_DUNGEON_RANK_MYRANK_CMD { u32 nCharRegNum, u16 nMyRank
   when the loop does not run; not checked in the asm (dead in 2016, W04-B43).
 - 0x3A01 cooldown text: TextData3 0x938F63DA is an empty string in the 2016 client table; whether a newer client fills it
   is open.
+- Chat block (§14): the 0xA801 list is assumed to arrive before the first map login of the character (it is part of the
+  0x1004 load stream, D02 §4 step 18) *(inferred)*; if it came later the client would get it only at the next map
+  change. listFresh is not cleared at character login, so a stale flag from a previous character can only matter if
+  the new count is non-zero, in which case the push is wanted anyway.
+- `tExchangedCoinSumDate` (0x1004, §15.1): that the Character server counts only exchanges after this time is read
+  from its name and D02, not from the GameDB / Character procedure bodies.
+- GM events (§16): the OPTool side (what it shows for 0x3211 / 0x3221, whether it ever sends a flag other than 0/1)
+  is not available; the zone's use of the records is Z08 §13 / Z09.
