@@ -16,6 +16,14 @@
   "\u2013"
  ],
  [
+  "S01",
+  1,
+  "2016 server PDBs (NA2016): official names, types and packet layouts for the exact build",
+  "C02",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "W01",
   1,
   "World manager core: sessions, world login, characters, zone handoff",

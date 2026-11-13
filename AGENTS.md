@@ -12,10 +12,13 @@ plan file (`docs/plan/items/<ID>.md`), follow it. This file holds the shared con
 | `Files/Client/2016/Fiesta.bin` | The matching game client (PE32). `Files/Client/2016/ressystem/*.shn` = client data tables (texts, items…) |
 | `Files/Client/2017/Fiesta.bin` + `Fiesta.pdb` | Slightly newer client (`patch_2017_08_p01`) with its **full private PDB** (GUID matches the exe): official opcode enums, `PROTO_NC_*` packet structs with field names, shared enums/structs, client function names. Read with `tools/protocol-re/pdb.py`; work item C02 |
 | `Files/Server/2016/_Database/` | SQL Server backups from private-server installs (Account, AccountLog, StatisticsData, Character + w00_Character, GameLog + w00_GameLog, OperatorTool) and their `Fixes/*.sql`: stored-procedure source, close to but not the 2016 build. Read with `tools/protocol-re/bak.py`; see `docs/plan/db-backups.md` |
+| `Files/Server/NA2016/` | **Same builds** as `Files/Server/2016` (same timestamps, PDB GUIDs) + their **private PDBs** (`Login/Login.pdb`, `WorldManager/WorldManager.pdb`, `Zone00/Zone.pdb`, `Account/Account.pdb`, `AccountLog/AccountLog.pdb`; none for Character/GameLog). Its exes carry private-server hook patches: never analyse them, use the 2016 exes. Work item S01 |
+| `re-data/exports/<bin>-pdb/` | The 2016 exes re-analysed **with the NA2016 PDB** (`login-pdb`, `wm-pdb`, `zone-pdb`, `account-pdb`, `accountlog-pdb`): official function names (`Class::Method`), struct member access, typed globals; same function addresses as `<bin>`. **Read code here first.** `<bin>` stays the input of the generated docs |
+| `re-data/external/fiestaheroes/` | Local only (gitignored): clone of github.com/FiestaHeroes/Documentation (Lua API `docs/Lua Scripting/`, `static/files/fiesta.lua`, 86 SHN tables, DB tables, GM commands) for the NA2016 set. Missing in a worktree: `git clone --depth 1 https://github.com/FiestaHeroes/Documentation re-data/external/fiestaheroes` |
 | `Files/Server/2015`, `Files/Client/2015` | Older versions. Only for diffing; do not document them |
 | `re-data/exports/<bin>/` | **Ghidra exports, already done. Use these, do not re-decompile.** `decomp.c` (all functions, `//==== FUNC <addr> <name>` separators), `strings.tsv` (addr, value, referencing functions), `handlers.json`, `layouts.json` |
 | `re-data/captures/` | Packet captures of real client↔server traffic (`.pcap/.pcapng`) + scenario notes (`.md`). Sensitive: test accounts only. Decoder: `tools/protocol-re/pcap_decode.py` (work item P01) |
-| `re-data/ghidra/` | Persistent Ghidra 12.1.4 project with all 8 binaries analyzed (`<bin>` = project name). Run extra Ghidra scripts against it with `-process -noanalysis` instead of re-importing |
+| `re-data/ghidra/` | Persistent Ghidra 12.1.4 projects (`<bin>` = project name). Run extra Ghidra scripts against them with `-process -noanalysis` instead of re-importing. The PDB projects (`<bin>-pdb`, `client2017`) are local only: rebuild them with `re-data/ghidra/README.md` |
 | `tools/protocol-re/` | Scripts (see below) |
 | `tools/protocol-re/names/<bin>/*.json` | Known function/global names, one file per work item, merged automatically |
 | `docs/protocol/` | Protocol spec: `README.md` (framing, crypto, flows), `opcodes-*.md`, `packets-*.md` (generated layouts), `opcodes.json`, `client-error-codes.json`, `annotations.json` + `annotations/<ID>.json` (hand-verified layouts) |
@@ -23,7 +26,7 @@ plan file (`docs/plan/items/<ID>.md`), follow it. This file holds the shared con
 | `docs/knowledge/<ID>.md` | Findings that other items need: struct/member offsets, subsystem facts, open questions |
 | `docs/plan/` | Master plan, work item plans, `status/<ID>.md` progress logs |
 
-`<bin>` export names: `login`, `wm`, `zone`, `account`, `accountlog`, `character`, `gamelog`, `client`.
+`<bin>` export names: `login`, `wm`, `zone`, `account`, `accountlog`, `character`, `gamelog`, `client`; with PDB: `<bin>-pdb` (five servers), `client2017`.
 
 ## Tools (run from the repo root)
 
@@ -43,9 +46,11 @@ P=Files/Client/2017/Fiesta.pdb
 python3 -I $T/pdb.py $P types '^PROTO_NC_MAP_LOGIN_REQ$'          # 2017 PDB: structs/enums by regex (C-like dump)
 python3 -I $T/pdb.py $P types '^PROTOCOL_COMMAND_MAP$'            # official opcode names of one dept (enum value = cmd)
 python3 -I $T/pdb.py $P publics 'On_NC_'                         # 2017 client function names + addresses
+python3 -I $T/clean.py $E/zone-pdb - 452590                       # same function, PDB names and types (S01)
+python3 -I $T/pdb.py Files/Server/NA2016/Zone00/Zone.pdb types '^ShineObjectClass::ShinePlayer$'  # 2016 server class/struct layouts
 tools/protocol-re/regen.sh                                   # rebuild ALL generated docs (after adding names/annotations)
 python3 -I $T/coverage.py Z08                                # item coverage: reachable functions no doc cites yet (--overview: docs/plan/progress.md)
-tools/protocol-re/reanalyze.sh <bin> <exe>                   # only if an export is missing or broken (slow)
+tools/protocol-re/reanalyze.sh <bin> <exe> [pdb]             # only if an export is missing or broken (slow); with pdb -> <bin>-pdb
 tools/protocol-re/item.sh <ID> [--auto]                      # run a work item, one part per fresh lean session (from its worktree)
 ```
 
@@ -119,10 +124,12 @@ The files here are big: `decomp.c` 15 MB with lines up to 6,700 chars, `strings.
      does; never "fix" it in the pseudocode. X01 collects these into one register for a rebuild
      (format: `docs/pseudocode/wm/W02-party-raid.md` §9)
 3. **Evidence levels** (strongest first): *(captured)*: observed in a real capture
-   (`docs/protocol/capture-validation.md`); plain statement = read in the code; *(pdb2017)* = from the 2017
-   PDB and not yet confirmed in a 2016 binary; *(db-backup)* = only from the DB backups (`docs/plan/db-backups.md`);
+   (`docs/protocol/capture-validation.md`); plain statement = read in the code; a fact from a **2016 server PDB**
+   (NA2016, same build: names, types, layouts) counts as read in the code, mark the name source *(pdb2016)* once;
+   *(pdb2017)* = from the 2017
+   PDB and not yet confirmed in a 2016 binary; *(fh-doc)* = only from the FiestaHeroes docs (third-party); *(db-backup)* = only from the DB backups (`docs/plan/db-backups.md`);
    *(inferred)* = deduced.
-   Mark the non-plain ones. Never invent names. Names come from strings in the binaries, the 2017 PDB, the
+   Mark the non-plain ones. Never invent names. Names come from the 2016 server PDBs (preferred), strings in the binaries, the 2017 PDB, the
    client texts, or are clearly marked as ours. If a capture contradicts your reading, the capture wins; re-read the code.
 4. **Cross-check with the client** for every client-facing packet: find the client handler (see C01's
    `docs/knowledge/C01.md` once it exists) and record what the client does with each field and error code.

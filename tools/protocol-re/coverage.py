@@ -60,7 +60,7 @@ class Bin:
         H = json.load(open(f"{E}/{name}/handlers.json"))
         self.registered = {e["handler"][-8:] for t in H["tables"] for e in t["entries"]}
         self.names = {}
-        for f in glob.glob(f"{R}/tools/protocol-re/names/{name}/*.json"):
+        for f in sorted(glob.glob(f"{R}/tools/protocol-re/names/{name}/*.json")):
             self.names.update({k[4:]: v for k, v in json.load(open(f)).items() if k.startswith("FUN_")})
 
     def reach(self, roots):
