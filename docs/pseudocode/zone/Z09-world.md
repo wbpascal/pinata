@@ -2,10 +2,17 @@
 
 Source binary: `Files/Server/2016/w00_Zone00/5ZoneServer2.exe` (export `re-data/exports/zone`). Read any function with
 `python3 -I tools/protocol-re/clean.py re-data/exports/zone tools/protocol-re/names/zone <addr>`. Names: the zone's
-own profiler strings (`docs/knowledge/Z01.md` §1) plus `tools/protocol-re/names/zone/Z09.json` (names marked *(ours)*
-there and here are ours). Evidence markers as in `AGENTS.md`: plain = read in the 2016 code, *(pdb2017)*, *(inferred)*.
+official names from the NA2016 `Zone.pdb` (same build, work item S01; export `re-data/exports/zone-pdb`, read with
+`clean.py re-data/exports/zone-pdb - <addr>`): they count as read in the code *(pdb2016)*. The namespace
+`ShineObjectClass::` is left out (`ShineMob::so_Routine` = `ShineObjectClass::ShineMob::so_Routine`). Where an earlier
+part of this file used a name of ours, it was replaced by the official one (part R1); the few names still marked
+*(ours)* have no PDB name. Global variables keep their PDB symbol (`mobdatabox`, `shineobjmanager`, `sock2wldman`, …);
+three short aliases stay because the other zone docs use them: `g_Now` = `clockwatch.cw_CurrTick` (DAT_14d41a70),
+`g_Rng` (DAT_150ba418, a `cWell512Random`), `g_SightDistSq` (DAT_008b7834). Evidence markers as in `AGENTS.md`: plain =
+read in the 2016 code (2016 server PDB included), *(pdb2017)*, *(inferred)*.
 
-Time unit: `g_Now` (DAT_14d41a70) counts **tenths of a second** (Z02 §1); "`g_Now + 50`" = 5 s.
+Time unit: `g_Now` (`clockwatch.cw_CurrTick`, DAT_14d41a70; `ClockWatch` 0x20 bytes) counts **tenths of a second**
+(Z02 §1); "`g_Now + 50`" = 5 s.
 
 This file is written in parts (status: `docs/plan/status/Z09.md`). Sections so far: §1 main loop and global timers,
 §2 the player tick, §3 GM events, §4 prison (no zone timer), §5 mob object core (data, spawn, routines, NPC, bandit),
@@ -30,34 +37,37 @@ player's tick, §2.5), every object's routine, and the global containers. IOCP w
 zs_mainthreadfunction(ctl)                                          @ FUN_005aca30
     # ctl = thread control block: +0 u8 running, +1 u8 stopRequest, +0xc u32 tickCounter
     ctl.running = 1; ctl.tickCounter = 1
-    srand(time()); r[16] = 16 × rand(); FUN_0063c890(r)              # seeds the zone's own RNG (inferred)
-    DAT_14d44a34 = 0
+    srand(time()); r[16] = 16 × rand(); InitWELLRNG512a(r) FUN_0063c890   # seeds the zone's WELL512a RNG
+    BalanceLog.dl_Activ (DAT_14d44a34) = 0                            # switches one debug log off
     while !ctl.stopRequest:
-        lock DAT_0d026c10 (FUN_004678e0) … unlock (FUN_004681f0) at the end of the tick   # main-thread lock (inferred)
+        _PerformanceRecorder (DAT_0d026c10): pr_MainLoopHead FUN_004678e0 … pr_MainLoopTail FUN_004681f0 at the end of the tick
+            # profiler bracket of one tick (an earlier part of this file read it as a lock; the PDB names settle it)
         # clock
-        acc64 += timeGetTime() − last;  g_Now = acc64 · 10 / 1000      # tenths of a second since the first WM 0x0821
-        DAT_14d41a74 = tenths elapsed since the last whole tenth (step of this tick, inferred)
-        DAT_1327281a = DAT_13272bca = −1                               # two per-tick caches reset (meaning not traced)
-        ClientSessions_Reap(server)                                    @ FUN_005abb60   §1.5
-        Listen_AcceptPending(server)                                   @ FUN_005aa840   §1.5
-        SessionPool_PollAll(g_GameDBSessions); (g_GameLogSessions); (g_WMSessions)   @ FUN_005ab030
-        Session_Poll("ZoneCon", g_ZoneRingNext); Session_Poll("ZoneLis", ring previous DAT_0af0cff0)   @ FUN_005a9f70
-        if g_WorldTm.tm_min ≠ (g_WorldDate >> 25):  PerMinuteBlock()   # §1.2
-        GMEvents_Routine(&g_GMEvents)                                  @ FUN_0046d7e0   §3 (every 1 s)
-        SessionPool_Reconnect(g_GameDBSessions, type 2); (g_GameLogSessions, 3); (g_WMSessions, 5)   @ FUN_005aa340
-        ForEachList(&g_Objects, ShineObjectEachList.soel_Routine)      @ FUN_004026e0 → FUN_0054f710   §1.3
+        clockwatch.cw_TotalMilliSec (u64) += timeGetTime() − cw_LastMilliSec;  g_Now = cw_CurrTick = cw_TotalMilliSec · 10 / 1000
+            # tenths of a second since the first WM 0x0821
+        clockwatch.cw_DeltaTick (DAT_14d41a74) = tenths since cw_LastMilliSecByDelta (step of this tick)
+        ShineObject::so_CostumWeaponChargeing / so_CostumShieldChargeing (static members, DAT_1327281a / DAT_13272bca):
+            item SerialNumber = −1                                     # two per-tick caches reset (users not traced)
+        ZoneServer::zs_disconnect(server)                                    @ FUN_005abb60   §1.5
+        ZoneServer::zs_connect(server)                                   @ FUN_005aa840   §1.5
+        SocketBundle<GameDBSession>::sb_Packet(sock2gameDB); (sock2gamelog); (sock2wldman)   @ FUN_005ab030
+        ZoneServer::zs_PacketProcess("ZoneCon", zoneconnect); ZoneServer::zs_PacketProcess("ZoneLis", ring previous DAT_0af0cff0)   @ FUN_005a9f70
+        if timefromworld.tm_min ≠ chargeditemcheck.ct_Current.minute (bits 25..31):  PerMinuteBlock()   # §1.2
+        GMEventManager::GMEM_ReflushRunState(&gGMEventManager)                                  @ FUN_0046d7e0   §3 (every 1 s)
+        SocketBundle<GameDBSession>::sb_Routine(sock2gameDB, type 2); (sock2gamelog, 3); (sock2wldman, 5)   @ FUN_005aa340
+        List<FieldMap>::l_4AllInList(&shineobjmanager, ShineObjectEachList.soel_Routine)      @ FUN_004026e0 → FUN_0054f710   §1.3
         SkillBlastEffectContainer.sbec_Routine(&g_BlastEffects)        @ FUN_00437fc0   (Z03 §5.4)
-        ForEach(&g_EventReserveList DAT_13388e70, erle_Routine)        @ FUN_005af1e0   §1.4
-        ForEach(&g_OPToolObjects DAT_0da3d2b8, OPToolObject.opto_Routine)   @ FUN_004c7e60   §1.5
-        ForEach(&g_GuildStorage, FUN_00474950)                         # drops records whose +0x106c "in use" byte is 0 (Z14)
-        g_MinuteFlags (DAT_00aa43e0, u16) = 0                          # the per-minute flags live for exactly one tick
-        if g_Pulse5s (DAT_14d6fcb4) < g_Now: g_Pulse5s = g_Now + 50   # 5-second pulse, §1.4
-        SleepManager.sm_Routine(&g_Sleep DAT_0086ed54)                 @ FUN_005aa610   §1.4
+        ForEach(&zonevent DAT_13388e70, erle_Routine)        @ FUN_005af1e0   §1.4
+        ForEach(&optoollist DAT_0da3d2b8, OPToolObject.opto_Routine)   @ FUN_004c7e60   §1.5
+        ForEach(&gldstoramanager, FUN_00474950)                         # drops records whose +0x106c "in use" byte is 0 (Z14)
+        chargeditemcheck.ct_1MinuteFlow = ct_1DayFlow = 0 (DAT_00aa43e0 / DAT_00aa43e1)   # the per-minute flags live for exactly one tick
+        if BossFieldContent::g_ServentBuffBossTable.sbbt_NextTick (DAT_14d6fcb4) < g_Now: sbbt_NextTick = g_Now + 50   # 5-second pulse, §1.4
+        SleepManager.sm_Routine(&sleepmanager DAT_0086ed54)                 @ FUN_005aa610   §1.4
         if DAT_0d76abc0 < g_Now:                                       # instance-cluster interval
             DAT_0d76abc0 += DAT_0d76abc4
-            ForEach(&g_MapClusterMgr, MapCluster.mc_Routine)           @ FUN_004868d0   (Z14)
-        g_TickTimes[DAT_0084fb20++ & mask] = g_Now                     # ring of tick start times (diagnostic, inferred)
-        GambleMgr_Routine(&g_GambleMgr)                                @ FUN_006158d0: every game object vt 0x20 (Z06 §5 routines)
+            ForEach(&mapclustermanager, MapCluster.mc_Routine)           @ FUN_004868d0   (Z14)
+        performancechech.pc_Buffer[pc_point++ & mask] = g_Now  (DAT_0084fb20, `PerformanceChecker`)   # ring of tick start times (diagnostic)
+        CGambleObjectManager::gom_Routine(&gGambleObjectManager)                                @ FUN_006158d0: every game object vt 0x20 (Z06 §5 routines)
         ctl.tickCounter++
     ctl.running = 0
 ```
@@ -68,43 +78,46 @@ There is no fixed tick length: the loop runs as fast as it can, throttled only b
 
 The WM sends `0x0821 NC_MISC_TIMEFROMWORLD_CMD { struct tm }` every 60 s and when the zone connects (W01 §2,
 `Zones_TimeSync`). The zone handler (`wms_NC_MISC_TIMEFROMWORLD_CMD` @ FUN_004511a0, Z01 §9) copies it into
-`g_WorldTm` (DAT_00aa43e4, 9 ints: sec, min, hour, mday, mon, year, wday, yday, isdst), sets the machine clock and
-`g_TimeOffset` (DAT_00aa4408 = mktime(tm) − time()). `WorldTime_Now(&t)` @ FUN_00450360 *(ours)* = `time() + g_TimeOffset`.
+`timefromworld` (DAT_00aa43e4, 9 ints: sec, min, hour, mday, mon, year, wday, yday, isdst), sets the machine clock and
+`diffence2world` (DAT_00aa4408 = mktime(tm) − time()). `mysecond(&t)` @ FUN_00450360 = `time() + diffence2world`.
 So the block below runs once per WM time message whose minute differs from the last one (≈ once a minute); while the
 WM link is down no minute passes *(inferred)*.
 
 ```pseudo
 PerMinuteBlock():                                                   (inline in FUN_005aca30)
-    # certification counters (Z10): DAT_14d6fce0 < DAT_14d6fce8 → ctl.stopRequest = 1 (the zone stops);
-    #   else DAT_14d6fce4++, and when ≥ DAT_14d6fcdc: DAT_14d6fcec = next non-zero (table DAT_150923f0[i] − 50), DAT_14d6fce4 = 0
-    clear the map DAT_13295a6c (entries added by som_FreeObject FUN_00557d70; freed-handle bookkeeping, inferred)
-    g_WorldDate (DAT_00aa43b8) = min<<25 | hour<<19 | mday<<13 | (mon+1)<<8 | (u8)(year − 100)
+    # certification counters (Z10), struct LuaArgument g_LuaArgument DAT_14d6fcd8 (pdb2016):
+    #   MaxSkip (+8) < SkipNumber (+0x10) → ctl.stopRequest = 1 (the zone stops);
+    #   else Summary (+0xc)++, and when ≥ Interval (+4): CertifyArg (+0x14) = next non-zero (rndbox.rb_box[100] slot − 50), Summary = 0
+    clear globalset (DAT_13295a68, std::set<ulong>; entries added by som_FreeObject FUN_00557d70; freed-handle bookkeeping, inferred)
+    chargeditemcheck.ct_Current (DAT_00aa43b8, ShineDateTime bitfield: year:8 month:5 date:6 hour:6 minute:7)
+        = min<<25 | hour<<19 | mday<<13 | (mon+1)<<8 | (u8)(year − 100)
         # packed "now" that charged / time-limited items compare with field by field (e.g. §2.4 SmallChargedItemLimitCheck)
-    g_WorldTmSnapshot (DAT_00aa43bc) = g_WorldTm
-    g_MinuteFlags: byte 0 (DAT_00aa43e0) = 1 "a minute passed";
-                   byte 1 (DAT_00aa43e1) = 1 when min == 0 and hour == 0 "a new day"
-    DAT_0086ed5c −= DAT_0086ed5c / 100                             # 1 % decay; nothing else reads it (inferred: dead statistic)
+    chargeditemcheck.ct_TimeStr (DAT_00aa43bc) = timefromworld
+    chargeditemcheck.ct_1MinuteFlow (DAT_00aa43e0) = 1 "a minute passed";
+    chargeditemcheck.ct_1DayFlow (DAT_00aa43e1) = 1 when min == 0 and hour == 0 "a new day"
+    sleepmanager.sm_MaxPacketInLoop (DAT_0086ed5c) −= itself / 100  # 1 % decay per minute of the peak used by sm_Routine (§1.4)
     wms_GuildTournamentCheck()                                      @ FUN_004776a0   (Z16)
-    wms_GuildWarStatusRequest(g_WMSessions)                         @ FUN_005a45f0   (Z08 / W03)
-    WeddingHall.wh_Routine(&g_WeddingHall)                          @ FUN_005a2a10   (Z13)
+    wms_GuildWarStatusRequest(sock2wldman)                         @ FUN_005a45f0   (Z08 / W03)
+    WeddingHall.wh_Routine(&weddinghall)                          @ FUN_005a2a10   (Z13)
     object-pool consistency check: for each of the 13 pools (DAT_132828a4[0..12]) and each used slot:
-        ObjectHandle_Decode(obj.handle) must give (pool, slot); otherwise log
+        ShineObjectHandleUnion::sohu_HandleSplit(obj.handle) must give (pool, slot); otherwise log
         "ZoneServer::zs_mainthreadfunction - so_GetZoneHandle[h] ObjType[t] Index[i] inlist[…]" (log only)
-    if DAT_00870de0 == 0: DAT_00870dd8 *= const DAT_006f91c8        # argument of the next call (not traced)
-    Lua_CallGlobal(start-script state DAT_14d6fdf0, "xlrfunction", …)   @ FUN_005d7bc0
+    if !g_LUA_SCRIPT_SECURITYFactor.lsf_IsFreeze (DAT_00870de0): lsf_Factor (DAT_00870dd8, double) *= 1.01   # read by the script (Z10)
+    LuaScript::ls_FunctionCall(&g_LUA_SCRIPT_SECURITY DAT_14d6fdf0, "xlrfunction", no arguments)   @ FUN_005d7bc0
         # a function defined by the downloaded start script (Z10); failure → log "…zs_mainthreadfunction : function call error"
 ```
 
-Everything that "runs once a minute" in the zone keys off `g_MinuteFlags` during that one tick (player checks §2.4).
+Everything that "runs once a minute" in the zone keys off `chargeditemcheck.ct_1MinuteFlow` during that one tick (player checks §2.4).
+`chargeditemcheck` is a `ChargedItemEffectList::CheckTime` (0x2c bytes: `ct_Current`, `ct_TimeStr`, the two flags) *(pdb2016)*.
 
 ### 1.3 Object routines
 
-`g_Objects` holds one `ShineObjectEachList` per object pool (13 lists, Z01 §4.2). The main loop visits each list
-(`ForEachList` @ FUN_004026e0 *(ours)*); each list visits its objects:
+`shineobjmanager` holds one `ShineObjectEachList` per object pool (13 lists, Z01 §4.2). The main loop visits each list
+(`List<FieldMap>::l_4AllInList` @ FUN_004026e0, a template instance shared by every list type); each list visits its objects:
 
 ```pseudo
 ShineObjectEachList.soel_Routine(list)                              @ FUN_0054f710
-    ok = ObjectList_ForEach(list, obj → obj.vt[0x4ac]())            @ FUN_0054b160, thunk LAB_0054b320 (jmp [vt+0x4ac])
+    ok = List<ShineObject>::l_4AllInList(list, obj → obj.vt[0x4ac]())            @ FUN_0054b160, thunk LAB_0054b320 (jmp [vt+0x4ac])
     if !ok: list.failCount (+0x1c)++                                # a visit stopped at a free slot
     if list.nextReport (+0x18) < g_Now:
         if failCount: log "ShineObjectEachList::soel_Routine - ObjectType[…] LISTNO Count[n]"; failCount = 0
@@ -116,15 +129,15 @@ ShineObjectEachList.soel_Routine(list)                              @ FUN_0054f7
 | Class | so_Routine | Section |
 |---|---|---|
 | ShineObject (base) | FUN_0064c820 `return 1` | — |
-| ShineAxialFlag | `ShineAxialFlag_so_Routine` | later part (objects) |
-| ShineDropItem | `ShineDropItem_so_Routine` | later part (drops) |
+| ShineAxialFlag | `ShineAxialFlag::so_Routine` | later part (objects) |
+| ShineDropItem | `ShineDropItem::so_Routine` | later part (drops) |
 | ShineMiniHouse | FUN_00567400 | Z06 §3.4 / Z13 |
-| ShineMagicField, ShineEffectObject, ShineDoor, ShineServant | `…_so_Routine` | later part (objects) |
-| ShineBandit | `ShineBandit_so_Routine` FUN_0056c630 | §5.10 |
+| ShineMagicField, ShineEffectObject, ShineDoor, ShineServant | `…::so_Routine` | later part (objects) |
+| ShineBandit | `ShineBandit::so_Routine` FUN_0056c630 | §5.10 |
 | ShineMobileObject (base of all movers) | FUN_0056a080 (cast completion: Z03 §5) | §5.5 |
 | ShinePlayer | FUN_0056c790 | §2 |
-| ShineMob, ShineNPC | `ShineMob_so_Routine` FUN_0056baa0, `ShineNPC_so_Routine` FUN_0056a9e0 | §5.4, §5.9 |
-| ShineMover, ShinePet | `…_so_Routine` | Z13 |
+| ShineMob, ShineNPC | `ShineMob::so_Routine` FUN_0056baa0, `ShineNPC::so_Routine` FUN_0056a9e0 | §5.4, §5.9 |
+| ShineMover, ShinePet | `…::so_Routine` | Z13 |
 
 ### 1.4 Other global containers
 
@@ -138,8 +151,8 @@ EventReserveListElement.erle_Routine(e, list, idx)                  @ FUN_005af1
     # at g_Now + table DAT_0083c798[i]·10 (Z16)
 
 SleepManager.sm_Routine(s)                                          @ FUN_005aa610
-    # s = { work (DAT_0086ed54), step, peak }; work is incremented once per processed packet
-    #     (player tick §2.5, Session_Poll, opto_Routine)
+    # s = sleepmanager { sm_PacketNumber (DAT_0086ed54), sm_LoopNumber, sm_MaxPacketInLoop }; sm_PacketNumber is incremented once per processed packet
+    #     (player tick §2.5, ZoneServer::zs_PacketProcess, opto_Routine)
     peak = max(peak, work)
     if work · 2500 / peak < step²:  SleepManager.sm_Sleep(s)        @ FUN_005aa5b0: Sleep(1 ms); step = 0
     else step++
@@ -147,27 +160,27 @@ SleepManager.sm_Routine(s)                                          @ FUN_005aa6
     # an idle zone sleeps 1 ms every other tick; a busy one sleeps after ~√(2500·work/peak) ticks
 ```
 
-`g_Pulse5s` (DAT_14d6fcb4) is "true" (`< g_Now`) for exactly one tick every 5 s, because the main loop re-arms it after
-the object routines. `ShineMob.sm_IBuffToBuffee` (FUN_005d48c0) and FUN_0069b690 test it (mob part).
+`BossFieldContent::g_ServentBuffBossTable.sbbt_NextTick` (DAT_14d6fcb4; our earlier name `g_Pulse5s`) is "true" (`< g_Now`) for exactly one tick every 5 s, because the main loop re-arms it after
+the object routines (it is a member of the boss-field servant-buff table, §8.9, not a general pulse). `ShineMob.sm_IBuffToBuffee` (FUN_005d48c0) and FUN_0069b690 test it (mob part).
 
 ### 1.5 Session polling and reaping (network side of the tick)
 
 ```pseudo
-Session_Poll(name, s)                                               @ FUN_005a9f70
+ZoneServer::zs_PacketProcess(name, s)                                               @ FUN_005a9f70
     if s.state ∉ {1, 2}: return 2
     r = s.io.vt[0xc]()                     # 0 nothing, 1 packet ready, 2 error
-    1 → s.vt[4](0, 0xFFFF) (dispatch with handle −1); s.io.vt[0x24]() (release); g_Sleep.work++; return 0
+    1 → s.vt[4](0, 0xFFFF) (dispatch with handle −1); s.io.vt[0x24]() (release); sleepmanager.sm_PacketNumber++; return 0
     2 → s.io.vt[0x10](&n); if n < 0 return 1; s.io.vt[0x18](); s.state = 3; return 1
     0 → if s.io.vt[0x28]() (flush) fails: FUN_005a66c0(s) (close)
-SessionPool_PollAll(pool)                                           @ FUN_005ab030
-    for the 4 entries in state 1/2: if Session_Poll ≠ 0: close (FUN_005a6690), state 0,
+SocketBundle<GameDBSession>::sb_Packet(pool)                                           @ FUN_005ab030
+    for the 4 entries in state 1/2: if ZoneServer::zs_PacketProcess ≠ 0: close (FUN_005a6690), state 0,
         reconnectAt (+0xfc) = g_Now + pool.reconnectSeconds (+0) · 10, ready = 0, log
-SessionPool_Reconnect(pool, info, type)                             @ FUN_005aa340
+SocketBundle<GameDBSession>::sb_Routine(pool, info, type)                             @ FUN_005aa340
     for entries not in state 1/2 whose reconnectAt ≤ g_Now: FUN_005a9b50(info, entry, type, 1) (connect + handshake, Z01 §3.3)
-Listen_AcceptPending(server)                                        @ FUN_005aa840
+ZoneServer::zs_connect(server)                                        @ FUN_005aa840
     per accepted socket by listen type: 6 zone ring (ZoneListenSession), 8 OPTool (OPToolSession; refused when
     no OPTool object is free), 0x14 client (ClientSession from the free pool; full → socket closed)
-ClientSessions_Reap(server)                                         @ FUN_005abb60
+ZoneServer::zs_disconnect(server)                                         @ FUN_005abb60
     also polls the ring-next link (reconnect when down) and the pools' keep-alives (FUN_005aae80, FUN_005ab2c0, not opened)
     for each client session:
         phase (FUN_0045b190) ∈ {0, 1} and g_Now − connectTime (FUN_0045b1b0) > 72000 (2 h): log, state = 3
@@ -177,7 +190,7 @@ ClientSessions_Reap(server)                                         @ FUN_005abb
             so_PacketBufferFlush; so_Unmark(…, 1, 7); som_FreeObject(handle) (log "…zs_disconnect : Fail to object free")
             release the session to the pool
 OPToolObject.opto_Routine(o, list, idx)                             @ FUN_004c7e60
-    same receive/dispatch as Session_Poll for an OPTool session; dead session → removed from the list
+    same receive/dispatch as ZoneServer::zs_PacketProcess for an OPTool session; dead session → removed from the list
 ```
 
 ---
@@ -208,16 +221,16 @@ ShinePlayer.so_Routine(p, _, poolIndex)                             @ FUN_0056c7
     if p.flags1e78 & 0x04 (Fear, Z03):
         CancelOnAction (vt 0x8d0); if actionTimer.state ∈ {2, 3} (swing): smo_BashStop (vt 0xed8)
         if casting (+0x1d84) and skill (+0x1d88) ≠ 0x7213: once (+0x2928c bit 1): p.deferredErr (+0x7f37) = 0xFCC; sp_castabort (vt 0xed4)
-    ScriptTrigger_Fire(p, 0, 0, 0)  (vt 0xa38)                      @ FUN_00577c10   §2.6
+    ShinePlayer::notifyObservers(p, 0, 0, 0)  (vt 0xa38)                      @ FUN_00577c10   §2.6
     ScriptTrigger range check                                       §2.6
-    ToggleSkill_DropUnusable(p.skillList +0x17d0c, p)               @ FUN_00448e20
+    CharaterSkillList::csl_Toggle_CheckOnOff(p.skillList +0x17d0c, p)               @ FUN_00448e20
         for each toggled skill (entry +2 ≠ 0) that csl_Toggle_CanUseSkill refuses now: remove its up to 4 abstates
-        (vt 0x650, BriefAbstateBit_Clear, so_AbnormalState_BroadcastReset) and p.vt[0xbcc](skill) (toggle off)
-    ScriptTrigger_Fire(p, 6, 0, 0)
+        (vt 0x650, so_AbnormalState_BitReset, so_AbnormalState_BroadcastReset) and p.vt[0xbcc](skill) (toggle off)
+    ShinePlayer::notifyObservers(p, 6, 0, 0)
     ReceivePackets(p, handle)                                       # §2.5
-    SlantedNodes_CheckRelink: if the player's x/y nodes (+0x16, +0x22) fail
+    slanted-list check: if the player's x/y nodes (+0x16, +0x22) fail
         SlantedCoordList::CoordedNode::cn_IsValid (FUN_0054b4c0: "Not inlist", "Link error", "Order error"):
-        FieldMap.fm_Relink(field)                                   @ FUN_00462bd0   (the same check runs again on exit, FUN_005670c0)
+        FieldMap.fm_Relink(field)                                   @ FUN_00462bd0   (the same check runs again on exit: destructor of the scope guard `SlantedListNormalizer`, FUN_005670c0)
 ```
 
 Disconnect reasons used here: `0x680` player outside the map rectangle, `0x685` in a game mode without a map.
@@ -230,7 +243,8 @@ FUN_00442eb0, FUN_0055fdf0 (re-placement). This corrects Z03 §2 ("routine ran o
 ```pseudo
 sp_ElderineRegionCheck(p)                                           @ FUN_005529d0
     if p.field.mapName == "Eld" and (x ∉ [6000, 20000] or y ∉ [6000, 20000]):
-        log x, y, charNo and dump the 16-entry position history ring p+0x2a804 (FUN_0054a120)   # log only, no correction
+        log x, y, charNo and dump p.sp_ProtocolLog (+0x2a804, `ProtocolLogger`: ring of the last 16 received packets
+        {tick, locate x/y, NETCOMMAND}, index pl_Pointer +0x100) via ProtocolLogger::pl_Logging FUN_0054a120   # log only, no correction
 ```
 
 ### 2.3 Work done for a player in a game mode
@@ -240,7 +254,7 @@ GameModeWork(p):                                                    (inline in F
     NormalAttackDamageTick.nadt_Routine(p+0x173d0, p)               @ FUN_00577520   (Z03 §3)
     if p.itemActions (vt 0x5d0): FUN_005d1930(it)                    # item-action cooldown routine (Z17)
     character-title minute counters: FUN_005cc4e0(p+0x29638)
-        when WorldTime_Now()/60 changes: +0x4c8++ (cond 3), +0x4d8++ (cond 4), +0x728++ (cond 0x29), and
+        when mysecond()/60 changes: +0x4c8++ (cond 3), +0x4d8++ (cond 4), +0x728++ (cond 0x29), and
         +0x748 = FUN_0062e3b0() (cond 0x2b); each through the title-condition update FUN_005cb5f0 (Z07 / Z12)
     ride timer: if rideItemSlot (+0x2a760) ≥ 0 and +0x2a768 ≤ g_Now:
         on a ShineMover (ride kind 2): if !FUN_0045ec10(p, 1): CancelOnAction, rideKind = 3;  else sp_HorseOn(p, 1)   (Z13)
@@ -253,9 +267,9 @@ GameModeWork(p):                                                    (inline in F
         emote shown (+0x7f32+0x54 ≠ −1) and timer +0x2abdc and ActionViewInfo row (+0x2abe4) matches with +0x71 == 1 → PetReaction(1)
     hooks (function pointers; the no-op FUN_00417480 unless set):
         +0x29628 HP/SP recovery (Z02: sp_RecoverPoint_House in a tent), +0x173bc, +0x173c8,
-        +0x29634 (ShinePlayer_MoverRecoveryTick FUN_0056b5f0 while on a mover)
+        +0x29634 (ShinePlayer::sp_MoverUpgradeEffect_ON FUN_0056b5f0 while on a mover)
     class object (vt 0x49c) .vt[0x34](p)                            # per-class routine (CharClass*, Z12)
-    if g_MinuteFlags.minute: PerMinutePlayerChecks(p)               # §2.4
+    if chargeditemcheck.ct_1MinuteFlow: PerMinutePlayerChecks(p)               # §2.4
     sp_SendHPinform, sp_SendSPinform, sp_SendLPinform               # §2.4 packets
     sp_SendPartyMemberInform(p)                                     @ FUN_0056e340
     sp_SendMyInform2PartyMember(p)                                  @ FUN_0056df80   (Z08 §1.2: party HP/SP to members)
@@ -268,7 +282,7 @@ GameModeWork(p):                                                    (inline in F
     pending relink (+0x5cb8 bit 0x40): clear; target = FUN_00551910(p, +0x292a2); if p.so_LinkTo(target, 6, 9, 10) fails and
         +0x5cb9 bit 0: set bit 0x40 again (retry next tick); clear +0x5cb9 bit 0
     +0x5cb9 bit 1: clear; p.vt[0x6d4](p+0x292a4)  (FUN_0057d1d0)
-    BashStopNotify_Send(p+0x7f36, p)                                @ FUN_00566820   (Z03: 0x243D)
+    CeaseFireSender::cfs_Routine(p+0x7f36, p)                                @ FUN_00566820   (Z03: 0x243D)
     if p.deferredErr (+0x7f37): so_SendErrorCode(9, 0x34, err) = 0x2434 {u16 err}; deferredErr = 0   (Z03 §4)
     if p.nextSave (+0x2aa40) ≤ g_Now: WholeSaver.ws_save2DB(p, 1, 10)   (Z01 §8.4; every 600 s)
     minimon auto-use: if vt 0xe54 (+0x2abec or +0x2abed set) and +0x2abe8 ≤ g_Now: +0x2abe8 = g_Now + 10 (1 s);
@@ -289,7 +303,7 @@ sp_SendSPinform(p)                                                  @ FUN_0056da
     if SP (vt 0x4ec) ≠ lastSentSP (+0x172dc): p ← 0x240F NC_BAT_SPCHANGE_CMD { u32 sp }
 sp_SendLPinform(p)                                                  @ FUN_0056dc20
     if LP (vt 0xd90) ≠ last (FUN_00561410): store (FUN_00561420); p ← 0x245F NC_BAT_LPCHANGE_CMD { u32 nLP };
-        then so_AllOfRange_Class0(…, so_ply_Send2WhoTargetMe): the same to everyone who targets p
+        then so_AllOfRange(…, so_ply_Send2WhoTargetMe): the same to everyone who targets p
 sp_SendPartyMemberInform(p)                                         @ FUN_0056e340
     # keeps the party record's member → object pointer current; sends nothing itself
     if p.partyNo (vt 0x550) ≠ −1 and vt 0xa84() == 0 and the first byte of the party record (+0x29244) < 2 (meaning not traced):
@@ -302,21 +316,21 @@ the 2017 PDB structs `PROTO_NC_BAT_HPCHANGE_CMD { ulong hp; ushort hpchangeorder
 `…LPCHANGE_CMD { ulong nLP }`.
 
 ```pseudo
-PerMinutePlayerChecks(p):                                           (inline; g_MinuteFlags byte 0)
-    p.minuteCounter (+0x2a7c8)++; reset to 0 on a new day (byte 1)    # reader not found (inferred: minutes played today)
+PerMinutePlayerChecks(p):                                           (inline; chargeditemcheck.ct_1MinuteFlow)
+    p.sp_PlayTimeDay (+0x2a7c8)++; reset to 0 on a new day (ct_1DayFlow)   # minutes played today (name pdb2016; reader not found)
     sp_MiniHouseActivCheck(p)                                       @ FUN_00534fe0   (Z13)
     sp_DecorationActivCheck(p)                                      @ FUN_00534c60   (Z07)
-    sp_ActionItemActivCheck(p, p+0xf758, 15)                        @ FUN_005697e0   (premium emote items, Z04 / Z02 §9.3)
+    sp_SmallItemActivCheck<ItemInform_ActionItem>(p, p+0xf758, 15)                        @ FUN_005697e0   (premium emote items, Z04 / Z02 §9.3)
     charged buffs: rebuild p+0x2a5a0 from the template DAT_132728f8 and the buff list p+0x2a330 (FUN_00450e10, FUN_00487c50);
         p+0xe94 = 1; if a buff expired (+0x2a5ce): so_RecalcEquipParam (vt 0x35c), so_RecalcLastParam (vt 0x368)
     smo_NotifyParameterChange(1) (vt 0x34); so_ply_SendBoothSize (vt 0x3e0)
     sp_ChargedItemLimitCheck (vt 0x38) on the inventory (p+0x8e2c, kind 9), the equipment (p+0x7fd8, kind 8) and, unless
         mode 4/5, the mini-house bag (p+0xe778, kind 0xc)           (expiry of time-limited items, Z04)
     sp_SmallChargedItemLimitCheck(p, p+0xf758, 15)                  @ FUN_0056b900
-        for each item of that bag with an expiry date (FUN_00643400): if expiry ≤ g_WorldDate
+        for each item of that bag with an expiry date (FUN_00643400): if expiry ≤ chargeditemcheck.ct_Current
         (compared year, month, day, hour, minute in that order): sp_SmallItemDelete
-    wedding status (+0x5cd0 low nibble): 1 Wedding_CheckProposeExpired (FUN_0059f1b0), 2 Wedding_CheckDivorceTimers
-        (FUN_005a1c90), 3 Wedding_CheckEscapeDivorce (FUN_0059f2d0)                                            (Z13)
+    wedding status (+0x5cd0 low nibble): 1 Checker::ApplicationLimit (FUN_0059f1b0), 2 Checker::DivorceLimit
+        (FUN_005a1c90), 3 Checker::DelayLimit (FUN_0059f2d0)                                            (Z13)
 ```
 
 ### 2.5 Client packets are handled inside the player tick
@@ -329,8 +343,8 @@ ReceivePackets(p, handle):                                          (inline in F
         0 (nothing left): if s.io flush (vt 0x28) fails: close s (FUN_005a66c0)
                           if !p.so_PacketBufferFlush (vt 0x2e8): log "Char as write fail ", s.state = 3
                           stop
-        1 (one packet):   p.lastPacketAt (+0x17d48) = g_Now; s.vt[4](p, handle) → ClientSession.zbs_Parsing (Z02 §1);
-                          if s.vt[0xc]() == 1: s.io.vt[0x24]() (release); g_Sleep.work++
+        1 (one packet):   p.sp_LogoutWait.lastpacket (+0x17d48) = g_Now; s.vt[4](p, handle) → ClientSession.zbs_Parsing (Z02 §1);
+                          if s.vt[0xc]() == 1: s.io.vt[0x24]() (release); sleepmanager.sm_PacketNumber++
         2 (malformed):    s.state = 3; log "Char as abnormal packet "; end of tick
 ```
 
@@ -343,67 +357,125 @@ in its send buffer go out at the next `so_PacketBufferFlush`. At most 1000 packe
 FUN_00576d50 / FUN_00577b50 (Lua `cTriggerRegist` and the chat/jump triggers; script part).
 
 ```pseudo
-ScriptTrigger_Fire(p, kind, a, b)       vt 0xa38                    @ FUN_00577c10
+ShinePlayer::notifyObservers(p, kind, a, b)       vt 0xa38                    @ FUN_00577c10
     for each entry e: r = e.vt[4](0, p, kind, a, b, 0, 0); if r & 2: destroy e and remove it
     # kinds seen: 0 every tick, 6 every tick after the skill check, 7 moved (Z02 §2), 4 emotion (Z02 §4)
-ScriptTrigger_RemoveFor(p, owner)       vt 0xa34                    @ FUN_00577ba0
+ShinePlayer::unregisterObsersvers(p, owner)       vt 0xa34                    @ FUN_00577ba0
     remove the entries whose owner == owner
 range check (so_Routine): for each entry whose owner is not closing:
     d² = distance² between p and owner (999999999 if either has no map, the maps differ or the layers differ)
-    if d² > owner.vt[0xa54]()² (FUN_005551a0 returns 1000 → 1000 units): ScriptTrigger_RemoveFor(p, owner)
+    if d² > owner.vt[0xa54]()² (FUN_005551a0 returns 1000 → 1000 units): ShinePlayer::unregisterObsersvers(p, owner)
 ```
+
+### 2.7 Player members used in this file *(pdb2016)*
+
+Part R1 checked every `p+0x…` / `player+0x…` offset of this file against `ShineObjectClass::ShinePlayer` (0x2c058
+bytes) of the NA2016 `Zone.pdb` (most are also in `docs/knowledge/S01-player-offsets.tsv`): all land on a member start
+or inside a named sub-struct. The ones this item owns or relies on:
+
+| Offset | Member | Used for (section) |
+|---|---|---|
+| +0x5cb8 / +0x5cb9 | `sp_MiscFlag` | teleport-reserve bit (+0x5cb9 bit 1, §2.3) |
+| +0x5cd0 | `sp_WeddingData` (`PROTO_NC_CHAR_WEDDINGDATA_ACK`) +8 | wedding status nibble (§2.4) |
+| +0x7e34 / +0x7f32 | `sp_CharBriefInfo` (`BriefInformationCharacter`) / its `bic_BriefInfo` | emote shown (§2.3) |
+| +0x7f36 | `sp_CeaseFireSender` | 0x243D sender (§2.3) |
+| +0x7f39 (+0x66 = +0x7f9f) | `sp_CharData` (`ZoneCharData`), `toclient.basedata.prisonmin` | prison minutes (§4) |
+| +0x7fd8 … +0x10854 | `sp_Item` (bags: `ci_Equipment` +0x7fd8, `ci_Inventory` +0x8e2c, `ci_MiniHouse` +0xe778, `ci_ActionBox` +0xf758) | item checks (§2.4) |
+| +0x172d8 / +0x172dc | `sp_LastStat` | last sent HP / SP (§2.4) |
+| +0x173b4 / +0x173c0 | `sp_HPStoneManager` / `sp_SPStoneManager` | stone timers |
+| +0x173d0 | `sp_NormalAttackDamageTick` | swing damage queue (§8.3) |
+| +0x173e8 | `sp_QuestDiary` (`ShineQuestDiary`) | quest drops (§11.4) |
+| +0x17d0c | `sp_SkillList` (`CharaterSkillList`) | toggle check (§2.1) |
+| +0x17d48 | `sp_LogoutWait.lastpacket` | time of the last received packet (§2.5) |
+| +0x17d7c (+0x4cc = +0x18248) | `sp_NPCProcess` | NPC-dialog state bit 3 (§2.4 minimon) |
+| +0x29244 | `sp_LastPartyParam` (`PartyMemberInform`) | party status (§2.4) |
+| +0x292a2 / +0x292a4 | `sp_Linkreserv` / `sp_TeleportReserv` | reserved link / teleport target (§2.3) |
+| +0x29334 | `sp_LastItemPickup` | last pick time (§11.4) |
+| +0x29634 | `sp_MoverUpgradeEffect` | mover recovery (§2.3) |
+| +0x29638 | `sp_CharacterTitle` (`CCharacterTitleZone`) | title minute counters (§2.3) |
+| +0x2a314 | `sp_EquipTick` (`Metronome`) | equipment check |
+| +0x2a330 / +0x2a5a0 | `sp_ChargedItem` (`ChargedItemEffectList::ChargedItem`) / `ci_Effect` inside it | charged buffs, drop-up (§2.4, §11.2) |
+| +0x2a760 | `sp_RideCast` | mount cast |
+| +0x2a784 | `sp_TimerStr` (`TimeScheduler`) | timers |
+| +0x2a7c8 | `sp_PlayTimeDay` | minutes played today (§2.4) |
+| +0x2a804 | `sp_ProtocolLog` (`ProtocolLogger`, 16 × `{tick, locate, cmd}`) | the last 16 received packets (§2.2) |
+| +0x2a90c | `sp_SoulCollect` (`SoulCollectStruct`) | soul-collect target / armed / until (§2.3) |
+| +0x2a918 | `sp_EntrancePoint` | last good position of the block check (§9.2) |
+| +0x2a948 | `observers_` (`std::vector<Observer>`) | script triggers (§2.6) |
+| +0x2a9cc / +0x2a9d0 / +0x2aa28 | `m_pCaptivateAI` / `m_TargetSelect` (`MobTargetPlayerCaptivate`) / `m_pAITarget` | charmed-player brain (§7.7, §8.10) |
+| +0x2aa40 / +0x2aa4c | `tAutoSaveTime` / `sp_ReviveReqProcessTime` | auto save, revive request |
+| +0x2ab60 … +0x2abe4 | `sp_PetInfo`, `sp_Pet_BoothTick`, `sp_Pet_DanceTick`, `sp_Pet_DanceDataIndex` | pet reactions (§2.3) |
+| +0x2abe8 / +0x2abec | `sp_UseItemMinimonCheckTime` / `sp_UseItemMinimon` (`USEITEM_MINIMON_INFO`; HP slots +2, SP slots +0x1a) | minimon auto-use (§2.3) |
 
 ---
 
-## 3. GM events (`g_GMEvents`, DAT_14d42940)
+## 3. GM events (`gGMEventManager`, DAT_14d42940)
 
 The WM pushes `GM_EVENT_DATA` records (0xD00B add/update, 0xD00C delete; Z08 §13, W04 §16). The zone keeps them in
-a vector of 0x958-byte entries: the 0x553-byte `GM_EVENT_DATA` followed by a derived map table and four state bytes.
+a vector (`GMEM_m_vecEventList`) of 0x958-byte `ZONE_GM_EVENT_DATA` entries: the 0x553-byte `GM_EVENT_DATA` (`Common`)
+followed by a derived map table and five state bytes (layouts *(pdb2016)*; `GMEventManager` = 0x1014 bytes).
 A GM event in the 2016 zone only **grants up to three abnormal states** to the players it matches; it changes no
 rate (exp/drop) directly; any rate change comes from the abstates' own effects *(inferred from the only effect code)*.
 
-| Offset | Field (2017 PDB `GM_EVENT_DATA`, size 0x553) | Use |
+| Offset | Field (`GM_EVENT_DATA` / `ZONE_GM_EVENT_DATA`) | Use |
 |---|---|---|
 | +0x000 | u16 nEventNo | key |
 | +0x002 / +0x006 | i32 dStartTime / dEndTime | `time_t` (machine clock, which the WM sets via 0x0821) |
-| +0x00a | u16 nRewardAbstateIndex[3] | abstate IDs (0xFFFF = none), looked up in `g_AbStateByName` (FUN_004013e0) |
+| +0x00a | u16 nRewardAbstateIndex[3] | abstate IDs (0xFFFF = none), looked up in `dic_abstate` (FUN_004013e0) |
 | +0x010 | u8 bIsPlayerLevel[255] | by level (vt 0x4d8) |
 | +0x10f | u8 bIsPlayerClass[64] | by class (vt 0x4dc) |
 | +0x14f | u8 bIsMapID[1024] | by map id |
 | +0x54f…+0x552 | u8 bIsField_KQ / _Battle / _ID / _Normal | add every map of that kind |
-| +0x553 | u8 map[1024] (zone-side) | effective map set = bIsMapID ∪ kind tables |
-| +0x953 | u8 active | start ≤ now < end |
-| +0x954 / +0x955 / +0x956 / +0x957 | u8 has abstate / level filter / class filter / map filter | derived |
+| +0x553 | u8 Zone_bIsMapID[1024] | effective map set = bIsMapID ∪ kind tables |
+| +0x953 | u8 Zone_bIsFlagRunning | start ≤ now < end |
+| +0x954 / +0x955 / +0x956 / +0x957 | u8 Zone_bIsFlagSetReward / Zone_bIsFlagLevel / Zone_bIsFlagClass / Zone_bIsFlagMap | has abstate / level filter / class filter / map filter (derived) |
 
-The four map-kind tables are 1024-byte arrays inside the manager (`g_GMEvents + 0x10 / 0x410 / 0x810 / 0xc10`,
-KQ / battle / instance / normal); their filler was not traced.
+The four map-kind tables are 1024-byte arrays inside the manager: `GMEM_bIsKQMapID` +0x10, `GMEM_bIsBattleMapID` +0x410,
+`GMEM_bIsIDMapID` +0x810, `GMEM_bIsNormalMapID` +0xc10; the 1-s timer is `GMEM_dNextReflushRunStateTime` +0x1010. They
+are filled only by the constructor:
 
 ```pseudo
-GMEvent_Activate(mgr, e)                (after 0xD00B)              @ FUN_0046d5c0
+GMEventManager::GMEventManager(mgr)                                @ FUN_0046dbd0
+    # called once, by the CRT static initialiser `dynamic_initializer_for_'gGMEventManager'` FUN_0069ae70
+    clear the vector and the four tables
+    for id in 0..1023 with id < mapdatabox.mdb_maxmapid and mapdatabox.mdb_index[id] ≠ null:
+        MapInfo.KingdomMap 0 → normal, 1 → KQ, 3 → ID (instance), 4 → battle   (2: none)
+    GMEM_dNextReflushRunStateTime = g_Now
+```
+
+(original bug) Z09-B24: the static initialiser runs before `main`, but `MapDataBox::mdb_Load` FUN_0064ebf0 fills
+`mapdatabox` only in the start stage `ZoneServer_zs_start_home` FUN_005adce0; at construction `mdb_maxmapid` is 0, so
+all four tables stay empty. An event that selects maps by kind (`bIsField_KQ` … `bIsField_Normal`) still sets
+`Zone_bIsFlagMap`, so the filter is on but matches no map: such events grant nothing unless `bIsMapID` also lists maps.
+Likely intent: fill the tables after the map data is loaded *(the effect on the WM-side event tool is inferred)*.
+
+```pseudo
+GMEventManager::GMEM_ReflushZoneInfo(mgr, e)                (after 0xD00B)              @ FUN_0046d5c0
     e.hasAbstate = any nRewardAbstateIndex ≠ 0xFFFF
     e.levelFilter = any bIsPlayerLevel[i] == 1;  e.classFilter = any bIsPlayerClass[i] == 1
-    e.map[] = 0; for each bIsField_X == 1: e.map |= mgr.kindTable[X];  e.map |= bIsMapID; e.mapFilter = any set
+    e.map[] = 0; for each bIsField_X == 1: e.map |= mgr.kindTable[X]; e.mapFilter = 1 (even if the table is empty, Z09-B24)
+    e.map |= bIsMapID; e.mapFilter = 1 if any bIsMapID entry is set
     if time() ∉ [start, end): e.active = 0
-    else e.active = 1; for every player: GMEvent_ApplyToPlayer(p, e)
-GMEvents_Routine(mgr)                   (main loop)                 @ FUN_0046d7e0
+    else e.active = 1; for every player: GMEM_CheckConditionAndApply(p, e)
+GMEventManager::GMEM_ReflushRunState(mgr)                   (main loop)                 @ FUN_0046d7e0
     every 1 s (mgr+0x1010 = g_Now + 10):
         for each e: if time() ∉ [start, end): e.active = 0
-                    else if !e.active: e.active = 1; for every player: GMEvent_ApplyToPlayer(p, e)
+                    else if !e.active: e.active = 1; for every player: GMEM_CheckConditionAndApply(p, e)
     # an event that ends is only marked inactive; already granted abstates run out on their own timer
-GMEvents_ApplyAll(mgr, p)                                           @ FUN_0046d8e0
-    for each e: GMEvent_ApplyToPlayer(p, e)
+GMEventManager::GMEM_CheckAllConditionAndApply(mgr, p)                                           @ FUN_0046d8e0
+    for each e: GMEM_CheckConditionAndApply(p, e)
     # called from sp_NC_MAP_LOGINCOMPLETE_CMD (FUN_00443390), sp_GainExp (FUN_0042d830, i.e. level change)
     # and so_ply_ClassChange (FUN_004521b0): a player who enters, levels or changes class gets the running events
-GMEvent_ApplyToPlayer(p, e)                                         @ FUN_0046d4d0
+GMEventManager::GMEM_CheckConditionAndApply(p, e)                                         @ FUN_0046d4d0
     if !(e.active and e.hasAbstate): return
     if e.levelFilter and !bIsPlayerLevel[p.level]: return          @ FUN_0046d260
     if e.classFilter and !(p.class < 64 and bIsPlayerClass[p.class]): return   @ FUN_0046d2a0
     if e.mapFilter and !(mapId(p) < 1024 and e.map[mapId]): return @ FUN_0046d300 (map id via FUN_004013d0 → FUN_0042ab10)
-    GMEvent_GiveAbstates(p, e)                                      @ FUN_0046d380
+    GMEventManager::GMEM_RewardApply(p, e)                                      @ FUN_0046d380
         for each of the 3 abstate IDs that exists with a strength-1 block:
             keep = (end − time()) · 1000 ms when end is in the future, else the row's default keep time (block +0x2b)
             if p.vt[0x638](p, idx, 1, row, g_Now, 0, −1, keep, 0, 0) (set abstate, Z03 §2):
-                BriefAbstateBit_Set; strength = DAT_00875220 clamped to 1..40 (1 if outside);
+                so_AbnormalState_BitSet; strength = DAT_00875220 clamped to 1..40 (1 if outside);
                 if a block exists for it: so_AbnormalState_Inform (vt 0x3f0) and so_AbnormalState_BroadcastSet
 ```
 
@@ -429,27 +501,31 @@ Mob death, experience and drops are in Z03 §8.1–§8.2; aggro, brain and targe
 movement part 5; regen breeders part 6. This section covers the data the mob is built from, spawning, the per-tick
 routine and the NPC and bandit variants.
 
-### 5.1 Mob data: `MobDataBox` (`g_MobData` DAT_14d44a38)
+### 5.1 Mob data: `MobDataBox` (`mobdatabox` DAT_14d44a38)
 
 `MobDataBox::mdb_Load` @ FUN_00641e60 (start stage `home`, Z01-core §2.3) loads eleven SHN tables into `BinaryDataBox`es
 inside the box, checks that MobInfo, MobInfoServer, MobSpecies and QuestSpecies have the same row count and the same ID in
 every row ("MobDataBox::mdb_Load : Mob number mismatch" / "DataOrder mismatch", fatal), then builds one **entry per mob ID**
-(`box+0x65c`, `(maxID + 1) × 0x34` bytes; max ID at `box+0x664`; name → ID index at `box+0x668`, `FUN_0063cc30(&DAT_14d450a0, name)`):
+(`mdb_index` box+0x65c, `(maxID + 1) × 0x34` bytes; max ID `mdb_maxmobhandle` box+0x664; name → ID index `mdb_btree`
+box+0x668, `BTree::operator[]` FUN_0063cc30(&DAT_14d450a0, name)). `MobDataBox` (0xa7c) holds the eleven `BinaryDataBox`es in
+`mdb_BinData` (`mobinf`, `mobinfserv`, `mobweapon`, `mobspec`, `questspec`, `mobkillannounce`, `mobkilllog`, `moblifetime`,
+`mobKillablePermission`, `mobRegenAni`, `groupAbstate`) and the GroupAbState multimap at +0xa6c *(pdb2016)*. Entry =
+`MobDataBox::MobDataBoxIndex` (0x34); its member names are in the first column:
 
 | Entry offset | Content | Filled by |
 |---|---|---|
-| +0x00 | → MobInfo row (client table, 2017 PDB `struct MobInfo`, layout holds for 2016: `ID +0, InxName[32] +2, Name[32] +0x22, Level +0x42, MaxHP +0x46, WalkSpeed +0x4a, RunSpeed +0x4e, IsNPC +0x52, Size +0x53, WeaponType +0x57, ArmorType +0x5b, GradeType +0x5f, Type +0x63, IsPlayerSide +0x67, AbsoluteSize +0x68`) | mdb_Load |
-| +0x04 | → MobInfoServer row (0xa7 bytes, see below) | mdb_Load |
-| +0x08 / +0x0c | MobWeapon list: array of `{ → MobWeapon row, u16 skill index, u32 abstate index (0x318 = none) }` (0xc each) / count | `mdb_SkillStore` @ FUN_00642630 |
-| +0x10 | → MobSpecies row (`ID u16, MobName[33], 3 more names`) | mdb_Load |
-| +0x14 | u16 MobResist row index (from MobInfoServer.ResIndex; 0xFFFF = "-") | mdb_Load, `MobResist` table DAT_150ba618 (FUN_00644e80) |
-| +0x18 | → QuestSpecies row (`ID u16, MobGroupName[33] × 5`) | mdb_Load |
-| +0x1c | → MobKillAnnounce row (`MobID u32, TextIndex u32`), or 0 | mdb_Load |
-| +0x20 | → MobKillLog row (`MobID u32`), or 0 | mdb_Load |
-| +0x24 | u32 MobLifeTime.LifeTime (seconds), 0 = none | mdb_Load |
-| +0x28 | two flag bits, cleared at load (not traced) | — |
-| +0x2c | → MobRegenAni row (`MobIDX[32], RegenTime u16 +0x20 (ms), GroupAbStateIDX[32] +0x22, IsAggro u8 +0x42`), or 0 | mdb_SkillStore |
-| +0x30 | GroupAbState group number of the RegenAni row (−1 = none) | mdb_SkillStore |
+| +0x00 `data` | → MobInfo row (client table, `struct MobInfo` 0x6c *(pdb2016)*: `ID +0, InxName[32] +2, Name[32] +0x22, Level +0x42, MaxHP +0x46, WalkSpeed +0x4a, RunSpeed +0x4e, IsNPC +0x52, Size +0x53, WeaponType +0x57, ArmorType +0x5b, GradeType +0x5f, Type +0x63, IsPlayerSide +0x67, AbsoluteSize +0x68`) | mdb_Load |
+| +0x04 `serv` | → MobInfoServer row (0xa7 bytes, see below) | mdb_Load |
+| +0x08 `weapon` / +0x0c `weaponnumber` | MobWeapon list: array of `_MobWeaponIndex { MobWeapon* weapon, u16 skill, ABSTATEINDEX abstate +8 (0x318 = none) }` (0xc each) / count | `mdb_SkillStore` @ FUN_00642630 |
+| +0x10 `species` | → MobSpecies row (`ID u16, MobName[33], 3 more names`) | mdb_Load |
+| +0x14 `registindex` | u16 mobresisttable row index (from MobInfoServer.ResIndex; 0xFFFF = "-") | mdb_Load, `mobresisttable` table DAT_150ba618 (FUN_00644e80) |
+| +0x18 `questspecies` | → QuestSpecies row (`ID u16, MobGroupName[33] × 5`) | mdb_Load |
+| +0x1c `p_mobkillannounce` | → MobKillAnnounce row (`MobID u32, TextIndex u32`), or 0 | mdb_Load |
+| +0x20 `p_mobkilllog` | → MobKillLog row (`MobID u32`), or 0 | mdb_Load |
+| +0x24 `p_MobLifeTime` | u32 MobLifeTime.LifeTime (seconds; row `MobLifeTime {MobIndex[32], u16 LifeTime +0x20}`), 0 = none | mdb_Load |
+| +0x28 `MobIndexFlag` | bit 0 `IsBufferToBoss` (set by `ServentBuffBossTable::sbbt_Load` FUN_005d4580, read by `ShineMob::so_Routine` §5.4), bit 1 `MobAutoAction_Damaged` (set by `MobAutomaticActionList::maal_Load` FUN_005d49f0, read by `ShineMob::so_DamagedBy` FUN_00431750); cleared at load | part 16 loaders |
+| +0x2c `pRegenAni` | → MobRegenAni row (`MobIDX[32], RegenTime u16 +0x20 (ms), GroupAbStateIDX[32] +0x22, IsAggro u8 +0x42`), or 0 | mdb_SkillStore |
+| +0x30 `nRegenAbstateGroup` | GroupAbState group number of the RegenAni row (−1 = none) | mdb_SkillStore |
 
 `mdb_SkillStore(skillNames, abstateNames)` @ FUN_00642630 (start stage `sleep`, "MobDataBox link") runs over MobWeapon twice
 (count, then fill), resolving `Skill` (+0x25, "-" = none) and `StaName` (+0x71) by name; unknown names are logged and the
@@ -457,7 +533,7 @@ weapon keeps 0xFFFF / 0x318. GroupAbState rows are grouped by `GroupAbStateIDX` 
 row; `AbstateIDX` +0x20, `Strength` u8 +0x40). Each MobRegenAni row is attached to its mob (duplicates and unknown names are
 fatal) and its group is looked up by name.
 
-MobInfoServer.shn (2016, 0xa7 bytes; column names from the SHN header): `ID u32 +0, InxName[32] +4, Visible u8 +0x24,
+MobInfoServer.shn (2016, 0xa7 bytes; column names from the SHN header, equal to the members of `struct MobInfoServer` *(pdb2016)*, which types `EnemyDetectType` as enum `EnemyDetect`, `MobKillInx` as `MobKillType`, `MobRaceType` as `MobRace`): `ID u32 +0, InxName[32] +4, Visible u8 +0x24,
 AC u16 +0x25, TB +0x27, MR +0x29, MB +0x2b, EnemyDetectType u32 +0x2d, MobKillInx u32 +0x31, MonEXP u32 +0x35, EXPRange u16
 +0x39, DetectCha u16 +0x3b, ResetInterval u8 +0x3d, CutInterval u16 +0x3e, CutNonAT u32 +0x40, FollowCha u32 +0x44,
 PceHPRcvDly u16 +0x48, PceHPRcv +0x4a, AtkHPRcvDly +0x4c, AtkHPRcv +0x4e, Str +0x50, Dex +0x52, Con +0x54, Int +0x56, Men +0x58,
@@ -465,15 +541,20 @@ MobRaceType u32 +0x5a, Rank u8 +0x5e, FamilyArea u32 +0x5f, FamilyRescArea u32 +
 u16 +0x68, StunResi +0x6a, MoveSpeedResi +0x6c, FearResi +0x6e, ResIndex[32] +0x70, KQKillPoint u16 +0x90, Return2Regen u8 +0x92,
 IsRoaming u8 +0x93, RoamingNumber u8 +0x94, RoamingDistance u16 +0x95, RoamingRestTime u16 +0x97, MaxSP u16 +0x99, BroadAtDead
 u8 +0x9b, TurnSpeed u16 +0x9c, WalkChase u16 +0x9e, AllCanLoot u8 +0xa0, DmgByHealMin u16 +0xa1, DmgByHealMax u16 +0xa3,
-RegenInterval u16 +0xa5`. `EnemyDetectType` values = enum `EnemyDetect` *(pdb2017)*: 0 ED_BOUT, 1 ED_AGGRESSIVE, 2 ED_NOBRAIN,
+RegenInterval u16 +0xa5`. `EnemyDetectType` values = enum `EnemyDetect` *(pdb2016)*: 0 ED_BOUT, 1 ED_AGGRESSIVE, 2 ED_NOBRAIN,
 3 ED_AGGRESSIVE2, 4 ED_AGGREESIVEALL, 5 ED_ENEMYALLDETECT (2016 data: 220 / 1872 / 728 / 12 / 1 / 9 rows; the NOBRAIN rows
 are shop NPCs and gates). The columns used by this section are named below; the AI columns are read in part 3.
+Columns with no member access anywhere in the PDB export (part R1, `rg` over `re-data/exports/zone-pdb/decomp.c`; a raw
+offset read is not excluded): `PceHPRcvDly`, `PceHPRcv`, `AtkHPRcvDly`, `AtkHPRcv`, `BloodingResi`, `StunResi`,
+`MoveSpeedResi`, `FearResi`, `Rank`, `AllCanLoot`, `DmgByHealMin`, `DmgByHealMax`. The FiestaHeroes MobInfoServer page
+calls the four regen columns "not used" and the four `*Resi` columns "replaced by MobResist, not used" *(fh-doc)*; mob
+HP regeneration comes from `sm_DuringRecover` (§6.5) instead.
 
 `MobDataBox::mdb_CanIKill(mobId, identity)` @ FUN_006424c0 — may this kind of attacker kill the mob:
 
 ```pseudo
     if mobId == 0xFFFF: return true
-    k = MobInfoServer.MobKillInx                               # enum MobKillType (pdb2017): 0 MKT_DEFAULT, 1 MKT_ONLYSCRIPT, 2 MKT_MOB
+    k = MobInfoServer.MobKillInx                               # enum MobKillType (pdb2016): 0 MKT_DEFAULT, 1 MKT_ONLYSCRIPT, 2 MKT_MOB
     if k >= 3: log "…Invalid MobKillType"; return false
     row = MobKillAble[k]                                       # MobKillAble.shn { MobKillInx, Cheat u8, Mob u8, User u8 }
     identity 0 → row.Cheat, 1 → row.Mob, 2 → row.User, 3 → true, other → log "Unknown identity", true
@@ -484,98 +565,109 @@ the mob target selectors and the magic-field damage (Z03, part 3).
 
 Other mob tables loaded elsewhere and read in this part:
 
-- `MobConditionServer.shn` → `MobConditionChecker::MCC_DataRead` @ FUN_004b0460 into the map DAT_1328bcd0 (mob ID →
-  vector of conditions, `FUN_004b0140(&DAT_1328bcd0, mobId)`; §5.6). Only `MC_Type` 0 is accepted (enum
-  `MobCondition_Type` *(pdb2017)*: `MCT_HP = 0` is the only member); any other type fails with "Memory Alloc Fail" and the
+- `MobConditionServer.shn` → `MobConditionChecker::MCC_DataRead` @ FUN_004b0460 into `gMobConditionChecker` DAT_1328bcd0 (mob ID →
+  vector of conditions, `MCC_GetCondition` FUN_004b0140(&gMobConditionChecker, mobId); §5.6). Only `MC_Type` 0 is accepted (enum
+  `MobCondition_Type` *(pdb2016)*: `MCT_HP = 0` is the only member before `MAX_MOBCONDITION_TYPE`); any other type fails with "Memory Alloc Fail" and the
   whole table is dropped. Consecutive rows of the same mob form one vector, in file order.
 - `MobDeadCount` (`mdc_Clear` @ FUN_004b07b0, `mdc_Count` @ FUN_004b0820, `mdc_DeadCountGet` @ FUN_004b08f0, created by
-  FUN_004b09f0): one u16 counter per mob ID, incremented by `ShineMob::so_KilledBy` (Z03 §8.1); readers are the map
+  `MobDeadCount::mdc_Init` FUN_004b09f0): one u16 counter per mob ID, incremented by `ShineMob::so_KilledBy` (Z03 §8.1); readers are the map
   scripts (part 14–16).
 - `MobAutoAction.shn` belongs to `BossFieldContent::MobAutomaticActionList::maal_Load` @ FUN_005d49f0 (part 16).
 
-### 5.2 Mob members (offsets from the object start; *(ours)* names)
+### 5.2 Mob members (offsets from the object start)
 
-| Offset | Meaning |
-|---|---|
-| +0x4e / +0x52 / +0x56 | layer ids / "visible in all layers" flag (Z03 `SameLayer`); NPC.txt NPCs set +0x56 = 1 (FUN_0054aae0) |
-| +0x66 → | position `{x, y}`; +0x6a → u8 direction (degrees / 2) |
-| +0x76 → +4 | sub-layer (`so_SubLayer_CanSee`, Z02 §5): 0 normal, 3 hidden (StaGMHideMode) |
-| +0x7a | → FieldMap |
-| +0x7e / +0x82 | AI Lua script of the mob type (map DAT_14d712d0, keyed by MobInfoServer.ID) / std::string function name = MobInfo.InxName; 7 more strings follow (+0x9e … +0x146), cleared by vt 0xc14 FUN_00558c80 |
-| +0x18c…+0x1b8 | MoveManager (part 5): +0x18c state, +0x1ac active |
-| +0x184 | killer handle (`ShineMobileObject::so_KilledBy`) |
-| +0xe9c → | mode byte (`GetMode` vt 0x484): 0 while spawning, 2 alive, 3 dead |
-| +0xea0 / +0xea4 | timestamps set to g_Now at spawn (recovery timers, part 3) |
-| +0xea8 / +0xeac | MaxHP (vt 0x4f0) / MaxSP (vt 0x4f4) |
-| +0xfc0 | stat matrix (Z03 knowledge §2); base layer from MobInfoServer (§5.3) |
-| +0x1d84 | cast block (Z03 §5) |
-| +0x1e74 | rule set: `RulesOfEngagementNormalPY` (no weapon or first weapon `HitType` 0) or `…NormalMA` |
-| +0x1e78 | flag byte: bit 0 invalid position, bit 2 Fear, bit 3 killed, bit 4 blast armed, bit 7 (vt 0xbf0) |
-| +0x1e8c…+0x1e9c | movement detector (FUN_0055d610): +0x1e8c 1 = moving, +0x1e90/94 last position, +0x1e98 time of the last change, +0x1e9c next check |
-| +0x1ea8 / +0x1eac | wander-chat timer `g_Now + t` / `t`, t = `MobChat` PIECE element of the mob ID (DAT_0084cc8c[mobId].vt[0](), ms → tenths; 10⁹ ms without a PIECE row) (§8.6) |
-| +0x1ec0 | `breeder` argument of vt 0x6e0: **0** for breeder spawns (the global DAT_0da2932c passed by `mb_regen` is never written, §10.4), −1 for NPC.txt NPCs and script / Lua spawns; it does not identify the breeder |
-| +0x1ec4 / +0x1ec8 | HP / SP |
-| +0x1ecc | the mob's own brief-info packet 0x1C08 `NC_BRIEFINFO_REGENMOB_CMD`; its payload pointer is +0x1f74 (§5.3) |
-| +0x1f78 | char map[12] (vt 0x4bc), the map the mob is spawned on |
-| +0x1f84…+0x1f8c | spawn x, y, dir copied from the brief (vt 0xf6c) |
-| +0x1f90 | → MobDataBox entry (vt 0x70c) |
-| +0x1f94 | u8 level (MobInfo.Level unless the spawn gives one) |
-| +0x1f98 | per-weapon cooldown: "usable again at" g_Now (one u32 per MobWeapon, zeroed at spawn; §7.4) |
-| +0x1fa8 | current weapon index (−1 at spawn / none; §7.4) |
-| +0x1fac / +0x1fb0 | `MobAttackSequence` record of the mob ID (`g_MobAttackSequence` DAT_0d76e9e8, FUN_0043f6e0) / sequence position (§7.6) |
-| +0x1fb4 / +0x1fb6 | chained NextSkill skill ID (0xFFFF none) / "do not advance the sequence after this use" (§7.6) |
-| +0x1fb8 / +0x1fba | death broadcast sent / killer handle (Z03 §8.1) |
-| +0x1fbc / +0x1fc0 | death time / extra corpse time (vt 0xc3c, `cSetDeadDelayTime`) |
-| +0x1fc4 / +0x1fc8 | brain context: tick argument / self |
-| +0x1fcc | `MobAggroManager` (aggro list, 10 entries) followed by one selector object per `EnemyDetectType` (+0x2124 … +0x21fc, §6.1) |
-| +0x2234 | → active target selector (§6.1; vt +8 per tick, +0x14 reset) |
-| +0x2238 | tactic set (InMove … Turning, §7.1), bound to the target cell +0x24e0 by FUN_004b8c80 at spawn |
-| +0x2260 / +0x227c | MobActionWander / MobActionAttack tactic elements (§7.1) |
-| +0x22e4 | current tactic state (`MobActionWander`, `MobActionRoaming` 0x84cfc4, `MobActionNoBrain` 0x84cfc8) |
-| +0x22e8 | the spawning `MobBreeder` (§10.2; +0x4c = spawn time set by RegenComplete, +0x50 = death time set by `so_KilledBy`), 0 for other spawns |
-| +0x22ec | guild number shown with the mob (`so_mob_SetGuildRegNum`, §5.8) |
-| +0x22f0 | HitMeList (Z03 §8.2) |
-| +0x249c/+0x24a0, +0x24a4/+0x24a8 | spawn point and return point (both = spawn position) |
-| +0x24ac | flags (bit 0, 1 set at spawn; 2, 3 cleared) |
-| +0x24ae | current fight target handle (`so_mob_CurrentTarget` vt 0xb78, §6.5); 0xFFFF at spawn |
-| +0x24b0 | battle state: 0 idle, 1 battle (`sm_DuringBattle`), 2 recover (`sm_DuringRecover`) (§6.5) |
-| +0x24b1 / +0x24b5 | family ring (prev / next mob of the same family; self when alone); vt 0x744 returns +0x24b1 |
-| +0x24bc, +0x24c0, +0x24c4 | rescue flags (bit 0 healed / not asking, bit 1 called by a dying friend, bit 2 help chat said), → friend to help (0), friend's last seen HP (60000) (§6.6) |
-| +0x24c8 / +0x24cc | script weapon rates `vector<u16>` (§8.2) |
-| +0x24d8 / +0x24da | u16 roaming flags `IsRoaming & 1 | (RoamingNumber & 0x7f) << 1` / RoamingDistance |
-| +0x24dc / +0x24e0 / +0x24e4 / +0x24e5 | last broadcast target / current target (vt 0xa04) / target-dirty flag / target order (vt 0xa08) |
-| +0x24e8 | NPCAction trigger entry for this mob ID (map DAT_14d50784, FUN_005c4420), or 0 |
-| +0x24ec | lifetime timer `{acc, period, active u8, start}` (vt 0xabc FUN_0055e5b0) |
-| +0x24fc | abstate level at death (`smo_BossAbstateSet` / `sm_BossAbstateGet`, §8.9) |
-| +0x2500 | resting until (vt 0xb34 / 0xb38, §7.1) |
-| +0x2504 / +0x2508 | script overrides MaxHP / MonEXP (0 = table) |
-| +0x250c | u8 drops enabled (1; `cSetNPCIsItemDrop` → vt 0xbb0 `so_mob_IsItemDropSetAtScript` FUN_004aa810) |
-| +0x250d | copy of the mob's MobResist row (0x34 bytes) |
-| +0x2544 | 6 at spawn; +0x2548 −1; +0x254c / +0x2550 / +0x2554 script WalkSpeed / RunSpeed / HPRegen (−1 = table); +0x2558 u16 0xFFFF |
-| +0x255c | → MobConditionServer vector of the mob ID (or 0) |
-| +0x2560 / +0x2564 | spawn time / "regen animation over" flag (AI waits for it) |
-| NPC +0x2568 | u8 "from NPC.txt" (`so_npc_FromTable` vt 0xa80 FUN_004b19b0) |
-| servant +0x2568…+0x2580 | servant row, master, follow target, explosion state / next time / count left (§8.8) |
-| bandit +0x2666 | → bandit brief (`+0xc2` u8 object type, §5.10) |
+Checked in part R1 against `ShineObjectClass::ShineMob` (0x2568 bytes, base `ShineMobileObject` 0x1ea8, base
+`ShineObject` 0x167) of the NA2016 `Zone.pdb` *(pdb2016)*: every offset below is a member start (or inside a named
+sub-struct). Column "Member" = the PDB name; "Meaning" = what the 2016 code does with it.
+
+| Offset | Member *(pdb2016)* | Meaning |
+|---|---|---|
+| +0x4e / +0x56 | `so_slantedlist.LayerRegistInfo`: `LayerRegNumberUnion` (u64, +0x4e/+0x52) / `nViewType` (+0x56) | layer ids / "visible in all layers" flag (Z03 `SameLayer`); NPC.txt NPCs set `nViewType` = 1 (`so_SetLayerObjectViewType` FUN_0054aae0) |
+| +0x66 → / +0x6a → | `so_LocateInfo.location` / `.direct` | position `{x, y}` / u8 direction (degrees / 2) |
+| +0x6e / +0x76 → | `so_layer.templyr` / `so_layer.layer` (`SubLayer::Layer {l_Main, l_Sub +4}`) | sub-layer (`so_SubLayer_CanSee`, Z02 §5): `l_Sub` 0 normal, 3 hidden (StaGMHideMode) |
+| +0x7a | `so_Field` | → FieldMap |
+| +0x7e | `so_AIScript` (`LuaAi`, 0xe4): `AIScript` (+0x7e, `LuaScriptScenario*`), then 8 `std::string` function names `Entrance` +0x82, `NPCClick` +0x9e, `NPCMenu` +0xba, `MobDamaged` +0xd6, `ObjectDied` +0xf2, `NPCAction` +0x10e, `MobAttack` +0x12a, `RankingValue` +0x146 | AI Lua script of the mob type (`g_AIScriptMobContainer` DAT_14d712d0, keyed by MobInfoServer.ID); `Entrance` = MobInfo.InxName; the others are set by scripts (part 9a); all cleared by vt 0xc14 `so_InitAIScript` FUN_00558c80 |
+| +0x180 | `smo_DeadCheck` (`DC_DeadCause`: 0 LIVE, 1 DOT, 2 ATTACK, 3 ATTACK2, 4 SELFKILL, 5 SKILL) | cause of death |
+| +0x184 / +0x186 | `smo_WhoKillMe` / `smo_WhoClickMe` | killer handle (`ShineMobileObject::so_KilledBy`) / last clicker |
+| +0x18c…+0x1cb | `smo_MoveManager` | MoveManager (§9.1): +0x18c state, +0x1ac active |
+| +0x1cc | `smo_Abstate` | abstate container (Z03) |
+| +0xe98 / +0xe9c → | `smo_Mode.tempmode` / `smo_Mode.mode` | mode byte (`GetMode` vt 0x484): 0 while spawning, 2 alive, 3 dead |
+| +0xea0…+0xeac | `smo_Recover {lasthp, lastsp, maxhp, maxsp}` | +0xea0 / +0xea4 set to g_Now at spawn (last HP / SP recovery time, §6.5); +0xea8 / +0xeac MaxHP (vt 0x4f0) / MaxSP (vt 0x4f4) |
+| +0xfc0 | `smo_Param` (`Parameter::Container`) | stat matrix (Z03 knowledge §2); base layer from MobInfoServer (`Parameter::Container::c_StoreMob`, §5.3) |
+| +0x1d84 | `smo_SkillCast` | cast block (Z03 §5) |
+| +0x1db0 | `smo_SceneMoveManager` | scenario move queue (§9.3) |
+| +0x1e74 | `smo_RulesOfNormalAttack` | rule set: `RulesOfEngagementNormalPY` (no weapon or first weapon `HitType` 0) or `…NormalMA` |
+| +0x1e78 | `smo_Flag` bits: 0 `Retrate`, 1 `DuringFlying`, 2 `InFear`, 3 `DeadProcessComplete`, 4 `InSkillShift`, 5 `InCaptivate`, 6 `ChineCast`, 7 `DamageAbsorb` | bit 0 set = invalid position (out of map; a player is kicked, §2), bit 2 Fear, bit 3 killed, bit 4 blast armed, bit 7 (vt 0xbf0) |
+| +0x1e8c…+0x1e9f | `smo_moveState` (`MoveStateStruct {eMoveState, PrevLocation +4, nStartTime +0xc, nCheckTime +0x10}`) | movement detector (`smo_CheckMoveState` FUN_0055d610): 1 = moving, last position, time of the last change, next check |
+| +0x1ea8 / +0x1eac | `sm_WanderChat` (`Metronome {m_NextTick, m_TickInterval}`) | wander-chat timer `g_Now + t` / `t`, t = interval of the mob ID's `mobchatman.mcm_Wander` element (DAT_0084cc8c[mobId].vt[0](), ms → tenths; 10⁹ ms without a PIECE row) (§8.6) |
+| +0x1eb0 | `sm_TargetAnalyser` (`TargetAnalyser_Player`) | (not read by the mob code of §5–§8) |
+| +0x1eb8 / +0x1ebc | `sm_RoamingPath` / `sm_CurrRoamInterval` (`MobRoamingPoint`: `pointer`:15, `direct`:1) | MobRoam path and position on it (§9.5) |
+| +0x1ec0 | `sm_MobRegnum` (ulong) | 8th argument of vt 0x6e0: the global `mobregnum` (DAT_0da2932c, never written → **0**) for breeder spawns (§10.4), −1 for NPC.txt NPCs and script / Lua spawns; it does not identify the breeder |
+| +0x1ec4 / +0x1ec8 | `sm_HP` / `sm_SP` | HP / SP |
+| +0x1ecc | `sm_MobBriefInfo` (`BriefInformationMob` 0xac: `bim_pack`, `bim_array`[152], `bim_nc`, `bim_BriefInfo` +0x1f74) | the mob's own brief-info packet 0x1C08 `NC_BRIEFINFO_REGENMOB_CMD`; its payload pointer is +0x1f74 (§5.3) |
+| +0x1f78 / +0x1f84 | `sm_LoginLoc` (`LoginLocation {currentmap Name3, currentcoord}`) | char map[12] (vt 0x4bc `so_LoginLocation`), the map the mob is spawned on / spawn x, y, dir copied from the brief (vt 0xf6c) |
+| +0x1f90 | `sm_MobDataBox` | → MobDataBox entry (vt 0x70c) |
+| +0x1f94 | `sm_MobLevel` | u8 level (MobInfo.Level unless the spawn gives one) |
+| +0x1f98 | `sm_ReadyWeapon.nextblast` (`vector<ulong>`) | per-weapon cooldown: "usable again at" g_Now (one u32 per MobWeapon, zeroed at spawn; §7.4) |
+| +0x1fa8 | `sm_ReadyWeapon.weaponindex` | current weapon index (−1 at spawn / none; §7.4) |
+| +0x1fac / +0x1fb0 | `sm_ReadyWeapon.attacksequence` / `.attacksequenceindex` | `MobAttackSequence` record of the mob ID (`mobattseq` DAT_0d76e9e8, `mas_Find` FUN_0043f6e0) / sequence position (§7.6) |
+| +0x1fb4 / +0x1fb6 | `sm_ReadyWeapon.NextSaveSkill` / `.bUseNextSaveSkill` | chained NextSkill skill ID (0xFFFF none) / "do not advance the sequence after this use" (§7.6) |
+| +0x1fb8 / +0x1fba | `sm_ReallyDead.senddeadpacket` / `.attacker` | death broadcast sent / killer handle (Z03 §8.1) |
+| +0x1fbc / +0x1fc0 | `sm_DeadTime` / `sm_DeadDelayTime` | death time / extra corpse time (vt 0xc3c, `cSetDeadDelayTime`) |
+| +0x1fc4 / +0x1fc8 | `sm_ArtificalIntelligence` (`MobTacticElement::MobActionArgument`, 0x324): `maa_MobHandle` (u16) / `maa_Mob` | brain context: the mob's own handle / self |
+| +0x1fcc | `maa_TargetSelect` (`Selector`, 0x26c): `targetlist` (`MobAggroManager`, 10 `MobTargetStruct` in `mam_Array` +0x18), then `bout` +0x2124, `aggresive` +0x213c, `nobrain` +0x2174, `aggresive2` +0x218c, `aggresiveall` +0x21c4, `aggresiveNoLevel` +0x21fc | aggro list followed by one selector object per `EnemyDetect` value (§6.1) |
+| +0x2234 | `maa_TargetSelect.selector` | → active target selector (§6.1; vt +8 per tick, +0x14 reset) |
+| +0x2238 | `maa_MobActionStruct` (`Actor`, 0xb0): `inmove`, `inmove_cancelable` +0x2240, `inmove_chase` +0x2248, `wander` +0x2260, `attack` +0x227c, `chase` +0x2294, `backstep` +0x229c, `avoidoverlap` +0x22a8, `waitskillend` +0x22b0, `swingdamage` +0x22c0, `turning` +0x22d0 | tactic set (§7.1), bound to the target cell `sm_MyTarget` +0x24e0 by `Actor::SetTargetPoint` FUN_004b8c80 at spawn |
+| +0x22e4 | `maa_MobActionStruct.action` | current tactic state (`MobActionWander`, `MobActionRoaming` 0x84cfc4, `MobActionNoBrain` 0x84cfc8) |
+| +0x22e8 | `sm_Breeder` | the spawning `MobBreeder` (10th argument of vt 0x6e0; §10.2: +0x4c spawn time set by RegenComplete, +0x50 death time set by `so_KilledBy`), 0 for other spawns |
+| +0x22ec | `sm_Guild` | guild number shown with the mob (`so_mob_SetGuildRegNum`, §5.8) |
+| +0x22f0 | `sm_HitMeList` (`HitMeList::EnemyList`) | damage list (Z03 §8.2) |
+| +0x249c / +0x24a4 | `sm_RegenLoc` / `sm_LastHittedLoc` | spawn point / "last hit" point; both = spawn position at spawn |
+| +0x24ac | `sm_Flag` bits: 0 `MobAggro`, 1 `HealAtPiece`, 2 `InNormalAttack`, 3 `JustAttacked` | bits 0, 1 set at spawn; 2, 3 cleared |
+| +0x24ae | `sm_CurrentTarget` | current fight target handle (`so_mob_CurrentTarget` vt 0xb78, §6.5); 0xFFFF at spawn |
+| +0x24b0 | `sm_DuringFuncIndex` | battle state: 0 idle, 1 battle (`sm_DuringBattle`), 2 recover (`sm_DuringRecover`) (§6.5) |
+| +0x24b1 / +0x24b5 | `sm_FamilyList.fml_Prev` / `.fml_Next` | family ring (prev / next mob of the same family; self when alone); vt 0x744 returns +0x24b1 |
+| +0x24bc, +0x24c0, +0x24c4 | `sm_Rescue {bit (bitrequest, bitscreamack, bitrescuechat), rescuewho, lasthp}` | rescue flags (bit 0 healed / not asking, bit 1 called by a dying friend, bit 2 help chat said), → friend to help (0), friend's last seen HP (60000) (§6.6) |
+| +0x24c8 | `sm_WeaponUseRate` (`vector<u16>`) | script weapon rates (§8.2) |
+| +0x24d8 / +0x24da | `sm_RoamingInfo` (`isroaming`:1, `maxroamingnum`:7, `roamingnum`:8 / `maxroamingdist` u16) | `IsRoaming`, `RoamingNumber`, position count / RoamingDistance |
+| +0x24dc / +0x24e0 / +0x24e4 / +0x24e5 | `sm_LastTarget` / `sm_MyTarget` / `sm_bSendTargetInfo` / `sm_bTarget` | last broadcast target / current target (vt 0xa04) / target-dirty flag / target order (vt 0xa08) |
+| +0x24e8 | `triggers_` (`vector<NPCAction::Trigger>*`) | NPCAction triggers of this mob ID (`triggerDic` DAT_14d50784, `NPCAction::Util::loadTriggers` FUN_005c4420), or 0 |
+| +0x24ec | `m_LifeTimer` (`TickTimer {m_CurDelayTime, m_DelayTime, m_bEnable, m_PrevCheckTime}`) | lifetime timer (vt 0xabc `so_mob_SetLifeTime` FUN_0055e5b0) |
+| +0x24fc | `sm_StaNumberForDrop` | abstate level at death, picks the drop list (`smo_BossAbstateSet` / `sm_BossAbstateGet`, §8.9, §11.2) |
+| +0x2500 | `tNextRoamingWaitTime` | resting until (vt 0xb34 / 0xb38, §7.1) |
+| +0x2504 / +0x2508 | `sm_MaxHPAtMobInfo` / `sm_MonEXPAtMobInfo` | script overrides MaxHP / MonEXP (0 = table) |
+| +0x250c | `sm_IsItemDrop` | u8 drops enabled (1; `cSetNPCIsItemDrop` → vt 0xbb0 `so_mob_IsItemDropSetAtScript` FUN_004aa810) |
+| +0x250d | `sm_MobResist` (struct `MobResist`, 0x34) | copy of the mob's MobResist row |
+| +0x2544 | `sm_EnemyDetect` (enum `EnemyDetect`) | `MAX_ENEMYDETECT` (6) at spawn, then the MobInfoServer value (§6.1) |
+| +0x2548 / +0x254c / +0x2550 / +0x2554 | `sm_MobIsPlayerSide` / `sm_WalkSpeedAtMobInfo` / `sm_RunSpeedAtMobInfo` / `sm_HPRegen` | −1 at spawn; script WalkSpeed / RunSpeed / HPRegen (−1 = table) |
+| +0x2558 | `sm_ItemDropMobID` | u16 0xFFFF; drop table of another mob ID (`cSetItemDropMobID`, §11.8) |
+| +0x255c | `sm_pMobConditionList` | → MobConditionServer vector of the mob ID (or 0) |
+| +0x2560 / +0x2564 | `sm_tRegenAniTime` / `sm_bRegenAniComplete` | spawn time / "regen animation over" flag (AI waits for it) |
+| NPC +0x2568 | `ShineNPC::sn_FromTable` | u8 "from NPC.txt" (`so_npc_FromTable` vt 0xa80 FUN_004b19b0) |
+| servant +0x2568…+0x2580 | `ShineServant` members (part 8b) | servant row, master, follow target, explosion state / next time / count left (§8.8) |
+| bandit +0x2568 | `ShineBandit::sb_MobBriefInfo` (`BriefInformationCharacter`, 0x102) | bandit brief; +0x2666 = `bic_BriefInfo` → its payload (`+0xc2` u8 object type, §5.10) |
 
 ### 5.3 Spawn: `so_mob_Regenerate` and `so_mob_RegenComplete`
 
 Every spawner (breeders, scripts, NPCManager, GM commands) allocates a pool slot and calls vt 0x6e0:
 
 ```pseudo
-ShineMob::so_mob_Regenerate(m, map[12], x, y, dirDeg, handle, mobId, briefArg, breeder, familyLeader,
-                            regenSlot, level, _, layerA, layerB) → 0 | marking error      @ FUN_004b41b0
-    m.breeder (+0x1ec0) = breeder;  m.map (+0x1f78) = map;  mode = 0;  m+0x2544 = 6
-    m.vt[0xf70](handle, mobId, briefArg)        # brief: FUN_004b1120 → FUN_004b0d20: handle, mobid, flagstate 0,
-                                                #   sAnimation "", nAnimationLevel 0, bRegenAni 0; entry = g_MobData[mobId]
+ShineMob::so_mob_Regenerate(m, Name3* map, x, y, dirDeg, u16 handle, u16 mobId,
+        PROTO_NC_BRIEFINFO_LOGINCHARACTER_CMD* banditBrief, ulong mobRegnum, ShineObject* familyLeader,
+        MobBreeder* breeder, int level, u8 _, u64 layerRegNum) → FM_MarkingError (0 = ok)      @ FUN_004b41b0
+    # parameter types from the PDB signature (pdb2016); the names are ours, after the members they fill
+    m.sm_MobRegnum (+0x1ec0) = mobRegnum;  m.sm_LoginLoc.currentmap (+0x1f78) = map;  mode = 0
+    m.sm_EnemyDetect (+0x2544) = MAX_ENEMYDETECT (6)
+    m.vt[0xf70](handle, mobId, banditBrief)     # brief: FUN_004b1120 → FUN_004b0d20: handle, mobid, flagstate 0,
+                                                #   sAnimation "", nAnimationLevel 0, bRegenAni 0; entry = mobdatabox[mobId]
     m.pos = (x, y);  m.dir = (dirDeg / 2, +180 if negative)
-    entry = g_MobData[mobId]   (null when the ID is out of range or the row ID differs: "MobDataBox::operator [] :Invalid mob index")
+    entry = mobdatabox[mobId]   (null when the ID is out of range or the row ID differs: "MobDataBox::operator [] :Invalid mob index")
     m.level = level >= 1 ? level : MobInfo.Level
     m.roaming (+0x24d8/+0x24da) from MobInfoServer.IsRoaming / RoamingNumber / RoamingDistance
     m+0x1eb8 = 0;  aggro list reset unless the current target is a pet (type 12)
     sm_SetBrain(m)                                                                  # part 3
     m.vt[0xf6c]()                                # spawn x/y/dir copied from the brief
-    m.regenSlot (+0x22e8) = regenSlot
+    m.sm_Breeder (+0x22e8) = breeder
     if (r = so_MapMarking(m, 0)) != 0: return r                                     # §5.7
     brief.flag (vt 0x4a0, 0x63 bytes) = template DAT_13272928
     remove every abnormal state (ListEraser over +0xcb0 of the abstate container)
@@ -618,7 +710,7 @@ ShineMob::so_mob_RegenComplete(m, handle)   (vt 0x6f4; NPC: FUN_00442ba0 just ca
     else:                                                      # "so_mob_RegenComplete1"
         sub-layer = 0
         g_SightDistSq = MapInfo.Sight² of the field (−1 = unlimited on special fields; 0 without a field)
-        so_AllOfRange_Class0(m, so_ExchageBriefInfo)           # brief info both ways with everything in sight (Z02 §5)
+        so_AllOfRange(m, so_ExchageBriefInfo)           # brief info both ways with everything in sight (Z02 §5)
     deathSent = 0;  killer = 0xFFFF
     tactic state = roaming flag ? MobActionRoaming (and +0x24d9 = 0) : MobActionWander.maw_MetronomeReset()
     if EnemyDetectType == 2 (ED_NOBRAIN): tactic state = MobActionNoBrain
@@ -630,7 +722,7 @@ ShineMob::so_mob_RegenComplete(m, handle)   (vt 0x6f4; NPC: FUN_00442ba0 just ca
     killer handle (+0x184) = −1;  so_RecalcAbstateParam;  rescue state reset;  m+0x24c4 = 60000
     m+0x1d70 = (+0xfbc).vt[0x3c]();  smo_ply_WeaponTitleSet(0xFFFF)
     m+0x1ea8 = g_Now + behaviour[mobId].vt[0]() / 100
-    regenSlot.lastSpawn = g_Now
+    breeder.lastSpawn = g_Now
     flags1e78 &= ~(bit1 | bit3 | bit4);  target selector reset;  target / last target / dirty = 0;  flags1e78 bit 7 = 0
     brief.bRegenAni = 0 (after the brief went out);  m.spawnTime (+0x2560) = g_Now
 ```
@@ -651,7 +743,7 @@ ShineMob::so_Routine(m, _, tickArg)                                             
     ShineMobileObject::so_Routine(m)                           # §5.5 (abstates, movement, casts)
     if flags1e78 & 1:  so_Unmark(0, 1, 3); som_FreeObject(m, reason 7); return
     if mode != 3 and m.npcAction (+0x24e8):                    # NPCAction proximity triggers (part 9)
-        so_AllOfRange_Class1(m, range = MobInfoServer.DetectCha, NeighborhoodChecker(m.npcAction))   @ FUN_005c2ee0 / FUN_005c2fe0
+        so_AllOfRange(m, range = MobInfoServer.DetectCha, NeighborhoodChecker(m.npcAction))   @ FUN_005c2ee0 / FUN_005c2fe0
     regen animation over? (FUN_0055e760): if no RegenAni row or g_Now > spawnTime + RegenTime/1000·10: regenAniOver = 1
     if m has StaImmortal (291) or StaAdlFLoussierIMT (499):
         run the AI Lua function only (below); return           # no AI while protected
@@ -660,7 +752,7 @@ ShineMob::so_Routine(m, _, tickArg)                                             
     if m.rescue (+0x24c0): so_RescueRoutine(m)                                       # part 3
     if mode == 3 (dead):
         if not deathSent:
-            to sight (incl. players only, AllOfRange_Class1 … 1):
+            to sight (incl. players only, so_AllOfRange … 1):
                 0x244A NC_BAT_REALLYKILL_CMD { u16 dead = m.handle, u16 attacker = m.killer (+0x1fba) }   # size 6
             deathSent = 1
         if m.deadAt and g_Now − m.deadAt >= (m.corpseExtra · 5 + 50) · 2:          # = 10 s + corpseExtra seconds
@@ -669,7 +761,7 @@ ShineMob::so_Routine(m, _, tickArg)                                             
     if m.entry == null: return
     if MobInfo row flag bit 0 of entry+0x28: sm_IBuffToBuffee(m)                     # part 4
     r = 2
-    if m.script and g_AIScriptOn (DAT_14d41a7c, set by FUN_004511a0):
+    if m.script and clockwatch.cw_IsReset (DAT_14d41a7c, set by the first WM time message FUN_004511a0; our earlier name g_AIScriptOn):
         r = LuaScriptScenario.lss_Routine(m.script, m.funcName, ctx{handle, field})  @ FUN_00507200 (ctx FUN_005d6ef0, result ctx+8)
             # calls the global Lua function named like the mob (MobInfo.InxName);
             # error → "LuaScriptScenario::lss_Routine : function call error"
@@ -703,7 +795,7 @@ one is a mob. Name: the 2017 PDB gives 0x244A two names; the 2016 zone sends the
 
 ```pseudo
 ShineMobileObject::so_Routine(o)                                                @ FUN_0056a080
-    SetItemData_SkillEffect.se_Clear(&g_SetEffect)
+    SetItemData_SkillEffect.se_Clear(&setitemskilleffect)
     flags1e78 &= ~4                                            # Fear is re-set by the abstate tick if still on
     if mode == 0 or mode == 3: return 1                        # nothing runs for dead or unspawned objects
     if sub-layer not in {2, 3}: sub-layer = 0                  # transient sub-layers last one tick
@@ -744,13 +836,13 @@ set animation level (m, lv):                                                    
 mobs, `WarL_Pore` (60 % → 1, 30 % → 2) and `WarL_BrainWash` (80/59/39/19 % → 1…4). The client
 (`GameFrameWork::On_NC_ACT_ANIMATION_LEVEL_CHANGE_CMD`, client FUN_004a6740) stores the level in the character
 (+0xb60), which picks the animation set (client table MobConditionView *(pdb2017)*: `MobInx, AniType, AniLv, EventCode`).
-Layout matches `PROTO_NC_ACT_ANIMATION_LEVEL_CHANGE_CMD` *(pdb2017)*.
+Layout matches `PROTO_NC_ACT_ANIMATION_LEVEL_CHANGE_CMD` *(pdb2016)*.
 
 ### 5.7 Placing the mob: `so_MapMarking` → `FieldMap::fm_Marking`
 
 ```pseudo
 ShineMob::so_MapMarking(m, force) → 0 | 3                                       @ FUN_004665f0
-    field = the FieldMap whose map name equals m.map (ListSearchSame over g_FieldList)
+    field = the FieldMap whose map name equals m.map (ListSearchSame over fieldlist)
     if none: return (no marking; caller treats non-zero as failure)
     spacing = MobInfoServer.RegenInterval (0 → 1; no server row → 25)
     return FieldMap.fm_Marking(field, m, spacing, 0, force)
@@ -765,12 +857,12 @@ FieldMap::fm_Marking(f, o, spacing, dropArg, force)                             
     DropLocationManager.dlm_home(dropArg)                      # spiral search around the wanted point
     loop:
         if the cell is not blocked (FUN_0049df70 on the block map) and
-           no object within `spacing` collides (so_AllOfRange_Class0(o, spacing, so_collesioncheck)):
+           no object within `spacing` collides (so_AllOfRange(o, spacing, so_collesioncheck)):
             o.marked = 1; return 0
         next spiral point (FUN_00460910; at most 32 levels, "DropLocationManager::dlm_Getloc");
         none left: log "FieldMap::fm_Marking : Fail mark"; return 3
         outside the field: return 3
-        ShineObject_SetPosition(o, point);  dlm_next
+        ShineObject::so_MoveTo(o, point);  dlm_next
     final check of the last point: free → marked = 1, return 0;  else return 3
 ```
 
@@ -797,13 +889,13 @@ So mobs of one breeder never stand on top of each other: each spawn moves outwar
 
 ### 5.9 `ShineNPC` and `NPCManager`
 
-`NPCManager` = `g_NPCRoleTable` DAT_0da29a60: 1024 entries of 12 bytes `{ → NPC.txt row, → NPCRole, u16 handle }`, +0x3000
+`NPCManager` = `npcmanager` DAT_0da29a60: 1024 entries of 12 bytes `{ → NPC.txt row, → NPCRole, u16 handle }`, +0x3000
 = number of NPC.txt rows (the static part). Row and role classes: Z02 §6.1.
 
 ```pseudo
 NPCManager::nm_SetNPC(nm)   (start stage `open`)                               @ FUN_004c6560
     for each static entry:
-        mobId = g_MobData.index(row.MobName);  unknown → log "nm_SetNPC : Invalid mob id"; next
+        mobId = mobdatabox.index(row.MobName);  unknown → log "nm_SetNPC : Invalid mob id"; next
         npc = som_AllocObject(type 4)  (none → "Too many npc")
         r = npc.so_mob_Regenerate(row.Map, row.x, row.y, row.Direct, handle, mobId, 0, breeder −1, 0, 0, level −1, 1, 0, 0)
         npc.so_npc_FromTable()                                 # +0x2568 = 1
@@ -811,7 +903,7 @@ NPCManager::nm_SetNPC(nm)   (start stage `open`)                               @
         npc.allLayers (+0x56) = 1;  entry.handle = handle;  entry.role.vt[0x2c](npc, row + 0x54)   # role init with RoleArg
         if NpcSchedule.shn has a row whose index (32 chars) equals row.MobName: so_Unmark(npc, 0, 1, 3)
                                                               # scheduled event NPCs stay off the map until WM 0x086A (Z01-core §10)
-    qsort the static part by handle (FUN_004c52f0)            # NPCRoleTable_Find bsearches it, then scans the dynamic part
+    qsort the static part by handle (FUN_004c52f0)            # NPCManager::nm_FindNPCFunc bsearches it, then scans the dynamic part
 
 NPCManager::nm_DynamicRegenerateNPC(nm, from, name[32], map, x, y, dir)        @ FUN_004c6cd0
         # callers: GM command `&RegenNPC` (FUN_00421e50) and Lua `cNPCRegen` (FUN_005de700)
@@ -822,11 +914,13 @@ NPCManager::nm_DynamicRegenerateNPC(nm, from, name[32], map, x, y, dir)        @
     x, y, dir = −1 → the row's values
     npc.allLayers = 1;  r = npc.so_mob_Regenerate(map, x, y, dir, handle, mobId, 0, −1, 0, 0, −1, 1, 0, 0);  npc.so_npc_FromTable()
     r != 0 → log "NPCRegenResult != FM_MARKSUCCESS: ", free (reason 0x2c)
-    else: put { row, role, handle } into the first slot at index ≥ count whose handle is 0xFFFF
+    else: put NPCIndexArray { pnt = row, func = role (NPCRoleBase*), handle } into the first slot at index ≥ count whose handle is 0xFFFF
           (original bug) Z09-B2: when no slot is free the loop ends at index 0x400 and the entry is written there anyway,
-          over `count` and the words after the table; the "nm_BufferArray Full" branch (free, reason 0x2d) is unreachable
+          over `count` and the words after the table (PDB layout: `nm_BufferArray[1024]` of 0xc-byte `NPCIndexArray`, then
+          `nm_BufferPoint` +0x3000 = count and `nm_NPCInfo` +0x3004); the "nm_BufferArray Full" branch (free, reason 0x2d)
+          is unreachable
 
-NPC role entry release (FUN_004c5310): clear the dynamic entry with that handle (row, role = 0, handle = 0xFFFF);
+`NPCManager::nm_DynamicReleaseNPC` (FUN_004c5310): clear the dynamic entry with that handle (row, role = 0, handle = 0xFFFF);
     static entries are never released.
 ```
 
@@ -850,7 +944,7 @@ ShineNPC::so_KilledBy(n, …)                                                   
     else: log "ShineNPC::so_KilledBy : NPC from table is killed" (file log DAT_0da28d68); nothing else
 
 ShineNPC::so_NPCRevive(n, gm)   (vt 0xa7c, GM `&NPCRevive` FUN_004231a0)        @ FUN_00452430
-    tell the GM "Changed from <mode> to 2";  mode = 2;  so_AllOfRange_Class0(n, so_BroadcastBriefInfo)
+    tell the GM "Changed from <mode> to 2";  mode = 2;  so_AllOfRange(n, so_BroadcastBriefInfo)
 
 ShineNPC::so_mob_Regenerate @ FUN_004b4bc0: fromTable = 0, then ShineMob::so_mob_Regenerate (§5.3).
 ```
@@ -872,7 +966,7 @@ ShineBandit::so_bandit_ChangeType(b, t)   (vt 0x898; map-script nodes ShineChang
 ```
 
 The client (`GameFrameWork::On_NC_SCENARIO_OBJTYPECHANGE_CMD`, client FUN_004a3580) stores `type` in the character
-(+0x78c). Layout matches `PROTO_NC_SCENARIO_OBJTYPECHANGE_CMD` *(pdb2017)*. Which value each script node passes
+(+0x78c). Layout matches `PROTO_NC_SCENARIO_OBJTYPECHANGE_CMD` *(pdb2016)*. Which value each script node passes
 (5 = mob, 4 = NPC *(inferred from the routine test and the spawn value)*) is read in part 15. The bandit name for
 `vt 0x4a0` is `+0x2666 + 0x5b` (FUN_00556f20).
 
@@ -887,11 +981,12 @@ battle / recover states and the call for help. Tactics, weapons and skills are p
 
 ### 6.1 Brain objects in the mob (`MobAggroManager` at +0x1fcc)
 
-The mob constructor part FUN_0054ee00 builds, at `mob+0x1fcc`, a `MobAggroManager` (FUN_004bda50: a
-`List<MobTargetStruct>` with **10 preallocated nodes** of 0x20 bytes) and right after it one selector object of every
-class. `sm_SetBrain` points `+0x2234` at one of them:
+The constructor `MobTacticElement::MobActionArgument::Selector::Selector` FUN_0054ee00 builds `maa_TargetSelect` at
+`mob+0x1fcc`: `targetlist`, a `MobAggroManager` (FUN_004bda50: a `List<MobTargetStruct>` with **10 preallocated nodes**
+`mam_Array` of 0x20 bytes), and right after it one selector object of every class (`bout`, `aggresive`, `nobrain`,
+`aggresive2`, `aggresiveall`, `aggresiveNoLevel`). `sm_SetBrain` points `selector` (+0x2234) at one of them:
 
-| Mob offset | Class (constructor) | `EnemyDetectType` *(enum names pdb2017)* | 2016 rows |
+| Mob offset | Class (constructor) | `EnemyDetectType` *(enum names pdb2016)* | 2016 rows |
 |---|---|---|---|
 | +0x2124 | `MobTargetBout` (FUN_004bd2c0) | 0 ED_BOUT, and every unknown value | 220 |
 | +0x213c | `MobTargetAggresive` (FUN_004bd2e0) | 1 ED_AGGRESSIVE | 1872 |
@@ -901,7 +996,8 @@ class. `sm_SetBrain` points `+0x2234` at one of them:
 | +0x21fc | `MobTargetAggresiveNoLevel` (same) | 5 ED_ENEMYALLDETECT | 9 |
 
 `MobTargetPlayerCaptivate` is not in the mob; its only vftable write is in FUN_0055bc80 at `player+0x2a9d0`
-(`param_1[0xaa74]`), i.e. a player-owned selector; its use with the charm state StaKarenCaptivate is *(inferred)* (§6.9).
+(`param_1[0xaa74]`) = the player member `m_TargetSelect`, next to `m_pCaptivateAI` (+0x2a9cc) and `m_pAITarget`
+(+0x2aa28) *(pdb2016)*: the charmed-player brain (§7.7, §8.10).
 
 ```pseudo
 ShineMob::sm_SetBrain(m)                                                        @ FUN_004b2480
@@ -919,15 +1015,15 @@ two setters below. `ShineObject::so_mob_SetEnemyDetect` exists as vt 0xba4 FUN_0
 
 **Selector object layout** (all classes, base `MobTargetSelector` FUN_004a9b40, which is also an `AxialListIterator`):
 
-| Offset | Meaning |
-|---|---|
-| +0x04 | → current target entry (`MobTargetStruct`); `&DAT_0da28aac` = the empty entry (no target) |
-| +0x08 | squared search radius during a scan; best distance² found so far |
-| +0x0c | → mob |
-| +0x10 | `MobInfoServer.DetectCha` (detection radius) |
-| +0x14 | → `MobAggroManager` (the aggro list, mob+0x1fcc) |
-| +0x18 … +0x20 | built-in entry `{u16 handle, identity, → object}` filled by a scan (`ali_Work`) |
-| +0x2c | Aggresive classes: a second container (FUN_0058a630; not used by the code read here) |
+| Offset | Member *(pdb2016)* | Meaning |
+|---|---|---|
+| +0x04 | `mts_Current.target` | → current target entry (`MobTargetStruct`); `&mobtargeteraser` DAT_0da28aac = the empty entry (no target) |
+| +0x08 | `mts_Current.distsquar` | squared search radius during a scan; best distance² found so far |
+| +0x0c | `mts_MyBody` | → mob |
+| +0x10 | `mts_SightRange` | `MobInfoServer.DetectCha` (detection radius) |
+| +0x14 | `MobTargetBout::mtb_targetlist` | → `MobAggroManager` (the aggro list, mob+0x1fcc) |
+| +0x18 … +0x37 | `MobTargetAggresive::mta_InstanceTarget` (`MobTargetStruct`) | built-in entry `{u16 handle, identity, → object}` filled by a scan (`ali_Work`) |
+| +0x2c | `mta_InstanceTarget.mts_EnemyAnalyzer` | Aggresive classes: its `IntelligenceOffice4Mob` (ctor FUN_0058a630; not used by the code read here) |
 
 **`MobTargetStruct`** (0x20, list entry): `+0 u16 handle, +4 identity (vt 0x344: player = character number, mob =
 spawning breeder; protects against reused handles), +8 → object, +0xc s32 aggro points, +0x10 time of the last
@@ -940,16 +1036,16 @@ mask`. An entry with 0 aggro counts as free.
 |---|---|---|
 | 0x00 | `ali_Work` FUN_004a9e20 (Aggresive, ALL, NoLevel), FUN_004aa020 (Aggresive2), FUN_004add20 (Captivate) | one candidate of a range scan (§6.3) |
 | 0x08 | `mts_Routine` FUN_004ac940 | per tick: expire entries (§6.2); called from `ShineMob::so_Routine` (§5.4) |
-| 0x0c | `mt_InitRegen` FUN_004aced0 | `mob = arg`; erase all entries |
+| 0x0c | `mts_InitRegen` FUN_004aced0 | `mob = arg`; erase all entries |
 | 0x10 | FUN_004abf00 → `mts_Initialize` FUN_004abe40 | `(mob, aggroManager)`: store both, radius = DetectCha, target = none; returns the selector |
 | 0x14 | `mts_AggroClear` FUN_004ad6f0 | erase all entries (battle over, §6.6) |
 | 0x18 | FUN_004ad7b0 *(ViewAggroList; it carries the profiler string "MobTargetBout::mts_AppendAggroPoint")* | GM list (§6.8) |
 | 0x1c | `mts_AppendAggroPoint` FUN_004ad9a0 | §6.2 |
 | 0x20 | `mts_DecreaseAggroPoint` FUN_004ac3d0 | §6.2 |
 | 0x24 | `mts_InitThink` FUN_004abf20 | target = none; radius = DetectCha; +8 = DetectCha² |
-| 0x28 | `mt_SelectTarget`: Bout FUN_004acfc0, Aggresive/2/NoLevel FUN_004ad290, ALL FUN_004ab1b0, NoBrain FUN_004ac0d0, base FUN_004ac000 | §6.3; called by the tactics (part 4) |
+| 0x28 | `mts_SelectTarget`: Bout FUN_004acfc0, Aggresive/2/NoLevel FUN_004ad290, ALL FUN_004ab1b0, NoBrain FUN_004ac0d0, base FUN_004ac000 | §6.3; called by the tactics (part 4) |
 | 0x2c | `mts_StoreAggroList` FUN_005d5250 (base FUN_005d30d0 returns −1) | append the handle of every entry with an object to a `vector<u16>`; returns the count |
-| 0x30 | FUN_004bd630 | run a `SlayerCollect` iterator over the list (the kill-credit list of 0x244C NC_BAT_MOBSLAYER_CMD, Z03 §8.1 *(inferred)*) |
+| 0x30 | FUN_004bd630 | run a `MobTargetBout::mts_SlayerList` iterator over the list (the kill-credit list of 0x244C NC_BAT_MOBSLAYER_CMD, Z03 §8.1 *(inferred)*) |
 | 0x34 | `mts_AggroAdjust` FUN_004a7c50 | §6.2 |
 | 0x38 | `mts_GetTopAggroTarget`: Bout/NoBrain FUN_004aa8d0, Aggresive* FUN_004aab80, ALL FUN_004aaf30 | §6.4 |
 | 0x3c | "target is protected": Aggresive* FUN_004a9b90 (StaAdlFLoussierIMT 499, StaImmortal 291, StaHide 75), ALL FUN_004a9cb0 (291, 499) | no caller found in the code read here (part 4) |
@@ -959,6 +1055,14 @@ Abstate numbers are `AbStataIndex` values (Z03 §1): 75 StaHide, 77 StaEntrapHid
 499 StaAdlFLoussierIMT, 562 StaWarLBrainWash.
 
 ### 6.2 The aggro list
+
+Entry = `MobTargetStruct` (0x20) *(pdb2016)*: `mts_Handle` u16 +0 (`handle`), `mts_CharRegnum` +4 (`identity`, vt 0x344:
+the character number of a player), `mts_Object` +8 (`obj`), `mts_AggroPoint` s32 +0xc (`aggro`), `mts_LastHit` +0x10
+(`time`), `mts_EnemyAnalyzer` +0x14 (`SpyNet::IntelligenceOffice4Mob`, 0xc; the `mask` word below sits in it at +0x1c).
+Selector base `MobTargetSelector` (0x14, an `AxialListIterator`): `mts_Current {target, distsquar}` +4, `mts_MyBody` +0xc,
+`mts_SightRange` +0x10; `MobTargetBout` adds `mtb_targetlist` +0x14 (→ the mob's `MobAggroManager`); `MobTargetAggresive`
+adds `mta_InstanceTarget` +0x18 (a `MobTargetStruct` for the scan winner); `MobTargetPlayerCaptivate` adds `PlayerTarget`
++0x38 (its `mts_Object` +0x40 is the `found` of §8.10).
 
 ```pseudo
 MobTargetBout::mts_AppendAggroPoint(sel, obj, points)            (vt 0x1c)      @ FUN_004ad9a0
@@ -1025,7 +1129,7 @@ ShineMob::so_mob_AggroAdjust(m, a, permille)     (vt 0x990)                    @
     m.targetSelector.AggroAdjust(a, permille).vt[0x28](m)    # scale, then select a target again
 
 ShinePlayer::smo_ply_AggroAdjust(p, permille, range)   (vt 0xebc)              @ FUN_004a4a40
-    so_AllOfRange_Class1(p, range (0 = sight), AxialListAggroAdjust{permille})
+    so_AllOfRange(p, range (0 = sight), AxialListAggroAdjust{permille})
         → every object o: o.vt[0x990](p, permille)           # ali_Work @ FUN_004a4990
 ```
 
@@ -1066,13 +1170,13 @@ MobTargetAggresive::mt_SelectTarget(sel, m)                                    @
     sel.+8 = DetectCha²;  sel.target = none
     centre = m.vt[0x8f4](DetectCha)                       # FUN_004abcd0: the mob's position moved 0.4 × DetectCha
                                                           # forward along its direction (FUN_004a2db0)
-    so_AllOfRange_Class1(m, centre, DetectCha, sel)       # sel.ali_Work for each object
+    so_AllOfRange(m, centre, DetectCha, sel)       # sel.ali_Work for each object
     if found: m.so_mob_AppendAggro(found, m.level × 5)    # the new enemy enters the list with level × 5 points
 
 MobTargetAggresiveALL select                                                    @ FUN_004ab1b0
     sel.target = the FIRST entry that passes the skip rules (not the highest aggro)
     if none and within 3000 of the spawn point: sel.+8 = DetectCha²; scan with sel over the field's sight range
-        (FUN_00553c20: so_AllOfRange_Class1 with range 0 = the map's sight radius); the found object becomes the
+        (FUN_00553c20: so_AllOfRange with range 0 = the map's sight radius); the found object becomes the
         target directly (sel.+4 = built-in entry), without aggro points
     else sel.+8 = 0
 
@@ -1091,7 +1195,7 @@ MobTargetSelector::ali_Work(sel, m, o, d²) → continue                        
         o.vt[0x904]()                                   # player 1; mob: flags +0x24ac bit 0
         o has neither StaImmortal nor StaAdlFLoussierIMT
         o.mode not in {3 dead, 0 spawning}
-        Layer_Match(o, m) and so_SubLayer_CanSee(o, m)  (Z02 §5)
+        SubLayer::SubLayerInteractLoader::slil_Interact(o, m) and so_SubLayer_CanSee(o, m)  (Z02 §5)
         not hidden (FUN_004a9be0): o has StaHide (75) or StaEntrapHide (77) and m is not ED_AGGREESIVEALL
         not sel.vt[0x40](m.level, o.level)              # aggressive mobs ignore targets more than 10 levels below them
         d² < sel.+8                                     # nearest wins
@@ -1154,10 +1258,11 @@ ShineMob::sm_DuringRecover(m)                    (battle state 2, each tick)  @ 
     m.so_recoversp(MaxSP / 10);  lastSPRecover (+0xea4) = g_Now                                          (vt 0x5b8)
     if HP >= MaxHP (+0xea8) and SP >= MaxSP (+0xeac):
         battle state = 0
-        if on a field: cc_ScriptInterrupt(field.cinema (+0x44), sim_ObjectDead (FUN_0050c840), { u16 m.handle })
-            # (original bug) Z09-B5: a mob that has finished healing is reported to the map scripts as "object dead"
+        if on a field: cc_ScriptInterrupt(field.cinema (+0x44), sim_MobHPFull (FUN_0050c840), { u16 m.handle })
+            # "mob HP full" interrupt to the map scripts (part 9b). Z09-B5 is withdrawn: part 3 had read FUN_0050c840
+            # as sim_ObjectDead (that is FUN_0050c950); the PDB names settle it
         rescueFlags bit 0 = 1
-    so_AllOfRange_Class0(m, sight, so_ply_Send2WhoTargetMe)  # every player whose target is m gets 0x2402 NC_BAT_TARGETINFO_CMD (Z03 §2.4)
+    so_AllOfRange(m, sight, so_ply_Send2WhoTargetMe)  # every player whose target is m gets 0x2402 NC_BAT_TARGETINFO_CMD (Z03 §2.4)
 ```
 
 So a mob regains 10 % HP and SP every 3 s after a fight (or the script value per step), and the players who target it
@@ -1170,7 +1275,7 @@ code of this section; part 4 checks the tactics).
 ShineMob::sm_Scream4Rescue(m, target, range, count, flag)                       @ FUN_00568bf0
     race = MobInfoServer.MobRaceType;  if race == 0 or range <= 0: return
     if target == null: log "ShineObjectClass::ShineMob::sm_Scream4Rescue : Target not found"; return
-    so_AllOfRange_Class1(m, m.pos, range, AxialListRescueRequest{ target, target.handle, race, count, flag })
+    so_AllOfRange(m, m.pos, range, AxialListRescueRequest{ target, target.handle, race, count, flag })
 
 AxialListRescueRequest::ali_Work(req, m, o) → continue                          @ FUN_00568ad0
     if req.count < 1: return stop
@@ -1198,7 +1303,7 @@ FamilyRescCount, 1)` every tick (count 1…5 helpers). The helper attacks only a
 ### 6.7 Target-type checks for mob weapons (`so_mob_CanMyTarget`, `so_ply_CanMyTarget`, friends, NPCs)
 
 These answer "may weapon `i` of the attacker's list be used on this object" from `MobWeapon.AtkType` (+0x4f; enum
-`ATKTYPE` *(pdb2017)*: 0 SKLTP_DAMAGE, 1 SKLTP_HEAL, 2 SKLTP_ABSTATE, 3 SKLTP_SPECIAL, 4 SKLTP_DISPEL). `list` is the
+`ATKTYPE` *(pdb2016)*: 0 SKLTP_DAMAGE, 1 SKLTP_HEAL, 2 SKLTP_ABSTATE, 3 SKLTP_SPECIAL, 4 SKLTP_DISPEL). `list` is the
 attacker's MobDataBox entry (+8 = weapon list, §5.1); a non-null result is the object itself. Callers are the tactics
 (`MobActionAttack` vt 0x760, `MobActionTargetting` vt 0x748 / 0x750, part 4).
 
@@ -1218,19 +1323,19 @@ ShinePlayer::so_ply_CanMyTarget(p, attacker, i)  (vt 0x760)                     
 ShineObject versions (FUN_004accd0, FUN_004ace80): null
 
 ShineMob::so_mob_FindMyRaceTarget(m, list, i)    (vt 0x748)                                    @ FUN_004acbd0
-    so_AllOfRange_Class1(m, 500, AxialListNearFriend{list, i}) → first hit, or 0
+    so_AllOfRange(m, 500, AxialListNearFriend{list, i}) → first hit, or 0
     AxialListNearFriend::ali_Work @ FUN_004aca50: skip dead; o.race (vt 0x714) != 0 and == m.race:
         result = o.so_mob_CanMyTarget(list, i); stop at the first result
     (base ShineObject FUN_004acb80: 0)
 ShineObject::so_mob_CanNPCTarget(m)              (vt 0x750, mob version)                        @ FUN_004acd70
-    so_AllOfRange_Class1(m, 500, AxialListNPCTargetFind{ mobId 0xbc (188), n = 1 }) → result
+    so_AllOfRange(m, 500, AxialListNPCTargetFind{ mobId 0xbc (188), n = 1 }) → result
     AxialListNPCTargetFind::ali_Work @ FUN_004abd80: for objects with mob ID 188: the first one is taken; for later ones
         (n in 1…100) a value from the per-n random ring DAT_14d720d0 (0x8008-byte blocks) decides whether it replaces
         the choice (reservoir-style pick *(inferred)*); n += 1
     (base FUN_004acd20: 0)
 ```
 
-`MOBATTACKTARGET` *(pdb2017)*: `MAT_ENEMY 0, MAT_ME 1, MAT_MYRACE 2, MAT_NONE 3, MAT_NPC 4` = `MobWeapon.MopAttackTarget`
+`MOBATTACKTARGET` *(pdb2016)*: `MAT_ENEMY 0, MAT_ME 1, MAT_MYRACE 2, MAT_NONE 3, MAT_NPC 4` = `MobWeapon.MopAttackTarget`
 (+0x69); the mapping to the four functions above (ME → vt 0x74c, MYRACE → vt 0x748, NPC → vt 0x750) is part 4's tactic code.
 Mob ID 188 is the only NPC type a mob can pick as a target (MobInfo row 188; the escort / defence NPC *(inferred)*).
 
@@ -1242,7 +1347,7 @@ Mob ID 188 is the only NPC type a mob can pick as a target (MobInfo row 188; the
 | `cAggroReset(mob, obj)` FUN_005e1280 | `mob.vt[0x704](obj, 1000)`: obj's aggro drops to 1 |
 | `cAggroListSize(mob)` FUN_005f2f70 | count from `vt 0xb88` |
 | `cAggroList(mob)` FUN_005f3250 | pushes every handle of `vt 0xb88`; returns their number |
-| `cIsInBattle(mob)` FUN_005ef430 | if `so_mob_CurrentTarget` (vt 0xb78) is an object within 999999999 distance² and the mob is not dead: returns that handle |
+| `cTargetHandle(mob)` FUN_005ef430 | if `so_mob_CurrentTarget` (vt 0xb78) is an object within 999999999 distance² and the mob is not dead: returns that handle |
 | `so_mob_GetAggroList(m, vec)` vt 0xb88 FUN_005d4dd0 | clears vec, `selector.vt[0x2c](vec)` (base FUN_005d4d50: −1) |
 | GM `&viewaggrolist` (level 50, FUN_004196f0) | target = `gm.vt[0x75c]()` or the GM; if on a field: `target.so_mob_ViewAggroList(gm)` |
 | `so_mob_ViewAggroList(m, gm)` vt 0x6fc FUN_0042d2a0 | `selector.vt[0x18](gm)`: GM notice per entry `"%d) %s : %d"` (index, name, aggro); without a selector a fixed notice (DAT_006aa168) |
@@ -1255,7 +1360,7 @@ The Lua bindings themselves (argument reading FUN_005f7680 / FUN_005f7ad0, resul
 
 ### 6.9 Not in this section
 
-- `MobTargetPlayerCaptivate` (`ali_Work` FUN_004add20, `mts_Initialize` FUN_004abde0, `mt_SelectTarget` FUN_004abe10): §8.10.
+- `MobTargetPlayerCaptivate` (`ali_Work` FUN_004add20, `mts_Initialize` FUN_004abde0, `mts_SelectTarget` FUN_004abe10): §8.10.
 - `FamilyMobManagement::FamilyMobManager` (`fmm_Initialize` FUN_004b5050, `fmm_Dead` FUN_004b5120, `fmm_Remove`
   FUN_004b5a40, `fmm_Regist` FUN_004b5cf0) is a per-breeder-group table `{u16 mobId, u16 limit (default 60000), u16
   dead count}`: `fmm_Dead` counts a death and returns `count >= limit`. All callers are `MobBreeder` /
@@ -1317,13 +1422,13 @@ Singletons (one object for all mobs; `PTR_vftable_…` globals, classes from RTT
 
 | Slot | Meaning | Implementations |
 |---|---|---|
-| 0x00 | `mab_Think(ctx)` → next state | per class (below); `MobActionBase` FUN_004b8ec0 → Targetting; `MobActionNoBrain` FUN_004b8c50 → itself (never moves, never fights) |
+| 0x00 | `mab_Think(ctx)` → next state | per class (below); `MobActionBase` FUN_004b8ec0 → Targetting; `MobActionNoBrain` FUN_004b8c50 → itself (never moves, never fights; the PDB gives this address the name of an identical folded function, `PineScriptTracer::ScriptTracer::operator<<`) |
 | 0x04 | damaged notify (`so_DamagedBy`, §6) | `MobActionWander` and `InMove_Cancelable` FUN_004b8c10: `so_mobile_StopHere` (vt 0xa48), state = Targetting; others no-op |
 | 0x08 / 0x0c | target handle / object (mob vt 0x754 / 0x75c, §6.5) | Attack, Chase, BackStep, AvoidOverlap: FUN_004b8a60 / FUN_004b8a80 (`*cell`); others 0xFFFF / 0; `WaitSkillEnd` +0xc: FUN_00461b70 |
 | 0x10 | re-plan (mob vt 0x8f8, §6) | FUN_004b8c40 → Targetting (all) |
 | 0x14 | bind the target cell | FUN_00653a60 (`this+4 = cell`) for Attack, Chase, BackStep, AvoidOverlap; others no-op |
 | 0x18 | `mab_SkillRegistAtScript` | Attack FUN_004b9400 (§8); base FUN_004b93b0 returns false |
-| 0x1c | "waiting for a skill to end" | `WaitSkillEnd` FUN_005af8d0 → 1; others 0 |
+| 0x1c | "waiting for a skill to end" | `WaitSkillEnd` FUN_005af8d0 → 1 (a folded `return 1` the PDB names `ShineObject::so_Gamble_IsGambleHouse`); others 0 |
 
 `MobActionElement` (vftable 0x6c15b4, ctor FUN_004a9b00, dtor FUN_004a9dc0) is an unrelated base whose `mae_Action`
 FUN_004aa880 returns a static empty object; no caller of it was found.
@@ -1333,7 +1438,7 @@ Helpers used throughout (mob slots unless noted):
 | Helper | Meaning |
 |---|---|
 | `FUN_004b8830(selector)` | the selector's current target object, or **0 when it has StaImmortal (291) or StaAdlFLoussierIMT (499)** (the name is copied to a debug ring) |
-| `ShineMob_SetCurrentTarget` FUN_004b8930 | +0x24ae, raises `sim_TargetChange` (§6.5) |
+| `ShineMob::sm_SetTarget` FUN_004b8930 | +0x24ae, raises `sim_TargetChange` (§6.5) |
 | vt 0x510(t) FUN_005566c0 | attack reach to `t` = `t.vt[0x6cc]()` (body size) + current weapon `Range` (+0x67); 99999 without a weapon |
 | vt 0x514 / 0x518 | walk / run speed: script override (vt 0xe84/0xe8c, 0xe88/0xe90) else (script +0x254c / +0x2550 ≥ 0 ? it : MobInfo.WalkSpeed / RunSpeed) × speed rate (+0x1c00) / 1000, clamped ≥ 0 (FUN_00556740 / FUN_005567b0) |
 | vt 0x610 | moving (`MoveManager` +0x1ac, part 5); vt 0x7b4 move mode (+0x18c: 1 walk, 2 run), vt 0x7b0 current speed (+0x194) |
@@ -1345,7 +1450,7 @@ Helpers used throughout (mob slots unless noted):
 | vt 0xf54 / 0xf4c / 0xf50 | set / read "was chasing" (+0x24ac bit 3) / spawn point := the current scenario path point (FUN_004b7690, path vector +0x1eb8, 0x2a-byte points, index +0x1ebc) |
 | vt 0xa18 | scenario path vector +0x1eb8 (part 5); non-zero = walk the path instead of wandering |
 | `FUN_004011c0(timer)` | periodic timer `{next, period}`: fires when `next < g_Now`, then `next += period` |
-| `ShineObject_so_FindBlockLocate(o, pos, r, out, bitmap)` | nearest unblocked point to `pos` within `r` (part 5) |
+| `ShineObject::so_FindBlockLocate(o, pos, r, out, bitmap)` | nearest unblocked point to `pos` within `r` (part 5) |
 | `DAT_0084cfb4` | "use `Navigator`" byte, initial value **1** and never written: the old block path finder branches (FUN_004a9ae0 + FUN_00632ba0 / FUN_00632450, "Path not found", "MobThink_Chase::mtc_pathfind : Zero path") are dead in 2016 |
 
 ### 7.2 Idle states: Targetting, Wander, Roaming, going home
@@ -1589,7 +1694,7 @@ MobActionAvoidOverlap::mab_Think(ctx)            (two mobs on one spot)         
 `MoveManager` (part 5), then
 
 ```pseudo
-sight (so_AllOfRange_Class1, radius DAT_132826b4) ← 0x2018 NC_ACT_SOMEONEMOVEWALK_CMD / 0x201A NC_ACT_SOMEONEMOVERUN_CMD {
+sight (so_AllOfRange, radius DAT_132826b4) ← 0x2018 NC_ACT_SOMEONEMOVEWALK_CMD / 0x201A NC_ACT_SOMEONEMOVERUN_CMD {
     u16 handle, u32 from.x, from.y (current position), u32 to.x, to.y, u16 speed (vt 0x514 / 0x518), u16 flags (bit 0 = 0) }
 the same 0x18-byte packet is kept in the object (+0x168 opcode, +0x16a… payload) for players who see the mob later (Z02 §5)
 ```
@@ -1640,7 +1745,7 @@ ShineMob::sm_UseWeapon(m, t)                                                    
         smo_SwingStart(m, t)                         # 0x2447 NC_BAT_SWING_START_CMD to sight (Z03 §2)
         MobChatManager::mcm_AttackChat(m)            # §8
     else:
-        sk = SkillDataBox_Find(weapon skill)
+        sk = SkillDataBox::operator[](weapon skill)
         if not sk: log "ShineObjectClass::ShineMob::sm_UseWeapon : Null skill"; return
         if m.SP < sk.SP (+0xa0): log "…sm_UseWeapon : Minus sp"; return
         if sk.+0x130: m.flags1e78 |= 2               # "alternate damage path" (Z03 knowledge bit 1)
@@ -1658,16 +1763,16 @@ ShineMob::sm_UseWeapon(m, t)                                                    
 
 cooldown (vt 0x718)                                                             @ FUN_00556d00
     if weapon >= 0: cooldown[weapon] = g_Now + ceil(AttackSpeed / 100)       # tenths
-AttackSpeed (vt 0x508)                                                          @ FUN_00556640
+ShineMob::so_attackspeed1000 (vt 0x508)                                                          @ FUN_00556640
     AtkSpd (+0x45) × param[0xa18] / 1000 (≥ 0); 99999 when weapon < 0 or the row is missing
     (the row is read before the index is checked; the only mob caller, vt 0x718, checks the index first, so this
      does not fault; the other vt 0x508 callers are the player schedule functions FUN_0042f550 / FUN_00430bc0, Z03)
-swing time (vt 0x71c)  FUN_005564f0: SwingTime × 10 / 1000 tenths (0 without a weapon)
+swing time (vt 0x71c)  `ShineMob::so_mob_SetWeaponAniTime` FUN_005564f0: SwingTime × 10 / 1000 tenths (0 without a weapon)
 ```
 
 ### 7.5 Weapon target by `MopAttackTarget`
 
-Both Targetting and Attack resolve "on whom is weapon `i` used" the same way (`MOBATTACKTARGET` *(pdb2017)*; 2016 data:
+Both Targetting and Attack resolve "on whom is weapon `i` used" the same way (`MOBATTACKTARGET` *(pdb2016)*; 2016 data:
 ENEMY 4898, ME 80, MYRACE 173, NONE 667 rows):
 
 | Value | Call | Result (§6.7) |
@@ -1685,7 +1790,7 @@ the weapon (sequence advanced, cooldown set).
 ### 7.6 `MobAttackSequence`: scripted skill orders
 
 Loader `MobAttackSequence::mas_Load` @ FUN_004a8990 (called once at start-up from the undecompiled block at 0x5b05d8,
-step label `mobattseq`, before `chargedbuffdatabox`) into `g_MobAttackSequence` **DAT_0d76e9e8** `{u32 count; record[400]}`
+step label `mobattseq`, before `chargedbuffdatabox`) into `mobattseq` **DAT_0d76e9e8** `{u32 count; record[400]}`
 (records built by `_eh_vector_constructor_iterator_` with FUN_0043be70, sorted by mob ID with `qsort` after each append,
 looked up with `bsearch` FUN_0043f6e0 at spawn → mob+0x1fac; sequence position mob+0x1fb0 = 0):
 
@@ -1751,7 +1856,7 @@ first one that matches; then `to == 0xFFFF` → weapon 0, else the first weapon 
 | `ShineMob::sm_SkillExchange_OutOfRange` @ FUN_004baef0 | +0x1244 | the first entry with that `from` (no condition) | `so_mob_SelectWeapon` (out of reach × factor), Attack (out of reach): a successful exchange attacks at once instead of chasing |
 | `ShineMob::sm_SkillExchange_HPLow` @ FUN_004bb100 | +0x1248 | `HP < MaxHP × Value / 1000` | Attack, every attempt |
 | `ShineMob::sm_SkillExchange_TargetState` @ FUN_004bb390 | +0x124c | the target has abstate `Value` (vt 0x3e4) | Attack, only when the target is out of reach |
-| HPLow_ChangeOrder FUN_004bb600 *(ours: `sm_SkillExchange_HPLowChangeOrder`)* | +0x1be4 | entry position == sequence position (+0x1fb0) and `HP < MaxHP × Value / 1000` | Attack, after HPLow |
+| HPLow_ChangeOrder FUN_004bb600 *(ours: `sm_SkillExchange_HPLow_ChangeOrder`)* | +0x1be4 | entry position == sequence position (+0x1fb0) and `HP < MaxHP × Value / 1000` | Attack, after HPLow |
 
 `HPLow_ChangeOrder` (367 of 400 rows) lets a boss play a different skill at given sequence positions once its HP drops
 below a threshold (e.g. `EglackMad`: below 40 % / 70 %). Unlike the others it ignores `from`.
@@ -1760,7 +1865,7 @@ below a threshold (e.g. `EglackMad`: below 40 % / 70 %). Unlike the others it ig
 
 When a player becomes captivated (StaKarenCaptivate 335 / StaWarLBrainWash 562, Z03 §6.6), `ShinePlayer` vt 0xf1c
 FUN_00564e50 (wraps `smo_SetCaptivate`) builds a 0x324-byte brain: `+4 → player`, `+8` brain objects
-(`ShineMob_BrainObjects_ctor` FUN_0054ee00), `+0x270` = the player's `MobTargetPlayerCaptivate` selector (+0x2a9d0,
+(`MobTacticElement::MobActionArgument::Selector::Selector` FUN_0054ee00), `+0x270` = the player's `MobTargetPlayerCaptivate` selector (+0x2a9d0,
 §6.9) initialised with them, `+0x274` the tactic set bound to the cell `player+0x2aa28`, state = Targetting; the pointer is
 kept at `player+0x2a9cc`. Captivate off destroys it and clears the pointer (Ghidra cuts the decompile at the
 `operator delete`, FUN_0065677f is wrongly marked no-return; the disassembly at 0x564f74 clears +0x2a9cc).
@@ -1788,7 +1893,7 @@ so the victim auto-attacks other players with normal attacks through the ordinar
 FUN_0042cab0 (damage from the rule set at 0x858ecc through FUN_004fc4a0) → vt 0x584 FUN_0042cb80, which logs
 "ShineObjectClass::ShineMobileObject::so_attack called", applies the damage and broadcasts **0x2404 / 0x2405
 NC_BAT_SOMEONEDAMAGED_SMALL / LARGE_CMD** `{u16 attacker, u16 target, u8|u16 damage, u8 action}` (or 0x2406 / 0x2407
-`NC_BAT_SOMEONEDEAD_SMALL / LARGE_CMD`, same layout, when the hit kills; small when damage < 256) *(names pdb2017)*. No
+`NC_BAT_SOMEONEDEAD_SMALL / LARGE_CMD`, same layout, when the hit kills; small when damage < 256) *(names pdb2016)*. No
 code calls vt 0x580 or 0x584 (no `+ 0x580` / `+ 0x584` call in the export except FUN_0042cab0 itself, and no direct
 call of FUN_0042ce00). Likewise `so_Bash` (vt 0x598: `ShineMobileObject::so_Bash` FUN_0042e950, `ShinePlayer::so_Bash`
 FUN_0042efb0, packets 0x242C–0x2431, Z03 §3.5) has no caller at all. The live mob attack is §7.3 (`SWING_START` +
@@ -1804,8 +1909,8 @@ hit / heal rules of the non-player classes are §8.
 
 ## 8. Mob AI 2b: script control, chat, servant explosions, boss hooks, hit rules
 
-Part 4b. Helpers as in §7.1. `RandomRing(n)` *(ours)*: the next value of a pre-filled ring of random numbers below `n`
-(`DAT_14d720d0 + n × 0x8008`: 0x4000 u16 values, index at +0x8000, mask at +0x8004); only for `1 ≤ n ≤ 100`, else 0.
+Part 4b. Helpers as in §7.1. `RandomRing(n)` *(ours: inlined, no function)*: the next value of a pre-filled ring of random numbers below `n`
+(`rndbox.rb_box[n]` = `DAT_14d720d0 + n × 0x8008` *(pdb2016)*: 0x4000 u16 values `rs_slot`, `rs_point` {value, mask}, index at +0x8000, mask at +0x8004); only for `1 ≤ n ≤ 100`, else 0.
 A mob's weapon vector (`MobDataBox` entry +8, §5.1) holds 0xC-byte slots `{→ MobWeapon row, u16 skill ID (+4), u8 present (+8)}`;
 "the weapon of skill `k`" below means the first slot whose skill ID is `k`.
 
@@ -1819,7 +1924,7 @@ players: `so_mob_SkillRegistAtScript` FUN_005d27f0, `so_mob_SkillBlastAtScript` 
 ShineMob::so_mob_SkillRegistAtScript(m, target, skillId)     (vt 0xb7c)        @ FUN_005d2840
     if m.param.flags (+0xfc0+0xcce) & 4: return false            # "cannot attack" abstate bit (Z03)
     if m is casting (vt 0xea0, cast block +0x1d84 ≠ 0): return false
-    sp_castabort(m)                                              # vt 0xed4 FUN_00579d50: no-op here (it acts only while casting)
+    smo_CastAbort(m)                                              # vt 0xed4 FUN_00579d50: no-op here (it acts only while casting)
     Attack = m+0x227c;  maa_SkillFromScriptClear(Attack)         # FUN_004b9470: skill 0xFFFF, weapon −1, target 0
     *Attack.cell = target                                        # FUN_004b89a0 (returns Attack)
     i = weapon index of skillId;  if none: return false
@@ -1834,7 +1939,7 @@ while `+0xc ≠ 0xFFFF`, and uses `+0x14` as the weapon target (clearing the ord
 ```pseudo
 ShineMob::so_mob_SetWeaponAsScript(m, i8)                    (vt 0xb74)        @ FUN_004ab5e0
     i = i8 & 0xFF                                     # (the 0xFFFFFFFF "none" test after the mask can never hit)
-    sk = SkillDataBox_Find(skill ID of weapon slot i)
+    sk = SkillDataBox::operator[](skill ID of weapon slot i)
     if sk and m.SP (vt 0x4ec) >= sk.SP (+0xa0): weapon (+0x1fa8) = i; return i
     weapon = −1; return −1
 ShinePlayer / other classes: FUN_004d8e20 returns −1
@@ -1966,7 +2071,7 @@ ShineServant::so_mobile_ICanDamageTo(s, d, why)                                @
     return s.master (+0x256c) ? master.vt[0x980](d, why) : false              # otherwise the master's (player) rules
 ShineServant::smo_ICanHealTo(s, d)                                             @ FUN_004356b0
     return s.master ? master.vt[0xe94](d) : false
-ShineServant same side (vt 0xe60)  FUN_0054b100: master ? master.vt[0xe60](d) : ShineMob_IsSameSide(s, d)
+ShineServant same side (vt 0xe60)  FUN_0054b100: master ? master.vt[0xe60](d) : ShineMob::so_IsAlliance(s, d)
 
 ShineMobileObject::smo_ICanHealTo(a, d)        (base: doors, movers)           @ FUN_004352d0
     return not a.vt[0x980](d, "smo_ICanHealTo")    # whatever a may not attack, a may heal
@@ -2014,7 +2119,7 @@ Seven tables, identical columns `MobIndex (mob InxName), Rate0 u32, Rate1 u32, S
 
 | Table (code name) | Array (manager +) | Element class, slot | Fired by | 2016 rows |
 |---|---|---|---|---|
-| `PIECE` | +0x08 (DAT_0084cc8c) | `MobChatElementWander` (0x130 bytes): vt 0 interval, vt 4 `mceb_WanderChat` | idle timer +0x1ea8 in `MobActionWander::mab_Think` FUN_004bb790 (§7.2) | 330 |
+| `PIECE` | +0x08 `mcm_Wander` (DAT_0084cc8c) | `MobChatElementWander` (0x130 bytes): vt 0 interval, vt 4 `mceb_WanderChat` | idle timer +0x1ea8 in `MobActionWander::mab_Think` FUN_004bb790 (§7.2) | 330 |
 | `ATTACK` | +0x0c | `MobChatElement` (0x128), vt 8 `mceb_AttackChat` | normal attack (weapon 0) in `sm_UseWeapon` (§7.4) | 330 |
 | `DAMAGED` | +0x10 | vt 0xc `mceb_DamageChat` | every hit, `ShineMob::so_DamagedBy` FUN_00431750 (Z03) | 330 |
 | `DEAD` | +0x14 | vt 0x10 `mceb_KilledChat` | `ShineMob::so_KilledBy` FUN_00432760, after the kill bookkeeping | 330 |
@@ -2028,7 +2133,7 @@ MobChatManager::mcm_Load(mgr, world)                                           @
     7 arrays of count pointers, every slot = &mgr+4    # a static MobChatElementBase (vftable 0x6c1f94): every chat is a
                                                        #   no-op, interval FUN_004ae540 = 1 000 000 000
     for every MobInfo row r (r < DAT_14d45098):
-        e = g_MobData entry of r.ID; if none: log "…mcm_Load : Null inf" (fatal log)
+        e = mobdatabox entry of r.ID; if none: log "…mcm_Load : Null inf" (fatal log)
         for each of the 7 table names (char[20], compared as 5 dwords: TableNameCompareArgument FUN_006470f0):
             rec = record of that table with MobIndex == MobInfo.InxName (FUN_00647c00); if none: continue
             if slot already set: log "…mcm_Load : Duplicate entry"          # cannot happen: each mob is visited once
@@ -2146,12 +2251,12 @@ Always::meb_Routine                                  FUN_0057b9d0
     stay
 
 MobExplosionBase::meb_Vanish(s, sec)                                            @ FUN_004a4110
-    s.vt[0xf7c](sec)       # ShineServant SetSuicide FUN_004a3490: state = Base, deathTime = g_Now + sec × 10,
+    s.vt[0xf7c](sec)       # ShineServant ShineServant::sm_serv_VanishReserv FUN_004a3490: state = Base, deathTime = g_Now + sec × 10,
                            #   vt 0x24, AxialListMobSuicide::alms_SelfKill(s) (part 8)
 
 MobExplosionBase::meb_Explosion(s, row, master) → bool                          @ FUN_004a7960
     sds_Initialize(damage sender DAT_0087efc4)                        (Z03 §5)
-    if not s or not master or row.skill == 0xFFFF or not (sk = SkillDataBox_Find(row.skill)): return false
+    if not s or not master or row.skill == 0xFFFF or not (sk = SkillDataBox::operator[](row.skill)): return false
     stat matrix ← the servant's MobWeapon row of that skill (as so_mob_SkillParameterSet, §8.1)
     row.blastMode: 1 smo_SkillBash_Blast_Trap_Loc(s, s.pos, sk)   (FUN_005835e0)
                    2 smo_SkillBash_Blast_Trap_Obj(s, s, sk)       (FUN_005838a0)
@@ -2190,7 +2295,7 @@ The only reader is `ItemDropFromMob::DropItemListForSpecies::dilfs_ItemDrop` FUN
 
 ```pseudo
 ShineMob::sm_IBuffToBuffee(m)                                                   @ FUN_005d48c0
-    if g_Pulse5s >= g_Now: return                      # once per 5 s (§1.4)
+    if g_ServentBuffBossTable.sbbt_NextTick >= g_Now: return                      # once per 5 s (§1.4)
     b = ServentBuffBossTable.sbbt_FindBuffer(m.mobId)  # DAT_14d6fca4, FUN_005d47f0: the StateMob.shn row whose
                                                        #   ConditionMobInx is m: {target mob ID, abstate index, abstate, strength}
     if b: so_AllInMap1(m, AxialListMobStateSet{targetMob, abstate, strength, keep 6000 ms})    # FUN_004eb880
@@ -2213,8 +2318,8 @@ Built in the player constructor at p+0x2a9d0 and used by the captivated-player b
 ```pseudo
 mts_Initialize(sel, owner, arg)                                                 @ FUN_004abde0
     sel+0xc = owner;  sel+0x14 = arg;  scan radius (+0x10) = 600;  result block → sel+0x38
-mt_SelectTarget(sel, p)                (vt 0x28)                                @ FUN_004abe10
-    sel.found (+0x40) = 0;  if p: ShineObject_ScanSight(p, sel)        # calls ali_Work per object in sight
+mts_SelectTarget(sel, p)                (vt 0x28)                                @ FUN_004abe10
+    sel.found (+0x40 = PlayerTarget.mts_Object) = 0;  if p: ShineObject::so_AllOfRange_Simple(p, sel)        # calls ali_Work per object in sight
 ali_Work(sel, p, o)                    (vt 0)                                   @ FUN_004add20
     skip unless mdb_CanIKill(o.mobId (vt 0x708), 1 = by a mob) and o.side (vt 0x8cc) ≠ 0
     if o has StaImmortal (291) or StaAdlFLoussierIMT (499): copy o's name to the debug ring DAT_0085dfb0; skip
@@ -2224,7 +2329,7 @@ ali_Work(sel, p, o)                    (vt 0)                                   
 ```
 
 The charmed player therefore attacks the first visible, uncharmed, unprotected **player** in scan order (radius 600 is set
-but `ShineObject_ScanSight` FUN_00553c20 calls `so_AllOfRange_Class1` with range 0, i.e. the whole sight list, and
+but `ShineObject::so_AllOfRange_Simple` FUN_00553c20 calls `so_AllOfRange` with range 0, i.e. the whole sight list, and
 `ali_Work` has no distance test, so the radius is not applied *(inferred: range 0 = sight)*).
 
 ### 8.11 Open points of this section
@@ -2253,20 +2358,20 @@ fear, scripts, skills) start it with `MoveStart` (vt 0x660).
 | +0x0c / +0x10 | +0x198 | start point |
 | +0x14 / +0x18 | +0x1a0 | destination (vt 0x60c returns its address; a player on a mover returns the mover's) |
 | +0x1c | +0x1a8 | start time (`timeGetTime`, ms) |
-| +0x20 | +0x1ac | duration in ms = distance × 1000 / speed (min 1); **non-zero = moving** (vt 0x610 `IsMoving` FUN_005555c0) |
+| +0x20 | +0x1ac | duration in ms = distance × 1000 / speed (min 1); **non-zero = moving** (vt 0x610 `ShineMobileObject::so_mobile_IsInMoving` FUN_005555c0) |
 | +0x24 / +0x28 | | last / previous step time (ms) |
 | +0x2c | | ms of the move already applied |
 | +0x30 / +0x34 | | \|dx\| / dx > 0; +0x38 / +0x3c \|dy\| / dy > 0 |
 
 ```pseudo
-MoveStart(o, dest, speed, kind, backwards)  (vt 0x660, all classes)        @ FUN_00555970
-    o.direction (*o+0x6a, 0..179 in 2° steps) = Direction(backwards ? pos − dest : dest − pos)   @ FUN_00401330
+ShineMobileObject::so_mobile_MoveReserve(o, dest, speed, kind, backwards)  (vt 0x660, all classes)        @ FUN_00555970
+    o.direction (*o+0x6a, 0..179 in 2° steps) = DirectDistanceTable::ddt_DirectSR(backwards ? pos − dest : dest − pos)   @ FUN_00401330
     mm_MoveStart(o+0x18c, dest, speed, kind)                                 @ FUN_004bdcc0
         if speed ≤ 0: return;  if !dest: log "Where am I to go?"; return
         if dest == o.pos: return                                             # nothing is (re)started
         kind, start = o.pos, start/last/prev step time = now, applied = 0, destination = dest
         mm_RecalcSpeed(speed)                                                @ FUN_004bdbe0
-            |dx|, |dy|, signs; duration = Distance(dx, dy) × 1000 / speed (≥ 1); speed stored
+            |dx|, |dy|, signs; duration = ddt_Distance(dx, dy) × 1000 / speed (≥ 1); speed stored
             speed ≤ 0: log "mm_RecalcSpeed : speed zero"
 Reset(mm)  (inlined in many places)                                          @ FUN_0043f780
     if kind ≠ 3: kind = 0; times, duration, applied, speed = 0; destination = o.pos
@@ -2289,7 +2394,7 @@ mm_Step(mm, force)            # called by so_Routine every tick while moving (§
     applied = (elapsed − applied < 100) ? elapsed : applied + 100
     loop while applied ≤ elapsed:                       # walks the time in slices of at most 100 ms
         point = (applied == duration) ? destination : start ± |d| × applied / duration (per axis)
-        if o.IsInFear (vt 0x9e8, +0x1e78 bit 2) and (no map or BlockA(point) or BlockB(point)): stop (see above); return
+        if o.IsInFear (vt 0x9e8, +0x1e78 bit 2) and (no map or mbi_IsAttackBlock(point) or mbi_IsMoveBlock(point)): stop (see above); return
         if !o.smo_BlockCheck(point) (vt 0xf40, §9.2): return
         old = o.pos
         smo_NewObjBriefInfoChange(o, point)             # §9.6: objects that come into sight
@@ -2330,8 +2435,8 @@ Cell size: 50/8 = **6.25 units**; map size in units = bytesPerRow × 50 (x) and 
 both; all 158 `.shbd` of 2016 are square). Also built at load: the `BlockDistribute` quadtree (+0x42c, §9.4).
 
 ```pseudo
-BlockA(map, x, y)  = .shab bit at cell (x·8/50, y·8/50); outside the map → blocked; no .shab → free     @ FUN_0049df00
-BlockB(map, x, y)  = .shbd|.shab bit; outside → blocked                                               @ FUN_0049df70
+mbi_IsAttackBlock(map, x, y)  = .shab bit at cell (x·8/50, y·8/50); outside the map → blocked; no .shab → free     @ FUN_0049df00
+mbi_IsMoveBlock(map, x, y)  = .shbd|.shab bit; outside → blocked                                               @ FUN_0049df70
 mbi_OccupCellCheck(map, x, y, r)                                                                      @ FUN_0049e230
     true when any cell in the (2r+1)² square around (x, y) is inside the map and free in .shbd   # Z02 CellFree uses r = 1
 mbi_DoorAction(map, name[32], action)                                                                 @ FUN_0049ec60
@@ -2354,9 +2459,9 @@ ShineMobileObject.smo_BlockCheck / smo_StopBlockCheck: return true            @ 
     # mobs, NPCs, servants, pets never test blocks while moving: their paths are checked when planned (§7, §9.3)
 ShinePlayer.smo_BlockCheck(p, point)                                          @ FUN_004bec00
     if no map: Reset; StopHere; ReinforceStopHere (0x204A); return false
-    if !BlockA(point) and !BlockB(point) (g_MoveBlockCheck FUN_004be3f0): lastGood (+0x2a918/+0x2a91c) = p.pos; return true
+    if !mbi_IsAttackBlock(point) and !mbi_IsMoveBlock(point) (sp_MoveBlockCheck FUN_004be3f0): lastGood = p.sp_EntrancePoint (+0x2a918/+0x2a91c) = p.pos; return true
     if dist²(p.pos, lastGood) > 899:                  # more than ~30 units into blocked cells
-        if (point ± 10 on x or y) all four blocked (g_FindEmpty FUN_004be4c0; a free one becomes lastGood):
+        if (point ± 10 on x or y) all four blocked (sp_MoveFindEmpty FUN_004be4c0; a free one becomes lastGood):
             SetPosition(p, lastGood); Reset; StopHere; ReinforceStopHere; return false
     return true                                      # the step onto the blocked cell is accepted
 ShinePlayer.smo_StopBlockCheck(p)  (Z02 "StopBlockCheck")                      @ FUN_004bee40
@@ -2376,7 +2481,7 @@ units of the point; the client is told with 0x2013 + 0x204A.
 
 ```pseudo
 so_FindBlockLocateFrom(from, to, maxDist, out, blockedFn)                     @ FUN_004be1c0
-    if Distance(from, to) > maxDist + 10: return false
+    if ddt_Distance(from, to) > maxDist + 10: return false
     out = from; n = Distance/8 + 1
     for k = 1..n: q = from + (to − from)·k/n; if blockedFn(q): break; out = q
     return true                                      # out = last free point on the line (from if the first step is blocked)
@@ -2384,10 +2489,10 @@ so_FindBlockLocate(o, to, maxDist, out, fn) = so_FindBlockLocateFrom(o.pos, …)
 FieldMap.fm_FindBlockLocation(from, maxDist, to, out, fn)                     @ FUN_004630f0
     same walk with n = Distance/16 + 1; returns 2 = too far, 1 = stopped at a block, 0 = reached `to`
 FieldMap.fm_IsStraightPath(a, b, fn) / Navigator::VirtualMap::vm_IsStreight(a, b)   @ FUN_004636e0 / FUN_005ca2f0
-    true if dist² < 25; else false if the midpoint is blocked (fn / BlockA), else both halves recursively
+    true if dist² < 25; else false if the midpoint is blocked (fn / mbi_IsAttackBlock), else both halves recursively
 ```
 
-`vm_IsStreight` and the Navigator test **only .shab** (BlockA): mob paths ignore `.shbd` walls (and closed doors) unless
+`vm_IsStreight` and the Navigator test **only .shab** (mbi_IsAttackBlock): mob paths ignore `.shbd` walls (and closed doors) unless
 the map also has a `.shab`; the per-step check does not run for mobs either. All 8 maps with a `.shab` and the 150
 without are treated so *(inferred consequence; whether the 150 maps then let mobs walk through walls was not checked in a
 capture)*.
@@ -2422,7 +2527,7 @@ smo_RunInFear(o)  (from so_Routine when feared and not rooted, §5.5)          @
     if moving: mm_Step(o.mm, 0); return
     dir = next value of the fear ring DAT_14f722d0 (index DAT_14f7a2d0) × 180 / 64
     target = o.pos + 320 units in direction dir
-    if so_FindBlockLocate(o, target, 450, &q, BlockB): so_MoveByServer(o, q, 0x1A, 0x49, run, 2)
+    if so_FindBlockLocate(o, target, 450, &q, mbi_IsMoveBlock): so_MoveByServer(o, q, 0x1A, 0x49, run, 2)
 so_mobile_SpeedChange(o)  (vt 0x7bc, from so_Routine when parameters changed)  @ FUN_00435ec0
     if kind == 1 and speed ≠ GetWalkSpeed: MoveStart(o, destination, walk speed); RememberMove 0x18;
         broadcast 0x2018 SOMEONEMOVEWALK { handle, pos, destination, speed, moveattr }
@@ -2453,10 +2558,10 @@ skill effects). Client 0x2069 (FUN_004a4180): `ClearTraceMove`, sets walk/run sp
 smo_ShootMeTo(o, dest)  (skill bash "shoot me" to a location)                 @ FUN_00459940
     t = AbState 391 StaBodyForce row's keep time (+0x30 → +0x2b), default 1000
     set abstate 391 (vt 0x638), brief bit, broadcast, inform (vt 0x3f0); same for 350 StaCannotControl
-    speed = Distance(o.pos, dest) × 1000 / t (100 if t == 0); o.so_ReinforceMove(dest, speed, 0, 0, 1)
+    speed = ddt_Distance(o.pos, dest) × 1000 / t (100 if t == 0); o.so_ReinforceMove(dest, speed, 0, 0, 1)
 smo_WarpTo(o, dest, skillRow)  (dash / blink skills)                          @ FUN_004a7de0
     dest.x += 5
-    if !so_FindBlockLocate(o, dest, skillRow+0xdc, &q, BlockB): return
+    if !so_FindBlockLocate(o, dest, skillRow+0xdc, &q, mbi_IsMoveBlock): return
     kind = 0; StopHere; NewObjBriefInfoChange(q); SetPosition(q); OldObjectDelete(old)
     o ← 0x2450 NC_BAT_SKILLBASH_HIT_FLD_START_CMD { u16 skillId, u32 dest.x, dest.y, u16 counter++ (DAT_0087efe4 & 0x7fff) }
         # to the warping object only; the log text on failure says "smo_SkillBash_BlastA" (copied)
@@ -2466,7 +2571,7 @@ smo_WarpForward(o, skillRow): dest = o.pos + skillRow+0xdc units in o's directio
 smo_JumpTo(o, target, skillRow, _)  (skill blast "jump")                      @ FUN_0057db20
     v = target − o.pos scaled to (row+0x248 == 1 ? |v| − row+0x24c : |v| + row+0x204)   # land short of / beyond the target
     land = o.pos + v
-    if so_FindBlockLocateFrom(target, land, that length, &q, BlockB) and the straight walk o.pos → q has no BlockA cell:
+    if so_FindBlockLocateFrom(target, land, that length, &q, mbi_IsMoveBlock) and the straight walk o.pos → q has no mbi_IsAttackBlock cell:
         StopHere; NewObj/SetPosition/OldObj; broadcast 0x482D NC_SKILL_JUMP_CMD { u16 nObject, From, To, u8 nDirect, u16 SkillID }
         Reset(o.mm); return true
     return false
@@ -2475,7 +2580,7 @@ smo_JumpTo(o, target, skillRow, _)  (skill blast "jump")                      @ 
 `smo_ShadowStep` FUN_0045ad10 (0x206A REINFORCEMOVEBYPATH, Z03 §5) builds its curved path with `RadianMoveTrack`:
 `rmt_Calculate` FUN_00460450 turns the angle between the facing and the target into an arc and `rmt_MakePath`
 FUN_00460250 splits it recursively (≤ 30 levels, ≤ 19 direction steps per piece) into points whose chords pass
-`FieldMap_fm_IsStreight` (both arc directions are tried).
+`FieldMap::fm_IsStreight` (both arc directions are tried).
 
 **Teleports.**
 
@@ -2485,11 +2590,11 @@ ShineMob.smo_Teleport(m, xy)  (vt 0x6d4 for non-players)                      @ 
     if fm_Marking(map, m) fails: log "smo_Teleport : Fail"; mode = 3 (dead); +0x1ec4 = 0
     if m has a brief packet (+0x1f90 → +4 → +0x24): full brief exchange around m (FUN_00441f60, so_ExchageBriefInfo)
 ShinePlayer.smo_Teleport(p, xy)  (vt 0x6d4 player)                            @ FUN_0057d1d0
-    kind = 0; StopHere; SetPosition; ShinePlayer_ReExchangeBriefInfo; OldObjectDelete(old); Reset; SendMoveFail (vt 0xa4c)
-smo_Teleport()  (vt 0x6d8, random spot)                                       @ FUN_0057a8b0
+    kind = 0; StopHere; SetPosition; ShinePlayer::sp_ReSetSendMyBriefInfo; OldObjectDelete(old); Reset; SendMoveFail (vt 0xa4c)
+so_mobile_Teleport()  (vt 0x6d8, random spot)                                       @ FUN_0057a8b0
     q = BlockDistribute random free spot of the map (FUN_00438960, §9.4); vt 0x6d4(q)
     callers: so_Routine (§5.5 table), ShineTeleport script node FUN_004f4cc0, cCastTeleport FUN_005e5b10, ac_CastTeleport FUN_004229b0, FUN_00428730
-SetPositionWithSight(o, x, y, dir)  (vt 0xc98, only if o+0x162)               @ FUN_0045a000
+ShineMobileObject::so_smo_SetLocation(o, x, y, dir)  (vt 0xc98, only if o+0x162)               @ FUN_0045a000
     NewObjBriefInfoChange; direction = dir; SetPosition; OldObjectDelete
 ```
 
@@ -2503,7 +2608,7 @@ dropped. The tree is built over x ∈ [0, map height] and y ∈ [0, map width] (
 because every 2016 map is square).
 
 ```pseudo
-RandomFreeSpot(tree)                                                         @ FUN_00438960
+BlockDistribute::BlockingDistribute::bd_FindEmptyCoord(tree)                                                         @ FUN_00438960
     node = root
     while node has children:
         pick a child weighted by its free-leaf count (Random 0..999 against the per-mille shares; 10 tries, else the first child)
@@ -2515,11 +2620,11 @@ Used by `smo_Teleport` vt 0x6d8, `&linkto` (Z11) and the script statement `os_Ob
 ### 9.5 Mob paths: Navigator and MobRoam
 
 **Navigator** (`Navigator::MapNavigator` at field+0xa4, grid step at +0xc, `PathFindBuffer` at +4; used only when
-`g_UseNavigator` DAT_0084cfb4 is set, §7.3):
+`g_NewBlockRule` DAT_0084cfb4 is set, §7.3):
 
 ```pseudo
 mn_PathFind(nav, from, to, outPath)                                           @ FUN_005c9ee0
-    if to is blocked (vm_IsBlocked = BlockA FUN_005ca230): mn_ExitFromBlock FUN_005c8ab0 moves `to` to the first free
+    if to is blocked (vm_IsBlocked = mbi_IsAttackBlock FUN_005ca230): mn_ExitFromBlock FUN_005c8ab0 moves `to` to the first free
         point on growing squares (1..49 units); none → return −1
     PathAnalyzer.pa_Analyze FUN_005c9870: points [from, first block on from→to (vm_FindBlock FUN_005ca470 via
         fm_FindBlockLocation), first block on to→from, to]  (2 points when the line is free)
@@ -2546,7 +2651,7 @@ so_mob_RoamingPathSet(m, path): m+0x1eb8 = path; if path: index (+0x1ebc) = 1   
 sm_NextPathPoint(m, &dx, &dy, &dist, &advanced)  (used by mab_RandomDirectWalk, §7.2)   @ FUN_004b7480
     no path or index ≥ count: return false
     p = path[index & 0x7fff]
-    if Distance(m, p) ≤ 100: AdvanceIndex(m+0x1ebc, path); p = new point; clear "was chasing" (+0x24ac bit 3); advanced = 1
+    if ddt_Distance(m, p) ≤ 100: AdvanceIndex(m+0x1ebc, path); p = new point; clear "was chasing" (+0x24ac bit 3); advanced = 1
     dx, dy, dist = p − m.pos; spawn point (+0x249c/+0x24a0) = p              # leash and "go home" follow the path
     return true
 AdvanceIndex(idx, path)                                                     @ FUN_004b71f0
@@ -2554,7 +2659,7 @@ AdvanceIndex(idx, path)                                                     @ FU
     else index+1; at the end: walk back (bit 15, index = count − 2)
         EventIndex of the reached point (first 20 bytes): "-" nothing; "return" → walk back from here;
         "rotate" → index 0 (loop)
-ShineMob_SpawnPointFromPath (vt 0xf50): spawn point = current path point          @ FUN_004b7690
+ShineMob::smo_RegenSpotAsNextRoamingSpot (vt 0xf50): spawn point = current path point          @ FUN_004b7690
 ```
 
 **Scenario moves** (NPCs and bandits moved by map scripts):
@@ -2586,9 +2691,9 @@ fm_Relink(map)                                                                @ 
     object again (§5.7)
 ```
 
-`so_AllOfRange_Class0/1(o, stamp, centre, range, …, work, includeSelf, skipHandle)` FUN_0054baf0 / FUN_0054bc80: range
+`so_AllOfRange(o, stamp, centre, range, …, work, includeSelf, skipHandle)`, two overloads FUN_0054baf0 / FUN_0054bc80 (Z01 named them `…_Class0` / `…_Class1`): range
 0 means the sight radius = MapInfo.Sight (field+0x10 → +0x48), 99,999,999 when o+0x163 == 1 or field+0x124 == 1. It
-calls the map's query function field+0x88; for normal maps `so_AllOfRangeNomal_Class2` FUN_0054c900:
+calls the map's query function field+0x88; for normal maps `so_AllOfRangeNomal` FUN_0054c900:
 
 ```pseudo
     walk o's X list both ways while |Δx| < range, stamping each object (obj+0x2e + depth·4 = stamp; nesting depth DAT_0074d71c)
@@ -2599,20 +2704,20 @@ calls the map's query function field+0x88; for normal maps `so_AllOfRangeNomal_C
     > 10000 steps on one list: log "Too many loop" and stop; a node pointing at itself: o.vt[0x8a0](1..4) and fm_Relink
 ```
 
-(Mini-house maps use `so_AllOfRangeMiniHouse_Class4` FUN_00553f60 *(inferred from the name; not read)*.)
+(Mini-house maps use `so_AllOfRangeMiniHouse` FUN_00553f60 *(inferred from the name; not read)*.)
 
 **Appear and disappear on every step.** `mm_Step`, `smo_WarpTo`, `smo_JumpTo`, `ShinePlayer.smo_Teleport` and vt 0xc98
 wrap `SetPosition` like this:
 
 ```pseudo
 smo_NewObjBriefInfoChange(o, newPos)                                          @ FUN_004bdef0
-    so_AllOfRange_Class1(o, around newPos, sight, AxialListBriefExchangerAtMove)
+    so_AllOfRange(o, around newPos, sight, AxialListBriefExchangerAtMove)
     ali_Work(o, other)                                                        @ FUN_004bdde0
         s = MapInfo.Sight² (0xFFFFFFFF on unlimited maps); if dist²(o's *old* position, other) < s: skip   # already in sight
         if SubLayer_CanSee(o, other): o.so_SendMyBriefInfo(other) (vt 0x4c8, Z02 §5) + o's abstate list 0x1C19 to other
         if SubLayer_CanSee(other, o): other.so_SendMyBriefInfo(o) + other's abstates to o
 smo_OldObjectDelete(o, oldPos)                                                @ FUN_004be0d0
-    so_AllOfRange_Class1(o, around oldPos, sight, AxialListBriefDeleteAtMove)
+    so_AllOfRange(o, around oldPos, sight, AxialListBriefDeleteAtMove)
     ali_Work(o, other)                                                        @ FUN_004bdfe0
         if other is an NPC (kind 4): skip                                     # NPCs are never removed by moving
         if dist²(o's *new* position, other) < s: skip                          # still in sight
@@ -2635,7 +2740,7 @@ deleted/announced at the map radius by moves *(inferred from the two formulas; n
 
 (original bug) Z09-B13: in both delete workers the second send ("tell o that other left") calls
 `o.sendObject.pcb_Append(other, packet)` with **other** as the first argument (the exchanger passes `o`). The packet still
-lands in o's buffer, but when that buffer is full (> 0x17ff bytes) `PacketContainer_pcb_Append` FUN_004c8b20 flushes it
+lands in o's buffer, but when that buffer is full (> 0x17ff bytes) `PacketContainer::pcb_Append` FUN_004c8b20 flushes it
 to `other.GetClientSession()` (vt 0xa70): to the other player's client, or to no session (0) when other is a mob.
 
 Client (C01): `On_NC_BRIEFINFO_BRIEFINFODELETE_CMD` FUN_004b99f0 removes NPC/resource/gate effects, puts the handle into
@@ -2653,7 +2758,7 @@ value is a bool here: players FUN_00557240 = mode ≠ 3 (alive); mobs FUN_005565
 
 - `MainChar+0x20 / +0x2c` (client 0x2049 guard) and player byte +0x7f36 (cleared by pushes) are not identified.
 - The meaning of `GetParam()+0xcce` bits 0/1 (which abstates set them): Z03 §6.
-- `so_AllOfRangeMiniHouse_Class4` (mini-house interiors) and field+0x88 selection (FUN_00464bc0 map init): Z06/Z01.
+- `so_AllOfRangeMiniHouse` (mini-house interiors) and field+0x88 selection (FUN_00464bc0 map init): Z06/Z01.
 - Callers of vt 0xc98 (`SetPositionWithSight`) were not listed (sweep).
 
 ## 10. Spawns: MobHatchery, breeder groups, breeders, script spawners
@@ -2689,13 +2794,13 @@ Not zone data: `MobNoFadeIn.shn` (`MobInx` list of projectile-like mobs) is load
 ### 10.2 Objects
 
 ```pseudo
-g_MobHatchery  DAT_0da28ad0 → MobHatchery
+mobhatchery  DAT_0da28ad0 → MobHatchery
     +0x19b8000  ObjectManager of MobBreederGroup (List: +4 capacity, +8 entries {ptr, u16 next, u16 prev, u8 used},
                 +0xc free head, +0xe used head, +0x14 count); groups are 0x19b8 bytes, inline → 4096 groups *(inferred
                 from 0x19b8000 / 0x19b8)*. Group-list alloc overrides FUN_004b2260 / FUN_004b22a0 (vt slots, `l_AllocA` /
                 `l_AllocZ` of the list) set the group key to "Def".
 
-MobBreederGroup (ctor `mb_SetGroup` FUN_004b3ce0, vftable MobRegenClass::MobBreederGroup; copy FUN_004b2af0)
+MobBreederGroup (ctor `MobBreederGroup::MobBreederGroup` FUN_004b3ce0 (our earlier name `mb_SetGroup`), vftable MobRegenClass::MobBreederGroup; copy FUN_004b2af0)
     +0x00  List<MobBreeder> header (capacity 64, count u16 +0x14)
     +0x18  64 × MobBreeder (0x64 bytes each)          "Too many mob in regengroup" when full
     +0x1918 name[20] (GroupIndex)        +0x192c IsFamily char ('Y' for file / script groups; 0/1 for mh_MobBreed)
@@ -2740,7 +2845,7 @@ MobHatchery::mh_Load(h, fieldRow, map[12])                                      
         if g.CenterX ≥ 0xFFFFFF or g.CenterY ≥ 0xFFFFFF: log "mh_Load : Invalid LoginLoc"; continue
         grp = new group  (none: FATAL "MobHatchery::mh_Load : Too many MobRegenGroup")
         mbg_Set(grp, g.GroupIndex, map, g.IsFamily, &g.CenterX)                     # below
-        grp.roam (+0x19b4) = MobRoamingSet.mrs_Load(&DAT_0da29330, fieldRow, g)      # §9.5
+        grp.roam (+0x19b4) = roamingpaths.mrs_Load(&DAT_0da29330, fieldRow, g)      # §9.5
     for each row r of table "MobRegen":
         (current row DAT_0da28adc, map DAT_0da28ad8)
         if ForEach(group, mbg_StoreData) found no group: log "RegenMob without RegenGroup in <map>",
@@ -2760,7 +2865,7 @@ mbg_StoreData(grp)  (ForEach functor; true = keep searching)                    
         # → no other group matches → FATAL "RegenMob without RegenGroup" (a bad regen time stops the zone)
     repeat r.MobNum times:
         b = new breeder in grp  (none: log + FATAL "mbg_StoreData : Too many mob in regengroup")
-        mobId = g_MobData.IdByName(r.MobIndex) (FUN_0063cc30 on DAT_14d450a0); unknown: log "Wrong mob name", mobId = 1
+        mobId = mobdatabox.IdByName(r.MobIndex) (FUN_0063cc30 on DAT_14d450a0); unknown: log "Wrong mob name", mobId = 1
         if grp.IsFamily == 'Y':
             first breeder → grp.leader; later ones → mb_SetLeader(b, grp.leader)
             fmm_Regist(g_FamilyMobManager, grp.leader, mobId, r.KillNum)            # §10.5
@@ -2774,13 +2879,13 @@ at the first regen tick after start-up (g_Now is far larger) *(inferred: probabl
 
 ### 10.4 The regen tick: `EventMobRegen`
 
-The static object `EventMobRegen` (DAT_14d41eb4, vftable 0x6c25fc, ctor FUN_004b0e00 from a static initialiser) is put
+The static object `eventmobregen` (DAT_14d41eb4, vftable 0x6c25fc, ctor FUN_004b0e00 from a static initialiser) is put
 into the event-reserve list (§1.4) by `zs_start_open` with first run `g_Now + 10` and **repeat 10 (1 s)**. (The other
 event reserved there repeats every 300 tenths = 30 s; Z01 §2.2 says "300 s and 10 s": both values are tenths.)
 
 ```pseudo
 EventMobRegen::erb_happen()                                                          @ FUN_004b56a0
-    ForEach(g_MobHatchery+0x19b8000, mbg_Routine)
+    ForEach(mobhatchery+0x19b8000, mbg_Routine)
 
 mbg_Routine(grp, list, idx)                                                          @ FUN_004b55a0
     if grp.count == 0: list.vt[0xc](idx)          # empty group (all script breeders used up) is freed
@@ -2829,8 +2934,8 @@ mb_regen(b, leader) → handle | 0xFFFF                                         
     dirDeg = RandomRing(72) × 5                            # ring DAT_14fb2310: 0, 5, … 355
     if grp.roam: pos = first point of the roaming path (FUN_004b77c0)
     if pos.x ≥ 0xFFFFFF or pos.y ≥ 0xFFFFFF: log "mb_regen : Invalid locate" + group name, free(o, reason 0x24), return 0xFFFF
-    if o.so_mob_Regenerate(grp.map, pos, dirDeg, h, b.mobId, briefArg = b.bandit, breeder = DAT_0da2932c (always 0),
-                           familyLeaderObj, regenSlot = b, level = b.level, 1, 0, 0) ≠ 0:   # §5.3
+    if o.so_mob_Regenerate(grp.map, pos, dirDeg, h, b.mobId, banditBrief = b.bandit, mobRegnum = mobregnum DAT_0da2932c (always 0),
+                           familyLeaderObj, breeder = b, level = b.level, 1, 0) ≠ 0:   # §5.3
         free(o, reason 0x25), return 0xFFFF
     o.vt[0xa14](grp.roam)                                  # roaming path (§9.5)
     o.SetLifeTime(MobLifeTime of the mob, entry[9]) (vt 0xabc, §5.4) when the mob has a data entry
@@ -2892,7 +2997,7 @@ mbg_MobBreed(grp, map, pos, outArg, mobId, _, mobNum, regenSec, family, count, k
 
 mb_MobBreed(b, grp, mobId, regenSec, count, leader, bandit, level) → bool            @ FUN_004b6150
     b.level = level; b.group = grp; b.mobId = mobId
-    g_MobData[mobId] missing: log "mb_MobBreed : Invalid mob index", return false
+    mobdatabox[mobId] missing: log "mb_MobBreed : Invalid mob index", return false
     if leader and leader ≠ b: insert b right after the leader in the chain; fmm_Regist(leader, mobId, 3)
     mb_Setregentime(b, regenSec)        # fixed regen time, no adaptation (Min = Max = Standard)
     b.handle = 0xFFFF; b.count = count; b.waiting = 1; b.nextAt = regenSec × 10 (≈ now: spawns on the next tick); b.bandit = bandit
@@ -2907,7 +3012,7 @@ breeder spawns once; after its mob is gone the breeder, then the empty group, is
 MobHatchery::mh_ScriptBreed(h, map, regenRow, groupRow, key[20])                    @ FUN_004b3e40
     grp = new group (none: log "mh_ScriptBreed : Too many MobRegenGroup", return)
     mbg_Set(grp, regenRow.RegenIndex, map, groupRow.IsFamily, &groupRow.CenterX)   # §10.3
-    grp.roam = MobRoamingSet.mrs_Get(&DAT_0da29330, regenRow.RegenIndex)          # cached roaming path by group name
+    grp.roam = roamingpaths.mrs_Get(&DAT_0da29330, regenRow.RegenIndex)          # cached roaming path by group name
     mbg_ScriptDataStore(grp, regenRow, key)
 
 mbg_ScriptDataStore(grp, r, key)                                                     @ FUN_004b3820
@@ -2921,7 +3026,7 @@ mbg_ScriptDataStore(grp, r, key)                                                
 ```
 
 The roaming paths that script groups find with `mrs_Get` are preloaded at start-up (stage zs_start_sun) by FUN_004b8690
-*(ours: `MobRoamingSet_LoadScriptPaths`)*: every `RoamingFile` (string, column type 2 checked: "sbs_LoadScripts : Type
+= `MobRoaming::MobRoamingSet::mrs_Load` *(pdb2016; our earlier name `MobRoamingSet_LoadScriptPaths`)*: every `RoamingFile` (string, column type 2 checked: "sbs_LoadScripts : Type
 error") of table `RoamingData` in `World/PineScript.txt` is loaded with `mrs_Load` (FATAL "Roaming Data(in
 PineScript.txt)not found" when missing; FATAL "Option read error" without the file).
 
@@ -2931,14 +3036,14 @@ centre, restored afterwards; part 15), Lua `cGroupRegenInstance(map, regenIndex)
 true). All pass key "Def" and take the rows from the `PineScriptMobRegenerator`:
 
 ```pseudo
-g_PineScriptMobRegenerator DAT_13249728 = { entries (0x90 each: group row 0x29 + MobRegen row 0x67 at +0x29), u16 capacity
+scriptmobregen DAT_13249728 = { entries (0x90 each: group row 0x29 + MobRegen row 0x67 at +0x29), u16 capacity
     +4 (doubles when full; "psmr_Store : Memory overflow"), u16 count +6, name index +8 }
 psmr_find(psmr, file, regenIndex) → entry | 0                                        @ FUN_004e7bd0
     key = "<file>:<regenIndex>" (psmr_makeindex FUN_004e7640); not cached → psmr_Load(psmr, file); look up again
 psmr_Load(psmr, file)                                                                @ FUN_004e7990
-    t = bsearch(file (12 bytes), g_KQRegenTables DAT_0da28ff0, count DAT_0da29310)     # loaded at start-up, below
+    t = bsearch(file (12 bytes), kqregentable DAT_0da28ff0, count DAT_0da29310)     # loaded at start-up, below
     for each MobRegen row r of t not yet cached: g = the MobRegenGroup row with GroupIndex = r.RegenIndex
-        (ScriptFile_FindRecord); missing: log "psmr_Load : Group name not found"; else psmr_Store(psmr, r, g, key) @ FUN_004e7790
+        (OptionReader::or_SelectFrom); missing: log "psmr_Load : Group name not found"; else psmr_Store(psmr, r, g, key) @ FUN_004e7790
 KQRegenTable::kqrt_Load (all)  FUN_004b3220: every MobRegen/KingdomQuest/*.txt, then every MobRegen/Instant/*.txt
     ("Path Invalid" FATAL when a directory is missing) → FUN_004b26b0 per file: name without extension (12 bytes) + parsed
     ScriptFile, ≤ 50 files ("Too many kq regen table" FATAL), "Error found" FATAL when the file cannot be parsed; sorted
@@ -2961,8 +3066,8 @@ cRegenGroupActiv(map, groupName, on = 1)  @ FUN_005efdc0   every breeder.active 
 
 ### 10.7 Direct spawns from Lua (`cMobRegen_*`)
 
-All allocate a pool `ShineMob` (kind 5), call `so_mob_Regenerate(map, x, y, dir, h, mobId, briefArg 0, breeder −1,
-leader 0, slot 0, level −1, flag 0, layerA, layerB)`, set the MobLifeTime (vt 0xabc) and push the handle (one return
+All allocate a pool `ShineMob` (kind 5), call `so_mob_Regenerate(map, x, y, dir, h, mobId, banditBrief 0, mobRegnum −1,
+leader 0, breeder 0, level −1, flag 0, layerRegNum)`, set the MobLifeTime (vt 0xabc) and push the handle (one return
 value); on a failed Regenerate they log and free the slot (reason 0x16) and return nothing. No breeder: the mob never
 respawns. Map = `FUN_00466a60(name)` (field by name) whose centre object exists (`fm_GetCenterObject`).
 
@@ -3007,7 +3112,7 @@ spawns left, handle, alive mark, waiting, nextAt, g_Now).
 Not a world object: the content generator for "item chest" items (item class 15), used when such an item is bought
 (Z04 §`ii_BuyAll` → `sp_MagicContainerMake`) and for KQ rewards (`sp_KQReward` FUN_0052da70, Z16).
 
-`World/TreasureReward.txt` (`MagicContainer::mc_Load` FUN_0049c7f0 into DAT_0d67a1f0, stage zs_start_tough):
+`World/TreasureReward.txt` (`MagicContainer::mc_Load` FUN_0049c7f0 into `magiccontainer` DAT_0d67a1f0, stage zs_start_tough):
 
 | Table | Columns |
 |---|---|
@@ -3023,15 +3128,15 @@ item-use function "UsePresentBox"; the dummy card gets "UseSkill" and an `ItemCo
 ShinePlayer::sp_MagicContainerMake(p, item, priceLo, priceHi)                       @ FUN_0049c050
     item class (attribute class vt 0x28) ≠ 15: return
     chest = TreasureChestMaker(item.id, kind 6, 0)   @ FUN_00595a40: ItemData.class must be 15 ("Not ItemChest"), key =
-            ItemKey_Make(id, 6, zone, world); +1000 count = 1 (the chest itself)
+            ItemTotalInformation::iti_mkregnum(id, 6, zone, world); +1000 count = 1 (the chest itself)
     c = Container row with ItemID = item.id ("sp_MagicContainerMake : Null Container" → return)
     n = MinLot + RandomRing(MaxLot − MinLot + 1)
-    repeat n: roll = Random_Next(g_Rng, 1 000 000); walk the Content rows of c.Index subtracting RewardRate until
+    repeat n: roll = cWell512Random::well512_GetRandom(g_Rng, 1 000 000); walk the Content rows of c.Index subtracting RewardRate until
               roll ≤ rate ("Content Null" / "Content Null2" when none); new item: lot RewardLot ("-L%d"), upgrade
               in [UpgradeLow, UpgradeHigh] ("-U%d", RandomRing(High − Low + 1) when < 100) via attribute vt 0x14;
               key kind 6; tcm_ItemMake(iti) FUN_00595ba0 appends it (≤ 8, "Too many content")
     cell = first empty inventory cell (box 9, FUN_004879d0); none or tcm_PutInto == 0: return (nothing sent)
-    Character DB ← 0x344D NC_ITEMDB_CREATEITEMLIST_REQ {      # PROTO_NC_ITEMDB_CREATEITEMLIST_REQ (pdb2017) matches
+    Character DB ← 0x344D NC_ITEMDB_CREATEITEMLIST_REQ {      # PROTO_NC_ITEMDB_CREATEITEMLIST_REQ (pdb2016) matches
         header { u16 clienthandle = p.handle, u32 charNo }, u32 owner = charNo, u16 lockindex = L.index,
         u16 map = map id of p's map, u64 price = (priceLo, priceHi),
         itemlist (tcm_PutInto FUN_00595f50): u8 count, per item { u8 len, u16 inven, item data }: first = the chest
@@ -3070,9 +3175,9 @@ is Z04 §3.3; `0x303C NC_ITEM_DICE_GAME_START_REQ` is Z04 §12.4; the DB side of
 | `World/<server>/ItemDropTable.txt`, else `World/ItemDropTable.txt` (table `ItemGroup`) | `dic_Load` @ FUN_0048fa30 (part of `DropItemManager::dim_Load`) | per mob ID: 100 record pointers at `cluster+0x10854 + mobId*0x190` | drop lists per mob |
 | `World/<server>/ItemDropGroup.txt`, else `World/ItemDropGroup.txt` (table `ItemDropGroup`) | same function | map name → `DropItemListInGroup` (`DAT_0d55bc30`, sorted by the 20-byte name, lookup FUN_0048e890) | items of a drop group |
 | `BelongDice.shn` (one column `DiceTimeLimit`, 2016 value 15) | FUN_005b3150 → `DAT_132723c4` | first row, byte column | dice time in seconds (default 15) |
-| `ItemDropLog.shn` (one column `ItemID`, 57 items) | `idb_Load` @ FUN_00649780 | `g_ItemData[id]` slot 6 (+0x18) | items whose drop is logged to GameLog (0x0798, D05) |
+| `ItemDropLog.shn` (one column `ItemID`, 57 items) | `idb_Load` @ FUN_00649780 | `itemdatabox[id]` slot 6 (+0x18) | items whose drop is logged to GameLog (0x0798, D05) |
 | `MobAbStateDropSetting.shn` | `lomscad_Load` @ FUN_005d5970 | §8.9 | selects the drop list by the mob's abstates |
-| `ItemInfoServer.shn` columns `DropGroupA` +0x39, `DropGroupB` +0x61, `RandomOptionDropGroup` +0x89, `Vanish` +0xaa, `looting` +0xae (ms) | Z04 | `g_ItemData[id]` slot 1 | group membership, random options, drop timers |
+| `ItemInfoServer.shn` columns `DropGroupA` +0x39, `DropGroupB` +0x61, `RandomOptionDropGroup` +0x89, `Vanish` +0xaa, `looting` +0xae (ms) | Z04 | `itemdatabox[id]` slot 1 | group membership, random options, drop timers |
 
 Both text files are tried in the server's own sub-directory first (the `%s` is the 16-byte server name block passed to
 the loader); a missing file in both places logs `DropItemManager::dim_Load : Error in …` and ends with the fatal path
@@ -3082,7 +3187,7 @@ the loader); a missing file in both places logs `DropItemManager::dim_Load : Err
 
 ```pseudo
 +0x000 MapArea  char[33]   breeder-group filter: "-" = any; else must equal the killing mob's breeder-group name (first 20 bytes)
-+0x021 MobId    char[33]   mob InxName → mob ID (FUN_00419080 on g_MobData); unknown names are skipped silently
++0x021 MobId    char[33]   mob InxName → mob ID (FUN_00419080 on mobdatabox); unknown names are skipped silently
 +0x042 MinLevel u16, +0x044 MaxLevel u16      only in the checksum
 +0x046 AbStateCnt u8       slot 0..99 of the mob's 100 lists (chosen at drop time by sm_BossAbstateGet, §8.9)
 +0x047 MinCen, +0x04b MaxCen, +0x04f CenRate u32   only in the checksum
@@ -3162,7 +3267,7 @@ independently, so one kill can drop several items (up to 45).
 DropItemListInGroup::dilig_Drop(group, killer, mob, looter, lotFactor, upMin, upMax):         @ FUN_0048e260
     if group.count (+0x27ec) == 0: return
     k = RandomRing(count) (uniform 0..count−1; 0 when count > 100);  id = entry[k].itemId
-    item = { key = ItemKey_Make(id, 3, server ids) (FUN ItemKey_Make), id, attr zeroed }
+    item = { key = ItemTotalInformation::iti_mkregnum(id, 3, server ids) (FUN ItemTotalInformation::iti_mkregnum), id, attr zeroed }
     cls = ItemAttr class of id (g_ItemAttrCls)
     if !cls.vt[0x2c](&item, &entry[k].row, rand(1000), mob.mobId (vt 0x708)): return   # builds the attributes from the group
                                                          # row (MinQtty..MaxQtty, Upgrade00..15 weights) *(inferred)*
@@ -3187,14 +3292,14 @@ ShineObject::so_IsDropping(dropper, item, flag, looter, …):                   
     o = som_AllocObject(type 1 drop item); none: log "so_IsDropping : itembuf full"; return false
     r = o.so_ItemDrop(handle, dropper, item, flag, looter)   (vt 0x544; pushes 5 arguments, the callee takes 6)
     r ≠ 0x301: log "so_IsDropping : Drop mark fail"; return false       # the allocated object is not freed here
-    DropItemAnalyzer.dia_Set(DAT_0cf15b40, dropper.mobId, item.id)  @ FUN_00460670       # counts per (mob, item); no reader found
+    dropitemanalyzer.dia_Set(DAT_0cf15b40, dropper.mobId, item.id)  @ FUN_00460670       # counts per (mob, item); no reader found
     if dropper.field: note field+0xc in the ring DAT_0085dfb0 (FUN_00418ec0; same ring as fm_Marking, §5.7)
     return true
 
 ShineDropItem::so_ItemDrop(o, handle, dropper, item, flag, looter, questOnly):              @ FUN_0052a7a0 (vt 0x544)
     dropper has no field: log "Dropper have no map"; return 0x305
     ItemInfo missing:     log "No Item Data"; return 0x305
-    DiceReset(o, 0)                                           # FUN_0052f020, §11.6
+    ShineDropItem::sd_DiceGameBufferReset(o, 0)                                           # FUN_0052f020, §11.6
     o.looter (+0x208) = *looter (12 bytes, §11.4);  o.map key (+0x275) = dropper's field key; +0x289 = 0
     o.pos = dropper.pos (also +0x281 / +0x285);  o.item (+0x18d) = item (0x6f bytes: u64 key, u16 id +0x195, attr)
     o.flag (+0x204) = flag
@@ -3204,9 +3309,9 @@ ShineDropItem::so_ItemDrop(o, handle, dropper, item, flag, looter, questOnly):  
         # FUN_00466470 → fm_Marking(field, o, spacing 25, dropArg 0): spiral search from the dropper's position (§5.7)
     o.layer = dropper.layer;  o.vt[0xe20](questOnly) → +0x28a
     brief (0x1C0A, buffer +0x167, payload +0x189): { handle, itemid, x, y, dropmobhandle = dropper.handle, attr = 0 }
-    sight broadcast: so_AllOfRange_Class0(o, …, so_drpitm_BriefInfo)        @ FUN_00567ff0
+    sight broadcast: so_AllOfRange(o, …, so_drpitm_BriefInfo)        @ FUN_00567ff0
         for each player in range: o.so_drpitm_CanLootingBitSet(p) (vt 0x538 FUN_0052a420, attr bit 3 = CanLooting(p)); p ← brief
-    if ItemDropLog has a row for the item (g_ItemData slot 6 first u32 == id):
+    if ItemDropLog has a row for the item (itemdatabox slot 6 first u32 == id):
         GameLog ← 0x0798 { u16 itemId, u16 lot, u64 key, u16 dropper.vt[0x344](), map key, x, y }  (0x22 bytes; D05)
     return 0x301
 ```
@@ -3258,8 +3363,8 @@ ShineMultiTypeHandle::IsCanItemPick(h, p, item, drop):                 @ FUN_004
     kind 1: same with p's party (party slot +0xb8); "…Not Find Party Loot Type"
             (a player no longer in the party / raid falls through to the next line)
     otherwise: h.id == p.charNo
-so_drpitm_CanLooting(drop, p):  item ID valid in g_ItemData and IsCanItemPick(...) and (questOnly ≠ 1 or p.vt[0xe28](itemId))
-                                # vt 0xe28 = CQuestZone_IsQuestDropItem on the player's quest diary (FUN_00561790)
+so_drpitm_CanLooting(drop, p):  item ID valid in itemdatabox and IsCanItemPick(...) and (questOnly ≠ 1 or p.vt[0xe28](itemId))
+                                # vt 0xe28 = CQuestZone::IsQuestDropItem on the player's quest diary (FUN_00561790)
 
 CLooting::GetItemLootingTypeConVert(rules[4], itemInfo):               @ FUN_00644f60
     ItemInfo +0x62 == 3: 0                                   # *(inferred)* one item class always free
@@ -3274,7 +3379,7 @@ The rule chosen here also drives the pickup handler (Z04 §3.3 rules 0–3).
 ShineDropItem::so_Routine(o):                                           @ FUN_0056ad00 (vt 0x4ac)
     handle check (FUN_005552c0: handle = 0x2904 + pool index, pool 10500..13499): mismatch → log, repair
     if o.item.id == 0xFFFF (taken):  DiceReset(o, 1); o.vt[0x33c](0, 1, 3); som_FreeObject(o, reason 0xd); relink; return
-    if dice timer fires (PeriodTimer_Advance): sd_DiceGameResult(o, 1)  (§11.6)
+    if dice timer fires (TickTimer::CheckUpdateEvent): sd_DiceGameResult(o, 1)  (§11.6)
     if o.looter.id ≠ −1 and g_Now ≥ ownerUntil:  o.looter = {3, −1}; re-broadcast 0x1C0A with fresh pickable bits
     if g_Now > vanishAt:  DiceReset(o, 1); clear item; o.vt[0x33c](0, 1, 3); som_FreeObject(o, reason 0xe)
     slanted-list relink
@@ -3313,7 +3418,7 @@ The party version gives each member at least 1 coin even when the amount is smal
 Entry from the pickup handler (Z04 §3.3, rule 3, FUN_0052ec70):
 
 ```pseudo
-PickupDiceRule(p, drop):                                     @ FUN_0052ec70
+ShinePlayer::sp_DicePicking(p, drop):                                     @ FUN_0052ec70
     item = drop.vt[0x548](); none: p.so_ply_itempickresult(0x343)
     p's party / raid already runs a dice game (party slot +0xcc FUN_006452d0, raid slot +0xcc FUN_0063d4a0): result 0x34d
         "You cannot acquire other items while rolling the dice."
@@ -3332,7 +3437,7 @@ ShineDropItem::so_DiceItemPickInit(drop, p):                 @ FUN_00531020 (vt 
            each player ← 0x303B NC_ITEM_DICE_GAME_CMD { u16 itemhandle = drop.handle, s32 nGameTimesec = DiceTimeLimit }
     return true
 
-0x303C handler (Z04 §12.4) → DiceJoin(drop, p, isYes, &err):  @ FUN_00531690 (vt 0xaa4)
+0x303C handler (Z04 §12.4) → ShineDropItem::so_DiceItemStart(drop, p, isYes, &err):  @ FUN_00531690 (vt 0xaa4)
     err = 0x2000;  p is not a ShinePlayer (RTTI check): err 0x2002 "This character cannot roll the dice."
     p not among the participants: err 0x2003 "You are not authorized to roll the dice."
     already decided: err 0x2005 "The dice are already rolling."
@@ -3365,7 +3470,7 @@ sd_DiceGameSendMsgResult(drop, code, name, roll):            @ FUN_0052ee60
     # client: 0x2008 → "%s acquired the %s item by rolling %d with the dice." when PickItemID is a known item;
     #         other codes → the error text
 
-DiceReset(drop, clearFlag):                                  @ FUN_0052f020
+ShineDropItem::sd_DiceGameBufferReset(drop, clearFlag):                                  @ FUN_0052f020
     dice timer off; for the first participant still found: if clearFlag, clear the dice flag of its raid (FUN_0063d470) or
     party (FUN_00645300); every slot = { 0xFFFF, 0 }
 ```
@@ -3382,10 +3487,10 @@ keeps the flag set until another drop resets it (only possible through that same
 ### 11.7 `DropLocationManager` (spiral placement)
 
 `dlm_Load` FUN_00460980 builds 32 rings of offsets (`SameDistanceCluster`, 12 bytes each: count, capacity, points):
-ring 0 is the single point (0, 0); odd ring r gets 6 points from `sdc_Setdelta(ring, (r+1)/2 × 1024, 0)`, even ring r
-gets `r/2 × 6` points from `r/2` calls `sdc_Setdelta(ring, x, (r/2+1) × 0x4400 / 20)` with x stepping by 1024
-(FUN_004607f0, not opened: the rings form widening bands around the centre *(inferred)*; overflow log
-"DropLoc::SameDistanceCluster::sdc_Setdelta : Buffer overflow").
+ring 0 is the single point (0, 0); odd ring r gets 6 points from `sdc_Setsixpoint(ring, (r+1)/2 × 1024, 0)` FUN_004607f0, even ring r
+gets `r/2 × 6` points from `r/2` calls `sdc_Setsixpoint(ring, x, (r/2+1) × 0x4400 / 20)` with x stepping by 1024
+(not opened: the rings form widening bands around the centre *(inferred)*; overflow log
+"DropLoc::SameDistanceCluster::sdc_Setdelta : Buffer overflow", a log text that keeps an older name).
 `dlm_home(start)` FUN_00460bb0 sets ring = start, index 0; `dlm_next` FUN_00460c20 moves to the next point and, when a ring
 is exhausted, shuffles one random point of the next ring to the front (FUN_00427c30 on the random ring); false after ring
 31. `sdc_Getdelta` FUN_00460910 scales the offset by `spacing / 1024`. `fm_Marking` (§5.7) is the only user, with
@@ -3411,5 +3516,5 @@ is exhausted, shuffles one random point of the next ring to the front (FUN_00427
 - `ItemAttr` class vt 0x2c (how MinQtty/MaxQtty and the `Upgrade00..15` weights become the item's lot and upgrade) was not
   read; the per-class functions are Z04's item model.
 - vt 0x33c(0, 1, 3) on removal is assumed to be the sight-removal broadcast (0x1C0E path of §9.6) *(inferred)*.
-- `DropItemAnalyzer` (DAT_0cf15b40, 256 buckets × 500 `{mobId, itemId, count}`) has no reader in the zone.
+- `dropitemanalyzer` (DAT_0cf15b40, 256 buckets × 500 `{mobId, itemId, count}`) has no reader in the zone.
 - `+0x204` (flag 1 from `so_IsDropping`) is never read by the drop functions found.
