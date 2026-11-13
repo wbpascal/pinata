@@ -9,7 +9,8 @@ Time unit: `g_Now` (DAT_14d41a70) counts **tenths of a second** (Z02 §1); "`g_N
 
 This file is written in parts (status: `docs/plan/status/Z09.md`). Sections so far: §1 main loop and global timers,
 §2 the player tick, §3 GM events, §4 prison (no zone timer), §5 mob object core (data, spawn, routines, NPC, bandit),
-§6 mob AI 1 (brain, target selectors, aggro, battle / recover, calls for help).
+§6 mob AI 1 (brain, target selectors, aggro, battle / recover, calls for help), §7 mob AI 2a (tactic state machine,
+weapons, attack sequences, captivated players, the dead `so_attack` / `so_Bash` path).
 
 ---
 
@@ -514,17 +515,17 @@ Other mob tables loaded elsewhere and read in this part:
 | +0x1f84…+0x1f8c | spawn x, y, dir copied from the brief (vt 0xf6c) |
 | +0x1f90 | → MobDataBox entry (vt 0x70c) |
 | +0x1f94 | u8 level (MobInfo.Level unless the spawn gives one) |
-| +0x1f98 | vector (one u32 per MobWeapon of the mob, zeroed at spawn) (part 4) |
-| +0x1fa8 | −1 at spawn |
-| +0x1fac / +0x1fb0 | record from the bsearch table DAT_0d76e9e8 (0x1bec-byte records keyed by mob ID, FUN_0043f6e0) / 0 (part 4) |
-| +0x1fb4 / +0x1fb6 | 0xFFFF / 0 at spawn |
+| +0x1f98 | per-weapon cooldown: "usable again at" g_Now (one u32 per MobWeapon, zeroed at spawn; §7.4) |
+| +0x1fa8 | current weapon index (−1 at spawn / none; §7.4) |
+| +0x1fac / +0x1fb0 | `MobAttackSequence` record of the mob ID (`g_MobAttackSequence` DAT_0d76e9e8, FUN_0043f6e0) / sequence position (§7.6) |
+| +0x1fb4 / +0x1fb6 | chained NextSkill skill ID (0xFFFF none) / "do not advance the sequence after this use" (§7.6) |
 | +0x1fb8 / +0x1fba | death broadcast sent / killer handle (Z03 §8.1) |
 | +0x1fbc / +0x1fc0 | death time / extra corpse time (vt 0xc3c, `cSetDeadDelayTime`) |
 | +0x1fc4 / +0x1fc8 | brain context: tick argument / self |
 | +0x1fcc | `MobAggroManager` (aggro list, 10 entries) followed by one selector object per `EnemyDetectType` (+0x2124 … +0x21fc, §6.1) |
 | +0x2234 | → active target selector (§6.1; vt +8 per tick, +0x14 reset) |
-| +0x2238 | aggro container (FUN_004b8c80 at spawn) (part 3) |
-| +0x2260 / +0x227c | MobActionWander / MobActionAttack tactic elements (part 3/4) |
+| +0x2238 | tactic set (InMove … Turning, §7.1), bound to the target cell +0x24e0 by FUN_004b8c80 at spawn |
+| +0x2260 / +0x227c | MobActionWander / MobActionAttack tactic elements (§7.1) |
 | +0x22e4 | current tactic state (`MobActionWander`, `MobActionRoaming` 0x84cfc4, `MobActionNoBrain` 0x84cfc8) |
 | +0x22e8 | regen slot of the breeder (+0x4c = time of the last spawn) |
 | +0x22ec | guild number shown with the mob (`so_mob_SetGuildRegNum`, §5.8) |
@@ -1106,8 +1107,8 @@ alsst_SkillBlast_RandomTarget` FUN_00583180 and the skill target scan FUN_0057e6
   the attacker when it is 0xFFFF (Z03 §7), the tactic `MobActionTargetting::mab_Think` (part 4) sets it through
   FUN_004b8930, which on a change raises the map-script interrupt `sim_TargetChange { mob handle, target handle }`
   (FUN_0050c730; not for 0xFFFF). `so_mob_RegenComplete` resets it to 0xFFFF.
-- vt 0x754 (FUN_00556b00) = `tactic.vt[8]()` = handle of the tactic's target (base `MobActionBase` 0xFFFF; the
-  fighting tactics return their target *(inferred)*, part 4); vt 0x75c (FUN_00556b10)
+- vt 0x754 (FUN_00556b00) = `tactic.vt[8]()` = handle of the tactic's target (base `MobActionBase` 0xFFFF; Attack,
+  Chase, BackStep and AvoidOverlap return their target cell, §7.1); vt 0x75c (FUN_00556b10)
   = `tactic.vt[0xc]()` = the target object.
 - **Battle state** `+0x24b0`: 0 idle, 1 battle, 2 recover. `vt 0x588` FUN_00556d70 is "I am fighting":
   `m.lastBattle (+0xfb8) = g_Now`; on the change 0 → 1, if the mob has a MobKillLog row, a map-wide notice
@@ -1267,3 +1268,530 @@ The Lua bindings themselves (argument reading FUN_005f7680 / FUN_005f7ad0, resul
 - `MobChatManager` (`DAT_0084cc84`; `mcm_HelpReqChat`, `mcm_HelpAckChat`, `mcm_DetectBattleChat`, `mcm_DamageChat`) and
   the per-mob-ID objects `DAT_0084cc8c` (= `MobChatManager`+8 *(inferred)*; they give the `+0x1ea8` delay of §5.2) are part 4
   (MobChat).
+
+---
+
+## 7. Mob AI 2a: tactic state machine, weapons, attack sequences
+
+Part 4a. The brain of §6 picks *whom*; the tactic state machine here decides *what to do next* (wander, chase, turn,
+attack, back off, go home), which weapon (normal attack or skill) to use, and when. Script-side setters
+(`so_mob_Skill*AtScript`, weapon rates, `cMobWeaponRate`), mob chat, explosions, cross-counter, boss abstates and the
+damage / heal target checks are §8 (part 4b).
+
+### 7.1 The tactic context and its states
+
+`ShineMob::so_Routine` (§5.4) runs one step per tick: `m.tactic = m.tactic.vt[0](&ctx)`. The context `ctx` is the block
+at **mob+0x1fc4** (`ctx+0 tickArg, ctx+4 → self`); everything below gives context offsets and, in brackets, mob offsets.
+The same block is allocated for a **captivated player** (§7.7), so the code never uses mob offsets directly.
+
+| ctx offset [mob] | Object | Kind |
+|---|---|---|
+| +0x008 [+0x1fcc] | `MobAggroManager` + selectors (§6.1) | |
+| +0x270 [+0x2234] | → active target selector (§6.1) | |
+| +0x274 [+0x2238] | `MobActionInMove` `{vt, next}` | tactic set, built by FUN_00549bc0 (so `+0x2238` is not an "aggro container" as §5.2 said: `FUN_004b8c80(set, cell)` at spawn stores the shared **target cell** `&mob+0x24e0` into every element through vt 0x14) |
+| +0x27c [+0x2240] | `MobActionInMove_Cancelable` `{vt, next}` | |
+| +0x284 [+0x2248] | `MobActionInChase` `{vt, → target, next-on-arrival, next-if-target-moved, target destination x, y}` | |
+| +0x29c [+0x2260] | `MobActionWander` `{vt, timer A {next, period}, timer B, timer C}` (ctor FUN_004b8ad0) | |
+| +0x2b8 [+0x227c] | `MobActionAttack` `{vt, → cell, u32 next attack time, u16 script skill (0xFFFF none), u32 script weapon, → script target}` (ctor FUN_004b9540) | |
+| +0x2d0 [+0x2294] | `MobActionChase` `{vt, → cell}` | |
+| +0x2d8 [+0x229c] | `MobActionBackStep` `{vt, → cell, u8 extra distance}` | |
+| +0x2e4 [+0x22a8] | `MobActionAvoidOverlap` `{vt, → cell}` | |
+| +0x2ec [+0x22b0] | `MobActionWaitSkillEnd` `{vt, until, next, target}` | |
+| +0x2fc [+0x22c0] | `MobActionSwingDamage` `{vt, delay, target, next}` | |
+| +0x30c [+0x22d0] | `MobActionTurning` `{vt, next, target, u16 TurnSpeed, start time}` | |
+| +0x320 [+0x22e4] | → current state | |
+
+Singletons (one object for all mobs; `PTR_vftable_…` globals, classes from RTTI): `MobActionBase` 0x84cfb8,
+**`MobActionTargetting` 0x84cfbc** (the hub every state falls back to), `MobAction2Region` 0x84cfc0, `MobActionRoaming`
+0x84cfc4, `MobActionNoBrain` 0x84cfc8, `DuringReturn2Regen` 0x84cfcc. The "cell" is a pointer to the shared target slot
+(mob+0x24e0, read by vt 0xa04); writing `*cell = obj` before switching state hands the target over.
+
+**Element vtable** (byte slots; all classes):
+
+| Slot | Meaning | Implementations |
+|---|---|---|
+| 0x00 | `mab_Think(ctx)` → next state | per class (below); `MobActionBase` FUN_004b8ec0 → Targetting; `MobActionNoBrain` FUN_004b8c50 → itself (never moves, never fights) |
+| 0x04 | damaged notify (`so_DamagedBy`, §6) | `MobActionWander` and `InMove_Cancelable` FUN_004b8c10: `so_mobile_StopHere` (vt 0xa48), state = Targetting; others no-op |
+| 0x08 / 0x0c | target handle / object (mob vt 0x754 / 0x75c, §6.5) | Attack, Chase, BackStep, AvoidOverlap: FUN_004b8a60 / FUN_004b8a80 (`*cell`); others 0xFFFF / 0; `WaitSkillEnd` +0xc: FUN_00461b70 |
+| 0x10 | re-plan (mob vt 0x8f8, §6) | FUN_004b8c40 → Targetting (all) |
+| 0x14 | bind the target cell | FUN_00653a60 (`this+4 = cell`) for Attack, Chase, BackStep, AvoidOverlap; others no-op |
+| 0x18 | `mab_SkillRegistAtScript` | Attack FUN_004b9400 (§8); base FUN_004b93b0 returns false |
+| 0x1c | "waiting for a skill to end" | `WaitSkillEnd` FUN_005af8d0 → 1; others 0 |
+
+`MobActionElement` (vftable 0x6c15b4, ctor FUN_004a9b00, dtor FUN_004a9dc0) is an unrelated base whose `mae_Action`
+FUN_004aa880 returns a static empty object; no caller of it was found.
+
+Helpers used throughout (mob slots unless noted):
+
+| Helper | Meaning |
+|---|---|
+| `FUN_004b8830(selector)` | the selector's current target object, or **0 when it has StaImmortal (291) or StaAdlFLoussierIMT (499)** (the name is copied to a debug ring) |
+| `ShineMob_SetCurrentTarget` FUN_004b8930 | +0x24ae, raises `sim_TargetChange` (§6.5) |
+| vt 0x510(t) FUN_005566c0 | attack reach to `t` = `t.vt[0x6cc]()` (body size) + current weapon `Range` (+0x67); 99999 without a weapon |
+| vt 0x514 / 0x518 | walk / run speed: script override (vt 0xe84/0xe8c, 0xe88/0xe90) else (script +0x254c / +0x2550 ≥ 0 ? it : MobInfo.WalkSpeed / RunSpeed) × speed rate (+0x1c00) / 1000, clamped ≥ 0 (FUN_00556740 / FUN_005567b0) |
+| vt 0x610 | moving (`MoveManager` +0x1ac, part 5); vt 0x7b4 move mode (+0x18c: 1 walk, 2 run), vt 0x7b0 current speed (+0x194) |
+| vt 0x60c | the object's move destination (+0x1a0) |
+| vt 0x614 / 0x618 | spawn point +0x249c / return point +0x24a4 |
+| vt 0x61c | leash² = `MobInfoServer.FollowCha` (+0x44)² |
+| vt 0xb34(t) / vt 0xb38 | rest until `t` (+0x2500) / resting (`g_Now < +0x2500`, else clears it) |
+| vt 0xa08(v) | target-order byte +0x24e5; sets the dirty flag +0x24e4 when target or order changed (§5.2) |
+| vt 0xf54 / 0xf4c / 0xf50 | set / read "was chasing" (+0x24ac bit 3) / spawn point := the current scenario path point (FUN_004b7690, path vector +0x1eb8, 0x2a-byte points, index +0x1ebc) |
+| vt 0xa18 | scenario path vector +0x1eb8 (part 5); non-zero = walk the path instead of wandering |
+| `FUN_004011c0(timer)` | periodic timer `{next, period}`: fires when `next < g_Now`, then `next += period` |
+| `ShineObject_so_FindBlockLocate(o, pos, r, out, bitmap)` | nearest unblocked point to `pos` within `r` (part 5) |
+| `DAT_0084cfb4` | "use `Navigator`" byte, initial value **1** and never written: the old block path finder branches (FUN_004a9ae0 + FUN_00632ba0 / FUN_00632450, "Path not found", "MobThink_Chase::mtc_pathfind : Zero path") are dead in 2016 |
+
+### 7.2 Idle states: Targetting, Wander, Roaming, going home
+
+```pseudo
+MobActionTargetting::mab_Think(ctx)                                             @ FUN_004b99e0
+    s = ctx.self
+    if s is not a ShineMob:                         # captivated player (§7.7)
+        sel.vt[0x28](s);  t = FUN_004b8830(sel)
+        if s.vt[0xa04]() != t and player state (+0x2a790) in {2, 3}: s.smo_BashStop()          # vt 0xed8
+        if t and SameLayer(s, t): *cell = t; return Attack
+        return Wander
+    f = s.vt[0xf78]()                               # ShineServant: +0x2570 (part 8); ShineMob: 0
+    if f and f != s.vt[0x9b0]() (master) and SameLayer(s, f): s.vt[0xa08](1); Chase.cell = f; return Chase
+    sel.vt[0x28](s)                                 # mt_SelectTarget (§6.3)
+    t = FUN_004b8830(sel)
+    if not t or not SameLayer(s, t):
+        SetCurrentTarget(s, 0xFFFF)
+        return roaming flag (+0x24d8 bit 0) ? Roaming : Wander
+    SetCurrentTarget(s, t.handle)
+    i = s.so_mob_SelectWeapon(t, advance = 0)       # vt 0x73c, §7.4
+    if i < 0: return Targetting                     # nothing usable now; try next tick
+    w = weapon i of the MobDataBox entry; if no row: log "MobTacticElement::MobActionTargetting::mab_Think : Null Weapon"; return Targetting
+    o = weapon target (§7.5) by w.MopAttackTarget
+    if o:
+        (t or o having 291 / 499 is only logged)
+        s.vt[0xa08](1); *cell = t; return Attack    # note: the cell gets the selector's target, not o
+    # the weapon cannot be used on anybody now: skip it
+    FUN_004b8c60(s)                                 # advance the attack sequence (§7.6)
+    s.vt[0x718]()                                   # weapon cooldown (§7.4)
+    return Targetting
+```
+
+```pseudo
+MobActionWander::mab_Think(ctx)          (per mob, +0x2260)                     @ FUN_004bb790
+    s.vt[0xa08](0)
+    if s.param.flags (+0xcce) & 3  or  MobInfo.WalkSpeed == 0: return Targetting   # bits 0/1: movement blocked (inferred)
+    if s.vt[0xa18]():                                # scenario path
+        InMove_Cancelable.next = this
+        return mab_RandomDirectWalk(s, -1, InMove_Cancelable, this)
+    if timer A fired: return 2Region                 # every (r + 55) s: go home
+    if timer B fired: return Targetting              # every 1 s: look for targets
+    if s is a ShineMob and its chat timer (+0x1ea8, §5.2) fired: MobChatManager::mcm_WanderChat(s)    # §8
+    if timer C fired (1 s) and rand(100) < 5:        # random ring DAT_14d720d0
+        InMove_Cancelable.next = this
+        return mab_RandomDirectWalk(s, 30 + rand(20), InMove_Cancelable, this)
+    return this
+
+MobActionWander::maw_MetronomeReset(w)                                          @ FUN_004b9210
+    r = next value of the u16 random ring DAT_14dc2120 (range not traced)
+    timer A = { g_Now + (r + 55) × 10, (r + 55) × 10 };  timer B = timer C = { g_Now + 10, 10 }
+```
+
+`maw_MetronomeReset` runs at spawn when the mob starts in Wander (§5.3).
+
+```pseudo
+MobActionRoaming::mab_Think(ctx)                                                @ FUN_004bc3a0
+    s = ShineMob(ctx.self) or return Targetting
+    if s.kind (vt 0x4d0) == 10 (ShineServant):
+        InMove_Cancelable.next = this; return mab_RandomDirectWalk(s, RoamingDistance (+0x24da), InMove_Cancelable, this)
+    n = RoamingNumber ((+0x24d8 >> 1) & 0x7f)
+    if n == 0:
+        return position != spawn point ? 2Region : Targetting
+    if walks done (u8 +0x24d9) >= n: walks done = 0; return 2Region
+    if not resting (vt 0xb38):
+        walks done += 1; InMove_Cancelable.next = this
+        return mab_RandomDirectWalk(s, RoamingDistance, InMove_Cancelable, this)
+    return Targetting
+
+MobAction2Region::mab_Think(ctx)               ("back to the region")          @ FUN_004ba1d0
+    s.vt[0xa08](0)
+    if MobInfoServer.Return2Regen (+0x92):
+        mab_RunTo(s, spawn point (vt 0x614));  ShineMob: return point (+0x24a4) = spawn point (+0x249c)
+        return DuringReturn2Regen
+    # no return: the mob makes its current place its home
+    ShineMob: spawn point = return point = current position
+              rest until g_Now + RoamingRestTime (+0x97) × 10 / 1000          # vt 0xb34; ms → tenths
+    return Targetting
+
+DuringReturn2Regen::mab_Think(ctx)                                              @ FUN_004b9010
+    if s is moving: return this
+    rest until g_Now + RoamingRestTime × 10 / 1000; return Targetting
+
+MobActionInMove::mab_Think(ctx)        (both InMove classes)                    @ FUN_004b8f10
+    sel.vt[0x28](s)
+    if FUN_004b8830(sel): return Targetting          # a target appeared: stop wandering
+    return s.moving ? this : this.next
+```
+
+The `mab_RandomDirectWalk(s, dist, inMove, stay)` @ FUN_004babe0 helper (ShineMob only, else returns `stay`):
+
+```pseudo
+    if dist == -1:                                   # scenario path
+        if resting: return Targetting
+        if not ShineMob::sm_NextPathPoint(s, &dx, &dy, &dist, &atEnd) (part 5): return stay
+        if atEnd: rest until g_Now + 50 (5 s); return Targetting
+        if s.vt[0xf4c]() (was chasing): s.vt[0xf50]() (spawn point := current path point); return 2Region
+    else:
+        if not s.vt[0xc58](&dir, &dist) (ShineMob: always false): dir = next value of ring DAT_14f722d0 × 180 / 64
+        dx, dy = cos/sin table DAT_13283770 (FUN_005790e0 / FUN_00579110) × dist / 1024
+    p = FindBlockLocate(s, pos + (dx, dy), 2 × dist, bitmap A); then FindBlockLocate(that, 2 × dist, bitmap B)
+    if both found and p != position: mab_WalkTo(s, p); return inMove
+    (vt 0xc5c / 0xc60: ShineMob no-op)
+    return stay
+```
+
+### 7.3 Fighting states
+
+```pseudo
+MobActionAttack::mab_Think(ctx)        (per mob, +0x227c)                       @ FUN_004bba00
+    t = *cell
+    if g_Now < this.nextAttack (+8): Chase.cell = t; return Chase          # cooling down: keep up with the target
+    if ShineMob and (f = vt 0xf78()) != 0: Chase.cell = f; return Chase    # servant
+    if s.param.flags (+0xcce) & 4: return Targetting                        # cannot attack (Z03 §4)
+    if not t: log "MobTacticElement::MobActionAttack::mab_Think : Target Null"; return Targetting
+    if t closing (vt 0x300) or t.mode in {3 dead, 0 spawning} or t.IsDead(): return Targetting
+    if s.IsCasting(): return this
+    if not SameLayer(s, t) or t is a captivated player: return Targetting
+    if t has StaImmortal (291) or StaAdlFLoussierIMT (499): return Targetting
+    if MobInfoServer.TurnSpeed (+0x9c) != 0 and the angle from s's direction to t > 15 (2° units, ddt_ShineRadianDiff):
+        return Turning.set(next = this, s, t)                              # FUN_004b8a00, §7.3 Turning
+    if FindBlockLocate(s, t.pos, 10000, bitmap A) != t.pos:                # target stands on a blocked cell
+        return rand(1000) < 800 ? (Chase.cell = t; Chase) : Targetting
+    if s moving: StopHere
+    if this.scriptSkill (+0xc) == 0xFFFF: s.so_mob_SelectWeapon(t, advance = 1)   # §7.4
+    else: s.so_mob_SetWeaponAsScript(low byte of this.scriptWeapon (+0x10))        # vt 0xb74, §8
+    if s is not a ShineMob:                                                 # captivated player
+        return FUN_004ba0d0(this, ctx)                                      # §7.7
+    sm_SkillExchange_HPLow(s); FUN_004bb600(s) (HPLow_ChangeOrder)          # §7.6
+    i = current weapon (+0x1fa8, vt 0x740); if i < 0: return this
+    o = weapon target of weapon i (§7.5)                                    # MAT_NONE / unknown → log, o = 0
+    if this.scriptTarget (+0x14): o = scriptTarget; maa_SkillFromScriptClear(this)    # FUN_004b9470
+    if not o: return Targetting
+    d² = dist²(o, s)
+    if d² > reach(o)²: sm_SkillExchange_TargetState(s, o)                   # §7.6 (yes: only when out of reach)
+    if d² > reach(o)² (reach of the possibly exchanged weapon) and not sm_SkillExchange_OutOfRange(s):
+        return rand(1000) < 800 ? (Chase.cell = o; Chase) : Targetting
+    # attack now
+    sm_UseWeapon(s, o)                                                      # §7.4
+    s.vt[0x718]()                                                           # weapon cooldown
+    r = min(reach(t) / 4, 150)
+    swing = SwingTime (+0x4b) tenths (vt 0x71c);  cast = skill CastTime (FUN_004b88e0, 0 for weapon 0)
+    next = d² < r² ? (i == 0 and rand(5) == 0 ? (BackStep.cell = t, BackStep.extra = 0, BackStep) : this) : Targetting
+    if 0 <= i < weapon count:
+        k = max(1, SwingTime_ms × 128 / max(1, AtkSpd))
+        rate = param[0xa18] (attack-speed rate, Z03 knowledge)
+        A = (SwingTime_t × 128 / k) × rate / 1000       # whole swing ≈ AtkSpd scaled by the rate
+        B = (HitTime_t  × 128 / k) × rate / 1000       # moment of the hit
+        D = AtkDly_t × rate / 1000                     # pause after the swing   (all ≥ 0; _t = ms × 10 / 1000)
+        this.nextAttack = g_Now + D + A + cast
+    if i == 0:                                         # normal attack: two-phase
+        s.flags24ac |= 4
+        SwingDamage.set(delay = A − B, next, target = o)                    # masd_SetDelay FUN_004b9340
+        return WaitSkillEnd.set(B, SwingDamage, o)                          # mawse_SetNextAction FUN_004b92c0
+    return WaitSkillEnd.set(cast + swing, next, o)                          # (A / B are not used for skills)
+
+MobActionWaitSkillEnd::mab_Think(ctx)                                           @ FUN_004b9140
+    s.vt[0x588]()                                    # "I am fighting" (§6.5)
+    return g_Now >= this.until ? this.next : this
+
+MobActionSwingDamage::mab_Think(ctx)                                            @ FUN_004baac0
+    ShineMob: flags24ac &= ~4
+    s.vt[0xeec](this.target, 0x318, 0, 0, 0)        # ShineMob FUN_00433a70: smo_SwingDamage(s, target, weapon abstate,
+                                                    #   StaStrength +0x92, StaRate +0x94, AggroInitialize +0x96) (Z03 §2)
+    return WaitSkillEnd.set(this.delay, this.next, this.target)
+```
+
+So a mob's normal attack is: `0x2447 NC_BAT_SWING_START_CMD` (from `smo_SwingStart` in `sm_UseWeapon`), wait `B`, the damage
+packet of `smo_SwingDamage` (Z03 §2), wait `A − B`, then the next state; the next attack is allowed after
+`D + A` from the start. `AggroInitialize` (5679 of 5818 weapons: 0) is passed to `smo_SwingDamage` (Z03 reads it).
+
+```pseudo
+MobActionChase::mab_Think(ctx)                                                  @ FUN_004bc950
+    t = *cell
+    if walk speed == 0 or s.param.flags & 3: return Targetting
+    s.vt[0xf54]()                                    # mark "was chasing" (+0x24ac bit 3)
+    if dist²(s, return point) > FollowCha²:          # leash
+        ShineMob: s.vt[0xf74]() (ShineServant FUN_004a3480: vt 0xf7c(0); mob no-op)
+        return 2Region
+    if dot(s − t.pos, s − t.destination) < 1:        # the target is coming at us / passing us
+        mab_RunTo(s, t.pos); Attack.cell = t
+        return InChase.set(t, Attack, this)          # FUN_004b89c0 (stores t's destination)
+    # Navigator path (DAT_0084cfb4 = 1)
+    if t.destination is blocked in the map's virtual map (field +0xa4, vm_IsBlocked): Attack.cell = t; return Attack
+    n = Navigator::MapNavigator::mn_PathFind(field +0xa4, s.pos, t.destination, path)   (part 5)
+    if n < 1: BackStep.extra = 10; BackStep.cell = t; return BackStep        # no path: step back
+    wp = path[0];  direct = (n == 2)
+    if direct:
+        wp = t.destination
+        if dist(s, wp) < reach(t): Attack.cell = t; return Attack
+        wp += (s − wp) × (reach(t) × 8 / 10) / dist        # stop at 80 % of the reach
+    if s is a ShineMob:
+        dist(s, wp) <= MobInfoServer.WalkChase (+0x9e) ? mab_WalkTo(s, wp) : mab_RunTo(s, wp)
+    else: s.smo_BashStop(); mab_RunTo(s, wp)       # captivated player
+    Attack.cell = t
+    return InChase.set(t, Attack, this)
+
+MobActionInChase::mab_Think(ctx)                                                @ FUN_004b9760
+    t = this.target
+    if t invalid (closing, mode 3 / 0, dead): return 2Region
+    if dist²(s, return point) > FollowCha²: ShineMob s.vt[0xf74](); return 2Region
+    if t.destination != stored destination: return this.ifMoved (Chase: plan again)
+    if not s.moving: return this.onArrival (Attack)
+    # still moving: follow speed changes (slow / haste abstates)
+    if move mode 1 and current speed != walk speed: mab_WalkTo(s, t.destination)
+    if move mode 2 and current speed != run speed:  mab_RunTo(s, t.destination)
+    return this
+
+MobActionTurning (set FUN_004b8a00, think FUN_004b9ea0):
+    set(next, s, t): store; TurnSpeed = MobInfoServer.TurnSpeed; if 0: return next (no turning) else start = g_Now, return this
+    think: if TurnSpeed == 0 or no s or no t: return next
+        if dist(s, t) < 5: s.vt[0x660](t.pos, 1, 2, 0) (MoveStart); s.vt[0x7c4](); return next
+        diff = angle from s.direction to t (2° units, sign)
+        allowed = (g_Now − start) × 180000 / (TurnSpeed × 10)          # TurnSpeed = ms per full turn
+        if allowed < diff:
+            if allowed > 14: dir = s.direction + sign × allowed (mod 180); mab_RunTo(s, 3 units towards dir); start = g_Now
+            return this
+        mab_RunTo(s, 3 units towards t); start = g_Now; return next     # a 3-unit "run" is how a mob turns on the client
+
+MobActionBackStep::mab_Think(ctx)                                               @ FUN_004ba390
+    t = *cell
+    if walk speed == 0 or flags & 3: return Targetting
+    v = s − t;  if |v| == 0: AvoidOverlap.cell = t; return AvoidOverlap
+    len = extra (+8) != 0 ? extra + |v| : reach(t) × 8 / 10
+    p = t.pos + v scaled to len                      # straight away from the target
+    if p blocked in bitmap A or B, or not fm_IsStraightPath(t.pos → p) in A or B: AvoidOverlap.cell = t; return AvoidOverlap
+    if no field or not vm_IsStreight(s.pos, p): return Targetting
+    mab_RunTo(s, p); Chase.cell = Attack.cell = t
+    return InChase.set(t, Attack, Chase)
+
+MobActionAvoidOverlap::mab_Think(ctx)            (two mobs on one spot)         @ FUN_004ba750
+    t = *cell
+    dir = random (ring DAT_14f722d0);  p = t.pos + (cos, sin)(dir) × reach(t) × 8 / 10
+    if p blocked (bitmap A): Attack.cell = t; return Attack
+    if no field or not vm_IsStreight(s.pos, p): return Targetting
+    mab_RunTo(s, p); Chase.cell = Attack.cell = t
+    InChase = { t, Attack, Chase, t.destination }; return InChase
+```
+
+**Movement packets** (`mab_WalkTo` @ FUN_004b8d30, `mab_RunTo` @ FUN_004b9590): `s.vt[0x660](dest, speed)` starts the
+`MoveManager` (part 5), then
+
+```pseudo
+sight (so_AllOfRange_Class1, radius DAT_132826b4) ← 0x2018 NC_ACT_SOMEONEMOVEWALK_CMD / 0x201A NC_ACT_SOMEONEMOVERUN_CMD {
+    u16 handle, u32 from.x, from.y (current position), u32 to.x, to.y, u16 speed (vt 0x514 / 0x518), u16 flags (bit 0 = 0) }
+the same 0x18-byte packet is kept in the object (+0x168 opcode, +0x16a… payload) for players who see the mob later (Z02 §5)
+```
+
+A player (captivated) does not send these itself: `mab_RunTo` calls `so_MoveByServer(dest, 0x1a, 0x49, 2, 0)` (vt 0x5b0,
+part 5) instead. The layouts are the verified ones of Z02 (`docs/protocol/packets-zone.md` 0x2018 / 0x201A).
+
+### 7.4 Weapons: choosing and using
+
+A mob's weapons are its MobWeapon rows (`MobDataBox` entry +8, §5.1; index 0 = the normal attack, the others skills).
+`MobWeapon.shn` (2016, 5818 rows, 0x98 bytes; columns from the SHN header): `ID u32 +0, InxName[33] +4, Skill[32] +0x25,
+AtkSpd u16 +0x45, BlastRate +0x47, AtkDly +0x49, SwingTime +0x4b, HitTime +0x4d (ms), AtkType u32 +0x4f, MinWC +0x53,
+MaxWC +0x57, TH u16 +0x5b, MinMA u32 +0x5d, MaxMA +0x61, MH u16 +0x65, Range +0x67, MopAttackTarget u32 +0x69, HitType u32
++0x6d, StaName[33] +0x71, StaStrength u16 +0x92, StaRate +0x94, AggroInitialize +0x96`.
+
+Mob members: **+0x1fa8 current weapon index** (−1 none), +0x1f98 vector of per-weapon "usable again at" times,
++0x24c8/+0x24cc script vector of per-weapon rates (`sm_scene_SetWeaponRate`, §8).
+
+```pseudo
+weapon rate(m, i)                                                               @ FUN_004aa060
+    i < script rate vector size ? vector[i] : (i < weapon count ? MobWeapon.BlastRate (+0x47) : 0)   # per mille
+
+ShineMob::so_mob_SelectWeapon(m, t, advance)     (vt 0x73c)                     @ FUN_004ab720
+    if smo_SkillBlastOption(m) == 2: weapon = 0; return 0         # FUN_0057c750: max over m's abstates of
+                                                                  #   actor.vt[0x1c]; 2 = "normal attack only" (Z03)
+    if m.attackSequence (+0x1fac) == 0:                            # no MobAttackSequence file
+        for i = count−1 down to 0:                                 # last weapon first
+            if row present and (no skill or m.SP (vt 0x4ec) >= skill SP (+0xa0)) and cooldown[i] <= g_Now
+               and rand(1000) <= rate(m, i):
+                weapon = i; return i
+        weapon = −1; return −1
+    pos = advance ? &m.sequencePos (+0x1fb0) : &copy                # a preview does not move the sequence
+    weapon = ae4m_NextSkill(m.attackSequence, m, pos, advance)      # §7.6
+    if dist²(m, t) > reach(t)² × 1.2 (double DAT_006c19f8): sm_SkillExchange_OutOfRange(m)
+    return weapon
+```
+
+A sequence mob ignores cooldowns; a plain mob tries its skills from the last row down and falls back to the normal
+attack only if the normal attack's own rate roll succeeds (BlastRate 1000 for 4794 rows). Callers: Targetting (preview),
+Attack (advance), the script node `ShineMobWeaponRate` path (§8).
+
+```pseudo
+ShineMob::sm_UseWeapon(m, t)                                                    @ FUN_004ab9c0
+    i = weapon; if i < 0: return
+    m.flags1e78 &= ~2
+    copy weapon i into m's stat matrix: +0x10a0 MinWC, +0x10a4 MaxWC, +0x10ac TH, +0x10b4 MinMA, +0x10b8 MaxMA, +0x10c0 MH
+    if i == 0:
+        smo_SwingStart(m, t)                         # 0x2447 NC_BAT_SWING_START_CMD to sight (Z03 §2)
+        MobChatManager::mcm_AttackChat(m)            # §8
+    else:
+        sk = SkillDataBox_Find(weapon skill)
+        if not sk: log "ShineObjectClass::ShineMob::sm_UseWeapon : Null skill"; return
+        if m.SP < sk.SP (+0xa0): log "…sm_UseWeapon : Minus sp"; return
+        if sk.+0x130: m.flags1e78 |= 2               # "alternate damage path" (Z03 knowledge bit 1)
+        tgt = sk.First (+0xb8) == 1 (ME) ? m : t;  pos = tgt.pos
+        if sk.+0x220 == 1 and sk.+0x224 in {0, 2}:   # a SkillSpecial "random target" kind (offset mapping inferred, Z03 §5.1)
+            if sk.First == 4 (SPOT): if not m.vt[0xc20](sk, &pos) (FUN_00579910: random point within Range): pos = tgt.pos
+            else: o = m.vt[0xc1c](sk, Range, m) (FUN_0057e660: random object of the Last target class in sight); if o: tgt = o
+        if sk.+0x260 == 1 and sk.First == 4 and (o = m.vt[0xc1c](sk, Range, m)): pos = o.pos
+        smo_SkillBash_Casting(m, sk, First == 4 ? null : tgt, First == 4 ? &pos : null, CastTime (+0xcb))   (Z03 §5)
+        if sk.+0x238 == 1: FUN_00553510(m, 0)        # sight ← 0xBC1C {u16 handle, u8 direction} (the "face direction"
+                                                     #   broadcast that Z06 also uses under the 2017 name NC_GAMBLE_ENTER_PLAYER_DIRECT_CMD)
+    if m.+0x1fb6 == 1: m.+0x1fb6 = 0                 # a chained NextSkill was used: the sequence does not advance
+    else: FUN_004b8c60(m)                            # advance the sequence position (§7.6)
+    for each abstate on m: aeo_Attack                # abstates that react to attacking (Z03 §6)
+
+cooldown (vt 0x718)                                                             @ FUN_00556d00
+    if weapon >= 0: cooldown[weapon] = g_Now + ceil(AttackSpeed / 100)       # tenths
+AttackSpeed (vt 0x508)                                                          @ FUN_00556640
+    AtkSpd (+0x45) × param[0xa18] / 1000 (≥ 0); 99999 when weapon < 0 or the row is missing
+    (the row is read before the index is checked; the only mob caller, vt 0x718, checks the index first, so this
+     does not fault; the other vt 0x508 callers are the player schedule functions FUN_0042f550 / FUN_00430bc0, Z03)
+swing time (vt 0x71c)  FUN_005564f0: SwingTime × 10 / 1000 tenths (0 without a weapon)
+```
+
+### 7.5 Weapon target by `MopAttackTarget`
+
+Both Targetting and Attack resolve "on whom is weapon `i` used" the same way (`MOBATTACKTARGET` *(pdb2017)*; 2016 data:
+ENEMY 4898, ME 80, MYRACE 173, NONE 667 rows):
+
+| Value | Call | Result (§6.7) |
+|---|---|---|
+| 0 MAT_ENEMY | `t.so_ply_CanMyTarget(m, i)` (vt 0x760 of the **target**) | `t` if the weapon's AtkType fits it |
+| 1 MAT_ME | `m.so_mob_CanMyTarget(entry, i)` (vt 0x74c) | `m` itself (heal / buff self) |
+| 2 MAT_MYRACE | `m.so_mob_FindMyRaceTarget(entry, i)` (vt 0x748) | a friend of the same race within 500 |
+| 4 MAT_NPC | `m.so_mob_CanNPCTarget(entry)` (vt 0x750) | a mob-188 NPC within 500 |
+| 3 MAT_NONE, other | log "MobAction::ma_think : MobTarget Wrong" | none |
+
+The NONE rows are the weapons of shop NPCs and gates (651 of 667 have no skill), which never reach a fighting state
+because their brain is NoBrain (§6.1). A mob whose current weapon has no target goes back to Targetting, which skips
+the weapon (sequence advanced, cooldown set).
+
+### 7.6 `MobAttackSequence`: scripted skill orders
+
+Loader `MobAttackSequence::mas_Load` @ FUN_004a8990 (called once at start-up from the undecompiled block at 0x5b05d8,
+step label `mobattseq`, before `chargedbuffdatabox`) into `g_MobAttackSequence` **DAT_0d76e9e8** `{u32 count; record[400]}`
+(records built by `_eh_vector_constructor_iterator_` with FUN_0043be70, sorted by mob ID with `qsort` after each append,
+looked up with `bsearch` FUN_0043f6e0 at spawn → mob+0x1fac; sequence position mob+0x1fb0 = 0):
+
+```pseudo
+for every MobInfo row (in table order):
+    file = "../9Data/Shine/MobAttackSequence/<MobInfo.InxName>.txt"; skip if it does not open
+    parse (ShineDataFile); on error log "MobAttackSequence::mas_Load : Option read error" and stop the server
+    if count > 399: "…mas_Append : Too many element" (fatal); record = { mobId, length 0 }; count += 1; qsort
+    table AttSeq (columns Order WORD, Attack STRING[33]): for i = 0, 1, 2 …: the Attack value of the row whose Order == i
+      (FUN_006483d0(file, "Attack", …, "Order", i), key lookup *(inferred)* from the arguments), until none is found:
+        "-"            → 0xFFFF (normal attack)
+        "*RepeatStart" → repeatStart (+0x1be8) = row index + 1, and the row itself is stored as 0xFFFF
+                         (original bug) Z09-B6: the marker row becomes an extra normal-attack step; other "*…" → "Invalid Command" (also stored as 0xFFFF)
+        skill InxName  → skill ID (unknown: "…mas_Load : Null skill", fatal)
+        record.seq[length++] = value         (u16 array at +4; length u8 at +2; longest 2016 file: 75 rows)
+    table SkillChange (Condition, Value, From, To); each row goes to a list created on first use (heap SkillChangeList,
+    100 entries; "…ExchangeSkill too many" fatal when full):
+        OutOfRange  → +0x1244 { from skill, to skill, atoi(Value) (unused) }
+        HPLow       → +0x1248 { from, to, Value = HP per mille }
+        TargetState → +0x124c { from, to, abstate index of Value ("-" → 0xFFFF; unknown → "Invalid ABState", fatal) }
+        NextSkill   → +0x1250 { from, to }
+        HPLow_ChangeOrder → +0x1be4 { 0xFFFF, to skill, Value = HP per mille, From = atoi = sequence position }
+        other       → "…mas_Load : Invalid condition" (fatal)
+    skill names in From / To: "-" = 0xFFFF (normal attack), unknown → "MobAttackSequence::SkillChange::sc_Store : Null skill" (fatal)
+```
+
+The record also embeds five `SkillChangeList` objects (+0x3ec, +0x8b4, +0xd7c, +0x1254, +0x171c, constructed by
+FUN_0043be70) that the code never uses; the five pointers above are separate heap lists. 2016 data: 297 files, 289 match
+a MobInfo name; SkillChange rows: 367 HPLow_ChangeOrder, 28 OutOfRange, 3 HPLow, 2 NextSkill (only `Karen.txt`).
+
+```pseudo
+MobAttackSequence::AttackElement4Mob::ae4m_NextSkill(rec, m, pos, advance)     @ FUN_004a9730
+    if m is not a ShineMob: return −1
+    if advance and m.chainedSkill (+0x1fb4) != 0xFFFF:      # set by a NextSkill row (below)
+        k = chainedSkill; chainedSkill = 0xFFFF
+        i = first weapon ≥ 1 whose skill == k
+        if found: m.+0x1fb6 = 1 (vt 0xaf4: do not advance the sequence after this use); return i
+        log "MobAttackSequence::AttackElement4Mob::ae4m_NextSkill : skill not found"; return 0
+    s = rec.seq[*pos];  result = 0                           # 0 = normal attack
+    if s != 0xFFFF:
+        i = first weapon ≥ 1 whose skill == s
+        if found and the skill exists, m.SP >= its SP and rand(1000) <= rate(m, i): result = i
+    if advance:
+        look up rec.NextSkill (+0x1250) for an entry whose from == skill of weapon result
+            # (original bug) Z09-B7: +0x1250 is read without a null check; only Karen.txt has NextSkill rows
+            #   (disassembly 0x4a999b: `mov eax,[rec+0x1250]; movzx ecx,[eax+0xe]`). For the other 288 sequence mobs the
+            #   list is never created, so every advancing select would fault; no writer of +0x1250 other than the loader and
+            #   no zone-wide exception trap were found. Uncertain how 2016 servers survived this (sweep / review: check SEH)
+        if found and to != 0xFFFF and some weapon ≥ 1 has skill to: m.chainedSkill = to
+    return result
+
+advance (FUN_004b8c60 → FUN_004a8500):  *pos += 1; if *pos >= length: *pos = repeatStart
+```
+
+So a sequence mob walks its list one step per attack (a failed rate roll uses the normal attack for that step), loops
+from `repeatStart`, and the conditions below may replace the chosen weapon. All three `sm_SkillExchange_*` share one shape:
+find, among the condition's entries whose **from** equals the skill of the current weapon (0xFFFF for weapon 0), the
+first one that matches; then `to == 0xFFFF` → weapon 0, else the first weapon ≥ 1 whose skill is `to` (none: log
+"…Changed skill not found"); return true when the weapon was replaced.
+
+| Function | List | Match | Called by |
+|---|---|---|---|
+| `ShineMob::sm_SkillExchange_OutOfRange` @ FUN_004baef0 | +0x1244 | the first entry with that `from` (no condition) | `so_mob_SelectWeapon` (out of reach × factor), Attack (out of reach): a successful exchange attacks at once instead of chasing |
+| `ShineMob::sm_SkillExchange_HPLow` @ FUN_004bb100 | +0x1248 | `HP < MaxHP × Value / 1000` | Attack, every attempt |
+| `ShineMob::sm_SkillExchange_TargetState` @ FUN_004bb390 | +0x124c | the target has abstate `Value` (vt 0x3e4) | Attack, only when the target is out of reach |
+| HPLow_ChangeOrder FUN_004bb600 *(ours: `sm_SkillExchange_HPLowChangeOrder`)* | +0x1be4 | entry position == sequence position (+0x1fb0) and `HP < MaxHP × Value / 1000` | Attack, after HPLow |
+
+`HPLow_ChangeOrder` (367 of 400 rows) lets a boss play a different skill at given sequence positions once its HP drops
+below a threshold (e.g. `EglackMad`: below 40 % / 70 %). Unlike the others it ignores `from`.
+
+### 7.7 Captivated players
+
+When a player becomes captivated (StaKarenCaptivate 335 / StaWarLBrainWash 562, Z03 §6.6), `ShinePlayer` vt 0xf1c
+FUN_00564e50 (wraps `smo_SetCaptivate`) builds a 0x324-byte brain: `+4 → player`, `+8` brain objects
+(`ShineMob_BrainObjects_ctor` FUN_0054ee00), `+0x270` = the player's `MobTargetPlayerCaptivate` selector (+0x2a9d0,
+§6.9) initialised with them, `+0x274` the tactic set bound to the cell `player+0x2aa28`, state = Targetting; the pointer is
+kept at `player+0x2a9cc`. Captivate off destroys it and clears the pointer (Ghidra cuts the decompile at the
+`operator delete`, FUN_0065677f is wrongly marked no-return; the disassembly at 0x564f74 clears +0x2a9cc).
+`ShineMobileObject::so_Routine` (§5.5) calls vt 0xf24 FUN_005601e0 for a captivated object: one tactic step.
+
+The tactic code branches on "not a ShineMob": Targetting attacks the selector's choice (a player only, §6.9), Chase runs
+(after `smo_BashStop`), and Attack ends in
+
+```pseudo
+captivated attack(this, ctx)                                                    @ FUN_004ba0d0
+    p = ctx.self (ShinePlayer);  t = *cell
+    if dist²(p, t) > reach²: Chase.cell = t; return Chase
+    if t != p:
+        p.so_ply_TargetChange(t)                    # vt 0x998
+        FUN_005497e0(p, 2)
+        if player state (+0x2a790) not in {2, 3}: run the client handler 0x242B NC_BAT_BASHSTART_CMD for p (Z03 §2)
+    return Targetting
+```
+
+so the victim auto-attacks other players with normal attacks through the ordinary player attack path.
+
+### 7.8 `so_attack` and `so_Bash` are dead code in 2016
+
+`ShineMob::so_attack` FUN_0042ce00 (vt 0x580 of ShineMob / NPC / Bandit / Pet / Servant) → `ShineMobileObject::so_attack`
+FUN_0042cab0 (damage from the rule set at 0x858ecc through FUN_004fc4a0) → vt 0x584 FUN_0042cb80, which logs
+"ShineObjectClass::ShineMobileObject::so_attack called", applies the damage and broadcasts **0x2404 / 0x2405
+NC_BAT_SOMEONEDAMAGED_SMALL / LARGE_CMD** `{u16 attacker, u16 target, u8|u16 damage, u8 action}` (or 0x2406 / 0x2407
+`NC_BAT_SOMEONEDEAD_SMALL / LARGE_CMD`, same layout, when the hit kills; small when damage < 256) *(names pdb2017)*. No
+code calls vt 0x580 or 0x584 (no `+ 0x580` / `+ 0x584` call in the export except FUN_0042cab0 itself, and no direct
+call of FUN_0042ce00). Likewise `so_Bash` (vt 0x598: `ShineMobileObject::so_Bash` FUN_0042e950, `ShinePlayer::so_Bash`
+FUN_0042efb0, packets 0x242C–0x2431, Z03 §3.5) has no caller at all. The live mob attack is §7.3 (`SWING_START` +
+`smo_SwingDamage`) and `smo_SkillBash_Casting`. This corrects Z03 §3.5 ("reached from `so_attack` … and the `&`
+commands") and narrows Z03 §7.1 (0x2406 / 0x2407 exist only in this dead path).
+
+### 7.9 Open for part 4b (§8)
+
+`so_mob_SkillRegistAtScript` / `SkillBlastAtScript` / `SkillParameterSetAtScript`, `mab_SkillRegistAtScript`
+(Attack +0xc/+0x10/+0x14), `so_mob_SetWeaponAsScript` FUN_004ab5e0 (vt 0xb74), `sm_scene_SetWeaponRate` (the +0x24c8
+vector), `cMobWeaponRate`, `ShineMobWeaponRate::sa_Step`; `MobChat`; `MobExplosionElement`; `smo_BossAbstateSet` /
+`sm_BossAbstateGet`; `sm_IBuffToBuffee`; `smo_Shout`; cross-counter; `so_mobile_ICanDamageTo` / `smo_ICanHealTo`;
+`smo_SkillBlastTick`; the `MobTargetPlayerCaptivate` selector functions.
