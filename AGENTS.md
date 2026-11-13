@@ -45,8 +45,6 @@ python3 -I $T/pdb.py $P types '^PROTOCOL_COMMAND_MAP$'            # official opc
 python3 -I $T/pdb.py $P publics 'On_NC_'                         # 2017 client function names + addresses
 tools/protocol-re/regen.sh                                   # rebuild ALL generated docs (after adding names/annotations)
 python3 -I $T/coverage.py Z08                                # item coverage: reachable functions no doc cites yet (--overview: docs/plan/progress.md)
-python3 -I $T/lint_item.py Z08 [--root WORKTREE]             # mechanical checks: opcode names, layouts vs PDB, "void" claims vs asm, bug tags
-python3 -I $T/deepseek.py annotate --bin wm --ops 0x7404,0x7406 --out /tmp/x.json  # cheap batch drafts: docs/plan/delegation.md
 tools/protocol-re/reanalyze.sh <bin> <exe>                   # only if an export is missing or broken (slow)
 ```
 
@@ -130,6 +128,3 @@ The files here are big: `decomp.c` 15 MB with lines up to 6,700 chars, `strings.
 6. **Progress log:** keep `docs/plan/status/<ID>.md` current (done / in progress / remaining, with handler
    lists). A later session must be able to resume from it alone. Update it before you run low on context.
 7. Do not modify the binaries, `re-data/exports/*/decomp.c`, or another item's output files.
-8. **Batch work and checks:** hand bulk drafting (packet layouts, helper one-liners, bug candidates) to DeepSeek with
-   `deepseek.py` as described in `docs/plan/delegation.md`; judgement (pseudocode logic, bug register, names) stays
-   with you. Before calling an item done, `lint_item.py <ID>` must report 0 errors.
