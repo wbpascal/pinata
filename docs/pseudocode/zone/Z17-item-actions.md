@@ -32,7 +32,7 @@ the SHN header `nVersionKey`, copies the file name and calls the virtual `DataPr
 
 | File | Loader `Table::Load<…>` / `ITableBase::Load` | VersionKey | Row struct (size) | Index built by `DataProcess` |
 |---|---|---|---|---|
-| ActionRangeFactor.shn | `ActionRangeFactors` @ FUN_005b59c0 / (ITableBase) | (not read here) | `ActionRangeFactor` (0xC) | `ActionRangeFactors::_rangeFactors` DAT_14d57594, `std::map<u32 ActionRangeIndex, row*>` @ FUN_005cf5a0 |
+| ActionRangeFactor.shn | `ActionRangeFactors` @ FUN_005b59c0 / FUN_005b3230 | 0x2D (45) | `ActionRangeFactor` (0xC) | `ActionRangeFactors::_rangeFactors` DAT_14d57594, `std::map<u32 ActionRangeIndex, row*>` @ FUN_005cf5a0 |
 | ItemActionCondition.shn | `ItemActionConditions` @ FUN_005b5b00 / FUN_005b3310 | 0x117 (279) | `ItemActionCondition` (0x1E) | `ItemActionConditions::_conditions` DAT_14d575a4, `map<u16 ConditionID, IActCondition*>` @ FUN_005cf820 |
 | ItemActionEffect.shn | `ItemActionEffects` @ FUN_005b5c40 / FUN_005b33f0 | 0x9A (154) | `ItemActionEffect` (0x16) | `ItemActionEffects::_effects` DAT_14d575b4, `map<u16 EffectID, IActEffect*>` @ FUN_005d0790 |
 | ItemAction.shn | `ItemActions` @ FUN_005b5d80 / FUN_005b34d0 | 0x40 (64) | `ItemAction` (0xC) | `ItemActions::_actions` DAT_14d6fc84, `map<u16 ItemActionID, Action*>` @ FUN_005b78e0 |
@@ -365,7 +365,8 @@ class  ActionResults { vector<ActionResult> m_Results; }           # what a hook
   pool; that relies on `Clear` having run before (lifecycle in §3).
 - **Observer pool**: `ItemActionObserveBuffer` @ FUN_005d1430, a function-local static (`ItemActionObserveBuffer::Instance`,
   DAT_14d575c8, built on first use, guard bit `_S4 & 1`) = `List<ItemActionObserve>` of **5000** slots
-  (`l_MakeList(5000)`, Z09 §28.11 for `List<T>`) whose contents point into `iaob_buffer[5000]`. The pool is shared by
+  (`l_MakeList(5000)` @ FUN_005d12b0: 5001 × 12-byte `ListStruct` entries, a doubly linked free chain 0…4999 with the
+  sentinel entry 5000 marked active, `l_ListNum` 0; Z09 §28.11 for `List<T>`) whose contents point into `iaob_buffer[5000]`. The pool is shared by
   all players of the zone process; `ItemActionObserve()` @ FUN_005d0830 only sets the vftable.
 
 ### 2.2 Adding and removing actions
@@ -518,7 +519,7 @@ TickTimer::CheckUpdateEvent_ClockWatch(now):  if enabled: cur += now − prev; p
 ItemActionObserveManager::ResetCoolTime()                                            @ FUN_005d1a00
     Send to the owner 0x482C { u16 num = n; n × { ItemActionID, ItemActionGroupID, SecondCoolTime = 0 } }   # 4 + 8n bytes
     iaom_CoolTimeList.clear()
-    # caller: the GM command &iareset (Z11 §7.4)
+    # caller: the GM command &iareset, `ac_ItemActionCoolTimeReset` @ FUN_00421990 (Z11 §7.4)
 ItemActionObserveManager::CoolTimeListClear()  → iaom_CoolTimeList.clear(), no packet          @ FUN_005d19b0
 ```
 
@@ -711,6 +712,31 @@ The `1000 + seit` buffers are read when the state's owner recalculates its param
 (`siae_GetArgument_Base1000ByEffect` FUN_00510090; set-item subsystem, Z21). The state therefore carries the caster's
 item-action bonus: e.g. a gem "+25 % to the AC debuff of skill group n" makes that debuff 25 % stronger. Only
 `SkillEffectIncrease` effects with target `THISSKILL` / `THISACTION` answer here (§1.6).
+
+Readers of the buffers in the abnormal-state actors (Z03 §6 for the actors; `Base1000ByEffect(seit)` returns the
+`Argument_Base1000` of the first buffer with `eb_Index − 1000 == seit`, or **1000** = neutral when none matches):
+
+```pseudo
+SubAbnormalStateActorHPHeal::sasa_Routine(e, owner, idx)                               @ FUN_00406e90
+    caster = e.aeo_FindCasterObject(owner.map)
+    heal = AbState(e).SAA_HEALAMOUNT − SAA_HEALAMOUNTMINUS
+    if heal == 0: heal = SAA_HEALRATE × owner.MaxHP (vt 0x4f0) / 1000
+    heal = Base1000ByEffect(SEIT_STA_DOT_HEAL_RATE_INCREASE 12) × (siae_GetArgument_Base1000(SET_HEALRATE) × heal / 1000) / 1000
+    owner.so_mobile_HPHealOverTime (vt 0x734)(caster, heal, idx); then the base SubAbnormalStateActor routine
+SubAbnormalStateActorHPSPHeal::sasa_Routine(e, owner, idx)                             @ FUN_00407120
+    HP part as above but always the amount (no HEALRATE fallback)
+    owner.so_mobile_SPHealOverTime (vt 0x738)(caster, SAA_HEALAMOUNT)       # SP part: no HEALAMOUNTMINUS, no set / item-action rate
+SubAbnormalStateActorPartyRecharge::sasa_Act_Killed(p, e)   (owner killed, Z03 §6)       @ FUN_00407730
+    party = p.vt 0x550; return if 0xFFFF; ≥ 4000 → assert "Too large party handle"
+    rate = SAA_DEADHPSPRECOVRATE
+    if &e.aeo_SetItemEffect ≠ null:            # always true (address of a member): dead check (original bug) Z17-B18
+        rate = Base1000ByEffect(SEIT_STA_DEAD_HPSP_RECOVER_RATE_INCREASE 9) × rate / 1000
+    members ∉ 2…5 → assert "Invalid party member number"
+    for each member m: if m.smo_GetMode (vt 0x484) ∉ {0, 3} and distance²(p, m) < 1 000 000:
+        m.so_ply_PartyRecharge (vt 0x7a0)(rate)
+```
+
+So of the eight `seit` values set by §2.8, 9 and 12 are read here and 4, 6, 8, 10, 13, 14 by `siae_ParameterRefit`.
 
 ---
 
@@ -1005,6 +1031,17 @@ AxialListScanSkillTarget::alsst_SkillBlast_RandomTarget(…)                    
         EventRun on caster { cond {AttackType, AT_PHYSIC if SkillHitType == SHT_FROM_PY_NORMAL_HITRATE else AT_MAGIC}, … }
     # runs before the per-target smo_SkillBlast, so before hit / miss is known *(inferred from the order)*
 
+SkillEffectApply::SkillBlastEffect::sbe_BlastObject()   (single-target blasts)             @ FUN_00583bc0 (Z03 §5)
+    # area skills (TargetNumber ≠ 1, first lightning wave) go to the scanners above; this is the other branch:
+    if skill.TargetNumber == 1 or sbe_nLightningWaveCnt > 1:
+        caster.smo_SkillBlast(skill, target, empower, lastDamage, multiHit, waveCnt, 1000)
+        if the caster has a manager (vt 0x5d0):
+            EventRun on caster { cond {AttackType, AT_SKILL}, immediate, me = subject = caster, object = target }
+            EventRun on caster { cond {AttackType, AT_PHYSIC if SkillHitType == SHT_FROM_PY_NORMAL_HITRATE else AT_MAGIC}, same }
+        # here the hook runs after smo_SkillBlast, i.e. after the hit roll, but takes no account of a miss either
+        # (same two events as the area path; both run once per lightning-wave step > 1 again, so a chain skill can
+        #  trigger them once per wave *(inferred from the branch condition)*)
+
 ShineMobileObject::smo_SkillBlast(skill, t, …)  (caster = this)                       @ FUN_00581160 (Z03 §5, Z09)
     caster-side value lookups, each EventRunBySkillGroupIndex(results, skill, kind, caster, t) when the caster has a
     manager (and, where noted, the skill has active skill groups), then v = GetRateAppliValue(results, v):
@@ -1272,7 +1309,10 @@ static `iaib_Default` reset to item 0xFFFF. Cell helpers: `sii_Clear` @ FUN_0064
 @ FUN_00643400 (the attribute), `sii_Import` / `sii_Export` @ FUN_00643410 / FUN_00643440 (key, id, attribute ↔
 `ItemTotalInformation`), `isb_Clear` @ FUN_00452550 (all cells empty, default attribute class), `isb_FindEmpty` @ FUN_0059b7c0
 (first empty cell below the input size, else −1), `isb_ItemCount_Output` @ FUN_004559c0 (non-empty cells), `isb_Store` @
-FUN_00520740 (import + attribute class from `itmattcontainer[itemid]`; the DB-answer path, Z05 §1.4 `CellChangeSmall`).
+FUN_00520740 (import + attribute class from `itmattcontainer[itemid]`; the DB-answer path, Z05 §1.4 `CellChangeSmall`,
+through `so_ply_StoreItem(to, item, from)` @ FUN_00520cd0: only for `to` in box 15 (`to & 0xFC00 == 0x3C00`); when the store
+succeeds it sends the client `0x3001` NC_ITEM_CELLCHANGE_CMD { ITEM_INVEN exchange = from, location = to, u16 itemid,
+attribute bytes (`iti_fill2buffer_atrib`) } on the game stream (vt 0x2fc); layout: `packets-zone.md` 0x3001, Z05 §1.4).
 Loading at login and the `0x1047` client list: Z12 §6.7 (`isb_Initializetotal` @ FUN_0044d5d0, `isb_FullBufferItem2Client`
 @ FUN_0044d6d0, part mark 0x20). Saving to the WM: `so_SaveItem_Part` @ FUN_00456030 (Z01 §8.4 `0x4013`) sends the box as its
 fourth part, `nPartMark` 0x22, through `isb_FullBufferItem2Server` @ FUN_00455860 (every non-empty cell as a
@@ -1365,3 +1405,53 @@ with item actions or charges.
 | Z17-B15 | `smo_ply_CostumWeaponChargeDecrease` FUN_00520840 | at 0 charges it deletes equipment slot 13 if occupied, else 11, not the cell `sp_CostumWeaponChargeing` points at | with skins in both 11 and 13 where only 11 is the counted one, the slot-13 skin is destroyed and the worn-out one stays; latent in 2016 (`so_RecalcEquipParam` lets the later slot 13 win whenever both are charged skins) | delete the counted cell |
 | Z17-B16 | `sp_CheckBashAndEquipment` FUN_00562160 | pairs the shield skin (slot 29) with slot 12 RIGHTHAND, while `so_RecalcEquipParam` pairs it with slot 10 LEFTHAND | a shield skin worn without a shield does not stop auto-attacking (and one worn over a shield without a right-hand item does) | test slot 10 for slot 29 |
 | Z17-B17 | `sp_Move4Activ` FUN_0059b8e0 (use of a class-27 action item) | box full (`isb_FindEmpty` < 0): returns without any `0x3016`; cell missing or key mismatch: sends `0x3016` with `0x700` (success) although nothing moved | the client's item use is never answered when the 42-cell box is full (no "box full" message), and a stale request is reported as done | answer an error code in both cases |
+| Z17-B18 | `SubAbnormalStateActorPartyRecharge::sasa_Act_Killed` FUN_00407730 | tests `&e.aeo_SetItemEffect ≠ null` before reading the item-action rate | dead check (the address of a member is never null); no effect | drop the test |
+
+## 5. Not reconstructed / uncertain
+
+- **`normalattackcontinue`** (`sp_SkillControl`, cleared by `sp_CheckBashAndEquipment`, §4.4): what the flag drives in
+  the swing cycle is Z03's (§3.2); here only "the character stops auto-attacking" *(inferred)*.
+- **Client side of the charge counter**: `ItemRepairTask` FUN_0066c750 / FUN_0066c780 write the count through the client
+  item object's vt 0x50 (read as "set charged number" *(inferred)*); how the client shows the count (tooltip / break
+  warning) was not followed.
+- **"Costume charged" hit bits** in the skill and swing results (§4.2): the server sets them; the client uses them for the
+  skin's hit effect *(inferred)*, the client code was not read.
+- **Effect vftable slots +4 / +8** (§1.6): empty in every class; their order is *(inferred)*.
+- **`_EventRun` third argument** in `EventRunBySkillGroupIndex` (§2.3): the decompiler shows a constant byte; read as
+  0xFFFF *(inferred)*.
+- **Several effects per action** (§2.4, Z17-B6): which effect "wins" depends on heap order of the effect objects
+  (normally the highest `EffectID`, file order) *(inferred)*.
+- **Load-dependent effect of Z17-B13** (pool exhaustion): not measured; depends on how many distinct pooled player
+  objects log in during a zone's uptime *(inferred)*.
+- **Lightning-wave repetition** of the single-target skill hook (§3.4.3): read from the branch condition only; no capture.
+- **No capture** of any item-action packet (`0x482C`, `0x206F`, `0x3046`) or charge packet (`0x3037`, `0x3066`, `0x3038`):
+  every layout here is read in the code / the 2016 PDB, none is *(captured)*.
+- **2016 data only**: several condition / effect kinds are latent (no 2016 row uses them: `TARGET_MYGUILD`,
+  `AAT_DispelAttr`, `AttackType` effects, range conditions other than `HP_RATE_0_20`, §1.8); their behaviour is read from
+  the code but never exercised by the shipped tables.
+
+## 6. Coverage boundary
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| charge refill `0x3035` / `0x3064` `sp_NC_ITEM_WEAPONENDURE_CHARGE_REQ` FUN_00519470 / `…SHIELD…` FUN_00519a10, DB `0x348D`/`0x348E`, `0x34C6`/`0x34C7` (`gds_…_CHARGE_ACK` FUN_0051a120 / FUN_0051a730, `so_ply_WeaponEndureChangeAck` FUN_0051a260 / `so_ply_ShieldEndureChangeAck` FUN_0051a870) | Z04 §12.2, Z05 §8.7 (both done, both document it) | client requests and their DB round trip; this item only uses the result (the counter, §4.1) |
+| charged buffs (`ChargedItemEffectList`, `ChargedEffectListRouter::lid_Call` FUN_00450f00, `ChargedEffectAfterLoginComplete::lid_Call` FUN_00417fd0, `sp_ChargedEffectAfterLoginComplete` FUN_00417ad0), other `ChargedEffect.shn` kinds | Z07 §4, Z12 §6.8, Z09 §28.13 (done, documented) | premium buff items; only `EffectEnum` 27 / 28 concern costume charges (§4.1) |
+| `sp_ChargedItemLimitCheck` FUN_00451530 (expiry of time-limited inventory / equipment items → `sp_ItemDelete`) | Z09 §2.4 (done; documents the vt 0x38 per-minute check) | generic item expiry; the action-item box variant is §4.5 |
+| `ItemSmallBag` load / client list / save of box 15 | Z12 §6.7, Z01 §8.4, Z05 §1.4 | cited in §4.5 |
+| `0x3001` NC_ITEM_CELLCHANGE_CMD layout | `packets-zone.md`, Z05 §1.4 | generic cell-change packet; §4.5 only names the box-15 sender |
+| CharDB `0x3459` DESTROY / `0x3428` RELOC / `0x342B` EXCHANGE / `0x3449` ITEMCHANGE layouts | D03 §7.5 (0x3459), `pdb2016-layouts.json` (0x3428, 0x342B, 0x3449), Z05 §1–§6 | generic item-DB requests; §4 cites the fields it fills |
+| `0x10D0` handler internals, `0x10CF`, `usp_Character_get/setItemActionCoolTime` | Z07 §2, D02 | cited in §3.1 / §3.5 |
+| `&iareset` `ac_ItemActionCoolTimeReset` FUN_00421990 | Z11 §7.4 (done, documented) | GM command; its effect is `ResetCoolTime` (§2.5) |
+| set-item subsystem (`SetItem` / `SetItemEffect` / `SetEffect` tables, set detection, `siae_*` getters other than §2.8, `SET_HEALRATE`) | Z21 (planned: "set items … set-item abstates and skill effects") | §1.7 / §2.8 / §3.2 cite only the item-action entry points |
+| abnormal-state actors and their routines (other than the three item-action readers in §2.8), `smo_Dispel` FUN_0057d8e0, `so_mobile_HPHealOverTime` | Z03 §6 | combat / abstate mechanics |
+| skill cast and blast internals (`smo_SkillBlast`, `alsst_*` target lists, `alsst_MakeRandomTargetList` FUN_0057e4e0), skill cool-downs (`csl_SetCoolTime` FUN_00448ab0, `msl_SetCoolTime` FUN_00449270) | Z03 §5 | §3.4.3 documents only the item-action hooks inside them |
+| passive-skill abstates (`so_ply_PassiveSetAbstate` vt 0xbf8, `cpl_SetAbstate` FUN_00446a10) | Z03 §4.2 / Z12 §2.4 | not item actions (correction in `docs/knowledge/Z17.md`) |
+| swing cycle and its delay ticks (`smo_ply_NextBashTime` FUN_0055ac90, `NormalAttackDamageDelay` FUN_00577390 / FUN_00577cd0) | Z03 §3.2 | §4.2 cites only the charge gate and spend |
+| equip conflict helpers `EquipEnumChanger::eec_*` (FUN_00460ff0, FUN_004611c0, FUN_00461360, FUN_004616c0, FUN_00461840) | Z04 §5 | equipment slot logic; §3.2 uses only the releasers |
+| `so_Unmark` callees (`GuildTournamentSystem::PlayerUnRegister` FUN_0047fd50 etc.) | Z16 (planned: guild tournament system) | §4.3 cites `so_Unmark` only for its charge flush |
+| `sp_NC_MAP_LOGINCOMPLETE_CMD` / `so_Routine` / `ws_save2worldmanager` / `so_SaveItem_Part` other callees (`ci_FillBufferInventoryTotal` FUN_00644220 …) | Z01 §8, Z07 | login, routine and save frameworks; §3 cites only the item-action calls |
+| map-script `GTItemAction`, `ShineCostumeCreate` / `TakeOff` script nodes (FUN_004f65a0, FUN_004f68c0, `so_ply_Script_Costume*` FUN_00518fb0 / FUN_005191b0) | Z09 §16.5 (done, documented) | script actions; §4.5 points there |
+| STL / container helpers reached from the documented code (FUN_0048c560, FUN_005b1b60, FUN_00463f20, FUN_005d06d0, FUN_0047a8c0, FUN_005cf320, FUN_0047bd60, FUN_004480c0, FUN_00564fa0) and the box constructors (`<unnamed-type-sp_Item>` FUN_00549820 in the player ctor, the static `so_defiteminven` initialiser FUN_006985d0) | – (no behaviour) | `std::map` / `vector` / `_Find` instantiations and plain constructors; nothing protocol- or rule-relevant |
+| `ActionViewInfo.shn`, `ReactionType.shn` (loaded next to the item-action tables) | Z02 | emote / reaction view data, not item actions |
+| mini-house furniture endurance (`MiniHouseEndure.shn`, `0x3033`, `0x348B`) | Z04, Z05, Z06 | similar name ("endure"), different system |
+
