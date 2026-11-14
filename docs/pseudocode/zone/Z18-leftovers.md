@@ -276,6 +276,358 @@ line, `ShineExit`.
 
 ---
 
+## 3. Z03: combat, skills, abnormal states
+
+Rows "Abnormal states" (18) and "Skills, attacks and target scans" (35) of Z09 §31.2, the packets 0x2442 / 0x2443
+(§31.3) and the "Skill-side helpers" open points of Z09 §31.5. Context: Z03 §5 (skills), §6 (abstates), §7.2–§7.3
+(death, shelters, revive). Names *(pdb2016)*; `g_AbActiveInfo` (Z03's name) is the PDB's `abstateidentarray`.
+
+### 3.1 The SubState → actor table: `ActorCluster`
+
+`AbnormalStateContainer::ActorCluster::ActorCluster` FUN_00405a10 builds the global `actorcluster` (0x384 bytes):
+one actor object per member (each just a vftable), then `ac_SubStateList[120]` (+0x1a4) = `SubState` → actor. It
+zeroes the list, fills every index and asserts "ActorCluster : Buffer not full" + `ShineExit` if one stays null.
+`aeo_Set` FUN_0040a340 (Z03 §6.2) is its only reader: `g_AbActiveInfo[index].actor = actorcluster.ac_SubStateList[sub.Type]`.
+`~ActorCluster` FUN_00406330 resets the vftables. This replaces Z03 §6.1's actor table, which was read from the class
+names (corrections in knowledge Z18):
+
+| `SubState` (enum, pdb2016) | Actor class |
+|---|---|
+| 16 DAMAGESHIELD, 92 UBAUP, 93 UBADOWN | `SubAbnormalStateActorShield` |
+| 17 MANASHIELD | `…ActorManaShield` |
+| 22 BLOODING, 27 DOTDAMAGE, 33 POISON, 67 KNOCKBACK, 83 BURN, 84 FITBLOODING, 94 BURNPAINME | `…ActorPoison` (67 see Z18-B5) |
+| 24 MAXHPRATE, 25 MAXSPRATE, 39 MAXHPPLUS, 40 MAXSPPLUS | `SubAbnormalStateMaxHP` |
+| 26 DEADHPSPRECOVRATE | `…ActorPartyRecharge` |
+| 28 FEAR / 70 CAPTIVATE / 105 CANNOTTARGET | `SubAbnormalStateFear` / `…Captivate` / `…CannotTarget` |
+| 29 CONHEAL / 41 CONSPHEAL / 66 CONHPSPHEAL | `…ActorHPHeal` / `…SPHeal` / `…HPSPHeal` |
+| 30 CASTINGTIMEPLUS / 118 DELCASTING | `…ActorCastDelay` / `…ActorDelCastTime` |
+| 31 COOLTIMEREMOVE | `…ActorIgnoreCoolTime` |
+| 32 MAGICATTACKNOUSE / 88 ONETIMECANNOTUSESKILL | `…ActorSilence` / `…ActorSilencetoone` |
+| 34 DISEASE | `…ActorDisease` |
+| 58 SELFREVIVE / 59 RANGESHIELDCOUNTER | `…ActorSelfRevive` / `…ActorRangeIntercept` |
+| 75 ANGRY (member `ac_TOTALDAMAGERATE`) / 76 DAMAGENEGLECT (`ac_TOTALDAMAGERATE_BYDEF`) / 77 TIMEATTACK | `…ActorLastDmgRatio` / `…LastDmgRatio_DefSide` / `SubAbnormalStateActerTimeAttack` |
+| 78 DETACHPROCESS | `…ActorDetachProcess` |
+| 82 GTI, 95 BURNPAINFOE, 101 MENDOWNRATEME (member `ac_SPDOWNRATEME`) | `…ActorAreaDamage` |
+| 97 BOMBSHOT | `…ActorBomb` |
+| 100 USESPDOWN | `…ActorUseSPDown` |
+| 106 HIDEDAMAGE / 107 MAGICFIELD | `…ActorHideDamage` / `…ActorMagicField` |
+| 109 EXPRATE / 110 DROPRATE | `…ActorExpUpRate` / `…ActorDropUpRate` |
+| 113 DISPEL | `…ActorDispel` |
+| 114 RANGEDMGDOWNRATE / 119 RANGEDMGDOWNRATEATK | `SubAbnormalStateDamageMinus` / `SubAbnormalStateRangeDamageMinusAtk` |
+| 115 DMGSHIELDRATE / 116 DMGDOWNRATE / 117 MINHP | `…ActorShieldHPRate` / `…ActorDamageDownRate` / `…ActorMinHP` |
+| all others (0–15, 18–21, 23, 35–38, 42–57, 60–65, 68, 69, 71–74, 79–81, 85–87, 89–91, 96, 98, 99, 102–104, 108, 111, 112) | base `SubAbnormalStateActor` (no hooks; the stat effect comes from the matrix, Z03 §6.1) |
+
+`SubAbnormalStateActorDmgState` (member `ac_DOTWCRATE`, `sasa_Routine` FUN_0040dc60) is built but in no slot: it is
+never attached (Z18-B5). The actor bodies are Z22's.
+
+**Which SubAbState kinds use the "MagicField" actor** (Z09 §12.8 open point): only SubState 107. `SubAbState.shn` has
+two such rows, `SubStaEglack04` (ID 9300) and `SubStaEglackMad04` (9301), Strength 1, KeepTime 15000 ms, actions
+`SAA_TICK` 1000 (the routine runs every second) and `SAA_SETACTIVESKILL` 29408 / 29414 (the skill whose field
+`sasa_Routine` FUN_00408d80 spreads, Z09 §12.2 (2)); the abstates are `StaEglack04` (494) / `StaEglackMad04` (501).
+
+**`smo_SkillBlastOption` values** (open point): `ShineMobileObject::smo_SkillBlastOption` FUN_0057c750 returns the
+maximum of `actor.vt[0x1c](e)` over the object's abstates (`SkillBlast`: 0 `SB_NORMAL`, 2 `SB_SILENCE`). Every actor
+returns 0 (the base slot is a folded `return 0`) except `SubAbnormalStateActorSilence::sasa_Act_SkillBlast` FUN_0063ecc0
+(→ 2) and `SubAbnormalStateActorSilencetoone::sasa_Act_SkillBlast` FUN_00401d20 (→ 2 and sets the element's
+`aeo_Tick.terminate = now`, so the state ends at the next routine). "One use" is therefore consumed by the first
+**query**, whoever asks: the cast checks (Z03 §5.2 / §5.5, 0xFC7), the item-use check (Z04, 0x3129) or a mob's attack
+choice (Z09 §7.4) *(inferred from the callers)*.
+
+### 3.2 Abstate elements and lists
+
+The element class `AbnormalStateElement` (one per `AbState` row, `abstatetemplate`, 11 virtual slots; subclasses
+`…ElementNormal`, `…Recover`, `…TickRoutine`, `…EachTickRoutine`, `…RestCount`, `…RestCountHPRate`, `…Hide`,
+`…Polymorph`, `…ReinforcedMove`, `…PartyEnchant`, `…CouplePartyEnchant`, `…GuildAcademyMasterEnchant`) is the second
+hook level besides the SubState actor. Its vt 0xc is "party-type enchant" (true only for the three `*PartyEnchant` /
+`GuildAcademyMasterEnchant` classes).
+
+```pseudo
+AbnormalStateElement::ase_AttachObject(cls, e, o)      (element vt 0x1c)                     @ FUN_00401d40
+    if e == null: return
+    g_AbActiveInfo[cls.ase_index].actor.vt[4](e, o)            # the SubState actor's sasa_AttachObject
+    if ActionEffectAbStateTable::FindActionID(AbState.InxName of e, &id):
+        o.so_AddItemAction(id, 0xFFFF)  (vt 0x5d8)              # abstates that switch on an item action (Z04 item actions)
+
+AbnormalStateReinforcedMove::ase_AttachObject(cls, e, victim)                                @ FUN_00401db0
+    # knock-back / pull: the element class of the push abstates (Z09 §9.3 "callers of vt 0xa28")
+    base ase_AttachObject(cls, e, victim)
+    if victim == null or victim.smo_GetMode() (vt 0x484) == 5: return
+    if mode == 4: victim.vt[0x488]()                             # player so_ply_ReinforceFoldtent *(inferred: leaves the sitting / tent state)*
+    sub = AbState entry .strength[e.aeo_Strength] (1…39); caster = e.aeo_GetCaster(); if caster == null: return
+    from = caster.pos
+    first of sub's 4 actions that is one of:
+        SAA_AWAY (49) d = arg:          push away from the caster,      backwards = 1
+        SAA_AWAYBACK (79) d = arg:      pull toward the caster,         backwards = 0
+        SAA_AWAYBACKSPOT (109) d = arg: pull toward e.AbsSetData.CenterLoc (the skill's spot), backwards = 0
+    (none of them → return; d == 0 → return)
+    if pull: d = min(d, dist(from, victim) − victim.so_BodySize() (vt 0x6cc)); d = −d   # stops at the body edge
+    dest = victim.pos + unit(victim.pos − from) · d              (same spot: dest.y += d)
+    if so_FindBlockLocate(victim, dest, |d|, &out, mbi_IsMoveBlock):
+        speed = sub row KeepTime (+0x2b) ≠ 0 ? |d · 1000 / KeepTime| : 500
+        victim.so_ReinforceMove(out, speed, backwards, 0, 0) (vt 0xa28 → 0x2069, Z09 §9.3)
+```
+
+`smo_ShadowStep` FUN_0045ad10 (the third mover, Z03 §5.4; path maths in Z09 §9.3) after the path: caster
+`so_mobile_StopHere` (vt 0xa48), `so_Unmark(2, 0, 3)`, position = last path point, `fm_Marking`; marking fails →
+`so_Disconnect(0x685)` (vt 0x5f8; a kick code, not in the client table); else face the target, broadcast to sight
+0x206A NC_ACT_REINFORCEMOVEBYPATH_CMD `{u16 mover, u16 speed = 500, u8 direct, u8 pathlength, SHINE_XY_TYPE path[n]}`
+(6 + 8n bytes, packets-zone.md), set `STA_CANNOTCONTROL` (350) on the caster for `pathLen · 1000 / 500` ms (how 9) and
+inform it, and halt the move manager unless it is in `MM_REINFORCEMOVE`. `NPCAction::BallAction::exe` FUN_005c1390 is
+Z09 §16.5 (actions).
+
+| Function | Address | What it does / where it plugs in |
+|---|---|---|
+| `AbstateElementInObject::aeo_CompName(list, i, other)` | FUN_004065c0 | `other.aeo_Index − this.aeo_Index`: the `List` compare callback (Z11 cites it) |
+| `aeo_GetAbstateElement` | FUN_004067b0 | element class of `aeo_Index` from `abstatetemplate` (null when out of range); readers `so_RecalcAbstateParam` (Z12 §2.5), `so_Dispel` (§3.4), `ab_SaveAbstate`, `lid_Call` |
+| `aeo_GetCaster` | FUN_00401b90 | `aeo_Caster.obj` if it still exists with the same `so_GetCharRegistNumber` (vt 0x344) as `aeo_Caster.chrregnum`, else clears the pointer and returns null; readers: ReinforcedMove above, MagicField / Bomb actors |
+| `aeo_GetRestTime` | FUN_00408990 | remaining ticks rounded up to whole seconds × 1000 (ms), 0 when expired (Z12 §5.4); also `so_FillBriefABState`, `ab_SaveAbstate`, `so_KilledBy` |
+| `aeo_GetStrength` | FUN_004011e0 | `aeo_Strength` (u8) |
+| `~AbstateElementInObject` | FUN_00401b20 | destroys the two embedded objects `aeo_SetItemEffect` (+0x60) and `aeo_Tick.nextaction` (+0x24) (folded no-op dtor) |
+| `AbstateListInObject::AbstateListInObject` | FUN_0040cf10 | 28 in-place elements `asl_Element[28]` (0x74 each) and `asl_List` (+0xcb0, `l_MakeList(28)`), every list slot pointing at its element: **an object holds at most 28 abstates at once**. From the `ShineMobileObject` ctor FUN_005591c0 and the static `so_defabstatelist` |
+| `asl_Check_SameAbstate(idx, strength)` | FUN_0040c180 | true when `idx` is set (`asl_Abstate_IsSet`) with exactly that strength (1…39); only caller `sp_UseItemMinimon_NormalRoutine` FUN_00564040 (Z13: the mini-pet does not re-cast a buff already present) |
+| `asl_GetAbstateList` | FUN_00401250 | `&asl_List` |
+| `asl_IsHereBad` / `asl_IsHereGood` | FUN_0040ad40 / FUN_0040abb0 | any element whose `AbState.DispelIndex` is ≠ / == `DA_GOOD` (1); used by the target rules `so_mob_CanMyTarget` FUN_004ade40 / `so_ply_CanMyTarget` FUN_004ae010 (and twins FUN_004ae280 / FUN_004ae450) for skills restricted to buffed / debuffed targets |
+| `ListTraveler<AbstateElementInObject>::lt_Next` | FUN_00402740 | iterator step (`lt_CurrElement = lt_NextElement`, follow `ls_Next`); false at the end |
+| `AbStateStrArgument::assa_IsHaveEffect(action)` | FUN_00416190 | true if one of the SubAbState row's 4 `assa_Effect[i].action` equals `action`; the actors' guard (24 callers, Z22) |
+
+```pseudo
+AbstateListInObject::asl_SendAfterLogin(list, p)                                              @ FUN_0040aed0
+    for each active element e: aeo_InformAfterLogin(e, p)                                       @ FUN_00409a20
+        cls = element class of e; if cls == null or cls.vt[0xc]() (party-type enchant): skip
+        ms = ceil((e.terminate − now) / 10) · 1000
+        p.so_AbnormalState_Inform(e.index, ms, 0) (vt 0x3f0 → 0x242A NOEFFECT)
+        so_AbnormalState_BroadcastSet(p, e.index, ms, e.strength)   (0x2427 / 0x1C18, Z03 §6.3)
+    # callers: 0x1803 login (Z01 §6), sp_ReviveNow FUN_0057d290, sp_ReSetSendMyBriefInfo FUN_00441b10,
+    #   alcm_SendBriefInfo FUN_00441c50, so_ply_SendBriefInfo_MoveLayer FUN_00441ed0 (Z02 §5)
+```
+
+### 3.3 Death shelters: `AbstateShelter`
+
+`g_ShelterItem` / `g_ShelterDie` (Z03 §7.2) are `AbnormalStateShelter::AbstateShelter` = `vector<AbstateBuffer> as_Safe`;
+`AbstateBuffer` (0x14) = `{ ulong ab_Master (charNo, 0xFFFFFFFF = free), vector<AbstateElementInObject> ab_List }`.
+
+```pseudo
+AbstateShelter::operator[](sh, charNo) → AbstateBuffer &                                     @ FUN_00418890
+    buffer with ab_Master == charNo → it;  else the first free one (ab_Master = −1) → claim it (ab_Master = charNo)
+    else push_back {charNo, empty} and return the new last one          # never shrinks
+AbstateShelter::as_Remove(sh, charNo)                                                         @ FUN_00417520
+    every buffer of charNo: ab_Master = −1                      # the element list is NOT cleared here
+AbstateBuffer::ab_Recover(buf, o)                                                              @ FUN_00417ef0
+    for each saved element: aeo_Recover(e, o)                                                   @ FUN_004176c0
+        if e.terminate <= now: skip                              # expired while dead
+        ms = (e.terminate − now) · 1000 / 10
+        if o.so_AbnormalState_Set(e.caster, e.index, e.strength, entry, now, 0, e.aeo_RestCount, ms, how 11) (vt 0x638):
+            if not a party state (PartyRange == 0 or PartyEnchantNumber == 0): BitSet; BroadcastSet(ms); Inform(ms, 0)
+            o.vt[0x528]() (recalc)
+    # callers of all three: 0x482A sp_NC_SKILL_REPLYREVIVE_CMD (Z03 §7.3), uib_Effect FUN_00418b60 (revive item, Z04),
+    #   sp_ReviveReqProcess FUN_00451bd0 (Z07); operator[] also from so_KilledBy (store) and 0x1103 REBIRTH_REJECT (Z07)
+```
+
+A claimed buffer keeps its old `ab_List` until the next store overwrites it *(inferred: `so_KilledBy` fills the buffer;
+not re-read)*.
+
+### 3.4 Dispel, cure and the caster-side abstate
+
+```pseudo
+ShineMobileObject::smo_Dispel(a, s, empower, t, bos)                                          @ FUN_0057d8e0
+    # from smo_SkillBlast (Z03 §5.6, section D) for EffectType SE_DISPEL / SE_CURE
+    mask = 0  (bit n = DispelAttr n: 1 GOOD, 2 DEBUFF, 3 DISEASE, 4 POISON, 5 CURSE, 8 DEEPER, 9 HIDE, 10 BOMB)
+    if not a.so_mobile_IsEnemy(t) (vt 0x72c):                    # friendly target: remove bad states
+        SE_CURE → mask = DISEASE | POISON (0x18)
+        SE_DISPEL → DISPELDEBUFF 0x4 | DISPELDISEASE 0x8 | DISPELPOISON 0x10 | DISPELCURSE 0x20 | BOMBDISPELALL 0x400
+    else if not s.DISPELDEEPER: mask = s.DETECT ? HIDE (0x200) : GOOD (0x2)   # enemy: strip buffs / reveal
+    else: mask = DEEPER (0x100) if t has a STA_DEEPER element set by a (aeo_IsMine), else 0
+    a.so_SkillCure(t, smash, bos)  (vt 0x5a4);  a.so_Dispel(t, smash, bos, mask)  (vt 0x5a8)
+    result slot: target t, isenchant = 1, isresist = 0
+
+ShineMobileObject::so_SkillCure(a, t, smash, bos) → bool                                      @ FUN_0042c440
+    if t == null or t dead (mode 3) or not s.CURE: return false
+    walk t's abstates; first element with DispelIndex DISEASE or POISON and AbState.StateGrade <= s.CURE value:
+        e.aeo_Flag |= f_Cured; e.terminate = now; return true
+    # a 1000-roll "< 1001" guards each element: always true (original bug) Z18-B6
+
+ShineMobileObject::so_Dispel(a, t, smash, bos, mask) → bool                                   @ FUN_0042bf70
+    if t == null or t dead: return false
+    if t.so_MiscTable() (vt 0x984) row has Dead.ByDebuff (+0x58 bit 0) and mask & GOOD:
+        t.so_DamagedBy(t, t.HP, 1000, 1) (vt 0x5c0); return true   # servants that die to a dispel (Z09 §13.3)
+    forward over t's abstates (same always-true roll, Z18-B6), elements whose DispelIndex bit is in mask:
+        s.DISPELONE  → e.terminate = now; return true            # first match only
+        s.DISPELALL  → e.terminate = now
+        s.DISPELRANDOM → reservoir pick: the k-th match replaces the pick with probability 1/k (RandomBox)
+        s.BOMBDISPELALL → e.aeo_Flag |= f_Dispeled; e.terminate = now   # the Bomb actor's detach sees the flag (Z22)
+    backward over t's abstates, first element with a mask bit and s.STEALENCHANT whose element class is not a
+    party-type enchant (vt 0xc):
+        if rand1000 < STEALENCHANT value: e.terminate = now on t;
+            a.so_AbnormalState_Set(a, e.index, e.strength, entry, e.start, 0, e.aeo_RestCount, 0, how 6) → on success
+            BitSet, Inform(KeepTime, 1), BroadcastSet(KeepTime, strength): the caster now has the state
+        stop after this one element, stolen or not
+    random pick (2 or more candidates seen): pick.aeo_Flag |= f_Dispeled; pick.terminate = now
+    return: true after a steal or an ALL / BOMB removal *(the decompiled return byte is unclear for the random path)*
+
+ShineObject::so_AbnormalState_Set_SS_SETABSTATEME(o, &abstate, &keeptime) → bool  (vt 0x648)  @ FUN_00416880
+    # a skill's SETABSTATEME on the caster: smo_SkillBash_Blast FUN_0057cd40, smo_MagicFieldSpread FUN_0057c880
+    entry = AbState by ID abstate.value (> as_maxhandle → assert "as_FromID : Invalid skill id"); none → false
+    if o.so_AbnormalState_Set(o, entry.index, strength 1, entry, now, 0, 0, keeptime.exist ? keeptime : −1, how 13):
+        BitSet; BroadcastSet(index, 0, 1); Inform(index, 0, 0); return true
+```
+
+### 3.5 Skill target scans and random targets
+
+`AxialListScanSkillTarget` (0x758, base `AxialListLimitAreaScan`) adds `alsst_attacker` +0x730, `alsst_attackPos`
++0x734, `deque alsst_RandomTargetList` +0x73c, `alsst_nEffectForJustSkill` +0x754. Its four subclasses differ only in
+their scan filter (vtable): `AxialListNearScanSkillEnemy` (`Last` = TARGET_ENEMY), `…Party` (PARTY / GROUP), `…Friend`
+(FRIEND), `…EnemyUser` (ENEMYUSER); the base class is used for TARGET_ALL. Constructors FUN_0057e0f0 (base),
+FUN_0057e1a0 / FUN_0057e260 / FUN_0057e360 / FUN_0057e420 (subclasses): `AxialListLimitAreaScan` ctor, empty deque,
+counters 0; `~AxialListScanSkillTarget` FUN_0057e320 frees the deque. `alsst_SetAttacker(a)` FUN_005793b0 stores `a` and its
+position. The blast functions use five global instances (`alnse`, `alnsp`, `alnsf`, `alnsst`, `alnseu`, Z03 §5.6);
+these ctors are reached only from the random-target helper below, which builds its own five on the stack.
+
+```pseudo
+ShineMobileObject::so_smo_GetRandomTarget_Object(m, s, range, from) → object  (vt 0xc1c)       @ FUN_0057e660
+    # mob AI "skill on a random target" (Z09 §7.4, sk.First ≠ SPOT)
+    if s or s.sdi_Activ is null or m has no position: return null
+    scanner by s.Last: ENEMY → …Enemy, PARTY / GROUP → …Party, FRIEND → …Friend, ALL → base, ENEMYUSER → …EnemyUser,
+        else return null
+    alsst_SetAttacker(scanner, from.vt[0xb8c]()) ; attackPos = m.pos
+    so_AllOfRange(from, m.pos, range, scanner); alns_Sort
+    exclude = m's own handle; if s.TOPAGGRONO and ≥ 2 candidates and m.so_mob_GetTopAggroTarget() (vt 0xc18):
+        exclude = that target's handle                            # "not the tank"
+    alsst_MakeRandomTargetList(scanner, 1, exclude); return its first entry or null
+
+AxialListScanSkillTarget::alsst_MakeRandomTargetList(sc, want, exclude)                       @ FUN_0057e4e0
+    clear the deque; want = min(want, candidates)
+    while deque size < want and candidates left:
+        pick a random candidate (RandomBox[count]; count ≥ 101 → index 0); remove it from the candidate array
+        (swap with the last)
+        keep it when it is not `exclude` and the straight line attacker → it is free
+            (so_FindBlockLocateFrom(attacker, attackPos → its pos, 10000, mbi_IsAttackBlock) reaches its pos)
+
+ShineMobileObject::so_smo_GetRandomTarget_Locate(m, s, &out) → bool  (vt 0xc20)                @ FUN_00579910
+    # mob AI SPOT skills (Z09 §7.4)
+    r = rb_largerandom(s.Range); angle = RandomBox[64] · 180 / 64 (sr_sin1024 / sr_cos1024 units)
+    p = m.pos + r · (sin, cos)
+    so_FindBlockLocate(m, p, 2r, mbi_IsAttackBlock) then again with mbi_IsMoveBlock: out = the reachable point; true
+    (either fails → false; the AI then uses the target's position)
+```
+
+`FanFormSectorArgument::FanFormSectorArgument(caster, target)` FUN_0057bda0 (0x14: `ffsa_shineradian`, `UnitVector
+ffsa_chardirect`): the cone direction = unit vector caster → target; when target == caster, toward the caster's current
+target (vt 0xa04) if any. From `sbe_BlastObject` FUN_00583bc0 for cone skills (Z03 §5.6, `SkillDegree`).
+
+### 3.6 0x2442 / 0x2443: trap blasts `smo_SkillBash_Blast_Trap`
+
+The only caller is `MobExplosionBase::meb_Explosion` FUN_004a7960 (mines and traps, Z09 §8.8: `blastMode` 1 / 3 → Loc,
+2 / 4 → Obj), so these packets announce a trap's skill without a cast phase.
+
+```pseudo
+ShineMobileObject::smo_SkillBash_Blast_Trap(Obj)(o, t, empower, s)                           @ FUN_005838a0
+    broadcast to sight of o (incl. o) 0x2442 NC_BAT_SOMEONESKILLBASH_OBJ_CAST_CMD {
+        u16 skill = s.sdi_Activ.ID, u16 caster = o.handle, u16 target = t.handle }                 # 6 bytes (pdb2016)
+    (copies o's name into the `namestring` ring; unused)
+    SkillResultBuffer::bufferpoint = 0
+    if s.TargetNumber == 1:
+        smo_SkillBlast(o, s, o.smo_SkillCast.scs_BattleSkill.target, &o.smo_SkillCast.scs_Empower, −1, MultiHitArgument(), 1, 1000)
+        # (original bug) Z18-B7: neither t nor the empower argument is used
+    else:
+        scanner by s.Last: ENEMY → alnse, PARTY / GROUP → alnsp, FRIEND → alnsf, ALL → alnsst
+            else assert "smo_SkillBash_Blast : Invalid TargetType" and skip the blast   # ENEMYUSER: (original bug) Z18-B7
+        attacker = o; no AreaSkill row: circle of Area/2 around t (self not included);
+        else the AreaSkill shape from o's position and facing (allas_Init / allas_GetEffectCoord, radius row +0x34)
+        so_AllOfRange; qsort by distance; alsst_SkillBlast(scanner, s, &o.smo_SkillCast.scs_Empower, TargetNumber, null)
+    smo_SkillResultPacket(o, s, t.pos)            # the results (Z03 §5.4); sds_Finish in meb_Explosion sends 0x2452
+
+ShineMobileObject::smo_SkillBash_Blast_Trap(Loc)(o, xy, empower, s)                          @ FUN_005835e0
+    broadcast to sight of o (incl. o) 0x2443 NC_BAT_SOMEONESKILLBASH_FLD_CAST_CMD {
+        u16 skill = s.sdi_Activ.ID, u16 caster = o.handle, SHINE_XY_TYPE loc = xy }               # 12 bytes (pdb2016)
+    always the area path (also for TargetNumber 1): scanner by Last incl. ENEMYUSER → alnseu; circle Area/2 around xy
+    (self included) or the AreaSkill shape; alsst_SkillBlast(scanner, s, empower, TargetNumber, null)
+    smo_SkillResultPacket(o, s, xy)
+```
+
+Client *(2016 handlers, names from the 2017 PDB)*: `GameFrameWork::On_NC_BAT_SOMEONESKILLBASH_OBJ_CAST_CMD` FUN_0049a460
+looks up caster and target (`GetCharByHandle`, opcode 0x2442 for the log); if the caster exists, is not the own
+character and the target exists: `caster.ActSkill(target, 1, skill)` (vt 0x138) and `AdjustMove` (vt 0x218).
+`On_NC_BAT_SOMEONESKILLBASH_FLD_CAST_CMD` FUN_0049a4d0: caster found and not the own character →
+`Char::SetSkillTargetGroundPoint(x, y, 1)`, `ActSkill(x, y, 1, skill)` (vt 0x134), `AdjustMove`. Same code in the 2017
+client (FUN_0049de40 / FUN_0049deb0). No error codes. A trap the client does not know (hidden by `StaEntrapHide`)
+shows nothing: the handle lookup fails.
+
+### 3.7 Blast queue, multi-hit and damage tables
+
+`sbec_Store` FUN_00438380 (Z03 §5.6) queues each blast into `g_BlastEffects`; the row functions plug in there:
+
+| Function | Address | What it does / where it plugs in |
+|---|---|---|
+| `SkillBlastEffect::SkillBlastEffect` | FUN_00434c60 | 0x6c-byte queue entry; only initialises its `sbe_MultiHitArgument` like the ctor below |
+| `MultiHitArgument::MultiHitArgument` | FUN_00434b30 | `mha_HitStep = −1` (single hit), `mha_DamageRate = 1000`, 4 × `{rate 0, MAX_ABSTATEINDEX, strength 0}`; also built by `alsst_SkillBlast`, `alsst_SkillBlast_RandomTarget`, `meb_Explosion`, Trap(Obj) |
+| `mha_SetAbState(i, name, rate, strength)` | FUN_00434de0 | slot i ← AbState by InxName (`as_BTreeIndex`); `"-"` or unknown name → empty slot. `sbec_Store` fills the 4 slots from the skill's `StaNameA…D` / `StaSucRateA…D` / `StaStrengthA…D` for single-hit skills |
+| `MultiHitData::MultiHitTable::operator[](id)` | FUN_004c0a90 | `MultiHitType.shn` row (0xa8: `mhe_ID`, `OneHit mhe_Array[10]`, `mhe_ArrayCnt`; loader `mht_Load` FUN_004c0ff0, Z01) by index, null if out of range or `mhe_ID ≠ id` |
+| `DamageBySoul::SoulDamageContainer::operator[](n)` | FUN_00434db0 | row n of `DamageBySoul.txt` (`ushort sde_DamageRateBySoul[8]`, loader `sdc_Load` FUN_0045d070), `sdc_Default` when out of range |
+| `SkillBlastEffectContainer::sbec_ListCheck` | FUN_004358a0 | empty (profiler only); called after every insert |
+| `DamageByAngle::DamageTable::operator[](delta)` | FUN_0045c9a0 | back-attack rate (‰) for an angle difference: `|delta|` folded into 0…90 (`delta > 90` → `delta − 180·k − 180`, then `|…|`), else assert "Invalid delta" and 1000; from `roe_CalcDamage` / `roe_AttackPowerCalcDamage` (Z03 §4.5) |
+
+```pseudo
+sbec_Store multi-hit part (s.HitID ≠ 0 and chain depth ≤ 1):                                  (in FUN_00438380)
+    row = g_MultiHitTable[s.HitID]; missing → nothing is queued (the skill does nothing)
+    soul = s.DemandSoul ? DamageBySoul[DemandSoul].sde_DamageRateBySoul[souls held] : 1000
+    for i, hit in row.mhe_Array while hit.oh_HitTimeRate ≠ 0:
+        queue {fireAt = now + oh_HitTimeRate · 10 / 1000 − 2, mha_HitStep = i, mha_AraeStep = oh_AreaStep,
+               mha_DamageRate = oh_DamageRate · soul / 1000, mha_AbState[0] = {oh_AbStateRate, oh_AbState, oh_AbStrength}}
+    # multi-hit skills apply only the row's one abstate per hit, not the skill's StaNameA…D
+single-hit: mha_DamageRate = soul, the 4 skill abstates, fireAt = now + smo_SkillBlastTick(s) (or SHOTSPEED flight
+    time: dist · 1000 / SHOTSPEED · 10 / 1000, ≥ 1, plus the blast tick for the first chain step) − 2 unless RANDOMTARGETNUMBER
+the queue is kept sorted by fireAt (insert before the first later entry)
+```
+
+`SkillDamageSender::sds_Initialize` FUN_00437ba0 empties the `SkillDamage` vector (`resize(0)`), here from
+`meb_Explosion` (Z03 §5.6 shows the `sbec_Routine` use). `SkillEffectEraser::~SkillEffectEraser` FUN_00437c40 is the
+scope guard of `sbec_Routine` FUN_00437fc0: on leaving it erases the entry `see_Skill` from `see_List` (vector erase,
+0x6c-byte moves), i.e. pops the processed blast also when an exception unwinds.
+
+**Damage-absorb flag consumer** (Z09 §31.5 open point). `smo_Flag.DamageAbsorb` (bit 7 of +0x1e78) is set by an
+NPC protector that took the hit for the player (`DamageAbsorbAction::exe` FUN_005c11a0, Z09 §16.6, which broadcasts
+its own 0x2449) and cleared by `so_ply_CheckDamageAbsorption` FUN_00579860 at the start of every damage step and at
+0x1803. It is read through `smo_GetFlagDamageAbsorb` FUN_005558c0 (vt 0xbec) right after the damage was applied:
+
+```pseudo
+smo_SwingDamage(a, d)  (basic attack, Z03 §3.2)                                              @ FUN_00432f30
+    … damage applied, passive triggers (vt 0xbf8) …
+    if d.smo_GetFlagDamageAbsorb(): skip the 0x2448 NC_BAT_SWING_DAMAGE_CMD broadcast for this hit
+SkillDamageSender::sds_TemplateStore(a, result)  (skill hit, Z03 §5.6)                       @ FUN_005803c0
+    … hpchange, resthp = target HP …
+    if not target.smo_GetFlagDamageAbsorb(): push the SkillDamage entry      # else the target is left out of 0x2452
+```
+
+So a fully absorbed hit is shown to clients only as the protector's 0x2449; the victim's own damage line is dropped.
+
+### 3.8 Player attack timing and the rest
+
+| Function | Address | What it does / where it plugs in |
+|---|---|---|
+| `ShinePlayer::TimeScheduler::TimeScheduler` | FUN_005697c0 | `p.sp_TimerStr` (Z03 §3.1 "`p.action`"): `ts_Limit = 0`, both callbacks = a `return 0` stub, `ts_CurWork = TSCW_NONE`. PDB layout: +0 `ts_Limit`, +4 `ts_CallFunc`, +8 `ts_DefaultReturn`, +0xc `ts_CurWork`, +0x10 `ts_TimerFunc`; `TS_CurWork`: 0 NONE, 1 MISC, 2 NORMALATTACK_SWING, 3 NORMALATTACK_DAMAGE, 4 LOGOUT |
+| `TimeScheduler::ts_IsInNormalAttack` / `ShinePlayer::sp_IsNormalAttack` | FUN_0042abb0 / FUN_00560230 | `ts_CurWork` ∈ {2, 3}. The first from 0x242B BASHSTART, 0x2440 / 0x2441 casts, 0x2017 / 0x2019 moves, item active skills; the second from the captivated-mob AI `mab_Think` FUN_004b99e0 / `mab_CaptivatePlayerAttack` FUN_004ba0d0 |
+| `ShinePlayer::so_ply_setSwingTime(t)` | FUN_00560ae0 | `sp_SwingTime = t`; only the player ctor (0) |
+| `NormalAttackDamageTick::NormalAttackDamageTick` / `nadt_Clear` | FUN_00577cd0 / FUN_00577e30 | the delayed-hit queue `p+0x173d0` (Z03 §3.2): ctor pushes 8 empty `NormalAttackDamageElement {nade_Tick, nade_Target, nade_AttackSequance, nade_MissileFlyMilliSec}` and resizes to 0 (pre-allocates); `nadt_Clear` = resize(0), from 0x242B, 0x1803, 0x2017 / 0x2019 (moving drops pending hits) |
+| `ShinePlayer::sp_SkillShiftCancel` | FUN_0057bcd0 | if `smo_Flag.InSkillShift` (bit 4 of +0x1e78): log "…sp_SkillShiftCancel : Cancel" (stdout), `smo_CastAbort` (vt 0xed4), clear the bit and `+0x1d84`; from 0x2017 / 0x2019 moves and `so_ReinforceMove` (Z09) |
+| `ShinePlayer::sp_SkinPolymorph(mob, abstate, broadcast)` | FUN_004a3280 | brief `polymorph = mob`, `sp_nPolymorphAbstateIndex = abstate` (MAX when mob == 0xFFFF); 0x10AF NC_CHAR_POLYMORPH_CMD `{u16 player, u16 polymorph, u32 AbstateIndex}` to sight incl. p (broadcast 1) or to p only (assert text copied from "sp_NC_MAP_LOGINCOMPLETE_CMD"); from `sp_SetAbstatePolymorph` FUN_004a33c0 and 0x1803 (Z07 §3.4 documents 0x10B0) |
+| `BattleObjectGroup::BattleObjectStruct(att, def)` | FUN_00434bb0 | 0x98-byte per-hit record copied from the zero template `battleobjectstructclear`, then `bos_Attacker` / `bos_Defender`; fields `bos_Damage`, `bos_Heal`, `bos_AbsoluteAggro`, `bos_DamageRateAggro`, `bos_MyHealHit`, `bos_MyHealKill`, abstate and dispel lists, `bos_StealedEnchant`; from `so_Bash` FUN_0042e950, `smo_SkillBlast`, `smo_old_skill_blast` |
+| `BattleObjectList::bol_Store` | FUN_00434ee0 | empty (profiler only): the battle records are built and passed around but never stored |
+| `BattleStat::bs_Clear` | FUN_0043be00 | zero the counters (`bs_KillScore`, `bs_DamageAmount`, `bs_HealAmount`, `bs_SkillBlast`, `bs_CriticalNum`, `bs_HittedNum`, `bs_KnockDownNum`, `bs_Dead`, `bs_Kill`), `bs_Score = 10000`; from 0x1803 |
+| `CharaterSkillList::CharaterSkillList` | FUN_00447eb0 | `p+0x17d0c` (Z03 §5.1): empty `csl_Skill` reserved for 3000 entries (0x14 each), `csl_SkillNumber = 0`, empty `csl_ToggleSkill`; player ctor |
+| `csl_EmpowerSummary` | FUN_00445070 | sum of the four 4-bit fields of every skill's `SKILL_EMPOWER` (+8): the points spent; from `sp_GainExp`, `&levelup`, `so_charskilldata`, 0x4811 (Z03 §9.1), `so_ply_InitSkillEmpow` |
+| `CharacterPassiveList::CharacterPassiveList` | FUN_00447200 | Z20 §6.5 (1000-bit passive set) |
+| `SkillDataBox::sdb_SpecSkillStruct` | FUN_0046a410 | Z20 §5.1 |
+| `ShinePlayer::sp_HPChangeCheck` | FUN_0055e130 | calls vt 0x4e8 and 0x484 and discards both: no effect (Z11, `&sethp`) |
+| `learnSkill(o, skill, isPassive)` | FUN_005a1790 | GameDB 0x4801 NC_SKILL_SKILLTEACH_REQ `{u16 handle, u32 charNo, u32 charNo, u16 skill, u8 isPassive, u16 0xFFFF}` (17 bytes; layout as Z03 §9.4); the answers are Z03 §9.3. Only caller: the wedding reward `gds_NC_CHAR_WEDDING_DO_ACK` FUN_005a1830 (Z07) |
+
+### 3.9 Open point: B31's player-rule twin
+
+`ShinePlayer::so_mobile_ICanDamageTo` FUN_004361a0 (Z03 §3.3): in the type-4 KQ branch "same raid" is computed as
+`p.raid (vt 0xa84) and d.raid exist and p.raid.number == p.raid.number`, i.e. any two raided players count as one raid
+(original bug) Z18-B4. The normal branch compares p with d correctly. Z09-B31 is the mover copy.
+
+---
+
 ## 5. Z06: trade, booths, gambling (constructors)
 
 | Function | Address | What it does / where it plugs in |
@@ -296,6 +648,10 @@ line, `ShineExit`.
 | Z18-B1 | Z01 `csm_AddClientSessionToIPGroup` FUN_0045c720 | when the 10th not-yet-logged-in session of one IP arrives, the 10-slot group is erased from the vector without `delete[]` | 40 bytes leaked per event (a flood from one IP leaks steadily) | `delete[] g` as `csm_Remove…` does |
 | Z18-B2 | Z01 0x0806 `sp_NC_MISC_SEED_REQ` FUN_00451a30 | reachable only with session mode 2 and player mode 0 (mode mask 0x01), i.e. after a 0x1803 that bailed out before `mode = 1`; it then sends a new seed from its own counter `newseed` without moving `sp_Encryption` | in practice dead; if reached the client switches its XOR index and every later packet decrypts wrong | drop the handler (the seed is sent at accept, §1.3), or set `pe_point` as `so_EncSeedSet` does |
 | Z18-B3 | Z01 `ClientSession::zbs_Parsing` FUN_004fb9f0 | in session mode 1 (and −1) an out-of-sequence packet is only logged to `InvalidSessionCutLog`; in mode 0 it is dropped silently | a client can send anything before 0x1803 without being cut | close the session, as Login and WM do |
+| Z18-B4 | Z03 `ShinePlayer::so_mobile_ICanDamageTo` FUN_004361a0, §3.9 | in the type-4 kingdom-quest branch the "same raid" test compares the attacker's raid number with itself | two players who are each in any raid count as raid mates there: they cannot hit each other unless their guilds are at war | compare with the target's raid (as the normal branch does); twin of Z09-B31 |
+| Z18-B5 | Z03 `ActorCluster::ActorCluster` FUN_00405a10, §3.1 | slot 67 KNOCKBACK gets the Poison actor (the register still holds `&ac_POISON`); the `ac_DOTWCRATE` actor (`SubAbnormalStateActorDmgState`) is constructed but put in no slot | the DmgState actor (its `sasa_Routine` FUN_0040dc60) is dead code; the 17 knock-back rows run Poison's routine (what that does with rows that have only `SAA_AWAY*` actions: Z22) | 67 → the base actor or `ac_DOTWCRATE`; intent unknown |
+| Z18-B6 | Z03 `so_Dispel` FUN_0042bf70, `so_SkillCure` FUN_0042c440, §3.4 | every element is guarded by `well512_GetRandom(1000) < 1001` | the guard is always true (dead check) | a per-state dispel / cure chance |
+| Z18-B7 | Z03 `smo_SkillBash_Blast_Trap(Obj)` FUN_005838a0, 0x2442, §3.6 | a single-target trap skill hits `o.smo_SkillCast.scs_BattleSkill.target` with `scs_Empower`, not the target and empower it was given; `Last` = ENEMYUSER is not handled (assert, no blast) | `blastMode` 2 / 4 single-target traps hit the servant's stale cast target (or nobody); 0x2442 still names the given target. ENEMYUSER trap skills on an object do nothing (the Loc version handles them) | use `t` and `empower`; add the ENEMYUSER scanner |
 
 ## 8. Not reconstructed / uncertain
 
@@ -307,3 +663,10 @@ line, `ShineExit`.
 - `zs_connect`'s client path: the ClientSessionManager's take function (vt 0) was not opened; the pool size is Z01's.
 - The three "skip only" opcodes of the session filter (0x200B, 0x304D, 0x3848) are those the 2016 client may send while
   loading; only 0x3848 has a name in `opcodes.json`.
+- §3.4 `so_Dispel`: the return value of the DISPELRANDOM-only path (the decompiler shows a byte of a reused argument);
+  `smo_Dispel` ignores it; whether `smo_SkillBlast` (the other vt 0x5a8 caller) reads it was not re-read.
+- §3.3: whether `so_KilledBy` clears a re-claimed shelter buffer before storing (not re-read; Z03 §7.2 describes the store).
+- §3.1: Silencetoone ends at the first `smo_SkillBlastOption` query; whether the item-use and mob-AI queries were meant to
+  consume it is unknown (design or bug).
+- §3.6: the visible effect of 0x2442 / 0x2443 on the client (`Char::ActSkill` animation path) was not followed beyond
+  the vtable names *(pdb2017)*.

@@ -4875,13 +4875,15 @@ Sent in reply to `0x243e` NC_BAT_ASSIST_REQ on ShineObjectClass::ShinePlayer (`F
 
 ### `0x2442` NC_BAT_SOMEONESKILLBASH_OBJ_CAST_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_BAT_SOMEONESKILLBASH_OBJ_CAST_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_005838a0 (smo_SkillBash_Blast_Trap(Obj)); client FUN_0049a460)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | skill |  |
-| 2 | u16 | caster |  |
-| 4 | u16 | target |  |
+| 0 | u16 | skill | ActiveSkill ID |
+| 2 | u16 | caster | trap / mine servant handle |
+| 4 | u16 | target | object handle |
+
+broadcast to the caster's sight when a servant explosion (meb_Explosion, blastMode 2/4) fires a skill on an object; client: caster.ActSkill(target, 1, skill) unless the caster is the own character or the target is unknown
 
 Sent from `FUN_005838a0` (`FUN_005838a0`) · payload 6 bytes
 
@@ -4893,14 +4895,16 @@ Sent from `FUN_005838a0` (`FUN_005838a0`) · payload 6 bytes
 
 ### `0x2443` NC_BAT_SOMEONESKILLBASH_FLD_CAST_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_BAT_SOMEONESKILLBASH_FLD_CAST_CMD`, 12 bytes
+**Verified layout** (basis: zone FUN_005835e0 (smo_SkillBash_Blast_Trap(Loc)); client FUN_0049a4d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | skill |  |
-| 2 | u16 | caster |  |
+| 0 | u16 | skill | ActiveSkill ID |
+| 2 | u16 | caster | trap / mine servant handle |
 | 4 | u32 | loc.x |  |
 | 8 | u32 | loc.y |  |
+
+broadcast to the caster's sight when a servant explosion (blastMode 1/3) fires a skill on a spot; client: SetSkillTargetGroundPoint + ActSkill(x, y, 1, skill) unless the caster is the own character
 
 Sent from `FUN_005835e0` (`FUN_005835e0`) · payload 12 bytes
 
