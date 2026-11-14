@@ -72,6 +72,8 @@ map kind as a KQ map.
 ```pseudo
 KingdomQuestContainer::KingdomQuestContainer()                 @ FUN_00499a40
     List<KQElement>::l_MakeList(300); every kqc_array[i].kqe_kqinfo.Handle = −1; list slot i → &kqc_array[i]
+    # List<T> is the zone's fixed-slot free list (Z01): l_MakeList FUN_004973f0 (KQElement) / FUN_00497570 (KQPlayerInform,
+    # §1.3), push / pop FUN_004998c0 / 00499900 / 00499940 / 00499990 and FUN_00495290 / 00497270 / 004952d0 / 00495320
 KingdomQuestContainer::kqc_SearchHandle(handle, &slot) → KQElement*   @ FUN_004954f0
     walk the used slots; first element with kqe_kqinfo.Handle == handle (slot index returned); none → null
 KingdomQuestContainer::kqc_MapUseCheck(Name3 mapName) → 1 free / 0 in use    @ FUN_00495710
@@ -438,6 +440,8 @@ kqidb_GetData(itemId) → KQItem* | null                            @ FUN_0064bc
     # ShinePlayer::so_RecalcEquipParam FUN_004cab70: for every equipped item with a row: move speed += MoveSpdRate,
     # +0x10c8 (absolute attack) += AbsoluteAttack (Z12)
 kqidb_CanPickUp(itemId, u64 total) → may pick up                  @ FUN_0064bc90
+    # boilerplate: ctor FUN_0064c020 (empty map); the file is read by `BinaryDataBox<KQItem>::bdb_ReadData` FUN_00648f70
+    # (CDataReader::Read; failure → assert "…bdb_ReadData : readfail" and ShineExit)
     no row or PickupLimit == 0: 1; else total ≤ PickupLimit
     # caller so_ply_PickupItem FUN_0052faf0 with total = lot picked + lot already held; refusal = pick result 0x34a
     # (Z04 §3.3, "max-owned limit")
@@ -766,6 +770,10 @@ GTWinScore 005b4df0; file-name strings 006fa920…006fa9ec, called from `zs_star
 `ITableBase<Row,T>::Load` (e.g. FUN_005b25e0: allocate the 0xc4 table object once, `CDataReader::Read`, accept only
 `nVersionKey == DataVersionKey` (0x36f for GuildTournamentScore; `docs/knowledge/S01.md` SHN header), then the table's vt+4 post-processing);
 failure → assert "Fail to read  : <file>" and `ShineExit`. The GTI* item tables are used by §5.
+The other loaders are the same template with their own key: LvGap FUN_005b26c0 (0x17), Occupy FUN_005b27a0 (0x12),
+Skill FUN_005b2880 (0xfb), MasterBuff FUN_005b2960 (0x2c), GTWinScore FUN_005b2dc0 (1). Boilerplate (no logic): the table
+ctors FUN_005b10e0 (Score) / 005b11a0 (LvGap) / 005b11e0 (Occupy) / 005b1220 (Skill) / 005b12e0 (MasterBuff) / 005b1420
+(GTWinScore) and the row counters `ITableBase<…>::GetTotal` FUN_005c6ee0 / 005c6f00 / 005c6f20 / 005c6f40 / 005c6f60.
 
 | File (row struct, size) | Fields | Getter | 2016 rows (MAP_TYPE 0) |
 |---|---|---|---|
@@ -862,9 +870,14 @@ Zone hooks:
         late:  not observer: system and (PlayerRegister(p) or IsPlayerRegister(p)) → stay; else sp_2Roumen(p)
                observer: no system → sp_2Roumen(p)
     so_Unmark(REMOVE_NOW) @ FUN_00558900: PlayerUnRegister(p) if the map has a system
-        # REMOVE_NOW is the logout (sp_Schedule_Logout) and the same-zone link (Z01 map link); REMOVE_REVIVE (link
-        # command 0x4f), REMOVE_WARP and REMOVE_LOGOUT skip it: such a fighter stays in m_vecGuildMembers with a stale
-        # handle until the system is cleared *(inferred)*
+        # PlayerUnRegister has no other caller. `RemoveWhen` *(pdb2016)*: REMOVE_NOW 0, REMOVE_LOGOUT 1, REMOVE_WARP 2,
+        # REMOVE_REVIVE 3. so_LinkTo FUN_0049ad30 passes REMOVE_NOW for a same-zone link and REMOVE_REVIVE when the reply
+        # cmd is 0x4f (revive link, Z01 §7.1); the cross-zone link calls so_banning(p, 0) FUN_00558b70 = so_Unmark(REMOVE_NOW);
+        # the WM kick-off so_banning(p, 1) (Z01 §8.3) is REMOVE_LOGOUT, which arms `sp_Schedule_Kickout` FUN_00558080 (10 s),
+        # and that calls so_Unmark(REMOVE_NOW) (as does the normal logout); REMOVE_WARP comes only from smo_ShadowStep
+        # FUN_0045ad10 / smo_LoginAfterLogout FUN_0055d880 (the object stays on the map). So only a same-zone revive link keeps the fighter
+        # registered: the team-point revive inside the tournament map (sp_ReviveReqProcess, Z07 §3.1) needs exactly
+        # that *(inferred)*. Should such a revive lead to another map, the entry (old handle) stays until Clear.
     0x204B NC_ACT_ROAR_REQ @ FUN_005404d0 (Z02 §9.2): a registered fighter gets 0x0720
     `NPCAction::GT_TeamCondition` @ FUN_005c2890 / FUN_005c2920 (Z09 §16.4): GetGuildRegIndex == team
     combat enemy test `fm_GuildTournamentEnemy(g1, g2)` @ FUN_004632f0 = IsBattleGuild (Z03 §3.1, §3.3)
@@ -1008,6 +1021,26 @@ so_SaveLocation(p, &NC_CHARSAVE_LOCATION_CMD) @ FUN_004542f0, tournament branch 
 fm_IsGuildTournametnMap() @ FUN_00475770: cached in m_nGuildTournamentMapFlag (1 yes, 2 no); compares fm_MapID with the
     13-byte entries `GTMap[i].mapname` (DAT_0d55a860) for i = 0…30 (§6.1: seed table, Z16-B17 settles Z08-B12)
 fm_GuildTournamentEnemy(g1, g2) @ FUN_004632f0 = system && IsBattleGuild(g1, g2)
+
+ShineMover::so_mobile_IsEnemy(v, d)  (vt 0x72c of a mover, a ridden vehicle)   @ FUN_004309a0
+    # the mover copy of ShinePlayer::so_mobile_IsEnemy (Z03 §3.3); its two GT tests:
+    d = d.owner (vt 0x9b0) or d; d == v or v has no map → false
+    d mob-like (vt 0x89c):
+        same side (vt 0xe60 ShineMover::so_IsAlliance) → false
+        map has a GT system and d.guild reg num == v's (vt 0x828 so_mobile_GetGuildRegnum) → false   # own flags, gates, team NPCs
+        v captivated (vt 0xf20) or d has abstate 499 → false
+        StaImmortal (0x123) rest time (vt 0x3ec): 0 → true; < 3600 → reset it (vt 0x650), true; else false
+    d.vt[0xc70]() (so_MoverSystem_NoDamage, *(pdb2016)*) == 0 → false     # the player version returns false on == 1
+    d is a captivated player or v is captivated (vt 0xf20) → true
+    fm_PKField (+0x54) == 1 → true
+    fm_MapInfo (+0x10) != null → false                 # every real map: the rest is never reached
+    # the rest reads fm_MapInfo->KingdomMap through that null pointer: assembly 0x430af1 `cmp byte ptr [0x3a], 4`
+    KingdomMap == 4 and v.so_mobile_ICanDamageTo(d) (vt 0x980) → true
+    party-battle map row (+0x69): v.party == −1 or parties differ → true
+    CGuildZone::IsGuildEnemy(v.guild, d.guild) == 1 or fm_GuildTournamentEnemy(v.guild, d.guild) → true; else false
+    # the null test is inverted against ShineMover::so_mobile_ICanDamageTo (Z09 §8.4: `fm_MapInfo == null` → false), so a
+    # mover never counts an enemy-guild fighter as enemy in a tournament, a guild war or a party-battle map
+    # (original bug) Z16-B21
 ```
 
 ## 5. Guild tournament: guild groups, guild skills, items and the dice game
@@ -1032,8 +1065,8 @@ GuildGroup (0xb4)
     +0x34 m_ErrorMessage         FastDelegate1<int> error sink
     +0x3c m_unAllGuildScore      match score (flag ticks, kills, dice; the win check and the result use it)
     +0x40 m_unKillerPoint        guild-skill points (+1 per own death, §4.6; spent by UseGuildSkill)
-    +0x44 m_unGuildScore         same increments as +0x3c (no reader found in parts 3–4)
-    +0x48 m_UseSkillCount        no writer or reader found
+    +0x44 m_unGuildScore         same increments as +0x3c (AddScore, flag tick in Update, DiceGameWinGuild; zeroed by Clear); no reader in the zone: write-only
+    +0x48 m_UseSkillCount        only zeroed by GuildGroup::Clear FUN_00480460; never counted or read
     +0x4c m_nTournamentType      MAP_TYPE for the skill / master-buff tables
     +0x50 m_vecGuildBuffUseTime  vector<TickTimer>: one cool-down timer per guild skill (index = skill number)
     +0x60 m_LastGuildMasterReviveTime  TickTimer, delay 300 (30 s): master buff again after the master's revive
@@ -1049,7 +1082,7 @@ GuildGroup (0xb4)
 DiceGame (0x48; vftable +0: Update)
     +0x04 m_RedPlayerNumber, +0x08 m_BluePlayerNumber   charNo of A's / B's manager user at the start
     +0x0c m_RedDiceResult, +0x10 m_BlueDiceResult       0 = not thrown yet, else 1…6
-    +0x14 m_StartTime (no writer found)
+    +0x14 m_StartTime (no access anywhere in the zone)
     +0x18 m_nDelayTic         TickTimer: throw period; enabled = "dice game running"
     +0x28 m_NotifyOfEndTimer  TickTimer: "5 seconds left" notice
     +0x38 m_ErrorDeleGate, +0x40 m_DiceGameEnd (= GuildTournamentSystem::DiceGameWinGuild, set by the ctor)
@@ -1656,11 +1689,12 @@ and only the map test gives the "location" code.
 | Z16-B18 | `so_ply_Send2GuildTournamentLogIn` FUN_00475950 | 0x749B is sent with a 1-byte payload that is never written | one stale g_buf byte on the wire (the client ignores it) | send the empty struct without the pad byte, or zero it |
 | Z16-B19 | `IsAccessTime` FUN_004757f0 / `sp_IsGuildTournamentAccessTime` FUN_00475830 / `so_ply_GuildTournament_isSummon` FUN_00475890 | entry window = `nExploerTimeMin · 4800 / 10` ticks = 480 ticks per minute with ticks of 0.1 s | players can answer the recall only for 80 % of the configured entry time; afterwards 0x749C gets 0x1444 "Entry Time is Over" | `nExploerTimeMin · 600` ticks |
 | Z16-B20 | `so_ply_GuildTournament_isSummon` FUN_00475890 (+ `wms_GuildTournamentCheck` FUN_004776a0) | the seed loop returns at the first entry of the player's guild whose window is over; entries are only reset by `fm_GuildTournamentClear` on the hosting zone (the check fallback and non-hosting zones keep them) | a guild's earlier-round entry (lower seed) hides its next match: no 0x749B prompt at map login and `nTournamentSeed` stays 0xFF, so 0x749C fails with 0x1441; repeated "Seed not empty" asserts at the next start | skip (`continue`) entries whose window is over; reset the entry on every zone at the end (0x7482 / a WM broadcast) |
+| Z16-B21 | `ShineMover::so_mobile_IsEnemy` FUN_004309a0 | tests `fm_MapInfo != null → not an enemy` (inverted against the mover's `so_mobile_ICanDamageTo`) before the KQ, party-battle, guild-war and tournament tests; the code after it would read `KingdomMap` through the null pointer (address 0x3a) | on every map (all have a MapInfo row) a mover's enemy test fails for player and mover targets except on PK fields or when captivated: the `fm_GuildTournamentEnemy` branch is dead | `fm_MapInfo == null → false`, as in `so_mobile_ICanDamageTo` |
 
 ## N. Not reconstructed / uncertain
 
-- Parts 1–5 written (KQ §1–§3, GT core §4, groups / skills / items / dice §5, match lifecycle §6); the sweep part
-  (coverage boundary, knowledge file) follows, see `docs/plan/status/Z16.md`.
+- Parts 1–6 written (KQ §1–§3, GT core §4, groups / skills / items / dice §5, match lifecycle §6, sweep); the
+  fresh-context review follows, see `docs/plan/status/Z16.md`.
 - §6.1 `GetLinkData`: `LinkInformTemplete.index[20]`, `direct` and `Party` are left as stack bytes; whether `so_LinkTo`
   (mode 6, 9, 10) reads them was not traced (Z01 §7.1).
 - §6.4: if `GetLinkData` fails after `StaObserverHideMode` was set, nothing removes the abstate; not reachable with the
@@ -1670,12 +1704,16 @@ and only the map test gives the "location" code.
 - §5.5 GTIT_MOBBREED: the argument of `so_mob_Regenerate` taken from the target's vt 0x6d0 (a folded 0-returning stub on
   mobs / NPCs, `so_GetCharBriefInfo` on players) and what `so_mob_RegenLocation` returns for a player target were not
   traced; with the 2016 data only team NPCs (TARGET_MYNPC) breed.
-- §5.1: no reader of `m_unGuildScore` and no writer of `m_UseSkillCount` / `DiceGame::m_StartTime` was found in parts 3–4;
-  the sweep part should `rg` their offsets.
 - §5.6: `rb_1000() % 6` is slightly biased towards 1…4 if `rb_1000` returns 0…999 (Z01 RandomBox, not checked).
-- §4.4: a fighter who leaves the tournament map through `so_Unmark` with REMOVE_REVIVE / REMOVE_WARP / REMOVE_LOGOUT
-  is not unregistered there; whether another path (`sp_2Roumen`, the cross-zone link, §6) removes the entry from
-  `m_vecGuildMembers` was not traced.
+- §4.4: a fighter stays in `m_vecGuildMembers` only after a same-zone 0x4F revive link (REMOVE_REVIVE). Whether the
+  death menu can send a registered fighter to another map that way (instead of the team revive point) was not traced
+  (Z07 §3.1); if it can, the entry keeps the old handle until `Clear`.
+- §4.7 `ShineMover::so_mobile_IsEnemy`: slot 0xc70 is `so_MoverSystem_NoDamage` *(pdb2016)* (player: rides a mover with
+  an ability; mover: has mover data but no ability), not "GM-invincible" as Z03 §3.3 / Z09 §8.4 label it. The mover
+  version treats `== 0` as "not an enemy", the player version `== 1`; whether that mover-against-mover rule is intended
+  was not settled, so it is not counted as a bug (Z16-B21 is the inverted MapInfo test after it).
+- 0x580C NC_KQ_START_CMD (empty struct *(pdb2017)*): neither the 2016 zone nor the WM sends it; the client accepts and
+  ignores it (`re-data/client-handlers.json`). The KQ start is 0x580F (WM → zone) and the gate keeper (§2.2–§2.3).
 - §4.6: the range of the 0x74DE / 0x74DF broadcasts (`allofrangearg`) was not resolved; read as the whole map.
 - `bs_SkillBlast`: the `so_Routine` branch that counts it tests `scs_ProduceSkill.sklidx`; whether that is every
   skill blast or only the production-skill step was not traced (Z03).
@@ -1687,4 +1725,22 @@ and only the map test gives the "location" code.
 
 ## N+1. Coverage boundary
 
-(Written in the sweep part.)
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| KQ client ↔ WM packets 0x5801–0x580B, 0x581B–0x5839 (list, status, join, schedule, votes, team select, joining alarms), `KQIsVote.shn`, `KQVoteMajorityRate.shn`, `KingdomQuestMap.shn`, the WM `CKQ` object and 0x580D / 0x580F / 0x5810 senders | W04 §6 (done; documents them) | WM-side KQ; the zone only receives 0x580D / 0x580F and sends 0x580E / 0x5810 / 0x5822 (§2) |
+| GT client ↔ WM and WM ↔ DB packets 0x747A–0x7480, 0x7485–0x749A, 0x74AA / 0x74AB, 0x74C3 / 0x74C4, 0x74E7–0x74EE, 0x74F6–0x74F9, `GuildTournamentRequire.shn`, `GuildTournamentReward.shn`, the WM side of 0x7481 / 0x7482 / 0x74C8 / 0x74C9 / 0x74E3–0x74E6 / 0x4019 | W03 §8 (done; documents them), D04 §6.4, D06 | WM scheduling, entry, rewards and DB rows; §6 documents the zone side and links W03 §8 where the two meet |
+| KQ reward DB packet (dept 22 to the Character DB) behind 0x5815 | D04 §3 (done) | DB side of `sp_KQReward`; Z16 §3.4 links it, Z11 §8.4 documents `sp_KQReward` |
+| Pine KQ / GT nodes and `@` functions (`AxialListKQResult` FUN_004e5390 / 004e5790 / 004e5d20 …, `SysFuncShineKQTop` / `KQResultList`, `ShineSendKQResult`, `ShineEndOfKingdomQuest`, `ShineEndOfGuildTournament`, `ShineDiceGameStart`, `GTMobRegenKey`, `linkto` by observer) | Z09 §22.3, §24.7, §24.8, §25.4, §25.6, §25.7, §26.1 (done) | map-script statements that only call the objects documented here (plan: "Map scripts … belong to Z09") |
+| KQ / GT packets sent only from Pine nodes: 0x5836 / 0x583C / 0x583D, 0x7484, 0x74E0, 0x74E2, 0x748D | Z09 §28.12, §23.6, §19.5, §24.8, §25.2 (done) | their senders are script nodes; layouts are in Z09's annotations |
+| KQ dialog scripts `KQ*.txt` (`KQScriptManager::kqsm_Load` FUN_0064cee0) and `MobRegen/KingdomQuest/*.txt` (`KQRegenTable` FUN_004b3220 / 004b26b0) | Z09 §22.6, §10.6 (done) | script data, loaded at start-up; the KQ element only names the script |
+| GM commands `&kingdomquest`, `&EndOfKingdomQuest`, `&Reroadkingdomquest`, `&kqreward`, `&GuildTournament`, `&StartGuildTournament`, `&FlagCapture`, `&GuildTournamentItemEffect`, `&ObserverLinkTo`, `&ObserverOut` | Z11 §5.5, §6.3, §7.2, §8.4 (done) | GM command parsing; §3.6 / §6 link the objects they call |
+| `GTIView.shn` (`gSHNView_GTIView`, initializer FUN_00699990) | Z01 start table (done: "checksum only"), Z10 SHN check | the zone reads it only for the client checksum list (`CShnDataFileCheckSum` entry 0x26); the item names come from the client's copy (§5.5) |
+| Raid / drop dice (`sd_DiceGameResult` FUN_00531470, `Raid::SetItemDiceGameMode`), `DiceDividind.shn`, `DiceRate.shn` | Z09 §11.6, Z06 §3–§4 (done) | loot and gambling dice, unrelated to the GT `DiceGame` (§5.6) |
+| `Observer` / `IObserver` / `LuaScriptObserver` / `MapRearrangeObserver`, `ShinePlayer::notifyObservers` | Z09 §14.7, §14.8 (done) | the observer *pattern* classes; the GT spectators (§6.4) do not use them |
+| generic callees of the documented hooks: party and raid quest checks (`pm_QuestCheck`, `rt_QuestCheck`), abstate helpers, map-login resets in `sp_NC_MAP_LOGINCOMPLETE_CMD`, `fm_GetRegenCityLinkData`, cluster loaders | Z01, Z03, Z07, Z09 (done) | reached from the kill, map-login, save-location and start-up functions only outside their KQ / GT branches |
+| mover combat beyond the GT test (`ShineMover::so_mobile_ICanDamageTo` FUN_004368c0, the meaning of slot 0xc70) | Z09 §8.4 (done; documents ICanDamageTo); §4.7 here documents `so_mobile_IsEnemy` FUN_004309a0 | small gap closed here because its only GT link (`fm_GuildTournamentEnemy`) is dead code (Z16-B21) |
+| `TickTimer::GetRestDelayTimeToSecond` FUN_00592000 / `CheckUpdateEvent_ClockWatch` FUN_00592050 | Z17 (open; plan: "the player's item-action cooldown container") | part 4 listed them as GT helpers; their only callers are `ItemActionObserveManager` (item cool-downs), no GT code |
+| name-only matches of the sweep: `ShineMobileObject::smo_GetFlagDamageAbsorb` FUN_005558c0, `so_EncSeedSet` FUN_0054f660 / 004d8e30 | Z09 §16.6 (the `smo_Flag` damage-absorb bit of `DamageAbsorbAction`), Z01 §5.1 (the cipher seed) (done) | "Flag" / "Seed" in their names are not the GT flag or tournament seed |
+| client handlers of the KQ / GT packets | C01 (done; `re-data/client-handlers.json`) | read per packet in §2–§6; client-side UI beyond the field meaning is not server behaviour |
+
+No follow-up item was needed: everything found is either documented here or in a finished item's output (cited above), except the TickTimer helpers, which the open Z17 covers.
