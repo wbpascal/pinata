@@ -674,6 +674,11 @@ ITEMS = [
              "the column → member map and the piece-count rules (which pieces count, duplicates, costume / KQ items).",
              "Packets: the set-item heal effect and any client notification (client handlers via `re-data/client-handlers.json`), "
              "how the set abstate is saved (`p_Char_SetStateWithSetItemAndRestTime`, D02) and restored at login.",
+             "Overlap with Z18: Z09 §31.2's \"Items, equipment, set items, random options\" row (owner Z04, taken by Z18 per "
+             "`docs/knowledge/Z09.md` §3) also lists `Send_SETITEMHEALEFFECT` 005cfbb0, `SkillEffect::operator[]` 00510010, "
+             "`se_Clear` 005105e0, the `SetItemAbstateEffect` ctor 00510350 and `ed_Compare` 004a2ed0. Check Z18's status and "
+             "output first: if it already documents them, cite its § and add only the set-item context; otherwise document "
+             "them here (Z21 owns the set-item subsystem) and say so in `docs/knowledge/Z21.md` so Z18 can cite Z21.",
              "Bugs as `Z21-B<n>`; Coverage boundary as usual."],
       done="Set detection, every `SetItemData::*` function and the three table loaders are written as pseudocode with their "
            "column → member maps, and every set-item function of the zone is cited as `FUN_…`."),

@@ -64,6 +64,8 @@ bit2 cannotattack}`, `0xcd0 u16 MissPercentFix`, `0xcd2 u16 DamageReflection`, `
 seven `ChangeByConditionParam` (0x1C each: `PassiveHPDownRateWCMin` 0xce0, `…WCMax` 0xcfc, `…MAMin` 0xd18, `…MAMax` 0xd34,
 `…AC` 0xd50, `…MR` 0xd6c, `PassiveMovingTBPlus` 0xd88), `0xda4 u16 PhysicalImmuneRate`, `0xda6 u16 MagicalImmuneRate`,
 `0xda8 u32 RangeOver`, `0xdac u16 DMGMinusRate`.
+The flag bits have one-line readers: `Parameter::Container::IsNoAttack` @ FUN_004c8ea0 = `flag.cannotattack`
+(bit 2; read by the attack checks of `ShineMobileObject`, Z03) and `IsNoAttacOrNoMove` (any of the three bits, §1.4 table).
 
 This names the cells Z03 §4.1 left as labels: Z03's `+0xa18` attack-speed rate is `AbnormalState.Rate.AttSpeed`;
 `+0xc30` "flat bonus damage" is `Total.AbsoluteAttack`; `+0xcd2` is `DamageReflection` (Z03: "splash rate");
@@ -85,7 +87,10 @@ Every recalculation first copies the eraser into its layers (plus → `.Plus`, r
 per mille with 1000 = neutral, and the seven resist/critical-TB cells of a rate cluster start at 0 and act as flat sums.
 
 ```pseudo
-Parameter::Container::c_clear(P):                                  @ FUN_0043c370   (object creation; mobs, players)
+Parameter::Container::c_clear(P):                                  @ FUN_0043c370
+    # callers: the ShineMobileObject constructor, every map login of a player (so_FirstActionAfterSocketConnect
+    # @ FUN_00554870; this is the "next map login" reset §2.4 / Z12-B2 rely on), mob regen (so_mob_RegenComplete
+    # @ FUN_004424f0), pet regen (spt_RegenComplete @ FUN_00442eb0), summoned movers (so_smv_SummonMover @ FUN_0055fdf0)
     PureCharParam, every .Plus = eraser_plus; every .Rate = eraser_rate
     flag = 0; SPRate = 1000; DotDamagePlus = 0; RangeEvasion = 0; DamageReflection = 0; ChangeAbilityInfo = 0xFFFF
     MissPercentFix = 0; WeaponTitle.Rate.CriDamRate = WeaponTitle.Rate.MagCriDamRate = 0; HealRate = 1000
@@ -153,7 +158,7 @@ Partial rebuilds (the weapon-title layer is per attack, §2.3):
 | the per-minute charged-buff rebuild (Z09 §2, `PerMinutePlayerChecks`) | vt 0x35c and vt 0x368 when a buff expired, then vt 0x34(1) |
 
 Note that the per-tick path (`parameterchange`) does not call `c_MakeTotal` itself; `Total` is refreshed by the notify
-(vt 0x34, part 2) *(inferred until part 2 reads `so_mobile_NotifyParameterChange` @ FUN_00503c10)*.
+(vt 0x34): `so_mobile_NotifyParameterChange` @ FUN_00503c10 calls `c_MakeTotal(P)` first (§4.2).
 
 ---
 
@@ -267,6 +272,8 @@ so_RecalcEquipParam(p):
         else:
             lv = cell.attr.vt[0x30](cell); if lv == 0: continue; if lv >= 13: assert; continue
             u = UpgradeDataBox[d.BasicUpInx] (operator[] @ FUN_004c8e50, null only for an index > udb_Number; UpGradeInfo: UpFactor, u16 Updata[12]); v = u.Updata[lv − 1]
+            # loader udb_Load @ FUN_00596240: udb_Number = largest UpGradeInfo.shn ID, udb_Number + 1 slots set to null, each row
+            # stored at [ID]; so index == udb_Number is valid (no read past the end) and a missing ID gives null
         if u: switch u.UpFactor:
             UPG_AC: Upgrade.Plus.AC += v          UPG_WC: Upgrade.Plus.WCmin/WCmax += v      UPG_SHIELDAC: Upgrade.Plus.ShieldAC += v
             UPG_MA: Upgrade.Plus.MAmin/MAmax += v  UPG_MR: Upgrade.Plus.MR += v                UPG_WC_MA: WC and MA += v
@@ -763,11 +770,14 @@ cbcp_MakeParam(c, base, charged, flag, p):                               @ FUN_0
     if (c.cbcp_nCondition or c.cbcp_nChange) and c.cbcp_nMaxValueNum and (base, charged) != (c.cbcp_nChangeParam, c.cbcp_nCharged):
         c.cbcp_nChangeParam = base; c.cbcp_nCharged = charged
         for i < nMaxValueNum: c.cbcp_pValue[i] = base × i × c.cbcp_nChange / 1000       # bonus at step i of the HP-loss curve
-        send p: 0x10DF { nSkillID = c.cbcp_nID, nChangeRate = (u16) c.cbcp_nCondition, nParamNum = nMaxValueNum,
+        if p == null: return              # values stored but nothing sent; dead: the notify always passes the player itself
+        send p (game stream vt 0x2fc so_GetGameSocketStream, not the data stream vt 0x2f8 of 0x1035):
+             0x10DF { nSkillID = c.cbcp_nID, nChangeRate = (u16) c.cbcp_nCondition, nParamNum = nMaxValueNum,
                          aParam[i] = { flag, i, (c.cbcp_pValue[i] + base) × charged >> 10 } }       # len 8 + 6·n
         (more than 7999 bytes → assert "cbcp_FillSendBuffer: Buffer Over"; pp_SetPacketLen fails → "cbcp_SendBuffer : Packet Too Long")
 cbcp_MakeParam_Plus (TB curve):                                           @ FUN_004cbcd0
     same, but cbcp_pValue[i] = c.cbcp_nChange × (i + 1)                   # flat steps; charged = 0x400 (no scaling)
+    # same null-player test and the same stream (vt 0x2fc)
 ```
 
 `nFlag` uses the 0x1035 numbering of the target cell: 0x1c WCmin, 0x1d WCmax, 0x1e MAmin, 0x1f MAmax, 0x20 AC, 0x21 MR,
@@ -939,8 +949,8 @@ length including the opcode, "Packet Too Long" asserts and drops).
 
 The other blobs of W01 §6.3 have their own owners: 0x1031 title (Z07 §1.3), 0x10D3 single option and 0x10B8 link-from
 (§7 of this item), 0x10D0 item cool-times (Z07 §1.2), card collection, chat colour, minimon, tutorial, coin,
-repurchase list, mover link data (Z07 §1.2 table). **0x1026 (house), 0x1028 ("maspup"), 0x102A (emblem), 0x102B (pet),
-0x102C (arena), 0x102D (sea war) have no handler in the 2016 zone** (no `pft_Store` for dept 4 cmd 38, 40, 42–45 in
+repurchase list, mover link data (Z07 §1.2 table). **0x1026 (house), 0x1027 (`NC_CHAR_ZONE_FRIEND_CMD` *(pdb2016)*), 0x1028 ("maspup"), 0x102A (emblem), 0x102B (pet),
+0x102C (arena), 0x102D (sea war) have no handler in the 2016 zone** (no `pft_Store` for dept 4 cmd 38–40, 42–45 in
 `handlers.json`): a WM that sends them has them dropped by the parser.
 
 Order dependencies: `so_charskilldata` takes the class from `shape` (0x1020 must come first, which the WM order
@@ -1321,6 +1331,8 @@ Body = header + `PROTO_NC_CHAR_LINKFROM_CMD` *(pdb2016)* `{ u32 chrregnum @6, Na
         e = new RollBackPosCallBackEvent(map, map, coord.x, coord.y)                 @ FUN_00444970
             # m_RollBackPos (NPCManager::LinkInformTemplete, 0x61 bytes): linktoserver = linktoclient = map (12 chars),
             # coordx, coordy; index, direct, Party left as allocated (operator new, not cleared)
+            # (original bug) Z12-B16: the 0x68-byte event is never zeroed; strncpy(…, 12) into char[33] leaves bytes 12–32
+            # of both names, index[20], direct and Party as heap garbage, and a 12-character name has no terminator
         sp_SetRollBackPosEvent(p, e)                                                 @ FUN_00570b30
             if p.sp_punMarkEvent: delete it (vt 0 with 1)
             p.sp_punMarkEvent (p+0x5e08) = e
@@ -1330,7 +1342,8 @@ The only producer is the guild-tournament observer entry `sp_Guild_Tournamnet_Ob
 summary, Z16): when the tournament map is on another zone, the leaving zone sends
 `WM ← 0x4019 NC_CHARSAVE_2WLDMAN_LINK_FROM_CMD { u16 wmHandle, u32 chrregnum, map = current field's map name, coord =
 current position }` (0x1a bytes) before the link; on the same zone it builds the event directly with
-`RollBackPosCallBackEvent(ShineObject*)` @ FUN_00444a40 (current map's server and client names, current position).
+`RollBackPosCallBackEvent(ShineObject*)` @ FUN_00444a40 (current map's server and client names, current position; it
+writes the same four fields only, so Z12-B16 applies to it too).
 
 `RollBackPosCallBackEvent` vftable *(pdb2016 + rtti)*: slot 0 deleting destructor (`CallBackEvent`'s), slot 1
 `doEventRun` @ FUN_00444a10 = `obj.so_LinkTo(&m_RollBackPos, 6, 9, 10)` (vt 0x600), slot 2 = event type, an
@@ -1352,6 +1365,8 @@ sp_RunRollBackPosEvent(p) → bool                                              
 so_LinkTo(p, link, …) (vt 0x600) @ FUN_0049ad30, first step:
     if p.sp_punMarkEvent and its type (slot 2) == 1:
         copy m_RollBackPos (0x61 bytes) over the caller's `link`           # any link while the event is set goes there
+        # the copy carries Z12-B16's garbage: so_LinkTo itself reads linktoserver (fieldserial lookup, Name3 copies),
+        # linktoclient (mdb_2mapid) as C strings and coordx / coordy; it does not read index / direct / Party
         sp_SetRollBackPosEvent(p, null)                                     # deletes the event
     … (the rest of so_LinkTo: Z01 §7.1)
 
@@ -1416,6 +1431,7 @@ Defender / Guardian / Guard Captain, values 480 … 5760) and the empty type 10 
 | Z12-B13 | `so_CharChargedBuffData` @ FUN_0044e1e0 | a buff id missing from `chargedbuffdatabox` is skipped, but its 14-byte slot in the client copy is still counted (`NumOfChargedBuff` unchanged, the output pointer advances) | the client gets a record of stale `gpp` bytes and shows a bogus charged buff | compact the list and send the stored count |
 | Z12-B14 | `sp_SetRollBackPosEvent` @ FUN_00570b30 / pool reuse | `sp_punMarkEvent` (the roll-back position of 0x10B8 / observer entry) is cleared only by the `ShinePlayer` constructor (once per pool slot), `sp_RunRollBackPosEvent` and `so_LinkTo`; logout and `som_FreeObject` leave it | the event leaks with the slot; the next character in that slot is linked to the stale position on its first `so_LinkTo` and saves it as its location *(inferred effect)* | delete the event at logout / object free |
 | Z12-B15 | `so_BriefEquipSetBackup` @ FUN_0054e590 | writes the five upgrade nibbles into the house backup brief (`mhs_Backup.bib_BriefInfo`) but the 20 equipment ids into the live brief, whose `shapedata` union holds the camp / booth data in modes 4 / 5 | camp handle / booth signboard bytes overwritten by item ids; unreachable in 2016 (the only caller, `sp_BriefEquipmentSetting` from `so_StoreCharData`, runs in mode 0) | write the ids into the backup brief too |
+| Z12-B16 | `RollBackPosCallBackEvent` ctors @ FUN_00444970 / FUN_00444a40 | the 0x61-byte `m_RollBackPos` of a heap-allocated event is not cleared; only `linktoserver` / `linktoclient` (strncpy 12 into `char[33]`) and `coordx` / `coordy` are written | `so_LinkTo` copies the whole record over the caller's link: `index`, `direct`, `Party` and the name tails are heap garbage; a 12-character map name is unterminated and its lookups (`fieldserial`, `mdb_2mapid`) read into the garbage (map names that long are rare; effect beyond `so_LinkTo` *(inferred)*) | zero the record (or copy with a terminator) before filling it |
 
 ## N. Not reconstructed / uncertain
 
@@ -1426,7 +1442,7 @@ Defender / Guardian / Guard Captain, values 480 … 5760) and the empty type 10 
   its constructor (`BitSet(8)`).
 - §6.9: whether `so_Field` can be set when 0x101D arrives (the `NameHide` early return) was not traced through the
   map-change path.
-- §6.1: whether the 2016 WM ever sends 0x1026 / 0x1028 / 0x102A–0x102D (unhandled in the zone) depends on the CharDB
+- §6.1: whether the 2016 WM ever sends 0x1026–0x1028 / 0x102A–0x102D (unhandled in the zone) depends on the CharDB
   sending their source blobs (W01 §6.3); not checked in captures.
 - §4.2: why the notify subtracts `cec_MoreStat` from `sp_LastStat.last` and why `Total.MAmin/MAmax` subtract the flat
   item MA (`Item.Plus.MAmin/MAmax`) while WC does not; the client side (how `CharInfoWin` combines `change` with item
@@ -1443,8 +1459,6 @@ Defender / Guardian / Guard Captain, values 480 … 5760) and the empty type 10 
   packet carries only one); for a map whose client name differs (instanced maps) the client would get the server name.
   Whether such a map can be the observer's origin was not checked.
 - §7.1: who sends 0x4025 in the client (which UI action stores `btMysteryType`) was not traced; only the 0x10D4 reader.
-- `UpgradeDataBox::operator[]` @ FUN_004c8e50 returns `udb_UpgradeInfoList[udb_Number]` for an index equal to the count;
-  whether the list has `udb_Number + 1` entries (loader not read) decides whether that is a read past the end.
 - The meaning of `ItemEquipTable.Equ_LeftHand == 2` (two-handed weapon in the right hand) and of `attr.vt[0x9c]` (costume
   charge left) is inferred; Z17 owns the costume charges.
 - `SAA_ALLSTATEPLUS` (39) goes into the rate cluster while `SAA_ALLSTATPLUS` (119) is flat; data `SubStaEventAllStatsUp`
@@ -1467,10 +1481,19 @@ written without `FUN_` so that they still count as uncovered.
 
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
-| Set-item subsystem: `sp_SetItemCheck` 00510b50, `sic_SetItemDefine` 00510370, `siel_AppendEffect` 005104c0, `aeo_SetItemEffectStore` 00510670, `aeo_SetItemActionEffect` 00510810, `siae_*` 00510030…00510350 (incl. `siae_SetItemEffectStore` 005100f0; the restore 005102b0 is cited in §6.4), `SkillEffect::se_Clear` 005105e0 / `operator[]` 00510010, `smo_ply_SetItemEffect` 00510c80 / 00510d20, `SetEffectTable` (`FindActionID` 005c7eb0, loader 005b5ec0), `Send_SETITEMHEALEFFECT` 005cfbb0, `ItemBoxIterator::ibi_Get` 0043c100; tables `SetItem.shn`, `SetItemEffect.shn`, `SetEffect.shn` | new item **Z21** (added by Z12) | ~900 decompiled lines with their own tables, item-action hooks and packets; Z12 only documents how the finished set abstate refits the matrix (§2.5, B3) and Z03 only reads `g_SetEffect`; no item, open or planned, lists it (`rg -i setitem docs/plan/items make_plans.py`) |
+| Set-item subsystem: `sp_SetItemCheck` 00510b50, `sic_SetItemDefine` 00510370, `siel_AppendEffect` 005104c0, `aeo_SetItemEffectStore` 00510670, `aeo_SetItemActionEffect` 00510810, `siae_*` 00510030…00510350 (incl. `siae_SetItemEffectStore` 005100f0; the restore 005102b0 is cited in §6.4), `SkillEffect::se_Clear` 005105e0 / `operator[]` 00510010, `smo_ply_SetItemEffect` 00510c80 / 00510d20, `SetEffectTable` (`FindActionID` 005c7eb0, loader 005b5ec0), `Send_SETITEMHEALEFFECT` 005cfbb0, `ItemBoxIterator::ibi_Get` 0043c100; tables `SetItem.shn`, `SetItemEffect.shn`, `SetEffect.shn` | new item **Z21** (added by Z12) | ~900 decompiled lines with their own tables, item-action hooks and packets; Z12 only documents how the finished set abstate refits the matrix (§2.5, B3) and Z03 only reads `g_SetEffect`; no item, open or planned, documents the subsystem (`rg -i setitem docs/plan/items make_plans.py`). Five helpers (`Send_SETITEMHEALEFFECT` 005cfbb0, `SkillEffect::operator[]` 00510010, `se_Clear` 005105e0, the `SetItemAbstateEffect` ctor 00510350, `ed_Compare` 004a2ed0) are also in Z09 §31.2's Items row (owner Z04, taken by Z18); Z21's plan has a step to coordinate with Z18 (part 5 of Z12) |
 | Abnormal-state actor bodies reached from the bomb DoT path of B7: `SubAbnormalStateActorBomb::sasa_ApplyAbstate` (cited in §4.1), `sasa_SetAbstateToArea_TargetNum` 0040b670, `AxialListNearScanEnemyorAll` 004c1830, and the other 55 uncited `SubAbnormalStateActor*` functions | new item **Z22** (added by Z12) | Z03 (done) lists the actor classes as not reconstructed (Z03 'Not reconstructed', 'Abnormal states'); ~1.9k uncited lines, outside the stat model |
-| Callees of `sp_NC_MAP_LOGINCOMPLETE_CMD` (cited in §1.4 / §7.1 as a trigger): `sp_RemoveKQItem` 0050f8c0, `sp_ItemInvenDelete` 0051c590, `sp_MoverSystem_MapLogin` 0045d9e0, `sp_KeepFromDoubleLogin` 0043cc90, `sp_EscapeFromEmptyID` 00440910, `mhs_Init` 00534a30, `sp_PetSystem_VirtualCast` 004d2180, `sp_SkinPolymorph` 004a3280, `sp_GetJoinKQTeamType` 00563990, `sp_RegistNumberVarification` 00551950, `sp_GhostBan` 0043f3d0, `sp_ConnectFromWhere` 0043f1f0, `asl_SendAfterLogin` 0040aed0, the reset helpers 00577e30, 0043bdb0, 00440d20, 0043d500, 00490c30, 0043be00, 0043bf90, 0043c250, `mbdb_GetModeIDLvType` 00462870, `GetStateData` 005ca9b0, `sp_SetCharTitleChangeAvailableTime` 00560900, `vector` resizes 004b40f0 / 004432e0, `lt_Next` 00402740 | Z18 (its list: Z09 §31 rows, `docs/knowledge/Z09.md` §3) | all are in Z09 §31's address rows that Z18 documents; the login burst is Z01 §6 |
-| Other Z09 §31 addresses reached here: `CQuestZone::InitNewPlayer` 005b9d40, `ProtocolLogger::pl_Clear` 005528a0, `sp_KQElementFunction` 00499710, `aeo_GetCaster` 00401b90, `DamageByAngle::DamageTable::operator[]` 0045c9a0, `ItemActionArgument` 0042aad0, `ie_DecoActList_Insert` 00643940, `Container::IsNoAttack` 004c8ea0, mount helpers `sp_HorseFree` 0045d3e0, `mvdb_GetData_ItemIndex` 004bf2c0, `GetUpgradeEffectInfo` 004c0460, `CheckNewTitle` 005cb5f0 | Z18 (same list) | reached only through triggers this document cites (`so_FirstActionAfterSocketConnect`, `sp_ReviveNow`, bomb / damage paths, `sp_HorseOn`, title saves) |
+| Login-burst and trigger callees of Z09 §31.2 rows whose owner is done, owner **Z01**: `sp_KeepFromDoubleLogin` 0043cc90, `sp_RegistNumberVarification` 00551950, `sp_GhostBan` 0043f3d0, `sp_ConnectFromWhere` 0043f1f0, `mbdb_GetModeIDLvType` 00462870, `ProtocolLogger::pl_Clear` 005528a0 | Z18 (Z01 section; `docs/knowledge/Z09.md` §3: rows "Player login, links and save", "Diagnostics and logging", "SHN boxes and fixed strings") | reached (`so_FirstActionAfterSocketConnect` / `sp_NC_MAP_LOGINCOMPLETE_CMD` login burst, `sp_ReviveNow`, bomb / damage paths, `sp_HorseOn`, title saves; Z12 cites them only as triggers) |
+| Same, owner **Z02**: `bixall_Init` 0043d500, 0043c250 (Z09 §31.2 "Brief info") | Z18 (Z02 section, knowledge Z09 §3 row "Brief info") | brief-info reset at login |
+| Same, owner **Z03**: `sp_SkinPolymorph` 004a3280, `asl_SendAfterLogin` 0040aed0, `lt_Next` 00402740, `aeo_GetCaster` 00401b90, 00577e30, 0043be00, `DamageByAngle::DamageTable::operator[]` 0045c9a0 (Z09 §31.2 "Abnormal states", "Skills, attacks and target scans") | Z18 (Z03 section, knowledge Z09 §3) | abstate / skill helpers reached from the login burst and the bomb / damage paths |
+| Same, owner **Z04**: `sp_ItemInvenDelete` 0051c590, 00440d20, 00490c30, 0043bf90, `ie_DecoActList_Insert` 00643940 (Z09 §31.2 "Items, equipment, set items, random options") | Z18 (Z04 section, knowledge Z09 §3) | inventory resets at login |
+| Same, owner **Z07**: `GetStateData` 005ca9b0, `sp_SetCharTitleChangeAvailableTime` 00560900 (§31.2 "Titles"), `CheckNewTitle` 005cb5f0 (§31.5) | Z18 (Z07 section, knowledge Z09 §3 row Z07 and its "Also" column) | title state at login and after title saves; §7.4 covers only `IsTitleRefresh` |
+| Mounts, pets, mini-house, wedding: `sp_MoverSystem_MapLogin` 0045d9e0, `sp_HorseFree` 0045d3e0, `mvdb_GetData_ItemIndex` 004bf2c0, `GetUpgradeEffectInfo` 004c0460, `sp_PetSystem_VirtualCast` 004d2180, `mhs_Init` 00534a30, `PROTO_NC_CHAR_WEDDINGDATA_ACK::Reset` 0043bdb0 | Z13 (Z09 §31.2 rows "Mounts" (Z13 plan line 16), "Pets" (line 15), "Mini-house" (line 12), "Wedding" (line 13)) | Z13 is open; its own gap list picks these up |
+| `sp_EscapeFromEmptyID` 00440910 | Z14 (Z09 §31.2 "Instance-dungeon clusters", Z14 plan line 15) | instance-dungeon escape at login |
+| `CQuestZone::InitNewPlayer` 005b9d40 | Z15 (Z09 §31.2 "Quests", Z15 plan line 12) | quest-zone state of a new player; §6.3 covers only the blob parsing |
+| `sp_RemoveKQItem` 0050f8c0, `sp_GetJoinKQTeamType` 00563990, `sp_KQElementFunction` 00499710 | Z16 (Z09 §31.2 "Kingdom quests", Z16 plan line 12) | KQ state at login / on revive |
+| `ItemActionArgument` 0042aad0 | Z17 (Z09 §31.2 "Item actions and costume charges", Z17 plan line 12) | item-action argument constructor |
+| `vector` resizes 004b40f0 / 004432e0 | none needed (Z09 §31.4 "MSVC STL instances") | library code |
 | `sp_RideInitialize` 0043d140 (from `sp_LoginInit`, §6.9), `sp_MakeRideBriefInfo` 0056e800 (from `sp_HorseOn`) | Z13 (plan: "the mover lifecycle are written as pseudocode") | mount state at login and while riding; Z12 only names the calls |
 | `KQPlayerInform::kqpi_KnockDownMinus` 00496d70 (from `sp_ReviveNow`) | Z16 (kingdom quest element) | KQ scoring on revive; Z12 cites `sp_ReviveNow` only as a matrix trigger |
 | `SkillDataBox::sdb_SpecSkillStruct` 0046a410 (from `so_Routine`) | Z20 (its plan lists 0046a410) | skill data box |
