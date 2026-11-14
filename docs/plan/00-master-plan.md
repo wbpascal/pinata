@@ -82,21 +82,6 @@ server builds with their private PDBs (Login, WM, Zone, Account, AccountLog). Th
 `names/<bin>/S01.json` already exist; run S01 for the layouts, patch analysis and the per-item follow-up table, then
 continue the open phase-2 items with the PDB exports as their main reading source.
 
-### Follow-ups for items done before the 2017 PDB arrived
-
-Evaluated 2026-11-11 by comparing the PDB with each item's output. C02 measures and lists the differences
-(`docs/knowledge/C02.md`); the owner then fixes its own files in a short follow-up session ("Execute the
-follow-up for W01 listed in `docs/knowledge/C02.md`").
-
-| Item | Benefit | What changes |
-|---|---|---|
-| C01 | **High** | 645 of 901 client-handled opcodes are unnamed and get the PDB name; 2017 `On_NC_*` handlers (705) and 30909 function names can be ported to the 2016 client (C02 does the port); client class layouts. The 8 `client` names all agree |
-| W01 | **High** | 133 of its 182 scope opcodes are unnamed today and get official names; 174 have a PROTO struct with field names. 27 of its 35 hand layouts match; 8 differ only by the `ref` prefix / 2-byte prefix (confirm). 3 name conflicts (`0x0871`, `0x1409`, `0x10d2`) to settle |
-| L00 | Medium | 32 of 41 login handlers are unnamed; 23 hand layouts get official names and field names (`0x0C5A` `sUserName[260]`, so the `unused` at 256 is the name's tail; `0x0C66` is a 1-byte struct). `login-server.md` "(ours)" names can be replaced |
-| Z01 | Medium | 54 of 65 scope names already agree; 4 conflicts are shared-handler naming (`0x9884`/`0x9885`, `0x0865`, `0x1095`); 24 of 30 hand layouts match, 6 differ by the `ref` prefix. SHN row structs (134 `::DataVersion`) can cross-check its table loaders. ShinePlayer is a server class and not in the PDB |
-| P03 | Medium | Dissector shows generated "guess" fields for most packets; PDB layouts give named fields for ~2300 packets once C02 adds them as a source to `make_dissector.py` |
-| P01 | Low | Decoder picks up names automatically after `regen.sh`; same layout-source change as P03 |
-
 ### Phase 2: subsystems (any order once their dependencies are done; up to ~4 in parallel works well)
 
 | ID | Item | Depends |
