@@ -12176,6 +12176,19 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 10 | u16 | nNumOfReadQuest |  |
 | 12 | u16[n] | QuestReadIDArray |  |
 
+### `0x10d0` NC_CHAR_ITEMACTIONCOOLTIME_ZONE_CMD (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_CHAR_ITEMACTIONCOOLTIME_ZONE_CMD FUN_0044e710 reads (SetCoolTime push order checked at 0x44e843..0x44e865); PDB 2016 NETPACKETZONEHEADER + ActionCooltime; WM replays the 0x4034 cache)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | zone handle of the player |
+| 2 | u32 | header.charregistnumber | must equal the player's charNo |
+| 6 | u16 | num | records |
+| 8 | struct[num] | group | ActionCooltime, 10 bytes each (pdb2016) |
+| 8 | u16 | group[i].actionID | ItemAction id (key of ItemActions::_actions; cool-time entry +0x14) |
+| 10 | i64 | group[i].expiredTime | absolute _time64 end = now + rest seconds (rounded down) |
+
 ### `0x10d3` NC_CHAR_ZONE_SINGLE_OPTION_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_005a6200 (PROTO_NC_CHAR_SINGLE_OPTION_CMD, pdb2016); Z12 §7.1)
@@ -12748,6 +12761,19 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 0 | u16 | bEnable |  |
 | 2 | u32 | charNo |  |
 
+### `0x4023` NC_CHARSAVE_ITEMACTIONCOOLTIME_REQ (Z→DB)
+
+**Verified layout** (basis: zone ItemActionObserveManager::SendCoolTimes2DB FUN_005d0e60 (10 + 10*num bytes incl. opcode, to sock2gameDB, only when the list is non-empty); PDB 2016 PROTO_NC_CHARSAVE_ITEMACTIONCOOLTIME_REQ / ActionCooltime; CharDB FUN_00424140 (D02))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | p handle |
+| 2 | u32 | header.charregistnumber | p charNo (vt 0x344) |
+| 6 | u16 | num | cool-time list size |
+| 8 | struct[num] | group | ActionCooltime, 10 bytes each (pdb2016) |
+| 8 | u16 | group[i].actionID | ItemAction id (key of ItemActions::_actions; cool-time entry +0x14) |
+| 10 | i64 | group[i].expiredTime | absolute _time64 end = now + rest seconds (rounded down) |
+
 ### `0x4812` NC_SKILL_EMPOWALLOC_DB_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_0044f150)
@@ -12932,6 +12958,18 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 11 | u8 | mystery_vault | sp_MysteryVaultUI |
 | 12 | u32 | nChatBan | sp_Spammer_ChatBan |
 | 16 | u8 | bFirstJoin | always 0 |
+
+### `0x4034` NC_CHARSAVE_2WLDMAN_ITEMACTIONCOOLTIME_CMD (Z→WM)
+
+**Verified layout** (basis: zone ItemActionObserveManager::SendCoolTimes2World FUN_005d0fa0 (8 + 10*num bytes incl. opcode, to sock2wldman, only when the list is non-empty); PDB 2016 PROTO_NC_CHARSAVE_2WLDMAN_ITEMACTIONCOOLTIME_CMD; WM FUN_0042cfc0 (W05 §5.5))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | p charNo |
+| 4 | u16 | ActionCoolTime.num | cool-time list size |
+| 6 | struct[num] | group | ActionCooltime, 10 bytes each (pdb2016) |
+| 6 | u16 | group[i].actionID | ItemAction id (key of ItemActions::_actions; cool-time entry +0x14) |
+| 8 | i64 | group[i].expiredTime | absolute _time64 end = now + rest seconds (rounded down) |
 
 ### `0x580e` NC_KQ_Z2W_MAKE_ACK (Z→WM)
 

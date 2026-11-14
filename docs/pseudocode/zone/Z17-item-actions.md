@@ -194,7 +194,8 @@ CharClassValidator::check(me, other)                                         @ F
 
 `me` is the owner of the item action (the player whose manager runs it); which object becomes `subject` and `object`
 is set by each hook point (§3). Note that `TARGET_ATTACKME` is tested as identity with `me` here; whether that is
-meaningful depends on how the callers fill the argument (open point for part 3).
+meaningful depends on how the callers fill the argument: §3.4.2 (the hook puts the attacked owner in `object`, so
+both are "that slot is the owner").
 
 ### 1.5 Condition test
 
@@ -713,6 +714,377 @@ item-action bonus: e.g. a gem "+25 % to the AC debuff of skill group n" makes th
 
 ---
 
+## 3. Item-action lifecycle and hook points
+
+Where actions are added to and removed from a player (§3.1–§3.3), which game events run them and how each fills
+`ItemActionArgument` (§3.4), and how the cool-down list survives map changes and logouts (§3.5–§3.6). Only players own a
+manager: `vt 0x5d0 so_GetItemActionObserves` returns `&p.sp_ItemActionObserves` for a `ShinePlayer` and null for every other
+object, so every hook below starts with "if X has a manager".
+
+### 3.1 Login: cool-time restore, then the action setup
+
+```pseudo
+WM 0x104C NC_CHAR_REGISTNUMBER_ACK → ShinePlayer::so_SetRegistNumber(ack)           @ FUN_0044e900 (Z01 §4)
+    … (char data request 0x101C to the WM, skill list clear, view/deco slots cleared, …)
+    p.so_GetItemActionObserves().CoolTimeListClear()           # @ FUN_005d19b0: the list a reused player object still held
+
+WM 0x10D0 NC_CHAR_ITEMACTIONCOOLTIME_ZONE_CMD {                                     @ FUN_0044e710 (Z07 §1.2)
+        NETPACKETZONEHEADER { u16 clienthandle; u32 charregistnumber }               # (pdb2016)
+        u16 num; ActionCooltime group[num] { u16 actionID; i64 expiredTime (time64) } }   # 8 + 10·num bytes
+    p = player by clienthandle; null, charregistnumber ≠ p charNo, or p closing (vt 0x300):
+        assert "…Invalid player", kick (0x689); return
+    m = p.vt 0x5d0(); now = _time64()
+    for each record:
+        a = ItemActions::_actions.find(actionID).value          # no end() test (original bug) Z17-B11
+        if expiredTime ≤ now or a == null: next
+        m.SetCoolTime((expiredTime − now) × 1000 (low 32 bits, ms), a._coolGroupID (+8), a._actionID (+0))   # §2.5
+            # each restored entry sends its own one-entry 0x482C to the client
+    # Z07 §1.2 calls the key "group"; the 2016 PDB names it ActionCooltime.actionID and the code looks it up in
+    # ItemActions::_actions (push order checked at 0x44e843…0x44e865)
+
+client 0x1803 NC_MAP_LOGINCOMPLETE_CMD → sp_NC_MAP_LOGINCOMPLETE_CMD @ FUN_00443390 (Z01 §6):
+    p.sp_EquipTick = Metronome(20 ticks = 2 s)                 # the equip/range hook of §3.4.1
+    p.sp_ItemActionSetup()
+
+ShinePlayer::sp_ItemActionSetup()                                                    @ FUN_00566420
+    m.Clear()                                                  # §2.2: all observers back to the pool, cool-downs kept
+    seenSets = []                                              # vector<string>
+    for slot in 0 .. 29 (equipment box, ci_Equipment vt 0):
+        cell = equipment[slot]; empty or no ItemDataBox row: next
+        doWithActionIDs<ItemAcion_Add>(itemID, p)              # §1.7, itemID as filter key
+            fail → assert "ShinePlayer::so_GetItemActionObserves itemAction Can`t Add ActionID. ShineItemID=" (id)
+        if ItemInfo.Class == ITEMCLASS_WEAPON:
+            for each of the 3 gem sockets ({u16 gemID, u8 restCount}, 3-byte stride after the item key):
+                doWithActionIDs<ItemAcion_Add>(gemID, p)       # itemID = gemID → observer IsEnchant (gem charge use, §2.7)
+                    fail → same assert with the gem id   # empty socket 0xFFFF has no row: nothing added, no assert
+        set = ItemInfo.SetItemIndex
+        if set ∉ seenSets:                                     # each set once, even when several pieces are worn
+            seenSets.push_back(set)
+            n = p.so_EqualSetitemIndexNameCount(set) (vt 0x5cc, @ FUN_00549a70; Z21)      # pieces of that set worn
+            for i in 1 .. n:
+                if SetEffectTable::FindActionID(set, i, &id) (@ FUN_005c7eb0: row name == set and count +0x20 == i
+                                                               → id = row+0x21 ItemActionID):
+                    p.so_AddItemAction(id, 0xFFFF) fail → assert "ShinePlayer::so_GetItemActionObserves Setitem Can`t Add ActionID"
+        # items without a set have SetItemIndex "" and go through the same lookup once (no SetEffect row has an
+        # empty name in 2016 *(inferred)*, so nothing is added)
+    for each abstate e in p's abstate list (vt 0x52c, +0xcb0):
+        if ActionEffectAbStateTable::FindActionID(e.InxName, &id) == 1:      # §1.7; no rows in 2016
+            p.so_AddItemAction(id, 0xFFFF) fail → assert "…Abstate Can`t Add ActionID"
+    m.SendCoolTimes2Client()                                   # §3.5: the full list restored from 0x10D0
+```
+
+All failures only assert; the player keeps whatever was added. So the set bonus actions at login are **all levels
+1…n** of every worn set, each with item filter 0xFFFF.
+
+`ShinePlayer::so_AddItemAction(actionID, itemID)` @ FUN_00560840 (vt 0x5d8) and `so_DelItemAction` @ FUN_00560880
+(vt 0x5dc) forward to `ItemActionObserveManager::AddAction` / `DelAction(p, actionID, itemID)` (§2.2) when the manager
+exists (always, for a player).
+
+### 3.2 Equip, unequip, drop
+
+Equipment changes go through the inventory lock list (Z05 §1, §5.1): the request reserves releasers, the CharDB
+answer applies them in order. Two releasers carry the item actions:
+
+| Lock-list slot (`InventoryCellLockList` vftable 006bb37c) | Reservation | Releaser apply |
+|---|---|---|
+| +0x50 `icl_EquipLocation(lock, slot, cell, otherSlot, otherCell)` @ FUN_00489380 | after the cell exchange | `InvenCellReleaser_EquipLocation::icr_Apply` @ FUN_0048ca20 |
+| +0x54 `icl_UnEquipInfo(lock, slot, cell)` @ FUN_004894b0 | before the cell exchange | `InvenCellReleaser_UnEquipInfo::icr_Apply` @ FUN_0048cc60 |
+
+```pseudo
+InvenCellReleaser_EquipLocation::icr_Apply(p, lc)                                    @ FUN_0048ca20
+    p.so_ply_ChangeBriefInfo (vt 0x608)(lc.equipcell, slot); if otherslot ≠ −1: same for (othercell, otherslot)   # Z05 §1.3
+    p.vt 0x57c(); p.vt 0x4b4(handle, …) with the position saved and restored around it          # recalc + look rebroadcast
+    cell = lc.equipcell; if cell and p is a ShinePlayer with a manager and the item has an ItemDataBox row:
+        doWithActionIDs<ItemAcion_Add>(itemID, p)   fail → assert "InventoryLocking::InvenCellReleaser_EquipLocation::icr_Apply itemaction Can`t Add ActionID. ShineItemID="
+        weapon: the 3 gem ids, same (same assert text)
+        n = p.vt 0x5cc(set)                                    # the cell already holds the new item: n counts it
+        if SetEffectTable::FindActionID(set, n, &id): p.so_AddItemAction(id, 0xFFFF)
+            fail → assert "…icr_Apply Setitem Can`t Add ActionID"
+        # only the set level n is added; levels 1…n−1 are already there from the earlier pieces (or from §3.1)
+
+InvenCellReleaser_UnEquipInfo::icr_Apply(p, lc)                                      @ FUN_0048cc60
+    the mirror image with doWithActionIDs<ItemAcion_Del> (@ FUN_0048c970) for the item and its gems, and
+    so_DelItemAction(FindActionID(set, n), 0xFFFF) with n counted while the piece is still worn
+    assert texts "ShinePlayer::sp_NC_ITEM_EQUIP_REQ … Can`t Del ActionID" (copied from the request handler)
+```
+
+Who reserves them: `sp_NC_ITEM_EQUIP_REQ` @ FUN_0052b8d0 (Z04 §5.1) reserves, for each conflicting piece that must come
+off, `UnEquipInfo(slot, equipCell)` → cell change → `EquipLocation(inventory slot, equipCell, −1)` (applied after the
+move, the equip cell is empty, so it adds nothing), and for the target slot `UnEquipInfo(slot, cell)` when the slot holds
+an item, the two cell changes, then `EquipLocation(slot, cell)`. So a **swap** removes the old item's actions before the
+new ones are added; unequip `sp_NC_ITEM_UNEQUIP_REQ` (Z04 §5.4, Z05 §5.1 `0x3414`) reserves `UnEquipInfo` + cell change.
+The ring and minimon equips (`0x3010` @ FUN_0052c5b0, `0x3050` @ FUN_0052d020, Z04 §5.2/§5.3) and the unequip request
+(@ FUN_0053a990) reserve the same releasers (lock-list slots +0x50 / +0x54).
+
+Set levels on unequip: removing a piece removes level n only; level n−1 … 1 stay, matching the n−1 pieces still worn.
+`DelAction` removes the first observer with that `(actionID, 0xFFFF)` pair (§2.2), so set observers stay consistent as long
+as every add has its del.
+
+```pseudo
+ShinePlayer::so_ply_ItemAction_UnEquip(cell)   (vt 0x5e0)                             @ FUN_00565020
+    # only caller: ItemInventory::ii_DropAll @ FUN_00529a70 (Z04 §3.1, Z05 §3.1) for a cell of the equipment box, before
+    # the cell is cleared (the "drop everything" path does not go through the lock list)
+    if cell == null or no manager or item id 0xFFFF or no ItemDataBox row / ItemInfo: return
+    doWithActionIDs<ItemAcion_Del>(itemID, p)                  fail → assert "ShinePlayer::so_ply_ItemAction_UnEquip. ShineItemID="
+    weapon: the 3 gem ids, same
+    n = p.vt 0x5cc(set); if SetEffectTable::FindActionID(set, n, &id) == 1: p.so_DelItemAction(id, 0xFFFF)
+        fail → assert "ShinePlayer::so_ply_ItemAction_UnEquip. SetItem Can`t Del ActionID"
+```
+
+### 3.3 Gems and abnormal states
+
+```pseudo
+sp_NC_ITEM_ENCHANT_ADD_GEM_REQ (Z04 §10.1)                                           @ FUN_00522560
+    the new socket's restCount = ActionEffectItemTable::GetByID(gemID).EnchantMaxLot (§1.7, @ FUN_005c80a0)
+        EnchantMaxLot 0 → restCount 0xFF (unlimited, never decremented by §2.7)
+        no ActionEffectItem row → assert "…Not Find ActionEffectItemTable", restCount 0
+        # Z04 §10.1 calls this lookup "EnchantSocketRate"; it is GetByID → EnchantMaxLot
+CharDB 0x3497 → ITEMDB_ENCHANT_ADD_GEM_ACK                                           @ FUN_00522fc0 (Z05 §8.2)
+    after the apply: if the weapon is equipped: doWithActionIDs<ItemAcion_Add>(gemID, p)
+CharDB 0x3499 → gds_NC_ITEMDB_ENCHANT_REMOVE_GEM_ACK                                 @ FUN_005233d0 (Z05 §8.2)
+    reads the gem ids of the flagged sockets before the apply; equipped weapon: doWithActionIDs<ItemAcion_Del>(gemID, p)
+    the request's remover cell is read only when useRemover (+0x1b) ≠ 0 (GameLog); the gem-charge path sends
+    needItem = 0, so the stale remover bytes of Z17-B9 are never used
+```
+
+Gem charge use (`so_ply_EnchantActionUse`, §2.7) and the window until `0x3499`: the socket keeps
+`{gemID, restCount 0}` in the live item, and the gem's observer stays, until the CharDB answer applies the copy and deletes
+the action. Every further success of that gem's action in this window asserts "RestCount Empty", sends `0x3046`
+(`restCount` 0) again, reserves another lock on the weapon cell and sends another `0x3498` (the lock result is not checked)
+(original bug) Z17-B12. If the CharDB refuses the removal, the `{gemID, 0}` socket stays and so does its action, firing
+for free.
+
+Abnormal states: `AbnormalStateContainer::ase_AttachObject` @ FUN_00401d40 / `ase_DetachObject` @ FUN_00402000
+call `ActionEffectAbStateTable::FindActionID(state InxName)` and add / delete that action with item 0xFFFF. With the empty
+2016 `ActionEffectAbState.shn`, no state carries an action.
+
+### 3.4 Hook points: the events that run the actions
+
+Notation: `{type, subtype}` for `arg.condition` and `arg.effect` (§1.5); "immediate" = `effect = {MAX_ACTIONACTIVITYTYPE, 0}`
+(or any type that is not one of the three value kinds), which runs Recover / AbState / Dispel effects (§2.6); `att` / `def`
+= attacker / defender. Every run uses `EventRun` (all observers, §2.3) unless noted.
+
+#### 3.4.1 Periodic, item use, kill
+
+```pseudo
+ShinePlayer::so_Routine (each pass, mode vt 0x484 ≠ 0)                               @ FUN_0056c790
+    m.UpDate()                                                 # §2.5: expired cool-downs dropped, no packet
+    … every sp_EquipTick (2 s) after the HP/SP/LP/party informs:
+        EventRun { cond {AAT_ActionETCType, AET_ITEMEQUIP}, effect {AAT_ABSTATEINDEX, 0}, me = subject = object = p }
+        sp_LevelChangeRoutineEvent(); sp_HPChangeRoutineEvent(); sp_SPChangeRoutineEvent()
+
+sp_LevelChangeRoutineEvent()                                                         @ FUN_00565790
+    lv = p level; arg { cond {AAT_ActionRangeType, ·}, immediate, me = subject = object = p }
+    if lv ≤ 40: run with subtype Lv_0_40 (1)
+    run with the first of: lv < 20 → Lv_0_19 (3), < 50 → Lv_20_49 (4), < 80 → Lv_50_79 (5), < 100 → Lv_80_99 (6),
+                            ≤ 150 → Lv_100_150 (7)              # RangeCondition re-checks with RangeEnd exclusive (Z17-B2)
+sp_HPChangeRoutineEvent()                                                            @ FUN_00565600
+    if HP × 100 / MaxHP < 20: run {AAT_ActionRangeType, HP_RATE_0_20 (0)}, immediate, me = subject = object = p
+sp_SPChangeRoutineEvent()                                                            @ FUN_005656d0
+    always run {AAT_ActionRangeType, SP_ABSOLUTE_0_1000 (2)}, immediate, me = subject = object = p
+```
+
+AbState effects under an `AET_ITEMEQUIP` or `ActionRangeType` condition go through `AbStateTypeEffect::equipTick`
+(§2.6): `so_AbnormalState_Set_Simple(…, arg5 = 2500, keep = −1, EF_JUSTENCHANTGLOBALACTION)` @ FUN_004164c0 passes 2500
+as the state's **keep time in ms** to `so_AbnormalState_Set` (vt 0x638, Z03 knowledge: `(setter, idx, strength, entry,
+g_Now, 0, flag, keepMs, how, origin)`), and −1 only as the keep time shown to the client (vt 0x3f0, broadcast). So the
+state lasts 2.5 s and the 2-s tick renews it while the item is worn / the range holds; nobody removes it explicitly: it
+runs out at most 2.5 s after unequip or after HP / level leaves the range *(inferred: renewal of an already-set state
+is Z03's `so_AbnormalState_Set`)*. The client is told "no end time" and gets no second broadcast on renewal.
+
+```pseudo
+sp_NC_ITEM_USE_REQ (Z04 §6) on an equipped cell → ShinePlayer::sp_ItemUseReq_Equip(slot, cell, info)   @ FUN_005415d0
+    if info == null or no manager: return                      # no answer at all in that case
+    results = EventRunByItemUse(itemID = info.ID,
+              { cond {AAT_ActionETCType, AET_ITEMUSE}, immediate, me = subject = object = p })    # only that item's observers
+    p.so_ply_ItemUseResultPacket(results ? 0x700 : 0x722, 8)   # vt 0x91c @ FUN_0045e610 → 0x3016 NC_ITEM_USE_ACK (Z04 §6)
+        # 0x700 success; 0x722 = no action fired (on cool-down, condition roll failed, or the item has none); 0x722
+        # has no entry in client-error-codes.json
+```
+
+The 2016 `Karen_…` weapons / shield are the only `AET_ITEMUSE` items (§1.8): "use" an equipped one to get a 150-s
+buff, then the group cool-down (`0x482C`).
+
+```pseudo
+ShineMobileObject::so_KilledBy(killer, …)  (the dead object's routine)                @ FUN_00432240
+    … after the death scripts / guild-tournament hook:
+    if killer has a manager:
+        EventRun on killer { cond {AAT_TargetAction, TA_DIE}, immediate, me = subject = killer, object = the dead }
+    # no 2016 condition uses AAT_TargetAction (§1.8): latent
+```
+
+#### 3.4.2 Normal attacks (swing) and the rule-set rates
+
+```pseudo
+ShineMobileObject::smo_SwingDamage(def, …)  (att = this)                              @ FUN_00432f30 (Z03 §4.2)
+    … after damage, hit lists and the 0x2448 / 0x2449 sends (no hit / miss test before this block):
+    kind = AT_PHYSIC if att.smo_RulesOfNormalAttack == roe_normalPY, AT_MAGIC if roe_normalMA, else AT_NORMAL
+    if att has a manager: me = att, subject = att, object = def; immediate
+        EventRun cond {AAT_AttackType, AT_NORMAL}; EventRun cond {AAT_AttackType, kind}
+    if def has a manager: me = def, subject = att, object = def; same two runs
+    # Z03 §4.2's "item-action triggers" comment on att.vt 0xbf8 is wrong: vt 0xbf8 is so_ply_PassiveSetAbstate
+    # (@ FUN_005798e0, passive-skill states); the item actions are this block
+```
+
+The rule sets (`RulesOfEngagement*`, Z03 §4) ask value effects. In every function below one `ActionResults` vector
+collects the results of **all** its runs and is never cleared in between, while the running total adds
+`GetPlusAppliValue()` (the sum over the whole vector) after each run. A result from an earlier run is therefore counted
+again by every later run (original bug) Z17-B10 (latent in 2016: no effect uses `AAT_AttackType`, §1.8).
+
+```pseudo
+roe_CriticalRateByGlobalAction(ctx) → ‰    (roe vt 0x24)
+    NormalPY @ FUN_00504b10 / NormalMA @ FUN_00504c20:
+        me = subject = att, object = def; effect {AAT_AttackType, AT_CRITICAL}
+        total  = Σ after EventRun cond {AttackType, AT_NORMAL}
+        total += Σ after EventRun cond {AttackType, AT_PHYSIC (PY) | AT_MAGIC (MA)}
+    PhisycalSkill @ FUN_00504d30 / MagicalSkill @ FUN_00504ee0:
+        run cond AT_PHYSIC | AT_MAGIC; if total ≥ 1000: return total
+        if ctx.sklinfo: run cond AT_SKILL; then for each active skill group g: run cond {AAT_ActiveSkillGroupIndex, g+0x20}
+    # called by roe_CalcDamage only when the normal crit roll failed: second roll rand1000 < total (Z03 §4.5)
+
+roe_ShieldBlockByGlobalAction(ctx) → ‰    (roe vt 0x28; the only implementation is NormalPY @ FUN_00505090, so every rule set uses it *(inferred: no other class defines it in the PDB)*)
+    effect {AttackType, AT_BLOCK}, cond {AttackType, AT_NORMAL}, subject = att, object = def
+    if def has a manager: me = def, run;  if att has a manager: me = att, run
+    # used in roe_HitRate: rand1000 < total → shield block (Z03 §4.3)
+
+roe_HitRateByGlobalAction(ctx) → ‰    (roe vt 0x2c)
+    effect {AttackType, AT_MISS}, subject = att, object = def; each run first on def (me = def), then on att (me = att)
+    NormalPY @ FUN_005051c0 / NormalMA @ FUN_005053b0: cond AT_NORMAL (def, att), then AT_PHYSIC | AT_MAGIC (def, att)
+    PhisycalSkill @ FUN_005055a0 / MagicalSkill @ FUN_005058d0: cond AT_PHYSIC | AT_MAGIC (def, att);
+        if total ≥ 1000: return 0;  if ctx.sklinfo: AT_SKILL (def, att), then each active skill group (def, att)
+    return 1000 − min(total, 1000)                              # the chance the hit is not evaded
+```
+
+Who answers what follows from the validators (§1.4): in a run on `def`, `me = def` and `subject = att`, so a subject
+validator `TARGET_ME` fails and only conditions whose subject accepts the attacker (`TARGET_ALL`, a `MobType`, …) and
+whose object is `TARGET_ME` / `TARGET_ATTACKME` (= "the object is me") pass. In a run on `att`, `me = subject = att`, so
+subject `TARGET_ME` ("I attack") passes. This answers the open point of §1.4: `TARGET_ATTACKME` and `TARGET_ME` are the
+same identity test, and the hook decides whether the owner is the attacker or the attacked through `subject` / `object`.
+The same condition subtype (`AT_NORMAL`, `AT_SKILL`, …) is used on both sides. Note that a run on `att` with effect
+`AT_BLOCK` adds to the **defender's** block chance and `AT_MISS` lowers the attacker's own hit chance; which side's
+bonus is meant is left to the data (none in 2016).
+
+```pseudo
+RulesOfEngagement::roe_CalcDamage(ctx)                                                @ FUN_00505c00 (Z03 §4.5)
+    crit = rand1000 < roe.vt 4(ctx) + ctx.crirateadd
+    if not crit and att has a manager: crit = rand1000 < roe_CriticalRateByGlobalAction(ctx)    (vt 0x24, above)
+        # an item-action crit goes straight to roe_CriticalStun, skipping the multi-hit damage-rate test of a normal crit
+    if def has a manager and crit:                              # the defender's answer to a crit
+        arg { cond {AttackType, AT_CRITICAL}, me = def, subject = att, object = def }
+        effect {AttackType, AT_BLOCK}:  v = Σ;  if rand1000 < v: crit = 0; ctx.isshieldblock = 1; return 0
+        effect {AttackType, AT_MISS}:   v = Σ (includes the AT_BLOCK results, Z17-B10); if rand1000 < v: crit = 0; ctx.ismiss = 1; return 0
+        immediate:                      EventRun (e.g. a state on the attacker, "when I am hit critically")
+    if att has a manager and crit:
+        EventRun on att { cond {AttackType, AT_CRITICAL}, immediate, me = subject = att, object = def }
+    … damage (roe vt 8 / 0xc / 0x10 = roe_AttackPower below)
+
+roe_AttackPower(ctx)                                    NormalPY @ FUN_00506660, NormalMA @ FUN_005068d0
+    min, max = roe_MinWC, roe_MaxWC (+ the HP-loss condition params, Z03)
+    results = []
+    a = att has a manager and EventRun_IncDmgRate(att, def, AT_NORMAL, results)     # me = att (§2.3)
+    d = def has a manager and EventRun_IncDmgRate(att, def, AT_NORMAL, results)     # me = def, subject = att, object = def
+    if a or d: min = GetRateAppliValue(results, round(min)); max = GetRateAppliValue(results, round(max))   # ‰ chained
+    return (min + rb_largerandom(max − min)) × att.param+0x858 / 1000
+                                                        PhisycalSkill @ FUN_00506b40, MagicalSkill @ FUN_00506ed0
+    min / max first get the skill's MinWC(Rate) / MaxWC(Rate) and the empower damage step (Z03); then the same with
+    AT_SKILL, plus on att EventRunBySkillGroupIndex(results, skill, SEIT_DAMAGE_RATE_INCREASE, att, def) when the skill
+    has active skill groups; all results in one vector, one GetRateAppliValue per bound (no double count here)
+```
+
+`EventRun_IncDmgRate` asks `{AAT_SetItemEffectType, SIET_DAMAGE_RATE_INCREASE}`: the two 2016 `SetItemEffect` rows.
+A defender-side success multiplies the damage the defender **takes** (there is no decrease kind), so such conditions
+need a subject that excludes the attacker.
+
+#### 3.4.3 Skills
+
+```pseudo
+AxialListScanSkillTarget::alsst_SkillBlast(skill, empower, n, …)                      @ FUN_00582de0
+AxialListScanSkillTarget::alsst_SkillBlast_RandomTarget(…)                            @ FUN_00583180
+    if the caster has a manager: for each target t (the first n scanned, 8-byte stride / the random target list):
+        EventRun on caster { cond {AttackType, AT_SKILL}, immediate, me = subject = caster, object = t }
+        EventRun on caster { cond {AttackType, AT_PHYSIC if SkillHitType == SHT_FROM_PY_NORMAL_HITRATE else AT_MAGIC}, … }
+    # runs before the per-target smo_SkillBlast, so before hit / miss is known *(inferred from the order)*
+
+ShineMobileObject::smo_SkillBlast(skill, t, …)  (caster = this)                       @ FUN_00581160 (Z03 §5, Z09)
+    caster-side value lookups, each EventRunBySkillGroupIndex(results, skill, kind, caster, t) when the caster has a
+    manager (and, where noted, the skill has active skill groups), then v = GetRateAppliValue(results, v):
+        SEIT_AGGRO_RATE_INCREASE:     v = (setEffect[12] − 1000) + ServerInfo.AggroPerDamage → bos_DamageRateAggro
+        SEIT_HEAL_RATE_INCREASE:      v = HEALAMOUNT (heal skills; runs on ctx.att with ctx.def)
+        SEIT_SS_RATE_THHPUP:          v = bos_MyHealHit after a successful HPUPRATE roll
+        SEIT_KEEPTIME_RATE_INCREASE:  v = FIRETIMEADD (→ t.so_smo_AbStateKeepTimeAdd (vt 0xa5c)(0x53, v)), CURSETIMEADD (→ states 0x23, 0x32…0x37,
+                                      0x39), POSIONTIMEADD (→ 0x21), and the keep time of each abstate the skill sets (groups required)
+    target side, if t has a manager (twice: in the buff / enchant branch, and in the damage branch only on multi-hit step 0):
+        EventRun on t { cond {AttackType, AT_SKILL}, immediate, me = t, subject = caster, object = t }
+        EventRun on t { cond {AttackType, AT_PHYSIC | AT_MAGIC by SkillHitType}, … }
+```
+
+Other `EventRunBySkillGroupIndex` users (all `me = subject = caster`, §2.3), each scaling one value with
+`GetRateAppliValue`:
+
+| Caller | `SkillEffectIncreaseType` | Value scaled | object |
+|---|---|---|---|
+| `ShinePlayer::smo_ply_SkillCoolTime` @ FUN_0055b6a0 | `SEIT_COOLTIME_RATE_DECREASE` | both cool times (after the set-item `SET_COOLTIMERATE`); any change → `so_ply_NewSkillCoolTime` (vt 0x374) with `(cool − elapsed)/1000` s | null |
+| `CharaterSkillList::csl_SPCheck` @ FUN_0055b920 | `SEIT_USESP_RATE_DECREASE` | SP cost (after `SET_SPCONSUMRATE` and `so_smo_SPExhByAbState` vt 0xa60, before the per-state SP hooks) | null |
+| `ShineMobileObject::so_SkillEnchant` @ FUN_00431ca0 | `SEIT_KEEPTIME_RATE_INCREASE` | keep time of each abstate a buff skill sets | the target |
+| `ShineMagicField::so_mgcfld_MagicFieldSpread` @ FUN_0057ea30 / `_Friend` @ FUN_0057ee80 | `SEIT_KEEPTIME_RATE_INCREASE` | the field's vanish time (Z09 §12.3) | caster |
+| `AxialListMagicFieldHeal::almfh_ApplyHeal` @ FUN_0056d2c0 | `SEIT_HEAL_RATE_INCREASE` | heal amount per tick (Z09 §12.3) | the healed |
+| `so_ItemActonAbstateApp` @ FUN_0055dea0 | several | the state just cast (§2.8) | |
+| `roe_AttackPower` (skills, above) | `SEIT_DAMAGE_RATE_INCREASE` | damage bounds | def |
+
+With `object = null` (cool time, SP), the distance test of §1.5 is skipped and an object validator other than
+`TARGET_ALL` / `THISACTION` / `THISSKILL` fails. `ShineMover::smo_ply_SkillCoolTime` @ FUN_0054a770 (mount skills) only
+sets the mover's cool time: no item actions. The `SEIT_STA_*` kinds and `SEIT_STA_SHEILD_BLOCK_RATE_INCREASE` are read only
+by `so_ItemActonAbstateApp` (§2.8).
+
+### 3.5 Cool-down persistence: `0x482C` (full list), `0x4023`, `0x4034`
+
+```pseudo
+ItemActionObserveManager::SendCoolTimes2Client()                                     @ FUN_005d0d30
+    Send to the owner (vt 0x2f8 data socket .vt 0xc) 0x482C NC_SKILL_ITEMACTIONCOOLTIME_CMD {
+        u16 num = list size
+        num × { u16 ItemActionID = t.ActionID (+0x14); u16 ItemActionGroupID = t.ActionGroupID (+0x10);
+                u32 SecondCoolTime = TickTimer::GetRestDelayTimeToSecond(t) × 1000 }   # @ FUN_00592000: (delay − cur)/10 s, 0 if run out
+    }   # 4 + 8·num bytes; sent also when the list is empty (num 0); too long → assert "…SendCoolTimes2Client : Packet Too Long", nothing sent
+    # callers: sp_ItemActionSetup (§3.1). The remaining time is rounded down to whole seconds.
+
+ItemActionObserveManager::SendCoolTimes2DB()       (from WholeSaver::ws_save2DB @ FUN_00455a10, Z01 §8.4)   @ FUN_005d0e60
+    if the list is empty: return                                # the DB keeps its old rows (Z11-B44)
+    now = _time64()
+    Send to CharDB (sock2gameDB) 0x4023 NC_CHARSAVE_ITEMACTIONCOOLTIME_REQ {
+        NETPACKETZONEHEADER { u16 clienthandle = p handle; u32 charregistnumber = p charNo (vt 0x344) }
+        u16 num
+        num × ActionCooltime { u16 actionID = t.ActionID; i64 expiredTime = now + rest seconds }
+    }   # 10 + 10·num bytes incl. opcode (D02: CharDB FUN_00424140, usp_Character_setItemActionCoolTime)
+    # Z01 §8.4 lists FUN_005d0e60 as "tutorial save": it is this cool-time save
+
+ItemActionObserveManager::SendCoolTimes2World()    (from WholeSaver::ws_save2worldmanager @ FUN_004536f0, Z01 §8.4)   @ FUN_005d0fa0
+    if the list is empty: return
+    Send to the WM (sock2wldman) 0x4034 NC_CHARSAVE_2WLDMAN_ITEMACTIONCOOLTIME_CMD {
+        u32 nCharNo; u16 num; num × ActionCooltime { u16 actionID; i64 expiredTime = now + rest s }
+    }   # 8 + 10·num bytes incl. opcode; the WM caches it (+0x668, W05 §5.5 / W01 §7.4, W05-B16) and replays it as 0x10D0 (§3.1)
+```
+
+Round trip: zone list → `0x4034` (map change / logout) or `0x4023` (DB save) as absolute `time64` end times → `0x10D0` at
+the next zone login → `SetCoolTime(rest ms)` per entry. Cool-downs therefore run in real time while the character is
+offline or changing maps. Two losses: the rest is rounded down to seconds at every hop, and an empty list is never sent,
+so after `&iareset` (Z11 §7.4, `ResetCoolTime`) or once every cool-down has run out, the WM cache and the DB still hold
+the last non-empty list. Entries that ended meanwhile are skipped at `0x10D0`, so only `&iareset` is visibly undone
+(Z11-B44 for the DB; the same for the WM cache).
+
+Client `GameFrameWork::On_NC_SKILL_ITEMACTIONCOOLTIME_CMD` (2016 FUN_0049c600, Z11 §7.4): per entry
+`Skill::SetLastCoolTimeByItemActionID(ItemActionID, SecondCoolTime / 1000)`, i.e. the cool-down display of every skill /
+item tied to that action restarts with the given rest (0 = ready). `ItemActionGroupID` is not used by the client.
+
+### 3.6 Teardown
+
+There is no removal at logout: `Clear` (§2.2) has one caller, `sp_ItemActionSetup`, and `~ItemActionObserveManager`
+(@ FUN_005592c0) / `~ShinePlayer` free only the vectors. Player objects live in a fixed pool of 1500 (Z01 §4.2) and are
+reused, so a logged-out character's observers keep their slots in the zone-wide 5000-entry `ItemActionObserveBuffer`
+until a later login on the same player object runs `Clear` (original bug) Z17-B13. The cool-down list is cleared at the
+next `so_SetRegistNumber`. Map changes inside one zone process do not leave the player object, so nothing is lost there.
+
+---
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -726,3 +1098,7 @@ item-action bonus: e.g. a gem "+25 % to the AC debuff of skill group n" makes th
 | Z17-B7 | `ItemActionObserveManager::AddAction` FUN_005d17f0 | `_actions.find(actionID)` result is dereferenced without an `end()` test | an unknown action id reads the value slot of the map's head node (uninitialised; crash or a bogus `Action*`); latent: every 2016 `ActionEffectItem` / `SetEffect` id exists | return false when not found |
 | Z17-B8 | `DispelAttrTypeEffect::_execute` FUN_005d05f0 | compares each state's `DispelIndex` with the effect's `Value`, not with its `DispelAttr` sub-type | a dispel effect would remove the wrong class of states; latent: no 2016 effect uses `AAT_DispelAttr` | compare `EffectActivityValue` |
 | Z17-B9 | `so_ply_EnchantActionUse` FUN_00562cb0 → CharDB `0x3498` | the 12-byte `remover` block is never written (stale send-buffer bytes); `needItem` = 0 | harmless for CharDB (it reads the remover only when `needItem` = 1, D03), but stale bytes go on the wire and come back in `0x3499` | zero the block |
+| Z17-B10 | `roe_CriticalRateByGlobalAction` / `roe_HitRateByGlobalAction` / `roe_ShieldBlockByGlobalAction` (FUN_00504b10…FUN_005058d0), `roe_CalcDamage` FUN_00505c00 | one `ActionResults` vector collects all runs and is never cleared, but the total adds the sum over the whole vector after each run | a success of an early run is counted once more by every later run (normal hit rate: up to 4×; skill variants: once per skill group more); in `roe_CalcDamage` the defender's crit-block results are added to its crit-miss chance; latent in 2016 (no `AttackType` effects) | clear the vector per run, or sum once at the end |
+| Z17-B11 | `0x10D0` `wms_NC_CHAR_ITEMACTIONCOOLTIME_ZONE_CMD` FUN_0044e710 | `_actions.find(actionID)` dereferenced without an `end()` test (same pattern as B7) | a stored id that is no longer in `ItemAction.shn` reads the map head node: bogus group / crash | skip unknown ids |
+| Z17-B12 | `so_ply_EnchantActionUse` FUN_00562cb0 + `0x3499` FUN_005233d0 | the emptied socket keeps `{gemID, 0}` and the gem's observer until CharDB answers | each further success in that window asserts "RestCount Empty", re-sends `0x3046` (0) and another lock + `0x3498`; a refused removal leaves the gem action firing without charges | delete the gem's action (or mark the socket empty) when the count reaches 0 |
+| Z17-B13 | player teardown (`~ItemActionObserveManager` FUN_005592c0; `Clear` FUN_005d16e0 called only by `sp_ItemActionSetup`) | a logged-out player's observers are not returned to the 5000-slot `ItemActionObserveBuffer` | slots stay used until the same pooled player object logs in again; with many distinct player objects (pool 1500) the buffer can fill → "Buffer Full", actions silently missing for new logins *(inferred: effect depends on load)* | `Clear` on logout |
