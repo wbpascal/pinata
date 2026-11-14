@@ -383,6 +383,7 @@ ShinePlayer::sp_ItemActionSetup(p)                                   @ FUN_00566
     for slot in 0 .. 29:
         cell = equipment[slot]; if not cell or not ItemDataBox[cell.ident]: continue
         doWithActionIDs<ItemAcion_Add>(ident, p)  else assert "ShinePlayer::so_GetItemActionObserves itemAction Can`t Add ActionID. ShineItemID="
+                # all three asserts of this function name so_GetItemActionObserves, not sp_ItemActionSetup (original bug) Z21-B13
         if ident == 0xFFFF: return                                    # dead: ItemDataBox[0xFFFF] is NULL (original bug) Z21-B3
         weapon: the 3 gem ids → Add (same assert)
         name = ItemInfo.SetItemIndex
@@ -414,10 +415,17 @@ set's row removes one copy and the others stay: correct for duplicates. `AddActi
 `ItemActions::_actions` (the `find` result's action pointer is NULL, *(inferred)* for the end node) or the observer buffer is full ("ItemActionObserveBuffer::alloc Buffer Full"); every
 `SetEffect.ItemActionID` exists in `ItemAction.shn`.
 
-Equipped items leave the equipment only through these paths in the 2016 zone (the only callers of `so_DelItemAction`
-are the two hooks above and `ase_DetachObject` @ FUN_00402000 for abstate actions); other removals of an equipped item,
-if any exist, would leave the set action registered until the next zone entry *(inferred; Z04 / Z05 own the removal
-paths)*.
+Callers of `so_DelItemAction` (vt 0x5dc): the two unequip hooks above, `ase_DetachObject` @ FUN_00402000 (abstate
+actions) and `doWithActionIDs<ItemAcion_Del>` @ FUN_0048c970 (an item's own and its gems' actions; called from the
+unequip hooks and from `gds_NC_ITEMDB_ENCHANT_REMOVE_GEM_ACK` @ FUN_005233d0, gem removal, no set row involved).
+Every way an equipped item leaves `ci_Equipment` in the 2016 zone runs a set hook:
+- `sp_NC_ITEM_UNEQUIP_REQ` / `sp_NC_ITEM_EQUIP_REQ` (above) and the forced unequip `so_ply_ReinforceRemoveEquip`
+  @ FUN_004a4da0 (Z05 §5.2, `0x347F` to the GameDB), which reserves through the same lock-list slots in the same order:
+  vt 0x54 `UnEquipInfo`, vt 0x30 / 0x40 moves, vt 0x50 `EquipLocation`; so `InvenCellReleaser_UnEquipInfo` runs;
+- `sp_NC_ITEM_DROP_REQ` / `ii_DropAll` → `so_ply_ItemAction_UnEquip` (above);
+- `sp_RemoveKQItem` removes KQ items, which carry no set name (§4.2: `SetItemIndex` "-"), so no set row is affected.
+`sp_ItemInvenDelete` @ FUN_0051c590 (expired items) walks only `ci_Inventory`, never `ci_Equipment`. No path leaves a
+set action registered after its piece is gone.
 
 ### 4.4 What the set-granted actions do
 
@@ -508,10 +516,12 @@ Send_SETITEMHEALEFFECT(ShineObject *t, u8 isheal, u32 amount)          @ FUN_005
     # only caller: RecoverTypeEffect::_execute (other functions merely share its EH handler)
 ```
 
-Client: `GameFrameWork::On_NC_ACT_SETITEMHEALEFFECT` *(pdb2017 name; 2016 client FUN_0049bd20)* calls FUN_00692d10
-(`DAT_00b441d0`, who, hpchange, style = isheal·4 | 1, 0): if the object is known and close enough to the camera, it
-spawns a floating number (`sprintf "%u"`, one digit sprite per character) in style 5 (heal) or 1 (damage). Nothing else
-(no HP gauge change) *(inferred from the code shape: FUN_00692d10 is the shared damage/heal number display)*.
+Client: `GameFrameWork::On_NC_ACT_SETITEMHEALEFFECT` *(pdb2017 name; 2016 client FUN_0049bd20)* is a single call
+`TextEffMgr::AddNumTextEff(&DAT_00b441d0, who, hpchange, color = (isheal & 1)·4 | 1, 0)` (FUN_00692d10, name from
+`names/client/C02.json`, 2017 public `?AddNumTextEff@TextEffMgr@@QAEXGHW4TextEffColor@1@_N@Z` *(pdb2017)*): if the object
+is known and close enough to the camera, it spawns a floating number (`sprintf "%u"`, one digit sprite per character) in
+colour `TextEffMgr::TextEffColor` 5 = `HEAL` (isheal = 1) or 1 = `RED` (isheal = 0) *(pdb2017 enum)*. The handler does
+nothing else: no HP gauge change.
 
 ## 5. Mechanism C: set-item values in abnormal states
 
@@ -765,6 +775,8 @@ UseEffect::UseItemJustReviveAtDead::uib_Effect(actor, ShineObject *p, item, fns)
 ```
 
   Both `ab_Recover` calls go through `aeo_Recover` (Z21-B8): no set-item value survives an item revive either.
+  (`aeo_Recover` profiles itself as "ShineObjectClass::ShinePlayer::so_AbstateRecover", another misnamed log; Z03's
+  function, noted only in passing.)
   The shelter helpers *(pdb2016)*, `AbstateShelter` = `std::vector<AbstateBuffer> as_Safe`, `AbstateBuffer` (0x14) =
   `{ u32 charNo @0 (0xFFFFFFFF = free); std::vector<AbstateElementInObject> ab_List @4 }` (elements of 0x74 bytes,
   whole copies, so the shelter copy keeps its `aeo_SetItemEffect`):
@@ -818,6 +830,8 @@ ShineMobileObject::so_SkillEnchant(caster, ShineObject *target, SmashArgument *a
             results = {}
             if EventRunBySkillGroupIndex(manager, &results, s, SEIT_KEEPTIME_RATE_INCREASE 2, caster, target):   # §5.3
                 base = GetRateAppliValue(&results, base)                 # item-action (incl. set-action) keep-time rate
+        row = dic_abstate.as_FromIndex(idx)                              # looked up again
+        if row == null: assert "BattleObjectGroup::BattleObject::bo_Routine : Invalid abstate", idx; continue   # (Z21-B12 name)
         extra = 0
         for each group g of s.sdi_ActiveSkillGroups until a null entry:
             if g.(+0x20) == 99:                                          # group 99 = buffs scaled by the passive rate
@@ -899,6 +913,7 @@ call (§5.4), never to SP; `SET_HPSPRECOVERYRATE` (mechanism A) is the only fact
 | Z21-B10 | `siae_SetItemEffectAndValue` FUN_00510170 (§5.3) | the 32-bit rate product of `GetRateAppliValue` is stored as u16 (and saved as `smallint`, D06 §7.2) | products ≥ 65,536 wrap (≥ 32,768 may fail the DB bind); latent with 2016 data (single rates 700…1300) | clamp, or a wider field |
 | Z21-B11 | `SubAbnormalStateActorPartyRecharge::sasa_Act_Killed` FUN_00407730 (§5.4) | tests `&e.aeo_SetItemEffect != null` (address of a member of a non-null element) | dead check, always true; harmless | no test |
 | Z21-B12 | `ShineMobileObject::so_SkillEnchant` FUN_00431ca0 (§5.7) | its asserts name `ShinePlayer::sp_NC_BAT_SKILLENCHANT_REQ` and `BattleObject::bo_Routine` | misleading logs (the function is the mobile-object enchant step, for every caster class) | the function's own name |
+| Z21-B13 | `ShinePlayer::sp_ItemActionSetup` FUN_00566420 (§4.3) | its three asserts ("… itemAction / Setitem / Abstate Can`t Add ActionID") name `ShinePlayer::so_GetItemActionObserves` | misleading logs (the getter it calls, not the setup) | the function's own name |
 
 ## 6. Not reconstructed / uncertain
 
@@ -907,13 +922,14 @@ call (§5.4), never to SP; `SET_HPSPRECOVERYRATE` (mechanism A) is the only fact
   member names. The 2015 zone could be diffed for an older loader (not documented here: 2015 is out of scope).
 - Whether `icl_Apply_N_Free` walks the lock list strictly in insertion order (§4.3 relies on it; the list class
   is `InventoryLocking::InventoryCellLockList`, Z05 §1.2–1.3).
-- What the client does with `0x206F` beyond the floating number (FUN_00692d10 is unnamed in the 2016 client; the 2017
-  PDB names only the handler). Whether the player's HP gauge is refreshed after a set heal (§4.4).
+- Whether the player's HP gauge is refreshed after a set heal (§4.4): `0x206F` only shows the number (§4.5); the HP
+  itself reaches the client through the usual HP updates (Z12 / Z09), not traced for this path.
 - §5.3 `EventRunBySkillGroupIndex` / `_EventRun` internals (which observers match, cooldowns, `ActivityRate` roll) are
   Z17's; the table of §5.3 assumes every matching action fires.
 - `so_batobj_GetDamage` (vt 0x65c, FUN_005556f0, reads `smo_BattleObject` +4 = o+0x1d80) is subtracted from the HP sent as
   `resthp` in the HoT packet (§5.8): which pending damage it holds was not traced (Z03's battle object).
-- The `0x243C` client handler FUN_004b5740 was read only as far as the damage number / death branch (§5.8).
+- The `0x243C` client handler FUN_004b5740: Z09 §17.3 gives its abstate-effect lookup; its full client side belongs to
+  Z22 (open, actor packets' client handlers); §5.8 reads only the damage number / death branch.
 - `uib_Effect` (§5.6) recovers `g_AbstateShelter` without freeing it, and the death filler only resets that entry when
   the player carries the keep-buff item: after an item revive the stale copy stays until a `0x104E` / skill revive frees
   it. It could only come back through another item revive after a death without the item (i.e. the item obtained while
@@ -945,6 +961,7 @@ here (profiler, logging, `std::` and iterator helpers skipped), and the `ShinePl
 | login restore `so_CharAbstateData` @ FUN_0044e0e0 → `asl_Store` @ FUN_0040afd0 | Z12 §6.4 (done, documents it) | §5.6 adds `siae_SetItemEffectRestore` |
 | `ItemInfo.SetItemIndex` column (the join key of §4.2) and the `ItemInfo.shn` loader `ItemDataBox::idb_Load` @ FUN_00649780 | Z01 §2.3 loader table (done, lists it) and §2.3 / §3.2 here (column offset +0x156; `ItemDataBoxIndex.SetItemIndex` set to 0xFFFF) | the set name is read straight from the item row; the loader's only set-item act is the 0xFFFF fill |
 | equip / unequip / drop flows that run the releasers of §4.3 (`sp_NC_ITEM_EQUIP_REQ` …, `InventoryCellLockList`) | Z04 / Z05 (done, documented: Z05 §1.2–1.3 for the lock list) | §4.3 documents only the set-action add / delete inside the releasers |
-| `0x206F` and `0x243C` client handlers (FUN_00692d10 / FUN_004b5740, 2016 client) beyond what §4.5 / §5.8 say | C01 (done: handler map in `re-data/client-handlers.json`) | the floating-number / HP display internals are client UI; noted in §6 |
+| `0x206F` client handler FUN_0049bd20 → `TextEffMgr::AddNumTextEff` FUN_00692d10 | here (§4.5) | the handler is one call; documented completely |
+| `0x243C NC_BAT_DOTDAMAGE_CMD` client handler FUN_004b5740 beyond the damage number / death branch of §5.8 | Z09 §17.3 (done, gives the abstate-effect lookup) and Z22 (open; plan: the actor packets and their client handlers) | the packet belongs to the DoT / HoT actors, not to set items; §5.8 documents only the set-item factor of its sender |
 | `smo_old_skill_blast` @ FUN_00579b50 / FUN_0057be40 (vt 0xEA4) | here (§5.7) | dead: no code calls vt 0xEA4 |
 | Overlap rows of Z09 §31.2 "Items, equipment, set items, random options" (`Send_SETITEMHEALEFFECT` FUN_005cfbb0, `SkillEffect::operator[]` FUN_00510010, `se_Clear` FUN_005105e0, `SetItemAbstateEffect` ctor FUN_00510350, `ed_Compare` FUN_004a2ed0) | here (§4.5, §3.6, §5.1) | Z18 (no status yet) can cite Z21; recorded in `docs/knowledge/Z21.md` |
