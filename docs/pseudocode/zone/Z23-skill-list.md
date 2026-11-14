@@ -60,8 +60,8 @@ class MoverSkillList { 0x00 vector<MoverSkill> msl_Skill; };   // 0x10, unsorted
 struct MoverSkillList::MoverSkill { 0x00 u16 ms_SkillID; 0x04 u32 ms_EndOfCooltime; };   // 8
 ```
 
-The skills of a `ShineMover` (mount object, Z13). Only cooldowns are kept; §3.5 has the functions. Who fills the
-vector is part of the mover creation (§9, part 3).
+The skills of a `ShineMover` (mount object, Z13). Only cooldowns are kept; §3.5 has the functions. `msl_Store`
+fills it from `MoverUseSkill.shn` on every summon (§9.1); that table is empty in 2016, so the list is always empty.
 
 ### 1.3 Vtable slots used here
 
@@ -412,8 +412,8 @@ MoverSkillList::msl_SetCoolTime(l, id, dly, group, groupDly):           @ FUN_00
 ```
 
 No set-item rate, no item actions, no 0x4821 (a mount has no client session of its own). Users:
-`so_smv_SkillBash_Object` FUN_00580800 and `so_smv_SkillBash_Location` FUN_00580cf0 check `msl_CoolTimeCheck` (part 3,
-§9); the mover's cast completion goes through the same `so_Routine` §3.1 (vt 0xeac → `msl_SetCoolTime`).
+`so_smv_SkillBash_Object` FUN_00580800 and `so_smv_SkillBash_Location` FUN_00580cf0 check `msl_CoolTimeCheck` (§9.2;
+both have no caller in 2016); the mover's cast completion goes through the same `so_Routine` §3.1 (vt 0xeac → `msl_SetCoolTime`).
 
 ### 3.6 Other callers that set or check skill cooldowns
 
@@ -724,6 +724,267 @@ pseudocode): the same loop with 500 records per chunk, no `cs_bSave` handling (e
 not cooling), and it skips — and subtracts from the header's `nMaxNum` — the hidden item pseudo-skills 29200–29205
 (0x7210–0x7215), 29428/29429 (0x72F4/0x72F5) and 29535/29536 (0x735F/0x7360).
 
+## 8. Dispel, cure and the miss result (Z03 leftovers)
+
+`smo_SkillBlast` FUN_00581160 (Z03 §5.6, step D) removes abnormal states from the target for skills whose
+`ActiveSkill.EffectType` is `SE_DISPEL` or `SE_CURE`. Z03 only names the step; this section is the full rule. The
+skill specials read here (`sdi_CURE`, `sdi_DISPELDEBUFF`, `sdi_DISPELDISEASE`, `sdi_DISPELPOISON`, `sdi_DISPELCURSE`,
+`sdi_BOMBDISPELALL`, `sdi_DISPELDEEPER`, `sdi_DETECT`, `sdi_DISPELONE`, `sdi_DISPELALL`, `sdi_DISPELRANDOM`,
+`sdi_STEALENCHANT`, `sdi_DISPELABSTATE`) are `SkillDataIndex` members filled from the skill's special list (Z20 §4).
+
+The kinds a dispel may remove form a bit mask `1 << DispelAttr` of the state's `AbState.DispelIndex`
+(enum `DispelAttr` *(pdb2016)*: 1 DA_GOOD, 2 DA_DEBUFF, 3 DA_DISEASE, 4 DA_POISON, 5 DA_CURSE, 6 DA_STUN, 7 DA_FEAR,
+8 DA_DEEPER, 9 DA_HIDE, 10 DA_BOMB, 11 DA_CHARGED). The abnormal-state list of an object is
+`AbstateListInObject` (`smo_Abstate.abstatelist`, object + 0x1cc, size 0xcc8: 28 `AbstateElementInObject` slots + an
+index-linked `List` at +0xcb0), reached through `so_mobile_AbstateList` (vt 0x52c).
+
+### 8.1 The mask: `smo_Dispel`
+
+```pseudo
+ShineMobileObject::smo_Dispel(a, s, empower, d, bos):                   @ FUN_0057d8e0   (caller: smo_SkillBlast, §8.4)
+    if s.sdi_Activ.EffectType not in {SE_DISPEL, SE_CURE}: return
+    arg = SmashArgument { actionnumber = attackcode = iscritical = isdead = 0, sklidx = s, empower = *empower }
+    mask = 0
+    if not a.so_mobile_IsEnemy(d) (vt 0x72c):                 # friend: remove bad states
+        if EffectType == SE_CURE: mask = DA_DISEASE | DA_POISON                                  # 0x18
+        else: mask = (DISPELDEBUFF ? DA_DEBUFF 0x4) | (DISPELDISEASE ? 0x8) | (DISPELPOISON ? 0x10)
+                   | (DISPELCURSE ? 0x20) | (BOMBDISPELALL ? DA_BOMB 0x400)
+    else if not s.sdi_DISPELDEEPER:                           # enemy: remove buffs, or reveal
+        mask = s.sdi_DETECT ? DA_HIDE (0x200) : DA_GOOD (0x2)
+    else:                                                     # enemy, DISPELDEEPER: only my own Deeper state
+        mask = DA_DEEPER (0x100) if some e in d's list has aeo_IsMine(e, a, STA_DEEPER) else 0
+    a.so_SkillCure(d, &arg, bos)            (vt 0x5a4, §8.2)
+    a.so_Dispel(d, &arg, bos, mask)         (vt 0x5a8, §8.3)
+    r = skillresultbuffer[bufferpoint]:  r.target = d;  r.isenchant = 1;  r.isresist = 0
+        # (original bug) Z23-B14: set whether or not anything was removed, and clears the resist flag the abstate
+        # part (so_SkillEnchant, §2.5) set just before
+```
+
+```pseudo
+AbstateElementInObject::aeo_IsMine(e, o, idx) → bool:                   @ FUN_00408880
+    e.aeo_Index == idx and e.aeo_Caster.obj != null and o != null
+    and e.aeo_Caster.obj.handle == o.handle and o.so_GetCharRegistNumber() (vt 0x344) == e.aeo_Caster.chrregnum
+    # handle and character number: a handle re-used by another object does not match
+```
+
+Callers of `aeo_IsMine`: `smo_Dispel` and the inline copy in `smo_SkillBlast` (§8.4); both only for `STA_DEEPER`.
+
+### 8.2 Cure: `so_SkillCure`
+
+```pseudo
+ShineMobileObject::so_SkillCure(a, d, arg, bos) → bool:                 @ FUN_0042c440 (vt 0x5a4)
+    if d == null or d.smo_GetMode() (vt 0x484) == 3 (dead, as in Z03 §5.6) or not arg.sklidx.sdi_CURE: false
+    grade = sdi_CURE.value
+    for e in d's list, in list order:
+        if rand(1000) < 1001:                                 # always true (original bug) Z23-B12
+            ab = dic_abstate[e.aeo_Index]   (index >= 0x318 → assert "AbnormalStateDictionary::AbState::as_FromIndex : Invalid skill idx")
+            if ab.DispelIndex in {DA_DISEASE, DA_POISON} and ab.StateGrade <= grade:
+                e.aeo_Flag.f_Cured = 1;  e.aeo_Tick.terminate = g_Now;  return true    # one state per call
+    false
+```
+
+It ignores the mask, so it also runs on an enemy target (only `sdi_CURE` decides; whether any CURE skill can target
+an enemy is the skill table's `First`, Z20 *(inferred)*).
+
+### 8.3 Dispel and steal: `so_Dispel`
+
+```pseudo
+ShineMobileObject::so_Dispel(a, d, arg, bos, mask) → bool:              @ FUN_0042bf70 (vt 0x5a8)
+    if d == null or d.smo_GetMode() == 3: false
+    if d.so_MiscTable() (vt 0x984).Dead.ByDebuff (+0x58 bit 0) and mask & DA_GOOD:
+        d.so_DamagedBy(d, d.so_GetHP(), 1000, 1) (vt 0x5c0 / 0x4e8);  return true
+        # servants marked "dies by dispel" (Z09 §13.3, `MiscData` `Dead`) are killed; the killer passed is d itself, not a,
+        # so the caster gets no kill credit *(inferred)*
+    s = arg.sklidx;  removed = false;  n = 1;  pick = null
+    for e in d's list, in list order:                        # pass 1: remove
+        if rand(1000) < 1001 (always, Z23-B12) and mask has bit ab(e).DispelIndex:
+            if s.sdi_DISPELONE:   e.aeo_Tick.terminate = g_Now;  return true           # the first match only
+            if s.sdi_DISPELALL:   e.aeo_Tick.terminate = g_Now;  removed = true;  continue
+            if s.sdi_DISPELRANDOM:                            # reservoir pick, uniform over the matches
+                if n == 1 or rndbox[n] == 0: pick = e         # rndbox[n] (RandomBox::operator[] FUN_00427c30): pre-rolled
+                n += 1                                        #   number for 1 <= n <= 100 (below n, inferred), 0 above 100
+            if s.sdi_BOMBDISPELALL: e.f_Dispeled = 1;  e.aeo_Tick.terminate = g_Now;  removed = true
+    for e in d's list, walked through the other link (+6) from the end:   # pass 2: steal one buff
+        if rand(1000) < 1001 and mask has bit ab(e).DispelIndex and s.sdi_STEALENCHANT:
+            if e.aeo_GetAbstateElement() (FUN_004067b0) != null and its vt[0xc]() : continue
+                # vt[0xc] is FUN_004b8d20 "return false" in all three AbnormalStateElement classes: never skips
+            if rand(1000) < sdi_STEALENCHANT.value:
+                e.aeo_Tick.terminate = g_Now
+                if a.so_AbnormalState_Set(setter = a, e.aeo_Index, e.aeo_Strength, ab, setTime = e.aeo_Tick.start,
+                                          0, keep = e.aeo_RestCount, 0, EF_JUSTENCHANTSTEALENCHANT (6), null) (vt 0x638, Z03 §6.2):
+                    a.so_AbnormalState_BitSet(idx);  a.so_AbnormalState_Inform(idx, sub.KeepTime, 1) (vt 0x3f0, players only)
+                    a.so_AbnormalState_BroadcastSet(idx, sub.KeepTime, strength)
+                removed = true
+            break                                             # one candidate only, whether the roll succeeded or not
+    if n > 1: pick.f_Dispeled = 1;  pick.aeo_Tick.terminate = g_Now                     # random dispel; `removed` stays
+    return removed                                            # ignored by smo_Dispel
+```
+
+- `aeo_Tick.terminate = g_Now` does not remove the element; the state ends at the target's next abnormal-state tick
+  (Z03 §6). `f_Cured` / `f_Dispeled` (`aeo_Flag` bits 0 / 1 *(pdb2016)*, cleared by `aeo_Set` FUN_0040a340) make the
+  end handlers skip their end effect: `SubAbnormalStateActorBomb::sasa_DetachObject` FUN_0040c520 (the bomb does not
+  go off), `…DetachProcess` FUN_0040c1c0, `…ExpUpRate` FUN_00408f90, `…DropUpRate` FUN_00409230. `DISPELONE` and
+  `DISPELALL` end the state without a flag, so these end effects still run *(inferred intent: the flag was meant for
+  bombs only, which only `BOMBDISPELALL` reaches)*.
+- Bits `DA_STUN`, `DA_FEAR`, `DA_CHARGED` are never set by `smo_Dispel`: no skill removes them through this path.
+
+### 8.4 Order in `smo_SkillBlast` and the double run
+
+Inside `smo_SkillBlast` FUN_00581160 (Z03 §5.6), after the hit roll succeeded (or with fixed damage):
+
+```pseudo
+    if mha.mha_HitStep < 1 and s.sdi_DISPELABSTATE and (ab = dic_abstate.as_FromID(sdi_DISPELABSTATE.value)) and ab.index:
+        if asl_Abstate_IsSet(d's list, ab.index.AbStataIndex):          # one named state, every target kind
+            d.so_AbnormalState_Reset(idx) (vt 0x650);  so_AbnormalState_BitReset(d, idx);  so_AbnormalState_BroadcastReset(d, idx)
+    … heal / damage parts (Z03 §5.6 B, C) …
+    if mha.mha_HitStep < 0:                                  # single-hit skill
+        unless r.isImmune: so_SkillEnchant (vt 0x5a0, §2.5) → r.isenchant, r.isresist |= resisted
+        smo_Dispel(a, s, empower, d, bos)
+        then the same code once more, inlined (0x582a31…0x582b0c: mask, vt 0x5a4, vt 0x5a8, result flags)
+            # (original bug) Z23-B13: dispel and cure run twice for every single-hit skill
+        BattleObjectList::bol_Store(bos, g_Now + SwingTime·…);  item actions "on skill hit" of d …
+    else:                                                    # multi-hit step (Z03 §5.6 E): the step's 4 abstates, then
+        smo_Dispel(a, s, empower, d, bos)                    # once
+```
+
+Effect of the double run *(inferred: ended states stay in the list until the tick)*: cure, `DISPELONE` and the random
+pick meet the same element again (no second removal, but `DISPELRANDOM` may pick another one, so up to two states
+go); `DISPELALL` / `BOMBDISPELALL` are idempotent; `STEALENCHANT` rolls twice on the same buff, so the steal chance is
+1 − (1 − p)², and a double success sets the state on the caster twice (a refresh).
+
+### 8.5 The miss result: `smo_ClearSkillResultBuffer_Miss`
+
+```pseudo
+ShineMobileObject::smo_ClearSkillResultBuffer_Miss(a, t):               @ FUN_0057a550
+    SkillResultBuffer::bufferpoint = 1
+    skillresultbuffer[0] = { target = t, isdamage = 1, ismissed = 1, every other flag 0, hpchange = 0,
+                             resthp = t.so_GetHP() (vt 0x4e8) }
+```
+
+Only caller: `smo_SkillBash_Blast(Obj)` FUN_0057cd40, when a `sdi_CROSSCOUNTER` skill fails (Z03 §5.4: no target, the
+target is not attackable, or `so_smo_CrossCounterDamage` returns −1). It first sends 0x2457
+NC_BAT_SKILLBASH_HIT_BLAST_CMD to the caster only, then this and `smo_SkillResultPacket` (0x2452 with one missed
+entry, Z03 §5.6). `SkillResultBuffer` *(pdb2016)*: 0x18 bytes `{ target, resthp, isdamage, IsCostumWeapon,
+IsCostumShield, iscritical, ismissed, isshieldblock, isheal, isenchant, isresist, isImmune, hpchange@0x14 }`.
+With `t == null` both this function and `smo_SkillResultPacket` (`t.so_LocateInfo`) dereference null
+(original bug) Z23-B17; latent, as `so_Routine` only calls the object blast with a target (Z03 §5.4) *(inferred)*.
+
+## 9. Mount skills (`ShineMover`)
+
+The skill code of mounts is complete but **unused in 2016**: `MoverUseSkill.shn` has no rows, and the two cast entry
+points have no caller. A rebuild can drop it or keep it as below.
+
+### 9.1 Who fills `MoverSkillList`
+
+```pseudo
+ShineMover::so_smv_SummonMover(m, map, x, y, dir, moverId, hp, layer):  @ FUN_0055fdf0   (the summon itself: Z13)
+    m.smv_MoverData = MoverDataBox.mvdb_GetData(moverId);  …
+    m.smv_MoverSkillList.msl_Skill.resize(0)
+    MoverSkillList::msl_Store(&m.smv_MoverSkillList, copy of smv_MoverData.mvdbi_vUseSkill)
+    *m.smo_Mode.mode = 1;  …
+
+MoverSkillList::msl_Store(l, rows):                                      @ FUN_00449190
+    for r in rows, until the end or a null pointer:
+        s = SkillDataBox.GetSkillIndexByName(r.ActiveSkillIDX)          # Z20 §5.1
+        null → assert "MoverSkillList::msl_Store : Skill data null";  no sdi_Activ → assert "… : ActiveSkillInfo data null"
+        else push { ms_SkillID = s.sdi_Activ.ID, ms_EndOfCooltime = 0 }   # no learning, no save: rebuilt on every summon
+    free the copied vector
+```
+
+`MoverUseSkill` *(pdb2016)*: `{ char MoverIDX[32]; char ActiveSkillIDX[32]; }` (0x40), loaded by FUN_004bf960 (Z01
+§2.3) into `MoverDataBoxIndex.mvdbi_vUseSkill` (+0x10, `vector<MoverUseSkill*>`). The 2016 server file has
+0 rows, so every mount's list is empty: `msl_CoolTimeCheck` / `msl_SetCoolTime` would assert "Did not learn skills".
+
+### 9.2 Casting: `so_smv_SkillBash_Object` / `so_smv_SkillBash_Location`
+
+ShineMover vt 0xcec / 0xcf0. Neither has a caller: each address occurs once in the exe (the vftable entry), and no
+`call [reg+0xcec]` / `[reg+0xcf0]` exists. `r` is the rider (the requesting player). Errors go to `r` at once through
+`ShinePlayer::so_SendErrorCode(r, 9, 0x34, code)` FUN_0054f050 = 0x2434 NC_BAT_SKILLBASH_CAST_FAIL_ACK `{ u16 err }`
+(4 bytes), not through the per-tick `castResult` of the player path (Z03 §5.2; texts in its table). The allowed
+mode set is a static `cmc_AllowMode = 6` (mover modes 1 and 2; the summon sets 1).
+
+```pseudo
+ShineMover::so_smv_SkillBash_Object(m, skill, target, r):               @ FUN_00580800 (vt 0xcec)
+    if r == null: return
+    if not (6 & 1 << m.mode):                                 → 0xFC0
+    if m.smo_DuringCast() (vt 0xea0):                         → 0xFC4
+    t = som_GetObject(target);  null                         → 0xFC4
+    if no field or not field.CanSkill (+0x9f):                → 0xFC3
+    for e in m's states: aeo_Attack(e)
+    if m.smo_Flag & 4 (Fear):                                 → 0xFCC
+    if m.smo_IsCaptivate() (vt 0xf20):                        → 0xFD2
+    (vt 0x9e4 "Ethereal" is FUN_004b8d20 = false for movers)
+    if m.smo_SkillBlastOption() == SB_SILENCE:                → 0xFC7
+    if not mdb_CanIKill(t.vt[0x708](), MKID_USER):            → 0xFD6
+    if not so_SubLayer_CanAttack(m, t):                       → 0xFC0
+    if m has STA 291 (0x123):                                 → 0xFC1
+    rest = t.so_AbnormalState_RestTime(291);  if rest > 0:
+        if not t.vt[0x89c]() (mob-like, as Z03 §5.2):         → 0xFC2
+        if rest > 3600: return (no answer);  t.so_AbnormalState_Reset(291)
+    if m has STA 499:                                         → 0xFC1
+    if t has STA 499:                                         → 0xFD6
+    if m.so_parameter().IsNoAttack(): m.smo_CastAbort() (vt 0xed4); return
+    if FindBlockLocate(m → t.pos, attack block) != t.pos:     → 0xFD1, m.smo_BashStop() (vt 0xed8)
+    s = SkillDataBox[skill]; null, no sdi_Activ or SkillTargetState == TS_NONE:  assert "ShineMover::so_smv_SkillBash_Object : Not Skill" → 0xFC6
+    if m.smo_MoveManager state (+0x18c) == 3 and (CastTime != 0 or SHOOTME or HOLDME):    → 0xFC8
+    switch s.First:
+        TARGET_ENEMY, TARGET_ENEMYUSER: if not m.so_mobile_ICanDamageTo(t) (vt 0x980): → 0xFD6;  then the heal test below
+        TARGET_ALL: the heal test below
+        heal test: if s.Area != 0 and not (First == TARGET_EVERY and t's mob type (+99) == 16)
+                   and not m.smo_ICanHealTo(t) (vt 0xe94):    → 0xFD7
+        other kinds: no target test
+        # (original bug) Z23-B19: the player version (Z03 §5.2) runs the heal test for friendly HEALING skills with
+        # Area == 0; here it runs for enemy / all skills with Area != 0, and friendly skills are not checked at all
+    if not msl_CoolTimeCheck(&m.smv_MoverSkillList, skill):   → 0xFC8          # §3.5
+    reach = t.so_BodySize() + s.sdi_AttackDist;  reach = min(reach·10/8, reach + 60)
+    if so_DistanceSquar(m, t) > reach²:                       → 0xFCA
+    smo_SkillBash_Casting(m, s, t, null, −1)                  # Z03 §5.4; completion → msl_SetCoolTime (§3.5)
+
+ShineMover::so_smv_SkillBash_Location(m, skill, xy, r):                 @ FUN_00580cf0 (vt 0xcf0)
+    if r == null: return
+    if not (6 & 1 << m.mode):                                 → 0xFC0
+    if no field:                                              → 0xFCC    # (original bug) Z23-B18: the Fear text, not 0xFC3
+    if not field.CanSkill:                                    → 0xFC3
+    for e in m's states: aeo_Attack(e)
+    if m.smo_DuringCast():                                    → 0xFC4
+    if Fear:                                                  → 0xFCC
+    if m.smo_IsCaptivate():                                   → 0xFD2
+    if m.smo_SkillBlastOption() == SB_SILENCE:                → 0xFC7
+    if m has STA 291 or STA 499:                              → 0xFC1
+    if FindBlockLocate(m → xy, attack block) != xy:           → 0xFD1, BashStop
+    s = SkillDataBox[skill]; null / no sdi_Activ / TS_NONE:   assert (empty text) → 0xFC6
+    if s.SHOOTME and FindBlockLocate(m → xy, move block) != xy:   → 0xFD1, BashStop
+    if move state == 3 and (CastTime != 0 or SHOOTME or HOLDME):  → 0xFC8
+    if not msl_CoolTimeCheck(…):  m.so_SendErrorCode(9, 0x34, 0xFC8); return
+        # (original bug) Z23-B16: sent to the mover, whose slot 0x308 is FUN_004c2450 (`ret 0xc`): the rider gets no answer
+    reach = m.so_BodySize() (ShineMover FUN_0055eb00) + s.sdi_AttackDist, same tolerance
+    if dist²(m.pos, xy) > reach²:                             → 0xFCA
+    smo_SkillBash_Casting(m, s, null, &xy, −1)
+```
+
+Compared with the player paths (Z03 §5.2 / §5.5) the mount paths have no cost check, no set-item load, no revive /
+spouse / soul / toggle checks and no `sp_AbstateCheck`.
+
+### 9.3 Mob weapons against a mount: `ShineMover::so_ply_CanMyTarget`
+
+```pseudo
+ShineMover::so_ply_CanMyTarget(m, attacker, i) → m or null:             @ FUN_004ae450 (vt 0x760)
+    if attacker == null or (box = attacker.so_mob_DataBox() (vt 0x70c)) == null or box.weapons (+8) == null: null
+    w = box.weapons[i] (0xc each);  w.row == null: null
+    switch w.row.AtkType (+0x4f, enum ATKTYPE, Z09 §6.7):
+        SKLTP_DAMAGE (0):  m
+        SKLTP_ABSTATE (2): sk = SkillDataBox[w.skill];  null → null
+                           m if one of sk's 4 abstates (≠ MAX_ABSTATEINDEX) is not set on m (l_GetInArray on m + 0xe7c), else null
+        SKLTP_DISPEL (4):  m if m has NO good state (asl_IsHereGood false)
+                           # (original bug) Z23-B15: inverted against ShinePlayer::so_ply_CanMyTarget FUN_004ae280 (Z09
+                           # §6.7: the player is a dispel target when it HAS a good state); `not` + `and` at 0x4ae50c
+        else: null
+```
+
+Same as the player version except the null checks and the inverted dispel test. Callers: the mob tactics
+`MobActionAttack::mab_Think` FUN_004bba00 and `MobActionTargetting::mab_Think` FUN_004b99e0 (vt 0x760 at 0x4bbe7c /
+0x4b9d11; Z09 §7.1 / §7.2), when the object they test is a mount.
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -739,6 +1000,14 @@ not cooling), and it skips — and subtracts from the header's `nMaxNum` — the
 | Z23-B9 | `sp_NC_SKILL_EMPOWALLOC_REQ` FUN_0044f150 → `csl_MaximumSkill` FUN_00448240 | the request's skill ID is not looked up before `skilldatabox[skill].sdi_NextSkill` is read | a 0x4811 with an unknown skill and zero plus/minus makes the zone read through a null pointer (crash) | refuse unknown or unlearned skills (0x884) first |
 | Z23-B10 | `csl_UnLearn` FUN_0057e930 | compares with `*lower_bound` without testing for `end` | an unlearn answer for a skill above every learned ID reads past the vector and may erase `end` | test `it != end` |
 | Z23-B11 | `csl_UnLearn` / `so_UnlearnSkillAck` FUN_0057f200 | removes the step but not its `csl_ToggleSkill` entry and does not switch an active toggle off | the toggle's abnormal states stay on with no step left to cast it off | switch the toggle off (`so_ply_ToggleSkill_Off`) and drop the entry |
+| Z23-B12 | `so_SkillCure` FUN_0042c440, `so_Dispel` FUN_0042bf70 | each state is first rolled with `rand(1000) < 1001` | always true: every matching state is a candidate | a per-state dispel chance (some rate below 1000) |
+| Z23-B13 | `smo_SkillBlast` FUN_00581160, single-hit path | calls `smo_Dispel` and then runs an inlined copy of it | cure / dispel / steal run twice per target: up to two states for `DISPELRANDOM`, steal chance 1 − (1 − p)² | one dispel per hit |
+| Z23-B14 | `smo_Dispel` FUN_0057d8e0 (and its copy) | sets `isenchant = 1` and `isresist = 0` on the result entry unconditionally | the client shows an effect even when nothing was removed, and a resisted debuff of the same skill as not resisted | set `isenchant` only when something was removed; keep `isresist` |
+| Z23-B15 | `ShineMover::so_ply_CanMyTarget` FUN_004ae450 | SKLTP_DISPEL weapon: returns the mount when it has **no** good state | mob dispel weapons pick mounts with nothing to dispel and skip buffed ones | `asl_IsHereGood` true → target, as the player version |
+| Z23-B16 | `so_smv_SkillBash_Location` FUN_00580cf0 (latent) | cooldown error 0xFC8 is sent through the mover's own `so_SendErrorCode` (a no-op) | the rider gets no answer | send to the rider like every other code |
+| Z23-B17 | `smo_SkillBash_Blast` FUN_0057cd40 → `smo_ClearSkillResultBuffer_Miss` FUN_0057a550 (latent) | the cross-counter failure branch for `t == null` reads `t`'s HP and position | null dereference (crash) if ever reached | send the miss without a target entry |
+| Z23-B18 | `so_smv_SkillBash_Location` FUN_00580cf0 (latent) | mount without a field gets 0xFCC | "Cannot use the skill on Fear State." | 0xFC3 as in the object version |
+| Z23-B19 | `so_smv_SkillBash_Object` FUN_00580800 (latent) | the `smo_ICanHealTo` test runs for enemy / all skills with `Area != 0`; friendly skills get no target test | heal-blocked targets refuse enemy area skills; friendly skills reach any target | test friendly HEALING skills with `Area == 0`, as the player version |
 
 ## Not reconstructed / uncertain
 
@@ -755,4 +1024,10 @@ not cooling), and it skips — and subtracts from the header's `nMaxNum` — the
 - `csl_AddMastery` runs right after the GameDB 0x3457 produce request is sent; if the DB refuses the produce, the
   mastery gain stays *(inferred; the 0x3457 answer is Z05/Z07)*.
 
-(Part 3 adds §8–§9; the coverage boundary is written in the sweep part.)
+- §8: whether an ended state (`terminate = g_Now`) stays visible to the second dispel run of the same blast
+  (Z23-B13) depends on when the abstate tick drops it (Z03 §6); the effects listed in §8.4 assume it stays.
+- §8.3: the meaning of `RandomBox` slots (pre-shuffled numbers below `n`) is inferred from the name and the reservoir use;
+  its fill routine is not read here.
+- §9.2: the mover modes (1, 2) have no names in the 2016 PDB; which mode a ridden mount is in is Z13's.
+
+(The coverage boundary is written in the sweep part.)
