@@ -142,6 +142,20 @@ ShinePlayer::sp_ItemUseBroadcast(p, entry, itemID)                              
     #   the item's name) *(inferred)*; useloc is not read
 ```
 
+Shared reader and dictionary helpers called by every loader of this item (bodies trivial; the reader itself is S02 /
+W05 §3.1, the template Z20 §2.1):
+
+```pseudo
+CDataReader::CDataReader(r)                     @ FUN_0062a050   vftable; m_sFileMD5 = 0 ×8; m_pHead = null; m_nBFSize = m_nDataArraySize = m_nFileCheckSum = 0
+CDataReader::ClearBF(r)                         @ FUN_0062a080   m_nBFSize ≠ 0: delete m_pHead; m_nFileCheckSum = m_nBFSize = 0
+CDataReader::GetRecord(r, i) → row              @ FUN_0062a0f0   m_pHead set and i < m_pHead.nNumOfRecord: m_pDataArray[i]; else null
+BinaryData::BinaryData / ~BinaryData            @ FUN_0063cf30 / FUN_0063cf50   CDataReader ctor / dtor + vftable
+OptionReader::or_ErrorLine / or_ErrorString     @ FUN_00645f00 / FUN_00645f10   or_Argument.errmsg.orem_Line / orem_Message (§2, Z09 §28.6)
+AbnormalStateDictionary::AbState::as_FromIndex(d, idx) → AbStateStr*   @ FUN_00401420
+    idx > 0x317 (MAX_ABSTATEINDEX − 1): assert "AbnormalStateDictionary::AbState::as_FromIndex : Invalid skill idx"; null
+    else d.as_StateIndexList[idx]                 # §3 (sidb_Load, uib_Effect)
+```
+
 ### 1.5 Writers of `uie_FuncStruct`, in stage order
 
 | Stage | Writer | Items | Actor | Use skill | Effect row |
@@ -583,7 +597,7 @@ So a riding item (`ui_ride`) is a "mover" when it is in MoverItem.shn, otherwise
 
 Four item-keyed tables built by one template, `ChargedItemEffectDataBox<T>` (a `BinaryDataBox<T>` plus an array of
 `{item ID, row}`), each loaded once with an actor and a use skill that it writes into `useditemeffect` for every listed
-item. `RidePetDataBox` is the RIDING instance plus a food pass. Consumers: charged buffs Z12 / Z07 §4, mini-house
+item. `RidePetDataBox` is the RIDING instance plus a food pass. Consumers: charged buffs Z12 / Z07 §4 (their per-effect application is §6.7), mini-house
 Z07 §6, horses Z13 (§10).
 
 ### 6.1 Data structures
@@ -635,7 +649,7 @@ ChargedItemEffect (0x2b, packed):
 | KeepTime_Hour (2:2) | `u16 KeepTime_Hour` | 0x22 | hours; `so_ply_ChargedBuff` 005970c0, `sp_NC_ITEM_TERMEXTEND_REQ` 0051eb40, `sp_MakeCapsuleItem` 0049cce0, `sp_SmallItemActivCheck<ItemInform_ActionItem>` 005697e0 |
 | EffectEnum (11:4) | `EffectEnumerate EffectEnum` | 0x24 | `EE_*` 0 … 39 (`MAX_EFFECTENUMERATE` 40): 0 SILVERWINGCOOLTIME, 1 NOLOSTINKILLED, 2 MOREINVENTORY, 3 MORESTORAGE, 4 MOREBOOTHSLOT, 5 FASTMINING, 6–8 MOREHP/SP/HSPSTONE, 9 COSTUM, 10 AKPOWER, 11 DPPOWER, 12 ALLPOWER, 13–15 HP/SP/ALLINCREASE, 16 DROP_RATE, 17 FEED, 18 EXP_RATE, 19 STATUS, 20–22 ITEMAT/ITENDF/ITEMAL_RATE, 23–25 PRODUCTSPEED/MASTERY/ALLRATE, 26 JUSTREVIVE_HP, 27 ENDURE_KIT, 28 WEAPON_MAXENDURE, 29 ADDPRODSKILL, 30 JUSTRREVIVAL, 31 SETABSTATE, 32 GBCOIN, 33 STORAGE_ANYWHERE, 34 LPINCREASE, 35 AUTOPATHFIND, 36 CHATCOLOR, 37 TERMEXTEND, 38 EXPHOLD, 39 CLASSCHANGE. Read by `ChargedItemEffectList::ChargedItemEffectElement::ciee_Activ` 00450550, `ciee_AfterLoginComplete` 00417910, `ChargedEffectChatColorItemFree::lid_Call` 00450fe0, `so_RecalcEquipParam` 004cab70, `WeaponCostumInitCharge` 00517d40, `sp_NC_ITEM_WEAPONENDURE_CHARGE_REQ` 00519470 / `…SHIELDENDURE…` 00519a10, `sp_NC_ITEM_CHAT_COLOR_CHANGE_REQ` 0051e580, `so_ply_ChatColorInfoApply` 00563ac0 / `…Clear` 00564a70, `sp_NC_ITEM_TERMEXTEND_REQ`, `so_ply_MH_FurnitureEndureUse` 00571550, `so_ply_ChargedBuff`, `UseItemChargedBuff::uib_CanUseItem` 00598310 |
 | EffectValue (2:2) | `u16 EffectValue` | 0x28 | amount / rate of the effect; the same readers plus `sp_CanChargedEnchant` 00418080, `sp_Gamble_UseCoinItem` 006174e0 |
-| StaStrength (1:1) | `u8 StaStrength` | 0x2a | abstate strength *(inferred: for EE_SETABSTATE)*; `ciee_AfterLoginComplete`, `sp_CanChargedEnchant`, `smo_SwingDamage` 00433a70, `so_ply_ChargedBuff` |
+| StaStrength (1:1) | `u8 StaStrength` | 0x2a | abstate strength of the EE_SETABSTATE rows (§6.7); `ciee_AfterLoginComplete`, `sp_CanChargedEnchant`, `smo_SwingDamage` 00433a70, `so_ply_ChargedBuff` |
 
 MiniHouse (0x6f; the house-skin items):
 
@@ -805,6 +819,158 @@ ChargedItemEffectDataBox<ChargedItemEffect>::cideb_FindFromHandle(this, int hand
   - The last FEED item without a writer is `Meat`: it keeps the stage-wide `ui_base` entry (§1.3).
 - The ChargedEffect rows of mini-house and mount items stay in `chargedbuffdatabox`: lookups by item
   (`cideb_GetItemID`: lifetime, term extension) still find them; only the use actor is replaced.
+
+### 6.7 Applying the charged buffs (`ChargedItemEffectList`, the readers of `EffectEnum` / `EffectValue` / `StaStrength`)
+
+A player's stored buffs are `p.sp_ChargedItem` (`ChargedItemEffectList::ChargedItem` 0x2a0: `ChargedEffectList ci_List`
++0 (the Z09 §28.11 `List<T>` with 50 slots, built by `ChargedEffectList` FUN_00451890, Z09 l.10116), `ChargedEffectContainer
+ci_Effect` +0x270 (p+0x2a5a0), `u8 ci_bRecalcParam` +0x29e). Each slot holds a `ChargedItemEffectElement` (0xc)
+`{ ChargedItemEffect* ciee_Index +0 (the §6.2 row); u8 ciee_Year +4 (since 2000), ciee_Month, ciee_Date, ciee_Hour,
+ciee_Minute +8 }` = the end time; the slot number is the buff's `ChargedBuffKey` (`so_CharChargedBuffData` allocates the
+slot with `l_AllocZ(key)`, Z12 §6.8). `ci_Effect` is rebuilt from the template `ShineObject::so_ChargedEffectContainerClear`
+(filled by `so_Initstaticvar` FUN_00549530, called from Z10 §1.1) and one `ciee_Routine` per slot, by `so_Routine` once a minute
+(Z09 §2.4 `PerMinutePlayerChecks`), `sp_NC_MAP_LOGINCOMPLETE_CMD` 00443390, `sp_NC_CHAR_CHARGEDBUFF_ERASE_REQ` 005645e0
+(Z07 §4.2), `so_ply_ChargedBuff` 005970c0 and `so_FirstActionAfterSocketConnect` 00554870 (template copy).
+
+`ChargedEffectContainer` (0x2e) members, template value, and the `EffectEnum` that sets them (`ciee_Activ`):
+
+| Off | Member | Template | Set by (EffectValue v) | Rule |
+|---|---|---|---|---|
+| 0x00 | `u8 cec_SilverWingCoolTime_Minute` | 60 | 0 SILVERWINGCOOLTIME | min(cur, v) (2016: v = 0) |
+| 0x02 / 0x04 | `u16 cec_HPStoneLimit` / `cec_SPStoneLimit` | 1000 / 1000 | 6 MOREHPSTONE / 7 MORESPSTONE / 8 MOREHSPSTONE (both) | max (‰ of the stone stock, Z12 l.618) |
+| 0x06 | `cec_ProveOfBless { u8 bless; u16 blesshandle @2 }` | 0 | 1 NOLOSTINKILLED | bless = 1, blesshandle = the slot number |
+| 0x0a / 0x0b / 0x0c | `u8 cec_MoreInven` / `cec_MoreStorage` / `cec_StreetBoothSlot` | 0 | 2 MOREINVENTORY / 3 MORESTORAGE / 4 MOREBOOTHSLOT | sum, capped at 6 / 2 / 20 |
+| 0x0d | `u8 cec_LighteningPickParts` | 0 | 5 FASTMINING | = 1 |
+| 0x0e / 0x10 / 0x26 | `u16 cec_MaxHPRate` / `cec_MaxSPRate` / `cec_MaxLPRate` | 1000 | 13 HP / 14 SP / 34 LPINCREASE; 15 ALLINCREASE (all three) | max (‰, Z12 §3.2) |
+| 0x12 / 0x14 | `u16 cec_AttackForceRate1024` / `cec_DefendForceRate1024` | 0x400 | 10 AKPOWER / 11 DPPOWER / 12 ALLPOWER (both) | max of `(v << 10) / 1000` (‰ → /1024) |
+| 0x16 | `u16 cec_ItemDropRate` | 1000 | 16 DROP_RATE | max (Z09 l.3314) |
+| 0x18 | `u8 cec_MoverNotHungry` | 0 | 17 FEED | = u8(v), last slot wins |
+| 0x19 | `u8 cec_MoreStat` | 0 | 19 STATUS | = u8(v), last slot wins (Z12 l.205) |
+| 0x1a | `u16 cec_ExpBonus` | 1000 | 18 EXP_RATE | = v, **last slot wins** (original bug) Z24-B13 |
+| 0x1c / 0x1e | `u16 cec_ItemPowerAttack` / `cec_ItemPowerDefence` | 1000 | 20 ITEMAT / 21 ITENDF / 22 ITEMAL_RATE (both) | max (Z12 l.232) |
+| 0x20 / 0x22 | `u16 cec_ProductCastTimeRate` / `cec_ProductMasteryRate` | 1000 | 23 PRODUCTSPEED / 24 PRODUCTMASTERY / 25 PRODUCTALLRATE (both) | max |
+| 0x24 | `u8 cec_StorageAnywhere` | 0 | 33 STORAGE_ANYWHERE | max (u8 of v) |
+| 0x28 | `u8 cec_IsAutoPathFind` | 0 | 35 AUTOPATHFIND | = 1 |
+| 0x29 / 0x2a / 0x2b | `u8 cec_ChatFontColor` / `cec_ChatBalloonColor` / `cec_ChatColor` | 0 | 36 CHATCOLOR with v = 1 / 2 / 3 | = 1 (other v: nothing) |
+| 0x2c | `u8 cec_ExpHold` | 0 | 38 EXPHOLD | = 1 |
+
+`ciee_Activ` ignores 9 COSTUM, 26 JUSTREVIVE_HP, 27 ENDURE_KIT, 28 WEAPON_MAXENDURE, 29 ADDPRODSKILL, 30 JUSTRREVIVAL,
+31 SETABSTATE, 32 GBCOIN, 37 TERMEXTEND, 39 CLASSCHANGE: those rows act at item use or elsewhere (Z04 / Z17; 31 below).
+
+```pseudo
+ChargedEffectListRouter(r, ci, p)                                                       @ FUN_00450e10
+    r.celr_ChargedItem = ci; r.celr_Player = p; r.celr_MoreStat = p.so_ply_ChargedEffectContainer().cec_MoreStat (vt 0x498)
+ChargedEffectListRouter::lid_Call(r, el, slot) = ciee_Routine(el, r.celr_ChargedItem, slot, r.celr_Player); continue   @ FUN_00450f00
+~ChargedEffectListRouter                                                                @ FUN_00450e80   (Z09 l.10118)
+    cec_MoreStat changed during the walk: so_allparametercalculate (vt 0x57c), smo_mobile_NotifyParameterChange(1) (vt 0x34)
+
+ChargedItemEffectElement::ciee_Routine(el, ci, slot, p)                                 @ FUN_00450c40
+    now = chargeditemcheck.ct_Current (Z09 §1.2; packed year:8 month:5 date:6 hour:6 minute:7)
+    (now.year, month, date, hour, minute) ≤ (el.ciee_Year, Month, Date, Hour, Minute) (field by field, the end minute
+        itself still counts): ciee_Activ(el, ci, slot)
+    else: ciee_Free(el, ci, slot, p)                                   # expired
+
+ChargedItemEffectElement::ciee_Activ(el, ci, slot)                                      @ FUN_00450550
+    switch el.ciee_Index.EffectEnum: apply EffectValue to ci.ci_Effect as in the table above
+
+ChargedItemEffectElement::ciee_Free(el, ci, slot, p)                                    @ FUN_00450a50
+    ci.ci_List.l_Free(slot) (List vt 0xc)
+    pkt = 0x9002 NC_CHARGED_RESETBUFF_CMD { u32 CharRegistNumber = p.so_GetCharRegistNumber (vt 0x344),
+        u32 ChargedBuffKey = slot, u16 ChargedBuffID = el.ciee_Index.Handle,
+        u32 nUserNo = p.so_GetCharRegistNumber again }      # (original bug) Z24-B14: the character number, not the user number
+    Character DB (sock2gameDB) ← pkt (D03 §9: p_Char_DelChargedBuff(charNo, key), log 0x043A); WM ← the same pkt (W04 §11)
+    p ← 0x9004 NC_CHARGED_BUFFTERMINATE_CMD { u32 ChargedBuffKey = slot }   (game socket, vt 0x2fc)
+    so_RecalcEquipParam (vt 0x35c), so_RecalcLastParam (vt 0x368), smo_mobile_NotifyParameterChange(1) (vt 0x34)
+    so_ply_ChatColorInfoClear(p, el.ciee_Index) (vt 0xe40)
+    ci.ci_bRecalcParam = 1                                             # the per-minute caller recalculates again (Z09 §2.4)
+    # "Packet Too Long" asserts name ciee_Free1 / 2 / 3
+
+ShinePlayer::so_ply_ChatColorInfoClear(p, eff)                                          @ FUN_00564a70
+    eff null or EffectEnum ≠ 36 CHATCOLOR: return
+    font = p.sp_nChatFontColor; balloon = p.sp_nChatBalloonColor
+    eff.EffectValue 1: font = 0;  2: balloon = 0;  3: font = balloon = 0;  else: assert "so_ply_ChatColorInfoClear : Invalid EffectCalue"; return
+    for each remaining slot with a CHATCOLOR row of another EffectValue w:   # a second buff of the same value does not restore
+        w 1: font = p.sp_nChatFontColor;  2: balloon = p.sp_nChatBalloonColor;  3: both restored
+    Character DB ← 0x4031 NC_CHARSAVE_CHAT_COLOR_CMD { u32 nCharNo, u8 font, u8 balloon }   (D02: CheckAlive only, nothing saved)
+        # its "Packet Too Long" assert names sp_NC_ITEM_CHAT_COLOR_CHANGE_REQ (copied code)
+    p.sp_nChatFontColor = font; p.sp_nChatBalloonColor = balloon       # the client is not told here
+
+ShinePlayer::sp_ChargedEffectAfterLoginComplete(p)                                      @ FUN_00417ad0   (Z09 l.10112)
+    l_4AllInList(p.sp_ChargedItem, ChargedEffectAfterLoginComplete { cealc_Player = p })   # List::l_4AllInList FUN_00487c50
+ChargedEffectAfterLoginComplete::lid_Call(it, el, slot) = ciee_AfterLoginComplete(el, slot, it.cealc_Player); continue   @ FUN_00417fd0
+
+ChargedItemEffectElement::ciee_AfterLoginComplete(el, slot, p)                          @ FUN_00417910
+    row = el.ciee_Index; row.EffectEnum ≠ 31 SETABSTATE: return
+    st = dic_abstate.as_FromID(row.EffectValue) (AbState ID); st null or st.index null: return
+    keepMs = ftol(difftime(mktime(end of el: year + 100, month − 1, date, hour, minute, 0 s), mktime(chargeditemcheck.ct_TimeStr)) × 1000.0)
+    if p.so_AbnormalState_Set(p, st.index.AbStataIndex, row.StaStrength, st, clockwatch.cw_CurrTick, 0, 0, keepMs, how 0xb, 0) (vt 0x638, Z03 knowledge):
+        st.index.PartyRange == 0 or PartyEnchantNumber == 0:
+            so_AbnormalState_BitSet(p, idx); so_AbnormalState_BroadcastSet(p, idx, keepMs, StaStrength)
+            p.so_AbnormalState_Inform(idx, keepMs, 1) (vt 0x3f0)
+        so_RecalcAbstateParamReady (vt 0x528)
+    # 2016: rows 31 = AbState 8873 / 8874 (strength 1), 1 / 168 / 720 h; a party-range abstate is set without the bit / broadcast
+
+ShinePlayer::sp_CanChargedEnchant(p, row) → bool                                        @ FUN_00418080
+    # caller UseItemChargedBuff::uib_CanUseItem FUN_00598310 (Z04 §6.3) for a SETABSTATE row
+    any slot whose row has EffectEnum 31, the same EffectValue (AbState) and StaStrength ≥ row.StaStrength: false
+    else true                                                        # a stronger one may replace a weaker one
+ShinePlayer::sp_RemoveEE_SETABSTATE(p, abstateId)                                       @ FUN_004181c0
+    every slot whose row has EffectEnum 31 and EffectValue == abstateId: el.ciee_Year = 1   # end date → 2001: freed (and
+        reported, ciee_Free) by the next per-minute ciee_Routine; the abstate itself stays until its own timer ends *(inferred)*
+
+UseItemChargedBuff::uib_CanUseItem(actor, p, item) → code                               @ FUN_00598310   (Z04 §6.3 actor table)
+    row = first chargedbuffdatabox row with ce_ItemID == item.itemid (cideb_Next walk); none or ce_Data null:
+        log to ChargedItemLog; return 0x712                                  # no client text in client-error-codes.json
+    c = p.so_ply_ChargedEffectContainer() (vt 0x498, the current ci_Effect)
+    return 0x700 (usable) when the new row would change something, else 0x713 "The selected item does not have any effect when used.":
+        0 SILVERWINGCOOLTIME: v < c.cec_SilverWingCoolTime_Minute
+        1 NOLOSTINKILLED / 5 FASTMINING / 17 FEED: c.bless / cec_LighteningPickParts / cec_MoverNotHungry == 0
+        2 / 3 / 4 MOREINVENTORY / MORESTORAGE / MOREBOOTHSLOT: cur + v < 7 / < 3 / < 20
+            # (original bug) Z24-B15: the booth test allows a sum of 19 at most, ciee_Activ caps at 20
+        6 / 7 / 8 STONE, 13 / 14 / 15 INCREASE, 16 DROP_RATE, 18 EXP_RATE, 19 STATUS, 20 / 21 / 22 ITEM*_RATE, 23 / 24 / 25
+            PRODUCT*, 34 LPINCREASE: some covered member < v (10 / 11 / 12 POWER: < (v << 10) / 1000)
+        31 SETABSTATE: sp_CanChargedEnchant(p, row) → sp_RemoveEE_SETABSTATE(p, v), 0x700; else 0x713
+        33 STORAGE_ANYWHERE: cec_StorageAnywhere == 0;  35 AUTOPATHFIND / 38 EXPHOLD: flag ≠ 1
+        every other EffectEnum (COSTUM, 26–30, 32, 36 CHATCOLOR, 37, 39): 0x713   # those items have their own actors / handlers
+    # a local object is constructed and destroyed around the returns (folded ctor/dtor names: so_ShineMobileObject /
+    #   so_Gamble_ChangeCoin), no effect on the result
+
+ChargedEffectChatColorItemFree(it, ci, p, eff, all)                                     @ FUN_00450fb0   (dtor FUN_00417900 = base vftable)
+    it.ceccif_pChargedItem = ci; ceccif_pPlayer = p; ceccif_pCIEffect = eff; ceccif_All = all (never read)
+ChargedEffectChatColorItemFree::lid_Call(it, el, slot) → continue                       @ FUN_00450fe0
+    # walked by so_ply_ChatColorInfoApply FUN_00563ac0 (Z05 §8.5 0x34B6) before the new chat-colour buff is stored
+    ci, eff null or eff.EffectEnum ≠ 36: stop the walk
+    el's row not CHATCOLOR: continue
+    v = eff.EffectValue (new), u = el's EffectValue (stored)
+    v == u or v == 3: ciee_Free(el, ci, slot, p)                       # same kind, or "all colours" replaces every one
+    v == 1 and u == 3 and ci.ci_Effect.cec_ChatBalloonColor: ciee_Free  # the "all" buff is only dropped when a balloon
+    v == 2 and u == 3 and ci.ci_Effect.cec_ChatFontColor:    ciee_Free  #   (resp. font) buff also covers its other half
+    continue
+```
+
+The same per-minute block also expires time-limited items (their own end date, not a §6.2 row; Z09 §2.4 calls it):
+
+```pseudo
+ShinePlayer::sp_ChargedItemLimitCheck(p, bag, kind) (vt 0x38)                           @ FUN_00451530
+    # kind 9 inventory, 8 equipment, 0xc mini-house bag (Z09 §2.4)
+    for each cell of bag not locked (UnlockedInventoryIterator over ItemBoxIterItem, lock list vt 0x7d4):
+        attr = cell.iic_AttrProc
+        attr item class (vt 0x28) == 23 RIDING and player mode (vt 0x484) == 6 (riding, Z01 knowledge): skip   # a mount in use does not expire
+        end = attr.vt[0x34](cell item) (ShineDateTime*; null = no end date): skip
+        end.year ≠ 0 and end < chargeditemcheck.ct_Current (year, month, date, hour, then minute; strictly earlier):
+            sp_ItemDelete(p, cell, kind, slot, end)
+ShinePlayer::sp_ItemDelete(p, cell, kind, slot, end)                                     @ FUN_00451090
+    copies the player name (vt 0x56c) into the rotating namestring buffer (log text; no reader found)
+    sp_DestroyItem(p, p.handle, cell, inven = kind << 10 | slot & 0x3ff)                    # FUN_00527870 (Z09 l.7976: 0x3459 to the item DB, cell cleared)
+```
+
+(`sp_SmallChargedItemLimitCheck` FUN_0056b900 is Z09 §2.4; the dice-game variant `so_DiceTaiSaiChargedItemLimitCheck`
+FUN_00517770 is §10, Z13.)
+
+2016 data per `EffectEnum` (rows, values): 0 ×7 (0 min), 2 ×9 / 3 ×10 (1–2), 4 ×4 (10), 6–8 ×15/15/18 (1200–4000 ‰),
+10–12 ×3/3/2 and 13–15 ×8/8/15 (1200–2000 ‰), 16 ×13, 18 ×25 (1100–2000 ‰), 17 ×5 (1), 19 ×6 (10), 22 ×9, 25 ×3,
+31 ×6, 33 ×2, 34 ×12, 35 ×1, 36 ×3 (v 1 / 2 / 3), 38 ×4; none for 20, 21, 23, 24, 26, 29. The longest SETABSTATE
+row is 720 h: its `keepMs` (2.59·10⁹) exceeds 2³¹ (§9).
 
 ## 7. `CharClassDataBox` and the other helpers
 
@@ -986,6 +1152,19 @@ other ItemInfo columns are the members in order (S01: "same"; offsets Z04 §1.2)
 17 `InxName`s used twice (all quest items `Q_…`, e.g. `Q_Pickaxe` 3178 / 3228): the trie keeps the later ID (also in
 `idb_Load`'s trie, *(inferred: same insert loop)*).
 
+Small `ItemDataBox` accessors reached from this item's tables (the rest of the index API is Z04 §1.2 / the follow-up Z25):
+
+```pseudo
+ItemDataBox::idb_GetItemInxName(db, id) → char*                                         @ FUN_006487d0
+    id < idb_maxItemhandle, id ≠ 0xffff and idb_index[id].data set: return data.InxName (ItemInfo +0x02); else null
+    # callers: mvdb_GetMoverType (§5.4), sp_MoverSystem_Cast / SummonItem / MapLogin, sp_HorseItemSave, RidingInitHP /
+    #   RidingInitHungry, sp_NC_ITEM_MOVER_UPGRADE_REQ, sp_PetSystem_Cast / VirtualCast, UseItemPet::uib_DirectUse
+ItemDataBox::idb_iter_next(db, &i) → bool = (++i < idb_Itemspacies)                      @ FUN_004900a0
+ItemDataBox::idb_iter_Get(db, &i) → u16                                                   @ FUN_004900c0
+    i ≥ idb_Itemspacies: 0xffff; else BinaryDataBox<ItemInfo>::operator[](itminf, i).ID   (row i in file order, FUN_004ae550)
+    # the pair walks the ItemInfo rows in file order; only caller DropItemListInGroup::dilig_StoreItem (Z09 drop groups)
+```
+
 ### 7.4 Gathering and production tables (`Gather.shn`, `Produce.shn`, stage wide)
 
 `gathertable` 0x0d026cd0 `GatherProduce::GatherTable { BinaryDataBox<GatherInfo> gt_BinData; GatherIndex* gt_Array
@@ -1099,8 +1278,18 @@ could re-read ItemInfo (it frees the old index) but has no caller after start-up
 | Z24-B10 | `GatherProduce::GatherTable::gt_Load` FUN_0046a660 | an unknown `NeededTool<k>` name becomes tool 0xFFFF ("no tool") without a message (`rb_Load` exits on an unknown raw) | 2016: the Mining rows with `MinerPickaxe` / `AlchemistPickaxe` (not in ItemInfo) need no tool; `sp_GatherCheck` stops at them with picker 0xFFFF and mining is refused with 0x0B0C, so a player holding only a `Kebypick` (the later row) can never mine | fatal on an unknown tool, or skip the row *(inferred)* |
 | Z24-B11 | `ItemGroupClassifier::igc_Load` FUN_00490330 | after the "Invalid Item index" assert of the inlined `itemdatabox[id]` the null index is dereferenced (`ix.dataserv`); the "invalid index" check of `igc_Store` FUN_004900f0 can never fire | latent: the index is built from the same rows, so the assert cannot fire in a loaded zone | skip the row |
 | Z24-B12 | `ItemDataBox::ReadData` FUN_006494f0 (via the ctor FUN_0064b5d0) | dead code (the only `ItemDataBox` is built with path −1); it leaves `MovingShot`, `AttackAngle`, `HitTimeArray`, `eDelConditionType`, `pBuyItemData` of every index entry uninitialised and loads no ItemInfoServer / option rows | none in 2016 (never runs) | remove, or share `idb_Load`'s index setup |
+| Z24-B13 | `ChargedItemEffectElement::ciee_Activ` FUN_00450550 | EE_EXP_RATE (and FEED, STATUS) assign `EffectValue` instead of taking the maximum like every other rate | with two exp buffs active, the one in the later list slot wins, which may be the weaker one (slots are reused, not in buy order); `uib_CanUseItem` only refuses a buff weaker than the current total | max, as for the other rates |
+| Z24-B14 | `ciee_Free` FUN_00450a50 | 0x9002 NC_CHARGED_RESETBUFF_CMD `nUserNo` = `so_GetCharRegistNumber` (the character number again) | the Character server's log 0x043A NC_LOG_GAME_CHARGED_BUFF_CLR records the character number as the user number (D05) | the account number |
+| Z24-B15 | `UseItemChargedBuff::uib_CanUseItem` FUN_00598310 | EE_MOREBOOTHSLOT is usable only while `cec_StreetBoothSlot + v < 20`; `ciee_Activ` caps the sum at 20 (inventory / storage tests match their caps 6 / 2) | 2016 (v = 10): a second booth-slot buff is refused although the cap would allow it | `< 21` (≤ 20) |
 
 ## 9. Not reconstructed / uncertain
+
+- §6.7 `ciee_AfterLoginComplete` passes the remaining time in ms (`ftol(seconds × 1000.0)`, low 32 bits) to
+  `so_AbnormalState_Set`: a 720 h SETABSTATE row gives up to 2.59·10⁹ ms, above 2³¹; whether the abstate keeps it as
+  unsigned (then fine up to 49.7 days) or signed was not checked in `so_AbnormalState_Set` (Z03 / Z22). Abstates set
+  by such a buff during play (`so_ply_ChargedBuff`, Z12 §6.8) were not compared.
+- §6.7 `ChargedEffectChatColorItemFree::ceccif_All` is stored but never read; `so_ply_ChatColorInfoClear` does not tell
+  the client the reset colours (the client presumably learns them at the next 0x3056 / login) *(inferred)*.
 
 - §7.1 `ccdb_BitToClass` relies on the CRT `log` / x87 rounding; the exactness claim is checked with IEEE doubles in
   Python, not on the original CRT (an off-by-one would only matter for bits whose double logarithm lands just below n).
@@ -1128,11 +1317,11 @@ could re-read ItemInfo (it frees the old index) but has no caller after start-up
 |---|---|---|
 | `UseItemByTable` / actor bodies (`uib_CanUseItem`, `uib_Effect` of every `ui_*`) | Z04 §6.3 (done; lists every actor with its functions) | this item only builds the table; only the "by abstate" actor (StateItem's consumer) is documented here because Z04 cites just its CanUse |
 | `sp_MysteryVaultMakeItem` FUN_005658f0 (the roll) | Z05 §9.8 (done) | the consumer of §4's map |
-| `MagicContainer::mc_Load` FUN_0049c7f0 (TreasureReward.txt) | Z09 (done; `OptionReader` caller list §28.6) | writes into `useditemeffect`; listed in §1.5 only; sweep part to confirm Z09 documents its body |
+| `MagicContainer::mc_Load` FUN_0049c7f0 (TreasureReward.txt) | Z09 §10.10 (done; documents the file, both tables, the load checks and the `UsePresentBox` / `UseSkill` writes) | writes into `useditemeffect`; listed in §1.5 only |
 | Mover consumers: `ShineMover` (`so_smv_SummonMover` 0055fdf0, `so_smv_GetOn` 0055f380, `smv_FoodEat` 0055f110, `so_smv_CanUseFeedItem` 0055f840, `so_smv_Feeding` 0055f8e0, `so_MaxHP` / `so_SetHP` / `so_GetLevel` / `so_BodySize` / `so_WalkSpeed` / `so_RunSpeed` / `so_smv_GetMoverID`, `smv_RegenComplete` 00441fd0), player `sp_MoverSystem_Cast` / `SummonItem` / `MapLogin`, `sp_HorseItemSave`, `RidingInitHP` / `RidingInitHungry`, `MoverSkillList::msl_Store` 00449190 | Z13 (open; plan line 16 "Mounts: mover creation …, hunger") | they read the rows this item loads (§5.2 lists which member each reads); the mover lifecycle is Z13's |
 | `UseItemRide::uib_DirectUse` FUN_005995b0, `UseItemHorseFood` actor | Z04 §6.3 (done; actor table row "UseItemRide" / "UseItemHorseFood") | the ride dispatch is summarised in §5.4 because it is `mvdb_GetMoverType`'s only caller; `sp_HorseCast` / `sp_MoverSystem_Cast` bodies are Z13 |
 | `sp_NC_ITEM_MOVER_UPGRADE_REQ` FUN_0051c850 (reads `pHG.FeedType`) | Z04 §9.5 (done) | handler; this item only documents the row it reads |
-| `ItemDataBox::idb_Load` FUN_00649780 (ItemInfo, ItemInfoServer, GradeItemOption, ItemDropLog, ItemSort, CollectCardMobGroup, ItemMoney: 1036 decompiled lines), `idb_MakeSpecialID` | **open: follow-up item created in the sweep part (5)** | Z04 (done) uses the index (§1.2) but does not document the loader; Z01 §2.3 lists it in one row; `ReadData` (the dead stand-alone reader) is §7.3 |
+| `ItemDataBox::idb_Load` FUN_00649780 (ItemInfo, ItemInfoServer, GradeItemOption, ItemDropLog, ItemSort, CollectCardMobGroup, ItemMoney: 1036 decompiled lines), `idb_MakeSpecialID` | new item **Z25** (added by Z24) | Z04 (done) uses the index (§1.2) but does not document the loader; Z01 §2.3 lists it in one row; `ReadData` (the dead stand-alone reader) is §7.3 |
 | Mini-house table consumers: `sp_MiniHouseActivCheck` 00534fe0, `mhs_Init` 00534a30, `so_mh_CreateFurniture` 00544f00, `so_mh_SaveMHInven` 005435d0, `so_mh_Move2MiniHouseFurniture` 005354a0, `smh_SendFurnitureInfo` 00546930, `smh_FurnitureActiveCheck` 005472e0, `so_mh_CanFurnitureEmotion` 005485c0, endurance `so_mh_EndureGradeDownTimeUpdate` 00547f60 / `so_mh_DoingEndureGradeDown` 00548270 / `so_ply_MH_FurnitureEndureUpdate` 00570fe0 / `so_ply_MH_FurnitureEndureUse` 00571550, dice `so_mh_DiceTaiSai_GetExpectIncomeMoney` 00516970 / `sp_DiceTaiSaiItemIDChange` 00514b40 | Z13 (open; plan line 11 "furniture create/rearrange/delete …, endurance, … the in-house dice game state, furniture emotions") | they read the MiniHouse / MiniHouseFurniture rows (§6.2 lists which member each reads); the house object is Z13's |
 | Riding.shn horse consumers: `sp_HorseCast` 0045e0e0, `sp_HorseOn` 0045f270, `so_ply_HorseFeed` 0045eaa0, `sp_HorseNotHungry` 0045d460, `sp_GetHorseFeed` 0045d510, `sp_NC_ACT_RIDE_FEEDING_REQ` 0045f9e0 (Z02 §9.1), `sp_RideInitialize` 0043d140, `UseItemRide::uib_CanUseItem` 005988b0 | Z13 (open; plan line 16 "Mounts: …, hunger (link to Z02 §9.1)") and Z04 §6.3 (actor) | readers of the RIDING rows (§6.2); the ride lifecycle is Z13's |
 | Charged-buff consumers by item: `sp_NC_ITEM_WEAPONENDURE_CHARGE_REQ` 00519470, `…SHIELDENDURE…` 00519a10, `sp_NC_ITEM_CHAT_COLOR_CHANGE_REQ` 0051e580, `sp_NC_ITEM_TERMEXTEND_REQ` 0051eb40, `UseItemChargedBuff::uib_CanUseItem` 00598310 | Z04 (done; cites each handler) | handlers that look up a ChargedEffect row by item; this item only documents the table |
@@ -1143,5 +1332,7 @@ could re-read ItemInfo (it frees the old index) but has no caller after start-up
 | `csl_PreProduceCheck` 0046ab70, `csl_GetDelayGroup` 00448950 | Z23 (open; plan title "CharaterSkillList … delay groups … mastery") | read `rb_Array` / the mastery columns |
 | Class checks by `UseClass`: equip handlers 0052b110 / 0052b8d0 / 0052c5b0 / 0052d020, `sp_ItemUseReq_Inven` 0053f5e0, `sp_UseItemMonimon_UseItem` 00561b80, booth search 00439c70, `ac_AllLearnSKill` 004212e0 | Z04 (done; equip / use handlers), Z06 §2.6 booth search (done), Z11 §9.3 (done) | callers of `ccdb_CheckClass` / `charclassdatabox` (§7.1 lists them); the class-change pair is cited from Z04 §12.10 / Z15 §6.5 |
 | `igc_Getitem` 004903e0, `igc_ChargedDuringUse` 00490630, `CardStack` helpers | Z09 §28.10 / §10.10 (done), Z04 (done), Z11 §9.3 (done) | readers of §7.2's groups |
-| W05 §3.2 "bit 0 = Fig … bit 26 = Sav" for the WM's `ccdb_UseClassTypeToBit` FUN_00465a90 | this item §7.1 (correction; into `docs/knowledge/Z24.md` in the sweep) | same code as the zone: Fig is bit 1 |
-| Charged-buff effect application `ChargedItemEffectElement::ciee_Activ` 00450550, `ciee_AfterLoginComplete` 00417910, `ChargedEffectChatColorItemFree::lid_Call` 00450fe0, `sp_CanChargedEnchant` 00418080 | **open: decided in the sweep part (5)** | no doc cites them yet; they apply EffectEnum / EffectValue / StaStrength (§6.2) |
+| W05 §3.2 "bit 0 = Fig … bit 26 = Sav" for the WM's `ccdb_UseClassTypeToBit` FUN_00465a90 | this item §7.1 (correction; recorded in `docs/knowledge/Z24.md`) | same code as the zone: Fig is bit 1 |
+| Charged-buff effect application `ciee_Activ` 00450550, `ciee_AfterLoginComplete` 00417910, `ChargedEffectChatColorItemFree::lid_Call` 00450fe0, `sp_CanChargedEnchant` 00418080, `ciee_Routine`, `ciee_Free`, the routers, `so_ply_ChatColorInfoClear`, `sp_RemoveEE_SETABSTATE`, `UseItemChargedBuff::uib_CanUseItem`, `sp_ChargedItemLimitCheck` / `sp_ItemDelete` | this item §6.7 | documented in the sweep part (small: they read the §6.2 columns; the per-minute caller is Z09 §2.4, the DB / WM side D03 §9 / W04 §11) |
+| `so_DiceTaiSaiChargedItemLimitCheck` FUN_00517770 (dice-game item expiry, calls `sp_DiceTaiSaiItemIDChange`), the other `ShineMiniHouse::so_mh_*` functions that name MiniHouse in their strings (portal, kick-out, title, arrange mode, `so_mh_BuildingMiniHouse` 00548810, …) | Z13 (open; plan line 11 "the in-house dice game state", mini-house object) | house object and dice game; they do not read the loader's tables beyond the §6.2 rows listed above |
+| `sp_DestroyItem` overloads (00527870 used by `sp_ItemDelete`) | Z09 l.7976 (one line) and Z18 (open; plan "`sp_DestroyItem` overloads") | item deletion body |
