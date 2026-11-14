@@ -6953,11 +6953,11 @@ Sent from `FUN_005ec6a0` (`FUN_005ec6a0`) · payload variable ((byte)
 
 ### `0x5818` NC_KQ_RESTDEADNUM_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_KQ_RESTDEADNUM_CMD`, 1 bytes
+**Verified layout** (basis: zone sp_EscapeFromEmptyKQ FUN_0043fa40; client On_NC_KQ_RESTDEADNUM_CMD FUN_0049af10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | number |  |
+| 0 | u8 | number | lives left = revives − knock-downs; 0 when unlimited |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_EscapeFromEmptyKQ` (`FUN_0043fa40`) · payload 1 bytes
 
@@ -7005,12 +7005,12 @@ Sent from `FUN_005ec1f0` (`FUN_005ec1f0`) · payload variable (iVar8)
 
 ### `0x5822` NC_KQ_MOBKILLNUMBER_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_KQ_MOBKILLNUMBER_CMD`, 4 bytes
+**Verified layout** (basis: zone kqcl_SendMobKill FUN_00499ff0; client FUN_0049bb30)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | CurrentMobKill |  |
-| 2 | u16 | DemandMobKill |  |
+| 0 | u16 | CurrentMobKill | kills of this character in this KQ |
+| 2 | u16 | DemandMobKill | KQInfo.DemandMobKill |
 
 Sent from `KQContribute::KQContributeList::kqcl_SendMobKill` (`FUN_00499ff0`) · payload 4 bytes
 
@@ -7036,11 +7036,11 @@ Sent from `FUN_005e3790` (`FUN_005e3790`) · payload 8 bytes
 
 ### `0x583a` NC_KQ_TEAM_TYPE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_KQ_TEAM_TYPE_CMD`, 1 bytes
+**Verified layout** (basis: zone sp_SendKQTeamType FUN_00561560; client inline in FUN_004be490)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nTeamType |  |
+| 0 | u8 | nTeamType | 0 red, 1 blue, 2 none; sent at every map login |
 
 Sent from `FUN_00561560` (`FUN_00561560`) · payload 1 bytes
 
@@ -10179,6 +10179,47 @@ Sent from `FUN_004d0bd0` (`FUN_004d0bd0`) · payload 18 bytes
 
 ## Hand-verified packets without a generated section
 
+### `0x5816` NC_KQ_REWARDSUC_ACK (CharDB→Z)
+
+**Verified layout** (basis: zone GameDBSession::gds_NC_KQ_REWARDSUC_ACK FUN_0052e570; PROTO_NC_KQ_REWARDSUC_ACK (pdb2017))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle | player handle |
+| 2 | u32 | header.charNo | must match the player |
+| 6 | u16 | lockindex | icl_Apply_N_Free(p, lockindex, 0) |
+
+### `0x5817` NC_KQ_REWARDFAIL_ACK (CharDB→Z)
+
+**Verified layout** (basis: zone GameDBSession::gds_NC_KQ_REWARDFAIL_ACK FUN_0052e680; PROTO_NC_KQ_REWARDFAIL_ACK (pdb2017))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle |  |
+| 2 | u32 | header.charNo | must match the player |
+| 6 | u16 | lockindex | icl_Free(lockindex) |
+| 8 | u16 | error | 0x1101 / 0x1102 (D04); not read |
+
+### `0x74e6` NC_GUILD_TOURNAMENT_DB_JOIN_NEW_ACK (CharDB→Z)
+
+**Verified layout** (basis: zone GameDBSession::gds_NC_GUILD_TOURNAMENT_DB_JOIN_NEW_ACK FUN_00476a10; PROTO_NC_GUILD_TOURNAMENT_DB_JOIN_NEW_ACK (pdb2016))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle | player handle; object must exist, not be empty |
+| 2 | u32 | ref.charNo | must equal the object's charNo |
+| 6 | u16 | lockindex | 0x1C40: icl_Apply_N_Free (money taken), else icl_Free |
+| 8 | u16 | Error | 0x1C40 success |
+| 10 | u16 | hWMChar |  |
+| 12 | u32 | nCharNo |  |
+| 16 | u32 | nGTNo |  |
+| 20 | u32 | nGuildNo |  |
+| 24 | u8 | nMinLevel | not relayed |
+| 25 | u16 | nMinMember | not relayed |
+| 27 | u64 | nProposalMoney |  |
+
+0x23 bytes; relayed to the WM as 0x74E4 first, then the lock list is settled. Z16 §6.7
+
 ### `0x0806` NC_MISC_SEED_REQ (C→S)
 
 **Verified layout**
@@ -10320,6 +10361,64 @@ Empty payload.
 **Verified layout** (basis: zone FUN_00589000)
 
 Empty payload.
+
+### `0x749c` NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ (C→Z)
+
+**Verified layout** (basis: zone sp_NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ FUN_004783c0; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | ack | 0 = declined, else accept |
+
+uses p.nTournamentSeed set by 0x749B. Z16 §6.3
+
+### `0x74ca` NC_GUILD_TOURNAMENT_FLAGCAPTURE_REQ (C→Z)
+
+**Verified layout** (basis: zone FUN_00475b80 → so_ply_FlagCaptureCast FUN_00477d90; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hTargetFlag | flag NPC handle |
+
+4 s cast; errors in 0x74CB. Z16 §6.5
+
+### `0x74cf` NC_GUILD_TOURNAMENT_USESKILL_REQ (C→Z)
+
+**Verified layout** (basis: zone sp_NC_GUILD_TOURNAMENT_USESKILL_REQ FUN_00477b20; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wUseSkillNumber | GuildTournamentSkill Index of the tournament type |
+
+2 bytes; answered by 0x74D0 (+ 0x74D1 on success). Z16 §5.3
+
+### `0x74d3` NC_GUILD_TOURNAMENT_DICEGAME_THROW_REQ (C→Z)
+
+**Verified layout** (basis: zone sp_NC_GUILD_TOURNAMENT_DICEGAME_THROW_REQ FUN_00477ba0; pdb2016 struct (size 1, no field read))
+
+Empty payload.
+
+no body read; success has no ack (0x74D5 broadcast), errors 0x74D4. Z16 §5.6
+
+### `0x74d7` NC_GUILD_TOURNAMENT_OBSERVER_ENTER_REQ (C→Z)
+
+**Verified layout** (basis: zone FUN_00476c50; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed |  |
+
+relayed unchecked to the WM as 0x74D9. Z16 §6.4
+
+### `0x74db` NC_GUILD_TOURNAMENT_OBSERVER_OUT_REQ (C→Z)
+
+**Verified layout** (basis: zone FUN_00476cc0; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed | not read |
+
+no 0x74DC reply in 2016. Z16 §6.4
 
 ### `0x10d2` NC_CHAR_FREESTAT_SET_DB_ACK (DB→Z)
 
@@ -11979,6 +12078,48 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 0 | u16 | nPartyNo |  |
 | 2 | u32 | nNewLooterCharNo |  |
 
+### `0x580d` NC_KQ_W2Z_MAKE_REQ (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_KQ_W2Z_MAKE_REQ FUN_00497790; PROTO_KQ_INFO (pdb2016))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle |  |
+| 4 | u8 | Status |  |
+| 5 | u16 | NumOfJoiner |  |
+| 7 | u16 | ID |  |
+| 9 | char[64] | Title |  |
+| 73 | u16 | LimitTime | minutes |
+| 126 | u8 | PlayerRevivalMode | 1/2/3/4, see Z16 §1.2 |
+| 127 | u8 | PlayerRevivalCount |  |
+| 147 | u16 | RewardIndex |  |
+| 149 | u16 | DemandMobKill |  |
+| 192 | PROTO_KQ_MAP_INFO[4] | MapLink | {u8 MapIndex, Name3 MapBase, Name3 MapName, u8 MapClear} 0x1a each |
+| 296 | u8[32] | ScriptLanguage | scenario book / film |
+| 328 | u8[32] | ScriptInitValue |  |
+| 360 | u8 | IsTeamPVP |  |
+| 361 | SHINE_XY_TYPE[2] | TeamRegenXY |  |
+
+0x179 bytes; only the fields the zone reads are listed, full struct PROTO_KQ_INFO in Z16 §1.2
+
+### `0x580f` NC_KQ_W2Z_START_CMD (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_KQ_W2Z_START_CMD FUN_00499240)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_KQ_INFO | KQInfo | 0x179 bytes |
+| 377 | u16 | NumOfJoiner |  |
+| 379 | PROTO_NC_KQ_JOINER[] | JoinerArray | {u32 chrregnum, u8 nTeamType} 5 bytes each, ≤ 100 used |
+
+### `0x5811` NC_KQ_W2Z_DESTROY_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_004972c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | hquest |  |
+
 ### `0x5833` NC_KQ_LINK_TO_FORCE_BY_BAN_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_00497120)
@@ -11987,6 +12128,73 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 |---|---|---|---|
 | 0 | u32 | nCharNum |  |
 | 4 | Name3[4] | sMapName |  |
+
+### `0x583b` NC_KQ_PLAYER_DISJOIN_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_00499100)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nHandle | KQ handle |
+| 4 | u32 | nCharNum |  |
+
+### `0x7481` NC_GUILD_TOURNAMENT_START_CMD (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_GUILD_TOURNAMENT_START_CMD FUN_00477a10 + wms_GuildTournamantStart FUN_00476de0; PROTO_NC_GUILD_TOURNAMENT_START_CMD (pdb2016))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed | 0…32 accepted (bound 33, Z16-B17) |
+| 1 | u16 | nTournamentMapNo | overwritten with GTMap[seed].mapid before use |
+| 3 | u16 | nExploerTimeMin | film token arg 3 |
+| 5 | u16 | nWaitPlayTimeSec | read by nobody on the zone |
+| 7 | u16 | nPlayTimeMin | film token arg 4 |
+| 9 | u32 | nNo1 | guild A number, film token arg 1 |
+| 13 | u32 | nNo2 | guild B number, film token arg 2 |
+
+0x11 bytes; sent to every zone, only the zone hosting GTMap[seed].mapname creates the match. Z16 §6.2
+
+### `0x74c7` NC_GUILD_TOURNAMENT_ZONE_MEMBERGRADE_ACK (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_GUILD_TOURNAMENT_ZONE_MEMBERGRADE_ACK FUN_00476460)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error | 7000 ok, 0x1B59 not found, 0x1B5A not in tournament |
+| 2 | u8 | nTournamentSeed | not read |
+| 3 | u32 | nGuildNo | not read |
+| 7 | u16 | nGuildMemberCnt |  |
+| 9 | {u32 charNo, u8 grade}[n] | members | → GuildTournamentSystem::sm_mapGuildMemberGrades |
+
+Z16 §6.2
+
+### `0x74da` NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_ACK (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_ACK FUN_00478be0; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1B60 enter, 0x1B61, 0x1B62 |
+| 2 | u8 | nTournamentSeed | even seed of the pair |
+| 3 | u16 | nPlayerHnd | zone handle of the requester |
+
+Z16 §6.4
+
+### `0x74e3` NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_REQ (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_REQ FUN_004766f0; PROTO_NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_REQ (pdb2016))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hWMChar | WM handle, echoed |
+| 2 | u32 | nCharNo | −1 or not on this zone: ignored |
+| 6 | u32 | nGTNo |  |
+| 10 | u32 | nGuildNo |  |
+| 14 | u8 | nMinLevel | not checked by the zone |
+| 15 | u16 | nMinMember | not checked by the zone |
+| 17 | u64 | nProposalMoney | checked against money + pending lock-list change |
+
+0x19 bytes. Z16 §6.7
 
 ### `0xa409` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ACK (WM→Z)
 
@@ -12137,6 +12345,246 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 4 | u16 | group[i].ItemActionGroupID | cool-time entry +0x10 |
 | 6 | u32 | group[i].SecondCoolTime | remaining ms (client divides by 1000); 0 from ResetCoolTime |
 
+### `0x5836` NC_KQ_SCORE_INFO_CMD (Z→C)
+
+**Verified layout** (basis: zone Lua cScoreInfo FUN_005e3790 / cScoreInfo_AllInMap FUN_005e3970; PROTO_NC_KQ_SCORE_INFO_CMD (pdb2016); client On_NC_KQ_SCORE_INFO_CMD FUN_0049d8b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32[2] | nScore | both zeroed, then nScore[i] = Lua arg 3 + i for i < min(n, 2); red, blue |
+
+8 bytes; KQ team-score window (KQScoreWin::SetScore). Sent by map scripts (Z09 §28.12)
+
+### `0x583c` NC_KQ_SCORE_BOARD_INFO_CMD (Z→C)
+
+**Verified layout** (basis: zone Lua cScoreBoard FUN_005ed860 / cScoreBoard_AllInMap FUN_005edad0; PROTO_NC_KQ_SCORE_BOARD_INFO_CMD (pdb2016); client FUN_0049af40)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bUseRound | toboolean(arg 2) |
+| 1 | u8 | nRound | arg 3 |
+| 2 | u8 | Red.nWinFlag | min(arg 4, 5): rounds won |
+| 3 | u8 | Red.nScore | min(arg 5, 99) |
+| 4 | u8 | Blue.nWinFlag | min(arg 6, 5) |
+| 5 | u8 | Blue.nScore | min(arg 7, 99) |
+
+6 bytes; KDTeamScoreWin. Sent by map scripts (Z09 §28.12)
+
+### `0x583d` NC_KQ_WINTER_EVENT_2014_SCORE_CMD (Z→C)
+
+**Verified layout** (basis: zone Lua cWinter_Event_ScoreBoard_AllInMap FUN_005edcf0; PROTO_NC_KQ_WINTER_EVENT_2014_SCORE_CMD (pdb2016); client On_NC_KQ_WINTER_EVENT_2014_SCORE_CMD FUN_004ae2b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Red.nWinFlag | 0 |
+| 1 | u8 | Red.nScore | arg 2 (no limit) |
+| 2 | u8 | Blue.nWinFlag | 0 |
+| 3 | u8 | Blue.nScore | arg 3 (no limit) |
+
+4 bytes; broadcast to the map; KDSoccer_W. Z09 §28.12
+
+### `0x7483` NC_GUILD_TOURNAMENTSTART_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildTournamentSystem::PlayerRegister FUN_0047f970; PROTO_NC_GUILD_TOURNAMENTSTART_CMD (pdb2016); client GuildTask FUN_006b4730)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nGuildA | group A guild number |
+| 4 | u32 | nGuildB | group B guild number |
+| 8 | u16 | nGuildTourNamentType | m_nTournamentType |
+| 10 | u32 | nGuildMyRegNumber | the receiver's guild number |
+
+0xe bytes, sent to the registering fighter; client: A or B 0 → 'There is no match opponent'. Z16 §4.4
+
+### `0x749b` NC_GUILD_TOURNAMENT_RECALL_ENTER_CMD (Z→C)
+
+**Verified layout** (basis: zone so_ply_Send2GuildTournamentLogIn FUN_00475950; client GuildTask FUN_006b5130)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | (pad) | never written: stale g_buf byte (Z16-B18) |
+
+1-byte payload (empty struct). Client shows the yes/no box 'Will you accept the Tournament Recall?'; answer 0x749C. Z16 §6.3
+
+### `0x749d` NC_GUILD_TOURNAMENT_RECALL_ENTER_ACK (Z→C)
+
+**Verified layout** (basis: zone FUN_004783c0 / _ErrorSendPlayer FUN_00478070; client GuildTask FUN_006b5170)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1440 ok or declined (silent), 0x1441 no seed / map table, 0x1443 map not loaded, 0x1444 'Entry Time is Over'; others shown as 'Error : %d' |
+
+data stream (vt 0x2f8). Z16 §6.3
+
+### `0x74cc` NC_GUILD_TOURNAMENT_FLAGCAPTURE_CMD (Z→C)
+
+**Verified layout** (basis: zone sp_NC_GUILD_TOURNAMENT_FLAGCAPTURE_CMD FUN_00475d40; client GuildTask FUN_006b3780)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1B40 cast started (client ActFlagCapture), 0x1B51 cast cancelled (StopFlagCapture) |
+| 2 | u16 | hPlayer | the caster |
+
+to everyone in range of the caster and the caster. Z16 §6.5
+
+### `0x74cd` NC_GUILD_TOURNAMENT_FLAGCAPTURE_RESULT_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildTournamentSystem::CaptureFlag FUN_0047eae0; pdb2016 struct; client GuildTask FUN_006b64f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CIDPlayer | capturer |
+| 20 | Name5 | CIDFlag | flag NPC name |
+| 40 | u32 | gRegGuildNo | capturer's guild |
+| 44 | u32 | gRegFlagCaptureGuild | new owner; 0 = flag neutralised |
+
+0x30 bytes, to all in the flag's map. Z16 §4.5
+
+### `0x74ce` NC_GUILD_TOURNAMENT_SKILLPOINT_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildGroup::SetSkillPoint FUN_0047afa0; pdb2016 struct; client GuildTask FUN_006b2660)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wSkillPoint | GuildGroup m_unKillerPoint (low 16 bits) |
+
+2 bytes; only to the group's manager user (data stream). Z16 §5.2
+
+### `0x74d4` NC_GUILD_TOURNAMENT_DICEGAME_THROW_ACK (Z→C)
+
+**Verified layout** (basis: zone FUN_00475e30; pdb2016 struct; client GuildTask FUN_006b34c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1B42 no tournament, 0x1B53 no dice period, 0x1B4E already thrown, 0x1B4C not a dice player |
+
+2 bytes; errors only. Z16 §5.6
+
+### `0x74d5` NC_GUILD_TOURNAMENT_DICEGAME_THROW_CMD (Z→C)
+
+**Verified layout** (basis: zone DiceGame::Send_DiceThrowResult FUN_00478f50; pdb2016 struct; client GuildTask FUN_006b3530)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | GuildRegNumber | thrower's guild (vt 0x818) |
+| 4 | u32 | unDiceGameResult | 1…6, never equal to the other side's |
+
+8 bytes; to all in the thrower's map. Z16 §5.6
+
+### `0x74d6` NC_GUILD_TOURNAMENT_DICEGAME_BEFORE_END_TIME_MSG_CMD (Z→C)
+
+**Verified layout** (basis: zone DiceGame::Update FUN_0047b540; pdb2016 struct; client GuildTask FUN_006b2830)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | unEndTime | always 5; the client acts only on 5 |
+
+4 bytes; to all in the red (else blue) player's map. Z16 §5.6
+
+### `0x74d8` NC_GUILD_TOURNAMENT_OBSERVER_ENTER_ACK (Z→C)
+
+**Verified layout** (basis: zone sp_Guild_Tournamnet_Observer_Enter FUN_004788c0 / _ErrorSendPlayer FUN_004781a0; client GuildTask FUN_006b35b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1B40 ok; 0x1B42 bad seed, 0x1B61, 0x1B54 (from WM 0x1B62) |
+| 2 | u8 | nTournamentSeed | written only for 0x1B40 |
+| 3 | u32 | nGuildRed | guild A (nNo1), only for 0x1B40 |
+| 7 | u32 | nGuildBlue | guild B (nNo2), only for 0x1B40 |
+
+11 bytes always; error replies leave bytes 2..10 stale. Z16 §6.4
+
+### `0x74dd` NC_GUILD_TOURNAMENT_SCORE_CMD (Z→C)
+
+**Verified layout** (basis: zone SendScorePacket::SendtoPlayer FUN_00479d50 / SendtoAllinMap FUN_00479ec0; pdb2016 struct; client GuildTask FUN_006b26d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | PartMask | 1 = full list (client clears its windows first), 0 = update |
+| 1 | u32 | regNumber | guild number |
+| 5 | u32 | unAllScore | m_unAllGuildScore |
+| 9 | u32 | unCaptureFlagCount | m_nCaptureFlagCount |
+| 13 | u32 | unPlayerNum | rows that follow |
+| 17 | TOURNAMENT_PLAYER_SCORE[unPlayerNum] | PlayerScore | 0x2c each: Name5 CharID, u32 unIncreaseScore, unDecreaseScore, unDieCount, unKillCount, unGuildGreade, unCaptureFlag |
+
+0x11 + 0x2c·n bytes. Z16 §4.6
+
+### `0x74de` NC_GUILD_TOURNAMENT_PLAYERDIEMSG_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildTournamentSystem::DeadPlayer FUN_0047e640; pdb2016 struct; client GuildTask FUN_006b5440)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | VictimCharID |  |
+| 20 | Name5 | MurderCharID |  |
+| 40 | i32 | VictimGuildGrade | 0 = guild master |
+
+0x2c bytes; 0x74DE to the victim's guild, 0x74DF to the killer's guild. Z16 §4.6
+
+### `0x74df` NC_GUILD_TOURNAMENT_PLAYERKILLMSG_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildTournamentSystem::DeadPlayer FUN_0047e640; pdb2016 struct; client GuildTask FUN_006b5680)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | VictimCharID |  |
+| 20 | Name5 | MurderCharID |  |
+| 40 | i32 | VictimGuildGrade | 0 = guild master |
+
+0x2c bytes; 0x74DE to the victim's guild, 0x74DF to the killer's guild. Z16 §4.6
+
+### `0x74e1` NC_GUILD_TOURNAMENT_MANAGERUSERMSG_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildGroup::CheckManagerUser FUN_004798f0; pdb2016 struct; client GuildTask FUN_006b55d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID | new manager user's CharName |
+
+0x14 bytes; to the side's guild members in the map (AxialListPacketBroadcastByGuild). Z16 §5.2
+
+### `0x74f0` NC_GUILD_TOURNAMENT_ITEM_PICK_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildTournamentSystem::CreateItemEffect FUN_0047c1e0; pdb2016 struct; client GuildTask FUN_006b5750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | GTIiemID | GTIServer / GTIGetRate ID |
+
+2 bytes; to the picker (game stream). Z16 §5.5
+
+### `0x74f1` NC_GUILD_TOURNAMENT_ITEM_EFFECT_CMD (Z→C)
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_GtItemEffectMsg FUN_00560670 (from CreateItemEffect); pdb2016 struct; client GuildTask FUN_006b57d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | GTIiemID | GTIServer ID |
+
+2 bytes; to each affected player (abstate items, first effect row only). Z16 §5.5
+
+### `0x74f2` NC_GUILD_TOURNAMENT_ITEM_FLAG_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildTournamentSystem::PlayerRegister FUN_0047f970 (other senders §5); pdb2016 struct; client GuildTask FUN_006b6d40)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | FlagScoreMultiple | GuildGroup m_FlagMultiple |
+| 1 | u32 | nGuildRegNo |  |
+
+5 bytes ('War Cry'). Z16 §4.4
+
+### `0x74f3` NC_GUILD_TOURNAMENT_ITEM_SCAN_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildTournamentSystem::ScanEnemyUser FUN_0047a3d0; pdb2016 struct; client GuildTask FUN_006b3b40)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nNum |  |
+| 2 | SHINE_XY_TYPE[nNum] | Members | {u32 x, u32 y} of each visible enemy fighter |
+
+2 + 8·n bytes, to the scanning player. Z16 §4.6
+
 ### `0x3438` NC_ITEMDB_PICKMONEY_REQ (Z→CharDB)
 
 **Verified layout** (basis: zone ShinePlayer::so_ply_PickupMoney FUN_0052fe80 (0x18 bytes incl. opcode; &getmoney ac_GetMoney FUN_00421bf0); PDB 2017 PROTO_NC_ITEMDB_PICKMONEY_REQ after the 6-byte ref; D03 §3.5)
@@ -12161,6 +12609,43 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 10 | u16 | skillid |  |
 | 12 | u8 | ispassive | 0 from &learnskill |
 | 13 | u16 | removeid | 0xFFFF = none |
+
+### `0x5815` NC_KQ_REWARD_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone ShinePlayer::sp_KQReward FUN_0052da70 (Z11 §8.4); PROTO_NC_KQ_REWARD_REQ (pdb2016))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | fame | sum of SRT_HONOR rewards |
+| 4 | u64 | cen | sum of SRT_MONEY rewards (high half 0) |
+| 12 | u16 | itmlst.header.handle | player handle |
+| 14 | u32 | itmlst.header.charNo |  |
+| 18 | u32 | itmlst.owner | charNo |
+| 22 | u16 | itmlst.lockindex | inventory lock index (cen / fame reserved under it) |
+| 24 | u16 | itmlst.map | MapInfo id, 0xFFFF unknown |
+| 26 | u64 | itmlst.price | 0 |
+| 34 | PROTO_ITEM_CMD | itmlst.itemlist | u8 count, per item {u8 len, u16 inven, item data}: chest at reward box 2 slot 0, contents at 0x2800 |
+
+sent length is one byte longer than the packet (Z11-B38); answer 0x5816 / 0x5817
+
+### `0x74e5` NC_GUILD_TOURNAMENT_DB_JOIN_NEW_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_GuildTournamentJoinNew FUN_00476860; PROTO_NC_GUILD_TOURNAMENT_DB_JOIN_NEW_REQ (pdb2016))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle | player handle |
+| 2 | u32 | ref.charNo | charNo |
+| 6 | u16 | lockindex | lock list index |
+| 8 | u16 | hWMChar | from 0x74E3 |
+| 10 | u32 | nCharNo | from 0x74E3 |
+| 14 | u32 | nGTNo | from 0x74E3 |
+| 18 | u32 | nGuildNo | from 0x74E3 |
+| 22 | u8 | nMinLevel | unchecked |
+| 23 | u16 | nMinMember | unchecked |
+| 25 | u64 | nProposalMoney | reserved in the lock list |
+
+0x21 bytes. Z16 §6.7
 
 ### `0xd401` NC_PET_SET_TENDENCY_DB_REQ (Z→CharDB)
 
@@ -12578,6 +13063,22 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 24 | u16 | kqId |  |
 | 26 | u32 | kqHandle |  |
 
+### `0x0442` NC_LOG_GAME_KQ_LEAVE (Z→GameLog)
+
+**Verified layout** (basis: zone AxialListKQEnd::ali_Work FUN_00429e00 (questresult / cQuestResult); PROTO_NC_LOG_GAME_KQ_LEAVE (pdb2017))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum | charNo |
+| 4 | Name3 | mappos.MapName | fm_MapID |
+| 16 | u32 | mappos.x |  |
+| 20 | u32 | mappos.y |  |
+| 24 | u16 | KQ_ID | fm_KQID |
+| 26 | u32 | KQ_Handle | fm_KQHandle |
+| 30 | u8 | Leave_Status | 1 success (0x5812), 0 fail (0x5813) |
+
+0x1f bytes; one per player on the map at the KQ result
+
 ### `0xc80f` NC_SYSLOG_CHAR_QUEST_STARTED (Z→GameLog)
 
 **Verified layout** (basis: zone FUN_005bf280)
@@ -12643,6 +13144,14 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 0 | u32 | hquest |  |
 | 4 | u16 | err | 0x981 ok, 0x982 dup, 0x983 full, 0x984+i map i missing, 0x988+i map i busy, 0x98C script |
 
+### `0x5810` NC_KQ_Z2W_END_CMD (Z→WM)
+
+**Verified layout** (basis: zone wms_EndOfKQPacket FUN_005a4800)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle |  |
+
 ### `0x6401` NC_ANNOUNCE_Z2W_CMD (Z→WM)
 
 **Verified layout** (basis: zone FUN_005b8d30 (zone→WM), megaphone via FUN_005b91f0)
@@ -12652,6 +13161,20 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 0 | ANNOUNCE_MESSAGE | AnnounceMessage | type 11 = roar, text from AnnounceData row 11 "%s:%s" |
 
 (pdb2017 struct; zone writes a type byte and a length-prefixed text, details not decoded)
+
+### `0x7482` NC_GUILD_TOURNAMENT_END_CMD (Z→WM)
+
+**Verified layout** (basis: zone FieldMap::fm_GuildTournamentEnd FUN_00475fa0; PROTO_NC_GUILD_TOURNAMENT_END_CMD (pdb2016))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed | seed |
+| 1 | u16 | nTournamentMapNo | guildtournamentinfo[seed].nTournamentMapNo (0 in 2016) |
+| 3 | u8 | nStatus | winner == loser (1 = draw / no result) |
+| 4 | u32 | nWinnerGuildNo | w |
+| 8 | u32 | nLoseGuildNo | l |
+
+0xc bytes, once per match (gta_Result2WMS); also sent as draw {0,0} by wms_GuildTournamentCheck. Z16 §6.6
 
 ### `0x74af` NC_GUILD_WORLD_RENAME_REQ (Z→WM)
 
@@ -12674,6 +13197,41 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 4 | u32 | nPriceGuildToken |  |
 | 8 | u32 | zero |  |
 
+### `0x74c6` NC_GUILD_TOURNAMENT_ZONE_MEMBERGRADE_REQ (Z→WM)
+
+**Verified layout** (basis: zone wms_GuildTournamantStart FUN_00476de0; pdb2017 struct agrees)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed |  |
+| 1 | u32 | nGuildNo | sent once for nNo1, once for nNo2 |
+
+only by the hosting zone. Z16 §6.2
+
+### `0x74c8` NC_GUILD_TOURNAMENT_ZONE_FIGHTER_ENTER_CMD (Z→WM)
+
+**Verified layout** (basis: zone PlayerRegister FUN_0047f970; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed | m_nTournamentSeed |
+| 1 | u32 | nGuildNo |  |
+| 5 | u32 | nCharNo |  |
+
+9 bytes. Z16 §4.4
+
+### `0x74c9` NC_GUILD_TOURNAMENT_ZONE_FIGHTER_OUT_CMD (Z→WM)
+
+**Verified layout** (basis: zone PlayerUnRegister FUN_0047fd50; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed | the zone writes (u8)m_nTournamentType here (original bug Z16-B10) |
+| 1 | u32 | nGuildNo |  |
+| 5 | u32 | nCharNo |  |
+
+9 bytes. Z16 §4.4
+
 ### `0x74d9` NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_REQ (Z→WM)
 
 **Verified layout** (basis: zone FUN_00476c50)
@@ -12685,18 +13243,20 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 
 ### `0x74e4` NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_ACK (Z→WM)
 
-**Verified layout** (basis: zone FUN_004766f0)
+**Verified layout** (basis: zone FUN_004766f0 (error path) and GameDBSession::gds_NC_GUILD_TOURNAMENT_DB_JOIN_NEW_ACK FUN_00476a10 (DB answer); PROTO_NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_ACK (pdb2016))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | Error | 0x1C40 ok |
+| 0 | u16 | Error | 0x1C42 no guild, 0x1C44 not enough money (from 0x74E3); else the DB's Error (0x1C40 ok) |
 | 2 | u16 | hWMChar |  |
 | 4 | u32 | nCharNo |  |
 | 8 | u32 | nGTNo |  |
 | 12 | u32 | nGuildNo |  |
-| 16 | u8 | nMinLevel | not copied from 0x74E6 |
-| 17 | u16 | nMinMember | not copied from 0x74E6 |
+| 16 | u8 | nMinLevel | copied on the 0x74E3 path; NOT written on the 0x74E6 path (stale buffer bytes, Z08-B13) |
+| 17 | u16 | nMinMember | as nMinLevel |
 | 19 | u64 | nProposalMoney |  |
+
+0x1b bytes. Z16 §6.7
 
 ### `0x7c14` NC_ZONE_PRISON_GO_ACK (Z→WM)
 
