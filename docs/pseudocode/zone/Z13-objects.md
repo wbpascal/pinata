@@ -1471,6 +1471,374 @@ the skill's own (Z03).
 
 ---
 
+## 5. Pets, player side: `PetInfoPlayer` and the summon flow
+
+Z07 §9 has the pet requests and DB answers (0xD404 / 0xD406 / 0xD407 / 0xD409 / 0xD40C / 0xD40E / 0xD412). This section
+covers the player methods behind them: the item actor, casting, summon / unsummon, the naming prompt, mind / stress and
+the re-summon after a map link. The `ShinePet` object (`spt_*`, its routine, AI, `CPetData` tables, Lua `cPet_*`) is §6
+(part 6); only its effect on the player state is given here.
+
+### 5.1 Data
+
+`ShinePlayer::sp_PetInfo` (`PetInfoPlayer`, 0x48 bytes at **p+0x2ab60**) *(pdb2016)*. This replaces the offsets Z07 §9
+listed by hand (they agree):
+
+| Off | p+ | Member | Meaning |
+|---|---|---|---|
+| +0x00 | 0x2ab60 | `nSummonState` | `PetSummonStateType`: 0 `PSST_NONE`, 1 `CASTING`, 2 `CASTED`, 3 `WAIT_CREATING`, 4 `WAIT_1ST_LOADING`, 5 `1ST_SUMMONED`, 6 `RESUMMONED`, 7 `UNSUMMONNING` (never set in 2016), 8 `LINKING_RESUMMON` |
+| +0x04 | 0x2ab64 | `nNameDecisionMode` | `PetNameDecisionMode`: 0 `PNDM_NONE`, 1 `CHECK_NAME`, 2 `MODIFY_WAIT` (0xD405 sent), 3 `MODIFIABLE` (client accepted, 0xD407 allowed), 4 `FIXED` |
+| +0x08 | 0x2ab68 | `nCallingState` | `PetNameCallingState`: 0 `PNCS_NONE`, 1 `PNCS_CALLING` (master said the pet's name, §5.9; read by Lua `cPet_IsMasterCalling`, §6) |
+| +0x0c | 0x2ab6c | `nCastEndTime` | `g_Now` tick when the summon cast ends |
+| +0x10 | 0x2ab70 | `nCastingLockIndex` | inventory lock index taken for the cast |
+| +0x12 | 0x2ab72 | `nCastSlot` | inventory slot being cast (0xFFFF none) |
+| +0x14 | 0x2ab74 | `nSummonSlot` | inventory slot of the summoned pet item (0xFFFF none) |
+| +0x16 / +0x18 | 0x2ab76 / 78 | `nWalkSpeed` / `nRunSpeed` | both = `CPetData::GetPetSpeed(PetIDX)` (`sp_PetSystem_FillCommonInfo`) |
+| +0x1c | 0x2ab7c | `nId` | pet id (`CPetData::GetPetID`, from the item's `InxName`) |
+| +0x20 | 0x2ab80 | `nHandle` | pet object handle |
+| +0x24 | 0x2ab84 | `nRegNum` | pet DB key (`0xFFFFFFFF` = not created yet) |
+| +0x28 | 0x2ab88 | `sName` | `Name4` (16 bytes) |
+| +0x38 / +0x3c | 0x2ab98 / 9c | `nMindMil` / `nStressMil` | mind / stress × 1000 (u32) |
+| +0x40 / +0x44 | 0x2aba0 / a4 | `nMindDiffMil` / `nStressDiffMil` | pending change × 1000 (i32), applied by §5.7 |
+
+Next to it: `sp_PetInfoLink` (`PetInfoForLink`, p+0x2aba8: `u8 bDoResummon`, `u64 xResummonCode` +8, `u16 nSummonSlot`
++0x10, `u32 nId` +0x14, `u32 nRegNum` +0x18), `sp_Pet_pObject` (p+0x2abc8, the `ShinePet`; `so_PetSystem_GetPet` player
+vt 0xe44 FUN_0055a8a0 returns it), three `Metronome {u32 m_NextTick, u32 m_TickInterval}` (`sp_Pet_HouseTick` p+0x2abcc,
+`sp_Pet_BoothTick` p+0x2abd4, `sp_Pet_DanceTick` p+0x2abdc) and `sp_Pet_DanceDataIndex` (p+0x2abe4).
+`Metronome::operator unsigned char` FUN_004011c0: `if NextTick < g_Now: NextTick += Interval; return 1` else 0.
+`sp_PetSystem_GetPetInfo` FUN_00419430 returns `&sp_PetInfo` (used by `ShinePet`).
+
+```pseudo
+sp_PetSystem_InitPetInfo(p):                @ FUN_004d1ff0  (called at LOGINCOMPLETE, after unsummon / cancel)
+    nId = nRegNum = 0xFFFFFFFF; sp_Pet_pObject = null; state = NONE; naming = NONE; calling = NONE; nCastEndTime = 0
+    nCastingLockIndex = nCastSlot = nSummonSlot = nHandle = 0xFFFF; speeds 0; sName = ""; mind = stress = diffs = 0
+sp_PetSystem_InitPetInfoLink(p):            @ FUN_004d2090
+    bDoResummon = 0; xResummonCode = 0; nSummonSlot = 0xFFFF; nId = nRegNum = 0xFFFFFFFF
+```
+
+**Pet item** = item attribute class 36 (0x24, `ItemAttrCls_Pet`), attribute `ShineItemAttr_Pet` (0x1a bytes at
+`SHINE_ITEM_STRUCT.itemattr`, i.e. `ItemTotalInformation` +0xa) *(pdb2016)*: `+0 u32 nPetRegNum`, `+4 u32 nPetID`,
+`+8 char sName[17]`, `+0x19 u8 bSummoning`. ITI offsets: RegNum +0xa, name +0x12 (Z07's "cell +0xa / +0x12").
+
+| Method | @ | Behaviour |
+|---|---|---|
+| `iac_GetAttrSize` / `iac_fill2buffer` / `iac_fill2struct` | 0063ecd0 / 0063ea00 / 0063ebf0 | 0x1a; copy the 26 bytes verbatim (client and DB see `bSummoning`) |
+| `iac_itemcreate` | 0063f470 | RegNum = 0xFFFFFFFF, PetID = 0xFFFFFFFF, name and `bSummoning` = 0 |
+| `iac_GetPetRegistNumber` / `iac_GetPetName` | 004d06d0 / 004d0650 | RegNum (null ITI → 0xFFFFFFFF); the 16 name bytes as `Name4` (null → "") |
+| `iac_SetPetName` | 004d05f0 | copies `min(len, 16)` bytes and terminates (byte 16 = +0x22 when longer) |
+| `iac_SetDuringPetSummon` | 00517d00 | `bSummoning = v`; only ever called with 1 (Z13-B37) |
+
+Items made by item mix (`sp_NC_ITEM_MIX_ITEM_REQ` FUN_00521540) and by `sp_CreateItemByAdmin` FUN_00527270 get
+`nPetID = CPetData::GetPetID(GetPetIDX(ItemInfo.InxName))`, RegNum 0xFFFFFFFF, empty name, `bSummoning = 0`.
+
+**Constants** (`gPetData`, `CPetData::ReadData` FUN_004cf870 from `SingleData.shn`; the Pup tables are §6): `Pup_MinMind` 1,
+`Pup_MaxMind` 100, `Pup_MinStress` 1, `Pup_MaxStress` 10, `PupCastingTime` 1500 ms, `PupCoolTime` 5000 ms (2016 data).
+The summon skill (cooldown carrier) is `ui_Pet.uip_PetSummonSkill` = `UsedItemEffect::uie_UseSkillID("UseSumPup")`, set by
+`UseItemPet::uip_SetSkill` FUN_00596b10 at start-up (`ZoneServer_zs_start_sun` FUN_005adbd0).
+
+### 5.2 State machine
+
+```
+            use item (Cast)            routine: cast end            Summon: spt_SummonPet
+  NONE(0) ───────────────▶ CASTING(1) ─────────────────▶ CASTED(2) ─────┬─ RegNum known ──────────────▶ CASTED(2) ── 0xD40C ──▶ RESUMMONED(6)
+    ▲  ▲                      │ move / run: CancelCasting              │                                (0xD40B sent)
+    │  └──────────────────────┘                                        └─ new pet: spt_CreatePet ──▶ WAIT_CREATING(3)
+    │                                                                        0xD40D sent                   │ 0xD40E (RegNum)
+    │                                                                                                      ▼
+    │                                                                                         WAIT_1ST_LOADING(4) ── 0xD40C ──▶ 1ST_SUMMONED(5)
+    │  use the same item again / DB error / Lua / mini-house build: Unsummon (from 5 / 6 only)
+    └──────────────────────────────────────────────────────────────────────────────────────────────
+  LOGINCOMPLETE after a link: VirtualCast → LINKING_RESUMMON(8) ── routine ──▶ CASTED(2) → LinkResummon → (0xD40C) → RESUMMONED(6)
+```
+
+5 and 6 are both "pet out"; every pet behaviour (tendency, naming, chat calling, unsummon) requires one of them.
+
+### 5.3 Using the pet item (`UseEffect::UseItemPet`, Z04 §6.3)
+
+Reached from `NC_ITEM_USE_REQ 0x3015` (Z04 §6.1: mode ∈ {1, 2, 6}, the field allows items, cell checks). Results go out
+as `0x3016 NC_ITEM_USE_ACK {u16 error, u16 useditem, u8 invenType}` (`so_ply_ItemUseResultPacket` vt 0x91c FUN_0045e610).
+
+```pseudo
+UseItemPet::uib_CanUseItem(p, cell) → code:                      @ FUN_0059b2b0
+    fail(c) = p ← 0xD411 NC_PET_USE_ITEM_FAIL_ACK { u16 c } (sp_Send_NC_PET_USE_ITEM_FAIL_ACK FUN_004d15a0); return c
+    p null:                                   return 0x3441
+    no field (p+0x7a):                        fail(0x3442) "Your pet cannot be summoned. Please try later."
+    field has no FieldAttr (+0xc):            fail(0x3443) "You cannot summon your pet in this area."
+    FieldAttr.KingdomQuestMap (+0x36) == 2:   return 0x3444 (no 0xD411)
+    FieldAttr.byCanItem (+0x9e) == 0:         fail(0x3444) "You cannot summon your pet in this area."
+    p.smo_DuringCast() (vt 0xea0) == 1:       fail(0x345b)                           # no client text
+    &p.sp_PetInfo == null:                    fail(0x3446)                           # dead check (Z13-B39)
+    nCastEndTime > g_Now:                     fail(0x345b)
+    switch state:
+        NONE, 1ST_SUMMONED, RESUMMONED:
+            mode = p.smo_GetMode() (vt 0x484)
+            mode ∈ {1, 2} or mode ≥ 8:        return 0x700 (ok)
+            else (0 or 3 dead / 4 tent / 5 booth / 6 riding / 7):   fail(0x3445) "Your pet cannot be summoned."
+        CASTING:                              return 0x345b (no 0xD411)
+        CASTED, WAIT_CREATING, WAIT_1ST_LOADING:   return 0x345c "Pet summoning is in progress." (no 0xD411)
+        LINKING_RESUMMON:                     return 0x345d "Pet summoning is in progress." (no 0xD411)
+        other (7):                            return 0x3460 "Your pet cannot be summoned. Please try later." (no 0xD411)
+    # every non-0x700 code is then also sent as 0x3016, whose client handler shows FUN_00416430(code):
+    # the codes sent through fail() appear twice (original bug) Z13-B38
+
+UseItemPet::uib_DirectUse(p, slot, cell) → handled:               @ FUN_0059b660
+    if p null: return 0
+    if mode ∈ {1, 2}:
+        if cell null, item has no InxName, or CPetData::GetPetIDX(InxName) null: return 0   # falls into the Z04 cast path
+        if state == NONE or state ∈ {5, 6}: sp_PetSystem_Cast(p, slot)
+    return 1                       # the pet item is never consumed; mode ≥ 8 returns 1 without any reply (unreachable: Z04 allows {1,2,6})
+```
+
+```pseudo
+sp_PetSystem_Cast(p, slot) → ok:                                   @ FUN_004d31c0
+    p.so_ply_AllCastCancel() (vt 0x8d0); p.so_ply_SendMoveFail() (vt 0xa4c); p.so_mobile_StopHere() (vt 0xa48); p.smo_BashStop() (vt 0xed8)
+    r(c) = so_ply_ItemUseResultPacket(c, 9)     # 0x3016, inventory
+    if state ∈ {5, 6}:  if slot ≠ nSummonSlot: r(0x702); return 0        # another pet item while a pet is out
+    elif state ≠ NONE:  r(0x701); return 0
+    if p has no sub-layer (+0x76) or layer.l_Sub == 3 (GM hidden):  r(0x701); return 0
+    cell = inventory[slot]:  null → r(0x703) ("Try to use empty cell"); ITI null → r(0x702)
+    attr null or attr class ≠ 36 → assert, r(0x702)
+    if state ∈ {5, 6}:                         # same item again = dismiss
+        (slot ≠ nSummonSlot → r(0x702) / other state → r(0x701), already excluded above)
+        if sp_PetSystem_Unsummon(p): r(0x700); return 1   else r(0x701); return 0
+    # state NONE: start the summon cast
+    nCastEndTime = g_Now + PupCastingTime × 10 / 1000          (1500 ms → 15 ticks)
+    nCastingLockIndex = lock list current index; nCastSlot = slot; state = CASTING
+    id = GetPetID(GetPetIDX(ItemInfo[cell.itemid].InxName)); if any step fails: r(0x702); return 0
+        # state stays CASTING with the times set (original bug) Z13-B35: 1.5 s later the summon fails with 0xD411 0x345e
+    nId = id; nRegNum = attr RegNum; sName = attr name
+    lock list vt 0x2c(nCastingLockIndex, 9, slot) (lock the cell); icl_IncIndex
+    r(0x700)
+    p ← 0x2047 NC_ACT_CREATECASTBAR { u16 millisec = PupCastingTime }   (to the player only)
+    return 1
+```
+
+Every failing check answers through 0x3016; the cast itself has no 0xD411. While casting, `sp_NC_ACT_MOVEWALK_CMD`
+FUN_00457c60 and `sp_NC_ACT_MOVERUN_CMD` FUN_00457fd0 call `sp_PetSystem_CancelCasting` when state == CASTING (before
+their own checks):
+
+```pseudo
+sp_PetSystem_CancelCasting(p) → ok:                                @ FUN_004d23a0
+    cell / ITI / attr at nCastSlot must exist (else assert, return 0; state stays CASTING)
+    lock list vt 0x28(nCastingLockIndex) (release); p ← 0x2048 NC_ACT_CANCELCASTBAR {} (so_SendProtocol(8, 0x48))
+    sp_PetSystem_InitPetInfo(p); return 1
+```
+
+### 5.4 Summon (`sp_PetSystem_PlayerRoutine`, `sp_PetSystem_Summon`)
+
+`ShinePlayer::so_Routine` FUN_0056c790 calls `sp_PetSystem_PlayerRoutine` on every player tick, before the recovery
+step (it also drives the tendency ticks, §5.7).
+
+```pseudo
+sp_PetSystem_PlayerRoutine(p):                                     @ FUN_004d2d20
+    switch state:
+    CASTING:  if nCastEndTime <= g_Now:
+                  state = CASTED
+                  if !sp_PetSystem_Summon(p): p.so_ply_AllCastCancel(); state = NONE
+                  # nothing else is reset: the cast lock stays taken (original bug) Z13-B34
+    1ST_SUMMONED, RESUMMONED:  naming prompt, §5.5
+    LINKING_RESUMMON:  state = CASTED
+                  if !sp_PetSystem_LinkResummon(p): p.so_ply_AllCastCancel(); state = NONE        # §5.8, silent for the client
+
+sp_PetSystem_Summon(p) → ok:                                       @ FUN_004d2640
+    if p has no sub-layer or l_Sub == 3: return 0                              # silent
+    if p.so_PetSystem_GetPet() (vt 0xe44) ≠ null: p ← 0xD411 {0x3458} "Your pet is nearby already."; return 0
+    pet = som_AllocObject(type 12 ShinePet) → handle h; null → assert "Too many pet", return 0
+    h == 0xFFFF → assert, pet.so_Unmark(0,1,3) (vt 0x33c), som_FreeObject(h, REMOVE_NOW, 0x78); return 0
+    nHandle = h
+    cell / ITI / attr at nCastSlot (null → assert, return 0; the allocated pet object is not freed, Z13-B36)
+    pet.spt_InitShinePet(); pet.spt_pItemTotalInfo = ITI; pet.spt_pItemAttr = attr
+    pet.spt_SetMaster(p, p.charNo)                                             (§6)
+    a = rnd(64) × 180 / 64  (degrees 0…177);  x = p.x + sin(a) × 50,  y = p.y + cos(a) × 50   (sr_sin1024/cos1024 >> 10)
+    dir = 2 × (a < 90 ? a + 90 : a − 90)
+    ok = pet.spt_SummonPet(p.map, x, y, dir, nId, p.layer)                     (§6: FillCommonInfo, regenerate; for a
+        # pet without RegNum and state CASTED it first calls spt_CreatePet → DB 0xD40D NC_PET_CREATE_DB_REQ
+        # {u16 p.handle, u32 p.charNo, Name4 "" , u8 mind, u8 stress (random in the PupServer row's ranges)},
+        # state = WAIT_CREATING, naming = CHECK_NAME)
+    if !ok: p ← 0xD411 {0x345e}; pet.so_Unmark(0,1,3); som_FreeObject(pet, REMOVE_NOW, 0x78); return 0
+    sp_Pet_pObject = pet
+    skill = ui_Pet.uip_PetSummonSkill;  null → return 0       # pet stays alive, state reset by the routine (original bug) Z13-B36
+    p.smo_ply_SkillCoolTime(skill.id, PupCoolTime, 0, 0, 0) (vt 0xeac); p.so_ply_NewSkillCoolTime(skill.id, PupCoolTime / 1000) (vt 0x374)
+    nSummonSlot = nCastSlot; nCastSlot = 0xFFFF; lock list vt 0x28(nCastingLockIndex) (release)
+    p ← 0x2048 NC_ACT_CANCELCASTBAR {}
+    attr.bSummoning = 1 (iac_SetDuringPetSummon)
+    if nRegNum ≠ 0xFFFFFFFF: naming = CHECK_NAME; → CharDB 0xD40B NC_PET_LOAD_INFO_DB_REQ { u16 p.handle, u32 nRegNum }   (FUN_004d11e0)
+    return 1
+```
+
+The state then advances by the DB answers (Z07 §9): `0xD40E CREATE_DB_ACK` (state 3: RegNum into `nRegNum` and the item,
+`sp_PetItemSave`, 0xD40B, state 4) and `0xD40C LOAD_INFO_DB_ACK` (state 4 → 5, states 2 / 8 → 6; mind / stress × 1000).
+A DB error unsummons (0xD40C) or leaves the state at 3 (0xD40E, Z07).
+
+```pseudo
+sp_PetItemSave(p):                                                 @ FUN_004d35e0   (only from 0xD40E)
+    if (u32)nSummonSlot ≠ 0xFFFFFFFF (always true, Z13-B39): sp_PetItemAttrSave(p, inventory[nSummonSlot], 9, nSummonSlot)
+sp_PetItemAttrSave(p, cell, type, slot):                           @ FUN_004d2ff0
+    if slot < 0: return
+    key = slot & 0x3ff | type << 10
+    lock list vt 0x40(lockindex, cell, ITI, &key, &key)      (reserve the changed copy = the cell as it is now)
+    → GameDB 0x3449 NC_ITEMDB_ITEMCHANGE_REQ { u16 p.handle, u32 p.charNo, u16 lockindex, u64 ITI.registnum,
+          u16 itemid, attr (attr class vt 0xc size: 0x1a) }        (length 0x14 + 0x1a)
+    lock index += 1
+```
+
+### 5.5 Naming prompt (`0xD405`)
+
+```pseudo
+sp_PetSystem_PlayerRoutine, state ∈ {5, 6}:                        @ FUN_004d2d20
+    if naming == CHECK_NAME and nRegNum ≠ 0:
+        cell / ITI / attr at nSummonSlot, attr class 36, dynamic cast to ItemAttrCls_Pet
+            # each failure: assert (texts say "sp_PetSystem_Unsummon") and return; repeats every tick while it lasts
+        if sName == "" and the item's name == "":
+            sp_Send_NC_PET_ASK_NEW_NAME_REQ(p, nHandle, nId, nFirstSummon = (state == 1ST_SUMMONED))
+        else: naming = FIXED
+
+sp_Send_NC_PET_ASK_NEW_NAME_REQ(p, handle, id, first):             @ FUN_004d0c90
+    if handle == 0xFFFF: return
+    p ← 0xD405 NC_PET_ASK_NEW_NAME_REQ { u16 nPetHandle, u32 nPetID, u8 nFirstSummon }
+    naming = MODIFY_WAIT           # also when the length check fails
+```
+
+Client (`GameFrameWork`, FUN_004bb170, 2017 `On_NC_PET_ASK_NEW_NAME_REQ`): looks `nPetID` up in its pet table; found → opens
+the naming dialog for `nPetHandle` with "You're my new master! Hello! What are you going to call me?" (`nFirstSummon` ≠ 0) or
+"What name should I answer to?" (0) and answers `0xD406 {u16 0x34C0, u16 nPetHandle}`; not found → `0xD406 {0x34C1, handle}`,
+which the server ignores (naming stays `MODIFY_WAIT`, the pet stays unnamed until the next summon). The rest of the naming
+exchange (0xD406 → `MODIFIABLE`, 0xD407 / 0xD403 / 0xD404 → `FIXED`, 0xD409 cancel → `FIXED`) is Z07 §9.
+`sp_Send_NC_PET_SET_NAME_DB_REQ` FUN_004d1110 (0xD403 `{u16 p.handle, u32 nRegNum, Name4 name}`, only for names of 4+
+characters and a known RegNum).
+
+So a pet is asked for a name once per summon while both names are empty; after a rename cancel (`FIXED`) it is asked again
+at the next summon. A link resummon (§5.8) sets `FIXED` directly and never asks.
+
+### 5.6 Unsummon
+
+```pseudo
+sp_PetSystem_Unsummon(p) → ok:                                     @ FUN_004d2990
+    if state ∉ {5, 6}: return 0                                     # silent
+    if sp_Pet_pObject == null: p ← 0xD411 {0x3481} "Your pet summons cannot be cancelled. Please try later."; InitPetInfo; return 0
+    if pet.so_ObjectType() (vt 0x4d0) ≠ 12:
+        p ← 0xD411 {0x3482} "Your pet summons cannot be cancelled."; InitPetInfo (sp_Pet_pObject = null)
+        # then falls through and calls sp_Pet_pObject->vt[0x33c]: null dereference, zone crash (original bug) Z13-B31
+    sp_PetSystem_ApplyChangedTendency(p); sp_PetSystem_SaveTendency(p)          (§5.7: 0xD401 to the Character DB)
+    pet.so_Unmark(0, 1, 3) (vt 0x33c); som_FreeObject(pet handle, REMOVE_NOW, 0x78)
+    sp_PetSystem_InitPetInfo(p); return 1
+    # the item's bSummoning stays 1 (Z13-B37); the client learns about the removal from the pet's unmark (§6) *(inferred)*
+```
+
+Callers: `sp_PetSystem_Cast` (same item again, §5.3), `gds_NC_PET_LOAD_INFO_DB_ACK` / `gds_NC_PET_SET_NAME_DB_ACK` on a
+DB error (Z07 §9), `sp_Schedule_BuildMiniHouse` FUN_00576570 (building a mini house, Z07 §6.3), Lua `cPet_Unsummon`
+FUN_005d65a0 (§6). Nothing unsummons on logout, death or a map link: the player only records the link state (§5.8) and the
+`ShinePet` notices the missing master itself (§6, `spt_FindMaster`) *(inferred until part 6)*.
+
+### 5.7 Mind and stress (tendency)
+
+```pseudo
+sp_PetSystem_ChangeTendency(p, cond):                              @ FUN_004d2470
+    if state ∉ {5, 6}: return
+    mt = CPetData::GetPetMindType(nMindMil / 1000)       (PupMind.shn rows: 1–25 PM_SJ, 26–50 PM_NT, 51–75 PM_NF, 76–100 PM_SP *(inferred, §6)*); MAX → return
+    d = CPetData::GetPetTendencyModifyData(mt, cond)     @ FUN_004cf440: the last PupFactorCondition row with
+        (PupMindType, PupFactorConditionType) = (mt, cond): type = PupFactorType, value = ±Value / 1000 (IsMinus → −); no row → type MAX
+    PF_STRESS (0): nStressDiffMil += (long)(value × 1000)      PF_MIND (1): nMindDiffMil += (long)(value × 1000)
+
+sp_PetSystem_ApplyChangedTendency(p):                              @ FUN_004d2520
+    if state ∉ {5, 6}: return
+    m = (u32)(nMindMil + nMindDiffMil);  if (u8)(m / 1000) < MinMind or > MaxMind: m = bound × 1000
+    s = (u32)(nStressMil + nStressDiffMil); same with MinStress / MaxStress
+    nMindMil = m; nStressMil = s; diffs = 0
+    # unsigned arithmetic and a byte compare: a sum below 0 wraps to ≈ 4.29e9 and its (u8)(/1000) lands anywhere in
+    # 0…255, e.g. stress 1.0 − 2.0 → 54 → clamped to MaxStress 10, mind 1.0 − 2.0 → kept as mind 54 (original bug) Z13-B30
+
+sp_PetSystem_SaveTendency(p):                                      @ FUN_004d25d0
+    if state ∈ {5, 6}: sp_Send_NC_PET_SET_TENDENCY_DB_REQ(p, nMindMil / 1000, nStressMil / 1000)
+sp_Send_NC_PET_SET_TENDENCY_DB_REQ(p, mind, stress):               @ FUN_004d1040
+    if p.handle == 0xFFFF or nRegNum == 0xFFFFFFFF: return
+    → CharDB 0xD401 NC_PET_SET_TENDENCY_DB_REQ { u16 nMasterHandle, u32 nPetRegNum, u8 nPetMind, u8 nPetStress }   (both clamped to the bounds)
+```
+
+Who changes the tendency (cond = `PupFactorConditionTypeEnum`) *(pdb2016)*:
+
+| cond | Raised by | When |
+|---|---|---|
+| 1 `PFC_S_DANCE` | `ShinePlayer::so_Routine` | every 60 s (`sp_Pet_DanceTick`, 600 ticks, armed by `sp_DoEmotion` FUN_00458860 for an emotion whose `ActionViewInfo` row has byte +0x71 == 1) while the emotion is still shown |
+| 2 / 3 / 4 `PFC_S_SUCCESS` / `FAIL` / `CRIFAIL` | `gds_NC_ITEMDB_UPGRADE_ACK` FUN_0053b900, `_NEW_UPGRADE_ACK` FUN_0053bd20, `_BRACELET_UPGRADE_ACK` FUN_0053c0f0 | item upgrade result (success / fail / fail with destruction, Z05) |
+| 5 `PFC_S_GATHER` | `sp_GatherComplete` FUN_0046b2f0 | gathering done |
+| 6 `PFC_S_PROD` | `smo_ply_ItemProduce` FUN_0046c2d0 | production success |
+| 7 `PFC_S_MOVER` | Lua `cPet_Unsummon` (§6) | |
+| 8 `PFC_S_REVIVALTOWN` | `so_KilledBy` FUN_00433be0 | on every death (Z13-B40) |
+| 9 `PFC_S_REVIVALHERE` | `sp_ReviveNow` FUN_0057d290 | revived in place |
+| 10 `PFC_S_RESTHOUSE` | `sp_RecoverPoint_House` FUN_0056b3b0 (tent, mode 4) and `so_Routine` (booth, mode 5) | tent: every 60 s (`sp_Pet_HouseTick`, armed by `sp_NC_ACT_PITCHTENT_REQ` FUN_00457760 only if the pet is out at that moment); booth: every 600 s (`sp_Pet_BoothTick`, armed by `sp_NC_BOOTH_OPEN_REQ` FUN_0058e900) (original bug) Z13-B32 |
+| 11 `PFC_S_STORE` | – | never raised |
+| 12–16 `PFC_M_*` (attack, dance, follow, talk, revolution) | Lua `cPet_ChangeMind` (§6) | pet AI |
+
+The pending change is applied and saved (0xD401) on unsummon, on every character save (`WholeSaver::ws_save2DB` FUN_00455a10,
+Z01 §8.4) and by Lua `cPet_SaveTendency` (§6). GM `&setpetinfo` / `&getpetinfo` are Z11 §7.7. `GetPetMindType` reads
+`nMindMil` without the pending diff, so the mind *type* (and with it the factor rows used) only changes once a change is applied.
+
+### 5.8 Re-summon after a map link
+
+```pseudo
+so_LinkTo(p, …) (pet part):                                        @ FUN_0049ad30
+    if state ∈ {5, 6}:
+        bDoResummon = 1; xResummonCode = (u64)p.charNo + 0x1BEC48797BAFC8B0
+        link.nSummonSlot = nSummonSlot; link.nId = nId; link.nRegNum = nRegNum
+WholeSaver::ws_save2worldmanager → sp_PetLinkResummonInfo_Save2World(p):     @ FUN_004d1760
+    if state ∈ {0, 5, 6}:
+        → WM 0x4033 NC_CHARSAVE_2WLDMAN_PET_LINK_RESUMMON_CMD { u32 nCharNo, u8 bDoResummon, u64 xResummonCode,
+              u16 nSummonSlot, u32 nId, u32 nRegNum }    (0x17 bytes)
+    # in states 1–4 and 8 nothing is sent (the WM keeps what it had, W01)
+# the WM stores it (W01 §6.3, "pet re-summon" row) and the new zone gets 0xD412 NC_PET_LINK_RESUMMON_CMD → p.sp_PetInfoLink (Z07 §9)
+
+sp_NC_MAP_LOGINCOMPLETE_CMD (pet part):                            @ FUN_00443390
+    sp_PetSystem_InitPetInfo(p)
+    if bDoResummon == 1 and xResummonCode == p.charNo + 0x1BEC48797BAFC8B0:
+        if !sp_PetSystem_VirtualCast(p, link.nSummonSlot): sp_PetSystem_InitPetInfo(p)
+    sp_PetSystem_InitPetInfoLink(p)
+
+sp_PetSystem_VirtualCast(p, slot) → ok:                            @ FUN_004d2180
+    if state ≠ NONE or no sub-layer or l_Sub == 3: return 0
+    cell / ITI / attr at slot (null → assert, return 0); attr class ≠ 36 → assert, return 0
+    nCastSlot = slot; state = LINKING_RESUMMON          # no cell lock, no cast bar
+    id via ItemInfo.InxName → PetIDX → PetID (any miss → return 0)
+    nId = id; nRegNum = attr RegNum; sName = attr name
+    return nId == link.nId and nRegNum == link.nRegNum     # the item in that slot must still be the same pet
+
+sp_PetSystem_LinkResummon(p) → ok:                                 @ FUN_004d2a40   (routine, state set to CASTED first)
+    as sp_PetSystem_Summon (§5.4) with these differences:
+        requires state == CASTED; an existing pet only asserts "ERR_PET_SUMMON_ALREADY" (no 0xD411)
+        spt_SummonPet failure → 0xD411 {0x345e} and free, as there
+        no cooldown, no lock release (none was taken), no 0x2048
+        nSummonSlot = nCastSlot; nCastSlot = 0xFFFF; sp_Pet_pObject = pet; attr.bSummoning = 1
+        nRegNum known → naming = FIXED (no name prompt); 0xD40B LOAD_INFO_DB_REQ   (→ 0xD40C: state 2 → 6)
+```
+
+The "code" is a fixed offset of the character number, a plausibility check only. A pet that was still being summoned or
+named at the link (states 1–4) is not carried over.
+
+### 5.9 Other pet hooks in player code
+
+- **Chat calling** (`sp_NC_ACT_CHAT_REQ` FUN_0045a400): after a normal chat line is broadcast (not an `&` command, map
+  allows chat, not spam), if the pet is out (5 / 6), has a RegNum and a name of at least 4 bytes, and the name occurs
+  anywhere in the chat text (`strncmp` at every offset), `nCallingState = PNCS_CALLING`. The scan bound is the packet
+  length, not the text length *(inferred: a few bytes past the text are compared)*.
+- **Item break** (`ItemBreaker::ib_OK` FUN_0048d0d0, NPC item destruction): a class-36 item is refused while the state is
+  1…8 (any pet activity, not only this item's): the cell lock is released and `0xD411 {0x345c}` "Pet summoning is in progress." is sent.
+- **Relocation** (`ItemRelocationManager::irm_Exchange` FUN_00531e90): swapping two inventory cells (type 9, key `0x2400`) while
+  the pet is out moves `nSummonSlot` along. `irm_Move` FUN_00531860 (into an empty cell), moves to other boxes, merges and
+  splits do not (original bug) Z13-B33.
+- **Mini house**: building one unsummons the pet (§5.6); in a tent the house tick raises `PFC_S_RESTHOUSE` (§5.7).
+
+### 5.10 Client side (2016 client, `GameFrameWork`)
+
+- `0xD411 NC_PET_USE_ITEM_FAIL_ACK` (FUN_0049d350, 2017 `On_NC_PET_USE_ITEM_FAIL_ACK`): shows `FUN_00416430(code)` unless the
+  code is 0x3440 or 0x3480 (success codes, never sent). Texts: 0x3441 / 0x3442 / 0x345e / 0x3460 "Your pet cannot be summoned.
+  Please try later.", 0x3443 / 0x3444 "You cannot summon your pet in this area.", 0x3445 / 0x3446 "Your pet cannot be
+  summoned.", 0x3458 "Your pet is nearby already.", 0x345c / 0x345d "Pet summoning is in progress.", 0x3481 "Your pet summons
+  cannot be cancelled. Please try later.", 0x3482 "Your pet summons cannot be cancelled."; **0x345b has no text**.
+- `0x3016 NC_ITEM_USE_ACK` (FUN_004abdb0): any code other than 0x700 and the special item codes goes through the same
+  `FUN_00416430`, so pet codes from `uib_CanUseItem` show up a second time (Z13-B38).
+- `0xD405`: §5.5. `0x2047` / `0x2048` cast bar (FUN_00499c10 / FUN_004d8f90): generic cast bar of mounts and pets.
+
+---
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1504,6 +1872,17 @@ the skill's own (Z03).
 | Z13-B27 | `wh_Reserv` (0x2053) | no check that the zone has the map `Wedding` (or that the player talks to a wedding NPC); every zone has its own `weddinghall` | a couple reserving on another zone holds that zone's slot; at start they are linked to `Wedding`, but `wh_Start` asserts "Map not found", no ceremony runs, and guests on the hall zone see no reservation | refuse the reservation outside the hall zone |
 | Z13-B28 | `Checker::DivorceLimit` Sub 1–4 | the `0x108F` / `0x108D` requests leave `header.clienthandle` (payload +0) stale; Sub 3 / 4 sets no lock, so both partners send `0x108D` and repeat it each minute until their reload | `gds_NC_CHAR_WEDDING_DIVORCE_DO_ACK` reloads whatever object holds the stale handle; the DB runs `Divorce_Do` twice (two GameLog 0x065B pairs, `dSubWhen` reset) | write the handle; lock as for Sub 1 / 2 and let only one side execute |
 | Z13-B29 | `ZoneRingPacketRefreshWeddingInfo::zrpb_Request` | a partner found on this zone without a field (logging in / linking) gets neither a reload nor a ring packet | the partner keeps stale wedding data (e.g. still "married" after the divorce) until their next 0x1081 | reload anyway (the DB answer arrives after the login completes) |
+| Z13-B30 | `sp_PetSystem_ApplyChangedTendency` | mind / stress + pending diff summed as `u32`, range tested on `(u8)(sum / 1000)` | a sum below 0 wraps: stress at its minimum jumps to `MaxStress`, mind becomes an arbitrary value (e.g. 54); also any sum ≥ 256 000 wraps | signed sum, clamp before the byte cast |
+| Z13-B31 | `sp_PetSystem_Unsummon` | when the pet object's type is not 12 it sends 0x3482, clears the pet info (`sp_Pet_pObject = null`) and then calls `sp_Pet_pObject->so_Unmark` | null dereference, zone crash (only if the handle was reused by another object kind) | return after the 0x3482 |
+| Z13-B32 | `ShinePlayer::so_Routine` booth tick | an open booth raises `PFC_S_RESTHOUSE` every 600 s; `PFC_S_STORE` (11) is never raised | booth time counts as tent rest in the tendency table (row 11 differs from row 10 for mind type 1) | raise `PFC_S_STORE` |
+| Z13-B33 | `irm_Move` / box moves / merge / split | only `irm_Exchange` updates `nSummonSlot` | after moving the summoned pet item, using it gives 0x702 (cannot dismiss it with the item), naming (0xD407) and `sp_PetItemSave` act on whatever lies in the old slot, the naming check asserts every tick if that slot is empty | track the slot on every move, or lock the summoned item |
+| Z13-B34 | `sp_PetSystem_PlayerRoutine` → failed `sp_PetSystem_Summon` | only `AllCastCancel` and state = NONE; the cast lock `nCastingLockIndex` is not released and `nCastSlot` / ids stay | the pet item's cell stays locked (item use 0x70a, moves refused) *(inferred: until the lock list is reset)* | `sp_PetSystem_CancelCasting` (release + init) |
+| Z13-B35 | `sp_PetSystem_Cast` | the pet id lookup (item → PetIDX → PetID) is done after state = CASTING and the cast end time are set | 0x3016 0x702 now, then 1.5 s later 0xD411 0x345e for the same use | look the id up before changing state |
+| Z13-B36 | `sp_PetSystem_Summon` | returns 0 without freeing the allocated pet when the cast cell / ITI / attr is missing, and after `sp_Pet_pObject = pet` when the `UseSumPup` skill is missing | a pet object without a summoned state: the next summon answers 0x3458 "nearby already" | free the object on every failure |
+| Z13-B37 | `iac_SetDuringPetSummon` callers | `bSummoning` is set to 1 at every summon and never cleared (unsummon, link, logout) | the item attribute (client cell info, DB copy at the next item save) keeps saying "summoning" *(effect in the client not traced)* | clear it on unsummon |
+| Z13-B38 | `UseItemPet::uib_CanUseItem` | most failures send `0xD411 {code}` and return the same code, which `ItemUse_Inventory` sends again as `0x3016` | the client shows the message twice; codes 0x3444 (KQ map), 0x345b–0x3460 come only once | one channel |
+| Z13-B39 | pet code | dead checks: `&p.sp_PetInfo == null` (0x3446 never sent), `(u32)nSummonSlot ≠ 0xFFFFFFFF` in `sp_PetItemSave` (always true), CanUseItem modes ≥ 8 (excluded by the item handler) | none at run time; 0x3446 and 0x3460 are unreachable in practice | – |
+| Z13-B40 | `so_KilledBy` | raises `PFC_S_REVIVALTOWN` at every death; `sp_ReviveNow` adds `PFC_S_REVIVALHERE` on top | an in-place revive applies both factors | raise RevivalTown only on the town revive |
 
 ## Not reconstructed / uncertain
 
@@ -1534,6 +1913,10 @@ the skill's own (Z03).
   offsets only; that the band is the target map's entry level is *(inferred)*. Whether the 2016 Character DB ever writes
   sub-status 8 (DivorceLimit case 8) is unknown (w00 writes 4). The client's answer to the 0x1384 dialog (0x205C accept /
   0x205E refuse) was not traced in the client.
+- Pets (§5): the meaning of `FieldAttr.KingdomQuestMap == 2` (refused without a 0xD411) is not identified. Whether the
+  WM drops its re-summon record after sending 0xD412, and what happens with a stale record when the next 0x4033 is
+  skipped (states 1–4 / 8 at the link), was not traced (W01). What the client does with `bSummoning` and how it removes
+  the pet at unsummon are left to §6. That the lock list keeps an unreleased cast lock until relog (Z13-B34) is *(inferred)*.
 
 ## Coverage boundary
 

@@ -10111,13 +10111,13 @@ Sent from `FUN_00456850` (`FUN_00456850`) · payload 6 bytes
 
 ### `0xd405` NC_PET_ASK_NEW_NAME_REQ
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_PET_ASK_NEW_NAME_REQ`, 7 bytes
+**Verified layout** (basis: zone FUN_004d0c90 (from sp_PetSystem_PlayerRoutine FUN_004d2d20); client FUN_004bb170)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nPetHandle |  |
-| 2 | u32 | nPetID |  |
-| 6 | u8 | nFirstSummon |  |
+| 0 | u16 | nPetHandle | pet object handle (sp_PetInfo.nHandle) |
+| 2 | u32 | nPetID | pet id; the client looks it up in its pet table (missing → answers 0xD406 0x34C1) |
+| 6 | u8 | nFirstSummon | 1 = state 1ST_SUMMONED (new pet: 'You're my new master!…'), 0 = resummoned unnamed pet ('What name should I answer to?') |
 
 Sent from `FUN_004d0c90` (`FUN_004d0c90`) · payload 7 bytes
 
@@ -10161,11 +10161,11 @@ Sent from `FUN_004d0b60` (`FUN_004d0b60`) · payload 6 bytes
 
 ### `0xd411` NC_PET_USE_ITEM_FAIL_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_PET_USE_ITEM_FAIL_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_004d15a0 (callers 4d2640 4d2990 4d2a40 59b2b0) and ib_OK 0048d0d0 via so_SendErrorCode; client FUN_0049d350)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x3442/43/44/45/5b (CanUseItem), 0x3458 already out, 0x345e summon failed, 0x3481/0x3482 unsummon failed, 0x345c item break refused; client shows the text unless 0x3440/0x3480; 0x345b has no text |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_Send_NC_PET_USE_ITEM_FAIL_ACK` (`FUN_004d15a0`) · payload 2 bytes
 
@@ -12279,6 +12279,18 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 6 | u8 | nPetMind | clamped to gPetData mind min..max |
 | 7 | u8 | nPetStress | clamped to gPetData stress min..max |
 
+### `0xd40d` NC_PET_CREATE_DB_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone ShinePet::spt_CreatePet FUN_0055d290 (length 0x1a incl. opcode))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMasterHandle | player handle |
+| 2 | u32 | nMasterRegNo | master charNo (spt_nMasterRegNum) |
+| 6 | Name4 | sPetName | always empty |
+| 22 | u8 | nPetMind | random in the PupServer row's [MinMind, MaxMind] |
+| 23 | u8 | nPetStress | random in [MinStress, MaxStress] |
+
 ### `0x10d1` NC_CHAR_FREESTAT_SET_DB_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_0058ad10 / FUN_0058b3f0)
@@ -12705,6 +12717,19 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 0 | u16 | killerWmHandle |  |
 | 2 | u32 | killerCharNo |  |
 | 6 | u32 | pkCount |  |
+
+### `0x4033` NC_CHARSAVE_2WLDMAN_PET_LINK_RESUMMON_CMD (Z→WM)
+
+**Verified layout** (basis: zone sp_PetLinkResummonInfo_Save2World FUN_004d1760 (ws_save2worldmanager); PDB2016 struct of the same name)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u8 | bDoResummon | 1 when the pet was out (state 5/6) at so_LinkTo |
+| 5 | u64 | xResummonCode | charNo + 0x1BEC48797BAFC8B0 |
+| 13 | u16 | nSummonSlot | inventory slot of the pet item |
+| 15 | u32 | nId | pet id |
+| 19 | u32 | nRegNum | pet DB key |
 
 ### `0x580e` NC_KQ_Z2W_MAKE_ACK (Z→WM)
 

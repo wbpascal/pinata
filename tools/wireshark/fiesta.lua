@@ -1266,8 +1266,10 @@ F.ANN = {["login"]={["c2s"]={[2052]={["name"]="NC_MISC_HEARTBEAT_REQ",["f"]={}},
 [52227]={["name"]="NC_MOVER_RIDE_ON_FAIL_CMD",["f"]={{0,"u16","nError"}}},
 [52228]={["name"]="NC_MOVER_SOMEONE_RIDE_ON_CMD",["f"]={{0,"u16","nHandle"},{2,"u16","nMoverHandle"},{4,"u8","nSlot"},{5,"u8","nGrade"}}},
 [52231]={["name"]="NC_MOVER_RIDE_OFF_FAIL_CMD",["f"]={{0,"u16","nError"}}},
+[54277]={["name"]="NC_PET_ASK_NEW_NAME_REQ",["f"]={{0,"u16","nPetHandle"},{2,"u32","nPetID"},{6,"u8","nFirstSummon"}}},
 [54280]={["name"]="NC_PET_SET_NAME_ACK",["f"]={{0,"u16","nError"},{2,"u32","nPetID"}}},
-[54282]={["name"]="NC_PET_SET_NAME_CANCEL_ACK",["f"]={{0,"u16","nError"},{2,"u32","nPetID"}}}}}}
+[54282]={["name"]="NC_PET_SET_NAME_CANCEL_ACK",["f"]={{0,"u16","nError"},{2,"u32","nPetID"}}},
+[54289]={["name"]="NC_PET_USE_ITEM_FAIL_ACK",["f"]={{0,"u16","nError"}}}}}}
 F.PDB = {[1025]={{["size"]=68,["var"]=false,["f"]={{0,"u32","nType"},{4,"u32","nCharNo"},{8,"char[12]","sMap"},{20,"u32","nMapX"},{24,"u32","nMapY"},{28,"u32","nMapZ"},{32,"u32","nTargetCharNo"},{36,"u32","nTargetID"},{40,"u64","nItemKey"},{48,"u32","nInt1"},{52,"u32","nInt2"},{56,"u32","nInt3"},{60,"u64","nBigint1"}},
 ["src"]="pdb2017"}},
 [1026]={{["size"]=72,["var"]=false,["f"]={{0,"u32","log_req_num"},{4,"u32","logdata.nType"},{8,"u32","logdata.nCharNo"},{12,"char[12]","logdata.sMap"},{24,"u32","logdata.nMapX"},{28,"u32","logdata.nMapY"},{32,"u32","logdata.nMapZ"},{36,"u32","logdata.nTargetCharNo"},{40,"u32","logdata.nTargetID"},{44,"u64","logdata.nItemKey"},{52,"u32","logdata.nInt1"},{56,"u32","logdata.nInt2"},{60,"u32","logdata.nInt3"},{64,"u64","logdata.nBigint1"}},
