@@ -2,6 +2,8 @@
  "DAT_0074d3d4": "serverindex",
  "DAT_0087c4e8": "AmpersandCommandLog",
  "DAT_0087c770": "ampcmd",
+ "FUN_00401a40": "ShineObject::so_AbnormalState_BitReset",
+ "FUN_00409b10": "AbstateListInObject::asl_Abstate_IsSet",
  "FUN_00419af0": "ListIter_AmpCmdArgument::~ListIter_AmpCmdArgument",
  "FUN_00419b80": "ListIter_AmpCmdArgument::lid_Call",
  "FUN_00419cd0": "ListIter_AmpCmdLevel::ListIter_AmpCmdLevel",
@@ -148,6 +150,7 @@
  "FUN_005117d0": "ShineObjectClass::ShineMiniHouse::so_mh_SetDiceFix",
  "FUN_00511830": "ShineObjectClass::ShineMiniHouse::so_mh_SetDiceProbability",
  "FUN_00555970": "ShineObjectClass::ShineMobileObject::so_mobile_MoveReserve",
+ "FUN_00559880": "ShinePlayer::so_IsEmpty",
  "FUN_0055e150": "ShineObjectClass::ShinePlayer::sp_NoAdmin",
  "FUN_005a79a0": "ZoneRingPacketExpBonus::zrpb_Request",
  "FUN_005a7f30": "ZoneRingPacketSummonPlayer::zrpb_Failure",
@@ -157,6 +160,7 @@
  "FUN_00615830": "CGambleObjectManager::gom_GetGambleObject",
  "FUN_006228f0": "SlotMachine::SlotMachineScreenManager::smsm_Action",
  "FUN_0063dc10": "Raid::SlotChangeMember",
+ "FUN_006453f0": "CParty::MemberJoin",
  "FUN_00694f00": "`dynamic_initializer_for_'AmpersandCommandLog''",
  "FUN_00694f40": "`dynamic_initializer_for_'ampcmd''"
 }
