@@ -36,6 +36,92 @@ certification thread, every 10 s             # answers the challenge over HTTP: 
 So the data stages run **before** any network service exists, and the order of both groups is the order written in
 the script (§4.3).
 
+### 1.1 Process entry: WinMain, zs_start and the Windows service
+
+How the process gets to `zs_ServiceThreadFunction`. It is the same design as the data servers' framework (D05 §7.1:
+same `UPLOAD`/`REMOVE` arguments, same `" \t,\""` token delimiters), but the zone has its own `WinService` class
+*(pdb2016)*, and the differences are listed below.
+
+```pseudo
+WinMain(hInst, hPrev, cmdline, show):                                       @ FUN_0049d910
+    base = module path without its last 4 characters (".exe")
+    # self-update: a staged build replaces the running one
+    if exists(base + ".exe_Reserve") and exists(base + ".pdb_Reserve"):
+        t = local time
+        rename .exe → .exe_Backup_<YYYY-MM-DD-hh-mm-ss>, .pdb → .pdb_Backup_<…>,
+               .exe_Reserve → .exe, .pdb_Reserve → .pdb
+        all four succeed: return 0           # the process ends WITHOUT starting; the next start runs the new build
+        a step fails: undo the renames done so far (in reverse), then continue with the old build
+    f = fopen("Size.txt", "w"); fprintf(f, "%d/%d\n", 235, 99); fclose(f)   # constants; meaning unknown (§10)
+        # relative to the process's working directory, which for an SCM start is not the zone folder (chdir comes later);
+        # fopen result unchecked (original bug) Z10-B24
+    MiniDumper::MiniDumper (crash dump filter, Z09 §30.1); MiniDumper::FuncForStack = StackPrinting
+    return ZoneServer::zs_start(&zoneserver, cmdline)
+
+ZoneServer::zs_start(server, cmdline) → int:                               @ FUN_005ab520
+    chdir(directory of the exe)
+    ShineObject::so_Initstaticvar()                                        @ FUN_00549530
+        # default templates copied into new objects: so_defstopmotion {emoticon 0xFF, frame 0xFFFF};
+        # BriefInformationMob::bim_DefStateBit = 0 (99 bytes); ItemBag::ib_InitStateCell();
+        # so_ChargedEffectContainerClear (premium-effect defaults): every rate 1000 ‰ (HP/SP stone limit, MaxHP/SP/LP rate,
+        #   item drop, exp bonus, item power attack/defence, production cast time / mastery), attack / defend force
+        #   1024/1024, SilverWing cool-down 60 min, all flags 0; so_WeddingData {handles 0xFFFF / 0xFFFFFFFF, partner ""};
+        # so_MiscTableDef.mds_Init(0xFFFF); costume weapon / shield charge item keys = 0xFFFFFFFF:FFFFFFFF
+    "../9Data/ServerInfo/_ServerGroup.txt": fopen + fscanf("%s")          # one word; read and discarded here
+        missing → assert "zs_start : Fail to read ServerGroup.txt"; no word → "… Fail to read ServerGroup"; both ShineExit("ZoneServer::zs_start")
+    ReadServerInfo("ZoneServerInfo/ZoneServerInfo.txt") else ("../9Data/ServerInfo/ZoneServerInfo.txt") else ShineExit
+    GetMyServerInfo(→ zs_serverinfo.myserver) else assert "Fail Serverinfo" + ShineExit
+    GetServerInfo(type 6, myserver.nWorldNo, nZoneNo, type 6) → ConnectSocket_BindIP (16 bytes)
+        else assert "Get BindServerInfo Fail" + ShineExit("ZoneServer::zs_start - BindIP")
+    if !ParseCmd(server, cmdline): return −2
+    GetWorldName(myserver.nWorldNo) → zs_serverinfo.worldname (Name4, from pWorldDataPath)
+        else assert "zs_start : Cannot found WorldName" (no exit) and return 0 without starting
+    WinService::startDispatcher("ZoneServer", OnStart_Service, OnStop_Service)                @ FUN_006535b0
+        # the literal "ZoneServer", not pServiceName: harmless, the SCM ignores the name of an own-process service
+        StartServiceCtrlDispatcherA({name, serviceLoop}); outside the SCM it fails → returns false (ignored)
+    return 0
+
+ZoneServer::ParseCmd(server, cmdline) → bool:                              @ FUN_005aab10
+    args = up to 5 tokens of cmdline (delimiters " \t,\"")
+    no args: queryServiceStatus(myserver.pServiceName) succeeds → "<SERVICE START>": return true
+             else args[0] = "UPLOAD"                                       # not installed: install it
+    "UPLOAD": uploadService(pServiceName, pDisplayName, module path)       @ FUN_00653050
+                  CreateServiceA(SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START, SERVICE_ERROR_IGNORE,
+                                 binary path = the module path unquoted (original bug) Z10-B23)
+              → "<SERVICE UPLOAD ONLY OK>" / "<SERVICE UPLOAD FAILED>"
+    "REMOVE": removeService(pServiceName)                                  @ FUN_00653150
+                  OpenServiceA(DELETE) unchecked; DeleteService; always true (original bug) Z10-B22
+              → "<SERVICE REMOVE OK>" ("<SERVICE REMOVE FAILED>" only when the SCM cannot be opened)
+    other   : "<SERVICE UNKNOWN COMMAND>"
+    every non-start case: debug message + MessageBoxA(text, caption = pDisplayName); return false (zs_start → −2)
+
+WinService::serviceLoop (ServiceMain):                                     @ FUN_00653480
+    onServiceStart():                                                      @ FUN_006533c0
+        event = CreateEventA(auto-reset); RegisterServiceCtrlHandlerA(name, serviceHandler)   # handler FUN_00653390:
+                                                                           #   statusEvent = control; SetEvent
+        SetServiceStatus(START_PENDING, controls STOP | SHUTDOWN, wait hint 1000)
+        OnStart_Service() → zs_ServiceRoutineStart(&zoneserver)            @ FUN_0049dc00 → FUN_005aa770
+            zs_ServiceThread.activ = stop = 0
+            CreateThread(zs_ServiceThreadFunction, server, &zs_ServiceThread.id) else return false
+            wait (Sleep 5) until zs_ServiceThread.activ == 1; true
+        false → skip to onServiceStop (the zone reports STOPPED, unlike the data servers' D05-B10)
+        SetServiceStatus(RUNNING)
+    loop: WaitForSingleObject(event); statusEvent 1 (STOP) or 5 (SHUTDOWN) → leave; other codes ignored
+    onServiceStop():                                                       @ FUN_00653200
+        SetServiceStatus(STOP_PENDING, wait hint 5000)
+        OnStop_Service() → zs_serviceend: zs_mainthread.stop = 1, wait until zs_mainthread.activ == 0   @ FUN_0049dc10 → FUN_005a9930
+        SetServiceStatus(STOPPED)
+        if event == INVALID_HANDLE_VALUE: CloseHandle(INVALID_HANDLE_VALUE)   # inverted test: the real event is never closed
+                                                                             # (original bug) Z10-B25
+```
+
+`zs_ServiceThreadFunction` sets `zs_ServiceThread.activ = 1` as its **first** instruction (FUN_005a9d90 writes the
+u16 `{activ = 1, stop = 0}` at +0x20 and `looping = 0` at +0x2c). So the service reports RUNNING a few milliseconds
+after the thread starts, **before** the start script is fetched and before any table is loaded. A RUNNING zone in the
+service manager says nothing about whether the script, the data stages or the listeners succeeded (§2.6, Z10-B19).
+`zs_serviceend` only stops the main thread; the IOCP workers, the acceptor and the two watchdog threads are ended by
+the process exit after `serviceLoop` returns.
+
 ## 2. Fetching the script
 
 ### 2.1 zs_start_old
@@ -531,7 +617,47 @@ memory** other than through this table.
 `ShineCommonParameter::scp_Load` FUN_004c9be0 (called by `zs_start_house`) reads `../9Data/Shine/World/<world>/ChrCommon.txt`
 (fallback `../9Data/Shine/World/ChrCommon.txt`; neither readable → `ShineExit`), table `Common`, `key` → `argument`.
 2016 file: `RunSpeed 127`, `WalkSpeed 33`, `AttackSpeed 13`, `ShoutLevel 5` ("USA 5, others 0"), `ShoutDelay 2`,
-`LevelLimit 125`, `MaxExpBonus 3000`, the rest-exp/buff times and the free-stat tables (those belong to Z05 / Z03).
+`LevelLimit 125`, `MaxExpBonus 3000`, `RestExpRate 1100`, `MinNeedTime 21600`, `DefaultBonusTime 600`,
+`IntervalTime 3600`, `AddBuffTime 600`, `MaxBuffTime 7200`, `LostExpLevel 21`, `MaxFreeStat 180`. The whole loader
+(the speed keys are only the first two of its outputs; the readers of the other members belong to Z07 / Z12):
+
+```pseudo
+ShineCommonParameter::scp_Load(shineparam, worldName):           @ FUN_004c9be0   # object 0x10fc0 bytes: scp_or (OptionReader) +0,
+                                                                  #   scp_param (ShineParameter, 0x768) +0x10858 = DAT_0da50470
+    or_Read("../9Data/Shine/World/<world>/ChrCommon.txt") else or_Read("../9Data/Shine/World/ChrCommon.txt")
+        else assert "PrimaryParameterTable::ppt_Load : Error in read : ChrCommon.txt" (error line) + ShineExit("ShineCommonParameter::scp_Load")
+    table Common, column `argument` selected by `key` = RunSpeed, WalkSpeed, ShoutLevel, AttackSpeed, ShoutDelay,
+        LevelLimit, MaxExpBonus, RestExpRate, MinNeedTime, DefaultBonusTime, IntervalTime, AddBuffTime, MaxBuffTime,
+        LostExpLevel, MaxFreeStat
+        any key missing → assert "scp_Load : NULL(MaxExpBonus)"; any value not of type 5 → "scp_Load : TYPE(MaxExpBonus)";
+        both + ShineExit (the label always names MaxExpBonus (original bug) Z10-B26)
+    scp_param (+offset):  chrrunspeed +0, chrwalkspeed +4, chrattackspeed +8, shoutlevel +0xC, shoutdelay +0x10 (u32);
+        levellimit +0x14 (u8); maxexpbonus +0x18 = MaxExpBonus / 1000.0 (double: 3.0); RestExpRate +0x20, MinNeedTime +0x24,
+        DefaultBonusTime +0x28, IntervalTime +0x2C, AddBuffTime +0x30, MaxBuffTime +0x34 (u32);
+        LostExpLevel +0x38 (u8, DAT_0da504a8), MaxFreeStat +0x39 (u8, DAT_0da504a9)
+    nextexp[0] = 0                                               # u64[151] at +0x40 = DAT_0da504b0
+    for level 1 … 150:
+        row = table StatTable where level = level             # CommonParameter (0x70): u8 level, char NextExp[50],
+                                                               #   u16 stat[28] (+0x33, one per class column Fig … Sav), u32 ExpLostAtPvP, u8 checksum
+            missing → "scp_Load : Error in commonparam" (level); row.level != row.checksum → "Error CheckSum in commonparam"; ShineExit
+        commonparam[level] = row                               # pointer array [151] at +0x4F8 = DAT_0da50968
+        nextexp[level] = decimal value of row.NextExp          # u64, no digit check: any byte counts as (c − '0')
+        any stat[i] (i < 28) > MaxFreeStat → "Error Over the MaxFreeStat" (i) + ShineExit
+    commonparam[0] = commonparam[1]
+    freestatStr / Int / Dex / Con / Men (+0x754 … +0x764) = malloc((MaxFreeStat + 1) × 4) each
+        any NULL → "scp_Load : Error FreeStat Memory Allocation" + ShineExit
+    for table in FreeStatStrTable, FreeStatIntTable, FreeStatConTable, FreeStatDexTable, FreeStatMenTable (this order):
+        for stat 0 … MaxFreeStat: row = table where Stat = stat
+            missing → "Error NextExp in freestat<Xxx>"; row.Stat != row.CheckSum → "Error CheckSum in freestat<Xxx>"; ShineExit
+            # rows: Str {Stat, WCAbsolute}, Int {Stat, MAAbsolute}, Dex {Stat, THRate, TBRate},
+            #       Con {Stat, ACAbsoulte, BlockRate, MaxHP}, Men {Stat, MRAbsolute, CriRate, MaxSP} (PDB spellings)
+```
+
+So the `g_LevelExp` of Z03 / Z07 (base DAT_0da504a8, "u64 per level") is `nextexp` read as `0x0da504a8 + 8 × lv` =
+`nextexp[lv − 1]` (the NextExp column of row `lv − 1`; the file's values grow to 1 469 080 243 062 at level 150, so they
+are cumulative *(inferred)*: the exp at which `lv` starts). Its "level-0 entry" is `LostExpLevel` (Z03's
+`g_ExpLossMinLevel`, 21), `MaxFreeStat` (Z07's per-stat cap DAT_0da504a9, 180) and six padding bytes. DAT_0da50968 is
+`commonparam[]`, the per-level row whose `stat[class]` Z07 reads as the stat-point total *(pdb2016)*.
 
 ```pseudo
 zs_start_house → scp_Load:   chrrunspeed = 127, chrwalkspeed = 33, chrattackspeed = 13, shoutlevel = 5, shoutdelay = 2
@@ -630,7 +756,7 @@ ZoneServer::zs_certification(server):                      @ FUN_005ab9c0  (thre
                 ok = zs_CertifyRoutine("cert1.fo.gamigo", 80)                 @ FUN_005ab880 (same request and check, one attempt)
             SkipNumber = ok ? 0 : SkipNumber + 1
             Count += 1
-            CertifyArg = 0
+            CertifyArg = 0                                  # no lock with the main thread: a challenge set meanwhile is lost (original bug) Z10-B18
         Sleep(10000)
         if zs_Certify.stop: zs_Certify.activ = 0; return 0  # stop is never set by anything: the thread runs until the process ends
 ```
@@ -692,7 +818,22 @@ no exit. It is unrelated to certification apart from being started by the script
 ```pseudo
 zs_service_iocp:   CIOCP::Start(zs_IOCP, n = 2·dwNumberOfProcessors + 1, wait = 1)      @ FUN_005aa800 → FUN_006505f0
     create the completion port once; Stop(-1) old workers; n worker threads CIOCP::WorkThread (Sleep 50 ms after each);
-    wait until every worker left status 1; m_NumOfWorkThread = n         # worker body: network core, §8 boundary
+    wait until every worker left status 1; m_NumOfWorkThread = n
+    # worker status (WORKER, 0x14 bytes each): 0 none, 1 starting, 2 running, 3 stop requested, 4 ended
+CIOCP::WorkThread(worker):                                                               @ FUN_00650520
+    log "<IOCP WORKTHREAD #%d RUNNING>"; worker.status = 2
+    while worker.status == 2:
+        ok = GetQueuedCompletionStatus(port, &bytes, &key, &ov, 1000 ms)
+        if !ok: unless WAIT_TIMEOUT (0x102) or ERROR_OPERATION_ABORTED (0x3E3):
+                    if ov and ov.owner (+0x18): ov.owner.vt[1](ov)          # I/O error → the socket's error/close path
+        elif ov.type (+0x14) == 3: break                                     # the stop packet
+        else: ov.owner.vt[0](ov, bytes)                                      # completed send/receive → the socket object
+    worker.status = 4; log "<IOCP WORKTHREAD #%d FREE>"
+CIOCP::Stop(iocp, which = −1 | index):                                                   @ FUN_006503f0
+    no workers → return. Repeat over the selected workers: status 2 → 3 + PostQueuedCompletionStatus(stop overlapped);
+    status 4 → CloseHandle(thread), status 0; Sleep 2 between rounds until every status is 0, then free the array
+    # callers: CIOCP::Start (before any worker exists: no-op) and CIOCP::~CIOCP FUN_006506e0 (static destructor at
+    # process exit). The zone never stops its workers while it runs.
 zs_service_multisocket:   no-op                                                          @ FUN_00570b00
 zs_service_acceptor → ZoneServer::zs_Start_Acceptor:                                     @ LAB_005aa7c0 → FUN_005a9c60
     row = ServerInfo entry (myserver.nServerID, nWorldNo, nZoneNo, type 0x14 = client listen)
@@ -993,9 +1134,13 @@ answers `GET /GR.php?act=boot…` on 127.0.0.1:58492 with the GamigoZR body (§4
 76 days (§6.6), an answer to `act=<x>` of the form `[10000][10]<2x³ − 3x² + 5x − 7>` (int32 arithmetic, §6.2 test
 vectors). GamigoZR does not do the latter; restarting the zone at least every 11 weeks has the same effect.
 
+**Process shell** (§1.1): keep or replace the Windows-service wrapper; if kept, report RUNNING only after the data
+stages and the listeners are up (Z10-B19), quote the service path (B23), check `REMOVE` (B22), and drop `Size.txt`
+(B24). The `.exe_Reserve` self-update swap is an operator convenience, not needed by the game.
+
 ## Original-server bugs
 
-(Rows added per part; the sweep part completes the table.)
+Every `(original bug)` tag of this document, in ID order.
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
@@ -1020,3 +1165,53 @@ vectors). GamigoZR does not do the latter; restarting the zone at least every 11
 | Z10-B19 | ZoneServer::zs_ServiceThreadFunction FUN_005a9d90 / WinService::serviceLoop FUN_00653480 | when `tmfpemfjs` fails (returns -3) or did not start the main thread (`Bad`), the service thread just ends; the service status was already set RUNNING by `onServiceStart` | an unusable zone shows as running in the service manager, with no hint beyond Message.txt | report SERVICE_STOPPED with an exit code |
 | Z10-B20 | zs_start_full / zs_start_sleep (LAB_005b6580 / LAB_005b67c0) | the exit labels of most loaders in `full` and `sleep` say `ZoneServer::zs_start_old`; the GBDiceDividind failures in `sleep` say `ZoneServer_zs_start_star` (copied from `star`); `sink`'s quest failures pass `NULL` | the ExitLog names the wrong stage (or none); `Message.txt`'s last label still points at the right loader | the stage's own name, as `moon`, `star` and `sink` (ItemDismantle) do |
 | Z10-B21 | zs_start_sink LAB_005aeff0 | `gQuestData.m_ReadError` is read before `CQuestData::Read` (asm 0x5af07a) and that old value is logged by `Fail to read Quest.shn Error Type` | the log shows the error type from before the load (presumably 0 at start *(inferred)*), not the reason it failed | read `m_ReadError` after the call |
+| Z10-B22 | WinService::removeService FUN_00653150 (`REMOVE` argument) | the `OpenServiceA` result is not checked; `DeleteService(NULL)` fails silently; returns true | `<SERVICE REMOVE OK>` even when the service does not exist or the caller lacks DELETE rights | check both calls and report the error |
+| Z10-B23 | WinService::uploadService FUN_00653050 (`UPLOAD`, or a first start of an uninstalled zone) | registers the module path as `lpBinaryPathName` without quotes | an install folder with spaces gives an unquoted service path: the SCM may run `C:\Program.exe` & co. (privilege escalation on a shared host) or fail to start | quote the path |
+| Z10-B24 | WinMain FUN_0049d910 | writes `Size.txt` (`"235/99"`) before `zs_start` changes to the exe folder, with an unchecked `fopen` | under the SCM the file lands in the service's working directory (normally `System32`); where it cannot be created, `fprintf(NULL)` crashes the zone before it starts | write it after `chdir`, check the handle (or drop it) |
+| Z10-B25 | WinService::onServiceStop FUN_00653200 | closes the service event only when it equals `INVALID_HANDLE_VALUE` (and then closes -1) | the real event handle is never closed (harmless: the process ends right after) | `if event != INVALID_HANDLE_VALUE` |
+| Z10-B26 | ShineCommonParameter::scp_Load FUN_004c9be0 (stage `house`) | the read error says `PrimaryParameterTable::ppt_Load`; every missing key and every wrong type is reported as `NULL(MaxExpBonus)` / `TYPE(MaxExpBonus)` | a broken `ChrCommon.txt` points the operator at the wrong key (or the wrong loader) | name the key that failed |
+
+## 10. Not reconstructed / uncertain
+
+- **Gamigo's own answer.** The script of §4.2 is the private-server replacement (GamigoZR, 2019). Whether Gamigo's
+  `GR.php` sent the same stage order, the same 127 / 33 and the same `Fantasy\Fighter` gate is unknown; no capture of a
+  2016 zone start exists in `re-data/captures/`. The stage order of §7 is checked against the data dependencies (§7.2),
+  so any order Gamigo used must satisfy D1–D12 as well.
+- **Gamigo's run-time answer.** The `[I][M]<2x³−3x²+5x−7>` format (§6.2) is read from the parser only; no sample
+  of a real `act=<x>` answer exists. The 76-day halt with GamigoZR (§6.6) is computed, not observed.
+- **Crash claims** (Z10-B4, B6) follow from the Lua 5.2.1 / CRT source, not from a run.
+- **Request headers** beyond `Host` and `User-Agent: HTTP_CONNECT` are WinINet defaults *(inferred)* (§2.3).
+- **Registry values** `Mountain` / `Ocean` / `Sabana` of `GBO.reg` (§2.5) are not read by the zone; whether another
+  2016 binary read them is not checked (only the zone has the certification strings).
+- **`Size.txt`** (`"235/99"`, §1.1): the meaning of the two constants is unknown; no binary in the repo reads the file.
+- **`.exe_Reserve` self-update** (§1.1): which tool stages the reserve files is unknown (not in the repo); under the
+  SCM the swapping start ends without calling the dispatcher, so that start fails and the next one runs the new build.
+- **`_ServerGroup.txt`** (§1.1): `zs_start` reads one word and drops it; the group used later comes from the
+  `ServerInfo` include (Z01-core §1).
+- **Stage dependencies** (§7.2) list the cross-stage reads that were checked; loader internals were not read line by
+  line, so a further dependency inside a loader is possible (each loader belongs to its own item, Z01-core §2.3).
+- **`EraseLog`** (`zs_start_black`, §7.1): the file-name pattern is assembled from stack bytes the decompiler partly
+  lost; the pattern given there is the reading of the assembly.
+- **Z10-B21**: the value the stale `m_ReadError` holds at start (presumably 0) is not proven.
+
+## 11. Coverage boundary
+
+Everything this item reached but does not describe itself.
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| The loaders called by the 16 stages (`mdb_Load`, `idb_Load`, `sdb_Load`, `fc_Load`, `nm_Load`, quest, gamble, …) | Z01-core §2.3 (table: file → loader → stage) and the item of each subsystem (Z03 skills / abstates, Z04 items, Z06 gamble, Z08 quests, Z09 world) | §7.1 documents each stage's calls, order, failure exits and cross-stage reads; what a loader does with its file is that subsystem's data model |
+| `KQScriptManager::kqsm_Load` FUN_0064cee0 (stage `home`) | Z09 §22.6 (done; documents it) | dialog-string files of the KQ / scenario scripts |
+| `NPCAction::Util::loadTriggers` FUN_005c4420 (stage `sleep`; its assert text says `zs_start_old`) | Z09 §16.1 (done; documents it) | NPCAction trigger dictionary |
+| `AmpCmdInit` FUN_00419f50 (stage `sleep`) and `AmpersandCommand::ac_mobdamage` (the other writer of `lsf_Factor`, §6.3) | Z11 (open; plan: "Find where the `AmpersandCommandElement` list is built"; "Every `AmpersandCommand_ac_*` function appears in the table") | GM command table and its handlers |
+| Events `eventheartping` / `eventmobregen` reserved by `zs_start_open` | Z09 §10.4 (`EventMobRegen`) and §28.4 (heart ping, a no-op) (done; documented) | world timers |
+| `Movie::CinemaComplex::cc_PlayFilm` FUN_005089a0 (stage `open`, per-map scenario film) | Z09 §27.2 (done; documents it) | scenario engine |
+| `ZoneServer::zs_mainthreadfunction` FUN_005aca30 apart from the certification part, `rndbox`, world time from WM `0x0821` | Z09 §1.1, §1.2, §8 (done; documented) | §6.1 documents only the certification lines of the per-minute block |
+| `LuaScriptScenario::lss_FuncExec` FUN_00461a90 / `lss_Routine` FUN_00507200 (the other callers of `ls_FunctionCall`) | Z09 §14.1 (done; documents them) | AI / scenario Lua host, a separate `lua_State` from the start script |
+| Socket completion handlers that `CIOCP::WorkThread` calls (`CSocket_IOCP` Receive / Close / Shutdown, `ZoneBaseSession`, `ClientSessionManager` incl. `csm_AddClientSessionToIPGroup` FUN_0045c720 with its "not certified yet" text, which is about sessions, not this certification) | Z18 (open; plan: "Z09's coverage boundary (§31) assigns 221 zone functions … to Z01", row "Network and sessions") | network core; §6.5 documents the worker loop and the acceptor start |
+| Diagnostics used by the threads: `FunctionCallingAnalyzer` (`fca_stack` / `fca_NetCommand`), `FunctionProfiler`, `AssertClass`, `MiniDumper::MinidumpCallStack` | Z18 (open; Z09 §31 row "Diagnostics and logging", owner Z01) and Z09 §30.1 (the exception filter) | §6.4 documents what the stack checker writes; the ring filling is shared instrumentation |
+| `CServerInfo::ReadServerInfo` / `GetServerInfo` / `GetMyServerInfo` / `GetWorldName` (ServerInfo file parsing) | Z01-core §1 / §2.1 (done; the files and the fields used) and Z18 (open; Z09 §31 "Network and sessions" row lists `CServerInfo`) | configuration parser, shared by all start code |
+| Readers of `scp_param` members other than the speeds and the shout values (`levellimit`, `maxexpbonus`, rest-exp / buff times, `LostExpLevel`, `nextexp`, `commonparam`, `freestat*`) | Z12 (open; plan: "Level/exp: `g_LevelExp` (DAT_0da504a8 …), the stat-point table DAT_0da50968 (loader, file, columns)"), Z07 (done) for the free-stat handlers | §5.4 documents the loader and every member's offset; using them is the stat / exp model |
+| `ParamXxxServer.txt` files loaded next to ChrCommon by `CharClassManager::ccm_Load` FUN_0044a5c0 (stage `house`) | Z12 (open; plan: "class base stats per level from class data `p.vt[0x49c]() + 0x10858`") | per-class parameters, part of the stat model |
+| The 2015 zone (`Files/Server/2015/w00_Zone00`) | out of scope by the plan ("only to see whether the mechanism changed") | §8 records the diff |
+| GamigoZR's other behaviour (service install scripts, logging) | S01 §1.5 (done; documents the service and its install) | §4.1 reads only what the zone receives |
