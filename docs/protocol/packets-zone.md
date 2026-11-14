@@ -6955,11 +6955,11 @@ Sent from `FUN_005ec6a0` (`FUN_005ec6a0`) · payload variable ((byte)
 
 ### `0x5818` NC_KQ_RESTDEADNUM_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_KQ_RESTDEADNUM_CMD`, 1 bytes
+**Verified layout** (basis: zone sp_EscapeFromEmptyKQ FUN_0043fa40; client On_NC_KQ_RESTDEADNUM_CMD FUN_0049af10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | number |  |
+| 0 | u8 | number | lives left = revives − knock-downs; 0 when unlimited |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_EscapeFromEmptyKQ` (`FUN_0043fa40`) · payload 1 bytes
 
@@ -7007,12 +7007,12 @@ Sent from `FUN_005ec1f0` (`FUN_005ec1f0`) · payload variable (iVar8)
 
 ### `0x5822` NC_KQ_MOBKILLNUMBER_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_KQ_MOBKILLNUMBER_CMD`, 4 bytes
+**Verified layout** (basis: zone kqcl_SendMobKill FUN_00499ff0; client FUN_0049bb30)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | CurrentMobKill |  |
-| 2 | u16 | DemandMobKill |  |
+| 0 | u16 | CurrentMobKill | kills of this character in this KQ |
+| 2 | u16 | DemandMobKill | KQInfo.DemandMobKill |
 
 Sent from `KQContribute::KQContributeList::kqcl_SendMobKill` (`FUN_00499ff0`) · payload 4 bytes
 
@@ -7038,11 +7038,11 @@ Sent from `FUN_005e3790` (`FUN_005e3790`) · payload 8 bytes
 
 ### `0x583a` NC_KQ_TEAM_TYPE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_KQ_TEAM_TYPE_CMD`, 1 bytes
+**Verified layout** (basis: zone sp_SendKQTeamType FUN_00561560; client inline in FUN_004be490)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nTeamType |  |
+| 0 | u8 | nTeamType | 0 red, 1 blue, 2 none; sent at every map login |
 
 Sent from `FUN_00561560` (`FUN_00561560`) · payload 1 bytes
 
@@ -11970,6 +11970,48 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 0 | u16 | nPartyNo |  |
 | 2 | u32 | nNewLooterCharNo |  |
 
+### `0x580d` NC_KQ_W2Z_MAKE_REQ (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_KQ_W2Z_MAKE_REQ FUN_00497790; PROTO_KQ_INFO (pdb2016))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle |  |
+| 4 | u8 | Status |  |
+| 5 | u16 | NumOfJoiner |  |
+| 7 | u16 | ID |  |
+| 9 | char[64] | Title |  |
+| 73 | u16 | LimitTime | minutes |
+| 126 | u8 | PlayerRevivalMode | 1/2/3/4, see Z16 §1.2 |
+| 127 | u8 | PlayerRevivalCount |  |
+| 147 | u16 | RewardIndex |  |
+| 149 | u16 | DemandMobKill |  |
+| 192 | PROTO_KQ_MAP_INFO[4] | MapLink | {u8 MapIndex, Name3 MapBase, Name3 MapName, u8 MapClear} 0x1a each |
+| 296 | u8[32] | ScriptLanguage | scenario book / film |
+| 328 | u8[32] | ScriptInitValue |  |
+| 360 | u8 | IsTeamPVP |  |
+| 361 | SHINE_XY_TYPE[2] | TeamRegenXY |  |
+
+0x179 bytes; only the fields the zone reads are listed, full struct PROTO_KQ_INFO in Z16 §1.2
+
+### `0x580f` NC_KQ_W2Z_START_CMD (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_KQ_W2Z_START_CMD FUN_00499240)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | PROTO_KQ_INFO | KQInfo | 0x179 bytes |
+| 377 | u16 | NumOfJoiner |  |
+| 379 | PROTO_NC_KQ_JOINER[] | JoinerArray | {u32 chrregnum, u8 nTeamType} 5 bytes each, ≤ 100 used |
+
+### `0x5811` NC_KQ_W2Z_DESTROY_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_004972c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | hquest |  |
+
 ### `0x5833` NC_KQ_LINK_TO_FORCE_BY_BAN_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_00497120)
@@ -11978,6 +12020,15 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 |---|---|---|---|
 | 0 | u32 | nCharNum |  |
 | 4 | Name3[4] | sMapName |  |
+
+### `0x583b` NC_KQ_PLAYER_DISJOIN_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_00499100)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nHandle | KQ handle |
+| 4 | u32 | nCharNum |  |
 
 ### `0xa409` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ACK (WM→Z)
 
@@ -12573,6 +12624,14 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 |---|---|---|---|
 | 0 | u32 | hquest |  |
 | 4 | u16 | err | 0x981 ok, 0x982 dup, 0x983 full, 0x984+i map i missing, 0x988+i map i busy, 0x98C script |
+
+### `0x5810` NC_KQ_Z2W_END_CMD (Z→WM)
+
+**Verified layout** (basis: zone wms_EndOfKQPacket FUN_005a4800)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle |  |
 
 ### `0x6401` NC_ANNOUNCE_Z2W_CMD (Z→WM)
 

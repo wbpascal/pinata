@@ -1,0 +1,15 @@
+{
+  "_about": "Z16: zone kingdom quest element and guild tournament system. Offsets are payload offsets; layouts read in the 2016 zone code (PDB export), names from the NA2016 zone PDB.",
+  "packets": {
+    "zone": {
+      "0x580d": {"dir":"WM→Z","name":"NC_KQ_W2Z_MAKE_REQ","basis":"zone wms_NC_KQ_W2Z_MAKE_REQ FUN_00497790; PROTO_KQ_INFO (pdb2016)","fields":[[0,"u32","Handle",""],[4,"u8","Status",""],[5,"u16","NumOfJoiner",""],[7,"u16","ID",""],[9,"char[64]","Title",""],[73,"u16","LimitTime","minutes"],[126,"u8","PlayerRevivalMode","1/2/3/4, see Z16 §1.2"],[127,"u8","PlayerRevivalCount",""],[147,"u16","RewardIndex",""],[149,"u16","DemandMobKill",""],[192,"PROTO_KQ_MAP_INFO[4]","MapLink","{u8 MapIndex, Name3 MapBase, Name3 MapName, u8 MapClear} 0x1a each"],[296,"u8[32]","ScriptLanguage","scenario book / film"],[328,"u8[32]","ScriptInitValue",""],[360,"u8","IsTeamPVP",""],[361,"SHINE_XY_TYPE[2]","TeamRegenXY",""]],"notes":"0x179 bytes; only the fields the zone reads are listed, full struct PROTO_KQ_INFO in Z16 §1.2"},
+      "0x580f": {"dir":"WM→Z","name":"NC_KQ_W2Z_START_CMD","basis":"zone wms_NC_KQ_W2Z_START_CMD FUN_00499240","fields":[[0,"PROTO_KQ_INFO","KQInfo","0x179 bytes"],[377,"u16","NumOfJoiner",""],[379,"PROTO_NC_KQ_JOINER[]","JoinerArray","{u32 chrregnum, u8 nTeamType} 5 bytes each, ≤ 100 used"]]},
+      "0x5810": {"dir":"Z→WM","name":"NC_KQ_Z2W_END_CMD","basis":"zone wms_EndOfKQPacket FUN_005a4800","fields":[[0,"u32","Handle",""]]},
+      "0x5811": {"dir":"WM→Z","name":"NC_KQ_W2Z_DESTROY_CMD","basis":"zone FUN_004972c0","fields":[[0,"u32","hquest",""]]},
+      "0x5818": {"dir":"S→C","name":"NC_KQ_RESTDEADNUM_CMD","basis":"zone sp_EscapeFromEmptyKQ FUN_0043fa40; client On_NC_KQ_RESTDEADNUM_CMD FUN_0049af10","fields":[[0,"u8","number","lives left = revives − knock-downs; 0 when unlimited"]]},
+      "0x5822": {"dir":"S→C","name":"NC_KQ_MOBKILLNUMBER_CMD","basis":"zone kqcl_SendMobKill FUN_00499ff0; client FUN_0049bb30","fields":[[0,"u16","CurrentMobKill","kills of this character in this KQ"],[2,"u16","DemandMobKill","KQInfo.DemandMobKill"]]},
+      "0x583a": {"dir":"S→C","name":"NC_KQ_TEAM_TYPE_CMD","basis":"zone sp_SendKQTeamType FUN_00561560; client inline in FUN_004be490","fields":[[0,"u8","nTeamType","0 red, 1 blue, 2 none; sent at every map login"]]},
+      "0x583b": {"dir":"WM→Z","name":"NC_KQ_PLAYER_DISJOIN_CMD","basis":"zone FUN_00499100","fields":[[0,"u32","nHandle","KQ handle"],[4,"u32","nCharNum",""]]}
+    }
+  }
+}
