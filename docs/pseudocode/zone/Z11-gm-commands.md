@@ -290,53 +290,53 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 119 | `&ts_DiceProbability` | ac_TaiSai_DiceProbability `004209f0` | 100 | `[<ddd> <weight>]` | set one outcome weight of that table (no argument: reload all) | 0x2011 on failure | §6.7 |
 | 120 | `&GB_DiceFix` | ac_Gamble_TaiSai_DiceFix `00420bb0` | 100 | `<ddd>` | fix the next throw of the targeted gamble-house TaiSai machine | 0x2011 on failure | §6.7 |
 | 121 | `&GB_DiceProbability` | ac_Gamble_TaiSai_DiceProbability `00420d30` | 100 | `[<ddd> <weight>]` | set one outcome weight of that machine (no argument: reload all) | 0x2011 on failure | §6.7 |
-| 122 | `&makeraid` | ac_makeraid `00420ef0` | 100 | (part 5) | | | |
-| 123 | `&outraid` | ac_outraid `00421040` | 100 | (part 5) | | | |
+| 122 | `&makeraid` | ac_makeraid `00420ef0` | 100 | — | turn the GM's party into a zone-only raid (second member moved to raid party 1); WM not told, members not linked (B26) | 0x2011 | §7.1 |
+| 123 | `&outraid` | ac_outraid `00421040` | 100 | — | remove the GM from its raid in the zone copy; fewer than 2 left: dissolve it (zone only, B27) | 0x2011 | §7.1 |
 | 124 | `&inraid` | ac_inraid `00423330` | 100 | (part 6) | | | |
-| 125 | `&PlayIns` | ac_PlayInstanceDungeon `00421190` | 100 | (part 5) | | | |
+| 125 | `&PlayIns` | ac_PlayInstanceDungeon `00421190` | 100 | — | on an instance map: start the instance script on a free instance keyed {PARTY, GM charNo} (B28) | — | §7.2 |
 | 126 | `&bigbang` | ac_BigBang `004240d0` | 100 | (part 6) | | | |
-| 127 | `&alllearnskill` | ac_AllLearnSKill `004212e0` | 100 | (part 5) | | | |
-| 128 | `&levelup` | ac_LevelUp `00421710` | 100 | (part 5) | | | |
+| 127 | `&alllearnskill` | ac_AllLearnSKill `004212e0` | 100 | — | teach every active / passive skill whose book fits the GM's class and level and that is not known (persistent) | 0x4801 per skill to the Character DB (→ 0x4804) | §7.3 |
+| 128 | `&levelup` | ac_LevelUp `00421710` | 100 | `[<n>]` (1) | n level-ups without EXP and without the level limit (B30); persistent | 0x240C, 0x240D, WM 0x1074 / 0x400E, GameLog 0x041E, DB save, 0x4810 | §7.3 |
 | 129 | `&showallchar` | ac_ShowAllChar `00423480` | 100 | (part 6) | | | |
 | 130 | `&루아인수` | ac_LuaSec `0041e6d0` | 100 | — | show the Lua certification counters | 0x2011 | §5.7 |
-| 131 | `&testlink` | ac_TestLink `004217e0` | 50 | (part 5) | | | |
-| 132 | `&gtieffect` | ac_GuildTournamentItemEffect `004218b0` | 50 | (part 5) | | | |
-| 133 | `&iareset` | ac_ItemActionCoolTimeReset `00421990` | 50 | (part 5) | | | |
+| 131 | `&testlink` | ac_TestLink `004217e0` | 50 | — | run the 0x181F multi-link request for "RouCos02" (needs a clicked link NPC) | 0x1820 or a map link | §7.2 |
+| 132 | `&gtieffect` | ac_GuildTournamentItemEffect `004218b0` | 50 | `[<GTIServer id>]` (0 = random) | apply a guild-tournament item effect to the GM (registered GT player only) | 0x74F0 + effect packets (Z16) | §7.2 |
+| 133 | `&iareset` | ac_ItemActionCoolTimeReset `00421990` | 50 | — | clear every item-action cool-down | 0x482C; 0x2011 | §7.4 |
 | 134 | `&queststart` | ac_QuestStartReq `00419500` | 50 | `[<questId>]` | runs the client handler 0x4414 for that quest (Z08 §3.2) | as 0x4414 | §3.4 |
 | 135 | `&questread` | ac_QuestReadReq `00419540` | 50 | `[<questId>]` | runs the client handler 0x4416 (Z08 §3.2) | as 0x4416 | §3.4 |
 | 136 | `&disposition` | (no-op) `00402370` | 50 | — | nothing: empty function FUN_00402370 | — | §3.6 |
 | 137 | `&idtimechange` | ac_IDTimeChange `00419580` | 50 | `[<min>]` (10) | set the party's instance-dungeon time limit to n minutes | 0x0810 to self; 0x2011 | §3.3 |
-| 138 | `&releasechatban` | ac_ReleaseChatBan `00421a60` | 50 | (part 5) | | | |
+| 138 | `&releasechatban` | ac_ReleaseChatBan `00421a60` | 50 | `<charName>` | ask the WM to lift a chat ban (GM needs CHARDATA admin level 50…100); persistent | WM 0x0866 → DB 0x0868; 0x0867 to the GM | §7.7 |
 | 139 | `&slotmachine` | (no-op) `00402370` | 1 | — | nothing: empty function FUN_00402370 | — | §3.6 |
 | 140 | `&godofslotmachine` | ac_GodOfSlotMachine `00419790` | 100 | `<9 symbols>` | force the next slot-machine screens | — | §3.4 |
 | 141 | `&viewaggrolist` | ac_ViewAggroList `004196f0` | 50 | — | aggro list of the current target (or self) as notices | 0x2011 | §3.4 |
-| 142 | `&ebcu` | ac_EquipBelongedCancelUse `00421b00` | 50 | (part 5) | | | |
+| 142 | `&ebcu` | ac_EquipBelongedCancelUse `00421b00` | 50 | `<boundSlot> <cancelSlot>` | run the unbinding-item request (0x3048) on two inventory slots | as 0x3048 (DB 0x34A6, 0x3049) | §7.4 |
 | 143 | `&luaobserver` | ac_LuaObserver `00419730` | 100 | `[x]` | with an argument: self becomes the Lua observer; without: observer cleared | 0x2011 later (Z09 §14.7) | §3.4 |
 | 144 | `&luafuncexec` | ac_LuaFuncExec `00419760` | 100 | `<func> <arg>` | call a Lua function of the current target's AI script | — | §3.4 |
-| 145 | `&mobitemdrop` | ac_MobItemDrop `00421ba0` | 100 | (part 5) | | | |
-| 146 | `&getmoney` | ac_GetMoney `00421bf0` | 100 | (part 5) | | | |
-| 147 | `&fnpc` | ac_FindNPC `00421cb0` | 100 | (part 5) | | | |
-| 148 | `&RegenNPC` | ac_RegenNPC `00421e50` | 100 | (part 5) | | | |
-| 149 | `&ReleaseNPC` | ac_ReleaseNPC `00421fc0` | 100 | (part 5) | | | |
+| 145 | `&mobitemdrop` | ac_MobItemDrop `00421ba0` | 100 | — | nothing: empty body | — | §7.4 |
+| 146 | `&getmoney` | ac_GetMoney `00421bf0` | 100 | `<n>` | add n Cen (u32; negative adds 2^32 − \|n\|, B31); persistent; the answer repeats the last pick message (B32) | DB 0x3438; 0x1033; 0x300A | §7.4 |
+| 147 | `&fnpc` | ac_FindNPC `00421cb0` | 100 | `<npcIndexName>` | show name, map and position of the first NPC with that MobInfo index in this zone | 0x2011 | §7.5 |
+| 148 | `&RegenNPC` | ac_RegenNPC `00421e50` | 100 | `<npcIndexName> [<x> <y>]` | spawn a dynamic copy of a table NPC of the GM's map at (x, y) or the GM's spot | 0x2011 on failure; NPC appears in sight | §7.5 |
+| 149 | `&ReleaseNPC` | ac_ReleaseNPC `00421fc0` | 100 | — | take the targeted NPC off the map | 0x2011 on failure; disappear in sight | §7.5 |
 | 150 | `&gmtestmode` | ac_GMTestMode `00425020` | 100 | (part 6) | | | |
 | 151 | `&arrangeiv` | ac_ArrangeInven `004197e0` | 100 | — | start an inventory auto-arrange (Z04 §12.5) | inventory packets (Z04) | §3.4 |
-| 152 | `&cmt` | ac_CameraMoveTest `004220c0` | 100 | (part 5) | | | |
+| 152 | `&cmt` | ac_CameraMoveTest `004220c0` | 100 | `<0\|1> [<aXZ> <aY> <dist> [<x> <y>]]` | set the map's camera state and send a camera move to the whole map (B34) | 0x6C14 to the map; 0x2011 | §7.6 |
 | 153 | `&reloadid` | ac_IndunReload `00419810` | 100 | `<map>` | drop all running films of the instance map and reload its script | — | §3.3 |
 | 154 | `&vie` | ac_ViewSlot_Equip `00419890` | 100 | `<itemIndex>` | preview an item in a view slot (Z09 §17.8) | equipment change to sight | §3.4 |
 | 155 | `&viue` | ac_ViewSlot_UnEquip `004198e0` | 100 | `<slot>` | clear one view slot | equipment change to sight | §3.4 |
 | 156 | `&viuea` | ac_ViewSlot_UnEquipAll `00419910` | 100 | — | clear all view slots (Z09 §17.8) | equipment change to sight | §3.4 |
-| 157 | `&setlp` | ac_Setlp `00422330` | 100 | (part 5) | | | |
+| 157 | `&setlp` | ac_Setlp `00422330` | 100 | `<n>` | set the GM's current LP (memory, no packet) | — | §7.6 |
 | 158 | `&movelayer` | ac_MoveNewLayer `00419930` | 100 | `<layerType> <numberType>` | move self to a new layer (base/tutorial × base/charNo) | sight (Z06 §1) | §3.1 |
 | 159 | `&moveotherlayer` | ac_MoveOtherLayer `00419970` | 100 | `<charNo>` | move self to that player's layer | sight | §3.1 |
-| 160 | `&godmode` | ac_GodMode `00422350` | 100 | (part 5) | | | |
+| 160 | `&godmode` | ac_GodMode `00422350` | 100 | — | fixed damage 1 000 000, no cool-downs, speed 10 000, immortal, +10 000 000 max HP / SP (memory) | 0x2011 ×6 | §7.6 |
 | 161 | `&fieldmobcount` | ac_FieldMobCount `00425290` | 100 | (part 6) | | | |
 | 162 | `&reloadpetlua` | ac_PetSystemTest_LuaReload `00424740` | 100 | (part 6) | | | |
-| 163 | `&getpetinfo` | ac_PetSystemTest_GetTendency `00422480` | 100 | (part 5) | | | |
-| 164 | `&setpetinfo` | ac_PetSystemTest_SetTendency `00422590` | 100 | (part 5) | | | |
-| 165 | `&vanishdropitem` | ac_VanishDropItem `00422800` | 100 | (part 5) | | | |
-| 166 | `&walkto` | ac_WalkTo `004228c0` | 100 | (part 5) | | | |
-| 167 | `&castteleport` | ac_CastTeleport `004229b0` | 100 | (part 5) | | | |
-| 168 | `&setobjectdirect` | ac_SetObjectDirect `00422a90` | 100 | (part 5) | | | |
+| 163 | `&getpetinfo` | ac_PetSystemTest_GetTendency `00422480` | 100 | — | show the targeted pet's number, mind and stress | 0x2011 | §7.7 |
+| 164 | `&setpetinfo` | ac_PetSystemTest_SetTendency `00422590` | 100 | `<mind> <stress>` | set the targeted pet's mind / stress (owner's PetInfo + DB; persistent) | DB 0xD401; 0x2011 | §7.7 |
+| 165 | `&vanishdropitem` | ac_VanishDropItem `00422800` | 100 | — | remove every dropped item of the GM's map | 0x2011; disappear in sight | §7.4 |
+| 166 | `&walkto` | ac_WalkTo `004228c0` | 100 | `<x> <y>` | server-side walk of the GM to (x, y) at speed 1000 | — | §7.6 |
+| 167 | `&castteleport` | ac_CastTeleport `004229b0` | 100 | `<x> <y>` | jump to (x, y) on the same map | sight / move-fail packets (Z09 §9.3) | §7.6 |
+| 168 | `&setobjectdirect` | ac_SetObjectDirect `00422a90` | 100 | `<dir> [<x>]` | set the GM's direction and broadcast it; one argument: not to the GM itself (B33) | 0xBC1C to sight | §7.6 |
 | 169 | `&pvp` | ac_SetPVP `00420230` | 100 | `<1\|0>` | set the map's free-PvP flag and tell every player on/off | 0x1812 / 0x1813; 0x2011 usage | §6.5 |
 
 ## 3. Commands, part 1 (handlers FUN_004194f0 … FUN_0041b030)
@@ -947,7 +947,7 @@ A zone change or a death therefore ends every mode below.
     ShinePlayer::sp_Immortal(gm)   (every tick)                        @ FUN_0055e390
         CurHP = so_MaxHP (vt 0x4f0); CurSP = so_MaxSP (vt 0x4f4); so_ply_Sen_GainLP(so_ply_Sen_MaxLP) (vt 0xd98/0xd94)
         # a direct write: no HP/SP packet in this function; the client sees the refill with the next HP/SP change (Z03)
-    # &godmode (part 5) sets sp_Immortal too; &deathaura replaces the immortal function (the flag stays set)
+    # &godmode (§7.6) sets sp_Immortal too; &deathaura replaces the immortal function (the flag stays set)
 
 &staticdamage [n]   ac_staticdamage                                    @ FUN_0041dfd0
     gm.smo_admindamage (+0x1e7c, pdb2016) = (args[0] given and ac_Scanf(args[0]) ≥ 0) ? that value : 0
@@ -1070,7 +1070,7 @@ the players. The ring path sends the rate as u16, the local path keeps the int, 
     t.so_ply_KeepFromChat(gm)   (vt 0x8f0)                             @ FUN_00549f60
         gm notice "Success to silence"; nothing else
     # (original bug) Z11-B17: no chat ban is set; the working chat ban is the WM one, 0x0865 NC_MISC_SPAMMER_ZONE_CHAT_BAN_CMD (Z01 §9), and
-    # &releasechatban (part 5)
+    # &releasechatban (§7.7)
 
 &chargeditem <effectHandle>   ac_ChargedItem                           @ FUN_0041d2f0
     ShinePlayer::sp_ChargedItemTest(gm, ac_Scanf(args[0]))              @ FUN_00451360
@@ -1529,6 +1529,372 @@ All four change memory only: the weights stay until the next reset or zone resta
 The roll that reads `bIsAdminDice`, `nDiceRate` and `nDiceRateSum` is Z06 §3.4 / §4.4. A weight of 0 removes an outcome;
 the probability of outcome i is `nDiceRate[i] / nDiceRateSum`. Nothing tells the players that the dice are fixed.
 
+## 7. Commands, part 5 (handlers FUN_00420ef0 … FUN_00422a90)
+
+### 7.1 Raid tests: `&makeraid`, `&outraid`
+
+Both work on the zone's own copy of the parties and raids (`RaidSystem` over the zone party table `partycontainer`,
+Z08 §1–§2). Real raids are made by the WM, which sends 0xB004 NC_RAID_ZONE_MAKE_CMD (Z08 §2); neither word tells the
+WM or any client. Notice texts are Korean (CP949), translated here.
+
+```pseudo
+&makeraid   ac_makeraid                                                @ FUN_00420ef0
+    partyNo = gm.so_PartyRegistNumber() (vt 0x550)
+    raid = RaidTask::rt_CreateRaid(partyNo, parties = NULL)            @ FUN_005cde10 (Z08 §2)
+        # NULL parties → RaidSystem::CreateRaidAndParty(&raid, partyNo, &err)   @ FUN_0063d760
+        #   no party table: err 0x1EC1; partyNo 0xFFFF (GM not in a party): err 0x1E84 → NULL
+        #   raidNo = index of the first free slot of the 500 m_RaidSlot (m_Raidnum == 0xFFFF); none free → NULL
+        #   three empty parties for raid positions 1…3: CParty::CreateRaidParty FUN_006451d0 (first empty party
+        #     slot < 4000, NumOfMember 0, isRaidTypeParty = true); one fails → delete the ones made, err 0x1E85, NULL
+        #   Raid::InitRaid(slot, raidNo, {partyNo, p1, p2, p3})        @ FUN_0063d240
+        #     m_Leader = looter = member 0 of the GM's party, m_NumOfMember = its size, the four parties isRaidTypeParty
+        # this branch never calls so_SetRaid (vt 0xa88) on the members (the WM branch does, Z08 §2) (original bug) Z11-B26
+    raid == NULL: wall "레이드 생성 실패" ("Raid creation failed"); return
+    wall "레이드 전환 성공" ("Raid conversion succeeded")
+    it = Raid::Begin(raid); ++it                                        # position {party 0, slot 1} (Raid::iterator::operator++ FUN_0063d080)
+    Raid::SlotChangeMember(raid, charNo at it, party index 1, slot 0, &err)   @ FUN_0063dc10
+        # the second member of the GM's party leaves it (CParty::MemberLeave) and joins raid party 1 (CParty::MemberJoin);
+        # errors (result not checked): no member there (charNo −1) 0x1F48, target party missing 0x1F4A, slot < its
+        # member count 0x1F4B, iterator without a member 0x1F41, join failed 0x1F46
+    MapClusterManager::ClusterManager::cm_ChangeCategory(partyNo, CATEGORY_PARTY → raidNo, CATEGORY_RAID)   @ FUN_00485210
+        # the party's instance dungeons now belong to the raid (as for 0xB004, Z08 §5.1)
+```
+
+The result is a raid that only this zone knows: the members' raid pointers stay NULL, so nothing that asks
+`so_GetRaid` (raid loot, raid packets, `&outraid`) sees it, while the second member has left the GM's party in the
+zone's table only. The WM keeps the old party; its next party or raid packet for these members refers to slots the
+zone has changed, and the zone raid number (first free slot) can be one the WM later sends in 0xB004, which then fails
+("Not Make Raid", Z08 §2) (original bug) Z11-B26.
+
+```pseudo
+&outraid   ac_outraid                                                  @ FUN_00421040
+    raid = gm.so_GetRaid() (vt 0xa84; only set by the WM raid packets, Z08 §2); none: nothing
+    if Raid::DeleteMember(raid, gm.charNo, &err)                       @ FUN_0063de00
+            # the GM leaves its raid party in the zone table (CParty::MemberLeave); refused with 0x1F48 when the
+            # charNo is not in the raid, 0x1E86 when the party is missing
+        gm.so_SetRaid(NULL) (vt 0xa88); wall "레이트 탈퇴 성공" ("Raid leave succeeded"; 레이트 is a typo of 레이드)
+    if raid.m_NumOfMember < 2:                                          # checked also when the delete failed
+        for every raid member online in this zone (RaidTask::rt_GetRaidPlayer FUN_005ce6f0 → _GetRaidPlayer FUN_005ce000):
+            p.so_SetRaid(NULL); p.so_SetParty(0xFFFF) (vt 0x574)
+        Raid::Reset(raid, &err)                                         @ FUN_0063d970
+            # every member leaves its party, the four parties are deleted (CParty::PartyDelete), the record is
+            # cleared (raidNo, leader, sub-leaders −1, looting reset)
+        wall "레이드 해체" ("Raid disbanded")
+```
+
+Only the zone's copy changes: the WM still lists the GM in the raid and keeps sending its raid packets (member lists,
+moves) for a member the zone has removed; the GM's client still shows the raid (original bug) Z11-B27. The real way out
+is the client's raid-leave request through the WM (W02).
+
+### 7.2 Instance, link and tournament tests: `&PlayIns`, `&testlink`, `&gtieffect`
+
+```pseudo
+&PlayIns   ac_PlayInstanceDungeon                                      @ FUN_00421190
+    name = gm.so_Field.fm_FieldOption → map name (the map's FieldOption row; for an instance its base map)
+    info = fieldlist.fc_GetInstanceDungeonInfoByMapName(name, ILT_NORMAL); none (not an instance map): nothing
+    inst = mapclustermanager.cm_FindEmptyByRegnum(name, regnum = gm.charNo, CATEGORY_PARTY, ILT_NORMAL)   @ FUN_00486290 (Z08 §5.1)
+        # the key is the GM's character number under the PARTY category (original bug) Z11-B28
+    inst ≠ NULL: Movie::CinemaComplex::cc_PlayFilm(inst.fm_Multiflex, info.ScriptName, empty token, inst.fm_MapID)
+        # FUN_005089a0 (Z09 §27.2): start the instance's script on that free instance
+    no message in any case; the GM is not moved to the instance
+```
+
+Unlike the gate's entry (0xA410, Z08 §5), the instance is not cleared (`fm_ClearObject`) and no mode row is set; the
+film runs on an instance nobody is in until a player enters a dungeon with the same key.
+
+```pseudo
+&testlink   ac_TestLink                                                @ FUN_004217e0
+    gpp = { opcode 0x7C06, char map[12] = "RouCos02" }                 # 0x7C06 is NC_PRISON_GET_REQ (original bug) Z11-B29
+    ShinePlayer::sp_NC_MAP_MULTY_LINK_SELECT_REQ(gm, gpp, len 0x27, 0xFFFF)   @ FUN_0055b430 (Z01 §7.3)
+        # the 0x181F handler: needs the last NPC the GM clicked to be near and to have a link entry to "RouCos02";
+        # otherwise it answers 0x1820 NC_MAP_MULTY_LINK_SELECT_ACK with 0x2029 / 0x202B / 0x202C / 0x202D
+        # (no client text, Z01-B4); with such an NPC the GM is linked to RouCos02 (smfm_Link, 0x2028)
+```
+
+The handler reads only the payload, so the wrong opcode in the buffer has no effect; the word is a fixed test of the
+multi-link NPC menu.
+
+```pseudo
+&gtieffect [<GTIServer id>]   ac_GuildTournamentItemEffect             @ FUN_004218b0
+    gts = gm.so_Field.fm_GetGuildTournamentSystem(); none (not a tournament map): nothing
+    GuildTournamentSystem::CreateItemEffect(gts, from = NULL, gm, atoi(args[0]))   @ FUN_0047c1e0 (Z16)
+        # only for a GM registered in the running tournament (IsPlayerRegister) whose guild is group A or B;
+        # id 0 = roll one by the group's advantage (GTIGetRateTable::GetItemIDbyProbabilityCalculate);
+        # GM ← 0x74F0 NC_GUILD_TOURNAMENT_ITEM_PICK_CMD { u16 id } (client: "Used %s"); then the GTIServer row's
+        # action (flag multiplier, abstate, skill, mob breed …) on its targets
+```
+
+The GM gets the effect of a tournament item box as if it had picked one up. The box effects are Z16's.
+
+### 7.3 Skills and level: `&alllearnskill`, `&levelup`
+
+```pseudo
+&alllearnskill   ac_AllLearnSKill                                      @ FUN_004212e0
+    for each row s of skilldatabox (ActiveSkill):
+        skip unless CharClassDataBox::ccdb_CheckClass(s.UseClass, gm class (so_CharacterClass vt 0x49c → vt 0x38))
+        book = itemdatabox[s.InxName]                                  # the skill book has the skill's index name
+        skip unless the book exists (its ItemInfo.ID must equal its index, else assert "ItemDataBox::operator [] :
+            Invalid Item index") and book.DemandLv ≤ gm level (vt 0x4d8)
+        skip if CharaterSkillList::csl_IsLearn(gm.sp_SkillList, s.ID)
+        Character DB ← 0x4801 NC_SKILL_SKILLTEACH_REQ { u16 handle, u32 charNo, u32 chrregnum = charNo,
+                                                       u16 skillid = s.ID, u8 ispassive = 0, u16 removeid = 0xFFFF }   (0x11 bytes)
+    for each row s of passivedatabox (PassiveSkill):
+        book = itemdatabox[s.InxName] as above (exists, DemandLv ≤ level)
+        skip unless ccdb_CheckClass(book.UseClass, gm class)           # the passive's class comes from its book
+        skip if bit s.ID of gm.sp_Passive.cpl_Passive is set (already known)
+        Character DB ← 0x4801 { …, skillid = s.ID, ispassive = 1, removeid = 0xFFFF }
+    # assert text on a failed length: "sp_NC_SKILL_PRODUCTFIELD_REQ Learn Skill  : Packet Too Long" (copied, never hit)
+```
+
+One 0x4801 per missing skill row, each answered by the DB as for `&learnskill` (§4.4, D04 §2, Z03 §9.3): every row is
+stored in `tSkill` (persistent) and the zone adds it, sends 0x4804 NC_SKILL_SKILL_LEARNSUC_CMD (and for passives
+0x4820 to the WM). Each skill level is its own ActiveSkill row with its own book, so every level whose book the GM's
+level allows is taught *(inferred from the per-row loop)*. Skills without a book item in ItemInfo are never taught.
+Unlike `&learnskill` the class and level are checked; the already-known test is done here, not by the DB, so a second
+`&alllearnskill` while the first answers are still pending sends the same rows again (duplicates fail in the DB:
+0x4803 → "Failed to learn the skill.").
+
+```pseudo
+&levelup [<n>]   ac_LevelUp                                            @ FUN_00421710
+    n = (argnum == 2) ? atoi(args[0]) : 1
+    repeat n times (n ≤ 0: never): gm.so_AmpersandCommand_LevelUp()   (vt 0xa9c)
+
+ShinePlayer::so_AmpersandCommand_LevelUp(p)                            @ FUN_0042fa00
+    p.level (sp_CharData.basedata.Level, u8) += 1                       # no level-limit test (original bug) Z11-B30
+    p.so_allparametercalculate() (vt 0x57c); sp_HPChangeCheck(MaxHP); CurHP = so_MaxHP; CurSP = so_MaxSP   # full heal
+    CCharacterTitleZone::CT_LevelUp(p.sp_CharacterTitle, level)        # level titles
+    CAnnounceSystem::AnnounceSystem_LevelMax(gAnnounceSystem, charid, level)   # max-level announcement
+    quest diary level hook (sp_QuestDiary vt +4, level)
+    p ← 0x240C NC_BAT_LEVELUP_CMD { u8 level, u16 mobhandle = 0, CHAR_PARAMETER_DATA (so_fill_CHAR_PARAMETER_DATA vt 0x668) }   (0xED bytes)
+    sight (so_AllOfRange, not p) ← 0x240D NC_BAT_SUMEONELEVELUP_CMD { u16 handle = p, u16 mobhandle = 0 }
+    WholeSaver::ws_savelevel2worldmamager(p)                           # FUN_00453580 → WM 0x400E (Z01 §8)
+    WM ← 0x1074 NC_CHAR_LEVEL_CHANGED_CMD { u16 wmHandle (vt 0x340), u32 charNo, u8 level }   (W01 §7.5)
+    GameLog ← 0x041E NC_LOG_GAME_LEVEL_UP { u32 charNo, map[12], u32 x, u32 y, u8 level, u64 exp }
+    WholeSaver::ws_save2DB(p, 1, 8)                                     # character save to the DB
+    academy member with an academy (vt 0x858 / 0x85c):
+        Character DB ← 0x986B NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_REQ { u16 handle, u32 charNo, u32 charNo, u32 academyNo, u8 level }
+    free = so_ply_TotalSkillEmpower (vt 0x6b8) − csl_EmpowerSummary(p.sp_SkillList)
+    free > 0: p ← 0x4810 NC_SKILL_EMPOWPOINT_CMD { u8 restempow = free }
+    sp_StatRemainSend(p) (stat points); vt 0x20(level); so_ply_SaveFame (vt 0x450); so_ply_ChangeFame (vt 0x44c)
+    p.sp_NextSaveExp = sp_NextSaveExperience(p); brief info Level = level; vt 0xb18 (so_Gamble_ChangeExchangedCoin, PDB name of the slot)
+```
+
+This is the level-up block of `sp_GainExp` (Z03 §8.3, the same packets in the same order) with three differences: the
+experience is not touched (it stays below the new level's threshold, so the next kill's EXP counts towards the level
+after; the EXP bar the client draws starts from the old value *(inferred)*); the `levellimit` test of `sp_GainExp` is
+missing; and `GMEventManager::GMEM_CheckAllConditionAndApply` (the GM-event check at the end of the normal level-up) is
+not called. Everything is persistent: the level reaches the WM (0x1074, 0x400E) and the character save.
+
+`&levelup 300` raises the level past `shineparam.scp_param.levellimit`; the u8 wraps to 0 after 255, and every later
+`sp_GainExp` indexes the per-level EXP table (`scp_param.nextexp[level]`) beyond the limit *(effect inferred)* (original
+bug) Z11-B30.
+
+### 7.4 Items and money: `&getmoney`, `&iareset`, `&ebcu`, `&vanishdropitem`, `&mobitemdrop`
+
+```pseudo
+&getmoney <n>   ac_GetMoney                                            @ FUN_00421bf0
+    argnum < 2 or atoi(args[0]) == 0: nothing
+    gm.so_ply_PickupMoney((u32) atoi(args[0]))   (vt 0x790)            @ FUN_0052fe80
+
+ShinePlayer::so_ply_PickupMoney(p, cen)                                # also the money branch of a normal pick-up (Z04 §3.3)
+    p.Cen (sp_CharData.basedata.Cen, u64) += cen                        # cen is a u32: a negative n adds 2^32 − |n| (original bug) Z11-B31
+    Character DB ← 0x3438 NC_ITEMDB_PICKMONEY_REQ { u16 handle, u32 charNo, u32 owner = charNo,
+                                                    u64 itemonfield = 0xFFFFFFFF_FFFFFFFF, u32 cen }   (0x18 bytes)
+    p ← 0x1033 NC_CHAR_CENCHANGE_CMD { u64 cen = p.Cen }  (so_ply_ChangeCen vt 0x448, Z05 §1)
+    p.inventory lock list.SetDBPending(1)  (InventoryCellLockList vt 0x14, Z05 §1.2)   # inventory requests wait for the answer
+```
+
+The DB side (D03 §3.5): `p_Char_MoneyAdd(owner, cen)` adds the amount to `tCharacter` (persistent) and logs GameLog
+0x0446 ("Need Cen", lot = (u16) cen); answer 0x3439 NC_ITEMDB_PICKMONEYSUC_ACK, or 0x343A … FAIL_ACK on error.
+The zone treats the answers as the end of a pick-up (Z05 §3.2): success clears the DB-pending flag and calls
+`so_ply_itempickresult`, which sends the GM 0x300A NC_ITEM_PICK_ACK with the item id and lot of the **last item the
+GM picked up** (`p+0x29278` / `p+0x2927c`, not written here), so the client prints "[%s] has been obtained." for an
+old item (or for item id 0 when nothing was picked since login *(inferred)*) (original bug) Z11-B32. Failure
+disconnects the GM (reason 0x684) after the money was already added in memory.
+
+`&getmoney` cannot take money away: the u32 is added with carry into the u64, so `&getmoney -1` adds 4 294 967 295
+Cen (B31). There is no upper bound and no check of a money limit.
+
+```pseudo
+&iareset   ac_ItemActionCoolTimeReset                                  @ FUN_00421990
+    m = gm.so_GetItemActionObserves() (vt 0x5d0); none: nothing
+    ItemActionObserveManager::ResetCoolTime(m)                          @ FUN_005d1a00
+        gm ← 0x482C NC_SKILL_ITEMACTIONCOOLTIME_CMD { u16 num, group[num] { u16 ItemActionID, u16 ItemActionGroupID,
+                                                     u32 SecondCoolTime = 0 } }   (num·8 + 4 bytes; data socket vt 0x2f8)
+            # one entry per element of iaom_CoolTimeList (0x1C-byte elements: ItemActionGroupID at +0x10, ItemActionID at +0x14)
+        iaom_CoolTimeList cleared (vector end = begin)
+        # assert text on a failed length: "GuildTourmentSystem::PlayerRegiste : Packet Too Long" (copied)
+    wall "Item Action CoolTime Reset"
+```
+
+Client `On_NC_SKILL_ITEMACTIONCOOLTIME_CMD` FUN_0049c600: `Skill::SetLastCoolTimeByItemActionID(id, SecondCoolTime /
+1000)` per entry, i.e. every item-action cool-down display ends. The list is memory only here; the next character save
+writes the empty list (0x4023 NC_CHARSAVE_ITEMACTIONCOOLTIME_REQ, Z17) *(inferred)*. The item-action cool-downs
+themselves are Z17's.
+
+```pseudo
+&ebcu <boundSlot> <cancelSlot>   ac_EquipBelongedCancelUse             @ FUN_00421b00
+    pkt = { opcode 0x3048, u8 nCancelItemInvenSlot = ac_Scanf(args[1]), u8 nBelongedItemInvenSlot = ac_Scanf(args[0]) }
+    ShinePlayer::sp_NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ(gm, pkt, len 4, handle)   @ FUN_0051b9a0 (Z04 §12.6)
+```
+
+Runs the client request "use an unbinding item on a bound item" with all its checks (the cancel item is consumed,
+DB 0x34A6, answer 0x3049 "Succesfully Unbound %s"); the word only saves the client UI. Persistent through the normal path.
+
+```pseudo
+&vanishdropitem   ac_VanishDropItem                                    @ FUN_00422800
+    gm has no field: nothing
+    so_AllInMap(gm, AxialListVanishDropItem, 0)                         # ctor FUN_004289f0, alvdi_VanishCount = 0
+        AxialListVanishDropItem::ali_Work(o)                            @ FUN_00428a00
+            o.so_ObjectType() == 1 (dropped item): alvdi_VanishCount += 1; o.so_RetrateFromMap() (vt 0x3f4)
+            return 1 (walk every object)
+    wall "vanish itme count - %d " (alvdi_VanishCount; read through the folded getter FUN_0045ff90)
+```
+
+Every item lying on the GM's map is removed (by its next routine, Z09 §25.1); kind 1 = dropped item is confirmed by
+this walker. Nothing is saved: drops are memory objects.
+
+`&mobitemdrop` (ac_MobItemDrop FUN_00421ba0) has an empty body: the word does nothing.
+
+### 7.5 NPC tools: `&fnpc`, `&RegenNPC`, `&ReleaseNPC`
+
+```pseudo
+&fnpc <npcIndexName>   ac_FindNPC                                      @ FUN_00421cb0
+    id = mobdatabox index of args[0] (MobInfo InxName); unknown / no row: wall "Invalid NPC IndexName"
+    npc = ShineObjectManager::som_FindNPC(shineobjmanager, id)          # first NPC of that MobInfo id in this zone
+    none: "Not Find NPC";  no field: "NPC Field Data Error";  no location: "NPC Coord Data Error"
+    else wall "%s, %s, %d, %d" = MobInfo.Name (+0x22), npc map name, x, y
+    # information only: the GM is not moved
+
+&RegenNPC <npcIndexName> [<x> <y>]   ac_RegenNPC                       @ FUN_00421e50
+    gm has no field: nothing;  args[0] not a MobInfo index: wall "Invalid NPC IndexName"
+    x = atoi(args[1]), y = atoi(args[2]); a value < 1 → the GM's own x / y
+    NPCManager::nm_DynamicRegenerateNPC(npcmanager, from = gm field, name = args[0] (32 bytes), map = gm field,
+                                        x, y, dir = gm direction × 2)   @ FUN_004c6cd0 (Z09 §5.9)
+        # needs a static NPC row (NPC.txt) with that MobName on the GM's map; spawns a dynamic copy with that
+        # row's role at (x, y); every failure is only logged by the callee
+    false: wall "NPC Regen Fail"
+
+&ReleaseNPC   ac_ReleaseNPC                                            @ FUN_00421fc0
+    t = gm.so_CurrentTargetObject() (vt 0x75c); none: wall "Invaild Target Object"
+    t.so_ObjectType() ≠ 4 (NPC): wall "Not NPC"
+    else t.so_RetrateFromMap() (vt 0x3f4, ShineMobileObject::so_RetrateFromMap FUN_00495d20: smo_Flag.Retrate)
+        # the NPC's next routine removes it from the map (Z09 §25.1); no message
+```
+
+`&RegenNPC` direction: the GM's direction byte is in 2° units (Z09 §9), so ×2 gives degrees as in the NPC table
+*(inferred)*. `&ReleaseNPC` also takes table NPCs off the map; they come back only with a zone restart or `&RegenNPC`
+(as a dynamic copy) *(inferred from Z09 §5.9: static entries are never released or re-spawned)*. Both are memory only.
+
+### 7.6 Character and movement: `&godmode`, `&setlp`, `&walkto`, `&castteleport`, `&setobjectdirect`, `&cmt`
+
+```pseudo
+&godmode   ac_GodMode                                                  @ FUN_00422350
+    gm.smo_admindamage (+0x1e7c) = 1000000;      wall "StaticDamage 1mil true"     # as &staticdamage 1000000 (§5.3)
+    ShinePlayer::sp_SetIgnoreCoolTime(gm, 1)  (FUN_00560220: sp_isIgnoreSkillCoolTime = 1)
+                                                 wall "IgnoreSkillCoolTime true"   # as &ignoreskillcooltime (part 6)
+    ShinePlayer::sp_SetTotalMoveSpeed(gm, 10000); wall "EditSpeed 10x true"        # as &speed 10000 (§6.4)
+    sp_MiscFlag.InAdminImmortal = 1; sp_AdminFunction = sp_Immortal;  wall "Immortal Mode true"   # as &immortal (§5.3)
+    gm.so_parameter().Item.Plus.MaxHP (Parameter::Container +0x158) = 10000000; sp_MaxHP(gm)
+        so_recoverhp(10000000) (vt 0x5b4); so_mobile_NotifyParameterChange(1) (vt 0x34)   wall "MaxHP Plus 10mil true"
+    …Item.Plus.MaxSP (+0x160) = 10000000; sp_MaxSP(gm); so_recoversp(10000000) (vt 0x5b8); vt 0x34(1)
+                                                 wall "MaxSP Plus 10mil true"
+    CurHP = so_MaxHP; CurSP = so_MaxSP
+```
+
+All memory only. The +10 000 000 HP / SP sit in the equipment bonus cluster (`Item.Plus`), which the next equipment
+change recomputes, so they last until the GM changes gear *(inferred: the Item cluster is rebuilt from the equipped
+items)*; damage, speed and immortality last until map login, reconnect or revive (§5.3). `&immortal` afterwards
+toggles immortality off, `&staticdamage 0` the fixed damage; nothing undoes the cool-down flag except
+`&ignoreskillcooltime` (part 6).
+
+```pseudo
+&setlp <n>   ac_Setlp                                                  @ FUN_00422330
+    gm.sp_Sen_LP.nCurLP = ac_Scanf(args[0])                             # no MaxLP test, no packet; memory only
+
+&walkto <x> <y>   ac_WalkTo                                            @ FUN_004228c0
+    gm.so_mobile_MoveReserve(&{ ac_Scanf(args[0]), ac_Scanf(args[1]) }, speed 1000, kind 1 (walk), backwards 0)   (vt 0x660)
+        # as &runto (§6.4) at walking speed; profiler label also "AmpersandCommand::ac_IgnoreSkillCoolTime"
+
+&castteleport <x> <y>   ac_CastTeleport                                @ FUN_004229b0
+    gm.so_mobile_Teleport(&{ ac_Scanf(args[0]), ac_Scanf(args[1]) })   (vt 0x6d4, FUN_0057d1d0, Z09 §9.3)
+        # immediate jump on the same map: stop, set position, sight re-exchange (sp_ReSetSendMyBriefInfo), old
+        # viewers told to drop the GM, move halt, vt 0xa4c (move-fail = position correction to the GM's client)
+        # the command tests neither the target cell nor the map size
+
+&setobjectdirect <dir> [<x>]   ac_SetObjectDirect                      @ FUN_00422a90
+    dir = ac_Scanf(args[0]); includeSelf = 1
+    if argnum == 2 (exactly one argument): includeSelf = (u8) ac_Scanf(args[1])   # args[1] is empty → 0 (original bug) Z11-B33
+    *gm.so_LocateInfo.direct = dir (u8, 2° units)
+    ShineObject::so_DirectInfoBroadcast(gm, includeSelf)                @ FUN_00553510 (Z09 §17.1)
+        sight (and the GM when includeSelf) ← 0xBC1C NC_GAMBLE_ENTER_PLAYER_DIRECT_CMD { u16 nHandle, u8 nDirect }
+```
+
+`&setobjectdirect 90` turns the GM for the others but not on the GM's own screen; with any second word the GM's
+client is told too (B33). The Lua `cSetObjectDirect` (Z09 §17.1) has the same broadcast.
+
+```pseudo
+&cmt <type> [<angleXZ> <angleY> <dist> [<x> <y>]]   ac_CameraMoveTest  @ FUN_004220c0
+    gm has no field: nothing
+    argnum < 2: wall "&cmt [Type:0~1] [AngleXZ:0~360] [AngleY:0~90] [Dist:0~] [x] [y]"; return
+    type = atoi(args[0]); type > 1: wall "Invalid Camera Move Type", "1 : ON, 0 : OFF"; return
+        # signed test: a negative type passes (original bug) Z11-B34
+    field.fm_CameraState (+0x124) = type                               # CS_NONE 0 / CS_MOVING 1 (Z09 §19.4)
+    type 0: wall "Camera Move OFF"; angles and dist 0; (x, y) = GM position
+    type 1: argnum < 5: walls "Camera Moving Type Need Default Input", "[AngleXZ:0~360] [AngleY:0~90] [Dist:0~] "; return
+            angleXZ = atoi(args[1]), angleY = atoi(args[2]), dist = atoi(args[3]) (all u16);
+            argnum > 6: (x, y) = atoi(args[4]), atoi(args[5]), else the GM position
+            walls "Camera Move ON", "aXZ:%d aY:%d D:%d x:%d y:%d"
+    (negative type: no message, values as for 0)
+    whole map (so_AllInMap, flag 1) ← 0x6C14 NC_SCENARIO_CAMERA_MOVE_CMD { u8 MoveType = type, SHINE_XY_TYPE ViewCoord = (x, y),
+                                                                         u16 AngleXZ, u16 AngleY, u16 Dist }   (0x11 bytes)
+```
+
+The GM version of the Lua `cCameraMove` (Z09 §19.4) without its brief-info exchange around the camera point: with
+`fm_CameraState` CS_MOVING the map's sight range becomes unlimited for later exchanges, but nobody is sent the objects
+around the new camera point now *(inferred from Z09 §19.4)*. A negative type is stored as the map's camera state and
+sent as MoveType 0x80…0xFF, which the client ignores (B34, the same test as Z09-B74). Memory only; the state stays
+until the next `&cmt 0` or script camera move.
+
+### 7.7 Chat ban and pets: `&releasechatban`, `&getpetinfo`, `&setpetinfo`
+
+```pseudo
+&releasechatban <charName>   ac_ReleaseChatBan                         @ FUN_00421a60
+    WM ← 0x0866 NC_MISC_SPAMMER_RELEASE_CHAT_BAN_REQ { u32 nGMCharNo = gm.charNo, Name5 sSpammerName = strncpy(args[0], 20) }   (0x1A bytes)
+        # assert text on a failed length: "WholeSaver::ws_save2worldmanager : Packet Too Long" (copied)
+```
+
+The WM (W04 §17.4, handler FUN_0042c3b0) checks the GM's own `CHARDATA.adminlevel` 50…100 (silently nothing otherwise,
+although the zone word needs only level 50 of the zone's table, §1.4), sends Character DB 0x0868 (nChatBan = 0); the
+answer 0x0869 clears the ban in the database (persistent), tells the target's zone (0x0865, which clears
+`chatBlockUntil`, Z01 §9) and answers the GM 0x0867 NC_MISC_SPAMMER_RELEASE_CHAT_BAN_ACK { u16 nError } (client
+FUN_004b35b0: "Backing out chatting block" on success). A 20-character name is sent without terminator (strncpy);
+the WM compares at most 20 bytes *(inferred from Name5)*. The ban itself is set from the client (0x0861, W04), not
+by a GM word (`&silence` does nothing, §5.6).
+
+```pseudo
+&getpetinfo   ac_PetSystemTest_GetTendency                             @ FUN_00422480
+&setpetinfo <mind> <stress>   ac_PetSystemTest_SetTendency             @ FUN_00422590
+    pet = gm.so_GetTargetObject() (vt 0xa04: sp_Target.to_Object); none: "Get/SetPetTendency : No Target"
+    pet.so_ObjectType() ≠ 12 (pet): "… : Target is not Pet"
+    m = ShinePet::spt_FindMaster(pet); none: "… : No Target's Master"; m not a player (kind 2): "… : Target's Master is not Player"
+    get: wall "Target Info (PetNo : %d) (Mind : %.1lf) (Stress : %.1lf)" =
+         m.sp_PetInfo.nRegNum, nMindMil / 1000, nStressMil / 1000     # the values live in the master's PetInfoPlayer
+    set: mind = atoi(args[0]) outside gPetData.m_nMindMinValue…m_nMindMaxValue: "SetPetTendency : Mind Range Over ( %d ~ %d )"
+         stress = atoi(args[1]) outside m_nStressMinValue…m_nStressMaxValue: "SetPetTendency : Stress Range Over ( %d ~ %d )"
+         wall "Target Info From (PetNo …)" (old values)
+         m.sp_PetInfo.nStressMil = stress × 1000; nMindMil = mind × 1000
+         ShinePlayer::sp_Send_NC_PET_SET_TENDENCY_DB_REQ(m, mind, stress)   @ FUN_004d1040
+             m has a handle and a pet (nRegNum ≠ −1):
+             Character DB ← 0xD401 NC_PET_SET_TENDENCY_DB_REQ { u16 nMasterHandle, u32 nPetRegNum, u8 nPetMind, u8 nPetStress }
+                 (10 bytes; both clamped again to the gPetData ranges)
+         wall "Target Info To   (PetNo …)" (new values)
+```
+
+The target is any player's summoned pet; the change is persistent (D03 §13: `usp_Pet_setTendency`, no answer). No packet tells the
+owner's client; it learns the new mind / stress with the next pet-state update *(inferred)*. The pet tendency rules
+(mind / stress drift, `gPetData` from the pet tables) are Z13's.
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1558,6 +1924,15 @@ the probability of outcome i is `nDiceRate[i] / nDiceRateSum`. Nothing tells the
 | Z11-B23 | `&showid` FUN_0041f4a0 | sends 0x1C16 NC_BRIEFINFO_PLAYER_LIST_INFO_APPEAR_CMD, which the 2016 client does not handle | the command shows nothing | a client handler, or GM notices |
 | Z11-B24 | `&pvp` FUN_00420230 | stores any value in `fm_PKField` but announces "on" only for 1 | `&pvp 2` keeps the map's PvP flag set while clients are told it is off | store `v == 1` |
 | Z11-B25 | `&invenview` `so_ply_InvenWrite` FUN_0051ad90 | the equipment loop is inside the inventory branch; an item without an ItemInfo row ends everything | empty inventory: equipped items are not listed; a bad item hides the rest | list both independently, skip bad rows |
+| Z11-B26 | `&makeraid` FUN_00420ef0 → `rt_CreateRaid(partyNo, NULL)` FUN_005cde10 | builds a raid in the zone's copy only: no WM message, members' raid pointer (vt 0xa88) never set, second member moved to raid party 1 in the zone party table; raid number = first free local slot | the raid is invisible to every raid feature; the zone's party table differs from the WM's; a later WM 0xB004 with the same raid number fails | a test helper that asks the WM (or also links the members) |
+| Z11-B27 | `&outraid` FUN_00421040 | `Raid::DeleteMember` / `Raid::Reset` on the zone copy only; the WM is not told | the WM still has the GM (or the dissolved raid) and keeps sending raid packets for slots the zone has emptied; clients still show the raid | send the raid-leave request to the WM |
+| Z11-B28 | `&PlayIns` FUN_00421190 | claims the instance with key {CATEGORY_PARTY, GM charNo} | the film runs on an instance owned by "party number = GM charNo", which a real party with that number would then enter | key {CATEGORY_INDIVIDUAL, charNo} or the GM's party number *(intent inferred)* |
+| Z11-B29 | `&testlink` FUN_004217e0 | writes opcode 0x7C06 (NC_PRISON_GET_REQ) into the buffer passed to the 0x181F handler | none (the handler reads only the payload) | 0x181F |
+| Z11-B30 | `&levelup` `so_AmpersandCommand_LevelUp` FUN_0042fa00 | raises the u8 level without the `levellimit` test of `sp_GainExp` | levels above the server limit (wrapping to 0 after 255) are saved to the DB and the WM; later EXP gains index the per-level table past the limit *(inferred)* | stop at `scp_param.levellimit` |
+| Z11-B31 | `&getmoney` FUN_00421bf0 / `so_ply_PickupMoney` FUN_0052fe80 | `atoi` result passed as u32 and added with carry | a negative amount adds 2^32 − \|n\| Cen; there is no way to remove money and no upper bound | refuse n < 1 (or a signed money change, `CenChange`) |
+| Z11-B32 | `&getmoney` → 0x3439 handler FUN_00530510 | reuses the pick-up path: the DB answer runs `so_ply_itempickresult` with the last picked item (`p+0x29278` / `p+0x2927c`) | the GM's client prints "[old item] has been obtained." | a money path without the pick message (0x347A INC_DEC_MONEY, Z05 §3.3) |
+| Z11-B33 | `&setobjectdirect` FUN_00422a90 | reads the include-self flag from `args[1]` when `argnum == 2` (one argument, `args[1]` empty) | with one argument the GM's own client is not told the new direction; with two it always is, whatever the second word | test `argnum == 3` |
+| Z11-B34 | `&cmt` FUN_004220c0 | type test `> 1` on a signed `atoi` value | a negative type is stored as the map's camera state and sent as MoveType 0x80…0xFF (client ignores it) | `0 ≤ type ≤ 1` (same as Z09-B74) |
 
 ## Not reconstructed / uncertain
 
@@ -1584,5 +1959,14 @@ the probability of outcome i is `nDiceRate[i] / nDiceRateSum`. Nothing tells the
   (Z09 §2.4); the iterator body was not re-read.
 - §6.5 `&ghostremove`: object kind 1 = dropped item is inferred from `som_AllocObject(type 1)` (Z05); kind 9 = effect
   object from Z09's pool list.
+- §7.1 `&makeraid`: `Raid::Begin` is assumed to start at {party 0, slot 0} (the iterator constructor was not read); what
+  the WM does with the zone's changed party table when it next sends party packets was not followed (W02).
+- §7.3 `&levelup`: the effect of a level above `levellimit` on the EXP table lookups and on the client was not traced;
+  the vt 0x20 call with the level (slot name `so_GainFame` in the merged vtable) was not opened.
+- §7.4 `&getmoney`: item id 0 in the 0x300A message when nothing was picked since login is assumed (the member's
+  initial value was not read). `&iareset`: whether the next character save writes the cleared cool-down list was not read.
+- §7.6 `&godmode`: how long the `Item.Plus` HP / SP bonus survives (recomputed on equipment change) is inferred;
+  `&castteleport`: whether `so_MoveTo` refuses a blocked or off-map target was not read.
+- §7.7 `&setpetinfo`: how the owner's client learns the new pet tendency was not traced (Z13).
 
 (Parts 2–6 add their commands as §4–§8; the sweep part adds the coverage boundary.)

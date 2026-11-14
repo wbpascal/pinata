@@ -12116,6 +12116,30 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
 
+### `0x482c` NC_SKILL_ITEMACTIONCOOLTIME_CMD (Z→C)
+
+**Verified layout** (basis: zone ItemActionObserveManager::ResetCoolTime FUN_005d1a00 (num*8+4 bytes incl. opcode); client On_NC_SKILL_ITEMACTIONCOOLTIME_CMD FUN_0049c600; PDB 2017 PROTO_SKILL_ITEMACTIONCOOLTIME_CMD)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | num | entries |
+| 2 | struct[num] | group | 8 bytes each |
+| 2 | u16 | group[i].ItemActionID | cool-time entry +0x14 |
+| 4 | u16 | group[i].ItemActionGroupID | cool-time entry +0x10 |
+| 6 | u32 | group[i].SecondCoolTime | remaining ms (client divides by 1000); 0 from ResetCoolTime |
+
+### `0x3438` NC_ITEMDB_PICKMONEY_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_PickupMoney FUN_0052fe80 (0x18 bytes incl. opcode; &getmoney ac_GetMoney FUN_00421bf0); PDB 2017 PROTO_NC_ITEMDB_PICKMONEY_REQ after the 6-byte ref; D03 §3.5)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle | zone object handle |
+| 2 | u32 | ref.charNo |  |
+| 6 | u32 | owner | = charNo |
+| 10 | u64 | itemonfield | 0xFFFFFFFF_FFFFFFFF (no drop object) |
+| 18 | u32 | cen | amount added |
+
 ### `0x4801` NC_SKILL_SKILLTEACH_REQ (Z→CharDB)
 
 **Verified layout** (basis: zone ac_learnskill FUN_0041c290 (0x11 bytes incl. opcode); D04 §2)
@@ -12128,6 +12152,17 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 10 | u16 | skillid |  |
 | 12 | u8 | ispassive | 0 from &learnskill |
 | 13 | u16 | removeid | 0xFFFF = none |
+
+### `0xd401` NC_PET_SET_TENDENCY_DB_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone ShinePlayer::sp_Send_NC_PET_SET_TENDENCY_DB_REQ FUN_004d1040 (10 bytes incl. opcode; &setpetinfo FUN_00422590); D03 (FUN_0042b920))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMasterHandle | pet owner's object handle |
+| 2 | u32 | nPetRegNum | sp_PetInfo.nRegNum |
+| 6 | u8 | nPetMind | clamped to gPetData mind min..max |
+| 7 | u8 | nPetStress | clamped to gPetData stress min..max |
 
 ### `0x10d1` NC_CHAR_FREESTAT_SET_DB_REQ (Z→DB)
 

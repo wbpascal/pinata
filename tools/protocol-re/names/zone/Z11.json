@@ -141,6 +141,7 @@
  "FUN_00427a40": "ShineObjectClass::ShinePlayer::so_ply_AdminCommand",
  "FUN_004504d0": "ChargedItemEffectList::ChargedItemEffectElement::ciee_SetEndTime",
  "FUN_00476460": "WorldManagerSession::wms_NC_GUILD_TOURNAMENT_ZONE_MEMBERGRADE_ACK",
+ "FUN_00485210": "MapClusterManager::ClusterManager::cm_ChangeCategory",
  "FUN_0049f460": "MapClusterManager::MapCluster::mc_FindEmpty",
  "FUN_0049f610": "MapClusterManager::MapCluster::mc_GetLimitTime",
  "FUN_0049f740": "MapClusterManager::MapCluster::mc_SetLimitItem",
@@ -152,8 +153,10 @@
  "FUN_005a7f30": "ZoneRingPacketSummonPlayer::zrpb_Failure",
  "FUN_005a8050": "ZoneRingPacketFindPlayer::zrpb_Failure",
  "FUN_005a9100": "ZoneRingPacketExpBonus::zrpb_Success",
+ "FUN_005cde10": "RaidTask::rt_CreateRaid",
  "FUN_00615830": "CGambleObjectManager::gom_GetGambleObject",
  "FUN_006228f0": "SlotMachine::SlotMachineScreenManager::smsm_Action",
+ "FUN_0063dc10": "Raid::SlotChangeMember",
  "FUN_00694f00": "`dynamic_initializer_for_'AmpersandCommandLog''",
  "FUN_00694f40": "`dynamic_initializer_for_'ampcmd''"
 }
