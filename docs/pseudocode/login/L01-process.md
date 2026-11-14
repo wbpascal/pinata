@@ -8,7 +8,9 @@ definition (size 0xfe40), which is the one the code uses. Everything else is rea
 
 This item covers the process layer around the handlers of `login-server.md` (L00): the main thread and its work
 steps, the packet pump, the session pools and the session managers, the world-status table and its load thresholds
-(`m_LoginUserRatable`), the shared server-link parser and the per-parser copies of the 0x0801 / 0x0804 handlers.
+(`m_LoginUserRatable`), the shared server-link parser and the per-parser copies of the 0x0801 / 0x0804 handlers,
+the entry point and Windows-service shell (§1.8), the one-time-token list (§4.3), the connection check and the small
+handler bodies L00 only names (§4.4), and a pointer table of the library copies linked into Login (§4.6).
 Already documented elsewhere and only cited here: process start-up and the version keys (`login-server.md` §2),
 the client dispatcher (L00 §3.2), the network library and the session glue (S02 §1, §1.6), the constructor,
 `OnStart_Service`, `Start_Acceptor`, `ProcessStop`, `DissconnectAllSessions`, `ProcHeartBeat` and the base-session
@@ -106,11 +108,15 @@ LoginServer::OnStop_Service(this):                                      @ FUN_00
 Nothing in Login ever sets `m_bOnStopService` (only the constructor writes 0). The WM's `::OnStop_Service` sets it
 before it calls the member function (W05 §1.6); Login's does not. So every stop, including a service-manager STOP,
 ends with `exit(0)` on the main thread right after `m_bActiveMainThread = 0`, racing the service STOP callback that is
-still returning from its wait **(original bug) L01-B3**. The effect on the service manager (whether it records an
-unexpected termination) was not traced *(inferred)*.
+still returning from its wait **(original bug) L01-B3**. The race, with the service shell of §1.8: the SCM thread is in
+`WinService::onServiceStop` FUN_00411560, which has reported `STOP_PENDING` and waits in `::OnStop_Service` for
+`m_bActiveMainThread == 0`; the main thread clears that flag and at once calls `exit(0)`, which runs the static
+destructor `~LoginServer` (§1.7, through `_dynamic_atexit_destructor_for_'gServer'` FUN_00427710) and ends the process.
+If `exit` wins, `SetServiceStatus(STOPPED)` is never sent and the service manager sees a service that ended while
+`STOP_PENDING` *(inferred: Windows then logs an unexpected termination and applies the service's recovery actions)*.
 
 ```pseudo
-LoginServer::ViewStartInfo(this):   (LoginServer::Start, after OnStart_Service)   @ FUN_00401120
+LoginServer::ViewStartInfo(this):   (LoginServer::Start, before ReadDefineScriptor, §1.8)   @ FUN_00401120
     m_ServerStartTime = GetLocalTime()
     log "Local  Time      " + "<date> <time>"          # GetDateFormatA / GetTimeFormatA, user locale
     log "System Time(UTC) " + "<date> <time>"          # GetSystemTime
@@ -260,6 +266,71 @@ FUN_00409c90, `~CLoginWorldManagerSessionManager` FUN_0040a3c0, `~CLoginClientSe
 sessions (`~CLoginBaseSession` = FUN_00408cf0: `~CPacket`, `~CSocket_IOCP`, S02 §4.2), then `CIOCP::Close`,
 `~CSocket_Acceptor` and `~CCsl` (the server info). `ProcessStop` (S02 §4.3) has already closed every socket and freed
 the client and WM pools, so the pool destructors only find null arrays there.
+
+### 1.8 Entry point and Windows-service shell
+
+Login links the WM's service shell (W05 §1.1 `Start` / `ParseCmd`, §6.3 `WinService`, `MiniDumper`) once more. Every
+function below was read in the Login binary and does what W05 describes for its WM twin; only addresses, the
+`LoginServer` offsets and `Start`'s error codes differ.
+
+```pseudo
+_dynamic_initializer_for_'gServer'():   (CRT start-up, before WinMain)                 @ FUN_00427560
+    LoginServer::LoginServer(&gServer)                          # S02 §4.3
+    atexit(_dynamic_atexit_destructor_for_'gServer')            # FUN_00427710: ~LoginServer(&gServer), §1.7
+
+WinMain(hInst, hPrev, cmdLine, show):                                                   @ FUN_00403340
+    MiniDumper()                                    # SetUnhandledExceptionFilter(TopLevelFilter), below
+    r = LoginServer::Start(&gServer, cmdLine)
+    log "< END OF MAIN = %d >" r; return r
+
+LoginServer::Start(this, cmdLine):                  (L00 §2 "main")                     @ FUN_00402f30
+    chdir(directory of GetModuleFileName)           # 9Data / LoginServerInfo.txt paths are relative to the exe
+    log "Launching the server....."; _ExecUpdateInfoMsg("-") (FUN_004103f0); two banner lines
+    ViewStartInfo(this)                             # §1.2
+    if !ReadDefineScriptor(this): return −1         # L00 §2 LoadServerInfo FUN_00401380
+    if !ParseCmd(this, cmdLine):  return −2         # below
+    if !ReadGlobalGameData(this): return −4         # L00 §2 LoadVersionKeys FUN_00401680
+    Singleton<WinService>::getInstance()            # inlined copy of FUN_00402960
+    WinService::startDispatcher(m_MyServer.pServiceName, ::OnStart_Service, ::OnStop_Service)
+    return 0                                        # also when the dispatcher failed (not started by the SCM)
+
+LoginServer::ParseCmd(this, cmdLine) → bool:                                            @ FUN_00402ba0
+    up to 5 tokens of cmdLine (_mbstok); first token upper-cased
+    no token: queryServiceStatus(pServiceName) succeeds → code 0 (run as the service)
+              else token = "UPLOAD"                 # first run without arguments installs the service
+    "UPLOAD" → code = uploadService(pServiceName, pDisplayName, exe path) ? 1 : 2
+    "REMOVE" → code = removeService(pServiceName) ? 3 : 4
+    other    → code = 5
+    delete the WinService singleton (vtbl[1], scalar deleting dtor FUN_004116c0); selfInstance = null
+    texts 0 "<SERVICE START>", 1 "<SERVICE UPLOAD ONLY OK>", 2 "<SERVICE UPLOAD FAILED>", 3 "<SERVICE REMOVE OK>",
+          4 "<SERVICE REMOVE FAILED>", 5 "<SERVICE UNKNOWN COMMAND>"
+    code 0 → log, return true; 1 … 5 → log + MessageBoxA(text, caption pDisplayName), return false (Start → −2)
+
+::OnStart_Service():   (service-shell start callback)                                   @ FUN_004033b0
+    return LoginServer::OnStart_Service(&gServer)   # S02 §4.3: acceptor, IOCP, main thread, step LINK
+# ::OnStop_Service FUN_004033c0: §1.2
+```
+
+`queryServiceStatus` succeeds whenever the service is installed, running or not, so a second start of the exe from a
+console takes code 0 and then fails in `StartServiceCtrlDispatcherA` (not started by the service manager): `Start`
+returns 0 and the process ends without a message. Login runs only as a manual-start service.
+
+| Function (Login) | Body | WM twin (W05 §6.3) |
+|---|---|---|
+| `Singleton<WinService>::getInstance` FUN_00402960 | first call: `new WinService` (0x44) + vtbl[0] | FUN_004069a0 |
+| `WinService::WinService` FUN_004116a0 / scalar deleting dtor FUN_004116c0 | `serviceName = ""`, `handleServiceEvent = INVALID_HANDLE_VALUE` / `~String`, delete if flag & 1 | FUN_00466d60 |
+| `WinService::startDispatcher` FUN_00411910 | `param = param` self-assignment, so the member `serviceName` stays `""` **(original bug) L01-B6**; `StartServiceCtrlDispatcherA({ name, serviceLoop })` | FUN_00466fd0 (W05-B23) |
+| `WinService::serviceLoop` FUN_004117e0 | `onServiceStart`; then wait on the event until `statusEvent` is 1 (STOP) or 5 (SHUTDOWN); `onServiceStop` | FUN_00466ea0 |
+| `WinService::onServiceStart` FUN_00411720 | `CreateEvent`; `RegisterServiceCtrlHandlerA("", serviceHandler)`; `START_PENDING` (accepts STOP + SHUTDOWN, wait 1000 ms); `::OnStart_Service()` false → return false (the loop is skipped, `onServiceStop` still runs); `RUNNING` | FUN_00466de0 |
+| `WinService::serviceHandler` FUN_004116f0 | `statusEvent = control; SetEvent` | FUN_00466db0 |
+| `WinService::onServiceStop` FUN_00411560 | `STOP_PENDING` (wait 5000 ms); `::OnStop_Service()` (§1.2, L01-B3); `STOPPED`; `CloseHandle` only when the event handle **is** `INVALID_HANDLE_VALUE` **(original bug) L01-B7** | FUN_00466c20 (W05-B24) |
+| `WinService::uploadService` FUN_004113b0 | `CreateServiceA(name, display, access 0, OWN_PROCESS, DEMAND_START, ERROR_IGNORE, exe path)` → true when created | FUN_00466a70 |
+| `WinService::removeService` FUN_004114b0 | `OpenSCManager` fails → false; else `DeleteService(OpenServiceA(name, DELETE))` and **true** whatever the result **(original bug) L01-B8** | FUN_00466b70 (W05-B22) |
+| `WinService::queryServiceStatus` FUN_004115f0 | `QueryServiceStatus` → `dwCurrentState`, 1; any failure → `GetLastError()`, 0 | FUN_00466cb0 |
+| `String::operator==` FUN_00411b90 | the `ParseCmd` token compare (library `String`, W05 §6.3) | – |
+| `MiniDumper::MiniDumper` FUN_004120c0 | `SetUnhandledExceptionFilter(TopLevelFilter)` | FUN_004608b0 |
+| `MiniDumper::TopLevelFilter` FUN_00411dd0 | `DBGHELP.DLL` from the exe directory else the system; `MinidumpCallStack` FUN_00411bb0 (`<exe>_<time>CallStack.txt`); `FuncForStack` (never set in Login: no writer); `MiniDumpWriteDump(…, type 0x40)` to `<exe>_<time>.mdmp`; logs "EXCEPTION - Saved dump file to '%s'" / "Failed to create / save dump file …"; returns 1 only when the dump was written | FUN_004605c0 |
+| `_ExecUpdateInfoMsg(text)` FUN_004103f0 | overwrite `.\DebugMessage\ExecUpdateInfo.txt` with `text` | FUN_004602c0 (W05 §6.4) |
 
 ---
 
@@ -773,10 +844,135 @@ COTPLogin::IsAddable(o, userNo):   @ FUN_0040a5e0   0 if a node with nUserNo == 
 COTPData::~COTPData():             @ FUN_0040a550   empty (`ret`)
 ```
 
+The list operations (callers: 0x0C35 `fc_NC_USER_CREATE_OTP_REQ` FUN_00408250 and 0x0C37
+`fc_NC_USER_LOGIN_WITH_OTP_REQ` FUN_00406bb0, L00 §5.3 / §4):
+
+```pseudo
+COTPLogin::Find(o, sOTP) → node:            @ FUN_0040a610   (L00 "g_TokenTable.Find")
+    null sOTP → null; first node from m_pOTPTop whose 32-byte sOTP equals sOTP (8 × u32 compare), else null
+COTPLogin::Add(o, data) → bool:             @ FUN_0040a680   (L00 "Insert")
+    node = new OTP_LIST (0x134); null → 0
+    node.OTPData = data (COTPData::operator= FUN_0040a580); append at m_pOTPBottom; m_NumOfOTP += 1; return 1
+    # no upper bound on m_NumOfOTP: one node per 0x0C35 that passed IsAddable (one token per user number)
+COTPLogin::DelByDueTime(o, now):            @ FUN_0040a710   (L00 "ExpireOlderThan")
+    unlink and delete every node with tDueTime <= now; return 1          # but see L01-B9
+COTPLogin::DelByIP(o, ip):                  @ FUN_0040a7a0   (L00 "NoteFailure")
+    unlink and delete every node with nClientIP == ip; return 1          # but see L01-B9
+    # 0x0C37 with an unknown token deletes every pending token of the sender's IP: a wrong guess from one address
+    # also invalidates the tokens of other players behind the same NAT address
+COTPLogin::DelByOTP(o, sOTP) → bool:        @ FUN_0040a830   (L00 "Remove")
+    node = Find(sOTP); null → 0; unlink, delete, m_NumOfOTP −= 1; return 1
+```
+
+Both sweeping deletes walk the list with one cursor and continue from `cursor->pLinkDn` after each step. When the node
+they delete is the head, the cursor becomes the old second node and the loop then steps past it, so that node is never
+tested **(original bug) L01-B9**. Tokens are appended in issue order, so expired tokens sit at the head: when two or
+more have expired, every second one survives a `DelByDueTime` call, and the next `Find` in the same 0x0C37 can still
+accept it after its due time (until a later call removes it as the new head).
+
+```pseudo
+COTPLogin::MakeOTP(o, d) → bool:   (cited by L00 §5.3 as the token generator)                   @ FUN_0040a8a0
+    d == null → 0
+    text = sprintf("%d%d%d%d%d%c", d.nClientIP, m_IncreaseSeed, d.nUserNo, d.tDueTime, rand(), '\0')
+    m_IncreaseSeed += 1
+    d.sOTP = first 32 chars of CMD5Checksum::GetMD5(text)          # 32 lower-case hex digits, no terminator
+    return 1                                                        # never fails for a non-null d
+```
+
+L00 §5.3 writes the token as the `sprintf` result itself; it is the MD5 hex digest of that string (argument order
+read from the pushes at 0x40a8f1 … 0x40a914; `%c` takes the 0 pushed before `rand()`). L00's failure code 0x1E59
+"token generation failed" is therefore unreachable. Login's MD5 is the library copy of W05 §6.3: `GetMD5`
+FUN_0040c170 (state 0x67452301 … 0x10325476) → `Update` FUN_0040b920 → `Transform` FUN_0040b240 → `Final` FUN_0040bf60
+(hex via `"%x"` / `"0%x"` / `"00"` padding into a `std::string`); `~CMD5Checksum` FUN_0040b200 and its scalar deleting
+destructor FUN_0040b210; FUN_0040bbac and the two `Catch_All` funclets at 0x40bb83 / 0x40bc0b are compiler-split
+pieces of `std::basic_string::_Copy` FUN_0040bad0, the `std::string` growth inside `Final` (copy old text, free the old buffer; *(inferred)* from the body).
+
 FUN_0040a550 is the one empty destructor the linker kept for every trivially destructible class: `~CSendPacket`
 (after every CSendPacket send in the handlers; the frame buffer is inside the object on the stack), `~PacketEncrypt`,
 `~COTPLogin` in `~LoginServer`, and the `WorldInfo` array in the WM `FreeSessions`. L00's names file calls it
 `Pkt_Free`; it frees nothing.
+
+### 4.4 Connection check, small handler bodies, template destructors
+
+Every handler except 0x0802 (WM / OPTool login), 0x0804 and 0x0805 starts with its parser's
+`CheckConnectionValidation`. The five bodies differ only in the peer name of the log line:
+
+```pseudo
+CParser<Peer>::CheckConnectionValidation(parser, s, pkt, len) → bool:
+        @ FUN_004038f0 (AccountDB) / FUN_00404e00 (AccountLogDB) / FUN_00405f60 (client) / FUN_00406f70 (OPTool) / FUN_00408020 (WM)
+    if s.m_Status == 1 (CONNECTED): return 1
+    log "ERROR - 접속 <ACCOUNT_DB | ACCOUNTLOG_DB | CLIENT | OPTool | WORLDMANAGER> 미인증 상태에서 패킷 도착, 바로 접속을
+         끊음, dep=%d, cmd=%d, length=%d, %15s:%- 5d)"      # "packet arrived before authentication, closing at once";
+                                                             # IP = inet_ntoa(s +0x30), port = ntohs(s +0x2e)
+    return 0                                                 # the handler returns 0 → the parser closes the link (§4.1)
+```
+
+`m_Status == 1` means: client accepted (§1.4), DB link answered 0x0803 (L00 §5.2), WM / OPTool sent a valid 0x0802
+(§2.5). A WM demoted to state 2 by a second login for its world (§2.5) therefore fails every later check and is
+closed by its next frame other than a heartbeat.
+
+```pseudo
+0x0C06 NC_USER_LOGIN_REQ:         CParserClient::fc_NC_USER_LOGIN_REQ          @ FUN_00406950   return 0
+0x0C18 NC_USER_NORMALLOGOUT_CMD:  CParserClient::fc_NC_USER_NORMALLOGOUT_CMD   @ FUN_004062e0   return 0
+    # both close the client (m_Status 3 via the client parser, L00 §3.2); L00 §4 calls them "no-op". 0x0C06 is the
+    # old login request, refused anyway before m_SessionMode 2; 0x0C18 is how a client at world select logs out
+
+0x2818 NC_OPTOOL_LOGON_PROCESS_TIME_VIEW_REQ {} (OPTool):                    @ FUN_00407df0
+    if !CheckConnectionValidation(s): return 0
+    Send raw { 1A, 19 28, PROTO_NC_OPTOOL_LOGON_PROCESS_TIME_VIEW_ACK {           # 27 bytes, opcode 0x2819
+        u32 Connect_Count = 0, Connect_Time = 0, Login_Count = 0, Login_Time = 0,
+        u32 IPBlock_Count = 0, IPBlock_Time = 0 } }                               # field names (pdb2016)
+    # every field is the constant 0: Login keeps no logon-time statistics   (original bug) L01-B10
+```
+
+The handler-table destructors are not folded like `pft_Store` (§4.1): each template instance keeps its own pair, all
+with the same body (restore the vftable, `delete[]` every row that is not `pft_defaultdepartment`; the scalar deleting
+one also frees the object when `flag & 1`). They run from `~LoginServer` (§1.7).
+
+| Instance | `~PROTOCOLFUNCTIONTEMPLETE` | scalar deleting destructor (vftable slot 0) |
+|---|---|---|
+| `CParserAccountDB` | FUN_00403fa0 | FUN_00403fd0 |
+| `CParserAccountLogDB` | FUN_00405100 | FUN_00405130 |
+| `CParserClient` | FUN_00406600 | FUN_00406630 |
+| `CParserOPTool` | FUN_00407e70 | FUN_00407ea0 |
+| `CParserWorldManager` | FUN_00408680 | FUN_00408780 (§4.1) |
+
+The session IOCP glue (S02 §1.6) has three more trivial bodies in Login: the base class
+`CIOCP_Process_Interfece::IOCP_CloseProcess` FUN_00408d20 (empty; `CIOCP_Process_LSession` overrides it with
+FUN_004090b0), the base scalar deleting destructor FUN_00408d30 (vftable slot 2 of the `CIOCP_Process_LSession`
+vftable, which therefore never runs the derived destructor) and `~CIOCP_Process_LSession` FUN_00410850 (resets the
+vftable to the base one). `PacketEncrypt::PacketEncrypt` FUN_0040b160 is empty (the cipher position is set by
+`InitSessions` / `ActiveSession`, §2.3).
+
+### 4.5 Value types and message helpers used by the L00 handlers
+
+| Function | Body | Used by |
+|---|---|---|
+| `Name256Byte::Name256Byte` FUN_00403430 | 256 bytes = 0 | client session ctor (§2.2), `COTPData` (§4.3), the message helpers below |
+| `Name256Byte::operator=(const char*)` FUN_00403560 | 256 bytes = 0, then `strncpy(…, 256)`: a 256-char source leaves no terminator | user names from DB answers (L00 §5.1) |
+| `Name256Byte::operator=(const Name256Byte&)` FUN_004036a0 | copy 256 bytes | `m_UserID` from a token or DB answer (L00 §4, §5) |
+| `Name4::operator=(const char*)` FUN_004033d0 | 16 bytes = 0, `strncpy(…, 16)` | password fields (L00 §5.1) |
+| `Name5::operator=(const Name5&)` FUN_00403400 | copy 20 bytes | `m_UserSwpawnApps` (§2.2) |
+| `PROTO_NC_USER_GER_PASSWORD_CHECK_ACK::operator=` FUN_00403ac0 | copy `clienthandle`, `id` (256), `password` (16), `usrregnum`, `authid`, `block`, `loginable` | AccountDB 0x0C3A `NC_USER_GER_PASSWORD_CHECK_ACK` FUN_00404990 (L00 §5.1) |
+| `PROTO_NC_USER_US_PASSWORD_CHECK_ACK::operator=` FUN_00403ed0 | copy `clienthandle`, `nError`, `nUserNo`, `sUserName[260]`, `sPassword[36]`, `sUserIP[20]`, `nAuthID`, `nBlock`, `bLoginAble`, `spawnapps` (20) | AccountDB 0x0C5C FUN_00404590 (L00 §5.1) |
+| `PROTO_NC_LOG_USER_LOGINFAIL_SEND::PROTO_NC_LOG_USER_LOGINFAIL_SEND` FUN_00404020 | user id (`Name256Byte`) and the 16-byte password = 0 | the 0x0720 login-failure log of AccountDB 0x0C27 `fc_NC_USER_TEENAGER_ACK` FUN_00404050 (L00 §5.1) |
+| `PROTO_NC_DATA_SEND1<PROTO_NC_USER_GER_IS_IP_BLOCK_REQ>` ctor FUN_00404960 | the `Name256Byte` at +5 and the 16 bytes at +0x105 = 0 | 0x0C3B `NC_USER_GER_IS_IP_BLOCK_REQ` to AccountLogDB, sent by FUN_00404990 (L00 §5.1) |
+| `std::basic_string<char>::~basic_string` FUN_00403280 | free a heap buffer (capacity > 15), reset to the empty small string | `MakeOTP` (§4.3), log helpers |
+| `std::bad_alloc::~bad_alloc` FUN_0040b1c0 / scalar deleting dtor FUN_0040b1d0 | CRT exception class | `operator new` failures |
+
+### 4.6 Library copies in Login (pointer table)
+
+These Login addresses are the same library functions that W05 / S02 document for the WM; they carry no
+Login-specific behaviour.
+
+| Login | Function | Documented at |
+|---|---|---|
+| FUN_004100c0 / FUN_00410180 | `GetCurrentTimeString` / `GetCurrentTimeString2` (time text for logs and dump file names) | W05 §6.3 (`GetCurrentTimeString2`), Z09 §30.1 |
+| FUN_00410260, FUN_00410470, FUN_00410490, FUN_004104b0 | `_DebugMessageNew2`, `_DEBUGMSG`, `_DEBUGMSGVC`, `_DebugMessageNew` (the `Msg_<date>.txt` log) | W05 §3.1 / §6.4 (FUN_00460130, FUN_00460340, FUN_00460360), S02 §2.5 (FUN_00460ac0) |
+| FUN_00410510 / FUN_00410530 | `CServerInfo::ViewErrorMsg` / `GetMyServerInfo` (`MY_SERVER` row → `m_MyServer`) | S02 §2.5, W05 §6.4 (FUN_00465cd0) |
+| FUN_004120e0 / FUN_00412160 | `AssertClass::ac_DateTime` / `ac_AssertFail(msg, x)` (called by `pft_Store`, §4.1) | W05 §6.4 (FUN_00467270 / FUN_004672f0) |
+| FUN_00412b50 | `cShineLogSystem::SLS_SetLogName`, called by the static initialisers of `gSocket_IOCP_Write` FUN_004275e0 and `gZoneLinktoErrorLog` FUN_00427640 | W05 §5.7 |
+| FUN_00412e20, FUN_00412ea0, FUN_00412ed0, FUN_00413120, FUN_00413150, FUN_00413580, FUN_004139d0, FUN_00413a30, FUN_00413180 | `FillInStackFrame`, `CH_ReadProcessMemory`, `EHConvertSimpleException`, `EHInitSymbolEngine`, `EHCleanupSymbolEngine`, `GetFaultReason`, `GetFirstStackTraceString`, `GetNextStackTraceString`, `EHInternalGetStackTraceString` (fault text and stack walk of `MinidumpCallStack`, §1.8) | W05 §6.3 (FUN_00468010, FUN_00468090, FUN_004680c0; the others by name) |
 
 ---
 
@@ -789,16 +985,39 @@ FUN_0040a550 is the one empty destructor the linker kept for every trivially des
 | L01-B3 | `::OnStop_Service` FUN_004033c0 / `MainThread` FUN_004030e0 | `m_bOnStopService` is never set to 1 (the WM's `::OnStop_Service` sets it) | a service STOP ends in `exit(0)` on the main thread ("<SERVER SELF STOPPED>"), racing the service STOP callback | set `m_bOnStopService = 1` before stopping, as the WM does |
 | L01-B4 | `SetWorldManagerConnectInfo` FUN_0040a0c0 | `nWMSUS_1` (default 3 %) is never compared | the OPTool value has no effect; the six thresholds give only five bands below "full" | unclear: a sixth band for an almost empty world, or a spare field |
 | L01-B5 | OPTool 0x2814 FUN_00407d50 (and 0x2812 FUN_00407c90) | no frame-length check; values not checked | a short frame stores stale receive-buffer bytes as thresholds | check `len` = 2 + 13 |
+| L01-B6 | `WinService::startDispatcher` FUN_00411910 | assigns its `String` parameter to itself instead of to `serviceName` | `RegisterServiceCtrlHandlerA("")`; works only because an own-process service ignores the name (same as W05-B23) | `this->serviceName = name` |
+| L01-B7 | `WinService::onServiceStop` FUN_00411560 | closes the event handle only when it equals `INVALID_HANDLE_VALUE` | the event handle leaks (once per process; same as W05-B24) | `!=` |
+| L01-B8 | `WinService::removeService` FUN_004114b0 | returns true whatever `OpenServiceA` / `DeleteService` return | "REMOVE" reports "<SERVICE REMOVE OK>" for a missing service or a failed delete (same as W05-B22) | return the `DeleteService` result |
+| L01-B9 | `COTPLogin::DelByDueTime` FUN_0040a710 / `DelByIP` FUN_0040a7a0 | after deleting the head node the walk continues from the new head's successor | the node after a deleted head is never tested: an expired one-time token can still be found by the 0x0C37 that just swept, and a failed 0x0C37 leaves one token of that IP | step to the new head without advancing |
+| L01-B10 | OPTool 0x2818 FUN_00407df0 | `NC_OPTOOL_LOGON_PROCESS_TIME_VIEW_ACK` is sent with all six counters 0 | the OPTool shows no logon statistics | count connects / logins / IP-block checks and their times |
 
-## Not reconstructed / uncertain
+## 5. Not reconstructed / uncertain
 
-(part 2 adds the sweep results.)
-
-- Whether the service manager records an unexpected termination after a STOP (L01-B3): the service shell
-  (`LoginServer::Start` FUN_00402f30 and the library's service wrapper) was not traced for this.
+- L01-B3: the service shell is now traced (§1.8); what the service manager does when the process ends while
+  `STOP_PENDING` (event log entry, recovery actions) is Windows behaviour, not in the binary *(inferred)*.
+- The two banner lines `LoginServer::Start` FUN_00402f30 logs after "Launching the server....." are `_DebugMessageNew`
+  calls whose string arguments the export drops; not recovered (cosmetic).
+- FUN_0040bbac and the `Catch_All` funclets 0x40bb83 / 0x40bc0b (§4.3) are assigned to `basic_string::_Copy`
+  FUN_0040bad0 by the sweep's call edge and their bodies only.
+- `CParserOPTool::CheckConnectionValidation` FUN_00406f70 / `CParserWorldManager::…` FUN_00408020: the export types
+  the session as a one-field struct, so the IP / port arguments of the log line show as `_padding_`; read as the same
+  `+0x30` / `+0x2e` reads as the other three copies *(inferred)*.
 - The client window check behind `WorldSelectWin::UpdateServerList` (vtable +0x104) is read as "is shown" from its
   use only.
 
-## Coverage boundary
+## 6. Coverage boundary
 
-(part 2.)
+Sweep (part 2): every function of `re-data/exports/login-pdb/decomp.c` between 0x401000 and 0x413000 (Login's own
+code and the library linked into it; above are the CRT and unwind funclets) was checked against the `FUN_…` citations
+of `login-server.md`, this file, `S02-library.md` and `knowledge/S02.md`; all callers and callees of the functions
+documented here and of `LoginServer::LoginServer` / `~LoginServer` / `MainThread` were listed too. Everything found
+is cited above, except:
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| The L00 handlers themselves (0x0C0B, 0x0C37, 0x0C35, the password-check and IP-block answers, OPTool 0x2801 … 0x2817), `ReadDefineScriptor` FUN_00401380, `ReadGlobalGameData` FUN_00401680, `ConnectAccountLogServer` FUN_00401ac0 | L00 (done) `login-server.md` §2, §4, §5 | documented there; this file only adds the corrections in `knowledge/L01.md` and the bodies L00 left out (0x0C06 / 0x0C18 / 0x2812 / 0x2814 / 0x2818, the token list) |
+| The network library under the sessions (`CSocket_IOCP`, `CIOCP`, `CPacket`, `CSocket_Acceptor`, `CIOBuffer`, `CCsl`, `CGdp`), `LoginServer::LoginServer` FUN_004029e0, `OnStart_Service` FUN_004032b0, `Start_Acceptor`, `ProcessStop`, `DissconnectAllSessions`, `ProcHeartBeat`, the base-session constructor, `CIOCP_Process_LSession::IOCP_Process` / `IOCP_CloseProcess` | S02 (done) §1–§3, §1.6, §4.3 | library and glue documented there with the Login addresses |
+| `std::string` / `String` helpers (`String::String` FUN_00411ab0 / FUN_00411b40, `~String` FUN_004119d0, `getBuffer` FUN_004119f0, `makeUpper` FUN_00411a00, `operator=` FUN_00411a10 / FUN_00411b70), `__tmainCRTStartup` FUN_004155c0 (calls `WinMain`), `_eh_vector_*` iterators, unwind funclets (`__unwindfunclet$…LoginServer…`, `…CParser…`, `…SessionManager…`), the CRT (`sprintf`, `memset`, `rand` / `srand`, `_time32`, `exit`, `_chdir`, `operator new` / `delete`, `_mbsnbcpy`, `_mbstok`, `strncpy`) | none needed | compiler / CRT boilerplate with standard semantics; nothing server-specific (S02 §7 bounds the same set) |
+| Client side of 0x0C1C / world status (`WorldSelectWin::UpdateServerList`) | C01 / L00 §4 | client scene handlers, cited in §3 for the status values only |
+
+No follow-up item was needed.
