@@ -276,6 +276,195 @@ line, `ShineExit`.
 
 ---
 
+## 2. Z02: brief info, server menus, chat ban
+
+### 2.1 The batched brief-info exchange: `BriefInfoExchanger`
+
+Z02 §5.2 describes `so_ExchageBriefInfo` (the map-iterator callback of a full exchange: login complete, regen, teleport,
+layer move, hide-except-me off, camera move) and the character batch; Z09 §9.6 the per-step appear / disappear. The
+batches it fills are global objects (`briefchar`, `briefmob`, `briefitem`, `briefminihouse`, `briefabstate_char`,
+`briefabstate_mob`, `briefmover`, `briefpet`, plus door / effect / magic-field ones): one packet buffer each, filled for
+**one receiving player** and flushed when full and at the end of the exchange (`bixall_Send` FUN_0043fc80, Z09 §9.6).
+
+| Batch (class, size) | Object kinds (Z02 §5.2) | Packet | Entry (2016 PDB struct, size) | Buffer | Max entries |
+|---|---|---|---|---|---|
+| `BriefInfoExchangeMob` (0x10f8) | 4 NPC, 5 mob, 10 servant | 0x1C09 NC_BRIEFINFO_MOB_CMD `{u8 mobnum, …}` | `PROTO_NC_BRIEFINFO_REGENMOB_CMD` 0x95 | 4321 | 28 |
+| `BriefInfoExchangeItem` (0x1c8) | 1 drop item | 0x1C0B NC_BRIEFINFO_ITEMONFIELD_CMD `{u8 itemnum, …}` | `PROTO_NC_BRIEFINFO_DROPEDITEM_CMD` 0xf | 435 | 28 |
+| `BriefInfoExchangeMiniHouse` (0x754) | 3 mini-house | 0x1C14 NC_BRIEFINFO_MINIHOUSE_CMD `{u8 minihouses, …}` | `PROTO_NC_BRIEFINFO_MINIHOUSEBUILD_CMD` 0x40 | 1856 | 28 |
+| `BriefInfoExchangeMover` (0xfd4) | 11 mover | 0x1C1B NC_BRIEFINFO_MOVER_CMD `{u8 nMoverNum, …}` | `PROTO_NC_BRIEFINFO_REGENMOVER_CMD` 0x8b | 4031 | 28 |
+| `BriefInfoExchangePet` (0x738) | 12 pet | 0x1C1D NC_BRIEFINFO_PET_CMD `{u8 nPetCnt, …}` | `PROTO_NC_BRIEFINFO_REGENPET_CMD` 0x3f | 1827 | 28 |
+| `BriefInfoExchangeAbstate` (0x26fc) ×2 | `_char`: 2 player, 8 bandit; `_mob`: 4, 5, 10, 11 | 28 separate 0x1C19 NC_BRIEFINFO_ABSTATE_CHANGE_LIST_CMD | `{u16 handle, u8 count, ABSTATE_INFORMATION[count] (0xc)}` | 28 × 341 | 28 (29 written, §2.2) |
+
+The mob / mover / pet init functions write the opcode into their buffer (`0x1C00 | 9`, `| 0x1b`, `| 0x1d`); the item and
+mini-house opcodes come from the 2016 PDB struct names of their pointers (`bixi_Pointer` is a
+`PROTO_NC_BRIEFINFO_ITEMONFIELD_CMD*`, `bixmh_Pointer` a `PROTO_NC_BRIEFINFO_MINIHOUSE_CMD*`; the write itself was not
+located) and are confirmed by the client handlers below.
+
+```pseudo
+bixm_Exchange / bixi_Exchange / bixmh_Exchange / bixmv_Exchange / bixp_Exchange (batch, me, other)
+        @ FUN_0043fe40 / FUN_004401a0 / FUN_004403e0 / FUN_00440690 / FUN_004407d0
+    # me = the player the exchange runs for; other = the object the map walk found
+    (mover, pet) me, other or batch pointer null: return
+    me.layer.l_Main ≠ other.layer.l_Main and neither is −1: return
+    (mini-house only) if so_SubLayer_CanSee(me, other): me.so_SendMyBriefInfo(other)   (vt 0x4c8)
+    if !so_SubLayer_CanSee(other, me): return            # (a, b) = "b may see a" (Z02 §5.2 table DAT_0d67a118)
+    if me.so_ObjectType (vt 0x4d0) ≠ 2: return            # receivers are players only
+    if batch.count > 27: bix*_Send(batch, me); batch.count = 0
+    (item only) me.vt[0x538](other)                       # (original bug) Z18-B16, see below
+    other.so_FillBriefInformation (vt 0x4c4)(&batch.entries[count]); count++
+
+bixm_Send / bixi_Send / bixmh_Send / bixmv_Send / bixp_Send (batch, me)
+        @ FUN_0043d6a0 / FUN_0043da30 / FUN_0043dc90 / FUN_0043e0d0 / FUN_0043e200
+    if count == 0 (or a null pointer): return
+    if me.vt[0x4d0]() == 2 and me.smo_GetMode (vt 0x484) ≠ 0:
+        pp_SetPacketLen(count × entry + 3)   (failure: assert "BriefInfoExchange<X>::bix<x>_Send")
+        me.so_GetGameSocketStream (vt 0x2fc).append(me, packet)          # into me's outgoing buffer
+    # Send does not reset count: the Exchange caller does, or the next bixall_Init
+
+bixm_Init / bixmv_Init / bixp_Init (batch)                @ FUN_0043c630 / FUN_0043c810 / FUN_0043c8a0
+    first call (pointer null): pp_Buffer = own array, pp_BufferSize = 4321 / 4031 / 1827, opcode 0x1C09 / 0x1C1B / 0x1C1D,
+        pointer = payload; count = 0   (mover: assert "BriefInfoExchangeMover::bixmv_Init : bixmv_Pointer NULL" if null)
+    later calls: count = 0
+bixall_Init()                                             @ FUN_0043d500
+    briefchar / door / effect / item / magfld / minihouse counts = 0; bixm_Init; bixa_Init(_char); bixa_Init(_mob);
+    bixmv_Init; bixp_Init
+    # callers: sp_NC_MAP_LOGINCOMPLETE_CMD (Z01 §6), sp_ReSetSendMyBriefInfo FUN_00441b10, so_ply_SendBriefInfo_MoveLayer
+    # FUN_00441ed0 (Z09 §9.6)
+```
+
+`ShineDropItem` overrides vt 0x538 with `so_drpitm_CanLootingBitSet(viewer)` FUN_0052a420 (writes `attr.looting`, bit 3
+of the entry's last byte, from vt 0x53c "can this viewer loot", Z09 §11.3). The item exchange calls the slot on **me**
+(the player; disassembly 0x44025b: `mov ecx, edi` = me, `push esi` = item), where it is the empty base stub
+FUN_00549070 (`ret 4`), so the item's brief keeps the looting bit last computed for some other player
+(original bug) Z18-B16. Z09 §11.3 notes the same stale bit for the single 0x1C0A path.
+
+Client (C01 `re-data/client-handlers.json`, scene `GameFrameWork`): 0x1C09 `On_NC_BRIEFINFO_MOB_CMD` FUN_004a9c10,
+0x1C0B `On_NC_BRIEFINFO_ITEMONFIELD_CMD` FUN_004998c0 (`DropItemMgr::Add` per 15-byte entry; the pickable flag comes from
+`attr.looting`), 0x1C14 FUN_004999c0, 0x1C1B FUN_00646ef0, 0x1C1D FUN_006492f0, 0x1C07 FUN_004a0540, 0x1C19 FUN_004a5560.
+Each walks `count` entries of the sizes above; none has an error code.
+
+### 2.2 The abstate batch: one 0x1C19 per object
+
+```pseudo
+BriefInfoExchangeAbstate::bixa_Init(batch)                @ FUN_0043c6b0
+    only when bixa_Pointer is null (the first call): for each of the 28 buffers: pp_Buffer = its 341-byte array,
+        pp_BufferSize = 0x155, opcode 0x1C19, handle = 0xFFFF, count = 0; then bixa_count = 0, pointer = buffer 0
+    later calls change nothing (bixa_count is not reset here)
+
+bixa_Exchange(batch, me, other)                           @ FUN_00440510
+    me.layer.l_Main ≠ other.layer.l_Main and neither is −1: return
+    if !so_SubLayer_CanSee(other, me): return                       # me cannot see other
+    if so_SubLayer_CanSee(me, other):                               # and other can see me
+        bia_Fill(briefInformationAbstate, me)  (FUN_0043cc00, Z02 §5.1)
+        if its count ≠ 0: other.so_GetGameSocketStream (vt 0x2fc).append(other, that 0x1C19)   # me's abstates → other
+    if me is a player (vt 0x4d0 == 2):
+        if bixa_count > 28: bixa_Send(batch, me); bixa_count = 0
+        pkt = buffer[bixa_count]: handle = other.handle; count = 0
+        other.so_FillBriefABState (vt 0xa94)(pkt.infoList, &pkt.count)                         # other's abstates → me
+        bixa_count++
+
+ShineMobileObject::so_FillBriefABState(o, out, &n)        @ FUN_00417330
+    n = 0; for each active element of o's abstate list (vt 0x52c → asl_GetAbstateList):
+        if n > 27: return                                            # at most 28 entries = 28 × 12 + 5 = 341 bytes
+        out[n] = { abstateID = aeo_Index, restKeeptime = aeo_GetRestTime(), strength = aeo_GetStrength() }; n++
+
+bixa_Send(batch, me)                                      @ FUN_0043df50
+    if 0 < bixa_count < 29 and me is a player and me.smo_GetMode ≠ 0:
+        for each buffer i < bixa_count with count ≠ 0: pp_SetPacketLen(count × 12 + 5); me's stream.append(me, buffer i)
+        bixa_count = 0
+```
+
+The class holds **28** buffers (`bixaPacketbuffer[28]` *(pdb2016)*) but the exchange flushes only when `bixa_count > 28`,
+so a 29th object is written to `buffer[28]`, which lies on `bixa_nc` / `bixa_Pointer`: its `pp_Buffer` is read from
+`bixa_nc`, which still points at buffer 27, so the 29th object's list overwrites the 28th's. `bixa_count` is then 29, and
+the next flush (the 30th object, or `bixall_Send` at the end) refuses it (`< 29`): **all 29 packets are dropped** and
+the count is reset by the caller. A player who logs in, teleports or changes layer with 29 or more players (or 29 or
+more mobs / NPCs / servants / movers) in sight therefore does not get the abstate lists (buff and debuff effects) of
+the first 29 of them; objects 30–57 start a new batch, and so on (original bug) Z18-B15. Because `bixa_Init` does not
+reset the count, a batch that `bixa_Send` did not send (count 29, or a receiver with mode 0) is carried into the next
+exchange, where its first flush drops it.
+
+### 2.3 Brief packet objects and the tent view backup
+
+| Function | Address | What it does / where it plugs in |
+|---|---|---|
+| `BriefInformationCharacter::BriefInformationCharacter` | FUN_00549090 | the player's own appear packet (`sp_CharBriefInfo`, `p+0x7e34`, Z02 §5): buffer 0xEE, length 0xED, opcode 0x1C06 NC_BRIEFINFO_LOGINCHARACTER_CMD, `bic_BriefInfo` = payload (`p+0x7f32`); `type = 2`, `myguild = 0`, `isGuildAcademyMember = 0`; from the `ShinePlayer` ctor FUN_0055bc80 and the `ShineBandit` ctor FUN_0055b2c0 |
+| `BriefInformationCharacter::bic_SetAnimation(s)` | FUN_0043c250 | `strncpy(sAnimation, s, 32)` when `s` is not null; only from `sp_NC_MAP_LOGINCOMPLETE_CMD` (Z01 §6) with `""`, which clears a looping animation left from the last session |
+| `BriefInformationMob::BriefInformationMob` | FUN_00549120 | the mob's appear packet (`mob+0x1ecc`): buffer 0x98, length 0x97, opcode 0x1C08 NC_BRIEFINFO_REGENMOB_CMD; from the `ShineMob` ctor FUN_0055b140 |
+| `PROTO_NC_BRIEFINFO_BUILDDOOR_CMD::operator=` | FUN_00555af0 | field copy of the 0x30-byte door brief (handle, mobid, coord, doorstate, blockindex `Name8`, scale); used by `ShineDoor::so_FillBriefInformation` FUN_00555c00 (vt 0x4c4, Z09 §13.1) |
+| `PROTO_NC_BRIEFINFO_EFFECTBLAST_CMD::operator=` | FUN_005553d0 | the same for the 0x30-byte effect brief (handle, effectname `Name8`, coord, detach, scale, flag); used by `ShineEffectObject::so_FillBriefInformation` FUN_005554a0 |
+| `BriefInfoBackup::BriefInfoBackup` | FUN_0043c9b0 | `bib_Backuped = 0`; the player's `sp_MiniHouse.mhs_Backup` (`p+0x292ac`, flag `p+0x292d7` = knowledge Z02's "saved shapedata"; 0x2c bytes: `CHARBRIEFINFO_NOTCAMP bib_BriefInfo` 0x2b = the equipment view `PROTO_EQUIPMENT`, `bib_Backuped`); from the player ctor |
+| `BriefInfoBackup::bib_Backup(view)` | FUN_00456750 | if not yet backed up: copy the 0x2b view bytes, `bib_Backuped = 1` |
+| `BriefInfoBackup::bib_Restore(view)` | FUN_0042ab20 | if backed up: copy the 0x2b bytes back into the brief, `bib_Backuped = 0` |
+
+The brief's `shapedata` is a union of `notcamp` (equipment view) and `camp` (tent view). `sp_NC_ACT_PITCHTENT_REQ`
+FUN_00457760 (Z02 §7) backs the equipment view up, builds the tent view with `sp_MakeTentBriefInfo`, and restores the
+backup if that fails (then `so_SendErrorCode` vt 0x308 (8, 0x28, 0xA85); 0xA85 has no client text in
+`client-error-codes.json`). Folding the tent (`sp_NC_ACT_FOLDTENT_REQ` FUN_00457a90) and the mount / horse /
+booth paths (`sp_MoverSystem_GetOn` FUN_0045d7a0, `sp_HorseOn` FUN_0045f270, `sp_NC_BOOTH_OPEN_REQ` FUN_0058e900) do the
+same copy inline on the same member; `so_Prison_Go` FUN_005b94b0 restores it when it finds the player in mode 3 (and
+sets mode 1) before sending them to prison. `sp_NC_MAP_LOGINCOMPLETE_CMD` clears `bib_Backuped`.
+
+### 2.4 Server menus: building the menu, the summon flag
+
+Z02 §6.6 documents the open (`sp_ServerMenuOpen`), the answer 0x3C02 and the actor layout. The builders:
+
+```pseudo
+ShinePlayer::sp_ServerMenuTitle(p, title) → p            @ FUN_0054e8a0
+    g_buf (gpp): opcode 0x3C01 NC_MENU_SERVERMENU_REQ; payload.title[128] = strncpy(title, 128); menunum (+0x8d) = 0
+    sma_Clear(p.sp_NPCProcess.servermenuactor)            @ FUN_0050f660
+        the 10 slot callbacks and the cancel callback = the empty default; sma_bRangeCheck = 1; sma_Subst (count) = 0
+    p.sp_MiscFlag.BeSummoned (p+0x5cb9 bit 2) = 0
+
+ShinePlayer::sp_ServerMenuItem(p, callback, text, arg) → p   @ FUN_0054e990
+    i = payload.menunum
+    i ≥ 10: assert "ShineObjectClass::ShinePlayer::sp_ServerMenuItem : Too many items"; return p   (item dropped)
+    payload.menu[i] = SERVERMENU { u8 reply = i, string[32] = strncpy(text, 32) }      # entry 0x21 bytes at +0x8e
+    sma_Regist(actor, callback, arg)                       @ FUN_0050f710
+        sma_Subst ≥ 10: assert "ServerMenuActor::sma_Regist : Too many regist"
+        else slot[sma_Subst] = { 0x68-byte ServerMenuArgument copy, callback }; sma_Subst++
+    menunum++
+```
+
+Both return the player so calls chain (`Title(t).Item(a).Item(b)` then `sp_ServerMenuOpen`). The callers are
+`cServerMenu` FUN_005dab40 (Lua, Z09 §14.6), `NPCRole_Portal::nrb_Role` FUN_004c2ef0 and
+`NPCRole_RandomMulti_Portal::nrb_Role` FUN_004c3850 (Z02 §6.5), `itembreakmenu` FUN_0048ced0,
+`sp_SilverWingMenu` FUN_0059c090, `UseItemImmediateDivorce::uib_DirectUse` FUN_00596810 (Z02 §10),
+`WorldManagerSession::wms_NC_INSTANCE_DUNGEON_DELETE_DUNGEON_*` FUN_00484590,
+`ZoneRingPacketFindInstanceDungeon::zrpb_Query` FUN_005a6d10 and `ZoneRingPacketSummonPartner::zrpb_Success`.
+
+| Function | Address | What it does |
+|---|---|---|
+| `ServerMenuActor::ServerMenuActor` | FUN_0050ec70 | `sma_pPlayer = null`, `sma_Subst = 0`, cancel callback = the empty default (FUN_00509900, an empty member function whose PDB name `CGambleObject::go_SMC_WinRank` is identical-code folding) |
+| `ServerMenuActor::sma_SetPlayer(p)` | FUN_0050ecb0 | `sma_pPlayer = p`; from the player ctor |
+
+**The summon flag (answers Z02 §6.6 "the setter was not traced").** `p+0x5cb9` bit 2 is
+`sp_MiscFlag.BeSummoned` *(pdb2016)*. Its only setter is the wedding partner summon:
+
+```pseudo
+ZoneRingPacketSummonPartner::zrpb_Success(req, obj, ringPkt)      @ FUN_005a8680
+    t = som_FindPlayer(ringPkt+9 charNo); must be a player
+    arg = { map name (12 chars at ringPkt+0xd), x = ringPkt+0x19, y = ringPkt+0x1d }
+    t.sp_ServerMenuTitle(ss_String("Summons")).Item(smfm_LinkWithoutNPC, ss_String("Yes"), arg)
+                                         .Item(smfm_Cancel, ss_String("No"), empty)
+     .sp_ServerMenuOpen(priority 0, npc 0xFFFF, no position, limitRange 1000)
+    t.sp_MiscFlag.BeSummoned = 1
+ServerMenuFuncter::smfm_LinkWithoutNPC(p, arg)                   @ FUN_0050f1d0
+    if BeSummoned: p.so_LinkTo (vt 0x600)(arg, 6, 9, 10); BeSummoned = 0
+```
+
+With the flag set, 0x3C02 (Z02 §6.6) skips the 1000-unit range check, so the summoned partner can answer from anywhere;
+any later `sp_ServerMenuTitle` clears it. The request side (`zrpb_Request` FUN_005a83b0, skill `ss_SummonMate`) is Z13's
+(Z09 §28.4).
+
+### 2.5 Spam chat ban setter
+
+`ShinePlayer::so_SetSpamerChatBan(v)` FUN_00560a20 (vt 0xae8): `sp_Spammer_ChatBan` (`p+0x2aa54`) = v. The player ctor
+sets 0; the WM option 0x10D3 sets the value (Z12 §7.1); WM 0x0865 NC_MISC_SPAMMER_ZONE_CHAT_BAN_CMD writes the same
+member (Z01). Chat and shout read it (Z02 §3.1 `gmBlocked`, FUN_00560a30).
+
+---
+
 ## 3. Z03: combat, skills, abnormal states
 
 Rows "Abnormal states" (18) and "Skills, attacks and target scans" (35) of Z09 §31.2, the packets 0x2442 / 0x2443
@@ -975,6 +1164,170 @@ clear) run at login complete (Z01 §6).
 
 ---
 
+## 6. Z07: character titles, collection cards
+
+Z07 §1.3 covers the title list arriving from the WM (0x1031 → client 0x1049), Z08 §7.2 the client's "set current
+title" request 0x6001 and the title → abstate table, Z09 §17.8 the Lua counter `cCharTitleAddValue`, W04 §7 / D04 §4.2
+the WM and DB side of dept 24 (NC_CT). This section adds the zone's title objects, the unlock check and the Lua grant.
+
+### 6.1 Title objects
+
+`ShinePlayer::sp_CharacterTitle` (`p+0x29638`, returned by vt 0x420 `so_GetCharacterTitle`) is a
+`CCharacterTitleZone : CCharacterTitle` (0xcd0 bytes *(pdb2016)*):
+
+| Offset | Member | Meaning |
+|---|---|---|
+| +0 | `m_pCharacterTitleData` | → `gCharacterTitleData` (`CharacterTitleData.shn`, rows `CHARACTER_TITLE_DATA` 0xac: Type, Permit (0 `TPT_PERMIT`), Refresh, then 4 × {Title[32], Value, Fame}) |
+| +4 | `m_Titles[128]` | `CT_TITLE`, one byte per title type: 2 bits per element 0–3 = `CT_ELEMENT_VALUE` (0 UNKNOWNED, 1 KNOWNED, 2 USABLE, 3 USE) |
+| +0x84 / +0x88 | `m_NumOfView` / `m_ViewArray[512]` | `CT_VIEW {Type, ElementNo}` list of the elements the player has (what 0x1049 and the save send) |
+| +0x488…+0x48c | `m_CurrentTitle`, `m_CurrentTitleElement`, `m_CurrentTitleMobID`, `m_pTitle` | the title worn and its display string |
+| +0x490 | `m_pPlayer` | owner |
+| +0x498 | `m_TitleValues[128]` | `TitleValueStruct {u64 TitleValue, int bTitleSave}`: the per-type progress counters (Z09 §17.8 `TitleAddValue`) |
+| +0xc98… | money give / beg, killed-by-mob, party join, booth / auction seller, upgrade item | anti-farming memory of the `CT_*` counter functions (the 30 s rules, Z06 §1.4) |
+
+| Function | Address | What it does |
+|---|---|---|
+| `CCharacterTitleZone::CCharacterTitleZone(data)` | FUN_005ca5c0 | base ctor `CCharacterTitle(data)` FUN_0062e4e0, `m_pPlayer = null`, `m_TitleValues` zeroed (0x800 bytes); from the player ctor and the static `ShineObject` default object |
+| `CCharacterTitleZone::ctz_SetObject(p)` | FUN_005ca610 | `m_pPlayer = p`; from the player ctor and `FieldMap::fm_Init` FUN_00464bc0 |
+| `CCharacterTitleData::GetGroupData(type)` | FUN_0062df60 | row `type` of `CharacterTitleData.shn` or null (`type ≥ nNumOfRecord`) |
+| `CCharacterTitleData::GetTitleValue(type, e)` / `GetTitleFame(type, e)` / `GetTitleString(type, e)` | FUN_0062e000 / FUN_0062e070 / FUN_0062df90 | `Value<e>` / `Fame<e>` (0 when out of range) / `Title<e>` (`szCTNull` when out of range) of the row |
+| `CCharacterTitleData::IsTitlePermit(type)` | FUN_0062e0e0 | `row.Permit == TPT_PERMIT` |
+| `CCharacterTitle::GetTitleStatus(type, e)` | FUN_0062e180 | the 2-bit element value (UNKNOWNED for type ≥ 128 or e > 3) |
+| `CCharacterTitle::IsUnknownedTitle(type, e, mob)` / `IsKnownedTitle(type, e, mob)` | FUN_0062e1f0 / FUN_0062e220 | for type 0 and 10 (weapon title): 0 / 1; else status == 0 / status **> 0** (`mob` unused) |
+| `CCharacterTitle::SetTitleStatus(type, e, v)` | FUN_0062e440 | writes the 2 bits, then `AddView(type, e)` FUN_0062e280 (append `{type, e}` to `m_ViewArray` unless present; at most 128 × 4 = 512 distinct pairs fit) |
+| `CCharacterTitleDataStateServer::GetStateData(type, e)` | FUN_005ca9b0 | `&m_CT_DataState[type × 4 + e]` (type < 128, e < 4, else null): the title → abstate rows (Z08 §7.2 `DAT_1328c128`); read by `sp_NC_MAP_LOGINCOMPLETE_CMD` and `sp_ReviveNow` FUN_0057d290 to apply the worn title's abstates |
+| `ShinePlayer::sp_SetCharTitleChangeAvailableTime(t)` | FUN_00560900 | `sp_NextCharTitleChangeTime` (`p+0x2aa48`) = t: login complete sets 0, 0x6001 sets `g_Now + 100` (Z08 §7.2, 10 s) |
+
+```pseudo
+CCharacterTitleDataStateServer::Read(file, …)             @ FUN_005ca790
+    # gCharacterTitleDataStateServer = 512 × CT_DataState {u8 nStateNum; 6 × {u8 nStrength, AbStateStr* pAbStateDic,
+    #   pAbStateMainDic}} (0x4c each) + the reader; file ../9Data/Shine/CharacterTitleStateServer.shn
+    #   (loaded at start-up, "Fail to read CharacterTitleStateServer.shn"); columns Type, TitleLV, StateName[32], Strength
+    read the file (failure: return 0); clear all 512 entries
+    for each row: d = &m_CT_DataState[row.TitleLV + row.Type × 4]       # neither index is range-checked
+        n = d.nStateNum; if n > 6: return 0                              # n == 6 passes (original bug) Z18-B20
+        d.StateData[n] = { nStrength = row.Strength, pAbStateDic = as_FromName(row.StateName) }
+        unknown state: assert "CCharacterTitleDataStateServer::Read : pAbStateDic is NULL. …"; return 0
+        if its MainStateInx is not "-": pAbStateMainDic = as_FromName(MainStateInx) (unknown: return 0)
+        d.nStateNum = n + 1
+```
+
+The 2016 table has 823 rows for 299 (type, level) pairs, at most 6 per pair and types ≤ 127, levels ≤ 3, so neither
+gap is reached by the shipped data.
+
+### 6.2 Unlocking titles: `CheckNewTitle`
+
+Every progress change ends here: `TitleAddValue` / `TitleSetValue` FUN_005cbc20 and the 21 `CT_*` counter functions
+(`CT_LevelUp` Z11 §7.3, `CT_ItemUpSuccess` Z05 §8.1, the money / booth counters Z06 §1.4, `CT_Chatting` / `CT_AddFrined` Z08
+§7.2, …).
+
+```pseudo
+CCharacterTitleZone::CheckNewTitle(t, type) → int          @ FUN_005cb5f0
+    row = GetGroupData(type); if !row or !IsTitlePermit(type): return 0
+    V[e] = GetTitleValue(type, e), e = 0..3;  S[e] = GetTitleStatus(type, e);  x = m_TitleValues[type].TitleValue (u64)
+    switch type:
+      9 ID_NOKILLED_BY_MOB:  if x ≠ 0: return 0                 # died to a mob at least once
+                             x = p.so_GetLevel (vt 0x4d8)        # then "reach level V[e] without dying"
+      6 ID_MONEY_GIVE:       threshold = V[e] × 1 000 000       # values in gold (copper × 10⁶)
+      7 ID_MONEY_BEG:        threshold = V[e] × 1 000
+      0x2b ID_CHAR_TITLE:    x = x × 100 / 512                  # owned elements in percent of 128 × 4
+      15 ID_MY_GUILD_GRADE:  as below, for all four elements, and then for each element with x < V[e] and S[e] ≥ 2:
+                             SetTitleStatus(type, e, KNOWNED)   # the title is taken back when the grade drops
+      3, 4, 8, 11–14, 16–42, 45–56, 58–116, 120–127 (counters): threshold = V[e]
+      0, 1 EXP, 2 CLASS, 5 MONEY, 10 WEAPON_TITLE, 44 FAME_COUNT, 57 CLBETA_TITLE, 117–119 OLYMPIC_MEDAL_*: return 0
+                             # never unlocked here: granted by other code or by script (§6.3)
+    for e in 0..3: if x ≥ threshold[e] and S[e] < 2: r = SetTitleUsable(type, e)
+    return r of the last call (0 when none ran)
+
+CCharacterTitleZone::SetTitleUsable(t, type, e)            @ FUN_005cb0b0
+    fame = GetTitleFame(type, e); if fame ≠ 0: p.so_GainFame (vt 0x20)(fame); p.so_ply_SaveFame (vt 0x450)()
+    return SetTitleStatus(type, e, USABLE)
+
+CCharacterTitleZone::SetTitleStatus(t, type, e, v) → 0/1   @ FUN_005caf70
+    old = GetTitleStatus(type, e); if !CCharacterTitle::SetTitleStatus(type, e, v): return 0
+    if old ≠ v:
+        info = CT_INFO { Type = type, ElementNo = e, ElementValue = v }
+        p ← 0x6004 NC_CT_SET_CMD { CT_INFO Info }                                        @ Send_NC_CT_SET_CMD FUN_005cab90
+        Character DB ← 0x6005 NC_CT_DB_SET_CMD { u16 handle, u32 charNo, CT_INFO Info } @ Send_NC_CT_DB_SET_CMD FUN_005cac90
+            (charNo −1 or 0: assert "Send_NC_CT_DB_SET_CMD : invalid charregistnumber" / "… charregistnumber ", not sent)
+        if p has a name and charNo ≠ −1:
+            CAnnounceSystem::AnnounceSystem_CharacterTitle(gAnnounceSystem, name, type, e)   @ FUN_005b9100
+                row 6 of the announce table; if e ≥ row+0x104 (minimum element):
+                    WM ← 0x6401 NC_ANNOUNCE_Z2W_CMD type 6, text = sprintf(row+4, name, GetTitleString(type, e))
+                    (Send_PROTO_NC_ANNOUNCE_Z2W_CMD FUN_005b8d30, as the megaphone in Z04 §6.4)
+    return 1
+```
+
+`SetTitleStatusZone` FUN_005ca6d0 (Z07 §1.3, Z08 §7.2) writes the bits without any packet; 0x6001 calls it first so the
+following `SetTitleStatus` sees no change and stays silent.
+
+The client's `On_NC_CT_SET_CMD` FUN_004a97f0 appends `{Type, ElementNo}` to its title list (no duplicate check), prints
+TextData 0x3564277a "Character Title [%s] acquired." with the title string, opens play guide 0x2c and refreshes
+`CharTitleWin`. It ignores `ElementValue`. So every status change reaches the player as "acquired", including the
+guild-grade take-back to KNOWNED, which is also announced world-wide when the element passes the announce minimum
+(original bug) Z18-B17.
+
+### 6.3 Lua `cAddCharacterTitle(charNo, type, element)`
+
+```pseudo
+cAddCharacterTitle(L)                                      @ FUN_005eb310   (registered by ls_FuncSet, Z09 §14.9)
+    arg 1 nil or charNo == −1: return nothing
+    p = som_FindPlayer(charNo); e = element & 0x3f; info = CT_INFO { type, e, ElementValue = 2 (USABLE) }
+    if type == 0 or !GetGroupData(type) or e ≥ 4: return false
+    if p is not on this zone:
+        WM ← 0x6009 NC_CT_LUASCRIPT_SET_WORLD_CMD { u32 nCharNo, CT_INFO CTInfo }   (W04 §7; relay bug W04-B19)
+    else:
+        t = p.so_GetCharacterTitle
+        if !IsUnknownedTitle(type, e) and !IsKnownedTitle(type, e): return true     # unreachable: one test always holds
+        t.SetTitleStatus(type, e, USABLE)                 # 0x6004 / 0x6005 / announce when it changed (§6.2)
+    Character DB ← 0x6005 NC_CT_DB_SET_CMD { u16 0xFFFF, u32 charNo, CT_INFO info }
+    return true
+```
+
+`IsKnownedTitle` is "status > 0", so one of the two tests always holds: a script grant of a title the player is
+**wearing** (USE) sets it back to USABLE while `m_CurrentTitle` still names it; the client is told "acquired" again and
+the DB stores USABLE. For a fresh grant the DB gets 0x6005 twice (once from `SetTitleStatus`, once at the end), and
+for an already usable title once although nothing changed (original bug) Z18-B18. Fame is not given on this path
+(`SetTitleStatus`, not `SetTitleUsable`).
+
+### 6.4 The weapon title after `so_ply_EquipmentChange` (answers §8 / Z18-B9)
+
+`CCharacterTitle::SetCurrentTitle(type, e, mob, text)` FUN_0062e2e0 checks the status only for types other than 0 and
+10, so for the weapon title it always stores `m_CurrentTitle = 10`, `m_CurrentTitleElement = e`,
+`m_CurrentTitleMobID = mob` and `m_pTitle = GetTitleString(10, e)` (`szCTNull` for e > 3). With the garbage of Z18-B9
+the server keeps a wrong mob id and display string; nothing is sent to the client at that point. The next
+`so_SaveCharTitle` FUN_00453f30 (Z12) writes `CurrentTitleMobID` into the character's title save (the element is forced
+to 0 for type 10), so after the next login the WM's 0x1031 and the client's 0x1049 carry the garbage mob id (Z07 §1.3);
+the client then shows the weapon title of that mob, or none *(inferred: client lookup not opened)*.
+
+### 6.5 Collection cards
+
+Z07 §7 covers the COLLECT handlers and §4.5 of this file the card drops (`g_CardCollectMake`).
+
+```pseudo
+ShinePlayer::sp_CardCollectionSend(p)                      @ FUN_0044cc30   (from sp_NC_MAP_LOGINCOMPLETE_CMD, Z01 §6)
+    p ← 0x10E4 NC_CHAR_CLIENT_CARDCOLLECT_CMD { u32 chrregnum (not written), u16 number,
+            CardInform[number] { long RegistTime, u32 SerialNumber, u16 CardID, u8 StarNumber } (11 bytes) }  = album p+0x2aa94
+    p ← 0x10E7 NC_CHAR_CLIENT_CARDCOLLECT_BOOKMARK_CMD { u32 (not written), u16 number, {u16 Slot, u16 CardID}[number] }  = p+0x2aaa4
+    p ← 0x10EA NC_CHAR_CLIENT_CARDCOLLECT_REWARD_CMD { u32 (not written), u16 number, u16 RewardID[number] }  = p+0x2aab4
+    # each through so_GetDataSocketStream (vt 0x2f8); length 8 + n × entry; "Packet Too Long" assert otherwise
+    # the 4 header bytes keep whatever the shared send buffer held (original bug) Z18-B19
+```
+
+Client: `On_NC_CHAR_CLIENT_CARDCOLLECT_CMD` FUN_0049cbb0 (`CollectWin::SetCard(CardID, Star, Serial, RegistTime)` +
+`SetNewest`), `…_BOOKMARK_CMD` FUN_0049cc30 (`SetBookmark(Slot, CardID)`), `…_REWARD_CMD` FUN_0049cca0
+(`SetReward(id, 1)`); all three read the count at +4 and do nothing while the collection window object
+(`GameFrameWork+0x1314`) does not exist. None reads the first 4 bytes. The album count is not capped here; a list longer than the send buffer fails the
+length assert and that packet is not sent.
+
+| Function | Address | What it does |
+|---|---|---|
+| `CardCollection::CardCollectionReward::CardCollectionReward` | FUN_00629150 | zero three pointers (an empty STL vector); the same code builds the album, bookmark and reward vectors in the player ctor and is shared (identical-code folding) by `ShineMover`, `SlotMachineScreenManager` and `gStateItemDataBox` |
+| `SHND::CommonData<CollectCard,…>::cd_Load(v)` | FUN_00629840 | `cd_Data = v` (the card table vector, Z07 §7 `CollectCard.shn`); the folded code is also called from the player ctor |
+| `BinaryDataBox<CollectCardMobGroup>::bdb_ReadData(path)` | FUN_00648d50 | `CDataReader::Read(path, 0x12, 0x24)`, fatal on failure; identical-code folding with the `ActiveSkillGroup.shn` reader (Z20 §2.1), which is its only caller seen |
+
+---
+
 ## 7. Original-server bugs
 
 | ID | Owner / handler | 2016 behaviour | Effect | Likely intent |
@@ -993,6 +1346,12 @@ clear) run at login complete (Z01 §6).
 | Z18-B12 | Z04 `Item_AdjUpgradeLevel` FUN_0053b560 / `Item_AdjFailCount` FUN_0053b700, §4.6 | an item id without `ItemDataBox` row leaves the index pointer null and reads `->data->Class` | crash; latent (callers pass items they looked up) | return 0 as for other classes |
 | Z18-B13 | Z04 `sp_DestroyItem` B FUN_00527b60, `sp_ItemInvenDelete` FUN_0051c590, §4.4 | key count in 7 bits (as Z11-B8) | more than 127 keys wrap the count (latent) | a wider count or several requests |
 | Z18-B14 | Z04 `RandomOptionTable::rot_FillOption` FUN_00493590, §4.5 | the option count is capped at 50 while `ItemOptionStorage` has 8 elements | a count > 8 would overwrite the attribute bytes after the options; latent (2016 counts 1…5) | cap at 8 |
+| Z18-B15 | Z02 `BriefInfoExchangeAbstate::bixa_Exchange` FUN_00440510 / `bixa_Send` FUN_0043df50, §2.2 | 28 buffers, flush only at count > 28, and `bixa_Send` refuses count 29 | in a full exchange (login, teleport, layer change) with ≥ 29 players or ≥ 29 mobs / NPCs / servants / movers in sight, the 29th list overwrites the 28th and all 29 abstate packets are dropped (repeats every 29 objects) | flush at count ≥ 28 (`> 27`, like the other batches) |
+| Z18-B16 | Z02 `BriefInfoExchangeItem::bixi_Exchange` FUN_004401a0, §2.1 | calls vt 0x538 on the receiving player (an empty stub) instead of on the drop item | batched 0x1C0B entries carry the `looting` bit last computed for another player: the client shows items as pickable / not pickable wrongly until the next 0x1C0A | `item.so_drpitm_CanLootingBitSet(me)` |
+| Z18-B17 | Z07 `CCharacterTitleZone::SetTitleStatus` FUN_005caf70 via `CheckNewTitle` type 15, §6.2 | any status change sends 0x6004 and the world announce, also the take-back to KNOWNED | when the guild grade drops, the player reads "Character Title [..] acquired." and the world may be told they earned it | send 0x6004 / announce only for USABLE (or send the new value and let the client remove the title) |
+| Z18-B18 | Z07 Lua `cAddCharacterTitle` FUN_005eb310, §6.3 | `IsKnownedTitle` is "status > 0", so the grant always runs; the trailing 0x6005 is unconditional | a granted title that is worn (USE) is set back to USABLE while still current; a fresh grant is saved twice, an unchanged one once | test `status < USABLE`; send 0x6005 only from `SetTitleStatus` |
+| Z18-B19 | Z07 `ShinePlayer::sp_CardCollectionSend` FUN_0044cc30, §6.5 | the `chrregnum` header (payload +0..3) of 0x10E4 / 0x10E7 / 0x10EA is not written | 4 stale bytes of the shared send buffer go to the client (it ignores them) | write the character number or 0 |
+| Z18-B20 | Z07 `CCharacterTitleDataStateServer::Read` FUN_005ca790, §6.1 | `nStateNum > 6` is refused but 6 is accepted, and Type / TitleLV are not range-checked | a 7th state row for one title (or a type ≥ 128 / level ≥ 4) writes past `StateData[6]` / the 512 entries; latent, the 2016 table has at most 6 rows per title | refuse `nStateNum ≥ 6`; check the indices |
 
 ## 8. Not reconstructed / uncertain
 
@@ -1013,9 +1372,17 @@ clear) run at login complete (Z01 §6).
   the vtable names *(pdb2017)*.
 - §4.2: the two "Old" conflict scans count a worn / view item without `ItemInfoServer` or equip row as covering every
   slot; whether that is a deliberate safety net or an oversight is open (no such item in the 2016 tables).
-- §4.3 / Z18-B9: what the garbage weapon title changes for other players (brief info, title packets) is Z07's title
-  code (part 4 of this item).
+- §4.3 / Z18-B9: answered in §6.4 (wrong mob id / string on the server, saved and shown after the next login); how the
+  client renders a weapon title with an unknown mob id was not opened.
 - §4.4: lock-list slots 0x44 (small-cell replace) and 0x6c (`LinkInformTemplete` carried with the lock) were read only
   from their call sites; the `0x345A` side that applies them is Z05 §6.4.
 - §4.8: `ili_Check` skips notes whose first target is type 3 / 12–16 or whose first source is type 2 (mini-house and
   reward boxes); type 12 is not a box Z04 §1.1 lists *(inferred: a reserved mini-house type)*.
+- §2.1: the opcode writes of the item (0x1C0B) and mini-house (0x1C14) batch buffers were not located (no init function
+  in the export; the names come from the PDB pointer types and agree with the client handlers' entry sizes).
+- §2.2: whether a receiver with `smo_GetMode == 0` ever reaches `bixa_Send` (which would carry its batch to the next
+  player's exchange) was not checked; login complete sets the mode before the exchange.
+- §6.2: what unlocks types 1 EXP, 2 CLASS, 5 MONEY, 44 FAME_COUNT, 57, 117–119 (no `CheckNewTitle` case) was not
+  searched beyond the Lua grant (§6.3); `CT_*` counters other than those named in §6.2 are documented by their callers.
+- §6.2: after the type-15 take-back the worn title (`m_CurrentTitle`) is not cleared; whether its abstates stay until
+  the next 0x6001 / login was not followed *(inferred: they stay)*.

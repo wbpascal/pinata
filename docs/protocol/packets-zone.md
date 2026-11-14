@@ -3084,15 +3084,15 @@ Sent from `FUN_004cbb30` (`FUN_004cbb30`) · payload variable (iVar4)
 
 ### `0x10e4` NC_CHAR_CLIENT_CARDCOLLECT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_CARDCOLLECT_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+**Verified layout** (basis: zone FUN_0044cc30 (sp_CardCollectionSend, login complete); client FUN_0049cbb0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | chrregnum |  |
+| 0 | u32 | chrregnum | not written: stale send-buffer bytes (Z18-B19); unread by the client |
 | 4 | u16 | number |  |
-| 6 | PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform[number] | CardList | variable length, element PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform |
+| 6 | CardInform[] | CardList | {i32 RegistTime, u32 SerialNumber, u16 CardID, u8 StarNumber} |
 
-Element `PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform` (11 bytes): +0 i32 RegistTime, +4 u32 SerialNumber, +8 u16 CardID, +10 u8 StarNumber
+length 6 + number × 11 (Z18 §6.5)
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`) · payload variable (iVar3)
 
@@ -3102,15 +3102,15 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`
 
 ### `0x10e7` NC_CHAR_CLIENT_CARDCOLLECT_BOOKMARK_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+**Verified layout** (basis: zone FUN_0044cc30 (sp_CardCollectionSend, login complete); client FUN_0049cc30)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | chrregnum |  |
+| 0 | u32 | chrregnum | not written: stale send-buffer bytes (Z18-B19); unread by the client |
 | 4 | u16 | number |  |
-| 6 | PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo[number] | ViewList | variable length, element PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo |
+| 6 | CardBookmarkInfo[] | ViewList | {u16 Slot, u16 CardID} |
 
-Element `PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo` (4 bytes): +0 u16 Slot, +2 u16 CardID
+length 6 + number × 4 (Z18 §6.5)
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`) · payload variable (iVar3)
 
@@ -3120,13 +3120,15 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`
 
 ### `0x10ea` NC_CHAR_CLIENT_CARDCOLLECT_REWARD_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_CARDCOLLECT_REWARD_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+**Verified layout** (basis: zone FUN_0044cc30 (sp_CardCollectionSend, login complete); client FUN_0049cca0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | chrregnum |  |
+| 0 | u32 | chrregnum | not written: stale send-buffer bytes (Z18-B19); unread by the client |
 | 4 | u16 | number |  |
-| 6 | u16[number] | RewardID | variable length |
+| 6 | u16[] | RewardID |  |
+
+length 6 + number × 2 (Z18 §6.5)
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`) · payload variable (iVar3)
 
@@ -3370,14 +3372,14 @@ Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePla
 
 ### `0x1c09` NC_BRIEFINFO_MOB_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_BRIEFINFO_MOB_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_0043fe40 / FUN_0043d6a0 (BriefInfoExchanger); client FUN_004a9c10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | mobnum |  |
-| 1 | PROTO_NC_BRIEFINFO_REGENMOB_CMD[mobnum] | mobs | variable length, element PROTO_NC_BRIEFINFO_REGENMOB_CMD |
+| 0 | u8 | mobnum | entries, at most 28 per packet |
+| 1 | PROTO_NC_BRIEFINFO_REGENMOB_CMD[] | entries | 149 bytes each (2016 PDB struct PROTO_NC_BRIEFINFO_REGENMOB_CMD) |
 
-Element `PROTO_NC_BRIEFINFO_REGENMOB_CMD` (149 bytes): +0 u16 handle, +2 u8 mode, +3 u16 mobid, +5 u32 coord.xy.x, +9 u32 coord.xy.y, +13 u8 coord.dir, +14 u8 flagstate, +15 byte[99] flag, +114 char[32] sAnimation, +146 u8 nAnimationLevel, +147 u8 nKQTeamType, +148 u8 bRegenAni
+full brief-info exchange batch to one player (login complete, regen, teleport, layer move, hide-except-me off); objects of kind 4 NPC, 5 mob, 10 servant; length 1 + n × 149 (Z18 §2.1)
 
 Sent from `FUN_00478e40` (`FUN_00478e40`) · payload variable ((byte)
 
@@ -7192,12 +7194,14 @@ Sent from `CCharacterTitleZone::Send_NC_CT_SET_CURRENT_ACK` (`FUN_005ca9e0`) · 
 
 ### `0x6004` NC_CT_SET_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CT_SET_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_005cab90 (Send_NC_CT_SET_CMD) from SetTitleStatus FUN_005caf70; client FUN_004a97f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | Info.Type |  |
-| 1 | u8 | Info.ElementNo|ElementValue | bits ElementNo:6@0, ElementValue:2@6 |
+| 0 | u8 | Info.Type | title type (CHARACTER_TITLE_TYPE) |
+| 1 | u8 | Info.ElementNo:6 / ElementValue:2 | element 0-3; new status in bits 6-7 (ignored by the client) |
+
+sent on every title status change; client appends the element to its list and prints "Character Title [%s] acquired." (TextData 0x3564277a) (Z18 §6.2, Z18-B17)
 
 Sent from `CCharacterTitleZone::Send_NC_CT_SET_CMD` (`FUN_005cab90`) · payload 2 bytes
 
@@ -11046,6 +11050,28 @@ also sent for items of the 29 classes without own builder; client: Char::UnEquip
 
 client: Char::Equip(item, upgrade); title type 10 shown and item class 5 → weapon title by (mob, level) or off for 0xFFFF
 
+### `0x1c0b` NC_BRIEFINFO_ITEMONFIELD_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_004401a0 / FUN_0043da30 (BriefInfoExchanger); client FUN_004998c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | itemnum | entries, at most 28 per packet |
+| 1 | PROTO_NC_BRIEFINFO_DROPEDITEM_CMD[] | entries | 15 bytes each (2016 PDB struct PROTO_NC_BRIEFINFO_DROPEDITEM_CMD) |
+
+full brief-info exchange batch to one player (login complete, regen, teleport, layer move, hide-except-me off); objects of kind 1 drop item (attr.looting bit stale: Z18-B16); length 1 + n × 15 (Z18 §2.1)
+
+### `0x1c14` NC_BRIEFINFO_MINIHOUSE_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_004403e0 / FUN_0043dc90 (BriefInfoExchanger); client FUN_004999c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | minihouses | entries, at most 28 per packet |
+| 1 | PROTO_NC_BRIEFINFO_MINIHOUSEBUILD_CMD[] | entries | 64 bytes each (2016 PDB struct PROTO_NC_BRIEFINFO_MINIHOUSEBUILD_CMD) |
+
+full brief-info exchange batch to one player (login complete, regen, teleport, layer move, hide-except-me off); objects of kind 3 mini-house; length 1 + n × 64 (Z18 §2.1)
+
 ### `0x1c19` NC_BRIEFINFO_ABSTATE_CHANGE_LIST_CMD (S→C)
 
 **Verified layout** (basis: zone FUN_0043cc00)
@@ -11055,6 +11081,28 @@ client: Char::Equip(item, upgrade); title type 10 shown and item class 5 → wea
 | 0 | u16 | handle |  |
 | 2 | u8 | count |  |
 | 3 | ABSTATE_INFORMATION[count] | infoList | ABSTATE_INFORMATION × count |
+
+### `0x1c1b` NC_BRIEFINFO_MOVER_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00440690 / FUN_0043e0d0 (BriefInfoExchanger); client FUN_00646ef0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nMoverNum | entries, at most 28 per packet |
+| 1 | PROTO_NC_BRIEFINFO_REGENMOVER_CMD[] | entries | 139 bytes each (2016 PDB struct PROTO_NC_BRIEFINFO_REGENMOVER_CMD) |
+
+full brief-info exchange batch to one player (login complete, regen, teleport, layer move, hide-except-me off); objects of kind 11 mover; length 1 + n × 139 (Z18 §2.1)
+
+### `0x1c1d` NC_BRIEFINFO_PET_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_004407d0 / FUN_0043e200 (BriefInfoExchanger); client FUN_006492f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nPetCnt | entries, at most 28 per packet |
+| 1 | PROTO_NC_BRIEFINFO_REGENPET_CMD[] | entries | 63 bytes each (2016 PDB struct PROTO_NC_BRIEFINFO_REGENPET_CMD) |
+
+full brief-info exchange batch to one player (login complete, regen, teleport, layer move, hide-except-me off); objects of kind 12 pet; length 1 + n × 63 (Z18 §2.1)
 
 ### `0x201F` NC_ACT_SOMEONESHOUT_CMD (hand-named) (S→C)
 
@@ -11430,6 +11478,23 @@ to every participant on the roller's map who is still in the party/raid; client 
 | 26 | u16 | PickItemID | drop+0x195 item ID at send time |
 
 to every participant still in the party/raid; client: 0x2008 → '%s acquired the %s item by rolling %d with the dice.' if PickItemID is a known item, else the error text
+
+### `0x3c01` NC_MENU_SERVERMENU_REQ (S→C)
+
+**Verified layout** (basis: zone FUN_0054e8a0 (sp_ServerMenuTitle), FUN_0054e990 (sp_ServerMenuItem), sp_ServerMenuOpen FUN_0054eaa0; client FUN_0049a950)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[128] | title |  |
+| 128 | u8 | priority |  |
+| 129 | u16 | npcHandle | 0xFFFF = no NPC |
+| 131 | u32 | npcPosition.x |  |
+| 135 | u32 | npcPosition.y |  |
+| 139 | u16 | limitRange | e.g. 1000 |
+| 141 | u8 | menunum | ≤ 10 |
+| 142 | SERVERMENU[] | menu | {u8 reply = index, char string[32]} (0x21 each) |
+
+answer 0x3C02 {u8 reply}; Z02 §6.6, Z18 §2.4
 
 ### `0x3c07` NC_MENU_OPENSTORAGE_FAIL_CMD (S→C)
 
@@ -12852,6 +12917,19 @@ to the Character DB (sock2gameDB); answer 0x345A (Z05 §6.4); no 2016 PDB struct
 | 50 | u16 | echo.licenseitem |  |
 | 52 | u16 | echo.weaponitem |  |
 
+### `0x6005` NC_CT_DB_SET_CMD (Z→DB)
+
+**Verified layout** (basis: zone FUN_005cac90 (Send_NC_CT_DB_SET_CMD), FUN_005eb310 (cAddCharacterTitle))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | player handle; 0xFFFF from cAddCharacterTitle |
+| 2 | u32 | header.charregnum |  |
+| 6 | u8 | Info.Type |  |
+| 7 | u8 | Info.ElementNo:6 / ElementValue:2 |  |
+
+to the Character DB (sock2gameDB); DB side D04 §4.2
+
 ### `0xac23` NC_DICE_TAISAI_DB_DICE_ROLL_RESULT_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_005161d0; = PDB)
@@ -13002,6 +13080,18 @@ to the Character DB (sock2gameDB); answer 0x345A (Z05 §6.4); no 2016 PDB struct
 |---|---|---|---|
 | 0 | u32 | hquest |  |
 | 4 | u16 | err | 0x981 ok, 0x982 dup, 0x983 full, 0x984+i map i missing, 0x988+i map i busy, 0x98C script |
+
+### `0x6009` NC_CT_LUASCRIPT_SET_WORLD_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_005eb310 (cAddCharacterTitle))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u8 | CTInfo.Type |  |
+| 5 | u8 | CTInfo.ElementNo:6 / ElementValue:2 | ElementValue = 2 (usable) |
+
+Lua title grant for a player not on this zone; WM relay W04 §7 (W04-B19)
 
 ### `0x6401` NC_ANNOUNCE_Z2W_CMD (Z→WM)
 
