@@ -1,0 +1,18 @@
+{
+  "_about": "Z22 (zone abnormal-state actor classes): layouts verified in the 2016 zone (NA2016 PDB structs) and the 2016 client handlers",
+  "packets": {
+    "zone": {
+      "0x245A": {
+        "dir": "S→C",
+        "name": "NC_BAT_AREADOTDAMAGE_CMD",
+        "basis": "zone FUN_0040d640 (SubAbnormalStateActorAreaDamage::sasa_Routine); dead twin FUN_0040dc60; client FUN_004b62f0",
+        "fields": [
+          [0, "u16", "abstate", "AbStataIndex of the area state"],
+          [2, "u16", "Centerobject", "handle of the caster (scan centre)"],
+          [4, "u8", "num", "records that follow; AreaDamage: scanned targets (max 30), untouched ones are all-zero records (Z22-B2)"],
+          [5, "targetinfo[num]", "target", "{u16 object, u32 resthp, u32 damage, u16 hpchangeorder} (12 bytes); client: object 0 / unknown skipped, damage number if > 0, resthp 0 = death"]
+        ]
+      }
+    }
+  }
+}
