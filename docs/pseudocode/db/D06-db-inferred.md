@@ -773,3 +773,269 @@ number, 2 invalid character number, 3 invalid amount, 4 character not found / de
 academy money; a DB error falls to 0xF98. In 2016 the handler only calls it with `0 < amount ≤` the money it has just
 read (D04 §9.3), so only 6 (concurrent withdrawal) and DB errors are reachable. A rebuild can keep the w00 body and map
 its negative codes to 1–6 in that order; nothing outside the Character server sees the codes except 0x986C's `Error`.
+
+## 6. Character DB (`w00_Character`), Character server: loading reports, login data, friend points, promotion, free stats
+
+Same conventions as §5 (Character exe has no PDB: parameter names come from the 2017 client PDB packet structs
+*(pdb2017)*, the backups' older procedure, the binary's log strings, or are *(ours)*). Wrapper return values were read
+from the asm epilogues (Ghidra shows most of them as `void`).
+
+### 6.1 Loading-failure reports: `usp_CharacterLoading` (11 vs 6), `usp_CharacterLoadingDetailInfo`
+
+The client reports a failed map load (0x0840, W04 §17.3); the WM adds `nCharNo` and `nWorldTime = time(NULL)` and forwards
+it as `0x0841 NC_MISC_DB_CLIENT_LOADING_BUG_DETECT_CMD` (D02 §5); the Character server stores it and answers nothing.
+
+```pseudo
+usp_CharacterLoading(@nCharNo int in, @dWorldTime datetime in, @sLoadingMapName varchar(16) in, @nFailType smallint in,
+                     @nLoadingFailCnt smallint in, @sFromMapName varchar(16) in, @sFromZoneIP varchar(16) in,
+                     @sToZoneIP varchar(16) in, @nToZonePort smallint in, @nSeqNo int out, @nRet int out)
+                     (names: inputs 3–9 = PROTO_NC_MISC_DB_CLIENT_LOADING_BUG_DETECT_CMD members (pdb2017); 1–5 and
+                      @nRet = the backups' 6-parameter procedure; @nSeqNo = its local variable / key column)
+    called by : SQL_usp_CharacterLoading @ FUN_0045c360 (log name `CSQLPCharacter::p_Set_Client_Loading_Bug_Detect`)
+                ← 0x0841 @ FUN_00420b80 (D02 §5)
+    binds     : 1 in ULONG→INTEGER +0 (nCharNo); 2 in TIMESTAMP→TIMESTAMP (11/11) +4 = localtime(nWorldTime), fraction 0;
+                3 in CHAR→VARCHAR buf 0x10 +0x14; 4 in USHORT→SMALLINT +0x24; 5 in USHORT→SMALLINT +0x26;
+                6 in CHAR→VARCHAR buf 0x10 +0x28; 7 +0x38 and 8 +0x48 the same (16-byte IP strings);
+                9 in USHORT→SMALLINT +0x58; 10 out SLONG→INTEGER +0x5C (handler presets 0); 11 out SLONG→INTEGER +0x60
+                (wrapper presets 0)
+    result    : wrapper returns 1 iff rc ∈ {0,1} and @nRet == 0 (asm: `mov eax,1` @ 0x45c608, else `xor eax,eax`
+                @ 0x45c5ce); otherwise logs "ERROR - …p_Set_Client_Loading_Bug_Detect, ret(%d), nRet(%d)" plus the SQL
+                diagnostics. On 1 the handler passes @nSeqNo to one DetailInfo call per error entry; on 0 none.
+    reads/writes: tCharacterLoading (2016 columns below)
+    body      : SET NOCOUNT ON; SET @nSeqNo = 0; SET @nRet = 0
+                BEGIN TRAN
+                SELECT TOP 1 @nSeqNo = nSeqNo FROM tCharacterLoading WITH (UPDLOCK, HOLDLOCK)
+                 WHERE nCharNo = @nCharNo ORDER BY nSeqNo DESC
+                SET @nSeqNo = @nSeqNo + 1
+                INSERT tCharacterLoading (nCharNo, nSeqNo, dWorldTime, sLoadingMapName, nFailType, nLoadingFailCnt,
+                                          sFromMapName, sFromZoneIP, sToZoneIP, nToZonePort)
+                VALUES (@nCharNo, @nSeqNo, @dWorldTime, @sLoadingMapName, @nFailType, @nLoadingFailCnt,
+                        @sFromMapName, @sFromZoneIP, @sToZoneIP, @nToZonePort)
+                IF @@ERROR <> 0: SET @nRet = -1001; ROLLBACK; RETURN
+                COMMIT
+    evidence  : the numbering, the insert and −1001 are the backups' body ("char loading save, 2009.6 By Luunar",
+                identical in Character.bak and w00_Character); the four extra inputs are what the 2016 handler binds; the
+                output @nSeqNo is required because the handler reuses parameter 10 as the detail rows' key (inferred);
+                the lock hint is ours (several Character-server workers may store reports of one character at once).
+
+usp_CharacterLoadingDetailInfo(@nCharNo int in, @nSeqNo int in, @nErrorNo smallint in, @nErrorData int in, @nRet int out)
+                     (names: CLBD_ErrorData { u16 nErrorNo, u32 nErrorData } (pdb2017), the parent's key)
+    called by : SQL_usp_CharacterLoadingDetailInfo @ FUN_0045c620 (log name `…p_Set_Client_Loading_Bug_Detec_Error_Data`)
+                ← 0x0841 @ FUN_00420b80, once per ErrorData entry (6-byte entries from packet +0x4A, count at +0x48)
+    binds     : 1 in ULONG→INTEGER +0 (nCharNo); 2 in SLONG→INTEGER +4 (@nSeqNo of the parent call); 3 in USHORT→SMALLINT
+                +8; 4 in ULONG→INTEGER +0xC; 5 out SLONG→INTEGER +0x10, preset 0
+    result    : same rule as the parent (1 iff rc ∈ {0,1} and @nRet == 0, asm @ 0x45c82c); the handler ignores it and
+                tries every entry
+    body      : SET NOCOUNT ON; SET @nRet = 0
+                INSERT tCharacterLoadingDetailInfo (nCharNo, nSeqNo, nErrorNo, nErrorData)
+                VALUES (@nCharNo, @nSeqNo, @nErrorNo, @nErrorData)
+                IF @@ERROR <> 0: SET @nRet = -1002          (code ours, in the family's −100x range)
+    evidence  : no source anywhere; the table and the code are ours, the columns are the bound values.
+```
+
+2016 tables (the backups' `tCharacterLoading` has only the first six columns):
+
+| Table | Columns | Source |
+|---|---|---|
+| `tCharacterLoading` | nCharNo int, nSeqNo int (per character, 1, 2, …), dWorldTime datetime, sLoadingMapName nvarchar(16), nFailType smallint, nLoadingFailCnt smallint, **sFromMapName nvarchar(16), sFromZoneIP varchar(16), sToZoneIP varchar(16), nToZonePort smallint**; key (nCharNo, nSeqNo) | first six *(db-backup)*; bold ones from the 2016 binds, names *(pdb2017)*, types ours; no key constraint name in the backups |
+| `tCharacterLoadingDetailInfo` *(ours)* | nCharNo int, nSeqNo int, nDetailNo int identity, nErrorNo smallint, nErrorData int; key (nCharNo, nSeqNo, nDetailNo) | the bound values; one row per CLBD_ErrorData entry, several per report, hence the identity |
+
+Values that make the insert fail, all from the client without a check *(inferred from the ODBC conversion rules)*:
+`nFailType`, `nLoadingFailCnt`, `nToZonePort` ≥ 0x8000 or `nErrorData` ≥ 2³¹ overflow `SMALLINT` / `INTEGER` (SQLSTATE
+22003, call fails, the report or detail row is lost and logged). The map names are copied 12 bytes + 4 zero bytes and so
+always terminated, but the two IP strings are copied as 16 raw bytes and bound as NUL-terminated: a client that fills all
+16 bytes makes the driver read `sFromZoneIP` on into `sToZoneIP`, and `sToZoneIP` on into the port and the zeroed
+`@nSeqNo` (at most 20 characters), so garbage is stored or the call fails on truncation (original bug) D06-B4. A normal
+client sends dotted IPv4 text (≤ 15 characters). What the client's `nFailType` / `nErrorNo` values mean was not traced
+(diagnostics only; no server logic depends on them).
+
+### 6.2 `p_Char_GetAllData` column 37 (D02-B19): the map-link scroll destination
+
+D02 §4.1 reads 37 columns; both backups' procedure ("2004.6 By CJC") returns 36. Column 37 is read with `DB_GetStr` into a
+21-byte zeroed buffer; when it is not `""` (compare @ FUN_0046bf70 with the empty string at 0x4b6667) and the name is
+in the map table (`ItemIndex_ToId(&DAT_006ecf7c, name)`, a generic name index; row +0x32 / +0x36 = regen X / Y), it
+replaces `currentmap` and the coordinates (@ FUN_0046e2e0).
+
+**Settled *(inferred, strong)*: column 37 = `tCharacter.sLinkScrollDestMap` *(ours)*, the value `usp_LinkScroll_SetDestMap`
+writes (§5.2).**
+
+- It is no column of the backups' `tCharacter`: the other map columns are `sLoginZone` (column 17) and `sKQMap`, which the
+  2016 binary reads separately (`{CALL p_Char_GetKQMap(?)}` @ FUN_0045a130; `nKQHandle, sKQMap, nKQX, nKQY, nKQD,
+  dKQDate`, present in both backups). No backup has a column or text containing `LinkScroll`, `DestMap`, `MapLink` or
+  `ReturnMap` (UTF-16 scan of both Character backups).
+- `usp_LinkScroll_SetDestMap` is the only 2016 write of a map name that nothing reads back, and column 37 the only
+  read of a map name that nothing writes; both are 12-byte map names (`Name3`), and both call strings are already in the
+  2015 Character binary (same feature generation).
+- The life cycle fits the override: written when a map-link scroll is consumed (0x34C9), cleared at every arrival on a
+  map (0x34CF from the zone's `sp_NC_MAP_LOGINCOMPLETE_CMD`). Only a character that disconnects between using the scroll
+  and arriving has a value at its next login, and it then starts at the destination map's regen point.
+
+So D02-B19 is a backup mismatch, not a 2016 bug. A rebuild:
+
+```pseudo
+ALTER TABLE tCharacter ADD sLinkScrollDestMap nvarchar(16) NOT NULL DEFAULT ''    (ours; '' = none)
+p_Char_GetAllData(@nCharNo int): the backups' SELECT plus, as the 37th item after dDeletedDate,
+    ISNULL(sLinkScrollDestMap, '') AS sLinkScrollDestMap
+```
+
+Type: `DB_GetStr` passes the column's `SQL_DESC_LENGTH` as the buffer length, so the declared length must stay ≤ 20 to
+fit the 21-byte buffer; `nvarchar(16)` matches `sLoginZone` (the backups' position-save procedure that also writes the KQ columns declares
+`@sLoginZone nvarchar(16)`, `@sKQMap nvarchar(16)`). A NULL value would make `SQLGetData` fail (no indicator, 22002) and leave the buffer empty,
+also "no override", but NOT NULL keeps it clean.
+
+### 6.3 `usp_Character_setFriendpoint` (2 markers, 3 binds) and `usp_Character_getFriendpoint`
+
+```pseudo
+usp_Character_setFriendpoint(@nCharNo int in, @nFriendPoint int in, @nRet int = 0 out)     (w00, "JK CHO 2014.8.19")
+    called by : SQL_usp_Character_setFriendpoint @ FUN_00460710 ← 0x1036 login (+1 for every friend, D02 §5) and
+                0x34BF NC_ITEMDB_UES_FRIEND_POINT_REQ @ FUN_0042ef20 (points − item cost, D03)
+    binds     : 1 in ULONG→INTEGER +0; 2 in SLONG→INTEGER +4; 3 out SLONG→INTEGER +8, preset 0 — but the call string is
+                `{CALL usp_Character_setFriendpoint(?,?)}` (two markers, also in the 2015 binary)
+    result    : 1 iff rc ∈ {0,1} and the buffer +8 == 0 (asm 0x460801–0x460808)
+usp_Character_getFriendpoint(@nCharNo int in, @nRet int = 0 out) → row { nFriendPoint int }  (w00, same author/date)
+    called by : SQL_usp_Character_getFriendpoint @ FUN_00460600 (same two callers); binds 1 in ULONG→INTEGER, 2 out SLONG
+                preset 0; result 1 iff rc ∈ {0,1} and the buffer == 0 (asm 0x4606d7–0x4606de); then DB_Fetch + DB_GetI32
+```
+
+- **D02-B8 confirmed for the w00 body, and harmless there.** Only the two marked parameters reach the server *(inferred:
+  ODBC sends parameters by marker number; parameter 3 has none)*; w00 declares `@nRet int = 0 output`, so the
+  two-argument call is legal and the procedure's `@nRet` stays local. The wrapper therefore tests its own preset 0 and
+  succeeds whenever the call executes. What is lost: `@nRet = −1111` (no such character) and `1` (`@@ROWCOUNT ≠ 1` after
+  the `EXISTS` check, only possible when the character is deleted in between). A real SQL error (deadlock, the
+  procedure's 5000 ms `LOCK_TIMEOUT`, error 1222) still reaches the wrapper as `SQL_ERROR` *(inferred)*. So the friend
+  point updates behave as designed.
+- The default is **required**: without `= 0` the call fails with error 201 ("expects parameter '@nRet'") on every
+  update, and neither the daily +1 nor the item exchange ever writes. A rebuild keeps the w00 signature exactly.
+- `getFriendpoint` tests `@nRet` before fetching its row: the D06-B1 dead check (§1.2 driver rule). For a missing
+  character the procedure returns no row: 0x34BF then compares the cost with 0 ("Lack FriendPoint" → 0x36C3, unless the
+  cost is 0) and 0x1036 skips the friend. `usp_Character_GetDiffFriendpoint` (0x1004, D02 §4) has the same shape.
+
+### 6.4 Promotion: `p_IsPromotionUser`, `p_Promotion_Get`, `p_Promotion_Set` (dead in 2016)
+
+No 2016 component sends `0xA001 NC_PROMOTION_USER_REQ` or `0xA004 NC_PROMOTION_DB_REWARD_REQ`: no opcode literal, no
+`.sends` entry and no `NC_PROMOTION_*` string in the login, WM or zone exports; the WM only handles the answers (0xA002
+no action, 0xA005 → client 0xA006, W01 §6.2). Even an arriving 0xA004 never reaches Get / Set (the reward table is never
+loaded, D02-B18). The three procedures are specified only so that the handlers have a contract.
+
+```pseudo
+p_IsPromotionUser(@nUserNo int in, @bIsPromotion tinyint out, @nRet int out)
+                     (bIsPromotion = PROTO_NC_PROMOTION_USER_ACK member (pdb2017); others ours / family style)
+    called by : SQL_p_IsPromotionUser @ FUN_0045b710 ← 0xA001 @ FUN_0041ef50 (D02 §13)
+    binds     : 1 in ULONG→INTEGER (copy of nUserNo); 2 out SQL_C_TINYINT→TINYINT into the handler's byte (preset 0);
+                3 out SLONG→INTEGER preset 1
+    result    : ok iff rc ∈ {0,1} and @nRet == 0 → 0xA002 DBError 0x1848, else 0x1849; bIsPromotion is sent either way
+    body      : SET NOCOUNT ON
+                SET @bIsPromotion = CASE WHEN EXISTS (SELECT 1 FROM tPromotionUser WHERE nUserNo = @nUserNo) THEN 1 ELSE 0 END
+                SET @nRet = 0                                  (tPromotionUser ours: nUserNo int PRIMARY KEY, dDate datetime)
+    evidence  : binds and codes only. What made an account a "promotion user" (an event registration) is in no backup;
+                the Character DB is per world, so the flag is per world account (inferred).
+
+p_Promotion_Get(@nUserNo int in, @nRewardLV tinyint in, @nWorldNo tinyint in, @nCharNo int out, @dRewardDate datetime out)
+    called by : SQL_p_Promotion_Get @ FUN_0045b7b0 ← 0xA004 @ FUN_0041eff0 (D02 §13)
+    binds     : 1 in ULONG→INTEGER +0 nUserNo; 2 in SQL_C_TINYINT→TINYINT +4 = request nLevel; 3 the same +5 = request
+                nWorldNo; 4 out ULONG→INTEGER +8, preset −1; 5 out TIMESTAMP +0xC (16 bytes, never read)
+    result    : ok iff rc ∈ {0,1} and @nCharNo ≠ −1. ok and @nCharNo == 0 → not rewarded yet, items are created;
+                ok and any other value → 0x1856 (already rewarded by that character); not ok → 0x1856 as well
+    body      : SET NOCOUNT ON; SET @nCharNo = 0; SET @dRewardDate = '1900-01-01'
+                SELECT @nCharNo = nCharNo, @dRewardDate = dDate FROM tPromotionReward
+                 WHERE nUserNo = @nUserNo AND nRewardLV = @nRewardLV AND nWorldNo = @nWorldNo
+                (tPromotionReward ours: nUserNo int, nRewardLV tinyint, nWorldNo tinyint, nCharNo int, dDate datetime,
+                 PRIMARY KEY (nUserNo, nRewardLV, nWorldNo))
+    evidence  : "none" must be 0, not NULL (−1 = failure, NULL breaks the call: §1.2); the parameter order level-before-
+                world is the struct the handler fills (+4 = byte 0xC of the request = nLevel, +5 = byte 6 = nWorldNo)
+                and the order of the Set failure log "nUser=%d, nRewardLV=%d, nWorld=%d, nCharNo=$d", which also gives
+                the name nRewardLV.
+
+p_Promotion_Set(@nUserNo int in, @nRewardLV tinyint in, @nWorldNo tinyint in, @nCharNo int in, @nRet int out)
+    called by : SQL_p_Promotion_Set @ FUN_0045b890 ← 0xA004 after every reward item was created
+    binds     : 1–3 as Get; 4 in ULONG→INTEGER +8 = request nCharNo; 5 out SLONG→INTEGER preset −1
+    result    : ok iff rc ∈ {0,1} and @nRet == 0; failure is only logged ("…But reward is successed…"), the 0xA005
+                answer still lists the items
+    body      : SET NOCOUNT ON
+                INSERT tPromotionReward (nUserNo, nRewardLV, nWorldNo, nCharNo, dDate) VALUES (…, GETDATE())
+                SET @nRet = CASE WHEN @@ERROR = 0 THEN 0 ELSE -1 END     (a key violation = already rewarded)
+```
+
+Get and Set are separate calls around the item creation, not one transaction: two 0xA004 of one account handled by two
+workers at once would both read 0 and both grant the items; the second Set then fails on the key and is only logged
+(original bug) D06-B5, in a path that is dead in 2016.
+
+### 6.5 `usp_Character_setStatPoint` −1091 / −1092 / −1094
+
+The binary's switch on `@nRet` (@ FUN_004135e0, jump table @ 0x4137c4) has one group for −1091…−1094 (cases −0x443…
+−0x446): log `자유스탯 설정 에러 : DB_ERROR CharNo %d ErrorNo %d` ("free-stat set error: DB_ERROR", string @ 0x4b0614)
+and return without `0x10D2` (D02-B10). The other codes have their own log texts, which confirm D02's reading of the
+backup body: −1024 "no init item" (→ 0xAC6), −1023 "can not delete item" (0x1094), −1022 "item lot" (0x1096), −1021
+"delete item lot" (0x1097), −1014 "not find char" (asm 0x413948–0x41399a).
+
+- Both backups' body (identical, "Ko Dong Gyun 2010.10.21") produces −1093 for the failed `UPDATE tCharacter`. −1091,
+  −1092 and −1094 occur in no procedure of either Character backup (UTF-16 scan for `1091`, `1092`, `1094`).
+- So −1091…−1094 is the DB-error class of the procedure; the 2016 body most likely had three more DB-error exits
+  numbered there (e.g. around the item writes, which the backup body reports as −1022 / −1023) *(inferred)*.
+- All four behave identically in the binary, so a rebuild can take the backup body unchanged: no visible behaviour
+  depends on which DB-error number is returned. Left open: which statements produced −1091 / −1092 / −1094.
+
+## 8. Version choices for Character procedures that have source (D02 / D03 *(db-backup)* points)
+
+(§7, run-time call strings, is written by a later part and goes before this section.)
+
+### 8.1 `p_Item_BuyAll` (10) / `p_Item_BuyLot` (8): follow w00
+
+| | Binary binds | Character.bak | w00_Character |
+|---|---|---|---|
+| `p_Item_BuyAll` @ FUN_00462380 | 1 SBIGINT→BIGINT key, 2 ULONG→INTEGER owner, 3 UTINYINT→TINYINT storage type, 4 USHORT→SMALLINT slot, 5 ULONG→INTEGER item ID, 6 ULONG→INTEGER flags, 7 SBIGINT→BIGINT price, 8 ULONG→INTEGER fame, 9 ULONG→INTEGER coin, 10 out ULONG→INTEGER nRet | 9 parameters, no `@nCoin` | `(@nItemKey bigint, @nOwner int, @nStorageType tinyint, @nStorage smallint, @nItemID int, @nFlags int, @nPrice bigint, @nFame int, @nCoin bigint, @nRet int OUTPUT)` = binary |
+| `p_Item_BuyLot` @ FUN_00462600 | 1 key BIGINT, 2 owner INTEGER, 3 USHORT→SMALLINT option type, 4 SBIGINT→BIGINT new lot, 5 SBIGINT→BIGINT price, 6 ULONG→INTEGER fame, 7 ULONG→INTEGER coin, 8 out nRet (preset −1) | 7 parameters, no `@nCoin` | `(…, @nPrice bigint, @nFame int, @nCoin bigint, @nRet int OUTPUT)` = binary |
+
+With the Character.bak copies every purchase fails (error 8144 "too many arguments", `SQL_ERROR`). w00's `@nCoin bigint`
+receives the binary's 32-bit value (implicit widening). `SQL_p_Item_BuyLot` returns `@nRet` without testing the
+`SQLExecDirect` result, so a failed call reads as its preset −1 (D03 §2 maps the codes).
+
+### 8.2 `usp_Character_setChatBan`: follow w00
+
+Binary @ FUN_0045e920: `{CALL usp_Character_setChatBan(?, ?, ?)}`, 1 in CHAR→WVARCHAR buf 0x28 (`sID`), 2 in
+ULONG→INTEGER (`nChatBan`), 3 out SLONG→INTEGER preset 0; returns 1 iff rc ∈ {0,1} and `@nRet ∈ {0, −3121}` (asm
+0x45ea29–0x45ea4d). w00 ("Ko Dong Gyun 2010.12.13", `@sID nvarchar(40), @nChatBan int, @nRet int = 0 output`) matches:
+−3121 no such (undeleted) character → 0x216A / 0x2172 "Can't find the character"; −3192 insert of the
+`tCharacterSingleOption` row failed and −3193 its update failed → wrapper 0 → 0x0864 `0x2169`, 0x0869 not sent at all
+(D02-B12). Character.bak has two truncated 2009.2.12 copies with other signatures (`@nRet int` alone; `@nCharNo int,
+@nExp bigint`, `bak.py` marks both `TRUNCATED?`); neither can run the 2016 call.
+
+### 8.3 `usp_Gamble_addCoin` and D03-B21
+
+Wrapper @ FUN_00466320: 1 in ULONG→INTEGER charNo +0, 2 in SBIGINT→BIGINT item key +8, 3 in SBIGINT→BIGINT coins
++0x10, 4 out SLONG→INTEGER `@nRet` +0x18 preset 0; returns 1 iff rc ∈ {0,1}, **`@nRet` is never tested**. w00 body
+("Ko Dong Gyun 2011.5.16", the only source): the key must be an item of the character, which it deletes before adding
+the coins; else −3331; −3311 / −3313 bad character / coin count; −3332 / −3329 / −3323 / −3326 write errors.
+
+- `0xBC19 NC_GAMBLE_COIN_DB_USE_COINITEM_REQ` (@ FUN_00424fc0, the coin item) passes the real key and maps `@nRet`
+  itself (D03 §11): the w00 body fits it.
+- `0xBC06 NC_GAMBLE_COIN_DB_ADD_REQ` (@ FUN_004248b0) leaves the key at +8 unwritten (D03-B21) **and answers `0x2828`
+  (ok) whenever the call executes**: `0x2829` only on a call failure. With the w00 body the garbage key matches nothing →
+  −3331 → the zone would be told "added" while no coin was added. Correction to D03 §11 (which lists 0x2829 as the
+  failure answer without saying that `@nRet` is ignored).
+- **0xBC06 is unreachable in 2016:** the zone never sends it and registers no `0xBC07` handler (its GameDB gamble
+  handlers are 0xBC0B, 0xBC12, 0xBC16, 0xBC1A; zone `handlers.json`), and the WM neither. D03-B21 has no effect in 2016,
+  and D03's verification step 8 ("buy/receive gamble coins (0xBC06)") cannot exercise it: coin purchases use 0xBC11, coin
+  items 0xBC19.
+- Were it reachable, the stack slot could hold a real item key of the same character left by an earlier request on the
+  same worker thread, and the procedure would delete that item *(inferred)*.
+
+A rebuild takes the w00 body for 0xBC19 and needs nothing for 0xBC06.
+
+### 8.4 Enchant procedures (`usp_Item_*Enchant*`): follow w00
+
+Only w00 has them (header "Author: <KHRISMIZER>, 2010.08.13", the SSMS template filled in; `bak.py` marks `3RD?`). Every
+parameter matches the 2016 binds in order, direction and type:
+
+| Procedure (wrapper) | Binary binds | w00 signature |
+|---|---|---|
+| `usp_Item_Add_EnchantGem` (FUN_00465540) | INTEGER, BIGINT, BIGINT, TINYINT +0x1C, INTEGER +0x18, TINYINT +0x1D, out INTEGER | `@nCharNo INT, @nEquipmentItemKey BIGINT, @nGemItemKey BIGINT, @nGemSocketIndex TINYINT, @nGemID INT, @nRestGemCount TINYINT, @nRet INT = 0 OUTPUT` |
+| `usp_Item_Del_EnchantGem` (FUN_00465640) | INTEGER, BIGINT, BIGINT, TINYINT, TINYINT, SMALLINT, out BIGINT, out INTEGER | `… @nResetSocketIndex TINYINT, @bNeedItem TINYINT, @nRemoverLotType SMALLINT, @nRemoverLotValue BIGINT OUTPUT, @nRet INT OUTPUT` |
+| `usp_Item_Add_EnchantSocket` (FUN_00465760) | INTEGER, BIGINT, BIGINT, out TINYINT, SMALLINT, out BIGINT, out INTEGER | `… @nDrillItemKey BIGINT, @nAllSocketCount TINYINT OUTPUT, @nDrillLotType SMALLINT, @nDrillLotValue BIGINT OUTPUT, @nRet INT OUTPUT` |
+| `usp_Item_Set_EnchantGemLot` (FUN_00465860) | INTEGER, BIGINT, TINYINT, TINYINT, out INTEGER | `@nCharNo INT, @nEquipmentItemKey BIGINT, @nSlot TINYINT, @nRestGemCount TINYINT, @nRet INT OUTPUT` |
+| `usp_Item_Get_EnchantAll` (FUN_00465930) | BIGINT, out INTEGER (+ result rows) | `@nEquipmentItemKey BIGINT, @nRet INT = 0 OUTPUT` |
+
+With the result codes D03 §6.2 found in the bodies (−101, −201, −202, −301, −302, all tested by the binary), this is the
+strongest compatibility the backups can give. Whether the bodies are the official 2016 ones or a private server's
+rewrite cannot be decided; a rebuild follows them. (`usp_Item_Get_EnchantAll` returns rows and `@nRet`: the wrapper does
+not test `@nRet`, so the D06-B1 timing does not matter there.)
