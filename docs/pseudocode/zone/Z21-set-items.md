@@ -18,7 +18,7 @@ The 2016 zone contains three separate mechanisms, of which only the second has a
 |---|---|---|---|---|
 | A | **Skill-effect sets** (legacy): equipped pieces per set → up to 10 "set effects" → per-cast multipliers (`SetIndex`, base 1000) on heal, damage, SP cost, cooldown, … of listed skills | `SetItem.shn`, `SetItemEffect.shn` | `ShinePlayer::sp_SetItemEffect` (`PlayerSetEffect`, p+0x2a7e0), `sp_SetEffectForJustSkill` (p+0x2a7de) | **dead**: neither table is loaded, the global tables stay empty, every multiplier stays 1000 (§3.9) |
 | B | **Item-action sets**: equipped pieces with the same `ItemInfo.SetItemIndex` name → `SetEffect.shn` row (set, count) → item action id added to / removed from the player's item actions | `SetEffect.shn` (+ `ItemInfo.SetItemIndex`) | the player's item-action list | live (§4) |
-| C | **Set-item abstate values**: up to 4 `{SetIndex, value}` pairs stored in an abnormal state when it is set, refitting the stats while it lasts; saved and restored with the state | — | `AbstateElementInObject::aeo_SetItemEffect` (`SetItemAbstateEffect`) | fed from mechanism A's `g_SetEffect`, so new states store nothing; DB-restored values still apply (§5, part 3) |
+| C | **Set-item abstate values**: up to 4 `{code, value}` pairs stored in an abnormal state when a skill sets it, refitting the target's stats or scaling its heal while it lasts; saved and restored with the state | — (fed by A and by B's item actions) | `AbstateElementInObject::aeo_SetItemEffect` (`SetItemAbstateEffect`) | live: the A source (codes 1…16) stores nothing, but the caster's `SkillEffectIncreaseType` item actions (codes 1000 + SEIT; 21 of them are set actions from `SetEffect.shn`) are stored, saved and restored (§5) |
 
 ## 2. Tables
 
@@ -255,7 +255,7 @@ only matter through mechanism C (Z12 §2.5 maps them onto the stat matrix).
 `sp_SetItemEffect.effectnumber` is always 0, so `smo_ply_SetItemEffect` only clears; every queue snapshot is 17 × 1000;
 `setitemskilleffect` never holds anything but 1000 (its only other writer, `siel_AppendEffect`, is never reached with an
 entry). Every multiplier in §3.7 is neutral, and `siae_SetItemEffectStore` (which skips values == 1000) never stores a
-value into a new abnormal state. A rebuild that loads the original tables unchanged reproduces 2016 behaviour by
+value into a new abnormal state (the item-action source of the same buffer is live, §5.3). A rebuild that loads the original tables unchanged reproduces 2016 behaviour by
 **not** loading `SetItem.shn` / `SetItemEffect.shn` (or by keeping every multiplier at 1000); implementing the legacy path
 would change game balance relative to 2016.
 
@@ -425,7 +425,7 @@ condition's `ConditionActivity`, enum `ActionActivityType`):
 
 | Effect activity | Actions | Meaning (Z17 owns the effect classes) |
 |---|---|---|
-| 5 `AAT_SkillEffectIncreaseType` (`ActionImpowerTypeEffect`) | 295 | skill empowerment, condition 7 `AAT_ActiveSkillGroupIndex` (the skill group cast) |
+| 5 `AAT_SkillEffectIncreaseType` (`ActionImpowerTypeEffect`) | 295 | skill empowerment, condition 7 `AAT_ActiveSkillGroupIndex` (the skill group cast); 21 of them (the `STA_*` subtypes) are stored in the abnormal state the skill sets (§5.3) |
 | 2 `AAT_ABSTATEINDEX` (`AbStateTypeEffect`) | 64 | an abnormal state (value = abstate id, e.g. 507, 525, 541) |
 | 1 `AAT_RecoverType` (`RecoverTypeEffect`, below) | 32 | 12 × `RT_HPABSOLUTEPLUS` (5…30 HP), 18 × `RT_SPABSOLUTEPLUS` (5…21 SP), 2 × `RT_HPABSOLUTEMINUS` |
 | 9 `AAT_SetItemEffectType` (`ActionEffectTypeEffect`) | 10 | damage rate 1100 / 900 (× 1.1 / × 0.9) against / from one mob type (`ObjectTarget` / `SubjectTarget` = `ATT_MobType` 0, 1, 2, 3, 5) |
@@ -514,9 +514,241 @@ spawns a floating number (`sprintf "%u"`, one digit sprite per character) in sty
 
 ## 5. Mechanism C: set-item values in abnormal states
 
-*(Part 3: `SetItemAbstateEffect::*` FUN_00510030…FUN_00510350, `aeo_SetItemEffectStore` FUN_00510670,
-`aeo_SetItemActionEffect` FUN_00510810, `aeo_FillSetItemEffect` FUN_004534f0, save `p_Char_SetStateWithSetItemAndRestTime`
-and restore at login; `siae_ParameterRefit` FUN_005108c0 is Z12 §2.5.)*
+Every abnormal-state element (`AbstateElementInObject`, 0x74 bytes, in the object's `smo_Abstate.abstatelist`, Z03 §6)
+carries a `SetItemAbstateEffect aeo_SetItemEffect`: four `{code, value}` pairs written when a skill sets the state on a
+target, read while it lasts (stat refit, heal over time, party recharge) and carried through map change, logout and
+login. Despite the name, its only live source in 2016 is the **caster's item actions** of activity
+`AAT_SkillEffectIncreaseType` (`SetEffect.shn` set actions among them, §5.3); the set-item source of mechanism A
+stores nothing (§3.8).
+
+### 5.1 Data structure and codes *(pdb2016)*
+
+```pseudo
+class SetItemData::SetItemAbstateEffect {          # 0x10, AbstateElementInObject.aeo_SetItemEffect
+    EffectBuffer siae_Buffer[4]                     # EffectBuffer { u16 eb_Index @0; u16 Argument_Base1000 @2 }
+}
+# empty slot = { eb_Index 0, Argument_Base1000 1000 }
+# eb_Index 1…16       = SetIndex (§3.1), source: mechanism A (dead)
+# eb_Index 1000 + t   = SkillEffectIncreaseType t (0…14), source: item actions (live)
+# 17…999, ≥ 1015      = never written by the zone; possible only from DB rows; read as "no code"
+
+enum SkillEffectIncreaseType {   # SEIT_*, the subtype of ItemActionEffect activity 5 AAT_SkillEffectIncreaseType
+    0 DAMAGE_RATE_INCREASE, 1 COOLTIME_RATE_DECREASE, 2 KEEPTIME_RATE_INCREASE, 3 USESP_RATE_DECREASE,
+    4 STA_AC_RATE_DECREASE, 5 AGGRO_RATE_INCREASE, 6 STA_DEX_RATE_DECREASE, 7 SS_RATE_THHPUP,
+    8 STA_MAX_HPSP_RATE_INCREASE, 9 STA_DEAD_HPSP_RECOVER_RATE_INCREASE, 10 STA_SHIELDAC_RATE_INDREASE,
+    11 HEAL_RATE_INCREASE, 12 STA_DOT_HEAL_RATE_INCREASE, 13 STA_WC_RATE_INCEASE, 14 STA_SHEILD_BLOCK_RATE_INCREASE,
+    15 MAX_SKILLEFFECTINCREASETYPE }          # (sic) spellings are the official ones
+# STA_* = "applies to the abnormal state": exactly the eight types §5.3 stores. The others are read at cast time
+# by the skill code (Z03 / Z09 §12, owner of the item-action evaluation Z17)
+```
+
+Constructors and clearing (all leave the four empty slots):
+
+```pseudo
+SetItemAbstateEffect::SetItemAbstateEffect()   @ FUN_00510350    # ctor; called by the element ctor
+                                                                  # AbstateElementInObject @ FUN_00406550 and for the
+                                                                  # stack "key" element of asl_Abstate_IsSet @ FUN_00409b10
+                                                                  # and asl_AbstateReset @ FUN_0040a930 (Z03 §6.2 / §6.4)
+siae_Clear()                                   @ FUN_00510030    # same body; called by aeo_Set @ FUN_0040a340
+# no destructor body: ~AbstateElementInObject @ FUN_00401b20 calls a shared empty COMDAT for the member
+```
+
+Accessors:
+
+```pseudo
+siae_GetArgument_Base1000(SetIndex s) → u16                     @ FUN_00510050
+    for i in 0..3: code = buf[i].eb_Index; if code > 16: code = 17 (MAX_SETINDEX)
+                   if code == s: return buf[i].Argument_Base1000
+    return 1000
+siae_GetArgument_Base1000ByEffect(SkillEffectIncreaseType t) → u16   @ FUN_00510090
+    for i in 0..3: code = buf[i].eb_Index; k = code < 1000 or code − 1000 > 14 ? 15 : code − 1000
+                   if k == t: return buf[i].Argument_Base1000
+    return 1000
+    # first match wins; 1000 = neutral
+```
+
+### 5.2 Writer 1: `aeo_SetItemEffectStore` (mechanism A source, stores nothing in 2016)
+
+```pseudo
+AbstateElementInObject::aeo_Set(e, …)                            @ FUN_0040a340   (Z03 §6.2)
+    … after e.aeo_RestCount is taken from the element class (vt 0x28), only when abstatetemplate has a node for
+      e.aeo_Index (the same test the tick setup uses):
+    siae_Clear(&e.aeo_SetItemEffect)                             # every (re)set starts empty: a refresh by another
+    aeo_SetItemEffectStore(e)                                    # caster drops the previous caster's values
+    …
+
+AbstateElementInObject::aeo_SetItemEffectStore(e)                @ FUN_00510670
+    siae_Clear(&e.aeo_SetItemEffect)                             # (inlined, again)
+    sub = abstateidentarray[e.aeo_Index].AbStateStr->subabstate[e.aeo_Strength]   # SubAbState row of this strength
+    for each of the 4 sub.assa_Effect[j].action (SubAbstateAction):
+        s = SAA_WCPLUS 3, WCRATE 4, MAPLUS 13, MARATE 46, MAMINUS 83, MADOWNRATE 84, WCMINUS 94, WCDOWNRATE 95 → SET_DAMEGERATE (2)
+            SAA_ACPLUS 5, ACRATE 6, ACMINUS 73, ACDOWNRATE 74                                   → SET_ACRATE (3)
+            SAA_DEXPLUS 7, DEXMINUS 81                                                          → SET_DEXRATE (8)
+            SAA_THPLUS 10, THRATE 11, THMINUS 92, THDOWNRATE 93                                 → SET_THRATE (11)
+            SAA_SPEEDRATE 20, SPEEDDOWNRATE 88                                                  → SET_MOVESPEEDRATE (10)
+            SAA_MAXHPRATE 22, MAXSPRATE 23, MAXHPPLUS 35, MAXSPPLUS 36, MAXHPDOWNRATE 85        → SET_HPSPMAXRATE (14)
+            SAA_HEALAMOUNT 30, HEALAMOUNTMINUS 82                                               → SET_HEALRATE (1)
+            any other action                                                                    → skip
+        siae_SetItemEffectStore(&e.aeo_SetItemEffect, s)
+
+siae_SetItemEffectStore(SetIndex s)                              @ FUN_005100f0
+    if s > 16 or setitemskilleffect.se_Argument[s] == 1000: return            # always returns in 2016 (§3.8)
+    i = first slot whose code (> 16 read as 17) == s, or whose eb_Index == 0  (codes ≥ 17, e.g. 1000+, count as used)
+    if none of the 4: assert "SetItemData::SetItemAbstateEffect::siae_SetItemEffectStore : Too many effect"; return
+    buf[i] = { s, (u16) setitemskilleffect.se_Argument[s] }
+    # a second action of the same group overwrites the same slot (no duplicates). The values are the CASTER's
+    # snapshot: aeo_Set runs inside the caster's skill, while setitemskilleffect holds the caster's per-cast copy
+    # (§3.5) (inferred)
+```
+
+`siae_ParameterRefit` applies `SET_DAMEGERATE` to WC only, although the MA actions (13, 46, 83, 84) are filed under it
+too (original bug) Z21-B9 (latent while mechanism A is dead).
+
+### 5.3 Writer 2: the caster's item actions, `so_ItemActonAbstateApp` (vt 0x5d4, live)
+
+```pseudo
+ShineMobileObject::so_ItemActonAbstateApp(caster, AbstateElementInObject *e, SkillDataIndex *skill, ShineObject *target)
+                                                                 @ FUN_0055dea0   (vt 0x5d4, every mobile-object class)
+    if e == null or skill == null or target == null: return
+    if caster.so_GetItemActionObserves() (vt 0x5d0) == null: return     # players: their manager (FUN_00560830);
+                                                                        # mobs: FUN_00570b00 = shared `return 0`
+                                                                        # COMDAT, so only player casters write
+    for t in [SEIT_STA_AC_RATE_DECREASE 4, STA_DEX_RATE_DECREASE 6, STA_MAX_HPSP_RATE_INCREASE 8,
+              STA_DEAD_HPSP_RECOVER_RATE_INCREASE 9, STA_SHIELDAC_RATE_INDREASE 10, STA_DOT_HEAL_RATE_INCREASE 12,
+              STA_WC_RATE_INCEASE 13, STA_SHEILD_BLOCK_RATE_INCREASE 14]:         # this order
+        results = {}
+        if EventRunBySkillGroupIndex(manager, &results, skill, t, caster, target):
+            aeo_SetItemActionEffect(e, t, GetRateAppliValue(&results, 1000))
+        results.clear()
+
+ItemActionObserveManager::EventRunBySkillGroupIndex(m, out, skill, t, me, object) → bool   @ FUN_005d1f50
+    if skill == null or me == null or out == null: return false
+    arg = { condition {AAT_ActiveSkillGroupIndex 7, group}, effect {AAT_SkillEffectIncreaseType 5, t},
+            me = subject = me, object }
+    for each group of skill.sdi_ActiveSkillGroups (its id at group+0x20):
+        if _EventRun(m, out, arg, 0xFFFF): any = true                   # Z17: every matching observer appends a result
+    return any
+
+ItemActionObserveManager::ActionResults::GetRateAppliValue(results, base) → u32   @ FUN_005d0c20
+    if base == 0: return 0
+    for each result r (8 bytes, rate at +4): base = r.rate · base / 1000         # product of the rates, base 1000
+    return base
+
+AbstateElementInObject::aeo_SetItemActionEffect(e, t, v) → true   @ FUN_00510810
+    siae_SetItemEffectAndValue(&e.aeo_SetItemEffect, t, v)
+
+siae_SetItemEffectAndValue(SkillEffectIncreaseType t, int v)     @ FUN_00510170
+    i = first slot whose code − 1000 == t (codes < 1000 or > 1014 never match) or whose eb_Index == 0
+    if none of the 4: assert "SetItemData::SetItemAbstateEffect::siae_SetItemEffectAndValue : Too many effect"; return
+    buf[i] = { 1000 + t, (u16) v }               # no "== 1000" filter; v truncated to 16 bits (original bug) Z21-B10
+```
+
+Call sites (both right after a successful `target.so_AbnormalState_Set(caster, …)` (vt 0x638) of a skill's abstate, on the
+element found again with `asl_Abstate_IsSet`): `ShineMobileObject::so_SkillEnchant` @ FUN_00431ca0 (the enchant /
+buff path) and `ShineMobileObject::smo_SkillBlast` @ FUN_00581160 (the damage-skill path, Z03 §5.6; `so_SkillEnchant` is otherwise cited only in §3.7). The order is:
+`aeo_Set` clears the buffer → mechanism A stores nothing → the item-action values are written. `so_AbnormalState_Set`
+only marks the stats dirty (`so_RecalcAbstateParamReady` vt 0x528 @ FUN_005556b0 sets `smo_Abstate.parameterchange`),
+so the refit (§5.4) sees the values at the next recalculation. Party copies of the state (party enchant) and states set
+by anything else than these two skill paths (items, scripts, GM, login restore, revive) get no item-action values.
+
+What the 2016 data feeds in (ItemAction → ItemActionEffect with `EffectActivity` = {5, t}; condition always
+`AAT_ActiveSkillGroupIndex`, i.e. the caster must cast a skill of the listed group):
+
+| t | Read by | Item actions (of them set actions from `SetEffect.shn`) | Values |
+|---|---|---|---|
+| 4 STA_AC_RATE_DECREASE | refit `R.AC += v − 1000` | 2 (2) | 800 ×2 (target AC −20 %) |
+| 6 STA_DEX_RATE_DECREASE | refit `R.Dex` | 1 (1) | 750 |
+| 8 STA_MAX_HPSP_RATE_INCREASE | refit `P.MaxHP`, `P.MaxSP` scaled (Z12-B3) | 1 (1) | 1250 |
+| 9 STA_DEAD_HPSP_RECOVER_RATE_INCREASE | `SubAbnormalStateActorPartyRecharge::sasa_Act_Killed` | 1 (1) | 1300 |
+| 10 STA_SHIELDAC_RATE_INDREASE | refit `R.ShieldAC` | 1 (1) | 1250 |
+| 12 STA_DOT_HEAL_RATE_INCREASE | HP heal-over-time routines | 10 (10) | 1250 ×8, 1300 ×2 |
+| 13 STA_WC_RATE_INCEASE | refit `R.WCmin/WCmax` | 3 (3) | 750, 700, 1200 |
+| 14 STA_SHEILD_BLOCK_RATE_INCREASE | refit `R.ShieldAC` (same cell as 10) | 3 (2) | 1250, 1300 (+ one non-set) |
+
+So 21 of the 401 set actions (§4.4: 295 are `AAT_SkillEffectIncreaseType`) end up in abnormal states; the other 274
+(types 0, 1, 2, 3, 5, 7, 11) act at cast time. `ShieldAC` = shield block (Z12 §1.1 stat 26) *(inferred from the enum
+name of 14)*.
+
+### 5.4 Readers
+
+```pseudo
+siae_ParameterRefit(&e.aeo_SetItemEffect, P)        @ FUN_005108c0, from aeo_ParameterEnchant @ FUN_004079f0 — Z12 §2.5
+    pass 1 (codes 1…16): SET_DAMEGERATE → R.WC, ACRATE → R.AC, DEXRATE → R.Dex, MOVESPEEDRATE → R.MoveSpeed,
+                         THRATE → R.TH, HPSPMAXRATE → P.MaxHP/MaxSP × v/1000
+    pass 2 (codes ≥ 1000): 1000 (SEIT 0) and 1013 → R.WC; 1004 → R.AC; 1006 → R.Dex; 1008 → P.MaxHP/MaxSP (Z12-B3);
+                           1010 and 1014 → R.ShieldAC
+    # 1000 (DAMAGE_RATE_INCREASE) is never written by §5.3 (not in its list): only a DB row can carry it.
+    # 1009 and 1012 are not refit codes; their readers follow.
+    # The matrix is the TARGET's (the state's owner): e.g. a caster's AC-down rate 800 makes the debuff take 20 % AC.
+
+SubAbnormalStateActorHPHeal::sasa_Routine(actor, e, o, idx)      @ FUN_00406e90   (SubAbState type 29, every tick; Z03 §6.1)
+    caster = aeo_FindCasterObject(e, …)
+    h = HEALAMOUNT − HEALAMOUNTMINUS (of this strength); if h == 0: h = o.MaxHP (vt 0x4f0) · HEALRATE / 1000
+    h = h · siae_GetArgument_Base1000(SET_HEALRATE) / 1000                      # always 1000 in 2016
+    h = h · siae_GetArgument_Base1000ByEffect(SEIT_STA_DOT_HEAL_RATE_INCREASE) / 1000
+    o.vt[0x734](caster, h, idx)                                                 # heal (Z03)
+    SubAbnormalStateActor::sasa_Routine(…)                                      # base tick bookkeeping
+SubAbnormalStateActorHPSPHeal::sasa_Routine                      @ FUN_00407120   (type 66)
+    HP: (HEALAMOUNT − HEALAMOUNTMINUS) scaled by the same two factors (no MaxHP-rate fallback), o.vt[0x734]
+    SP: o.vt[0x738](caster, HEALAMOUNT)                                         # unscaled, no set-item factor
+SubAbnormalStateActorPartyRecharge::sasa_Act_Killed(actor, killer p, e)   @ FUN_00407730
+    if p's party (vt 0x550) != 0xFFFF:
+        r = DEADHPSPRECOVRATE of the state · ByEffect(SEIT_STA_DEAD_HPSP_RECOVER_RATE_INCREASE) / 1000
+            # guarded by "&e.aeo_SetItemEffect != null", always true (original bug) Z21-B11 (dead check)
+        party has 2…5 members (else assert): every member found by pm_FindMember that is alive (vt 0x484 ∉ {0, 3})
+        and within distance² < 1,000,000 of p: member.vt[0x7a0](r)                # recharge (Z03 / Z08)
+```
+
+### 5.5 Saving: `ABSTATEREADBLOCK.setitem[4]`
+
+```pseudo
+siae_FillSetItemEffect(buf, ABSTATEREADBLOCK *r)   @ FUN_00510300:  r.setitem[i] = { buf[i].eb_Index, buf[i].Argument_Base1000 }, i = 0..3
+aeo_FillSetItemEffect(e, r)                       @ FUN_004534f0:  siae_FillSetItemEffect(&e.aeo_SetItemEffect, r)
+
+ShinePlayer::so_SaveAbstate(p, PROTO_NC_CHARSAVE_ABSTATE_REQ *out, Name5 *charId, bool toDB) → bytes   @ FUN_00454d80 (vt 0x3a4)
+    out.abstatenum = 0
+    b = g_AbstateNeverShelter.as_GetAbstateBuffer(p.charNo (vt 0x344))  # = Z03's g_ShelterDie DAT_0087c4c8: IsSaveDie states kept while dead (Z03 §7.2)
+    if b: AbstateBuffer::ab_SaveAbstate(b, out, toDB)                    @ FUN_00417b90
+    p.abstatelist (p+0xe7c).l_4AllInList(AbnormalStateSaver { out, charId, charNo, toDB })   # lid_Call per element
+    return abstatenum == 0 ? 0 : 8 + abstatenum · 0x24
+
+AbnormalStateSaver::lid_Call(s, e, i) → continue?    @ FUN_00454b10     (and ab_SaveAbstate, the same per element)
+    row = dic_abstate[e.aeo_Index] (index ≥ 792: assert "…as_FromIndex : Invalid skill idx"); null: assert "Null Abstate"; next
+    skip unless row.pSaveTypeInfo.(toDB ? IsSaveLogoff : IsSaveLink)       # AbStateSaveType table (Z03)
+    row.index.ID == 0xFFFF: assert "Invalid ABState"; next
+    # ab_SaveAbstate also skips sheltered states already past their end tick
+    r = &out.abstate[out.abstatenum]   (0x24 bytes, layout Z12 §6.4)
+    r.abstateid = row.index.ID;  r.strength = e.aeo_Strength;  r.restcount = e.aeo_RestCount;  r.empower = 0
+    r.pasttime = (now − e.aeo_Tick.start) · 1000 / 10   (ms);  r.resttime = element class present ? aeo_GetRestTime(e) : 0
+    aeo_FillSetItemEffect(e, r)  /  siae_FillSetItemEffect(&e.aeo_SetItemEffect, r)
+    r.CasterInfo = { e.aeo_Caster.nLevel, e.aeo_Caster.nAttackPower }
+    (lid_Call: if charId: NameString[charId], result unused)
+    out.abstatenum++;  if abstatenum · 0x24 + 0x2c > 8000: stop             # at most 222 rows
+```
+
+Two senders (Z01 §8.4 `WholeSaver`): `ws_save2DB` @ FUN_00455a10 calls vt 0x3a4 with `(buf, null, true)` →
+GameDB `0x4007 NC_CHARSAVE_ABSTATE_REQ` (states with `IsSaveLogoff`) → `p_Char_SetStateWithSetItemAndRestTime` per row,
+`@nSetItemIndexA…D` / `@nSetItemValueA…D` = `setitem[0..3]` (D02 §6, D06 §7.2; table `tCharacterState`).
+`ws_save2worldmanager` @ FUN_004536f0 calls it with `(buf, so_CharName())` and an implicit `false` (the `push 0` at
+asm 0x453957 is left on the stack for the third argument: `so_CharName` @ FUN_00559780 takes none) → WM `0x4011`
+(states with `IsSaveLink`), which the WM hands to the next zone as `0x1023 NC_CHAR_ZONE_ABSTATE_CMD` (W01 §6.3, row
+"+0x590 abstate"). Both bind / copy `Value` as u16; the DB columns are `smallint` *(db-backup)*.
+
+### 5.6 Restoring
+
+- **Login / map change:** `0x100C NC_CHAR_ABSTATE_CMD` (from `p_Char_GetStateAllWithSetItemAndRestTime`, D02) or
+  `0x1023` → `so_CharAbstateData` @ FUN_0044e0e0 → `asl_Store` @ FUN_0040afd0 (Z12 §6.4): the state is set again
+  (`so_AbnormalState_Set` → `aeo_Set` clears the buffer), then
+  `siae_SetItemEffectRestore(&el.aeo_SetItemEffect, r)` @ FUN_005102b0 copies `r.setitem[0..3]` back verbatim
+  (`eb_Index = Index`, `Argument_Base1000 = Value`; no range check: any code reaches the readers of §5.4, which ignore
+  unknown codes). So a buffed player keeps the caster's item-action rates on the state across map change and relog.
+- **Revive:** the death shelter (`g_AbstateNeverShelter` *(pdb2016)* = Z03's `g_ShelterDie`, filled at death, Z03 §7.2–7.3) keeps whole element copies, but
+  `AbstateBuffer::ab_Recover` @ FUN_00417ef0 → `AbstateElementInObject::aeo_Recover` @ FUN_004176c0 re-sets each state
+  through `so_AbnormalState_Set(caster obj, index, strength, row, now, 0, restcount, rest ms, 0xb, 0)` and does not copy
+  `aeo_SetItemEffect` back: `aeo_Set` has cleared it, so a revived player loses the values (original bug) Z21-B8 —
+  while `ab_SaveAbstate` saves them from the shelter when the player logs out dead, so relogging instead of reviving
+  keeps them.
+- Nothing about the buffer is sent to any client: it is server-side only.
 
 ## Original-server bugs
 
@@ -529,6 +761,10 @@ and restore at login; `siae_ParameterRefit` FUN_005108c0 is Z12 §2.5.)*
 | Z21-B5 | `Send_SETITEMHEALEFFECT` FUN_005cfbb0 (§4.5) | `hpchange` is u16, the amount u32 | amounts ≥ 65,536 (rate types on very high MaxHP) show wrapped; latent with the 2016 set data (absolute 5…30) | u32 field, or clamp to 0xFFFF |
 | Z21-B6 | `InvenCellReleaser_UnEquipInfo::icr_Apply` FUN_0048cc60 (§4.3) | the set-action delete failure logs "ShineObjectClass::ShinePlayer::sp_NC_ITEM_EQUIP_REQ SetItem Can`t Del ActionID" | misleading log (names the equip handler) | the releaser's own name |
 | Z21-B7 | `Send_SETITEMHEALEFFECT` FUN_005cfbb0 (§4.5) | only bit 0 of the `flag` byte is written (`b ^= (b ^ isheal) & 1`) | bits 1–7 carry stale buffer bytes to the client; harmless, the client masks bit 0 | write the whole byte |
+| Z21-B8 | `AbstateElementInObject::aeo_Recover` FUN_004176c0 via `ab_Recover` FUN_00417ef0 (§5.6) | re-sets each sheltered state through `so_AbnormalState_Set` → `aeo_Set` (which clears `aeo_SetItemEffect`) and does not copy the sheltered element's set-item buffer back | a revived player's states lose the caster's item-action rates (AC/Dex/WC/ShieldAC/MaxHPSP refit, DoT-heal and party-recharge factors); logging out dead keeps them (`ab_SaveAbstate` saves the shelter copy) | copy `aeo_SetItemEffect` back after the re-set, as `asl_Store` does at login |
+| Z21-B9 | `aeo_SetItemEffectStore` FUN_00510670 / `siae_ParameterRefit` FUN_005108c0 (§5.2) | the MA actions (SAA 13, 46, 83, 84) are filed under `SET_DAMEGERATE`, which the refit applies to WC only | a magic-attack state would get its set rate on WC; latent (mechanism A stores nothing, Z21-B1) | refit MA too, or a separate MA index |
+| Z21-B10 | `siae_SetItemEffectAndValue` FUN_00510170 (§5.3) | the 32-bit rate product of `GetRateAppliValue` is stored as u16 (and saved as `smallint`, D06 §7.2) | products ≥ 65,536 wrap (≥ 32,768 may fail the DB bind); latent with 2016 data (single rates 700…1300) | clamp, or a wider field |
+| Z21-B11 | `SubAbnormalStateActorPartyRecharge::sasa_Act_Killed` FUN_00407730 (§5.4) | tests `&e.aeo_SetItemEffect != null` (address of a member of a non-null element) | dead check, always true; harmless | no test |
 
 ## 6. Not reconstructed / uncertain
 
@@ -539,7 +775,10 @@ and restore at login; `siae_ParameterRefit` FUN_005108c0 is Z12 §2.5.)*
   is `InventoryLocking::InventoryCellLockList`, Z05 §1.2–1.3).
 - What the client does with `0x206F` beyond the floating number (FUN_00692d10 is unnamed in the 2016 client; the 2017
   PDB names only the handler). Whether the player's HP gauge is refreshed after a set heal (§4.4).
-- Part 3 pending (§5).
+- §5.3 `EventRunBySkillGroupIndex` / `_EventRun` internals (which observers match, cooldowns, `ActivityRate` roll) are
+  Z17's; the table of §5.3 assumes every matching action fires.
+- Whether the WM keeps `0x4011` rows byte-exact into `0x1023` (W01 §6.3 says the blob is cached; the set-item words are
+  assumed untouched).
 
 ## 7. Coverage boundary
 
