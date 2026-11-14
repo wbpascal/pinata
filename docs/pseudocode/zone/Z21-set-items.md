@@ -16,7 +16,7 @@ The 2016 zone contains three separate mechanisms, of which only the second has a
 
 | # | Mechanism | Tables | Per-player state | 2016 status |
 |---|---|---|---|---|
-| A | **Skill-effect sets** (legacy): equipped pieces per set → up to 10 "set effects" → per-cast multipliers (`SetIndex`, base 1000) on heal, damage, SP cost, cooldown, … of listed skills | `SetItem.shn`, `SetItemEffect.shn` | `ShinePlayer::sp_SetItemEffect` (`PlayerSetEffect`, p+0x2a7e0), `sp_SetEffectForJustSkill` (p+0x2a7de) | **dead**: neither table is loaded, the global tables stay empty, every multiplier stays 1000 (§3.9) |
+| A | **Skill-effect sets** (legacy): equipped pieces per set → up to 10 "set effects" → per-cast multipliers (`SetIndex`, base 1000) on heal, damage, SP cost, cooldown, … of listed skills | `SetItem.shn`, `SetItemEffect.shn` | `ShinePlayer::sp_SetItemEffect` (`PlayerSetEffect`, p+0x2a7e0), `sp_SetEffectForJustSkill` (p+0x2a7de) | **dead**: neither table is loaded, the global tables stay empty, every multiplier stays 1000 (§3.8) |
 | B | **Item-action sets**: equipped pieces with the same `ItemInfo.SetItemIndex` name → `SetEffect.shn` row (set, count) → item action id added to / removed from the player's item actions | `SetEffect.shn` (+ `ItemInfo.SetItemIndex`) | the player's item-action list | live (§4) |
 | C | **Set-item abstate values**: up to 4 `{code, value}` pairs stored in an abnormal state when a skill sets it, refitting the target's stats or scaling its heal while it lasts; saved and restored with the state | — (fed by A and by B's item actions) | `AbstateElementInObject::aeo_SetItemEffect` (`SetItemAbstateEffect`) | live: the A source (codes 1…16) stores nothing, but the caster's `SkillEffectIncreaseType` item actions (codes 1000 + SEIT; 21 of them are set actions from `SetEffect.shn`) are stored, saved and restored (§5) |
 
@@ -216,7 +216,8 @@ siel_AppendEffect(list, h, skillID):
     if d.skilllist != NULL and bsearch(skillID, d.skilllist, d.skillnumber, 2, ed_Compare) == NULL: return
     setitemskilleffect.se_Argument[d.seteffect] += d.setargument - 1000      # effects of one slot add up around 1000
 
-EffectDescription::ed_Compare(a, b) = *(u16*)a − *(u16*)b                    @ FUN_004a2ed0   (bsearch comparator)
+EffectDescription::ed_Compare(a, b) = *(u16*)a − *(u16*)b                    @ FUN_004a2ed0   (bsearch comparator;
+    # one COMDAT body referenced by ten other functions (u16 bsearch / sort users), e.g. so_ply_ItemMakeItem @ FUN_0049c680)
 SkillEffect::se_Clear(se):        se_Argument[0..16] = 1000                    @ FUN_005105e0
 SkillEffect::operator[](se, i):   return i < 17 ? se_Argument[i] : 1000        @ FUN_00510010
 ```
@@ -235,17 +236,17 @@ own items; listed here so the subsystem's contract is in one place:
 | 1 HEALRATE | `AxialListMagicFieldHeal::almfh_ApplyHeal` FUN_0056d2c0 | magic-field heal (stale global, Z09-B30) | Z09 §12.5 |
 | 2 DAMEGERATE | `smo_SkillBlast` | skill damage | Z03 §5.6 |
 | 4 ABSTATEKEEPTIMERATE | `AbstateElementInObject::aeo_Set` FUN_0040a340 | abstate end time | Z03 §6.2 |
-| 4 ABSTATEKEEPTIMERATE | `so_SkillEnchant` FUN_00431ca0 | duration, only if < 3,600,000 ms | here (factor only); function not yet cited elsewhere, sweep part checks its owner |
+| 4 ABSTATEKEEPTIMERATE | `so_SkillEnchant` FUN_00431ca0 | keep time sent in the inform / broadcast (scaled `x · v / 1000` below 3,600,000 ms, `v · (x / 1000)` above) | §5.7 |
 | 5 SPCONSUMRATE | `CharaterSkillList::csl_SPCheck` FUN_0055b920 | SP cost | Z03 §5.3 |
-| 6 HPSPRECOVERYRATE | `so_mobile_HPHealOverTime` FUN_0040e910, `so_mobile_SPHealOverTime` FUN_004055d0 | heal-over-time tick | here (factor only); function not yet cited elsewhere, sweep part checks its owner |
-| 7 COOLTIMERATE | `smo_ply_SkillCoolTime` FUN_0055b6a0 | cooldown (both times), only if ≠ 1000 | here (factor only); function not yet cited elsewhere, sweep part checks its owner |
+| 6 HPSPRECOVERYRATE | `so_mobile_HPHealOverTime` FUN_0040e910, `so_mobile_SPHealOverTime` FUN_004055d0 | heal-over-time tick (HP and SP) | §5.8 |
+| 7 COOLTIMERATE | `smo_ply_SkillCoolTime` FUN_0055b6a0 | cooldown (both times), only if ≠ 1000 | Z11 §8.5 |
 | 9 HPDRAINRATE | `smo_SkillBlast` | own heal from damage (`bos_MyHealHit`) | Z03 §5.6 |
 | 12 AGGRORATE | `smo_SkillBlast` | `bos_DamageRateAggro = arg − 1000 + AggroPerDamage` | Z03 §5.6 |
 | 13 PROBABILITYRATE | `smo_SkillBlast` | hit chance, HP-up chance (`+ arg − 1000`) | Z03 §5.6 |
 | 13 PROBABILITYRATE | `MiscDataTable::mdt_PostSkillBlast` FUN_004a3a90 | neutralization-item chance | Z09 §28.3 |
 | (all) | `sbec_Routine` FUN_00437fc0 | load per blast from the queue, restore after | Z03 §5.6 |
 | (all, clear) | `ShineMobileObject::so_Routine` FUN_0056a080 | `se_Clear` at the start of each object's routine | Z09 §5.5 |
-| (snapshot) | `SetItemAbstateEffect::siae_SetItemEffectStore` FUN_005100f0 | copies values ≠ 1000 into a newly set abstate | §5 (part 3) |
+| (snapshot) | `SetItemAbstateEffect::siae_SetItemEffectStore` FUN_005100f0 | copies values ≠ 1000 into a newly set abstate | §5.2 |
 
 Slots 3 AC, 8 DEX, 10 move speed, 11 TH, 14 HP/SP max, 15 abstate rate and 16 damage-ignore have no direct reader; they
 only matter through mechanism C (Z12 §2.5 maps them onto the stat matrix).
@@ -550,6 +551,8 @@ SetItemAbstateEffect::SetItemAbstateEffect()   @ FUN_00510350    # ctor; called 
                                                                   # stack "key" element of asl_Abstate_IsSet @ FUN_00409b10
                                                                   # and asl_AbstateReset @ FUN_0040a930 (Z03 §6.2 / §6.4)
 siae_Clear()                                   @ FUN_00510030    # same body; called by aeo_Set @ FUN_0040a340
+# element ctor @ FUN_00406550 also: Metronome aeo_Tick, aeo_Index = MAX_ABSTATEINDEX, aeo_PartyEnchant[0..4].skillindex = null,
+#   aeo_Caster = {nLevel 0, nAttackPower 0}
 # no destructor body: ~AbstateElementInObject @ FUN_00401b20 calls a shared empty COMDAT for the member
 ```
 
@@ -645,7 +648,7 @@ siae_SetItemEffectAndValue(SkillEffectIncreaseType t, int v)     @ FUN_00510170
 
 Call sites (both right after a successful `target.so_AbnormalState_Set(caster, …)` (vt 0x638) of a skill's abstate, on the
 element found again with `asl_Abstate_IsSet`): `ShineMobileObject::so_SkillEnchant` @ FUN_00431ca0 (the enchant /
-buff path) and `ShineMobileObject::smo_SkillBlast` @ FUN_00581160 (the damage-skill path, Z03 §5.6; `so_SkillEnchant` is otherwise cited only in §3.7). The order is:
+buff path) and `ShineMobileObject::smo_SkillBlast` @ FUN_00581160 (the damage-skill path, Z03 §5.6; `so_SkillEnchant` itself is §5.7). The order is:
 `aeo_Set` clears the buffer → mechanism A stores nothing → the item-action values are written. `so_AbnormalState_Set`
 only marks the stats dirty (`so_RecalcAbstateParamReady` vt 0x528 @ FUN_005556b0 sets `smo_Abstate.parameterchange`),
 so the refit (§5.4) sees the values at the next recalculation. Party copies of the state (party enchant) and states set
@@ -707,7 +710,7 @@ aeo_FillSetItemEffect(e, r)                       @ FUN_004534f0:  siae_FillSetI
 
 ShinePlayer::so_SaveAbstate(p, PROTO_NC_CHARSAVE_ABSTATE_REQ *out, Name5 *charId, bool toDB) → bytes   @ FUN_00454d80 (vt 0x3a4)
     out.abstatenum = 0
-    b = g_AbstateNeverShelter.as_GetAbstateBuffer(p.charNo (vt 0x344))  # = Z03's g_ShelterDie DAT_0087c4c8: IsSaveDie states kept while dead (Z03 §7.2)
+    b = g_AbstateNeverShelter.as_GetAbstateBuffer(p.charNo (vt 0x344))   # FUN_00417d90, §5.6  # = Z03's g_ShelterDie DAT_0087c4c8: IsSaveDie states kept while dead (Z03 §7.2)
     if b: AbstateBuffer::ab_SaveAbstate(b, out, toDB)                    @ FUN_00417b90
     p.abstatelist (p+0xe7c).l_4AllInList(AbnormalStateSaver { out, charId, charNo, toDB })   # lid_Call per element
     return abstatenum == 0 ? 0 : 8 + abstatenum · 0x24
@@ -748,7 +751,137 @@ asm 0x453957 is left on the stack for the third argument: `so_CharName` @ FUN_00
   `aeo_SetItemEffect` back: `aeo_Set` has cleared it, so a revived player loses the values (original bug) Z21-B8 —
   while `ab_SaveAbstate` saves them from the shelter when the player logs out dead, so relogging instead of reviving
   keeps them.
+- **Revive by item** (`UseItemJustReviveAtDead`, Z04 §12.3 `0x3039 NC_ITEM_REVIVEITEMUSE_CMD`: "on the DB success the actor's uib_Effect revives the player"):
+  the same loss, through both shelters:
+
+```pseudo
+UseEffect::UseItemJustReviveAtDead::uib_Effect(actor, ShineObject *p, item, fns)   @ FUN_00418b60
+    p.so_ReviveByItem() (vt 0xa98)               @ FUN_00417850  = sp_ReviveNow(p, 1000)  (full HP, Z03 §7.3)
+    g_AbstateShelter[p.charNo].ab_Recover(p)     # = Z03's g_ShelterItem DAT_0087c4d8 (good buffs kept by the keep-buff item)
+    g_AbstateNeverShelter[p.charNo].ab_Recover(p) # = g_ShelterDie DAT_0087c4c8 (IsSaveDie states)
+    g_AbstateNeverShelter.as_Remove(p.charNo)
+    # g_AbstateShelter's entry is not removed here (the 0x104E revive path and the skill revive free it, Z07 §3.1 /
+    # Z03 §7.3); see §6
+```
+
+  Both `ab_Recover` calls go through `aeo_Recover` (Z21-B8): no set-item value survives an item revive either.
+  The shelter helpers *(pdb2016)*, `AbstateShelter` = `std::vector<AbstateBuffer> as_Safe`, `AbstateBuffer` (0x14) =
+  `{ u32 charNo @0 (0xFFFFFFFF = free); std::vector<AbstateElementInObject> ab_List @4 }` (elements of 0x74 bytes,
+  whole copies, so the shelter copy keeps its `aeo_SetItemEffect`):
+
+```pseudo
+AbstateShelter::as_GetAbstateBuffer(sh, charNo) → AbstateBuffer* or null     @ FUN_00417d90   (linear search)
+AbstateShelter::operator[](sh, charNo) → AbstateBuffer*                       @ FUN_00418890
+    existing buffer of charNo, else the first free one (charNo written into it), else push_back a new empty buffer
+AbstateShelter::as_Remove(sh, charNo)                                         @ FUN_00417520
+    every buffer with this charNo: charNo = 0xFFFFFFFF   # marks it free; its ab_List elements are kept until reuse
+# the filler, so_KilledBy @ FUN_00433be0 (Z03 §7.2), takes operator[](charNo) and resizes ab_List to 0 before copying
+# (g_AbstateShelter only when the player carries itemdatabox.idb_specialid.sii_JustReviveItem, the NeverShelter always)
+AbstateBuffer::~AbstateBuffer()                                               @ FUN_00418490   (destroys ab_List)
+```
 - Nothing about the buffer is sent to any client: it is server-side only.
+
+### 5.7 The enchant path: `ShineMobileObject::so_SkillEnchant` (vt 0x5a0)
+
+The abnormal-state part of every skill hit (Z03 §5.6 part E summarises it inline without the address). It is the place
+where a skill's state, its keep time, the caster's item-action keep-time rate, the set-item keep-time rate
+(`SET_ABSTATEKEEPTIMERATE`) and the mechanism C writer (§5.3) meet. Same body for every mobile-object class.
+
+```pseudo
+ShineMobileObject::so_SkillEnchant(caster, ShineObject *target, SmashArgument *a, BattleObjectStruct *bo,
+                                   u8 *resisted, bool canDamage /* unused */) → bool enchanted   @ FUN_00431ca0   (vt 0x5a0)
+    # SmashArgument (0xa): { u8 actionnumber, u8 attackcode, u8 iscritical, u8 isdead, SkillDataIndex *sklidx @4,
+    #                        SKILL_EMPOWER empower @8 (u16 bit fields damage:4, sp:4, keeptime:4, cooltime:4) }
+    if target == null or target.smo_GetMode() (vt 0x484) == 3 (dead): return false
+    s = a.sklidx
+    if s == null: assert "ShineObjectClass::ShinePlayer::sp_NC_BAT_SKILLENCHANT_REQ : Blast invalid spell"; return false
+        # assert texts name another function (original bug) Z21-B12
+    *resisted = 0;  enchanted = false
+    if s.sdi_ToggleData is not empty:                                    # toggle skill
+        if s.sdi_Activ == null: return false
+        if not caster.so_ply_ToggleSkill_IsOn(s.sdi_Activ.ID) (vt 0xbc4):    # toggled off by this cast
+            for each of the 4 entries s.sdi_Abstate[i] (12 bytes: abstateidx, strength, sucrate) with idx ≠ MAX_ABSTATEINDEX:
+                if caster.so_mobile_AbstateList().asl_Abstate_IsSet(idx):  # on the CASTER, not the target
+                    caster.so_AbnormalState_Reset(idx) (vt 0x650); BitReset(idx); BroadcastReset(idx)
+            return false
+    if target.so_AbnormalState_IsSet(STA_IMMORTAL 291) or IsSet(STA_ADLFLOUSSIERIMT 499) (vt 0x3e4): return false
+    if s.sdi_Activ == null: assert "…sp_NC_BAT_SKILLENCHANT_REQ : Blast invalid spell activ"; return false
+    if s.sdi_Activ.EffectType == SE_HEALING and not caster.smo_ICanHealTo(target) (vt 0xe94): return false
+    for i in 0..3:  (idx, strength, sucrate) = s.sdi_Abstate[i]
+        if idx == MAX_ABSTATEINDEX or rand(1000) (well512) ≥ sucrate or dic_abstate[idx] == null: continue
+        row = dic_abstate[idx]
+        if target.so_AbnormalState_Resist(row) (vt 0x634, Z03 §6.2): *resisted |= 1; continue
+        bonus = a.empower.keeptime ≠ 0 ? s.sdi_Activ.nT2[empower.keeptime − 1] : 0
+                # the code reads nT1[keeptime + 4] (asm 0x431ef8: [Activ + 4·k + 0x1e3]) = nT2[k − 1]; k ≥ 6 reads into nT3
+        base  = row.subabstate[strength].assa_info ? SubAbStateInfo.KeepTime : 0           # ms
+        if caster.so_GetItemActionObserves() (vt 0x5d0) and s.sdi_ActiveSkillGroups not empty:
+            results = {}
+            if EventRunBySkillGroupIndex(manager, &results, s, SEIT_KEEPTIME_RATE_INCREASE 2, caster, target):   # §5.3
+                base = GetRateAppliValue(&results, base)                 # item-action (incl. set-action) keep-time rate
+        extra = 0
+        for each group g of s.sdi_ActiveSkillGroups until a null entry:
+            if g.(+0x20) == 99:                                          # group 99 = buffs scaled by the passive rate
+                x = bonus + base
+                extra = x < 3,600,000 ? caster.smo_Param.PassiveBuffKeepTimeUPRate · x / 1000
+                                      : PassiveBuffKeepTimeUPRate · (x / 1000)
+                break
+        keep = base + extra + bonus
+        if not target.so_AbnormalState_Set(caster, idx, strength, row, now, 0, 0xFFFFFFFF, keep, 5, 0) (vt 0x638, Z03 §6.2):
+            continue                                                     # aeo_Set applies SET_ABSTATEKEEPTIMERATE itself
+        str = g_NewAbstateStrength                                       # the strength the set actually stored
+        e = target.so_mobile_AbstateList().asl_Abstate_IsSet(row.index.AbStataIndex)
+        if e: caster.so_ItemActonAbstateApp(e, s, target) (vt 0x5d4)     # §5.3: mechanism C values
+        el = e ? aeo_GetAbstateElement(e) : null   (null: assert "BattleObjectGroup::BattleObject::bo_Routine: invalid abstate[ 2]")
+        if el and not el.vt[0xc]():                                      # vt 0xc = shared `return 0` (FUN_004b8d20) for
+                                                                         # all three element classes: always taken
+            target.so_AbnormalState_BitSet(idx)
+            v = setitemskilleffect[SET_ABSTATEKEEPTIMERATE]              # 1000 in 2016 (§3.8)
+            k = keep < 3,600,000 ? v · keep / 1000 : v · (keep / 1000)
+            target.so_AbnormalState_Inform(idx, k, 1) (vt 0x3f0, Z03 §6.3)    # players: the state packet to the owner
+            target.so_AbnormalState_BroadcastSet(idx, k, str)                   # Z03 §6.3
+        enchanted = true                                                 # asm 0x4321ba: set after every successful Set
+    return enchanted
+```
+
+Callers: `smo_SkillBlast` @ FUN_00581160 (Z03 §5.6) once per target on the last hit step (`mha_HitStep < 0`) when the
+target is not immune; the return value sets the result's
+`isenchant`, `*resisted` ORs into `isresist`. The only other caller, `ShineMobileObject::smo_old_skill_blast`
+@ FUN_00579b50 (player override @ FUN_0057be40 just forwards; it also calls `so_skillsmash` vt 0x59c), sits in vt 0xEA4,
+which no code calls (no `+ 0xea4` virtual call in the zone): dead legacy code *(inferred)*.
+
+So with the 2016 data the set-related inputs here are: the set actions with `SEIT_KEEPTIME_RATE_INCREASE` (§4.4, they
+lengthen the caster's buffs/debuffs when cast from the listed skill group) and `SET_ABSTATEKEEPTIMERATE` (always 1000).
+Z03 §5.6 part E describes the empower keep-time bonus as a bonus to the success *rate*; the code adds `nT2[k − 1]` to
+the keep time and rolls the plain `sucrate`.
+
+### 5.8 Heal over time: `so_mobile_HPHealOverTime` / `so_mobile_SPHealOverTime` (vt 0x734 / 0x738)
+
+The heal step of the HoT actors (§5.4; Z09 §12.5 calls it for the magic-field heal with `MAX_ABSTATEINDEX`). Same body
+for every mobile-object class.
+
+```pseudo
+ShineMobileObject::so_mobile_HPHealOverTime(o, ShineObject *caster, int heal, ABSTATEINDEX idx)   @ FUN_0040e910 (vt 0x734)
+    f = setitemskilleffect[SET_HPSPRECOVERYRATE]                         # 1000 in 2016 (§3.8)
+    before = o.so_GetHP() (vt 0x4e8)
+    o.so_Heal(f · heal / 1000) (vt 0x4e4)                                # × HealRate ‰, capped at MaxHP (Z09 §17.3)
+    resthp = o.so_GetHP() − o.so_batobj_GetDamage() (vt 0x65c, reads smo_BattleObject +4 = o+0x1d80)
+    healed = o.so_GetHP() − before
+    # RankingValue script events (Z09 §14.3, bug Z09-B39): Lua function 0xAC with
+    #   { caster's field, caster as player (vt 0xbbc), dealt = healed } when the caster is a player on a field
+    #   whose script has a RankingValue name, and { o's field, o as player, healed-part = healed } likewise for o
+    Broadcast to every player in range of o (so_AllOfRange, AxialListPacketBroadcast, 15 bytes):
+        0x243C NC_BAT_DOTDAMAGE_CMD { u16 object = o.handle, u32 resthp, u16 damage = 0, u16 abstate = idx,
+                                      u16 hpchangeorder = o.so_mobile_GetHPChangeOrder() (vt 0x7e8), u8 IsMissDamage = 0 }
+        # layout as the verified one in packets-zone.md (0x243C, basis alms_SelfKill). Client handler FUN_004b5740
+        # (partly read): a damage number only when damage ≠ 0 (and abstate ∉ {0x0E, 0x153, 0x318}); resthp == 0 runs
+        # the death display; so a HoT tick shows no number, only the HP update
+
+ShineMobileObject::so_mobile_SPHealOverTime(o, ShineObject *caster, int sp)   @ FUN_004055d0 (vt 0x738)
+    o.so_recoversp(setitemskilleffect[SET_HPSPRECOVERYRATE] · sp / 1000) (vt 0x5b8)    # no packet here, no ranking
+```
+
+The item-action rate `SEIT_STA_DOT_HEAL_RATE_INCREASE` (§5.3, 10 set actions) is applied by the HP actors before the
+call (§5.4), never to SP; `SET_HPSPRECOVERYRATE` (mechanism A) is the only factor inside, and is neutral in 2016.
 
 ## Original-server bugs
 
@@ -761,10 +894,11 @@ asm 0x453957 is left on the stack for the third argument: `so_CharName` @ FUN_00
 | Z21-B5 | `Send_SETITEMHEALEFFECT` FUN_005cfbb0 (§4.5) | `hpchange` is u16, the amount u32 | amounts ≥ 65,536 (rate types on very high MaxHP) show wrapped; latent with the 2016 set data (absolute 5…30) | u32 field, or clamp to 0xFFFF |
 | Z21-B6 | `InvenCellReleaser_UnEquipInfo::icr_Apply` FUN_0048cc60 (§4.3) | the set-action delete failure logs "ShineObjectClass::ShinePlayer::sp_NC_ITEM_EQUIP_REQ SetItem Can`t Del ActionID" | misleading log (names the equip handler) | the releaser's own name |
 | Z21-B7 | `Send_SETITEMHEALEFFECT` FUN_005cfbb0 (§4.5) | only bit 0 of the `flag` byte is written (`b ^= (b ^ isheal) & 1`) | bits 1–7 carry stale buffer bytes to the client; harmless, the client masks bit 0 | write the whole byte |
-| Z21-B8 | `AbstateElementInObject::aeo_Recover` FUN_004176c0 via `ab_Recover` FUN_00417ef0 (§5.6) | re-sets each sheltered state through `so_AbnormalState_Set` → `aeo_Set` (which clears `aeo_SetItemEffect`) and does not copy the sheltered element's set-item buffer back | a revived player's states lose the caster's item-action rates (AC/Dex/WC/ShieldAC/MaxHPSP refit, DoT-heal and party-recharge factors); logging out dead keeps them (`ab_SaveAbstate` saves the shelter copy) | copy `aeo_SetItemEffect` back after the re-set, as `asl_Store` does at login |
+| Z21-B8 | `AbstateElementInObject::aeo_Recover` FUN_004176c0 via `ab_Recover` FUN_00417ef0, from the skill revive (Z03 §7.3) and the item revive `uib_Effect` FUN_00418b60 (§5.6) | re-sets each sheltered state through `so_AbnormalState_Set` → `aeo_Set` (which clears `aeo_SetItemEffect`) and does not copy the sheltered element's set-item buffer back | a revived player's states lose the caster's item-action rates (AC/Dex/WC/ShieldAC/MaxHPSP refit, DoT-heal and party-recharge factors); logging out dead keeps them (`ab_SaveAbstate` saves the shelter copy) | copy `aeo_SetItemEffect` back after the re-set, as `asl_Store` does at login |
 | Z21-B9 | `aeo_SetItemEffectStore` FUN_00510670 / `siae_ParameterRefit` FUN_005108c0 (§5.2) | the MA actions (SAA 13, 46, 83, 84) are filed under `SET_DAMEGERATE`, which the refit applies to WC only | a magic-attack state would get its set rate on WC; latent (mechanism A stores nothing, Z21-B1) | refit MA too, or a separate MA index |
 | Z21-B10 | `siae_SetItemEffectAndValue` FUN_00510170 (§5.3) | the 32-bit rate product of `GetRateAppliValue` is stored as u16 (and saved as `smallint`, D06 §7.2) | products ≥ 65,536 wrap (≥ 32,768 may fail the DB bind); latent with 2016 data (single rates 700…1300) | clamp, or a wider field |
 | Z21-B11 | `SubAbnormalStateActorPartyRecharge::sasa_Act_Killed` FUN_00407730 (§5.4) | tests `&e.aeo_SetItemEffect != null` (address of a member of a non-null element) | dead check, always true; harmless | no test |
+| Z21-B12 | `ShineMobileObject::so_SkillEnchant` FUN_00431ca0 (§5.7) | its asserts name `ShinePlayer::sp_NC_BAT_SKILLENCHANT_REQ` and `BattleObject::bo_Routine` | misleading logs (the function is the mobile-object enchant step, for every caster class) | the function's own name |
 
 ## 6. Not reconstructed / uncertain
 
@@ -777,9 +911,40 @@ asm 0x453957 is left on the stack for the third argument: `so_CharName` @ FUN_00
   PDB names only the handler). Whether the player's HP gauge is refreshed after a set heal (§4.4).
 - §5.3 `EventRunBySkillGroupIndex` / `_EventRun` internals (which observers match, cooldowns, `ActivityRate` roll) are
   Z17's; the table of §5.3 assumes every matching action fires.
+- `so_batobj_GetDamage` (vt 0x65c, FUN_005556f0, reads `smo_BattleObject` +4 = o+0x1d80) is subtracted from the HP sent as
+  `resthp` in the HoT packet (§5.8): which pending damage it holds was not traced (Z03's battle object).
+- The `0x243C` client handler FUN_004b5740 was read only as far as the damage number / death branch (§5.8).
+- `uib_Effect` (§5.6) recovers `g_AbstateShelter` without freeing it, and the death filler only resets that entry when
+  the player carries the keep-buff item: after an item revive the stale copy stays until a `0x104E` / skill revive frees
+  it. It could only come back through another item revive after a death without the item (i.e. the item obtained while
+  dead), so it is not listed as a bug *(inferred)*.
 - Whether the WM keeps `0x4011` rows byte-exact into `0x1023` (W01 §6.3 says the blob is cached; the set-item words are
   assumed untouched).
 
 ## 7. Coverage boundary
 
-*(Completed in the sweep part.)*
+Sweep method: every `//==== FUNC` of the zone PDB export whose name contains `SetItem`, `SetEffect`, `SkillEffect`,
+`EffectBy` or `EffectDesc` (87; all set-item ones are cited here; the rest are `SkillEffectApply::*` blast code (Z03 §5.6)
+or verbs like `SetItemDiceGameMode`, `so_mob_SetItemDropMobID`, `so_mh_reSetItemInfoOpen`, `sohu_SetEffectHandle`), every
+string with `SetItem` / `SetEffect` (all referencing functions cited), the callers and callees of every function cited
+here (profiler, logging, `std::` and iterator helpers skipped), and the `ShinePlayer` / `ShineMob` vtable slots used.
+`coverage.py Z21` does not apply (no scope table).
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| `ItemActionObserveManager::_EventRun` @ FUN_005d1df0, `AddAction` / `DelAction` internals, `doWithActionIDs`, `ActionEffectAbStateTable::FindActionID` @ FUN_005c7f40, `SendCoolTimes2Client` @ FUN_005d0d30, `ItemActionObserveManager::Clear` @ FUN_005d16e0 (reached from `sp_ItemActionSetup`, §4.3, and `EventRunBySkillGroupIndex`, §5.3), the item-action effect classes other than the two in §4.4 | Z17 (open; plan: "Item actions: the tables `ItemAction*.shn`, …, the player's item-action cooldown container (player `vt 0x5d0`), what triggers a check …, each condition and effect type") | generic item-action engine; set actions are ordinary item actions with observer key 0xFFFF (§4.3); Z21 documents only the set-specific entry points and the two effect classes the set data uses |
+| `SubAbnormalStateActor*` bodies beyond the set-item factor (HPHeal / HPSPHeal / PartyRecharge rest, every other actor) | Z22 (open; goal: "Reconstruct each actor's attach / routine / detach / apply") | §5.4 gives only the set-item reads of three actors |
+| `siae_ParameterRefit` @ FUN_005108c0, `aeo_ParameterEnchant` @ FUN_004079f0 | Z12 §2.5 (done, documents both) | cited in §5.4; Z12's "filled from the caster's set-item effects" is corrected in §5.3 and `docs/knowledge/Z21.md` |
+| `smo_SkillBlast` @ FUN_00581160, `sbec_Routine` @ FUN_00437fc0, `aeo_Set` @ FUN_0040a340, `so_AbnormalState_Set` / `Resist` / `Inform` / `Reset`, `csl_SPCheck` @ FUN_0055b920 | Z03 §5.3, §5.6, §6.2–6.4 (done, documented) | the readers of §3.7 and the callers of §5.7; only their set-item parts are described here |
+| `so_KilledBy` @ FUN_00433be0 (death shelters), skill revive `sp_NC_SKILL_REPLYREVIVE_CMD` @ FUN_00418a30, `sp_ReviveNow` @ FUN_0057d290 | Z03 §7.2–7.3 (done, documented) | §5.6 adds the shelter helpers and the item revive `uib_Effect` @ FUN_00418b60 / `so_ReviveByItem` @ FUN_00417850, which no doc had |
+| `0x3039 NC_ITEM_REVIVEITEMUSE_CMD`, the revive item's use and DB consumption | Z04 §12.3 (done, documented) | §5.6 documents only the `uib_Effect` it ends in |
+| `smo_ply_SkillCoolTime` @ FUN_0055b6a0 (SET_COOLTIMERATE reader) | Z11 §8.5 (done, documents the rate step) | §3.7 |
+| `so_Routine` @ FUN_0056a080 (`se_Clear` per routine), `almfh_ApplyHeal` @ FUN_0056d2c0, `mdt_PostSkillBlast` @ FUN_004a3a90, the RankingValue script events of §5.8 | Z09 §5.5, §12.5, §28.3, §14.3 (done, documented) | readers / callers listed in §3.7 and §5.8 |
+| `so_SaveAbstate` senders `ws_save2DB` / `ws_save2worldmanager`, GameDB `0x4007` → `p_Char_SetStateWithSetItemAndRestTime`, `0x100C` from `p_Char_GetStateAllWithSetItemAndRestTime` | Z01 §8.4, D02 §6, D06 §7.2 (done, documented) | §5.5 / §5.6 give the set-item words of the row |
+| WM relay `0x4011` → `0x1023 NC_CHAR_ZONE_ABSTATE_CMD` | W01 §6.3 (done, documented) | §5.5; byte-exactness noted in §6 |
+| login restore `so_CharAbstateData` @ FUN_0044e0e0 → `asl_Store` @ FUN_0040afd0 | Z12 §6.4 (done, documents it) | §5.6 adds `siae_SetItemEffectRestore` |
+| `ItemInfo.SetItemIndex` column (the join key of §4.2) and the `ItemInfo.shn` loader `ItemDataBox::idb_Load` @ FUN_00649780 | Z01 §2.3 loader table (done, lists it) and §2.3 / §3.2 here (column offset +0x156; `ItemDataBoxIndex.SetItemIndex` set to 0xFFFF) | the set name is read straight from the item row; the loader's only set-item act is the 0xFFFF fill |
+| equip / unequip / drop flows that run the releasers of §4.3 (`sp_NC_ITEM_EQUIP_REQ` …, `InventoryCellLockList`) | Z04 / Z05 (done, documented: Z05 §1.2–1.3 for the lock list) | §4.3 documents only the set-action add / delete inside the releasers |
+| `0x206F` and `0x243C` client handlers (FUN_00692d10 / FUN_004b5740, 2016 client) beyond what §4.5 / §5.8 say | C01 (done: handler map in `re-data/client-handlers.json`) | the floating-number / HP display internals are client UI; noted in §6 |
+| `smo_old_skill_blast` @ FUN_00579b50 / FUN_0057be40 (vt 0xEA4) | here (§5.7) | dead: no code calls vt 0xEA4 |
+| Overlap rows of Z09 §31.2 "Items, equipment, set items, random options" (`Send_SETITEMHEALEFFECT` FUN_005cfbb0, `SkillEffect::operator[]` FUN_00510010, `se_Clear` FUN_005105e0, `SetItemAbstateEffect` ctor FUN_00510350, `ed_Compare` FUN_004a2ed0) | here (§4.5, §3.6, §5.1) | Z18 (no status yet) can cite Z21; recorded in `docs/knowledge/Z21.md` |
