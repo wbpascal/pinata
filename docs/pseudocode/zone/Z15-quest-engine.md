@@ -192,7 +192,7 @@ CQuestParserScript::CQuestParserScript():                                       
     m_Token.SetSeprator(" ,\t\r\n")                # comma is a separator too
 CQuestParserScript::~CQuestParserScript(): m_Token.Close(); ~CToken                 @ FUN_006371b0
 CQuestParserScript::ParserClose(): m_Token.Close()                                 @ FUN_00637090
-CQuestZone::CQuestZone(questData): CQuest::CQuest(questData); parser ctor; m_pPlayer = NULL; four more members 0   @ FUN_005b9a00
+CQuestZone::CQuestZone(questData): CQuest::CQuest(questData); parser ctor; m_pPlayer = NULL; m_QuestRestTime = 0 (4 × i32, §4.4)   @ FUN_005b9a00
 ```
 
 ### 2.2 Keyword tables (static data)
@@ -958,9 +958,487 @@ the dialog. Part 5 (§7) adds the non-script quest codes 0xB41…0xB5A.
 
 ---
 
-<!-- Parts 3–5 add: §4 diary, conditions and repeat resets,
-§5 the reward path, §6 other entry points, §7 quest error numbers. The sweep adds the bugs table, uncertain list and
-coverage boundary. -->
+## 4. The diary (`CQuest`), quest conditions and repeat resets
+
+`CQuest` is the shared quest library (the 2016 client runs the same code, client FUN_00727ab0…FUN_007298e0, names in
+`names/client/C02.json`; checked for `IsQuestArea` and `QuestPlayer_TimeProcess`, identical bugs). The zone uses it
+through `CQuestZone` (§2.1, vftable §3.8). This section corrects Z08 §3.1's helper names: `Diary_Find` = `GetQuestInfo`,
+`Diary_Store` = `AddQuestInfo`, `Diary_Touch` = `SetQuestInfoClearRepeat`, `Diary_Count` = `GetNumOfDoingQuest`.
+
+### 4.1 Members and the diary array
+
+| `CQuest+` | Member *(pdb2016)* | Meaning |
+|---|---|---|
+| +0x00 | vftable | `CQuestZone` vftable in the zone (§3.8) |
+| +0x04 | `CQuestData *m_pQuestData` | → `gQuestData` (§1) |
+| +0x08 | int `m_NumOfQuest` | used diary entries |
+| +0x0C | int `m_NumOfQuestBF` | capacity (entries allocated) |
+| +0x10 | `PLAYER_QUEST_INFO *m_pQuestArray` | the diary: unsorted array of 0x20-byte records, searched linearly by ID |
+| +0x14 | long `m_ProcessedTime` | `_time32` of the last `QuestPlayer_TimeProcess` pass (§4.5) |
+| +0x18 / +0x1C / +0x20 | `m_MaxOfQuestListWithNPC`, `m_NumOfQuestListWithNPC`, `NPC_QUEST_STATUS *m_pQuestListWithNPC` | client-side NPC quest list (`GetQuestListWithNPC`, client FUN_007298e0); the zone never fills it (0 / NULL from the constructor, freed by the destructor) |
+| +0x24 | u32 `m_QuestStatusPriority[21]` | rank of a status for the NPC choice (§4.4), lower wins |
+| +0x78 | u32 `m_QuestTypePriority[11]` | rank of a `QUEST_TYPE` for the NPC choice, lower wins |
+| +0xA4 | `PROTO_NC_QUEST_RESET_TIME_CMD m_QuestRestTime` | period starts from the WM (Z08 §3.4, W05 §2.3) |
+
+`PLAYER_QUEST_INFO` (0x20) *(pdb2016)*: +0 u16 `ID`, +2 u8 `Status` (`PLAYER_QUEST_STATUS`, Z08 §3.1), +3
+`PLAYER_QUEST_DATA Data` (0x1D): +0 i64 `StartTime`, +8 i64 `EndTime`, +0x10 u32 `RepeatCount`, +0x14 u8
+`ProgressStep` (the script's `PROGRESS` value), +0x15 u8 `End_NPCMobCount[5]` (counters for `End.NPCMobList[i]`), +0x1A
+bit 0 `End_Location`, bit 1 `End_Scenario`, +0x1B u16 `End_RunningTimeSec`. (Record offsets: Status +2, counts +0x18,
+flags +0x1D, running time +0x1E.)
+
+```pseudo
+CQuest::CQuest(questData):                                                          @ FUN_006301d0
+    m_pQuestData = questData; m_NumOfQuest = 0; m_ProcessedTime = _time32(); m_NumOfQuestBF = 0; m_pQuestArray = NULL
+    m_Max/NumOfQuestListWithNPC = 0; m_pQuestListWithNPC = NULL          # m_QuestRestTime: CQuestZone ctor (§2.1)
+    m_QuestStatusPriority: 8 REWARD 0, 6 ING 1, 5 ABLE / 7 FAILED / 20 READ_ABLE 2, 0 NONE 0x16, every other 0x15
+    m_QuestTypePriority:   3 EVENT 0, 2 CLASS 1, 6 EPIC / 7 EPIC_PARTY / 8 RAID 2, 5 NORMAL_PARTY 3, 9 CHAO_QUEST 4,
+                           0 NORMAL 5, 1 STORY / 4 INSTANCE_DUNGEON / 10 DAILY_QUEST 0xB
+CQuest::~CQuest(): free(m_pQuestArray); delete[] m_pQuestListWithNPC; counters 0                @ FUN_0062f0f0
+
+CQuest::InitQuestBF(n) → int:                                                       @ FUN_0062f130
+    if m_NumOfQuestBF < n: free(m_pQuestArray); m_pQuestArray = NULL; m_NumOfQuestBF = 0
+    if !m_pQuestArray: m_pQuestArray = malloc(n·0x20) zero-filled (fail → m_NumOfQuest = 0; return 0); m_NumOfQuestBF = n
+    m_NumOfQuest = 0; return 1
+CQuest::ClearQuest(): m_NumOfQuest = 0; m_ProcessedTime = _time32()                    @ FUN_0062f1b0
+```
+
+Capacity: `ZoneServer_zs_start_sink` FUN_005aeff0 asserts "Too Many Quest (MAXQUEST …)" and exits when the table has
+more than 3000 quests, then calls `InitQuestBF(NumOfQuest)` for each of the 1500 player objects of the object pool
+(indexes 0…0x5DB; "Fail to player quest bf alloc" + exit on a failed malloc); `InitNewPlayer` (§3.8) repeats it per
+login. The diary therefore has room for **one record per quest in the table** (2306 in 2016 *(data)*), so the
+"diary full" branches below (`AddQuestInfo`, `SetQuestAccept`) cannot be reached. The only count limit is the 40
+quests in progress of §4.3.
+
+```pseudo
+GetQuestIndex(id) → int:        index of the record with ID == id, -1 if none (also -1 when m_NumOfQuestBF == 0)   @ FUN_0062f1d0
+GetQuestInfo(id) → rec*:        the record or NULL                                                               @ FUN_0062f210
+GetQuestInfoByIndex(i) → rec*:  m_pQuestArray + i for 0 <= i < m_NumOfQuest, else NULL                          @ FUN_0062f260
+SetQuestInfo(info) → int:       overwrite the record with info.ID by *info (32 bytes); 0 if none                @ FUN_0062f280
+AddQuestInfo(info) → int:       SetQuestInfo, else append if m_NumOfQuest < m_NumOfQuestBF (else return 0); 1   @ FUN_0062f2e0
+SetQuestInfoClearRepeat(rec):   if rec: ProgressStep = 0, End_NPCMobCount[0…4] = 0, End_Location = End_Scenario = 0,
+                                End_RunningTimeSec = 0     (StartTime, EndTime, RepeatCount, Status kept)    @ FUN_0062f320
+SetQuestClear(id):              remove the record (memcpy of the tail one slot down; overlapping copy, works with
+                                the CRT's forward memcpy); m_NumOfQuest -= 1                                    @ FUN_0062f350
+GetNumOfDoingQuest() → int:     number of records with Status 6 ING, 7 FAILED or 8 REWARD                       @ FUN_0062fb10
+```
+
+### 4.2 Loading the diary at login (WM 0x1021 / 0x1022 / 0x10CD / 0x10D6)
+
+The WM sends the character's quest lists when the player enters the map (Z07 §1.2); `so_StoreQuestDoing/Done/Read/
+Repeat` (0044b3c0…, §5) hand them to these four functions. Each record is merged with `SetQuestInfo`-or-append
+semantics (inlined); the return value is 1 when every record found a place.
+
+```pseudo
+CQuest::Recv_NC_CHAR_QUEST_DOING_CMD_ACK(cmd {u32 chrregnum, u8 bNeedClear, u8 nNumOfDoingQuest,
+                                         PLAYER_QUEST_INFO QuestDoingArray[]}) → int:   @ FUN_0062f6e0
+    if bNeedClear: m_NumOfQuest = 0; m_ProcessedTime = _time32()        # first packet of a login
+    for each of the n records: store it as is (32 bytes, Status from the DB)
+CQuest::Recv_NC_CHAR_QUEST_REPEAT_CMD_ACK(cmd {u32 chrregnum, u16 nNumOfRepeatQuest,
+                                          PLAYER_QUEST_INFO QuestRepeatArray[]}) → int: @ FUN_0062f960
+    for each record: store it as is
+CQuest::Recv_NC_CHAR_QUEST_DONE_CMD_ACK(cmd {u32 chrregnum, u16 nTotalDoneQuest, nTotalDoneQuestSize, nDoneQuestCount,
+                                        nIndex, PLAYER_QUEST_DONE_INFO QuestDoneArray[] {u16 ID, i64 tEndTime}}) → int:   @ FUN_0062f7c0
+    for each entry: store { ID, Status = 2 DONE, Data.EndTime = tEndTime }
+CQuest::Recv_NC_CHAR_QUEST_READ_CMD_ACK(cmd {u32 chrregnum, u16 nNumOfReadQuest, u16 QuestReadIDArray[]}) → int:   @ FUN_0062f890
+    for each id: store { ID = id, Status = 20 READ_ABLE }
+```
+
+The DONE and READ records are built in one stack buffer of which only `ID`, `Status` (and `EndTime`) are written: the
+rest of `Data` (`StartTime`, `RepeatCount`, `ProgressStep`, counters, flags, running time) is whatever the stack held
+(original bug) Z15-B31. For READ records this is harmless (`SetQuestAccept` zeroes a READ_ABLE record), but a DONE
+record that is accepted again (a daily quest after its reset, §4.6) keeps its garbage `StartTime` and `RepeatCount`:
+`QuestNext` ACCEPT copies the record into the 0x4403 request (§3.3) and the Character server stores it (D04 §1.2).
+
+### 4.3 Status changes after a DB answer
+
+`Recv_NC_QUEST_DB_SET_INFO_ACK` (§4.7) applies the change only after the Character server confirmed it; it uses only
+`QuestInfo.ID` from the answer and recomputes the record locally:
+
+```pseudo
+CQuest::SetQuestAccept(id) → int:                                                   @ FUN_0062f3b0
+    if !GetQuestData(id): return 0
+    rec = GetQuestInfo(id)
+    if rec:
+        old = rec.Status; rec.Status = 6 ING
+        if old == 20 READ_ABLE: rec.Data = 0 except StartTime = _time64()      # a fresh start
+        else: SetQuestInfoClearRepeat(rec)                                       # e.g. 4 REPEAT, 2 DONE (daily): StartTime,
+                                                                                 # EndTime, RepeatCount kept
+        return 1
+    if m_NumOfQuest >= m_NumOfQuestBF: return 0
+    append { ID = id, Status = 6, Data = 0 except StartTime = _time64() }; return 1
+CQuest::SetQuestCancel(id) → int:                                                   @ FUN_0062f4b0
+    rec, row required (else 0)
+    if row.Repeatable: rec.Status = 4 REPEAT; SetQuestInfoClearRepeat(rec)
+    else: SetQuestClear(id)                                                      # record removed
+    return 1
+CQuest::SetQuestProgress(id, step) → int: rec.Data.ProgressStep = step              @ FUN_0062f550
+CQuest::SetQuestFailed(id) → int:         rec.Status = 7 FAILED                     @ FUN_0062f5b0
+CQuest::SetQuestAbort(id) → int:          rec.Status = 1 ABORT                      @ FUN_0062f680
+CQuest::SetQuestDone(id) → int:  SetQuestDone(GetQuestInfo(id))  (NULL → 0)          @ FUN_006302b0
+CQuest::SetQuestDone(rec) → int:                                                    @ FUN_0062f610
+    if !rec or !GetQuestData(rec.ID): return 0
+    rec.Status = row.Repeatable ? 4 REPEAT : 2 DONE
+    rec.Data.RepeatCount += 1; rec.Data.EndTime = _time64()
+    this.vt 0x5c(rec, row)                                                       # empty hook in the zone (§3.8)
+    return 1
+```
+
+`SetQuestDone` is called from the SET_INFO_ACK (`nQSC 10`, unreachable, §4.7) and from the reward path
+(`Send_NC_QUEST_DB_DONE_REQ`, `Recv_NC_QUEST_DB_DONE_ACK`, `Recv_NC_ITEMDB_QUESTREWARD_ACK`: §5). Note the
+ProgressStep / counters are not cleared on DONE; the next ACCEPT clears them.
+
+### 4.4 Quest conditions and the computed status
+
+The stored `Status` is only a base: what a quest "is" for the player right now is computed by `GetNewQuestStatus`
+from the stored status and the quest's start / end conditions (`QUEST_DATA` §1.2). Player values come from the
+`CQuestZone` getters (§3.8): level vt 0x64, item lot vt 0x68 (`GetQuestPlayerItemLot`, unlocked cells only), race 0x6c,
+class 0x70, gender 0x74, item lock 0x7c, location 0x60, area test 0x28.
+
+```pseudo
+CQuest::IsSoonableQuest(row) → int:      "the quest can be shown as coming soon"    @ FUN_0062fc80
+    if Start.bLevel and !(Start.LevelMin <= (u8)(level + 5) and level <= Start.LevelMax): return 0   # 5 levels early
+    if Start.bItem and GetQuestPlayerItemLot(Start.ItemID) < Start.ItemLot: return 0
+    if Start.bLocation:
+        GetPlayerCurrentLocation(&map, &x, &y)
+        if map != Start.Location or !IsQuestArea(x, y, Start.LocationX, Start.LocationY, Start.LocationRange): return 0
+    if Start.bQuest:                                                             # prerequisite quest
+        pre = GetQuestInfo(Start.QuestID); if !pre: return 0
+        if pre.Status == 2 DONE: if IsSoonableDailyQuest(pre) == 1: return 0   # a daily prerequisite counts only in the
+                                                                                 # period it was done in (2 quests, data)
+        elif pre.Status != 4 REPEAT: return 0
+    if Start.bRace and race != Start.Race: return 0
+    if Start.bClass and class != Start.Class: return 0
+    if Start.bGender and gender != Start.Gender: return 0
+    if Start.bDate:                                                              # local time, _localtime64
+        now, s, e = localtime(now), localtime(Start.DateStart), localtime(Start.DateEnd)
+        DateMode 0 YEAR_TERM:  require s.tm_year <= now.tm_year <= e.tm_year
+                 1 MONTH_TERM: require s.tm_mon  <= now.tm_mon  <= e.tm_mon     # month only, any year
+                 2 DATE_TERM:  require s.tm_mday <= now.tm_mday <= e.tm_mday    # day of month only
+                 3 PERIOD:     require DateStart <= now <= DateEnd              # full 64-bit time
+                 other: no test
+    return 1
+CQuest::IsDoingableQuest(row) → int:     "the quest can be accepted"                @ FUN_0062fea0
+    IsSoonableQuest(row) and (!Start.bLevel or Start.LevelMin <= level <= Start.LevelMax)
+CQuest::IsDoingableQuest(id) → int:      same with GetQuestData(id) (NULL → 0)       @ FUN_0062fee0   (QuestNext ACCEPT, 0xC03)
+
+CQuest::IsRewardAbleQuest(rec) → int:    "the end conditions are met"               @ FUN_0062ff40
+    row = GetQuestData(rec.ID); if !row: return 0
+    if End.bLevel and level < End.Level: return 0
+    for i in 0..4: if End.NPCMobList[i].bNPCMob and NPCMobAction in {1 KILL, 2 FIND, 3 CONVERSATION}
+                      and rec.Data.End_NPCMobCount[i] < NPCMobCount: return 0
+    for i in 0..4: if End.ItemList[i].bItem:
+        if IsQuestPlayerItemLock(ItemID) == 1: return 0                          # no unlocked cell holds the item
+        if GetQuestPlayerItemLot(ItemID) < ItemLot: return 0
+    if End.bLocation: same map / area test as above with End.Location…; else return 0
+    if End.bScenario and !rec.Data.End_Scenario: return 0
+    if End.bRace and race != End.Race: return 0
+    if End.bClass and class != End.Class: return 0
+    if End.bTimeLimit and rec.Data.End_RunningTimeSec >= End.TimeLimit: return 0
+    return 1
+CQuest::IsRewardAbleQuest(id) → int:     on GetQuestInfo(id) (none → 0)              @ FUN_006300d0   (QuestNext DONE, 0xC08)
+
+CQuest::IsQuestArea(x, y, cx, cy, range) → int:                                     @ FUN_0062fab0
+    return (u32)trunc(sqrt(|x − cy| + |y − cy|)) <= range
+    # (original bug) Z15-B24: `cx` is never read (both differences use cy) and the sum of the absolute differences
+    # is not squared, so the test accepts a far larger, wrongly placed area; no 2016 quest has a location
+    # condition (§1.2 data), the client has the same code (client FUN_007284d0)
+
+CQuest::IsSoonableDailyQuest(rec) → u8   (vftable 0x80)  "a daily quest may be done again"   @ FUN_00630130
+    row = GetQuestData(rec.ID); if !rec or !row or row.Type != 10 DAILY_QUEST: return 0
+    t = by row.nDailyQuestType: 1 DAY tResetDayQuest, 2 WEEK tResetWeekQuest, 3 MONTH tResetMonthQuest,
+        4 YEAR tResetYearQuest, other: return 0
+    return rec.Data.EndTime < (i64)t                                             # done before the current period began
+```
+
+`m_QuestRestTime` holds the start of the current day / week (Monday 00:00) / month / year (WM `CDailyQuestTimer`, W05
+§2.3); it arrives with 0x441D at map login and with every 0x441C at the daily rollover (Z08 §3.4; handlers §5). Before
+the first 0x441D it is 0 (`CQuestZone::CQuestZone` zeroes it, asm 0x5b9a4f…0x5b9a61; `CQuest::CQuest` does not), so
+no daily quest is repeatable until then.
+
+```pseudo
+CQuest::GetNewQuestStatus(row) → PLAYER_QUEST_STATUS:                                @ FUN_00630320
+    rec = GetQuestInfo(row.ID)
+    if rec: switch rec.Status:
+        2 DONE:       return (IsSoonableDailyQuest(rec) == 1 and IsDoingableQuest(row) == 1) ? 5 ABLE : 2 DONE
+        3 SOON:       if IsDoingableQuest(row): return 5 ABLE
+                      return IsSoonableQuest(row) ? 3 SOON : 0 NONE
+        4 REPEAT:     return IsDoingableQuest(row) ? 4 REPEAT : 0 NONE
+        5 ABLE:       return IsDoingableQuest(row) ? 5 ABLE : 0 NONE
+        6 ING, 8 REWARD: return IsRewardAbleQuest(rec) ? 8 REWARD : 6 ING
+        20 READ_ABLE: return IsDoingableQuest(row) ? 20 READ_ABLE : 0 NONE
+        other (0 NONE, 1 ABORT, 7 FAILED, 9 LOWABLE, …): return rec.Status           # sticky
+    # no record:
+    if IsSoonableQuest(row) and (!Start.bLevel or LevelMin <= level <= LevelMax): return 5 ABLE
+    return IsSoonableQuest(row) ? 3 SOON : 0 NONE
+CQuest::GetNewQuestStatus(id): GetQuestData(id) → GetNewQuestStatus(row); unknown id → 0 NONE   @ FUN_006304a0
+CQuest::IsDoingQuest(id) → int:  row exists and GetNewQuestStatus(row) ∈ {6 ING, 7 FAILED, 8 REWARD}   @ FUN_006304d0
+    # callers: 0x4407 give-up (§4.7), FieldContainer::fc_CanEnterIndun FUN_004624d0 (a map's NeedQuest:
+    # ENTER_MAP_ERR_NEED_PARTY_OR_QUEST otherwise, Z08 §5)
+CQuest::DoingQuestUpdateStatus(i) → status:                                          @ FUN_00630510
+    rec = GetQuestInfoByIndex(i); if !rec: return 0
+    rec.Status = GetQuestData(rec.ID) ? GetNewQuestStatus(row) : 0 NONE; return rec.Status
+```
+
+The computed status is written back into the diary only by `DoingQuestUpdateStatus` (the event functions of §4.5 and
+`QuestPlayer_NPCMobKill` / `ScriptMobKill` of §6) and by `QuestPlayer_DestroyItem`. A record never reaches the DB with
+a computed status except through the next 0x4403 / 0x441A / character save (§5). REWARD ↔ ING therefore flips in
+both directions as items are gained and lost. Nothing in the zone ever computes 7 FAILED (only the script `FAILED`
+command sets it) or 9 LOWABLE except `GetQuestStatusWithNPC` with `bLow` (never set by a zone caller).
+
+NPC side (which quest an NPC offers):
+
+```pseudo
+CQuest::IsQuestNPCMob(row, npc) → int:                                              @ FUN_0062fb50
+    (Start.bNPC and Start.NPCID == npc) or some End.NPCMobList[i] {bNPCMob, NPCMobID == npc, action 0 REWARD_OBJECT or 3 CONVERSATION}
+CQuest::IsConversationNPCMob(row, npc) → int: some End.NPCMobList[i] {bNPCMob, NPCMobID == npc, action 3}   @ FUN_0062fbb0
+CQuest::GetRewardNPC(row) → u16:  NPCMobID of the first End.NPCMobList entry with bNPCMob and action 0; 0xFFFF   @ FUN_0062fbf0
+CQuest::GetRewardNPC(id)  → u16:  same on GetQuestData(id)                           @ FUN_0062fc40   (used by §5 DONE_REQ)
+CQuest::GetStartNPC(id)   → u16:  CQuestData::GetStartNPC(id) (§1)                   @ FUN_0062fc30   (GameLog 0xC80F, §4.7)
+
+CQuest::GetQuestStatusWithNPC(st {u16 hID = npc}, row, level, bLow, unused) → int:   @ FUN_00630570
+    st.eResultState = 0; st.lpQuestData = row
+    if !IsQuestNPCMob(row, st.hID): return 0
+    s = GetNewQuestStatus(row)
+    switch s:
+        0 NONE, 1 ABORT, 2 DONE, 3 SOON: return 0                               # nothing to offer
+        4 REPEAT, 5 ABLE, 7 FAILED, 20 READ_ABLE: require Start.bNPC and Start.NPCID == hID, else return 0
+        6 ING:      require IsConversationNPCMob(row, hID) or the start NPC, else return 0
+        8 REWARD:   if hID != GetRewardNPC(row): require the start NPC (else return 0); s = 6 ING   # the start NPC
+                                                                                 # runs the Doing script
+    if bLow and s ∈ {5, 20} and Start.LevelMin + 5 < level: s = 9 LOWABLE      # far below the player's level
+    st.eResultState = s; st.nLevel = Start.LevelMin; return s != 0
+    # zone caller: 0x440F select-start (§4.7) with level 0, bLow false
+
+CQuest::GetQuestStatusWithNPC(st {hID}):   the quest an NPC click opens (§6: NPCClick, NPCClickCheck)   @ FUN_00630f60
+    best = NULL; bestState = 0 NONE; bestLevel = 0
+    for every quest row of the table (index order):
+        if !GetQuestStatusWithNPC(&tmp {hID}, row, 0, false, false): continue
+        if !best: best = row
+        pn, pb = m_QuestStatusPriority[tmp.eResultState], m_QuestStatusPriority[bestState]
+        if pn < pb: best = row; bestState = tmp.eResultState; if Start.bLevel: bestLevel = Start.LevelMin
+        elif pn == pb and Start.bLevel:                                          # tie-breaks, in this order:
+            higher Start.LevelMin wins (bestLevel updated); lower loses
+            then Type 3 EVENT beats non-EVENT; then a quest with a prerequisite (Start.bQuest) beats one without;
+            then one with a start item (Start.bItem); then a Repeatable one beats a non-repeatable one;
+            between two non-repeatable ones the lower m_QuestTypePriority[Type] wins; otherwise the earlier row stays
+    st.lpQuestData = best; st.eResultState = bestState; st.nLevel = bestLevel
+```
+
+Priority (lower first): REWARD 0, ING 1, ABLE / FAILED / READ_ABLE 2, REPEAT (and LOWABLE) 0x15. So an NPC opens the
+End script of a finished quest first, then a quest in progress, then a new one. A tie-break replaces `best` but keeps
+`bestState` of the previous winner (original bug) Z15-B27: with an ABLE / READ_ABLE quest and a FAILED quest of the same
+rank, the NPC click runs `QuestScriptRun(bestState, best.ID)` (§6) with the other quest's status, i.e. the Doing
+script of a quest not yet accepted or the Start script of a failed one. Quests without a level condition never win a
+tie (`Start.bLevel == 0` keeps the earlier row).
+
+### 4.5 Event functions (`CQuest` vftable 0x04…0x24)
+
+All iterate over the diary; "update" means `st = DoingQuestUpdateStatus(i)` followed, for a record that was 6 ING, by
+`vt 0x50(rec, row)` if `st == 8 REWARD` or `vt 0x54(rec, row)` if `st == 7 FAILED` (both empty in the zone, §3.8).
+Each returns 1 when some record matched. The per-event hooks `vt 0x2c…0x4c` are empty in the zone.
+
+```pseudo
+QuestPlayer_LevelChange(level) (0x04):                                              @ FUN_0062fa20
+    for ING records with End.bLevel == 1 and End.Level <= level: vt 0x30(id, level, End.Level)   # hook only, no update
+    # callers: ShinePlayer::sp_GainExp FUN_0042d830 and so_AmpersandCommand_LevelUp FUN_0042fa00 (after a level-up).
+    # The status is not re-evaluated here; it is recomputed at the next NPC click / DONE (§4.4).
+QuestPlayer_NPCMobKill(mobId, questId) (0x08):                                      @ FUN_006306d0
+    only the ING record with ID == questId: for each End.NPCMobList[i] {bNPCMob == 1, NPCMobID == mobId, action 1 KILL}:
+        if End_NPCMobCount[i] < NPCMobCount: End_NPCMobCount[i] += 1; vt 0x2c(id, mobId, count, needed); update
+    # the zone calls its own CQuestZone::QuestPlayer_NPCMobKill / ScriptMobKill instead (§6)
+QuestPlayer_TakeItem(itemId, lot) (0x0c):                                           @ FUN_00630810
+    for ING records, for each End.ItemList[i] {bItem == 1, ItemID == itemId}: vt 0x34(…); if lot >= ItemLot: update
+QuestPlayer_DestroyItem(itemId, lot) (0x10):                                        @ FUN_00630920
+    for every record (any status), for each End.ItemList[i] {bItem == 1, ItemID == itemId}: vt 0x38(…)
+        if lot < ItemLot: rec.Status = GetNewQuestStatus(row) (0 without row)
+            if old status was 8 REWARD: vt 0x58 if now ING, vt 0x54 if now FAILED (empty)
+    # (original bug) Z15-B26: no status filter: a REPEAT or READ_ABLE record whose start conditions fail at that
+    # moment (e.g. level above LevelMax) is stored as 0 NONE, and NONE is sticky in GetNewQuestStatus, so the
+    # quest cannot be started again until the next login; a DONE daily quest after its reset is stored as 5 ABLE
+so_ply_ItemLotChange(itemId, delta) (ShinePlayer, the caller of 0x0c / 0x10):       @ FUN_00578270
+    lot = q.vt 0x68 GetQuestPlayerItemLot(itemId)                                # the new total
+    delta > 0: q.QuestPlayer_TakeItem(itemId, lot); delta < 0: q.QuestPlayer_DestroyItem(itemId, lot); 0: nothing
+    # callers (item gain / loss paths): §6
+QuestPlayer_CheckLocation() (0x14):                                                 @ FUN_00630a60
+    GetPlayerCurrentLocation(&map, &x, &y)
+    for ING records with End.bLocation == 1, End.Location == map, End_Location not yet set, IsQuestArea(…):
+        End_Location = 1; vt 0x3c(id, map); update
+QuestPlayer_ScenarioDone(scenarioId) (0x18): §3.6                                   @ FUN_00630ba0
+QuestPlayer_RaceChange(race) (0x1c) / QuestPlayer_ClassChange(class) (0x20):        @ FUN_00630c90 / FUN_00630d70
+    for ING records with End.bRace / End.bClass == 1 and the value equal: vt 0x44 / 0x48; update
+QuestPlayer_TimeProcess() (0x24):                                                   @ FUN_00630e50
+    now = _time32(); if now == m_ProcessedTime: return 0
+    prev = m_ProcessedTime; m_ProcessedTime = now
+    for ING records with End.bTimeLimit == 1 and End_RunningTimeSec <= End.TimeLimit:
+        End_RunningTimeSec = (u16)(End_RunningTimeSec + (u16)(prev − now)); vt 0x4c(…); update
+    # caller: ShinePlayer::so_Routine FUN_0056c790 (player tick), so at most once per second
+    # (original bug) Z15-B25: adds prev − now (negative): the counter wraps from 0 to ≈65535 at the first second,
+    # which makes IsRewardAbleQuest fail forever (>= TimeLimit) and stops the counting; a time-limited quest can
+    # never be finished. There is also no FAILED on timeout (GetNewQuestStatus never yields 7). No 2016 quest has a
+    # time limit (§1.2 data); the 2016 client has the same code (client FUN_00729780)
+CQuest::Occure_LevelChange(id, level, needed):  empty body (PDB name of a shared, folded empty function; Z01 calls
+    the same address ShinePlayer_HeartbeatNoOp)                                    @ FUN_004c2450
+```
+
+No call of `QuestPlayer_CheckLocation`, `QuestPlayer_RaceChange` or `QuestPlayer_ClassChange` exists in the zone (direct
+or through `sp_QuestDiary` / vt 0x808; searched the whole export): location and race / class end conditions are
+re-checked only inside `IsRewardAbleQuest` (which tests the area itself, not the `End_Location` flag), so
+`End_Location` is never set and unused in the zone. Kill counts for `End.NPCMobList` actions 2 FIND and 3 CONVERSATION are never incremented by
+`CQuest` (§6 checks the zone's own counters); no 2016 quest uses them (§1.2 data: actions 0 and 1 only).
+
+### 4.6 Repeat rules (repeatable, daily, give-up)
+
+| Quest | After DONE | Can start again when |
+|---|---|---|
+| non-repeatable, not daily | Status 2 DONE (sticky) | never |
+| `Repeatable` ≠ 0 (157 in 2016) | Status 4 REPEAT, `RepeatCount` + 1 | at once, while `IsDoingableQuest` holds (REPEAT is offered at the start NPC) |
+| `Type 10 DAILY_QUEST` (30 in 2016, all `Repeatable 0`, `nDailyQuestType 1 DAY` *(data)*) | Status 2 DONE, `EndTime` = now | when `EndTime` < start of the current period (`IsSoonableDailyQuest`): computed status 5 ABLE |
+| given up, non-repeatable | DB record → 20 READ_ABLE with zero data (D04 0x4409); zone record 20 | at once (Start script) |
+| given up, repeatable | 4 REPEAT, progress cleared (0x4403 with nQSC 28) | at once |
+| CANCEL command | repeatable: 4 REPEAT; non-repeatable: record deleted in the DB only (Z15-B16) | at once |
+
+A daily quest needs `Type 10`; `nDailyQuestType` on another type has no effect. `Repeatable` together with `Type 10`
+would give REPEAT and skip the period test. The 40-quest limit counts ING, FAILED and REWARD records
+(`GetNumOfDoingQuest`); `QuestNext` ACCEPT refuses the 40th with 0xC0F (§3.3).
+
+### 4.7 Give-up, select-start, read and the SET_INFO answer
+
+Z08 §3.2 / §3.3 list these packets; this is the full logic (with corrections to Z08).
+
+```pseudo
+0x4407 NC_QUEST_GIVE_UP_REQ { u16 nQuestID }   ShinePlayer::sp_NC_QUEST_GIVE_UP_REQ  @ FUN_00578910
+    if !smo_IsActiveMode: return                                                  # no answer
+    if clockwatch.cw_CurrTick < p.sp_ScriptCommand (p+0x5cb4) + 100:              # 10 s after the last 0x4402 (§3.4)
+        Send_NC_QUEST_GIVE_UP_ACK(nQuestID, 0xB49); return
+    q.Recv_NC_QUEST_GIVE_UP_REQ(req)
+CQuestZone::Recv_NC_QUEST_GIVE_UP_REQ(req):                                         @ FUN_005bd960
+    if !m_pPlayer: return
+    rec = GetQuestInfo(nQuestID); row = GetQuestData(nQuestID)
+    if !rec or !row: Send_NC_QUEST_GIVE_UP_ACK(nQuestID, 0xB45); return
+    if !IsDoingQuest(nQuestID): return                                            # computed status not ING/FAILED/REWARD
+    if !row.Repeatable: Send_NC_QUEST_DB_GIVE_UP_REQ(nQuestID); return
+    info = copy of rec; info.Status = 4 REPEAT; SetQuestInfoClearRepeat(&info)
+    Send_NC_QUEST_DB_SET_INFO_REQ(&info, &{Cmd 28 QSC_REPEAT_QUEST_GIVE_UP, Data.nID = rec.ID})   # §3.5; the diary
+                                                                                  # is changed by the answer
+```
+
+**Z08-B6 settled:** the silent case is `IsDoingQuest` = 0, i.e. the quest has a diary record whose computed status is
+not ING / FAILED / REWARD: a record in 1 ABORT, 2 DONE, 4 REPEAT, 20 READ_ABLE, or one turned NONE (Z15-B26). The
+client offers "give up" only for quests it lists as in progress *(inferred)*, so this happens when the client's and the zone's
+diaries disagree, e.g. after a CANCEL / CLEAR (Z15-B16: the client still shows the quest) or an ABORT; the client then
+gets no answer at all (original bug, Z08-B6). It is not a timing case: the 10 s rule always answers (0xB49).
+
+```pseudo
+CQuestZone::Send_NC_QUEST_DB_GIVE_UP_REQ(id) → int:                                 @ FUN_005bae70
+    if !m_pPlayer: return 0
+    if (u32 at gpp buffer + 4) != 0:                                              # stale buffer test, asm 0x5baf12
+        → GameDB 0x4409 NC_QUEST_DB_GIVE_UP_REQ { u16 clienthandle = p.handle; u32 charregistnumber; u16 nQuestID }   # payload 8
+    return 1
+    # (original bug) Z15-B30: the same stale-buffer test as Z15-B9: when bytes 4…7 of the previous packet in the
+    # shared buffer were 0, nothing is sent and the client never gets 0x4408
+
+0x440A NC_QUEST_DB_GIVE_UP_ACK { hdr6, u16 nQuestID, u16 ErrorType }  (gds handler FUN_00578610: player by handle,
+    charNo must match, vt 0x300 == 0 (not closing, Z08 §3.3), then via vt 0x808) →
+CQuestZone::Recv_NC_QUEST_DB_GIVE_UP_ACK(ack):                                      @ FUN_005bafc0
+    if !m_pPlayer: return
+    if ErrorType == 0xB41: AddQuestInfo({ID = nQuestID, Status = 20 READ_ABLE, Data = 0})   # matches the DB (D04)
+    Send_NC_QUEST_GIVE_UP_ACK(nQuestID, ErrorType)                                # 0xB41 or the DB's 0xB46
+
+CQuestZone::Send_NC_QUEST_GIVE_UP_ACK(id, err) → int:                               @ FUN_005bad20
+    → player 0x4408 NC_QUEST_GIVE_UP_ACK { u16 nQuestID, u16 ErrorCode }  (via p.vt 0x2fc)
+```
+
+Client (`GameFrameWork::On_NC_QUEST_GIVE_UP_ACK` client FUN_004ba720): `ErrorCode 0xB41` → `CQuest::Recv_NC_QUEST_GIVE_UP_ACK`
+(client FUN_00728180: `SetQuestCancel(id)`), system message "Abandoned <%s> quest." (text 0xCAF22853), removes the quest
+from the quest helper, re-scans the start items (`SearchQuestStartItem`) and stores `{id, 20 READ_ABLE}`; every other
+code (0xB45, 0xB46, 0xB49, …) → "Failed to give up <%s> quest." (0x96F4E9C7). For a repeatable quest the client thus
+holds 20 READ_ABLE where the zone and the DB hold 4 REPEAT (original bug) Z15-B32; both allow a restart, but the
+client's quest list shows it as a new quest until the next login.
+
+```pseudo
+0x440F NC_QUEST_SELECT_START_REQ { u16 nNPCID, u16 nQuestID }   sp_ handler FUN_00578ab0 (requires IsActiveMode) →
+CQuestZone::Recv_NC_QUEST_SELECT_START_REQ(req) → int:                              @ FUN_005c0550
+    if !m_pPlayer: return 0
+    row = GetQuestData(nQuestID)                                                  # Z08 said "current quest row": no
+    err = 0xB47
+    if row and GetQuestStatusWithNPC(&st {hID = nNPCID}, row, 0, false, false):
+        if m_ParsingQuestID != nQuestID and m_QuestClickNPC == nNPCID              # the NPC the player clicked (§6)
+           and QuestScriptRun(st.eResultState, nQuestID) != 0: err = 0xB41        # the script runs (§2.7)
+    return Send_NC_QUEST_SELECT_START_ACK(nNPCID, nQuestID, err)
+CQuestZone::Send_NC_QUEST_SELECT_START_ACK(npc, id, err):                          @ FUN_005bb340
+    → player 0x4410 { u16 nNPCID, u16 nQuestID, u16 ErrorType }                    # the 2016 client ignores it (C01)
+```
+
+The client sends 0x440F when the player picks one quest from an NPC's list; the zone re-checks that this NPC offers
+it now, and runs the Start / Doing / End script chosen by its computed status. Running the same quest again is refused
+(0xB47), as is a pick at an NPC other than the last clicked one.
+
+```pseudo
+0x4416 NC_QUEST_READ_REQ { u16 nQuestID }   ShinePlayer::sp_NC_QUEST_READ_REQ        @ FUN_00578f90
+    if !smo_IsActiveMode: _ErrorSendPlayer<PROTO_NC_QUEST_START_ACK>(p, 0xB5A)     # FUN_00578c30: 0x4415 {u16 err}
+        # (original bug) Z15-B28: the "not active" answer of a READ request goes out as 0x4415 NC_QUEST_START_ACK
+        # (Z08 said 0x4417); the client acts on 0x4415 only for 0xB50, so the code is ignored either way
+    elif q.Send_NC_QUEST_DB_READ_REQ(nQuestID) == 0: _ErrorSendPlayer<PROTO_NC_QUEST_READ_ACK>(p, 0xB59)   # FUN_00578d60
+    # (`&p.sp_QuestDiary != NULL` before the call is always true; dead check like Z08-B15)
+CQuestZone::Send_NC_QUEST_DB_READ_REQ(id) → int:                                    @ FUN_005bb6b0
+    if !m_pPlayer or !GetQuestData(id): return 0
+    if GetNewQuestStatus(id) ∈ {2 DONE, 6 ING, 7 FAILED, 8 REWARD}: return 0      # computed status
+    → GameDB 0x4418 NC_QUEST_DB_READ_REQ { u16 clienthandle; u32 charregistnumber; u16 nQuestID }   # payload 8
+    return 1
+    # the DB overwrites any record with 20 READ_ABLE / zero data (D04): reading a REPEAT quest resets its RepeatCount
+
+0x4419 NC_QUEST_DB_READ_ACK { hdr6, u16 err, u16 nQuestID }  (gds handler FUN_00578710) →
+CQuestZone::Recv_NC_QUEST_DB_READ_ACK(ack):                                         @ FUN_005c06c0
+    if !m_pPlayer: return
+    if err == 0xB41: AddQuestInfo({nQuestID, 20 READ_ABLE, Data = 0}); → player 0x4417 { u16 err = 0xB58, u16 nQuestID }
+    else: _ErrorSendPlayer<PROTO_NC_QUEST_READ_ACK>(p, err)                        # the DB's 0xB43
+_ErrorSendPlayer<PROTO_NC_QUEST_READ_ACK>(p, err): → 0x4417 { u16 err, u16 nQuestID = stale buffer bytes }  (payload 4, via p.vt 0x2f8)
+    # (original bug) Z15-B29: nQuestID is never written (whatever the previous packet left at buffer+4); the 2016
+    # client handler (client FUN_0049c8e0) only prints "%d ??? Read OK" to the debugger, so no visible effect
+```
+
+"Reading" marks a quest the player has looked at (status 20 READ_ABLE, which the Start script accepts like ABLE).
+
+```pseudo
+0x4404 NC_QUEST_DB_SET_INFO_ACK { hdr6, u8 nQSC, PLAYER_QUEST_INFO QuestInfo, u16 ErrorType }  (gds FUN_00578410) →
+CQuestZone::Recv_NC_QUEST_DB_SET_INFO_ACK(ack):                                     @ FUN_005bf280
+    if !m_pPlayer: return
+    p.vt 0xae4 so_SetIsQuestRewardReq(0); m_bWaitResult = 0                        # for every nQSC, see Z15-B33
+    if nQSC == 28 REPEAT_QUEST_GIVE_UP:                                            # from 0x4407 above
+        rec = GetQuestInfo(QuestInfo.ID)
+        if ErrorType == 0xB41 and rec: rec.Status = 4 REPEAT; SetQuestInfoClearRepeat(rec); err = 0xB41 else err = 0xB46
+        Send_NC_QUEST_GIVE_UP_ACK(QuestInfo.ID, err); return                        # no QuestNext
+    if ErrorType != 0xB41:
+        _DebugMessageNew("ERROR, CQuestZone::Recv_NC_QUEST_DB_SET_INFO_ACK …" char name, m_ParsingQuestID, ID, Status, time)
+        Send_QUEST_ERROR_TO_CLIENT(0xC0E); return                                  # §3.4; the script was waiting
+    switch nQSC:
+        6 ACCEPT:   ok = SetQuestAccept(ID)
+        7 CANCEL:   ok = SetQuestCancel(ID)
+        8 PROGRESS: ok = SetQuestProgress(ID, QuestInfo.Data.ProgressStep)
+        9 FAILED:   ok = SetQuestFailed(ID)
+        10 DONE:    ok = SetQuestDone(ID); if ok and !row.Repeatable: p.vt 0x420 → CCharacterTitleZone::CT_QuestSuccess(ID) (§5)
+                    # unreachable: the zone sends DONE through 0x441A, never 0x4403 with nQSC 10
+        12 ABORT:   ok = SetQuestAbort(ID)
+        other:      _DebugMessageNew("ERROR, Recv_NC_QUEST_DB_SET_INFO_ACK, QUEST UN-DRIVED COMMAND=%d, QuestID=%d At %s")
+                    Send_QUEST_ERROR_TO_CLIENT(0xC0E); return
+    if ok: Send_NC_QUEST_SCRIPT_CMD_REQ(ID, &{Cmd = nQSC, IsPigeonStartType 0, Data.nID = ID,
+                                              Data[2] = ProgressStep for PROGRESS})   # 0x4401, client §3.4
+    if nQSC == 6: → GameLog 0xC80F NC_SYSLOG_CHAR_QUEST_STARTED { u32 userNo (vt 0x348), u32 charNo (vt 0x344),
+                     u16 questId, u8 zoneNo, u16 GetStartNPC(questId) }   (payload 13)
+                  (a packet-length failure asserts and skips the send)
+    QuestNext()                                                                   # also when ok == 0
+```
+
+The local `STRUCT_QSC` for the 0x4401 sets only `Cmd`, `IsPigeonStartType`, `Data.nID` (and the progress byte); the
+other `Data` bytes are stack leftovers (same class as Z15-B10). `so_SetIsQuestRewardReq(0)` and `m_bWaitResult = 0` run
+for every answer, also for a repeat give-up that has nothing to do with the running script: a give-up answer that
+arrives while a reward request (0x441A) or another 0x4403 is pending clears both flags early (original bug) Z15-B33
+(narrow: 0x4407 is refused for 10 s after the last 0x4402).
+
+---
+
+<!-- Parts 4–5 add: §5 the reward path (and the 0x441C / 0x441D handlers, `so_StoreQuest*`), §6 other entry points,
+§7 quest error numbers. The sweep adds the bugs table, uncertain list and coverage boundary. -->
 
 ## Original-server bugs (collected so far; the sweep part numbers this section)
 
@@ -989,6 +1467,16 @@ coverage boundary. -->
 | Z15-B21 | `QuestNext` CREATE_ITEM / `sp_MakeItem` FUN_00528930 | success means only "item id exists"; the inner `sp_MakeItem` result (no free cell → nothing) is ignored | with a full inventory the item is silently not given | report 0xC0B (or check room) |
 | Z15-B22 | `QuestNext` SET/RESET/IS_ABSTATE | copies the name token into a 128-byte stack buffer without a length check | stack overflow with a long name in a script file; latent (data) | bounded copy |
 | Z15-B23 | `sp_ThirdPromote` FUN_00591de0 | class of another branch: assert only, no ack | the script stays on SCENARIO without a wait and never resumes | answer the ack with result 0 |
+| Z15-B24 | `CQuest::IsQuestArea` FUN_0062fab0 (client FUN_007284d0 too) | distance = trunc(sqrt(\|x − cy\| + \|y − cy\|)): the centre's X is never read and the differences are not squared | start / end location conditions accept a wrongly placed, far too large area; latent (no 2016 quest has a location condition) | sqrt((x − cx)² + (y − cy)²) <= range |
+| Z15-B25 | `CQuest::QuestPlayer_TimeProcess` FUN_00630e50 (client FUN_00729780 too) | adds `prev − now` (negative) to `End_RunningTimeSec` | the counter wraps to ≈65535 after one second, `IsRewardAbleQuest` fails forever: a time-limited quest can never be finished; latent (no 2016 quest has a time limit) | add `now − prev` |
+| Z15-B26 | `CQuest::QuestPlayer_DestroyItem` FUN_00630920 | re-evaluates and stores the status of every record that lists the item, whatever its status | a REPEAT / READ_ABLE record whose start conditions fail at that moment becomes NONE, which is sticky: the quest cannot be restarted until the next login | only re-evaluate ING / REWARD records |
+| Z15-B27 | `CQuest::GetQuestStatusWithNPC(st)` FUN_00630f60 | a tie-break between two quests of the same status rank replaces the quest but keeps the previous quest's status | an NPC click (§6) runs the Doing script of a quest not yet accepted, or the Start script of a FAILED quest, when ABLE / READ_ABLE and FAILED quests share an NPC | copy the status with the quest |
+| Z15-B28 | 0x4416 `sp_NC_QUEST_READ_REQ` FUN_00578f90 | the "not active" refusal is sent as 0x4415 NC_QUEST_START_ACK {0xB5A} | wrong opcode; ignored by the client (acts on 0x4415 only for 0xB50) | `_ErrorSendPlayer<PROTO_NC_QUEST_READ_ACK>` |
+| Z15-B29 | `_ErrorSendPlayer<PROTO_NC_QUEST_READ_ACK>` FUN_00578d60 (0x4416 refusal, 0x4419 DB error) | writes only `err`; `nQuestID` is the previous packet's bytes | stale quest id on the wire; no visible effect (client prints a debug line only) | write nQuestID |
+| Z15-B30 | `Send_NC_QUEST_DB_GIVE_UP_REQ` FUN_005bae70 | sends 0x4409 only if the u32 at offset 4 of the shared send buffer is non-zero (same as Z15-B9) | a give-up of a non-repeatable quest is randomly not sent; the client never gets 0x4408 | drop the test |
+| Z15-B31 | `CQuest::Recv_NC_CHAR_QUEST_DONE_CMD_ACK` FUN_0062f7c0 / `_READ_CMD_ACK` FUN_0062f890 | builds each login record on the stack, writing only ID, Status (and EndTime) | DONE / READ records carry stack garbage in StartTime, RepeatCount, progress and counters; a daily quest accepted again sends that garbage to the DB in 0x4403 | zero the record first |
+| Z15-B32 | client `On_NC_QUEST_GIVE_UP_ACK` FUN_004ba720 vs zone `Recv_NC_QUEST_DB_SET_INFO_ACK` nQSC 28 | after giving up a repeatable quest the client stores 20 READ_ABLE, the zone and the DB 4 REPEAT | the client lists the quest as new instead of repeatable until the next login | the same status on both sides |
+| Z15-B33 | `Recv_NC_QUEST_DB_SET_INFO_ACK` FUN_005bf280 | clears `so_SetIsQuestRewardReq` and `m_bWaitResult` for every answer, also for a repeat give-up unrelated to the script | a give-up answer during a pending 0x441A or 0x4403 lifts the reward guard of `QuestStart` and the script wait early (narrow window) | clear them only for the script's own command |
 
 ## Not reconstructed / uncertain (so far)
 
