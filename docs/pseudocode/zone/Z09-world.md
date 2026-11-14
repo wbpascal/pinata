@@ -44,7 +44,8 @@ statement base (`OtherStatement` loader, object build / change helpers), the 25 
 auto-registered nodes (save link, GT portal / NPC / item box, party scenario code, abstate test, code notices), the
 scenario book shelf (Pine or Lua books, reload) and the dialog-string files (`Script/*.txt`). §23–§26 the Pine action
 nodes, §27 films and the boss-field tables, §28 the sweep additions (map query functions per map kind, heal reports,
-the rest of `MiscDataTable.txt`, answers to the sweep leftovers).
+the rest of `MiscDataTable.txt`, answers to the sweep leftovers, the `OptionReader` text-table format, the dead
+`CFindWay` path finder, the methods reached only through vtables, the data-file and opcode check).
 
 ---
 
@@ -9671,3 +9672,166 @@ Constructors, accessors and loader plumbing; listed so the sweep can show them a
 | `BelongDiceTable::BelongDiceTable` FUN_005b1620, `AxialListMobKillLog` ctor FUN_00428340, `AxialListObjectClear` ctor / dtor FUN_004957f0 / FUN_004958a0, `AxialListMobCounter` dtor FUN_004e2cf0, `AxialListAreaObjectList` dtor FUN_0042a3f0, `AxialListRevival` dtor FUN_0042a0a0, `AxialListSetAbstateInArea` ctor FUN_004c1bd0, `AxialListMobStateSet` dtor FUN_004eb8c0 | visitor objects: dice table (§11.1), mob-kill log on entering battle (§6.5 vt 0x588, GameLog 910 in D05), `fm_ClearObject` (§24.8), area / map counters (§15.7), Lua area functions (§17, §18), boss buffs (§8.9) |
 | Pine node ctors `ShineEffectLocate` FUN_004e8b00, `ShineEffectObject` FUN_004e8ae0, `ShineDoorClose` FUN_004e8740, `ShineDoorOpen` FUN_004e8720, `ShineDoorBuild` FUN_004e8660, `ShineInterruptErase` FUN_004e8600, `ShineInterruptClear` FUN_004e85c0 | `OtherStatement(keyword, …)` constructors registered by `StatementList` (§21.2) |
 | `SlantedCoordList::CoordedNode::cn_MakeLink` FUN_00588060, `ShineObject::so_Reset_SlantedList` FUN_00554370, `MapRearrangeObserver::mro_Set` FUN_00462e90 | sentinel link (§28.1), node reset in `fm_Relink`, list-damage reason record (§9.6) |
+
+### 28.6 `OptionReader`: the `#`-command text tables
+
+Every text table of the zone goes through one parser, `OptionReader` *(pdb2016)*. Callers of `or_Read`: in this file
+`MobHatchery::mh_Load`, `MobRoamingSet::mrs_Load`, `KQRegenTable::kqrt_Load`, `MobAttackSequence::mas_Load`,
+`MobChatManager::mcm_Load`, `DropIndexCluster::dic_Load`, `MagicContainer::mc_Load`, `MiscDataTable::mdt_Load`,
+`NPCManager::nm_Load`, the three `NPCAction::Util::loadFromOptionReader<…>`, `ScenarioBookShelf::sbs_LoadScripts`,
+`KQScriptManager::kqsm_Load`, `ShineScript::ss_Load`; elsewhere `CharClass::cc_Load`, `ShineCommonParameter::scp_Load`,
+`DamageTable::dt_Load`, `SoulDamageContainer::sdc_Load`, `FieldContainer::fc_Load`, `SubLayerInteractLoader::slil_Load`,
+`ItemUseFunction::iuf_Load`, `NPCItemListTable::nilt_ReadTable`, `RecallPointTable::rpt_Load`. No other item documents
+the parser (Z01's loader table only names the files), so its format is here.
+
+Objects *(pdb2016)*: `OptionReader` 0x10854 = `{TokenArgument or_Argument +0 (error message, delimiter list, exchange
+list, comment char, brace pair, ignore list), List<ORTable> or_TableList +0x9c, ORTable or_TableArray[32] +0xb4,
+ORTable* or_CurrentTable +0x10834, std::string m_strFileName +0x10838}` (ctor `OptionReader::OptionReader` FUN_00646a30:
+32 empty tables in the free list). `ORTable` 0x83c = `{ORToken ort_TableName (20 bytes), int ort_RecordLength,
+ORColumnHeaderList ort_HeaderList (512 column pointers), List<ORRecord> ort_DataRecord +0x820 (count u16 +0x834),
+ORKeyList* ort_PrimaryKey +0x838}`. `ORRecord` = `{ORField* orr_FieldArray[512], char* orr_Buffer, int orr_Pointer}`:
+one packed buffer per record, fields in column order.
+
+```
+OptionReader::or_Read(reader, path) -> bool                                   @ FUN_00646bf0
+    fopen(path, "r"); fails: error "File not found", return false
+    ok = true
+    loop while ok:
+        cmd = ORTokenReader::ortr_ReadCommand(&tr, &token)                     @ FUN_0064dcf0
+            # reads the next line that is not blank (blank = delimiters, control chars < 0x20, or a line whose first
+            # non-blank char is the comment char: the rest of that line is dropped, ortr_SkipBlank FUN_0064d700);
+            # its first non-blank char must be '#' (else error "# comment expected" → fail); the word after '#' is read
+            # up to the next delimiter, cut to 20 bytes and lowercased (ORToken::ort_ToLower) → commands are case-blind
+            # end of file → error "Unexpected EOF" → fail (a file must end with `#end`)
+        switch word:
+            "comment"    : comment char ← next char                          ORComment::orc_Exec    @ FUN_0064de50
+            "brace"      : open / close chars of string lengths (2 chars)    ORBrace::orb_Exec      @ FUN_0064de80
+            "ignore"     : add a char that is dropped from values (≤ 32)     ORDelimiter::ord_Exec  @ FUN_0064dd90
+            "delimiter"  : add a field separator char (≤ 32, "Too many delimiters")          (same function)
+            "exchange"   : pair (from, to): `from` is replaced by `to` in values (≤ 32, "Too many exchange")
+                                                                             ORExchange::ore_Exec   @ FUN_0064dde0
+            "table"      : or_CurrentTable ← next free table (32 max, "Too many tables"); name = next value, strncpy 20
+                                                                             or_ExecTable           @ FUN_00646100
+            "columntype" : ORTable::ort_ReadColumnHeader                       @ FUN_00645c20  (no table: "ColumnHeader without table")
+                           per value (lowercased): "index" 20-byte key, "string" + `<brace>n<brace>` n bytes (n ≥ 1; errors
+                           "String need length", "Error in string length", "String length must be bigger then 0",
+                           "Brace must be closed in same line"; ORColumnHeaderString::ortr_SetLength FUN_00647160), "byte" 1,
+                           "word" 2, "dwrd" / "dword" 4; anything else → "Undefined column type"; ≤ 512 columns
+                           (ORColumnHeaderList::orchl_AllocObject FUN_00647260, "Too many columns or memory leak");
+                           record length = sum of the lengths; no column → "At least one column needed"
+            "columnname" : one name per column (ort_ReadColumnName FUN_006477a0), then end of line ("Extra data exist",
+                           ortr_isEOL FUN_0064da70)                          or_ExecColumnName      @ FUN_00645f20
+            "record"     : one record of the current table                   or_ExecRecord          @ FUN_006482c0
+            "recordin"   : first value = table name (any table already declared; "#recordin has no table name",
+                           "Unknown table name"), then the record            or_ExecRecordIn        @ FUN_006481c0
+                ORTable::ort_ReadData                                                            @ FUN_006480a0
+                    new record ("Too many records"), buffer of ort_RecordLength bytes; each column reads its value:
+                    index / string: ortr_ReadString (index: strncpy 20, ORFieldIndex::orf_Read FUN_00653a70;
+                    string: zero-filled then strncpy n, ORFieldString::orf_Read FUN_00653ed0); byte / word / dwrd:
+                    ortr_ReadNumber (byte > 255 → "Cannot read byte data", ORFieldByte::orf_Read FUN_00653b60;
+                    ORFieldDwrd::orf_Read FUN_00653c80); then end of line
+            "end"        : stop
+            anything else: error "Undefined command", stop      # ok is still true → or_Read returns true (original bug, Z09-B125)
+    fclose; return ok
+
+ORTokenReader::ortr_ReadString(tr, braceMode)                                   @ FUN_0064db40
+    skip blanks; value = chars up to the next delimiter (≤ 2047 chars); `ignore` chars dropped; `exchange` applied;
+    in BIS_EXCLUDEBRACE mode (names, commands) a brace char ends the value and `\d…` / `\o…` / `\x…` escapes give one
+    byte (decimal / octal / hex, > 255 → "Invalid character"); null at end of line
+ORTokenReader::ortr_ReadNumber(tr, &ok)                                         @ FUN_0064d9f0
+    '-' → −(number); "0x…" hex; leading '0' octal; else decimal
+```
+
+Look-ups *(pdb2016)*, all by table name (20-byte compare, the reason for Z09-B9):
+
+| Function | Returns |
+|---|---|
+| `or_SelectFrom(table, column, value, skip)` FUN_00647c00, int-value form FUN_00648310 (`"%d"`) | buffer of the (skip+1)-th record whose `column` equals `value` (linear, `ORTable::ort_RecordBuffer` FUN_006479b0 with `RecordDataCompareArgument::lid_Call` FUN_006475a0); null if none |
+| `or_Select(column, table, keyColumn, keyValue, skip, &type)` FUN_00647cb0, int form FUN_006483d0 | pointer to field `column` of that record and its type (`ORTable::ort_FindData` FUN_006478c0, `TargetColumnFindArgument::lid_Call` FUN_00647080) |
+| `or_Select(column, table, key, &type)` FUN_00647b30 | the same through the primary key (bsearch, `ORKeyList::okl_Searching` FUN_006539d0, `ORRecord::orr_GetFieldData` FUN_00647830); null without a key |
+| `or_MakePrimaryKey(table, column)` FUN_00647d70 → `ORTable::ort_MakePrimaryKey` FUN_00647680 | builds a key list of ≤ 1024 `{20-byte key, record}` (`okl_AddKey` FUN_006538d0, `MakePrimaryKey::lid_Call` FUN_00647410) sorted by `qsort` (`okl_Sorting` FUN_006539a0, compare = the five dwords as signed differences, `okl_KeyCompare` FUN_00653930); 0 records or 1024 and more → no key (false). Only `ShineScript::ss_Load` (§22.6) uses keys; the 2016 `Script/*.txt` tables are far below 1024 records |
+| `or_SelectCountFrom(table)` FUN_00648460, `or_SelectCount()` FUN_00647e10, `or_SelectFromOrder(table, i)` FUN_00647a60 | record count of a table; number of tables; buffer of the i-th record |
+
+Reader plumbing (read, no further logic): `ORTokenReader` ctor FUN_0064d6d0, `ortr_ReadChar` FUN_0064dab0 (one char or a
+`\d` / `\o` / `\x` escape), `ortr_GetDigit` / `ortr_GetOctal` / `ortr_GetHexa` FUN_0064d930 / FUN_0064d8e0 / FUN_0064d980,
+`ortr_ReadNumber10` / `…8` / `…16` FUN_0064d800 / FUN_0064d7a0 / FUN_0064d860, `ortr_SetError` FUN_0064d780 (message +
+line number), `ORLinebuffer::orlb_LineRead` FUN_0064d520 (one `fgets` line) / `orlb_FGetc` FUN_0064d5b0,
+`ORDelimiter::operator[]` FUN_0064d5f0 (is a delimiter) and ctor FUN_0064d5e0, `ORBrace` ctor / `orb_IsOpen` / `orb_IsClose`
+FUN_0064d650 / FUN_0064d660 / FUN_0064d670, `ORErrorMessage` ctor / `orem_Clear` / `operator=` FUN_0064dec0 / FUN_0064d690 /
+FUN_0064d6b0, `ORToken::ort_ToLower` FUN_0064d460, `ort_GetString` FUN_0064d4f0, `ort_IsNull` FUN_0064d4e0, ctor
+FUN_00418e90, `operator=` FUN_00401030, `ORTable` ctor / dtor FUN_00646950 / FUN_006462f0,
+`ORColumnHeaderList::orchl_4AllInList` FUN_006473d0, `ORRecord::orr_MakeBuffer` FUN_00653d60 / `orr_GetBuffer` FUN_00653d50.
+
+The 2016 files use only `#table`, `#columntype`, `#columnname`, `#record`, `#recordin`, `#ignore`, `#exchange`,
+`#delimiter`, `#end` (any case; counted over `World/*.txt`), so Z09-B125 is latent there.
+
+### 28.7 `CFindWay`: the old path finder is dead in 2016
+
+`g_NewBlockRule` (DAT_0084cfb4, §7.1) is only read: the 2016 exe has exactly four `cmpb $0x0, 0x84cfb4` and no write
+(objdump), and the PDB export has the same four reads. Its three users, `MobActionBackStep::mab_Think` FUN_004ba390,
+`MobActionAvoidOverlap::mab_Think` FUN_004ba750 and `MobActionChase::mab_Think` FUN_004bc950, therefore always take the
+`Navigator` branch (§9.5). The other branch is dead code: `FieldMap::fm_FindWayInit` FUN_004a9ae0, `CFindWay::SetLoadedData`
+FUN_00632450 and `CFindWay::FindWay` FUN_00632ba0 (global `findway`, built at start-up by its dynamic initializer FUN_006967e0
+and never used). For completeness, what `FindWay` does: if the end cell is blocked or off the map, `SearchMoveable`
+FUN_00632810 moves the end to a free cell near it (none → path = start only); if `LineIntersect` FUN_00632500 finds no
+block on the straight line, the path is the end point alone; otherwise a best-first search over a local length map
+(`LenMapClear` FUN_006326a0, `LenMapSet` FUN_006327a0; priority = Manhattan distance to the end; at most 0x300 open cells)
+keeps the nearest reached cell for an unreachable end. Not traced further because nothing reaches it.
+
+### 28.8 Methods of the Z09 classes reached only through vtables
+
+The call-graph check of part 17a cannot see virtual calls. A per-class pass (every function of a class that this file
+owns, i.e. cites more of than any other doc, against every doc) found these; all read in the PDB export.
+
+| Function | What it does |
+|---|---|
+| `ShineMob::so_mobile_BattleCamp` FUN_00556460 | the mob form of vt 0x8cc (§13.3 lists the servant form): `sm_MobIsPlayerSide` (+0x2548) or, when < 0, `MobInfo.IsPlayerSide` (+0x67): 0 / 3 → `BC_MOB` 1, 1 / 2 → `BC_CHAR` 2, other → `BC_NONE` 0 (jump tables read in objdump) |
+| `ShineMob::sm_IsPlayerSide` FUN_00556be0, `so_mob_SetIsPlayerSide` FUN_004aa7a0 | same override / table value (vt 0xf68); the setter is a vt slot with no caller in 2016 (so +0x2548 stays −1 and the table decides) |
+| `ShineMob::so_mob_CanBeAttackedByPlayer` FUN_004a5bc0 | `!so_IsAlliance(player)` (vt 0xe60) |
+| `ShineMob::so_GainHP` FUN_00556a00 (vt 0x504), `so_GainSP` FUN_00556980 (vt 0x4fc), `so_LostSP` FUN_00556950 (vt 0x4f8), `smo_ZeroHP` FUN_005569c0 | add HP / SP and cap; SP is capped at `so_MaxSP` (vt 0x4f4), but **HP is capped at `so_GetHP` (vt 0x4e8, the current HP) instead of `so_MaxHP` (vt 0x4f0)**, so the cap never applies and a mob's HP can pass its maximum (original bug, Z09-B126; objdump confirms the slot). Only caller of vt 0x504: the item action `RecoverTypeEffect::_execute` FUN_005cfc70 (recover types 0 / 1), i.e. latent unless an item action heals a mob. `so_LostSP` subtracts or sets 0 |
+| `ShineMob::sm_IsUseSkill(skill)` FUN_0055e530 | the skill is one of the mob's weapon skills (weapon slots of §7.4); caller `GuildTournamentSystem::CreateItemEffect` (Z16) |
+| `ShineMob::so_mob_SkillParameterSet_WeaponIndex(i)` FUN_0055e6d0 | `sm_PrepareWeapon` with weapon row i's skill parameters (vt 0xc40); caller `ShineMagicField::smfm_MagicFieldDamage` (§12.5, the field owner's current weapon) |
+| `ShineMob::so_mob_IsNPC` FUN_00556c70 | `MobInfo.IsNPC == 1` or `MobInfo.Type == MT_NPC` (6) |
+| `ShineMob::so_FillBriefInformation` FUN_00556570, `ShineBandit::so_FillBriefInformation` FUN_00556f30, `ShineBandit::so_GetCharBriefInfo` FUN_00556ec0, `ShineBandit::so_SendMyBriefInfo` FUN_00556e50 | copy of the 0x95-byte 0x1C08 REGENMOB brief; the bandit's character-shaped brief (`BriefInformationCharacter`, the 0x1C06 LOGINCHARACTER payload, §5.2 / §5.10): sent through the receiver's game stream, then vt 0xa10 |
+| `ShineMob::so_RemakeHandle` FUN_00556a40, `ShineNPC::so_RemakeHandle` FUN_00557c70, `ShineBandit::so_RemakeHandle` FUN_00556ed0 | handle from a pool index (mob: index ≥ 8000 asserts; NPC: 0x42BC + index, index > 255 asserts; §15.3 pools) |
+| `ShineMob::so_FreeFromList` FUN_00554280 | unlinks the family ring (§10.5) and both coordinate lists; asserts "ShineObjectList::som_FreeObject : one of SlantedList is removed" if only one list was linked |
+| `ShineMob::smo_LoginAfterLogout` FUN_0055d9b0, `so_relink` FUN_00566ea0, `ShineDropItem::so_relink` FUN_00566e80, `ShineMob::sm_BriefLocateSet` FUN_004b1090 | base re-login + restart the roaming interval (`MobRoamingPoint::mrp_Start`); `fm_MoveCenter` re-link (§28.1); login location ← brief coordinate |
+| `ShineMob::so_GetTargetInfo(o)` FUN_00566900, `so_Mob_SetSendTagetInfo(flag)` FUN_0042ac70, `so_IsTarget` FUN_0042acb0, `so_GetTargetObject` FUN_0042ac60 | target broadcast (vt 0xa00, §6.5) when `o` is the tactic's target; the "send target info" dirty flag is set when the target or the flag changes |
+| `ShineMob::so_mobile_IsImmortal` FUN_0042b010 | abstate test 198 (vt 0x3e4) |
+| `ShineMob::so_mob_ReturnToRegen` FUN_004abe30 | tactic state ← `Actor::toregion` (go home, §7.2) |
+| `ShineMob::so_CanSkillTarget` FUN_00556b20 | `MobInfo.GradeType != MGT_NONE` |
+| `ShineMob::so_mob_ChaseRangeSquar` FUN_005564e0, `so_Getabstatebit` FUN_00556a90, `smo_BattleKillScore` FUN_00556b70 | `FollowCha²`; the brief's abstate bits (or the default set when the brief's flag state is set); `MobInfoServer.KQKillPoint` |
+| `ShineMob` setters / getters FUN_0054a4e0 / FUN_0054a4d0 (next skill), FUN_00556c30 / FUN_00556c20 (use next skill), FUN_00556c50 / FUN_00556c40 / FUN_0055e6b0 (next roaming wait: `CheckNextRoamingWait` is true until the tick, then clears it), FUN_0055e730 / FUN_0055e740 / FUN_0055e750 (regen animation time / complete, §5.3), FUN_00556ca0 / FUN_00556cc0 (brief `nKQTeamType`), FUN_0054a600 / FUN_004b7110 (`sm_Flag.JustAttacked`), FUN_0055e810 (`so_mob_FindLooter` → `el_FindLooter`, §11.4), FUN_004b7100, FUN_005564c0, FUN_005564d0, FUN_00556620, FUN_005566a0, FUN_00556720, FUN_00556730, FUN_00556830, FUN_005568a0, FUN_00556940, FUN_00556ac0, FUN_0056d940, FUN_00556450 | member accessors (roaming path, regen / last-hit location, object type, body size, data box, race, login location, HP, SP, family list, guild, RTTI) |
+| `ShineNPC::so_npc_SetLocation(map, x, y, deg)` FUN_00557cc0, `ShineNPC::so_SetGateBriefInform(map)` FUN_00557bc0 | place the NPC (direction = deg / 2, negative + 180); mark the brief as a gate (+0xe = 1) with a 12-byte destination map name. `so_npc_SetLocation` (vt 0xb4c) has no caller in 2016; `so_SetGateBriefInform` (vt 0x4cc) is called by `NPCRole_Portal::nrb_BriefInformSet` FUN_004c2360 with the portal's link target (portal NPCs, Z02) |
+| `ShineNPC::so_TentDistance(xy)` FUN_0058cbf0 | true for NPC mob IDs 5606 (`HouseZonePost`), 5607, 5700 when `xy` is farther than 45 units (distance² > 2025); false for other NPCs. Vt 0x768, asked by `ShineObject::so_TentPoint` FUN_0058d260 (rest / booth / tent rules, Z02 §7, Z06) |
+| `NPCManager::nm_FindNPCInfo(handle)` FUN_005600f0 | bsearch of the NPC info table (§5.9) by handle; caller `sp_NC_ACT_AUTO_WAY_FINDING_USE_GATE_REQ` (Z02) |
+| `HitMeList::EnemyList::el_EnemyExpDistCheck(mob)` FUN_00482720 | run by `el_ExpDistribute` (Z03 §8.2) before the EXP split: every player entry `{key, obj, …, damage}` of `el_vecEnemyPlayer` is refreshed (stale object → `som_FindPlayer(key)`, not found → key −1, skipped); a player farther from the mob than `MobInfoServer.EXPRange` (+0x39) has its damage subtracted from its unit (raid → kind 2, party → 1, else single), and a unit whose total drops below 1 is removed. So players out of EXP range at the kill get no share and shrink their party's share |
+| `ShineMob::sm_DamageSet` FUN_0055e5f0 | the `&mobdamage` command body (`AmpersandCommand::ac_mobdamage`, Z11): arguments freeze `Y/N`, recover `Y/N`, factor (`%lg`) → `g_LUA_SCRIPT_SECURITYFactor.lsf_IsFreeze` / `lsf_IsRecover` / `lsf_Factor` (the factor of §1.1); replies with the factor as a notice (vt 0x784) |
+| `MobDataBox::mdb_SpeciesDistance(id1, id2)` FUN_00640f50, `mdb_IsSpeciesDistanceByQuest(id1, id2, col)` FUN_00641020 | compare the four `MobSpecies` names (first match not `-` → its column, else −1) / one `QuestSpecies.MobGroupName` column of two mobs *(column return inferred from the loop)*; callers weapon titles (`CWeaponTitleZone::GetLevelData`, `so_weapontitle`, Z07) and quests (`CQuestZone::IsConnectionEnd` / `…Action`, Z15) |
+| `ShineObject::so_DistanceSquar` FUN_004013b0 (x, y) / FUN_004028f0 (object), `so_GetXCoord` FUN_00401390, `so_GetYCoord` FUN_004013a0, `so_GetLayer` FUN_00419420, `so_InitLayerRegNum` FUN_005536e0 / `so_SetLayerRegNum` FUN_0054aab0 / `so_GetLayerRegNum` FUN_0054aad0 | distance², coordinates, layer, 64-bit layer registration number (§9.6 sub-layers) |
+| `ShineObject::so_DamageLog` FUN_0054b5e0, `so_smo_LastDamageOperation` FUN_00631170 | the first only creates `Dbg.txt` and the "DamageLog" log once (its caller `so_Bash` is dead, §7.8); the second is an empty base slot |
+| `ShineMobileObject::so_SendInform2Admin(gm)` FUN_0058e0d0 (mob: `ShineMob::so_SendInform2Admin`) | GM inspect lines "Name", "Level", "Mode", "Location map/x/y" (or "Null"), "HP cur/max" to the GM (command side: Z11) |
+| `ShineMobileObject::smo_CureCurse(subState, rank)` FUN_0040a1a0 | every abstate of that SubState with rank ≤ `rank` gets end time = now (ends next tick); caller `so_ply_ItemEffect` (item use, Z04 / Z03) |
+| `ShineMobileObject::smo_SkillResultPacket` FUN_0057a630, `so_FirstActionAfterSocketConnect` FUN_0054b6d0 | dept-9 header then the skill-result sender (vt 0x49c → +0x40; Z03); base first action + mode byte 0 (Z01) |
+| `FieldMap::fm_GuildTournamentEnemy(g1, g2)` FUN_004632f0, `fm_GetKQhandle` FUN_00419370, `fm_GetFieldBonus` FUN_004193a0, `fm_IsBlock(x, y, test)` FUN_00419300 | GT system `IsBattleGuild` (mover hit rule §8.4); `fm_KQHandle`; `&fm_FieldBonus` (drop rate §11.2); calls the given block test |
+| `FieldMap::fm_Exist(kind)` FUN_00485040, `fm_KickAll` FUN_00484f70, `fm_SetIndunLevelType` FUN_00461b60, `fm_Compare` FUN_00452a30 | `IsAnybody` walk over the map (`so_AllInMap` from `flag[2]`); `KickPlayer` walk; dungeon level type; map-ID order of `List<FieldMap>`: instance-dungeon cluster (Z14) and GT start (Z16) |
+| Constructors / destructors: `ShineObject` FUN_00558f70 / FUN_00554e30, `ShineNPC` FUN_0055c230, `ShineBandit` FUN_0055b2c0, `ShineDropItem` FUN_00559090, `MobHatchery` FUN_004b3fc0 / FUN_004b22e0, `KQRegenTable` FUN_004b1220 / FUN_004b2630, `ItemDropFromMob::DropGroupCluster` FUN_0048ffc0, `Navigator::MapNavigator` FUN_005c89f0, `PineScriptMobRegenerator` FUN_004e76e0, `MobAttackSequence` FUN_004a8920, `BlockDistribute::BlockDistributeManager` FUN_00438ac0 (+ `BlockingDistribute::bd_Inactiv` FUN_00438950), `LuaScriptScenario` FUN_005d8020, `MobDataBox` FUN_00642cf0 / FUN_00642c50 (+ iterators FUN_00490090 / FUN_004a84b0), `MobConditionChecker` FUN_004b06e0 / FUN_004b03f0 / `MCC_DeInit` FUN_004b02b0, `MobActionArgument::Actor` FUN_00549c90, `…::Selector` FUN_0054eec0, `MapBlockInformation` FUN_0049de60, `MobActionWander` FUN_004b8b40 | the `ShineObject` ctor links both coordinate nodes to the object, points layer / location at shared temporaries and clears the map-marking flag and layer number; the rest allocate / free the members listed in §5–§13 |
+
+### 28.9 Data files and opcodes against this file
+
+- **9Data:** every `.shn` in `9Data/Shine/` and every `World/*.txt` is named by some doc except the 27
+  `World/Param<Class>Server.txt` files; they are loaded by `CharClassManager::ccm_Load` FUN_0044a5c0 together with
+  `ChrCommon.txt` (Z01's loader table: `World/ChrCommon.txt | CharClassManager_ccm_Load`): per-class player parameters,
+  not world simulation (coverage boundary). The directories `AIScript`, `AreaBMP`, `BlockInfo`, `LuaScript`,
+  `MobAttackSequence`, `MobBehaviorDescript`, `MobRegen`, `MobRoam`, `MobSetting`, `ScenarioBookShelf`, `Script` are in
+  §5–§27. Of the rest, `NPCItemList` (Z01 / Z02 / Z04), `View/*.shn` (Z01's loader list) and
+  `DefaultCharacterData.txt` / `TutorialCharacterData.txt` (D02) are documented elsewhere; `AbState/*.dat` (11 files) is
+  named by no doc: abnormal-state data, Z03's (coverage boundary).
+- **Opcodes:** 162 opcodes are sent from functions this file cites (generated layouts, `s2c` send sites). 98 of
+  them are described here; the other 64 are sent by functions cited only as callers or callees (`sp_GainExp`,
+  `so_KilledBy`, `so_LinkTo`, `sp_NC_MAP_LOGINCOMPLETE_CMD`, `so_Bash`, `sp_SendMyInform2PartyMember`, mini-house,
+  mover, wedding, GT and instance-dungeon code). All but six are documented by their owners (Z01, Z02, Z03, Z04, Z05,
+  Z06, Z07, Z08, W01–W04, D02–D05); the six without any doc are in the coverage boundary: 0x0E0D
+  (`ShineMiniHouse::smh_SendFurnitureInfo`), 0x8C4F (`ShineMiniHouse::so_Routine`), 0x1059 / 0x105A
+  (`so_ply_ClassChange`), 0x2442 / 0x2443 (`ShineMobileObject::smo_SkillBash_Blast_Trap`), 0x74F2
+  (`GuildTournamentSystem::PlayerRegister`).
