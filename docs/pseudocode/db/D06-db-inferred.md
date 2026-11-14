@@ -762,8 +762,12 @@ SELECT nNo, nMoney, CAST(bChoice AS tinyint), CAST(bRefundNotice AS tinyint)
 **`usp_Character_getKeyMap` −2721 / −2725 (D04 §5.2, 0x7057).** The w00 procedure (Ko Dong Gyun 2010.09.13) returns no
 result set and `@nRet = −2725` when the character has no `tCharacterKeyMap` rows; −2721 is the family's "not found
 nCharNo" (`usp_Character_getShortCutList`, same author and date). The 2016 handler only skips its log line for −2721;
-both values give the same behaviour (no answer, D04-B14). For a rebuild the difference is cosmetic; −2721 keeps the
-2016 log quiet. After `usp_Character_initKeyMap` the rows always exist unless `tKeyMapInit` is empty.
+both values give the same behaviour (no answer, D04-B14). The second caller is the login-time loader
+`GetCharOptionImprove_KeyMapData` @ FUN_00422660 (called by `SendCharOption_Improve_Data` @ FUN_004354b0, D02 §4 step 20):
+on a failed call it logs unless `nRet == −2721` and returns 0 (asm `xor eax,eax`), so no 0x702E key-map packet is sent and
+the following game-option step is skipped ("FAILED - GetCharOptionImprove_KeyMapData"); on success it sends 0x702E
+`{u32 nCharNo, u16 n, KEY_MAP_DATA[n] {u16, u8, u8}}` (at most 0x5F rows; returns the send result). Again −2721 and −2725
+differ only in the log line. For a rebuild the difference is cosmetic; −2721 keeps the 2016 log quiet. After `usp_Character_initKeyMap` the rows always exist unless `tKeyMapInit` is empty.
 
 **`usp_GuildAcademy_withdrawMoney` 1–6 (D04 §9.3, 0x986B).** Both backups (2008.5.14, w00 adds `UPDLOCK, HOLDLOCK`
 2011.7.11) return 0 or −1511 / −1512 / −1514 / −1524 / −1525 / −1527 / −1593. The 2016 wrapper (@ FUN_00456510) passes
@@ -1171,6 +1175,67 @@ strongest compatibility the backups can give. Whether the bodies are the officia
 rewrite cannot be decided; a rebuild follows them. (`usp_Item_Get_EnchantAll` returns rows and `@nRet`: the wrapper does
 not test `@nRet`, so the D06-B1 timing does not matter there.)
 
+### 8.5 Version sweep: every called procedure that exists in two backups
+
+Method (sweep part, from the restore of §9.1): every procedure name in a `{CALL …}` string of the Character (307 names) and
+GameLog (23) binaries that exists in both `Character` and `w00_Character` (219) or `GameLog` and `w00_GameLog` (21) was
+compared after removing comments, whitespace, case and `[dbo].` brackets. 193 + 20 are identical; the 26 + 1 that
+differ are below, with the version a rebuild follows and the 2016 evidence that decides it. (The three `usp_Tutorial_*`
+of `Account.bak` were compared with w00 too: only `setCharInfo` differs, D02 §3 already decided it.) Account, AccountLog
+and StatisticsData exist in one backup each (§3.5 compared AccountLog / Statistics with the binary).
+
+| Procedure (wrapper) | `Character.bak` (2011–2015 dates) | `w00_Character` | Follow | Evidence |
+|---|---|---|---|---|
+| `p_Char_Create` (FUN_00458070) | "2004.6 CJC" body | header adds "2010.10.7 By kodong: changed for the new short-cut key system": calls `usp_Character_initKeyMap`, `−4` on its failure | **w00** (corrects D02 §3 / §15 "Character.bak used") | the 2016 server has the 2010 key-map system (0x702E / 0x7057, `tCharacterKeyMap`), which `Character.bak` lacks entirely (§9.7); `−4` reaches the 0x1403 `else` branch (0x181 "The name is already in use."), like `0` |
+| `p_Char_GetLoginData` (FUN_004584f0) | runs `p_Prison_UpdateCharPrisonMin @nCharNo, 0` before the SELECT | SELECT only | **w00** | same SELECT; the extra call belongs to the third-party prison rework below (dated 2015-10-01); with w00's prison procedure it would release every prisoner at login |
+| `p_Prison_Add` / `p_Prison_Add2` (FUN_004659e0 / FUN_00465af0) | forces `@nMinute = 10080` and updates the existing `tPrison` row | the GM's `nMinute`; inserts a history row | **w00** (as D04 §7) | the binary passes the GM's `nMinute` (0x7C0B) and echoes it to the client; a fixed 7-day sentence is a private change |
+| `p_Prison_UpdateCharPrisonMin` (FUN_00465be0) | parameter `@nMinuteOld`; recomputes the rest from `tPrison.dPrisonDate`, ends the sentence only in `EldPri` | `@nMinute`: 0 → release to Rou (5963, 9793), else store it | **w00** (as D04 §7) | the zone counts the minutes down and sends them (0x7C0D, Z09); the binary binds the zone's value |
+| `p_Char_GetStateAllWithSetItemAndRestTime` (FUN_00459340) | 17 columns | 19: + `nCasterLevel`, `nCasterAttackPower` | **w00** | the loader FUN_0046c6e0 fetches 19 columns (9 × U16/U32/U8 state fields, 8 set-item U16, then 2 more), matching the 21-parameter save of §7.2 |
+| `usp_Character_getSingleOption` (FUN_0045c0e0) | `bMysteryBolt, bAutoPick, dRestExpLastExecuteTime` | + `nChatBan` | **w00** | FUN_0046dc00 fetches U8, U8, TIME, U32 (4 columns) |
+| `usp_GuildAcademy_getMemberList` (FUN_004558e0) | no `nChatBanTime` | + `g.nChatBanTime` | **w00** (as D04 §9) | D04 §9 reads `nChatBanTime` in the fetch list |
+| `p_Quest_GetAllDoing` (FUN_00453240) | `WHERE nStatus <> @nStatus` | `WHERE nStatus = @nStatus` | **w00** | the binary passes `PLAYER_QUEST_STATUS` *(pdb2017)* values read from the asm: the "doing" list FUN_0046cb00 calls it three times (6 `PQS_ING`, 7 `PQS_FAILED`, 8 `PQS_REWARD`) into one packet, the done list FUN_0046ce30 / `SendQuestDone` FUN_004288d0 with 2 (`PQS_DONE`), the read list FUN_0046ce50 with 20 (`PQS_READ_ABLE`), the repeat list FUN_0046ced0 with 4 (`PQS_REPEAT`). With `<>` every quest would appear three times in 0x100A (corrects D02 §4 "filter values 2, 7, 8 and one from a register, `<>`") |
+| `p_Quest_Set` (FUN_004530e0) | counts completions of quest 20016 ("wedding planner 2", 2008-06-03) in `tQuestTimes` | the same block commented out | either; **w00** | no 2016 procedure or binary reads `tQuestTimes` (only `p_Quest_Set` names it in both backups) |
+| `p_Char_Login` (FUN_00458560) / `p_Char_Logout` (FUN_004585f0) | third-party `LoggedInChars` table; Login returns no row | "JK CHO 2014.8.22": Login returns `nLoginDateDiff`; Logout snapshots `nFriendPoint` into `nLastFriendPoint` | **w00** (as D02 §5) | the friend-point columns exist only in w00 (§9.7); `LoggedInChars` is no official table (D02 knowledge) |
+| `p_Char_Rename` (FUN_00458400) | plain UPDATE | requires an unused `tCharacterChangeID` row (= `Fixes/Free Name Change`, 2018) | **Character.bak** (as D02 §3) | the w00 copy is the 2018 fix applied to the dump; the 2016 rename item flow (0xB40A) is separate |
+| `usp_Character_setChangeID` (FUN_00465f30) | "Ko Dong Gyun 2010.7.7" | + `−3024` "no unused `tCharacterChangeID` row" (Free Name Change fix) | **Character.bak** (as D02 §14) | the binary has no own code for −3024 (→ 0x20C5) |
+| `p_Guild_Member_SetGrade` (FUN_00454ab0) | third-party (2014-11-02): `@nRet tinyint`, 1 = ok / 0 = fail, 24-hour rule on `tGuild.dMasterChange` | 2006 CJC + kodong: `@nRet int`, 0 = ok, −1311 / −1313 / −1323 / −1324 / −1325, 7-day rule on `tLog_GuildMasterChange` | **w00** (as D04 §6) | the wrapper treats `nRet == 0` as success and the handler maps −1324 to 0xC8A: with the `Character.bak` copy every successful change would be reported as failure |
+| `p_Char_Wedding_Do`, `…_Divorce_Do` (FUN_0045b610, FUN_0045b470) | `dSubWhen = now + 3 minutes` | `+ 7 days` | **w00** | client text 0x1382 "Your marriage has not yet elapsed 7 days. You cannot apply for a divorce yet."; `Character.bak` has test-server timers |
+| `p_Char_Wedding_Divorce_by_Agree` (FUN_0045b330) | `+ 5 minutes` | `+ 10 minutes` | **w00** | same family; sub-status values identical in both |
+| `p_Char_Wedding_Divorce_by_Force` (FUN_0045b3d0) | `+ 5 minutes` | `+ 3 days` | **w00** | as above |
+| `usp_Dice_setDicePay` (FUN_0045d0e0) | deletes the money card by key only | requires `nOwner = @nCharNo`, else `−2423` | **w00** | −2423 falls to the handler's generic 0x1D0D (D03 §10); the owner check only adds safety |
+| `usp_Dice_setDiceResult` (FUN_0045ca50) | `−2421` and rollback when a loss exceeds the customer's money | clamps the customer's money at 0, `UPDLOCK, HOLDLOCK` | **w00** | the 2016 handler does not see this `nRet` (it tests the wrong variable, D03-B23), so only the money outcome differs; w00 is the version the other dice procedures come from |
+| `p_Item_BuyAll`, `p_Item_BuyLot`, `usp_Character_setChatBan`, `usp_GuildAcademy_withdrawMoney`, `usp_GuildTournament_setRegist` | | | §8.1, §8.2, §5.7 | already decided |
+| `p_GameLog_Add_Type6` (GameLog) | `GameLog.bak` keeps a `tLevelUpInfo` ranking for nType 30 | w00 without it | **w00** | §4.2 |
+
+Not in the table: procedures that exist only in w00 (dice / gamble / collection, key map, tutorial, enchant, …): the
+only version; their result codes match what the binary tests (D03 §16, §8.4), so a rebuild follows them.
+
+### 8.6 Other open DB statements of D01–D05 settled in the sweep
+
+- **Account storage = storage type 6 owned by the user number** (D03 §5.1 / §16, *inferred*): confirmed by the DB. The
+  w00 procedure `p_Event_Friend_Reward` (lenasoft 2006-05-22; not called by the 2016 binary) sets `@nStorageType = 6
+  --개정창고` ("account storage"), reads `@nFriendUserNo = tCharacter.nUserNo` and inserts `tItem(nStorageType 6,
+  nOwner = nFriendUserNo, nStorage ≤ 143)`: owner = user number, 4 pages × 36 slots, as D03 read from the listing.
+- **Storage type 10 = the hidden content box of chests and capsules** (D03 §16): left *(inferred)*. No procedure of
+  either backup names type 10, and `w00_Character` has no CHECK constraint on `tItem` (none at all: `sys.check_constraints`
+  is empty), so the DB treats storage types as plain numbers; only the binary's use defines them (D03 §7.2).
+- **Wedding sub-status 6 / "+4" marker** (D02 §11 / §16, open): both backups write the same values (only the timers
+  differ, §8.5). The zone does handle them: `Wedding_CheckDivorceTimers` @ FUN_005a1c90 (zone; Z07 §5.1 lists Sub 0–4
+  only) switches on `Sub = Status >> 4` (vt 0x958 `so_ply_WeddingStatus`) before the limit test: **5** (1 + 4: own
+  agreement request withdrawn by `Divorce_Cancel`) → stores Sub 0 (vt 0x95c `so_ply_WeddingInfoUpdate`); unless
+  `sp_IsLockedRefundReq` (vt 0x404) is set it calls `sp_LockRefundReq` (vt 0x408) and `so_ply_IncDecMoney` (vt 0x794)
+  `(250 000, 1)`; then `so_SendErrorCode` (vt 0x308) `(8, 0x5D, 4999 = 0x1387)`; **6** (2 + 4: partner applied by
+  agreement) → `so_SendErrorCode(8, 0x5D, 0x1385)`, stores Sub 2; **7** (3 + 4: forced divorce withdrawn) → as 5 with
+  750 000; **8** (4 + 4) → stores Sub 4. Slot names *(pdb2016)*, resolved through the RTTI vftable of `ShinePlayer`.
+  So "+4" = "not yet shown to this character": the zone shows it once and strips it, and 5 / 7 refund the
+  by-agreement / forced divorce fee the zone took (Z02 §10 0x1089, D02 §11), guarded by the refund lock against a
+  second refund. 0x1385 / 0x1387 have no entry in the client error table. A rebuild keeps the DB values.
+- **`tGameLog` column types, defaults, date column** (D05 §9): read from the restore, §9.3 (`w00_GameLog`).
+- **0x0798 `ItemDropLog`** (D05 §9): an SHN table read by the zone, not a database table; nothing for D06.
+- **D01 knowledge *(db-backup)* statements** (`nBlock` = `tUser.bIsBlock` after `usp_User_chkBlock`, admin levels,
+  `p_IPBlock_IsBlock` AccountLog copy): `Account.bak` / `AccountLog.bak` are the only versions and their parameter
+  counts match (§3.5, `bak.py cover account`); they stand as *(db-backup)*.
+
 ## 9. Table schema of the 2016 servers
 
 ### 9.1 Source and method
@@ -1413,3 +1478,68 @@ w00 (attendance, auto-minimon, game option / key map / short-cut, chat colour, c
 jackpot / slot machine, emblem, academy history, in-game guide, item-action cool time, enchant, storage-find helper,
 master-change log, tutorial). Every one is reached by a procedure the 2016 binary calls with w00's parameter count, which
 is the reason to follow w00 (D02 knowledge). `tGameLog` is identical in `GameLog.bak` and `w00_GameLog.bak`.
+
+## 10. Original-server bugs
+
+Tagged in place with `(original bug) D06-B<n>`. They are bugs of the 2016 server binaries as they meet the database
+(the procedure bodies a rebuild writes are not bugs of 2016).
+
+| ID | Handler / procedure | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| D06-B1 | AccountLog `usp_AccountLog_GetDateDiffLastlogout` (FUN_00415020, §3.4); same in Account `usp_ReturnUser_GetDatediffLastlog`, `usp_User_GetDatediffCreated`, Character `usp_Pet_setCreate` / `usp_Pet_getInfo` (§5.1), `usp_Character_getFriendpoint` (§6.3) | the wrapper tests the output `@nRet` right after `SQLExecDirect` of a procedure that also returns a result set | SQL Server returns output parameters only after the last result set is consumed (§1.2 driver rule), so the test always sees the pre-set 0: dead error check *(inferred from the ODBC rules)* | test `@nRet` after `SQLMoreResults`, or return the code as a column |
+| D06-B2 | zone 0x347D mini-house effect payment (FUN_00574a30) → `p_Item_MiniHouse_Effect_Resource_Del` (§5.3) | a money-only effect leaves item key / lot of the request stale | the procedure receives an old item key and lot; with a body that checks them, a money-only payment can fail or consume the wrong item | zero the item fields when the effect costs money only |
+| D06-B3 | WM 0x74F8 tournament refund notice → `usp_GuildTournament_setRefundNotice` (§5.6) | the refunds the notice announces are paid by no 2016 component (the zone's 0x74F4 handler is empty) *(inferred)* | guilds that were not chosen never get their fee back, though the DB marks the refund as announced | pay the fee back (`p_Guild_SetMoney`) before marking it |
+| D06-B4 | Character 0x0841 loading report → `usp_CharacterLoading` / `…DetailInfo` (FUN_00420b80, §6.1) | the IP strings are copied as 16 raw bytes but bound as NUL-terminated strings; u16 / u32 client values are bound into SMALLINT / INTEGER | an IP of 16 characters reads past the field; large values overflow and the report row is lost | bound the copies with a terminator; bind the matching unsigned ranges |
+| D06-B5 | `p_Promotion_Get` / `p_Promotion_Set` (FUN_0041eff0, §6.4) | "already rewarded?" and "mark rewarded" are two calls, not one transaction | two simultaneous requests can both get the reward (path dead in 2016: no sender of 0xA001 / 0xA004) | one procedure that checks and marks under a lock |
+| D06-B6 | Character `CharSaveState` → `p_Char_SetStateWithSetItemAndRestTime` (§7.2) | `CasterInfo.nAttackPower` (32-bit) is copied as its low 16 bits (bound `SQL_C_USHORT`) | a caster attack power above 65 535 is saved wrapped; the buff reloads weaker | bind the full 32-bit value |
+| D06-B7 | all four DB servers `DBRecord::query` with the `ODBC_INFO` startup command (§7.3) | the configured text is used as the `vsprintf` format with no arguments, into a 0x2000-byte buffer | a `%` in the command is undefined behaviour; a longer command overflows the stack buffer | pass the text as data (`"%s"`), bound the length |
+| D06-B8 | Character `p_Item_GetStorageEmptyList` (FUN_00464b40, §9.2) | `@nRet` is bound as input (`SQL_PARAM_INPUT`, pre-set 0) | the wrapper's `nRet != 0` test is dead; a DB-side refusal is never seen and the (possibly empty) rows are used | bind it `SQL_PARAM_OUTPUT` |
+
+## 11. Not reconstructed / uncertain
+
+- **Procedures without source** (§2–§6): every block is the narrowest contract the binary's binds, fetches and code
+  mapping force; bodies, table names and some column names are *(ours)*. Tables invented: `tUserPlayTime` (§2.3),
+  `tSameTimeCharClass` (§3.1), `tEventL20` (§3.2), `tLoginChannel` (§4.1), `tPetInfo` (§5.1), `tMiniHouseURL` (§5.4),
+  `tCharacterLoadingDetailInfo`, `tPromotionUser`, `tPromotionReward` (§6), columns `tCharacter.sLinkScrollDestMap`
+  (§5.2), `tGuildTournamentRegist.bRefundNotice` (§5.6); §9.6 lists them with types.
+- **Account:** the portal tables behind the teen-protection trio and the Netmarble / TW / JP logins (§2.3, §2.4) are
+  unknown (only one is live: `usp_Pcbang_chkIP`). The `nUserNo == −2` agreement answer of 0x4B (§2.5) is produced by no
+  backup procedure: left open (a payment-agreement table exists for the web shop only).
+- **AccountLog:** the L20 event result codes (§3.2) come from `p_Event_WorldCup_Enter` of the same family, not from a
+  2016 body; the path is dead in 2016.
+- **Character:** `usp_GuildAcademy_withdrawMoney`'s 1–6 order (§5.7) is *(inferred, weak)*; which statements gave
+  `usp_Character_setStatPoint` −1091 / −1092 / −1094 (§6.5) is left open (the backup body is enough for a rebuild);
+  `usp_CharacterLoading`'s `nFailType` / `nErrorNo` values (§6.1) are client-side and not traced; whether the
+  enchant procedures (§8.4) are the official bodies cannot be decided.
+- **D06-B1 / D06-B3** rest on the ODBC driver rule and on the absence of a payer in all 2016 binaries; a capture with a
+  tournament refund or a pet creation would settle them.
+- **Storage type 10** (§8.6) and the zone-side meaning of the wedding message ids 0x1385 / 0x1387 (no client error-table
+  entry) stay *(inferred)*.
+- **Schema** (§9): types, defaults and keys are those of the 2019 restore. Where a 2016 column differs, only the binds
+  show it (§9.2: systemic unsigned → signed, 7 real mismatches). The private-server tables of §9.4 stand in for 2016
+  tables that are not in any backup.
+- **Version choices** (§8): the w00 dump is from 2019 and carries 2018 private fixes; §8.5 follows w00 where a 2016 bind,
+  fetch or code mapping proves it and keeps the older copy where w00 holds a dated private fix (`p_Char_Rename`,
+  `usp_Character_setChangeID`, `usp_Tutorial_setCharInfo`). `p_Quest_Set`'s quest-20016 counter and the
+  `usp_Dice_setDiceResult` loss rule cannot be decided from the binary (both versions work with it).
+
+## 12. Coverage boundary
+
+D06 has no scope table (`coverage.py D06`: "no scope table; coverage does not apply"). Every procedure in the plan's scope
+list has a block (§2–§6, re-checked with `bak.py cover` for account / accountlog / character / gamelog in the sweep: the
+missing and mismatching names are unchanged); every caller of every documented wrapper is cited here or in its D0x
+section (sweep: one caller added, `GetCharOptionImprove_KeyMapData` FUN_00422660, §5.7).
+
+| Found (function / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| Server handlers around each procedure (packets, error-code mapping, client texts) | D01 §2–§5, D02 §2–§15, D03 §2–§15, D04 §1–§11, D05 §1–§6 (all done) | D06 documents the procedure side only and links each handler there |
+| Backup tables and procedures no 2016 binary reaches (§9.1 list: one-off copies, web-shop agreement procs, `p_Event_Friend_Reward`, old `tPet` / `tMiniHouse`, `LoggedInChars`) | none needed | §9.1 builds the table set from the dependency closure of the called procedures; unreached objects carry no 2016 behaviour (used here only as family evidence) |
+| `OperatorTool` DB (tOperator, tMenuAuth, tOpLog) | none needed | used by no 2016 server binary (ODBC_INFO lists no DSN for it, §9.1); it belongs to an external GM tool that is not part of the reconstruction |
+| Zone `Wedding_CheckDivorceTimers` FUN_005a1c90 Sub 5–8 branches | this document §8.6 | Z07 (done) §5.1 lists Sub 0–4 only; the missing branches were a small gap, documented here because they decide the meaning of the DB's "+4" values |
+| Zone 0x347D sender FUN_00574a30 (D06-B2) and zone 0x74F4 (D06-B3) | Z07 §6.10 (0x347D), Z08 §8.2 0x74F4 "empty body" (both done) | D06 records only what reaches the DB; the zone handlers themselves are documented there and only the DB consequence is new |
+| `ItemDropLog` (D05 §9) | Z01 §2.3 (done) | SHN table read by the zone, not a database table |
+| Client meaning of `usp_CharacterLoading`'s `nFailType` / `nErrorNo` (§6.1) | W04 §17.3 (done: the 0x0840 packet and its forwarding) | client diagnostics stored verbatim; no server or DB logic reads them, so a rebuild needs only the column types (§6.1); left in §11 |
+| Client texts of the wedding message ids 0x1385 / 0x1387 (§8.6) | this document §8.6 | looked up in `client-error-codes.json` (C01's table): no entry; nothing more to read in the 2016 files |
+
+No follow-up item was created: every remaining thing is either documented here, in a finished item's section cited
+above, or outside the 2016 server binaries.
