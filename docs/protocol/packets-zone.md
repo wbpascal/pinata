@@ -6935,15 +6935,15 @@ Sent in reply to `0x34c0` NC_ITEMDB_UES_FRIEND_POINT_ACK on GameDBSession (`FUN_
 
 ### `0x5814` NC_KQ_SCORE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_KQ_SCORE_CMD`, 5 bytes + variable tail
+**Verified layout** (basis: zone PineEventScriptNode::SysFuncShineKQResultList::sfb_Calculate FUN_004e6420 + AxialListKQResult::alkqr_MakeList FUN_004e5790; client FUN_004a32f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | num |  |
-| 1 | u32 | base |  |
-| 5 | PROTO_NC_KQ_SCORE_CMD::KQScore[num] | array | variable length, element PROTO_NC_KQ_SCORE_CMD::KQScore |
+| 0 | u8 | num | players listed (≤ 128), sorted by score descending |
+| 1 | u32 | base | alkqr_BasePoint (script argument 1) |
+| 5 | KQScore[num] | array | 38 bytes each: +0 char charid[20] (so_CharName), +20 u8 flag (medal 1/2/3 for ranks 0/1/2 in the low bits, gender), +21 u8 chrcls, +22 u32 killpoint, +26 u32 downpoint, +30 u32 contribute, +34 u32 score |
 
-Element `PROTO_NC_KQ_SCORE_CMD::KQScore` (38 bytes): +0 char[20] charid, +20 u8 flag.medal|gender, +21 u8 flag.chrcls, +22 u32 killpoint, +26 u32 downpoint, +30 u32 contribute, +34 u32 score
+broadcast to every player of the script map (centre flag); GMs (admin level) are skipped. Score sources per mode name in Z09 §22.3
 
 Sent from `PineEventScriptNode::SysFuncShineGetObjectList::sfb_Calculate` (`FUN_004e6420`) · payload variable (*pbVar1 * 0x26 + 7)
 
@@ -6971,19 +6971,19 @@ Sent from `ShineObjectClass::ShinePlayer::sp_EscapeFromEmptyKQ` (`FUN_0043fa40`)
 
 ### `0x5821` NC_KQ_SCORE_SIMPLE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_KQ_SCORE_SIMPLE_CMD`, 18 bytes + variable tail
+**Verified layout** (basis: zone PineEventScriptNode::SysFuncShineKQTop::sfb_Calculate FUN_004e6760 + AxialListKQResult::alkqr_MakeSimpleList FUN_004e5d20; client FUN_004a33c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | num |  |
-| 1 | u32 | base |  |
-| 5 | u8 | self.rank |  |
-| 6 | u32 | self.kill |  |
-| 10 | u32 | self.down |  |
-| 14 | u32 | self.score |  |
-| 18 | PROTO_NC_KQ_SCORE_SIMPLE_CMD::KQScore[num] | array | variable length, element PROTO_NC_KQ_SCORE_SIMPLE_CMD::KQScore |
+| 0 | u8 | num | min(players, n) top entries |
+| 1 | u32 | base | script argument 2 |
+| 5 | u8 | self.rank | 0-based rank of the receiver |
+| 6 | u32 | self.kill | receiver killpoint |
+| 10 | u32 | self.down | receiver downpoint |
+| 14 | u32 | self.score | receiver score |
+| 18 | KQScore[num] | array | 32 bytes each: +0 char charid[20], +20 u32 kill, +24 u32 down, +28 u32 score |
 
-Element `PROTO_NC_KQ_SCORE_SIMPLE_CMD::KQScore` (32 bytes): +0 char[20] charid, +20 u32 kill, +24 u32 down, +28 u32 score
+sent to every player of the walk separately (game stream), each with its own self block, skipping leaving / mode-0 / soloing players; num = min(players, n). The 2016 client handler reads only the entries (name, score, down, kill), not the self block
 
 Sent from `PineEventScriptNode::SysFuncShineKQTop::sfb_Calculate` (`FUN_004e6760`) · payload variable (iVar6)
 

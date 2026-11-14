@@ -39,7 +39,10 @@ marks). §19 the Lua message functions (`ScriptMsg.shn` messages, dialogs, notic
 timers, sounds). §20 the Pine map-script language, reading side (`World/PineScript.txt`, tokens, the string value
 model, expressions, variables, the process stack; `MobBehaviorDescript/` is unused). §21 the Pine language, running side
 (grammar, the statement registry, blocks, how a film steps, `var` / assignment / `if` / `while` / `infinite` / `call` /
-`break` / `print` / `permillage`, conditions, `@` system functions, which 2016 books load).
+`break` / `print` / `permillage`, conditions, `@` system functions, which 2016 books load). §22 the Pine action
+statement base (`OtherStatement` loader, object build / change helpers), the 25 `@` system functions, the nine
+auto-registered nodes (save link, GT portal / NPC / item box, party scenario code, abstate test, code notices), the
+scenario book shelf (Pine or Lua books, reload) and the dialog-string files (`Script/*.txt`).
 
 ---
 
@@ -7268,3 +7271,390 @@ A first-level check of every `.ps` file (statement starts against the registry, 
 - Open: what `arg` (the `ushort` passed down from `fc_Routine`) is, and what removing a film does (part 16).
 - Open: whether a handler block reached through `call InterruptBlock.` can re-enter a block already on the stack
   (Z09-B86) depends on the interrupt targets of each book (§15); not traced per book.
+
+## 22. Scripts 9: Pine action statements (base), `@` system functions, scenario books and dialog files
+
+This section covers what §21 left to "§22": the common loader and helpers of every action statement
+(`OtherStatement`), the bodies of the 25 `@` system functions (§21.6 table), the nine statements registered through
+`ScriptBase<>` (§21.2 rows 94–102), the scenario book shelf (which file a book name loads, Pine or Lua, reload) and
+the dialog-string files of `World/PineScript.txt` table `DialogFile`. The 84 `Shine*` action steps are parts 15a–15d.
+Class, member and function names are *(pdb2016)*. Packets sent here: 0x5814, 0x5821 (KQ score lists, §22.3) and
+0x6C04 (`BroadcastCode`, §22.4).
+
+### 22.1 `OtherStatement`: the action-statement base
+
+```pseudo
+OtherStatement : StatementBase {                                   # 0xBC
+    u8 os_Command[32] +4            # the keyword (copied by the ctor)
+    Identify os_Ident +0x24         # the target, loaded when os_IDRead ≠ 0
+    Express* os_Express[32] +0x30   # the arguments
+    int os_ExpressNumMin +0xb0, os_ExpressNumMax +0xb4; u16 os_IDRead +0xb8 }
+OtherStatement::OtherStatement(keyword, idRead, min, max)   @ FUN_004dae40   # all 32 expression slots null
+OtherStatement::~OtherStatement                             @ FUN_004daf20   # deletes the 32 expressions and the target
+    # never reached by the generic node deletes of §21.2 (Z09-B88): only the ScriptBase<> vt 0x14 destructors call it
+
+OtherStatement::sa_Load(n, tr) → ok                         @ FUN_004dccf0   # vt 0 of every Shine* / ScriptBase<> node
+    t = token; none or t ≠ os_Command (case-sensitive): unget t, return 0
+    if os_IDRead and not os_Ident.sa_Load(tr): return 0     # the keyword stays consumed (§21.2 trial order)
+    for i = 0 …:
+        t = token
+        if t == ".":
+            if os_ExpressNumMax < 1: return 1               # no maximum: any number of arguments is accepted
+            if os_Express[max] == null and (min == 0 or os_Express[min−1] ≠ null): return 1
+            unget "."; return 0                             # wrong argument count: the statement fails
+        unget t; os_Express[i] = new Express; if not Express.sa_Load(tr): return 0   # the failed Express stays in the slot
+        if i + 1 > 31: return 1                             # 32 arguments: returns without reading the "." (the next
+                                                            # statement then starts at "." and the file fails to load)
+```
+
+A statement is `keyword [target] expr … .`; the argument count must lie in [min, max] of the §21.2 table, except for
+nodes with max 0 (`interruptclear`, `vanish`, `waitlogin`, `questresult`, `reward`, `waitidle`, `deathcountclear`,
+`suicide`, `battlestop`, `endofkq`, `revival`, `ClearSaveLinkto`, …), which accept and ignore any arguments. A failed
+expression fails the statement and so the file (§21.2); B83 (a failed `Term` eats a token) changes nothing here.
+Arguments are evaluated only when the node steps (`os_Express[i].vt[8](token, ps)`), never at load time.
+
+Helpers shared by the action nodes:
+
+```pseudo
+os_ShineObject(n, ps) → obj | null                          @ FUN_004ebbb0
+    v = os_Ident.i_GetVariable(ps) (FUN_004d9f60); missing: assert "…OtherStatement::sa_Step", null
+    return ShineObjectManager::som_GetObjectAbsolute(pst_GetNumber(v))  @ FUN_0054fc20   # the variable holds a handle
+
+os_ObjectRegen(n, arg, ps, &ip, o, h, brief) → ok           @ FUN_004f8c40   # build a fresh pool object o (handle h)
+    # callers: ShineMobRegen / ShineNPCStand (part 15), ShineDoorBuild (§13); they allocate o and free it on failure
+    v = os_Ident.i_GetVariable(ps); missing: assert "…os_ObjectRegen", return 0
+    name = os_Express[0]; mobId = mob ID of name (`BTree::operator[]` FUN_0063cc30 on `mobdatabox.mdb_btree`); unknown: assert "…os_ObjectRegen : Invalid mob", return 0
+    x, y, dir, e4 = numbers of os_Express[1…4]; os_Express[5] must evaluate (value unused here)
+        # any failing argument: assert "…os_ObjectRegen" with its index, return 0
+    map = Movie::Theater::t_MapNameServer(ps_Shine.theater) (FUN_004e3010); none: assert "…os_ObjectRegen : Not map name", return 0
+    if x == 0 or y == 0:                                    # "anywhere": a random free cell of the map
+        field = fieldlist search by map; none → return 0
+        BlockDistribute::BlockingDistribute::bd_FindEmptyCoord(field.fm_BlockInfo.mbi_BlockDistribute) (FUN_00438960) fails → return 0; else x, y = that cell
+    if o.so_ObjectType (vt 0x4d0) == 7 (door):
+        r = o.vt[0x6dc] so_door_Build(map, x, y, dir, h, mobId, scale = e4, layer 0)        # §13.1
+    else:
+        r = o.vt[0x6e0] so_mob_Regenerate(map, x, y, dir, h, mobId, brief, −1, 0, 0, −1, 1, 0, 0)   # §5.3; brief = copied look or null
+    if r ≠ 0: assert "…os_ObjectRegen : Marking fail"; som_FreeObject(h, REMOVE_NOW, 0x16); return 0
+    v = "<h>"                                               # the target variable now holds the new handle
+    return 1
+    # also traced: Ghidra shows the x/y == 0 branch skipping the build; the disassembly (0x4f8f6f…0x4f901a) builds in both cases
+
+os_ObjectChange(n, arg, ps, &ip, o, h) → ok                 @ FUN_004ecec0   # replace the target object by a new one in place
+    old = os_ShineObject(ps); missing → return 0 (no assert)
+    v = os_Ident.i_GetVariable(ps); missing: assert "…os_ObjectChange", return 0
+    mobId = mob ID of os_Express[0]; argument fails → assert, return 0; unknown name → assert "…Invalid mob", return 0
+    pos, dir, map = old's location, direction, field map ID; old has no field: assert "…os_ObjectChange : Null map", return 0
+    if o is a door (kind 7): r = o.so_door_Build(map, x, y, dir, h, mobId, 1000, layer 0)
+        r ≠ 0 → return 0                                    # no free of h here (the mob branch frees it)
+    else: r = o.so_mob_Regenerate(map, x, y, dir, h, mobId, null, −1, 0, 0, −1, 1, 0, 0)
+        r ≠ 0 → som_FreeObject(h, REMOVE_NOW, 0x16), return 0
+    v = "<h>"; return 1                                     # the old object is left in place: removing it is the caller's job (part 15)
+```
+
+`so_mob_Regenerate` / `so_door_Build` return 0 on success (an error code), hence "r ≠ 0 = failure".
+
+### 22.2 `@` system functions
+
+Calling convention (§21.6): `SystemFunction::sa_Calculate` returns `sfm_Function.sfb_Calculate(out, ps, args)`.
+`ArgumentList::al_GetArgument(args, i, tok, ps)` FUN_004d64c0 sets `tok = ""` and, when `i < 10` and argument `i`
+exists, evaluates it (returns null when the expression fails). A **missing argument therefore reads as "" / 0**; a
+failed one usually makes the function return null, and a null result makes the surrounding expression fail (§20.5).
+`ps_assert(cond, text, detail)` FUN_004d61f0 logs and returns 1 when `cond` is false. Results are strings: numbers via
+`pst_MergeNumber` (`%d`), lists as `"h1 h2 … "` (each value followed by one space, read back with `@RemoveFirst`).
+
+```pseudo
+@Random(a, b)          SysFuncRand          @ FUN_004d77d0   a + rand() % (b − a + 1)       # CRT rand(), 0…32767
+    # (original bug) Z09-B89: no check of b ≥ a: b == a − 1 divides by zero (zone crash); b < a − 1 gives values ≥ a.
+    # The 2016 scripts call it with constant ranges (0 360, 0 99, 40 70, …)
+@SquarRoot(n)          SysFuncSQRT          @ FUN_004d7960   (int) sqrt(n)
+@Distance(x1, y1, x2, y2) SysFuncDistance   @ FUN_004d7a60   (int) sqrt((x1 − x2)² + (y1 − y2)²)      # unused in 2016
+@mobregen / @npcstand / @doorbuild(name, x, y, dir, a4)                                      # unused in 2016
+    SysFuncShineMobRegen FUN_004e3850 (pool kind 5) / SysFuncShineNPCStand FUN_004e3ad0 (kind 4) /
+    SysFuncShineDoorBuild FUN_004e3990 (kind 7):
+    o = som_AllocObject(kind); none: assert "…Too many mob", return null
+    if ScriptMobBreeder::smb_ObjectRegen(&mobbreeder, ps, o, h, args) (§10.8) fails:
+        List<…>::l_Free(&shineobjmanager, h) (FUN_004b1300); result "65535"
+    else result "<h>"
+@change2mob / @change2npc / @change2door(handle, name)                                       # unused in 2016
+    SysFuncShineChange2Mob FUN_004e3c10 (kind 5) / …Change2NPC FUN_004e3e90 (kind 4) / …Change2Door FUN_004e3d50 (kind 7):
+    same with smb_ObjectChange (§10.8): a new object at the old one's place; the old one stays
+```
+
+The second free in the six builders is `List::l_Free` on `shineobjmanager`'s own base `List<ShineObjectEachList>` (13
+entries, `ShineObjectManager::ShineObjectManager` FUN_00557550; the PDB name `List<ItemActionObserve>::l_Free` is a
+folded body) with the object handle as index: for handles ≥ 13 it returns at once, for mob handles 0…12 it would unlink
+an entry of that base list if it were in use (no allocation from it was found *(inferred)*). (original bug) Z09-B95:
+the intended call is the pool free; `smb_ObjectRegen` already freed mobs / NPCs (reason 200), doors stay allocated
+and unbuilt until the pool walk reclaims them (§13).
+
+```pseudo
+@Count(what)           SysFuncShineCount    @ FUN_004e3fd0   # 22 uses (e.g. `@Count("player") <= 0`)
+    what == "player": counter = AxialListMobCounter{ALMC_PLAYER, max 99999}; so_AllInMap(theater.t_CenterFlag, counter, 0)
+        (null flag: assert "Movie::Theater::t_AllInMap : Null flag", count 0)
+    what == "all":    counter {mob 0xFFFF → ala_SearchAll, max 99999}; Movie::Theater::t_AllInMap (FUN_004e2c30, same walk)
+    else: mobId = mob ID of `what`; unknown: ps_assert "…SysFuncShineCount::sfb_Calculate : MobName wrong", result "0"
+          counter {mobId → ala_SearchMob}; t_AllInMap
+    result = counter.almc_Counter                           # rules of the three searches: §15.7 (live objects only)
+@RestSec()             SysFuncShineRestSecond @ FUN_004e42e0  Movie::TimeLimit::tl_GetTimeLimit_Second(theater.t_TimeLimit) FUN_00507df0
+    = (tl_EndTick − g_Now) / 10, unsigned                   # seconds left of the `timelimit` statement
+    # (original bug) Z09-B90: tl_IsActiv is not tested and the subtraction is unsigned: with no limit set or after it
+    # ran out the result is about 429 million instead of 0 (the one 2016 use, JobChange1, reads it while the limit runs)
+@CharClass(handle)     SysFuncShineCharClass @ FUN_004e43a0  argument fails: assert, null
+    o missing → ""; else by base class (CharClass vt 0x48 cc_ClassType, §18): 1 "Fighter", 6 "Cleric", 11 "Archer",
+    16 "Mage", 21 "Joker", 26 "Sentinel", other ""        # JobChange1: `@CharClass(PlayerHandle) % "-m"` builds a menu key
+@CharName(handle)      SysFuncShineCharName  @ FUN_004e45a0  argument fails: assert, null; o missing → ""
+    else o.vt[0x56c] so_CharName (20 bytes, through the `namestring` ring buffer) appended
+@DeathNum(mobName)     SysFuncShineDeadNumber @ FUN_004e4780 # 16 uses
+    unknown name: ps_assert "…SysFuncShineCount… MobName wrong" (Count's text), null; argument fails: null
+    result = MobDeadCount::mdc_DeadCountGet(theater.t_Field.fm_MobDeadCount, mobId) (FUN_004b08f0); no field → 0
+    # the per-map death counter of §5.1 (`MobDeadCount`; reset by the `deathcountclear` statement, part 15)
+@CircularScatter(x, y, r) SysFuncShineCircularScatter @ FUN_004e4940
+    any argument fails → null
+    MobRegenClass::MobRegenLoc_Circular(x, y, r) FUN_004b0e60 + mrlc_Get FUN_004b0e80 (the circle spawn point of §10.4)
+    result = "<px> <py>"                                    # split with @RemoveFirst (JobChange2-1)
+@RemoveFirst(varName, sep) SysFuncShineRemoveFisrt @ FUN_004e4b70   # 48 uses: the list reader
+    c = first character of sep; v = ProcessStack::ps_FindVariable(ps, varName) (FUN_004d8ce0); fails / missing → null
+    result = characters of v up to the first c (or the end)
+    skip the c's that follow; v = the rest moved to the front ("" when nothing is left)
+@GetObjectList(handle, kind…) SysFuncShineGetObjectList @ FUN_004e4fd0
+    o = object of handle; missing: ps_assert "Invalid Object", null
+    flags = OR over arguments 1…9, lower-cased, until the first "" or failed one:
+        "player" 1<<2, "npc" 1<<4, "mob" 1<<5, "bandit" 1<<8 (= 1 << object kind); other: ps_assert "Invalid flag", null
+    walk = AxialListObjectList{flags}; so_AllInMap(o, walk, 1)                  # every object of o's map
+        AxialListObjectList::ali_Work FUN_004e4de0: kind bit set → store {handle, so_DistanceSquar(o, x)}; stops at 64
+    result = AxialListObjectList::alol_MakeList FUN_004e4ed0: "h1 h2 … " in walk order (the stored distance is not
+        used, no sorting), appending only while the text is ≤ 240 characters
+@DistanceBetween(h1, h2) SysFuncShineDistance @ FUN_004e5f40   # GordonMaster: `@DistanceBetween(GordonMaster RubiMan) > 1000`
+    result starts as "999999999" (appended to `out`)
+    both objects exist: result = DirectDistanceTable::ddt_Distance(dx, dy) (FUN_004012d0, §9)
+    missing object: ps_assert "…SysFuncShineDistance::sfb_Calculate : Invalid Object", result stays "999999999"
+@PlayerInArea(what, area) SysFuncShinePlayerInArea @ FUN_004e6150   # 10 uses: `@PlayerInArea("player" "ID_UrgDragonArea") <= 0`
+    area = Name8 (32 bytes) of argument 1
+    "player": AxialListMobInAreaCounter(0xFFFF, area, 0, ALMC_PLAYER, 99999) (FUN_004e2d00) over the centre flag
+    "all":    (0xFFFF, area, 0, ALMC_MOB, 99999) through t_AllInMap
+    mob name: (mobId, …, ALMC_MOB, …); unknown: ps_assert (Count's text), result "0"
+    result = almc_Counter                                   # area test and counter rules: §15.7
+@KQResultList(name, base, limit) / @KQTopList(name, n, base)   # §22.3
+@IsGateUse(flag, opener, arg) SysFuncShineIsGateUse @ FUN_004e6b50   # GuildTournament1: `@IsGateUse(FlagCapture_1 Opener InterruptArg)`
+    f = object of flag (missing: assert "SysFuncShineIsCaptureFlag::sfb_Calculate : NO Object", null); field of f's map (vt 0x4bc so_LoginLocation, map name)
+    p = object of opener (missing: same assert, null); a = number of arg
+    result = GuildTournamentSystem::IsUseGate(fm_GetGuildTournamentSystem(field), p, f.handle, a) (FUN_004795d0) ? "1" : ""
+    # no null test of the field's tournament system: only used on tournament maps (GT internals: Z16)
+@GetWinnerGuild() / @GetLoseGuild()   SysFuncShineGetWinnerGuild FUN_004e6e10 / SysFuncShineGetLoseGuild FUN_004e7000
+    map = t_MapNameServer(theater); none: assert "…os_ObjectRegen : Not map name" (copied text), null
+    gts = FieldMap::fm_GetGuildTournamentSystem (FUN_00463290) of that field; none → "" (unchanged out)
+    g = GuildTournamentSystem::GetVictoryGuild (FUN_004790e0) / GetLoseGuild (FUN_00479100); result = g ? "<g>" : ""
+@Range(from, to, order) SysFuncShineRange   @ FUN_004e72b0   # unused in 2016
+    a failing argument → ""
+    vector<int>(to − from + 1); order (lower-cased) "asc": from, from+1, …; "desc": to, to−1, …;
+    "shuffle": ascending then std::random_shuffle; other: ps_assert "…Invalid order" (the vector stays all 0)
+    result = every value followed by " "
+    # (original bug) Z09-B92: no length check: more than about 50 values overrun the 256-byte result token
+    # (original bug) Z09-B93: to < from − 1 makes a negative vector size (std::length_error / bad_alloc thrown inside a
+    #   script step)
+```
+
+### 22.3 KQ score lists: `@KQResultList`, `@KQTopList` and 0x5814 / 0x5821
+
+Both functions walk the players of the script's map with an `AxialListKQResult` and sort them by score (used by the
+KQ books `KQHBat1…5` and the older `Quest/ConditionOfHero`; the Lua twins `cScoreResultList` / `cScoreTopList`
+FUN_005ec6a0 / FUN_005ec1f0 send the same packets and belong to Z14).
+
+```pseudo
+AxialListKQResult : AxialListIterator {                      # 0x1A18
+    alkqr_ScoreFunction +4, alkqr_worker +8 (member-function pointers),
+    ALKQR alkqr_Array[128] +0xc { u16 handle; ShineObject* obj; PROTO_NC_KQ_SCORE_CMD::KQScore scorestr (38); int score },
+    int alkqr_BasePoint +0x1a0c, alkqr_Pointer +0x1a10, alkqr_LimitPoint +0x1a14 }
+mode by name (argument 0, case-sensitive):
+    "ConditionOfHero"    → score function alkqr_Score_ConditionOfHero FUN_004e2df0, worker defaultWorker
+    "NewConditionOfHero" → worker zerosumWorker (no score function)          # the 2016 KQHBat books
+    other                → alkqr_Score_Default FUN_004e2ec0, worker defaultWorker
+ali_Work(w, centre, x)            @ FUN_004e5390   skip x with an admin level (vt 0x4d4 ≠ 0, GMs); else worker(x)
+defaultWorker                     @ FUN_004e5480   players only (kind 2), ≤ 128: handle, obj, charid = so_CharName; score function(x)
+zerosumWorker                     @ FUN_004e55d0   players only, ≤ 128; s = x.so_GetBattleStat (vt 0x428, `BattleStat`):
+    killpoint = s.bs_Kill, downpoint = s.bs_Dead, contribute = 0, score = base + s.bs_Score
+alkqr_Score_Default               s = BattleStat: killpoint = bs_KillScore, downpoint = bs_KnockDownNum, contribute = 0,
+                                  score = contribute − downpoint + killpoint + base
+alkqr_Score_ConditionOfHero       killpoint = bs_KillScore + 500, downpoint = bs_KnockDownNum,
+                                  contribute = RandomRing(10) (0…9, a random bonus), score as above
+    # (original bug) Z09-B91: both score functions set score = 0 when the sum is negative and then overwrite it
+    #   with the sum: negative scores stay negative (zerosumWorker has no clamp at all)
+alkqr_CalcScore                   @ FUN_004e2f80   per entry: flag.medal = 0, flag.gender = vt 0x804 so_ply_GetGender,
+                                  flag.chrcls = class (CharClass vt 0x38)
+alkqr_ScoreCompare                @ FUN_004e2ff0   qsort comparator: descending score
+
+@KQResultList(name, base, limit)  SysFuncShineKQResultList @ FUN_004e6420   # `@KQResultList("NewConditionOfHero" 0 5000)`
+    base / limit = arguments 1 / 2 when not "" (else 0); walk the map from the centre flag (null: assert, empty list)
+    alkqr_CalcScore; alkqr_MakeList FUN_004e5790:
+        sort; packet num = count, base
+        entry i = {charid, flag (medal 1 / 2 / 3 for ranks 0 / 1 / 2), killpoint, downpoint, contribute, score}
+        result = "h " for every entry with limit == 0 or score ≥ limit, while the text is ≤ 240 characters
+    broadcast to the map (AxialListPacketBroadcast over the centre flag):
+    0x5814 NC_KQ_SCORE_CMD { u8 num; u32 base; KQScore[num] { char charid[20]; u8 medal|gender; u8 chrcls;
+        u32 killpoint, downpoint, contribute, score } }      # 5 + 38·num bytes (up to 128 players)
+@KQTopList(name, n, base)         SysFuncShineKQTop @ FUN_004e6760          # `@KQTopList("NewConditionOfHero" 10 0)`
+    base = argument 2 when not "" ; n = number of argument 1; same walk and alkqr_CalcScore
+    alkqr_MakeSimpleList FUN_004e5d20: sort; result = handles of the first min(n, count); packet entries for every
+        player {charid, kill = killpoint, down = downpoint, score}; then num = min(count, n)
+    for every player i of the walk (sorted order, not only the top n) that exists, is not leaving (vt 0x300
+        so_IsEmpty), has a mode (vt 0x484 ≠ 0) and is not in soloing mode (vt 0x79c so_ply_SoloingMode):
+        self = {rank i (0-based), kill, down, score of entry i}; length 2 + 18 + 32·num ("Packet Too Long" assert
+        when it does not fit); send to that player only (game stream, vt 0x2fc)
+    0x5821 NC_KQ_SCORE_SIMPLE_CMD { u8 num; u32 base; u8 self.rank; u32 self.kill, self.down, self.score;
+        KQScore[num] { char charid[20]; u32 kill, down, score } }
+```
+
+Client (2016, game scene dispatcher FUN_004be490): 0x5814 → FUN_004a32f0 clears the KQ result window, sets `base`,
+adds one row per entry (name and the entry data) and opens the window; 0x5821 → FUN_004a33c0 adds one row per entry
+(name, score, down, kill) to the score board; it does **not** read the `self` block.
+
+### 22.4 The nine `ScriptBase<>` statements
+
+All load with `OtherStatement::sa_Load` (§22.1; target / argument counts in §21.2) and pop themselves when done, also
+after a failure, unless noted. Four of them read their arguments through `ScriptParameterPaser` (§20.7): their min =
+max argument count guarantees that every `m_ppExpress[i]` it reads exists.
+
+```pseudo
+SaveLinkto server client x y.          SaveLinkto::sa_Step        @ FUN_004fa650   # GuildTournament(1).ps: SaveLinkto "Eld" "Eld" 17214 13445.
+    strings 0, 1 and numbers 2, 3 (ScriptParameterPaser, error prefix "SaveLinkto::sa_Step"); a failing one: pop only
+    rec = NPCManager::LinkInformTemplete (0x61 bytes) zeroed; rec.linktoserver = server (12 chars), rec.linktoclient = client
+        (12 chars), rec.coordx = x, rec.coordy = y      # index "", direct 0, Party 0
+    FieldMap::fm_SetSaveLinktoData(Movie::Theater::GetFieldMap(theater), rec)   @ FUN_004634a0 → field.m_SaveLinktoData
+ClearSaveLinkto.                       ClearSaveLinkto::sa_Step   @ FUN_004f7340
+    fm_SetSaveLinktoData(field, all zero)
+    # FieldMap::fm_GetSaveLinktoData FUN_004633e0 returns the record only when coordx ≠ 0. Users: the client's
+    # 0x10B9 NC_CHAR_SAVE_LINK_REQ (Z07 §3.5, `sp_NC_CHAR_SAVE_LINK_REQ` FUN_005622d0) and
+    # `ShinePlayer::sp_LinktoCurMapSaveData` FUN_00560170 (called only by the GM command `ac_LinktoSaveData`, Z11):
+    # both link the player there (vt 0x600 so_LinkTo(rec, 6, 9, 10)). The tournament script sets the Eld exit while
+    # the match runs and clears it at the end
+RegisterGTPortal portal flag red blue. RegisterGTPortal::sa_Step  @ FUN_004fa3d0   # GuildTournament.ps (3 portals)
+    object 0, number 1, strings 2, 3 (prefix "RegisterGTPortal::sa_Step"); failure: pop
+    gts = fm_GetGuildTournamentSystem(field of portal's map); gts: GuildTournamentSystem::PortalResiter(gts, portal, flag, red, blue) (FUN_0047ccf0)
+GTRegisterNPC npc guild.               GTRegisterNPC::sa_Step     @ FUN_004fa1a0   # GuildTournament.ps (A1…B3 NPCs)
+    object 0, number 1 (prefix "GTMobRegenKey::sa_Step", copied text); failure or missing object: pop
+    map = t_MapNameServer(theater); none: assert "GTRegisterNPC : Not map name", **return 0 without pop** (ends the film)
+    gts of that field: npc.vt[0x900] so_mob_SetGuildRegNum(guild) (FUN_00476110); GuildTournamentSystem::AddTeamNPC(gts, npc.handle) (FUN_0047c700)
+GTMobRegenKey key count guild.         GTMobRegenKey::sa_Step     @ FUN_004fb0b0   # GTMobRegenKey "lose_Itembox_a1" 1 GuildA.
+    string 0, numbers 1, 2; failure: pop
+    map as above (none: assert "…os_ObjectRegen : Not map name", return 0 without pop)
+    gts: GuildTournamentSystem::AddAdvanItemMonster(gts, AdvanMobItemRegenInfo {map name, key, count}, guild) (FUN_00480f60)
+    # what the tournament does with portals, team NPCs and item-box regen keys: Z16
+HasAbstate var handle abstate strength. HasAbstate::sa_Step       @ FUN_004f9f00   # unused in 2016
+    v = target variable (missing: assert, pop); v = "0"
+    o = object of argument 0 (fails: assert "…ShineWhoClickMe::sa_Step : no Player", copied text; missing: assert "… No obj")
+    idx = abstate index of argument 1 (dic_abstate; unknown name: v stays 0, no assert); s = number of argument 2
+    if o.vt[0x52c] so_mobile_AbstateList().asl_Abstate_IsSet(idx) (FUN_00409b10) has index idx and strength == s exactly: v = "1"
+NPCChatNoFacecut npc key.              NPCChatNoFacecut::sa_Step  @ FUN_004f7420   # unused in 2016
+    o = os_ShineObject (null: assert "…Null obj"); key = argument 0 (fails: assert)
+    if ps_Shine.shinescript (the dialog set chosen by the `scriptfile` statement, part 15):
+        text = ShineScript::ss_String(set, key) (§22.6); o.so_Chat(0xFFFF, text, strlen, 0, 0)   # vt 0x530 → 0x2002 to sight (§8 / Z02 §3.1)
+    # = `npcchat` (part 15) without the face-cut window
+ScinarioCodeParty player code.         ScinarioCodeParty::sa_Step @ FUN_004f7600   # unused in 2016
+    p = os_ShineObject (null: log, pop); code = argument 0 (fails: assert "…no code", log "Fail 1")
+    party = p.vt[0x550] so_PartyRegistNumber
+    no party (0xFFFF): p.vt[0x808] so_ply_QuestDiary → CQuestZone::QuestPlayer_ScenarioDone_Server(code) (FUN_005bd750, Z15)
+        (no diary: log "Fail 2-1")
+    else for each member m of CParty::operator[](party) (FUN_00645340) with an object and a quest diary:
+        same map as p and so_DistanceSquar(p, m) ≤ 1 000 000 (1000 units): m's diary ScenarioDone(code), log "Suc-2"
+        else log "Except/NotInMap " / "Except/NotInRange " with m's char number
+    # every step is written to the `ScinarioCodeLog` debug log; = `scinariocode` (part 15) for the whole party
+BroadcastCode target "CODE" [handle].  BroadcastCode::sa_Step     @ FUN_004f7ae0   # unused in 2016
+    m = argument 0 (fails: assert "…no message", pop)
+    code = "ERR_NOERR_TIMEATK_START" 0x2020, "…_WARNING" 0x2021, "…_EXPLODE" 0x2022, "…_WARNING_2" 0x2023; other: pop, nothing sent
+    0x6C04 NC_SCENARIO_MESSAGENOTICE_CMD { u32 message = code }            # §19.3 (client texts: the four time-attack notices)
+    t = os_Ident.i_GetToken (FUN_004d9ea0), lower-cased
+    t == index_all: broadcast to the whole map over the centre flag (null flag: assert)
+    t == index_handle: o = object of argument 1 (fails: assert "…no Player with handle"); o exists: send to o only
+    other: nothing
+    # (original bug) Z09-B94: the "handle" form needs two arguments, but the node registers max 1 (§21.2), so a
+    # statement with a handle never loads; the branch that reads os_Express[1] is dead (it would read a null slot)
+```
+
+`index_all` / `index_handle` are global `PineScriptToken`s (the target words, "all" / "handle" by their names
+*(inferred)*); the same globals serve `broadcast` (part 15).
+
+### 22.5 The scenario book shelf
+
+```pseudo
+ScenarioBookShelf { vector<ScenarioBook*> sbs_Array; BTree sbs_Tree +0x10 (name → index) }   # global scenarioshelf, 0x414
+ScenarioBook vt: 0 scalar deleting destructor, 4 sb_Load(name), 8 type (1 Pine, 2 Lua), 0xc Pine script, 0x10 Lua script
+    ScenarioBookPS  { PineEventScript* sbps_Script }: vt 8 → 1 (folded FUN_00557bb0), vt 0xc → sbps_Script (FUN_0045ff90), vt 0x10 → 0
+    ScenarioBookLua { LuaScriptScenario* sbl_Script }: vt 8 → 2 (FUN_00647230), vt 0xc → 0, vt 0x10 → sbl_Script
+    # (the folded slot bodies carry unrelated PDB names: go_Get_GambleType, go_Get_NpcObject, GDTSO_GetGameStatus)
+
+sbs_LoadScripts(shelf)                       @ FUN_00509750   # start stage zs_start_earth (Z01 §2.2)
+    read World/PineScript.txt (fails: assert "…Option read error", ShineExit)
+    for each record of table PineScript, column ScriptName (not a string: assert "…Type error", ShineExit):
+        sbs_Read(name) fails → assert "ScenarioBookShelf::sbs_ReadNAssert : Script Load Error", ShineExit
+sbs_ReadNAssert(shelf, name)                 @ FUN_00509710   same, one name; caller FieldContainer::fc_Load FUN_004655f0
+    # for every World/Field.txt FieldList record whose ScriptName ≠ "-" (2016: one map, OX_field → `Map/OXFieldInit`,
+    # a Pine book that is not in PineScript.txt); start stage zs_start_wide, after the shelf
+sbs_Read(shelf, name) → ok                   @ FUN_00509570
+    ScenarioBook::sb_GetFileName(buf, name, ext) FUN_00507440: ext "lua" → "../9Data/Shine/LuaScript/<name>.lua",
+        else "../9Data/Shine/ScenarioBookShelf/<name>.<ext>"
+    if the .ps file opens: b = new ScenarioBookPS
+    else if the .lua file opens: b = new ScenarioBookLua
+    else: assert "ScenarioBookShelf::sbs_Read : File not found", return 0
+    b.sb_Load(name)                          # result ignored
+    sbs_Tree.bt_Insert(name, index); sbs_Array.push_back(b); return 1
+ScenarioBookPS::sb_Load(b, name) → ok        @ FUN_005076b0
+    delete the old sbps_Script (~PineEventScript); sbps_Script = new PineEventScript
+    ok = PineEventScript::pes_Load(script, "<…>.ps", &line) (§20.2); fails: assert(name, line)
+    return ok
+ScenarioBookLua::sb_Load(b, name) → 1        @ FUN_00507800
+    delete the old sbl_Script (vt 0); sbl_Script = new LuaScriptScenario; LuaScript::ls_FromFile (§14.1)
+    fails: assert "…ScenarioBookLua::sb_Load : Lua load error", ShineExit
+sbs_GetScenarioBook(shelf, name, &index) → book | null   @ FUN_00507b90   BTree lookup, index < size
+    # callers: Movie::Theater::t_PlayFilm, CinemaComplex::cc_PlayFilm / cc_DropFilm (part 16), cSetAIScript /
+    # cSetFieldScript (§14), wms_NC_KQ_W2Z_MAKE_REQ (Z08 / Z16), GM ac_ReroadKingdomQuest (Z11)
+sbsReLoad(shelf, name)                       @ FUN_00507c90   found: book.sb_Load(name) again (unknown name: nothing)
+    # callers: GM commands ac_IndunReload FUN_00419810 and ac_ReroadKingdomQuest FUN_0041dc80 (Z11 / Z16)
+~ScenarioBookShelf                           @ FUN_005094d0   deletes every book (vt 0), the tree and the vector (atexit)
+ScenarioBook / ScenarioBookPS / ScenarioBookLua destructors: FUN_00507430, FUN_00507610, FUN_00508430 (deletes the
+    PineEventScript), FUN_00507640 (deletes the Lua script)
+```
+
+2016 data: all 58 `PineScript` records exist, 16 as `.ps` under `ScenarioBookShelf/` and 42 as `.lua` under
+`LuaScript/` (the `; LuaScript` comment marks only 18 of them; the loader goes by the files). A `.ps` file shadows a
+`.lua` of the same name. With `Map/OXFieldInit` from `Field.txt`, 17 Pine books are loaded (§21.7 lists 16).
+
+(original bug) Z09-B96: a Pine book that fails to load only asserts; `sbs_Read` ignores `sb_Load`'s result, so the
+zone keeps a half-loaded book (the Lua path exits instead). Its blocks hold the dangling statement pointer of Z09-B84,
+which the next `sbsReLoad` of that book (GM reload) or the shelf's destructor frees a second time.
+
+### 22.6 Dialog-string files: `KQScriptManager` and `ShineScript`
+
+```pseudo
+KQScriptManager { BTree kqsm_BTree; ShineScript kqsm_Script[64] +0x404; u32 kqsm_Number +0x421904 }   # global kqscriptmanager
+ShineScript : OptionReader                                                                         # 0x10854, one text file
+KQScriptManager::kqsm_Load(m, worldName)     @ FUN_0064cee0   # start stage zs_start_home, worldName = zs_serverinfo.worldname
+    read World/PineScript.txt (fails: assert with the shelf's text "…sbs_LoadScripts : Option read error", ShineExit)
+    for each record of table DialogFile, column ScriptName (not a string: assert "…Type error", ShineExit):
+        kqsm_Number > 63: assert "Too many KQ Script", ShineExit
+        ShineScript::ss_Load(&kqsm_Script[n], worldName, name); bt_Insert(name, n); n++
+    no record at all: assert "KQScriptManager::kqsm_Load : No Script", ShineExit
+ShineScript::ss_Load(s, worldName, name)     @ FUN_0064cd30
+    read "../9Data/Shine/World/<worldName>/Script/<name>.txt", else "../9Data/Shine/Script/<name>.txt"
+        neither: assert "ShineScript::ss_Load : Error in Script read" + the reader's error line, ShineExit
+    primary key of table "Script" on column "ScrIndex" (fails: assert "…Error in indexing", ShineExit)
+KQScriptManager::operator[](m, name) → set | null   @ FUN_0064ce70   unknown: assert "Invalid script name", null
+ShineScript::ss_String(s, key) → text        @ FUN_0048ce60   column "ScrString" of the "Script" record `key`; missing → ""
+```
+
+2016: 43 `DialogFile` records, all present in `Script/` (no `World/<world>/Script/` override directory). A file is a
+table `Script` with columns `ScrIndex` (INDEX) and `ScrString` (STRING[64]); `#exchange # \x20` turns `#` into
+spaces. Users: the `scriptfile` statement (sets `ps_Shine.shinescript`, part 15), `npcchat` / `NPCChatNoFacecut`, the
+Lua `cGetScriptString` and message functions (§18.4 / §19).
+
+### 22.7 Answers to open questions and open points
+
+- §20.9 / §21.8 `Identify::sa_Calculate` on a `#expr` target: `OtherStatement` and the nine nodes use the target only
+  through `i_GetVariable` (`os_ShineObject`, `os_ObjectRegen`, `os_ObjectChange`, `HasAbstate`) or `i_GetToken`
+  (`BroadcastCode`); a search of the whole PDB export finds no vt 8 call on `os_Ident` (only `StatePrint`, §21.5).
+- §20.7 missing `ScriptParameterPaser` arguments: impossible for its four users (exact argument counts, §22.4).
+- §20.9 / §21.8 B83 in the argument loop: no effect (a failed expression fails the file).
+- §21.7 the 42 books without `.ps`: all exist as `LuaScript/<name>.lua` and load as Lua books (§22.5).
+- §10.8 the second free after a failed `smb_*` spawn: Z09-B95 (no effect in practice).
+- Open (part 15): who removes the old object after `os_ObjectChange`, and whether `ShineChange2Door` frees the slot of
+  a failed door build (`os_ObjectChange` does not).
+- Open (part 16): how films use the book type (vt 8) and the Lua book's script when a film starts.
