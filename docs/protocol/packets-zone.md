@@ -5716,7 +5716,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_WeaponEndureChangeAck` (`FUN_00
 
 ### `0x3037` NC_ITEM_WEAPONENDURESET_CMD
 
-**Verified layout** (basis: zone ShinePlayer::sp_CostumWeaponChargeDecrease_ToClient FUN_0051a500 (6 bytes incl. opcode, game stream); callers smo_ply_CostumWeaponChargeDecrease FUN_00520840 (every 10th charge) and smo_BashStop FUN_0042e840; not sent for counters >= 100000000 (the not-charged sentinel); PDB 2016 PROTO_NC_ITEM_WEAPONENDURESET_CMD; client ItemRepairTask::On_Recv_NC_ITEM_WEAPONENDURESET_CMD FUN_0066c750)
+**Verified layout** (basis: zone ShinePlayer::sp_CostumWeaponChargeDecrease_ToClient FUN_0051a500 (6 bytes incl. opcode, game stream); callers smo_ply_CostumWeaponChargeDecrease FUN_00520840 (every 10th charge on a normal swing, every charge on a damaging skill blast from sbec_Routine FUN_00437fc0) and smo_BashStop FUN_0042e840; not sent for counters >= 100000000 (the not-charged sentinel); PDB 2016 PROTO_NC_ITEM_WEAPONENDURESET_CMD; client ItemRepairTask::On_Recv_NC_ITEM_WEAPONENDURESET_CMD FUN_0066c750)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -6108,7 +6108,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ShieldEndureChangeAck` (`FUN_00
 
 ### `0x3066` NC_ITEM_SHIELDENDURESET_CMD
 
-**Verified layout** (basis: zone ShinePlayer::sp_CostumShieldChargeDecrease_ToClient FUN_0051ab10 (6 bytes incl. opcode, game stream); callers smo_ply_CostumShieldChargeDecrease FUN_00520aa0 (every 10th charge) and smo_BashStop FUN_0042e840; PDB 2016 PROTO_NC_ITEM_SHIELDENDURESET_CMD; client ItemRepairTask::On_Recv_NC_ITEM_SHIELDENDURESET_CMD FUN_0066c780)
+**Verified layout** (basis: zone ShinePlayer::sp_CostumShieldChargeDecrease_ToClient FUN_0051ab10 (6 bytes incl. opcode, game stream); callers smo_ply_CostumShieldChargeDecrease FUN_00520aa0 (every 10th charge on a normal swing, every charge on a damaging skill blast from sbec_Routine FUN_00437fc0) and smo_BashStop FUN_0042e840; PDB 2016 PROTO_NC_ITEM_SHIELDENDURESET_CMD; client ItemRepairTask::On_Recv_NC_ITEM_SHIELDENDURESET_CMD FUN_0066c780)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|

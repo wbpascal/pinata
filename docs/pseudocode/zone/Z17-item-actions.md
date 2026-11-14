@@ -429,7 +429,7 @@ EventRunBySkillGroupIndex(results, skill, seit, me, object) → bool            
     any = false
     for each group g in skill.sdi_ActiveSkillGroups (vector of pointers):
         arg.condition.subtype = g+0x20 (the group index)
-        if _EventRun(results, arg, 0xFFFF): any = true *(inferred: the decompiler shows a constant byte)*
+        if _EventRun(results, arg, 0xFFFF): any = true   # `push 0xffff` before the call @ 0x5d1fca (the decompiler shows a byte)
     return any
 
 EventRun_IncDmgRate(subject, object, attackType, results) → bool                    @ FUN_005d2010
@@ -507,7 +507,7 @@ ItemActionObserveManager::SetCoolTime(coolMs, group, actionID)                  
         Send to the owner (vt 0x2f8 so_GetDataSocketStream → .vt 0xc) 0x482C NC_SKILL_ITEMACTIONCOOLTIME_CMD {
             u16 num = 1
             { u16 ItemActionID = actionID; u16 ItemActionGroupID = group; u32 SecondCoolTime = coolMs }
-        }   # 10 bytes; Packet-Too-Long assert text is copied from "GuildTourmentSystem::PlayerRegiste"
+        }   # 10 bytes payload (pp_SetPacketLen 0xC incl. the opcode); Packet-Too-Long assert text is copied from "GuildTourmentSystem::PlayerRegiste"
 
 ItemActionObserveManager::UpDate()            # every so_Routine pass of a live player (so_Routine @ FUN_0056c790, §3)   @ FUN_005d1930
     for each t in iaom_CoolTimeList:
@@ -517,7 +517,7 @@ TickTimer::CheckUpdateEvent_ClockWatch(now):  if enabled: cur += now − prev; p
                                               if cur > delay: cur −= delay; return true.   return false
 
 ItemActionObserveManager::ResetCoolTime()                                            @ FUN_005d1a00
-    Send to the owner 0x482C { u16 num = n; n × { ItemActionID, ItemActionGroupID, SecondCoolTime = 0 } }   # 4 + 8n bytes
+    Send to the owner 0x482C { u16 num = n; n × { ItemActionID, ItemActionGroupID, SecondCoolTime = 0 } }   # 2 + 8n bytes payload (4 + 8n incl. opcode)
     iaom_CoolTimeList.clear()
     # caller: the GM command &iareset, `ac_ItemActionCoolTimeReset` @ FUN_00421990 (Z11 §7.4)
 ItemActionObserveManager::CoolTimeListClear()  → iaom_CoolTimeList.clear(), no packet          @ FUN_005d19b0
@@ -645,7 +645,7 @@ Send_SETITEMHEALEFFECT(t, heal, amount)                                         
     Broadcast to the players around t (AxialListPacketBroadcast, so_AllOfRange radius 0 = sight, includeSelf = 1)
     0x206F NC_ACT_SETITEMHEALEFFECT {                        # 5 bytes, PROTO_NC_ACT_SETITEMHEALEFFECT (pdb2016)
         u16 who      = t's zone handle (so_GetZoneHandle_ItemLooter, identical-code-folded handle getter)
-        u8  flag     : bit 0 isheal = heal (1 = HP gained, 0 = HP lost); bits 1–7 left as they were in the send buffer
+        u8  flag     : bit 0 isheal = heal (1 = HP gained, 0 = HP lost); bits 1–7 left as they were in the send buffer (original bug) Z17-B19
         u16 hpchange = amount (truncated to 16 bits)
     }
 ```
@@ -682,7 +682,7 @@ ShinePlayer::so_ply_EnchantActionUse(gemItemID)   (vt 0x5e4; mobs: empty body)  
 ```
 
 Client `GameFrameWork::On_NC_ITEM_ENCHANT_SET_GEM_LOT_CMD` (2016 FUN_004b3260): accepts `equipment` only in the
-equipped (`>> 10 == 9`, slot < 0xC0) or inventory (`== 8`, slot < 0x1E) store, sets the socket's rest count on the
+inventory (`>> 10 == 9`, slot < 0xC0) or equipped (`== 8`, slot < 0x1E) store, sets the socket's rest count on the
 item (`item.vt 0x50(gemSocketIndex, restCount)`), and refreshes the open `EnchantGemWin` (`SignGemSuccess`) and the gem
 tooltip. 2016 lots: `ActionEffectItem.EnchantMaxLot` 0 / 10 / 30 / 50 (§1.8; how a lot becomes `restCount` when the gem
 is socketed is §3). Because every successful gem action (each hit, each crit) uses a charge, the 10…50 lots are
@@ -971,7 +971,8 @@ roe_CriticalRateByGlobalAction(ctx) → ‰    (roe vt 0x24)
 roe_ShieldBlockByGlobalAction(ctx) → ‰    (roe vt 0x28; the only implementation is NormalPY @ FUN_00505090, so every rule set uses it *(inferred: no other class defines it in the PDB)*)
     effect {AttackType, AT_BLOCK}, cond {AttackType, AT_NORMAL}, subject = att, object = def
     if def has a manager: me = def, run;  if att has a manager: me = att, run
-    # used in roe_HitRate: rand1000 < total → shield block (Z03 §4.3)
+    # used in roe_HitRate @ FUN_005011f0 (NormalMA twin @ FUN_005020b0): def.vt 0x5d0 manager present → roe vt 0x28;
+    # rand1000 < total → shield block, BalanceLog " Shield Success By GlobalAction" (Z03 §4.3)
 
 roe_HitRateByGlobalAction(ctx) → ‰    (roe vt 0x2c)
     effect {AttackType, AT_MISS}, subject = att, object = def; each run first on def (me = def), then on att (me = att)
@@ -1070,7 +1071,7 @@ Other `EventRunBySkillGroupIndex` users (all `me = subject = caster`, §2.3), ea
 
 With `object = null` (cool time, SP), the distance test of §1.5 is skipped and an object validator other than
 `TARGET_ALL` / `THISACTION` / `THISSKILL` fails. `ShineMover::smo_ply_SkillCoolTime` @ FUN_0054a770 (mount skills) only
-sets the mover's cool time: no item actions. The `SEIT_STA_*` kinds and `SEIT_STA_SHEILD_BLOCK_RATE_INCREASE` are read only
+sets the mover's cool time (`msl_SetCoolTime`, §3.7): no item actions. The `SEIT_STA_*` kinds and `SEIT_STA_SHEILD_BLOCK_RATE_INCREASE` are read only
 by `so_ItemActonAbstateApp` (§2.8).
 
 ### 3.5 Cool-down persistence: `0x482C` (full list), `0x4023`, `0x4034`
@@ -1081,7 +1082,7 @@ ItemActionObserveManager::SendCoolTimes2Client()                                
         u16 num = list size
         num × { u16 ItemActionID = t.ActionID (+0x14); u16 ItemActionGroupID = t.ActionGroupID (+0x10);
                 u32 SecondCoolTime = TickTimer::GetRestDelayTimeToSecond(t) × 1000 }   # @ FUN_00592000: (delay − cur)/10 s, 0 if run out
-    }   # 4 + 8·num bytes; sent also when the list is empty (num 0); too long → assert "…SendCoolTimes2Client : Packet Too Long", nothing sent
+    }   # 2 + 8·num bytes payload (4 + 8·num incl. opcode); sent also when the list is empty (num 0); too long → assert "…SendCoolTimes2Client : Packet Too Long", nothing sent
     # callers: sp_ItemActionSetup (§3.1). The remaining time is rounded down to whole seconds.
 
 ItemActionObserveManager::SendCoolTimes2DB()       (from WholeSaver::ws_save2DB @ FUN_00455a10, Z01 §8.4)   @ FUN_005d0e60
@@ -1122,6 +1123,43 @@ next `so_SetRegistNumber`. Map changes inside one zone process do not leave the 
 
 ---
 
+### 3.7 Helpers of finished items reached from the hooks
+
+Small functions of Z03's subsystems that the hooks above reach and no doc cites by address (Z03 names them only). Kept
+here at Z03's depth; Z03's text stays the reference for the surrounding flow.
+
+```pseudo
+CharaterSkillList::csl_SetCoolTime(skill, coolMs, group, groupCoolMs, elapsedMs)    @ FUN_00448ab0
+    # caller: ShinePlayer::smo_ply_SkillCoolTime @ FUN_0055b6a0 (§3.4.3: after the SEIT_COOLTIME_RATE_DECREASE hook)
+    e = lower_bound(csl_Skill (sorted by cs_SkillId, 0x14-byte CharSkill), skill); not found → assert
+        "CharaterSkillList::csl_SetCoolTime : Not learn" (skill); return
+    e.cs_EndOfCooltime = now + (coolMs − elapsedMs) / 100 − 3                  # 0.1 s clock ticks, 0.3 s early
+    for each other learnt skill o with csl_GetDelayGroup(o) == group:
+        o.cs_EndOfCooltime = max(o.cs_EndOfCooltime, now + (groupCoolMs − elapsedMs) / 100 − 3)
+    # no packet here (0x4821 NC_SKILL_COOLTIME_CMD is sent by the caller, Z03 §5)
+
+MoverSkillList::msl_SetCoolTime(skill, coolMs, group, groupCoolMs)               @ FUN_00449270
+    # caller: ShineMover::smo_ply_SkillCoolTime @ FUN_0054a770 (mount skills); the same rule without elapsedMs, on
+    # msl_Skill (8-byte {u16 skill, u32 readyTick}); group = ActiveSkillInfo.DlyTimeGroup of each learnt skill;
+    # asserts "MoverSkillList::msl_SetCoolTime : Skill data null" / ": ActiveSkillInfo data null" / ": Did not learn skills"
+
+NormalAttackDamageDelay::NormalAttackDamageTick::NormalAttackDamageTick()      @ FUN_00577cd0   (the player's hit queue, Z03 §3.2)
+    nadt_DamageTime = empty std::deque<NormalAttackDamageElement { u32 nade_Tick; ShineObject* nade_Target;
+                      u8 nade_AttackSequance; u32 nade_MissileFlyMilliSec }>   # 8 empty elements pushed, then resize(0)
+NormalAttackDamageTick::nadt_Clear_PassHitTime()                               @ FUN_00577390   (smo_BashStop, Z03 §3.4)
+    repeat size times: e = pop_front();  if e.nade_Tick − e.nade_MissileFlyMilliSec < now: push_back(e)
+    # keeps only the hits whose missile has already left (fireAt − flight in the past): they still land; the rest is dropped
+```
+
+`smo_Dispel` @ FUN_0057d8e0 (skill blast, Z03 §5.4 "smo_Dispel for EffectType CURE / DISPEL"): for a skill with
+`sdi_Activ.EffectType` `SE_DISPEL` or `SE_CURE` it builds a dispel mask and calls `so_SkillCure` (vt 0x5a4, FUN_0042c440)
+and `so_Dispel` (vt 0x5a8, FUN_0042bf70) on the target, then marks the result slot `isenchant = 1, isresist = 0`. Mask:
+target not an enemy (vt 0x72c `so_mobile_IsEnemy` false): `SE_CURE` → 0x18; else bits 0x4 `DISPELDEBUFF`, 0x8
+`DISPELDISEASE`, 0x10 `DISPELPOISON`, 0x20 `DISPELCURSE`, 0x400 `BOMBDISPELALL` from the skill's flags; enemy target:
+without `DISPELDEEPER` → 2, or 0x200 with `DETECT`; with `DISPELDEEPER` → 0x100 when the target carries the caster's own
+`STA_DEEPER` state (`aeo_IsMine`), else 0. The bodies of `so_Dispel` / `so_SkillCure` (which states a mask bit removes)
+are the follow-up item Z23 (§6).
+
 ## 4. Costume weapon / shield charges and the action-item box
 
 Two unrelated "charge" mechanisms share the item-attribute union `SHINE_ITEM_ATTRIBUTE` (pdb2016; all members start at
@@ -1129,8 +1167,8 @@ attribute offset 0, so Ghidra prints the charge as `itemattr.MobCard_Unident.Ser
 
 | Item class (`iac_ItemClass`) | Attribute member *(pdb2016)* | Meaning |
 |---|---|---|
-| 26 costume weapon (`ItemAttrCls_CostumWeapon`, vftable 00709fa4) | `costumweapon.CostumCharged` u32 | swings left |
-| 37 costume shield (`ItemAttrCls_CostumShield`, vftable 0070a074, `iac_ItemClass` @ FUN_0063e480 = 0x25) | `costumshield.CostumCharged` u32 | swings left |
+| 26 costume weapon (`ItemAttrCls_CostumWeapon`, vftable 00709fa4) | `costumweapon.CostumCharged` u32 | charges left (swings and damaging skill blasts) |
+| 37 costume shield (`ItemAttrCls_CostumShield`, vftable 0070a074, `iac_ItemClass` @ FUN_0063e480 = 0x25) | `costumshield.CostumCharged` u32 | charges left (swings and damaging skill blasts) |
 | 27 action item (`ItemAttrCls_ActionItem`, vftable 0070a144) | `actionitem.deletetime` `ShineDateTime` | expiry; year 0 = not yet started |
 
 The "action item" (class 27, the premium dance emotes) has nothing to do with the item actions of §1–§3: only the name
@@ -1188,9 +1226,9 @@ ShinePlayer::smo_ply_IsCostumShieldCharged() = sp_CostumShieldChargeing ≠ sent
 
 Readers: `smo_SwingDamage` @ FUN_00432f30 (Z03 §3.2: `0x2448` flag bit 4 / bit 8, `0x2449` flag bits 1 / 2, only when the
 attacker's vt 0xeb4 = 1) and `smo_SkillBlast` @ FUN_00581160 (skill result `IsCostumWeapon` / `IsCostumShield`, set on every
-damaging hit). The client uses the bits for the skin's hit effect *(inferred)*.
+damaging hit; the blast itself spends the charge, §4.2). The client uses the bits for the skin's hit effect *(inferred)*.
 
-### 4.2 Where charges are spent: normal swings only
+### 4.2 Where charges are spent: normal swings and damaging skill blasts
 
 ```pseudo
 ShinePlayer::sp_Schedule_SwingStart(p)                     @ FUN_00430bc0   (Z03 §3.2)
@@ -1198,17 +1236,38 @@ ShinePlayer::sp_Schedule_SwingStart(p)                     @ FUN_00430bc0   (Z03
     # Z03 §3.2 reads these two tests as "p.weapon (+0x2a7f8 → +10) == 0 or p.weapon2 (+0x2a7fc → +10) == 0": they are the
     # charge counters (+10 = the attribute inside ItemTotalInformation). Without a skin the sentinel's counter is never 0.
 
+ShinePlayer::smo_ply_NextBashTime(p)                       @ FUN_0055ac90   (vt; schedules the next swing)
+    sp_SkillControl.duringnormalhit = 1
+    if sp_TimerStr.ts_CurWork ∉ { TSCW_NORMALATTACK_SWING, TSCW_NORMALATTACK_DAMAGE }:
+        ts_Limit = cw_CurrTick + (field_0x1d70.vt 8(sp_BashControl.bashinterval) × p.vt 0x430()+0xa18 / 1000) / 100
+                                                         # interval (ms) × speed ‰, in 0.1 s clock ticks
+        if ts_CurWork == TSCW_LOGOUT: assert "ShinePlayer::TimeScheduler::ts_Set - "; return
+        ts_CallFunc = sp_Schedule_SwingStart;  ts_CurWork = TSCW_NORMALATTACK_SWING      # the charge gate below runs then
+
 ShinePlayer::sp_Schedule_SwingDamage(p)                    @ FUN_0042f550   (Z03 §3.2)
     … if first hit of the swing (multiHitIdx == 1):  p.vt[0xf0c](0, null, false);  p.vt[0xf10](0, null, false)
+
+SkillEffectApply::SkillBlastEffectContainer::sbec_Routine()   @ FUN_00437fc0   (main loop, Z03 §5.4)
+    for each due blast effect e (at most 10 per pass) whose caster passes the checks of Z03 §5.4:
+        e.target == null: sbe_BlastLocate(e)                        # area skill
+        else, target alive and valid:  sbe_BlastObject(e)           # single target (item-action hook §3.4.3)
+        after either blast:  sds_Finish(skilldamagesender, e);  caster.vt[0xf00]()   # player: smo_SetEffectForJustSkillClear @ FUN_005102a0
+            if e.MultiHitArgument.mha_HitStep ∈ { −1, 0 }:          # once per blast; multi-hit skills on their first step only
+                caster.vt[0xf0c](1, e.skill, true);  caster.vt[0xf10](1, e.skill, true)
+        # mobs: vt 0xf0c / 0xf10 are an empty identical-code-folded body (CQuest::Occure_LevelChange @ FUN_004c2450)
+        # target gone / invalid: no blast, no spend (error 0xFCB on hit step 0, Z03 §5.4)
 ```
 
-`sp_Schedule_SwingDamage` is the only caller of the two decrease slots (vt 0xf0c / 0xf10; `so_smo_CrossCounterDamage`
-@ FUN_004a5360 / FUN_004a56a0 only share their exception-handler label). One charge of each worn skin is spent per swing,
-on the first hit of a multi-hit weapon, whether the swing hits or misses (the call is outside the damage test).
+These are the two callers of the decrease slots (vt 0xf0c / 0xf10; `so_smo_CrossCounterDamage` @ FUN_004a5360 /
+FUN_004a56a0 only share their exception-handler label). A normal swing spends one charge of each worn skin, on the first hit
+of a multi-hit weapon, whether the swing hits or misses (the call is outside the damage test). A skill blast spends one
+charge of each worn skin when the skill is a damaging one (`sdi_DamageRule` test below), once per blast effect whatever
+the number of targets hit (an area skill that finds no target in `sbe_BlastLocate` still spends), and always tells the
+client (`forceSend` = 1).
 
 ```pseudo
 ShinePlayer::smo_ply_CostumWeaponChargeDecrease(forceSend u8, skill SkillDataIndex*, isSkill bool)   @ FUN_00520840   (vt 0xf0c)
-    if isSkill:                                          # never true in 2016 (original bug) Z17-B14
+    if isSkill:                                          # skill blasts (sbec_Routine): not limited by the per-tick flag
         if skill == null: return
         if not skill.sdi_DamageRule.vt[0x20](EngageArgument{skill}): return      # only damaging skills spend
     else:
@@ -1234,9 +1293,11 @@ ShinePlayer::smo_ply_CostumShieldChargeDecrease(...)                            
 
 The global flags make the normal-swing branch spend at most one charge per player tick: the flag is shared by all players,
 but every swing damage runs inside its owner's `so_Routine` (`nadt_Routine`, Z03 §3.2), right after that routine set it
-*(inferred from the call chain)*. `forceSend` is 0 at the only call site.
-
-Because the skill branch is dead, skill hits never spend a charge although they carry the "charged" flags (§4.1).
+*(inferred from the call chain)*. The skill branch skips the flag: `sbec_Routine` runs in the main loop, outside any
+player's routine, and every damaging blast spends. `forceSend` is 0 for swings (client told every 10th charge) and 1 for
+skills (`0x3037` / `0x3066` after every damaging skill; the DB still only every 10th charge). For a player without a skin
+the pointer is the sentinel: its counter (`0xFFFFFFFF`, reset every main-loop pass, §4.1) is decremented and the send is
+skipped (≥ 100 000 000), so nothing goes out.
 
 ### 4.3 Flushing the counter: packets
 
@@ -1316,7 +1377,13 @@ attribute bytes (`iti_fill2buffer_atrib`) } on the game stream (vt 0x2fc); layou
 Loading at login and the `0x1047` client list: Z12 §6.7 (`isb_Initializetotal` @ FUN_0044d5d0, `isb_FullBufferItem2Client`
 @ FUN_0044d6d0, part mark 0x20). Saving to the WM: `so_SaveItem_Part` @ FUN_00456030 (Z01 §8.4 `0x4013`) sends the box as its
 fourth part, `nPartMark` 0x22, through `isb_FullBufferItem2Server` @ FUN_00455860 (every non-empty cell as a
-`PROTO_ITEMPACKET_TOTAL` with location `15 << 10 | slot`, chunks of ≤ 8000 bytes).
+`PROTO_ITEMPACKET_TOTAL` with location `15 << 10 | slot`, chunks of ≤ 8000 bytes). The other parts (inventory box 9
+`nPartMark` 5, equipment 8 mark 8, mini-house 12 mark 0x12) are filled by
+`CharacterInventory::ci_FillBufferInventoryTotal(bag, &num, out, box, &skip, 8000)` @ FUN_00644220: box ≥ 0x11 → none;
+skip the first `skip` non-empty cells, then per non-empty cell write `{ u8 datasize; u16 location = box << 10 | slot;
+iti_fill2buffer_whole(item) }`, `num += 1`, `skip += 1`, until the box ends or ≥ 8000 bytes are written (return the
+length; the caller loops for the next chunk); an item id outside `ItemDataBox` → return −1 (the caller logs to
+`MoreDisconnectLog` and stops the save), a row without `ItemInfo` → assert "…Invalid ItemID found", cell skipped.
 
 2016 data: the 75 class-27 items are the `Emotion_ChargdDance*` items; each has a ChargedEffect row with `EffectEnum` 9
 (`EE_COSTUM`), `EffectValue` 1 and `KeepTime_Hour` 720 (25 items), 168 (25), 24 (1) or 0 (24, permanent). A new action item
@@ -1401,11 +1468,14 @@ with item actions or charges.
 | Z17-B11 | `0x10D0` `wms_NC_CHAR_ITEMACTIONCOOLTIME_ZONE_CMD` FUN_0044e710 | `_actions.find(actionID)` dereferenced without an `end()` test (same pattern as B7) | a stored id that is no longer in `ItemAction.shn` reads the map head node: bogus group / crash | skip unknown ids |
 | Z17-B12 | `so_ply_EnchantActionUse` FUN_00562cb0 + `0x3499` FUN_005233d0 | the emptied socket keeps `{gemID, 0}` and the gem's observer until CharDB answers | each further success in that window asserts "RestCount Empty", re-sends `0x3046` (0) and another lock + `0x3498`; a refused removal leaves the gem action firing without charges | delete the gem's action (or mark the socket empty) when the count reaches 0 |
 | Z17-B13 | player teardown (`~ItemActionObserveManager` FUN_005592c0; `Clear` FUN_005d16e0 called only by `sp_ItemActionSetup`) | a logged-out player's observers are not returned to the 5000-slot `ItemActionObserveBuffer` | slots stay used until the same pooled player object logs in again; with many distinct player objects (pool 1500) the buffer can fill → "Buffer Full", actions silently missing for new logins *(inferred: effect depends on load)* | `Clear` on logout |
-| Z17-B14 | `smo_ply_CostumWeaponChargeDecrease` / `…Shield…` FUN_00520840 / FUN_00520aa0 | the skill branch (`isSkill`, spend only for a damaging `sdi_DamageRule`) has no caller: `smo_SkillBlast` FUN_00581160 sets the "costume charged" flags on skill hits but never calls vt 0xf0c / 0xf10 | skills use a costume weapon / shield skin for free; only normal swings spend charges | call the decrease with `(0, skill, true)` from the skill damage path |
 | Z17-B15 | `smo_ply_CostumWeaponChargeDecrease` FUN_00520840 | at 0 charges it deletes equipment slot 13 if occupied, else 11, not the cell `sp_CostumWeaponChargeing` points at | with skins in both 11 and 13 where only 11 is the counted one, the slot-13 skin is destroyed and the worn-out one stays; latent in 2016 (`so_RecalcEquipParam` lets the later slot 13 win whenever both are charged skins) | delete the counted cell |
 | Z17-B16 | `sp_CheckBashAndEquipment` FUN_00562160 | pairs the shield skin (slot 29) with slot 12 RIGHTHAND, while `so_RecalcEquipParam` pairs it with slot 10 LEFTHAND | a shield skin worn without a shield does not stop auto-attacking (and one worn over a shield without a right-hand item does) | test slot 10 for slot 29 |
 | Z17-B17 | `sp_Move4Activ` FUN_0059b8e0 (use of a class-27 action item) | box full (`isb_FindEmpty` < 0): returns without any `0x3016`; cell missing or key mismatch: sends `0x3016` with `0x700` (success) although nothing moved | the client's item use is never answered when the 42-cell box is full (no "box full" message), and a stale request is reported as done | answer an error code in both cases |
 | Z17-B18 | `SubAbnormalStateActorPartyRecharge::sasa_Act_Killed` FUN_00407730 | tests `&e.aeo_SetItemEffect ≠ null` before reading the item-action rate | dead check (the address of a member is never null); no effect | drop the test |
+| Z17-B19 | `Send_SETITEMHEALEFFECT` FUN_005cfbb0 (`0x206F`) | `flag ^= (flag ^ heal) & 1` sets only bit 0; bits 1–7 keep whatever the shared send buffer held | stale bytes on the wire (the client reads only bit 0 `isheal`, so no visible effect) | write the whole byte (`flag = heal`) |
+
+Z17-B14 ("skills never spend costume charges") was withdrawn in the review: `sbec_Routine` @ FUN_00437fc0 calls the
+skill branch (§4.2). The ID is not reused.
 
 ## 5. Not reconstructed / uncertain
 
@@ -1417,8 +1487,6 @@ with item actions or charges.
 - **"Costume charged" hit bits** in the skill and swing results (§4.2): the server sets them; the client uses them for the
   skin's hit effect *(inferred)*, the client code was not read.
 - **Effect vftable slots +4 / +8** (§1.6): empty in every class; their order is *(inferred)*.
-- **`_EventRun` third argument** in `EventRunBySkillGroupIndex` (§2.3): the decompiler shows a constant byte; read as
-  0xFFFF *(inferred)*.
 - **Several effects per action** (§2.4, Z17-B6): which effect "wins" depends on heap order of the effect objects
   (normally the highest `EffectID`, file order) *(inferred)*.
 - **Load-dependent effect of Z17-B13** (pool exhaustion): not measured; depends on how many distinct pooled player
@@ -1443,13 +1511,14 @@ with item actions or charges.
 | `0x10D0` handler internals, `0x10CF`, `usp_Character_get/setItemActionCoolTime` | Z07 §2, D02 | cited in §3.1 / §3.5 |
 | `&iareset` `ac_ItemActionCoolTimeReset` FUN_00421990 | Z11 §7.4 (done, documented) | GM command; its effect is `ResetCoolTime` (§2.5) |
 | set-item subsystem (`SetItem` / `SetItemEffect` / `SetEffect` tables, set detection, `siae_*` getters other than §2.8, `SET_HEALRATE`) | Z21 (planned: "set items … set-item abstates and skill effects") | §1.7 / §2.8 / §3.2 cite only the item-action entry points |
-| abnormal-state actors and their routines (other than the three item-action readers in §2.8), `smo_Dispel` FUN_0057d8e0, `so_mobile_HPHealOverTime` | Z03 §6 | combat / abstate mechanics |
-| skill cast and blast internals (`smo_SkillBlast`, `alsst_*` target lists, `alsst_MakeRandomTargetList` FUN_0057e4e0), skill cool-downs (`csl_SetCoolTime` FUN_00448ab0, `msl_SetCoolTime` FUN_00449270) | Z03 §5 | §3.4.3 documents only the item-action hooks inside them |
+| abnormal-state actors and their routines (other than the three item-action readers in §2.8); `so_mobile_HPHealOverTime` FUN_0040e910 | Z22 (planned: `SubAbnormalStateActor*` bodies); Z09 §12.5 (done, documents `so_mobile_HPHealOverTime`) | combat / abstate mechanics; `smo_Dispel` FUN_0057d8e0 is now §3.7 |
+| skill cast and blast internals: `smo_SkillBlast` special branches, `so_Dispel` FUN_0042bf70 / `so_SkillCure` FUN_0042c440 (what a dispel mask removes), `smo_ReflectionDamage` | Z23 (created by this item: Z03 lists them as only named, no item had them) | §3.4.3 documents only the item-action hooks, §3.7 the `smo_Dispel` mask |
 | passive-skill abstates (`so_ply_PassiveSetAbstate` vt 0xbf8, `cpl_SetAbstate` FUN_00446a10) | Z03 §4.2 / Z12 §2.4 | not item actions (correction in `docs/knowledge/Z17.md`) |
-| swing cycle and its delay ticks (`smo_ply_NextBashTime` FUN_0055ac90, `NormalAttackDamageDelay` FUN_00577390 / FUN_00577cd0) | Z03 §3.2 | §4.2 cites only the charge gate and spend |
-| equip conflict helpers `EquipEnumChanger::eec_*` (FUN_00460ff0, FUN_004611c0, FUN_00461360, FUN_004616c0, FUN_00461840) | Z04 §5 | equipment slot logic; §3.2 uses only the releasers |
-| `so_Unmark` callees (`GuildTournamentSystem::PlayerUnRegister` FUN_0047fd50 etc.) | Z16 (planned: guild tournament system) | §4.3 cites `so_Unmark` only for its charge flush |
-| `sp_NC_MAP_LOGINCOMPLETE_CMD` / `so_Routine` / `ws_save2worldmanager` / `so_SaveItem_Part` other callees (`ci_FillBufferInventoryTotal` FUN_00644220 …) | Z01 §8, Z07 | login, routine and save frameworks; §3 cites only the item-action calls |
+| skill target lists (`alsst_*`, `alsst_MakeRandomTargetList` FUN_0057e4e0) | Z18 (planned; Z09 §31.2 "Skills, attacks and target scans" → Z03 leftovers, `docs/knowledge/Z09.md` §3) | target scans, not item actions |
+| skill / mover cool-downs (`csl_SetCoolTime` FUN_00448ab0, `msl_SetCoolTime` FUN_00449270), swing cycle (`smo_ply_NextBashTime` FUN_0055ac90, hit queue FUN_00577390 / FUN_00577cd0) | documented here: §3.7, §4.2 | Z03 (done) names them without address; small gaps, closed in this item |
+| equip conflict helpers `EquipEnumChanger::eec_*` (FUN_00460ff0, FUN_004611c0, FUN_00461360, FUN_004616c0, FUN_00461840) | Z18 (planned; Z09 §31.2 "Items, equipment, set items, random options" → Z04 leftovers) | equipment slot logic; §3.2 uses only the releasers |
+| `so_Unmark` callees (`GuildTournamentSystem::PlayerUnRegister` FUN_0047fd50 etc.) | Z16 (planned: guild tournament system; Z09 §31.2 "Guild tournament" row assigns FUN_0047fd50 to it) | §4.3 cites `so_Unmark` only for its charge flush |
+| `sp_NC_MAP_LOGINCOMPLETE_CMD` / `so_Routine` / `ws_save2worldmanager` / `so_SaveItem_Part` other callees | Z01 §8, Z07 | login, routine and save frameworks; §3 cites only the item-action calls; `ci_FillBufferInventoryTotal` FUN_00644220 (no doc had it) is now §4.5 |
 | map-script `GTItemAction`, `ShineCostumeCreate` / `TakeOff` script nodes (FUN_004f65a0, FUN_004f68c0, `so_ply_Script_Costume*` FUN_00518fb0 / FUN_005191b0) | Z09 §16.5 (done, documented) | script actions; §4.5 points there |
 | STL / container helpers reached from the documented code (FUN_0048c560, FUN_005b1b60, FUN_00463f20, FUN_005d06d0, FUN_0047a8c0, FUN_005cf320, FUN_0047bd60, FUN_004480c0, FUN_00564fa0) and the box constructors (`<unnamed-type-sp_Item>` FUN_00549820 in the player ctor, the static `so_defiteminven` initialiser FUN_006985d0) | – (no behaviour) | `std::map` / `vector` / `_Find` instantiations and plain constructors; nothing protocol- or rule-relevant |
 | `ActionViewInfo.shn`, `ReactionType.shn` (loaded next to the item-action tables) | Z02 | emote / reaction view data, not item actions |
