@@ -1172,6 +1172,305 @@ so_mh_SendInnerPlayerFurnitureEmotion(target)                 house vt 0x2e4  @ 
 
 ---
 
+## 4. Wedding: hall, ceremony, married-state timers, partner summon
+
+Z02 §10 has the client requests (propose, reserve, guest enter, divorce), Z07 §5 the DB answers and the partner-info
+exchange, D02 §11 the Character-DB procedures, Z11 §6.1 the GM commands `&weddingreset` / `&reserve` / `&enterready` /
+`&enter` / `&wedding`. This section is the object side: the hall, its timetable and ceremony, the per-minute status
+checker, the ring packets and the partner-summon skill.
+
+### 4.1 Data
+
+```pseudo
+class WeddingHall  (global `weddinghall`, DAT_0086ea38 = Z07's g_WeddingHall; size 0x44)           (pdb2016)
+    +0x00 u8  Reserved          # one reservation per zone, no queue
+    +0x01 u8  Started           # couple recalled, ceremony running
+    +0x04 ShineDateTime EnteringStart    # = reservation time + 20 min
+    +0x08 ShineDateTime EnteringEnd      # = EnteringStart + 5 min (guest entry window ends)
+    +0x0c ShineDateTime WeddingEnd       # = EnteringEnd + 10 min (hall freed)
+    +0x10 FieldMap* wh_Field             # map "Wedding" of this zone, set by wh_Start
+    +0x14 WeddingPerson Groom  { u32 RegistNumber, Name5 CharacterName }
+    +0x2c WeddingPerson Bride  { … }
+    static init @ FUN_00699320: names "", Bride.RegistNumber = 0xFFFFFFFF (Groom's stays 0)
+
+ShineDateTimeSpan (u32) = { u16 date, u8 hour, u8 minute }: the spans 0x14000000 / 0x05000000 / 0x0A000000 are 20 / 5 / 10 min.
+ShineDateTime (u32 bitfield) = { year:8 (−2000), month:5, date:6, hour:6, minute:7 } (pdb2016). "now" = chargeditemcheck.ct_Current,
+    rebuilt from the world clock (timefromworld) when the minute changes, in ZoneServer::zs_mainthreadfunction @ FUN_005aca30.
+
+ShinePlayer.sp_WeddingData (p+0x5cc8) = PROTO_NC_CHAR_WEDDINGDATA_ACK (Z07 §5.1); so_ply_WeddingStatus (vt 0x958) returns it   @ FUN_0059eed0
+    ShineObject::so_ply_WeddingStatus (non-players) returns the static so_WeddingData (initialiser FUN_006986c0)              @ FUN_0059eec0
+    PROTO_NC_CHAR_WEDDINGDATA_ACK::operator= (field copy of all 0x2b bytes)                                                   @ FUN_0059f250
+    PROTO_NC_CHAR_WEDDINGDATA_ACK::Reset (in sp_NC_MAP_LOGINCOMPLETE_CMD, before the 0x1080 request)                          @ FUN_0043bdb0
+        header = {0xFFFF, 0xFFFFFFFF}; Status = 0 (Main 0, Sub 0); When ← the old SubWhen (as compiled: `mov ecx,[esi+0xd]; mov [esi+9],ecx`);
+        Partner.Name = "", Partner.RegisterNumber = 0xFFFFFFFF, WeddingCount = RefusalCount = 0; Error and SubWhen kept
+ShinePlayer.sp_MiscFlag: LockRefundReq, LockRefundCanCelReq, BeSummoned (bytes; pdb2016). Accessors (player vt):
+    0x404 sp_IsLockedRefundReq @ FUN_0055a580   0x408 sp_LockRefundReq @ FUN_0055a590   0x40c sp_UnlockRefundReq @ FUN_00549400
+    0x410 sp_IsLockedRefundCancelReq @ FUN_0055a5a0   0x414 sp_LockRefundCancelReq @ FUN_0055a5b0   0x418 sp_UnlockRefundCancelReq @ FUN_00549410
+    LOGINCOMPLETE calls vt 0x40c and vt 0x418 (both locks cleared at every login / map change).
+Special items (ItemDataBox::idb_MakeSpecialID, by item index): sii_ProposeRing "ProposeRing", sii_InvitationCard "InvitationCard",
+    sii_WeddingCoupon "WeddingCoupon" (the reservation item Z02 calls "wedding application"), sii_WeddingPresent "MiniWedding01_1".
+Special skills: ss_SummonMate "SummonMate01" (active), ss_PowerOfLove "PowerofLove01" (passive), learnt on 0x1092 (Z07 §5.2).
+Abstates: STA_WEDDINGBUFF 293 (0x125), STA_WEDDINGSUB01 294, STA_WEDDINGSUB02 295 (pdb2016 enum ABSTATEINDEX).
+AnnounceData.shn rows (CAnnounceSystem gAnnounceSystem, DAT_13388678): 12 `"%s"'s proposal has been accepted by  "%s"`,
+    13 `Congratulations and well wishes to "%s" and "%s".`
+```
+
+`so_ply_WeddingPrepareItem` (vt 0x950) = "holds a WeddingCoupon" (`sp_FindItemFromInventory`) @ FUN_0059f490. The request
+checks of Z02 §10 are these helpers (names pdb2016), each returning the code Z02 lists:
+
+| Helper | @ | Checks → code |
+|---|---|---|
+| `Checker::WhenPropose(p)` | FUN_0059f060 | mode ∉ {1,2,6} → 0x12C1; Main ≠ 0 → 0x12C5 |
+| `Checker::WhenBeProposed(t)` | FUN_0059ed90 | mode ∉ {1,2,6} → 0x12C2; Main ≠ 0 → 0x12C6 |
+| `Checker::WhenProposeBoth(p, t)` | FUN_0059f180 | `so_DistanceSquar > 10000` → 0x12C3 |
+| `Checker::WhenReserve(p)` | FUN_0059ede0 | mode ∉ {1,2} → 0x1301; Main ≠ 1 → 0x1303; no WeddingCoupon → 0x1308 |
+| `Checker::WhenReservePartner(t)` | FUN_0059ee50 | same with 0x1302 / 0x1303 / 0x1308 |
+
+### 4.2 Reservation and the timetable
+
+```pseudo
+WeddingHall::wh_Reserv(p, t, out i64 time) → bool                    @ FUN_005a0810   (only caller: 0x2053, Z02 §10)
+    if Reserved: time = toTime_t(WeddingEnd); return false             # → 0x1306 "All spots for reservations are full." + when the hall frees
+    Reserved = 1; Started = 0
+    groom, bride = (p, t) if p.so_ply_GetGender() (vt 0x804) == 1 else (t, p)       # 1 = male (inferred); same-sex: t is the groom
+    Groom = { groom.charNo, groom.so_CharName() (vt 0x56c) }; Bride = { bride.charNo, bride name }
+    EnteringStart = now + 20 min; EnteringEnd = EnteringStart + 5 min; WeddingEnd = EnteringEnd + 10 min
+    time = toTime_t(EnteringStart); return true
+    # no check that this zone has the map "Wedding" or that p talks to a wedding NPC (original bug) Z13-B27
+
+WeddingHall::wh_GuestCanEnter(ack) → bool                              @ FUN_0059ef40   (0x2056 GUEST_ENTER_READY)
+    if Reserved and EnteringStart ≤ now ≤ EnteringEnd:
+        ack { err = 0x1340, GroomID = Groom name, BrideID = Bride name, EnterStart = toTime_t(EnteringStart),
+              WeddingStart = toTime_t(EnteringEnd), WeddingEnd = toTime_t(WeddingEnd), tm_* = _localtime64 of the three }
+        return true
+    ack.err = 0x1342 "It's not the right moment for you to enter at this time."; return false
+    # 0x1340 = success (no client text; WeddingTask shows the ready window)
+
+WeddingHall::wh_Routine()       once per wall-clock minute, from zs_mainthreadfunction @ FUN_005aca30      @ FUN_005a2a10
+    if !Reserved: return
+    if !Started and now ≥ EnteringStart:                  # time to start
+        Started = 1
+        n = wh_RecallCouple(Groom.RegistNumber) + wh_RecallCouple(Bride.RegistNumber)
+        if n == 2: wh_Start()
+        else: zone ring ← 0x2055 NC_ACT_WEDDING_COUPLE_ENTRANCE_RNG {          # size 0x10 (pdb2016)
+                  ZONERINGLINKAGESTART start = { u8 myZoneNo, u16 0xFFFF, u32 0xFFFFFFFF },
+                  u32 groom = Groom.RegistNumber, u32 bride = Bride.RegistNumber, u8 RecallCount = n }
+    elif now ≥ WeddingEnd:                                 # (Started, or not yet due → this branch only when Started)
+        Reserved = 0; Started = 0                          # hall free again; no log, no message
+
+WeddingHall::wh_RecallCouple(charNo) → bool                            @ FUN_005a27f0
+    q = som_FindPlayer(charNo); none → false
+    if q.so_ply_MH_GetActiveMH() (vt 0x130) != 0: return true             # counted, but not moved (original bug) Z13-B25
+    if q.so_Field == 0 or q's map is "EldPri" (Elderine prison, inferred): return false
+    sp_DestroyItem(q, WeddingCoupon, 1)                                    # the reservation item is consumed here
+    if q.mode == 4: so_ply_ReinforceFoldtent (vt 0x488)                     # leave the tent
+    q.so_LinkToReserv({ "Wedding", "Wedding", x 558, y 154 }, 1) (vt 0x3fc)
+    return true
+
+0x2055 NC_ACT_WEDDING_COUPLE_ENTRANCE_RNG (zone ring)  ZoneListenSession::zls_… @ FUN_005a2b60
+    if start.zoneNo == myZoneNo:                         # back at the hall zone
+        if RecallCount == 0: Reserved = 0; Started = 0
+                             GameLog ← 0x065F NC_LOG_WEDDING_HALL_CANCEL { u32 groom, u32 bride }
+        else: wh_Start()                                 # also with only one of the two found (original bug) Z13-B26
+    else:
+        RecallCount += wh_RecallCouple(groom) + wh_RecallCouple(bride)
+        forward the 16 bytes unchanged otherwise to the next zone (zcs_Send, Z01 §10)
+```
+
+`&weddingreset` (Z11) sends the same packet with the GM as groom and bride and count 0: the other zones do not find the GM,
+so the lap returns with 0 and the GM's zone cancels its reservation (it is also an ordinary cancel log line).
+`0x10B2 NC_CHAR_WEDDING_CANCEL_WEDDING` from the WM (Z07 §5.4, @ FUN_005a07d0) clears `Reserved` / `Started` only while not
+started; no log.
+
+### 4.3 Ceremony
+
+```pseudo
+WeddingHall::wh_Start()                                                @ FUN_005a25a0
+    arg = Groom.CharacterName + " " + Bride.CharacterName              # PineScriptToken, the script's InitFlag
+    wh_Field = the FieldMap "Wedding" of this zone (fieldlist search)
+    if none: assert "WeddingHall::wh_Start : Map not found"; return      # Reserved stays until WeddingEnd
+    wh_Field.CinemaComplex.cc_PlayFilm("Wedding/Wedding", arg)          # scenario ScenarioBookShelf/Wedding/Wedding.ps
+    CAnnounceSystem::AnnounceSystem_WeddingStart(Groom name, Bride name)   (below)
+    GameLog ← 0x065E NC_LOG_WEDDING_HALL_START { u32 Groom.RegistNumber, u32 Bride.RegistNumber }
+```
+
+The scenario `9Data/Shine/ScenarioBookShelf/Wedding/Wedding.ps` (texts in `Script/Wedding.txt`) runs the ceremony
+(scenario commands are Z02 §12 / Z09):
+
+| Time from start | Script |
+|---|---|
+| 0 | `timelimit Min 15` (timeout → `WeddingEnd`); names split from InitFlag; NPCs `PledgeBook` (557, 1137), `WeddingDreian` (501, 1106); door `OX_gate` opened |
+| 0–4 min | four `chatwin "Wedding1"` one minute apart (guests enter: `EnteringStart … EnteringEnd`) |
+| ~4 min | door closed; `teleportall Split 304 833 808 833`; groom to (536, 580), bride to (582, 580); both walk to y 620, later y 1078 |
+| ~4–8 min | 22 lines (`Wedding2…13`, `Book1…9`) 10 s apart |
+| ~8 min | `weddingcomplete` (below), `abstateset StaWeddingSub02 1 259200000` (3 days) on both; door opens; couple walks back; `MapLinkGate` NPC at (549, 129) links a clicker to Eld (17214, 13445) |
+| 15 min | timeout `WeddingEnd`: `linkto all "Eld" 17214 13445`, NPCs vanish |
+
+The commented-out `WaitBookClick` block (both click the pledge book) and `itemcreate "MiniWedding01_1"` are unused in 2016;
+the present comes from 0x1092 (Z07 §5.2).
+
+```pseudo
+script statement "weddingcomplete" (2 arguments, ignored)    PineEventScriptNode::ShineWeddingComplete
+    ctor / sb_CloneMe: OtherStatement("weddingcomplete", 0, 2, 2)            @ FUN_004e8e40 / FUN_004eaef0
+    sa_Step:                                                               @ FUN_004f6b70
+        g = som_FindPlayer(weddinghall.Groom.RegistNumber); b = som_FindPlayer(weddinghall.Bride.RegistNumber)
+        if both on this zone (and vt 0x4d0 == 2 for both: the folded default returns 2 for every player, always true):
+            Character DB ← 0x1091 NC_CHAR_WEDDING_DO_REQ { u16 g.handle, u32 g.charNo, u32 Partner = b.charNo }   (12 bytes)
+        pop the script stack (next statement); nothing is sent or shown when one is missing
+    # the DB answer 0x1092 (Z07 §5.2) reloads both, gives MiniWedding01_1 and the two skills
+```
+
+The only other sender of 0x1091 is `&wedding <name>` (Z11, `ac_Wedding` @ FUN_0041f3a0: `{GM handle, GM charNo, target
+charNo}`, no status check; the DB refuses unless the two rows point at each other, D02 §11).
+
+```pseudo
+CAnnounceSystem::AnnounceSystem_ProposeAccept(a, b)   (0x2051 accepted: a = proposer, b = acceptor)      @ FUN_005b92a0
+CAnnounceSystem::AnnounceSystem_WeddingStart(groom, bride)                                              @ FUN_005b9380
+    if AnnounceData has the row (12 resp. 13): text = sprintf(row.Message, a, b)
+        Send_PROTO_NC_ANNOUNCE_Z2W_CMD(type = 12 resp. 13, text)                                       @ FUN_005b8d30
+            WM ← 0x6401 NC_ANNOUNCE_Z2W_CMD { u8 AnnounceType, u8 SizeOfMessage = strlen + 1, char Message[] }   (W01 relays it world-wide)
+```
+
+### 4.4 Married-state checks (`Checker`, per minute and on every 0x1081)
+
+`so_ply_WeddingData` (vt 0x954, Z07 §5.1) and `ShinePlayer::so_Routine` (once per wall-clock minute, after the
+charged-item checks, @ FUN_0056c790) both dispatch on `Main`: 1 → `ApplicationLimit`, 2 → `DivorceLimit`, 3 →
+`DelayLimit`. On 0x1081 this runs **before** the copy is sent to the client, so the client gets the corrected status.
+"Save(Main | Sub′)" below = take a copy of `sp_WeddingData`, set Status, call `so_ply_WeddingInfoUpdate` (vt 0x95c):
+`sp_WeddingData = copy` and Character DB ← `0x1082 NC_CHAR_WEDDINGDATA_CMD` (same 0x2b-byte body; D02 §11 writes the row)
+@ FUN_0059f390. Messages are `0x205D NC_ACT_WEDDING_DIVORCE_REQ_ACK { u16 err }` (`so_SendErrorCode(8, 0x5d, code)`).
+
+```pseudo
+Checker::ApplicationLimit(p)          Main 1 (engaged)                                        @ FUN_0059f1b0
+    if now ≥ SubWhen (ApplicationLimit, set to proposal + 3 days by the DB):
+        Character DB ← 0x1085 PROPOSE_CANCEL_REQ { u16 handle, u32 charNo, u32 Partner }     # every minute until the reload (no lock)
+
+Checker::DelayLimit(p)                Main 3 (divorced, delay period)                         @ FUN_0059f2d0
+    if Sub ≠ 0: so_ply_DivorceProcess() (vt 0x960); return
+    if now ≥ SubWhen (DelayLimit, divorce + 7 days):
+        Character DB ← 0x1087 ESCAPE_DIVORCE_REQ { u16 handle, u32 charNo, u32 Partner }     # → Main 0 (D02), reload on 0x1088
+
+ShinePlayer::so_ply_DivorceProcess()  the divorce takes effect on this character, once       @ FUN_0059f550
+    Character DB ← 0x4825 NC_SKILL_ERASE_REQ { u16 handle, u32 charNo, u16 SummonMate01 }
+    Character DB ← 0x4825 { handle, charNo, u16 PowerofLove01 + 30000 }                       # passive ids are stored + 30000
+    sp_DestroyItem(MiniWedding01_1, 1) from the inventory (box 9, ci_Inventory), else from box 8 (inferred: equipped)
+    so_AbnormalState_Reset 293, 294, 295; so_RecalcAbstateParamReady (vt 0x528)
+    if Sub == 2: p ← 0x205D {0x1389} (TextData2: "Your partner used "Annulment" , you are divorced.")
+    Save(Main 3 | Sub 0)
+    p ← 0x205D {0x1386} "Divorce proceeding complete.  You are now single."
+    # the DB writes Main 3 / Sub 1 for a normal divorce and Sub 1 (user) / 2 (partner) for the annulment item (D02 §11)
+
+Checker::DivorceLimit(p)              Main 2 (married), by Sub                                @ FUN_005a1c90
+    Sub 0:  sp_UnlockRefundReq(); sp_UnlockRefundCancelReq()
+    Sub 1 … 4 (and 9 … 15):  if now < SubWhen: return                 # DivorceLimit = application + 10 min (w00 DB)
+        Sub 1 (my agreement application expired unanswered):
+            if sp_IsLockedRefundCancelReq(): return
+            Character DB ← 0x108F DIVORCE_CANCEL_REQ { u16 handle (stale), u32 charNo = mine, u32 Partner, u8 IncreseCount 0 }
+            lock: sp_LockRefundCancelReq() on p and on the partner if on this zone
+        Sub 2 (partner's agreement application expired, I did not agree):
+            same, but { charNo = Partner, Partner = mine }                 # the applicant's row: 1 → 5 (refund on its next load)
+        Sub 3, 4 (forced divorce, refusal window over):
+            Character DB ← 0x108D DIVORCE_DO_REQ { u16 handle (stale), u32 charNo = Partner, u32 Partner = mine, u8 Reason 1 }
+            # no lock: repeated every minute until the reload; both partners send it (original bug) Z13-B28
+        other: nothing
+    Sub 5 / 7 (my agreement / forced application was cancelled: partner refused or let it expire; DB marker +4):
+        Save(Main 2 | Sub 0)
+        if !sp_IsLockedRefundReq(): sp_LockRefundReq(); so_ply_IncDecMoney(+250 000 resp. +750 000, 1)     # fee of 0x205B / 0x205C refunded
+        p ← 0x205D {0x1387 = 4999} "Your spouse refused to get a divorce."    # also when the lock skipped the refund
+    Sub 6 (partner applied by agreement, first notice):  p ← 0x205D {0x1385} "Your spouse has filed for a collaborative divorce."
+        Save(Main 2 | Sub 2)
+    Sub 8 (partner applied by force, first notice):      Save(Main 2 | Sub 4)
+        # then so_ply_WeddingData sees Sub 4 and sends 0x205D {0x1384} "Your spouse has filed for an uncontested divorce."
+```
+
+**Answer to the D02 question (sub-status 5–7).** The zone does not mask bit 2: `Checker::DivorceLimit` handles 5, 6, 7 and 8
+as explicit cases. Bit 2 (+4) is a "notify once" marker that the zone consumes and clears through `0x1082`: 5 / 7 = "your
+application was cancelled" (refund 250 000 / 750 000 + message 0x1387, back to Sub 0), 6 = "partner applied by
+agreement" (message 0x1385, stored as 2), 8 = "partner applied by force" (stored as 4, message 0x1384). The handling runs
+on the next `0x1081` (login, map change, the reloads of Z07 §5.2) or minute tick. The w00 DB writes 4 directly for the
+forced partner (D02), so case 8 is reached only with a DB that writes 8 *(inferred: older procedure)*. On the client
+side only `Main` matters: WeddingTask stores `Status & 0xF` from 0x1081 (FUN_006dd280).
+
+The refund lock (`LockRefundReq`) and the cancel lock (`LockRefundCanCelReq`) live only in the zone process: they stop a
+repeated refund / cancel request within one session and are cleared on Sub 0 and at every LOGINCOMPLETE *(inferred
+purpose)*.
+
+### 4.5 Ring refresh of a partner's wedding data
+
+```pseudo
+ZoneRingPacketRefreshWeddingInfo::zrpb_Request(charNo, buf)        (callers: the DB answers 0x1086 … 0x1090, Z07 §5.2)   @ FUN_005a91c0
+    q = som_FindPlayer(charNo)
+    none:        zone ring ← 0x10AB NC_CHAR_WEDDING_REFRESH_INFO_RNG { ZONERINGLINKAGESTART { myZoneNo, 0xFFFF, u32 charNo } }   (7 bytes)
+    q.so_Field:  zrpb_Success: Character DB ← 0x1080 WEDDINGDATA_REQ { u16 q.handle, u32 q.charNo }       @ FUN_005a8950
+    q without a field (logging in / linking): nothing (original bug) Z13-B29
+
+0x10AB on the ring   ZoneListenSession::zls_NC_CHAR_WEDDING_REFRESH_INFO_RNG                              @ FUN_005a0e00
+    zls_TravelComplete(start) (back at the origin): drop
+    q = som_FindPlayer(start.regnum); q with a field → zrpb_Success (reload); else forward unchanged
+```
+
+The class has no state; its three vtable slots are the shared no-op FUN_00509900, so the methods are only called
+directly.
+
+### 4.6 Partner summon (`SummonMate01`, Z09 §28.4 hand-over)
+
+```pseudo
+skill cast end, ShineMobileObject::so_Routine @ FUN_0056a080 (skill effect branch; Z03 owns the cast):
+    if skill == ss_SummonMate and the caster is not in a mini house (vt 0x130) and has a field:
+        buf = PROTO_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG (pdb2016, 0x23 bytes) { RegisterNumber = Partner.RegisterNumber,
+              Name3 map = caster's map name, SHINE_XY_TYPE coord = caster's position (*(p+0x66)) }
+        ZoneRingPacketSummonPartner::zrpb_Request(caster, buf)
+    smo_SkillResultPacket(...)                                       # the skill result is sent either way
+
+ZoneRingPacketSummonPartner::zrpb_Request(caster, buf)                                                   @ FUN_005a83b0
+    buf.from = 1; buf.to = shineparam levellimit; buf.err = 0xFCF
+    for each row of the NPC option table "LinkTable" (OptionReader order): if mapid(row+0x35) == mapid(buf.map):
+        if FieldLevelDataBox::fldb_GetFieldLv(row+0x14) exists: from = LvFrom, to = LvTo                 # level band of the map (inferred)
+        break
+    q = som_FindPlayer(buf.RegisterNumber)
+    none: zone ring ← 0x10AA NC_CHAR_WEDDING_PARTNER_SUMMON_RNG { start = { myZoneNo, caster.handle, caster.charNo }, rest of buf }  (0x23 bytes)
+    q.level ∉ [from, to] or !q.so_ply_IsLink_OutMap_AndSendErrorMsg() (vt 0xa74):
+        caster ← 0x2434 NC_BAT_SKILLBASH_CAST_FAIL_ACK { 0xFCE } "Skill usage is prohibited in this area." (Z03 §5.2 table)
+    q in a mini house: nothing
+    q.mode == 0: zrpb_Failure(caster, buf) → caster ← 0x2434 { buf.err = 0xFCF } "Your spouse is not online, skill cannot be used."
+    else: zrpb_Success(caster, buf)
+
+zrpb_Success(_, buf)                                                                                      @ FUN_005a8680
+    q = som_FindPlayer(buf.RegisterNumber); must be a player (vt 0x4d0 == 2, always true)
+    q ← server menu (Z02 §6.6) title "Summons", "Yes" → smfm_LinkWithoutNPC { buf.map, buf.coord }, "No" → smfm_Cancel,
+        timeout/range arg 1000; q.sp_MiscFlag.BeSummoned = 1
+    # smfm_LinkWithoutNPC @ FUN_0050f1d0 links only while BeSummoned (so_LinkTo(arg, 6, 9, 10)) and clears it;
+    # 0x3C02 skips the menu range check while BeSummoned (FUN_0050fe60); smfm_Cancel, sp_ServerMenuTitle (any new menu) and LOGINCOMPLETE clear it
+
+zrpb_Failure(caster, buf): caster ← 0x2434 { buf.err }                                                    @ FUN_005a8890
+
+0x10AA on the ring   ZoneListenSession::zls_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG                             @ FUN_005a0c90
+    zls_TravelComplete (back at the origin): caster = zls_FindPlayer(start); if online: zrpb_Failure(caster, buf)   # 0xFCF or 0xFCE
+    q = som_FindPlayer(RegisterNumber) with a field:
+        level in [from, to] and vt 0xa74 true: zrpb_Success(_, buf); stop (the origin is not told)
+        else: forward with err = 0xFCE
+    else forward unchanged
+    # forwarded copies are built with PROTO_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG::operator= @ FUN_0059eee0
+    # the remote branch does not test the mini house or mode 0 as the local one does
+```
+
+The 2016 client shows 0xFCE / 0xFCF through its cast-fail handler (Z03 §5.2). No cooldown or cost is applied here beyond
+the skill's own (Z03).
+
+### 4.7 Client side
+
+- `WeddingTask::OnProcessNetMsg` FUN_006dd280: 0x1081 keeps `Status & 0xF` (Main), When, SubWhen and the partner name
+  for `WeddingInfoWin::SetWeddingInfo_006da790`; **0x1094 PARTNER_INFO_ACK is handled** (`SetWeddingInfo_006da330`
+  FUN_006da330: for Main 2 it shows "Name: %s", "Level: %d", "Married", the wedding date (`When`), and online state / last
+  login; Main 1 "Engaged", Main 3 "Divorced"). This corrects Z07 §5.3 ("no handler for 0x1094").
+- `Recv_NC_ACT_WEDDING_DIVORCE_REQ_ACK` FUN_006dd040 (0x205D): 0x1380 "Registration for divorce procedure is complete.",
+  0x1384 yes/no dialog "Your spouse has filed for an uncontested divorce." (sets a flag at task+0x70; the answer sends
+  0x205C / 0x205E, Z02 §10 *(inferred)*), 0x1385 OK dialog "…collaborative divorce.", 0x1386 "Divorce proceeding complete.
+  You are now single.", 0x1387 "Your spouse refused to get a divorce.", 0x1389 OK dialog (TextData2) annulment; other codes
+  through `ErrMsgTable::GetErrMsg` (0x1381–0x1383, 0x1388 have texts).
+
+---
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1200,6 +1499,11 @@ so_mh_SendInnerPlayerFurnitureEmotion(target)                 house vt 0x2e4  @ 
 | Z13-B22 | `so_mh_CanObjAni` | the 294-entry last-touch table is never cleared and handles are never reused | after 294 distinct furniture handles in one house, new furniture can no longer be animated (0x14C1) | free entries of removed furniture or index by cell |
 | Z13-B23 | 0x8C3D CHAR_ACTION (FUN_00574750) | the animation `Handle` is not checked against the furniture's item | a client can play any furniture's animation on any furniture; everybody in the house sees it | require `row.ItemID == furniture item` |
 | Z13-B24 | `so_mh_CanFurnitureEmotion` (0x8C62); also 0x8C3D / 0x8C40 | `IsPlaced` is not tested and `nEmotionNo` is not validated | sitting on (or animating) an item still in the box near its default spot (276, 388); arbitrary emotion numbers broadcast | test `IsPlaced` and `MHEmotionID` |
+| Z13-B25 | `WeddingHall::wh_RecallCouple` | a partner inside a mini house counts as recalled (returns true) but is neither moved nor charged the coupon | the ceremony can start while that partner stays in the house; `weddingcomplete` still marries them if they are on the hall zone (`som_FindPlayer` ignores the map), otherwise no marriage | return false, or link them out of the house |
+| Z13-B26 | `wh_Routine` / 0x2055 at the origin | the ceremony starts when `RecallCount ≠ 0`, i.e. with only one of the two found | a one-person ceremony; `weddingcomplete` needs both, so no 0x1091 is sent, the reservation and the coupon of the present partner are used up | start only with 2, cancel otherwise |
+| Z13-B27 | `wh_Reserv` (0x2053) | no check that the zone has the map `Wedding` (or that the player talks to a wedding NPC); every zone has its own `weddinghall` | a couple reserving on another zone holds that zone's slot; at start they are linked to `Wedding`, but `wh_Start` asserts "Map not found", no ceremony runs, and guests on the hall zone see no reservation | refuse the reservation outside the hall zone |
+| Z13-B28 | `Checker::DivorceLimit` Sub 1–4 | the `0x108F` / `0x108D` requests leave `header.clienthandle` (payload +0) stale; Sub 3 / 4 sets no lock, so both partners send `0x108D` and repeat it each minute until their reload | `gds_NC_CHAR_WEDDING_DIVORCE_DO_ACK` reloads whatever object holds the stale handle; the DB runs `Divorce_Do` twice (two GameLog 0x065B pairs, `dSubWhen` reset) | write the handle; lock as for Sub 1 / 2 and let only one side execute |
+| Z13-B29 | `ZoneRingPacketRefreshWeddingInfo::zrpb_Request` | a partner found on this zone without a field (logging in / linking) gets neither a reload nor a ring packet | the partner keeps stale wedding data (e.g. still "married" after the divorce) until their next 0x1081 | reload anyway (the DB answer arrives after the login completes) |
 
 ## Not reconstructed / uncertain
 
@@ -1225,6 +1529,11 @@ so_mh_SendInnerPlayerFurnitureEmotion(target)                 house vt 0x2e4  @ 
 - `RandomBox::operator[](n)` returning 0 … n−1 (animation follow-ups, actor index) is *(inferred)*.
 - The 0x8C61 list counter is a `u8` over a 294-entry array; a pass with more than 255 changed placed items would wrap
   (not reachable with the 2016 timers, *(inferred)*).
+- Wedding (§4): the gender value 1 = male in `wh_Reserv` and "EldPri" = the Elderine prison map in `wh_RecallCouple` are
+  *(inferred)*. The `LinkTable` columns used by the partner summon (row +0x14 = FieldLevel key, +0x35 = map) were read as
+  offsets only; that the band is the target map's entry level is *(inferred)*. Whether the 2016 Character DB ever writes
+  sub-status 8 (DivorceLimit case 8) is unknown (w00 writes 4). The client's answer to the 0x1384 dialog (0x205C accept /
+  0x205E refuse) was not traced in the client.
 
 ## Coverage boundary
 

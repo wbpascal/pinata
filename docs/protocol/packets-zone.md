@@ -12206,6 +12206,43 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 4 | u16 | group[i].ItemActionGroupID | cool-time entry +0x10 |
 | 6 | u32 | group[i].SecondCoolTime | remaining ms (client divides by 1000); 0 from ResetCoolTime |
 
+### `0x1082` NC_CHAR_WEDDINGDATA_CMD (Z→CharDB)
+
+**Verified layout** (basis: zone so_ply_WeddingInfoUpdate FUN_0059f390 (copy of PROTO_NC_CHAR_WEDDINGDATA_ACK, 0x2d bytes with opcode); Character FUN_00418c80 (D02))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | from the stored copy |
+| 2 | u32 | header.charregistnumber | from the stored copy |
+| 6 | u16 | Error |  |
+| 8 | u8 | Status | Main | Sub << 4 (Sub after the Checker rewrite) |
+| 9 | ShineDateTime | When |  |
+| 13 | ShineDateTime | SubWhen |  |
+| 17 | Name5 | Partner.Name |  |
+| 37 | u32 | Partner.RegisterNumber |  |
+| 41 | u8 | WeddingCount |  |
+| 42 | u8 | RefusalCount |  |
+
+### `0x1085` NC_CHAR_WEDDING_PROPOSE_CANCEL_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone Checker::ApplicationLimit FUN_0059f1b0 (0xc bytes with opcode); Character FUN_00418fc0 (D02))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | player handle |
+| 2 | u32 | header.charregistnumber | player charNo |
+| 6 | u32 | Partner | Partner.RegisterNumber |
+
+### `0x1087` NC_CHAR_WEDDING_ESCAPE_DIVORCE_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone Checker::DelayLimit FUN_0059f2d0 (0xc bytes with opcode); Character FUN_00419140 (D02))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | player handle |
+| 2 | u32 | header.charregistnumber | player charNo |
+| 6 | u32 | Partner | Partner.RegisterNumber |
+
 ### `0x3438` NC_ITEMDB_PICKMONEY_REQ (Z→CharDB)
 
 **Verified layout** (basis: zone ShinePlayer::so_ply_PickupMoney FUN_0052fe80 (0x18 bytes incl. opcode; &getmoney ac_GetMoney FUN_00421bf0); PDB 2017 PROTO_NC_ITEMDB_PICKMONEY_REQ after the 6-byte ref; D03 §3.5)
@@ -12857,6 +12894,32 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 1 | u16 | start.handle |  |
 | 3 | u32 | start.regnum |  |
 | 7 | Name5 | charid | kicked character |
+
+### `0x10aa` NC_CHAR_WEDDING_PARTNER_SUMMON_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone ZoneRingPacketSummonPartner::zrpb_Request FUN_005a83b0 (write, 0x25 bytes with opcode), zls_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG FUN_005a0c90 (read/forward), zrpb_Success FUN_005a8680; PDB 2016 PROTO_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG (0x23))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.zoneNo | origin zone |
+| 1 | u16 | start.handle | caster handle |
+| 3 | u32 | start.regnum | caster charNo |
+| 7 | u32 | RegisterNumber | partner charNo (Partner.RegisterNumber) |
+| 11 | Name3 | map | caster's map |
+| 23 | SHINE_XY_TYPE | coord | caster's position |
+| 31 | u8 | from | min level (1 or FieldLv.LvFrom) |
+| 32 | u8 | to | max level (levellimit or FieldLv.LvTo) |
+| 33 | u16 | err | 0xFCF; set to 0xFCE by a zone that refuses (level / map) |
+
+### `0x10ab` NC_CHAR_WEDDING_REFRESH_INFO_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone ZoneRingPacketRefreshWeddingInfo::zrpb_Request FUN_005a91c0 (write, 9 bytes with opcode), zls_NC_CHAR_WEDDING_REFRESH_INFO_RNG FUN_005a0e00; PDB 2016 PROTO_NC_CHAR_WEDDING_REFRESH_INFO_RNG (7))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.zoneNo | origin zone |
+| 1 | u16 | Start.handle | 0xFFFF |
+| 3 | u32 | Start.regnum | charNo whose wedding data is reloaded where online |
 
 ### `0x1810` NC_MAP_EXPBONUS_RNG (Z→Z (ring))
 
