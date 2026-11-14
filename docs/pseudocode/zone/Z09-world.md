@@ -37,7 +37,9 @@ damage / kill / revive, abstates, mob settings, map rules, links and parties, pl
 Lua query functions (time / random, object state, positions and areas, searches and lists, object effects, sounds, map
 marks). §19 the Lua message functions (`ScriptMsg.shn` messages, dialogs, notices, shouts, camera, fog, screen effects,
 timers, sounds). §20 the Pine map-script language, reading side (`World/PineScript.txt`, tokens, the string value
-model, expressions, variables, the process stack; `MobBehaviorDescript/` is unused).
+model, expressions, variables, the process stack; `MobBehaviorDescript/` is unused). §21 the Pine language, running side
+(grammar, the statement registry, blocks, how a film steps, `var` / assignment / `if` / `while` / `infinite` / `call` /
+`break` / `print` / `permillage`, conditions, `@` system functions, which 2016 books load).
 
 ---
 
@@ -6422,7 +6424,7 @@ nodes parts 15a–15d. All class and member names are *(pdb2016)*; there are no 
 - `9Data/Shine/World/PineScript.txt` (option-file format, `OptionReader`; read three times, by three loaders):
   - table `PineScript`, column `ScriptName` (String[32]): one record per script book, a path below
     `9Data/Shine/ScenarioBookShelf/` without extension (`KQ/KingSlime/KingSlime`, `Quest/Quest`, `Guild/GuildTournament`,
-    `Wedding/Wedding`, `ID/GraveYard/GraveYard`, …; 70 records in 2016). A trailing comment `; LuaScript` marks the
+    `Wedding/Wedding`, `ID/GraveYard/GraveYard`, …; 58 records in 2016, 16 of them exist as `.ps`, §21.7). A trailing comment `; LuaScript` marks the
     books that were rewritten in Lua; the loader decides the type itself. Loader: `ScenarioBookShelf::sbs_LoadScripts`
     FUN_00509750 (book path format `../9Data/Shine/ScenarioBookShelf/%s.%s`, `sb_GetFileName` FUN_00507440; §22).
   - table `DialogFile`, column `ScriptName`: the script-string files `9Data/Shine/Script/<name>.txt` (`KQKingSlime`,
@@ -6726,3 +6728,543 @@ GetByString(i, std::string& s) → ok   @ FUN_004e29d0   same, s = m_tkn
   the variable. A `Term` never builds that case (it handles `#` itself); whether a statement calls vt 8 on an
   `Identify` it loaded with `#` is checked in §21 / §22.
 - What `sa_Step`'s result and `ip` mean per node: §21.
+- Both answered in §21.8.
+
+## 21. Scripts 8: the Pine map-script language 2 — statements, blocks and how a film runs
+
+This section is the running side of Pine (§20 is the reading side): the grammar of a script file, the registry of
+all statements, blocks and the script, how a film steps through its process stack, and the control statements
+(`var`, assignment, `if`, `while`, `infinite`, `call`, `break`, `print`, `permillage`) with conditions and the `@`
+system-function call. The action statements (`Shine*` nodes and the nine `OtherStatement` nodes) only appear here in
+the registry table: their loader `OtherStatement::sa_Load` and the `SysFunc*` bodies are §22 (part 14c), the `Shine*`
+steps parts 15a–15d. All class, member and function names are *(pdb2016)*; there are no packets in this section.
+
+### 21.1 Grammar of a script file
+
+```text
+Script    := { Block }                                              # §20.2; the film starts at the block named main
+Block     := "open" [ "[" Id "]" ] { Statement } "close"            # Id: [A-Za-z_][0-9A-Za-z_]*; no name = ""
+Statement := one registered statement (§21.2), tried in reverse registration order:
+  action     := keyword [ Identify ] { Express } "."                # Shine* / OtherStatement nodes (§22, part 15)
+  break      := "break" [ Express ] "."                             # name of the block to leave
+  permillage := "permillage" Identify "."
+  print      := "print" Express "."
+  call       := "call" Express [ Express ] "."                      # block name [default block name]
+  if         := "if" Condition [ "then" Block ] [ "else" ( if | Block ) ]
+  while      := "while" Condition Block
+  infinite   := "infinite" Block
+  var        := "var" { Identify Express } "."                      # 1…64 pairs, each name with an initial value
+  Block                                                             # an anonymous nested block is a statement too
+  assign     := Identify "=" Express "."
+Condition := Express CompareOp Express                              # §20.5
+```
+
+Keywords are compared case-sensitively as whole tokens (`if` / `then` / `else` / `open` / `close` / `var` / …).
+Every statement except `if`, `while`, `infinite` and a nested block ends with the token `.`. A 2016 example
+(`KQ/GordonMaster.ps`, Korean comments removed):
+
+```text
+open [KeyDrop]
+    if KeyDropRate > @Random(0 99) then
+    open
+        itemdrop InterruptArg KeyDropIndex 1000000.
+        interrupterase "KeyDrop".
+    close
+    else
+    open
+        KeyDropRate = KeyDropRate + 5.
+    close
+close
+```
+
+### 21.2 The statement registry: `ps_statementlist`
+
+```pseudo
+StatementList { StatementBase* sl_Array[128]; int sl_Point; int sl_Pnt }           # 0x208; global ps_statementlist
+Statement : ScriptAtom { ScriptAtom* s_Statement }                                  # 8; the slot type of a block
+
+StatementList::StatementList(sl)                   @ FUN_004de8d0
+    # static initialiser `dynamic_initializer_for_'ps_statementlist'' FUN_00697310 (CRT init table entry 0x6a2608)
+    sl_Point = 0
+    append 94 prototypes in the order of the table below (index 0…93): `new` of each class with its constructor
+    # full (sl_Point > 127) → assert "Too many statement" and the prototype is dropped
+StatementList::sl_AddStatement(sl, st)             @ FUN_004d6990   # the same append (used by the ctor for the last 13)
+AutoRegList::AutoRegList(reg, st)                  @ FUN_004d6d10   # the same append into ps_statementlist
+    # the nine `…AutoReg` static initialisers FUN_00697bc0, FUN_00697c40, FUN_00697cc0, FUN_00697d40, FUN_00697dc0,
+    # FUN_00697e40, FUN_00697ec0, FUN_00697f40, FUN_00697fc0 (CRT entries 0x6a2750…0x6a2770, after the list ctor)
+    # each build one ScriptBase<X> prototype = OtherStatement(keyword, idRead, min, max) with X's vtable: index 94…102
+
+Statement::sa_Load(slot, tr) → ok                  @ FUN_004d85d0   # a block reading one statement
+    for i = sl_Point−1 down to 0:                                   # sl_Pnt = i (global cursor); the LAST registered first
+        slot.s_Statement = sl_Array[i].vt[0x10]()                   # sb_CloneMe: a fresh empty node of that class
+        if slot.s_Statement.vt[0](tr): return 1                     # its sa_Load
+        node vtable = ScriptAtom; operator delete(node)             # (original bug) Z09-B84 / B88, see below
+    return 0                                                        # no statement matched: the file fails to load
+Statement::Statement @ FUN_004d6520 (s_Statement = null); ~Statement @ FUN_004d6530: deletes s_Statement with the
+    plain ScriptAtom vtable (no node destructor runs)
+```
+
+`sb_CloneMe` (vt 0x10) of each prototype builds an empty node of its class; the prototypes themselves are never
+loaded. `ScriptBase<X>` (the template of the nine auto-registered nodes) only adds this `sb_CloneMe` and a virtual
+`scalar_deleting_destructor` at vt 0x14 (`~OtherStatement`, then free): FUN_004f8610 / FUN_004f8a10 (`RegisterGTPortal`),
+FUN_004f8680 / FUN_004ebaf0 (`SaveLinkto`), FUN_004f86f0 / FUN_004f8a40 (`ClearSaveLinkto`), FUN_004f8760 / FUN_004f8a70
+(`NPCChatNoFacecut`), FUN_004f87d0 / FUN_004f8aa0 (`ScinarioCodeParty`), FUN_004f8840 / FUN_004f8ad0 (`HasAbstate`),
+FUN_004f88b0 / FUN_004ebb20 (`BroadcastCode`), FUN_004f8920 / FUN_004ebb50 (`GTRegisterNPC`), FUN_004f8990 / FUN_004f8b00
+(`GTMobRegenKey`). The generic deletes in `Statement::sa_Load` / `~Statement` do not use vt 0x14 (no caller of it
+found in the §21 code).
+
+All 84 `Shine*` nodes and the nine `ScriptBase<>` nodes are `OtherStatement`s (0xBC bytes, ctor
+`OtherStatement::OtherStatement(keyword, os_IDRead, os_ExpressNumMin, os_ExpressNumMax)` FUN_004dae40; their vt 0 is
+`OtherStatement::sa_Load`, §22). The columns "target" (= `os_IDRead`: an `Identify` is read after the keyword) and
+"args" (= expression count min–max) are the constructor arguments; how the loader uses them is §22. "Uses" = statements
+in the 46 `.ps` files of 2016 / files that use it (counted from the files, the listed and the unlisted ones, §21.7).
+
+| # | Keyword | Class | `sb_CloneMe` | target | args | Uses | Where |
+|---|---|---|---|---|---|---|---|
+| 0 | `(X =)` | `StateAssignment` | FUN_004db0b0 |  |  | 248/27 | §21.5 |
+| 1 | `open` | `Block` | FUN_004de520 |  |  | 878/46 (all blocks) | §21.3 |
+| 2 | `var` | `StateVarDeclear` | FUN_004dafe0 |  |  | 77/36 | §21.5 |
+| 3 | `infinite` | `StateInfinite` | FUN_004de590 |  |  | 164/35 | §21.5 |
+| 4 | `while` | `StateWhile` | FUN_004de600 |  |  | 11/7 | §21.5 |
+| 5 | `if` | `StateIf` | FUN_004d8070 |  |  | 131/30 | §21.5 |
+| 6 | `call` | `StateCall` | FUN_004d80b0 |  |  | 422/33 | §21.5 |
+| 7 | `print` | `StatePrint` | FUN_004da010 |  |  | 1/1 | §21.5 |
+| 8 | `permillage` | `StatePermillage` | FUN_004db080 |  |  | 0/0 | §21.5 |
+| 9 | `break` | `StateBreak` | FUN_004d6570 |  |  | 213/31 | §21.5 |
+| 10 | `printf` | `ShinePrintf` | FUN_004e8fe0 | — | 1 | 7/4 | part 15 |
+| 11 | `scriptfile` | `ShineScriptFile` | FUN_004e9050 | — | 1 | 37/27 | part 15 |
+| 12 | `timelimit` | `ShineTimeLimit` | FUN_004e90c0 | yes | 1 | 43/27 | part 15 |
+| 13 | `interruptclear` | `ShineInterruptClear` | FUN_004e9130 | — | 0 | 153/30 | §15 |
+| 14 | `interruptset` | `ShineInterruptSet` | FUN_004e91a0 | yes | 3–5 | 760/33 | §15 |
+| 15 | `interrupterase` | `ShineInterruptErase` | FUN_004e9210 | — | 1 | 36/9 | §15 |
+| 16 | `waitinterrupt` | `ShineWaitInterrupt` | FUN_004e9280 | yes | 1 | 153/33 | §15 |
+| 17 | `mobregen` | `ShineMobRegen` | FUN_004e92f0 | yes | 6–7 | 206/20 | part 15 |
+| 18 | `doorbuild` | `ShineDoorBuild` | FUN_004e9360 | yes | 6 | 27/9 | §13 |
+| 19 | `npcstand` | `ShineNPCStand` | FUN_004e93d0 | yes | 6 | 81/9 | part 15 |
+| 20 | `change2mob` | `ShineChange2Mob` | FUN_004e9440 | yes | 1 | 2/1 | part 15 |
+| 21 | `change2door` | `ShineChange2Door` | FUN_004e94b0 | yes | 1 | 0/0 | part 15 |
+| 22 | `change2npc` | `ShineChange2NPC` | FUN_004e9520 | yes | 1 | 3/2 | part 15 |
+| 23 | `exchange2mob` | `ShineExchange2Mob` | FUN_004e9590 | yes | 1 | 2/2 | part 15 |
+| 24 | `dooropen` | `ShineDoorOpen` | FUN_004e9600 | yes | 1 | 32/9 | §13 |
+| 25 | `doorclose` | `ShineDoorClose` | FUN_004e9670 | yes | 1 | 40/9 | §13 |
+| 26 | `vanish` | `ShineObjectVanish` | FUN_004e96e0 | yes | 0 | 21/5 | part 15 |
+| 27 | `regengroup` | `ShineRegenGroup` | FUN_004e9750 | — | 2–4 | 854/23 | part 15 |
+| 28 | `waitlogin` | `ShineWaitUserLogin` | FUN_004e97c0 | yes | 0 | 26/26 | part 15 |
+| 29 | `pause` | `ShinePause` | FUN_004e9830 | yes | 1 | 505/32 | part 15 |
+| 30 | `npcchat` | `ShineNPCChat` | FUN_004e98a0 | yes | 1 | 47/5 | part 15 |
+| 31 | `npcshout` | `ShineNPCShout` | FUN_004e9910 | yes | 1 | 11/2 | part 15 |
+| 32 | `chatwin` | `ShineChatWindow` | FUN_004e9980 | — | 2–9 | 215/17 | part 15 |
+| 33 | `chatwinrange` | `ShineChatWindowRange` | FUN_004e99f0 | — | 4–9 | 25/2 | part 15 |
+| 34 | `summonmob` | `ShineSummonMob` | FUN_004e9ad0 | yes | 2 | 225/13 | part 15 |
+| 35 | `questresult` | `ShineQuestResult` | FUN_004e9b40 | yes | 0 | 31/15 | part 15 |
+| 36 | `reward` | `ShineReward` | FUN_004e9bb0 | yes | 0 | 14/13 | part 15 |
+| 37 | `someoneshout` | `ShineSomeoneShout` | FUN_004e9a60 | — | 2 | 0/0 | part 15 |
+| 38 | `broadcast` | `ShineBroadcast` | FUN_004e9c20 | yes | 1–2 | 268/33 | part 15 |
+| 39 | `linkto` | `ShineLinkTo` | FUN_004e9c90 | yes | 4 | 64/34 | part 15 |
+| 40 | `whoclickme` | `ShineWhoClickMe` | FUN_004e9d70 | yes | 1 | 28/7 | part 15 |
+| 41 | `whokillme` | `ShineWhoKillMe` | FUN_004e9de0 | yes | 1 | 1/1 | part 15 |
+| 42 | `itemdrop` | `ShineItemDrop` | FUN_004e9d00 | yes | 2 | 21/7 | part 15 |
+| 43 | `invensearch` | `ShineInvenSearch` | FUN_004e9e50 | yes | 2 | 12/3 | part 15 |
+| 44 | `itemcreate` | `ShineItemCreate` | FUN_004e9ec0 | yes | 1 | 2/2 | part 15 |
+| 45 | `itemerase` | `ShineItemErase` | FUN_004e9f30 | yes | 1–2 | 32/9 | part 15 |
+| 46 | `findhandle` | `ShineFindHandle` | FUN_004e9fa0 | yes | 2 | 7/3 | part 15 |
+| 47 | `abstateset` | `ShineAbstatSet` | FUN_004ea010 | yes | 3–4 | 26/15 | part 15 |
+| 48 | `abstatereset` | `ShineAbstatReset` | FUN_004ea080 | yes | 1 | 9/2 | part 15 |
+| 49 | `suicide` | `ShineSuicide` | FUN_004ea0f0 | yes | 0 | 32/7 | part 15 |
+| 50 | `run` | `ShineRun` | FUN_004ea160 | yes | 2 | 4/1 | part 15 |
+| 51 | `walk` | `ShineWalk` | FUN_004ea1d0 | yes | 2 | 0/0 | part 15 |
+| 52 | `maplight` | `ShineMapLight` | FUN_004ea240 | — | 3 | 9/2 | part 15 |
+| 53 | `mapfog` | `ShineMapFog` | FUN_004ea2b0 | — | 2 | 1/1 | part 15 |
+| 54 | `effectobj` | `ShineEffectObject` | FUN_004ea320 | yes | 4 | 4/2 | §13 |
+| 55 | `effectloc` | `ShineEffectLocate` | FUN_004ea390 | yes | 6 | 25/2 | §13 |
+| 56 | `aggro` | `ShineAggro` | FUN_004ea400 | yes | 2 | 2/1 | part 15 |
+| 57 | `mobweaponrate` | `ShineMobWeaponRate` | FUN_004ea470 | yes | 1–8 | 40/4 | part 15 |
+| 58 | `mobdetectrange` | `ShineMobDetectRange` | FUN_004ea4e0 | yes | 1 | 10/5 | part 15 |
+| 59 | `heal` | `ShineHeal` | FUN_004ea550 | yes | 1 | 5/5 | part 15 |
+| 60 | `animate` | `ShineAnimate` | FUN_004ea5c0 | yes | 1 | 11/6 | part 15 |
+| 61 | `duplicate` | `ShineDuplicate` | FUN_004ea630 | yes | 1 | 0/0 | part 15 |
+| 62 | `waitidle` | `ShineWaitIdle` | FUN_004ea6a0 | — | 0 | 11/6 | part 15 |
+| 63 | `deathcountclear` | `ShineDeathCountClear` | FUN_004ea710 | — | 0 | 4/1 | part 15 |
+| 64 | `itemattrset` | `ShineItemAttrSet` | FUN_004ea780 | yes | 2 | 0/0 | part 15 |
+| 65 | `scinariocode` | `ShineScinarioCode` | FUN_004ea7f0 | yes | 1 | 1/1 | part 15 |
+| 66 | `battlestart` | `ShineBattleStart` | FUN_004ea860 | yes | 0–2 | 10/8 | part 15 |
+| 67 | `battlestop` | `ShineBattleStop` | FUN_004ea8d0 | yes | 0 | 22/8 | part 15 |
+| 68 | `sendquestresult` | `ShineSendKQResult` | FUN_004ea940 | yes | 1 | 17/8 | part 15 |
+| 69 | `invidualreward` | `ShineInvidualReward` | FUN_004ea9b0 | — | 2 | 15/8 | part 15 |
+| 70 | `returnvalue` | `ShineReturnValue` | FUN_004eaa20 | — | 2 | 6/1 | part 15 |
+| 71 | `sublayershift` | `ShineSubLayerShift` | FUN_004eaa90 | yes | 2 | 0/0 | part 15 |
+| 72 | `teleport` | `ShineTeleport` | FUN_004eab00 | yes | 1–3 | 13/4 | part 15 |
+| 73 | `itemowner` | `ShineItemOwner` | FUN_004eab70 | yes | 2 | 2/1 | part 15 |
+| 74 | `mobattr` | `ShineMobAttribute` | FUN_004eabe0 | yes | 2 | 4/1 | part 15 |
+| 75 | `collect` | `ShineObjectCollect` | FUN_004eac50 | yes | 4 | 0/0 | part 15 |
+| 76 | `endofkq` | `ShineEndOfKingdomQuest` | FUN_004eacc0 | — | 0 | 43/21 | part 15 |
+| 77 | `endofgt` | `ShineEndOfGuildTournament` | FUN_004ead30 | — | 2 | 4/2 | part 15 |
+| 78 | `gtresult` | `ShineGuildTorunamentResult` | FUN_004eada0 | yes | 1–2 | 4/2 | part 15 |
+| 79 | `costumecreate` | `ShineCostumeCreate` | FUN_004eae10 | yes | 3 | 0/0 | part 15 |
+| 80 | `costumetakeoff` | `ShineCostumeTakeOff` | FUN_004eae80 | yes | 2 | 0/0 | part 15 |
+| 81 | `weddingcomplete` | `ShineWeddingComplete` | FUN_004eaef0 | — | 2 | 1/1 | part 15 |
+| 82 | `playerwork` | `ShinePlayerWalk` | FUN_004eaf60 | yes | 2 | 6/1 | part 15 |
+| 83 | `findplayer` | `ShineFindPlayer` | FUN_004eafd0 | yes | 1–2 | 6/1 | part 15 |
+| 84 | `teleportall` | `ShineTeleportAll` | FUN_004eb040 | yes | 0–4 | 1/1 | part 15 |
+| 85 | `briefeffect` | `ShineBriefEffect` | FUN_004eb0b0 | yes | 1 | 2/1 | part 15 |
+| 86 | `banfromarea` | `ShineBanFromArea` | FUN_004eb120 | — | 5 | 3/1 | part 15 |
+| 87 | `RegisteFlag` | `ShineRegesteFlag` | FUN_004eb190 | — | 3 | 10/2 | part 15 |
+| 88 | `RegisteGate` | `ShineRegesteGate` | FUN_004eb200 | — | 4 | 20/2 | part 15 |
+| 89 | `DiceGameStart` | `ShineDiceGameStart` | FUN_004eb270 | — | 1 | 2/2 | part 15 |
+| 90 | `revival` | `ShineRevival` | FUN_004eb2e0 | yes | 0 | 5/5 | part 15 |
+| 91 | `spawn` | `ShineSpawn` | FUN_004eb350 | — | 1–2 | 7/3 | part 15 |
+| 92 | `hpset` | `ShineHPSet` | FUN_004eb3c0 | yes | 1 | 1/1 | part 15 |
+| 93 | `questmobkill` | `ShineQuestMobkill` | FUN_004eb430 | — | 3 | 10/9 | part 15 |
+| 94 | `RegisterGTPortal` | `RegisterGTPortal` | FUN_004f8610 | — | 4 | 10/2 | §22 |
+| 95 | `SaveLinkto` | `SaveLinkto` | FUN_004f8680 | — | 4 | 2/2 | §22 |
+| 96 | `ClearSaveLinkto` | `ClearSaveLinkto` | FUN_004f86f0 | — | 0 | 2/2 | §22 |
+| 97 | `NPCChatNoFacecut` | `NPCChatNoFacecut` | FUN_004f8760 | yes | 1 | 0/0 | §22 |
+| 98 | `ScinarioCodeParty` | `ScinarioCodeParty` | FUN_004f87d0 | yes | 1 | 0/0 | §22 |
+| 99 | `HasAbstate` | `HasAbstate` | FUN_004f8840 | yes | 3 | 0/0 | §22 |
+| 100 | `BroadcastCode` | `BroadcastCode` | FUN_004f88b0 | yes | 1 | 0/0 | §22 |
+| 101 | `GTRegisterNPC` | `GTRegisterNPC` | FUN_004f8920 | — | 2 | 20/1 | §22 |
+| 102 | `GTMobRegenKey` | `GTMobRegenKey` | FUN_004f8990 | — | 3 | 10/1 | §22 |
+
+Trial order and its effects:
+
+- The registry is tried from index 102 down to 0: the nine `ScriptBase<>` nodes first, then the `Shine*` nodes, then
+  `break` … `var`, a nested block, and the assignment last. Keywords are distinct, so the order only matters for
+  a variable whose name is a keyword: `pause = 1.` is taken by the `pause` node and fails; keywords are reserved
+  words in practice *(inferred from the order)*.
+- A candidate that fails after it has read past its keyword (e.g. `if` with a broken condition, `call` without `.`)
+  does not give the tokens back (only the first token is pushed back, §20.3): the remaining candidates see the
+  wrong tokens and all fail, so the load fails at a later line than the real error. Error reporting only, the
+  outcome (file not loaded) is the same.
+- (original bug) Z09-B84: a failed candidate is freed but `slot.s_Statement` keeps the freed pointer. When no
+  candidate matches, `Statement::sa_Load` returns 0 with that dangling pointer in a slot of the block's statement
+  list; `ScenarioBookPS::sb_Load` FUN_005076b0 keeps the half-loaded `PineEventScript` after the "load failed" assert,
+  and its next destruction (`sb_Load` of the same book again, or the book's delete; §22) runs `~Statement` on the slot
+  and frees the pointer a second time (heap corruption). Only a script with a syntax error reaches it; every listed
+  2016 Pine book passes the statement check of §21.7.
+- (original bug) Z09-B88: nodes are freed without their destructors (the vtable is reset to `ScriptAtom` first, and
+  only the `ScriptBase<>` nodes have a virtual destructor, which these deletes do not call): everything a node allocated while
+  loading (an `if`'s blocks, `call`'s default expression, an expression's `Express` / `Term` chain) leaks, for every
+  failed candidate and for every node when a script is unloaded. `List<Block>::l_Enlargement` FUN_004e13b0 also leaks:
+  it constructs the new `Block`s (each allocating a statement list) and then overwrites their list pointers with
+  the moved ones. Load-time only; a reload of the books leaks the old script.
+
+### 21.3 Blocks and the script
+
+```pseudo
+Block : StatementBase { BlockName b_BlockName; int b_VarStackPoint; List<Statement>* b_StatementList;
+                        ListArray<Statement>* b_StatementArray }                       # 0x118
+BlockName : ScriptAtom { Id bn_Name }                                                  # 0x108
+
+Block::Block(b)                                    @ FUN_004de410
+    name ""; statement array of 16 Statement slots + a List over them; b_VarStackPoint is not initialised
+Block::~Block(b)                                   @ FUN_004dada0   # deletes the list (vt 0, scalar dtor), then the slots (~Statement each)
+BlockName::~BlockName @ FUN_004d6560 (vtable resets only); Block::sb_CloneMe @ FUN_004de520 (new Block)
+
+Block::sa_Load(b, tr) → ok                         @ FUN_004dc1e0
+    t = token; t ≠ "open" → unget t, return 0
+    b_BlockName.sa_Load(tr)                                         # result ignored (a broken "[name" still loads)
+    loop:
+        t = token; none (EOF / token error) → return 0              # a block must be closed
+        t == "close" → return 1
+        unget t
+        slot = next free slot of b_StatementList (list vt 2; none → List<Statement>::l_Enlargement(8) FUN_004d9720;
+               still none → return 0)                                # slots are appended: file order = run order
+        if !Statement::sa_Load(slot, tr): return 0
+
+BlockName::sa_Load(bn, tr) → ok                    @ FUN_004dc0c0
+    t = token; t ≠ "[" → unget t, return 1                          # anonymous block, name ""
+    bn_Name.sa_Load(tr) (Id: first char a letter or '_') fails → return 0
+    t = token; t == "]" → return 1; else unget t, return 0
+
+Block::sa_BlockNameCheck(b, name) → match          @ FUN_004d65f0   # vt 0xc, used by ps_ExitBlock (§20.6)
+    name == null → 1 (any block matches); else strcmp(bn_Name, name) == 0 (case-sensitive)
+
+Script::sa_FindBlock(s, name) → Block*             @ FUN_004d7fd0
+    walk s_BlockList in file order; first block with bn_Name == name; name == null or none → null
+    # top-level blocks only: blocks nested in statements are not in s_BlockList and cannot be called
+Script::Script @ FUN_004e1690 / ~Script @ FUN_004e1790 (block array of 4, grown by 4: List<Block>::l_Enlargement
+    FUN_004e13b0 moves name, var mark and list pointers into new Blocks, B88); PineEventScript::~PineEventScript
+    @ FUN_004e1970 = the same inline
+```
+
+Containers (template instances, nothing script-specific beyond the copy noted): `List<Statement>` ctor FUN_004dd8d0,
+`l_MakeList` FUN_004dd350, `l_GetInList(index, &cursor)` FUN_004d6e90 (the `index`-th entry in list order, null past
+the end), `l_Enlargement` FUN_004d9720 (moves the `s_Statement` pointers, nulls the old ones), `l_PushA` FUN_004dda70 /
+`l_PushZ` FUN_004dd950 (copy `s_Statement` into a new head / tail slot), `l_PopA` FUN_004dd990, `l_PopZ` FUN_004dd9e0,
+`scalar_deleting_destructor` FUN_004dda30 (frees only the link array); `List<Block>` ctor FUN_004ddab0, `l_MakeList`
+FUN_004dd4d0, `l_PushA` FUN_004ddb70 / `l_PushZ` FUN_004ddbe0 (copy name, var mark and list pointers), `l_PopA`
+FUN_004ddc50, `l_PopZ` FUN_004ddce0, `scalar_deleting_destructor` FUN_004ddb30. Only `l_GetInList`, the free-slot
+slot (vt 2) and `l_Enlargement` are used by the script code.
+
+### 21.4 How a film runs
+
+A film owns one `ProcessStack` (§20.6). `ps_Ready` puts the `Script` at the bottom (`ps_Stack[0]`, ip 0). After that:
+
+```pseudo
+# once per main-loop pass: ShineAxialFlag flag[2] of the map runs its cinema (§12.7) →
+Movie::FilmCase::fc_Routine(fc, list, arg)         @ FUN_00508e40
+    if fc.fc_Film and !Movie::FilmBase::fb_Routine(fc.fc_Film, arg): list.vt[0xc](…)     # film removed (part 16)
+Movie::FilmBase::fb_Routine(f, arg) @ FUN_005085f0 = Movie::Theater::t_Routine(&f.fb_Theater, arg)
+Movie::Theater::t_Routine(t, arg) → keep           @ FUN_00508090
+    t_SenarioType == ST_PS:  return ps_Step(&t.t_Screen, arg) ≠ 0                         # one node step
+    t_SenarioType == ST_LUA: t_LuaScript: lss_Routine(t_LuaScript, "Main", LuaArgumentInstanceDungeon(t_Field)); return 1
+                             (no script: return 0)
+```
+
+So a Pine film makes **exactly one node step per main-loop pass**, and **any step that returns 0 ends the film**
+(the Lua films call `Main` every pass instead). Each node's `sa_Step(arg, ps, &ip)` follows one convention: `ip` is the
+node's own cursor in its stack entry (0 when pushed); the node pushes a child and returns 1 (the child runs from the
+next pass), or pops itself (`ps_Pop` / `--ps_StackPoint`) and returns 1 when it is done, or returns 1 without popping
+to be stepped again next pass (the waiting action nodes, part 15), or returns 0 on an error. `arg` is not used by the
+nodes of this section.
+
+```pseudo
+Script::sa_Step(s, arg, ps, &ip)                   @ FUN_004d8100   # the bottom entry
+    ip == 0: b = sa_FindBlock("main"); none → return 0              # no [main]: the film ends at its first step
+             ip = 1; push b (sp ≥ 31 → return 0); return 1
+    ip ≠ 0: sp == 0 → return 0                                      # main finished (or was left by break): film ends
+Block::sa_Step(b, arg, ps, &ip)                    @ FUN_004d81b0
+    ip == 0: b_VarStackPoint = ps.vs_StackPoint                      # variable scope starts
+    st = l_GetInList(b_StatementList, ip)                            # ip-th statement; past the end (ip 9999 after a break) → null
+    st: ip++; push st (sp ≥ 31 → return 0); return 1
+    none: if b_VarStackPoint ≥ 0: vs_StackPoint = b_VarStackPoint;   # the block's variables are dropped
+              sp ≠ 0 → pop, return 1
+          return 0
+Statement::sa_Step(slot, arg, ps, &ip)             @ FUN_004d8250   # the slot wrapper around every statement
+    ip == 0: ip = 1; push slot.s_Statement (sp ≥ 31 → return 0); return 1
+    ip ≠ 0: sp ≠ 0 → pop, return 1; else return 0
+```
+
+- **Cost:** a statement takes at least four passes: the block pushes the slot, the slot pushes the node, the node
+  runs and pops, the slot pops. A control statement adds its own step and its block's start / end. Time-based waits
+  in the action nodes compare against `g_Now` (part 15), so the pass rate changes only how fast the script moves
+  between waits.
+- **Depth:** 32 stack entries (`ps_Push` and the inline pushes refuse when `sp > 30`). Each nesting level (a block
+  inside `if` / `while` / `infinite` / `call`, or a nested block) costs three entries (slot, control node, block):
+  with the script and `main` at the bottom, an action can sit at most 9 levels below `main`. A deeper push returns 0
+  and the film ends without a log line *(depth count inferred from the push rules)*.
+- (original bug) Z09-B86: `b_VarStackPoint` belongs to the `Block` object, not to the stack entry. A block that is
+  on the stack twice (a block that `call`s itself directly or through a handler block) overwrites the mark of the
+  outer run; when the inner run ends both restore the inner mark, so the outer run's variables stay on the variable
+  stack until an enclosing block ends (or overflow it, "Variable stack overflow", which ends the film at the next
+  `var`). No 2016 block calls its own name; handler blocks reached through `call InterruptBlock.` were not traced.
+
+### 21.5 Control statements
+
+```pseudo
+StateVarDeclear { Identify svd_VarName[64]; Express svd_Express[64]; int svd_VarNum }   # 0x4a08 (`var`)
+StateVarDeclear::sa_Load(v, tr)                    @ FUN_004dc3a0
+    t = token; t ≠ "var" → unget, 0
+    svd_VarNum = 0
+    while svd_VarNum < 64:
+        t = token (none → 0); t == "." → return 1; unget t
+        svd_VarName[n].sa_Load (Identify: a name, or `#` expression) fails → 0
+        svd_Express[n].sa_Load fails → assert "Var : Not init", 0   # every variable needs an initial value
+        n++
+    after 64 names the next token must be "." (else 0)               # `var .` with no names is valid
+StateVarDeclear::sa_Step(v, arg, ps, &ip)          @ FUN_004da040
+    for each pair i < svd_VarNum:
+        name = svd_VarName[i].i_GetToken(ps)                         # the word as written (or the value of `#expr`)
+        slot = vs_Push(ps.ps_VarStack, name); null (stack full, "Variable stack overflow") → return 0   # film ends
+        svd_Express[i].sa_Calculate(out = slot, ps) fails (division by 0) → return 0                       # film ends
+    pop; return 1                                                     # all in one step
+    # the variables live until the enclosing block ends (§21.4); a `var` inside a loop body is re-declared on every
+    # pass of the body and dropped at its end. Lookups search newest first, so an inner `var X` hides an outer X.
+StateVarDeclear::sb_CloneMe @ FUN_004dafe0
+
+StateAssignment { Identify sa_LeftValue; Express sa_Express }                         # 0x12c (`X = …`)
+StateAssignment::sa_Load(a, tr)                    @ FUN_004dcc00
+    sa_LeftValue.sa_Load; t = token; t == "="; sa_Express.sa_Load; t = token; t == "." → 1; anything else → 0
+    # no token is pushed back on failure; it is the last candidate, so the file fails to load anyway
+StateAssignment::sa_Step(a, arg, ps, &ip)          @ FUN_004db110
+    i_GetToken(sa_LeftValue, ps)                                     # computed and unused (left for the tracer)
+    target = sa_LeftValue.i_GetVariable(ps)                          # missing variable → &deftkn (Z09-B82, §20.6)
+    target null (the `#` expression failed) → return 0               # film ends
+    sa_Express.sa_Calculate(out = target, ps) fails → return 0       # film ends
+    pop; return 1
+    # (original bug) Z09-B85: the expression is computed straight into the variable: Express::sa_Calculate writes its
+    #   first term into `out` before it evaluates the rest (§20.5), so when the assigned variable appears after the
+    #   first term it reads the new partial value: `X = 1 + X` gives 2 for any X, `S = "a" % S` gives "aa". With X
+    #   inside the first term it works (`KeyCore0 = (KeyCore0 * TotalCore) / 100.`, Quest/GoldHill.ps). A failed
+    #   expression (division by 0) also leaves the partial value in the variable. No 2016 assignment has the bad form.
+StateAssignment::sb_CloneMe @ FUN_004db0b0
+
+StateIf { Condition si_Condition; ScriptAtom* si_True; ScriptAtom* si_False }        # 0x350
+StateIf::StateIf @ FUN_004d7fa0 (branches null); StateIf::sb_CloneMe @ FUN_004d8070
+StateIf::sa_Load(s, tr)                            @ FUN_004de670
+    t = token; t ≠ "if" → unget, 0
+    si_Condition.sa_Load fails → 0                                   # Condition::sa_Load, §21.6
+    t = token (none → 0)
+    t == "then": si_True = new Block; its sa_Load fails → 0
+    else: unget t                                                    # (original bug) Z09-B87, below
+    t = token (none → 0)
+    t ≠ "else": unget t; return 1
+    si_False = new StateIf; its sa_Load ok → return 1                # "else if …" chains
+    free it (B88); si_False = new Block; its sa_Load fails → 0; return 1
+StateIf::sa_Step(s, arg, ps, &ip)                  @ FUN_004d8400
+    ip == 0: ip = 1
+             r = si_Condition.sa_Calculate(ps)                        # "1" / "0" (or 65535 for =!=, §20.5)
+             branch = pst_GetNumber(r) ≠ 0 ? si_True : si_False
+             branch: return ps_Push(branch)                           # depth full → 0, the film ends
+    sp ≠ 0 → pop, return 1; else 0                                    # no branch, or the branch has finished
+    # (original bug) Z09-B87: without `then` the true branch is silently absent (si_True = null, no error) and the
+    #   `open … close` that was meant as the branch is read as the next statement, a nested block that always runs.
+    #   `if c then open … close` is the only working form; all 131 `if`s of 2016 have `then`.
+
+StateWhile { Condition sw_Condition; Block sw_Block }                                 # 0x460
+StateWhile::sa_Load(w, tr)                         @ FUN_004dc640   "while", Condition, Block (no `then`); else unget / 0
+StateWhile::sa_Step(w, arg, ps, &ip)               @ FUN_004d8300   # ip unused
+    r = sw_Condition.sa_Calculate(ps); n = trailing digits of r (inline pst_GetNumber)
+    n ≠ 0: push &sw_Block (sp > 30 → return 0); return 1          # the body; when it pops, the while steps again
+    else: sp ≠ 0 → pop, return 1; else 0
+    # the condition is re-evaluated after every pass of the body; the body is one Block object, re-pushed each time
+StateWhile::sb_CloneMe @ FUN_004de600
+
+StateInfinite { Block si_Block }                                                       # 0x11c
+StateInfinite::sa_Load(i, tr)                      @ FUN_004dc590   "infinite", then si_Block.sa_Load
+StateInfinite::sa_Step(i, arg, ps, &ip)            @ FUN_004d82c0
+    push &si_Block (sp > 30 → return 0); return 1                   # never pops itself: only a break that names an
+                                                                     # enclosing block (or the end of the film) leaves it
+StateInfinite::sb_CloneMe @ FUN_004de590
+
+StateCall { Express sc_CallBlock; Express* sc_DefaultBlock }                          # 0x124
+StateCall::sa_Load(c, tr)                          @ FUN_004dc880
+    t ≠ "call" → unget, 0; sc_CallBlock.sa_Load fails → 0
+    t = token; "." → 1; else unget, sc_DefaultBlock = new Express, load it, then the token must be "." (else 0)
+StateCall::sa_Step(c, arg, ps, &ip)                @ FUN_004da180
+    ip == 0: ip = 1
+        name = sc_CallBlock.sa_Calculate(ps); b = sa_FindBlock(ps.ps_Script, name)
+        b: push b (sp ≥ 31 → return 0); return 1
+        sc_DefaultBlock: b = sa_FindBlock(value of sc_DefaultBlock); b: return ps_Push(b)
+        assert "PineEventScriptNode::StateCall::sa_Step : not exist default routine" (name); return 0   # film ends
+    ip ≠ 0: sp ≠ 0 → pop, return 1; else 0                           # the called block has finished
+    # the block name is an expression: `call "SelfHealStart".`, `call InterruptBlock.` (variable set by
+    # `waitinterrupt`, §15.4), `call InterruptBlock "Default".` (Map/OXFieldInit.ps); only top-level blocks are found
+StateCall::sb_CloneMe @ FUN_004d80b0
+
+StateBreak { Express* b_Break }                                                         # 8
+StateBreak::sa_Load(b, tr)                         @ FUN_004dc710
+    t ≠ "break" → unget, 0; t = token; "." → 1 (b_Break null)
+    else unget; b_Break = new Express; load; then the token must be "." (else 0)
+StateBreak::sa_Step(b, arg, ps, &ip)               @ FUN_004da120
+    name = b_Break ? b_Break.sa_Calculate(ps) : null
+    return ps_ExitBlock(ps, name)                                   # §20.6: pops every entry above the nearest Block
+        # whose name matches (null: the nearest block), sets that entry's ip = 9999 and returns 1; no match: the
+        # stack is unwound to the script and 0 is returned (film ends)
+StateBreak::sb_CloneMe @ FUN_004d6570
+```
+
+What `break` does, from these rules:
+
+- `break "main".` (55 uses): `main` gets ip 9999, ends on the next pass, the script sees `sp == 0`: **the film ends**.
+- `break "<called block>".` from a handler: leaves the named block and everything it started (loops, calls), and
+  goes on after the `call` that started it; this is how the 2016 interrupt loops end:
+  `open [HeroDoorClick] … infinite open waitinterrupt InterruptBlock "InterruptArg". call InterruptBlock. close close`
+  with `break "HeroDoorClick".` in the handler block `[HDC_DoorHeroClick]` (KQ/GordonMaster.ps).
+- A break that names a loop body (`infinite open [Loop] … break "Loop".`) or a bare `break.` (nearest block, no 2016
+  use) only ends the current pass of the body: `while` re-tests its condition, `infinite` starts the body again.
+- A name that is not on the stack ends the film (whole stack unwound, `ps_ExitBlock` returns 0).
+
+```pseudo
+StatementBaseExpress { uchar sbe_Command[32]; Express sbe_Express }                  # 0x140
+StatementBaseExpress::StatementBaseExpress(e, command) @ FUN_004d9e40   (strcpy of the keyword)
+StatementBaseExpress::sa_Load(e, tr)               @ FUN_004dcb00   token == sbe_Command, Express, "."
+StatePrint : StatementBaseExpress ("print")        sb_CloneMe @ FUN_004da010
+StatePrint::sa_Step(p, arg, ps, &ip)               @ FUN_004d84c0
+    sbe_Express.sa_Calculate(ps) into a stack token; result dropped; pop; return 1
+    # prints nothing (the tracer is empty, §20.8): only the side effects of `@` functions in the expression remain.
+    # One 2016 use: `print #("GateHandle" % Count).` (KQ/RoumenGate.ps, not listed in PineScript.txt)
+
+StatePermillage { Identify sp_Var }                                                     # 0x10
+StatePermillage::sa_Load(p, tr)                    @ FUN_004dc9f0   "permillage", Identify, "."
+StatePermillage::sa_Step(p, arg, ps, &ip)          @ FUN_004ebcc0
+    v = sp_Var.i_GetVariable(ps)                                     # missing → &deftkn
+    v: *v = "" then pst_MergeNumber(v, well512_GetRandom(1000))      # 0…999 (§18.1); the "" comes from a folded
+                                                                     # body that only clears the first byte
+    return ps_Pop(ps)
+    # no 2016 script uses it (scripts use @Random(0 99) in a condition)
+StatePermillage::sb_CloneMe @ FUN_004db080
+```
+
+`CeaseFireSender::CeaseFireSender` FUN_004d6300 is the folded body (`byte[0] = 0`) that `permillage` calls on the token.
+
+### 21.6 Conditions and `@` system functions
+
+```pseudo
+Condition : ScriptAtom { Express c_Left; CompareOperator c_Oper; Express c_Right }   # 0x344
+Condition::Condition @ FUN_004d7ea0 (empty expressions, operator type 0); ~Condition @ FUN_004d7f30
+Condition::sa_Load(c, tr) → ok                     @ FUN_004d6590
+    c_Left.sa_Load and c_Oper.sa_Load and c_Right.sa_Load            # §20.5; no token pushed back on failure
+Condition::sa_Calculate(c, out, ps)                @ FUN_004d87a0   # fully in §20.5: both sides evaluated into stack
+    # tokens, their failures ignored (a failed side keeps its partial value or ""), result "1" / "0" (=!= : 0 / 1 / 65535)
+```
+
+`if` uses `pst_GetNumber` of the result, `while` the same digit scan inline: a comparison is true when its result's
+trailing digits are non-zero, so `=!=` (1 or 65535 when different) works as "not equal".
+
+```pseudo
+SystemFunction : ScriptAtom { ArgumentList sfm_ArgumentList; SysFuncBase* sfm_Function }   # 0x34
+SystemFunction::SystemFunction @ FUN_004d7cf0      # 10 empty arguments; sfm_Function = &sysfuncbase
+SystemFunction::sa_Load(f, tr) → ok                @ FUN_004db7c0   # one of the Term alternatives (§20.5)
+    t = token (none → 0); t ≠ "@" → unget, return 0
+    name = token (none → 0); sfm_ArgumentList.sa_Load fails → 0      # parentheses are required: @DeathNum()
+    sfm_Function = the singleton of `name` (table below, case-sensitive compare)
+    unknown: assert "PineEventScriptNode::SystemFunction::sa_Load : undefined function" (name); return 0
+        # the tokens are not pushed back: the statement around it fails to load
+SystemFunction::sa_Calculate(f, out, ps)           @ FUN_004d66f0
+    return sfm_Function.vt[0](out, ps, &sfm_ArgumentList)            # sfb_Calculate(out, ps, args); bodies §22
+SysFuncBase::sfb_Calculate(out, ps, args) @ FUN_004d64f0: out = "", return out   # the default (unused after a load)
+```
+
+| `@` name | Singleton (global) | Uses 2016 |
+|---|---|---|
+| `SquarRoot` | `sysfuncsqrt` (`SysFuncSQRT`) | 0 |
+| `Distance` | `sysfuncdistance` (`SysFuncDistance`) | 0 |
+| `Random` | `sysfuncrand` (`SysFuncRand`) | 15 |
+| `mobregen` / `doorbuild` / `npcstand` | `sysfuncshinemobregen` / `sysfuncshinedoorbuild` / `sysfuncshinenpcstand` | 0 |
+| `change2mob` / `change2door` / `change2npc` | `sysfuncshinechange2mob` / `…change2door` / `…change2npc` | 0 |
+| `Count` | `sysfuncshinecount` | 22 |
+| `RestSec` | `sysfuncshinerestsec` | 1 |
+| `CharClass` / `CharName` | `sysfuncshinecharclass` / `sysfuncshinecharname` | 1 / 12 |
+| `DeathNum` | `sysfuncshinedeadnum` | 16 |
+| `CircularScatter` | `sysfuncshinecircularlocate` | 2 |
+| `RemoveFirst` | `sysfuncshineremovefisrt` | 48 |
+| `GetObjectList` | `sysfuncshinegetobjectlist` | 2 |
+| `KQResultList` / `KQTopList` | `sysfuncshinekqresultlist` / `sysfuncshinekqtoplist` | 8 / 10 |
+| `DistanceBetween` | `sysfuncshinedistance` | 2 |
+| `PlayerInArea` | `sysfuncshineplayerinarea` | 10 |
+| `Range` | `sysfuncshinerange` | 0 |
+| `IsGateUse` | `sysfuncshineisgateuse` | 10 |
+| `GetWinnerGuild` / `GetLoseGuild` | `sysfuncshinegetwinnerguild` / `sysfuncshinegetloseGuild` | 4 / 0 |
+
+25 functions (the 25 `SysFunc*` classes of §22). `mobregen`, `doorbuild`, `npcstand` and the `change2*` names exist
+both as action statements (`mobregen X "Mob" x y d r "…".`) and as `@` functions; the scripts use only the statements.
+
+### 21.7 The 2016 scripts against this grammar
+
+A first-level check of every `.ps` file (statement starts against the registry, ignoring comments) gives:
+
+- The 16 of the 58 `World/PineScript.txt` books that exist as `.ps` (`KQ/UnderHall`, `KQ/UnderHall2`, `KQ/Honeying`,
+  `KQ/GordonMaster`, `KQ/KQHBat1…5`, `Quest/Quest`, `Promote/JobChange1`, `Promote/JobChange2-1`, `Guild/GuildTournament`,
+  `Wedding/Wedding`, `ID/d_NestOfLeviathan`, `Map/Monkey`) use only registered statements. The other 42 records have
+  no `.ps` at that path (18 of them are marked `; LuaScript`; how the shelf picks Lua or Pine and what it does with a
+  missing file is §22).
+- The files with an older dialect are not listed: `KQ/KickOut`, `KQ/TesScript`, `KQ/Quest`, `KQ/KingSlime/{Main,Suc,Fail}`,
+  `KQ/UnderHall/{Main,Suc,Fail}`, `KQ/ConditionOfHero/…` and the `Quest/` copies of some of them use `WaitTime`,
+  `wait`, `Regen`, `Terminate`, `shout`, `freepk`, `remove`, which are not statements in 2016: they would not load.
+- Never used in 2016 (statement exists, no file uses it): `permillage`, `someoneshout`, `walk`, `duplicate`,
+  `itemattrset`, `sublayershift`, `collect`, `costumecreate`, `costumetakeoff`, `change2door`, `NPCChatNoFacecut`,
+  `ScinarioCodeParty`, `HasAbstate`, `BroadcastCode`; system functions `SquarRoot`, `Distance`, `Range`,
+  `GetLoseGuild`, the `@` forms of the six object builders.
+
+### 21.8 Answers to §20.9 and open points
+
+- `Identify::sa_Calculate` on a `#expr` form: none of the statements of this section calls vt 8 on an `Identify`
+  (`var` uses `i_GetToken`, assignment and `permillage` `i_GetVariable`); `Condition` and `Express` go through `Term`,
+  which handles `#` itself. The `OtherStatement` target (`os_Ident`) is checked in §22.
+- `sa_Step` results and `ip`: §21.4 (convention) and §21.5 (each control statement).
+- B83 (a failed `Term` eats a token) has no effect in this section's statements: each treats a failed expression as a
+  failed statement. The `OtherStatement` argument loop (min…max expressions) is checked in §22.
+- Open: what `arg` (the `ushort` passed down from `fc_Routine`) is, and what removing a film does (part 16).
+- Open: whether a handler block reached through `call InterruptBlock.` can re-enter a block already on the stack
+  (Z09-B86) depends on the interrupt targets of each book (§15); not traced per book.
