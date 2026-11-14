@@ -7655,6 +7655,321 @@ Lua `cGetScriptString` and message functions (§18.4 / §19).
 - §20.9 / §21.8 B83 in the argument loop: no effect (a failed expression fails the file).
 - §21.7 the 42 books without `.ps`: all exist as `LuaScript/<name>.lua` and load as Lua books (§22.5).
 - §10.8 the second free after a failed `smb_*` spawn: Z09-B95 (no effect in practice).
-- Open (part 15): who removes the old object after `os_ObjectChange`, and whether `ShineChange2Door` frees the slot of
-  a failed door build (`os_ObjectChange` does not).
+- Answered in §23.9 (part 15a): nobody removes the old object after `os_ObjectChange` (Z09-B98); `ShineChange2Door`
+  frees the slot of a failed door build itself (reason 0x1a).
 - Open (part 16): how films use the book type (vt 8) and the Lua book's script when a film starts.
+
+---
+
+## 23. Scripts 10: Pine action nodes A–C (abstates, aggro, animation, battle modes, messages, object change, costumes, area ban)
+
+The `sa_Step` bodies of the 16 `Shine*` action statements whose class names start with A–C (§21.2 rows 20–22, 32,
+33, 38, 47, 48, 56, 60, 66, 67, 79, 80, 85, 86). They load with `OtherStatement::sa_Load` and read their target and
+arguments as §22.1 describes (`os_ShineObject`, `os_ObjectChange`). Class, member and function names are *(pdb2016)*.
+Packets sent here: 0x6C0B (via `so_bandit_ChangeType`), 0x6C0C, 0x6C0D, 0x6C10, 0x1812 / 0x1813, 0x7483, 0x7484,
+0x74E0, 0x2011 (via `so_ply_Notice`), and 0x3401 / 0x3459 to the item DB (costumes).
+
+### 23.1 Common shape
+
+- Every node writes a trace line `[<film>] Shine… : …` to the Pine tracer `scrpttrcr` (§20.8) and **pops itself in
+  every case** (success, failed argument, missing object): none of them waits or ends the film (step convention §21.4).
+  A failed argument evaluation (`os_Express[i].vt[8]` returns 0) logs an assert and pops.
+- Target words: several nodes read the target with `Identify::i_GetToken` (FUN_004d9ea0, the word itself), lower-case it
+  (`pst_ToLower`) and compare it with the global `PineScriptToken`s set by static initialisers: `index_all` "all"
+  (FUN_006975a0), `index_handle` "handle" (FUN_00697960), `index_guild` "guild" (FUN_00697980), `index_pk` "pk"
+  (FUN_006979e0), `index_GuildTournamentStart` "guildtournamentstart" (FUN_00697a40), `index_CostumeHeadAcc` "headacc"
+  (FUN_00697ae0), `index_CostumeBodyAcc` "bodyacc" (FUN_00697b00). The other nodes read a variable holding a handle
+  (`os_ShineObject` FUN_004ebbb0, or `i_GetVariable` FUN_004d9f60 + `som_GetObject` FUN_0054fd10).
+- "Whole map" = `so_AllInMap(theater.t_CenterFlag, list, includeSelf 0)` (FUN_0054b9e0; `Movie::Theater::t_AllInMap`
+  FUN_004e2c30 is the same call, null flag → assert "…t_AllInMap : Null flag", nothing sent). `so_AllInMapNomal`
+  FUN_0054be00 skips the walker itself when `includeSelf` is 0, which matters only when the walker is a player
+  (`abstateset all … handle`, §23.3). Packets go through `AxialListPacketBroadcast` (FUN_00428a40, `ali_Work` FUN_00428b20:
+  live players on the same layer, Z01 §3.2) or `AxialListProtocolSend(dept, cmd)` (FUN_004282f0, `ali_Work` FUN_00428310:
+  `so_SendProtocol` vt 0x304 of an empty packet to every object; non-players ignore it).
+- Several assert texts are copied from other nodes (`ShineFindHandle … no skip / no keep / no handle` in the abstate
+  nodes, `ShineFindPlayer … no part` in `briefeffect`, `ShineChatWindow … no mob` in `chatwinrange`,
+  `SysFuncShineChange2Mob::sfb_Calculate : Too many mob` in the three change nodes): log text only.
+
+Constructors (`OtherStatement(keyword, idRead, min, max)` + the class vtable, values in §21.2) and `sb_CloneMe`:
+
+| Keyword | Class | ctor | `sb_CloneMe` | `sa_Step` | § |
+|---|---|---|---|---|---|
+| `change2mob` | `ShineChange2Mob` | FUN_004e86a0 | FUN_004e9440 | FUN_004ed1e0 | 23.2 |
+| `change2door` | `ShineChange2Door` | FUN_004e86c0 | FUN_004e94b0 | FUN_004ed350 | 23.2 |
+| `change2npc` | `ShineChange2NPC` | FUN_004e86e0 | FUN_004e9520 | FUN_004ed4c0 | 23.2 |
+| `abstateset` | `ShineAbstatSet` | FUN_004e8a00 | FUN_004ea010 | FUN_004f1010 | 23.3 |
+| `abstatereset` | `ShineAbstatReset` | FUN_004e8a20 | FUN_004ea080 | FUN_004f1480 | 23.3 |
+| `aggro` | `ShineAggro` | FUN_004e8b20 | FUN_004ea400 | FUN_004f2d10 | 23.4 |
+| `animate` | `ShineAnimate` | FUN_004e8ba0 | FUN_004ea5c0 | FUN_004f3240 | 23.4 |
+| `broadcast` | `ShineBroadcast` | FUN_004e88e0 | FUN_004e9c20 | FUN_004ef830 | 23.5 |
+| `chatwin` | `ShineChatWindow` | FUN_004e8820 | FUN_004e9980 | FUN_004f50f0 | 23.5 |
+| `chatwinrange` | `ShineChatWindowRange` | FUN_004e8840 | FUN_004e99f0 | FUN_004f5520 | 23.5 |
+| `briefeffect` | `ShineBriefEffect` | FUN_004e8ec0 | FUN_004eb0b0 | FUN_004f6ec0 | 23.5 |
+| `battlestart` | `ShineBattleStart` | FUN_004e8c60 | FUN_004ea860 | FUN_004f3cb0 | 23.6 |
+| `battlestop` | `ShineBattleStop` | FUN_004e8c80 | FUN_004ea8d0 | FUN_004f4070 | 23.6 |
+| `banfromarea` | `ShineBanFromArea` | FUN_004e8ee0 | FUN_004eb120 | FUN_004f99c0 | 23.7 |
+| `costumecreate` | `ShineCostumeCreate` | FUN_004e8e00 | FUN_004eae10 | FUN_004f65a0 | 23.8 |
+| `costumetakeoff` | `ShineCostumeTakeOff` | FUN_004e8e20 | FUN_004eae80 | FUN_004f68c0 | 23.8 |
+
+### 23.2 Changing an object's kind: `change2mob`, `change2npc`, `change2door`
+
+```pseudo
+change2mob obj mobName.                ShineChange2Mob::sa_Step   @ FUN_004ed1e0   # JobChange1.ps: change2mob ShadowHandle ShadowMobIndex.
+    old = os_ShineObject(ps); null → pop
+    if old.so_ObjectType (vt 0x4d0) == 8 (bandit):
+        old.vt[0x898] so_bandit_ChangeType(5)            # §5.10 FUN_005508b0: type = 5 (acts as a mob), 0x6C0B to the whole map
+    else:
+        o = som_AllocObject(&h, pool 5 mob) (FUN_0054fe20); none: assert "…Too many mob", pop
+        ok = os_ObjectChange(o, h) (§22.1)               # new mob mobName at old's place; target variable = h
+        if !ok: som_FreeObject(h, REMOVE_NOW, 0x19)      # (original bug) Z09-B97 when the regenerate failed
+    pop
+change2npc obj mobName.                ShineChange2NPC::sa_Step   @ FUN_004ed4c0   # JobChange2-1.ps: change2npc NPC "Slime".
+    as change2mob with: bandit → so_bandit_ChangeType(4) (acts as an NPC); else pool 4 (NPC), free reason 0x1b
+    # between alloc and os_ObjectChange it tests the NEW object: kind 8 → o.so_bandit_ChangeType(4) and skip the
+    # change. A pool-4 object is always an NPC (kind 4): (original bug) Z09-B99 dead check (meant for `old`)
+change2door obj mobName.               ShineChange2Door::sa_Step  @ FUN_004ed350   # unused in 2016
+    o = som_AllocObject(&h, pool 7 door) first (none: assert, pop); no bandit branch
+    ok = os_ObjectChange(o, h)                           # door: so_door_Build(…, scale 1000); old missing → 0
+    if !ok: som_FreeObject(h, REMOVE_NOW, 0x1a)          # also frees a failed door build (os_ObjectChange does not)
+    pop
+```
+
+- The mob name argument is an `InxName` of `MobInfo` (`mobdatabox.mdb_btree`); it is read only on the non-bandit path
+  (the bandit path ignores it).
+- 2016 uses (`JobChange1.ps`, `JobChange2-1.ps`) apply both nodes only to **bandits** made by the 7-argument
+  `mobregen` (part 15c): the scripts' own comment says a bandit is spawned as a mob and then turned into an NPC.
+  So in 2016 only the in-place `so_bandit_ChangeType` path runs; the object, its handle and its brief info stay.
+- (original bug) Z09-B98: on a non-bandit, the three nodes build a second object at the old one's place and write
+  its handle into the target variable, but never remove the old object (`os_ObjectChange` leaves it, §22.1). Both stay
+  in the world and the script has lost its handle to the old one. `exchange2mob` (part 15b) unmarks and frees the old
+  object first, which is what a "change" most likely meant too *(inferred)*.
+- (original bug) Z09-B97: when `so_mob_Regenerate` fails, `os_ObjectChange` already frees the new handle (reason 0x16)
+  and returns 0; the node frees it again. `som_FreeObject` (FUN_00557d70) finds no object and logs "Try to free
+  unalloced object" (once per handle and reason, kept in `globalset`). Log noise only; door failures are freed once.
+
+### 23.3 Abnormal states: `abstateset`, `abstatereset`
+
+```pseudo
+abstateset target abstate strength keepMs [handle].   ShineAbstatSet::sa_Step   @ FUN_004f1010
+    name = argument 0 (fails: assert "…ShineFindHandle::sa_Step : no skip", pop)
+    idx = dic_abstate.as_BTreeIndex[name] (FUN_0063cc30; the AbState InxName); unknown → pop (no assert)
+    strength = number of argument 1 (fails: same "no skip" assert, pop)
+    keep = number of argument 2 (fails: assert "…no keep", pop)        # milliseconds (§17.4)
+    data = AbnormalStateDictionary::AbState::as_FromIndex(&dic_abstate, idx)
+    if lower(i_GetToken(target)) == "all":                             # players
+        list = AxialListPlayerStateSet(idx, strength, data, keep)      # FUN_004285c0
+        no argument 3: t_AllInMap(theater, list)                       # every player of the map
+        else: h = number of argument 3 (fails: assert "…no Player with handle", pop)
+              o = som_GetObject(h); null → pop
+              so_AllInMap(o, list, includeSelf 0)                       # every player of o's map EXCEPT o
+    else:
+        v = i_GetVariable(target); m = mdb_2MobID(value of v) (FUN_00419080)
+        m ≠ 0xFFFF (the variable holds a mob InxName):
+            t_AllInMap(theater, AxialListMobStateSet(m, idx, strength, data, keep))   # every mob of that type (§8.9)
+        else: o = os_ShineObject(ps) (the variable holds a handle); null → pop
+            AxialListMobStateSet(0xFFFF, …).almss_AbStateSet(o)        # o directly, any kind (players too)
+    pop
+abstatereset target abstate.           ShineAbstatReset::sa_Step  @ FUN_004f1480
+    name = argument 0 (fails: assert "…ShineFindHandle::sa_Step : no handle", pop); unknown abstate → pop
+    variable value is a mob InxName (mdb_btree): t_AllInMap(theater, AxialListMobStateSet(mobId, idx, 0, data null, 0))
+    else o = os_ShineObject(ps); o: AxialListMobStateSet(0xFFFF, idx, 0, null, 0).almss_AbStateSet(o)
+    pop                                                                # no "all" form: `all` is looked up as a variable
+AxialListPlayerStateSet::ali_Work(walker, o)   @ FUN_00429800   # o.so_ObjectType == 2 → alpss_AbStateSet(o); continue
+AxialListPlayerStateSet::alpss_AbStateSet(l, o) @ FUN_004285f0
+    skip o when mode (vt 0x484) == 3 (dead) or vt 0x28 `so_YouHaveAlreadyDead`
+    then the same body as almss_AbStateSet:
+AxialListMobStateSet::almss_AbStateSet(l, o)    @ FUN_004eb8d0   (ctor FUN_004eb880, ali_Work FUN_004f0fc0: mobs of almss_MobID, §8.9)
+    data == null (reset): o.vt[0x650](idx); o.so_mobile_AbstateList (vt 0x52c).asl_AbstateReset(o, idx); o.vt[0x528] recalc
+    else if o.vt[0x638](o, idx, strength, data, g_Now, 0, 0, keep, how 9, 0):          # set (§17.4)
+        so_AbnormalState_BitSet(o, idx); so_AbnormalState_BroadcastSet(o, idx, keep, strength);
+        o.vt[0x3f0](idx, keep, 1); o.vt[0x528]()
+```
+
+- The direct form (`abstateset PlayerHandle …`, `abstateset GordonMaster …`) reaches `almss_AbStateSet` without the
+  kind and dead tests of the walks: players, NPCs and dead objects are set too.
+- `abstateset all "StaCommonStun01" 1 3000 LooterHandle.` (`KQHBat1…5.ps`): every player in the looter's map except
+  the looter is stunned for 3 s, as the script's own broadcast announces ("Everyone else will be immobilized for 3
+  seconds"). The handle selects whom to spare (and the map), not whom to hit.
+- `GordonMaster.ps` writes `" StaMobImmortal"` with a leading space in one `abstateset` / `abstatereset` pair: the
+  dictionary lookup fails and both statements do nothing (script data, not a server bug).
+
+### 23.4 Mobs and animation: `aggro`, `animate`
+
+```pseudo
+aggro mob target amount.               ShineAggro::sa_Step        @ FUN_004f2d10   # JobChange1.ps: aggro ChiefAA PlayerHandle 1.
+    m = os_ShineObject(ps); null → pop
+    h = number of argument 0 (fails: assert "…ShineAggro::sa_Step : no Player", pop); t = som_GetObject(h); null → pop
+    a = number of argument 1 (fails: assert "…no aggro", pop)
+    m.vt[0x700](t, a)                                  # ShineMob::so_mob_AppendAggro FUN_0042d470 (§6.2; bandits too);
+    pop                                                # players / NPCs: folded no-op FUN_00509900
+animate obj animation.                 ShineAnimate::sa_Step      @ FUN_004f3240   # d_graveyard.ps, KQ / Quest Kingkong, MiniDragon
+    o = os_ShineObject(ps); null → pop; argument 0 fails → pop (no assert)
+    0x6C0D NC_SCENARIO_ANIMATE_CMD { u16 handle = o; Name8 anicode = argument 0 (32 bytes zeroed, strncpy 32) }
+    → so_AllOfRange(o, allofrangearg, o.pos, range 0 = map sight, no fan, AxialListPacketBroadcast, includeSelf 0, 0xFFFF)
+        (FUN_0054bc80, §9.6)                           # sight of o, any object kind
+    pop
+```
+
+`animate` is the Pine twin of Lua `cAnimateForcedly "start"` (§17.2) with one difference: it builds the packet itself,
+so it also works on players (the Lua path goes through vt 0xc38, a no-op for players). The animation is not
+remembered in the brief info; the client stops the current animation and plays the new one (client FUN_004a3610).
+
+### 23.5 Messages: `broadcast`, `chatwin`, `chatwinrange`, `briefeffect`
+
+```pseudo
+broadcast target text [handle].        ShineBroadcast::sa_Step    @ FUN_004ef830   (268 uses: 251 `all`, 17 `handle`)
+    t = argument 0 (fails: assert "…ShineBroadcast::sa_Step : no message", pop)
+    msg = t; if ps_Shine.shinescript (set by `scriptfile`, part 15): s = ShineScript::ss_String(set, t) (FUN_0048ce60);
+          s ≠ "" → msg = s                             # a dialog key, else the literal text (`scriptfile ""` = literal)
+    lower(i_GetToken(target)) == "all": so_AllInMap(flag, AxialListWall(msg) (FUN_004281a0), 0)   # null flag: assert
+        # AxialListWall::ali_Work FUN_004281c0 = so_ply_Notice (vt 0x784) on every object: players get 0x2011 (§19.3)
+    == "handle": h = number of argument 1 (fails: assert "…no Player with handle"); o = som_GetObject(h);
+        o: o.vt[0x784] so_ply_Notice(msg) (FUN_005977e0)  # non-players: folded no-op
+    other target words: nothing
+    pop
+chatwin mobName key [p1 … p7].        ShineChatWindow::sa_Step   @ FUN_004f50f0   (215 uses)
+    name = argument 0 (fails: assert, pop); mob = mdb_btree[name]; unknown: assert "…ShineChatWindow::sa_Step : no mob", pop
+    key = argument 1 (fails: assert, pop); no ps_Shine.shinescript → pop (nothing sent)
+    fmt = ss_String(set, key); p[i] = arguments 2…8 (missing or failing → "")
+    sprintf(g_buf + 5, fmt, p1, …, p7)                  # up to 7 `%s` in the dialog string
+    n = strlen; n ≥ 256 → pop (nothing sent)
+    0x6C0C NC_SCENARIO_CHATWIN_CMD { u16 mob; u8 len = n; char content[n] } → whole map (null flag: assert)
+    pop
+chatwinrange obj range mobName key [p1 … p5].  ShineChatWindowRange::sa_Step  @ FUN_004f5520   (25 uses, `Quest/Quest.ps`)
+    o = som_GetObject(number of argument 0) (fails: assert, pop; null → pop)
+    range = number of ARGUMENT 2                        # (original bug) Z09-B100: argument 1 is never read
+    name = argument 2; mob = mdb_btree[name]; unknown: assert "…ShineChatWindow::sa_Step : no mob", pop
+    key = argument 3 (fails: assert, pop); no shinescript → pop
+    fmt = ss_String(set, key); p[i] = arguments 4…8; sprintf / length check as chatwin (5 values)
+    0x6C0C (as above) → so_AllOfRange(flag, allofrangearg, o.pos, range, no fan, list, includeSelf 1, 0xFFFF)
+        # around o; range 0 = map sight (null flag: assert "…t_AllOfRange : Null flag")
+    pop
+briefeffect target code.               ShineBriefEffect::sa_Step  @ FUN_004f6ec0   # OXFieldInit.ps: briefeffect all 1. / 2.
+    c = argument 0 (fails: assert "…ShineFindPlayer::sa_Step : no part", pop)
+    lower(i_GetToken(target)) == "all": 0x6C10 NC_SCENARIO_BRIEFEFFECT_CMD { u8 effectcode = c } → whole map
+    other target words: nothing sent
+    pop
+```
+
+- `chatwin` / `chatwinrange` are the Pine counterparts of Lua `cMobDialog` / `cMobDialog_Range` (§19.2: same packet,
+  same client handler; the mob only chooses the face cut). Their texts can carry parameters (`chatwin "KQ_G_Boss"
+  "GM_Teleport" % NextTeleportHP.` concatenates instead; the `%s` form is unused in the listed books *(not counted)*).
+- B100 in 2016: every `chatwinrange` of `Quest/Quest.ps` (the only listed book using it) is written
+  `chatwinrange Mara 1000 "Scenario" "Mara01".`, i.e. handle, range, **dialog file**, key. The code reads `"Scenario"`
+  as the mob name (no such mob: assert, nothing shown) and as the range (no digits: 0). That book also never runs
+  `scriptfile`, so even a correct mob would send nothing. The script form looks older than the 2016 node (the older
+  `KQ/Quest.ps` has yet another order, `"Mara" "Mara01" Mara 1000`); `chatwinrange` shows nothing in 2016.
+- Client 0x6C10 (`GameFrameWork`, client FUN_004a3d80): resets a display timer; code 1 → if the frame's object at
+  +0x9a0 exists, flags +0xa44 = 1, +0xa45 = 1; code 2 → object +0x9a4, +0xa44 = 1, +0xa45 = 0; then plays sound 0x1e;
+  other codes are ignored. In `OXFieldInit.ps` code 1 follows the GM's "O" answer and code 2 the "X" answer, so the two
+  objects are the O / X answer effects of the OX quiz *(inferred from the script)*.
+
+### 23.6 Map battle modes: `battlestart`, `battlestop`
+
+```pseudo
+battlestart flag [a b].                ShineBattleStart::sa_Step  @ FUN_004f3cb0
+    f = lower(i_GetToken(target))
+    f == "pk":                                          # KQHBat1…5.ps, ConditionOfHero (unlisted)
+        flag = theater.t_CenterFlag (null: assert "Movie::Theater::t_MapPKFlag CenterFlag"); field = flag.so_Field
+            (null: assert "…t_MapPKFlag Map"); field.fm_PKField = 1        # free PvP on the map (as Lua cSetFreeBattle, §17.6)
+        whole map ← AxialListProtocolSend(6, 0x12): 0x1812 NC_MAP_FREEPKZONE_ON_CMD {}   # client: "This area is enabled for PvP."
+    f == "guild":                                       # unused in 2016
+        arguments 0 and 1 must exist (else assert "…Argument error"); a, b = their numbers
+            (a failing one: assert "…ShineBattleStart::sa_Step : no Player" with its index)
+        Movie::Theater::t_MapGuildBattle(theater, a, b) (FUN_004ebb80): theater.t_Field.fm_GuildTournamentInform.guildA/B = a, b
+        whole map ← 0x7483 NC_GUILD_TOURNAMENTSTART_CMD { u32 nGuildA = a; u32 nGuildB = b;
+            u16 nGuildTourNamentType, u32 nGuildMyRegNumber: not written }   # (original bug) Z09-B101
+    f == "guildtournamentstart":                       # GuildTournament.ps / GuildTournament1.ps: … 5. and … 0.
+        s = number of argument 0 (fails: assert "…no Time")
+        whole map ← 0x74E0 NC_GUILD_TOURNAMENT_STARTMSG_CMD { s32 nStartBeforeTime = s }   # §19.5 (cStartMsg_AllInMap sends 5)
+    other: ps_assert "…ShineBattleStart::sa_Step : invalid flag" with the word
+    pop
+battlestop flag.                       ShineBattleStop::sa_Step   @ FUN_004f4070
+    "pk": field (via the centre flag, asserts as above).fm_PKField = 0; whole map ← 0x1813 NC_MAP_FREEPKZONE_OFF_CMD {}
+    "guild": theater.t_Field (if any).fm_GuildTournamentInform.guildA = guildB = 0;
+             whole map ← AxialListProtocolSend(0x1d, 0x84): 0x7484 NC_GUILD_TOURNAMENTSTOP_CMD {}   # GuildTournament*.ps
+    other: ps_assert "…ShineBattleStop::sa_Step : invalid flag", nothing changed
+    pop
+```
+
+- `fm_PKField` is the same map flag as Lua `cSetFreeBattle` and GM `ac_SetPVP` (Z11) set; who reads it (the PvP target
+  rules) is Z03. `fm_GuildTournamentInform` is also written by `FieldMap::fm_GuildTournamentClear` FUN_00475a30 /
+  `fm_GuildTournamentEnd` FUN_00475fa0 / `fm_Init`; its readers are the guild-tournament system (Z16).
+- (original bug) Z09-B101: the `guild` form sends a 14-byte 0x7483 but writes only the first 8 bytes; bytes 8–13 are
+  whatever the previous packet left in the global send buffer. The client (`GuildTask::Recv_NC_GUILD_TOURNAMENTSTART_CMD`
+  client FUN_006b4730) stores both stale fields (type at task+0xb48, own guild number at +0x4c), then shows the
+  enemy guild's name when one of a / b is its own guild, or the text "There is no match opponent" (TextData
+  0x38281f8b) when a or b is 0. The real sender (`GuildTournamentSystem::PlayerRegister` FUN_0047f970, Z16) fills all
+  four fields. No 2016 script uses `battlestart guild`.
+- Client 0x7484 (`GuildTask::Recv_NC_GUILD_TOURNAMENTSTOP_CMD` client FUN_006b3240): sets the tournament state to 1,
+  clears the opponent data, closes the tournament windows and ends the status windows (`GTStatusWin::EndGame`).
+
+### 23.7 Banning players from an area: `banfromarea`
+
+```pseudo
+banfromarea map area toMap x y.        ShineBanFromArea::sa_Step  @ FUN_004f99c0   # OXFieldInit.ps (3 uses)
+    map = argument 0 (12 chars), area = argument 1 (32 chars) (either fails: assert "…ShineBanFromArea::sa_Step : no area", pop)
+    toMap = argument 2 (12 chars; fails: assert "…no map", pop); x, y = numbers of arguments 3, 4 ("…no X" / "…no Y")
+    field = fieldlist.l_Search(fm_Compare, FieldMap(map)) (FUN_004239a0, temporary FieldMap FUN_004662e0 / FUN_00465490);
+        none → pop                                      # the first field of that map name (not the theater's own instance)
+    ban = AxialListBanArea(area, field, toMap, x, y)   # FUN_0042a100 (§15.7 table)
+    t_AllInMap(theater, ban)                            # ali_Work FUN_0042a570: players (kind 2) with admin level
+                                                        #   (vt 0x4d4) 0 inside fm_AreaEntry(field, area, pos) are collected
+    AxialListBanArea::alba_Banish(ban)                  # FUN_00429f70: each → vt 0x890 ShinePlayer::so_ply_BriefLink(toMap, (x, y)) (Z01 §7.3)
+    pop                                                 # ~AxialListBanArea FUN_0042a180
+```
+
+The OX quiz (`Map/OXFieldInit`, the `OX_field` map script, §22.5): after the GM's answer (`interruptset admin`, §15)
+the script shows the O / X effect (§23.5), waits, and bans the players standing in the wrong answer zone
+(`OZone01` / `XZone01`, areas of `OX_field.aid`) to `OX_field` 6467 4771; `ArenaClear` bans both zones. GMs stay.
+The area test uses the area table of the searched field, while the walk covers the theater's map; with one
+`OX_field` instance both are the same map.
+
+### 23.8 Costumes: `costumecreate`, `costumetakeoff`
+
+```pseudo
+costumecreate player part item options.   ShineCostumeCreate::sa_Step   @ FUN_004f65a0   # unused in 2016
+    v = i_GetVariable(target); null → pop; p = som_GetObject(number of v); null → pop
+    part = lower(argument 0) (fails: assert "…ShineCostumeCreate::sa_Step : no part", pop):
+        "headacc" → slot 27 (ITEMEQUIP_HATACC), "bodyacc" → slot 8 (ITEMEQUIP_BODYACC), other → pop
+    item = itemdatabox.idb_btree[argument 1] (fails: assert "…no item", pop; unknown item → pop)
+    opts = argument 2 (fails: assert "…no item", pop)
+    p.vt[0x948](slot, item, opts)                      # non-players: folded no-op FUN_00514570
+    pop
+ShinePlayer::so_ply_Script_CostumeCreate(p, slot, item, opts) → ok     @ FUN_00518fb0
+    slot ≥ equipment size → 0; the equipment cell 0x2000|slot locked (InventoryLocking vt 0x7d4, vt 8) → 0
+    info = ItemTotalInformation::iti_mkregnum(item, 7, zoneNo, worldNo); attr = ItemAttributeClassContainer[item]
+    attr.vt[0x14] iac_itemcreate(item, info, "-o"); then for every '-' in opts: iac_itemcreate(item, info, opts from that '-')
+        # the option syntax of the GM make-item command (Z05)
+    info.itemid = item; ShinePlayer::sp_CreateItemByAdmin(p, 8, slot, info, equipment cell) (FUN_00527270)
+        # 0x3401 NC_ITEMDB_ADMINCREATE_REQ for location 0x2000|slot (equipment), Z05 §9.1
+    return 1
+costumetakeoff player part item.          ShineCostumeTakeOff::sa_Step  @ FUN_004f68c0   # unused in 2016
+    player, part and item as costumecreate (argument 1 fails: assert "…ShineCostumeTakeOff::sa_Step : no item"; unknown → nothing)
+    p.vt[0x94c](slot, item)                            # non-players: folded no-op FUN_004021b0
+    pop
+ShinePlayer::so_ply_Script_CostumeTakeOff(p, slot, item) → ok          @ FUN_005191b0
+    slot range and equipment-cell lock as above, else 0
+    e = equipment cell of slot; c = ShinePlayer::sp_FindItemFromInventory(p, item) (FUN_00589990: first unlocked
+        inventory cell 0x2400|n holding that item); either missing → 0
+    e empty (itemid 0xFFFF): ShinePlayer::sp_DestroyItem(p, c) (FUN_00527870): 0x3459 to the item DB, cell cleared
+    else: ShinePlayer::sp_DestroyNReloc(p, e, c) (FUN_00535af0): 0x3459 for c's item, c cleared, then
+          ItemRelocationManager::irm_Move moves the equipped item from the equipment slot into c's inventory cell
+```
+
+Both nodes are unused in 2016, and `costumetakeoff` searches the inventory, not the equipment slot that
+`costumecreate` fills: as written, a take-off after a create destroys another copy of the item from the inventory
+and moves the costume into that cell *(inferred from the calls; the item DB answers are Z05)*.
+
+### 23.9 2016 use, answers and open points
+
+- Use counts per keyword: §21.2. Never used in 2016: `change2door`, `costumecreate`, `costumetakeoff`,
+  `battlestart guild`; `chatwinrange` loads but shows nothing (B100).
+- §22.7 open question: after `os_ObjectChange` nobody removes the old object in `change2mob` / `change2npc` /
+  `change2door` (B98); a failed door build is freed by `ShineChange2Door` (reason 0x1a). `exchange2mob` removes the old
+  object (part 15b).
+- Keep times above 2³¹ − 1 (`4200000000`, `4000000000` in `JobChange1.ps`, `GordonMaster.ps`, `Monkey.ps`) pass through
+  `pst_GetNumber` (`int`) and arrive with the same 32-bit pattern; whether `so_AbnormalState_Set` (vt 0x638) reads them
+  as unsigned (about 48 days) or as a negative keep was not traced.
+- `chatwin` / `chatwinrange` `sprintf` into the global send buffer before the `< 256` check; the buffer capacity
+  (`gpp.pp_BufferSize`, set statically) and a dialog string with more `%s` than values (stack garbage) were not traced.

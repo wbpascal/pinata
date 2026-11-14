@@ -11514,7 +11514,7 @@ sent to the whole map
 | 2 | u8 | len | text length (< 256; < 255 for cMobDialog_String) |
 | 3 | char[len] | content | script string, no NUL |
 
-client opens the NPC script dialog of that mob
+client opens the NPC script dialog of that mob. Also sent by Pine ShineChatWindow FUN_004f50f0 (whole map) / ShineChatWindowRange FUN_004f5520 (range around an object), text = sprintf(dialog string, parameters), len < 256 (Z09 §23.5)
 
 ### `0x6C0D` NC_SCENARIO_ANIMATE_CMD (hand-named) (S→C)
 
@@ -11525,7 +11525,7 @@ client opens the NPC script dialog of that mob
 | 0 | u16 | handle | mob |
 | 2 | char[32] | anicode | Name8; bytes zeroed, then strncpy 32 |
 
-sight without the mob; the client stops the current animation first (Z09 §17.2). Also sent by Pine ShineAnimate (part 15)
+sight without the mob; the client stops the current animation first (Z09 §17.2). Also sent by Pine ShineAnimate::sa_Step FUN_004f3240 for any object kind, players included (Z09 §23.4)
 
 ### `0x6C0E` NC_SCENARIO_FOG_CMD (hand-named) (S→C)
 
@@ -11537,6 +11537,16 @@ sight without the mob; the client stops the current animation first (Z09 §17.2)
 | 1 | u16 | depth |  |
 
 map-wide, not stored on the server
+
+### `0x6C10` NC_SCENARIO_BRIEFEFFECT_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone Pine ShineBriefEffect::sa_Step FUN_004f6ec0; client FUN_004a3d80)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | effectcode | argument 0 of `briefeffect all <code>.` |
+
+whole map, only for the target word `all`; client: 1 / 2 set the O / X answer effect of the OX quiz (inferred from OXFieldInit.ps) and play sound 0x1e, other codes ignored (Z09 §23.5)
 
 ### `0x6C11` NC_SCENARIO_NPCCHAT_CMD (hand-named) (S→C)
 
@@ -11712,6 +11722,14 @@ to one player (handle) or every player of a map (map name), Z09 §14.6
 | 0 | u32 | nDeleteSec | Lua argument 2 |
 
 to one player or every player of a map, Z09 §14.6
+
+### `0x7484` NC_GUILD_TOURNAMENTSTOP_CMD (S→C)
+
+**Verified layout** (basis: zone Pine ShineBattleStop::sa_Step FUN_004f4070 (AxialListProtocolSend 0x1d/0x84); client GuildTask::Recv_NC_GUILD_TOURNAMENTSTOP_CMD FUN_006b3240)
+
+Empty payload.
+
+no payload; whole map on `battlestop guild.`; client ends the tournament display (Z09 §23.6)
 
 ### `0x748D` NC_GUILD_MOBGUILD_CMD (hand-named) (S→C)
 
