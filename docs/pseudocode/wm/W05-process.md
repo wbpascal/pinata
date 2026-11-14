@@ -615,7 +615,302 @@ belongs to the zone (Z01 §5.2).
 
 ---
 
-<!-- Parts 3–4 add §4 session lifecycle, §5 W01 core gaps; the sweep part adds the bug table,
+## 4. Session pools and the client session lifecycle
+
+W01-core §2 / §3.2 / §5.4 document what happens *inside* a client session (world login, `CharacterLogout`,
+`Client_OnClosed`). This section documents the pool around it: how a slot is taken, reset, released and destroyed,
+which event leads there, and the same machinery for zone and OPTool sessions. Offsets are 2016 offsets (non-PDB
+export); member names are `CWMClientSession` **definition 2** of the PDB. The `wm-pdb` export types this class with
+definition 1, whose members are shifted by 4 or 8 bytes from `+0x6b8` on, so its member names for e.g.
+`CharDataFree` / `ActiveSession` are wrong there (it shows `m_bAttendanceRewardLock`, `m_dwReportTickCount`, … being
+reset; the 2016 code does not touch them).
+
+### 4.1 Pool structure (`CWMBaseSessionManager`)
+
+| Offset | Member *(pdb2016)* | Notes |
+|---|---|---|
+| +0x00 | vftable | slot 0 `ActiveSession`, slot 1 `InactiveSession` (RTTI vftables, below) |
+| +0x04 | `m_pSessionListArray` | `WM_SESSION_LIST[m_MaxSessions]`, 12 bytes each: prev, next, `pSession` |
+| +0x08 / +0x0c | `m_MaxSessions` / `m_NumSessions` | capacity / sessions in use |
+| +0x10 / +0x14 | `m_pActiveSessions` / `m_pEmptySessions` | heads of two doubly linked lists over the same nodes |
+| +0x18 | `m_pSessionArray` | the session objects (derived managers) |
+
+| Manager | vftable [0] / [1] | Session class, size | Extra members |
+|---|---|---|---|
+| `CWMClientSessionManager` (`m_Client`) | FUN_00438a60 / FUN_004380f0 | `CWMClientSession`, 0x1f7b8 | +0x1c `m_NextSendWMTime` (§2.2), +0x20 `m_ClientSeed` (u16, `rand()` at construction), +0x24 `m_SessionGroupByIPArray` (`std::vector<CWMClientSession**>`) |
+| `CWMZoneSessionManager` (`m_Zone`) | FUN_00439180 / FUN_00439920 | `CWMZoneSession`, 0x118 | +0x1c `m_MaxZoneSession`, +0x20 `m_ppZoneMappingTable[zoneNo]`, +0x24 / +0x28 indun map list (32 × 0xd), +0x1c8 / +0x1cc service map list (1024 × 0x10), +0x41cc `m_SendWMTime` |
+| `CWMOPToolSessionManager` (`m_OPTool`) | FUN_00439180 / FUN_00439080 | `CWMOPToolSession`, 0x118 | – |
+
+`CWMBaseSession` (0x114 bytes, all three session classes): +0x00 `m_Status` (`SESSION_STATUS`: 0 EMPTY, 1 CONNECTED,
+2 CONNECTING, 3 CLOSEING, 4 CLOSED; 5 … 0x18 are the CharDB guild-load steps, W03 §9.1), +0x04 `m_Connected_Server_ID`
+(peer type: 6 zone, 20 client, …), +0x08 / +0x0c `m_Connected_World` / `m_Connected_Zone`, +0x10 `m_Connected_Time`,
++0x20 `m_LastReceiveTime`, +0x28 `m_SocketIOCP` (socket at +0x28, peer `sockaddr` at +0x2c, i.e. IPv4 at +0x30 =
+`GetIPAddress` FUN_00433500), +0xdc `m_Packet`, +0xf4 … +0x108 last two packets (logs), +0x110
+`m_LastHeartBeatSendTime`. Zone and OPTool sessions add only +0x114 `m_SessionHandle` (u16); the OPTool manager
+constructs its sessions with the zone session's constructor / destructor (identical code).
+
+```pseudo
+CWMBaseSessionManager::InitSessions(m, n):                                  @ FUN_004301d0
+    FreeSessions(m)                                                          @ FUN_00430100 (delete the node array)
+    nodes = new WM_SESSION_LIST[n], chained 0 → n−1 (prev / next); pSession = null (set by the derived manager)
+    m_MaxSessions = n; m_NumSessions = 0; m_pEmptySessions = nodes[0]; m_pActiveSessions = null
+
+CWMClientSessionManager::InitSessions(m, n):    (Listen_Client, §1.3)       @ FUN_00437fd0
+    base FreeSessions; delete[] the old session array (each ~CWMClientSession)
+    if n > 0: base InitSessions(n); new CWMClientSession[n]  (ctor FUN_00434300 each)
+        for i: node[i].pSession = &session[i]; session[i].m_SessionHandle = i
+               m_ZoneLinking = 1; m_ZoneHandle = 0xFFFF
+    return 1
+CWMZoneSessionManager::InitSessions(m, n):      (Listen_Zone)                @ FUN_004397d0
+    same with CWMZoneSession[n]; also m_ppZoneMappingTable = new ptr[n] (all null); m_MaxZoneSession = n
+CWMOPToolSessionManager::InitSessions(m, n):    (Listen_OPTool)              @ FUN_00438f70
+    same with 0x118-byte sessions, no mapping table
+
+CWMBaseSessionManager::ActiveSession(m, socket, addr) → node:               @ FUN_004302f0
+    if m_NumSessions < m_MaxSessions and m_pEmptySessions:
+        node = m_pEmptySessions; s = node.pSession
+        s.m_Packet.vtbl[0x2c]()                                              # reset the receive buffer (inferred)
+        s.socket = socket; s.addr = addr (16 bytes); s.m_LastReceiveTime = timeGetTime()
+        s.m_LastHeartBeatSendTime = 0; s.m_Status = 2 (CONNECTING); s.m_Connected_Time = GetLocalTime()
+        EmptyToActive(m, node)                                               @ FUN_00430280
+            # unlink from the empty list, push at the head of the active list, m_NumSessions++
+            # (node == null: log "* NULL Session List used - CSocket_Session_Manager::CutFromEmpty *", count++ anyway)
+        return node
+    log "* ACCEPT NO SESSION BUFFER - ERROR *" once (flag DAT_004975f4, re-armed by the next success); return null
+    # ProcessConnect (§1.4) then closes the socket
+
+CWMBaseSessionManager::InactiveSession(m, node):                             @ FUN_004303d0
+    unlink node from the active list; push it at the head of the empty list; m_NumSessions−−; s.m_Status = 0 (EMPTY)
+```
+
+`CWMZoneSessionManager::ActiveSession` FUN_00439180 is only the base call (zone and OPTool share it).
+
+### 4.2 Handles
+
+A session's handle (`m_SessionHandle`, +0x114) is what other links carry to address it (client handle in the DB
+requests and in 0x0C14, W01 §1.1; zone handle in `NETPACKETZONEHEADER`). Slot = `handle % m_MaxSessions`, so a handle
+is valid only while the slot still holds the same generation:
+
+```pseudo
+CWMClientSessionManager::HandleIsValid(m, h) = session[h % max].m_SessionHandle == h          @ FUN_00437830
+Clients_GetByHandle(m, h) = that session if the handles match and m_Status == 1, else null   @ FUN_00437860 (W01)
+
+release (InactiveSession of the derived manager):
+    slot = h % max; h' = h + max (u16)
+    zone / OPTool only: if h' == 0xFFFF: h' = max − 1
+    if h' % max != slot: h' = slot                       # u16 wrap: start again at the slot index
+    session[slot].m_SessionHandle = h'
+```
+
+So every reuse of a slot advances its handle by `max`; answers from the DB servers or zones that arrive for a
+closed session find a different handle and are dropped. The client manager lacks the 0xFFFF check the zone and
+OPTool managers have: the slot `0xFFFF % max` reaches handle 0xFFFF after enough reuses (e.g. `max` = 1000:
+slot 535 after 65 reuses) **(original bug) W05-B8**. 0xFFFF is the "offline" value of the friend and
+holy-promise handle arrays (W04 §5, §12), so that player shows as offline to them *(inferred)*.
+
+### 4.3 Client session: construct, take, reset
+
+```pseudo
+CWMClientSession::CWMClientSession(s):      (InitSessions, once per slot)    @ FUN_00434300
+    CWMBaseSession ctor; PacketEncrypt; m_UserID; avatar array (6 × 0x82, all charNo = −1)
+    CFriendServer, CKQ (KQList_Init FUN_0045cfd0), CHolyPromiseServer, CChatRestrictServer (ChatRestrict_Construct)
+    m_LogoutType = 0x786 (u32 write: also m_ClientSeed = 0)
+    CharDataClear(s)                                                         @ FUN_00430600
+        # every blob pointer of W01 §6.3 = null (+0x560 … +0x6e0, +0x1ecf8), m_bCharDataValid = 0,
+        # m_CharOptionDataType = 0, spammer ring pointers +0x1ecec / +0x1ecf0 = null, ring index = 0
+    the remaining members 0 / −1 (guild, KQ, raid, tutorial, ranking delays; m_myRankingInfo memset)
+
+CWMClientSessionManager::ActiveSession(m, socket, addr):   (vftable[0], ProcessConnect §1.4)   @ FUN_00438a60
+    node = base ActiveSession(socket, addr); if null: return null
+    m.m_ClientSeed = (m.m_ClientSeed + 1) % pe_encryptlen; s.m_ClientSeed = m.m_ClientSeed   # sent in 0x0807 (W01 §3.2)
+    s.m_UserNo = −1
+    CharDataFree(s)                                     # the previous user's blobs are freed only here (below)
+    s.m_bKQServerTimeSend = 0; s.m_KQ_AutoRefreshActive = 0; s.m_KQ_AutoRefreshTime = 0
+    CKQ::Clear(s.m_KQ)                                                       @ FUN_0045cd60  (count 0, list time = now)
+    s.m_bGTFighter = 0; s.m_LastGuildTournamentJoinListAckTime = 0; s.m_LastGuildListAckTime = 0
+    s.m_nPlayingCharNo = −1; s.m_bFirstJoinSendRestExpLastExecteTimeToClient = 0
+    s.m_SessionMode = 0 (BEFORE_NC_USER_LOGINWORLD_REQ)   # W01 "loginStep"
+    s.m_dActiveTime = time()                              # W01 "acceptTime"; 2-hour login timeout
+    s.m_bClosingSession = 0
+    AddClientSessionToIPGroup(m, s)
+    s.m_tLastGuildWarAbleListAckTime = 0
+    return node
+```
+
+Not reset per connection: `m_LogoutType` keeps the previous connection's value (0x786 only on a slot's first use),
+so a session that ends without an explicit reason (socket drop, heartbeat timeout, login timeout, service stop:
+W05-B2) reports the reason of the slot's previous user to AccountDB 0x0C11, AccountLogDB 0x0722 and CharDB 0x1037
+**(original bug) W05-B9**. `m_UserID`, avatars, user type, guild and friend state are overwritten later, at world
+login (0x0C0F, W01 §3.2) or character login (0x1001, W01 §4.2). `m_bFirstJoinSend_WMTime_ToClient` is set by the
+CharDB character data and cleared by the first 0x0849 (§2.2); if the client drops in between, the next user of the
+slot just gets that first 0x0849 too (harmless).
+
+```pseudo
+CWMClientSession::CharDataFree(s):                                           @ FUN_00434530
+    s.m_bCharDataValid = 0
+    free + null every character blob with its size (W01 §6.3 table): +0x560 base … +0x590 abstate, skills[6] +0x598,
+        +0x5c8 … +0x5f8, inventories[3] +0x600, +0x618 … +0x630, +0x640 … +0x6b8 (CT, KQ map, charged buff, single
+        option, link-from, item cool-time, the 7 binary + 3 improved option blobs)
+    SpammerReportingTimeInfoInit(s)                                          @ FUN_00432a70
+        n = SR_Number (SpamerReport row 0, W04 §2.5); malloc u32[n] for +0x1ecec / +0x1ecf0 when still null (once per
+        slot, never freed); reportTime[i] = 0, reporterCharNo[i] = −1, ring index +0x1ecf4 = 0; malloc failure → 0
+    free +0x1ecf8 newbie-guide view list (0x10D8 blob); m_CharGamblePrevMap (+0x1ed04, Name3) = ""
+    free +0x6c0 coin, +0x6c8 / +0x6d0 / +0x6d8 card collection, +0x6e0 sell-item info
+    s.m_bZoneLink_DataValid (+0x1dfa0) = 0
+```
+
+Callers: `ActiveSession` (new connection), `fc_NC_CHAR_LOGIN_REQ` 0x1001 (W01 §4.2, before 0x1004 asks the CharDB
+for the new character) and the destructor. Neither logout nor disconnect frees the blobs: after a disconnect they
+stay allocated in the empty slot until it is reused or the process stops.
+
+### 4.4 Pending-login groups per IP
+
+`m_SessionGroupByIPArray` holds one `CWMClientSession*[10]` per IP that has sessions which have not yet sent the world
+login (log text: "array of session which is not certified yet").
+
+```pseudo
+CWMClientSessionManager::AddClientSessionToIPGroup(m, s):  (ActiveSession)   @ FUN_00438810
+    group = the entry whose first session has s's IP
+    if none: group = new ptr[10] = { s, 0 … } and append it    (alloc failure: log "Cannot memory allocation for
+             array of session which is not certified yet."; s stays ungrouped); return
+    put s into the first free slot of group
+    if that was slot 9 (10 sessions):            # a group never stays full, so the 'no free slot' case cannot occur
+        every session in group: m_bClosingSession = 1 (also s); remove the group from the vector (the 40-byte
+        pointer array itself is not freed: a small leak per flood)
+    # ProcessDisconnect then closes them all with "Invalid Client Session - NumberOfSessionOver(%d) …" (W01 §2)
+
+Clients_RemoveFromIpTable = RemoveClientSessionFromIPGroup(m, s) → bool:     @ FUN_004386e0
+    group = the entry whose first session has s's IP; find s in its 10 slots (else return 0)
+    shift the later slots left; slot 9 = 0
+    if the group is now empty: delete it, remove it from the vector
+    return 1
+```
+
+Callers of the removal: `CParserClient::Parser` FUN_00419690 when 0x0C0F moves the session to mode 1 (W01 §3.2), and
+`ProcessDisconnect` for every closed session (a no-op for sessions already removed). So at most 9 connections from
+one IP can wait for their world login at the same time; the 10th closes all of them (anti-flood; a NAT gateway
+with many simultaneous connects is affected too). The group lookup compares only the IP of the group's first session.
+
+### 4.5 Release: which event closes a client session
+
+Every client close path ends in the same two steps: something sets `m_Status = 3` (CLOSEING), and the next
+`ProcessDisconnect` pass (§1.5, W01 §2) does the teardown.
+
+| Event | Who sets state 3 | `m_LogoutType` set |
+|---|---|---|
+| socket closed / reset by the client, receive error | `Pump` r == 2 (§1.4) | – (stale, W05-B9) |
+| no packet for 30 s + 180 s | `ProcHeartBeat` → `CSocket_IOCP::CloseUseIOCP` FUN_00466120 (posts a zero-byte completion for the socket, the IOCP side then closes it, *inferred*) → as above | – |
+| first packet is not 0x0C0F, or a packet in mode −1 | `CParserClient::Parser` FUN_00419690 (W01 §3.2) | – |
+| a handler returns 0, incl. every unregistered opcode | `CParserClient::Parser`; `fc_dummyfunction` FUN_00412be0 logs "fc_dummyfunction, CLIENT, dep=%d, cmd=%d, length=%d …" + the previous packet and returns 0 | 0x781 (dummy only) |
+| login not completed within 7200 s | `ProcessDisconnect` (W01 §2) | – |
+| 10 pending sessions from one IP | `ProcessDisconnect` via `m_bClosingSession` (§4.4) | – |
+| quit (0x0C18 mode 0) | W01 §5.1 | 0x780 |
+| same account logs in again (0x0C0F) | `Kickoff(s, userNo)` FUN_00437dc0 (W01 §3.2): 0x0C17 {0x683} to the old session, log "CLIENT DOUBLE CONNECT CLOSE2" | 0x785 |
+| Login kicks the user (Login 0x0C16) | `Kickoff(userNo)` FUN_00437d50: every session with that `m_UserNo` gets 0x0C17 {0x683}; log "CLIENT DOUBLE CONNECT CLOSE1, nUserNo=%d"; returns 1 if any | 0x785 |
+| OPTool kick | W04 §4 / W01 §9 | 0x790 |
+| world-login refused, DB error | W01 §3.2 / §3.3 | 0x788 |
+| service stop / lost AccountDB / CharDB | `SetLogoutType` FUN_00437d20 then `DissconnectAllSessions` (§1.2, §1.6) | 0x782 / 0x789 / 0x78b |
+
+W01 §5.2 marks the Login-kick path *inferred*; the code above confirms it. W01-core §1 says unregistered opcodes
+"are ignored"; on the client link they close the session (above). The server links' `fc_dummyfunction`s return 1
+(AccountDB, GameLogDB, Login, OPTool, zone), 0 (AccountLogDB) or 0 from the 11th call on (CharDB, `DummyCount`);
+what a 0 does on those links is part 4 (W01 core gaps).
+
+```pseudo
+ProcessDisconnect, client part (after the links, W01 §2):                    @ FUN_00404e70
+    for each node of m_Client's active list:
+        s = node.pSession
+        if s.m_SessionMode == 0 and time() − s.m_dActiveTime > 7200: log "… TimeOver …"; s.m_Status = 3
+        if s.m_bClosingSession == 1: log "… NumberOfSessionOver …"; → close
+        elif s.m_Status == 3: → close
+      close:
+        s.m_SessionMode = −1 (INACTIVE_MODE)            # further packets are rejected by the parser
+        RemoveClientSessionFromIPGroup(m_Client, s)
+        CWMClientSession::Close(s) = Client_OnClosed (W01 §2) @ FUN_00437030
+            # CharacterLogout, AccountDB 0x0C11, AccountLogDB 0x0722 / 0xC803, zones 0x0C19, then Session_Close
+        m_Client.vftable[1](node) = CWMClientSessionManager::InactiveSession       @ FUN_004380f0
+            new handle (§4.2); s.m_ZoneLinking = 1; s.m_ZoneHandle = 0xFFFF; s.m_bCharDataValid = 0
+            base InactiveSession (to the empty list, m_Status = 0)
+        log "Closed CL from (%-25s world=%3d …)"
+
+Session_Close = CWMBaseSession::Close(s):                                    @ FUN_0042fc30
+    CSocket_IOCP::Shutdown(s.socket)                                         @ FUN_00466060
+        shutdown(sock, SD_SEND); on error other than WSAECONNRESET (10054, both codes): log
+        "ERROR - CSocket_IOCP::Shutdown : ret(%d), GetLastError(%d), WsaError(%d)"
+    CSocket_IOCP::Close(s.socket)                                            @ FUN_00466180
+        if sock != −1: closesocket; success → sock = −1, else log "ERROR - CSocket_IOCP::Close : …" (sock kept)
+        under the socket's lock: FreeBuffer; two counters at socket +0xa8 / +0xac = 0
+```
+
+`CParserCharDB::fc_NC_USER_AVATARINFO_ACK` FUN_0040ede0 on a DB error (W01 §3.3: 0x0C15 {0x46}, 0x788) calls
+`CWMClientSession::Close` directly without setting state 3. The session stays in the active list with a closed
+socket; when the network layer reports the dead socket (`Pump` r == 2 *inferred*) `ProcessDisconnect` runs
+`Client_OnClosed` a second time, so AccountDB 0x0C11, AccountLogDB 0x0722 / 0xC803 and the zone 0x0C19 go out twice
+for this user **(original bug) W05-B10** *(inferred: the second pass depends on how the IOCP layer reports a socket
+the WM closed itself)*.
+
+Zone and OPTool sessions are closed the same way in `ProcessDisconnect` (state 3 → `CWMBaseSession::Close` →
+vftable[1]), without logout reports:
+
+```pseudo
+CWMZoneSessionManager::InactiveSession(m, node):                             @ FUN_00439920
+    z = node.pSession
+    if m_ppZoneMappingTable[z.m_Connected_Zone] == z and z.m_Connected_Server_ID == 6:
+        if another active zone session has the same zone number: mapping[zoneNo] = it   # a second link of that zone
+        else mapping[zoneNo] = null
+    new handle (§4.2, with the 0xFFFF guard); base InactiveSession
+CWMOPToolSessionManager::InactiveSession(m, node):                           @ FUN_00439080
+    new handle; base InactiveSession
+```
+
+The zone's service-map entries (`SetServiceMapZoneNo`, W01 §7.1) are not touched on release; only the zone-number →
+session mapping is. A character login for a map of a lost zone then finds no session for that zone number and is
+refused with 0x145 "map under maintenance" (W01 §4.2) *(inferred from the two tables; the lookup itself is part 4)*.
+
+### 4.6 Destroy (process stop and exit)
+
+```pseudo
+ProcessStop (§1.6) → CWMClientSessionManager::DissconnectAllSessions (Client_OnClosed for every active session,
+                     W01 §2) → CWMClientSessionManager::FreeSessions(m)       @ FUN_00437660
+    base FreeSessions (node array); delete[] the session array → ~CWMClientSession for every slot
+    # zone / OPTool: DissconnectAllSessions (Close) + FreeSessions FUN_00439120 (also the mapping table) / FUN_00438e90
+
+CWMClientSession::~CWMClientSession(s):                                      @ FUN_004352e0
+    CharDataFree(s)                     # re-runs SpammerReportingTimeInfoInit: the two ring arrays are never freed
+    ChatRestrict_Destroy(+0x1e290)      (W04 §14.1)        HPInfo_Destruct(+0x1dfb0) FUN_0045d470 (W04 §12)
+    KQList_Destroy(+0x2594) FUN_0045cf90 (W04 §6)          ~CFriendServer(+0x708) FUN_0045c920 (count 0, 100 entries)
+    avatar array (6 × 0x82); ~CWMBaseSession FUN_0042fbc0 (~CPacket, ~CSocket_IOCP)
+```
+
+At process exit the global `gServer` is destroyed by `~WorldManagerServer` FUN_00403920: members in reverse
+construction order (ranking, gamble, class data, single data, GM events, quest timer, attendance, NPC schedule, the
+`CDataReader` tables, guild manager, 500 `Raid`s, KQ server, party finder, party, `m_MsgWM`, then each parser's
+`PROTOCOLFUNCTIONTEMPLETE` and session manager: OPTool, zone `~CWMZoneSessionManager` FUN_004396f0, client
+`~CWMClientSessionManager` FUN_00438630 (= `FreeSessions` + delete the IP-group vector storage), login, the DB
+links). The session arrays are normally already gone (`ProcessStop`), so these destructors find null pointers.
+
+### 4.7 Newbie-guide list on the first map login (0x10D9)
+
+```pseudo
+CWMClientSession::NewbieGuideViewListRefresh(s):  (zone 0x180C map login done, W01 §7.3)   @ FUN_00432ce0
+    if s.m_pCharDataNewbieGuideViewList (+0x1ecf8, CharDB 0x10D8 blob, W01 §6.3) == null: return
+    n = blob[0]
+    Send client 0x10D9 NC_CHAR_CLIENT_NEWBIE_GUIDE_VIEW_LIST_CMD { u8 nGuideViewNum = n, u8 nGuideViewList[n] }
+         (n + 1 bytes copied from the blob)
+    sent: free the blob (so only the first map login of a character sends it; 0x10DA updates go to the CharDB only,
+          W01 §5.3)
+    send failed: log "ERROR - CWMClientSession::ChatBlockSpamFilterRefresh, nCharNo=%d" (wrong function name in the
+          text (original bug) W05-B11); the blob is kept and resent on the next map login
+```
+
+Client GameFrameWork FUN_004ba310: clears its 197-entry "guide already seen" table (all −1), sets entry `id` for every
+listed `id < 0xC5` (larger ids are ignored), marks the list as received and, when the guide option is on, refreshes
+the guide window (FUN_00493040). Struct `PROTO_NC_CHAR_NEWBIE_GUIDE_VIEW_LIST_CMD { uchar nGuideViewNum; uchar
+nGuideViewList[] }` *(pdb2017)* matches the 2016 send. Layout: `annotations/W05.json`.
+
+---
+
+<!-- Part 4 adds §5 W01 core gaps; the sweep part adds the bug table,
      "Not reconstructed / uncertain" and "Coverage boundary". -->
 
 ## Original-server bugs (so far; completed in the sweep part)
@@ -623,9 +918,13 @@ belongs to the zone (Z01 §5.2).
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
 | W05-B1 | `MainThread` FUN_00407340 | sleeps 5 ms per pass only while the CharDB link is in state 1 | one CPU core at 100 % during start-up, the guild data load and while the CharDB is lost | sleep on every pass (or wait on events) |
-| W05-B2 | `OnStop_Service` FUN_00406d40 | sets `m_MainWorkStep = CLOSE_NORMAL` and `m_bStopMainThread = 1` together | the main thread exits before `MainWork` applies `SetLogoutType(0x782)`; logout reports of a service stop carry stale close reasons | set only the step and let `MainWork` stop the thread |
+| W05-B2 | `OnStop_Service` FUN_00406d40 | sets `m_MainWorkStep = CLOSE_NORMAL` and `m_bStopMainThread = 1` together | the main thread exits before `MainWork` applies `SetLogoutType(0x782)`; logout reports of a service stop carry stale close reasons (the session's last explicit reason, or the previous slot user's, W05-B9) | set only the step and let `MainWork` stop the thread |
 | W05-B3 | `CDailyQuestTimer` ctor FUN_00439f10 | December start: next month = February (month index 1) of next year | none (the year branch fires on 1 January and sets the month too) | month index 0 |
 | W05-B4 | `DQ_Schedule_Process` FUN_0043a120 | `tInitYear/Month/WeekQuest` are computed once at start and never advanced | after the first boundary each daily run recomputes year / month / week again; same values | advance the end times when a period rolls over |
 | W05-B5 | `CGuildTournamentServer::ReadScheduleData` FUN_0043d270 | with no `isActive == 1` row the loop leaves the last row selected and returns success | a table with every schedule disabled still runs the tournament on the last row's schedule | fail the load (or run no tournament) when no row is active |
 | W05-B6 | `CDataReader::Read` FUN_00458ca0 | byte checksum and MD5 run over `m_nBFSize` (buffer capacity), not `m_nFileSize` | none in the WM (each reader is filled once); a re-read of a smaller file into the same reader would hash stale bytes | hash `m_nFileSize` bytes |
 | W05-B7 | `ReadGlobalGameData` FUN_00404100 | every `*FATAL ERROR* … %s` text is passed to `_DEBUGMSG` without an argument for `%s` | on a failed load the log line prints a random stack pointer as a string or faults while logging | pass the file name |
+| W05-B8 | `CWMClientSessionManager::InactiveSession` FUN_004380f0 | new handle = old + max without the `== 0xFFFF` guard the zone / OPTool managers have | slot `0xFFFF % max` eventually gets handle 0xFFFF, the "offline" marker of friend / holy-promise handle arrays; that player shows offline *(inferred)* | skip 0xFFFF as the other managers do |
+| W05-B9 | `CWMClientSessionManager::ActiveSession` FUN_00438a60 | `m_LogoutType` is set to 0x786 only by the constructor, never per connection | a session closed without an explicit reason (socket drop, heartbeat, login timeout, service stop) reports the previous slot user's reason to AccountDB 0x0C11, AccountLogDB 0x0722 and CharDB 0x1037 | reset `m_LogoutType` to 0x786 in `ActiveSession` |
+| W05-B10 | CharDB 0x0C13 `fc_NC_USER_AVATARINFO_ACK` FUN_0040ede0 | DB-error path calls `CWMClientSession::Close` directly instead of setting state 3 | `Client_OnClosed` runs again when `ProcessDisconnect` sees the dead socket: duplicate 0x0C11 / 0x0722 / 0xC803 / 0x0C19 *(inferred)* | set `m_Status = 3` and let `ProcessDisconnect` close |
+| W05-B11 | `NewbieGuideViewListRefresh` FUN_00432ce0 | failure log names `CWMClientSession::ChatBlockSpamFilterRefresh` | misleading log line | log its own name |

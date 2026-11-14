@@ -9222,6 +9222,17 @@ sent on every map login once 0x0844 arrived
 |---|---|---|---|
 | 0 | Name8 | sMobIndex | NpcSchedule.shn Mob_Inx |
 
+### `0x10d9` NC_CHAR_CLIENT_NEWBIE_GUIDE_VIEW_LIST_CMD (WM→C)
+
+**Verified layout** (basis: wm FUN_00432ce0; client FUN_004ba310)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nGuideViewNum | number of guide ids that follow |
+| 1 | u8[nGuideViewNum] | nGuideViewList | guide ids already seen (client keeps ids < 0xC5) |
+
+nGuideViewNum + 1 bytes, copied from the CharDB 0x10D8 blob at the first map login (0x180C) of a character; blob freed after a successful send. Struct name PROTO_NC_CHAR_NEWBIE_GUIDE_VIEW_LIST_CMD (pdb2017).
+
 ### `0x10ed` NC_CHAR_EVENT_ATTENDANCE_LIST_CLIENT_CMD (WM→C)
 
 **Verified layout** (basis: wm FUN_0043bab0; client FUN_0049d030)

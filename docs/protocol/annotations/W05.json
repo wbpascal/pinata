@@ -2,21 +2,123 @@
   "_about": "W05 hand-verified layouts (offsets read in the 2016 WM; names pdb2016, same as the 2017 PDB)",
   "packets": {
     "wm": {
-      "0x0849": {"dir": "WM→C", "name": "NC_MISC_SERVER_TIME_NOTIFY_CMD", "basis": "wm FUN_00437e30, FUN_00432e10; client FUN_004a4420",
-        "fields": [[0, "tm", "dCurrentTM", "localtime() at send time (9 × i32: sec, min, hour, mday, mon, year, wday, yday, isdst)"],
-                   [36, "i8", "nTimeZone", "(mktime(local) − mktime(gmtime)) / 3600, truncated; standard-time offset (inferred)"]],
-        "notes": "37 bytes. Every 60 s to all in-game clients (inGame +0x704 == 1), first send aligned to the next full minute; once per character login at the first 0x180C (flag +0x1ed00 set by CharDB 0x1007). Client shows it as \"%H:%M GMT(+n)\" (FUN_0057d8f0)"},
-      "0x0804": {"dir": "WM→peer", "name": "NC_MISC_HEARTBEAT_REQ", "basis": "wm FUN_0042fda0",
+      "0x0849": {
+        "dir": "WM→C",
+        "name": "NC_MISC_SERVER_TIME_NOTIFY_CMD",
+        "basis": "wm FUN_00437e30, FUN_00432e10; client FUN_004a4420",
+        "fields": [
+          [
+            0,
+            "tm",
+            "dCurrentTM",
+            "localtime() at send time (9 × i32: sec, min, hour, mday, mon, year, wday, yday, isdst)"
+          ],
+          [
+            36,
+            "i8",
+            "nTimeZone",
+            "(mktime(local) − mktime(gmtime)) / 3600, truncated; standard-time offset (inferred)"
+          ]
+        ],
+        "notes": "37 bytes. Every 60 s to all in-game clients (inGame +0x704 == 1), first send aligned to the next full minute; once per character login at the first 0x180C (flag +0x1ed00 set by CharDB 0x1007). Client shows it as \"%H:%M GMT(+n)\" (FUN_0057d8f0)"
+      },
+      "0x0804": {
+        "dir": "WM→peer",
+        "name": "NC_MISC_HEARTBEAT_REQ",
+        "basis": "wm FUN_0042fda0",
         "fields": [],
-        "notes": "raw 3 bytes 02 04 08; sent once after 30 s without any received packet; no packet within 180 s more → the WM closes the link (\"ERROR - HEARTBEAT OVERTIME\")"},
-      "0x441c": {"dir": "WM→Zone", "name": "NC_QUEST_RESET_TIME_CMD", "basis": "wm FUN_00439d20 (from FUN_0043a120)",
-        "fields": [[0, "i32", "tResetYearQuest", "1 Jan 00:00 local"], [4, "i32", "tResetMonthQuest", "1st of the month 00:00"],
-                   [8, "i32", "tResetWeekQuest", "Monday 00:00"], [12, "i32", "tResetDayQuest", "today 00:00"]],
-        "notes": "16 bytes, broadcast to all zones at the first main-loop pass after local midnight"},
-      "0x441d": {"dir": "WM→Zone", "name": "NC_QUEST_RESET_TIME_ZONE_CMD", "basis": "wm FUN_00439e30 (from 0x101C handler)",
-        "fields": [[0, "u32", "nCharNo", "= charregistnumber of the zone's 0x101C NETPACKETZONEHEADER (the zone puts charNo there)"],
-                   [4, "i32", "tResetYearQuest", ""], [8, "i32", "tResetMonthQuest", ""], [12, "i32", "tResetWeekQuest", ""], [16, "i32", "tResetDayQuest", ""]],
-        "notes": "20 bytes, per character at map login"}
+        "notes": "raw 3 bytes 02 04 08; sent once after 30 s without any received packet; no packet within 180 s more → the WM closes the link (\"ERROR - HEARTBEAT OVERTIME\")"
+      },
+      "0x441c": {
+        "dir": "WM→Zone",
+        "name": "NC_QUEST_RESET_TIME_CMD",
+        "basis": "wm FUN_00439d20 (from FUN_0043a120)",
+        "fields": [
+          [
+            0,
+            "i32",
+            "tResetYearQuest",
+            "1 Jan 00:00 local"
+          ],
+          [
+            4,
+            "i32",
+            "tResetMonthQuest",
+            "1st of the month 00:00"
+          ],
+          [
+            8,
+            "i32",
+            "tResetWeekQuest",
+            "Monday 00:00"
+          ],
+          [
+            12,
+            "i32",
+            "tResetDayQuest",
+            "today 00:00"
+          ]
+        ],
+        "notes": "16 bytes, broadcast to all zones at the first main-loop pass after local midnight"
+      },
+      "0x441d": {
+        "dir": "WM→Zone",
+        "name": "NC_QUEST_RESET_TIME_ZONE_CMD",
+        "basis": "wm FUN_00439e30 (from 0x101C handler)",
+        "fields": [
+          [
+            0,
+            "u32",
+            "nCharNo",
+            "= charregistnumber of the zone's 0x101C NETPACKETZONEHEADER (the zone puts charNo there)"
+          ],
+          [
+            4,
+            "i32",
+            "tResetYearQuest",
+            ""
+          ],
+          [
+            8,
+            "i32",
+            "tResetMonthQuest",
+            ""
+          ],
+          [
+            12,
+            "i32",
+            "tResetWeekQuest",
+            ""
+          ],
+          [
+            16,
+            "i32",
+            "tResetDayQuest",
+            ""
+          ]
+        ],
+        "notes": "20 bytes, per character at map login"
+      },
+      "0x10d9": {
+        "dir": "WM→C",
+        "name": "NC_CHAR_CLIENT_NEWBIE_GUIDE_VIEW_LIST_CMD",
+        "basis": "wm FUN_00432ce0; client FUN_004ba310",
+        "fields": [
+          [
+            0,
+            "u8",
+            "nGuideViewNum",
+            "number of guide ids that follow"
+          ],
+          [
+            1,
+            "u8[nGuideViewNum]",
+            "nGuideViewList",
+            "guide ids already seen (client keeps ids < 0xC5)"
+          ]
+        ],
+        "notes": "nGuideViewNum + 1 bytes, copied from the CharDB 0x10D8 blob at the first map login (0x180C) of a character; blob freed after a successful send. Struct name PROTO_NC_CHAR_NEWBIE_GUIDE_VIEW_LIST_CMD (pdb2017)."
+      }
     }
   },
   "structs": {}
