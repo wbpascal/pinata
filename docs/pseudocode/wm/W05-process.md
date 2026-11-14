@@ -222,14 +222,17 @@ CWMBaseSession::CheckHeartBeat(s):                                          @ FU
     now = CGTimer::GetTime() (ms)
     if now − s.m_LastReceiveTime < 30000: s.m_LastHeartBeatSendTime = 0; return ok
     if s.m_LastHeartBeatSendTime == 0:
-        s.m_LastHeartBeatSendTime = now; SendRaw(s, 0x0804 NC_MISC_HEARTBEAT_REQ {})   # 3 raw bytes 02 04 08
+        s.m_LastHeartBeatSendTime = now
+        return CSocket_IOCP::Send(s, 0x0804 NC_MISC_HEARTBEAT_REQ {})   # 3 raw bytes 02 04 08; a failed send
+                                                                        # = fail: the peer is closed at once
     elif now − s.m_LastHeartBeatSendTime ≥ 180000:
         log "ERROR - HEARTBEAT OVERTIME, NOW DISSCONNECT WITH %s"; return fail
     return ok
 ```
 
 So a peer (DB server, Login, zone, OPTool or client) that sends nothing for 30 s gets one `0x0804`; if nothing at all
-arrives in the next 180 s, the WM closes it. Any received packet resets the timer (`m_LastReceiveTime`, network
+arrives in the next 180 s, the WM closes it. A fail result makes `ProcHeartBeat` FUN_00430160 call
+`CSocket_IOCP::CloseUseIOCP` on that peer, so a peer whose 0x0804 cannot be sent is closed right away. Any received packet resets the timer (`m_LastReceiveTime`, network
 library). After a CharDB reconnect the link goes through the whole guild load again (state 5 on 0x0803), while
 clients stay connected *(inferred: nothing blocks clients during it; their CharDB requests are sent on a link in
 state 5 … 0x18)*.
@@ -242,9 +245,11 @@ state 5 … 0x18)*.
     WorldManagerServer::OnStop_Service(&gServer)                               @ FUN_00406d40
         m_MainWorkStep = CLOSE_NORMAL; m_bStopMainThread = 1
         wait (Sleep 50 ms) until m_bActiveMainThread == 0
-    # (original bug) W05-B2: m_bStopMainThread is set together with the step, so MainThread leaves its loop
-    # without running MainWork's CLOSE_NORMAL case: SetLogoutType(0x782) is not applied and the logout reports
-    # (AccountDB 0x0C11 / AccountLog 0x0722) carry each session's current m_LogoutType instead of 0x782
+    # (original bug) W05-B2: m_bStopMainThread is set right after the step, with no hand-shake. MainThread
+    # (FUN_00407340) checks the flag only after MainWork: a stop that lands before MainWork runs (e.g. during
+    # the Sleep(5) of CharDB state 1, most of a normal pass) still runs the CLOSE_NORMAL case once and applies
+    # SetLogoutType(0x782); a stop that lands while MainWork is running ends the loop without it, and the
+    # logout reports (AccountDB 0x0C11 / AccountLog 0x0722) then carry each session's current m_LogoutType
 
 ProcessStop(this):                                                            @ FUN_004067f0
     CSocket_Acceptor::Listen_Stop; CIOCP::Close
@@ -304,7 +309,9 @@ CWMClientSessionManager::SendWMTimeToClient(this):     (every main-loop pass)   
     m_NextSendWMTime = mktime(localtime(now) with sec + 60)                       # = now + 60 s
     local = localtime(now2); utc = gmtime(now2)       # now2 = _time32() again
     nTimeZone = (i8)((mktime(local) − mktime(utc)) / 3600)     # signed hours, truncated toward 0
-    Send to every client session with inGame (+0x704) == 1:            # BroadCastToPlayer(&m_Client, pkt, 0)
+    Send to every client session with m_bCharDataValid (+0x704) == 1:  # BroadCastToPlayer(&m_Client, pkt, 0)
+        # +0x704 = W01's "inGame": set when the character data is complete (0x1005), cleared by
+        # CWMClientSession::Logout FUN_00436d50 and on release; the receiver may still be loading a map
         0x0849 { dCurrentTM = local, nTimeZone }                       #   @ FUN_00437b40 (W01 Clients_BroadcastInGame)
 
 CWMClientSession::SendWMTimeToClientFirst(s):   (from 0x180C map-login-done, W01 §7.3)   @ FUN_00432e10
@@ -323,9 +330,12 @@ the C runtime semantics)*; half-hour zones are truncated.
 
 Client: `GameFrameWork::On_NC_MISC_SERVER_TIME_NOTIFY_CMD` (2016 FUN_004a4420, name from the 2017 PDB) copies
 `dCurrentTM` to a global (DAT_00a80918), `nTimeZone` to DAT_00a8094c and stores `QueryPerformanceCounter` as the
-reference point. FUN_0057d8f0 shows the clock: `dCurrentTM` + elapsed seconds, `strftime("%H:%M")` followed by
+reference point. FUN_0057d8f0 shows the clock: copies `dCurrentTM`, adds the elapsed seconds to `tm_sec` only (no `mktime`
+normalisation), then `strftime("%H:%M")`, which ignores `tm_sec`: the clock shows the HH:MM of the last 0x0849
+and moves only when the next one arrives (hence the server's full-minute alignment, *inferred*). Then
 `" {color,yellow,GMT(+%d)}"` (or `"GMT(-%d)"` with the already negative value, so a negative zone shows as
-`GMT(--5)`; client-side). No error codes.
+`GMT(--5)`; client-side). When the cursor is over the clock (vfunc +0x14c hit test) a tooltip shows
+`strftime("%Y-%m-%d (%a)")` of the same `dCurrentTM`. No error codes.
 
 ### 2.3 Quest reset times (`CDailyQuestTimer`, 0x441C / 0x441D)
 
@@ -432,9 +442,9 @@ or row size refuses the file. All 2016 files pass (checked with `shn.py`: key, r
 WorldManagerServer::ReadGlobalGameData(this) → bool                                    @ FUN_00404100
     for each row of the table below, in order:
         ok = <loader>(<object>, "../9Data/Shine/<file>")
-        if !ok: _DEBUGMSG("*FATAL ERROR* - <text> READ FAILED %s"); return 0
-            # _DEBUGMSG passes its varargs to _vsnprintf but the call has no argument for "%s": the text
-            # prints whatever pointer is on the stack (or faults while logging) (original bug) W05-B7
+        if !ok: _DEBUGMSG("*FATAL ERROR* - <text> READ FAILED %s", path); return 0
+            # the path is pushed as the %s argument (disassembly at 0x40411b: push path, push format,
+            # call _DEBUGMSG, add esp,8); the export drops _DEBUGMSG's varargs. The two Attend texts have no %s
     # between rows 9 and 10: m_BoomStartKey1 … m_BoomStartKey6 (+0x22b4e4 … +0x22b4f8, u32) = 0;
     #   no WM function reads or writes them otherwise (dead members)
     CharClassDataBox::ccdb_Load(&m_CharClassDataBox, "../9Data/Shine/UseClassTypeInfo.shn")   # row 25
@@ -738,8 +748,8 @@ CWMClientSessionManager::ActiveSession(m, socket, addr):   (vftable[0], ProcessC
 ```
 
 Not reset per connection: `m_LogoutType` keeps the previous connection's value (0x786 only on a slot's first use),
-so a session that ends without an explicit reason (socket drop, heartbeat timeout, login timeout, service stop:
-W05-B2) reports the reason of the slot's previous user to AccountDB 0x0C11, AccountLogDB 0x0722 and CharDB 0x1037
+so a session that ends without an explicit reason (socket drop, heartbeat timeout, login timeout, service stop
+when W05-B2 hits, 0x0C18 from character select) reports the reason of the slot's previous user to AccountDB 0x0C11, AccountLogDB 0x0722 and CharDB 0x1037
 **(original bug) W05-B9**. `m_UserID`, avatars, user type, guild and friend state are overwritten later, at world
 login (0x0C0F, W01 §3.2) or character login (0x1001, W01 §4.2). `m_bFirstJoinSend_WMTime_ToClient` is set by the
 CharDB character data and cleared by the first 0x0849 (§2.2); if the client drops in between, the next user of the
@@ -804,7 +814,10 @@ Every client close path ends in the same two steps: something sets `m_Status = 3
 | a handler returns 0, incl. every unregistered opcode | `CParserClient::Parser`; `fc_dummyfunction` FUN_00412be0 logs "fc_dummyfunction, CLIENT, dep=%d, cmd=%d, length=%d …" + the previous packet and returns 0 | 0x781 (dummy only) |
 | login not completed within 7200 s | `ProcessDisconnect` (W01 §2) | – |
 | 10 pending sessions from one IP | `ProcessDisconnect` via `m_bClosingSession` (§4.4) | – |
-| quit (0x0C18 mode 0) | W01 §5.1 | 0x780 |
+| any client packet on a session whose `m_Status` ≠ 1 (e.g. after a quit set state 3) | `CParserClient::CheckConnectionValidation` FUN_00412b20 (called first by every client handler): logs "ERROR … CLIENT …", returns 0 → parser closes | 0x787 |
+| quit (0x0C18 mode 0) | `fc_NC_USER_NORMALLOGOUT_CMD` FUN_00412df0 (W01 §5.1): broadcasts 0x0C19 {userNo, 0xFFFFFFFF} to the zones, `Logout` FUN_00436d50, `m_Status = 3`; `Client_OnClosed` then broadcasts 0x0C19 **again** and calls `Logout` again (no-op: its +0x704 guard is cleared; only the unconditional tail, KQ / guild fields and `CPrisonServer::LogOutPrison`, repeats) **(original bug) W05-B25** | 0x780 |
+| 0x0C18 sent while `m_pCharDataBase == null` (quit from the character-select screen) | handler returns 0 → parser closes | – (stale, W05-B9) |
+| return to character select (0x0C18 mode 1) | nobody: the session stays open. `Logout` only (party / friend / KQ / guild / prison logoff, CharDB 0x1037); `m_ZoneLinking = 1`, `m_ZoneHandle = 0xFFFF`; blobs stay until `CharDataFree` at the next 0x1001 (§4.3) | 0x780 (kept: a later socket drop reports a normal logout) |
 | same account logs in again (0x0C0F) | `Kickoff(s, userNo)` FUN_00437dc0 (W01 §3.2): 0x0C17 {0x683} to the old session, log "CLIENT DOUBLE CONNECT CLOSE2" | 0x785 |
 | Login kicks the user (Login 0x0C16) | `Kickoff(userNo)` FUN_00437d50: every session with that `m_UserNo` gets 0x0C17 {0x683}; log "CLIENT DOUBLE CONNECT CLOSE1, nUserNo=%d"; returns 1 if any | 0x785 |
 | OPTool kick | W04 §4 / W01 §9 | 0x790 |
@@ -972,7 +985,7 @@ W01 §1 ("unregistered opcodes … are ignored") holds only for AccountDB, GameL
                                      nServerIDFrom 6)                                       @ FUN_00465ef0
         # the payload's world byte is NOT used for the lookup and not compared (original bug) W05-B13
     no row: log "ERROR - 접속해온 WolrdNo=%d, ZoneNo=%d, IP=%s 정보 없음" ("no info for the connecting world/zone")
-            with only two arguments for three conversions (original bug) W05-B12; return 0
+            with world (+5), zone (+6), ip (sprintf at 0x4285f3; the export drops the varargs); return 0
     if _mbsicmp(row.pIP, ip) != 0:                                 # case-insensitive string compare, no DNS
         log "ERROR - 대기중인 WorldNo=%d, ZoneNo=%d IP=%s, 접속해온 WorldNo=%d, ZoneNo=%d IP=%s 다름" ("expected … differs"); return 0
     newZone = (CWMZoneSessionManager::GetZoneSession(zone) == null)
@@ -1180,7 +1193,7 @@ NC_MISC_HACK_SCAN_STORE_CMD FUN_00415bc0 only run `Client_CheckAlive`.
 | `CChatRestrictServer::Get(charNo)` FUN_0045cb90 | linear search over `n` (+0) entries of the charNo array at +0x8a0; returns entry +4 + 0x16·i or null | CharDB id change (W04 §14) |
 | `CHolyPromiseServer::Clear` FUN_00451000 | `CHolyPromise::Clear`, then the 3 handle words at +0x22c..+0x231 = 0xFFFF | logout (W04 holy promise) |
 | `CFriend::PartyChange` FUN_0045c430 | find the friend whose Name5 (5 dwords @+8) matches; set its party byte (+0x1e in the 0x48-byte entry); 1 if found | W04 §5 friend party state |
-| `CKQServer::Send_NC_KQ_VOTE_BAN_MSG_LOGOFF_CMD` FUN_004530e0 | if CHARDATA and inGame (+0x704): Send 0x5830 with payload size 1 and no data: the byte is whatever the stack buffer held (`CSendPacket` ctor FUN_0045fd30 clears only size / id; `CSendPacket::ID` FUN_0045fe70 copies nothing for a null source) (original bug) W05-B19. The 2017 struct is empty (`sizeof` 1) | KQ map login (W04 §6) |
+| `CKQServer::Send_NC_KQ_VOTE_BAN_MSG_LOGOFF_CMD` FUN_004530e0 | if CHARDATA and `m_bCharDataValid` (+0x704, W01 inGame): Send 0x5830 with payload size 1 and no data: the byte is whatever the stack buffer held (`CSendPacket` ctor FUN_0045fd30 clears only size / id; `CSendPacket::ID` FUN_0045fe70 copies nothing for a null source) (original bug) W05-B19. The 2017 struct is empty (`sizeof` 1) | KQ map login (W04 §6) |
 | `Raid::iterator::GetPartyRegNo` FUN_00462ae0, `Raid::GetSubLeader` FUN_004629c0, `Raid::GetLooter` FUN_00462a50, `Raid::GetLooting` FUN_00462a80 (raid + 0x24), `CLooting::reset` FUN_00464740 (4 types 0, looter −1), `GetItemLootingType` FUN_004646d0, `GetLooter` FUN_00464760 / `SetLooter` FUN_00464770 (+0x10), `CParty::operator[]` FUN_00464f50 (party no ≥ 4000 → `CParty::p_def`; else 0xd0-byte entries) | accessors | W02 (raid / party loot) |
 | `PROTO_NC_DATA_SEND2<PROTO_NC_RAID_MEMBER_LIST_CMD>` ctor FUN_004359c0 | zero-inits the 4 × 0x14 and 0x15 × 0x14 MEMBER_INFO arrays | W02 raid member list |
 | `std::list<AttendanceInfo>::push_back` FUN_0043b770 / `insert` FUN_0043b830 / `erase` FUN_0043b340 | STL | W04 §17.5 |
@@ -1404,6 +1417,7 @@ via `std::string::append` FUN_00458bb0).
 | `CGuildMemberServer::Send_NC_GUILD_WAR_START_CMD` / `…_END_CMD` FUN_00444180 / FUN_00444230 | `BroadCastToMember` of 0x7433 (0x3c bytes) / 0x7434 (0x22 bytes); the payloads are W03 §3.3 `Guild_WarStart` / `Guild_WarEnd` |
 | `CGuildAcademyMember::~CGuildAcademyMember` FUN_0045b250 | destroys the 100 × 0x6d member array (`CGuildManager::Clear`, W03) |
 | `RandomBox::rb_1000` FUN_00467bc0 | `well512_GetRandom(1000)` (KQ team draw, W04 §6): `cWell512Random::well512_GetRandom()` FUN_00468fd0 is the WELL512 generator (16-word state) returning `state / 2^32` in [0, 1); `well512_GetRandom(n)` FUN_00469080 = `round(r × 10^11) % n` |
+| `CPartyFinder::Find(name)` FUN_0045d510 *(pdb2016)* | linear search of the party-finder list for the entry whose `sCharID` (Name5, 5 dwords) equals `name`; null if none. Used by `CPartyFinder::Del` FUN_0045d670 (W02 §1.5 `PartyFinder_Delete`), reached from `Logout` → `CPartyFinderServer::LogOffChar` (§4.5) |
 | `Name8::operator=` FUN_004244d0 | 32-byte name copy (NPC schedule, W04 §17.6) |
 | `std::list<AttendanceInfo>::splice` FUN_0043bda0 | STL splice used by `EA_Schedule_Process` (W04 §17.5) |
 | `String` FUN_00467170 / FUN_00467200 (ctors), FUN_00467090 (dtor), FUN_004670d0 / FUN_00467230 (`operator=`), FUN_00467250 (`operator==`), FUN_004670c0 (`makeUpper`), FUN_004670b0 (`getBuffer`) | the small heap-string class of `ParseCmd` and `WinService` (§1.1, §6.3); FUN_00467230 = `operator=(other.chData)` |
@@ -1413,17 +1427,17 @@ via `std::string::append` FUN_00458bb0).
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
 | W05-B1 | `MainThread` FUN_00407340 | sleeps 5 ms per pass only while the CharDB link is in state 1 | one CPU core at 100 % during start-up, the guild data load and while the CharDB is lost | sleep on every pass (or wait on events) |
-| W05-B2 | `OnStop_Service` FUN_00406d40 | sets `m_MainWorkStep = CLOSE_NORMAL` and `m_bStopMainThread = 1` together | the main thread exits before `MainWork` applies `SetLogoutType(0x782)`; logout reports of a service stop carry stale close reasons (the session's last explicit reason, or the previous slot user's, W05-B9) | set only the step and let `MainWork` stop the thread |
+| W05-B2 | `OnStop_Service` FUN_00406d40 | sets `m_MainWorkStep = CLOSE_NORMAL` and `m_bStopMainThread = 1` together; `MainThread` tests the flag after each `MainWork` | timing-dependent: when the stop lands while `MainWork` runs (not during the 5 ms sleep), the thread exits before `MainWork` applies `SetLogoutType(0x782)`; logout reports of that service stop carry stale close reasons (the session's last explicit reason, or the previous slot user's, W05-B9) | set only the step and let `MainWork` stop the thread |
 | W05-B3 | `CDailyQuestTimer` ctor FUN_00439f10 | December start: next month = February (month index 1) of next year | none (the year branch fires on 1 January and sets the month too) | month index 0 |
 | W05-B4 | `DQ_Schedule_Process` FUN_0043a120 | `tInitYear/Month/WeekQuest` are computed once at start and never advanced | after the first boundary each daily run recomputes year / month / week again; same values | advance the end times when a period rolls over |
 | W05-B5 | `CGuildTournamentServer::ReadScheduleData` FUN_0043d270 | with no `isActive == 1` row the loop leaves the last row selected and returns success | a table with every schedule disabled still runs the tournament on the last row's schedule | fail the load (or run no tournament) when no row is active |
 | W05-B6 | `CDataReader::Read` FUN_00458ca0 | byte checksum and MD5 run over `m_nBFSize` (buffer capacity), not `m_nFileSize` | none in the WM (each reader is filled once); a re-read of a smaller file into the same reader would hash stale bytes | hash `m_nFileSize` bytes |
-| W05-B7 | `ReadGlobalGameData` FUN_00404100 | every `*FATAL ERROR* … %s` text is passed to `_DEBUGMSG` without an argument for `%s` | on a failed load the log line prints a random stack pointer as a string or faults while logging | pass the file name |
+| W05-B7 | – | withdrawn in review: `ReadGlobalGameData` does pass the path for `%s` (the export drops varargs, §3.2) | – | – |
 | W05-B8 | `CWMClientSessionManager::InactiveSession` FUN_004380f0 | new handle = old + max without the `== 0xFFFF` guard the zone / OPTool managers have | slot `0xFFFF % max` eventually gets handle 0xFFFF, the "offline" marker of friend / holy-promise handle arrays; that player shows offline *(inferred)* | skip 0xFFFF as the other managers do |
 | W05-B9 | `CWMClientSessionManager::ActiveSession` FUN_00438a60 | `m_LogoutType` is set to 0x786 only by the constructor, never per connection | a session closed without an explicit reason (socket drop, heartbeat, login timeout, service stop) reports the previous slot user's reason to AccountDB 0x0C11, AccountLogDB 0x0722 and CharDB 0x1037 | reset `m_LogoutType` to 0x786 in `ActiveSession` |
 | W05-B10 | CharDB 0x0C13 `fc_NC_USER_AVATARINFO_ACK` FUN_0040ede0 | DB-error path calls `CWMClientSession::Close` directly instead of setting state 3 | `Client_OnClosed` runs again when `ProcessDisconnect` sees the dead socket: duplicate 0x0C11 / 0x0722 / 0xC803 / 0x0C19 *(inferred)* | set `m_Status = 3` and let `ProcessDisconnect` close |
 | W05-B11 | `NewbieGuideViewListRefresh` FUN_00432ce0 | failure log names `CWMClientSession::ChatBlockSpamFilterRefresh` | misleading log line | log its own name |
-| W05-B12 | zone 0x0802 FUN_004283e0 | "no info" log `WolrdNo=%d, ZoneNo=%d, IP=%s` gets two arguments | `%s` reads a stray stack value: garbage or a fault while logging a zone with an unknown number | pass the peer IP |
+| W05-B12 | – | withdrawn in review: the 0x0802 "no info" log gets world, zone and IP (§5.2) | – | – |
 | W05-B13 | zone 0x0802 FUN_004283e0 | `server_from_world_num` is stored but neither used for the ServerInfo lookup nor compared with the WM's world | a zone configured for another world (same zone number and IP) registers and is stored with the wrong world | refuse a world mismatch |
 | W05-B14 | CharDB `fc_dummyfunction` FUN_00409ae0 | `DummyCount` is global and never reset; from the 11th unknown CharDB packet of the process lifetime each one returns 0 | rare unknown packets accumulate over days until one closes the CharDB link (`CLOSE_CHAR_DB`) | count per connection or per time window |
 | W05-B15 | CharDB blob pushes (§5.4), zone 0x4013 FUN_0042a160 | copies `len − 2` (zone items `len − 4`) bytes from payload+2 (+6); `len` = 2 + payload | each blob holds 2 (items 4) bytes read past the packet; they go to the zones in 0x101C *(inferred from `len`)* | copy `len − 4` (`len − 8`) |
@@ -1436,6 +1450,7 @@ via `std::string::append` FUN_00458bb0).
 | W05-B22 | `WinService::removeService` FUN_00466b70 | the result of `OpenServiceA` is not checked; `DeleteService` failure is ignored; returns true | `REMOVE` prints "<SERVICE REMOVE OK>" for a service that does not exist or could not be deleted | return false when the open or the delete fails |
 | W05-B23 | `WinService::startDispatcher` FUN_00466fd0 | assigns the name argument to itself instead of to `serviceName` | `RegisterServiceCtrlHandlerA` gets an empty name; no effect for a `SERVICE_WIN32_OWN_PROCESS` service (Windows ignores the name) | `this->serviceName = name` |
 | W05-B24 | `WinService::onServiceStop` FUN_00466c20 | closes `handleServiceEvent` only when it equals `INVALID_HANDLE_VALUE` (and then closes −1) | the event handle is never closed; none in practice (the process ends right after) | close it when it is valid |
+| W05-B25 | quit 0x0C18 mode 0 FUN_00412df0 + `Client_OnClosed` FUN_00437030 | the handler broadcasts 0x0C19 to the zones, then the close path broadcasts it again | every normal quit sends two 0x0C19 for the user to every zone (zones handle an absent user, W01 §5.1 / Z01) | broadcast only in `Client_OnClosed` |
 
 ## 8. Not reconstructed / uncertain
 
@@ -1447,8 +1462,9 @@ via `std::string::append` FUN_00458bb0).
   `"_"` *(inferred from the Ghidra label)*; the `MiniDumpWriteDump` type 0x40
   (`MiniDumpWithIndirectlyReferencedMemory`) is taken from the decompiled argument order.
 - `gpShineServerIDShortNames` (§6.4) is a table of 21 string pointers; its texts are not listed here (logs only).
-- §3.4 `CShnDataFileCheckSum`: built but never read in the WM. Whether a zone or the client compares the same
-  49-name list was not checked (zone and client items own those binaries).
+- §3.4 `CShnDataFileCheckSum`: built but never read in the WM. The zone's copy of the class is the one used: its
+  0x1801 check against the client's SHN checksums (FUN_00631350, 49 × 0x41 entries, code 0x147) is documented in
+  `docs/pseudocode/zone/Z01-core.md` (map login); the WM keeps a dead copy of the shared class.
 - The socket / IOCP layer and the `CCsl` script reader are described here only by what the WM calls (§1.3–§1.5, §4.5,
   §5.2): the send queue, partial writes, buffer limits and the script grammar are S02's.
 

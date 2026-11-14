@@ -20,7 +20,7 @@
             "(mktime(local) − mktime(gmtime)) / 3600, truncated; standard-time offset (inferred)"
           ]
         ],
-        "notes": "37 bytes. Every 60 s to all in-game clients (inGame +0x704 == 1), first send aligned to the next full minute; once per character login at the first 0x180C (flag +0x1ed00 set by CharDB 0x1007). Client shows it as \"%H:%M GMT(+n)\" (FUN_0057d8f0)"
+        "notes": "37 bytes. Every 60 s to all client sessions with m_bCharDataValid (+0x704, W01 inGame) == 1, first send aligned to the next full minute; once per character login at the first 0x180C (flag +0x1ed00 set by CharDB 0x1007). Client shows it as \"%H:%M GMT(+n)\" (FUN_0057d8f0): HH:MM of the last 0x0849 (elapsed seconds only added to tm_sec, not shown), date tooltip \"%Y-%m-%d (%a)\""
       },
       "0x0804": {
         "dir": "WM→peer",

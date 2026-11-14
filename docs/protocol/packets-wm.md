@@ -9274,7 +9274,7 @@ sent on every map login once 0x0844 arrived
 | 0 | tm | dCurrentTM | localtime() at send time (9 × i32: sec, min, hour, mday, mon, year, wday, yday, isdst) |
 | 36 | i8 | nTimeZone | (mktime(local) − mktime(gmtime)) / 3600, truncated; standard-time offset (inferred) |
 
-37 bytes. Every 60 s to all in-game clients (inGame +0x704 == 1), first send aligned to the next full minute; once per character login at the first 0x180C (flag +0x1ed00 set by CharDB 0x1007). Client shows it as "%H:%M GMT(+n)" (FUN_0057d8f0)
+37 bytes. Every 60 s to all client sessions with m_bCharDataValid (+0x704, W01 inGame) == 1, first send aligned to the next full minute; once per character login at the first 0x180C (flag +0x1ed00 set by CharDB 0x1007). Client shows it as "%H:%M GMT(+n)" (FUN_0057d8f0): HH:MM of the last 0x0849 (elapsed seconds only added to tm_sec, not shown), date tooltip "%Y-%m-%d (%a)"
 
 ### `0x0860` NC_MISC_SPAMMER_REPORT_ACK (WM→C)
 
