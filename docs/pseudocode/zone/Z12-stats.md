@@ -904,6 +904,332 @@ existing buff is extended by (full hours past 6 h + 1) × 10 min. `so_AbnormalSt
 
 ---
 
+## 6. Login data parsing (WM → zone character blobs)
+
+At a map login (first login or map change) the WM streams the character's cached blobs to the zone, each as its own
+packet `{ NETPACKETZONEHEADER ref (u16 clienthandle, u32 charNo), body }` (W01 §6.3 table, §7.2 order), ending with
+`0x101D NC_CHAR_ZONE_CHARDATA_ACK`. The zone-side wrappers (player lookup by `ref`, "Invalid player" →
+`so_Disconnect(0x689)`) are Z07 §1.2; each passes `body = payload + 6` to one `ShinePlayer` method. This section is those
+methods: the body layout (2016 server PDB struct; the 2017 client PDB has the same sizes), the members they fill and the
+copy most of them forward to the client. All client copies go through `so_GetDataSocketStream` (vt 0x2f8) `→ vt 0xc`
+(send to this player), built in the global packet buffer `gpp` (opcode at +0, body at +2; `pp_SetPacketLen` takes the
+length including the opcode, "Packet Too Long" asserts and drops).
+
+### 6.1 Summary
+
+| WM → Z | Body (pdb2016) | Method (vt) @ | Members filled | Client copy |
+|---|---|---|---|---|
+| 0x101F BASE | `PROTO_NC_CHAR_BASE_CMD` 0x69 | `so_charbasedata` (0x674) @ FUN_0044d890 | `sp_CharData.toclient.basedata` (p+0x7f3d, Z07 §1.1), position | 0x1038 NC_CHAR_CLIENT_BASE_CMD |
+| 0x1020 SHAPE | `PROTO_AVATAR_SHAPE_INFO` 4 | `so_charsharpdata` (0x678) @ FUN_0044ae80 | `sp_CharData.toclient.shape` (p+0x7fa6) | 0x1039 NC_CHAR_CLIENT_SHAPE_CMD |
+| 0x1021 QUEST_DOING | `PROTO_NC_CHAR_QUEST_DOING_CMD` | `so_StoreQuestDoing` (0x67c) @ FUN_0044b3c0 | `sp_QuestDiary` (`CQuest`, p+0x173e8) | 0x103A NC_CHAR_CLIENT_QUEST_DOING_CMD |
+| 0x1022 QUEST_DONE | `PROTO_NC_CHAR_QUEST_DONE_CMD` | `so_StoreQuestDone` (0x680) @ FUN_0044b500 | `sp_QuestDiary` | 0x103B NC_CHAR_CLIENT_QUEST_DONE_CMD |
+| 0x10CD QUEST_READ | `PROTO_NC_CHAR_QUEST_READ_CMD` | `so_StoreQuestRead` (0x684) @ FUN_0044b640 | `sp_QuestDiary` | 0x10CE NC_CHAR_CLIENT_QUEST_READ_CMD |
+| 0x10D6 QUEST_REPEAT | `PROTO_NC_CHAR_QUEST_REPEAT_CMD` | `so_StoreQuestRepeat` (0x688) @ FUN_0044b770 (profiler string says `so_StoreQuestRead`) | `sp_QuestDiary` | 0x10D7 NC_CHAR_CLIENT_QUEST_REPEAT_CMD |
+| 0x1023 ABSTATE | `PROTO_NC_CHAR_ABSTATE_CMD` | `so_CharAbstateData` (0x68c) @ FUN_0044e0e0 | `smo_Abstate.abstatelist` (p+0x1cc), abstate bits | none (0x103C is never sent) |
+| 0x1024 SKILL | `PROTO_NC_CHAR_SKILL_CMD` (chunked) | `so_charskilldata` (0x690) @ FUN_0044bf20 | `smo_CharClass` (p+0xfbc), `sp_SkillList` (p+0x17d0c) | 0x103D NC_CHAR_CLIENT_SKILL_CMD (after the last chunk) |
+| 0x1025 PASSIVE | `PROTO_NC_CHAR_SKILL_PASSIVE_CMD` | `so_charpassivedata` (0x698) @ FUN_0044e5a0 | `sp_Passive` (p+0x17d30) | 0x103E NC_CHAR_CLIENT_PASSIVE_CMD |
+| 0x1029 GUILD | `u32 guildNo` | `so_ply_SetMyGuildNo` (0x81c) @ FUN_0055a1f0 | `m_nMyGuildNo` (p+0x2a31c) | none |
+| 0x1098 GUILD_ACADEMY | `u32 academyNo` | `so_ply_SetMyGuildAcademyNo` (0x860) @ FUN_0055a530 | `m_nMyGuildAcademyNo` (p+0x2a328) | none |
+| 0x102E ITEM (×6) | `PROTO_NC_CHAR_ITEM_CMD` | `so_StoreInventoryFromServer` (0x69c) @ FUN_0044ddf0 | `sp_Item.itembag` (p+0x7fd8) boxes | 0x1047 NC_CHAR_CLIENT_ITEM_CMD |
+| 0x102F CHESTINFO | `PROTO_NC_CHAR_CHESTINFO_CMD` | `so_ply_Getchestinform` (0x6c4) @ FUN_0044c8a0 | `sp_ChestItemBox` (p+0x29326) | none |
+| 0x1030 GAME | `PROTO_GAMEDATA_CMD` 5 | `so_Storegamedata` (0x6a0) @ FUN_0044c220 | `sp_GameData` (p+0x7fb8) | 0x1048 NC_CHAR_CLIENT_GAME_CMD |
+| 0x1032 CHARGEDBUFF | `PROTO_NC_CHAR_CHARGEDBUFF_CMD` | `so_CharChargedBuffData` (0x694) @ FUN_0044e1e0 | `sp_ChargedItem.ci_List` (p+0x2a330) | 0x104A NC_CHAR_CLIENT_CHARGEDBUFF_CMD |
+| 0x101D CHARDATA_ACK | `u16 wldmanhandle` | Z07 §1.4 → `so_StoreCharData` (0x4b4) @ FUN_0055ab60 | `sp_CharBriefInfo`, `sp_MiscFlag.DataRecieve` | (0x1802 login ACK, Z07 §1.4) |
+
+The other blobs of W01 §6.3 have their own owners: 0x1031 title (Z07 §1.3), 0x10D3 single option and 0x10B8 link-from
+(part 4 of this item, Z07 §1.2), 0x10D0 item cool-times (Z07 §1.2), card collection, chat colour, minimon, tutorial, coin,
+repurchase list, mover link data (Z07 §1.2 table). **0x1026 (house), 0x1028 ("maspup"), 0x102A (emblem), 0x102B (pet),
+0x102C (arena), 0x102D (sea war) have no handler in the 2016 zone** (no `pft_Store` for dept 4 cmd 38, 40, 42–45 in
+`handlers.json`): a WM that sends them has them dropped by the parser.
+
+Order dependencies: `so_charskilldata` takes the class from `shape` (0x1020 must come first, which the WM order
+guarantees); the stat matrix is built only in `0x101D` (`so_allparametercalculate`, §1.4) and after 0x1032 (Z07 §1.2),
+so the blobs themselves never recalculate. `CharClass` (`smo_CharClass`, used by every class slot of §3.1) is first set by
+`so_charskilldata` (§6.5), so the skill blob's `so_ply_TotalSkillEmpower` already reads the right class; it is set again
+from `shape.chrclass` by every `so_allparametercalculate` (§1.4) and by `so_ply_ClassChange` (FUN_004521b0, class change).
+
+### 6.2 Base and shape
+
+```pseudo
+so_charbasedata(p, b: PROTO_NC_CHAR_BASE_CMD)                                     @ FUN_0044d890
+    # b { u32 chrregnum, Name5 charid, u8 slotno @0x18, u8 Level @0x19, u64 Experience @0x1a, u16 CurPwrStone @0x22,
+    #     u16 CurGrdStone @0x24, u16 CurHPStone @0x26, u16 CurSPStone @0x28, u32 CurHP @0x2a, u32 CurSP @0x2e,
+    #     u32 CurLP @0x32, u32 fame @0x36, u64 Cen @0x3a, LoginLocation logininfo @0x42 { Name3 currentmap,
+    #     SHINE_COORD_TYPE currentcoord { u32 x, u32 y, u8 dir } }, CHARSTATDISTSTR statdistribute @0x57 (6 bytes),
+    #     u8 pkyellowtime @0x5d, u32 pkcount @0x5e, u16 prisonmin @0x62, u8 adminlevel @0x64, flags @0x65 (4 bytes) }
+    if p.sp_CharData.basedata.chrregnum != b.chrregnum:
+        log to "RegistNumberLog" (file opened on first use): new name, old name, old and new charNo      # no reject
+    p.sp_CharData.toclient.basedata = b                                   # whole 0x69 bytes
+    if basedata.Level >= 151:  so_Disconnect(0x689, 0, 0); return        # 151 = size of the level tables (§5.1)
+    *p.so_LocateInfo.location = (currentcoord.x, currentcoord.y)          # object position (p+0x66 points at it)
+    copy = b;  f = fieldlist search by fm_MapID == b.logininfo.currentmap (FieldMap::fm_Compare)
+    if f == null: assert "so_charbasedata : Map not fount"; return        # nothing sent (the login then stalls, inferred)
+    copy.logininfo.currentmap = f.fm_FieldOption.mapidclient              # the client's map id (instance maps, Field.txt)
+    p ← 0x1038 NC_CHAR_CLIENT_BASE_CMD { PROTO_NC_CHAR_BASE_CMD copy }     # 0x69 bytes
+
+so_charsharpdata(p, s: PROTO_AVATAR_SHAPE_INFO)                                   @ FUN_0044ae80
+    # s { u8 race:2, chrclass:5, gender:1; u8 hairtype; u8 haircolor; u8 faceshape }
+    p.sp_CharData.toclient.shape = s
+    p ← 0x1039 NC_CHAR_CLIENT_SHAPE_CMD { s }                              # 4 bytes
+```
+
+Client: `0x1038` → character object (FUN_006631f0; in the zone-login scene also copies the name to DAT_00b1b3d0),
+`0x1039` → class = `(b0 >> 2) & 0x1f` (FUN_006614c0; zone login writes `UserInfo.txt`) (C01).
+
+### 6.3 Quests
+
+All four go through the shared quest library into one array: `CQuest` (= `sp_QuestDiary.sqd_QuestDiary`, a `CQuestZone`,
+Z08 §3) `{ m_NumOfQuest +8, m_NumOfQuestBF +0xc (capacity), PLAYER_QUEST_INFO* m_pQuestArray +0x10, m_ProcessedTime +0x14 }`.
+`PLAYER_QUEST_INFO` (0x20) = `{ u16 ID, u8 Status (PLAYER_QUEST_STATUS), PLAYER_QUEST_DATA Data (0x1d) { i64 StartTime,
+i64 EndTime @+8, u32 RepeatCount @+0x10, u8 ProgressStep @+0x14, u8 End_NPCMobCount[5] @+0x15, u8 End_Location:1 /
+End_Scenario:1 @+0x1a, u16 End_RunningTimeSec @+0x1b } }`. Each `Recv_*` upserts one record per entry: the first record
+with the same `ID` is overwritten, else it is appended while `m_NumOfQuest < m_NumOfQuestBF` (a full array silently drops
+the entry; the function then returns 0, which no caller reads).
+
+```pseudo
+so_StoreQuestDoing(p, b { u32 chrregnum, u8 bNeedClear @4, u8 nNumOfDoingQuest @5, PLAYER_QUEST_INFO[n] @6 })   @ FUN_0044b3c0
+    CQuest::Recv_NC_CHAR_QUEST_DOING_CMD_ACK                                       @ FUN_0062f6e0
+        if bNeedClear: m_NumOfQuest = 0; m_ProcessedTime = _time32()          # first chunk empties the whole array
+        upsert each 32-byte record as is
+    p ← 0x103A NC_CHAR_CLIENT_QUEST_DOING_CMD { u32 chrregnum, u8 bNeedClear, u8 n, PLAYER_QUEST_INFO[n] }   # 6 + 32n
+
+so_StoreQuestDone(p, b { u32 chrregnum, u16 nTotalDoneQuest @4, u16 nTotalDoneQuestSize @6, u16 nDoneQuestCount @8,
+                         u16 nIndex @0xa, PLAYER_QUEST_DONE_INFO[n] @0xc { u16 ID, i64 tEndTime } })   @ FUN_0044b500
+    CQuest::Recv_NC_CHAR_QUEST_DONE_CMD_ACK                                        @ FUN_0062f7c0
+        per entry upsert { ID, Status = PQS_DONE (2), Data.EndTime = tEndTime }
+        # built in a stack record: only ID, Status, the first StartTime byte (0) and EndTime are written; the other
+        # 21 bytes (StartTime bytes 1-7, RepeatCount, ProgressStep, counters, flags) are uninitialised stack (original bug) Z12-B10
+    p ← 0x103B NC_CHAR_CLIENT_QUEST_DONE_CMD { the 12-byte header as received, PLAYER_QUEST_DONE_INFO[n] }   # 0xc + 10n
+
+so_StoreQuestRead(p, b { u32 chrregnum, u16 nNumOfReadQuest @4, u16 QuestReadIDArray[n] @6 })   @ FUN_0044b640
+    CQuest::Recv_NC_CHAR_QUEST_READ_CMD_ACK                                        @ FUN_0062f890
+        per ID upsert { ID, Status = PQS_READ_ABLE (20), Data byte 0 = 0, rest uninitialised (same as B10) }
+    p ← 0x10CE NC_CHAR_CLIENT_QUEST_READ_CMD { u32 chrregnum, u16 n, u16 ID[n] }   # 6 + 2n
+
+so_StoreQuestRepeat(p, b { u32 chrregnum, u16 nNumOfRepeatQuest @4, PLAYER_QUEST_INFO[n] @6 })   @ FUN_0044b770
+    CQuest::Recv_NC_CHAR_QUEST_REPEAT_CMD_ACK                                      @ FUN_0062f960
+        upsert each 32-byte record as is (Status as stored by the DB, normally PQS_REPEAT 4, inferred)
+    p ← 0x10D7 NC_CHAR_CLIENT_QUEST_REPEAT_CMD { u32 chrregnum, u16 n, PLAYER_QUEST_INFO[n] }   # 6 + 32n
+```
+
+The client copies are byte-identical forwards of the bodies; only the chunked DONE list (W01 §6.3: ≤ 8000 bytes per
+chunk) can arrive several times. Client: `0x103A` `{u8 reset @4, u8 n @5, 32-byte records @6}` (FUN_00727fd0),
+`0x103B` `{u16 n @8, 10-byte records @0xc}` (FUN_007280b0), `0x10CE` `{u16 n @4, u16[n] @6}` (FUN_007281b0), `0x10D7`
+`{u16 n @4, 32-byte records @6}` (FUN_00728280) (C01) — the same offsets.
+
+### 6.4 Abnormal states
+
+```pseudo
+so_CharAbstateData(p, b { u32 chrregnum, u16 number @4, ABSTATEREADBLOCK[number] @6 })   @ FUN_0044e0e0
+    if number >= 792 (0x318): assert "Too many ABState"; return
+    empty the list smo_Abstate.abstatelist.+0xcb0 (p+0xe7c)
+    AbstateListInObject::asl_Store(&p.smo_Abstate (p+0x1cc), p, b)                @ FUN_0040afd0
+        p.so_Getabstatebit() (vt 0x4a0) = so_emptyabstate               # 99-byte ABNORMAL_STATE_BIT cleared
+        empty so_mobile_AbstateList() (vt 0x52c) +0xcb0 again
+        for each r: ABSTATEREADBLOCK (0x24) { u16 abstateid, u8 strength @2, u32 pasttime @3 (ms), u32 resttime @7 (ms),
+                    u16 restcount @0xb, SKILL_EMPOWER empower @0xd, CasterInfo { u8 nLevel @0xf, i32 nAttackPower @0x10 },
+                    { u16 Index, u16 Value } setitem[4] @0x14 }:
+            start = max(0, now − pasttime × 10 / 1000)                  # clockwatch ticks of 0.1 s (Z09 knowledge)
+            e = dic_abstate[abstateid] (AbStateStr); id > as_maxhandle or no row: assert "No dic"; next
+            node = abstatetemplate.asl_AbstateList[e.index.AbStataIndex]; null: assert "invalid abstate"
+            party = node.asn_Abstate.vt[0xc]()     # true only for AbnormalStatePartyEnchant, …CouplePartyEnchant,
+                                                   # …GuildAcademyMasterEnchant (all other element classes return 0)
+            if resttime == 0:  p.so_AbnormalState_Set(party ? p : null, AbStataIndex, strength, e, start, 0, restcount, 0, 0, 0)
+            else:              p.so_AbnormalState_Set(party ? p : null, AbStataIndex, strength, e, now, 0, restcount, resttime …)
+                               # vt 0x638 @ FUN_004162d0 (Z03 §6.2; Z11 §3.1 uses the same order, keep = 8th); the decompile shows
+                               # no 9th/10th argument on this call (uncertain). The set is refused while so_GetHP() == 0
+            el = asl_Abstate_IsSet(list, AbStataIndex); null: assert "Null abstate" (e.g. dead at login)
+            else: el.aeo_SetItemEffect = r.setitem[0..3] (siae_SetItemEffectRestore @ FUN_005102b0: eb_Index = Index,
+                      Argument_Base1000 = Value); el.aeo_Caster.nLevel = r.CasterInfo.nLevel; .nAttackPower = r.nAttackPower
+            if not party: set bit AbStataIndex in so_Getabstatebit()
+            # empower (r+0xd) is not read
+```
+
+Nothing is sent to the client here; the client learns the states through the brief info (`abstatebit`, built after
+0x101D) and the abstate informs of Z03 §6. The client handler for `0x103C` (FUN_00661d60, `{u16 n @4, 36-byte records @6}`,
+C01) is never fed by the 2016 zone (no write of opcode 0x103C in the zone binary).
+
+### 6.5 Skills
+
+`CharaterSkillList` (p+0x17d0c) = `{ vector<CharSkill> csl_Skill, int csl_SkillNumber +0x10, vector<CharacterToggleSkill>
+csl_ToggleSkill +0x14 }`; `CharSkill` (0x14) = `{ u16 cs_SkillId, u32 cs_EndOfCooltime @4 (tick), SKILL_EMPOWER cs_Empower @8
+{damage:4, sp:4, keeptime:4, cooltime:4}, u32 cs_Mastery @0xc, int cs_bSave @0x10 }`.
+
+```pseudo
+so_charskilldata(p, b { u32 chrregnum, PARTMARK PartMark @4 {bIsStart:1, bIsEnd:1, nOrder:6}, u16 nMaxNum @5,
+                        u16 number @7, PROTO_SKILLREADBLOCK[number] @9 })   @ FUN_0044bf20
+    # PROTO_SKILLREADBLOCK (0x10) { i32 savetime (time32 of the save), PROTO_SKILLREADBLOCKCLIENT skilldata @4
+    #     { u16 skillid, u32 cooltime @2 (remaining s at savetime), u16 empow @6, u32 mastery @8 } }
+    p.smo_CharClass = charclassmanager.ccm_array[shape.chrclass] (chrclass < 64, else &charclassmanager)   # §3.1
+    p.so_GetCharRegistNumber()                                            # result unused
+    CharaterSkillList::csl_Store(&p.sp_SkillList, b)                               @ FUN_00449360
+        if number >= 3000: assert "Too many skills"; return
+        if csl_SkillNumber == 0: csl_Skill.resize(nMaxNum); csl_ToggleSkill.clear()   # first chunk
+        for each r: s = csl_Skill[csl_SkillNumber]                        # no bound check against nMaxNum (original bug) Z12-B11
+            s.cs_SkillId = r.skillid; s.cs_Empower = r.empow (4 nibbles); s.cs_Mastery = r.mastery
+            s.cs_bSave = (r.cooltime != 0)
+            rest = max(0, r.cooltime − (int)difftime(now, r.savetime));  s.cs_EndOfCooltime = now_tick + rest × 10
+            csl_Toggle_Store(r.skillid)                                            @ FUN_00448c60
+                row = skilldatabox[skillid] (null: assert "INVALID Skill Data"); if row.sdi_ToggleData not empty:
+                    csl_ToggleSkill.push({ skillid, bSkillOn = toggle state of row.sdi_PrevSkill's skill if listed, else 0 })
+            csl_SkillNumber++
+        if csl_SkillNumber == nMaxNum:                                    # last chunk
+            csl_CheckDefSkill()                                                    @ FUN_00447fb0
+                # appends every `defskill` id missing from the list (cs_EndOfCooltime = now, rest 0); `defskill`
+                # (DefSkillData @ 0x0af0d288, 32 × {u16 skill, u8 exist, u8 only2mage}, dsd_Max) is never written in the
+                # 2016 zone (only the atexit initialiser), so dsd_Max = 0 and this is a no-op (dead code)
+            sort csl_Skill by CharSkill::cs_Compare_STLVer
+    if csl_SkillNumber != nMaxNum: return                                 # wait for the next chunk
+    hdr = gpp+2:  hdr.restempow (u8 @0) = so_ply_TotalSkillEmpower() (vt 0x6b8 @ FUN_00559fd0: PrimaryParameter[level].+0x7c
+                  of smo_CharClass, level ≥ 151 → row 0) − csl_EmpowerSummary()   (negative: assert "Too many empow", 0)
+                  hdr.PartMark (u8 @1) = bIsStart; hdr.nMaxNum (u16 @2) = csl_SkillNumber; hdr.skill.chrregnum (u32 @4)
+    i = 0
+    loop:
+        i = csl_FillSendBuffer_Client(&hdr.skill, i, &hdr.nMaxNum)                 @ FUN_00445460
+            # from list index i: at most 500 records per packet; skips (and decrements hdr.nMaxNum for) the item-use
+            # pseudo-skills 29200–29205 (UseSilverWings, UseStageRecallScroll, UseSkill, UsePotion, UsePresentBox,
+            # UseScroll), 29428 MineStun_W, 29429 UseMineNormalScroll, 29535/29536 M_WarH_* (ActiveSkill.shn)
+            # record PROTO_SKILLREADBLOCKCLIENT { skillid, cooltime = remaining (cs_EndOfCooltime − now)/10 s
+            #   (> 10800 s: assert "Too long cooltime", still sent), empow, mastery }; returns the next list index
+        if i < 1: break
+        if i >= hdr.nMaxNum: PartMark.bIsEnd = 1                         # list index vs visible count (original bug) Z12-B9
+        p ← 0x103D NC_CHAR_CLIENT_SKILL_CMD { u8 restempow, PARTMARK, u16 nMaxNum, u32 chrregnum, u16 number,
+                                             PROTO_SKILLREADBLOCKCLIENT[number] }   # 12 + 12·number
+        PartMark: bIsStart = 0, nOrder += 1
+        while i < hdr.nMaxNum
+```
+
+Client `Skill::InitSkill` (FUN_006a0690): `bIsStart` → `ClearLearnSkill`; stores `nMaxNum` and `restempow`; learns each
+record (id @+10, empower nibbles @+16/17, mastery @+18 of the payload) and, if `cooltime ≠ 0`, records the skill as used
+`(EmpowerAppliedCoolTime − cooltime·k)` ago (cool-down continues); then refreshes all skill icons. It never reads
+`bIsEnd`/`nOrder`.
+
+### 6.6 Passives
+
+```pseudo
+so_charpassivedata(p, b { u16 number, u16 passive[number] @2 })                @ FUN_0044e5a0
+    sp_Passive.cpl_Passive.bs_clear(); sp_Passive.cpl_SetAbstateList.clear()
+    CharacterPassiveList::cpl_Store(&p.sp_Passive, b, so_CharName())                @ FUN_00447aa0
+        for each id: id >= 1000: assert "Invalid passive"; next
+                     set bit id in cpl_Passive (if < bs_maxbit)
+                     cpl_StoreSetAbstateList(id)                                    @ FUN_00447340
+                         s = passivedatabox.sdb_GetSetAbstate(id); if s: if s.pssabs_Prev (lower step) is listed, remove it;
+                         append s                                     # passive-granted abstates, read by §2.4
+    p ← 0x103E NC_CHAR_CLIENT_PASSIVE_CMD { u16 number, u16 passive[number] }   # as received, invalid ids included
+```
+
+Client FUN_0069f430: `{u16 n, u16 id[n]}`, at most 3001 (C01).
+
+### 6.7 Inventory
+
+```pseudo
+so_StoreInventoryFromServer(p, b: PROTO_NC_CHAR_ITEM_CMD)                        @ FUN_0044ddf0
+    # b { u8 PacketOrder { nPacketOrderNum:7, nIsLastOfInven:1 }, u8 nPartMark @1, PROTO_ITEM_CMD ItemCmd @2
+    #     { u8 numofitem, PROTO_ITEMPACKET_TOTAL[ ] @3 { u8 datasize, ITEM_INVEN location { Pos:10, Type:6 }, item data } } }
+    box = nPartMark & 4    → 9  ci_Inventory   ItemBag::ib_Initializetotal              @ FUN_00643a00
+          else & 8         → 8  ci_Equipment   ib_Initializetotal
+          else & 0x10      → 12 ci_MiniHouse   ib_Initializetotal
+          else & 0x20      → 15 ci_ActionBox   ItemSmallBag::isb_Initializetotal          @ FUN_0044d5d0
+          none             → no store; `box` keeps the low byte of the body pointer (original bug) Z12-B12
+        # both initialisers, per record: skip it unless location.Type == box; Pos ≥ bag size: assert "Invalid slot";
+        # else iti_fill2struct_whole (default attribute class, item data) into the cell at Pos, and set the cell's
+        # attribute class from itmattcontainer[itemid] (isb_: ItemInform_ActionItem::sii_Import). Next record at
+        # +1+datasize. Cells not in the packet are not cleared (the bags start empty at object creation).
+    for every item of ci_Inventory: item.attrclass.vt[0x44](item)     # only ItemAttrCls_ItemChest overrides it
+                                                                     # (iac_Getitemchest @ FUN_0063e410 returns a pointer,
+                                                                     # discarded): no effect
+    if not PacketOrder.nIsLastOfInven: return                         # inventory arrives in several chunks (W01 §6.3)
+    hdr = gpp+2: { u8 numofitem, u8 box @1, u8 flag @2 (bit 0 invenclear), PROTO_ITEMPACKET_INFORM[ ] @3 }
+    if box == 15:
+        size = isb_FullBufferItem2Client(ActionBox, &numofitem, records, 15)          @ FUN_0044d6d0
+            # every non-empty cell (iic_ItemIdent ≠ 0xFFFF): sii_Export, location = (15 << 10) | slot, iti_fill2buffer_union
+            # with the cell's attribute class, datasize = 2 + item bytes; stops after ≥ 8000 bytes
+        numofitem ≠ ItemCmd.numofitem: assert "ItemNumber not match" (still sent)
+        flag bit 0 = 1;  p ← 0x1047 { hdr, records }                  # one packet
+    else:
+        sent = 0; first = 1
+        while (size = CharacterInventory::ci_FillBufferInventoryItem(&itembag, &numofitem, records, box, &sent, 8000, null)) > 0:
+                                                                                      @ FUN_00643d40
+            # bag = charinvenman.cim_Array[box] (box < 17); skip `sent` non-empty cells, then write each further
+            # non-empty cell { datasize, location = (box << 10) | slot, iti_fill2buffer_union(item) } until ≥ 8000 bytes;
+            # an item id missing from ItemInfo stops the packet (return 0; its "Invalid ItemID found" assert is dead)
+            flag bit 0 = first;  p ← 0x1047 { hdr, records }          # size + 5 bytes with the opcode
+            first = 0
+        # an empty box sends nothing (the client keeps whatever it had); flag bits 1–7 are left from earlier gpp use
+```
+
+Client `0x1047`: item manager load (FUN_00666eb0 on DAT_00a8d120), `invenclear` empties the box first, then the shortcut bar
+is refreshed (C01). `PROTO_NC_CHAR_CLIENT_ITEM_CMD.flag` has only `invenclear` (pdb2016), so the stale upper bits are
+unused.
+
+### 6.8 Chest locations, game data, charged buffs
+
+```pseudo
+so_ply_Getchestinform(p, b { u16 itemnum, u16 location[itemnum] @2 })          @ FUN_0044c8a0
+    sp_ChestItemBox.bs_clear()            # TreasureChestLocationManager = BitSet (p+0x29326; maxbit at +4)
+    for each loc: loc < bs_maxbit: set bit loc; else assert "Too large location"
+    # the occupied "inside a treasure chest" cells (Z09 §10.10: chest contents live at inven 0x2800 + n; tcm_PutInto
+    # allocates from this set, inferred); the reverse is so_SaveChestInfo @ FUN_004547a0 (u16 n, u16 loc[n],
+    # stops at 3995 entries), the body of the dept-16 chest save 0x4014 that the WM caches (W05 table, inferred). No client copy.
+
+so_Storegamedata(p, b: PROTO_GAMEDATA_CMD { ZoneServer zone { u8 bIsGM }, Client client @1 { u16 partyno, u16 nRaidNo } })   @ FUN_0044c220
+    p.sp_GameData = b (5 bytes)
+    p.sp_GameData.client.partyno = partymanufacture.pm_FindParty(charNo)   # the zone's own party table wins
+    p ← 0x1048 NC_CHAR_CLIENT_GAME_CMD { u16 partyno, u16 nRaidNo }        # 4 bytes; the client ignores it (C01)
+
+so_CharChargedBuffData(p, b { u16 NumOfChargedBuff, PROTO_CHARGEDBUFF_INFO[n] @2 })   @ FUN_0044e1e0
+    # PROTO_CHARGEDBUFF_INFO (0xe) { u32 ChargedBuffKey, u16 ChargedBuffID @4, ShineDateTime UseTime @6, ShineDateTime EndTime @0xa }
+    # ShineDateTime (u32) { year:8 (since 2000, inferred), month:5, date:6, hour:6, minute:7 }
+    empty sp_ChargedItem.ci_List; ci_bRecalcParam = 0
+    for each r (out = record slot i of the client copy):
+        eff = chargedbuffdatabox.cideb_FindFromHandle(ChargedBuffID)              @ FUN_00450390
+        eff == null: log to ChargedItemLog; the slot is skipped but still counted (original bug) Z12-B13
+        el = ci_List.vt[8](ChargedBuffKey)                                  # new element for this key
+        el == null: log; return                                            # no client copy at all
+        ChargedItemEffectElement::ciee_SetEndTime(el, eff, EndTime fields)          @ FUN_004504d0
+            # ciee_Index = eff; ciee_Year/Month/Date/Hour/Minute = EndTime (UseTime is not stored)
+        out = r (14 bytes)
+    p ← 0x104A NC_CHAR_CLIENT_CHARGEDBUFF_CMD { u16 NumOfChargedBuff, PROTO_CHARGEDBUFF_INFO[NumOfChargedBuff] }
+    # the wrapper (0x1032, Z07 §1.2) then runs so_allparametercalculate: the buffs' stat effects (§2.5 / Z07 §4)
+```
+
+Client `0x104A`: `{u16 n, n × 14-byte records @2}`, FUN_006d2540 per record (C01).
+
+### 6.9 End of data: `so_StoreCharData` (vt 0x4b4) and `sp_LoginInit`
+
+```pseudo
+so_StoreCharData(p, handle, tag)                                               @ FUN_0055ab60
+    # called by 0x101D (Z07 §1.4) with handle = its ref.clienthandle (the player's zone handle) and tag = the
+    # handler's name string, before the map marking and so_allparametercalculate
+    if p.so_Field and p.so_Field.fm_FieldOption and fm_FieldOption.NameHide (FieldAttr +0x6a): return    # see below
+    title = so_GetCharacterTitle() (vt 0x420) +0x488 (CHARTITLE_BRIEFINFO { u8 Type, u8 ElementNo, u16 MobID })
+    BriefInformationCharacter::bic_InitBriefInfo(&p.sp_CharBriefInfo, handle, smo_GetMode(), &p.sp_CharData, &title, tag)
+                                                                                   @ FUN_0055a9b0
+        if mode in {0, 1, 2}:   # the cached PROTO_NC_BRIEFINFO_LOGINCHARACTER_CMD (0xeb, bic_BriefInfo)
+            coord = basedata.logininfo.currentcoord; charid = basedata.charid; shape; chrclass = shape.chrclass
+            emoticon = { id 0xFF, frame 0 }; chartitle = title; polymorph = 0xFFFF; handle = handle
+    sp_BriefEquipmentSetting()                                                     @ FUN_00576010
+        mode 0–3: so_briefequipset (vt 0x5c8 @ FUN_0054df70); 4, 5: so_BriefEquipSetBackup; 6: so_BriefEquipSetRiding
+    sp_MiscFlag.DataRecieve = 1
+```
+
+At the first login `so_Field` is not yet set (the map marking follows in 0x101D), so the `NameHide` test can only
+matter for a re-login on a live object *(inferred)*; on such a map the brief info would keep its old content. `tag`
+is not read.
+
+```pseudo
+ShinePlayer::sp_LoginInit(p)                                                    @ FUN_00440d80
+    # called by sp_NC_MAP_LOGINCOMPLETE_CMD (FUN_00443390, Z01) and sp_ReviveNow (FUN_0057d290, the revive path of Z07 §3.1 / Z11)
+    sp_LastBoothSlotSend = 0xFF; so_ply_SendBoothSize() (vt 0x3e0)
+    sp_TimerStr = { ts_Limit 0, ts_CallFunc / ts_TimerFunc = no-op stubs, ts_CurWork TSCW_NONE }
+    sp_DuringItemEquip = 0; so_InitAIScript() (vt 0xc14); sp_RideInitialize()
+    smo_DeadCheck (p+0x180) = 0; pmi_Clear(sp_LastPartyParam); smo_Flag.DeadProcessComplete = smo_Flag.InSkillShift = 0
+    sp_NormalLogoutTick = 0xFFFFFFFF; empty sp_MobHuntLog
+    sp_LastStat.last = parameter_eraser_plus      # all zero: the next notify (§4.2) reports every stat as changed
+```
+
+---
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -916,9 +1242,23 @@ existing buff is extended by (full hours past 6 h + 1) × 10 min. `so_AbnormalSt
 | Z12-B6 | `NormalPY/NormalMA::roe_FreeStateAttackPower` @ FUN_005003c0 / FUN_00500390 | the physical rule set adds `FreeStatInt.MAAbsolute`, the magical one `FreeStatStr.WCAbsolute` | DoT snapshots (`roe_GetAttackPower`) of physical states grow with spent INT, magical ones with STR | physical STR, magical INT (as `roe_Damage`) |
 | Z12-B7 | `NormalPY/NormalMA::roe_FreeStateDefendPower` @ FUN_00500420 / FUN_005003f0 | read the **attacker** (`ctx.att`), and the other kind's stat (PY: Men.MRAbsolute, MA: Con.ACAbsoulte); the only caller (`roe_AttackPowerCalcDamage` from DoT / bomb damage) passes `att = NULL` | the free-stat defence never reduces DoT / bomb damage (always 0) | `ctx.def`, PY Con.ACAbsoulte, MA Men.MRAbsolute |
 | Z12-B8 | `RestExpAbstateApplication` @ FUN_0059d510 | `so_AbnormalState_Inform` / `BroadcastSet` get `SubAbState.KeepTime` of the row, not the computed duration | the client shows the rest-exp buff with the table duration, not the real remaining time | pass `ms` |
+| Z12-B9 | `so_charskilldata` @ FUN_0044bf20 | the chunk loop compares the next **list index** (hidden skills included) with `nMaxNum`, which `csl_FillSendBuffer_Client` decrements for every hidden skill | with more than 500 skills and hidden ones in the first chunk, `bIsEnd` is set and the loop stops early: the last skills are never sent (practically unreachable: ≤ 10 hidden ids) | count visible records, or compare with `csl_SkillNumber` |
+| Z12-B10 | `CQuest::Recv_NC_CHAR_QUEST_DONE_CMD_ACK` / `…READ_CMD_ACK` @ FUN_0062f7c0 / FUN_0062f890 | the 32-byte record is built on the stack with only `ID`, `Status`, the first `StartTime` byte and (DONE) `EndTime` written | the stored done / read records carry stack garbage in `StartTime`, `RepeatCount`, `ProgressStep`, the counters and flags; anything that reads or saves them sees random values | zero the record first |
+| Z12-B11 | `CharaterSkillList::csl_Store` @ FUN_00449360 | the vector is sized `nMaxNum` on the first chunk; later records are written at `csl_SkillNumber` without a bound check (only `number < 3000` per chunk) | a WM whose chunks add up to more than `nMaxNum` writes past the vector (heap corruption) and the client list is never sent (`csl_SkillNumber` never equals `nMaxNum`) | check `csl_SkillNumber < nMaxNum` per record |
+| Z12-B12 | `so_StoreInventoryFromServer` @ FUN_0044ddf0 | when `nPartMark` has none of the bits 4/8/0x10/0x20, nothing is stored but the box number used for the client copy is the low byte of the body pointer | a malformed last chunk sends a random box (or nothing when the byte is ≥ 17) | return without a client copy |
+| Z12-B13 | `so_CharChargedBuffData` @ FUN_0044e1e0 | a buff id missing from `chargedbuffdatabox` is skipped, but its 14-byte slot in the client copy is still counted (`NumOfChargedBuff` unchanged, the output pointer advances) | the client gets a record of stale `gpp` bytes and shows a bogus charged buff | compact the list and send the stored count |
 
 ## N. Not reconstructed / uncertain
 
+- §6.4: the `so_AbnormalState_Set` call for states with a remaining time shows only eight arguments in the decompile;
+  `how` / `origin` were not checked in the assembly. The `party` test is read from the element classes' vt 0xc bodies.
+- §6.8: the meaning of the chest-location numbers (cells inside treasure chests) is inferred from `tcm_PutInto` taking
+  `sp_ChestItemBox` (Z11 §8.4 `&kqreward`, Z09 §10.10); `TreasureChestLocationManager` was not read beyond
+  its constructor (`BitSet(8)`).
+- §6.9: whether `so_Field` can be set when 0x101D arrives (the `NameHide` early return) was not traced through the
+  map-change path.
+- §6.1: whether the 2016 WM ever sends 0x1026 / 0x1028 / 0x102A–0x102D (unhandled in the zone) depends on the CharDB
+  sending their source blobs (W01 §6.3); not checked in captures.
 - §4.2: why the notify subtracts `cec_MoreStat` from `sp_LastStat.last` and why `Total.MAmin/MAmax` subtract the flat
   item MA (`Item.Plus.MAmin/MAmax`) while WC does not; the client side (how `CharInfoWin` combines `change` with item
   values) was not traced.
