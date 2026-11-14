@@ -211,6 +211,29 @@
         ],
         "notes": "answer 0x3C02 {u8 reply}; Z02 §6.6, Z18 §2.4"
       },
+      "0x5c03": {
+        "dir": "S→C",
+        "name": "NC_WT_GRADE_CMD",
+        "basis": "zone FUN_0059e190 (ShinePlayer::so_weapontitle); client FUN_00479fa0 (GameFrameWork, 'Weapon title has been upgraded.')",
+        "fields": [
+          [0, "u16", "ItemInven", "ITEM_INVEN: 0x200A (equipment slot 10) when equipment slot 12 is empty, else 0x200C"],
+          [2, "u8", "Grade", "CWeaponTitle::GetLevel after the kill (Z18 §6.6, Z18-B22)"]
+        ],
+        "notes": "3 bytes; sent only when the level changes (Z18 §6.6)"
+      },
+      "0x5c09": {
+        "dir": "Z→DB",
+        "name": "NC_WT_MOB_KILLCOUNT_SET_REQ",
+        "basis": "zone FUN_0059dd00 (sp_saveweapontitle); Character DB FUN_00412bd0 (D04)",
+        "fields": [
+          [0, "u16", "handle", "ref: player handle"],
+          [2, "u32", "chrregnum", "ref: so_GetCharRegistNumber"],
+          [6, "u64", "ItemKey", "weapon item key"],
+          [14, "u16", "MobID", "title mob of the entry"],
+          [16, "u32", "MobKillCount", "new 28-bit count"]
+        ],
+        "notes": "0x14 bytes; every 10th kill or on a level change (Z18 §6.6)"
+      },
       "0x6004": {
         "dir": "S→C",
         "name": "NC_CT_SET_CMD",

@@ -274,6 +274,71 @@ line, `ShineExit`.
 | `Name8::Name8(s)` / `operator=(s)` | FUN_00418e50 / FUN_00427de0 | same for 32 bytes |
 | `NameString::operator[](Name4*)` | FUN_0045b060 | next buffer of the `namestring` ring (`ns_point.value = (value+1) & mask`), copy 16 bytes + NUL, return it; for log lines (`so_LinkTo`) |
 
+### 1.8 Sweep additions: packet path helpers, profiler line, crash-handler library
+
+Found by the part-5 depth-1 gap check (§9.1). They sit on the receive path of `ClientSession::zbs_Parsing`
+FUN_004fb9f0 (§1.3) and under `MiniDumper::MinidumpCallStack` FUN_0064e5f0 (§1.6).
+
+| Function | Address | What it does |
+|---|---|---|
+| `PacketEncrypt::pe_FromClientToServer(buf, len)` | FUN_00631120 | the client→server XOR: `buf[i] ^= pe_encryptstr[pe_point]`, `pe_point++`, wraps to 0 after 0x1F2 (499-byte table); `len < 1` returns at once. The per-session `pe_point` is the seed of 0x0806 (§1.3, `docs/protocol/README.md`) |
+| `PROTOCOLFUNCTIONTEMPLETE<ShinePlayer>::pft_IsRegisteredProtocol(cmd)` | FUN_004fb350 | true when `cmd` is not null, the outer table slot `pft_funcpnt[command]` (`NETCOMMAND.str.command` = low 10 bits, *(pdb2016)*) is not the shared default and the inner slot `[department]` (high 6 bits) is not `pft_deffunc`. The table is `[command][department]`, the order every `pft_Store(dept, cmd, fn)` instance fills it (`pft_funcpnt[cmd][dept] = fn`, e.g. FUN_004d36c0); `zbs_Parsing` uses it in session mode 1 to choose between the "Invalid sequence" and "Not registered" log texts (§1.3) |
+| `ZoneServer::zs_GetClientSessionManager` | FUN_005aa040 | returns `&zoneserver.zs_clientsessionmanager` |
+| `ShinePlayer::sp_LastProtocol(cmd)` | FUN_00552920 | `ProtocolLogger::pl_Store(&p.sp_ProtocolLog, cmd, p.position)`; called by `zbs_Parsing` for every packet of a logged-in player |
+| `ProtocolLogger::pl_Store(cmd, xy)` | FUN_005527f0 | ring of 16 `{NETCOMMAND cmd, tick = clockwatch.cw_CurrTick, x, y}`; `pl_Pointer = (pl_Pointer + 1) & 0xf`; cleared by `pl_Clear` (§1.6) |
+| `FunctionProfiler::FunctionPerformance::fp_Report` | FUN_00467810 | one `fprintf(fp_ProfileFile, "%s\t%I64u\t%f\t%f\n", …)` line per profiled function (name, call count, two timings); called per entry by `pr_Report` FUN_004680d0 (§1.6, Z11 §4.5) |
+| `ORToken::operator!=(other)` | FUN_00484340 | 5-dword (20-byte) compare of the instance-dungeon gate key (`ORToken`, Z14 §1); false only when all five match; used by `NPCRole_Portal::nrb_Role` FUN_004c2ef0 (Z02 §6.5) |
+
+Crash handler. `GetFaultReason` FUN_00654710, `GetFirstStackTraceString` FUN_00654b60, `GetNextStackTraceString`
+FUN_00654bc0, `EHInitSymbolEngine` FUN_006542b0, `EHCleanupSymbolEngine` FUN_006542e0, `FillInStackFrame` FUN_00653fb0
+and `EHInternalGetStackTraceString` FUN_00654310 (memory reads through `CH_ReadProcessMemory` FUN_00654030, the
+`StackWalk64` read callback) are the public "CrashHandler" helper set (function names, debug
+strings such as `"Bad parameter to GetFaultReason\n"` and the output format are that library's) *(inferred: third-party
+code, not Fiesta's)*. Behaviour as used by `MinidumpCallStack`:
+
+```pseudo
+GetFaultReason(ex):                                   @ FUN_00654710
+    IsBadReadPtr(ex) → OutputDebugString "Bad parameter to GetFaultReason\n", return null
+    EHInitSymbolEngine()                              @ FUN_006542b0   # once: SymSetOptions(|0x10 UNDNAME… as read), SymInitialize(process, null, TRUE)
+    text = "<exe file name> caused an: < " + EHConvertSimpleException(code)
+           (unknown code: FormatMessage from NTDLL.DLL) + " > in module <module> at <seg>:<addr>" + symbol / line when found
+    return static buffer s_szBuff (2 KB)
+GetFirstStackTraceString(opts, ex):                   @ FUN_00654b60
+    FillInStackFrame(ex.ContextRecord) (FUN_00653fb0: STACKFRAME64 from Eip / Esp / Ebp); copy the CONTEXT (0x2cc bytes)
+    return EHInternalGetStackTraceString(opts)        @ FUN_00654310
+GetNextStackTraceString(opts, ex):                    @ FUN_00654bc0
+    return EHInternalGetStackTraceString(opts)
+EHInternalGetStackTraceString(opts):                  @ FUN_00654310
+    StackWalk64(IMAGE_FILE_MACHINE_I386 0x14c, …); none → null
+    "%04X:%08X" (CS:EIP) [+ " (0x%08X 0x%08X 0x%08X 0x%08X)" params] [+ ", <module>"] [+ " <symbol>()+%04d byte(s)"]
+    [+ " <file>, line %04d+%04d byte(s)"]             # flags in opts choose the parts
+EHCleanupSymbolEngine():                              @ FUN_006542e0   # SymCleanup when initialised
+```
+
+**Raid slot setter (a Z14 leftover).** Z09 §31.2 gave `so_SetRaid` to Z14, which is finished and names it only as
+"vt 0xa88" in its `RaidTask` callers (Z14 §5.2); documented here:
+
+```pseudo
+ShinePlayer::so_SetRaid(p, raid)   (vt 0xa88)          @ FUN_005604a0
+    if p.sp_RaidSlot == raid: return
+    p.sp_RaidSlot = raid
+    raid == null (left / raid dissolved):
+        if p.so_PartyRegistNumber() (vt 0x550) ≠ −1:
+            p.so_SetParty(0xFFFF) (vt 0x574); p.so_SetRaidNumber(0xFFFF) (vt 0x558)
+            if p.smo_GetMode() ≠ 0 and p's map has FieldAttr.KingdomQuestMap == 3 (a raid-only map *(inferred)*)
+               and fm_GetRegenCityLinkData(map, &link):
+                p.so_LinkToReserv(link, 0) (vt 0x3fc)            # sent back to the map's regen city
+    else:
+        p.so_SetRaidNumber(raid.m_Raidnum)
+        it = Raid::Find(raid, p.charNo) (FUN_0063da80); if it ≠ Raid::End (FUN_0063d220):
+            p.so_SetParty(it.GetPartyRegNo()) (FUN_0063d0d0); p.so_ply_Setpartyslot(it.GetPartySlot()) (vt 0x774, FUN_0063d590)
+FieldMap::fm_GetRegenCityLinkData(map, &link) → bool   @ FUN_00463570
+    attr = map.fm_FieldOption; null → false
+    link.linktoserver = link.linktoclient = attr.regencity (12 chars + NUL)
+    n = attr.regenspots: 1 … 100 → k = next value of the shuffled box rndbox.rb_box[n]; k < 4 → attr.regenloc[k], else regenloc[0]
+    otherwise regenloc[0];  link.coord = that spot, direct = 0; true
+```
+
 ---
 
 ## 2. Z02: brief info, server menus, chat ban
@@ -462,6 +527,65 @@ any later `sp_ServerMenuTitle` clears it. The request side (`zrpb_Request` FUN_0
 `ShinePlayer::so_SetSpamerChatBan(v)` FUN_00560a20 (vt 0xae8): `sp_Spammer_ChatBan` (`p+0x2aa54`) = v. The player ctor
 sets 0; the WM option 0x10D3 sets the value (Z12 §7.1); WM 0x0865 NC_MISC_SPAMMER_ZONE_CHAT_BAN_CMD writes the same
 member (Z01). Chat and shout read it (Z02 §3.1 `gmBlocked`, FUN_00560a30).
+
+### 2.6 Sweep additions: menu actor setters, divorce and Silver Wing menu callbacks, rest-mode regeneration
+
+| Function | Address | What it does |
+|---|---|---|
+| `ServerMenuActor::sma_SetRangeCheck(b)` | FUN_0050eca0 | `sma_bRangeCheck = b` (whether a menu answer re-checks the NPC distance, §2.4); set by `itembreakmenu` FUN_0048ced0 |
+| `ShinePlayer::sp_ServerMenu_SetReserFunction(fn, arg)` | FUN_00549b30 | forwards to `sma_SetResetFuction` of the player's menu actor (`sp_NPCProcess.servermenuactor`) |
+| `ServerMenuActor::sma_SetResetFuction(fn, arg)` | FUN_0050f800 | when both are non-null: copies the 0x68-byte `ServerMenuArgument` and the callback into `sma_ResetFuction`, the callback run when the menu is reset / closed without an answer (`smfm_Cancel` FUN_0050ecc0, Z02 §6.5) |
+
+The immediate-divorce item (`UseEffect::UseItemImmediateDivorce::uib_DirectUse` FUN_00596810, Z02 §10 builds the menu)
+answers through two callbacks:
+
+```pseudo
+smfm_ImmediateDivorce(p, arg):                        @ FUN_0050f430   ("Yes")
+    p.so_ply_GetInventoryLockList() (vt 0x7d4).unlock(arg.sma_ItemBreak.lockindex) (lock-list vt 0x28)
+    Character DB ← 0x108D NC_CHAR_WEDDING_DIVORCE_DO_REQ {           # 0xd bytes payload
+        u16 handle = p.handle, u32 charNo = p.so_GetCharRegistNumber() (vt 0x344),
+        u32 partner = p.so_ply_WeddingStatus() (vt 0x958) +0x25, u8 Reason = 2 }
+    sp_DestroyItem(p, p.handle, inventory[arg.smli_NPCHandle & 0x3ff], {0x2400 | slot})   # §4.4: the item is used up
+smfm_ImmediateDivorceCancel(p, arg):                  @ FUN_0050f5a0   ("No")
+    unlock the same cell; smfm_Cancel(p, arg)
+```
+
+`Reason = 2` is the item path; Z02 §10 sends 0 (agreement) and 1 (forced) from the NPC ladder; the Character DB side is
+D02 §11 (`FUN_00419550`). The item is destroyed right after the request is sent, before the DB answers, so a DB
+failure still costs the item (as written).
+
+The Silver Wing menu (`sp_SilverWingMenu` FUN_0059c090, §2.4) has three callbacks; the item flow is §4.9:
+
+| Callback | Address | Calls |
+|---|---|---|
+| `smfm_Silverwing_Portal` ("SilverWingPortal", only when a location is stored) | FUN_0059bbe0 | `sp_SilverWing_PortalCast(p, cell)` FUN_00597b30 |
+| `smfm_Silverwing_LocSet` ("SilverWingLocSet") | FUN_0059bff0 | `sp_silverwing_Setloc(p, cell)` FUN_0059bc80 |
+| `smfm_Silverwing_Cancel` ("Cancel") | FUN_0059bb30 | `sp_silverwing_Cancel(p, cell)` FUN_00597900 (answers `so_ply_ItemUseResultPacket(0x700, 9)`), then `smfm_Cancel` |
+
+**Rest-mode regeneration.** The rest command of Z02 §7 installs `sp_RecoverPoint_House` as the player's
+`sp_RecoverPoint` hook (`p+0x29628`); the mini-house item's `MiniHouseStr` (`p+0x292ac`, filled by `mhs_Init`, Z07 §6)
+gives the ticks and rates.
+
+```pseudo
+ShinePlayer::sp_RecoverPoint_House(p):                @ FUN_0056b3b0
+    if p.smo_GetMode() (vt 0x484) ≠ 4 (resting): return
+    changed = false
+    if smo_Recover.lasthp + mhs_HPTick < now:
+        old = p.so_GetHP() (vt 0x4e8)
+        p.so_recoverhp(AbnormalState.Rate.HPRecover × (mhs_HPInc × smo_Recover.maxhp / 1000) / 1000)   (vt 0x5b4, FUN_0042cfe0)
+        smo_Recover.lasthp = now; changed |= HP differs
+    if smo_Recover.lastsp + mhs_SPTick < now:
+        old = p.so_GetSP() (vt 0x4ec)
+        p.so_recoversp(PassiveSkill.Plus.SPRecover × mhs_SPTick / 1000 + mhs_SPInc × smo_Recover.maxsp / 1000)   (vt 0x5b8)
+        smo_Recover.lastsp = now; changed |= SP differs
+    if changed: so_AllOfRange(p, all-of-range, p.position, so_ply_Send2WhoTargetMe FUN_00568ee0)   # HP/SP to whoever targets p (Z03)
+    if pet summoned (PSST_1ST_SUMMONED / PSST_RESUMMONED) and sp_Pet_HouseTick due:
+        next += interval; sp_PetSystem_ChangeTendency(p, PFC_S_RESTHOUSE) (FUN_004d2470, Z13 pets)
+```
+
+The stat terms are matrix cells (Z12 §1.1): `p+0x19a0` = layer 12 `AbnormalState.Rate`.HPRecover, `p+0x1740` = layer 9
+`PassiveSkill.Plus`.SPRecover. HP is scaled by an abstate rate, SP gets a flat passive bonus per tick: the two formulas
+differ *(as written)*. The level getter (vt 0x4d8) is called and its result unused.
 
 ---
 
@@ -815,6 +939,19 @@ So a fully absorbed hit is shown to clients only as the protector's 0x2449; the 
 `p.raid (vt 0xa84) and d.raid exist and p.raid.number == p.raid.number`, i.e. any two raided players count as one raid
 (original bug) Z18-B4. The normal branch compares p with d correctly. Z09-B31 is the mover copy.
 
+### 3.10 Sweep additions: element constructor, sub-state lookup, action-effect table
+
+| Function | Address | What it does |
+|---|---|---|
+| `AbstateElementInObject::AbstateElementInObject` | FUN_00406550 | builds the `aeo_Tick.nextaction` metronome and the `aeo_SetItemEffect` holder, `aeo_Index = MAX_ABSTATEINDEX` (free), the five `aeo_PartyEnchant[i].skillindex = null`, caster level / attack power 0 |
+| `List<AbstateElementInObject>::l_MakeList(n)` | FUN_00409890 | the shared `List<T>` free-list build (12-byte `ListStruct {prev, next, active, content}` × (n+1), sentinel at `[n]`, then `l_4AllInList(ListEraser)`); `n = 0xffff` leaves the array null. Same template as the `CommonList` forms of Z09 §28.13 |
+| `AbstateElementInObject::aeo_FindSubState(i, inxName)` | FUN_00406670 | (profiler name `aspe_FindSubState`) `dic_abstate.as_BTreeID[inxName]` → `AbStateStr`; not found → false; id > `as_maxhandle` → assert "as_FromID : Invalid skill id"; stores the row in `aeo_PartyEnchant[i].skillindex` and its `AbStataIndex` in `.soul`; true when found. The five `aeo_PartyEnchant` slots hold the sub-states an element applies to the party (§3.2) |
+| `SetItemData::SetItemAbstateEffect::siae_Clear` | FUN_00510030 | the four `siae_Buffer[k] = {eb_Index 0, Argument_Base1000 1000}` (no set-item effect, factor 1.0); from `aeo_Set` when an element is (re)used. The set-item effects themselves are Z21 |
+| `ActionEffectAbStateTable::FindActionID(inxName, &id)` | FUN_005c7f40 | linear scan of `ActionEffectAbState.shn` (row 0x26 *(pdb2016)*: `char InxName[32]`, `u32 Strength`, `u16 ItemActionID`): first row whose `InxName` equals the abstate's name → `id = ItemActionID`, true; null arguments or no row → false. Used by `ase_AttachObject` (§3.2) to start the item action bound to an abstate |
+| `ITableBase<ActionEffectAbState,…>::GetTotal` | FUN_005c7e70 | record count of the loaded table (`m_pHead.nNumOfRecord`), 0 when not loaded |
+| `BinaryDataBox<MultiHitType>::bdb_ReadData(path)` | FUN_004c09b0 | `CDataReader::Read(path, 0xac, 0x2a)`, fatal on failure (§1.7 pattern); row *(pdb2016)* `{u16 ID, u16 HitTime, char AbIndex[32], u8 AS_Step, u8 AbStr, u16 AbRate, u16 DmgRate}`; loaded by `MultiHitTable::mht_Load` (§3.7) |
+| `FieldMap::fm_IsRefuseAbstate(index)` | FUN_00464540 | (profiler name `FieldContainer::fm_IsRefuseAbstate`) `index ∈ fm_RefuseAbstate` (an `std::set<ABSTATEINDEX>`); filled by `fm_SetRefuseAbstate`; read by `sp_RemoveField` FUN_00440b40 (§1.1) to end the states a map refuses |
+
 ---
 
 ## 4. Z04: items, equipment, set items, random options
@@ -1149,6 +1286,80 @@ all 64 notes: `Act`, `From0/1`, `To0/1`, `MoveLot`, `TotalLot`). Nothing else ha
 ctor: mask 0x3f, pointer 1, note cleared; `ili_Clear` (all 64 notes: item 0xFFFF, action 0) and `ili_Reset` (advance +
 clear) run at login complete (Z01 §6).
 
+### 4.9 Sweep additions: item boxes, locks, lot sums, bracelet upgrade rows, `sp_MakeItem(id)`, Silver Wing
+
+| Function | Address | What it does |
+|---|---|---|
+| `ItemInventory::ItemInventory` | FUN_006447e0 | vftable + 192 (0xc0) `ItemInventoryCell` of 0x74 bytes |
+| `ItemEquipment::ItemEquipment` | FUN_00644850 | 30 (0x1e) cells |
+| `ItemMiniHouseBox::ItemMiniHouseBox` | FUN_00644980 | 35 (0x23) cells (furniture box) |
+| `ItemQuestItemBox::ItemQuestItemBox` | FUN_006448b0 | 5 cells |
+| `ItemActionItemBox::ItemActionItemBox` | FUN_00644b00 | 42 (0x2a) 0x14-byte entries (the element ctor is identical-code folded with `so_ShineMobileObject`) |
+| `InventoryLocking::InventoryCellLockList::InventoryCellLockList` | FUN_0048c740 | `icll_List.l_MakeList(0xc0)` (FUN_0048bb90, the §3.10 `List<T>` build for `LockedCell`), then the 192 `icll_Array` cells get `lc_Releaser = &icll_Releaser_None` and are put into the list's free slots; the player's lock list (`so_ply_GetInventoryLockList`, vt 0x7d4, Z04 §1.4). All six are built by the `<unnamed-type-sp_Item>` ctor FUN_00549820 (§1.1) |
+| `BinaryDataBox<ItemServerEquipTypeInfo>::bdb_ReadData(path)` | FUN_00492230 | `CDataReader::Read(path, 0x3e9, 0x1d)` (§1.7 pattern); the 0x1d-byte row is the column map of §4.2; called by `ItemEquipTable::iet_Load` |
+| `List<SellItemInfo>::l_MakeList(n)` | FUN_0050e990 | same build for the buy-back list of `CSellItemManager` FUN_0050eb60 (§4.1) |
+| `ShinePlayer::sp_CalcTotalLot(bag, itemid)` | FUN_00490b00 | sum over every cell of `bag` holding `itemid` (`ItemBoxIterIdent`) of the class's lot getter (`ItemAttributeClass` vt 0x1c); called by `so_ply_CalcTotalLot` (item counts for quest and NPC checks *(inferred from the callers)*) |
+| `BRAccUpgradeDataBox::LoadBRAccUpgradeData` | FUN_0043bb00 | reads `BRAccUpGrade.shn` through `BinaryDataBox<BRAccUpgrade>::bdb_ReadData` FUN_0043b8c0 (key 0x51, row 0xe, §1.7 pattern; rows `{u32 ID = grade, u16 CriFail, DownFail, NormalFail, nCon, LuckySuc}`; 2016 data: 10 rows grade 1, 15 grade 2, 20 grade 3) and counts rows per grade into `m_upgradeStepList[grade]` (grade 0 skipped), then prefix-sums `[1] += [0]`, `[2] += [1]`, so `[g−1]` = rows of lower grades; `m_upgradeList[i]` = row i. The array has 3 entries but is indexed by the grade itself: the 20 grade-3 rows increment `m_upgradeStepList[3]`, which is the first dword (vftable pointer) of the next member `m_binDataBRAccUpgradeInfo` (original bug) Z18-B21. Then `BRAccUpgradeInfo.shn` (key 0x1acc, row 0x50): `m_upgradeInfoNumber` = highest ID, `m_upgradeInfoList[0 … max]` by ID |
+| `BRAccUpgradeDataBox::GetBRAccUpgrade(grade, demandLv, lv)` | FUN_0043b850 | `grade > 0` and `m_upgradeStepList[grade−1] + lv ≥ 0` → `m_upgradeList[that]`, else null: the `lv`-th row of that grade (rows sorted by grade in the file). `demandLv` is not read (Z04 §9.4 says the row is chosen "by (Grade, DemandLv, lv)": correction in knowledge Z18). Neither `grade ≤ 3` nor `lv` < the grade's row count is checked: `lv` past the grade's rows takes the next grade's rows; grade ≥ 4 would index with the corrupted dword of B21. Caller: `Item_Upgrade_Table_mode` FUN_0053ca10 (Z04 §9.4) for bracelets (class 0x26) |
+| `BRAccUpgradeDataBox::GetBRAccUpgradeInfo(i)` | FUN_0043b880 | `i > m_upgradeInfoNumber` → null, else `m_upgradeInfoList[i]`; the list has max-ID + 1 entries, so the bound is right (a negative `i` is not checked); read by `so_RecalcEquipParam` FUN_004cab70 (Z12 §2.2: `BRAccUpgradeDataBox[d.BasicUpInx]`) |
+| `RandomBox::rb_1000000` | FUN_0048dfb0 | `well512_GetRandom(1000000)`: the per-million roll of `g_CardCollectMake` (§4.5), pet actions and the slot machine |
+
+`sp_MakeItem(handle, keyKind, itemid, lot)` FUN_00528930, the id form of FUN_00528690 (Z09 §24.2):
+
+```pseudo
+sp_MakeItem(p, handle, keyKind, id, lot):             @ FUN_00528930
+    info.key = ItemTotalInformation::iti_mkregnum(id, keyKind, zoneNo, worldNo); info.itemid = id
+    no ItemDataBox row (or row.data null): return false
+    cls = itmattcontainer[id]; cls.iac_itemcreate(id, &info, "-o") (vt 0x14); cls.vt[0x20](&info.item, lot)   # lot setter (inferred)
+    sp_MakeItem(p, handle, &info) (FUN_00528690); return true
+```
+
+Called with `keyKind 2` by the quest script command `QSC_CREATE_ITEM` (`CQuestZone::QuestEnd`, Z15). Unlike the GM path
+(Z11 §4.3 `&makeitem`) it applies no random options.
+
+**Silver Wing** (the return-scroll item `itemdatabox.idb_specialid.sii_silverwing`; Z04 §6.3 lists its `UseEffect`
+actor by address). The item stores one location in its attribute bytes: `+0` u8 set flag, `+1` u16 map index
+(`MapInfo` id), `+3` u32 x, `+7` u32 y (as read: cell +0xa / +0xb / +0xd / +0x11; the decompiler names them after
+other union members).
+
+```pseudo
+UseItemSilverWing::uib_CanUseItem(p, item):           @ FUN_00598000
+    if not p.so_ply_IsLink_OutMap_AndSendErrorMsg() (vt 0xa74): system line "RecallDisableField"; return 0x70f
+    return 0x700
+UseItemSilverWing::uib_DirectUse(p, slot, item):      @ FUN_0059c260
+    sp_SilverWingMenu(p, slot, item) (§2.4); return true                  # the menu answers, no cast yet
+sp_silverwing_Setloc(p, cell)  ("SilverWingLocSet")   @ FUN_0059bc80
+    cell.itemid ≠ sii_silverwing: assert "ShinePlayer::sp_silverwing_Setloc : wrong item"; result 0x703
+    p.so_Field null: result 0x70f
+    map.fm_FieldOption.LinkIn == 0 (the map is no link target): result 0x70f
+    copy = cell.item; flag = 1; map index = mapdatabox[current map name] (0xffff unknown); x, y = p's position
+    sp_AttrChange2DB(p, cell, cell.iic_AttrProc, &copy, slot) (FUN_005979b0, Z05: attribute save to the Character DB)
+    result 0x700
+sp_SilverWing_PortalCast(p, cell)  ("SilverWingPortal") @ FUN_00597b30
+    e = useditemeffect[cell.itemid]; e or e.useskill or its server row missing: result 0x70d
+    csl_CoolTimeCheck(skill) fails: result 0x70d
+    start the item cast exactly as ItemUse_Inventory (Z04 §6.1: p+0x1d84 cast end = now + CastTime/100, skill, item, slot)
+    # cast end → uib_AfterCast
+UseItemSilverWing::uib_AfterCast(p, bag, info, slot): @ FUN_0053ff70
+    bag[slot].itemid ≠ info.ID: assert "…uib_AfterCast : Item Changed"; result 0x702
+    sp_SilverWing_PortalBlast(p, {0x2400 | slot})
+sp_SilverWing_PortalBlast(p, cell):                   @ FUN_00597cf0
+    cell.itemid ≠ sii_silverwing: assert (text "…sp_silverwing_Setloc : wrong item"); no result
+    map index < mdb_maxmapid and MapInfo row exists:
+        link = { MapName (12) twice, x, y }
+        p.so_SendProtocol(0x0C, 0x1A) (vt 0x304): 0x301A NC_ITEM_USECOMPLETE_CMD (no payload)
+        result 0x700
+        p.so_LinkTo(link, 6, 9, 10) (vt 0x600, Z01 §4: same-map / other-map link)
+    else nothing is sent: the cast ends without a result packet *(as written)*
+sp_silverwing_Cancel(p, cell):                        @ FUN_00597900
+    result 0x700
+```
+
+"Result" = `so_ply_ItemUseResultPacket(code, 9)` → 0x3016 NC_ITEM_USE_ACK (Z04 §6.1, which gives the texts of 0x700,
+0x702, 0x703, 0x70d; 0x70f has no `client-error-codes.json` entry). The item is not consumed here: no
+`sp_DestroyItem` / lot decrease on this path *(as written; a stack-consuming variant would go through the item-use
+lot code of Z04 §6.1)*.
+
 ---
 
 ## 5. Z06: trade, booths, gambling (constructors)
@@ -1161,6 +1372,8 @@ clear) run at login complete (Z01 §6).
 | `CGambleObject::go_Get_MaxEnterPlayerCnt` | FUN_00591ff0 | returns `go_nMaxEnterPlayerCnt`; read by the gamble-house TaiSai (`GDTSO_DiceTaiSai_Enter` FUN_00618890, `GDTSO_ClearDiceTaiSaiInfo` FUN_0061b490, Z06 §4.4) and by the loot dice game (`DiceGame::End` / `DiceThrow` / `Update`, `ShineDropItem::so_IsDiceGamePlay`, Z09 §11.6) |
 | `StreetBoothBuy::StreetBoothBuy` / `StreetBoothSell::StreetBoothSell` | FUN_0058f390 / FUN_00590580 | base `StreetBooth` ctor + own vftable; the two booth objects at `p+0x294b8` / `p+0x29348` built by the player ctor FUN_0055bc80 (Z06 §2.1) |
 | `TradeBoard::TradeBoard` | FUN_00427ee0 | `tb_opposit = null`; the player's board (`p+0x17d5f`, Z06 §1.1), FieldMap ctors and the static `so_deftradebrd` |
+| `StreetBooth::StreetBooth` | FUN_0058cbd0 | base of both booth objects: vftable, `sb_Terminal = 0` |
+| `CGambleObjectManager::gom_SetNeedRecalDiceRankInfo` | FUN_00615530 | `gom_NeedRecalDiceRankInfo = 1`: the TaiSai rank list is rebuilt on the next manager tick; set by `GDTSO_DiceTaiSai_Enter` / `_Out` / `_MoneyResult_DiceRoll` / `_ResultLog_DiceRoll` (Z06 §4.4) |
 
 ---
 
@@ -1326,6 +1539,60 @@ length assert and that packet is not sent.
 | `SHND::CommonData<CollectCard,…>::cd_Load(v)` | FUN_00629840 | `cd_Data = v` (the card table vector, Z07 §7 `CollectCard.shn`); the folded code is also called from the player ctor |
 | `BinaryDataBox<CollectCardMobGroup>::bdb_ReadData(path)` | FUN_00648d50 | `CDataReader::Read(path, 0x12, 0x24)`, fatal on failure; identical-code folding with the `ActiveSkillGroup.shn` reader (Z20 §2.1), which is its only caller seen |
 
+### 6.6 Sweep additions: weapon titles, group titles, card table lookups
+
+**Weapon title (licence) kill counter.** A weapon carries up to three `{u16 mob, u32 count:28}` entries in its
+attribute (`mobkills[3]` at attr +7, §4.3); the title levels come from `WeaponTitleData.shn` (`CWeaponTitle gWeaponTitle`,
+loaded by FUN_006358c0, Z01 §2.3; rows `WEAPON_TITLE_DATA` 0x40 *(pdb2016)*: `u16 MobID, u8 Level, char Prefix[16],
+Suffix[16], u32 MobKillCount, u16 MinAdd, MaxAdd, 3 × {u8 Reference, u16 Type, u32 Value}`; up to 10 rows per mob at
+`m_ppWTDArray[mob·10 + level]`).
+
+```pseudo
+CWeaponTitle::GetLevel(mob, kills) → level            @ FUN_006359c0
+    mob·10 ≥ m_MaxArrayIndex: return 0xFFFFFFFF
+    for i in 0 … 9:
+        row = m_ppWTDArray[mob·10 + i]; stop at the array end or a null row
+        if kills < row.MobKillCount: return i
+    return i − 1                                       # i = rows checked
+ShinePlayer::so_weapontitle(p, &mobId) → 1 if counted @ FUN_0059e190
+    w = p.so_ply_EquipWeapon() (vt 0x7ac, the weapon's item key / attr); none: return 0
+    mob = MobDataBox[mobId]; missing: assert "ShinePlayer::so_weapontitle : Invalid mob"; return 0
+    unless p.level − 5 ≤ mob.Level ≤ p.level + 20: return 0
+    for k in 0 … 2:
+        if MobDataBox::mdb_SpeciesDistance(w.mobkills[k].mob, mobId) ≥ 0 (FUN_00640f50, Z09; ≥ 0 = the kill counts for that entry):
+            mobId = w.mobkills[k].mob                  # reported back to the caller (sent in 0x5C0D)
+            old = GetLevel(mob, count); count = count + 1 (28-bit field); new = GetLevel(mob, count)
+            if count % 10 == 0 or old ≠ new:
+                sp_saveweapontitle(p, w.key, mob, count)                     @ FUN_0059dd00
+                    Character DB ← 0x5C09 NC_WT_MOB_KILLCOUNT_SET_REQ { ref (u16 handle, u32 charNo),
+                        u64 ItemKey, u16 MobID, u32 MobKillCount }   (0x14, D04 FUN_00412bd0)
+                if old ≠ new:
+                    send p: 0x5C03 NC_WT_GRADE_CMD { ITEM_INVEN ItemInven = equipment slot 12 empty ? 0x200A : 0x200C,
+                                                     u8 Grade = new }   (3 bytes)
+            return 1
+    return 0
+```
+
+The caller is `sp_GainExp` FUN_0042d830 (Z03 §8.3: `so_weapontitle(&mobId) == 1` → 0x5C0D NC_WT_MOBINC_CMD). The level byte of 0x1C05 (§4.3) is the same `GetLevel` value.
+
+Level semantics. With the 2016 data (mob 2: Killer 3, Executioner 6, Eliminator 9 kills), `GetLevel` gives 0 below 3
+kills, 1 from 3, 2 from 6 and still 2 from 9 on, because the loop stops at the null fourth row and returns `i − 1`. The
+0x5C03 "Weapon title has been upgraded." (client `GameFrameWork` FUN_00479fa0, C01 summary) therefore fires at 3 and
+6 kills but never at the last threshold, and a full table of 10 rows ends at 9 as well: if 0 means "no title" (as the
+first 0x5C03 at the first threshold suggests), the highest title of every mob cannot be reached (original bug) Z18-B22
+*(inferred: the client's reading of the level value was not traced)*.
+
+| Function | Address | What it does |
+|---|---|---|
+| `CCharacterTitle::GetGroupTitle(type)` | FUN_0062e160 | `type > 0x7f` → null, else `&m_Titles[type]` (one `CT_TITLE` per title type); used by `SetTitleStatusZone` (§6.2) |
+| `SHND::CommonData<CollectCard, CmpCardCollect>::cd_Find(cardId)` | FUN_00627d30 | first `CollectCard` row (0x2a: `u16 CC_CardID, char CC_ItemInx[32], CardGrade, CardMobGroupIndex` *(pdb2016)*) with that id, else null |
+| `SHND::CommonData<CollectCard, CmpCollectCard_MobGroup>::cd_Find(group, &pos)` | FUN_00627db0 | iterator form: from `pos`, next card of that mob group; `pos` = one past the hit |
+| `SHND::CommonData<CollectCardMobGroup, …>::cd_Find(mobInx)` | FUN_00627ed0 | the `CollectCardMobGroup` row (0x24: `char CC_MobInx[32]`, group) whose 32-byte name equals the mob's `Name8` |
+| `SHND::CommonData<CollectCardStarRate, …>::cd_Find(grade, &pos)` | FUN_00627fd0 | iterator form over `CollectCardStarRate` rows (7 bytes: `CardGrade, u8 CC_StarLot, u16 CC_StarRate`) of that grade |
+
+All four are the lookups of `g_CardCollectMake` FUN_00628880 (§4.5): mob → group → candidate cards, card → grade → star
+roll.
+
 ---
 
 ## 7. Original-server bugs
@@ -1352,6 +1619,8 @@ length assert and that packet is not sent.
 | Z18-B18 | Z07 Lua `cAddCharacterTitle` FUN_005eb310, §6.3 | `IsKnownedTitle` is "status > 0", so the grant always runs; the trailing 0x6005 is unconditional | a granted title that is worn (USE) is set back to USABLE while still current; a fresh grant is saved twice, an unchanged one once | test `status < USABLE`; send 0x6005 only from `SetTitleStatus` |
 | Z18-B19 | Z07 `ShinePlayer::sp_CardCollectionSend` FUN_0044cc30, §6.5 | the `chrregnum` header (payload +0..3) of 0x10E4 / 0x10E7 / 0x10EA is not written | 4 stale bytes of the shared send buffer go to the client (it ignores them) | write the character number or 0 |
 | Z18-B20 | Z07 `CCharacterTitleDataStateServer::Read` FUN_005ca790, §6.1 | `nStateNum > 6` is refused but 6 is accepted, and Type / TitleLV are not range-checked | a 7th state row for one title (or a type ≥ 128 / level ≥ 4) writes past `StateData[6]` / the 512 entries; latent, the 2016 table has at most 6 rows per title | refuse `nStateNum ≥ 6`; check the indices |
+| Z18-B21 | Z04 `BRAccUpgradeDataBox::LoadBRAccUpgradeData` FUN_0043bb00 / `GetBRAccUpgrade` FUN_0043b850, §4.9 | rows are counted into `m_upgradeStepList[grade]` of a 3-entry array; grade-3 rows write index 3 = the vftable pointer of `m_binDataBRAccUpgradeInfo` (+20 with the 2016 data); the getter checks neither `grade ≤ 3` nor `lv` against the grade's row count | a corrupted vftable pointer (harmless while nothing calls it virtually); a level past a grade's rows silently uses the next grade's rates | count into `[grade−1]`; bound-check grade and level |
+| Z18-B22 | Z07 `CWeaponTitle::GetLevel` FUN_006359c0 (with `so_weapontitle` FUN_0059e190), §6.6 | after passing every threshold it returns `rows − 1`, the same value as one threshold less | the last weapon-title level of every mob is never reached and no 0x5C03 is sent for it *(inferred: if 0 = no title)* | return the number of thresholds reached |
 
 ## 8. Not reconstructed / uncertain
 
@@ -1386,3 +1655,48 @@ length assert and that packet is not sent.
   searched beyond the Lua grant (§6.3); `CT_*` counters other than those named in §6.2 are documented by their callers.
 - §6.2: after the type-15 take-back the worn title (`m_CurrentTitle`) is not cleared; whether its abstates stay until
   the next 0x6001 / login was not followed *(inferred: they stay)*.
+- §6.6: how the client reads the weapon-title level byte (0x5C03 `Grade`, 0x1C05 `currentkilllevel`): whether 0 means
+  "no title" or the first row decides whether Z18-B22 is a bug or an off-by-one in the data's favour; read the client's
+  `On_NC_WT_GRADE_CMD` (FUN_00479fa0) and the 0x1C05 handler against `WeaponTitleData.shn`.
+- §4.9: the Silver Wing result 0x70f and the "RecallDisableField" line have no `client-error-codes.json` entry; the text
+  the client shows for 0x70f was not looked up. When the stored map no longer exists `sp_SilverWing_PortalBlast` sends
+  nothing, so the client's cast bar is not closed by an item-use result *(inferred from the code; not tested)*.
+- §2.6: `AbnormalState.Rate.HPRecover` in the rest-mode formula is a rate layer; its neutral value (1000 or 0 without
+  any abstate) decides whether resting heals at all without a buff. Z12 §1.2 (erasers) should give the default; not
+  checked here.
+
+## 9. Coverage boundary
+
+### 9.1 How the boundary was checked
+
+(a) **Address check.** Every address of the Z09 §31.2 rows of Z01 (5 rows), Z02 (2), Z03 (2), Z04 (1), Z06 (1) and
+Z07 (2) is cited as `FUN_…` in this file: 221 of 221 (scratch script over the row cells, regex `00[0-9a-f]{6}`).
+
+(b) **Depth-1 gap check** (as Z09 §31.1, strict form): roots = every `FUN_` cited in this file, one call level,
+`coverage.py`'s `Bin` with its TINY (< 6 lines) / HUB (> 25 callers) / registered-handler filters, "covered" = cited in a
+zone pseudocode doc or `S02-library.md`. Before part 5: **124 functions / 5.3 k lines**. Part 5 documented the 45 of them that belong to Z01–Z07 or to finished items (§1.8, §2.6, §3.10, §4.9, §5, §6.6),
+plus what their citations exposed one level further (the Silver Wing chain, the bracelet table reader,
+`so_weapontitle` / `sp_saveweapontitle`, `CH_ReadProcessMemory`, `sp_RecoverPoint_House`, `so_SetRaid` +
+`fm_GetRegenCityLinkData`); re-runs until no new Z01–Z07 function appeared. After: **79 functions / 3.9 k lines**, all in the
+table below: 48 with an open item whose plan line names them or their class, 31 already listed in Z09 §31.2 for an open
+item. None belongs to Z01–Z07 or to a finished item. Addresses are written without `FUN_` so that the owners' own gap
+lists keep showing them.
+
+### 9.2 Functions of other items
+
+| Found (functions) | Covered by | Argument |
+|---|---|---|
+| `CQuestZone::Send_NC_QUEST_DB_DONE_REQ` 005bbe60, `CQuestZone::QuestCheckReward` 005bcde0, `CQuestZone::QuestCheckSelectReward` 005ba0e0, `CQuest::GetNewQuestStatus` 006304a0, `CQuestZone::Send_NC_QUEST_DB_SET_INFO_REQ` 005baa80, `CQuestZone::Send_NC_QUEST_DB_CLEAR_REQ` 005babd0, `CQuestZone::QuestStart` 005bca30, `CQuestZone::Send_NC_QUEST_SCRIPT_CMD_REQ` 005ba960, `CQuestZone::Send_NC_QUEST_REWARD_NEED_SELECT_ITEM_CMD` 005bb570, `CQuestZone::QuestEnd` 005bccb0, `CQuestZone::QuestDoing` 005bcb80 | Z15 (plan lines 13–15: "The interpreter: every `QUEST_SCRIPT_COMMAND` …", "Conditions and diary updates: … FUN_006304a0 (status)", "Rewards: `QuestCheckReward`, `QuestCheckSelectReward`, … `QuestTakeReward` FUN_005bbe60 and the 0x441A NC_QUEST_DB_DONE_REQ body") | callees of `CQuestZone::QuestNext` FUN_005bdef0 (cited in §1.6 as a `FunctionEntarance` user): the quest step machine (start / doing / end phases, reward checks, DB done / set-info / clear requests, script-command and select-item packets) is the quest engine |
+| `SubAbnormalStateActor::sasa_SetAbstateToArea_T` 0040b670, `SubAbnormalStateActor::sasa_SetAbstateToArea` 00401bd0, `SubAbnormalStateActorPoison::sasa_Routine` 0040d4c0, `AxialListNearScanEnemyorAll::AxialListNearScanEnemyorAll` 004c1830 | Z22 (plan line 12: "List every `AbnormalStateContainer::SubAbnormalStateActor*` function …", naming `sasa_SetAbstateToArea_TargetNum` 0040b670 and `AxialListNearScanEnemyorAll`) | abstate actor bodies (area-apply helpers of the actor base, Poison `sasa_Routine`) reached from the §3.1 actor table; Z22 depends on Z18 and takes every actor class |
+| `ShineMobileObject::smo_ClearSkillResultBuffer_Miss` 0057a550, `AbstateElementInObject::aeo_IsMine` 00408880 | Z23 (plan line 12: "the Z03 leftovers reached from `smo_SkillBlast` / `smo_SkillBash_Blast`: … `smo_ClearSkillResultBuffer_Miss` 0057a550, `AbstateElementInObject::aeo_IsMine` 00408880") | named in Z23's plan |
+| `ShinePlayer::sp_RideInitialize` 0043d140, `ShinePlayer::sp_MakeRideBriefInfo` 0056e800, `CPetData::GetPetTendencyModifyData` 004cf440, `CPetData::GetPetMindType` 004cf250 | Z13 (plan line 16 "Mounts: mover creation …" for the ride functions; line 15 "Pets: … 0xD401 SET_TENDENCY (mind/stress)" for the `CPetData` getters) | mount brief / ride init from `sp_LoginInit` and the horse code; pet tendency data read by `sp_PetSystem_ChangeTendency` FUN_004d2470 (cited in §2.6 as the rest-mode pet hook) |
+| `KQElement::operator=` 00499140, `KQPlayerInform::kqpi_KnockDownMinus` 00496d70 | Z16 (plan line 12: "KQ: `KingdomQuest::KQElement` …, `KQPlayerInfoList` (add/remove, knock-down counters …)") | KQ element copy (`List<KQElement>::l_PushA`) and the knock-down counter decrement of `sp_Revive` |
+| `ShinePlayer::sp_RemoveKQItem` 0050f8c0, `ShinePlayer::sp_EscapeFromEmptyKQ` 0043fa40, `KQContributeList::kqcl_SendMobKill` 00499ff0, `ShinePlayer::sp_GetJoinKQTeamType` 00563990, `ShinePlayer::sp_KQElementFunction` 00499710, `KQElement::kqe_ReviveNumber` 00496b90, `ShinePlayer::sp_SendKQTeamType` 00561560, `KQPlayerInform::kqpi_KnockDownGet` 00496e50 | Z16 (plan line 12: "`KingdomQuest::KQElement` (… `kqe_ReviveNumber` …), `KQPlayerInfoList` (… knock-down counters …), `KQContribute::KQContributeList`") | listed in Z09 §31.2 row "Kingdom quests"; reached here through functions this file cites |
+| `ShinePlayer::sp_PetSystem_Summon` 004d2640, `ShinePlayer::sp_PetSystem_LinkResummon` 004d2a40, `ShinePlayer::sp_PetSystem_VirtualCast` 004d2180, `ItemAttrCls_Pet::iac_GetPetName` 004d0650, `ShinePlayer::sp_Send_NC_PET_ASK_NEW_NAME_REQ` 004d0c90, `ShinePlayer::sp_PetSystem_InitPetInfoLink` 004d2090 | Z13 (plan line 15: "Pets: the summon/unsummon flow …, the `ShinePet` object") | listed in Z09 §31.2 row "Pets"; reached here through functions this file cites |
+| `ShinePlayer::sp_MoverSystem_MapLogin` 0045d9e0, `ShinePlayer::so_MoverSystem_ClearLinkData` 0045e040, `MoverDataBox::mvdb_GetData_ItemIndex` 004bf2c0, `ShinePlayer::sp_HorseFree` 0045d3e0, `CMoverUpgradeData::GetUpgradeEffectInfo` 004c0460 | Z13 (plan line 16: "Mounts: mover creation …, `sp_HorseItemSave` …") | listed in Z09 §31.2 row "Mounts"; reached here through functions this file cites |
+| `MiniHouseStr::mhs_Init` 00534a30, `ShinePlayer::so_ply_MH_InitFurnitureEmotionInfo` 0056fe60, `ShinePlayer::so_ply_MH_SetMyHandle` 00570a10 | Z13 (plan line 12: "ShineMiniHouse … furniture … emotions") | listed in Z09 §31.2 row "Mini-house"; reached here through functions this file cites |
+| `ShinePlayer::sp_SendUseItemMinimonInfo_Client` 00561990, `ShinePlayer::sp_UseItemMinimon_NormalSlotClear` 00563f60 | Z13 (plan line 17: "minimon list kinds") | listed in Z09 §31.2 row "Minimon"; reached here through functions this file cites |
+| `CQuestZone::InitNewPlayer` 005b9d40, `ShineQuestDiary::ShineQuestDiary` 00578040, `CQuestZone::qz_SetObject` 005b9ae0 | Z15 (plan line 12: "Quest data …", line 16: "Other entry points: NPC click …, mob kill (`ShineQuestDiary_sqd_MobDead`, 0x440D …), party quest checks (`PartyManufacture_pm_QuestCheck_*`), quest items (`IsQuestDropItem`)") | listed in Z09 §31.2 row "Quests"; reached here through functions this file cites |
+| `PROTO_NC_CHAR_WEDDINGDATA_ACK::operator=` 0059f250, `PROTO_NC_CHAR_WEDDINGDATA_ACK::Reset` 0043bdb0 | Z13 (plan line 13: "Wedding hall and married state") | listed in Z09 §31.2 row "Wedding"; reached here through functions this file cites |
+| `ItemActionObserveManager::ItemActionObserveManager` 005d1910, `ItemActionObserveManager::SetObject` 005d0890 | Z17 (plan line 12: "the player's item-action cooldown container"; line 13: "`sp_CostumWeaponChargeDecrease_*`") | listed in Z09 §31.2 row "Item actions and costume charges"; reached here through functions this file cites |
+| MSVC STL instances (25): 0045cdf0, 004c0d20, 00577a20, 005b2460, 004187c0, 00442170, 0057f350, 005771b0, 0057dfb0, 004b40f0, 00577990, 00447480, 00447600, 00437f30, 00437df0, 004642e0, 00437ec0, 00464760, 00466f10, 0057e0a0, 00437a60, 004432e0, 0043a680, 00424850, 0040e090 | none needed | `std::vector` / `deque` / `list` / `_Tree` template code (as Z09 §31.2 "MSVC STL instances") behind the containers of §2–§5 (soul damage, multi-hit, attack delay, shelters, scan results, skill lists, booth lists, the refuse-abstate set) |

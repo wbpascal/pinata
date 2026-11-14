@@ -7129,12 +7129,14 @@ Sent in reply to `0x5c06` NC_WT_LICENSE_SET_ACK on GameDBSession (`FUN_0059dab0`
 
 ### `0x5c03` NC_WT_GRADE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_WT_GRADE_CMD`, 3 bytes
+**Verified layout** (basis: zone FUN_0059e190 (ShinePlayer::so_weapontitle); client FUN_00479fa0 (GameFrameWork, 'Weapon title has been upgraded.'))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | ItemInven | ITEM_INVEN (union: Inven, str) |
-| 2 | u8 | Grade |  |
+| 0 | u16 | ItemInven | ITEM_INVEN: 0x200A (equipment slot 10) when equipment slot 12 is empty, else 0x200C |
+| 2 | u8 | Grade | CWeaponTitle::GetLevel after the kill (Z18 §6.6, Z18-B22) |
+
+3 bytes; sent only when the level changes (Z18 §6.6)
 
 Sent from `ShineObjectClass::ShinePlayer::so_weapontitle` (`FUN_0059e190`) · payload 3 bytes
 
@@ -12916,6 +12918,20 @@ to the Character DB (sock2gameDB); answer 0x345A (Z05 §6.4); no 2016 PDB struct
 | 48 | u16 | LicenseMobID |  |
 | 50 | u16 | echo.licenseitem |  |
 | 52 | u16 | echo.weaponitem |  |
+
+### `0x5c09` NC_WT_MOB_KILLCOUNT_SET_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_0059dd00 (sp_saveweapontitle); Character DB FUN_00412bd0 (D04))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | ref: player handle |
+| 2 | u32 | chrregnum | ref: so_GetCharRegistNumber |
+| 6 | u64 | ItemKey | weapon item key |
+| 14 | u16 | MobID | title mob of the entry |
+| 16 | u32 | MobKillCount | new 28-bit count |
+
+0x14 bytes; every 10th kill or on a level change (Z18 §6.6)
 
 ### `0x6005` NC_CT_DB_SET_CMD (Z→DB)
 
