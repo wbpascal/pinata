@@ -9,5 +9,13 @@
   "FUN_00613f20": "LuaScriptSecurity::_scalar_deleting_destructor_",
   "DAT_14d6fcd8": "g_LuaArgument",
   "DAT_14d6fdf0": "g_LUA_SCRIPT_SECURITY",
-  "DAT_00870dd8": "g_LUA_SCRIPT_SECURITYFactor"
+  "DAT_00870dd8": "g_LUA_SCRIPT_SECURITYFactor",
+  "FUN_005b8c00": "ZoneServer_zs_start_long",
+  "FUN_0049dc00": "OnStart_Service",
+  "FUN_0049dc10": "OnStop_Service",
+  "FUN_00653480": "WinService::serviceLoop",
+  "FUN_006533c0": "WinService::onServiceStart",
+  "FUN_00653200": "WinService::onServiceStop",
+  "FUN_006535b0": "WinService::startDispatcher",
+  "FUN_00653390": "WinService::serviceHandler"
 }
