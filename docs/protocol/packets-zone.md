@@ -3374,16 +3374,14 @@ Fill: +1: ShineObjectClass::ShinePlayer::vfunc[0x4c4] = FUN_0055abf0 (assumed cl
 |---|---|---|
 | 0 | u8 | `1` |
 
-### `0x1c16` ?
+### `0x1c16` NC_BRIEFINFO_PLAYER_LIST_INFO_APPEAR_CMD (hand-named)
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_BRIEFINFO_PLAYER_LIST_INFO_APPEAR_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone &showid ac_ShowPlayerID FUN_0041f4a0 / AxialListShowID::ali_Work FUN_00429170 (write, 1 + n*30 bytes, n ≤ 28 per packet); PDB 2016 PROTO_NC_BRIEFINFO_PLAYER_LIST_INFO_APPEAR_CMD; the 2016 client has no handler (C01))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nPlayerCnt |  |
-| 1 | PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD[nPlayerCnt] | PlayerInfo | variable length, element PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD |
-
-Element `PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD` (30 bytes): +0 u16 nHnd, +2 char[20] sID, +22 u8 CharTitle.Type, +23 u8 CharTitle.ElementNo, +24 u16 CharTitle.MobID, +26 u32 nGuildID
+| 0 | u8 | nPlayerCnt | 1..28 |
+| 1 | PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD[nPlayerCnt] | PlayerInfo | 30 bytes each: +0 u16 nHnd, +2 Name5 sID (20), +22 CHARTITLE_BRIEFINFO {u8 Type, u8 ElementNo, u16 MobID}, +26 u32 nGuildID |
 
 Sent from `AmpersandCommand::ac_ShowPlayerID` (`FUN_0041f4a0`) · payload variable (iVar4)
 
@@ -12118,6 +12116,54 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
 
+### `0x482c` NC_SKILL_ITEMACTIONCOOLTIME_CMD (Z→C)
+
+**Verified layout** (basis: zone ItemActionObserveManager::ResetCoolTime FUN_005d1a00 (num*8+4 bytes incl. opcode); client On_NC_SKILL_ITEMACTIONCOOLTIME_CMD FUN_0049c600; PDB 2017 PROTO_SKILL_ITEMACTIONCOOLTIME_CMD)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | num | entries |
+| 2 | struct[num] | group | 8 bytes each |
+| 2 | u16 | group[i].ItemActionID | cool-time entry +0x14 |
+| 4 | u16 | group[i].ItemActionGroupID | cool-time entry +0x10 |
+| 6 | u32 | group[i].SecondCoolTime | remaining ms (client divides by 1000); 0 from ResetCoolTime |
+
+### `0x3438` NC_ITEMDB_PICKMONEY_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_PickupMoney FUN_0052fe80 (0x18 bytes incl. opcode; &getmoney ac_GetMoney FUN_00421bf0); PDB 2017 PROTO_NC_ITEMDB_PICKMONEY_REQ after the 6-byte ref; D03 §3.5)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle | zone object handle |
+| 2 | u32 | ref.charNo |  |
+| 6 | u32 | owner | = charNo |
+| 10 | u64 | itemonfield | 0xFFFFFFFF_FFFFFFFF (no drop object) |
+| 18 | u32 | cen | amount added |
+
+### `0x4801` NC_SKILL_SKILLTEACH_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone ac_learnskill FUN_0041c290 (0x11 bytes incl. opcode); D04 §2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | zone object handle |
+| 2 | u32 | charNo | ref |
+| 6 | u32 | chrregnum | = charNo |
+| 10 | u16 | skillid |  |
+| 12 | u8 | ispassive | 0 from &learnskill |
+| 13 | u16 | removeid | 0xFFFF = none |
+
+### `0xd401` NC_PET_SET_TENDENCY_DB_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone ShinePlayer::sp_Send_NC_PET_SET_TENDENCY_DB_REQ FUN_004d1040 (10 bytes incl. opcode; &setpetinfo FUN_00422590); D03 (FUN_0042b920))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMasterHandle | pet owner's object handle |
+| 2 | u32 | nPetRegNum | sp_PetInfo.nRegNum |
+| 6 | u8 | nPetMind | clamped to gPetData mind min..max |
+| 7 | u8 | nPetStress | clamped to gPetData stress min..max |
+
 ### `0x10d1` NC_CHAR_FREESTAT_SET_DB_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_0058ad10 / FUN_0058b3f0)
@@ -12359,19 +12405,6 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 |---|---|---|---|
 | 0 | u16 | bEnable |  |
 | 2 | u32 | charNo |  |
-
-### `0x4801` NC_SKILL_SKILLTEACH_REQ (Z→DB)
-
-**Verified layout** (basis: zone FUN_0046c820 (production skill))
-
-| Off | Type | Field | Notes |
-|---|---|---|---|
-| 0 | u16 | zonehandle |  |
-| 2 | u32 | chrregnum |  |
-| 6 | u32 | chrregnum2 | same value |
-| 10 | u16 | skill |  |
-| 12 | u8 | ispassive | 0 here |
-| 13 | u16 |  | 0xFFFF here |
 
 ### `0x4812` NC_SKILL_EMPOWALLOC_DB_REQ (Z→DB)
 
@@ -12646,6 +12679,115 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 7 | u16 | nError |  |
 | 9 | i32 | eLevelType |  |
 | 13 | Name3 | sMapName |  |
+
+### `0x0811` NC_MISC_ZONERINGLINKTEST_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &zonelink ac_ZoneLinkTest FUN_0041d950 (writes, 10 bytes); zls_NC_MISC_ZONERINGLINKTEST_RNG FUN_0045b4d0 (appends, forwards mechines*16+10 bytes); PDB 2016 PROTO_NC_MISC_ZONERINGLINKTEST_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | u8 | mechines | number of addr entries (0 at the start, +1 per zone) |
+| 8 | Name4[mechines] | addr | each zone's next-zone address string (16 bytes each) |
+
+### `0x1068` NC_CHAR_PLAYERSEARCH_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &pfind ac_FindPlayer FUN_0041d050 / ZoneRingPacketFindPlayer::zrpb_Request FUN_005a7190 (writes, 0x1D bytes); zls_NC_CHAR_PLAYERSEARCH_RNG FUN_0045b870 (reads, forwards); PDB 2016 PROTO_NC_CHAR_PLAYERSEARCH_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | Name5 | charid | character searched (20 bytes) |
+
+### `0x1069` NC_CHAR_PLAYERFOUND_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone zls_NC_CHAR_PLAYERSEARCH_RNG FUN_0045b870 (writes, 0x31 bytes); zls_NC_CHAR_PLAYERFOUND_RNG FUN_0045ba60 (forwards) → zrpb_Success FUN_005a7b70 (reads); PDB 2016 PROTO_NC_CHAR_PLAYERFOUND_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | Name3 | map | server map of the player (12 bytes) |
+| 19 | u32 | coord.x |  |
+| 23 | u32 | coord.y |  |
+| 27 | Name5 | charid | player found (20 bytes) |
+
+### `0x106a` NC_CHAR_PLAYERSUMMON_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &psummon ac_SummonPlayer FUN_0041d140 / ZoneRingPacketSummonPlayer::zrpb_Request FUN_005a6fd0 (writes, 0x31 bytes); zls_NC_CHAR_PLAYERSUMMON_RNG FUN_0045b700 → zrpb_Success FUN_005a7ab0 (reads); PDB 2016 PROTO_NC_CHAR_PLAYERSUMMON_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | Name5 | charid | player to summon (20 bytes) |
+| 27 | Name3 | map | GM's server map (12 bytes) |
+| 39 | u32 | coord.x | GM position |
+| 43 | u32 | coord.y |  |
+
+### `0x106b` NC_CHAR_KICKPLAYEROUT_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone zls_NC_CHAR_KICKPLAYEROUT_RNG FUN_0045bc30 (reads, forwards 0x1E bytes); &kickout ac_KickOutPlayer FUN_0041cec0 / zrpb_Request FUN_005a76f0 build this layout but send it as 0x1068 (Z11-B6); PDB 2016 PROTO_NC_CHAR_KICKPLAYEROUT_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | u8 | tmp | padding, never written by &kickout |
+| 8 | Name5 | charid | character to kick (20 bytes) |
+
+### `0x106c` NC_CHAR_PLAYERBANNED_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_0045bc30 (builds, 0x1D bytes), zls_NC_CHAR_PLAYERBANNED_RNG FUN_0045bdf0 (forwards); PDB 2016 PROTO_NC_CHAR_PLAYERBANNED_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine |  |
+| 1 | u16 | start.handle |  |
+| 3 | u32 | start.regnum |  |
+| 7 | Name5 | charid | kicked character |
+
+### `0x1810` NC_MAP_EXPBONUS_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &expbonus ac_BonusExp FUN_0041e190 → zrpb_Request FUN_005a79a0 (writes, 0x0B bytes); ring handler forwards and applies; PDB 2016 PROTO_NC_MAP_EXPBONUS_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | u16 | bonus | per mille (1000 = normal) for every map of the zone |
+
+### `0x1811` NC_MAP_ITEMBONUS_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &itembonus ac_BonusItem FUN_0041e2d0 → zrpb_Request FUN_005a7890 (writes, 0x0B bytes); ring handler forwards and applies; PDB 2016 PROTO_NC_MAP_ITEMBONUS_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | u16 | bonus | per mille (1000 = normal) for every map of the zone |
+
+### `0x2055` NC_ACT_WEDDING_COUPLE_ENTRANCE_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &weddingreset ac_WeddingReset FUN_0041ec70 and WeddingHall::wh_Routine FUN_005a2a10 (write, 0x12 bytes with opcode); zls_NC_ACT_WEDDING_COUPLE_ENTRANCE_RNG FUN_005a2b60 (reads, forwards 16 bytes); PDB 2016 PROTO_NC_ACT_WEDDING_COUPLE_ENTRANCE_RNG (0x10))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number |
+| 1 | u16 | start.handle | 0xFFFF (not used) |
+| 3 | u32 | start.regnum | 0xFFFFFFFF (not used) |
+| 7 | u32 | groom | groom charNo (&weddingreset: GM charNo) |
+| 11 | u32 | bride | bride charNo (&weddingreset: GM charNo) |
+| 15 | u8 | RecallCount | partners recalled so far; 0 back at the origin = cancel the hall reservation |
 
 ### `0x10b1` NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG (Z→Z ring)
 

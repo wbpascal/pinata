@@ -622,6 +622,33 @@ ITEMS = [
       done="The config file format is specified (directives, types, limits, errors) with a reader tested on every 2016 config "
            "file, every `CCsl` function of the zone is cited as `FUN_…`, and the other servers' copies are confirmed or their "
            "differences recorded."),
+ dict(id="Z20", phase=2, title="Zone: skill data box loader (SkillDataBox / PassiveDataBox, SkillDataIndex build; added by Z11)",
+      out="docs/pseudocode/zone/Z20-skill-data.md", deps=["Z01", "Z03"], scope=[],
+      goal="The zone builds one `SkillDataBox::SkillDataIndex` per active skill from five SHN tables (ActiveSkill, "
+           "ActiveSkillInfoServer, ActiveSkillGroup, ToggleSkill, AreaSkill; Z01 §2.3 row FUN_00585f40) and the passive "
+           "skills in `PassiveDataBox`. Z03 uses the rows (`docs/knowledge/Z03.md` SkillEntry) and Z11 §8.6 shows that "
+           "`&reloaddata ActiveSkill` re-runs the loader at run time, but no item documents how the index is built: "
+           "`sdb_Load` alone is ~1.1k decompiled lines. Reconstruct it so a rebuild can load the original tables unchanged.",
+      steps=["Read `docs/pseudocode/zone/Z01-core.md` §2.3 (loader table), `docs/knowledge/Z03.md` (SkillEntry offsets), "
+             "`docs/pseudocode/zone/Z03-combat.md` (who reads `SkillDataIndex` members), Z11 §8.6 (`&reloaddata`, bug Z11-B37) and "
+             "Z10's loader stage list (`docs/pseudocode/zone/Z10-certification.md`, `sdb_Load` FUN_00585f40) first.",
+             "PDB names (`clean.py re-data/exports/zone-pdb - <addr> …`): `SkillDataBox::sdb_Load` 00585f40 (files, order, "
+             "`sdb_ValidArray` / `sdb_MaxValid`, `skillnametree`, sorting `sdb_compare` 005844e0, the area-skill vector), "
+             "`SkillDataIndex::sdi_SetArgument` 00584800 and `sdi_Clear` 00584500 (which SHN columns become which "
+             "`EnumStruct {exist, value}` / special-value members), the ctor / dtor 00447e30 / 00447e50, the `sdb_BinData` "
+             "ctor / dtor 00585520 / 00585680, `BinaryDataBox<ActiveSkillInfo|ActiveSkillInfoServer|AreaSkill|ToggleSkill|"
+             "CollectCardMobGroup>::bdb_ReadData` 00585030 / 00584f70 / 005850f0 / 005851b0 / 00648d50 (header check, "
+             "\"readfail\" path), `_DebugMessageNew2` 0064f1f0 (the error message helper they call), `GetSkillIndexByName` "
+             "00585ef0, `sdb_GetAreaSkillInfo` 00585730, `sdb_SpecSkillStruct` 0046a410; `PassiveDataBox` ctor 00585790, "
+             "`pdb_Load` 005858d0, `sdb_GetSetAbstate` 00584f20, `sdb_SpecSkillStruct` 0059ebe0.",
+             "Row structs: the 2016 PDB types (`pdb.py Files/Server/NA2016/Zone00/Zone.pdb types '^(ActiveSkillInfo|"
+             "ActiveSkillInfoServer|AreaSkill|ToggleSkill|PassiveSkillInfo)$'`) against `docs/knowledge/S01-shn-structs.tsv` and "
+             "the `shn.py` column names of each file; record the column → member map.",
+             "Invariants a rebuild needs: id ranges, missing or duplicate rows, rows dropped by the loader, what lookups return "
+             "for an unknown id (default blocks), and which other objects keep `SkillDataIndex*` (settles Z11-B37's holder list).",
+             "Bugs as `Z20-B<n>`; Coverage boundary as usual."],
+      done="`sdb_Load`, `sdi_SetArgument`, `sdi_Clear` and `pdb_Load` are written as pseudocode with a column → member map for "
+           "every skill table, and every SkillDataBox / PassiveDataBox function of the zone is cited as `FUN_…`."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
