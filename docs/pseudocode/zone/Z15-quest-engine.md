@@ -445,7 +445,7 @@ script pauses whenever a command needs an answer. State that controls a pause:
 | Member | Set to 1 / a value by | Cleared by |
 |---|---|---|
 | `m_ParsingQuestID` (+0x906) | `QuestStart/Doing/End` (§2.7) | `QuestClose` (0xFFFF) |
-| `m_bWaitResult` (+0x900) | SAY, CLEAR, CANCEL, PROGRESS, FAILED, ABORT, a client SCENARIO (§3.6); **not** ACCEPT, DONE, CALLPS, server SCENARIOs (Z15-B15) | every 0x4402 (§3.4), `Recv_NC_QUEST_DB_SET_INFO_ACK` (Z08 §3.3), `Recv_NC_QUEST_DB_CLEAR_ACK` success (§3.5), `Recv_NC_QUEST_DB_DONE_ACK` success (§5), `QuestStart/Doing/End`, `QuestClose`, `InitNewPlayer` |
+| `m_bWaitResult` (+0x900) | SAY, CLEAR, CANCEL, PROGRESS, FAILED, ABORT, a client SCENARIO (§3.6), DONE (inside `Send_NC_QUEST_DB_DONE_REQ`, §5.2); **not** ACCEPT, CALLPS, server SCENARIOs (Z15-B15) | every 0x4402 (§3.4), `Recv_NC_QUEST_DB_SET_INFO_ACK` (Z08 §3.3), `Recv_NC_QUEST_DB_CLEAR_ACK` success (§3.5), `Recv_NC_QUEST_DB_DONE_ACK` success (§5), `QuestStart/Doing/End`, `QuestClose`, `InitNewPlayer` |
 | `m_Var[0]` RESULT (+0xD0) | SAY / SCENARIO answer (§3.4), `PsEnd` (§3.7), `IS_ABSTATE`, `GET_ITEM_LOT` | never reset while the script runs (0 at `ParserStart`, §2.4) |
 
 `m_bWaitResult` only makes `QuestNext` return 2 and makes `QuestPlayer_NotCheckNPC` (0x4414, Z08 §3.2; §6) refuse; it
@@ -939,7 +939,7 @@ the dialog. Part 5 (§7) adds the non-script quest codes 0xB41…0xB5A.
 | Code | Raised by | Client text |
 |---|---|---|
 | 0xC00 | CLEAR_ACK: quest id mismatch or DB error (§3.5) | "<%s> an unknown error has occurred." |
-| 0xC01 | DONE: `QuestCheckReward` failed or 0x441A not sent (§3.3, §5; part 4 adds the other reward-path callers) | "Inventory full. Cannot receive the reward item." |
+| 0xC01 | DONE only: `QuestCheckReward` failed (no room), or `Send_NC_QUEST_DB_DONE_REQ` returned 0: a reward already pending, an item lock open, no row / record / title object (§3.3, §5.2, Z15-B37) | "Inventory full. Cannot receive the reward item." |
 | 0xC02 | ACCEPT: no quest row | (none) |
 | 0xC03 | ACCEPT: start conditions not met | "<%s> ths quest is not proceedable." |
 | 0xC04 | CANCEL: no diary record / row | "<%s> an unknown error has occurred while Giving Up the quest." |
@@ -952,7 +952,7 @@ the dialog. Part 5 (§7) adds the non-script quest codes 0xB41…0xB5A.
 | 0xC0B | CREATE_ITEM: unknown item | "<%s> Error. Failed to create quest item." |
 | 0xC0C | 0x4402 for another quest or command | "<%s> a lag or an unknown error occurred during proceeding the quest." |
 | 0xC0D | 0x4402 for a command that takes no answer | "<%s> internal command error occurred during proceeding the quest." |
-| 0xC0E | DB answer 0x4404 / 0x441B with an error (Z08 §3.3, parts 3–4) | "<%s> DB writing error occurred during proceeding the quest." |
+| 0xC0E | DB answer with an error: 0x4404 (also an unknown nQSC, §4.7), 0x441B (§5.3), 0x345C (dead path, §5.5) | "<%s> DB writing error occurred during proceeding the quest." |
 | 0xC0F | ACCEPT: 40 quests in progress | "Cannot accept 40 or more quests at once." (`fs(text, 0x28)`) |
 | 0xC10 | CALLPS: film already running / not started | (none) |
 
@@ -1437,8 +1437,366 @@ arrives while a reward request (0x441A) or another 0x4403 is pending clears both
 
 ---
 
-<!-- Parts 4–5 add: §5 the reward path (and the 0x441C / 0x441D handlers, `so_StoreQuest*`), §6 other entry points,
-§7 quest error numbers. The sweep adds the bugs table, uncertain list and coverage boundary. -->
+## 5. Rewards, the DONE round trip, reset times and the character save
+
+The reward path starts at the script command `DONE` (§3.3) and ends with the answer 0x441B. The zone checks and
+reserves everything first (money, exp, fame, title, item cells under one inventory lock index), the Character server
+writes everything in one request (D04 §1.2 0x441A), and only the success answer applies the reservations in memory
+(Z05 §1.1 style 1). The quest record itself is updated on the zone only after the answer.
+
+### 5.1 Reward data, selection and the room check
+
+Rewards are `QUEST_DATA.Reward[12]` (row +0x204, §1.2): `{u8 Use (0 UNUSE, 1 PRIMARY, 2 SELECTABLE); u8 Type; VALUE}`.
+Every PRIMARY entry is given; of the SELECTABLE entries only the one the player picked. The pick is the **absolute
+slot index 0…11** in `Reward[]`: `QuestCheckSelectReward` compares it with the slot number, and the 2017 client converts
+its UI choice (n-th selectable) into that slot number before sending (`RewardWin::GetRealSelectReword` 0057cc80
+*(pdb2017)*).
+
+```pseudo
+0x4411 NC_QUEST_REWARD_SELECT_ITEM_INDEX_CMD { u16 nQuestID; u32 nSelectedItemIndex }  (zone handler @ FUN_00578b70, Z08 §3.2) →
+CQuestZone::Recv_NC_QUEST_REWARD_SELECT_ITEM_INDEX_CMD(cmd) → int:                 @ FUN_005bb490
+    if !m_pPlayer: return 0
+    if m_ParsingQuestID == cmd.nQuestID: m_nSelectedItem = cmd.nSelectedItemIndex   # no range check; validated at DONE
+    return 1
+# m_nSelectedItem = 0xFFFFFFFF on every QuestStart / QuestDoing / QuestEnd (§2.7); nothing else writes it
+
+CQuestZone::Send_NC_QUEST_REWARD_NEED_SELECT_ITEM_CMD(questId) → int:              @ FUN_005bb570
+    if !m_pPlayer: return 0
+    → client 0x4412 NC_QUEST_REWARD_NEED_SELECT_ITEM_CMD { u16 nQuestID }  (payload 2, game socket vt 0x2fc)
+    # client FUN_00479fa0: message "Please choose reward(s)." (TextData 0x90fcd9c7); the field is not read
+    return 1
+
+CQuestZone::QuestCheckSelectReward(questId, sel) → int:   "the choice is valid"   @ FUN_005ba0e0
+    if !m_pPlayer or !(row = GetQuestData(questId)): return 0
+    for i in 0..11: if row.Reward[i].Use == 2 SELECTABLE and i == sel: return 1
+    return (no SELECTABLE entry exists)            # 1 for a quest without choice, whatever sel holds
+
+CQuestZone::QuestCheckReward(questId, sel, chargedEffects) → int:  "enough free cells"   @ FUN_005bcde0
+    if !m_pPlayer or !(row = GetQuestData(questId)): return 0
+    need = number of i with Reward[i].Type ∈ {2 ITEM, 5 PET} and (Use == 1 PRIMARY or (Use == 2 and i == sel))
+    return QuestCheckRewardInven(need, chargedEffects)
+
+CQuestZone::QuestCheckRewardInven(need, chargedEffects) → int:                     @ FUN_005b9f60
+    if !m_pPlayer: return 0
+    box = the inventory (p.sp_Item.itembag.ci_Inventory); limit = chargedEffects ? box.vt 4(chargedEffects) : box.vt 8()
+                                                   # usable size with the bought inventory pages / full size (Z04 §1.2)
+    free = number of empty cells below limit that are not locked (ItemBoxIterEmpty + UnlockedInventoryIterator,
+           inventory type 9, lock list p.vt 0x7d4)
+    return need <= free
+```
+
+`QuestNext` (`DONE`, §3.3) always passes `so_ply_ChargedEffectContainer()` (p.vt 0x498), so the usable size counts.
+
+What the zone gives per reward type (`Send_NC_QUEST_DB_DONE_REQ`, §5.2):
+
+| Type | Given as | 2016 data *(data)* |
+|---|---|---|
+| 0 EXP | `nExp = Value` | PRIMARY 2129, SELECTABLE 1 (quest 1060, slot 0, its only selectable entry) |
+| 1 MONEY | `nMoney = Value` | PRIMARY 2125 |
+| 2 ITEM | one `ItemCreate` of `ItemID` × `ItemLot` (§5.2) | PRIMARY 530, SELECTABLE 362 |
+| 4 FAME | `nFame = Value` | PRIMARY 17 |
+| 7 TITLE | `CT_Type = Value[0]`, `CT_ElementNo = Value[1]`; Type is cleared when ElementNo > 3 | none |
+| 3 ABSTATE, 5 PET, 6 MINIHOUSE, 8 KILLPOINT | **nothing** (no case; PET still needs a free cell in `QuestCheckReward`) | none |
+
+EXP, MONEY and FAME are assigned, not added: a second PRIMARY entry of the same type would replace the first
+*(none in the 2016 data)*. 122 quests have selectable rewards (121 with more than one); a quest needs at most 8 free
+cells.
+
+### 5.2 `0x441A NC_QUEST_DB_DONE_REQ`: reserve and send
+
+The function carries the profiler string `CQuestZone::QuestTakeReward` (the name Z01 gave it).
+
+```pseudo
+CQuestZone::Send_NC_QUEST_DB_DONE_REQ(questId, sel) → int:                         @ FUN_005bbe60
+    if !m_pPlayer: return 0
+    if p.vt 0xae0 so_GetIsQuestRewardReq() == 1: return 0        # a reward is already in flight (§5.4)
+    L = p.vt 0x7d4 (InventoryCellLockList)
+    if L.vt 0x10 icl_IsAnyLock(): return 0                       # any open item reservation / DB-pending item request
+    if !(row = GetQuestData(questId)): return 0
+    req = gpp: opcode 0x441A, payload {                          # PROTO_NC_QUEST_DB_DONE_REQ (pdb2016)
+        +0x00 NETPACKETZONEHEADER { u16 clienthandle = p.handle (p+4); u32 charregistnumber = p.vt 0x344 }
+        +0x06 u32 UserNo = p.vt 0x348 so_GetUserRegistNumber()
+        +0x0A u16 NPCID  = CQuest::GetRewardNPC(questId)          # first End NPC with action 0; 0xFFFF (§4.4)
+        +0x2D…+0x51 zeroed: nMoney, nExp, nFame, nCur_*, CT_Type, CT_ElementNo, nCur_CT_ElementValue
+        +0x50 u16 nLockIndex = 0, +0x52 u8 nItemCreateCount = 0 }
+    if !(rec = GetQuestInfo(questId)): return 0
+    req.QuestInfo (+0x0D, 0x20) = copy of rec; CQuest::SetQuestDone(&req.QuestInfo)
+                                     # status 4 REPEAT (repeatable) or 2 DONE, RepeatCount + 1, EndTime = now (§4.3)
+    req.nQSC (+0x0C) = m_pQSC.Cmd                                # 10 DONE
+    m_bWaitResult = 1                                            # the script pauses here (corrects §3.1's table)
+    for i in 0..11 with Reward[i].Use ≠ 0 and (Use ≠ 2 or i == sel):   # table §5.1
+        0 EXP → nExp (+0x31); 1 MONEY → nMoney (+0x2D); 4 FAME → nFame (+0x35)
+        2 ITEM → itemId[n] = Value.ItemID, lot[n] = Value.ItemLot, n += 1 (nItemCreateCount)
+        7 TITLE → CT_Type (+0x4D) = Value.Type, CT_ElementNo (+0x4E) = Value.ElementNo; if CT_Type ≠ 0 and ElementNo > 3: CT_Type = 0
+    req.nLockIndex   = L.icll_index (L+4, u16)
+    req.nCur_Money   = p.vt 0x434 so_ply_CurrentMoney()  (u64, +0x39)
+    req.nCur_Exp     = p.vt 0x438 so_ply_CurrentExp()    (u64, +0x41)
+    req.nCur_Fame    = p.vt 0x43c so_ply_CurrentFame()   (u32, +0x49)
+    title = p.vt 0x420 so_GetCharacterTitle(); if !title: return 0
+    req.nCur_CT_ElementValue (+0x4F) = CCharacterTitle::GetTitleStatus(title, CT_Type, req.nCur_CT_ElementValue)   @ FUN_0062e180
+        # passes the byte it is about to fill (still 0) as the element: always the state of element 0, not of
+        # CT_ElementNo (original bug) Z15-B36. GetTitleStatus(type < 128, e 0..3) = m_Titles[type].Element<e>, else 0
+    L.vt 0x48 icl_StoreMoney(lock, u64 nMoney, +1)              # CenChange reservation (Z05 §1.4), also when nMoney == 0
+    L.vt 0x60 icl_QuestReward(lock, nExp, nFame, CT_Type, CT_ElementNo)    @ FUN_00489800
+        # LockedCell { lc_Index = lock, lc_Releaser = icll_Releaser_QuestReward, both locations = inventory 0x11 slot 0,
+        #              lc_Argument.questreward { i32 exp, i32 fame, u8 ct_type, u8 ct_elementno } };
+        # a full lock list asserts "…icl_QuestReward : List Full" and reserves nothing
+    attr = req + 0x53 + n × 0x26                                 # attribute bytes follow the ItemCreate array
+    if n > 0:
+        it = empty unlocked inventory cells (ItemBoxIterEmpty with the charged container, inventory type 9, as §5.1)
+        if !it.Home(): return 0
+        for k in 0..n-1:
+            if no current cell: return 0                         # cannot happen after QuestCheckReward (inferred)
+            key = ItemTotalInformation::iti_mkregnum(itemId[k], kind 2, own zoneNo, own worldNo)   # kind 2 = quest reward
+            cls = ItemAttributeClassContainer[itemId[k]]; item = {itemId[k], cls.vt 0x14 init attribute(itemId, &key, "-o")}
+            if ItemDataBox[itemId].dataserv.RandomOptionDropGroup names a RandomOptionTable row and cls.vt 0x70(item) gives
+                an option storage: rot_FillOption(storage, row)  # random options rolled now (Z04)
+            cls.vt 0x20 SetLot(item, lot[k])
+            ItemCreate[k] (0x26) = { u32 owner = p.vt 0x344 charNo; MAPPOS map = 12-byte map name (*(p+0x7a)) + x, y
+                (*(p+0x66)); ITEM_INVEN location = 9 << 10 | cell; SHINE_ITEM_REGISTNUMBER createitemregnum = key;
+                u16 createitemid = itemId[k]; u16 attr = (attr − payload start) }   # payload offset of its attribute bytes
+            attr = cls.vt 4(item, attr)                          # writes the attribute bytes, returns the new end
+            L.vt 0x40 icl_StoreItem(lock, cell, &{key, item}, &location, &location)   # CellChange reservation (Z05 §1.4)
+            it.Next()
+    pp_SetPacketLen(attr − buffer); too long → assert "Send_NC_QUEST_DB_DONE_REQ : Packet Too Long" (no send)
+    else → GameDB (Character server, D04 §1.2) 0x441A, total payload 0x53 + n × 0x26 + attribute bytes
+    L.icll_index += 1
+    p.vt 0xae4 so_SetIsQuestRewardReq(1)
+    QuestNext()                                                  # returns 2 at once: m_bWaitResult is set
+    return 1
+```
+
+On `return 0`, `QuestNext` frees whatever was reserved under the current index (`L.vt 0x28 icl_Free(L+4)`), moves the
+index on and sends error 0xC01 + `QuestClose` (§3.3); `QuestClose` clears the `m_bWaitResult` set above. So 0xC01
+"Inventory full. Cannot receive the reward item." is also what the player reads when a reward is already pending or any
+other item operation is still open (`icl_IsAnyLock`) (original bug) Z15-B37.
+
+The reservations lock the chosen empty cells (other item requests skip them) and the open lock makes `icl_IsAnyLock`
+true, so every other item request that tests it is refused until the answer (Z04 §1.4).
+
+### 5.3 `0x441B NC_QUEST_DB_DONE_ACK`: apply or drop
+
+The DB answer `{ hdr6, u8 nQSC, PLAYER_QUEST_INFO QuestInfo, u16 nLockIndex, u16 ErrorType }` (0x2B; Character server
+D04 §1.2: 0xB41 ok, 0xB43 quest store failed, 0xBC2 item insert failed, 0xBC3 money failed, 0xBC5 title failed; the DB has
+rolled back on failure) reaches the quest object through `gds_NC_QUEST_DB_DONE_ACK` FUN_00578810 (Z08 §3.3).
+
+```pseudo
+CQuestZone::Recv_NC_QUEST_DB_DONE_ACK(ack) → int:                                  @ FUN_005bfb30
+    if !m_pPlayer: return 0
+    L = p.vt 0x7d4
+    if ack.ErrorType == 0xB41:
+        if !L.vt 0x1c icl_Apply_N_Free(p, ack.nLockIndex, 0):     # apply every reservation of the index (Z05 §1.3)
+            LockIndexLog << "CQuestZone::Recv_NC_ITEMDB_QUESTREWARD_ACK : " << lock    (copy-pasted text)
+        m_bWaitResult = 0
+        if CQuest::SetQuestDone(ack.QuestInfo.ID):               # the diary record by id (§4.3); 0 = no record
+            if (row = GetQuestData(ID)) and !row.Repeatable:
+                CCharacterTitleZone::CT_QuestSuccess(p.vt 0x420(), ID)
+            Send_NC_QUEST_SCRIPT_CMD_REQ(ID, &{Cmd = ack.nQSC (10 DONE), IsPigeonStartType 0, Data.nID = ID})
+                # 0x4401 to the client (§3.4: the client runs CQuest::SetQuestDone(nID)); other Data bytes are stack leftovers
+                # (same class as Z15-B10)
+        p.vt 0xae4 so_SetIsQuestRewardReq(0)
+        QuestNext()                                               # the command after DONE
+        return 1
+    # failure
+    _DebugMessageNew("ERROR, CQuestZone::Recv_NC_QUEST_DB_DONE_ACK …", char name, m_ParsingQuestID, ID, Status, time)
+    L.vt 0x28 icl_Free(ack.nLockIndex)                            # drop the reservations; nothing was applied
+    Send_QUEST_ERROR_TO_CLIENT(0xC0E)                             # "DB writing error …", NPC dialog closed (§3.4)
+    p.vt 0xae4 so_SetIsQuestRewardReq(0)
+    return 0
+```
+
+The answer is not matched with the running script: neither `ack.QuestInfo.ID` nor `nQSC` is compared with
+`m_ParsingQuestID` / the current command. While the reward is pending only `QuestStart` is refused (§2.7); `QuestDoing` /
+`QuestEnd` (an ING or REWARD quest at another NPC) still open a new script, which closes the waiting one. When 0x441B then
+arrives, it clears the new script's `m_bWaitResult` and runs `QuestNext` on it, so a `SAY` waiting for its answer is
+passed with the stale RESULT (original bug) Z15-B35. On a failure answer `m_bWaitResult` stays 1 and the script stays
+open: `QuestNext` and 0x4414 (§6) are blocked until the next script opens (original bug) Z15-B34 (as Z15-B17 for CLEAR).
+
+What the apply does (releasers, Z05 §1.4), in reservation order *(inferred: list order)*:
+
+```pseudo
+CenChange (money):  money += nMoney → client 0x1033 NC_CHAR_CENCHANGE_CMD { u64 cen }            (Z05 §1.4)
+InvenCellReleaser_QuestReward::icr_Apply(this, obj, cell, ctx):  obj.vt 0x464(cell)                @ FUN_004881a0
+ShinePlayer::so_ply_InvenCellReleaser_QuestReward(cell):                                         @ FUN_0052d980
+    sp_GainExp(this, cell.questreward.exp, 0xFFFF, 0xFFFF)       # Z03: exp gain, level-ups
+    this.vt 0x20 so_GainFame(cell.questreward.fame)
+    if cell.questreward.ct_type ≠ 0:
+        CCharacterTitleZone::SetTitleStatus(p.vt 0x420(), ct_type, ct_elementno, 2 ELEMENT_USABLE)
+CellChange (each item): the new item is written into its reserved cell → client 0x3001 NC_ITEM_CELLCHANGE_CMD (Z05 §1.5)
+```
+
+`CT_ELEMENT_VALUE` *(pdb2016)*: 0 UNKNOWNED, 1 KNOWNED, 2 USABLE, 3 USE. The DB stores the title as value 2 too
+(D04 §1.2), so zone and DB agree.
+
+```pseudo
+CCharacterTitleZone::CT_QuestSuccess(questId):                                             @ FUN_005cc270
+    m_TitleValues[40 ID_QUEST_SUC_COUNT].TitleValue (u64) += 1; .bTitleSave = 1
+    CheckNewTitle(40)                                            # unlock a "quests completed" title (Z18, Z07 section; Z09 §17.8)
+```
+`questId` is not used: the counter counts non-repeatable quest completions.
+
+### 5.4 The reward-request flag
+
+`ShinePlayer.sp_IsQuestRewardReq` (u8 at p+0x2AA50 *(pdb2016)*) is read by `so_GetIsQuestRewardReq` (vt 0xAE0, FUN_0054a7a0)
+and written by `so_SetIsQuestRewardReq` (vt 0xAE4, FUN_0054a7b0).
+
+| Set to | By |
+|---|---|
+| 1 | `Send_NC_QUEST_DB_DONE_REQ` after the send (§5.2) |
+| 0 | `Recv_NC_QUEST_DB_DONE_ACK` (both outcomes), `Recv_NC_QUEST_DB_SET_INFO_ACK` (every answer, Z15-B33), `Recv_NC_ITEMDB_QUESTREWARD_ACK` failure (§5.5) |
+
+Readers while it is 1: `QuestStart` refuses (§2.7), `Send_NC_QUEST_DB_DONE_REQ` refuses (0xC01), and the item code
+refuses: `sp_NC_ITEM_USE_REQ` FUN_005416b0 (fail code 0x701 "Cannot use the item due to an Abnormal State."),
+`UseItemRecallScroll::uib_CanUseItem` FUN_005980d0, `sp_NC_ITEM_MOVER_UPGRADE_REQ` FUN_0051c850,
+`sp_NC_ITEM_MAPLINK_SCROLL_REQ` FUN_00520130, `sp_NC_ITEM_RANDOMOPTION_RECOVER_COUNT_LIMIT_REQ` FUN_0051dd40,
+`sp_NC_ITEM_CHAT_COLOR_CHANGE_REQ` FUN_0051e580, `sp_NC_ITEM_TERMEXTEND_REQ` FUN_0051eb40,
+`sp_NC_ITEM_CLASS_CHANGE_REQ` FUN_0051f5c0, `sp_NC_ITEM_RANDOMOPTION_CHANGE_REQ` FUN_00520e40,
+`sp_NC_ITEM_USE_ACTIVESKILL_REQ` FUN_00540b90, and the minimon auto-use routine `sp_UseItemMinimon_Routine`
+FUN_00564d40 (skips its run). Their own replies are Z04's. If the DB never answers, the flag stays 1 until the player
+object is rebuilt (relog / map change) *(inferred)*.
+
+### 5.5 The older two-step path: `0x345C NC_ITEMDB_QUESTREWARD_ACK`
+
+The zone still handles the answer of the Character server's `0x345B NC_ITEMDB_QUESTREWARD_REQ` (D03 §7.5; success
+code 0xBC1), but **the 2016 zone never sends 0x345B** (no send site in the code; the only `0x345b` constants are pet
+item-use fail codes in `UseItemPet::uib_CanUseItem`). The handler is dead code for a 2016 Character server that only
+answers what it is asked.
+
+```pseudo
+0x345C { hdr6, u16 lockindex, u16 nQuestID, u16 err }  (gds_NC_ITEMDB_QUESTREWARD_ACK FUN_00527ff0, profiler string
+        "gds_NC_ITEMDB_DESTROY_ACK", Z05 §6.5) → q = p.vt 0x808 so_ply_QuestDiary()
+CQuestZone::Recv_NC_ITEMDB_QUESTREWARD_ACK(ack):                                    @ FUN_005bf7f0
+    if !m_pPlayer: return
+    if ack.err == 0xBC1:
+        L.icl_Apply_N_Free(p, lockindex, 0) (failure logged as above)
+        if rec = GetQuestInfo(nQuestID):
+            info = copy of rec; CQuest::SetQuestDone(&info); m_bWaitResult = 1
+            Send_NC_QUEST_DB_SET_INFO_REQ(&info, m_pQSC)          # 0x4403 with nQSC = the current command (10 DONE)
+            QuestNext()                                           # returns 2
+    else:
+        L.icl_Free(lockindex); Send_QUEST_ERROR_TO_CLIENT(0xC0E); p.so_SetIsQuestRewardReq(0)
+```
+
+This is the only path that would reach the `nQSC 10 DONE` case of `Recv_NC_QUEST_DB_SET_INFO_ACK` (§4.7), which part 3
+found unreachable: items first through ITEMDB, the quest status second through SET_INFO. The 2016 design does both in
+0x441A *(inferred: an earlier protocol kept for compatibility)*.
+
+### 5.6 Reset times: 0x441C / 0x441D → 0x441E
+
+`CQuest.m_QuestRestTime` (+0xA4, `PROTO_NC_QUEST_RESET_TIME_CMD` *(pdb2016)*: `i32 tResetYearQuest, tResetMonthQuest,
+tResetWeekQuest, tResetDayQuest`) holds the last reset instant of each period; `IsSoonableQuest` / `IsSoonableDailyQuest`
+compare a DONE record's `EndTime` with it (§4.4, §4.6). The `CQuestZone` constructor zeroes it.
+
+```pseudo
+WM 0x441C NC_QUEST_RESET_TIME_CMD { Year, Month, Week, Day }  (wms FUN_005a6520: every player, Z08 §3.4) →
+CQuestZone::Recv_NC_QUEST_RESET_TIME_CMD(cmd) → int:                               @ FUN_005bdc80
+    if !cmd or !m_pPlayer: return 0
+    m_QuestRestTime = cmd (16 bytes)
+    if !Send_NC_QUEST_RESET_TIME_ZONE_CMD(0): assert "CQuestZone::Recv_NC_QUEST_RESET_TIME_CMD"; return 0
+    return 1
+
+WM 0x441D NC_QUEST_RESET_TIME_ZONE_CMD { u32 nCharNo; Year, Month, Week, Day }  (wms FUN_005a5b90: one player, at map
+        login, Z08 §3.4) →
+CQuestZone::Recv_NC_QUEST_RESET_TIME_ZONE_CMD(cmd) → int:                          @ FUN_005bddb0
+    if !cmd or !m_pPlayer: return 0
+    m_QuestRestTime = cmd.{Year, Month, Week, Day}
+    if !Send_NC_QUEST_RESET_TIME_ZONE_CMD(1): assert "CQuestZone::Recv_NC_QUEST_RESET_TIME_ZONE_CMD"
+    return 1
+
+CQuestZone::Send_NC_QUEST_RESET_TIME_ZONE_CMD(viaData) → int:                      @ FUN_005bc570
+    if !m_pPlayer: return 0
+    → client 0x441E NC_QUEST_RESET_TIME_CLIENT_CMD { i32 Year, Month, Week, Day } = m_QuestRestTime   (payload 16)
+      through p.vt 0x2f8 so_GetDataSocketStream() when viaData == 1 (login), else p.vt 0x2fc so_GetGameSocketStream()
+    return 1                                       # also when the length check asserts (no send)
+```
+
+The client stores the four values at the same offset of its own `CQuest` (FUN_006ac760: quest object +0xA4…+0xB0), so its
+`IsSoonableQuest` uses the same reset instants as the server (shared library, §4) *(inferred)*. Nothing on the zone computes reset
+times itself: without a 0x441D/0x441C all four are 0 and every period counts as reset long ago (§4.4).
+
+### 5.7 The diary in the character save and at map login
+
+The DB receives single records as they change (0x4403, 0x4405, 0x4409, 0x4418, 0x441A: D04 §1.2). The character save
+(`WholeSaver`, Z01 §8.4) additionally writes the in-progress list to the DB and the whole diary to the WM's cache (W01
+§6.3, W05 §5.4), which hands it to the next zone at the map login (0x1021 / 0x1022 / 0x10CD / 0x10D6, §4.2). Each list is
+selected by the **stored** `Status`:
+
+```pseudo
+so_SaveQuestDoing(PROTO_NC_CHARSAVE_QUEST_DOING_REQ*)  vt 0x398 @ FUN_004534a0 → (ws_save2DB, GameDB 0x4005 NC_CHARSAVE_QUEST_DOING_REQ)
+CQuestZone::MakeStruct_NC_CHARSAVE_QUEST_DOING_REQ(out) → n:                        @ FUN_005bb850
+    if !m_pPlayer: return 0
+    out = { handle (6, filled by the caller), u8 bNeedClear = 1, u8 nNumOfDoingQuest = n, PLAYER_QUEST_INFO[n] @+8 }
+    n = records with Status ∈ {6 ING, 7 FAILED, 8 REWARD}, copied in diary order; stop once the end offset passes 7999
+
+so_SaveQuestDoing(PROTO_NC_CHARSAVE_2WLDMAN_QUEST_DOING_CMD*)  vt 0x394 @ FUN_004534b0 → (ws_save2worldmanager, WM 0x400F)
+CQuestZone::MakeStruct_NC_CHARSAVE_2WLDMAN_QUEST_DOING_CMD(out) → n:                @ FUN_005bb980
+    same selection into { u16 wldmanhandle (caller), u32 chrregnum (caller), u8 bNeedClear = 1, u8 n, records @+8 }
+    # no size limit (the 40-quest rule keeps n small, §4.6)
+
+so_SaveQuestRead  vt 0x39c @ FUN_004534d0 → WM 0x4029
+CQuestZone::MakeStruct_NC_CHARSAVE_2WLDMAN_QUEST_READ_CMD(out) → n:                 @ FUN_005bbab0
+    { wldmanhandle, chrregnum, u16 nNumOfReadQuest = n, u16 QuestReadIDArray[n] @+8 }: ids of records with Status 20
+    READ_ABLE; stop past offset 7999
+
+so_SaveQuestRepeat  vt 0x3a0 @ FUN_004534e0 → WM 0x402B
+CQuestZone::MakeStruct_NC_CHARSAVE_2WLDMAN_QUEST_REPEAT_CMD(out) → n:               @ FUN_005bbbd0
+    { wldmanhandle, chrregnum, u16 nNumOfRepeatQuest = n, PLAYER_QUEST_INFO[n] @+8 }: records with Status 4 REPEAT;
+    stop past offset 7999
+
+so_Send_NC_CHARSAVE_2WLDMAN_QUEST_DONE_CMD(buf)  vt 0xd20 @ FUN_004534c0 (from ws_save2worldmanager) →
+CQuestZone::Send_NC_CHARSAVE_2WLDMAN_QUEST_DONE_CMD(buf = gpp):                    @ FUN_005bc6f0
+    list = { u16 ID, i64 EndTime } (PLAYER_QUEST_DONE_INFO, 10 bytes) of every record with Status 2 DONE
+           (built in a 30000-byte stack buffer: room for the 3000-record diary maximum, §4.1)
+    header: opcode 0x4010 NC_CHARSAVE_2WLDMAN_QUEST_DONE_CMD; u16 wldmanhandle = p.vt 0x340; u32 chrregnum = p.vt 0x344;
+            u16 nTotalDoneQuest = N; u16 nTotalDoneQuestSize = N × 10 + 12; u16 nDoneQuestCount; u16 nIndex = 0
+    split into packets of at most 799 records (a packet is sent when its length would pass 7999):
+        each: nDoneQuestCount = records in it; send to the WM; next nIndex = nIndex + count
+    the last (or only) packet is always sent, also with N = 0
+    # WM CharDataStore FUN_00433210 copies each chunk to blob + 12 + nIndex × 10 of a blob of nTotalDoneQuestSize (W05 §5.4)
+```
+
+So a record whose stored status is 0 NONE, 1 ABORT, 3 SOON, 5 ABLE or 9 LOWABLE is in none of the lists: it is not
+carried to the next zone through the WM cache, and comes back only with the next character login from the DB (which
+stores every record the zone sent with 0x4403). For a 0 NONE record (Z15-B26) this heals the sticky status at the map
+change; an ABORT record would be forgotten until the next login, but `ABORT` is never used in the 2016 scripts (§2.8)
+*(inferred)*.
+
+The four WM blobs come back at the next map login as 0x1021 / 0x1022 / 0x10CD / 0x10D6 (Z07 §1.2). Their
+`so_StoreQuest*` methods merge the list into the diary (§4.2) and forward it unchanged to the client:
+
+```pseudo
+so_StoreQuestDoing(cmd)  vt 0x67c @ FUN_0044b3c0:  CQuest::Recv_NC_CHAR_QUEST_DOING_CMD_ACK(cmd) (§4.2);
+    → client 0x103A NC_CHAR_CLIENT_QUEST_DOING_CMD { u32 chrregnum, u8 bNeedClear, u8 n, PLAYER_QUEST_INFO[n] }  (8 + 32n)
+so_StoreQuestDone(cmd)   vt 0x680 @ FUN_0044b500:  Recv_NC_CHAR_QUEST_DONE_CMD_ACK(cmd);
+    → client 0x103B NC_CHAR_CLIENT_QUEST_DONE_CMD { u32 chrregnum, u16 nTotalDoneQuest, u16 nTotalDoneQuestSize,
+         u16 nDoneQuestCount, u16 nIndex, PLAYER_QUEST_DONE_INFO[nDoneQuestCount] }  (0xE + 10n)
+so_StoreQuestRead(cmd)   vt 0x684 @ FUN_0044b640:  Recv_NC_CHAR_QUEST_READ_CMD_ACK(cmd);
+    → client 0x10CE NC_CHAR_CLIENT_QUEST_READ_CMD { u32 chrregnum, u16 n, u16 ids[n] }  (8 + 2n)
+so_StoreQuestRepeat(cmd) vt 0x688 @ FUN_0044b770:  Recv_NC_CHAR_QUEST_REPEAT_CMD_ACK(cmd);
+    → client 0x10D7 NC_CHAR_CLIENT_QUEST_REPEAT_CMD { u32 chrregnum, u16 n, PLAYER_QUEST_INFO[n] }  (8 + 32n)
+all four: data socket (p.vt 0x2f8); a too long packet asserts "<method> : Packet Too Long" and is not sent
+```
+
+Client handlers (C01): 0x103A FUN_00727fd0, 0x103B FUN_007280b0, 0x10CE FUN_007281b0, 0x10D7 FUN_00728280 store the
+records in the client's `CQuest` (`FUN_006acdb0()`), the same merge as the server's §4.2.
+
+### 5.8 Worked trace: a quest with an item reward
+
+Quest with PRIMARY EXP 500, MONEY 100, ITEM (id 2000 × 1), status 8 REWARD, player at the End NPC, 1 free cell:
+
+1. NPC click → `QuestEnd` → `QuestNext`: `SAY` → 0x4401 Cmd 2, wait; the answer 0x4402 (no 0x4411: nothing to choose).
+2. `DONE`: `IsRewardAbleQuest` ok; `QuestCheckSelectReward` 1 (no SELECTABLE); `QuestCheckReward`: need 1 ≤ free 1.
+3. `Send_NC_QUEST_DB_DONE_REQ`: reserves money 100 and {exp 500, fame 0, no title} and one cell with a new key (kind 2);
+   0x441A {NPCID, nQSC 10, QuestInfo (status 2, RepeatCount + 1, EndTime now), nMoney 100, nExp 500, nCur_*, lock L,
+   1 × ItemCreate + attribute bytes}; L + 1; reward flag 1; `m_bWaitResult` 1.
+4. Character server: item row, money, exp, quest record, logs (D04 §1.2) → 0x441B {nQSC 10, QuestInfo, L, 0xB41}.
+5. Zone: apply L → 0x1033 (money), exp gain (level-up packets of Z03), 0x3001 (the item); diary record → DONE;
+   quest counter title + 1; 0x4401 {Cmd 10, nID}; flag 0; `QuestNext` → the script's next command (or END).
+
+---
+
+<!-- Part 5 adds §6 other entry points and §7 quest error numbers. The sweep adds the bugs table, uncertain list and
+coverage boundary. -->
 
 ## Original-server bugs (collected so far; the sweep part numbers this section)
 
@@ -1477,6 +1835,10 @@ arrives while a reward request (0x441A) or another 0x4403 is pending clears both
 | Z15-B31 | `CQuest::Recv_NC_CHAR_QUEST_DONE_CMD_ACK` FUN_0062f7c0 / `_READ_CMD_ACK` FUN_0062f890 | builds each login record on the stack, writing only ID, Status (and EndTime) | DONE / READ records carry stack garbage in StartTime, RepeatCount, progress and counters; a daily quest accepted again sends that garbage to the DB in 0x4403 | zero the record first |
 | Z15-B32 | client `On_NC_QUEST_GIVE_UP_ACK` FUN_004ba720 vs zone `Recv_NC_QUEST_DB_SET_INFO_ACK` nQSC 28 | after giving up a repeatable quest the client stores 20 READ_ABLE, the zone and the DB 4 REPEAT | the client lists the quest as new instead of repeatable until the next login | the same status on both sides |
 | Z15-B33 | `Recv_NC_QUEST_DB_SET_INFO_ACK` FUN_005bf280 | clears `so_SetIsQuestRewardReq` and `m_bWaitResult` for every answer, also for a repeat give-up unrelated to the script | a give-up answer during a pending 0x441A or 0x4403 lifts the reward guard of `QuestStart` and the script wait early (narrow window) | clear them only for the script's own command |
+| Z15-B34 | `Recv_NC_QUEST_DB_DONE_ACK` FUN_005bfb30 (failure) | frees the lock, sends 0xC0E, clears the reward flag, but leaves `m_bWaitResult` 1 and the script open | `QuestNext` and 0x4414 stay blocked until another script is opened (as Z15-B17) | `QuestClose()` after the error |
+| Z15-B35 | `Recv_NC_QUEST_DB_DONE_ACK` FUN_005bfb30 (success) | does not compare `QuestInfo.ID` / `nQSC` with the running script; clears `m_bWaitResult` and calls `QuestNext` | a Doing/End script opened while the reward was pending (only `QuestStart` is refused) is resumed past a `SAY` that is still waiting, with a stale RESULT | resume only when the answer belongs to `m_ParsingQuestID`'s `DONE` |
+| Z15-B36 | `Send_NC_QUEST_DB_DONE_REQ` FUN_005bbe60 | `nCur_CT_ElementValue = GetTitleStatus(CT_Type, nCur_CT_ElementValue)`: the element argument is the still-zero target byte | the DB gets the state of element 0 instead of `CT_ElementNo` (no TITLE reward in the 2016 data) | `GetTitleStatus(CT_Type, CT_ElementNo)` |
+| Z15-B37 | `QuestNext` DONE FUN_005bdef0 / `Send_NC_QUEST_DB_DONE_REQ` | every refusal of 0x441A (reward already pending, an open item lock, missing record) is reported as 0xC01 | the client shows "Inventory full. Cannot receive the reward item." with free cells | a distinct code (e.g. 0xC0C/0xC0E class) |
 
 ## Not reconstructed / uncertain (so far)
 

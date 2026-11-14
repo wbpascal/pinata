@@ -1397,12 +1397,12 @@ No payload fields read directly by the handler.
 
 ### `0x4411` NC_QUEST_REWARD_SELECT_ITEM_INDEX_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_QUEST_REWARD_SELECT_ITEM_INDEX_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_005bb490)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nQuestID |  |
-| 2 | u32 | nSelectedItemIndex |  |
+| 0 | u16 | nQuestID | must equal the running script's quest |
+| 2 | u32 | nSelectedItemIndex | absolute Reward[] slot 0..11 (2017 client RewardWin::GetRealSelectReword); validated only at DONE |
 
 Handler `FUN_00578b70`
 
@@ -6479,11 +6479,11 @@ Sent from `CQuestZone::Send_NC_QUEST_SELECT_START_ACK` (`FUN_005bb340`) · paylo
 
 ### `0x4412` NC_QUEST_REWARD_NEED_SELECT_ITEM_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_QUEST_REWARD_NEED_SELECT_ITEM_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_005bb570; client FUN_00479fa0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nQuestID |  |
+| 0 | u16 | nQuestID | client ignores it, shows 'Please choose reward(s).' |
 
 Sent from `CQuestZone::Send_NC_QUEST_REWARD_NEED_SELECT_ITEM_CMD` (`FUN_005bb570`) · payload 2 bytes
 
@@ -6509,14 +6509,14 @@ Sent from `CQuestZone::Recv_NC_QUEST_DB_READ_ACK` (`FUN_005c06c0`) · payload 4 
 
 ### `0x441e` NC_QUEST_RESET_TIME_CLIENT_CMD
 
-**Verified layout** (basis: zone FUN_005bc570)
+**Verified layout** (basis: zone FUN_005bc570; client FUN_006ac760)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | i32 | tResetYearQuest |  |
+| 0 | i32 | tResetYearQuest | CQuest.m_QuestRestTime |
 | 4 | i32 | tResetMonthQuest |  |
 | 8 | i32 | tResetWeekQuest |  |
-| 12 | i32 | tResetDayQuest |  |
+| 12 | i32 | tResetDayQuest | client stores all four at its CQuest+0xA4 |
 
 Sent from `CQuestZone::Send_NC_QUEST_RESET_TIME_ZONE_CMD` (`FUN_005bc570`) · payload 16 bytes
 
@@ -10649,16 +10649,16 @@ Empty payload.
 
 ### `0x441b` NC_QUEST_DB_DONE_ACK (DB→Z)
 
-**Verified layout** (basis: zone FUN_005bfb30)
+**Verified layout** (basis: zone FUN_005bfb30; size 0x2B)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | ref.handle |  |
-| 2 | u32 | ref.charNo |  |
-| 6 | u8 | nQSC |  |
-| 7 | PLAYER_QUEST_INFO | QuestInfo |  |
-| 39 | u16 | nLockIndex |  |
-| 41 | u16 | ErrorType |  |
+| 0 | u16 | clienthandle |  |
+| 2 | u32 | charregistnumber |  |
+| 6 | u8 | nQSC | echo; sent to the client as 0x4401 Cmd |
+| 7 | PLAYER_QUEST_INFO | QuestInfo | echo; only ID is used (SetQuestDone(ID)) |
+| 39 | u16 | nLockIndex | applied on 0xB41, freed otherwise |
+| 41 | u16 | ErrorType | 0xB41 ok; else client error 0xC0E |
 
 ### `0x4802` NC_SKILL_SKILLTEACHSUC_ACK (DB→Z)
 
@@ -12438,6 +12438,31 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 2 | u32 | charregistnumber |  |
 | 6 | u16 | nQuestID | only sent when the stale u32 at buffer+4 is non-zero (Z15-B9) |
 
+### `0x441a` NC_QUEST_DB_DONE_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_005bbe60 (Send_NC_QUEST_DB_DONE_REQ); size 0x53 + n*0x26 + attribute bytes)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | player handle p+4 |
+| 2 | u32 | charregistnumber | p.vt 0x344 |
+| 6 | u32 | UserNo | p.vt 0x348 |
+| 10 | u16 | NPCID | CQuest::GetRewardNPC(questId), 0xFFFF if none |
+| 12 | u8 | nQSC | current script command (10 DONE) |
+| 13 | PLAYER_QUEST_INFO | QuestInfo | diary record after SetQuestDone: status 2 DONE / 4 REPEAT, RepeatCount+1, EndTime now |
+| 45 | u32 | nMoney | MONEY reward (assigned, not summed) |
+| 49 | u32 | nExp | EXP reward |
+| 53 | u32 | nFame | FAME reward |
+| 57 | u64 | nCur_Money | so_ply_CurrentMoney |
+| 65 | u64 | nCur_Exp | so_ply_CurrentExp |
+| 73 | u32 | nCur_Fame | so_ply_CurrentFame |
+| 77 | u8 | CT_Type | TITLE reward type; 0 if ElementNo > 3 |
+| 78 | u8 | CT_ElementNo | TITLE reward element |
+| 79 | u8 | nCur_CT_ElementValue | GetTitleStatus(CT_Type, 0): element 0, not CT_ElementNo (Z15-B36) |
+| 80 | u16 | nLockIndex | inventory lock index of the reservations |
+| 82 | u8 | nItemCreateCount | number of ItemCreate entries (ITEM rewards) |
+| 83 | PROTO_ITEM_CREATE[n] | ItemCreate | 0x26 each: u32 owner, MAPPOS map (12-byte name + x, y), ITEM_INVEN location (9<<10|cell), u64 createitemregnum (key kind 2), u16 createitemid, u16 attr = payload offset of the item's attribute bytes after the array |
+
 ### `0x4812` NC_SKILL_EMPOWALLOC_DB_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_0044f150)
@@ -12596,6 +12621,20 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 0 | u16 | killerWmHandle |  |
 | 2 | u32 | killerCharNo |  |
 | 6 | u32 | pkCount |  |
+
+### `0x4010` NC_CHARSAVE_2WLDMAN_QUEST_DONE_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_005bc6f0; chunked, at most 799 records per packet)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wldmanhandle | p.vt 0x340 |
+| 2 | u32 | chrregnum | p.vt 0x344 |
+| 6 | u16 | nTotalDoneQuest | all DONE records |
+| 8 | u16 | nTotalDoneQuestSize | nTotalDoneQuest*10 + 12 (WM blob size) |
+| 10 | u16 | nDoneQuestCount | records in this packet |
+| 12 | u16 | nIndex | records sent in earlier packets |
+| 14 | PLAYER_QUEST_DONE_INFO[n] | QuestDoneArray | 10 each: u16 ID, i64 tEndTime |
 
 ### `0x580e` NC_KQ_Z2W_MAKE_ACK (Z→WM)
 
