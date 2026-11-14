@@ -1721,20 +1721,21 @@ sp_PetSystem_Unsummon(p) → ok:                                     @ FUN_004d2
     sp_PetSystem_ApplyChangedTendency(p); sp_PetSystem_SaveTendency(p)          (§5.7: 0xD401 to the Character DB)
     pet.so_Unmark(0, 1, 3) (vt 0x33c); som_FreeObject(pet handle, REMOVE_NOW, 0x78)
     sp_PetSystem_InitPetInfo(p); return 1
-    # the item's bSummoning stays 1 (Z13-B37); the client learns about the removal from the pet's unmark (§6) *(inferred)*
+    # the item's bSummoning stays 1 (Z13-B37); the unmark sends 0x1805 { u16 pet handle } to everyone in sight (§6.4)
 ```
 
 Callers: `sp_PetSystem_Cast` (same item again, §5.3), `gds_NC_PET_LOAD_INFO_DB_ACK` / `gds_NC_PET_SET_NAME_DB_ACK` on a
 DB error (Z07 §9), `sp_Schedule_BuildMiniHouse` FUN_00576570 (building a mini house, Z07 §6.3), Lua `cPet_Unsummon`
 FUN_005d65a0 (§6). Nothing unsummons on logout, death or a map link: the player only records the link state (§5.8) and the
-`ShinePet` notices the missing master itself (§6, `spt_FindMaster`) *(inferred until part 6)*.
+`ShinePet` notices the missing master itself: its routine frees it as soon as `spt_FindMaster` fails (master gone, in
+mode 0 / 7, or on another map; §6.3).
 
 ### 5.7 Mind and stress (tendency)
 
 ```pseudo
 sp_PetSystem_ChangeTendency(p, cond):                              @ FUN_004d2470
     if state ∉ {5, 6}: return
-    mt = CPetData::GetPetMindType(nMindMil / 1000)       (PupMind.shn rows: 1–25 PM_SJ, 26–50 PM_NT, 51–75 PM_NF, 76–100 PM_SP *(inferred, §6)*); MAX → return
+    mt = CPetData::GetPetMindType(nMindMil / 1000)       (PupMind.shn rows: 1–25 PM_SJ, 26–50 PM_NT, 51–75 PM_NF, 76–100 PM_SP, 2016 data §6.1); MAX → return
     d = CPetData::GetPetTendencyModifyData(mt, cond)     @ FUN_004cf440: the last PupFactorCondition row with
         (PupMindType, PupFactorConditionType) = (mt, cond): type = PupFactorType, value = ±Value / 1000 (IsMinus → −); no row → type MAX
     PF_STRESS (0): nStressDiffMil += (long)(value × 1000)      PF_MIND (1): nMindDiffMil += (long)(value × 1000)
@@ -1767,10 +1768,11 @@ Who changes the tendency (cond = `PupFactorConditionTypeEnum`) *(pdb2016)*:
 | 9 `PFC_S_REVIVALHERE` | `sp_ReviveNow` FUN_0057d290 | revived in place |
 | 10 `PFC_S_RESTHOUSE` | `sp_RecoverPoint_House` FUN_0056b3b0 (tent, mode 4) and `so_Routine` (booth, mode 5) | tent: every 60 s (`sp_Pet_HouseTick`, armed by `sp_NC_ACT_PITCHTENT_REQ` FUN_00457760 only if the pet is out at that moment); booth: every 600 s (`sp_Pet_BoothTick`, armed by `sp_NC_BOOTH_OPEN_REQ` FUN_0058e900) (original bug) Z13-B32 |
 | 11 `PFC_S_STORE` | – | never raised |
-| 12–16 `PFC_M_*` (attack, dance, follow, talk, revolution) | Lua `cPet_ChangeMind` (§6) | pet AI |
+| 12 / 13 `PFC_M_ATTACK` / `PFC_M_DANCE` | Lua `cPet_ChangeMind` (§6.6) | pet AI; the string compare is inverted: "dance" raises ATTACK, every other string DANCE (Z13-B44) |
+| 14–16 `PFC_M_FOLLOW` / `TALK` / `REVOLUTION` | – | never raised (Z13-B44) |
 
 The pending change is applied and saved (0xD401) on unsummon, on every character save (`WholeSaver::ws_save2DB` FUN_00455a10,
-Z01 §8.4) and by Lua `cPet_SaveTendency` (§6). GM `&setpetinfo` / `&getpetinfo` are Z11 §7.7. `GetPetMindType` reads
+Z01 §8.4). Lua `cPet_SaveTendency` (§6.6) only *applies* the pending change (no 0xD401, Z13-B45). GM `&setpetinfo` / `&getpetinfo` are Z11 §7.7. `GetPetMindType` reads
 `nMindMil` without the pending diff, so the mind *type* (and with it the factor rows used) only changes once a change is applied.
 
 ### 5.8 Re-summon after a map link
@@ -1839,6 +1841,299 @@ named at the link (states 1–4) is not carried over.
 
 ---
 
+## 6. Pets, object side: `ShinePet`, `CPetData`, pet AI scripts
+
+§5 is the player side (state machine, summon, unsummon, tendency); this section is the pet object (`ShineObjectClass::ShinePet`,
+object type 12), the tables in `gPetData` and the Lua interface the pet AI uses.
+
+### 6.1 Tables (`CPetData gPetData`)
+
+`CPetData` (0x50 bytes) *(pdb2016)*: seven row arrays `m_pPup*` + their counts, then the six `SingleData.shn` constants of §5.1
+(`m_nMindMinValue` +0x38 … `m_nSummonCoolTimeMil` +0x4c). Ctor FUN_004ceee0 nulls the arrays, dtor FUN_004cef00 frees them.
+
+```pseudo
+CPetData::ReadData() → ok                                  @ FUN_004cf870   (from ZoneServer_zs_start_sleep FUN_005b67c0)
+    read PupMain (row 0x46), PupServer (0x24), PupMind (6), PupPriority (5), PupCase (9), PupCaseDesc (0x70),
+         PupFactorCondition (0x11) from ../9Data/Shine/<name>.shn (CDataReader::Read(path, u32 0x91/0x23/0xc/5/0x19/0x267/0x5e, row size))
+    any file missing → assert "Fail to read <name>.shn"; any table empty → "Data is Empty in <name>.shn"; return 0
+    allocate the arrays; read the six constants (§5.1)
+    validate and copy row by row (failure → assert "<what> in <name>.shn, Index" with the row index, return 0):
+      PupMain:      PupID ≠ 0 (the assert prints the not yet written destination row's PupID (original bug) Z13-B46);
+                    strlen(PupIDX) ≥ 3; strlen(ItemIDX) ≥ 3
+      PupServer:    strlen(PupIDX) ≥ 3; MinMind ≥ Pup_MinMind; MaxMind ≤ Pup_MaxMind; MinStress ≥ Pup_MinStress; MaxStress ≤ Pup_MaxStress
+                    (min ≤ max is not checked)
+      PupMind:      PupMindType 0…3; MinMind ≥ Pup_MinMind; MaxMind ≤ Pup_MaxMind
+      PupPriority:  PupPriorityType 0…4; PriorityNum ≤ row count                         # the table is never read afterwards
+      PupCase:      PupMindType 0…3; StressNum in [Pup_MinStress, Pup_MaxStress]; PupCaseType 0…40
+      PupCaseDesc:  PupPriorityType 0…4; PupCaseType 0…40; PPT_Idle (4) ⇔ PupCaseType ≠ ALL_PUP_CASE (40);
+                    PupIDX, SM_Inx, SoundFile: strlen ≥ 3 or exactly "-"; PupAIType 0…9; PPT_Idle ⇔ PupAIType ≠ PAI_SCRIPT (9)
+      PupFactorCondition: PupMindType 0…3; PupFactorConditionType 0…16; PupFactorType 0…1; IsMinus 0/1;
+                    Value ≤ (MaxStress − MinStress) × 1000 (PF_STRESS) or ≤ (MaxMind − MinMind) × 1000 (PF_MIND)
+    return 1
+```
+
+Row structs (`PupMain {u32 PupID; char PupIDX[32]; char ItemIDX[32]; u16 PupSpeed}`, `PupServer {char PupIDX[32]; u8 MinMind,
+MaxMind, MinStress, MaxStress}`, `PupMind {PupMindTypeEnum; u8 MinMind, MaxMind}`, `PupCase {PupCaseTypeEnum; PupMindTypeEnum;
+u8 StressNum}`, `PupCaseDesc {PupPriorityTypeEnum; PupCaseTypeEnum; char PupIDX[32]; PupAITypeEnum; char SM_Inx[32]; u32
+ActionEffectID; char SoundFile[32]}`, `PupFactorCondition {PupMindTypeEnum; PupFactorConditionTypeEnum; PupFactorTypeEnum; u8
+IsMinus; u32 Value}`) and enums are *(pdb2016)*. Enums: `PupMindTypeEnum` PM_SJ 0, PM_NT 1, PM_NF 2, PM_SP 3; `PupPriorityTypeEnum`
+PPT_MapLink 0, PPT_Die 1, PPT_CallPup 2, PPT_Follow 3, PPT_Idle 4; `PupCaseTypeEnum` SJ01…SJ10 0–9, NT01…NT10 10–19, NF01…NF10 20–29,
+SP01…SP10 30–39, ALL_PUP_CASE 40; `PupAITypeEnum` PAI_NONE 0, FOLLOW 1, REVOLUTION 2, DANCE 3, ATTACK 4, ROAMING 5, ROTATION 6,
+TALK 7, DIE 8, SCRIPT 9; `PupFactorTypeEnum` PF_STRESS 0, PF_MIND 1 (conditions: §5.7).
+
+2016 data: PupMain 3 pets (1 `P_Slime`, 2 `P_Honeying`, 3 `P_Kebing`; ItemIDX = PupIDX, speed 130); PupServer initial mind
+67–100 / 34–66 / 1–33, stress 4–7 for all three; PupMind 1–25 SJ, 26–50 NT, 51–75 NF, 76–100 SP; PupCase = the 40 rows
+(mind type, stress 1…10) → case `type × 10 + stress − 1`; PupCaseDesc 153 rows (121 idle rows, the others PAI_SCRIPT rows of the
+other priorities, PupIDX "-" = every pet); PupFactorCondition 64 rows (4 mind types × 16 conditions).
+
+| Getter | @ | Returns |
+|---|---|---|
+| `GetPetID(PupIDX)` | 004cef80 | PupMain.PupID of the row with that PupIDX, else 0xFFFFFFFF |
+| `GetPetIDX(u32 PupID)` | 004ceff0 | PupIDX of that PupID, else null |
+| `GetPetIDX(char* ItemIDX)` | 004cf030 | PupIDX of the row whose ItemIDX is the item's InxName, else null (null arg → null) |
+| `GetPetSpeed(PupIDX)` | 004cf0b0 | PupSpeed, else 0xFFFFFFFF |
+| `GetPetInitMindRange` / `GetPetInitStressRange(out BRange, PupIDX)` | 004cf130 / 004cf1c0 | {Min, Max} of the PupServer row; **no row: the output is left untouched** (Z13-B47) |
+| `GetPetMindType(u8 mind)` | 004cf250 | the first PupMind row with Min ≤ mind ≤ Max, else `MAX_PUPMINDTYPEENUM` (4) |
+| `GetPetTendencyModifyData` | 004cf440 | §5.7 |
+| `GetPetActionCaseFlexible(u8 mind, u8 stress)` | 004cf290 | below |
+| `GetPetActionBundleFlexible(prio, case, PupIDX)` | 004cf690 | below |
+
+```pseudo
+GetPetActionCaseFlexible(mind, stress) → PupCaseTypeEnum             @ FUN_004cf290
+    mt = mind type of mind (first PupMind row); none or MAX → MAX_PUPCASETYPEENUM (41)
+    s' = clamp(stress + d, Pup_MinStress, Pup_MaxStress) with d = −2 / −1 / 0 / +1 / +2 at 5 / 20 / 50 / 20 / 5 %   (rb_1000 % 100)
+    return PupCaseType of the first PupCase row with (PupMindType, StressNum) = (mt, s'), else 41
+GetPetActionBundleFlexible(prio, case, idx) → PupCaseDesc*           @ FUN_004cf690
+    candidates = PupCaseDesc rows with PupPriorityType == prio and PupCaseType ∈ {case, ALL_PUP_CASE}
+                 and PupIDX ∈ {idx, "-"}                    (idx null → only "-")
+    none → null; else candidates[rb_1000000 % count]       # random pick (the decompiled vector code is garbled; as read)
+```
+
+So idle actions depend on the pet's mind type and (jittered) stress; the other priorities only have `ALL_PUP_CASE` rows, but
+`cPet_GetActionRecord` still needs a valid case first (§6.6).
+
+### 6.2 Object (`ShinePet`, 0x25d4 bytes) and its overrides
+
+`ShinePet : ShineMob` *(pdb2016)*: `+0x2568 spt_nPetRegNum`, `+0x256c spt_pMaster` (`ShineMobileObject*`), `+0x2570
+spt_nMasterRegNum` (the master's charNo), `+0x2574 spt_pItemTotalInfo`, `+0x2578 spt_pItemAttr` (the pet item's
+`ShineItemAttr_Pet`, §5.1), `+0x257c spt_PetBriefInfo` (`BriefInformationPet`, 0x56: a 0x42-byte packet buffer with opcode
+0x1C1C and `+0x52 bip_BriefInfo` → its `PROTO_NC_BRIEFINFO_REGENPET_CMD`). Everything else is the `ShineMob` state (Z09 §5),
+which the pet reuses for movement, the AI script slot and the death timer.
+
+```pseudo
+ShinePet::ShinePet()                       @ FUN_0055b360    ShineMob ctor; BriefInformationPet ctor FUN_00549390
+                                                             (buffer, length 0x41, opcode 0x1C1C); spt_pMaster = null
+ShinePet::spt_InitShinePet()               @ FUN_004d1fd0    master, ITI, attr = null; spt_nMasterRegNum = 0xFFFFFFFF
+ShinePet::spt_SetMaster(player, charNo)    @ FUN_004d2610    sets each argument that is not null / 0xFFFFFFFF
+ShinePet::spt_FindMaster() → master|null   @ FUN_00419a80    Z11 §9.2: spt_pMaster unless empty, in mode 0 / 7, or on another map
+~ShinePet / vector deleting destructor     @ FUN_005571c0 / FUN_00557a60   (ShineMob dtor; element size 0x25d4)
+```
+
+Overridden slots (rest = `ShineMob`) *(vtable diff, rtti.py)*:
+
+| Slot | Method | @ | Behaviour |
+|---|---|---|---|
+| 0x0 / 0x4 | `GetRTTI` / vector deleting dtor | 005571d0 / 00557a60 | |
+| 0x344 | (`so_MiscTable` fold) | 005572e0 | returns +0x2568 (`spt_nPetRegNum`) |
+| 0x4a0 | `so_Getabstatebit` | 00557360 | returns the **shared** static `ShineObject::so_emptyabstate` (Z13-B43) |
+| 0x4a4 | `so_RemakeHandle(i)` | 00557310 | `i + 0x5c56` for `i ≤ 0x5db` (1500 pet handles 0x5C56…0x6231), else 0xFFFF |
+| 0x4ac | `so_Routine` | 0056c1e0 | §6.4 |
+| 0x4b8 | (`so_OverlapFactor` fold) | 00557240 | `mode ≠ 3` |
+| 0x4c4 | `so_FillBriefInformation(dst)` | 00557490 | copies the 0x3f-byte brief (`PROTO_NC_BRIEFINFO_REGENPET_CMD::operator=` FUN_005571e0) |
+| 0x4c8 | `so_SendMyBriefInfo(rcv)` | 00557260 | §6.5 |
+| 0x4d0 | `so_ObjectType` | 005572d0 | 12 |
+| 0x4f0 / 0x4f4 | `so_MaxHP` / `so_MaxSP` | 005572f0 / 00557300 | 1 (cached in +0xea8 / +0xeac) |
+| 0x514 / 0x518 | `so_WalkSpeed` / `so_RunSpeed` | 005574b0 / 00557500 | master's `sp_PetInfo.nWalkSpeed` / `nRunSpeed` (§5.1, = PupSpeed) when `spt_FindMaster` gives a player, else 1000 |
+| 0x56c | `so_CharName` | 005573a0 | the **master's** `sp_PetInfo.sName` (16 bytes) copied into a static `Name5` (`charID`, NUL at byte 16); null when `spt_pMaster` is no player |
+| 0x5ac, 0x89c | (fold) | 004b8d20 | 0 |
+| 0x6cc | `so_BodySize` | 00559910 | 50 |
+| 0x700 | (fold `EmptyHandler`) | 00509900 | no-op |
+| 0x708 | (fold) | 005550b0 | 0xFFFF |
+| 0x714 | (fold) | 00570b00 | 0 |
+| 0x72c | `so_mobile_IsEnemy` | 0042f3a0 | false |
+| 0x8cc | (fold) | 00647230 | 2 |
+| 0x980 / 0xe94 | `so_mobile_ICanDamageTo` / `smo_ICanHealTo` | 004350f0 / 00435770 | false (Z09 §8.4) |
+| 0x9b8 | `so_mob_CanBeAttackedByPlayer` | 004a5d80 | false |
+| 0xe04 | (fold) | 00549070 | no-op (the mob's KQ team type setter) |
+| 0xe08 | (`so_GetKQTeamType` fold) | 005551b0 | 2 (none) |
+| 0xe48 | `so_SetAnimationBriefInfo(s)` | 00557370 | `strncpy(brief.sAnimationIndex, s, 32)` (from `ShineMob::so_SetAnimation` / `so_ResetAnimation`, Z09) |
+| 0xf68 | (fold) | 005af8d0 | 1 |
+| 0xf6c | `sm_BriefLocateSet` | 004b10f0 | copies the brief's x, y, dir to the mob location block (+0x1f84…+0x1f8c) |
+| 0xf70 | `sm_InitBriefInfo(h, id)` | 004b1200 | `bip_InitBriefInfo` |
+
+Not overridden and relevant: vt 0x91c is the `ShineMob` no-op (FUN_00509900), so the `(0x702, 9)` item-use error that
+`spt_SummonPet` sends to the **pet** when `FillCommonInfo` fails goes nowhere (original bug) Z13-B42 (the player still gets
+0xD411 {0x345e} from `sp_PetSystem_Summon`, §5.4). A pet cannot be attacked, healed or targeted as an enemy, and never attacks.
+
+### 6.3 Creation and spawn
+
+```pseudo
+ShinePet::spt_SummonPet(map, x, y, dir, id, layer) → ok           @ FUN_0055d440   (from sp_PetSystem_Summon, §5.4)
+    if spt_pMaster null or not a player: return 0
+    pi = master.sp_PetSystem_GetPetInfo()  (FUN_00419430)
+    if pi.state ∈ {NONE, CASTING} or pi.nId == 0xFFFFFFFF: return 0
+    if pi.nRegNum == 0xFFFFFFFF:                                   # pet never created in the DB
+        if pi.state ≠ CASTED: return 0
+        if !spt_CreatePet(master, pi.nId): assert "ShinePet::spt_SummonPet : Create Pet Error" (charNo, nId); return 0
+        pi.state = WAIT_CREATING; pi.naming = CHECK_NAME
+    if !master.sp_PetSystem_FillCommonInfo(pi.nId) (§5.1 speeds):
+        assert "ShinePet::spt_SummonPet : Filling Pet Common Info is Failed"; pet.vt[0x91c](0x702, 9) (no-op, Z13-B42); return 0
+    return spt_Regenerate(map, x, y, dir, pi.nHandle, (u16)pi.nId, pi.nRegNum, &pi.sName, 0, layer) == FM_MARKSUCCESS
+    # the id argument is not used; a new pet spawns with RegNum 0xFFFFFFFF and an empty name
+
+ShinePet::spt_CreatePet(master, nId) → ok                          @ FUN_0055d290
+    idx = GetPetIDX(nId); null → return 0
+    mind   = Min + rb_1000 % (Max − Min + 1)  over GetPetInitMindRange(idx)       # no PupServer row: range = uninitialised stack
+    stress = Min + rb_1000 % (Max − Min + 1)  over GetPetInitStressRange(idx)     #   bytes / the nId bytes (original bug) Z13-B47
+    if master is not a player or master.charNo ≠ spt_nMasterRegNum: return 0
+    pi.nMindMil = mind × 1000; pi.nStressMil = stress × 1000
+    → CharDB 0xD40D NC_PET_CREATE_DB_REQ { u16 nMasterHandle = master zone handle, u32 nMasterCharNo = spt_nMasterRegNum,
+          Name4 sPetName = "", u8 nPetMind = mind, u8 nPetStress = stress }        (length 0x18; Z07 §9, annotation of part 5)
+        (the length check's assert names "spt_SummonPet : Packet Too Long"; unreachable)
+    pi.state = WAIT_CREATING; return 1
+
+ShinePet::spt_Regenerate(map, x, y, dir, handle, id, regnum, name, markFlag, layer) → FM_MarkingError   @ FUN_004b48c0
+    spt_nPetRegNum = sm_MobRegnum (+0x1ec0) = regnum;  login map (+0x1f78) = map;  mode = 0
+    bip_InitBriefInfo(handle, id)  FUN_004b0d90: brief = { nHandle, nID, XYDir = 0, sPetName = "", sAnimationIndex = "" }
+    brief.sPetName = name (16 bytes);  position = (x, y), dir' = dir / 2 (+180 when negative); brief.XYDir = (x, y, dir')
+    sm_BriefLocateSet (vt 0xf6c); roaming / wander state, target, path cleared
+    r = ShinePet::so_MapMarking(markFlag)  FUN_00466790: FieldMap with the login map name (vt 0x4bc) in g_FieldList,
+        none → FM_MAPNOTEXIST; else fm_Marking(field, pet, 0x19, 0, markFlag)
+    if r ≠ FM_MARKSUCCESS: return r
+    abstate bits = so_emptyabstate (vt 0x4a0 returns the same static: a self-copy); abstate list emptied
+    if dic_abstate[291 StaImmortal]: so_AbnormalState_Set (vt 0x638)(pet, 291, strength 1, row, g_Now, 0, 0xFFFFFFFF, 5000, 8, 0)
+        # Z03 §6.2; runs before HP is set below, so it fails when the (pooled) object has HP 0 *(inferred)*
+        so_AbnormalState_BitSet(291)  FUN_00401a00: sets the bit in vt 0x4a0's array = the global so_emptyabstate
+        # every later "reset to empty" (ShineMob::so_mob_Regenerate FUN_004b41b0, so_KilledBy FUN_00432240, the player's
+        # so_FirstActionAfterSocketConnect FUN_00554870, ShineMover::so_smv_SummonMover FUN_0055fdf0,
+        # AbstateListInObject::asl_Store FUN_0040afd0) then starts from a template with bit 291 set (original bug) Z13-B43
+    regen animation complete = 1; layer = layer; sight state OSS_NONE
+    spt_RegenComplete(handle)
+    sm_HP = MaxHP() = 1; sm_SP = MaxSP() = 1; target 0xFFFF; HitMe vector cleared; move state reset; return FM_MARKSUCCESS
+
+ShinePet::spt_RegenComplete(handle)                                 @ FUN_00442eb0
+    the ShineMob::so_mob_RegenComplete reset (Z09 §5.3) without the MobInfo parts: vt 0xde4 (no-op for pets), overrides
+    (MaxHP, EXP, speeds, HP regen) = 0 / −1, drops on, swing index 2, enemy detect 6, so_InitAIScript (vt 0xc14)
+    AI script: so_AIScript.script = g_AIScriptPetContainer[PAT_BASE (1)]; if set: funcName = aispc_GetFileName(PAT_BASE) = "PetBase"
+    skill-from-script list cleared; layer key cleared
+    BriefInfoExchangePet::bixp_Init(&briefpet); g_SightDistSq = MapInfo.Sight² (−1 on wide-sight / special maps, 0 without field)
+    so_AllOfRange(pet, sight, so_ExchageBriefInfo)        # every player in sight gets the pet (§6.5); kind 12 → bixp
+    deathSent = 0; killer = 0xFFFF; tactic = roaming? (and +0x24d9 = 0) : MobActionWander.maw_MetronomeReset; then NoBrain
+    brain context = {self, handle}; mode = 2; stats c_clear + c_MakeTotal; HitMeList cleared; move / cast / battle state cleared
+    spawn = return point = position; recalc abstates; rescue reset; +0x24c4 = 60000; weapon title 0xFFFF; damage-absorb flag 0
+    mob brief bRegenAni byte = 0; sm_SetRegenAniTime(g_Now)
+```
+
+### 6.4 Routine and removal
+
+```pseudo
+ShinePet::so_Routine(pet, _, tick)                                    @ FUN_0056c1e0
+    if mode ≠ 3 and spt_FindMaster() == null: so_Unmark(0, 1, 3); som_FreeObject(pet, REMOVE_NOW, reason 9); return
+    if mode == 0: return
+    position outside the field → log "fm_IsInFieldSize : Mob", flags1e78 |= 1
+    ShineMobileObject::so_Routine (Z09 §5.5)
+    if flags1e78 & 1: so_Unmark(0, 1, 3); som_FreeObject(pet, reason 7); return
+    if mode ≠ 3 and triggers_: NPCAction proximity check (as for mobs)          # pets have no triggers_ (cleared at regen)
+    sm_DuringRegen; battle state 1 / 2 → sm_DuringBattle / sm_DuringRecover; rescue → so_RescueRoutine
+    if mode ≠ 3:
+        m = spt_FindMaster(); if m is no player (type 2, dynamic cast) or has no pet info:
+            so_Unmark(0, 1, 3); som_FreeObject(pet, reason 9); return
+        if m.sp_PetInfo.state ∈ {1ST_SUMMONED, RESUMMONED} and spt_nPetRegNum ≠ 0xFFFFFFFF:
+            if so_AIScript.script: lss_Routine(script, "PetBase", LuaArgumentMobAI{pet handle, field})   # return value ignored
+            sm_GetRegenAniComplete
+            if alive (vt 0x28 == 0) and HP ≠ 0 and (no move manager or move state ≠ 3): brain context = {self, tick}
+            # no tactic step: the pet moves only by its Lua script (cRunTo etc.)
+        return                                    # other master states (casting, waiting for the DB, linking): the pet idles
+    # mode 3 (dead): as ShineMob (Z09 §5.4): 0x244A NC_BAT_REALLYKILL_CMD once to sight, free (reason 8) after
+    #   (sm_DeadDelayTime × 5 + 50) × 2 ticks, Lua routine; no path kills a pet (not attackable), so this is unreachable *(inferred)*
+```
+
+Removal is always `so_Unmark(0, 1, 3)` + `som_FreeObject(REMOVE_NOW)`: `ShineObject::so_Unmark` FUN_00553970 → vt 0x310
+(no-op) → `so_BroadcastLogout` FUN_0054f290 → `so_Logout` → to sight **0x1805** `{ u16 handle }` (Z09 §12.4, Z01 §3.2): this
+is how clients drop a pet. Reasons: 9 master lost (`spt_FindMaster` fails: master freed, in mode 0 / 7, or on another map,
+which covers logout and map links), 7 off-field, 8 death timer; the unsummon of §5.6 uses 0x78. A pet left behind by a failed summon (Z13-B36) lives until its master leaves the map.
+
+### 6.5 Brief info: `0x1C1C NC_BRIEFINFO_REGENPET_CMD`, `0x1C1D NC_BRIEFINFO_PET_CMD`
+
+`PROTO_NC_BRIEFINFO_REGENPET_CMD` (0x3f) *(pdb2016, same in 2017)*: `+0 u16 nHandle`, `+2 u32 nID` (PupID), `+6 SHINE_COORD_TYPE
+XYDir {u32 x, u32 y, u8 dir}`, `+0xf Name4 sPetName`, `+0x1f char sAnimationIndex[32]`. `0x1C1D` = `{ u8 nPetCnt; REGENPET[nPetCnt] }`.
+
+```pseudo
+ShinePet::so_SendMyBriefInfo(pet, rcv)                                @ FUN_00557260   (0x1C01 inform, move into sight: Z02 §5.1, Z09 §9.6)
+    if rcv.so_ply_SoloingMode() (vt 0x79c, hide-except-me) and spt_nMasterRegNum == 0xFFFFFFFF: return
+        # spt_nMasterRegNum is always the master's charNo after spt_SetMaster, so hide-except-me never hides pets (original bug) Z13-B41
+    rcv ← 0x1C1C { spt_PetBriefInfo }     (payload 0x3f)
+    pet.so_mobile_SendMyMoveInfo(rcv) (vt 0xa10, FUN_005555e0): the last move command, if the pet is moving
+
+BriefInfoExchangePet::bixp_Exchange(batch, rcv, pet)                  @ FUN_004407d0   (so_ExchageBriefInfo kind 12, Z02 §5.2)
+    if same layer key (or either −1) and so_SubLayer_CanSee(pet, rcv) and batch ready and rcv is a player:
+        if batch.count > 27: bixp_Send(batch, rcv); count = 0
+        pet.so_FillBriefInformation(&batch.Pets[count]); count++                # no hide-except-me test here either (Z13-B41)
+BriefInfoExchangePet::bixp_Send(batch, rcv)                           @ FUN_0043e200
+    if count ≠ 0 and rcv is a player in mode ≠ 0: rcv ← 0x1C1D { nPetCnt = count, Pets[count] }   (length count × 0x3f + 3 incl. opcode)
+BriefInfoExchangePet::bixp_Init(batch)                                @ FUN_0043c8a0
+    first call: buffer (0x723 bytes, at most 28 entries) with opcode 0x1C1D; afterwards count = 0
+```
+
+The pet itself never receives anything (it has no socket); the pet learns nothing about players in sight.
+
+Client (2016 `GameFrameWork`, 2017 names `On_NC_BRIEFINFO_REGENPET_CMD` / `On_NC_BRIEFINFO_PET_CMD`): `0x1C1C` FUN_006491e0 ignores
+a packet with `nID == 0xFFFFFFFF`, converts x / y to a ground position, `dir × 2°` to the facing, and creates the pet object with
+`CharMgr::AddPet` *(pdb2017 name)* FUN_00649040 (id, handle, position, facing, `sPetName` + NUL). `0x1C1D` FUN_006492f0 does the same per
+entry and **stops at the first entry with nID 0xFFFFFFFF or a failed AddPet** (the rest of the batch is dropped). Neither reads
+`sAnimationIndex`. Removal: 0x1805 (§6.4).
+
+### 6.6 Lua interface and the pet AI script
+
+**Script objects** (`AIScriptPetContainer g_AIScriptPetContainer`, a `std::map<PET_AI_TYPE, LuaScriptScenario*>` plus
+`aispc_m_petNameMap` +0x10): ctor FUN_006270e0 maps `PAT_DUMMY` 0 → "PetDummy", `PAT_BASE` 1 → "PetBase"; `aispc_Load`
+FUN_00626630 loads `LuaScript/PetSystem/<name>.lua`; `aispc_GetFileName` FUN_00626440; all three in Z09 §14.2, the GM reload
+`&reloadpetlua` in Z11 §8.6; dtor FUN_00627020. Only `PAT_BASE` is ever used (`spt_RegenComplete`).
+
+Every `cPet_*` function takes a handle (Lua number, arg 1; `0xFFFF` → no result) and, except `cPet_Unsummon`, a **pet**
+handle: object type 12 → `spt_FindMaster` → a player (type 2) → `sp_PetInfo` → state 5 or 6. Any failed step asserts
+"`cPet_<name> : Error get pet` / `Not Pet Handle` / `Pet Type Casting Error` / `Error get pet master` / `Not Player Handle` /
+`Player Type Casting Error` / `Get Player Pet Info Error` / `Pet is not summoned`" and returns no value (Lua `nil`).
+
+| Function | @ | Behaviour |
+|---|---|---|
+| `cPet_Unsummon(masterHandle)` | 005d65a0 | the handle is the **master** (player, state 5/6): `sp_PetSystem_ChangeTendency(PFC_S_MOVER)`, `sp_PetSystem_Unsummon` (§5.6); true, or nil + "Unsummon pet fail" |
+| `cPet_IsMasterCalling(pet)` | 005e9320 | `nCallingState == PNCS_CALLING` → true and resets it to NONE; else false |
+| `cPet_GetMind` / `cPet_GetStress(pet)` | 005e9520 / 005e9720 | `(u8)(nMindMil / 1000)` / `(u8)(nStressMil / 1000)` (applied value, without the pending diff) |
+| `cPet_GetWalkSpeed` / `cPet_GetRunSpeed(pet)` | 005e9920 / 005e9b10 | `nWalkSpeed` / `nRunSpeed` (§5.1) |
+| `cPet_GetActionRecord(pet, mode)` | 005e9d00 | below |
+| `cPet_ChangeMind(pet, action)` | 005ea1d0 | arg 2 must be a string; raises one tendency condition via `sp_PetSystem_ChangeTendency` and returns true (below) |
+| `cPet_SaveTendency(pet)` | 005ea410 | `sp_PetSystem_ApplyChangedTendency` (§5.7) only, returns true; nothing goes to the DB (original bug) Z13-B45. Its "not summoned" assert text says `cPet_ChangeMind` |
+
+```pseudo
+cPet_GetActionRecord(pet, mode) → (aiType, SM_Inx, ActionEffectID, SoundFile)      @ FUN_005e9d00
+    prio = "idle" → PPT_Idle, "follow" → PPT_Follow, "call" → PPT_CallPup, "die" → PPT_Die, "link" → PPT_MapLink,
+           else assert "cPet_GetActionRecord : 2nd param - Pet Master Mode is Invalid", nil
+    case = GetPetActionCaseFlexible(nMindMil / 1000, nStressMil / 1000);  41 → "GetPetActionCase fail", nil
+    idx  = GetPetIDX(nId);  null → "GetPetIDX fail", nil
+    row  = GetPetActionBundleFlexible(prio, case, idx);  null → "GetPetActionBundle fail", nil
+    return PupAIType as "none" / "follow" / "revolution" / "dance" / "attack" / "roaming" / "rotation" / "talk" / "die" / "script",
+           row.SM_Inx, row.ActionEffectID, row.SoundFile
+
+cPet_ChangeMind(pet, action)                                                         @ FUN_005ea1d0
+    # source intent: "dance" → PFC_M_DANCE, "attack" → ATTACK, "follow" → FOLLOW, "talk" → TALK, "revolution" → REVOLUTION;
+    # every strcmp branch is inverted in the 2016 code (assembly at 0x5ea30c: test ecx,ecx / je next compare):
+    cond = (action ≠ "dance") ? PFC_M_DANCE (13) : PFC_M_ATTACK (12)      # the later compares are unreachable (original bug) Z13-B44
+    sp_PetSystem_ChangeTendency(master, cond); return true
+```
+
+**The 2016 pet AI** (`9Data/Shine/LuaScript/PetSystem/PetBase.lua` + 7 included files, read in the shipped scripts; summary only,
+the script is data): `PetBase(nHandle, sMapIndex)` runs at most every 0.2 s per pet (`cCurrentSecond`), keeps its state in
+`gPetAIMemory["PetBase"][handle]` and re-initialises it when `cGetMaster` / `cGetRegistNumber` change. Per call, by the master's
+`cGetObjectMode`: "linking" → link mode; "corpse" → a "die" action record (sad animation, stays 180 s); master farther than 300
+→ `cRunTo` next to the master (30); farther than 500 for 10 s → `cPet_Unsummon(master)`; `cPet_IsMasterCalling` → "call" record
+(runs to the master, distance 50); otherwise an "idle" record every 30–60 s (follow / revolve around / dance with / attack /
+talk to another pet within 200, roam within 100, rotate), several of which call `cPet_ChangeMind` with "follow", "revolution",
+"dance", "attack" or "talk", and `cPet_SaveTendency` every 60 s while idle. Effects and sounds of a record are played through the
+script helpers `PetBaseObjectEffect` / `PetBaseObjectSound` over the generic script functions (Z09).
+
+---
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1883,6 +2178,13 @@ named at the link (states 1–4) is not carried over.
 | Z13-B38 | `UseItemPet::uib_CanUseItem` | most failures send `0xD411 {code}` and return the same code, which `ItemUse_Inventory` sends again as `0x3016` | the client shows the message twice; codes 0x3444 (KQ map), 0x345b–0x3460 come only once | one channel |
 | Z13-B39 | pet code | dead checks: `&p.sp_PetInfo == null` (0x3446 never sent), `(u32)nSummonSlot ≠ 0xFFFFFFFF` in `sp_PetItemSave` (always true), CanUseItem modes ≥ 8 (excluded by the item handler) | none at run time; 0x3446 and 0x3460 are unreachable in practice | – |
 | Z13-B40 | `so_KilledBy` | raises `PFC_S_REVIVALTOWN` at every death; `sp_ReviveNow` adds `PFC_S_REVIVALHERE` on top | an in-place revive applies both factors | raise RevivalTown only on the town revive |
+| Z13-B41 | `ShinePet::so_SendMyBriefInfo` FUN_00557260, `bixp_Exchange` FUN_004407d0 | hide-except-me skips a pet only when `spt_nMasterRegNum == 0xFFFFFFFF`, which never holds after `spt_SetMaster`; the batch path has no test at all | a player in hide-except-me mode still sees every pet | hide other players' pets (compare the master with the receiver) |
+| Z13-B42 | `spt_SummonPet` FUN_0055d440 | on a `FillCommonInfo` failure calls vt 0x91c `(0x702, 9)` on the **pet** (a no-op there) | the intended item-use error never reaches the player (0xD411 {0x345e} still does) | the master's `so_ply_ItemUseResultPacket` |
+| Z13-B43 | `ShinePet::so_Getabstatebit` FUN_00557360 + `spt_Regenerate` FUN_004b48c0 | the pet's abstate bit array is the shared static `so_emptyabstate`; `so_AbnormalState_BitSet(StaImmortal)` at every summon sets bit 291 in it | every object later reset from the "empty" template (mob regen, deaths, player connect, mover summon, every `asl_Store`) carries bit 291 in its brief abstate bits; the client-side effect of that bit is not traced *(inferred)* | a per-pet bit array |
+| Z13-B44 | Lua `cPet_ChangeMind` FUN_005ea1d0 | every `strcmp` branch is inverted: "dance" → `PFC_M_ATTACK`, any other string → `PFC_M_DANCE` | the pet AI's follow / talk / revolution / attack calls all apply the DANCE factor; FOLLOW, TALK, REVOLUTION rows of PupFactorCondition are never used | map each action string to its own condition |
+| Z13-B45 | Lua `cPet_SaveTendency` FUN_005ea410 | only applies the pending change (`ApplyChangedTendency`); no 0xD401 | mind / stress reach the DB only at unsummon and at the character save | apply and send 0xD401 (`sp_PetSystem_SaveTendency`) |
+| Z13-B46 | `CPetData::ReadData` FUN_004cf870 | the "Invalid ID in PupMain.shn" assert prints the destination row's PupID, which is not written yet | the log shows uninitialised heap bytes instead of the bad id | print the source row's PupID |
+| Z13-B47 | `spt_CreatePet` FUN_0055d290 | `GetPetInitMindRange` / `GetPetInitStressRange` leave the output untouched when no PupServer row matches; the caller does not check | a pet without a PupServer row gets mind / stress from stack garbage and the nId bytes (out of the 1–100 / 1–10 bounds) | refuse the creation or use the global bounds |
 
 ## Not reconstructed / uncertain
 
@@ -1915,8 +2217,10 @@ named at the link (states 1–4) is not carried over.
   0x205E refuse) was not traced in the client.
 - Pets (§5): the meaning of `FieldAttr.KingdomQuestMap == 2` (refused without a 0xD411) is not identified. Whether the
   WM drops its re-summon record after sending 0xD412, and what happens with a stale record when the next 0x4033 is
-  skipped (states 1–4 / 8 at the link), was not traced (W01). What the client does with `bSummoning` and how it removes
-  the pet at unsummon are left to §6. That the lock list keeps an unreleased cast lock until relog (Z13-B34) is *(inferred)*.
+  skipped (states 1–4 / 8 at the link), was not traced (W01). The pet is removed by 0x1805 (§6.4); what the client does with `bSummoning` was not
+  traced (the 0x1C1C handler does not read the item). Pets (§6): the client effect of the polluted abstate bit 291
+  (Z13-B43), whether the StaImmortal set in `spt_Regenerate` ever succeeds (HP test before HP = 1), and what player mode 7
+  is in `spt_FindMaster` are *(inferred)* / open; `GetPetActionBundleFlexible`'s random pick is read through garbled decompiler output. That the lock list keeps an unreleased cast lock until relog (Z13-B34) is *(inferred)*.
 
 ## Coverage boundary
 
