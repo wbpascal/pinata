@@ -8460,16 +8460,16 @@ Sent in reply to `0x8c32` NC_MINIHOUSE_MODIFY_MAXENTERNUM_REQ on ShineObjectClas
 
 ### `0x8c3f` NC_MINIHOUSE_CHAR_ACTION_CMD
 
-**Verified layout** (basis: zone FUN_00574750)
+**Verified layout** (basis: zone FUN_00574750 + mhoadb_GetAniData FUN_004a14c0; client FUN_0049b760)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | PreHandle |  |
-| 2 | u16 | NextHandle |  |
+| 0 | u16 | PreHandle | the requested MiniHouseObjAni Handle |
+| 2 | u16 | NextHandle | follow-up animation: NextAniHandle, or a random member of the group NextAniHandle ≥ 10000; 0xFFFF none |
 | 4 | u16 | nFurnitureHnd |  |
-| 6 | u16 | ActorHnd |  |
-| 8 | u8 | ActorIdx |  |
-| 9 | u8 | ActeeIdx |  |
+| 6 | u16 | ActorHnd | the requesting player |
+| 8 | u8 | ActorIdx | 1…ActorMaxNum random, 0 none; not read by the 2016 client |
+| 9 | u8 | ActeeIdx | 1…ActeeMaxNum random, 0 none; not read by the 2016 client |
 
 Sent in reply to `0x8c3d` NC_MINIHOUSE_CHAR_ACTION_REQ on ShineObjectClass::ShinePlayer (`FUN_00574750`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_CHAR_ACTION_REQ) · payload 10 bytes
 
@@ -8549,12 +8549,12 @@ Sent from `FUN_0056f660` (`FUN_0056f660`) · payload variable (iVar11)
 
 ### `0x8c4c` NC_MINIHOUSE_PORTAL_ADD_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_PORTAL_ADD_CMD`, 6 bytes · ⚠ 2016 code uses 12 bytes: same build, so an extraction error or the code does not send this struct
+**Verified layout** (basis: zone FUN_0056fa10; client FUN_0049b830)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | NewPortal.nPortalItemID |  |
-| 2 | i32 | NewPortal.dEndTime |  |
+| 0 | u16 | nPortalItemID |  |
+| 2 | i32 | dEndTime | time_t, 0 = permanent; length 0xE leaves 6 stale bytes after it |
 
 Sent from `FUN_0056fa10` (`FUN_0056fa10`) · payload 12 bytes
 
@@ -8565,11 +8565,11 @@ Sent from `FUN_0056fa10` (`FUN_0056fa10`) · payload 12 bytes
 
 ### `0x8c4f` NC_MINIHOUSE_PORTAL_DEL_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_PORTAL_DEL_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_00567400 (so_Routine, owner only); client FUN_0049b870)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nPortalItemID |  |
+| 0 | u16 | nPortalItemID | never sent in practice (Z13-B18) |
 
 Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · payload 2 bytes
 
@@ -8593,14 +8593,12 @@ Sent in reply to `0x8c56` NC_MINIHOUSE_PORTAL_EFFECT_REQ on ShineObjectClass::Sh
 
 ### `0x8c61` NC_MINIHOUSE_FURNITURE_ENDURE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_ENDURE_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_00567400 (so_Routine) / FUN_00570fe0; client FUN_0049b960)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nEndureFurnitureCnt |  |
-| 1 | ENDURE_FURNITURE_INFO[nEndureFurnitureCnt] | EndureFurniture | variable length, element ENDURE_FURNITURE_INFO |
-
-Element `ENDURE_FURNITURE_INFO` (4 bytes): +0 u16 nFurnitureHnd, +2 u8 nEndureGrade, +3 u8 isRePair
+| 0 | u8 | nEndureFurnitureCnt | placed furniture whose grade changed (repair: 1) |
+| 1 | ENDURE_FURNITURE_INFO[n] | EndureFurniture | {u16 nFurnitureHnd, u8 nEndureGrade (MHE_STEP 0–4), u8 isRePair (1 after a repair kit; not read by the client)} |
 
 Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · payload variable (*(byte *)
 
@@ -8639,15 +8637,12 @@ Sent in reply to `0x8c62` NC_MINIHOUSE_FURNITURE_EMOTION_REQ on ShineObjectClass
 
 ### `0x8c64` NC_MINIHOUSE_FURNITURE_EMOTION_CMD
 
-**Verified layout** (basis: zone FUN_00575850)
+**Verified layout** (basis: zone FUN_00575850 (1 entry, broadcast) / FUN_005432d0 (all seated members, to the entering player); client FUN_004a5170)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nEmotionCnt | 1 |
-| 2 | u16 | nPlayerHandle |  |
-| 4 | u16 | nFurnitureHnd |  |
-| 6 | u8 | nPosition |  |
-| 7 | u8 | nEmotionNo |  |
+| 0 | u16 | nEmotionCnt |  |
+| 2 | FURNITURE_EMOTION_INFO[n] | Emotion | {u16 nPlayerHandle, u16 nFurnitureHnd, u8 nPosition, u8 nEmotionNo} |
 
 Sent from `FUN_005432d0` (`FUN_005432d0`) · payload variable (iVar9)
 
@@ -8681,12 +8676,12 @@ Sent in reply to `0x8c65` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_REQ on ShineObje
 
 ### `0x8c67` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_CMD
 
-**Verified layout** (basis: zone FUN_00575ae0)
+**Verified layout** (basis: zone FUN_00575ae0 (1 entry) / FUN_005431b0 (everybody on one furniture); client FUN_004a5230)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nCancelEmotionCnt | 1 |
-| 2 | u16 | player |  |
+| 0 | u16 | nCancelEmotionCnt |  |
+| 2 | u16[n] | nCancelEmotion | player handles |
 
 Sent from `FUN_005431b0` (`FUN_005431b0`) · payload variable (local_18 & 0xffff)
 
@@ -11903,6 +11898,26 @@ to the live players of the map (AxialListPacketBroadcast, 0x16 bytes with the op
 |---|---|---|---|
 | 0 | u16 | err | 0x14C0 ok |
 
+### `0x8c42` NC_MINIHOUSE_FURNITURE_EFFECT_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_005751f0 + FUN_00542520; client FUN_004b5070)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEffectHandle | MiniHouseFurnitureObjEffect row index (client looks the row up by index) |
+| 2 | u16 | nApplyPlayerCnt | > 0 (not sent otherwise) |
+| 4 | u16[n] | nApplyPlayerHandle | players the effect was applied to (owner last) |
+
+### `0x8c58` NC_MINIHOUSE_PORTAL_EFFECT_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00574450 + FUN_00542c70; client ignores it)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEffectHandle | Handle of the portal's ObjEffect row (1000+) |
+| 2 | u16 | nApplyPlayerCnt | > 0 |
+| 4 | u16[n] | nApplyPlayerHandle | recalled players |
+
 ### `0xBC1C` NC_GAMBLE_ENTER_PLAYER_DIRECT_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone ShineObject::so_DirectInfoBroadcast FUN_00553510 (cSetObjectDirect FUN_005e8fa0, mob skill facing); client MHDiceGameTask FUN_007069b0)
@@ -12396,6 +12411,17 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 2 | u32 | ref.charNo |  |
 | 6 | u32 | guildregnum | guild or academy number |
 | 10 | u8 | nOpenType |  |
+
+### `0x348b` NC_ITEMDB_FURNITURE_ENDURE_REQ (Z→DB)
+
+**Verified layout** (basis: zone UseItemFurnitureEndureKit::uivpb_ProtocolMake FUN_00596960 (+ CommonData by uib_AfterCast FUN_0059a530))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nFurnitureHnd |  |
+| 2 | u64 | nItemKey | the furniture item |
+| 10 | ShineDateTime | dNewEndureTime | old end extended by the kit's EffectValue hours, capped at now + Endure[0] |
+| 14 | PROTO_NC_ITEMDB_USE_VARIATION_ITEM_REQ | CommonData | the consumed kit (Z04 §6) |
 
 ### `0x349e` NC_ITEMDB_MYSTERY_VAULT_MAKEITEM_REQ (Z→DB)
 

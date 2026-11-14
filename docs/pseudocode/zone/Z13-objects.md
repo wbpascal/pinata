@@ -139,6 +139,7 @@ ShineMiniHouse::so_Routine(list, n)        vt 0x4ac   @ FUN_00567400   (every zo
                 owner? owner ← 0x8C4F NC_MINIHOUSE_PORTAL_DEL_CMD { u16 nPortalItemID }          # owner only, 4 bytes
                 remove Portal[i] (shift down), nPortalCnt −= 1
                 # (original bug) Z13-B3: i still advances, so the entry shifted into i is tested only 30 s later
+                # (original bug) Z13-B18: dEndTime is a time_t, g_Now / 10 seconds since zone start: never true (§3.1)
         for each member m (slots 5 − GMCount … EnterPlayerCount − 1):
             if !m.so_ply_MH_GetActiveMH (player vt 0x130: the player's house handle is 0xFFFF):
                 log "minihouse error(invalid MH handle) : mhnd(%d) - (%s : %d, %d)"
@@ -820,6 +821,357 @@ own bags every minute, Z09 §2.4).
 
 ---
 
+## 3. Portals, effects, endurance, furniture animations and emotions
+
+### 3.1 Portals (house vt 0x104–0x124)
+
+**Data** `smh_PortalList` (`MiniHousePortalList`, +0xc100, 0x138 bytes) *(pdb2016)*: `+0 u8 isActivePortal`, `+2 u16
+ActivePortalIndex`, `+4 u32 PortalDeActiveTime` (g_Now ticks), `+8 u16 nPortalCnt`, `+0xa PORTAL_INFO Portal[50]`
+(`{u16 nPortalItemID, i32 dEndTime}`, 6 bytes). `dEndTime` is what the Character DB sends: a `time_t` (seconds since 1970)
+for a timed gate, 0 for a permanent one (D03, `usp_Minihouse_getGateList`; the DB already leaves out expired rows). A portal
+is a portal-scroll item (`MiniHouseFurniture.InvenType = PORTAL`, rows 1000+) moved into the house (§2.6 →
+`0x8C5D` PORTAL_ADD); when open it is shown as the pseudo-furniture with handle **60000**.
+
+```pseudo
+so_mh_SetPortalList(ack PROTO_NC_MINIHOUSE_DB_PORTAL_LIST_ACK)          vt 0x104  @ FUN_005478c0
+    # caller so_ply_MH_SetMHPortalList (player vt 0xfc, Z07 §6.12) has checked Error == 0x1A08 and nPortalCnt < 51
+    nPortalCnt = ack.nPortalCnt; Portal[i] = ack.PortalInfo[i] for i < nPortalCnt
+    CanEnter += 1                       # the 5th of the five "data loaded" steps (§1.3: enter allowed at >= 5)
+
+so_mh_AddPortal(ack PROTO_NC_MINIHOUSE_DB_PORTAL_ADD_ACK)               vt 0x108  @ FUN_00547960
+    if nPortalCnt + 1 <= 50: Portal[nPortalCnt] = { ack.nPortalItemID, ack.dEndDate }; nPortalCnt += 1
+    # else silently dropped (the scroll was already deleted by the DB)
+    # caller so_ply_MH_AddMHPortal (player vt 0x100, FUN_0056fa10) on ack.Error == 0x1A10:
+    #   lock list vt 0x1c (commit lockindex); p must be in its own house (vt 0x130, owner charNo == p.charNo),
+    #   else log "] : not found mh" / "] : not owner"; then house vt 0x108 and
+    #   p ← 0x8C4C NC_MINIHOUSE_PORTAL_ADD_CMD { PORTAL_INFO { u16 nPortalItemID, i32 dEndDate } } with length 0xE = 12 payload bytes: 6 stale bytes follow (cosmetic, the client reads the first 4)
+    #   ack.Error ≠ 0x1A10: lock list vt 0x28 (release lockindex), log
+
+so_mh_PortalOpen(req { u16 nPortalItemID })                              vt 0x10c  @ FUN_00547a30
+    if isActivePortal: return 0x19F8                        # another portal is already open
+    if so_mh_ActivePortal(nPortalItemID): return 0x1181      # ok → handler broadcasts 0x8C24 for handle 60000 (Z07 §6.8)
+    return 0x19F9                                           # not in the list (expired portals are still in it: Z13-B18)
+
+so_mh_ActivePortal(id)                                                   vt 0x118  @ FUN_00547d90
+    if id == 0xFFFF: return 0
+    i = first index < min(nPortalCnt, 50) with Portal[i].nPortalItemID == id; none: return 0
+    ActivePortalIndex = i; isActivePortal = 1; PortalDeActiveTime = g_Now + 600        # open for 60 s
+    return 1
+
+so_mh_PortalClose()                                                      vt 0x110  @ FUN_00547b40
+    if !isActivePortal: return 0x1A00
+    so_mh_DeActivePortal(); return 0x1181                   # handler broadcasts 0x8C27 { 1, 60000 } (Z07 §6.8)
+so_mh_DeActivePortal()                                                   vt 0x11c  @ FUN_00542bc0
+    isActivePortal = 0; PortalDeActiveTime = 0; return 1
+so_mh_isActivePortal()                                                   vt 0x114  @ FUN_00547d30   → isActivePortal
+so_mh_GetActivePortalID()                                                vt 0x120  @ FUN_00547c30
+    active and ActivePortalIndex < min(50, nPortalCnt) → Portal[ActivePortalIndex].nPortalItemID, else 0xFFFF
+so_mh_GetActivePortalEffect()                                            vt 0x124  @ FUN_00542be0
+    id = GetActivePortalID(); 0xFFFF → null
+    return the first MiniHouseFurnitureObjEffect row whose ItemID (inx name) resolves to item id `id`, else null
+```
+
+Timers (in `so_Routine`, §1.2): an open portal closes after 60 s (`0x8C27` delete of handle 60000 to the house, needs the
+owner object); every 30 s the list drops entries with `0 < dEndTime < g_Now / 10` that are not the open one and tells the
+owner `0x8C4F NC_MINIHOUSE_PORTAL_DEL_CMD { u16 nPortalItemID }`. `g_Now / 10` is seconds since the zone's clock reset
+(`clockwatch` is zeroed at the world-time sync, `wms_NC_MISC_TIMEFROMWORLD_CMD` FUN_004511a0) while `dEndTime` is a `time_t` around 1.3 × 10⁹:
+the test is never true, so a timed portal that expires while the house is up stays in the list and can still be opened
+and used until the house is rebuilt (original bug) Z13-B18. Z13-B3 (index advance after a removal) only matters once
+B18 is fixed.
+
+### 3.2 Furniture and portal effects
+
+**Table `MiniHouseFurnitureObjEffect.shn`** (`CDataReader gMiniHouseObjEffect`, read at zone start in `zs_start_star`
+with row size 0xD2; read failure → assert "Fail to read 'MiniHouseFurnitureObjEffect.shn'" + `ShineExit`). Columns
+(from the SHN header; offsets as the code reads them): `+0 u16 Handle, +2 ItemID[32]` (inx name of the furniture or portal
+item), `+0x22 u32 EffectEnum, +0x26 EffectIndex[32], +0x46 u32 ApplyRange[5], +0x5a u32 UseRange[5], +0x6e NeedItem[32],
++0x8e u32 NeedMoney, +0x92 EffectName[32], +0xb2 EffectSound[32]`. `UseRange` (who may *trigger* the effect) is checked by
+the requests (Z07 §6.10: [0] anybody, [1] host's party, [2] host's guild, [3] / [4] level range); `ApplyRange` (who
+*receives* it), same meaning, by the apply methods below. `EffectEnum`: **0** recall (EffectIndex = recall-scroll item,
+its `RecallPoint` row is the target), **1** abnormal state (EffectIndex = abstate inx), **2** none (players are only
+listed for the client effect), **3** portal recall (only `so_mh_PortalEffectApply`). The 2016 table: rows 0–3 are type 0
+(`IN_ValDn01` …, ApplyRange `{0,1,0,1,120}`, UseRange `{0,0,0,1,120}`), rows 4–12 (Handles 1000–1008) type 3 for the
+`IN_PORTAL_*` items (ApplyRange `{0,1,0,1,150}`, UseRange `{0,0,0,1,150}`); no NeedItem, NeedMoney 0, EffectName and
+EffectSound all "-". So with the 2016 data only the host can trigger an effect (UseRange all 0 → 0x16CE / 0x19DE for
+others), it is free (applied at once, no DB round trip), and it recalls the host plus the host's party members of level
+1–120 / 1–150 who are in the house.
+
+```pseudo
+so_mh_EffectApply(rowIndex, out cmd PROTO_NC_MINIHOUSE_FURNITURE_EFFECT_CMD)   house vt 0x160  @ FUN_00542520
+    # rowIndex = the request's nEffectHandle used as a record index (row Handle == index for the type 0–2 rows)
+    row = gMiniHouseObjEffect[rowIndex]; out of range / null: return 1
+    switch row.EffectEnum:
+      0: rp = RecallPoint row "ItemIdent" == item id of row.EffectIndex; none: return 2
+         link = { rp.map (+0x24) as destMap and destMapForClient, x = rp +0x44, y = rp +0x46 }
+      1: abstate = dic_abstate[row.EffectIndex]; unknown: return 2
+      2: (nothing)
+      else: return 2
+    owner = GetObject(owner handle); none: return 3
+    for i = 5 − GMCount … EnterPlayerCount − 1:                 # GMs, then visitors (slot 5 = owner, skipped)
+        m = member i; skip null, the owner, level ∉ [ApplyRange[3], ApplyRange[4]]
+        eligible = ApplyRange[0] == 1
+                   or (ApplyRange[2] == 1 and m has a guild and m.guild == owner.guild)        (vt 0x828)
+                   or (ApplyRange[1] == 1 and m has a party and m.party == owner.party)        (vt 0x550)
+                   # the guild / party tests run only if ApplyRange[1] or [2] is non-zero
+        if !eligible: continue
+        cmd.nApplyPlayerHandle[cmd.nApplyPlayerCnt++] = m.handle
+        type 0: if m.so_IsJoinThisGame (vt 0x170) and TaiSai status (vt 0x2a0) ∈ {2 rolling, 3 stand-by}:
+                    m.so_SetDiceTaiSaiRoomLeaveInfo(1) (vt 0x190); m.so_SetMiniGameRoomLeaveMapInfo(link map, x, y) (vt 0x194)
+                    # moved when the dice round ends (Z06 §3)
+                else:
+                    before = EnterPlayerCount
+                    m.so_LinkTo(link, 6, 9, 10) false: log "…so_mh_EffectApply : player [name] cannot out minihouse";
+                                                      m.so_Disconnect (vt 0x5f8)
+                    else if EnterPlayerCount changed and i > 4: i −= 1   # the member left the array (same-zone link
+                                                                         # unmarks at once): re-test the shifted slot
+        type 1: m.so_AbnormalState_Set(m, abstate, strength 1, …) (vt 0x638); so_AbnormalState_BitSet(index);
+                if the abstate has sub-state info [1]: m.so_AbnormalState_Inform(index, KeepTime, 1) (vt 0x3f0) and
+                so_AbnormalState_BroadcastSet(index, KeepTime, 1)
+    owner: same level test, then listed; type 0: TaiSai status ∈ {2, 3} → house.so_mh_SetIsLeaveOwner(1) (vt 0x200) and
+           owner vt 0x194(link); else owner.so_LinkTo(link, 6, 9, 10), failure → log, disconnect; type 1 as above
+           # the owner needs no ApplyRange membership; outside the level range it is not affected
+    return 0
+
+ShinePlayer::so_MH_EffectApply(rowIndex)                     player vt 0x15c  @ FUN_005751f0
+    # called by 0x8C40 for a free effect (Z07 §6.10) and by the DB answer 0x347E (Z05 §9.6)
+    ack = 0x8C41 NC_MINIHOUSE_FURNITURE_EFFECT_ACK { u16 nEffectHandle = rowIndex, u16 err }
+    no field: err 0x16C2; not in a house (vt 0x130): 0x16C4; house gone: 0x16C3 → p ← ack; return
+    cmd = static furniture_effect_cmd_buffer: 0x8C42 NC_MINIHOUSE_FURNITURE_EFFECT_CMD { u16 nEffectHandle = rowIndex,
+          u16 nApplyPlayerCnt = 0, u16 nApplyPlayerHandle[] }
+    r = house.so_mh_EffectApply(rowIndex, cmd) → err 0 → 0x16C0 ok, 1 → 0x16CA, 2 → 0x16C6, other → 0x16C1
+    p ← ack { rowIndex, err }
+    if err == 0x16C0 and nApplyPlayerCnt > 0: so_AllInMap(p, cmd, 4 + 2n payload bytes)   # whole house map
+```
+
+```pseudo
+so_mh_PortalEffectApply(row, out cmd PROTO_NC_MINIHOUSE_PORTAL_EFFECT_CMD)   house vt 0x12c  @ FUN_00542c70
+    row null: return 1; row.EffectEnum ≠ 3: return 2
+    rp = RecallPoint row of the item id of row.EffectIndex; none: return 2
+    owner none: return 3
+    member loop as in so_mh_EffectApply type 0 (same ApplyRange, level, TaiSai leave-info and LinkTo rules), except:
+        after a successful LinkTo: if EnterPlayerCount is unchanged → **break** (stop the loop);
+                                   else if i > 4: i −= 1
+        # a link to another zone does not unmark the member (Z01 so_LinkTo: only the WM 0x180D reservation), so the count
+        # stays and the loop ends after the first such member: the other eligible visitors are not recalled
+        # (original bug) Z13-B19
+    owner part as in type 0; return 0
+    # the portal is not closed by its use; it closes after its 60 s
+
+ShinePlayer::so_MH_PortalEffectApply(row)                    player vt 0x128  @ FUN_00574450
+    ack = 0x8C57 NC_MINIHOUSE_PORTAL_EFFECT_ACK { u16 Error }
+    no field 0x19D2; not in a house 0x19D4; house gone 0x19D3 → p ← ack; return
+    cmd = static portal_effect_cmd_buffer: 0x8C58 { u16 nEffectHandle = row.Handle (first u16 of the row), u16 cnt, handles[] }
+    r = house.so_mh_PortalEffectApply(row, cmd) → 0 → 0x19D0, 1 → 0x19DA, 2 → 0x19D6, other → 0x19D1
+    p ← ack; if 0x19D0 and cnt > 0: so_AllInMap(p, cmd)
+    # caller: 0x8C56 (Z07 §6.10, free effect). The paid path has no DB handler (Z05-B12).
+```
+
+### 3.3 Endurance (durability)
+
+**Table `MiniHouseEndure.shn`** (`MiniHouseEndureDataBox minihouseenduredatabox`, `mhe_Load` @ FUN_004a11e0 at zone start
+from `../9Data/Shine/MiniHouseEndure.shn` (`BinaryDataBox<MiniHouseEndure>::bdb_ReadData` @ FUN_004a1100); `mhe_default`
+= the zeroed default block). Rows `{u16 Handle, u16 Endure[4]}` (hours): 0 `{0,0,0,0}`, 1 `{720,384,48,0}`, 2
+`{2160,1200,240,0}`, 3 `{72,48,24,0}`. `MiniHouseFurniture.KeepTime_Endure` selects the row (2016 data: 1 or 0).
+`operator[]` @ FUN_00543440: index ≥ row count → the default block.
+
+Grade `MHE_STEP` *(pdb2016)*: 0 NONE (no durability), 1–3 STEP_1–3 (wearing), 4 STEP_4 (worn out). Uses of the grade
+(cell +0x25): furniture edits are refused at > 3 (0x11E2, §2.4), character actions at ≥ 3 (0x11E2, Z07 §6.9), furniture
+effects at ≥ 3, emotions at > 1 (0x170F, §3.5).
+
+```pseudo
+mhe_CalEndureGrade(rowIdx, ShineDateTime end, out grade) → ok         @ FUN_004a12a0
+    rowIdx > row count: return 0; row = row rowIdx (or the default block); row.Handle ≠ rowIdx: return 0
+    year byte of end == 0:    grade = NONE; return 1                     # no durability clock
+    year byte == 0xFF (never) and row.Endure[0] == 0: grade = STEP_1; return 1
+    now = chargeditemcheck's current time (struct tm, minute resolution (inferred))
+    if mktime(end) <= mktime(now): grade = STEP_4; return 1
+    h = min((end − now) / 3600, row.Endure[0])                            # whole hours left
+    for k in 0, 1, 2: if row.Endure[k+1] <= h < row.Endure[k]: grade = STEP_1 + k; return 1
+    return 0
+    # h == Endure[0] (at least Endure[0] hours left) matches no bucket: no grade, the callers keep the old one
+    # (original bug) Z13-B20; a fresh or repaired item is capped at now + Endure[0] and is a few seconds below it
+    # "never" with Endure[0] ≠ 0: mktime of year 2155 fails (−1) → STEP_4 (only with inconsistent data)
+    # row 1: STEP_1 = 384–719 h left, STEP_2 = 48–383 h, STEP_3 = 0–47 h, STEP_4 = expired
+
+so_mh_DoingEndureGradeDown(out changed) → ok                 house vt 0x16c  @ FUN_00548270   (so_Routine every 60 s, §1.2)
+    !so_mh_CanEnter (data not loaded) or owner object missing: return 0
+    isEndureCheck = 0; nEndureFurnitureCnt = 0
+    for each item cell of the four boxes (§2.1), with an attribute and an item id:
+        row = MiniHouseFurniture by item id; none: skip
+        old = cell +0x25
+        if mhe_CalEndureGrade(row.KeepTime_Endure, attr.GetEndureEndTime, &g) and g ≠ old:
+            attr.SetEndureGrade(cell, g) (vt 0x98)
+            if placed (cell +0x0a bit 0):
+                EndureFurniture[nEndureFurnitureCnt++] = { nFurnitureHnd = cell +0x0b, nEndureGrade = g, isRePair = 0 }
+                changed = 1
+    return 1
+    # the grade lives in memory only (it is recomputed from dEndureEndTime at every load, §2.2); unplaced items change
+    # silently. List: ENDURE_FURNITURE_INFO[294] with a u8 count (a pass with more than 255 placed changes would wrap,
+    # not reachable with the 2016 timers (inferred))
+    # caller (so_Routine) broadcasts 0x8C61 { nCount, EndureFurniture[] } and stops the emotions on each listed furniture
+
+so_mh_EndureGradeDownTimeUpdate()                            house vt 0x168  @ FUN_00547f60   — no caller in the 2016 zone
+    for each furniture (as above) with grade g ∈ 1…3 and Endure[g−1] ≠ 0:
+        t = g_Now + (Endure[g−1] − Endure[g]) × 36000 + 10           # the full length of the current step, from now
+        if t < tEndureCheckTime: tEndureCheckTime = t; isEndureCheck = 1
+so_mh_isEndureGradeDown()                                    house vt 0x164  @ FUN_00547f00   → isEndureCheck; no caller
+    (ShineObject default @ FUN_00547eb0 returns 0). isEndureCheck is written only here and in the two methods above:
+    the "next grade change" timer is dead; the fixed 60 s pass does the work.
+```
+
+**Repair kit** (request `0x3033` NC_ITEM_MH_FURNITURE_ENDURE_KIT_USE_REQ, handler and state checks Z04 §8.4):
+
+```pseudo
+so_ply_MH_FurnitureEndureUse(p, req { u8 nInvenSlot, u16 nFurnitureHnd })   player vt 0x13c  @ FUN_00571550
+    house = GetObject(p.GetMyHandle) none: return 0x1A76 "Estate is not activated."
+    house owner charNo ≠ p.charNo: return 0x1A7D            # only the owner repairs
+    nInvenSlot ≥ inventory size: assert "wrong slot"; return 0x1A73
+    inventory cell (9, slot) locked: return 0x1A74 "Working on the other item."
+    info = ItemInfo(cell.itemid); none: return 0x1A73
+    info.ItemFunc ≠ ITEMFUNC_ENDUREKIT_F: return 0x1A78 "It is wrong repair item."
+    p.sp_LastUsedItem = itemid; lot < 1: assert "Try to use lot 0 item"; return 0x1A75
+    ce = first chargedbuffdatabox row with ce_ItemID == itemid; none, no data or EffectEnum ≠ EE_ENDURE_KIT: return 0x1A73
+    add = ce.EffectValue (hours)
+    fcell = house.so_mh_GetItemCellByFurnitureHandle(nFurnitureHnd); none: return 0x1A79 "It is wrong furniture item."
+    copy = fcell (0x74 bytes)
+    year byte of copy.dEndureEndTime == 0: return 0x1A7B "It is useless for you to use."   # furniture without durability
+    row = MiniHouseFurniture by item id; none: return 0x1A79
+    e = MiniHouseEndure[row.KeepTime_Endure]; e.Endure[0] == 0: return 0x1A7A "Has no effect."
+    attr.SetEndureEndTime(copy, add, e.Endure[0], now) (vt 0x90, §2.1: extend, capped at now + Endure[0])
+    actor ui_FurnitureEndureKit (UseEffect::UseItemFurnitureEndureKit): uivpb_SetFurnitureHnd @ FUN_005969a0,
+        uivpb_SetFurnitureKey(copy key) @ FUN_005969c0, uivpb_SetFurnitureEndureTime(copy end) @ FUN_005969e0
+    UseItemVariationProtocolBase::uib_AfterCast(actor, p, inventory, info, slot) (Z04 §6: consumes one kit) sends
+        → DB 0x348B NC_ITEMDB_FURNITURE_ENDURE_REQ (uivpb_ProtocolMake @ FUN_00596960, size 0x23):
+          { u16 nFurnitureHnd, u64 nItemKey, ShineDateTime dNewEndureTime, PROTO_NC_ITEMDB_USE_VARIATION_ITEM_REQ CommonData }
+    return 0x1A70                                          # handler sends nothing now; every other code → 0x3034 { Error }
+    # the kit is used up even when the end time was already at the cap (no "no effect" test)
+    # Z04 §8.4 / Z04-B13 say the failures are silent: they are not, the handler FUN_00571340 sends each code as
+    # 0x3034 { dEndEndureDate stale, Error }.
+
+UseItemFurnitureEndureKit::uivpb_SendErrorCode(p, code)     actor vt 0x18  @ FUN_0059a990
+    # called by uib_AfterCast when the kit cell changed or has lot 0 (code 0x702)
+    p ← 0x3034 with Error written at payload +4 but pp_SetPacketLen(6) = 4 payload bytes: the code is not on the wire,
+        the client reads `Error` past the packet (original bug) Z13-B17 (also the assert text names smh_SendFurnitureInfo)
+
+so_ply_MH_FurnitureEndureUpdate(p, ack PROTO_NC_ITEMDB_FURNITURE_ENDURE_ACK)   player vt 0x140  @ FUN_00570fe0
+    # DB answer 0x348C with Error 0x700 (Z05 §9.7, which sends 0x3034 { Error } for a result ≠ 0x1A70)
+    not in a house / house gone: return 0x1A76
+    cell = house vt 0x54(ack.nFurnitureHnd); none: return 0x1A75
+    attr.vt 0x94 (set dEndureEndTime = ack.dNewEndureTime) fails, no MiniHouseFurniture row, or mhe_CalEndureGrade fails: return 0x1A73
+    attr.SetEndureGrade(cell, g)
+    p ← 0x3034 NC_ITEM_MH_FURNITURE_ENDURE_KIT_USE_ACK { ShineDateTime dEndEndureDate = ack.dNewEndureTime, u16 Error = 0x1A70 }
+    if placed: so_AllInMap(p, 0x8C61 { nCount 1, { nFurnitureHnd, nEndureGrade = g, isRePair = 1 } })   (5-byte payload)
+    return 0x1A70
+```
+
+### 3.4 Furniture animations (`MiniHouseObjAni.shn`, 0x8C3D / 0x8C3F)
+
+**Table** `MiniHouseObjAniDataBox minihouseobjanidatabox`, `mhoadb_Load` @ FUN_004a1970 at zone start (`zs_start_tough`)
+from `../9Data/Shine/MiniHouseObjAni.shn` (`bdb_ReadData` @ FUN_004a1580, row 0x27 bytes, failure → assert + `ShineExit`).
+Row `MiniHouseObjAni` *(pdb2016)*: `Handle, ItemID (u16 item id), AniGroupIDMaxNum, AniGroupID, EventCode, NextAniHandle,
+ActorMaxNum, Actor01–03, ActeeMaxNum, Actee01–03`. 2016 data: 183 rows, Handles 0–182 contiguous, 67 furniture items;
+only row 29 (item 50024) uses a random follow-up and only row 29 has `ActorMaxNum` (2); no row has actees.
+
+```pseudo
+mhoadb_MakeServerAniData()                                    @ FUN_004a1660   (end of mhoadb_Load)
+    mhoadb_MaxItemHandle = max(row.Handle) + 1; p_mhoadb_ServerAniData = new ServerAniData[MaxItemHandle]
+        (default { isRand 0, RandCnt 0, RandStartHandle 0xFFFF, ActorMaxNum 0, ActeeMaxNum 0 })
+    for each row r: s = ServerAniData[r.Handle]
+        if r.NextAniHandle < 10000: s = { isRand 0, RandCnt 0, RandStartHandle = r.NextAniHandle }   # fixed follow-up
+        else:                                                       # NextAniHandle names an animation group
+            group = rows with ItemID == r.ItemID and AniGroupID == r.NextAniHandle
+            s = { isRand 1, RandCnt = |group|, RandStartHandle = Handle of the first group row }   # assumes contiguous handles
+        s.ActorMaxNum = r.ActorMaxNum; s.ActeeMaxNum = r.ActeeMaxNum
+
+mhoadb_GetAniData(handle) → AniData* (one shared static)      @ FUN_004a14c0
+    handle >= MaxItemHandle: return null
+    s = ServerAniData[handle]
+    AniData = { PreHandle = handle,
+                NextHandle = s.isRand ? s.RandStartHandle + rnd(s.RandCnt) : s.RandStartHandle,
+                ActorIdx = s.ActorMaxNum ? rnd(s.ActorMaxNum) + 1 : 0,
+                ActeeIdx = s.ActeeMaxNum ? rnd(s.ActeeMaxNum) + 1 : 0 }        # rnd(n) = RandomBox 0…n−1 (inferred)
+    # a handle below MaxItemHandle without a row gets the defaults (NextHandle 0xFFFF)
+
+so_mh_CanObjAni(furnitureHandle)                              house vt 0x158  @ FUN_005424a0   (anti-spam, 2 s per furniture)
+    walk smh_FurnitureLastTouchTIme[294] {u16 FurnitureHandle, u32 LastTouch} up to the first free (0xFFFF) entry:
+        found: if g_Now <= LastTouch + 20: return 0; LastTouch = g_Now; return 1
+    table full (294 used): return 0
+    take the free entry: { furnitureHandle, g_Now }; return 1
+    # entries are never freed during the house's life; furniture handles are never reused (§2.1), so after 294 distinct
+    # furniture handles have been animated every new one is refused (0x14C1) (original bug) Z13-B22
+```
+
+**0x8C3F field mapping (Z07 §6.9 open point):** the handler (FUN_00574750) sends the `AniData` returned by
+`mhoadb_GetAniData(req.Handle)`, not the raw table row: `{ u16 PreHandle = requested Handle, u16 NextHandle = follow-up
+animation, u16 nFurnitureHnd, u16 ActorHnd = p, u8 ActorIdx, u8 ActeeIdx }` (`(u8)` of the two u16 `AniData` words). The
+names agree with `PROTO_NC_MINIHOUSE_CHAR_ACTION_CMD`; there is no layout difference. The requested animation's `ItemID` is
+never compared with the furniture's item, so any animation Handle can be played on any furniture (original bug) Z13-B23.
+
+### 3.5 Furniture emotions (sitting / lying on furniture)
+
+Player state `sp_FurnitureEmotionInfo` (`FURNITURE_EMOTION_INFO` *(pdb2016)*: `{u16 nPlayerHandle, u16 nFurnitureHnd, u8
+nPosition, u8 nEmotionNo}`); `so_ply_MH_InitFurnitureEmotionInfo` @ FUN_0056fe60 (player vt 0x2b0) sets all to 0xFF… =
+"not on furniture". Accessors (player vt 0x2b4–0x2d4): `IsFurnitureEmotion(h)` @ FUN_0056fe80 (h ≠ 0xFFFF and on h),
+`IsFurnitureEmotionPosition(h, pos)` @ FUN_0056feb0, `IsFurnitureEmotionNo(n)` @ FUN_0056fef0, `GetFurnitureEmotion` (handle,
+0xFFFF = none) @ FUN_0056ff10, `GetFurnitureEmotionPosition` @ FUN_0056ff20, `GetFurnitureEmotionNo` @ FUN_0056ff30,
+`SetFurnitureEmotion` @ FUN_0056ff40, `SetFurnitureEmotionPosition` @ FUN_0056ff60, `SetFurnitureEmotionNo` @ FUN_0056ff80,
+`GetFurnitureEmotionInfo` (pointer) @ FUN_0056fe50 (no caller found). `nPlayerHandle` is never set (the packets use the
+player's object handle). The state is reset by the player constructor, `0x8C10` VISIT (a visitor entering, FUN_00571c50), `0x8C65`
+cancel and `so_mh_FurnitureEmotionStop`; **not** by `so_mh_Out` or the owner's own entry (`so_mh_Move2MiniHouse`): a player
+who leaves while seated keeps the state, and an owner re-entering a rebuilt house (handles renumbered from 1) is reported as
+seated on whatever furniture now has that handle, to every later visitor (`0x8C64` at LOGINCOMPLETE) and blocks that seat
+(original bug) Z13-B21.
+
+```pseudo
+so_mh_CanFurnitureEmotion(p, req { u16 nFurnitureHnd, u8 nPosition, u8 nEmotionNo }) → code   house vt 0x2d8  @ FUN_005485c0
+    # ShineObject default @ FUN_00543130 returns 0x1709. Caller 0x8C62 (Z07 §6.11) applies the state on 0x1708.
+    p or req null: return 0x1709
+    seat taken (so_mh_IsFurnitureEmotion false) and not by p itself (p vt 0x2b8): return 0x170E "Someone else is using that position of the furniture."
+    cell = house vt 0x54(nFurnitureHnd); none: return 0x1710
+    cell grade (+0x25) > 1: return 0x170F "Cannot use the furniture due to low duration."
+    distance(p, furniture LocX/LocY rounded) > 200: return 0x170D "The furniture is too far away."
+    row = MiniHouseFurniture by item id; none (or item id 0xFFFF): return 0x1709
+    nPosition < row.MaxSlot: return 0x1708 (ok); else return 0x1711
+    # nEmotionNo is not validated (MiniHouseFurniture.MHEmotionID is not read) and the furniture's IsPlaced bit is not
+    # tested: an item still in the box (default location 276, 388) can be sat on from near that point, and any emotion
+    # number is broadcast (original bug) Z13-B24 (CHAR_ACTION and FURNITURE_EFFECT do not test IsPlaced either)
+    # 0x170C "You already have this emotion." is never returned
+
+so_mh_IsFurnitureEmotion(h, pos) → "seat free"                house vt 0x2dc  @ FUN_00543140
+    for every member (slots 5 − GMCount … EnterPlayerCount − 1): if m.IsFurnitureEmotionPosition(h, pos): return 0
+    return 1
+
+so_mh_FurnitureEmotionStop(h, broadcaster)                    house vt 0x2e0  @ FUN_005431b0
+    for every member on furniture h (any position): list its handle; m.InitFurnitureEmotionInfo (vt 0x2b0)
+    if any: so_AllInMap(broadcaster, 0x8C67 NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_CMD { u16 nCancelEmotionCnt, u16 handle[] })
+    return 1
+    # callers: so_Routine after a grade change (§1.2, broadcaster = owner) and the FurnitureReloc releaser for a
+    # rearranged / deleted furniture (§2.5)
+
+so_mh_SendInnerPlayerFurnitureEmotion(target)                 house vt 0x2e4  @ FUN_005432d0
+    entries = { m.handle, m.GetFurnitureEmotion, Position, No } for every member with GetFurnitureEmotion ≠ 0xFFFF
+    if any: target ← 0x8C64 NC_MINIHOUSE_FURNITURE_EMOTION_CMD { u16 nEmotionCnt, FURNITURE_EMOTION_INFO[] }   (4 + 6n bytes
+            with the opcode); caller LOGINCOMPLETE (Z07 §6.4)
+```
+
+### 3.6 Client side (2016 client, `GameFrameWork` scene)
+
+| Packet | Client handler | What the client does |
+|---|---|---|
+| 0x8C3F CHAR_ACTION_CMD | `On_NC_MINIHOUSE_CHAR_ACTION_CMD` @ FUN_0049b760 | `MiniHouseIndoor::ObjDoAction(nFurnitureHnd, ActorHnd, PreHandle, NextHandle)`; `ActorIdx` / `ActeeIdx` are not read |
+| 0x8C41 FURNITURE_EFFECT_ACK | @ FUN_00499a20 | 0x16C0: nothing; 0x16C7 / 0x16C8 / 0x16CF: `MiniHouseIndoor::ObjEffErrMsg(nEffectHandle, code)` (message built from the effect row); other codes: `ErrMsgTable` text |
+| 0x8C42 FURNITURE_EFFECT_CMD | @ FUN_004b5070 | client ObjEffect row `nEffectHandle` (by **index**, as the server); for each listed player: `EffectName` effect and `EffectSound` sound unless "-" (all "-" in 2016) |
+| 0x8C4B PORTAL_LIST_CMD / 0x8C4C PORTAL_ADD_CMD / 0x8C4F PORTAL_DEL_CMD | @ FUN_0049b7d0 / FUN_0049b830 / FUN_0049b870 | `mhPortalListWin::Add(entry)` per entry / `Add` / `Delete` (the DEL handler passes no packet field to `Delete` as decompiled; which entry it removes is not resolved) |
+| 0x8C51 / 0x8C54 / 0x8C57 / 0x8C58 | – | accepted and ignored: portal open / close results and the portal effect ACK and CMD have no client effect, so the 0x19D* / 0x19F8 / 0x19F9 / 0x1A00 codes are never shown |
+| 0x8C61 FURNITURE_ENDURE_CMD | @ FUN_0049b960 | `MiniHouseIndoor::ChangeEndure(nEndureGrade, nFurnitureHnd)` per entry; `isRePair` not read |
+| 0x8C63 EMOTION_ACK | @ FUN_004a5080 | ≠ 0x1708: text, leave the emotion mode, stand up at the ground position; 0x1708: nothing (the CMD seats) |
+| 0x8C64 EMOTION_CMD | @ FUN_004a5170 | only inside a house: per entry load the character, `ActMHEmotion(entry)`, `AddObjSeatInfo(position, player)` |
+| 0x8C66 EMOTION_CANCEL_ACK | @ FUN_0049c3f0 | 0x1718: stand the main character up; any other code: nothing (0x1719 / 0x171A–0x171C not shown) |
+| 0x8C67 EMOTION_CANCEL_CMD | @ FUN_004a5230 | only inside a house: per handle stand the character up, `DelObjSeatInfo`; the main character also leaves the emotion UI |
+| 0x3034 ENDURE_KIT_USE_ACK | @ FUN_004af590 (Z04 §8.4) | 0x1A70 "Repair has been completed." + new end date; other codes: their texts (0x1A71–0x1A7D, `client-error-codes.json`) |
+
+---
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -840,6 +1192,14 @@ own bags every minute, Z09 §2.4).
 | Z13-B14 | `InvenCellReleaser_FurnitureReloc::lc_Free` | every refused furniture change answers `0x8C20` REARRANGE_ACK {0x11CE} | a failed create / delete shows "You may not place an item at an invalid location." through the rearrange ACK | ACK of the request kind with a DB-error code |
 | Z13-B15 | `ShinePlayer::so_mh_Move2MiniHouseFurniture` | item-use result 0x700 is sent although the house method may do nothing (target box full, portal already listed / list full) | the client sees a successful use; the item stays in the inventory without a message | report a failure code |
 | Z13-B16 | `so_mh_Move2MiniHouseFurniture` (portal) → 0x8C5D | `PROTO_ITEM_RELOC.newlocation` (2 bytes) is never written | stale bytes reach the DB request (the DB side was not checked for its use) | write the source location |
+| Z13-B17 | `UseItemFurnitureEndureKit::uivpb_SendErrorCode` (0x3034) | the code is written at payload +4 but the length is set to 4 payload bytes | a kit-use failure found by `uib_AfterCast` (0x702) reaches the client without its code; the client reads `Error` past the packet | `pp_SetPacketLen(8)` as the handler does |
+| Z13-B18 | `ShineMiniHouse::so_Routine` portal expiry | `dEndTime` (a `time_t` from the DB) is compared with `g_Now / 10` (seconds since the zone clock reset) | timed portals never expire while the house stands; an expired portal can still be opened and used | compare with the current `time_t` |
+| Z13-B19 | `so_mh_PortalEffectApply` (0x8C56) | the member loop stops when a successful `so_LinkTo` leaves `EnterPlayerCount` unchanged, which is the case for every link to another zone | with a recall point on another zone only the first eligible visitor (and the owner) is recalled | continue the loop as `so_mh_EffectApply` does |
+| Z13-B20 | `mhe_CalEndureGrade` | the hours left are clamped to `Endure[0]`, but the first bucket is `h < Endure[0]` | with at least `Endure[0]` hours left no grade is computed and the old grade stays | `h <= Endure[0]` for the first bucket |
+| Z13-B21 | furniture emotions (`so_mh_Out`, `so_mh_Move2MiniHouse`) | the seated state is not reset when a player leaves or when the owner enters | an owner who left seated shows up seated (on whatever furniture now has that handle) in the rebuilt house and blocks that seat | reset the state in `so_mh_Out` |
+| Z13-B22 | `so_mh_CanObjAni` | the 294-entry last-touch table is never cleared and handles are never reused | after 294 distinct furniture handles in one house, new furniture can no longer be animated (0x14C1) | free entries of removed furniture or index by cell |
+| Z13-B23 | 0x8C3D CHAR_ACTION (FUN_00574750) | the animation `Handle` is not checked against the furniture's item | a client can play any furniture's animation on any furniture; everybody in the house sees it | require `row.ItemID == furniture item` |
+| Z13-B24 | `so_mh_CanFurnitureEmotion` (0x8C62); also 0x8C3D / 0x8C40 | `IsPlaced` is not tested and `nEmotionNo` is not validated | sitting on (or animating) an item still in the box near its default spot (276, 388); arbitrary emotion numbers broadcast | test `IsPlaced` and `MHEmotionID` |
 
 ## Not reconstructed / uncertain
 
@@ -859,6 +1219,12 @@ own bags every minute, Z09 §2.4).
   lock list and the two DB answers then do with one cell was not traced.
 - The 0x3449 requests of `smh_SendFurnitureInfo` use the static `delete_item_packet` buffer (0x81 bytes) instead of the
   shared `gpp`; why (re-entrancy with the 0x8C08 sends) is *(inferred)*.
+- `mhPortalListWin::Delete` (client, 0x8C4F): which entry it removes is not visible in the decompiled call (no field passed).
+- `mhe_CalEndureGrade`'s "now" is `chargeditemcheck`'s time struct; that it is refreshed every minute is *(inferred)* from
+  its `ct_1MinuteFlow` use in Z09.
+- `RandomBox::operator[](n)` returning 0 … n−1 (animation follow-ups, actor index) is *(inferred)*.
+- The 0x8C61 list counter is a `u8` over a 294-entry array; a pass with more than 255 changed placed items would wrap
+  (not reachable with the 2016 timers, *(inferred)*).
 
 ## Coverage boundary
 
