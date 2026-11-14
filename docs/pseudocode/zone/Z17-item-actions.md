@@ -1085,6 +1085,265 @@ next `so_SetRegistNumber`. Map changes inside one zone process do not leave the 
 
 ---
 
+## 4. Costume weapon / shield charges and the action-item box
+
+Two unrelated "charge" mechanisms share the item-attribute union `SHINE_ITEM_ATTRIBUTE` (pdb2016; all members start at
+attribute offset 0, so Ghidra prints the charge as `itemattr.MobCard_Unident.SerialNumber` or `itemattr.dlot.lot`):
+
+| Item class (`iac_ItemClass`) | Attribute member *(pdb2016)* | Meaning |
+|---|---|---|
+| 26 costume weapon (`ItemAttrCls_CostumWeapon`, vftable 00709fa4) | `costumweapon.CostumCharged` u32 | swings left |
+| 37 costume shield (`ItemAttrCls_CostumShield`, vftable 0070a074, `iac_ItemClass` @ FUN_0063e480 = 0x25) | `costumshield.CostumCharged` u32 | swings left |
+| 27 action item (`ItemAttrCls_ActionItem`, vftable 0070a144) | `actionitem.deletetime` `ShineDateTime` | expiry; year 0 = not yet started |
+
+The "action item" (class 27, the premium dance emotes) has nothing to do with the item actions of §1–§3: only the name
+and the `ItemAction…` class prefix are shared (§4.5).
+
+### 4.1 Data and the charge counter
+
+`ChargedEffect.shn` (`ChargedItemEffectDataBox` `chargedbuffdatabox`, keyed by item id; row `ChargedItemEffect`
+{ Handle, ItemID, KeepTime_Hour, EffectEnum, EffectValue, StaStrength }): `EffectEnum` 28 `EE_WEAPON_MAXENDURE` gives the
+charge capacity in `EffectValue`, 27 `EE_ENDURE_KIT` the charges a kit adds (Z04 §12.2 calls them "kind 0x1c / 0x1b" of the
+"item usage table" DAT_00aa4280: that table is `chargedbuffdatabox`). 2016 data: all 554 class-26 and all 56 class-37 items
+have a MAXENDURE row (capacity 3000, 5000, 10000, 15000 or 25000; e.g. `HinaSword03` 25000, `HinaSword03_1` 10000,
+`HinaSword03_2` 3000); the kits `WeaponEndure03…06` add 10000 / 5000 / 3000 / 1000.
+
+```pseudo
+ItemAttrCls_CostumWeapon::iac_itemcreate(itemid, item)            @ FUN_0063f300   (vftable slot 0x14; the shield class shares it)
+    item.attr = 0;  item.attr.CostumCharged = WeaponCostumInitCharge(itemid)
+WeaponCostumInitCharge(itemid) → u16                              @ FUN_00517d40
+    row = chargedbuffdatabox.cideb_GetItemID(itemid)
+    return row and row.EffectEnum == EE_WEAPON_MAXENDURE ? row.EffectValue : 0
+iac_GetChargedNumber(item) = item.attr.CostumCharged              @ FUN_0063f540   (slot 0x9c, both classes)
+iac_SetChargedNumber(item, n): item.attr.CostumCharged = n        @ FUN_0063f550   (slot 0xa0; used by the refill, Z05 §8.7)
+```
+
+A new costume item is therefore full. Refill = `0x3035` / `0x3064` with an endure kit (Z04 §12.2) → CharDB
+`0x348D` / `0x34C6` (D03 §6.6 `p_Item_CostumWeapon_Endure_Update`) → `0x348E` / `0x34C7` sets the counter and answers the
+client (Z05 §8.7).
+
+**The charging pointers.** The player keeps `sp_CostumWeaponChargeing` (p+0x2a7f8) and `sp_CostumShieldChargeing`
+(p+0x2a7fc), `ItemTotalInformation*` *(pdb2016)*. "Not charged" is the address of the static sentinels
+`ShineObject::so_CostumWeaponChargeing` / `so_CostumShieldChargeing` (key set to −1 by `so_Initstaticvar` @ FUN_00549530;
+their counter is reset to `0xFFFFFFFF` on every main-loop pass in `ZoneServer::zs_mainthreadfunction` @ FUN_005aca30, so it
+never reaches 0 and is never sent: every send below skips counters ≥ 100 000 000). The constructor (`ShinePlayer` @
+FUN_0055bc80) and `so_FirstActionAfterSocketConnect` @ FUN_00554870 set both pointers to the sentinels; `so_RecalcEquipParam`
+@ FUN_004cab70 (Z12 §2.2) points them at the equipped cell:
+
+```pseudo
+    for each equipment cell s (in slot order):
+        s == 11 LEFTHANDACC and slot 10 LEFTHAND holds an item, or s == 13 RIGHTHANDACC and slot 12 RIGHTHAND holds one:
+            if attr.iac_GetChargedNumber(cell) == 0:
+                sp_CostumWeaponChargeing = sentinel
+                if ChargedEffect(itemid).EffectEnum ≠ EE_WEAPON_MAXENDURE: skip      # an uncharged skin stays "not charged"
+            sp_CostumWeaponChargeing = cell                    # with both 11 and 13 worn, the later slot (13) wins
+        s == 29 SHIELDACC: slot 10 LEFTHAND empty → sp_CostumShieldChargeing = sentinel; else the same test → cell
+    at the end: a pointer whose cell is now empty (itemid 0xFFFF) is reset to its sentinel
+```
+
+So a charged skin with 0 charges left (possible only if its delete at 0 failed, §4.3) is still pointed at, and that
+blocks normal attacks (§4.2).
+
+```pseudo
+ShinePlayer::smo_ply_IsCostumCharged() = sp_CostumWeaponChargeing ≠ sentinel           @ FUN_00517e20   (vt 0xf04)
+ShinePlayer::smo_ply_IsCostumShieldCharged() = sp_CostumShieldChargeing ≠ sentinel     @ FUN_00517e30   (vt 0xf08)
+```
+
+Readers: `smo_SwingDamage` @ FUN_00432f30 (Z03 §3.2: `0x2448` flag bit 4 / bit 8, `0x2449` flag bits 1 / 2, only when the
+attacker's vt 0xeb4 = 1) and `smo_SkillBlast` @ FUN_00581160 (skill result `IsCostumWeapon` / `IsCostumShield`, set on every
+damaging hit). The client uses the bits for the skin's hit effect *(inferred)*.
+
+### 4.2 Where charges are spent: normal swings only
+
+```pseudo
+ShinePlayer::sp_Schedule_SwingStart(p)                     @ FUN_00430bc0   (Z03 §3.2)
+    … if sp_CostumWeaponChargeing.CostumCharged == 0 or sp_CostumShieldChargeing.CostumCharged == 0:  p.smo_BashStop(); return
+    # Z03 §3.2 reads these two tests as "p.weapon (+0x2a7f8 → +10) == 0 or p.weapon2 (+0x2a7fc → +10) == 0": they are the
+    # charge counters (+10 = the attribute inside ItemTotalInformation). Without a skin the sentinel's counter is never 0.
+
+ShinePlayer::sp_Schedule_SwingDamage(p)                    @ FUN_0042f550   (Z03 §3.2)
+    … if first hit of the swing (multiHitIdx == 1):  p.vt[0xf0c](0, null, false);  p.vt[0xf10](0, null, false)
+```
+
+`sp_Schedule_SwingDamage` is the only caller of the two decrease slots (vt 0xf0c / 0xf10; `so_smo_CrossCounterDamage`
+@ FUN_004a5360 / FUN_004a56a0 only share their exception-handler label). One charge of each worn skin is spent per swing,
+on the first hit of a multi-hit weapon, whether the swing hits or misses (the call is outside the damage test).
+
+```pseudo
+ShinePlayer::smo_ply_CostumWeaponChargeDecrease(forceSend u8, skill SkillDataIndex*, isSkill bool)   @ FUN_00520840   (vt 0xf0c)
+    if isSkill:                                          # never true in 2016 (original bug) Z17-B14
+        if skill == null: return
+        if not skill.sdi_DamageRule.vt[0x20](EngageArgument{skill}): return      # only damaging skills spend
+    else:
+        if not costumeWeaponDec_Normal: return           # global bool; ShinePlayer::so_Routine @ FUN_0056c790 sets it
+        costumeWeaponDec_Normal = false                  # (and costumeShieldDec_Normal) to true at the start of each player's tick
+    c = sp_CostumWeaponChargeing
+    if c.CostumCharged == 0: return
+    c.CostumCharged −= 1
+    if forceSend or c.CostumCharged % 10 == 0: sp_CostumWeaponChargeDecrease_ToClient(p)      # 0x3037
+    if c.CostumCharged % 10 == 0:                sp_CostumWeaponChargeDecrease_ToDB(p)          # 0x348F
+    if c.CostumCharged == 0:                     # worn out: the skin is destroyed
+        slot = 13 (RIGHTHANDACC) if that cell holds an item, else 11 (LEFTHANDACC)          # not necessarily c (original bug) Z17-B15
+        if the cell holds an item:
+            sp_NoticeItemBreak(p, 8, slot)                                  # 0x3038 (below)
+            sp_ItemDelete(p, cell, 8, slot, null)                           # @ FUN_00451090 → sp_DestroyItem @ FUN_00566f00 (below)
+            Send to GameLog 0x0612 NC_LOG_GAME_ITEM_CW_BREAKATZERO {        # 0x22 bytes incl. opcode (D05 §3.1, nType 530)
+                u32 chrregnum = so_GetCharRegistNumber (vt 0x344); u64 itemkey = cell key;
+                MAPPOS mappos { Name3 MapName = current map's name (first 12 bytes of the FieldMap); u32 x; u32 y } }
+
+ShinePlayer::smo_ply_CostumShieldChargeDecrease(...)                                            @ FUN_00520aa0   (vt 0xf10)
+    identical with costumeShieldDec_Normal, sp_CostumShieldChargeing, 0x3066 / 0x34C8 and the break slot fixed to 29 (SHIELDACC)
+```
+
+The global flags make the normal-swing branch spend at most one charge per player tick: the flag is shared by all players,
+but every swing damage runs inside its owner's `so_Routine` (`nadt_Routine`, Z03 §3.2), right after that routine set it
+*(inferred from the call chain)*. `forceSend` is 0 at the only call site.
+
+Because the skill branch is dead, skill hits never spend a charge although they carry the "charged" flags (§4.1).
+
+### 4.3 Flushing the counter: packets
+
+```pseudo
+ShinePlayer::sp_CostumWeaponChargeDecrease_ToClient(p)                 @ FUN_0051a500
+    if sp_CostumWeaponChargeing.CostumCharged ≥ 100 000 000: return     # the sentinel
+    p (game stream, vt 0x2fc) ← 0x3037 NC_ITEM_WEAPONENDURESET_CMD { u32 ChargedNumber = CostumCharged }     # 6 bytes incl. opcode
+ShinePlayer::sp_CostumWeaponChargeDecrease_ToDB(p)                     @ FUN_0051a610
+    same test; CharDB (sock2gameDB) ← 0x348F NC_ITEMDB_WEAPONENDURESET_CMD { u64 WeaponKey = cell key; u32 ChargedNumber }   # 0xE bytes
+sp_CostumShieldChargeDecrease_ToClient / _ToDB                         @ FUN_0051ab10 / FUN_0051ac20
+    the same with sp_CostumShieldChargeing: 0x3066 NC_ITEM_SHIELDENDURESET_CMD { u32 ChargedNumber },
+    0x34C8 NC_ITEMDB_SHIELDENDURESET_CMD { u64 ShieldKey; u32 ChargedNumber }
+```
+
+Layouts *(pdb2016)* `PROTO_NC_ITEM_WEAPONENDURESET_CMD` / `…SHIELD…` { ulong ChargedNumber } and
+`PROTO_NC_ITEMDB_WEAPONENDURESET_CMD` / `…SHIELD…` { SHINE_ITEM_REGISTNUMBER key; ulong ChargedNumber }, as sent.
+CharDB stores the value with `p_Item_CostumWeapon_Endure_Set` (both opcodes, no answer: D03 §6.6).
+
+Senders besides the decrease (every 10 charges):
+
+| Caller | Sends |
+|---|---|
+| `ShinePlayer::smo_BashStop` @ FUN_0042e840 (vt 0xed8, every stop of normal attacking, Z03 §3.4) | both `_ToClient` and both `_ToDB` (after `CeaseFireSender::cfs_Send`) |
+| `ShinePlayer::so_Unmark` @ FUN_00558900 (leaving the zone / logout) | both `_ToDB` |
+
+So the client's display and the DB lag by up to 9 charges while attacking and are corrected when attacking stops; a zone
+crash loses up to 9 charges of use (in the player's favour).
+
+```pseudo
+ShinePlayer::sp_NoticeItemBreak(p, box, slot)              @ FUN_00519370
+    p (data stream, vt 0x2f8) ← 0x3038 NC_ITEM_ITEMBREAK_CMD { ITEM_INVEN slot = box << 10 | slot }     # 4 bytes incl. opcode
+
+ShinePlayer::sp_ItemDelete(p, cell, box, slot, date)       @ FUN_00451090
+    (copies so_CharName into a name buffer, unused) → sp_DestroyItem(p, p.handle, cell, ITEM_INVEN(box, slot))
+ShinePlayer::sp_DestroyItem(p, handle, item, inven) ("sp_DestroyItemA")   @ FUN_00566f00
+    CharDB ← 0x3459 NC_ITEMDB_DESTROY_REQ { u16 handle, u32 charNo, u16 lockIndex, u8 count:7 = 1, …, @0x19 u64 key }   # 0x21 bytes
+    lock the cell (lock list vt 0x44, with an empty item as the new content); lockIndex += 1
+    # 0x345A applies the removal (Z05 §6.4); so_RecalcEquipParam then resets the pointer to the sentinel (§4.1)
+```
+
+Client: `ItemRepairTask::On_Recv_NC_ITEM_WEAPONENDURESET_CMD` (FUN_0066c750) sets the counter of
+`Inventory::GetEquipedWeaponAcc` (equipment slot 13, else 11, item class 0x1A) through the item's vt 0x50;
+`…SHIELDENDURESET_CMD` (FUN_0066c780) the same for `GetEquipedShieldAcc` (slot 29, class 0x25). `GameFrameWork::On_NC_ITEM_ITEMBREAK_CMD`
+(FUN_004ab710): for an equipment slot (type 8) whose item is the equipped weapon skin, system message TextData2
+0x0F3D5672 "Weapon Costume has been destroyed."; a broken shield skin gets no message.
+
+### 4.4 `sp_CheckBashAndEquipment`: skin without its base item
+
+```pseudo
+ShinePlayer::sp_CheckBashAndEquipment(p) → bool           @ FUN_00562160   (the plan's "WeaponChargeOk"; name pdb2016)
+    for each non-empty equipment cell s:
+        s == 11 and equipment[10] empty  → return false
+        s == 13 and equipment[12] empty  → return false
+        s == 29 and equipment[12] empty  → return false        # so_RecalcEquipParam pairs 29 with slot 10 (original bug) Z17-B16
+    return true
+```
+
+Callers clear `sp_SkillControl.normalattackcontinue` (bit 0 of p+0x2928c, Z03's "attackFlags & 1") when it returns false:
+`sp_NC_BAT_BASHSTART_CMD` @ FUN_00430fa0 (Z03 §3.1), `sp_NC_BAT_SKILLBASH_FLD_CAST_REQ` @ FUN_0057f400 and
+`sp_NC_BAT_SKILLBASH_OBJ_CAST_REQ` @ FUN_0057fa50 (Z03 §5.5 and its OBJ twin). It does not look at charges: with a skin worn over nothing the
+character still attacks but does not keep auto-attacking *(inferred: what `normalattackcontinue` drives is Z03's)*.
+
+### 4.5 The action-item box (premium emote items)
+
+`ci_ActionBox` (p+0xf758, inventory type 15 = `0x3C00`) is an `ItemActionItemBox` (ctor @ FUN_00644b00): 42 cells
+`ItemInventorySmallCell<ItemInform_ActionItem>` (0x14 bytes: `ItemInform_ActionItem` { u64 iiai_RegistNumber, u16 iiai_ItemID,
+u32 iiai_Attribute (= deletetime) } + `ItemAttributeClass* iisc_AttrProc`) *(pdb2016)*. `isb_BagSizeInput` @ FUN_00644b60 and
+`isb_BagSizeOutput` @ FUN_00644b70 both return 42; `isb_GetInventoryCell(i)` @ FUN_00644b80 returns the cell, or for i ≥ 42 the
+static `iaib_Default` reset to item 0xFFFF. Cell helpers: `sii_Clear` @ FUN_006433f0 (item 0xFFFF), `sii_GetDeteleDateTime`
+@ FUN_00643400 (the attribute), `sii_Import` / `sii_Export` @ FUN_00643410 / FUN_00643440 (key, id, attribute ↔
+`ItemTotalInformation`), `isb_Clear` @ FUN_00452550 (all cells empty, default attribute class), `isb_FindEmpty` @ FUN_0059b7c0
+(first empty cell below the input size, else −1), `isb_ItemCount_Output` @ FUN_004559c0 (non-empty cells), `isb_Store` @
+FUN_00520740 (import + attribute class from `itmattcontainer[itemid]`; the DB-answer path, Z05 §1.4 `CellChangeSmall`).
+Loading at login and the `0x1047` client list: Z12 §6.7 (`isb_Initializetotal` @ FUN_0044d5d0, `isb_FullBufferItem2Client`
+@ FUN_0044d6d0, part mark 0x20). Saving to the WM: `so_SaveItem_Part` @ FUN_00456030 (Z01 §8.4 `0x4013`) sends the box as its
+fourth part, `nPartMark` 0x22, through `isb_FullBufferItem2Server` @ FUN_00455860 (every non-empty cell as a
+`PROTO_ITEMPACKET_TOTAL` with location `15 << 10 | slot`, chunks of ≤ 8000 bytes).
+
+2016 data: the 75 class-27 items are the `Emotion_ChargdDance*` items; each has a ChargedEffect row with `EffectEnum` 9
+(`EE_COSTUM`), `EffectValue` 1 and `KeepTime_Hour` 720 (25 items), 168 (25), 24 (1) or 0 (24, permanent). A new action item
+gets attribute 0 (`iac_itemcreate` = the folded `ItemAttrCls_MiniHouseSkin::iac_itemcreate` @ FUN_0063f1c0), i.e. "not started".
+
+```pseudo
+0x3015 item use of a class-27 item → UseEffect::UseItemActionItem::uib_DirectUse(p, slot, item)   @ FUN_0059be50   (Z04 §6.3 table)
+    sp_Move4Activ(p, slot, item, 15); return true                 # handled; no cast
+
+ShinePlayer::sp_Move4Activ(p, invSlot, item, box)          @ FUN_0059b8e0
+    cell = inventory[invSlot]
+    if cell and cell.key == item.key:
+        if box ≠ 15: return                                    # (only 15 is ever passed)
+        to = ci_ActionBox.isb_FindEmpty(p);  if to < 0: return  # box full: no answer at all (original bug) Z17-B17
+        CharDB ← 0x3428 NC_ITEMDB_RELOC_REQ { u16 handle, u32 charNo, u32 fromOwner = charNo, u32 toOwner = charNo, u16 lockIndex,
+                 u64 key, ITEM_INVEN to = 0x3C00 | to, ITEM_INVEN from = 0x2400 | invSlot, u16 itemid, u32 lot = attr.vt[0x1c] }  # 0x24 bytes
+        lock both cells (lock list vt 0x30 and vt 0x44); lockIndex += 1      # 0x3429 moves the item (Z05 §4)
+    p ← 0x3016 NC_ITEM_USE_ACK { 0x700 (success), …, invenType 9 } (so_ply_ItemUseResultPacket vt 0x91c, Z04 §6)
+        # also when the cell or key did not match and nothing was moved (part of Z17-B17)
+```
+
+```pseudo
+NC_ITEM_RELOC_REQ 0x300B with from.type 15 → ShinePlayer::sp_ItemReloc @ FUN_00536780 (Z04 §4.1) case 15 →
+ShinePlayer::sp_SmallItemReloc<ItemInform_ActionItem>(p, ci_ActionBox, req)     @ FUN_00535e10
+    to.type ≠ from.type:                          ack 0x242          # only moves inside the box
+    from.slot ≥ output size or to.slot ≥ input size (42):   ack 0x244
+    from cell empty (or a cell missing):          ack 0x245
+    to cell empty:  CharDB ← 0x3428 RELOC_REQ { …, key, to, from, itemid, lot } (0x24 bytes); reserve to ← item, from ← empty
+    else:           CharDB ← 0x342B NC_ITEMDB_EXCHANGE_REQ { …, keyA @0x12, to @0x1a, keyB @0x1c, from @0x24, idA, idB, lotA, lotB } (0x32 bytes);
+                    reserve the swap (a missing attribute class → ack 0x247, unreachable: it falls back to the default)
+    lockIndex += 1                                 # answers 0x3429 / 0x342C: Z05 §4
+    # errors: so_SendErrorCode(12, 0x0C, code) = 0x300C NC_ITEM_RELOC_ACK; client "Failed to move the item." (Z04 §4.1)
+```
+
+Starting and ending the time (from the per-minute player check, Z09 §2.4 `PerMinutePlayerChecks`):
+
+```pseudo
+ShinePlayer::sp_SmallItemActivCheck<ItemInform_ActionItem>(p, box, 15)   @ FUN_005697e0   (profiler "sp_ActionItemActivCheck")
+    for slot in 0 .. box.output size − 1:
+        skip if the cell (15, slot) is locked (lock list vt 8), empty, or its deletetime.year ≠ 0
+        row = ChargedEffect(itemid); skip if none                          # such an item never starts and never expires
+        deletetime = row.KeepTime_Hour == 0 ? 0x76BBECFF (year 255, 12-31 23:59: "never")
+                                            : now (chargeditemcheck.ct_Current) + KeepTime_Hour hours (mktime; year = tm_year − 100)
+        lock the cell (lock list vt 0x44)
+        CharDB ← 0x3449 NC_ITEMDB_ITEMCHANGE_REQ { u16 handle, u32 charNo, u16 lockIndex, u64 key, u16 itemid, attribute }
+                 # length 0x14 + the attribute class's size (vt 0xc; 4 for class 27); answer 0x344A (Z05 §5.4)
+        lockIndex += 1
+        # the assert text on a failed length is copied: "sp_MiniHouseActCheck : Packet Too Long"
+
+ShinePlayer::sp_SmallChargedItemLimitCheck<ItemInform_ActionItem>(p, box, 15)   @ FUN_0056b900
+    for each cell with deletetime.year ≠ 0 and deletetime < now (year, month, day, hour compared ≤, minute <):
+        sp_SmallItemDelete(p, cell, 15, slot, &deletetime)
+
+ShinePlayer::sp_SmallItemDelete<ItemInform_ActionItem>(p, cell, box, slot, date)   @ FUN_00569b80
+    sii_Export(cell) → sp_DestroyItem(p, p.handle, item, ITEM_INVEN(box, slot))     # 0x3459 as in §4.3; answer 0x345A (Z05 §6.4)
+```
+
+The clock therefore starts at the first minute check after the item lands in the box (time-limited emotes count from
+being moved there, not from purchase), and an item lives `KeepTime_Hour` hours from then, to the minute. Using an emote
+from the box (`0x2067`, Z02 §9.3) neither checks nor changes the date.
+
+`NPCAction::GTItemAction::exe` @ FUN_005c1120 (the plan asked where it belongs) is a guild-tournament NPC action
+(`"GTIEffect"`, Z09 §16.5): it calls `GuildTournamentSystem::CreateItemEffect` (Z16) and has nothing to do
+with item actions or charges.
+
+---
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1102,3 +1361,7 @@ next `so_SetRegistNumber`. Map changes inside one zone process do not leave the 
 | Z17-B11 | `0x10D0` `wms_NC_CHAR_ITEMACTIONCOOLTIME_ZONE_CMD` FUN_0044e710 | `_actions.find(actionID)` dereferenced without an `end()` test (same pattern as B7) | a stored id that is no longer in `ItemAction.shn` reads the map head node: bogus group / crash | skip unknown ids |
 | Z17-B12 | `so_ply_EnchantActionUse` FUN_00562cb0 + `0x3499` FUN_005233d0 | the emptied socket keeps `{gemID, 0}` and the gem's observer until CharDB answers | each further success in that window asserts "RestCount Empty", re-sends `0x3046` (0) and another lock + `0x3498`; a refused removal leaves the gem action firing without charges | delete the gem's action (or mark the socket empty) when the count reaches 0 |
 | Z17-B13 | player teardown (`~ItemActionObserveManager` FUN_005592c0; `Clear` FUN_005d16e0 called only by `sp_ItemActionSetup`) | a logged-out player's observers are not returned to the 5000-slot `ItemActionObserveBuffer` | slots stay used until the same pooled player object logs in again; with many distinct player objects (pool 1500) the buffer can fill → "Buffer Full", actions silently missing for new logins *(inferred: effect depends on load)* | `Clear` on logout |
+| Z17-B14 | `smo_ply_CostumWeaponChargeDecrease` / `…Shield…` FUN_00520840 / FUN_00520aa0 | the skill branch (`isSkill`, spend only for a damaging `sdi_DamageRule`) has no caller: `smo_SkillBlast` FUN_00581160 sets the "costume charged" flags on skill hits but never calls vt 0xf0c / 0xf10 | skills use a costume weapon / shield skin for free; only normal swings spend charges | call the decrease with `(0, skill, true)` from the skill damage path |
+| Z17-B15 | `smo_ply_CostumWeaponChargeDecrease` FUN_00520840 | at 0 charges it deletes equipment slot 13 if occupied, else 11, not the cell `sp_CostumWeaponChargeing` points at | with skins in both 11 and 13 where only 11 is the counted one, the slot-13 skin is destroyed and the worn-out one stays; latent in 2016 (`so_RecalcEquipParam` lets the later slot 13 win whenever both are charged skins) | delete the counted cell |
+| Z17-B16 | `sp_CheckBashAndEquipment` FUN_00562160 | pairs the shield skin (slot 29) with slot 12 RIGHTHAND, while `so_RecalcEquipParam` pairs it with slot 10 LEFTHAND | a shield skin worn without a shield does not stop auto-attacking (and one worn over a shield without a right-hand item does) | test slot 10 for slot 29 |
+| Z17-B17 | `sp_Move4Activ` FUN_0059b8e0 (use of a class-27 action item) | box full (`isb_FindEmpty` < 0): returns without any `0x3016`; cell missing or key mismatch: sends `0x3016` with `0x700` (success) although nothing moved | the client's item use is never answered when the 42-cell box is full (no "box full" message), and a stale request is reported as done | answer an error code in both cases |

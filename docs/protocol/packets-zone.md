@@ -5716,11 +5716,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_WeaponEndureChangeAck` (`FUN_00
 
 ### `0x3037` NC_ITEM_WEAPONENDURESET_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_WEAPONENDURESET_CMD`, 4 bytes
+**Verified layout** (basis: zone ShinePlayer::sp_CostumWeaponChargeDecrease_ToClient FUN_0051a500 (6 bytes incl. opcode, game stream); callers smo_ply_CostumWeaponChargeDecrease FUN_00520840 (every 10th charge) and smo_BashStop FUN_0042e840; not sent for counters >= 100000000 (the not-charged sentinel); PDB 2016 PROTO_NC_ITEM_WEAPONENDURESET_CMD; client ItemRepairTask::On_Recv_NC_ITEM_WEAPONENDURESET_CMD FUN_0066c750)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | ChargedNumber |  |
+| 0 | u32 | ChargedNumber | charges left on the worn weapon skin; the client sets it on the equipped weapon skin (slot 13, else 11) |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CostumWeaponChargeDecrease_ToClient` (`FUN_0051a500`) · payload 4 bytes
 
@@ -5730,11 +5730,11 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CostumWeaponChargeDecrease_ToClient
 
 ### `0x3038` NC_ITEM_ITEMBREAK_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_ITEMBREAK_CMD`, 2 bytes
+**Verified layout** (basis: zone ShinePlayer::sp_NoticeItemBreak FUN_00519370 (4 bytes incl. opcode, data stream); only callers the costume charge decreases FUN_00520840 / FUN_00520aa0 at 0 charges; PDB 2016 PROTO_NC_ITEM_ITEMBREAK_CMD; client GameFrameWork::On_NC_ITEM_ITEMBREAK_CMD FUN_004ab710)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | slot | ITEM_INVEN (union: Inven, str) |
+| 0 | u16 | slot | ITEM_INVEN: box 8 (equipment) << 10 | slot 13 / 11 (weapon skin) or 29 (shield skin); client: 'Weapon Costume has been destroyed.' (TextData2 0x0F3D5672) only when it is the equipped weapon skin |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_NoticeItemBreak` (`FUN_00519370`) · payload 2 bytes
 
@@ -6108,11 +6108,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ShieldEndureChangeAck` (`FUN_00
 
 ### `0x3066` NC_ITEM_SHIELDENDURESET_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_SHIELDENDURESET_CMD`, 4 bytes
+**Verified layout** (basis: zone ShinePlayer::sp_CostumShieldChargeDecrease_ToClient FUN_0051ab10 (6 bytes incl. opcode, game stream); callers smo_ply_CostumShieldChargeDecrease FUN_00520aa0 (every 10th charge) and smo_BashStop FUN_0042e840; PDB 2016 PROTO_NC_ITEM_SHIELDENDURESET_CMD; client ItemRepairTask::On_Recv_NC_ITEM_SHIELDENDURESET_CMD FUN_0066c780)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | ChargedNumber |  |
+| 0 | u32 | ChargedNumber | charges left on the worn shield skin (slot 29) |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CostumShieldChargeDecrease_ToClient` (`FUN_0051ab10`) · payload 4 bytes
 
@@ -12673,6 +12673,15 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 6 | u32 | guildregnum | guild or academy number |
 | 10 | u8 | nOpenType |  |
 
+### `0x348f` NC_ITEMDB_WEAPONENDURESET_CMD (Z→DB)
+
+**Verified layout** (basis: zone ShinePlayer::sp_CostumWeaponChargeDecrease_ToDB FUN_0051a610 (0xE bytes incl. opcode, sock2gameDB); callers the decrease (every 10th charge), smo_BashStop, so_Unmark FUN_00558900; PDB 2016 PROTO_NC_ITEMDB_WEAPONENDURESET_CMD; CharDB FUN_0041ff10 (D03 §6.6), no answer)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | WeaponKey | item key of the weapon skin |
+| 8 | u32 | ChargedNumber | charges left |
+
 ### `0x3498` NC_ITEMDB_ENCHANT_REMOVE_GEM_REQ (Z→DB)
 
 **Verified layout** (basis: zone ShinePlayer::so_ply_EnchantActionUse FUN_00562cb0 (0x26 bytes incl. opcode; the manual removal sender is Z04 §10.2); PDB 2016 PROTO_NC_ITEMDB_ENCHANT_REMOVE_GEM_REQ; CharDB FUN_004236e0 (D03))
@@ -12751,6 +12760,15 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 8 | u64 | EraseItemKey |  |
 | 16 | bytes[38] | CreateItem | PROTO_ITEM_CREATE {u32 owner, MAPPOS map, u16 location, u64 key, u16 id, u16 attr} |
 | 54 | bytes | attributes | of the created card |
+
+### `0x34c8` NC_ITEMDB_SHIELDENDURESET_CMD (Z→DB)
+
+**Verified layout** (basis: zone ShinePlayer::sp_CostumShieldChargeDecrease_ToDB FUN_0051ac20 (0xE bytes incl. opcode, sock2gameDB); same callers as 0x348F; PDB 2016 PROTO_NC_ITEMDB_SHIELDENDURESET_CMD; CharDB FUN_004201c0 (D03 §6.6), no answer)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | ShieldKey | item key of the shield skin |
+| 8 | u32 | ChargedNumber | charges left |
 
 ### `0x401c` NC_CHARSAVE_AUTO_PICK_SAVE_REQ (Z→DB)
 
