@@ -9170,6 +9170,17 @@ raw long frame, len 0x143 + n
 
 sent on every map login once 0x0844 arrived
 
+### `0x0849` NC_MISC_SERVER_TIME_NOTIFY_CMD (WM→C)
+
+**Verified layout** (basis: wm FUN_00437e30, FUN_00432e10; client FUN_004a4420)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | tm | dCurrentTM | localtime() at send time (9 × i32: sec, min, hour, mday, mon, year, wday, yday, isdst) |
+| 36 | i8 | nTimeZone | (mktime(local) − mktime(gmtime)) / 3600, truncated; standard-time offset (inferred) |
+
+37 bytes. Every 60 s to all in-game clients (inGame +0x704 == 1), first send aligned to the next full minute; once per character login at the first 0x180C (flag +0x1ed00 set by CharDB 0x1007). Client shows it as "%H:%M GMT(+n)" (FUN_0057d8f0)
+
 ### `0x0860` NC_MISC_SPAMMER_REPORT_ACK (WM→C)
 
 **Verified layout** (basis: wm FUN_00417ef0; client FUN_0049cb10)
@@ -10980,6 +10991,33 @@ size 4
 | 14 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 16 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
 
+### `0x441c` NC_QUEST_RESET_TIME_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00439d20 (from FUN_0043a120))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | tResetYearQuest | 1 Jan 00:00 local |
+| 4 | i32 | tResetMonthQuest | 1st of the month 00:00 |
+| 8 | i32 | tResetWeekQuest | Monday 00:00 |
+| 12 | i32 | tResetDayQuest | today 00:00 |
+
+16 bytes, broadcast to all zones at the first main-loop pass after local midnight
+
+### `0x441d` NC_QUEST_RESET_TIME_ZONE_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00439e30 (from 0x101C handler))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | = charregistnumber of the zone's 0x101C NETPACKETZONEHEADER (the zone puts charNo there) |
+| 4 | i32 | tResetYearQuest |  |
+| 8 | i32 | tResetMonthQuest |  |
+| 12 | i32 | tResetWeekQuest |  |
+| 16 | i32 | tResetDayQuest |  |
+
+20 bytes, per character at map login
+
 ### `0x5833` NC_KQ_LINK_TO_FORCE_BY_BAN_CMD (WM→Zone)
 
 **Verified layout** (basis: wm FUN_004531a0)
@@ -11183,6 +11221,14 @@ size 0x553
 | 0 | u16 | nEventNo |  |
 
 size 2
+
+### `0x0804` NC_MISC_HEARTBEAT_REQ (WM→peer)
+
+**Verified layout** (basis: wm FUN_0042fda0)
+
+Empty payload.
+
+raw 3 bytes 02 04 08; sent once after 30 s without any received packet; no packet within 180 s more → the WM closes the link ("ERROR - HEARTBEAT OVERTIME")
 
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→zone)
 
