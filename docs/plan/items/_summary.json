@@ -216,6 +216,14 @@
   "\u2013"
  ],
  [
+  "Z20",
+  2,
+  "Zone: skill data box loader (SkillDataBox / PassiveDataBox, SkillDataIndex build; added by Z11)",
+  "Z01, Z03",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "D01",
   2,
   "Account and AccountLog servers",

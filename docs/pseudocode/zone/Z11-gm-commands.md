@@ -58,8 +58,12 @@ ListIter_AmpCmdArgument(it, handle, admin, line)                       @ FUN_004
         AmpersandCommandLog << "[" << admin.so_CharName() (vt 0x56c) << "] " << line << LF
     args[i][0] = 0 for i in 0..11
     tokens = tokenize(line, delimiters " ", preserve "", quote "\"", escape "\\")
-        # std::string tokenizer (the CodeProject `tokenize` signature, *(inferred)* from the arguments):
-        # words separated by spaces, "…" keeps spaces inside one word, \ escapes
+        # tokenize(str, out, delimiters, preserve, quote, escape)  @ FUN_005921c0 (std::string tokenizer), per character c:
+        #   c in escape: take the next character literally (a trailing escape is dropped)
+        #   c in quote (not escaped): opens a quoted run, only the same quote character closes it; the quote is dropped
+        #   c in delimiters (not escaped, not quoted): ends the current word (empty words are not stored)
+        #   c in preserve (same conditions): ends the word and is stored as its own one-character word (unused here)
+        #   else c is appended; at the end a non-empty word is stored. An unclosed quote runs to the end of the line.
     if tokens is empty: return                             # cannot happen: the line starts with '&'
     liaca_command = tokens[0] (strncpy 20 bytes into the zeroed Name5)
     n = min(len(tokens) − 1, 12)                           # extra words are dropped
@@ -206,7 +210,7 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 35 | `&mb` | ac_MobBreed_simple `0041b790` | 50 | `<Mob>` | spawn one mob at the GM, once | mob appear (Z09); 0x2011 | §4.2 |
 | 36 | `&fullpoint` | ac_fullpoint `0041be90` | 50 | — | CurHP/CurSP = max | none | §4.4 |
 | 37 | `&summonplayer` | ac_summonplayer `0041bf50` | 100 | `<charName>` | link a player of this zone to the GM's position; refused in a mini-house | 0x1809 or zone change (Z01 §7.1) | §4.5 |
-| 38 | `&performance` | ac_performance `0041c8d0` | 10 | `[n]` (unused) | print the main-loop rate | 0x2011 | §4.5 |
+| 38 | `&performance` | ac_performance `0041c8d0` | 10 | `[n]` (default 10) | print the main-loop rate; profile every function over the next n ticks into `FunctionPerformance.txt` | 0x2011 | §4.5 |
 | 39 | `&sethp` | ac_Sethp `0041c9d0` | 100 | `<n>` | CurHP = n clamped to 1…MaxHP | none | §4.4 |
 | 40 | `&setsp` | ac_Setsp `0041cad0` | 100 | `<n>` | CurSP = n clamped to 1…MaxSP | none | §4.4 |
 | 41 | `&dist` | ac_Dist `0041cbc0` | 10 | — | distance to the target in grid units | 0x2011 | §4.5 |
@@ -296,7 +300,7 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 125 | `&PlayIns` | ac_PlayInstanceDungeon `00421190` | 100 | — | on an instance map: start the instance script on a free instance keyed {PARTY, GM charNo} (B28) | — | §7.2 |
 | 126 | `&bigbang` | ac_BigBang `004240d0` | 100 | `<mapName> <scriptName>` | KQ-end on a map: clear objects (mask 0x3b0), stop the script film, close all doors | 0x2011 "Invalid map name"; despawns (Z09) | §8.4 |
 | 127 | `&alllearnskill` | ac_AllLearnSKill `004212e0` | 100 | — | teach every active / passive skill whose book fits the GM's class and level and that is not known (persistent) | 0x4801 per skill to the Character DB (→ 0x4804) | §7.3 |
-| 128 | `&levelup` | ac_LevelUp `00421710` | 100 | `[<n>]` (1) | n level-ups without EXP and without the level limit (B30); persistent | 0x240C, 0x240D, WM 0x1074 / 0x400E, GameLog 0x041E, DB save, 0x4810 | §7.3 |
+| 128 | `&levelup` | ac_LevelUp `00421710` | 100 | `[<n>]` (1) | n level-ups without EXP and without the level limit (B30); persistent | 0x240C, 0x240D, 0x2446, WM 0x1074 / 0x400E, GameLog 0x041E, DB save, 0x4810 | §7.3 |
 | 129 | `&showallchar` | ac_ShowAllChar `00423480` | 100 | `[<mapName>]` | list the players of this zone on that map (default the GM's): handle, name, x/y | 0x2011 per player | §8.1 |
 | 130 | `&루아인수` | ac_LuaSec `0041e6d0` | 100 | — | show the Lua certification counters | 0x2011 | §5.7 |
 | 131 | `&testlink` | ac_TestLink `004217e0` | 50 | — | run the 0x181F multi-link request for "RouCos02" (needs a clicked link NPC) | 0x1820 or a map link | §7.2 |
@@ -795,7 +799,20 @@ both are dead.
         # the map is always the GM's (the target is in sight, so the same map)
 &performance [n]   ac_performance                                     @ FUN_0041c8d0
     wall "Main performance : %g loop/sec"  (PerformanceChecker::pc_loopPERsecond(&performancechech): main-loop rate)
-    n = args[0] ? ac_Scanf(args[0]) : 10; never used (original bug) Z11-B11
+        # pc_loopPERsecond FUN_004cee50: ring of 32 tick stamps (0.1 s); rate = 32 / ((newest − oldest) / 10)
+    n = args[0] ? ac_Scanf(args[0]) : 10
+    FunctionProfiler::PerformanceRecorder::pr_SetCount(&_PerformanceRecorder, n)        @ FUN_00468180
+        # pr_CheckLoopCount_Command = n; every FunctionPerformance entry's counters (exec count, entry, total) = 0
+# the function profiler (`_PerformanceRecorder`, every handler's pr_Entrance / pr_Exit pair):
+pr_MainLoopHead (start of each main-loop tick)            @ FUN_004678e0
+    Command > 0: Real = Command; Command = −1                 # arms the profile for the next n ticks
+pr_Entrance(name) / pr_Exit(name)                         @ FUN_004682d0 / FUN_00468360
+    only while Real > 0: find-or-insert the entry by name; Entrance counts the call and stamps QueryPerformanceCounter;
+    Exit adds the elapsed counter to the entry's total
+pr_MainLoopTail (end of the tick)                         @ FUN_004681f0
+    Real ≥ 0: Real == 0 → pr_Report; Real −= 1
+pr_Report                                                 @ FUN_004680d0
+    FunctionPerformance.txt (cwd, overwritten): "Function\tExec Number\tTotal Second\tSecond/exec", one line per entry
 &block   ac_BlockMatrix                                               @ FUN_0041ccb0
     calls FUN_00549070 (a bare `ret 4`, the folded empty body) with the map's block info (+0x14) and args: nothing
     # the block-matrix dump of the development build is compiled out *(inferred)*
@@ -1552,6 +1569,8 @@ WM or any client. Notice texts are Korean (CP949), translated here.
     raid == NULL: wall "레이드 생성 실패" ("Raid creation failed"); return
     wall "레이드 전환 성공" ("Raid conversion succeeded")
     it = Raid::Begin(raid); ++it                                        # position {party 0, slot 1} (Raid::iterator::operator++ FUN_0063d080)
+        # Raid::Begin FUN_0063d200 = {raid, party 0, slot 0}, Raid::End FUN_0063d220 = {party 4, slot 0}; the iterator walks
+        # 4 parties × 5 slots; iterator::GetCharRegistNo FUN_0063d4d0: −1 for an empty slot, false without a party
     Raid::SlotChangeMember(raid, charNo at it, party index 1, slot 0, &err)   @ FUN_0063dc10
         # the second member of the GM's party leaves it (CParty::MemberLeave) and joins raid party 1 (CParty::MemberJoin);
         # errors (result not checked): no member there (charNo −1) 0x1F48, target party missing 0x1F4A, slot < its
@@ -1675,7 +1694,7 @@ ShinePlayer::so_AmpersandCommand_LevelUp(p)                            @ FUN_004
         Character DB ← 0x986B NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_REQ { u16 handle, u32 charNo, u32 charNo, u32 academyNo, u8 level }
     free = so_ply_TotalSkillEmpower (vt 0x6b8) − csl_EmpowerSummary(p.sp_SkillList)
     free > 0: p ← 0x4810 NC_SKILL_EMPOWPOINT_CMD { u8 restempow = free }
-    sp_StatRemainSend(p) (stat points); vt 0x20(level); so_ply_SaveFame (vt 0x450); so_ply_ChangeFame (vt 0x44c)
+    sp_StatRemainSend(p) (stat points); so_GainFame(level) (vt 0x20, FUN_0042df00: fame += new level while fame < 1,000,000, capped there, then 0x2446 NC_BAT_FAMEGAIN_CMD {u32 famegain} to the player); so_ply_SaveFame (vt 0x450); so_ply_ChangeFame (vt 0x44c)
     p.sp_NextSaveExp = sp_NextSaveExperience(p); brief info Level = level; vt 0xb18 (so_Gamble_ChangeExchangedCoin, PDB name of the slot)
 ```
 
@@ -1966,7 +1985,7 @@ The file goes to the zone's working directory, one per hour; the GM sees the sam
     best: best.so_NPCRevive(gm)  (vt 0xa7c)                              @ FUN_00452430 (Z09 §5.9)
         gm.so_ply_Notice("Changed from <old mode> to 2")
         best.smo_Mode.mode = 2 (alive); so_AllOfRange(best, sight, so_BroadcastBriefInfo FUN_0057acd0)
-            # every object in the NPC's sight range is sent its brief again (so_SendMyBriefInfo vt 0x4c8, Z09)
+            # every object in the NPC's sight range is sent its brief again (so_SendMyBriefInfo vt 0x4c8, NPC form FUN_00556590: Z02 §5)
     no NPC near: nothing (no message)
 ```
 
@@ -2212,6 +2231,110 @@ FUN_00422cb0, FUN_00422d30, FUN_00423a20) are the generic list of the `ampcmd` t
 compare function, used by the map lookups above); `AxialListMobList` dtor FUN_004246e0; FUN_0042390c is the tail of
 `std::string::_Copy` FUN_00423830 (CRT).
 
+## 9. Helpers reached by the commands (sweep)
+
+The sweep ran `coverage.py`'s reachability (depth 3, same filters) with every `AmpersandCommand` function and the
+§1 dispatch functions as roots (Z11 has no scope table, so `coverage.py Z11` itself does not apply). This section
+documents the small helpers it found that no doc described; the larger subsystems are in "Coverage boundary".
+
+### 9.1 Parser and command list
+
+- `tokenize` FUN_005921c0: the word splitter of §1.2 (rules there).
+- `List<AmpersandCommandElement>` dtor FUN_00419a10 / scalar deleting dtor FUN_00419a40 (free `l_Array`) and
+  `ListIteratorDefault<AmpersandCommandElement>` dtor FUN_00419a30: the `ampcmd` list (§1.3), run at exit only.
+
+### 9.2 Object, map and quest lookups
+
+```pseudo
+ShineObjectManager::som_FindNPC(u16 mobId)               @ FUN_005505d0   (&fnpc §7.5)
+    walk som_NPC with a ShineMobIDFinder: the first NPC whose MobInfo id = mobId, else null
+ShineObjectManager::som_FindNPC(Name5 name)              @ FUN_00550500   (&flagcapture §6.3)
+    same walk with a ShineCharIDFinder (object name compare)
+ShinePet::spt_FindMaster(pet) → ShineMobileObject*       @ FUN_00419a80   (&getpetinfo / &setpetinfo §7.7)
+    m = pet.spt_pMaster (+0x256c); null, m.so_IsEmpty() (vt 0x300), m.smo_GetMode() (vt 0x484) ∈ {0, 7}: null
+    return m only when m.so_Field (+0x7a) == pet.so_Field (same map; read in the disassembly)
+MapClusterManager::ClusterManager::cm_FindMapCluster(name) @ FUN_00486580 (&IDTimeChange §3.3)
+    builds a temporary MapCluster(name) on the stack (0xa028 bytes; ctor FUN_0049f400, dtor FUN_0049ed20) as search key,
+    ListSearchSame with mc_CompName: first cluster of that map name, else null
+FieldContainer::fc_GetInstanceDungeonInfoByMapName(Name3 map, ID_LEVEL_TYPE lv) @ FUN_004844e0 (&IndunReload §3.3, &PlayIns §7.2)
+    linear scan of fc_InstanceDungeon rows: MapIDClient (12 chars) == map and ModeIDLv == lv, else null
+KQContribute::KQContributeList::kqcl_FindKQ(handle)      @ FUN_00499ca0   (&amibusy §6.6)
+    linear scan of kqcl_List (PlayerList entries of 0x14 bytes) for pl_KQHandle == handle, else null
+ShineMobileObject::smo_IsActiveMode(o)                   @ FUN_0055d780   (&gtieffect target filter, Z16)
+    true when bit smo_GetMode() of the static mask 0x56 is set: modes 1, 2, 4, 6
+```
+
+Accessors: `ShinePlayer::sp_MoverSystem_Type` FUN_0045d540 (`sp_RideCast.eMoverSystemType`, §3.1 `&hide`; the merged
+name `GetRideKind` was ours, the PDB name is in `names/zone/Z11.json`), `ZoneServer::zs_GetServerGroup` FUN_005a9950
+(`zs_serverinfo.servergroup`, §6.3 observer link), `CGambleObject::go_Get_MaxEnterPlayerCnt` FUN_00591ff0,
+`TickTimer::GetRestDelayTimeToSecond` FUN_00592000 (`(m_DelayTime − m_CurDelayTime) / 10` s, 0 when expired),
+`AbstateElementInObject::aeo_CompName` FUN_004065c0 (compare by `aeo_Index`) and the `SetItemAbstateEffect` ctor
+FUN_00510350 (4 slots, index 0, `Argument_Base1000` 1000), both inside `asl_Abstate_IsSet` (§8.3),
+`AxialListPacketBroadcastByGuild` ctor FUN_00428cd0 (broadcast filtered by `m_GuildRegNum`, §6.3 guild skill).
+
+### 9.3 Skills, inventory and items
+
+```pseudo
+CharaterSkillList::csl_IsLearn(list, id)                 @ FUN_00446630   (&alllearnskill §7.3)
+    binary search (std::_Lower_bound, cs_Compare_STLVer FUN_00444bb0) over csl_Skill (sorted by id, 0x14-byte entries)
+SkillDataBox::sdb_Next(i) FUN_0050ffd0: ++i < sdb_MaxValid;  sdb_Get(i) FUN_0050fff0: &sdb_ValidArray[i]
+PassiveDataBox::sdb_Home FUN_0050ffc0: i = −1;  sdb_Next FUN_00584f00: ++i < pdb_passivenumber
+PassiveDataBox::sdb_Get(i)                               @ FUN_00585d10
+    i ≥ pdb_passivenumber: pdb_default; i ≥ row count: the box's default block; else CDataReader::GetRecord(i)
+ItemBoxIterItem(bag, effect)                             @ FUN_0043c000   (&cleariv §4.3)
+    finger = effect ? bag.vt[4](effect) : bag.vt[8]()   (first cell)
+UnlockedInventoryIterator ctor FUN_0043c140 {type, iterator, lock list}; uii_Get FUN_0043c160 (cell at the finger);
+    uii_Slot FUN_0043c170 (the finger = cell index)
+ItemRandomOption::RandomOptionTable::operator[](name)    @ FUN_00493ff0   (&makeitem §4.3)
+    find the RandomOptionList whose Name8 index = name (32 chars; std::_Find FUN_00493490); none: null
+    returns the static `returnstr` {list, MaxOpCount = largest rol_Count of the list} (one shared result object)
+```
+
+`&makeitem` of a pet item: `sp_CreateItemByAdmin` FUN_00527270 (Z05 §9.1) checks item class 0x24 and maps
+`ItemInfo.InxName` → `CPetData::GetPetIDX` FUN_004cf030 (the pet table row of 0x46 bytes whose `ItemIDX` matches →
+`PupIDX`) → `CPetData::GetPetID` FUN_004cef80 (`PupIDX` → `PupID`, −1 if none). With an id: `itemattr.Pet.nPetID` =
+PupID, pet registration number = −1 (a new pet), `ItemAttrCls_Pet::iac_SetPetName` FUN_004d05f0 with "" (copies at
+most 16 characters and terminates), and one more attribute byte = 0. Without a row the pet fields stay as made.
+
+Accessory upgrade tables behind `augdb_RandomOptionUpgrade` (§4.3, also every upgrade handler of Z04):
+
+```pseudo
+augdb_AccUpGradeData = map<u16 BasicUpInx, map<RandomOptionType, ACC_UPGRADE_FACTOR {AccUpGradeInfo *up, *down}>>
+augdb_GetAccUpGradeFactorMap(inx) FUN_005c5a90: inner map or null
+augdb_GetAccUpGradeFactor(inx, type) FUN_005c5ad0: factor or null
+augdb_GetAccUpGradeInfo(inx, type, up) FUN_005c5b30: up ? factor.up : factor.down (null when missing)
+augdb_GetOptionUpGradeValue(inx, type, up, level)        @ FUN_005c5bb0
+    row = GetAccUpGradeInfo; none: 0; k = up ? level − 1 : level; k ≥ 12: 0
+    min = row column Min_Variables[k], max = column Max_Variables[k]; span = max − min, at least 1
+    return min + RandomBox[span + 1]       # RandomBox::operator[] FUN_00427c30: next value of a pre-shuffled ring of
+        # box n (0…n−1 *(inferred)*), and 0 for n outside 1…100
+        # max == min gives min or min + 1 (original bug) Z11-B40; max − min ≥ 100 always gives min (original bug) Z11-B41
+augdb_GetOptionUpGradeLimit(inx, type, up, level)        @ FUN_005c5c20
+    same row and k; return column Limit_Variables[k] (0 when missing)
+```
+
+The candidate list is a `CardDeck::CardStack` (ctor FUN_0064e560, dtor FUN_0064e190, `List<Card>::l_MakeList`
+FUN_0064e360 / `l_SetListArray` FUN_0064e4e0, `cs_Clear` FUN_0064cb70, `cs_InsertTop` FUN_0064e2c0, `cs_TakeTop`
+FUN_004902d0, `cs_CardNum` FUN_004902c0; `cs_Suffle` is in Z09 §28.10): a plain stack of option types.
+
+### 9.4 Raid, party and save helpers
+
+- `Raid::iterator::operator!=` FUN_0063d550 (different raid, party index or slot), `GetPartyRegNo` FUN_0063d0d0
+  (`m_PartyNos[index]`, 0xFFFF out of 0…3), `Raid::GetNumOfMember` FUN_0063d050 (`&outraid` §7.1); Begin / End /
+  GetCharRegistNo in §7.1.
+- `CParty::PartyGetNo(charNo)` FUN_00645160: scans all 4000 party slots (used ones or raid-type) for a member with that
+  charNo; party number or 0xFFFF. `CLooting::reset` FUN_00645040 (in `Raid::Reset`): the 4 loot types = FREE, looter
+  −1. `PROTO_PARTY_MEMBER_AND_ZONEMERCHINE::operator=` FUN_00645390 and `PROTO_NC_CHAR_PLAYERSUMMON_RNG::operator=`
+  FUN_0045b260 (`&psummon` §5.1) are member copies.
+- `&levelup` saves through `ws_save2DB` (Z01 §8.4). Its callees not described there: `PROTO_NC_CHARSAVE_ALL_REQ::operator=`
+  FUN_00453ca0 (copy), `WholeSaver::ws_saveassure` FUN_00453d40 (empty body), `ShinePlayer::sp_SaveUseItemMinimonInfo_DB`
+  FUN_00563d80: Character DB ← 0x4035 NC_CHARSAVE_USEITEM_MINIMON_INFO_DB_CMD (0x50 bytes: u32 charNo, the 50-byte
+  `sp_UseItemMinimon` block, then 12 + 12 flags "slot empty" (item id 0xFFFF) for the normal and charged lists; D02 has
+  the receiver).
+- `&bigbang` / `&kingdomquest` find the map with a temporary `FieldMap` as search key; its constructor (Z09) also runs
+  `BoothManager::BoothManager` FUN_0043b550 (two empty list heads, `bim_nLastCreatedHandleNo` −1) and
+  `TradeBoard::TradeBoard` FUN_00427ee0 (`tb_opposit` = null): a whole map object per lookup, freed at the end.
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -2226,7 +2349,7 @@ compare function, used by the map lookups above); `AxialListMobList` dtor FUN_00
 | Z11-B8 | `&cleariv` FUN_0041bbd0 | key count kept in 7 bits while the loop reserves every unlocked cell (inventory: 192 cells) | 128 items: no packet, all cells stay reserved; more: the DB deletes only the last n−128 keys, the ACK still empties all n cells in memory; the rest returns at the next login | split into several 0x3459 of ≤ 127 keys |
 | Z11-B9 | `&templink` FUN_0041b2f0 | `LinkInformTemplete.index[20]` of the temp link is never written | 20 stack bytes in the gate's `nrb_BrenchSpot` (compared byte-wise by `nrb_LinkBrenchCheck`, so still consistent) | zero the template |
 | Z11-B10 | `ac_TempLinkUsage` FUN_0041a210 / `&templink` | the example line starts with "&mobbreed" | misleading help text | "&templink" |
-| Z11-B11 | `&performance` FUN_0041c8d0 | parses an optional number (default 10) and never uses it | none (dead code) | a sample period that was removed *(inferred)* |
+| Z11-B11 | `&performance` FUN_0041c8d0 | (withdrawn in the sweep: the number is used, `pr_SetCount` FUN_00468180, §4.5) | – | – |
 | Z11-B12 | `&makeitem` FUN_0041b8a0 | "Invalid item" only after the row was already found; an unknown name or a full inventory returns without a message | the GM gets no feedback for a typo or a full bag | notice for every failure |
 | Z11-B13 | `&makeitem` FUN_0041b8a0 | rolls random options (`rot_FillOption` FUN_00493590 resets the option count) after the GM's `-p` options | `-p<type>/<value>` works only on items without a RandomOptionDropGroup | skip the roll when the GM gave options |
 | Z11-B14 | 0x1068 `zls_NC_CHAR_PLAYERSEARCH_RNG` FUN_0045b870 (`&pfind`) | another zone answers with the player's own map and position | a player in a mini-house elsewhere is reported (and the GM linked) at the house map, while the local path uses the house entrance (`so_LoginLocation`) | substitute the house entrance as `zrpb_Request` does |
@@ -2255,10 +2378,11 @@ compare function, used by the map lookups above); `AxialListMobList` dtor FUN_00
 | Z11-B37 | `&reloaddata ActiveSkill` FUN_00424c00 → `sdb_Load` FUN_00585f40 | deletes and reallocates `sdb_ValidArray` at run time | `SkillDataIndex*` held by casts, skill effects, abstates and mob skill lists dangle *(inferred)*: crash or wrong skill data on next use | load into a new box and swap when no skill is in use, or reload only at start |
 | Z11-B38 | `sp_KQReward` FUN_0052da70 (0x5815) | packet length `size + 0x25` for a packet of `0x24 + size` bytes (same `+1` in `sp_MagicContainerMake` 0x344D, FUN_0049c050) | one stale byte of the global send buffer after the item list; the DB ignores it | `size + 0x24` |
 | Z11-B39 | `&bigbang` FUN_004240d0 | the "map not found" assert names `ac_KingdomQuest` (copied text) | the assert log blames the wrong command | "AmpersandCommand::ac_BigBang : Map not found" |
+| Z11-B40 | `augdb_GetOptionUpGradeValue` FUN_005c5bb0 (`&makeitem` amulets, every accessory upgrade) | span = max(Max − Min, 1), value = Min + RandomBox[span + 1] | a level whose Min = Max can still give Min + 1 | span = Max − Min |
+| Z11-B41 | `augdb_GetOptionUpGradeValue` FUN_005c5bb0 | `RandomBox::operator[]` returns 0 for n > 100 | a level with Max − Min ≥ 100 always gives the minimum | a random source without the 100 limit |
 
 ## Not reconstructed / uncertain
 
-- The `tokenize` helper is identified by its argument list only (§1.2); quoting and escaping follow that reading.
 - `AmpersandCommandLog` file name: the third `%02d` is assumed to be the hour.
 - Who sets `tCharacter.nAdminLevel` in production (operator tool, direct SQL) is outside the binaries.
 - §4.1 `&oxblock`: which door of the OX-quiz map is first in the `so_AllInMap` walk was not checked against the map
@@ -2281,10 +2405,10 @@ compare function, used by the map lookups above); `AxialListMobList` dtor FUN_00
   (Z09 §2.4); the iterator body was not re-read.
 - §6.5 `&ghostremove`: object kind 1 = dropped item is inferred from `som_AllocObject(type 1)` (Z05); kind 9 = effect
   object from Z09's pool list.
-- §7.1 `&makeraid`: `Raid::Begin` is assumed to start at {party 0, slot 0} (the iterator constructor was not read); what
+- §7.1 `&makeraid`: what
   the WM does with the zone's changed party table when it next sends party packets was not followed (W02).
 - §7.3 `&levelup`: the effect of a level above `levellimit` on the EXP table lookups and on the client was not traced;
-  the vt 0x20 call with the level (slot name `so_GainFame` in the merged vtable) was not opened.
+  (Sweep: the vt 0x20 call is `so_GainFame`, §7.3.)
 - §7.4 `&getmoney`: item id 0 in the 0x300A message when nothing was picked since login is assumed (the member's
   initial value was not read). `&iareset`: whether the next character save writes the cleared cool-down list was not read.
 - §7.6 `&godmode`: how long the `Item.Plus` HP / SP bonus survives (recomputed on equipment change) is inferred;
@@ -2293,7 +2417,7 @@ compare function, used by the map lookups above); `AxialListMobList` dtor FUN_00
 
 - §8.1 `&fieldmobcount`: the arguments of the file's header `fprintf` (map id and time) are inferred from the strings;
   the `%02d` of the file name is the hour (pushed `tm_hour`).
-- §8.2 `&npcrevive`: which packet `so_SendMyBriefInfo` sends for an NPC (brief family 0x1C0x) was not opened (Z09).
+- §8.2 `&npcrevive`: the NPC brief packet is Z02 §5's (`so_SendMyBriefInfo` FUN_00556590).
 - §8.4 `&kqreward`: what the Character DB does when reward-box slot 0 is already taken (no free-cell search on the
   zone) is D03's `CreateChestItemList`; how the client learns about the new reward-box chest was not traced.
   `&kingdomquest`: the behaviour of KQ script nodes on a map without a KQ element was not followed (Z16 / Z09 §25).
@@ -2301,5 +2425,31 @@ compare function, used by the map lookups above); `AxialListMobList` dtor FUN_00
   (scope: "which packets … `smo_NotifyParameterChange` (vt 0x34) send").
 - §8.6 `&reloaddata`: the holders of `SkillDataIndex*` were not enumerated; `&reloadpetlua`: whether live pets keep a
   pointer to their old `LuaScriptScenario` was not read.
+- §9.3 / B40 / B41: the contents of `RandomBox` box n (a shuffled 0…n−1) are inferred from its use; its filler was not read.
+- §9.3: which SHN file holds the `CPetData` rows (0x46 bytes: ItemIDX, PupIDX, PupID) was not checked (Z13's pet tables).
+- Sweep: coverage was measured with a scratch run of `coverage.py`'s `Bin` / `measure` over 228 roots (every
+  `AmpersandCommand` function and the §1 dispatch functions): 386 reachable, 266 cited here, 120 by other docs, 0 gaps.
 
-(Parts 2–6 added their commands as §4–§8; the sweep part adds the coverage boundary.)
+## Coverage boundary
+
+Found by the sweep (reachability from every `AmpersandCommand` function, §9 intro) or while reading the commands, and
+not documented here. "Plan line" quotes the owner's `docs/plan/items/<ID>.md`; every owner named is open (no
+`**State:** done`), except where a done item's § already documents the thing.
+
+| Thing | Reached from | Owner and argument |
+|---|---|---|
+| Guild-tournament system: `GuildTournamentSystem` ctor FUN_00480d30, `Initialize` FUN_00480f10, `Clear` FUN_004808f0, `GuildGroup::Clear` FUN_00480460, `MakeGTItemTargets` FUN_0047be70, `SetFlagMultiple` FUN_00479bd0, `InitFlagAbStateSetup` FUN_00479680, `GuildGroup::UseGuildSkill` FUN_0047b140, `CheckManagerUser` FUN_004798f0, `EverythingGiveBuff` FUN_00479760, `SetSkillPoint` FUN_0047afa0, `GuildTournamentSkillTable::GetStateByIndex` FUN_005c71b0, `GTIGetRateTable::GetItemIDbyProbabilityCalculate` FUN_005c7250, `GTIBreedSubjectTable::GetByIndexName` FUN_005c73e0, `ITableBase<…>::GetTotal` FUN_00479060 / FUN_005c6f80 / FUN_005c6fa0, `GuildTouramentLoginDataInfo::GetLinkData` FUN_00478610, `_ErrorSendPlayer<PROTO_NC_GUILD_TOURNAMENT_RECALL_ENTER_ACK>` FUN_00478070 | `&startGT`, `&useguildskill`, `&gtieffect`, `&observerlinkto` (§6.3, §7.2) | **Z16**, plan line "Guild tournament: `FieldMap_fm_GetGuildTournamentSystem` and the GT system class (… guild skills `FUN_0047b9a0`, … observers FUN_004788c0, member grades FUN_0047ccd0) …, `wms_GuildTournamantStart`". §6.3 / §7.2 document the command side only |
+| KQ element pieces: `CommonList<KQPlayerInform>` ctor FUN_00499810, `KQPlayerInfoList` ctor FUN_004999e0, `List<KQPlayerInform>` dtor FUN_00495270; `kqpl_EndOfKQ`'s vector helpers FUN_0049a410 / FUN_0049a160; KQ script nodes on a map without a KQ element (§8.4) | `&kqreward` (temporary KQElement), `&endofkq`, `&kingdomquest` | **Z16**, plan line "KQ: `KingdomQuest::KQElement` (…), `KQPlayerInfoList` (add/remove, …), `KingdomQuestContainer` …, `KQContribute::KQContributeList` (… `kqpl_EndOfKQ` …)" |
+| Instance clusters: `mc_FindEmptyByRegnum` FUN_00484960, `mc_ChangeCategory` FUN_00484d20, `fc_GetFirstInstanceDungeonInfo` FUN_004843e0, `InstanceMap` ctor / dtor FUN_004847c0 / FUN_00484730 | `&PlayIns`, `&makeraid`, `&emptymap` | **Z14**, plan line "`MapClusterManager::ClusterManager` … and `MapCluster`: how instances are created (cm_FindEmpty / FindEmptyByRegnum / …), the owner key `{category, regnum}`, `mc_ChangeCategory` …" |
+| Raid record: `Raid::Raid` FUN_0063d180, `RaidSystem::CreateRaid` FUN_0063d6f0, `Raid::_PartyLeaveCheckResult` FUN_0063cfe0; the WM's view after `&makeraid` / `&outraid` / `&inraid` (B26, B27, B35) | `&makeraid`, `&outraid`, `&inraid` (§7.1, §8.2) | **Z14**, plan line "Raid internals: the shared `Raid` record (FUN_0063d…/FUN_0063e…, compare the WM's `Raid` class in W02), `RaidTask` …" |
+| Stat matrix totals: `Parameter::Container::c_MakeTotal` FUN_004c9a40, `Parameter::Cluster` operators FUN_004c9160 / FUN_004c9040; 0x1035 contents of `so_mobile_NotifyParameterChange` | `&godmode`, `&gmtestmode`, `&HP` / `&SP` (speed and MaxHP/SP recompute, §7.6, §8.5) | **Z12**, plan line "`so_allparametercalculate` …: what fills each layer …, and the order … Which packets the refresh `vt 0x528` and `smo_NotifyParameterChange` (vt 0x34) send" |
+| Level-up side effects: `sp_NextSaveExperience` FUN_0042d6f0, `CharaterSkillList::csl_EmpowerSummary` FUN_00445070; levels above `levellimit` (B30) | `&levelup` (§7.3) | **Z12**, plan line "Level/exp: `g_LevelExp` …, exp gain and level-up side effects (FUN_0058bd10, …), level-up packets" |
+| Pet tendency save: `sp_PetSystem_ApplyChangedTendency` FUN_004d2520, `sp_PetSystem_SaveTendency` FUN_004d25d0; how the owner's client learns `&setpetinfo` values | `&levelup` save (`ws_save2DB`), §7.7 | **Z13**, plan line "Pets: the summon/unsummon flow (`so_PetSystem_Unsummon` FUN_004d2990 and its callees FUN_004d1ff0, FUN_004d2520, FUN_004d25d0; …), … who sends … 0xD401 SET_TENDENCY (mind/stress)" |
+| Skill data box loader: `sdi_SetArgument` FUN_00584800, `sdi_Clear` FUN_00584500, `~SkillDataIndex` FUN_00447e50, `sdb_compare` FUN_005844e0, `GetSkillIndexByName` FUN_00585ef0, `BinaryDataBox<…>::bdb_ReadData` FUN_00585030 / FUN_005850f0 / FUN_00648d50 / FUN_00584f70 / FUN_005851b0, `_DebugMessageNew2` FUN_0064f1f0, its vector helpers FUN_00585df0 / FUN_00585db0 / FUN_00585d50 / FUN_005c7450; holders of `SkillDataIndex*` (B37) | `&reloaddata` (§8.6), `&gtieffect` | **Z20** (created by this item): Z01 §2.3 only names the loader per file, Z03 (done) uses the rows; `sdb_Load` alone is ~1.1k lines, too large for a gap fix |
+| Lua 5.2 library: `luaL_loadfilex` FUN_005fa1b0, `lua_pcallk` FUN_005f8d60, `luaL_openlibs` FUN_00603ab0, `luaL_newstate` FUN_005faba0, `lua_close` FUN_0060c690 | `&reloadpetlua` → `aispc_Load` (Z09 §14.2) | upstream third-party code (`docs/plan/items` has no item for it, none needed: its behaviour is the published Lua source); the pet-script host is Z09 §14.2 |
+| CRT: `_CIsqrt` FUN_00658330 and its helpers FUN_0065834d / FUN_006688bc / FUN_00668918 / FUN_006688a5, `atoi` FUN_00658292 | `&dist`, many | Microsoft C runtime, no game logic |
+| Templates without game logic: `ShineDynamicCast<ShineMobileObject>` FUN_004097f0, `fastdelegate::FastDelegate1::empty` FUN_00479000; unwind-path destructors `~AxialListMobSuicide` FUN_00418f00, `~AxialListDoorAction` FUN_004194c0, `ListEraser<FieldMap>` dtor FUN_00462a60 | various | casts, delegate test and destructors of the visitors documented in §4.1 / §5.2 / §8.4 |
+| STL instances (containers only): `std::string::insert` / `find` / `_Chassign` FUN_004dd7d0 / FUN_00592080 / FUN_004d9a60, `vector<string>` FUN_00566350 / FUN_005662d0 / FUN_00592130 / FUN_00425250 (tokenize); `map<u16,…>` trees used by `&fieldmobcount` FUN_005b1c40 / FUN_005cf0d0 / FUN_004244b0 / FUN_005cf500 / FUN_005b1870 / FUN_005cf070 / FUN_0043cae0 / FUN_0043ca50 / FUN_005ceff0 / FUN_005cf010 / FUN_005c84b0 and by the pet Lua map FUN_00441080 / FUN_005c8460 / FUN_00424470 / FUN_00626790 / FUN_00441230; `vector<ABSTATEINDEX>` FUN_005d5020 / FUN_0045a060 / FUN_004b0110; `_Lower_bound` FUN_00445f50; GT containers FUN_0047d760 / FUN_0047b6b0 / FUN_0047c7a0 / FUN_0047a9a0 / FUN_0047d5c0 / FUN_0047bc10 / FUN_00479120 / FUN_00479160; upgrade-factor maps FUN_00464350 / FUN_005c5950 / FUN_005c52a0 | various | standard library (identical-code folding gives some of them unrelated template names); no item needed |
+| `so_SendMyBriefInfo` for an NPC (`&npcrevive`) | §8.2 | done item **Z02**, documented in Z02 §5 (`ShineMob/NPC/Servant.so_SendMyBriefInfo` FUN_00556590) |
+| Wedding hall timetable and ceremony | §6.1 | **Z13**, plan line "Wedding hall and married state: `g_WeddingHall` … the hall timetable and ceremony flow" |
+| Mob hatchery, dice games, slot machine screen | §6.5, §6.7, §3.4 | done items, documented: Z09 §10.9 (hatchery), Z06 §3 / §4.4 (TaiSai dice), Z06 §5 (slot machines) |
