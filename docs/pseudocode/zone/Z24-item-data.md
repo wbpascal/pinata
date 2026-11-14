@@ -808,7 +808,266 @@ ChargedItemEffectDataBox<ChargedItemEffect>::cideb_FindFromHandle(this, int hand
 
 ## 7. `CharClassDataBox` and the other helpers
 
-*(part 4)*
+Four small tables that item code reads: the class masks of `UseClassTypeInfo.shn` (§7.1), the item drop groups
+built from `ItemInfoServer.shn` (§7.2), the unused stand-alone ItemInfo reader (§7.3) and the gathering / production
+tables (§7.4). All readers are the Z20 §2.1 template (`CDataReader::Read(path, key, size)`, readfail → two asserts +
+`ShineExit`); keys and row sizes equal `S01-shn-structs.tsv`, columns = members in order ("same").
+
+### 7.1 `CharClassDataBox` (`UseClassTypeInfo.shn`, stage home)
+
+`charclassdatabox` 0x14d42140 *(pdb2016)*: `class CharClassDataBox { BinaryDataBox<UseClassTypeInfo> ccdb_classbits; }`
+(0x60 bytes). `_dynamic_initializer_for_'charclassdatabox'` FUN_0069af60 runs the ctor `CharClassDataBox::CharClassDataBox`
+FUN_00640950 (`BinaryData` base, all-zero default row: `UseClass = UCT_NONE`, every class byte 0) and registers
+`_dynamic_atexit_destructor_for_'charclassdatabox'` FUN_006a00d0 → `~CharClassDataBox` FUN_00640980 (`~BinaryData`);
+`BinaryDataBox<UseClassTypeInfo>::scalar_deleting_destructor` FUN_00640920 is the vftable's copy.
+
+```pseudo
+zs_start_home:  … ItemDataBox::idb_Load, …, ItemGroupClassifier::igc_Load (§7.2), …, DamageTable::dt_Load ×2,
+    CharClassDataBox::ccdb_Load(&charclassdatabox, "../9Data/Shine/UseClassTypeInfo.shn")   @ FUN_00640990 (call 0x5adf82)
+        BinaryDataBox<UseClassTypeInfo>::bdb_ReadData(&ccdb_classbits, path)               @ FUN_00640870
+            CDataReader::Read(path, key 0x48A (1162), row 0x1F); fail → asserts + ShineExit("BinaryDataBox<T>::bdb_ReadData")
+    # nothing else is built: every query below scans the rows linearly
+```
+
+| Column (type:size) | Member | Off | Use |
+|---|---|---|---|
+| UseClass (11:4) | `UseClassType UseClass` | 0x00 | the row's key; the queries take the **first** row with that value |
+| Fig … Sav (1:1 ×27) | `u8 Fig, Cfig, War, Gla, Kni, Cle, Hcle, Pal, Hol, Gua, Arc, Harc, Sco, Sha, Ran, Mag, Wmag, Enc, Warl, Wiz, Jok, Chs, Cru, Cls, Ass, Sen, Sav` | 0x04 … 0x1E | 1 = class may use; class ID n (1 … 27) is column n |
+
+`UseClassType` *(pdb2016)*: 0 NONE, 1 ALL, 2 FIGHTER_ALL, 3 CLEVERFIGHTER_AND_OVER, 4 WARRIOR_AND_OVER, 5 WARRIOR_OVER,
+6 GLADIATOR_ONLY, 7 KNIGHT_ONLY, 8 CLERIC_ALL, 9 HIGHCLERIC_AND_OVER, 10 PALADIN_AND_OVER, 11 GUARDIAN_ONLY,
+12 HOLYKNIGHT_ONLY, 13 PALADIN_OVER, 14 ARCHER_ALL, 15 HAWKARCHER_AND_OVER, 16 SCOUT_AND_OVER, 17 RANGER_ONLY,
+18 SHARPSHOOTER_ONLY, 19 SCOUT_OVER, 20 MAGE_ALL, 21 WIZMAGE_AND_OVER, 22 ENCHANTER_AND_OVER, 23 WIZARD_ONLY,
+24 WARLOCK_ONLY, 25 ENCHANTER_OVER, 26 SENTINEL_EXCLUDE, 27 JOKER_ALL, 28 CHASER_AND_OVER, 29 CRUEL_AND_OVER,
+30 ASSASSIN_ONLY, 31 CLOSER_ONLY, 32 CRUEL_OVER, 33 SENTINEL_ALL, 34 SAVIOR_ONLY, 35 DEEPER_SKILL, 36 SHIELD,
+37 CLASS_CHANGE, 38 SHIELD_NOT_GLA (MAX 39). Item, skill and passive rows carry it as `UseClass`.
+
+```pseudo
+CharClassDataBox::ccdb_UseClassTypeToBit(uct) → u64                                @ FUN_006409a0
+    for i in 0 … rowcount−1:                       # row i ≥ count would be the default row (cannot happen)
+        r = row i
+        if r.UseClass == uct:
+            return Horner(Sav, Sen, …, Cfig, Fig) << 1   # ((…(Sav·2 + Sen)·2 + …)·2 + Fig)·2, 64-bit with carries
+            # = Σ r.<class n> << n: bit n = class ID n, bit 0 always 0. The bytes are added, not ORed: a cell > 1
+            #   would carry into the next class (2016 cells are all 0/1)
+    return 0                                       # unknown UseClass: no class may use it
+
+CharClassDataBox::ccdb_ClassToBit(class) → u64 = 1 << class (64-bit _allshl; class ≥ 64 → 0)        @ FUN_00640850
+
+CharClassDataBox::ccdb_CheckClass(uct, class) → bool                              @ FUN_00640e40
+    return (ccdb_UseClassTypeToBit(uct) & ccdb_ClassToBit(class)) ≠ 0
+
+CharClassDataBox::ccdb_BitToClass(bits u64) → u8 class                            @ FUN_00640b90
+    c = (u8) trunc(log((double)(i64)bits) / log(2.0))          # CRT _CIlog twice; constant 2.0 at 0x7001a0;
+                                                               #   fistp with round-toward-zero
+    p = 2.0^c (inlined integer power, x87) → _ftol2 → i64
+    return c if p == bits else 0                               # only an exact single bit gives its class;
+    # 0, several bits or bit 63 (negative as i64: log → NaN) → 0. Exact for every bit 0 … 62 with IEEE doubles
+    #   (checked: trunc(log(2^n)/log 2) = n for n < 64)
+
+CharClassDataBox::ccdb_ClassToUseClassType(class) → UseClassType                  @ FUN_00640c20
+    b = 1 << class
+    for each row i in order: if mask(row i) == b: return row i.UseClass            # mask as in UseClassTypeToBit
+    return UCT_NONE                                # only the "…_ONLY" rows have exactly one class
+
+CharClassDataBox::ccdb_GetThirdClassGroup(class) → UseClassType                   @ FUN_00640e80
+    b = 1 << class
+    for g in (UCT_WARRIOR_OVER, UCT_PALADIN_OVER, UCT_SCOUT_OVER, UCT_ENCHANTER_OVER):
+        if ccdb_UseClassTypeToBit(g) & b: return g
+    if ccdb_CheckClass(UCT_CRUEL_OVER, class): return UCT_CRUEL_OVER
+    return UCT_SAVIOR_ONLY if ccdb_CheckClass(UCT_SAVIOR_ONLY, class) else UCT_NONE
+```
+
+Callers. The four class-change helpers have exactly two callers each (call sites in the binary): the class-change
+item handler `sp_NC_ITEM_CLASS_CHANGE_REQ` FUN_0051f5c0 (Z04 §12.10: `g = GetThirdClassGroup(class)`, NONE or
+SAVIOR_ONLY → 0x3682; new class = `BitToClass(UseClassTypeToBit(g) ^ ClassToBit(class))` written into the DB request;
+`ClassToUseClassType(class)` selects the skills of the own class) and `sp_OpenClassChangeMenu` FUN_0051fd10 (Z15
+§6.5, Lua `cClassChangeOpen`: the same computation for the menu's `nNewClass` and price). `ccdb_UseClassTypeToBit` is also
+called by `ItemGroupClassifier::igc_Getitem` FUN_004903e0 (Z09 §28.10 / §10.10, KQ rewards: only the low 32 bits of the mask are
+tested against the 32-bit class mask, enough for bits 1 … 27); `ccdb_CheckClass` by `ac_AllLearnSKill` FUN_004212e0
+(Z11), `sp_NC_BOOTH_SEARCH_ITEM_LIST_CATEGORIZED_REQ` FUN_00439c70 (Z06). Other readers of `charclassdatabox` (they
+inline the same check): `so_ply_ViewSlot_Equip` 0052b110, `sp_NC_ITEM_EQUIP_REQ` 0052b8d0, `sp_NC_ITEM_RINGEQUIP_REQ`
+0052c5b0, `sp_NC_ITEM_MINIMON_EQUIP_REQ` 0052d020, `sp_ItemUseReq_Inven` 0053f5e0, `sp_UseItemMonimon_UseItem`
+00561b80 (Z04).
+
+**2016 data** (39 rows, `UseClass` = row index 0 … 38, every cell 0/1, so the first-row rule never matters). Results
+per class ID (1 Fig … 27 Sav) of the class-change helpers, computed from the file with the functions above:
+
+| Class (ID) | `ClassToUseClassType` | `GetThirdClassGroup` | new class (`BitToClass(group ^ own)`) |
+|---|---|---|---|
+| Gla 4 / Kni 5 | 6 GLADIATOR_ONLY / 7 KNIGHT_ONLY | 5 WARRIOR_OVER | 5 / 4 |
+| Hol 9 / Gua 10 | 12 HOLYKNIGHT_ONLY / 11 GUARDIAN_ONLY | 13 PALADIN_OVER | 10 / 9 |
+| Sha 14 / Ran 15 | 18 SHARPSHOOTER_ONLY / 17 RANGER_ONLY | 19 SCOUT_OVER | 15 / 14 |
+| Warl 19 / Wiz 20 | 24 WARLOCK_ONLY / 23 WIZARD_ONLY | 25 ENCHANTER_OVER | 20 / 19 |
+| Cls 24 / Ass 25 | 31 CLOSER_ONLY / 30 ASSASSIN_ONLY | 32 CRUEL_OVER | 25 / 24 |
+| Sav 27 | 34 SAVIOR_ONLY | 34 SAVIOR_ONLY (refused by both callers) | – |
+| every other class (1st–3rd job, Sen 26) | 0 NONE | 0 NONE (refused) | – |
+
+So a class change swaps the two 4th-job classes of one line (the masks of the five "…_OVER" rows hold exactly those
+two). Shared types: 35 DEEPER_SKILL = War Gla Kni Sco Sha Ran; 36 SHIELD = War Gla Kni Pal Hol Gua;
+37 CLASS_CHANGE = the ten 4th-job classes; 38 SHIELD_NOT_GLA = SHIELD without Gla; 26 SENTINEL_EXCLUDE = classes
+1 … 25. The WM reads the same file with the same function (W05 §3.2 row 25, `ccdb_UseClassTypeToBit` FUN_00465a90,
+identical code): its mask also has Fig at **bit 1** (W05's "bit 0 = Fig … bit 26 = Sav" is one bit low).
+
+### 7.2 `ItemGroupClassifier` (item drop groups of `ItemInfoServer.shn`, stage home)
+
+`itemgroupclassifier` 0x0d56c4a0 *(pdb2016)*: `{ BTree igc_btree +0; CardDeck::CardStack igc_itemgroup[1000] +0x404
+(0x20 each); u32 igc_point +0x8104 }` (0x8108 bytes). `_dynamic_initializer_for_'itemgroupclassifier'` FUN_006963f0
+builds the trie (`BTree::BTree`) and the 1000 stacks (`CardStack::CardStack` FUN_0064e560, Z11 §9.3), atexit
+`_dynamic_atexit_destructor_for_'itemgroupclassifier'` FUN_0069d480 (stack dtors FUN_0064e190, `~BTree`); unwind
+funclet FUN_00686390.
+
+```pseudo
+ItemGroupClassifier::igc_Load(this)                                           @ FUN_00490330 (zs_start_home, call 0x5ade9b,
+                                                                              #   after idb_Load and dic_Load, Z10 §7.1)
+    igc_point = 0                                  # the trie and the stacks are not cleared (one call only)
+    for i in 0 … itemdatabox.idb_Itemspacies−1:    # ItemInfo rows in file order
+        id = BinaryDataBox<ItemInfo>::operator[](itminf, i).ID
+        ix = itemdatabox[id]                       # inlined ItemDataBox::operator[] FUN_00419020 (Z04 §1.2): id < idb_maxItemhandle,
+                                                   #   ix.data ≠ null, ix.data.ID == id, else assert
+                                                   #   "ItemDataBox::operator [] :Invalid Item index" (id*10000+found)
+                                                   #   and ix = null
+        igc_Store(id, ix.dataserv.DropGroupA)      # ix = null → null dereference (original bug) Z24-B11 (latent)
+        igc_Store(id, ix.dataserv.DropGroupB)
+
+ItemGroupClassifier::igc_Store(this, itemID u16, name)                         @ FUN_004900f0
+    if name[0] == '\0' or name[0] == '-': return
+    g = BTree::operator[](igc_btree, name)                                     # Z20 §5.2 trie, case-sensitive
+    if g == 0xFFFFFFFF:
+        if igc_point > 999: assert "ItemGroupClassifier::igc_Load : Too many groups" (igc_point);
+                            ShineExit("ItemGroupClassifier::igc_Store")         # at most 1000 groups
+        g = igc_point++; bt_Insert(igc_btree, name, g)
+    elif g ≥ igc_point: assert "ItemGroupClassifier::igc_Load : invalid index" (g); ShineExit(…)   # dead check (original bug) Z24-B11
+    CardStack::cs_InsertTop(igc_itemgroup[g], itemID)                          @ FUN_0064e2c0 (Z11 §9.3)
+    CardStack::cs_Suffle(igc_itemgroup[g], 1)                                  @ FUN_0064e200 (one random pair swap, CRT rand; Z09 §28.10)
+```
+
+`ItemInfoServer` columns read: `DropGroupA` (+0x39) and `DropGroupB` (+0x61), both `char[40]` (Z09 §11.1);
+the other ItemInfoServer columns belong to `idb_Load` (§10 row). The groups are read by `igc_Getitem` FUN_004903e0
+(Z09 §28.10: an item name wins over a group name; draws by class mask, §7.1) and `igc_ChargedDuringUse` FUN_00490630
+(Z04); `itemgroupclassifier` itself is also referenced by `sp_ItemReloc` 00536780, `sp_NC_ITEM_SELL_REQ` 00539020,
+`sp_NC_BOOTH_OPEN_REQ` 0058e900, `TradeBoard::tb_CanTradeItem` 00593560, `sp_NC_TRADE_UPBOARD_REQ` 00595280 (the
+`igc_ChargedDuringUse` check, Z04 / Z06) and `tcm_ItemMake` 00595d00 (Z09). Not reloadable (§8).
+
+**2016 data**: 789 groups (limit 1000), largest 84 items. Two items name the same group in both columns
+(`UniqRing01` 2280, `UniqNeck01` 2480): they are inserted twice and drawn twice as often from their group. 152 of the
+789 group names are also item `InxName`s (e.g. `MaraRing`, `SkullRing`): `igc_Getitem` with such a name returns the
+item itself, so those groups can never be drawn by name (the drop table's `dilig_AppendByName`, Z09 §11.1, does the
+same lookup order).
+
+### 7.3 `ItemDataBox::ReadData` (stand-alone ItemInfo reader, unused)
+
+```pseudo
+ItemDataBox::ItemDataBox(this, path, checkExists)                             @ FUN_0064b5d0
+    BTree::BTree(idb_btree); construct idb_BinData (the seven readers); idb_index = null; idb_maxItemhandle = 0
+    if path ≠ (char*)−1:
+        path = path or "../9Data/Shine/ItemInfo.shn"
+        if checkExists and fopen(path, "rb") fails: return       # (fclose otherwise)
+        ItemDataBox::ReadData(this, path)                        # its only call (0x64b65e)
+_dynamic_initializer_for_'itemdatabox' FUN_0069af20: ItemDataBox(&itemdatabox, (char*)−1, false)  # → no read
+    atexit _dynamic_atexit_destructor_for_'itemdatabox' FUN_006a00b0 → ~ItemDataBox FUN_00649700
+
+ItemDataBox::ReadData(this, path) → bool                                      @ FUN_006494f0
+    if !CDataReader::Read(idb_BinData.itminf, path, key 0x4B67 (19303), row 0x17A): return false   # no assert, no exit
+    idb_Itemspacies = rowcount
+    idb_maxItemhandle = max(row.ID) + 1
+    delete[] idb_index; idb_index = new ItemDataBoxIndex[idb_maxItemhandle] (0x28 each); null → return false
+    each entry: data = dataserv = itemoption = itemdroplog = null; SetItemIndex = 0xFFFF; ItemSortOrder = 0xFF
+        # MovingShot, AttackAngle, HitTimeArray, eDelConditionType, pBuyItemData stay uninitialised (idb_Load sets them)
+    for each row: idb_index[row.ID].data = row                  # a duplicate ID keeps the last row
+    for each row: bt_Insert(idb_btree, row.InxName, row.ID)    # trie never cleared; a duplicate name keeps the last
+    return true
+```
+
+The only global `ItemDataBox` is built with path −1, and the zone loads ItemInfo through `idb_Load` FUN_00649780 (stage
+home, all seven item files, §10 row), so `ReadData` never runs in the 2016 zone (dead code with a partly initialised index,
+(original bug) Z24-B12). It reads only `ItemInfo.ID` (+0x00, u16) and `ItemInfo.InxName` (+0x02, char[32]); the
+other ItemInfo columns are the members in order (S01: "same"; offsets Z04 §1.2). 2016 ItemInfo: 14989 rows, IDs unique,
+17 `InxName`s used twice (all quest items `Q_…`, e.g. `Q_Pickaxe` 3178 / 3228): the trie keeps the later ID (also in
+`idb_Load`'s trie, *(inferred: same insert loop)*).
+
+### 7.4 Gathering and production tables (`Gather.shn`, `Produce.shn`, stage wide)
+
+`gathertable` 0x0d026cd0 `GatherProduce::GatherTable { BinaryDataBox<GatherInfo> gt_BinData; GatherIndex* gt_Array
++0xf0; u32 gt_Number +0xf4 }` and `recipebook` 0x0d026dc8 `GatherProduce::RecipeBook { BinaryDataBox<ProduceInfo>
+rb_BinData; ProductIndex* rb_Array +0x1f8; int rb_Number +0x1fc }` *(pdb2016)* (Z02 §8's "DAT_0d026dc0" /
+Z07's "DAT_0d026fc0" are the two arrays). Initializers `_dynamic_initializer_for_'gathertable'` FUN_00695990 /
+`…'recipebook'` FUN_006959d0 (`BinaryData` base, zeroed default row, array null) and atexit destructors FUN_0069ce40 /
+FUN_0069ce70 (delete the array, `~BinaryData`); the vftable copies `BinaryDataBox<GatherInfo>::scalar_deleting_destructor`
+FUN_0046a600 / `<ProduceInfo>` FUN_0046a630. Both loaders run in `zs_start_wide` after `sdb_Load` / `pdb_Load` (Z10 §7.1).
+
+```pseudo
+GatherProduce::GatherTable::gt_Load(this)                                     @ FUN_0046a660
+    BinaryDataBox<GatherInfo>::bdb_ReadData(gt_BinData, "../9Data/Shine/Gather.shn")   @ FUN_0046a4a0  key 0x3BF (959), row 0xAE
+    gt_Number = rowcount; gt_Array = new GatherIndex[gt_Number] (12 bytes: { GatherInfo* index; u16 tool[3] })
+    null → assert "GatherProduce::GatherTable::gt_Load : Memory leak"; ShineExit
+    for each row i:
+        gt_Array[i].index = row
+        gt_Array[i].tool[k] = idb_btree[row.NeededTool<k>] (0xFFFFFFFF → 0xFFFF), k = 0 … 2
+            # '-' and '' are looked up like names (→ 0xFFFF); an unknown tool name also becomes 0xFFFF = "no tool
+            #   needed" without any message (original bug) Z24-B10
+        bt_Insert(skillnametree, row.Index, row.GatherID)         # Z20 §5.2: the gather "skill" names
+
+GatherProduce::RecipeBook::rb_Load(this)                                      @ FUN_0046a840
+    BinaryDataBox<ProduceInfo>::bdb_ReadData(rb_BinData, "../9Data/Shine/Produce.shn") @ FUN_0046a550  key 0x18A5 (6309), row 0x1B6
+    rb_Number = rowcount; rb_Array = new ProductIndex[rb_Number] (0x4C bytes)
+    null → assert "GatherProduce::RecipeBook::rb_Load : Memory leak"; ShineExit
+    for each row i:
+        e = rb_Array[i]; e.index = row
+        e.product = idb_btree[row.Product] (unknown → 0xFFFF, no message; the cast answers 0x0B09, Z02 §8)
+        e.productlot = row.Lot
+        for k in 0 … 7:
+            e.raw[k].quantity = row.Quantity<k>
+            e.raw[k].item = 0xFFFF if row.Raw<k> is '-' or ''
+                            else idb_btree[row.Raw<k>]; unknown → assert "GatherProduce::RecipeBook::rb_Load : Invalid Raw"
+                                 (name); ShineExit("GatherProduce::RecipeBook::rb_Load")
+    qsort(rb_Array, rb_Number, 0x4C, rb_Compare)                  # rb_Compare FUN_0046a470: index.ProductID ascending
+
+GatherProduce::RecipeBook::operator[](this, skillID u16) → ProductIndex*        @ FUN_00444b50
+    key = a stack ProductIndex whose index points at a stack ProduceInfo with ProductID = skillID
+    return bsearch(key, rb_Array, rb_Number, 0x4C, rb_Compare)    # null = no recipe; equal IDs: any of them
+```
+
+`ProductIndex` *(pdb2016)*: `{ ProduceInfo* index +0; u16 product +4; int productlot +8; { u16 item; int quantity }
+raw[8] +0xC }`. `operator[]` is called by `sp_NC_ACT_PRODUCE_CAST_REQ` FUN_0046cf90 (call 0x46d0c2, Z02 §8) and
+`UseItemSkillScroll::uib_CanUseItem` FUN_0059d1b0 (call 0x59d432, Z04 §6.3 / Z20 §5.2: a recipe scroll needs a recipe);
+`csl_GetDelayGroup` 00448950 and `csl_PreProduceCheck` 0046ab70 (both Z23) and `smo_ply_ItemProduce` 0046c2d0 (Z07 §11)
+read `rb_Array` directly. `gt_Array` is read only by `sp_GatherCheck` FUN_0046ad70 (Z02 §8).
+
+Gather.shn (0xAE):
+
+| Column (type:size) | Member | Off | Use |
+|---|---|---|---|
+| GatherID (2:2) | `u16 GatherID` | 0x00 | the gather skill ID (value in `skillnametree`) |
+| Index (9:32) | `char Index[32]` | 0x02 | gather skill name (key in `skillnametree`) |
+| Type (11:4) | `GatherType Type` | 0x22 | 0 GT_HERBING, 1 GT_MINING, 2 GT_WOODCUTTING, 3 GT_FISHING *(pdb2016)*; `sp_GatherCheck` selects rows by it |
+| NeededTool0 … 2 (9:32 ×3) | `char NeededTool0/1/2[32]` | 0x26 / 0x46 / 0x66 | item names → `tool[3]` (0xFFFF = none) |
+| EqipItemView (9:32) | `char EqipItemView[32]` | 0x86 | not read by the zone (client view) |
+| AniNumber (3:4) | `u32 AniNumber` | 0xA6 | not read by the zone |
+| Gauge (3:4) | `u32 Gauge` | 0xAA | not read by the zone (Z02 §8: the client's gather time) |
+
+Produce.shn (0x1B6):
+
+| Column (type:size) | Member | Off | Use |
+|---|---|---|---|
+| ProductID (2:2) | `u16 ProductID` | 0x00 | the production skill ID; sort / search key |
+| ProduceIndex (9:32) | `char ProduceIndex[32]` | 0x02 | not read (equals the skill's InxName in 2016) |
+| Name (9:64) | `char Name[64]` | 0x22 | not read |
+| Product (9:32) | `char Product[32]` | 0x62 | item name → `product` |
+| Lot (3:4) | `u32 Lot` | 0x82 | → `productlot` (`ip_WhereProductStore` 0046b880) |
+| Raw0 … Raw7 / Quantity0 … 7 (9:32 / 3:4) | `char Raw<k>[32]; u32 Quantity<k>` | 0x86 + 0x24·k / 0xA6 + 0x24·k | → `raw[k]` |
+| MasteryType (11:4) | `TotalMasteryType MasteryType` | 0x1A6 | `csl_PreProduceCheck` (MT_STONE 0, PORTION 1, SCROLL 2, SUMMON 3, COMPOUND 4, RESOLVE 5, COOK 6) |
+| MasteryGain (3:4) | `u32 MasteryGain` | 0x1AA | `smo_ply_ItemProduce` |
+| NeededMasteryType (11:4) | `TotalMasteryType NeededMasteryType` | 0x1AE | `csl_PreProduceCheck` |
+| NeededMasteryGain (3:4) | `u32 NeededMasteryGain` | 0x1B2 | `csl_PreProduceCheck` |
+
+**2016 data.** Gather.shn: 6 rows: 29000 `Herbing` (type 0, no tool), 29002 `WoodCutting` (2, no tool) and four
+29001 `Mining` rows (1) with tools `Pickaxe`, `MinerPickaxe`, `AlchemistPickaxe`, `Kebypick` (that order; `Mining` is
+inserted four times with the same ID). `MinerPickaxe` and `AlchemistPickaxe` are not in ItemInfo, so rows 3 and 4
+need no tool: `sp_GatherCheck` returns 0x0B01 with picker 0xFFFF for them and `so_mob_CanGathered` turns that into
+0x0B0C for mining; a player with only a `Kebypick` reaches row 3 before row 6 and can never mine (Z24-B10). Produce.shn:
+216 rows, ProductID 20000 … 24082, unique and already sorted, every `ProduceIndex` = the InxName of the active skill
+with the same ID, every `Product` and `Raw` name known (at most 4 raws per recipe, no empty strings), Lot 1 … 4+.
 
 ## 8. Reload behaviour
 
@@ -818,6 +1077,11 @@ MysteryVaultServer.shn, the five Mover*.shn files (`mvdb_Load`, §5) and Charged
 MiniHouseFurniture / Riding.shn (`cideb_Load`, §6; a second call would leak the old `cideb_Array` and re-read the reader) are read once at start; after `&reloaddata ActiveSkill` every `useskill` of §1.5 dangles
 (Z20 §7). (`ITableBase::Load` clears and re-reads its reader, so a second `Table::Load<MysteryVaultTable>` would
 re-run `DataProcess` and insert every row again into the never-cleared `sm_ItemLists`; nothing calls it twice.)
+
+The §7 tables are not reloadable either: `UseClassTypeInfo.shn` (`ccdb_Load`, home), the drop groups (`igc_Load`,
+home; a second call would reset `igc_point` but keep the trie and the stacks, so every item would be appended again),
+`Gather.shn` / `Produce.shn` (`gt_Load` / `rb_Load`, wide; a second call would leak the old array). `ItemDataBox::ReadData`
+could re-read ItemInfo (it frees the old index) but has no caller after start-up (§7.3).
 
 ## Original-server bugs
 
@@ -832,8 +1096,17 @@ re-run `DataProcess` and insert every row again into the never-cleared `sm_ItemL
 | Z24-B7 | `MoverDataBox::mvdb_Load` FUN_004bf960 | MoverIDX (MoverMain) and ItemIDX (MoverItem) go into BTrees whose `bt_Insert` overwrites an equal key; only MoverID and per-mover duplicates are checked | a second mover with the same name silently takes all Ability / HG / Item / UseSkill rows of that name (the first has none); an item named by two movers summons only the last; latent in 2016 (all unique) | fatal "duplicate" check on the names too |
 | Z24-B8 | `mvdb_Load` | the fatal texts of the HG / Item / UseSkill loops say "MoverMain Data defblock" / "Data duplicate in MoveMain.shn", an unknown mover is reported as "Data duplicate … invalid mover"; the five default-block checks can never fire | misleading Assert log on bad data; dead checks | name the file and the real error |
 | Z24-B9 | `ChargedItemEffectDataBox<T>::cideb_Load` FUN_00450070 / FUN_005af300 / FUN_005af4d0 / FUN_005af6d0 | the "Same Handle" check compares row i with rows 0 … i−2 (`j < i − 1`, confirmed in the disassembly at 0x5af3e8 … 0x5af42e) | a Handle equal to the previous row's passes; 2016 ChargedEffect.shn rows 1709 / 1710 share Handle 1738, and `cideb_FindFromHandle` maps a stored buff 1738 always to the first one (`Cos_Uniform_USA_Boots01_2`, not `Hat_Uniform01`) | `j < i` |
+| Z24-B10 | `GatherProduce::GatherTable::gt_Load` FUN_0046a660 | an unknown `NeededTool<k>` name becomes tool 0xFFFF ("no tool") without a message (`rb_Load` exits on an unknown raw) | 2016: the Mining rows with `MinerPickaxe` / `AlchemistPickaxe` (not in ItemInfo) need no tool; `sp_GatherCheck` stops at them with picker 0xFFFF and mining is refused with 0x0B0C, so a player holding only a `Kebypick` (the later row) can never mine | fatal on an unknown tool, or skip the row *(inferred)* |
+| Z24-B11 | `ItemGroupClassifier::igc_Load` FUN_00490330 | after the "Invalid Item index" assert of the inlined `itemdatabox[id]` the null index is dereferenced (`ix.dataserv`); the "invalid index" check of `igc_Store` FUN_004900f0 can never fire | latent: the index is built from the same rows, so the assert cannot fire in a loaded zone | skip the row |
+| Z24-B12 | `ItemDataBox::ReadData` FUN_006494f0 (via the ctor FUN_0064b5d0) | dead code (the only `ItemDataBox` is built with path −1); it leaves `MovingShot`, `AttackAngle`, `HitTimeArray`, `eDelConditionType`, `pBuyItemData` of every index entry uninitialised and loads no ItemInfoServer / option rows | none in 2016 (never runs) | remove, or share `idb_Load`'s index setup |
 
 ## 9. Not reconstructed / uncertain
+
+- §7.1 `ccdb_BitToClass` relies on the CRT `log` / x87 rounding; the exactness claim is checked with IEEE doubles in
+  Python, not on the original CRT (an off-by-one would only matter for bits whose double logarithm lands just below n).
+- §7.2 the draw order inside a group depends on the CRT `rand` state at stage home (one `cs_Suffle(1)` per insert);
+  whether `srand` ran before is not checked. §7.3 duplicate names in `idb_Load`'s trie *(inferred)* from the same
+  `bt_Insert` loop; `idb_Load` itself is not documented here (§10).
 
 - §6.2 "no reader found" (ChargedEffect none; MiniHouse DummyType, Backimage, Casting; MiniHouseFurniture
   FurnitureType, Backimage, WALL/BOTTOM/CEILING, IsAnimation, Weight, Grip, MHEmotionID; RIDING Name, BodyType, Shape,
@@ -859,10 +1132,16 @@ re-run `DataProcess` and insert every row again into the never-cleared `sm_ItemL
 | Mover consumers: `ShineMover` (`so_smv_SummonMover` 0055fdf0, `so_smv_GetOn` 0055f380, `smv_FoodEat` 0055f110, `so_smv_CanUseFeedItem` 0055f840, `so_smv_Feeding` 0055f8e0, `so_MaxHP` / `so_SetHP` / `so_GetLevel` / `so_BodySize` / `so_WalkSpeed` / `so_RunSpeed` / `so_smv_GetMoverID`, `smv_RegenComplete` 00441fd0), player `sp_MoverSystem_Cast` / `SummonItem` / `MapLogin`, `sp_HorseItemSave`, `RidingInitHP` / `RidingInitHungry`, `MoverSkillList::msl_Store` 00449190 | Z13 (open; plan line 16 "Mounts: mover creation …, hunger") | they read the rows this item loads (§5.2 lists which member each reads); the mover lifecycle is Z13's |
 | `UseItemRide::uib_DirectUse` FUN_005995b0, `UseItemHorseFood` actor | Z04 §6.3 (done; actor table row "UseItemRide" / "UseItemHorseFood") | the ride dispatch is summarised in §5.4 because it is `mvdb_GetMoverType`'s only caller; `sp_HorseCast` / `sp_MoverSystem_Cast` bodies are Z13 |
 | `sp_NC_ITEM_MOVER_UPGRADE_REQ` FUN_0051c850 (reads `pHG.FeedType`) | Z04 §9.5 (done) | handler; this item only documents the row it reads |
-| `ItemDataBox::idb_Load` FUN_00649780, `idb_MakeSpecialID` | Z04 (done) | source of `idb_btree`, `idb_specialid`; `ItemDataBox::ReadData` is part 4 of this item |
+| `ItemDataBox::idb_Load` FUN_00649780 (ItemInfo, ItemInfoServer, GradeItemOption, ItemDropLog, ItemSort, CollectCardMobGroup, ItemMoney: 1036 decompiled lines), `idb_MakeSpecialID` | **open: follow-up item created in the sweep part (5)** | Z04 (done) uses the index (§1.2) but does not document the loader; Z01 §2.3 lists it in one row; `ReadData` (the dead stand-alone reader) is §7.3 |
 | Mini-house table consumers: `sp_MiniHouseActivCheck` 00534fe0, `mhs_Init` 00534a30, `so_mh_CreateFurniture` 00544f00, `so_mh_SaveMHInven` 005435d0, `so_mh_Move2MiniHouseFurniture` 005354a0, `smh_SendFurnitureInfo` 00546930, `smh_FurnitureActiveCheck` 005472e0, `so_mh_CanFurnitureEmotion` 005485c0, endurance `so_mh_EndureGradeDownTimeUpdate` 00547f60 / `so_mh_DoingEndureGradeDown` 00548270 / `so_ply_MH_FurnitureEndureUpdate` 00570fe0 / `so_ply_MH_FurnitureEndureUse` 00571550, dice `so_mh_DiceTaiSai_GetExpectIncomeMoney` 00516970 / `sp_DiceTaiSaiItemIDChange` 00514b40 | Z13 (open; plan line 11 "furniture create/rearrange/delete …, endurance, … the in-house dice game state, furniture emotions") | they read the MiniHouse / MiniHouseFurniture rows (§6.2 lists which member each reads); the house object is Z13's |
 | Riding.shn horse consumers: `sp_HorseCast` 0045e0e0, `sp_HorseOn` 0045f270, `so_ply_HorseFeed` 0045eaa0, `sp_HorseNotHungry` 0045d460, `sp_GetHorseFeed` 0045d510, `sp_NC_ACT_RIDE_FEEDING_REQ` 0045f9e0 (Z02 §9.1), `sp_RideInitialize` 0043d140, `UseItemRide::uib_CanUseItem` 005988b0 | Z13 (open; plan line 16 "Mounts: …, hunger (link to Z02 §9.1)") and Z04 §6.3 (actor) | readers of the RIDING rows (§6.2); the ride lifecycle is Z13's |
 | Charged-buff consumers by item: `sp_NC_ITEM_WEAPONENDURE_CHARGE_REQ` 00519470, `…SHIELDENDURE…` 00519a10, `sp_NC_ITEM_CHAT_COLOR_CHANGE_REQ` 0051e580, `sp_NC_ITEM_TERMEXTEND_REQ` 0051eb40, `UseItemChargedBuff::uib_CanUseItem` 00598310 | Z04 (done; cites each handler) | handlers that look up a ChargedEffect row by item; this item only documents the table |
 | `so_CharChargedBuffData` 0044e1e0, `so_ply_ChargedBuff` 005970c0, `ciee_Free` 00450a50, `sp_ChargedItemTest` 00451360 (GM) | Z12 §6.8 (done), Z11 (done) | stored charged buffs → `cideb_FindFromHandle` |
 | `WeaponCostumInitCharge` 00517d40 (EE_WEAPON_MAXENDURE rows) | Z17 (open; plan "Costume weapon/shield charges … how charges are refilled") | costume charge consumer |
+| Gathering / production consumers: `sp_GatherCheck` 0046ad70, `so_mob_CanGathered`, `sp_NC_ACT_PRODUCE_CAST_REQ` 0046cf90 | Z02 §8 (documented there) | readers of `gt_Array` / `RecipeBook::operator[]`; §7.4 documents the tables |
+| `smo_ply_ItemProduce` 0046c2d0, `ItemProducer::ip_WhereProductStore` 0046b880 / `ip_ProductExecute` 0046bf80 | Z07 §11 (done, documented there) | production result; reads `ProductIndex` |
+| `csl_PreProduceCheck` 0046ab70, `csl_GetDelayGroup` 00448950 | Z23 (open; plan title "CharaterSkillList … delay groups … mastery") | read `rb_Array` / the mastery columns |
+| Class checks by `UseClass`: equip handlers 0052b110 / 0052b8d0 / 0052c5b0 / 0052d020, `sp_ItemUseReq_Inven` 0053f5e0, `sp_UseItemMonimon_UseItem` 00561b80, booth search 00439c70, `ac_AllLearnSKill` 004212e0 | Z04 (done; equip / use handlers), Z06 §2.6 booth search (done), Z11 §9.3 (done) | callers of `ccdb_CheckClass` / `charclassdatabox` (§7.1 lists them); the class-change pair is cited from Z04 §12.10 / Z15 §6.5 |
+| `igc_Getitem` 004903e0, `igc_ChargedDuringUse` 00490630, `CardStack` helpers | Z09 §28.10 / §10.10 (done), Z04 (done), Z11 §9.3 (done) | readers of §7.2's groups |
+| W05 §3.2 "bit 0 = Fig … bit 26 = Sav" for the WM's `ccdb_UseClassTypeToBit` FUN_00465a90 | this item §7.1 (correction; into `docs/knowledge/Z24.md` in the sweep) | same code as the zone: Fig is bit 1 |
 | Charged-buff effect application `ChargedItemEffectElement::ciee_Activ` 00450550, `ciee_AfterLoginComplete` 00417910, `ChargedEffectChatColorItemFree::lid_Call` 00450fe0, `sp_CanChargedEnchant` 00418080 | **open: decided in the sweep part (5)** | no doc cites them yet; they apply EffectEnum / EffectValue / StaStrength (§6.2) |
