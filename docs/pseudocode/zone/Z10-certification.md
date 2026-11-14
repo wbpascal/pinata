@@ -739,9 +739,259 @@ exit the process (`xlrfunction` missing or failing: `ShineExit`); retune its own
 good answer); and, through the script, degrade combat (§6.3) or slow movement (§5.4). It never sends a packet, never
 logs a failed round and has no expiry date in the code: the only date reader is the script's `dhsmfskfWk`.
 
-## 7. Start stages and their order (part 3)
+## 7. Start stages and their order
 
-*To be written in part 3: what each stage needs from the earlier ones, checked against the script order of §4.3.*
+The script (§4.2) fixes the real order; this section reads each stage for what it takes from the earlier ones and
+checks the order against those dependencies. The tables each stage loads are listed in Z01-core §2.3 (by table) and
+§2.2 (by stage); here only the stage bodies, their cross-stage reads and their failure exits. All 16 are
+`int (lua_State*)` returning 0 results; none reads a Lua argument. Code: `clean.py re-data/exports/zone-pdb - <addr>`
+(in the plain `zone` export most stages are only labels, `LAB_…`).
+
+**Message.txt progress lines.** Before most loaders a stage appends one line to `Message.txt` (`fopen("a")`,
+`fprintf("%s\n", label)`, `fclose`). The label is the name of the global about to be loaded (`bmpdata`, `fieldlist`,
+`skilldatabox`, …, read from the `push` operands; Ghidra drops them), so the last line of `Message.txt` after a crash
+names the loader that crashed. Labels per stage are listed below; `zs_start_open` ends with `Load end`.
+
+### 7.1 The stages, in script order
+
+```pseudo
+zs_start_sky():                                            @ FUN_005ae560
+    Message.txt += sprintf("Player Buffer size : %d", 1500)      # 0x5dc = size of the player pool (Z01-core §4.2); nothing else
+
+zs_start_earth():                                          @ LAB_005ad970
+    Table::SetTableDir("../9Data/Shine/")                  @ FUN_005c74d0  # global strDirPath; every Table::Load<T>(name)
+                                                           #   (e.g. FUN_005b56c0) loads GetTableDir() + name, else
+                                                           #   assert "Fail to read  : <name>" + ShineExit(<same text>)
+    ScenarioBookShelf::sbs_LoadScripts(&scenarioshelf)     @ FUN_00509750  # scenario ("PineScript") books, read by fc_Load
+    mobhatchery = &mobhat                                  # the only writer of this pointer; FieldMap::fm_Init FUN_00464bc0
+                                                           #   calls MobHatchery::mh_Load(mobhatchery, …) FUN_004b6330 per map
+
+zs_start_black():                                          @ LAB_005ad910
+    (call of an ICF-folded empty function, shown as so_Gamble_ChangeCoin: no effect)
+    EraseOldLogList("Assert")                              @ FUN_005aa080  # append to the erase list erasefile[128][0x80];
+                                                           #   "ChargedItemLog" is never added; a 129th name → Message.txt
+                                                           #   "void EraseOldLogList(char *filename)" + ShineExit
+    EraseLog()                                             @ FUN_005aa130
+        for each listed name: FindFirstFile(<name>…"*.txt"); delete every file whose two digits after the name
+        (the month) are neither the current nor the previous month (January: 1 or 12)
+                                                           # pattern assembly partly lost by the decompiler *(inferred)*
+    protocolstore(&optsprotofunc, &zlsprotofunc, &gdsprotofunc, &glsprotofunc, &shineprotofunc, &wldmanprotofunc)
+                                                           # the 6 handler tables (Z01-core §2.2); one call each
+
+zs_start_yellow():                                         @ LAB_005ae4e0
+    HitMeList::hml_Load(worldname)                         @ FUN_004824d0  # exp tables: lh4ed, pebd, g_MaxExpGainAtGroup
+    ShineScript::ss_Load(&shinescriptetc, worldname, "ETC")
+    ShineScript::ss_Load(&shinescriptmenusting, worldname, "MenuString")
+    if shinescriptetc.ss_String("DeamonDead") == "":
+        assert "ZoneServer_zs_start_yellow : DeamonDead needed"; ShineExit("ZoneServer::ZoneServer_zs_start_yellow")
+
+zs_start_home():                                           @ LAB_005adce0
+    KQScriptManager::kqsm_Load(worldname)                  # kingdom-quest scripts (not in Z01-core §2.2)
+    then, labels DamageBySoul, MobRegist, MobDataBox, MapData, ItemData, ItemGroupClassifier, SubAbstateDic,
+    AbstateDic, RandomOptionTable: the loaders of Z01-core §2.3 "home", including
+    MapClusterManager::cm_Init, MobDataBox::mdb_Load, MapDataBox::mdb_Load, ItemDataBox::idb_Load, AbState::as_Load,
+    and CharClassDataBox::ccdb_Load("../9Data/Shine/UseClassTypeInfo.shn"), FieldLevelDataBox::fldb_Load
+
+zs_start_house():                                          @ LAB_005b64e0
+    ShineCommonParameter::scp_Load(worldname)              @ FUN_004c9be0  # ChrCommon.txt → shineparam (§5.4): run 127 / walk 33
+    CharClassManager::ccm_Load(worldname)                  @ FUN_0044a5c0
+    NPCManager::nm_Load(worldname)                         @ FUN_004c58c0  # World/<w>/NPC.txt, else World/NPC.txt
+        per Merchant NPC: NPCItemList::nilt_ReadTable      @ FUN_004c5130
+            → ItemListOption::ilo_PacketMake               @ FUN_004c4de0  # item InxName → itemdatabox.idb_btree (home);
+                                                           #   unknown name → assert + ShineExit("…ilo_PacketMake")
+    Table::Load<…> × 10: GuildTournamentScore/LvGap/Occupy/Skill/MasterBuff, GTIGetRate, GTIGetRateGap, GTIServer,
+                         GTIBreedSubject, GTWinScore                    # need earth's table dir
+
+zs_start_wide():                                           @ LAB_005ad9a0
+    labels bmpdata, fieldlist, skilldatabox, passivedatabox, upgradedatabox, merchantcity, gathertable, recipebook,
+    useditemeffect, kqreward, each before its loader:
+    BmpDataBox::bdb_ReadData
+    FieldContainer::fc_Load(worldname)                     @ FUN_004655f0  # World/Field.txt; reads zoneserver (own maps),
+                                                           #   mapclustermanager (home), scenarioshelf (earth), itemdatabox (home);
+                                                           #   per map FieldMap::fm_Init → mh_Load(mobhatchery) (earth)
+    SkillDataBox::sdb_Load                                 @ FUN_00585f40  # fills skillnametree; reads dic_abstate (home), bmpdatabox
+    PassiveDataBox::pdb_Load, UpgradeDataBox::udb_Load, MerchantCityData::mcd_Load, GatherTable::gt_Load,
+    RecipeBook::rb_Load,
+    UsedItemEffect::uie_Load                               @ FUN_0059cc30  # reads itemdatabox, dic_abstate (home)
+    KQRewardDataBox::kqrdb_Load
+
+zs_start_tough():                                          @ LAB_005b0540
+    labels itemusefunction, magiccontainer, mobattseq, chargedbuffdatabox, minihousedatabox,
+    minihousefurnituredatabox, minihouseobjanidatabox, kqregentable, g_AIScriptMobContainer, g_AIScriptPetContainer:
+    ItemUseFunction::iuf_Load                              @ FUN_0049b770  # reads useditemeffect (wide), itemdatabox (home)
+    MagicContainer::mc_Load, MobAttackSequence::mas_Load
+    for ChargedEffect.shn, MiniHouse.shn, MiniHouseFurniture.shn:
+        skill = UsedItemEffect::uie_UseSkillID("UseSkill")  @ FUN_0059cba0  # skillnametree + skilldatabox (wide); not found,
+                                                           #   passive or no data → assert, NULL (no exit)
+        ChargedItemEffectDataBox<…>::cideb_Load(file, &ui_…, skill)
+    MiniHouseObjAniDataBox::mhoadb_Load, KQRegenTable::kqrt_Load, AIScriptMobContainer::aismc_Load,
+    AIScriptPetContainer::aispc_Load
+
+zs_start_sun():                                            @ LAB_005adbd0
+    labels ridedatabox, ui_ride, Roaming Data, miscdatatable:
+    RidePetDataBox::rpdb_Load
+    UseItemRide::uir_SetSkill(uie_UseSkillID("UseRide")); UseItemPet::uip_SetSkill(uie_UseSkillID("UseSumPup"))   # wide
+    MobRoaming::MobRoamingSet::mrs_Load(worldname)         @ FUN_004b8690
+    MiscDataTable::mdt_Load
+
+zs_start_moon():                                           @ LAB_005ae250
+    ItemMall::im_Load                                      @ FUN_00493250
+    ItemEquipTable::iet_Load
+    ZoneIPContainer::zipc_SetNextIP(zs_worlddata().nZoneNo)  # ring neighbour (Z01-core §10); ZoneServerInfo was read before the script
+    CharacterTitleData.shn (key 0x998, row 0xac), CharacterTitleStateServer.shn (100, 0x26), AnnounceData.shn
+    (0x23b, 0x108), ClassName.shn (no check), ItemUpgrade.shn (0x51, 0xe)
+        each failure: assert "Fail to read <file>" + ShineExit("ZoneServer::ZoneServer_zs_start_moon")
+
+zs_start_full():                                           @ LAB_005b6580
+    label "SHN - AccUpGradeInfo.shn"; AccUpGradeDataBox::augdb_Load, failure → ShineExit("ZoneServer::zs_start_old")
+                                                           # (original bug) Z10-B20: wrong stage name in the exit log
+    Table::Load<…>: AccUpGrade, DamageLvGapPVE, DamageLvGapEVP, DamageLvGapPVP, BelongDice, MysteryVaultServer
+    label _MultiHitTable; MultiHitTable::mht_Load
+
+zs_start_sink():                                           @ LAB_005aeff0
+    ItemDismantle.shn (0x253a, 0x66), failure → ShineExit("ZoneServer::ZoneServer_zs_start_sink")
+    err = gQuestData.m_ReadError                           # read BEFORE the call (asm 0x5af07a)
+    if !CQuestData::Read("../9Data/Shine/QuestData.shn", 0):
+        assert("Fail to read Quest.shn Error Type", err); ShineExit(NULL)   # (original bug) Z10-B21: stale error type
+    if !CQuestParserScript::LoadConvertIDfromIndexName("../9Data/Shine/World/QuestParser.txt"):
+        assert "QuestParser.txt"; ShineExit(NULL)
+    n = QuestData.NumOfQuest (0 without data); n > 3000 → assert "Too Many Quest (MAXQUEST …)"; ShineExit(NULL)
+    for slot in 0 .. 1499:                                 # every player object of the pool (type 2), allocated by
+        CQuest::InitQuestBF(player[slot].quest (vt 0x808), n)   @ FUN_0062f130   # som_Initialize before the script
+        failure → assert("Fail to player quest bf alloc", slot, n); ShineExit("ZoneServer::ZoneServer_zs_start_sink")
+
+zs_start_star():                                           @ LAB_005adfa0
+    MiniHouseFurnitureObjEffect.shn (0x1213, 0xd2); MiniHouseEndureDataBox::mhe_Load; DiceRate.shn (10, 4);
+    DiceGame.shn (0x831, 0x2c; message says 'DiecGame.shn'); DiceDividind.shn (0xa7e, 0x1f);
+    row 0 of DiceDividind: DiceTaiSai::Init(byte +0x1e); DiceTaiSaiDividind::Init(rate r, u16 at +2r) for every
+    DividendRate; not complete → assert 'DiceDividind.shn' 2; ItemMix.shn (0x2c, 0x40)
+        each failure: assert + ShineExit("ZoneServer::ZoneServer_zs_start_star")
+
+zs_start_sleep():                                          @ LAB_005b67c0
+    MobDataBox::mdb_SkillStore(&skillnametree, &dic_abstate.as_BTreeIndex)   @ FUN_00642630
+        per MobWeapon row: owner by InxName (home), Skill name → skillnametree (wide; unknown → assert only),
+        StaName → abstate (home; unknown → assert only); GroupAbState names → abstate (unknown → ShineExit);
+        MobRegenAni rows → mob (unknown or duplicate → ShineExit), its GroupAbStateIDX must exist (else ShineExit)
+    WeaponTitleData.shn (0x6c0, 0x40) else "ZoneServer::zs_Init : WeaponTitleData loading failed."; weapontitle = &gWeaponTitle
+    World/NPCAction.txt conditions + actions, NPCAction::Util::loadTriggers
+    Table::Load<…>: ActionRangeFactor, ItemActionCondition, ItemActionEffect, ItemAction
+    ActionViewInfo, MapLinkPoint, MapWayPoint, GBHouse, GBExchangeMaxCoin, GBJoinGameMember, GBDiceDividind,
+    GBDiceGame, GBDiceRate (+ GBDiceTaiSai from row 0 as in star; failures say "ZoneServer_zs_start_star"),
+    NpcSchedule, ReactionType, AdminLvSet
+    AmpCmdInit()                                           # GM '&' command table (Z11)
+    Table::Load<…>: SetEffect, ActionEffectItem, ActionEffectAbState; JobEquipInfo; the 14 View/*.shn;
+    MobConditionChecker, SingleData, MarketSearchInfo, MoverUpgradeData, PetData, BadNameFilter, StateItem,
+    ChatColor, TermExtendMatch, Minimon, MinimonAutoUseItem, ChargedDeletableBuff, KQItem, BRAccUpgrade
+        most failures: ShineExit("ZoneServer::zs_start_old")       # (original bug) Z10-B20
+    if !ShnDataFile.isFileLoadAllComplete():               @ FUN_006313f0  # InitCheckSumCnt == 49
+        assert("Fail to read SHN Data File. ", ShnDataFile.NotLoadFileName())   @ FUN_00631400 (first unmarked name)
+        ShineExit(NULL)
+
+zs_start_open():                                           @ LAB_005b6640
+    Table::Load<EnchantSocketRateTable>("EnchantSocketRate.shn")   @ FUN_005b56c0
+    now = clockwatch.cw_CurrTick
+    reserve event { due = now + 300, handler = &eventheartping, period = 300 }   # zonevent pool; none free →
+    reserve event { due = now + 10,  handler = &eventmobregen,  period = 10 }    #   "ZoneServer::zs_Init : EventReserve error" + ShineExit
+    label npcmanager;  NPCManager::nm_SetNPC()             @ FUN_004c6560  # spawn the NPCs into the NPC pool; reads
+                                                           #   mobdatabox (home), gNpcSchedule (sleep), the maps (wide)
+    label ::fieldlist.l_4AllInList;  for each map: FieldMap::fm_StartScript   @ FUN_005ad800
+        if map.fm_FieldOption.script != "-": Movie::CinemaComplex::cc_PlayFilm(map.fm_Multiflex, script, map id)
+    label "Load end"
+
+zs_start_long():                                           @ FUN_005b8c00
+    shineparam.chrrunspeed = 5; chrwalkspeed = 10          # §5.4: the script restores 127 / 33 right after
+    SpamerPenaltyDataBox::spdb_Load
+    FieldContainer::fc_AbstateInFieldLoad()                @ FUN_00464950  # StateField.shn: abstate by name (home) per map (wide)
+    MapBuffDataBox::mbdb_Load; boss content (ServentBuffBoss, ListOfMobStateCheckAtDead, MobAutomaticActionList);
+    CollectCard tables (+ indexing); GBBanGame, GBTaxRate, GBEventCode, GBReward; slot machine screens, analyse,
+    jackpot ranking
+    CGambleObjectManager::gom_Init()                       @ FUN_00615a00
+        walk the NPC pool (type 4): count NPCs whose MobInfo.Type (vt 0x708 → mobdatabox) is MT_GB_DICE / MT_GB_SLOTMACHINE;
+        allocate that many CGambleDiceTaiSaiObject (0x570) / SlotMachineCluster (0xb8); bind each to its NPC (vt +8),
+        a bind failure returns 0 (result ignored by the stage)
+    CLCReward::clcr_Load; MoverDataBox::mvdb_Load          @ FUN_004bf960  # reads useditemeffect (wide), itemdatabox (home)
+```
+
+The SHN completeness check at the end of `sleep` covers 49 files (`CShnDataFileCheckSum::CShnDataFileCheckSum`
+FUN_00631450 names them; each SHN load marks its entry through `InitDataFileCheckSum` FUN_006311a0, Z01-core §5.2):
+Abstate, ActiveSkill, CharacterTitleData, ChargedEffect, ClassName, Gather, GradeItemOption, ItemDismantle, ItemInfo,
+MapInfo, MiniHouse, MiniHouseFurniture, MiniHouseObjAni, MobInfo, PassiveSkill, Riding, SubAbstate, UpgradeInfo,
+WeaponAttrib, WeaponTitleData, MiniHouseFurnitureObjEffect, MiniHouseEndure, DiceDividind, ActionViewInfo,
+MapLinkPoint, MapWayPoint, the 14 View tables, SingleData, MarketSearchInfo, ItemMoney, PupMain, ChatColor,
+TermExtendMatch, MinimonInfo, MinimonAutoUseItem, ChargedDeletableBuff. They are loaded by home, wide, tough, sun,
+moon, sink, star and sleep itself; none by full, open or long.
+
+### 7.2 Dependencies between the stages
+
+Each row is a read of one stage's result by a later one, found in the code above; "breaks" is what happens when the
+order is reversed.
+
+| # | Must run before | Because | Breaks if reversed |
+|---|---|---|---|
+| D1 | earth → house, full, sleep, open, long | `Table::Load<T>` uses the table dir set by earth | file not found → `Fail to read  : <name>` + ShineExit *(inferred: cwd is the zone folder)* |
+| D2 | earth → wide | `fm_Init` → `mh_Load(mobhatchery)`; `fc_Load` reads `scenarioshelf` | NULL `this` in mh_Load → crash *(inferred)* |
+| D3 | home → wide | `fc_Load` (mapclustermanager, itemdatabox), `sdb_Load` / `uie_Load` (dic_abstate) | unknown abstate / item names, empty clusters *(inferred)* |
+| D4 | home → house | NPC shop lists resolve item names in `itemdatabox` | ShineExit("…ilo_PacketMake") on the first merchant |
+| D5 | wide → tough, sun | `uie_UseSkillID` needs skills; `iuf_Load` needs `useditemeffect` | `uie_UseSkillID : Not found` asserts, NULL skill for charged items, rides, pets |
+| D6 | home, wide → sleep | `mdb_SkillStore` resolves mob skills / abstates | asserts for every weapon; ShineExit on group abstates |
+| D7 | home, wide, tough, sun, moon, sink, star → sleep | sleep's SHN completeness check (49 files) | `Fail to read SHN Data File. <name>` + ShineExit |
+| D8 | house, wide, sleep → open | `nm_SetNPC` spawns the NPCs of `nm_Load` on the maps of `fc_Load` with `gNpcSchedule` | no NPCs / NULL schedule *(inferred)* |
+| D9 | open → long | `gom_Init` binds dice and slot-machine games to **spawned** NPCs | 0 gamble NPCs found: no gamble games, silently |
+| D10 | home, wide → long | `fc_AbstateInFieldLoad` (maps, abstate names), `mvdb_Load` (useditemeffect) | map abstates missing, mover items unbound *(inferred)* |
+| D11 | long → `ekfflrlthreh` / `rjerlthreh` | long writes 5 / 10 into the speed factors | players move at 5/127 and 10/33 of normal speed (§5.4) |
+| D12 | black, all data stages → `tmfpemfjs` services | the acceptor and the main thread use the handler tables and the loaded world | packets into empty tables, events on empty maps *(inferred)* |
+
+No later stage was found to read the results of **sky** (log only), **yellow** (its ShineScript strings and exp
+tables are read at run time), **moon**'s ring neighbour (used by the services), **full** or **star** (except through
+D7). The script order `sky earth black yellow home house wide tough sun moon full sink star sleep open long` satisfies
+D1–D12. The constraints that fix its shape are D7 (sleep after every loader of a checksummed file), D8 (open after
+sleep) and D9 (long after open: the gamble manager needs spawned NPCs, which is why `zs_start_open`'s `Load end` is
+not the last stage); D11 is the trap that makes the script call mandatory. Any order consistent with D1–D12 is
+equivalent *(inferred: only the reads listed were checked, not every loader's internals)*; a rebuild should keep the
+script order as is.
+
+## 8. 2015 zone: same mechanism
+
+The 2015 zone (`Files/Server/2015/w00_Zone00/5ZoneServer2.exe`, linked 2015-11-17; 2016: 2016-06-02) has the same
+mechanism, read from its strings and disassembly (no export exists):
+
+- the same Lua names (`tmfpemfjs`, `chrlghk`, `xlrfunction`, `vmflsxm`, `fpwltmxmcheck`, `dhsmfskfWk`,
+  `ekfflrlthreh`, `rjerlthreh`), the same 16 `zs_start_*` and 6 `zs_service_*` globals, the same request strings
+  (`GR.php`, `wkdbdmldutlstkd`, `title`/`nation`/`world`/`machine`), `[%d][%d]` / `[%d][%d]%d`, the registry values
+  `Natural` / `Desert`;
+- boot fetch (0x5aeae4): `127.0.0.1:58492` first, then the fallback **`cert.fo.gamigo`:80** (2016: `cert1.fo.gamigo`);
+- certification thread (0x5a9650): the same one local attempt, then `cert.fo.gamigo`:80, and the same expected answer
+  `((2x − 3)·x + 5)·x − 7` (0x5a96fe…0x5a970e);
+- `zs_start_long` (0x5b65b5) writes the same 5 / 10 into the speed factors.
+
+So the only change between the two builds is the fallback host name. The GamigoZR answer (§4) works for both.
+
+## 9. Recommendation for a rebuild
+
+**Drop the whole mechanism.** It is copy protection, not game logic: it sends no packet to any client or server and no
+other binary takes part (§1). A rebuilt zone:
+
+1. Runs the 16 data stages **in the script order** (§7.2: `sky earth black yellow home house wide tough sun moon full
+   sink star sleep open long`) as plain code, then starts the services in the script order: IOCP workers
+   (2 × CPUs + 1), main thread, acceptor, optionally the stack-checker watchdog (§6.4). `zs_service_multisocket` is
+   empty and the certification thread (§6.2) is left out.
+2. Does **not** write 5 / 10 in `zs_start_long`; the movement factors stay as `ChrCommon.txt` sets them in
+   `zs_start_house` (127 / 33, the same values the script writes). If a hard-coded value is wanted: run 127, walk 33.
+3. Leaves out: the HTTP fetch and its hosts (§2), the cipher and the GBO keys (§3), the `Fantasy\Fighter` registry
+   gates (§4.3), the Lua host for the start script (§5; the AI / pet Lua scripts of `zs_start_tough` are a separate
+   host, Z09), the per-minute certification counter and kill switch (§6.1) with `xlrfunction`,
+   `g_LuaArgument` (`Interval` 10000, `MaxSkip` 10 only drive the certification).
+4. Keeps the combat factor `lsf_Factor` at exactly **1.0** (§6.3): with the real script it is reset to 1.0 every
+   minute before any combat, so the constant reproduces the 2016 behaviour. The GM command `&mobdamage` (Z11) is the
+   only other writer; keep it only if that command is kept.
+5. Keeps the parts that are not protection: the Message.txt progress labels (§7, useful to locate a failing loader),
+   the SHN completeness check at the end of `zs_start_sleep`, the two recurring events of `zs_start_open`, the
+   Assert-log clean-up of `zs_start_black`.
+
+**Running the original 2016 zone** instead needs: `GBO.reg` and `Fantasy.reg` imported (§2.5, §4.3), something that
+answers `GET /GR.php?act=boot…` on 127.0.0.1:58492 with the GamigoZR body (§4.2), and, to avoid the halt after about
+76 days (§6.6), an answer to `act=<x>` of the form `[10000][10]<2x³ − 3x² + 5x − 7>` (int32 arithmetic, §6.2 test
+vectors). GamigoZR does not do the latter; restarting the zone at least every 11 weeks has the same effect.
 
 ## Original-server bugs
 
@@ -768,3 +1018,5 @@ logs a failed round and has no expiry date in the code: the only date reader is 
 | Z10-B17 | cpp_Print FUN_005d5c70 (`vmflsxm`) | `sprintf(buf[256], "Script : %s", text)` with no length limit; the `fopen` result is not checked | text > 246 characters overflows the stack; a non-writable Message.txt → `fprintf(NULL)` crash | `snprintf`; check the file |
 | Z10-B18 | g_LuaArgument (main thread ↔ certification thread) | `CertifyArg`, `Interval`, `MaxSkip`, `SkipNumber` are shared by two threads without a lock; the certification thread clears `CertifyArg` after its round | a challenge set by the main thread during a running round is wiped: that round is lost (no failure counted, next challenge only after another `Interval`) | hand over the challenge atomically (interlocked exchange) |
 | Z10-B19 | ZoneServer::zs_ServiceThreadFunction FUN_005a9d90 / WinService::serviceLoop FUN_00653480 | when `tmfpemfjs` fails (returns -3) or did not start the main thread (`Bad`), the service thread just ends; the service status was already set RUNNING by `onServiceStart` | an unusable zone shows as running in the service manager, with no hint beyond Message.txt | report SERVICE_STOPPED with an exit code |
+| Z10-B20 | zs_start_full / zs_start_sleep (LAB_005b6580 / LAB_005b67c0) | the exit labels of most loaders in `full` and `sleep` say `ZoneServer::zs_start_old`; the GBDiceDividind failures in `sleep` say `ZoneServer_zs_start_star` (copied from `star`); `sink`'s quest failures pass `NULL` | the ExitLog names the wrong stage (or none); `Message.txt`'s last label still points at the right loader | the stage's own name, as `moon`, `star` and `sink` (ItemDismantle) do |
+| Z10-B21 | zs_start_sink LAB_005aeff0 | `gQuestData.m_ReadError` is read before `CQuestData::Read` (asm 0x5af07a) and that old value is logged by `Fail to read Quest.shn Error Type` | the log shows the error type from before the load (presumably 0 at start *(inferred)*), not the reason it failed | read `m_ReadError` after the call |
