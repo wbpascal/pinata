@@ -368,7 +368,7 @@ CSocket_IOCP::Send(s, data, n):                    @ FUN_004666f0
             !ok and GetLastError() != ERROR_IO_PENDING:
                 err ∉ {WSAENOTSOCK 10038, WSAECONNRESET 10054, WSAECONNABORTED 10053, WSAESHUTDOWN 10058,
                        WSAEINVAL 10022, ERROR_NETNAME_DELETED 64}: log "CSocket_IOCP::Write %#x(%#x) err=%d"
-                cShineLogSystem::SLS_AddLog(gSocket_IOCP_Write, …)   # daily "Socket_IOCP_Write" log, W05 §5.7
+                cShineLogSystem::SLS_AddLog(gSocket_IOCP_Write, …)   # daily "Socket_IOCP_Write" log, W05 §5.7; never written (W05-B20)
                 FreeBuffer(s); unlock; return 0    # the queue is dropped; the socket is not closed here
         elif m_pFirstBuf == m_pLastBuf or m_pLastBuf.m_dwSize + chunk > 0x2000:
             m_pLastBuf.m_pNext = b; m_pLastBuf = b # new queue entry (the buffer in flight is never appended to)
@@ -1373,3 +1373,164 @@ Zone, the quest-script parser `CQuestParserScript`, §2.5): no other caller of a
   or a `LINK`'s `Comment` is ever filled is unknown.
 - Whether Account / AccountLog / Character / GameLog link the same `CGdp` is not compared (no PDB); none of them
   contains the `GDPID` constant, so the container mode is dead there too.
+
+## 4. Library users and small helpers (sweep)
+
+What sits directly on top of the library and no other item cites. The rest of each server's process layer is
+documented per server (WM: W05 §1, §4; Zone: Z10 §6.5, Z09 §1.5, Z01 §1; Login: `login-server.md` §2 and the
+follow-up item L01, §7).
+
+### 4.1 Helpers
+
+```pseudo
+CGTimer::GetTime(): return timeGetTime()          # ms since boot   @ FUN_00467bb0 (Login FUN_00412870, Zone FUN_00650700)
+    # every library timestamp (accept time §1.4, session m_LastReceiveTime / m_LastSendTime §1.6) is this value
+```
+
+`GetLastErrorStr` (FUN_0045ff10), `ShineExit` (FUN_004673f0) and `cShineLogSystem::SLS_AddLog` (FUN_00467530) are
+W05 §6.4 / §5.7; Login / Zone copies: `GetLastErrorStr` FUN_00410050 / FUN_0064efe0, `ShineExit` FUN_004121b0 /
+FUN_0063c7c0, `SLS_AddLog` FUN_00412bc0 / FUN_00648570.
+
+### 4.2 Destructors that tear the library down
+
+```pseudo
+CServerInfo::~CServerInfo(si):                    @ FUN_004037d0   (WM; Login FUN_00401000; Zone has none, below)
+    CCsl::Close(&si.m_Csl); CToken::~CToken(&si.m_Csl)      # rows and formats freed by Close (§2.3.8)
+
+ZoneServer::~ZoneServer(z):                       @ FUN_005aa6f0
+    ~ClientSessionManager(z.zs_clientsessionmanager)        # Z01
+    CSocket_Acceptor::~CSocket_Acceptor(z.zs_Acceptor)      # §1.4 (FUN_00652bb0)
+    CIOCP::~CIOCP(z.zs_IOCP)                                # = WM / Login CIOCP::Close (§1.3, §1.9)
+    CCsl::~CCsl(z.zs_serverinfo)                            # CServerInfo is torn down as its CCsl member
+
+LoginServer::~LoginServer(l):                     @ FUN_00401010
+    reverse member order: COTPLogin, OPTool parser table + pool, WM parser table + pool, client parser table + pool,
+    AccountLog parser table + session, AccountDB parser table + session, CIOCP::Close(m_IOCP),
+    ~CSocket_Acceptor(m_Acceptor), ~CCsl(m_ServerInfo)
+    # the two DB sessions are destroyed through ~CLoginWorldManagerSession FUN_00408cf0: identical bodies folded by
+    # the linker (inferred), same code as ~CLoginBaseSession below
+
+CLoginBaseSession::~CLoginBaseSession(s):         @ FUN_00408d60   (WM ~CWMBaseSession FUN_0042fbc0, W05 §6.2)
+    s.m_IOCP_Process.vftable = CIOCP_Process_Interfece; ~CPacket(s.m_Packet); ~CSocket_IOCP(s.m_SocketIOCP)
+```
+
+### 4.3 Login process glue the library reaches
+
+The Login counterparts of WM W05 §1.1 / §1.6 / §6.2 that `login-server.md` does not cite. Same shape as the WM.
+
+```pseudo
+LoginServer::LoginServer(l):                      @ FUN_004029e0
+    construct m_ServerInfo (CServerInfo, §2.5), m_Acceptor (§1.4), m_IOCP (§1.3), AccountDB / AccountLog sessions and
+    parsers, client / WM / OPTool pools and parsers, m_OTPLogin
+    m_ConnectSocket_BindIP[16] = 0; m_bOnStopService = m_bProcessLinked = 0; m_MainWorkStep = MAIN_WORK_NONE
+    m_strHashValue[0x80] = 0
+    m_LoginUserRatable[256] = { 3, 5, 8, 10, 30, 95 } each    # 6 ints per entry (nWMSUS_1 …); meaning: L01
+
+LoginServer::OnStart_Service(l):                  @ FUN_004032b0   (WM: W05 §1.1)
+    n = 2 × GetSystemInfo().dwNumberOfProcessors
+    CIOCP::Start(m_IOCP, n, 1) != n → return false           # §1.3: returns the number of workers started
+    Start_Acceptor(l) == 0 → return false
+    m_isPermitServer = 1
+    Start_MainThread(l) == 0 → return false                   # FUN_00403200: CreateThread(MainThread), Sleep(5)
+                                                              # until it sets m_bActiveMainThread; fail → log
+    m_MainWorkStep = MAIN_WORK_LINK; return true              # the main loop: login-server.md §2
+
+LoginServer::Start_Acceptor(l):                   @ FUN_00401740
+    CSocket_Acceptor::Listen_Start(m_Acceptor) → log "<SUCCESSED START ACCEPTOR>", 1; else "*FAILED START ACCEPTOR*", 0
+    # the listen ports are added before (Listen_OPTool / Listen_WorldManager / Listen_Client, login-server.md §2)
+
+LoginServer::ProcessStop(l):                      @ FUN_00402820   (WM: W05 §1.6)
+    Listen_Stop(m_Acceptor); log "<STOPPED ACCEPTOR>" (or "*FAILED STOP ACCEPTOR*")
+    CIOCP::Close(m_IOCP); log "<IOCP CLOSED>"                 # workers gone before any session is closed
+    DissconnectAllSessions(client pool); client FreeSessions
+    DissconnectAllSessions(WM pool); WM FreeSessions
+    CLoginBaseSession::Close(m_AccountDB); CLoginBaseSession::Close(m_AccountLogDB)
+    DissconnectAllSessions(OPTool pool); OPTool FreeSessions
+    ViewStopInfo(l)                                           # one log line per step in between
+
+CLoginBaseSessionManager::DissconnectAllSessions(m):   @ FUN_00409250
+    if m_NumSessions: for node in m_pActiveSessions list: node.pSession → CLoginBaseSession::Close   (§1.6)
+
+CLoginBaseSessionManager::ProcHeartBeat(m, iocp):      @ FUN_00409280   (WM: W05 §1.5)
+    for node in m_pActiveSessions (next taken before the call):
+        CLoginBaseSession::CheckHeartBeat(node.pSession) == 0 → CSocket_IOCP::CloseUseIOCP(&node.pSession.m_SocketIOCP, iocp)
+        # CheckHeartBeat FUN_00408f30: login-server.md §3.1
+
+CLoginBaseSession::CLoginBaseSession(s):          @ FUN_00409140   (WM: W05 §6.2)
+    CSocket_IOCP(s.m_SocketIOCP) (§1.5); CPacket(s.m_Packet) (§1.7); s.m_IOCP_Process.vftable = CIOCP_Process_LSession
+    m_Connected_Server_ID = 10 (SERVER_ID_UNKNOWN); m_Connected_World = m_Connected_Zone = 0
+    m_Status = SESSION_STATUS_EMPTY; m_Connected_Time = GetLocalTime(); m_LastReceiveTime = m_LastSendTime = GetTime()
+    m_LastHeartBeatSendTime = 0
+    for ov in (Write, Read, Close): ov.pIOCP_Process.m_pProcess = &s.m_IOCP_Process; ov.pData = s
+        # the wiring §1.6 relies on: a completion reaches CIOCP_Process_LSession::IOCP_Process with pData = session
+```
+
+Login's `CServerInfo` (FUN_004104d0 … FUN_00410810) is instruction-identical to the WM's (`asmcmp.py CServerInfo`),
+plus `GetNumOfData()` FUN_00410520 (`return m_Csl.m_NumDatas`) and the two world accessors of §2.5. Its row lookups:
+`GetServerInfo(out, index)` FUN_004105c0 (row must have `dwID == 3`, the `SERVER_INFO` format in Login's order; fills
+`pName`, `nServerID`, `nWorldNo`, `nZoneNo`, `nServerIDFrom`, `pIP`, `nPort`, `nBackLog`, `nMaxAccept` from columns
+0–8, strings as pointers into the row), `GetServerIndex(id, world, zone, from)` FUN_00410670 (first `dwID == 3` row
+whose columns 1–4 match, else −1) and `GetServerInfo(out, id, world, zone, from)` FUN_00410810 (= index lookup, then
+the first). The WM bodies are W05 §5.2.
+
+## 5. Original-server bugs
+
+| ID | Handler | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| S02-B1 | `CSocket_Acceptor::AcceptThreadRing` FUN_00463ee0 (ADD) | a failed `bind` / `listen` calls `WSACleanup` (ordinal 116) and does not close the new socket | one leaked socket per failed listen; the WinSock reference count drops | `WSAGetLastError` (111) for the log, then `closesocket` |
+| S02-B2 | same | `getsockname(s, &addr, namelen = 4)` | always fails; the slot's address stays 0 (never read) | `namelen = sizeof(sockaddr_in)` |
+| S02-B3 | `CIOCP::Register` FUN_00464380 | creates the port when the handle is −1, but it is 0 before `Start`; `CreateIoCompletionPort(h, 0, …)` then makes a new port per socket | dead in practice (Start runs first); a Register before Start would bind the socket to a port no worker waits on | test `== 0` / create in the ctor |
+| S02-B4 | `CSocket_Acceptor::Listen_Stop` FUN_00463e10 | decrements `m_NumOfListen` for all 10 slots | the count ends negative; no effect (process stopping) | decrement only for used slots |
+| S02-B5 | `CSocket_IOCP::Connect` FUN_004665b0 | blocking `connect` without timeout on the main thread | a silent peer host stalls the WM main loop ~21 s per retry (inferred) | non-blocking connect / `ConnectEx` |
+| S02-B6 | `CSocket_IOCP::Send` FUN_004666f0 | no limit on the queued buffers; buffers are never returned to the heap | a peer that stops reading grows the process without bound | cap the queue and close the session |
+| S02-B7 | `CSocket_IOCP::WriteCallback` FUN_00466240 | a partial write drops the rest of the buffer and the whole queue, socket stays open | the peer's byte stream loses data mid-frame, so its framing desyncs | re-issue the write for the unsent rest |
+| S02-B8 | Zone `IOCPProcessSession::IOCP_Process` FUN_005a6820 | no `IOCP_CloseProcess` override; a failed completion does not mark the session | a reset connection stays until the heartbeat check (30 s, then 180 s) | mark state 3 like WM / Login |
+| S02-B9 | `CIOCP_Process_LSession::IOCP_Process` read path FUN_0042fe90 (WM; Login / Zone copies §1.9) | adds the bytes, then re-reads `m_WritePosition` for the free space | a one-instruction window lets the main thread compact and re-arm; then two `ReadFile`s share one OVERLAPPED | compute the free space from the local value |
+| S02-B10 | `CPacket::IsValidPacket` FUN_00467820 | long frames with size2 0 / 1 pass (`n = 3 / 4` > 2) | dispatched with len 0 / 1 and an opcode taken from the next frame's bytes | require size2 ≥ 2 |
+| S02-B11 | `CCsl::MakeData` FUN_00461240 | `<ARRAYSRT>` writes nothing but the row size and `GetData` count 4 bytes | every column after it is read 4 bytes off | write (or skip) the 4 bytes consistently |
+| S02-B12 | `CCsl::MakeFormat` FUN_00460ea0 | format inheritance indexes the format list as an array (`m_pFormats + i·0x4c`) | only the first format can be inherited; others read heap | walk the linked list |
+| S02-B13 | `CToken::GoStartString` FUN_0045a380 / `GetTokenString` FUN_0045a6f0 | scans for `"` without bound; `""` leaves `m_pToken` on the unterminated quote | a missing quote or `""` before another string column reads past the buffer | bound the scan; NUL-terminate the empty string |
+| S02-B14 | `CToken::my_tcstok` FUN_0045a170 | returns `""` (not null) when only delimiters remain | a script without `#END` ending in whitespace fails with `'' - UNKNOWNED.` | return null at the end |
+| S02-B15 | `CCsl::CCsl(parent)` FUN_00461ea0 | include reader's `m_pDummyNull` not set | EOF inside a row of an included file passes an uninitialised pointer to `atoi` / `atof` | copy it from the parent / call Clear |
+| S02-B16 | `CToken::GoNextLine` FUN_0045a330 | with LF-only files a remark token ending at the line end skips the next line too | LF files silently lose rows (505 of 530 in `DefaultCharacterData.txt`) | skip to the next LF from the token start |
+| S02-B17 | `CCsl::Read` FUN_00461730 | success paths never close the file handle; failure paths leak the chunk buffer | one handle per `#READ` | close / free on every path |
+| S02-B18 | `CCsl::IncludeFile` FUN_00462090 | re-tokenises from the saved position after the include | an include name with a space or comma leaves its tail as a token and fails the read | skip the whole quoted name |
+| S02-B19 | `ProcRemark` FUN_00460c90, `MakeFormat` FUN_00460ea0, `MakeData` FUN_00461240 | unbounded `strcpy` into STRING [512], FILENAME [260], remark markers [64], format name [64] | a long value overflows the row / reader | bounded copy |
+| S02-B20 | `CCsl::GetDataToken` FUN_00461190 | EOF inside a data row increments `m_NumFormatErrors` | the message counts it as a format error | `m_NumDataErrors` |
+| S02-B21 | `CCsl::MakeData` FUN_00461240 | `[…]` optional column types consume a value like `<…>` | a short row silently takes its missing values from the next row | stop at the line end for optional columns |
+| S02-B22 | `CCsl::CCsl(CCsl* null)` FUN_00461ea0 | builds a temporary `CCsl` on the stack instead of initialising `this` | dead (only caller passes `this`) | call `VarClear` / `Clear` on `this` |
+| S02-B23 | `CGdp::SetFilePointer` FUN_0045f360 (FILE_END) | method / high-pointer arithmetic mixed | dead in 2016 (container mode, §3.2) | – |
+| S02-B24 | `CGdp::CreateFileA` FUN_0045fac0 (TRUNCATE_EXISTING) | inverted existence test; a missing entry indexes `list[−1]` | dead in 2016 | test the found index |
+| S02-B25 | `CGdp::ReadFile` FUN_0045f1a0 | read not bounded to the entry; StoreType > 2 returns 1 with nothing read | dead in 2016 | clamp to SrcSize; fail unknown types |
+| S02-B26 | `CGdp::GdpMakeEmptyChunk` FUN_0045f4e0 (ANSI) | any non-zero `ftell` counts as an error | dead in 2016 | test −1 |
+| S02-B27 | `CGdp::CreateFileA` FUN_0045fac0 | new slot's StoreType / Encrypt uninitialised | dead in 2016 | zero them |
+| S02-B28 | `CGdp::UpdateWriteDataInfo` FUN_0045efb0 (WriteFile) | adds n to SrcSize regardless of the position | dead in 2016 | size = max(size, pos + n) |
+| S02-B29 | `CGdp::Open(i)` FUN_0045f980 | accepts `i == m_dwNumChunk` | dead in 2016 (one record past the list) | `i ≥ n` → fail |
+| S02-B30 | `CGdp::GdpMakeEmptyChunk` FUN_0045f4e0 | malloc failure returns 0 (= the MAIN index) | dead in 2016 (turns MAIN into a FILE entry) | return −1 |
+
+## 6. Not reconstructed / uncertain
+
+The per-part lists are §1.10, §2.8 and §3.7. In addition:
+
+- The `m_LoginUserRatable` values in the Login constructor (§4.3) are stored here only; their meaning (a per-world
+  user-count → status table, *inferred* from the `nWMSUS` names = "WM server user status") is for L01.
+- Account / AccountLog / Character / GameLog link the same `CCsl` / `CToken` (same message strings) and an older
+  session framework (GameLog: D05 §7.2); their copies of the network classes and `CCsl` were not compared
+  instruction by instruction (no PDB). Z19 covers the `CCsl` comparison for all servers.
+
+## 7. Coverage boundary
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| WM process layer on top of the library: `WorldManagerServer` ctor / dtor, `Listen_OPTool` / `Listen_Zone` / `Listen_Client`, `Start_Acceptor`, `OnStart_Service`, `ProcessLink` / `ProcessConnect` / `ProcessPacket` / `ProcessDisconnect` / `ProcessStop`, `CWMBaseSession` ctor / dtor / `CheckHeartBeat`, `CWMBaseSessionManager` pools | W05 (done) §1.1–§1.6, §4.1, §6.2 | already documented there; this document is the layer below |
+| Handlers that build frames with `CSendPacket` and send through the session `Send` (WM, Login) or `ProtocolPacket::pp_SendPacket` (Zone) | the server items (W01–W04, L00, Z01–Z18) | the library only frames and queues; the payloads are the handlers' |
+| `cShineLogSystem` (`SLS_AddLog`, `gSocket_IOCP_Write` initialiser FUN_00482690), `ShineExit`, `GetLastErrorStr`, `_DebugMessageNew` | W05 (done) §5.7, §6.4 | process log systems, documented there (W05-B20: `Socket_IOCP_Write` is never written) |
+| `CServerInfo` row accessors (`GetMyServerInfo`, `GetServerInfo`, `GetServerIndex`; Zone `GetNationName` / `GetWorldName`) | W05 (done) §5.2 / §6.2, Z10 (done) §1.1 | what the rows mean per server; Login copies identical, §4.3 |
+| `PROTOCOLFUNCTIONTEMPLETE<T>::pft_Store` handler tables | W05 (done) §6.1 | the dispatch above `CPacket` |
+| Login process layer not cited anywhere: `ViewStartInfo` FUN_00401120, `MainThread` FUN_004030e0, `ProcessPacket` FUN_004024e0, `OnStop_Service` FUN_00402b70, the session pools (`CLoginBaseSessionManager` InitSessions / EmptyToActive / ActiveSession / InactiveSession / FreeSessions, `CLoginClientSessionManager` ActiveSession / HandleIsValid / GetSession / Kickoff / Send / InitSessions, `CLoginWorldManagerSessionManager` Get/SetWorldManagerConnectInfo / GetClientValidation / SetWMSession / InactiveSession / FreeSessions / InitSessions, `CLoginClientSession` Get/SetSessionMode), `m_LoginUserRatable` | new item L01 (added by S02) | L00 is done and `login-server.md` cites none of them (~45 functions, the Login twin of W05 §1 / §4); too large for a gap fix here |
+| Zone process layer: `zs_Start_Acceptor` FUN_005a9c60, `zs_service_acceptor` LAB_005aa7c0, `zs_connect` FUN_005aa840, `ZoneBaseSession` / `ZoneBaseSessionManager::ProcHeartBeat` / `CheckHeartBeat`, `ClientSessionManager` | Z10 (done) §6.5, Z09 (done) §1.5, Z01 §1 | documented there; `~ZoneServer` here (§4.2) |
+| GameLog's session framework (older variant) | D05 (done) §7.2 | documented there |
+| `CCsl` / `CToken` copies in Account, AccountLog, Character, GameLog; tested reader for all servers | Z19 (open; plan: "Other servers: confirm Login, WM, Account, AccountLog use the same functions … Character and GameLog … find the copy by its strings") | Z19 can cite §2 for the grammar and parser and add only the per-server diff |
+| `CToken` as the quest-script tokenizer (`CQuestParserScript` FUN_00636f60 …, `ParserNext` FUN_006387f0) | Z15 (open; plan cites `QuestScript_Next` FUN_006387f0) | the tokenizer is §2.2; the quest grammar on top is Z15's |
+| What each config file read through `CCsl` contains (`*ServerInfo.txt` rows, `DefaultCharacterData.txt`, `TutorialCharacterData.txt`, zone configs) | X03 knowledge §4–§5, Z10 §1.1, D03, Z19 | §2.4 gives the grammar and checks every shipped file; the meaning of the rows is per server |
+| C runtime called by the library (`memmove`, `sscanf`, `atof`, `atoi`, `fopen` / `fclose` / `fread` / `fwrite` / `ftell` / `fseek`, `_mbspbrk`, `_mbsicmp`, `atexit`) | none needed | standard MSVC CRT semantics; nothing server-specific |

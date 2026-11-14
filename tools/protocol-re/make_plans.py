@@ -249,6 +249,31 @@ ITEMS = [
              "uncertain section and coverage boundary as every item does."],
       done="Every function listed above cited with pseudocode at W05's depth; the Login / Zone copies mapped; the config "
            "grammar written and checked against the shipped files."),
+ dict(id="L01", phase=2, title="Login server: process layer and session pools left out of login-server.md (added by S02)",
+      out="docs/pseudocode/login/L01-process.md", deps=["L00", "S02"], scope=[],
+      goal="`login-server.md` (L00) documents the Login handlers, startup order and listen ports, but cites none of the "
+           "process layer around them: about 45 functions (~1.2k decompiled lines, `login-pdb`) of `LoginServer`, the "
+           "session pools and the client / WM session managers. S02 §4.3 documents only the pieces that call the shared "
+           "library (constructor, OnStart_Service, Start_Acceptor, ProcessStop, DissconnectAllSessions, ProcHeartBeat, "
+           "session constructor). Reconstruct the rest at W05's depth (W05 §1 / §4 is the WM twin).",
+      steps=["Read `docs/pseudocode/login-server.md` §1–§3, `docs/pseudocode/shared/S02-library.md` §1.6, §4.3 and "
+             "`docs/pseudocode/wm/W05-process.md` §1, §4.1–§4.5 (the WM equivalents) first; cite them, do not redo them.",
+             "Main thread and steps (`clean.py re-data/exports/login-pdb - <addr> …`): `MainThread` FUN_004030e0, "
+             "`ProcessPacket` FUN_004024e0 (the packet pump: order of pools, per-pass limits, the bad-frame close), "
+             "`OnStop_Service` FUN_00402b70, `ViewStartInfo` / `ViewStopInfo` FUN_00401120 / FUN_00401250.",
+             "Session pools: `CLoginBaseSessionManager` ctor / InitSessions / EmptyToActive / ActiveSession / "
+             "InactiveSession / FreeSessions / dtor (FUN_00409200 … FUN_004094d0), `CLoginClientSessionManager` "
+             "(FUN_00409680 … FUN_00409bc0: ActiveSession, HandleIsValid, GetSession, Kickoff, Send, InitSessions, "
+             "FreeSessions), `CLoginOPToolSessionManager` (FUN_00409c30 … FUN_00409d20), `CLoginWorldManagerSessionManager` "
+             "(FUN_00409e40 … FUN_0040a420: ActiveSession, Get/SetWorldManagerConnectInfo, GetClientValidation, SetWMSession, "
+             "InactiveSession, FreeSessions, InitSessions), `CLoginClientSession` ctor / dtor / Get/SetSessionMode "
+             "(FUN_00409520 … FUN_00409670): pool sizes (from `nMaxAccept`), handles, which event frees a session.",
+             "`LoginServer::m_LoginUserRatable` (256 × 6 ints set to 3, 5, 8, 10, 30, 95 in the constructor FUN_004029e0, "
+             "S02 §4.3): find its readers and what the world status sent to the client is computed from.",
+             "Mark unintended behaviour `(original bug) L01-B<n>`; fix nothing in `login-server.md` (done item): put "
+             "corrections in `docs/knowledge/L01.md`."],
+      done="Every function named above cited with pseudocode; the session lifecycle (accept → pool → free) and the main "
+           "loop order written; `coverage.py L01` shows no Login process function left uncited."),
  dict(id="Z02", phase=2, title="Zone: movement, chat, emotes, sight/briefinfo, NPC menus, scenario",
       out="docs/pseudocode/zone/Z02-actions.md", deps=["Z01"],
       scope=[("zone", "ShinePlayer", [7, 8, 15, 27]), ("zone", "WorldManagerSession", [8])],
