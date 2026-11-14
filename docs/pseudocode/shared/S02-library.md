@@ -100,7 +100,8 @@ CIOBuffer::Alloc():                                @ FUN_00468e10
     else:
         unlock slot k; lock IOBufferList[k].iobc_Lock
         if IOBufferList[k].iobc_Pointer < 512: b = PointerList[iobc_Pointer++]    # next never-used buffer
-        else: b = new CIOBuffer (s_nCount++)                     # heap; a null result is not checked
+        else: b = new CIOBuffer (s_nCount++)                     # heap; a null result is not checked: the
+                                                                 # writes below fault (original bug) S02-B31
     unlock (the slot lock or the container lock)
     b.m_dwSize = 0; b.m_nRef = 1; b.m_pNext = null; s_nAlloc++
     return b
@@ -135,7 +136,8 @@ CIOCP::Start(io, n, bWait):                        @ FUN_004645c0
     m_pWorkThreads = new WORKER[n]; m_ActiveWorker = 1
     for i in 0..n−1:
         w = m_pWorkThreads[i]; w.pIOCP = io; w.WorkerID = i; w.WorkerStatus = STARTING
-        w.hThread = CreateThread(WorkThread, &w, &w.ThreadID)      # failure not checked
+        w.hThread = CreateThread(WorkThread, &w, &w.ThreadID)      # failure not checked: the worker stays STARTING
+                                                                   # and the wait below never ends (original bug) S02-B32
         Sleep(50)
     if bWait: for each worker: Sleep(50) while its status is STARTING
     m_NumOfWorkThread = n
@@ -610,24 +612,25 @@ identical.
 
 | Function | WM | Login | Zone |
 |---|---|---|---|
-| `CIOBuffer::Alloc` / `Free` / dtor | 468e10 / 468f00 / 468de0 | 412a00 / 412af0 / 4129d0 | 654cd0 / 654dc0 / 654ca0 |
-| `IOBufferContainer` ctor, `CIOSpinLock::Wait` | 468d80, 468d10 | 412970, 412900 | 654c40, 654bd0 |
-| `CIOCP` ctor / Register / Stop / WorkThread / Start | 464350 / 464380 / 4643c0 / 4644f0 / 4645c0 | 40fc40 / 40fc70 / 40fcb0 / 40fde0 / 40feb0 | 650380 / 6503b0 / 6503f0 / 650520 / 6505f0 |
-| `CIOCP::Close` (Zone: `~CIOCP`) | 4646b0 | 40ffa0 | 6506e0 |
-| `CIOCP_Process` ctor / dtor, default `IOCP_Process` | 4677a0 / 465f30, 467790 | 412460 / 410860, 410a70 | 64f3e0 / 64f400, folded |
-| `CSocket_Acceptor` ctor / Stop / Listen_Add / GetAccepted / SetAccepted / dtor | 463960 / 4639e0 / 463a50 / 463bb0 / 463c40 / 463de0 | 40f250 / 40f2d0 / 40f340 / 40f4a0 / 40f530 / 40f6d0 | 652730 / 6527b0 / 652820 / 652980 / 652a10 / 652bb0 |
-| `CSocket_Acceptor` Listen_Stop / AcceptThreadRing / Listen_Start | 463e10 / 463ee0 / 4642a0 | 40f700 / 40f7d0 / 40fb90 | – / 652be0 / 652fa0 |
-| `CSocket_Acceptor_Process` ctor, `InetAddress::WinSockStart` | 468c30, 468c40 | 412880, 412890 | 654e20, 653840 |
-| `CSocket_IOCP` ctor / dtor / Connect / Send / WriteCallback | 466420 / 466520 / 4665b0 / 4666f0 / 466240 | 410d60 / 410e60 / 410ef0 / 411030 / 410b80 | 64f930 / 64fa30 / 64fac0 / 64fc00 / 64f750 |
-| `CSocket_IOCP` Receive / Shutdown / CloseUseIOCP / FreeBuffer / Close | 465f40 / 466060 / 466120 / 466140 / 466180 | 410870 / 410990 / 410a50 / 410a80 / 410ac0 | 64f410 / 64f530 / 64f5f0 / 64f620 / 64f690 |
-| `CPacket` ctor / dtor / Clear / IsValidHeader / IsValidPacket / GetPacketSize | 467ac0 / 4677b0 / 4679d0 / 4677e0 / 467820 / 467880 | 412780 / 412470 / 412690 / 4124a0 / 4124e0 / 412540 | 650290 / 64ff80 / 6501a0 / 64ffb0 / 64fff0 / 650050 |
-| `CPacket` GetDataSize / GetIDPtr / GetDataPtr / GetPacket / TakeNextPacket / RemoveAllUsedPacket | 4678c0 / 4678e0 / 4678f0 / 467900 / 467960 / 467990 | 412580 / 4125a0 / 4125b0 / 4125c0 / 412620 / 412650 | 650090 / 6500b0 / 6500c0 / 6500d0 / 650130 / 650160 |
-| `CPacket` ID() / ID(op,…) / WriteData / GetWriteableBufferSize / GetWriteDataPtr | 467a10 / 467b00 / 467a30 / 467aa0 / 467ab0 | 4126d0 / 4127c0 / 4126f0 / 412760 / 412770 | 6501e0 / 6502d0 / 650200 / 650270 / 650280 |
-| `CSendPacket` ctor / SetSize / GetSendSize / GetSendPtr / ID | 45fd30 / 45fd50 / 45fe30 / 45fe50 / 45fe70 | 412280 / 4122a0 / 412380 / 4123a0 / 4123c0 | – |
-| session `IOCP_Process` / `IOCP_CloseProcess` | 42fe90 / 42ff60 | 409020 / 4090b0 | 5a6820 / no-op |
-| session Register / Connect / Receive / Close / Send | 42fd10 / 42ffb0 / 42fcd0 / 42fc30 / 42fc50, 42fca0 | 408e70 / 4090d0 / 408e30 / 408dd0 / 408df0, 408e20 | 5a6700 / 5a68b0 / 5a66c0 / 5a6690 / 5a66b0 |
+| `CIOBuffer::Alloc` / `Free` / dtor | FUN_00468e10 / FUN_00468f00 / FUN_00468de0 | FUN_00412a00 / FUN_00412af0 / FUN_004129d0 | FUN_00654cd0 / FUN_00654dc0 / FUN_00654ca0 |
+| `IOBufferContainer` ctor, `CIOSpinLock::Wait` | FUN_00468d80, FUN_00468d10 | FUN_00412970, FUN_00412900 | FUN_00654c40, FUN_00654bd0 |
+| `CIOCP` ctor / Register / Stop / WorkThread / Start | FUN_00464350 / FUN_00464380 / FUN_004643c0 / FUN_004644f0 / FUN_004645c0 | FUN_0040fc40 / FUN_0040fc70 / FUN_0040fcb0 / FUN_0040fde0 / FUN_0040feb0 | FUN_00650380 / FUN_006503b0 / FUN_006503f0 / FUN_00650520 / FUN_006505f0 |
+| `CIOCP::Close` (Zone: `~CIOCP`) | FUN_004646b0 | FUN_0040ffa0 | FUN_006506e0 |
+| `CIOCP_Process` ctor / dtor, default `IOCP_Process` | FUN_004677a0 / FUN_00465f30, FUN_00467790 | FUN_00412460 / FUN_00410860, FUN_00410a70 | FUN_0064f3e0 / FUN_0064f400, folded |
+| `CSocket_Acceptor` ctor / Stop / Listen_Add / GetAccepted / SetAccepted / dtor | FUN_00463960 / FUN_004639e0 / FUN_00463a50 / FUN_00463bb0 / FUN_00463c40 / FUN_00463de0 | FUN_0040f250 / FUN_0040f2d0 / FUN_0040f340 / FUN_0040f4a0 / FUN_0040f530 / FUN_0040f6d0 | FUN_00652730 / FUN_006527b0 / FUN_00652820 / FUN_00652980 / FUN_00652a10 / FUN_00652bb0 |
+| `CSocket_Acceptor` Listen_Stop / AcceptThreadRing / Listen_Start | FUN_00463e10 / FUN_00463ee0 / FUN_004642a0 | FUN_0040f700 / FUN_0040f7d0 / FUN_0040fb90 | – / FUN_00652be0 / FUN_00652fa0 |
+| `CSocket_Acceptor_Process` ctor, `InetAddress::WinSockStart` | FUN_00468c30, FUN_00468c40 | FUN_00412880, FUN_00412890 | FUN_00654e20, FUN_00653840 |
+| `CSocket_IOCP` ctor / dtor / Connect / Send / WriteCallback | FUN_00466420 / FUN_00466520 / FUN_004665b0 / FUN_004666f0 / FUN_00466240 | FUN_00410d60 / FUN_00410e60 / FUN_00410ef0 / FUN_00411030 / FUN_00410b80 | FUN_0064f930 / FUN_0064fa30 / FUN_0064fac0 / FUN_0064fc00 / FUN_0064f750 |
+| `CSocket_IOCP` Receive / Shutdown / CloseUseIOCP / FreeBuffer / Close | FUN_00465f40 / FUN_00466060 / FUN_00466120 / FUN_00466140 / FUN_00466180 | FUN_00410870 / FUN_00410990 / FUN_00410a50 / FUN_00410a80 / FUN_00410ac0 | FUN_0064f410 / FUN_0064f530 / FUN_0064f5f0 / FUN_0064f620 / FUN_0064f690 |
+| `CPacket` ctor / dtor / Clear / IsValidHeader / IsValidPacket / GetPacketSize | FUN_00467ac0 / FUN_004677b0 / FUN_004679d0 / FUN_004677e0 / FUN_00467820 / FUN_00467880 | FUN_00412780 / FUN_00412470 / FUN_00412690 / FUN_004124a0 / FUN_004124e0 / FUN_00412540 | FUN_00650290 / FUN_0064ff80 / FUN_006501a0 / FUN_0064ffb0 / FUN_0064fff0 / FUN_00650050 |
+| `CPacket` GetDataSize / GetIDPtr / GetDataPtr / GetPacket / TakeNextPacket / RemoveAllUsedPacket | FUN_004678c0 / FUN_004678e0 / FUN_004678f0 / FUN_00467900 / FUN_00467960 / FUN_00467990 | FUN_00412580 / FUN_004125a0 / FUN_004125b0 / FUN_004125c0 / FUN_00412620 / FUN_00412650 | FUN_00650090 / FUN_006500b0 / FUN_006500c0 / FUN_006500d0 / FUN_00650130 / FUN_00650160 |
+| `CPacket` ID() / ID(op,…) / WriteData / GetWriteableBufferSize / GetWriteDataPtr | FUN_00467a10 / FUN_00467b00 / FUN_00467a30 / FUN_00467aa0 / FUN_00467ab0 | FUN_004126d0 / FUN_004127c0 / FUN_004126f0 / FUN_00412760 / FUN_00412770 | FUN_006501e0 / FUN_006502d0 / FUN_00650200 / FUN_00650270 / FUN_00650280 |
+| `CSendPacket` ctor / SetSize / GetSendSize / GetSendPtr / ID | FUN_0045fd30 / FUN_0045fd50 / FUN_0045fe30 / FUN_0045fe50 / FUN_0045fe70 | FUN_00412280 / FUN_004122a0 / FUN_00412380 / FUN_004123a0 / FUN_004123c0 | – |
+| session `IOCP_Process` / `IOCP_CloseProcess` | FUN_0042fe90 / FUN_0042ff60 | FUN_00409020 / FUN_004090b0 | FUN_005a6820 / no-op |
+| session Register / Connect / Receive / Close / Send | FUN_0042fd10 / FUN_0042ffb0 / FUN_0042fcd0 / FUN_0042fc30 / FUN_0042fc50, FUN_0042fca0 | FUN_00408e70 / FUN_004090d0 / FUN_00408e30 / FUN_00408dd0 / FUN_00408df0, FUN_00408e20 | FUN_005a6700 / FUN_005a68b0 / FUN_005a66c0 / FUN_005a6690 / FUN_005a66b0 |
+| session ctor / dtor (`CWMBaseSession`, `CLoginBaseSession`, `ZoneBaseSession`) | FUN_00430020 / FUN_0042fbc0 | FUN_00409140 / FUN_00408d60 | FUN_005a6920 / FUN_005a6620 |
 
-(All addresses are `FUN_00…`: e.g. Zone `CSocket_IOCP::Send` = FUN_0064fc00.)
+(Session ctor / dtor bodies: WM §1.6, Login §4.3 / §4.2, Zone §4.4.)
 
 Differences:
 
@@ -883,8 +886,10 @@ CCsl::MakeFormat():                         # after "#DEFINE"                   
         tok = GetToken()
         if tok == null: m_NumFormatErrors++; AddResultMsg("FORMAT DEFINNING, EOF Come."); return null   # params leak
         if ProcRemark(tok): continue
-        if name == none: name = strncpy(tok, 64); continue   # first token = format name; 64 chars leave no NUL in
-                                                             # Format[64] (part of S02-B19)
+        if name == none: name = strncpy(tok, 64); continue   # first token = format name, into a zeroed 65-byte local;
+                                                             # strcpy'd later into Format[64]: a 64-char name puts its
+                                                             # NUL in the next member NumParameter, written right after
+                                                             # (harmless; part of S02-B19)
         k = IsTokenID(tok, m_pCslParameter, 19)
         if k <= 17: params.append(k); continue               # <ID> … [ARRAYEND]
         if k == 18 (#ENDDEFINE): return new CSL_FORMAT_LIST { Format = name, NumParameter = len(params), pParameter = params }
@@ -1123,15 +1128,16 @@ lacks `ViewResultMsg` (no caller) and adds `CToken::GetTokenID` (§2.5).
 
 | Function | WM | Login | Zone |
 |---|---|---|---|
-| `CToken::CToken` / `Close` / `SetSeprator` / `my_tcstok` / `GetToken` | 0045a080 / a0f0 / a150 / a170 / a1f0 | 0040aa00 / aa70 / aad0 / aaf0 / ab70 | 0063aea0 / af10 / af70 / af90 / b010 |
-| `GoBegin` / `GoNextLine` / `GoStartString` / `SaveTokenPositon` / `RestoreTokenPositon` | 0045a270 / a330 / a380 / a3d0 / a3e0 | 0040abf0 / acb0 / ad00 / ad50 / ad60 | 0063b090 / b150 / b1a0 / b1f0 / b200 |
-| `IsTokenID` / `GetTokenID` / `~CToken` / `Open` / `OpenFromMemory` / `GetTokenString` | 0045a450 / – / a490 / a520 / a630 / a6f0 | 0040add0 / – / ae10 / aea0 / afb0 / b070 | 0063b270 / b2b0 / b310 / b3a0 / b4b0 / b570 |
-| `CCsl::VarClear` / `MakeFormatTable` / `MakeDataTable` / `AddResultMsg` / `ViewResultMsg` | 004608d0 / 0940 / 09c0 / 0a40 / 0ac0 | 0040d200 / d270 / d2f0 / d370 / d3f0 | 00650710 / 0780 / 0800 / 0880 / – |
-| `GetFormat` / `GetNumDatas` / `GetDataInfo` / `GetData` / `ProcRemark` / `MakeFormat` | 00460af0 / 0b40 / 0b50 / 0ba0 / 0c90 / 0ea0 | 0040d420 / d470 / d480 / d4d0 / d5c0 / d7d0 | 00650900 / 0950 / 0960 / 09b0 / 0aa0 / 0cb0 |
-| `AddFormat` / `GetDataToken` / `Parameter_filename` / `MakeData` / `ProcData` / `ReadScriptDone` | 00461150 / 1190 / 1210 / 1240 / 1490 / 1520 | 0040da80 / dac0 / db40 / db70 / ddc0 / de50 | 00650f60 / 0fa0 / 1020 / 1050 / 12a0 / 1330 |
-| `Read` / `WriteFormat` / `WriteData` / `ClearFormats` / `ClearDatas` / `Close` / `Clear` | 00461730 / 1970 / 1a90 / 1ba0 / 1c10 / 1c80 / 1d00 | 0040e060 / e2a0 / e3c0 / e4d0 / e540 / e5b0 / e630 | 00651540 / 1780 / 18a0 / 19b0 / 1a20 / 1a90 / 1b10 |
-| `~CCsl` / `CCsl()` / `CCsl(parent)` / `IncludeFile` / `ProcCmd` / `ReadScript` | 00461de0 / 1e40 / 1ea0 / 2090 / 21f0 / 26f0 | 0040e710 / e770 / e7d0 / e9c0 / eb20 / f020 | 00651bf0 / 1c50 / 1cb0 / 1ea0 / 2000 / 2500 |
-| `CServerInfo::ReadServerInfo` / `GetShineServerIDName` / `…ShortName` | 00465c90 / 0045a040 / 0045a060 | 004104e0 / 0040a9c0 / 0040a9e0 | 0064d0f0 / – / – |
+| `CToken::CToken` / `Close` / `SetSeprator` / `my_tcstok` / `GetToken` | FUN_0045a080 / FUN_0045a0f0 / FUN_0045a150 / FUN_0045a170 / FUN_0045a1f0 | FUN_0040aa00 / FUN_0040aa70 / FUN_0040aad0 / FUN_0040aaf0 / FUN_0040ab70 | FUN_0063aea0 / FUN_0063af10 / FUN_0063af70 / FUN_0063af90 / FUN_0063b010 |
+| `GoBegin` / `GoNextLine` / `GoStartString` / `SaveTokenPositon` / `RestoreTokenPositon` | FUN_0045a270 / FUN_0045a330 / FUN_0045a380 / FUN_0045a3d0 / FUN_0045a3e0 | FUN_0040abf0 / FUN_0040acb0 / FUN_0040ad00 / FUN_0040ad50 / FUN_0040ad60 | FUN_0063b090 / FUN_0063b150 / FUN_0063b1a0 / FUN_0063b1f0 / FUN_0063b200 |
+| `IsTokenID` / `GetTokenID` / `~CToken` / `Open` / `OpenFromMemory` / `GetTokenString` | FUN_0045a450 / – / FUN_0045a490 / FUN_0045a520 / FUN_0045a630 / FUN_0045a6f0 | FUN_0040add0 / – / FUN_0040ae10 / FUN_0040aea0 / FUN_0040afb0 / FUN_0040b070 | FUN_0063b270 / FUN_0063b2b0 / FUN_0063b310 / FUN_0063b3a0 / FUN_0063b4b0 / FUN_0063b570 |
+| `CCsl::VarClear` / `MakeFormatTable` / `MakeDataTable` / `AddResultMsg` / `ViewResultMsg` | FUN_004608d0 / FUN_00460940 / FUN_004609c0 / FUN_00460a40 / FUN_00460ac0 | FUN_0040d200 / FUN_0040d270 / FUN_0040d2f0 / FUN_0040d370 / FUN_0040d3f0 | FUN_00650710 / FUN_00650780 / FUN_00650800 / FUN_00650880 / – |
+| `GetFormat` / `GetNumDatas` / `GetDataInfo` / `GetData` / `ProcRemark` / `MakeFormat` | FUN_00460af0 / FUN_00460b40 / FUN_00460b50 / FUN_00460ba0 / FUN_00460c90 / FUN_00460ea0 | FUN_0040d420 / FUN_0040d470 / FUN_0040d480 / FUN_0040d4d0 / FUN_0040d5c0 / FUN_0040d7d0 | FUN_00650900 / FUN_00650950 / FUN_00650960 / FUN_006509b0 / FUN_00650aa0 / FUN_00650cb0 |
+| `AddFormat` / `GetDataToken` / `Parameter_filename` / `MakeData` / `ProcData` / `ReadScriptDone` | FUN_00461150 / FUN_00461190 / FUN_00461210 / FUN_00461240 / FUN_00461490 / FUN_00461520 | FUN_0040da80 / FUN_0040dac0 / FUN_0040db40 / FUN_0040db70 / FUN_0040ddc0 / FUN_0040de50 | FUN_00650f60 / FUN_00650fa0 / FUN_00651020 / FUN_00651050 / FUN_006512a0 / FUN_00651330 |
+| `Read` / `WriteFormat` / `WriteData` / `ClearFormats` / `ClearDatas` / `Close` / `Clear` | FUN_00461730 / FUN_00461970 / FUN_00461a90 / FUN_00461ba0 / FUN_00461c10 / FUN_00461c80 / FUN_00461d00 | FUN_0040e060 / FUN_0040e2a0 / FUN_0040e3c0 / FUN_0040e4d0 / FUN_0040e540 / FUN_0040e5b0 / FUN_0040e630 | FUN_00651540 / FUN_00651780 / FUN_006518a0 / FUN_006519b0 / FUN_00651a20 / FUN_00651a90 / FUN_00651b10 |
+| `~CCsl` / `CCsl()` / `CCsl(parent)` / `IncludeFile` / `ProcCmd` / `ReadScript` | FUN_00461de0 / FUN_00461e40 / FUN_00461ea0 / FUN_00462090 / FUN_004621f0 / FUN_004626f0 | FUN_0040e710 / FUN_0040e770 / FUN_0040e7d0 / FUN_0040e9c0 / FUN_0040eb20 / FUN_0040f020 | FUN_00651bf0 / FUN_00651c50 / FUN_00651cb0 / FUN_00651ea0 / FUN_00652000 / FUN_00652500 |
+| `CServerInfo::CServerInfo` (= `CCsl()` on `m_Csl`) | FUN_00465c80 | FUN_004104d0 | FUN_0064d0e0 |
+| `CServerInfo::ReadServerInfo` / `GetShineServerIDName` / `…ShortName` | FUN_00465c90 / FUN_0045a040 / FUN_0045a060 | FUN_004104e0 / FUN_0040a9c0 / FUN_0040a9e0 | FUN_0064d0f0 / – / – |
 
 ### 2.8 Uncertain (part 2)
 
@@ -1358,10 +1364,10 @@ servers.
 
 | Function | WM | Login | Zone |
 |---|---|---|---|
-| `Clear` / `GdpSetFilePointer` / `GdpDecryptData` / `GdpWriteChunk` / `GdpUpdateChunk` / `UpdateWriteDataInfo` | 0045ed50 / edd0 / ee50 / ee90 / ef50 / efb0 | 0040c220 / c2a0 / c320 / c360 / c420 / c480 | 0063b660 / b6e0 / b760 / b7a0 / b860 / b8c0 |
-| `GdpSearchFile` / `GdpDeleteFile(i)` / `GdpDeleteFile(name)` / `CloseHandle` / `ReadFile` / `WriteFile` | 0045f050 / f0b0 / f130 / f160 / f1a0 / f230 | 0040c520 / c580 / c600 / c630 / c670 / c700 | 0063b960 / b9c0 / ba40 / ba70 / bab0 / bb40 |
-| `GetFileSize` / `SetFilePointer` / `fclose` / `CGdp()` / `GdpCloseFile` / `GdpMakeEmptyChunk` | 0045f320 / f360 / f430 / f480 / f4a0 / f4e0 | 0040c7f0 / c830 / c900 / c950 / c970 / c9b0 | 0063bc30 / bc70 / bd40 / bd90 / bdb0 / bdf0 |
-| `GdpClose` / `Open(i)` / `Open(name)` / `~CGdp` / `GdpGetEmptyChunk` / `CreateFileA` | 0045f8d0 / f980 / fa40 / fa70 / fa80 / fac0 | 0040cda0 / ce50 / cf10 / cf40 / cf50 / cf90 | 0063c1e0 / c290 / c350 / c380 / c390 / c3d0 |
+| `Clear` / `GdpSetFilePointer` / `GdpDecryptData` / `GdpWriteChunk` / `GdpUpdateChunk` / `UpdateWriteDataInfo` | FUN_0045ed50 / FUN_0045edd0 / FUN_0045ee50 / FUN_0045ee90 / FUN_0045ef50 / FUN_0045efb0 | FUN_0040c220 / FUN_0040c2a0 / FUN_0040c320 / FUN_0040c360 / FUN_0040c420 / FUN_0040c480 | FUN_0063b660 / FUN_0063b6e0 / FUN_0063b760 / FUN_0063b7a0 / FUN_0063b860 / FUN_0063b8c0 |
+| `GdpSearchFile` / `GdpDeleteFile(i)` / `GdpDeleteFile(name)` / `CloseHandle` / `ReadFile` / `WriteFile` | FUN_0045f050 / FUN_0045f0b0 / FUN_0045f130 / FUN_0045f160 / FUN_0045f1a0 / FUN_0045f230 | FUN_0040c520 / FUN_0040c580 / FUN_0040c600 / FUN_0040c630 / FUN_0040c670 / FUN_0040c700 | FUN_0063b960 / FUN_0063b9c0 / FUN_0063ba40 / FUN_0063ba70 / FUN_0063bab0 / FUN_0063bb40 |
+| `GetFileSize` / `SetFilePointer` / `fclose` / `CGdp()` / `GdpCloseFile` / `GdpMakeEmptyChunk` | FUN_0045f320 / FUN_0045f360 / FUN_0045f430 / FUN_0045f480 / FUN_0045f4a0 / FUN_0045f4e0 | FUN_0040c7f0 / FUN_0040c830 / FUN_0040c900 / FUN_0040c950 / FUN_0040c970 / FUN_0040c9b0 | FUN_0063bc30 / FUN_0063bc70 / FUN_0063bd40 / FUN_0063bd90 / FUN_0063bdb0 / FUN_0063bdf0 |
+| `GdpClose` / `Open(i)` / `Open(name)` / `~CGdp` / `GdpGetEmptyChunk` / `CreateFileA` | FUN_0045f8d0 / FUN_0045f980 / FUN_0045fa40 / FUN_0045fa70 / FUN_0045fa80 / FUN_0045fac0 | FUN_0040cda0 / FUN_0040ce50 / FUN_0040cf10 / FUN_0040cf40 / FUN_0040cf50 / FUN_0040cf90 | FUN_0063c1e0 / FUN_0063c290 / FUN_0063c350 / FUN_0063c380 / FUN_0063c390 / FUN_0063c3d0 |
 
 The only `CGdp` instances in the three servers are the `m_Gdp` members of `CToken` objects (the `CCsl` readers and, in
 Zone, the quest-script parser `CQuestParserScript`, §2.5): no other caller of any `CGdp` method exists.
@@ -1398,7 +1404,7 @@ CServerInfo::~CServerInfo(si):                    @ FUN_004037d0   (WM; Login FU
     CCsl::Close(&si.m_Csl); CToken::~CToken(&si.m_Csl)      # rows and formats freed by Close (§2.3.8)
 
 ZoneServer::~ZoneServer(z):                       @ FUN_005aa6f0
-    ~ClientSessionManager(z.zs_clientsessionmanager)        # Z01
+    ~ClientSessionManager(z.zs_clientsessionmanager)        # §4.4 (FUN_0045c5e0)
     CSocket_Acceptor::~CSocket_Acceptor(z.zs_Acceptor)      # §1.4 (FUN_00652bb0)
     CIOCP::~CIOCP(z.zs_IOCP)                                # = WM / Login CIOCP::Close (§1.3, §1.9)
     CCsl::~CCsl(z.zs_serverinfo)                            # CServerInfo is torn down as its CCsl member
@@ -1473,6 +1479,93 @@ plus `GetNumOfData()` FUN_00410520 (`return m_Csl.m_NumDatas`) and the two world
 whose columns 1–4 match, else −1) and `GetServerInfo(out, id, world, zone, from)` FUN_00410810 (= index lookup, then
 the first). The WM bodies are W05 §5.2.
 
+### 4.4 Zone process glue the library reaches
+
+The Zone counterparts of §4.2 / §4.3. Session pools, parsers and the zone ring belong to Z01 (§1, §10). Only the parts
+that build or use the library are shown here.
+
+```pseudo
+ZoneServer::ZoneServer(z):                        @ FUN_005ab470   (global `zoneserver`, dynamic initialiser)
+    CServerInfo::CServerInfo(z.zs_serverinfo.serverinfo)    # FUN_0064d0e0: only CCsl() on m_Csl (§2.3.8)
+    z.zs_serverinfo.worldname.n4_code[0..3] = 0
+    CIOCP::CIOCP(z.zs_IOCP)                                 # §1.3 (FUN_00650380)
+    CSocket_Acceptor::CSocket_Acceptor(z.zs_Acceptor)       # §1.4 (FUN_00652730)
+    ClientSessionManager::ClientSessionManager(z.zs_clientsessionmanager)   # below
+    z.zs_serverinfo.ConnectSocket_BindIP[16] = 0            # filled from ZoneServerInfo (Z10 §1.1)
+
+ZoneBaseSession::ZoneBaseSession(s):              @ FUN_005a6920   (WM FUN_00430020 §1.6, Login FUN_00409140 §4.3)
+    CSocket_IOCP(s.m_SocketIOCP) (§1.5); CPacket(s.m_Packet) (§1.7); s.m_IOCP_Process.vftable = IOCPProcessSession
+    m_Connected_Server_ID = 10; m_Connected_World = m_Connected_Zone = 0; m_Status = SESSION_STATUS_EMPTY
+    m_Connected_Time = GetLocalTime(); m_LastReceiveTime = m_LastSendTime = CGTimer::GetTime(); m_LastHeartBeatSendTime = 0
+    for ov in (Write, Read, Close): ov.pIOCP_Process.m_pProcess = &s.m_IOCP_Process; ov.pData = s
+    # base of ClientSession, ClientSessionNull, GameDBSession, GameLogSession, WorldManagerSession, ZoneConnectSession
+    # (and the zone listen sessions): every Zone connection gets the IOCPProcessSession callbacks of §1.6
+
+ZoneBaseSession::~ZoneBaseSession(s):             @ FUN_005a6620
+    s.m_IOCP_Process.vftable = CIOCP_Process_Interfece; ~CPacket(s.m_Packet); ~CSocket_IOCP(s.m_SocketIOCP)
+    # the socket is not closed here: ~CSocket_IOCP (§1.5) does that
+
+ClientSession::CheckHeartBeat(s, unused):         @ FUN_0045b110
+    return ZoneBaseSession::CheckHeartBeat(s, 300)          # FUN_005a67c0 (§1.6): the argument is ignored there too;
+                                                            # the 30 s / 180 s limits are constants
+
+ZoneBaseSessionManager::ProcHeartBeat(m, iocp):   @ FUN_005a6a40   (WM: W05 §1.5; Login FUN_00409280 §4.3)
+    for node in m_pActiveSessions (next taken before the call):
+        node.pSession.vtbl[0](30) == 0 → CSocket_IOCP::CloseUseIOCP(&node.pSession.m_SocketIOCP, iocp)   # §1.5
+        # slot 0 = CheckHeartBeat: ZoneBaseSession FUN_005a67c0 or the ClientSession override above; the 30 / 300
+        # arguments are ignored by both
+
+ClientSessionManager::ClientSessionManager(m):    @ FUN_0045c5c0
+    ZoneBaseSessionManager(m)                               # FUN_005a69f0: list array, active / empty lists = null,
+                                                            # m_MaxSessions = m_NumSessions = 0
+    m.csm_SessionGroupByIPArray = {0, 0, 0}                 # (begin, end, capacity) of a vector (inferred); Z01
+
+ClientSessionManager::~ClientSessionManager(m):   @ FUN_0045c5e0   (called from ~ZoneServer, §4.2)
+    delete csm_SessionGroupByIPArray storage; zero its 3 words
+    ZoneBaseSessionManager::~ZoneBaseSessionManager(m)      # FUN_005a6a80: delete m_pSessionListArray
+    # sessions are not closed here; the stop path closes them before (inferred; Z01)
+
+ZoneServer::zs_ServerConnect2Zone(z, s):          @ FUN_005a9a00   (only caller: ZoneConnectSession::zcs_Send FUN_005a6ed0, Z01 §10)
+    s.m_Status != SESSION_STATUS_EMPTY → return 1           # already connecting or connected
+    next = ZoneIPContainer::zipc_GetNextZoneNo(zipc, my nZoneNo)   # FUN_005a96b0, below
+    next == −1 → return 0                                   # never: GetNextZoneNo returns 0 … 11 (dead check)
+                                                            # (original bug) S02-B33
+    ZoneIPContainer::zipc_Mechine2IP(zipc, next, &ip, &port)        # FUN_005a9760, below
+        fails → AssertFail "zs_ServerConnect2Zone : not find nextzoneinfo"; return 0   # unreachable for 0 … 11
+    log "Try to connect[%s:%d] bind[%s]"
+    ZoneBaseSession::Connect(s, ConnectSocket_BindIP, 0, ip-string, port, &z.zs_IOCP) != 1 → return 1   # §1.6;
+                                                            # state stays EMPTY, so the next zcs_Send retries
+    log "Connect Success[%s:%d] bind[%s]"; s.m_Status = SESSION_STATUS_CONNECTING; return 1
+
+ZoneIPContainer::zipc_GetNextZoneNo(c, zone):     @ FUN_005a96b0
+    zone + 1 > 11 → return 0                                # wrap after the 12th slot
+    c.zipc_IPAddress[zone + 1].addr == "" (16 zero bytes) → return 0   # no next zone: back to zone 0
+    return zone + 1
+    # with zone 0 alone in the world, zone 0 is its own "next" zone and connects to its own zone-listen port
+    # (inferred: ring of one)
+
+ZoneIPContainer::zipc_Mechine2IP(c, n, &ip, &port):   @ FUN_005a9760
+    n == 99 ('c') → n = zs_worlddata().nZoneNo              # "this machine"
+    n > 11 → AssertFail "ZoneIPContainer::zipc_Mechine2IP : Invalid machine number"; return 0
+    ip = c.zipc_IPAddress[n].addr (Name4, 16 bytes); port = c.zipc_IPAddress[n].port; return 1
+
+ZoneIPContainer (global `zipc`): zipc_IPAddress[12] of { Name4 addr (16 bytes, dotted IP string); u16 port } (0x12 each),
+    then Name4 zipc_NextIP. One slot per zone number ("machine") of this world.
+ZoneIPContainer::ZoneIPContainer(c):             @ FUN_005a97d0   (element ctor FUN_005a9630: addr = 0)
+    zipc_NextIP = ""; every slot: addr = "" (port left as constructed)
+ZoneIPContainer::zipc_Store(c, n, ip, port):     @ FUN_005a9640   (caller: FieldContainer::fc_MakeField FUN_004650a0)
+    n > 11 → AssertFail "ZoneIPContainer::zipc_Store : Invalid mechine"; ShineExit("ZoneIPContainer::zipc_Store")
+    slot[n].addr = strncpy(ip, 16) after zeroing; slot[n].port = port     # 16 chars leave no NUL (inferred harmless:
+                                                                          # read back as a Name4)
+ZoneIPContainer::zipc_SetNextIP(c, own):         @ FUN_005a9850   (caller: zs_start_moon LAB_005ae250, Z10 §7.1)
+    next = zipc_GetNextZoneNo(own)
+    zipc_NextIP = (next == own) ? "" : slot[next].addr               # a lone zone 0 has no next IP
+ZoneIPContainer::zipc_GetNextIP(c):              @ FUN_005a96a0   return &zipc_NextIP
+    # caller: ZoneListenSession::zls_NC_MISC_ZONERINGLINKTEST_RNG FUN_0045b4d0 (Z01 §10)
+    # note: zs_ServerConnect2Zone does not use zipc_NextIP; it recomputes the neighbour, so a lone zone 0 still
+    # connects to slot 0 = itself (inferred)
+```
+
 ## 5. Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1495,7 +1588,7 @@ the first). The WM bodies are W05 §5.2.
 | S02-B16 | `CToken::GoNextLine` FUN_0045a330 | with LF-only files a remark token ending at the line end skips the next line too | LF files silently lose rows (505 of 530 in `DefaultCharacterData.txt`) | skip to the next LF from the token start |
 | S02-B17 | `CCsl::Read` FUN_00461730 | success paths never close the file handle; failure paths leak the chunk buffer | one handle per `#READ` | close / free on every path |
 | S02-B18 | `CCsl::IncludeFile` FUN_00462090 | re-tokenises from the saved position after the include | an include name with a space or comma leaves its tail as a token and fails the read | skip the whole quoted name |
-| S02-B19 | `ProcRemark` FUN_00460c90, `MakeFormat` FUN_00460ea0, `MakeData` FUN_00461240 | unbounded `strcpy` into STRING [512], FILENAME [260], remark markers [64], format name [64] | a long value overflows the row / reader | bounded copy |
+| S02-B19 | `ProcRemark` FUN_00460c90, `MakeFormat` FUN_00460ea0, `MakeData` FUN_00461240 | unbounded `strcpy` into STRING [512], FILENAME [260], remark markers [64]; the format name is cut to 64 chars first (`strncpy` 0x40 into a zeroed 0x41 local), so only its NUL can land in the next member `NumParameter`, which is then overwritten | a long value overflows the row / reader (format name: harmless) | bounded copy |
 | S02-B20 | `CCsl::GetDataToken` FUN_00461190 | EOF inside a data row increments `m_NumFormatErrors` | the message counts it as a format error | `m_NumDataErrors` |
 | S02-B21 | `CCsl::MakeData` FUN_00461240 | `[…]` optional column types consume a value like `<…>` | a short row silently takes its missing values from the next row | stop at the line end for optional columns |
 | S02-B22 | `CCsl::CCsl(CCsl* null)` FUN_00461ea0 | builds a temporary `CCsl` on the stack instead of initialising `this` | dead (only caller passes `this`) | call `VarClear` / `Clear` on `this` |
@@ -1507,6 +1600,9 @@ the first). The WM bodies are W05 §5.2.
 | S02-B28 | `CGdp::UpdateWriteDataInfo` FUN_0045efb0 (WriteFile) | adds n to SrcSize regardless of the position | dead in 2016 | size = max(size, pos + n) |
 | S02-B29 | `CGdp::Open(i)` FUN_0045f980 | accepts `i == m_dwNumChunk` | dead in 2016 (one record past the list) | `i ≥ n` → fail |
 | S02-B30 | `CGdp::GdpMakeEmptyChunk` FUN_0045f4e0 | malloc failure returns 0 (= the MAIN index) | dead in 2016 (turns MAIN into a FILE entry) | return −1 |
+| S02-B31 | `CIOBuffer::Alloc` FUN_00468e10 | after the 512 pooled buffers of a slot, `new CIOBuffer` (0x2010) is not checked for null; `m_dwSize` / `m_nRef` / `m_pNext` are written at once | out of memory → access violation in a send instead of a failed send | return null and let `CSocket_IOCP::Send` fail |
+| S02-B32 | `CIOCP::Start` FUN_004645c0 | `CreateThread` result not checked; with the wait flag set (all callers) the loop sleeps 50 ms until the worker leaves STARTING, which a thread that was never created never does; `Start` returns `n` either way, so the Login / WM `!= n` checks only catch a failed port creation (0); Zone (2 × CPUs + 1 workers) ignores the result | start-up hangs forever instead of failing | check the handle, count started workers, return the count |
+| S02-B33 | `ZoneServer::zs_ServerConnect2Zone` FUN_005a9a00 | tests `zipc_GetNextZoneNo() == −1` and asserts "not find nextzoneinfo" when `zipc_Mechine2IP` fails, but GetNextZoneNo returns 0 … 11 (0 when there is no next zone), so both are dead | a missing ring neighbour is never reported; the zone connects to zone 0 (its own listen port when it is zone 0) | return −1 for "no next zone" |
 
 ## 6. Not reconstructed / uncertain
 
@@ -1527,8 +1623,8 @@ The per-part lists are §1.10, §2.8 and §3.7. In addition:
 | `cShineLogSystem` (`SLS_AddLog`, `gSocket_IOCP_Write` initialiser FUN_00482690), `ShineExit`, `GetLastErrorStr`, `_DebugMessageNew` | W05 (done) §5.7, §6.4 | process log systems, documented there (W05-B20: `Socket_IOCP_Write` is never written) |
 | `CServerInfo` row accessors (`GetMyServerInfo`, `GetServerInfo`, `GetServerIndex`; Zone `GetNationName` / `GetWorldName`) | W05 (done) §5.2 / §6.2, Z10 (done) §1.1 | what the rows mean per server; Login copies identical, §4.3 |
 | `PROTOCOLFUNCTIONTEMPLETE<T>::pft_Store` handler tables | W05 (done) §6.1 | the dispatch above `CPacket` |
-| Login process layer not cited anywhere: `ViewStartInfo` FUN_00401120, `MainThread` FUN_004030e0, `ProcessPacket` FUN_004024e0, `OnStop_Service` FUN_00402b70, the session pools (`CLoginBaseSessionManager` InitSessions / EmptyToActive / ActiveSession / InactiveSession / FreeSessions, `CLoginClientSessionManager` ActiveSession / HandleIsValid / GetSession / Kickoff / Send / InitSessions, `CLoginWorldManagerSessionManager` Get/SetWorldManagerConnectInfo / GetClientValidation / SetWMSession / InactiveSession / FreeSessions / InitSessions, `CLoginClientSession` Get/SetSessionMode), `m_LoginUserRatable` | new item L01 (added by S02) | L00 is done and `login-server.md` cites none of them (~45 functions, the Login twin of W05 §1 / §4); too large for a gap fix here |
-| Zone process layer: `zs_Start_Acceptor` FUN_005a9c60, `zs_service_acceptor` LAB_005aa7c0, `zs_connect` FUN_005aa840, `ZoneBaseSession` / `ZoneBaseSessionManager::ProcHeartBeat` / `CheckHeartBeat`, `ClientSessionManager` | Z10 (done) §6.5, Z09 (done) §1.5, Z01 §1 | documented there; `~ZoneServer` here (§4.2) |
+| Login process layer not cited anywhere: `ViewStartInfo` FUN_00401120, `MainThread` FUN_004030e0, `ProcessPacket` FUN_004024e0, `OnStop_Service` FUN_00402b70, the session pools (`CLoginBaseSessionManager` InitSessions / EmptyToActive / ActiveSession / InactiveSession / FreeSessions, `CLoginClientSessionManager` ActiveSession / HandleIsValid / GetSession / Kickoff / Send / InitSessions, `CLoginWorldManagerSessionManager` Get/SetWorldManagerConnectInfo / GetClientValidation / SetWMSession / InactiveSession / FreeSessions / InitSessions, `CLoginClientSession` Get/SetSessionMode), `m_LoginUserRatable`, `CParserWorldManager::Parser` FUN_004087d0 / its `pft_Store` FUN_004086b0, the AccountDB / AccountLogDB session ctors FUN_00408cd0 / FUN_00408d00, `COTPLogin` ctor FUN_0040a560, `~COTPData` FUN_0040a550, the per-parser 0x0801 / 0x0804 handler copies FUN_00404f50 / FUN_004050e0 / FUN_00407480 / FUN_00408560 | new item L01 (added by S02) | L00 is done and `login-server.md` cites none of them (~45 functions, the Login twin of W05 §1 / §4); too large for a gap fix here |
+| Zone process layer: `zs_Start_Acceptor` FUN_005a9c60, `zs_service_acceptor` LAB_005aa7c0, `zs_connect` FUN_005aa840, the ring (`ZoneConnectSession::zcs_Send` FUN_005a6ed0, `ZoneListenSession`, `FieldContainer::fc_MakeField`), the session pools above the base manager (`ClientSessionManager` InitSessions …) | Z10 (done) §1.1 / §6.5 (acceptor start and service), Z09 (done) §1.5 (`zs_connect`), Z01 (done) §1 / §10 (pools, ring) | documented there. The library-facing glue those docs did not cite (`ZoneServer` ctor, `ZoneBaseSession` ctor / dtor, `ProcHeartBeat`, `ClientSession::CheckHeartBeat`, `ClientSessionManager` ctor / dtor, `zs_ServerConnect2Zone`, all of `ZoneIPContainer`, Zone `CServerInfo` ctor) is §4.4; `~ZoneServer` §4.2 |
 | GameLog's session framework (older variant) | D05 (done) §7.2 | documented there |
 | `CCsl` / `CToken` copies in Account, AccountLog, Character, GameLog; tested reader for all servers | Z19 (open; plan: "Other servers: confirm Login, WM, Account, AccountLog use the same functions … Character and GameLog … find the copy by its strings") | Z19 can cite §2 for the grammar and parser and add only the per-server diff |
 | `CToken` as the quest-script tokenizer (`CQuestParserScript` FUN_00636f60 …, `ParserNext` FUN_006387f0) | Z15 (open; plan cites `QuestScript_Next` FUN_006387f0) | the tokenizer is §2.2; the quest grammar on top is Z15's |

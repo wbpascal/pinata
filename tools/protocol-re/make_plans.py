@@ -270,10 +270,20 @@ ITEMS = [
              "(FUN_00409520 … FUN_00409670): pool sizes (from `nMaxAccept`), handles, which event frees a session.",
              "`LoginServer::m_LoginUserRatable` (256 × 6 ints set to 3, 5, 8, 10, 30, 95 in the constructor FUN_004029e0, "
              "S02 §4.3): find its readers and what the world status sent to the client is computed from.",
+             "Parsers and members the constructor / dtor / ProcessPacket reach: `CParserWorldManager::Parser` FUN_004087d0 and "
+             "its `pft_Store` FUN_004086b0 (compare with the other parsers L00 cites), `CLoginAccountDBSession` / "
+             "`CLoginAccountLogDBSession` ctors FUN_00408cd0 / FUN_00408d00, `COTPLogin` ctor FUN_0040a560 and `~COTPData` "
+             "FUN_0040a550; the per-parser copies of the 0x0801 / 0x0804 handlers L00 cites only once: "
+             "`CParserAccountLogDB::fc_NC_MISC_S2SCONNECTION_RDY` / `fc_NC_MISC_HEARTBEAT_REQ` FUN_00404f50 / FUN_004050e0, "
+             "`CParserOPTool::fc_NC_MISC_HEARTBEAT_REQ` FUN_00407480, `CParserWorldManager::fc_NC_MISC_HEARTBEAT_REQ` "
+             "FUN_00408560 (same body as L00's copy or not).",
+             "Sweep (L01 has no scope table, so `coverage.py L01` does not apply): list every caller and callee in "
+             "`login-pdb` of the functions above and of `LoginServer::LoginServer` / `~LoginServer` / `MainThread` that no "
+             "doc cites as `FUN_…` (S02 part 4 used such a script over `decomp.c`), and cover or bound each.",
              "Mark unintended behaviour `(original bug) L01-B<n>`; fix nothing in `login-server.md` (done item): put "
              "corrections in `docs/knowledge/L01.md`."],
       done="Every function named above cited with pseudocode; the session lifecycle (accept → pool → free) and the main "
-           "loop order written; `coverage.py L01` shows no Login process function left uncited."),
+           "loop order written; the sweep step finds no Login process function left uncited."),
  dict(id="Z02", phase=2, title="Zone: movement, chat, emotes, sight/briefinfo, NPC menus, scenario",
       out="docs/pseudocode/zone/Z02-actions.md", deps=["Z01"],
       scope=[("zone", "ShinePlayer", [7, 8, 15, 27]), ("zone", "WorldManagerSession", [8])],
