@@ -1,4 +1,7 @@
 {
   "DAT_006d4c18": "bWorkAllAndNextSession",
-  "DAT_006d4c10": "Listen_OPTool_bListen"
+  "DAT_006d4c10": "Listen_OPTool_bListen",
+  "DAT_006d52e0": "g_ShnDataFile",
+  "DAT_006c5220": "g_DataFileServer",
+  "DAT_006c54ac": "g_CharClassDataBox"
 }

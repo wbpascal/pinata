@@ -378,7 +378,244 @@ to the client as 0x441E. The WM itself does not reset any quest; it only defines
 
 ---
 
-<!-- Parts 2–4 add §3 data loader, §4 session lifecycle, §5 W01 core gaps; the sweep part adds the bug table,
+## 3. Data loader (`ReadGlobalGameData`) and the SHN reader
+
+The WM loads all its game data once, in `Start` before the service dispatcher starts (§1.1); nothing reloads it
+later (no reload command reaches these loaders). Config files (`WMServerInfo.txt`, `ServerInfo.txt`) are read
+before this by `ReadDefineScriptor` (W01 §2); the WM reads no other input file. Files it writes: debug log
+`.\DebugMessage\Msg_<yyyy-mm-dd>.txt` (`_DEBUGMSG` FUN_00460340 → `_DebugMessageNew2` FUN_00460130), the
+`SLS_AddLog` logs, `CallStack.txt` (crash dump), `Assert<date><hh>.txt` and `ExitLog<date><hh>.txt` (`ShineExit`).
+
+### 3.1 `CDataReader`: the SHN reader all tables use
+
+`CDataReader` *(pdb2016)*, 0x40 bytes: +0 vftable, +4 `m_nFileSize`, +8 `m_nBFSize` (buffer capacity), +0xC
+`m_nDataArraySize`, +0x10 `m_nFileCheckSum`, +0x14 `m_sFileMD5` (Name8 = char[32], hex text), +0x34 `m_pHead`
+(`HEAD*`, the whole file), +0x38 `m_pData` (first row), +0x3C `m_pDataArray` (row pointers). SHN header and field
+types: `docs/knowledge/S01.md` §6.1; the cipher is the one `tools/protocol-re/shn.py` implements.
+
+```pseudo
+CDataReader::CDataReader(this)                                                         @ FUN_00458a70
+    MD5 text = 0; m_pHead = 0; m_nBFSize = m_nDataArraySize = m_nFileCheckSum = 0
+
+CDataReader::Read(this, path) → bool                                                   @ FUN_00458ca0
+    f = fopen(path, "rb"); none → return 0
+    m_nFileSize = filelength(f)
+    if m_nBFSize < m_nFileSize:                       # grow only; a smaller file reuses the old buffer
+        free the old buffer; m_pHead = new[m_nFileSize]; m_nBFSize = m_nFileSize; m_nFileCheckSum = 0
+    if fread(m_pHead, m_nFileSize) fails: fclose; free the buffer; m_nBFSize = m_nFileCheckSum = 0; return 0
+    fclose(f)
+    if HEAD.nDataMode != 0: CDataReader::Encription(&HEAD.nDataSize (+0x24), m_nFileSize − 0x24)   @ FUN_00458aa0
+        # in place, from the last byte down: b[i] ^= key; key = (i·11) ^ ((i & 0xF) + 0x55) ^ key ^ 0xAA,
+        # first key = low byte of the length (= shn.py decrypt)
+    m_pData = m_pHead + 0x34 + nNumOfField · 0x38
+    grow m_pDataArray to nNumOfRecord; walk the rows: m_pDataArray[i] = row + 2 (each row starts with a u16 length)
+    m_nFileCheckSum = Σ byte[i] · i over i < m_nBFSize            # never read by the WM
+    m_sFileMD5 = MD5 hex text of the first m_nBFSize bytes        (CMD5Checksum::GetMD5)
+        # both use the buffer capacity, not the file size: a re-read of a smaller file hashes stale bytes,
+        # (original bug) W05-B6
+    return CShnDataFileCheckSum::InitDataFileCheckSum(&ShnDataFile, path, m_sFileMD5)    # §3.4
+
+CDataReader::Read(this, path, key, rowSize) → bool       (`Shn_LoadChecked`)                @ FUN_00458f00
+    return Read(path) and HEAD.nVersionKey == key and HEAD.nFieldSize − 2 == rowSize
+
+CDataReader::GetRecord(this, i) → row* or 0              (`Shn_GetRow`)                     @ FUN_00458ae0
+    m_pHead != 0 and i < nNumOfRecord ? m_pDataArray[i] : 0
+CDataReader::~CDataReader(this): free the buffer and the row array                        @ FUN_00458b10
+```
+
+Every WM table goes through the checked read: a wrong `nVersionKey` (= the row struct's `DataVersionKey`, S01 §6.1)
+or row size refuses the file. All 2016 files pass (checked with `shn.py`: key, row size and row count below).
+
+### 3.2 `ReadGlobalGameData`: order, destination, checks
+
+```pseudo
+WorldManagerServer::ReadGlobalGameData(this) → bool                                    @ FUN_00404100
+    for each row of the table below, in order:
+        ok = <loader>(<object>, "../9Data/Shine/<file>")
+        if !ok: _DEBUGMSG("*FATAL ERROR* - <text> READ FAILED %s"); return 0
+            # _DEBUGMSG passes its varargs to _vsnprintf but the call has no argument for "%s": the text
+            # prints whatever pointer is on the stack (or faults while logging) (original bug) W05-B7
+    # between rows 9 and 10: m_BoomStartKey1 … m_BoomStartKey6 (+0x22b4e4 … +0x22b4f8, u32) = 0;
+    #   no WM function reads or writes them otherwise (dead members)
+    CharClassDataBox::ccdb_Load(&m_CharClassDataBox, "../9Data/Shine/UseClassTypeInfo.shn")   # row 25
+    return 1
+# Start returns −4 when this returns 0: the process ends before the service runs (§1.1).
+```
+
+"Fatal" = `ReadGlobalGameData` returns 0 → WM does not start. All rows are fatal; no table is optional. Offsets are
+from `gServer`. Key / row = the arguments of the checked read (`Shn_LoadChecked`); rows = 2016 file.
+
+| # | File | Loader | Lands at | Key / row | 2016 rows | Extra check (fatal) | Used by |
+|---|---|---|---|---|---|---|---|
+| 1 | `MsgWorldManager.shn` | `CDataReader::Read` FUN_00458f00 | +0xc40c0 `m_MsgWM` | 0x1E / 1 (Desc VARSTR) | 3 | — | `GetMsg` (§3.3): KQ notices, W04 §6.2 |
+| 2 | `KingdomQuest.shn` | `CKQServer::Read` FUN_00451b40 | +0xc4134 `m_KQServer` (+0x1B9D4) | 0x2535 / 0xB4 | 57 | W04 §6.1 | W04 §6 |
+| 3 | `KingdomQuestMap.shn` | `CKQServer::ReadMap` FUN_00453e70 | `m_KQServer` +0x1BA14 | 0x2085 / 0x16B | 38 | W04 §6.1 | W04 §6 |
+| 4 | `KQVoteMajorityRate.shn` | `CKQServer::ReadVoteRate` FUN_00451b60 | `m_KQServer` +0x1BA54 | 1 / 1 | 2 | — | W04 §6.5 |
+| 5 | `KQIsVote.shn` | `CKQServer::ReadIsVote` FUN_00451b80 | `m_KQServer` +0x1BA94 | 5 / 3 | 30 | duplicate / missing IDs only logged (W04 §6.1) | W04 §6.1, §6.5 |
+| 6 | `KQTeam.shn` | `CKQServer::ReadTeam` FUN_00451d80 | `m_KQServer` +0x1BAD4 | 0xF1 / 0x16 | 8 | W04 §6.1 | W04 §6 |
+| 7 | `GuildGradeData.shn` | `CGuildDataServer::ReadGradeScoreData` FUN_0045a7e0 (on `m_GuildGradeData`) | +0x22b06c `m_GuildGradeData.m_GuildGradeData` | 0x4DA / 0x15 | 5 | — | **nobody in the WM** (below) |
+| 8 | `GuildGradeScoreData.shn` | same FUN_0045a7e0 | +0x22b0ac `m_GuildDataServer` +0 `m_GuildGradeScoreData` | 0x2BD / 0xE | 7 | — | `GetGradeScore` FUN_0043c410, war points W03 §3.4 |
+| 9 | `GuildLevelScoreData.shn` | `ReadLevelScoreData` FUN_0043c400 | `m_GuildDataServer` +0x40 | 0x12 / 4 | 3 | — | FUN_0043c450, W03 §3.4 |
+| 10 | `GuildTournament.shn` | `CGuildTournamentServer::ReadScheduleData` FUN_0043d270 | +0x22acc4 `m_GuildManager.m_Tournament` (T) +0x2D4, active row T+0x314 | 0x3DE / 0x1D | 7 | ≥ 1 row; active row (below) | W03 §8.4, W04 §4.4 |
+| 11 | `GuildTournamentReward.shn` | `ReadRewardData` FUN_0043d200 | T+0x318, row 0 at T+0x358 | 0x225 / 0x26 | 37 | ≥ 1 row | W03 §8.5 |
+| 12 | `GuildTournamentRequire.shn` | `ReadRequireData` FUN_0043d510 | T+0x35C, row 0 at T+0x39C | 0x18 / 7 | 1 | ≥ 1 row | W03 §8.1 (entry conditions) |
+| 13 | `GuildAcademy.shn` | `ReadGuildAcademyData` FUN_0043c520 | `m_GuildDataServer` +0x80, row 0 at +0xC0 | 0xDA / 0x26 | 1 | ≥ 1 row | W03 §6.4 (BuffName) |
+| 14 | `GuildAcademyLevelUp.shn` | `ReadGuildAcademyLevelUpData` FUN_0043c590 | `m_GuildDataServer` +0xC4, row 0 at +0x104 | 0x2F / 9 | 51 | ≥ 1 row | W03 §4.7, §6.4 (FUN_0043c670) |
+| 15 | `GuildAcademyRank.shn` | `ReadGuildAcademyRankData` FUN_0043c600 | `m_GuildDataServer` +0x108, row 0 at +0x148 | 0x108 / 0x26 | 4 | ≥ 1 row | W03 §6.4 |
+| 16 | `SpamerReport.shn` | `CDataFileServer::ReadSpamerReportData` FUN_0043a220 | +0x22b1f8 `m_DataFileServer` +0, row 0 at +0x40 | 0x11C / 0x86 | 1 | ≥ 1 row | W04 §2.5 |
+| 17 | `GBHouse.shn` | `ReadGBHouseData` FUN_0043a2e0 | `m_DataFileServer` +0x44, row 0 at +0x84 | 0x28 / 0xB | 1 | ≥ 1 row | W04 §15.1 |
+| 18 | `NpcSchedule.shn` | `CNpcScheduleServer::enss_DataLoad` FUN_00457510 | +0x22b344 `m_NpcScheduleServer` | 0x83 / 0x2A | **0** | W04 §17.6 | W04 §17.6 |
+| 19 | `BadNameFilter.shn` | `ReadBadNameFilterData` FUN_0043a370 | `m_DataFileServer` +0x88, row 0 at +0xC8 | 0x12 / 0x24 | 1175 | ≥ 1 row; every BadName upper-cased in place (`_mbsupr`) | `GetIsBadName` (§3.3): W01 §4.1, W03 §2.2 |
+| 20 | `AttendSchedule.shn` | `ReadAttendScheduleData` FUN_0043a4c0 | `m_DataFileServer` +0xCC | 0x5C / 0xA | 1 | rows ordered and not overlapping (below) | W04 §17.5 |
+| 21 | `AttendReward.shn` | `ReadAttendRewardData` FUN_0043a620 | `m_DataFileServer` +0x10C | 0x98 / 0x26 | 7 | — | W04 §17.5 |
+| 22 | — | `cEvent_Attendance::EA_Schedule_Init(…, 0)` FUN_0043b090 | +0x22b38c `m_EventAttendance` | — | — | AttendSchedule row 0 usable (W04 §17.5); text "*FATAL ERROR* - Attend Schedule" | W04 §17.5 |
+| 23 | — | `EA_Event_Set_RewardData` FUN_0043b9c0 | `m_EventAttendance` | — | — | AR_Type 0 or 1 only (W04 §17.5); "*FATAL ERROR* - Attend Set RewardData" | W04 §17.5 |
+| 24 | `SingleData.shn` | `CSingleDataMap::InitSingleDataArray` FUN_00459de0 | +0x22b474 `m_SingleData` (std::map) | 7 / 0x22 | 41 | every row non-null | `GetValue` (§3.3) |
+| 25 | `UseClassTypeInfo.shn` | `CharClassDataBox::ccdb_Load` FUN_00465a80 → `BinaryDataBox<UseClassTypeInfo>::bdb_ReadData` FUN_00465960 | +0x22b484 `m_CharClassDataBox` | 0x48A / 0x1F | 39 | failure → `ShineExit` (below) | `ccdb_UseClassTypeToBit` FUN_00465a90: KQ class mask, W04 §6.2 |
+
+Error texts (row → `*FATAL ERROR* - … READ FAILED %s`): 1 `MsgWorldManager.shn`, 2–6 `KINGDOM QUEST [MAP / VOTE RATE /
+ISVOTE / TEAM] DATA`, 7 `GUILD GRADE DATA`, 8 `GUILD GRADE SCORE DATA`, 9 `GUILD LEVEL SCORE DATA`, 10–12 `GUILD
+TOURNAMENT [REWARD / REQUIRE] DATA`, 13–15 `GUILD ACADEMY [LEVEL UP / RANK] DATA`, 16–21 `DATA FILE - SPAMER REPORT /
+GAMBLE HOUSE / NPC SCHEDULE / BAD NAME FILTER / Attend Schedule / Attend Reward DATA`, 24 `DATA FILE - SINGLE DATA`.
+
+Loader details:
+
+```pseudo
+# rows 11–17 (the "row 0" loaders): one pattern
+Read<X>Data(this, path):                    @ FUN_0043d200 FUN_0043d510 FUN_0043c520 FUN_0043c590 FUN_0043c600 FUN_0043a220 FUN_0043a2e0
+    m_p<X> = 0
+    if !Read(&m_<X>, path, key, row) or nNumOfRecord == 0: return 0
+    m_p<X> = GetRecord(0); return m_p<X> != 0
+    # the WM keeps only row 0 for SpamerReport, GBHouse, GuildTournamentRequire, GuildAcademy;
+    # the others are walked by their users (W03 / W04)
+
+CGuildTournamentServer::ReadScheduleData(T, path)                                     @ FUN_0043d270
+    m_pScheduleData = 0
+    if !Read(T+0x2D4, path, 0x3DE, 0x1D) or no rows: return 0
+    for i in rows: m_pScheduleData = row i; if row.isActive == 1: break
+    return m_pScheduleData != 0
+    # with no active row the loop leaves the LAST row as the schedule and the load succeeds
+    # (original bug) W05-B5; 2016: row 0 is active (isActive 1, Week 2, 13:00, MatchCycleMin 10080)
+
+CDataFileServer::ReadBadNameFilterData(this, path)                                     @ FUN_0043a370
+    checked read (0x12, 0x24), ≥ 1 row; _mbsupr(row.BadName) for every row; return 1
+    # row: BadName char[32] @0, Type FilterType u32 @0x20 (FT_COMPLETE 0, FT_PART 1) (pdb2016)
+
+CDataFileServer::ReadAttendScheduleData(this, path)                                     @ FUN_0043a4c0
+    checked read (0x5C, 0xA)        # row: AS_StartYear u16, Month, Day, Hour, Minute u8, AS_JoinKeepTime u16 @6,
+                                    #      AS_CheckTerm u16 @8 (W04 §17.5)
+    prevEnd = 0
+    for each row (0 rows pass):
+        row missing → return 0
+        if AS_CheckTerm ≤ AS_JoinKeepTime: return 0          # a "day" must be longer than the required online time
+        start = mktime(local AS_StartYear-AS_StartMonth-AS_StartDay AS_StartHour:AS_StartMinute:00)
+        if start < prevEnd: return 0                          # also an invalid date (mktime −1) on row 0
+        prevEnd = start + AS_CheckTerm · 1680                  # 1680 = 28 days × 60: the event's 28 "days"
+    return 1
+    # a _time32(now) is taken and never used. 2016: 1 row, 2015-11-09 00:00, JoinKeepTime 60, CheckTerm 1440
+
+CSingleDataMap::InitSingleDataArray(this, path, 7, 0x22)                                @ FUN_00459de0
+    read into a temporary CDataReader (checked); failure → return 0
+    for each row: missing → return 0; m_SingleData[string(row.SingleDataIDX char[32])] = row.SingleDataValue u16 @0x20
+    the temporary reader is freed; only the map stays
+
+BinaryDataBox<UseClassTypeInfo>::bdb_ReadData(this, path)                               @ FUN_00465960
+    if checked read (0x48A, 0x1F) succeeds: return
+    ac_AssertFail("BinaryDataBox<T>::bdb_ReadData : readfail", path); ac_AssertFail("Code:%X:%d\tSHN:%X:%d")
+    ShineExit("BinaryDataBox<T>::bdb_ReadData")                                         @ FUN_004673f0
+        append "<time> : AssertClass::ac_AssertFail : <text>" to ExitLog<yyyymmdd><hh>.txt; exit(0)
+    # so this last table does not fail through ReadGlobalGameData: the process exits with code 0
+    # row: UseClass (UseClassType enum, 39 values UCT_NONE … UCT_SHIELD_NOT_GLA) u32 @0, then one u8 per class
+    # Fig @4 … Sav @0x1E (27 classes); ccdb_UseClassTypeToBit FUN_00465a90 turns the row of a UseClass into a u64
+    # mask, bit 0 = Fig … bit 26 = Sav; unknown UseClass → 0 (W04 §6.2 uses it for the KQ class check)
+```
+
+`GuildGradeData.shn` (row 7): `CGuildGradeData` *(pdb2016)* is one `CDataReader`; the loader called for it is the
+PDB's `CGuildDataServer::ReadGradeScoreData` with `this = &m_GuildGradeData` (both readers sit at +0 of their
+object, so the linker folded the two identical functions *(inferred)*). No WM function reads `m_GuildGradeData`
+(gServer+0x22b06c has no other reference): the WM loads it only for the start-up check. Its columns (Type, NeedFame,
+MaxOfMember, MaxOfGradeMember[7]) are the zone's guild-grade rules (W03 §9.5: the zone combines the grade with the
+GuildGradeData rights).
+
+### 3.3 Table accessors
+
+```pseudo
+WorldManagerServer::GetMsg(this, n) → char*        (`WM_GetMsg`)                         @ FUN_00404570
+    n < nNumOfRecord(m_MsgWM) ? GetRecord(m_MsgWM, n) (= Desc text) : pNULLMSG ("")
+    # 2016 has rows 0…2; W04-B58 reads #3 / #4
+
+CDataFileServer::GetIsBadName(this, name) → 1 = forbidden                                @ FUN_0043a400
+    up = strcpy(local[128], name); _mbsupr(up)           # unbounded copy; callers pass length-checked names
+    for each BadNameFilter row:
+        Type 0 FT_COMPLETE: _mbsicmp(name, row.BadName) == 0 → return 1     # whole name, case-insensitive
+        Type 1 FT_PART:     _mbsstr(up, row.BadName) != 0   → return 1     # BadName anywhere in the name
+        other types: ignored
+    return 0
+    # callers: character create / rename (W01 §4.1, FUN_0043a400 there marked inferred: confirmed) and guild
+    # create (W03 §2.2)
+
+CSingleDataMap::GetValue(this, key) → u16           (`ServerParam_GetInt`)              @ FUN_00459f10
+    return m_SingleData[key]           # std::map operator[]: an unknown key is inserted with 0 and returns 0
+```
+
+`SingleData.shn` keys the WM reads (all 16 exist in the 2016 file; value in brackets):
+
+| Key | 2016 | Read by (documented in) |
+|---|---|---|
+| `KQVote_VoteLimitTime` | 60 | `CKQServer::GetVoingEndTime`, 0x5810 vote start (W04 §6.5) |
+| `KQVote_SuggestCoolTime` | 300 | 0x5810 vote start (W04 §6.5) |
+| `KQVote_LoginCoolTime` | 300 | `fc_NC_CHAR_LOGIN_REQ`, `TutorialLoginProcess` (W01 §4.2) |
+| `KQPlayerList_ResetListCoolTime` | 5 | `Recv_NC_KQ_JOIN_LIST_REQ` (W04 §6.5) |
+| `Guild_CannotLeaveTime` | 1 | `MemberJoin`, member leave / vanish (W03 §2.6, §2.7) |
+| `Academy_CannotJoinNotTime` | 30 | `CGuildAcademyServer::AddBanishInfo` (W03 §5) |
+| `GE_Member_60Lv`, `GE_Member_100Lv`, `GE_Change_Month`, `GE_Delete_Term_Date` | 20, 5, 1, 30 | guild emblem conditions and expiry (W03 §3.11) |
+| `ChrLevel_CanCreateSen` | 60 | `fc_NC_AVATAR_CREATE_REQ` (W01 §4.1) |
+| `UserNewbie_DaysAfterSignUp`, `UserComeback_DaysAfterSignUp` / `…DaysAfterLogOff` / `…DaysAfterComeback` | 21, 90, 30, 15 | AccountDB return check, AccountLogDB last-logout day (W01 §3.3) |
+| `FriendLvDiff` | 10 | `fc_NC_FRIEND_FIND_FRIENDS_REQ` (W04 §5.6) |
+
+The other 25 keys (Gather_*, Sen*, Pup*, item / mix keys …) are zone settings; the WM loads them unused.
+
+### 3.4 Client-SHN checksum list (`CShnDataFileCheckSum`)
+
+`ShnDataFile` (DAT_006d52e0) is a global `CShnDataFileCheckSum` *(pdb2016)*: `InitCheckSumCnt` u32 @0, then 49
+entries of 0x41 bytes { bool `Marking` @0, Name8 `CheckSum` @1 (MD5 hex text), char `DataFileName`[32] @0x21 }
+(size 0xC78). It is the zone's client-data check (the client sends the MD5s of these 49 files in 0x1801
+NC_MAP_LOGIN_REQ and the zone compares them, Z01 §5.2), linked into the WM as part of the shared `CDataReader`
+code.
+
+```pseudo
+`dynamic_initializer_for_'ShnDataFile'` (CRT static constructor, before WinMain)                @ FUN_00482610
+    CShnDataFileCheckSum::CShnDataFileCheckSum(&ShnDataFile); atexit(destructor FUN_00482a10)
+
+CShnDataFileCheckSum::CShnDataFileCheckSum(this)                                       @ FUN_0045d8c0
+    InitCheckSumCnt = 0; every Marking = false
+    DataFileName[0…48] = Abstate, ActiveSkill, CharacterTitleData, ChargedEffect, ClassName, Gather,
+        GradeItemOption, ItemDismantle, ItemInfo, MapInfo, MiniHouse, MiniHouseFurniture, MiniHouseObjAni, MobInfo,
+        PassiveSkill, Riding, SubAbstate, UpgradeInfo, WeaponAttrib, WeaponTitleData, MiniHouseFurnitureObjEffect,
+        MiniHouseEndure, DiceDividind, ActionViewInfo, MapLinkPoint, MapWayPoint, AbStateView, ActiveSkillView,
+        CharacterTitleStateView, EffectViewInfo, ItemShopView, ItemViewInfo, MapViewInfo, MobViewInfo, NPCViewInfo,
+        PassiveSkillView, ProduceView, CollectCardView, GTIView, ItemViewEquipTypeInfo, SingleData,
+        MarketSearchInfo, ItemMoney, PupMain, ChatColor, TermExtendMatch, MinimonInfo, MinimonAutoUseItem,
+        ChargedDeletableBuff  (each + ".shn"), then every name lower-cased
+    # index = position in the client's 0x1801 checksum array (same list in the zone, FUN_00631450)
+
+CShnDataFileCheckSum::InitDataFileCheckSum(this, path, md5) → bool                     @ FUN_0045d710
+    copy path to a 128-byte local (unbounded), lower-case it, split at '/' and '\'
+    for each token: if it equals DataFileName[i] (exact, after both were lower-cased):
+        if InitCheckSumCnt > 49: return 0             # makes the CDataReader::Read fail
+        CheckSum[i] = md5; Marking[i] = true; InitCheckSumCnt++; return 1
+    return 1                                           # files not in the list pass
+```
+
+**What uses it in the WM: nothing.** Only the constructor, `InitDataFileCheckSum` (called by every
+`CDataReader::Read`) and the destructor touch `ShnDataFile`; the WM has no `DataFileCheck` / `GetDataFileCheckSum`
+(the zone has them, FUN_00631350 …). Of the WM's 25 files only `SingleData.shn` is in the list, so at run time entry
+40 holds the MD5 of the WM's `SingleData.shn` and nothing reads it. A rebuild of the WM can drop the class; the check
+belongs to the zone (Z01 §5.2).
+
+---
+
+<!-- Parts 3–4 add §4 session lifecycle, §5 W01 core gaps; the sweep part adds the bug table,
      "Not reconstructed / uncertain" and "Coverage boundary". -->
 
 ## Original-server bugs (so far; completed in the sweep part)
@@ -389,3 +626,6 @@ to the client as 0x441E. The WM itself does not reset any quest; it only defines
 | W05-B2 | `OnStop_Service` FUN_00406d40 | sets `m_MainWorkStep = CLOSE_NORMAL` and `m_bStopMainThread = 1` together | the main thread exits before `MainWork` applies `SetLogoutType(0x782)`; logout reports of a service stop carry stale close reasons | set only the step and let `MainWork` stop the thread |
 | W05-B3 | `CDailyQuestTimer` ctor FUN_00439f10 | December start: next month = February (month index 1) of next year | none (the year branch fires on 1 January and sets the month too) | month index 0 |
 | W05-B4 | `DQ_Schedule_Process` FUN_0043a120 | `tInitYear/Month/WeekQuest` are computed once at start and never advanced | after the first boundary each daily run recomputes year / month / week again; same values | advance the end times when a period rolls over |
+| W05-B5 | `CGuildTournamentServer::ReadScheduleData` FUN_0043d270 | with no `isActive == 1` row the loop leaves the last row selected and returns success | a table with every schedule disabled still runs the tournament on the last row's schedule | fail the load (or run no tournament) when no row is active |
+| W05-B6 | `CDataReader::Read` FUN_00458ca0 | byte checksum and MD5 run over `m_nBFSize` (buffer capacity), not `m_nFileSize` | none in the WM (each reader is filled once); a re-read of a smaller file into the same reader would hash stale bytes | hash `m_nFileSize` bytes |
+| W05-B7 | `ReadGlobalGameData` FUN_00404100 | every `*FATAL ERROR* … %s` text is passed to `_DEBUGMSG` without an argument for `%s` | on a failed load the log line prints a random stack pointer as a string or faults while logging | pass the file name |
