@@ -11061,7 +11061,7 @@ to the player only, after every server-side stop (mm_Step stop, block-check roll
 
 ### `0x204D` NC_ACT_REINFORCE_WALK_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone ShinePlayer::smo_ply_ReinforceRun FUN_00566ab0 with cmd 0x4D (no 2016 caller passes 0x4D, see Z09 §9.3); client FUN_004aa320; no PROTO struct in pdb2016 (R2))
+**Verified layout** (basis: zone ShinePlayer::smo_ply_ReinforceRun FUN_00566ab0 with lastCmd 0x4D, sent by so_MoveByServer FUN_00569510 from the Pine node `playerwork` ShinePlayerWalk::sa_Step FUN_004f6d40 (Z09 §25.2); client FUN_004aa320; no PROTO struct in pdb2016 (R2))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -11444,6 +11444,16 @@ Empty payload.
 
 empty; same recipients as 0x5812; Z09 §24.8
 
+### `0x5823` NC_KQ_NOREWARD_CMD (S→C)
+
+**Verified layout** (basis: zone AxialListKQReward::ali_Work FUN_00428490 → ShinePlayer::so_SendErrorCode FUN_0054f050 (dept 0x16, cmd 0x23, size 4); client FUN_004b0830; PROTO_NC_KQ_NOREWARD_CMD (pdb2017))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1104 = not enough mob kills: "You haven't hunted enough monsters to receive a reward." |
+
+Pine `reward KingdomQuest`, Z09 §25.6
+
 ### `0x6802` NC_BOOTH_OPEN_ACK (S→C)
 
 **Verified layout** (basis: zone FUN_0058e900 (codes from disassembly); client FUN_004a87b0)
@@ -11508,6 +11518,18 @@ the client tests its own position every frame and answers 0x6C08 when outside on
 | 2 | u8 | doorstate | DA_CLOSE 0 / DA_OPEN 1 (DA_BREAK 2 never sent) |
 
 the client switches its own door block by the name stored from the last 0x1C0F/0x1C10 (Z09-B33); Z09 §13.1
+
+### `0x6C0A` NC_SCENARIO_LIGHT_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone ShineMapLight::sa_Step FUN_004f20f0 (objdump 0x4f2299…0x4f22c5, size 5 with the opcode); client FUN_0049b010; PROTO_NC_SCENARIO_LIGHT_CMD (pdb2017))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | red | client: value / constant → scene light colour |
+| 1 | u8 | green |  |
+| 2 | u8 | blue |  |
+
+map-wide (AxialListPacketBroadcast), not stored on the server; Z09 §25.3
 
 ### `0x6C0B` NC_SCENARIO_OBJTYPECHANGE_CMD (hand-named) (S→C)
 

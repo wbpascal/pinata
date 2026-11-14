@@ -2225,7 +2225,7 @@ ShineObject::so_Shout                                                           
 
 The client reads `speaker` as a u16 mob ID when `isMob` is set (client handler reads offset 1 as u16, C01 table
 `re-data/client-handlers.json` 0x201f) and shows the mob's name. Callers: the Lua `cMobShout` FUN_005dbcd0 (part 12) and the
-map-script node `ShineNPCShout` `PineEventScriptNode::ShineNPCShout::sa_Step` FUN_004eecd0 (part 15).
+map-script node `ShineNPCShout` `PineEventScriptNode::ShineNPCShout::sa_Step` FUN_004eecd0 (§25.3).
 
 ```pseudo
 cMobChat(handle, scriptName, key, chatwin)           (Lua)                       @ FUN_005e2560
@@ -2558,7 +2558,7 @@ so_MoveByServer(o, dest, cmd, lastCmd, kind, logArg)  (vt 0x5b0)              @ 
 ```
 
 Callers: `mab_RunTo` (§7.3, cmd 0x1A), `smo_RunInFear`, `so_mobile_SpeedChange` (players), the map-script node
-`ShinePlayerWalk` `PineEventScriptNode::ShinePlayerWalk::sa_Step` FUN_004f6d40 (part 15). All pass lastCmd 0x49 for a run *(as read at the fear / speed-change sites)*.
+`ShinePlayerWalk` `PineEventScriptNode::ShinePlayerWalk::sa_Step` FUN_004f6d40 (§25.2: walk, cmd 0x18 / lastCmd 0x4D). The run callers pass lastCmd 0x49 *(as read at the fear / speed-change sites)*.
 (original bug) Z09-B14: the remembered command is `lastCmd` (0x49), so a player who comes into sight of an object moved
 this way gets `ResendLastMove` (Z02 §5) as **0x2049 NC_ACT_REINFORCE_RUN_CMD** with the 22-byte move payload; the client
 reads its first 8 bytes (`handle | from.x<<16`, …) as a destination for its *own* character. The client obeys only
@@ -2711,7 +2711,7 @@ ShineMob::smo_RegenSpotAsNextRoamingSpot (vt 0xf50): spawn point = current path 
 **Scenario moves** (NPCs and bandits moved by map scripts):
 
 ```pseudo
-so_scene_MovePathSet(o, x, y, kind)  (vt 0x8ac; ShineAct / ShineWalk script nodes, part 15)   @ FUN_0050d450
+so_scene_MovePathSet(o, x, y, kind)  (vt 0x8ac; script nodes `run` ShineRun §25.2 / `walk` ShineWalk part 15d)   @ FUN_0050d450
     append {x, y, kind} to the queue o+0x1db0 (16 × 12 bytes, count +0x1e70); full → ignored
 smo_MoveByScenario(o)  (from ShineNPC / ShineBandit so_Routine, §5.9 / §5.10)               @ FUN_0050d520
     if queue empty or moving: return
@@ -3091,7 +3091,7 @@ error") of table `RoamingData` in `World/PineScript.txt` is loaded with `mrs_Loa
 PineScript.txt)not found" when missing; FATAL "Option read error" without the file).
 
 Callers of `mh_ScriptBreed`: Pine node `ShineRegenGroup::sa_Step` FUN_004ee0f0 (optional x/y override of the group
-centre, restored afterwards; part 15), Lua `cGroupRegenInstance(map, regenIndex)` FUN_005ddaa0 and
+centre, restored afterwards; §25.1), Lua `cGroupRegenInstance(map, regenIndex)` FUN_005ddaa0 and
 `cGroupRegenInstance_XY(map, regenIndex, x, y)` FUN_005ddc40 (centre replaced by x, y for this call; both return 1 / push
 true). All pass key "Def" and take the rows from the `PineScriptMobRegenerator`:
 
@@ -6834,36 +6834,36 @@ in the 46 `.ps` files of 2016 / files that use it (counted from the files, the l
 | 7 | `print` | `StatePrint` | FUN_004da010 |  |  | 1/1 | §21.5 |
 | 8 | `permillage` | `StatePermillage` | FUN_004db080 |  |  | 0/0 | §21.5 |
 | 9 | `break` | `StateBreak` | FUN_004d6570 |  |  | 213/31 | §21.5 |
-| 10 | `printf` | `ShinePrintf` | FUN_004e8fe0 | — | 1 | 7/4 | part 15 |
+| 10 | `printf` | `ShinePrintf` | FUN_004e8fe0 | — | 1 | 7/4 | §25 |
 | 11 | `scriptfile` | `ShineScriptFile` | FUN_004e9050 | — | 1 | 37/27 | part 15 |
 | 12 | `timelimit` | `ShineTimeLimit` | FUN_004e90c0 | yes | 1 | 43/27 | part 15 |
 | 13 | `interruptclear` | `ShineInterruptClear` | FUN_004e9130 | — | 0 | 153/30 | §15 |
 | 14 | `interruptset` | `ShineInterruptSet` | FUN_004e91a0 | yes | 3–5 | 760/33 | §15 |
 | 15 | `interrupterase` | `ShineInterruptErase` | FUN_004e9210 | — | 1 | 36/9 | §15 |
 | 16 | `waitinterrupt` | `ShineWaitInterrupt` | FUN_004e9280 | yes | 1 | 153/33 | §15 |
-| 17 | `mobregen` | `ShineMobRegen` | FUN_004e92f0 | yes | 6–7 | 206/20 | part 15 |
+| 17 | `mobregen` | `ShineMobRegen` | FUN_004e92f0 | yes | 6–7 | 206/20 | §25 |
 | 18 | `doorbuild` | `ShineDoorBuild` | FUN_004e9360 | yes | 6 | 27/9 | §13 |
-| 19 | `npcstand` | `ShineNPCStand` | FUN_004e93d0 | yes | 6 | 81/9 | part 15 |
-| 20 | `change2mob` | `ShineChange2Mob` | FUN_004e9440 | yes | 1 | 2/1 | part 15 |
-| 21 | `change2door` | `ShineChange2Door` | FUN_004e94b0 | yes | 1 | 0/0 | part 15 |
-| 22 | `change2npc` | `ShineChange2NPC` | FUN_004e9520 | yes | 1 | 3/2 | part 15 |
+| 19 | `npcstand` | `ShineNPCStand` | FUN_004e93d0 | yes | 6 | 81/9 | §25 |
+| 20 | `change2mob` | `ShineChange2Mob` | FUN_004e9440 | yes | 1 | 2/1 | §23 |
+| 21 | `change2door` | `ShineChange2Door` | FUN_004e94b0 | yes | 1 | 0/0 | §23 |
+| 22 | `change2npc` | `ShineChange2NPC` | FUN_004e9520 | yes | 1 | 3/2 | §23 |
 | 23 | `exchange2mob` | `ShineExchange2Mob` | FUN_004e9590 | yes | 1 | 2/2 | §24.5 |
 | 24 | `dooropen` | `ShineDoorOpen` | FUN_004e9600 | yes | 1 | 32/9 | §13 |
 | 25 | `doorclose` | `ShineDoorClose` | FUN_004e9670 | yes | 1 | 40/9 | §13 |
-| 26 | `vanish` | `ShineObjectVanish` | FUN_004e96e0 | yes | 0 | 21/5 | part 15 |
-| 27 | `regengroup` | `ShineRegenGroup` | FUN_004e9750 | — | 2–4 | 854/23 | part 15 |
+| 26 | `vanish` | `ShineObjectVanish` | FUN_004e96e0 | yes | 0 | 21/5 | §25 |
+| 27 | `regengroup` | `ShineRegenGroup` | FUN_004e9750 | — | 2–4 | 854/23 | §25 |
 | 28 | `waitlogin` | `ShineWaitUserLogin` | FUN_004e97c0 | yes | 0 | 26/26 | part 15 |
-| 29 | `pause` | `ShinePause` | FUN_004e9830 | yes | 1 | 505/32 | part 15 |
-| 30 | `npcchat` | `ShineNPCChat` | FUN_004e98a0 | yes | 1 | 47/5 | part 15 |
-| 31 | `npcshout` | `ShineNPCShout` | FUN_004e9910 | yes | 1 | 11/2 | part 15 |
-| 32 | `chatwin` | `ShineChatWindow` | FUN_004e9980 | — | 2–9 | 215/17 | part 15 |
-| 33 | `chatwinrange` | `ShineChatWindowRange` | FUN_004e99f0 | — | 4–9 | 25/2 | part 15 |
+| 29 | `pause` | `ShinePause` | FUN_004e9830 | yes | 1 | 505/32 | §25 |
+| 30 | `npcchat` | `ShineNPCChat` | FUN_004e98a0 | yes | 1 | 47/5 | §25 |
+| 31 | `npcshout` | `ShineNPCShout` | FUN_004e9910 | yes | 1 | 11/2 | §25 |
+| 32 | `chatwin` | `ShineChatWindow` | FUN_004e9980 | — | 2–9 | 215/17 | §23 |
+| 33 | `chatwinrange` | `ShineChatWindowRange` | FUN_004e99f0 | — | 4–9 | 25/2 | §23 |
 | 34 | `summonmob` | `ShineSummonMob` | FUN_004e9ad0 | yes | 2 | 225/13 | part 15 |
-| 35 | `questresult` | `ShineQuestResult` | FUN_004e9b40 | yes | 0 | 31/15 | part 15 |
-| 36 | `reward` | `ShineReward` | FUN_004e9bb0 | yes | 0 | 14/13 | part 15 |
+| 35 | `questresult` | `ShineQuestResult` | FUN_004e9b40 | yes | 0 | 31/15 | §25 |
+| 36 | `reward` | `ShineReward` | FUN_004e9bb0 | yes | 0 | 14/13 | §25 |
 | 37 | `someoneshout` | `ShineSomeoneShout` | FUN_004e9a60 | — | 2 | 0/0 | part 15 |
-| 38 | `broadcast` | `ShineBroadcast` | FUN_004e9c20 | yes | 1–2 | 268/33 | part 15 |
-| 39 | `linkto` | `ShineLinkTo` | FUN_004e9c90 | yes | 4 | 64/34 | part 15 |
+| 38 | `broadcast` | `ShineBroadcast` | FUN_004e9c20 | yes | 1–2 | 268/33 | §23 |
+| 39 | `linkto` | `ShineLinkTo` | FUN_004e9c90 | yes | 4 | 64/34 | §25 |
 | 40 | `whoclickme` | `ShineWhoClickMe` | FUN_004e9d70 | yes | 1 | 28/7 | part 15 |
 | 41 | `whokillme` | `ShineWhoKillMe` | FUN_004e9de0 | yes | 1 | 1/1 | part 15 |
 | 42 | `itemdrop` | `ShineItemDrop` | FUN_004e9d00 | yes | 2 | 21/7 | §24.1 |
@@ -6871,53 +6871,53 @@ in the 46 `.ps` files of 2016 / files that use it (counted from the files, the l
 | 44 | `itemcreate` | `ShineItemCreate` | FUN_004e9ec0 | yes | 1 | 2/2 | §24.2 |
 | 45 | `itemerase` | `ShineItemErase` | FUN_004e9f30 | yes | 1–2 | 32/9 | §24.2 |
 | 46 | `findhandle` | `ShineFindHandle` | FUN_004e9fa0 | yes | 2 | 7/3 | §24.4 |
-| 47 | `abstateset` | `ShineAbstatSet` | FUN_004ea010 | yes | 3–4 | 26/15 | part 15 |
-| 48 | `abstatereset` | `ShineAbstatReset` | FUN_004ea080 | yes | 1 | 9/2 | part 15 |
+| 47 | `abstateset` | `ShineAbstatSet` | FUN_004ea010 | yes | 3–4 | 26/15 | §23 |
+| 48 | `abstatereset` | `ShineAbstatReset` | FUN_004ea080 | yes | 1 | 9/2 | §23 |
 | 49 | `suicide` | `ShineSuicide` | FUN_004ea0f0 | yes | 0 | 32/7 | part 15 |
-| 50 | `run` | `ShineRun` | FUN_004ea160 | yes | 2 | 4/1 | part 15 |
+| 50 | `run` | `ShineRun` | FUN_004ea160 | yes | 2 | 4/1 | §25 |
 | 51 | `walk` | `ShineWalk` | FUN_004ea1d0 | yes | 2 | 0/0 | part 15 |
-| 52 | `maplight` | `ShineMapLight` | FUN_004ea240 | — | 3 | 9/2 | part 15 |
-| 53 | `mapfog` | `ShineMapFog` | FUN_004ea2b0 | — | 2 | 1/1 | part 15 |
+| 52 | `maplight` | `ShineMapLight` | FUN_004ea240 | — | 3 | 9/2 | §25 |
+| 53 | `mapfog` | `ShineMapFog` | FUN_004ea2b0 | — | 2 | 1/1 | §25 |
 | 54 | `effectobj` | `ShineEffectObject` | FUN_004ea320 | yes | 4 | 4/2 | §13 |
 | 55 | `effectloc` | `ShineEffectLocate` | FUN_004ea390 | yes | 6 | 25/2 | §13 |
-| 56 | `aggro` | `ShineAggro` | FUN_004ea400 | yes | 2 | 2/1 | part 15 |
-| 57 | `mobweaponrate` | `ShineMobWeaponRate` | FUN_004ea470 | yes | 1–8 | 40/4 | part 15 |
-| 58 | `mobdetectrange` | `ShineMobDetectRange` | FUN_004ea4e0 | yes | 1 | 10/5 | part 15 |
+| 56 | `aggro` | `ShineAggro` | FUN_004ea400 | yes | 2 | 2/1 | §23 |
+| 57 | `mobweaponrate` | `ShineMobWeaponRate` | FUN_004ea470 | yes | 1–8 | 40/4 | §8.2 |
+| 58 | `mobdetectrange` | `ShineMobDetectRange` | FUN_004ea4e0 | yes | 1 | 10/5 | §25 |
 | 59 | `heal` | `ShineHeal` | FUN_004ea550 | yes | 1 | 5/5 | §24.6 |
-| 60 | `animate` | `ShineAnimate` | FUN_004ea5c0 | yes | 1 | 11/6 | part 15 |
+| 60 | `animate` | `ShineAnimate` | FUN_004ea5c0 | yes | 1 | 11/6 | §23 |
 | 61 | `duplicate` | `ShineDuplicate` | FUN_004ea630 | yes | 1 | 0/0 | §24.5 |
 | 62 | `waitidle` | `ShineWaitIdle` | FUN_004ea6a0 | — | 0 | 11/6 | part 15 |
 | 63 | `deathcountclear` | `ShineDeathCountClear` | FUN_004ea710 | — | 0 | 4/1 | §24.6 |
 | 64 | `itemattrset` | `ShineItemAttrSet` | FUN_004ea780 | yes | 2 | 0/0 | §24.2 |
 | 65 | `scinariocode` | `ShineScinarioCode` | FUN_004ea7f0 | yes | 1 | 1/1 | part 15 |
-| 66 | `battlestart` | `ShineBattleStart` | FUN_004ea860 | yes | 0–2 | 10/8 | part 15 |
-| 67 | `battlestop` | `ShineBattleStop` | FUN_004ea8d0 | yes | 0 | 22/8 | part 15 |
+| 66 | `battlestart` | `ShineBattleStart` | FUN_004ea860 | yes | 0–2 | 10/8 | §23 |
+| 67 | `battlestop` | `ShineBattleStop` | FUN_004ea8d0 | yes | 0 | 22/8 | §23 |
 | 68 | `sendquestresult` | `ShineSendKQResult` | FUN_004ea940 | yes | 1 | 17/8 | part 15 |
 | 69 | `invidualreward` | `ShineInvidualReward` | FUN_004ea9b0 | — | 2 | 15/8 | §24.7 |
-| 70 | `returnvalue` | `ShineReturnValue` | FUN_004eaa20 | — | 2 | 6/1 | part 15 |
+| 70 | `returnvalue` | `ShineReturnValue` | FUN_004eaa20 | — | 2 | 6/1 | §25 |
 | 71 | `sublayershift` | `ShineSubLayerShift` | FUN_004eaa90 | yes | 2 | 0/0 | part 15 |
 | 72 | `teleport` | `ShineTeleport` | FUN_004eab00 | yes | 1–3 | 13/4 | part 15 |
 | 73 | `itemowner` | `ShineItemOwner` | FUN_004eab70 | yes | 2 | 2/1 | §24.3 |
-| 74 | `mobattr` | `ShineMobAttribute` | FUN_004eabe0 | yes | 2 | 4/1 | part 15 |
-| 75 | `collect` | `ShineObjectCollect` | FUN_004eac50 | yes | 4 | 0/0 | part 15 |
+| 74 | `mobattr` | `ShineMobAttribute` | FUN_004eabe0 | yes | 2 | 4/1 | §25 |
+| 75 | `collect` | `ShineObjectCollect` | FUN_004eac50 | yes | 4 | 0/0 | §25 |
 | 76 | `endofkq` | `ShineEndOfKingdomQuest` | FUN_004eacc0 | — | 0 | 43/21 | part 15 |
 | 77 | `endofgt` | `ShineEndOfGuildTournament` | FUN_004ead30 | — | 2 | 4/2 | §24.8 |
 | 78 | `gtresult` | `ShineGuildTorunamentResult` | FUN_004eada0 | yes | 1–2 | 4/2 | §24.8 |
-| 79 | `costumecreate` | `ShineCostumeCreate` | FUN_004eae10 | yes | 3 | 0/0 | part 15 |
-| 80 | `costumetakeoff` | `ShineCostumeTakeOff` | FUN_004eae80 | yes | 2 | 0/0 | part 15 |
+| 79 | `costumecreate` | `ShineCostumeCreate` | FUN_004eae10 | yes | 3 | 0/0 | §23 |
+| 80 | `costumetakeoff` | `ShineCostumeTakeOff` | FUN_004eae80 | yes | 2 | 0/0 | §23 |
 | 81 | `weddingcomplete` | `ShineWeddingComplete` | FUN_004eaef0 | — | 2 | 1/1 | part 15 |
-| 82 | `playerwork` | `ShinePlayerWalk` | FUN_004eaf60 | yes | 2 | 6/1 | part 15 |
+| 82 | `playerwork` | `ShinePlayerWalk` | FUN_004eaf60 | yes | 2 | 6/1 | §25 |
 | 83 | `findplayer` | `ShineFindPlayer` | FUN_004eafd0 | yes | 1–2 | 6/1 | §24.4 |
 | 84 | `teleportall` | `ShineTeleportAll` | FUN_004eb040 | yes | 0–4 | 1/1 | part 15 |
-| 85 | `briefeffect` | `ShineBriefEffect` | FUN_004eb0b0 | yes | 1 | 2/1 | part 15 |
-| 86 | `banfromarea` | `ShineBanFromArea` | FUN_004eb120 | — | 5 | 3/1 | part 15 |
-| 87 | `RegisteFlag` | `ShineRegesteFlag` | FUN_004eb190 | — | 3 | 10/2 | part 15 |
-| 88 | `RegisteGate` | `ShineRegesteGate` | FUN_004eb200 | — | 4 | 20/2 | part 15 |
+| 85 | `briefeffect` | `ShineBriefEffect` | FUN_004eb0b0 | yes | 1 | 2/1 | §23 |
+| 86 | `banfromarea` | `ShineBanFromArea` | FUN_004eb120 | — | 5 | 3/1 | §23 |
+| 87 | `RegisteFlag` | `ShineRegesteFlag` | FUN_004eb190 | — | 3 | 10/2 | §25 |
+| 88 | `RegisteGate` | `ShineRegesteGate` | FUN_004eb200 | — | 4 | 20/2 | §25 |
 | 89 | `DiceGameStart` | `ShineDiceGameStart` | FUN_004eb270 | — | 1 | 2/2 | §24.8 |
-| 90 | `revival` | `ShineRevival` | FUN_004eb2e0 | yes | 0 | 5/5 | part 15 |
+| 90 | `revival` | `ShineRevival` | FUN_004eb2e0 | yes | 0 | 5/5 | §25 |
 | 91 | `spawn` | `ShineSpawn` | FUN_004eb350 | — | 1–2 | 7/3 | part 15 |
 | 92 | `hpset` | `ShineHPSet` | FUN_004eb3c0 | yes | 1 | 1/1 | §24.6 |
-| 93 | `questmobkill` | `ShineQuestMobkill` | FUN_004eb430 | — | 3 | 10/9 | part 15 |
+| 93 | `questmobkill` | `ShineQuestMobkill` | FUN_004eb430 | — | 3 | 10/9 | §25 |
 | 94 | `RegisterGTPortal` | `RegisterGTPortal` | FUN_004f8610 | — | 4 | 10/2 | §22 |
 | 95 | `SaveLinkto` | `SaveLinkto` | FUN_004f8680 | — | 4 | 2/2 | §22 |
 | 96 | `ClearSaveLinkto` | `ClearSaveLinkto` | FUN_004f86f0 | — | 0 | 2/2 | §22 |
@@ -7321,7 +7321,7 @@ os_ShineObject(n, ps) → obj | null                          @ FUN_004ebbb0
     return ShineObjectManager::som_GetObjectAbsolute(pst_GetNumber(v))  @ FUN_0054fc20   # the variable holds a handle
 
 os_ObjectRegen(n, arg, ps, &ip, o, h, brief) → ok           @ FUN_004f8c40   # build a fresh pool object o (handle h)
-    # callers: ShineMobRegen / ShineNPCStand (part 15), ShineDoorBuild (§13); they allocate o and free it on failure
+    # callers: ShineMobRegen / ShineNPCStand (§25.1), ShineDoorBuild (§13); they allocate o and free it on failure
     v = os_Ident.i_GetVariable(ps); missing: assert "…os_ObjectRegen", return 0
     name = os_Express[0]; mobId = mob ID of name (`BTree::operator[]` FUN_0063cc30 on `mobdatabox.mdb_btree`); unknown: assert "…os_ObjectRegen : Invalid mob", return 0
     x, y, dir, e4 = numbers of os_Express[1…4]; os_Express[5] must evaluate (value unused here)
@@ -8355,3 +8355,415 @@ GuildTournamentSystem::DiceGameStart(gt, ticks)                            @ FUN
   upgrade weights) and whether it reads the uninitialised InxName bytes; `iac_itemcreate`'s parsing of the `itemattrset`
   attribute string.
 - `som_FindPlayer`'s name comparison (case, which player list) was not traced (`findplayer`).
+
+## 25. Scripts 12: Pine action nodes L–R (spawns, NPC talk, map light / fog, links, waits, KQ results and rewards, GT flags)
+
+The `sa_Step` bodies of the 24 `Shine*` action statements whose class names start with L–R (§21.2 rows 10, 17, 19,
+26, 27, 29–31, 35, 36, 39, 50, 52, 53, 57, 58, 70, 74, 75, 82, 87, 88, 90, 93). `ShineMobWeaponRate` is already in
+§8.2 (FUN_004fa8c0, not repeated). They load with `OtherStatement::sa_Load` (§22.1) and follow the common shape of
+§23.1 (trace line, pop in every case, copied assert texts are log only) with these exceptions: `pause` waits (returns
+1 without pop until its time is up); `mobregen` / `npcstand` build objects through `os_ObjectRegen` (§22.1). Class,
+member and function names are *(pdb2016)*. Ghidra merges the pop / assert tails of most of these nodes (it shows
+"no argument" asserts after the success path of `maplight` / `mapfog`, loses the calls of `mobattr`, `npcchat`,
+`npcshout`, `run`, `RegisteFlag` and the waits of `pause`): every step below was checked in the disassembly of the
+2016 exe. Packets sent here: 0x6C0A / 0x6C0E (map light / fog), 0x2002 / 0x201F (NPC chat / shout), 0x2018 + 0x204D
+(scripted player walk), 0x5812 / 0x5813 (KQ complete / fail), 0x5823 (KQ no reward), 0x0442 to the GameLog server.
+
+| Keyword | Class | ctor | `sb_CloneMe` | `sa_Step` | § |
+|---|---|---|---|---|---|
+| `linkto` | `ShineLinkTo` | FUN_004e8900 | FUN_004e9c90 | FUN_004efb10 | 25.4 |
+| `collect` | `ShineObjectCollect` | FUN_004e8d80 | FUN_004eac50 | FUN_004f5ca0 | 25.4 |
+| `mobregen` | `ShineMobRegen` | FUN_004e8640 | FUN_004e92f0 | FUN_004f9170 | 25.1 |
+| `npcstand` | `ShineNPCStand` | FUN_004e8680 | FUN_004e93d0 | FUN_004f95b0 | 25.1 |
+| `regengroup` | `ShineRegenGroup` | FUN_004e8780 | FUN_004e9750 | FUN_004ee0f0 | 25.1 |
+| `vanish` | `ShineObjectVanish` | FUN_004e8760 | FUN_004e96e0 | FUN_004edcf0 | 25.1 |
+| `mobattr` | `ShineMobAttribute` | FUN_004e8d60 | FUN_004eabe0 | FUN_004f5a00 | 25.2 |
+| `mobdetectrange` | `ShineMobDetectRange` | FUN_004e8b60 | FUN_004ea4e0 | FUN_004f2f10 | 25.2 |
+| `mobweaponrate` | `ShineMobWeaponRate` | FUN_004e8b40 | FUN_004ea470 | FUN_004fa8c0 | §8.2 |
+| `run` | `ShineRun` | FUN_004e8a60 | FUN_004ea160 | FUN_004f1cf0 | 25.2 |
+| `playerwork` | `ShinePlayerWalk` | FUN_004e8e60 | FUN_004eaf60 | FUN_004f6d40 | 25.2 |
+| `npcchat` | `ShineNPCChat` | FUN_004e87e0 | FUN_004e98a0 | FUN_004eeaf0 | 25.3 |
+| `npcshout` | `ShineNPCShout` | FUN_004e8800 | FUN_004e9910 | FUN_004eecd0 | 25.3 |
+| `maplight` | `ShineMapLight` | FUN_004e8aa0 | FUN_004ea240 | FUN_004f20f0 | 25.3 |
+| `mapfog` | `ShineMapFog` | FUN_004e8ac0 | FUN_004ea2b0 | FUN_004f2350 | 25.3 |
+| `pause` | `ShinePause` | FUN_004e87c0 | FUN_004e9830 | FUN_004ee650 | 25.5 |
+| `printf` | `ShinePrintf` | FUN_004e8560 | FUN_004e8fe0 | FUN_004eb6c0 | 25.5 |
+| `questresult` | `ShineQuestResult` | FUN_004e88a0 | FUN_004e9b40 | FUN_004ef450 | 25.6 |
+| `reward` | `ShineReward` | FUN_004e88c0 | FUN_004e9bb0 | FUN_004ef650 | 25.6 |
+| `questmobkill` | `ShineQuestMobkill` | FUN_004e8fc0 | FUN_004eb430 | FUN_004f8270 | 25.6 |
+| `returnvalue` | `ShineReturnValue` | FUN_004e8ce0 | FUN_004eaa20 | FUN_004f45f0 | 25.6 |
+| `revival` | `ShineRevival` | FUN_004e8f60 | FUN_004eb2e0 | FUN_004f7070 | 25.6 |
+| `RegisteFlag` | `ShineRegesteFlag` | FUN_004e8f00 | FUN_004eb190 | FUN_004fab70 | 25.7 |
+| `RegisteGate` | `ShineRegesteGate` | FUN_004e8f20 | FUN_004eb200 | FUN_004fae00 | 25.7 |
+
+Use in the 17 Pine books loaded in 2016 (§22.5; statements outside comments): `regengroup` 317 (UnderHall, UnderHall2,
+Honeying, GordonMaster, KQHBat1–5, d_NestOfLeviathan), `pause` 291 (all 17), `npcstand` 57 (GuildTournament 40,
+JobChange2-1, Wedding, GordonMaster, d_NestOfLeviathan), `mobregen` 37 (JobChange1 24), `npcchat` 34 (GordonMaster,
+JobChange1, JobChange2-1), `linkto` 30 (14 books), `vanish` 20, `questresult` 13, `RegisteGate` 10 and `RegisteFlag`
+5 (GuildTournament), `maplight` 9 (JobChange1, JobChange2-1), `questmobkill` 6, `playerwork` 6 (Wedding),
+`returnvalue` 6 (Quest), `npcshout` 5 (Honeying), `reward` 5, `revival` 5 (KQHBat1–5), `mobattr` 4 (GordonMaster),
+`run` 4 (JobChange1), `mapfog` 1, `printf` 1 (JobChange2-1). Not used by a loaded book: `mobdetectrange`,
+`mobweaponrate` (only in unloaded files), `collect`.
+
+### 25.1 Spawning and removing objects: `mobregen`, `npcstand`, `regengroup`, `vanish`
+
+```pseudo
+mobregen var mobName x y dir scale mode [look].   ShineMobRegen::sa_Step  @ FUN_004f9170
+    # JobChange1.ps: mobregen ShadowHandle ShadowMobIndex 1033 704 180 1000 "Shadow" PlayerHandle.
+    # JobChange2-1.ps: mobregen NPC "Slime" x y d 1000 "Normal" "Beggar".   (args 0–5 = os_ObjectRegen's, §22.1;
+    #   arg 5 "Normal" / "Shadow" is evaluated there but not used)
+    pool = 5 (mob)
+    brief = ScriptBriefMaker::sbr_MakeBeggar(&scriptbriefmaker, stack brief)   @ FUN_004eb630   # always built
+    if argument 6 present:
+        fails: assert "…ShineMobRegen::sa_Step" (index 4), pop, return                  # nothing spawned
+        word = lower-case value
+        if word == index_beggar "beggar" (FUN_00697aa0): pool = 8 (bandit)              # random look, no equipment
+        else: p = som_GetObject(number(value))
+            if p: brief = copy of p.vt[0x6d0] so_GetCharBriefInfo() (0xEB bytes)          # player FUN_00559920
+                  p.vt[0xd04] so_ply_getBanditBriefinfo(&brief)  (players FUN_00560b00; others folded no-op FUN_00549070)
+                  pool = 8                                                              # a bandit that looks like p
+            # unknown handle: stays a plain mob (pool 5); the brief is then ignored (ShineMob::sm_InitBriefInfo)
+            # (original bug) Z09-B110: a mob / NPC / door handle reaches the copy too: their vt 0x6d0 is the folded
+            #   `return 0` FUN_00570b00, and the 0xEB-byte copy reads from address 0 (zone crash)
+    o = som_AllocObject(&h, pool) (FUN_0054fe20); none: assert "…ShineMobRegen::sa_Step : Too many mob", pop
+    if not os_ObjectRegen(o, h, &brief) (§22.1): som_FreeObject(h, REMOVE_NOW, 0x16)   # second free, as B97 (log only)
+    pop
+```
+
+- A pool-8 object is a `ShineBandit` (§5.10): `ShineBandit::sm_InitBriefInfo` (vt 0xf70, FUN_004b11a0) copies the
+  brief into `sb_MobBriefInfo` and sets handle, `type` 4 (acts as an NPC), `myguild` 0, `isGuildAcademyMember` 0;
+  `ShineBandit::sm_BriefLocateSet` (vt 0xf6c, FUN_004b10c0) copies the brief's coordinate into
+  `sm_LoginLoc.currentcoord` (+0x1f84). The object itself stands at the node's x / y (so_mob_Regenerate writes the
+  location before; §5.3). So a player copy keeps the player's name, class, shape, equipment and title in its brief;
+  the beggar's coordinate bytes are never written (stack) *(the coordinate copy has no reader found; uncertain)*.
+- The script comment in JobChange2-1.ps (cp949) says it: "there is no way to make a bandit-shaped NPC, so make a mob
+  and change it to an NPC; if the last argument is a player handle a copy is made, with "Beggar" a figure without
+  equipment, any class". `change2npc` / `change2mob` (§23.2) then switch the bandit's `type`.
+
+```pseudo
+ScriptBriefMaker::sbr_MakeBeggar(sbm, b)                         @ FUN_004eb630
+    sbr_RandomShape(sbm, b)                                      @ FUN_004eb4a0
+        class from ring rndbox box 5 (0…4 → 1 Fighter, 6 Cleric, 11 Archer, 16 Mage, 21 Joker), race chosen with it,
+        gender from box 2, hair colour / face from box 3, hair type from box 4 (+4 for one gender)
+        handle 0xFFFF, charid = 5 zero codes + name "???", mode 1, Level 1, polymorph 0xFFFF
+    shapedata (first 0x28 bytes) = 0xFF (no equipment), emoticon 0xFF / 0, chartitle 0, abstatebit 0 (99 bytes),
+    myguild 0, type 4, isGuildAcademyMember 0
+ShinePlayer::so_ply_getBanditBriefinfo(p, b)                     @ FUN_00560b00   # default gear for a copied player
+    row = first JobEquipInfo row (gJopEquipInfo, `JobEquipInfo.shn`: ChrClass, Equ_RightHand, Equ_LeftHand,
+        Equ_Shoes, Equ_Head, Equ_Leg, Equ_Body, Equ_ETC, InxNames) with so_ply_CheckCharType(row.ChrClass) (vt 0xd08
+        FUN_00560cc0: the player's base class 1/11/6/16/21/26 against CCT_FIGHTER…CCT_SENTINEL; CCT_COMMON always)
+        # no row matches: the last row is used
+    if b.RightHand (+0x29) == 0xFFFF:
+        if b.LeftHand (+0x2d) ≠ 0xFFFF:                          # something in the left hand only
+            left item missing in ItemInfo → return
+            if its Class == 7 (shield): RightHand = row.Equ_RightHand, or row.Equ_ETC when that item is two-handed
+        else: RightHand = row.Equ_RightHand (missing item → return); if not two-handed: LeftHand = row.Equ_LeftHand
+    elif b.LeftHand == 0xFFFF: right item missing → return; if not two-handed: LeftHand = row.Equ_LeftHand
+    Head / Body / Pant / Boot = row.Equ_Head / Equ_Body / Equ_Leg / Equ_Shoes where 0xFFFF
+    # 2016 rows (5): class 0 BroadSword / Buckler / Chain set, 2 SpikedClub / RoundShield / Bless set, 1 LightBow /
+    #   HardLeather set, 3 MagicStaff / Magic set, 4 CrimsonClaw / Mario set
+```
+
+```pseudo
+npcstand var mobName x y dir scale mode.   ShineNPCStand::sa_Step  @ FUN_004f95b0
+    # GuildTournament.ps 40×, e.g. npcstand Book "PledgeBook" 557 1137 0 1000 "Normal".
+    o = som_AllocObject(&h, pool 4 NPC); none: assert "…ShineNPCStand::sa_Step : Too many mob", pop
+    if not os_ObjectRegen(o, h, brief null): som_FreeObject(h, REMOVE_NOW, 0x18)   # second free, as B97 (log only)
+    pop
+    # ShineNPC::so_mob_Regenerate FUN_004b4bc0 (fromTable 0, §5.9): a script NPC without an NPC-table row; the
+    #   mob name must be a MobInfo InxName of an NPC-type mob; its clicks reach the map script (NPCClick, §15)
+
+regengroup file regenIndex [x y].        ShineRegenGroup::sa_Step  @ FUN_004ee0f0
+    # UnderHall2.ps: regengroup "KDKingkong" "KQ_Kingkong_03_10".   ConditionOfHero: regengroup "KDHero" "HERO" % InitFlag.
+    file = argument 0 (fails: assert "…: no map"), index = argument 1 (fails: assert "…: no index")
+    map = Movie::Theater::t_MapNameServer(theater) (FUN_004e3010); none: assert "…: Not map name"
+    r = PineScriptMobRegenerator::psmr_find(&scriptmobregen, file, index) (FUN_004e7bd0, §10.6)
+        none: assert "…ShineMobRegen::sa_Step : No regen index" (copied text)
+    if arguments 2 and 3 are present and evaluate: r.group CenterX / CenterY = x / y (only for this call)
+    MobHatchery::mh_ScriptBreed(mobhatchery, map, &r.rs_data, &r.rs_group, key "Def") (FUN_004b3e40, §10.6)
+    restore CenterX / CenterY; pop
+    # the file argument names a `MobRegen/KingdomQuest/*.txt` or `MobRegen/Instant/*.txt` table (KQRegenTable); no
+    #   loaded 2016 book passes x / y
+
+vanish word [arg].                        ShineObjectVanish::sa_Step  @ FUN_004edcf0   # target read, max 0 → any args
+    # JobChange1.ps: vanish ShadowHandle.   Wedding.ps: vanish mobindex "PledgeBook".
+    word = target word (i_GetToken, lower-cased); arg = argument 0 when present (evaluated, result unchecked)
+    word == "all" (index_all):     AxialListMobVanish { almv_MobID 0xFFFF } over the map (so_AllInMap of
+                                   t_CenterFlag; null → assert "…t_AllInMap : Null flag"): every kind-5 object (mob)
+    word == "mobindex" (index_mobindex FUN_00697b80): id = mob ID of arg's string (mobdatabox.mdb_btree);
+                                   unknown → nothing; else AxialListMobVanish { id } over the map: every object
+                                   whose vt 0x708 mob ID == id (mobs, NPCs, bandits; players / doors never match)
+    word == "handle":              o = som_GetObject(number(arg)) (FUN_0054fd10); AxialListMobVanish::almv_Vanish(o)
+    otherwise (a variable):        o = os_ShineObject (the variable's handle); almv_Vanish(o)
+        # missing object (both forms): log "…ShineObjectVanish::sa_Step : Invalid mob Object T…"
+    pop
+AxialListMobVanish::almv_Vanish(o) = o.vt[0x3f4] so_RetrateFromMap      @ FUN_004283a0   # (ali_Work FUN_004283c0, §17)
+```
+
+- `so_RetrateFromMap` for mobile objects (`ShineMobileObject::so_RetrateFromMap` FUN_00495d20) only sets
+  `smo_Flag.Retrate` (+0x1e78 bit 0); the object's next `so_Routine` removes it (mobs / NPCs / bandits: unmark,
+  free; §13.1 for doors). The `handle` and variable forms do not check the kind: on a player the same bit is the
+  "invalid position" flag of §2 (player kicked with 0x680) *(inferred from §2)*; no 2016 book passes a player.
+
+### 25.2 Mob settings and scripted moves: `mobattr`, `mobdetectrange`, `run`, `playerwork`
+
+```pseudo
+mobattr attribute handleExpr value.      ShineMobAttribute::sa_Step  @ FUN_004f5a00
+    # GordonMaster.ps: mobattr NoAggro HeroHandle 0.   mobattr Recover Door2Boss 0.
+    word = target word, lower-cased
+    h = number of argument 0 (fails: assert "…ShineChatWindowRange::sa_Step", copied text; pop)
+    o = som_GetObject(h); null → pop
+    v = number of argument 1 (fails: assert "…ShineMobAttribute::sa_Step", pop)
+    "guild"   (index_guild):   o.vt[0x900] so_mob_SetGuildRegNum(v)    FUN_00476110 (§5.8: 0x748D to sight)
+    "recover" (index_recover FUN_006979a0): o.vt[0x724] so_mob_CanRecover(v)  FUN_00556b90 (§17.5: back to idle after a fight)
+    "noaggro" (index_noaggro FUN_006979c0): o.vt[0x728] so_mob_MobAggro(v)    FUN_00556bb0 (§17.5: other-side aggressive
+                                                                               mobs ignore it when 0)
+    other words: nothing;  pop
+    # players: all three slots are the folded no-op FUN_00549070. Same setters as Lua cSetMobAttr (§17.5), which
+    #   refuses NPCs; this node does not (the NPC class has the mob bodies)
+
+mobdetectrange var range.                ShineMobDetectRange::sa_Step  @ FUN_004f2f10   # only in unloaded files
+    o = os_ShineObject; null → pop
+    range = argument 0; when it evaluates: o.vt[0x8bc](range)   (ShineMob::so_scene_DetectRange FUN_0050dd30, §5.8)
+    pop
+
+run var x y.                             ShineRun::sa_Step  @ FUN_004f1cf0   # JobChange1.ps 4× (the shadow runs)
+    o = os_ShineObject; null → pop
+    x = argument 0 (fails: assert "…ShineRun::sa_Step : no locx"), y = argument 1 (fails: "… no locy")
+    o.vt[0x8ac] so_scene_MovePathSet(x, y, 2 run)   (FUN_0050d450, §9.5: queued; NPCs / bandits walk it in their
+                                                     so_Routine via smo_MoveByScenario, 0x201A to sight)
+    ps_Shine.currentmob (+0x1012c) = o              # written here (and by `walk`), read by no node in 2016
+    pop                                             # the trace name is "PineEventScriptNode::ShineAct::sa_Step"
+
+playerwork var x y.                      ShinePlayerWalk::sa_Step  @ FUN_004f6d40   # Wedding.ps: playerwork GroomHandle 536 620.
+    o = os_ShineObject; null → pop
+    x = argument 0 (fails: assert "…ShineCostumeTakeOff::sa_Step : no part", copied text; pop); y = argument 1
+        # (original bug) Z09-B111: the result of argument 1 is not checked (a failed y keeps the token of x)
+    o.vt[0x5b0] so_MoveByServer(&{x, y}, cmd 0x18, lastCmd 0x4D, kind 1 walk, logArg 1)   (§9.3)
+        → 0x2018 NC_ACT_SOMEONEMOVEWALK_CMD to sight; players also get 0x204D NC_ACT_REINFORCE_WALK_CMD { dest }
+          (ShinePlayer vt 0xe98 smo_ply_ReinforceRun with lastCmd 0x4D) and the 0x203E speed packet
+    pop
+```
+
+`playerwork` is the one caller of `so_MoveByServer` that passes the walk pair (0x18 / 0x4D); the §9.3 remark "all pass
+lastCmd 0x49" holds for the run callers only. B14 (the remembered command is `lastCmd`) applies: a newcomer sees the
+walking groom as 0x204D instead of 0x2018.
+
+### 25.3 NPC talk, map light and fog: `npcchat`, `npcshout`, `maplight`, `mapfog`
+
+```pseudo
+npcchat var key.                         ShineNPCChat::sa_Step  @ FUN_004eeaf0   # GordonMaster.ps: npcchat InterruptArg "Hero00".
+    o = os_ShineObject; null: assert "…ShineNPCChat::sa_Step : Null obj", pop
+    key = argument 0 (fails: assert, pop)
+    if ps_Shine.shinescript (set by `scriptfile`, part 15d):
+        text = ShineScript::ss_String(set, key) (FUN_0048ce60, §22.6; "" when missing)
+        o.vt[0x530] so_Chat(0xFFFF, text, strlen(text), chatwin 1, links 0)   (ShineMobileObject::so_Chat FUN_00458c90)
+            → 0x2002 to sight (§8.7 / Z02 §3.1); chatwin 1 = the client's NPC dialog window with face cut
+    pop                                                        # NPCChatNoFacecut (§22.4) is the same with chatwin 0
+npcshout var key.                        ShineNPCShout::sa_Step  @ FUN_004eecd0   # Honeying.ps: npcshout Boss "Summon01".
+    as npcchat, then o.vt[0x534] so_Shout(0xFFFF, speaker "", text, strlen(text))
+        (mobs / NPCs / bandits ShineMob::so_Shout FUN_00459250, §8.7: 0x201F to the whole map with isMob = 1 and the
+        mob ID as speaker; B10's extra byte applies; players ShineMobileObject::so_Shout FUN_00459080)
+
+maplight r g b.                          ShineMapLight::sa_Step  @ FUN_004f20f0   # JobChange1.ps: maplight 72 72 72.
+    r, g, b = numbers of arguments 0–2 (any fails: assert "…ShineMapLight::sa_Step : no argument", pop)
+    0x6C0A NC_SCENARIO_LIGHT_CMD { u8 red = r; u8 green = g; u8 blue = b }   (5 bytes with the opcode)
+        to the whole map: AxialListPacketBroadcast over t_AllInMap (live players, same layer; §23.1)
+    pop
+mapfog fog depth.                        ShineMapFog::sa_Step  @ FUN_004f2350   # JobChange2-1.ps: mapfog 100 1400.
+    fog, depth = arguments 0, 1 (either fails: assert "…ShineMapFog::sa_Step : no argument", pop)
+    0x6C0E NC_SCENARIO_FOG_CMD { u8 fog; u16 depth } to the whole map (same walk; null flag → assert, nothing)
+    pop                                                        # = Lua cMapFog (§19.4)
+```
+
+- Both packets are fire-and-forget: the server keeps no light / fog state, so a player who enters the map later (or
+  relogs) has the default scene *(as cMapFog, §19.4)*. Client: 0x6C0A `FUN_0049b010` (game scene) divides each byte
+  by a constant (DAT_00968ac8) and sets the colour of the scene light object DAT_00a8e358 (0 = 0.0); 0x6C0E
+  `On_NC_SCENARIO_FOG_CMD` FUN_004a35b0 (§19.4). JobChange1 dims the light step by step (0 … 255) during the shadow
+  fight. Layouts confirmed against `PROTO_NC_SCENARIO_LIGHT_CMD` / `…FOG_CMD` *(pdb2017 names)*.
+
+### 25.4 Sending players to other maps: `linkto`, `collect`
+
+```pseudo
+linkto word serverMap clientMap x y.     ShineLinkTo::sa_Step  @ FUN_004efb10   # UnderHall2.ps: linkto all "Eld" "Eld" 17214 13445.
+    serverMap, clientMap, x, y = arguments 0–3 (each failure: assert "…: no ServerMap" / "no ClientMap" / "no xcoord"
+        / "no ycoord", pop)
+    link = LinkInformTemplete { linktoserver = serverMap (12 + NUL), linktoclient = clientMap (12 + NUL), coordx, coordy }
+        # not validated against the map tables (cLinkTo does, §17.7)
+    word == "all":       AxialListLinkTo(link) (ctor FUN_00428510, ali_Work FUN_00428950, §17.7: fold a camp,
+                         so_LinkToReserv(link, 0)) over t_AllInMap: every player of the map
+    word == "observer" (index_observer FUN_00697a20):
+                         AxialListLinkToByObserver over t_AllInMap, ali_Work FUN_00428530 for each object:
+        abstate 289 STA_OBSERVERHIDEMODE set (vt 0x3e4) only:
+            mode 4 (camp) → so_ply_ReinforceFoldtent (vt 0x488)
+            players: ShinePlayer::sp_RunRollBackPosEvent FUN_00570b80
+                stored sp_punMarkEvent (a RollBackPosCallBackEvent set by sp_SetRollBackPosEvent FUN_00570b30 when the
+                player entered as a guild-tournament observer, sp_Guild_Tournamnet_Observer_Enter FUN_004788c0, Z08 §8;
+                or by the WM zone-link handler) → clear it; if mode ≠ 0: doEventRun FUN_00444a10 = so_LinkTo(saved
+                place, 6, 9, 10) (vt 0x600, §2.3: back where the observer came from); delete it; result true
+                none → so_LinkToReserv(link, 0)                  # only observers without a saved place use the node's map
+    otherwise (a variable): o = os_ShineObject; if o: mode 4 → fold the camp; o.vt[0x3fc] so_LinkToReserv(link, 0)
+        (players FUN_00495f00; other kinds no-op FUN_00495eb0)
+    pop
+
+collect word map x y guild.              ShineObjectCollect::sa_Step  @ FUN_004f5ca0   # unused in 2016
+    word = target word, lower-cased
+    map = argument 0 (fails: assert "…ShineChatWindowRange::sa_Step", copied text; pop)
+    x, y, guild = numbers of arguments 1–3
+        # (original bug) Z09-B111: only argument 1 is checked (fails: assert, pop); a failed y / guild keeps the
+        #   previous token's value
+    attr = FieldOption::fo_GetFieldAttr(&fieldlist.fc_FieldOption, map); its client map must be in MapInfo (else pop)
+    link = { map, client map name, x, y }
+    if word == "guild": AxialListObjectCollector(link, guild) (ctor FUN_00429f10) over t_AllInMap:
+        ali_Work FUN_004298e0: compare = ala_CompareGuild FUN_00429830 (object vt 0x828 guild regnum == guild) when
+        guild ≠ 0, else none; no compare → returns 0 (the walk stops at the first object: nothing happens);
+        match → so_LinkToReserv(link, 0) (no camp fold)
+    pop
+```
+
+### 25.5 Waiting and tracing: `pause`, `printf`
+
+```pseudo
+pause unit amount.                       ShinePause::sa_Step  @ FUN_004ee650   # 321× "pause sec 5.", MilliSec, Minute
+    if *ip ≠ 0 (stepped before):
+        if ps_Shine.waittick (+0x1010c) ≥ g_Now: return 1         # still waiting (no pop: stepped again next pass)
+        pop; return
+    *ip += 1
+    unit = target word, lower-cased; n = number of argument 0
+    "hour" (index_hour FUN_00697600):      waittick = g_Now + n × 36000
+    "minute" (index_minute FUN_00697620):  waittick = g_Now + n × 600
+    "sec" (index_sec FUN_00697640):        waittick = g_Now + n × 10
+    "millisec" (index_millisec FUN_00697660): waittick = g_Now + (n × 10) / 1000        # 100-ms ticks, truncated
+        argument fails (any unit): assert "PineEventScriptNode::ShineWait::sa_Step : no time" (index 0…3), pop
+    other units: assert "…ShineWait::sa_Step : Invalid flag", trace "Error : ", pop     # e.g. "pause 3." in two
+                                                                                        #   unloaded files: no wait
+    then the wait test above (waittick ≥ g_Now → return 1)
+```
+
+- `g_Now` is in 100-ms ticks (§1); one node step per main-loop pass (§21.4), so the wait ends on the first pass after
+  `waittick` (granularity = main-loop period). `pause sec 0.` still waits one pass. The wait time lives in the
+  stack's `ps_Shine.waittick`, shared by the whole film (one waiting node at a time per film).
+- The trace / assert texts say `ShineWait` (an older class name).
+
+```pseudo
+printf expr.                             ShinePrintf::sa_Step  @ FUN_004eb6c0   # JobChange2-1.ps: printf "Zombie : " % ZombieNum.
+    value = argument 0 (fails: assert "…ShinePrintf::sa_Step: wrong argument")
+    when file logging and the Pine tracer (scrpttrcr, §20.8) are on: write "@@@printf : " + value + "\n" to the
+        tracer file and close it
+    pop                                                        # no packet, no state
+```
+
+### 25.6 KQ results and rewards: `questresult`, `reward`, `questmobkill`, `returnvalue`, `revival`
+
+```pseudo
+questresult word.                        ShineQuestResult::sa_Step  @ FUN_004ef450   # questresult Suc. / questresult Fail.
+    word = target word, lower-cased
+    k = AxialListKQEnd(dept 0x16, cmd = word == "suc" (index_suc FUN_006976a0) ? 0x12 : 0x13)   (ctor FUN_004284f0)
+    so_AllInMap(t_CenterFlag, k, includeSelf 0)   (null flag: assert "…t_AllInMap : Null flag", nothing)
+    if theater.t_Field: FieldMap::fm_ClearObject(field, 0x1b0) (FUN_00495a10, §24.8): kinds 4 NPC, 5 mob, 7 door,
+        8 bandit are removed next tick (so_RetrateFromMap)
+    pop
+AxialListKQEnd::ali_Work(o)                                       @ FUN_00429e00   # players (kind 2) only
+    success ? o.vt[0x7fc] so_ply_KQSuccess FUN_0055ae10 : o.vt[0x800] so_ply_KQFail FUN_0055ae30
+        # on a map whose FieldAttr.KingdomQuestMap (+0x36) == 1: CCharacterTitleZone::CT_KQSuccess FUN_005cbfb0 /
+        #   CT_KQFail FUN_005cbfd0 (title counters, Z07)
+    if o has a field: → GameLog 0x0442 NC_LOG_GAME_KQ_LEAVE { u32 chrregnum (vt 0x344); MAPPOS mappos = field
+        fm_MapID (12 bytes) + o's x, y; u16 KQ_ID = field.fm_KQID; u32 KQ_Handle = field.fm_KQHandle;
+        u8 Leave_Status = success }   (0x21 bytes with the opcode; too long → assert with the copied text
+        "KingdomQuestGate::KingdomQuestGateKeeper::erb_happen : Packet Too Long"); D05 stores it
+    o.vt[0x304] so_SendProtocol(0x16, cmd): empty 0x5812 NC_KQ_COMPLETE_CMD / 0x5813 NC_KQ_FAIL_CMD to the player
+        # client: complete / fail window and sound (FUN_004a31f0 / FUN_004a3270, §24.8)
+```
+
+`questresult` is the KQ end signal of the KQ books (UnderHall, UnderHall2, Honeying, GordonMaster) and of the job-change
+books (JobChange1 / 2-1 send 0x5812 / 0x5813 for the promotion test); it ends nothing by itself: the book then runs
+`reward` and `endofkq` (part 15d, `ShineEndOfKingdomQuest`), which removes the KQ instance (Z16). Answer for Z08's open
+question: the KQ result is sent by this node, per player of the map, with the GameLog leave record.
+
+```pseudo
+reward word.                             ShineReward::sa_Step  @ FUN_004ef650   # reward KingdomQuest.
+    word = target word, lower-cased; word ≠ "kingdomquest" (index_kq FUN_00697680) → pop (nothing)
+    kq = theater.t_Field.fm_KQHandle (no field → 0xFFFFFFFF); 0xFFFFFFFF: assert "…ShineEventReward::sa_Step :
+        No KQ info" (older class name), pop
+    r = AxialListKQReward(kq) (ctor FUN_00428410): kqe = KingdomQuestContainer::kqc_SearchHandle(&kqcontainer, kq)
+        (FUN_004954f0); DemandKill = kqe.kqe_kqinfo.DemandMobKill (QuestData KQ row)
+    so_AllInMap(t_CenterFlag, r, 0)
+    pop
+AxialListKQReward::ali_Work(o)                                    @ FUN_00428490
+    no kqe: nothing
+    kills = KQContribute::KQContributeList::kqcl_GetMobKill(&g_KQContributeList, kqe.kqinfo id, o)  (FUN_00499d80, Z16)
+    kills ≥ DemandKill: o.vt[0x76c] so_ply_KQRewardStruct(kqe) (FUN_0052e9c0, Z16: the KQ reward items / money / exp)
+    else: o.vt[0x308] so_SendErrorCode(0x16, 0x23, 0x1104) (FUN_0054f050)
+        → 0x5823 NC_KQ_NOREWARD_CMD { u16 err = 0x1104 } (4 bytes); client FUN_004b0830 (game scene): "You haven't
+          hunted enough monsters to receive a reward."
+    # non-players: vt 0x76c / 0x308 are no-ops for them *(not checked per class; kills are 0 for non-players)*
+
+questmobkill quest mobName count.        ShineQuestMobkill::sa_Step  @ FUN_004f8270   # questmobkill 2668 "Daliy_Check" 1.
+    q = number of argument 0 (fails: assert "…: no quest", pop); 0xFFFF = every quest
+    mob = mob ID of argument 1 (mobdatabox.mdb_btree; unknown: assert "…ShineSummonMob::sa_Step : no mob", copied
+        text; argument fails: assert "…ShineQuestMobkill::sa_Step : no mob"; pop)
+    count = number of argument 2 (fails: assert "… no mob", pop)
+    s = AxialListNearScanObjectType(kind 2 players, 0) (FUN_004c1b40) over t_AllInMap (≤ 200 players, §18)
+    n = alns_GetNumber(s) (FUN_004c17e0); limit = min(n, count)
+        # (original bug) Z09-B109: the per-player repeat count is capped by the number of players on the map
+    for each player p of s (alns_GetMember FUN_004c17f0), not leaving (vt 0x300 so_IsEmpty ≠ 1), with a quest diary
+        (vt 0x808 so_ply_QuestDiary):
+        repeat up to limit times while the call returns ≠ 0:
+            q == 0xFFFF ? CQuestZone::QuestPlayer_ScriptMobKill_All(diary, mob) (FUN_005c0cf0)
+                        : CQuestZone::QuestPlayer_ScriptMobKill(diary, q, mob) (FUN_005c0b40)      # Z15
+    pop
+```
+
+`questmobkill` credits a scripted "kill" of a (dummy) mob to every player's quest: the 2016 books use it for the
+daily-check quests (`Daliy_Check`, `Daliy_Check_d_Leviathan` 5 in d_NestOfLeviathan). With count 5 and fewer than 5
+players on the map, B109 gives each player fewer than 5 credits (one player alone gets 1).
+
+```pseudo
+returnvalue handleExpr value.            ShineReturnValue::sa_Step  @ FUN_004f45f0   # Quest.ps: returnvalue CharHandle 1.
+    h = number of argument 0 (fails: assert "…ShineSendKQResult::sa_Step : no Player", copied text; pop)
+    o = som_GetObject(h); null → pop
+    v = number of argument 1 (fails: assert "…ShineSendKQResult::sa_Step : no value")
+    o.vt[0x8fc](v): players ShinePlayer::so_ply_Return2Quest FUN_005bfa80 → CQuestZone::PsEnd(diary, v)
+        (FUN_005bf990, Z15: the result of a quest's Pine scenario); others folded no-op
+    pop
+
+revival word.                            ShineRevival::sa_Step  @ FUN_004f7070   # KQHBat1–5: revival all.
+    (target word not read) AxialListRevival (ctor FUN_0042a060) over the whole map (null flag: assert), then
+    AxialListRevival::alr_Revive FUN_00429f40 (§17.5 cRevivalAll: every dead player revives at its revive point,
+    sp_ReviveReqProcess, Z07 §3.1); pop
+```
+
+### 25.7 Guild-tournament flags and gates: `RegisteFlag`, `RegisteGate`
+
+```pseudo
+RegisteFlag flagHandle nameA nameB.      ShineRegesteFlag::sa_Step  @ FUN_004fab70
+    # GuildTournament.ps: RegisteFlag FlagCapture_1 "Red_Flag00" "Blue_Flag00".
+    o = som_GetObject(number of argument 0) (fails: assert "…ShineRegesteGuildTorunamentFlag::sa_Step : no Object");
+        null → pop
+    a = argument 1 (fails: "… no Guild Name A", pop), b = argument 2 (fails: "… Guild Name B", pop)  (std::string)
+    field = fieldlist search by o.vt[0x4bc] so_LoginLocation (the map o stands on); gts = fm_GetGuildTournamentSystem
+        (FUN_00463290); none → pop
+    GuildTournamentSystem::FlagRegister(gts, o, a, b) (FUN_00480970, Z16)
+    pop
+RegisteGate gateHandle team flagHandle gateName.   ShineRegesteGate::sa_Step  @ FUN_004fae00
+    # GuildTournament.ps: RegisteGate Guild_A1_Gate GuildA FlagCapture_1 "GuildGate01".
+    g = som_GetObject(arg 0) (fails: assert "…ShineRegesteGate::sa_Step : no Object"); team = number of arg 1;
+    f = som_GetObject(arg 2); name = arg 3 (fails: assert "…ShineRegesteGuildTorunamentFlag::sa_Step : no
+    UseGateName", copied text); any missing object / failed argument 1–2 → assert "… no Guild Name A" (copied), pop
+    gts as above (by g's map); GuildTournamentSystem::GateRegister(gts, g, team, f.handle, name) (FUN_00480ab0, Z16)
+        false → assert "ShineRegesteGuildTorunamentGate Bad GateRegiste"
+    pop
+```
+
+What the tournament does with registered flags and gates (capture, gate opening, the A/B score) is Z16.
+
+### 25.8 2016 use, answers and open points
+
+- Part 15b's question "which `mobregen` form makes bandits": the 7-argument form, with a player handle (copy) or
+  `"Beggar"` (§25.1); JobChange1 (shadow of the player) and JobChange2-1 (slime NPC) are the 2016 users.
+- Z08's open question (`ShineQuestMobkill`, `ShineQuestResult`): §25.6. `ShineEndOfKingdomQuest` is part 15d.
+- Not traced (Z16): `GuildTournamentSystem::FlagRegister` / `GateRegister`, `so_ply_KQRewardStruct`,
+  `kqcl_GetMobKill`; (Z15) `QuestPlayer_ScriptMobKill(_All)`, `CQuestZone::PsEnd`; (Z07) `CT_KQSuccess` /
+  `CT_KQFail`; (Z08) where else `sp_SetRollBackPosEvent` is set (`wms_NC_CHAR_ZONE_LINK_FROM_CMD` FUN_00476600).
+- Open: whether the bandit's `sm_LoginLoc.currentcoord` (the copied brief coordinate, garbage for a beggar) is read
+  anywhere (no reader found by member name).
