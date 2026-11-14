@@ -547,7 +547,7 @@ box+0x668, `BTree::operator[]` FUN_0063cc30(&DAT_14d450a0, name)). `MobDataBox` 
 | +0x1c `p_mobkillannounce` | → MobKillAnnounce row (`MobID u32, TextIndex u32`), or 0 | mdb_Load |
 | +0x20 `p_mobkilllog` | → MobKillLog row (`MobID u32`), or 0 | mdb_Load |
 | +0x24 `p_MobLifeTime` | u32 MobLifeTime.LifeTime (seconds; row `MobLifeTime {MobIndex[32], u16 LifeTime +0x20}`), 0 = none | mdb_Load |
-| +0x28 `MobIndexFlag` | bit 0 `IsBufferToBoss` (set by `ServentBuffBossTable::sbbt_Load` FUN_005d4580, read by `ShineMob::so_Routine` §5.4), bit 1 `MobAutoAction_Damaged` (set by `MobAutomaticActionList::maal_Load` FUN_005d49f0, read by `ShineMob::so_DamagedBy` FUN_00431750); cleared at load | part 16 loaders |
+| +0x28 `MobIndexFlag` | bit 0 `IsBufferToBoss` (set by `ServentBuffBossTable::sbbt_Load` FUN_005d4580, read by `ShineMob::so_Routine` §5.4), bit 1 `MobAutoAction_Damaged` (set by `MobAutomaticActionList::maal_Load` FUN_005d49f0, read by `ShineMob::so_DamagedBy` FUN_00431750); cleared at load | §27.6 loaders |
 | +0x2c `pRegenAni` | → MobRegenAni row (`MobIDX[32], RegenTime u16 +0x20 (ms), GroupAbStateIDX[32] +0x22, IsAggro u8 +0x42`), or 0 | mdb_SkillStore |
 | +0x30 `nRegenAbstateGroup` | GroupAbState group number of the RegenAni row (−1 = none) | mdb_SkillStore |
 
@@ -596,7 +596,7 @@ Other mob tables loaded elsewhere and read in this part:
 - `MobDeadCount` (`mdc_Clear` @ FUN_004b07b0, `mdc_Count` @ FUN_004b0820, `mdc_DeadCountGet` @ FUN_004b08f0, created by
   `MobDeadCount::mdc_Init` FUN_004b09f0): one u16 counter per mob ID, incremented by `ShineMob::so_KilledBy` (Z03 §8.1); readers are the map
   scripts (part 14–16).
-- `MobAutoAction.shn` belongs to `BossFieldContent::MobAutomaticActionList::maal_Load` @ FUN_005d49f0 (part 16).
+- `MobAutoAction.shn` belongs to `BossFieldContent::MobAutomaticActionList::maal_Load` @ FUN_005d49f0 (§27.6).
 
 ### 5.2 Mob members (offsets from the object start)
 
@@ -2314,7 +2314,7 @@ the abstates are cleared):
 ShineMob::smo_BossAbstateSet(m)                                                 @ FUN_005d3ab0
     m.bossAbstate (+0x24fc) = 0
     c = ListOfMobStateCheckAtDead[m.mobId]   (BossFieldContent::g_ListOfMobStateCheckAtDead DAT_14d6fcb8, BossFieldContent::ListOfMobStateCheckAtDead::operator[] FUN_005d2580; 0x14-byte entries {DropType, vector<abstate index>, …};
-                                              loaded from MobAbStateDropSetting.shn by lomscad_Load FUN_005d5970, part 16)
+                                              loaded from MobAbStateDropSetting.shn by lomscad_Load FUN_005d5970, §27.6)
     if c: m.bossAbstate = macad_AbstateCheck(c, m.abstates (+0x1cc))          # FUN_005d3880
 macad_AbstateCheck:
     list empty → 0
@@ -3937,7 +3937,7 @@ ShineAxialFlag::so_BroadcastLogout(a)          (vt 0x51c)   @ FUN_00549d90: asse
 so_ObjectType (vt 0x4d0) = 0 and so_BriefInfoRange (vt 8) = 0 (folded bodies): brief exchanges skip flags.
 
 ShineAxialFlag::so_Routine(a)                  (vt 0x4ac)   @ FUN_00569e00
-    if a.safm_Screen: List<…>::l_4AllInList(a.safm_Screen, Movie::FilmCase::fc_Routine)    # the map's cinema (part 16)
+    if a.safm_Screen: List<…>::l_4AllInList(a.safm_Screen, Movie::FilmCase::fc_Routine)    # the map's cinema (§27.3)
     for each r in a.safm_vecRoutions: r.vt[4]()                                              # e.g. GuildTournamentSystem (Z16)
     return 1
 ```
@@ -3949,7 +3949,7 @@ Creation, in `FieldMap::fm_Init` FUN_00464bc0 (map load): `zero` = flag at (0, 0
 `flag[2].so_safm_SetCinema(cc_SetArgument(fm_Multiflex, map, flag[2]))`. `FieldMap::fm_CreateGuildTournamentSystem`
 FUN_00464830 creates the map's `GuildTournamentSystem` (0x1E8 bytes), sets the cinema again and pushes the system into
 `flag[2].safm_vecRoutions`. `FieldMap::fm_Relink` FUN_00462bd0 re-places the sentinels and anchors with `so_SlantedFlag`.
-So the per-map cinema (scripted scenes, part 16) and the guild tournament run once per tick from the object routine of
+So the per-map cinema (scripted scenes, §27) and the guild tournament run once per tick from the object routine of
 the axial-flag pool (§1.3), not from the map. Flags are never freed while the server runs (the pool is freed in
 `ShineObjectManager::~ShineObjectManager` FUN_0054f8b0).
 
@@ -4498,7 +4498,7 @@ pushes −1, `charNo` = `so_GetCharRegistNumber` (player vt 0x344).
 | Class (ctor, ArgumentSet) | Members | Pushes | Results |
 |---|---|---|---|
 | `LuaArgumentMobAI` (FUN_005d6ef0, FUN_005d6f20) | +0xc `lamai_HostHandle`, +0x10 `lamai_Map` | handle, mapName | 1 |
-| `LuaArgumentInstanceDungeon` (FUN_005d6e20, FUN_005d6e40) | +0xc `laid_FieldMap` | mapName | 1; users `Movie::Theater::t_Routine` ("Main") and `Movie::CinemaComplex::cc_DropFilm` ("InstanceDungeonClear") → part 16 |
+| `LuaArgumentInstanceDungeon` (FUN_005d6e20, FUN_005d6e40) | +0xc `laid_FieldMap` | mapName | 1; users `Movie::Theater::t_Routine` ("Main") and `Movie::CinemaComplex::cc_DropFilm` ("InstanceDungeonClear") → §27.3 |
 | `LuaArgumentFuncExec` (FUN_005d6eb0, FUN_005d6ed0) | +0xc `lafe_Arg` | the string | 0 |
 | `LuaArgumentNPCClick` (FUN_005d6fa0, FUN_005d6fd0) | +0xc `lanc_NPC`, +0x10 `lanc_Player`, +0x14 `lanc_String` | npc handle, player handle, charNo, string (all −1 and "" if either object is null) | 0 |
 | `LuaArgumentItemUse` (FUN_005d70b0, FUN_005d70e0) | +0xc NPC, +0x10 player, +0x14 `lanc_UseItem` | npc, player, charNo, item ID | 0 |
@@ -4733,7 +4733,7 @@ names for the NA build *(fh-doc)*; the 2016 zone registers only these.
 
 FiestaHeroes' `fiesta.lua` *(fh-doc)* has 272 names; 245 of them are registered by the 2016 zone. Not in 2016 (part 13):
 `cViewEquip` is the 2016 `cViewSlotEquip` under another name, `InstanceDungeonClear` is a Lua function the script
-defines (`cc_DropFilm` calls it, §14.4 / part 16), and the other 25 are C functions the NA private server added (FH marks
+defines (`cc_DropFilm` calls it, §14.4 / §27.3), and the other 25 are C functions the NA private server added (FH marks
 most "Hook only"): `cAddFame`, `cAddMoney`, `cFinishKey`, `cGainFame`, `cGainMoney`, `cGetClass`, `cGetExactClass`,
 `cGetExactTime`, `cGetExp`, `cGetItemPower`, `cGetTarget`, `cHasSubAbstate`, `cKickout`, `cObjectSP`, `cPartyMembers`,
 `cPartyMembersZone`, `cPlayerStatSkilled`, `cPlayerStatTotal`, `cPostDiscord`, `cRevive`, `cRoar`, `cSendRoar`,
@@ -4758,13 +4758,13 @@ them; Lua map scripts get their events through the `LuaField` / `LuaAi` function
 books under `9Data/Shine/ScenarioBookShelf/` (guild tournament, KQs, instance dungeons, job change, wedding, OX field,
 quest maps) use them. The Pine statements themselves (`interruptset`, `waitinterrupt`, `interrupterase`,
 `interruptclear`) are documented here because they are the whole API; the rest of the Pine engine is part 14, the
-`Movie::*` film objects part 16.
+`Movie::*` film objects §27.
 
 ### 15.1 Objects *(pdb2016)*
 
 | Object | Layout | Role |
 |---|---|---|
-| `Movie::CinemaComplex` (field+0x44 `fm_Multiflex`, 0x12e798) | `List<Movie::FilmCase>` + `cc_FilmCase[8]`, `cc_PSFilm[8]`, `cc_LuaFilm[8]` | the films (running scripts) of a map instance; part 16 |
+| `Movie::CinemaComplex` (field+0x44 `fm_Multiflex`, 0x12e798) | `List<Movie::FilmCase>` + `cc_FilmCase[8]`, `cc_PSFilm[8]`, `cc_LuaFilm[8]` | the films (running scripts) of a map instance; §27.1 |
 | `Movie::FilmCase` (0x108) | +0 `fc_ScriptName`, +0x100 `fc_ScriptID`, +0x104 `fc_Film` | one list entry |
 | `Movie::FilmBase` / `PSFilm` / `LuaFilm` (0x12df4) | +4 `fb_Theater` | vt[1] `fb_ScriptInterrupt`, vt[2] `fb_SetInterruptClear`: PSFilm FUN_00507ae0 / FUN_00508f00; `FilmBase` and `LuaFilm` have the folded no-op FUN_00509900 in both slots |
 | `Movie::Theater` (0x12df0) | +0 `t_SenarioType`, +4 `t_LuaScript`, +8 `t_Screen` (Pine process stack), +0x1023c `t_TimeLimit`, **+0x1024c `t_InterruptManager`**, +0x12ce4 `t_ScriptName`, +0x12de4 `t_ScriptID`, +0x12de8 `t_Field`, +0x12dec `t_CenterFlag` (the map's `ShineAxialFlag`, §12.7) | the run state of one script |
@@ -4790,7 +4790,7 @@ FUN_0050c020 (copy with `operator=`; the interrupt code itself only uses `l_Allo
 FUN_004f8a00, `InterruptEventArgument` / `InterruptEventWinGuild` dtors FUN_00478d50 / FUN_00478ee0, `ScriptInteruptWinGuild`
 dtor FUN_0050d0c0, the atexit destructors of the two singletons FUN_0069e840 / FUN_0069e850. The rest of
 `Movie::CinemaComplex` (ctor FUN_00509330, dtors FUN_00507d40 / FUN_005086a0, `cc_SetArgument` FUN_005086d0,
-`cc_IsDuringPlay` FUN_00508fc0, `cc_PlayFilm`, `cc_DropFilm`) is part 16.
+`cc_IsDuringPlay` FUN_00508fc0, `cc_PlayFilm`, `cc_DropFilm`) is §27.
 
 Kind vtable (`ScriptInterruptBase`, 10 slots; unused slots = no-op FUN_00509900):
 
@@ -4973,7 +4973,7 @@ was** (the last value of another interrupt).
 | MobEliminate | FUN_0050a6f0 | no live mob left in the map: `so_AllInMap1(centerFlag, AxialListMobCounter{SearchAll, max 1}, 1)` counts 0 | unchanged | §15.7 counter rules |
 | PlayerEliminate | FUN_0050a860 | no live player left (`ala_SearchPly`) | unchanged | |
 | GuildEliminate | FUN_0050a9d0 | no live player of `guild.regnum` in the map; `StartTime` = first tick seen empty; fires when `g_Now ≥ StartTime + DelayTime`; a guild member present resets `StartTime = 0` | unchanged | the guild tournament's "other side left" rule |
-| TimeOut | FUN_0050ae40 | `Movie::TimeLimit::tl_LeftTick(timeLimit)` FUN_00507f60 ≤ 0 | unchanged | `tl_LeftTick` also broadcasts 0x0810 NC_MISC_RESTMINUTE_CMD when the rest minute changes (part 16) |
+| TimeOut | FUN_0050ae40 | `Movie::TimeLimit::tl_LeftTick(timeLimit)` FUN_00507f60 ≤ 0 | unchanged | `tl_LeftTick` also broadcasts 0x0810 NC_MISC_RESTMINUTE_CMD when the rest minute changes (§27.4) |
 | unit (WinGuild) | `ScriptInterruptUnitBase::sib_BlastCheck` FUN_00509c30 | blast (after unit vt 0x2c, a no-op for WinGuild) | unit vt 0x30 `UpdateArgument`: the winning guild's number | §15.6 |
 
 ### 15.5 Removing interrupts
@@ -4987,7 +4987,7 @@ ScriptInterruptManager::sim_InterruptErase(m, index)                  @ FUN_0050
 PineEventScriptNode::ShineInterruptClear::sa_Step                     @ FUN_004f8b30   ("interruptclear [all].")
 Movie::PSFilm::fb_SetInterruptClear(film)                             @ FUN_00508f00   (film vt[2])
     free all interrupts of the theater (ListEraser over the list)
-    # vt[2] is called by Movie::CinemaComplex::cc_PlayFilm FUN_005089a0 and cc_DropFilm FUN_00509150 (part 16)
+    # vt[2] is called by Movie::CinemaComplex::cc_PlayFilm FUN_005089a0 and cc_DropFilm FUN_00509150 (§27.2 / §27.3)
 ```
 
 A unit interrupt is stored under its flag name ("winguild", lower case), so `interrupterase` with the index the script
@@ -5082,7 +5082,7 @@ functions (`ShineMiniHouse::so_mh_CompulsionMoveTo` FUN_00543a40, `so_mh_CreateF
 
 ### 15.9 Open points of this section
 
-- How often a film steps (and so how long the 100 area re-checks last) is part 16 (`Movie::Theater` / `fc_Routine`).
+- How often a film steps (and so how long the 100 area re-checks last) is answered in §27.3: one step per main-loop pass, so 100 passes.
 - `so_AllInMap1`'s last argument (0 for the area requests, 1 for the counters) is passed through to the map's
   `fm_fp_AllInMap2` broadcast function; its meaning is not read here.
 
@@ -6416,7 +6416,7 @@ this section: `docs/protocol/annotations/Z09.json`.
 ## 20. Scripts 7: the Pine map-script language 1 — files, tokens, expressions, the process stack
 
 Pine (`PineEventScript`, files `*.ps`) is the zone's older map-script language: kingdom quests, job changes, wedding,
-the guild tournament and some instance dungeons run as Pine "films" (`Movie::PSFilm`, §15, part 16). This section is
+the guild tournament and some instance dungeons run as Pine "films" (`Movie::PSFilm`, §15, §27). This section is
 the reading side: which files exist, how a file is turned into tokens, the value model (every value is a 256-byte
 string), expressions, variables and the process stack a running script uses. Statements, blocks and conditions are
 §21 (part 14b), the `SysFunc*` / `OtherStatement` nodes and `ScenarioBookShelf` §22 (part 14c), the `Shine*` action
@@ -6665,10 +6665,10 @@ ProcessStack {                                                        # 0x10234,
 ctor @ FUN_004d8c00 (built by Movie::PSFilm and Movie::LuaFilm ctors; VarArray ctor FUN_004d69e0 empties both tokens)
 dtor @ FUN_004d6b20
 
-ps_Ready(script)                       @ FUN_004d6b40   # Movie::Theater::t_PlayFilm (part 16)
+ps_Ready(script)                       @ FUN_004d6b40   # Movie::Theater::t_PlayFilm (§27.2)
     ps_StackPoint = 0; ps_Stack[0] = {script, ip 0}; ps_Script = script
     ps_Shine.argument = block = shinescript = currentmob = null; ps_VarStack.vs_StackPoint = 0      # variables dropped
-    # waittick, player, mobnum, theater, mobbreeder, hprate are left as they were (set by the film, part 16)
+    # waittick, player, mobnum, theater, mobbreeder, hprate are left as they were (t_PlayFilm resets none of them, §27.2)
 ps_Step(arg) → r                       @ FUN_004d6b90   # Movie::Theater::t_Routine, every film step
     top = ps_Stack[ps_StackPoint]; top.node == null → 0
     return top.node.sa_Step(arg, this, &top.ip)        # vt 4; the meaning of r and of ip per node: §21
@@ -7006,7 +7006,7 @@ A film owns one `ProcessStack` (§20.6). `ps_Ready` puts the `Script` at the bot
 ```pseudo
 # once per main-loop pass: ShineAxialFlag flag[2] of the map runs its cinema (§12.7) →
 Movie::FilmCase::fc_Routine(fc, list, arg)         @ FUN_00508e40
-    if fc.fc_Film and !Movie::FilmBase::fb_Routine(fc.fc_Film, arg): list.vt[0xc](…)     # film removed (part 16)
+    if fc.fc_Film and !Movie::FilmBase::fb_Routine(fc.fc_Film, arg): list.vt[0xc](…)     # film removed (§27.3)
 Movie::FilmBase::fb_Routine(f, arg) @ FUN_005085f0 = Movie::Theater::t_Routine(&f.fb_Theater, arg)
 Movie::Theater::t_Routine(t, arg) → keep           @ FUN_00508090
     t_SenarioType == ST_PS:  return ps_Step(&t.t_Screen, arg) ≠ 0                         # one node step
@@ -7268,7 +7268,7 @@ A first-level check of every `.ps` file (statement starts against the registry, 
 - `sa_Step` results and `ip`: §21.4 (convention) and §21.5 (each control statement).
 - B83 (a failed `Term` eats a token) has no effect in this section's statements: each treats a failed expression as a
   failed statement. The `OtherStatement` argument loop (min…max expressions) is checked in §22.
-- Open: what `arg` (the `ushort` passed down from `fc_Routine`) is, and what removing a film does (part 16).
+- Answered in §27.3: `arg` is the film's cell index (0–7); a film that ends is unlinked from the cinema, a dropped one also loses its interrupts.
 - Open: whether a handler block reached through `call InterruptBlock.` can re-enter a block already on the stack
   (Z09-B86) depends on the interrupt targets of each book (§15); not traced per book.
 
@@ -7605,7 +7605,7 @@ ScenarioBookLua::sb_Load(b, name) → 1        @ FUN_00507800
     delete the old sbl_Script (vt 0); sbl_Script = new LuaScriptScenario; LuaScript::ls_FromFile (§14.1)
     fails: assert "…ScenarioBookLua::sb_Load : Lua load error", ShineExit
 sbs_GetScenarioBook(shelf, name, &index) → book | null   @ FUN_00507b90   BTree lookup, index < size
-    # callers: Movie::Theater::t_PlayFilm, CinemaComplex::cc_PlayFilm / cc_DropFilm (part 16), cSetAIScript /
+    # callers: Movie::Theater::t_PlayFilm, CinemaComplex::cc_PlayFilm / cc_DropFilm (§27), cSetAIScript /
     # cSetFieldScript (§14), wms_NC_KQ_W2Z_MAKE_REQ (Z08 / Z16), GM ac_ReroadKingdomQuest (Z11)
 sbsReLoad(shelf, name)                       @ FUN_00507c90   found: book.sb_Load(name) again (unknown name: nothing)
     # callers: GM commands ac_IndunReload FUN_00419810 and ac_ReroadKingdomQuest FUN_0041dc80 (Z11 / Z16)
@@ -7657,7 +7657,7 @@ Lua `cGetScriptString` and message functions (§18.4 / §19).
 - §10.8 the second free after a failed `smb_*` spawn: Z09-B95 (no effect in practice).
 - Answered in §23.9 (part 15a): nobody removes the old object after `os_ObjectChange` (Z09-B98); `ShineChange2Door`
   frees the slot of a failed door build itself (reason 0x1a).
-- Open (part 16): how films use the book type (vt 8) and the Lua book's script when a film starts.
+- Answered in §27.2: the book type picks the film object (`PSFilm` / `LuaFilm`); a Lua film uses the book's shared `LuaScriptScenario`.
 
 ---
 
@@ -8925,12 +8925,12 @@ spawn film [argument].                   ShineSpawn::sa_Step  @ FUN_004f7eb0   #
         # (original bug) Z09-B118: the slot is used without a null check: `spawn "X".` (one argument, allowed by
         #   the 1–2 count of §21.2) dereferences a null expression and crashes the zone when the node steps
     if theater and its field:
-        Movie::CinemaComplex::cc_PlayFilm(field.fm_Multiflex, film, arg, field.fm_MapID)   (FUN_005089a0, part 16)
+        Movie::CinemaComplex::cc_PlayFilm(field.fm_Multiflex, film, arg, field.fm_MapID)   (FUN_005089a0, §27.2)
     pop
 ```
 
 `spawn` starts another film of the scenario book shelf on the same map with an argument string (the Monkey books pass
-a coordinate pair); the new film runs in parallel with the caller (how films start and read their argument: part 16).
+a coordinate pair); the new film runs in parallel with the caller (the argument is its variable `InitFlag`, §27.2).
 
 ### 26.4 Killing and moving objects: `suicide`, `teleport`, `teleportall`, `walk`, `sublayershift`
 
@@ -9046,7 +9046,7 @@ afterwards `tl_LeftTick` is called by the `TimeOut` interrupt check (§15.4) and
 time crosses a minute. The u16 is **seconds** (`second` in `PROTO_NC_MISC_RESTMINUTE_CMD`, *(pdb2016)* and
 *(pdb2017)*): this answers part 9b's question; Z01's annotation of 0x0810 calls it "minutes = limit / 10" (correction
 for the knowledge file). A later `timelimit` replaces the running limit. Who clears `tl_IsActiv` and the rest of
-`Movie::TimeLimit` (`tl_GetTimeLimit_Second` FUN_00507df0, KQ timer functions): part 16.
+`Movie::TimeLimit` (`tl_GetTimeLimit_Second` FUN_00507df0, KQ timer functions): §27.4.
 
 ```pseudo
 waitlogin var.                           ShineWaitUserLogin::sa_Step  @ FUN_004ee430   # KQHBat1.ps: waitlogin Players.
@@ -9121,6 +9121,304 @@ ceremony flow around this statement are Z13.
 - Part 9b's open point (0x0810 unit): seconds (§26.5).
 - Z08's open point "the map scripts that run kingdom quests": the KQ end is `questresult` → `reward` → `endofkq`
   (§25.6, §26.1); the WM's 0x5811 removes the rest (Z08, W04).
-- Not traced: `cc_PlayFilm` and the film argument (part 16); `QuestPlayer_ScenarioDone_Server` (Z15); the wedding
+- Not traced: `QuestPlayer_ScenarioDone_Server` (Z15); the wedding
   hall registration (`weddinghall.Groom` / `.Bride`, Z13); whether a `sublayershift` without `logout` leaves stale
   objects on clients (sight refresh, Z02 §5).
+
+---
+
+## 27. Scripts 14: films (`Movie::*`) and the boss-field tables (`BossFieldContent::*`)
+
+A **film** is one running scenario book (§22.5) on one map instance: a Pine script (`PSFilm`, run one node step per
+main-loop pass, §21.4) or a Lua script (`LuaFilm`, whose `Main` is called every pass). Every map has one
+`Movie::CinemaComplex` (`fm_Multiflex`, field+0x44) with **8 film slots**; its anchor flag 2 runs it (§12.7). This
+section documents the cinema itself (start, stop, step, time limit) and who starts and stops films; the interrupt API
+of the films is §15, the Pine engine §20–§26, the Lua engine §14. Names *(pdb2016)* (`Zone.pdb`).
+
+### 27.1 Objects
+
+| Object | Layout *(pdb2016)* | Notes |
+|---|---|---|
+| `Movie::CinemaComplex` (0x12E798) | base `List<Movie::FilmCase>` (+0 vftable, +4 `l_MaxSize` = 8, +8 `l_Array`, +0xc `l_Finger {empty, store}`, +0x14 `l_ListNum`), +0x18 `cc_FilmCase[8]` (0x108 each), +0x858 `cc_PSFilm[8]`, +0x977F8 `cc_LuaFilm[8]` (0x12DF4 each) | list slot *i* always uses `cc_FilmCase[i]` and, by book type, `cc_PSFilm[i]` or `cc_LuaFilm[i]`: a film object belongs to a slot, not to a book |
+| `Movie::FilmCase` (0x108) | +0 `fc_ScriptName` (`PineScriptToken`), +0x100 `fc_ScriptID` (book index), +0x104 `fc_Film` | the list entry |
+| `Movie::FilmBase` → `PSFilm` / `LuaFilm` (0x12DF4) | +4 `fb_Theater` | vt 0 scalar deleting destructor FUN_005084b0, vt 4 `fb_ScriptInterrupt`, vt 8 `fb_SetInterruptClear` (PSFilm FUN_00507ae0 / FUN_00508f00; FilmBase and LuaFilm: the folded no-ops FUN_00509900 / FUN_00417480) |
+| `Movie::Theater` (0x12DF0) | §15.1 | +0 `t_SenarioType` (`ST_NONE` 0, `ST_PS` 1, `ST_LUA` 2), +4 `t_LuaScript`, +8 `t_Screen` (`ProcessStack`, §20.6), +0x1023C `t_TimeLimit`, +0x1024C `t_InterruptManager`, +0x12CE4 `t_ScriptName`, +0x12DE4 `t_ScriptID`, +0x12DE8 `t_Field`, +0x12DEC `t_CenterFlag` |
+| `Movie::TimeLimit` (0x10) | +0 `tl_EndTick`, +4 `tl_RestMinuteSend`, +8 `tl_IsActiv`, +0xc `tl_Theater` | §27.4 |
+
+```pseudo
+Movie::CinemaComplex::CinemaComplex(cc)        @ FUN_00509330
+    List<Movie::FilmCase>::l_MakeList(cc, 8)    @ FUN_00508cc0   # 9 ListStruct cells (8 + sentinel 8); all free, l_ListNum 0
+    construct cc_FilmCase[8] (Movie::FilmCase::FilmCase FUN_005072d0: name "", fc_ScriptID −1, fc_Film null),
+              cc_PSFilm[8] (Movie::PSFilm::PSFilm FUN_00507950), cc_LuaFilm[8] (Movie::LuaFilm::LuaFilm FUN_00507a50)
+    list cell i → content &cc_FilmCase[i]
+PSFilm / LuaFilm ctor: FilmBase vftable; ProcessStack ctor (theater+8); ScriptInterruptManager ctor (theater+0x1024C);
+    t_ScriptName = ""; t_Screen.ps_Shine.theater = t_TimeLimit.tl_Theater = &fb_Theater; own vftable
+    # tl_EndTick, t_SenarioType, t_LuaScript are not initialised (CinemaComplex comes from operator new)
+Movie::CinemaComplex::cc_SetArgument(cc, map, flag) → cc   @ FUN_005086d0
+    for i in 0..7: cc_PSFilm[i].fb_Theater.{t_Field = map, t_CenterFlag = flag}; same for cc_LuaFilm[i]
+    # called by FieldMap::fm_Init (flag = anchor 2) and again by fm_CreateGuildTournamentSystem (§12.7)
+```
+
+Destruction (`~CinemaComplex` FUN_00507d40 / `scalar_deleting_destructor` FUN_005086a0, `~FilmCase` FUN_00507370,
+`~PSFilm` FUN_005079e0, also used for the Lua films): maps are never freed while the zone runs, so these only run at
+exit. Container boilerplate: `List<Movie::FilmCase>` dtor FUN_005074c0 / `scalar_deleting_destructor` FUN_005075c0 /
+`l_PushA` FUN_005074e0 / `l_PushZ` FUN_005083f0 / `l_PopA` FUN_00507520 / `l_PopZ` FUN_00507570 (copies, never used by
+the cinema), `ListEraser<Movie::FilmCase>` dtor FUN_00507600. The list's own slots (CinemaComplex vftable): vt 4
+`l_AllocA(index)` FUN_0054b1e0 (take the given free cell, link it **first**), vt 8 `l_AllocZ`, vt 0xc `l_Free(index)`
+FUN_004b1300 (unlink, back to the free ring; refuses the sentinel). So the **newest film is first** in every walk.
+
+### 27.2 Starting a film
+
+```pseudo
+Movie::CinemaComplex::cc_PlayFilm(cc, bookName, argument, mapID) → book index | −1   @ FUN_005089a0
+    log "Movie::CinemaComplex::cc_PlayFilm 1" (KQLogging, also "… 2", "… 3", "… Free" below)
+    i = cc.l_Finger.empty (the first free cell); i == 0xFFFF → fc = null
+    else fc = cc.l_AllocA(i)                                         # cell i taken, linked at the head
+    fc null: assert "Movie::CinemaComplex::cc_PlayFilm : Too many film"; return −1        # 8 films already
+    book = scenarioshelf.sbs_GetScenarioBook(bookName, &index)      # FUN_00507b90, §22.5
+    book null: return −1                                             # (original bug) Z09-B119: cell i stays allocated
+    type = book.vt[8]()     # 1 Pine, 2 Lua
+    type 0: assert "…cc_PlayFilm : Wrong scenario type"; return −1  # Z09-B119 too (no 2016 book has type 0)
+    fc.fc_Film = type 1 ? &cc_PSFilm[i] : &cc_LuaFilm[i]
+    fc.fc_ScriptName = bookName; fc.fc_ScriptID = index
+    fc.fc_Film.vt[8]()                                               # fb_SetInterruptClear: drop the slot's old interrupts (PSFilm)
+    r = Movie::FilmBase::fb_PlayFilm(fc.fc_Film, bookName, argument, mapID)   @ FUN_00508540 → t_PlayFilm(&fb_Theater, …)
+    r == −1: assert "Script Error" (bookName); cc.l_Free(i)          # cannot happen: the same name was just found
+    return r
+Movie::Theater::t_PlayFilm(t, bookName, argument, mapID) → t_ScriptID | −1   @ FUN_005081f0
+    t.t_SenarioType = ST_NONE; t.t_LuaScript = null; t.t_ScriptName = bookName
+    book = sbs_GetScenarioBook(t_ScriptName, &t.t_ScriptID); null → return −1
+    t.t_SenarioType = book.vt[8]()
+    ST_PS:  script = book.vt[0xc]()   (null: assert "Movie::Theater::t_PlayFilm : Null PSScript", the stack is left as it was)
+            PineScriptStack::ProcessStack::ps_Ready(&t.t_Screen, script)     # §20.6: Script at ps_Stack[0], ip 0
+            t.t_TimeLimit.tl_IsActiv = 0
+            v = ps_PushVariable(&t.t_Screen, "InitFlag"); if v: v = argument (256 bytes)
+    ST_LUA: t.t_LuaScript = book.vt[0x10]()                          # the book's LuaScriptScenario (shared, below)
+    other:  t_SenarioType = ST_NONE; assert "Invalid Script Type" (then also reads vt[0x10])
+    return t.t_ScriptID
+    # mapID is not used: the map comes from cc_SetArgument
+```
+
+- **The film argument** is a string. A Pine film sees it as the global variable **`InitFlag`** (pushed at the bottom of
+  the variable stack before `[main]` runs, so every block can read it): `ConditionOfHero.ps` / `KQHBat2.ps` build
+  regen-group and reward keys from it (`"HERO" % InitFlag`), the Monkey books get a coordinate pair from `spawn`
+  (§26.3), the guild tournament gets four numbers (below). A **Lua film ignores the argument**.
+- **Lua films share one Lua state.** `t_LuaScript` is the book's own `LuaScriptScenario` (one `lua_State` per file,
+  §14.1), so every map running the same Lua book uses the same globals. The 2016 instance scripts therefore key all
+  their state by map: `common.lua` `Main(Field)` starts with `InstanceField[Field]` (created on the first call) and
+  `InstanceDungeonClear(Field)` sets it to nil.
+- Two films with the same book can run on one map (only the quest starter checks `cc_IsDuringPlay` first); a drop by
+  name stops the newest of them.
+
+### 27.3 Running and stopping films
+
+```pseudo
+# once per main-loop pass, from ShineAxialFlag::so_Routine of anchor 2 (§12.7):
+List<FieldMap>::l_4AllInList(cc, Movie::FilmCase::fc_Routine)      @ FUN_004026e0
+    # walks from the sentinel's next cell (newest first); reads the next cell before the call, so the visited
+    # film may free its own cell; stops at a cell that is not active
+Movie::FilmCase::fc_Routine(fc, list, i) → 1                         @ FUN_00508e40
+    if fc.fc_Film and !Movie::FilmBase::fb_Routine(fc.fc_Film, i):  list.l_Free(i)     # vt 0xc: the film has ended
+        # fc_Film and fc_ScriptName are left in the free cell (cc_PlayFilm overwrites them on reuse)
+Movie::FilmBase::fb_Routine(f, i) = Movie::Theater::t_Routine(&f.fb_Theater, i)   @ FUN_005085f0
+Movie::Theater::t_Routine(t, i) → keep                               @ FUN_00508090
+    ST_PS:  return PineScriptStack::ProcessStack::ps_Step(&t.t_Screen, i) ≠ 0      # one node step (§21.4)
+    ST_LUA: t_LuaScript null → return 0
+            LuaScriptScenario::lss_Routine(t_LuaScript, "Main", LuaArgumentInstanceDungeon(t_Field))   # §14.1 / §14.4: Main(mapID)
+            return 1                                                  # a Lua film never ends by itself
+    else:   return 0
+```
+
+The `ushort` passed down to `ps_Step` (§21.4's `arg`) is the **film's cell index 0–7**; no Pine node reads it. A
+film steps once per main-loop pass, and the loop has no fixed tick (§1.1: it runs as fast as it can and sleeps 1 ms
+at most every other pass when idle), so Pine timing never relies on the step count: waits use `g_Now`
+(`pause` §25.5, `waitlogin` §26.5, `timelimit` §27.4, the `interval` interrupt §15.4). The 100 area re-checks of an
+area interrupt (§15.4) therefore last 100 passes, a fraction of a second on an idle zone and longer on a busy one
+*(inferred: pass rate not measured)*.
+
+```pseudo
+Movie::CinemaComplex::cc_DropFilm(cc, bookName, map) → found          @ FUN_00509150
+    fc = the first film (newest first) whose fc_ScriptName == bookName
+         (ListSearchSame<Movie::FilmCase>::lid_Call FUN_00474e40 + Movie::FilmCase::fc_NameCompare FUN_00507410)
+    none: return 0
+    book = sbs_GetScenarioBook(bookName); lua = book ? book.vt[0x10]() : null      # Pine books: null
+    if lua: LuaScriptScenario::lss_FuncExec(lua, "InstanceDungeonClear", LuaArgumentInstanceDungeon(map))   # Lua films only
+    fc.fc_Film.vt[8]()                     # fb_SetInterruptClear, no null check (see Z09-B119)
+    fc.fc_Film = null; cc.l_Free(cell); return 1
+    # the theater is not reset (its Pine stack, time limit and variables stay until the cell is reused)
+Movie::CinemaComplex::cc_IsDuringPlay(cc, bookName) → bool            @ FUN_00508fc0   any film with that name
+FieldMap::fm_PlayFilm(map, bookName, argument)                       @ FUN_00419320 = cc_PlayFilm(map.fm_Multiflex, …, map.fm_MapID)
+FieldMap::fm_DropFilm(map, bookName)                                 @ FUN_00419340
+    cc_DropFilm(map.fm_Multiflex, bookName, map); MapBlock::MapDoorArray::mda_CloseAllDoor(map)   # §9.2: every door of the map closed
+FieldMap::fm_PlayFilmNum(map) = map.fm_Multiflex.l_ListNum           @ FUN_0043f770   (films running; user: mc_AllDropFilm, Z14)
+FieldMap::fm_QuestPS_Start(map, bookName, argument) → index | −1     @ FUN_005b9970 = cc_PlayFilm(…, PineScriptToken(argument), …)
+FieldMap::fm_StartScript(map, list, i) → 1                           @ FUN_005ad800
+    if map.fm_FieldOption.script ≠ "-": cc_PlayFilm(map.fm_Multiflex, script, "", map.fm_MapID)
+    # visitor run over every map by ZoneServer_zs_start_open FUN_005b6640 (last start stage, after nm_SetNPC):
+    # the Field.txt map scripts (2016: OX_field → Map/OXFieldInit, §22.5) start once at boot and run forever
+cDropFilm(mapName, bookName)                                         @ FUN_005d6b00   (Lua, returns nothing)
+    both arguments present and the map found (fc_FindMap): cc_DropFilm(map.fm_Multiflex, bookName, map); mda_CloseAllDoor(map)
+    # 2016 use: Promote/Job2_Forest and Job2_Gamb Progress.lua drop their own film (MainLuaScriptPath) when the
+    # player leaves; the Lua state is re-entered for InstanceDungeonClear while Main is still on the C stack
+    # (inferred: Progress functions are called from Main)
+```
+
+(original bug) Z09-B119: `cc_PlayFilm` takes the free cell before it looks the book up and does not give it back when
+the book is unknown (or has type 0). The cell stays in the list with `fc_Film` = null and the name of the film that
+last used the cell ("" for a fresh one, the old name after a drop): `fc_Routine` skips it, so the map has one film slot
+fewer until the zone restarts, and `cc_IsDuringPlay` still reports the old name as playing (a quest `PsStart` of that
+book is refused). A later `cc_DropFilm` of that old name finds this cell first and calls `fc_Film.vt[8]` through the
+null pointer (crash). Reachable through the book names that come from input: GM `&kingdomquest` /
+`&playinstancedungeon` names, Pine `spawn` arguments, quest `CALLPS` names (Z15).
+
+### 27.4 Time limits (`Movie::TimeLimit`, Pine `timelimit`)
+
+```pseudo
+Movie::TimeLimit::tl_SetTimeLimit(tl, unit, n)                       @ FUN_00507e60   (ShineTimeLimit, §26.5)
+    tl.tl_IsActiv = 1
+    seconds = unit[0] in 'H','h' ? n·3600 : unit[0] in 'M','m' ? n·60 : n          # "Sec", anything else = seconds
+    tl.tl_EndTick = g_Now + seconds·10; tl.tl_RestMinuteSend = 99999999            # forces a send at the next check
+Movie::TimeLimit::tl_LeftTick(tl) → left (tenths, may be negative)   @ FUN_00507f60
+    left = tl_EndTick − g_Now; s = left / 10; m = s / 60
+    if m ≠ tl_RestMinuteSend:
+        tl_RestMinuteSend = m
+        to every object of the map (so_AllInMap(tl.tl_Theater.t_CenterFlag, AxialListPacketBroadcast, 0); null flag:
+            assert "Movie::Theater::t_AllInMap : Null flag"):
+            0x0810 NC_MISC_RESTMINUTE_CMD { u8 flag = 1; u16 second = s }        # §26.5; once per minute boundary
+    return left
+Movie::TimeLimit::tl_GetTimeLimit_Second(tl) = (tl_EndTick − g_Now) / 10   (unsigned)   @ FUN_00507df0   (`@RestSec`, §22.2, B90)
+```
+
+Callers: `ShineTimeLimit::sa_Step` (set + first check, §26.5), the `TimeOut` interrupt (`ScriptInterruptTimeOut::
+sib_BlastCheck` FUN_0050ae40: fires when `tl_LeftTick ≤ 0`, §15.4) and `@RestSec`. Nothing else. Other 0x0810 senders
+(Lua timer functions §17, the instance timeout of `mc_Routine` Z14) do not use a `TimeLimit`.
+
+(original bug) Z09-B120: `tl_IsActiv` is written (1 by `timelimit`, 0 by `t_PlayFilm`) and never read. The `TimeOut`
+interrupt and `@RestSec` use `tl_EndTick` whether or not this film set a limit, so in a film without `timelimit` the
+interrupt fires at a time left over from the cell's previous film (or from uninitialised memory on the first use of the
+cell) and its check broadcasts 0x0810 with that time to the map. Every 2016 book that uses `TimeOut` sets `timelimit`
+first, so this is latent.
+
+### 27.5 Who starts and stops films
+
+| Caller | Item | Film call | Argument / notes |
+|---|---|---|---|
+| `FieldMap::fm_StartScript` FUN_005ad800 | Z09 (§27.3) | play `Field.txt` ScriptName at boot | "" |
+| Pine `spawn` FUN_004f7eb0 | Z09 (§26.3) | `cc_PlayFilm` | the node's second argument |
+| Lua `cDropFilm` FUN_005d6b00 | Z09 (§27.3) | `cc_DropFilm` + doors | — |
+| `CQuestZone::PsStart` FUN_005bbd00 → `fm_QuestPS_Start` | Z15 (quest `CALLPS`) | play, refused when `cc_IsDuringPlay(name)`; `m_ScriptIdent` = book index | the player's name (vt 0x56c) |
+| `KingdomQuest::KQElement::kqe_QuestStart` FUN_004953e0 | Z16 | per KQ map (up to 4): drop `kqe_Script`, close doors, play | `kqe_InitValue` |
+| `wms_NC_KQ_W2Z_DESTROY_CMD` FUN_004972c0 | Z16 / Z08 | drop `kqe_Script` + doors on every KQ map | — |
+| `wms_GuildTournamantStart` FUN_00476de0 | Z16 | `fm_ClearObject(0x3b0)`, drop + doors, play `Guild/GuildTournament` | `"%d %d %d %d"` (tournament numbers) |
+| `WeddingHall::wh_Start` FUN_005a25a0 | Z13 | play `Wedding/Wedding` | the couple (not read here) |
+| `ZoneRingPacketFindInstanceDungeon::zrpb_Success` FUN_005a8c20 | Z14 | `fm_ClearObject(0x3b0)`, drop + doors, play the dungeon's ScriptName | "" |
+| `ZoneRingPacketFindJobDungeon::zrpb_Success` FUN_005a8f40, `ShinePlayer::so_ply_2JobDungeon` FUN_0049f880 | Z14 | `fm_ClearObject(0x3b6)`, play (the second also clears the map's revive flags) | "" |
+| `MapCluster::mc_PlayAllFilm` FUN_00485fb0 (← `cm_PlayAllFilm` FUN_004a0d40, `FieldContainer::fc_Load`) | Z14 | `fm_PlayFilm` per instance map | "" |
+| `MapCluster::mc_AllDropFilm` FUN_00485290, `mc_DeleteInstanceDungeon` FUN_00486710, `mc_MissoionFailInstance` FUN_0049ee70, `cm_AllDropFilm` FUN_00486ec0 | Z14 | `fm_DropFilm` / `cc_DropFilm` (+ `fm_PlayFilmNum`) | — |
+| `wms_NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_ECHO_REQ` FUN_004871a0 | Z08 / Z14 | `fm_ClearObject(0x3b0)`, `fm_DropFilm`, `fm_SetIndunLevelType`, `fm_PlayFilm` | "" |
+| GM `ac_PlayInstanceDungeon` FUN_00421190, `ac_KingdomQuest` FUN_00423dd0, `ac_BigBang` FUN_004240d0, `ac_IndunReload` FUN_00419810 / `ac_ReroadKingdomQuest` FUN_0041dc80 (`cm_AllDropFilm` then `sbsReLoad`) | Z11 | play / drop | GM text |
+
+The drop-and-restart pattern (clear the map's objects, drop the old film, close all doors, play again) is how every
+reused map (instance, KQ, tournament) is reset; `cc_DropFilm` alone does not touch objects or doors.
+
+### 27.6 Boss-field tables (`BossFieldContent`)
+
+Three tables loaded by `ZoneServer_zs_start_long` FUN_005b8c00 right after `FieldContainer::fc_AbstateInFieldLoad` and
+`MapBuffDataBox::mbdb_Load` (so after `MobInfo` and the abstate dictionary); their users are §8.9 and §11.
+
+```pseudo
+BossFieldContent::ServentBuffBossTable::sbbt_Load(t)                  @ FUN_005d4580   g_ServentBuffBossTable DAT_14d6fca4
+    for each row of ../9Data/Shine/StateMob.shn (StateMob 0x64: TargetMobInx, ConditionMobInx, AbStateInx, u32 Strength):
+        buffer = mdb_2MobID(ConditionMobInx); 0xFFFF → assert "ServentBuffBossTable::sbbt_Load : ConditionMob not found", ShineExit
+        buffee = mdb_2MobID(TargetMobInx);    0xFFFF → assert "… TargetMob not found", ShineExit
+        a = dic_abstate.as_BTreeIndex[AbStateInx]; missing → assert "… Abstate not fount", ShineExit (exit text "FieldContainer::fc_AbstateInFieldLoad": copied)
+        mobdatabox[buffer].MobIndexFlag.IsBufferToBoss = 1                       # ShineMob::so_Routine calls sm_IBuffToBuffee (§8.9)
+        t.sbbt_List.insert(ServentBossTable{ sbt_Buffer = buffer, sbt_Buffee = buffee, sbt_AbstateIndex = a,
+                                             sbt_Dictionary = as_FromIndex(a), sbt_AbstateStrength = Strength })
+        # std::set ordered by sbt_Buffer: one row per buffer mob (a second row of the same buffer is dropped, inferred)
+sbbt_FindBuffer(t, mobId) → row | null                                @ FUN_005d47f0   (§8.9)
+sbbt_TimerReset(t): t.sbbt_NextTick = 0                               @ FUN_005d2520
+    # called at the end of every WM 0x0821 (wms_NC_MISC_TIMEFROMWORLD_CMD FUN_004511a0, §1.2): the first message
+    # resets g_Now to 0, so the 5-s pulse must restart; the later (per-minute) calls only add one extra buff pulse a minute
+BossFieldContent::`dynamic_initializer_for_'g_ServentBuffBossTable'' FUN_0069b690: empty set, sbbt_NextTick = 0
+
+BossFieldContent::ListOfMobStateCheckAtDead::lomscad_Load(l)          @ FUN_005d5970   g_ListOfMobStateCheckAtDead DAT_14d6fcb8
+    lomscad_StructList = [ empty entry ]                              # entry 0 = "no check": operator[] returns it for every other mob
+    lomscad_IndexList = one int per MobInfo ID, all 0
+    for each row of ../9Data/Shine/MobAbStateDropSetting.shn (0x47: MobInx, ABStateInx, StateDropType DropType, u8 MaxCount):
+        id = mdb_2MobID(MobInx); 0xFFFF → assert "…lomscad_Load : Invalid mob", ShineExit
+        if IndexList[id] == 0: IndexList[id] = StructList.size; StructList.push_back(empty entry)
+        s = as_FromName(ABStateInx); null → assert "…lomscad_Load : Invalid abstate", ShineExit
+        MobAbstateCheckAtDead::macad_PushBack(StructList[IndexList[id]], s.index.AbStataIndex, DropType)
+    # MaxCount is not read (the drop table's own list count decides how far bossAbstate can go, §11)
+BossFieldContent::MobAbstateCheckAtDead::macad_PushBack(e, abstate, type)   @ FUN_005d50f0
+    abstate already in e.macad_List → assert "…lomscad_Load : Duplicate abstate", ShineExit
+    list empty: e.macad_Type = type
+    else: type ≠ e.macad_Type → assert "…macad_PushBack : DropType not same", ShineExit
+          e.macad_Type ≠ SDT_STA (0) → assert "…macad_PushBack : SDT_STA must be one", ShineExit
+              # i.e. only SDT_STA (count the listed abstates) may list several; SDT_STRENGTH (1) takes exactly one
+              # (the message names the wrong type: log text only)
+    e.macad_List.push_back(abstate)
+operator[] FUN_005d2580: id ≥ IndexList size or index ≥ StructList size → entry 0, else StructList[IndexList[id]]
+    # macad_AbstateCheck FUN_005d3880 and smo_BossAbstateSet: §8.9
+
+BossFieldContent::MobAutomaticActionList::maal_Load(l)                @ FUN_005d49f0   g_MobAutomaticActionList DAT_14d6fc94
+    for each row of ../9Data/Shine/MobAutoAction.shn (0x51: MobInx, ATKTYPE Attack, TargetType Target, GTIActionType
+                                                     ActionType, StateInx, u8 Strength, u16 EffectRate, u16 Range):
+        id = mdb_2MobID(MobInx); 0xFFFF → assert "…maal_Load : Invalid mob in MobAutoAction", ShineExit
+        if Attack == SKLTP_DAMAGE (0): mobdatabox[id].MobIndexFlag.MobAutoAction_Damaged = 1
+        ActionType ≠ GTIT_ABSTATE (1) → assert "…maal_Load : ActionType not defined", ShineExit
+        a = dic_abstate.as_BTreeIndex[StateInx]; missing → assert "…maal_Load : Abstate not fount", ShineExit
+        l.maal_Set.insert(MobAutomaticAction{ maa_MobID = id, maa_ActionType = ActionType,
+                                              maa_Abstate = { Index a, Strength, Rate = EffectRate, Range } })   # one per mob
+    # Target is not read: the action always hits the attacker
+BossFieldContent::MobAutomaticActionList::maal_MobDamaged(l, mobId, attacker, mob)   @ FUN_005d4c40
+    # from ShineMob::so_DamagedBy FUN_00431750 after the aggro / hit-list update, when attacker ≠ null and the mob's
+    # data entry has MobAutoAction_Damaged
+    e = maal_Set.find(mobId); none, or e.maa_ActionType ≠ GTIT_ABSTATE, or attacker null: return
+    if rndbox.rb_1000() < e.Rate and so_DistanceSquar(attacker, mob) < e.Range²:
+        attacker.so_AbnormalState_Set_Simple(caster = attacker, e.Index, e.Strength, 1)   (vt 0x644, Z03)
+BossFieldContent::`dynamic_initializer_for_'g_MobAutomaticActionList'' FUN_0069b720 / `…g_ListOfMobStateCheckAtDead'' FUN_0069b710:
+    empty containers; atexit destructors FUN_006a0cd0 / FUN_006a0d30 / FUN_006a0d90
+```
+
+2016 data: `StateMob.shn` 6 rows (the Cracker bosses: `B_CrackerGuardian` / `B_CrackerLooter` buff `B_CrackerHumar`
+with `StaCrackerWCUpRate` / `StaCrackerACUpRate` strength 1, the `BH_` versions with strength 2; `BH_Helga` /
+`BH_HelgaBall` buff `BH_KaraTemplerAC` / `…MR` with `StaMobACPlus` / `StaMobMRPlus`); `MobAutoAction.shn` 4 rows (the same
+guardians and looters put `StaCrackerWCDownRate` / `StaCrackerACDownRate` on every attacker within 1600 units, rate
+1000 ‰ = always, Target 15 `TARGET_ATTACKME`); `MobAbStateDropSetting.shn` 6 rows (§8.9). So the Cracker fight is:
+kill the guardian and looter first, or the boss keeps its buffs and every hit on them debuffs the hitter.
+
+Container boilerplate (no logic): the `std::_Tree` / `_Tree_val` / iterator instances of both sets (`_Max`, `_Min`,
+`operator++` / `--`, `_Lrotate`, `_Rrotate`, `_Insert`, `_Buynode`, `erase` ×2, `_Erase`, `_Linsert`, `find`, `clear`;
+`ServentBossTable` set: FUN_005d2080, FUN_005d20a0, FUN_005d2100, FUN_005d2460, FUN_005d3120, FUN_005d3180, FUN_005d3310,
+FUN_005d3770, FUN_005d3bf0, FUN_005d4090, FUN_005d4110, FUN_005d42d0, FUN_005d43b0, FUN_005d4ee0; `MobAutomaticAction`
+set: FUN_005d20c0, FUN_005d20e0, FUN_005d2150, FUN_005d24c0, FUN_005d31e0, FUN_005d3240, FUN_005d3540, FUN_005d37f0,
+FUN_005d3e40, FUN_005d40d0, FUN_005d41f0, FUN_005d4340, FUN_005d4400, FUN_005d4f80) and the `vector<MobAbstateCheckAtDead>`
+helpers (`_Uninit_move` FUN_005d55f0, `erase` FUN_005d56a0, `reserve` FUN_005d5710, `_Reserve` FUN_005d5820,
+`push_back` FUN_005d58a0).
+
+**Boss detector item** (`UseEffect::UseItemBossMobDetect`, singleton `ui_BossMobDetect` DAT_0086e9f4, initializer
+FUN_00699240 / atexit FUN_0069f650; the item-use frame is Z04 §6):
+
+```pseudo
+UseEffect::UseItemBossMobDetect::uib_DirectUse(u, player, slot, item) → 1    @ FUN_00599b20
+    so_AllInMap(player, AxialListBossFind, 0)                         # ctor FUN_00428190
+    player.so_ply_ItemUseResultPacket(0x700, 9)                       # vt 0x91c → 0x3016 success, invenType 9 (Z04 §6.1)
+AxialListBossFind::ali_Work(walker, o, dist) → 1                       @ FUN_00429080
+    if o's mode (vt 0x484) ≠ 3 (not dead) and o's data entry (vt 0x70c) has MobInfo.GradeType == MGT_BOSS (2):
+        so_AllInMap(o, ShineObject::so_BroadcastBriefInfo FUN_0057acd0, 0)   # o.vt[0x4c8] so_SendMyBriefInfo to every object of the map
+```
+
+Every living boss of the map sends its brief info (its appear packet, §5.3 / §9.6) to every player of the map, so
+the client learns bosses outside its sight; nothing removes them later except the normal sight updates (§9.6).
+
+### 27.7 Answers and open points
+
+- §21's open point "what `arg` is": the film's cell index (§27.3). §15.9 "how often a film steps": once per main-loop
+  pass (§27.3). §22's "how films use the book type": §27.2. §26's "`cc_PlayFilm` and the film argument": `InitFlag`.
+- `Movie::TimeLimit`: `tl_IsActiv` is dead (Z09-B120); `tl_GetTimeLimit_Second` has one caller (`@RestSec`); the
+  teleport visitors (`AxialListTeleport`, `…Anywhere`, `…Split`, `AxialListCount2`) are created only by
+  `ShineTeleportAll::sa_Step` (§26.4), so Z09-B115 has no other victim.
+- Not traced: the 0x1C08 layout a boss sends through `so_BroadcastBriefInfo` to players outside its sight and whether
+  the client keeps such a far object (C01 / Z02 §5).
