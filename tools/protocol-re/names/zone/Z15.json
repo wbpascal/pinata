@@ -1,0 +1,15 @@
+{
+  "FUN_00635ff0": "CQuestData::GetQuestData",
+  "FUN_006387f0": "CQuestParserScript::ParserNext",
+  "FUN_005c0080": "CQuestZone::QuestScriptRun",
+  "FUN_005bca30": "CQuestZone::QuestStart",
+  "FUN_005bcb80": "CQuestZone::QuestDoing",
+  "FUN_005bccb0": "CQuestZone::QuestEnd",
+  "FUN_005b9e50": "CQuestZone::QuestClose",
+  "FUN_006994d0": "`dynamic_initializer_for_'gQuestData''",
+  "DAT_008718f0": "gpQSC",
+  "DAT_00871980": "gpQSV",
+  "DAT_008719a0": "gpQSAE",
+  "DAT_008719b8": "gpQST",
+  "DAT_008719c0": "gpQSIL"
+}
