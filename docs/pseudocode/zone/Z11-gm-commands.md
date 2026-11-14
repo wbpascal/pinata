@@ -19,7 +19,7 @@ chat and while the GM is chat-banned. Shout (0x201E), whisper and party chat do 
 
 ```pseudo
 sp_AmpersandCommand(p, hnd, PROTO_NC_ACT_CHAT_REQ *req) → bool        @ FUN_0041a060   (Z02 §3.3)
-    if req.content[0] != '&': return false                 # (len is not checked: a 0-length line tests a stale byte)
+    if req.content[0] != '&': return false                 # len not checked first: a 0-length line tests a stale byte (original bug) Z11-B43
     if req.len > 100: req.len = 100; req.content[100] = 0
     p.so_ply_AdminCommand(req.content, req.len)            # vt 0x964
     return true                                            # never shown as chat, also for players with level 0
@@ -93,10 +93,11 @@ AmpersandCommand::ac_Store(ac, word, level, func)                      @ FUN_004
     e.ace_command = strncpy(word, 20); e.ace_adminlevel = level; e.ace_func = func
 ```
 
-169 words, 154 distinct handlers: 15 Korean aliases share the handler of an English word (`&숨어` = `&hide`, `&보여`
+169 words, 154 distinct handlers (153 `ac_*` + FUN_00402370). The 15 extra words are 13 Korean aliases that share the
+handler of an English word (`&숨어` = `&hide`, `&보여`
 = `&show`, `&캐추적` = `&pfind`, `&몹추적` = `&mfind`, `&추방` = `&kickout`, `&이동` = `&linkto`, `&캐소환` = `&psummon`,
 `&경험치보너스` = `&expbonus`, `&아이템보너스` = `&itembonus`, `&필드보너스` = `&fieldbonus`, `&조용히` = `&silence`, `&ㅋ` =
-`&z`, `&쿨타임무시` = `&ignoreskillcooltime`, and `&루아인수` alone for `ac_LuaSec`); the strings are CP949 in the exe
+`&z`, `&쿨타임무시` = `&ignoreskillcooltime`, ; the 14th Korean word, `&루아인수`, is alone on `ac_LuaSec`) and the 2 extra words on the no-op below; the strings are CP949 in the exe
 (addresses 0x6a91fc…0x6a93e4, read by pushing order of FUN_00425b70). `&&&`, `&disposition` and `&slotmachine` point
 at FUN_00402370, an empty function shared by identical-code folding (its PDB name `ShineObject::so_ply_CardRegist`
 is one of the folded names): typing them does nothing. Of the 158 `AmpersandCommand::ac_*` functions, 153 are
@@ -154,7 +155,7 @@ ShinePlayer::so_ply_Notice(p, text)                                    @ FUN_005
 `AmpersandCommandLog` (DAT_0087c4e8, a `DebugLogging`, initializer FUN_00694f00, `EraseOldLogList` FUN_005aa080
 registers the name for old-log cleanup): every `&` line typed by a character with level 1…100, valid or not, as
 `[<charName>] <line>`. File name = `dl_MakeFileName` FUN_00419100 `"%s%s%02d.txt"` = `AmpersandCommandLog` + `YYYYMMDD` +
-two digits *(inferred: the hour)*, opened with `"a+"` by `dl_FilePoint` FUN_004191b0, each line prefixed `"HH:MM:SS : "`.
+two-digit hour (the third `sprintf` pushes `tm_hour`, tm +8; checked in the disassembly), opened with `"a+"` by `dl_FilePoint` FUN_004191b0, each line prefixed `"HH:MM:SS : "`.
 
 ### 1.6 Helpers
 
@@ -169,7 +170,7 @@ Numbers are read with `atoi` or `ac_Scanf`: a missing or non-numeric argument re
 ## 2. All commands
 
 Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": built-in → effective after
-`AdminLvSet` (§1.4). Rows marked "(part n)" are documented by a later part of this item (status file).
+`AdminLvSet` (§1.4).
 
 | # | Word | Handler | Level (reg → eff.) | Syntax | Effect | Packets | § |
 |---|---|---|---|---|---|---|---|
@@ -300,7 +301,7 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 125 | `&PlayIns` | ac_PlayInstanceDungeon `00421190` | 100 | — | on an instance map: start the instance script on a free instance keyed {PARTY, GM charNo} (B28) | — | §7.2 |
 | 126 | `&bigbang` | ac_BigBang `004240d0` | 100 | `<mapName> <scriptName>` | KQ-end on a map: clear objects (mask 0x3b0), stop the script film, close all doors | 0x2011 "Invalid map name"; despawns (Z09) | §8.4 |
 | 127 | `&alllearnskill` | ac_AllLearnSKill `004212e0` | 100 | — | teach every active / passive skill whose book fits the GM's class and level and that is not known (persistent) | 0x4801 per skill to the Character DB (→ 0x4804) | §7.3 |
-| 128 | `&levelup` | ac_LevelUp `00421710` | 100 | `[<n>]` (1) | n level-ups without EXP and without the level limit (B30); persistent | 0x240C, 0x240D, 0x2446, WM 0x1074 / 0x400E, GameLog 0x041E, DB save, 0x4810 | §7.3 |
+| 128 | `&levelup` | ac_LevelUp `00421710` | 100 | `[<n>]` (1) | n level-ups without EXP and without the level limit (B30); persistent | 0x240C, 0x240D, 0x2446, WM 0x1074 / 0x400E, WM 0x6401 (level announce at AnnounceData row 4's level), GameLog 0x041E, DB save, 0x4810 | §7.3 |
 | 129 | `&showallchar` | ac_ShowAllChar `00423480` | 100 | `[<mapName>]` | list the players of this zone on that map (default the GM's): handle, name, x/y | 0x2011 per player | §8.1 |
 | 130 | `&루아인수` | ac_LuaSec `0041e6d0` | 100 | — | show the Lua certification counters | 0x2011 | §5.7 |
 | 131 | `&testlink` | ac_TestLink `004217e0` | 50 | — | run the 0x181F multi-link request for "RouCos02" (needs a clicked link NPC) | 0x1820 or a map link | §7.2 |
@@ -354,8 +355,12 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
     if gm.smo_GetMode() (vt 0x484) == 6 and sp_MoverSystem_Type(gm) == MVST_MOVER: sp_MoverSystem_GetOff(gm, 0)
     so_Logout(gm)                                          # FUN_0054b780: the others lose the GM from sight
     gm.so_layer.layer→l_Sub = 3                            # GM sub-layer: g_SubLayerCanSee hides it (Z09 §5.2 so_layer row)
-    if gm.so_AbnormalState_Set(gm, STA_GMHIDEMODE (0x120), strength 1, dic_abstate entry, now, …, keep 0xFFFFFFFF, …)  (vt 0x638, Z03 §6.2):
+    if gm.so_AbnormalState_Set(gm, STA_GMHIDEMODE (0x120), strength 1, dic_abstate entry, now, 0, 0xFFFFFFFF, keep 0, EnchantFrom 3, 0)
+            (vt 0x638, Z03 §6.2; same argument order as §4.4 / §6.4: keep is the 8th):
+        # keep 0 → aeo_Set FUN_0040a340 takes the sub-row's KeepTime (+ 999 ms): AbState StaGMHideMode (ID 7000) →
+        #   SubStaKeepTime_Eternal (ID 9070) KeepTime 4 200 000 000 ms (≈ 48.6 days), so the hide state effectively never ends
         gm.so_AbnormalState_Inform(0x120, 4 200 000 000 ms, 0)                               (vt 0x3f0, Z03 §6.3)
+        # the informed time is a literal that equals the row's KeepTime (the two agree with the 2016 data)
 
 &show, &보여   ac_Show                                                @ FUN_0041a4d0
     in a mini-house: wall "fail to 'show' : not allowed to do 'show' in the MH"; return
@@ -1681,9 +1686,24 @@ Unlike `&learnskill` the class and level are checked; the already-known test is 
 ShinePlayer::so_AmpersandCommand_LevelUp(p)                            @ FUN_0042fa00
     p.level (sp_CharData.basedata.Level, u8) += 1                       # no level-limit test (original bug) Z11-B30
     p.so_allparametercalculate() (vt 0x57c); sp_HPChangeCheck(MaxHP); CurHP = so_MaxHP; CurSP = so_MaxSP   # full heal
-    CCharacterTitleZone::CT_LevelUp(p.sp_CharacterTitle, level)        # level titles
-    CAnnounceSystem::AnnounceSystem_LevelMax(gAnnounceSystem, charid, level)   # max-level announcement
-    quest diary level hook (sp_QuestDiary vt +4, level)
+    CCharacterTitleZone::CT_LevelUp(p.sp_CharacterTitle, level)                          @ FUN_005cc2f0
+        g = class id of p (vt 0x49c → vt 0x38; *(inferred)* from the 1…27 ranges = the six class lines): 1…5 → title value 0x2d, 6…10 → 0x2e, 11…15 → 0x2f, 16…20 → 0x30,
+            21…25 → 0x3c, 26…27 → 0x71; other classes: none
+        that group: if m_TitleValues[v].TitleValue (u64) != level: TitleValue = level, bTitleSave = 1; CheckNewTitle(v)
+        always: m_TitleValues[9].bTitleSave = 1; CheckNewTitle(9)          # CheckNewTitle FUN_005cb5f0: titles (Z07 → Z18)
+    CAnnounceSystem::AnnounceSystem_LevelMax(gAnnounceSystem, &charid, level)            @ FUN_005b8f70
+        row = AnnounceData.shn record 4 (needs > 4 records) {Type, Message[256] +4, Value +0x104}
+        if level == row.Value:                                         # 2016 data: Value 20,
+            text = sprintf(row.Message, charName, level)               #   `"%s" has just become level %d. Congratulations!`
+            Send_PROTO_NC_ANNOUNCE_Z2W_CMD(type 4, text)                                 @ FUN_005b8d30
+                WM ← 0x6401 NC_ANNOUNCE_Z2W_CMD { ANNOUNCE_MESSAGE: u8 type = 4, u8 len = strlen + 1, char text[len] }
+                    # WM W01 §7 FUN_0042ab50 → every client 0x6402 NC_ANNOUNCE_W2C_CMD
+            return 1
+        # no level limit (B30): every &levelup that passes the row's level announces to the whole world, also for GMs
+    CQuest::QuestPlayer_LevelChange(p.sp_QuestDiary.sqd_QuestDiary, level)  (vt +4)     @ FUN_0062fa20
+        for each quest slot with state 6 whose QuestData End.bLevel == 1 and End.Level ≤ level:
+            vt 0x30 = CQuest::Occure_LevelChange(id, level, End.Level)  @ FUN_004c2450 = `ret 0xc`: no effect in the zone
+        # returns 1 when such a quest exists; the result is ignored
     p ← 0x240C NC_BAT_LEVELUP_CMD { u8 level, u16 mobhandle = 0, CHAR_PARAMETER_DATA (so_fill_CHAR_PARAMETER_DATA vt 0x668) }   (0xED bytes)
     sight (so_AllOfRange, not p) ← 0x240D NC_BAT_SUMEONELEVELUP_CMD { u16 handle = p, u16 mobhandle = 0 }
     WholeSaver::ws_savelevel2worldmamager(p)                           # FUN_00453580 → WM 0x400E (Z01 §8)
@@ -1747,8 +1767,10 @@ Cen (B31). There is no upper bound and no check of a money limit.
 ```
 
 Client `On_NC_SKILL_ITEMACTIONCOOLTIME_CMD` FUN_0049c600: `Skill::SetLastCoolTimeByItemActionID(id, SecondCoolTime /
-1000)` per entry, i.e. every item-action cool-down display ends. The list is memory only here; the next character save
-writes the empty list (0x4023 NC_CHARSAVE_ITEMACTIONCOOLTIME_REQ, Z17) *(inferred)*. The item-action cool-downs
+1000)` per entry, i.e. every item-action cool-down display ends. The list is memory only here, and the next character save does **not** write
+the cleared list: `ItemActionObserveManager::SendCoolTimes2DB` FUN_005d0e60 (called from `ws_save2DB`) sends 0x4023
+NC_CHARSAVE_ITEMACTIONCOOLTIME_REQ (Z17) only when `iaom_CoolTimeList` is not empty. So the DB keeps the cool-downs last
+saved, and they come back at the next login until their stored end time (original bug) Z11-B44. The item-action cool-downs
 themselves are Z17's.
 
 ```pseudo
@@ -1859,6 +1881,8 @@ client is told too (B33). The Lua `cSetObjectDirect` (Z09 §17.1) has the same b
     type = atoi(args[0]); type > 1: wall "Invalid Camera Move Type", "1 : ON, 0 : OFF"; return
         # signed test: a negative type passes (original bug) Z11-B34
     field.fm_CameraState (+0x124) = type                               # CS_NONE 0 / CS_MOVING 1 (Z09 §19.4)
+        # stored before the type-1 argument test: `&cmt 1` with < 3 numbers leaves the map in CS_MOVING and sends
+        # no 0x6C14 (original bug) Z11-B42
     type 0: wall "Camera Move OFF"; angles and dist 0; (x, y) = GM position
     type 1: argnum < 5: walls "Camera Moving Type Need Default Input", "[AngleXZ:0~360] [AngleY:0~90] [Dist:0~] "; return
             angleXZ = atoi(args[1]), angleY = atoi(args[2]), dist = atoi(args[3]) (all u16);
@@ -2380,10 +2404,12 @@ FUN_004902d0, `cs_CardNum` FUN_004902c0; `cs_Suffle` is in Z09 §28.10): a plain
 | Z11-B39 | `&bigbang` FUN_004240d0 | the "map not found" assert names `ac_KingdomQuest` (copied text) | the assert log blames the wrong command | "AmpersandCommand::ac_BigBang : Map not found" |
 | Z11-B40 | `augdb_GetOptionUpGradeValue` FUN_005c5bb0 (`&makeitem` amulets, every accessory upgrade) | span = max(Max − Min, 1), value = Min + RandomBox[span + 1] | a level whose Min = Max can still give Min + 1 | span = Max − Min |
 | Z11-B41 | `augdb_GetOptionUpGradeValue` FUN_005c5bb0 | `RandomBox::operator[]` returns 0 for n > 100 | a level with Max − Min ≥ 100 always gives the minimum | a random source without the 100 limit |
+| Z11-B42 | `&cmt` FUN_004220c0 | `fm_CameraState` = type is written before the type-1 argument test | `&cmt 1` with fewer than three numbers leaves the map in CS_MOVING (unlimited sight range for later exchanges, §7.6) and sends no 0x6C14 | test the arguments first |
+| Z11-B43 | `sp_AmpersandCommand` FUN_0041a060 | `content[0]` is tested for `'&'` before `len` | a 0-length chat line counts as a command when the stale byte after the header is `&` *(inferred effect)* | `len > 0 && content[0] == '&'` |
+| Z11-B44 | `&iareset` FUN_00421990 / `SendCoolTimes2DB` FUN_005d0e60 | the cleared cool-down list is memory only, and the save sends 0x4023 only for a non-empty list | the DB keeps the last saved item-action cool-downs; they return at the next login | send an empty list (or a delete) when the list was cleared |
 
 ## Not reconstructed / uncertain
 
-- `AmpersandCommandLog` file name: the third `%02d` is assumed to be the hour.
 - Who sets `tCharacter.nAdminLevel` in production (operator tool, direct SQL) is outside the binaries.
 - §4.1 `&oxblock`: which door of the OX-quiz map is first in the `so_AllInMap` walk was not checked against the map
   scripts; with one door per map the result is the same.
@@ -2410,7 +2436,7 @@ FUN_004902d0, `cs_CardNum` FUN_004902c0; `cs_Suffle` is in Z09 §28.10): a plain
 - §7.3 `&levelup`: the effect of a level above `levellimit` on the EXP table lookups and on the client was not traced;
   (Sweep: the vt 0x20 call is `so_GainFame`, §7.3.)
 - §7.4 `&getmoney`: item id 0 in the 0x300A message when nothing was picked since login is assumed (the member's
-  initial value was not read). `&iareset`: whether the next character save writes the cleared cool-down list was not read.
+  initial value was not read). (`&iareset` and the save: settled in review, §7.4, B44.)
 - §7.6 `&godmode`: how long the `Item.Plus` HP / SP bonus survives (recomputed on equipment change) is inferred;
   `&castteleport`: whether `so_MoveTo` refuses a blocked or off-map target was not read.
 - §7.7 `&setpetinfo`: how the owner's client learns the new pet tendency was not traced (Z13).
@@ -2443,6 +2469,7 @@ not documented here. "Plan line" quotes the owner's `docs/plan/items/<ID>.md`; e
 | Instance clusters: `mc_FindEmptyByRegnum` FUN_00484960, `mc_ChangeCategory` FUN_00484d20, `fc_GetFirstInstanceDungeonInfo` FUN_004843e0, `InstanceMap` ctor / dtor FUN_004847c0 / FUN_00484730 | `&PlayIns`, `&makeraid`, `&emptymap` | **Z14**, plan line "`MapClusterManager::ClusterManager` … and `MapCluster`: how instances are created (cm_FindEmpty / FindEmptyByRegnum / …), the owner key `{category, regnum}`, `mc_ChangeCategory` …" |
 | Raid record: `Raid::Raid` FUN_0063d180, `RaidSystem::CreateRaid` FUN_0063d6f0, `Raid::_PartyLeaveCheckResult` FUN_0063cfe0; the WM's view after `&makeraid` / `&outraid` / `&inraid` (B26, B27, B35) | `&makeraid`, `&outraid`, `&inraid` (§7.1, §8.2) | **Z14**, plan line "Raid internals: the shared `Raid` record (FUN_0063d…/FUN_0063e…, compare the WM's `Raid` class in W02), `RaidTask` …" |
 | Stat matrix totals: `Parameter::Container::c_MakeTotal` FUN_004c9a40, `Parameter::Cluster` operators FUN_004c9160 / FUN_004c9040; 0x1035 contents of `so_mobile_NotifyParameterChange` | `&godmode`, `&gmtestmode`, `&HP` / `&SP` (speed and MaxHP/SP recompute, §7.6, §8.5) | **Z12**, plan line "`so_allparametercalculate` …: what fills each layer …, and the order … Which packets the refresh `vt 0x528` and `smo_NotifyParameterChange` (vt 0x34) send" |
+| Title unlock: `CCharacterTitleZone::CheckNewTitle` FUN_005cb5f0 (called by `CT_LevelUp`, §7.3) | `&levelup` | **Z18**: Z09 §31 assigns it to Z07 ("titles"), done, so Z18 takes it (plan: "Z09's coverage boundary … assigns … zone functions … to Z01 … Z07 … Document them") |
 | Level-up side effects: `sp_NextSaveExperience` FUN_0042d6f0, `CharaterSkillList::csl_EmpowerSummary` FUN_00445070; levels above `levellimit` (B30) | `&levelup` (§7.3) | **Z12**, plan line "Level/exp: `g_LevelExp` …, exp gain and level-up side effects (FUN_0058bd10, …), level-up packets" |
 | Pet tendency save: `sp_PetSystem_ApplyChangedTendency` FUN_004d2520, `sp_PetSystem_SaveTendency` FUN_004d25d0; how the owner's client learns `&setpetinfo` values | `&levelup` save (`ws_save2DB`), §7.7 | **Z13**, plan line "Pets: the summon/unsummon flow (`so_PetSystem_Unsummon` FUN_004d2990 and its callees FUN_004d1ff0, FUN_004d2520, FUN_004d25d0; …), … who sends … 0xD401 SET_TENDENCY (mind/stress)" |
 | Skill data box loader: `sdi_SetArgument` FUN_00584800, `sdi_Clear` FUN_00584500, `~SkillDataIndex` FUN_00447e50, `sdb_compare` FUN_005844e0, `GetSkillIndexByName` FUN_00585ef0, `BinaryDataBox<…>::bdb_ReadData` FUN_00585030 / FUN_005850f0 / FUN_00648d50 / FUN_00584f70 / FUN_005851b0, `_DebugMessageNew2` FUN_0064f1f0, its vector helpers FUN_00585df0 / FUN_00585db0 / FUN_00585d50 / FUN_005c7450; holders of `SkillDataIndex*` (B37) | `&reloaddata` (§8.6), `&gtieffect` | **Z20** (created by this item): Z01 §2.3 only names the loader per file, Z03 (done) uses the rows; `sdb_Load` alone is ~1.1k lines, too large for a gap fix |
