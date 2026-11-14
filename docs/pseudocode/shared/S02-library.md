@@ -1140,3 +1140,236 @@ lacks `ViewResultMsg` (no caller) and adds `CToken::GetTokenID` (§2.5).
 - `m_hWnd` / `m_UseMsgID` (0x401 = `WM_USER + 1`) and the unused `m_lplpTokenList` / `m_dwNumTokens` suggest the
   reader came from a Windows editor tool *(inferred)*; the servers never post window messages through them.
 - What S02-B13 reads past the buffer depends on the heap; with the shipped files the path is not reached.
+
+## 3. Packed files: `CGdp`
+
+`CGdp` (0x15c bytes) is the file layer under `CToken` and `CCsl`: every file the script reader opens, reads, seeks,
+writes or closes goes through it (`CToken::m_Gdp` at +0, §2.1; callers: `CToken::Open` / `GoBegin` / `Close` /
+`OpenFromMemory` / `~CToken`, `CCsl::Read` / `WriteFormat` / `WriteData` / `ProcCmd` `#WRITE*`, §2.2–§2.3). It wraps a
+"GDP" container format (a directory of named entries inside one file) behind Win32-shaped methods. Names, layout and
+enums are *(pdb2016)*.
+
+**In the 2016 servers the container mode is unreachable**: `m_bIsGDPOpen` is written only by `Clear`, `GdpClose` and
+the destructor, always 0, and no function that opens a container is linked (the PDB lists all 24 `CGdp` publics; none
+reads a container header). The magic `GDPID` / `GDP_TYPE_MAIN` = 0x1A504447 ("GDP\x1a") appears neither as an
+immediate in the code nor as bytes in any 2016 server or client binary, and none of the 7,028 files under `Files/`
+starts with it (no `*.gdp` either). So every `CGdp` method is a straight pass-through to the Win32 call of the same
+name (§3.2). **No 2016 install ships a GDP container**, and the config scripts are always plain text files.
+§3.3–§3.5 document the dead container code for completeness; its bugs (S02-B23 … B30) cannot happen in 2016.
+
+### 3.1 Data structures
+
+```
+CGdp (0x15c)
+  +0x000 int  m_bIsGDPOpen            container open (never set ≠ 0 in 2016)
+  +0x004 GDP_IO_TYPE m_GdpIO          0 GDP_IO_WIN32 (HANDLE), 1 GDP_IO_ANSI (FILE*); always 0
+  +0x008 HANDLE m_hGDPFile, +0x00c FILE* m_fpGDPFile      the container
+  +0x010 int  m_bIsGDPOpenByHandle, +0x014 m_bIsGDPOpenByFilePointer   container given by the caller: GdpClose keeps it open
+  +0x018 char m_GDPFileName[260]
+  +0x11c u32  m_dwGDPFPos, +0x120 m_dwGDPFPosHigh         (only cleared)
+  +0x124 u32  m_dwNumChunk, +0x128 GDP_CHUNK_LIST* m_pChunkList   in-memory copy of all chunk records
+  +0x12c u32  m_dwDefaultNumEmptyMakes                    10 (GDP_DEFAULT_NUM_EMPTY_MAKES)
+  +0x130 int  m_bWriteEncryptedHeader, +0x134 m_bWriteEncryptedData, +0x138 u32 m_EncryptKey   (ctor: 0, 0, 0; never set)
+  +0x13c int  m_bIsOpen                                    an entry is open
+  +0x140 GDP_STORE_TYPE m_StoreType, +0x144 int m_bNew, +0x148 int m_bWritten
+  +0x14c HANDLE m_hFile, +0x150 FILE* m_fpFile             = the container handle while an entry is open
+  +0x154 u32  m_dwFileNo, +0x158 GDP_CHUNK_LIST* m_pFileChunk   index / record of the open entry
+
+GDP_CHUNK_LIST (0x144) { u32 ChunkFPos; i32 ChunkFPosHigh;  GDP_CHUNK Chunk }   (where the record sits in the container)
+GDP_CHUNK (0x13c, the on-disk record) {
+  +0x00 GDP_TYPE Type        0x1A504447 MAIN, 1 LINK, 2 FILE, 3 DELETED, 4 EMPTY, 5 END
+  +0x04 u32 Encrypt          bit 0 ENCRYPTED_HEADER (+0x08…+0x13b XORed), bit 1 ENCRYPTED_DATA (entry bytes XORed)
+  +0x08 union (0x134):
+    TYPE_MAIN { char Comment[260]; u32 NumChunk; u32 NumNextChunkComes }                     (record 0)
+    TYPE_LINK { char Comment[260]; u32 FDirPos; u32 FDirPosHigh; u32 NumNextChunkComes }     (continuation pointer)
+    TYPE_DIR  { char Name[260]; GDP_STORE_TYPE StoreType (0 COPY, 1 DIB, 2 ZIP); u32 FPos, FPosHigh;
+                u32 SrcSize, SrcSizeHigh; u32 DatSize, DatSizeHigh; FILETIME ftLastWriteTime; u32 CHK32, res0, res1 }  (FILE entry)
+}
+Other PDB constants: GDP_MAX_NAME 260, GDP_COPY_BUFFER_SIZE 131072; structs FILE_LIST { char FileName[512] },
+FILE_LIST2 { FileName[512]; WIN32_FIND_DATAA } — used by no linked function.
+```
+
+The decompiler shows `TYPE_DIR` fields under the `TYPE_MAIN` / `TYPE_LINK` names that share their offset (union):
+`TYPE_MAIN.NumChunk` = `StoreType` / `LINK.FDirPos` (+0x104), `TYPE_MAIN.NumNextChunkComes` = `FPos` /
+`LINK.FDirPosHigh` (+0x108), `TYPE_LINK.NumNextChunkComes` = `FPosHigh` (+0x10c). The pseudocode below uses the
+member that the logic means.
+
+Container layout *(inferred from the writers; no reader is linked)*: record 0 is `MAIN` (`NumChunk` = total records);
+records follow back to back, a run ends with `END`. Growing the directory appends a new run at the end of the file and
+turns the old `END` into `LINK` { `FDirPos` = where the new run starts, `NumNextChunkComes` = its length }. Entry data
+(`FILE.FPos`, `SrcSize` bytes) is appended at the end of the file too, so runs and data interleave. `CHK32`, `DatSize`
+≠ `SrcSize` (compression, `DIB` / `ZIP`) and `res0/1` are never computed (`DatSize` = `SrcSize` always).
+
+### 3.2 What the servers execute: the pass-through
+
+```pseudo
+CGdp::CGdp(): m_bWriteEncryptedHeader = m_bWriteEncryptedData = m_EncryptKey = 0; Clear()      @ FUN_0045f480
+CGdp::Clear(): m_bIsGDPOpen = 0; m_GdpIO = WIN32; both container handles = 0; ByHandle = ByFilePointer = 0;   @ FUN_0045ed50
+    m_GDPFileName = 0…; m_dwGDPFPos/High = 0; m_dwNumChunk = 0; m_pChunkList = 0; m_bIsOpen = 0; m_StoreType = COPY;
+    m_bNew = 0; m_hFile = 0; m_dwFileNo = 0; m_pFileChunk = 0; m_dwDefaultNumEmptyMakes = 10
+    # m_bWritten, m_fpFile and the encryption fields are not touched
+
+with m_bIsGDPOpen == 0 (always, in 2016):
+CGdp::CreateFileA(name, access, share, sa, disposition, flags, template) = ::CreateFileA(same)      @ FUN_0045fac0
+CGdp::ReadFile(h, buf, n, &read, ov)     = ::ReadFile(same)                                       @ FUN_0045f1a0
+CGdp::WriteFile(h, buf, n, &written, ov) = ::WriteFile(same)                                      @ FUN_0045f230
+CGdp::GetFileSize(h, &high)              = ::GetFileSize(same)       (tail jump)                  @ FUN_0045f320
+CGdp::SetFilePointer(h, lo, &hi, method) = ::SetFilePointer(same)    (tail jump)                  @ FUN_0045f360
+CGdp::CloseHandle(h)                     = ::CloseHandle(h)                                       @ FUN_0045f160
+CGdp::fclose(fp)                         = ::fclose(fp)              (no caller)                  @ FUN_0045f430
+CGdp::GdpClose(): m_bIsOpen = 0 → skip; m_bIsGDPOpen = 0 → skip; m_pChunkList = 0 → skip; Clear(); return 1   @ FUN_0045f8d0
+CGdp::~CGdp() = jmp GdpClose                                                                       @ FUN_0045fa70
+```
+
+So `CToken::Close` (`CloseHandle(m_hFile)` then `GdpClose`) closes the OS handle and re-clears the object; nothing else
+is held. Win32 semantics apply unchanged, including the error codes the callers see.
+
+### 3.3 Container mode: opening entries
+
+```pseudo
+CGdp::GdpSearchFile(name):  first i < m_dwNumChunk with chunk[i].Type == FILE and _mbsicmp(chunk[i].Name, name) == 0   @ FUN_0045f050
+    → i, else 0xFFFFFFFF                     # case-insensitive (multibyte), linear
+CGdp::Open(name): !m_bIsGDPOpen → 0; i = GdpSearchFile(name); −1 → 0; return Open(i)               @ FUN_0045fa40
+CGdp::Open(i):                                                                                      @ FUN_0045f980
+    !m_bIsGDPOpen → 0
+    i > m_dwNumChunk → 0             # i == m_dwNumChunk passes: reads one record past the list (original bug) S02-B29
+    chunk[i].Type != FILE → 0
+    GdpCloseFile() fails → 0
+    m_dwFileNo = i; m_pFileChunk = &list[i]
+    GdpSetFilePointer(FPos, &FPosHigh, FILE_BEGIN) != FPos → 0   # also writes the container's new high dword into FPosHigh
+    m_bWritten = 0; m_bNew = 0; m_fpFile = m_fpGDPFile; m_hFile = m_hGDPFile; m_bIsOpen = 1; return 1
+CGdp::GdpCloseFile(): m_bIsOpen: WIN32 → return CloseHandle(m_hFile); ANSI → return fclose(m_fpFile); else 1   @ FUN_0045f4a0
+CGdp::CloseHandle(h) / fclose(fp) with the container open:                                          @ FUN_0045f160 / FUN_0045f430
+    m_bIsOpen → GdpUpdateChunk(m_dwFileNo) (rewrite the entry record: sizes, time); m_bIsOpen = 0
+    return 1 (CloseHandle) / 0 (fclose)            # h / fp is ignored; the container stays open
+CGdp::GdpClose() / ~CGdp():                                                                         @ FUN_0045f8d0 / FUN_0045fa70
+    m_bIsOpen: close the entry as above (failure → return 0, the object stays as is); m_bIsOpen = 0
+    m_bIsGDPOpen: m_bIsGDPOpen = 0; close the container handle / FILE* unless it was given by the caller (ByHandle / ByFilePointer)
+    free(m_pChunkList); Clear(); return 1
+CGdp::GdpSetFilePointer(lo, &hi, method):                                                           @ FUN_0045edd0
+    WIN32: ::SetFilePointer(m_hGDPFile, lo, &hi, method)
+    ANSI:  fseek(m_fpGDPFile, lo, method) ok → hi = 0; return ftell();  fails → SetLastError(0x84); return −1
+    other: return −1
+```
+
+`CGdp::CreateFileA` with the container open (the disposition decides; `access`, `share`, `flags` are ignored):  @ FUN_0045fac0
+
+```pseudo
+    m_bIsOpen → close the current entry (CloseHandle / fclose as above)
+    switch disposition:
+      1 CREATE_NEW:        name exists → SetLastError(0xB7 ERROR_ALREADY_EXISTS); return INVALID_HANDLE_VALUE
+      2 CREATE_ALWAYS:     GdpDeleteFile(name) (mark the old entry DELETED, if any)
+      3 OPEN_EXISTING:     Open(name) → return m_hFile;  else SetLastError(0x490 ERROR_NOT_FOUND); return INVALID
+      4 OPEN_ALWAYS:       Open(name) → return m_hFile
+      5 TRUNCATE_EXISTING: name exists → SetLastError(0x490); return INVALID
+                           else GdpDeleteFile(0xFFFFFFFF) (index −1: reads the record before the list) → 0 → return INVALID
+                           # inverted test: an existing entry is refused and a missing one indexes list[−1] (original bug) S02-B24
+      other:               return INVALID (no SetLastError)
+    # create a new entry:
+    i = GdpGetEmptyChunk(); m_dwFileNo = i; −1 → return INVALID
+    m_pFileChunk = &list[i]; Type = FILE; strncpy(Name, name, 259)
+    SrcSize/High = DatSize/High = 0; ftLastWriteTime = now (UTC); CHK32 = 0; FPosHigh = 0
+    FPos = ::SetFilePointer(m_hGDPFile, 0, &FPosHigh, FILE_END)        # Win32 call even in ANSI mode
+    FPos == −1 and GetLastError() != 0 → return INVALID
+    m_bIsOpen = 1; m_bNew = 1; m_bWritten = 0; m_fpFile = 0; m_hFile = m_hGDPFile; return m_hGDPFile
+    # StoreType, Encrypt, res0/1 of the slot are not set: uninitialised heap if the slot came from GdpMakeEmptyChunk
+    # (original bug) S02-B27; the record is written to disk only when the entry is closed (GdpUpdateChunk)
+```
+
+The returned "handle" is the container handle itself; `ReadFile` / `WriteFile` / `SetFilePointer` / `GetFileSize`
+recognise it by comparing with `m_hFile`.
+
+### 3.4 Container mode: reading, writing, seeking
+
+```pseudo
+CGdp::ReadFile(h, buf, n, &read, ov):                                                               @ FUN_0045f1a0
+    h != m_hFile → return 0
+    switch m_pFileChunk.StoreType:
+      COPY (0): ::ReadFile(h, buf, n, &read, ov) else return 0
+                # n is not limited to the entry: reading past SrcSize returns the next records / entries (original bug) S02-B25
+      DIB (1), ZIP (2): return 0              # not implemented
+      other:    nothing read, `read` untouched, falls through and returns 1 (part of S02-B25)
+    Encrypt & ENCRYPTED_DATA → GdpDecryptData(buf, read)
+    return 1
+CGdp::GdpDecryptData(buf, n):  k = byte0 ^ byte1 ^ byte2 ^ byte3 of m_EncryptKey; buf[j] ^= k for j < n    @ FUN_0045ee50
+    # one constant byte: the "encryption" is symmetric and the key is 0 in every 2016 object (identity)
+CGdp::WriteFile(h, buf, n, &written, ov):                                                           @ FUN_0045f230
+    h != m_hFile → return 0
+    Encrypt & ENCRYPTED_DATA → XOR buf in place with k (same byte as above)
+    StoreType COPY → r = ::WriteFile(h, buf, n, &written, ov);  DIB / ZIP → r = 0;  other → r = h (non-zero, nothing written)
+    Encrypt & ENCRYPTED_DATA → XOR buf again (restores the caller's const buffer)
+    r != 0 → m_bWritten = 1; UpdateWriteDataInfo(buf, n)
+    return r
+CGdp::UpdateWriteDataInfo(buf, n):  SrcSize:High += n (64-bit); DatSize:High = SrcSize:High; ftLastWriteTime = now   @ FUN_0045efb0
+    # adds n, not the bytes written, and whatever the position: rewriting an existing entry (Open / OPEN_ALWAYS)
+    # grows its size and can overwrite the data or records that follow it (original bug) S02-B28
+CGdp::GetFileSize(h, &high): high = SrcSizeHigh; return SrcSize        # h not checked                         @ FUN_0045f320
+CGdp::SetFilePointer(h, lo, &hi, method):        # h not checked; always the Win32 call on m_hFile                  @ FUN_0045f360
+    FILE_BEGIN (0):   hi += FPosHigh (if &hi); r = ::SetFilePointer(m_hFile, lo + FPos, &hi, FILE_BEGIN)
+    FILE_CURRENT (1): r = ::SetFilePointer(m_hFile, lo, &hi, FILE_CURRENT)
+    FILE_END (2):     r = ::SetFilePointer(m_hFile, lo + FPos + SrcSize, &hi + FPosHigh (pointer arithmetic), FILE_END)
+                      # method FILE_END with an absolute target (lands past the container end), the high dword is
+                      # passed as `&hi + FPosHigh` elements instead of `hi + FPosHigh`, then FPosHigh is subtracted
+                      # from a value it was never added to (original bug) S02-B23
+    other:            hi = −1 (if &hi); SetLastError(0x57 ERROR_INVALID_PARAMETER); return −1
+    hi −= FPosHigh (if &hi); return r − FPos        # also when r is −1 (failure): returns −1 − FPos
+```
+
+### 3.5 Container mode: directory maintenance
+
+```pseudo
+CGdp::GdpWriteChunk(chunk):                                                                         @ FUN_0045ee90
+    m_bWriteEncryptedHeader == 0: chunk.Encrypt &= ~1; write chunk as is
+    else: chunk.Encrypt |= 1; copy = chunk; key = m_EncryptKey
+          for j in 0 … 0x4c: copy.dword[2 + j] ^= key ^ 0x36175A5A; key = rotl(key, 1)   # the 0x134-byte union; Type / Encrypt stay plain
+          write copy
+    WIN32: return ::WriteFile(m_hGDPFile, rec, 0x13C, …)  (the byte count is not checked);  ANSI: fwrite(rec, 0x13C, 1) == 1;  other: 1
+CGdp::GdpUpdateChunk(i): GdpSetFilePointer(list[i].ChunkFPos, &list[i].ChunkFPosHigh, FILE_BEGIN)          @ FUN_0045ef50
+    (−1 and GetLastError() != 0 → 0); return GdpWriteChunk(&list[i].Chunk) != 0
+CGdp::GdpDeleteFile(i): list[i].Type != FILE → 0; Type = DELETED; seek to list[i].ChunkFPos; return GdpWriteChunk != 0   @ FUN_0045f0b0
+    # i is not range-checked (S02-B24 passes −1)
+CGdp::GdpDeleteFile(name): i = GdpSearchFile(name); −1 → 0; return GdpDeleteFile(i)                 @ FUN_0045f130
+CGdp::GdpGetEmptyChunk(): first i with Type == EMPTY → i; none → GdpMakeEmptyChunk(m_dwDefaultNumEmptyMakes = 10)   @ FUN_0045fa80
+    # DELETED records are never reused
+CGdp::GdpMakeEmptyChunk(n):                                                                         @ FUN_0045f4e0
+    new = malloc((m_dwNumChunk + 1 + n) × 0x144) else return 0       # 0 is a valid index (record 0, MAIN): CreateFileA
+                                                                       # turns MAIN into a FILE entry (original bug) S02-B30
+    copy the old list, free it, m_pChunkList = new        # the n + 1 new slots stay uninitialised except as set below
+    e = first index with Type == END; none → return −1
+    endPos:endHigh = seek(container, 0, FILE_END)          # ANSI: fseek + ftell, high = 0
+    for k in 1 … n:
+        list[e+k].ChunkFPos:High = current position (Win32: SetFilePointer(0, FILE_CURRENT);
+                                   ANSI: ftell, but any non-zero result counts as an error → −1 (original bug) S02-B26)
+        −1 and GetLastError() != 0 → return −1
+        GdpWriteChunk({ Type = EMPTY, rest 0 }) else −1; list[e+k].Type = EMPTY
+    list[e+n+1].ChunkFPos:High = current position; GdpWriteChunk({ Type = END }) else −1; list[e+n+1].Type = END
+    list[e].Type = LINK; list[e].FDirPos = endPos; FDirPosHigh = endHigh; NumNextChunkComes = n + 1
+    seek to list[e].ChunkFPos; GdpWriteChunk(&list[e].Chunk) else −1      # the old END becomes the link record
+    m_dwNumChunk += n + 1; list[0].NumChunk = m_dwNumChunk; GdpUpdateChunk-like rewrite of record 0 else −1
+    return e + 1                                           # the first new EMPTY slot
+```
+
+### 3.6 Login and Zone copies
+
+`tools/protocol-re/asmcmp.py CGdp` over all 24 functions: **no code difference** in Login or Zone. The only mismatch is
+`CGdp::CreateFileA`'s inline switch jump table after the final `ret` (address bytes), which is also why the Login /
+Zone exports decompile it differently (part 1 note). The pass-through behaviour (§3.2) therefore holds in all three
+servers.
+
+| Function | WM | Login | Zone |
+|---|---|---|---|
+| `Clear` / `GdpSetFilePointer` / `GdpDecryptData` / `GdpWriteChunk` / `GdpUpdateChunk` / `UpdateWriteDataInfo` | 0045ed50 / edd0 / ee50 / ee90 / ef50 / efb0 | 0040c220 / c2a0 / c320 / c360 / c420 / c480 | 0063b660 / b6e0 / b760 / b7a0 / b860 / b8c0 |
+| `GdpSearchFile` / `GdpDeleteFile(i)` / `GdpDeleteFile(name)` / `CloseHandle` / `ReadFile` / `WriteFile` | 0045f050 / f0b0 / f130 / f160 / f1a0 / f230 | 0040c520 / c580 / c600 / c630 / c670 / c700 | 0063b960 / b9c0 / ba40 / ba70 / bab0 / bb40 |
+| `GetFileSize` / `SetFilePointer` / `fclose` / `CGdp()` / `GdpCloseFile` / `GdpMakeEmptyChunk` | 0045f320 / f360 / f430 / f480 / f4a0 / f4e0 | 0040c7f0 / c830 / c900 / c950 / c970 / c9b0 | 0063bc30 / bc70 / bd40 / bd90 / bdb0 / bdf0 |
+| `GdpClose` / `Open(i)` / `Open(name)` / `~CGdp` / `GdpGetEmptyChunk` / `CreateFileA` | 0045f8d0 / f980 / fa40 / fa70 / fa80 / fac0 | 0040cda0 / ce50 / cf10 / cf40 / cf50 / cf90 | 0063c1e0 / c290 / c350 / c380 / c390 / c3d0 |
+
+The only `CGdp` instances in the three servers are the `m_Gdp` members of `CToken` objects (the `CCsl` readers and, in
+Zone, the quest-script parser `CQuestParserScript`, §2.5): no other caller of any `CGdp` method exists.
+
+### 3.7 Uncertain (part 3)
+
+- The container's read side (open by name / handle / `FILE*`, header decryption, walking `LINK` runs) is not linked,
+  so the on-disk layout in §3.1 is *(inferred)* from the writers and the PDB types. Whether the record-0 `MAIN` comment
+  or a `LINK`'s `Comment` is ever filled is unknown.
+- Whether Account / AccountLog / Character / GameLog link the same `CGdp` is not compared (no PDB); none of them
+  contains the `GDPID` constant, so the container mode is dead there too.
