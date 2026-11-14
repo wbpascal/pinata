@@ -1,0 +1,15 @@
+{
+  "DAT_00aa43e0": "chargeditemcheck.ct_1MinuteFlow",
+  "DAT_14d6fcb4": "BossFieldContent::g_ServentBuffBossTable.sbbt_NextTick",
+  "DAT_14d41a7c": "clockwatch.cw_IsReset",
+  "DAT_0084cc8c": "mobchatman.mcm_Wander",
+  "DAT_0da29310": "kqregentable.kqrt_Number",
+  "DAT_0da2932c": "mobregnum",
+  "DAT_0da28adc": "mbsa.mbsa_Struct",
+  "DAT_0da28ad8": "mbsa.mbsa_map",
+  "FUN_004ad7b0": "MobTargetBout::mts_ViewAggroList",
+  "FUN_006951d0": "`dynamic_initializer_for_'briefinfodelete''",
+  "FUN_005977e0": "ShineObjectClass::ShinePlayer::so_ply_Notice",
+  "FUN_0054bc80": "ShineObjectClass::ShineObject::so_AllOfRange",
+  "FUN_0054baf0": "ShineObjectClass::ShineObject::so_AllOfRange"
+}

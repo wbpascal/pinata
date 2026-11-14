@@ -121,6 +121,7 @@ follow-up for W01 listed in `docs/knowledge/C02.md`").
 | [Z15](items/Z15.md) | Zone: quest script engine (added by Z08) | Z08 |
 | [Z16](items/Z16.md) | Zone: kingdom quest element and guild tournament system (added by Z08) | Z08 |
 | [Z17](items/Z17.md) | Zone: item actions and costume weapon/shield charges (added by Z06) | Z03, Z04 |
+| [Z18](items/Z18.md) | Zone: leftovers of finished zone items from Z09's coverage boundary (221 functions for Z01–Z04, Z06, Z07) (added by Z09) | Z01–Z04, Z06, Z07, Z09 |
 | [D01](items/D01.md) | Account + AccountLog servers (resolves open Login error conditions) | – |
 | [D02](items/D02.md) | Character server: characters, avatars, save/load | – |
 | [D03](items/D03.md) | Character server: items, economy, pets, house | D02 |
@@ -157,7 +158,7 @@ follow-up session.
 1c. S01, then its follow-ups (`docs/knowledge/S01.md`) for finished items
 2. Z02, Z03, Z04, W02 (core gameplay)
 3. Z07, Z08, Z05, Z06, W03, W04
-4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, W05, then D06
+4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, W05, then D06
 5. P02 again with fuller captures, then X01
 6. X02 → user records its scenarios → P02 → X02 again (repeat until the low ratings are gone or not worth a capture)
 

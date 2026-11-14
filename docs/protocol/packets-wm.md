@@ -11589,6 +11589,16 @@ re-broadcast as 0x2079 with the same layout
 | 2 | u32 | chrregnum |  |
 | 6 | u16 | passiveskillid | appended to the passive blob |
 
+### `0x5810` NC_KQ_Z2W_END_CMD (Zone→WM)
+
+**Verified layout** (basis: zone WorldManagerSession::wms_EndOfKQPacket FUN_005a4800 (Pine endofkq, ShineEndOfKingdomQuest::sa_Step FUN_004f5fc0); WM fc_NC_KQ_Z2W_END_CMD FUN_0042aac0; PROTO_NC_KQ_Z2W_END_CMD (pdb2016) agrees)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Handle | the map's fm_KQHandle; 0xFFFFFFFF when the map has none (sent anyway after an assert, Z09-B117) |
+
+Z09 §26.1; the WM then ends the KQ and broadcasts 0x5811
+
 ### `0x6009` NC_CT_LUASCRIPT_SET_WORLD_CMD (Zone→WM)
 
 **Verified layout** (basis: wm FUN_0042cda0)
