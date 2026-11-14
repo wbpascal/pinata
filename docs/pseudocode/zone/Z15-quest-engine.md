@@ -2181,9 +2181,7 @@ only ("You cannot teleport to the saved locaion in current state.").
 
 ---
 
-<!-- The sweep (part 6) numbers the bugs section, completes the uncertain list and adds the coverage boundary. -->
-
-## Original-server bugs (collected so far; the sweep part numbers this section)
+## 8. Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
@@ -2233,7 +2231,7 @@ only ("You cannot teleport to the saved locaion in current state.").
 | Z15-B44 | `sp_OpenClassChangeMenu` FUN_0051fd10 (Lua `cClassChangeOpen`) | a wrong mode is answered with `so_SendErrorCode` on opcode 0x3060 (2-byte payload); an invalid class with 0x305F | the client reads the short 0x3060 as the 11-byte menu and opens the class-change window with class 0x81 and a stale price | send the full struct with `nError` 0x3681 (and have the client check it) |
 | Z15-B45 | `ZoneRingPacketFindJobDungeon::zrpb_Request` FUN_005a8d30 (SCENARIO 8/11/12/13) | NULL arguments or a map that forbids links out (`so_ply_IsLink_OutMap_AndSendErrorMsg` 0) return without an ack | the quest script stays on SCENARIO without a wait and never resumes | answer the ack with nResult 0 / 2 |
 
-## Not reconstructed / uncertain (so far)
+## 9. Not reconstructed / uncertain
 
 - Whether the `CQuestZone` objects are zero-filled when the player pool is allocated (decides whether Z15-B2 crashes
   or reads garbage).
@@ -2246,3 +2244,36 @@ only ("You cannot teleport to the saved locaion in current state.").
   player killers (§6.2).
 - Whether anything fills inventory type 7 (`ci_QuestBox`, §6.3); no writer was found from the quest functions.
 - Which client message box posts frame message 0x102 (the third 0x4414 sender, §6.1): not traced.
+- Whether other 2016 data sets (other regions' `QuestData.shn`) use the latent paths this item marks as unused in the
+  shipped data (`PROGESS`, names from `QuestParser.txt`, location / time-limit conditions, MOB_REGEN / CALL_PS actions,
+  TITLE rewards): the latent bugs Z15-B1…B3, B24, B25, B36, B40 only matter then *(data)*.
+- The DB side of every quest request is D04 §1; where this document states a DB result (0xB41 success, 0xB42 / 0xB43 /
+  0xB46 failures) it relies on D04's reading, not on a capture; no quest traffic was checked against a capture.
+
+## 10. Coverage boundary
+
+The sweep listed every zone function whose PDB name contains `quest` or `scenario`, every function referencing a quest
+string in `strings.tsv`, every quest / scenario opcode in `opcodes.json`, and the callers and callees of every function
+cited in §1–§7, and compared them with the addresses cited in `docs/pseudocode/`. What is left:
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| Kingdom quest objects: `KingdomQuest::KingdomQuestContainer` (ctor FUN_00499a40, `kqc_MapUseCheck` FUN_00495710), `KQElement` (`operator=` FUN_00499140, `kqe_GetKQLimitMin` FUN_005e4d20), `KQPlayerInform` / `KQPlayerInfoList` (FUN_00495250, FUN_00495260, FUN_00496d70, FUN_00498ba0, FUN_00498c40, FUN_00498e90), `KingdomQuestEntrance` (FUN_004950f0, FUN_00495140, FUN_004960a0, FUN_004960f0), `KingdomQuestGateKeeper` ctor FUN_00495150, `ListIteratorKingdomQuestMapFind::lid_Call` FUN_00495620, `BinaryDataBox<KINGDOM_QUEST_REW>::bdb_ReadData` FUN_0049a860, their `List<>` helpers | Z16 (open; Goal: "the per-event state behind them (KQ element, players, scores, rewards …)") | KQ is a separate event system that only shares the word "quest"; it never touches `CQuestZone`, the diary or `QuestData.shn`. Its Lua / Pine reward hooks are linked from §6.5 |
+| `so_ply_KQRewardStruct`, `so_ply_KQSuccess` / `KQFail` reached from `AxialListKQReward::ali_Work` FUN_00428490 (§6.5) | Z16 (open, same Goal line) | KQ reward and title counters, not quest-diary state |
+| Job-dungeon ring: `ZoneListenSession::zls_NC_QUEST_JOBDUNGEON_FIND_RNG` 0x441F FUN_005bfde0, `ZoneRingPacketFindJobDungeon::zrpb_Success` FUN_005a8f40, the ring transport behind `zrpb_Request` FUN_005a8d30 | Z14 (open; plan line 14 lists "`0x441F` (job dungeon) FUN_005bfde0" and `ZoneRingPacketFindJobDungeon`) | §3.6 documents the quest side up to the request (SCENARIO 8/11/12/13, `so_ply_IsLink_OutMap_AndSendErrorMsg`, 0x4420, Z15-B45); finding / creating the instance in another zone is the zone-ring protocol |
+| `RaidTask::rt_Broadcast` profiler label copied from `pm_QuestCheck` | Z14 (open; raid internals) | cosmetic: a wrong profiler string in a raid function; the raid quest path itself is §6.2 |
+| Other `ZoneRingPacket*::zrpb_Request` / `zrpb_Success` (FindPlayerByNormalUser FUN_005a7430, RefreshWeddingInfo FUN_005a91c0, …) and `AxialListRescueRequest` FUN_005668f0 | Z14 (open; zone-ring storage handlers) | matched the name sweep only through "Re**quest**"; no quest logic |
+| `CCharacterTitleZone::CheckNewTitle(40)` called from the DONE answer (§5.3) | Z18 (open; plan: "Z07 section: `CCharacterTitleZone::CheckNewTitle`") | title unlocking is the character-title subsystem; §5.3 documents the call and its argument |
+| Pine quest nodes (`questresult`, `reward`, `questmobkill`, `returnvalue`), Lua scenarios (`LuaScriptScenario`, its `std::map` helpers FUN_00440f10 / FUN_00441300 / FUN_005c83d0), scenario book shelf (`scenarioshelf` init / dtor FUN_00698190 / FUN_0069e6d0), map scenario packets 0x6Cxx (`sp_NC_SCENARIO_AREAENTRY_ACK` / `AREALEAVE_ACK`) | Z09 (done): §25.6, §14.9, §22.5, §22; tutorial Lua §28.13 | map-script engine; §6.5 documents every Lua function that calls into the quest engine |
+| Quest DB procedures behind 0x4403 / 0x4405 / 0x4409 / 0x441A (Character server) | D04 (done) §1.1, §1.2 | the zone side of each request and answer is §3.5, §4.7, §5.2, §5.3 |
+| Where the WM takes the 0x441C reset instants from | Z08 (done) §3.4 (zone receiver FUN_005a6520); WM timer `CDailyQuestTimer` W05 (done) §2.3 | §5.6 starts at the zone handler; the period arithmetic on the zone is §4.4 / §4.6 |
+| Quest GameLog packets 0x043C NC_LOG_GAME_QUEST_GET / 0x043D NC_LOG_GAME_QUEST_COMPLETE, 0xC80F NC_SYSLOG_CHAR_QUEST_STARTED | D05 (done) §2.3, §6 | the zone sends 0xC80F from the SET_INFO answer (§4.7); the GameLog server's handling is D05's |
+| ITEMDB quest packets 0x3404 NC_ITEMDB_QUESTALL_REQ … 0x3409, 0x345D NC_ITEMDB_QUESTITEMGET_REQ, 0x345B / 0x345C QUESTREWARD | D03 (done) §7.1, §7.5 | Character-server item procedures; the zone's (dead) 0x345C path is §5.5 |
+| WM side of the diary lists 0x1021 / 0x1022 / 0x10CD / 0x10D6 and the char-save chunks 0x4010 | W05 (done) §5.4 (0x4010 row: `CharDataStore` FUN_00433210) | the WM caches and forwards the blobs; the zone's merge and save are §4.2 and §5.7 |
+| GM commands `&queststart`, `&questread`, `&questrecieve`, `&questgiveup`, `&questcomplete` | Z11 (done) §3.4, §4.6 | §6.6 links them; their quest calls are the functions of §2.7 / §4.7 |
+| Who is credited for pet / summon kills (`so_KilledBy` `param_1`) | Z03 (done) §8.1 | combat attribution; §6.2 starts at the credited player |
+| NPC menu path that reaches `QuestPlayer_NPCClick` | Z02 (done), NPC menus | §6.1 starts at the click check Z02 calls |
+| Compiler / library code with no behaviour: `QUEST_DATA` hash-map and list instantiations FUN_00635b00…FUN_00636760, `std::_Uninit_def_fill_n<MobOfQuest>` FUN_005c0060, `BinaryDataBox<QuestSpecies>` dtors FUN_00641400 / FUN_00641990, static init / atexit of `icll_Releaser_QuestReward` FUN_00696240 / FUN_0069d230 and of `gQuestData` FUN_0069f880, `cmc` atexit destructors FUN_0069e6e0 / FUN_0069e6f0 / FUN_0069f790 / FUN_006a06c0, `__unwindfunclet$…` handlers | none needed | containers, static construction / destruction and exception unwinding; the objects they build are documented (§1.1 hash map, §5.3 releaser, §6.3 `QuestSpecies`) |
+
+No follow-up item was created: every remaining function belongs to an open item (Z14, Z16, Z18) whose plan names it,
+or to a done item whose output already documents it.
