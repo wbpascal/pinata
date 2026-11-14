@@ -374,7 +374,7 @@ Evidence for §3.2–§3.3 (all *(inferred)* except the binds and the branch str
   `usp_Cash_setCash_EVENT_L20` and the "delete on 2007-10-07" note give the period check.
 - **Get's `nRet > 0`.** The wrapper's −1 default and the handler's `== −1` test make −1 the error value; the Set call on
   every other non-positive value makes 0 "no row". "> 0" = found.
-- Client side: 0x082E NC_MISC_EVENT_L20_CMD `{ u8 nEventNo, u16 nError }` (pdb2017) is forwarded by the WM for every code
+- Client side: 0x082E NC_MISC_EVENT_L20_CMD `{ u8 nEventNo, u16 nError }` (pdb2016, WorldManager.pdb) is forwarded by the WM for every code
   except 0x1289 (W01-core.md §8); the 2016 client ignores it, and `client-error-codes.json` has no text for
   0x1288–0x128b.
 
@@ -707,14 +707,14 @@ usp_GuildTournament_setRefundNotice(@nGTNo int in, @nNo int in, @nRet int out)
     body (family: Ko Dong Gyun's usp_GuildTournament_* 2009, codes −1411 / −1412 / −1493):
         SET NOCOUNT ON; SET @nRet = 0
         IF ISNULL(@nGTNo,0) <= 0: SET @nRet = -1411; RETURN;   IF ISNULL(@nNo,0) <= 0: SET @nRet = -1412; RETURN
-        UPDATE tGuildTournamentRegist SET bRefundNotice = 1 WHERE nGTNo = @nGTNo AND nNo = @nNo
+        UPDATE tGuildTournamentRegist SET bIsRefundNotice = 1 WHERE nGTNo = @nGTNo AND nNo = @nNo
         IF @@ERROR <> 0: SET @nRet = -1493
 ```
 
-- `bRefundNotice` is a 2016 column the backups' `tGuildTournamentRegist (nGTNo, nNo, nMoney, nSeed, bChoice, dDate)` does
+- `bIsRefundNotice` is a 2016 column the backups' `tGuildTournamentRegist (nGTNo, nNo, nMoney, nSeed, bChoice, dDate)` does
   not have (constraint names `DF__tGuildTou__nSeed`, `__bChoi`, `__dDate`; `bak.py names` / UTF-16 scan of Character.bak).
   The 2016 `getRegistList` returns it as the 4th column (§5.7) and the WM keeps it as `GT_EnterList.bIsRefundNotice`
-  *(pdb2017 field name; W03 §8.1)*. Column name ours.
+  *(pdb2016: WorldManager.pdb and Zone.pdb `GT_EnterList { nGuildNo, bIsChoice, bIsRefundNotice, nRefundMoney }`; W03 §8.1)*. Column name ours, taken from that member.
 - **Who pays the refund (original bug, inferred) D06-B3.** The WM broadcasts the unchosen entries to all zones as
   0x74F4 NC_GUILD_TOURNAMENT_GOLD_REFUND_ZONE_CMD, but the 2016 zone handler is empty (Z08 §8.2, LAB_00476c00), and none of
   the Character-server procedures on the refund path receives money or a character (`setRefundNotice` has only tournament
@@ -752,7 +752,7 @@ U64 in 0x74F6), and two flags (U8 in 0x74EB, I32 in 0x74F6) = `GT_EnterList {nGu
 nRefundMoney}`. A rebuild returns
 
 ```sql
-SELECT nNo, nMoney, CAST(bChoice AS tinyint), CAST(bRefundNotice AS tinyint)
+SELECT nNo, nMoney, CAST(bChoice AS tinyint), CAST(bIsRefundNotice AS tinyint)
   FROM tGuildTournamentRegist WITH (NOLOCK) WHERE nGTNo = @nGTNo
 ```
 
@@ -780,8 +780,8 @@ its negative codes to 1–6 in that order; nothing outside the Character server 
 
 ## 6. Character DB (`w00_Character`), Character server: loading reports, login data, friend points, promotion, free stats
 
-Same conventions as §5 (Character exe has no PDB: parameter names come from the 2017 client PDB packet structs
-*(pdb2017)*, the backups' older procedure, the binary's log strings, or are *(ours)*). Wrapper return values were read
+Same conventions as §5 (Character exe has no PDB: parameter names come from the packet structs of the WM / Zone 2016
+PDBs *(pdb2016)* or, where those lack them, the 2017 client PDB *(pdb2017)*, the backups' older procedure, the binary's log strings, or are *(ours)*). Wrapper return values were read
 from the asm epilogues (Ghidra shows most of them as `void`).
 
 ### 6.1 Loading-failure reports: `usp_CharacterLoading` (11 vs 6), `usp_CharacterLoadingDetailInfo`
@@ -793,7 +793,7 @@ it as `0x0841 NC_MISC_DB_CLIENT_LOADING_BUG_DETECT_CMD` (D02 §5); the Character
 usp_CharacterLoading(@nCharNo int in, @dWorldTime datetime in, @sLoadingMapName varchar(16) in, @nFailType smallint in,
                      @nLoadingFailCnt smallint in, @sFromMapName varchar(16) in, @sFromZoneIP varchar(16) in,
                      @sToZoneIP varchar(16) in, @nToZonePort smallint in, @nSeqNo int out, @nRet int out)
-                     (names: inputs 3–9 = PROTO_NC_MISC_DB_CLIENT_LOADING_BUG_DETECT_CMD members (pdb2017); 1–5 and
+                     (names: inputs 3–9 = PROTO_NC_MISC_DB_CLIENT_LOADING_BUG_DETECT_CMD members (pdb2016, WorldManager.pdb); 1–5 and
                       @nRet = the backups' 6-parameter procedure; @nSeqNo = its local variable / key column)
     called by : SQL_usp_CharacterLoading @ FUN_0045c360 (log name `CSQLPCharacter::p_Set_Client_Loading_Bug_Detect`)
                 ← 0x0841 @ FUN_00420b80 (D02 §5)
@@ -823,7 +823,7 @@ usp_CharacterLoading(@nCharNo int in, @dWorldTime datetime in, @sLoadingMapName 
                 the lock hint is ours (several Character-server workers may store reports of one character at once).
 
 usp_CharacterLoadingDetailInfo(@nCharNo int in, @nSeqNo int in, @nErrorNo smallint in, @nErrorData int in, @nRet int out)
-                     (names: CLBD_ErrorData { u16 nErrorNo, u32 nErrorData } (pdb2017), the parent's key)
+                     (names: CLBD_ErrorData { u16 nErrorNo, u32 nErrorData } (pdb2016, WorldManager.pdb), the parent's key)
     called by : SQL_usp_CharacterLoadingDetailInfo @ FUN_0045c620 (log name `…p_Set_Client_Loading_Bug_Detec_Error_Data`)
                 ← 0x0841 @ FUN_00420b80, once per ErrorData entry (6-byte entries from packet +0x4A, count at +0x48)
     binds     : 1 in ULONG→INTEGER +0 (nCharNo); 2 in SLONG→INTEGER +4 (@nSeqNo of the parent call); 3 in USHORT→SMALLINT
@@ -841,7 +841,7 @@ usp_CharacterLoadingDetailInfo(@nCharNo int in, @nSeqNo int in, @nErrorNo smalli
 
 | Table | Columns | Source |
 |---|---|---|
-| `tCharacterLoading` | nCharNo int, nSeqNo int (per character, 1, 2, …), dWorldTime datetime, dDBTime datetime = getdate() (not bound), sLoadingMapName varchar(16), nFailType smallint, nLoadingFailCnt smallint, PK `PK_tCharLoading` (nCharNo, nSeqNo) (restore, §9.3), **sFromMapName varchar(16), sFromZoneIP varchar(16), sToZoneIP varchar(16), nToZonePort smallint**; key (nCharNo, nSeqNo) | first six *(db-backup)*; bold ones from the 2016 binds, names *(pdb2017)*, types ours; no key constraint name in the backups |
+| `tCharacterLoading` | nCharNo int, nSeqNo int (per character, 1, 2, …), dWorldTime datetime, dDBTime datetime = getdate() (not bound), sLoadingMapName varchar(16), nFailType smallint, nLoadingFailCnt smallint, PK `PK_tCharLoading` (nCharNo, nSeqNo) (restore, §9.3), **sFromMapName varchar(16), sFromZoneIP varchar(16), sToZoneIP varchar(16), nToZonePort smallint**; key (nCharNo, nSeqNo) | first six *(db-backup)*; bold ones from the 2016 binds, names *(pdb2016)*, types ours; no key constraint name in the backups |
 | `tCharacterLoadingDetailInfo` *(ours)* | nCharNo int, nSeqNo int, nDetailNo int identity, nErrorNo smallint, nErrorData int; key (nCharNo, nSeqNo, nDetailNo) | the bound values; one row per CLBD_ErrorData entry, several per report, hence the identity |
 
 Values that make the insert fail, all from the client without a check *(inferred from the ODBC conversion rules)*:
@@ -891,7 +891,7 @@ also "no override", but NOT NULL keeps it clean.
 
 ```pseudo
 usp_Character_setFriendpoint(@nCharNo int in, @nFriendPoint int in, @nRet int = 0 out)     (w00, "JK CHO 2014.8.19")
-    called by : SQL_usp_Character_setFriendpoint @ FUN_00460710 ← 0x1036 login (+1 for every friend, D02 §5) and
+    called by : SQL_usp_Character_setFriendpoint @ FUN_00460710 ← 0x1036 login @ FUN_00405810 (+1 for every friend, D02 §5) and
                 0x34BF NC_ITEMDB_UES_FRIEND_POINT_REQ @ FUN_0042ef20 (points − item cost, D03)
     binds     : 1 in ULONG→INTEGER +0; 2 in SLONG→INTEGER +4; 3 out SLONG→INTEGER +8, preset 0 — but the call string is
                 `{CALL usp_Character_setFriendpoint(?,?)}` (two markers, also in the 2015 binary)
@@ -910,9 +910,13 @@ usp_Character_getFriendpoint(@nCharNo int in, @nRet int = 0 out) → row { nFrie
   point updates behave as designed.
 - The default is **required**: without `= 0` the call fails with error 201 ("expects parameter '@nRet'") on every
   update, and neither the daily +1 nor the item exchange ever writes. A rebuild keeps the w00 signature exactly.
-- `getFriendpoint` tests `@nRet` before fetching its row: the D06-B1 dead check (§1.2 driver rule). For a missing
-  character the procedure returns no row: 0x34BF then compares the cost with 0 ("Lack FriendPoint" → 0x36C3, unless the
-  cost is 0) and 0x1036 skips the friend. `usp_Character_GetDiffFriendpoint` (0x1004, D02 §4) has the same shape.
+- `getFriendpoint` tests `@nRet` right after `SQLExecDirect`, before fetching its row. That test is **not** dead: the
+  w00 body returns a result set only when the character exists; for a missing character it only sets `@nRet = −1111`
+  (no SELECT, `NOCOUNT ON`), so the call has no result set and the output arrives with `SQLExecDirect` (§1.2 driver
+  rule). The wrapper then logs "ERROR - CSQLPCharacter::usp_Character_getFriendpoint, nRet(…)" and returns 0: 0x34BF
+  @ FUN_0042ef20 logs "…usp_Character_getFriendpoint : CharNo" and answers 0x34C0 with 0x36C2, and the 0x1036 login
+  caller FUN_00405810 takes its failure branch. On the success path `@nRet` is 0 anyway, so the early test changes
+  nothing. `usp_Character_GetDiffFriendpoint` (0x1004, D02 §4) has the same shape and the same correct behaviour.
 
 ### 6.4 Promotion: `p_IsPromotionUser`, `p_Promotion_Get`, `p_Promotion_Set` (dead in 2016)
 
@@ -1072,9 +1076,13 @@ p_Char_SetStateWithSetItemAndRestTime(
   not) *(inferred)*.
 - `nCasterAttackPower` is truncated *(original bug)* D06-B6: CharSaveState copies only the low 16 bits of the 32-bit
   `CasterInfo.nAttackPower` (`movzx edx, word ptr [eax+0x18]`, asm 0x4061e9) and the wrapper binds it as `SQL_C_USHORT`,
-  although the column and the parameter are `int`. A caster attack power ≥ 65536 or negative is saved modulo 65536, so
-  a damage-over-time state restored at the next login deals damage from the wrong attack power *(inferred)*. Likely intent: bind the
-  full `int`. A rebuild's procedure is unaffected (the value arrives already cut).
+  although the column and the parameter are `int`. The loader truncates too: FUN_0046c6e0 (the
+  `p_Char_GetStateAllWithSetItemAndRestTime` reader, §8.5) fetches column 19 `nCasterAttackPower` with `DB_GetU16` and
+  stores it zero-extended into the 32-bit field (+0xe of the state entry), and column 18 `nCasterLevel` with `DB_GetU16`
+  stored as a byte (+0xd). So the round trip is 16-bit both ways: a caster attack power ≥ 65536 or negative comes back
+  modulo 65536, and a damage-over-time state restored at the next login deals damage from the wrong attack power
+  *(inferred)*. Likely intent: bind and fetch the full `int` (fixing only the save would still reload a cut value). A
+  rebuild's procedure is unaffected (the value arrives already cut).
 - A rebuild implements the w00 body unchanged; it can build the statement with any method (the name and marker count
   are fixed), but must keep `@nRet` = `@@ERROR` (0 on success) as the only output.
 
@@ -1190,10 +1198,10 @@ and StatisticsData exist in one backup each (§3.5 compared AccountLog / Statist
 | `p_Char_GetLoginData` (FUN_004584f0) | runs `p_Prison_UpdateCharPrisonMin @nCharNo, 0` before the SELECT | SELECT only | **w00** | same SELECT; the extra call belongs to the third-party prison rework below (dated 2015-10-01); with w00's prison procedure it would release every prisoner at login |
 | `p_Prison_Add` / `p_Prison_Add2` (FUN_004659e0 / FUN_00465af0) | forces `@nMinute = 10080` and updates the existing `tPrison` row | the GM's `nMinute`; inserts a history row | **w00** (as D04 §7) | the binary passes the GM's `nMinute` (0x7C0B) and echoes it to the client; a fixed 7-day sentence is a private change |
 | `p_Prison_UpdateCharPrisonMin` (FUN_00465be0) | parameter `@nMinuteOld`; recomputes the rest from `tPrison.dPrisonDate`, ends the sentence only in `EldPri` | `@nMinute`: 0 → release to Rou (5963, 9793), else store it | **w00** (as D04 §7) | the zone counts the minutes down and sends them (0x7C0D, Z09); the binary binds the zone's value |
-| `p_Char_GetStateAllWithSetItemAndRestTime` (FUN_00459340) | 17 columns | 19: + `nCasterLevel`, `nCasterAttackPower` | **w00** | the loader FUN_0046c6e0 fetches 19 columns (9 × U16/U32/U8 state fields, 8 set-item U16, then 2 more), matching the 21-parameter save of §7.2 |
+| `p_Char_GetStateAllWithSetItemAndRestTime` (FUN_00459340) | 17 columns | 19: + `nCasterLevel`, `nCasterAttackPower` | **w00** | the loader FUN_0046c6e0 fetches 19 columns (9 × U16/U32/U8 state fields, 8 set-item U16, then `nCasterLevel` U16 and `nCasterAttackPower` U16, the latter truncated: D06-B6), matching the 21-parameter save of §7.2 |
 | `usp_Character_getSingleOption` (FUN_0045c0e0) | `bMysteryBolt, bAutoPick, dRestExpLastExecuteTime` | + `nChatBan` | **w00** | FUN_0046dc00 fetches U8, U8, TIME, U32 (4 columns) |
 | `usp_GuildAcademy_getMemberList` (FUN_004558e0) | no `nChatBanTime` | + `g.nChatBanTime` | **w00** (as D04 §9) | D04 §9 reads `nChatBanTime` in the fetch list |
-| `p_Quest_GetAllDoing` (FUN_00453240) | `WHERE nStatus <> @nStatus` | `WHERE nStatus = @nStatus` | **w00** | the binary passes `PLAYER_QUEST_STATUS` *(pdb2017)* values read from the asm: the "doing" list FUN_0046cb00 calls it three times (6 `PQS_ING`, 7 `PQS_FAILED`, 8 `PQS_REWARD`) into one packet, the done list FUN_0046ce30 / `SendQuestDone` FUN_004288d0 with 2 (`PQS_DONE`), the read list FUN_0046ce50 with 20 (`PQS_READ_ABLE`), the repeat list FUN_0046ced0 with 4 (`PQS_REPEAT`). With `<>` every quest would appear three times in 0x100A (corrects D02 §4 "filter values 2, 7, 8 and one from a register, `<>`") |
+| `p_Quest_GetAllDoing` (FUN_00453240) | `WHERE nStatus <> @nStatus` | `WHERE nStatus = @nStatus` | **w00** | the binary passes `PLAYER_QUEST_STATUS` *(pdb2016: Zone.pdb, same in the 2017 client PDB)* values read from the asm: the "doing" list FUN_0046cb00 calls it three times (6 `PQS_ING`, 7 `PQS_FAILED`, 8 `PQS_REWARD`) into one packet, the done list FUN_0046ce30 / `SendQuestDone` FUN_004288d0 with 2 (`PQS_DONE`), the read list FUN_0046ce50 with 20 (`PQS_READ_ABLE`), the repeat list FUN_0046ced0 with 4 (`PQS_REPEAT`). With `<>` every quest would appear three times in 0x100A (corrects D02 §4 "filter values 2, 7, 8 and one from a register, `<>`") |
 | `p_Quest_Set` (FUN_004530e0) | counts completions of quest 20016 ("wedding planner 2", 2008-06-03) in `tQuestTimes` | the same block commented out | either; **w00** | no 2016 procedure or binary reads `tQuestTimes` (only `p_Quest_Set` names it in both backups) |
 | `p_Char_Login` (FUN_00458560) / `p_Char_Logout` (FUN_004585f0) | third-party `LoggedInChars` table; Login returns no row | "JK CHO 2014.8.22": Login returns `nLoginDateDiff`; Logout snapshots `nFriendPoint` into `nLastFriendPoint` | **w00** (as D02 §5) | the friend-point columns exist only in w00 (§9.7); `LoggedInChars` is no official table (D02 knowledge) |
 | `p_Char_Rename` (FUN_00458400) | plain UPDATE | requires an unused `tCharacterChangeID` row (= `Fixes/Free Name Change`, 2018) | **Character.bak** (as D02 §3) | the w00 copy is the 2018 fix applied to the dump; the 2016 rename item flow (0xB40A) is separate |
@@ -1220,16 +1228,50 @@ only version; their result codes match what the binary tests (D03 §16, §8.4), 
   either backup names type 10, and `w00_Character` has no CHECK constraint on `tItem` (none at all: `sys.check_constraints`
   is empty), so the DB treats storage types as plain numbers; only the binary's use defines them (D03 §7.2).
 - **Wedding sub-status 6 / "+4" marker** (D02 §11 / §16, open): both backups write the same values (only the timers
-  differ, §8.5). The zone does handle them: `Wedding_CheckDivorceTimers` @ FUN_005a1c90 (zone; Z07 §5.1 lists Sub 0–4
-  only) switches on `Sub = Status >> 4` (vt 0x958 `so_ply_WeddingStatus`) before the limit test: **5** (1 + 4: own
-  agreement request withdrawn by `Divorce_Cancel`) → stores Sub 0 (vt 0x95c `so_ply_WeddingInfoUpdate`); unless
-  `sp_IsLockedRefundReq` (vt 0x404) is set it calls `sp_LockRefundReq` (vt 0x408) and `so_ply_IncDecMoney` (vt 0x794)
-  `(250 000, 1)`; then `so_SendErrorCode` (vt 0x308) `(8, 0x5D, 4999 = 0x1387)`; **6** (2 + 4: partner applied by
-  agreement) → `so_SendErrorCode(8, 0x5D, 0x1385)`, stores Sub 2; **7** (3 + 4: forced divorce withdrawn) → as 5 with
-  750 000; **8** (4 + 4) → stores Sub 4. Slot names *(pdb2016)*, resolved through the RTTI vftable of `ShinePlayer`.
-  So "+4" = "not yet shown to this character": the zone shows it once and strips it, and 5 / 7 refund the
-  by-agreement / forced divorce fee the zone took (Z02 §10 0x1089, D02 §11), guarded by the refund lock against a
-  second refund. 0x1385 / 0x1387 have no entry in the client error table. A rebuild keeps the DB values.
+  differ, §8.5). Who writes which value (w00 bodies): `p_Char_Wedding_Divorce_by_Agree` applicant 1, partner **6** (2 + 4);
+  `…_by_Force` applicant 3, partner 4; `p_Char_Wedding_Divorce_Cancel` applicant 1 → **5**, 3 → **7**, partner 0. No
+  procedure writes 8. The zone handles them in `Checker::DivorceLimit` @ FUN_005a1c90 *(pdb2016 name; Z07 §5.1 calls it
+  by role and lists Sub 1–4 only)*, called for a married character (Main 2) when its wedding record arrives (Z07 §5.1). It switches on
+  `Sub = Status >> 4` (vt 0x958 `so_ply_WeddingStatus`):
+
+  ```pseudo
+  Checker::DivorceLimit(player)                                   @ FUN_005a1c90 (zone)
+      Sub 0: sp_UnlockRefundReq (vt 0x40c); sp_UnlockRefundCancelReq (vt 0x418)      # clear both refund locks
+      Sub 5 (own request cancelled: by-agreement request lapsed, Sub 1/2 below):
+          so_ply_WeddingInfoUpdate (vt 0x95c) with Sub 0     # local copy + DB 0x1082 save (FUN_0059f390)
+          if not sp_IsLockedRefundReq (vt 0x404): sp_LockRefundReq (vt 0x408); so_ply_IncDecMoney (vt 0x794)(250 000, 1)
+          so_SendErrorCode (vt 0x308)(8, 0x5D, 4999 = 0x1387)  # also when locked: only the refund is skipped
+      Sub 6 (partner applied by agreement, not yet shown): so_SendErrorCode(8, 0x5D, 0x1385); store Sub 2
+      Sub 7 (own forced divorce refused: zone 0x205E, Z02 §10): as Sub 5 with 750 000
+      Sub 8: store Sub 4 (no message; no procedure writes 8)
+      Sub 1–4, only once the limit `WeddingData+0xd` has passed:
+          Sub 1 / 2: if sp_IsLockedRefundCancelReq (vt 0x410): return
+                     DB 0x108F NC_CHAR_WEDDING_DIVORCE_CANCEL_REQ { applicant, partner, u8 IncreseCount 0 }
+                       (Sub 1: applicant = self; Sub 2: applicant = the partner WeddingData+0x25)
+                     sp_LockRefundCancelReq (vt 0x414) on self, and on the partner if som_FindPlayer finds them
+          Sub 3 / 4: DB 0x108D NC_CHAR_WEDDING_DIVORCE_DO_REQ { partner, self, u8 1 }  # forced divorce executes
+  ```
+
+  Slot names *(pdb2016)*, resolved through the RTTI vftable of `ShinePlayer`; the locks are the `sp_MiscFlag` bytes
+  `LockRefundReq` / `LockRefundCanCelReq` (FUN_00549400, FUN_0055a580, FUN_0055a5b0). So "+4" = "change not yet shown
+  to this character": the zone shows it once, strips it and saves the stripped value (0x1082), and 5 / 7 also refund
+  the by-agreement / forced divorce fee the zone took (Z02 §10 0x1089 / 0x205C). The refund lock stops a second
+  refund before the 0x1082 save lands; the cancel lock stops a second 0x108F before the DB answers; Sub 0 clears both.
+- **Client cross-check (0x205D NC_ACT_WEDDING_DIVORCE_REQ_ACK).** The client handles these codes itself, not through
+  the error table, in `WeddingTask::Recv_NC_ACT_WEDDING_DIVORCE_REQ_ACK` @ FUN_006dd040 (client): 0x1385 → text
+  0x0A6E6E51 "Your spouse has filed for a collaborative divorce." (message box); 4999 = 0x1387 → 0x1030E51D "Your spouse
+  refused to get a divorce." (chat line, shown for a lapsed request too); 0x1386 → 0x7CBCC7B9 "Divorce proceeding
+  complete. You are now single."; 0x1384 (Sub 4 notice, Z07 §5.1) → 0xCAEDDB1D, a message box (type 5) that sets
+  `WeddingTask+0x70` (the id is not in the 2016 `TextData*.shn`: empty text); 0x1389 → `TextData2` 0x89C0CDB9; every
+  other code → `ErrMsgTable`. Texts from `shn.py` over `Files/Client/2016/ressystem/TextData*.shn`.
+- **0x1090 sub-status bytes** (D02 §11 / §16: "arguments lost by the decompiler"): settled from the asm of
+  `fc_NC_CHAR_WEDDING_DIVORCE_CANCEL_REQ` @ FUN_00419730 (0x419793–0x4197c3): it calls FUN_0046d9a0 →
+  `SQL_p_Char_Wedding_Divorce_Cancel` @ FUN_0045b520 with (charregistnumber, Partner, IncreseCount, &MySubStatus
+  (0x1090 +10), &PartnerSubStatus (+15)); binds 4 and 5 are out UTINYINT→TINYINT, 6 out `@nRet`, result 1 iff rc ∈
+  {0,1} and `@nRet` == 0. The w00 body reads `@SubStatusA` / `@SubStatusB` **before** its UPDATEs, so the reply carries
+  the old sub-status of applicant and partner (e.g. 1 and 2), not the new 5 / 0. `@nRet`: 0 ok, 1 = either row missing
+  or an UPDATE error (rolled back). On failure the outputs are not set (NULL, never delivered, §1.2), so the two bytes
+  keep stale stack contents *(inferred)*; the zone reads only Success (Z07 §5.2 0x1090). A rebuild keeps the w00 body.
 - **`tGameLog` column types, defaults, date column** (D05 §9): read from the restore, §9.3 (`w00_GameLog`).
 - **0x0798 `ItemDropLog`** (D05 §9): an SHN table read by the zone, not a database table; nothing for D06.
 - **D01 knowledge *(db-backup)* statements** (`nBlock` = `tUser.bIsBlock` after `usp_User_chkBlock`, admin levels,
@@ -1255,8 +1297,10 @@ only version; their result codes match what the binary tests (D03 §16, §8.4), 
   closure of `sys.sql_expression_dependencies` (procedures calling procedures included). Dynamic SQL is invisible to
   that view: of the called procedures only `p_Item_GetStorageEmptyList` uses `sp_executesql` (adds `tItemStorageFindEmpty`;
   every other `EXEC(`/`sp_executesql` hit is an operator-tool or maintenance procedure no binary calls). Result:
-  8 Account tables, 5 AccountLog, 1 Statistics, 70 Character (+ `Account.dbo.tChargeItem`, read cross-database by
-  `usp_ChargeItem_Draw` / `usp_ChargeItem_GetList`, so `Account` and `w00_Character` must live on one instance), 1 GameLog.
+  8 Account tables, 5 AccountLog, 1 Statistics, 70 Character (+ `Account.dbo.tChargeItem`, reached cross-database:
+  `usp_ChargeItem_Draw` / `usp_ChargeItem_GetList` `EXEC Account.dbo.usp_Charge_ItemDraw` / `usp_Charge_ItemSelectList`
+  (Account.bak, Ko Dong Gyun 2006-06-17; D03 §6), so a rebuild needs these two Account procedures too and `Account` and
+  `w00_Character` must live on one instance), 1 GameLog.
   Plus the tables of the procedures that have no source (§9.6, *ours*).
 - **Not used by any 2016 call** (a rebuild can leave them out): `Account` 26 of 34 tables (tCash, tCashLog, tOrder, tPay*,
   tChannelLog, tItem, tTutorial, event and one-off copy tables…), `AccountLog` 5 of 10 (tUser, tUserLog, tEventWorldCup,
@@ -1295,7 +1339,7 @@ run-time call string is §7.2) was compared with `sys.parameters` of the called 
 | Character `usp_CharacterLoading` (FUN_0045c360) | 11 params | 6 | 2016 table had more columns | §6.1 |
 | Character `usp_Character_setFriendpoint` (FUN_00460710) | 2 markers, 3 binds | 3 params | harmless with w00's `@nRet = 0` default | §6.3 |
 | Character `p_Item_GetStorageEmptyList` (FUN_00464b40) | `@nRet` (4) bound **input** (`SQL_PARAM_INPUT`, buffer pre-set 0) | `@nRet int OUTPUT` | the wrapper's `nRet != 0` test never sees the procedure's value: dead check (original bug) D06-B8; rows are read regardless | D03 §7.2 |
-| Account `usp_Item_setSerialKey` (FUN_004190d0) | `@serialKey` `SQL_C_ULONG`/`SQL_INTEGER` | `bigint` | keys ≥ 2³² cannot be passed (32-bit field) | D01 |
+| Account `usp_Item_setSerialKey` (FUN_004190d0) | binds 1–2 (`@serialKey` …) `SQL_C_ULONG`/`SQL_INTEGER` | `@serialKey bigint` | by the systemic rule above a key ≥ 2³¹ already fails with 22003; the 32-bit buffer cannot carry the bigint range at all | D01 |
 | Character `p_Guild_SetWar` (FUN_00454420) | `@nWarEnemy` `SQL_C_UBIGINT`/`SQL_BIGINT` | `int` | guild numbers fit; a value ≥ 2³¹ fails (22003) | D04 |
 | Character `usp_GuildAcademy_getReward` (FUN_00456190) | `@nLevel` `SQL_C_USHORT`/`SQL_SMALLINT` | `tinyint` | levels > 255 fail; the procedure answers −1513 for 0 | D04 |
 
@@ -1313,7 +1357,7 @@ that is given by the procedure bodies (D02–D05) and §5–§8.
 
 #### `Account`
 
-- **`tChargeItem`** (Account `usp_ReturnUser_SetUserItem`; Character `usp_ChargeItem_Draw` / `usp_ChargeItem_GetList` read it as `Account.dbo.tChargeItem`; 1 row in the backup): `rowNo int IDENTITY(1)` · `userNo int` · `orderNo int` · `goodsNo int` · `amount int =1` · `registerDate datetime =getdate()` · `isDraw tinyint =0` · `drawDate datetime NULL =getdate()`. PK `PK_tChargeItem_NC` (rowNo) nonclustered.
+- **`tChargeItem`** (Account `usp_ReturnUser_SetUserItem`; Character `usp_ChargeItem_Draw` / `usp_ChargeItem_GetList` reach it through `EXEC Account.dbo.usp_Charge_ItemDraw` / `usp_Charge_ItemSelectList`; 1 row in the backup): `rowNo int IDENTITY(1)` · `userNo int` · `orderNo int` · `goodsNo int` · `amount int =1` · `registerDate datetime =getdate()` · `isDraw tinyint =0` · `drawDate datetime NULL =getdate()`. PK `PK_tChargeItem_NC` (rowNo) nonclustered.
 - **`tReturnUser`** (2 procs): `nRowNo int IDENTITY(1)` · `dDate datetime` · `nUserNo int` · `nItemNo int`. PK `PK_tReturnUser_nRowNo_NC` (nRowNo) nonclustered.
 - **`tSerialKey`** (1 proc): `userNo int` · `serialKey bigint` · `registerDate datetime =getdate()`. PK `PK_tSerialKey_CL` (userNo); FK `FK__tSerialKe__userN__5629CD9C` userNo → tUser.nUserNo.
 - **`tUser`** (5 procs; 1 row in the backup): `nUserNo int IDENTITY(100)` · `sUserID nvarchar(60)` · `sUserPW nvarchar(32)` · `sUserName nvarchar(10) NULL` · `bIsBlock bit =0` · `bIsDelete bit =0` · `nAuthID tinyint =1` · `sUserIP nvarchar(30)` · `dDate datetime =getdate()` · `sUserNo int NULL` · `blsBlock tinyint NULL` · `blsDelete tinyint NULL`. PK `PK_tUser_CL` (nUserNo); FK `FK__tUser__nAuthID__7E6CC920` nAuthID → tUserAuth.nAuthID.
@@ -1460,7 +1504,7 @@ account / character):
 | `tPetInfo` | w00_Character | §5.1 | yes |
 | `tCharacter.sLinkScrollDestMap` | w00_Character | §5.2, §6.2 | yes (`p_Char_GetAllData` column 37); `varchar(16)` like `sLoginZone` (§9.3) |
 | `tMiniHouseURL` | w00_Character | §5.4 | no |
-| `tGuildTournamentRegist.bRefundNotice` | w00_Character | §5.6 | yes |
+| `tGuildTournamentRegist.bIsRefundNotice` | w00_Character | §5.6 | yes |
 | `tCharacterLoading` + `sFromMapName, sFromZoneIP, sToZoneIP, nToZonePort` | w00_Character | §6.1 | yes |
 | `tCharacterLoadingDetailInfo` | w00_Character | §6.1 | yes |
 | `tPromotionUser`, `tPromotionReward` | w00_Character | §6.4 | no |
@@ -1486,12 +1530,12 @@ Tagged in place with `(original bug) D06-B<n>`. They are bugs of the 2016 server
 
 | ID | Handler / procedure | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
-| D06-B1 | AccountLog `usp_AccountLog_GetDateDiffLastlogout` (FUN_00415020, §3.4); same in Account `usp_ReturnUser_GetDatediffLastlog`, `usp_User_GetDatediffCreated`, Character `usp_Pet_setCreate` / `usp_Pet_getInfo` (§5.1), `usp_Character_getFriendpoint` (§6.3) | the wrapper tests the output `@nRet` right after `SQLExecDirect` of a procedure that also returns a result set | SQL Server returns output parameters only after the last result set is consumed (§1.2 driver rule), so the test always sees the pre-set 0: dead error check *(inferred from the ODBC rules)* | test `@nRet` after `SQLMoreResults`, or return the code as a column |
+| D06-B1 | AccountLog `usp_AccountLog_GetDateDiffLastlogout` (FUN_00415020, §3.4); Character `usp_Pet_setCreate` / `usp_Pet_getInfo` (§5.1); the same code shape in Account `usp_ReturnUser_GetDatediffLastlog`, `usp_User_GetDatediffCreated` (harmless there: their bodies never set `@nRet` ≠ 0) | the wrapper tests the output `@nRet` right after `SQLExecDirect` of a procedure that returns a result set on its error path too | SQL Server returns output parameters only after the last result set is consumed (§1.2 driver rule), so the test always sees the pre-set 0: dead error check *(inferred from the ODBC rules)*. Not `usp_Character_getFriendpoint` / `GetDiffFriendpoint`: their error path has no result set, so the test works (§6.3) | test `@nRet` after `SQLMoreResults`, or return the code as a column |
 | D06-B2 | zone 0x347D mini-house effect payment (FUN_00574a30) → `p_Item_MiniHouse_Effect_Resource_Del` (§5.3) | a money-only effect leaves item key / lot of the request stale | the procedure receives an old item key and lot; with a body that checks them, a money-only payment can fail or consume the wrong item | zero the item fields when the effect costs money only |
 | D06-B3 | WM 0x74F8 tournament refund notice → `usp_GuildTournament_setRefundNotice` (§5.6) | the refunds the notice announces are paid by no 2016 component (the zone's 0x74F4 handler is empty) *(inferred)* | guilds that were not chosen never get their fee back, though the DB marks the refund as announced | pay the fee back (`p_Guild_SetMoney`) before marking it |
 | D06-B4 | Character 0x0841 loading report → `usp_CharacterLoading` / `…DetailInfo` (FUN_00420b80, §6.1) | the IP strings are copied as 16 raw bytes but bound as NUL-terminated strings; u16 / u32 client values are bound into SMALLINT / INTEGER | an IP of 16 characters reads past the field; large values overflow and the report row is lost | bound the copies with a terminator; bind the matching unsigned ranges |
 | D06-B5 | `p_Promotion_Get` / `p_Promotion_Set` (FUN_0041eff0, §6.4) | "already rewarded?" and "mark rewarded" are two calls, not one transaction | two simultaneous requests can both get the reward (path dead in 2016: no sender of 0xA001 / 0xA004) | one procedure that checks and marks under a lock |
-| D06-B6 | Character `CharSaveState` → `p_Char_SetStateWithSetItemAndRestTime` (§7.2) | `CasterInfo.nAttackPower` (32-bit) is copied as its low 16 bits (bound `SQL_C_USHORT`) | a caster attack power above 65 535 is saved wrapped; the buff reloads weaker | bind the full 32-bit value |
+| D06-B6 | Character `CharSaveState` (FUN_00406070) → `p_Char_SetStateWithSetItemAndRestTime` (FUN_00460ee0, §7.2), and the loader FUN_0046c6e0 of `p_Char_GetStateAllWithSetItemAndRestTime` | `CasterInfo.nAttackPower` (32-bit) is copied as its low 16 bits (bound `SQL_C_USHORT`) on save and fetched with `DB_GetU16` on load | a caster attack power above 65 535 is saved and reloaded wrapped; the buff reloads weaker | bind and fetch the full 32-bit value |
 | D06-B7 | all four DB servers `DBRecord::query` with the `ODBC_INFO` startup command (§7.3) | the configured text is used as the `vsprintf` format with no arguments, into a 0x2000-byte buffer | a `%` in the command is undefined behaviour; a longer command overflows the stack buffer | pass the text as data (`"%s"`), bound the length |
 | D06-B8 | Character `p_Item_GetStorageEmptyList` (FUN_00464b40, §9.2) | `@nRet` is bound as input (`SQL_PARAM_INPUT`, pre-set 0) | the wrapper's `nRet != 0` test is dead; a DB-side refusal is never seen and the (possibly empty) rows are used | bind it `SQL_PARAM_OUTPUT` |
 
@@ -1501,7 +1545,7 @@ Tagged in place with `(original bug) D06-B<n>`. They are bugs of the 2016 server
   mapping force; bodies, table names and some column names are *(ours)*. Tables invented: `tUserPlayTime` (§2.3),
   `tSameTimeCharClass` (§3.1), `tEventL20` (§3.2), `tLoginChannel` (§4.1), `tPetInfo` (§5.1), `tMiniHouseURL` (§5.4),
   `tCharacterLoadingDetailInfo`, `tPromotionUser`, `tPromotionReward` (§6), columns `tCharacter.sLinkScrollDestMap`
-  (§5.2), `tGuildTournamentRegist.bRefundNotice` (§5.6); §9.6 lists them with types.
+  (§5.2), `tGuildTournamentRegist.bIsRefundNotice` (§5.6); §9.6 lists them with types.
 - **Account:** the portal tables behind the teen-protection trio and the Netmarble / TW / JP logins (§2.3, §2.4) are
   unknown (only one is live: `usp_Pcbang_chkIP`). The `nUserNo == −2` agreement answer of 0x4B (§2.5) is produced by no
   backup procedure: left open (a payment-agreement table exists for the web shop only).
@@ -1513,8 +1557,8 @@ Tagged in place with `(original bug) D06-B<n>`. They are bugs of the 2016 server
   enchant procedures (§8.4) are the official bodies cannot be decided.
 - **D06-B1 / D06-B3** rest on the ODBC driver rule and on the absence of a payer in all 2016 binaries; a capture with a
   tournament refund or a pet creation would settle them.
-- **Storage type 10** (§8.6) and the zone-side meaning of the wedding message ids 0x1385 / 0x1387 (no client error-table
-  entry) stay *(inferred)*.
+- **Storage type 10** (§8.6) stays *(inferred)*. Wedding: the client text of 0x1384 (id 0xCAEDDB1D) is missing from the
+  2016 `TextData*.shn`; the 0x1090 sub-status bytes on a failed cancel are stale stack bytes *(inferred)* (§8.6).
 - **Schema** (§9): types, defaults and keys are those of the 2019 restore. Where a 2016 column differs, only the binds
   show it (§9.2: systemic unsigned → signed, 7 real mismatches). The private-server tables of §9.4 stand in for 2016
   tables that are not in any backup.
@@ -1535,11 +1579,12 @@ section (sweep: one caller added, `GetCharOptionImprove_KeyMapData` FUN_00422660
 | Server handlers around each procedure (packets, error-code mapping, client texts) | D01 §2–§5, D02 §2–§15, D03 §2–§15, D04 §1–§11, D05 §1–§6 (all done) | D06 documents the procedure side only and links each handler there |
 | Backup tables and procedures no 2016 binary reaches (§9.1 list: one-off copies, web-shop agreement procs, `p_Event_Friend_Reward`, old `tPet` / `tMiniHouse`, `LoggedInChars`) | none needed | §9.1 builds the table set from the dependency closure of the called procedures; unreached objects carry no 2016 behaviour (used here only as family evidence) |
 | `OperatorTool` DB (tOperator, tMenuAuth, tOpLog) | none needed | used by no 2016 server binary (ODBC_INFO lists no DSN for it, §9.1); it belongs to an external GM tool that is not part of the reconstruction |
-| Zone `Wedding_CheckDivorceTimers` FUN_005a1c90 Sub 5–8 branches | this document §8.6 | Z07 (done) §5.1 lists Sub 0–4 only; the missing branches were a small gap, documented here because they decide the meaning of the DB's "+4" values |
+| Zone `Checker::DivorceLimit` FUN_005a1c90: Sub 0 lock reset, Sub 1 / 2 refund-cancel lock, Sub 5–8 branches | this document §8.6 | Z07 (done) §5.1 lists Sub 1–4 only and leaves Sub 0 "(not traced)"; the missing parts were a small gap, documented here because they decide the meaning of the DB's "+4" values |
 | Zone 0x347D sender FUN_00574a30 (D06-B2) and zone 0x74F4 (D06-B3) | Z07 §6.10 (0x347D), Z08 §8.2 0x74F4 "empty body" (both done) | D06 records only what reaches the DB; the zone handlers themselves are documented there and only the DB consequence is new |
 | `ItemDropLog` (D05 §9) | Z01 §2.3 (done) | SHN table read by the zone, not a database table |
 | Client meaning of `usp_CharacterLoading`'s `nFailType` / `nErrorNo` (§6.1) | W04 §17.3 (done: the 0x0840 packet and its forwarding) | client diagnostics stored verbatim; no server or DB logic reads them, so a rebuild needs only the column types (§6.1); left in §11 |
-| Client texts of the wedding message ids 0x1385 / 0x1387 (§8.6) | this document §8.6 | looked up in `client-error-codes.json` (C01's table): no entry; nothing more to read in the 2016 files |
+| Client handling of the wedding codes 0x1384–0x1389 in 0x205D (`WeddingTask::Recv_NC_ACT_WEDDING_DIVORCE_REQ_ACK` FUN_006dd040) | this document §8.6 | the client handles them in its own handler, not through the error table; texts resolved from `TextData*.shn` (small gap, documented here) |
+| 0x1090 sub-status bytes (D02 §16 open point) | this document §8.6 | settled from the asm of FUN_00419730 and the w00 body (small gap) |
 
 No follow-up item was created: every remaining thing is either documented here, in a finished item's section cited
 above, or outside the 2016 server binaries.
