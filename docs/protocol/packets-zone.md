@@ -3966,6 +3966,10 @@ Sent from `ShineObjectClass::ShinePlayer::smo_ply_ReinforceStopHere` (`FUN_00456
 
 ### `0x204e` NC_ACT_WEDDING_PROPOSE_WORD_REQ
 
+**Verified layout** (basis: zone UseItemPropose::uib_DirectUse FUN_00596770 (len 2); client WeddingTask FUN_006dd280 case 0x4E → FUN_006dcbe0 (opens WeddingProposeInputWin))
+
+Empty payload.
+
 Sent from `FUN_00596770` (`FUN_00596770`) · payload 0 bytes
 
 ### `0x2050` NC_ACT_WEDDING_PROPOSEACK_REQ
@@ -10225,6 +10229,12 @@ Empty payload.
 | 1 | u16 | emoticon.emoticonframe |  |
 
 PDB struct name not checked; fields = STOPEMOTICON_DESCRIPT as echoed in 0x2023
+
+### `0x205e` NC_ACT_WEDDING_DIVORCE_REFUSE_CMD (C→S)
+
+**Verified layout** (basis: client WeddingTask::DirectMessage FUN_006dcba0 (SendNetMsgZoneMgr(8, 0x5e, null, 0), answer to the 0x205D 0x1384 dialog); zone FUN_005a0440 reads no payload)
+
+Empty payload.
 
 ### `0x2408` NC_BAT_UNTARGET_REQ (C→S)
 

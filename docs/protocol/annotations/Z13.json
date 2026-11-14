@@ -2,55 +2,1338 @@
   "_about": "Z13: zone mini-house object internals (furniture lists, placement, releasers, portals, effects, endurance, animations, emotions; wedding ring packets and married-state DB requests; pet player-side packets). Offsets are payload offsets. Layouts read in the 2016 zone code (house methods and InventoryLocking releasers) and checked against the 2016 client handlers; names from the 2017 PDB structs where they agree.",
   "packets": {
     "zone": {
-      "0x8c08": {"dir": "S→C", "name": "NC_MINIHOUSE_FUNICHERINVEN_CMD", "basis": "zone FUN_00546930 + FUN_00643d40; client FUN_0049b510", "fields": [[0, "u8", "numofitem", ""], [1, "u8", "box", "inventory type 3 / 13 / 14 / 16"], [2, "u8", "flag", "never written (Z13-B11)"], [3, "PROTO_ITEMPACKET_INFORM[n]", "ItemArray", "{u8 datasize, u16 location, SHINE_ITEM_STRUCT}; owner only"]]},
-      "0x8c09": {"dir": "S→C", "name": "NC_MINIHOUSE_FUNICHER_CMD", "basis": "zone FUN_00546930; client FUN_004af160", "fields": [[0, "u8", "furniturecount", "placed items, wraps above 255 (Z13-B10)"], [1, "u8", "next", "0xFF: last packet, client then sends 0x8C1D"], [2, "{u16 furniturehandle, u16 furnitureid, f32 x, f32 y, f32 z, f32 angle, u8 nEndureGrade}[n]", "array", "21 bytes each"]]},
-      "0x8c1f": {"dir": "C→S", "name": "NC_MINIHOUSE_REARRANGE_REQ", "basis": "zone FUN_00572d50 → FUN_00546150", "fields": [[0, "u8", "furniturecount", "< 393; not checked against the length (Z13-B7)"], [1, "{u16 furniturehandle, f32 x, f32 y, f32 z, f32 angle}[n]", "rearrange", "18 bytes each"]]},
-      "0x8c20": {"dir": "S→C", "name": "NC_MINIHOUSE_REARRANGE_ACK", "basis": "zone so_SendErrorCode 35/0x20; client FUN_0049b3d0", "fields": [[0, "u16", "err", "0x11C1 ok (from the releaser), 0x11CE DB refused (any furniture change), 0x11C6 / 0x11C7 / 0x11CB / 0x11CD / 0x11E0 / 0x11E1 / 0x11E2"]]},
-      "0x8c21": {"dir": "S→C", "name": "NC_MINIHOUSE_REARRANGE_CMD", "basis": "zone FUN_0048a560; client FUN_0049b400", "fields": [[0, "u8", "furniturecount", "always 1; the client reads only the first entry"], [1, "u16", "furniturehandle", ""], [3, "f32", "x", ""], [7, "f32", "y", ""], [11, "f32", "z", ""], [15, "f32", "angle", ""]]},
-      "0x8c22": {"dir": "C→S", "name": "NC_MINIHOUSE_CREATE_FURNITURE_REQ", "basis": "zone FUN_00572bf0 → FUN_00544f00", "fields": [[0, "u8", "furniturecount", "< 393; not checked against the length (Z13-B7)"], [1, "{u16 furniturehandle, f32 x, f32 y, f32 z, f32 angle}[n]", "rearrange", "18 bytes each"]]},
-      "0x8c23": {"dir": "S→C", "name": "NC_MINIHOUSE_CREATE_FURNITURE_ACK", "basis": "zone so_SendErrorCode 35/0x23; client FUN_004a3a80", "fields": [[0, "u16", "err", "0x11C1 ok (from the releaser), 0x1184 / 0x1187 / 0x1188 / 0x1193, 0x11C6 / 0x11C7 / 0x11CA / 0x11CB / 0x11CD / 0x11E0 / 0x11E1 / 0x11E2, 0x1DC0 / 0x1DC1"]]},
-      "0x8c24": {"dir": "S→C", "name": "NC_MINIHOUSE_CREATE_FURNITURE_CMD", "basis": "zone FUN_0048a560 (and the portal of FUN_00573930); client FUN_0049b440", "fields": [[0, "u8", "furniturecount", "1"], [1, "u16", "furniturehandle", "60000 = the portal"], [3, "u16", "furnitureid", "item id"], [5, "f32", "x", ""], [9, "f32", "y", ""], [13, "f32", "z", ""], [17, "f32", "angle", ""], [21, "u8", "nEndureGrade", ""]]},
-      "0x8c25": {"dir": "C→S", "name": "NC_MINIHOUSE_DELETE_FURNITURE_REQ", "basis": "zone FUN_00572eb0 → FUN_00545a40", "fields": [[0, "u8", "furniturecount", "< 393; not checked against the length (Z13-B7)"], [1, "u16[n]", "furniturehandle", ""]]},
-      "0x8c26": {"dir": "S→C", "name": "NC_MINIHOUSE_DELETE_FURNITURE_ACK", "basis": "zone so_SendErrorCode 35/0x26; client FUN_0049b4b0", "fields": [[0, "u16", "err", "0x11C1 ok (from the releaser), 0x11C6 / 0x11C7 / 0x11CB / 0x11E0 / 0x11E1, 0x1DC2 dice removal reserved"]]},
-      "0x8c27": {"dir": "S→C", "name": "NC_MINIHOUSE_DELETE_FURNITURE_CMD", "basis": "zone FUN_0048a560 / FUN_0048aa60; client FUN_004a3ac0", "fields": [[0, "u8", "furniturecount", "1; the client reads only the first handle"], [1, "u16", "furniturehandle", "60000 = the portal"]]},
-      "0x8c5d": {"dir": "Z→DB", "name": "NC_MINIHOUSE_DB_PORTAL_ADD_REQ", "basis": "zone FUN_005354a0", "fields": [[0, "u16", "header.handle", "player handle"], [2, "u32", "header.charNo", ""], [6, "u16", "nPortalItemID", "item id"], [8, "u8", "bType", "KeepTime_Hour != 0"], [9, "i32", "dEndDate", "mktime(now + KeepTime_Hour h)"], [13, "u16", "lockindex", ""], [15, "SHINE_ITEM_REGISTNUMBER", "Item.relocitemregnum", ""], [23, "u16", "Item.newlocation", "never written (Z13-B16)"]]},
-      "0x8c3f": {"dir": "S→C", "name": "NC_MINIHOUSE_CHAR_ACTION_CMD", "basis": "zone FUN_00574750 + mhoadb_GetAniData FUN_004a14c0; client FUN_0049b760", "fields": [[0, "u16", "PreHandle", "the requested MiniHouseObjAni Handle"], [2, "u16", "NextHandle", "follow-up animation: NextAniHandle, or a random member of the group NextAniHandle ≥ 10000; 0xFFFF none"], [4, "u16", "nFurnitureHnd", ""], [6, "u16", "ActorHnd", "the requesting player"], [8, "u8", "ActorIdx", "1…ActorMaxNum random, 0 none; not read by the 2016 client"], [9, "u8", "ActeeIdx", "1…ActeeMaxNum random, 0 none; not read by the 2016 client"]]},
-      "0x8c42": {"dir": "S→C", "name": "NC_MINIHOUSE_FURNITURE_EFFECT_CMD", "basis": "zone FUN_005751f0 + FUN_00542520; client FUN_004b5070", "fields": [[0, "u16", "nEffectHandle", "MiniHouseFurnitureObjEffect row index (client looks the row up by index)"], [2, "u16", "nApplyPlayerCnt", "> 0 (not sent otherwise)"], [4, "u16[n]", "nApplyPlayerHandle", "players the effect was applied to (owner last)"]]},
-      "0x8c58": {"dir": "S→C", "name": "NC_MINIHOUSE_PORTAL_EFFECT_CMD", "basis": "zone FUN_00574450 + FUN_00542c70; client ignores it", "fields": [[0, "u16", "nEffectHandle", "Handle of the portal's ObjEffect row (1000+)"], [2, "u16", "nApplyPlayerCnt", "> 0"], [4, "u16[n]", "nApplyPlayerHandle", "recalled players"]]},
-      "0x8c61": {"dir": "S→C", "name": "NC_MINIHOUSE_FURNITURE_ENDURE_CMD", "basis": "zone FUN_00567400 (so_Routine) / FUN_00570fe0; client FUN_0049b960", "fields": [[0, "u8", "nEndureFurnitureCnt", "placed furniture whose grade changed (repair: 1)"], [1, "ENDURE_FURNITURE_INFO[n]", "EndureFurniture", "{u16 nFurnitureHnd, u8 nEndureGrade (MHE_STEP 0–4), u8 isRePair (1 after a repair kit; not read by the client)}"]]},
-      "0x8c4c": {"dir": "S→C", "name": "NC_MINIHOUSE_PORTAL_ADD_CMD", "basis": "zone FUN_0056fa10; client FUN_0049b830", "fields": [[0, "u16", "nPortalItemID", ""], [2, "i32", "dEndTime", "time_t, 0 = permanent; length 0xE leaves 6 stale bytes after it"]]},
-      "0x8c4f": {"dir": "S→C", "name": "NC_MINIHOUSE_PORTAL_DEL_CMD", "basis": "zone FUN_00567400 (so_Routine, owner only); client FUN_0049b870", "fields": [[0, "u16", "nPortalItemID", "never sent in practice (Z13-B18)"]]},
-      "0x8c64": {"dir": "S→C", "name": "NC_MINIHOUSE_FURNITURE_EMOTION_CMD", "basis": "zone FUN_00575850 (1 entry, broadcast) / FUN_005432d0 (all seated members, to the entering player); client FUN_004a5170", "fields": [[0, "u16", "nEmotionCnt", ""], [2, "FURNITURE_EMOTION_INFO[n]", "Emotion", "{u16 nPlayerHandle, u16 nFurnitureHnd, u8 nPosition, u8 nEmotionNo}"]]},
-      "0x8c67": {"dir": "S→C", "name": "NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_CMD", "basis": "zone FUN_00575ae0 (1 entry) / FUN_005431b0 (everybody on one furniture); client FUN_004a5230", "fields": [[0, "u16", "nCancelEmotionCnt", ""], [2, "u16[n]", "nCancelEmotion", "player handles"]]},
-      "0x348b": {"dir": "Z→DB", "name": "NC_ITEMDB_FURNITURE_ENDURE_REQ", "basis": "zone UseItemFurnitureEndureKit::uivpb_ProtocolMake FUN_00596960 (+ CommonData by uib_AfterCast FUN_0059a530)", "fields": [[0, "u16", "nFurnitureHnd", ""], [2, "u64", "nItemKey", "the furniture item"], [10, "ShineDateTime", "dNewEndureTime", "old end extended by the kit's EffectValue hours, capped at now + Endure[0]"], [14, "PROTO_NC_ITEMDB_USE_VARIATION_ITEM_REQ", "CommonData", "the consumed kit (Z04 §6)"]]},
-      "0x10aa": {"dir": "Z→Z (ring)", "name": "NC_CHAR_WEDDING_PARTNER_SUMMON_RNG", "basis": "zone ZoneRingPacketSummonPartner::zrpb_Request FUN_005a83b0 (write, 0x25 bytes with opcode), zls_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG FUN_005a0c90 (read/forward), zrpb_Success FUN_005a8680; PDB 2016 PROTO_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG (0x23)", "fields": [[0, "u8", "start.zoneNo", "origin zone"], [1, "u16", "start.handle", "caster handle"], [3, "u32", "start.regnum", "caster charNo"], [7, "u32", "RegisterNumber", "partner charNo (Partner.RegisterNumber)"], [11, "Name3", "map", "caster's map"], [23, "SHINE_XY_TYPE", "coord", "caster's position"], [31, "u8", "from", "min level (1 or FieldLv.LvFrom)"], [32, "u8", "to", "max level (levellimit or FieldLv.LvTo)"], [33, "u16", "err", "0xFCF; set to 0xFCE by a zone that refuses (level / map)"]]},
-      "0x10ab": {"dir": "Z→Z (ring)", "name": "NC_CHAR_WEDDING_REFRESH_INFO_RNG", "basis": "zone ZoneRingPacketRefreshWeddingInfo::zrpb_Request FUN_005a91c0 (write, 9 bytes with opcode), zls_NC_CHAR_WEDDING_REFRESH_INFO_RNG FUN_005a0e00; PDB 2016 PROTO_NC_CHAR_WEDDING_REFRESH_INFO_RNG (7)", "fields": [[0, "u8", "Start.zoneNo", "origin zone"], [1, "u16", "Start.handle", "0xFFFF"], [3, "u32", "Start.regnum", "charNo whose wedding data is reloaded where online"]]},
-      "0x1082": {"dir": "Z→CharDB", "name": "NC_CHAR_WEDDINGDATA_CMD", "basis": "zone so_ply_WeddingInfoUpdate FUN_0059f390 (copy of PROTO_NC_CHAR_WEDDINGDATA_ACK, 0x2d bytes with opcode); Character FUN_00418c80 (D02)", "fields": [[0, "u16", "header.clienthandle", "from the stored copy"], [2, "u32", "header.charregistnumber", "from the stored copy"], [6, "u16", "Error", ""], [8, "u8", "Status", "Main | Sub << 4 (Sub after the Checker rewrite)"], [9, "ShineDateTime", "When", ""], [13, "ShineDateTime", "SubWhen", ""], [17, "Name5", "Partner.Name", ""], [37, "u32", "Partner.RegisterNumber", ""], [41, "u8", "WeddingCount", ""], [42, "u8", "RefusalCount", ""]]},
-      "0x1085": {"dir": "Z→CharDB", "name": "NC_CHAR_WEDDING_PROPOSE_CANCEL_REQ", "basis": "zone Checker::ApplicationLimit FUN_0059f1b0 (0xc bytes with opcode); Character FUN_00418fc0 (D02)", "fields": [[0, "u16", "header.clienthandle", "player handle"], [2, "u32", "header.charregistnumber", "player charNo"], [6, "u32", "Partner", "Partner.RegisterNumber"]]},
-      "0x1087": {"dir": "Z→CharDB", "name": "NC_CHAR_WEDDING_ESCAPE_DIVORCE_REQ", "basis": "zone Checker::DelayLimit FUN_0059f2d0 (0xc bytes with opcode); Character FUN_00419140 (D02)", "fields": [[0, "u16", "header.clienthandle", "player handle"], [2, "u32", "header.charregistnumber", "player charNo"], [6, "u32", "Partner", "Partner.RegisterNumber"]]},
-      "0xd405": {"dir": "S→C", "name": "NC_PET_ASK_NEW_NAME_REQ", "basis": "zone FUN_004d0c90 (from sp_PetSystem_PlayerRoutine FUN_004d2d20); client FUN_004bb170", "fields": [[0, "u16", "nPetHandle", "pet object handle (sp_PetInfo.nHandle)"], [2, "u32", "nPetID", "pet id; the client looks it up in its pet table (missing → answers 0xD406 0x34C1)"], [6, "u8", "nFirstSummon", "1 = state 1ST_SUMMONED (new pet: 'You're my new master!…'), 0 = resummoned unnamed pet ('What name should I answer to?')"]]},
-      "0xd411": {"dir": "S→C", "name": "NC_PET_USE_ITEM_FAIL_ACK", "basis": "zone FUN_004d15a0 (callers 4d2640 4d2990 4d2a40 59b2b0) and ib_OK 0048d0d0 via so_SendErrorCode; client FUN_0049d350", "fields": [[0, "u16", "nError", "0x3442/43/44/45/5b (CanUseItem), 0x3458 already out, 0x345e summon failed, 0x3481/0x3482 unsummon failed, 0x345c item break refused; client shows the text unless 0x3440/0x3480; 0x345b has no text"]]},
-      "0x4033": {"dir": "Z→WM", "name": "NC_CHARSAVE_2WLDMAN_PET_LINK_RESUMMON_CMD", "basis": "zone sp_PetLinkResummonInfo_Save2World FUN_004d1760 (ws_save2worldmanager); PDB2016 struct of the same name", "fields": [[0, "u32", "nCharNo", ""], [4, "u8", "bDoResummon", "1 when the pet was out (state 5/6) at so_LinkTo"], [5, "u64", "xResummonCode", "charNo + 0x1BEC48797BAFC8B0"], [13, "u16", "nSummonSlot", "inventory slot of the pet item"], [15, "u32", "nId", "pet id"], [19, "u32", "nRegNum", "pet DB key"]]},
-      "0xd40d": {"dir": "Z→CharDB", "name": "NC_PET_CREATE_DB_REQ", "basis": "zone ShinePet::spt_CreatePet FUN_0055d290 (length 0x1a incl. opcode)", "fields": [[0, "u16", "nMasterHandle", "player handle"], [2, "u32", "nMasterRegNo", "master charNo (spt_nMasterRegNum)"], [6, "Name4", "sPetName", "always empty"], [22, "u8", "nPetMind", "random in the PupServer row's [MinMind, MaxMind]"], [23, "u8", "nPetStress", "random in [MinStress, MaxStress]"]]},
-      "0xcc0b": {"dir": "Z→WM", "name": "NC_MOVER_LINKDATA_WORLD_CMD", "basis": "zone FUN_0045e710 (sp_MoverSystem_ZoneLink_Save2World); 2016 PDB MOVER_LINKDATA (0x3d bytes)", "fields": [[0, "u32", "nCharNo", "charNo of the sender (Z→WM: so_GetCharNo; WM→Z: the target player)"], [4, "i32", "nItemSlot", "inventory slot of the mover item; −1 for a passenger"], [8, "u32", "nMoverID", "MoverMain.MoverID"], [12, "u32", "nMoverHP", "mover HP at the link"], [16, "u32", "nMasterCharNo", "owner's charNo"], [20, "u8", "nGrade", "mover upgrade grade"], [21, "u32[10]", "nPassenger", "charNo per seat, −1 empty; only the linking player's own seat is filled"]]},
-      "0xcc0c": {"dir": "WM→Z", "name": "NC_MOVER_LINKDATA_ZONE_CMD", "basis": "zone FUN_005a5ac0 → FUN_0045ddf0 (copy of MOVER_LINKDATA)", "fields": [[0, "u32", "nCharNo", "charNo of the sender (Z→WM: so_GetCharNo; WM→Z: the target player)"], [4, "i32", "nItemSlot", "inventory slot of the mover item; −1 for a passenger"], [8, "u32", "nMoverID", "MoverMain.MoverID"], [12, "u32", "nMoverHP", "mover HP at the link"], [16, "u32", "nMasterCharNo", "owner's charNo"], [20, "u8", "nGrade", "mover upgrade grade"], [21, "u32[10]", "nPassenger", "charNo per seat, −1 empty; only the linking player's own seat is filled"]]},
-      "0x2041": {"dir": "S→C", "name": "NC_ACT_RIDE_FAIL_CMD", "basis": "zone FUN_0045d3b0 (SendErrorCode(8, 0x41, err)); client FUN_00499ee0", "fields": [[0, "u16", "err", "0x10C2 cooldown, 0x10C3 wrong mode / abstate 0x4B, 0x10C4 casting, 0x10C8 map forbids riding, 0x10CA ride skill missing; 0 = no message"]]},
-      "0x0554": {"dir": "Z→GameLog", "name": "NC_LOG_GAME_ITEM_PUT_ON_BELONGED", "basis": "zone FUN_0045e810 (sp_HorseItemSave)", "fields": [[0, "u32", "chrregnum", ""], [4, "u64", "itemkey", "item register number"], [12, "u16", "iteminvenfrom", "0x2400 | slot (inventory 9)"], [14, "u16", "iteminvento", "same value"]]},
-      "0xcc02": {"dir": "S→C", "name": "NC_MOVER_RIDE_ON_CMD", "basis": "zone FUN_0055f380 (size 6); client FUN_004b3aa0", "fields": [[0, "u16", "nMoverHandle", ""], [2, "u8", "nSlot", "seat; 0 = driver (client opens the feed window)"], [3, "u8", "nGrade", "mover upgrade grade"]]},
-      "0xcc04": {"dir": "S→C", "name": "NC_MOVER_SOMEONE_RIDE_ON_CMD", "basis": "zone FUN_0055f380 (size 8, mover's range); client FUN_004a5f70", "fields": [[0, "u16", "nHandle", "rider"], [2, "u16", "nMoverHandle", ""], [4, "u8", "nSlot", ""], [5, "u8", "nGrade", ""]]},
-      "0xcc06": {"dir": "S→C", "name": "NC_MOVER_RIDE_OFF_CMD", "basis": "zone FUN_0055f620 (so_SendProtocol 51/6, no payload); client FUN_004b3c00", "fields": []},
-      "0xcc07": {"dir": "S→C", "name": "NC_MOVER_RIDE_OFF_FAIL_CMD", "basis": "zone so_SendErrorCode 51/7 from FUN_0055f620 / FUN_0045d910 / FUN_0045f020 / FUN_00563420; client FUN_0049d250", "fields": [[0, "u16", "err", "0x3080 success (ignored by the client), 0x3081 / 0x3082 player side, 0x3083 no mover data, 0x3084 seat out of range, 0x3085 not your seat, 0x3086 seat empty"]]},
-      "0xcc08": {"dir": "S→C", "name": "NC_MOVER_SOMEONE_RIDE_OFF_CMD", "basis": "zone FUN_0055f620 (size 4, rider's range); client FUN_004a6090", "fields": [[0, "u16", "nHandle", "rider"]]},
-      "0xcc0a": {"dir": "S→C", "name": "NC_MOVER_HUNGRY_CMD", "basis": "zone smv_SendHungryInfo FUN_0055f0a0 (size 4); client FUN_004b3da0", "fields": [[0, "u16", "nHungry", "item hunger gauge; 0 → client forces walking"]]},
-      "0xcc0d": {"dir": "S→C", "name": "NC_MOVER_MOVESPEED_CMD", "basis": "zone FUN_00456910 / FUN_00456850 (size 8, driver only); client FUN_0049d2b0", "fields": [[0, "u16", "nMoverHandle", ""], [2, "u16", "nWalk", ""], [4, "u16", "nRun", ""]]},
-      "0x1c1a": {"dir": "S→C", "name": "NC_BRIEFINFO_REGENMOVER_CMD", "basis": "zone BriefInformationMover FUN_0055e830 / FUN_0043c280 / FUN_0055ea10 (0x8b bytes); client FUN_00646e00", "fields": [[0, "u16", "nHandle", ""], [2, "u32", "nID", "MoverMain.MoverID; client ignores 0xFFFF"], [6, "u32", "nHP", "0 in 2016"], [10, "SHINE_COORD_TYPE", "nCoord", "{u32 x, u32 y, u8 dir}"], [19, "ABNORMAL_STATE_BIT", "AbstateBit", "99 bytes; not read by the client handler"], [118, "u8", "nGrade", ""], [119, "u16[10]", "nSlotHandle", "rider per seat, 0xFFFF empty; not read by the client handler"]]},
-      "0x1c1b": {"dir": "S→C", "name": "NC_BRIEFINFO_MOVER_CMD", "basis": "zone bixmv_Init / bixmv_Exchange / bixmv_Send FUN_0043c810 / FUN_00440690 / FUN_0043e0d0; client FUN_00646ef0", "fields": [[0, "u8", "nMoverNum", "≤ 28 per packet"], [1, "PROTO_NC_BRIEFINFO_REGENMOVER_CMD[n]", "Movers", "0x8b bytes each (layout 0x1C1A)"]]},
-      "0x1122": {"dir": "WM→Z", "name": "NC_CHAR_USEITEM_MINIMON_INFO_ZONE_CMD", "basis": "zone FUN_005a5d80 → so_ply_SetUseItemMinimon FUN_005617c0", "fields": [[0, "u16", "nSessionHandle", "zone object handle"], [2, "u32", "nCharNo", "must match the player"], [6, "USEITEM_MINIMON_INFO", "UseItemMinimonInfo", "USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot; slots failing MinimonAutoUseItem or with lot 0 are dropped"]]},
-      "0x1123": {"dir": "S→C", "name": "NC_CHAR_USEITEM_MINIMON_INFO_CLIENT_CMD", "basis": "zone sp_SendUseItemMinimonInfo_Client FUN_00561990 (at LOGINCOMPLETE); client FUN_0049dae0 → FUN_00429e20", "fields": [[0, "USEITEM_MINIMON_INFO", "UseItemMinimonInfo", "USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot; the client sets its two auto-buff buttons and slot ids"]]},
-      "0x1124": {"dir": "C→S", "name": "NC_CHAR_USEITEM_MINIMON_NORMAL_ITEM_ON_REQ", "basis": "zone FUN_005642e0 → sp_UseItemMinimon_NormalOn FUN_00561d90; client FUN_004a6f70", "fields": [[0, "u16[12]", "NormalItemList", "item ids, 0xFFFF empty; must be MAUI_BUFFITEM (2) items, no duplicates; no length check"]]},
-      "0x112d": {"dir": "S→C", "name": "NC_CHAR_USEITEM_MINIMON_NOTICE_CMD", "basis": "zone sp_UseItemMinimon_NormalSlotClear FUN_00563f60 / ChargedSlotClear FUN_00564150; client FUN_0049dbb0", "fields": [[0, "u16", "nErr", "always 0x3648 (item ran out); the client acts only on 0x3648"], [2, "u16", "nItemID", "item removed from the list; client: \"%s supply has reached zero.\""]]},
-      "0x4035": {"dir": "Z→DB", "name": "NC_CHARSAVE_USEITEM_MINIMON_INFO_DB_CMD", "basis": "zone sp_SaveUseItemMinimonInfo_DB FUN_00563d80 (from ws_save2DB); Character FUN_0042de30 (D02 §6)", "fields": [[0, "u32", "nCharNo", ""], [4, "USEITEM_MINIMON_INFO", "UseItemMinimonInfo", "USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot"], [54, "u8[12]", "DelSlotList_Normal", "1 = slot empty (every empty slot, Z13-B62)"], [66, "u8[12]", "DelSlotList_Charged", "same for the charged list"]]},
-      "0x4036": {"dir": "Z→WM", "name": "NC_CHARSAVE_USEITEM_MINIMON_INFO_WORLD_CMD", "basis": "zone sp_SaveUseItemMinimonInfo_World FUN_00563e70 (from ws_save2worldmanager); WM FUN_0042d020", "fields": [[0, "u16", "nWorldHandle", "so_GetWMSHandle (vt 0x340)"], [2, "u32", "nCharNo", ""], [6, "USEITEM_MINIMON_INFO", "UseItemMinimonInfo", "USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot"]]}
+      "0x8c08": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_FUNICHERINVEN_CMD",
+        "basis": "zone FUN_00546930 + FUN_00643d40; client FUN_0049b510",
+        "fields": [
+          [
+            0,
+            "u8",
+            "numofitem",
+            ""
+          ],
+          [
+            1,
+            "u8",
+            "box",
+            "inventory type 3 / 13 / 14 / 16"
+          ],
+          [
+            2,
+            "u8",
+            "flag",
+            "never written (Z13-B11)"
+          ],
+          [
+            3,
+            "PROTO_ITEMPACKET_INFORM[n]",
+            "ItemArray",
+            "{u8 datasize, u16 location, SHINE_ITEM_STRUCT}; owner only"
+          ]
+        ]
+      },
+      "0x8c09": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_FUNICHER_CMD",
+        "basis": "zone FUN_00546930; client FUN_004af160",
+        "fields": [
+          [
+            0,
+            "u8",
+            "furniturecount",
+            "placed items, wraps above 255 (Z13-B10)"
+          ],
+          [
+            1,
+            "u8",
+            "next",
+            "0xFF: last packet, client then sends 0x8C1D"
+          ],
+          [
+            2,
+            "{u16 furniturehandle, u16 furnitureid, f32 x, f32 y, f32 z, f32 angle, u8 nEndureGrade}[n]",
+            "array",
+            "21 bytes each"
+          ]
+        ]
+      },
+      "0x8c1f": {
+        "dir": "C→S",
+        "name": "NC_MINIHOUSE_REARRANGE_REQ",
+        "basis": "zone FUN_00572d50 → FUN_00546150",
+        "fields": [
+          [
+            0,
+            "u8",
+            "furniturecount",
+            "< 393; not checked against the length (Z13-B7)"
+          ],
+          [
+            1,
+            "{u16 furniturehandle, f32 x, f32 y, f32 z, f32 angle}[n]",
+            "rearrange",
+            "18 bytes each"
+          ]
+        ]
+      },
+      "0x8c20": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_REARRANGE_ACK",
+        "basis": "zone so_SendErrorCode 35/0x20; client FUN_0049b3d0",
+        "fields": [
+          [
+            0,
+            "u16",
+            "err",
+            "0x11C1 ok (from the releaser), 0x11CE DB refused (any furniture change), 0x11C6 / 0x11C7 / 0x11CB / 0x11CD / 0x11E0 / 0x11E1 / 0x11E2"
+          ]
+        ]
+      },
+      "0x8c21": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_REARRANGE_CMD",
+        "basis": "zone FUN_0048a560; client FUN_0049b400",
+        "fields": [
+          [
+            0,
+            "u8",
+            "furniturecount",
+            "always 1; the client reads only the first entry"
+          ],
+          [
+            1,
+            "u16",
+            "furniturehandle",
+            ""
+          ],
+          [
+            3,
+            "f32",
+            "x",
+            ""
+          ],
+          [
+            7,
+            "f32",
+            "y",
+            ""
+          ],
+          [
+            11,
+            "f32",
+            "z",
+            ""
+          ],
+          [
+            15,
+            "f32",
+            "angle",
+            ""
+          ]
+        ]
+      },
+      "0x8c22": {
+        "dir": "C→S",
+        "name": "NC_MINIHOUSE_CREATE_FURNITURE_REQ",
+        "basis": "zone FUN_00572bf0 → FUN_00544f00",
+        "fields": [
+          [
+            0,
+            "u8",
+            "furniturecount",
+            "< 393; not checked against the length (Z13-B7)"
+          ],
+          [
+            1,
+            "{u16 furniturehandle, f32 x, f32 y, f32 z, f32 angle}[n]",
+            "rearrange",
+            "18 bytes each"
+          ]
+        ]
+      },
+      "0x8c23": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_CREATE_FURNITURE_ACK",
+        "basis": "zone so_SendErrorCode 35/0x23; client FUN_004a3a80",
+        "fields": [
+          [
+            0,
+            "u16",
+            "err",
+            "0x11C1 ok (from the releaser), 0x1184 / 0x1187 / 0x1188 / 0x1193, 0x11C6 / 0x11C7 / 0x11CA / 0x11CB / 0x11CD / 0x11E0 / 0x11E1 / 0x11E2, 0x1DC0 / 0x1DC1"
+          ]
+        ]
+      },
+      "0x8c24": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_CREATE_FURNITURE_CMD",
+        "basis": "zone FUN_0048a560 (and the portal of FUN_00573930); client FUN_0049b440",
+        "fields": [
+          [
+            0,
+            "u8",
+            "furniturecount",
+            "1"
+          ],
+          [
+            1,
+            "u16",
+            "furniturehandle",
+            "60000 = the portal"
+          ],
+          [
+            3,
+            "u16",
+            "furnitureid",
+            "item id"
+          ],
+          [
+            5,
+            "f32",
+            "x",
+            ""
+          ],
+          [
+            9,
+            "f32",
+            "y",
+            ""
+          ],
+          [
+            13,
+            "f32",
+            "z",
+            ""
+          ],
+          [
+            17,
+            "f32",
+            "angle",
+            ""
+          ],
+          [
+            21,
+            "u8",
+            "nEndureGrade",
+            ""
+          ]
+        ]
+      },
+      "0x8c25": {
+        "dir": "C→S",
+        "name": "NC_MINIHOUSE_DELETE_FURNITURE_REQ",
+        "basis": "zone FUN_00572eb0 → FUN_00545a40",
+        "fields": [
+          [
+            0,
+            "u8",
+            "furniturecount",
+            "< 393; not checked against the length (Z13-B7)"
+          ],
+          [
+            1,
+            "u16[n]",
+            "furniturehandle",
+            ""
+          ]
+        ]
+      },
+      "0x8c26": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_DELETE_FURNITURE_ACK",
+        "basis": "zone so_SendErrorCode 35/0x26; client FUN_0049b4b0",
+        "fields": [
+          [
+            0,
+            "u16",
+            "err",
+            "0x11C1 ok (from the releaser), 0x11C6 / 0x11C7 / 0x11CB / 0x11E0 / 0x11E1, 0x1DC2 dice removal reserved"
+          ]
+        ]
+      },
+      "0x8c27": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_DELETE_FURNITURE_CMD",
+        "basis": "zone FUN_0048a560 / FUN_0048aa60; client FUN_004a3ac0",
+        "fields": [
+          [
+            0,
+            "u8",
+            "furniturecount",
+            "1; the client reads only the first handle"
+          ],
+          [
+            1,
+            "u16",
+            "furniturehandle",
+            "60000 = the portal"
+          ]
+        ]
+      },
+      "0x8c5d": {
+        "dir": "Z→DB",
+        "name": "NC_MINIHOUSE_DB_PORTAL_ADD_REQ",
+        "basis": "zone FUN_005354a0",
+        "fields": [
+          [
+            0,
+            "u16",
+            "header.handle",
+            "player handle"
+          ],
+          [
+            2,
+            "u32",
+            "header.charNo",
+            ""
+          ],
+          [
+            6,
+            "u16",
+            "nPortalItemID",
+            "item id"
+          ],
+          [
+            8,
+            "u8",
+            "bType",
+            "KeepTime_Hour != 0"
+          ],
+          [
+            9,
+            "i32",
+            "dEndDate",
+            "mktime(now + KeepTime_Hour h)"
+          ],
+          [
+            13,
+            "u16",
+            "lockindex",
+            ""
+          ],
+          [
+            15,
+            "SHINE_ITEM_REGISTNUMBER",
+            "Item.relocitemregnum",
+            ""
+          ],
+          [
+            23,
+            "u16",
+            "Item.newlocation",
+            "never written (Z13-B16)"
+          ]
+        ]
+      },
+      "0x8c3f": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_CHAR_ACTION_CMD",
+        "basis": "zone FUN_00574750 + mhoadb_GetAniData FUN_004a14c0; client FUN_0049b760",
+        "fields": [
+          [
+            0,
+            "u16",
+            "PreHandle",
+            "the requested MiniHouseObjAni Handle"
+          ],
+          [
+            2,
+            "u16",
+            "NextHandle",
+            "follow-up animation: NextAniHandle, or a random member of the group NextAniHandle ≥ 10000; 0xFFFF none"
+          ],
+          [
+            4,
+            "u16",
+            "nFurnitureHnd",
+            ""
+          ],
+          [
+            6,
+            "u16",
+            "ActorHnd",
+            "the requesting player"
+          ],
+          [
+            8,
+            "u8",
+            "ActorIdx",
+            "1…ActorMaxNum random, 0 none; not read by the 2016 client"
+          ],
+          [
+            9,
+            "u8",
+            "ActeeIdx",
+            "1…ActeeMaxNum random, 0 none; not read by the 2016 client"
+          ]
+        ]
+      },
+      "0x8c42": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_FURNITURE_EFFECT_CMD",
+        "basis": "zone FUN_005751f0 + FUN_00542520; client FUN_004b5070",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nEffectHandle",
+            "MiniHouseFurnitureObjEffect row index (client looks the row up by index)"
+          ],
+          [
+            2,
+            "u16",
+            "nApplyPlayerCnt",
+            "> 0 (not sent otherwise)"
+          ],
+          [
+            4,
+            "u16[n]",
+            "nApplyPlayerHandle",
+            "players the effect was applied to (owner last)"
+          ]
+        ]
+      },
+      "0x8c58": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_PORTAL_EFFECT_CMD",
+        "basis": "zone FUN_00574450 + FUN_00542c70; client ignores it",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nEffectHandle",
+            "Handle of the portal's ObjEffect row (1000+)"
+          ],
+          [
+            2,
+            "u16",
+            "nApplyPlayerCnt",
+            "> 0"
+          ],
+          [
+            4,
+            "u16[n]",
+            "nApplyPlayerHandle",
+            "recalled players"
+          ]
+        ]
+      },
+      "0x8c61": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_FURNITURE_ENDURE_CMD",
+        "basis": "zone FUN_00567400 (so_Routine) / FUN_00570fe0; client FUN_0049b960",
+        "fields": [
+          [
+            0,
+            "u8",
+            "nEndureFurnitureCnt",
+            "placed furniture whose grade changed (repair: 1)"
+          ],
+          [
+            1,
+            "ENDURE_FURNITURE_INFO[n]",
+            "EndureFurniture",
+            "{u16 nFurnitureHnd, u8 nEndureGrade (MHE_STEP 0–4), u8 isRePair (1 after a repair kit; not read by the client)}"
+          ]
+        ]
+      },
+      "0x8c4c": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_PORTAL_ADD_CMD",
+        "basis": "zone FUN_0056fa10; client FUN_0049b830",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nPortalItemID",
+            ""
+          ],
+          [
+            2,
+            "i32",
+            "dEndTime",
+            "time_t, 0 = permanent; length 0xE leaves 6 stale bytes after it"
+          ]
+        ]
+      },
+      "0x8c4f": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_PORTAL_DEL_CMD",
+        "basis": "zone FUN_00567400 (so_Routine, owner only); client FUN_0049b870",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nPortalItemID",
+            "never sent in practice (Z13-B18)"
+          ]
+        ]
+      },
+      "0x8c64": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_FURNITURE_EMOTION_CMD",
+        "basis": "zone FUN_00575850 (1 entry, broadcast) / FUN_005432d0 (all seated members, to the entering player); client FUN_004a5170",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nEmotionCnt",
+            ""
+          ],
+          [
+            2,
+            "FURNITURE_EMOTION_INFO[n]",
+            "Emotion",
+            "{u16 nPlayerHandle, u16 nFurnitureHnd, u8 nPosition, u8 nEmotionNo}"
+          ]
+        ]
+      },
+      "0x8c67": {
+        "dir": "S→C",
+        "name": "NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_CMD",
+        "basis": "zone FUN_00575ae0 (1 entry) / FUN_005431b0 (everybody on one furniture); client FUN_004a5230",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nCancelEmotionCnt",
+            ""
+          ],
+          [
+            2,
+            "u16[n]",
+            "nCancelEmotion",
+            "player handles"
+          ]
+        ]
+      },
+      "0x348b": {
+        "dir": "Z→DB",
+        "name": "NC_ITEMDB_FURNITURE_ENDURE_REQ",
+        "basis": "zone UseItemFurnitureEndureKit::uivpb_ProtocolMake FUN_00596960 (+ CommonData by uib_AfterCast FUN_0059a530)",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nFurnitureHnd",
+            ""
+          ],
+          [
+            2,
+            "u64",
+            "nItemKey",
+            "the furniture item"
+          ],
+          [
+            10,
+            "ShineDateTime",
+            "dNewEndureTime",
+            "old end extended by the kit's EffectValue hours, capped at now + Endure[0]"
+          ],
+          [
+            14,
+            "PROTO_NC_ITEMDB_USE_VARIATION_ITEM_REQ",
+            "CommonData",
+            "the consumed kit (Z04 §6)"
+          ]
+        ]
+      },
+      "0x10aa": {
+        "dir": "Z→Z (ring)",
+        "name": "NC_CHAR_WEDDING_PARTNER_SUMMON_RNG",
+        "basis": "zone ZoneRingPacketSummonPartner::zrpb_Request FUN_005a83b0 (write, 0x25 bytes with opcode), zls_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG FUN_005a0c90 (read/forward), zrpb_Success FUN_005a8680; PDB 2016 PROTO_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG (0x23)",
+        "fields": [
+          [
+            0,
+            "u8",
+            "start.zoneNo",
+            "origin zone"
+          ],
+          [
+            1,
+            "u16",
+            "start.handle",
+            "caster handle"
+          ],
+          [
+            3,
+            "u32",
+            "start.regnum",
+            "caster charNo"
+          ],
+          [
+            7,
+            "u32",
+            "RegisterNumber",
+            "partner charNo (Partner.RegisterNumber)"
+          ],
+          [
+            11,
+            "Name3",
+            "map",
+            "caster's map"
+          ],
+          [
+            23,
+            "SHINE_XY_TYPE",
+            "coord",
+            "caster's position"
+          ],
+          [
+            31,
+            "u8",
+            "from",
+            "min level (1 or FieldLv.LvFrom)"
+          ],
+          [
+            32,
+            "u8",
+            "to",
+            "max level (levellimit or FieldLv.LvTo)"
+          ],
+          [
+            33,
+            "u16",
+            "err",
+            "0xFCF; set to 0xFCE by a zone that refuses (level / map)"
+          ]
+        ]
+      },
+      "0x10ab": {
+        "dir": "Z→Z (ring)",
+        "name": "NC_CHAR_WEDDING_REFRESH_INFO_RNG",
+        "basis": "zone ZoneRingPacketRefreshWeddingInfo::zrpb_Request FUN_005a91c0 (write, 9 bytes with opcode), zls_NC_CHAR_WEDDING_REFRESH_INFO_RNG FUN_005a0e00; PDB 2016 PROTO_NC_CHAR_WEDDING_REFRESH_INFO_RNG (7)",
+        "fields": [
+          [
+            0,
+            "u8",
+            "Start.zoneNo",
+            "origin zone"
+          ],
+          [
+            1,
+            "u16",
+            "Start.handle",
+            "0xFFFF"
+          ],
+          [
+            3,
+            "u32",
+            "Start.regnum",
+            "charNo whose wedding data is reloaded where online"
+          ]
+        ]
+      },
+      "0x1082": {
+        "dir": "Z→CharDB",
+        "name": "NC_CHAR_WEDDINGDATA_CMD",
+        "basis": "zone so_ply_WeddingInfoUpdate FUN_0059f390 (copy of PROTO_NC_CHAR_WEDDINGDATA_ACK, 0x2d bytes with opcode); Character FUN_00418c80 (D02)",
+        "fields": [
+          [
+            0,
+            "u16",
+            "header.clienthandle",
+            "from the stored copy"
+          ],
+          [
+            2,
+            "u32",
+            "header.charregistnumber",
+            "from the stored copy"
+          ],
+          [
+            6,
+            "u16",
+            "Error",
+            ""
+          ],
+          [
+            8,
+            "u8",
+            "Status",
+            "Main | Sub << 4 (Sub after the Checker rewrite)"
+          ],
+          [
+            9,
+            "ShineDateTime",
+            "When",
+            ""
+          ],
+          [
+            13,
+            "ShineDateTime",
+            "SubWhen",
+            ""
+          ],
+          [
+            17,
+            "Name5",
+            "Partner.Name",
+            ""
+          ],
+          [
+            37,
+            "u32",
+            "Partner.RegisterNumber",
+            ""
+          ],
+          [
+            41,
+            "u8",
+            "WeddingCount",
+            ""
+          ],
+          [
+            42,
+            "u8",
+            "RefusalCount",
+            ""
+          ]
+        ]
+      },
+      "0x1085": {
+        "dir": "Z→CharDB",
+        "name": "NC_CHAR_WEDDING_PROPOSE_CANCEL_REQ",
+        "basis": "zone Checker::ApplicationLimit FUN_0059f1b0 (0xc bytes with opcode); Character FUN_00418fc0 (D02)",
+        "fields": [
+          [
+            0,
+            "u16",
+            "header.clienthandle",
+            "player handle"
+          ],
+          [
+            2,
+            "u32",
+            "header.charregistnumber",
+            "player charNo"
+          ],
+          [
+            6,
+            "u32",
+            "Partner",
+            "Partner.RegisterNumber"
+          ]
+        ]
+      },
+      "0x1087": {
+        "dir": "Z→CharDB",
+        "name": "NC_CHAR_WEDDING_ESCAPE_DIVORCE_REQ",
+        "basis": "zone Checker::DelayLimit FUN_0059f2d0 (0xc bytes with opcode); Character FUN_00419140 (D02)",
+        "fields": [
+          [
+            0,
+            "u16",
+            "header.clienthandle",
+            "player handle"
+          ],
+          [
+            2,
+            "u32",
+            "header.charregistnumber",
+            "player charNo"
+          ],
+          [
+            6,
+            "u32",
+            "Partner",
+            "Partner.RegisterNumber"
+          ]
+        ]
+      },
+      "0xd405": {
+        "dir": "S→C",
+        "name": "NC_PET_ASK_NEW_NAME_REQ",
+        "basis": "zone FUN_004d0c90 (from sp_PetSystem_PlayerRoutine FUN_004d2d20); client FUN_004bb170",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nPetHandle",
+            "pet object handle (sp_PetInfo.nHandle)"
+          ],
+          [
+            2,
+            "u32",
+            "nPetID",
+            "pet id; the client looks it up in its pet table (missing → answers 0xD406 0x34C1)"
+          ],
+          [
+            6,
+            "u8",
+            "nFirstSummon",
+            "1 = state 1ST_SUMMONED (new pet: 'You're my new master!…'), 0 = resummoned unnamed pet ('What name should I answer to?')"
+          ]
+        ]
+      },
+      "0xd411": {
+        "dir": "S→C",
+        "name": "NC_PET_USE_ITEM_FAIL_ACK",
+        "basis": "zone FUN_004d15a0 (callers 4d2640 4d2990 4d2a40 59b2b0) and ib_OK 0048d0d0 via so_SendErrorCode; client FUN_0049d350",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nError",
+            "0x3442/43/44/45/5b (CanUseItem), 0x3458 already out, 0x345e summon failed, 0x3481/0x3482 unsummon failed, 0x345c item break refused; client shows the text unless 0x3440/0x3480; 0x345b has no text"
+          ]
+        ]
+      },
+      "0x4033": {
+        "dir": "Z→WM",
+        "name": "NC_CHARSAVE_2WLDMAN_PET_LINK_RESUMMON_CMD",
+        "basis": "zone sp_PetLinkResummonInfo_Save2World FUN_004d1760 (ws_save2worldmanager); PDB2016 struct of the same name",
+        "fields": [
+          [
+            0,
+            "u32",
+            "nCharNo",
+            ""
+          ],
+          [
+            4,
+            "u8",
+            "bDoResummon",
+            "1 when the pet was out (state 5/6) at so_LinkTo"
+          ],
+          [
+            5,
+            "u64",
+            "xResummonCode",
+            "charNo + 0x1BEC48797BAFC8B0"
+          ],
+          [
+            13,
+            "u16",
+            "nSummonSlot",
+            "inventory slot of the pet item"
+          ],
+          [
+            15,
+            "u32",
+            "nId",
+            "pet id"
+          ],
+          [
+            19,
+            "u32",
+            "nRegNum",
+            "pet DB key"
+          ]
+        ]
+      },
+      "0xd40d": {
+        "dir": "Z→CharDB",
+        "name": "NC_PET_CREATE_DB_REQ",
+        "basis": "zone ShinePet::spt_CreatePet FUN_0055d290 (length 0x1a incl. opcode)",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nMasterHandle",
+            "player handle"
+          ],
+          [
+            2,
+            "u32",
+            "nMasterRegNo",
+            "master charNo (spt_nMasterRegNum)"
+          ],
+          [
+            6,
+            "Name4",
+            "sPetName",
+            "always empty"
+          ],
+          [
+            22,
+            "u8",
+            "nPetMind",
+            "random in the PupServer row's [MinMind, MaxMind]"
+          ],
+          [
+            23,
+            "u8",
+            "nPetStress",
+            "random in [MinStress, MaxStress]"
+          ]
+        ]
+      },
+      "0xcc0b": {
+        "dir": "Z→WM",
+        "name": "NC_MOVER_LINKDATA_WORLD_CMD",
+        "basis": "zone FUN_0045e710 (sp_MoverSystem_ZoneLink_Save2World); 2016 PDB MOVER_LINKDATA (0x3d bytes)",
+        "fields": [
+          [
+            0,
+            "u32",
+            "nCharNo",
+            "charNo of the sender (Z→WM: so_GetCharNo; WM→Z: the target player)"
+          ],
+          [
+            4,
+            "i32",
+            "nItemSlot",
+            "inventory slot of the mover item; −1 for a passenger"
+          ],
+          [
+            8,
+            "u32",
+            "nMoverID",
+            "MoverMain.MoverID"
+          ],
+          [
+            12,
+            "u32",
+            "nMoverHP",
+            "mover HP at the link"
+          ],
+          [
+            16,
+            "u32",
+            "nMasterCharNo",
+            "owner's charNo"
+          ],
+          [
+            20,
+            "u8",
+            "nGrade",
+            "mover upgrade grade"
+          ],
+          [
+            21,
+            "u32[10]",
+            "nPassenger",
+            "charNo per seat, −1 empty; only the linking player's own seat is filled"
+          ]
+        ]
+      },
+      "0xcc0c": {
+        "dir": "WM→Z",
+        "name": "NC_MOVER_LINKDATA_ZONE_CMD",
+        "basis": "zone FUN_005a5ac0 → FUN_0045ddf0 (copy of MOVER_LINKDATA)",
+        "fields": [
+          [
+            0,
+            "u32",
+            "nCharNo",
+            "charNo of the sender (Z→WM: so_GetCharNo; WM→Z: the target player)"
+          ],
+          [
+            4,
+            "i32",
+            "nItemSlot",
+            "inventory slot of the mover item; −1 for a passenger"
+          ],
+          [
+            8,
+            "u32",
+            "nMoverID",
+            "MoverMain.MoverID"
+          ],
+          [
+            12,
+            "u32",
+            "nMoverHP",
+            "mover HP at the link"
+          ],
+          [
+            16,
+            "u32",
+            "nMasterCharNo",
+            "owner's charNo"
+          ],
+          [
+            20,
+            "u8",
+            "nGrade",
+            "mover upgrade grade"
+          ],
+          [
+            21,
+            "u32[10]",
+            "nPassenger",
+            "charNo per seat, −1 empty; only the linking player's own seat is filled"
+          ]
+        ]
+      },
+      "0x2041": {
+        "dir": "S→C",
+        "name": "NC_ACT_RIDE_FAIL_CMD",
+        "basis": "zone FUN_0045d3b0 (SendErrorCode(8, 0x41, err)); client FUN_00499ee0",
+        "fields": [
+          [
+            0,
+            "u16",
+            "err",
+            "0x10C2 cooldown, 0x10C3 wrong mode / abstate 0x4B, 0x10C4 casting, 0x10C8 map forbids riding, 0x10CA ride skill missing; 0 = no message"
+          ]
+        ]
+      },
+      "0x0554": {
+        "dir": "Z→GameLog",
+        "name": "NC_LOG_GAME_ITEM_PUT_ON_BELONGED",
+        "basis": "zone FUN_0045e810 (sp_HorseItemSave)",
+        "fields": [
+          [
+            0,
+            "u32",
+            "chrregnum",
+            ""
+          ],
+          [
+            4,
+            "u64",
+            "itemkey",
+            "item register number"
+          ],
+          [
+            12,
+            "u16",
+            "iteminvenfrom",
+            "0x2400 | slot (inventory 9)"
+          ],
+          [
+            14,
+            "u16",
+            "iteminvento",
+            "same value"
+          ]
+        ]
+      },
+      "0xcc02": {
+        "dir": "S→C",
+        "name": "NC_MOVER_RIDE_ON_CMD",
+        "basis": "zone FUN_0055f380 (size 6); client FUN_004b3aa0",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nMoverHandle",
+            ""
+          ],
+          [
+            2,
+            "u8",
+            "nSlot",
+            "seat; 0 = driver (client opens the feed window)"
+          ],
+          [
+            3,
+            "u8",
+            "nGrade",
+            "mover upgrade grade"
+          ]
+        ]
+      },
+      "0xcc04": {
+        "dir": "S→C",
+        "name": "NC_MOVER_SOMEONE_RIDE_ON_CMD",
+        "basis": "zone FUN_0055f380 (size 8, mover's range); client FUN_004a5f70",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nHandle",
+            "rider"
+          ],
+          [
+            2,
+            "u16",
+            "nMoverHandle",
+            ""
+          ],
+          [
+            4,
+            "u8",
+            "nSlot",
+            ""
+          ],
+          [
+            5,
+            "u8",
+            "nGrade",
+            ""
+          ]
+        ]
+      },
+      "0xcc06": {
+        "dir": "S→C",
+        "name": "NC_MOVER_RIDE_OFF_CMD",
+        "basis": "zone FUN_0055f620 (so_SendProtocol 51/6, no payload); client FUN_004b3c00",
+        "fields": []
+      },
+      "0xcc07": {
+        "dir": "S→C",
+        "name": "NC_MOVER_RIDE_OFF_FAIL_CMD",
+        "basis": "zone so_SendErrorCode 51/7 from FUN_0055f620 / FUN_0045d910 / FUN_0045f020 / FUN_00563420; client FUN_0049d250",
+        "fields": [
+          [
+            0,
+            "u16",
+            "err",
+            "0x3080 success (ignored by the client), 0x3081 / 0x3082 player side, 0x3083 no mover data, 0x3084 seat out of range, 0x3085 not your seat, 0x3086 seat empty"
+          ]
+        ]
+      },
+      "0xcc08": {
+        "dir": "S→C",
+        "name": "NC_MOVER_SOMEONE_RIDE_OFF_CMD",
+        "basis": "zone FUN_0055f620 (size 4, rider's range); client FUN_004a6090",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nHandle",
+            "rider"
+          ]
+        ]
+      },
+      "0xcc0a": {
+        "dir": "S→C",
+        "name": "NC_MOVER_HUNGRY_CMD",
+        "basis": "zone smv_SendHungryInfo FUN_0055f0a0 (size 4); client FUN_004b3da0",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nHungry",
+            "item hunger gauge; 0 → client forces walking"
+          ]
+        ]
+      },
+      "0xcc0d": {
+        "dir": "S→C",
+        "name": "NC_MOVER_MOVESPEED_CMD",
+        "basis": "zone FUN_00456910 / FUN_00456850 (size 8, driver only); client FUN_0049d2b0",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nMoverHandle",
+            ""
+          ],
+          [
+            2,
+            "u16",
+            "nWalk",
+            ""
+          ],
+          [
+            4,
+            "u16",
+            "nRun",
+            ""
+          ]
+        ]
+      },
+      "0x1c1a": {
+        "dir": "S→C",
+        "name": "NC_BRIEFINFO_REGENMOVER_CMD",
+        "basis": "zone BriefInformationMover FUN_0055e830 / FUN_0043c280 / FUN_0055ea10 (0x8b bytes); client FUN_00646e00",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nHandle",
+            ""
+          ],
+          [
+            2,
+            "u32",
+            "nID",
+            "MoverMain.MoverID; client ignores 0xFFFF"
+          ],
+          [
+            6,
+            "u32",
+            "nHP",
+            "0 in 2016"
+          ],
+          [
+            10,
+            "SHINE_COORD_TYPE",
+            "nCoord",
+            "{u32 x, u32 y, u8 dir}"
+          ],
+          [
+            19,
+            "ABNORMAL_STATE_BIT",
+            "AbstateBit",
+            "99 bytes; not read by the client handler"
+          ],
+          [
+            118,
+            "u8",
+            "nGrade",
+            ""
+          ],
+          [
+            119,
+            "u16[10]",
+            "nSlotHandle",
+            "rider per seat, 0xFFFF empty; not read by the client handler"
+          ]
+        ]
+      },
+      "0x1c1b": {
+        "dir": "S→C",
+        "name": "NC_BRIEFINFO_MOVER_CMD",
+        "basis": "zone bixmv_Init / bixmv_Exchange / bixmv_Send FUN_0043c810 / FUN_00440690 / FUN_0043e0d0; client FUN_00646ef0",
+        "fields": [
+          [
+            0,
+            "u8",
+            "nMoverNum",
+            "≤ 28 per packet"
+          ],
+          [
+            1,
+            "PROTO_NC_BRIEFINFO_REGENMOVER_CMD[n]",
+            "Movers",
+            "0x8b bytes each (layout 0x1C1A)"
+          ]
+        ]
+      },
+      "0x1122": {
+        "dir": "WM→Z",
+        "name": "NC_CHAR_USEITEM_MINIMON_INFO_ZONE_CMD",
+        "basis": "zone FUN_005a5d80 → so_ply_SetUseItemMinimon FUN_005617c0",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nSessionHandle",
+            "zone object handle"
+          ],
+          [
+            2,
+            "u32",
+            "nCharNo",
+            "must match the player"
+          ],
+          [
+            6,
+            "USEITEM_MINIMON_INFO",
+            "UseItemMinimonInfo",
+            "USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot; slots failing MinimonAutoUseItem or with lot 0 are dropped"
+          ]
+        ]
+      },
+      "0x1123": {
+        "dir": "S→C",
+        "name": "NC_CHAR_USEITEM_MINIMON_INFO_CLIENT_CMD",
+        "basis": "zone sp_SendUseItemMinimonInfo_Client FUN_00561990 (at LOGINCOMPLETE); client FUN_0049dae0 → FUN_00429e20",
+        "fields": [
+          [
+            0,
+            "USEITEM_MINIMON_INFO",
+            "UseItemMinimonInfo",
+            "USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot; the client sets its two auto-buff buttons and slot ids"
+          ]
+        ]
+      },
+      "0x1124": {
+        "dir": "C→S",
+        "name": "NC_CHAR_USEITEM_MINIMON_NORMAL_ITEM_ON_REQ",
+        "basis": "zone FUN_005642e0 → sp_UseItemMinimon_NormalOn FUN_00561d90; client FUN_004a6f70",
+        "fields": [
+          [
+            0,
+            "u16[12]",
+            "NormalItemList",
+            "item ids, 0xFFFF empty; must be MAUI_BUFFITEM (2) items, no duplicates; no length check"
+          ]
+        ]
+      },
+      "0x112d": {
+        "dir": "S→C",
+        "name": "NC_CHAR_USEITEM_MINIMON_NOTICE_CMD",
+        "basis": "zone sp_UseItemMinimon_NormalSlotClear FUN_00563f60 / ChargedSlotClear FUN_00564150; client FUN_0049dbb0",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nErr",
+            "always 0x3648 (item ran out); the client acts only on 0x3648"
+          ],
+          [
+            2,
+            "u16",
+            "nItemID",
+            "item removed from the list; client: \"%s supply has reached zero.\""
+          ]
+        ]
+      },
+      "0x4035": {
+        "dir": "Z→DB",
+        "name": "NC_CHARSAVE_USEITEM_MINIMON_INFO_DB_CMD",
+        "basis": "zone sp_SaveUseItemMinimonInfo_DB FUN_00563d80 (from ws_save2DB); Character FUN_0042de30 (D02 §6)",
+        "fields": [
+          [
+            0,
+            "u32",
+            "nCharNo",
+            ""
+          ],
+          [
+            4,
+            "USEITEM_MINIMON_INFO",
+            "UseItemMinimonInfo",
+            "USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot"
+          ],
+          [
+            54,
+            "u8[12]",
+            "DelSlotList_Normal",
+            "1 = slot empty (every empty slot, Z13-B62)"
+          ],
+          [
+            66,
+            "u8[12]",
+            "DelSlotList_Charged",
+            "same for the charged list"
+          ]
+        ]
+      },
+      "0x4036": {
+        "dir": "Z→WM",
+        "name": "NC_CHARSAVE_USEITEM_MINIMON_INFO_WORLD_CMD",
+        "basis": "zone sp_SaveUseItemMinimonInfo_World FUN_00563e70 (from ws_save2worldmanager); WM FUN_0042d020",
+        "fields": [
+          [
+            0,
+            "u16",
+            "nWorldHandle",
+            "so_GetWMSHandle (vt 0x340)"
+          ],
+          [
+            2,
+            "u32",
+            "nCharNo",
+            ""
+          ],
+          [
+            6,
+            "USEITEM_MINIMON_INFO",
+            "UseItemMinimonInfo",
+            "USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot"
+          ]
+        ]
+      },
+      "0x204e": {
+        "dir": "S→C",
+        "name": "NC_ACT_WEDDING_PROPOSE_WORD_REQ",
+        "basis": "zone UseItemPropose::uib_DirectUse FUN_00596770 (len 2); client WeddingTask FUN_006dd280 case 0x4E → FUN_006dcbe0 (opens WeddingProposeInputWin)",
+        "fields": []
+      },
+      "0x205e": {
+        "dir": "C→S",
+        "name": "NC_ACT_WEDDING_DIVORCE_REFUSE_CMD",
+        "basis": "client WeddingTask::DirectMessage FUN_006dcba0 (SendNetMsgZoneMgr(8, 0x5e, null, 0), answer to the 0x205D 0x1384 dialog); zone FUN_005a0440 reads no payload",
+        "fields": []
+      }
     }
   }
 }

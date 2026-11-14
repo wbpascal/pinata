@@ -191,6 +191,13 @@ so_mh_Out(p)                      vt 0x88   @ FUN_00543f40     → 1 removed / 0
     if p.so_IsJoinThisGame(1) (vt 0x170, p plays the TaiSai table):
         remove p from GamerInfo (shift), nGamerCnt −= 1; p.so_SetMiniGameInfo(0) (vt 0x178);
         so_mh_RankSort (vt 0x1e4); so_mh_DiceTaiSai_Out(p, 0) (vt 0x22c)                 # Z06 §3
+
+so_mh_RankSort()                  vt 0x1e4  @ FUN_00516ee0     → 1
+    # also called by so_mh_DiceTaiSai_Out FUN_00512160 and ResultLog FUN_005165c0 (Z06 §3)
+    pRank[i] = &GamerInfo[i] for i < nGamerCnt; qsort(pRank, nGamerCnt, 4, so_mh_RankSortCompare)
+so_mh_RankSortCompare(a, b)                 @ FUN_005144d0     → (*a).nTotalWinCnt < (*b).nTotalWinCnt ? 1 : 0
+    # DiceGamerInfo { ShineObject* pGamer; u32 nTotalWinCnt } (pdb2016): pRank = gamers by total wins, most first.
+    # never returns < 0; MSVC's qsort only tests "> 0", so the order is still a valid descending sort (inferred)
     if p has StaQuestEntangle (0x122, set while loading / decorating): reset it, recalc parameters (vt 0x650, asl_AbstateReset, vt 0x528)
     if p lacks StaGMHideMode: search slots 5 … EnterPlayerCount − 1; found → shift the rest down, clear the last, EnterPlayerCount −= 1, return 1
     else: search GM slots 4 … 0; found → shift, clear slot 5 − EnterGMCount, EnterGMCount −= 1, return 1
@@ -324,6 +331,12 @@ so_mh_CompulsionMoveTo(req { u16 hnd, SHINE_XY_TYPE location })   vt 0xa4  @ FUN
     location inside one of the interior's areas "FURNITURE_ARE1…9" (AreaInfoData of smh_Info.Map) → 0x11D0 (no text) else 0x11D1
     "Invalid location have been selected.  Unable to move"        # nothing is moved; the result is only computed
 so_mh_BroadcastNotify(text)   vt 0x144 @ FUN_00541eb0:  every member m: m.so_ply_Notice(text) (vt 0x784)
+so_mh_DiceTaiSai_BroadModeChangeLeave(p)   vt 0x240 @ FUN_005129c0   (no virtual call through slot 0x240 in the 2016 zone)
+    p null → 0x1CA4; p.charNo ≠ owner charNo (vt 0x80) → 0x1CA8; table not active (vt 0x214) → 0x1CA7
+    every gamer g on this map who plays the table (g vt 0x170(1)): 0xAC15 { DICE_TAISAI_GAME_MODE nGameMode (u32) }   (len 6)
+    if nGameStatus == DTGS_BETTING: restart the betting timer (nTimerCheckTime = now + ActiveDice.CastTime,
+        bIsActiveTimerCheckTime = 1); every such gamer: 0xAC2C { u8 1, u16 CastTime, u32 remaining ms }
+    → 0x1CA0     # same shape as the live BroadModeChange vt 0x238 FUN_00512660 (Z06 §3.2), for an owner who leaves
 ```
 
 ### 1.6 Player side: the mini-house item, `MiniHouseStr`, build queue
@@ -845,6 +858,30 @@ delete waiting for its DB answer) is skipped until the next minute.
 - `so_MH_SendFunitureInfoStart(target)` @ FUN_00544de0 (player vt 0xd4): if player vt 0xb0 (default, returns 0) is
   false, puts `StaQuestEntangle` (abstate 0x122) on `target` for 420 000 000 ms with bit set and broadcast. **No caller** in
   the 2016 zone (the vt 0xd4 calls in the TaiSai code are on `CGambleDiceTaiSaiObject`).
+- The house boxes in the character save to the WM: `ShinePlayer::so_SaveItem_Part` (player vt 0x3b8, the only call is
+  `ws_save2worldmanager` FUN_004536f0, Z01 §8.4; `ShineObject` default FUN_00453520 asserts) sends the item part of
+  `0x4013 NC_CHARSAVE_2WLDMAN_ITEM_CMD`:
+
+```pseudo
+so_SaveItem_Part(p, buf, cmd { u16 wldmanhandle, u32 nCharNo, u8 PacketOrder { nPacketOrderNum:7, nIsLastOfInven:1 },
+                               u8 nPartMark, PROTO_ITEM_CMD itemstr { u8 numofitem, PROTO_ITEMPACKET_TOTAL[] } })   @ FUN_00456030
+    for (box, nPartMark) in [(9 inventory, 5), (8 equipment, 8), (12 mini-house item box ci_MiniHouse, §2.1, 0x12),
+                             (15 action box ci_ActionBox, 0x22)]:
+        PacketOrder = 0; n = item count of the box; done = 0
+        repeat: numofitem = 0; len = ci_FillBufferInventoryTotal(box, &itemstr, …, &done, limit 8000)   # action box: isb_FullBufferItem2Server
+                if len < 0: log ("… Equip Inven Fail" / "… MiniHouse Skin Inven Fail. will be disconnect."), p vt 0x5f8(0x68C, 0, 0); return 0
+                if done ≥ n: nIsLastOfInven = 1
+                WM ← buf (len + 0xb)
+                nPacketOrderNum += 1 (7 bits)     # boxes 12 and 15 increment before the send, 9 and 8 after (as read)
+        until done ≥ n
+    return 1
+```
+
+  So every save carries at least one packet per box (an empty box sends `numofitem 0` with `nIsLastOfInven 1`); the
+  furniture boxes (inventory types 3 / 13 / 14 / 16, §2.1) are not part of it: they are saved by the DB requests of §2.4 / §2.6 only *(inferred
+  from the box list)*. A fill failure disconnects the player with code 0x68C. The first packet of boxes 12 and 15 goes out
+  with `nPacketOrderNum` 1, those of boxes 9 and 8 with 0; how the WM orders the parts (W01 §6.3) does not depend on it
+  *(inferred)*.
 
 ---
 
@@ -1508,8 +1545,12 @@ the skill's own (Z03).
   FUN_006da330: for Main 2 it shows "Name: %s", "Level: %d", "Married", the wedding date (`When`), and online state / last
   login; Main 1 "Engaged", Main 3 "Divorced"). This corrects Z07 §5.3 ("no handler for 0x1094").
 - `Recv_NC_ACT_WEDDING_DIVORCE_REQ_ACK` FUN_006dd040 (0x205D): 0x1380 "Registration for divorce procedure is complete.",
-  0x1384 yes/no dialog "Your spouse has filed for an uncontested divorce." (sets a flag at task+0x70; the answer sends
-  0x205C / 0x205E, Z02 §10 *(inferred)*), 0x1385 OK dialog "…collaborative divorce.", 0x1386 "Divorce proceeding complete.
+  0x1384 two-button dialog (`MsgBox` type 5) "Your spouse has filed for an uncontested divorce." and `m_bDivorce`
+  (task +0x70) = 1; the answer comes back as event 0x1B to `WeddingTask::DirectMessage` FUN_006dcba0: button 0 with
+  `m_bDivorce` set → 0x205E `NC_ACT_WEDDING_DIVORCE_REFUSE_CMD` (no payload; zone FUN_005a0440 → Character DB 0x108F
+  DIVORCE_CANCEL_REQ, Z02 §10) and `m_bDivorce` = 0; the other button sends nothing (the forced divorce then runs out on
+  its timer, §4.4). 0x205C is not an answer to this dialog (it is the user's own forced-divorce request). Button 0 =
+  the first / "yes" button *(inferred from `GameFrameWork::DirectMessage`'s raid-invitation case, where 0 = accept)*; 0x1385 OK dialog "…collaborative divorce.", 0x1386 "Divorce proceeding complete.
   You are now single.", 0x1387 "Your spouse refused to get a divorce.", 0x1389 OK dialog (TextData2) annulment; other codes
   through `ErrMsgTable::GetErrMsg` (0x1381–0x1383, 0x1388 have texts).
 
@@ -1546,6 +1587,40 @@ ServerMenuFuncter::smfm_ImmediateDivorceCancel(p, arg)                          
 ```
 
 The 0x108E answer is handled like any `DIVORCE_DO` answer (Z07 §5.2: reload of 0x1081 for both partners).
+
+### 4.9 The proposal item (`UseItemPropose`): where the partner is chosen
+
+The proposal ring's use effect (Z04 §6 actor table, "00596660 … own") is the step before Z02 §10's 0x204F: it picks
+the counterpart and writes the `Partner.RegisterNumber` (wedding data +0x25) that every later wedding handler uses
+through `som_FindPlayer`. This answers Z02 §10's "how the partner is chosen before proposing".
+
+```pseudo
+UseItemPropose::uib_CanUseItem(p, item)                                            @ FUN_00596660
+    t = p's current target (p vt 0x75c)
+    if t null or t == p or t is not a player (t vt 0x4d0 ≠ 2): ProposeResult(p, p.handle, 0x12C8); return 0x71E
+    code = Checker::WhenPropose(p)           (§4.1: mode ∉ {1,2,6} → 0x12C1; Main ≠ 0 → 0x12C5)
+        ≠ 0 → ProposeResult(p, p.handle, code); return 0x71E
+    code = Checker::WhenBeProposed(t)        (0x12C2 / 0x12C6)                   ≠ 0 → same
+    code = Checker::WhenProposeBoth(p, t)    (dist² > 10000 → 0x12C3)            ≠ 0 → same
+    t.wedding.Partner.RegisterNumber = p.charNo     (vt 0x958 +0x25)
+    p.wedding.Partner.RegisterNumber = t.charNo
+    return 0x700
+    # 0x71E has an empty client text: the user sees only the 0x2052 reason (Z02 §10 texts)
+    # the pairing is written already here, before the item is used, and is never cleared: not on refusal (0x2051
+    # reply 0), not when the proposal is never sent. A third player C who uses a ring on t (still single) overwrites
+    # t.Partner with C; if t then accepts p's earlier 0x2050, the 0x2051 handler looks up t.Partner = C and engages
+    # t with C, while p.Partner still points at t (original bug) Z13-B66
+
+UseItemPropose::uib_DirectUse(p, slot, item)                                      @ FUN_00596770
+    p ← 0x204E NC_ACT_WEDDING_PROPOSE_WORD_REQ (no payload, len 2)
+    p.so_ply_ItemUseResultPacket(0x700, 9) (vt 0x91c)
+    return 1
+    # the ring is not consumed here: 0x2051 destroys it when the proposal is accepted (Z02 §10)
+```
+
+Client: `WeddingTask::OnProcessNetMsg` FUN_006dd280 case 0x4E → `Recv_NC_ACT_WEDDING_PROPOSE_WORD_REQ` FUN_006dcbe0
+shows `m_pkWeddingProposeInputWin` (task +0x60, member name *(pdb2017)*) unless it is already open; that window's text
+is what the client sends as `propose_word` in 0x204F (Z02 §10) *(inferred from the window name; the send is not read)*.
 
 ---
 
@@ -3223,7 +3298,7 @@ sp_UseItemMinimon_NormalSlotClear(slot) / ChargedSlotClear(slot):    @ FUN_00563
 | 0x1125 NORMAL_ITEM_ON_ACK | @ FUN_004b4600 | 0x3628: button ON + "Activate auto buff"; 0x362B: "There are no items registered in the window."; every other code (0x3629, 0x362A, 0x362C, and 0x363A/0x363C/0x363D sent here by Z07-B9) is ignored |
 | 0x1129 CHARGED_ITEM_ON_ACK | @ FUN_004b4650 | 0x3638: premium button ON; 0x363B: same "no items" text; 0x3639 ignored |
 | 0x1127 / 0x112B OFF_ACK | FUN_00429920(0) / FUN_004299b0(0) | button OFF + "Deactivate (premium) auto buff" |
-| 0x112C USE_BROAD_CMD | @ FUN_0049db70 | character by `nCharHandle` → FUN_00633f10(char, bUse ≠ 0) (shows / hides the minimon's auto-use state) |
+| 0x112C USE_BROAD_CMD | @ FUN_0049db70 | character by `nCharHandle` → `Char::SetItemAutoUseState` FUN_00633f10(char, bUse ≠ 0): stores the flag (char +0x5b0) and calls `CharShape::SetMinimonAutoUseEff` (2017 client FUN_0065b3c0, read there): removes the old effect; if on, for the equipped left / right minimon whose `MinimonInfo.MinimonRole` is `MRT_USEITEM`, attaches the effect `"Minimon_AutoItemUse"` to its link node (an aura on the minimon while auto-use is on); off: effect removed |
 | 0x112D NOTICE_CMD | @ FUN_0049dbb0 | only `nErr == 0x3648`: removes `nItemID` from the first matching normal and premium slot and shows "%s supply has reached zero." with the item name |
 
 Client senders (window FUN_00429750 / the premium twin, packet builders FUN_004a6f70 0x1124, FUN_004a6ff0 0x1126,
@@ -3263,7 +3338,7 @@ never looks the code up.
 
 | Family (Z07 §) | Answer packet → client handler | Codes without text | What the user sees |
 |---|---|---|---|
-| 0xAC1–0xAC7 stat points (§2.4) | 0x1061 / 0x1067 → `StatPointReqTask` FUN_006ab090 | all | the task ends with event 0x19 and a string `"err: %d"` for its listeners; no message box or chat text *(inferred: event 0x19 = task failed)* (0x105F / 0x1065 success refresh the stat window via FUN_006629d0) |
+| 0xAC1–0xAC7 stat points (§2.4) | 0x1061 / 0x1067 → `StatPointReqTask` FUN_006ab090 | all | the task sends event 0x19 with the string `"err: %d"` up its task tree (`ITask::DirectDispatchToParent`); `GameFrameWork::DirectMessage` case 0x19 = `AddSysMsg(text)`: a system chat line `err: <code>` (routing read in the 2017 client, FUN_006a9110 / FUN_0049aac0 there; the 2016 task code is the same; the code as the `%d` argument is *(inferred)*, the decompiler drops it). The same event carries the wedding texts of §4.7 (0x205D). 0x105F / 0x1065 success refresh the stat window via FUN_006629d0 |
 | 0x3628–0x363D minimon (§4.1) | 0x1125 / 0x1129 (§9.6) | all | only ok and "empty list" have an effect; the other codes are ignored |
 | 0x3648 minimon notice | 0x112D (§9.6) | 0x3648 | own text "%s supply has reached zero." |
 | 0x3658–0x365C charged buff erase (§4.2) | 0x112F → FUN_004a7140 | 0x3658, 0x365B | 0x3658: runs the `ChargedOff` UI script *(inferred: removes the buff icon)*; others through `ErrMsgTable` (0x365B → generic line; 0x3659 / 0x365A / 0x365C have texts) |
@@ -3342,6 +3417,7 @@ never looks the code up.
 | Z13-B63 | 0x1124 / 0x1128 ON with an all-empty list (§9.3) | the empty list is stored, the answer is 0x362B / 0x363B, but `bNormalItem` / `bChargedItem` keep their old value | a list that was on stays "on" with no items (the client shows "no items registered" and keeps its button state); harmless, the 2016 client sends OFF first when the list is on | clear the flag (and the brief flag) on an empty list |
 | Z13-B64 | `smfm_ImmediateDivorce` FUN_0050f430 (annulment item, "Yes") | sends 0x108D Reason 2 and destroys the item without re-checking the married state or the cell, and before the DB answers | if the couple is already divorced when "Yes" is chosen (the partner annulled first), the item is still consumed and the DB answers 0x108E Success 0 | re-check `Main == 2` and destroy only on success |
 | Z13-B65 | WM 0xD412 after a link without 0x4033 (§5.8) | the WM re-sends the record of an earlier link; the zone sends no 0x4033 in pet states 1–4 / 8 | a pet that was unsummoned and is being cast or named again at the link is re-summoned from the old record at the next map login (if its item is still in the recorded slot) | send 0x4033 with `bDoResummon = 0` in every state, or clear the WM record after 0xD412 |
+| Z13-B66 | `UseItemPropose::uib_CanUseItem` FUN_00596660 (§4.9) | writes both players' `Partner.RegisterNumber` at ring use, for any single target, and never clears it | a second proposer C who targets the same single player t overwrites t's partner; when t accepts the first proposer p's 0x2050, the 0x2051 handler engages t with C (if C is on this zone and single), p stays pointed at t; refusals leave stale partner numbers | write the pairing on acceptance, keyed by the 0x2050 / 0x2051 `from` handle, and clear it on refusal |
 
 ## Not reconstructed / uncertain
 
@@ -3352,8 +3428,10 @@ never looks the code up.
   handle) was not traced.
 - `so_Routine`'s "invalid MH handle" branch sets the member's handle back to this house before linking it out; the intent
   (so that the member's unmark runs `so_MH_LogOut` → `so_mh_Out` for this house) is *(inferred)*.
-- `sp_MiniHouseActivCheck`: the meaning of `mhs_Activ` (set when a cell was locked) is *(inferred)*; its readers are
-  outside this part.
+- `sp_MiniHouseActivCheck`: the meaning of `mhs_Activ` (set when a cell was locked) is *(inferred)*. The field is
+  write-only in the 2016 zone: written by map login FUN_00443390 (= 1), `sp_MiniHouseActivCheck` FUN_00534fe0 and
+  `sp_NC_MINIHOUSE_ACTIV_REQ` FUN_00536310 (= 1), read by no named access (sweep scan of the `zone-pdb` export); a raw-offset
+  reader was not searched for.
 - `"FURNITURE_ARE%d%c"`: the arguments are `(i, 0)` (assembly at 0x545051: `esi` = i, `edi` = 0), so the areas are named
   `FURNITURE_ARE1` … `FURNITURE_ARE9` (also for `CompulsionMoveTo`). The valid height band z ∈ [700, 900] is as read; that
   the client's furniture z values lie there (while the item default is z = 6.0) was not checked in a capture.
@@ -3370,11 +3448,13 @@ never looks the code up.
 - Wedding (§4): the gender value 1 = male in `wh_Reserv` and "EldPri" = the Elderine prison map in `wh_RecallCouple` are
   *(inferred)*. The `LinkTable` columns used by the partner summon (row +0x14 = FieldLevel key, +0x35 = map) were read as
   offsets only; that the band is the target map's entry level is *(inferred)*. Whether the 2016 Character DB ever writes
-  sub-status 8 (DivorceLimit case 8) is unknown (w00 writes 4). The client's answer to the 0x1384 dialog (0x205C accept /
-  0x205E refuse) was not traced in the client.
+  sub-status 8 (DivorceLimit case 8) is unknown (w00 writes 4). The labels of the 0x1384 dialog's two buttons (which
+  one is index 0, the one that sends 0x205E, §4.7) were not read.
 - Pets (§5): the meaning of `FieldAttr.KingdomQuestMap == 2` (refused without a 0xD411) is not identified. The WM's
-  re-summon record is answered in §5.8 (kept for the session, Z13-B65). The pet is removed by 0x1805 (§6.4); what the client does with `bSummoning` was not
-  traced (the 0x1C1C handler does not read the item). Pets (§6): the client effect of the polluted abstate bit 291
+  re-summon record is answered in §5.8 (kept for the session, Z13-B65). The pet is removed by 0x1805 (§6.4). `bSummoning`: the 0x1C1C handler does not read the item, and the 2017 client
+  export has no typed reader of `ShineItemAttr_Pet` (the struct exists in its PDB, no function references it); whether
+  the 2016 client reads byte +0x19 of a pet item's attribute by raw offset was not searched, so its client effect stays
+  open *(inferred: none)*. Pets (§6): the client effect of the polluted abstate bit 291
   (Z13-B43), whether the StaImmortal set in `spt_Regenerate` ever succeeds (HP test before HP = 1), and what player mode 7
   is in `spt_FindMaster` are *(inferred)* / open; `GetPetActionBundleFlexible`'s random pick is read through garbled decompiler output. That the lock list keeps an unreleased cast lock until relog (Z13-B34) is *(inferred)*.
 - Mounts (§7): `go_Get_NpcObject(&ui_ride)` is a folded getter; that it returns `ui_ride`'s skill (whose first u16 is the
@@ -3390,12 +3470,12 @@ never looks the code up.
   through slot 0xeb8 and no direct call of the mover's FUN_00456850 or the player's FUN_00459490 (which sends 0x203E
   `{walk, run}` to the player only when the speeds changed) exist in the 2016 zone (sweep); dead code. The client's `AddMover` FUN_00646c50 internals (model, seat nodes) were not read.
 - Minimon (§9): that the inventory is already loaded when WM 0x1122 arrives (otherwise every slot is dropped at login) is
-  *(inferred)* from the blob order. Which players `so_AllOfRange` reaches with 0x112C (whether the sender is included) and
-  what client FUN_00633f10 shows for `bUse` were not traced. Whether an MRT_USEITEM minimon must still be equipped while
+  *(inferred)* from the blob order. Which players `so_AllOfRange` reaches with 0x112C (whether the sender is included) was not
+  traced (client effect of `bUse`: §9.6). Whether an MRT_USEITEM minimon must still be equipped while
   the routine runs: the routine itself does not check (only the ON requests and the login copy do; removing it turns the
   lists off through §9.5).
-- 0xAC* stat answers: the listener of `StatPointReqTask`'s event 0x19 (the stat window) was not read; that it shows
-  nothing is *(inferred)* from the absence of a text lookup in the task.
+- 0xAC* stat answers: the `"err: %d"` line's argument is dropped by the decompiler; that it is the code is *(inferred)*.
+  The routing of event 0x19 to `GameFrameWork::AddSysMsg` was read in the 2017 client (§9.8).
 
 ## Coverage boundary
 
@@ -3406,15 +3486,14 @@ What remains uncited after this part:
 
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
-| House TaiSai methods (house vt 0x1bc–0x2a8): `so_mh_DiceTaiSai_BroadModeChangeLeave` FUN_005129c0, `so_mh_RankSort` FUN_00516ee0 / `RankSortCompare` FUN_005144d0, `so_mh_ClearDiceBettingInfo` FUN_005118e0, `ClearGamerBettingInfo` FUN_00511990, `Set/IsCreateDice` FUN_005144f0 / FUN_00514540, `Set/IsDeleteDice` FUN_00514580 / FUN_005145d0, `Set/IsLeaveOwner` FUN_00514630 / FUN_00514650, `Set/IsBlowGame` FUN_00514600 / FUN_00514620, `IsActiveDice` FUN_00511790 / FUN_00511760, `SetDiceHistory` FUN_00511960, `GetTaiSaiGamerCnt` FUN_005144c0, `GetGameMode` FUN_00514a30, and the `ShineObject` defaults (`so_mh_DiceTaiSai_Out` FUN_00512150, `BroadOut` FUN_00512450, `ModeChange` FUN_00512560, `BroadSetTimer` FUN_00513020, `CanBettingCancel` FUN_00513400, `CanDiceRoll` FUN_00513cf0, `GetExpectIncomeMoney` FUN_00514050, `GetRank` FUN_00514060); 0xAC28 LARGE_AMOUNT_REQ | Z06 §3 (done) | the dice table's state, join / leave / mode change, betting, roll and ranking are written there (§3.1–§3.5, 0xAC28 §3.4 + Z06-B16); this item only links the house's calls into it (§1.2, §2.4, §3.2) |
+| House TaiSai methods (house vt 0x1bc–0x2a8; `BroadModeChangeLeave` FUN_005129c0 (no caller) is written in §1.5 and `so_mh_RankSort` FUN_00516ee0 / `RankSortCompare` FUN_005144d0 in §1.3, since Z06 does not cite them): `so_mh_ClearDiceBettingInfo` FUN_005118e0, `ClearGamerBettingInfo` FUN_00511990, `Set/IsCreateDice` FUN_005144f0 / FUN_00514540, `Set/IsDeleteDice` FUN_00514580 / FUN_005145d0, `Set/IsLeaveOwner` FUN_00514630 / FUN_00514650, `Set/IsBlowGame` FUN_00514600 / FUN_00514620, `IsActiveDice` FUN_00511790 / FUN_00511760, `SetDiceHistory` FUN_00511960, `GetTaiSaiGamerCnt` FUN_005144c0, `GetGameMode` FUN_00514a30, and the `ShineObject` defaults (`so_mh_DiceTaiSai_Out` FUN_00512150, `BroadOut` FUN_00512450, `ModeChange` FUN_00512560, `BroadSetTimer` FUN_00513020, `CanBettingCancel` FUN_00513400, `CanDiceRoll` FUN_00513cf0, `GetExpectIncomeMoney` FUN_00514050, `GetRank` FUN_00514060); 0xAC28 LARGE_AMOUNT_REQ | Z06 §3 (done) | the dice table's state, join / leave / mode change, betting, roll and ranking are written there (§3.1–§3.5, 0xAC28 §3.4 + Z06-B16); this item only links the house's calls into it (§1.2, §2.4, §3.2) |
 | `UseItemVariationProtocolBase` actors other than the endurance kit; `uib_AfterCast` itself is written in §3.3 | Z04 §6 (done) | the actor table and item-use pipeline are Z04's; §3.3 documents the shared AfterCast because the kit reaches it |
-| `ShinePlayer::so_SaveItem_Part` FUN_00456030 (WM item save, includes the mini-house skin box 12) | Z01 §8.4 (done) | the character save to the WM (0x4013 items, part marks per box) is Z01's `WholeSaver`; nothing house-specific beyond the box list |
 | `sp_ServerMenuTitle` / `sp_ServerMenuItem` FUN_0054e8a0 / FUN_0054e990 (annulment menu, §4.8; hall menus §4) | Z02 §6 (done) | the server-menu builder and 0x3C01 are documented there (menu built with Title / Item, sent by `sp_ServerMenuOpen`) |
-| Ring travel `ZoneListenSession::zls_TravelComplete` FUN_0045b1f0 (wedding ring refresh §4.5, partner summon §4.6) | Z01 §10 (done) | the zone ring (RNG packets travel all zones and return to the origin) is Z01's zone↔zone relay; §4.5 / §4.6 state what the origin does when the packet comes back |
+| Ring travel `ZoneListenSession::zls_TravelComplete` FUN_0045b1f0 (wedding ring refresh §4.5, partner summon §4.6) | Z01 §10 (done), generically | Z01 §10 documents the zone ring only as a concept (RNG packets travel all zones; back at the origin → `zrpb_Success` / `zrpb_Failure`) without naming FUN_0045b1f0; the per-packet dispatch at the origin that this item needs is written in §4.5 / §4.6 (the function's other RNG cases belong to their packets' items) |
 | WM storage of the pet re-summon record (0x4033 / 0xD412) and the mover link data (0xCC0B / 0xCC0C) | W01 §6.3 ("pet re-summon", "mover link data" rows), W05 (0x4033 row) | WM-side storage and re-send; the zone side and the stale-record effect are §5.8 / §7.7 here |
 | Callees of the context functions this doc only cites for one branch (player login FUN_00443390, logout FUN_00558900, player routine FUN_0056c790, death FUN_00433be0, WM save FUN_004536f0, item move FUN_0052b8d0, …): KQ, guild tournament, card collection, quest, equipment-conflict and abstate helpers | Z01, Z03, Z04, Z08, Z09 (done; they cite those context functions) | not reached through the house / wedding / pet / mount / minimon logic; listed by `coverage`-style scans only because a context function is cited here |
 | Library and template code: `std::map` / `std::vector` instantiations (MinimonInfo, PET_AI_TYPE maps), `BinaryDataBox<…>` / data-box ctors and dtors (FUN_004bf7f0, FUN_004c05c0, FUN_004c0310, FUN_004a29b0, FUN_004a1b80, FUN_004bf3d0, FUN_004a1ad0, FUN_004bf550, FUN_004bf490, FUN_004bf310, FUN_004bf950), `ShineMover::GetRTTI` FUN_0055e9b0, `ShineDateTime::operator+=` FUN_0059ead0 / `toTime_t` FUN_00517a10, `Parameter::Container::c_clear` FUN_0043c370, `ItemBag::ib_GetItemLot` FUN_00642e80, `idb_GetItemInxName` FUN_006487d0, `uie_SetChargedBuffer` FUN_005963e0, item-box iterators | none needed | no subsystem behaviour; what each call means is stated at the call site (date compare / add, lot read, name lookup, use-effect registration) |
-| Client presentation: `AddMover` FUN_00646c50 internals (model, seat nodes), the `StatPointReqTask` event-0x19 listener, client FUN_00633f10 (minimon `bUse`) | none (client rendering) | the spec records what the client does with each field and code (§3.6, §5.10, §7.9, §8.11, §9.6, §9.8); scene-graph and widget code is not protocol behaviour |
+| Client presentation: `AddMover` FUN_00646c50 internals (model, seat nodes) | none (client rendering) | the spec records what the client does with each field and code (§3.6, §5.10, §7.9, §8.11, §9.6, §9.8; event 0x19 and minimon `bUse` are traced there); the mover's scene-graph code is not protocol behaviour |
 | Opcodes without a 2016 handler or client sender: 0x8C15 KICKOUTCANCEL_REQ, 0x8C1A ARRANGEMODE_REQ, 0x8C28 COMPULSIONMOVETO_REQ, OWNERBLOG 0x8C35 / 0x8C37, mover skills 0xCC0E / 0xCC0F | this doc §1.5, §8.9 | documented as unreachable; nothing more to reconstruct |
 
 No follow-up item was needed: everything found is either documented here or in a finished item's output (cited above).
