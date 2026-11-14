@@ -1,0 +1,4 @@
+{
+ "FUN_00413f70": "DBRecord::query",
+ "FUN_0041b720": "CGameDB_Connect::DBConnect"
+}

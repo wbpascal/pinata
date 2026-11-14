@@ -902,7 +902,7 @@ usp_Character_getFriendpoint(@nCharNo int in, @nRet int = 0 out) → row { nFrie
   two-argument call is legal and the procedure's `@nRet` stays local. The wrapper therefore tests its own preset 0 and
   succeeds whenever the call executes. What is lost: `@nRet = −1111` (no such character) and `1` (`@@ROWCOUNT ≠ 1` after
   the `EXISTS` check, only possible when the character is deleted in between). A real SQL error (deadlock, the
-  procedure's 5000 ms `LOCK_TIMEOUT`, error 1222) still reaches the wrapper as `SQL_ERROR` *(inferred)*. So the friend
+  connection's 5000 ms `LOCK_TIMEOUT`, §7.3, error 1222) still reaches the wrapper as `SQL_ERROR` *(inferred)*. So the friend
   point updates behave as designed.
 - The default is **required**: without `= 0` the call fails with error 201 ("expects parameter '@nRet'") on every
   update, and neither the daily +1 nor the item exchange ever writes. A rebuild keeps the w00 signature exactly.
@@ -975,9 +975,140 @@ backup body: −1024 "no init item" (→ 0xAC6), −1023 "can not delete item" (
 - All four behave identically in the binary, so a rebuild can take the backup body unchanged: no visible behaviour
   depends on which DB-error number is returned. Left open: which statements produced −1091 / −1092 / −1094.
 
-## 8. Version choices for Character procedures that have source (D02 / D03 *(db-backup)* points)
+## 7. SQL built at run time (all four DB servers)
 
-(§7, run-time call strings, is written by a later part and goes before this section.)
+`bak.py cover` lists the procedures whose `{CALL …}` text is a literal string. This section lists every SQL statement
+the four binaries build at run time, so that together with `cover` the inventory is complete.
+
+### 7.1 Inventory: how the four servers reach SQL Server
+
+- **One entry point.** All four executables import from `ODBC32.dll` only by ordinal, and the only execute function among
+  them is `SQLExecDirect` (ordinal 11). There is no `SQLPrepare` (19) and no `SQLExecute` (12) in any import table
+  (`objdump -p`, Character: 9 10 11 13 16 24 26 27 29 31 39 41 43 72 75; Account: the same without 27). The `Ordinal_11` /
+  `Ordinal_19` calls with one or four arguments in the decompiled code are `WS2_32.dll` ordinals 11 / 19 (`inet_addr`,
+  `send`; the three `Ordinal_19` calls of Character are the gSOAP sender @ FUN_0048bf40), not SQL.
+- **Every `SQLExecDirect` call site whose statement is not one string literal** (scan of the `Ordinal_11(stmt, str, -3)`
+  calls, `SQL_NTS` = −3):
+
+| Binary | Site | Statement | Covered |
+|---|---|---|---|
+| Character | `SQL_p_Char_SetStateWithSetItemAndRestTime` @ FUN_00460ee0 | built by `SQL_BuildCallString` @ FUN_00460bf0 | §7.2 |
+| Character | `DBRecord::query` @ FUN_0044fb00 | `vsprintf` of the caller's format | §7.3 |
+| Account | `DBRecord::query` @ FUN_00412410 *(pdb2016)* | same | §7.3 |
+| AccountLog | `DBRecord::query` @ FUN_0040e4a0 *(pdb2016)* | same | §7.3 |
+| GameLog | `DBRecord::query` @ FUN_00413f70 | same | §7.3 |
+| Character | @ FUN_00458480 | `p_Char_GetListOfUserChar( ? )` / `p_Char_GetListOfUserCharAll( ? )` by flag | literals: `cover` lists both, source in both backups, same count (D02 §3.1) |
+| Character | @ FUN_0045b470 | `p_Char_Wedding_Divorce_Do(?,?,?)` / `…_by_Item(?,?,?)` | same (D02 §11) |
+| Character | @ FUN_00461270 | `p_Item_Create(…7)` / `p_Item_Create_UseEmptyStorage(…7)` | same (D03 §1.2) |
+| Character | @ FUN_00461fc0 | `p_Item_SetStorageAndOwner(…5)` / `…_UseEmptyStorage(…5)` | same (D03 §1.2) |
+
+- **Strings.** Apart from the literal `{CALL name(…)}` texts, the only SQL-looking strings in the four `strings.tsv` are
+  `"{CALL "` @ 0x4c5a3c and `"p_Char_SetStateWithSetItemAndRestTime"` @ 0x4c5b24 (both §7.2). `"DELETE"` / `"DELETE "`
+  in Character (@ FUN_004825e0, FUN_00484d00) are gSOAP HTTP method names; no `SELECT` / `INSERT` / `UPDATE` / `EXEC`
+  text exists. So no ad-hoc SQL statement exists in any 2016 DB server.
+- Same in 2015: the 2015 Character executable has the same `"{CALL "` + name strings and the same 312 `{CALL ` literals
+  (diff only).
+
+### 7.2 `p_Char_SetStateWithSetItemAndRestTime` — save one abnormal state (buff) of a character
+
+The only procedure whose call string is assembled at run time. `SQL_BuildCallString(out std::string, name, n)` @
+FUN_00460bf0 writes `"{CALL " + name + "(" + "?" + ",?" × (n−1) + ")}"` into a `std::stringstream` (no `?` for n = 0)
+and returns its `str()` (@ FUN_00460bc0). Its one caller passes n = 0x15, so the statement is
+`{CALL p_Char_SetStateWithSetItemAndRestTime(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)}`: 21 markers, 21 binds.
+
+```
+p_Char_SetStateWithSetItemAndRestTime(
+    @nCharNo int in, @nStateNo smallint in, @nStateLevel smallint in, @nStateTime int in, @nRestTime int in,
+    @nStateCount smallint in, @nStatePowerDemage tinyint in, @nStatePowerSP tinyint in,
+    @nStatePowerKeepTime tinyint in, @nStatePowerCoolTime tinyint in,
+    @nSetItemIndexA smallint in, @nSetItemValueA smallint in, … @nSetItemIndexd smallint in, @nSetItemValueD smallint in,
+    @nCasterLevel smallint in, @nCasterAttackPower int in, @nRet int out)
+    called by  : SQL_p_Char_SetStateWithSetItemAndRestTime @ FUN_00460ee0 ← CharSaveState @ FUN_00406070
+                 ← fc_NC_CHARSAVE_ABSTATE_REQ 0x4007 @ FUN_00406850 (D02 §6, once per ABSTATEREADBLOCK row,
+                 after p_Char_DelStateAll)
+    binds      : 1 in C −16 → INTEGER   nCharNo                      (struct +0x00)
+                 2 in C −17 → SMALLINT  nStateNo   = abstateid        (+0x04)
+                 3 in C −17 → SMALLINT  nStateLevel = strength (u8 widened)   (+0x06)
+                 4 in C −16 → INTEGER   nStateTime = pasttime          (+0x08)
+                 5 in C −16 → INTEGER   nRestTime  = resttime          (+0x0C)
+                 6 in C −17 → SMALLINT  nStateCount = restcount        (+0x10)
+                 7–10 in C −28 → TINYINT the four 4-bit nibbles of SKILL_EMPOWER (bits 0–3, 4–7, 8–11, 12–15)
+                                          = nStatePowerDemage / SP / KeepTime / CoolTime   (+0x12…+0x15)
+                 11–18 in C −17 → SMALLINT setitem[0..3].Index / .Value   (+0x16…+0x24)
+                 19 in C −17 → SMALLINT nCasterLevel = CasterInfo.nLevel (u8 widened)   (+0x26)
+                 20 in C −17 → INTEGER  nCasterAttackPower = low 16 bits of CasterInfo.nAttackPower   (+0x28)
+                 21 out C −16 → INTEGER nRet, preset −1
+    result     : SQLExecDirect not 0/1 → ViewDBError("CSQLPCharacter::p_Char_SetState", stmt) @ FUN_00451ec0 (log only).
+                 Then: nRet ∉ {0, 2627} → log "ERROR, CSQLPCharacter::p_Char_SetStateWithSetItem, nCharNo=%d, …, nRet=%d …"
+                 Returns AL = (nRet == 0 || nRet == 2627)   (asm 0x46119c–0x46124e: 2627 forced to 0, then sete)
+                 → on false CharSaveState logs "ERROR - CharSaveState SetState, nCharNo=%d, nStateNo=%d, …" and clears its
+                   "all saved" flag (0x4008 not sent, D02)
+    reads/writes: tCharacterState (nCharNo, nStateNo) primary key (PK__tCharacterState__…), all columns below
+    body (w00_Character.bak, "2008.06 By Lunar", caster columns added "2011.10.19 by kodong"):
+        IF EXISTS (row nCharNo, nStateNo): UPDATE every column = the parameter
+        ELSE INSERT the row
+        SET @nRet = @@ERROR
+    evidence   : binds and return read in the wrapper and its asm; field mapping from the copy loop in CharSaveState
+                 (asm 0x40615a–0x406240) and ABSTATEREADBLOCK (2016 zone PDB, 0x24 bytes: abstateid u16, strength u8,
+                 pasttime / resttime u32, restcount u16, empower u16 @ +0x0D, CasterInfo {u8 nLevel, int nAttackPower}
+                 @ +0x0F, setitem[4] {u16 Index, u16 Value} @ +0x14) (pdb2016)
+```
+
+- **Version: follow w00.** w00_Character.bak has exactly the 21 parameters in the bind order and types above. Character.bak
+  has an older 19-parameter text (no `@nCasterLevel` / `@nCasterAttackPower`, found as ASCII text by a raw scan; `bak.py
+  proc` does not find it): the 2016 call would fail with "too many arguments" on every row, so no buff would ever be
+  saved. w00 also has the uncalled siblings `p_Char_SetState`, `p_Char_SetStateWithRestTime`, `p_Char_SetStateWithSetItem`
+  (no 2016 caller; the log label `p_Char_SetState` / `p_Char_SetStateWithSetItem` in the wrapper is a leftover name).
+- **2627 = SQL Server error 2627, PRIMARY KEY violation.** The wrapper accepts it as success: the `EXISTS` check and the
+  `INSERT` are not atomic, so a second save of the same state racing in between (two workers saving the same character)
+  hits the key; the row then exists, which is the wanted result *(inferred)*. Within one packet this cannot happen:
+  `p_Char_DelStateAll` runs first and a repeated `abstateid` takes the `UPDATE` branch. Whether the driver delivers
+  `@nRet` after a statement error inside the procedure is not certain (the statement returns an error record first); the
+  wrapper does not depend on it: on `SQL_ERROR` it only logs and then tests `@nRet` as delivered (still −1 = failure if
+  not) *(inferred)*.
+- `nCasterAttackPower` is truncated *(original bug)* D06-B6: CharSaveState copies only the low 16 bits of the 32-bit
+  `CasterInfo.nAttackPower` (`movzx edx, word ptr [eax+0x18]`, asm 0x4061e9) and the wrapper binds it as `SQL_C_USHORT`,
+  although the column and the parameter are `int`. A caster attack power ≥ 65536 or negative is saved modulo 65536, so
+  a damage-over-time state restored at the next login deals damage from the wrong attack power *(inferred)*. Likely intent: bind the
+  full `int`. A rebuild's procedure is unaffected (the value arrives already cut).
+- A rebuild implements the w00 body unchanged; it can build the statement with any method (the name and marker count
+  are fixed), but must keep `@nRet` = `@@ERROR` (0 on success) as the only output.
+
+### 7.3 Connection startup command (`ODBC_INFO` column 5, `DBRecord::query`)
+
+```
+SessionWorker_DBInit(w)        @ Account FUN_00405f20 CSessionWorker::DB_Init (pdb2016), AccountLog FUN_00405870,
+                                 Character FUN_0043e040, GameLog FUN_0040a290
+    info = GetODBCInfo(row id, my world)            # ServerInfo.txt ODBC_INFO rows: Account 0, AccountLog 1,
+                                                    # Statistics 2, w00_Character 10, w00_GameLog 11
+    CGameDB_Connect::DBConnect(w.db, info.pConnectInfo, info.pStartupCmd)   (pdb2016 names)
+                               @ Account FUN_00419bb0, AccountLog FUN_00415680, Character FUN_0046ecd0, GameLog FUN_0041b720
+        connect (vtable slot 1) with the connection string; failure → return 1
+        if pStartupCmd is not empty:
+            DBRecord::query(w.db, pStartupCmd)      @ FUN_00412410 / FUN_0040e4a0 / FUN_0044fb00 / FUN_00413f70
+                vsprintf(buf[0x2000], pStartupCmd, <no arguments>)
+                SQLCloseCursor; SQLFreeStmt(SQL_CLOSE); SQLExecDirect(buf, SQL_NTS)
+            failure → return 2
+        return 0
+    AccountLog: same for the Statistics row into w.statDb; if that fails the AccountLog connection is closed again
+    (CGameDB_Connect::DBClose)
+    any failure → log, the worker does not start (D01 §1, D05 §1.1)
+```
+
+- Every `ODBC_INFO` row of the 2016 `ServerInfo.txt` has the startup command `"SET LOCK_TIMEOUT 5000;"`. It is the only
+  free SQL text the servers execute, and it comes from the configuration, not the binary. Effect on every procedure:
+  a statement that waits more than 5 s for a lock fails with SQL Server error 1222 ("Lock request time out period
+  exceeded"); the batch is not aborted, but `SQLExecDirect` returns `SQL_ERROR` and the wrapper takes its failure path
+  (usually: log, no reply or the handler's DB-error reply). A rebuild that keeps the procedures but not this setting waits
+  indefinitely instead (SQL Server's default `LOCK_TIMEOUT` is −1). So a rebuild should run `SET LOCK_TIMEOUT 5000` on
+  every connection (or keep the configuration column).
+- The command is passed to `vsprintf` as the **format** with no arguments *(original bug)* D06-B7: a `%` in the
+  configured text (e.g. a `LIKE '%…'` in a custom startup batch) reads stack garbage or crashes the worker at start; text
+  longer than 0x2000 bytes overflows the stack buffer. Harmless with the shipped value. Likely intent: execute the text
+  as is.
+- `DBRecord::query` has no other caller in any of the four binaries.
+
+## 8. Version choices for Character procedures that have source (D02 / D03 *(db-backup)* points)
 
 ### 8.1 `p_Item_BuyAll` (10) / `p_Item_BuyLot` (8): follow w00
 
