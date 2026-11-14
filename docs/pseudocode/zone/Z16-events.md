@@ -716,6 +716,300 @@ GM words: `&endofkq` and `&Reroadkingdomquest` are in Z11 §5.5, and `&kqreward`
 Z11 §8.4 (`&kingdomquest` starts a map script without a KQ element, so `cReward` / `reward` find no KQ handle there
 *(inferred from Z11 §8.4)*).
 
+## 4. Guild tournament: the system core
+
+One `GuildTournamentSystem` (0x1e8 bytes) per tournament map, `FieldMap::fm_pGuildTournamentSystem` (read by
+`fm_GetGuildTournamentSystem` @ FUN_00463290). It is created and filled by `fm_CreateGuildTournamentSystem` @ FUN_00464830
+(from `wms_GuildTournamantStart`, §6) and holds the two fighting guilds, the flags and the dice game. Its group behaviour
+(scores, skills, master buff, gates, items) is `GuildTournamentSystem::GuildGroup` (§5); the match start / end with
+the WM and the client requests are §6. The map script (`Guild/GuildTournament.ps`) registers flags, gates and portals
+and ends the match through Pine nodes (Z09 §24.8, §25.7, `RegisterGTPortal` Z09 §22.4).
+
+### 4.1 Data structures
+
+```pseudo
+GuildTournamentSystem : RoutionInterface   (0x1e8)                     # vftable: +0 dtor, +4 Roution
+    +0x004 m_ErrorMessage     FastDelegate1<int>   error sink of the request in progress (SetErrorDelegate)
+    +0x00c m_vecFlags         vector<FlagInfo>     in FlagRegister order
+    +0x01c m_GroupA, +0x0d0 m_GroupB   GuildGroup (0xb4, §5.1)     # A = nNo1, B = nNo2 of 0x7481
+    +0x184 m_nTournamentType  int   MAP_TYPE key of every GuildTournament*.shn table (all 2016 rows: 0)
+    +0x188 m_nTournamentSeed  int   −1 = none
+    +0x18c m_diceGame         DiceGame (0x48, §5)
+    +0x1d4 m_OldTime          tick of the previous Roution
+    +0x1d8 m_FlagAllConnectTime TickTimer, delay 600 (60 s): runs while one guild holds every flag
+
+FlagInfo (0xc4): +0 m_GuildNumber (owner; 0 = neutral), +4 u16 m_ObjectNumber (flag NPC handle),
+    +8 m_strFlagAType, +0x24 m_strFlagBType, +0x40 m_strFlagNormalType (mob index names of the three looks),
+    +0x5c m_FlagScoreTimer TickTimer (delay = OccupyTime·10/1000), +0x6c m_PortalInfo
+PortalInfo (0x58): +0 u16 m_Handle (0xFFFF = none), +4 m_strAType, +0x20 m_strBType, +0x3c m_strNormalType
+Gate (0x40): +0 bIsUse, +2 u16 hFlagNumber, +4 u16 hGateNumber, +8 strunUseGateName, +0x24 strUseGateName
+GuildMemberInfo (0x1c): +0 u16 m_hHandle, +4 m_nGuildMemberGrade (0 = guild master, see 0x74DE), +8 m_unInCreaseScore,
+    +0xc m_unDeCreaseScore, +0x10 m_DieCount, +0x14 m_KillCount, +0x18 m_CaptureFlagCount
+GuildGroup fields used here (full list §5.1): +0 m_GuildNumber, +4 m_mapOutMemberBackUps map<charName, GuildMemberInfo>,
+    +0x14 m_vecGuildGates, +0x24 m_vecGuildMembers (sorted by grade, GradeSort @ FUN_00478d80: a.grade < b.grade),
+    +0x3c m_unAllGuildScore, +0x40 m_unKillerPoint, +0x44 m_unGuildScore, +0x70 m_nCaptureFlagCount,
+    +0x74 m_pManageruser (the member used as the map anchor for broadcasts), +0x88 m_Advan {bool m_IsAdvan, int m_nLevel},
+    +0x90 m_FlagMultiple (≥ 1; > 1 while a "War Cry" item runs, §5)
+GuildTournamentSystem::sm_mapGuildMemberGrades   map<charNo, grade>, filled by SetGuildMemberGrade from 0x74C7 (§6)
+
+TickTimer (0x10): +0 m_CurDelayTime, +4 m_DelayTime, +8 m_bEnable, +0xc m_PrevCheckTime; units = clockwatch ticks
+    (tenths of a second). Enable(b) @ FUN_00591fd0: m_bEnable = b, m_CurDelayTime = 0.
+    CheckUpdateEvent(dt) @ FUN_00592020: if enabled: cur += dt; if cur > delay: cur −= delay, return true (periodic).
+    The delay is written by the folded setter FUN_00653a60 (named `UseItemRide::uir_SetSkill` in the PDB: `*(this+4) = v`).
+```
+
+### 4.2 Tables
+
+Loaded at zone start by `Table::Load<T>` (GuildTournamentScore 005b42b0, LvGap 005b43f0, Occupy 005b4530, Skill 005b4670,
+MasterBuff 005b47b0, GTIGetRate 005b48f0, GTIGetRateGap 005b4a30, GTIServer 005b4b70, GTIBreedSubject 005b4cb0,
+GTWinScore 005b4df0; file-name strings 006fa920…006fa9ec, called from `zs_start_house` LAB_005b64e0, Z01 start table): `GetTableDir()` + file name →
+`ITableBase<Row,T>::Load` (e.g. FUN_005b25e0: allocate the 0xc4 table object once, `CDataReader::Read`, accept only
+`nVersionKey == DataVersionKey` (0x36f for GuildTournamentScore; `docs/knowledge/S01.md` SHN header), then the table's vt+4 post-processing);
+failure → assert "Fail to read  : <file>" and `ShineExit`. The GTI* item tables are used by §5.
+
+| File (row struct, size) | Fields | Getter | 2016 rows (MAP_TYPE 0) |
+|---|---|---|---|
+| GuildTournamentScore.shn (`GUILD_TOURNAMENT_SCORE`, 0x10) | MAP_TYPE, u16 GradeScore[7] | `GetScore(type, killerGrade, victimGrade)` @ FUN_005c7080: the killerGrade-th row of the type, column victimGrade; victimGrade > 6 → assert "…GetScore : No Script" and still reads `row[victimGrade+1]` (original bug) Z16-B11; no row → 0 | 7 rows, e.g. killer grade 0: 18 12 10 8 4 4 3; grade 6: 20 16 14 12 10 8 5 |
+| GuildTournamentLvGap.shn (`GUILD_TOURNAMENT_LVGAP`, 8) | MAP_TYPE, float LvGap, u16 PointRate | `DataProcess` @ FUN_005c7d00 groups the rows per MAP_TYPE into `sm_mapBalanceDatas` (file order); `BalanceScoreMediate(type, score, killerLv, victimLv)` @ FUN_005c7c50: gap = victimLv − killerLv; first row with `LvGap ≤ gap` (else the last row) → `PointRate · score / 100`; type unknown → assert "GuildTournamentBalanceTable::BalanceScoreMediate Not Find" and 0 | LvGap 11 → 150 %, 6 → 120 %, −5 → 100 %, −10 → 80 %, −11 → 50 %, −130 → 50 % |
+| GuildTournamentOccupy.shn (`GUILD_TOURNAMENT_OCCUPY`, 6) | MAP_TYPE, u16 OccupyTime (ms), u16 Score | `GetOccupyTime(type)` @ FUN_005c70f0 (none: assert, 0xFFFFFFFF), `GetScore(type)` @ FUN_005c7150 (none: assert, 0) | 60000 ms, 20 points |
+| GuildTournamentSkill.shn (`GUILD_TOURNAMENT_SKILL`, 0x2e) | MAP_TYPE, Index, DeathPoint, char StaName[32], TargetType, u32 DlyTime | `GetStateByIndex(type, index)` @ FUN_005c71b0, `GetUseSkillCount(type, points)` @ FUN_005c7200 (rows with DeathPoint ≤ points); used in §5 | 0 StaGldRestore 20 pts; 1 StaGldMoveSpeedUp 15; 2 StaGldACMinus 80; 3 StaGldSlow 50; 4 StaGldStun 60; 5 StaGldAtkUp 0 |
+| GuildTournamentMasterBuff.shn (`GUILD_TOURNAMENT_MASTERBUFF`, 0x22) | MAP_TYPE, char StateName[32] | `GetMasterBuff(type)` @ FUN_005c7500 (string; "" if none) | StaAcaMsBuf7PMain |
+| GTWinScore.shn (`GTWinScore`, 2) | u16 WinScore | row 0 read in `Update` (§4.3) | 4000 |
+| GTIGetRateGap.shn (`GTIGetRateGap`, 3) | u8 ID, u16 Gap | `ChangeAdvanRule` (§4.6) | 1: 200, 2: 500, 3: 1000 |
+
+### 4.3 Lifetime and the tick
+
+```pseudo
+GuildTournamentSystem()                                   @ FUN_00480d30
+    groups constructed (GuildGroup() @ FUN_00480c10: revive timer delay 300, GuildGroup::Clear); dice game zeroed;
+    m_OldTime 0, seed −1, type 0; m_diceGame.m_DiceGameEnd = this.DiceGameWinGuild (§5); m_FlagAllConnectTime delay 600
+~GuildTournamentSystem @ FUN_00480e40 (groups, flag vector); scalar deleting dtor FUN_00480ee0
+
+Initialize(guildA, guildB, type, seed)                    @ FUN_00480f10   (from fm_CreateGuildTournamentSystem, §6)
+    Clear(); A.m_GuildNumber = guildA; A.SetTournamentType(type); B likewise (§5); m_nTournamentType = type; seed = seed
+
+Clear()                                                   @ FUN_004808f0   (also fm_GuildTournamentClear, wms_GuildTournamantStart)
+    empty m_vecFlags; GuildGroup::Clear(A), Clear(B) (@ FUN_00480460: removes the master buff from the first member if
+    that member is still the grade-0 master, empties gates / members / buff timers / out-member backups / advan item list /
+    team NPCs, zeroes scores, m_FlagMultiple = 1, m_pManageruser = NULL); seed −1, type 0, both guild numbers 0
+    # m_FlagAllConnectTime and the dice game are not reset here
+
+Roution()  (RoutionInterface vt+4)                        @ FUN_0047eab0
+    driver: ShineAxialFlag::so_Routine @ FUN_00569e00 of the map's axial flag object (FieldMap flag[2]) runs the map's
+    films, then Roution() of every entry of its safm_vecRoutions (fm_CreateGuildTournamentSystem pushes the system there)
+    dt = now − m_OldTime (first call: 0); m_OldTime = now; Update(dt)
+
+Update(dt)                                                @ FUN_0047e0e0
+    for each flag f:
+        g = group whose m_GuildNumber == f.m_GuildNumber
+        none (neutral flag): m_ErrorMessage(0x1B4F) if a sink is set (only during a request); continue
+        if f.m_FlagScoreTimer.CheckUpdateEvent(dt):                      # every OccupyTime (60 s) the flag is held
+            pts = OccupyTable.GetScore(type) · max(g.m_FlagMultiple, 1)  # 20, 40 with War Cry
+            g.m_unAllGuildScore += pts; g.m_unGuildScore += pts
+            win = GTWinScore row 0 (4000), 2000 if the GTIGetRateGap table is missing or empty
+                # tests GTIGetRateGap's header but reads GTWinScore (original bug) Z16-B9
+            if g.m_unAllGuildScore ≥ win: g.SendWinEventToScript()      # §5: the script ends the match
+            ChangeAdvanRule()                                            # §4.6
+            anchor = g.m_pManageruser, else g.CheckManagerUser() (§5)
+            if anchor: → all in anchor's map 0x74DD NC_GUILD_TOURNAMENT_SCORE_CMD
+                {PartMask 0, regNumber g.no, unAllScore, unCaptureFlagCount = g.m_nCaptureFlagCount, unPlayerNum 0}
+    if m_FlagAllConnectTime.CheckUpdateEvent(dt):                         # one guild held all flags for 60 s
+        m_FlagAllConnectTime.Enable(false)
+        if there is a flag: g = owner of flag[0]: g.SendWinEventToScript() (no group: 0x1B4F to the sink)
+    A.Update(dt), B.Update(dt) (§5); m_diceGame.Update(dt) (vt 0, §5)
+```
+
+### 4.4 Registration of fighters, flags, gates and portals
+
+```pseudo
+PlayerRegister(p) → bool                                  @ FUN_0047f970
+    only if p's layer sub index (so_layer.layer +4 l_Sub) is 0 or 1 and p is not yet registered (IsPlayerRegister):
+        # observers stand on layer 2 (map login, below); GM hide mode on layer 3
+    g = group with m_GuildNumber == p.guildNo (vt 0x818); none → sink(0x1B4F), false
+    grade = sm_mapGuildMemberGrades[p.charNo]; missing → log "GuildTourmentSystem::PlayerRegiste Not Find Grade Info :
+        <name>" to GuildTournamentLog, false
+    info = {handle p, grade, all counters 0}
+    if g.m_mapOutMemberBackUps has p's name: info = the backup (all seven fields), handle = p's handle  # rejoin keeps scores
+    insert info into g.m_vecGuildMembers after the last member with grade ≤ info.grade (upper_bound, GradeSort)
+    if grade (from sm_map) == 0: g.GuildMasterBuffRun() (§5)
+    → p (data stream vt 0x2f8) 0x7483 NC_GUILD_TOURNAMENTSTART_CMD {u32 nGuildA = A.no, u32 nGuildB = B.no,
+        u16 nGuildTourNamentType = type, u32 nGuildMyRegNumber = p.guildNo (0 → assert)}            # 14 bytes
+    → WM 0x74C8 NC_GUILD_TOURNAMENT_ZONE_FIGHTER_ENTER_CMD {u8 nTournamentSeed = seed, u32 nGuildNo, u32 nCharNo}
+        # WM sets the character's inArena flag (W03 §8.3)
+    A.SendPlayerAllScoreInfo(p, 1); (A.no == B.no ? A : B).SendPlayerAllScoreInfo(p, 0)    # §5: full score lists
+    if g.m_FlagMultiple > 1: → p 0x74F2 NC_GUILD_TOURNAMENT_ITEM_FLAG_CMD {u8 FlagScoreMultiple, u32 nGuildRegNo = g.no}
+    true
+
+SendMapInPlayerInfoToObserber(p)                          @ FUN_0047fd10
+    A.SendPlayerAllScoreInfo(p, 1); (A.no == B.no ? A : B).SendPlayerAllScoreInfo(p, 0)
+
+PlayerUnRegister(p) → bool                                @ FUN_0047fd50
+    g by p.guildNo (none → sink 0x1B4F, false); m = member with p's handle (none → false)
+    g.m_mapOutMemberBackUps[p.name] = m (insert or overwrite); erase m from m_vecGuildMembers
+    g.CheckManagerUser(); g.SetSkillPoint(g.m_unKillerPoint) (§5: re-evaluates the usable skills)
+    → WM 0x74C9 NC_GUILD_TOURNAMENT_ZONE_FIGHTER_OUT_CMD {u8 nTournamentSeed = (u8)m_nTournamentType (!), u32 nGuildNo,
+        u32 nCharNo}     # writes the tournament type into the seed field (original bug) Z16-B10; the 2016 WM ignores it
+    true
+
+IsPlayerRegister(p) @ FUN_0047a160: p's guild is A or B (else sink 0x1B4F, false) and its member list has p's handle
+IsBattleGuild(g1, g2) @ FUN_00478db0: {g1, g2} == {A.no, B.no} in either order
+GetGuildRegIndex(p) @ FUN_00478df0: 0 = guild A, 1 = guild B, 100 = neither (no member check)
+
+Zone hooks:
+    map login complete (sp_NC_MAP_LOGINCOMPLETE_CMD @ FUN_00443390, Z01), on a tournament map (fm_IsGuildTournametnMap):
+        early: off a tournament map → vt 0x650 (reset abstate); on one with abstate STA_OBSERVERHIDEMODE: layer = {0, 2};
+               SendMapInPlayerInfoToObserber(p) if the map has a system
+        late:  not observer: system and (PlayerRegister(p) or IsPlayerRegister(p)) → stay; else sp_2Roumen(p)
+               observer: no system → sp_2Roumen(p)
+    so_Unmark(REMOVE_NOW) @ FUN_00558900: PlayerUnRegister(p) if the map has a system
+        # REMOVE_NOW is the logout (sp_Schedule_Logout) and the same-zone link (Z01 map link); REMOVE_REVIVE (link
+        # command 0x4f), REMOVE_WARP and REMOVE_LOGOUT skip it: such a fighter stays in m_vecGuildMembers with a stale
+        # handle until the system is cleared *(inferred)*
+    0x204B NC_ACT_ROAR_REQ @ FUN_005404d0 (Z02 §9.2): a registered fighter gets 0x0720
+    `NPCAction::GT_TeamCondition` @ FUN_005c2890 / FUN_005c2920 (Z09 §16.4): GetGuildRegIndex == team
+    combat enemy test `fm_GuildTournamentEnemy(g1, g2)` @ FUN_004632f0 = IsBattleGuild (Z03 §3.1, §3.3)
+
+FlagRegister(flag, nameA, nameB) → true                   @ FUN_00480970   (Pine `RegisteFlag`, Z09 §25.7)
+    push FlagInfo {guild 0, handle flag, AType nameA, BType nameB, NormalType = flag's current mob index name (vt 0x894),
+        score timer delay OccupyTime(type)·10/1000 (60000 ms → 600 ticks), disabled; portal handle 0xFFFF}
+GateRegister(gate, guildNo, hFlag, useName) → bool        @ FUN_00480ab0   (Pine `RegisteGate`, Z09 §25.7)
+    g = group with m_GuildNumber == guildNo (none → sink 0x1B4F, false)
+    g.m_vecGuildGates.push {bIsUse false, hFlagNumber hFlag, hGateNumber gate, strunUseGateName = gate's index name,
+        strUseGateName = useName}; true                                     # the gate's open / closed looks
+PortalResiter(portal, hFlag, nameA, nameB) → true         @ FUN_0047ccf0   (Pine `RegisterGTPortal`, Z09 §22.4)
+    every flag with m_ObjectNumber == hFlag: m_PortalInfo = {portal handle, AType nameA, BType nameB,
+        NormalType = portal's index name}
+```
+
+### 4.5 Flag capture
+
+The cast (0x74CA, `so_ply_FlagCaptureCast`, 4 s cast bar) and its end callback `so_ply_FlagCapture` are §6; they set the
+error sink and call these.
+
+```pseudo
+IsFlagCapture(p, hFlag) → bool                            @ FUN_00479510
+    p's guild must be A or B (else sink 0x1B4F, false); flag with handle hFlag: true when its owner == p's guild
+    (vt 0x828, the same guild getter) # "already captured by you" test (0x1B48 in the cast)
+IsUseGate(p, hFlag, hGate) → bool                         @ FUN_004795d0   (Pine `@IsGateUse`, Z09 §22.2)
+    IsFlagCapture(p, hFlag) and p's group has a gate {hFlagNumber hFlag, hGateNumber hGate}
+
+CaptureFlag(p, hFlag) → bool                              @ FUN_0047eae0
+    g = p's group (none → sink 0x1B4F, false); isA = (g == A)
+    f = flag entry with handle hFlag (none → false)
+    o = som_GetObject(hFlag): missing → sink 0x1B41 ("You tried to capture NPC, not the flag"), log, false;
+        so_ObjectType (vt 0x4d0) ≠ 4 (NPC) → log name, sink 0x1B41, false
+    cur = o.so_mob_MobID (vt 0x708); idA = mobID(f.AType); idB = mobID(f.BType)
+    new = isA ? (cur == idB ? Normal : idA) : (cur == idA ? Normal : idB)      # enemy flag → neutral; else → own colour
+    new == 0xFFFF → log "GuildTourmentSystem::FlagCapture Not Find Flag Change Type ", false
+    portal = NPC at f.m_PortalInfo.m_Handle (may be none)
+    if cur == idA or cur == idB:                         # neutralising an owned flag
+        f.m_GuildNumber = 0; owner = 0; f.m_FlagScoreTimer.Enable(true)
+        (the group that is not p's).ChangeGateState(false, hFlag) (§5)
+        portal: look = Normal
+    else:                                                # taking a neutral flag
+        f.m_GuildNumber = owner = p.guildNo; f.m_FlagScoreTimer.Enable(true)    # scoring restarts from 0
+        g.ChangeGateState(true, hFlag)
+        portal: look = isA ? AType : BType
+    portal: sm_InitBriefInfo(handle, mobID(look), 0) (vt 0xf70: becomes that mob) and SendBriefChange(portal)
+    flag:   sm_InitBriefInfo(handle, new, 0); SendBriefChange(flag)
+    AxialListFlagCaptureCancel{hFlag} over all in the flag's map: every player → sp_FlagCaptureFreeCheck(hFlag)
+        (ali_Work @ FUN_004794b0; cancels other casts on this flag, §6)
+    → all in the flag's map 0x74CD NC_GUILD_TOURNAMENT_FLAGCAPTURE_RESULT_CMD {Name5 CIDPlayer = p.name,
+        Name5 CIDFlag = flag name, u32 gRegGuildNo = p.guildNo, u32 gRegFlagCaptureGuild = owner (0 = neutralised)}
+    p's member: m_CaptureFlagCount++; → all in p's map 0x74DD {PartMask 0, g.no, g.m_unAllGuildScore,
+        g.m_nCaptureFlagCount, 1, [p's TOURNAMENT_PLAYER_SCORE]}
+        # g.m_nCaptureFlagCount is not changed here (§5 decides who writes it)
+    m_FlagAllConnectTime.Enable(every flag owned by p.guildNo)    # restarts the 60 s countdown on every capture
+    InitFlagAbStateSetup(); true
+
+InitFlagAbStateSetup()                                     @ FUN_00479680   (also after a War Cry item, §5)
+    for each flag: owner group with m_FlagMultiple ≥ 2 → flag NPC so_AbnormalState_Set_Simple(0, STA_GTIRATEPOINT
+        (366), 1, 1); else (neutral or multiple 1) → so_AbnormalState_Reset(STA_GTIRATEPOINT)
+
+SendBriefChange(o)                                         @ FUN_00478e40
+    → all in o's map 0x1C09 NC_BRIEFINFO_MOB_CMD {u8 count 1, o.so_FillBriefInformation (vt 0x4c4, 0x95 bytes)}
+```
+
+Client 0x74CD (GuildTask FUN_006b64f0): ignored when `gRegGuildNo` is 0; text TextData2 0x20588487 "%s of %s Guild
+captured the flag of %s" or, when `gRegFlagCaptureGuild` is 0, 0x14542566 "%s of %s Guild neutralized the flag of %s"
+(player, guild name from the client's tournament list, flag), coloured by whether the capturer is the enemy; then
+`Char::StopFlagCapture` on the capturing character (ends its capture animation).
+
+### 4.6 Kills, scores, advantage and the enemy scan
+
+```pseudo
+DeadPlayer(victim, killer)                                 @ FUN_0047e640
+    caller: ShineMobileObject::so_KilledBy @ FUN_00432240 (any victim with a map, Z03 §7) when the map has a system
+    both non-NULL; vg = victim's group, kg = killer's group (either missing → sink 0x1B4F, return)
+    vm = victim's member, km = killer's member (missing → log "GuildTourmentSystem::DeadPlayer Not Find Player : <name>")
+    # a monster or non-fighter killer stops here: no score, no message
+    if victim.guild ≠ killer.guild:
+        s = ScoreTable.GetScore(type, km.grade, vm.grade)
+        s = LvGapTable.BalanceScoreMediate(type, s, killer.level (vt 0x4d8, low byte), victim.level)
+        kg.AddScore(s) (§5); km.m_unInCreaseScore += s; km.m_KillCount++
+        vg.SetSkillPoint(vg.m_unKillerPoint + 1)        # the dying side earns a guild skill point (§5)
+        vm.m_unDeCreaseScore += s; vm.m_DieCount++
+        → all in the map (anchor vg.m_pManageruser / CheckManagerUser) 0x74DD {0, vg.no, vg.all, vg.capt, 1, [victim row]}
+        → same anchor 0x74DD {0, kg.no, kg.all, kg.capt, 1, [killer row]}
+    → victim's guild members in range (AxialListPacketBroadcastByGuild, so_AllOfRange with the all-of-range argument)
+        0x74DE NC_GUILD_TOURNAMENT_PLAYERDIEMSG_CMD {Name5 VictimCharID, Name5 MurderCharID, int VictimGuildGrade = vm.grade}
+    → killer's guild members likewise 0x74DF NC_GUILD_TOURNAMENT_PLAYERKILLMSG_CMD {same body}
+    ChangeAdvanRule()
+
+ChangeAdvanRule()                                          @ FUN_0047a2d0
+    gap = |A.all − B.all| (low 16 bits); bLeads = B.all > A.all
+    if gap == 0 or the GTIGetRateGap table is empty: return     # equal scores keep the old advantage (original bug) Z16-B12
+    level = first row index i with gap < row[i].Gap, else count − 1      # 2016: < 200 → 0, < 500 → 1, else 2
+    A.SetAdvan({m_IsAdvan = bLeads, level}); B.SetAdvan({!bLeads, level})   # the trailing guild gets the advantage (§5)
+
+SendScorePacket(g)  (0x28: buffer[17], m_pPacket → buffer, vector<TOURNAMENT_PLAYER_SCORE>)   @ FUN_0047ddb0
+    header {PartMask 0, regNumber g.no, unAllScore g.m_unAllGuildScore, unCaptureFlagCount g.m_nCaptureFlagCount, 0}
+    SendtoPlayer(p, mask) @ FUN_00479d50: → p (game stream vt 0x2fc) 0x74DD with PartMask = mask, unPlayerNum = rows
+    SendtoAllinMap(o, mask) @ FUN_00479ec0: same packet to all in o's map; o NULL → nothing
+    dtor FUN_0047dad0
+Make_TOURNAMENT_PLAYER_SCORE(row, p, m) @ FUN_00479080: {CharID p.name, unIncreaseScore, unDecreaseScore, unDieCount,
+    unKillCount, unGuildGreade = grade, unCaptureFlag} from m
+
+ScanEnemyUser(p)                                           @ FUN_0047a3d0
+    caller: SubAbnormalStateActor::sasa_Routine @ FUN_00406d50 for an abstate with the SAA_SCANENEMYUSER effect (a GT
+    item, §5), when p's map has a system
+    p registered; e = the other group (A if p is not in A)
+    → p 0x74F3 NC_GUILD_TOURNAMENT_ITEM_SCAN_CMD {u16 nNum, SHINE_XY_TYPE loc[nNum]}: every member of e that exists and
+        has neither STA_HIDE (75) nor STA_GTIHIDE (373) (vt 0x3e4 so_AbnormalState_IsSet)
+```
+
+Client: 0x74DD (GuildTask FUN_006b26d0) feeds `GTStatusMiniWin` / `GTStatusWin`: PartMask 1 clears both windows and
+adds the rows (with 0 rows the guild totals are not updated), PartMask 0 adds / updates rows or, with 0 rows, only the
+guild totals; the mini window is shown unless the big one is open. 0x74DE (FUN_006b5440): victim == me → TextData2
+0xe5f5ec07 "You have been killed by %s"; else VictimGuildGrade 0 → 0x4f3d8783 "Our Guild Master %s has been killed by
+%s", else 0x90a3a8ed "%s has been killed by %s". 0x74DF (FUN_006b5680): 0xdd093b47 "%s has killed %s". 0x74F3
+(FUN_006b3b40): nNum 0 → ignored; else `MiniMapWin::ClearGTEnemyPos` and one `AddGTEnemyPos(x, y)` per entry. 0x7483
+(FUN_006b4730): stores A, B, type and the own number; A or B 0 → TextData 0x38281f8b "There is no match opponent"; else
+the enemy is B if the client's guild is A, otherwise A (name from `CClientGuild::FindGttEnemyInfo`).
+
+### 4.7 Result, master revive, error sink, map helpers
+
+```pseudo
+EndBattle(&tGuildTournamentResult) → true                 @ FUN_004803f0   (Pine `gtresult result`, Z09 §24.8)
+    {AGuildRegNumber A.no, u16 AGuildScore = (u16)A.all, BGuildRegNumber B.no, u16 BGuildScore = (u16)B.all}
+    empties m_vecFlags (captures and flag scoring stop; groups and members stay until Clear)
+GetVictoryGuild() @ FUN_004790e0 / GetLoseGuild() @ FUN_00479100: by m_unAllGuildScore; equal → 0 (Pine
+    `@GetWinnerGuild` / `@GetLoseGuild`, Z09 §22.2)
+GuildMasterRevive(p)                                       @ FUN_0047a260   (from sp_ReviveReqProcess, Z07 §3.1)
+    p's group (none → sink 0x1B4F); if p is the group's master (GetGuildMaster, §5): m_LastGuildMasterReviveTime.Enable(true)
+SetErrorDelegate(d) @ FUN_0047a1f0 / ClearErrorDelegate() @ FUN_0047a230: set / clear the sink of the system, both
+    groups and the dice game; set around the 0x74CF / 0x74D3 requests and so_ply_FlagCapture (§6)
+
+so_SaveLocation(p, &NC_CHARSAVE_LOCATION_CMD) @ FUN_004542f0, tournament branch (map has a system, no roll-back event):
+    map = the current map, coord = p's position; if p is dead (mode 3): CurHP = maxHP / 3 and coord = the map's
+    regenloc[GetGuildRegIndex(p)] (index 100: position kept; ≥ 4 otherwise: regenloc[0] + assert "…Guild Map Revive
+    Point Low") — the same team revive points as sp_ReviveReqProcess
+
+fm_IsGuildTournametnMap() @ FUN_00475770: cached in m_nGuildTournamentMapFlag (1 yes, 2 no); compares fm_MapID with the
+    13-byte entries `GTMap[i].mapname` (DAT_0d55a860) for i = 0…30 (§6: seed table, Z08-B12)
+fm_GuildTournamentEnemy(g1, g2) @ FUN_004632f0 = system && IsBattleGuild(g1, g2)
+```
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -728,10 +1022,19 @@ Z11 §8.4 (`&kingdomquest` starts a map script without a KQ element, so `cReward
 | Z16-B6 | Lua `cGetKQLimitSecond` FUN_005e5390 | tests the u16 `LimitTime` against 0xFFFFFFFF | dead check: the nil branch can never be taken, every KQ returns `LimitTime · 60` (0 for `LimitTime` 0) | compare with the u16 "no limit" value (0xFFFF, *(inferred)*) |
 | Z16-B7 | `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 / `sp_ReviveReqProcess` FUN_00451bd0 | the `bs_ClearAtLink` reset runs only off KQ maps, where `so_GetBattleStat` returns the shared `so_DefBattleStat` | a player's KQ statistics are never reset by it; only the shared default object (written by every non-KQ fight) is cleared | keep the statistics per player and reset them at the link out of the KQ |
 | Z16-B8 | `AxialListKQReward::ali_Work` FUN_00428490 (`reward` / `cReward`) | rewards every player on the map whose kill count reaches `DemandMobKill`, without a joiner or admin-level check (the result list skips GMs) | with `DemandMobKill` 0 GMs and non-joiners on the map get the KQ reward chest, cen, fame and EXP | reward joiners only (`kqpil_IsKQJoiner`), skip GMs |
+| Z16-B9 | `GuildTournamentSystem::Update` FUN_0047e0e0 | the win-score lookup tests whether the GTIGetRateGap table has rows, then reads row 0 of GTWinScore | an empty or missing GTIGetRateGap falls back to 2000 points although GTWinScore says 4000; an empty GTWinScore with a non-empty GTIGetRateGap reads a missing row | test the GTWinScore table it reads |
+| Z16-B10 | `GuildTournamentSystem::PlayerUnRegister` FUN_0047fd50 | 0x74C9 FIGHTER_OUT carries `(u8)m_nTournamentType` in its `nTournamentSeed` field (0x74C8 carries the seed) | wrong seed on the wire; harmless only because the 2016 WM ignores the field (W03 §8.3) | send `m_nTournamentSeed` |
+| Z16-B11 | `GuildTournamentScoreTable::GetScore` FUN_005c7080 | a victim grade > 6 asserts but still reads `GradeScore[grade]` past the 7-entry row | the kill score comes from the next row's MAP_TYPE / scores | return 0 (or clamp) after the assert |
+| Z16-B12 | `GuildTournamentSystem::ChangeAdvanRule` FUN_0047a2d0 | returns without touching either group when the scores are equal | after a tie the guild that trailed before keeps its comeback advantage although nobody trails | clear both advantages when the gap is 0 |
 
 ## N. Not reconstructed / uncertain
 
-- Parts 1–2 (KQ). The guild tournament (§4 ff.) follows in later parts; see `docs/plan/status/Z16.md`.
+- Parts 1–3 (KQ, GT core §4). GT groups / dice / items (§5) and the match lifecycle (§6) follow in later parts; see
+  `docs/plan/status/Z16.md`.
+- §4.4: a fighter who leaves the tournament map through `so_Unmark` with REMOVE_REVIVE / REMOVE_WARP / REMOVE_LOGOUT
+  is not unregistered there; whether another path (`sp_2Roumen`, the cross-zone link, §6) removes the entry from
+  `m_vecGuildMembers` was not traced.
+- §4.6: the range of the 0x74DE / 0x74DF broadcasts (`allofrangearg`) was not resolved; read as the whole map.
 - `bs_SkillBlast`: the `so_Routine` branch that counts it tests `scs_ProduceSkill.sklidx`; whether that is every
   skill blast or only the production-skill step was not traced (Z03).
 - 0x5817 after `sp_KQReward`: what the client shows for a reward-box chest whose DB rows were never created
