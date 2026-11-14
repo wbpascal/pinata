@@ -46,8 +46,9 @@ scenario book shelf (Pine or Lua books, reload) and the dialog-string files (`Sc
 nodes, §27 films and the boss-field tables, §28 the sweep additions (map query functions per map kind, heal reports,
 the rest of `MiscDataTable.txt`, answers to the sweep leftovers, the `OptionReader` text-table format, the dead
 `CFindWay` path finder, the methods reached only through vtables, the data-file and opcode check, the last helpers of the gap list, the game's own `List` / `BTree` / vector
-templates; review additions: the Lua score / ranking functions, the instance-dungeon rank result, the hunt log), §29 the original-server bugs
-register (Z09-B1 … B130), §30 what is not reconstructed or uncertain, §31 the coverage boundary.
+templates; review additions: the Lua score / ranking functions, the instance-dungeon rank result, the hunt log, and the small
+leftovers of finished items: capsule creation, class change, charged effects, guild-war request, tutorial Lua functions), §29 the original-server bugs
+register (Z09-B1 … B131), §30 what is not reconstructed or uncertain, §31 the coverage boundary.
 
 ---
 
@@ -9851,8 +9852,8 @@ owns, i.e. cites more of than any other doc, against every doc) found these; all
   Z06, Z07, Z08, W01–W04, D02–D05); the six without any doc are in the coverage boundary (§31.3; the `layouts.json` hit
   0x0E0D in `ShineMiniHouse::smh_SendFurnitureInfo` is no packet: the bytes are the local inventory-kind array `{3, 0xd, 0xe, 0x10}`;
   that function sends 0x8C08 / 0x8C09 and DB 0x3449): 0x8C4F (`ShineMiniHouse::so_Routine`), 0x1059 / 0x105A
-  (`so_ply_ClassChange`), 0x2442 / 0x2443 (`ShineMobileObject::smo_SkillBash_Blast_Trap`), 0x74F2
-  (`GuildTournamentSystem::PlayerRegister`).
+  (`so_ply_ClassChange`; documented in §28.13 since part 18, so four remain), 0x2442 / 0x2443
+  (`ShineMobileObject::smo_SkillBash_Blast_Trap`), 0x74F2 (`GuildTournamentSystem::PlayerRegister`).
 
 ### 28.10 Last Z09 helpers of the gap list (part 17d)
 
@@ -9898,7 +9899,7 @@ List<T>        fixed array of (max + 1) ListStruct<T> { T* ls_Content, u16 ls_Pr
                l_Finger { u16 store = first used entry, u16 empty = first free entry }, u16 l_ListNum, u16 l_MaxSize
   l_MakeList(n)      @ FUN_004b36a0 (same body per T: MobBreeder; MobBreederGroup FUN_004b3b20, HitMeList::Enemy FUN_00481ef0,
                        SkillChange FUN_004a86a0, MobTargetStruct FUN_004bd730, ORTable FUN_00646650, ShineObject FUN_005546f0,
-                       ShineObjectEachList FUN_00554b10, HuntLog::MobHuntElement FUN_004b6d20 (part 18))
+                       ShineObjectEachList FUN_00554b10, HuntLog::MobHuntElement FUN_004b6d20, ChargedItemEffectElement FUN_00451710 (part 18))
       n == 0xFFFF: no array. Else new[(n + 1) × 12], all contents null; entries 0…n−1 form the free ring
       (prev = i−1, next = i+1, entry 0's prev = n−1, entry n−1's next = 0), inactive; entry n is the sentinel
       (self-linked, active); store = n, empty = 0, count 0; then the ListEraser walk over the (empty) used ring
@@ -10049,6 +10050,98 @@ mhl_SendAll2Log(log, p)                                                  @ FUN_0
 
 Small helper: `MapDataBox::mdb_2mapid(name)` FUN_00419470 (from `cLinkToAll`, §17) = the map name's id in `mdb_btree`
 (BTree, §28.11), 0xFFFF when unknown.
+
+### 28.13 Small leftovers of finished items: capsule creation, class change, charged effects, guild-war request
+
+Their owners (Z05, Z07, Z08, Z01) were already done when part 18 re-owned them, and each is too small for a follow-up
+session, so they are documented here (the larger leftovers of finished items: `docs/knowledge/Z09.md` §3).
+
+```pseudo
+ShinePlayer::sp_MakeCapsuleItem(p, capsule, u64 price, u32 fame, u32 gbcoin)          @ FUN_0049cce0
+    # caller: sp_CreateItemByAdmin FUN_00527270 when the created item's ItemAttr class (vt 0x28) is 0x1D (capsule),
+    #   with price = fame = gbcoin = 0 (asm 0x527320); the profiler string says "so_MakeCapsuleItem"
+    every failure below: p.so_SendErrorCode(12, 4, code) (vt 0x308) = 0x3004 NC_ITEM_BUY_ACK { u16 code } (Z04),
+        0x0203 or 0x020A (no client error text)
+    capsule null, class ≠ 0x1D, or no ChargedItemEffect row for its id (`chargedbuffdatabox.cideb_GetItemID`): 0x0203
+    class.vt[0xb0](capsule, row.KeepTime_Hour, now = chargeditemcheck.ct_Current)       # sets the capsule's expiry
+    cell = first free unlocked cell of the inventory (ItemBoxIterEmpty over the bag + charged list, lock list
+           vt 0x7d4 so_ply_GetInventoryLockList, inventory type 9); none: 0x020A
+    reward = CLCReward::clcr_GetRandomLCRewardData(gLCReward, capsule.id)                # random content row
+    reward null or reward.Item_Inx unknown: 0x0203
+    content = { key = iti_mkregnum(id, 1, zone, world), id }, attributes from its class (vt 0x14, "-o"),
+              RandomOption fill when ItemInfoServer names a table (as dilig_Drop, §11.2), lot = reward.LCR_Lot (vt 0x20)
+    capsule's attribute keeps the content key (attr dwords ← content key)
+    Character server ← 0x34A0 NC_ITEMDB_BUYCAPSULE_REQ (0xFC) { hdr { u16 handle, u32 charNo }, nBuyNpcHandle = p.sp_NPCProcess.npchandle,
+        nLockIndex = lock list +4, nMap = NameString[p+0x7a] (FUN_00418ec0 on DAT_0085dfb0), nPrice, nFame, nGbCoin,
+        CapsuleLocation = cell, CapsuleInfo = capsule (ItemTotalInformation), ContentInfo = content }   (layout D03 §2.5)
+    lock: the cell (lock vt 0x40), money price (vt 0x48), fame (vt 0x4c), coin gbcoin (vt 0x70); lock index += 1
+    p.so_ply_ReactionNpcHandle() (vt 0xb40)
+    # the answer 0x34A1 NC_ITEMDB_BUYCAPSULE_ACK is Z05's (scope line 117, FUN_00525840)
+
+CLCReward::clcr_GetRandomLCRewardData(r, capsuleId)                                    @ FUN_0049cbc0
+    # tables LCGroupRate / LCReward (loader 0049d420, Z01 §2.3 table list); groups clcr_LCRewardGroup[clcr_nMaxNum]
+    #   (16 bytes: LCGroupRate m_Group { Item_ID, LCR_Group, LCR_Rate }, m_pItem, m_ItemCnt)
+    no groups: null
+    total = clcr_LCItemList entry of capsuleId (sum of its rates), 1 000 000 when the capsule is not listed
+    roll = rand(1 000 000); cum = 0
+    for g in groups (in table order): if g.Item_ID == capsuleId: cum += g.LCR_Rate × 1 000 000 / total (integer);
+                                      if roll ≤ cum: take g, stop
+    no group taken: g = the **last group of the whole table** (any capsule) (original bug) Z09-B131
+    g.m_pItem null: null;  else g.m_pItem[RandomRing(g.m_ItemCnt)] (index 0 when the count is 0 or > 100)
+
+ShinePlayer::so_ply_ClassChange(p, newclass)                                          @ FUN_004521b0 (vt 0x6c8)
+    # callers: 0x1057 NC_CHAR_CLASSCHANGE_ACK (Z07), Lua cClassChangeOpen / quest rewards
+    newclass == 0: assert "None Class"; 0x1059 still sent with newclass 0
+    else: shape bits 2…6 (sp_CharData.toclient.shape) ← newclass; class manager (+0xfbc) ← ccm_array[newclass]
+          (newclass ≥ 0x40: the manager object itself (unchecked; classes come from the DB / quest data))
+    p ← 0x1059 NC_CHAR_PROMOTE_ACK { u8 newclass }                         (game stream vt 0x2fc)
+    newclass ≠ 0: so_allparametercalculate (vt 0x57c); sp_StatRemainSend
+    brief info (sp_CharBriefInfo): chrclass ← newclass; shape class bits too when mode ∈ {1, 2, 6}
+    WM ← 0x1058 NC_CHAR_CLASSCHANGE_CMD { hdr { u16 handle, u32 charNo }, u16 wldmanhandle = so_GetWMSHandle (vt 0x340),
+        u8 newclass = class manager vt 0x38 }  (W01 scope line 246)
+    newclass ≠ 0: sight ← 0x105A NC_CHAR_SOMEONEPROMOTE_CMD { u16 handle, u8 newclass } (so_AllOfRange, include self 0)
+    GMEM_CheckAllConditionAndApply(p)                                     (GM events by class, §1)
+    # client: On_NC_CHAR_PROMOTE_ACK FUN_004b5b20: 0 → system message text 0xdaebbeca; else "SkillLevelUp" effect,
+    #   message 0xd6433c22 with the class name (class table +0x15), SetMainCharClass, char-info window; classes
+    #   4, 5, 9, 10, 14, 15, 19, 20, 24, 25, 27 also get the "Aura100" effect. On_NC_CHAR_SOMEONEPROMOTE_CMD
+    #   FUN_004b5d30: own handle → SetMainCharClass; the character by handle gets the class and an effect
+
+ShinePlayer::sp_GuildWarRequest(guildA, guildB)  (static)                              @ FUN_0042e5f0
+    # caller: the PvP hit rule on an attack between guilds (Z03 §3.3)
+    both ≠ 0: WM ← 0x7478 NC_GUILD_GUILDWARCONFIRM_REQ { u32 guildA, u32 guildB }   (W03 scope line 154; answer 0x7479 is Z08's)
+ShinePlayer::sp_ChargedEffectAfterLoginComplete(p)                                      @ FUN_00417ad0
+    # from the login-complete handler 0x1803 (Z01-core line 510)
+    walk the player's charged-item list (sp_ChargedItem) with a ChargedEffectAfterLoginComplete iterator (applies each
+    effect after login *(inferred: the iterator's vt[0] was not opened)*)
+ChargedItemEffectList::ChargedEffectList::ChargedEffectList                            @ FUN_00451890
+    the §28.11 List<T> with 50 entries + a 50-element ChargedItemEffectElement array (12 bytes each), element i = entry i's content
+ChargedItemEffectList::ChargedEffectListRouter::~ChargedEffectListRouter               @ FUN_00450e80
+    if the container's byte +0x19 (vt 0x498 so_ply_ChargedEffectContainer) ≠ celr_MoreStat (the value when the walk
+    started): so_allparametercalculate (vt 0x57c) and so_mobile_NotifyParameterChange(1) (vt 0x34)
+CChargedItem::CChargedItem                                                             @ FUN_006323a0   m_NumOfChargedItem = 0
+CParty::p_defaultslot                                                                  @ FUN_00645330   returns the static empty slot p_def
+```
+
+The tutorial Lua functions (§14.9 listed them under Z15, part 17d under Z07; they are Lua C functions like the rest of
+§17–§19, used by `LuaScript/Tutorial/Tutorial.lua`). Tutorial info = `so_ply_GetTutorialInfo` (vt 0xdfc,
+`PROTO_TUTORIAL_INFO` at p+0x2ab44 { u32 nTutorialState, u8 nTutorialStep @4 }, filled by 0x1115, Z07 §1.2):
+
+```pseudo
+cGetTutorialInfo(handle)                                                                @ FUN_005e7450
+    arg 1 nil, object or tutorial info missing: 0 results;  else returns nTutorialStep (1 result)
+cProgressTutorial(handle, step)                                                         @ FUN_005e72f0
+    object missing: return;  object ← 0x1116 NC_CHAR_TUTORIAL_STEP_REQ { u8 nTutorialStep = step } (data stream vt 0x2f8;
+        no player-kind check)
+    # client GameFrameWork::On_NC_CHAR_TUTORIAL_STEP_REQ FUN_004a6a70: creates the client tutorial Lua script and the
+    #   Tutorial object on first use and runs the step there
+cSaveTutorialInfo(handle, state, step)                                                  @ FUN_005e70b0
+    object or tutorial info missing: return
+    info = { nTutorialState = state (integer), nTutorialStep = step }
+    Character server ← 0x1118 NC_CHAR_TUTORIAL_STEP_SAVE_REQ { u32 nCharNo, u32 nUserNo (vt 0x348 so_GetUserRegistNumber), info }
+    WM ← 0x111C NC_CHAR_TUTORIAL_STEP_SAVE_CMD { u32 nCharNo, info }
+    state == 1 (finished): GameLog ← NC_LOG_GAME_DATA_TYPE_5 (nType 2025, charNo, state, step)   (D05 §4.4)
+    # Tutorial.lua calls it with state 1 at the end and 0 to store a step
+```
 
 ---
 
@@ -10214,6 +10307,7 @@ deduced from the code, not observed.
 | Z09-B128 | `sp_NC_ACT_GATHERCOMPLETE_REQ` FUN_0046cbf0 (0x2032), §11.2 | clears the gather timer and calls `sp_GatherComplete(p, 2)` without checking how long the gather has run | a client can finish every gather at once after 0x202E (and gets lots × 2 for resource types 8/9/10, the factor of the client-side completion) | reject 0x2032 before the gather time has passed |
 | Z09-B129 | `DropItemListForSpecies::dilfs_DropByRate` FUN_0048e920, §11.2 | the rate roll compares `(uint)rand(1000000) < (uint)(sum × DrItemR / 1000)`; a negative sum becomes a huge unsigned bound | latent: an abstate actor's negative drop rate or a `cec_ItemDropRate` far below 1000 would make every entry drop instead of none (the 2016 map rate 1000 keeps the sum ≥ 0) | signed compare / clamp the sum at 0 |
 | Z09-B130 | Lua `cIndunRankResult` FUN_005ee4d0, `cSendRankingList` FUN_005eaee0, `cScoreTopList` FUN_005ec1f0, `cScoreResultList` FUN_005ec6a0, §28.12 | copy a script table into fixed buffers without a count limit: 0x30-byte entries into a 4 KB stack buffer (> 85 entries), 20 per ranking list (the 21st Previous entry lands in Current[0], Current beyond 20 past the 1000-byte payload), a local u16 handle array (ebp−0x50), a u8 count | latent (scripts pass party / ranking lists; no 2016 script calls three of them): a long table overwrites the stack (cookie check → the zone ends, §30.1) or sends wrapped counts | cap the count at the buffer size |
+| Z09-B131 | `CLCReward::clcr_GetRandomLCRewardData` FUN_0049cbc0, §28.13 | the cumulative rates are integer quotients `rate × 1e6 / total`; when the roll exceeds their sum (rounding, or rates that do not add up to the listed total) the loop ends on the last group of the whole table | a capsule can open with the content of another capsule (the last LCGroupRate row), rarely with consistent data | take the last *matching* group, or compare against the exact sum |
 
 ---
 
@@ -10337,12 +10431,18 @@ items: their code, not a Z09 gap.)
 
 Part 18 (review) re-ran the check in a stricter form: "covered" = cited in a **pseudocode** doc (knowledge files no
 longer count, because a knowledge-file citation had hidden `sp_MakeCapsuleItem` (C02.md) and `mdb_2mapid` (Z01.md)).
-It also moved six functions out of this section into §28.12 (the hunt log `MobHuntLog` / `mhl_SendAll2Log`,
-`cIndunRankResult`, `cScoreInfo`, `cScoreInfo_AllInMap`, `cSendRankingList`: their plan lines did not name them) and found
-two more Z09 helpers (`CommonList<MobHuntElement>` ctor, §28.12, and its `l_MakeList` form, §28.11). Result with §1–§30 as roots: **518 functions / 20.7 k
-lines**, exactly the 518 of this section. Counts per owner: library code 146 (STL 120, Lua 16, CRT 10), Z01 75, Z03 53,
-Z04 49, Z13 47, Z16 38, Z02 29, Z15 23, Z14 18, Z07 12, Z17 8, Z06 7, Z08 5, Z12 4, D05 2, Z05 1, Z11 1. No function is
-left without an owner whose plan line includes it, so no follow-up item is proposed (status file).
+It moved six functions out of this section into §28.12 (the hunt log `MobHuntLog` / `mhl_SendAll2Log`,
+`cIndunRankResult`, `cScoreInfo`, `cScoreInfo_AllInMap`, `cSendRankingList`: their plan lines did not name them) and,
+because their owners Z01 / Z05 / Z07 / Z08 were already finished, the seven small leftovers of those items into §28.13
+(capsule creation, class change sends, charged-effect lists, guild-war request, party default slot) plus the three
+tutorial Lua functions (Lua C functions are Z09 scope, as in §28.12); the helpers they
+reach (`CommonList` / `l_MakeList` forms, `clcr_GetRandomLCRewardData`) are documented there too. Result with §1–§30 as
+roots: **509 functions / 20.2 k lines**, exactly the 509 of this section. Counts per owner: library code 146 (STL 120,
+Lua 16, CRT 10), Z01 74, Z03 53, Z04 49, Z13 47, Z16 38, Z02 29, Z15 23, Z14 18, Z07 9, Z17 8, Z06 7, Z12 4, D05 3
+(already documented in `D05-gamelog.md` §4.4; the zone check reads zone docs only), Z11 1. No function is left without
+an owner whose plan line includes it, so no follow-up item is proposed. **Owners already finished** (Z01, Z02, Z03, Z04,
+Z06, Z07: 221 functions + 0x2442 / 0x2443) will not reach these through their own gap lists: their follow-up list is
+`docs/knowledge/Z09.md` §3 (one short session per owner).
 
 ### 31.2 Functions of other items
 
@@ -10361,8 +10461,6 @@ left without an owner whose plan line includes it, so no follow-up item is propo
 | Trade, booths, gambling: `BoothManager` BoothManager 0043b550, operator= 00467500, ~BoothManager 0043b620; `CGambleObject` go_Get_MaxEnterPlayerCnt 00591ff0; `StreetBoothBuy` StreetBoothBuy 0058f390; `StreetBoothSell` StreetBoothSell 00590580; `TradeBoard` TradeBoard 00427ee0 | Z06 (plan lines 15 / 17: TRADE, BOOTH, GAMBLE) | constructors reached through the player object |
 | Titles: `CCharacterTitleDataStateServer` GetStateData 005ca9b0; `CCharacterTitleZone` CCharacterTitleZone 005ca5c0, ctz_SetObject 005ca610; `ShinePlayer` sp_SetCharTitleChangeAvailableTime 00560900; `cAddCharacterTitle` 005eb310 | Z07 (plan line 9: "titles") | Lua `cAddCharacterTitle` sends 0x6005 / 0x6009 (W04 / D04 document the other servers' side); `cCharTitleAddValue` (§17.8) feeds the same engine |
 | Collection cards: `BinaryDataBox<CollectCardMobGroup>` bdb_ReadData 00648d50; `CardCollection::CardCollectionReward` CardCollectionReward 00629150; `SHND::CommonData<CollectCard,SHND::CmpCardCollect<CollectCard>_>` cd_Load 00629840; `ShinePlayer` sp_CardCollectionSend 0044cc30 | Z07 (plan line 9: "collection cards") | card tables and the card send at login |
-| Tutorial: `cGetTutorialInfo` 005e7450, `cProgressTutorial` 005e72f0, `cSaveTutorialInfo` 005e70b0 | Z07 (scope tables, plan lines 44 / 106 / 153: 0x1117, 0x1119, 0x1115 tutorial packets) | the Lua tutorial functions send 0x1116 / 0x1118 / 0x111C; §14.9 had put them under Z15, but the tutorial packets are in Z07's scope (D02 has the DB side) |
-| Charged items, party slots, guild war: `CChargedItem` CChargedItem 006323a0; `CParty` p_defaultslot 00645330; `ChargedItemEffectList::ChargedEffectList` ChargedEffectList 00451890; `ChargedItemEffectList::ChargedEffectListRouter` ~ChargedEffectListRouter 00450e80; `ShinePlayer` sp_ChargedEffectAfterLoginComplete 00417ad0, sp_GuildWarRequest 0042e5f0 | Z01 for `sp_ChargedEffectAfterLoginComplete` (plan line 45: 0x1803 NC_MAP_LOGINCOMPLETE_CMD, whose handler calls it; Z01-core.md line 510 names it); Z08 for the charged-effect containers (plan lines 72–75: the 0x9007…0x900A NC_CHARGED_* handlers), `sp_GuildWarRequest` (`docs/knowledge/Z03.md` §3 line 68 hands it to Z08; plan line 111, 0x7479 NC_GUILD_GUILDWARCONFIRM_ACK, the answer of the request it starts) and `CParty::p_defaultslot` (plan title: "guild/party/friend zone side"; line 15 "14 PARTY") | charged-effect lists at login, the party slot default, guild-war request; none is world simulation |
 | GM command: `AmpersandCommand` ac_MobBreedUsage 0041a260 | Z11 (plan line 7: every `AmpersandCommand_ac_*`) | usage text of `&mobbreed` (the breeder it creates is §10.6) |
 | Stat containers: `Parameter::Container` Container 004c98a0, IsNoAttack 004c8ea0, c_MakeTotal 004c9a40, c_clear 0043c370 | Z12 (plan line 12: "`so_allparametercalculate` … what fills each layer") | the stat-matrix container; `IsNoAttack` is read by `ShineMobileObject::so_Routine` (§5.5) and the skill-bash handlers, but the container is Z12's |
 | Pets: `CPetData` GetPetID 004cef80, GetPetIDX 004cf030; `ItemAttrCls_Pet` iac_GetPetName 004d0650, iac_SetPetName 004d05f0; `ShinePet` spt_FindMaster 00419a80; `ShinePlayer` sp_PetSystem_InitPetInfo 004d1ff0, sp_PetSystem_InitPetInfoLink 004d2090, sp_PetSystem_LinkResummon 004d2a40, sp_PetSystem_Summon 004d2640, sp_PetSystem_VirtualCast 004d2180, sp_Send_NC_PET_ASK_NEW_NAME_REQ 004d0c90; `cPet_ChangeMind` 005ea1d0, `cPet_GetActionRecord` 005e9d00, `cPet_GetMind` 005e9520, `cPet_GetRunSpeed` 005e9b10, `cPet_GetStress` 005e9720, `cPet_GetWalkSpeed` 005e9920, `cPet_SaveTendency` 005ea410, `cPet_Unsummon` 005d65a0 | Z13 (plan line 15: "Pets: the summon/unsummon flow …, the `ShinePet` object") | pet summon / name / mind; the Lua `cPet_*` functions (§14.9 "Z13" row) are the pet AI script's interface |
@@ -10376,18 +10474,15 @@ left without an owner whose plan line includes it, so no follow-up item is propo
 | Kingdom quests: `KQContribute::KQContributeList` kqcl_FindKQ 00499ca0, kqcl_SendMobKill 00499ff0; `KQRewardDataBox` operator[] 0049a9a0; `KingdomQuest::KQElement` kqe_ReviveNumber 00496b90; `KingdomQuest::KQPlayerInform` kqpi_KnockDownGet 00496e50, kqpi_KnockDownPlus 00496de0; `ShinePlayer` sp_EscapeFromEmptyKQ 0043fa40, sp_GetJoinKQTeamType 00563990, sp_KQElementFunction 00499710, sp_RemoveKQItem 0050f8c0, sp_SendKQTeamType 00561560; `cEndOfKingdomQuest` 005df1f0, `cGetKQLimitSecond` 005e5390, `cGetKQTeamType` 005e81c0, `cIsKQJoiner` 005e82d0, `cKQRewardIndex` 005e4000, `cShowKQTimerWithLife` 005e54f0, `cShowKQTimerWithLife_Obj` 005e5690 | Z16 (plan line 12: "`KingdomQuest::KQElement` (… `kqe_ReviveNumber` …), `KQPlayerInfoList` (… knock-down counters …), `KQContribute::KQContributeList`") | KQ state; the Pine KQ nodes (§24.7, §25.6, §26.1) call it |
 | Guild tournament: `DiceGame` Start 00478ef0; `GuildTouramentLoginDataInfo` GetLinkData 00478610; `GuildTournamentOccupyTable` GetOccupyTime 005c70f0; `GuildTournamentSystem::AdvanMobItemRegenInfo` ~AdvanMobItemRegenInfo 0047aa60; `GuildTournamentSystem` Clear 004808f0, CreateItemEffect 0047c1e0, GuildTournamentSystem 00480d30, Initialize 00480f10, IsBattleGuild 00478db0, IsFlagCapture 00479510, PlayerUnRegister 0047fd50, ScanEnemyUser 0047a3d0; `GuildTournamentSystem::FlagInfo` FlagInfo 0047ac30, ~FlagInfo 0047ace0; `GuildTournamentSystem::GuildGroup` AddTeamNPC 0047c120, CheckManagerUser 004798f0, GuildMasterBuffRun 0047b040, SendPlayerAllScoreInfo 0047f260; `GuildTournamentSystem::GuildMemberInfo` GradeSort 00478d80; `ShinePlayer` sp_FlagCaptureFree 00476cf0 | Z16 (plan line 13: "the GT system class (… `00479510` flag check, … dice game …)") | GT state; §12.3 (axial flags), §22 (GT nodes) and §24.8 call it |
 | Item actions and costume charges: `ItemActionArgument` ItemActionArgument 0042aad0; `ItemActionObserveManager::ActionResults` GetRateAppliValue 005d0c20; `ItemActionObserveManager` EventRunBySkillGroupIndex 005d1f50, ItemActionObserveManager 005d1910, SetObject 005d0890, _EventRun 005d1df0; `ShinePlayer` sp_CostumShieldChargeDecrease_ToDB 0051ac20, sp_CostumWeaponChargeDecrease_ToDB 0051a610 | Z17 (plan line 12: "the player's item-action cooldown container"; line 13: "`sp_CostumWeaponChargeDecrease_*`") | `EventRunBySkillGroupIndex` is raised from skill use and from the magic field (`so_mgcfld_MagicField…`, `almfh_ApplyHeal`, §12); the container is Z17's |
-| Capsule items: `ShinePlayer` sp_MakeCapsuleItem 0049cce0 (reached from `sp_CreateItemByAdmin` FUN_00527270, §17; opens a capsule's `CLCReward` content and sends DB 0x34A0 NC_ITEMDB_BUYCAPSULE_REQ) | Z05 (scope table, plan line 117: 0x34A1 NC_ITEMDB_BUYCAPSULE_ACK, the answer) + D03 (plan line 98: the 0x34A0 handler) | item creation from capsule contents; cited before part 18 only in C02.md (a knowledge file), which hid it from the gap check |
-| Game-log sends: `cSendGameLogDataType_4` 005f1a10, `cSendGameLogDataType_5` 005f1d40 | D05 (its scope table, plan lines 201 / 202: `NC_LOG_GAME_DATA_TYPE_4` / `_5`; D05-gamelog documents the zone senders by address) | the Lua side is one line each (§14.9 "already documented" row); the zone function is cited by no zone doc |
+| Game-log sends: `cSendGameLogDataType_4` 005f1a10, `cSendGameLogDataType_5` 005f1d40, `Send_NC_LOG_GAME_DATA_TYPE_5` 006145c0 (also from `cSaveTutorialInfo`, §28.13) | D05 (its scope table, plan lines 201 / 202: `NC_LOG_GAME_DATA_TYPE_4` / `_5`; D05-gamelog documents the zone senders by address) | the Lua side is one line each (§14.9 "already documented" row); the zone function is cited by no zone doc |
 
 ### 31.3 Packets and data files
 
 | Found | Covered by | Argument |
 |---|---|---|
 | 0x8C4F NC_MINIHOUSE_PORTAL_DEL_CMD (`ShineMiniHouse::so_Routine`) (the `layouts.json` "0x0E0D" of `smh_SendFurnitureInfo` 00546930 is a false positive, §28.9) | Z13 (plan line 12: "`smh_SendFurnitureInfo` …, portals … and `so_Routine` (portal timeout)") | sent by mini-house code §28.1 only names; no doc describes them yet |
-| 0x1059 NC_CHAR_PROMOTE_ACK, 0x105A NC_CHAR_SOMEONEPROMOTE_CMD (`so_ply_ClassChange` FUN_004521b0) | Z07 (scope table, plan line 87: 0x1057 NC_CHAR_CLASSCHANGE_ACK, whose handler calls `so_ply_ClassChange`; Z07-character.md line 250 cites it but does not describe its two sends) | class change is reached from 0x1057, Lua `cClassChangeOpen` and the quest reward path, not from world simulation; Z12 ("level-up side effects") was named here before part 18 and does not cover it |
 | 0x2442 NC_BAT_SOMEONESKILLBASH_OBJ_CAST_CMD, 0x2443 NC_BAT_SOMEONESKILLBASH_FLD_CAST_CMD (`ShineMobileObject::smo_SkillBash_Blast_Trap`) | Z03 (plan line 9: "skill cast/bash") | trap / field skill casts; §8.1 reaches the skill code only through `cNPCSkillUse` / `cSkillBlast` |
 | 0x74F2 NC_GUILD_TOURNAMENT_ITEM_FLAG_CMD (`GuildTournamentSystem::PlayerRegister`) | Z16 (plan line 13: "the client packets 0x74xx sent during a match") | GT item flag |
-| 0x5836, 0x583C, 0x583D, 0x5814, 0x5821 (Lua score / ranking functions), 0x6C20 (`cSendRankingList`), 0x1116 / 0x1118 / 0x111C (tutorial Lua) | Z16 / Z02 / Z07 (rows above) | sent by the Lua functions of §14.9's other-item rows |
 | `World/Param<Class>Server.txt` (27 files, `CharClassManager::ccm_Load` 0044a5c0) | Z12 (plan line 12: "class base stats per level from class data `p.vt[0x49c]() + 0x10858`") | per-class player parameters (§28.9) |
 | `AbState/*.dat` (11 files) | Z03 (plan line 9: abstates) | no string in the zone names the folder or a file (`strings.tsv`), so the 2016 zone does not load them; left-over client-style data |
 
