@@ -131,7 +131,7 @@
       "0x201F": {
         "dir": "S→C",
         "name": "NC_ACT_SOMEONESHOUT_CMD",
-        "basis": "zone ShineMob::so_Shout FUN_00459250, ShineMobileObject::so_Shout FUN_00459080; client handler reads offset 1 as u16 for mobs (re-data/client-handlers.json 0x201f); 2017 PDB PROTO_NC_ACT_SOMEONESHOUT_CMD agrees; Lua cSomebodyShout FUN_005e5150",
+        "basis": "zone ShineMob::so_Shout FUN_00459250, ShineMobileObject::so_Shout FUN_00459080; client handler reads offset 1 as u16 for mobs (re-data/client-handlers.json 0x201f); 2017 PDB PROTO_NC_ACT_SOMEONESHOUT_CMD agrees; Lua cSomebodyShout FUN_005e5150; Pine someoneshout ShineSomeoneShout::sa_Step FUN_004eeeb0 (Z09 §26.2)",
         "fields": [
           [
             0,
@@ -164,7 +164,7 @@
             "text, then itemLinkDataCount × 0x67-byte item links (player version only)"
           ]
         ],
-        "notes": "to the whole map instance (target 0xFFFF) or one object. The mob version sends len + 0x1A bytes including the opcode, one stale byte more than the packet (Z09-B10). The client shows nothing for len 0 or > 128."
+        "notes": "to the whole map instance (target 0xFFFF) or one object. The mob version sends len + 0x1A bytes including the opcode, one stale byte more than the packet (Z09-B10). The client shows nothing for len 0 or > 128. Pine someoneshout writes speaker = 20 bytes of a dialog string, clears GMColor and isMob, never writes itemLinkDataCount (Z09-B112) and sends len + 0x19."
       },
       "0x1C0E": {
         "dir": "S→C",
@@ -1753,6 +1753,70 @@
           ]
         ],
         "notes": "Pine `reward KingdomQuest`, Z09 §25.6"
+      },
+      "0x0810": {
+        "dir": "S→C",
+        "name": "NC_MISC_RESTMINUTE_CMD",
+        "basis": "zone Movie::TimeLimit::tl_LeftTick FUN_00507f60 (Pine timelimit FUN_004ebfc0, TimeOut interrupt check) and FUN_00443390 (Z01); client FUN_004997a0; PROTO_NC_MISC_RESTMINUTE_CMD {flag, second} (pdb2016, pdb2017)",
+        "fields": [
+          [
+            0,
+            "u8",
+            "flag",
+            "1"
+          ],
+          [
+            1,
+            "u16",
+            "second",
+            "seconds left (left ticks / 10)"
+          ]
+        ],
+        "notes": "Z09 §26.5: replaces Z01's 'minutes = limit / 10' (the value is seconds); tl_LeftTick sends it to the whole map when the remaining time crosses a minute boundary and always on the first call after timelimit"
+      }
+    },
+    "wm": {
+      "0x5810": {
+        "dir": "Zone→WM",
+        "name": "NC_KQ_Z2W_END_CMD",
+        "basis": "zone WorldManagerSession::wms_EndOfKQPacket FUN_005a4800 (Pine endofkq, ShineEndOfKingdomQuest::sa_Step FUN_004f5fc0); WM fc_NC_KQ_Z2W_END_CMD FUN_0042aac0; PROTO_NC_KQ_Z2W_END_CMD (pdb2016) agrees",
+        "fields": [
+          [
+            0,
+            "u32",
+            "Handle",
+            "the map's fm_KQHandle; 0xFFFFFFFF when the map has none (sent anyway after an assert, Z09-B117)"
+          ]
+        ],
+        "notes": "Z09 §26.1; the WM then ends the KQ and broadcasts 0x5811"
+      }
+    },
+    "character": {
+      "0x1091": {
+        "dir": "Zone→CharDB",
+        "name": "NC_CHAR_WEDDING_DO_REQ",
+        "basis": "zone Pine weddingcomplete ShineWeddingComplete::sa_Step FUN_004f6b70; Character FUN_00419920 (D02); header struct NETPACKETZONEHEADER (pdb2016)",
+        "fields": [
+          [
+            0,
+            "u16",
+            "header.clienthandle",
+            "groom's object handle"
+          ],
+          [
+            2,
+            "u32",
+            "header.charregistnumber",
+            "groom's character number (vt 0x344)"
+          ],
+          [
+            6,
+            "u32",
+            "Partner",
+            "bride's character number (vt 0x344)"
+          ]
+        ],
+        "notes": "Z09 §26.7; groom and bride come from the wedding-hall reservation (weddinghall.Groom / .Bride RegistNumber); sent only when both are online players on this zone; reply 0x1092"
       }
     }
   }

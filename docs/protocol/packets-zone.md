@@ -2528,14 +2528,14 @@ Sent in reply to `0x0806` NC_MISC_SEED_REQ on ShineObjectClass::ShinePlayer (`FU
 
 ### `0x0810` NC_MISC_RESTMINUTE_CMD
 
-**Verified layout** (basis: zone FUN_00443390; client FUN_004997a0)
+**Verified layout** (basis: zone Movie::TimeLimit::tl_LeftTick FUN_00507f60 (Pine timelimit FUN_004ebfc0, TimeOut interrupt check) and FUN_00443390 (Z01); client FUN_004997a0; PROTO_NC_MISC_RESTMINUTE_CMD {flag, second} (pdb2016, pdb2017))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | one | 1 |
-| 1 | u16 | minutes | limit / 10 |
+| 0 | u8 | flag | 1 |
+| 1 | u16 | second | seconds left (left ticks / 10) |
 
-Z01 name was 'map time limit (ours)'
+Z09 §26.5: replaces Z01's 'minutes = limit / 10' (the value is seconds); tl_LeftTick sends it to the whole map when the remaining time crosses a minute boundary and always on the first call after timelimit
 
 Sent from `FUN_00419580` (`FUN_00419580`) · payload 3 bytes
 
@@ -10975,7 +10975,7 @@ Z09 §13.2
 
 ### `0x201F` NC_ACT_SOMEONESHOUT_CMD (hand-named) (S→C)
 
-**Verified layout** (basis: zone ShineMob::so_Shout FUN_00459250, ShineMobileObject::so_Shout FUN_00459080; client handler reads offset 1 as u16 for mobs (re-data/client-handlers.json 0x201f); 2017 PDB PROTO_NC_ACT_SOMEONESHOUT_CMD agrees; Lua cSomebodyShout FUN_005e5150)
+**Verified layout** (basis: zone ShineMob::so_Shout FUN_00459250, ShineMobileObject::so_Shout FUN_00459080; client handler reads offset 1 as u16 for mobs (re-data/client-handlers.json 0x201f); 2017 PDB PROTO_NC_ACT_SOMEONESHOUT_CMD agrees; Lua cSomebodyShout FUN_005e5150; Pine someoneshout ShineSomeoneShout::sa_Step FUN_004eeeb0 (Z09 §26.2))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10985,7 +10985,7 @@ Z09 §13.2
 | 22 | u8 | len | content length |
 | 23 | char[len] | content | text, then itemLinkDataCount × 0x67-byte item links (player version only) |
 
-to the whole map instance (target 0xFFFF) or one object. The mob version sends len + 0x1A bytes including the opcode, one stale byte more than the packet (Z09-B10). The client shows nothing for len 0 or > 128.
+to the whole map instance (target 0xFFFF) or one object. The mob version sends len + 0x1A bytes including the opcode, one stale byte more than the packet (Z09-B10). The client shows nothing for len 0 or > 128. Pine someoneshout writes speaker = 20 bytes of a dialog string, clears GMColor and isMob, never writes itemLinkDataCount (Z09-B112) and sends len + 0x19.
 
 ### `0x2028` NC_ACT_PITCHTENT_ACK (S→C)
 

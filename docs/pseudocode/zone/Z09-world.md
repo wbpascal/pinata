@@ -984,14 +984,14 @@ ShineBandit::so_Routine(b, _, handle)                                          @
     if outside the field: log "fm_IsInFieldSize : Bandit"; so_Unmark(0, 1, 3); som_FreeObject(reason 6); return
     smo_MoveByScenario(b);  ShineMobileObject::so_Routine(b)  # no AI while it is an NPC
 
-ShineBandit::so_bandit_ChangeType(b, t)   (vt 0x898; map-script nodes ShineChange2Mob / ShineChange2NPC, part 15)   @ FUN_005508b0
+ShineBandit::so_bandit_ChangeType(b, t)   (vt 0x898; map-script nodes ShineChange2Mob / ShineChange2NPC, §23.2)   @ FUN_005508b0
     b.type = t
     to the whole map (so_AllInMap1): 0x6C0B NC_SCENARIO_OBJTYPECHANGE_CMD { u16 handle, u8 type }   # size 5
 ```
 
 The client (`GameFrameWork::On_NC_SCENARIO_OBJTYPECHANGE_CMD`, client FUN_004a3580) stores `type` in the character
 (+0x78c). Layout matches `PROTO_NC_SCENARIO_OBJTYPECHANGE_CMD` *(pdb2016)*. Which value each script node passes
-(5 = mob, 4 = NPC *(inferred from the routine test and the spawn value)*) is read in part 15. The bandit name for
+(5 = mob, 4 = NPC *(inferred from the routine test and the spawn value)*) is read in §23.2. The bandit name for
 `vt 0x4a0` is `+0x2666 + 0x5b` (FUN_00556f20).
 
 ---
@@ -1398,7 +1398,7 @@ The Lua bindings themselves (argument reading FUN_005f7680 / FUN_005f7ad0, resul
 - `MobBehaviorDescript/` (`DefaultBehavior.ps` and 7 `KQ/*.ps`): PineScript text (`whoistarget`, `permillage`, `chat`,
   `whokillme`); no zone string names the folder or a `.ps` path of it: the 2016 zone does not read it (§20.1).
 - Other aggro sources, documented with their owners: the map-script node `PineEventScriptNode::ShineAggro::sa_Step`
-  FUN_004f2d10 (part 15), `AxialListMagicFieldAggro` (`alns_ValidObject` FUN_0057a980, `almfa_AppendAggro` FUN_0057aad0;
+  FUN_004f2d10 (§23.4), `AxialListMagicFieldAggro` (`alns_ValidObject` FUN_0057a980, `almfa_AppendAggro` FUN_0057aad0;
   part 8), the tactic base `MobActionElement::mae_Action` FUN_004aa880 (part 4).
 - `MobChatManager` (`DAT_0084cc84`; `mcm_HelpReqChat`, `mcm_HelpAckChat`, `mcm_DetectBattleChat`, `mcm_DamageChat`) and
   the per-mob-ID objects `DAT_0084cc8c` (= `MobChatManager`+8, the PIECE array; they give the `+0x1ea8` delay of §5.2):
@@ -2711,7 +2711,7 @@ ShineMob::smo_RegenSpotAsNextRoamingSpot (vt 0xf50): spawn point = current path 
 **Scenario moves** (NPCs and bandits moved by map scripts):
 
 ```pseudo
-so_scene_MovePathSet(o, x, y, kind)  (vt 0x8ac; script nodes `run` ShineRun §25.2 / `walk` ShineWalk part 15d)   @ FUN_0050d450
+so_scene_MovePathSet(o, x, y, kind)  (vt 0x8ac; script nodes `run` ShineRun §25.2 / `walk` ShineWalk §26.4)   @ FUN_0050d450
     append {x, y, kind} to the queue o+0x1db0 (16 × 12 bytes, count +0x1e70); full → ignored
 smo_MoveByScenario(o)  (from ShineNPC / ShineBandit so_Routine, §5.9 / §5.10)               @ FUN_0050d520
     if queue empty or moving: return
@@ -3065,7 +3065,7 @@ mb_MobBreed(b, grp, mobId, regenSec, count, leader, bandit, level) → bool     
 
 Callers: GM `ac_MobBreed` FUN_0041b510 (all arguments from the command; family, count, regen, level) and `AmpersandCommand::ac_MobBreed_simple` FUN_0041b790
 (one mob, count 1, regen 0) (Z11); Pine node `ShineSummonMob::sa_Step` FUN_004ef160 (mobNum from the node, regen 0,
-no family, count 1, level −1: each mob spawns once around the script object's position) (part 15). With `count 1` the
+no family, count 1, level −1: each mob spawns once around the script object's position) (§26.3). With `count 1` the
 breeder spawns once; after its mob is gone the breeder, then the empty group, is freed.
 
 ```pseudo
@@ -4335,7 +4335,7 @@ AxialListMobSuicide::alms_SelfKill(m)                                           
     so_DamageLog("alms_SelfKill"); m.vt[0x8d4] so_mobile_DeadCheck(4)
 AxialListMobSuicide::ali_Work(it, me, o) → continue                              @ FUN_004f18b0
     if o is a mob (kind 5) and (alms_MobID == 0xFFFF or o's mob ID == alms_MobID): alms_SelfKill(o)
-    # range users: cMobSuicide FUN_005e28c0 (part 10), Pine ShineSuicide FUN_004f1980 (part 15)
+    # range users: cMobSuicide FUN_005e28c0 (part 10), Pine ShineSuicide FUN_004f1980 (§26.4)
 ```
 
 `sm_serv_VanishReserv` sets the dead flag before it calls `alms_SelfKill`, which returns at once for a dead object:
@@ -6748,7 +6748,7 @@ steps parts 15a–15d. All class, member and function names are *(pdb2016)*; the
 Script    := { Block }                                              # §20.2; the film starts at the block named main
 Block     := "open" [ "[" Id "]" ] { Statement } "close"            # Id: [A-Za-z_][0-9A-Za-z_]*; no name = ""
 Statement := one registered statement (§21.2), tried in reverse registration order:
-  action     := keyword [ Identify ] { Express } "."                # Shine* / OtherStatement nodes (§22, part 15)
+  action     := keyword [ Identify ] { Express } "."                # Shine* / OtherStatement nodes (§22, §23–§26)
   break      := "break" [ Express ] "."                             # name of the block to leave
   permillage := "permillage" Identify "."
   print      := "print" Express "."
@@ -6835,8 +6835,8 @@ in the 46 `.ps` files of 2016 / files that use it (counted from the files, the l
 | 8 | `permillage` | `StatePermillage` | FUN_004db080 |  |  | 0/0 | §21.5 |
 | 9 | `break` | `StateBreak` | FUN_004d6570 |  |  | 213/31 | §21.5 |
 | 10 | `printf` | `ShinePrintf` | FUN_004e8fe0 | — | 1 | 7/4 | §25 |
-| 11 | `scriptfile` | `ShineScriptFile` | FUN_004e9050 | — | 1 | 37/27 | part 15 |
-| 12 | `timelimit` | `ShineTimeLimit` | FUN_004e90c0 | yes | 1 | 43/27 | part 15 |
+| 11 | `scriptfile` | `ShineScriptFile` | FUN_004e9050 | — | 1 | 37/27 | §26.2 |
+| 12 | `timelimit` | `ShineTimeLimit` | FUN_004e90c0 | yes | 1 | 43/27 | §26.5 |
 | 13 | `interruptclear` | `ShineInterruptClear` | FUN_004e9130 | — | 0 | 153/30 | §15 |
 | 14 | `interruptset` | `ShineInterruptSet` | FUN_004e91a0 | yes | 3–5 | 760/33 | §15 |
 | 15 | `interrupterase` | `ShineInterruptErase` | FUN_004e9210 | — | 1 | 36/9 | §15 |
@@ -6852,20 +6852,20 @@ in the 46 `.ps` files of 2016 / files that use it (counted from the files, the l
 | 25 | `doorclose` | `ShineDoorClose` | FUN_004e9670 | yes | 1 | 40/9 | §13 |
 | 26 | `vanish` | `ShineObjectVanish` | FUN_004e96e0 | yes | 0 | 21/5 | §25 |
 | 27 | `regengroup` | `ShineRegenGroup` | FUN_004e9750 | — | 2–4 | 854/23 | §25 |
-| 28 | `waitlogin` | `ShineWaitUserLogin` | FUN_004e97c0 | yes | 0 | 26/26 | part 15 |
+| 28 | `waitlogin` | `ShineWaitUserLogin` | FUN_004e97c0 | yes | 0 | 26/26 | §26.5 |
 | 29 | `pause` | `ShinePause` | FUN_004e9830 | yes | 1 | 505/32 | §25 |
 | 30 | `npcchat` | `ShineNPCChat` | FUN_004e98a0 | yes | 1 | 47/5 | §25 |
 | 31 | `npcshout` | `ShineNPCShout` | FUN_004e9910 | yes | 1 | 11/2 | §25 |
 | 32 | `chatwin` | `ShineChatWindow` | FUN_004e9980 | — | 2–9 | 215/17 | §23 |
 | 33 | `chatwinrange` | `ShineChatWindowRange` | FUN_004e99f0 | — | 4–9 | 25/2 | §23 |
-| 34 | `summonmob` | `ShineSummonMob` | FUN_004e9ad0 | yes | 2 | 225/13 | part 15 |
+| 34 | `summonmob` | `ShineSummonMob` | FUN_004e9ad0 | yes | 2 | 225/13 | §26.3 |
 | 35 | `questresult` | `ShineQuestResult` | FUN_004e9b40 | yes | 0 | 31/15 | §25 |
 | 36 | `reward` | `ShineReward` | FUN_004e9bb0 | yes | 0 | 14/13 | §25 |
-| 37 | `someoneshout` | `ShineSomeoneShout` | FUN_004e9a60 | — | 2 | 0/0 | part 15 |
+| 37 | `someoneshout` | `ShineSomeoneShout` | FUN_004e9a60 | — | 2 | 0/0 | §26.2 |
 | 38 | `broadcast` | `ShineBroadcast` | FUN_004e9c20 | yes | 1–2 | 268/33 | §23 |
 | 39 | `linkto` | `ShineLinkTo` | FUN_004e9c90 | yes | 4 | 64/34 | §25 |
-| 40 | `whoclickme` | `ShineWhoClickMe` | FUN_004e9d70 | yes | 1 | 28/7 | part 15 |
-| 41 | `whokillme` | `ShineWhoKillMe` | FUN_004e9de0 | yes | 1 | 1/1 | part 15 |
+| 40 | `whoclickme` | `ShineWhoClickMe` | FUN_004e9d70 | yes | 1 | 28/7 | §26.6 |
+| 41 | `whokillme` | `ShineWhoKillMe` | FUN_004e9de0 | yes | 1 | 1/1 | §26.6 |
 | 42 | `itemdrop` | `ShineItemDrop` | FUN_004e9d00 | yes | 2 | 21/7 | §24.1 |
 | 43 | `invensearch` | `ShineInvenSearch` | FUN_004e9e50 | yes | 2 | 12/3 | §24.3 |
 | 44 | `itemcreate` | `ShineItemCreate` | FUN_004e9ec0 | yes | 1 | 2/2 | §24.2 |
@@ -6873,9 +6873,9 @@ in the 46 `.ps` files of 2016 / files that use it (counted from the files, the l
 | 46 | `findhandle` | `ShineFindHandle` | FUN_004e9fa0 | yes | 2 | 7/3 | §24.4 |
 | 47 | `abstateset` | `ShineAbstatSet` | FUN_004ea010 | yes | 3–4 | 26/15 | §23 |
 | 48 | `abstatereset` | `ShineAbstatReset` | FUN_004ea080 | yes | 1 | 9/2 | §23 |
-| 49 | `suicide` | `ShineSuicide` | FUN_004ea0f0 | yes | 0 | 32/7 | part 15 |
+| 49 | `suicide` | `ShineSuicide` | FUN_004ea0f0 | yes | 0 | 32/7 | §26.4 |
 | 50 | `run` | `ShineRun` | FUN_004ea160 | yes | 2 | 4/1 | §25 |
-| 51 | `walk` | `ShineWalk` | FUN_004ea1d0 | yes | 2 | 0/0 | part 15 |
+| 51 | `walk` | `ShineWalk` | FUN_004ea1d0 | yes | 2 | 0/0 | §26.4 |
 | 52 | `maplight` | `ShineMapLight` | FUN_004ea240 | — | 3 | 9/2 | §25 |
 | 53 | `mapfog` | `ShineMapFog` | FUN_004ea2b0 | — | 2 | 1/1 | §25 |
 | 54 | `effectobj` | `ShineEffectObject` | FUN_004ea320 | yes | 4 | 4/2 | §13 |
@@ -6886,36 +6886,36 @@ in the 46 `.ps` files of 2016 / files that use it (counted from the files, the l
 | 59 | `heal` | `ShineHeal` | FUN_004ea550 | yes | 1 | 5/5 | §24.6 |
 | 60 | `animate` | `ShineAnimate` | FUN_004ea5c0 | yes | 1 | 11/6 | §23 |
 | 61 | `duplicate` | `ShineDuplicate` | FUN_004ea630 | yes | 1 | 0/0 | §24.5 |
-| 62 | `waitidle` | `ShineWaitIdle` | FUN_004ea6a0 | — | 0 | 11/6 | part 15 |
+| 62 | `waitidle` | `ShineWaitIdle` | FUN_004ea6a0 | — | 0 | 11/6 | §26.5 |
 | 63 | `deathcountclear` | `ShineDeathCountClear` | FUN_004ea710 | — | 0 | 4/1 | §24.6 |
 | 64 | `itemattrset` | `ShineItemAttrSet` | FUN_004ea780 | yes | 2 | 0/0 | §24.2 |
-| 65 | `scinariocode` | `ShineScinarioCode` | FUN_004ea7f0 | yes | 1 | 1/1 | part 15 |
+| 65 | `scinariocode` | `ShineScinarioCode` | FUN_004ea7f0 | yes | 1 | 1/1 | §26.1 |
 | 66 | `battlestart` | `ShineBattleStart` | FUN_004ea860 | yes | 0–2 | 10/8 | §23 |
 | 67 | `battlestop` | `ShineBattleStop` | FUN_004ea8d0 | yes | 0 | 22/8 | §23 |
-| 68 | `sendquestresult` | `ShineSendKQResult` | FUN_004ea940 | yes | 1 | 17/8 | part 15 |
+| 68 | `sendquestresult` | `ShineSendKQResult` | FUN_004ea940 | yes | 1 | 17/8 | §26.1 |
 | 69 | `invidualreward` | `ShineInvidualReward` | FUN_004ea9b0 | — | 2 | 15/8 | §24.7 |
 | 70 | `returnvalue` | `ShineReturnValue` | FUN_004eaa20 | — | 2 | 6/1 | §25 |
-| 71 | `sublayershift` | `ShineSubLayerShift` | FUN_004eaa90 | yes | 2 | 0/0 | part 15 |
-| 72 | `teleport` | `ShineTeleport` | FUN_004eab00 | yes | 1–3 | 13/4 | part 15 |
+| 71 | `sublayershift` | `ShineSubLayerShift` | FUN_004eaa90 | yes | 2 | 0/0 | §26.4 |
+| 72 | `teleport` | `ShineTeleport` | FUN_004eab00 | yes | 1–3 | 13/4 | §26.4 |
 | 73 | `itemowner` | `ShineItemOwner` | FUN_004eab70 | yes | 2 | 2/1 | §24.3 |
 | 74 | `mobattr` | `ShineMobAttribute` | FUN_004eabe0 | yes | 2 | 4/1 | §25 |
 | 75 | `collect` | `ShineObjectCollect` | FUN_004eac50 | yes | 4 | 0/0 | §25 |
-| 76 | `endofkq` | `ShineEndOfKingdomQuest` | FUN_004eacc0 | — | 0 | 43/21 | part 15 |
+| 76 | `endofkq` | `ShineEndOfKingdomQuest` | FUN_004eacc0 | — | 0 | 43/21 | §26.1 |
 | 77 | `endofgt` | `ShineEndOfGuildTournament` | FUN_004ead30 | — | 2 | 4/2 | §24.8 |
 | 78 | `gtresult` | `ShineGuildTorunamentResult` | FUN_004eada0 | yes | 1–2 | 4/2 | §24.8 |
 | 79 | `costumecreate` | `ShineCostumeCreate` | FUN_004eae10 | yes | 3 | 0/0 | §23 |
 | 80 | `costumetakeoff` | `ShineCostumeTakeOff` | FUN_004eae80 | yes | 2 | 0/0 | §23 |
-| 81 | `weddingcomplete` | `ShineWeddingComplete` | FUN_004eaef0 | — | 2 | 1/1 | part 15 |
+| 81 | `weddingcomplete` | `ShineWeddingComplete` | FUN_004eaef0 | — | 2 | 1/1 | §26.7 |
 | 82 | `playerwork` | `ShinePlayerWalk` | FUN_004eaf60 | yes | 2 | 6/1 | §25 |
 | 83 | `findplayer` | `ShineFindPlayer` | FUN_004eafd0 | yes | 1–2 | 6/1 | §24.4 |
-| 84 | `teleportall` | `ShineTeleportAll` | FUN_004eb040 | yes | 0–4 | 1/1 | part 15 |
+| 84 | `teleportall` | `ShineTeleportAll` | FUN_004eb040 | yes | 0–4 | 1/1 | §26.4 |
 | 85 | `briefeffect` | `ShineBriefEffect` | FUN_004eb0b0 | yes | 1 | 2/1 | §23 |
 | 86 | `banfromarea` | `ShineBanFromArea` | FUN_004eb120 | — | 5 | 3/1 | §23 |
 | 87 | `RegisteFlag` | `ShineRegesteFlag` | FUN_004eb190 | — | 3 | 10/2 | §25 |
 | 88 | `RegisteGate` | `ShineRegesteGate` | FUN_004eb200 | — | 4 | 20/2 | §25 |
 | 89 | `DiceGameStart` | `ShineDiceGameStart` | FUN_004eb270 | — | 1 | 2/2 | §24.8 |
 | 90 | `revival` | `ShineRevival` | FUN_004eb2e0 | yes | 0 | 5/5 | §25 |
-| 91 | `spawn` | `ShineSpawn` | FUN_004eb350 | — | 1–2 | 7/3 | part 15 |
+| 91 | `spawn` | `ShineSpawn` | FUN_004eb350 | — | 1–2 | 7/3 | §26.3 |
 | 92 | `hpset` | `ShineHPSet` | FUN_004eb3c0 | yes | 1 | 1/1 | §24.6 |
 | 93 | `questmobkill` | `ShineQuestMobkill` | FUN_004eb430 | — | 3 | 10/9 | §25 |
 | 94 | `RegisterGTPortal` | `RegisterGTPortal` | FUN_004f8610 | — | 4 | 10/2 | §22 |
@@ -7018,7 +7018,7 @@ So a Pine film makes **exactly one node step per main-loop pass**, and **any ste
 (the Lua films call `Main` every pass instead). Each node's `sa_Step(arg, ps, &ip)` follows one convention: `ip` is the
 node's own cursor in its stack entry (0 when pushed); the node pushes a child and returns 1 (the child runs from the
 next pass), or pops itself (`ps_Pop` / `--ps_StackPoint`) and returns 1 when it is done, or returns 1 without popping
-to be stepped again next pass (the waiting action nodes, part 15), or returns 0 on an error. `arg` is not used by the
+to be stepped again next pass (the waiting action nodes: `pause` §25.5, `waitlogin` §26.5, `waitinterrupt` §15), or returns 0 on an error. `arg` is not used by the
 nodes of this section.
 
 ```pseudo
@@ -7040,7 +7040,7 @@ Statement::sa_Step(slot, arg, ps, &ip)             @ FUN_004d8250   # the slot w
 
 - **Cost:** a statement takes at least four passes: the block pushes the slot, the slot pushes the node, the node
   runs and pops, the slot pops. A control statement adds its own step and its block's start / end. Time-based waits
-  in the action nodes compare against `g_Now` (part 15), so the pass rate changes only how fast the script moves
+  in the action nodes compare against `g_Now` (§25.5, §26.5), so the pass rate changes only how fast the script moves
   between waits.
 - **Depth:** 32 stack entries (`ps_Push` and the inline pushes refuse when `sp > 30`). Each nesting level (a block
   inside `if` / `while` / `infinite` / `call`, or a nested block) costs three entries (slot, control node, block):
@@ -7546,9 +7546,9 @@ HasAbstate var handle abstate strength. HasAbstate::sa_Step       @ FUN_004f9f00
     if o.vt[0x52c] so_mobile_AbstateList().asl_Abstate_IsSet(idx) (FUN_00409b10) has index idx and strength == s exactly: v = "1"
 NPCChatNoFacecut npc key.              NPCChatNoFacecut::sa_Step  @ FUN_004f7420   # unused in 2016
     o = os_ShineObject (null: assert "…Null obj"); key = argument 0 (fails: assert)
-    if ps_Shine.shinescript (the dialog set chosen by the `scriptfile` statement, part 15):
+    if ps_Shine.shinescript (the dialog set chosen by the `scriptfile` statement, §26.2):
         text = ShineScript::ss_String(set, key) (§22.6); o.so_Chat(0xFFFF, text, strlen, 0, 0)   # vt 0x530 → 0x2002 to sight (§8 / Z02 §3.1)
-    # = `npcchat` (part 15) without the face-cut window
+    # = `npcchat` (§25.3) without the face-cut window
 ScinarioCodeParty player code.         ScinarioCodeParty::sa_Step @ FUN_004f7600   # unused in 2016
     p = os_ShineObject (null: log, pop); code = argument 0 (fails: assert "…no code", log "Fail 1")
     party = p.vt[0x550] so_PartyRegistNumber
@@ -7557,7 +7557,7 @@ ScinarioCodeParty player code.         ScinarioCodeParty::sa_Step @ FUN_004f7600
     else for each member m of CParty::operator[](party) (FUN_00645340) with an object and a quest diary:
         same map as p and so_DistanceSquar(p, m) ≤ 1 000 000 (1000 units): m's diary ScenarioDone(code), log "Suc-2"
         else log "Except/NotInMap " / "Except/NotInRange " with m's char number
-    # every step is written to the `ScinarioCodeLog` debug log; = `scinariocode` (part 15) for the whole party
+    # every step is written to the `ScinarioCodeLog` debug log; = `scinariocode` (§26.1) for the whole party
 BroadcastCode target "CODE" [handle].  BroadcastCode::sa_Step     @ FUN_004f7ae0   # unused in 2016
     m = argument 0 (fails: assert "…no message", pop)
     code = "ERR_NOERR_TIMEATK_START" 0x2020, "…_WARNING" 0x2021, "…_EXPLODE" 0x2022, "…_WARNING_2" 0x2023; other: pop, nothing sent
@@ -7571,7 +7571,7 @@ BroadcastCode target "CODE" [handle].  BroadcastCode::sa_Step     @ FUN_004f7ae0
 ```
 
 `index_all` / `index_handle` are global `PineScriptToken`s (the target words, "all" / "handle" by their names
-*(inferred)*); the same globals serve `broadcast` (part 15).
+*(inferred)*); the same globals serve `broadcast` (§23.5).
 
 ### 22.5 The scenario book shelf
 
@@ -7643,7 +7643,7 @@ ShineScript::ss_String(s, key) → text        @ FUN_0048ce60   column "ScrStrin
 
 2016: 43 `DialogFile` records, all present in `Script/` (no `World/<world>/Script/` override directory). A file is a
 table `Script` with columns `ScrIndex` (INDEX) and `ScrString` (STRING[64]); `#exchange # \x20` turns `#` into
-spaces. Users: the `scriptfile` statement (sets `ps_Shine.shinescript`, part 15), `npcchat` / `NPCChatNoFacecut`, the
+spaces. Users: the `scriptfile` statement (sets `ps_Shine.shinescript`, §26.2), `npcchat` / `NPCChatNoFacecut`, the
 Lua `cGetScriptString` and message functions (§18.4 / §19).
 
 ### 22.7 Answers to open questions and open points
@@ -7819,7 +7819,7 @@ remembered in the brief info; the client stops the current animation and plays t
 ```pseudo
 broadcast target text [handle].        ShineBroadcast::sa_Step    @ FUN_004ef830   (268 uses: 251 `all`, 17 `handle`)
     t = argument 0 (fails: assert "…ShineBroadcast::sa_Step : no message", pop)
-    msg = t; if ps_Shine.shinescript (set by `scriptfile`, part 15): s = ShineScript::ss_String(set, t) (FUN_0048ce60);
+    msg = t; if ps_Shine.shinescript (set by `scriptfile`, §26.2): s = ShineScript::ss_String(set, t) (FUN_0048ce60);
           s ≠ "" → msg = s                             # a dialog key, else the literal text (`scriptfile ""` = literal)
     lower(i_GetToken(target)) == "all": so_AllInMap(flag, AxialListWall(msg) (FUN_004281a0), 0)   # null flag: assert
         # AxialListWall::ali_Work FUN_004281c0 = so_ply_Notice (vt 0x784) on every object: players get 0x2011 (§19.3)
@@ -7979,7 +7979,7 @@ and moves the costume into that cell *(inferred from the calls; the item DB answ
 The `sa_Step` bodies of the 17 `Shine*` action statements whose class names start with D–I and that no earlier section
 covers (§21.2 rows 23, 42–46, 59, 61, 63, 64, 69, 73, 77, 78, 83, 89, 92). Already documented, not repeated here:
 `ShineDoorBuild` / `ShineDoorOpen` / `ShineDoorClose` / `ShineEffectObject` / `ShineEffectLocate` (§13),
-`ShineInterruptSet` / `ShineInterruptErase` / `ShineInterruptClear` (§15); `ShineEndOfKingdomQuest` belongs to part 15d.
+`ShineInterruptSet` / `ShineInterruptErase` / `ShineInterruptClear` (§15); `ShineEndOfKingdomQuest` is in §26.1.
 They load with `OtherStatement::sa_Load` and read target and arguments as §22.1 describes; the common shape of §23.1
 holds (trace line, copied assert texts are log text only), with the exceptions noted per node (`itemdrop` can wait,
 `DiceGameStart` can end the film). Class, member and function names are *(pdb2016)*. Packets sent here: 0x5812 /
@@ -8555,7 +8555,7 @@ walking groom as 0x204D instead of 0x2018.
 npcchat var key.                         ShineNPCChat::sa_Step  @ FUN_004eeaf0   # GordonMaster.ps: npcchat InterruptArg "Hero00".
     o = os_ShineObject; null: assert "…ShineNPCChat::sa_Step : Null obj", pop
     key = argument 0 (fails: assert, pop)
-    if ps_Shine.shinescript (set by `scriptfile`, part 15d):
+    if ps_Shine.shinescript (set by `scriptfile`, §26.2):
         text = ShineScript::ss_String(set, key) (FUN_0048ce60, §22.6; "" when missing)
         o.vt[0x530] so_Chat(0xFFFF, text, strlen(text), chatwin 1, links 0)   (ShineMobileObject::so_Chat FUN_00458c90)
             → 0x2002 to sight (§8.7 / Z02 §3.1); chatwin 1 = the client's NPC dialog window with face cut
@@ -8677,7 +8677,7 @@ AxialListKQEnd::ali_Work(o)                                       @ FUN_00429e00
 
 `questresult` is the KQ end signal of the KQ books (UnderHall, UnderHall2, Honeying, GordonMaster) and of the job-change
 books (JobChange1 / 2-1 send 0x5812 / 0x5813 for the promotion test); it ends nothing by itself: the book then runs
-`reward` and `endofkq` (part 15d, `ShineEndOfKingdomQuest`), which removes the KQ instance (Z16). Answer for Z08's open
+`reward` and `endofkq` (§26.1, `ShineEndOfKingdomQuest`), which removes the KQ instance (Z16). Answer for Z08's open
 question: the KQ result is sent by this node, per player of the map, with the GameLog leave record.
 
 ```pseudo
@@ -8761,9 +8761,366 @@ What the tournament does with registered flags and gates (capture, gate opening,
 
 - Part 15b's question "which `mobregen` form makes bandits": the 7-argument form, with a player handle (copy) or
   `"Beggar"` (§25.1); JobChange1 (shadow of the player) and JobChange2-1 (slime NPC) are the 2016 users.
-- Z08's open question (`ShineQuestMobkill`, `ShineQuestResult`): §25.6. `ShineEndOfKingdomQuest` is part 15d.
+- Z08's open question (`ShineQuestMobkill`, `ShineQuestResult`): §25.6. `ShineEndOfKingdomQuest`: §26.1.
 - Not traced (Z16): `GuildTournamentSystem::FlagRegister` / `GateRegister`, `so_ply_KQRewardStruct`,
   `kqcl_GetMobKill`; (Z15) `QuestPlayer_ScriptMobKill(_All)`, `CQuestZone::PsEnd`; (Z07) `CT_KQSuccess` /
   `CT_KQFail`; (Z08) where else `sp_SetRollBackPosEvent` is set (`wms_NC_CHAR_ZONE_LINK_FROM_CMD` FUN_00476600).
 - Open: whether the bandit's `sm_LoginLoc.currentcoord` (the copied brief coordinate, garbage for a beggar) is read
   anywhere (no reader found by member name).
+
+## 26. Scripts 13: Pine action nodes S–W and `endofkq` (KQ end, scenario codes, dialog files, summons, suicides, teleports, time limits, waits, wedding)
+
+The `sa_Step` bodies of the 17 `Shine*` action statements whose class names start with S–W (§21.2 rows 11, 12, 28,
+34, 37, 40, 41, 49, 51, 62, 65, 68, 71, 72, 81, 84, 91; `waitinterrupt`, row 16, is in §15) plus `endofkq`
+(`ShineEndOfKingdomQuest`, row 76, left over from part 15b). They load with `OtherStatement::sa_Load` (§22.1) and
+follow the common shape of §23.1 (trace line, copied assert texts are log only), with these exceptions: `waitlogin`
+waits (returns 1 without pop) until a player is in the map or 240 s have passed; `waitidle` would wait but never
+does (Z09-B114); `timelimit` and `scriptfile` end the film when their argument fails (Z09-B116). Class, member and
+function names are *(pdb2016)*. Every step below was checked in the disassembly of the 2016 exe (Ghidra drops the
+calls of `walk`, `suicide`'s word test, `scinariocode`'s quest call and the wait of `waitidle`). Packets sent here:
+0x5810 to the WM, 0x1091 to the Character DB, 0x5812 / 0x5813 (KQ complete / fail), 0x201F (shout), 0x0810 (time
+limit), 0x243C (via `alms_SelfKill`), 0x1805 (sub-layer logout).
+
+| Keyword | Class | ctor | `sb_CloneMe` | `sa_Step` | § |
+|---|---|---|---|---|---|
+| `endofkq` | `ShineEndOfKingdomQuest` | FUN_004e8da0 | FUN_004eacc0 | FUN_004f5fc0 | 26.1 |
+| `sendquestresult` | `ShineSendKQResult` | FUN_004e8ca0 | FUN_004ea940 | FUN_004f4300 | 26.1 |
+| `scinariocode` | `ShineScinarioCode` | FUN_004e8c40 | FUN_004ea7f0 | FUN_004f39d0 | 26.1 |
+| `scriptfile` | `ShineScriptFile` | FUN_004e8580 | FUN_004e9050 | FUN_004ebde0 | 26.2 |
+| `someoneshout` | `ShineSomeoneShout` | FUN_004e8860 | FUN_004e9a60 | FUN_004eeeb0 | 26.2 |
+| `summonmob` | `ShineSummonMob` | FUN_004e8880 | FUN_004e9ad0 | FUN_004ef160 | 26.3 |
+| `spawn` | `ShineSpawn` | FUN_004e8f80 | FUN_004eb350 | FUN_004f7eb0 | 26.3 |
+| `suicide` | `ShineSuicide` | FUN_004e8a40 | FUN_004ea0f0 | FUN_004f1980 | 26.4 |
+| `teleport` | `ShineTeleport` | FUN_004e8d20 | FUN_004eab00 | FUN_004f4cc0 | 26.4 |
+| `teleportall` | `ShineTeleportAll` | FUN_004e8ea0 | FUN_004eb040 | FUN_004f4930 | 26.4 |
+| `walk` | `ShineWalk` | FUN_004e8a80 | FUN_004ea1d0 | FUN_004f1ef0 | 26.4 |
+| `sublayershift` | `ShineSubLayerShift` | FUN_004e8d00 | FUN_004eaa90 | FUN_004f4770 | 26.4 |
+| `timelimit` | `ShineTimeLimit` | FUN_004e85a0 | FUN_004e90c0 | FUN_004ebfc0 | 26.5 |
+| `waitlogin` | `ShineWaitUserLogin` | FUN_004e87a0 | FUN_004e97c0 | FUN_004ee430 | 26.5 |
+| `waitidle` | `ShineWaitIdle` | FUN_004e8be0 | FUN_004ea6a0 | FUN_004f3590 | 26.5 |
+| `waitinterrupt` | `ShineWaitInterrupt` | FUN_004e8620 | FUN_004e9280 | FUN_004ecd10 | §15 |
+| `whoclickme` | `ShineWhoClickMe` | FUN_004e8920 | FUN_004e9d70 | FUN_004f03a0 | 26.6 |
+| `whokillme` | `ShineWhoKillMe` | FUN_004e8940 | FUN_004e9de0 | FUN_004f7170 | 26.6 |
+| `weddingcomplete` | `ShineWeddingComplete` | FUN_004e8e40 | FUN_004eaef0 | FUN_004f6b70 | 26.7 |
+
+Use in the 17 Pine books loaded in 2016 (§22.5; statements outside comments): `summonmob` 79 (GordonMaster, Honeying,
+Monkey, UnderHall, UnderHall2, d_NestOfLeviathan), `scriptfile` 23 (13 books), `timelimit` 21 (14 books), `endofkq` 19
+(the nine KQ books), `waitlogin` 12, `whoclickme` 12 (GordonMaster, GuildTournament, Wedding, d_NestOfLeviathan),
+`suicide` 12 (GordonMaster, d_NestOfLeviathan), `sendquestresult` 10 (KQHBat1–5), `teleport` 8 (GordonMaster,
+GuildTournament, Wedding), `scinariocode` 1 (JobChange2-1), `teleportall` 1 and `weddingcomplete` 1 (Wedding),
+`whokillme` 1 (d_NestOfLeviathan). Not used by a loaded book: `someoneshout`, `spawn` (only the unlisted
+`Map/MonkeyBreed0x.ps`), `sublayershift`, `waitidle` (only unlisted books: Kingkong, MiniDragon, HMiniDragon,
+d_graveyard), `walk`.
+
+### 26.1 KQ end and results: `endofkq`, `sendquestresult`, `scinariocode`
+
+```pseudo
+endofkq.                                 ShineEndOfKingdomQuest::sa_Step  @ FUN_004f5fc0   # last statement of the KQ books
+    field = theater.t_Field; h = field ? field.fm_KQHandle : 0xFFFFFFFF
+    if h == 0xFFFFFFFF: assert "…ShineEndOfKingdomQuest::sa_Step : Invalid Shine Quest"   # (original bug) Z09-B117: no return
+    WorldManagerSession::wms_EndOfKQPacket(sock2wldman, h)                            @ FUN_005a4800
+        → WM 0x5810 NC_KQ_Z2W_END_CMD { u32 Handle = h }  (6 bytes with the opcode; too long → assert with the text
+          "…ShineEndOfKingdomQuest::sa_Step : Packet Too Long", nothing sent)
+        KQContribute::KQContributeList::kqpl_EndOfKQ(&g_KQContributeList, h)      @ FUN_0049a500
+            # removes the contribution entry (PlayerList) of handle h from the vector kqcl_List (made by kqcl_NewKQ, Z08)
+    if field: FieldMap::fm_ClearObject(field, 0xb0)    # FUN_00495a10 (§24.8): kinds 4 NPC, 5 mob, 7 door removed next tick
+    pop
+```
+
+The WM ends the KQ (`fc_NC_KQ_Z2W_END_CMD` FUN_0042aac0, W04 §6: status 5, broadcast 0x5811 NC_KQ_W2Z_DESTROY_CMD,
+free its map slots); every zone then runs its 0x5811 handler (Z08: `kqpl_EndOfKQ` again, `fm_ClearObject(map, 0x3b0)`,
+map KQ handle −1, the map's film is dropped). So `endofkq` itself removes the mobs, NPCs and doors at once; the bandits
+(kind 8, mask 0x100) and the film go with 0x5811. The KQ books run it last, after `questresult` / `reward` (§25.6) and
+after sending the players home themselves (KQHBat1: `broadcast all "KQReturn10"`, two pauses, `linkto all "Eld" "Eld"
+17214 13445`, `endofkq`; its `PickUpMaulFirst` block ends the same way).
+
+```pseudo
+sendquestresult word handleExpr.         ShineSendKQResult::sa_Step  @ FUN_004f4300   # KQHBat2.ps: sendquestresult Suc PlayerHandle.
+    v = argument 0 (fails: assert "…ShineSendKQResult::sa_Step : no Player", pop)
+    o = som_GetObject(pst_GetNumber(v)) (FUN_0054fd10); null → pop (no assert)
+    word = target word, lower-cased; cmd = word == index_suc "suc" (FUN_006976a0) ? 0x12 : 0x13
+    o.vt[0x304] so_SendProtocol(0x16, cmd)      # empty 0x5812 NC_KQ_COMPLETE_CMD / 0x5813 NC_KQ_FAIL_CMD to that player only
+    pop                                          # non-players: vt 0x304 is the no-op FUN_00509900
+```
+
+Unlike `questresult` (§25.6: every player of the map, `so_ply_KQSuccess` / `KQFail` title counters, GameLog 0x0442,
+object clear), `sendquestresult` only sends the window packet to one player: the KQHBat books walk the ranking (`@KQResultList`, §22.3) and send `Suc` with
+`invidualreward` to the first three players and `Fail` to the others. Client: the complete / fail
+window and sound (FUN_004a31f0 / FUN_004a3270, §24.8).
+
+```pseudo
+scinariocode var codeExpr.               ShineScinarioCode::sa_Step  @ FUN_004f39d0   # JobChange2-1.ps: scinariocode PlayerHandle 16.
+    o = os_ShineObject (§22.1); null: log line, pop
+    code = argument 0 (fails: assert "…ShineScinarioCode::sa_Step : no code", log "Fail 1", pop)
+    q = o.vt[0x808] so_ply_QuestDiary (FUN_0055a270; non-players: folded `return 0` FUN_00570b00)
+    q ? CQuestZone::QuestPlayer_ScenarioDone_Server(q, code) (FUN_005bd750, Z15) and log "Suc"  :  log "Fail 2"
+    pop
+```
+
+This is the single-player form of `ScinarioCodeParty` (§22.4, which walks the party). `QuestPlayer_ScenarioDone_Server`
+completes the quest-script condition `code` of the player's running quests (quest engine, Z15; the item upgrade uses
+code 5, Z05; the tutorial 7, Z08). JobChange2-1 reports scenario code 16 in its `QuestSuccess` block, right after
+`questresult Suc`.
+
+### 26.2 Dialog files and shouts: `scriptfile`, `someoneshout`
+
+```pseudo
+scriptfile name.                         ShineScriptFile::sa_Step  @ FUN_004ebde0   # d_NestOfLeviathan.ps: scriptfile "d_NestOfLeviathan".
+    name = argument 0
+        fails: assert "…ShineScriptFile::sa_Step: wrong argument"; return 0   # (original bug) Z09-B116: the film ends (§21.4)
+    if name == "": ps_Shine.shinescript (+0x10130) = null                    # trace "Unset script file"
+    else: ps_Shine.shinescript = KQScriptManager::operator[](&kqscriptmanager, name)   (FUN_0064ce70, §22.6;
+        unknown name: assert "Invalid script name", null)
+    pop
+```
+
+`ps_Shine.shinescript` is the dialog-string set read by `npcchat` / `npcshout` (§25.3), `NPCChatNoFacecut` (§22.4) and
+`someoneshout`; with no set (never set, or unknown name) those nodes send nothing. It belongs to the film's process
+stack, so each running film has its own.
+
+```pseudo
+someoneshout speakerKey textKey.         ShineSomeoneShout::sa_Step  @ FUN_004eeeb0   # unused in 2016
+    a = argument 0 (fails: assert "…ShineChat::sa_Step : Null body", pop)
+    b = argument 1 (fails: assert "…ShineChat::sa_Step : Null chat", pop)
+    if ps_Shine.shinescript:
+        speaker = ss_String(set, a); text = ss_String(set, b)   (FUN_0048ce60; "" when missing)
+        0x201F NC_ACT_SOMEONESHOUT_CMD (layout §8.7) {
+            speaker[20] = the first 20 bytes at `speaker` (a plain 20-byte copy: no terminator when ≥ 20 characters,
+                bytes after a shorter string's terminator come from the string table),
+            flag &= ~3 (GMColor 0, isMob 0: the client shows `speaker` as a name), other bits stale,
+            len = strlen(text) as u8, content = text }
+        to the whole map: AxialListPacketBroadcast over t_AllInMap (live players, same layer, §23.1); size len + 0x19
+        # (original bug) Z09-B112: itemLinkDataCount (payload byte 0) is never written (stale, as in Z09-B71: the
+        #   client then parses item links past the packet); a text of 256+ characters wraps the u8 length
+    pop
+```
+
+`someoneshout` is the named-speaker counterpart of `npcshout` (which shouts as the NPC object, §25.3) and of Lua
+`cSomebodyShout` (§19.3, which shouts as a mob ID).
+
+### 26.3 Summoning mobs and starting films: `summonmob`, `spawn`
+
+```pseudo
+summonmob var mobName count.             ShineSummonMob::sa_Step  @ FUN_004ef160   # d_graveyard.ps: summonmob GiantMagmaton01 "ID_EarthCalerben" 2.
+    o = os_ShineObject (the place); null → pop
+    name = argument 0 (fails: assert "…ShineSummonMob::sa_Step : no mob", pop)
+    mobId = mob ID of name (BTree::operator[] FUN_0063cc30 on mobdatabox.mdb_btree); unknown: assert "… no mob", pop
+    n = number of argument 1 (fails: assert "… no number", pop)
+    MobHatchery::mh_MobBreed(mobhatchery, o.so_Field.fm_MapID, o's position, 0, mobId, "-", mobNum n, regenSec 0,
+        family 0, count 1, key "Def", brief null, "-", 0xFFFF, level −1, layer 0)            (FUN_004b6960, §10.6)
+    pop
+```
+
+A new breeder group around the object's position (circle of radius 50) with `|n|` breeders (a negative `n` is made
+positive, `mbg_MobBreed`); each spawns one mob on the next breeder tick and is freed after its mob is gone (§10.6). The
+summoned mobs are ordinary breeder mobs: they are not written into a script variable, so a book that must count them
+uses `@` counters or interrupts (§22.2, §15). The place object is the boss in the 2016 books (GordonMaster:
+`summonmob GordonMaster "KQ_G_Gordon" 3.`; Monkey: `summonmob BossHandle SummonIndex 10.`). `o.so_Field` is read without
+a check (a slot object without a field would pass a null map; not reached by the 2016 books).
+
+```pseudo
+spawn film [argument].                   ShineSpawn::sa_Step  @ FUN_004f7eb0   # MonkeyBreed01.ps: spawn "Map/Monkey" "2713 2311".
+    film = argument 0 (fails: assert "…ShineSpawn::sa_Step : no script", pop)
+    arg = argument 1 (os_Express[1].vt[8]); fails → arg = ""
+        # (original bug) Z09-B118: the slot is used without a null check: `spawn "X".` (one argument, allowed by
+        #   the 1–2 count of §21.2) dereferences a null expression and crashes the zone when the node steps
+    if theater and its field:
+        Movie::CinemaComplex::cc_PlayFilm(field.fm_Multiflex, film, arg, field.fm_MapID)   (FUN_005089a0, part 16)
+    pop
+```
+
+`spawn` starts another film of the scenario book shelf on the same map with an argument string (the Monkey books pass
+a coordinate pair); the new film runs in parallel with the caller (how films start and read their argument: part 16).
+
+### 26.4 Killing and moving objects: `suicide`, `teleport`, `teleportall`, `walk`, `sublayershift`
+
+```pseudo
+suicide what.                            ShineSuicide::sa_Step  @ FUN_004f1980   # GordonMaster.ps: suicide #("InterruptArg").
+    w = Identify::i_GetToken(target) (the word, or the value of a `#` variable, §20.5)
+    if lower-case(w) == "all":                                  # literal string, same text as index_all
+        so_AllInMap(t_CenterFlag, AxialListMobSuicide{alms_MobID 0xFFFF}, 0)   # every live mob of the map (§13.3)
+        (null flag: assert "…t_AllInMap : Null flag")
+    else if w == "<pst_GetNumber(w)>" (w is a plain number): # a handle
+        o = som_GetObject(n); o: AxialListMobSuicide{0xFFFF}.alms_SelfKill(o)   (FUN_004f1720, §13.3: any object kind)
+    else:                                                       # a mob name: every live mob of that type
+        id = mob ID of w (unknown → 0xFFFF): assert "…ShineSuicide::sa_Step : Invalid mob id" with the name
+        so_AllInMap(t_CenterFlag, AxialListMobSuicide{alms_MobID = id}, 0)
+        # (original bug) Z09-B113: the assert does not return, so an unknown name walks with id 0xFFFF and kills
+        #   every mob of the map
+    pop
+```
+
+`alms_SelfKill` kills with the object as its own killer (`so_KilledBy(o, HP, 1000, 1)`), broadcasts 0x243C to sight and
+runs the death check (§13.3) with the object as its own killer, so the death interrupts and the breeder bookkeeping
+run as for any death. The handle form takes any kind (a player handle kills the player). 2016: `suicide
+BombBoogySum01.` (d_NestOfLeviathan, mob names) and `suicide #("InterruptArg").` (GordonMaster: the hero NPC of the
+interrupt dies after its last `npcchat`).
+
+```pseudo
+teleport word var [x y].                 ShineTeleport::sa_Step  @ FUN_004f4cc0
+    # GuildTournament.ps: teleport SomeWhere Opener 5084 3326.   GordonMaster.ps: teleport AnyWhere GordonMaster.
+    anywhere = lower-case(target word) == index_anywhere "anywhere" (FUN_00697940)
+    v = argument 0 (fails: assert "…ShineSubLayerShift::sa_Step : no Player", copied text; pop)
+    o = som_GetObject(pst_GetNumber(v)); null → pop
+    anywhere: o.vt[0x6d8] so_mobile_Teleport()  (FUN_0057a8b0: a random free cell of the map, §9.3)
+    else: x = argument 1 ("… no X"), y = argument 2 ("… no Y"); o.vt[0x6d4] so_mobile_Teleport(&{x, y})
+        (players FUN_0057d1d0, mobs FUN_005793e0, §9.3: immediate move with sight update)
+        # Z09-B118: with fewer than 3 arguments (allowed by 1–3) the missing slot is dereferenced (crash)
+    pop
+```
+
+Any word other than "anywhere" means "to x y" (the books write `SomeWhere`). Non-mobile objects assert in the base
+`so_mobile_Teleport` (FUN_0057a800 / FUN_0057a750) and stay.
+
+```pseudo
+teleportall word [x y | x1 y1 x2 y2].    ShineTeleportAll::sa_Step  @ FUN_004f4930   # Wedding.ps: teleportall Split 304 833 808 833.
+    w = lower-case(target word)
+    w == "anywhere": so_AllInMap(t_CenterFlag, AxialListTeleportAnywhere, 0)
+        AxialListTeleportAnywhere::ali_Work(walker, o)          @ FUN_00428730
+            if walker.so_ObjectType (vt 0x4d0) == 2:            # tests the walker, not o
+                if o.vt[0x484] mode == 4: o.vt[0x488] so_ply_ReinforceFoldtent   # stand up from a tent
+                o.vt[0x6d8] so_mobile_Teleport()
+    w == index_split "split" (FUN_00697b20):
+        x1, y1, x2, y2 = arguments 0–3 (x fails: assert "…ShineSubLayerShift::sa_Step : no X"; y: "… no Y"; pop)
+        c = AxialListCount2 (ctor FUN_004e7d50); t_AllInMap(c)    # ali_Work FUN_00428780: counts objects of kind 2
+        s = AxialListTeleportSplit(c.alc_Cnt, &{x1, y1}, &{x2, y2})   (ctor FUN_004e7d80: _Half = count / 2, _Current 0)
+        t_AllInMap(s):  AxialListTeleportSplit::ali_Work(walker, o)  @ FUN_004287b0
+            o not a player → continue
+            o mode 4 → vt 0x488 (stand up)
+            o.vt[0x400] so_TeleportReserv(_Current < _Half ? &{x2, y2} : &{x1, y1}); _Current++
+    else: x, y = arguments 0, 1 (same asserts); so_AllInMap-walk AxialListTeleport{&{x, y}} via t_AllInMap
+        AxialListTeleport::ali_Work(walker, o)                  @ FUN_004286e0
+            walker kind == 2: o mode 4 → vt 0x488; o.vt[0x6d4] so_mobile_Teleport(&{x, y})
+    pop
+    # (original bug) Z09-B115: the "anywhere" and "x y" visitors test the kind of the walker (the map's centre flag,
+    #   a ShineAxialFlag whose vt 0x4d0 is the folded `return 0` FUN_004b8d20) instead of the visited object, so they
+    #   teleport nobody; only "split" (which tests o) works. Z09-B118 also applies (missing slots dereferenced).
+```
+
+`ShinePlayer::so_TeleportReserv` (vt 0x400, FUN_00496020; other objects: no-op FUN_00495fd0) only stores the target
+(`sp_TeleportReserv`, flag `sp_MiscFlag.TeleportReserv`); the player tick (`ShinePlayer::so_Routine` FUN_0056c790,
+§2.3) clears the flag and calls vt 0x6d4 on the next pass. The split counts players on all layers of the map
+instance (the counter has no layer test) and sends the first half (in walk order) to the second point and the rest
+to the first: the wedding puts the guests on the two sides of the aisle.
+
+```pseudo
+walk var x y.                            ShineWalk::sa_Step  @ FUN_004f1ef0   # unused in 2016
+    as run (§25.2), with o.vt[0x8ac] so_scene_MovePathSet(x, y, 1 walk); ps_Shine.currentmob = o
+    # asserts are the copied "…ShineRun::sa_Step : no locx / no locy"
+sublayershift word var value.            ShineSubLayerShift::sa_Step  @ FUN_004f4770   # unused in 2016
+    logout = lower-case(target word) == index_logout "logout" (FUN_00697920)
+    v = argument 0 (fails: assert "…ShineSubLayerShift::sa_Step : no Player", pop)
+    o = som_GetObject(pst_GetNumber(v)); null → pop
+    n = argument 1 (fails: assert with the copied text "…ShineSendKQResult::sa_Step : no value", pop)
+    if logout: ShineObject::so_Logout(o) (FUN_0054b780, §12: 0x1805 to sight; a booth is closed)
+    o.so_layer.layer→l_Sub = n (u8)                       # the visibility class of so_SubLayer_CanSee (Z02 §5)
+    pop
+```
+
+`l_Sub` selects the row / column of the 6 × 6 `World/SubLayerInteract.txt` table (Z01, Z02 §5: 0 normal, 3 GM hide).
+Changing it sends nothing by itself; the `logout` form first removes the object from the clients in sight, so that
+the next sight exchange (moves, §9) shows it only to those the new class may see *(inferred: no re-announce is made
+here)*.
+
+### 26.5 Time limits and waits: `timelimit`, `waitlogin`, `waitidle`
+
+```pseudo
+timelimit unit n.                        ShineTimeLimit::sa_Step  @ FUN_004ebfc0   # KQHBat1.ps: timelimit Min 15.  timelimit Sec 30.
+    unit = target word (i_GetToken, case kept); n = argument 0
+        fails: assert "…ShineTimeLimit::sa_Step: wrong argument"; return 0      # Z09-B116: the film ends
+    Movie::TimeLimit::tl_SetTimeLimit(&theater.t_TimeLimit (+0x1023c), unit, n)   @ FUN_00507e60
+        tl_IsActiv = 1
+        seconds = n × 3600 if unit starts with 'H' / 'h', n × 60 if 'M' / 'm', else n
+        tl_EndTick = g_Now + seconds × 10; tl_RestMinuteSend = 99999999
+    Movie::TimeLimit::tl_LeftTick(&theater.t_TimeLimit)                           @ FUN_00507f60
+        left = tl_EndTick − g_Now (ticks); s = left / 10
+        if s / 60 ≠ tl_RestMinuteSend: tl_RestMinuteSend = s / 60
+            0x0810 NC_MISC_RESTMINUTE_CMD { u8 flag = 1; u16 second = s }   (5 bytes with the opcode) to the whole map
+            (AxialListPacketBroadcast via so_AllInMap(t_CenterFlag); null flag → assert, nothing)
+        return left
+    pop
+```
+
+The reset of `tl_RestMinuteSend` makes the first `tl_LeftTick` always send, so the client's map timer starts at once;
+afterwards `tl_LeftTick` is called by the `TimeOut` interrupt check (§15.4) and sends again each time the remaining
+time crosses a minute. The u16 is **seconds** (`second` in `PROTO_NC_MISC_RESTMINUTE_CMD`, *(pdb2016)* and
+*(pdb2017)*): this answers part 9b's question; Z01's annotation of 0x0810 calls it "minutes = limit / 10" (correction
+for the knowledge file). A later `timelimit` replaces the running limit. Who clears `tl_IsActiv` and the rest of
+`Movie::TimeLimit` (`tl_GetTimeLimit_Second` FUN_00507df0, KQ timer functions): part 16.
+
+```pseudo
+waitlogin var.                           ShineWaitUserLogin::sa_Step  @ FUN_004ee430   # KQHBat1.ps: waitlogin Players.
+    first step (*ip == 0): *ip = 1; ps_Shine.waittick (+0x1010c) = g_Now + 2400      # 240 s
+    v = target.i_GetVariable (null only for a failed `#` form: assert "…ShineWaitUserLogin::sa_Step", pop)
+    k = AxialListMobCounter{almc_MobID 0xFFFF, guild 0, counter 0, max 1, search ala_SearchPly}   (§15.7: live players,
+        mode 1/2/4/6); so_AllInMap(t_CenterFlag, k, 0) (null flag: assert)
+    if k.almc_Counter < 1 and g_Now ≤ waittick: return 1               # wait, stepped again next pass
+    v = "" then pst_MergeNumber(v, counter ≥ 1 ? 1 : 0)                 # 1 = a player came, 0 = timed out
+    pop
+```
+
+The KQ, promotion and guild-tournament books use it before their first round (KQHBat1: `waitlogin Players.` then
+`if Players === 0 then … call "QuestEnd"`): an instance whose players never arrive ends itself after 4 minutes.
+
+```pseudo
+waitidle.                                ShineWaitIdle::sa_Step  @ FUN_004f3590   # Kingkong.ps (unlisted): waitidle.  ; wait while the boss casts
+    first step: *ip = 1 (trace only)
+    o = os_ShineObject(ps)                    # the node has no target (os_IDRead 0): os_Ident is empty, i_GetVariable
+                                              #   returns null → assert "…OtherStatement::sa_Step", o = null
+    if o and not o.vt[0x8c4] so_scene_IsIdle (ShineMob FUN_0050def0: smo_SkillCast end time (+0x1d84) ≠ 0, a cast
+        is running; players / others: folded `return true`): return 1    # wait
+    pop
+    # (original bug) Z09-B114: with no target the object is always null, so `waitidle` never waits (and asserts every
+    #   time); the intended "wait until the boss's cast ends" cannot work. No loaded 2016 book uses it.
+```
+
+### 26.6 Who clicked, who killed: `whoclickme`, `whokillme`
+
+```pseudo
+whoclickme var handleExpr.               ShineWhoClickMe::sa_Step  @ FUN_004f03a0   # GuildTournament.ps: whoclickme Opener InterruptArg.
+whokillme var handleExpr.                ShineWhoKillMe::sa_Step   @ FUN_004f7170   # d_NestOfLeviathan.ps: whokillme bufftarget InterruptArg.
+    t = target.i_GetVariable (failed `#` form: assert "…sa_Step", pop; a missing name writes the shared deftkn, Z09-B82)
+    a = argument 0 (fails: assert "… : no Player", pop)
+    o = som_GetObject(pst_GetNumber(a)); null: assert "… : No npc", pop
+    h = whoclickme ? o.vt[0x810] so_mobile_WhoIsClickMe (FUN_00555750: smo_WhoClickMe +0x186)
+                   : o.vt[0x80c] so_mobile_WhoIsKillMe  (FUN_00555740: smo_WhoKillMe +0x184)
+    t = "" then pst_MergeNumber(t, h)          # a handle; 0 / stale for an object never clicked / killed
+    pop
+```
+
+`smo_WhoClickMe` is written by `ShineMobileObject::so_mobile_SetClicker` (vt 0x814, FUN_00555760), called from the
+NPC-click handler `sp_NC_ACT_NPCCLICK_CMD` FUN_004c4b70 (Z02) right after it raises the `sim_NPCClick` interrupt
+(§15); the film steps on a later main-loop pass (§21.4), so the clicker is already stored when `whoclickme` runs.
+`smo_WhoKillMe` is written by `ShineMobileObject::so_KilledBy` (§5). Both slots resolve to these two getters for
+players, mobs, NPCs and bandits (other kinds not traced; the 2016 books pass NPC and mob handles).
+
+### 26.7 Wedding: `weddingcomplete`
+
+```pseudo
+weddingcomplete a b.                     ShineWeddingComplete::sa_Step  @ FUN_004f6b70   # Wedding.ps: weddingcomplete ClickGroom ClickBride.
+    # the two arguments are never evaluated
+    g = som_FindPlayer(weddinghall.Groom.RegistNumber) (FUN_00550360; global weddinghall, Z07 / Z13)
+    b = som_FindPlayer(weddinghall.Bride.RegistNumber)
+    if g and b and both are players (kind 2):
+        → Character DB 0x1091 NC_CHAR_WEDDING_DO_REQ { NETPACKETZONEHEADER { u16 clienthandle = g.handle,
+            u32 charregistnumber = g (vt 0x344) }, u32 Partner = b (vt 0x344) }   (12 bytes with the opcode; to
+            sock2gameDB; too long → assert "…ShineWeddingComplete::sa_Step : Packet Too Long")
+    pop                                       # either partner absent: nothing (no message, no retry)
+```
+
+The DB marks both characters married (`p_Char_Wedding_Do`, D02) and answers 0x1092 NC_CHAR_WEDDING_DO_ACK, handled by
+the zone `GameDBSession::gds_NC_CHAR_WEDDING_DO_ACK` FUN_005a1830 (Z07: reload both, wedding item and skills on success). The partners are taken from the hall
+reservation, not from the script's click variables; they must be on this zone (any map). The hall timetable and the
+ceremony flow around this statement are Z13.
+
+### 26.8 2016 use, answers and open points
+
+- Part 15c's list for 15d is closed: `ShineEndOfKingdomQuest` (§26.1), `ShineSummonMob` (§26.3), `ShineScriptFile`
+  (§26.2), `ShineWalk`, `ShineTeleport`, `ShineSuicide` (§26.4), `ShineWaitIdle` (§26.5) and the rest of the table.
+  With this section every `Shine*` node of §21.2 is documented (§13, §15, §23–§26, §8.2).
+- Part 9b's open point (0x0810 unit): seconds (§26.5).
+- Z08's open point "the map scripts that run kingdom quests": the KQ end is `questresult` → `reward` → `endofkq`
+  (§25.6, §26.1); the WM's 0x5811 removes the rest (Z08, W04).
+- Not traced: `cc_PlayFilm` and the film argument (part 16); `QuestPlayer_ScenarioDone_Server` (Z15); the wedding
+  hall registration (`weddinghall.Groom` / `.Bride`, Z13); whether a `sublayershift` without `logout` leaves stale
+  objects on clients (sight refresh, Z02 §5).
