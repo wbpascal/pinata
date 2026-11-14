@@ -12640,6 +12640,26 @@ Z16 §6.4
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
 
+### `0x245c` NC_BAT_TOGGLESKILL_ON_CMD (Z→C)
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_ToggleSkill_On FUN_00579500; client GameFrameWork::On_NC_BAT_TOGGLESKILL_ON_CMD FUN_0049ce60; PROTO_NC_BAT_TOGGLESKILL_ON_CMD (pdb2016, pdb2017))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSkillID | toggle skill step switched on (SkillDataIndex.sdi_Activ.ID) |
+
+2 bytes, to the player only; sent from the second blast pass of a toggle-skill cast (Z23 §2.5). Client: ShortCutWin::OnToggleKey on all shortcut bars.
+
+### `0x245d` NC_BAT_TOGGLESKILL_OFF_CMD (Z→C)
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_ToggleSkill_Off FUN_005795d0; client GameFrameWork::On_NC_BAT_TOGGLESKILL_OFF_CMD FUN_004a5b70; PROTO_NC_BAT_TOGGLESKILL_OFF_CMD (pdb2016, pdb2017))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSkillID | toggle skill step switched off |
+
+2 bytes, to the player only; sent by the off-cast, csl_Toggle_CheckOnOff, csl_Toggle_AllOff (map link) and csl_Toggle_AllOffAndReset (tent, mount; also for steps that were off, Z23-B2). Client: ShortCutWin::OffToggleKey, then Skill::RecordSkillUse (starts the client cooldown display).
+
 ### `0x482c` NC_SKILL_ITEMACTIONCOOLTIME_CMD (Z→C)
 
 **Verified layout** (basis: zone ItemActionObserveManager::ResetCoolTime FUN_005d1a00 (num*8+4 bytes incl. opcode); client On_NC_SKILL_ITEMACTIONCOOLTIME_CMD FUN_0049c600; PDB 2017 PROTO_SKILL_ITEMACTIONCOOLTIME_CMD)

@@ -1,0 +1,21 @@
+{
+  "_about": "Z23: zone per-player active skill list (toggle skills, cooldowns, empower, mastery). Offsets are payload offsets; layouts read in the 2016 zone code (PDB export), names from the NA2016 zone PDB.",
+  "packets": {
+    "zone": {
+      "0x245c": {
+        "dir": "Z→C",
+        "name": "NC_BAT_TOGGLESKILL_ON_CMD",
+        "basis": "zone ShinePlayer::so_ply_ToggleSkill_On FUN_00579500; client GameFrameWork::On_NC_BAT_TOGGLESKILL_ON_CMD FUN_0049ce60; PROTO_NC_BAT_TOGGLESKILL_ON_CMD (pdb2016, pdb2017)",
+        "fields": [[0, "u16", "nSkillID", "toggle skill step switched on (SkillDataIndex.sdi_Activ.ID)"]],
+        "notes": "2 bytes, to the player only; sent from the second blast pass of a toggle-skill cast (Z23 §2.5). Client: ShortCutWin::OnToggleKey on all shortcut bars."
+      },
+      "0x245d": {
+        "dir": "Z→C",
+        "name": "NC_BAT_TOGGLESKILL_OFF_CMD",
+        "basis": "zone ShinePlayer::so_ply_ToggleSkill_Off FUN_005795d0; client GameFrameWork::On_NC_BAT_TOGGLESKILL_OFF_CMD FUN_004a5b70; PROTO_NC_BAT_TOGGLESKILL_OFF_CMD (pdb2016, pdb2017)",
+        "fields": [[0, "u16", "nSkillID", "toggle skill step switched off"]],
+        "notes": "2 bytes, to the player only; sent by the off-cast, csl_Toggle_CheckOnOff, csl_Toggle_AllOff (map link) and csl_Toggle_AllOffAndReset (tent, mount; also for steps that were off, Z23-B2). Client: ShortCutWin::OffToggleKey, then Skill::RecordSkillUse (starts the client cooldown display)."
+      }
+    }
+  }
+}
