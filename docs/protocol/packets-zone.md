@@ -3374,16 +3374,14 @@ Fill: +1: ShineObjectClass::ShinePlayer::vfunc[0x4c4] = FUN_0055abf0 (assumed cl
 |---|---|---|
 | 0 | u8 | `1` |
 
-### `0x1c16` ?
+### `0x1c16` NC_BRIEFINFO_PLAYER_LIST_INFO_APPEAR_CMD (hand-named)
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_BRIEFINFO_PLAYER_LIST_INFO_APPEAR_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone &showid ac_ShowPlayerID FUN_0041f4a0 / AxialListShowID::ali_Work FUN_00429170 (write, 1 + n*30 bytes, n ≤ 28 per packet); PDB 2016 PROTO_NC_BRIEFINFO_PLAYER_LIST_INFO_APPEAR_CMD; the 2016 client has no handler (C01))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nPlayerCnt |  |
-| 1 | PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD[nPlayerCnt] | PlayerInfo | variable length, element PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD |
-
-Element `PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD` (30 bytes): +0 u16 nHnd, +2 char[20] sID, +22 u8 CharTitle.Type, +23 u8 CharTitle.ElementNo, +24 u16 CharTitle.MobID, +26 u32 nGuildID
+| 0 | u8 | nPlayerCnt | 1..28 |
+| 1 | PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD[nPlayerCnt] | PlayerInfo | 30 bytes each: +0 u16 nHnd, +2 Name5 sID (20), +22 CHARTITLE_BRIEFINFO {u8 Type, u8 ElementNo, u16 MobID}, +26 u32 nGuildID |
 
 Sent from `AmpersandCommand::ac_ShowPlayerID` (`FUN_0041f4a0`) · payload variable (iVar4)
 
@@ -12742,6 +12740,19 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 1 | u16 | start.handle | GM object handle at the origin |
 | 3 | u32 | start.regnum | GM charNo |
 | 7 | u16 | bonus | per mille (1000 = normal) for every map of the zone |
+
+### `0x2055` NC_ACT_WEDDING_COUPLE_ENTRANCE_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &weddingreset ac_WeddingReset FUN_0041ec70 and WeddingHall::wh_Routine FUN_005a2a10 (write, 0x12 bytes with opcode); zls_NC_ACT_WEDDING_COUPLE_ENTRANCE_RNG FUN_005a2b60 (reads, forwards 16 bytes); PDB 2016 PROTO_NC_ACT_WEDDING_COUPLE_ENTRANCE_RNG (0x10))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number |
+| 1 | u16 | start.handle | 0xFFFF (not used) |
+| 3 | u32 | start.regnum | 0xFFFFFFFF (not used) |
+| 7 | u32 | groom | groom charNo (&weddingreset: GM charNo) |
+| 11 | u32 | bride | bride charNo (&weddingreset: GM charNo) |
+| 15 | u8 | RecallCount | partners recalled so far; 0 back at the origin = cancel the hall reservation |
 
 ### `0x10b1` NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG (Z→Z ring)
 

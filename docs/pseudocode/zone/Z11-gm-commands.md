@@ -249,47 +249,47 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 78 | `&horsespeed` | ac_HorseSpeed `0041ded0` | 100 | `<n>` | set the GM's mount run speed | — | §5.6 |
 | 79 | `&charinform` | ac_CharInform `0041e510` | 10 | — (target) | dump the target's name, level, mode, location, HP (+ player house/booth/ride state) | 0x2011 lines | §5.7 |
 | 80 | `&partyinfo` | ac_PartyInform `0041e5e0` | 100 | `[charName]` | dump the party of a player (default: self) from the zone's party mirror | 0x2011 lines | §5.7 |
-| 81 | `&propose` | ac_Propose `0041e9d0` | 100 | (part 4) | | | |
-| 82 | `&proposeres` | ac_ProposeRes `0041eb30` | 100 | (part 4) | | | |
-| 83 | `&weddingreset` | ac_WeddingReset `0041ec70` | 100 | (part 4) | | | |
-| 84 | `&reserve` | ac_WeddingReserve `0041ed70` | 100 | (part 4) | | | |
-| 85 | `&enterready` | ac_WeddingGuestEnterReady `0041ee40` | 100 | (part 4) | | | |
-| 86 | `&enter` | ac_WeddingGuestEnter `0041ef10` | 100 | (part 4) | | | |
-| 87 | `&learnpassive` | ac_learnPassive `0041f270` | 100 | (part 4) | | | |
-| 88 | `&unlearn` | ac_Unlearnskill `0041f050` | 100 | (part 4) | | | |
-| 89 | `&unlearnpassive` | ac_UnlearnPassive `0041f160` | 100 | (part 4) | | | |
-| 90 | `&wedding` | ac_Wedding `0041f3a0` | 100 | (part 4) | | | |
-| 91 | `&showid` | ac_ShowPlayerID `0041f4a0` | 100 | (part 4) | | | |
-| 92 | `&mobhatchery` | ac_MobHatchery `0041f6c0` | 100 | (part 4) | | | |
-| 93 | `&allcritical` | ac_AllCritical `0041f770` | 100 | (part 4) | | | |
-| 94 | `&erasechargebuf` | ac_EraseChargeBuff `0041f620` | 100 | (part 4) | | | |
-| 95 | `&startGT` | ac_StartGuildTournament `0041f850` | 100 | (part 4) | | | |
-| 96 | `&flagcapture` | ac_FlagCapture `0041fa10` | 100 | (part 4) | | | |
-| 97 | `&useguildskill` | ac_UseGuildSkill `0041fb20` | 100 | (part 4) | | | |
-| 98 | `&observerlinkto` | ac_ObserverLinkTo `0041fc00` | 100 | (part 4) | | | |
-| 99 | `&observerout` | ac_ObserverOut `0041fcb0` | 100 | (part 4) | | | |
+| 81 | `&propose` | ac_Propose `0041e9d0` | 100 | `<charName> <word>` | run the client's proposal (0x204F) for the GM; the GM's partner is asked, the name only has to exist | 0x2050 / 0x2052 (Z02 §10) | §6.1 |
+| 82 | `&proposeres` | ac_ProposeRes `0041eb30` | 100 | `<charName> <1\|other>` | answer a proposal as the GM (0x2051); accept = engagement in the DB | 0x2052; DB 0x1083 (Z02 §10) | §6.1 |
+| 83 | `&weddingreset` | ac_WeddingReset `0041ec70` | 100 | — | fake couple-entrance lap with the GM as both partners: the hosting zone cancels its wedding-hall reservation | ring 0x2055; GameLog 0x065F | §6.1 |
+| 84 | `&reserve` | ac_WeddingReserve `0041ed70` | 100 | — | the client's hall reservation 0x2053 with all checks | 0x2054 / 0x2052; GameLog 0x065D (Z02 §10) | §6.1 |
+| 85 | `&enterready` | ac_WeddingGuestEnterReady `0041ee40` | 100 | — | the client's 0x2056: show the current reservation | 0x2057 | §6.1 |
+| 86 | `&enter` | ac_WeddingGuestEnter `0041ef10` | 100 | — | take one invitation if held and link the GM into the wedding hall (Wedding 558,154) without any check | GM's map link | §6.1 |
+| 87 | `&learnpassive` | ac_learnPassive `0041f270` | 100 | `<passiveId>` | learn a passive skill through the DB, unchecked | DB 0x4801 (ispassive 1) → 0x4804, WM 0x4820 | §6.2 |
+| 88 | `&unlearn` | ac_Unlearnskill `0041f050` | 100 | `<skillId>` | delete a skill through the DB, unchecked (≥ 30000 = passive) | DB 0x4825 → 0x4827 | §6.2 |
+| 89 | `&unlearnpassive` | ac_UnlearnPassive `0041f160` | 100 | `<passiveId>` | delete a passive skill (id + 30000) through the DB | DB 0x4825 → 0x4827 | §6.2 |
+| 90 | `&wedding` | ac_Wedding `0041f3a0` | 100 | `<charName>` | marry the GM to the named player if the two are engaged (DB 0x1091, skips the ceremony) | DB 0x1091 → 0x1092 (Z07) | §6.1 |
+| 91 | `&showid` | ac_ShowPlayerID `0041f4a0` | 100 | — | list names / guilds of the visible players to the GM, only on NameHide maps; the client ignores the packet (B23) | 0x1C16; 0x2011 on refusal | §6.5 |
+| 92 | `&mobhatchery` | ac_MobHatchery `0041f6c0` | 100 | — | dump the regen groups and breeders of the GM's map | 0x2011 lines | §6.5 |
+| 93 | `&allcritical` | ac_AllCritical `0041f770` | 100 | `[0]` | every normal attack of the GM is critical; `0` = off | — | §6.4 |
+| 94 | `&erasechargebuf` | ac_EraseChargeBuff `0041f620` | 100 | — | set every charged buff of the GM to an expired end date | — | §6.4 |
+| 95 | `&startGT` | ac_StartGuildTournament `0041f850` | 100 | `<char1> <char2> [playMin]` | start guild tournament map 0 here for the two players' guilds, both get member grade 0 | GT start (Z16); 0x2011 | §6.3 |
+| 96 | `&flagcapture` | ac_FlagCapture `0041fa10` | 100 | `<npcName>` | start capturing the named flag NPC (0x74CA path) | 0x74CB, 0x2047 (Z08 §8.1); 0x2011 | §6.3 |
+| 97 | `&useguildskill` | ac_UseGuildSkill `0041fb20` | 100 | `<n>` | use guild-tournament skill n on the GM's map (no ack) | GT system (Z16); 0x2011 | §6.3 |
+| 98 | `&observerlinkto` | ac_ObserverLinkTo `0041fc00` | 100 | `<seed>` | enter tournament `seed` as observer without asking the WM | 0x74D8; WM 0x4019 if another zone | §6.3 |
+| 99 | `&observerout` | ac_ObserverOut `0041fcb0` | 100 | — | leave the tournament map (stored position or Roumen) | GM's map link | §6.3 |
 | 100 | `&HP` | ac_HPChange `004248e0` | 100 | (part 6) | | | |
 | 101 | `&SP` | ac_SPChange `00424a70` | 100 | (part 6) | | | |
-| 102 | `&speed` | ac_EditSpeed `0041fd50` | 50 | (part 4) | | | |
+| 102 | `&speed` | ac_EditSpeed `0041fd50` | 50 | `<n>` | set the GM's base move speed (min 1000) | — | §6.4 |
 | 103 | `&linktosavedata` | ac_LinktoSaveData `004194f0` | 100 | — | teleport to the current map's save-link point | as &linkto | §3.1 |
 | 104 | `&reloaddata` | ac_ReLoadData `00424c00` | 100 | (part 6) | | | |
 | 105 | `&captivate` | ac_Captivate `00424d60` | 100 | (part 6) | | | |
 | 106 | `&ignoreskillcooltime` | ac_IgnoreSkillCoolTime `00424ec0` | 100 | (part 6) | | | |
 | 107 | `&쿨타임무시` | ac_IgnoreSkillCoolTime `00424ec0` | 100 | (part 6) | | | |
-| 108 | `&invenview` | ac_InventoryView `004206b0` | 100 | (part 4) | | | |
-| 109 | `&runto` | ac_RunTo `0041fe20` | 100 | (part 4) | | | |
-| 110 | `&ghostremove` | ac_GhostRemove `0041fef0` | 100 | (part 4) | | | |
-| 111 | `&curtime` | ac_CurTime `0041ffb0` | 100 | (part 4) | | | |
-| 112 | `&amibusy` | ac_AmIBusy `004200d0` | 100 | (part 4) | | | |
-| 113 | `&knockback` | ac_KnockBack `00420350` | 100 | (part 4) | | | |
-| 114 | `&partblock` | ac_PartBlock `00420470` | 100 | (part 4) | | | |
-| 115 | `&debuglogging` | ac_DebugLogging `00420760` | 100 | (part 4) | | | |
+| 108 | `&invenview` | ac_InventoryView `004206b0` | 100 | — | list the GM's inventory and equipment (cell, key, name) | 0x2011 lines | §6.6 |
+| 109 | `&runto` | ac_RunTo `0041fe20` | 100 | `<x> <y>` | move the GM server-side towards (x, y) at speed 10000; the client is not told | — | §6.4 |
+| 110 | `&ghostremove` | ac_GhostRemove `0041fef0` | 100 | — | remove every dropped item, NPC, mob, door, bandit and effect object of the GM's map | removal packets (Z09 §13) | §6.5 |
+| 111 | `&curtime` | ac_CurTime `0041ffb0` | 100 | — | show the world date/time and world seconds | 0x2011 | §6.6 |
+| 112 | `&amibusy` | ac_AmIBusy `004200d0` | 100 | — | show the KQ list size and the GM's mob kills in the map's KQ | 0x2011 lines | §6.6 |
+| 113 | `&knockback` | ac_KnockBack `00420350` | 100 | — (target) | STA_KNOCKBACK on the GM with the target as setter (B22) | 0x2429, 0x2427 / 0x1C18 (Z03) | §6.4 |
+| 114 | `&partblock` | ac_PartBlock `00420470` | 100 | `<x> <y> <r>` | write the move / attack block grid around (x, y) into PartBlock.txt | — | §6.5 |
+| 115 | `&debuglogging` | ac_DebugLogging `00420760` | 100 | `<BalanceLog\|other> <0\|1>` | switch BalanceLog or all debug logs (also AmpersandCommandLog) on/off | 0x2011 | §6.6 |
 | 116 | `&&&` | (no-op) `00402370` | 100 | — | nothing: empty function FUN_00402370 | — | §3.6 |
 | 117 | `&npcrevive` | ac_NPCRevive `004231a0` | 100 | (part 6) | | | |
-| 118 | `&ts_DiceFix` | ac_TaiSai_DiceFix `00420860` | 100 | (part 4) | | | |
-| 119 | `&ts_DiceProbability` | ac_TaiSai_DiceProbability `004209f0` | 100 | (part 4) | | | |
-| 120 | `&GB_DiceFix` | ac_Gamble_TaiSai_DiceFix `00420bb0` | 100 | (part 4) | | | |
-| 121 | `&GB_DiceProbability` | ac_Gamble_TaiSai_DiceProbability `00420d30` | 100 | (part 4) | | | |
+| 118 | `&ts_DiceFix` | ac_TaiSai_DiceFix `00420860` | 100 | `<ddd>` | fix the next throw of the mini-house TaiSai table the GM is in | 0x2011 on failure | §6.7 |
+| 119 | `&ts_DiceProbability` | ac_TaiSai_DiceProbability `004209f0` | 100 | `[<ddd> <weight>]` | set one outcome weight of that table (no argument: reload all) | 0x2011 on failure | §6.7 |
+| 120 | `&GB_DiceFix` | ac_Gamble_TaiSai_DiceFix `00420bb0` | 100 | `<ddd>` | fix the next throw of the targeted gamble-house TaiSai machine | 0x2011 on failure | §6.7 |
+| 121 | `&GB_DiceProbability` | ac_Gamble_TaiSai_DiceProbability `00420d30` | 100 | `[<ddd> <weight>]` | set one outcome weight of that machine (no argument: reload all) | 0x2011 on failure | §6.7 |
 | 122 | `&makeraid` | ac_makeraid `00420ef0` | 100 | (part 5) | | | |
 | 123 | `&outraid` | ac_outraid `00421040` | 100 | (part 5) | | | |
 | 124 | `&inraid` | ac_inraid `00423330` | 100 | (part 6) | | | |
@@ -337,7 +337,7 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 166 | `&walkto` | ac_WalkTo `004228c0` | 100 | (part 5) | | | |
 | 167 | `&castteleport` | ac_CastTeleport `004229b0` | 100 | (part 5) | | | |
 | 168 | `&setobjectdirect` | ac_SetObjectDirect `00422a90` | 100 | (part 5) | | | |
-| 169 | `&pvp` | ac_SetPVP `00420230` | 100 | (part 4) | | | |
+| 169 | `&pvp` | ac_SetPVP `00420230` | 100 | `<1\|0>` | set the map's free-PvP flag and tell every player on/off | 0x1812 / 0x1813; 0x2011 usage | §6.5 |
 
 ## 3. Commands, part 1 (handlers FUN_004194f0 … FUN_0041b030)
 
@@ -1131,6 +1131,404 @@ per `<< Finisher`, which sends it with `f_Admin.vt[0x784]` (so_ply_Notice).
     # 1 = some free cell in the (2r+1)² square around the GM; gm without a map dereferences null (GMs are on a map)
 ```
 
+## 6. Commands, part 4 (handlers FUN_0041e9d0 … FUN_00420d30)
+
+### 6.1 Wedding: `&propose`, `&proposeres`, `&weddingreset`, `&reserve`, `&enterready`, `&enter`, `&wedding`
+
+Most of these words call the client's wedding handlers (Z02 §10) with a packet built in the global send buffer `gpp`.
+Those handlers never read the handle in their packet: the counterpart is always the caller's partner from the
+wedding data (`p+0x5cc8`, Z02 §10), so the character a GM names here only has to be online in this zone.
+`MH` = `gm.so_ply_MH_GetActiveMH()` (vt 0x130) is non-zero, i.e. the GM is inside a mini-house. In that case five
+of the words refuse with the `&pfind` text "fail to 'pfind' : not allowed to do 'pfind' in the MH"
+(original bug) Z11-B19.
+
+```pseudo
+&propose <charName> <word>   ac_Propose                                @ FUN_0041e9d0
+    MH: wall "fail to 'pfind' : …"; return                                    # Z11-B19
+    t = som_FindPlayer(Name5 = args[0] (20)); none → wall "Failed : Cannot find character"; return
+    gpp = 0x204F NC_ACT_WEDDING_PROPOSEREQ_REQ { u16 to = t.handle, char propose_word[37] = args[1] (37, last byte 0) }
+    ShinePlayer::sp_NC_ACT_WEDDING_PROPOSEREQ_REQ(gm, gpp, 0x27, 0xFFFF)       @ FUN_0059f760 (Z02 §10)
+        # every check of the client request applies (mode, single, partner within 100 units); the proposal goes to the
+        # GM's partner, not to t; replies 0x2052 / 0x2050 as described there
+
+&proposeres <charName> <1|other>   ac_ProposeRes                       @ FUN_0041eb30
+    MH: wall "fail to 'pfind' : …"; return                                    # Z11-B19
+    t = som_FindPlayer(args[0]); none → wall "Failed : Cannot find character"; return
+    gpp = 0x2051 NC_ACT_WEDDING_PROPOSEACK_ACK { u16 from = t.handle, u8 reply = (args[1][0] == '1') }
+        # response_word[37] (payload +3) is not written: it holds whatever the last packet left in gpp
+        # (original bug) Z11-B20
+    ShinePlayer::sp_NC_ACT_WEDDING_PROPOSEACK_ACK(gm, gpp, 0x28, 0xFFFF)       @ FUN_0059f900 (Z02 §10)
+        # reply 1: the proposer (the GM's partner) loses one proposal ring, both get 0x2052 err 0x12C0 with the stale
+        # response_word, and the Character DB gets 0x1083 NC_CHAR_WEDDING_PROPOSE_REQ (engagement, persistent)
+        # reply 0: the proposer gets 0x12CA (refused) with the stale word
+
+&reserve   ac_WeddingReserve                                           @ FUN_0041ed70
+    MH: wall "fail to 'pfind' : …"; return                                    # Z11-B19
+    ShinePlayer::sp_NC_ACT_WEDDING_HALL_RESERV_REQ(gm, gpp, 0, 0xFFFF)          @ FUN_005a2330 (Z02 §10)
+        # = the client's 0x2053 with all its checks; success reserves this zone's hall (WeddingHall::wh_Reserv), gives
+        # 10 invitations to both and logs 0x065D
+
+&enterready   ac_WeddingGuestEnterReady                                @ FUN_0041ee40
+    MH: wall "fail to 'pfind' : …"; return                                    # Z11-B19
+    ShinePlayer::sp_NC_ACT_WEDDING_HALL_GUEST_ENTER_READY_REQ(gm, gpp, 0, 0xFFFF)   @ FUN_0059fb60 (Z02 §10)
+        # gm ← 0x2057 with the current reservation (groom, bride, entry / wedding times)
+
+&enter   ac_WeddingGuestEnter                                          @ FUN_0041ef10
+    MH: wall "fail to 'pfind' : …"; return                                    # Z11-B19
+    ShinePlayer::sp_DestroyItem(gm, gm.handle, itemdatabox.idb_specialid.sii_InvitationCard, 1, null)
+        # one invitation, if the GM holds one (the result is not checked)
+    link = LinkInformTemplete { map "Wedding", "Wedding", x 558, y 154 }
+    gm.smo_GetMode() (vt 0x484) == 4 (tent): gm.so_ply_ReinforceFoldtent() (vt 0x488)
+    gm.so_LinkToReserv(link, 1)   (vt 0x3fc, Z01 §7.1)
+    # = the success path of 0x2058 NC_ACT_WEDDING_HALL_GUEST_ENTER_REQ (Z02 §10) without its checks: no invitation,
+    # couple membership or entry window is needed and no hall needs to be reserved
+
+&weddingreset   ac_WeddingReset                                        @ FUN_0041ec70
+    zone ring ← 0x2055 NC_ACT_WEDDING_COUPLE_ENTRANCE_RNG {                    # 0x10 bytes (pdb2016 struct)
+        ZONERINGLINKAGESTART start = { u8 machine = own zone no, u16 handle = 0xFFFF, u32 regnum = 0xFFFFFFFF },
+        u32 groom = gm charNo (vt 0x344), u32 bride = gm charNo, u8 RecallCount = 0 }
+    zcs_Send(&zoneconnect, gpp, 0x12)
+```
+
+The 0x2055 lap is the one the hall timer starts (`WeddingHall::wh_Routine` FUN_005a2a10, Z13 scope "wedding hall
+timetable and ceremony flow"): at the entry time the hosting zone sets `Started`, recalls groom and bride if they are
+its own (`wh_RecallCouple` FUN_005a27f0), and if not both were found sends this packet round the ring with the count.
+`&weddingreset` fakes such a lap with the GM as both partners:
+
+```pseudo
+0x2055 NC_ACT_WEDDING_COUPLE_ENTRANCE_RNG { start, u32 groom, u32 bride, u8 RecallCount }   zls_…  @ FUN_005a2b60
+    start.machine ≠ own zone:
+        n = wh_RecallCouple(groom) + wh_RecallCouple(bride)                     @ FUN_005a27f0
+            # charNo online here, not in a mini-house, map ≠ "EldPri": destroy one wedding coupon
+            # (sii_WeddingCoupon), fold a tent, so_LinkToReserv({ "Wedding", 558, 154 }, 1); true
+            # online but in a mini-house: true without a recall; offline / on EldPri / no map: false
+        forward the 16 bytes with RecallCount += n                             (zcs_Send, 0x12)
+    start.machine == own zone (back at the origin):
+        RecallCount == 0: weddinghall.Reserved = 0, Started = 0
+                          GameLog ← 0x065F NC_LOG_WEDDING_HALL_CANCEL { u32 groom, u32 bride }     ("WeddingHall::wh_Cancel")
+        else:             WeddingHall::wh_Start(&weddinghall)                   @ FUN_005a25a0
+                          # play film "Wedding/Wedding" on map "Wedding", announce, GameLog 0x065E NC_LOG_WEDDING_HALL_START
+```
+
+With the GM as groom and bride nobody is recalled anywhere (the GM is in the origin zone, which does not recall on the
+lap), so the count returns 0 and the origin **cancels its hall reservation**: `Reserved` / `Started` are cleared and a
+cancel with the GM's charNo twice is logged. The couple that had reserved is not told, keeps its invitations and
+its `ApplicationLimit`, and the hall can be reserved again (`wh_Reserv`). If the ring is broken the packet never
+comes back and nothing is reset *(inferred)*. The reset is effective only on the zone that hosts the hall.
+
+```pseudo
+&wedding <charName>   ac_Wedding                                       @ FUN_0041f3a0
+    t = som_FindPlayer(args[0]); none, or t.so_ObjectType() (vt 0x4d0) ≠ 2: nothing
+    Character DB ← 0x1091 NC_CHAR_WEDDING_DO_REQ { u16 handle = gm.handle, u32 charNo = gm charNo, u32 Partner = t charNo }
+        (12 bytes with the opcode, sock2gameDB; too long: assert "PineEventScriptNode::ac_Wedding::sa_Step : Packet Too Long")
+    # no message to the GM; the DB answer 0x1092 → GameDBSession::gds_NC_CHAR_WEDDING_DO_ACK FUN_005a1830 (Z07)
+```
+
+`p_Char_Wedding_Do` (D02 §0x1091, *(db-backup)*) marks both `tMarriage` rows married (`nStatus 2`, `nSubStatus 0`,
+`dSubWhen` = now + 7 days, `nMarriageCount + 1`) only if each row exists and points at the other; otherwise it rolls
+back and answers failure. So `&wedding` marries **the GM** to the named character, and only when the two are already
+engaged to each other (an accepted proposal, 0x1083): it skips the hall reservation and ceremony, which normally end
+in the same 0x1091 sent by the script statement `weddingcomplete` (Z09 §26.7). It cannot marry two other players.
+
+### 6.2 Skills: `&unlearn`, `&unlearnpassive`, `&learnpassive`
+
+```pseudo
+&unlearn <skillId>   ac_Unlearnskill                                   @ FUN_0041f050
+    Character DB ← 0x4825 NC_SKILL_ERASE_REQ { u16 handle = gm.handle, u32 charNo, u16 skill = (u16) ac_Scanf(args[0]) }
+        (10 bytes with the opcode; assert "AmpersandCommand::ac_Unlearnskill : Packet Too Long", never)
+&unlearnpassive <passiveId>   ac_UnlearnPassive                        @ FUN_0041f160
+    same packet with skill = (u16)(ac_Scanf(args[0]) + 30000)               # passives are stored as id + 30000 (D04 §2)
+&learnpassive <passiveId>   ac_learnPassive                            @ FUN_0041f270
+    Character DB ← 0x4801 NC_SKILL_SKILLTEACH_REQ (0x11 bytes) {
+        u16 handle, u32 charNo, u32 chrregnum = charNo, u16 skillid = (u16) ac_Scanf(args[0]), u8 ispassive = 1, u16 removeid = 0xFFFF }
+```
+
+None of the three checks anything (skill table, class, level, whether the skill is known); the skill-erase item and
+its queue (`sp_NC_SKILL_UNLEARN_REQ`, Z03 §9) are bypassed. The DB side (D04 §2):
+
+- **0x4825**: `p_Skill_Del(charNo, skill)` deletes the `tSkill` row (success also when there was none) and answers
+  0x4826 err 0x1501 (fail 0x1504). The zone's `so_UnlearnSkillAck` (Z03 §9) removes the skill from memory: id < 30000
+  → active list (`csl_UnLearn`), else passive list with err 0x1505 and the passives re-applied; the GM's client gets
+  0x4827 NC_SKILL_UNLEARN_ACK ("Deleted %s skills"). `&unlearn 30005` is therefore the same as `&unlearnpassive 5`.
+- **0x4801 ispassive 1**: `p_Skill_SetPassive(charNo, skillid + 30000, no old row)` inserts the passive (a duplicate
+  fails: 0x4803 → client "Failed to learn the skill."); success 0x4802 → the zone adds it, sends 0x4804
+  NC_SKILL_SKILL_LEARNSUC_CMD and tells the WM (0x4820 NC_SKILL_PASSIVESKILL_LEARN_CMD), Z03 §9.3. Any number is
+  stored, also ids without a PassiveSkill row *(inferred, as for `&learnskill` §4.4)*.
+
+All three are persistent (the `tSkill` table).
+
+### 6.3 Guild tournament: `&startGT`, `&flagcapture`, `&useguildskill`, `&observerlinkto`, `&observerout`
+
+The tournament system (`GuildTournamentSystem`, the seed table `guildtournamentinfo`, match flow) is Z16's; these
+words call its entry points directly.
+
+```pseudo
+&startGT <charName1> <charName2> [playMin]   ac_StartGuildTournament   @ FUN_0041f850
+    gm without a map: wall "Fail CreateGuildtournamentSystem"; return
+    a = som_FindPlayer(args[0]); b = som_FindPlayer(args[1])         # both must be online in this zone
+    min = atoi(args[2]); < 1 → 1
+    a or b missing: wall "Fail CreateGuildtournamentSystem"; return
+    WorldManagerSession::wms_GuildTournamantStart(sock2wldman[0], &PROTO_NC_GUILD_TOURNAMENT_START_CMD {   @ FUN_00476de0
+        nTournamentSeed 0, nTournamentMapNo 0, nExploerTimeMin 1, nWaitPlayTimeSec 0, nPlayTimeMin = min,
+        nNo1 = a.so_mobile_GetGuildRegnum() (vt 0x818), nNo2 = b's guild })
+    GuildTournamentSystem::SetGuildMemberGrade(a charNo, 0); …(b charNo, 0)    @ FUN_0047ccd0
+        # static map sm_mapGuildMemberGrades[charNo] = 0; normally filled from the WM's
+        # 0x…MEMBERGRADE_ACK (wms_NC_GUILD_TOURNAMENT_ZONE_MEMBERGRADE_ACK FUN_00476460) and copied into the
+        # participant record by GuildTournamentSystem::PlayerRegister FUN_0047f970 (m_nGuildMemberGrade)
+    wall "CreateGuildtournamentStart"
+```
+
+Like `&guildtournament` (§5.5) this runs the zone's own handler of the WM's start order: tournament map 0 starts
+here, explore 1 min, no wait, `min` minutes of play, with the guilds of the two named players; nothing goes to the WM.
+Grade 0 for both players is *(inferred)* the guild-master grade, so they may use the guild skills (`0x1B4C` authority
+check, Z08 §8.1). A player without a guild gives guild number 0, and the same name twice gives one guild against
+itself: neither is checked (original bug) Z11-B21.
+
+```pseudo
+&flagcapture <npcName>   ac_FlagCapture                                @ FUN_0041fa10
+    gm on a map and n = som_FindNPC(Name5 = args[0]):
+        gm.so_ply_FlagCaptureCast(n.handle) (vt 0x930)                @ FUN_00477d90
+            # = 0x74CA NC_GUILD_TOURNAMENT_FLAGCAPTURE_REQ (Z08 §8.1): all checks apply (tournament map, participant,
+            # distance ≤ 100, mode); replies 0x74CB, on success the 4 s cast bar 0x2047 and the capture callback
+        wall "FlagCapture"                                             # also when the cast was refused
+    else wall "Fail FlagCapture"
+
+&useguildskill <n>   ac_UseGuildSkill                                  @ FUN_0041fb20
+    gm without a map: wall "Fail ac_UseGuildSkill"; return
+    gt = fm_GetGuildTournamentSystem(gm map); gt: GuildTournamentSystem::GuildBuffUse(gt, gm, atoi(args[0]))   @ FUN_0047b9a0
+        # the skill use of 0x74CF NC_GUILD_TOURNAMENT_USESKILL_REQ (Z08 §8.1) without its ack 0x74D0 and the map
+        # broadcast 0x74D1; GuildBuffUse's own checks (points, authority, cool time) and error sink apply (Z16)
+    wall "Soccess ac_UseGuildSkill"                                    # also without a tournament or when the use failed
+
+&observerlinkto <seed>   ac_ObserverLinkTo                             @ FUN_0041fc00
+    ShinePlayer::sp_Guild_Tournamnet_Observer_Enter(gm, atoi(args[0]))     @ FUN_004788c0
+&observerout   ac_ObserverOut                                          @ FUN_0041fcb0
+    ShinePlayer::sp_Guild_Tournamnet_Observer_Out(gm, 0)                   @ FUN_00475ba0
+        !sp_RunRollBackPosEvent(gm) and gm map is a tournament map (fm_IsGuildTournametnMap): sp_2Roumen(gm)
+        # = the 0x74DB NC_GUILD_TOURNAMENT_OBSERVER_OUT_REQ handler (Z08 §8.1): back to the stored position, else Roumen
+```
+
+`sp_Guild_Tournamnet_Observer_Enter` is what the zone runs when the WM accepts a player's 0x74D7 observer request
+(Z08 §8.1: 0x74D7 → WM 0x74D9 → answer → FUN_004788c0). The GM skips the WM:
+
+```pseudo
+sp_Guild_Tournamnet_Observer_Enter(p, seed)                            @ FUN_004788c0   (owned by Z16; summary)
+    seed == 0xFF or > 31: p ← 0x74D8 NC_GUILD_TOURNAMENT_OBSERVER_ENTER_ACK { u16 err 0x1B42 } (11-byte payload, rest stale)
+    mode ∈ {0, 3, 5, 7}: nothing
+    !so_AbnormalState_Set_Simple(p, STA_OBSERVERHIDEMODE (289), 1, 0) (vt 0x644): nothing
+    mode 4 (tent): fold it (vt 0x488)
+    GuildTouramentLoginDataInfo::GetLinkData(guildtournamentinfo[seed], &link, p) false: nothing
+    p ← 0x74D8 { u16 err 0x1B40, u8 seed, u32 nNo1, u32 nNo2 }
+    tournament map on this zone: so_LinkTo(link, 6, 9, 10) (vt 0x600) + RollBackPosCallBackEvent (return position)
+    else: WM ← 0x4019 NC_CHARSAVE_2WLDMAN_LINK_FROM_CMD { u16 wmHandle, u32 charNo, map (12), x, y }; so_LinkTo(link, 6, 9, 10)
+```
+
+### 6.4 Character and combat: `&speed`, `&runto`, `&allcritical`, `&knockback`, `&erasechargebuf`
+
+```pseudo
+&speed <n>   ac_EditSpeed                                              @ FUN_0041fd50
+    ShinePlayer::sp_SetTotalMoveSpeed(gm, max(atoi(args[0]), 1000))       @ FUN_00560150 (Z09 §17.5)
+        # PureCharParam.MoveSpeed = n, c_MakeTotal; run speed = Total.MoveSpeed × chrrunspeed / 1000
+    # same as Lua cStaticSpeed (Z09 §17.5); no packet here, the client learns it with the next parameter update
+    # (inferred, as there); memory only
+
+&runto <x> <y>   ac_RunTo                                              @ FUN_0041fe20
+    gm.so_mobile_MoveReserve(&{ ac_Scanf(args[0]), ac_Scanf(args[1]) }, speed 10000, kind 2 (run), backwards 0)   (vt 0x660)
+        # FUN_00555970 (Z09 §9.1): the server moves the GM's position towards (x, y) at 10000 units/s, no block check
+    # no packet: the GM's client is not told and keeps its own position *(inferred)*; the profiler label is
+    # "AmpersandCommand::ac_IgnoreSkillCoolTime" (copied from another handler; harmless)
+
+&allcritical [0]   ac_AllCritical                                      @ FUN_0041f770
+    gm.smo_RulesOfNormalAttack (+0x1e74) = (args[0] == "0") ? RulesOfEngagementNormalPY (roe_normalPY)
+                                                             : RulesOfEngagementAlwaysCritical (roe_alwaysCritical)
+        (ShinePlayer::sp_SetRulesOfEngagement FUN_0054a110)
+```
+
+`RulesOfEngagementAlwaysCritical` is `RulesOfEngagementNormalPY` (Z03 §4 table) with the critical-rate slots (vt +4
+and +0x24) replaced by `roe_CriticalRateByGlobalAction` FUN_004ffda0 = 1000.0 (‰): every **normal** attack of the GM
+is critical; skills use their own rule sets and are unchanged. `&allcritical` without an argument turns it on
+(only the exact word "0" turns it off, back to `roe_normalPY`, the set every player has from the `ShineMobileObject`
+constructor FUN_005591c0; only mobs switch to `roe_normalMA`, Z09 §5.3). While it is on, the code that tests the
+rule set by address (`smo_SwingDamage` FUN_00432f30: attack type physical / magical for item actions; the heal-on-hit
+abstate checks 0xC9 / 0xCA in `smo_AttackedDamage` FUN_0042aeb0) matches neither set *(effect not traced further)*.
+Memory only.
+
+```pseudo
+&knockback   ac_KnockBack                                              @ FUN_00420350
+    t = gm.so_CurrentTargetObject() (vt 0x75c); none: nothing
+    e = dic_abstate.as_StateIndexList[STA_KNOCKBACK (346)]               # AbState row StaKnockBack, SubStaKnockBack
+    gm.so_AbnormalState_Set(setter t, e.AbStataIndex, strength 1, e, now, 0, 0xFFFFFFFF, keep 1000, 5, 0)   (vt 0x638, Z03 §6.2)
+    so_AbnormalState_BitSet(gm, idx)                                     # result of the set not checked
+    e.subabstate[1]: gm.so_AbnormalState_Inform(idx, sub.KeepTime, 1) (0x2429); so_AbnormalState_BroadcastSet(gm, idx, sub.KeepTime, 1)
+```
+
+The knock-back state lands on **the GM**, with the target as the one who set it; `&setabstatetarget` (§4.4) does it
+the other way round (state on the target, GM as setter). The GM is thrown back from the target instead of the
+target from the GM (original bug) Z11-B22 *(intent inferred from the name and the target lookup)*.
+
+```pseudo
+&erasechargebuf   ac_EraseChargeBuff                                   @ FUN_0041f620
+    ShinePlayer::sp_RemoveAllChargeBuff(gm)                              @ FUN_00418280
+        for each active entry of gm.sp_ChargedItem.ci_List (List<ChargedItemEffectElement>, 12-byte entries):
+            e.ciee_Index (ChargedItemEffect row) ≠ null: e.ciee_Year = 1     # end date → 2001
+```
+
+Nothing is removed directly: every charged buff gets an end date in the past and is dropped by the per-minute
+expiry check (Z09 §2.4) *(inferred: the check compares the end date with now)*. No packet, no DB write here.
+
+### 6.5 Map tools: `&showid`, `&pvp`, `&ghostremove`, `&partblock`, `&mobhatchery`
+
+```pseudo
+&showid   ac_ShowPlayerID                                              @ FUN_0041f4a0
+    gm map or its FieldList row (map +0xc) missing: nothing
+    row.NameHide (+0x6a) == 0: wall "fail to 'showid' : This instruction code is not used in condition which the
+                                     FieldMap option - NameHide is activated."; return
+        # i.e. it works only on maps that hide names (the text reads the other way round)
+    gpp = 0x1C16 NC_BRIEFINFO_PLAYER_LIST_INFO_APPEAR_CMD { u8 nPlayerCnt = 0 }      (AxialListShowID ctor FUN_004281e0)
+    so_AllOfRange(gm, allofrangearg, gm position, …, AxialListShowID)       # every object in the GM's view range
+        AxialListShowID::ali_Work(gm, o)                                    @ FUN_00429170
+            o is a player (vt 0x4d0 == 2) and so_SubLayer_CanSee(gm, o):
+                PlayerInfo[n] = PROTO_NC_BRIEFINFO_PLAYER_INFO_APPEAR_CMD { u16 nHnd = o.handle, Name5 sID = o.so_CharName()
+                    (vt 0x56c), CHARTITLE_BRIEFINFO CharTitle = o.so_GetCharacterTitle() (vt 0x420) +0x488 Type, +0x489
+                    ElementNo, +0x48a MobID, u32 nGuildID = o.so_mobile_GetGuildRegnum() (vt 0x818) }      # 30 bytes
+                n == 28: send 3 + 28·30 bytes to the GM (so_GetDataSocketStream vt 0x2f8), n = 0
+    0 < n < 28: send 3 + n·30 bytes to the GM
+```
+
+The packet carries the names of the visible players to the GM only. The 2016 client has no handler for 0x1C16 (C01:
+"a player, ignored by this client build"), so the command shows nothing (original bug) Z11-B23.
+
+```pseudo
+&pvp <1|other>   ac_SetPVP                                             @ FUN_00420230
+    argnum ≠ 2: wall "usage: &SetPVP 1/0"; return                          # the word is &pvp
+    gm map and its centre object (fm_GetCenterObject): v = ac_Scanf(args[0])
+        map.fm_PKField (+0x54) = (u8) v                                     # the free-PvP flag (Z03 knowledge +0x54)
+        so_AllInMap(centre, AxialListProtocolSend(6, v == 1 ? 0x12 : 0x13), 0)
+            # every player of the map ← 0x1812 NC_MAP_FREEPKZONE_ON_CMD {} ("This area is enabled for PvP.") or
+            # 0x1813 NC_MAP_FREEPKZONE_OFF_CMD {}
+```
+
+Same flag and packets as the Lua `cSetFreeBattle` and the script word `pk` (Z09 §17.6). Any value other than 1 is
+announced as "off" but stored as it is: `&pvp 2` keeps a non-zero free-PvP flag while every client is told PvP is off
+(original bug) Z11-B24 *(inferred: the readers test the flag as non-zero)*. Memory only; `fm_Init` clears it.
+
+```pseudo
+&ghostremove   ac_GhostRemove                                          @ FUN_0041fef0
+    FieldMap::fm_ClearObject(gm map, 0x3b2)                               @ FUN_00495a10 (Z09 §24.8)
+        so_AllInMap(map, AxialListObjectClear{0x3b2}, 1); ali_Work FUN_00495940: (0x3b2 >> o.so_ObjectType) & 1 →
+            o.so_RetrateFromMap() (vt 0x3f4, removed next tick)
+```
+
+`0x3b2` = kinds 1 (dropped item *(inferred from `som_AllocObject` type 1, Z05)*), 4 NPC, 5 mob, 7 door, 8 bandit,
+9 effect object: everything on the GM's map except players, mini-houses and magic fields (the clear mask the
+instance and KQ code use is 0x3b0, the same without dropped items). NPCs and gates do not come back until the map
+script respawns them *(inferred)*. A GM without a map dereferences null (GMs chat from a map).
+
+```pseudo
+&partblock <x> <y> <r>   ac_PartBlock                                  @ FUN_00420470
+    gm without a map: nothing; r = ac_Scanf(args[2]); r > 100 or fopen("PartBlock.txt", "w") fails: nothing
+    write "MoveBlock\n"; for dy = −r…r: for dx = −r…r: char(mbi_IsMoveBlock(map block info (map +0x14), x+dx, y+dy)); "\n"
+    write "\n", "AttackBlock\n"; same grid with mbi_IsAttackBlock
+    char = blocked ? (centre ? '@' : '*') : (centre ? ':' : '.')
+    fclose
+```
+
+A text picture of the move-block and attack-block bits (Z09 §9.2: `.shbd` / `.shab`) around a world point, one
+character per world unit (a block cell is 6.25 units wide, so cells repeat), into `PartBlock.txt` in the zone's working
+directory (overwritten each time). A negative `r` writes only the two headers. Nothing goes to the GM.
+
+```pseudo
+&mobhatchery   ac_MobHatchery                                          @ FUN_0041f6c0
+    MobHatchery::mh_View(mobhatchery, gm)                                 @ FUN_004b3a60 (Z09 §10.9)
+        # one GM notice per regen group of the GM's map and per breeder (mob, spawns left, handle, next regen)
+```
+
+### 6.6 Information and logs: `&curtime`, `&amibusy`, `&invenview`, `&debuglogging`
+
+```pseudo
+&curtime   ac_CurTime                                                  @ FUN_0041ffb0
+    t = mysecond()                                                         # FUN_00450360: time() + diffence2world (Z09 §1.2)
+    d = chargeditemcheck.ct_Current (DAT_00aa43b8, ShineDateTime of the world clock)
+    wall sprintf("%d.%d.%d %d:%d[%u]", (d & 0xff) + 2000, d >> 8 & 0x1f, d >> 13 & 0x3f, d >> 19 & 0x3f, d >> 25, t)
+        # year.month.day hour:minute of the packed date, then the world time in seconds
+
+&amibusy   ac_AmIBusy                                                  @ FUN_004200d0
+    wall "TotalKQList : %d" (KQContributeList::kqcl_KQListNumber(&g_KQContributeList) FUN_00499bd0: entries of 0x14 bytes)
+    h = gm map.fm_KQHandle (+0x3c)
+    h == 0xFFFFFFFF: wall "No KQ"
+    kqc_SearchHandle(&kqcontainer, h) (FUN_004954f0) none: wall "KQElement[%d] not found" (h)
+    else wall "MyKill : %d" (KQContributeList::kqcl_GetMobKill(&g_KQContributeList, h, gm) FUN_00499d80: the GM's
+        mob-kill count in that KQ's contribution list, 0 when not listed)
+
+&invenview   ac_InventoryView                                          @ FUN_004206b0
+    gm.so_ply_InvenWrite(null) (vt 0xa58)                                 @ FUN_0051ad90
+        for each item of the inventory (ItemBoxIterItem): wall "     Inv %3d   %I64u   %.40s" (cell, item key, ItemInfo name)
+        then for each equipped item:                   wall "     Equ %3d   %I64u   %.40s"
+        # an item whose id has no ItemInfo row ends the whole listing; with an empty inventory the equipment part is
+        # skipped too (it is inside the inventory branch) (original bug) Z11-B25
+
+&debuglogging <BalanceLog|other> <0|1>   ac_DebugLogging               @ FUN_00420760
+    v = (u8) ac_Scanf(args[1])
+    args[0] == "BalanceLog": BalanceLog.dl_Activ = v;      wall "BalanceLog changed"
+    else:                    DebugLogging::dl_ActivAll = v; wall "All of log changed"
+```
+
+`dl_ActivAll` is the master switch every `DebugLogging` file log tests before writing (`dl_FilePoint` FUN_004191b0 and
+the write paths, §1.5), so `&debuglogging x 0` also stops `AmpersandCommandLog`: later commands of every GM are not
+logged until someone sets it back to 1 or the zone restarts. `BalanceLog` is switched off at start-up (Z09 §1.1).
+
+### 6.7 Dice: `&ts_DiceFix`, `&ts_DiceProbability`, `&GB_DiceFix`, `&GB_DiceProbability`
+
+The TaiSai dice table exists in two forms (Z06): the one in a mini-house (`ShineMiniHouse.smh_DiceTaiSai`) and the
+gamble-house machine (`CGambleDiceTaiSaiObject.G_DiceTaiSai`, Z06 §4.4). `ts_` works on the house the GM is in, `GB_` on
+the machine the GM has targeted. The dice are three digits 1…6 typed together (`args[0][0..2]`, more characters are
+ignored); the replies are Korean (CP949) GM notices, translated here.
+
+```pseudo
+dice(s) = for i in 0…2: d[i] = s[i] − '0'; any s[i] ∉ '1'…'6' → notice "Enter a value between 1 and 6." (1 ~ 6 사이의 값을 입력해 주세요.)
+
+&ts_DiceFix <ddd>   ac_TaiSai_DiceFix                                  @ FUN_00420860
+    argnum ≠ 2: notice "Enter the dice together, 111 ~ 666." (111 ~ 666 사이의 주사위를 붙여서 입력하세요.); return
+    d = dice(args[0])
+    no map: "No map information." (맵 정보가 없습니다.); not in a house (vt 0x130): "You are not in a mini house."
+    h = som_GetObject(gm.so_ply_MH_GetMyHandle() (vt 0x138)); none: "Mini house information not found."
+    !h.so_mh_SetDiceFix(d) (vt 0x1cc)                                     @ FUN_005117d0
+        # so_mh_IsActiveDiceTaiSai (vt 0x214) and nGameStatus ∈ {DTGS_NONE_BETTING, DTGS_BETTING}:
+        # bIsAdminDice = 1, CurrentRollingDice = d → the next roll shows these dice (Z06 §3.4)
+        → "Dice setting failed." (주사위 셋팅에 실패 하였습니다.)
+
+&ts_DiceProbability [<ddd> <weight>]   ac_TaiSai_DiceProbability        @ FUN_004209f0
+    no map / not in a house / house not found: as above
+    argnum 1: !h.so_mh_SetDiceProbability(null, 0) (vt 0x1d0)            @ FUN_00511830
+        # reload all 216 weights nDiceRate[] and nDiceRateSum from gMiniHouseDiceRate (DiceRate table); fewer rows → false
+        → "Dice probability reset failed." (주사위 확률 초기화에 실패 하였습니다.)
+    argnum 3: d = dice(args[0]); w = (u16) atoi(args[1])
+        !h.so_mh_SetDiceProbability(d, w): table active (vt 0x214) and DiceTaiSai::ConvertDice(d) → index i:
+            nDiceRateSum += w − nDiceRate[i]; nDiceRate[i] = w
+        → "Dice probability setting failed." (주사위 확률 셋팅에 실패 하였습니다.)
+    other argnum: "Enter dice 111 ~ 666 and a probability 0 ~ 65535." (111 ~ 666 사이의 주사위, 0~65535 사이의 확률을 입력하세요.)
+
+&GB_DiceFix <ddd>   ac_Gamble_TaiSai_DiceFix                           @ FUN_00420bb0
+    no map: "No map information."; no target (vt 0x75c): "Use it after clicking the dice machine." (주사위 게임기를 클릭 한 후 사용하세요.)
+    argnum ≠ 2: the 111 ~ 666 usage; d = dice(args[0])
+    g = CGambleObjectManager::gom_GetGambleObject(&gGambleObjectManager, target.handle)   @ FUN_00615830 (machine by NPC handle)
+    none: "Dice machine information not found." (주사위 게임기 정보를 찾을 수 없습니다.)
+    !g.vt[0xa8](d) = CGambleDiceTaiSaiObject::GDTSO_SetDiceFix          @ FUN_0061b5d0   (status 0/1 as above, no active check)
+        → "Dice setting failed."
+
+&GB_DiceProbability [<ddd> <weight>]   ac_Gamble_TaiSai_DiceProbability   @ FUN_00420d30
+    no map / no target / no machine: as above
+    argnum 1: g.vt[0xac](null, 0) = GDTSO_SetDiceProbability              @ FUN_0061b6b0   (reload from gGBDiceRate)
+        false → "Dice probability reset failed."
+    argnum 3: d = dice(args[0]); GDTSO_SetDiceProbability(d, (u16) atoi(args[1])) → index i, sum and weight as above
+        false → "Dice probability setting failed."
+    other: the 111 ~ 666 / 0 ~ 65535 usage
+```
+
+All four change memory only: the weights stay until the next reset or zone restart, a fixed throw is used once.
+The roll that reads `bIsAdminDice`, `nDiceRate` and `nDiceRateSum` is Z06 §3.4 / §4.4. A weight of 0 removes an outcome;
+the probability of outcome i is `nDiceRate[i] / nDiceRateSum`. Nothing tells the players that the dice are fixed.
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1153,6 +1551,13 @@ per `<< Finisher`, which sends it with `f_Admin.vt[0x784]` (so_ply_Notice).
 | Z11-B16 | `&expbonus` / `&itembonus` FUN_0041e190 / FUN_0041e2d0 | the usage says `[map]`, but the first word is only tested for 'A'/'a'; anything else means the GM's current map | a GM who names another map changes the one they stand on | look the named map up |
 | Z11-B17 | `&silence` FUN_0041e090 → `so_ply_KeepFromChat` FUN_00549f60 | only sends "Success to silence" to the GM | the player is not silenced although the GM is told so | set the chat block (`+0x2aa54`, Z01 §9) |
 | Z11-B18 | `&chargeditem` `sp_ChargedItemTest` FUN_00451360 | end time = `tm_min + 5` without carry | minutes 60…64 are stored in the buff's end time (how the expiry check treats them was not read) | normalise the time (add 300 s before `localtime`) |
+| Z11-B19 | `&propose`, `&proposeres`, `&reserve`, `&enterready`, `&enter` FUN_0041e9d0 … FUN_0041ef10 | refuse in a mini-house with "fail to 'pfind' : not allowed to do 'pfind' in the MH" | the GM is told about the wrong command | own text per word |
+| Z11-B20 | `&proposeres` FUN_0041eb30 | builds 0x2051 without writing `response_word[37]` | the proposer's 0x2052 carries whatever text the previous packet left in `gpp` | clear or copy a third argument |
+| Z11-B21 | `&startGT` FUN_0041f850 | takes the guild numbers of the two players unchecked | a player without a guild gives guild 0; one name twice sets a guild against itself | require two different guilds |
+| Z11-B22 | `&knockback` FUN_00420350 | sets STA_KNOCKBACK on the GM with the target as setter | the GM is knocked back instead of the target | `t.so_AbnormalState_Set(setter gm, …)` as `&setabstatetarget` *(inferred)* |
+| Z11-B23 | `&showid` FUN_0041f4a0 | sends 0x1C16 NC_BRIEFINFO_PLAYER_LIST_INFO_APPEAR_CMD, which the 2016 client does not handle | the command shows nothing | a client handler, or GM notices |
+| Z11-B24 | `&pvp` FUN_00420230 | stores any value in `fm_PKField` but announces "on" only for 1 | `&pvp 2` keeps the map's PvP flag set while clients are told it is off | store `v == 1` |
+| Z11-B25 | `&invenview` `so_ply_InvenWrite` FUN_0051ad90 | the equipment loop is inside the inventory branch; an item without an ItemInfo row ends everything | empty inventory: equipped items are not listed; a bad item hides the rest | list both independently, skip bad rows |
 
 ## Not reconstructed / uncertain
 
@@ -1169,5 +1574,15 @@ per `<< Finisher`, which sends it with `f_Admin.vt[0x784]` (so_ply_Notice).
   read (assumed: nobody in range).
 - `FieldMap.fm_Multiflex` first u16 as "no film running" for `mc_FindEmpty` (`&emptymap`) is inferred from the test only.
 - The `so_AllInMap` flag (1 for `&mobdist`, 0 elsewhere) is passed through to the map's walker; its meaning was not read.
+
+- §6.1 `&weddingreset`: what happens when the zone ring has a single zone (does `zcs_Send` loop back to itself?) was
+  not read; with a broken ring the packet does not return and nothing is reset *(inferred)*.
+- §6.4 `&allcritical`: the side effects of a rule set that is neither `roe_normalPY` nor `roe_normalMA` on the
+  address tests in `smo_SwingDamage` / `smo_AttackedDamage` were not followed; `&runto`: whether the GM's client learns
+  the server-side position (no packet is sent here) was not traced.
+- §6.4 `&erasechargebuf`: the expiry of a buff whose end year was set to 1 is assumed from the per-minute check
+  (Z09 §2.4); the iterator body was not re-read.
+- §6.5 `&ghostremove`: object kind 1 = dropped item is inferred from `som_AllocObject(type 1)` (Z05); kind 9 = effect
+  object from Z09's pool list.
 
 (Parts 2–6 add their commands as §4–§8; the sweep part adds the coverage boundary.)
