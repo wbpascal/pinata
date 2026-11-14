@@ -42,7 +42,9 @@ model, expressions, variables, the process stack; `MobBehaviorDescript/` is unus
 `break` / `print` / `permillage`, conditions, `@` system functions, which 2016 books load). §22 the Pine action
 statement base (`OtherStatement` loader, object build / change helpers), the 25 `@` system functions, the nine
 auto-registered nodes (save link, GT portal / NPC / item box, party scenario code, abstate test, code notices), the
-scenario book shelf (Pine or Lua books, reload) and the dialog-string files (`Script/*.txt`).
+scenario book shelf (Pine or Lua books, reload) and the dialog-string files (`Script/*.txt`). §23–§26 the Pine action
+nodes, §27 films and the boss-field tables, §28 the sweep additions (map query functions per map kind, heal reports,
+the rest of `MiscDataTable.txt`, answers to the sweep leftovers).
 
 ---
 
@@ -1051,7 +1053,7 @@ two setters below. `ShineObject::so_mob_SetEnemyDetect` exists as vt 0xba4 FUN_0
 
 **`MobTargetStruct`** (0x20, list entry): `+0 u16 handle, +4 identity (vt 0x344: player = character number, mob =
 spawning breeder; protects against reused handles), +8 → object, +0xc s32 aggro points, +0x10 time of the last
-aggro (g_Now), +0x14 SpyNet intelligence report (`SpyNet::IntelligenceOffice::io_ReadReport`, part 4), +0x18 report
+aggro (g_Now), +0x14 `mts_EnemyAnalyzer` (`IntelligenceOffice4Mob`: read position in the target's heal-report ring, §28.2), +0x18 report
 mask`. An entry with 0 aggro counts as free.
 
 **Selector vtable** (byte offsets; names from profiler strings unless marked):
@@ -1072,7 +1074,7 @@ mask`. An entry with 0 aggro counts as free.
 | 0x30 | FUN_004bd630 | run a `MobTargetBout::mts_SlayerList` iterator over the list (the kill-credit list of 0x244C NC_BAT_MOBSLAYER_CMD, Z03 §8.1 *(inferred)*) |
 | 0x34 | `mts_AggroAdjust` FUN_004a7c50 | §6.2 |
 | 0x38 | `mts_GetTopAggroTarget`: Bout/NoBrain FUN_004aa8d0, Aggresive* FUN_004aab80, ALL FUN_004aaf30 | §6.4 |
-| 0x3c | "target is protected": Aggresive* FUN_004a9b90 (StaAdlFLoussierIMT 499, StaImmortal 291, StaHide 75), ALL FUN_004a9cb0 (291, 499) | no caller found in the code read here (part 4) |
+| 0x3c | "target is protected": Aggresive* FUN_004a9b90 (StaAdlFLoussierIMT 499, StaImmortal 291, StaHide 75), ALL FUN_004a9cb0 (291, 499) | `IsNoAttackAbstate` *(pdb2016)*: no caller anywhere (dead slot, §28.4) |
 | 0x40 | "level gap too big": FUN_004a9b70 `mobLevel − candLevel > 10`; NoLevel FUN_004021b0 always false | used by `ali_Work` |
 
 Abstate numbers are `AbStataIndex` values (Z03 §1): 75 StaHide, 77 StaEntrapHide, 291 StaImmortal, 335 StaKarenCaptivate,
@@ -1123,7 +1125,7 @@ MobTargetBout::mts_Routine(sel)                  (vt 0x08, every mob tick)     @
     for e in list (lid_Call @ FUN_004ac800):
         o = som_GetObject(e.handle)
         if g_Now <= e.time + keepTime and o and dist²(mob, o) <= keepDist²:
-            SpyNet::IntelligenceOffice::io_ReadReport(&e.report, mob, o.intelligence)   # part 4
+            SpyNet::IntelligenceOffice::io_ReadReport(&e.report, mob, o.intelligence)   # heal reports → healer aggro, §28.2
         else: free the entry (mtea_free @ FUN_004ac750 → list.vt[0xc])               # forgotten
     # dtor of the iterator: FUN_004ac6c0
 ```
@@ -1527,7 +1529,7 @@ MobActionWander::mab_Think(ctx)          (per mob, +0x2260)                     
     return this
 
 MobActionWander::maw_MetronomeReset(w)                                          @ FUN_004b9210
-    r = next value of the u16 random ring DAT_14dc2120 (range not traced)
+    r = next value of the u16 random ring DAT_14dc2120 (= RandomRing(10): 0…9, §28.4)
     maw_ReturnTick = { g_Now + (r + 55) × 10, (r + 55) × 10 };  maw_SearchTick = maw_WanderTick = { g_Now + 10, 10 }
 ```
 
@@ -2755,7 +2757,7 @@ member-function pointer; the block `fm_BroadFunc` +0x58 holds `fm_fp_AllInMap1/2
     > 10000 steps on one list: log "Too many loop" and stop; a node pointing at itself: o.vt[0x8a0](1..4) and fm_Relink
 ```
 
-(Mini-house maps use `so_AllOfRangeMiniHouse` FUN_00553f60 *(inferred from the name; not read)*.)
+(Mini-house maps use `so_AllOfRangeMiniHouse` FUN_00553f60 / FUN_00554100 instead: §28.1.)
 
 **Appear and disappear on every step.** `mm_Step`, `smo_WarpTo`, `smo_JumpTo`, `ShinePlayer::so_mobile_Teleport` and vt 0xc98
 wrap `SetPosition` like this:
@@ -2809,8 +2811,8 @@ value is a bool here: players `ShineMobileObject::so_OverlapFactor` FUN_00557240
 
 - `MainChar+0x20 / +0x2c` (client 0x2049 guard) and player byte +0x7f36 (cleared by pushes) are not identified.
 - The meaning of `GetParam()+0xcce` bits 0/1 (which abstates set them): Z03 §6.
-- `so_AllOfRangeMiniHouse` (mini-house interiors) and field+0x88 selection (`FieldMap::fm_Init` FUN_00464bc0 map init): Z06/Z01.
-- Callers of vt 0xc98 (`SetPositionWithSight`) were not listed (sweep).
+- `so_AllOfRangeMiniHouse` (mini-house interiors) and the field+0x88 selection in `FieldMap::fm_Init` FUN_00464bc0: answered in §28.1.
+- Callers of vt 0xc98 (`SetPositionWithSight`): the mover passenger moves only (§28.4).
 
 ## 10. Spawns: MobHatchery, breeder groups, breeders, script spawners
 
@@ -3220,7 +3222,7 @@ class mask), attribute from the reward row, random options (`rot_FillOption`) wh
   on the hatchery memory being zero *(inferred: no bandit groups appear in practice)*.
 - The arguments 5, 12, 13 of `mh_MobBreed` and the `mbg_RegenLoc` out value are unused; the group key "Def" is stored
   but never compared.
-- Who reserves the 30-s event next to `EventMobRegen` (object 0x86fae8) was not followed (Z01).
+- The 30-s event next to `EventMobRegen` (object 0x86fae8) is `eventheartping`, a no-op in 2016 (§28.4).
 
 ---
 
@@ -4186,7 +4188,7 @@ the summon, the master link, the overrides and the end of life.
 read error → "Error in read MiscDataTable.txt", ShineExit). The loader reads five tables in order: `SkillBreedMob`
 (`mdt_SkillBreedMob` FUN_004a6880, this section), then `AbStateReset`, `Neutralization`, `Polymorph`,
 `StateCondition` (`mdt_AbStateReset` FUN_004a6580 / `mdt_Neutralization` FUN_004a64c0 / `mdt_Polymorph`
-FUN_004a63e0 / `mdt_StateCondition` FUN_004a3550: skill side effects, see Coverage
+FUN_004a63e0 / `mdt_StateCondition` FUN_004a3550: skill side effects, §28.3; see Coverage
 boundary). Skill rows are `MiscData_Skill` (0x80, ≤ 100, kept sorted by skill ID; `mdt_SkillBufferAlloc`
 FUN_004a3d90 finds or adds the row of a skill name: unknown skill "Imvalid skill name" / > 100 "Too many Data" →
 ShineExit; new rows from `mds_Init` FUN_004a2e50: BreedMob 0xFFFF, Polymorph 0xFFFF, all else 0 / none).
@@ -9422,3 +9424,250 @@ the client learns bosses outside its sight; nothing removes them later except th
   `ShineTeleportAll::sa_Step` (§26.4), so Z09-B115 has no other victim.
 - Not traced: the 0x1C08 layout a boss sends through `so_BroadcastBriefInfo` to players outside its sight and whether
   the client keeps such a far object (C01 / Z02 §5).
+
+## 28. Sweep additions: map query functions, heal reports, the rest of MiscDataTable, leftovers (part 17a)
+
+`coverage.py` does not apply to Z09 (no scope table). The sweep used its own check instead: every function called
+directly by a function this file cites, not cited by any doc (scratch script over `coverage.Bin`, same TINY / HUB
+filters). Result before this part: 688 functions / 26 k lines, nearly all owned by other items (player login work, pets,
+guild tournament, quests, skills, brief-info exchange, sessions; listed in the Coverage boundary). This section
+documents the Z09-owned ones and answers every "→ sweep" leftover of the status file.
+
+### 28.1 Map initialisation and the query functions per map kind
+
+`FieldMap::fm_Init(field, FieldAttr* attr, Name4 regenFile, Name3 mapId)` runs once per map at start-up (from
+`FieldContainer::fc_MakeField`, Z01):
+
+```pseudo
+FieldMap::fm_Init(f, attr, regenName, mapId)                                    @ FUN_00464bc0
+    f.fm_GuildTournamentInform = {seed 0xFF, guildA 0, guildB 0};  f.fm_PKField = 0
+    f.fm_MapInfo = MapInfo row of attr.mapidclient (mapdatabox B-tree; unknown → null)
+    f.fm_FieldBonus = {fb_Experience 1000, fb_DropRate 1000};  f.fm_KQHandle = −1
+    if mapId == rouname: fm_Rou = f                          # the global "Rou" map pointer
+    f.fm_MapID = mapId;  f.fm_FieldOption = attr
+    if attr.KingdomQuestMap == 2:                            # mini-house interior (Field.txt kind)
+        fm_MiniHouseInteriorMap = mapId
+        fm_BroadFunc = {AllInMap1/2 = so_AllInMapMiniHouse, AllOfRange1/2 = so_AllOfRangeMiniHouse}
+    else:
+        fm_BroadFunc = {AllInMap1/2 = so_AllInMapNomal,     AllOfRange1/2 = so_AllOfRangeNomal}
+    f.fm_BlockInfo = mbib_Load(mapId, attr.mapidclient, &fm_XSize, &fm_YSize)     (§9.2)
+    MobHatchery::mh_Load(mobhatchery, regenName, mapId)                            (§10.3)
+    the two sentinels zero / infinite: som_AllocObject(…, 0), placed by vt 0x590 at (0, 0) and (0xFFFFFF, 0xFFFFFF);
+        zero gets the default title object (ctz_SetObject(so_DefCharTitle)); cn_MakeLink(zero, infinite) on the
+        X and Y lists (SlantedCoordList::CoordedNode::cn_MakeLink @ FUN_00588060)
+    five anchors flag[0..4] at (w/10 + i·w/5, h/10 + i·w/5), cn_AppendList on both lists        (§9.6)
+    f.fm_Multiflex = new CinemaComplex (0x12e798 bytes; failure: "FieldMap::fm_Init : Memory Leak", ShineExit)
+    flag[2].vt[0x670](cc_SetArgument(fm_Multiflex, f, flag[2]))                    # the anchor that runs the films (§12.7, §27)
+    if attr.isfreepk: f.fm_PKField = 1
+    every MapCluster of mapclustermanager: mc_Regist(cluster, f, attr.mapidclient)  (Z14: instance clusters)
+    MobDeadCount::mdc_Init(&f.fm_MobDeadCount);  m_nGuildTournamentMapFlag = 0;  fm_CameraState = CS_NONE
+    fm_LuaScript = {null, all seven event names ""}                                (§14.3)
+    fm_FieldFlag = {revive item 1, revive skill 1};  fm_ReviveDelaySec = 180;  fm_eLevelType = ILT_MAX
+```
+
+The four members of `fm_BroadFunc` (field+0x58) are member-function pointers; `so_AllOfRange` / `so_AllInMap` call
+form 1 when the caller passes an `AxialListIterator` object and form 2 when it passes a member function of
+`ShineObject` (e.g. `ShineMobileObject::so_Routine` passes `so_ply_Send2WhoTargetMe`):
+
+| Slot | Normal map | Mini-house interior (`KingdomQuestMap` 2) |
+|---|---|---|
+| AllInMap, iterator | `so_AllInMapNomal` FUN_0054c370 | `so_AllInMapMiniHouse` FUN_00553dd0 |
+| AllInMap, member function | `so_AllInMapNomal` FUN_0054be00 | `so_AllInMapMiniHouse` FUN_00553c60 |
+| AllOfRange, iterator | `so_AllOfRangeNomal` FUN_0054c900 (§9.6) | `so_AllOfRangeMiniHouse` FUN_00553f60 |
+| AllOfRange, member function | `so_AllOfRangeNomal` FUN_0054d360 (same walk as FUN_0054c900) | `so_AllOfRangeMiniHouse` FUN_00554100: **empty**, returns 1 |
+
+```pseudo
+guard of every normal walk:
+    BroadcastEventPopper()                                                      @ FUN_005496d0
+        if g_BroadcastStackPoint < 3: depth += 1, legal          # at most 4 nested walks (depth 0..3)
+        else: log, illegal → the walk returns 0 without visiting anybody (the popper's dtor restores the depth)
+    if both list neighbours of o resolve to o itself: MapRearrangeObserver.mro_Set("Unlinked object") @ FUN_00462e90; return 0
+    so_SlantedListChecker.lcs_ListCheck[depth] += 1                # a new visit stamp for this walk
+    per visited object: so_SlantedListCheck(obj)                                @ FUN_0054a500
+        if obj.listcheck[depth] == the stamp: log, return 0        # already visited in this walk (damaged list)
+        obj.listcheck[depth] = stamp; return 1
+
+so_AllInMapNomal(o, work, includeSelf)                                          @ FUN_0054c370 (iterator) / FUN_0054be00
+    walk o's Y list towards smaller y, then towards larger y (whole map, ≤ 10000 steps per direction, "Too many loop")
+        first direction: a repeat visit ends the walk (return 0)
+        a node whose neighbour is itself: o.vt[0x8a0](1), mro_Set("AllInMap2" / "AllInMap3"), fm_Relink (§9.6)
+        same layer (LayerRegNumberUnion equal) or either object's nViewType ≠ 0: work(o, other, so_DistanceSquar(o, other))
+    includeSelf: return work(o, o, 0);  else return 1
+
+so_AllInMapMiniHouse(o, work, includeSelf)                                      @ FUN_00553dd0 / FUN_00553c60
+    if o.vt[0x130]() (ShinePlayer::so_ply_MH_GetActiveMH: o is inside a house):
+        h = som_GetObject(o.vt[0x138]())   (so_ply_MH_GetMyHandle; missing → return 0)
+        for i = 5 − h.so_mh_GetInnerGMCount() … h.so_mh_GetInnerPlayerCount() − 1:      # vt 0x70 / 0x6c
+            m = h.so_mh_GetMemberPlayer(i)  (vt 0x68: smh_Info.pEnterPlayerIndex[i])
+            if m and m ≠ o: work(o, m, dist²)
+    includeSelf: return work(o, o, 0);  else return 1
+so_AllOfRangeMiniHouse(o, stamp, centre, range, cone, work, includeSelf, skip)  @ FUN_00553f60
+    the same member loop, work only when dist²(member, centre) ≤ range² (no layer, cone or skip test)
+so_AllOfRangeMiniHouse(member-function form)                                    @ FUN_00554100
+    return 1                                                       # visits nobody, not even o (original bug)
+```
+
+(original bug) Z09-B121: the member-function form of the mini-house range query (FUN_00554100) is an empty stub: on a
+mini-house map every range call made with a member function (e.g. `so_ply_Send2WhoTargetMe` in the mobile routine)
+reaches nobody, and its `includeSelf` is ignored, while the iterator form walks the house members.
+
+(original bug) Z09-B122: the mini-house member walk runs from slot `5 − EnterGMCount` up to `EnterPlayerCount − 1`, but
+`so_mh_Enter` FUN_00543cb0 stores players from slot 0 upwards and GMs downwards from slot 4 (`pEnterPlayerIndex[4 − n]`).
+With no GM inside and at most 5 players the loop body never runs: map-wide and range walks on a mini-house map reach
+only the caller (`includeSelf`). With GMs, only the slots `5 − GMs … players − 1` are visited (some players or GMs
+are skipped). The likely intent is "every occupied member slot". (How the two groups share the 104 slots is Z13's.)
+
+### 28.2 Heal reports: how mobs learn who healed their enemy (`SpyNet`)
+
+Every mobile object has a `SpyNet::EspionageAgent smo_Spy` (+0xeb0, 0x108 bytes: `SecretReport ea_SecretReport[16]`
+{`sr_Type`, union `sr_Report`}, `BitANDInt ea_Pointer` +0x100 {value, mask 0xf}); `so_SpyAgent` (vt 0x480) returns it
+(`ShineMobileObject::so_SpyAgent` FUN_005555a0); other objects return the shared static `ShineObject::so_spy`
+(`ShineObject::so_SpyAgent` FUN_00554f30, static initialiser FUN_00698540). Report kinds `SecretReportType`
+*(pdb2016)*: `SRT_EOR` 0 (end of reports), `SRT_GETHEAL` 1, `SRT_SOMEONE_GIVE_ABSTATE` 2, `SRT_SOMEONE_REMOVE_ABSTATE` 3,
+`SRT_VANISH_ABSTATE` 4. Only `SRT_GETHEAL` is ever written.
+
+```pseudo
+EspionageAgent ctor                                                             @ FUN_0058a5f0
+    ea_Pointer = {0, mask 0xf};  all 16 reports = {SRT_GETHEAL, healer null, healingup −1, aggrorate 1000}   # no EOR (original bug)
+ea_Clear(agent): agent.ea_SecretReport[ea_Pointer].sr_Type = SRT_EOR           @ FUN_0043c610
+    (only caller: ShineMover::so_smv_SummonMover, Z13)
+
+writer: a heal lands (SkillEffectApply::SkillDamageSender::sds_TemplateStore @ FUN_005803c0, Z03)
+    a = target.so_SpyAgent();  a.report[a.ea_Pointer] = {SRT_GETHEAL, healer = caster, healingup = HP actually healed, aggrorate = arg 4}
+    a.ea_Pointer = (a.ea_Pointer + 1) & 0xf;  a.report[a.ea_Pointer].sr_Type = SRT_EOR
+
+aggro entry created (MobTargetBout::mts_AppendAggroPoint @ FUN_004ad9a0, §6.2):
+    entry.mts_EnemyAnalyzer.io_Pointer = target.so_SpyAgent().ea_Pointer   # read only reports written from now on
+
+each analysis pass, per aggro entry still in time and range (MobTarget_EnemyAnalysis::lid_Call @ FUN_004ac800, §6.2):
+    IntelligenceOffice::io_ReadReport(&entry.mts_EnemyAnalyzer, mob, target.so_SpyAgent())   @ FUN_0058a6d0
+        up to 16 times: r = agent.report[io_Pointer & 0xf]
+            SRT_EOR: return                                          # stop at the end mark (next pass resumes here)
+            SRT_GETHEAL / GIVE / REMOVE / VANISH: office vt 4 / 8 / 0xc / 0x10 (mob, r)
+            io_Pointer = (io_Pointer + 1) & 0xf
+        no EOR within 16: assert "SpyNet::IntelligenceOffice::io_ReadReport : Cannot found EOR(End of Report)" (log)
+IntelligenceOffice4Mob (ctor FUN_0058a630, dtor FUN_0058a650):
+    vt 4 io_SRT_GETHEAL(mob, r): mob.so_mob_AppendAggro(r.healer, r.aggrorate × r.healingup / 1000)   @ FUN_0058a660
+    vt 8 / 0xc / 0x10: folded no-op FUN_00509900
+```
+
+So a healer gets aggro from every mob that has the healed player on its aggro list (§6.2's family sharing applies, the
+call is the normal vt 0x700). A ring of 16: more than 15 heals on one target between two passes of a mob overwrite
+reports the mob has not read yet.
+
+(original bug) Z09-B123: the agent constructor fills all 16 slots with `SRT_GETHEAL` and writes no `SRT_EOR`. For a
+target that was never healed, every analysis pass of every mob that has it on its list reads 16 reports with a null
+healer (`so_mob_AppendAggro` returns on null, so no aggro changes) and then logs the "Cannot found EOR" assert:
+pure log spam and wasted work, until the first heal writes an end mark. Likely intent: `ea_Clear` in the constructor.
+
+### 28.3 The rest of `World/MiscDataTable.txt`: Polymorph, Neutralization, AbStateReset, ExpandSkill
+
+`MiscDataTable::mdt_Load` FUN_004a82d0 reads, after `SkillBreedMob` (§13.3), four more tables (each with a `Serial` byte
+first and a `CheckSum` byte last that must be equal, else "<loader> : Checksum error" + ShineExit). The table object
+(`miscdatatable`, ctor FUN_004a39a0) also holds the defaults `mdt_DefSkill` (no polymorph 0xFFFF, no neutralization,
+`ETO_NONE`, …) and `mdt_DefAbState` (all reset conditions 0, `EW_NONE` / `EC_NONE`).
+
+| Table (2016 rows) | Columns | Loader | Stored in |
+|---|---|---|---|
+| `Polymorph` (1: `Metamorphosis01` → `Metamorphosis_bird`) | Skill, MobIndex, CanMove, CanAttack | `mdt_Polymorph` @ FUN_004a63e0 | skill row (`mdt_SkillBufferAlloc`, §13.3): `mds_Polymorph` = mob ID (unknown name → 0xFFFF, silently), `mds_PolymorphAction.Move` / `.Attack` bits |
+| `Neutralization` (4) | Skill, Weapon, Shield, Body, Leg (per-mille words) | `mdt_Neutralization` @ FUN_004a64c0 | skill row: `mds_IsThereNeutralizationItem` = 1, `mds_NeutralizationItemArray[30]` (equip slot → rate): Weapon → [12], Shield → [10], Body → [7], Leg → [19] |
+| `AbStateReset` (7: `StaBuckler`, `StaNeglect`, `StaHide`, `StaMesmerize`, `StaEntrapHide`, `StaGTIConfusion`, `StaGTIHide`) | AbState, Run, Walk, Attack, Attacked (bytes), EquipWhere (`-` / `LeftHand`), EquipClass (`-` / `Shield`) | `mdt_AbStateReset` @ FUN_004a6580 | `MiscData_AbState` (0xc bytes, ≤ 50, sorted by abstate ID; `mdt_AbStateBufferAlloc` @ FUN_004a3f50: unknown abstate → assert "Imvalid skill name" (copied text) + ShineExit, 51st → "Too many Data" + ShineExit): `mdas_ResetCondition {run, walk, attack, attacked}`, `mdas_ResetEquipment {eqwhere, eqclass}`; other EquipWhere / EquipClass words: assert only (the field keeps its default); EquipWhere set with EquipClass `-`: "Invalis match" + ShineExit |
+| `ExpandSkill` (4: `PowerBenTear`, `PowerWeaponBlast`, `FinalSwordForce`, `WeaponBlast`) | Skill, Condition (`Stun` / `Slow` / `ACMRMinus`), Dmg (word), AbState (name or `-`), Critical (word) | `mdt_StateCondition` @ FUN_004a3550 | `MiscData_VarifyByAbstate` array (0x14 bytes, ≤ 100, sorted by skill ID after loading): `{mdvba_Skill, mdvba_Condition (AbnormalStateAttr STUN / SLOW / ACMRMINUS; other words: "Invalid Condition" + ShineExit), mdvba_DamageRate = Dmg, mdvba_NewState (unknown or `-` → MAX_ABSTATEINDEX), mdvba_Crirate = Critical}` |
+
+```pseudo
+mdt_StateCondition, per record:
+    if Skill itself is a skill name: store one row for it, record counter += 1
+    for name in MapSubString(Skill + "01" … Skill + "99")       # MapSubString ctor FUN_00461be0, mss_Home FUN_00461c20, mss_Next FUN_00461c60
+        stop at the first name that is not a skill; else store a row with the same values      # every level of the skill
+    record counter += 1
+```
+
+(original bug) Z09-B124: when the `Skill` word of an `ExpandSkill` record is itself a skill name, the record counter
+is advanced twice, so the next record is never read. Latent in 2016: none of the four base names is a skill (the
+skills are `PowerBenTear01…`, `FinalSwordForce01…`), so only the level expansion stores rows.
+
+Who uses the tables (the consumers are Z03's skill and abstate code; listed here so the data has a meaning):
+
+```pseudo
+skill blast damage setup (ShineMobileObject::smo_SkillBlast, Z03) → MiscDataTable::mdt_ArgumentLoad(arg)   @ FUN_004a6110
+    row = ExpandSkill row of the skill's ActiveSkill ID (bsearch); none → return
+    if arg.def.so_smo_AbnormalStateAttribute(row.Condition) (vt 0xa64: the target has an abstate of that attribute):
+        arg.damagerate = row.DamageRate;  arg.crirateadd = row.Crirate
+        if row.NewState valid and arg.def.so_AbnormalState_Set(att, NewState, strength 1, …, g_Now, …, kind 6) (vt 0x638):
+            set the abstate bit, inform (vt 0x3f0) with the sub-state's KeepTime, broadcast the set
+
+after each blast hit (SkillBlastEffect::sbe_BlastObject / sbe_BlastLocate, Z03) → mdt_PostSkillBlast(caster, target, skillId, xy)   @ FUN_004a3a90
+    row = skill row (default when none)
+    if row.mds_Polymorph ≠ 0xFFFF: caster.vt[0xeb0](row)          # players: smo_ply_Polymorph FUN_004a5830; others: folded no-op
+    if row.mds_IsThereNeutralizationItem:
+        for slot 0..29: if well512(1000) < rate[slot] − 1000 + setitemskilleffect[SET_PROBABILITYRATE]:
+            slot 10 → target.so_ply_ReinforceRemoveShield (vt 0x9a4);  slot 12 → …RemoveWeapon (vt 0x9a0);
+            else → …RemoveEquip(slot) (vt 0x9a8)                    # players only; mobs: folded no-ops
+    caster.smo_SoulManage(target, skill) (vt 0xf34, Z03)
+
+ShinePlayer::smo_ply_Polymorph(p, row)                                          @ FUN_004a5830
+    row == null (end): if abstate 0x123 is set (vt 0x3e4): reset it (vt 0x650);  mob = 0xFFFF
+    else: mob = row.mds_Polymorph; set abstate 0x123 (StaImmortal's row) for 1,000,000,000 ms, kind 9
+    if brief.polymorph == 0xFFFF or p.sp_nPolymorphAbstateIndex == MAX_ABSTATEINDEX:
+        brief.polymorph = mob;  0x10AF NC_CHAR_POLYMORPH_CMD {u16 handle, u16 mob, u32 0x318} to the sight range incl. p
+
+abstate element set (AbstateElementInObject::aeo_Set, Z03) keeps aeo_MiscData = mdt_FindAbStateAlways(id)   @ FUN_004a2ef0 (default row when none)
+    aeo_Run / aeo_Walk / aeo_Attack / aeo_Attacked                              @ FUN_004a41c0 / FUN_004a4230 / FUN_004a42a0 / FUN_004a4310
+        if the row's flag is set: aeo_Tick.terminate = g_Now               # the abstate ends now
+        (called from the run / walk handlers, bash start, damage-over-time and every so_DamagedBy, Z02 / Z03)
+    aeo_ItemChange(inventory)                                                   @ FUN_004a4380 (via ListIteratorAbstateEquip::lid_Call FUN_004a4810)
+        EW_LEFTHAND rows: if the left-hand item (equip slot 10) is missing from ItemInfo, or the row wants EC_SHIELD and
+        the item class is not ITEMCLASS_SHIELD: terminate now          # StaBuckler ends when the shield comes off
+```
+
+`mds_PolymorphAction` (CanMove / CanAttack) is written by the loader and never read: those two columns have no effect.
+The neutralization chance uses `setitemskilleffect`, a global scratch buffer of set-item effects (as in Z09-B30): its
+`SET_PROBABILITYRATE` value at that moment decides how much of the table rate applies *(inferred: with 1000 there the
+chance is rate / 1000)*.
+
+### 28.4 Answers to the leftovers marked "sweep"
+
+- **Selector slot 0x3c** (§6.1): its official name is `IsNoAttackAbstate` *(pdb2016)* (`MobTargetAggresive` FUN_004a9b90,
+  `MobTargetAggresiveALL` FUN_004a9cb0). No method of any `MobTarget*` class and no tactic calls slot 0x3c (`rg` over
+  the PDB export); only `IsNoTargetAbstate` (FUN_004a9be0) is called, from `MobTargetAggresive::ali_Work`. The slot is
+  dead in 2016; the tactics test abstates 291 / 499 directly (§7.3).
+- **`PceHPRcv*` / `AtkHPRcv*`** (MobInfoServer +0x48…+0x4e): no member access anywhere in the PDB export (where every
+  MobInfoServer access is typed); the tactics do not read them either. Mob regeneration is only `sm_DuringRecover`
+  (§6.5). (§5.1's list of unread columns stands.)
+- **Ring DAT_14dc2120** (Wander `maw_ReturnTick`, §7.2): it is `RandomRing(10)` (base DAT_14d720d0 + 10 × 0x8008), values
+  0…9, so an idle wandering mob returns home every 55…64 s.
+- **The 30-s event** next to `EventMobRegen`: `ZoneServer_zs_start_open` FUN_005b6640 reserves `eventheartping`
+  (`EventHeartPing`, DAT_0086fae8) every 300 tenths; its `erb_happen` is the folded no-op FUN_00417480, so it does
+  nothing in 2016. The same start step loads `EnchantSocketRate.shn`, sets the NPCs (`nm_SetNPC`, §5.9) and starts every
+  map's Lua script (`FieldMap::fm_StartScript`, §14.2).
+- **Callers of vt 0xc98** (`SetPositionWithSight`, §9.6): only the mover passenger moves `ShineMover::smv_PassengerMove`
+  FUN_0055efe0 and `ShineMover::so_smv_GetOn` FUN_0055f380 (Z13). **FUN_00428730** (vt 0x6d8 caller) is
+  `AxialListTeleportAnywhere::ali_Work` (§26.4).
+- **Field+0x88 selection and mini-house queries** (§9.8): §28.1.
+- **SpyNet** (§6.2 "part 4"): §28.2.
+- **MiscDataTable skill side tables** (part 8b leftover): §28.3; the consumers stay Z03's.
+- **`Item_ForcedUpgrade`** FUN_0053c510 (called by the drop roll, §11.2): the upgrade itself is item code (Z04).
+- **Wedding partner summon**: the skill `ss_SummonMate` at cast end in `ShineMobileObject::so_Routine` sends
+  `ZoneRingPacketSummonPartner::zrpb_Request` FUN_005a83b0 (local partner → level / map checks; else zone ring 0x10AA) —
+  Z13 (wedding), not world simulation.
+
+### 28.5 Small helpers reached from documented code
+
+Constructors, accessors and loader plumbing; listed so the sweep can show them as read.
+
+| Function | What it does |
+|---|---|
+| `BinaryDataBox<T>::bdb_ReadData` for MobInfo FUN_00641110, MobInfoServer FUN_006411d0, MobWeapon FUN_00641290, MobSpecies FUN_00641350, QuestSpecies FUN_00641410, MobKillAnnounce FUN_006414d0, ItemDropLog FUN_00641580, MobLifeTime FUN_00641630, AbStateSaveTypeInfo FUN_006416e0, MobRegenAni FUN_00641790, GroupAbState FUN_00641830 (all from `MobDataBox::mdb_Load`, §5.1), MobResist FUN_00644da0, MobAutoAction FUN_005d2320, MobAbStateDropSetting FUN_005d2270, StateMob FUN_005d21b0 (§27.6) | `CDataReader::Read(file, rowSize, …)`; failure: "BinaryDataBox<T>::bdb_ReadData : readfail" + ShineExit |
+| `MobResistTable::operator[](name)` FUN_00644ec0 / `operator[](index)` FUN_00644e90 | name → row index (linear search; unknown → "MobResistTable::operator [] : Invalid index" + ShineExit); index → row (out of range → null) |
+| `MobDataBox::GetGroupAbstateLoweriter` FUN_006425b0 / `…Upperiter` FUN_006425f0, `MobDataBox::operator[]` FUN_004190b0, `mdb_iter_Get` FUN_004a84d0 | lower / upper bound in the GroupAbState multimap (the regen abstates of §5.3); mob row by ID; row by position |
+| `TickTimer::TickTimer` FUN_00591f80, `Enable` FUN_00591fd0, `CheckUpdateEvent_ClockWatch` FUN_00592050 | `{m_CurDelayTime, m_DelayTime, m_bEnable, m_PrevCheckTime}`; enable resets the accumulator; the check adds `now − prev` and fires (subtracting `m_DelayTime`) when the sum exceeds `m_DelayTime` (mob lifetime §5.2, dice §11.6) |
+| `FieldMap::fm_IsStreight` FUN_004600e0 | straight-line test by bisection: true below 5 units; false if the midpoint is a move block; else both halves (§9.5) |
+| `DirectDistanceTable::ddt_ShineRadianDiff` FUN_00460050 | difference of two directions in 2° units folded to 0…90 with a turn sign (±1) (§7.3 TurnSpeed) |
+| `DropLoc::SameDistanceCluster::sdc_Init` FUN_00460790, `ShineRadian::sr_degree2sr` FUN_00579180 | allocate n zeroed `{dx1024, dy1024}` offsets; degrees → Shine radian (§11.7) |
+| `HitMeList::EnemyList::EnemyList` FUN_00482ca0, `ShineDynamicCast<ShineServant>` FUN_00481ea0, `ShineDynamicCast<ShineMob>` FUN_00479460, `ListTraveler<MobTargetStruct>::operator*` FUN_004a9d90 | containers and RTTI casts of §6 |
+| `MobAttackSequence::SkillChangeList::SkillChangeList` FUN_004a8820, `SkillChange::sc_Store` FUN_004a8520 | the skill-change list of §7.6 |
+| `Navigator::NaviPoint::NaviPoint` FUN_005c87e0, `MobRegenStruct::RegenMobStruct::operator=` FUN_004e75b0 | path point (§9.5); regen record copy (§10.8) |
+| `FieldMap::LuaField::LuaField` FUN_00464170, `~LuaField` FUN_004641e0, `operator=` FUN_004646c0 | the map script names of §14.3 |
+| `BelongDiceTable::BelongDiceTable` FUN_005b1620, `AxialListMobKillLog` ctor FUN_00428340, `AxialListObjectClear` ctor / dtor FUN_004957f0 / FUN_004958a0, `AxialListMobCounter` dtor FUN_004e2cf0, `AxialListAreaObjectList` dtor FUN_0042a3f0, `AxialListRevival` dtor FUN_0042a0a0, `AxialListSetAbstateInArea` ctor FUN_004c1bd0, `AxialListMobStateSet` dtor FUN_004eb8c0 | visitor objects: dice table (§11.1), mob-kill log on entering battle (§6.5 vt 0x588, GameLog 910 in D05), `fm_ClearObject` (§24.8), area / map counters (§15.7), Lua area functions (§17, §18), boss buffs (§8.9) |
+| Pine node ctors `ShineEffectLocate` FUN_004e8b00, `ShineEffectObject` FUN_004e8ae0, `ShineDoorClose` FUN_004e8740, `ShineDoorOpen` FUN_004e8720, `ShineDoorBuild` FUN_004e8660, `ShineInterruptErase` FUN_004e8600, `ShineInterruptClear` FUN_004e85c0 | `OtherStatement(keyword, …)` constructors registered by `StatementList` (§21.2) |
+| `SlantedCoordList::CoordedNode::cn_MakeLink` FUN_00588060, `ShineObject::so_Reset_SlantedList` FUN_00554370, `MapRearrangeObserver::mro_Set` FUN_00462e90 | sentinel link (§28.1), node reset in `fm_Relink`, list-damage reason record (§9.6) |
