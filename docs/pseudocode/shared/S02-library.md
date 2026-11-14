@@ -639,8 +639,8 @@ Differences:
 - Login `IOCP_Process` returns 1 for an unknown type without a log; WM logs it and closes.
 - The decompiler shows the Zone `CIOCP::Stop`, `CPacket::ID(op,…)` and `~CPacket` without the final member resets;
   the disassembly has them (0x6504f0, 0x650304, 0x64ff99): same behaviour as the WM.
-- The CCsl and CGdp copies differ in a few functions (Zone `CCsl::Read`, `MakeFormat`, `Clear*`; Login / Zone
-  `CCsl::ProcRemark`, `CGdp::CreateFileA`): §2 / §3 (later parts).
+- `CToken` / `CCsl`: no code difference (the decompiler differences are artefacts), §2.7. `CGdp::CreateFileA`
+  (Login / Zone decompile differently): §3.
 
 Corrections to existing docs: `login-server.md` §3.1 sets `lastRecvTime` per dispatched packet; the code sets it on
 every read completion (§1.6), so a peer trickling a partial frame keeps its heartbeat alive. W05 §1.4's
@@ -654,3 +654,489 @@ every read completion (§1.6), so a peer trickling a partial frame keeps its hea
 - After S02-B8 the zone session ends by its heartbeat (`ZoneBaseSession::CheckHeartBeat` FUN_005a67c0, read: 30 s →
   0x0804, 180 s more → fail; manager `ProcHeartBeat` FUN_005a6a40 then `CloseUseIOCP`). Whether the 0x0804 send already
   fails on the reset socket (closing it after 30 s) is *inferred*. Z01 owns the zone session lifecycle.
+
+## 2. Config scripts: `CToken` and `CCsl`
+
+Every server reads its `*ServerInfo.txt` (and the shared `9Data/ServerInfo/ServerInfo.txt` it includes) with the
+`CCsl` script reader ("CSL", the class's own prefix), built on the `CToken` tokenizer. Names, layouts and enums are
+*(pdb2016)* (`WorldManager.pdb`; the Login and Zone PDBs agree). Login and Zone link the same code (§2.7). The
+Account, AccountLog, Character and GameLog binaries carry the same result-message strings ("FORMAT DEFINNING, EOF
+Come." …), so they link the same reader *(inferred; not compared)*; D05 §1.1 documents GameLog's use of it.
+
+### 2.1 Data structures and constant tables
+
+```
+CToken (0x294)                                   CCsl : CToken (0x4f8)
+  +0x000 CGdp m_Gdp            (file layer, §3)    +0x294 CCsl* m_pParentCsl      (include: the including script)
+  +0x15c int  m_bIsOpen                            +0x298 int   m_bInclude         (1 in an include reader)
+  +0x160 HANDLE m_hFile                            +0x29c char  m_ScriptFN[260]    (name as passed to ReadScript)
+  +0x164 u32  m_dwFileSize                         +0x3a0 HWND  m_hWnd, +0x3a4 m_UseMsgID (stored only, §2.3.1)
+  +0x168 char* m_pFileBF       (whole file + NUL)  +0x3a8 int   m_bEnd             (#END seen)
+  +0x16c char* m_pSaveTokenPos                     +0x3ac int   m_NumFormatErrors, +0x3b0 m_NumDataErrors
+  +0x170 int  m_bOpenByMemory, +0x174 m_pOpenMemory +0x3b4 char* m_pDummyNull      ("" returned at EOF in a row)
+  +0x178 char m_szSeprator[256] (strtok delimiters) +0x3b8 int   m_bRemarkBlock     (inside /* … */)
+  +0x278 char* m_pResetStart, +0x27c m_bResetStart  +0x3bc char  m_CslSeprator[64] (delimiters, copied to CToken)
+  +0x280 int  m_bIsStart       (next read = 1st)   +0x3fc char** m_CslRemarks      (7 keyword pointers)
+  +0x284 char* m_pToken        (current token)     +0x400 / 0x440 / 0x480 char[64] m_CslRemarkLine / Start / End
+  +0x288 char* m_pMyTokenStart (strtok position)   +0x4c0 m_pCslCmd, +0x4c4 m_pCslParameter, +0x4c8 m_pCslParameterSize
+  +0x28c / 0x290 m_lplpTokenList, m_dwNumTokens    +0x4cc m_NumFormats, +0x4d0 m_pFormats, +0x4d4 m_pFormatLast,
+                 (never used by the code read)            +0x4d8 m_ppFormatTable (index, built at the end)
+                                                   +0x4dc m_NumDatas, +0x4e0 m_pDatas, +0x4e4 m_pDataLast, +0x4e8 m_ppDataTable
+                                                   +0x4ec m_dwNumResultMsg, +0x4f0 m_pResultMsgs, +0x4f4 m_pResultMsgLast
+CSL_FORMAT_LIST (0x4c) { char Format[64]; int NumParameter; CSL_PARAMETER* pParameter; next }
+CSL_DATA_LIST   (0x10) { u32 dwID = format index; u32 dwSize; void* pData; next }
+CSL_RESULT_MSG_LIST    { next; char Msg[] }       (one heap block, 4 + strlen + 1 bytes… allocated strlen + 9)
+CSL_CHUNK_INFO  (8)    { CLS_CHUNK_ID dwID (0x11111111 FORMAT, 0x22222222 DATA); u32 dwSize }
+CSL_FORMAT_WRITE       { chunk; char Format[64]; int NumParameter; CSL_PARAMETER pParameter[] }   (chunk.dwSize = 0x44 + 4n)
+CSL_DATA_WRITE         { chunk; u32 dwID; u32 dwSize; u8 Data[dwSize] }                          (chunk.dwSize = 8 + dwSize)
+```
+
+Constant tables (identical bytes in WM `0x497b34 / 0x497ae8 / 0x497a98 / 0x497b5c`, Login `0x43075c / 0x430710 /
+0x4306c0 / 0x430784`, Zone `0x873864 / 0x873818 / 0x8737c8 / 0x87388c`; the pointers are installed by `CCsl::Clear`):
+
+| Table | Index = enum value | Entries |
+|---|---|---|
+| `pCslCmd` (`CSL_CMD`) | 0 … 9 | `#END`, `#DEFINE`, `#INCLUDE`, `#CLEAR`, `#CLEARFORMAT`, `#CLEARDATA`, `#READ`, `#WRITE`, `#WRITEFORMAT`, `#WRITEDATA` |
+| `pCslParameter` (`CSL_PARAMETER`) | 0 … 18 | `<ID>` `[ID]` `<INTEGER>` `[INTEGER]` `<HEX>` `[HEX]` `<FLOAT>` `[FLOAT]` `<STRING>` `[STRING]` `<FILENAME>` `[FILENAME]` `<SHORTKEY>` `[SHORTKEY]` `<ARRAYSRT>` `[ARRAYSRT]` `<ARRAYEND>` `[ARRAYEND]` `#ENDDEFINE` (the enum calls 14/15 `ARRAYSTART`; the keyword is spelled `ARRAYSRT`) |
+| `pCslParameterSize` | same | 4 ×8 (ID, INTEGER, HEX, FLOAT), **512** ×2 (STRING), **260** ×2 (FILENAME), 4 ×2 (SHORTKEY), 4 ×2 (ARRAYSRT), 0 ×2 (ARRAYEND), 0 (#ENDDEFINE) |
+| `pCslRemarks` (`CSL_REMARK`, copied to the heap per reader) | 0 … 6 | → `m_CslRemarkLine`, → `m_CslRemarkStart`, → `m_CslRemarkEnd`, `#SEPRATOR`, `#REMARKLINE`, `#REMARKSTART`, `#REMARKEND` |
+
+Defaults (`CCsl::Clear`): delimiters `", \t\r\n"` (comma, space, tab, CR, LF), line remark `;`, block remark `/*` … `*/`.
+The bare `CToken` constructor sets `" \t\r\n"` (no comma); `ReadScript` replaces it with the CSL set.
+
+A data row is one heap block: the columns packed in format order, each `pCslParameterSize[type]` bytes, **strings stored
+inline** (a `<STRING>` column is a 512-byte char array, a `<FILENAME>` 260). A `SERVER_INFO` row is 512 + 4·4 + 512 +
+3·4 = 1052 bytes; `CServerInfo` hands out pointers into it (W05 §5.2 "strings are stored as pointers" means the
+`SERVER_INFO` struct members, not the row).
+
+### 2.2 `CToken`: the tokenizer
+
+```pseudo
+CToken::CToken():                                                                  @ FUN_0045a080
+    CGdp::CGdp(&m_Gdp)                                                             # §3
+    m_bIsOpen = m_hFile = m_pFileBF = m_pSaveTokenPos = m_bOpenByMemory = m_bResetStart = 0
+    m_bIsStart = 1; m_szSeprator = " \t\r\n"; m_pToken = m_lplpTokenList = m_dwNumTokens = 0
+CToken::Close():  free(m_pFileBF); if m_bIsOpen: CGdp::CloseHandle(m_hFile); CGdp::GdpClose(); m_bOpenByMemory = 0   @ FUN_0045a0f0
+CToken::~CToken(): the same body, then CGdp::~CGdp                                   @ FUN_0045a490
+CToken::SetSeprator(s): strcpy(m_szSeprator, s)                                     @ FUN_0045a150
+
+CToken::Open(name):                                                                @ FUN_0045a520
+    Close()  (inlined)
+    m_hFile = CGdp::CreateFileA(name, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
+    if m_hFile == INVALID_HANDLE_VALUE: return 0
+    m_bIsOpen = 1                                    # the file stays open until Close (GoBegin re-reads it)
+    m_dwFileSize = CGdp::GetFileSize(m_hFile)
+    m_pFileBF = malloc(size + 1); m_pFileBF[size] = 0
+    CGdp::ReadFile(m_hFile, m_pFileBF, size) ok → m_bOpenByMemory = 0; m_bIsStart = 1; return 1
+    any failure → Close(); return 0
+CToken::OpenFromMemory(text):                                                      @ FUN_0045a630
+    Close(); m_dwFileSize = strlen(text); if 0: return 0
+    m_pFileBF = malloc(len + 1) copy of text (NUL-terminated); m_pOpenMemory = text  # kept for GoBegin
+    m_bIsStart = 1; m_bOpenByMemory = 1; return 1
+CToken::GoBegin():                         # restore the pristine buffer (tokenising writes NULs into it)   @ FUN_0045a270
+    by memory: m_pFileBF[size] = 0; memcpy(m_pFileBF, m_pOpenMemory, size); m_bIsStart = 1; return 1
+    by file:   CGdp::SetFilePointer(m_hFile, 0, 0, FILE_BEGIN) and CGdp::ReadFile(whole file) → m_bIsStart = 1; return 1
+               failure → Close(); return 0
+    neither:   return 0
+
+CToken::my_tcstok(start, delims):          # strtok over m_pMyTokenStart, MBCS-aware (_mbspbrk)   @ FUN_0045a170
+    if start: m_pMyTokenStart = start
+    p = m_pMyTokenStart; if p == null: return null
+    q = _mbspbrk(p, delims); m_pMyTokenStart = q
+    while q == p:                          # skip leading delimiters
+        p = ++m_pMyTokenStart; q = _mbspbrk(p, delims); m_pMyTokenStart = q
+    if m_pMyTokenStart: *m_pMyTokenStart++ = 0
+    return p
+    # unlike strtok, when only delimiters remain before the end it returns p = "" (empty token), not null;
+    # the next call returns null; a script that ends in delimiters without #END therefore ends with one "" token,
+    # which the main loop reports as "UNKNOWNED" and which fails the read (original bug) S02-B14
+CToken::GetToken():                                                                @ FUN_0045a1f0
+    if m_pFileBF == null: return null
+    if m_bIsStart: m_bIsStart = m_bResetStart = 0; m_pToken = my_tcstok(m_pFileBF, m_szSeprator)
+    elif m_bResetStart: m_bResetStart = 0; m_pToken = my_tcstok(m_pResetStart, m_szSeprator)   # after an empty ""
+    else: m_pToken = my_tcstok(null, m_szSeprator)
+    return m_pToken
+CToken::GoStartString():                   # find the next '"' after the current token             @ FUN_0045a380
+    p = m_pToken + strlen(m_pToken) + 1    # first byte after the token's terminating NUL
+    while *p != '"': p++                   # unbounded: crosses lines, NULs and the buffer end (original bug) S02-B13
+    return p
+CToken::GetTokenString(&len):              # read the next "quoted" string                        @ FUN_0045a6f0
+    if m_pFileBF == null: return null
+    if m_bIsStart: m_bIsStart = m_bResetStart = 0; m_pToken = my_tcstok(m_pFileBF, "\"")
+    if m_bResetStart: m_pToken = m_pResetStart - 1; m_bResetStart = 0
+    p = GoStartString(); m_pToken = p
+    if p[0] == '"' and p[1] == '"':        # empty string: nothing to NUL-terminate
+        m_pResetStart = p + 2; m_bResetStart = 1; m_pToken = &CToken::m_NULLstr (static ""); len = 0
+        # the next GetToken resumes at p+2. The next GetTokenString instead sets m_pToken = p+1 (the closing
+        # quote, not NUL-terminated), so GoStartString's strlen runs to the end of the buffer and the scan
+        # continues past it: an empty string followed directly by another string column reads heap memory
+        # (original bug) S02-B13
+    else:
+        m_pToken = my_tcstok(p, "\"")      # string = bytes between the quotes; closing quote → NUL
+        len = strlen(m_pToken)
+    return m_pToken                        # no escape sequences; a string cannot contain '"'
+CToken::GoNextLine():                      # skip the rest of the line (line remark)              @ FUN_0045a330
+    if m_pFileBF == null or m_pToken == null: return 0
+    p = m_pToken + strlen(m_pToken) + 1
+    if *p != '\n': m_pToken = my_tcstok(null, "\n")
+    return 1
+    # with CRLF files the token ends at the CR, *p is the LF, nothing is skipped and the next GetToken starts on the
+    # next line. With LF-only files a remark token that ends at the line end (";" or ";----" alone on its line) was
+    # terminated by the LF itself: *p is the first byte of the next line and that whole line is skipped as well
+    # (original bug) S02-B16
+CToken::SaveTokenPositon(): m_pSaveTokenPos = m_pToken                              @ FUN_0045a3d0
+CToken::RestoreTokenPositon(pos):                                                  @ FUN_0045a3e0
+    pos == null: pos = m_pSaveTokenPos; if null: return 0
+    if !GoBegin(): return 0                # buffer reloaded: every NUL written so far is gone
+    m_bIsStart = 0; m_pToken = my_tcstok(pos, m_szSeprator); return 1
+CToken::IsTokenID(tok, list, n): first i < n with _mbsicmp(tok, list[i]) == 0, else 0xFFFFFFFF   @ FUN_0045a450
+    # every keyword comparison of the reader is therefore case-insensitive and whole-token
+```
+
+### 2.3 `CCsl`: the script reader
+
+#### 2.3.1 ReadScript: the main loop
+
+```pseudo
+CCsl::ReadScript(name, hWnd, msgId, memText):                                      @ FUN_004626f0
+    m_hWnd = hWnd; m_UseMsgID = msgId                       # never read again by the library (servers pass 0, 0x401)
+    ok = memText ? CToken::OpenFromMemory(memText) : CToken::Open(name)             # servers: always the file
+    if !ok:
+        GetLastError()
+        AddResultMsg("-----…"); AddResultMsg((m_bInclude ? "INCLUDE OPEN ERROR(Code = %d) - %s "
+                                                         : "FILE OPEN ERROR(Code = %d) - %s ") % (err, name))
+        AddResultMsg("-----…"); m_NumFormatErrors++
+        ReadScriptDone(); return 0
+    top level: AddResultMsg("=====…" ×80); "FILE PROCESSING - %s " % name; "=====…"; " "
+    include:   AddResultMsg("-----…" ×63); "Include - %s " % name; "-----…"
+    if name: strcpy(m_ScriptFN, name)                       # unbounded into char[260]
+    CToken::SetSeprator(m_CslSeprator)
+    while !m_bEnd and (tok = GetToken()) != null:
+        if ProcRemark(tok): continue                        # §2.3.2
+        if ProcCmd(tok): continue                           # §2.3.3
+        if ProcData(tok): continue                          # §2.3.5: tok names a #DEFINEd format
+        AddResultMsg("%s - UNKNOWNED." % tok); m_NumDataErrors++
+    ReadScriptDone(); CToken::Close()
+    return (m_NumDataErrors + m_NumFormatErrors) < 1        # 1 only with no error at all, includes counted (§2.3.4)
+
+CCsl::AddResultMsg(text): node = new[strlen + 9] { next = 0; Msg = text }; append; m_dwNumResultMsg++; return node != 0   @ FUN_00460a40
+CCsl::ViewResultMsg(): for each message: _DebugMessageNew(1, "Msg", "%s", msg)       @ FUN_00460ac0
+    # WM / Login only (the Zone linker dropped it); no caller. The servers print the list through
+    # CServerInfo::ViewErrorMsg (§2.5) after a failed read.
+```
+
+#### 2.3.2 Remarks and the remark-control commands
+
+```pseudo
+CCsl::ProcRemark(tok) → 1 if consumed:                                             @ FUN_00460c90
+    i = IsTokenID(tok, m_CslRemarks, 7)     # [0] line remark, [1] block start, [2] block end, [3..6] commands
+    if m_bRemarkBlock and i != 2: return 1  # inside /* … */ every token is ignored, commands included
+    switch i:
+    0 (tok == line remark, whole token): GoNextLine(); return 1
+    1 (/*): m_bRemarkBlock = 1;  2 (*/): m_bRemarkBlock = 0;  return 1
+    3 #SEPRATOR:   t = GetToken(); m_CslSeprator = t ?? ", \t\r\n"; SetSeprator(m_CslSeprator); return 1
+    4 #REMARKLINE:  t = GetToken(); m_CslRemarkLine  = t ?? ";"
+    5 #REMARKSTART: t = GetToken(); m_CslRemarkStart = t ?? "/*"
+    6 #REMARKEND:   t = GetToken(); m_CslRemarkEnd   = t ?? "*/";   return 1
+                    # the new value is the next token under the *current* delimiters, so it cannot contain them;
+                    # strcpy into the 64-byte members, unbounded (original bug) S02-B19
+    default: if _mbsnbcmp(tok, m_CslRemarkLine, strlen(m_CslRemarkLine)) == 0: GoNextLine(); return 1
+             return 0
+```
+
+So a line remark is any token that **starts with** `;` (`;comment`, `;-----`); block markers must be whole tokens
+(`/*text` is not a block start). ProcRemark runs before every token the reader takes with `GetToken` (main loop, format
+definitions, numeric columns), but not before string columns: `GetTokenString` scans straight to the next `"`, even
+through a remark.
+
+#### 2.3.3 Commands
+
+```pseudo
+CCsl::ProcCmd(tok) → 1 if tok is a command:                                        @ FUN_004621f0
+    switch IsTokenID(tok, m_pCslCmd, 10):
+    0 #END:          m_bEnd = 1                               # stops this file only (an include returns to its parent)
+    1 #DEFINE:       f = MakeFormat(); if f: AddFormat(f)      # §2.3.4
+    2 #INCLUDE:      IncludeFile()                            # §2.3.6
+    3 #CLEAR:        ClearFormats(); ClearDatas()
+    4 #CLEARFORMAT:  ClearFormats()                            # rows keep their format index into the new list
+    5 #CLEARDATA:    ClearDatas()
+    6 #READ "f":     Parameter_filename(f)                    # GetTokenString + strcpy into char[260]   @ FUN_00461210
+                     Read(f) ? "%s - READ OK" : (m_NumDataErrors++, "%s - READ ERROR")      # §2.3.7
+    7 #WRITE "f":    h = CGdp::CreateFileA(f, GENERIC_WRITE, FILE_SHARE_READ, 0, CREATE_ALWAYS, NORMAL)
+                     ok = h valid and WriteFormat(0, h) and WriteData(0, h); CloseHandle(h) if valid
+                     ok ? "%s - WRITE OK" : (m_NumDataErrors++, "%s - WRITE ERROR")
+    8 #WRITEFORMAT "f": as WriteFormat, inlined ("%s - WRITE FORMAT OK" / "%s - WRITE FORMAT ERROR" + error)
+    9 #WRITEDATA "f":   as WriteData, inlined ("%s - WRITE DATA OK" / "%s - WRITE DATA ERROR" + error)
+    else: return 0
+    return 1                                                  # also when MakeFormat failed (its error is counted)
+```
+
+`#READ` / `#WRITE*` turn a text script into the binary chunk file of §2.3.7 and back (a tool feature: no shipped
+script uses them).
+
+#### 2.3.4 `#DEFINE`: formats
+
+```pseudo
+CCsl::MakeFormat():                         # after "#DEFINE"                                       @ FUN_00460ea0
+    name = none; params = []
+    loop:
+        tok = GetToken()
+        if tok == null: m_NumFormatErrors++; AddResultMsg("FORMAT DEFINNING, EOF Come."); return null   # params leak
+        if ProcRemark(tok): continue
+        if name == none: name = strncpy(tok, 64); continue   # first token = format name; 64 chars leave no NUL in
+                                                             # Format[64] (part of S02-B19)
+        k = IsTokenID(tok, m_pCslParameter, 19)
+        if k <= 17: params.append(k); continue               # <ID> … [ARRAYEND]
+        if k == 18 (#ENDDEFINE): return new CSL_FORMAT_LIST { Format = name, NumParameter = len(params), pParameter = params }
+        # not a type keyword: the name of an earlier format inserts that format's columns ("inheritance")
+        for i in 0 .. m_NumFormats-1:
+            if _mbsicmp(tok, (m_pFormats + i * 0x4c)->Format) == 0:      # array stride over a linked list:
+                params += (m_pFormats + i * 0x4c)->pParameter[0 .. NumParameter-1]; break
+        # only i = 0 (the first format) is a real node; i ≥ 1 reads whatever heap follows it (original bug) S02-B12
+        else: m_NumFormatErrors++; AddResultMsg("%s - FORMAT DEFINING, UNKNOWNED PARAMATER." % tok)   # token skipped
+CCsl::AddFormat(f): append to m_pFormats / m_pFormatLast; m_NumFormats++                       @ FUN_00461150
+```
+
+A format's index (`CSL_DATA_LIST.dwID`) is its position in the list, counted across includes in reading order; the
+same name may be defined twice (rows then match the first one, §2.3.5).
+
+#### 2.3.5 Data rows
+
+```pseudo
+CCsl::ProcData(tok):                                                               @ FUN_00461490
+    i = index of the first format whose Format equals tok (_mbsicmp); none → return 0
+    row = MakeData(i, format); append to m_pDatas / m_pDataLast; m_NumDatas++; return 1
+CCsl::MakeData(id, f):                                                             @ FUN_00461240
+    size = Σ pCslParameterSize[f.pParameter[k]]  (loop unrolled ×2)
+    row = new CSL_DATA_LIST { dwID = id, dwSize = size, pData = new[size] zeroed }
+    w = pData
+    for each column type t:
+        ID / INTEGER (0..3):  *(i32*)w = atoi(GetDataToken()); w += 4
+        HEX (4, 5):           sscanf(GetDataToken(), "%x", (u32*)w); w += 4      # "0x" prefix accepted by %x
+        FLOAT (6, 7):         *(f32*)w = (float)atof(GetDataToken()); w += 4
+        STRING (8, 9):        strcpy(w, GetTokenString()); w += 512              # no length check (original bug) S02-B19
+        FILENAME (10, 11):    strcpy(w, GetTokenString()); w += 260
+        SHORTKEY (12, 13):    *(i32*)w = (signed char) GetTokenString()[0]; w += 4   # first char of a "quoted" key
+        ARRAYSRT / ARRAYEND (14..17): nothing read, w not advanced (jump-table entries 14–17 → loop end, 0x46141e)
+            # the size sum and CCsl::GetData count 4 bytes for ARRAYSRT, so every column after it is written 4 bytes
+            # lower than GetData reads it (original bug) S02-B11
+    return row
+    # the "[…]" optional variants behave exactly like "<…>": a value is always consumed, so a short row silently
+    # takes its missing values from the next row (original bug) S02-B21. Values may span lines: rows end only by
+    # column count.
+CCsl::GetDataToken():                                                              @ FUN_00461190
+    loop: tok = GetToken()
+          null → m_NumFormatErrors++ (a data error counted as a format error (original bug) S02-B20);
+                 AddResultMsg("DATA DEFINNING, EOF Come"); return m_pDummyNull ("")
+          !ProcRemark(tok) → return tok
+```
+
+Accessors (W05 §5.2 has their pseudocode): `GetNumDatas` FUN_00460b40, `GetDataInfo` FUN_00460b50, `GetData(row, col)`
+FUN_00460ba0 (null if row ≥ m_NumDatas, the row's format is missing or col ≥ NumParameter; else `pData + Σ size of
+columns 0..col-1`; it uses the index tables when they exist, else walks the lists), `GetFormat(i)` FUN_00460af0.
+
+#### 2.3.6 `#INCLUDE`
+
+```pseudo
+CCsl::IncludeFile():                       # after "#INCLUDE"                                       @ FUN_00462090
+    file = GetTokenString()                # quoted; copied into a 260-byte local, unbounded
+    saveDir = GetCurrentDirectoryA()
+    _fullpath(full, m_ScriptFN); _splitpath(full, drive, dir, …); SetCurrentDirectoryA(drive + dir)
+        # the include name is relative to the including file's directory (nested includes chain correctly)
+    SaveTokenPositon()                     # m_pToken = the file name inside the buffer
+    child = CCsl(this)                     # §2.3.8: shares this reader's lists, remark settings and delimiters
+    child.ReadScript(file, m_hWnd, m_UseMsgID, 0)          # result ignored: errors reach this reader via ReadScriptDone
+    RestoreTokenPositon(null)              # GoBegin re-reads this file from disk, then strtok from the saved
+                                           # position: the next token is the rest of the file name up to a delimiter
+        # a file name containing a delimiter (space, comma) leaves its tail as a token → "%s - UNKNOWNED." data error,
+        # which fails the whole read (original bug) S02-B18
+    SetCurrentDirectoryA(saveDir); child.Close(); child.~CToken()
+CCsl::ReadScriptDone():                                                            @ FUN_00461520
+    include (m_bInclude):
+        AddResultMsg("Include Format %d Defined, %d Errors" % (m_NumFormats − parent.m_NumFormats, m_NumFormatErrors))
+        AddResultMsg("Include Data %d Defined, %d Errors"   % (m_NumDatas − parent.m_NumDatas, m_NumDataErrors)); " "
+        parent.m_NumFormatErrors += m_NumFormatErrors; parent.m_NumDataErrors += m_NumDataErrors
+        parent.{m_NumFormats, m_pFormats, m_pFormatLast, m_NumDatas, m_pDatas, m_pDataLast,
+                m_pResultMsgLast, m_dwNumResultMsg, m_pResultMsgs} = this's            # hand the grown lists back
+    top level:
+        AddResultMsg(" "); "TOTAL Format %d Defined, %d Errors"; "TOTAL Data %d Defined, %d Errors"; " "
+        MakeFormatTable(); MakeDataTable()  # pointer arrays for O(1) GetFormat / GetDataInfo   @ FUN_00460940 / FUN_004609c0
+```
+
+The child's settings are copied once: a `#SEPRATOR` / `#REMARK*` inside an include changes only the include (and the
+child shares the parent's `m_CslRemarks` pointer array, whose entries 0–2 point at the **parent's** marker strings, so
+an include's `#REMARKLINE x` changes the prefix test of the default case but not the whole-token test of case 0).
+`m_bRemarkBlock` is copied in but not back.
+
+#### 2.3.7 Binary chunk files (`#READ` / `#WRITE`)
+
+```pseudo
+CCsl::Read(file):                                                                  @ FUN_00461730
+    h = CGdp::CreateFileA(file, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, NORMAL); invalid → return 0
+    total = GetFileSize(h); 0xFFFFFFFF → CloseHandle; return 0;  0 → return 1
+    pos = 0
+    repeat:
+        ReadFile(h, &chunk, 8) else fail
+        buf = new[chunk.dwSize + 8]; ReadFile(h, buf + 8, chunk.dwSize) else fail
+        chunk.dwID 0x11111111: append CSL_FORMAT_LIST { Format = buf+8 (strcpy), NumParameter = *(buf+0x48),
+                                                         pParameter = copy of NumParameter × 4 bytes at buf+0x4c }
+        chunk.dwID 0x22222222: append CSL_DATA_LIST { dwID = *(buf+8), dwSize = *(buf+0xc), pData = copy of dwSize bytes at buf+0x10 }
+        other id → fail
+        delete buf; pos += 8 + chunk.dwSize
+    until pos ≥ total
+    return 1
+    fail: CloseHandle(h); return 0          # buf leaks on the failure paths
+    # the success paths (also total == 0) never close h (original bug) S02-B17. No size field is checked
+    # against the chunk length.
+CCsl::WriteFormat(file, h):  h == INVALID → open file (GENERIC_WRITE, CREATE_ALWAYS) and close it at the end;      @ FUN_00461970
+    per format: { 0x11111111, 0x44 + 4n } + Format[64] + NumParameter + pParameter[n]; any WriteFile failure → 0
+CCsl::WriteData(file, h):    same; per row: { 0x22222222, dwSize + 8 } + dwID + dwSize + pData[dwSize]               @ FUN_00461a90
+```
+
+Rows are written with their inline strings, so a chunk file is position-independent and `Read` restores it exactly.
+`Read` appends: it does not clear the lists first.
+
+#### 2.3.8 Construction, clearing, teardown
+
+```pseudo
+CCsl::CCsl():  CToken(); m_CslRemarks = 0; VarClear(); Clear()                    @ FUN_00461e40
+CCsl::CCsl(parent):                                                                @ FUN_00461ea0
+    CToken()
+    parent != 0: m_bEnd, m_bRemarkBlock, m_CslSeprator, m_CslRemarkLine/Start/End, m_CslRemarks (pointer!),
+                 m_pCslCmd / Parameter / ParameterSize, the format, data and result-message lists = parent's;
+                 m_NumFormatErrors = m_NumDataErrors = 0; m_pParentCsl = parent; m_bInclude = 1
+                 # m_pDummyNull is not set (Clear is not called): EOF inside a data row of an included file makes
+                 # GetDataToken return an uninitialised stack pointer to atoi / atof (original bug) S02-B15
+    parent == 0: builds a temporary CCsl on the stack (CToken, VarClear, Clear, Close, ~CToken) and leaves `this`
+                 with only the CToken fields set (the C++ "constructor calls a constructor" mistake). Dead: the only
+                 caller is IncludeFile with `this` (original bug) S02-B22
+CCsl::VarClear(): m_bEnd = m_bRemarkBlock = error counts = 0; all list heads, counts, index tables = 0;   @ FUN_004608d0
+                  m_pParentCsl = 0; m_bInclude = 0          # does not free anything
+CCsl::Clear():  Close(); VarClear(); m_pDummyNull = ""; m_CslRemarks = new char*[7] copy of pCslRemarks;   @ FUN_00461d00
+                defaults of §2.1; m_CslRemarks[0..2] = &m_CslRemarkLine / Start / End; table pointers
+CCsl::Close():  CToken::Close(); if !m_bInclude: free result messages, ClearFormats(), ClearDatas(),        @ FUN_00461c80
+                delete m_CslRemarks; m_CslRemarks = 0       # an include reader frees nothing (the parent owns it)
+CCsl::ClearFormats(): free every format and its pParameter; m_NumFormats = 0; delete m_ppFormatTable   @ FUN_00461ba0
+CCsl::ClearDatas():   free every row and its pData; m_NumDatas = 0; delete[] m_ppDataTable           @ FUN_00461c10
+    # m_pFormatLast / m_pDataLast keep pointing at freed nodes; harmless because the append paths test the head first
+CCsl::~CCsl(): Close(); ~CToken()                                                  @ FUN_00461de0
+```
+
+### 2.4 Grammar, checked against the shipped files
+
+```
+script     := { item } [ "#END" ] ; reading stops at #END or at the end of the buffer
+item       := remark | command | row
+remark     := token starting with ";"  → rest of the line ignored
+            | "/*" { token } "*/"     → whole tokens, may span lines
+            | "#SEPRATOR" tok | "#REMARKLINE" tok | "#REMARKSTART" tok | "#REMARKEND" tok
+command    := "#DEFINE" NAME { type | NAME_OF_EARLIER_FORMAT } "#ENDDEFINE"
+            | "#INCLUDE" STRING | "#READ" STRING | "#WRITE" STRING | "#WRITEFORMAT" STRING | "#WRITEDATA" STRING
+            | "#CLEAR" | "#CLEARFORMAT" | "#CLEARDATA"
+type       := "<ID>" | "<INTEGER>" | "<HEX>" | "<FLOAT>" | "<STRING>" | "<FILENAME>" | "<SHORTKEY>"
+            | "<ARRAYSRT>" | "<ARRAYEND>"  and each in "[…]" form (identical behaviour)
+row        := FORMAT_NAME value × (number of columns)          ; no terminator, may span lines
+value      := token (numeric types: atoi / %x / atof)  |  STRING (string, filename, shortkey types)
+STRING     := '"' { any byte except '"' } '"'                   ; no escapes; "" = empty
+token      := maximal run of non-delimiters; delimiters ", \t\r\n" (comma = whitespace)
+```
+
+Keywords and format names are case-insensitive. Numeric columns accept anything `atoi`/`atof` accept (garbage → 0,
+never an error). Only these produce errors (and fail `ReadScript`): an unknown token at item level, an unknown word in
+a `#DEFINE`, EOF inside a `#DEFINE` or a row, a file or include that cannot be opened, `#READ` / `#WRITE*` I/O failures.
+
+Checked with a byte-faithful Python emulation of §2.2–§2.3 (`tools/protocol-re/csl.py <file> [-v] [--lf] [--noend]`;
+it follows includes like `IncludeFile` and flags the bug paths S02-B11…B21) on every shipped script of the 2016 set:
+
+| File | Formats (index: name, columns) | Rows | Errors |
+|---|---|---|---|
+| `Login/LoginServerInfo.txt`, `w00_WorldManager/WMServerInfo.txt`, `w00_Zone00…03/ZoneServerInfo/ZoneServerInfo.txt`, `Account/DataServerInfo_Account.txt`, `AccountLog/DataServerInfo_AccountLog.txt`, `w00_Character/DataServerInfo_Character.txt`, `w00_GameLog/DataServerInfo_GameLog.txt` | 0 MY_SERVER (5: STRING name, STRING, INTEGER server id, INTEGER world, INTEGER zone), then the include's 1 NATION_NAME (1), 2 WORLD_NAME (3), 3 SERVER_INFO (9), 4 ODBC_INFO (5) | 1 + 29 | 0 |
+| `9Data/ServerInfo/ServerInfo.txt` (alone) | NATION_NAME, WORLD_NAME, SERVER_INFO, ODBC_INFO | 1 + 1 + 22 + 5 | 0 |
+| `9Data/Shine/DefaultCharacterData.txt` (Character server *(inferred)*) | CHARACTER (11), ITEM (3), SKILL (2), QUEST (2), MAXSHAPE (4), SHORTCUT (4) | 530 (6 / 17 / 476 / 0 / 6 / 25) | 0 |
+| `9Data/Shine/TutorialCharacterData.txt` | TUTORIAL_CHARACTER (9), DEFAULT_ITEM (3), TUTORIAL_ITEM (3) | 10 | 0 |
+
+So the format indices `CServerInfo` relies on (3 = SERVER_INFO, W05 §5.2; Z10's 0–4) come from the order
+MY_SERVER-then-include in each per-process file. The shipped files use only `#DEFINE`, `#ENDDEFINE`, `#INCLUDE`,
+`#END`, `<INTEGER>`, `<STRING>` and `;` remarks (inline after values too, e.g. `ITEM 26, 62930, 50 ; …`), all with CRLF
+line ends; none uses block remarks, `#SEPRATOR`, optional or array types, inheritance, `#READ` or `#WRITE*`. The
+`ODBC_INFO` connection strings contain `;` and `{…}` safely because strings are not tokenised.
+
+Variants run through the emulation: removing the final `#END` makes every file fail (the trailing CRLF becomes one
+empty token → `'' - UNKNOWNED.`, S02-B14); converting `DefaultCharacterData.txt` to LF line ends still "succeeds" but
+loads 505 rows instead of 530 (S02-B16: the data line after each `;` / `;-----` line is lost).
+
+### 2.5 Users of the reader
+
+```pseudo
+CServerInfo::CServerInfo(): CCsl::CCsl(&m_Csl)                                     @ FUN_00465c80
+CServerInfo::ReadServerInfo(file): CCsl::Clear(&m_Csl); return CCsl::ReadScript(&m_Csl, file, 0, 0x401, 0)   @ FUN_00465c90
+CServerInfo::ViewErrorMsg(): for each m_Csl result message: _DebugMessageNew(1, "Msg", "%s", msg)    @ FUN_00465cc0
+    # = ViewResultMsg inlined; WorldManagerServer::ReadDefineScriptor (FUN_00403e70, W01 §2) calls it after a failed
+    # read ("*FAILED SCRIPTOR READ* %s"), then CToken::Close on the reader (already closed by ReadScript; harmless)
+GetShineServerIDName(id) / GetShineServerIDShortName(id): id outside 0..20 → 10; table lookup   @ FUN_0045a040 / FUN_0045a060
+    names: 0 SERVER_ID_DB_ACCOUNT, 1 …_DB_ACCOUNTLOG, 2 …_DB_CHARACTER, 3 …_DB_GAMELOG, 4 …_LOGIN, 5 …_WORLDMANAGER,
+           6 …_ZONE, 7 …_PATCH, 8 …_OPTOOL, 9 …_WEB, 10 …_UNKNOWN, 11–18 SERVER_ID_11 … SERVER_ID_18, 19 …_LAUNCHER,
+           20 …_CLIENT (short names drop "SERVER_ID_" for the named ones); used only in log lines
+```
+
+The accessors over the rows (`GetMyServerInfo`, `GetServerInfo`, `GetServerIndex`, Zone `GetNationName` /
+`GetWorldName`) are W05 §5.2 / §6.2 and Z10 §1.1. The two Login-only ones (used by
+`CLoginWorldManagerSessionManager::InitWorldManagerInfo` FUN_00409eb0, X03 §2):
+
+```pseudo
+CServerInfo::GetNumOfWorld(): count of rows with dwID == 2 (WORLD_NAME, Login's format order)        @ FUN_00410750
+CServerInfo::GetWorldName(world, out): first WORLD_NAME row whose column 0 == world →                @ FUN_00410790
+    out = { nWorldNo = col 0, pWorldName = &col 1, pWorldDataPath = &col 2 }; return 1;  none → 0
+```
+
+Zone also uses the bare `CToken` for quest scripts (`CQuestParserScript` FUN_00636f60 …: `OpenFromMemory`, `GoBegin`,
+`GetToken`, `GoNextLine`, `Save/RestoreTokenPositon`, and the zone-only):
+
+```pseudo
+CToken::GetTokenID(&id, list, n):          (Zone only)                            @ FUN_0063b2b0
+    GetToken(); id = 0xFFFFFFFF
+    if list and n and m_pToken: if *m_pToken == 0: return null       # the empty end-of-buffer token → "no token"
+                                id = IsTokenID(m_pToken, list, n)
+    return m_pToken
+```
+
+### 2.6 Result messages (complete list)
+
+`FILE PROCESSING - %s `, `Include - %s `, `FILE OPEN ERROR(Code = %d) - %s `, `INCLUDE OPEN ERROR(Code = %d) - %s `,
+`FORMAT DEFINNING, EOF Come.`, `%s - FORMAT DEFINING, UNKNOWNED PARAMATER.`, `DATA DEFINNING, EOF Come`,
+`%s - UNKNOWNED.`, `%s - READ OK` / `READ ERROR`, `%s - WRITE OK` / `WRITE ERROR`, `%s - WRITE FORMAT OK` /
+`WRITE FORMAT ERROR`, `%s - WRITE DATA OK` / `WRITE DATA ERROR`, `Include Format %d Defined, %d Errors`,
+`Include Data %d Defined, %d Errors`, `TOTAL Format %d Defined, %d Errors`, `TOTAL Data %d Defined, %d Errors`, plus
+separator lines of `=` (80) and `-` (63) and `" "`. They are only shown on a failed `ReadServerInfo` (§2.5); the
+`*(inferred)*` argument lists above follow the format strings (the export drops varargs; ReadScriptDone's were read
+in the disassembly at 0x461543 … 0x46159f).
+
+### 2.7 Login and Zone copies
+
+An instruction-level comparison (`tools/protocol-re/asmcmp.py CCsl,CToken`: objdump of each same-name function,
+addresses normalised) of all 16 `CToken` and 30
+`CCsl` functions finds **no code difference**: the only mismatches are the inline jump tables of `MakeData`,
+`ProcRemark`, `ProcCmd` (address bytes). The constant tables (§2.1) are byte-identical. The decompiler differences part 1
+noted (Zone `Read`, `MakeFormat`, `Clear*`, `Close`, `MakeFormatTable`; Login / Zone `ProcRemark`) are export artefacts
+(e.g. Zone `ClearFormats` 0x6519b0 has its loop at 0x6519c0–0x6519ee; the export shows one iteration). The Zone build
+lacks `ViewResultMsg` (no caller) and adds `CToken::GetTokenID` (§2.5).
+
+| Function | WM | Login | Zone |
+|---|---|---|---|
+| `CToken::CToken` / `Close` / `SetSeprator` / `my_tcstok` / `GetToken` | 0045a080 / a0f0 / a150 / a170 / a1f0 | 0040aa00 / aa70 / aad0 / aaf0 / ab70 | 0063aea0 / af10 / af70 / af90 / b010 |
+| `GoBegin` / `GoNextLine` / `GoStartString` / `SaveTokenPositon` / `RestoreTokenPositon` | 0045a270 / a330 / a380 / a3d0 / a3e0 | 0040abf0 / acb0 / ad00 / ad50 / ad60 | 0063b090 / b150 / b1a0 / b1f0 / b200 |
+| `IsTokenID` / `GetTokenID` / `~CToken` / `Open` / `OpenFromMemory` / `GetTokenString` | 0045a450 / – / a490 / a520 / a630 / a6f0 | 0040add0 / – / ae10 / aea0 / afb0 / b070 | 0063b270 / b2b0 / b310 / b3a0 / b4b0 / b570 |
+| `CCsl::VarClear` / `MakeFormatTable` / `MakeDataTable` / `AddResultMsg` / `ViewResultMsg` | 004608d0 / 0940 / 09c0 / 0a40 / 0ac0 | 0040d200 / d270 / d2f0 / d370 / d3f0 | 00650710 / 0780 / 0800 / 0880 / – |
+| `GetFormat` / `GetNumDatas` / `GetDataInfo` / `GetData` / `ProcRemark` / `MakeFormat` | 00460af0 / 0b40 / 0b50 / 0ba0 / 0c90 / 0ea0 | 0040d420 / d470 / d480 / d4d0 / d5c0 / d7d0 | 00650900 / 0950 / 0960 / 09b0 / 0aa0 / 0cb0 |
+| `AddFormat` / `GetDataToken` / `Parameter_filename` / `MakeData` / `ProcData` / `ReadScriptDone` | 00461150 / 1190 / 1210 / 1240 / 1490 / 1520 | 0040da80 / dac0 / db40 / db70 / ddc0 / de50 | 00650f60 / 0fa0 / 1020 / 1050 / 12a0 / 1330 |
+| `Read` / `WriteFormat` / `WriteData` / `ClearFormats` / `ClearDatas` / `Close` / `Clear` | 00461730 / 1970 / 1a90 / 1ba0 / 1c10 / 1c80 / 1d00 | 0040e060 / e2a0 / e3c0 / e4d0 / e540 / e5b0 / e630 | 00651540 / 1780 / 18a0 / 19b0 / 1a20 / 1a90 / 1b10 |
+| `~CCsl` / `CCsl()` / `CCsl(parent)` / `IncludeFile` / `ProcCmd` / `ReadScript` | 00461de0 / 1e40 / 1ea0 / 2090 / 21f0 / 26f0 | 0040e710 / e770 / e7d0 / e9c0 / eb20 / f020 | 00651bf0 / 1c50 / 1cb0 / 1ea0 / 2000 / 2500 |
+| `CServerInfo::ReadServerInfo` / `GetShineServerIDName` / `…ShortName` | 00465c90 / 0045a040 / 0045a060 | 004104e0 / 0040a9c0 / 0040a9e0 | 0064d0f0 / – / – |
+
+### 2.8 Uncertain (part 2)
+
+- The varargs of the result messages are *(inferred)* from their format strings except ReadScriptDone's include
+  counts (read). They are diagnostics only.
+- `m_hWnd` / `m_UseMsgID` (0x401 = `WM_USER + 1`) and the unused `m_lplpTokenList` / `m_dwNumTokens` suggest the
+  reader came from a Windows editor tool *(inferred)*; the servers never post window messages through them.
+- What S02-B13 reads past the buffer depends on the heap; with the shipped files the path is not reached.
