@@ -572,7 +572,7 @@
       33,
       "SHINE_INVEN_SLOT_INFO",
       "From",
-      "0x10: key 8, ITEM_INVEN, u16 ItemID, u32 Lot"
+      "0x10: ItmeReg (item key) 8 B @0, u16 ItemID @8, ITEM_INVEN inven @0xa, u32 Lot @0xc (pdb2016)"
      ],
      [
       49,
@@ -797,6 +797,32 @@
       "u16",
       "err",
       "0x30C2"
+     ]
+    ]
+   },
+   "0xb021": {
+    "dir": "S→C",
+    "name": "NC_RAID_MAPOUT_CMD",
+    "basis": "zone FUN_0056dd80 sp_partylogout (0x14; rt_Broadcast to raid members on the map); client FUN_0049bfd0",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "sCharID",
+      "name of the member leaving the map"
+     ]
+    ]
+   },
+   "0x384a": {
+    "dir": "S→C",
+    "name": "NC_PARTY_MEMBERMAPOUT",
+    "basis": "zone FUN_0056dd80 sp_partylogout (0x14; to each live party member object, not in a raid); client FUN_0049a750",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "memberid",
+      "name of the member leaving the map"
      ]
     ]
    }

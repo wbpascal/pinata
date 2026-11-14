@@ -52,7 +52,7 @@ fc_GetInstanceDungeonInfoCount / fc_GetInstanceDungeonInfo(i)  @ FUN_00462840 / 
 ```
 
 `fc_IndunMapRegist(wm)` @ FUN_00462af0 (at WM connect): 0xA419 NC_INSTANCE_DUNGEON_MAP_REGIST_CMD
-`{u16 nMapCount, SHINE_INDUN_INFO[n] {Name3 MapIDClient (12 + NUL), u8 ModeIDLv}}` (4 + 0xD·n; the opcode is written as a
+`{u16 nMapCount, SHINE_INDUN_INFO[n] {Name3 MapIDClient (12 B, strncpy 0xc, no NUL) @0, u8 ModeIDLv @0xc}}` (4 + 0xD·n; the opcode is written as a
 u32 `0x0000A419`, so `nMapCount` starts at 0) — one entry per row of **all** zones (W04 handles it).
 
 **Map type.** `FieldOption::FieldAttr` (FieldList row) +0x36 is the column `KingdomQuestMap`, typed by enum
@@ -136,7 +136,10 @@ cm_AddTutorialMapCluster(map) @ FUN_004a0860                (fc_Load, every Tuto
 mc_Regist(cluster, field, rowName) @ FUN_0049ed40           (FieldMap::fm_Init, for every list cluster)
     if cluster.mc_MapIndex == rowName and field.fm_MapID != rowName (an instance, not the base map):
         mc_MapNumber ≥ 512 → "Too many mapcluster", ShineExit
-        mc_Map[n] = {Field = field, RegisterNumber = −1, timers off, Category = CLASSIC, eIndunLevel = ILT_MAX}; n++
+        mc_Map[n] = {Field = field, RegisterNumber = −1, IsTimerSet = IsDelayTimerSet = bIsFailDelayTime = false,
+                     Category = CLASSIC, eIndunLevel = ILT_MAX}; n++
+        # bIsLimitTime / bIsLimitTimeWarning are not written (heap memory); harmless: mc_FindEmptyByRegnum sets both
+        #  before the routine reads them (the routine only visits owned entries)
 ```
 
 ### 1.4 Finding and taking an instance
@@ -151,7 +154,9 @@ cm_FindExistByRegnum(map, regnum, category, &level) @ FUN_00486400 → mc_FindEx
 
 cm_FindEmptyByRegnum(map, regnum, category, level) @ FUN_00486290 → mc_FindEmptyByRegnum @ FUN_00484960
     first entry (after advancing mc_Pointer) with RegisterNumber == −1:
-        IsTimerSet = false; fm_ClearObject(Field, 0x3b6)             # wipe mobs/objects of the old run
+        IsTimerSet = false; fm_ClearObject(Field, 0x3b6)             # wipe the old run, players included (§1.10)
+        # a player still standing in the free instance (a GM, who sp_EscapeFromEmptyID lets stay) is flagged
+        #  Retrate and disconnected                                     (original bug, inferred intent) Z14-B14
         RegisterNumber = regnum; Category = category; eIndunLevel = level; bIsFailDelayTime = false
         row = fc_GetFirstInstanceDungeonInfo(cluster.mc_MapIndex)   # by map name (Z14-B1 fallback)
         if row: bIsLimitTimeWarning = false
@@ -159,8 +164,10 @@ cm_FindEmptyByRegnum(map, regnum, category, level) @ FUN_00486290 → mc_FindEmp
             else: bIsLimitTime = bIsLimitTimeWarning = true
                   LimitExpirationTime = {now + LimitTime·600, LimitTime·600}          # minutes → ticks
                   if LimitTime > 5: Warning_1 = (LimitTime−5)·600, Warning_2 = (LimitTime−1)·600 ticks
-                  # LimitTime 1..5: the warning flag is set but the warning metronomes keep old values
-                  # (original bug, inferred: stale or zero metronomes fire the warnings every routine) Z14-B4
+                  # LimitTime 1..5: the warning flag is set but the warning metronomes keep old values; an entry
+                  #  never used with LimitTime > 5 still has the ctor values {next 0, interval 0} (Metronome::Metronome
+                  #  @ FUN_005ad7f0, built by InstanceMap::InstanceMap @ FUN_004847c0), so both warnings fire on every
+                  #  15-s routine pass (next += 0)                                      (original bug) Z14-B4
         return Field          # note: IsDelayTimerSet is not cleared here (it is cleared by the next routine pass)
     none free → NULL
 
@@ -174,12 +181,12 @@ cm_PlayerinToInstanceDungeon(&outMap, row, regnum, category) → code @ FUN_0048
         inst = cm_FindEmptyByRegnum(row.MapIDClient, regnum, category, ILT_NORMAL)
         if !inst: return 1                                            # no free instance
         ZoneRingPacketFindInstanceDungeon.zrpb_Success(row, inst) @ FUN_005a8c20:
-            fm_ClearObject(inst, 0x3b0); cc_DropFilm(row.ScriptName); close all doors (mda_CloseAllDoor);
+            fm_ClearObject(inst, 0x3b0 = NPC, mob, door, bandit, effect); cc_DropFilm(row.ScriptName); close all doors (mda_CloseAllDoor);
             cc_PlayFilm(row.ScriptName, CeaseFireSender, inst.fm_MapID)  # restart the instance script
     outMap = inst.fm_MapID; return 0
     # the level is always ILT_NORMAL here: IDGate dungeons have one level; ModeIDGate uses the WM flow (Z08 §5.3)
 
-cm_FindEmpty(map) @ FUN_004a05e0 → mc_FindEmpty @ FUN_0049f460      (job-change dungeons, §2.4)
+cm_FindEmpty(map) @ FUN_004a05e0 → mc_FindEmpty @ FUN_0049f460      (job-change dungeons, §2.3)
     first entry whose map has no film running (Field.fm_Multiflex film count == 0); RegisterNumber is not used
 cm_FindNotFullMap(Name3 map) @ FUN_004a0b40 → mc_FindNotFullMap @ FUN_0049f010   (tutorial)
     cluster missing → log "don't find MapCluster"; entry at mc_Pointer: fm_GetPlayerCountInField < MaxChr → advance
@@ -207,7 +214,7 @@ cm_ChangeCategory(oldReg, oldCat, newReg, newCat) @ FUN_00485210: for every clus
 cluster runs `mc_Routine` @ FUN_004868d0. For each entry with `RegisterNumber != −1`:
 
 ```pseudo
-if fm_Exist(Field, 4) (a player is in the instance):
+if fm_Exist(Field, 4 = 1 << type 2 player) (a player is in the instance):
     if IsTimerSet: → WM 0xA403 NC_INSTANCE_DUNGEON_RESET_COUNTDOWN_CMD {u8 Category, u32 RegisterNumber} (7 B total)
     IsTimerSet = IsDelayTimerSet = false
 else (empty):
@@ -216,7 +223,7 @@ else (empty):
         elif now > EmptytoMsgDelay.next: EmptytoMsgDelay.next += 200
              IsTimerSet = true; TimeToDestroy = {now + 3000, 3000}
              → WM 0xA401 NC_INSTANCE_DUNGEON_EMPTY_DUNGEON_CMD {u8 Category, u32 RegisterNumber}
-               (the WM asks the leader "delete now?", answer 0xA402 → Z08 §5.3 / ring 0x10B1 §2.3)
+               (the WM asks the leader "delete now?", answer 0xA402 → Z08 §5.3 / ring 0x10B1 §2.2)
     if IsTimerSet and now > TimeToDestroy.next: TimeToDestroy.next += 3000; mc_DeleteInstanceDungeon(i)   (§1.7)
 if bIsLimitTime and now > LimitExpirationTime.next: next += interval; mc_MissoionFailInstance(Field, "DungeonTimeout")
 if bIsFailDelayTime and now > FailDelayTime.next: next += interval; mc_DeleteInstanceDungeon(i)
@@ -234,7 +241,7 @@ counts from the moment the instance was taken; the warnings come 5 and 1 min bef
 mc_MissoionFailInstance(Field, textKey) @ FUN_0049ee70: entry with Field == Field:
     bIsFailDelayTime = true; FailDelayTime = {now + 50, 50}             # deleted 5 s later by the routine
     row = fc_GetInstanceDungeonInfoByMapName(Field's map row name, eIndunLevel); if row: cc_DropFilm(script); close doors
-    wall message ss_String(etc, textKey) to the map (missing → "Not Found ETC : DungeonTimeout"); fm_ClearObject(Field, 0xb0)
+    wall message ss_String(etc, textKey) to the map (missing → "Not Found ETC : DungeonTimeout"); fm_ClearObject(Field, 0xb0 = NPC, mob, door)
 mc_GetLimitTime(&rest, regnum) @ FUN_0049f610: first entry with RegisterNumber == regnum (any category):
     if bIsLimitTime: rest = LimitExpirationTime.next − now (ticks); true                (Z01 0x1803 map-login, Z11 &idtimechange)
 mc_SetLimitItem(minutes, regnum) @ FUN_0049f740: first entry with that regnum and bIsLimitTime:
@@ -253,10 +260,11 @@ mc_DeleteInstanceDungeon(i, playerCheck) @ FUN_00486710
     IsTimerSet = bIsFailDelayTime = bIsLimitTimeWarning = false
     fm_KickAll(Field)                                              # every player linked out (Z01 / Z09 FieldMap)
     row = fc_GetInstanceDungeonInfoByMapName(row name of Field, eIndunLevel); if row: fm_DropFilm(Field, row.ScriptName)
-    fm_ClearObject(Field, 0x3b2); RegisterNumber = −1; eIndunLevel = ILT_MAX   # Category is left as it was
+    fm_ClearObject(Field, 0x3b2 = drop item, NPC, mob, door, bandit, effect); RegisterNumber = −1; eIndunLevel = ILT_MAX
+    # Category is left as it was; players were kicked just before, so 0x3b2 leaves them out
     # playerCheck is never read: callers cannot ask for "only if empty"            (original bug) Z14-B6
 # callers: party dismiss (Z08 §1, {PARTY}), raid dismiss (Z08 §2, {RAID}), guild delete (Z08 §8.2, {GUILD}),
-#          ring 0x10B1 (§2.3, leader confirmed "ID_DeleteNow"), and the routine (§1.6)
+#          ring 0x10B1 (§2.2, leader confirmed "ID_DeleteNow"), and the routine (§1.6)
 
 cm_PlayAllFilm(map, script) @ FUN_004a0d40 → mc_PlayAllFilm @ FUN_00485fb0: every entry (by-value copy of the
     InstanceMap): Field NULL → "Filed is NULL :" + return false; else fm_PlayFilm(Field, script, CeaseFireSender)
@@ -284,13 +292,15 @@ wms_KickPlayerFromInstanceDungeon(q, regnum, category) @ FUN_00486c00      (Z08 
 sp_EscapeFromEmptyID() @ FUN_00440910       (called from sp_NC_MAP_LOGINCOMPLETE_CMD @ FUN_00443390, Z01: every map login)
     require q on a type-3 map
     so_AdministratorLevel (vt 0x4d4) ≥ 100 → so_ply_Notice("You are administrator."), stay
-    if the map has a regen-city table entry (+0x44 → +0x14 ≠ 0) and its cluster exists and so_GetInsDunGeonInRegNoAndType
+    if the instance script is running (map.fm_Multiflex (+0x44, Movie::CinemaComplex*) → List<FilmCase>::l_ListNum
+       (+0x14) ≠ 0, the running-film count) and its cluster exists and so_GetInsDunGeonInRegNoAndType
        (vt 0xa8c) gives a key whose instance is q's map and a row exists:
         if players in the map > row.MaxUseCount and fm_GetRegenCityLinkData(map, &link): so_LinkToReserv(link)
         return                                                      # otherwise q stays
     else: sp_2Roumen(q)                                             # not the group's instance → to Roumen
     # on arrival or relog into an instance: a player whose group does not own this instance (instance deleted or
-    #  reassigned meanwhile, group left) goes to Roumen; an owner stays unless the instance is over-full
+    #  reassigned meanwhile, group left), or whose instance has no script running any more (script ended, or dropped
+    #  by &reloadid: Z14-B7), goes to Roumen; an owner stays unless the instance is over-full
 ```
 
 ### 1.9 Lifecycle summary
@@ -306,12 +316,35 @@ delete  : party dismiss / raid dismiss / guild delete / leader's "delete now" (r
           → 0xA403, kick all, drop film, clear objects, RegisterNumber = −1
 ```
 
+### 1.10 Object-kind masks
+
+`fm_ClearObject(field, mask)` (visitor `AxialListObjectClear::ali_Work` @ FUN_00495940) and `fm_Exist(field, mask)`
+(`IsAnybody::ali_Work` @ FUN_00484680) test `mask & (1 << so_ObjectType)` (vt 0x4d0; types in `docs/knowledge/Z01.md`
+§2: 1 drop item, 2 player, 4 NPC, 5 mob, 7 door, 8 bandit, 9 effect). The clear calls `so_RetrateFromMap` (vt 0x3f4,
+FUN_00495d20: sets `smo_Flag.Retrate`); a player with that flag is disconnected with 0x680 (`docs/knowledge/Z09.md`, the
+Z03 §2 row).
+
+| Mask | Kinds | Used by |
+|---|---|---|
+| 0x4 | player | `fm_Exist` in `mc_Routine` (§1.6) |
+| 0xb0 | NPC, mob, door | `mc_MissoionFailInstance` (§1.6) |
+| 0x3b0 | + bandit, effect | `ZoneRingPacketFindInstanceDungeon::zrpb_Success` (§1.4) |
+| 0x3b2 | + drop item | `mc_DeleteInstanceDungeon`, `mc_AllDropFilm` (§1.7, after `fm_KickAll`) |
+| 0x3b6 | + **player** | `mc_FindEmptyByRegnum` (§1.4), `so_ply_2JobDungeon` FUN_0049f880 and `ZoneRingPacketFindJobDungeon::zrpb_Success` FUN_005a8f40 (§2.3) |
+
+The three 0x3b6 users take a map for a new run and disconnect anyone still standing in it: a GM left in a free instance
+(`sp_EscapeFromEmptyID` lets administrators stay), or a player still in a job-change map whose film has ended (the map
+counts as free as soon as no film runs, §1.4 `mc_FindEmpty`). The other clears leave players alone
+(original bug, inferred intent: clear the old run's objects, not players; 0x3b2 as in the delete path) Z14-B14.
+
 ## 2. Zone-ring handlers: instance and job dungeons (ZoneListenSession)
 
 `zls_TravelComplete(start)` @ FUN_0045b1f0: true when `start.machine ≥ 10` or `start.machine == own zone` (back at
 the origin). Every ring packet starts with `ZONERINGLINKAGESTART {u8 machine, u16 handle, u32 regnum}` (7 B). The handlers
 below are registered in the ZoneListenSession table (`pft_Store`, Z01 §10). Forwarding = copy into `g_buf` and
 `ZoneConnectSession::zcs_Send(&g_buf, len)` @ FUN_005a6ed0 to the next zone.
+
+Ring-request classes (RTTI vftables, slots Request / Success / Failure as in `ZoneRingPacketBase`): `ZoneRingPacketEmtpyInstanceDungeon` = {zrpb_Request FUN_005a8a70, zrpb_Success FUN_005a8b70, empty stub FUN_00509900}; `ZoneRingPacketFindInstanceDungeon` and `ZoneRingPacketFindJobDungeon` hold the empty stub in all three slots: their Request / Success / Query functions are non-virtual overloads called directly. **None of the three has a Failure callback**: a request that comes back unanswered is handled by the TravelComplete branch of the handler itself (error code in the packet), not by a callback.
 
 ### 2.1 0xA404 NC_INSTANCE_DUNGEON_FIND_RNG (IDGate, party / raid instance on another zone)
 
@@ -326,7 +359,8 @@ origin request: ZoneRingPacketFindInstanceDungeon.zrpb_Request(p, buf, row) @ FU
             else so_ply_Notice(ss_String(etc, "CannotAddAnymore")); return
         # the category is recomputed here and the regnum is buf.IDRegisterNumber (from the menu data)
         code = cm_PlayerinToInstanceDungeon(&map, row, buf.IDRegisterNumber, category)
-        code ≠ 0: "CannotAddAnymore" (also for 3 = full)
+        code ≠ 0: "CannotAddAnymore" (also for 3 = full; the ring-origin path below says "InstanceDungeonMaxPlayer"
+            for 3: the same condition gives two different messages; cosmetic, not tagged)
         else: walk the NPC option "LinkTable" rows (or_SelectFromOrder) for the one whose key == row.Argument;
               link = that row with linktoserver = map
               NeedItemID == 0xFFFF or Consume == 0: if sp_LinkReplyCheck(link): so_LinkTo (vt 0x600)
@@ -347,7 +381,7 @@ origin request: ZoneRingPacketFindInstanceDungeon.zrpb_Request(p, buf, row) @ FU
     Error 0: row = fc_GetInstanceDungeonInfo(Argument, ILT_NORMAL) (NULL → drop); title "LinkTitle" is formatted but unused;
              find the LinkTable row with key == row.Argument; link.linktoserver = ServerMapName
              NeedItemID == 0xFFFF or Consume == 0: so_LinkTo (vt 0x600) directly  — no sp_LinkReplyCheck here, unlike
-                 the same-zone path                                             (original bug, inferred) Z14-B8
+                 the same-zone path FUN_005a92e0, which calls it before vt 0x600 (original bug; intent inferred) Z14-B8
              else sp_DestroyItem(p, p.so_GetZoneHandle_ItemLooter(), NeedItemID, Consume, link)
     Error 1: so_ply_Notice("CannotAddAnymore"); 2: "RecallDisableField" (no zone hosts the row); 3: "InstanceDungeonMaxPlayer"
     # the item and group conditions were checked at the gate (Z08 §5.2) and are not re-checked when the answer arrives
@@ -365,7 +399,7 @@ Layout `PROTO_NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG` (0xb): `Start` @0 (handle 0xFF
 
 ```pseudo
 origin: ZoneRingPacketEmtpyInstanceDungeon.zrpb_Request(p, buf) @ FUN_005a8a70     (smfm_DeleteInstanceDungeon, Z08 §5.3)
-    vt 4 of the ring object (zrpb_Success on the origin itself, inferred from the call) → local delete
+    vt 4 of the ring object = zrpb_Success FUN_005a8b70 (RTTI vftable) on the origin itself → local delete
     g_buf = 0x10B1 {Start {own zone, 0xFFFF, buf.regnum}, Category = buf.Category}; zcs_Send(0xd)
 on the way @ FUN_00485120: !zls_TravelComplete:
     zrpb_Success @ FUN_005a8b70: cm_DeleteInstanceDungeon(Category, Start.regnum, false)   (§1.7)
@@ -393,7 +427,7 @@ origin request: ZoneRingPacketFindJobDungeon.zrpb_Request(p, clientMap, script, 
     inst = cm_FindEmpty(clientMap)                                    # §1.4: no film running
     inst: so_ply_2JobDungeon (vt 0x3d0) @ FUN_0049f880(inst, script):
         map row of inst (mdb) missing → assert "Null info"/"Null option", 0
-        fm_ClearObject(inst, 0x3b6); so_ply_BriefLink (vt 0x890) to the map's RegenX/RegenY;
+        fm_ClearObject(inst, 0x3b6: players too, §1.10, Z14-B14); so_ply_BriefLink (vt 0x890) to the map's RegenX/RegenY;
         map flags ff_CanUseReviveItem = ff_CanUseReviveSkill = 0; cc_PlayFilm(script, CeaseFireSender, inst.fm_MapID); 1
     none: g_buf = 0x441F {Start {own zone, p.handle, p.charNo}, nError 0x30C1, ClientMapName, ServerMapName = 0,
           ScriptName, QuestScript = ack}; zcs_Send(0x75)
@@ -401,7 +435,7 @@ origin request: ZoneRingPacketFindJobDungeon.zrpb_Request(p, clientMap, script, 
 on the way @ FUN_005bfde0 (zls_NC_QUEST_JOBDUNGEON_FIND_RNG), !zls_TravelComplete:
     if nError == 0x30C1 and inst = cm_FindEmpty(ClientMapName):
         ZoneRingPacketFindJobDungeon.zrpb_Success(inst, ScriptName) @ FUN_005a8f40: CeaseFireSender;
-            fm_ClearObject(inst, 0x3b6); cc_PlayFilm(ScriptName, …, inst.fm_MapID)   # reserves it (film running)
+            fm_ClearObject(inst, 0x3b6: players too, Z14-B14); cc_PlayFilm(ScriptName, …, inst.fm_MapID)   # reserves it
         nError = 0x30C0; ServerMapName = inst.fm_MapID (12 B + NUL)
     forward (0x75)
 
@@ -433,7 +467,9 @@ gse_StoreItem(pkt 0x3473, p) @ FUN_00474a80 (Z05 §7.2): clear the bag, ib_Initi
     count mismatch → assert "ItemNumber not match"
 gse_GetMoney/SetMoney/GetToken/SetToken @ FUN_004749b0 / 004749c0 / 004749e0 / 004749f0; gse_GuildCheck @ FUN_00474900;
 gse_SetActivate / gse_Deactivate @ FUN_00474980 / FUN_00474970 (gse_Activate = 1 / 0);
-gse_FreeDeactivate(list, cell) @ FUN_00474950: inactive → free its list cell (sweep visitor; caller not traced)
+gse_FreeDeactivate(list, cell) @ FUN_00474950: inactive → free its list cell; run over the whole guild-storage list on
+    every main-loop pass by ZoneServer::zs_mainthreadfunction @ FUN_005aca30 (l_4AllInList(&gldstoramanager, …)), so a
+    deactivated guild storage cell is freed on the next pass
 
 so_ply_GuildStorageDeactivate() (vt 0x82c) @ FUN_00477420  (0x74A0 close, guild leave; Z08 §8)
     if guildNo ≠ 0 and a handle is open: s = gsm_FindStorage(guildNo, handle)
@@ -476,7 +512,7 @@ Record: `gldacademyrewardstoramanager` (`GuildAcademyRewardStorage::GuildAcademy
 ctor @ FUN_00472ef0): `List` over `garsm_StorageArray[500]` of `GuildAcademyRewardStorageElement` (0x20b8 B:
 `ItemGuildAcademyRewardStorage garse_Storage` @0, `u64 garse_Cen` @0x20a8, `u32 garse_Guild` @0x20b0, `u8 garse_Activate`
 @0x20b4). Player: `sp_GuildAcademyRewardStorageManager` {storagehandle, `GuildAcademyRewardStoreageGrade`}, handle via
-vt 0x83c / 0x840. The storage belongs to the guild: a guild member (vt 0x858 == 0) uses `guildNo` (vt 0x818), an
+vt 0x83c / 0x840. The storage belongs to the guild: a non-academy member (vt 0x858 `so_ply_isAcademyGuildMember` == 0) uses `guildNo` (vt 0x818), an
 academy member (== 1) `academyNo` (vt 0x85c). In ITEM_INVEN the storage is box 0 (`Inven & 0xfc00 == 0`); box 9
 (`0x2400`) is the player's bag (Z04 §1).
 
@@ -494,7 +530,10 @@ so_ply_GuildAcademyRewordSrorageItemInfoCmd(cmd, kind) (vt 0x87c) @ FUN_00470b50
 so_ply_GuildAcademyRewardStoreGradeFill(grade) (vt 0x870) @ FUN_0046dea0: GuildAcademyRewardStoreageGrade = grade
     (from 0x9871 / 0x9886, Z08 §10); read by the withdraw request (Z05)
 so_ply_GuildAcademyRewardStorageDeactivate() (vt 0x844) @ FUN_0046f7f0  (0x986F close, academy leave, error paths)
-    no = guildNo or academyNo by kind (any other kind: an uninitialised local, inferred harmless)
+    no = academy member ? academyNo (vt 0x85c) : guildNo (vt 0x818)
+    # the code tests vt 0x858 == 0, then vt 0x858 == 1 and leaves the number uninitialised otherwise; vt 0x858 is
+    #  so_ply_isAcademyGuildMember @ FUN_0055a540 = `m_nMyGuildAcademyNo != 0` (0 or 1), so that branch is dead
+    #  (same in the visitor FUN_004725c0, local_90); not a bug
     if no ≠ 0 and a handle is open: s = garsm_FindStorage(no, handle)
         s: count players with {same no, same handle} (ShineGuildAcademyRewardStorageDeactive::lid_Call @ FUN_0046df40);
            < 2 → garse_Deactivate(s) @ FUN_00470870 and l_Free(list, handle)    # unlike the guild storage, the cell is freed
@@ -533,8 +572,8 @@ answer, and §4.3 below.
 ### 4.2 0x9884 NC_GUILD_ACADEMY_REWARDSTORAGE_ITEM_INFO_ZONE_RNG (item moves)
 
 Layout (0xb0): `Start` @0, `u32 nGldregnum` @7, `u8 Who` @0xb, `Name5 Charid` @0xc, `u8 Type` @0x20,
-`SHINE_INVEN_SLOT_INFO From` @0x21, `SHINE_INVEN_SLOT_INFO To` @0x31 (each 0x10: item key 8 B, `ITEM_INVEN inven`,
-`u16 ItemID`, `u32 Lot`), `ItemTotalInformation ChangeIteminfo` @0x41. Sender: the cell releaser
+`SHINE_INVEN_SLOT_INFO From` @0x21, `SHINE_INVEN_SLOT_INFO To` @0x31 (each 0x10: `SHINE_ITEM_REGISTNUMBER ItmeReg` @0,
+`u16 ItemID` @8, `ITEM_INVEN inven` @0xa, `u32 Lot` @0xc; pdb2016), `ItemTotalInformation ChangeIteminfo` @0x41. Sender: the cell releaser
 `InvenCellReleaser_GuildAcademyRewardStorageInfoZoneRng::icr_Apply` FUN_00488250 (Z05 §3).
 
 ```pseudo
@@ -574,7 +613,9 @@ so_ply_GuildAcademyRewardStorageRewardZoneRng(ack) @ FUN_0046e750
     g_buf = 0x9885 {Start {own zone, p.handle, p.charNo}, nGuildNo, sCharID = p.name, Reward_Cen = nSubAcademyMoney,
         Storage_Cen = nStorageMoney, Reward_ItemNum = nModifyItemCnt, Reward_ItemInfo[] = ModifyItem[]}; zcs_Send(0x32 + 9n)
     apply locally (garsm_RewardInfoZoneRngAtOther) and notify locally (garsm_SendRewardInfoZoneRng2Member), as below
-    if nSubAcademyMoney ≠ 0: p money += nSubAcademyMoney (vt 0x434 get / 0x440 set / 0x448 send); no upper-bound check
+    if nSubAcademyMoney ≠ 0: p money += nSubAcademyMoney (vt 0x434 so_ply_CurrentMoney / 0x440 so_ply_StoreMoney
+        / 0x448 so_ply_ChangeCen); no upper-bound check: StoreMoney @ FUN_0055a060 stores the u64 as is and the zone has no
+        money cap on any path, so only a u64 wrap could go wrong (not a bug; the amount comes from the Character DB)
     # WantItem / nWantItemCnt / nWantMoney are not used here; the items reach the member through the storage withdraw
     #  rows (nStatus/nLot) — how the member's bag receives them is outside this function (inferred: DB side, D07)
 
@@ -586,7 +627,7 @@ apply: garsm_RewardInfoZoneRngAtOther @ FUN_00472070 → garse_RewardInfoZoneRng
     for each item: cell = storage[nLocation & 0x3ff]; cell missing or cell.itemID ≠ nItemID → stop
         nStatus 0: cell.lot == nLot → clear the cell, else stop
         nStatus 1: cell.lot > nLot → cell.lot −= nLot, else stop
-        # the decompile shows the loop index unchanged (register-held, inferred) — read as "for each item"
+        # loop: index +1 and entry pointer +9 per pass, up to Reward_ItemNum
 notify: garsm_SendRewardInfoZoneRng2Member @ FUN_00471ac0 → ShineGuildAcademyRewardStorageRewardInfoZonRng
     (ctor @ FUN_00471a00: CenCmd {who 3, type 2, charid = sCharID, item 0, slot 0, cen = Reward_Cen, storage_cen};
      ItemCmd {who 3, type 0, item = first entry's nItemID})
@@ -627,7 +668,7 @@ Raid::iterator (0xc): {Raid* m_pRaid, int m_nPartyIndex, int m_nSlot}; Begin {0,
 | FUN_0063d0f0 / FUN_0063d6d0 | RaidSystem::FindRaid / GetRaid (0xFFFF → NULL; slot must hold that number) | Raids_Get FUN_00462b10 |
 | FUN_0063d6f0 | RaidSystem::CreateRaid(raidNo, partyNos[4], &err): slot raidNo free → InitRaid | (zone only: the WM's number is reused) |
 | FUN_0063d760 | RaidSystem::CreateRaidAndParty(firstParty, &err): first free slot, 3 new raid parties | Raids_Create FUN_00462fb0 |
-| FUN_0063d240 | Raid::InitRaid (codes 0x1EC1, 0x1EC2, 0x1E86; leader = looter = first party's member 0) | Raid_Init FUN_00462c60 |
+| FUN_0063d240 | Raid::InitRaid (codes 0x1EC1, 0x1EC2, 0x1E86; leader = looter = first party's member 0; see below) | Raid_Init FUN_00462c60 |
 | FUN_0063e110 / FUN_0063d970 | RaidSystem::ResetRaid (not found → 8000) / Raid::Reset | Raid_Dismiss FUN_004631c0 |
 | FUN_0063d360 / FUN_0063db20 | Raid::AddMember (two overloads; zone uses the MEMBER_JOIN_CMD one) | Raid_AddMember FUN_00463370 |
 | FUN_0063de00 | Raid::DeleteMember | Raid_RemoveMember FUN_00463650 |
@@ -637,6 +678,20 @@ Raid::iterator (0xc): {Raid* m_pRaid, int m_nPartyIndex, int m_nSlot}; Begin {0,
 | FUN_0063d4d0 | iterator::GetCharRegistNo: false only for a bad index or party slot 0xFFFF; positions past the party's member count give true with charNo −1 | |
 | FUN_0063d5d0 / FUN_0063d0d0 / FUN_0063d590 | iterator::GetSlotInfo (member slot or NULL) / GetPartyRegNo / GetPartySlot | |
 | FUN_0063d050 / 0063d060 / 0063d070 / 0063d470 / 0063d4a0 / 0063d8b0 / 0063cfe0 / 0063d410 / 0063d620 | GetNumOfMember / GetLooter / GetLooting / SetItemDiceGameMode / IsItemDiceGameIng / RaidSystem::GetInRaidNumber / _PartyLeaveCheckResult / GetMemberRegNoByIndex / iterator::UpdateMemberName | read by name only (not opened) |
+
+```pseudo
+Raid::InitRaid(raidNo, partyNos[4], &err) @ FUN_0063d240
+    sm_pPartyData NULL → 0x1EC1; m_Raidnum ≠ 0xFFFF (slot taken) → 0x1EC2
+    first = CParty[partyNos[0]]; m_Raidnum = raidNo; m_NumOfMember = first.NumOfMember; m_Leader = first.Members[0].chrregnum
+        # `first` is dereferenced without the NULL check the loop below makes            (original bug) Z14-B15
+    looting reset, looter = leader; first.isRaidTypeParty = true
+    for i in 0..3: party = CParty[partyNos[i]]
+        NULL → 0x1E86; reset the record (numbers, leader, sub-leaders −1, looting) — parties 0..i−1 keep
+               isRaidTypeParty = true                                                 (original bug) Z14-B15
+        party.isRaidTypeParty = true; m_PartyNos[i] = partyNos[i]
+    true
+# zone caller: RaidSystem::CreateRaid ← rt_CreateRaid ← 0xB004 NC_RAID_ZONE_MAKE_CMD (Z08 §2) with the WM's party numbers
+```
 
 ### 5.2 RaidTask
 
@@ -654,8 +709,11 @@ _GetRaidPlayer(&near, raidNo, center, range) @ FUN_005ce000: NearRaidPlayers {un
     @ FUN_005ce6d0, rt_GetRaidPlayer = all @ FUN_005ce6f0
 rt_QuestCheck(fn, p, mob, idx) @ FUN_005ce710 (profiler name "PartyManufacture::pm_QuestCheck"): for each raid member within
     1000 of the mob: so_ply_QuestCheck (vt 0x7f4)(fn, p, mob, idx)        # raid share of quest kill credit (Z09/Z15)
-rt_Broadcast(p, pkt, len) @ FUN_005cd720: to every online raid member on p's map (same so_Field), including p,
-    through the game socket (vt 0x2fc); pp_SetPacketLen(len) failure → "RaidTask::rt_Broadcast : Packet Too Long"
+rt_Broadcast(p, pkt, len) @ FUN_005cd720: p NULL or not in a raid (vt 0xa84) → false; walk the raid positions
+    (Raid::iterator): GetCharRegistNo false → return false at once (stop, not skip; unreachable in practice: a raid
+    always holds 4 valid parties, Raid::InitRaid); else the member, if online and on p's map (same so_Field), gets the
+    packet through the game socket (vt 0x2fc), p included; pp_SetPacketLen(len) failure → "RaidTask::rt_Broadcast : Packet
+    Too Long"; true. (Profiler string copied from pm_QuestCheck.)
 ```
 
 ### 5.3 Raid status packets (zone → client)
@@ -671,7 +729,7 @@ rt_SendPlayerData(p) @ FUN_005cd8f0 → rt_Broadcast 0xB022 NC_RAID_MEMBERINFORM
     {u16 nPartyNo, u8 nPartyIndex, u8 nSlotIndex, u32 hp, u32 sp, u32 lp}           (caller: player tick, Z08 §1.2 counterpart)
 rt_SendPlayerDataDetail(p) @ FUN_005cd9c0 → rt_Broadcast 0xB023 NC_RAID_MEMBERCLASS_CMD {u8 nNum = 1, RAID_MEMBERCLASS} (0x3d)
 rt_SendPlayerDataDetail(raidNo, charNo) @ FUN_005ce190 → the same 0xB023 for that member to EVERY online raid member
-    on this zone (any map)                                                           (Z08 §2 0xB013 when the joiner is remote)
+    on this zone (any map; the walk stops at the first false GetCharRegistNo, as in rt_Broadcast)                                                           (Z08 §2 0xB013 when the joiner is remote)
 rt_SendMeRaidPlayersData(p) @ FUN_005cda50 → p only: 0xB023 {u8 nNum, RAID_MEMBERCLASS[nNum]} for every filled position
     length = nNum·0x3a + 1 instead of nNum·0x3a + 3: the last entry loses its last 2 bytes (loc.y high half); with
     nNum = 0 the length (1) is shorter than the opcode                              (original bug) Z14-B12
@@ -682,10 +740,30 @@ rt_SendPlayerLocationExChange(p) @ FUN_005cdc00: rt_SendPlayerLocation(p), then 
     rt_SendMeRaidPlayersData): far more bytes than written, the rest is stale g_buf content    (original bug) Z14-B13
 ```
 
-0xB020 NC_RAID_LOGOUTINFO_CMD has no zone sender; 0xB021 NC_RAID_MAPOUT_CMD {Name5 sCharID} is sent by
-`sp_partylogout` @ FUN_0056dd80 (Z08 §1 / Z01 logout path). Client handlers (C01): 0xB022 FUN_0049c0c0 reads
-{nPartyNo, idx, slot, hp, sp, lp}; 0xB023 FUN_004a4890 reads nNum then the entries; 0xB026 FUN_0049c160 reads nNum and the
-array; 0xB021 FUN_0049bfd0 reads the 20-byte name; 0xB020 FUN_0049bea0 (WM sender, W02).
+0xB020 NC_RAID_LOGOUTINFO_CMD has no zone sender (WM sender, W02).
+
+```pseudo
+sp_partylogout() @ FUN_0056dd80        (only caller: so_CloseByLink vt 0x310 @ FUN_005934b0, the player leaves the map
+                                        by a link; Z06 §"Who breaks a trade from outside")
+    in a raid (vt 0xa84 so_GetRaid ≠ NULL):
+        g_buf = 0xB021 NC_RAID_MAPOUT_CMD {Name5 sCharID = own name (vt 0x56c)} (0x16 total); rt_Broadcast(p, g_buf, 0x16)
+            # raid members on the same map, p included
+    else: g_buf = 0x384A NC_PARTY_MEMBERMAPOUT {Name5 memberid = own name} (0x16 total; client FUN_0049a750), for each slot of the last party (sp_LastPartyParam.pmi_PartySlot,
+        0x24-byte members) whose chrregnum is not p's and whose memberobj is set:
+            memberobj not closing (vt 0x300 == 0) and memberobj.charNo (vt 0x344) == the slot's chrregnum → send to it
+                (game socket vt 0x2fc; pp_SetPacketLen failure → "…sp_partylogout : Packet Too Long")
+            else: memberobj = NULL (stale pointer cleared)
+```
+
+Client handlers (C01):
+
+| Opcode | Client | What it does |
+|---|---|---|
+| 0xB021 | FUN_0049bfd0 | finds the member by the 20-byte name in the raid table: clears its located flag (+0x40) and removes it from the minimap; same flag cleared in the party table |
+| 0xB022 | FUN_0049c0c0 | reads {nPartyNo, idx, slot, hp, sp, lp}, updates the member's bars |
+| 0xB023 | `On_NC_RAID_MEMBERCLASS_CMD` FUN_004a4890 | reads nNum then the entries: `RaidInfo::MemberInfoDetailInfo` per entry, rebuilds the minimap raid list, adds / updates own-party members (`Party::AddMember`); with Z14-B12 the last entry's loc.y high half comes from the 2 bytes after the packet (stale receive-buffer bytes) |
+| 0xB026 | `On_NC_RAID_LOCATION_CMD` FUN_0049c160 | per entry (12 B): member = raid table[`nPartyIndex·5 + nSlotIndex`] (nPartyNo ignored); x/y → float, sets the online/located flags (+0x14, +0x40), adds the member to the minimap; nPartyIndex == own party index → also updates the party-window entry. Reads only nNum entries, so Z14-B13's extra bytes are ignored |
+| 0xB020 | FUN_0049bea0 | (WM sender, W02) |
 
 ## 6. Z08-B5 and Z08-B9 re-checked
 
@@ -705,32 +783,29 @@ array; 0xB021 FUN_0049bfd0 reads the 20-byte name; 0xB020 FUN_0049bea0 (WM sende
 | Z14-B1 | fc_GetFirstInstanceDungeonInfo FUN_00484380 / FUN_004843e0 | returns the last row instead of NULL when nothing matches | a lookup by an unknown key/map yields an unrelated row (LimitTime, MaxUseCount) | return NULL |
 | Z14-B2 | AddInstanceDungeonCluster FUN_00484850, cm_AddTutorialMapCluster FUN_004a0860 | check "all 10 Clusters[] used" but never store into Clusters[] | dead limit; the real limit is the 14-cell list, overflow = ShineExit | store the cluster pointer or drop the array |
 | Z14-B3 | AddInstanceDungeonCluster | no duplicate-name check; rows of two levels with the same MapIDClient make two clusters | second cluster unused but registers all instances and takes a list cell (zone 3 has 9 of 10 free cells in use) | one cluster per map name |
-| Z14-B4 | mc_FindEmptyByRegnum FUN_00484960 | LimitTime 1–5: warning flag set, warning metronomes not set *(inferred)* | warnings at stale/zero times, possibly every routine pass (latent: all LimitTime are 0) | only set the flag when LimitTime > 5 |
+| Z14-B4 | mc_FindEmptyByRegnum FUN_00484960 | LimitTime 1–5: warning flag set, warning metronomes not set (ctor values {0, 0}, FUN_005ad7f0) | an entry never used with LimitTime > 5 fires both warnings on every 15-s pass; otherwise at stale times (latent: all LimitTime are 0) | only set the flag when LimitTime > 5 |
 | Z14-B5 | mc_FindNotFullMap FUN_0049f010 | loop never advances to the next map when the current one is full (disassembly) | tutorial login fails ("Tutorial Map Full") while other RouT copies are free | advance mc_Pointer in the loop |
 | Z14-B6 | mc_DeleteInstanceDungeon FUN_00486710 | `playerCheck` argument never read | callers cannot protect occupied instances (all pass false today) | honour it or remove it |
 | Z14-B7 | mc_AllDropFilm FUN_00485290 (&reloadid) | resets a by-value copy of the InstanceMap | owner/level/timers stay; group re-enters a cleared map without a script | modify the entry in place |
-| Z14-B8 | 0xA404 at the origin FUN_00487510 | links without `sp_LinkReplyCheck` (the same-zone path checks it) *(inferred)* | link checks skipped for cross-zone instance entry | call sp_LinkReplyCheck as in zrpb_Request |
+| Z14-B8 | 0xA404 at the origin FUN_00487510 | links without `sp_LinkReplyCheck` (the same-zone path FUN_005a92e0 checks it) | link checks skipped for cross-zone instance entry | call sp_LinkReplyCheck as in zrpb_Request |
 | Z14-B9 | 0x441F at the origin FUN_005bfde0 | `som_FindPlayer` result used without NULL check | zone crash if the player left while the request was on the ring | check for NULL |
 | Z14-B10 | 0x7493 FUN_00474f10 | the ring packet is not forwarded | only the next zone notifies its guild members of a storage withdraw | forward like 0x9872 |
 | Z14-B11 | ShineGuildStorageWithdraw::lid_Call FUN_004752d0 and the four academy visitors (FUN_00472140, FUN_00472380, FUN_004725c0, FUN_00472b20) | return 0 (stop the player iteration) when the viewer's storage is missing or the cell is empty | the remaining members on that zone get no notice / cell refresh | return 1 (continue) |
 | Z14-B12 | rt_SendMeRaidPlayersData FUN_005cda50 | length nNum·0x3a + 1 (2 short) | last member's loc.y truncated; nNum 0 → invalid length | nNum·0x3a + 3 |
 | Z14-B13 | rt_SendPlayerLocationExChange FUN_005cdc00 | 0xB026 list sent with the MEMBERCLASS length formula | 46 extra stale bytes per entry on the wire; client reads only nNum entries | nNum·12 + 3 |
+| Z14-B14 | mc_FindEmptyByRegnum FUN_00484960, so_ply_2JobDungeon FUN_0049f880, ZoneRingPacketFindJobDungeon::zrpb_Success FUN_005a8f40 | `fm_ClearObject(0x3b6)` includes players (type 2): anyone in the map being taken is flagged Retrate | a GM in a free instance, or a player still in a job map whose film ended, is disconnected (0x680) when the next group takes the map | clear only non-player kinds (0x3b2 as in the delete path) *(inferred)* |
+| Z14-B15 | Raid::InitRaid FUN_0063d240 (0xB004 → CreateRaid) | party 0 dereferenced without NULL check; on a missing party i the earlier parties keep `isRaidTypeParty = true` | zone crash if the WM names an unknown first party; parties left marked as raid parties after a failed create | check party 0 like the others; undo the flags on failure |
 
 Z08-B5 and Z08-B9: effects refined in §6 (owned by Z08).
 
 ## 8. Not reconstructed / uncertain
 
-- `Metronome::Metronome` initial values were not read; Z14-B4's "fires every pass" assumes zero-initialised metronomes.
-- `garse_RewardInfoZoneRngAtOther` shows the same never-incremented loop index; read as "for each item" (inferred).
 - `ItemBag` vtable slot 0 (`gse_Storage.vt0(slot)`) is read as "cell at slot" from its use; not opened.
 - The type 0 / type 1 branches of 0x9872 / 0x9874 are reached only by the dead `RewardAck` (vt 0x850) and by senders
   in Z05; whether a type 0 deposit is ever sent was not traced.
-- `sp_EscapeFromEmptyID`: the meaning of the map test at +0x44 → +0x14 (a per-map table entry must be non-zero) is not
-  identified.
-- `gse_FreeDeactivate` (frees inactive guild-storage cells) has no caller found; the guild storage cell may never be
-  freed after `gse_Deactivate` (only the academy close frees its cell).
-- `fm_Exist(Field, 4)`, `fm_KickAll`, `fm_ClearObject(0x3b0/0x3b2/0x3b6/0xb0)` flag meanings and `CinemaComplex` film
-  internals belong to FieldMap / Movie (Z09); the flag values are copied, not decoded.
+- `fm_KickAll` and `CinemaComplex` film internals belong to FieldMap / Movie (Z09 §28.8); the object-kind masks are
+  decoded in §1.10.
+- Z14-B14's intent (keep players out of the clear) is inferred; the code clears them on purpose or not.
 - `so_LinkTo(link, 6, 9, 10)` extra arguments in the job-dungeon origin path are not decoded.
 - No capture contains any of these messages.
 
@@ -743,11 +818,11 @@ Z08-B5 and Z08-B9: effects refined in §6 (owned by Z08).
 | `CQuestZone::QuestPlayer_ScenarioRun` FUN_005bd2f0, `Recv_NC_QUEST_SCRIPT_CMD_ACK` | Z15 (open; plan: "quest script engine", `QuestPlayer_ScenarioRun`) | the job-dungeon request is one scenario step of the quest script |
 | `so_ply_GuildStorageWithdrawAck` FUN_00537640, cell releasers FUN_0048aca0 / FUN_0048ab80 / FUN_00488250, academy withdraw/deposit ACKs FUN_0046f970 / FUN_0046fc80, `so_ply_GuildAcademyRewardStoreFill` FUN_0046ff90 | Z05 (done) §3, §7.2, §7.3 | the senders of the ring packets (DB answers) |
 | Character-DB reward merge for 0x986B / 0x986C | D07 (open; plan: academy reward storage merge 0x986B) | DB side of the academy reward |
-| `fm_ClearObject`, `fm_KickAll`, `fm_Exist`, `CinemaComplex::cc_PlayFilm` / `cc_DropFilm`, door blocks | Z09 (done) world simulation (FieldMap, scripts) | map object and film engine; used here as black boxes |
+| `fm_ClearObject`, `fm_KickAll`, `fm_Exist`, `CinemaComplex::cc_PlayFilm` / `cc_DropFilm`, door blocks | Z09 (done) `Z09-world.md` §28.8 (helper table: `fm_Exist` FUN_00485040, `fm_KickAll` FUN_00484f70), §25.6 / §24.8 (`fm_ClearObject` FUN_00495a10 kinds) | map object and film engine; the masks used here are decoded in §1.10 |
 | GM `&makeraid`, `&PlayIns`, `&idtimechange`, `&reloadid`, `&ReloadKingdomQuest` | Z11 (done) §3.3, §7.1, §7.2 | GM commands calling the cluster functions documented here |
 | map-login limit-time display (`mc_GetLimitTime` in 0x1803 FUN_00443390) | Z01 (done) `Z01-core.md` line ~506 | map login |
 | `sp_EscapeFromEmptyID` FUN_00440910 caller 0x1803 map-login complete FUN_00443390 | Z01 (done) map login | the call site is the map login; the function itself is documented here in §1.8 |
 | Raid creation/dismiss/member handlers 0xB004…0xB03E | Z08 (done) §2 | the handlers; this item documents the record and RaidTask they call |
 | `Raid::*` getters listed as "read by name only" in §5.1 | W02 (done) §2 (WM copy of the same library) | identical shared library; W02 documents the logic |
-| `fc_MakeField`, `MapSubString`, FieldList loader | Z01 (done) map loading / Z09 | map creation; §1.1 records only what the clusters need |
+| `fc_MakeField`, `MapSubString`, FieldList loader | Z09 (done) `Z09-world.md` §10.3 (per-instance field set-up from `fc_MakeField`), §28.1 (map initialisation, `MapSubString` FUN_00461be0) | map creation; §1.1 records only what the clusters need |
 | Lua side of instances: `cIndunRankResult` FUN_005ee4d0 (0xA413/0xA415 rank), `InstanceDungeonClear`, `cScoreBoard*`, `LuaArgumentInstanceDungeon` FUN_005d6e20 / FUN_005d6e40 | Z09 (done) §27.3, §28.12; WM side W04 §13.3 | script API used by the instance scripts started here |

@@ -6298,11 +6298,11 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendMyInform2PartyMember` (`FUN_005
 
 ### `0x384a` NC_PARTY_MEMBERMAPOUT
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_PARTY_MEMBERMAPOUT`, 20 bytes
+**Verified layout** (basis: zone FUN_0056dd80 sp_partylogout (0x14; to each live party member object, not in a raid); client FUN_0049a750)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | memberid | Name5 |
+| 0 | Name5 | memberid | name of the member leaving the map |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · payload 20 bytes
 
@@ -9268,11 +9268,11 @@ Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · pay
 
 ### `0xb021` NC_RAID_MAPOUT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_RAID_MAPOUT_CMD`, 20 bytes
+**Verified layout** (basis: zone FUN_0056dd80 sp_partylogout (0x14; rt_Broadcast to raid members on the map); client FUN_0049bfd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sCharID | Name5 |
+| 0 | Name5 | sCharID | name of the member leaving the map |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · payload 20 bytes
 
@@ -12957,7 +12957,7 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 11 | u8 | Who |  |
 | 12 | Name5 | Charid |  |
 | 32 | u8 | Type | 0/1 move, 2 split, 3 merge, 4 swap |
-| 33 | SHINE_INVEN_SLOT_INFO | From | 0x10: key 8, ITEM_INVEN, u16 ItemID, u32 Lot |
+| 33 | SHINE_INVEN_SLOT_INFO | From | 0x10: ItmeReg (item key) 8 B @0, u16 ItemID @8, ITEM_INVEN inven @0xa, u32 Lot @0xc (pdb2016) |
 | 49 | SHINE_INVEN_SLOT_INFO | To |  |
 | 65 | ItemTotalInformation | ChangeIteminfo | item now at the destination |
 
