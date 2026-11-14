@@ -12,7 +12,8 @@ What this file covers, and where the neighbours are:
   This file is about the per-player state the cast path reads and writes: the learned skills, cooldowns, delay groups,
   toggle skills, empower points and mastery.
 - Z20 is the skill tables (`SkillDataBox`, `SkillDataIndex`, `ActiveSkill.shn`, `ToggleSkill.shn`, `ActiveSkillGroup.shn`).
-- W03 / W04 / Z12 cover `csl_Store` (DB → zone load) and `csl_FillSaveBuffer`; this file only adds the parts they skip.
+- Z12 §6.5 covers `csl_Store` (DB → zone load) and the 0x103D client list; §7 here covers the DB and WM saves
+  (`csl_FillSaveBuffer`, `csl_FillSendBuffer_Server`). Empower allocation and learn / unlearn requests are Z03 §9.
 
 Time base: `g_Now` = `clockwatch.cw_CurrTick`, in **tenths of a second** (Z09 knowledge). Table times
 (`ActiveSkill.DlyTime`, `DlyTimeGroup`) are milliseconds, so a cooldown of `t` ms ends at `g_Now + t·10/1000`.
@@ -73,6 +74,13 @@ vector is part of the mover creation (§9, part 3).
 | 0xea8 | `smo_ply_SkillCoolTimeUpdate` FUN_005596f0 → `csl_UpdateCoolTime` | mover: FUN_0055e9e0 → `msl_UpdateCoolTime`; mob: no-op |
 | 0xeac | `smo_ply_SkillCoolTime` FUN_0055b6a0 (§3.2) | mover: FUN_0054a770 → `msl_SetCoolTime`; mob: no-op |
 | 0xf60 | `smo_ChineCastCut` FUN_005794d0 (§3.3) | no-op |
+| 0x37c | `so_ply_InitSkillEmpow` FUN_00518c00 (§4, 0x900D) | – |
+| 0x3a8 | `so_SaveSkill` FUN_00456520 (§7.2) | – |
+| 0x624 | `so_LearnSkill` FUN_0055bbf0 (§6.3) | – |
+| 0x6bc | `so_ply_skillempowerclear` FUN_0055a010 (§4) | – |
+| 0x97c | `so_UnlearnSkillAck` FUN_0057f200 (§6.4) | – |
+| 0xaec | `so_Send_NC_CHARSAVE_2WLDMAN_SKILL_CMD` FUN_00455780 (§7.3) | – |
+| 0xecc | `smo_ply_ItemProduce` FUN_0046c2d0 (§5) | – |
 
 ## 2. Toggle skills
 
@@ -441,6 +449,281 @@ tell the two apart:
 | `UseItemRide::uib_CanUseItem` FUN_005988b0 (Z04 / Z13) | 0x10C2 (only when the ride skill is learned: `csl_GetSkillStruct` first) |
 | `sp_UseItemMonimon_UseItem` FUN_00561b80 (minimon auto-use, Z09 §2.3 / Z13) | the item is skipped |
 
+## 4. Empower points
+
+`SKILL_EMPOWER` (u16, `cs_Empower` at `CharSkill`+8) holds four 4-bit counters: `damage` (bits 0–3), `sp` (4–7),
+`keeptime` (8–11), `cooltime` (12–15). Each learned step has its own counters (§1.1); every reader adds up the steps
+of one skill line. The cast path uses them through `csl_SPCheck` and `smo_SkillBash_Casting` (Z03 §5.3 / §5.6:
+index = points − 1 into the `nT0…nT3` columns). Allocation is
+`sp_NC_SKILL_EMPOWALLOC_REQ` 0x4811 + `csl_EmpowerAlloc` (Z03 §9.1); this section adds the list functions and two
+corrections to that section.
+
+```pseudo
+CharaterSkillList::csl_MaximumSkill(this, u16 skill) → u16                                    @ FUN_00448240
+    e = skilldatabox[skill]                          # SkillDataBox::operator[] FUN_00448140: bsearch, null if unknown
+    while e.sdi_NextSkill: e = e.sdi_NextSkill        # no null check of the first e (original bug) Z23-B9
+    return e.sdi_Activ.ID                             # the TOP step of the line in ActiveSkill.shn, learned or not
+
+CharaterSkillList::csl_EmpowerStruct(this, u16 top, SKILL_EMPOWER* out)                       @ FUN_004482c0
+    *out = {0,0,0,0}
+    for e = skilldatabox[top]; e; e = e.sdi_PrevSkill:          # every step of the line, top down
+        s = lower_bound(csl_Skill, e.sdi_Activ.ID); if s is an exact hit:
+            out.damage += s.damage; out.sp += s.sp; out.keeptime += s.keeptime; out.cooltime += s.cooltime
+            # each sum is kept in its 4-bit field: it wraps at 16
+    for each field f: if out.f > 5: assert "csl_EmpowerStruct : Too many empow.damage" (the same text for all four), out.f = 5
+    # callers: csl_SPCheck FUN_0055b920 (cast, Z03 §5.3) and csl_EmpowerAlloc FUN_00448570, both with
+    # csl_MaximumSkill(skill): the result is the sum over all learned steps of the line, capped at 5 per field
+
+CharaterSkillList::csl_EmpowerSummary(this) → int                                             @ FUN_00445070
+    return Σ over csl_Skill[0 … csl_SkillNumber−1] of damage + sp + keeptime + cooltime     # points spent, no cap
+    # callers: so_charskilldata FUN_0044bf20 (0x103D restempow, Z12), sp_NC_SKILL_EMPOWALLOC_REQ FUN_0044f150 (Z03 §9.1),
+    # sp_GainExp FUN_0042d830 / so_AmpersandCommand_LevelUp FUN_0042fa00 (free points after a level-up, Z12 / Z03 §8),
+    # so_ply_InitSkillEmpow FUN_00518c00 (below). Free points = so_ply_TotalSkillEmpower (vt 0x6b8, FUN_00559fd0, Z12) − this.
+
+CharaterSkillList::csl_EmpowerClear(this)                                                    @ FUN_00445190
+    for every entry of csl_Skill: cs_Empower = {0,0,0,0}         # memory only; the DB was reset before (callers below)
+```
+
+`csl_EmpowerAlloc` FUN_00448570, as read (Z03 §9.1 shortens it):
+
+```pseudo
+    cur = csl_EmpowerStruct(csl_MaximumSkill(req.skill))          # sum of the line (above), not one step's bits
+    fail ("Too many point1…4") unless cur.f + plus.f ≤ 5 for every field f
+    fail ("Too many point5…8") if minus.f > cur.f for some f
+    s = csl_GetSkillStruct(req.skill); null → "Not learn", fail
+    s.f = s.f + plus.f − minus.f  (4-bit, per field)             # the request's own step, not the line sum
+    *out = s.cs_Empower; return true                              # the 0x4812 DB request carries *out (D04: the DB refuses any field > 5)
+```
+
+- The limit is per **line** (5 per field over all learned steps), but the points are stored on the step named in the
+  request. Points given while a lower step was the highest one stay on that lower step's entry; `csl_Learn` starts the
+  new step at 0 (Z20 §5.2). `minus` is checked against the line sum and subtracted from the request's step, so taking
+  back such a point through the new step wraps that field to 15; the DB then refuses the row (`p_Skill_SetPowerAll`,
+  value > 5 → 0x885) and the zone disconnects the player (0x68A, Z03 §9.1) (original bug) Z23-B8. Which step ID the
+  2016 client puts in `req.skill` is not read here *(inferred: the highest learned step shown in the skill window)*.
+- An unknown `req.skill` reaches `csl_MaximumSkill` without any check in `sp_NC_SKILL_EMPOWALLOC_REQ` (only the mode,
+  the plus/minus overlap, the item count and the point total are checked first): `skilldatabox[skill]` is null and the
+  first `sdi_NextSkill` read faults; one 0x4811 with all-zero plus/minus from any player in a normal mode is enough
+  (original bug) Z23-B9.
+
+Resets (both clear every entry's counters in memory after the DB has reset them):
+
+| Path | Function | Then |
+|---|---|---|
+| empower-reset item: GameDB 0x480D NC_SKILL_EMPOW_RESET_DB_SUC_ACK (Z03 §9.2) | `ShinePlayer::so_ply_skillempowerclear` FUN_0055a010 (vt 0x6bc) = `csl_EmpowerClear` | 0x480F { u8 totalempow } |
+| charged item: GameDB 0x9008 NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_SUC_ACK FUN_00518780 (Z08) | `ShinePlayer::so_ply_InitSkillEmpow` FUN_00518c00 (vt 0x37c): `csl_EmpowerClear`, then send 0x900D NC_CHARGED_SKILLEMPOW_INITIALIZE_SUC_CMD { u8 = vt 0x6b8() − csl_EmpowerSummary() } (3 bytes) | client `GameFrameWork::On_NC_CHARGED_SKILLEMPOW_INITIALIZE_SUC_CMD` FUN_0049b330: `Skill::ClearLearnActSkillInfo`, `Skill::SetRestEmpowerPoint(u8)`, `SkillIcon::RefreshSkillInfoAll` |
+
+## 5. Mastery (production skills)
+
+`cs_Mastery` (u32, `CharSkill`+0xc) is the experience of a **produce recipe skill** (one `ActiveSkill` row per
+recipe, `RecipeBook` row `ProduceInfo.ProductID` = the skill). It is loaded and saved with the list (§7, Z12) and only
+grows.
+
+```pseudo
+CharaterSkillList::csl_AddMastery(this, ShinePlayer* p, u16 skill, int gain)                 @ FUN_00446730
+    s = lower_bound(csl_Skill, skill); not an exact hit: assert "csl_AddMastery : Not learn"; return
+    s.cs_Mastery += gain                             # no cap, u32
+    s.cs_bSave = 1                                   # include it in the next incremental DB save (§7.2)
+    send p: 0x481D NC_SKILL_SKILLEXP_CLIENT_CMD { u16 skill, u32 mastery = s.cs_Mastery }   # 8 bytes with opcode
+
+# only caller: ShinePlayer::smo_ply_ItemProduce FUN_0046c2d0 (vt 0xecc, Z07: produce cast finished), after
+# ip_ProduceCheck == 0xB01 and the GameDB 0x3457 produce request was sent:
+    csl_AddMastery(p.sp_SkillList, p, recipeSkill,
+                   (u16 sp_ChargedItem.ci_Effect.cec_ProductMasteryRate · recipe.index.MasteryGain) / 1000)
+                   # ‰ rate of the charged-item effects (Z12); the gain is applied before the DB answers the produce
+```
+
+Client: `0x481D` is handled only by `ProductTask::OnProcessNetMsg` FUN_00487400 (dept 0x12 cmd 0x1D):
+`Skill::GetLearnProductSkill` FUN_0069edd0 looks the skill up in the client's learned production list (`DAT_00b44fc0`,
+8-byte rows, count `DAT_00b50b5c`) and stores `mastery` at +4; unknown skill → ignored. No text.
+
+Readers of the mastery: `csl_PreProduceCheck` (§6.2, recipe scroll), the produce checks of Z07/Z02, the 0x103D list
+(Z12) and the saves (§7).
+
+## 6. Learn, unlearn, load
+
+### 6.1 Membership tests
+
+```pseudo
+CharaterSkillList::csl_IsLearn(this, u16 skill) → bool                                       @ FUN_00446630
+    return lower_bound(csl_Skill, skill) is an exact hit          # same search as csl_GetSkillStruct FUN_004465b0 (§1.1)
+
+CharaterSkillList::csl_PreSkillCheck(this, ShinePlayer* p, char* demandSk) → bool            @ FUN_00447110
+    if demandSk[0] == '-': return true                            # no prerequisite
+    v = skillnametree[demandSk]                                   # Z20 §5.2; unknown name → 0xFFFFFFFF, skill 0xFFFF
+    return csl_IsLearn(v.skill)                                   # ispassive ignored
+```
+
+`csl_IsLearn` callers: `csl_Learn` FUN_0055b810 (Z20 §5.2), `csl_PreSkillCheck`, `csl_PreProduceCheck` (§6.2),
+`uib_CanUseItem` FUN_0059d1b0 (§6.2), `sp_NC_SKILL_PRODUCTFIELD_REQ` FUN_0046c820 / `sp_NC_SKILL_UNLEARN_REQ`
+FUN_0057ad80 (Z03 §9.4 / §9.5), `sp_NC_ITEM_CLASS_CHANGE_REQ` FUN_0051f5c0 / `sp_OpenClassChangeMenu` FUN_0051fd10
+(Z04 / Z15 / Z20), `sp_NC_MINIHOUSE_BUILDING_REQ` FUN_005769d0 (Z07), `AmpersandCommand::ac_AllLearnSKill` FUN_004212e0
+(Z11 / Z20).
+
+### 6.2 Skill scroll: `UseItemSkillScroll::uib_CanUseItem`
+
+The skill-book item's "can use" check (Z04 §6 use-effect classes; the effect itself, `uib_Effect` FUN_00599d30, sends
+the GameDB 0x4801 NC_SKILL_SKILLTEACH_REQ, Z20 §5.2 / Z03 §9.3). The return value is the item-use result code.
+
+```pseudo
+UseEffect::UseItemSkillScroll::uib_CanUseItem(this, ShinePlayer* p, ItemTotalInformation* item) → u16   @ FUN_0059d1b0
+    row = itemdatabox[item.itemid]; null (or ID mismatch "ItemDataBox::operator [] :Invalid Item index"):
+        assert "sp_uie_skillscroll : Invalid item";                          return 0x702
+    v = skillnametree[row.InxName]                       # the scroll's item InxName = the skill's InxName
+    v == 0xFFFFFFFF: assert "sp_uie_skillscroll : Cannot found matched skill"; return 0x702
+    if not v.ispassive:
+        if csl_IsLearn(v.skill):                                             return 0x70B   # "You already have the skill."
+        e = skilldatabox[v.skill]; null: assert "sp_uie_SkillScroll_CanUse : Invalid Activ"; return 0x702
+        recipe = recipebook[v.skill]                     # GatherProduce::RecipeBook::operator[]
+        if recipe: return csl_PreProduceCheck(p.sp_SkillList, p, v.skill, recipe)
+        return csl_PreSkillCheck(e.sdi_Activ.DemandSk) ? 0x700 : 0x70C      # 0x70C "You must get the previous level skill(s) first."
+    else:                                                # passive scroll
+        if bit v.skill of p.sp_Passive.cpl_Passive.bs_bitlist:              return 0x70B
+        info = passivedatabox.pdb_index[v.skill] (id ≥ pdb_maxpassiveID → pdb_default); null:
+            assert "sp_uie_SkillScroll_CanUse : Invalid Passive";            return 0x702
+        return CharacterPassiveList::cpl_PreSkillCheck(info.DemandSk) (FUN_00445810, Z20) ? 0x700 : 0x70C
+
+CharaterSkillList::csl_PreProduceCheck(this, ShinePlayer* p, u16 skill, ProductIndex* recipe) → u16   @ FUN_0046ab70
+    if recipe == null:                                                       return 0x702
+    main = by recipe.index.MasteryType:  MT_STONE → sdb_SpecSkill.ss_StoneProductMain, MT_PORTION → ss_PortionProductMain,
+           MT_SCROLL → ss_ScrollProductMain, MT_COMPOUND → ss_CompoundProductMain, MT_RESOLVE → ss_ResolveProductMain
+           MT_SUMMON, MT_COOK, other: assert "csl_PreProduceCheck : Wrong mastery type"; return 0x702
+    if not csl_IsLearn(p.sp_SkillList, main):                                return 0x717   # "Selected Production Skill cannot be learned."
+    total = 0
+    for i in 0 … recipebook.rb_Number−1:                 # every recipe of the game (rows of 0x4C)
+        r = recipebook.rb_Array[i]
+        s = csl_GetSkillStruct(r.index.ProductID)
+        if s and r.index.MasteryType == recipe.index.NeededMasteryType: total += s.cs_Mastery
+    return total < recipe.index.NeededMasteryGain ? 0x711 : 0x700            # 0x711 "You need more skill experience to learn the selected skill."
+```
+
+`0x700` is success (no text); the other texts are from `client-error-codes.json`. `skill` is not used by
+`csl_PreProduceCheck`. The production base skills `sdb_SpecSkill.ss_*ProductMain` are Z20's (§1.3).
+
+### 6.3 Learning and the default skills
+
+- Learning a step: GameDB 0x4802 → `ShinePlayer::so_LearnSkill` FUN_0055bbf0 (vt 0x624) → `csl_Learn` (Z20 §5.2 has
+  the pseudocode); `so_LearnSkill` then sets bit 0 of `sp_CharData.toclient.basedata.flags` *(inferred: "character
+  data changed", read by the save)*.
+- `csl_CheckDefSkill` FUN_00447fb0 (called by `csl_Store` once the last DB chunk is in, Z12 §6.5): for each of
+  `defskill.dsd_GetSkillMaxNum()` ids (`DefSkillData::dsd_GetSkillID`, stops at the first 0 return) that no entry
+  has (linear search over `csl_SkillNumber` entries), push `{ id, cs_EndOfCooltime = g_Now, empower 0, mastery 0,
+  cs_bSave 0 }` and `csl_SkillNumber++`; `csl_Store` sorts afterwards. Dead in 2016: `defskill` is never filled
+  (Z12 §6.5). So the item pseudo-skills (29200 UseSilverWings …, §3.6) come from the character's DB skill rows like
+  any other skill (D02: the character-create / login paths insert missing default rows with `p_Skill_Set`).
+
+### 6.4 Unlearning one step: `csl_UnLearn`
+
+Called only by `ShinePlayer::so_UnlearnSkillAck` FUN_0057f200 (vt 0x97c) for an active skill after the DB deleted the
+row (Z03 §9.5; the DB side is D04 `p_Skill_Del`, one `(nCharNo, nSkillNo)` row).
+
+```pseudo
+CharaterSkillList::csl_UnLearn(this, u16 skill)                                              @ FUN_0057e930
+    if csl_Skill is empty: return
+    it = lower_bound(csl_Skill, skill)
+    if not (skill < it.cs_SkillId):                      # it is not compared with end first (original bug) Z23-B10
+        csl_Skill.erase(it); csl_SkillNumber -= 1
+    # csl_ToggleSkill is not touched, nothing is switched off, nothing is sent here (original bug) Z23-B11
+```
+
+- Only the named step is removed; its lower steps stay learned (Z03 §9.5's "and its lower steps" does not match the
+  code or `p_Skill_Del`). Since the client shows the highest learned step of a line, one erase item lowers a skill by
+  one step *(inferred)*.
+- If the removed step was a toggle skill that is on, its `CharacterToggleSkill` entry stays with `cts_bSkillOn = 1` and
+  the toggle's abnormal states stay on; the player can no longer cast the step to switch it off. Only the automatic
+  switch-offs (§2.4) end it (original bug) Z23-B11.
+
+## 7. Buffers: save to the DB and the WM, list to the client
+
+All three fillers write `PROTO_SKILLREADBLOCK` / `PROTO_SKILLREADBLOCKCLIENT` records *(pdb2016)*:
+
+```
+PROTO_SKILLREADBLOCK (0x10)       { i32 savetime; PROTO_SKILLREADBLOCKCLIENT skilldata @4 }
+PROTO_SKILLREADBLOCKCLIENT (0xC)  { u16 skillid; u32 cooltime @2 (seconds left); u16 empow @6 (SKILL_EMPOWER); u32 mastery @8 }
+```
+
+`cooltime = (cs_EndOfCooltime − g_Now) / 10` (whole seconds, rounded down) while the skill is cooling down, else 0;
+above 10800 s (3 h) the server only complains (assert / `SkillCoolTimeLog`) and writes the value anyway. `savetime` =
+`mysecond()` (time of day in seconds since 1970). The load side (`csl_Store`, §1.1) gives back
+`g_Now + max(0, cooltime − (now − savetime))·10`, so a cooldown keeps running while the character is offline.
+
+### 7.1 Which entries are written (`cs_bSave`)
+
+The two save fillers take a mode; `1` = incremental, `0` = all:
+
+```pseudo
+for each entry s (from the start index):
+    if s.cs_EndOfCooltime > g_Now:  write s with cooltime = seconds left;  s.cs_bSave = 1
+    else if s.cs_bSave != 0 or mode != 1:  write s with cooltime 0;  s.cs_bSave = 0
+    else: skip                                            # incremental save and nothing to tell the DB
+```
+
+So an incremental save writes every skill still cooling down, plus once more each skill whose cooldown ran out (to
+store 0) or whose mastery changed (`csl_AddMastery` sets `cs_bSave`). Empower and learn/unlearn have their own DB
+requests (0x4812, 0x4801, 0x4825) and need no flag.
+
+### 7.2 Character DB: `so_SaveSkill` / `csl_FillSaveBuffer`
+
+```pseudo
+ShinePlayer::so_SaveSkill(p, PROTO_NC_CHARSAVE_SKILL_REQ* buf, int mode) → int (bytes)       @ FUN_00456520  (vt 0x3a8)
+    csl_FillSaveBuffer(p.sp_SkillList, buf, mode)
+    return buf.number == 0 ? 0 : buf.number·16 + 8
+
+CharaterSkillList::csl_FillSaveBuffer(this, buf, mode)                                       @ FUN_00454f60
+    buf.number = 0
+    for i in 0 … csl_SkillNumber−1: rule of §7.1
+        after each written record: if 0x18 + 16·buf.number > 8000: stop        # at most 499 records
+    # (> 10800 s: line in SkillCoolTimeLog when DebugLogging is on, no assert)
+```
+
+`WholeSaver::ws_save2DB` FUN_00455a10 (Z01 §8.4) calls `so_SaveSkill(buf, 1)` on every save: 0 bytes → the skill part
+is skipped (`esc_skill.handle.chrregnum = 0xFFFFFFFF`); else GameDB 0x4009 NC_CHARSAVE_SKILL_REQ { 6-byte zone ref,
+`PROTO_NC_CHARSAVE_SKILL_REQ` { `PROTO_NC_CHARSAVE_ALL_ACK handle` {u16 bufferlocation, u32 chrregnum}, u16 number,
+records } } = 16·(number + 1) bytes with the opcode; the DB writes each record with `p_Skill_Set` (D02 §6, 0x4009) and
+answers 0x400A NC_CHARSAVE_SKILL_ACK, ignored (`gds_NC_CHARSAVE_SKILL_ACK` FUN_00455570, no-op). Only one packet per
+save: with more than 499 records to write, the rest wait for the next save, and in mode 1 the ones already written lose
+nothing; the skipped ones keep their `cs_bSave`.
+
+### 7.3 World manager cache: `so_Send_NC_CHARSAVE_2WLDMAN_SKILL_CMD` / `csl_FillSendBuffer_Server`
+
+```pseudo
+ShinePlayer::so_Send_NC_CHARSAVE_2WLDMAN_SKILL_CMD(p, NETCOMMAND* buf)                      @ FUN_00455780  (vt 0xaec)
+    # from WholeSaver::ws_save2worldmanager FUN_004536f0 (Z01 §8.4), between 0x4011 and 0x4013
+    buf = 0x4012 NC_CHARSAVE_2WLDMAN_SKILL_CMD {
+        u16 wldmanhandle = p.vt[0x340]()
+        PARTMARK PartMark @2 = { bIsStart 1, bIsEnd 0, nOrder 0 }
+        u16 nMaxNum @3 = csl_SkillNumber
+        PROTO_NC_CHARSAVE_SKILL_REQ skill @5 { handle.bufferlocation @5 never written (original bug) Z23-B7,
+                                               handle.chrregnum @7 = p.vt[0x344]() (charNo), u16 number @0xB, records @0xD } }
+    if nMaxNum == 0: nothing is sent
+    i = 0
+    loop:
+        i = csl_FillSendBuffer_Server(p.sp_SkillList, &buf.skill, i, mode 0)    # all skills
+        if i < 1: return
+        if i >= nMaxNum: PartMark.bIsEnd = 1
+        send WM: 16·number + 0xF bytes  (pp_SetPacketLen fail → assert "WholeSaver::ws_save2worldmanager : Packet Too Long")
+        PartMark: bIsStart = 0, bIsEnd kept, nOrder += 1
+    while i < nMaxNum
+
+CharaterSkillList::csl_FillSendBuffer_Server(this, buf, int start, int mode) → int next index   @ FUN_00445260
+    buf.number = 0
+    for i = start … csl_SkillNumber−1 while buf.number ≤ 499: rule of §7.1
+    return i                                             # 500 records per chunk; asserts "csl_FillSaveBuffer : Too long cooltime" > 10800 s
+```
+
+The WM stores the chunks in its character cache (W01 §6.3, W05 0x4012: it reads `chrregnum` @7 and ignores
+`bufferlocation`) and sends them back to the next zone as 0x1024 NC_CHAR_ZONE_SKILL_CMD on a map change, which ends
+in `csl_Store` again (§1.1). Mode 0 also clears `cs_bSave` on every entry that is not cooling down; this loses no
+mastery change because the only caller, `so_LinkTo` FUN_0049ad30, runs `ws_save2DB` (mode 1, §7.2) just before
+`ws_save2worldmanager`.
+
+### 7.4 Client list: `csl_FillSendBuffer_Client`
+
+`csl_FillSendBuffer_Client` FUN_00445460 builds 0x103D NC_CHAR_CLIENT_SKILL_CMD after the load (Z12 §6.5 has the
+pseudocode): the same loop with 500 records per chunk, no `cs_bSave` handling (every entry is written, cooltime 0 when
+not cooling), and it skips — and subtracts from the header's `nMaxNum` — the hidden item pseudo-skills 29200–29205
+(0x7210–0x7215), 29428/29429 (0x72F4/0x72F5) and 29535/29536 (0x735F/0x7360).
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -451,6 +734,11 @@ tell the two apart:
 | Z23-B4 | `msl_SetCoolTime` FUN_00449270 | compares `DlyTimeGroup` (ms) of the other mount skills with the group number | the shared delay of mount skills hits the wrong skills (or none) | compare `DlyGroupNum` |
 | Z23-B5 | `ShineMobileObject::so_Routine` FUN_0056a080, silver-wing item cast | 0x4821 `sec` = `so_ply_SilverWingCoolTime()` in **ms** | client shows a cooldown 1000× too long (60 min → 3 600 000 s) | `/ 1000` as in `so_ply_ChargedBuff` |
 | Z23-B6 | `gds_NC_ITEMDB_MAPLINK_ITEM_CONSUME_ACK` FUN_004698a0, `sp_PetSystem_Summon` FUN_004d2640 | send their own 0x4821 with the unshortened time after `smo_ply_SkillCoolTime` already sent the shortened one | with a cooldown set-item rate or item action, the client shows a longer cooldown than the server keeps | send once, after the rate |
+| Z23-B7 | `so_Send_NC_CHARSAVE_2WLDMAN_SKILL_CMD` FUN_00455780 (0x4012) | `skill.handle.bufferlocation` (payload +5, 2 bytes) is never written | leftover bytes of the previous packet in `gpp` go to the WM, which ignores them | write 0 or the zone's buffer index |
+| Z23-B8 | `csl_EmpowerAlloc` FUN_00448570 (0x4811) | `minus` is checked against the line sum of all learned steps but subtracted from the request's step | removing a point that sits on a lower step wraps the field of the higher step to 15; the DB refuses (> 5, 0x885) and the zone disconnects the player (0x68A) | check and subtract on the same step, or move points to the new step on learning |
+| Z23-B9 | `sp_NC_SKILL_EMPOWALLOC_REQ` FUN_0044f150 → `csl_MaximumSkill` FUN_00448240 | the request's skill ID is not looked up before `skilldatabox[skill].sdi_NextSkill` is read | a 0x4811 with an unknown skill and zero plus/minus makes the zone read through a null pointer (crash) | refuse unknown or unlearned skills (0x884) first |
+| Z23-B10 | `csl_UnLearn` FUN_0057e930 | compares with `*lower_bound` without testing for `end` | an unlearn answer for a skill above every learned ID reads past the vector and may erase `end` | test `it != end` |
+| Z23-B11 | `csl_UnLearn` / `so_UnlearnSkillAck` FUN_0057f200 | removes the step but not its `csl_ToggleSkill` entry and does not switch an active toggle off | the toggle's abnormal states stay on with no step left to cast it off | switch the toggle off (`so_ply_ToggleSkill_Off`) and drop the entry |
 
 ## Not reconstructed / uncertain
 
@@ -462,4 +750,9 @@ tell the two apart:
 - `setitemskilleffect` is a global reloaded by `so_Routine` before each blast; for the non-cast callers of
   `smo_ply_SkillCoolTime` (§3.6) it holds whatever the last routine left in it *(inferred)*.
 
-(Parts 2–3 add §4 onward; the coverage boundary is written in the sweep part.)
+- Which step ID the 2016 client sends in 0x4811 `skill` (decides how often Z23-B8 happens) and in 0x4824 (§6.4):
+  the client side of the skill window is not read here.
+- `csl_AddMastery` runs right after the GameDB 0x3457 produce request is sent; if the DB refuses the produce, the
+  mastery gain stays *(inferred; the 0x3457 answer is Z05/Z07)*.
+
+(Part 3 adds §8–§9; the coverage boundary is written in the sweep part.)
