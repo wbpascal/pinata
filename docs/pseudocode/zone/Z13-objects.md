@@ -2134,6 +2134,406 @@ script helpers `PetBaseObjectEffect` / `PetBaseObjectSound` over the generic scr
 
 ---
 
+## 7. Mounts, player side: horses (`RideCasting`) and the mover system
+
+A ride item (item class 23 RIDING, Z04 §2) is one of two kinds, decided by `MoverDataBox::mvdb_GetMoverType` FUN_004bf240
+(item InxName in `MoverItem.shn` → `MVST_MOVER`, else `MVST_MAX`; callers treat "not MOVER" as a horse):
+
+- **horse** (`MVST_RIDE`): the player is the mount. Row in `Riding.shn`, mode 6, hunger gauge on the item, speeds from the
+  row. Packets of dept 8 (`0x203F`–`0x2048`).
+- **mover** (`MVST_MOVER`): a separate `ShineMover` object (type 11, §8 next part) with seats; the item owner is its
+  master, others ride as passengers. Packets of dept 51 (`0xCC01`–`0xCC0C`, client requests in Z07 §8).
+
+The 2016 zone allocates a `ShineMover` in exactly two places: `sp_MoverSystem_SummonItem` (end of an item cast, §7.4) and
+`sp_MoverSystem_MapLogin` (restore after a map link, §7.7). No NPC or script creates one.
+
+### 7.1 Data
+
+**`enum MOVER_SYSTEM_TYPE`** *(pdb2016)*: `MVST_RIDE` 0 (horse), `MVST_RIDE_ADEL` 1 (never used in the 2016 zone),
+`MVST_MOVER` 2, `MVST_MAX` 3 (not riding). This is the "ride kind" of Z07 §8 / Z09 §2.3 (Z07's "3 = got off" = `MVST_MAX`).
+
+**Player members** (`ShinePlayer`, *pdb2016*):
+
+| Offset | Member | Meaning |
+|---|---|---|
+| +0x2962c | `sp_LastEffect` u32 | last tick of the upgrade recovery |
+| +0x29630 / +0x29632 | `sp_MoverRecoveryTick` / `sp_MoverRecovery` u16 | interval (ms) / ‰ of max HP and SP per tick (`MoverUpgradeEffect` row) |
+| +0x29634 | `sp_MoverUpgradeEffect` fn | `sp_MoverUpgradeEffect_ON` FUN_0056b5f0 while active, else the no-op FUN_00417480 |
+| +0x2a760 | `sp_RideCast` (`RideCasting`, 0x20 bytes) | `+0 castslot` i16 (≥ 0 while a ride cast runs), `+2 rideslot` i16 (inventory slot of the ride item, −1 none), `+4 info` → `CIDEB_Element<RIDING>` {u16 itemID, RIDING*} (horses), `+8 castend` (g_Now ticks), `+0xc lockIndex` (cast lock), `+0xe walkspd` / `+0x10 runspd` (‰ of the base speeds), `+0x12 horselockindex` (lock while riding), `+0x14 nexthungrydec`, `+0x18 hungry` (gauge 0), `+0x1c eMoverSystemType` |
+| +0x2aad4 | `sp_Mover_LinkData` (`MOVER_LINKDATA`, 0x3d) | mover state carried over a map link (§7.7); `nCharNo == −1` = none |
+| +0x2ab11 | `sp_Mover_nSlot` u8 | seat on the mover (10 = none, the `ShineObject` default of vt 0xc7c) |
+| +0x2ab14 | `sp_Mover_pObject` | the `ShineMover` ridden |
+| brief +0xe6 / +0xe8 | `nMoverHnd` / `nMoverSlot` | mirrored into `PROTO_NC_BRIEFINFO_LOGINCHARACTER_CMD` by `so_MoverSystem_SetMover` FUN_00549430 / `SetMoverSlot` FUN_00549470 (0xffff = none) |
+| `sp_MiniHouse.mhs_Backup` | `BriefInfoBackup` {notcamp 0x2b, u8 bib_Backuped} | the shape backup of the mini-house (§1.6) is reused for the ride shape |
+| `sp_MiscFlag.bMoverUpgradeWait` | bit | upgrade transaction pending (`sp_Get/SetMoverUpgradeWaitState` FUN_00561600 / FUN_00561610; Z04 §11, cleared at map login) |
+| `sp_ChargedItem.ci_Effect.cec_MoverNotHungry` | u8 | charged-item effect: horse gauge does not drop (`so_MoverSystem_ChargedMoverNotHungry` FUN_0055a800, vt 0xc94) |
+
+Player vtable (mover slots): 0xc6c `so_MoverSystem_GetOff` FUN_0045f020, 0xc70 `NoDamage` FUN_0055a7d0, 0xc74 `GetMover`
+FUN_0055a7a0 (the object only while `eMoverSystemType == MVST_MOVER`), 0xc78 `SetMover`, 0xc7c `GetMoverSlot` FUN_0055a7c0,
+0xc80 `SetMoverSlot`, 0xc88 `SetLinkData` FUN_0045ddf0, 0xc8c `ClearLinkData` FUN_0045e040, 0xc90 `Feeding` FUN_0045f1d0,
+0xc94 `ChargedMoverNotHungry`, 0x8c8 `so_ply_HorseFeed` FUN_0045eaa0, 0xdd4 `so_ply_LayerMoverRideOn` FUN_0054aef0.
+`ShineObject::so_MoverSystem_GetMoverSlot` FUN_00556ff0 returns 10 for every non-player.
+
+`so_MoverSystem_NoDamage` FUN_0055a7d0: on a mover → `!mover.so_MoverSystem_NoDamage()` (mover vt 0xc70, §8); else 0.
+
+**Item attribute `ShineItemAttr_Riding`** (0x13 bytes, *pdb2016*; `ItemAttrCls_Riding`, 51-slot vtable):
+
+| Attr offset | Field | Accessor (attr vt) |
+|---|---|---|
+| +0 | u16 `hungrypoint` | 0x3c `iac_FoodEat`(cell, add, max) FUN_0063fc60: `clamp(hungry + add, 0, max)`; 0x40 `iac_GetHungry` FUN_0063fc90 |
+| +2 | `ShineDateTime deletetime` | 0x34 `iac_GetDeteleDateTime` FUN_0063e460; 0x38 `iac_SetDeteleDateTime`(hours, tm now, hour) FUN_00640140 → `ItemAttributeClass::iac_SetEndTime` FUN_0063e510 (hours < 1 → 0x76bbecff "never", else now + hours; first byte 0 = never set) |
+| +6 | u16 `bitflag`, bit 15 = during ride | 0x60 `iac_GetDuringRide` FUN_0063f560, 0x64 `iac_SetDuringRide` FUN_0063f580 |
+| +8 | u32 `IsPutOnBelonged` (`SPOBI_NOT_BELONGED` 0 / `SPOBI_BELONGED` 1) | 0xa4 FUN_0063ff70 / 0xa8 FUN_0063ffa0 |
+| +0xc | u32 `nHP` (mover HP) | 0xb4 `iac_SetHP` FUN_00640040 / 0xb8 `iac_GetHP` FUN_00640060 |
+| +0x10 | u8 `nGrade` (upgrade grade, Z04 §11) | 0xbc FUN_00640090 / 0xc0 FUN_006400b0 |
+| +0x11 | u16 `nRareFailCount` | 0xc4 FUN_006400d0 / 0xc8 FUN_006400f0 |
+
+`iac_fill2buffer` FUN_0063e910 / `iac_fill2struct` FUN_0063eb10 copy the 0x13 bytes as they are (`iac_GetAttrSize` FUN_0063ec80
+= 0x13). `iac_itemcreate` FUN_0063f230: hunger = `RidingInitHungry(id)` FUN_0044fe00 (mover → `MoverHG.MaxHG`; else the
+`Riding.shn` row's `InitHgauge`; none → 0), delete time 0, flags 0, bound 0, HP = `RidingInitHP(id)` FUN_0044f930
+(`MoverAbility.HP`, else 0), grade 0, rare fail count 0. Every other attr class has a no-op at vt 0x60 / 0x64.
+
+**Tables** (all loaded once at zone start):
+
+| Table | Loader | Rows (2016) | Use |
+|---|---|---|---|
+| `Riding.shn` (`RIDING`, 0x15a) | `RidePetDataBox::rpdb_Load` FUN_00450270 (`zs_start_sun`): `ChargedItemEffectDataBox<RIDING>::cideb_Load` (same template as §1.6) registers each row's item with `ui_ride` (`UseEffect::UseItemRide`) and skill "UseRide"; every `FeedType` ≠ "-" must be an item ("RidePetDataBox::rpdb_Load : Invalid food" → `ShineExit`) and is registered with `ui_horsefood` and skill "UseSkill" | 2 (Coll: feed Hay, FeedGauge 100, HGauge 1000, InitHgauge 1000, Tick 20000 ms, UGauge 4, Run 1300, Foot 1100, cast 1000 ms, cool 3000 ms; Claude: no feed, UGauge 0) | horses |
+| `MoverMain.shn` (`MoverMain` {MoverID, MoverIDX, CastingTime, CoolTime, RunSpeed, WalkSpeed, DurationHour, MaxCharSlot}) | `MoverDataBox::mvdb_Load` FUN_004bf960 (`zs_start_long`) | 461 (437 with 1 seat, 24 with 2; DurationHour 0 for 185) | `mvdb_Index[MoverID]` (array of `MoverDataBoxIndex` {pBase, pAbility, pHG, pSummonItem, vUseSkill}); BTree MoverIDX → MoverID; duplicate ID → exit |
+| `MoverAbility.shn` | same | 0 | mover combat stats (`Parameter::Container::c_StoreMover` FUN_0055e8d0 for the mover object: WC/MA min/max, AC, MR, TH, TB; move/HP/SP recovery 1000) |
+| `MoverHG.shn` ({MoverIDX, FeedType, RestoreAmount, MaxHG, CreateHG, Tick, ConsumeHG}) | same; each `FeedType` ≠ "-" registered with `ui_horsefood` / "UseSkill" ("Food skill null" → exit) | 461 (163 with a feed, e.g. LifeDust) | mover hunger (§8) |
+| `MoverItem.shn` ({MoverIDX, ItemIDX}) | same; BTree ItemIDX → MoverID; each item registered with `ui_ride` / "UseRide" ("Ride skill null" → exit) | 461 | item → mover |
+| `MoverUseSkill.shn` ({MoverIDX, ActiveSkillIDX}) | same, read through `BinaryDataBox<MoverItem>::bdb_ReadData` (identical 0x40-byte rows, folded code), appended to `vUseSkill` | 0 | mover skills (`MoverSkillList` below) |
+| `MoverUpgradeEffect.shn` (`MoverUpgradeEffect`, 0x4b) + `RareMoverRate` / `RareMoverEachRate` / `RareMoverSubRate.shn` | `CMoverUpgradeData::DataRead` FUN_004c0660 (`zs_start_sleep`; ctor FUN_004c0540) | 6 grades | per grade (`GetUpgradeEffectInfo(grade)` FUN_004c0460, null above `m_nMaxGrade`): `{RunSpeed, HPSPRecoveryTick, HPSPRecovery ‰, CastingTime ‰, CastingCoolTime ‰, EffectFileName, AbStateIDX, Strength}`; the rare tables are Z04 §11 |
+
+`DataRead` requires as many `RareMoverSubRate` rows as `MoverUpgradeEffect` rows ("Grade is Not Match" → fail),
+`m_nMaxGrade = rows − 1`; per grade it resolves `AbStateIDX` ≠ "-" to `{eAbstateIndex, pAbstateDic, nStrength = Strength}`
+(unknown → fail; default index 0x318 = none); `RareMoverEachRate` rows become cumulative `{itemID, sum}` pairs. 2016 grades:
+RunSpeed 0/200/400/800/800/800, recovery 0/20/40/60/80/100 ‰ every 1000 ms, cast and cooldown −0/20/30/40/50/60 %, grade 4
+`StaMoverStatUpSingle` and grade 5 `StaMoverStatUpParty` (strength 1) on dismount.
+
+Row readers: `BinaryDataBox<MoverMain/MoverAbility/MoverHG/MoverItem>::bdb_ReadData` FUN_004bf320 / FUN_004bf3e0 /
+FUN_004bf4a0 / FUN_004bf560 (SHN read, one record array each). Lookups: `mvdb_GetData(id)` FUN_004bf290, `mvdb_GetData_ItemIndex(inxName)` FUN_004bf2c0 (null when unknown or above
+`mvdb_MaxID`); ctor FUN_004bf8a0.
+
+**`MoverSkillList`** (vector of `{u16 ms_SkillID, u32 ms_EndOfCooltime}`, used by the mover object): `msl_Store` FUN_00449190
+(one entry per `MoverUseSkill` row whose skill has an active part), `msl_CoolTimeCheck` FUN_004463d0 (end ≤ now; unknown
+skill asserts and returns 0), `msl_SetCoolTime(skill, ms, group, groupMs)` FUN_00449270 (end = now + ms/100 − 3; every
+other skill of the same `DlyTimeGroup` gets at least now + groupMs/100 − 3), `msl_UpdateCoolTime` FUN_00446370. Empty in 2016.
+
+**Object lookup:** `ShineObjectManager::som_FindMover(masterCharNo, moverID)` FUN_005506a0 walks `som_Mover` with
+`ShineMoverFinder::lid_Call` FUN_00549e30 (mover vt 0xca8 master == and vt 0xce4 mover ID ==); mover handles
+`ShineObjectHandleUnion::sohu_SetMoverHandle` FUN_00549010 = 22138 + index (index < 1000).
+
+Cooldowns use the ride skill of `ui_ride` (the "UseRide" skill): the folded getter
+`go_Get_NpcObject(&ui_ride)` returns the stored skill, whose first u16 is the skill ID *(inferred from the use)*.
+
+### 7.2 Using a ride item and the cast
+
+```pseudo
+UseItemRide::uib_CanUseItem(p, item) → code     @ FUN_005988b0   (item-use pipeline, Z04 §6; "direct use" kind)
+    no map / map FieldAttr.byCanRide (+0xa4) == 0:     c = 0x10C8
+    p is casting (vt 0xea0 smo_DuringCast):             c = 0x10C4
+    mode 1:  ride skill (uir_RideSkill, "UseRide") not learned: 0x10CA; on cooldown: 0x10C2; else 0x700
+    mode 2:  swing time (vt 0xc68) > now → 0x10C3; else as mode 1
+    mode 0 / 3 / 4 / 5:                                  c = 0x10C3
+    any other mode (6 riding, 7, …):                     0x700 (allowed: using the item while riding dismounts)
+    every code ≠ 0x700 goes through sp_HorseError(c) FUN_0045d3b0 = SendErrorCode(8, 0x41, c) →
+        0x2041 NC_ACT_RIDE_FAIL_CMD { u16 err = c }, and is returned to the pipeline
+
+UseItemRide::uib_DirectUse(p, slot, item) → 1    @ FUN_005995b0
+    mode 1 / 2: item null → 0;  mvdb_GetMoverType(item.id) == MVST_MOVER ? sp_MoverSystem_Cast(slot) : sp_HorseCast(slot)
+    mode 6:     eMoverSystemType == MVST_MOVER ? sp_MoverSystem_GetOff(0) (§7.4) : sp_HorseOff (§7.3)
+    other modes: nothing
+```
+
+```pseudo
+sp_HorseCast(slot)                                    @ FUN_0045e0e0
+    so_ply_AllCastCancel (vt 0x8d0), so_mobile_StopHere (0xa48), so_ply_SendMoveFail (0xa4c), smo_BashStop (0xed8)
+    cell = inventory[slot]; null → return (no answer)
+    info = first Riding.shn element whose item ID == cell.id (linear scan; an element without data → return)
+           # no match: info is left on the last element and the cast goes on with that row (original bug) Z13-B52
+    info and cell.attr set:
+        t = RIDING.CastingTime − CastingTime‰ of MoverUpgradeEffect[cell.grade] × t / 1000
+        castend = g_Now + t/100; castslot = rideslot = slot
+        lockIndex = next lock index; lock list OnlyLock(lockIndex, inventory 9, slot) (vt 0x2c); next index++
+        so_ply_ItemUseResultPacket(0x700, 9) → 0x3016 NC_ITEM_USE_ACK (Z04 §6)
+        p ← 0x2047 NC_ACT_CREATECASTBAR { u16 millisec = t }
+    # eMoverSystemType is not set: it keeps the value of the last cast (original bug) Z13-B48
+
+sp_MoverSystem_Cast(slot) → bool                     @ FUN_0045d550
+    the same four cancels
+    no layer (p+0x76) or layer kind (+4) == 3:   ItemUseResult(0x701) → false
+    cell null:                                   ItemUseResult(0x703) → false
+    no MoverDataBox entry for the item's InxName, no MoverMain row, or no attr:   ItemUseResult(0x702) → false
+    csl_Toggle_AllOffAndReset (every toggle skill off)
+    t = MoverMain.CastingTime reduced by CastingTime‰ of the item grade (as above)
+    castend, castslot = rideslot = slot, cast lock as above, eMoverSystemType = MVST_MOVER
+    ItemUseResult(0x700); p ← 0x2047 { t } → true
+
+cast end (so_Routine, GameModeWork; Z09 §2.3):        @ FUN_0056c790
+    if castslot ≥ 0 and castend ≤ g_Now:
+        eMoverSystemType == MVST_MOVER: if !sp_MoverSystem_SummonItem(1): so_ply_AllCastCancel; type = MVST_MAX
+        else: sp_HorseOn(1)
+
+cancel: so_ply_AllCastCancel FUN_0055a310 → if castslot ≥ 0: sp_HorseFree      @ FUN_0045d3e0
+    castslot = −1; lock list Free(lockIndex) (vt 0x28); p ← 0x2048 NC_ACT_CANCELCASTBAR {}
+```
+
+### 7.3 Horse on and off
+
+```pseudo
+sp_HorseOn(fresh)                                    @ FUN_0045f270   (fresh = 1 at cast end / layer move, 0 at login)
+    if !mhs_Backup.bib_Backuped: copy brief shapedata.notcamp (0x2b) into the backup; bib_Backuped = 1
+    sp_MakeRideBriefInfo(&brief.shapedata.ride)       @ FUN_0056e800
+        ride.equip = current shapedata (0x2b bytes); ride.rideinfo.horse = info ? RIDING.Handle : 0xffff; return 1
+        # always 1: the "fail → 0x2041 {0x10C3}, restore the backup" branch is dead (original bug) Z13-B53
+    if p has abstate 0x4B (vt 0x3e4):  0x2041 { 0x10C3 }; so_ply_AllCastCancel; return
+        # the backup stays marked and the shape keeps the ride copy (same equipment bytes)
+    mode = 6
+    attr.SetDuringRide(cell, 1)
+    broadcast in range 0x2040 NC_ACT_SOMEONERIDE_ON_CMD { u16 handle, u16 ride.horse }
+    p ← 0x203F NC_ACT_RIDE_ON_CMD { u16 ride.horse }
+    if no info:  walkspd = runspd = 10; nexthungrydec = now; fresh → ride-skill cooldown 10 000 ms (vt 0xeac)
+    else:
+        walkspd = RIDING.FootSpeed; runspd = RIDING.RunSpeed
+        e = MoverUpgradeEffect[item grade]: walkspd += e.RunSpeed; runspd += e.RunSpeed; cool = CoolTime − CastingCoolTime‰
+        nexthungrydec = now + RIDING.Tick/100
+        smo_ply_SkillCoolTime(ride skill, cool) (vt 0xeac); fresh → so_ply_NewSkillCoolTime(ride skill, cool/1000 s) (vt 0x374, to the client)
+    eMoverSystemType = MVST_RIDE
+    sp_HorseFree                                     # castslot −1, cast lock freed, 0x2048
+    sp_SendHorseHungry(attr.GetHungry(cell))         # §7.5
+    horselockindex = next lock index; OnlyLock(horselockindex, 9, rideslot); next index++
+    if info:
+        d = attr.GetDeteleDateTime(cell); null → assert
+        if d unset (first byte 0):
+            attr.SetDeteleDateTime(cell, RIDING.UseTime hours, ct_Current)    # starts a rental period (both 2016 rows: 0 = never)
+            sp_HorseItemSave (§7.6)
+            if e: sp_LastEffect = now; sp_MoverRecoveryTick / sp_MoverRecovery = e.HPSPRecoveryTick / e.HPSPRecovery;
+                  sp_MoverUpgradeEffect = sp_MoverUpgradeEffect_ON
+            # the recovery is set up only on the first ride of the item (original bug) Z13-B49
+
+sp_HorseOff                                          @ FUN_0045f7c0
+    only in mode 6 and eMoverSystemType ≠ MVST_MOVER
+    mode = 1
+    cell = inventory[rideslot]; null cell / attr → assert, return (mode is already 1)
+    attr.SetDuringRide(cell, 0)
+    restore the brief shape from the backup if marked; bib_Backuped = 0
+    broadcast in range 0x2043 NC_ACT_SOMEONERIDE_OFF_CMD { u16 handle }
+    p ← 0x2042 NC_ACT_RIDE_OFF_CMD {}  (so_SendProtocol); ItemUseResult(0x700, 9)
+    lock list Free(horselockindex); sp_HorseItemSave
+    eMoverSystemType = MVST_MAX
+    sp_MoverOffEffect(attr.GetGrade(cell)); sp_MoverUpgradeEffect = no-op
+    # rideslot, info and the speeds stay as they were (only read in mode 6)
+
+sp_MoverOffEffect(grade)                              @ FUN_00561630   (also at the end of a mover ride, §7.4)
+    e = MoverUpgradeEffect info[grade]; if e and its abstate index < 0x318:
+        if so_AbnormalState_Set(p, idx, e.nStrength, dic, now, …) (vt 0x638) == 1:
+            so_AbnormalState_BitSet(idx); so_AbnormalState_BroadcastSet(idx, dic.subabstate[g_NewAbstateStrength].KeepTime,
+            g_NewAbstateStrength); so_AbnormalState_Inform (vt 0x3f0, same KeepTime, 1); so_RecalcAbstateParamReady (vt 0x528)
+    # 2016: grade 4 → StaMoverStatUpSingle, grade 5 → StaMoverStatUpParty (strength 1); grades 0–3 nothing
+
+sp_MoverUpgradeEffect_ON (routine hook +0x29634)     @ FUN_0056b5f0
+    mode 6 and now > sp_LastEffect + sp_MoverRecoveryTick/100:
+        sp_LastEffect = now; HP += MaxHP (+0xea8) × ‰ / 1000 (vt 0x5b4); SP += MaxSP (+0xeac) × ‰ / 1000 (vt 0x5b8)
+        if HP or SP changed: so_AllOfRange(…, so_ply_Send2WhoTargetMe)   # the target bars of whoever targets p
+```
+
+While in mode 6 the brief-equipment refresh `sp_BriefEquipmentSetting` FUN_00576010 calls `so_BriefEquipSetRiding`
+FUN_0054e280: it rewrites the 20 item IDs and the upgrade nibbles of `shapedata` from the current equipment (the ride
+handle at +0x2b stays) and sets the attack speed to 7.
+
+Speeds: `so_WalkSpeed` / `so_RunSpeed` (Z10 §5.4, FUN_00559960 / FUN_005599c0) use `walkspd` / `runspd` in mode 6:
+`base × spd / 1000`. Movers set both to 1000 (§7.4); `sp_SetMoverRunSpeed(v)` FUN_00560130 (`runspd = max(v, 1000)`;
+only caller the Lua function `cStaticMoverSpeed` FUN_005debb0, Z09) and the GM command `&horsespeed` (`ac_HorseSpeed`
+FUN_0041ded0, Z11) change `runspd`.
+
+### 7.4 Mover summon, get on, get off
+
+```pseudo
+sp_MoverSystem_SummonItem(fresh) → bool               @ FUN_0045ec10   (cast end, or layer move with fresh = 1)
+    no layer or layer kind 3: return false (no answer)
+    already on a mover (vt 0xc74): SendErrorCode(51, 3, 0x306A) → 0xCC03 NC_MOVER_RIDE_ON_FAIL_CMD; false
+    cell = inventory[rideslot], its attr, MoverDataBox entry by InxName, MoverMain row: any missing → assert, false
+    m = som_AllocObject(type 11); none → assert "Too many mover", false
+    m.so_smv_ClearMoverInfo (vt 0xc9c); m.so_smv_SetMoverItemInfo(attr, cell) (0xcb4); m.SetMaster_RegNum(p.charNo) (0xca4);
+    m.SetMaster_Object(p) (0xcac); m.SetMoverGrade(attr.GetGrade) (0xd00)
+    if !m.so_smv_SummonMover(p.field, p.x, p.y, p.dir × 2, MoverMain.MoverID, attr.GetHP(cell), p.layerRegNum) (0xca0):
+        0xCC03 { 0x3069 "The mover summoning is failed." }; m.so_Unmark; som_FreeObject(m, REMOVE_NOW, 0x78); false
+    cool = MoverMain.CoolTime − CastingCoolTime‰ (grade); ride-skill cooldown (vt 0xeac); fresh → so_ply_NewSkillCoolTime (vt 0x374)
+    sp_HorseFree                                     # end the cast: castslot −1, cast lock freed, 0x2048
+    if !sp_MoverSystem_GetOn(m, seat 0): m.so_Unmark; som_FreeObject(m, REMOVE_NOW, 0x79); false
+        # the cooldown set above stays (original bug) Z13-B54
+    attr.SetDuringRide(cell, 1); horselockindex = next; OnlyLock(horselockindex, 9, rideslot); next++
+    d = attr.GetDeteleDateTime; null → assert, true
+    if d unset: attr.SetDeteleDateTime(MoverMain.DurationHour, ct_Current); sp_HorseItemSave
+    true
+
+sp_MoverSystem_GetOn(m, seat) → bool                  @ FUN_0045d7a0   (also 0xCC01, Z07 §8, and §7.7)
+    m null: 0xCC03 { 0x306B }; false
+    p has abstate 0x4B: 0xCC03 { 0x306A }; so_ply_AllCastCancel; false
+    if !m.so_smv_GetOn(p, seat) (vt 0xcb8, §8: seat checks, 0xCC02 / 0xCC04, SetMover / SetMoverSlot on p): false
+    shape backup (as sp_HorseOn); mode = 6
+    walkspd = runspd = 1000; castend = 0; lockIndex = 0; nexthungrydec = 0; hungry = 0; eMoverSystemType = MVST_MOVER
+    e = MoverUpgradeEffect[m.so_smv_GetMoverGrade (0xcfc)]: recovery hook as in sp_HorseOn (every time, owner and passengers)
+    if m.master charNo (0xca8) ≠ p.charNo: castslot = rideslot = −1     # passenger: no item
+    true
+
+sp_MoverSystem_GetOff(how) → bool                    @ FUN_0045d910   (how: 0 normal, 1 map link, 2 logout / layer move)
+    mode ≠ 6: 0xCC07 NC_MOVER_RIDE_OFF_FAIL_CMD { 0x3081 }; false
+    no mover: 0xCC07 { 0x3082 }; false
+    passenger: return so_MoverSystem_GetOff(how) (vt 0xc6c)
+    owner: m.so_smv_GetOffAll(how) (vt 0xcc0: every seated passenger's vt 0xc6c(how), owner included);
+           m.so_Unmark(0, 1, 3); som_FreeObject(m, REMOVE_NOW, 0x7B); true
+    # 0xCC05 answers a true result with 0xCC07 { 0x3080 } (Z07 §8)
+
+so_MoverSystem_GetOff(how) → bool  (vt 0xc6c)         @ FUN_0045f020
+    mode ≠ 6: 0xCC07 { 0x3081 }; false;   no mover: 0xCC07 { 0x3082 }; false
+    if !m.so_smv_GetOff(p, p.seat) (vt 0xcbc, §8; 0xCC06 / 0xCC08): false
+    restore the brief shape from the backup; mode = 1; eMoverSystemType = MVST_MAX
+    if rideslot ≠ −1 (the owner):
+        cell / attr null → assert, true
+        sp_MoverOffEffect(attr.GetGrade); attr.SetDuringRide(cell, 0)
+        how == 0: lock list Free(horselockindex)     # 1 / 2 keep the lock (the player is leaving) — but see Z13-B51
+        sp_HorseItemSave
+    sp_MoverUpgradeEffect = no-op; ItemUseResult(0x700, 9) → 0x3016; true
+```
+
+### 7.5 Hunger and feeding
+
+```pseudo
+routine (GameModeWork, Z09 §2.3):                     @ FUN_0056c790
+    mode 6, eMoverSystemType == MVST_RIDE, nexthungrydec ≤ now:
+        no info / RIDING row, or rideslot < 0: sp_HorseOff
+        else if !cec_MoverNotHungry and RIDING.UGauge ≠ 0:
+            attr.FoodEat(cell, −UGauge, HGauge); sp_SendHorseHungry(attr.GetHungry); nexthungrydec = now + Tick/100
+        # with the charged effect or UGauge 0 the timer is not advanced (the test repeats every tick, no effect)
+    # mover hunger runs in the mover object (§8, smv_SendHungryInfo FUN_0055f0a0 → sp_SendHorseHungry)
+
+sp_SendHorseHungry(h)                                 @ FUN_0045e510
+    p ← 0x2046 NC_ACT_RIDE_HUNGRY_CMD { u16 hungry = h }; hungry flag = (h == 0)   # blocks running in mode 6 (Z02 §2.2)
+
+UseItemHorseFood::uib_CanUseItem(p, item) → code      @ FUN_00596500   (feed items registered in §7.1; codes go to 0x3016)
+    mode ≠ 6 or no item: 0x701
+    on a mover: owner → m.so_smv_CanUseFeedItem(item.id) (vt 0xcc4, §8); passenger → 0x701
+    horse: item.id ≠ sp_GetHorseFeed() FUN_0045d510 (ItemInfo ID of RIDING.FeedType, 0xffff none) → 0x10C7
+           sp_HorseNotHungry() FUN_0045d460 (gauge ≥ RIDING.HGauge; null cell / attr / info → assert, "full") → 0x10C9
+           else 0x700
+UseItemHorseFood::uib_Effect(p)                       @ FUN_00596600
+    on a mover: so_MoverSystem_Feeding (vt 0xc90)     @ FUN_0045f1d0
+        mode ≠ 6: SendErrorCode(51, 9, 0x3091) → 0xCC09 NC_MOVER_FEEDING_ERROR_CMD; no mover: 0xCC09 { 0x3092 };
+        not the owner: 0xCC09 { 0x3091 }; m.so_smv_Feeding() (vt 0xcc8, §8) true → sp_HorseItemSave
+    else so_ply_HorseFeed (vt 0x8c8)                  @ FUN_0045eaa0
+        mode 6, rideslot ≥ 0, info, cell.id == info item ID (else assert): attr.FoodEat(FeedGauge, HGauge);
+        sp_HorseItemSave; sp_SendHorseHungry(attr.GetHungry)
+```
+
+The direct request `0x2044 NC_ACT_RIDE_FEEDING_REQ` is Z02 §9.1 (its `row+0xc4 / +0xc6` = `FeedGauge` / `HGauge`).
+
+### 7.6 Saving the ride item: `sp_HorseItemSave`
+
+```pseudo
+sp_HorseItemSave                                      @ FUN_0045e810
+    rideslot == −1 → return; cell, attr and InxName must exist
+    if the item has a MoverDataBox entry with a MoverAbility row and attr.GetHP(cell) == 0:
+        sp_DestroyItem(p.handle, cell, {inventory 9, rideslot})        # a mover with 0 HP is destroyed (2016: no MoverAbility rows)
+        return
+    if attr.GetIsPutOnBelonged(cell) == SPOBI_BELONGED: return        # (original bug) Z13-B50: nothing saved
+    if ItemInfo row exists:
+        if the belong type is a put-on-bound type (IA_IsDataPutOnBelonged: BT_PUTON_ACC / BT_PUTON_CHR):
+            IsPutOnBelonged = 1
+            GameLog ← 0x0554 NC_LOG_GAME_ITEM_PUT_ON_BELONGED { u32 chrregnum, u64 itemkey,
+                     u16 iteminvenfrom = iteminvento = 0x2400 | rideslot (inventory 9) }     (D05)
+        sp_ItemAttrSave(cell, 9, rideslot)                              # Z05: attribute to the Character DB
+```
+
+Callers: feeding (§7.5, Z02 §9.1), first ride (§7.3 / §7.4), `sp_HorseOff`, `so_MoverSystem_GetOff`, and
+`ShinePlayer::so_Unmark` FUN_00558900 in mode 6 for `REMOVE_WARP` (Z01).
+
+### 7.7 Login, map link, layer moves
+
+```pseudo
+sp_RideInitialize (from sp_LoginInit FUN_00440d80)    @ FUN_0043d140
+    only without mover link data (nCharNo == −1) and not on a mover
+    rideslot = castslot = −1
+    map forbids riding (byCanRide 0): every inventory item: attr.SetDuringRide(0)     # no-op for non-ride attrs
+    else: first item with attr.GetDuringRide: rideslot = its slot; info = Riding element by item ID (none → assert, stop);
+          sp_HorseOn(0); castslot = −1; mode = 6
+    # a horse stays mounted across relog and map links; mover items had DuringRide cleared on the way out
+
+so_LinkTo (Z09) on a mover:                           @ FUN_0049ad30
+    seat ≠ 10: sp_Mover_LinkData = { nCharNo = p.charNo, nItemSlot = rideslot (−1 for a passenger), nMoverID (vt 0xce4),
+        nMoverHP = m.so_GetHP (vt 0x4e8), nMasterCharNo (0xca8), nGrade (0xcfc), nPassenger[seat] = p.charNo }
+        # only the linking player's own seat; the others stay −1 (from ClearLinkData)
+    sp_MoverSystem_GetOff(1)                          # owner: everybody gets off, the mover is freed
+
+WholeSaver::ws_save2worldmanager FUN_004536f0 → sp_MoverSystem_ZoneLink_Save2World    @ FUN_0045e710
+    nCharNo ≠ −1: WM ← 0xCC0B NC_MOVER_LINKDATA_WORLD_CMD { u32 charNo = p.charNo, i32 nItemSlot, u32 nMoverID,
+        u32 nMoverHP, u32 nMasterCharNo, u8 nGrade, u32 nPassenger[10] }      (0x3d bytes = MOVER_LINKDATA)
+    # the WM keeps it (W05 §5.5, FUN_00432fa0) and sends it to the next zone (W01 §6.3)
+
+0xCC0C NC_MOVER_LINKDATA_ZONE_CMD { MOVER_LINKDATA }  (WM→Z)   @ FUN_005a5ac0 `wms_NC_MOVER_LINKDATA_ZONE_CMD`
+    p = som_FindPlayer(charNo); none → assert; else p.so_MoverSystem_SetLinkData(payload) (vt 0xc88, FUN_0045ddf0: copy)
+
+sp_NC_MAP_LOGINCOMPLETE_CMD (Z01) → sp_MoverSystem_MapLogin, then ClearLinkData (vt 0xc8c)    @ FUN_0045d9e0
+    no link data, or the map forbids riding: return
+    already on a mover: 0xCC03 { 0x306A }; return
+    m = som_FindMover(nMasterCharNo, nMoverID)
+    none: m = som_AllocObject(11) (none → assert "Too many mover", return); ClearMoverInfo; SetMoverGrade(nGrade);
+          SummonMover(field, x, y, dir × 2, nMoverID, nMoverHP, layerRegNum) fails → Unmark; som_FreeObject(m, 0x7C); return
+          m.so_MoverSystem_SetLinkData(link) (vt 0xc88, FUN_0045deb0, §8: seat bookings from nPassenger, master, grade)
+    p is the master:
+        cell (9, nItemSlot) locked (lock list vt 0xc icl_IsLocked) or cell / attr / MoverDataBox entry missing:
+            m.GetOffAll(0); m.Unmark; som_FreeObject(m, 0x80); return
+        attr.SetDuringRide(1); m.SetMoverItemInfo(attr, cell); m.SetMaster_RegNum(p.charNo); m.SetMaster_Object(p)
+        rideslot = nItemSlot; castslot = −1; horselockindex lock on (9, rideslot)
+    seat = m.so_smv_GetMyBookingSlot(p.charNo) (vt 0xce8, §8); sp_Mover_nSlot = seat; sp_MoverSystem_GetOn(m, seat)
+    # a passenger who arrives first (or alone) creates a mover with no master object (§8 decides its fate)
+
+`ShineMover::so_MoverSystem_GetLinkData` FUN_0045dd60 (mover vt 0xc84: nCharNo −1, ID, HP, nItemSlot −1, master, every
+passenger's charNo) has no caller in the 2016 zone.
+
+layer moves: so_ply_MoveNewLayer FUN_0054ab90 / so_ply_MoveOtherLayer FUN_0054ac70 (and the _AllInMap variants FUN_0054ad30 /
+FUN_0054ae10; Z09):
+    trade break, close booth, AllCastCancel
+    mode 6: remember (type, rideslot); not on a mover → sp_HorseOff, else sp_MoverSystem_GetOff(2)
+    change layer
+    remembered type ≠ MVST_MAX: so_ply_LayerMoverRideOn(type, slot) (vt 0xdd4)      @ FUN_0054aef0
+        map allows riding and slot ≠ −1: rideslot = slot; MVST_MOVER → sp_MoverSystem_SummonItem(1) (fails →
+        AllCastCancel, type = MVST_MAX); else sp_HorseOn(1)
+    # a passenger (slot −1) is not seated again; the owner re-summons a fresh, empty mover
+```
+
+### 7.8 Forced dismounts
+
+| Caller | Mover | Horse |
+|---|---|---|
+| `so_KilledBy` FUN_00433be0 (death, mode 6) | `sp_MoverSystem_GetOff(0)` | `sp_HorseOff`; then `sp_MoverUpgradeEffect` = no-op |
+| `so_ply_FlagCaptureCast` FUN_00477d90 (mode in the flag-capture mask) | GetOff(0) | HorseOff |
+| `sp_StateChangeToNormal` FUN_005606e0 (mode 6) | GetOff(0) | HorseOff |
+| `UseItemRide::uib_DirectUse` in mode 6 (§7.2) | GetOff(0) | HorseOff |
+| layer moves (§7.7) | GetOff(2) + re-summon | HorseOff + HorseOn |
+| `so_LinkTo` FUN_0049ad30 | GetOff(1) after saving the link data | – (DuringRide stays, §7.7) |
+| `ShinePlayer::so_Unmark` FUN_00558900: `REMOVE_WARP` | GetOff(2) (and `sp_HorseItemSave` in mode 6) | save only |
+| `ShinePlayer::so_Unmark`: `REMOVE_LOGOUT`; `sp_Schedule_Logout` FUN_00558160 | GetOff(2) / GetOff(0) | – |
+| GM `&hide` (`ac_Hide` FUN_0041a3a0, Z11) | GetOff(0) | – |
+| `so_ply_AllCastCancel` FUN_0055a310 | cancels a running ride cast (`sp_HorseFree`) | same |
+
+### 7.9 Client side (2016 client, `GameFrameWork`)
+
+| Opcode | Client handler | What it does |
+|---|---|---|
+| 0x203F RIDE_ON_CMD {u16 horse} | `On_NC_ACT_RIDE_ON_CMD` FUN_004aa100 | own char `Char::RidePet(horse)`, mode 6, effect "Pet_St01", run mode, opens the ride window, "Mover has been summoned. You can toggle Run/Walk by Z button." |
+| 0x2040 SOMEONERIDE_ON_CMD {u16 handle, u16 horse} | FUN_004a1fc0 | same on another character (no window, no text) |
+| 0x2041 RIDE_FAIL_CMD {u16 err} | FUN_00499ee0 | err ≠ 0: system message `ErrMsgTable::GetErrMsg(err)`; only 0x10C3 has a text ("Moving items…"); 0x10C2 / 0x10C4 / 0x10C7–0x10CA fall back to the generic "<text>: <code>" line |
+| 0x2042 RIDE_OFF_CMD {} | FUN_004a2060 | `Char::GetoutOfPet`, mode 1, effect "Pet_Fi01", closes the ride window |
+| 0x2043 SOMEONERIDE_OFF_CMD {u16 handle} | FUN_004a2100 | same on another character |
+| 0x2046 RIDE_HUNGRY_CMD {u16 hungry} | FUN_004aa1c0 (Z02 §9.1) | gauge; text when 0 |
+| 0x2047 CREATECASTBAR {u16 millisec} | FUN_00499c10 | stops auto-run, starts the cast bar for `millisec` |
+| 0x2048 CANCELCASTBAR {} | FUN_004d8f90 | resets the cast bar |
+| 0xCC03 / 0xCC07 / 0xCC09 {u16 err} | FUN_0049d220 / FUN_0049d250 / FUN_0049d280 | system message `GetErrMsg(err)` unless err is the success code of its family (0x3068 / 0x3080 / 0x3090, ignored): so the 0x3080 "success on the FAIL opcode" of 0xCC05 (Z07 §8) is expected by the client; 0x3069–0x3070, 0x3081–0x3086, 0x3091–0x3096 all have texts |
+
+---
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -2185,6 +2585,13 @@ script helpers `PetBaseObjectEffect` / `PetBaseObjectSound` over the generic scr
 | Z13-B45 | Lua `cPet_SaveTendency` FUN_005ea410 | only applies the pending change (`ApplyChangedTendency`); no 0xD401 | mind / stress reach the DB only at unsummon and at the character save | apply and send 0xD401 (`sp_PetSystem_SaveTendency`) |
 | Z13-B46 | `CPetData::ReadData` FUN_004cf870 | the "Invalid ID in PupMain.shn" assert prints the destination row's PupID, which is not written yet | the log shows uninitialised heap bytes instead of the bad id | print the source row's PupID |
 | Z13-B47 | `spt_CreatePet` FUN_0055d290 | `GetPetInitMindRange` / `GetPetInitStressRange` leave the output untouched when no PupServer row matches; the caller does not check | a pet without a PupServer row gets mind / stress from stack garbage and the nId bytes (out of the 1–100 / 1–10 bounds) | refuse the creation or use the global bounds |
+| Z13-B48 | `sp_HorseCast` FUN_0045e0e0 | does not set `eMoverSystemType`; a mover cast that was cancelled (`sp_HorseFree` only clears `castslot`) leaves `MVST_MOVER` | the next horse cast ends in `sp_MoverSystem_SummonItem` with the horse item ("Mover data null" assert, cast cancelled, no mount); the second try works | `eMoverSystemType = MVST_RIDE` in `sp_HorseCast` (as `sp_MoverSystem_Cast` does for movers) |
+| Z13-B49 | `sp_HorseOn` FUN_0045f270 | the `MoverUpgradeEffect` HP/SP recovery hook is set inside the "delete time not set yet" branch | an upgraded horse recovers HP/SP only on the very first ride of the item; afterwards never (movers set it on every `GetOn`) | set the recovery outside that branch |
+| Z13-B50 | `sp_HorseItemSave` FUN_0045e810 | returns without `sp_ItemAttrSave` once the item is bound (`IsPutOnBelonged == 1`); the save sits inside the "bind now" test | hunger, expiry and the during-ride flag of a bound mount are not written at feeding / dismount / first ride; only a later full item save (if any, Z05) persists them | bind-and-log only when unbound, save always |
+| Z13-B51 | `so_MoverSystem_GetOff` FUN_0045f020 with how = 2 from a layer move | the owner's `horselockindex` lock is kept (only how = 0 frees it), then `so_ply_LayerMoverRideOn` → `SummonItem` takes a second lock on the same cell | after a layer change on an own mover the mover item's cell stays locked until relog *(inferred effect)* (also `REMOVE_WARP`) | free the lock unless the player really leaves the zone (how = 1 / logout) |
+| Z13-B52 | `sp_HorseCast` FUN_0045e0e0 | when no `Riding.shn` element matches the item, `info` keeps the last element scanned and the cast goes on | casts with the last row's cast time and later shows its horse; unreachable with the shipped data (only `Riding.shn` items and mover items use `ui_ride`, movers go to `sp_MoverSystem_Cast`) | reset `info` to null when the scan finds nothing |
+| Z13-B53 | `sp_HorseOn` FUN_0045f270 | `sp_MakeRideBriefInfo` always returns 1 | the failure branch (0x2041 {0x10C3} + restore the shape backup) is dead; the abstate-0x4B refusal right after it leaves the backup marked and does not restore | check abstate 0x4B before building the ride shape |
+| Z13-B54 | `sp_MoverSystem_SummonItem` FUN_0045ec10 | sets the ride-skill cooldown (and tells the client) before `sp_MoverSystem_GetOn`; a failing get-on (abstate 0x4B: 0x306A) frees the mover but keeps the cooldown | the player waits the full cooldown without having ridden | set the cooldown after a successful get-on |
 
 ## Not reconstructed / uncertain
 
@@ -2221,6 +2628,12 @@ script helpers `PetBaseObjectEffect` / `PetBaseObjectSound` over the generic scr
   traced (the 0x1C1C handler does not read the item). Pets (§6): the client effect of the polluted abstate bit 291
   (Z13-B43), whether the StaImmortal set in `spt_Regenerate` ever succeeds (HP test before HP = 1), and what player mode 7
   is in `spt_FindMaster` are *(inferred)* / open; `GetPetActionBundleFlexible`'s random pick is read through garbled decompiler output. That the lock list keeps an unreleased cast lock until relog (Z13-B34) is *(inferred)*.
+- Mounts (§7): `go_Get_NpcObject(&ui_ride)` is a folded getter; that it returns `ui_ride`'s skill (whose first u16 is the
+  "UseRide" skill ID) is *(inferred)*, as is the skill bound by `uir_SetSkill` (folded body, Z09). `so_AbnormalState_Set`
+  writing the strength used into `g_NewAbstateStrength` (read by `sp_MoverOffEffect`) is *(inferred)*. What the item-use
+  pipeline does when `UseItemRide::uib_DirectUse` returns 1 without doing anything (modes ≠ 1, 2, 6, which `uib_CanUseItem`
+  lets through) was not traced. Whether a later full save writes the attributes skipped by Z13-B50 was not checked (Z05).
+  A passenger who links alone re-creates the owner's mover without a master in the new map (§7.7); its fate is part 8.
 
 ## Coverage boundary
 

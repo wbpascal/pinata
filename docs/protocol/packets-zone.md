@@ -11040,6 +11040,14 @@ to the whole map instance (target 0xFFFF) or one object. The mob version sends l
 | 0 | u16 | walkspeed |  |
 | 2 | u16 | runspeed |  |
 
+### `0x2041` NC_ACT_RIDE_FAIL_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_0045d3b0 (SendErrorCode(8, 0x41, err)); client FUN_00499ee0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x10C2 cooldown, 0x10C3 wrong mode / abstate 0x4B, 0x10C4 casting, 0x10C8 map forbids riding, 0x10CA ride skill missing; 0 = no message |
+
 ### `0x2045` NC_ACT_RIDE_FEEDING_ACK (hand-named) (S→C)
 
 **Verified layout** (basis: zone FUN_0045f9e0; not handled by the 2016 client)
@@ -12128,6 +12136,20 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 8 | u8 | nPartyIndex |  |
 | 9 | u8 | nSlotIndex |  |
 
+### `0xcc0c` NC_MOVER_LINKDATA_ZONE_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_005a5ac0 → FUN_0045ddf0 (copy of MOVER_LINKDATA))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | charNo of the sender (Z→WM: so_GetCharNo; WM→Z: the target player) |
+| 4 | i32 | nItemSlot | inventory slot of the mover item; −1 for a passenger |
+| 8 | u32 | nMoverID | MoverMain.MoverID |
+| 12 | u32 | nMoverHP | mover HP at the link |
+| 16 | u32 | nMasterCharNo | owner's charNo |
+| 20 | u8 | nGrade | mover upgrade grade |
+| 21 | u32[10] | nPassenger | charNo per seat, −1 empty; only the linking player's own seat is filled |
+
 ### `0x0821` NC_MISC_TIMEFROMWORLD_CMD (WM→zone)
 
 **Verified layout** (basis: zone FUN_004511a0)
@@ -12676,6 +12698,17 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 24 | u16 | kqId |  |
 | 26 | u32 | kqHandle |  |
 
+### `0x0554` NC_LOG_GAME_ITEM_PUT_ON_BELONGED (Z→GameLog)
+
+**Verified layout** (basis: zone FUN_0045e810 (sp_HorseItemSave))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum |  |
+| 4 | u64 | itemkey | item register number |
+| 12 | u16 | iteminvenfrom | 0x2400 | slot (inventory 9) |
+| 14 | u16 | iteminvento | same value |
+
 ### `0xc80f` NC_SYSLOG_CHAR_QUEST_STARTED (Z→GameLog)
 
 **Verified layout** (basis: zone FUN_005bf280)
@@ -12845,6 +12878,20 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 7 | u16 | nError |  |
 | 9 | i32 | eLevelType |  |
 | 13 | Name3 | sMapName |  |
+
+### `0xcc0b` NC_MOVER_LINKDATA_WORLD_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_0045e710 (sp_MoverSystem_ZoneLink_Save2World); 2016 PDB MOVER_LINKDATA (0x3d bytes))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | charNo of the sender (Z→WM: so_GetCharNo; WM→Z: the target player) |
+| 4 | i32 | nItemSlot | inventory slot of the mover item; −1 for a passenger |
+| 8 | u32 | nMoverID | MoverMain.MoverID |
+| 12 | u32 | nMoverHP | mover HP at the link |
+| 16 | u32 | nMasterCharNo | owner's charNo |
+| 20 | u8 | nGrade | mover upgrade grade |
+| 21 | u32[10] | nPassenger | charNo per seat, −1 empty; only the linking player's own seat is filled |
 
 ### `0x0811` NC_MISC_ZONERINGLINKTEST_RNG (Z→Z (ring))
 
