@@ -18,9 +18,9 @@ expiry) and `docs/pseudocode/zone/Z12-stats.md` §2.5 / §4.1 (stat matrix, `roe
 - **bearer** = the object that carries the state (the routine's `ShineMobileObject *` argument), **caster** = the
   setter stored in `e.aeo_Caster`.
 
-Parts done: §1–§12 (framework, base actor, damage over time, area damage, heal over time, detach actions, rate
-actors, damage / skill / death hooks, element classes). Still to come (see `docs/plan/status/Z22.md`): the sweep
-(knowledge file, gap check, final bugs / boundary).
+Sections: §1–§12 (framework, base actor, damage over time, area damage, heal over time, detach actions and the
+removers dispel / cure / steal / map refusal, rate actors, damage / skill / death hooks, the skill enchant, element
+classes). Facts other items need: `docs/knowledge/Z22.md`.
 
 ## 1. Framework
 
@@ -146,6 +146,10 @@ ase_AttachObject(e, o)                                                          
     o.vt[0x5d8](action, 0xffff) (player: so_AddItemAction)
 ase_DetachObject(e, o)                                                                  @ FUN_00402000
     actor(e).sasa_DetachObject(e, o);  same lookup → o.vt[0x5dc](action, 0xffff) (player: so_DelItemAction)
+ActionEffectAbStateTable::FindActionID(inxName, *actionId) → bool                       @ FUN_005c7f40
+    linear scan of ActionEffectAbState.shn { char InxName[32]; u32 Strength; u16 ItemActionID } (0x26, pdb2016):
+    first row whose InxName equals (case-sensitive) → *actionId = ItemActionID; the Strength column is not read
+    # the 2016 table has 0 rows: no abstate ever adds an item action
 AbnormalStateElementRecover::ase_DetachObject(e, o)                                     @ FUN_004084e0
     ase_DetachObject; then o.vt[0xd4c](0) (player: so_SendSpeedInformation)        # only StaCannotControl uses it
 ase_AfterEnchant(o)                                                                     @ FUN_00405500
@@ -743,6 +747,112 @@ The only 2016 kind is SubStaKQSpImBuff (`SAA_SPEEDRESISTRATE` 1000): when it lan
 the bearer ends at once. The resist values themselves are matrix stats (Z12 §2.5); the actor only uses the presence
 of the action.
 
+### 7.5 The removers: dispel, cure, steal and map refusal  @ FUN_0057d8e0, FUN_0042c440, FUN_0042bf70, FUN_00440b40
+
+These are the only writers of the §7.1 flags. They walk the bearer's element list `so_mobile_AbstateList` (vt 0x52c)
++0xcb0, a `List<AbstateElementInObject>`. Every zone `List<T>` has the layout built by `l_MakeList` (example
+`List<AbnormalStateNode>::l_MakeList` @ FUN_0040e0d0): +4 `u16 l_MaxSize`, +8 `l_Array` of `MaxSize + 1` 12-byte
+`ListStruct { T *ls_Content; u16 ls_Next; u16 ls_Prev; u8 ls_IsActiv }`, the sentinel at index `MaxSize`
+(`l_Finger.store`, +0xe), free nodes chained from `l_Finger.empty`. "For each element" = from `sentinel.ls_Next`
+while the index is `< MaxSize`; "from the newest" = from `sentinel.ls_Prev` backwards.
+
+```pseudo
+ShineMobileObject::smo_Dispel(c, s, empower, t, bo)                                     @ FUN_0057d8e0
+    # called by smo_SkillBlast FUN_00581160 for every target hit (Z03 §5.6 step D); twice on one path (§10.7, Z22-B16)
+    if s.sdi_Activ.EffectType ∉ { SE_DISPEL 9, SE_CURE 8 }: return
+    smash = SmashArgument { sklidx = s, empower = *empower }
+    if not c.so_mobile_IsEnemy (vt 0x72c)(t):          # friend: remove its bad states
+        if EffectType == SE_CURE: mask = 0x18                                       # DA_DISEASE | DA_POISON
+        else: mask = DISPELDEBUFF ? 0x04 : 0 | DISPELDISEASE ? 0x08 | DISPELPOISON ? 0x10 | DISPELCURSE ? 0x20
+                     | BOMBDISPELALL ? 0x400                                        # bit = 1 << DispelAttr
+    elif not s.sdi_DISPELDEEPER: mask = s.sdi_DETECT ? 0x200 (DA_HIDE) : 0x02 (DA_GOOD)   # enemy: strip buffs / reveal
+    else: mask = 0x100 (DA_DEEPER) if t carries a STA_DEEPER element set by c (aeo_IsMine(x, c, STA_DEEPER)), else 0
+        # aeo_IsMine(x, c, idx) @ FUN_00408880: x.aeo_Index == idx, x.aeo_Caster.obj and c non-null, same object
+        #   handle (+4), and c.so_GetCharRegistNumber (vt 0x344) == x.aeo_Caster.chrregnum
+    c.so_SkillCure (vt 0x5a4)(t, &smash, bo)
+    c.so_Dispel    (vt 0x5a8)(t, &smash, bo, mask)
+    skillresultbuffer[bufferpoint] .target = t, .isenchant = 1, .isresist = 0       # both return values are ignored
+
+ShineMobileObject::so_SkillCure(c, t, smash, bo) → bool                                 @ FUN_0042c440
+    if t null, t dead (smo_GetMode 3) or the skill has no sdi_CURE: return 0
+    grade = s.sdi_CURE.value
+    for each element x of t:
+        if rand(1000) < 1001:                          # always true (original bug) Z22-B17
+            info = AbState of x  (index ≥ 0x318: assert "as_FromIndex : Invalid skill idx")
+            if info.DispelIndex ∈ { DA_DISEASE, DA_POISON } and info.StateGrade ≤ grade:
+                x.aeo_Flag |= f_Cured; x.aeo_Tick.terminate = now; return 1          # only the oldest match
+    return 0
+
+ShineMobileObject::so_Dispel(c, t, smash, bo, mask) → bool                              @ FUN_0042bf70
+    if t null or dead: return 0
+    if t.so_MiscTable (vt 0x984).mds_Dead.ByDebuff (+0x58 bit 0) and mask & 0x02:   # servant row Debuff = Dead (Z09 §10)
+        t.so_DamagedBy (vt 0x5c0)(t, t.so_GetHP (vt 0x4e8)(1000, 1)); return 1       # killed, the attacker is t itself
+    result = 0; picks = 1; chosen = null
+    # pass 1: dispel, oldest first
+    for each element x of t (next index read before x):
+        if rand(1000) < 1001 and mask & (1 << AbState(x).DispelIndex):               # rand test always true (Z22-B17)
+            if s.sdi_DISPELONE:   x.terminate = now; return 1                          # first match only; no flag,
+                                                                                       #   no steal, no random pick
+            elif s.sdi_DISPELALL: x.terminate = now; result = 1                        # no flag
+            else:
+                if s.sdi_DISPELRANDOM:                                                 # reservoir sample, uniform
+                    if picks == 1 or RandomBox[picks] == 0: chosen = x
+                    picks += 1
+                if s.sdi_BOMBDISPELALL: x.aeo_Flag |= f_Dispeled; x.terminate = now; result = 1
+    # pass 2: steal, newest first (only reached without DISPELONE)
+    for each element x of t from the newest:
+        if mask & (1 << AbState(x).DispelIndex) and s.sdi_STEALENCHANT:
+            if x's element class is a party main (element vt 0x0c, §12.1): continue
+            if rand(1000) < s.sdi_STEALENCHANT.value:
+                x.terminate = now                                                       # no flag: its detach runs
+                if c.so_AbnormalState_Set (vt 0x638)(c, x.aeo_Index, x.aeo_Strength, entry, setTime = x.aeo_Tick.start,
+                                                     0, restCount = x.aeo_RestCount, keep 0,
+                                                     EF_JUSTENCHANTSTEALENCHANT 6, null):
+                    so_AbnormalState_BitSet(c, AbStataIndex)
+                    if row info: c.so_AbnormalState_Inform (vt 0x3f0)(index, KeepTime, 1)     # 0x2429 to c
+                                 so_AbnormalState_BroadcastSet(c, index, KeepTime, strength)  # 0x2427 / 0x1C18
+                result = 1
+            break                                       # only the newest eligible state gets a steal roll
+    if picks > 1: chosen.aeo_Flag |= f_Dispeled; chosen.terminate = now              # DISPELRANDOM's pick
+    return result          # 0 for a DISPELRANDOM-only dispel that removed a state (original bug) Z22-B18
+```
+
+Notes:
+
+- Removal is deferred: `terminate = now` makes the state expire on the bearer's next routine walk (Z03 §6.4), which
+  sends 0x2428 and runs the detach hooks (§7.1: only the flagged removals defuse bombs / detach processes).
+- The stolen copy is set with the victim's **start** tick and keep 0, so `aeo_Set` FUN_0040a340 ends it at
+  `start + ticks(KeepTime + 999) × SET_ABSTATEKEEPTIMERATE / 1000`: the victim's original row time, without the
+  victim's extensions; a state set long ago is stolen already expired. The thief's client is told the full
+  `KeepTime` from now (original bug) Z22-B19.
+- Masks are `1 << DispelAttr` (`DA_GOOD 1, DEBUFF 2, DISEASE 3, POISON 4, CURSE 5, …, DEEPER 8, HIDE 9, BOMB 10`).
+  The friendly `BOMBDISPELALL` sets bit 10 (DA_BOMB), so a bomb dispel removes bombs (and the debuff kinds also
+  selected) with `f_Dispeled`: the bomb is defused (§7.2).
+
+```pseudo
+ShinePlayer::sp_RemoveField(p)                                                          @ FUN_00440b40
+    # called once from the map-login completion (Z01 §6, 0x1803 login burst: "… sp_RemoveField")
+    f = p.field (+0x7a FieldMap*);  if f null or no abstate list: return
+    for each element x of p:
+        if abstateidentarray[x.aeo_Index].entry and f.fm_IsRefuseAbstate(entry.index.AbStataIndex):
+            x.aeo_Flag |= f_SystemRemove; x.terminate = now          # expires on the next walk, defused (§7.1)
+
+FieldMap::fm_IsRefuseAbstate(f, index) → bool = index ∈ f.fm_RefuseAbstate (std::set)            @ FUN_00464540
+    # other caller: ShineMobileObject::so_AbnormalState_Set FUN_004161c0 returns 0 for such a state on the object's
+    #   current map (so_CurMapname = &field.fm_MapID, offset 0) before asl_AbstateSet; Z03 §6.2 omits this step
+
+FieldContainer::fc_AbstateInFieldLoad()                                                 @ FUN_00464950
+    rows = StateField.shn { char AbStateInx[32]; Name3 MapName; StateSetType StateSet }   (0x30 bytes, pdb2016)
+    for each field map m, for each row r:
+        idx = dic_abstate.as_BTreeIndex[r.AbStateInx]
+        SST_SET_HERE 1: if m.name ≠ r.MapName: m.fm_SetRefuseAbstate(idx)   (FUN_00464480)   # only allowed on MapName
+        SST_NOT_HERE 0: if m.name == r.MapName: m.fm_SetRefuseAbstate(idx)                   # forbidden on MapName
+```
+
+2016 `StateField.shn` has 6 rows: StaCrackerACDownRate / WCDownRate / Disease / Curse only on `B_Cracker`, StaHide
+forbidden on `BH_Helga` and `BH_Cracker`. So a player who leaves the Cracker map with a Cracker debuff loses it (without
+its detach effect) when the next map's login completes, and an existing StaHide ends on entering those two maps.
+
 ## 8. Exp and drop rate actors (types 109, 110)
 
 ```pseudo
@@ -984,6 +1094,66 @@ the matrix actions (`SAA_MAXHPPLUS` / `MAXSPPLUS` / `MAXHPRATE` / `MAXSPRATE`). 
 (SubStaSafeProtection, set-item states SubStaSetF4HPUp …), 39 MAXHPPLUS 5 HP scrolls, 40 MAXSPPLUS 10 kinds
 (SubStaSoulEdge1…5, SP scrolls); 25 MAXSPRATE has no rows.
 
+### 10.7 Skill enchant (vt 0x5a0)  @ FUN_00431ca0
+
+`smo_SkillBlast` FUN_00581160 (Z03 §5.6) applies a skill's four abstate entries in one of two ways. With
+`hit.mha_HitStep ≥ 0` (a multi-hit step) it uses the inline loop Z03 §5.6 step E describes. With `mha_HitStep < 0`
+(when it is negative was not traced: `AxialListScanSkillTarget::alsst_SkillBlast` FUN_00582de0 overwrites it only for
+`SS_DMGSHARE` skills and treats −1 like 0 as "first hit") and a target that is not immune, it calls
+the virtual `so_SkillEnchant` (player and mob vt 0x5a0 both = FUN_00431ca0) and sets `r.isenchant` when that returns 1,
+`r.isresist |= resisted`. Then it calls `smo_Dispel` (§7.5) **and** runs a second, inline copy of `smo_Dispel`'s body
+(checked in the disassembly: `call 0x57d8e0` at 0x58295c, then the inline vt 0x5a4 / 0x5a8 calls at 0x582aeb /
+0x582b0c): every cure / dispel / steal of that path runs twice (original bug) Z22-B16. The other caller,
+`ShineMobileObject::smo_old_skill_blast` FUN_00579b50 (and its player override FUN_0057be40), sits in vt slot 0xea4,
+which nothing calls (no `[reg + 0xea4]` call in the 2016 disassembly): dead code.
+
+```pseudo
+ShineMobileObject::so_SkillEnchant(c, t, smash, bo, *resisted, unused) → bool          @ FUN_00431ca0
+    if t null or dead: return 0
+    s = smash.sklidx;  if s null: assert "…sp_NC_BAT_SKILLENCHANT_REQ : Blast invalid spell", return 0
+    *resisted = 0
+    if s.sdi_ToggleData not empty:                      # toggle skill (ToggleSkill.shn, Z03 §5)
+        if s.sdi_Activ null: return 0
+        if not c.so_ply_ToggleSkill_IsOn (vt 0xbc4)(s.ID):          # mobs: stub returning 0 (FUN_00615e70)
+            for each of the 4 entries with idx ≠ MAX: if c has idx (asl_Abstate_IsSet):
+                c.so_AbnormalState_Reset (vt 0x650)(idx); so_AbnormalState_BitReset(c, idx)
+                so_AbnormalState_BroadcastReset(c, idx)                                  # 0x2428 to sight
+            return 0                                    # turning the toggle off removes the caster's own states
+    if t has STA_IMMORTAL 291 or STA_ADLFLOUSSIERIMT 499 (vt 0x3e4): return 0
+    if s.sdi_Activ null: assert "… Blast invalid spell activ", return 0
+    if EffectType == SE_HEALING and not c.smo_ICanHealTo (vt 0xe94)(t): return 0
+    result = 0
+    for k in 0..3: (idx, strength, sucrate) = s.sdi_Abstate[k]           # ActiveSkill AbstateIndex / Strength / Rate
+        if idx == MAX or rand(1000) ≥ sucrate or not (entry = as_FromIndex(idx)): continue
+        if t.so_AbnormalState_Resist (vt 0x634)(entry): *resisted |= 1; continue    # Z03 §6.2 resist roll
+        bonus = empower.keeptime ? s.sdi_Activ.<+0x1e3 + 4·keeptime> : 0         # = nT2[keeptime − 1] (ActiveSkill T columns)
+        keep  = entry.subabstate[strength].KeepTime (0 without a row)
+        if c has an item-action container (vt 0x5d0) and s has skill groups:
+            keep = item-action rate of SEIT_KEEPTIME_RATE_INCREASE for s's groups applied to keep  (Z17)
+        passive = 0
+        if one of s's ActiveSkillGroups has ActiveSkillGroupIndex 99 BiffTimeIncrease:
+            passive = (bonus + keep) × c.smo_Param.PassiveBuffKeepTimeUPRate / 1000    # Z12 §2 (KeepTimeBuffUPRate)
+        keep += passive + bonus                         # (both products divide first above 3 600 000 ms)
+        if t.so_AbnormalState_Set (vt 0x638)(c, idx, strength, entry, now, 0, restCount −1, keep,
+                                            EF_JUSTENCHANTBATTLEOBJECT 5, null):
+            str = g_NewAbstateStrength                  # the strength asl_AbstateSet actually stored
+            x = t's element of entry.AbStataIndex
+            if x: c.so_ItemActonAbstateApp (vt 0x5d4, FUN_0055dea0)(x, s, t)
+                # 8 item-action kinds (SEIT_STA_AC_RATE_DECREASE, _DEX_, _MAX_HPSP_, _DEAD_HPSP_RECOVER_, _SHIELDAC_,
+                #   _DOT_HEAL_, _WC_RATE_INCEASE, _SHEILD_BLOCK_) → aeo_SetItemActionEffect(x, kind, rate) (Z17 / Z21)
+            x null or no element class: assert "bo_Routine: invalid abstate" / "… invalid abstate 2"
+            elif not element.vt[0x0c]():                # party mains inform through their own routine (§12.4)
+                so_AbnormalState_BitSet(t, index)
+                shown = keep × SET_ABSTATEKEEPTIMERATE / 1000                                # as aeo_Set scales it
+                t.so_AbnormalState_Inform (vt 0x3f0)(index, shown, 1)                       # 0x2429 to t (player)
+                so_AbnormalState_BroadcastSet(t, index, shown, str)                         # 0x2427 / 0x1C18
+            result = 1
+    return result
+```
+
+The setter passed to `so_AbnormalState_Set` is the caster `c`, so a party-main state (§12.4) set by a skill on
+another object has `aeo_Caster.obj` ≠ bearer; the party routines then use that raw pointer (§13).
+
 ## 11. Death hooks (slot 0x14)  @ FUN_00407730, FUN_00407910
 
 `ShinePlayer::so_KilledBy` FUN_00433be0 (Z03 §7.2) calls slot 0x14 for every state of the dying player.
@@ -998,7 +1168,10 @@ SubAbnormalStateActorPartyRecharge::sasa_Act_Killed(p, e):                      
     party ≥ 4000: assert "… : Too large party handle", return
     n = partycontainer.m_Array[party].NumOfMember; n ∉ 2…5: assert "… : Invalid party member number", return
     for i in 0 … n−1:
-        m = pm_FindMember(partymanufacture, party, i)
+        m = pm_FindMember(partymanufacture, party, i)                                  @ FUN_004cc390
+            # party ≥ 4000 → assert "Too large party regnum"; raid party (isRaidTypeParty): Members[i].memberobj if
+            #   i < NumOfMember else null; normal party: needs 2…5 members ("Invalid party member number") and
+            #   i < NumOfMember ("sub is too big"), then Members[i].memberobj (null for an offline slot)
         if m and m.smo_GetMode() ∉ {0, 3} and so_DistanceSquar(p, m) < 1,000,000:     # alive, within 1000 units
             m.so_ply_PartyRecharge (vt 0x7a0)(rate)
 ShinePlayer::so_ply_PartyRecharge(m, rate):                                                  @ FUN_0055a0a0
@@ -1238,6 +1411,8 @@ AbnormalStateReinforcedMove::ase_PreAttachObject(setter, bearer, strength, …) 
         if bearer.smo_GetMode() == 4 (camp / tent): bearer.so_ply_ReinforceFoldtent() (vt 0x488)
         bearer.so_ply_AllCastCancel() (vt 0x8d0)           # players; mobs: folded no-ops
         skilleffectapplyer.sbec_SkillCancel(bearer)        # drops the bearer's pending skill blasts (Z03)
+            # @ FUN_00437ca0: std::remove of every queued SkillBlastEffect that equals (SkillBlastEffect::operator==)
+            #   a template with sbe_CasterObject = bearer (FUN_005794a0 compares only the caster), then erase; the blasts never fire (no packet)
         0x2456 NC_BAT_SUMEONESKILLCUT_CMD { u16 caster = bearer.handle } to the bearer's sight range incl. the bearer
 AbnormalStateReinforcedMove::ase_AttachObject  @ FUN_00401db0 — the knock-back / pull movement (vt 0xa28), Z18 (Z09 §31.5)
 AbnormalStateReinforcedMove::ase_DetachObject(e, o)                                     @ FUN_004085b0
@@ -1304,6 +1479,10 @@ writes 0 (Z11 §3.1, `ac_Hide` FUN_0041a3a0 / `ac_Show` FUN_0041a4d0). Its keep 
 | Z22-B13 | `AbnormalStateHide::ase_Routine` 00409c10 | tests the `removed` **pointer** for null instead of the flag | the per-tick write of `ash_SubLayer` (3) to the GM's `so_layer.layer→l_Sub` never runs; GM hide relies on `ac_Hide`'s own write | `if (!*removed)` (keep the hidden sub-layer while the state lasts) |
 | Z22-B14 | `AbnormalStateGuildAcademyMasterEnchant::ase_Routine` 0040ef70 | buffs every scanned guild / academy member (up to 200), ignoring `PartyEnchantNumber` (5); informs the master with keep 0xFFFFFFFF while < 6 000 000 ticks remain (always: the main lasts 70 s) and broadcasts 900 000 000 ms | unlimited targets; the master's client and sight show a wrong (endless) time for its own copy, where the party routine sends the real remaining time | cap at `PartyEnchantNumber`; send the remaining time as `AbnormalStatePartyEnchant::ase_Routine` does |
 | Z22-B15 | `AbnormalStatePartyEnchant::ase_Routine` 0040ebc0 (no-party branch), `…CouplePartyEnchant::ase_Routine` 0040e5e0, `…GuildAcademyMasterEnchant::ase_Routine` 0040ef70 | send `so_AbnormalState_Inform` / `BroadcastSet` for the bearer's own copy without checking `asl_AbstateSet`'s result (the party-member path and the in-party branch do check) | when the set is refused (a stronger copy present, a refusing map, …) the client is told of a state / time the server did not set | inform only after a successful set |
+| Z22-B16 | `smo_SkillBlast` FUN_00581160 (path `mha_HitStep < 0`, §10.7) | calls `smo_Dispel` FUN_0057d8e0 and then runs an inline copy of its body | every cure / dispel / steal of a single hit runs twice: SE_CURE and DISPELONE remove two states, DISPELRANDOM picks twice, STEALENCHANT rolls twice | apply the dispel once (the `mha_HitStep ≥ 0` path already does) |
+| Z22-B17 | `so_SkillCure` FUN_0042c440, `so_Dispel` FUN_0042bf70 | each candidate state passes `rand(1000) < 1001` first | dead check (always true) | a per-state success rate (a skill or row column) was probably planned |
+| Z22-B18 | `so_Dispel` FUN_0042bf70 | a dispel with only `sdi_DISPELRANDOM` returns 0 even when its pick was removed; DISPELONE / DISPELALL / BOMBDISPELALL / a steal return 1 | harmless today: both callers ignore the result | return 1 when the random pick removes a state |
+| Z22-B19 | `so_Dispel` FUN_0042bf70 (steal) | the stolen copy is set with the victim's start tick and keep 0 (`aeo_Set`: ends at start + row KeepTime), but Inform / BroadcastSet send the full `KeepTime` | the thief's copy ends earlier than its client shows; a state set more than `KeepTime` ago (e.g. extended by a passive) is stolen already expired | set the copy with `now` and the victim's remaining time, and send that |
 
 ## 13. Not reconstructed / uncertain
 
@@ -1326,22 +1505,36 @@ writes 0 (Z11 §3.1, `ac_Hide` FUN_0041a3a0 / `ac_Show` FUN_0041a4d0). Its keep 
   `so_AbnormalState_Reset`) restores it elsewhere (the Type 38 actor's detach, `sp_nPolymorphAbstateIndex`) was not
   followed; Z09 §28.3 documents `smo_ply_Polymorph`.
 - The party routines use `e.aeo_Caster.obj` without the register-number check of `aeo_GetCaster`; safe while the
-  caster is the bearer (self-cast mains, login restore with setter = the player), a dangling pointer otherwise
-  *(inferred: no other setter was found, but `so_SkillEnchant` was not read whole)*.
+  caster is the bearer (self-cast mains, login restore with setter = the player). `so_SkillEnchant` (§10.7) passes the
+  caster as setter, so a party-main skill aimed at another object would leave a pointer that dangles once the caster
+  logs out; whether any 2016 `ActiveSkill` row with a party-main abstate targets others was not checked.
+- When `smo_SkillBlast`'s `hit.mha_HitStep` is negative (§10.7 path) was not traced into the blast container
+  (`SkillBlastEffect.sbe_MultiHitArgument` starts at −1; Z03 §5.4).
+- `so_GetHP (vt 0x4e8)(1000, 1)` in the servant kill of `so_Dispel` is read as "full current HP" from the arguments
+  (rate 1000); the two-argument form of `so_GetHP` was not opened.
 - The ctor's member → index join is a regex over the decompiled ctor (scratch script); all 792 nodes resolved, but
   a member assigned through an unusual expression would be misattributed.
 
 ## 14. Coverage boundary
 
-(Preliminary, completed in the sweep part.)
+Gap check (sweep): every `FUN_` cited here, expanded one call deep with `coverage.py`'s call graph (hubs > 25 callers,
+registered handlers and < 6-line functions skipped), against all docs: the rows below are what remained.
 
 | Found | Covered by | Argument |
 |---|---|---|
 | `GuildTournamentSystem::ScanEnemyUser` FUN_0047a3d0 | Z16 (guild tournament system class, via Z09 §31 row "Guild tournament") | GT state logic; the actor only triggers it |
 | `ShinePlayer::sp_SkinPolymorph` FUN_004a3280, `ase_AttachObject` FUN_00401d40 | Z18 (Z09 §31.2 rows owned by Z03, `docs/knowledge/Z09.md` §3) | listed there as Z03 leftovers |
-| set-item effect slots (`aeo_FillSetItemEffect`, `aeo_SetItemEffectStore`, `setitemskilleffect`) | Z21 (plan: "set-item abstates and skill effects") | the actors only read the stored rates |
-| `so_Heal` / `so_recoversp`, `so_DamagedBy` / `so_KilledBy`, `roe_DefendPower`, level-gap and angle tables | Z03 §4, §7 (done) / Z09 §17.3 | combat core, already documented |
-| `so_Dispel` FUN_0042bf70, `so_SkillCure` FUN_0042c440 (whole bodies; §7.1 has only the flag writes) | this item, sweep part (Z03 is done and does not document them) | small gap |
-| `sp_RemoveField` FUN_00440b40 (map change; §7.1 has only the `f_SystemRemove` write) | to be checked in the sweep (Z01 mentions it) | map-change code, not an actor |
 | `AbnormalStateReinforcedMove::ase_AttachObject` FUN_00401db0 (knock-back / pull movement) | Z18 (Z09 §31.5 row "Skill-side helpers … skill movers 00401db0", owner Z03) | movement code; §12.7 documents the element's other slots |
-| `ShineMobileObject::so_SkillEnchant` FUN_00431ca0 (skill → abstate application; §12.9 has only the party test) | to be decided in the sweep (no item plan names it; Z03 is done and does not cite it) | skill side, not an element |
+| set-item effect slots (`aeo_FillSetItemEffect`, `aeo_SetItemEffectStore`, `aeo_SetItemActionEffect`, `SetItemAbstateEffect::siae_Clear` FUN_00510030, `SetItemData::SkillEffect::operator[]` FUN_00510010) | Z21 (plan: "`SetItemAbstateEffect::siae_*` 00510030…00510350", "`aeo_SetItemActionEffect` 00510810") | the actors only read the stored rates |
+| item-action observers: `ItemActionObserveManager::EventRunBySkillGroupIndex` FUN_005d1f50, `ActionResults::GetRateAppliValue` FUN_005d0c20, `ItemActionArgument` ctor FUN_0042aad0, `Send_SETITEMHEALEFFECT` FUN_005cfbb0 (from `RecoverTypeEffect::_execute`) | Z17 (plan: "Item actions … the player's item-action cooldown container (player `vt 0x5d0`)") | §10.7 / §5 use them only as "item-action rate of kind X" |
+| `so_Heal` / `so_recoversp`, `so_DamagedBy` / `so_KilledBy`, `roe_DefendPower`, level-gap tables, `DamageByAngle::DamageTable::operator[]` FUN_0045c9a0 | Z03 §4.5 / §4.6 / §7 (done) / Z09 §17.3 | combat core, already documented |
+| `smo_SkillBlast` FUN_00581160 apart from the enchant / dispel calls, its `mha_HitStep ≥ 0` abstate loop | Z03 §5.6 (done; steps D / E) | skill blast core; §10.7 adds only the `mha_HitStep < 0` path and Z22-B16 |
+| callees of `so_KilledBy` FUN_00433be0 reached through §11: `sp_HorseOff` FUN_0045f7c0 (also from `sp_StateChangeToNormal`) | Z13 (plan: "Mounts: mover creation …, `so_smv_GetOff` …") | dismounting a horse is mount code; Z03 §7.2 / Z08 name the call |
+| `AbstateShelter::operator[]` FUN_00418890, `std::vector<AbstateElementInObject>` push_back / resize FUN_00433b70 / FUN_00433ac0, `~AbstateElementInObject` FUN_00401b20 (from `so_KilledBy`) | Z03 §7.2 (done: `g_ShelterItem` keeps the saved states) / Z18 (Z09 §31 row "Abnormal states: … ~AbstateElementInObject 00401b20") | STL container instances; the stored data is described in Z03 |
+| `PartyManufacture_pm_QuestCheck` FUN_004ccbf0, `ShineQuestDiary::sqd_MobDead` FUN_00578170 (from `so_KilledBy`) | Z15 (plan: "mob kill (… `ShineQuestDiary_sqd_MobDead` …), party quest checks (`PartyManufacture_pm_QuestCheck_*`)") | quest engine |
+| `sp_KQElementFunction` FUN_00499710, `KQPlayerInfoList::kqpil_KnockDownPlus` FUN_00496de0 (from `so_KilledBy`) | Z16 (plan: "`KQPlayerInfoList` (… knock-down counters …)") | kingdom-quest counters |
+| `CharaterSkillList::csl_EmpowerStruct` FUN_004482c0, `csl_MaximumSkill` FUN_00448240 (from `SkillCostCheck`) | Z03 §5.2 (done: "the SKILL_EMPOWER bits of the highest learned step") | skill list; §10.4 only reads the SP cost hook |
+| `std::operator!=<char>` FUN_0040e090, `vector<SkillDamage>::push_back` FUN_0057f350, `ShinePlayer::GetMode` FUN_00549800 | none needed | library code / one-line accessor |
+| second-order callees of the rows above, reached only because a row cites its parent: `sp_HorseItemSave` FUN_0045e810; `QuestPlayer_NPCMobKill` FUN_005c08d0; `kqpil_PlayerInformFunc` FUN_00498c40, `sp_MyKQElement` FUN_00496c50; `ItemActionObserveManager::_EventRun` FUN_005d1df0; `aeo_SetItemActionEffect` FUN_00510810; `BattleObjectList::bol_Store` FUN_00434ee0 | the row of the parent (Z13 / Z15 / Z16 / Z17 / Z21 / Z03 §5.6) | same subsystem as the parent |
+| `BinaryDataBox<StateField>::bdb_ReadData` FUN_004628e0 (SHN reader instance) | Z01 §2.3 (data tables and their loaders; StateField row) | §7.5 documents the StateField rows and their use |
+| STL and list templates: `std::_Tree<ABSTATEINDEX>` `_Linsert` / `find` / `_Buynode` FUN_00463f90 / FUN_004642e0 / FUN_00463f20, `std::_Remove<SkillBlastEffect>` FUN_00435dd0, vector `_Reserve` / `erase` / `_Uninit_def_fill_n` / `clear` FUN_004339f0 / FUN_00431b00 / FUN_00431a30 / FUN_0055de70 / FUN_004378d0, `vector<AbstateBuffer>::push_back` FUN_004187c0, `basic_string::compare` FUN_00409710, `ListTraveler::lt_Next` FUN_00402740, ctors `MultiHitArgument` FUN_00434b30 / `BattleObjectStruct` FUN_00434bb0 / FUN_00434b70, `ITableBase<ActionEffectAbState>::GetTotal` FUN_005c7e70, `ProtocolPacket::pp_NetCommand` FUN_00401280 | none needed | library / container code with no game logic (the `List<T>` layout is in §7.5) |
