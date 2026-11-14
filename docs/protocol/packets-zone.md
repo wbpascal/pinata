@@ -1410,11 +1410,11 @@ No payload fields read directly by the handler.
 
 ### `0x4414` NC_QUEST_START_REQ
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_QUEST_START_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_00578e90 → CQuestZone::QuestPlayer_NotCheckNPC FUN_005c03c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nQuestID |  |
+| 0 | u16 | nQuestID | quest to start / finish without its NPC (needs Start.bItem or the wait-list progress flag) |
 
 Handler `FUN_00578e90`
 
@@ -6038,13 +6038,13 @@ Sent from `FUN_00537ba0` (`FUN_00537ba0`) · payload 2 bytes
 
 ### `0x3060` NC_ITEM_OPENCLASSCHANGEMENU_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_OPENCLASSCHANGEMENU_CMD`, 11 bytes
+**Verified layout** (basis: zone FUN_0051fd10; client FUN_0049dcd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nNewClass |  |
-| 1 | u64 | nTotalPrice |  |
-| 9 | u16 | nError |  |
+| 0 | u8 | nNewClass | the other class of the player's third-job group (0 for none) |
+| 1 | u64 | nTotalPrice | sum of skill-book BuyPrice of the learned skills / passives of that group |
+| 9 | u16 | nError | 0x3680 ok (not read by the client); a wrong mode sends only u16 0x3681 at offset 0 (Z15-B44) |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_OpenClassChangeMenu` (`FUN_0051fd10`) · payload 11 bytes
 
@@ -6430,14 +6430,12 @@ Sent from `CQuestZone::Send_NC_QUEST_CLIENT_SCENARIO_DONE_ACK` (`FUN_005bb0c0`) 
 
 ### `0x440d` NC_QUEST_NOTIFY_MOB_KILL_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_QUEST_NOTIFY_MOB_KILL_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_005bdb00 (callers FUN_005c08d0, FUN_005c0b40, FUN_005c0cf0); client FUN_00728400)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | NumOfActionQuest |  |
-| 1 | PROTO_NC_QUEST_NOTIFY_MOB_KILL_CMD::MobOfQuest[NumOfActionQuest] | mobofquest | variable length, element PROTO_NC_QUEST_NOTIFY_MOB_KILL_CMD::MobOfQuest |
-
-Element `PROTO_NC_QUEST_NOTIFY_MOB_KILL_CMD::MobOfQuest` (4 bytes): +0 u16 nMobID, +2 u16 nQuestID
+| 0 | u8 | NumOfActionQuest | number of entries |
+| 1 | MobOfQuest[] | mobofquest | 4 bytes each: u16 nMobID (the quest row's End.NPCMobList[k].NPCMobID, not the killed mob), u16 nQuestID; one entry per matching kill entry, also already full ones |
 
 Sent from `CQuestZone::Send_NC_QUEST_NOTIFY_MOB_KILL_CMD` (`FUN_005bdb00`) · payload variable (iVar6 * 4 + 3)
 

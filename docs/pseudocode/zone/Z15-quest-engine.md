@@ -934,7 +934,7 @@ answer 1 runs `GOTO MARK1`, which does not exist: script closed as ERROR without
 ### 3.10 Script error codes (0x4401 `Cmd 0`, `Data.ErrCode`)
 
 Client texts from 2016 `On_NC_QUEST_SCRIPT_CMD_REQ` (TextData; `<%s>` = quest name). Codes without a text only close
-the dialog. Part 5 (§7) adds the non-script quest codes 0xB41…0xB5A.
+the dialog. The non-script quest codes 0xB41…0xB5A are §7.
 
 | Code | Raised by | Client text |
 |---|---|---|
@@ -1795,8 +1795,346 @@ Quest with PRIMARY EXP 500, MONEY 100, ITEM (id 2000 × 1), status 8 REWARD, pla
 
 ---
 
-<!-- Part 5 adds §6 other entry points and §7 quest error numbers. The sweep adds the bugs table, uncertain list and
-coverage boundary. -->
+## 6. Other entry points: NPC click, start request, kills, quest drops, Lua, GM
+
+Besides the client's quest packets (§3–§5), a script starts from an NPC click or a 0x4414 start request, and quest
+counters move on mob kills (the killer's party or raid shares them) and on Lua / Pine calls. All of these work on the
+player's `CQuestZone` (`p+0x173e8`, `ShinePlayer::sp_QuestDiary.sqd_QuestDiary`).
+
+### 6.1 NPC click and the start request 0x4414
+
+```pseudo
+# caller: ShinePlayer::InteractWithNPC FUN_004c4660 (Z02 §6.2, after 0x200A NC_ACT_NPCCLICK_CMD), with
+#         mobId = npc.vt 0x708 (the NPC's mob ID, not its handle). Result 1 → QuestPlayer_NPCClick(mobId) and the
+#         1000-unit range check; 2 → nothing; 0 → the NPC's own role / menu (0x201C), Z02 §6.2.
+CQuestZone::QuestPlayer_NPCClickCheck(mobId) → int:                                @ FUN_005ba250
+    if !m_pPlayer: return 0
+    m_nClickNPCNo = mobId                                         # default speaker of SAY (§3.3)
+    st = { hID = mobId }; CQuest::GetQuestStatusWithNPC(&st)      # FUN_00630f60: this NPC's best quest over the table (§4.4)
+    if st.lpQuestData and st.lpQuestData.ID != 0xFFFF and m_ParsingQuestID == st.lpQuestData.ID
+       and m_bWaitResult == 1 and m_QuestClickNPC == mobId:
+        return 2                                                  # this NPC's dialog is open and waits for an answer
+    if st.eResultState ∈ {4 REPEAT, 5 ABLE, 6 ING, 7 FAILED, 8 REWARD, 20 READ_ABLE}: return 1
+    return 0                                                      # 0 NONE (no quest), 9 LOWABLE (never produced, §4.4)
+
+CQuestZone::QuestPlayer_NPCClick(mobId) → int:                                     @ FUN_005c0250
+    if !m_pPlayer: return 0
+    m_nClickNPCNo = mobId
+    st = { hID = mobId }; CQuest::GetQuestStatusWithNPC(&st)      # the same full-table scan again
+    if (same "already waiting" test as above): return 2
+    m_QuestClickNPC = mobId                                       # the NPC of the running script (0x440F compares it, §4.7)
+    m_QSC.IsPigeonStartType = 0                                   # NPC dialog (the client's SAY uses it, §3.4)
+    return QuestScriptRun(st.eResultState, st.lpQuestData.ID)     # §2.7: Start / Doing / End script by status
+        # st.lpQuestData is not tested here; only reached after NPCClickCheck returned 1, which implies a quest
+```
+
+So an NPC that has a quest for the player (any of the six statuses) never opens its shop / menu: the quest script
+replaces it, and `QuestNext` ends with `sp_EndOfTrade` (§3.2). Which quest and which script come from the priority table
+of §4.4 (REWARD before ING before ABLE / FAILED / READ_ABLE before REPEAT), including the status mix-up of Z15-B27.
+A click on the NPC whose dialog is still open is ignored (2) rather than restarting the script.
+
+```pseudo
+0x4414 NC_QUEST_START_REQ { u16 nQuestID }   ShinePlayer::sp_NC_QUEST_START_REQ      @ FUN_00578e90 (Z08 §3.2)
+    !smo_IsActiveMode:  → 0x4415 NC_QUEST_START_ACK { u16 err = 0xB53 }
+    (&p.sp_QuestDiary == NULL: assert "… NULL == sp_QuestDiary.sqd_GetZoneQuest()", 0xB51; can never be true, Z08-B15)
+    r = QuestPlayer_NotCheckNPC(nQuestID); r != 0: → 0x4415 { 0xB50 }   # r == 0: no answer at all
+        # client GameFrameWork::On_NC_QUEST_START_ACK FUN_0049c890: on 0xB50 it closes its quest window (+0x2f8) and
+        # that window's child (+0x2a0); every other code is ignored
+
+CQuestZone::QuestPlayer_NotCheckNPC(nQuestID) → int:   "start without an NPC"       @ FUN_005c03c0
+    if !m_pPlayer or m_bWaitResult == 1: return 0                 # a script waits (also while a 0x441A is pending, §3.1)
+    s = CQuest::GetNewQuestStatus(nQuestID)                       # computed status (§4.4)
+    row = GetQuestData(nQuestID); if !row: return 0               # also the GM default 0xFFFF (§6.6)
+    if Start.bNPC == 1: m_nClickNPCNo = Start.NPCID               # SAY speaker = the start NPC
+    if s == 8 REWARD:
+        first End.NPCMobList[i] (i < 5) with bNPCMob == 1 and TargetGroup == 0: m_nClickNPCNo = its NPCMobID
+        # (original bug) Z15-B38: tests TargetGroup (entry +6), not NPCMobAction == 0 REWARD_OBJECT as GetRewardNPC
+        # (§4.4) does, so a kill entry could be taken as the speaker; no 2016 quest gives a different NPC (data check)
+    # otherwise m_nClickNPCNo keeps the last clicked NPC (original bug) Z15-B39: 5 start-able quests of the 2016 data
+    # have no start NPC, so their SAYs without an NPC speak as whatever NPC the player clicked last
+    if Start.bItem == 0:                                          # quests started by an item ("pigeon") always pass
+        flag = s == 8 REWARD ? End.bIsWaitListProgress : Start.bIsWaitListProgress
+        if flag == 0: return 0                                    # the quest needs its NPC: refused, no answer
+    m_QSC.IsPigeonStartType = 1                                   # client: not an NPC dialog (§3.4)
+    return QuestScriptRun(s, nQuestID)                            # §2.7; status not checked here: 0 for other statuses
+```
+
+`m_QuestClickNPC` is not set by this path: it keeps the last NPC click, so a 0x440F select-start (§4.7) after a 0x4414
+start compares against that older NPC. Data *(2016)*: 663 quests are start-able this way (20 by a start item, the rest by
+`Start.bIsWaitListProgress`), 616 can be finished this way (start item or `End.bIsWaitListProgress`), all with a reward
+NPC. The client sends 0x4414 from its quest list ("progress from the list", wait-list flags) *(inferred from the field
+names)*.
+
+### 6.2 Mob kills: `so_KilledBy` → party / raid → the diary
+
+```pseudo
+# ShineMob::so_KilledBy FUN_00432760 (Z03 §8.1 mob death: EXP, drops), then:
+    killer.vt 0xa84 so_GetRaid() == 0: PartyManufacture::pm_QuestCheck(&partymanufacture, sqd_MobDead, killer, mob, mob.sm_MobDataBox)
+    else:                              RaidTask::rt_QuestCheck(sqd_MobDead, killer, mob, mob.sm_MobDataBox)
+
+PartyManufacture::pm_QuestCheck(fn, killer, mob, box):                             @ FUN_004ccbf0
+    if !killer: return
+    party = killer.vt 0x550 so_PartyRegistNumber()
+    party == 0xFFFF: killer.vt 0x7f4 so_ply_QuestCheck(fn, killer, mob, box)       # alone
+    else: for each member object of CParty[party] (partycontainer):
+              if so_DistanceSquar(killer, member) < 1 000 001: member.vt 0x7f4(fn, killer, mob, box)
+              # within 1000 units of the killer (not of the mob); the killer is one of the members
+RaidTask::rt_QuestCheck(fn, killer, mob, box) → u8:                                @ FUN_005ce710
+    raid = killer.vt 0xa84; if !raid: return 0
+    _GetRaidPlayer(&near, raid id (+4), mob, 1000) fails: return 0               # raid members near the mob (Z09 §11.5)
+    for each near player: player.vt 0x7f4(fn, killer, mob, box); return 1
+ShinePlayer::so_ply_QuestCheck(fn, a, b, c):  fn(this = p + 0x173e8 (the player's ShineQuestDiary), a, b, c)   @ FUN_005780c0 (vt 0x7f4)
+ShineObject::so_ply_QuestCheck:               empty (non-players)                    @ FUN_00578070
+ShineQuestDiary::sqd_MobDead(killer, mob, box): CQuestZone::QuestPlayer_NPCMobKill(&sqd_QuestDiary, mob)   @ FUN_00578170
+
+CQuestZone::QuestPlayer_NPCMobKill(mob) → int:                                     @ FUN_005c08d0
+    if !m_pPlayer or !mob: return 0
+    box = mob.vt 0x710 so_mob_DataBoxforQuest()                   # FUN_00554fc0 = vt 0x70c so_mob_DataBox; mobs only
+    if !box: return 0
+    mobId = box.data.ID; list = []; any = 0; credited = 0
+    for i in 0 … m_NumOfQuest−1:
+        rec = GetQuestInfoByIndex(i); need rec.Status == 6 ING and row = GetQuestData(rec.ID)
+        hit = 0
+        for k in 0…4:
+            if IsConnectionEnd(row, k, mobId):                    # §3.8: raid rule, bNPCMob, action 1 KILL, species match
+                list.append({ nMobID = End.NPCMobList[k].NPCMobID, nQuestID = row.ID })   # also when already full
+                if Data.End_NPCMobCount[k] < End.NPCMobList[k].NPCMobCount: Data.End_NPCMobCount[k] += 1; hit = credited = 1
+        for a in 0 … row.NumOfAction−1:
+            if IsConnectionAction(row, a, mobId): hit |= QuestActionMobKill(rec, row, a, mob)
+        if hit:
+            st = DoingQuestUpdateStatus(i)                        # §4.4; REWARD once every counter and item is complete
+            (rec was ING) st == 8: vt 0x50(rec, row); st == 7: vt 0x54(rec, row)   # empty in the zone (§3.8)
+        any |= hit
+    if credited: Send_NC_QUEST_NOTIFY_MOB_KILL_CMD(list)
+    return any
+
+CQuestZone::QuestActionMobKill(rec, row, a, mob) → int:                            @ FUN_005bd000
+    if !m_pPlayer: return 0
+    switch row.Action[a].ThenType:
+      1 DROP_ITEM:                                                # the only ThenType of the 2016 data (§1.2)
+        item = (u16) ThenTarget
+        need = GetSuccessItemCount(row, item) (§3.8); have = sp_GetItemInvenLot(item)
+        if have < need and well512_GetRandom(1 000 000) < ThenPersent:     # chance in millionths
+            n = (ThenCountMax − ThenCountMin) × well512_GetRandom(1 000 000) / 999 999 + ThenCountMin
+            n = min(n, need − have)
+            repeat n times: ShinePlayer::sp_QuestItemGet(p, item, mob)       # §6.3
+            return 1                                              # also when n == 0
+        return 0
+      2 DO_SCENARIO: return Send_NC_QUEST_SCENARIO_RUN_CMD(ThenTarget)       # 0x440E (§3.6; no client handler)
+      3 MOB_REGEN:   well512_GetRandom(1 000 000); return 0       # the roll is drawn and discarded
+      other (4 CALL_PS): return 0
+      # (original bug) Z15-B40: MOB_REGEN and CALL_PS do nothing (unused in 2016)
+
+CQuestZone::Send_NC_QUEST_NOTIFY_MOB_KILL_CMD(list) → int:                         @ FUN_005bdb00
+    if !m_pPlayer: return 0
+    → player 0x440D NC_QUEST_NOTIFY_MOB_KILL_CMD { u8 NumOfActionQuest = |list|,
+          MobOfQuest[] { u16 nMobID, u16 nQuestID } }             # 3 + 4n bytes; too long: assert "… Packet Too Long"
+    return 1
+```
+
+Client: `GameFrameWork::On_NC_QUEST_NOTIFY_MOB_KILL_CMD` (client FUN_0049b170) → `CQuest::Recv_NC_QUEST_NOTIFY_MOB_KILL_CMD`
+(client FUN_00728400): for each entry the shared-library `CQuest::QuestPlayer_NPCMobKill(nMobID, nQuestID)` (vt 0x08,
+§4.5: the ING record of that quest, every list entry with that exact `NPCMobID` and action KILL, +1 up to the needed
+count), then refreshes the quest-finish window. The server sends the row's `NPCMobID`, not the killed mob's, so the
+client's exact-ID test works for species matches too; the client caps at the needed count, so the entries of already
+full counters do no harm. The client also recomputes the status itself (its own diary).
+
+Kill credit goes to every party member within 1000 units of the killer, or every raid member near the mob, each for
+their own quests; a player in a raid gets credit only for RAID (type 8) quests, a player outside a raid only for the
+other types (`IsConnectionEnd`, §3.8). Non-player killers credit nobody (the base `so_ply_QuestCheck` is empty) *(Z03 decides who
+"killer" is for pet and summon kills)*.
+
+```pseudo
+# scripted kills: Pine `questmobkill` (Z09 §25.6) and Lua cQuestMobKill / cQuestMobKill_AllInMap (§6.5)
+CQuestZone::QuestPlayer_ScriptMobKill(questId, mobId) → int:                       @ FUN_005c0b40
+    if !m_pPlayer or questId == 0xFFFF or !MobDataBox[mobId]: return 0
+    i = GetQuestIndex(questId); if i == −1: return 0
+    rec = GetQuestInfoByIndex(i); need rec.Status ∈ {6 ING, 8 REWARD} and row
+    for k in 0…4: IsConnectionEnd(row, k, mobId): append { NPCMobID, row.ID }; count < needed: +1, hit = 1
+    if hit:                                                       # no QUEST_ACTION drops for scripted kills
+        st = DoingQuestUpdateStatus(i); (rec was ING) st 8 → vt 0x50, st 7 → vt 0x54 (empty)
+        Send_NC_QUEST_NOTIFY_MOB_KILL_CMD(list); return 1
+    return 0                                                      # 0 = nothing left to count: the callers' repeat loops stop
+CQuestZone::QuestPlayer_ScriptMobKill_All(mobId) → int:                            @ FUN_005c0cf0
+    if !m_pPlayer or mobId > mdb_maxmobhandle or !mdb_index[mobId].data: return 0
+    if data.ID != mobId: assert "MobDataBox::operator [] :Invalid mob index"; return 0
+    the same for every diary record with status ING or REWARD; one 0x440D for all; returns 1 if any counter rose
+```
+
+The 2016 books use the scripted kill for the instance-dungeon "daily check" quests: `cQuestMobKill_AllInMap(map,
+2665 / 2666 / …, "Daliy_Check_d_…", 5)` in 22 Lua dungeon scripts, and the Pine node `questmobkill` in 9 books (Z09 §25.6). A REWARD
+quest still takes credit for an entry not yet full (several entries).
+
+### 6.3 Quest drops
+
+```pseudo
+ShinePlayer::sp_QuestItemGet(p, itemId, mob):                                      @ FUN_00528240
+    # only caller: QuestActionMobKill DROP_ITEM (§6.2); one call = one item of lot 1
+    attr = itmattcontainer[itemId]
+    item = ItemTotalInformation; iti_mkregnum(itemId, kind 2, zone, world) (item key); itemid = itemId
+    attr.vt 0x14(itemId, &item, "-o")                             # default attributes (Z04)
+    attr.vt 0x20(&item.iti_itemstruct, 1)                         # lot 1
+    o = som_AllocObject(1); none: assert "DropItemGroupScope::ElementItemIdent::eii_dropitem : itembuf full" (copied text)
+    looter = ShineMultiTypeHandle of p                            # owner = this player only
+    o.vt 0x544 so_ItemDrop(handle, mob, &item, 1, &looter, questOnly = 1)   # FUN_0052a7a0: dropped at the mob (Z09 §11.3)
+    result != 0x301: assert "ShineObjectClass::ShinePlayer::sp_QuestItemGet : Drop mark fail"   # object not freed
+```
+
+The drop lies on the ground like a normal mob drop (owner = the player, 20 s owner time, 60 s vanish, Z09 §11.3) with
+`sdi_bQuestDropItem` = 1 (`so_drpitm_bQuestDropItem_Set/Get` FUN_00555320 / FUN_00555330). Looting it
+(`so_drpitm_CanLooting`, Z09 §11.4) additionally requires `p.vt 0xe28` = `ShinePlayer::so_ply_QuestItemCheck` FUN_00561790
+→ `CQuestZone::IsQuestDropItem(itemId)`:
+
+```pseudo
+CQuestZone::IsQuestDropItem(itemId) → int:                                         @ FUN_005bc900
+    1 if some diary record with Status 6 ING has, in its row, an Action[a] with ThenType 1 DROP_ITEM and
+      (u16) ThenTarget == itemId; else 0
+```
+
+So a quest drop can be picked up only while the player still has a quest in progress that drops it; the item goes into
+the normal inventory (type 9) and counts for `End.ItemList` through the item-gain events (§4.5, `so_ply_ItemLotChange`).
+
+The character inventory also has a 5-cell quest box (`CharacterInventory::ci_QuestBox`, `ItemQuestItemBox` ctor
+FUN_006448b0 / dtor FUN_006430e0, `ib_BagSizeInput` FUN_00643140 = 5 cells of 0x74 bytes), registered as inventory type
+7 in `CharacterInventoryManager` (`cim_quest` FUN_00642e10, `charinvenman.cim_Array[7]`) and cleared at the map login
+(`sp_NC_MAP_LOGIN_REQ`). No quest function of the 2016 zone reads or fills it *(no other writer found)*; Z04's inventory
+type table has no row 7.
+
+### 6.4 Other quest helpers reached from the world
+
+- `MobDataBox::mdb_IsSpeciesDistanceByQuest(id1, id2, col)` FUN_00641020 (Z09 §28.8): the species match of
+  `IsConnectionEnd` / `IsConnectionAction`; `col` = the entry's `TargetGroup` = a `QuestSpecies.MobGroupName` column
+  (`QuestSpecies` table, `BinaryDataBox<QuestSpecies>::bdb_ReadData` FUN_00641410, loaded with the mob tables, Z09 §5.1).
+  So "kill 10 of X" also counts the mobs that share X's group name in that column.
+- `ShinePlayer::so_ply_Return2Quest` FUN_005bfa80: end of a CALLPS film (§3.7).
+- `AxialQuesterFind` (ctor FUN_00429bd0, `ali_Work` FUN_00429c80): only used by Lua `cGetQuestHero_NPC` (§6.5).
+
+### 6.5 Lua functions (handed over by Z09 §14.9)
+
+Lua C functions of the zone (registration and argument conventions: Z09 §14). Numbers are read with `lua_tonumberx`
+(missing → 0), strings with `lua_tolstring`. "Player" = `som_GetObject(handle)`.
+
+```pseudo
+cQuestMobKill(handle, questId, mobIndexName)                                       @ FUN_005d6010
+    o = som_GetObject(handle), not leaving (vt 0x300 so_IsEmpty != 1), with a diary (vt 0x808 so_ply_QuestDiary)
+    q = (int) questId == −1 ? 0xFFFF : (u16) questId              # nil → 0 (no such quest: nothing)
+    mob = mdb_2MobID(mobIndexName); 0xFFFF → nothing
+    q == 0xFFFF ? QuestPlayer_ScriptMobKill_All(mob) : QuestPlayer_ScriptMobKill(q, mob)   # one credit; 0 results
+cQuestMobKill_AllInMap(mapIndex, questId, mobIndexName, count)                     @ FUN_005d6150
+    map = fc_FindMap(mapIndex), with a centre object; q as above; mob as above
+    players = AxialListNearScanObjectType(kind 2) over so_AllInMap of the centre object
+    limit = min(number of players, (int) count)
+        # (original bug) Z15-B41: as Z09-B109 (Pine questmobkill): the credits per player are capped by the number
+        # of players on the map; a player alone in the dungeon gets 1 of the 5 "daily check" kills
+    for each player (not leaving, with a diary): repeat up to limit times while the ScriptMobKill call returns ≠ 0
+    0 results
+cGetQuestHero_NPC(questId, npcHandle, range) → (handle, partyRegnum) | nothing       @ FUN_005d8f60
+    npc = som_GetObject(npcHandle) (arg 2 nil or no object: nothing)
+    f = AxialQuesterFind{ aqf_QuestID = questId, &handle, &party }  (FUN_00429bd0)
+    so_AllOfRange(npc, allofrangearg, npc position, range, no sector, f, 0, 0xFFFF)
+    AxialQuesterFind::ali_Work(f, _, o):                                            @ FUN_00429c80
+        o.vt 0x4d0 so_ObjectType == 2 (player) and o.vt 0x484 smo_GetMode() != 0: handle = o.handle,
+        party = o.vt 0x550 so_PartyRegistNumber(); stop the scan
+    stopped: return handle, party (2 numbers); else nothing
+    # (original bug) Z15-B42: aqf_QuestID is stored but never tested: the "quest hero" is the first player in
+    # range whatever their quests. No 2016 Lua script calls it
+cGetQuestHero_ItemUse(?, mapIndex, itemIndexName)                                  @ FUN_005d9140
+    reads its arguments, finds the map, its centre object and the item ID (idb_2itemid), then returns nothing
+    # (original bug) Z15-B43: a stub with no effect and no result; unused in 2016
+cQuestResult(mapIndex, "Success" | "Fail") → 1 | nothing                           @ FUN_005e30d0
+    map with a centre object; word compared case-sensitively ("Success" / "Fail"; anything else: nothing)
+    so_AllInMap(centre, AxialListKQEndLua{0x16, 0x12 Success / 0x13 Fail} (ctor FUN_004289d0), 0)
+        # its vftable slot 0 is AxialListKQEnd::ali_Work FUN_00429e00 (identical code), Z09 §25.6: per player
+        # so_ply_KQSuccess / KQFail (title counters), GameLog 0x0442 NC_LOG_GAME_KQ_LEAVE, 0x5812 / 0x5813
+    FieldMap::fm_ClearObject(map, 0x1b0)                          # NPCs, mobs, doors, bandits removed (Z09 §24.8)
+    return 1
+cQuestResult_Individual(handle, "Success" | "Fail") → 1 | nothing                  @ FUN_005ecca0
+    o player (so_ObjectType 2): o.vt 0x304 so_SendProtocol(0x16, 0x12 / 0x13) → empty 0x5812 NC_KQ_COMPLETE_CMD /
+        0x5813 NC_KQ_FAIL_CMD (client complete / fail window, Z09 §24.8); return 1   # like Pine sendquestresult
+cReward(mapIndex, "KQ") → 1 | nothing                                              @ FUN_005df060
+    map with a centre object, word "KQ" (case-sensitive; another word: return 1 without effect)
+    map.fm_KQHandle == 0xFFFFFFFF: assert "cReward : No KQ info"; nothing
+    so_AllInMap(centre, AxialListKQRewardLua(kqHandle) (ctor FUN_004288c0), 0)
+        # slot 0 = AxialListKQReward::ali_Work FUN_00428490 (Z09 §25.6): enough kills → so_ply_KQRewardStruct (Z16),
+        # else 0x5823 NC_KQ_NOREWARD_CMD {0x1104}
+    return 1
+cRewardItem_CharInven(handle, itemIndexName, count)                                @ FUN_005d6a10
+    o player, not leaving, on a map; item ID by name with ItemInfo and ItemInfoServer rows
+    if (int) count > 0: o.vt 0x8b4 so_scene_CreateItem(itemId)    # Z09 §24.2 (FUN_0050d770): one item, count ignored
+    0 results                                                     # used once: Promote/Job2_Forest (count 1)
+cClassChangeOpen(handle) → 1 | nothing                                             @ FUN_005ed720
+    o = som_GetObject(handle); p = o.vt 0xbbc (ShinePlayer cast); p: ShinePlayer::sp_OpenClassChangeMenu(p); return 1
+    # used by the AI scripts ClassChangeMaster01…03 (the class-change NPCs)
+```
+
+`cGetTutorialInfo` FUN_005e7450 and `cProgressTutorial` FUN_005e72f0 (Z09's list also gives them to Z15) are already
+documented in Z09 §28.13.
+
+```pseudo
+ShinePlayer::sp_OpenClassChangeMenu(p):                                            @ FUN_0051fd10
+    allowed modes: static cmc.cmc_AllowMode = 0x46 (bits 1, 2, 6)
+    p's mode not allowed: p.vt 0x308 so_SendErrorCode(0x0C, 0x60, 0x3681) → 0x3060 { u16 0x3681 }   # 2-byte payload
+    elif !p.vt 0x49c so_CharacterClass(): assert "…sp_NC_ITEM_CLASS_CHANGE_REQ : Try to use invalid class" (copied);
+        so_SendErrorCode(0x0C, 0x5F, 0x3682) → 0x305F NC_ITEM_CLASS_CHANGE_ACK { u16 0x3682 }
+    else:
+        g = ccdb_GetThirdClassGroup(class)                        # CharClassDataBox (Z07)
+        g ∈ {UCT_NONE, UCT_SAVIOR_ONLY}: nNewClass = 0, price 0
+        else: nNewClass = ccdb_BitToClass(ccdb_UseClassTypeToBit(g) ^ ccdb_ClassToBit(class))   # the other class of the group
+              own = ccdb_ClassToUseClassType(class)
+              price = Σ ItemInfo[skill.InxName].BuyPrice over every learned active skill (SkillDataBox, csl_IsLearn)
+                      whose UseClass is g or own, + Σ ItemInfo[passive.InxName].BuyPrice over every learned passive
+                      (bit set in sp_Passive) whose skill-book item's UseClass is g or own   # u64, carry kept
+        → 0x3060 NC_ITEM_OPENCLASSCHANGEMENU_CMD { u8 nNewClass, u64 nTotalPrice, u16 nError = 0x3680 }   # payload 11
+    # client GameFrameWork::On_NC_ITEM_OPENCLASSCHANGEMENU_CMD FUN_0049dcd0: ClassChangeWin SetChangeClassID(nNewClass),
+    #   SetMoney(price low, high), show; nError is not read
+```
+
+The menu offers the switch to the other class of the player's third-job group, priced at the skill books of the skills
+learned for it *(inferred: the cost of the books the change converts; the change itself is 0x305E, Z04 §12.10)*. The
+refusal for a wrong mode reuses opcode 0x3060 with only the 2-byte code, which the client reads as the 11-byte menu
+(class = 0x81, price from stale buffer bytes) and opens the window anyway (original bug) Z15-B44.
+
+### 6.6 GM commands
+
+Already documented by Z11 (done): `&queststart [id]` (`ac_QuestStartReq` FUN_00419500) and `&questread [id]`
+(`ac_QuestReadReq` FUN_00419540) build a fake 0x4414 / 0x4416 and call the handlers of §6.1 / §4.7 (Z11 §3.4; without
+an id the quest is 0xFFFF and nothing happens). `&questrecieve` FUN_0041c140, `&questgiveup` FUN_0041c190 and
+`&questcomplete` FUN_0041c1e0 are empty (Z11 §4.6).
+
+---
+
+## 7. Quest result codes 0xB41…0xB5A
+
+Quest-local numbers without a client error-table text (the client table has only an empty 0x0B48 entry); no 2016 or
+2017 PDB enum names them. Script errors 0xC00…0xC10 are §3.10; the DONE reward codes 0xBC2…0xBC5 belong to the Character
+server (D04 §1.2, §5.3 here). Every number of the range was searched in the zone, Character and WM code.
+
+| Code | Set by | Meaning | Client |
+|---|---|---|---|
+| 0xB41 | Character server answers 0x4404 / 0x4406 / 0x440A / 0x4419 / 0x441B (D04 §1); zone 0x4408 (§4.7) and 0x4410 `err` (§4.7) | success | 0x4408: "Abandoned <%s> quest."; 0x4410 ignored |
+| 0xB42 | Character server 0x4406 CLEAR answer | delete of the quest record failed (also when no record existed) | zone → script error 0xC00 (§3.5) |
+| 0xB43 | Character server 0x4404 SET_INFO, 0x4419 READ, 0x441B DONE | storing the quest record failed | zone → 0xC0E (SET_INFO, DONE), 0x4417 READ_ACK {0xB43} (no handling, §4.7) |
+| 0xB44 | — | not used in 2016 | |
+| 0xB45 | 0x4408 GIVE_UP_ACK (`Recv_NC_QUEST_GIVE_UP_REQ`, §4.7) | give up: no diary record or no quest row | "Failed to give up <%s> quest." |
+| 0xB46 | Character server 0x440A GIVE_UP; zone 0x4408 after a repeat give-up (SET_INFO nQSC 28 failed or no record, §4.7) | give up could not be stored | "Failed to give up …" |
+| 0xB47 | 0x4410 SELECT_START_ACK (§4.7) | select-start refused (no row, the NPC does not offer it, same quest, another NPC, or the script did not open) | 0x4410 ignored |
+| 0xB48 | — | not used in 2016 (the client's error table has an entry without text) | |
+| 0xB49 | 0x4408 (§4.7) | give up less than 10 s after the last script answer | "Failed to give up …" |
+| 0xB4A…0xB4F | — | not used | |
+| 0xB50 | 0x4415 START_ACK (§6.1) | the start request opened the quest script | closes the quest window |
+| 0xB51 | 0x4415 (§6.1) | no quest object (dead check, Z08-B15) | ignored |
+| 0xB52 | — | not used | |
+| 0xB53 | 0x4415 (§6.1) | start request while not in an active mode | ignored |
+| 0xB54…0xB57 | — | not used | |
+| 0xB58 | 0x4417 READ_ACK (§4.7) | quest read stored (status 20 READ_ABLE) | debug output "%d ??? Read OK" only (`On_NC_QUEST_READ_ACK` client FUN_0049c8e0) |
+| 0xB59 | 0x4417 (§4.7) | read refused: no row, or computed status DONE / ING / FAILED / REWARD | ignored (same handler) |
+| 0xB5A | 0x4415 (sic, Z15-B28) from the 0x4416 handler (§4.7) | read request while not in an active mode | ignored |
+
+A refused 0x4414 (`QuestPlayer_NotCheckNPC` 0) and a refused give-up of Z08-B6 (§4.7) send no code at all.
+
+---
+
+<!-- The sweep (part 6) numbers the bugs section, completes the uncertain list and adds the coverage boundary. -->
 
 ## Original-server bugs (collected so far; the sweep part numbers this section)
 
@@ -1839,6 +2177,13 @@ coverage boundary. -->
 | Z15-B35 | `Recv_NC_QUEST_DB_DONE_ACK` FUN_005bfb30 (success) | does not compare `QuestInfo.ID` / `nQSC` with the running script; clears `m_bWaitResult` and calls `QuestNext` | a Doing/End script opened while the reward was pending (only `QuestStart` is refused) is resumed past a `SAY` that is still waiting, with a stale RESULT | resume only when the answer belongs to `m_ParsingQuestID`'s `DONE` |
 | Z15-B36 | `Send_NC_QUEST_DB_DONE_REQ` FUN_005bbe60 | `nCur_CT_ElementValue = GetTitleStatus(CT_Type, nCur_CT_ElementValue)`: the element argument is the still-zero target byte | the DB gets the state of element 0 instead of `CT_ElementNo` (no TITLE reward in the 2016 data) | `GetTitleStatus(CT_Type, CT_ElementNo)` |
 | Z15-B37 | `QuestNext` DONE FUN_005bdef0 / `Send_NC_QUEST_DB_DONE_REQ` | every refusal of 0x441A (reward already pending, an open item lock, missing record) is reported as 0xC01 | the client shows "Inventory full. Cannot receive the reward item." with free cells | a distinct code (e.g. 0xC0C/0xC0E class) |
+| Z15-B38 | `QuestPlayer_NotCheckNPC` FUN_005c03c0 | for a REWARD quest picks as SAY speaker the first `End.NPCMobList` entry with `bNPCMob == 1` and `TargetGroup == 0` | a kill-target entry could become the speaker; no 2016 quest gives a different NPC than `GetRewardNPC` | test `NPCMobAction == 0` as `GetRewardNPC` |
+| Z15-B39 | `QuestPlayer_NotCheckNPC` FUN_005c03c0 | `m_nClickNPCNo` is only overwritten when the quest has a start NPC (or a reward NPC for REWARD) | 0x4414-started quests without a start NPC (5 in 2016) use the last clicked NPC as default SAY speaker | reset to 0xFFFF / a neutral speaker |
+| Z15-B40 | `QuestActionMobKill` FUN_005bd000 | ThenType 3 MOB_REGEN draws a random number and does nothing; 4 CALL_PS has no case | quest actions other than DROP_ITEM / DO_SCENARIO are silently ignored (unused in 2016) | implement or reject at load |
+| Z15-B41 | Lua `cQuestMobKill_AllInMap` FUN_005d6150 | the per-player repeat count is `min(players on the map, count)` (as Z09-B109) | a player alone in a dungeon gets 1 of the 5 "daily check" kills | repeat `count` times per player |
+| Z15-B42 | Lua `cGetQuestHero_NPC` / `AxialQuesterFind::ali_Work` FUN_00429c80 | `aqf_QuestID` is never tested | returns the first player in range, not one with the quest (unused in 2016) | require the quest in the player's diary |
+| Z15-B43 | Lua `cGetQuestHero_ItemUse` FUN_005d9140 | looks up map and item, then returns nothing | no effect, no result (unused in 2016) | finish or remove |
+| Z15-B44 | `sp_OpenClassChangeMenu` FUN_0051fd10 (Lua `cClassChangeOpen`) | a wrong mode is answered with `so_SendErrorCode` on opcode 0x3060 (2-byte payload); an invalid class with 0x305F | the client reads the short 0x3060 as the 11-byte menu and opens the class-change window with class 0x81 and a stale price | send the full struct with `nError` 0x3681 (and have the client check it) |
 
 ## Not reconstructed / uncertain (so far)
 
@@ -1850,3 +2195,7 @@ coverage boundary. -->
   FUN_005f80f0): not traced; and what scenario 15 (server: no packet, no wait) does on the client (`Scenario_15`).
 - `ZoneRingPacketFindJobDungeon::zrpb_Request` and when it returns `nResult 2` synchronously: Z14.
 - Whether the client closes its NPC dialog by itself after the last SAY (the server never sends END, Z15-B12).
+- Who counts as the killer for pet and summon kills (`so_KilledBy` `param_1`): Z03 §8.1; the quest path credits only
+  player killers (§6.2).
+- Whether anything fills inventory type 7 (`ci_QuestBox`, §6.3); no writer was found from the quest functions.
+- Where the 2016 client sends 0x4414 NC_QUEST_START_REQ from (quest list / wait-list window): not traced (§6.1).
