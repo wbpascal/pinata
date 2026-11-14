@@ -1006,7 +1006,7 @@ so_SaveLocation(p, &NC_CHARSAVE_LOCATION_CMD) @ FUN_004542f0, tournament branch 
     Point Low") — the same team revive points as sp_ReviveReqProcess
 
 fm_IsGuildTournametnMap() @ FUN_00475770: cached in m_nGuildTournamentMapFlag (1 yes, 2 no); compares fm_MapID with the
-    13-byte entries `GTMap[i].mapname` (DAT_0d55a860) for i = 0…30 (§6: seed table, Z08-B12)
+    13-byte entries `GTMap[i].mapname` (DAT_0d55a860) for i = 0…30 (§6.1: seed table, Z16-B17 settles Z08-B12)
 fm_GuildTournamentEnemy(g1, g2) @ FUN_004632f0 = system && IsBattleGuild(g1, g2)
 ```
 
@@ -1308,6 +1308,330 @@ GuildTournamentSystem::DiceGameWinGuild(charNo)                @ FUN_0047ba80   
     # no 0x74DD: clients see the 100 points only with the next score packet (original bug) Z16-B16
 ```
 
+## 6. Guild tournament: the match lifecycle with the WM and the client
+
+The WM owns the bracket and the schedule (W03 §8.4–§8.5). For one match it broadcasts 0x7481 to **every** zone; each
+zone records the match in its seed table, the zone that hosts the instance map builds the match there, and every zone
+asks the online members of both guilds to come (0x749B). The map film `Guild/GuildTournament` runs the match
+(Z09 §24.7 / §24.8); its `endofgt` step reports the result (0x7482) and clears the seed. Lifecycle:
+
+```pseudo
+WM 0x7481 START_CMD ─► every zone: guildtournamentinfo[seed] = match            (§6.2)
+   hosting zone:  clear map, play film, 0x74C6 ×2 → WM 0x74C7 grades, create / Initialize GuildTournamentSystem
+   every zone:    online members of both guilds ← 0x749B recall prompt          (§6.3)
+client 0x749C yes ─► entry window open? ─► so_ply_Summon2GuildTournament ─► so_LinkTo(instance map, team regen point)
+map login on the GT map ─► PlayerRegister (§4.4) → fighting: flags (§4.5, §6.5), kills (§4.6), skills / dice (§5)
+observers: 0x74D7 → WM → 0x74DA → link with StaObserverHideMode (§6.4)
+film `endofgt w l` ─► fm_GuildTournamentEnd → WM 0x7482 END_CMD; fm_GuildTournamentClear (§6.6)
+fallback (once a minute): film gone without a result → 0x7482 {w 0, l 0}       (§6.6)
+```
+
+### 6.1 Seed table and tournament map table
+
+```pseudo
+guildtournamentinfo  GuildTouramentLoginDataInfo[32]  @ DAT_0d55a3e0 (0x24 each; built by the vector ctor
+                     FUN_00695fd0, count 0x20; ctor FUN_004757d0: gta_Field = "", nTournamentSeed = 0xFF)
+    +0x00 gta_Struct         PROTO_NC_GUILD_TOURNAMENT_START_CMD (0x11): u8 nTournamentSeed (0xFF = free),
+                             u16 nTournamentMapNo, u16 nExploerTimeMin, u16 nWaitPlayTimeSec, u16 nPlayTimeMin,
+                             u32 nNo1 (guild A), u32 nNo2 (guild B)
+    +0x11 gta_Field          Name3: the instance map of this seed (copied from GTMap[seed].mapname)
+    +0x1d gta_Result2WMS     1 once 0x7482 was sent for this match
+    +0x20 gta_MatchStartTime clockwatch tick of the start (0 = no match)
+GTMap  {u8 mapid; Name3 mapname}[32]  @ DAT_0d55a860 (13 bytes each, directly after guildtournamentinfo)
+    filled by the static initializer FUN_00695aa0: mapid = 0 for every entry (nothing writes it later),
+    mapname = "GuildT0400" … "GuildT0407" repeated four times (entry i → "GuildT040" + (i mod 8))
+fieldlist.fc_GuildTournamentMap  attr[GTMapNo] → FieldOption::GuildTournamentMapStr (0x131, pdb2016), loaded by
+    FieldContainer::fc_Load FUN_004655f0 from table `GuildTournamentMap` of World/Field.txt:
+    MapIDClient[13] (base map), GTMapNo, Stone X/Y/Dir, GldA/GldB regen X/Y, DoorA0…DoorB2, CheckSum (= GTMapNo,
+    else ShineExit "Checksum error in table GuildTournamentMap(Field.txt)"; GTMapNo ≥ rows: "Too large GTMapNo";
+    two rows with one number: "duplicate GTMapNo")
+    2016 data: one row, MapIDClient "GuildT04", GTMapNo 0
+```
+
+So every match uses row 0 (`GuildT04`) whatever the WM chose (`nTournamentMapNo = rand() % 3` in W03 §8.4): the zone
+overwrites it with `GTMap[seed].mapid` = 0. The instance is chosen by seed. The WM only starts pairs at even slots
+(seed = first slot of the pair: 0…14 in round 1, 16…22, 24 / 26, final 28), so the 2016 matches use GuildT0400 / 02 / 04
+/ 06. Round-1 seeds k and k + 8 share one instance, and the WM runs them at different times (Time_Match_161 for slots
+0–7, Time_Match_162 for 8–15). The odd GTMap entries are never used.
+
+**Z08-B12 settled.** `0x7481` accepts `seed ≤ 32` (assembly at 0x477a77: `cmp 0x20, seed; sbb; inc; jne`), but both
+tables have 32 entries. `guildtournamentinfo[32]` is `GTMap[0…2]`: its `nTournamentSeed` byte is `GTMap[0].mapid` (0 ≠ 0xFF,
+so the handler asserts "Seed not empty" and writes 0xFF there), and the start overwrites GTMap[0] / [1] and part of [2] with
+the match record. `GTMap[32]` (the map number and name) is read past the array. After that, seeds 0, 1, 2 cannot start
+(`GTMap[0].mapid` is no longer a valid `fc_GuildTournamentMap` index, "gtms NULL"), and `fm_IsGuildTournametnMap` no longer
+recognises their instance names. Every other reader limits the seed to < 32 (0x749C, `sp_IsGuildTournamentAccessTime`,
+observer enter, the check loop). This is latent in 2016 because the WM never sends a seed above 29 (W03 §8.3 / §8.4)
+(original bug) Z16-B17. `fm_IsGuildTournametnMap` checks only entries 0…30. Entry 31 ("GuildT0407") repeats entry 7, so
+that bound has no effect.
+
+```pseudo
+GuildTouramentLoginDataInfo::IsAccessTime() → bool                     @ FUN_004757f0
+    gta_MatchStartTime ≠ 0 and now ≤ gta_MatchStartTime + nExploerTimeMin · 4800 / 10
+    # 480 ticks per "minute"; clockwatch ticks are tenths of a second, so the entry window lasts
+    # 0.8 · nExploerTimeMin minutes (original bug) Z16-B19
+ShinePlayer::sp_IsGuildTournamentAccessTime(p) → bool                   @ FUN_00475830
+    p.nTournamentSeed (p+0x5e0e) is 0xFF or > 31: false; else IsAccessTime() of that entry (inlined)
+    # only reader: so_LinkTo's WM packet 0x180C byte +0x2e "inGuildTournament" (Z01 §6)
+GetFieldGTMapInfo(p) → GuildTournamentMapStr*                           @ FUN_004782d0
+    fc_GuildTournamentMap.attr[GTMap[gta_Struct.nTournamentMapNo].mapid]; NULL (or index ≥ rows):
+    p ← 0x749D {0x1441} (_ErrorSendPlayer<…RECALL_ENTER_ACK> FUN_00478070) and NULL
+GetMapInfo(p) → MapInfo*                                                @ FUN_00478320
+    same lookup (0x1441 on failure); then mapdatabox[gtms.MapIDClient]; missing: p ← 0x749D {0x1443}, NULL
+GetLinkData(&link, p) → bool                                            @ FUN_00478610
+    gtms as above (0x1441 to p when missing; the first lookup still copies from the NULL pointer before the
+        second lookup returns false: reachable only if Field.txt has no row 0)
+    link.linktoserver = gta_Field (instance name), link.linktoclient = gtms.MapIDClient (12 chars)
+    FieldAttr of MapIDClient (none: false)
+    side = (p.guild (vt 0x818) == nNo2) ? 1 : 0          # guild B → regen slot 1; guild A and everyone else (observers) → 0
+    link.coordx / coordy = FieldAttr.regenloc[side]; true
+    # link.index[20], direct and Party are not written (stack bytes); so_LinkTo's use of them was not traced
+```
+
+### 6.2 Start: 0x7481 NC_GUILD_TOURNAMENT_START_CMD (WM → every zone)
+
+```pseudo
+0x7481 NC_GUILD_TOURNAMENT_START_CMD {u8 nTournamentSeed, u16 nTournamentMapNo, u16 nExploerTimeMin,
+        u16 nWaitPlayTimeSec, u16 nPlayTimeMin, u32 nNo1, u32 nNo2}   (0x11)       @ FUN_00477a10
+    seed > 32: assert "…: Invalid seed"; return                       # bound 33, Z16-B17
+    guildtournamentinfo[seed].nTournamentSeed ≠ 0xFF: assert "…: Seed not empty. May be RE-Match."; set it 0xFF
+    body.nTournamentMapNo = GTMap[seed].mapid (= 0)
+    wms_GuildTournamantStart(body)
+
+WorldManagerSession::wms_GuildTournamantStart(body)                   @ FUN_00476de0   (also GM `&startGT`, Z11 §6.3)
+    gtms = fc_GuildTournamentMap.attr[GTMap[body.nTournamentMapNo].mapid]; NULL: assert
+        "const FieldOption::GuildTournamentMapStr *gtms NULL"; return
+    field = the local FieldMap named GTMap[seed].mapname (ListSearchSame over fieldlist)
+    not on this zone:
+        guildtournamentinfo[seed] = {gta_Struct = body, gta_Field = GTMap[seed].mapname,
+                                     gta_MatchStartTime = now, gta_Result2WMS = 0}
+    hosting zone:
+        if field.fm_GuildTournamentInform.seed ≠ 0xFF (the instance still holds a match):
+            assert "…: seed not empty. May be RE-Match."; that old seed's entry: nTournamentSeed = 0xFF,
+            gta_MatchStartTime = 0; field seed = 0xFF; field's GuildTournamentSystem.Clear() (§4.3)
+        field.fm_GuildTournamentInform = {seed, guildA 0, guildB 0}   # A / B are set by the film's guild battle
+                                                                    # step (Movie::Theater::t_MapGuildBattle, Z09 §23.6)
+        guildtournamentinfo[seed] = as above
+        token = sprintf("%d %d %d %d", nNo1, nNo2, nExploerTimeMin, nPlayTimeMin)
+            # an earlier sprintf of 36 values (gtms stone / regen / door coordinates, guild numbers) into the same
+            # buffer is wiped by memset(0x400) before use: dead code; nWaitPlayTimeSec reaches nobody
+        fm_ClearObject(field, 0x3B0)                 # NPCs, mobs, doors … of the last match leave the map (Z09 §24.8)
+        cc_DropFilm(field.fm_Multiflex, "Guild/GuildTournament"); mda_CloseAllDoor(field's doors)
+        cc_PlayFilm(field.fm_Multiflex, "Guild/GuildTournament", PineScriptToken(token))   # the match script, Z09
+        → WM 0x74C6 NC_GUILD_TOURNAMENT_ZONE_MEMBERGRADE_REQ {u8 seed, u32 nGuildNo = nNo1}
+        → WM 0x74C6 {seed, nNo2}                                       # answers: 0x74C7 below (W03 §8.3)
+        fm_CreateGuildTournamentSystem(field, nNo1, nNo2, type = GTMap[seed].mapid (0), seed)
+    every zone, if gtms.MapIDClient is a known map (mapdatabox): every player in the player list
+        (som_ListContainer[2]) → so_ply_Send2GuildTournamentLogIn(body, seed) (vt 0x928, §6.3)
+
+FieldMap::fm_CreateGuildTournamentSystem(field, guildA, guildB, type, seed)   @ FUN_00464830
+    first match on this instance: field.fm_pGuildTournamentSystem (+0xa8) = new GuildTournamentSystem (0x1e8, §4.3);
+        cc_SetArgument(field.fm_Multiflex, field, axial flag[2]); flag[2].vt 0x670(cinema)   # re-binds the cinema
+        push the system into flag[2]'s safm_vecRoutions (its Roution then runs with the films, §4.3)
+    system.Initialize(guildA, guildB, type, seed)                       # §4.3; the object lives as long as the map
+FieldMap::fm_GetGuildTournamentSystem() = fm_pGuildTournamentSystem    @ FUN_00463290
+
+0x74C7 NC_GUILD_TOURNAMENT_ZONE_MEMBERGRADE_ACK {u16 Error, u8 nTournamentSeed, u32 nGuildNo,
+        u16 nGuildMemberCnt, {u32 charNo, u8 grade}[n]}               @ FUN_00476460
+    Error 7000 (0x1B58): SetGuildMemberGrade(charNo, grade) for each entry
+    0x1B59: log "…ERR_GUILDTOURNAMENT_MEMBERGRADE_NOT_FOUND"; 0x1B5A: "…_NOT_TOURNAMENT"; other: "%d" to GuildTournamentLog
+GuildTournamentSystem::SetGuildMemberGrade(charNo, grade)  (static)   @ FUN_0047ccd0
+    sm_mapGuildMemberGrades[charNo] = grade
+    # one static map for all instances, never cleared: it keeps every fighter's last grade for the zone's lifetime;
+    # read by PlayerRegister (§4.4). A fighter who enters before 0x74C7 arrives is not registered (§4.4 log)
+```
+
+### 6.3 Recall: 0x749B prompt, 0x749C answer, summon
+
+```pseudo
+ShinePlayer::so_ply_Send2GuildTournamentLogIn(body, seed)  (vt 0x928)    @ FUN_00475950
+    p.guild ∉ {nNo1, nNo2}: return
+    p.so_ply_IsLink_OutMap_AndSendErrorMsg() (vt 0xa74, §2.3) == 0:   # the current map forbids leaving
+        p ← notices "GTEntryMapErr0", "GTEntryMapErr1" (ScrString); return
+    p.nTournamentSeed = seed
+    p ← 0x749B NC_GUILD_TOURNAMENT_RECALL_ENTER_CMD (1 payload byte, never written: stale g_buf byte; the 2017
+        struct is empty) (original bug) Z16-B18
+    # client GuildTask FUN_006b5130: yes / no box "Will you accept the Tournament Recall?"; the answer is 0x749C
+
+ShinePlayer::so_ply_GuildTournament_isSummon(p)  (vt 0x92c)              @ FUN_00475890
+    # from sp_NC_MAP_LOGINCOMPLETE_CMD (Z01 §6), right after p.nTournamentSeed = 0xFF at every map login
+    for seed in 0…31 with entry.nTournamentSeed ≠ 0xFF and p.guild ∈ {nNo1, nNo2}:
+        entry.gta_MatchStartTime == 0 or the entry window is over (Z16-B19 formula): return
+        p is on the entry's instance (map name == gta_Field): p.nTournamentSeed = seed; return
+        else so_ply_Send2GuildTournamentLogIn(entry.gta_Struct, seed)      # prompt again, keep looking
+    # the first matching entry whose window is over ends the whole search. Zones that do not host a match never
+    # reset its entry (only fm_GuildTournamentClear on the hosting zone does), and the hosting zone keeps it when
+    # the film ends without `endofgt`. A guild that played seed 2 in round 1 therefore gets no prompt at map
+    # login for its round-2 match at seed 16 (original bug) Z16-B20
+
+0x749C NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ {u8 ack}                     @ FUN_004783c0
+    reply 0x749D NC_GUILD_TOURNAMENT_RECALL_ENTER_ACK {u16 err} through the data stream (vt 0x2f8)
+    ack == 0 (declined): err 0x1440
+    p.nTournamentSeed is 0xFF or > 31: err 0x1441
+    entry window closed (IsAccessTime): err 0x1444
+    GetFieldGTMapInfo NULL: it sent 0x1441; assert "…RECALL_ENTER_REQ"; no further reply
+    GetMapInfo NULL: it sent 0x1441 / 0x1443; no further reply
+    else: err 0x1440; so_ply_Summon2GuildTournament(entry, NULL, NULL) (vt 0x924)
+    # no check here that p's guild fights in the match; Summon checks it silently
+    # client GuildTask FUN_006b5170: 0x1440 nothing; 0x1444 "Entry Time is Over"; any other code "Error : %d"
+    # (corrects Z08 §8.1: a decline is answered with 0x1440, not 0x1441; a missing map table entry sends 0x1441
+    #  itself instead of "log only")
+
+ShinePlayer::so_ply_Summon2GuildTournament(start, gtms, mapinfo)  (vt 0x924)   @ FUN_00478750
+    # gtms / mapinfo are unused (always NULL)
+    p.so_IsEmpty() (vt 0x300): return
+    p.mode ∈ {0, 3, 5, 7} (not in game, dead, …): return               # after 0x749D 0x1440: nothing happens
+    p.guild ∉ {start.nNo1, start.nNo2}: return
+    mode 4 (sitting): stand up (vt 0x488)
+    GetLinkData(guildtournamentinfo[start.nTournamentSeed], &link, p): so_LinkTo(link, 6, 9, 10) (vt 0x600)
+        # same zone 0x1809 / other zone 0x180A (Z01 §7.1); the map login then registers the fighter (§4.4)
+```
+
+### 6.4 Observers
+
+```pseudo
+0x74D7 NC_GUILD_TOURNAMENT_OBSERVER_ENTER_REQ {u8 nTournamentSeed}       @ FUN_00476c50
+    → WM 0x74D9 NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_REQ {u8 seed, u16 nPlayerHnd = p.handle}   # no zone check
+    # WM (W03 §8.3): seed > 29 → 0x1B61; seed rounded down to even; pair fighting → 0x1B60; else 0x1B62
+
+0x74DA NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_ACK {u16 err, u8 nTournamentSeed, u16 nPlayerHnd}   @ FUN_00478be0
+    q = ShinePlayer at nPlayerHnd (RTTI check); none: return
+    err 0x1B60: sp_Guild_Tournamnet_Observer_Enter(q, seed)
+    err 0x1B61: q ← 0x74D8 {0x1B61};  err 0x1B62: q ← 0x74D8 {0x1B54 "Relevant Guild Tournament is not in Progress"}
+        (_ErrorSendPlayer<…OBSERVER_ENTER_ACK> FUN_004781a0: 11-byte payload, only err written)
+    other codes: nothing
+
+ShinePlayer::sp_Guild_Tournamnet_Observer_Enter(p, seed)                @ FUN_004788c0   (also GM `&observerlinkto`, Z11 §6.3)
+    seed 0xFF or > 31: p ← 0x74D8 {0x1B42 "It is not the Guild Tournament Map"}; return
+    p.mode ∈ {0, 3, 5, 7}: return (silent)
+    p.so_AbnormalState_Set_Simple(0x121 StaObserverHideMode, 1, 0) (vt 0x644) fails: return (silent)
+    mode 4: stand up
+    GetLinkData(guildtournamentinfo[seed]) fails: return            # (the observer abstate stays set)
+    p ← 0x74D8 NC_GUILD_TOURNAMENT_OBSERVER_ENTER_ACK {u16 err 0x1B40, u8 nTournamentSeed, u32 nGuildRed = nNo1,
+        u32 nGuildBlue = nNo2}                                        # 11 bytes, data stream
+    machine = fo_GetMechineNumber(server group, fieldserial[link.linktoserver], own zone); −1: assert, return
+    instance on this zone: so_LinkTo(link, 6, 9, 10); sp_SetRollBackPosEvent(new RollBackPosCallBackEvent(p) (0x68))
+        # the roll-back event brings the observer back to where they stood (sp_RunRollBackPosEvent)
+    other zone: → WM 0x4019 NC_CHARSAVE_2WLDMAN_LINK_FROM_CMD {u16 wldmanhandle (vt 0x340), u32 chrregnum,
+        Name3 map = current map, u32 x, u32 y} (0x1a); so_LinkTo(link, 6, 9, 10)
+    # an observer links to regen slot 0 (guild A's spawn point, §6.1); the map login sets layer {0, 2} (§4.4)
+    # client GuildTask FUN_006b35b0: 0x1B40 → stores seed, red / blue guild numbers, shows the "quit" button
+    # (MiniMapWin::ShowGTQuit); any other code → ErrMsgTable text
+
+0x74DB NC_GUILD_TOURNAMENT_OBSERVER_OUT_REQ {u8 nTournamentSeed}  @ FUN_00476cc0
+ShinePlayer::sp_Guild_Tournamnet_Observer_Out(p, 0)                     @ FUN_00475ba0   (GM `&observerout`, Z11 §6.3)
+    (both bodies are the same; the seed is not read)
+    sp_RunRollBackPosEvent(p) ran (same-zone observer): done
+    else if p is on a tournament map (fm_IsGuildTournametnMap): sp_2Roumen(p)
+    # no 0x74DC NC_GUILD_TOURNAMENT_OBSERVER_OUT_ACK is ever sent by the 2016 zone (client FUN_006b3840 exists)
+# When the match ends the film moves everyone with StaObserverHideMode out: AxialListLinkToByObserver
+# (ali_Work FUN_00428530, Z09 §25.4): stand up; players: roll-back event, else so_LinkToReserv(link)
+```
+
+### 6.5 Flag capture cast (0x74CA)
+
+```pseudo
+0x74CA NC_GUILD_TOURNAMENT_FLAGCAPTURE_REQ {u16 hTargetFlag}  @ FUN_00475b80 → so_ply_FlagCaptureCast (vt 0x930)
+ShinePlayer::so_ply_FlagCaptureCast(p, hFlag)                            @ FUN_00477d90
+    errors → sp_NC_GUILD_TOURNAMENT_FLAGCAPTURE_ACK(err) FUN_00475cd0 = p ← 0x74CB {u16 err} (game stream vt 0x2fc)
+    no map or no tournament system on it: 0x1B42
+    IsFlagCapture(p, hFlag) (§4.5; the flag already belongs to p's guild): 0x1B48
+    not IsPlayerRegister(p): 0x1B4F
+    no object at hFlag: return (silent)
+    so_DistanceSquar(flag, p) > 10000 (100 units): 0x1B52
+    mode 6 (riding): sp_MoverSystem_Type == MVST_MOVER ? sp_MoverSystem_GetOff(p, 0) : sp_HorseOff(p); continue
+    mode ∈ {3, 4, 5} or abstate 0x123 StaImmortal (login protection): 0x1B45 "You are unable to capture the flag"
+    so_parameter().IsNoAttacOrNoMove() or p+0x1e78 bit 2 or smo_IsCaptivate (vt 0xf20): 0x1B45
+    p.sp_hGuildTorunamentFlagHandle (p+0x5e06) ≠ 0xFFFF: 0x1B46 "You are capturing the flag"
+    casting something (smo_DuringCast vt 0xea0): so_ply_AllCastCancel (vt 0x8d0)
+    remove abstates 0x4B StaHide and 0x175 StaGTIHide (vt 0x650) when set   # capturing reveals the player
+    p ← 0x74CB {0x1B40}; sp_NC_GUILD_TOURNAMENT_FLAGCAPTURE_CMD(0x1B40)
+    ts_Set(p.sp_TimerStr (p+0x2a784), so_ply_FlagCapture, TSCW_MISC, 4000)
+    p.sp_hGuildTorunamentFlagHandle = hFlag
+    p ← 0x2047 NC_ACT_CREATECASTBAR {u16 4000} (game stream)
+
+sp_NC_GUILD_TOURNAMENT_FLAGCAPTURE_CMD(p, err)                          @ FUN_00475d40
+    0x74CC NC_GUILD_TOURNAMENT_FLAGCAPTURE_CMD {u16 err, u16 hPlayer = p.handle} to everyone in range of p
+    (so_AllOfRange with AxialListPacketBroadcast) and to p
+    # client GuildTask FUN_006b3780: 0x1B40 → Char::ActFlagCapture(hPlayer) (capture animation);
+    # 0x1B51 → Char::StopFlagCapture(hPlayer); other codes → ErrMsgTable text
+
+ShinePlayer::so_ply_FlagCapture(p) → TSRT_RETURN   (timer callback after 4 s)   @ FUN_00477c00
+    system = p's map system; none: return (the flag handle stays set)
+    SetErrorDelegate(p.sp_NC_GUILD_TOURNAMENT_FLAGCAPTURE_ACK)        # CaptureFlag errors reach p as 0x74CB
+    CaptureFlag(p, p.sp_hGuildTorunamentFlagHandle) (§4.5) true: p ← 0x74CB {0x1B40}
+    ClearErrorDelegate; p.sp_hGuildTorunamentFlagHandle = 0xFFFF
+
+ShinePlayer::sp_FlagCaptureFree(p)                                       @ FUN_00476cf0
+    cast running (handle ≠ 0xFFFF): handle = 0xFFFF; stop the cast timer (ts_Limit 0, TSCW_NONE, no-op functions);
+    p ← so_SendProtocol(8, 0x48) = 0x2048 NC_ACT_CANCELCASTBAR; sp_NC_GUILD_TOURNAMENT_FLAGCAPTURE_CMD(0x1B51)
+    # callers: so_ply_AllCastCancel FUN_0055a310 (any cast cancel: hit, move, …, Z03) and
+    # sp_FlagCaptureFreeCheck(p, hFlag) FUN_00476d50 (only if p casts on hFlag), which AxialListFlagCaptureCancel
+    # (ali_Work FUN_004794b0) runs for every player in the map when CaptureFlag changes the owner (§4.5)
+```
+
+### 6.6 Match end and result to the WM
+
+```pseudo
+film step `endofgt w l` (ShineEndOfGuildTournament, Z09 §24.8): fm_ClearObject(0xb0);
+    FieldMap::fm_GuildTournamentEnd(field, w, l) FUN_00475fa0 → WM 0x7482 NC_GUILD_TOURNAMENT_END_CMD
+        {u8 seed, u16 nTournamentMapNo (always 0, §6.1), u8 nStatus = (w == l), u32 nWinnerGuildNo = w,
+         u32 nLoseGuildNo = l}; gta_Result2WMS = 1      (field seed / entry not set: assert, nothing sent)
+    FieldMap::fm_GuildTournamentClear(field) FUN_00475a30: entry seed 0xFF, start time 0, field seed 0xFF,
+        system.Clear() (§4.3)
+    # the score, winner and loser come from the script (`@GetWinnerGuild` / `gtresult`, Z09 §22.2 / §24.8; §4.7)
+    # the WM side (bracket advance, 0x7490 results, rewards) is W03 §8.5
+
+WorldManagerSession::wms_GuildTournamentCheck()     (once a minute, Z09 §1.2)   @ FUN_004776a0
+    for seed in 0…31: entry.nTournamentSeed ≠ 0xFF and gta_Result2WMS == 0 and the instance is on this zone
+        and its cinema runs no film (fm_Multiflex +0x14 l_ListNum == 0, assembly 0x4777a4):
+            fm_GuildTournamentEnd(field, 0, 0)      # 0x7482 {seed, 0, nStatus 1, 0, 0}: "no result" (draw)
+    # it does not call fm_GuildTournamentClear: the entry and the field seed stay set until the next start on
+    # this instance (which then logs "seed not empty. May be RE-Match.") (part of Z16-B20)
+```
+
+### 6.7 Entry application (WM → zone → DB)
+
+```pseudo
+0x74E3 NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_REQ {u16 hWMChar, u32 nCharNo, u32 nGTNo, u32 nGuildNo, u8 nMinLevel,
+        u16 nMinMember, u64 nProposalMoney}  (0x19, WM → every zone, W03 §8.2)      @ FUN_004766f0
+    nCharNo == −1 or the character is not on this zone or so_IsEmpty: nothing (another zone answers)
+    e = q.so_ply_GuildTournamentJoinNew(body) (vt 0x934)
+    e ≠ 0x1C40: → WM 0x74E4 NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_ACK {u16 Error = e, the 0x19-byte body} (0x1b)
+
+ShinePlayer::so_ply_GuildTournamentJoinNew(p, body) → u16                @ FUN_00476860
+    p.guild == 0: 0x1C42
+    money (vt 0x434) + the pending money change of p's lock list (icl_ReservedQuantity) < nProposalMoney: 0x1C44
+    → DB 0x74E5 NC_GUILD_TOURNAMENT_DB_JOIN_NEW_REQ {ref {u16 p.handle, u32 charNo}, u16 lockindex = the lock
+        list's current index, u16 hWMChar, u32 nCharNo, u32 nGTNo, u32 nGuildNo, u8 nMinLevel, u16 nMinMember,
+        u64 nProposalMoney} (0x21)
+    lock list: icl_StoreMoney(lockindex, nProposalMoney, −1) (a pending −nProposalMoney change); icl_IncIndex
+    0x1C40 (asked the DB; the WM gets its answer from 0x74E6)
+    # the zone checks only the guild and the money; nMinLevel / nMinMember are passed on unchecked
+    # (W03 §8.2's "checks level / members / money" is more than the 2016 zone does)
+
+0x74E6 NC_GUILD_TOURNAMENT_DB_JOIN_NEW_ACK {ref, u16 lockindex, u16 Error, hWMChar, nCharNo, nGTNo, nGuildNo,
+        nMinLevel, nMinMember, nProposalMoney}                                      @ FUN_00476a10
+    → WM 0x74E4 {Error, hWMChar, nCharNo, nGTNo, nGuildNo, (3 bytes not written: Z08-B13), nProposalMoney}
+    q = object at ref.handle, not empty, charNo == ref.charNo:
+        Error 0x1C40: lock list icl_Apply_N_Free(q, lockindex, 0) (money taken); failure → LockIndexLog
+        else: icl_Free(lockindex) (money kept)
+0x74F4 NC_GUILD_TOURNAMENT_GOLD_REFUND_ZONE_CMD @ FUN_00476c00: empty (profiler only); no refund on the zone
+    (D06 / Z08 record the same)
+```
+
+### 6.8 0x74AC / 0x74B4 check order (Z08 open point, assembly)
+
+`sp_NC_GUILD_RENAME_REQ` FUN_00473550 (0x4735e2…0x47362a) and `sp_NC_GUILD_RETYPE_REQ` FUN_00473860 (0x47390c…0x47393a):
+
+```pseudo
+mode ∉ mask 0x56 {1, 2, 4, 6}                         → 0x1A41 (retype 0x1A59)      # no client text
+no map, or the map's FieldAttr byCanItem (+0x9e) == 0 → 0x1A42 (0x1A5A) "Request cannot be processed at a current location"
+NPC menu / storage open (p+0x18248 & 0x0C)            → 0x1A41 (0x1A59)             # jumps back to the mode error
+```
+
+So Z08 §8.1's line "an NPC menu or storage open: 0x1A42" is wrong. The open menu shares the mode code 0x1A41 / 0x1A59,
+and only the map test gives the "location" code.
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1328,11 +1652,21 @@ GuildTournamentSystem::DiceGameWinGuild(charNo)                @ FUN_0047ba80   
 | Z16-B14 | `GuildGroup::SendPlayerAllScoreInfo` FUN_0047f260 | after more than 200 rows it sends the list but never empties the row vector | each further member re-sends the whole growing list; lists over the packet limit fail with "Packet Too Long" (dead with real guild sizes) | clear the vector after each 200-row chunk |
 | Z16-B15 | `GuildTournamentSystem::GuildBuffUse` FUN_0047b9a0 (0x74CF) | a requester whose guild is in neither group gets the 0x1B4F error twice (the else branch falls through to the final sink call) | two 0x74D0 error acks, the message shows twice | one sink call |
 | Z16-B16 | `GuildTournamentSystem::DiceGameWinGuild` FUN_0047ba80 | adds the 100 dice points without sending 0x74DD | the score boards show the old score until the next flag tick or kill (up to 60 s) | broadcast 0x74DD as the flag tick does |
+| Z16-B17 | 0x7481 @ FUN_00477a10 (settles Z08-B12) | accepts `seed ≤ 32`; `guildtournamentinfo` and `GTMap` have 32 entries, and `guildtournamentinfo[32]` overlaps `GTMap[0…2]` | seed 32 writes 0xFF and then the match record into the map table, reads `GTMap[32]` past the array; seeds 0–2 can no longer start and their instances are no longer tournament maps (latent: the 2016 WM sends seeds ≤ 29) | `seed < 32` as every other reader |
+| Z16-B18 | `so_ply_Send2GuildTournamentLogIn` FUN_00475950 | 0x749B is sent with a 1-byte payload that is never written | one stale g_buf byte on the wire (the client ignores it) | send the empty struct without the pad byte, or zero it |
+| Z16-B19 | `IsAccessTime` FUN_004757f0 / `sp_IsGuildTournamentAccessTime` FUN_00475830 / `so_ply_GuildTournament_isSummon` FUN_00475890 | entry window = `nExploerTimeMin · 4800 / 10` ticks = 480 ticks per minute with ticks of 0.1 s | players can answer the recall only for 80 % of the configured entry time; afterwards 0x749C gets 0x1444 "Entry Time is Over" | `nExploerTimeMin · 600` ticks |
+| Z16-B20 | `so_ply_GuildTournament_isSummon` FUN_00475890 (+ `wms_GuildTournamentCheck` FUN_004776a0) | the seed loop returns at the first entry of the player's guild whose window is over; entries are only reset by `fm_GuildTournamentClear` on the hosting zone (the check fallback and non-hosting zones keep them) | a guild's earlier-round entry (lower seed) hides its next match: no 0x749B prompt at map login and `nTournamentSeed` stays 0xFF, so 0x749C fails with 0x1441; repeated "Seed not empty" asserts at the next start | skip (`continue`) entries whose window is over; reset the entry on every zone at the end (0x7482 / a WM broadcast) |
 
 ## N. Not reconstructed / uncertain
 
-- Parts 1–4 (KQ, GT core §4, groups / skills / items / dice §5). The match lifecycle (§6) follows in a later part; see
-  `docs/plan/status/Z16.md`.
+- Parts 1–5 written (KQ §1–§3, GT core §4, groups / skills / items / dice §5, match lifecycle §6); the sweep part
+  (coverage boundary, knowledge file) follows, see `docs/plan/status/Z16.md`.
+- §6.1 `GetLinkData`: `LinkInformTemplete.index[20]`, `direct` and `Party` are left as stack bytes; whether `so_LinkTo`
+  (mode 6, 9, 10) reads them was not traced (Z01 §7.1).
+- §6.4: if `GetLinkData` fails after `StaObserverHideMode` was set, nothing removes the abstate; not reachable with the
+  2016 Field.txt (row 0 exists), so not counted as a bug.
+- §6.2: the token `nNo1 nNo2 nExploerTimeMin nPlayTimeMin` is what `Guild/GuildTournament` receives; how the script
+  uses each value is Z09's (§24.7); `nWaitPlayTimeSec` reaches no zone code.
 - §5.5 GTIT_MOBBREED: the argument of `so_mob_Regenerate` taken from the target's vt 0x6d0 (a folded 0-returning stub on
   mobs / NPCs, `so_GetCharBriefInfo` on players) and what `so_mob_RegenLocation` returns for a player target were not
   traced; with the 2016 data only team NPCs (TARGET_MYNPC) breed.

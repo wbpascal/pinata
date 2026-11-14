@@ -10344,6 +10344,26 @@ Empty payload.
 
 Empty payload.
 
+### `0x749c` NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ (C→Z)
+
+**Verified layout** (basis: zone sp_NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ FUN_004783c0; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | ack | 0 = declined, else accept |
+
+uses p.nTournamentSeed set by 0x749B. Z16 §6.3
+
+### `0x74ca` NC_GUILD_TOURNAMENT_FLAGCAPTURE_REQ (C→Z)
+
+**Verified layout** (basis: zone FUN_00475b80 → so_ply_FlagCaptureCast FUN_00477d90; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hTargetFlag | flag NPC handle |
+
+4 s cast; errors in 0x74CB. Z16 §6.5
+
 ### `0x74cf` NC_GUILD_TOURNAMENT_USESKILL_REQ (C→Z)
 
 **Verified layout** (basis: zone sp_NC_GUILD_TOURNAMENT_USESKILL_REQ FUN_00477b20; pdb2016 struct)
@@ -10361,6 +10381,26 @@ Empty payload.
 Empty payload.
 
 no body read; success has no ack (0x74D5 broadcast), errors 0x74D4. Z16 §5.6
+
+### `0x74d7` NC_GUILD_TOURNAMENT_OBSERVER_ENTER_REQ (C→Z)
+
+**Verified layout** (basis: zone FUN_00476c50; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed |  |
+
+relayed unchecked to the WM as 0x74D9. Z16 §6.4
+
+### `0x74db` NC_GUILD_TOURNAMENT_OBSERVER_OUT_REQ (C→Z)
+
+**Verified layout** (basis: zone FUN_00476cc0; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed | not read |
+
+no 0x74DC reply in 2016. Z16 §6.4
 
 ### `0x10d2` NC_CHAR_FREESTAT_SET_DB_ACK (DB→Z)
 
@@ -12069,6 +12109,32 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 0 | u32 | nHandle | KQ handle |
 | 4 | u32 | nCharNum |  |
 
+### `0x74c7` NC_GUILD_TOURNAMENT_ZONE_MEMBERGRADE_ACK (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_GUILD_TOURNAMENT_ZONE_MEMBERGRADE_ACK FUN_00476460)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | Error | 7000 ok, 0x1B59 not found, 0x1B5A not in tournament |
+| 2 | u8 | nTournamentSeed | not read |
+| 3 | u32 | nGuildNo | not read |
+| 7 | u16 | nGuildMemberCnt |  |
+| 9 | {u32 charNo, u8 grade}[n] | members | → GuildTournamentSystem::sm_mapGuildMemberGrades |
+
+Z16 §6.2
+
+### `0x74da` NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_ACK (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_ACK FUN_00478be0; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1B60 enter, 0x1B61, 0x1B62 |
+| 2 | u8 | nTournamentSeed | even seed of the pair |
+| 3 | u16 | nPlayerHnd | zone handle of the requester |
+
+Z16 §6.4
+
 ### `0xa409` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ACK (WM→Z)
 
 **Verified layout** (basis: zone FUN_00485540)
@@ -12231,6 +12297,37 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 
 0xe bytes, sent to the registering fighter; client: A or B 0 → 'There is no match opponent'. Z16 §4.4
 
+### `0x749b` NC_GUILD_TOURNAMENT_RECALL_ENTER_CMD (Z→C)
+
+**Verified layout** (basis: zone so_ply_Send2GuildTournamentLogIn FUN_00475950; client GuildTask FUN_006b5130)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | (pad) | never written: stale g_buf byte (Z16-B18) |
+
+1-byte payload (empty struct). Client shows the yes/no box 'Will you accept the Tournament Recall?'; answer 0x749C. Z16 §6.3
+
+### `0x749d` NC_GUILD_TOURNAMENT_RECALL_ENTER_ACK (Z→C)
+
+**Verified layout** (basis: zone FUN_004783c0 / _ErrorSendPlayer FUN_00478070; client GuildTask FUN_006b5170)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1440 ok or declined (silent), 0x1441 no seed / map table, 0x1443 map not loaded, 0x1444 'Entry Time is Over'; others shown as 'Error : %d' |
+
+data stream (vt 0x2f8). Z16 §6.3
+
+### `0x74cc` NC_GUILD_TOURNAMENT_FLAGCAPTURE_CMD (Z→C)
+
+**Verified layout** (basis: zone sp_NC_GUILD_TOURNAMENT_FLAGCAPTURE_CMD FUN_00475d40; client GuildTask FUN_006b3780)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1B40 cast started (client ActFlagCapture), 0x1B51 cast cancelled (StopFlagCapture) |
+| 2 | u16 | hPlayer | the caster |
+
+to everyone in range of the caster and the caster. Z16 §6.5
+
 ### `0x74cd` NC_GUILD_TOURNAMENT_FLAGCAPTURE_RESULT_CMD (Z→C)
 
 **Verified layout** (basis: zone GuildTournamentSystem::CaptureFlag FUN_0047eae0; pdb2016 struct; client GuildTask FUN_006b64f0)
@@ -12284,6 +12381,19 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 0 | u32 | unEndTime | always 5; the client acts only on 5 |
 
 4 bytes; to all in the red (else blue) player's map. Z16 §5.6
+
+### `0x74d8` NC_GUILD_TOURNAMENT_OBSERVER_ENTER_ACK (Z→C)
+
+**Verified layout** (basis: zone sp_Guild_Tournamnet_Observer_Enter FUN_004788c0 / _ErrorSendPlayer FUN_004781a0; client GuildTask FUN_006b35b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1B40 ok; 0x1B42 bad seed, 0x1B61, 0x1B54 (from WM 0x1B62) |
+| 2 | u8 | nTournamentSeed | written only for 0x1B40 |
+| 3 | u32 | nGuildRed | guild A (nNo1), only for 0x1B40 |
+| 7 | u32 | nGuildBlue | guild B (nNo2), only for 0x1B40 |
+
+11 bytes always; error replies leave bytes 2..10 stale. Z16 §6.4
 
 ### `0x74dd` NC_GUILD_TOURNAMENT_SCORE_CMD (Z→C)
 
@@ -12894,6 +13004,17 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 0 | u32 | nGuildNo |  |
 | 4 | u32 | nPriceGuildToken |  |
 | 8 | u32 | zero |  |
+
+### `0x74c6` NC_GUILD_TOURNAMENT_ZONE_MEMBERGRADE_REQ (Z→WM)
+
+**Verified layout** (basis: zone wms_GuildTournamantStart FUN_00476de0; pdb2017 struct agrees)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nTournamentSeed |  |
+| 1 | u32 | nGuildNo | sent once for nNo1, once for nNo2 |
+
+only by the hosting zone. Z16 §6.2
 
 ### `0x74c8` NC_GUILD_TOURNAMENT_ZONE_FIGHTER_ENTER_CMD (Z→WM)
 
