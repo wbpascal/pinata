@@ -46,8 +46,8 @@ scenario book shelf (Pine or Lua books, reload) and the dialog-string files (`Sc
 nodes, §27 films and the boss-field tables, §28 the sweep additions (map query functions per map kind, heal reports,
 the rest of `MiscDataTable.txt`, answers to the sweep leftovers, the `OptionReader` text-table format, the dead
 `CFindWay` path finder, the methods reached only through vtables, the data-file and opcode check, the last helpers of the gap list, the game's own `List` / `BTree` / vector
-templates), §29 the original-server bugs
-register (Z09-B1 … B127), §30 what is not reconstructed or uncertain, §31 the coverage boundary.
+templates; review additions: the Lua score / ranking functions, the instance-dungeon rank result, the hunt log), §29 the original-server bugs
+register (Z09-B1 … B130), §30 what is not reconstructed or uncertain, §31 the coverage boundary.
 
 ---
 
@@ -2771,7 +2771,8 @@ smo_NewObjBriefInfoChange(o, newPos)                                          @ 
     ali_Work(o, other)                                                        @ FUN_004bdde0
         s = MapInfo.Sight² (0xFFFFFFFF on unlimited maps); if dist²(o's *old* position, other) < s: skip   # already in sight
         if SubLayer_CanSee(o, other): o.so_SendMyBriefInfo(other) (vt 0x4c8, Z02 §5) + o's abstate list 0x1C19 to other
-        if SubLayer_CanSee(other, o): other.so_SendMyBriefInfo(o) + other's abstates to o
+            # (BriefInformationAbstate::bia_Fill; 0x1C19 only when the list count ≠ 0)
+        if SubLayer_CanSee(other, o): other.so_SendMyBriefInfo(o) + other's abstates to o (same count ≠ 0 rule)
 smo_OldObjectDelete(o, oldPos)                                                @ FUN_004be0d0
     so_AllOfRange(o, around oldPos, sight, AxialListBriefDeleteAtMove)
     ali_Work(o, other)                                                        @ FUN_004bdfe0
@@ -3313,7 +3314,7 @@ DropItemListForSpecies::dilfs_ItemDrop(species, name, killer, mob, looter, lotFa
                                                          # (1000 by default, template DAT_132728f8; ChargedEffect.shn
                                                          #  EffectEnum 16 "SNS_DropUp" 1100 *(inferred)*); mobs: 1000 → 0
     d = killer.level − mob.level (vt 0x4d8, u8)
-    gate     = (d < 0 ? 1000 : (10 − d) × 100) + bonus   # killer ≥ 11 levels above the mob: gate ≤ 0, nothing drops
+    gate     = (d < 0 ? 1000 : (10 − d) × 100) + bonus   # killer ≥ 10 levels above the mob: gate ≤ 0, nothing drops
     mapRate  = mob has a field ? max(field.fm_FieldBonus.fb_DropRate (+0x50), 0) : 1000   # always 1000 in 2016 (below)
     if killer.vt[0x944]() == 1 (player: `ShinePlayer::so_ply_GetFromWhere` FUN_0043c9d0 = `sp_ConnectFrom` +0x2a7d4, set by WM
         0x082B NC_MISC_CONNECTFROMWHERE_ACK `connectfrom`): mapRate += 200   # *(inferred)* PC-room bonus (meaning of value 1)
@@ -3326,8 +3327,11 @@ dilfs_Drop(rec, name, …):                                   @ FUN_0048eb90
     for i in 0..44: if rec.entry[i].DrItem ≠ "-" and Rule == 'r': dilfs_DropByRate(i, rec, …)
 
 dilfs_DropByRate(i, rec, killer, mob, r, looter, lotFactor):   @ FUN_0048e920
-    if rand(1000) ≥ r.gate: return                          # one gate roll per entry
-    if rand(1000000) ≥ (r.abRate + r.mapRate + r.bonus) × DrItemR / 1000: return
+    if not (int)rand(1000) < r.gate: return                  # one gate roll per entry (rr_ByLevel)
+    if not (uint)rand(1000000) < (uint)((int)((r.abRate + r.mapRate + r.bonus) × DrItemR) / 1000): return
+        # unsigned compare: a negative sum (an abstate actor's vt 0x48 below 0, or cec_ItemDropRate far below 1000)
+        # becomes a huge bound and the entry always passes (original bug) Z09-B129 (latent: mapRate ≥ 1000 keeps the
+        # sum ≥ 0 with the 2016 data)
     if Num == 0: return;  if Num ≠ −1: Num −= 1             # the count lives in the shared table record (original bug) Z09-B20
     group = DAT_0d55bc30[DrItem]; none: return
     dilig_Drop(group, killer, mob, looter, lotFactor, UpGradeMin, UpGradeMax)
@@ -3356,7 +3360,11 @@ DropItemListInGroup::dilig_Drop(group, killer, mob, looter, lotFactor, upMin, up
 script kills seen (`…, 1000, 1)`); gathering (`sp_GatherComplete(p, how)` FUN_0046b2f0, Z02 §8) calls
 `so_KilledBy(p, hp, 0, how')` (read from the disassembly: `GetHP` takes no argument) with `how'` = `how` for resources of
 MobInfo.Type 8/9/10 and 1 otherwise. 0x2032 passes `how` = 2, so a gather the client completes drops **double lots**
-(this answers the Z02 open point "gather loot"; the timer path's `how` is Z02's). The aggro share is 0 (aggroRate 0).
+(this answers the Z02 open point "gather loot"; the timer path `sp_Schedule_Gather` FUN_0046cb40 passes 1). The aggro share is 0 (aggroRate 0).
+`sp_NC_ACT_GATHERCOMPLETE_REQ` FUN_0046cbf0 only clears the gather timer (`sp_TimerStr`) and calls `sp_GatherComplete(p, 2)`:
+it never checks how long the gather has run, so a client that sends 0x2032 right after 0x202E gets the resource at once,
+with lots × 2 for resource types 8/9/10 (original bug) Z09-B128. Whether the factor 2 for the client-side completion is
+meant (the normal path: the client's `Gather.shn` time is shorter than the server's 4-s fallback timer) is not visible.
 
 ### 11.3 Creating the drop object
 
@@ -3479,7 +3487,9 @@ ShinePlayer::sp_partyitemdistribute(p, drop, item, handle):                     
     near = members within 1000 units of p (DistanceSquare < 1000001); picker = the one with the oldest last pickup
            (vt 0x41c ShinePlayer::sp_lastpickuptime FUN_0055a090 = p+0x29334, set by so_ply_PickupItem; a member never picking has 0 → first)
     money item (g_MoneyItemID): share = max(amount / |near|, 1)
-        for slot in 0..4: slot.vt[0x790](share)      # all 5 slots, absent / far / unused ones included (original bug) Z09-B22
+        for slot in 0..4: slot.vt[0x790](share)      # all 5 slots, no null check (original bug) Z09-B22:
+            # far / absent members' slots hold 0 (set at 0x52f71e), slots n..4 are never written (stack garbage);
+            # the call reads slot->vtable → access violation → MiniDumper ends the zone (§30.1)
         drop.vt[0x54c]()  (removed)
     else: picker null: log "Null picker"
           picker ≠ p: p ← 0x301B NC_ITEM_PICKOTHER_ACK { u16 itemid, u16 towho = picker.handle }   # no client handler (C01)
@@ -3491,8 +3501,11 @@ ShinePlayer::sp_RaidItemsidtribute(p, drop):                                    
     else: picker = oldest last pickup among near; 0x301B to p if someone else; picker.so_ply_PickupItem(drop, item, handle)
 ```
 
-The party version gives each member at least 1 coin even when the amount is smaller than the member count
-(original bug) Z09-B23; the raid version splits exactly.
+Callers (`sp_NC_ITEM_PICK_REQ` FUN_00530a50, Z04 §3.3): in a party, money goes to `sp_partyitemdistribute` under the
+loot rules LOOTER, ORDER and DICE (the DICE case falls through to ORDER for money); FREE pays the picker
+(`so_ply_PickupItem`, vt 0x798). With B22 the money branch survives only with 5 members all within 1000 units; then
+each member gets at least 1 coin even when the amount is smaller than the member count (original bug) Z09-B23; the raid
+version splits exactly.
 
 ### 11.6 Dice game on a drop (loot rule 3)
 
@@ -4725,18 +4738,18 @@ names for the NA build *(fh-doc)*; the 2016 zone registers only these.
 
 | Documented in | n | Lua name, address (section / item when done) |
 |---|---|---|
-| already documented | 45 | `cAddCharacterTitle` 005eb310 W04, `cAggroList` 005f3250 §6.8, `cAggroListSize` 005f2f70 §6.8, `cAggroReset` 005e1280 §6.8, `cAggroSet` 005d9370 §6.8, `cCastTeleport` 005e5b10 §9.3, `cDoorAction` 005dc840 §13.1, `cDoorBuild` 005dc5f0 §13.1, `cDropFilm` 005d6b00 §9.2, `cDropItem` 005d9a30 §11.8, `cEffectRegen_Object` 005e4f30 §13.2, `cEffectRegen_XY` 005f0b50 §13.2, `cGroupRegen` 005efc60 §10.6, `cGroupRegenInstance` 005ddaa0 §10.6, `cGroupRegenInstance_XY` 005ddc40 §10.6, `cIndunRankResult` 005ee4d0 W04, `cMagicFieldSpread` 005f17c0 §12.2, `cMobChat` 005e2560 §8.7, `cMobRegen_Circle` 005e1ea0 §10.7, `cMobRegen_Obj` 005d8690 §10.7, `cMobRegen_Rectangle` 005e2100 §10.7, `cMobRegen_XY` 005d8440 §10.7, `cMobRegen_XY_Layer` 005e7680 §10.7, `cMobShout` 005dbcd0 §8.7, `cMobSuicide` 005e28c0 §13.3, `cMobWeaponRate` 005f3e30 §8.2, `cMoveLayer` 005e7c90 Z06, `cNPCRegen` 005de700 §5.9, `cNPCSkillUse` 005ef5c0 §8.1, `cNPCVanish` 005d8be0 §13.1, `cPet_IsMasterCalling` 005e9320 Z02, `cRegenGroupActiv` 005efdc0 §10.6, `cRewardItem` 005e17e0 Z05, `cRewardItem_AllInMap` 005e1b30 Z05, `cSaveTutorialInfo` 005e70b0 D05, `cSendGameLogDataType_4` 005f1a10 D05, `cSendGameLogDataType_5` 005f1d40 D05, `cSetItemDropMobID` 005ebea0 §11.8, `cSetNPCIsItemDrop` 005daf40 §11.8, `cSetNPCResist` 005db0a0 §5.8, `cSetServantFlag` 005e4be0 §13.3, `cSkillBlast` 005f0960 §8.1, `cSkillDamageCalculate` 005f1370 §8.1, `cTargetHandle` 005ef430 §6.8, `cVanishReserv` 005ede60 §13.3 |
+| already documented | 45 | `cAddCharacterTitle` 005eb310 W04, `cAggroList` 005f3250 §6.8, `cAggroListSize` 005f2f70 §6.8, `cAggroReset` 005e1280 §6.8, `cAggroSet` 005d9370 §6.8, `cCastTeleport` 005e5b10 §9.3, `cDoorAction` 005dc840 §13.1, `cDoorBuild` 005dc5f0 §13.1, `cDropFilm` 005d6b00 §9.2, `cDropItem` 005d9a30 §11.8, `cEffectRegen_Object` 005e4f30 §13.2, `cEffectRegen_XY` 005f0b50 §13.2, `cGroupRegen` 005efc60 §10.6, `cGroupRegenInstance` 005ddaa0 §10.6, `cGroupRegenInstance_XY` 005ddc40 §10.6, `cIndunRankResult` 005ee4d0 §28.12 (WM side W04 §13.3), `cMagicFieldSpread` 005f17c0 §12.2, `cMobChat` 005e2560 §8.7, `cMobRegen_Circle` 005e1ea0 §10.7, `cMobRegen_Obj` 005d8690 §10.7, `cMobRegen_Rectangle` 005e2100 §10.7, `cMobRegen_XY` 005d8440 §10.7, `cMobRegen_XY_Layer` 005e7680 §10.7, `cMobShout` 005dbcd0 §8.7, `cMobSuicide` 005e28c0 §13.3, `cMobWeaponRate` 005f3e30 §8.2, `cMoveLayer` 005e7c90 Z06, `cNPCRegen` 005de700 §5.9, `cNPCSkillUse` 005ef5c0 §8.1, `cNPCVanish` 005d8be0 §13.1, `cPet_IsMasterCalling` 005e9320 Z02, `cRegenGroupActiv` 005efdc0 §10.6, `cRewardItem` 005e17e0 Z05, `cRewardItem_AllInMap` 005e1b30 Z05, `cSaveTutorialInfo` 005e70b0 D05, `cSendGameLogDataType_4` 005f1a10 D05, `cSendGameLogDataType_5` 005f1d40 D05, `cSetItemDropMobID` 005ebea0 §11.8, `cSetNPCIsItemDrop` 005daf40 §11.8, `cSetNPCResist` 005db0a0 §5.8, `cSetServantFlag` 005e4be0 §13.3, `cSkillBlast` 005f0960 §8.1, `cSkillDamageCalculate` 005f1370 §8.1, `cTargetHandle` 005ef430 §6.8, `cVanishReserv` 005ede60 §13.3 |
 | this section (§14.6) | 16 | `cAIScriptFunc` 005f05f0, `cAIScriptSet` 005eef50, `cAssertLog` 005d63a0, `cCastingBar` 005dd120, `cDebugLog` 005d8350, `cExecCheck` 005d82a0, `cFieldScriptFunc` 005e0f90, `cServerMenu` 005dab40, `cSetAIScript` 005dc050, `cSetFieldScript` 005e0dd0, `cTimer` 005dd310, `cTimerEnd` 005eb770, `cTimerStart` 005eb5a0, `cTimer_Obj` 005dd4b0, `cTriggerRegist` 005f4c50, `tonumber` 005d81c0 |
 | §17 (part 10: object / mob control) | 57 | `cActByEventCode` 005eaa70, `cAnimate` 005dd690, `cAnimateForcedly` 005dd8a0, `cCharTitleAddValue` 005ded30, `cDamaged` 005f10d0, `cDePolymorph` 005e9210, `cDePolymorph_Area` 005f30d0, `cFollow` 005dc1f0, `cFreeStatInit` 005e7dc0, `cHeal` 005de540, `cHideOtherPlayer` 005e6a50, `cInvenItemDestroy` 005d63d0, `cItemErase` 005ecb40, `cKillObject` 005e6d40, `cLevelUp` 005e7590, `cLinkTo` 005dde20, `cLinkToAll` 005df4b0, `cLocationRotate` 005ed000, `cMapObjectControl` 005e2ad0, `cMobDetectRange` 005e80b0, `cMobIDFind` 005eee50, `cMove2Where` 005df6e0, `cMoveStop` 005edf90, `cPartyJoin` 005e3460, `cPartyLeave` 005e3610, `cResetAbstate` 005ef120, `cRevivalAll` 005ec100, `cRunTo` 005da040, `cRunToUntilBlock` 005da590, `cSetAbstate` 005d97a0, `cSetAbstateInArea` 005e2c40, `cSetAbstate_Range` 005f2560, `cSetCanUseReviveItem` 005e8520, `cSetCanUseReviveSkill` 005e8660, `cSetDeadDelayTime` 005de090, `cSetFreeBattle` 005ebfe0, `cSetMobAttr` 005e13d0, `cSetNPCParam` 005f0320, `cSetObjectDirect` 005e8fa0, `cSetReviveDelayTime` 005e8740, `cSetSightState` 005e7b80, `cSetTeamBattle` 005e83e0, `cStaticDamage` 005de8c0, `cStaticDamage_smo` 005e48f0, `cStaticMoverSpeed` 005debb0, `cStaticRunSpeed` 005ed3c0, `cStaticSpeed` 005dea30, `cStaticWalkSpeed` 005ed500, `cTargetChangeNull` 005d6b80, `cUseMoney` 005e6450, `cVanishAll` 005f0150, `cVanishTimer` 005e5840, `cViewSlotEquip` 005e3c00, `cViewSlotUnEquipAll` 005e3d40, `cWaitIdle` 005e7f70, `cWalkTo` 005da300, `cWillMovement` 005df340 |
 | part 11 (queries, lists) | 60 | `cAbstateRestTime` 005ef750, `cCurSec` 005d8cd0, `cCurrentSecond` 005d8d60, `cDistanceSquar` 005d88c0, `cFindAttackBlockLocate` 005ee1a0, `cFindNearPlayer` 005f37d0, `cFindNearestMobList` 005e6eb0, `cGetAbstate` 005e5e20, `cGetAdminLevel` 005e42a0, `cGetAreaObject` 005dca40, `cGetAreaObjectList` 005f4620, `cGetAroundCoord` 005de220, `cGetBaseClass` 005deee0, `cGetCharNo` 005e4110, `cGetCoord_Circle` 005d6720, `cGetCurMapIndex` 005e59b0, `cGetCurrentSkillInfo` 005f2070, `cGetDirect` 005de400, `cGetItemIndex` 005e5cf0, `cGetItemLot` 005dad80, `cGetLevel` 005e0c90, `cGetMapName` 005e8d50, `cGetMaster` 005e32c0, `cGetMobID` 005e47b0, `cGetMoveState` 005e2f30, `cGetNPCHandle` 005d8df0, `cGetNearObjListByCoord` 005f4ef0, `cGetNearestObjByCoord` 005f3a50, `cGetObjectMode` 005d6880, `cGetPlayerList` 005f4410, `cGetPlayerName` 005d9240, `cGetRegistNumber` 005d6500, `cGetRunSpeed` 005ed140, `cGetScriptString` 005e8b30, `cGetTargetList` 005f0e40, `cGetWalkSpeed` 005ed280, `cGetWhoKillMe` 005ee350, `cIsEquipItem` 005e23b0, `cIsInArea` 005ead70, `cIsInMap` 005ef2c0, `cIsMovable` 005da9c0, `cIsNoAttacOrNoMove` 005eac30, `cIsObjectAlreadyDead` 005ee090, `cIsObjectDead` 005d94f0, `cMapMark` 005df860, `cMapMark_FieldSight` 005e0640, `cMapMark_Obj` 005dffc0, `cNearObjectList` 005f22e0, `cObjectCount` 005e26c0, `cObjectEffect` 005ea8b0, `cObjectFind` 005f33d0, `cObjectHP` 005d9630, `cObjectLocate` 005d9ef0, `cObjectLocateDirection` 005e4d80, `cObjectSound` 005ea6f0, `cObjectType` 005f04b0, `cPermileRate` 005da8b0, `cPlayerExist` 005d8aa0, `cRandom` 005ed640, `cRandomInt` 005eed70 |
 | §19 (part 12: messages, dialogs, effects) | 36 | `cCameraMove` 005dbe30, `cCameraMove_Obj` 005e7920, `cDelDirectionalArrow` 005e89d0, `cDirectionalArrow` 005e8810, `cEffectMsg` 005e4540, `cEffectMsg_AllInMap` 005e4670, `cEffectTimer` 005e6bb0, `cEmoticon` 005e3e60, `cEmotion` 005e3e60, `cEndCinematicText` 005eeb30, `cMapFog` 005e6260, `cMessage` 005ef8f0, `cMobDialog` 005db690, `cMobDialog_FileName` 005e4a00, `cMobDialog_Obj` 005db860, `cMobDialog_Range` 005dbaa0, `cMobDialog_String` 005ece70, `cNPCChat` 005efaa0, `cNPCChatTest` 005db4b0, `cNPCMenuOpen` 005dcf50, `cNotice` 005e15b0, `cNoticeRedWarningCode` 005e5ff0, `cNoticeString` 005e16e0, `cNotice_Obj` 005e8e50, `cPlaySound` 005e4410, `cScriptMessage` 005dcbe0, `cScriptMessage_Obj` 005dcd80, `cScriptMessage_Range` 005f27e0, `cScriptMsg` 005ebb40, `cScriptMsg_World` 005eb970, `cShowCinematicText` 005eec40, `cSimpleChatScriptMsg` 005ea530, `cSomebodyShout` 005e5150, `cStartMsg_AllInMap` 005e3af0, `cSystemMessage_Obj` 005e6890, `cTopView` 005e6600 |
 | part 13 (rest) | 0 | none: checked in part 13 (the 248 `lua_setglobal` names of FUN_005f5350 = the 248 names of this table, and every address is cited as `FUN_…` in a pseudocode or knowledge file) |
 | Z13 (pets) | 8 | `cPet_ChangeMind` 005ea1d0, `cPet_GetActionRecord` 005e9d00, `cPet_GetMind` 005e9520, `cPet_GetRunSpeed` 005e9b10, `cPet_GetStress` 005e9720, `cPet_GetWalkSpeed` 005e9920, `cPet_SaveTendency` 005ea410, `cPet_Unsummon` 005d65a0 |
-| Z14 (instance dungeons, scores) | 8 | `cScoreBoard` 005ed860, `cScoreBoard_AllInMap` 005edad0, `cScoreInfo` 005e3790, `cScoreInfo_AllInMap` 005e3970, `cScoreResultList` 005ec6a0, `cScoreTopList` 005ec1f0, `cSendRankingList` 005eaee0, `cWinter_Event_ScoreBoard_AllInMap` 005edcf0 |
+| §28.12 (scores, rankings; part 18 — was "Z14", which no plan line supports) | 8 | `cScoreBoard` 005ed860, `cScoreBoard_AllInMap` 005edad0, `cScoreInfo` 005e3790, `cScoreInfo_AllInMap` 005e3970, `cScoreResultList` 005ec6a0, `cScoreTopList` 005ec1f0, `cSendRankingList` 005eaee0, `cWinter_Event_ScoreBoard_AllInMap` 005edcf0 |
 | Z15 (quests, rewards, tutorial) | 11 | `cClassChangeOpen` 005ed720, `cGetQuestHero_ItemUse` 005d9140, `cGetQuestHero_NPC` 005d8f60, `cGetTutorialInfo` 005e7450, `cProgressTutorial` 005e72f0, `cQuestMobKill` 005d6010, `cQuestMobKill_AllInMap` 005d6150, `cQuestResult` 005e30d0, `cQuestResult_Individual` 005ecca0, `cReward` 005df060, `cRewardItem_CharInven` 005d6a10 |
 | Z16 (kingdom quests) | 7 | `cEndOfKingdomQuest` 005df1f0, `cGetKQLimitSecond` 005e5390, `cGetKQTeamType` 005e81c0, `cIsKQJoiner` 005e82d0, `cKQRewardIndex` 005e4000, `cShowKQTimerWithLife` 005e54f0, `cShowKQTimerWithLife_Obj` 005e5690 |
 
-Part 17d (§31.2) moves the score functions (0x58xx sends) to Z16 and the tutorial functions to Z07.
+Part 17d (§31.2) moved the tutorial functions to Z07; part 18 (review) documents the score / ranking functions here (§28.12).
 
 FiestaHeroes' `fiesta.lua` *(fh-doc)* has 272 names; 245 of them are registered by the 2016 zone. Not in 2016 (part 13):
 `cViewEquip` is the 2016 `cViewSlotEquip` under another name, `InstanceDungeonClear` is a Lua function the script
@@ -7465,7 +7478,7 @@ and unbuilt until the pool walk reclaims them (§13).
 
 Both functions walk the players of the script's map with an `AxialListKQResult` and sort them by score (used by the
 KQ books `KQHBat1…5` and the older `Quest/ConditionOfHero`; the Lua twins `cScoreResultList` / `cScoreTopList`
-FUN_005ec6a0 / FUN_005ec1f0 send the same packets and belong to Z14).
+FUN_005ec6a0 / FUN_005ec1f0 send the same packets without sorting: §28.12).
 
 ```pseudo
 AxialListKQResult : AxialListIterator {                      # 0x1A18
@@ -9834,9 +9847,10 @@ owns, i.e. cites more of than any other doc, against every doc) found these; all
 - **Opcodes:** 162 opcodes are sent from functions this file cites (generated layouts, `s2c` send sites). 98 of
   them are described here; the other 64 are sent by functions cited only as callers or callees (`sp_GainExp`,
   `so_KilledBy`, `so_LinkTo`, `sp_NC_MAP_LOGINCOMPLETE_CMD`, `so_Bash`, `sp_SendMyInform2PartyMember`, mini-house,
-  mover, wedding, GT and instance-dungeon code). All but seven are documented by their owners (Z01, Z02, Z03, Z04, Z05,
-  Z06, Z07, Z08, W01–W04, D02–D05); the seven without any doc are in the coverage boundary (§31.3; part 17b counted six): 0x0E0D
-  (`ShineMiniHouse::smh_SendFurnitureInfo`), 0x8C4F (`ShineMiniHouse::so_Routine`), 0x1059 / 0x105A
+  mover, wedding, GT and instance-dungeon code). All but six are documented by their owners (Z01, Z02, Z03, Z04, Z05,
+  Z06, Z07, Z08, W01–W04, D02–D05); the six without any doc are in the coverage boundary (§31.3; the `layouts.json` hit
+  0x0E0D in `ShineMiniHouse::smh_SendFurnitureInfo` is no packet: the bytes are the local inventory-kind array `{3, 0xd, 0xe, 0x10}`;
+  that function sends 0x8C08 / 0x8C09 and DB 0x3449): 0x8C4F (`ShineMiniHouse::so_Routine`), 0x1059 / 0x105A
   (`so_ply_ClassChange`), 0x2442 / 0x2443 (`ShineMobileObject::smo_SkillBash_Blast_Trap`), 0x74F2
   (`GuildTournamentSystem::PlayerRegister`).
 
@@ -9884,7 +9898,7 @@ List<T>        fixed array of (max + 1) ListStruct<T> { T* ls_Content, u16 ls_Pr
                l_Finger { u16 store = first used entry, u16 empty = first free entry }, u16 l_ListNum, u16 l_MaxSize
   l_MakeList(n)      @ FUN_004b36a0 (same body per T: MobBreeder; MobBreederGroup FUN_004b3b20, HitMeList::Enemy FUN_00481ef0,
                        SkillChange FUN_004a86a0, MobTargetStruct FUN_004bd730, ORTable FUN_00646650, ShineObject FUN_005546f0,
-                       ShineObjectEachList FUN_00554b10)
+                       ShineObjectEachList FUN_00554b10, HuntLog::MobHuntElement FUN_004b6d20 (part 18))
       n == 0xFFFF: no array. Else new[(n + 1) × 12], all contents null; entries 0…n−1 form the free ring
       (prev = i−1, next = i+1, entry 0's prev = n−1, entry n−1's next = 0), inactive; entry n is the sentinel
       (self-linked, active); store = n, empty = 0, count 0; then the ListEraser walk over the (empty) used ring
@@ -9909,6 +9923,132 @@ VectorClass::UnitVector (VectorWithLength of length 32)
   Rotation(angle)      @ FUN_00579250: rotate by `angle` with the 1024-scaled sin / cos tables of `shineradian`
                        (x' = (cos·x − sin·y) / 1024, y' = (sin·x + cos·y) / 1024, rounded toward 0)
 ```
+
+### 28.12 Score boards, rankings, the instance-dungeon rank and the hunt log (review)
+
+Found by the review (part 18): Lua functions that §14.9 had handed to Z14 / Z16 although neither plan names them, and
+the player's hunt log. All Lua functions below are registered by `LuaScriptScenario::ls_FuncSet` FUN_005f5350 (§14.9).
+"Player" = `som_GetObject(handle)` non-null, not `so_IsEmpty` (vt 0x300) and kind (vt 0x4d0) 2. "Map" = `fc_FindMap(name)`
+and its centre object (`fm_GetCenterObject`); a broadcast "to the map" is `so_AllInMap(centre, AxialListPacketBroadcast)`
+(every player on the map, §18). Per player sends go through the data stream (vt 0x2f8) or the game stream (vt 0x2fc) as
+noted. Every function returns 0 Lua results unless stated.
+
+```pseudo
+cScoreInfo(handle, n, score0, score1)                                   @ FUN_005e3790
+    arg 1 nil or not a player: return
+    0x5836 NC_KQ_SCORE_INFO_CMD { u32 nScore[2] }  (both 0, then nScore[i] = arg 3 + i for i < min(n, 2))   → player (vt 0x2f8)
+cScoreInfo_AllInMap(map, n, score0, score1)                              @ FUN_005e3970
+    map / centre missing: return;  same packet, broadcast to the map
+    # 2016 scripts: KDArena, KDSoccer(_W), KDSpring (`cScoreInfo(Handle, #TeamNumberList, red, blue)`)
+    # client GameFrameWork::On_NC_KQ_SCORE_INFO_CMD FUN_0049d8b0: if the KQ score window (+0x13cc) exists, open it
+    #   (OpenKQScoreWin) and KQScoreWin::SetScore for both teams
+
+cScoreBoard(handle, useRound, round, redWin, redScore, blueWin, blueScore)    @ FUN_005ed860
+    arg 1 nil or not a player: return
+    0x583C NC_KQ_SCORE_BOARD_INFO_CMD { u8 bUseRound = toboolean(arg 2), u8 nRound = arg 3,
+        TEAM_SCORE_INFO Red { u8 nWinFlag = min(arg 4, 5), u8 nScore = min(arg 5, 99) },
+        TEAM_SCORE_INFO Blue { u8 nWinFlag = min(arg 6, 5), u8 nScore = min(arg 7, 99) } }  (8 bytes)   → player (vt 0x2f8)
+    # the length-error text says "cScoreInfo : Packet Too Long" (copied; never reached)
+cScoreBoard_AllInMap(map, useRound, round, redWin, redScore, blueWin, blueScore)   @ FUN_005edad0
+    same packet and limits, broadcast to the map
+    # 2016 scripts: KDCake, KDWater (`cScoreBoard(Handle, true, Round, red.RoundResultCount.Win, red.Score, …)`):
+    #   nWinFlag carries the rounds won
+cWinter_Event_ScoreBoard_AllInMap(map, red, blue)                        @ FUN_005edcf0
+    0x583D NC_KQ_WINTER_EVENT_2014_SCORE_CMD { Red { 0, u8 red }, Blue { 0, u8 blue } }  (6 bytes, no limit), broadcast
+    # 2016 script: KDSoccer_W
+    # client: 0x583C FUN_0049af40 / 0x583D GameFrameWork::On_NC_KQ_WINTER_EVENT_2014_SCORE_CMD FUN_004ae2b0: if the team
+    #   score window (+0x1418, KDTeamScoreWin) exists: show it (FUN_0048ce20), SetUseRound (0 for 0x583D), per team the
+    #   score and SetWinFlag; 0x583C then SetRound, 0x583D sets the title text 0xf821dc11
+
+cSendRankingList(handle, previous, current)                              @ FUN_005eaee0
+    handle 0xFFFF or not a player: return
+    0x6C20 NC_SCENARIO_RANKING_LIST_CMD { SCENARIO_RANKING_INFO PreviousRanking[20] @0, CurrentRanking[20] @0x1F4 }  (0x3E8, zeroed)
+        SCENARIO_RANKING_INFO (0x19) { u8 nRanking, Name5 sCharID @1, u32 nScore @0x15 }
+    for list in (arg 2 → Previous, arg 3 → Current), when the argument is a table: for each value (lua_next order):
+        nRanking = number field "nRanking", sCharID = strncpy(string field "sCharID", 20), nScore = number field "nScore"
+        a field of another type: return at once, nothing sent (asm 0x5eb2d7)
+        # no limit of 20 per list (original bug) Z09-B130
+    → player (vt 0x2fc)
+    # 2016 script: AIScript/E_Ski_CongressNPC.lua (ski congress ranking NPC)
+    # client GameFrameWork::On_NC_SCENARIO_RANKING_LIST_CMD FUN_0049d3f0: if the event rank window (+0x135c) exists:
+    #   every entry with nRanking ≠ 0 → EventRankWin::AddPrevRank / AddCurRank (25 bytes each), then shows the window
+
+cScoreResultList(map, mode, base, limit, list)                           @ FUN_005ec6a0
+    map / centre missing or mode not a string: return
+    0x5814 NC_KQ_SCORE_CMD { u8 num, u32 base = arg 3, KQScore[num] @5 (0x26) }       (layout §22.3)
+    if arg 5 is a table: for each value i (lua_next order):
+        e.charid = strncpy("CharName", 20); e.killpoint = "Kill"; e.downpoint = "Death"; e.score = "Score" (integers)
+        o = GetObject(number "Handle"); "Handle" not a number, o null, so_IsEmpty, smo_GetMode (vt 0x484) == 0 or
+            ShinePlayer::so_ply_SoloingMode (vt 0x79c) == 1: return, nothing sent
+        mode "ConditionOfHero":    killpoint += 500; contribute = RandomRing(10) (0…9); score = killpoint − downpoint + contribute + base
+        mode "NewConditionOfHero": contribute = 0; score = Score + base
+        other:                     contribute = 0; score = killpoint − downpoint + base
+        flag.gender = so_ply_GetGender (vt 0x804); flag.chrcls = class (vt 0x49c → vt 0x38)
+    count > 0: medals 1 / 2 / 3 written into entries 0 / 1 / 2 (the first three of the table, **not sorted**: unlike the
+        Pine `@KQResultList` of §22.3 the Lua version keeps the script's order); num = count, or min(count, limit) when limit ≠ 0
+        broadcast to the map (7 + 0x26 · num bytes)
+    # no 2016 script calls it; no count limit (num is a u8) (original bug) Z09-B130
+
+cScoreTopList(map, mode, base, limit, list)                              @ FUN_005ec1f0
+    same checks; 0x5821 NC_KQ_SCORE_SIMPLE_CMD { u8 num, u32 base, self { u8 rank, u32 kill, down, score } @5,
+        KQScore[num] @0x12 (0x20: Name5 charid, u32 kill, down, score) }
+    per table value: the same fields and the same three score rules (contribute is not sent); the handles are kept in a
+        local u16 array (ebp−0x50)
+    count > 0: num = count, or min(count, limit) when limit ≠ 0
+        for i in 0..count−1: o = GetObject(handle[i]); null / empty / mode 0 / soloing: stop
+            self = { i, kill, down, score of entry i };  o ← the packet (0x14 + 0x20 · num bytes, vt 0x2fc)
+    # no 2016 script calls it; no count check against the handle array (original bug) Z09-B130
+
+cIndunRankResult(mapName, seconds, players)                              @ FUN_005ee4d0
+    map = fc_FindMap(arg 1) (string); missing: return 0
+    t = tointeger(arg 2)
+    DB packet in gpp: 0xA413 NC_INSTANCE_DUNGEON_RANK_SAVE_DB_CMD { SHINE_INDUN_INFO { Name3 MapIDClient =
+        map.fm_FieldOption.mapidclient, u8 ModeIDLv = map.fm_eLevelType (ILT_MAX → 1) }, u32 nPlayTime = t @0xD,
+        u16 nRankCount @0x11, SHINE_INDUN_RANK[n] @0x13 (0x20: u32 nCharRegNum, u64 nDamageDealt @8, nDamageTaken @0x10,
+        nHealingDone @0x18) }
+    client packet in a 4 KB stack buffer: 0xA412 NC_INSTANCE_DUNGEON_RANK_RESULT_CMD { u8 nPlayTimeHour = t / 3600,
+        u8 nPlayTimeMinute = t % 3600 / 60, u8 nPlayTimeSecond = t % 60, u16 nRankCount @3,
+        SHINE_INDUN_RANK_CLIENT[n] @5 (0x30: Name5 nCharID, u8 nCharClass @0x14, u64 dealt @0x18, taken @0x20, healing @0x28) }
+    map has no fm_FieldOption, or arg 3 not a table: return 0, nothing sent
+    for each value of arg 3:
+        value not a table; "Handle" missing or not a number; object missing; no name (vt 0x56c so_CharName);
+        no character data (vt 0x49c); "DamageDealt" / "DamageTaken" / "HealingDone" not numbers:
+            return 0, nothing sent (asm 0x5ee66e)
+        DB entry: nCharRegNum = o.vt[0x344]() (charNo), the three values
+        client entry: nCharID = name (20 bytes), nCharClass = class (vt 0x49c → vt 0x38), the three values
+        n += 1                                # no limit (original bug) Z09-B130
+    Character server ← 0xA413 (0x15 + 0x20 · n bytes, `sock2gameDB`)   # dropped there in 2016 (W04 §13.3, W04-B43)
+    broadcast to the map 0xA412 (7 + 0x30 · n bytes, so_AllInMap with include flag 1)
+    return 1 (the number 1)
+    # no 2016 script calls it (FH documents `cIndunRankResult(MapInx, Time, PlyList)`, NA scripts *(fh-doc)*)
+    # client GameFrameWork::On_NC_INSTANCE_DUNGEON_RANK_RESULT_CMD FUN_0049de70: PartyScoreWin (+0x1424)
+    #   SetPartyScore(ranks @5, count @3), then opens that window (FUN_0048cf00, client names file:
+    #   `OpenKDTeamScoreWin`); the play time is not read there
+```
+
+**Hunt log** (`HuntLog::MobHuntLog`, member `ShinePlayer::sp_MobHuntLog`, built in the player ctor FUN_0055bc80 by
+`MobHuntLog::MobHuntLog` FUN_004b70d0 = `CommonList<MobHuntElement>(50)` FUN_004b6fe0: the §28.11 `List<T>` with
+`l_MakeList(50)` plus one `new[50]` element array `cl_Array` whose element i becomes the content of list entry i):
+
+```pseudo
+MobHuntElement { u16 mobid, u16 number, u32 expgain }
+mhl_Logging(log, p, mobId, exp)                                          @ FUN_004b6ea0   (exp path, Z03 §8.2)
+    e = search the used entries by mobid (MobHuntElement::mhe_Compare FUN_004b6aa0: mobid difference)
+    found: e.expgain += exp; e.number += 1; e.number ≥ 65000: mhe_Send2Log(e, p)   # flush before the u16 overflows
+    else:  take a free entry (none: the kill is not logged; 50 mob kinds per session) = { mobId, 1, exp }
+mhe_Send2Log(e, p)                                                       @ FUN_004b6ae0
+    e.number == 0: return
+    GameLog ← 0x042D NC_LOG_GAME_MK_GETEXPINFIELD { u32 chrregnum = p.vt[0x344](), u16 mobid, u16 number, u32 exp }
+        (14 bytes with the opcode; GameLog side D05 §2.3, `p_GameLog_Add_Type4`)
+    e.number = 0; e.expgain = 0
+mhl_SendAll2Log(log, p)                                                  @ FUN_004b6c20
+    called from ShinePlayer::so_Unmark FUN_00558900 (logout): mhe_Send2Log for every used entry
+    # the inlined accessor returns null for an inactive entry inside the used ring, which would crash in
+    # mhe_Send2Log; unreachable while the ring is consistent
+```
+
+Small helper: `MapDataBox::mdb_2mapid(name)` FUN_00419470 (from `cLinkToAll`, §17) = the map name's id in `mdb_btree`
+(BTree, §28.11), 0xFFFF when unknown.
 
 ---
 
@@ -9945,7 +10085,7 @@ deduced from the code, not observed.
 | Z09-B19 | Lua `cMobRegen_Obj` FUN_005d8690, §10.7 | direction taken from the new pool object (`newMob+0x6a`), not the source object | spawned mob faces a stale direction | the source object's direction |
 | Z09-B20 | `ItemDropFromMob::dilfs_DropByRate` FUN_0048e920, §11.2 | the drop count `Num` is decremented in the shared table record | a limited drop (`Num` > 0) runs out for the whole server, not per kill / per mob *(inferred)* | count per drop event |
 | Z09-B21 | drop sight broadcast FUN_00567ff0, §11.3 | the "quest only" byte is the low byte of the stack cookie | random quest-only flag on drop briefs | the drop's real flag |
-| Z09-B22 | `sp_partyitemdistribute` FUN_0052f630, §11.5 | the share is `amount / count(near)` (near = within 1000 units), but it is paid through all 5 member slots (absent, far, unused ones included) | members out of range are paid too, so more money is paid out than dropped whenever not everyone is near | pay only the near members |
+| Z09-B22 | `sp_partyitemdistribute` FUN_0052f630, §11.5 | the money loop (0x52f7a0) calls `vt[0x790](share)` through all 5 member slots without a null check; far / absent members' slots are 0, slots from the member count to 4 are never written (uninitialised stack) | every party money pickup that reaches the distributor (party loot rule LOOTER, ORDER or DICE, `sp_NC_ITEM_PICK_REQ` FUN_00530a50; FREE pays the picker directly) crashes the zone (access violation → `MiniDumper::TopLevelFilter`, §30.1) unless the party has 5 members all within 1000 units of the picker | pay only the near members (loop over the filled slots) |
 | Z09-B23 | `sp_partyitemdistribute` FUN_0052f630, §11.5 | each share is at least 1 coin | a small amount creates money (n × 1 > amount); the raid version splits exactly | exact split |
 | Z09-B24 | `GMEventManager` ctor FUN_0046dbd0, §3 | the map-kind tables are filled by a static constructor before `mdb_Load` has read the maps | GM events that select maps by kind match no map | fill the tables after map load |
 | Z09-B25 | `mdbe_DoorAction` (4-arg) FUN_0049e080, §9.2 | close / break ORs block bits through a null row pointer when a door row lies outside the map | crash on a misplaced door row *(inferred)* | bounds check |
@@ -10071,6 +10211,9 @@ deduced from the code, not observed.
 | Z09-B125 | `ORTable::ort_ReadData` FUN_006480a0, §28.6 | "Undefined command" stops reading but `ok` stays true | `or_Read` reports success for a truncated table | return false |
 | Z09-B126 | `ShineMob::so_GainHP` FUN_00556a00 (vt 0x504), §28.8 | caps HP at `so_GetHP` (current HP) instead of `so_MaxHP` | the cap never applies; a mob's HP can pass its maximum (latent: only `RecoverTypeEffect::_execute` FUN_005cfc70 heals through it) | cap at MaxHP |
 | Z09-B127 | `CardDeck::CardStack::cs_Suffle` FUN_0064e200 from `ItemGroupClassifier::igc_Getitem` FUN_004903e0, §28.10 | shuffles before the empty-group check; with 0 cards it computes `rand() % 0` | integer division by zero → the minidump handler ends the zone (§30.1) (latent: needs an item group without items) | check the card count first |
+| Z09-B128 | `sp_NC_ACT_GATHERCOMPLETE_REQ` FUN_0046cbf0 (0x2032), §11.2 | clears the gather timer and calls `sp_GatherComplete(p, 2)` without checking how long the gather has run | a client can finish every gather at once after 0x202E (and gets lots × 2 for resource types 8/9/10, the factor of the client-side completion) | reject 0x2032 before the gather time has passed |
+| Z09-B129 | `DropItemListForSpecies::dilfs_DropByRate` FUN_0048e920, §11.2 | the rate roll compares `(uint)rand(1000000) < (uint)(sum × DrItemR / 1000)`; a negative sum becomes a huge unsigned bound | latent: an abstate actor's negative drop rate or a `cec_ItemDropRate` far below 1000 would make every entry drop instead of none (the 2016 map rate 1000 keeps the sum ≥ 0) | signed compare / clamp the sum at 0 |
+| Z09-B130 | Lua `cIndunRankResult` FUN_005ee4d0, `cSendRankingList` FUN_005eaee0, `cScoreTopList` FUN_005ec1f0, `cScoreResultList` FUN_005ec6a0, §28.12 | copy a script table into fixed buffers without a count limit: 0x30-byte entries into a 4 KB stack buffer (> 85 entries), 20 per ranking list (the 21st Previous entry lands in Current[0], Current beyond 20 past the 1000-byte payload), a local u16 handle array (ebp−0x50), a u8 count | latent (scripts pass party / ranking lists; no 2016 script calls three of them): a long table overwrites the stack (cookie check → the zone ends, §30.1) or sends wrapped counts | cap the count at the buffer size |
 
 ---
 
@@ -10113,6 +10256,7 @@ named here; §31 gives their owners.
   it reads the uninitialised InxName bytes).
 - §11.9: `dropitemanalyzer` (DAT_0cf15b40, 256 buckets × 500 `{mobId, itemId, count}`) has no reader in the zone; the
   drop object's `+0x204` (flag 1 from `so_IsDropping`) is never read by the drop functions found.
+- §11.2: whether the lot factor 2 of a client-completed gather (0x2032) against 1 for the server timer is meant (B128).
 
 ### 30.4 Movement, sight, world objects (§9, §12, §13, §27)
 
@@ -10142,6 +10286,8 @@ named here; §31 gives their owners.
   part of the bitmap *(inferred from the member order)*. View-slot storage across logout for `cViewSlotEquip` is Z05 / Z07.
 - §19.6: which `TextData` / sound a `cEffectMsg` type plays (client `EffectMsg` table); whether a 2016 client dialog
   opened by `cNPCMenuOpen` answers with 0x2073 or 0x201D (client NPC dialog code, C01).
+- §28.12: which client window FUN_0048cf00 opens after 0xA412 (the client names file calls it `OpenKDTeamScoreWin`, but it
+  shows the `PartyScoreWin` of +0x1424); `KDTeamScoreWin::SetRound` takes no visible round argument (C01).
 
 ### 30.6 Pine engine and action nodes (§20–§26)
 
@@ -10181,15 +10327,22 @@ Everything this item reached but does not document, with the item that owns it. 
 ### 31.1 How the boundary was checked
 
 Gap check (part 17d, scratch script on `coverage.py`'s `Bin` / `cited`): roots = every `FUN_` cited in this file,
-depth 1, `coverage.py`'s TINY / HUB / registered filters, "covered" = cited by any zone doc. Result before this part:
+depth 1, `coverage.py`'s TINY / HUB / registered filters, "covered" = cited by any zone doc. Result before part 17d:
 **612 functions / 23.3 k lines**. 89 of them are Z09's own classes and are now in §28.10 / §28.11 (the re-run found 8
 more helpers one level further; also added there). The other **523 functions / 21.1 k lines** are below, by owner; a
 re-run with §1–§30 as roots finds exactly these 523 and nothing else. Their addresses are written without the `FUN_`
 prefix (as in §14.9) on purpose: `coverage.py` counts a `FUN_` citation in any zone doc as covered, so the owners' own
 gap lists keep showing them. (Taking §31's functions as roots too would reach 262 more, one level inside those other
-items: their code, not a Z09 gap.) Counts per owner: library code 146 (STL 120, Lua 16, CRT 10), Z01 74, Z03 55,
-Z04 49, Z13 47, Z16 41, Z02 29, Z15 23, Z14 19, Z07 12, Z17 8, Z06 7, Z08 6, Z12 4, D05 2, Z11 1. No function was left
-without an owner, so no follow-up item is proposed (status file).
+items: their code, not a Z09 gap.)
+
+Part 18 (review) re-ran the check in a stricter form: "covered" = cited in a **pseudocode** doc (knowledge files no
+longer count, because a knowledge-file citation had hidden `sp_MakeCapsuleItem` (C02.md) and `mdb_2mapid` (Z01.md)).
+It also moved six functions out of this section into §28.12 (the hunt log `MobHuntLog` / `mhl_SendAll2Log`,
+`cIndunRankResult`, `cScoreInfo`, `cScoreInfo_AllInMap`, `cSendRankingList`: their plan lines did not name them) and found
+two more Z09 helpers (`CommonList<MobHuntElement>` ctor, §28.12, and its `l_MakeList` form, §28.11). Result with §1–§30 as roots: **518 functions / 20.7 k
+lines**, exactly the 518 of this section. Counts per owner: library code 146 (STL 120, Lua 16, CRT 10), Z01 75, Z03 53,
+Z04 49, Z13 47, Z16 38, Z02 29, Z15 23, Z14 18, Z07 12, Z17 8, Z06 7, Z08 5, Z12 4, D05 2, Z05 1, Z11 1. No function is
+left without an owner whose plan line includes it, so no follow-up item is proposed (status file).
 
 ### 31.2 Functions of other items
 
@@ -10204,13 +10357,12 @@ without an owner, so no follow-up item is proposed (status file).
 | NPC menus and chat ban: `ServerMenuActor` ServerMenuActor 0050ec70, sma_SetPlayer 0050ecb0; `ShinePlayer` so_SetSpamerChatBan 00560a20, sp_ServerMenuItem 0054e990, sp_ServerMenuTitle 0054e8a0 | Z02 (plan line 9: "chat types …, NPC click/menu flow") | the server-menu actor behind Lua `cServerMenu` (§14.6 documents the script side) and the spam chat ban |
 | Abnormal states: `AbnormalStateContainer::AbnormalStateElement` ase_AttachObject 00401d40; `AbnormalStateContainer::AbstateElementInObject` aeo_CompName 004065c0, aeo_GetAbstateElement 004067b0, aeo_GetCaster 00401b90, aeo_GetRestTime 00408990, aeo_GetStrength 004011e0, ~AbstateElementInObject 00401b20; `AbnormalStateContainer::AbstateListInObject` AbstateListInObject 0040cf10, asl_Check_SameAbstate 0040c180, asl_GetAbstateList 00401250, asl_IsHereBad 0040ad40, asl_IsHereGood 0040abb0, asl_SendAfterLogin 0040aed0; `AbnormalStateDictionary::AbState::AbStateStr::AbStateStrArgument` assa_IsHaveEffect 00416190; `AbnormalStateShelter::AbstateBuffer` ab_Recover 00417ef0; `AbnormalStateShelter::AbstateShelter` as_Remove 00417520, operator[] 00418890; `ListTraveler<AbnormalStateContainer::AbstateElementInObject>` lt_Next 00402740 | Z03 (plan line 9: "abstates (buffs/debuffs, AbState.shn, SubAbState.shn)") | the abstate container and shelter; Z09's Lua / Pine functions only call `so_AbnormalState_Set` and the queries (§17.4) |
 | Skills, attacks and target scans: `AxialListNearScanSkillEnemy` AxialListNearScanSkillEnemy 0057e1a0; `AxialListNearScanSkillEnemyUser` AxialListNearScanSkillEnemyUser 0057e420; `AxialListNearScanSkillFriend` AxialListNearScanSkillFriend 0057e360; `AxialListNearScanSkillParty` AxialListNearScanSkillParty 0057e260; `AxialListScanSkillTarget` AxialListScanSkillTarget 0057e0f0, alsst_MakeRandomTargetList 0057e4e0, alsst_SetAttacker 005793b0, ~AxialListScanSkillTarget 0057e320; `BattleObjectGroup::BattleObjectList` bol_Store 00434ee0; `BattleObjectGroup::BattleObjectStruct` BattleObjectStruct 00434bb0; `BattleStat` bs_Clear 0043be00; `CharacterPassiveList` CharacterPassiveList 00447200; `CharaterSkillList` CharaterSkillList 00447eb0, csl_EmpowerSummary 00445070; `DamageByAngle::DamageTable` operator[] 0045c9a0; `DamageBySoul::SoulDamageContainer` operator[] 00434db0; `FanFormSectorArgument` FanFormSectorArgument 0057bda0; `MultiHitArgument` MultiHitArgument 00434b30, mha_SetAbState 00434de0; `MultiHitData::MultiHitTable` operator[] 004c0a90; `NormalAttackDamageDelay::NormalAttackDamageTick` NormalAttackDamageTick 00577cd0, nadt_Clear 00577e30; `ShinePlayer::TimeScheduler` TimeScheduler 005697c0, ts_IsInNormalAttack 0042abb0; `ShinePlayer` so_ply_setSwingTime 00560ae0, sp_HPChangeCheck 0055e130, sp_IsNormalAttack 00560230, sp_SkillShiftCancel 0057bcd0, sp_SkinPolymorph 004a3280; `SkillDataBox` sdb_SpecSkillStruct 0046a410; `SkillEffectApply::SkillBlastEffect` SkillBlastEffect 00434c60; `SkillEffectApply::SkillBlastEffectContainer` sbec_ListCheck 004358a0; `SkillEffectApply::SkillDamageSender` sds_Initialize 00437ba0; `SkillEffectApply::SkillEffectEraser` ~SkillEffectEraser 00437c40; `learnSkill` 005a1790 | Z03 (plan line 9: "Attack flow (basic attack, skill cast/bash …), target validation … damage formulas") | skill target lists, multi-hit, blast effects, attack timing, skill lists and `learnSkill` (Lua / GM learn); the mob side that calls them is §7–§8 |
-| Hunt log: `HuntLog::MobHuntLog` MobHuntLog 004b70d0, mhl_SendAll2Log 004b6c20 | Z03 (Z03-combat §8.2 calls `mhl_Logging` in the exp path; plan line 9 "experience") + D05 (`MobHuntElement` log rows) | written on kills and sent to the GameLog on logout (`so_Unmark`); not world simulation |
 | Items, equipment, set items, random options: `BinaryDataBox<ItemInfo>` bdb_ReadData 00648a50, operator[] 004ae550; `BinaryDataBox<ItemInfoServer>` bdb_ReadData 00648b10; `BinaryDataBox<ItemMoney>` bdb_ReadData 00648df0; `BinaryDataBox<ItemSort>` bdb_ReadData 00648ca0; `CSellItemManager` CSellItemManager 0050eb60; `EquipEnumChanger` eec_ConflictWithNewEquip 004611c0, eec_ConflictWithNewViewSlot 004616c0, eec_ConflictWithOldEquip 00461360, eec_ConflictWithOldViewSlot 00461840, eec_EquipLocation 00460ff0, eec_GetEquipSlotList 00461590; `InventoryLocking::InventoryCellLockList` icll_ClearItem 00440d20; `ItemAccountStorage` ItemAccountStorage 00644910; `ItemBag` ib_GetItemLot 00642e80; `ItemBoxIterEmpty` ItemBoxIterEmpty 0043c050; `ItemDataBox` idb_GetItemInxName 006487d0, idb_iter_Get 004900c0, idb_iter_next 004900a0; `ItemEquipment` ie_DecoActList_Insert 00643940, ie_ViewSlot_Clear 00643660, ie_ViewSlot_GetItemID 006437b0, ie_ViewSlot_Set 00643630, ie_ViewSlot_UseCheck 00643750; `ItemInform_ActionItem` sii_Export 00643440; `ItemLotInspector` ItemLotInspector 00490be0, ili_Clear 00490c30, ili_Reset 0043bf90; `ItemRandomOption::RandomOptionTable` operator[] 00493ff0, rot_FillOption 00493590; `ItemRewardStorage` ItemRewardStorage 00644c20; `ItemTotalInformation` iti_clear 00470cf0, iti_fill2buffer_whole 006407d0; `Item_AdjFailCount` 0053b700, `Item_AdjUpgradeLevel` 0053b560, `Item_GetUpgradeLimit` 0053b2a0, `Send_SETITEMHEALEFFECT` 005cfbb0; `SetItemData::EffectDescription` ed_Compare 004a2ed0; `SetItemData::SetItemAbstateEffect` SetItemAbstateEffect 00510350; `SetItemData::SkillEffect` operator[] 00510010, se_Clear 005105e0; `ShinePlayer` sp_GetAutoPick 00560370, sp_GetItemWhoEquip_ClassGroup 005630f0, sp_ItemInvenDelete 0051c590, sp_ItemUseBroadcast 0053f840, `sp_SmallItemDelete<ItemInform_ActionItem>` 00569b80; `UseEffect::UsedItemEffect` operator[] 004878e0, uie_SetChargedBuffer 005963e0, uie_UseSkillID 0059cba0 | Z04 (plan line 9: "Inventory model …, equip/unequip, use item, drop/pickup, enchant/upgrade … RandomOption") | reached from drops (§11), treasure chests (§10.10) and the Lua / Pine item functions (§17.8, §24.2); the item model itself is Z04's (view-slot persistence: Z05) |
 | Trade, booths, gambling: `BoothManager` BoothManager 0043b550, operator= 00467500, ~BoothManager 0043b620; `CGambleObject` go_Get_MaxEnterPlayerCnt 00591ff0; `StreetBoothBuy` StreetBoothBuy 0058f390; `StreetBoothSell` StreetBoothSell 00590580; `TradeBoard` TradeBoard 00427ee0 | Z06 (plan lines 15 / 17: TRADE, BOOTH, GAMBLE) | constructors reached through the player object |
 | Titles: `CCharacterTitleDataStateServer` GetStateData 005ca9b0; `CCharacterTitleZone` CCharacterTitleZone 005ca5c0, ctz_SetObject 005ca610; `ShinePlayer` sp_SetCharTitleChangeAvailableTime 00560900; `cAddCharacterTitle` 005eb310 | Z07 (plan line 9: "titles") | Lua `cAddCharacterTitle` sends 0x6005 / 0x6009 (W04 / D04 document the other servers' side); `cCharTitleAddValue` (§17.8) feeds the same engine |
 | Collection cards: `BinaryDataBox<CollectCardMobGroup>` bdb_ReadData 00648d50; `CardCollection::CardCollectionReward` CardCollectionReward 00629150; `SHND::CommonData<CollectCard,SHND::CmpCardCollect<CollectCard>_>` cd_Load 00629840; `ShinePlayer` sp_CardCollectionSend 0044cc30 | Z07 (plan line 9: "collection cards") | card tables and the card send at login |
 | Tutorial: `cGetTutorialInfo` 005e7450, `cProgressTutorial` 005e72f0, `cSaveTutorialInfo` 005e70b0 | Z07 (scope tables, plan lines 44 / 106 / 153: 0x1117, 0x1119, 0x1115 tutorial packets) | the Lua tutorial functions send 0x1116 / 0x1118 / 0x111C; §14.9 had put them under Z15, but the tutorial packets are in Z07's scope (D02 has the DB side) |
-| Charged items, party slots, guild war: `CChargedItem` CChargedItem 006323a0; `CParty` p_defaultslot 00645330; `ChargedItemEffectList::ChargedEffectList` ChargedEffectList 00451890; `ChargedItemEffectList::ChargedEffectListRouter` ~ChargedEffectListRouter 00450e80; `ShinePlayer` sp_ChargedEffectAfterLoginComplete 00417ad0, sp_GuildWarRequest 0042e5f0 | Z08 (plan line 16: "36 CHARGED", "29 GUILD"; line 15: "14 PARTY") | charged-effect lists at login, the party slot default, guild-war request |
+| Charged items, party slots, guild war: `CChargedItem` CChargedItem 006323a0; `CParty` p_defaultslot 00645330; `ChargedItemEffectList::ChargedEffectList` ChargedEffectList 00451890; `ChargedItemEffectList::ChargedEffectListRouter` ~ChargedEffectListRouter 00450e80; `ShinePlayer` sp_ChargedEffectAfterLoginComplete 00417ad0, sp_GuildWarRequest 0042e5f0 | Z01 for `sp_ChargedEffectAfterLoginComplete` (plan line 45: 0x1803 NC_MAP_LOGINCOMPLETE_CMD, whose handler calls it; Z01-core.md line 510 names it); Z08 for the charged-effect containers (plan lines 72–75: the 0x9007…0x900A NC_CHARGED_* handlers), `sp_GuildWarRequest` (`docs/knowledge/Z03.md` §3 line 68 hands it to Z08; plan line 111, 0x7479 NC_GUILD_GUILDWARCONFIRM_ACK, the answer of the request it starts) and `CParty::p_defaultslot` (plan title: "guild/party/friend zone side"; line 15 "14 PARTY") | charged-effect lists at login, the party slot default, guild-war request; none is world simulation |
 | GM command: `AmpersandCommand` ac_MobBreedUsage 0041a260 | Z11 (plan line 7: every `AmpersandCommand_ac_*`) | usage text of `&mobbreed` (the breeder it creates is §10.6) |
 | Stat containers: `Parameter::Container` Container 004c98a0, IsNoAttack 004c8ea0, c_MakeTotal 004c9a40, c_clear 0043c370 | Z12 (plan line 12: "`so_allparametercalculate` … what fills each layer") | the stat-matrix container; `IsNoAttack` is read by `ShineMobileObject::so_Routine` (§5.5) and the skill-bash handlers, but the container is Z12's |
 | Pets: `CPetData` GetPetID 004cef80, GetPetIDX 004cf030; `ItemAttrCls_Pet` iac_GetPetName 004d0650, iac_SetPetName 004d05f0; `ShinePet` spt_FindMaster 00419a80; `ShinePlayer` sp_PetSystem_InitPetInfo 004d1ff0, sp_PetSystem_InitPetInfoLink 004d2090, sp_PetSystem_LinkResummon 004d2a40, sp_PetSystem_Summon 004d2640, sp_PetSystem_VirtualCast 004d2180, sp_Send_NC_PET_ASK_NEW_NAME_REQ 004d0c90; `cPet_ChangeMind` 005ea1d0, `cPet_GetActionRecord` 005e9d00, `cPet_GetMind` 005e9520, `cPet_GetRunSpeed` 005e9b10, `cPet_GetStress` 005e9720, `cPet_GetWalkSpeed` 005e9920, `cPet_SaveTendency` 005ea410, `cPet_Unsummon` 005d65a0 | Z13 (plan line 15: "Pets: the summon/unsummon flow …, the `ShinePet` object") | pet summon / name / mind; the Lua `cPet_*` functions (§14.9 "Z13" row) are the pet AI script's interface |
@@ -10220,20 +10372,19 @@ without an owner, so no follow-up item is proposed (status file).
 | Wedding: `CAnnounceSystem` AnnounceSystem_WeddingStart 005b9380; `PROTO_NC_CHAR_WEDDINGDATA_ACK` Reset 0043bdb0, operator= 0059f250; `WeddingHall` wh_RecallCouple 005a27f0 | Z13 (plan line 13: "Wedding hall and married state") | wedding hall recall / start notice, the wedding-data record; Pine `weddingcomplete` (§26.7) and `wh_Start`'s film (§27.5) are the script side |
 | Instance-dungeon clusters: `FieldContainer` fc_GetInstanceDungeonInfoByMapName 004844e0; `MapClusterManager::ClusterManager` AddInstanceDungeonCluster 00484850, cm_AddTutorialMapCluster 004a0860, cm_FindMapCluster 00486580; `MapClusterManager::MapCluster::InstanceMap` ~InstanceMap 00484730; `MapClusterManager::MapCluster` MapCluster 0049f400, mc_CompName 0049f580, mc_GetLimitTime 0049f610, mc_Regist 0049ed40, ~MapCluster 0049ed20; `ShinePlayer` sp_EscapeFromEmptyID 00440910 | Z14 (plan line 15: "`MapClusterManager::ClusterManager` … and `MapCluster`") | the clusters behind the film restarts of §27.5 and the map kinds of §28.1 |
 | Raids: `Raid` Begin 0063d200, End 0063d220, GetLooting 0063d070; `Raid::iterator` GetCharRegistNo 0063d4d0, operator!= 0063d550, operator++ 0063d080; `ShinePlayer` so_SetRaid 005604a0 | Z14 (plan line 17: "Raid internals: the shared `Raid` record") | `Raid::GetLooting` = the raid's loot mode, read by the pickup checks (`ShineMultiTypeHandle::IsCanItemPick` 004c15e0, `sp_NC_ITEM_PICK_REQ`); the record is Z14's |
-| Instance rank: `cIndunRankResult` 005ee4d0 | Z08 (plan line 17: part 3 "41 INSTANCE"; 0xA413 is dept 41) / Z14 (instance dungeons) + W04 (WM side, documented) | the zone function was cited by no zone doc |
-| Script scores: `cScoreInfo` 005e3790, `cScoreInfo_AllInMap` 005e3970, `cSendRankingList` 005eaee0 | Z16 (plan line 12: "how scores are counted", "the KQ client packets sent during the event") | `cScoreInfo*` send 0x5836, `cSendRankingList` 0x6C20; §14.9 had put them under Z14, but the score packets are KQ dept 22 (0x58xx). 0x6C20 is SCENARIO dept 27 (Z02 plan line 17: part 3 "27 SCENARIO") |
 | Quests: `CQuest` DoingQuestUpdateStatus 00630510, GetQuestIndex 0062f1d0, GetQuestInfoByIndex 0062f260; `CQuestZone` InitNewPlayer 005b9d40, IsConnectionEnd 005b9af0, IsQuestDropItem 005bc900, Send_NC_QUEST_CLIENT_SCENARIO_DONE_ACK 005bb0c0, Send_NC_QUEST_NOTIFY_MOB_KILL_CMD 005bdb00, qz_SetObject 005b9ae0; `PartyManufacture` pm_FindMember 004cc390, pm_QuestCheck 004ccbf0; `RaidTask` rt_QuestCheck 005ce710; `ShineQuestDiary` ShineQuestDiary 00578040, sqd_MobDead 00578170; `cClassChangeOpen` 005ed720, `cGetQuestHero_ItemUse` 005d9140, `cGetQuestHero_NPC` 005d8f60, `cQuestMobKill` 005d6010, `cQuestMobKill_AllInMap` 005d6150, `cQuestResult` 005e30d0, `cQuestResult_Individual` 005ecca0, `cReward` 005df060, `cRewardItem_CharInven` 005d6a10 | Z15 (plan line 12: "Quest data …", line 16: "Other entry points: NPC click …, mob kill (`ShineQuestDiary_sqd_MobDead`, 0x440D …), party quest checks (`PartyManufacture_pm_QuestCheck_*`), quest items (`IsQuestDropItem`)") | the quest engine; Z09's mob kill (`so_KilledBy`) and drop roll (§11) call into it |
 | Kingdom quests: `KQContribute::KQContributeList` kqcl_FindKQ 00499ca0, kqcl_SendMobKill 00499ff0; `KQRewardDataBox` operator[] 0049a9a0; `KingdomQuest::KQElement` kqe_ReviveNumber 00496b90; `KingdomQuest::KQPlayerInform` kqpi_KnockDownGet 00496e50, kqpi_KnockDownPlus 00496de0; `ShinePlayer` sp_EscapeFromEmptyKQ 0043fa40, sp_GetJoinKQTeamType 00563990, sp_KQElementFunction 00499710, sp_RemoveKQItem 0050f8c0, sp_SendKQTeamType 00561560; `cEndOfKingdomQuest` 005df1f0, `cGetKQLimitSecond` 005e5390, `cGetKQTeamType` 005e81c0, `cIsKQJoiner` 005e82d0, `cKQRewardIndex` 005e4000, `cShowKQTimerWithLife` 005e54f0, `cShowKQTimerWithLife_Obj` 005e5690 | Z16 (plan line 12: "`KingdomQuest::KQElement` (… `kqe_ReviveNumber` …), `KQPlayerInfoList` (… knock-down counters …), `KQContribute::KQContributeList`") | KQ state; the Pine KQ nodes (§24.7, §25.6, §26.1) call it |
 | Guild tournament: `DiceGame` Start 00478ef0; `GuildTouramentLoginDataInfo` GetLinkData 00478610; `GuildTournamentOccupyTable` GetOccupyTime 005c70f0; `GuildTournamentSystem::AdvanMobItemRegenInfo` ~AdvanMobItemRegenInfo 0047aa60; `GuildTournamentSystem` Clear 004808f0, CreateItemEffect 0047c1e0, GuildTournamentSystem 00480d30, Initialize 00480f10, IsBattleGuild 00478db0, IsFlagCapture 00479510, PlayerUnRegister 0047fd50, ScanEnemyUser 0047a3d0; `GuildTournamentSystem::FlagInfo` FlagInfo 0047ac30, ~FlagInfo 0047ace0; `GuildTournamentSystem::GuildGroup` AddTeamNPC 0047c120, CheckManagerUser 004798f0, GuildMasterBuffRun 0047b040, SendPlayerAllScoreInfo 0047f260; `GuildTournamentSystem::GuildMemberInfo` GradeSort 00478d80; `ShinePlayer` sp_FlagCaptureFree 00476cf0 | Z16 (plan line 13: "the GT system class (… `00479510` flag check, … dice game …)") | GT state; §12.3 (axial flags), §22 (GT nodes) and §24.8 call it |
 | Item actions and costume charges: `ItemActionArgument` ItemActionArgument 0042aad0; `ItemActionObserveManager::ActionResults` GetRateAppliValue 005d0c20; `ItemActionObserveManager` EventRunBySkillGroupIndex 005d1f50, ItemActionObserveManager 005d1910, SetObject 005d0890, _EventRun 005d1df0; `ShinePlayer` sp_CostumShieldChargeDecrease_ToDB 0051ac20, sp_CostumWeaponChargeDecrease_ToDB 0051a610 | Z17 (plan line 12: "the player's item-action cooldown container"; line 13: "`sp_CostumWeaponChargeDecrease_*`") | `EventRunBySkillGroupIndex` is raised from skill use and from the magic field (`so_mgcfld_MagicField…`, `almfh_ApplyHeal`, §12); the container is Z17's |
+| Capsule items: `ShinePlayer` sp_MakeCapsuleItem 0049cce0 (reached from `sp_CreateItemByAdmin` FUN_00527270, §17; opens a capsule's `CLCReward` content and sends DB 0x34A0 NC_ITEMDB_BUYCAPSULE_REQ) | Z05 (scope table, plan line 117: 0x34A1 NC_ITEMDB_BUYCAPSULE_ACK, the answer) + D03 (plan line 98: the 0x34A0 handler) | item creation from capsule contents; cited before part 18 only in C02.md (a knowledge file), which hid it from the gap check |
 | Game-log sends: `cSendGameLogDataType_4` 005f1a10, `cSendGameLogDataType_5` 005f1d40 | D05 (its scope table, plan lines 201 / 202: `NC_LOG_GAME_DATA_TYPE_4` / `_5`; D05-gamelog documents the zone senders by address) | the Lua side is one line each (§14.9 "already documented" row); the zone function is cited by no zone doc |
 
 ### 31.3 Packets and data files
 
 | Found | Covered by | Argument |
 |---|---|---|
-| 0x0E0D (no name; `ShineMiniHouse::smh_SendFurnitureInfo` 00546930), 0x8C4F NC_MINIHOUSE_PORTAL_DEL_CMD (`ShineMiniHouse::so_Routine`) | Z13 (plan line 12: "`smh_SendFurnitureInfo` …, portals … and `so_Routine` (portal timeout)") | sent by mini-house code §28.1 only names; no doc describes them yet |
-| 0x1059 NC_CHAR_PROMOTE_ACK, 0x105A NC_CHAR_SOMEONEPROMOTE_CMD (`so_ply_ClassChange`) | Z12 (plan line 7: "level-up side effects") / Z07 (class change) | class change is reached from Lua `cClassChangeOpen` and the quest reward path, not from world simulation |
+| 0x8C4F NC_MINIHOUSE_PORTAL_DEL_CMD (`ShineMiniHouse::so_Routine`) (the `layouts.json` "0x0E0D" of `smh_SendFurnitureInfo` 00546930 is a false positive, §28.9) | Z13 (plan line 12: "`smh_SendFurnitureInfo` …, portals … and `so_Routine` (portal timeout)") | sent by mini-house code §28.1 only names; no doc describes them yet |
+| 0x1059 NC_CHAR_PROMOTE_ACK, 0x105A NC_CHAR_SOMEONEPROMOTE_CMD (`so_ply_ClassChange` FUN_004521b0) | Z07 (scope table, plan line 87: 0x1057 NC_CHAR_CLASSCHANGE_ACK, whose handler calls `so_ply_ClassChange`; Z07-character.md line 250 cites it but does not describe its two sends) | class change is reached from 0x1057, Lua `cClassChangeOpen` and the quest reward path, not from world simulation; Z12 ("level-up side effects") was named here before part 18 and does not cover it |
 | 0x2442 NC_BAT_SOMEONESKILLBASH_OBJ_CAST_CMD, 0x2443 NC_BAT_SOMEONESKILLBASH_FLD_CAST_CMD (`ShineMobileObject::smo_SkillBash_Blast_Trap`) | Z03 (plan line 9: "skill cast/bash") | trap / field skill casts; §8.1 reaches the skill code only through `cNPCSkillUse` / `cSkillBlast` |
 | 0x74F2 NC_GUILD_TOURNAMENT_ITEM_FLAG_CMD (`GuildTournamentSystem::PlayerRegister`) | Z16 (plan line 13: "the client packets 0x74xx sent during a match") | GT item flag |
 | 0x5836, 0x583C, 0x583D, 0x5814, 0x5821 (Lua score / ranking functions), 0x6C20 (`cSendRankingList`), 0x1116 / 0x1118 / 0x111C (tutorial Lua) | Z16 / Z02 / Z07 (rows above) | sent by the Lua functions of §14.9's other-item rows |
@@ -10252,7 +10403,7 @@ without an owner, so no follow-up item is proposed (status file).
 
 | Found | Covered by | Argument |
 |---|---|---|
-| §14.9 Lua rows "Z13 (pets)", "Z15 (quests, rewards, tutorial)", "Z16 (kingdom quests)", "Z14 (instance dungeons, scores)" | Z13 / Z15 / Z16 / Z07 / Z14 (§31.2 rows; tutorial → Z07 and scores → Z16 corrected there) | the Lua functions call other items' engines; §14.9 records their names and addresses |
+| §14.9 Lua rows "Z13 (pets)", "Z15 (quests, rewards, tutorial)", "Z16 (kingdom quests)" | Z13 / Z15 / Z16 / Z07 (§31.2 rows; tutorial → Z07 corrected there; the former "Z14 (instance dungeons, scores)" row is documented in §28.12) | the Lua functions call other items' engines; §14.9 records their names and addresses |
 | The 25 NA-only Lua functions of FiestaHeroes' `fiesta.lua` (§14.9 after the table: `cAddFame` … `cStartKey`) *(fh-doc)* | none: not in the 2016 build | the private-server hooks; the 2016 zone does not register them (no code to document) |
 | §27.5 film starters outside Z09: `CQuestZone::PsStart` 005bbd00, `kqe_QuestStart` 004953e0, `wms_NC_KQ_W2Z_DESTROY_CMD` 004972c0, `wms_GuildTournamantStart` 00476de0, `wh_Start` 005a25a0, `ZoneRingPacketFindInstanceDungeon::zrpb_Success` 005a8c20, `ZoneRingPacketFindJobDungeon::zrpb_Success` 005a8f40, `so_ply_2JobDungeon` 0049f880, `mc_PlayAllFilm` 00485fb0, `mc_AllDropFilm` 00485290, `mc_DeleteInstanceDungeon` 00486710, `mc_MissoionFailInstance` 0049ee70, `cm_AllDropFilm` 00486ec0, `wms_NC_INSTANCE_DUNGEON_LEVEL_SELECT_JOIN_ECHO_REQ` 004871a0, GM `ac_PlayInstanceDungeon` 00421190, `ac_KingdomQuest` 00423dd0, `ac_BigBang` 004240d0, `ac_IndunReload` 00419810, `ac_ReroadKingdomQuest` 0041dc80 | Z15 (plan line 13: `CALLPS` (`PsStart` / `PsEnd`)), Z16 (line 12 / 13), Z13 (line 13), Z14 (line 15), Z08 (part 3: 41 INSTANCE), Z11 (line 7) | §27.5's table: the film API is Z09's, deciding when to start a film is the caller's |
 | Skill-side helpers: `smo_SkillBlastOption` actor vt 0x1c values, random-target helpers 0057e660 / 00579910, skill movers 00401db0 / 005c1390 / `smo_ShadowStep`, `so_AbnormalState_Set_SS_SETABSTATEME` (vt 0x648), `ShineMobileObject::so_Dispel` 0042bf70, the damage-absorb flag consumer (vt 0xbec in `smo_SwingDamage` 00432f30 / `sds_TemplateStore` 005803c0), which SubAbState kinds use the magic-field actor, B31's player-rule twin | Z03 (plan line 9) | combat and abstate rules; Z09 documents the mob / object side (§7.4, §8.4, §9.3, §12, §16.6) |
