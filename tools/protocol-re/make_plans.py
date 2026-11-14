@@ -649,6 +649,72 @@ ITEMS = [
              "Bugs as `Z20-B<n>`; Coverage boundary as usual."],
       done="`sdb_Load`, `sdi_SetArgument`, `sdi_Clear` and `pdb_Load` are written as pseudocode with a column → member map for "
            "every skill table, and every SkillDataBox / PassiveDataBox function of the zone is cited as `FUN_…`."),
+ dict(id="Z21", phase=2, title="Zone: per-player active skill list (CharaterSkillList / MoverSkillList: toggle skills, "
+                               "cooldowns and delay groups, empower, mastery, skill buffers; added by Z20)",
+      out="docs/pseudocode/zone/Z21-skill-list.md", deps=["Z03", "Z20"], scope=[],
+      goal="Z03 documents the skill cast path and Z20 the skill tables, but about 1.4k decompiled lines of the per-player "
+           "skill list are cited by no doc: the toggle skills (`ToggleSkill.shn` rows in `SkillDataIndex::sdi_ToggleData`, "
+           "0x245C NC_BAT_TOGGLESKILL_ON_CMD / 0x245D NC_BAT_TOGGLESKILL_OFF_CMD; Z03 only names them), cooldowns and "
+           "shared delay groups, empower points, mastery, learn/unlearn and the client/server skill buffers. Document them so "
+           "a rebuild keeps the same cooldown, toggle and empower rules.",
+      steps=["Read `docs/pseudocode/zone/Z20-skill-data.md` §1.3 (`SkillDataIndex` members: `sdi_ToggleData`, "
+             "`sdi_ActiveSkillGroups`, delay group), §2.2 (ToggleSkill / ActiveSkillGroup columns), §5.2 (`skillnametree`, "
+             "`csl_Learn`) and §7 (the list keeps skill IDs, not pointers); Z03 §5 (cast path: `csl_SPCheck`, "
+             "`csl_Toggle_CanUseSkill`, `csl_EmpowerAlloc`, `csl_CoolTimeCheck`) and Z09's `csl_Toggle_CheckOnOff`; W03 / W04 "
+             "for `csl_Store` / `csl_FillSaveBuffer`. Do not redo those.",
+             "PDB names (`clean.py re-data/exports/zone-pdb - <addr> …`), all uncited so far: toggle "
+             "`csl_Toggle_CanUseSkill_WeaponType` 00444bd0, `csl_Toggle_GetToggleSkill` 00445680, `csl_Toggle_IsOn` 004456c0, "
+             "`csl_Toggle_Store` 00448c60, `csl_Toggle_SetOnOff` 00448ce0, `ShinePlayer::so_ply_ToggleSkill_IsOn / _On / _Off "
+             "/ _AllOff` 005794f0 / 00579500 / 005795d0 / 00579670 (vtable slots 0xbc4 / 0xbc8 / 0xbcc, Z03 §5); cooldown "
+             "`csl_UpdateCoolTime` 004468c0, `csl_GetDelayGroup` 00448950, `csl_SetCoolTime` 00448ab0 (0x4821 "
+             "NC_SKILL_COOLTIME_CMD), `csl_DmgCoolTimeDown` 00449080, `MoverSkillList::msl_UpdateCoolTime` 00446370, "
+             "`msl_CoolTimeCheck` 004463d0, `msl_SetCoolTime` 00449270; empower `csl_EmpowerClear` 00445190, "
+             "`csl_EmpowerStruct` 004482c0; `csl_AddMastery` 00446730; `csl_FillSendBuffer_Server` 00445260 / "
+             "`_Client` 00445460; `csl_CheckDefSkill` 00447fb0, `csl_MaximumSkill` 00448240, `csl_PreProduceCheck` 0046ab70, "
+             "`csl_UnLearn` 0057e930; the Z03 leftovers reached from `smo_SkillBlast` / `smo_SkillBash_Blast`: "
+             "`ShineMobileObject::smo_Dispel` 0057d8e0, `smo_ClearSkillResultBuffer_Miss` 0057a550, "
+             "`AbstateElementInObject::aeo_IsMine` 00408880; the mount skill users `ShineMover::so_smv_SkillBash_Location` "
+             "00580cf0 and `ShineMover::so_ply_CanMyTarget` 004ae450 (the other `so_*_CanMyTarget` / `so_smv_SkillBash_Object` "
+             "are cited already).",
+             "Packets: 0x245C / 0x245D, 0x4821 and the mastery send of `csl_AddMastery` (layouts with the 2016 PDB structs, "
+             "client handlers via C01 / `opcodes.json`).",
+             "Then every caller of these functions (vtable slots included) until what remains is Z03 / Z12 / Z20.",
+             "Bugs as `Z21-B<n>`; Coverage boundary as usual."],
+      done="Every function listed above is cited as `FUN_…` with pseudocode, the toggle on/off rules (condition, weapon check, "
+           "abstates, packets) and the cooldown / delay-group rules are specified, and the packets have layouts and client "
+           "handlers."),
+ dict(id="Z22", phase=2, title="Zone: item-side data loaders (UsedItemEffect, ItemUseFunction, ChargedItemEffectDataBox, "
+                               "MoverDataBox, cStateItemDataBox, MysteryVaultTable, RidePetDataBox) and CharClassDataBox (added by Z20)",
+      out="docs/pseudocode/zone/Z22-item-data.md", deps=["Z01", "Z04", "Z20"], scope=[],
+      goal="Z01 §2.3 lists these loaders in one table row each and Z20 §7 shows that they store `SkillDataIndex*` "
+           "(the use-effect table that dangles after `&reloaddata ActiveSkill`), but no item documents how they build their "
+           "tables (about 2k decompiled lines): which SHN / text files, columns, lookups, fatal checks and invariants. Z04 "
+           "(done) also left the class-to-class-type helpers of NC_ITEM_CLASS_CHANGE_REQ uncited. Document them so a rebuild "
+           "can load the original files unchanged.",
+      steps=["Read `docs/pseudocode/zone/Z01-core.md` §2.3 (loader table and stages), Z10 (`docs/pseudocode/zone/"
+             "Z10-certification.md`, loader stage list and its read-dependencies), Z20 §2.1 (the `BinaryDataBox<T>::bdb_ReadData` "
+             "template and its bug Z20-B1) and §7 (holder table), Z04 for the item handlers that use these tables. Do not redo "
+             "those.",
+             "PDB names (`clean.py re-data/exports/zone-pdb - <addr> …`): `UseEffect::UsedItemEffect::uie_Load` 0059cc30, "
+             "`uie_SetChargedBuffer` 005963e0, `uie_BroadCast` 005963c0, `uie_UseSkillID` 0059cba0 (Z20 §5.2); "
+             "`ChargedItemEffectDataBox<RIDING|ChargedItemEffect|MiniHouse|MiniHouseFurniture>::cideb_Load` 00450070 / 005af300 / "
+             "005af4d0 / 005af6d0 and accessors `cideb_Next` 0044f9e0 / 00570cf0, `cideb_GetIndex` 0045e0b0, `cideb_GetItem` "
+             "00570d40, `cideb_Get` 00570d20; `RidePetDataBox::rpdb_Load` 00450270; `ItemUseFunction::iuf_Load` 0049b770; "
+             "`MoverDataBox::mvdb_Load` 004bf960, `~MoverDataBoxIndex` 004bf920; `cStateItemDataBox::sidb_Load` 0058c920, "
+             "`sidb_GetElement` 0058c190 (+ vector helpers 0058c850 / 0058c560 / 0058c480, folded dtor 005d49c0); "
+             "`MysteryVaultTable::DataProcess` 005c8590 (+ 005c8520, `GetTotal` 005c83b0); the readers "
+             "`BinaryDataBox<MoverMain|MoverAbility|MoverHG|MoverItem|ChargedItemEffect|MiniHouse|MiniHouseFurniture|RIDING|"
+             "ItemUseEffect|StateItem|GatherInfo>::bdb_ReadData` 004bf320 / 004bf3e0 / 004bf4a0 / 004bf560 / 005ae790 / "
+             "005ae840 / 005ae8f0 / 0044fd50 / 00596b20 / 0058bfe0 / 0046a4a0 (file, key, row size; same template as Z20 §2.1); "
+             "`CharClassDataBox::ccdb_ClassToUseClassType` 00640c20, `ccdb_BitToClass` 00640b90, `ccdb_ClassToBit` 00640850 "
+             "(from `sp_NC_ITEM_CLASS_CHANGE_REQ` 0051f5c0 / `sp_OpenClassChangeMenu` 0051fd10); "
+             "`GatherProduce::RecipeBook::operator[]` 00444b50; `ItemDataBox::ReadData` 006494f0 (the `idb_btree` name "
+             "index; `idb_Load` 00649780 is cited) and `ItemGroupClassifier::igc_Store` 004900f0.",
+             "Row structs: the 2016 PDB types against `docs/knowledge/S01-shn-structs.tsv` and `shn.py`; record the column → "
+             "member map of every file, and the 2016 data invariants (id ranges, duplicates, rows dropped).",
+             "Bugs as `Z22-B<n>`; Coverage boundary as usual."],
+      done="Every function listed above is cited as `FUN_…` with pseudocode, every file it loads has a column → member map, "
+           "and the reload behaviour (which tables `&reloaddata` can rebuild, Z11 §8.6) is stated for each."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "

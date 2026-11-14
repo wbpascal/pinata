@@ -111,6 +111,8 @@ continue the open phase-2 items with the PDB exports as their main reading sourc
 | [Z18](items/Z18.md) | Zone: leftovers of finished zone items from Z09's coverage boundary (221 functions for Z01–Z04, Z06, Z07) (added by Z09) | Z01–Z04, Z06, Z07, Z09 |
 | [Z19](items/Z19.md) | Shared config-script reader `CCsl` and the server config file format (`*ServerInfo.txt`), all servers (added by Z10) | Z01 |
 | [Z20](items/Z20.md) | Zone: skill data box loader (`SkillDataBox::sdb_Load`, `SkillDataIndex` build, `PassiveDataBox`) (added by Z11) | Z01, Z03 |
+| [Z21](items/Z21.md) | Zone: per-player active skill list (`CharaterSkillList` / `MoverSkillList`: toggle skills, cooldowns, delay groups, empower, mastery) (added by Z20) | Z03, Z20 |
+| [Z22](items/Z22.md) | Zone: item-side data loaders (`UsedItemEffect`, `ItemUseFunction`, `ChargedItemEffectDataBox`, `MoverDataBox`, `cStateItemDataBox`, `MysteryVaultTable`, `RidePetDataBox`) and `CharClassDataBox` (added by Z20) | Z01, Z04, Z20 |
 | [D01](items/D01.md) | Account + AccountLog servers (resolves open Login error conditions) | – |
 | [D02](items/D02.md) | Character server: characters, avatars, save/load | – |
 | [D03](items/D03.md) | Character server: items, economy, pets, house | D02 |
@@ -147,7 +149,7 @@ follow-up session.
 1c. S01, then its follow-ups (`docs/knowledge/S01.md`) for finished items
 2. Z02, Z03, Z04, W02 (core gameplay)
 3. Z07, Z08, Z05, Z06, W03, W04
-4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, Z19, Z20, W05, S02, L01, then D06
+4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, Z19, Z20, Z21, Z22, W05, S02, L01, then D06
 5. P02 again with fuller captures, then X01
 6. X02 → user records its scenarios → P02 → X02 again (repeat until the low ratings are gone or not worth a capture)
 

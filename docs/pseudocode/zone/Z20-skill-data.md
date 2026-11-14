@@ -27,7 +27,9 @@ skills in `PassiveDataBox` (§6). Loader position in the start sequence: Z01 §2
 `sdb_ValidArray = null` and registers `_dynamic_atexit_destructor_for_'skilldatabox'` FUN_0069f1e0, which at exit
 destroys the index array (vector-delete with the element count stored in the 4 bytes before it, §1.3) and then
 `sdb_BinData` (FUN_00585680). The other members (`sdb_MaxValid`, `sdb_SpecSkill`, …) stay zero (static storage)
-until `sdb_Load`.
+until `sdb_Load`. `_dynamic_initializer_for_'skillnametree'` FUN_00698f30 constructs the empty trie (`BTree::BTree`) and
+registers `_dynamic_atexit_destructor_for_'skillnametree'` FUN_0069f150 (`BTree::~BTree`); the trie is never cleared
+in between, so `&reloaddata ActiveSkill` re-inserts every name over the old entries (§5.2).
 
 ### 1.2 `SkillDataBox` and `sdb_BinData`
 
@@ -58,7 +60,9 @@ constructor FUN_00585520 builds the five readers (`BinaryData` ctor) and zeroes 
 `TS_HPRATEOFF`, 0). The destructor FUN_00585680 runs the five `BinaryData` destructors in reverse order. The
 `BinaryDataBox<…>` scalar-deleting destructors FUN_005853c0 / FUN_005853f0 / FUN_00585420 / FUN_00585450 /
 FUN_00585480 and plain destructors FUN_00585020 / FUN_005850e0 / FUN_005851a0 only reset the vftable and call the
-`BinaryData` destructor (the boxes are members, never deleted on their own).
+`BinaryData` destructor (the boxes are members, never deleted on their own). `ActiveSkillInfoServerData`'s own
+destructor FUN_00585510 does the same for the `server` member; only the exception-unwind funclets of the
+`sdb_BinData` ctor / dtor call it (the normal dtor path is inlined in FUN_00585680).
 
 ### 1.3 `SkillDataIndex` (one per active skill, 0x268)
 
@@ -111,7 +115,9 @@ per-world override: the paths are fixed.
 ```pseudo
 BinaryDataBox<T>::bdb_ReadData(this, path) → this             @ FUN_00585030, FUN_00584f70, FUN_00648d50, FUN_005851b0, FUN_005850f0
     if CDataReader::Read(this, path, KEY_T, sizeof T): return this               # FUN_0062a9e0
-    AssertFail "BinaryDataBox<T>::bdb_ReadData : readfail", path                  # log only (FUN_0063c710)
+    AssertFail "BinaryDataBox<T>::bdb_ReadData : readfail", path                  # log only (FUN_0063c710: when
+        #   ac_Write2File, appends "<text> : AssertClass::ac_AssertFail : <msg>[<n>]" to Assert<YYYYMMDD><hh>.txt;
+        #   the file name comes from AssertClass::ac_DateTime FUN_0063c640 *(inferred: the "%02d" is the hour)*)
     AssertFail sprintf("Code:%X:%d\tSHN:%X:%d", KEY_T, KEY_T, m_pHead->nVersionKey, m_pHead->nVersionKey)
         # (args read in the disassembly) the row size is never printed, so a size mismatch shows two equal keys;
         # when the file could not be opened at first load m_pHead is still null and this read faults before
@@ -296,6 +302,11 @@ SkillDataBox::sdb_Load(this, _)                                         @ FUN_00
       if null: fatal "… data get error", 1
       sdb_ValidArray[j].sdi_Area.push_back({ AreaStep = r.AS_Step, BMPIndex = r.AS_BMPIndex (_mbsnbcpy 32),
           EffectTarget = r.AS_ImagePin, bIsDirection = r.AS_IsDirection, AreaCenter_X … AreaBMP = *bi (6 dwords) })
+      # push_back is inlined; on growth it calls vector<AreaSkillInfo>::reserve FUN_00585df0 (capacity × 1.5, at least
+      #   size + 1; "vector<T> too long" above 0x3c3c3c3 elements), which allocates through
+      #   allocator<AreaSkillInfo>::allocate FUN_00585d50 (0x44 bytes per element, bad_alloc on overflow) and moves
+      #   the old elements with _Uninit_move FUN_00585db0 (a 0x44-byte copy each). The 2016 data puts at most a
+      #   handful of steps on one skill, so a rebuild can use any growable array.
 
   # 11. data sanity warnings (§3.2), all non-fatal except the "Null skll" check
 ```
@@ -305,7 +316,8 @@ SkillDataBox::sdb_Load(this, _)                                         @ FUN_00
 After the index is built, `sdb_Load` checks the tables and writes each finding with
 `sprintf` + `_DebugMessageNew(1, "Msg", "%s", text)` FUN_0064f3c0 → `_DebugMessageNew2` FUN_0064f1f0. That helper
 (enabled when its first argument ≠ 0) formats the text, increments `gDebugMessageCounter`, and appends
-`"%06d %s%s\n"` (counter, current time string, text) to `.\DebugMessage\Msg_<YYYY-MM-DD>.txt` (directory created
+`"%06d %s%s\n"` (counter, current time string from `GetCurrentTimeString(0)` FUN_0064f050 = local time
+`"YYYY-MM-DD hh:mm:ss "` in a static buffer, UTC when the argument ≠ 0, text) to `.\DebugMessage\Msg_<YYYY-MM-DD>.txt` (directory created
 with `MakeSureDirectoryPathExists`; argument order read in the disassembly). Nothing is sent and the load continues.
 All loops run over the sorted array; "step name" = `Name` ending in `]`, step number = `atoi(Name + len − 3)`
 (assumes a two-digit `"[NN]"` suffix); "same skill line" = `Name[0 .. len−4)` equals the next element's.
@@ -473,6 +485,51 @@ A 256-way trie: exact, case-sensitive byte match, no removal. The value is a `Sk
 `{skill = ID, ispassive = 0}` (§3.1 step 5), passive skills `{ID, 1}` (§6). The same `BTree` type is the abstate
 name index (`dic_abstate.as_BTreeID`).
 
+**Who writes the trie.** `sdb_Load` (actives, `ispassive` 0), `pdb_Load` (passives, 1; startup order: after
+`sdb_Load`, §6.3) and, in the same `zs_start_wide` stage after both, `GatherProduce::GatherTable::gt_Load`
+FUN_0046a660 (Z02 §8, `Gather.shn`), which inserts every Gather row's `Index` name with the value `GatherID` (u16,
+so `ispassive` 0). In 2016 the three Gather names `Herbing` / `Mining` / `WoodCutting` are also active-skill names
+with the same IDs 29000 / 29001 / 29002, so the insert rewrites identical values. A rebuild must keep
+`Gather.GatherID` equal to the active skill of the same name: a different ID would silently redirect that skill name
+for every later lookup (the gather action is cast as that skill *(inferred)*), and a Gather name equal to a passive
+name would turn it into an active entry. `&reloaddata ActiveSkill` re-runs only `sdb_Load` (§3.1), so after a reload
+the active entries win again over Gather until the next start.
+
+**Who reads it** (every `&skillnametree` reference of the zone; all treat the value as `{u16 skill, u8 ispassive}`):
+
+| Reader | Key | Unknown name (0xFFFFFFFF) | `ispassive` |
+|---|---|---|---|
+| `GetSkillIndexByName` FUN_00585ef0, sdb_Load / pdb_Load internals | §5.1, §3.1, §6.3 | as described there | dropped (Z20-B5, B7) |
+| `UsedItemEffect::uie_UseSkillID` FUN_0059cba0 (item use-effect table, §7) | effect skill name | assert "Not found", null | ≠ 0: assert "Passive", null; then `operator[]`, null → assert "Skill" |
+| `UseItemSkillScroll::uib_CanUseItem` FUN_0059d1b0 / `uib_Effect` FUN_00599d30 | the scroll item's own `InxName` | assert "sp_uie_skillscroll : Cannot found matched skill", nothing sent | kept: `uib_Effect` sends Character DB 0x4801 NC_SKILL_SKILLTEACH_REQ (0x11 bytes) {handle, charNo (vt 0x344) twice, skill, ispassive, 0xFFFF}; layout and reply: D04 §2 / Z03 §9.3 |
+| `CharaterSkillList::csl_Learn` FUN_0055b810, `csl_PreSkillCheck` FUN_00447110 | `DemandSk` of the skill | not checked: `csl_IsLearn(0xFFFF)` (false unless an entry has ID 0xFFFF) | ignored |
+| `CharacterPassiveList::cpl_PreSkillCheck` FUN_00445810 | `DemandSk` | not checked (Z20-B8) | ignored |
+| `ShineMobileObject::so_Routine` FUN_0056a080 | `"UseRide"`, once, cached in DAT_00869290 | 0xFFFF cached | ignored |
+| `MiscDataTable::mdt_StateCondition` FUN_004a3550, `mdt_SkillBufferAlloc` FUN_004a3d90, `mdt_SkillBreedMob` FUN_004a6880, `MobAttackSequence::mas_Load` FUN_004a8990 / `SkillChange::sc_Store` FUN_004a8520, `NPCAction::ActionGen_OptionReader::operator()` FUN_005c18c0 / `CondGen_OptionReader::createCondition_` FUN_005c29c0 (load-time tables, Z09) | skill names in their SHN / script rows | fatal (`ShineExit`), except `mdt_StateCondition` (row skipped / list ends) | ignored (low 16 bits) |
+| `MobDataBox::mdb_SkillStore` FUN_00642630 (gets the trie as argument from `zs_start_sleep` FUN_005b67c0) | mob weapon skill names | assert "Invalid MobSkill Name", skill 0xFFFF stored | ignored |
+| Lua `cNPCSkillUse` FUN_005ef5c0, `cSkillBlast` FUN_005f0960 | script argument | not checked (0xFFFF passed on) | ignored |
+| Lua `cSkillDamageCalculate` FUN_005f1370, `cMagicFieldSpread` FUN_005f17c0 | script argument | function does nothing | ignored; then `operator[]` |
+
+```pseudo
+CharaterSkillList::csl_Learn(this, u16 skill)          @ FUN_0055b810
+    # only caller: ShinePlayer::so_LearnSkill FUN_0055bbf0 = csl_Learn(p.sp_SkillList, skill), then sets bit 0 of
+    #   sp_CharData.toclient.basedata.flags; it is ShinePlayer vtable slot 0x624 (rtti.py), the p.vt[0x624](skillid)
+    #   of the 0x4802 answer (Z03 §9.3)
+    e = skilldatabox[skill]; null: AssertFail "… csl_Learn … NotFind Skill ID", skill; return
+    end = clockwatch.cw_CurrTick; save = 0
+    if e.sdi_Activ.DemandSk[0] ≠ '-':                                  # step > 1 of a skill line
+        prev = skillnametree[DemandSk].skill                            # no 0xFFFFFFFF check
+        if csl_IsLearn(prev): c = csl_GetSkillStruct(prev); end = c.cs_EndOfCooltime; save = c.cs_bSave
+    csl_Skill.push_back(CharSkill {      # vector<CharSkill>::push_back FUN_00447cc0 cs_SkillId = skill, cs_EndOfCooltime = end, cs_bSave = save,
+                                    cs_Empower = {0,0,0,0}, cs_Mastery = 0 })        # 0x14 bytes
+    csl_SkillNumber += 1
+    sort csl_Skill by CharSkill::cs_Compare_STLVer (std::_Sort FUN_004476d0)                    # ascending skill ID (csl_IsLearn binary-searches it)
+    csl_Toggle_Store(skill)                                             # FUN_00448c60 (Z21)
+```
+
+The new step inherits the cooldown end of the learned previous step (learning a step does not reset a running
+cooldown); the previous step stays in the list.
+
 ## 6. PassiveDataBox
 
 Passive skills get no index structure: the zone uses the `PassiveSkillInfo` rows of PassiveSkill.shn directly,
@@ -556,7 +613,7 @@ Because the rows are used as they are, the column meaning is defined by the read
 | HpDownAcUp, DownAcHp | u16 | cpl_RecalcParam | AC/MR rate + HpDownAcUp while HP ≤ DownAcHp (both ≠ 0) |
 | MoveTBUpPlus | u16 | cpl_RecalcParam | moving TB plus (condition 1000) |
 | HealUPRate, KeepTimeBuffUPRate, CriDmgUpRate, DMG_MinusRate | u16 | cpl_RecalcParam | PassiveHealRate, PassiveBuffKeepTimeUPRate, PassiveCriDamageRatePlus, DMGMinusRate |
-| ActiveSkillGroupInx | `ActiveSkillGroupIndex` (u32) | – (no reader by member name; sweep part 3) | 2016: 0 in 495 rows, 98 / 99 in 4 each |
+| ActiveSkillGroupInx | `ActiveSkillGroupIndex` (u32) | – (no reader: none of the zone's passive-row readers, §6.4 / §6.5, reads +0xf8) | 2016: 0 in 495 rows, 98 / 99 in 4 each; a rebuild can ignore it |
 
 PSkillSetAbstate.shn: `PS_InxName` char[32] (passive `InxName`), `PS_Condition` `PS_ConditionEnum`
 (PS_CBOWATKRATEKNOCKBACK 0, PS_SKILLSPUSEDOWN 1, PS_AREAENEMYSPDOWN 2, PS_MEDMGMISSCRIUPRATE 3), `PS_ConditioRate`
@@ -666,7 +723,8 @@ CharacterPassiveList::cpl_PreSkillCheck(this, player, char* demand) → bool   @
     v = skillnametree[demand]                  # not checked for 0xFFFFFFFF nor ispassive (original bug) Z20-B8
     bit (v & 0xFFFF) set: true;  else player.vt[0x91c/4](0x70c, 9, …) (error message to the player, Z03/Z07); false
 CharacterPassiveList::cpl_SetAbstate(this, PS_ConditionEnum c, caster, target, u8 flag, ulong)   @ FUN_00446a10
-    # via ShinePlayer::so_ply_PassiveSetAbstate FUN_005798e0 (vtable; trigger points are Z03)
+    # via ShinePlayer::so_ply_PassiveSetAbstate(c, target, flag, x) FUN_005798e0 = cpl_SetAbstate(p.sp_Passive, c,
+    #   caster = p, target, flag, x); vtable slot 0xbf8 (rtti.py), so only players react; trigger table below
     caster, target non-null, list non-empty, c < 4, else return
     for each entry e in list order (stops at a null value):
         row = e.pssabs_pPSkillSetAbstate; null: AssertFail "… : INVALID PSkillSetAbstate Data" e.pssabs_nID; stop
@@ -678,6 +736,15 @@ CharacterPassiveList::cpl_SetAbstate(this, PS_ConditionEnum c, caster, target, u
             target.vt[0x634/4](a) == 1 (already has it): stop
             target.vt[0x644/4](caster, a.index.AbStataIndex, row.Strength, 1); next entry
         else stop                              # only entries up to the first failed roll are tried
+    # trigger sites of vt 0xbf8 (all the calls in the zone):
+    #   c 0 PS_CBOWATKRATEKNOCKBACK, target = the hit object, flag = hit:
+    #       ShineMobileObject::smo_SwingDamage FUN_00432f30 (normal attack, flag 1),
+    #       SkillDamageSender::sds_TemplateStore FUN_005803c0 (skill damage, flag = isdamage)
+    #   c 3 PS_MEDMGMISSCRIUPRATE, target = the attacker itself, flag = missed: the same two sites, right after c 0
+    #   c 1 PS_SKILLSPUSEDOWN, target = the caster: SkillBlastEffect::sbe_BlastObject FUN_00583bc0 /
+    #       sbe_BlastLocate FUN_00584160, after the caster's skill-use call (vt 0xee0)
+    #   c 2 PS_AREAENEMYSPDOWN, target = the player: sp_NC_MAP_LOGINCOMPLETE_CMD FUN_00443390 (once per map login;
+    #       psl_Store applies the same condition when the passive is learned)
 CharacterPassiveList::cpl_RecalcParam(this, Container* param, ItemBag* bag)   @ FUN_00445940
     # via ShinePlayer::so_RecalcPassiveParam FUN_004cb4a0 (resets the passive plus/rate block first)
     weapon = item ID in equipment slot 12, or slot 10 if empty (0xFFFF) *(inferred: slot meaning)*
@@ -691,6 +758,31 @@ CharacterPassiveList::cpl_RecalcParam(this, Container* param, ItemBag* bag)   @ 
         each other column as in §6.2, assigned only when ≠ 0 (CastingTime: when ≠ 1000)
         # assignments, not sums: for each member the highest learned ID with a non-zero value wins
 ```
+
+The two HP-condition pairs and `MoveTBUpPlus` are not plain members: `cpl_RecalcParam` passes them to
+`Parameter::ChangeByConditionParam::cbcp_SetCondition(param, id, condition, change)` FUN_004c8f10:
+HpDownDamegeUp / DownDamegeHp → `PassiveHPDownRateWCMin`, `…WCMax`, `…MAMin`, `…MAMax`; HpDownAcUp / DownAcHp →
+`PassiveHPDownRateAC`, `…MR`; MoveTBUpPlus → `PassiveMovingTBPlus` with condition 1000.
+
+```pseudo
+ChangeByConditionParam::cbcp_SetCondition(this, u16 id, u32 condition, u32 change)   @ FUN_004c8f10
+    cbcp_nID = 0xFFFF; cbcp_nCondition = cbcp_nChange = cbcp_nChangeParam = cbcp_nCharged = 0
+    if condition == 0 or change == 0: return                     # cleared
+    cbcp_nID = id; cbcp_nCondition = condition; cbcp_nChange = change
+    n = ceil(1000 / condition)                                   # loop: count steps of `condition` until 1000 is used up
+    if n ≠ cbcp_nMaxValueNum:                                    # u8
+        cbcp_nMaxValueNum = n; delete[] cbcp_pValue; cbcp_pValue = new int[n] (all 0)
+        null: AssertFail "", 0; return
+```
+
+So `condition` is a step in ‰ of the HP rate (or 1000 = one step for the moving-TB bonus) and the object keeps one
+value slot per step; how the slots are filled from the current HP (`cbcp_nChangeParam`, `cbcp_nCharged`) is the
+stat calculation (Z12). Because `cpl_RecalcParam` assigns, the last learned row with both columns set wins, as for the
+plain members.
+2016 data: 4 rows each set both HP pairs with condition 50 (‰ steps → 20 slots) and change 10 / 20 / 30 / 40;
+`MoveTBUpPlus` is 0 in every row. The slot count is stored in a `u8`: a condition below 4 gives n > 255, which is
+truncated (n = 1000 for condition 1 is stored as 232) while the step logic would expect n slots (original bug)
+Z20-B11 (latent, not reached with the 2016 data).
 
 `PassiveMasteryVariable` `pmv` (ctor FUN_00444db0, initializer FUN_00695330): `pmv_var[twohand][0 = rate, 1 =
 plus][WeaponTypeEnum]` = byte offset of the PassiveSkillInfo column. Every entry not listed is MstRtTmp / MstPlTmp
@@ -744,7 +836,13 @@ but no holder outside the index keeps a row pointer, so that only matters for th
 
 `uir_SetSkill`'s body (store the argument at +4) is shared by identical-code folding: `DiceGame::Start` FUN_00478ef0,
 `ShineMobileObject` ctor FUN_005591c0 and `DataRecordArgument::lid_Call` FUN_00647510 call FUN_00653a60 for
-unrelated "set member +4" writes; those are not skill holders.
+unrelated "set member +4" writes; those are not skill holders. In `lid_Call` it is the per-column callback of
+`ORTable::ort_ReadData` (Z09 §28.6, the `#record` text tables): `field = ORRecord::orr_AllocObject(record, &id,
+column.vt[1]())` FUN_00653dc0 (first free of the 512 `orr_FieldArray` slots; type 1 index, 2 string, 3 byte, 4 word,
+5 dwrd → a 0xc-byte `ORField<type>`; no free slot or other type → null → `ortr_SetError "Cannot alloc field memory"`),
+`field.column = header` (the folded FUN_00653a60), `ORRecord::orr_AllocMemory(record, field)` FUN_00653d90 (hands the
+field its slice `orr_Buffer + orr_Pointer` via `field.vt[1]` and advances `orr_Pointer` by the returned size), then
+`field.vt[2](token reader)` reads the value.
 
 ## Original-server bugs
 
@@ -760,22 +858,50 @@ unrelated "set member +4" writes; those are not skill holders.
 | Z20-B8 | `cpl_PreSkillCheck`, `cpl_UnLearn` (§6.5) | the bit index is not bounded: `cpl_PreSkillCheck` tests bit `0xFFFF` for an unknown name (and the passive bit of an active skill's number); `cpl_UnLearn` logs an ID > 999 but reads `bs_bitlist[id >> 3]` before its `bs_maxbit` check | heap read up to 8 KB past the 125-byte bit list; a bogus "prerequisite learned" | bound the index (`< bs_maxbit`) and check the lookup result |
 | Z20-B9 | `cpl_UnLearn` (§6.5) | clears the bit but leaves the passive's `PSSetAbstateIndex` in `cpl_SetAbstateList` | after unlearning a set-abstate passive (MagicDance, DeepFear, Shame, PointAttack) its proc keeps firing until the list is rebuilt at the next login *(inferred: no other remover found)* | remove the entry (and restore the previous level) |
 | Z20-B10 | `PassiveDataBox` ctor default block (§6.1) | `CastingTime` 0 and `MstRtClaw` / `MstRtDSword` 0, while `cpl_RecalcParam` treats 1000 as the neutral cast rate | a learned bit with no row (an ID that is a gap, or ≥ `pdb_maxpassiveID`, e.g. from stale Character DB data) sets `Rate.CastingTime = 0` | default `CastingTime = 1000` like the other rates |
+| Z20-B11 | `cbcp_SetCondition` (§6.5) | the slot count `ceil(1000 / condition)` is stored in the `u8` `cbcp_nMaxValueNum` | latent: a PassiveSkill row with `DownDamegeHp` / `DownAcHp` 1…3 gets a truncated slot array (1000 → 232), so the Z12 step code can index past it | reject conditions < 4 or store the count in 16 bits |
 
 ## 8. Not reconstructed / uncertain
 
 - Which of the two ID-9034 rows `bsearch` returns (MSVC `qsort` order of equal keys) was not simulated.
 - What `Rate.CastingTime = 0` does: 34 PassiveSkill rows (WCMastery, MAMastery, LightMastery, BackgroundDefense)
   have CastingTime 0, so `cpl_RecalcParam` writes 0 for players who learned them (Z20-B10 is the same value from the
-  default block); the reader of `PassiveSkill.Rate.CastingTime` is not reached by member name (the parameter sum is
-  Z12 / Z03). If it multiplies, those passives make casting instant; if 0 is skipped, the data is harmless.
+  default block). The rate layer is applied by `Parameter::Cluster::operator*=` FUN_004c9160, which multiplies each
+  member by the rate in ‰ unless the rate is 1000 (`x = x · rate / 1000`), so a `Rate.CastingTime` of 0 zeroes the
+  cast-time member of the cluster it is applied to. Which cluster that is and whether the cast code reads that
+  member (instant cast for those players) is the stat calculation (Z12, open) and was not followed.
 - `cpl_StoreSetAbstateList` removes the previous level only when it is already in the list: if the Character DB lists
   a higher level before a lower one (`cpl_Store` keeps the packet order), both entries stay. The DB order was not
   checked (Z12 / `p_Char_GetPassive…` procedures).
-- `PassiveSkillInfo.ActiveSkillGroupInx` (8 rows ≠ 0 in 2016) has no reader by member name; the sweep part
-  looks for offset reads (+0xf8).
+- `PassiveSkillInfo.ActiveSkillGroupInx` (8 rows ≠ 0 in 2016): no reader found, by member name or by a +0xf8 read in
+  any function that touches `passivedatabox` (§6.4 / §6.5 list). A read through an untyped pointer elsewhere cannot be
+  ruled out completely.
 - The 49 delay-group / 24 step-number warnings are my reproduction of the rules over the 2016 data, not a run of
   the server.
 
 ## 9. Coverage boundary
 
-*(sweep part)*
+How it was checked (no scope table, so `coverage.py Z20` does not apply): every PDB function whose name contains
+`SkillDataBox`, `PassiveDataBox`, `SkillDataIndex`, `PassiveSkillInfo`, `ActiveSkillInfo`, `AreaSkill`,
+`ToggleSkill`, `PSSetAbstate`, `CharacterPassiveList` or `SpecialSkill` is cited (exception-unwind funclets aside);
+every direct callee of every `FUN_` this document cites (`coverage.py`'s `Bin`, same `TINY` / `HUB` limits) is cited
+by some doc or listed below; every caller of the box functions (`operator[]`, `GetSkillIndexByName`, `sdb_Get`,
+both `sdb_SpecSkillStruct`, `sdb_GetSetAbstate`, `sdb_GetAreaSkillInfo`, the `CharacterPassiveList` functions) and
+every `&skillnametree` / `passivedatabox` reference is cited; the strings of the five skill files, `PassiveSkill`,
+`PSkillSetAbstate`, `SkillDataBox` and `PassiveDataBox` lead only to cited functions (plus the client-view checksum
+`ActiveSkillView.shn` / `PassiveSkillView.shn` in `zs_start_*` and FUN_00631450, which is Z10's certification list).
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| `CharaterSkillList` toggle / cooldown / delay-group / empower / mastery / buffer functions (`csl_Toggle_*` 00444bd0 00445680 004456c0 00448c60 00448ce0, `csl_UpdateCoolTime`, `csl_GetDelayGroup`, `csl_SetCoolTime`, `csl_DmgCoolTimeDown`, `csl_EmpowerClear`, `csl_EmpowerStruct`, `csl_AddMastery`, `csl_FillSendBuffer_*`, `csl_CheckDefSkill`, `csl_MaximumSkill`, `csl_PreProduceCheck`, `csl_UnLearn`), `MoverSkillList::msl_UpdateCoolTime / msl_CoolTimeCheck / msl_SetCoolTime`, `ShinePlayer::so_ply_ToggleSkill_*` (vt 0xbc4 / 0xbc8 / 0xbcc) and packets 0x245C / 0x245D / 0x4821; mount skill users `so_smv_SkillBash_Location` 00580cf0, `ShineMover::so_ply_CanMyTarget` 004ae450 | new item **Z21** (added by Z20) | the per-player active skill list, ~1.4k lines that read the box only through `operator[]`; Z03 (done) only names toggles and cooldowns (Z03 §11), so no existing item will document them |
+| Z03 skill-blast leftovers reached from §7 holder sites: `smo_Dispel` 0057d8e0, `smo_ClearSkillResultBuffer_Miss` 0057a550, `AbstateElementInObject::aeo_IsMine` 00408880 | new item **Z21** | callees of `smo_SkillBlast` / `smo_SkillBash_Blast` (Z03, done; "only named" in Z03 §11) that no doc cites |
+| Item-side data loaders that store `SkillDataIndex*` (§7): `uie_Load` 0059cc30, `uie_SetChargedBuffer` 005963e0, `uie_BroadCast` 005963c0, `cideb_Load` ×4 and the `cideb_*` accessors, `rpdb_Load` 00450270, `iuf_Load` 0049b770, `mvdb_Load` 004bf960, `sidb_Load` 0058c920, `MysteryVaultTable::DataProcess` 005c8590, their `BinaryDataBox<…>::bdb_ReadData` readers and STL helpers; `CharClassDataBox::ccdb_*` 00640c20 / 00640b90 / 00640850 (from the class-change handlers that read `sdb_Get`); `RecipeBook::operator[]` 00444b50; `ItemDataBox::ReadData` 006494f0 and `igc_Store` 004900f0 (other `bt_Insert` users) | new item **Z22** (added by Z20) | Z01 §2.3 lists them as one loader row each; only the `SkillDataIndex*` they keep is this item's (§7); their own tables (item use effects, mounts, mini-house, mover upgrade, state items, mystery vault, class data) are item data, ~2k lines |
+| Callees of §7 holder sites listed in Z09 §31.2 (`Parameter::Container` ctor / `c_clear` / `IsNoAttack`, `ItemActionObserveManager::EventRunBySkillGroupIndex` / `GetRateAppliValue`, `MultiHitArgument`, `SkillBlastEffect` vector helpers, `sds_Initialize`, `BattleObjectStruct`, `ListTraveler`, `ItemActionArgument`, `se_Clear`, `learnSkill` 005a1790, `PROTO_NC_CHAR_WEDDINGDATA_ACK::operator=`, mover-upgrade accessors, `UsedItemEffect::operator[]`, `ed_Compare`, `lua_next`) | Z09 §31.2 / §31.4 rows (owners Z12, Z13, Z17, Z18 as assigned there) | already assigned by Z09's boundary; this item reaches them only through code it cites as a pointer holder or name-trie reader |
+| Who fills the passive `Plus` / `Rate` blocks into the final stats, the `ChangeByConditionParam` slot logic (`cbcp_nChangeParam`, `cbcp_nCharged`) and the cast-time use of `Rate.CastingTime` (§6.5, §8, Z20-B10) | Z12 (plan line 12: "`so_allparametercalculate` … what fills each layer … passives") | stat calculation; this item documents only what `cpl_RecalcParam` writes |
+| `CharacterPassiveList` callers: `so_charpassivedata` 0044e5a0 (Character DB passive list) | Z12 (plan line 14 lists `so_charpassivedata` FUN_0044e5a0) | login data parsing; §6.5 documents `cpl_Store` it calls |
+| `so_LearnPassive` 00559e50, `so_UnlearnSkillAck` 0057f200, `so_LearnSkill` 0055bbf0 (vt 0x620 / 0x624), the 0x4802 / 0x4803 answers | Z03 §9.3 / §9.5 (done, documented there) | the learn / unlearn flow; §5.2 / §6.5 document the list functions they call |
+| `Gather.shn` loader `gt_Load` 0046a660 (writes `skillnametree`, §5.2) | Z02 §8 (done, documented there) | §5.2 records only the trie side effect and its invariant |
+| Load-time tables that look skills up by name: `MiscDataTable::mdt_*`, `MobAttackSequence::mas_Load` / `sc_Store`, `MobDataBox::mdb_SkillStore`, `NPCAction` option readers, Lua `cNPCSkillUse` / `cSkillBlast` / `cSkillDamageCalculate` / `cMagicFieldSpread` | Z09 (done; each cited in `docs/pseudocode/zone/Z09-world.md`) | §5.2 states their lookup behaviour; their tables are world content |
+| MSVC STL internals under `csl_Learn`'s `std::_Sort` / `push_back` (`_Unguarded_partition` 00446c50, `_Make_heap` 00445fc0, `_Insertion_sort1` 00446110, `_Sort_heap` 00447040, `vector<CharSkill>` growth 00447580) | library code (no item) | standard introsort and vector growth; a rebuild uses any sort by `cs_SkillId` |
+| `CDataReader` (read, decrypt, row index, checksum) | W05 §3.1 / S01 §6 (done, documented) | the generic SHN reader under every `BinaryDataBox<T>` |
+| The `BTree` callers on other tries (item `idb_btree`, abstate, mob, map, NPC, mini-house …) | the owners of those functions | `BTree::operator[]` / `bt_Insert` are shared helpers (over 25 callers); only `skillnametree` users are this item's (§5.2) |
+| `ActiveSkillGroupCondition` (item-action condition on a skill group, ctor 005cedd0) | Z17 (plan: item actions) | an `ItemActionCondition` validator; it only names `ActiveSkillGroupIndex`, it does not read the box |
