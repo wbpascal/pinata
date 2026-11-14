@@ -80,6 +80,14 @@
   "\u2013"
  ],
  [
+  "L01",
+  2,
+  "Login server: process layer and session pools left out of login-server.md (added by S02)",
+  "L00, S02",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "Z02",
   2,
   "Zone: movement, chat, emotes, sight/briefinfo, NPC menus, scenario",
