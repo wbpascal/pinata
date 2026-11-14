@@ -5870,13 +5870,13 @@ Sent in reply to `0x349b` NC_ITEMDB_ENCHANT_ADD_NEW_SOCKET_ACK on GameDBSession 
 
 ### `0x3046` NC_ITEM_ENCHANT_SET_GEM_LOT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_ENCHANT_SET_GEM_LOT_CMD`, 4 bytes
+**Verified layout** (basis: zone ShinePlayer::so_ply_EnchantActionUse FUN_00562cb0 (6 bytes incl. opcode); PDB 2016 PROTO_NC_ITEM_ENCHANT_SET_GEM_LOT_CMD; client On_NC_ITEM_ENCHANT_SET_GEM_LOT_CMD FUN_004b3260)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | equipment | ITEM_INVEN (union: Inven, str) |
-| 2 | u8 | gemSocketIndex |  |
-| 3 | u8 | restCount |  |
+| 0 | u16 | equipment | ITEM_INVEN of the equipped weapon (client accepts store 9 slot < 0xC0 or store 8 slot < 0x1E) |
+| 2 | u8 | gemSocketIndex | 0-2 |
+| 3 | u8 | restCount | charges left after this use; 0 = the gem is removed |
 
 Sent from `FUN_00562cb0` (`FUN_00562cb0`) · payload 4 bytes
 
@@ -11110,6 +11110,16 @@ to the player only, after every server-side stop (mm_Step stop, block-check roll
 |---|---|---|---|
 | 0 | u16 | err | 0x1381 0x1382 0x1383 0x1388 |
 
+### `0x206f` NC_ACT_SETITEMHEALEFFECT (S→C)
+
+**Verified layout** (basis: zone Send_SETITEMHEALEFFECT FUN_005cfbb0 (7 bytes incl. opcode, broadcast in sight) from RecoverTypeEffect::_execute FUN_005cfc70; PDB 2016 PROTO_NC_ACT_SETITEMHEALEFFECT; client On_NC_ACT_SETITEMHEALEFFECT FUN_0049bd20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | who | zone handle of the healed / damaged object |
+| 2 | u8 | flag | bit 0 isheal: 1 HP gained, 0 HP lost; bits 1-7 not set (stale buffer bits) |
+| 3 | u16 | hpchange | amount, truncated to 16 bits; client shows a floating number |
+
 ### `0x207A` NC_ACT_OBJECT_SOUND_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone cObjectSound FUN_005ea6f0 (to sight); client On_NC_ACT_OBJECT_SOUND_CMD FUN_0049d4d0; pdb2016 struct)
@@ -12649,6 +12659,22 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 2 | u32 | ref.charNo |  |
 | 6 | u32 | guildregnum | guild or academy number |
 | 10 | u8 | nOpenType |  |
+
+### `0x3498` NC_ITEMDB_ENCHANT_REMOVE_GEM_REQ (Z→DB)
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_EnchantActionUse FUN_00562cb0 (0x26 bytes incl. opcode; the manual removal sender is Z04 §10.2); PDB 2016 PROTO_NC_ITEMDB_ENCHANT_REMOVE_GEM_REQ; CharDB FUN_004236e0 (D03))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle | zone handle |
+| 2 | u32 | header.charNo |  |
+| 6 | u16 | itemLockIndex | inventory lock index |
+| 8 | u64 | equipment.key | weapon item key |
+| 16 | u16 | equipment.id | weapon item id |
+| 18 | u16 | equipment.cell | ITEM_INVEN |
+| 20 | u8[12] | remover | from so_ply_EnchantActionUse: never written (stale bytes), unused since needItem = 0 |
+| 32 | u8[3] | gemSlot | 1 = clear this socket (charges used up) |
+| 35 | u8 | needItem | 0 here (no remover item to delete) |
 
 ### `0x349e` NC_ITEMDB_MYSTERY_VAULT_MAKEITEM_REQ (Z→DB)
 

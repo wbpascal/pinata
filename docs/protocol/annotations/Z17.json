@@ -1,0 +1,28 @@
+{
+  "_about": "Z17 verified packet layouts (item actions). Same schema as annotations.json.",
+  "packets": {
+    "zone": {
+      "0x206f": {"dir": "S→C", "name": "NC_ACT_SETITEMHEALEFFECT",
+        "basis": "zone Send_SETITEMHEALEFFECT FUN_005cfbb0 (7 bytes incl. opcode, broadcast in sight) from RecoverTypeEffect::_execute FUN_005cfc70; PDB 2016 PROTO_NC_ACT_SETITEMHEALEFFECT; client On_NC_ACT_SETITEMHEALEFFECT FUN_0049bd20",
+        "fields": [[0, "u16", "who", "zone handle of the healed / damaged object"],
+                   [2, "u8", "flag", "bit 0 isheal: 1 HP gained, 0 HP lost; bits 1-7 not set (stale buffer bits)"],
+                   [3, "u16", "hpchange", "amount, truncated to 16 bits; client shows a floating number"]]},
+      "0x3046": {"dir": "S→C", "name": "NC_ITEM_ENCHANT_SET_GEM_LOT_CMD",
+        "basis": "zone ShinePlayer::so_ply_EnchantActionUse FUN_00562cb0 (6 bytes incl. opcode); PDB 2016 PROTO_NC_ITEM_ENCHANT_SET_GEM_LOT_CMD; client On_NC_ITEM_ENCHANT_SET_GEM_LOT_CMD FUN_004b3260",
+        "fields": [[0, "u16", "equipment", "ITEM_INVEN of the equipped weapon (client accepts store 9 slot < 0xC0 or store 8 slot < 0x1E)"],
+                   [2, "u8", "gemSocketIndex", "0-2"],
+                   [3, "u8", "restCount", "charges left after this use; 0 = the gem is removed"]]},
+      "0x3498": {"dir": "Z→DB", "name": "NC_ITEMDB_ENCHANT_REMOVE_GEM_REQ",
+        "basis": "zone ShinePlayer::so_ply_EnchantActionUse FUN_00562cb0 (0x26 bytes incl. opcode; the manual removal sender is Z04 §10.2); PDB 2016 PROTO_NC_ITEMDB_ENCHANT_REMOVE_GEM_REQ; CharDB FUN_004236e0 (D03)",
+        "fields": [[0, "u16", "header.handle", "zone handle"],
+                   [2, "u32", "header.charNo", ""],
+                   [6, "u16", "itemLockIndex", "inventory lock index"],
+                   [8, "u64", "equipment.key", "weapon item key"],
+                   [16, "u16", "equipment.id", "weapon item id"],
+                   [18, "u16", "equipment.cell", "ITEM_INVEN"],
+                   [20, "u8[12]", "remover", "from so_ply_EnchantActionUse: never written (stale bytes), unused since needItem = 0"],
+                   [32, "u8[3]", "gemSlot", "1 = clear this socket (charges used up)"],
+                   [35, "u8", "needItem", "0 here (no remover item to delete)"]]}
+    }
+  }
+}
