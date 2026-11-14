@@ -200,6 +200,14 @@
   "\u2013"
  ],
  [
+  "Z18",
+  2,
+  "Zone: leftovers of finished zone items from Z09's coverage boundary (added by Z09)",
+  "Z01, Z02, Z03, Z04, Z06, Z07, Z09",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "D01",
   2,
   "Account and AccountLog servers",

@@ -10440,9 +10440,9 @@ reach (`CommonList` / `l_MakeList` forms, `clcr_GetRandomLCRewardData`) are docu
 roots: **509 functions / 20.2 k lines**, exactly the 509 of this section. Counts per owner: library code 146 (STL 120,
 Lua 16, CRT 10), Z01 74, Z03 53, Z04 49, Z13 47, Z16 38, Z02 29, Z15 23, Z14 18, Z07 9, Z17 8, Z06 7, Z12 4, D05 3
 (already documented in `D05-gamelog.md` §4.4; the zone check reads zone docs only), Z11 1. No function is left without
-an owner whose plan line includes it, so no follow-up item is proposed. **Owners already finished** (Z01, Z02, Z03, Z04,
-Z06, Z07: 221 functions + 0x2442 / 0x2443) will not reach these through their own gap lists: their follow-up list is
-`docs/knowledge/Z09.md` §3 (one short session per owner).
+an owner whose plan line includes it. **Owners already finished** (Z01, Z02, Z03, Z04,
+Z06, Z07: 221 functions + 0x2442 / 0x2443) will not reach these through their own gap lists: work item **Z18** (added by Z09)
+documents them; its list is `docs/knowledge/Z09.md` §3.
 
 ### 31.2 Functions of other items
 

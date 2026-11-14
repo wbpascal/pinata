@@ -478,6 +478,42 @@ ITEMS = [
              "DB side)."],
       done="Item-action lifecycle (load → trigger → condition → effect → cooldown) and costume charge lifecycle written as "
            "pseudocode; every packet either sends has a layout."),
+ dict(id="Z18", phase=2, title="Zone: leftovers of finished zone items from Z09's coverage boundary (added by Z09)",
+      out="docs/pseudocode/zone/Z18-leftovers.md", deps=["Z01", "Z02", "Z03", "Z04", "Z06", "Z07", "Z09"], scope=[],
+      goal="Z09's coverage boundary (`docs/pseudocode/zone/Z09-world.md` §31) assigns 221 zone functions and two packets to "
+           "Z01, Z02, Z03, Z04, Z06 and Z07, whose plans include them, but those items were already done, so their own gap "
+           "lists will never pick them up. Document them in one output, one section per owner, so that every one is cited "
+           "as `FUN_…` in a zone doc (that is what `coverage.py` counts) and its behaviour is described at the owner's depth.",
+      steps=["**The list:** `docs/knowledge/Z09.md` §3 (table: owner, count, the Z09 §31 rows to take, extras). Read those "
+             "rows with `python3 -I tools/protocol-re/sect.py docs/pseudocode/zone/Z09-world.md 31.2` (and `31.3`, `31.5`); "
+             "their addresses are written **without** `FUN_` on purpose. Sizes (decompiled lines, extras included): Z01 74 "
+             "functions ~2.0k, Z02 29 ~1.0k, Z03 53 + 7 helpers + 0x2442 / 0x2443 ~2.8k, Z04 49 + 3 ~2.2k, Z06 7 ~0.1k, "
+             "Z07 10 ~0.6k. Suggested parts: 1 = Z01 + Z06, 2 = Z03, 3 = Z04, 4 = Z02 + Z07, then sweep and review.",
+             "**Per owner section:** first read the owner's knowledge file and the sections of its output that call or are "
+             "called by these functions (`sect.py`), so each block says where it plugs in (link `Z0x §n`) instead of "
+             "re-deriving context. Read the code in the PDB export (`clean.py re-data/exports/zone-pdb - <addr> …`, official "
+             "names, *(pdb2016)*), several functions per call; group trivial ones (accessors, ctors / dtors, `BinaryDataBox` "
+             "readers, STL-like wrappers) in one table row each with what they do, and write pseudocode blocks for the ones "
+             "with logic. Do not edit the owners' files: corrections of their text go into `docs/knowledge/Z18.md` "
+             "\"Corrections\" (for X01), one row each (owner, place, old statement, correction, evidence).",
+             "**Packets and open points:** Z03 section: 0x2442 NC_BAT_SOMEONESKILLBASH_OBJ_CAST_CMD and 0x2443 "
+             "NC_BAT_SOMEONESKILLBASH_FLD_CAST_CMD (sender `ShineMobileObject::smo_SkillBash_Blast_Trap`; layout with the 2016 "
+             "PDB struct, receivers, client handler from `opcodes.json` / C01) and the \"Skill-side helpers\" open points of "
+             "Z09 §31.5 (answer each or say why it stays open). Z04 section: Z09 §31.5 \"Items\" (`ItemAttr` class vt 0x2c "
+             "group row → lot / upgrade, `so_ply_EquipmentChange` and the view slots, `sp_DestroyItem` overloads). Z07 "
+             "section: `CCharacterTitleZone::CheckNewTitle`. Every client-facing packet gets its client handler and error codes "
+             "resolved through `docs/protocol/client-error-codes.json`; verified layouts go into `docs/protocol/annotations/Z18.json`.",
+             "**Coverage (no scope table, so `coverage.py Z18` does not apply):** (a) every address of the Z09 §3 rows is cited "
+             "as `FUN_…` in the output (check with a scratch script over the §31 rows); (b) depth-1 gap check as Z09 §31.1 "
+             "describes (roots = every `FUN_` of the output, `coverage.py`'s `Bin` and TINY / HUB / registered filters, "
+             "\"covered\" = cited in a pseudocode doc): each callee found is documented here when it belongs to Z01–Z07, or "
+             "listed in the \"Coverage boundary\" with its owner's plan line (items not started yet keep it through their own "
+             "gap lists; write those addresses without `FUN_`). Record the before / after counts in the status file.",
+             "Bugs as `Z18-B<n>` (owner named in the row). Do not re-document anything the owners or Z09 already describe "
+             "(Z09 §28.12 / §28.13 took the small leftovers of Z01 / Z05 / Z07 / Z08)."],
+      done="All 221 functions of `docs/knowledge/Z09.md` §3 are cited as `FUN_…` and described, the packets 0x2442 / 0x2443 have "
+           "layouts and client handlers, every Z09 §31.5 open point of these owners is answered or argued open, and the "
+           "depth-1 gap check of the output lists only functions with an owner whose plan line includes them."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
