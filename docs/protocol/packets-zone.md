@@ -12647,6 +12647,57 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 9 | i32 | eLevelType |  |
 | 13 | Name3 | sMapName |  |
 
+### `0x0811` NC_MISC_ZONERINGLINKTEST_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &zonelink ac_ZoneLinkTest FUN_0041d950 (writes, 10 bytes); zls_NC_MISC_ZONERINGLINKTEST_RNG FUN_0045b4d0 (appends, forwards mechines*16+10 bytes); PDB 2016 PROTO_NC_MISC_ZONERINGLINKTEST_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | u8 | mechines | number of addr entries (0 at the start, +1 per zone) |
+| 8 | Name4[mechines] | addr | each zone's next-zone address string (16 bytes each) |
+
+### `0x1068` NC_CHAR_PLAYERSEARCH_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &pfind ac_FindPlayer FUN_0041d050 / ZoneRingPacketFindPlayer::zrpb_Request FUN_005a7190 (writes, 0x1D bytes); zls_NC_CHAR_PLAYERSEARCH_RNG FUN_0045b870 (reads, forwards); PDB 2016 PROTO_NC_CHAR_PLAYERSEARCH_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | Name5 | charid | character searched (20 bytes) |
+
+### `0x1069` NC_CHAR_PLAYERFOUND_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone zls_NC_CHAR_PLAYERSEARCH_RNG FUN_0045b870 (writes, 0x31 bytes); zls_NC_CHAR_PLAYERFOUND_RNG FUN_0045ba60 (forwards) → zrpb_Success FUN_005a7b70 (reads); PDB 2016 PROTO_NC_CHAR_PLAYERFOUND_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | Name3 | map | server map of the player (12 bytes) |
+| 19 | u32 | coord.x |  |
+| 23 | u32 | coord.y |  |
+| 27 | Name5 | charid | player found (20 bytes) |
+
+### `0x106a` NC_CHAR_PLAYERSUMMON_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &psummon ac_SummonPlayer FUN_0041d140 / ZoneRingPacketSummonPlayer::zrpb_Request FUN_005a6fd0 (writes, 0x31 bytes); zls_NC_CHAR_PLAYERSUMMON_RNG FUN_0045b700 → zrpb_Success FUN_005a7ab0 (reads); PDB 2016 PROTO_NC_CHAR_PLAYERSUMMON_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | Name5 | charid | player to summon (20 bytes) |
+| 27 | Name3 | map | GM's server map (12 bytes) |
+| 39 | u32 | coord.x | GM position |
+| 43 | u32 | coord.y |  |
+
 ### `0x106b` NC_CHAR_KICKPLAYEROUT_RNG (Z→Z (ring))
 
 **Verified layout** (basis: zone zls_NC_CHAR_KICKPLAYEROUT_RNG FUN_0045bc30 (reads, forwards 0x1E bytes); &kickout ac_KickOutPlayer FUN_0041cec0 / zrpb_Request FUN_005a76f0 build this layout but send it as 0x1068 (Z11-B6); PDB 2016 PROTO_NC_CHAR_KICKPLAYEROUT_RNG)
@@ -12669,6 +12720,28 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 1 | u16 | start.handle |  |
 | 3 | u32 | start.regnum |  |
 | 7 | Name5 | charid | kicked character |
+
+### `0x1810` NC_MAP_EXPBONUS_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &expbonus ac_BonusExp FUN_0041e190 → zrpb_Request FUN_005a79a0 (writes, 0x0B bytes); ring handler forwards and applies; PDB 2016 PROTO_NC_MAP_EXPBONUS_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | u16 | bonus | per mille (1000 = normal) for every map of the zone |
+
+### `0x1811` NC_MAP_ITEMBONUS_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone &itembonus ac_BonusItem FUN_0041e2d0 → zrpb_Request FUN_005a7890 (writes, 0x0B bytes); ring handler forwards and applies; PDB 2016 PROTO_NC_MAP_ITEMBONUS_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | u16 | bonus | per mille (1000 = normal) for every map of the zone |
 
 ### `0x10b1` NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG (Z→Z ring)
 

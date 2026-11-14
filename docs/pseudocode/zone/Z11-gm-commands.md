@@ -173,29 +173,29 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 2 | `&숨어` | ac_Hide `0041a3a0` | 10 | — | leave sight, sub-layer 3, abstate STA_GMHIDEMODE; refused in a mini-house | 0x2011 on refusal; abstate inform (Z03) | §3.1 |
 | 3 | `&show` | ac_Show `0041a4d0` | 10 | — | clear STA_GMHIDEMODE, sub-layer 0; refused in a mini-house | abstate reset (Z03) | §3.1 |
 | 4 | `&보여` | ac_Show `0041a4d0` | 10 | — | clear STA_GMHIDEMODE, sub-layer 0; refused in a mini-house | abstate reset (Z03) | §3.1 |
-| 5 | `&pfind` | ac_FindPlayer `0041d050` | 10 | (part 3) | | | |
-| 6 | `&캐추적` | ac_FindPlayer `0041d050` | 10 | (part 3) | | | |
-| 7 | `&mfind` | ac_FindMob `0041cf90` | 10 | (part 3) | | | |
-| 8 | `&몹추적` | ac_FindMob `0041cf90` | 10 | (part 3) | | | |
+| 5 | `&pfind` | ac_FindPlayer `0041d050` | 10 | `<charName>` | show where a player is (any zone) and move the GM there (so_ply_BriefLink); a house player is shown at the house entrance (this zone only, B14) | ring 0x1068 / 0x1069; 0x2011; GM's map link | §5.1 |
+| 6 | `&캐추적` | ac_FindPlayer `0041d050` | 10 | `<charName>` | show where a player is (any zone) and move the GM there (so_ply_BriefLink); a house player is shown at the house entrance (this zone only, B14) | ring 0x1068 / 0x1069; 0x2011; GM's map link | §5.1 |
+| 7 | `&mfind` | ac_FindMob `0041cf90` | 10 | `<mobIndex>` | move the GM to the first mob of that MobInfo index on the GM's map | 0x2011 on failure; GM's map link | §5.1 |
+| 8 | `&몹추적` | ac_FindMob `0041cf90` | 10 | `<mobIndex>` | move the GM to the first mob of that MobInfo index on the GM's map | 0x2011 on failure; GM's map link | §5.1 |
 | 9 | `&kickout` | ac_KickOutPlayer `0041cec0` | 10 | `<charName>` | disconnect a player of this zone (reason 0x68B); other zones: broken, never kicked (B6) | 0x0C1A to WM via so_Disconnect (Z01 §8.3); ring 0x1068; 0x2011 | §4.5 |
 | 10 | `&추방` | ac_KickOutPlayer `0041cec0` | 10 | `<charName>` | disconnect a player of this zone (reason 0x68B); other zones: broken, never kicked (B6) | 0x0C1A to WM via so_Disconnect (Z01 §8.3); ring 0x1068; 0x2011 | §4.5 |
 | 11 | `&linkto` | ac_LinkTo `0041a7e0` | 10 | `[<map> [<x> <y>]]` / `-` | teleport to a map (default regen point) or, without argument, to a free spot of the current map; `-` = back to the normal location | 0x1809 (same zone) or zone change (Z01 §6) | §3.1 |
 | 12 | `&이동` | ac_LinkTo `0041a7e0` | 10 | `[<map> [<x> <y>]]` / `-` | teleport to a map (default regen point) or, without argument, to a free spot of the current map; `-` = back to the normal location | 0x1809 (same zone) or zone change (Z01 §6) | §3.1 |
-| 13 | `&psummon` | ac_SummonPlayer `0041d140` | 10 | (part 3) | | | |
-| 14 | `&캐소환` | ac_SummonPlayer `0041d140` | 10 | (part 3) | | | |
-| 15 | `&expbonus` | ac_BonusExp `0041e190` | 50 | (part 3) | | | |
-| 16 | `&경험치보너스` | ac_BonusExp `0041e190` | 50 | (part 3) | | | |
-| 17 | `&itembonus` | ac_BonusItem `0041e2d0` | 50 | (part 3) | | | |
-| 18 | `&아이템보너스` | ac_BonusItem `0041e2d0` | 50 | (part 3) | | | |
-| 19 | `&fieldbonus` | ac_FieldBonus `0041e410` | 50 | (part 3) | | | |
-| 20 | `&필드보너스` | ac_FieldBonus `0041e410` | 50 | (part 3) | | | |
-| 21 | `&silence` | ac_KeepFromChat `0041e090` | 100 | (part 3) | | | |
-| 22 | `&조용히` | ac_KeepFromChat `0041e090` | 100 | (part 3) | | | |
+| 13 | `&psummon` | ac_SummonPlayer `0041d140` | 10 | `<charName>` | move a player of any zone to the GM's position (no house check, no answer) | ring 0x106A; 0x2011 on failure | §5.1 |
+| 14 | `&캐소환` | ac_SummonPlayer `0041d140` | 10 | `<charName>` | move a player of any zone to the GM's position (no house check, no answer) | ring 0x106A; 0x2011 on failure | §5.1 |
+| 15 | `&expbonus` | ac_BonusExp `0041e190` | 50 | `<A\|x> <rate‰>` | set fm_FieldBonus.fb_Experience of the GM's map (A: every map of every zone); nothing reads it (B15, B16) | ring 0x1810; 0x2011 usage | §5.4 |
+| 16 | `&경험치보너스` | ac_BonusExp `0041e190` | 50 | `<A\|x> <rate‰>` | set fm_FieldBonus.fb_Experience of the GM's map (A: every map of every zone); nothing reads it (B15, B16) | ring 0x1810; 0x2011 usage | §5.4 |
+| 17 | `&itembonus` | ac_BonusItem `0041e2d0` | 50 | `<A\|x> <rate‰>` | set fm_FieldBonus.fb_DropRate (drop roll factor) of the GM's map (A: every map of every zone) (B16) | ring 0x1811; 0x2011 usage | §5.4 |
+| 18 | `&아이템보너스` | ac_BonusItem `0041e2d0` | 50 | `<A\|x> <rate‰>` | set fm_FieldBonus.fb_DropRate (drop roll factor) of the GM's map (A: every map of every zone) (B16) | ring 0x1811; 0x2011 usage | §5.4 |
+| 19 | `&fieldbonus` | ac_FieldBonus `0041e410` | 50 | — | show the GM's map EXP / drop bonus in percent | 0x2011 | §5.4 |
+| 20 | `&필드보너스` | ac_FieldBonus `0041e410` | 50 | — | show the GM's map EXP / drop bonus in percent | 0x2011 | §5.4 |
+| 21 | `&silence` | ac_KeepFromChat `0041e090` | 100 | `<charName>` | only answers "Success to silence"; no chat ban (B17) | 0x2011 | §5.6 |
+| 22 | `&조용히` | ac_KeepFromChat `0041e090` | 100 | `<charName>` | only answers "Success to silence"; no chat ban (B17) | 0x2011 | §5.6 |
 | 23 | `&distribute` | ac_PlayerDistribute `00422f90` | 10 | (part 6) | | | |
-| 24 | `&isblock` | ac_IsBlock `0041e880` | 10 | (part 3) | | | |
-| 25 | `&mobdist` | ac_MobDistribute `0041d250` | 10 | (part 3) | | | |
-| 26 | `&chargeditem` | ac_ChargedItem `0041d2f0` | 100 | (part 3) | | | |
-| 27 | `&parameterview` | ac_ParameterView `0041e7d0` | 100 | (part 3) | | | |
+| 24 | `&isblock` | ac_IsBlock `0041e880` | 10 | — | block test around the GM for radius 0…3 | 0x2011 | §5.7 |
+| 25 | `&mobdist` | ac_MobDistribute `0041d250` | 10 | — | list every object of the map with position | 0x2011 per object | §5.2 |
+| 26 | `&chargeditem` | ac_ChargedItem `0041d2f0` | 100 | `<effectHandle>` | turn the GM's first charged buff into buff n ending in 5 min (memory only, B18) | — | §5.6 |
+| 27 | `&parameterview` | ac_ParameterView `0041e7d0` | 100 | `<0…11>` | show one stat across nine smo_Param layers | 0x2011 | §5.7 |
 | 28 | `&adminlevel` | ac_AdminLevel `0041a650` | 1 | — | "Admin level is %d" | 0x2011 | §3.2 |
 | 29 | `&serverindex` | ac_ServerIndex `0041a730` | 100 | — | prints the build tag "20120409-Hero[Release]-1" | 0x2011 | §3.2 |
 | 30 | `&makeitem` | ac_MakeItem `0041b8a0` | 100 | `<InxName> [-u<n>] [-s<n>] [-l<n>] [-p<t>/<v>] [-pi] [-e<n>] [-n<n>] …` | create an item (full stack, random options, amulet upgrade steps) in the first free inventory cell; unknown name or full inventory: silent | DB 0x3401 → 0x3402, client cell change (Z05 §9.1) | §4.3 |
@@ -230,25 +230,25 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 59 | `&setabstatetarget` | ac_SetAbstateTarget `0041c6e0` | 100 | `<AbState> [<keepMs>] [<strength 1–39>]` | set an abnormal state on the target | as &setabstate, keep time of the row (B5) | §4.4 |
 | 60 | `&resetabstatetarget` | ac_ReSetAbstateTarget `00423ba0` | 100 | (part 6) | | | |
 | 61 | `&kqreward` | ac_KQReward `00423cc0` | 100 | (part 6) | | | |
-| 62 | `&killallmob` | ac_killallmob `0041d3c0` | 50 | (part 3) | | | |
-| 63 | `&mobdamage` | ac_mobdamage `0041d460` | 100 | (part 3) | | | |
-| 64 | `&suicideallmob` | ac_SuicideAllMob `0041d540` | 50 | (part 3) | | | |
-| 65 | `&suicidemob` | ac_SuicideMob `0041d620` | 100 | (part 3) | | | |
+| 62 | `&killallmob` | ac_killallmob `0041d3c0` | 50 | — | kill every attackable live mob of the map, GM as killer | kill packets (Z03 §7) | §5.2 |
+| 63 | `&mobdamage` | ac_mobdamage `0041d460` | 100 | `<Y\|N> <Y\|N> [factor]` | set the Lua-certification combat factor flags (freeze, recover) and value | 0x2011 | §5.3 |
+| 64 | `&suicideallmob` | ac_SuicideAllMob `0041d540` | 50 | — | every mob of the map kills itself (no EXP) | 0x243C per mob; kill packets | §5.2 |
+| 65 | `&suicidemob` | ac_SuicideMob `0041d620` | 100 | `<mobIndex>` | every mob of that index on the map kills itself | 0x2011; 0x243C per mob | §5.2 |
 | 66 | `&kingdomquest` | ac_KingdomQuest `00423dd0` | 100 | (part 6) | | | |
-| 67 | `&Reroadkingdomquest` | ac_ReroadKingdomQuest `0041dc80` | 100 | (part 3) | | | |
-| 68 | `&endofkq` | ac_EndOfKingdomQuest `0041dbd0` | 100 | (part 3) | | | |
-| 69 | `&guildtournament` | ac_GuildTournament `0041da30` | 100 | (part 3) | | | |
-| 70 | `&zonelink` | ac_ZoneLinkTest `0041d950` | 100 | (part 3) | | | |
+| 67 | `&Reroadkingdomquest` | ac_ReroadKingdomQuest `0041dc80` | 100 | `<script>` | stop the films of that script and reload the scenario book | — | §5.5 |
+| 68 | `&endofkq` | ac_EndOfKingdomQuest `0041dbd0` | 100 | `<kqHandle>` | end a kingdom quest at the WM and drop its contribution list (map not cleared) | WM 0x5810 | §5.5 |
+| 69 | `&guildtournament` | ac_GuildTournament `0041da30` | 100 | — (arguments ignored) | start guild tournament map 0 on GuildT01 locally with fixed times | GT start (Z16) | §5.5 |
+| 70 | `&zonelink` | ac_ZoneLinkTest `0041d950` | 100 | — | send a probe round the zone ring and list every zone's next address | ring 0x0811; 0x2011 | §5.5 |
 | 71 | `&block` | ac_BlockMatrix `0041ccb0` | 100 | — | nothing (calls an empty body) | — | §4.5 |
-| 72 | `&emptymap` | ac_EmptyMap `0041d850` | 100 | (part 3) | | | |
-| 73 | `&serversocketcut` | ac_ServerSocketCut `0041d760` | 100 | (part 3) | | | |
-| 74 | `&staticdamage` | ac_staticdamage `0041dfd0` | 50 | (part 3) | | | |
-| 75 | `&deathaura` | ac_deathaura `0041dd70` | 100 | (part 3) | | | |
-| 76 | `&immortal` | ac_immortal `0041ddf0` | 10 | (part 3) | | | |
-| 77 | `&enterminihouse` | ac_EnterMiniHouse `0041df80` | 100 | (part 3) | | | |
-| 78 | `&horsespeed` | ac_HorseSpeed `0041ded0` | 100 | (part 3) | | | |
-| 79 | `&charinform` | ac_CharInform `0041e510` | 10 | (part 3) | | | |
-| 80 | `&partyinfo` | ac_PartyInform `0041e5e0` | 100 | (part 3) | | | |
+| 72 | `&emptymap` | ac_EmptyMap `0041d850` | 100 | `<map>` | name a free instance map of that cluster (moves the cluster's cursor) | 0x2011 | §5.5 |
+| 73 | `&serversocketcut` | ac_ServerSocketCut `0041d760` | 100 | `<0…3>` | close slot n of the WM, GameDB and GameLog connections (they reconnect) | — | §5.5 |
+| 74 | `&staticdamage` | ac_staticdamage `0041dfd0` | 50 | `[n]` | fixed damage n for every GM hit (0/none = off); also the death-aura radius | — | §5.3 |
+| 75 | `&deathaura` | ac_deathaura `0041dd70` | 100 | — | toggle: every tick kill all mobs within smo_admindamage of the GM | kill packets | §5.3 |
+| 76 | `&immortal` | ac_immortal `0041ddf0` | 10 | — | toggle: refill HP/SP/LP every tick | 0x2011 | §5.3 |
+| 77 | `&enterminihouse` | ac_EnterMiniHouse `0041df80` | 100 | — | nothing (empty) | — | §5.6 |
+| 78 | `&horsespeed` | ac_HorseSpeed `0041ded0` | 100 | `<n>` | set the GM's mount run speed | — | §5.6 |
+| 79 | `&charinform` | ac_CharInform `0041e510` | 10 | — (target) | dump the target's name, level, mode, location, HP (+ player house/booth/ride state) | 0x2011 lines | §5.7 |
+| 80 | `&partyinfo` | ac_PartyInform `0041e5e0` | 100 | `[charName]` | dump the party of a player (default: self) from the zone's party mirror | 0x2011 lines | §5.7 |
 | 81 | `&propose` | ac_Propose `0041e9d0` | 100 | (part 4) | | | |
 | 82 | `&proposeres` | ac_ProposeRes `0041eb30` | 100 | (part 4) | | | |
 | 83 | `&weddingreset` | ac_WeddingReset `0041ec70` | 100 | (part 4) | | | |
@@ -298,7 +298,7 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 127 | `&alllearnskill` | ac_AllLearnSKill `004212e0` | 100 | (part 5) | | | |
 | 128 | `&levelup` | ac_LevelUp `00421710` | 100 | (part 5) | | | |
 | 129 | `&showallchar` | ac_ShowAllChar `00423480` | 100 | (part 6) | | | |
-| 130 | `&루아인수` | ac_LuaSec `0041e6d0` | 100 | (part 3) | | | |
+| 130 | `&루아인수` | ac_LuaSec `0041e6d0` | 100 | — | show the Lua certification counters | 0x2011 | §5.7 |
 | 131 | `&testlink` | ac_TestLink `004217e0` | 50 | (part 5) | | | |
 | 132 | `&gtieffect` | ac_GuildTournamentItemEffect `004218b0` | 50 | (part 5) | | | |
 | 133 | `&iareset` | ac_ItemActionCoolTimeReset `00421990` | 50 | (part 5) | | | |
@@ -451,8 +451,8 @@ ShinePlayer::so_ply_MoveNewLayer(p, t, n)                              @ FUN_005
 
 &reloadid <map>   ac_IndunReload                                     @ FUN_00419810
     info = fieldlist.fc_GetInstanceDungeonInfoByMapName(args[0] (12), ILT_NORMAL); none → nothing
-    ClusterManager::cm_AllDropFilm(mapclustermanager, args[0][0])   # FUN_00486ec0 (Z14): stop every film of the instances
-        # (passes only the first character of the name as the argument *(inferred: the decompiled call; Z14 owns the callee)*)
+    ClusterManager::cm_AllDropFilm(mapclustermanager, args[0])      # FUN_00486ec0 (Z14): stop every film of the instances
+        # (the pointer to the name: the push in the disassembly; the decompiler shows args[0][0])
     ScenarioBookShelf::sbsReLoad(scenarioshelf, info.ScriptName)    # FUN_00507c90, Z09 §22.5: reload the instance script
         # (with Z09-B84/B96 a reload of a once-failed Pine book double-frees)
 
@@ -762,7 +762,7 @@ a GM-made `+u` amulet carries the same kind of option growth as an upgraded one 
     t = som_FindPlayer(Name5 = args[0] (20)); this zone only; not found: nothing, no message
     t in a mini-house: the same "fail to 'summonplayer' …" line
     t.so_LinkTo({ server map = client map = gm's map name (12), x, y = gm position }, 6, 9, 10)   (vt 0x600, Z01 §7.1)
-    # the zone-wide version through the zone ring is &psummon (part 3)
+    # the zone-wide version through the zone ring is &psummon (§5.1)
 
 &kickout, &추방 <charName>   ac_KickOutPlayer                          @ FUN_0041cec0
     gpp payload = PROTO_NC_CHAR_KICKPLAYEROUT_RNG { ZONERINGLINKAGESTART start (7), u8 tmp (not written), Name5 charid (20) }
@@ -807,6 +807,330 @@ both are dead.
 `&questcomplete` FUN_0041c1e0 parses `ac_Scanf(args[0])` and drops it. The working quest debug words are `&queststart` /
 `&questread` (§3.4).
 
+## 5. Commands, part 3 (handlers FUN_0041cf90 … FUN_0041e880)
+
+### 5.1 Finding and summoning: `&mfind`, `&pfind`, `&psummon`
+
+All three refuse in a mini-house (`vt 0x130 so_ply_MH_GetActiveMH`) with the wall line
+"fail to '<word>' : not allowed to do '<word>' in the MH". The GM (or the target) moves with
+`so_ply_BriefLink(map, xy)`:
+
+```pseudo
+ShinePlayer::so_ply_BriefLink(p, Name3 map, SHINE_XY_TYPE xy)     (vt 0x890)          @ FUN_00452c10
+    map or xy null: assert "ShineObjectClass::ShinePlayer::so_ply_BriefLink : Error"; return
+    attr = fo_GetFieldAttr(map); none → nothing
+    client map = attr.mapidclient; not in mapdatabox (MapInfo) → nothing
+    p.so_LinkTo({ server map = map (12), client map (32), x, y }, 6, 9, 10)           # vt 0x600, Z01 §7.1
+        # same arguments as &summonplayer / &linkto: another zone's map becomes a zone change
+```
+
+```pseudo
+&mfind, &몹추적 <mobIndex>   ac_FindMob                                @ FUN_0041cf90
+    ShinePlayer::sp_Admin_FindMob(gm, args[0])                          @ FUN_00452e10
+        id = mobdatabox.mdb_btree[args[0]] (MobInfo InxName); none → notice "%s is not Mob index"; return
+        walk gm's map with AxialListMobFind { mobid = id, ObjectType 5 (mob), Skip 0 }
+            ali_Work @ FUN_00428130: first object with so_ObjectType (vt 0x4d0) == 5 and so_mob_MobID (vt 0x708) == id
+            (Skip is a "take the n-th" counter, always 0 here) → stop
+        none → notice "%s is not in this map"
+        else gm.so_ply_BriefLink(mob.so_Field.fm_MapID, mob position)   # the GM jumps to the first such mob
+
+&pfind, &캐추적 <charName>   ac_FindPlayer                              @ FUN_0041d050
+    gpp payload = PROTO_NC_CHAR_PLAYERSEARCH_RNG { ZONERINGLINKAGESTART start; Name5 charid = args[0] (20) }   (0x1B)
+    ZoneRingPacketFindPlayer::zrpb_Request(gm, gpp)                     @ FUN_005a7190
+        t = som_FindPlayer(charid)
+        t here:
+            t has no map → vt 8 zrpb_Failure: notice "%s is not in game"            @ FUN_005a8050
+            loc = { t's map fm_MapID, t.x, t.y }
+            t in a mini-house (vt 0x130): mh = som_GetObject(t.so_ply_MH_GetMyHandle (vt 0x138));
+                loc = mh.so_LoginLocation() (ShineMiniHouse vt 0x14c FUN_00555e50: the house's entrance map + xy);
+                no house object or no location: nothing at all
+            vt 4 zrpb_Success(gm, { start, map, coord, charid })                     @ FUN_005a7b70
+                notice "%s is at %s %d/%d" (name, map, x, y); gm.so_ply_BriefLink(map, coord)
+        not here → zone ring (zcs_Send, 0x1D bytes) 0x1068 NC_CHAR_PLAYERSEARCH_RNG,
+            start = { machine = own zone no, handle = gm handle, regnum = gm charNo (vt 0x344) }
+
+0x1068 NC_CHAR_PLAYERSEARCH_RNG (ring) { start; Name5 charid }   zls_NC_CHAR_PLAYERSEARCH_RNG  @ FUN_0045b870
+    start.machine < 10 and ≠ own zone:
+        t = som_FindPlayer(charid); t here and on a map:
+            ring 0x1069 NC_CHAR_PLAYERFOUND_RNG { start, Name3 map = t's fm_MapID, SHINE_XY_TYPE coord = t.x/y,
+                                                 Name5 charid }   (0x31 bytes)
+            # (original bug) Z11-B14: no mini-house substitution here, unlike the local path: a player in a house in
+            # another zone is reported (and the GM linked) at the house map itself
+        else: forward the packet unchanged (0x1D)
+    else (back at the origin): o = som_GetObject(start.handle); o.charNo == start.regnum → zrpb_Failure "%s is not in game"
+
+0x1069 NC_CHAR_PLAYERFOUND_RNG (ring)   zls_NC_CHAR_PLAYERFOUND_RNG                       @ FUN_0045ba60
+    not the origin: forward unchanged (0x31); origin: o = som_GetObject(start.handle), charNo check → zrpb_Success
+        (notice + so_ply_BriefLink: the GM changes zone to the player's map)
+
+&psummon, &캐소환 <charName>   ac_SummonPlayer                         @ FUN_0041d140
+    gm without a map: nothing
+    gpp payload = PROTO_NC_CHAR_PLAYERSUMMON_RNG { start; Name5 charid = args[0]; Name3 map = gm's fm_MapID;
+                                                   SHINE_XY_TYPE coord = gm.x/y }   (0x2F)
+    ZoneRingPacketSummonPlayer::zrpb_Request(gm, gpp)                   @ FUN_005a6fd0
+        t here: no map → vt 8 zrpb_Failure: notice "%s is not in game"              @ FUN_005a7f30
+                else vt 4 zrpb_Success                                              @ FUN_005a7ab0
+                    t = som_FindPlayer(charid) again; t.so_ply_BriefLink(map, coord)   # no message to anyone
+        not here → ring (0x31 bytes) 0x106A NC_CHAR_PLAYERSUMMON_RNG with start = { own zone, gm handle, gm charNo }
+
+0x106A NC_CHAR_PLAYERSUMMON_RNG (ring)   zls_NC_CHAR_PLAYERSUMMON_RNG                    @ FUN_0045b700
+    not the origin: t here and on a map → zrpb_Success(null, packet): t.so_ply_BriefLink(GM's map, GM's xy)
+                    (a zone change for t; nothing goes back to the origin); else forward unchanged (0x31)
+    origin: charNo check → zrpb_Failure "%s is not in game"
+```
+
+Unlike `&summonplayer` (§4.5), `&psummon` reaches every zone and does not refuse a target that is in a mini-house.
+FiestaHeroes lists `&pfind` / `&psummon` as "find / summon a player" *(fh-doc)*; the code adds that `&pfind` also moves the GM.
+
+### 5.2 Mob tools: `&mobdist`, `&killallmob`, `&suicideallmob`, `&suicidemob`
+
+```pseudo
+&mobdist   ac_MobDistribute → ShinePlayer::sp_MobDistribute(gm)       @ FUN_0041d250 → FUN_00459410
+    so_AllInMap(gm, AxialListMobDistribute { almd_Admin = gm }, 1)      # FUN_0054b9e0: the map's walker with flag 1
+                                                                        # (passed through; meaning not read)
+        ali_Work @ FUN_004567e0: for every object: notice "%s/%d/%d" (so_CharName (vt 0x56c), x, y); never stops
+    # no type filter: one 0x2011 line per object the walk visits (mobs, NPCs, players …); hundreds on a busy map
+
+&killallmob   ac_killallmob → ShinePlayer::sp_KillAllMob(gm)           @ FUN_0041d3c0 → FUN_0055e460
+    so_AllInMap(gm, AxialListDeathAura, 0)
+        AxialListDeathAura::ali_Work(gm, o)                             @ FUN_0055e190
+            same main layer (or either layer −1), so_SubLayer_CanAttack(gm, o),
+            o.vt[0x89c]() (true only for ShineMob: the base returns 0, ShineMob's slot returns 1),
+            o.smo_GetMode (vt 0x484) ≠ 3 (dead):
+                o.so_KilledBy(gm, o.so_GetHP(), 1000, 1)                # vt 0x5bc, Z03 §7: the GM is the killer
+                                                                        # (EXP, drops and quest credit as for a kill *(inferred)*)
+
+&suicideallmob   ac_SuicideAllMob                                      @ FUN_0041d540
+    so_AllInMap(gm, AxialListMobSuicide { alms_MobID = 0xFFFF }, 0)
+&suicidemob <mobIndex>   ac_SuicideMob                                 @ FUN_0041d620
+    id = mobdatabox.mdb_btree[args[0]]; none → wall "Invalid mob index"; return
+    wall "SuicideMob : %d" (id); so_AllInMap(gm, AxialListMobSuicide { alms_MobID = id }, 0)
+
+AxialListMobSuicide::ali_Work(o)                                      @ FUN_004f18b0
+    o.so_ObjectType == 5 (mob) and (alms_MobID == 0xFFFF or o.so_mob_MobID == alms_MobID): alms_SelfKill(o); never stops
+AxialListMobSuicide::alms_SelfKill(m)                                 @ FUN_004f1720
+    m.so_AmIAlreadyDead (vt 0x28): return
+    m.so_KilledBy(m, m.so_GetHP(), 1000, 1)                             # the mob is its own killer: no EXP for anyone
+    broadcast to every object in sight of m (so_AllOfRange, default range) 0x243C NC_BAT_DOTDAMAGE_CMD {
+        u16 object = m.handle; u32 resthp = 0; u16 damage = m.so_GetHP() (read after the kill);
+        u16 abstate = 0x318 (none); u16 hpchangeorder = m.so_mobile_GetHPChangeOrder (vt 0x7e8); u8 IsMissDamage = 0 }  (0x0F)
+    so_DamageLog(m, "alms_SelfKill", …); resthp == 0 (always): m.so_mobile_DeadCheck(4) (vt 0x8d4, Z03 §7)
+```
+
+The client draws 0x243C as a damage-over-time tick (Z03); with `resthp` 0 the mob dies on screen.
+
+*(fh-doc)* says `&suicidemob` kills "the first alive" mob of the index; the walker returns 1 (go on) for every mob, so
+every mob of that index on the map dies. *(fh-doc)* `&mfind` says "first alive": the code does not test life.
+
+### 5.3 Combat debug: `&deathaura`, `&immortal`, `&staticdamage`, `&mobdamage`
+
+`ShinePlayer.sp_AdminFunction` (+0x29318, a member-function pointer *(pdb2016)*) is called once per player tick by
+`ShinePlayer::so_Routine` FUN_0056c790. It is reset to `sp_NoAdmin` FUN_0055e150 (empty) at map login
+(`sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390), at socket connect (`so_FirstActionAfterSocketConnect` FUN_00554870) and on
+revive (`sp_ReviveNow` FUN_0057d290); the last two and the login also set `smo_admindamage` (+0x1e7c) = −1.
+A zone change or a death therefore ends every mode below.
+
+```pseudo
+&deathaura   ac_deathaura                                              @ FUN_0041dd70
+    toggle sp_AdminFunction between sp_DeathAura and sp_NoAdmin (no message)
+    ShinePlayer::sp_DeathAura(gm)   (every tick)                       @ FUN_0055e2a0
+        so_AllOfRange(gm, center = gm position, range = gm.smo_admindamage, AxialListDeathAura)   # FUN_0054baf0
+        # every attackable live mob in range dies with the GM as killer (ali_Work as in &killallmob).
+        # The radius is the &staticdamage value: 0 → the map's sight range; the default −1 kills nothing *(inferred:
+        # the map's range walk with a negative radius)*. So the aura needs "&staticdamage <radius>" first, which also
+        # fixes the GM's damage to that value.
+
+&immortal   ac_immortal                                                @ FUN_0041ddf0
+    sp_AdminFunction == sp_Immortal:
+        sp_MiscFlag.InAdminImmortal = 0; sp_AdminFunction = sp_NoAdmin; wall "Immortal Mode False"
+    else: InAdminImmortal = 1; sp_AdminFunction = sp_Immortal; wall "Immortal Mode True"
+    ShinePlayer::sp_Immortal(gm)   (every tick)                        @ FUN_0055e390
+        CurHP = so_MaxHP (vt 0x4f0); CurSP = so_MaxSP (vt 0x4f4); so_ply_Sen_GainLP(so_ply_Sen_MaxLP) (vt 0xd98/0xd94)
+        # a direct write: no HP/SP packet in this function; the client sees the refill with the next HP/SP change (Z03)
+    # &godmode (part 5) sets sp_Immortal too; &deathaura replaces the immortal function (the flag stays set)
+
+&staticdamage [n]   ac_staticdamage                                    @ FUN_0041dfd0
+    gm.smo_admindamage (+0x1e7c, pdb2016) = (args[0] given and ac_Scanf(args[0]) ≥ 0) ? that value : 0
+    # > 0: every normal hit (smo_SwingDamage, so_Bash) and skill hit (smo_SkillBlast) of the GM deals exactly n and
+    # never misses (Z03 §3.2 "fixedDamage"); 0 switches it off (≤ 0 = off); also the &deathaura radius
+
+&mobdamage <freeze Y/N> <recover Y/N> [factor]   ac_mobdamage          @ FUN_0041d460
+    ShineMob::sm_DamageSet(gm, args[0] … args[9])   (__cdecl; name pdb2016, the body has nothing mob-specific)   @ FUN_0055e5f0
+        g_LUA_SCRIPT_SECURITYFactor.lsf_IsFreeze  = args[0][0] ∈ {'Y','y'}
+        g_LUA_SCRIPT_SECURITYFactor.lsf_IsRecover = args[1][0] ∉ {'N','n'}
+        args[2] given: v = sscanf("%lg"); v > 0 → lsf_Factor = v
+        notice "%g" (lsf_Factor)
+    # lsf_Factor is the run-time certification's combat factor (Z10 §6.3): it multiplies every swing's hit roll
+    # (Z03 smo_SwingDamage) and grows × 1.01 per world minute unless frozen; "recover" lets the next Lua
+    # certification reset it to 1.0. The word is a test hook for that mechanism.
+```
+
+### 5.4 Bonus events: `&expbonus`, `&itembonus`, `&fieldbonus`
+
+Per map `FieldMap.fm_FieldBonus` (+0x4c) = `FieldBonus { int fb_Experience; int fb_DropRate }` *(pdb2016)* in
+per mille, both 1000 after `FieldMap::fm_Init` FUN_00464bc0. These two commands are the only other writers (Z09 §11.9
+lists only `fm_Init` / `operator=`). The only reader in the zone is the drop roll: `dilfs_ItemDrop` FUN_0048ef80 takes
+`max(fb_DropRate, 0)` as `rr_FieldBonus` (Z09 §11.2). `fb_Experience` has no reader: `&expbonus` has no effect on
+EXP (original bug) Z11-B15.
+
+```pseudo
+&expbonus <A | anything> <rate>   ac_BonusExp                          @ FUN_0041e190
+&itembonus <A | anything> <rate>  ac_BonusItem                         @ FUN_0041e2d0
+    gm without a map: nothing
+    argnum ≠ 3: wall "Usger : &expbonus [map] [rate]" / "Usger : &itembonus [map] [rate]"; return
+    rate = ac_Scanf(args[1]); rate < 1 → 0                              # per mille: 1000 = normal, 2000 = double
+    args[0][0] ∈ {'A','a'} → every map of every zone:
+        local 11-byte packet { u16 opcode 0x1810 NC_MAP_EXPBONUS_RNG / 0x1811 NC_MAP_ITEMBONUS_RNG,
+                               ZONERINGLINKAGESTART start (not initialised here), u16 bonus = (u16) rate }
+        ZoneRingPacketExpBonus::zrpb_Request(gm, pkt) / ZoneRingPacketItemBonus::zrpb_Request   @ FUN_005a79a0 / FUN_005a7890
+            copy into gpp; gm given: start = { own zone no, gm handle, gm charNo }
+            zcs_Send(ring, 0x0B)
+            vt 4 zrpb_Success(null, pkt): for every loaded map of fieldlist (in-use flag set):   @ FUN_005a9100 / FUN_005a9040
+                map.fm_FieldBonus.fb_Experience / .fb_DropRate = bonus
+    else → only gm's current map: fb_Experience / fb_DropRate = rate (full int)
+        # (original bug) Z11-B16: the usage line asks for a map, but the word is never compared with a map name:
+        # anything other than "A…" means "this map"
+
+0x1810 NC_MAP_EXPBONUS_RNG / 0x1811 NC_MAP_ITEMBONUS_RNG (ring) { start; u16 bonus }      @ FUN_0045bf30 / FUN_0045bff0
+    start.machine < 10 and ≠ own zone: zrpb_Request(null, packet): forward unchanged (start kept) + apply to all maps here
+    back at the origin: nothing (stops)
+
+&fieldbonus, &필드보너스   ac_FieldBonus                                @ FUN_0041e410
+    gm on a map: wall "E[%g%%] D[%g%%]" (fb_Experience / 10.0, fb_DropRate / 10.0)   # percent: "E[100%] D[100%]"
+```
+
+The values are memory only: a zone restart, or a map that is reloaded (`fm_Init`), is back to 1000. Nothing tells
+the players. The ring path sends the rate as u16, the local path keeps the int, so rates above 65535 differ
+(irrelevant in practice).
+
+### 5.5 Server and map tools
+
+```pseudo
+&serversocketcut <n>   ac_ServerSocketCut                              @ FUN_0041d760
+    n = ac_Scanf(args[0]) (unsigned); n < 4:
+        sock2gameDB[n].m_Status = sock2gamelog[n].m_Status = sock2wldman[n].m_Status = SESSION_STATUS_CLOSEING (3)
+            # ZoneBaseSession::SESSION_STATUS (pdb2016): 0 EMPTY, 1 CONNECTED, 2 CONNECTING, 3 CLOSEING
+    # the next ZoneServer::zs_PacketProcess sees a state outside {1, 2}; SocketBundle::sb_Packet closes the socket and
+    # reconnects after the pool's delay (Z09 §1.5). One index cuts slot n of all three pools at once (WM, GameDB,
+    # GameLog); with one server of each kind only n = 0 does anything. Test word for reconnect handling.
+
+&emptymap <map>   ac_EmptyMap                                          @ FUN_0041d850
+    f = ClusterManager::cm_FindEmpty(mapclustermanager, args[0])        @ FUN_004a05e0
+        cluster = the MapCluster whose mc_MapIndex == args[0] (12; list search with mc_CompName FUN_0049f580)
+        none → null; else MapCluster::mc_FindEmpty(cluster)             @ FUN_0049f460
+            round robin from mc_Pointer + 1 over the cluster's mc_MapNumber instance maps: the first whose
+            fm_Multiflex (Movie::CinemaComplex) first u16 is 0 *(inferred: no film running)*; mc_Pointer is left there
+    wall f ? f.fm_MapID (12) : "NULL"
+    # side effect: the cluster's cursor moves, so the next instance assignment (Z14) starts after this map
+
+&zonelink   ac_ZoneLinkTest                                            @ FUN_0041d950
+    ring 0x0811 NC_MISC_ZONERINGLINKTEST_RNG { start = { own zone, gm handle, gm charNo }, u8 mechines = 0 }   (10 bytes)
+0x0811 (ring) { start; u8 mechines; Name4 addr[mechines] }   zls_NC_MISC_ZONERINGLINKTEST_RNG   @ FUN_0045b4d0
+    always first: addr[mechines] = zipc_GetNextIP() (16 bytes, this zone's next-zone address); mechines++
+        (written in place into the received buffer; no bound *(inferred: ≤ 9 zones in practice)*)
+    not the origin: forward (mechines × 16 + 10 bytes)
+    origin: o = som_GetObject(start.handle), charNo check: notice "%d mechines travel complete" (mechines), then one
+        notice per entry with the address string
+    # one ring lap: the GM sees every zone's next-hop address, the last one being the own zone's
+
+&guildtournament   ac_GuildTournament                                  @ FUN_0041da30
+    attr = fo_GetFieldAttr("GuildT01") (fixed; the GM's arguments are not read)
+    attr none or its client map not in mapdatabox: wall "Invalid map name"; return
+    WorldManagerSession::wms_GuildTournamantStart(sock2wldman[0], &PROTO_NC_GUILD_TOURNAMENT_START_CMD {
+        nTournamentSeed 0, nTournamentMapNo 0, nExploerTimeMin 1, nWaitPlayTimeSec 30, nPlayTimeMin 60, nNo1 4, nNo2 1 })
+        # FUN_00476de0 is the zone's own handler of the WM's GT start (Z08 §8.2, owned by Z16); called directly, it
+        # starts tournament map 0 here as if the WM had ordered it: explore 1 min, wait 30 s, play 60 min, guilds 4 vs 1.
+        # Nothing goes to the WM.
+
+&endofkq <kqHandle>   ac_EndOfKingdomQuest                             @ FUN_0041dbd0
+    WorldManagerSession::wms_EndOfKQPacket(sock2wldman[0], ac_Scanf(args[0]))   @ FUN_005a4800 (Z09 §26.1)
+        → WM 0x5810 NC_KQ_Z2W_END_CMD { u32 Handle }   (W04 §6.3: the WM marks the KQ ended, state 5)
+        and kqpl_EndOfKQ(&g_KQContributeList, h): drops the KQ's contribution list
+    # unlike the script statement endofkq (Z09 §26.1) the map is not cleared and the handle is not checked
+
+&Reroadkingdomquest <script>   ac_ReroadKingdomQuest                   @ FUN_0041dc80
+    book = ScenarioBookShelf::sbs_GetScenarioBook(scenarioshelf, args[0], &index)   @ FUN_00507b90 (Z09 §22.5); none: nothing
+    ClusterManager::cm_AllDropFilm(mapclustermanager, args[0])          # FUN_00486ec0 (Z14): stop the films named so
+    ScenarioBookShelf::sbsReLoad(scenarioshelf, args[0])                # FUN_00507c90: reload the book
+    # the same pair as &reloadid (§3.3), keyed by the script name instead of an instance map; no message
+```
+
+### 5.6 Player tools: `&horsespeed`, `&enterminihouse`, `&silence`, `&chargeditem`
+
+```pseudo
+&horsespeed <n>   ac_HorseSpeed                                        @ FUN_0041ded0
+    gm.sp_RideCast.runspd = (short) ac_Scanf(args[0])   # the mount run speed (Z10 §5.4: the speed base while riding)
+    # no packet is sent; the server's speed limits use it from now on, the client is not told *(inferred)*
+
+&enterminihouse   ac_EnterMiniHouse                                    @ FUN_0041df80
+    empty (no profiler either)
+
+&silence, &조용히 <charName>   ac_KeepFromChat                          @ FUN_0041e090
+    t = som_FindPlayer(Name5 = args[0] (20)); none → wall "Player not found"
+    t.so_ply_KeepFromChat(gm)   (vt 0x8f0)                             @ FUN_00549f60
+        gm notice "Success to silence"; nothing else
+    # (original bug) Z11-B17: no chat ban is set; the working chat ban is the WM one, 0x0865 NC_MISC_SPAMMER_ZONE_CHAT_BAN_CMD (Z01 §9), and
+    # &releasechatban (part 5)
+
+&chargeditem <effectHandle>   ac_ChargedItem                           @ FUN_0041d2f0
+    ShinePlayer::sp_ChargedItemTest(gm, ac_Scanf(args[0]))              @ FUN_00451360
+        row = first chargedbuffdatabox entry (ChargedEffect data) with Handle == n; none: nothing
+        e = first element of gm.sp_ChargedItem.ci_List (head index ≠ −1; vt 8 = element by index); none: nothing
+        ChargedItemEffectElement::ciee_SetEndTime(e, row, now(world) as yy−100, mon+1, mday, hour, min + 5)  @ FUN_004504d0
+            # e.ciee_Index = row; end = now + 5 minutes; the minute is not carried: 55…59 become 60…64
+            # (original bug) Z11-B18
+    # memory only: no packet, no DB write; turns the GM's first charged buff into buff n expiring in 5 minutes,
+    # to test the expiry (Z09 §2.4 per-minute check)
+```
+
+### 5.7 Information: `&charinform`, `&partyinfo`, `&루아인수`, `&parameterview`, `&isblock`
+
+All answers are 0x2011 notices to the GM. `StringMaker::Maker` (`maker`, FUN_0058dc10 … FUN_0058dfd0) builds one line
+per `<< Finisher`, which sends it with `f_Admin.vt[0x784]` (so_ply_Notice).
+
+```pseudo
+&charinform   ac_CharInform                                            @ FUN_0041e510
+    t = current target (vt 0x75c); none → wall "Target needed"
+    t.so_SendInform2Admin(gm)   (vt 0x8d8)
+        ShineObject (drop item, mini-house …): nothing                  @ FUN_0058e080
+        ShineMobileObject (doors; base of the rest)                     @ FUN_0058e0d0
+            "Name : %s", "Level : %d" (vt 0x4d8), "Mode : %d" (vt 0x484), "Location : <map>/<x>/<y>" or "Location : Null",
+            "HP : <cur>/<max>"
+        ShineMob (also NPCs): the mobile-object lines                   @ FUN_0058e5d0
+        ShinePlayer: the mobile-object lines, then                      @ FUN_0058e310
+            "MiniHouse(Inven) : <the mini-house inventory cell>", "MiniHouse(SkinHandle) : <handle | NULL handle | NULL Data>"
+            mode 4 (camp): "MiniHouse(Brief:Camp) : <brief Equ_Head>"
+            mode 5 (booth): "MiniHouse(Brief:Booth) : <Equ_Head>[<board text | NULL>]", " [<brief shape +0xd>]",
+                            " [<sb_SignBoard>]" when a booth board exists
+            mode 6 (riding): "Riding(Brief:Camp) : <ride horse>"
+
+&partyinfo [charName]   ac_PartyInform                                 @ FUN_0041e5e0
+    t = som_FindPlayer(args[0]) (this zone), else gm itself
+    t.so_ply_SendPartyInformTo(gm)   (vt 0x578)                        @ FUN_004ccf30
+        "PartyRegNum[%d]CharRegNum[%d]HndW[%d]HndZ[%d]CharID[%s]"  (vt 0x550, vt 0x344, so_GetWMSHandle vt 0x340,
+                                                                    zone handle, name)
+        party = partycontainer[partyRegNum]; none → "Null party"
+        else "Party member : %d\n", and per member
+            "RegNum[%d]hndZ[%d]hndW[%d]CharID[%s]Level[%d]Flag[%d]Merchine[%d]Obj[%s]"  (Obj = "Ext" when the member
+            has an object pointer in this zone, else "NULL")       # the zone's party mirror (Z08 §1)
+
+&루아인수   ac_LuaSec   (profiler label "AmpersandCommand::ac_PartyInform", copy-paste)        @ FUN_0041e6d0
+    notice "Thread : %d : %d/%d : %d/%d\n" = g_LuaArgument { Count : Summary / Interval : SkipNumber / MaxSkip }
+    # the run-time certification counters (Z10 §6.1, §6.2)
+
+&parameterview <k>   ac_ParameterView → ShinePlayer::sp_ParameterView(gm, ac_Scanf(args[0]))   @ FUN_0041e7d0 → FUN_004cb670
+    k = 0…11 selects one stat: Str, Con, Dex, Int, Men, WCmin, WCmax, AC, TH, TB, CR (CriDamRate +0x80), MCR (MagCriDamRate +0x84)
+    notice "<Stat>/%d/%d/%d/%d/%d/%d/%d/%d/%d" = that member of nine smo_Param (Parameter::Container, +0xfc0) clusters:
+        PureCharParam, Item.Plus, Item.Rate, Upgrade.Plus, Upgrade.Rate, WeaponTitle.Plus, WeaponTitle.Rate,
+        PassiveSkill.Plus, PassiveSkill.Rate     # not ItemPowerRate, AbnormalState, LastTune or Total (Z12 owns the layers)
+    other k: nothing
+
+&isblock   ac_IsBlock                                                  @ FUN_0041e880
+    for r = 0…3: b[r] = mbi_OccupCellCheck(gm map's fm_BlockInfo, gm.x, gm.y, r)   # FUN_0049e230, Z09 §9.2
+    notice "Block : %d/%d/%d/%d  0:Block 1:Non-Block"
+    # 1 = some free cell in the (2r+1)² square around the GM; gm without a map dereferences null (GMs are on a map)
+```
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -824,6 +1148,11 @@ both are dead.
 | Z11-B11 | `&performance` FUN_0041c8d0 | parses an optional number (default 10) and never uses it | none (dead code) | a sample period that was removed *(inferred)* |
 | Z11-B12 | `&makeitem` FUN_0041b8a0 | "Invalid item" only after the row was already found; an unknown name or a full inventory returns without a message | the GM gets no feedback for a typo or a full bag | notice for every failure |
 | Z11-B13 | `&makeitem` FUN_0041b8a0 | rolls random options (`rot_FillOption` FUN_00493590 resets the option count) after the GM's `-p` options | `-p<type>/<value>` works only on items without a RandomOptionDropGroup | skip the roll when the GM gave options |
+| Z11-B14 | 0x1068 `zls_NC_CHAR_PLAYERSEARCH_RNG` FUN_0045b870 (`&pfind`) | another zone answers with the player's own map and position | a player in a mini-house elsewhere is reported (and the GM linked) at the house map, while the local path uses the house entrance (`so_LoginLocation`) | substitute the house entrance as `zrpb_Request` does |
+| Z11-B15 | `&expbonus` FUN_0041e190 / FUN_005a9100 | writes `fm_FieldBonus.fb_Experience`, which no zone code reads | the EXP event does nothing (only `&itembonus` works) | apply `fb_Experience` in the EXP award (Z03) |
+| Z11-B16 | `&expbonus` / `&itembonus` FUN_0041e190 / FUN_0041e2d0 | the usage says `[map]`, but the first word is only tested for 'A'/'a'; anything else means the GM's current map | a GM who names another map changes the one they stand on | look the named map up |
+| Z11-B17 | `&silence` FUN_0041e090 → `so_ply_KeepFromChat` FUN_00549f60 | only sends "Success to silence" to the GM | the player is not silenced although the GM is told so | set the chat block (`+0x2aa54`, Z01 §9) |
+| Z11-B18 | `&chargeditem` `sp_ChargedItemTest` FUN_00451360 | end time = `tm_min + 5` without carry | minutes 60…64 are stored in the buff's end time (how the expiry check treats them was not read) | normalise the time (add 300 s before `localtime`) |
 
 ## Not reconstructed / uncertain
 
@@ -836,5 +1165,9 @@ both are dead.
   layout `{u16 map, u32 x, u32 y}` and the ItemChest count bits are *(inferred)* from the constants. The meaning of key
   kind 0 in `iti_mkregnum` (GM make) is inferred from the other callers (2 scene, 3 mob drop, 6 chest, 7 costume).
 - §4.4: how the GM's client learns the HP/SP set by `&fullpoint` / `&sethp` / `&setsp` (no packet is sent) was not traced.
+- `&deathaura` with the default `smo_admindamage` −1: what the map's range walker does with a negative radius was not
+  read (assumed: nobody in range).
+- `FieldMap.fm_Multiflex` first u16 as "no film running" for `mc_FindEmpty` (`&emptymap`) is inferred from the test only.
+- The `so_AllInMap` flag (1 for `&mobdist`, 0 elsewhere) is passed through to the map's walker; its meaning was not read.
 
 (Parts 2–6 add their commands as §4–§8; the sweep part adds the coverage boundary.)
