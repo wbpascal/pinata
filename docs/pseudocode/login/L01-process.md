@@ -263,9 +263,12 @@ sends nothing to AccountDB, AccountLogDB or a WM.
 reverse order: `m_OTPLogin` (with the shared empty destructor FUN_0040a550, so the token list nodes are not freed,
 §4.3), each parser's `PROTOCOLFUNCTIONTEMPLETE` (§4.1) and session manager (`~CLoginOPToolSessionManager`
 FUN_00409c90, `~CLoginWorldManagerSessionManager` FUN_0040a3c0, `~CLoginClientSessionManager` FUN_00409970), the two DB
-sessions (`~CLoginBaseSession` = FUN_00408cf0: `~CPacket`, `~CSocket_IOCP`, S02 §4.2), then `CIOCP::Close`,
-`~CSocket_Acceptor` and `~CCsl` (the server info). `ProcessStop` (S02 §4.3) has already closed every socket and freed
-the client and WM pools, so the pool destructors only find null arrays there.
+sessions (the folded body FUN_00408cf0, PDB name `~CLoginWorldManagerSession`: `~CPacket`, `~CSocket_IOCP`, §2.2),
+then `CIOCP::Close`, `~CSocket_Acceptor` and `~CCsl` (the server info). `ProcessStop` FUN_00402820 (S02 §4.3) has
+already closed every socket and freed the client, WM **and OPTool** pools (`DissconnectAllSessions` + `FreeSessions`
+each), so the pool destructors only find null arrays there. `CIOCP::Close` (S02 §1.3 FUN_004646b0) thus runs twice,
+once in `ProcessStop` and again here; the second call is harmless: `Stop` returns at once because `m_pWorkThreads` is
+already null, and `m_HandleIOCP` is 0, so nothing is closed again.
 
 ### 1.8 Entry point and Windows-service shell
 
@@ -428,10 +431,12 @@ CLoginWorldManagerSession::CLoginWorldManagerSession(s): @ FUN_00409e10  base ct
 CLoginOPToolSession::CLoginOPToolSession(s):            @ FUN_00409c10   base ctor only
 CLoginClientSession::CLoginClientSession(s):            @ FUN_00409520
     base ctor; PacketEncrypt ctor; m_UserID = Name256Byte() ; m_UserSwpawnApps = 0 (5 × u32); m_ClientSeed = 0
-CLoginClientSession::~CLoginClientSession(s):           @ FUN_004095b0   ~PacketEncrypt (= the empty FUN_0040a550); ~CLoginBaseSession
-~CLoginBaseSession = CLoginWorldManagerSession::~CLoginWorldManagerSession:   @ FUN_00408cf0
-    m_IOCP_Process.vftable = CIOCP_Process_Interfece; ~CPacket(m_Packet); ~CSocket_IOCP(m_SocketIOCP)
-    # one folded body serves every Login session destructor (DB links, WM, OPTool pools, client base part)
+CLoginClientSession::~CLoginClientSession(s):           @ FUN_004095b0   ~PacketEncrypt (= the empty FUN_0040a550); ~CLoginBaseSession FUN_00408d60
+CLoginBaseSession::~CLoginBaseSession(s):               @ FUN_00408d60   (client base part only; no EH frame)
+CLoginWorldManagerSession::~CLoginWorldManagerSession(s):   @ FUN_00408cf0   (with an EH frame)
+    both: m_IOCP_Process.vftable = CIOCP_Process_Interfece; ~CPacket(m_Packet); ~CSocket_IOCP(m_SocketIOCP)
+    # FUN_00408cf0 is one folded body for the DB-link members (from ~LoginServer), the WM pool and the OPTool pool
+    # array destructors; the client sessions reach the separate FUN_00408d60 through ~CLoginClientSession
 
 CLoginClientSession::SetSessionMode(s, mode) / GetSessionMode(s):   @ FUN_00409660 / FUN_00409670   m_SessionMode
     # callers: CParserClient::Parser FUN_00406680 (L00 §3.2) and CLoginClientSessionManager::ActiveSession
@@ -525,7 +530,7 @@ it when the world-select window is open (client `AccountFrameWork::On_NC_USER_WO
 ```pseudo
 CLoginOPToolSessionManager::CLoginOPToolSessionManager(m):   @ FUN_00409c30   base ctor; vftable; m_pSessionArray = null
 CLoginOPToolSessionManager::InitSessions(m, n):  (Listen_OPTool)            @ FUN_00409d20
-    base FreeSessions; destroy + delete[] the old array (with the folded ~CLoginBaseSession FUN_00408cf0)
+    base FreeSessions; destroy + delete[] the old array (with the folded session destructor FUN_00408cf0, §2.2)
     if n > 0: base InitSessions(n); new CLoginOPToolSession[n] (FUN_00409c10); node[i].pSession = &session[i]
     return 1                                       # no handles: m_SessionHandle stays uninitialised
 CLoginOPToolSessionManager::FreeSessions(m):                 @ FUN_00409c50   base FreeSessions; destroy + delete[] the array
@@ -679,13 +684,23 @@ ProcessDisconnect (§1.6): CLoginBaseSession::Close (shutdown + closesocket) →
 | peer closed the connection (zero-byte read), failed read / write completion | `CIOCP_Process_LSession::IOCP_Process` / `IOCP_CloseProcess` FUN_00409020 / FUN_004090b0 (S02 §1.6) | all |
 | bad frame | the pump, r == 2 (§1.5) | all |
 | handler returns 0 (incl. a failed `CheckConnectionValidation`, an unregistered opcode on the client link, a login-state violation) | `CParserClient::Parser` FUN_00406680 (L00 §3.2) / the shared parser FUN_004087d0 (§4.1) | all |
+| client answers Login's 0x0804 (or sends any opcode but 0x0C65 / the login request) before logging in (`m_SessionMode` 0 / 1) | `CParserClient::Parser` FUN_00406680 "Invalid sequence protocol" | client |
 | no frame for 30 s + 180 s | `ProcHeartBeat` / `CheckHeartBeat` → `CSocket_IOCP::CloseUseIOCP` → IOCP close completion → as above | all |
 | register to IOCP or the first send fails | `ProcessConnect` (§1.4) | all |
 | a DB server or the WM rejects / answers a login with a close | `CLoginClientSessionManager::Close(handle)` FUN_00409790, called by the password-check answers, 0x0C0E, the OTP / Netmarble / Outspark logins (L00 §4, §5) | client |
 | same account logs in again | `Kickoff` FUN_00409810: 0x0C17 {0x683} to the old session | client |
 | process stop | not via state 3: `ProcessStop` closes every socket with `DissconnectAllSessions`, then frees the pools without `InactiveSession` (S02 §4.3) | all |
 
-Nothing in Login closes a client that stays idle but answers heartbeats (the WM's 2-hour login timeout,
+The heartbeat outcome for a client depends on its `m_SessionMode` (`CParserClient::Parser` FUN_00406680, L00 §3.2):
+in mode 0 only 0x0C65 (version check) and in mode 1 only dept 3 with cmd 0x37 or the login request of the build are
+accepted; every other opcode, **including 0x0804 / 0x0805**, is logged "Invalid sequence protocol" and closes the
+client (m_Status 3). So a client that stays 30 s before logging in gets Login's 0x0804; if it answers 0x0805 it is
+closed at once, if not it is closed 180 s later: the heartbeat Login sends to a pre-login client has no answer that
+keeps it open **(original bug) L01-B11**. Only in mode 2 (after the login request) are 0x0804 / 0x0805
+accepted. Whether the client answers in the login scene depends on its heartbeat flag (net+0x10048, set by client
+FUN_006d2da0, whose caller is not resolved; §5).
+
+Nothing in Login closes a mode-2 client that stays idle but answers heartbeats (the WM's 2-hour login timeout,
 W05 §4.5, has no Login twin): a client may stay on the world-select screen indefinitely *(inferred: no other
 timer touches client sessions)*.
 
@@ -702,29 +717,53 @@ it from a file, so the values hold until an OPTool changes them and are lost at 
 ```pseudo
 load band in SetWorldManagerConnectInfo(world, NumOfUser, MaxOfUser):   @ FUN_0040a0c0
     t = gServer.m_LoginUserRatable[world]; pct(x) = (x × MaxOfUser) / 100      (signed int division)
-    if   NumOfUser >= pct(t.nWMSUS_FULL): status = 5     # full
-    elif NumOfUser >= pct(t.nWMSUS_5):    status = 10
-    elif NumOfUser >= pct(t.nWMSUS_4):    status = 9
-    elif NumOfUser >= pct(t.nWMSUS_3):    status = 8
-    elif NumOfUser >= pct(t.nWMSUS_2):    status = 7
-    else:                                 status = 6
+    if   NumOfUser >= pct(t.nWMSUS_FULL): status = WMSUS_FULL (5)
+    elif NumOfUser >= pct(t.nWMSUS_5):    status = WMSUS_5 (10)
+    elif NumOfUser >= pct(t.nWMSUS_4):    status = WMSUS_4 (9)
+    elif NumOfUser >= pct(t.nWMSUS_3):    status = WMSUS_3 (8)
+    elif NumOfUser >= pct(t.nWMSUS_2):    status = WMSUS_2 (7)
+    else:                                 status = WMSUS_1 (6)
 ```
 
+The status values are the 2016 PDB enum `WORLD_MANAGER_SERVER_USER_STATUS` *(pdb2016)*: `WMSUS_CLOSED` 0,
+`WMSUS_WORKING` 1, `WMSUS_EMPTY` 2, `WMSUS_RES1` 3, `WMSUS_UNKNOWN` 4, `WMSUS_FULL` 5, `WMSUS_1` … `WMSUS_5` 6 … 10.
+Each `LOGIN_USER_RATABLE` field `nWMSUS_k` is the lower threshold of status `WMSUS_k`.
+
 `nWMSUS_1` is never read by the computation: the OPTool can set and read it, without effect **(original bug)
-L01-B4**. `MaxOfUser = 0` makes every threshold 0, so the world shows as full.
+L01-B4**. `WMSUS_1` is the "else" band, so its threshold would only matter as a lower bound for a band below it,
+which the enum does not have. `MaxOfUser = 0` makes every threshold 0, so the world shows as full.
 
 All world status values (`WorldInfo.worldstatus` in 0x0C0A / 0x0C1C, `worldstatus` in 0x0C0C); client texts from
-L00 §8 (client `FUN_0046ef20`):
+L00 §8 (client `FUN_0046ef20`), icons from the world list (below):
 
-| Value | Set by | Client on world select (0x0C0C) |
-|---|---|---|
-| 0 | `InitWorldManagerInfo` (configured world), WM link released (§2.5) | "Server is closed. Please try login later." |
-| 1 | – (never set) | "Server is under maintenance. Please try login later." |
-| 2 | `InitWorldManagerInfo`: world without a WM client-port row; kept on WM release, overwritten by a WM connect (6) | "You cannot connect to an empty server." |
-| 3 | – (never set) | "The server has been reserved for a special use." |
-| 4 | `GetWorldManagerConnectInfo`: world number not in the list | "Login failed due to an unknown error." |
-| 5 | load ≥ `nWMSUS_FULL` % | "Server is full. Please try again later." (Login passes it, L00-B3) |
-| 6 … 10 | WM connected (6), then each 0x0808 by load band | connect to the WM |
+| Value (`WMSUS_…`) | Set by | Client on world select (0x0C0C) | World-list icon |
+|---|---|---|---|
+| 0 `CLOSED` | `InitWorldManagerInfo` (configured world), WM link released (§2.5) | "Server is closed. Please try login later." | 4 |
+| 1 `WORKING` | – (never set) | "Server is under maintenance. Please try login later." | 3 |
+| 2 `EMPTY` | `InitWorldManagerInfo`: world without a WM client-port row; kept on WM release, overwritten by a WM connect (6) | "You cannot connect to an empty server." | 4 |
+| 3 `RES1` | – (never set) | "The server has been reserved for a special use." | 4 |
+| 4 `UNKNOWN` | `GetWorldManagerConnectInfo`: world number not in the list | "Login failed due to an unknown error." | 4 |
+| 5 `FULL` | load ≥ `nWMSUS_FULL` % | "Server is full. Please try again later." (Login passes it, L00-B3) | 1 |
+| 6 / 7 / 8 `WMSUS_1` … `_3` | WM connected (6), then each 0x0808 by load band (< `nWMSUS_4` %) | connect to the WM | 0 |
+| 9 `WMSUS_4` | 0x0808, load ≥ `nWMSUS_4` % | connect to the WM | 2 |
+| 10 `WMSUS_5` | 0x0808, load ≥ `nWMSUS_5` % | connect to the WM | 1 (same as full) |
+
+```pseudo
+client WorldSelectWin::UpdateServerList(win):   (after 0x0C0A / 0x0C1C)        client @ FUN_00473b80
+    for row r in 0 … 7 of the current page (world index i = page × 8 + r):
+        hide the row's five status icons
+        if i >= world count: continue                       # no row
+        if i is past the window's world list: show icon 4
+        else switch WorldInfo[i].worldstatus:               # (byte +0x11 of the 0x12-byte entry)
+            0, 2, 3, 4: icon 4      1: icon 3      5, 10: icon 1      6, 7, 8: icon 0      9: icon 2
+            other: no icon
+```
+
+The client therefore shows three load levels for an open world (icon 0 below `nWMSUS_4`, icon 2, icon 1 from
+`nWMSUS_5` on), and the top load band (default ≥ 30 %) shows the same icon as a full world while still connecting
+on select (FUN_0046ef20 connects for 6 … 10) *(inferred: icons 0 / 2 / 1 read as low / medium / high-full; their
+images are not resolved)*. The icon slots are the window's 5 controls per row at `win+0x1a4 + row × 20`; their
+meaning comes only from this switch.
 
 The status changes with every 0x0808 the WM sends, but only the first 0x0808 after a WM connects pushes the list
 to the clients (0x0C1C, L00 §5.3); later changes reach a client only with its next 0x0C1B request or a new login.
@@ -822,8 +861,9 @@ An unknown opcode from a newer WM therefore drops the world from the list (§2.5
 
 0x0804 NC_MISC_HEARTBEAT_REQ (AccountDB, AccountLogDB, OPTool, WM, client):   @ FUN_00403aa0 / FUN_004050e0 / FUN_00407480 / FUN_00408560 / FUN_004060b0
     return Send(s, Ack = { 02, 05 08 }, 3)                                 # 0x0805 HEARTBEAT_ACK, bytes at 0x430080
-    # five identical bodies; no CheckConnectionValidation, so a heartbeat is answered in any state (also a
-    # demoted WM link in state 2, §2.5)
+    # five identical bodies; no CheckConnectionValidation, so a server link's heartbeat is answered in any state
+    # (also a demoted WM link in state 2, §2.5); on the client link the parser lets 0x0804 / 0x0805 through only in
+    # m_SessionMode 2 and closes the client for them in modes 0 / 1 (§2.6)
 
 0x0805 NC_MISC_HEARTBEAT_ACK (all five parsers):   CParserWorldManager::fc_NC_MISC_HEARTBEAT_ACK   @ FUN_004074a0
     return 1          # one folded body; receiving any frame already refreshed m_LastReceiveTime (S02 §1.6)
@@ -844,7 +884,7 @@ COTPLogin::IsAddable(o, userNo):   @ FUN_0040a5e0   0 if a node with nUserNo == 
 COTPData::~COTPData():             @ FUN_0040a550   empty (`ret`)
 ```
 
-The list operations (callers: 0x0C35 `fc_NC_USER_CREATE_OTP_REQ` FUN_00408250 and 0x0C37
+The list operations (callers: 0x0C35 `fc_NC_USER_CREATE_OTP_REQ` FUN_00408a20 and 0x0C37
 `fc_NC_USER_LOGIN_WITH_OTP_REQ` FUN_00406bb0, L00 §5.3 / §4):
 
 ```pseudo
@@ -990,6 +1030,7 @@ Login-specific behaviour.
 | L01-B8 | `WinService::removeService` FUN_004114b0 | returns true whatever `OpenServiceA` / `DeleteService` return | "REMOVE" reports "<SERVICE REMOVE OK>" for a missing service or a failed delete (same as W05-B22) | return the `DeleteService` result |
 | L01-B9 | `COTPLogin::DelByDueTime` FUN_0040a710 / `DelByIP` FUN_0040a7a0 | after deleting the head node the walk continues from the new head's successor | the node after a deleted head is never tested: an expired one-time token can still be found by the 0x0C37 that just swept, and a failed 0x0C37 leaves one token of that IP | step to the new head without advancing |
 | L01-B10 | OPTool 0x2818 FUN_00407df0 | `NC_OPTOOL_LOGON_PROCESS_TIME_VIEW_ACK` is sent with all six counters 0 | the OPTool shows no logon statistics | count connects / logins / IP-block checks and their times |
+| L01-B11 | client `ProcHeartBeat` (S02 §4.3) / `CParserClient::Parser` FUN_00406680 | Login sends 0x0804 to every client silent for 30 s, also before its login request (`m_SessionMode` 0 / 1), where the parser rejects 0x0805 / 0x0804 as "Invalid sequence protocol" | a client idle 30 s on the login screen is closed at once if it answers the heartbeat, else 180 s later | accept 0x0804 / 0x0805 in every session mode (or skip heartbeats before login) |
 
 ## 5. Not reconstructed / uncertain
 
@@ -1004,6 +1045,11 @@ Login-specific behaviour.
   `+0x30` / `+0x2e` reads as the other three copies *(inferred)*.
 - The client window check behind `WorldSelectWin::UpdateServerList` (vtable +0x104) is read as "is shown" from its
   use only.
+- Whether the client answers Login's 0x0804 on the login screen (L01-B11, §2.6): client `Net` heartbeat flag
+  net+0x10048 is set by FUN_006d2da0, which has no direct caller in the client export (called through a pointer
+  *(inferred)*); C01's table says the client replies "if heartbeats are enabled". Either way the pre-login client is
+  closed (at once or after 180 s); only the timing is open.
+- The images of the five world-list status icons (§3) are not resolved; the low / medium / high reading is inferred.
 
 ## 6. Coverage boundary
 
@@ -1018,6 +1064,6 @@ is cited above, except:
 | The L00 handlers themselves (0x0C0B, 0x0C37, 0x0C35, the password-check and IP-block answers, OPTool 0x2801 … 0x2817), `ReadDefineScriptor` FUN_00401380, `ReadGlobalGameData` FUN_00401680, `ConnectAccountLogServer` FUN_00401ac0 | L00 (done) `login-server.md` §2, §4, §5 | documented there; this file only adds the corrections in `knowledge/L01.md` and the bodies L00 left out (0x0C06 / 0x0C18 / 0x2812 / 0x2814 / 0x2818, the token list) |
 | The network library under the sessions (`CSocket_IOCP`, `CIOCP`, `CPacket`, `CSocket_Acceptor`, `CIOBuffer`, `CCsl`, `CGdp`), `LoginServer::LoginServer` FUN_004029e0, `OnStart_Service` FUN_004032b0, `Start_Acceptor`, `ProcessStop`, `DissconnectAllSessions`, `ProcHeartBeat`, the base-session constructor, `CIOCP_Process_LSession::IOCP_Process` / `IOCP_CloseProcess` | S02 (done) §1–§3, §1.6, §4.3 | library and glue documented there with the Login addresses |
 | `std::string` / `String` helpers (`String::String` FUN_00411ab0 / FUN_00411b40, `~String` FUN_004119d0, `getBuffer` FUN_004119f0, `makeUpper` FUN_00411a00, `operator=` FUN_00411a10 / FUN_00411b70), `__tmainCRTStartup` FUN_004155c0 (calls `WinMain`), `_eh_vector_*` iterators, unwind funclets (`__unwindfunclet$…LoginServer…`, `…CParser…`, `…SessionManager…`), the CRT (`sprintf`, `memset`, `rand` / `srand`, `_time32`, `exit`, `_chdir`, `operator new` / `delete`, `_mbsnbcpy`, `_mbstok`, `strncpy`) | none needed | compiler / CRT boilerplate with standard semantics; nothing server-specific (S02 §7 bounds the same set) |
-| Client side of 0x0C1C / world status (`WorldSelectWin::UpdateServerList`) | C01 / L00 §4 | client scene handlers, cited in §3 for the status values only |
 
-No follow-up item was needed.
+The client world list (`WorldSelectWin::UpdateServerList` FUN_00473b80), which the done items C01 / L00 do not
+document, is covered in §3. No follow-up item was needed.
