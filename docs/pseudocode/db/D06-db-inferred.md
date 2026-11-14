@@ -48,6 +48,22 @@ are written into `bufferLength` bytes (including the NUL).
 | 4 | – | – | `SQL_INTEGER` |
 | −5 | – | – | `SQL_BIGINT` |
 | −9 | – | – | `SQL_WVARCHAR` (the narrow C string is converted to nvarchar) |
+| −15 | – | `SQL_C_SSHORT` | – |
+| 5 | – | – | `SQL_SMALLINT` |
+| 12 | – | – | `SQL_VARCHAR` (narrow; the AccountLog IP strings) |
+| −10 | – | – | `SQL_WLONGVARCHAR` (`text` / `ntext` parameter; report chat log) |
+
+Two driver rules a rebuild's procedures must respect *(inferred from Microsoft's ODBC documentation of the SQL Server
+drivers, not from the binaries)*:
+
+- **Output parameters arrive after the last result set.** The SQL Server drivers return output parameter values only once
+  every result set of the call has been read (`SQLMoreResults` → `SQL_NO_DATA`). A wrapper that tests an output parameter
+  right after `SQLExecDirect` of a procedure that also `SELECT`s a row therefore tests the value the caller put into the
+  buffer before the call, not the procedure's (see `usp_AccountLog_GetDateDiffLastlogout`, §3.4). For procedures without
+  a result set (`SET NOCOUNT ON`, only `SET @out = …`) the values are there when `SQLExecDirect` returns.
+- **Never return NULL in an output parameter.** Every bind passes a NULL indicator pointer; a NULL output value then
+  makes the call fail with SQLSTATE 22002 ("indicator variable required but not supplied"). Every procedure in this
+  document sets each output parameter to a non-NULL value on every path (dates included, e.g. `'1900-01-01'`).
 
 `SQLExecDirect` (ordinal 11) returns `SQL_SUCCESS` 0 / `SQL_SUCCESS_WITH_INFO` 1; every wrapper treats exactly these two as
 "executed". A procedure `RETURN` value is never bound (no `{? = CALL …}` anywhere in the four binaries): only output
@@ -249,3 +265,216 @@ usp_JPUser_insert(@sUserName nvarchar(20) in, @sIP nvarchar(30) in, @sChannel nv
   `usp_User_USloginGame` **without** the Stu / John blocks: the e-mail retry is in Ko Dong Gyun's own dated change note
   (2013-01-28, "US service move"), the two additions name a private host address (`10.55.12.231`) and a single
   hard-coded password hash, which are deployment hacks of unknown date *(db-backup)*.
+
+## 3. AccountLog DB (`AccountLog`) and Statistics DB (`StatisticsData`), AccountLog server
+
+The AccountLog server holds two ODBC connections (`ServerInfo.txt` `ODBC_INFO`): "AccountLog" (`Database=AccountLog`,
+`*this + 0x124c`) and "Statistics" (`Database=StatisticsData`, `*this + 0x126c`). Four procedures it calls have no source
+in any backup; the 2015 AccountLog binary calls the same four with the same strings (no older version to compare).
+Code: `clean.py re-data/exports/accountlog-pdb - <addr>` (official wrapper and struct names, *(pdb2016)*).
+
+**Reachability in 2016.** 0x080A (WM, every statistics interval) and 0x0C62 (WM, world login of an account whose comeback window is over or
+that is older than `UserComeback_DaysAfterSignUp`, W01-core.md §3.3) are live; 0x082C has no sender in any 2016 binary (no literal in the
+login / WM / zone exports, no `EVENT_L20` string outside the WM's 0x082D handler) and the 2016 client ignores the
+resulting 0x082E (C01: "WM `0x082e` … ignored by this client build"). So a 2016 rebuild needs §3.1 and §3.4; §3.2–§3.3
+only if it revives the level-20 event.
+
+### 3.1 `p_SameTimeCharClass_Add` — concurrent players per class (Statistics DB)
+
+```pseudo
+p_SameTimeCharClass_Add(@nIndex int in, @nClass tinyint in, @nCount int in, @nRet int out)
+                                      (names: CSQLPStatistics::SQL_SAME_TIME_CHAR_CLASS_DATA, pdb2016)
+    called by : CSQLPStatistics::p_SameTimeCharClass_Add @ FUN_004155c0 ← 0x080A NC_MISC_CONNECTER_ACK
+                CPFsAccountLog::fc_NC_MISC_CONNECTER_ACK @ FUN_004026f0 (D01 §4.2), after p_SameTimeChar_Add @ FUN_00415540
+    binds     : 1 in SQL_C_ULONG → INTEGER  (nIndex = the @nIndex output of p_SameTimeChar_Add for this report)
+                2 in SQL_C_TINYINT → TINYINT (nClass = 0…63, the index into the WM's nEachClass[64])
+                3 in SQL_C_ULONG → INTEGER  (nCount = nEachClass[nClass], 1…65535; classes with 0 are not called)
+                4 out SQL_C_ULONG → INTEGER (nRet, set to 0 by the handler before each call)
+    result    : ok = rc ∈ {0,1} and nRet == 0; on an rc error `ViewDBError("CSQLPStatistics::p_SameTimeCharClass_Add")`.
+                The handler ignores the result (no retry, no reply).
+    table     : tSameTimeCharClass (nIndex int, nClass tinyint, nCount int)   *(ours: name and columns from the PDB struct)*
+    body      : SET NOCOUNT ON
+                INSERT tSameTimeCharClass (nIndex, nClass, nCount) VALUES (@nIndex, @nClass, @nCount)
+                SET @nRet = CASE WHEN @@ERROR = 0 THEN 0 ELSE -1 END
+```
+
+Evidence: the parent row `p_SameTimeChar_Add` (StatisticsData.bak, 2005) inserts `tSameTimeChar (nWorld, nCount)` and
+returns `@nIndex = @@IDENTITY`; its PDB struct `SQL_SAMETIMECHAR_DATA { int nIndex; TIMESTAMP dDate; uchar nWorld; int
+nCount }` is exactly that table's row (`p_SameTimeChar_Query` selects `nIndex, dDate, nWorld, nCount`). The class struct
+`SQL_SAME_TIME_CHAR_CLASS_DATA { int nIndex; uchar nClass; int nCount; int nRet }` has the same shape minus the date, so
+the class rows are children of one `tSameTimeChar` row keyed by `nIndex` *(inferred)*. StatisticsData.bak has no class
+table at all (`bak.py names`: only `tSameTimeChar`, `tDayClassLevel*`, `tDayUser*`, …), so the private-server install
+dropped it.
+
+- `nIndex` is 0 when `p_SameTimeChar_Add` failed (D01-B8): a rebuild that wants the 2016 behaviour must not declare a
+  foreign key from `tSameTimeCharClass.nIndex` to `tSameTimeChar`, or the class rows of a failed report are lost
+  instead of stored under 0.
+- Per world and report at most 64 rows; nothing in any binary reads the table back (reporting is external).
+
+### 3.2 `p_Event_L20_Get` — has the account already had the level-20 reward?
+
+```pseudo
+p_Event_L20_Get(@nUserNo int in, @nEventType tinyint in, @nWorldNo tinyint out, @nCharNo int out,
+                @dDateDone datetime out, @nRet int out)        (names: CSQLPEventL20::SQL_EVENT_L20, pdb2016)
+    called by : CSQLPEventL20::p_Event_L20_Get @ FUN_00415360 ← 0x082C NC_MISC_EVENT_L20_DB_REQ
+                CPFsAccountLog::fc_NC_MISC_EVENT_L20_DB_REQ @ FUN_00402aa0 (D01 §4.2)
+    binds     : 1 in ULONG → INTEGER (nUserNo = req.nUserNo); 2 in UTINYINT → TINYINT (nEventType = req.nEventNo);
+                3 out UTINYINT → TINYINT; 4 out ULONG → INTEGER; 5 out TIMESTAMP; 6 out ULONG → INTEGER
+                (nRet; the wrapper sets it to −1 before binding: asm `mov dword [edi+0x20], 0xffffffff` @ 0x41538e)
+    result    : wrapper true = rc ∈ {0,1} and nRet > 0. The handler:
+                    true             → ack nError 0x1289            (already rewarded: stop)
+                    nRet == −1       → ack nError 0x128a + log "…GetEventL20…"   (rc error leaves the −1 in place)
+                    other (0, < −1)  → p_Event_L20_Set (§3.3)
+                The outputs 3–5 (world, character and date of the earlier reward) are fetched into the struct but no
+                code reads them.
+    table     : tEventL20 (nUserNo int, nEventType tinyint, nWorldNo tinyint, nCharNo int, nEventPoint int,
+                dDateDone datetime DEFAULT getdate())   *(ours: name; columns = SQL_EVENT_L20 minus nRet)*
+    body      : SET NOCOUNT ON
+                SELECT @nWorldNo = nWorldNo, @nCharNo = nCharNo, @dDateDone = dDateDone
+                  FROM tEventL20 WHERE nUserNo = @nUserNo AND nEventType = @nEventType
+                IF @@ROWCOUNT > 0  SET @nRet = 1
+                ELSE  SELECT @nWorldNo = 0, @nCharNo = 0, @dDateDone = '1900-01-01', @nRet = 0
+                (a DB error inside the procedure: @nRet = −1)
+```
+
+### 3.3 `p_Event_L20_Set` — record the reward
+
+```pseudo
+p_Event_L20_Set(@nUserNo int in, @nEventType tinyint in, @nWorldNo tinyint in, @nCharNo int in,
+                @nEventPoint int in, @nRet int out)              (same struct SQL_EVENT_L20)
+    called by : CSQLPEventL20::p_Event_L20_Set @ FUN_00415450 ← fc_NC_MISC_EVENT_L20_DB_REQ @ FUN_00402aa0,
+                only after p_Event_L20_Get answered "not yet"
+    binds     : 1 in ULONG; 2 in UTINYINT (nEventType); 3 in UTINYINT (nWorldNo = req.nWorldNo); 4 in ULONG
+                (nCharNo = req.nCharNo); 5 in ULONG (nEventPoint = req.nEventPoint); 6 out ULONG nRet (wrapper sets −1)
+    result    : ok = rc ∈ {0,1} and nRet == 0 → ack nError 0x1288 (granted). Else nError 0x128b, and the line
+                "ERROR - …SetEventL20,…, nRet=%d" is logged only when nRet ∉ {1, 3} (D01-B10's condition): 1 and 3 are
+                expected refusals, 2 / −1 / anything else is a DB error.
+    body      : SET NOCOUNT ON
+                IF <event period over>                 SET @nRet = 3      (inferred, see below)
+                ELSE IF EXISTS(SELECT * FROM tEventL20 WHERE nUserNo = @nUserNo AND nEventType = @nEventType)
+                                                       SET @nRet = 1      (race with a parallel request)
+                ELSE  INSERT tEventL20 (nUserNo, nEventType, nWorldNo, nCharNo, nEventPoint)
+                           VALUES (@nUserNo, @nEventType, @nWorldNo, @nCharNo, @nEventPoint)
+                      SET @nRet = CASE WHEN @@ERROR = 0 THEN 0 ELSE 2 END
+```
+
+Evidence for §3.2–§3.3 (all *(inferred)* except the binds and the branch structure):
+
+- **The event.** Account.bak `usp_Cash_setCash_EVENT_L20` (Ko Dong Gyun, 2007-06-14): "event cash for the 2007-08-07
+  PandoraTV / own event; to pay the cash only once per account even if several characters reach Lv 20; delete on
+  2007-10-07" (`reference = '200708_EVENT_L20'`, `RETURN(-1)` when the account already has it). So L20 = "a character
+  of the account reached level 20", once per (account, event number); `nEventPoint` is the amount the WM asked for. That
+  procedure runs in the Account DB and is not called by any 2016 binary, so the cash payment itself happened outside
+  these servers (web shop or a cross-database call inside `p_Event_L20_Set`; `p_AccountLog_GetLog` shows that
+  AccountLog procedures do reach `AccountDB.Account.dbo.tUser` through a linked server). A rebuild that revives the event
+  can call `usp_Cash_setCash_EVENT_L20` from `p_Event_L20_Set`.
+- **The codes 1 / 2 / 3.** The AccountLog family procedure `p_Event_WorldCup_Enter` (AccountLog.bak, lenasoft
+  2006-05-26) answers `@err` 3 = `GETDATE()` past the event end, 1 = already entered, 2 = insert error, 0 = done. That is
+  exactly the split the handler makes: 1 and 3 are not logged, every other code is. The once-per-account rule of
+  `usp_Cash_setCash_EVENT_L20` and the "delete on 2007-10-07" note give the period check.
+- **Get's `nRet > 0`.** The wrapper's −1 default and the handler's `== −1` test make −1 the error value; the Set call on
+  every other non-positive value makes 0 "no row". "> 0" = found.
+- Client side: 0x082E NC_MISC_EVENT_L20_CMD `{ u8 nEventNo, u16 nError }` (pdb2017) is forwarded by the WM for every code
+  except 0x1289 (W01-core.md §8); the 2016 client ignores it, and `client-error-codes.json` has no text for
+  0x1288–0x128b.
+
+### 3.4 `usp_AccountLog_GetDateDiffLastlogout` — seconds since the account's last logout
+
+```pseudo
+usp_AccountLog_GetDateDiffLastlogout(@nUserNo int in, @nRet int out)
+                                                   (names: CSQLPAccountLog::SQL_GET_DATE_LAST_LOGOUT, pdb2016)
+    called by : CSQLPAccountLog::usp_AccountLog_GetDateDiffLastlogout @ FUN_00415020 ← 0x0C62 NC_USER_LOGOUT_LAST_DAY_REQ
+                CPFsAccountLog::fc_NC_USER_LOGOUT_LAST_DAY_REQ @ FUN_004035e0 (D01 §4.4)
+    binds     : 1 in SQL_C_SLONG → INTEGER (nUserNo); 2 out SQL_C_SLONG → INTEGER (nRet, set to 0 by the handler)
+    result    : wrapper true = rc ∈ {0,1} and nRet == 0 (with a result set this tests the handler's 0, §1.2:
+                (original bug) D06-B1). Then DBRecord::fetch: a row → column 1 read as SLONG into
+                ack.tLastSec; endFetch. No row or a failed call → tLastSec 0 and the log "Error - … : UserNo %d".
+    result row: one row, one int column = seconds between the last logout and now
+    body      : SET NOCOUNT ON
+                SET @nRet = 0
+                SELECT TOP 1 DATEDIFF(s, dDate, getdate()) AS diffDate
+                  FROM tAccountLog WHERE nUserNo = @nUserNo AND nType = 2
+                 ORDER BY dDate DESC                                    (inferred)
+```
+
+Evidence: the WM sends 0x0C62 during world login (after 0x0C61) when the account's last comeback is older than
+`UserComeback_DaysAfterComeback` days, or it has none and is older than `UserComeback_DaysAfterSignUp` days, and treats `tLastSec ≥ UserComeback_DaysAfterLogOff · 86400` as a comeback (W01-core.md
+§3.3), so the value is seconds since the last logout. The Account twin `usp_ReturnUser_GetDatediffLastlog` (Account.bak,
+JK CHO 2014-02-10, same `(@nUserNo, @nRet output)` signature, called the same way by the Account server, D01 §3.3) is
+`SET @nRet = 0; SELECT TOP 1 DATEDIFF(s, dDate, getdate()) … ORDER BY dDate DESC`; the body above is that procedure on
+the AccountLog table. `tAccountLog` has `dDate` (`p_AccountLog_Get` selects `nLogNo, dDate, nType, nUserNo, …`), and
+`nType 2` is the account logout row (0x0722 NC_LOG_USER_LOGOUT, sent by the WM at session close, D01 §4.1). The
+alternative source, `tLogout` (`usp_Log_setLogout`, one row per character logoff), is not written when an account leaves
+without entering the game and its date column is not visible in the backup, so `tAccountLog nType 2` is the better fit;
+the procedure prefix `usp_AccountLog_` points the same way *(inferred)*. When the procedure is called, the current
+session is still open, so the newest `nType 2` row is the previous session's logout.
+
+- An account without a logout row returns no row: tLastSec 0, logged as an error, and the WM classes it as a normal
+  user (0 < the comeback limit). Same outcome for a DB error.
+
+### 3.5 Version check of the AccountLog / Statistics procedures that have source
+
+Binds of the 2016 wrappers against the parameter lists of the backup copies (each procedure has one version; `cover`
+shows the same parameter count for all):
+
+| Procedure (backup) | Wrapper | Binds vs backup | Verdict |
+|---|---|---|---|
+| `p_AccountLog_Add` (AccountLog.bak) | `@ FUN_00414a30` | TINYINT, SLONG, TINYINT, SSHORT→SMALLINT, USHORT→SMALLINT, CHAR→VARCHAR(16), CHAR→WVARCHAR buf 16 ×2, out UBIGINT→BIGINT vs `tinyint, int, tinyint, smallint, smallint, varchar(16), nvarchar(16) ×2, bigint OUTPUT` | match; `nErrorCode` ≥ 0x8000 would overflow `smallint` (SQLSTATE 22003, row lost); all close reasons and login codes are small |
+| `p_IPBlock_IsBlock` (AccountLog.bak) | `@ FUN_00414d00` | SLONG, CHAR→VARCHAR buf 20, out TINYINT vs `int, nvarchar(20), tinyint OUTPUT` | match (the `Fixes/` copy is the 2018 edit, D01 §4.3) |
+| `usp_Log_setLogout` (AccountLog.bak) | `@ FUN_00414be0` | TINYINT, SLONG ×2, TINYINT, USHORT→SMALLINT, SBIGINT→BIGINT, SSHORT→SMALLINT, out SLONG vs `TINYINT, INT ×2, TINYINT, SMALLINT, BIGINT, SMALLINT, INT OUTPUT` (`@RET` 1 = ok) | match |
+| `usp_EventiPad_setTicket` (AccountLog.bak) | `@ FUN_00414e30` | SLONG ×2, out SLONG vs `int, int, int output` | match |
+| `p_Report_Add` (AccountLog.bak) | `@ FUN_004150c0` | ULONG, WVARCHAR buf 20 ×2, UTINYINT, WVARCHAR buf 16, WVARCHAR buf 256, WLONGVARCHAR, out ULONG vs `int, nvarchar(16) ×2, tinyint, nvarchar(16), nvarchar(512), text, int OUTPUT` | match; a 17–19 character name would be cut to 16 by the parameter (character names are shorter) |
+| `p_Report_Del` / `p_Report_Get` (AccountLog.bak) | `@ FUN_004151f0` / `@ FUN_00415270` | ULONG, out USHORT→SMALLINT / ULONG, UTINYINT vs `int, smallint OUTPUT` / `int, tinyint` | match |
+| `p_SameTimeChar_Add` (StatisticsData.bak) | `@ FUN_00415540` | TINYINT, ULONG, out ULONG vs `tinyint, int, int OUTPUT` | match |
+
+All AccountLog-side procedures with source are consistent with the 2016 calls; a rebuild can take them as they are
+(`p_IPBlock_IsBlock` from AccountLog.bak, not from `Fixes/`).
+
+## 4. GameLog DB (`w00_GameLog`), GameLog server
+
+### 4.1 `usp_Login_setChannel` — the client channel tag of each character login
+
+```pseudo
+usp_Login_setChannel(@nCharNo int in, @nUserNo int in, @sChannel nvarchar(20) in, @nRet int out)
+                                                          (parameter names ours; the struct has no PDB)
+    called by : SQL_usp_Login_setChannel @ FUN_0041b680 ← 0x040A NC_LOG_GAME_LOGIN fc_NC_LOG_GAME_LOGIN @ FUN_004032b0
+                (D05 §2.2), before the p_GameLog_Add_Type6 nType 10 row of the same login
+    binds     : 1 in SQL_C_ULONG → INTEGER (req.chrregnum); 2 in SQL_C_ULONG → INTEGER (req.usrregnum);
+                3 in SQL_C_CHAR → WVARCHAR, buffer 0x14 (req.spawnapps, copied with _mbsnbcpy max 20 bytes; the zeroed
+                output field behind it terminates a 20-byte value); 4 out SQL_C_SLONG → INTEGER (set to 0 first)
+    result    : none: the SQLExecDirect return value and @nRet are not read, and unlike the p_GameLog_Add* wrappers no
+                failure line is written to GameLog_<date>.txt (D05 §1.2). A failing procedure loses the row silently.
+    table     : tLoginChannel (nLogNo int IDENTITY, dDate datetime DEFAULT getdate(), nCharNo int, nUserNo int,
+                sChannel nvarchar(20))                     *(ours)*
+    body      : SET NOCOUNT ON
+                INSERT tLoginChannel (nCharNo, nUserNo, sChannel) VALUES (@nCharNo, @nUserNo, @sChannel)
+                SET @nRet = CASE WHEN @@ERROR = 0 THEN 0 ELSE -1 END
+```
+
+Evidence:
+
+- **What `spawnapps` is.** The 2016 client fills the 20-byte `spawnapps` of 0x0C5A NC_USER_US_LOGIN_REQ
+  (`AccountFrameWork::NcUserLoginReq` @ FUN_0046f0a0, `_strncpy(…, DAT_00a64358, 0x14)`) from a string that
+  client start-up (@ FUN_0045b1b0) sets to `"Original"` and then overwrites with the first entry read from `Fiesta.ini`;
+  for "Original" it prints "SpawnApps Off.". Login keeps it in the session (login-server.md §5.1), the WM passes it to the
+  Character server in 0x1036, and the Character server forwards the 56-byte request as 0x040A (D02 §5). So the value is
+  the name of the launcher / partner portal that started the client, `"Original"` for the publisher's own launcher. The
+  AccountLog server prints the same field as `client-version` (D01 §4.5); the client code shows it is a tag, not a version.
+- **"Channel".** The Account DB has the same concept for account creation: `usp_User_setChannelLog` (Account.bak, Ko Dong
+  Gyun 2007-08-03, "log of users who joined through a channeling partner", `@channel nvarchar(20)` = "ONSON/PANDORA")
+  inserts `tChannelLog (userNo, channel, issueDate)` with a `dDate` default (`bak.py names`: `DF__tChannelL__dDate`).
+  `@channel nvarchar(20)` has the same size as the 20-byte bind. `usp_Login_setChannel` is the per-login counterpart in
+  the game log *(inferred)*; whether it inserts one row per login (as above) or keeps one row per character with the last
+  channel cannot be told from the binary, since nothing reads it back.
+- 2015 GameLog calls the same string; neither GameLog backup has the procedure or a channel table.
+
+### 4.2 `p_GameLog_Add_Type6` version (D05 §1.2 open point)
+
+The two GameLog backups differ only in Type6: `GameLog.bak` (2008 R2 backup, 31 procedures, has table `tLevelUpInfo`)
+adds the event-ranking update for nType 30; `w00_GameLog.bak` (2017 backup, 26 procedures, no `tLevelUpInfo`) has the
+plain insert. The 2016 binary calls `p_GameLog_Add_TypeL`, which only `w00_GameLog.bak` has, and `ServerInfo.txt` points
+the GameLog server at `Database=w00_GameLog`. So the only backup that serves every 2016 call has the plain Type6, and a
+rebuild should follow it. The `tLevelUpInfo` block ("이벤트 랭킹용으로 별도 테이블기록 by amadeus", for an event ranking) is an
+event-time addition of the older database; that the live 2016 database still had it is possible but not shown by
+anything *(db-backup)*. The binary cannot decide it (same call either way); D05's statement stays open for the live
+database, settled for the rebuild.
