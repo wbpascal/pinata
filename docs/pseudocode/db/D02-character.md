@@ -73,7 +73,9 @@ The CPFs handlers are the D01 ones (§2 of `D01-account.md`), same code after re
     checks as D01 (state, server_id_to == 2, key == to + from)
     if g_GameLogLink == null or a check failed: close(session)            # NEW: links are refused until GameLog is connected
     else reply 0x0803 { u8 echo, u16 0 }; session.state = 1; session.type/world/zone = from/world/zone
-0x0803 NC_MISC_S2SCONNECTION_ACK:          @ FUN_0043cd20  (as D01)
+0x0803 NC_MISC_S2SCONNECTION_ACK:          @ FUN_0043cd20  (as D01; server name for the log: GetShineServerIDName FUN_00442310, S02 §2.5)
+    a rejected 0x0802 closes the session: FUN_0044cdf0 (= Account's CSocket_Session::Close, inferred) → CSocket_IOCP::Shutdown FUN_0044b280,
+    Close FUN_0044b3d0, FreeBuffer FUN_0044b360 (library copies, S02 §1.5)
 0x2801 / 0x2803 / 0x2805 / 0x2807 OPTool:  @ FUN_0043ce10 / FUN_0043d000 / FUN_0043d0b0 / FUN_0043d180  (as D01, my_type = 2)
 ```
 
@@ -167,7 +169,7 @@ CreateCharacter(req):                                                           
     on any failure below: p_Char_Wipe(charNo); return 0                              @ FUN_00458390 (→ 0x181 "name in use")
     p_Char_CreateSetDefaultData(charNo, map, x, y, HP, SP, HPStones, SPStones, money, out nRet == 1)   @ FUN_004581e0
         # UPDATE tCharacter SET sLoginZone, nLoginZoneX/Y, nHP, nSP, nHPS, nSPS, nMoney (db-backup)
-    p_Char_SetLevelExp(charNo, InitLV, InitEXP (u64 parsed from the string), out u8)   @ FUN_00402c80 → FUN_00459770
+    p_Char_SetLevelExp(charNo, InitLV, InitEXP (u64 parsed from the string, _atoi64 FUN_0048ec5c), out u8)   @ FUN_00402c80 → FUN_00459770
     slot = 0; equipped = 0
     for each ITEM row of this class:
         key = MakeItemKey(); attr = ItemAttr_Init(itemId) (FUN_00467940; fail → log, abort)
@@ -184,6 +186,15 @@ CreateCharacter(req):                                                           
         # Sentinel (class 26) starts with the tutorial marked done; all others start "not done" (W01 §4.2 asks the client)
         # Fixes/Tutorial Skip (2018) inserts nState 2 for every new row: private-server change, not 2016 behaviour
     return charNo
+
+Row readers over the CCsl script objects (S02 §2; row list m_NumDatas +0x4dc, m_pDatas +0x4e0, m_ppDataTable +0x4e8):
+    NumDatas() FUN_004453a0;  Row(i) FUN_004453b0 (table lookup, else walks the list);  Format(id) FUN_00445350
+    Field(i, col) FUN_00445400 = &row data + sum of the format's column sizes before col (STRING fields: the pointer)
+    each typed reader checks the row's #DEFINE index (0-based, file order) and copies its columns:
+      g_DefaultCharacterData: ITEM (1) FUN_0043ee60 {class, id, lot}, SKILL (2) FUN_0043ec50 {class, id},
+                              QUEST (3) FUN_0043eca0 {class, id}, SHORTCUT (5) FUN_0043ecf0 {class, slot, code, value}
+      g_TutorialCharacterData: TUTORIAL_CHARACTER (0) by class FUN_0043ed80 (first row whose class matches; 9 columns),
+                               DEFAULT_ITEM (1) FUN_0043ee60 (same reader); the 0x1112 tutorial items (§8) use these
 ```
 
 `DefaultCharacterData.txt` (2016): classes 1/6/11/16/21 start in `RouN` (6888, 7045), level 1, money 0, item 46003
@@ -281,6 +292,7 @@ noted; the PDB structs (named below) omit it.
           ts dKQDate (packed year:4, month:4, day:5, hour:5, min:6, sec:6)       @ FUN_0045a130                   fail 0x594
     4  0x1008 NC_CHAR_SHAPE (6: handle + 4 shape bytes) ← p_Char_GetShape(charNo)  @ FUN_0046c5d0              fail 0x583
     5  0x100A NC_CHAR_QUEST_DOING_CMD (8 + n·32) ← p_Quest_GetAllDoing (doing list) @ FUN_0046cb00            fail 0x587
+          (entries qsorted by u16 quest id ascending, compare FUN_0046cae0)
     6  0x100B NC_CHAR_QUEST_DONE_CMD, parts ≤ 8000 bytes, 10-byte records          @ FUN_004288d0 (own 0x1006 0x587)
     7  0x10CC NC_CHAR_QUEST_READ_CMD (8 + n·2)                                     @ FUN_0046ce50              fail 0x587
     8  0x10D5 NC_CHAR_QUEST_REPEAT_CMD (8 + n·32)                                  @ FUN_0046ced0              fail 0x587
@@ -305,7 +317,8 @@ noted; the PDB structs (named below) omit it.
           "ERROR - CPFsCharacter::fc_NC_CHAR_CHARDATA_REQ, CharNo=%d"); the u8 is never written (original bug) D02-B7
     15 items: four ItemList reads, then 0x1017 NC_CHAR_ITEM_CMD packets   (Send_NC_CHAR_ITEM_CMD @ FUN_004056a0)
           storage 9 inventory (max 144, part mark 5), 8 equipped (max 30, 8), 12 (max 35, 0x10), 15 (max 42, 0x22)
-          @ FUN_00402f80 / FUN_00403000 / FUN_00403480 / FUN_00403700 → ItemList (§3.6) + per item p_Item_GetOptionAll,
+          @ FUN_00402f80 / FUN_00403000 / FUN_00403480 / FUN_00403700 → ItemList (§3.6; inventory / 12 / 15 through
+          ItemList_Inventory FUN_0046a290, ItemList_Storage12 FUN_0046a410, ItemList_Storage15 FUN_0046a4b0, §10) + per item p_Item_GetOptionAll,
           p_Item_GetMobListAll, p_Item_GetTitle, usp_Item_Get_EnchantAll, usp_Pet_getInfo (item content: D03)
           the inventory list is split into parts < 0x1C13 bytes; byte 0 = PacketOrder (bit 7 = last part)
           a send that fails: raw 0x1006 { u16 handle, u16 0x591 } ("There is an error in the Item Information.")
@@ -316,6 +329,11 @@ noted; the PDB structs (named below) omit it.
     20 options: usp_Character_chkKeyMap(charNo) (FUN_00422240) chooses the format     fail 0x59B
           1 → "improved" options: usp_Character_getShortCutList, usp_Character_getKeyMap, usp_Character_getGameOption
               → 0x702C NC_CHAR_OPTION_IMPROVE_DB_GET_DATA_TYPE_CMD packets   @ FUN_004354b0
+              shortcuts   @ FUN_004222c0: 0x702D { u32 nCharNo, u16 n, n × { u8 slot, u16 code, i32 value } (7 B) }
+              key map     @ FUN_00422660: 0x702E (D06 §"usp_Character_getKeyMap")
+              game option @ FUN_00422d10: 0x702F { u32 nCharNo, u16 n, n × { u16 option, u8 value } (3 B) }
+              each: rows until the payload would pass 8000 bytes (logged "too many short cut data", also in the
+              game-option copy); a failed call sends nothing and logs unless nRet == −2721 (no rows)
           else → old options: p_Char_GetOptShortCutData / GetOptShortCutSize / GetOptGame / GetOptWindowsPos /
               GetOptKeyMapping → raw long-frame packets 0x7018, 0x701A, 0x7020, 0x7022, 0x7024
               (NC_CHAR_OPTION_DB_GET_*_ACK, pdb2017)                          @ FUN_00422020
@@ -326,7 +344,7 @@ noted; the PDB structs (named below) omit it.
     23 0x10CF item action cool times (4 + n·10) ← usp_Character_getItemActionCoolTime  @ FUN_0046dd40         fail 0x59A
     24 0x10D8 NC_CHAR_NEWBIE_GUIDE_VIEW_LIST_CMD { u16 handle, u8 n, u8 list[n] } ← usp_InGameGuide_getViewList   fail 0x59C
     25 0x10DC NC_CHAR_COININFO_CMD { u16 handle, u64 nCoin, u64 nExchangedCoin }                                 fail 0x59D
-          nCoin ← usp_Gamble_getCoin(charNo); nExchangedCoin ← usp_Gamble_getExchangedCoin(charNo,
+          nCoin ← usp_Gamble_getCoin(charNo) (FUN_0046dfc0: first row's i64, 0 when no row); nExchangedCoin ← usp_Gamble_getExchangedCoin(charNo,
           TIMESTAMP(tExchangedCoinSumDate) via FUN_00414340)          # the WM passes "day start − 1 day" (W01 §4.2)
     26 0x10E2 NC_CHAR_CARDCOLLECT_CMD { u16 handle, u32 chrregnum, u16 n, n × { u32 serial, u16 card, u8 star,
           u32 time (mktime of the row's ts) } (11 bytes) } ← usp_Collection_getCardList     fail 0x59E
@@ -658,6 +676,10 @@ usp_Character_setStatPoint(@nCharNo, @nMaxStatPoint, @nStrength…@nMentalPower 
         5 FUN_00403200, 6 FUN_00403100, 7 FUN_00403080, 8 equipped (FUN_00403000), 9 inventory (FUN_00402f80),
         11 and 15 FUN_00403700, 12 FUN_00403480, 13 FUN_00403580, 14 FUN_00403600, 16 FUN_00403680; 10 and > 16 → error
         (each = ItemList(nOwner, storage type, max) + item details, D03)
+        wrappers → ItemList_ByStorage(owner, type, max): 1 FUN_0046a3d0 (80), 2 FUN_0046a3a0 (1024), 3 FUN_0046a430 (98),
+        5 FUN_0046a360 (42), 6 FUN_0046a300 (576), 7 FUN_0046a2e0 (5), 9 ItemList_Inventory FUN_0046a290 (144),
+        12 ItemList_Storage12 FUN_0046a410 (35), 13 FUN_0046a450 (98), 14 FUN_0046a470 (98), 15 ItemList_Storage15
+        FUN_0046a4b0 (42; also used for type 11, so 11 lists storage 15), 16 FUN_0046a490 (98); 0 and 4: D03 §5.3 / §5.2 (FUN_0046a3f0 / FUN_0046a380)
     reply 0x1077 NC_CHAR_GET_ITEMLIST_BY_TYPE_ACK { hdr6, u8 nInvenType, u32 nOwner, u16 Error, u8 PacketOrder,
           u8 nPartMark, u8 numofitem, items… }
         only nPartMark (+0xE) and numofitem (+0xF) are written: Error and PacketOrder (+0xB…+0xD) keep stale bytes
@@ -666,6 +688,8 @@ usp_Character_setStatPoint(@nCharNo, @nMaxStatPoint, @nStrength…@nMentalPower 
         bytes as an empty list.
 0x1099 NC_CHAR_GET_ITEMLIST_BY_TYPE_NUM_REQ { hdr6, u8 nInvenType, u32 nOwner, u8 slotORnumber, u16 from, u16 to }   @ FUN_00417860
     only nInvenType 2 is served (FUN_00403780: slots from..to); anything else → empty part, nPartMark 3
+        FUN_00403780 → FUN_0046a4d0 → FUN_0046a160(owner, type 2, max 0x400, from, to): p_Item_GetListType rows, keeps
+        rows whose 0-based row index is in [from, to] (row index, not the slot column), stops at max
     reply 0x109A (same layout as 0x1077, same stale fields)
 ```
 
@@ -775,7 +799,9 @@ the next proposal or a `0x1082` that writes another value.
     p_Char_Wedding_Do: both rows nStatus 2, nSubStatus 0, dSubWhen = now + 7 days (newly-wed period, inferred)
     if ok: GameLog 0x0660 both directions;  reply 0x1092 { hdr6, i32 Success, u32 Partner }
 0x1093 NC_CHAR_WEDDING_PARTNER_INFO_REQ { hdr6, u32 Partner }                                      @ FUN_00419af0
-    p_Char_Wedding_Get_Partner_Info(Partner): SELECT nLevel, dLastLoginDate FROM tCharacter (db-backup)
+    p_Char_Wedding_Get_Partner_Info(Partner): SELECT nLevel, dLastLoginDate FROM tCharacter (db-backup)   @ FUN_0046da20
+        every row overwrites (last row wins): Level = u8; LastConnect = packed u32: bits 0–7 (u8)(year + 0x30)
+        (= year − 2000 for 2000–2255), 8–12 month, 13–18 day, 19–24 hour, 25–31 minute
     reply 0x1094 NC_CHAR_WEDDING_PARTNER_INFO_ACK { hdr6, u8 Level, u8 Connected, u32 LastConnect, u16 CurrentMap }
         only Level and LastConnect are written; Connected and CurrentMap keep stale bytes (original bug) D02-B15
 ```
@@ -881,6 +907,15 @@ sends the client `0xA006` only when items are listed (W01 §6.2), so nothing hap
 Wrapper addresses: `tools/protocol-re/names/character/D02.json` (`SQL_<procedure>`). "both" = `Character.bak` and
 `w00_Character.bak` have it with the binary's parameter count; "w00" = only the 2017 backup; "–" = no source anywhere.
 Where the two differ, the version used is named.
+
+Wrapper addresses not cited elsewhere in this doc (all follow the D01 §1.1 SQL wrapper pattern):
+`usp_ChatBlock_getBlockList` FUN_0045b960, `usp_SpamFilter_set` FUN_0045e230, `usp_Item_setAutoMon` FUN_00460370, `usp_Character_setItemActionCoolTime` FUN_0045e6e0, `usp_Attendance_getCallDateList` FUN_0045f3d0, `usp_Attendance_getCount` FUN_0045f630, `usp_Attendance_setReward` FUN_0045f890, `usp_SpamBlock_setTime` FUN_0045e4b0, `usp_Attendance_getRewardList` FUN_0045f770, `usp_Attendance_setCall` FUN_0045f510, `usp_Character_setBuffScroll` FUN_00460000, `usp_Item_getAutoMonList` FUN_004604d0, `usp_SpamFilter_get` FUN_0045e100, `usp_SpamBlock_getTime` FUN_0045e380, `usp_Collection_getRewardList` FUN_00466f50, `usp_Character_chkKeyMap` FUN_0045d720, `usp_ChatColor_get` FUN_0045fc90, `usp_Character_getAutoScroll` FUN_00460260, `usp_Gamble_getCoin` FUN_00466220, `usp_Character_getItemActionCoolTime` FUN_0045e830, `p_Char_SetShape` FUN_00458880, `p_Char_WeddingStatus_Set` FUN_0045b050, `usp_Character_setMysteryBolt` FUN_0045c2b0, `usp_ChargeItem_UseStatPointDecDel` FUN_00463d50, `usp_InGameGuide_setGuideNo` FUN_0045eaf0, `p_Char_GetCharID` FUN_004586f0, `p_Char_FameSet` FUN_00459630, `p_Char_Wedding_Propose` FUN_0045b170, `p_Char_GetShape` FUN_00458810, `usp_InGameGuide_getViewList` FUN_0045ea60, `p_Char_Wedding_Cancel_Propose` FUN_0045b210, `p_Char_Wedding_Escape_Divorce_State` FUN_0045b2b0, `p_Char_SavePKCount` FUN_0045a0b0, `p_Friend_GetNumOfFriend` FUN_004535c0, `p_Friend_Del_All` FUN_00453410, `p_Char_WeddingStatus_Get` FUN_0045aff0, `p_Skill_GetAll` FUN_00452f20, `p_Friend_GetAll` FUN_00453560, `p_Char_GetTitleAll` FUN_00459820, `p_Char_GetChargedBufferAll` FUN_0045aa40, `p_Char_Wedding_Get_Partner_Info` FUN_0045b6b0, `p_Char_StatPoint_Inc` FUN_004599d0, `p_Char_DelStateAll` FUN_004592d0.
+Thin forwarders (call the wrapper, return its bool): `WeddingStatus_Set` FUN_0046d890, Propose FUN_0046d8b0, Divorce_by_Agree
+FUN_0046d910, Divorce_by_Force FUN_0046d940, Wedding_Do FUN_0046d9d0, Escape_Divorce_State FUN_0046da00.
+Other helpers: `TmToTimestamp` FUN_00427d30 (tm → SQL TIMESTAMP: year + 1900, mon + 1, fraction 0; §12). MSVC STL, not
+reconstructed (`std::string` assign / substring copy / grow FUN_0043f4b0 / FUN_0043f220 / FUN_0043f060, used by 0x0870 and
+GetCharBaseData; 0x0870 item-shop URL also `std::vector`
+push_back / reserve FUN_0043f5f0 / FUN_0043f450, request reset FUN_00471840: sets +0x20 and clears the string at +4).
 
 | Handler(s) | Procedures (source) |
 |---|---|

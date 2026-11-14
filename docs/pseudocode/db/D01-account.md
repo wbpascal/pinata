@@ -63,15 +63,49 @@ SQL wrapper pattern (every CSQLPAccount / CSQLPAccountLog function):
     rc = SQLExecDirect(stmt, "{CALL proc(?,…)}", SQL_NTS)        # ordinal 11
     ok = rc in {SQL_SUCCESS, SQL_SUCCESS_WITH_INFO} [and the @nRet output has the expected value]
     on error some wrappers log SQLError state/number/text   @ FUN_00417420 (AL:FUN_00412f80)
-Result rows: DB_Fetch @ FUN_004124a0 (SQLFetch), DB_GetLong @ FUN_004124e0 (SQLGetData col++, SQL_C_SLONG),
-             DB_GetULong @ FUN_00412510 (SQL_C_ULONG), DB_CloseCursor @ FUN_004124d0.
+Result rows: DB_Fetch @ FUN_004124a0 (AL:FUN_0040e530) (SQLFetch), DB_GetLong @ FUN_004124e0 (AL:FUN_0040e570)
+             (SQLGetData col++, SQL_C_SLONG), DB_GetULong @ FUN_00412510 (SQL_C_ULONG), DB_CloseCursor @ FUN_004124d0.
+             AccountLog's `DBRecord::operator>>` (AL:FUN_0040e5a0, AL:FUN_0040e5d0) are the same column reads (pdb2016 names).
 
 Sends:  SendPacket(session, CSendPacket)  @ FUN_004055a0 (AL:FUN_00404e80)
-          CSendPacket: Init @ FUN_004121d0, SetOpcode(op, size) @ FUN_00412310, payload at +5;
-          SetSize @ FUN_004121f0 writes {u8 size+2} when size+2 < 0x100, else {0, u16 size+2}  (correct framing)
+          CSendPacket: Init @ FUN_004121d0 (AL:FUN_0040e250), SetOpcode(op, size) @ FUN_00412310 (AL:FUN_0040e3a0),
+          payload at +5; GetSendSize @ FUN_004122d0 (AL:FUN_0040e360), GetSendPtr @ FUN_004122f0 (AL:FUN_0040e380)
+          SetSize @ FUN_004121f0 (AL:FUN_0040e280) writes {u8 size+2} when size+2 < 0x100, else {0, u16 size+2}  (correct framing)
         SendRaw(session, frame, n)  @ FUN_004055d0 (AL:FUN_00404eb0): the handler builds {u8 len, u16 op, payload}
           itself; the length byte is a plain u8 (see D01-B1 / D01-B2)
 ```
+
+### 1.2 Copies of shared and library code (address aliases)
+
+Both binaries link their own copy of the shared server library (S02) and of the compiler runtime. The behaviour is
+documented where the cited section says; only the addresses here are new. Names are *(pdb2016)*. The Account /
+AccountLog bodies were not compared byte-wise with the S02 reference copies (same library source, inferred).
+
+| Function | Account | AccountLog | Documented at |
+|---|---|---|---|
+| `CSocket_IOCP::Send` | FUN_00413770 | – | S02 §1.5 |
+| `CSocket_IOCP::Shutdown` | FUN_004131f0 | FUN_0040ed50 | S02 §1.5 |
+| `CSocket_IOCP::Close` | FUN_00413340 | FUN_0040eea0 | S02 §1.5 |
+| `CSocket_IOCP::FreeBuffer` | FUN_004132d0 | FUN_0040ee30 | S02 §1.5 |
+| `CSocket_Session::Send` (two overloads) | FUN_00412c80, FUN_00412cd0 | FUN_0040e7e0, FUN_0040e830 | S02 §1.6 |
+| `CSocket_Session::Close` | FUN_00412c60 | FUN_0040e7c0 | S02 §1.6 |
+| `CSocket_Session_Manager::CSM_Enter_CS` / `CSM_Leave_CS` | FUN_00410300 / FUN_00410320 | FUN_0040c390 / FUN_0040c3b0 | session-list lock, S02 §1.6 |
+| `GetShineServerIDName` | FUN_00406eb0 | FUN_00406a80 | S02 §2.5 |
+| `Name256Byte::Name256Byte`, `Name256Byte::operator=` | FUN_00402050, FUN_00402180, FUN_004022c0 | FUN_004020f0, FUN_00402220 | 256-byte name copy (compiler-generated) |
+| `PROTO_NC_USER_GER_PASSWORD_CHECK_ACK::operator=`, `PROTO_NC_USER_US_PASSWORD_CHECK_ACK::operator=` | – | FUN_00402d70, FUN_00403000 | struct copy of `LoginData` into the IP-block ack, §4.3 |
+| `std::basic_string` `assign` / `append` / `_Copy` / dtor, `std::_Xlength_error` | FUN_00406db0, FUN_0040f460, FUN_0040b7b0, FUN_00406b50, FUN_00403de0, FUN_00419c42 | – | MSVC STL, not reconstructed |
+| `_ftol2_sse`, `operator delete[]` | FUN_0041b830, FUN_0041b75a | – | MSVC CRT, not reconstructed |
+
+The JP web check's helpers (§3.2, 0x0C4B) are third-party code used as-is, not reconstructed beyond their call site:
+MD5 `CMD5Checksum::Update` / `Transform` / `Final` FUN_0040b700 / FUN_0040b020 / FUN_0040b8e0 (under `MD5_Hex`
+FUN_0040baf0); HTTP client `CWebHttpConnect::InitConnection` / `SetServer` / `SetFuntion` / `SetParameter` /
+`MakeAddress` / `QueryToServer` / `GetHTMLDocument` / dtor FUN_004129b0 / FUN_00412710 / FUN_00412750 / FUN_004127a0 /
+FUN_00412800 / FUN_00412a70 / FUN_00412950 / FUN_00412980; TinyXML `TiXmlDocument` ctor / `Parse` / `SetError`
+FUN_00408140 / FUN_0040a210 / FUN_004096d0, `TiXmlNode` ctor / dtor / `Identify` / `FirstChild` / `NextSibling` /
+`FirstChildElement` FUN_00407de0 / FUN_00407e20 / FUN_00409b80 / FUN_004078b0 / FUN_00407900 / FUN_00407950,
+`TiXmlElement` ctor / `GetText` FUN_00408c40 / FUN_00407a30, `TiXmlText` / `TiXmlDeclaration` ctors FUN_004089f0 /
+FUN_00408ac0, `TiXmlBase::SkipWhiteSpace` / `StringEqual` / `IsAlpha` FUN_004094e0 / FUN_00409620 / FUN_004092d0,
+`TiXmlString::assign` FUN_00407710.
 
 ---
 
@@ -104,16 +138,16 @@ packet. The normalized decompilation of all CPFs handlers is byte-for-byte the s
     if send failed: log "CProtocol_Functions::fc_NC_MISC_S2SCONNECTION_REQ - 응답패킷 보내기 에러 …"; close
     else: session.state = 1; session.connectTime = GetLocalTime(); log "Connected from %p (…)"
 
-0x0803 NC_MISC_S2SCONNECTION_ACK { u8 echo, u16 err @1 }:  if err == 0: session.state = 1; log "Connected to …"   @ FUN_00404ce0
+0x0803 NC_MISC_S2SCONNECTION_ACK { u8 echo, u16 err @1 }:  if err == 0: session.state = 1; log "Connected to …"   @ FUN_00404ce0 (AL:FUN_004045a0)
 
-0x2801 NC_OPTOOL_S2SCONNECT_LIST_REQ { u8 echo }:          @ FUN_00404dd0
+0x2801 NC_OPTOOL_S2SCONNECT_LIST_REQ { u8 echo }:          @ FUN_00404dd0 (AL:FUN_00404690)
     reply 0x2802 { u8 echo, u8 my_type, u16 n, n × { u8 type, u8 world, u8 zone,
                    u32 connectTime = (year & 0xf) | month<<4 | day<<8 | hour<<13 | minute<<18 | second<<24 } }
                    # bit fields 4/4/5/5/6/6 of the session's connect SYSTEMTIME
                    # one entry per session with state 1, under the session-list lock
-0x2803 NC_OPTOOL_CLOSE_SERVER_REQ:  reply 0x2804 { u16 0x0600 }; g_Shutdown (DAT_00654bbc) = 1   @ FUN_00404fc0  (no CheckAlive)
-0x2805 NC_OPTOOL_MAP_USER_LIST_REQ { u8 echo }:  reply 0x2806 { u8 echo, u8 my_type, u16 0 }   @ FUN_00405070
-0x2807 NC_OPTOOL_CONNECT_BRIF_REQ { u8 echo }:             @ FUN_00405140
+0x2803 NC_OPTOOL_CLOSE_SERVER_REQ:  reply 0x2804 { u16 0x0600 }; g_Shutdown (DAT_00654bbc) = 1   @ FUN_00404fc0 (AL:FUN_00404880)  (no CheckAlive)
+0x2805 NC_OPTOOL_MAP_USER_LIST_REQ { u8 echo }:  reply 0x2806 { u8 echo, u8 my_type, u16 0 }   @ FUN_00405070 (AL:FUN_00404930)
+0x2807 NC_OPTOOL_CONNECT_BRIF_REQ { u8 echo }:             @ FUN_00405140 (AL:FUN_00404a00)
     reply 0x2808 (0xaa bytes, zeroed) { u8 echo, u8 my_type, u16 count[type][world][zone] }
         for each session with state 1: t = type (> 20 → 10), w = world (> 1 → 0), z = zone (> 1 → 0); count[t][w][z]++
 ```
@@ -401,7 +435,10 @@ AccountLogAdd(l):                                        @ AL:FUN_00414a30
     {CALL p_AccountLog_Add(?,?,?,?,?,?,?,?,?)}
       1 TINYINT nType  2 SLONG nUserNo  3 TINYINT nWorldNo  4 SSHORT nPlayMin  5 USHORT nErrorCode
       6 VARCHAR sIP(16)  7 WVARCHAR sUserID(16)  8 WVARCHAR sUserPassword(16)  9 out UBIGINT nLogNo
-    on error: log every field (no reply in any case)
+    on error (rc ∉ {0, 1}): p_AccountLog_TextLogWrite(" nType, nUserNo, nWorldNo, nPlayMin, nErrorCode, sIP, sUserID,
+        sUserPassword, nLogNo")   @ AL:FUN_00414930
+        # appends "YYYY-MM-DD hh:mm:ss> <line>" to AccountLog_<YYYY-MM-DD>.txt (fopen "a+", working directory)
+    no reply in any case
 
 0x0720 NC_LOG_USER_LOGINFAIL { Name256Byte userid @0, Name4 userpassword @0x100, uchar userip[4] @0x110,
                                u16 error @0x114 }   (0x116, pdb2017 names):     @ AL:FUN_00402470
@@ -566,6 +603,8 @@ SysLog(msg):                                             @ AL:FUN_00403150
     line = sprintf("%s %s %s %s %s - %s", "Mon d hh:mm:ss" (local), gethostname(), "YYYY-MM-DDThh:mm:ss.mmmZ" (UTC),
                    "ACCOUNTLOG", "ACCOUNTLOG", msg)
     queue line in the writer at DAT_0064fa90             @ AL:FUN_0040aa20   (consumer not traced)
+        # = cLogSystem::ls_LogReservation on gServer.m_UK_SysLog (pdb2016); it pushes a std::string into a
+        # cLS_Queue (lsq_Push @ AL:FUN_0040a870: chunked ring of blocks; when full it overwrites the last slot)
 
 0xC801 NC_SYSLOG_ACCOUNT_LOGIN_SUCCESS { u32 UserNo @0, char UserIP[16] @4, Name5 spawnapps @0x14 }  (2016: 40 bytes):   @ AL:FUN_00403310
     SysLog("ACCOUNT_LOGIN_SUCCESS [fiesta@onson account-id=\"%d\" ipv4=\"%s\" client-version=\"%s\"]", UserNo, UserIP, spawnapps)
