@@ -1941,14 +1941,12 @@ Handler `FUN_00572670`
 
 ### `0x8c1f` NC_MINIHOUSE_REARRANGE_REQ
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_REARRANGE_REQ`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_00572d50 → FUN_00546150)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | furniturecount |  |
-| 1 | PROTO_NC_MINIHOUSE_REARRANGE_REQ::<unnamed-type-rearrange>[furniturecount] | rearrange | variable length, element PROTO_NC_MINIHOUSE_REARRANGE_REQ::<unnamed-type-rearrange> |
-
-Element `PROTO_NC_MINIHOUSE_REARRANGE_REQ::<unnamed-type-rearrange>` (18 bytes): +0 u16 furniturehandle, +2 f32 location.x, +6 f32 location.y, +10 f32 location.z, +14 f32 location.angle
+| 0 | u8 | furniturecount | < 393; not checked against the length (Z13-B7) |
+| 1 | {u16 furniturehandle, f32 x, f32 y, f32 z, f32 angle}[n] | rearrange | 18 bytes each |
 
 Handler `FUN_00572d50`
 
@@ -1956,14 +1954,12 @@ No payload fields read directly by the handler.
 
 ### `0x8c22` NC_MINIHOUSE_CREATE_FURNITURE_REQ
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_00572bf0 → FUN_00544f00)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | furniturecount |  |
-| 1 | PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ::<unnamed-type-rearrange>[furniturecount] | rearrange | variable length, element PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ::<unnamed-type-rearrange> |
-
-Element `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ::<unnamed-type-rearrange>` (18 bytes): +0 u16 furniturehandle, +2 f32 location.x, +6 f32 location.y, +10 f32 location.z, +14 f32 location.angle
+| 0 | u8 | furniturecount | < 393; not checked against the length (Z13-B7) |
+| 1 | {u16 furniturehandle, f32 x, f32 y, f32 z, f32 angle}[n] | rearrange | 18 bytes each |
 
 Handler `FUN_00572bf0`
 
@@ -1971,12 +1967,12 @@ No payload fields read directly by the handler.
 
 ### `0x8c25` NC_MINIHOUSE_DELETE_FURNITURE_REQ
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_DELETE_FURNITURE_REQ`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_00572eb0 → FUN_00545a40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | furniturecount |  |
-| 1 | u16[furniturecount] | furniturehandle | variable length |
+| 0 | u8 | furniturecount | < 393; not checked against the length (Z13-B7) |
+| 1 | u16[n] | furniturehandle |  |
 
 Handler `FUN_00572eb0`
 
@@ -8340,6 +8336,17 @@ Sent in reply to `0x8c12` NC_MINIHOUSE_KICKOUT_REQ on ShineObjectClass::ShinePla
 
 ### `0x8c21` NC_MINIHOUSE_REARRANGE_CMD
 
+**Verified layout** (basis: zone FUN_0048a560; client FUN_0049b400)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | furniturecount | always 1; the client reads only the first entry |
+| 1 | u16 | furniturehandle |  |
+| 3 | f32 | x |  |
+| 7 | f32 | y |  |
+| 11 | f32 | z |  |
+| 15 | f32 | angle |  |
+
 Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_0048a560`) · payload 19 bytes
 
 | Off | Type | Value / source |
@@ -8353,14 +8360,18 @@ Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_
 
 ### `0x8c24` NC_MINIHOUSE_CREATE_FURNITURE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_0048a560 (and the portal of FUN_00573930); client FUN_0049b440)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | furniturecount |  |
-| 1 | PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD::<unnamed-type-rearrange>[furniturecount] | rearrange | variable length, element PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD::<unnamed-type-rearrange> |
-
-Element `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD::<unnamed-type-rearrange>` (21 bytes): +0 u16 furniturehandle, +2 u16 furnitureid, +4 f32 location.x, +8 f32 location.y, +12 f32 location.z, +16 f32 location.angle, +20 u8 nEndureGrade
+| 0 | u8 | furniturecount | 1 |
+| 1 | u16 | furniturehandle | 60000 = the portal |
+| 3 | u16 | furnitureid | item id |
+| 5 | f32 | x |  |
+| 9 | f32 | y |  |
+| 13 | f32 | z |  |
+| 17 | f32 | angle |  |
+| 21 | u8 | nEndureGrade |  |
 
 Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_0048a560`) · payload 22 bytes
 
@@ -8376,6 +8387,13 @@ Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_
 | 21 | u8 | `*(undefined1 *)(*(int *)(param_2 + 0x10) + 0x25)` |
 
 ### `0x8c27` NC_MINIHOUSE_DELETE_FURNITURE_CMD
+
+**Verified layout** (basis: zone FUN_0048a560 / FUN_0048aa60; client FUN_004a3ac0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | furniturecount | 1; the client reads only the first handle |
+| 1 | u16 | furniturehandle | 60000 = the portal |
 
 Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_0048a560`) · payload 3 bytes
 
@@ -11824,6 +11842,27 @@ to the live players of the map (AxialListPacketBroadcast, 0x16 bytes with the op
 |---|---|---|---|
 | 0 | u16 | err | 0x1182 status, 0x1185 already, 0x1193, 0x1195 zone, 0x1196 later, 0x1199 near NPC, 0x119A skill |
 
+### `0x8c08` NC_MINIHOUSE_FUNICHERINVEN_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00546930 + FUN_00643d40; client FUN_0049b510)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | numofitem |  |
+| 1 | u8 | box | inventory type 3 / 13 / 14 / 16 |
+| 2 | u8 | flag | never written (Z13-B11) |
+| 3 | PROTO_ITEMPACKET_INFORM[n] | ItemArray | {u8 datasize, u16 location, SHINE_ITEM_STRUCT}; owner only |
+
+### `0x8c09` NC_MINIHOUSE_FUNICHER_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00546930; client FUN_004af160)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | furniturecount | placed items, wraps above 255 (Z13-B10) |
+| 1 | u8 | next | 0xFF: last packet, client then sends 0x8C1D |
+| 2 | {u16 furniturehandle, u16 furnitureid, f32 x, f32 y, f32 z, f32 angle, u8 nEndureGrade}[n] | array | 21 bytes each |
+
 ### `0x8c11` NC_MINIHOUSE_VISIT_ACK (S→C)
 
 **Verified layout** (basis: zone so_SendErrorCode 35/0x11)
@@ -11831,6 +11870,30 @@ to the live players of the map (AxialListPacketBroadcast, 0x16 bytes with the op
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x1181 ok, 0x119B password, 0x11A0 too far |
+
+### `0x8c20` NC_MINIHOUSE_REARRANGE_ACK (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 35/0x20; client FUN_0049b3d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x11C1 ok (from the releaser), 0x11CE DB refused (any furniture change), 0x11C6 / 0x11C7 / 0x11CB / 0x11CD / 0x11E0 / 0x11E1 / 0x11E2 |
+
+### `0x8c23` NC_MINIHOUSE_CREATE_FURNITURE_ACK (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 35/0x23; client FUN_004a3a80)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x11C1 ok (from the releaser), 0x1184 / 0x1187 / 0x1188 / 0x1193, 0x11C6 / 0x11C7 / 0x11CA / 0x11CB / 0x11CD / 0x11E0 / 0x11E1 / 0x11E2, 0x1DC0 / 0x1DC1 |
+
+### `0x8c26` NC_MINIHOUSE_DELETE_FURNITURE_ACK (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 35/0x26; client FUN_0049b4b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x11C1 ok (from the releaser), 0x11C6 / 0x11C7 / 0x11CB / 0x11E0 / 0x11E1, 0x1DC2 dice removal reserved |
 
 ### `0x8c3e` NC_MINIHOUSE_CHAR_ACTION_ACK (S→C)
 
@@ -12448,6 +12511,21 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 48 | u16 | LicenseMobID |  |
 | 50 | u16 | echo.licenseitem |  |
 | 52 | u16 | echo.weaponitem |  |
+
+### `0x8c5d` NC_MINIHOUSE_DB_PORTAL_ADD_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_005354a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle | player handle |
+| 2 | u32 | header.charNo |  |
+| 6 | u16 | nPortalItemID | item id |
+| 8 | u8 | bType | KeepTime_Hour != 0 |
+| 9 | i32 | dEndDate | mktime(now + KeepTime_Hour h) |
+| 13 | u16 | lockindex |  |
+| 15 | SHINE_ITEM_REGISTNUMBER | Item.relocitemregnum |  |
+| 23 | u16 | Item.newlocation | never written (Z13-B16) |
 
 ### `0xac23` NC_DICE_TAISAI_DB_DICE_ROLL_RESULT_REQ (Z→DB)
 
