@@ -1,0 +1,6 @@
+{
+ "FUN_0044fb00": "DBRecord::query",
+ "FUN_0046ecd0": "CGameDB_Connect::DBConnect",
+ "FUN_00451ec0": "ViewDBError",
+ "FUN_00460bc0": "StringStream_Str"
+}
