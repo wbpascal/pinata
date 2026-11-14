@@ -10027,13 +10027,13 @@ Sent in reply to `0xc412` NC_COLLECT_REWARD_DB_ACK on GameDBSession (`FUN_00627a
 
 ### `0xcc02` NC_MOVER_RIDE_ON_CMD
 
-**Verified layout** (basis: zone FUN_0055f380)
+**Verified layout** (basis: zone FUN_0055f380 (size 6); client FUN_004b3aa0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nMoverHandle |  |
-| 2 | u8 | nSlot |  |
-| 3 | u8 | nGrade |  |
+| 2 | u8 | nSlot | seat; 0 = driver (client opens the feed window) |
+| 3 | u8 | nGrade | mover upgrade grade |
 
 Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 4 bytes
 
@@ -10045,11 +10045,11 @@ Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 4 bytes
 
 ### `0xcc04` NC_MOVER_SOMEONE_RIDE_ON_CMD
 
-**Verified layout** (basis: zone FUN_0055f380)
+**Verified layout** (basis: zone FUN_0055f380 (size 8, mover's range); client FUN_004a5f70)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nHandle |  |
+| 0 | u16 | nHandle | rider |
 | 2 | u16 | nMoverHandle |  |
 | 4 | u8 | nSlot |  |
 | 5 | u8 | nGrade |  |
@@ -10065,11 +10065,11 @@ Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 6 bytes
 
 ### `0xcc08` NC_MOVER_SOMEONE_RIDE_OFF_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MOVER_SOMEONE_RIDE_OFF_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_0055f620 (size 4, rider's range); client FUN_004a6090)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nHandle |  |
+| 0 | u16 | nHandle | rider |
 
 Sent from `FUN_0055f620` (`FUN_0055f620`) · payload 2 bytes
 
@@ -10079,11 +10079,11 @@ Sent from `FUN_0055f620` (`FUN_0055f620`) · payload 2 bytes
 
 ### `0xcc0a` NC_MOVER_HUNGRY_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MOVER_HUNGRY_CMD`, 2 bytes
+**Verified layout** (basis: zone smv_SendHungryInfo FUN_0055f0a0 (size 4); client FUN_004b3da0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nHungry |  |
+| 0 | u16 | nHungry | item hunger gauge; 0 → client forces walking |
 
 Sent from `FUN_0055f0a0` (`FUN_0055f0a0`) · payload 2 bytes
 
@@ -10093,7 +10093,7 @@ Sent from `FUN_0055f0a0` (`FUN_0055f0a0`) · payload 2 bytes
 
 ### `0xcc0d` NC_MOVER_MOVESPEED_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MOVER_MOVESPEED_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_00456910 / FUN_00456850 (size 8, driver only); client FUN_0049d2b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10983,6 +10983,29 @@ Z09 §13.2
 | 0 | u16 | handle |  |
 | 2 | u8 | count |  |
 | 3 | ABSTATE_INFORMATION[count] | infoList | ABSTATE_INFORMATION × count |
+
+### `0x1c1a` NC_BRIEFINFO_REGENMOVER_CMD (S→C)
+
+**Verified layout** (basis: zone BriefInformationMover FUN_0055e830 / FUN_0043c280 / FUN_0055ea10 (0x8b bytes); client FUN_00646e00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u32 | nID | MoverMain.MoverID; client ignores 0xFFFF |
+| 6 | u32 | nHP | 0 in 2016 |
+| 10 | SHINE_COORD_TYPE | nCoord | {u32 x, u32 y, u8 dir} |
+| 19 | ABNORMAL_STATE_BIT | AbstateBit | 99 bytes; not read by the client handler |
+| 118 | u8 | nGrade |  |
+| 119 | u16[10] | nSlotHandle | rider per seat, 0xFFFF empty; not read by the client handler |
+
+### `0x1c1b` NC_BRIEFINFO_MOVER_CMD (S→C)
+
+**Verified layout** (basis: zone bixmv_Init / bixmv_Exchange / bixmv_Send FUN_0043c810 / FUN_00440690 / FUN_0043e0d0; client FUN_00646ef0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nMoverNum | ≤ 28 per packet |
+| 1 | PROTO_NC_BRIEFINFO_REGENMOVER_CMD[n] | Movers | 0x8b bytes each (layout 0x1C1A) |
 
 ### `0x201F` NC_ACT_SOMEONESHOUT_CMD (hand-named) (S→C)
 
@@ -11964,13 +11987,19 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 |---|---|---|---|
 | 0 | u16 | nError | 0x306A…0x3070 |
 
+### `0xcc06` NC_MOVER_RIDE_OFF_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_0055f620 (so_SendProtocol 51/6, no payload); client FUN_004b3c00)
+
+Empty payload.
+
 ### `0xcc07` NC_MOVER_RIDE_OFF_FAIL_CMD (S→C)
 
-**Verified layout** (basis: zone so_SendErrorCode 51/7)
+**Verified layout** (basis: zone so_SendErrorCode 51/7 from FUN_0055f620 / FUN_0045d910 / FUN_0045f020 / FUN_00563420; client FUN_0049d250)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError | 0x3080 (sent on success), 0x3081, 0x3082 |
+| 0 | u16 | err | 0x3080 success (ignored by the client), 0x3081 / 0x3082 player side, 0x3083 no mover data, 0x3084 seat out of range, 0x3085 not your seat, 0x3086 seat empty |
 
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→Z)
 

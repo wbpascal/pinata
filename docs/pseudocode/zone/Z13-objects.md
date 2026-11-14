@@ -2463,7 +2463,10 @@ sp_RideInitialize (from sp_LoginInit FUN_00440d80)    @ FUN_0043d140
 so_LinkTo (Z09) on a mover:                           @ FUN_0049ad30
     seat ≠ 10: sp_Mover_LinkData = { nCharNo = p.charNo, nItemSlot = rideslot (−1 for a passenger), nMoverID (vt 0xce4),
         nMoverHP = m.so_GetHP (vt 0x4e8), nMasterCharNo (0xca8), nGrade (0xcfc), nPassenger[seat] = p.charNo }
-        # only the linking player's own seat; the others stay −1 (from ClearLinkData)
+        # only the linking player's own fields: on the NPC gate (smfm_Link FUN_0050ed70) and the town portal
+        # (sp_NC_MAP_TOWNPORTAL_REQ FUN_0049fe70) the owner's request first copies the mover's whole seating into every
+        # rider (mover vt 0xc84 GetLinkData → player vt 0xc88), so all seats are filled; any other link keeps the
+        # others at −1 (from ClearLinkData) (§8.5)
     sp_MoverSystem_GetOff(1)                          # owner: everybody gets off, the mover is freed
 
 WholeSaver::ws_save2worldmanager FUN_004536f0 → sp_MoverSystem_ZoneLink_Save2World    @ FUN_0045e710
@@ -2490,7 +2493,9 @@ sp_NC_MAP_LOGINCOMPLETE_CMD (Z01) → sp_MoverSystem_MapLogin, then ClearLinkDat
     # a passenger who arrives first (or alone) creates a mover with no master object (§8 decides its fate)
 
 `ShineMover::so_MoverSystem_GetLinkData` FUN_0045dd60 (mover vt 0xc84: nCharNo −1, ID, HP, nItemSlot −1, master, every
-passenger's charNo) has no caller in the 2016 zone.
+seat's passenger charNo or −1) is called by `smfm_Link` FUN_0050ed70 and `sp_NC_MAP_TOWNPORTAL_REQ` FUN_0049fe70 when the
+mover's owner links (Z02 §6.5, Z01 §7.3): the result goes into the owner's and every other passenger's `sp_Mover_LinkData`
+(vt 0xc88), then each passenger is linked (vt 0x600), the owner last. (Part 7 wrote "no caller": corrected in part 8.)
 
 layer moves: so_ply_MoveNewLayer FUN_0054ab90 / so_ply_MoveOtherLayer FUN_0054ac70 (and the _AllInMap variants FUN_0054ad30 /
 FUN_0054ae10; Z09):
@@ -2531,6 +2536,400 @@ FUN_0054ae10; Z09):
 | 0x2047 CREATECASTBAR {u16 millisec} | FUN_00499c10 | stops auto-run, starts the cast bar for `millisec` |
 | 0x2048 CANCELCASTBAR {} | FUN_004d8f90 | resets the cast bar |
 | 0xCC03 / 0xCC07 / 0xCC09 {u16 err} | FUN_0049d220 / FUN_0049d250 / FUN_0049d280 | system message `GetErrMsg(err)` unless err is the success code of its family (0x3068 / 0x3080 / 0x3090, ignored): so the 0x3080 "success on the FAIL opcode" of 0xCC05 (Z07 §8) is expected by the client; 0x3069–0x3070, 0x3081–0x3086, 0x3091–0x3096 all have texts |
+
+---
+
+## 8. Mounts, object side: `ShineMover` (object type 11)
+
+The player side (items, casts, get on / off from the rider's view, link data, forced dismounts) is §7; this section is
+the vehicle object. Code: `clean.py re-data/exports/zone-pdb - <addr>`; names and layouts *(pdb2016)*. In 2016 every
+mover is a one- or two-seat vehicle without combat: `MoverAbility.shn` and `MoverUseSkill.shn` are empty (§7.1), so the
+HP, resist, level, skill and damage code below never runs with data (noted per block).
+
+### 8.1 Object and vtable
+
+`ShineObjectClass::ShineMover : ShineMobileObject`, 0x202c bytes, handles 22138 + index (`so_RemakeHandle` FUN_0055edf0:
+index ≥ 1000 → 0xFFFF), 1000 objects (Z01 §3). Ctor FUN_0055fb90 (`ShineMobileObject` ctor, empty `MoverSkillList`,
+`BriefInformationMover` ctor; points the mobile object's coordinate (+0x66) and direction (+0x6a) pointers and `smv_nHP`
+into the brief packet), dtor FUN_0055e950, deleting dtor FUN_00549dd0.
+
+| Offset | Member | Meaning |
+|---|---|---|
+| +0x1ea8 | `smv_Master_RegNum` u32 | owner's charNo (−1 none); vt 0xca4 / 0xca8 FUN_0055ef00 / FUN_0055ef10 |
+| +0x1eac | `smv_Master_Object` | owner object, null until the owner is aboard (vt 0xcac / 0xcb0 FUN_0055ef20 / FUN_0055ef30) |
+| +0x1eb0 / +0x1eb4 | `smv_nPassengerCnt`, `smv_pPassengerArray[10]` | seated riders; seat 0 = the driver (the owner after a summon) |
+| +0x1edc / +0x1ee0 | `smv_nBookingCnt`, `smv_BookingArray[10]` (`MoverBookingInfo` {u32 mbki_CharNo (−1 free), u32 mbki_RegistTime (g_Now)}) | seats reserved across a map link (§8.5) |
+| +0x1f30 | `smv_LastMoveLoc` | position at the last passenger update (§8.4) |
+| +0x1f38 | `smv_SendMoveSpeed` (`PROTO_NC_MOVER_MOVESPEED_CMD`) | last speeds sent in 0xCC0D (§8.7) |
+| +0x1f40 | `smv_HungryTime` | next hunger tick (g_Now), 0 = no hunger (§8.6) |
+| +0x1f44 | `smv_MoverData` | `MoverDataBoxIndex` (§7.1); null = invalid mover |
+| +0x1f48 / +0x1f4c | `smv_MoverItemTotalInfo` / `smv_MoverItemAttr` | the owner's mover item cell and its `ShineItemAttr_Riding` (vt 0xcb4 `so_smv_SetMoverItemInfo` FUN_0055ef40); null on a mover without its owner |
+| +0x1f50 | `smv_MoverResist` | `MobResist` row of `MoverAbility.ResIndex` (none in 2016) |
+| +0x1f54 | `smv_MoverSkillList` | `MoverSkillList` (§7.1) |
+| +0x1f64 | `smv_nMaxSlotNum` u8 | `MoverMain.MaxCharSlot` (1 or 2 in 2016) |
+| +0x1f65 | `smv_MoverBriefInfo` (`BriefInformationMover`, 0xa2) | the live `0x1C1A` packet (§8.10): handle, ID, HP, coordinates, abstate bits, grade, seat handles |
+| +0x2008 | `smv_nHP` → brief `nHP` | |
+| +0x200c | `smv_LoginLoc` | map name of the summon (`so_LoginLocation` FUN_0055ed60) |
+| +0x2021 | `smv_EntrancePoint` | last good position of the block check (Z09 §9.2, `smo_BlockCheck` FUN_004bf020) |
+
+Overridden slots (the rest are the `ShineMobileObject` defaults; mover-system slots are listed with their callers in §7.1):
+
+| Slot | Function | Behaviour |
+|---|---|---|
+| 0x8 | `so_BriefInfoRange` FUN_00556e40 | `BIR_VARIOUS` |
+| 0x28 | `so_AmIAlreadyDead` FUN_0055ee70 | NoDamage → false; else dead flag (+0x1d7c) or HP 0 |
+| 0x300 | `so_IsEmpty` FUN_0055eaa0 | true without a master object or in mode 3: a mover whose owner is not aboard counts as "removed" for every scan that tests vt 0x300 (Z09 §16 notes) |
+| 0x4a0 | `so_Getabstatebit` FUN_0055ee40 | the brief's `AbstateBit` |
+| 0x4ac | `so_Routine` FUN_0056af60 | §8.4 |
+| 0x4c4 / 0x4c8 | `so_FillBriefInformation` FUN_0055e9f0 / `so_SendMyBriefInfo` FUN_0055ea10 | §8.10 |
+| 0x4d0 | `so_ObjectType` FUN_0055ead0 | 11 |
+| 0x4d8 / 0x6cc | `so_GetLevel` FUN_0055eae0 / `so_BodySize` FUN_0055eb00 | `MoverAbility.MoverLv` / `.AbsoluteSize`; without a row 0 / 50 |
+| 0x4e8 / 0x4f0 | `so_GetHP` FUN_0055ed70 / `so_MaxHP` FUN_0055ed80 | brief `nHP` / parameter-container MaxHP (stored at +0xea8) when there is a `MoverAbility` row, else 0 |
+| 0xaac / 0xf18 | `so_SetHP` FUN_0054a610 / `smo_ZeroHP` FUN_0055ede0 | HP = n; with a `MoverAbility` row and an item also `attr.iac_SetHP` (the HP lives in the item, §7.1) / SetHP(0) |
+| 0x514 / 0x518 | `so_WalkSpeed` FUN_0055eb20 / `so_RunSpeed` FUN_0055ec40 | §8.7 |
+| 0x550, 0x818, 0x828, 0x85c, 0xa84 | `so_PartyRegistNumber` FUN_0055ee50, `so_ply_GetMyGuildNo` FUN_0055eec0, `so_mobile_GetGuildRegnum` FUN_0056d960, `so_ply_GetMyGuildAcademyNo` FUN_0055eee0, `so_GetRaid` FUN_00560480 | the master object's answer; without a master 0xFFFF / 0 / 0 / 0 / null |
+| 0x8cc | `so_mobile_BattleCamp` FUN_0055e9c0 | `BC_CHAR` with a master object, else 0 |
+| 0xe60 | `so_IsAlliance` FUN_0054b130 | master's vt 0xe60; no master → false |
+| 0x5bc, 0x5c0, 0x634, 0x72c, 0x760, 0x980 | KilledBy, DamagedBy, AbnormalState_Resist, IsEnemy, CanMyTarget, ICanDamageTo | §8.9 |
+| 0xd4c / 0xeb8 | `so_SendSpeedInformation` FUN_00456910 / `smo_ply_SendSpeedInformation` FUN_00456850 | §8.7 |
+| 0xea8 / 0xeac | `smo_ply_SkillCoolTimeUpdate` FUN_0055e9e0 / `smo_ply_SkillCoolTime` FUN_0054a770 | `msl_UpdateCoolTime` / `msl_SetCoolTime` (§7.1) |
+| 0xedc | `smo_SPCheck` FUN_0055eeb0 | always true (a mover pays no SP) |
+| 0xcc4 … 0xd00 | the `so_smv_*` methods | §8.2–§8.8 |
+
+Not overridden and relevant: vt 0xa4c `so_ply_SendMoveFail` is the folded no-op FUN_00417480 on a mover (§8.7), vt 0x3f0
+`so_AbnormalState_Inform` is a folded no-op, vt 0xa48 `so_mobile_StopHere` and vt 0xa10 `so_mobile_SendMyMoveInfo` are the
+`ShineMobileObject` ones (Z02 §1, Z09 §9).
+
+### 8.2 Summon
+
+```pseudo
+ShineMover::so_smv_ClearMoverInfo (vt 0xc9c)            @ FUN_0055f360   (same body: smv_Clear FUN_0055f1f0, no caller)
+    master object null, master charNo −1, passenger and booking counts 0, every seat empty, every booking {−1, 0},
+    seat count 0, HungryTime 0, mover data / item / attr / resist null, HP 0
+
+ShineMover::so_smv_SummonMover(map, x, y, dir2, moverID, hp, layerRegNum) → bool   (vt 0xca0)   @ FUN_0055fdf0
+    # callers: sp_MoverSystem_SummonItem (§7.4), sp_MoverSystem_MapLogin (§7.7); dir2 = player dir × 2
+    smv_MoverData = mvdb_GetData(moverID) (FUN_004bf290); none or no MoverMain row: return false
+    smv_nMaxSlotNum = MoverMain.MaxCharSlot
+    MoverAbility row (none in 2016): HP = hp; smv_MoverResist = MobResist[MoverAbility.ResIndex]
+    parameter container (obj+0xfc0): c_clear; c_StoreMover(MoverAbility) FUN_0055e8d0; c_MakeTotal
+    MoverHG row with Tick ≠ 0: smv_HungryTime = g_Now + Tick / 100           # Tick in ms
+    skill list emptied, msl_Store(MoverUseSkill rows) FUN_00449190
+    mode = 1; smv_SendMoveSpeed = {_, 0, 0}
+    smv_LastMoveLoc = the old position; position = (x, y), dir = dir2 / 2 (+180 if negative); smv_LoginLoc.map = map
+    abstate bits = so_emptyabstate; abstate element list erased
+    if so_MapMarking(0) ≠ FM_MARKSUCCESS: return false                       # the caller frees the object
+    generic mobile-object reset: move manager halted, status flags (+0x1e78) &= 0xFE then &= 0xE5 (Z03 §6.6),
+        timers +0xea0 / +0xea4 = g_Now, abstate params recalculated (vt 0x360), vt 0xec8, vt 0xbf0
+    so_SetLayerRegNum(layerRegNum); smv_RegenComplete; return true
+
+ShineMover::smv_RegenComplete                           @ FUN_00441fd0
+    bimv_InitBriefInfo(handle, MoverMain.MoverID) FUN_0043c280      # nHandle, nID, every nSlotHandle = 0xFFFF
+    so_AllOfRange(allofrangearg, position, so_ExchageBriefInfo)     # every player in range gets 0x1C1A (§8.10)
+    # (the sight radius it computes first into the global sightsquar is not used by this call)
+```
+
+The owner's grade is written by `so_smv_SetMoverGrade` (vt 0xd00, FUN_0055fb70) straight into the brief `nGrade`;
+`so_smv_GetMoverGrade` (vt 0xcfc, FUN_0055fb50) reads it (0 without a brief). `so_smv_GetMoverID` (vt 0xce4, FUN_0055efa0) =
+`MoverMain.MoverID` (0 without data), `so_smv_GetMaxSlotNum` (vt 0xcd8, FUN_0055ef60), `so_smv_GetPassenger(i)` (vt 0xcdc,
+FUN_0055ef70: null for i ≥ seat count), `so_MoverSystem_NoDamage` (vt 0xc70, FUN_0055efc0: data present and no
+`MoverAbility` row → true, i.e. **every 2016 mover is undamageable**; without data false).
+
+### 8.3 Seats
+
+```pseudo
+ShineMover::so_smv_GetOn(p, seat) → bool  (vt 0xcb8)    @ FUN_0055f380   (from sp_MoverSystem_GetOn, §7.4)
+    p null: assert, false
+    no mover data: p ← 0xCC03 NC_MOVER_RIDE_ON_FAIL_CMD { 0x306C "The mover cannot be riden." }; false
+    seat ≥ smv_nMaxSlotNum: 0xCC03 { 0x306D "This is not the right slot for riding." }; false
+    seat occupied: 0xCC03 { 0x306F "This is not the slot for riding." }; false
+    booking[seat] held by another charNo: 0xCC03 { 0x306F }; false
+    booking[seat] held by p.charNo: booking = {−1, 0}; smv_nBookingCnt −1
+    seat[seat] = p; brief nSlotHandle[seat] = p.handle; smv_nPassengerCnt +1
+    p.so_mobile_StopHere (vt 0xa48: 0x2013 at p's position); p.so_smo_SetLocation(mover x, y, dir) (vt 0xc98)
+    p.SetMover(this) (vt 0xc78); p.SetMoverSlot(seat) (vt 0xc80)          # also the character brief +0xe6 / +0xe8
+    p ← 0xCC02 NC_MOVER_RIDE_ON_CMD { u16 nMoverHandle, u8 nSlot = seat, u8 nGrade }
+    in range of the mover ← 0xCC04 NC_MOVER_SOMEONE_RIDE_ON_CMD { u16 nHandle = p, u16 nMoverHandle, u8 nSlot, u8 nGrade }
+    MoverHG row and the owner's item known: smv_SendHungryInfo(p, attr.iac_GetHungry) → p ← 0xCC0A NC_MOVER_HUNGRY_CMD { u16 nHungry }
+        # this is the "mover script hook (+0x1f4c vt 0x40) → FUN_0055f0a0" of Z07 §8: +0x1f4c is smv_MoverItemAttr, vt 0x40 iac_GetHungry
+    true
+    # no code sends 0x306E "There is no available slot for riding.": a full mover answers 0x306F
+
+ShineMover::so_smv_GetOff(p, seat) → bool  (vt 0xcbc)   @ FUN_0055f620   (from so_MoverSystem_GetOff, §7.4)
+    p null: false (no answer)
+    no mover data: p ← 0xCC07 NC_MOVER_RIDE_OFF_FAIL_CMD { 0x3083 "It is not the mover you can get off." }; false
+    seat ≥ smv_nMaxSlotNum: 0xCC07 { 0x3084 "You cannot get off from this slot." }
+    seat empty: 0xCC07 { 0x3086 "You cannot get off from this slot." }
+    seat holds another handle: 0xCC07 { 0x3085 "This is not your slot." }
+    seat[seat] = null; brief nSlotHandle[seat] = 0xFFFF; smv_nPassengerCnt −1
+    p.so_mobile_StopHere (0x2013); p.SetMover(null); p.SetMoverSlot(10)
+    p.so_SendSpeedInformation(0) (vt 0xd4c, argument 0 = send even if unchanged) → p ← 0x203E NC_ACT_MOVESPEED_CMD
+    p ← 0xCC06 NC_MOVER_RIDE_OFF_CMD {} (so_SendProtocol 51/6)
+    in range of p (at the mover's position) ← 0xCC08 NC_MOVER_SOMEONE_RIDE_OFF_CMD { u16 nHandle = p }
+    true
+
+ShineMover::so_smv_GetOffAll(how)  (vt 0xcc0)           @ FUN_0055f7c0
+    smv_nPassengerCnt < 1: assert "Passenger count error", return
+    every seated rider: rider.so_MoverSystem_GetOff(how) (player vt 0xc6c, §7.4)    # the owner's item is saved there
+
+ShineMover::so_smv_GetMyBookingSlot(charNo) → seat  (vt 0xce8)   @ FUN_0055fa10
+    smv_nBookingCnt < 1: 10;  the first seat < seat count booked for charNo, else 10
+    # 10 makes the following get-on fail with 0x306D (§8.5)
+
+ShineMover::so_smv_PassengerNotice(text)  (vt 0xce0)    @ FUN_0055f9a0
+    text null: assert; every seated rider: so_ply_Notice(text) (vt 0x784)     # no caller in the 2016 zone
+```
+
+### 8.4 Routine and removal
+
+```pseudo
+ShineMover::so_Routine(list, n)                         @ FUN_0056af60   (every object tick)
+    no mover data: GetOffAll(0); so_Unmark(0, 1, 3); som_FreeObject(REMOVE_NOW, 0x7E); return
+    smv_PassengerCheck                                  @ FUN_0055f2f0
+        every seat whose rider is so_IsEmpty (vt 0x300: leaving player): seat = null, brief seat handle 0xFFFF, count −1
+        # silent: no 0xCC06 / 0xCC08, the rider's own SetMover / slot are not reset
+    if smv_nBookingCnt < 1:
+        no rider left, or no master object: GetOffAll(0); Unmark; free (0x7E); return
+    else, every seat < seat count with RegistTime ≠ 0 and RegistTime + 600 < g_Now (60 s):
+        booking of the master charNo: GetOffAll(0); Unmark; free (0x7E); return    # the owner never arrived
+        else booking = {−1, 0}                          # smv_nBookingCnt is not decremented (original bug) Z13-B55
+    master object set and (master.so_IsEmpty (vt 0x300) or master.charNo (vt 0x344) ≠ smv_Master_RegNum):
+        GetOffAll(0); Unmark; free (0x7E); return       # owner left or the object slot was reused
+    ShineMobileObject::so_Routine (movement, abstates; Z09 §2)
+    position ≠ smv_LastMoveLoc: smv_PassengerMove FUN_0055efe0 (every rider that is not empty and not already there:
+        so_smo_SetLocation(mover x, y, dir), vt 0xc98); smv_LastMoveLoc = position
+    smv_HungryTime ≠ 0 and ≤ g_Now: smv_FoodEat (§8.6)
+    return 1
+```
+
+Removal is always `so_Unmark(0, 1, 3)` (the generic `ShineObject::so_Unmark` FUN_00553970: 0x1805 to the sight, as for
+pets §6.4) followed by `som_FreeObject(handle, REMOVE_NOW, reason)`. Reasons: 0x78 / 0x79 summon failures, 0x7B owner gets
+off, 0x7C / 0x80 map-login failures (§7), 0x7E routine and death (this section).
+
+Lifecycle summary:
+
+| Event | What happens |
+|---|---|
+| owner uses the item (§7.2, §7.4) | `som_AllocObject(11)`, ClearMoverInfo, item info, master, grade, SummonMover, owner seated on seat 0 |
+| passenger 0xCC01 (Z07 §8) | `so_smv_GetOn` on a free, unbooked seat |
+| passenger 0xCC05 | that rider's `so_MoverSystem_GetOff(0)` |
+| owner 0xCC05, death, flag capture, state change, GM hide, logout (§7.8) | `sp_MoverSystem_GetOff`: GetOffAll, Unmark, free (0x7B) |
+| owner disconnects without a clean get-off | next routine: master `so_IsEmpty` → GetOffAll(0), free (0x7E) |
+| a rider disconnects | `smv_PassengerCheck` drops the seat silently |
+| map link of the owner | §7.7 / §8.5: the mover is freed in the old map and rebuilt in the new one |
+
+### 8.5 Map links: who rebuilds the mover, and the bookings
+
+The answers to the two open points of part 7, from §7.7 and the methods above:
+
+- **All riders link through the owner's NPC gate or town portal** (`smfm_Link` / `sp_NC_MAP_TOWNPORTAL_REQ`, which copy
+  the full seating, §7.7): every rider's link data carries the owner (`nMasterCharNo`), mover ID, HP, grade and every
+  seat's charNo. The **first rider to finish its map login** (owner or passenger) creates the mover
+  (`sp_MoverSystem_MapLogin`) and `so_MoverSystem_SetLinkData` FUN_0045deb0 books every seat for its charNo with
+  `RegistTime = g_Now`. Each later rider finds it with `som_FindMover(master, moverID)` and takes its booked seat
+  (`GetMyBookingSlot` → `GetOn` consumes the booking). The owner, when it arrives, also restores the item info and the
+  master object. A passenger who boards first sits on a mover with no master object: it is `so_IsEmpty` (§8.1), its
+  speeds lack the owner's modifiers and its hunger does not tick (§8.6); it cannot be driven (the driver is seat 0, §8.7).
+- **The owner does not arrive within 60 s** (600 ticks): its booking expires and the routine dismounts everyone
+  (`GetOffAll(0)`) and frees the mover. A passenger who does not arrive only loses its booking after 60 s; until then
+  its seat answers 0x306F to anyone else.
+- **A rider arrives with no booking for itself** (the mover was rebuilt from another rider's partial link data, or
+  the booking expired): `GetMyBookingSlot` returns 10 and `GetOn` fails with 0xCC03 { 0x306D }; the rider stays on foot.
+- **A passenger links alone** (any other link: its link data holds only its own seat and the owner's charNo): no mover
+  of that owner exists in the new map, so the passenger's map login creates one booked only for itself and seats the
+  passenger (0xCC02 / 0xCC04 / 0x1C1A go out). The booking is consumed, so at the next routine tick `smv_nBookingCnt < 1`
+  with no master object: GetOffAll(0) (0xCC06 / 0xCC08) and free. The passenger appears on a phantom copy of the owner's
+  mover for one tick (original bug) Z13-B60.
+- The owner linking alone keeps only its own seat: it rebuilds the mover and gets on as driver; the passengers were
+  dismounted in the old map by the owner's `GetOff(1)` (§7.7).
+
+### 8.6 Hunger and feeding (mover side)
+
+```pseudo
+ShineMover::smv_FoodEat                                 @ FUN_0055f110   (routine, when smv_HungryTime ≤ g_Now)
+    needs: mover data, a MoverHG row with ConsumeHG ≠ 0, the owner's item and attr, a master object; else return
+        # the timer is not advanced, so the test repeats every tick until the owner is aboard (no effect)
+    master.so_MoverSystem_ChargedMoverNotHungry (vt 0xc94, charged item effect, §7.1) true: return (timer not advanced)
+    attr.iac_FoodEat(cell, −ConsumeHG, MaxHG) (clamped to 0 … MaxHG); smv_HungryTime = g_Now + Tick / 100
+    smv_SendHungryInfo(seat 0 rider, attr.iac_GetHungry)  @ FUN_0055f0a0 → 0xCC0A NC_MOVER_HUNGRY_CMD { u16 nHungry }
+        # only the driver; passengers got one 0xCC0A when they boarded (§8.3) and no later updates
+    # the gauge is not saved here: sp_HorseItemSave runs on feeding and get-off (§7.4–§7.6)
+
+ShineMover::so_smv_CanUseFeedItem(itemID) → code  (vt 0xcc4)   @ FUN_0055f840   (from UseItemHorseFood, §7.5)
+    itemID 0xFFFF, no data or no MoverHG row, or itemID ≠ ItemInfo ID of MoverHG.FeedType: 0x10C7
+    no item / attr: 0x10C9;  gauge ≥ MaxHG: 0x10C9 (full);  else 0x700
+
+ShineMover::so_smv_Feeding → bool  (vt 0xcc8)          @ FUN_0055f8e0   (from so_MoverSystem_Feeding, §7.5)
+    master object (vt 0xcb0) null: assert, false
+    no data or no MoverHG row: master ← 0xCC09 NC_MOVER_FEEDING_ERROR_CMD { 0x3093 "This is not the mover you can feed." }; false
+    no item / attr: master ← 0xCC09 { 0x3096 "This is not the mover you can feed." }; false
+    attr.iac_FoodEat(cell, +RestoreAmount, MaxHG); smv_SendHungryInfo(master, gauge) (0xCC0A); true
+```
+
+The server never acts on an empty gauge: `so_smv_MoveRun` (§8.7) does not test it, only the client switches to walking
+on `0xCC0A { 0 }` (original bug) Z13-B56. 0x3094 / 0x3095 ("There is no feed you can give.") are never sent.
+
+### 8.7 Movement and speed
+
+The player's move requests hand over to the mover when the player rides one (Z02 §2.2 / §2.3).
+
+```pseudo
+ShineMover::so_smv_MoveWalk / so_smv_MoveRun(req {from, to}, p) → bool   (vt 0xccc / 0xcd0)   @ FUN_00459b00 / FUN_00459d80
+    req null: assert, false
+    mover feared (+0x1e78 bit 2), captivated (vt 0xf20), or move manager blocked (+0x1ac active and state 3): false
+    no field: assert "Invalid map", false
+    seat 0 ≠ p: assert "Not the driver", false            # passengers cannot steer; the handler then sends 0x201B
+    walk: mm_Step, then drop the abstate elements ended by walking (aeo_Walk)
+    run:  drop aeo_Run elements, then mm_Step
+    speed = so_WalkSpeed / so_RunSpeed; 0: false
+    from == to: smo_StopBlockCheck (vt 0xf44); false
+    from not near the position, or `to` / the position not walkable (smo_MoveLocationCheck_From / _To), or the path
+        blocked (sp_MovePathBlockCheck(position, to, 2)): smo_StopBlockCheck; false
+    so_mobile_MoveReserve(to, speed, walk 1 / run 2, 0) (vt 0x660, Z09 §9.1); so_SendSpeedInformation(1)
+    around the driver ← 0x2018 NC_ACT_SOMEONEMOVEWALK_CMD / 0x201A NC_ACT_SOMEONEMOVERUN_CMD { u16 handle = mover,
+        u32 from = server position, u32 to, u16 speed, u16 moveattr (bit 0 cleared, rest stale as Z02-B2) }; true
+    # riders follow in the routine (smv_PassengerMove, §8.4); hunger is not checked (Z13-B56)
+
+ShineMover::so_smv_MoveStop(req {loc}, p)  (vt 0xcd4)   @ FUN_00456e30
+    no field: assert; move manager blocked: return
+    mm_Step; req null: assert
+    dist²(position, loc) < 40001 and loc walkable: so_mobile_StopHere (0x2013 { mover, server position })
+    else: smo_StopBlockCheck; vt 0xa4c (no-op on a mover)   # the driver gets no 0x201B correction (original bug) Z13-B57
+    # p (the requester) is not checked: any rider's 0x2012 stops the mover
+
+ShineMover::so_WalkSpeed / so_RunSpeed                  @ FUN_0055eb20 / FUN_0055ec40
+    no data / MoverMain row: 0
+    master object: master static speed set (vt 0xe84 / 0xe88, scripts, Z10): return it (vt 0xe8c / 0xe90)
+                   rate = master parameter MoveSpeed ‰ (container +0xc40 = p+0x1c00) − 1000     # the rider's speed buffs
+    bonus = MoverUpgradeEffect[attr.grade].RunSpeed (item known; also for the walk speed)
+    v = (MoverMain.WalkSpeed|RunSpeed + bonus + rate) × chrwalkspeed|chrrunspeed / 1000 (s16)
+    return max(0, v × own MoveSpeed ‰ (obj+0x1c00) / 1000)
+    # Z10 §5.4 gives the same formula; the grade's RunSpeed bonus is added to the walk speed as well (as read)
+
+ShineMover::so_SendSpeedInformation(onlyIfChanged)  (vt 0xd4c)   @ FUN_00456910
+ShineMover::smo_ply_SendSpeedInformation  (vt 0xeb8)    @ FUN_00456850   (= the same with onlyIfChanged = 1)
+    no seat-0 rider: return
+    speeds ≠ smv_SendMoveSpeed or !onlyIfChanged: driver ← 0xCC0D NC_MOVER_MOVESPEED_CMD { u16 nMoverHandle, u16 nWalk,
+        u16 nRun }; remember them
+```
+
+The player version `ShinePlayer::so_SendSpeedInformation` FUN_00459540 uses the same argument sense (1 = only if
+changed, 0 = always), so Z02 §2.2's "force=1" is the opposite of the code. Block checks of the mover
+(`smo_BlockCheck` FUN_004bf020, `smv_MoveBlockCheck` FUN_004be610, `smv_MoveFindEmpty` FUN_004be6e0) are Z09 §9.2.
+
+### 8.8 Abnormal states shared with the riders
+
+```pseudo
+ShinePlayer::so_AbnormalState_Set → after a successful set, if p rides a mover (vt 0xc74):   @ FUN_004162d0
+    mover.so_smv_MasterSetAbsCheck(same arguments)  (vt 0xcf4)       @ FUN_0055fc50
+        strength ∉ 1…39, abstate or its sub-abstate null: assert, false
+        smv_AbstateAffectedByMaster(index) FUN_0055fa70: DispelIndex DA_STUN / DA_FEAR, or SubDispelIndex
+            SDA_STUN / SDA_FEAR / SDA_BIND / SDA_KNOCKBACK → true; else false (nothing happens)
+        ShineMobileObject::so_AbnormalState_Set on the mover (vt 0x638) succeeds: BitSet(index) in the brief bits;
+            vt 0x3f0 (no-op); so_AbnormalState_BroadcastSet(index, KeepTime, strength); true
+ShinePlayer::so_AbnormalState_Reset(index) → if on a mover: mover.so_smv_MasterResetAbsCheck(index) (vt 0xcf8)
+    @ FUN_00559ef0 → FUN_0055fae0: same class test → asl_AbstateReset on the mover
+```
+
+Any rider (not only the owner, despite the "Master" in the names) passes stuns, fears, binds and knock-backs to the
+vehicle; a stunned or feared mover refuses `MoveWalk` / `MoveRun` (§8.7). The mover's copy ends with its own timer or
+when the rider's state is reset.
+
+### 8.9 Combat overrides (no effect with the 2016 data)
+
+Every 2016 mover is `NoDamage` (§8.2), so player and mob rules never take it as a target (`so_mobile_IsEnemy` and
+`ICanDamageTo` of players and mobs return false for a target whose vt 0xc70 is true; the skill target scan
+`AxialListScanSkillTarget::alns_ValidObject` FUN_00579320 skips it), and it has no skills. For a rebuild with mover data:
+
+```pseudo
+ShineMover::so_DamagedBy(attacker, dmg, …)  (vt 0x5c0) @ FUN_0042d170
+    no data: assert; StaImmortal (291) / 499 tests only fetch the name (stripped logging, inferred)
+    attacker: its battle stat (vt 0x428) +8 += dmg; drop the mover's aeo_Attacked elements
+    so_SetHP(HP − dmg)                                  # no lower clamp here (the caller decides death, Z03)
+ShineMover::so_KilledBy  (vt 0x5bc)                     @ FUN_00432df0
+    once (status bit 3, Z03 §6.6): base so_KilledBy; SetHP(0); GetOffAll(0); Unmark; free (0x7E)
+ShineMover::so_AbnormalState_Resist(abstate)  (vt 0x634) @ FUN_00416790
+    null / no info: assert, resisted; no resist row: not resisted
+    by SubDispelIndex: stun ResStun, move speed ResMoveSpeed, fear ResFear, blooding ResDot, reverse ResReverse,
+        bind ResBinding, mesmerize ResMesmerize, sever bone ResSeverBone, knock-back ResKnockBack, TB minus ResTBMinus;
+        other kinds: not resisted;  resisted when random(1000) < value
+ShineMover::so_ply_CanMyTarget(mob, i)  (vt 0x760)      @ FUN_004ae450
+    mob row's i-th skill entry: target kind (+0x4f) 0 → the mover; 2 → the mover unless it already has all of the skill's
+    abstates (first missing one → the mover); 4 → the mover unless `asl_IsHereGood`; else null
+ShineMover::so_mobile_IsEnemy(d)  (vt 0x72c)            @ FUN_004309a0
+    d = d.owner (vt 0x9b0) or d; d == this or no field: false
+    d mob-like (vt 0x89c): as the player rule (Z03 §3.3): not allied (vt 0xe60), not the same guild in a guild
+        tournament, mover not captivated, d without 499, d's StaImmortal (291) none or < 3600 left (then reset) → true
+    d.NoDamage (vt 0xc70) false: false
+    d (a player) captivated, or the mover captivated: true
+    field fm_PKField == 1: true
+    field has a MapInfo row: false                      # every real map
+    (MapInfo null: KingdomMap read through the null pointer, then party battle / guild war / tournament tests)
+    # the player version tests PKField ≠ 0, then "MapInfo and KingdomMap == 4"; here the MapInfo test is inverted,
+    # so a mover never counts a player as enemy outside PK fields and captivation, and the rest is dead (original bug) Z13-B58
+```
+
+`so_mobile_ICanDamageTo` FUN_004368c0 is Z09 §8.4.
+
+**Mover skills (unreachable):** `so_smv_SkillBash_Object(skill, target, p)` (vt 0xcec, FUN_00580800) and
+`so_smv_SkillBash_Location(skill, loc, p)` (vt 0xcf0, FUN_00580cf0) are the mover copies of the player's skill-bash
+checks (Z03 §5.2) with errors to `p` as `0x2434 NC_BAT_SKILLBASH_CAST_FAIL_ACK` (SendErrorCode 9/0x34): mover mode not 1/2
+→ 0xFC0; casting → 0xFC4; target unknown → 0xFC4; field without `FieldAttr` +0x9f (skills allowed) → 0xFC3; feared →
+0xFCC; captivated → 0xFD2; StaEthereal (vt 0x9e4) → 0xFC0; silenced → 0xFC7; target not killable by users (`mdb_CanIKill`) →
+0xFD6; sub-layer → 0xFC0; mover with StaImmortal (291) or 499 → 0xFC1; target with 291: not mob-like → 0xFC2, a mob with
+more than 360 s left → silent return, else its 291 is reset; target with 499 → 0xFD6; `IsNoAttack` → vt 0xed4; attack-blocked line → 0xFD1; unknown skill / no active part → 0xFC6; move-manager
+state 3 with a cast time or SHOOTME / HOLDME → 0xFC8; target rules (TARGET_ENEMY / ENEMYUSER via vt 0x980) → 0xFD6, area
+→ 0xFD7; `msl_CoolTimeCheck` fails → 0xFC8; out of range ((body size + AttackDist) × 1.25, at most +60) → 0xFCA; else
+`smo_SkillBash_Casting`. The location variant checks the target point instead and sends its cooldown failure to the
+mover itself (vt 0x308 of `this`) (original bug) Z13-B59. **No code calls vt 0xcec / 0xcf0**: the 2016 zone registers no
+handler for `0xCC0E NC_MOVER_SKILLBASH_OBJ_CAST_REQ { u16 nSkillID, u16 nTarget }` / `0xCC0F
+NC_MOVER_SKILLBASH_FLD_CAST_REQ { u16 nSkillID, SHINE_XY_TYPE nTargetLoc }` (only 0xCC01 and 0xCC05 are registered).
+
+### 8.10 Brief info: `0x1C1A NC_BRIEFINFO_REGENMOVER_CMD`, `0x1C1B NC_BRIEFINFO_MOVER_CMD`
+
+`BriefInformationMover` (ctor FUN_0055e830): a `ProtocolPacket` over its own 0x8e-byte array, length 0x8d, opcode 0x1C1A;
+`bimv_SetSlotHandle(i, h)` FUN_0055e8a0 (i < 10). The packet *is* the mover's state storage, so it is always current:
+
+```
+0x1C1A NC_BRIEFINFO_REGENMOVER_CMD (0x8b bytes)
+    +0x00 u16 nHandle          mover handle
+    +0x02 u32 nID              MoverMain.MoverID
+    +0x06 u32 nHP              (0 in 2016)
+    +0x0a SHINE_COORD_TYPE nCoord { u32 x, u32 y, u8 dir }   live position
+    +0x13 ABNORMAL_STATE_BIT AbstateBit (99 bytes)           §8.8
+    +0x76 u8  nGrade           upgrade grade (Z04 §11)
+    +0x77 u16 nSlotHandle[10]  rider handle per seat, 0xFFFF empty
+```
+
+```pseudo
+ShineMover::so_SendMyBriefInfo(r)  (vt 0x4c8)            @ FUN_0055ea10   (sight exchange, regen broadcast)
+    r in "soloing" mode (vt 0x79c so_ply_SoloingMode, Z01 §9 flag 8) and this is a mover:
+        master charNo −1 or ≠ r.charNo: return          # a soloing player sees only its own mover
+    r ← the 0x1C1A packet; so_mobile_SendMyMoveInfo(r) (vt 0xa10: the current move, if any)
+ShineMover::so_FillBriefInformation(dst)  (vt 0x4c4)    @ FUN_0055e9f0   copies the 0x8b bytes
+
+BriefInfoExchangeMover (batches for a player entering sight, Z02 §5.2):
+    bixmv_Init FUN_0043c810: buffer 0xfbf bytes, opcode 0x1C1B, nMoverNum = 0
+    bixmv_Exchange(r, m) FUN_00440690: same layer (or either −1) and m visible from r's sub-layer and r is a player:
+        when 28 entries are queued, send and restart; append m.so_FillBriefInformation; nMoverNum +1
+    bixmv_Send(r) FUN_0043e0d0: entries > 0, r a player with mode ≠ 0: length 3 + n × 0x8b →
+        r ← 0x1C1B NC_BRIEFINFO_MOVER_CMD { u8 nMoverNum, PROTO_NC_BRIEFINFO_REGENMOVER_CMD Movers[n] }
+```
+
+### 8.11 Client side (2016 client, `GameFrameWork` / `CharMgr`)
+
+| Opcode | Client handler | What it does |
+|---|---|---|
+| 0x1C1A | `CharMgr::AddMover` FUN_00646e00 | nID 0xFFFF → ignored; else creates the mover model (`AddMover` FUN_00646c50) with handle, ID, HP, grade at the ground height of (x, y), rotated by dir × 2°. Seat handles and abstate bits are not read: riders are seated from their own character brief (`nMoverHnd` / `nMoverSlot`, §7.1) and 0xCC02 / 0xCC04 |
+| 0x1C1B | `CharMgr::AddMover` FUN_00646ef0 | the same per entry; an entry with nID 0xFFFF or a failed `AddMover` ends the loop (later entries dropped) |
+| 0xCC02 RIDE_ON_CMD | FUN_004b3aa0 | unknown mover → asks its brief info (0x1C01, Z02 §5.1); else `Mover::RideOn(mover, own char, slot)`, effect "Pet_St01"; seat 0 only: text 0x43482579 "Mover has been summoned. You can toggle Run/Walk by Z button." and `OpenFeedMoverWin(mover, grade)` |
+| 0xCC04 SOMEONE_RIDE_ON_CMD | FUN_004a5f70 | mover and character by handle (unknown ones are requested), `RideOn`, effect |
+| 0xCC06 RIDE_OFF_CMD | FUN_004b3c00 | own char's mover / slot: effect "Pet_Fi01", `SetMoverEffect(0)`, `RideOff`; a ground click queued while riding is replayed; `CloseFeedMoverWin`; back to run mode |
+| 0xCC08 SOMEONE_RIDE_OFF_CMD | FUN_004a6090 | the same for another character (no window) |
+| 0xCC0A HUNGRY_CMD | FUN_004b3da0 | feed window gauge (+0x1b4) = nHungry (0 → non-zero switches back to run); 0 → walk mode and "Hunger Gauge is Zero. Your Mover cannot run in this status. Hunger Gauge can be replenished with Mover Feed items." |
+| 0xCC0D MOVESPEED_CMD | FUN_0049d2b0 | character by nMoverHandle: walk speed (vt 0x104) = nWalk, run speed (vt 0x108) = nRun |
+
+0xCC03 / 0xCC07 / 0xCC09 are §7.9.
 
 ---
 
@@ -2592,6 +2991,12 @@ FUN_0054ae10; Z09):
 | Z13-B52 | `sp_HorseCast` FUN_0045e0e0 | when no `Riding.shn` element matches the item, `info` keeps the last element scanned and the cast goes on | casts with the last row's cast time and later shows its horse; unreachable with the shipped data (only `Riding.shn` items and mover items use `ui_ride`, movers go to `sp_MoverSystem_Cast`) | reset `info` to null when the scan finds nothing |
 | Z13-B53 | `sp_HorseOn` FUN_0045f270 | `sp_MakeRideBriefInfo` always returns 1 | the failure branch (0x2041 {0x10C3} + restore the shape backup) is dead; the abstate-0x4B refusal right after it leaves the backup marked and does not restore | check abstate 0x4B before building the ride shape |
 | Z13-B54 | `sp_MoverSystem_SummonItem` FUN_0045ec10 | sets the ride-skill cooldown (and tells the client) before `sp_MoverSystem_GetOn`; a failing get-on (abstate 0x4B: 0x306A) frees the mover but keeps the cooldown | the player waits the full cooldown without having ridden | set the cooldown after a successful get-on |
+| Z13-B55 | `ShineMover::so_Routine` FUN_0056af60 | an expired non-master booking is cleared without decrementing `smv_nBookingCnt` | the count stays > 0 for the mover's life, so the "no rider / no master → free" branch never runs for it (other checks still free it when the owner leaves) | decrement the count with the booking |
+| Z13-B56 | `ShineMover::so_smv_MoveRun` FUN_00459d80 | runs regardless of the hunger gauge (the horse's run block of Z02 §2.2 is skipped for movers) | only the client enforces "cannot run" on `0xCC0A {0}`; a modified client runs a starving mover | refuse runs at gauge 0 |
+| Z13-B57 | `ShineMover::so_smv_MoveStop` FUN_00456e30 | on a failed stop it calls vt 0xa4c, which is the no-op default on a mover, and the 0x2012 handler returns after the mover call | the driver's client is not corrected (no 0x201B) | send the move-fail to the requesting rider |
+| Z13-B58 | `ShineMover::so_mobile_IsEnemy` FUN_004309a0 | after the PK test (`fm_PKField == 1`) it returns false whenever the field has a MapInfo row; the KQ / party-battle / guild-war tests run only with a null MapInfo and then read `KingdomMap` through it | a mover never treats players as enemies outside PK fields and captivation; the rest is dead (no effect in 2016: movers cannot attack) | the player rule: PK field ≠ 0, or MapInfo and KingdomMap == 4, then party battle, guild war, tournament |
+| Z13-B59 | `ShineMover::so_smv_SkillBash_Location` FUN_00580cf0 | the cooldown failure 0xFC8 goes to the mover's own `so_SendErrorCode` (vt 0x308 of `this`), not to the rider | the rider would get no answer (unreachable in 2016: no handler for 0xCC0F) | send to the rider like every other check |
+| Z13-B60 | `sp_MoverSystem_MapLogin` FUN_0045d9e0 with `so_Routine` | a passenger who links without the owner (link data with only its own seat) rebuilds the owner's mover, boards it, and the next routine tick dismounts it and frees the mover | the passenger and its sight see a summon, 0xCC02 / 0xCC04 and a dismount 0xCC06 / 0xCC08 within one tick | do not rebuild a mover whose owner is not coming (no master booking) |
 
 ## Not reconstructed / uncertain
 
@@ -2633,7 +3038,12 @@ FUN_0054ae10; Z09):
   writing the strength used into `g_NewAbstateStrength` (read by `sp_MoverOffEffect`) is *(inferred)*. What the item-use
   pipeline does when `UseItemRide::uib_DirectUse` returns 1 without doing anything (modes ≠ 1, 2, 6, which `uib_CanUseItem`
   lets through) was not traced. Whether a later full save writes the attributes skipped by Z13-B50 was not checked (Z05).
-  A passenger who links alone re-creates the owner's mover without a master in the new map (§7.7); its fate is part 8.
+  A passenger who links alone re-creates the owner's mover without a master in the new map (§7.7); its fate: §8.5.
+- Mover object (§8): the meaning of the parameter-container offset +0xc40 (read as the master's `MoveSpeed` ‰, the same
+  as `p+0x1c00`) is *(inferred)* from the offsets; `so_DamagedBy`'s unused name fetches being stripped logging is
+  *(inferred)*; whether the damage pipeline (Z03) calls `so_KilledBy` instead of `so_DamagedBy` when HP would go below 0
+  was not traced (no mover can be damaged in 2016). The callers of `smo_ply_SendSpeedInformation` (vt 0xeb8, no virtual
+  call found) were not traced. The client's `AddMover` FUN_00646c50 internals (model, seat nodes) were not read.
 
 ## Coverage boundary
 
