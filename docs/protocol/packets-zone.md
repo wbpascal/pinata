@@ -10344,6 +10344,24 @@ Empty payload.
 
 Empty payload.
 
+### `0x74cf` NC_GUILD_TOURNAMENT_USESKILL_REQ (C→Z)
+
+**Verified layout** (basis: zone sp_NC_GUILD_TOURNAMENT_USESKILL_REQ FUN_00477b20; pdb2016 struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wUseSkillNumber | GuildTournamentSkill Index of the tournament type |
+
+2 bytes; answered by 0x74D0 (+ 0x74D1 on success). Z16 §5.3
+
+### `0x74d3` NC_GUILD_TOURNAMENT_DICEGAME_THROW_REQ (C→Z)
+
+**Verified layout** (basis: zone sp_NC_GUILD_TOURNAMENT_DICEGAME_THROW_REQ FUN_00477ba0; pdb2016 struct (size 1, no field read))
+
+Empty payload.
+
+no body read; success has no ack (0x74D5 broadcast), errors 0x74D4. Z16 §5.6
+
 ### `0x10d2` NC_CHAR_FREESTAT_SET_DB_ACK (DB→Z)
 
 **Verified layout** (basis: zone FUN_0058be50)
@@ -12226,6 +12244,47 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 
 0x30 bytes, to all in the flag's map. Z16 §4.5
 
+### `0x74ce` NC_GUILD_TOURNAMENT_SKILLPOINT_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildGroup::SetSkillPoint FUN_0047afa0; pdb2016 struct; client GuildTask FUN_006b2660)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wSkillPoint | GuildGroup m_unKillerPoint (low 16 bits) |
+
+2 bytes; only to the group's manager user (data stream). Z16 §5.2
+
+### `0x74d4` NC_GUILD_TOURNAMENT_DICEGAME_THROW_ACK (Z→C)
+
+**Verified layout** (basis: zone FUN_00475e30; pdb2016 struct; client GuildTask FUN_006b34c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1B42 no tournament, 0x1B53 no dice period, 0x1B4E already thrown, 0x1B4C not a dice player |
+
+2 bytes; errors only. Z16 §5.6
+
+### `0x74d5` NC_GUILD_TOURNAMENT_DICEGAME_THROW_CMD (Z→C)
+
+**Verified layout** (basis: zone DiceGame::Send_DiceThrowResult FUN_00478f50; pdb2016 struct; client GuildTask FUN_006b3530)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | GuildRegNumber | thrower's guild (vt 0x818) |
+| 4 | u32 | unDiceGameResult | 1…6, never equal to the other side's |
+
+8 bytes; to all in the thrower's map. Z16 §5.6
+
+### `0x74d6` NC_GUILD_TOURNAMENT_DICEGAME_BEFORE_END_TIME_MSG_CMD (Z→C)
+
+**Verified layout** (basis: zone DiceGame::Update FUN_0047b540; pdb2016 struct; client GuildTask FUN_006b2830)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | unEndTime | always 5; the client acts only on 5 |
+
+4 bytes; to all in the red (else blue) player's map. Z16 §5.6
+
 ### `0x74dd` NC_GUILD_TOURNAMENT_SCORE_CMD (Z→C)
 
 **Verified layout** (basis: zone SendScorePacket::SendtoPlayer FUN_00479d50 / SendtoAllinMap FUN_00479ec0; pdb2016 struct; client GuildTask FUN_006b26d0)
@@ -12264,6 +12323,36 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 40 | i32 | VictimGuildGrade | 0 = guild master |
 
 0x2c bytes; 0x74DE to the victim's guild, 0x74DF to the killer's guild. Z16 §4.6
+
+### `0x74e1` NC_GUILD_TOURNAMENT_MANAGERUSERMSG_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildGroup::CheckManagerUser FUN_004798f0; pdb2016 struct; client GuildTask FUN_006b55d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | CharID | new manager user's CharName |
+
+0x14 bytes; to the side's guild members in the map (AxialListPacketBroadcastByGuild). Z16 §5.2
+
+### `0x74f0` NC_GUILD_TOURNAMENT_ITEM_PICK_CMD (Z→C)
+
+**Verified layout** (basis: zone GuildTournamentSystem::CreateItemEffect FUN_0047c1e0; pdb2016 struct; client GuildTask FUN_006b5750)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | GTIiemID | GTIServer / GTIGetRate ID |
+
+2 bytes; to the picker (game stream). Z16 §5.5
+
+### `0x74f1` NC_GUILD_TOURNAMENT_ITEM_EFFECT_CMD (Z→C)
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_GtItemEffectMsg FUN_00560670 (from CreateItemEffect); pdb2016 struct; client GuildTask FUN_006b57d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | GTIiemID | GTIServer ID |
+
+2 bytes; to each affected player (abstate items, first effect row only). Z16 §5.5
 
 ### `0x74f2` NC_GUILD_TOURNAMENT_ITEM_FLAG_CMD (Z→C)
 

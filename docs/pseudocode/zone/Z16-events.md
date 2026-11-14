@@ -846,7 +846,7 @@ SendMapInPlayerInfoToObserber(p)                          @ FUN_0047fd10
 PlayerUnRegister(p) → bool                                @ FUN_0047fd50
     g by p.guildNo (none → sink 0x1B4F, false); m = member with p's handle (none → false)
     g.m_mapOutMemberBackUps[p.name] = m (insert or overwrite); erase m from m_vecGuildMembers
-    g.CheckManagerUser(); g.SetSkillPoint(g.m_unKillerPoint) (§5: re-evaluates the usable skills)
+    g.CheckManagerUser(); g.SetSkillPoint(g.m_unKillerPoint) (§5.2: re-sends 0x74CE to the, possibly new, manager user)
     → WM 0x74C9 NC_GUILD_TOURNAMENT_ZONE_FIGHTER_OUT_CMD {u8 nTournamentSeed = (u8)m_nTournamentType (!), u32 nGuildNo,
         u32 nCharNo}     # writes the tournament type into the seed field (original bug) Z16-B10; the 2016 WM ignores it
     true
@@ -918,7 +918,7 @@ CaptureFlag(p, hFlag) → bool                              @ FUN_0047eae0
         Name5 CIDFlag = flag name, u32 gRegGuildNo = p.guildNo, u32 gRegFlagCaptureGuild = owner (0 = neutralised)}
     p's member: m_CaptureFlagCount++; → all in p's map 0x74DD {PartMask 0, g.no, g.m_unAllGuildScore,
         g.m_nCaptureFlagCount, 1, [p's TOURNAMENT_PLAYER_SCORE]}
-        # g.m_nCaptureFlagCount is not changed here (§5 decides who writes it)
+        # g.m_nCaptureFlagCount is not changed here: ChangeGateState above writes it (§5.4)
     m_FlagAllConnectTime.Enable(every flag owned by p.guildNo)    # restarts the 60 s countdown on every capture
     InitFlagAbStateSetup(); true
 
@@ -1010,6 +1010,304 @@ fm_IsGuildTournametnMap() @ FUN_00475770: cached in m_nGuildTournamentMapFlag (1
 fm_GuildTournamentEnemy(g1, g2) @ FUN_004632f0 = system && IsBattleGuild(g1, g2)
 ```
 
+## 5. Guild tournament: guild groups, guild skills, items and the dice game
+
+Each `GuildTournamentSystem` holds two `GuildTournamentSystem::GuildGroup` objects (A, B; §4.1) and one `DiceGame`.
+This section covers their methods, the guild-skill request (0x74CF), the item boxes (`GTIEffect` NPC action and the
+GTI* tables) and the dice game (Pine `DiceGameStart`, 0x74D3). Errors go to the *error sink*: the group's own
+`m_ErrorMessage` (+0x34) or the dice game's `m_ErrorDeleGate`, which `SetErrorDelegate` sets together with the system's
+(§4.7); outside a request the sinks are empty and errors are silent. Error texts: `docs/protocol/client-error-codes.json`
+(0x1B4B "You cannot use Guild Skill because of Point Lack", 0x1B4C "You have no authority on Guild Skill or Dice Game",
+0x1B4D "Relevant Skill is invalid", 0x1B4E "The Dice is cast", 0x1B4F "You are not the participated Guild Tournament
+user", 0x1B50 "Guild Skill on Cooltime", 0x1B53 "It is not a Dice Game period"; 0x1B40 = success).
+
+### 5.1 `GuildGroup` and `DiceGame` layouts *(pdb2016)*
+
+```pseudo
+GuildGroup (0xb4)
+    +0x00 m_GuildNumber          guild of this side (Initialize)
+    +0x04 m_mapOutMemberBackUps  map<charName, GuildMemberInfo>: members who left the map (PlayerUnRegister), restored on return (§4.4)
+    +0x14 m_vecGuildGates        vector<Gate> (0x40 each, GateResiter §4.4)
+    +0x24 m_vecGuildMembers      vector<GuildMemberInfo> (0x1c), sorted by grade: [0] is the guild master when its grade is 0
+    +0x34 m_ErrorMessage         FastDelegate1<int> error sink
+    +0x3c m_unAllGuildScore      match score (flag ticks, kills, dice; the win check and the result use it)
+    +0x40 m_unKillerPoint        guild-skill points (+1 per own death, §4.6; spent by UseGuildSkill)
+    +0x44 m_unGuildScore         same increments as +0x3c (no reader found in parts 3–4)
+    +0x48 m_UseSkillCount        no writer or reader found
+    +0x4c m_nTournamentType      MAP_TYPE for the skill / master-buff tables
+    +0x50 m_vecGuildBuffUseTime  vector<TickTimer>: one cool-down timer per guild skill (index = skill number)
+    +0x60 m_LastGuildMasterReviveTime  TickTimer, delay 300 (30 s): master buff again after the master's revive
+    +0x70 m_nCaptureFlagCount    gates of this side in the "used" state = flags it holds (ChangeGateState, §5.4)
+    +0x74 m_pManageruser         ShineObject*: the first online member in grade order; anchor of broadcasts and the
+                                 only member allowed to use guild skills and throw the dice
+    +0x78 m_vecAdenItemInfo      vector<AdvanMobItemRegenInfo> (0x2c: Name3 mapName, string strGroupName, u32 AdvanIndex)
+    +0x88 m_Advan                {bool m_IsAdvan, int m_nLevel 0…2} comeback advantage (ChangeAdvanRule §4.6)
+    +0x90 m_FlagMultiple         flag-score multiplier, 1 normally, 2 for 60 s after a GTI_Bless item
+    +0x94 m_FlagMultiplelTime    TickTimer, delay 600 (60 s)
+    +0xa4 m_MyTeamNPCs           vector<u16> NPC handles of this side (Pine GTRegisterNPC → AddTeamNPC)
+
+DiceGame (0x48; vftable +0: Update)
+    +0x04 m_RedPlayerNumber, +0x08 m_BluePlayerNumber   charNo of A's / B's manager user at the start
+    +0x0c m_RedDiceResult, +0x10 m_BlueDiceResult       0 = not thrown yet, else 1…6
+    +0x14 m_StartTime (no writer found)
+    +0x18 m_nDelayTic         TickTimer: throw period; enabled = "dice game running"
+    +0x28 m_NotifyOfEndTimer  TickTimer: "5 seconds left" notice
+    +0x38 m_ErrorDeleGate, +0x40 m_DiceGameEnd (= GuildTournamentSystem::DiceGameWinGuild, set by the ctor)
+```
+
+Boilerplate (no logic): `AdvanMobItemRegenInfo` dtor FUN_0047aa60, `PortalInfo` ctor FUN_0047b8b0 / dtor FUN_0047abc0,
+`FlagInfo` ctors FUN_0047ac30 / FUN_0047bc80 and dtor FUN_0047ace0, `Gate` ctor FUN_0047b810 / dtor FUN_0047ad50,
+`GuildGroup` dtor FUN_004802d0; table getters `ITableBase<GTIGetRateGap>::GetTotal` FUN_00479040, `<GTIServer>` FUN_00479060,
+`<GTIGetRate>` FUN_005c6f80, `<GTIBreedSubject>` FUN_005c6fa0. The folded `CGambleObject::go_Get_MaxEnterPlayerCnt`
+used on TickTimers reads `m_bEnable` (+8): "timer running".
+
+### 5.2 Manager user, win event, scores
+
+```pseudo
+GuildGroup::CheckManagerUser()                               @ FUN_004798f0
+    first member (grade order) whose handle is a live object:
+        already m_pManageruser → return
+        m_pManageruser = it; → guild members of this side in its map (AxialListPacketBroadcastByGuild(m_GuildNumber),
+            so_AllInMap includeSelf 1) 0x74E1 NC_GUILD_TOURNAMENT_MANAGERUSERMSG_CMD {Name5 CharID = its CharName}
+            # client GuildTask FUN_006b55d0: "Guild Skill Use Authority is transferred to %s"
+    none online: m_pManageruser = NULL (no packet)
+    # the pointer is not cleared when the object leaves; PlayerUnRegister re-runs CheckManagerUser (§4.4)
+
+GuildGroup::GetGuildMaster() → ShineObject*                  @ FUN_004798a0
+    members[0] if it is a live object and its grade is 0, else NULL
+
+GuildGroup::SendWinEventToScript()                           @ FUN_0047a580
+    anchor = m_pManageruser, else CheckManagerUser(); none → return (the win is not reported)
+    fm_ScriptInterrupt(anchor's map, ScriptInterruptManager::sim_UnitEvent, InterruptEventWinGuild{m_GuildNumber})
+    # the map script's `WinGuild` unit interrupt fires (Z09 §15.6); the script ends the match (gtresult, Z09 §24.8)
+
+GuildGroup::AddScore(n)                                      @ FUN_0047af50   (DeadPlayer, §4.6)
+    m_unAllGuildScore += n; m_unGuildScore += n
+    win = GTWinScore row 0 (4000), 2000 when GTIGetRateGap is empty    # same wrong table test as Update (original bug) Z16-B9
+    m_unAllGuildScore ≥ win → SendWinEventToScript()
+    # no 0x74DD here: the caller sends it
+
+GuildGroup::SetSkillPoint(n)                                 @ FUN_0047afa0
+    m_unKillerPoint = n
+    members not empty: anchor = m_pManageruser or CheckManagerUser() (none → return)
+        → anchor only (data stream vt 0x2f8) 0x74CE NC_GUILD_TOURNAMENT_SKILLPOINT_CMD {u16 wSkillPoint = (u16)n}
+        # client FUN_006b2660: updates GTTSkillWin / GTTMiniSkillWin and opens the mini skill window
+        # only the manager user sees the points; PlayerUnRegister re-sends them to a new manager (§4.4)
+```
+
+### 5.3 Guild skills: 0x74CF and the cool-downs
+
+```pseudo
+GuildGroup::SetTournamentType(type)                          @ FUN_0047db00   (Initialize, §4.3)
+    m_nTournamentType = type; n = GuildTournamentSkillTable::GetUseSkillCount(type, 0xFFFFFFFF)   # every row of the type
+    m_vecGuildBuffUseTime cleared; for i in 0…n−1:
+        row = GetStateByIndex(type, i); none → log only (the vector then has fewer entries than skills)
+        push TickTimer(delay = row.DlyTime · 10 / 1000)             # ms → ticks; 2016: 30 (3 s), skill 5: 100 (10 s)
+
+0x74CF NC_GUILD_TOURNAMENT_USESKILL_REQ {u16 wUseSkillNumber}   @ FUN_00477b20   (re-read of Z08 §8.1)
+    gts = p's map system; none → 0x74D0 {err 0x1B42, 0xFFFF} (sp_NC_GUILD_TOURNAMENT_USESKILL_ACK @ FUN_00476d70)
+    SetErrorDelegate(sp_NC_GUILD_TOURNAMENT_USESKILL_ACK of p)      # every error below → p 0x74D0 {err, 0xFFFF}
+    if gts.GuildBuffUse(p, wUseSkillNumber):
+        sp_NC_GUILD_TOURNAMENT_USESKILL(p, 0x1B40, n)               @ FUN_00475bd0
+            → p (game stream) 0x74D0 NC_GUILD_TOURNAMENT_USESKILL_ACK {u16 err 0x1B40, u16 wUseSkillNumber n}
+            n ≠ 0xFFFF → all in p's map 0x74D1 NC_GUILD_TOURNAMENT_USESKILL_CMD {u32 regGuildNumber = p.guildNo, u16 n}
+    ClearErrorDelegate()
+    # client 0x74D0 FUN_006b3440: 0x1B40 → GTTSkillWin::StartCoolTime(n), else the error text in the chat window;
+    # 0x74D1 FUN_006b66e0: "%s Guild used the Skill %s" (guild name from the client's tournament info, skill
+    # name from GuildTournamentStateDesc)
+
+GuildTournamentSystem::GuildBuffUse(p, n) → bool             @ FUN_0047b9a0   (also GM `&useguildskill`, Z11 §6.3)
+    g = group with m_GuildNumber == p.guildNo (vt 0x818)
+    none → sink 0x1B4F, then sink 0x1B4F again, false       # two error acks (original bug) Z16-B15
+    (g.m_pManageruser or g.CheckManagerUser()) ≠ p → sink 0x1B4C, false
+    return g.UseGuildSkill(n, enemy = the other group)
+
+GuildGroup::UseGuildSkill(n, enemy) → bool                   @ FUN_0047b140
+    n < 0 or n ≥ |m_vecGuildBuffUseTime| → log, sink 0x1B4D, false
+    row = GetStateByIndex(m_nTournamentType, n); none → log "GuildTourmentSystem::UseGuildSkill Not Find
+        GuildTournamentState Type :<type>  ID:<n>", sink 0x1B4D, false
+    cool-down timer[n] running → sink 0x1B50, false
+    row.DeathPoint > m_unKillerPoint → sink 0x1B4B, false
+    SetSkillPoint(m_unKillerPoint − row.DeathPoint)                 # → 0x74CE to the manager
+    target = (row.TargetType == TARGET_MYGUILD) ? this : enemy; target ≠ NULL → target.EverythingGiveBuff(row.StaName)
+    timer[n].Enable(true); true
+    # 2016 rows (§4.2): 0 StaGldRestore 20 pts own, 1 StaGldMoveSpeedUp 15 own, 2 StaGldACMinus 80 enemy,
+    # 3 StaGldSlow 50 enemy, 4 StaGldStun 60 enemy, 5 StaGldAtkUp 0 own (free, 10 s cool-down)
+
+GuildGroup::EverythingGiveBuff(staName, unused)              @ FUN_00479760
+    abstate = dic_abstate.as_FromName(staName); unknown → sink 0x1B4D (this group's), return
+    for each member: live player, still in this guild (vt 0x818 == m_GuildNumber), active mode (smo_IsActiveMode):
+        so_AbnormalState_Set_Simple(abstate, strength 1, 1) (vt 0x644)    # no range check: the whole side on the map
+
+GuildGroup::Update(dt)                                       @ FUN_0047b480   (from GuildTournamentSystem::Update, §4.3)
+    m_LastGuildMasterReviveTime fires → Enable(false); GuildMasterBuffRun()     # 30 s after the master's revive
+    every cool-down timer that fires → Enable(false)                            # skill usable again
+    m_FlagMultiplelTime fires → SetFlagMultiple(1); Enable(false)               # GTI_Bless over
+
+GuildGroup::GuildMasterBuffRun()                             @ FUN_0047b040   (PlayerRegister of a grade-0 member, Update)
+    m = members[0]; live object and grade 0:
+        name = GuildTournamentMasterBuffTable::GetMasterBuff(m_nTournamentType) (2016: StaAcaMsBuf7PMain)
+        known abstate → m.so_AbnormalState_Set(idx, 1, abstate, now, 0, 0xFFFFFFFF, 0, 0, 0) (vt 0x638)
+```
+
+### 5.4 Gates, team NPCs, advantage item boxes
+
+```pseudo
+GuildGroup::ChangeGateState(bUse, hFlag) → bool              @ FUN_0047e330   (CaptureFlag, §4.5)
+    gate = first of m_vecGuildGates with hFlagNumber == hFlag; none → false
+    bUse:  if !gate.bIsUse: m_nCaptureFlagCount++; look = gate.strUseGateName
+    !bUse: if gate.bIsUse:  m_nCaptureFlagCount−−; look = gate.strunUseGateName
+    gate.bIsUse = bUse
+    anchor (m_pManageruser or CheckManagerUser()) → all in its map 0x74DD NC_GUILD_TOURNAMENT_SCORE_CMD
+        {PartMask 0, regNumber m_GuildNumber, unAllScore, unCaptureFlagCount = m_nCaptureFlagCount, unPlayerNum 0}
+    id = mdb_2MobID(look); 0xFFFF → log, false
+    npc = object hGateNumber; none → false; not an NPC (so_ObjectType vt 0x4d0 ≠ 4) → log, sink 0x1B41, false
+    npc.sm_InitBriefInfo(handle, id, 0) (vt 0xf70: the gate becomes that mob, e.g. open / closed gate); SendBriefChange(npc); true
+    # so m_nCaptureFlagCount counts the flags this side holds that have a gate of this side
+
+GuildTournamentSystem::AddTeamNPC(h)                         @ FUN_0047c700   (Pine GTRegisterNPC, Z09 §22.4)
+    o = som_GetObject(h); none → assert "GuildTournamentSystem::AddTeamNPC Not Find Handle ", return
+    g = group with m_GuildNumber == o.so_mobile_GetGuildRegnum (vt 0x828, set just before by so_mob_SetGuildRegNum)
+    none → sink 0x1B4F, assert "…AddTeamNPC Not Find Cur Guild Group"
+    GuildGroup::AddTeamNPC(h) @ FUN_0047c120: push h into m_MyTeamNPCs unless already present
+
+GuildTournamentSystem::AddAdvanItemMonster(info {mapName, strGroupName, AdvanIndex}, guild)   @ FUN_00480f60
+    (Pine `GTMobRegenKey <group> <AdvanIndex> <guild>`, Z09 §22.4; GuildTournament.ps: the `lose_Itembox_*` groups)
+    bg = MobHatchery::mg_FindBreedGroup(mapName, strGroupName); none → assert "…Not Find BreedGroup :<name>", return
+    bg.mbg_SetEnableNextRegen(false)                                    # item boxes start switched off
+    g = group of guild: push info into g.m_vecAdenItemInfo
+    none → sink 0x1B4F (push read in the assembly at 0x481004), assert "…AddAdvanItemMonster Not Find GuildGroup :<guild>"
+
+GuildGroup::SetAdvan(adv)                                    @ FUN_00479ab0   (ChangeAdvanRule, §4.6)
+    m_Advan = adv
+    for each info in m_vecAdenItemInfo: bg = mg_FindBreedGroup(info.mapName, info.strGroupName)
+        none → assert "GuildTournamentSystem::GuildGroup Not Find BreedGroup :"
+        else bg.mbg_SetEnableNextRegen(adv.m_IsAdvan and adv.m_nLevel ≥ info.AdvanIndex)
+    # the trailing side's item-box groups regenerate, more of them the larger the gap (level 0…2, GTIGetRateGap)
+```
+
+### 5.5 Item boxes: `GTIEffect` and the GTI* tables
+
+The item boxes are NPCs whose click action is `GTIEffect` (`NPCAction::GTItemAction::exe` @ FUN_005c1120, Z09 §16.5):
+box alive (mode ≠ 3), clicker on layer sub 0 or 1 (not an observer), clicker's map has a system → `CreateItemEffect(gts,
+box, clicker, 0)`. The GM word `&gtieffect [id]` (Z11 §7.2) calls it with a fixed id.
+
+| File (row, size) | Fields | Use | 2016 content |
+|---|---|---|---|
+| GTIGetRate.shn (`GTIGetRate`, 7) | u8 ID, u8 Win1, Lose1, Win2, Lose2, Win3, Lose3 | weights of the item roll; `DataProcess` @ FUN_005c7350 sums each column into `AllProbability[6]` (order Win1, Win2, Win3, Lose1, Lose2, Lose3) | 20 items, e.g. ID 2 (Speed) 150/150/160/100/180/90, ID 18 (Breed06) 2/2/1/18/0/25 |
+| GTIServer.shn (`GTIServer`, 0x4c) | u8 ID, char InxName[33], TargetType SubjectTarget +0x22, u8 EnemyNumber +0x26, GTIActionType +0x27, char Index[32] +0x2b, u8 Value +0x4b | the effect rows; one ID may have several rows (Bomb 3, Virus 2) | see below |
+| GTIBreedSubject.shn (`GTIBreedSubject`, 0x41) | char InxName[33], char MobIndex[32] | `GetByIndexName(name)` @ FUN_005c73e0 (linear, exact match): which mob may breed | GTI_Breed01…06 → GTI_TotemSummon |
+| GTIGetRateGap.shn | §4.2 | advantage level (ChangeAdvanRule) | 200 / 500 / 1000 |
+
+Loaded by `Table::Load<…>` FUN_005b48f0 / 005b4a30 / 005b4b70 / 005b4cb0 → `ITableBase<…>::Load` FUN_005b2a40 / 005b2b20 /
+005b2c00 / 005b2ce0 (table objects FUN_005b1320 / 005b1360 / 005b13a0 / 005b13e0), same scheme as §4.2.
+`GTIActionType`: 0 GTIT_ACTISKILL, 1 GTIT_ABSTATE, 2 GTIT_FLAG, 3 GTIT_MOBBREED. 2016 GTIServer rows: ABSTATE on
+TARGET_ME (1): Speed, Protect, Mirror, Hide, Scan, Bomb (StaGTIBomb1 / 2 / Die); ABSTATE on TARGET_ENEMYGUILD (9): Blind,
+Meta_Slime, Binding (EnemyNumber 3), ReverseOrder, Virus (Start / Move, EnemyNumber 3); ACTISKILL on TARGET_MYNPC (11):
+Confusion (skill GTIConfusion), KnockBack (GTIKnockBack); MOBBREED on TARGET_MYNPC: Breed01…06 (2 × GTI_AngryWolf,
+GTI_WereBear, GTI_KingSpider, GTI_Mandrake, GTI_FireNix, GTI_MiniDragon); FLAG: Bless (StaGTIRatePoint).
+
+```pseudo
+GTIGetRateTable::GetItemIDbyProbabilityCalculate(bAdvan, level) → u8 ID     @ FUN_005c7250
+    level > 2 → assert "…Level Over Value :", level = 0
+    col = level + (bAdvan ? 3 : 0)          # 0 Win1, 1 Win2, 2 Win3, 3 Lose1, 4 Lose2, 5 Lose3: the trailing side uses Lose
+    r = rand() % AllProbability[col]
+    for each row: r −= row[col]; if r < 1: return row.ID
+        # picks a row when r ≤ its cumulative weight: weight-0 rows can be drawn and every row's share is off by one (original bug) Z16-B13
+    (not reached with the 2016 data) assert "…Probability error :", 0
+
+GuildTournamentSystem::CreateItemEffect(box, p, forcedID)    @ FUN_0047c1e0
+    p NULL or not registered (IsPlayerRegister) → return
+    g = p's group (vt 0x818); none → sink 0x1B4F, return
+    id = forcedID ≠ 0 ? forcedID : GetItemIDbyProbabilityCalculate(g.m_Advan.m_IsAdvan, (u8)g.m_Advan.m_nLevel)
+    → p (game stream) 0x74F0 NC_GUILD_TOURNAMENT_ITEM_PICK_CMD {u16 GTIiemID = id}
+        # client FUN_006b5750: "Used %s" with the GTIView name; unknown id: nothing
+    targets = []; first = true
+    for each GTIServer row with ID == id (missing record → assert "GuildTournamentSystem::CreateItemEffect", stop):
+        GTIT_FLAG: g.SetFlagMultiple(2); InitFlagAbStateSetup() (§4.5); continue
+        targets empty → MakeGTItemTargets(targets, box, p, row) else first = false   # later rows reuse the first row's targets
+        for each t in targets (stop at a NULL entry):
+            GTIT_ABSTATE: a = abstate row.Index (unknown → assert "…Not Find Abstate ID :<id>", return)
+                if !t.so_AbnormalState_Resist(a) (vt 0x634):
+                    t.so_AbnormalState_Set_Simple(a, strength = row.Value, 1) fails → assert "templog :<id>"
+                    first → t.so_ply_GtItemEffectMsg(id) (vt 0xab0, players only @ FUN_00560670):
+                        → t 0x74F1 NC_GUILD_TOURNAMENT_ITEM_EFFECT_CMD {u16 GTIiemID = id}
+                        # client FUN_006b57d0: GTIView kind 1 "{blue}%s Item works perfectly", 2 "{red}%s Debuff works perfectly"
+            GTIT_ACTISKILL: skill = SkillDataBox::GetSkillIndexByName(row.Index) (none → assert
+                "ShineObjectClass::ShineMob::sm_UseWeapon : Null skill", return)
+                t is a ShineMob and sm_IsUseSkill(skill) == 1: smo_SkillBash_Casting(t, skill, target t, no spot, −1)
+                    (the team NPC casts on itself; Z03); first → vt 0xab0 (no-op for mobs)
+            GTIT_MOBBREED: s = GTIBreedSubject row.InxName
+                s and t has a mob data box (vt 0x70c; players: none) and t's InxName ≠ s.MobIndex → skip t
+                id2 = mdb_2MobID(row.Index); 0xFFFF → assert "…CreateItemEffect : Null MobIndex", return
+                row.Value times: m = som_AllocObject(type 5) (none → assert "…Too many mob");
+                    m.so_mob_Regenerate(t's map, t.so_mob_RegenLocation, handle, id2, …) (vt 0x6e0, Z09)
+                    ok → m.so_mob_SetGuildRegNum(t's guild reg number, vt 0x828 → 0x900) (fights for t's side)
+                    failed → som_FreeObject(m, REMOVE_NOW)
+            other → assert "…Not Define ACtionType ID :<id>"
+    # an ID with no GTIServer row does nothing after 0x74F0
+
+GuildTournamentSystem::MakeGTItemTargets(out, box, p, row)   @ FUN_0047be70
+    out NULL or row NULL → assert "GuildTournamentSystem::MakeGTItemTargets", return; out cleared
+    TARGET_ME:          p if a mobile object in active mode
+    TARGET_MYNPC:       g = group with m_GuildNumber == p.vt 0x828 (none → sink 0x1B4F, return); every live object of g.m_MyTeamNPCs
+    TARGET_ENEMYGUILD:  the other group (A.no == p.guild ? B : A): every live member in active mode
+    TARGET_BOX:         the box itself, then return (EnemyNumber ignored)
+    other:              nothing
+    row.EnemyNumber ≠ 0: std::random_shuffle(out); drop entries from the end until |out| ≤ EnemyNumber
+```
+
+`GuildGroup::SetFlagMultiple(n)` @ FUN_00479bd0: → all in the map of the first live member 0x74F2
+NC_GUILD_TOURNAMENT_ITEM_FLAG_CMD {u8 FlagScoreMultiple = n, u32 nGuildRegNo = m_GuildNumber} (layout §4.4); m_FlagMultiple
+= n; n > 1 → m_FlagMultiplelTime delay 600 (60 s); timer enabled iff n > 1. Update (§4.3) multiplies the flag score by it.
+
+### 5.6 The dice game
+
+Started by the map script (`DiceGameStart 15`, Z09 §24.8: `DiceGameStart(gts, seconds × 10)` @ FUN_0047ada0, which
+also sends 0x74D2 NC_GUILD_TOURNAMENT_DICEGAME_START_CMD; layout in Z09's annotation). Red = group A's manager user,
+blue = group B's; nothing starts when either side has none.
+
+```pseudo
+DiceGame::Start(ticks, red, blue) → true                      @ FUN_00478ef0
+    m_RedPlayerNumber = red; m_BluePlayerNumber = blue (charNo, vt 0x344); both results 0
+    m_nDelayTic delay = ticks, enabled
+    m_NotifyOfEndTimer delay = ticks > 50 ? ticks − 50 : ticks, enabled        # fires 5 s before the end
+
+0x74D3 NC_GUILD_TOURNAMENT_DICEGAME_THROW_REQ {}               @ FUN_00477ba0   (re-read of Z08 §8.1)
+    no system → p 0x74D4 NC_GUILD_TOURNAMENT_DICEGAME_THROW_ACK {u16 err 0x1B42} (@ FUN_00475e30)
+    SetErrorDelegate(sp_NC_GUILD_TOURNAMENT_DICEGAME_THROW_ACK of p); DiceGameThrow(p) @ FUN_0047af20 = DiceThrow(p.charNo); ClearErrorDelegate()
+    # no success ack: the result goes out as 0x74D5. Client 0x74D4 FUN_006b34c0: any code ≠ 0x1B40 → error text
+
+DiceGame::DiceThrow(charNo)                                    @ FUN_0047a630
+    m_nDelayTic not running → sink 0x1B53, return
+    charNo == red:  red result 0 → roll; else sink 0x1B4E
+    charNo == blue: blue result 0 → roll; else sink 0x1B4E
+    other → sink 0x1B4C
+    roll: result = rb_1000() % 6 + 1, rolled again while equal to the other side's result (no draws)
+        Send_DiceThrowResult(charNo, result) @ FUN_00478f50: thrower found by charNo → all in its map 0x74D5
+            NC_GUILD_TOURNAMENT_DICEGAME_THROW_CMD {u32 GuildRegNumber = thrower's guild (vt 0x818), u32 unDiceGameResult}
+            (thrower gone: no packet)
+        # client FUN_006b3530: stores the result under the side whose guild number 0x74D2 gave; shows own / other dice
+    both results set → End()
+
+DiceGame::End()                                                @ FUN_00479d00
+    m_nDelayTic running: Enable(false); results differ and m_DiceGameEnd set → m_DiceGameEnd(winner charNo)
+
+DiceGame::Update(dt)  (vt 0, from GuildTournamentSystem::Update)   @ FUN_0047b540
+    only while m_nDelayTic runs:
+    m_nDelayTic fires → DiceThrow(red); DiceThrow(blue); Enable(false)        # automatic throw for whoever has not
+    m_NotifyOfEndTimer fires → o = red player, else blue player (by charNo); none → return (timer stays on)
+        → all in o's map 0x74D6 NC_GUILD_TOURNAMENT_DICEGAME_BEFORE_END_TIME_MSG_CMD {u32 unEndTime = 5}; Enable(false)
+        # client FUN_006b2830: only unEndTime == 5 → GTTDiceWin::SetCount(1) ("rolled automatically after 5 seconds")
+
+GuildTournamentSystem::DiceGameWinGuild(charNo)                @ FUN_0047ba80   (= m_DiceGameEnd)
+    w = som_FindPlayer(charNo); none → return                   # the winner's manager left the zone: no points
+    g = w's group (vt 0x818); none → sink 0x1B4F
+    g.m_unAllGuildScore += 100; g.m_unGuildScore += 100
+    win check as AddScore (Z16-B9 pattern) → g.SendWinEventToScript()
+    # no 0x74DD: clients see the 100 points only with the next score packet (original bug) Z16-B16
+```
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1026,11 +1324,21 @@ fm_GuildTournamentEnemy(g1, g2) @ FUN_004632f0 = system && IsBattleGuild(g1, g2)
 | Z16-B10 | `GuildTournamentSystem::PlayerUnRegister` FUN_0047fd50 | 0x74C9 FIGHTER_OUT carries `(u8)m_nTournamentType` in its `nTournamentSeed` field (0x74C8 carries the seed) | wrong seed on the wire; harmless only because the 2016 WM ignores the field (W03 §8.3) | send `m_nTournamentSeed` |
 | Z16-B11 | `GuildTournamentScoreTable::GetScore` FUN_005c7080 | a victim grade > 6 asserts but still reads `GradeScore[grade]` past the 7-entry row | the kill score comes from the next row's MAP_TYPE / scores | return 0 (or clamp) after the assert |
 | Z16-B12 | `GuildTournamentSystem::ChangeAdvanRule` FUN_0047a2d0 | returns without touching either group when the scores are equal | after a tie the guild that trailed before keeps its comeback advantage although nobody trails | clear both advantages when the gap is 0 |
+| Z16-B13 | `GTIGetRateTable::GetItemIDbyProbabilityCalculate` FUN_005c7250 | draws `r = rand() % sum` and returns the first row with `r − cumulative ≤ 0` (`< 1`) | a row with weight 0 can be drawn (r on its boundary, e.g. GTI_Bless in Win3 for r = 0) and every row's chance is shifted by one in `sum` | return the first row with `r < cumulative` |
+| Z16-B14 | `GuildGroup::SendPlayerAllScoreInfo` FUN_0047f260 | after more than 200 rows it sends the list but never empties the row vector | each further member re-sends the whole growing list; lists over the packet limit fail with "Packet Too Long" (dead with real guild sizes) | clear the vector after each 200-row chunk |
+| Z16-B15 | `GuildTournamentSystem::GuildBuffUse` FUN_0047b9a0 (0x74CF) | a requester whose guild is in neither group gets the 0x1B4F error twice (the else branch falls through to the final sink call) | two 0x74D0 error acks, the message shows twice | one sink call |
+| Z16-B16 | `GuildTournamentSystem::DiceGameWinGuild` FUN_0047ba80 | adds the 100 dice points without sending 0x74DD | the score boards show the old score until the next flag tick or kill (up to 60 s) | broadcast 0x74DD as the flag tick does |
 
 ## N. Not reconstructed / uncertain
 
-- Parts 1–3 (KQ, GT core §4). GT groups / dice / items (§5) and the match lifecycle (§6) follow in later parts; see
+- Parts 1–4 (KQ, GT core §4, groups / skills / items / dice §5). The match lifecycle (§6) follows in a later part; see
   `docs/plan/status/Z16.md`.
+- §5.5 GTIT_MOBBREED: the argument of `so_mob_Regenerate` taken from the target's vt 0x6d0 (a folded 0-returning stub on
+  mobs / NPCs, `so_GetCharBriefInfo` on players) and what `so_mob_RegenLocation` returns for a player target were not
+  traced; with the 2016 data only team NPCs (TARGET_MYNPC) breed.
+- §5.1: no reader of `m_unGuildScore` and no writer of `m_UseSkillCount` / `DiceGame::m_StartTime` was found in parts 3–4;
+  the sweep part should `rg` their offsets.
+- §5.6: `rb_1000() % 6` is slightly biased towards 1…4 if `rb_1000` returns 0…999 (Z01 RandomBox, not checked).
 - §4.4: a fighter who leaves the tournament map through `so_Unmark` with REMOVE_REVIVE / REMOVE_WARP / REMOVE_LOGOUT
   is not unregistered there; whether another path (`sp_2Roumen`, the cross-zone link, §6) removes the entry from
   `m_vecGuildMembers` was not traced.
