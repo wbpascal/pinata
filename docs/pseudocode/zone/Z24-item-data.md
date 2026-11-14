@@ -155,11 +155,11 @@ ShinePlayer::sp_ItemUseBroadcast(p, entry, itemID)                              
 | sun | `RidePetDataBox::rpdb_Load`, `ChargedItemEffectDataBox<RIDING>::cideb_Load` (part 3) | | | | |
 | full | `MysteryVaultTable::DataProcess` FUN_005c8590 (§4) | every MysteryVaultServer.shn box | ui_mysterybolt | "UsePresentBox" | reset |
 | sleep | `cStateItemDataBox::sidb_Load` FUN_0058c920 (§3) | every StateItem.shn item | ui_ByAbstate | ItemUseSkill | reset |
-| long | `MoverDataBox::mvdb_Load` FUN_004bf960 (part 2) | | | | |
+| long | `MoverDataBox::mvdb_Load` FUN_004bf960 (§5.3) | MoverHG.shn food items (FeedType ≠ `-`); MoverItem.shn summon items | ui_horsefood; ui_ride | "UseSkill"; "UseRide" | reset |
 
 `uie_SetChargedBuffer` replaces the effect row by `uie_DefStruct`, so an item that is both in ItemUseEffect.shn and
 in a later table silently loses its use-effect row (no warning). 2016: ItemUseEffect, ItemUseFunction, StateItem and
-MysteryVaultServer have no item in common (checked pairwise; the part-2/3 tables are checked there).
+MysteryVaultServer have no item in common (checked pairwise); the Mover tables overlap ChargedEffect and Riding (§5.5); §6 checks its own.
 
 ### 1.6 Invariants with the 2016 data
 
@@ -370,7 +370,212 @@ exactly 1000, every group run belongs to one box, and the file's last run is gro
 
 ## 5. `MoverDataBox` (MoverMain / MoverAbility / MoverHG / MoverItem / MoverUseSkill, stage long)
 
-*(part 2)*
+The mount ("mover") definition tables. Global `MoverDataBox moverdatabox` (0x13388f90; 0xab4 bytes; built by the
+dynamic initializer FUN_0069af40 = ctor `MoverDataBox::MoverDataBox` FUN_004bf8a0 + `atexit` of FUN_006a00c0 →
+`~MoverDataBox` FUN_004c0310). Loaded once by `zs_start_long` (Z10 §7.1, D10: reads `useditemeffect` (wide) and
+`itemdatabox`); the consumers (mover summon, ride, feeding, upgrade) are Z13.
+
+### 5.1 Data structures
+
+```pseudo
+MoverDataBox (0xab4)
+    +0x000 mvdb_BinData { BinaryDataBox<MoverMain> m_MoverMain +0x000, <MoverAbility> m_MoverAbility +0x074,
+                          <MoverHG> m_MoverHG +0x118, <MoverItem> m_MoverItem +0x1a4, <MoverUseSkill> m_MoverUseSkill +0x224 }
+                        # ctor FUN_004bf6f0: BinaryData ctor + vftable + bdb_defaultblock zeroed per reader; dtor FUN_004bf7f0
+    +0x2a4 u32 mvdb_MaxID                      # ctor 0
+    +0x2a8 MoverDataBoxIndex* mvdb_Index        # new[MaxID + 1] (count stored in the 4 bytes before), ctor null
+    +0x2ac BTree mvdb_BTree_MoverIndex          # MoverMain.MoverIDX → MoverID
+    +0x6b0 BTree mvdb_BTree_ItemIndex           # MoverItem.ItemIDX (item InxName) → MoverID
+
+MoverDataBoxIndex (0x20), one per MoverID 0 … MaxID      # ctor FUN_004bf950 (empty vector), dtor FUN_004bf920 (frees it)
+    +0x00 MoverMain*    mvdbi_pBase         # null = no MoverMain row with this ID (holes in the ID range)
+    +0x04 MoverAbility* mvdbi_pAbility      # null = no MoverAbility row (every mover in 2016)
+    +0x08 MoverHG*      mvdbi_pHG           # null = no MoverHG row
+    +0x0c MoverItem*    mvdbi_pSummonItem   # null = no MoverItem row
+    +0x10 std::vector<MoverUseSkill*> mvdbi_vUseSkill     # every MoverUseSkill row of the mover, file order
+```
+
+All pointers point into the readers' row arrays, which live as long as the process (the box is never reloaded, §8).
+`enum MOVER_SYSTEM_TYPE { MVST_RIDE 0, MVST_RIDE_ADEL 1, MVST_MOVER 2, MVST_MAX 3 }`.
+
+### 5.2 Files, readers, column maps
+
+| File (`../9Data/Shine/`) | Row struct | Reader | key | row size | rows 2016 |
+|---|---|---|---|---|---|
+| MoverMain.shn | `MoverMain` | `BinaryDataBox<MoverMain>::bdb_ReadData` FUN_004bf320 | 0xba (186) | 0x33 | 461 |
+| MoverAbility.shn | `MoverAbility` | `BinaryDataBox<MoverAbility>::bdb_ReadData` FUN_004bf3e0 | 0x388 (904) | 0x61 | **0** |
+| MoverHG.shn | `MoverHG` | `BinaryDataBox<MoverHG>::bdb_ReadData` FUN_004bf4a0 | 0x95 (149) | 0x4a | 461 |
+| MoverItem.shn | `MoverItem` | `BinaryDataBox<MoverItem>::bdb_ReadData` FUN_004bf560 | 0x2c (44) | 0x40 | 461 |
+| MoverUseSkill.shn | `MoverUseSkill` | the **same** FUN_004bf560 (the call casts `m_MoverUseSkill` to `BinaryDataBox<MoverItem>*`; key and row size are equal) | 0x2c (44) | 0x40 | **0** |
+
+All five use the Z20 §2.1 template (`CDataReader::Read(path, key, size)`, readfail → two asserts + `ShineExit`); the
+2016 files pass (keys and sizes = `S01-shn-structs.tsv`). Fixed paths, no per-world override. Columns = members in
+order (S01: "same"); "Read by" lists the functions that read the member (`->member` in the PDB decompile; bodies Z13):
+
+MoverMain (0x33):
+
+| Column (type:size) | Member | Off | Use |
+|---|---|---|---|
+| MoverID (3:4) | `u32 MoverID` | 0x00 | index into `mvdb_Index`; must be unique (fatal). 2016: 1 … 476 (index entry 0 and 15 other IDs unused). Read by `smv_RegenComplete` 00441fd0, `sp_MoverSystem_SummonItem` 0045ec10, `so_smv_GetMoverID` 0055efa0 |
+| MoverIDX (9:32) | `char MoverIDX[32]` | 0x04 | key of `mvdb_BTree_MoverIndex`; the other four files refer to it |
+| CastingTime (3:4) | `u32 CastingTime` | 0x24 | ms; `sp_MoverSystem_Cast` 0045d550 (2016: 1500) |
+| CoolTime (3:4) | `u32 CoolTime` | 0x28 | ms; `sp_MoverSystem_SummonItem` |
+| RunSpeed (2:2) | `u16 RunSpeed` | 0x2c | `so_RunSpeed` 0055ec40, `so_WalkSpeed` 0055eb20 (speed check: Z10 §5.4) |
+| WalkSpeed (2:2) | `u16 WalkSpeed` | 0x2e | `so_WalkSpeed` |
+| DurationHour (2:2) | `u16 DurationHour` | 0x30 | `sp_MoverSystem_SummonItem` (item lifetime *(inferred)*) |
+| MaxCharSlot (1:1) | `u8 MaxCharSlot` | 0x32 | seats; `so_smv_SummonMover` 0055fdf0 |
+
+MoverAbility (0x61; packed):
+
+| Column | Member | Off | Use |
+|---|---|---|---|
+| MoverIDX (9:32) | `char MoverIDX[32]` | 0x00 | mover (fatal if unknown) |
+| MoverLv (1:1) | `u8 MoverLv` | 0x20 | `so_GetLevel` 0055eae0 |
+| HP (3:4) | `u32 HP` | 0x21 | `RidingInitHP` 0044f930 (also `so_MaxHP` 0055ed80, `so_SetHP` 0054a610, `sp_HorseItemSave` 0045e810, `so_MoverSystem_NoDamage` 0055efc0 test the pointer) |
+| WCMin, WCMax, MAMin, MAMax (3:4 each) | `u32` | 0x25, 0x29, 0x2d, 0x31 | no reader found *(inferred: unused)* |
+| AC, MR, TH, TB (2:2 each) | `u16` | 0x35, 0x37, 0x39, 0x3b | no reader found *(inferred: unused)* |
+| ResIndex (9:32) | `char ResIndex[32]` | 0x3d | `so_smv_SummonMover` |
+| AbsoluteSize (3:4) | `u32 AbsoluteSize` | 0x5d | `so_BodySize` 0055eb00 |
+
+MoverHG (0x4a; hunger gauge):
+
+| Column | Member | Off | Use |
+|---|---|---|---|
+| MoverIDX (9:32) | `char MoverIDX[32]` | 0x00 | mover (fatal if unknown) |
+| FeedType (9:32) | `char FeedType[32]` | 0x20 | food item InxName or `-` (no food); the item gets the horse-food actor (§5.3). Also `so_smv_CanUseFeedItem` 0055f840, `sp_NC_ITEM_MOVER_UPGRADE_REQ` 0051c850 |
+| RestoreAmount (2:2) | `u16` | 0x40 | `so_smv_Feeding` 0055f8e0 |
+| MaxHG (2:2) | `u16` | 0x42 | `RidingInitHungry` 0044fe00, `smv_FoodEat` 0055f110, `so_smv_CanUseFeedItem`, `so_smv_Feeding` |
+| CreateHG (2:2) | `u16` | 0x44 | no reader found *(inferred: unused; 2016: equal to MaxHG in all 461 rows)* |
+| Tick (2:2) | `u16` | 0x46 | `smv_FoodEat`, `so_smv_SummonMover` |
+| ConsumeHG (2:2) | `u16` | 0x48 | `smv_FoodEat` |
+
+MoverItem (0x40): `char MoverIDX[32]` +0x00 (mover, fatal if unknown), `char ItemIDX[32]` +0x20 (the summon item's
+InxName, fatal if not in ItemInfo; key of `mvdb_BTree_ItemIndex`).
+MoverUseSkill (0x40): `char MoverIDX[32]` +0x00 (mover, fatal if unknown), `char ActiveSkillIDX[32]` +0x20 (skill
+InxName; **not checked at load**: the vector is copied into the mover's skill list by `so_smv_SummonMover` →
+`MoverSkillList::msl_Store` FUN_00449190, Z13).
+
+### 5.3 `mvdb_Load`
+
+```pseudo
+MoverDataBox::mvdb_Load(this)                                                  @ FUN_004bf960   (void; caller zs_start_long)
+    bdb_ReadData(m_MoverMain, "../9Data/Shine/MoverMain.shn")                  @ FUN_004bf320
+    bdb_ReadData(m_MoverAbility, "../9Data/Shine/MoverAbility.shn")            @ FUN_004bf3e0
+    bdb_ReadData(m_MoverHG, "../9Data/Shine/MoverHG.shn")                      @ FUN_004bf4a0
+    bdb_ReadData(m_MoverItem, "../9Data/Shine/MoverItem.shn")                  @ FUN_004bf560
+    bdb_ReadData(m_MoverUseSkill, "../9Data/Shine/MoverUseSkill.shn")          @ FUN_004bf560 (same reader, see §5.2)
+    # each failure: Z20 §2.1 (ShineExit)
+
+    # index array
+    for r in MoverMain rows: if r.MoverID > mvdb_MaxID: mvdb_MaxID = r.MoverID        # starts at 0 (ctor), unsigned
+    n = mvdb_MaxID + 1
+    mvdb_Index = new MoverDataBoxIndex[n]        # 0x20 × n + 4, saturating on overflow (n × 0x20 ≥ 2³², or + 4 > 2³²)
+    null: assert "Memory leak for index in MoverMain" (n); ShineExit("MoverDataBox::mvdb_Load")
+    for id in 0 … MaxID: pBase = pAbility = pHG = pSummonItem = null; vUseSkill.clear()    # already so from the ctor
+
+    # MoverMain
+    for i, r in MoverMain rows:
+        if r is the reader's default block: assert "MoverMain Data defblock" (i); ShineExit("MoverDataBox::mvdb_Load")
+            # (row i < count always gives a real row: dead check; same in the four loops below)
+        if mvdb_Index[r.MoverID].pBase != null: assert "Data duplicate in MoveMain.shn" (MoverID); ShineExit(same)
+        mvdb_Index[r.MoverID].pBase = r
+        mvdb_BTree_MoverIndex.bt_Insert(r.MoverIDX, r.MoverID)        # FUN_0063cba0; an equal name overwrites (Z20 §5.2):
+            # a second MoverID with the same MoverIDX is not detected; the first one can then get no Ability / HG /
+            # Item / UseSkill row (original bug) Z24-B7
+
+    # MoverAbility (one optional row per mover)
+    for i, r in MoverAbility rows:
+        default block: assert "MoverAbility Data defblock" (i); ShineExit                    # dead
+        id = mvdb_BTree_MoverIndex[r.MoverIDX]                                              # BTree::operator[] FUN_0063cc30
+        id == 0xffffffff: assert "Data duplicate in MoverAbility.shn invalid mover" (−1); ShineExit
+        mvdb_Index[id].pAbility != null: assert "Data duplicate in MoverAbility.shn not null" (id); ShineExit
+        mvdb_Index[id].pAbility = r
+
+    # MoverHG (one optional row per mover) + food items
+    food = uie_UseSkillID(useditemeffect, "UseSkill")                               # FUN_0059cba0 (§1.4)
+    null: assert "Food skill null" (0); ShineExit
+    for i, r in MoverHG rows:
+        default block: assert "MoverMain Data defblock" (i); ShineExit                       # dead; wrong file name in the text
+        id = mvdb_BTree_MoverIndex[r.MoverIDX]
+        id == 0xffffffff: assert "Data duplicate in MoverHG.shn invalid mover" (−1); ShineExit
+        mvdb_Index[id].pHG != null: assert "Data duplicate in MoverHG.shn not null" (id); ShineExit
+        mvdb_Index[id].pHG = r
+        if r.FeedType[0] != '-':                                                     # only the first char is tested
+            item = itemdatabox.idb_2itemid(r.FeedType)                               # FUN_00418ff0
+            item == 0xffff: assert "Data duplicate in MoverHG.shn invalid food item" (r.FeedType); ShineExit
+            uie_SetChargedBuffer(useditemeffect, item, ui_horsefood, food)            # FUN_005963e0: actor
+                # UseItemHorseFood (Z04 §6.3), effect row reset to uie_DefStruct; many movers share one food item
+                # (2016: 7 items for 163 rows), each row rewrites the same entry with the same values
+
+    # MoverItem (one optional row per mover) = the summon items
+    ride = uie_UseSkillID(useditemeffect, "UseRide")
+    null: assert "Ride skill null" (0); ShineExit
+    for i, r in MoverItem rows:
+        default block: assert "MoverMain Data defblock" (i); ShineExit                       # dead
+        id = mvdb_BTree_MoverIndex[r.MoverIDX]
+        id == 0xffffffff: assert "Data duplicate in MoverItem.shn" (−1); ShineExit
+        mvdb_Index[id].pSummonItem != null: assert "Data duplicate in MoverItem.shn" (id); ShineExit
+        item = itemdatabox.idb_2itemid(r.ItemIDX)
+        item == 0xffff: assert "Data duplicate in MoverItem.shn invalid mover item" (r.ItemIDX); ShineExit
+        mvdb_Index[id].pSummonItem = r
+        mvdb_BTree_ItemIndex.bt_Insert(r.ItemIDX, id)          # an item used by two movers: the last row wins, unnoticed (Z24-B7)
+        uie_SetChargedBuffer(useditemeffect, item, ui_ride, ride)          # actor UseItemRide, effect row reset
+
+    # MoverUseSkill (any number of rows per mover)
+    for i, r in MoverUseSkill rows:
+        default block: assert "MoverMain Data defblock" (i); ShineExit                       # dead
+        id = mvdb_BTree_MoverIndex[r.MoverIDX]
+        id == 0xffffffff: assert "Data duplicate in MoveMain.shn" (−1); ShineExit        # text names the wrong file
+        mvdb_Index[id].vUseSkill.push_back(r)                                        # inlined vector growth (×1.5),
+                                                                                     # "vector<T> too long" → _Xlength_error
+```
+
+The fatal-check texts in the HG / Item / UseSkill loops name the wrong file ("MoverMain Data defblock", "Data
+duplicate in MoveMain.shn") and an unknown mover is reported as "Data duplicate … invalid mover"; log only
+(original bug) Z24-B8. There is no check that a mover has an HG, Item or Ability row, that the summon item is of
+class `ITEMCLASS_RIDING`, or that the food item is `ITEMCLASS_FEED`; the consumers test the pointers (Z13).
+
+### 5.4 Accessors
+
+```pseudo
+MoverDataBox::mvdb_GetData(this, u32 id) → MoverDataBoxIndex*               @ FUN_004bf290
+    id != 0xffffffff and mvdb_Index != null and id <= mvdb_MaxID: return &mvdb_Index[id]     # entry may be all null (hole)
+    else null                                                                # caller so_smv_SummonMover 0055fdf0
+
+MoverDataBox::mvdb_GetData_ItemIndex(this, char* itemInxName) → MoverDataBoxIndex*   @ FUN_004bf2c0
+    name null: null; id = mvdb_BTree_ItemIndex[name]; id != 0xffffffff and index != null and id <= MaxID: &mvdb_Index[id]
+    # callers: RidingInitHP 0044f930, RidingInitHungry 0044fe00, sp_MoverSystem_Cast 0045d550, sp_MoverSystem_MapLogin
+    #   0045d9e0, sp_HorseItemSave 0045e810, sp_MoverSystem_SummonItem 0045ec10, sp_NC_ITEM_MOVER_UPGRADE_REQ 0051c850
+
+MoverDataBox::mvdb_GetMoverType(this, u16 itemid) → MOVER_SYSTEM_TYPE         @ FUN_004bf240
+    itemid != 0xffff and (name = itemdatabox.idb_GetItemInxName(itemid)) != null:
+        return mvdb_BTree_ItemIndex[name] != 0xffffffff ? MVST_MOVER (2) : MVST_MAX (3)
+    return MVST_MAX
+    # only caller UseItemRide::uib_DirectUse FUN_005995b0 (actor ui_ride, Z04 §6.3): player mode (vt 0x484, Z01 §4.3) 1 or 2 →
+    #   MVST_MOVER: sp_MoverSystem_Cast, else sp_HorseCast; mode 6 (riding) → get off (sp_MoverSystem_Type
+    #   FUN_0045d540 == MVST_MOVER: sp_MoverSystem_GetOff, else sp_HorseOff); returns 1 (also for other modes, no effect)
+```
+
+So a riding item (`ui_ride`) is a "mover" when it is in MoverItem.shn, otherwise a classic horse (Riding.shn,
+`ridedatabox`, §6). `MVST_RIDE_ADEL` is not produced here.
+
+### 5.5 Invariants with the 2016 data
+
+- MoverMain 461 rows, MoverID 1 … 476 unique (entries 0 and 15 unused IDs keep all pointers null), MoverIDX unique.
+- MoverAbility.shn and MoverUseSkill.shn have **no rows**: every `pAbility` is null and every `vUseSkill` empty. So
+  every mover counts as `so_MoverSystem_NoDamage` (mover with data but no ability, `docs/knowledge/Z16.md`) and no
+  mover has its own skills.
+- MoverHG and MoverItem: one row per mover, same 461 MoverIDX as MoverMain, no unknown mover, no duplicate.
+- FeedType: 298 × `-`, 163 rows with 7 food items (LifeDust 123, Hay 18, FlyStone 15, Djewel 4, Sap, Dew, Scales);
+  all exist, all `ITEMCLASS_FEED` (22). The other 6 FEED items (JewelCarrot01_1/2/3/5/6, Meat) are no mover's food
+  and keep the stage-wide actor (`ui_base`, §1.3) unless a part-3 table writes them.
+- MoverItem: 461 distinct summon items, all `ITEMCLASS_RIDING` (23), all with ItemUseSkill "UseRide". The only RIDING
+  item without a MoverItem row is `Claude` (stays `ui_base` unless §6 writes it).
+- Overlap with the other writers of `useditemeffect` (§1.5): none with ItemUseEffect, ItemUseFunction (empty),
+  StateItem, MysteryVaultServer (box column), MiniHouse, MiniHouseFurniture; no item is both food and summon item.
+  **221 summon items also have a ChargedEffect.shn row** and `Coll` also has a Riding.shn row: mvdb_Load runs last
+  (stage long), so their `useditemeffect` entry ends as `ui_ride` + "UseRide" + `uie_DefStruct`, and
+  `mvdb_GetMoverType` makes `Coll` a mover, not a Riding.shn horse (what §6's writes for them meant: part 3).
 
 ## 6. `ChargedItemEffectDataBox` and `RidePetDataBox` (ChargedEffect, MiniHouse, MiniHouseFurniture, Riding)
 
@@ -383,8 +588,8 @@ exactly 1000, every group run belongs to one box, and the file's last run is gro
 ## 8. Reload behaviour
 
 `&reloaddata` (Z11 §8.6) only accepts `ActiveSkill` and reruns `SkillDataBox::sdb_Load`. None of the tables of this
-item can be reloaded at run time: `useditemeffect` (ItemUseEffect.shn), ItemUseFunction.txt, StateItem.shn and
-MysteryVaultServer.shn are read once at start; after `&reloaddata ActiveSkill` every `useskill` of §1.5 dangles
+item can be reloaded at run time: `useditemeffect` (ItemUseEffect.shn), ItemUseFunction.txt, StateItem.shn,
+MysteryVaultServer.shn and the five Mover*.shn files (`mvdb_Load`, §5) are read once at start; after `&reloaddata ActiveSkill` every `useskill` of §1.5 dangles
 (Z20 §7). (`ITableBase::Load` clears and re-reads its reader, so a second `Table::Load<MysteryVaultTable>` would
 re-run `DataProcess` and insert every row again into the never-cleared `sm_ItemLists`; nothing calls it twice.)
 
@@ -398,9 +603,14 @@ re-run `DataProcess` and insert every row again into the never-cleared `sm_ItemL
 | Z24-B4 | `UseItemByAbstate::uib_Effect` FUN_0059c310 | roll 0…999 tested with `roll <= cumulative` | the first row wins (rate + 1)‰, the last (rate − 1)‰; a leading rate-0 row still wins on roll 0 | `roll < cumulative` |
 | Z24-B5 | `MysteryVaultTable::DataProcess` FUN_005c8590 | rate groups = runs of equal `Group` across the file; the last run is not checked | adjacent boxes with the same group number add up ("Group Rate Over" or a masked shortage); a short last group loads; latent in 2016 | check per (box, group), and at the end |
 | Z24-B6 | `MysteryVaultTable::DataProcess` | asserts "InSert Fail" when `multimap::insert` returns `end()` | dead check | – |
+| Z24-B7 | `MoverDataBox::mvdb_Load` FUN_004bf960 | MoverIDX (MoverMain) and ItemIDX (MoverItem) go into BTrees whose `bt_Insert` overwrites an equal key; only MoverID and per-mover duplicates are checked | a second mover with the same name silently takes all Ability / HG / Item / UseSkill rows of that name (the first has none); an item named by two movers summons only the last; latent in 2016 (all unique) | fatal "duplicate" check on the names too |
+| Z24-B8 | `mvdb_Load` | the fatal texts of the HG / Item / UseSkill loops say "MoverMain Data defblock" / "Data duplicate in MoveMain.shn", an unknown mover is reported as "Data duplicate … invalid mover"; the five default-block checks can never fire | misleading Assert log on bad data; dead checks | name the file and the real error |
 
 ## 9. Not reconstructed / uncertain
 
+- §5.2 "no reader found" (MoverAbility WC/MA/AC/MR/TH/TB, MoverHG CreateHG) comes from a search for `->member` in the
+  PDB decompile of the whole zone; a read through a raw offset or a copied row would be missed (Z13 reads the bodies).
+  `DurationHour` as item lifetime is *(inferred)* from its name and its reader `sp_MoverSystem_SummonItem`.
 - §1.4 client side of 0x3029: what object vt 0xc4 and FUN_0068fc00 do is *(inferred)* from the call shape (effect by
   item name); C01 lists only the two reads.
 - Z24-B2's "item 0" depends on `itemdatabox` living in zero-initialised static storage (no write to
@@ -413,4 +623,7 @@ re-run `DataProcess` and insert every row again into the never-cleared `sm_ItemL
 | `UseItemByTable` / actor bodies (`uib_CanUseItem`, `uib_Effect` of every `ui_*`) | Z04 §6.3 (done; lists every actor with its functions) | this item only builds the table; only the "by abstate" actor (StateItem's consumer) is documented here because Z04 cites just its CanUse |
 | `sp_MysteryVaultMakeItem` FUN_005658f0 (the roll) | Z05 §9.8 (done) | the consumer of §4's map |
 | `MagicContainer::mc_Load` FUN_0049c7f0 (TreasureReward.txt) | Z09 (done; `OptionReader` caller list §28.6) | writes into `useditemeffect`; listed in §1.5 only; sweep part to confirm Z09 documents its body |
+| Mover consumers: `ShineMover` (`so_smv_SummonMover` 0055fdf0, `so_smv_GetOn` 0055f380, `smv_FoodEat` 0055f110, `so_smv_CanUseFeedItem` 0055f840, `so_smv_Feeding` 0055f8e0, `so_MaxHP` / `so_SetHP` / `so_GetLevel` / `so_BodySize` / `so_WalkSpeed` / `so_RunSpeed` / `so_smv_GetMoverID`, `smv_RegenComplete` 00441fd0), player `sp_MoverSystem_Cast` / `SummonItem` / `MapLogin`, `sp_HorseItemSave`, `RidingInitHP` / `RidingInitHungry`, `MoverSkillList::msl_Store` 00449190 | Z13 (open; plan line 16 "Mounts: mover creation …, hunger") | they read the rows this item loads (§5.2 lists which member each reads); the mover lifecycle is Z13's |
+| `UseItemRide::uib_DirectUse` FUN_005995b0, `UseItemHorseFood` actor | Z04 §6.3 (done; actor table row "UseItemRide" / "UseItemHorseFood") | the ride dispatch is summarised in §5.4 because it is `mvdb_GetMoverType`'s only caller; `sp_HorseCast` / `sp_MoverSystem_Cast` bodies are Z13 |
+| `sp_NC_ITEM_MOVER_UPGRADE_REQ` FUN_0051c850 (reads `pHG.FeedType`) | Z04 §9.5 (done) | handler; this item only documents the row it reads |
 | `ItemDataBox::idb_Load` FUN_00649780, `idb_MakeSpecialID` | Z04 (done) | source of `idb_btree`, `idb_specialid`; `ItemDataBox::ReadData` is part 4 of this item |
