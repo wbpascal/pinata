@@ -217,6 +217,38 @@ ITEMS = [
              "FUN_00432ce0, …) belong here; gaps inside W02–W04 subsystems go to those items' coverage boundary instead."],
       done="Main loop, data loader, 0x0849 broadcast and the session teardown/reset chain written as pseudocode; every core "
            "gap from `coverage.py W01` either documented here or assigned to another item with a reason."),
+ dict(id="S02", phase=2, title="Shared server library: IOCP sockets, acceptor, packet buffers, CCsl script and GDP file "
+                               "readers (added by W05)",
+      out="docs/pseudocode/shared/S02-library.md", deps=["W05"], scope=[],
+      goal="Login, WorldManager and Zone link the same network and config library (classes `CIOCP`, `CSocket_IOCP`, "
+           "`CSocket_Acceptor`, `CIOBuffer` / `IOBufferContainer`, `CIOSpinLock`, `CPacket`, `CSendPacket`, `InetAddress`; "
+           "the `CCsl` / `CToken` script parser that reads ServerInfo.txt and WMServerInfo.txt; the `CGdp` packed-file "
+           "reader `CCsl::Read` opens files through). No item documents it: L00, W01, W05 and Z01 only call it (W05 §1, "
+           "§4.5, §5.2 describe what the WM sees of it). Reconstruct it once, from the WM build (PDB names), and map the "
+           "Login and Zone copies onto it: send queue and partial writes, receive buffer and framing hand-off to "
+           "`CPacket`, close / shutdown / overlapped completion, accept thread and the 3-port listener, worker-thread "
+           "loop, buffer pools and their limits; the script grammar (`#` commands, formats, data rows, includes, "
+           "remarks, tokens) and the GDP container (chunks, `GdpDecryptData`).",
+      steps=["Read `docs/pseudocode/wm/W05-process.md` §1.1–§1.5, §4.5, §5.2 and §9 (its coverage-boundary rows that name "
+             "S02) and `docs/protocol/README.md` (framing, cipher) first; do not redo them.",
+             "Network, WM build (`clean.py re-data/exports/wm-pdb - <addr> …`): `CIOCP` ctor FUN_00464350, Start FUN_004645c0, "
+             "WorkThread FUN_004644f0, Register FUN_00464380, Stop FUN_004643c0, Close FUN_004646b0; `CSocket_Acceptor` "
+             "FUN_00463960 … FUN_00463ee0 (Listen_Add FUN_00463a50, Listen_Start FUN_004642a0, AcceptThreadRing FUN_00463ee0, "
+             "Get/SetAccepted FUN_00463bb0 / FUN_00463c40, Stop / Listen_Stop FUN_004639e0 / FUN_00463e10); `CSocket_IOCP` "
+             "ctor FUN_00466420, Connect FUN_004665b0, Send FUN_004666f0, WriteCallback FUN_00466240, Receive FUN_00465f40, "
+             "FreeBuffer FUN_00466140, dtor FUN_00466520; `CIOBuffer::Alloc` / `Free` FUN_00468e10 / FUN_00468f00, "
+             "`IOBufferContainer` FUN_00468d80 (512 × 0x2010), `CIOSpinLock::Wait` FUN_00468d10, `InetAddress::WinSockStart` "
+             "FUN_00468c40, `CSendPacket` FUN_0045fd30 … FUN_0045fe70, `CPacket` FUN_00467aa0 … FUN_004678c0. Then find the "
+             "same functions in the Login (`login-pdb`) and Zone (`zone-pdb`) exports by name and note any difference.",
+             "Script / file readers: `CCsl` FUN_00460a40 … FUN_004626f0 (ReadScript FUN_004626f0, ProcCmd FUN_004621f0, "
+             "MakeFormat FUN_00460ea0, MakeData FUN_00461240, ProcRemark FUN_00460c90, IncludeFile FUN_00462090, "
+             "ReadScriptDone FUN_00461520, Read FUN_00461730), `CToken` FUN_0045a080 … FUN_0045a6f0, `CGdp` FUN_0045ed50 … "
+             "FUN_0045fac0. Write the grammar the shipped `ServerInfo.txt` / `WMServerInfo.txt` / Zone and Login configs "
+             "use, check it against those files, and say whether any 2016 install ships a GDP container.",
+             "Mark library behaviour that looks unintended as `(original bug) S02-B<n>`; end with the bugs table, "
+             "uncertain section and coverage boundary as every item does."],
+      done="Every function listed above cited with pseudocode at W05's depth; the Login / Zone copies mapped; the config "
+           "grammar written and checked against the shipped files."),
  dict(id="Z02", phase=2, title="Zone: movement, chat, emotes, sight/briefinfo, NPC menus, scenario",
       out="docs/pseudocode/zone/Z02-actions.md", deps=["Z01"],
       scope=[("zone", "ShinePlayer", [7, 8, 15, 27]), ("zone", "WorldManagerSession", [8])],

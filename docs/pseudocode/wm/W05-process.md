@@ -335,9 +335,9 @@ tInitMonthQuest, tInitWeekQuest, tInitDayQuest }` (when the period ends). Weeks 
 
 ```pseudo
 helpers (all local time, via localtime + mktime):                     @ FUN_00439a00 … FUN_00439c80
-    GetToday      today 00:00                 GetTodayEnd     today 00:00 + 86400
-    GetThisWeek   Monday 00:00 of this week   GetThisWeekEnd  next Monday 00:00
-    GetThisMonth  1st of this month 00:00     GetThisYear     1 January 00:00
+    GetToday      FUN_00439a00  today 00:00                 GetTodayEnd     FUN_00439c00  today 00:00 + 86400
+    GetThisWeek   FUN_00439a80  Monday 00:00 of this week   GetThisWeekEnd  FUN_00439c80  next Monday 00:00
+    GetThisMonth  FUN_00439b20  1st of this month 00:00     GetThisYear     FUN_00439b90  1 January 00:00
 
 CDailyQuestTimer::CDailyQuestTimer(this):    (process start, global constructor)       @ FUN_00439f10
     m_ResetTime = { GetThisYear, GetThisMonth, GetThisWeek, GetToday }  (inlined)
@@ -1238,9 +1238,177 @@ zone release (§4.5) clears only the mapping, so the lookup succeeds and `GetZon
 
 ---
 
-<!-- The sweep part completes the bug table and adds "Not reconstructed / uncertain" and "Coverage boundary". -->
+## 6. Construction, service shell and small helpers (sweep)
 
-## Original-server bugs (so far; completed in the sweep part)
+What the sweep found below the functions of §1–§5 that no doc cited: the constructors `gServer` runs before
+`WinMain`, the parsers' handler tables, the Windows-service shell and crash dump, and small helpers. The socket / IOCP
+layer and the config-script reader are a shared library of Login, WM and Zone and go to the follow-up item S02 (§9).
+
+### 6.1 Parser handler tables (`PROTOCOLFUNCTIONTEMPLETE<T>`)
+
+Every link parser (`CParserAccountDB` … `CParserZone`) holds one `m_PFT` dispatch table:
+
+```pseudo
+PROTOCOLFUNCTIONTEMPLETE<T> layout:                                 (identical for the 8 parsers)
+    +0x000          vftable
+    +0x004          pft_funcpnt[1024]          # one row pointer per **command** (opcode & 0x3FF)
+    +0x1004         pft_defaultdepartment[64]  # shared row: every department → pft_deffunc
+    +0x1104         pft_deffunc = the parser's fc_dummyfunction (§5.1)        (size 0x1108, pdb2016)
+
+<Parser>::<Parser>(this):        (constructed as a member of gServer, before WinMain)
+    pft_deffunc = &fc_dummyfunction; pft_defaultdepartment[0..63] = pft_deffunc
+    pft_funcpnt[0..1023] = &pft_defaultdepartment
+    pft_Store(dept, cmd, handler) for each handler   # the registrations of handlers.json
+
+pft_Store(this, dept, cmd, fn):                                     @ FUN_00427260  (one copy, folded for all 8)
+    if pft_funcpnt[cmd] == &pft_defaultdepartment:
+        pft_funcpnt[cmd] = new fn[64], all = pft_deffunc          # rows are allocated per command on first use
+    if pft_funcpnt[cmd][dept] != pft_deffunc:
+        ac_AssertFail("PROTOCOLFUNCTIONTEMPLETE<T>::pft_Store : Duplicate protocol set")
+        ShineExit("PROTOCOLFUNCTIONTEMPLETE<T>::pft_Store")       # process ends (§3.2)
+    pft_funcpnt[cmd][dept] = fn
+
+~PROTOCOLFUNCTIONTEMPLETE<T>(this):     (at exit, §4.6)
+    delete[] every pft_funcpnt[i] that is not &pft_defaultdepartment
+```
+
+Dispatch is `pft_funcpnt[opcode & 0x3FF][opcode >> 10]` (the folded parser of §5.1). Constructors / destructors and
+their registration counts (handlers.json, 486 `pft_Store` calls in total, all to FUN_00427260):
+
+| Parser | Ctor | `~PROTOCOLFUNCTIONTEMPLETE` | Registrations |
+|---|---|---|---|
+| `CParserAccountDB` | FUN_00408ae0 | FUN_00408260 | 9 |
+| `CParserAccountLogDB` | FUN_00409650 | FUN_004092b0 | 10 |
+| `CParserCharDB` | FUN_00411ec0 | FUN_0040ed60 | 163 |
+| `CParserClient` | FUN_004234f0 | FUN_00419660 | 167 |
+| `CParserGameLogDB` | FUN_00424340 | FUN_004242c0 | 4 |
+| `CParserLogin` | FUN_00424b40 | FUN_00424920 | 7 |
+| `CParserOPTool` | FUN_00427e60 | FUN_00427230 | 38 |
+| `CParserZone` | FUN_0042f540 | FUN_0042d490 | 88 |
+
+What each registered handler does is in W01–W04 and §5 (triage §5.8); the constructors hold nothing else.
+
+### 6.2 Member and session constructors
+
+`WorldManagerServer::WorldManagerServer` FUN_00406a20 (header) constructs, among others:
+
+| Constructor | What it sets |
+|---|---|
+| `CWMBaseSession` FUN_00430020 (all session classes) | `m_SocketIOCP` + `m_Packet` built; `m_Connected_Server_ID = 10`, world / zone 0, `m_Status = EMPTY`, `m_Connected_Time = GetLocalTime()`, `m_LastReceiveTime = m_LastSendTime = CGTimer::GetTime()`, `m_LastHeartBeatSendTime = 0`; the three overlapped records (read / write / close) point back to the session and its `CIOCP_Process_LSession` |
+| `CWMAccountDBSession` FUN_0042fb70 / `CWMAccountLogDBSession` FUN_0042fb90 | peer type 0 (AccountDB) / 1 (AccountLogDB), world 0, zone 0 |
+| `CWMLoginSession` FUN_00438dd0 / dtor FUN_00438b30 | peer type 4; `m_ValidationBF` = 0x800 × `PROTO_NC_USER_WILLLOGIN_REQ` (0x15b bytes each, ctor FUN_00412d20 clears `userid` and `spawnapps`): the pending world-login table of W01 §3.1 |
+| `CWMZoneSession` FUN_00430430 / dtor FUN_00438e50 | base only (also used for OPTool sessions, §4.1) |
+| `CWMBaseSessionManager` FUN_004300e0 / dtor FUN_004301a0 | all list pointers null, counts 0 / delete the node array, clear the list heads |
+| `CWMClientSessionManager` FUN_004385f0 | IP-group vector empty; `srand(time())`, `m_ClientSeed = rand()` (u16); `m_NextSendWMTime = 0` |
+| `CWMZoneSessionManager` FUN_00439640 | 32 `INDUN_MAP_LIST` + 1024 `ZONE_SERVICE_MAP_LIST` built, the service-map list zeroed (0x4000 bytes), mapping table null, `m_SendWMTime = 0` |
+| `CWMOPToolSessionManager` FUN_00438e70 / dtor FUN_00438ed0 | session array null / base `FreeSessions` + delete the 0x118-byte sessions with the zone-session dtor |
+| `CGuildManager` FUN_0043da90 / dtor FUN_00450f60 | `m_Tournament` (`CGuildTournamentServer` FUN_0043d0d0: `CGuildTournament` FUN_0045b8c0 = 31 × `GUILD_TOURNAMENT_LIST`, match type NONE, `Clear`; three `CDataReader`s for the tournament tables, §3.2; `m_bDBRead = 0`); init flags 0, guild list empty. Dtor: `Clear` (W03), the three readers, the tournament |
+| `CNpcScheduleServer` FUN_00456c10 | one `CDataReader` (`NpcSchedule`, W04 §17.6) |
+| `CSingleDataMap` FUN_00459fd0 / dtor FUN_00459f70 | empty `std::map<std::string, u16>` (the `ServerParam` table, §3.3; `bad_alloc` thrown if the head node cannot be allocated) / erase all, free the head |
+| `CharClassDataBox` FUN_00465a40 / dtor FUN_00465a70 | `BinaryDataBox<UseClassTypeInfo>` (base `BinaryData` FUN_00468cb0 / FUN_00468cd0 = a `CDataReader` with its own vftable) with an all-zero default row (§3.2) |
+| `CParty` FUN_00465950 | `CParty::Init` (W02 §1.2) |
+| `CPartyFinderServer` FUN_00457710 / dtor FUN_00457730 | `CPartyFinder` FUN_0045d500 (empty list) + a critical section / delete the CS, `~CPartyFinder` FUN_0045d6e0 (free every node) |
+| `CServerInfo` FUN_00465c80 | its `CCsl` (S02) |
+| `IOBufferContainer` FUN_00468d80 | pre-allocates 512 `CIOBuffer`s of 0x2010 bytes; any allocation failure → `ShineExit("IOBufferContainer::IOBufferContainer")` |
+
+`CWMClientSession::CWMClientSession` FUN_00434300 (§4.3) adds `CHolyPromiseServer` FUN_004512f0 (`CHolyPromise`
+cleared, `m_HolyPromisesUpHandle = 0xFFFF`, `m_HolyPromisesUpCharNo = 0xFFFFFFFF`, both "need send first info" flags
+and `m_nRemainMoney` 0; W04 §12), `CFriendServer` FUN_0045c8f0 (100 × `PROTO_FRIEND_INFO` 0x48 bytes, count 0,
+`m_bNeedTakeInfo = 0`; W04 §5) and `PacketEncrypt` FUN_0045d4a0 (empty constructor; the client cipher state lives
+elsewhere, `docs/protocol/README.md`).
+
+### 6.3 Windows-service shell, crash dump, checksums
+
+```pseudo
+Singleton<WinService>::getInstance():                                         @ FUN_004069a0
+    first call: new WinService (FUN_00466d60: serviceName = "", handleServiceEvent = INVALID_HANDLE_VALUE) + vtbl[0]
+WinService::startDispatcher(name, startFn, stopFn):                            @ FUN_00466fd0
+    name = name                       # self-assignment: this->serviceName stays ""   (original bug) W05-B23
+    serviceStartFunc = startFn (::OnStart_Service); serviceStopFunc = stopFn (::OnStop_Service)
+    StartServiceCtrlDispatcherA({ name, serviceLoop }) → false on failure (Start still returns 0, §1.1)
+WinService::serviceLoop(argc, argv):     (SCM thread)                          @ FUN_00466ea0
+    if onServiceStart():
+        loop: WaitForSingleObject(handleServiceEvent, INFINITE)
+              if statusEvent in (1 STOP, 5 SHUTDOWN): break    # other controls (4 INTERROGATE) just loop
+    onServiceStop()
+WinService::onServiceStart():                                                  @ FUN_00466de0
+    handleServiceEvent = CreateEvent(auto-reset); RegisterServiceCtrlHandlerA(serviceName = "", serviceHandler)
+    SetServiceStatus(OWN_PROCESS, START_PENDING, accepts STOP | SHUTDOWN, checkpoint 1, wait 1000 ms)
+    if serviceStartFunc and !serviceStartFunc(): return false        # OnStart_Service failed (§1.1)
+    SetServiceStatus(RUNNING); return true
+WinService::serviceHandler(control):                                           @ FUN_00466db0
+    statusEvent = control; SetEvent(handleServiceEvent)
+WinService::onServiceStop():                                                   @ FUN_00466c20
+    SetServiceStatus(STOP_PENDING, wait 5000 ms); serviceStopFunc()   # ::OnStop_Service (§1.6) returns only when stopped
+    SetServiceStatus(STOPPED)
+    if handleServiceEvent == INVALID_HANDLE_VALUE: CloseHandle(INVALID)   # inverted test   (original bug) W05-B24
+WinService::uploadService(name, display, exePath):                            @ FUN_00466a70
+    CreateServiceA(SCM, name, display, access 0, SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START,
+                   SERVICE_ERROR_IGNORE, exePath, no account) → true when created
+WinService::removeService(name):                                               @ FUN_00466b70
+    OpenSCManager fails → false; else DeleteService(OpenServiceA(name, DELETE)) → **true** even when the service
+    does not exist or the delete fails                                                  (original bug) W05-B22
+WinService::queryServiceStatus(&state, machine, name):                         @ FUN_00466cb0
+    QueryServiceStatus → state = dwCurrentState, return 1; any failure → state = GetLastError(), return 0
+```
+
+So the WM is installed as a manual-start service: the first run without arguments installs it (`ParseCmd`, §1.1), and the
+service manager then starts it; stop and system shutdown both run `OnStop_Service`.
+
+```pseudo
+MiniDumper::MiniDumper():        (WinMain, §1.1)                                @ FUN_004608b0
+    SetUnhandledExceptionFilter(TopLevelFilter)
+MiniDumper::TopLevelFilter(exc):                                               @ FUN_004605c0
+    load DBGHELP.DLL from the exe directory, else from the system path
+    MinidumpCallStack(exc)                                                      @ FUN_004603a0
+        "<exe path>_<time>CallStack.txt": fault reason, a dashed line, then the stack trace (EHInitSymbolEngine,
+        GetFirst/NextStackTraceString(0xe, exc))
+    FuncForStack() if set (null in the WM)
+    no DBGHELP.DLL → log "EXCEPTION - DBGHELP.DLL NOT FOUND"; no MiniDumpWriteDump → "… DBGHELP.DLL TOO OLD"; return 0
+    "<exe path>_<time>.mdmp" = MiniDumpWriteDump(process, pid, file, type 0x40, { thread, exc })
+    log "EXCEPTION - Saved dump file to '%s'" (or the create / save failure texts); return 1 on success
+```
+
+`<time>` = `GetCurrentTimeString2(0)` (Z09 §30.1 documents the zone's copy of this dumper; same code). The call-stack text
+comes from a linked-in crash-handler library (function names as in John Robbins' *CrashHandler* *(inferred from
+the names)*): `GetFaultReason` FUN_00468770 ("<exe> caused an: <exception name> in module: <module> at: < seg:offset >",
+registers; "Bad parameter to GetFaultReason" for a null record, `EHConvertSimpleException` FUN_004680c0 maps the
+exception code to its name), `GetFirstStackTraceString` / `GetNextStackTraceString` FUN_00468bc0 / FUN_00468c20 →
+`EHInternalGetStackTraceString` FUN_00468370 (`StackWalk` frames with `FillInStackFrame` FUN_00468010 and
+`CH_ReadProcessMemory` FUN_00468090), `EHInitSymbolEngine` / `EHCleanupSymbolEngine` FUN_00468310 / FUN_00468340
+(dbghelp symbol engine). Process exit
+after a crash is then the CRT's default.
+
+`CDataReader::Read`'s MD5 (§3.1) is the standard RFC 1321 algorithm: `CMD5Checksum::GetMD5` FUN_0045eca0 →
+`Update` FUN_0045e9e0 → `Transform` FUN_0045e300 (round constants 0xd76aa478 …) → `Final` FUN_0045ea90 (hex string,
+via `std::string::append` FUN_00458bb0).
+
+### 6.4 Small helpers
+
+| Function | What it does |
+|---|---|
+| `CWMClientSession::SetSessionMode` / `GetSessionMode` FUN_004334b0 / FUN_004334c0 | write / read `m_SessionMode` (+0x1ed20, W01's `loginStep`; W01 names them `Client_SetLoginStep` / `Client_GetLoginStep`) |
+| `CWMClientSession::SetActiveTimeToCurrent` / `GetActiveTime` FUN_004334d0 / FUN_004334f0 | `m_dActiveTime` (+0x1ed24) = `_time32()` / read it (W01's `Client_GetConnectTime`; the login timeout of §4.5) |
+| `CWMClientSession::GetBoolClosingSession` / `SetBoolClosingSession` FUN_00433520 / FUN_00433530 | read / write `m_bClosingSession` (W01 names the getter `Client_IsOverLimit`; it is the "already closing" flag of §4.5) |
+| `CWMClientSession::cs_GetRawIPAddress` FUN_00433510 | pointer to the peer IPv4 in the socket address (+0x30, §4.1; IP groups §4.4) |
+| `CServerInfo::ReadServerInfo` FUN_00465c90 | `CCsl::Clear` + `CCsl::ReadScript(file, 0, 0x401, 0)` (S02) |
+| `CServerInfo::GetMyServerInfo` FUN_00465cd0 | first data row of format id 0 (`MY_SERVER`, the first `#DEFINE` of WMServerInfo.txt): `pServiceName`, `pDisplayName`, `nServerID`, `nWorldNo`, `nZoneNo` (fields 0–4) → `m_MyServer` (W01 §2); 0 if missing |
+| `GetShineServerIDShortName(id)` FUN_0045a060 | short peer-type name for logs, `gpShineServerIDShortNames[id]`; out of 0…20 → entry 10 |
+| `GetLastErrorStr(code, crlf)` FUN_0045ff10 | `FormatMessageA` of `code` (0 → `GetLastError()`), one line unless `crlf`; unknown → `"ErrorCode=%d"`; static buffer |
+| `_ExecUpdateInfoMsg(text)` FUN_004602c0 | overwrite `.\DebugMessage\ExecUpdateInfo.txt` with `text` (`Start` writes `"-"`) |
+| `_DEBUGMSGVC` FUN_00460360 / `Log` FUN_00460380 | `_DebugMessageNew2(level, "Msg", fmt, …)` like `_DEBUGMSG` (§3.2) |
+| `AssertClass::ac_DateTime` / `ac_AssertFail(msg, x)` FUN_00467270 / FUN_004672f0 | build `Assert<yyyymmdd><hh>.txt` and append `"<time> : AssertClass::ac_AssertFail : msg[x]"` when `ac_Write2File`; the 3-argument variant FUN_00467340 is §5.7 |
+| `CPartyFinder::DelNode` FUN_0045d560 | unlink one party-finder entry, free it, count − 1 (`PartyFinder_ExpireTick`, W02 §1.5) |
+| `Raid::GetMemberRegNoByIndex(party, slot)` FUN_00462d80, `Raid::iterator::GetCharRegistNo` FUN_00462de0, `Raid::iterator::GetSlotInfo` FUN_00462ea0 | raid member lookups for W02 §1.4: party index < 4, slot < 5 and < `NumOfMember`, party number ≠ 0xFFFF; return `chrregnum` (else 0xFFFFFFFF) or the slot pointer (else null); the iterator returns charNo 0xFFFFFFFF with success for an empty slot |
+| `CLooting::CLooting` FUN_00464f80 | the raid's four looting types = FREE, looter 0xFFFFFFFF (`Raid` ctor, W02 §1.4) |
+| `CGuildMemberServer::Send_NC_GUILD_WAR_START_CMD` / `…_END_CMD` FUN_00444180 / FUN_00444230 | `BroadCastToMember` of 0x7433 (0x3c bytes) / 0x7434 (0x22 bytes); the payloads are W03 §3.3 `Guild_WarStart` / `Guild_WarEnd` |
+| `CGuildAcademyMember::~CGuildAcademyMember` FUN_0045b250 | destroys the 100 × 0x6d member array (`CGuildManager::Clear`, W03) |
+| `RandomBox::rb_1000` FUN_00467bc0 | `well512_GetRandom(1000)` (KQ team draw, W04 §6): `cWell512Random::well512_GetRandom()` FUN_00468fd0 is the WELL512 generator (16-word state) returning `state / 2^32` in [0, 1); `well512_GetRandom(n)` FUN_00469080 = `round(r × 10^11) % n` |
+| `Name8::operator=` FUN_004244d0 | 32-byte name copy (NPC schedule, W04 §17.6) |
+| `std::list<AttendanceInfo>::splice` FUN_0043bda0 | STL splice used by `EA_Schedule_Process` (W04 §17.5) |
+| `String` FUN_00467170 / FUN_00467200 (ctors), FUN_00467090 (dtor), FUN_004670d0 / FUN_00467230 (`operator=`), FUN_00467250 (`operator==`), FUN_004670c0 (`makeUpper`), FUN_004670b0 (`getBuffer`) | the small heap-string class of `ParseCmd` and `WinService` (§1.1, §6.3); FUN_00467230 = `operator=(other.chData)` |
+
+## 7. Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
@@ -1265,3 +1433,41 @@ zone release (§4.5) clears only the mapping, so the lookup succeeds and `GetZon
 | W05-B19 | `CKQServer::Send_NC_KQ_VOTE_BAN_MSG_LOGOFF_CMD` FUN_004530e0 | 0x5830 sent with a 1-byte payload and a null source | one uninitialised stack byte on the wire | send 0 bytes or a zeroed byte |
 | W05-B20 | `cShineLogSystem` `gZoneLinktoErrorLog` / `gSocket_IOCP_Write` | `SLS_bIsUse` is never set | the ZoneLinktoError and Socket_IOCP_Write logs are never written; those errors leave no trace | enable them (config or init) |
 | W05-B21 | `CWMClientSessionManager::Send` FUN_00438220 | null check of the slot pointer after reading through it | none (the array pointer is never null) | check before use |
+| W05-B22 | `WinService::removeService` FUN_00466b70 | the result of `OpenServiceA` is not checked; `DeleteService` failure is ignored; returns true | `REMOVE` prints "<SERVICE REMOVE OK>" for a service that does not exist or could not be deleted | return false when the open or the delete fails |
+| W05-B23 | `WinService::startDispatcher` FUN_00466fd0 | assigns the name argument to itself instead of to `serviceName` | `RegisterServiceCtrlHandlerA` gets an empty name; no effect for a `SERVICE_WIN32_OWN_PROCESS` service (Windows ignores the name) | `this->serviceName = name` |
+| W05-B24 | `WinService::onServiceStop` FUN_00466c20 | closes `handleServiceEvent` only when it equals `INVALID_HANDLE_VALUE` (and then closes −1) | the event handle is never closed; none in practice (the process ends right after) | close it when it is valid |
+
+## 8. Not reconstructed / uncertain
+
+- §5.9 (part 4): the `"0.0.0.0"` zone rows of the shipped `ServerInfo.txt` against the exact IP check of 0x0802, and
+  W05-B15's dependence on `len` = 2 + payload. Both need a live zone registration or capture (X02).
+- W05-B8 and W05-B10 give their effect *(inferred)*: no capture shows a friend shown offline by handle 0xFFFF or a
+  duplicated logout report.
+- §6.3 dump file names: the separator between the exe path and the time string is a 2-byte constant (`s__`) read as
+  `"_"` *(inferred from the Ghidra label)*; the `MiniDumpWriteDump` type 0x40
+  (`MiniDumpWithIndirectlyReferencedMemory`) is taken from the decompiled argument order.
+- `gpShineServerIDShortNames` (§6.4) is a table of 21 string pointers; its texts are not listed here (logs only).
+- §3.4 `CShnDataFileCheckSum`: built but never read in the WM. Whether a zone or the client compares the same
+  49-name list was not checked (zone and client items own those binaries).
+- The socket / IOCP layer and the `CCsl` script reader are described here only by what the WM calls (§1.3–§1.5, §4.5,
+  §5.2): the send queue, partial writes, buffer limits and the script grammar are S02's.
+
+## 9. Coverage boundary
+
+`coverage.py` does not apply to W05 (no scope table). The sweep instead took every function this file cites, followed
+callees three calls deep (`coverage.py`'s rules: hubs over 25 callers and registered handlers not expanded, functions
+under 6 lines not counted) and listed what no doc cites: 212 functions before the sweep, 90 after it (54 script / file reader, 20 STL
+including the split tail FUN_0040844c of `std::string`'s grow, 16 network library and CRT `atoi`). §6 covers the
+WM-specific ones; the rest is below. `coverage.py W01 --all`: gaps 0 (part 4).
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| Network library: `CIOCP` FUN_00464350 / FUN_004645c0 / FUN_004644f0 / FUN_00464380 / FUN_004643c0 / FUN_004646b0, `CSocket_Acceptor` FUN_00463960 … FUN_00463ee0, `CSocket_IOCP` FUN_00466420 / FUN_004665b0 / FUN_004666f0 / FUN_00466240 / FUN_00465f40 / FUN_00466140 / FUN_00466520, `CIOBuffer::Alloc` / `Free` FUN_00468e10 / FUN_00468f00, `CIOSpinLock::Wait` FUN_00468d10, `InetAddress::WinSockStart` FUN_00468c40, `CSendPacket` FUN_0045fd30 … FUN_0045fe70, `CWMBaseSession::Connect` / `Receive` / `Socket_Register_To_IOCP` FUN_0042ffb0 / FUN_0042fcd0 / FUN_0042fd10 | new item S02 (added by W05) | the same library is linked into Login, WM and Zone; no item documents it (L00, W01, Z01 and this file only call it). One item documents it once for all three servers; W05 §1 / §4.5 / §5.2 already give what the WM sees of it |
+| Config-script and packed-file readers: `CCsl` FUN_00460a40 … FUN_004626f0, `CToken` FUN_0045a080 … FUN_0045a6f0, `CGdp` FUN_0045ed50 … FUN_0045fac0 | new item S02 | shared with Login and Zone (their `ServerInfo.txt` readers); W05 uses only the accessors (§5.2) |
+| STL instantiations (`std::_Tree<…string, u16…>` insert / erase / `_Linsert`, `std::map::operator[]`, `std::vector<…>::reserve`, `std::basic_string::append`; about 18 functions) | none needed | standard-library behaviour (MSVC STL); a rebuild uses its own containers. Their WM users are documented (`ServerParam` §3.3, IP groups §4.4) |
+| `__unwindfunclet$…` FUN_0047f3e0 … FUN_00481d50 (exception unwind) | none needed | compiler-generated destructor calls for a constructor that throws; no behaviour |
+| FUN_0044e5f9 (calls `ServerParam_GetInt("Guild_CannotLeaveTime")`) | W03 §2.7 (done; documents it under FUN_0044e580) | Ghidra split of `CGuildMemberServer::Recv_NC_GUILD_MEMBER_LEAVE_REQ` FUN_0044e580 after its `try` block; W03 §2.7 has the leave-time check and the 0x0CE2 / 0x0C41 / 0x3190 results |
+| Bodies of the 486 handlers registered by the parser constructors (§6.1) | W01–W04, §5 (triage §5.8) | each handler is documented by its subsystem item; §6.1 covers only the table |
+| Zone side of 0x441C / 0x441D and client side of 0x0849 / 0x10D9 | Z08 §3.4 (0x441C / 0x441D → 0x441E); §2.2 and §4.7 here (client handlers) | already documented |
+| `"0.0.0.0"` zone rows vs the 0x0802 IP check; W05-B15 `len` | X02 (plan: "turn whatever static reading cannot settle into concrete capture scenarios") | needs a live zone registration or capture, not more reading |
+| W01 statements this item corrects (listener order, CharDB loss, `fc_dummyfunction` return, blob sizes, names) | `docs/knowledge/W05.md` §1 "Corrections" (for X01) | W01 is done; corrections go to the knowledge file, which X01 collects |

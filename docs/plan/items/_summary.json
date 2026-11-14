@@ -72,6 +72,14 @@
   "\u2013"
  ],
  [
+  "S02",
+  2,
+  "Shared server library: IOCP sockets, acceptor, packet buffers, CCsl script and GDP file readers (added by W05)",
+  "W05",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "Z02",
   2,
   "Zone: movement, chat, emotes, sight/briefinfo, NPC menus, scenario",

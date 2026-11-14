@@ -105,6 +105,7 @@ follow-up for W01 listed in `docs/knowledge/C02.md`").
 | [W03](items/W03.md) | WM: guild and guild academy | W01 |
 | [W04](items/W04.md) | WM: friends, chat routing, KQ, holy promise, instances, misc | W01 |
 | [W05](items/W05.md) | WM: process services left out of W01-core: main loop, data loader, 0x0849 broadcast, session teardown (added by W04) | W01 |
+| [S02](items/S02.md) | Shared server library (Login / WM / Zone): IOCP sockets, acceptor, packet buffers, `CCsl` config-script and GDP file readers (added by W05) | W05 |
 | [Z02](items/Z02.md) | Zone: movement, chat, emotes, sight, NPC menus, scenario | Z01 |
 | [Z03](items/Z03.md) | Zone: combat, skills, abstates, damage | Z01 |
 | [Z04](items/Z04.md) | Zone: items, inventory, equipment, upgrades | Z01 |
@@ -158,7 +159,7 @@ follow-up session.
 1c. S01, then its follow-ups (`docs/knowledge/S01.md`) for finished items
 2. Z02, Z03, Z04, W02 (core gameplay)
 3. Z07, Z08, Z05, Z06, W03, W04
-4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, W05, then D06
+4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, W05, S02, then D06
 5. P02 again with fuller captures, then X01
 6. X02 → user records its scenarios → P02 → X02 again (repeat until the low ratings are gone or not worth a capture)
 
