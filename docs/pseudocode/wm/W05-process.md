@@ -814,7 +814,7 @@ Every client close path ends in the same two steps: something sets `m_Status = 3
 W01 §5.2 marks the Login-kick path *inferred*; the code above confirms it. W01-core §1 says unregistered opcodes
 "are ignored"; on the client link they close the session (above). The server links' `fc_dummyfunction`s return 1
 (AccountDB, GameLogDB, Login, OPTool, zone), 0 (AccountLogDB) or 0 from the 11th call on (CharDB, `DummyCount`);
-what a 0 does on those links is part 4 (W01 core gaps).
+a 0 closes the link (§5.1).
 
 ```pseudo
 ProcessDisconnect, client part (after the links, W01 §2):                    @ FUN_00404e70
@@ -865,7 +865,7 @@ CWMOPToolSessionManager::InactiveSession(m, node):                           @ F
 
 The zone's service-map entries (`SetServiceMapZoneNo`, W01 §7.1) are not touched on release; only the zone-number →
 session mapping is. A character login for a map of a lost zone then finds no session for that zone number and is
-refused with 0x145 "map under maintenance" (W01 §4.2) *(inferred from the two tables; the lookup itself is part 4)*.
+refused with 0x145 "map under maintenance" (W01 §4.2) (lookup confirmed in §5.8).
 
 ### 4.6 Destroy (process stop and exit)
 
@@ -910,8 +910,335 @@ nGuideViewList[] }` *(pdb2017)* matches the 2016 send. Layout: `annotations/W05.
 
 ---
 
-<!-- Part 4 adds §5 W01 core gaps; the sweep part adds the bug table,
-     "Not reconstructed / uncertain" and "Coverage boundary". -->
+## 5. W01 core gaps
+
+What `coverage.py W01 --all` lists as unreached core code: the packet pump's handler-return rule, the zone
+registration chain, the world-login entry copy, the per-opcode blob handlers W01 §6.3 / §7.4 describe only as a
+table, the ping-test relay, and the small accessors the W01 handlers call. Feature code reached from the same
+handlers (raid, KQ, friends, attendance, holy promise, chat restriction) is in W02–W04; §5.8 lists where.
+
+### 5.1 Handler return value and `fc_dummyfunction` (corrects W01 §1)
+
+Every parser runs one handler per packet (§1.4 `Pump`). The handler gets `(session, packet, len)`: `packet` points
+at the opcode, the payload starts at `packet + 2`, and `len` is `CPacket::GetDataSize` FUN_004678c0 (vtable slot 5
+of the session's `m_Packet` at +0xdc), the frame length byte = **2 + payload length** (README §1.1). A handler
+returning 0 closes the link or session.
+
+```pseudo
+CParserZone::Parser(this, s):                                                    @ FUN_0042d4c0
+    s.prevOpcode/prevLen/prevState (+0x100/+0x104/+0x108) = s.lastOpcode/lastLen/handlerState (+0xf4/+0xf8/+0xfc)
+    s.lastOpcode = *m_Packet.GetIDPtr(); s.lastLen = m_Packet.GetDataSize(); s.handlerState = 1
+    r = pft_funcpnt[cmd][dept](s, packet, len)
+    r == 0: s.handlerState = 3; log "FAILED - ZONE Parser's unknowned packer"; s.state = 3     # zone link closed
+    else:   s.handlerState = 2
+CParserOPTool::Parser                                                            @ FUN_00424400
+    the same without the log. The linker folded the identical CParserAccountDB / AccountLogDB / CharDB / GameLogDB
+    / Login parsers into this one function: ProcessPacket (§1.4) calls FUN_00424400 for all five outgoing links.
+CParserClient::Parser: W01 §3.2 (FUN_00419690).
+```
+
+`fc_dummyfunction` (unregistered opcode) logs `fc_dummyfunction, <PEER>, dep=%d, cmd=%d, length=%d, …` and the
+previous packet (`pre packet, <PEER>, …, WT=%d`), then returns:
+
+| Parser | `fc_dummyfunction` | Returns | Effect of an unknown opcode |
+|---|---|---|---|
+| AccountDB | FUN_00407bf0 | 1 | ignored |
+| AccountLogDB | FUN_00408ca0 | **0** | link state 3: closed, reconnected by `ProcessConnect` (§1.4) |
+| CharDB | FUN_00409ae0 | 1 while `++DummyCount < 11`, then 0 | from the 11th unknown CharDB packet of the process lifetime on, each one closes the CharDB link → `CLOSE_CHAR_DB` (§1.5). `DummyCount` is never reset (original bug) W05-B14 |
+| GameLogDB | FUN_00424000 | 1 | ignored |
+| Login | FUN_004245c0 | 1 | ignored |
+| OPTool | FUN_00424d20 | 1 | ignored |
+| Zone | FUN_004282e0 | 1 | ignored |
+| Client | FUN_00412be0 | 0 (+ `m_LogoutType` 0x781) | session closed (§4.5) |
+
+W01 §1 ("unregistered opcodes … are ignored") holds only for AccountDB, GameLogDB, Login, OPTool and zone links.
+
+### 5.2 Zone registration 0x0802 (completes W01 §7.1)
+
+```pseudo
+0x0802 NC_MISC_S2SCONNECTION_REQ { u8 echo_data, u8 server_to_id, u8 server_from_id, u8 server_from_world_num,
+                                   u8 server_from_zone_num, u16 key }   (PROTO size 7, pdb2016)   @ FUN_004283e0
+    if server_to_id != gServer.m_MyServer.nServerID (+0x500, = 5 from WMServerInfo.txt MY_SERVER):
+        log "접속요청한 서버의 타입과 나의 타입이 맞지 않음, 바로 접속을 끊음 - IP=%s:%d, SOCKET=%d (아래정보참고)"
+            ("type of the requesting server does not match mine, disconnecting")
+            + "NC_MISC_S2SCONNECTION_REQ <server_from id=%d w=%d z=%d, server_id_to=%d, key=%d, my_type=%d>"
+        return 0                                                   # → zone Parser: state 3 (§5.1)
+    if server_to_id + server_from_id != key:
+        log "접속요청한 곧에서 잘못된 키값이 왔음, …" ("wrong key value") + "NC_MISC_S2SCONNECTION_REQ <server_id_from=%d,
+            server_id_to=%d, key=%d, my_type=%d>"; return 0
+    s.m_Connected_Server_ID (+4) = server_from_id
+    ip = inet_ntoa(s.addr); port = ntohs(s.port)
+    row = CServerInfo::GetServerInfo(&gServer.m_ServerInfo, out, nServerID 6, gServer.nWorldNo, server_from_zone_num,
+                                     nServerIDFrom 6)                                       @ FUN_00465ef0
+        # the payload's world byte is NOT used for the lookup and not compared (original bug) W05-B13
+    no row: log "ERROR - 접속해온 WolrdNo=%d, ZoneNo=%d, IP=%s 정보 없음" ("no info for the connecting world/zone")
+            with only two arguments for three conversions (original bug) W05-B12; return 0
+    if _mbsicmp(row.pIP, ip) != 0:                                 # case-insensitive string compare, no DNS
+        log "ERROR - 대기중인 WorldNo=%d, ZoneNo=%d IP=%s, 접속해온 WorldNo=%d, ZoneNo=%d IP=%s 다름" ("expected … differs"); return 0
+    newZone = (CWMZoneSessionManager::GetZoneSession(zone) == null)
+    s.world (+8) = server_from_world_num; s.zone (+0xc) = server_from_zone_num; GetLocalTime(&s.connectTime +0x10)
+    CWMZoneSessionManager::SetZoneSession(&gServer.m_Zone, zone, s)                        @ FUN_00439190
+        if zone < m_MaxZoneSession: m_ppZoneMappingTable[zone] = s      # a reconnect replaces the old mapping
+    s.state = 1
+    log "Connected from (%-25s world=%3d zone=%3d, %- 5d=%15s:%- 5d) %4d/%4d개" with GetShineServerIDName(from)  @ FUN_0045a040
+        (gpShineServerIDNames[id], id outside 0..20 → entry 10)
+    Send 0x0803 NC_MISC_S2SCONNECTION_ACK { u8 echo_data, u16 error = 0 }   (size 3)
+    CWMZoneSessionManager::SendWMTimeToZone(force 1)               # 0x0821, W01 §2
+    if newZone: CNpcScheduleServer::enss_NPCStandState(zone)       # 0x086A per standing NPC, W04 §17.6 (W01's FUN_00457110)
+    GMEventManager::GMEM_SendAllEventInfo(zone)                    # W04
+    return Send result
+```
+
+The row the IP is checked against is the **zone's own row for zone-type peers** (`SERVER_INFO "PG_W00_Z<nn>", 6,
+<world>, <zone>, 6, ip, port, …`). In the shipped `9Data/ServerInfo/ServerInfo.txt` those rows carry `"0.0.0.0"`, which
+never equals a peer address: with that file every zone registration would fail (see §5.9 uncertain).
+
+`CServerInfo` (`m_ServerInfo`, gServer +0) wraps a `CCsl` script (the parsed `WMServerInfo.txt` + included
+`ServerInfo.txt`; `m_Csl`). Rows are `CSL_DATA_LIST { dwID = format index, pData, pNext }`; the format index is the
+`#DEFINE` order across both files: 0 `MY_SERVER`, 1 `NATION_NAME`, 2 `WORLD_NAME`, **3 `SERVER_INFO`**, 4 `ODBC_INFO`.
+
+```pseudo
+CServerInfo::GetServerIndex(type, world, zone, from):             @ FUN_00465e10
+    for i in 0 .. CCsl::GetNumDatas() - 1:                         @ FUN_00460b40 (m_NumDatas)
+        if CCsl::GetDataInfo(i).dwID == 3 and columns 1..4 == (type, world, zone, from): return i     # first match
+    return -1
+CServerInfo::GetServerInfo(out, i):                                @ FUN_00465d60
+    if GetDataInfo(i).dwID != 3: return 0                         # no null check: only called with a valid i
+    out = { pName = col 0, nServerID 1, nWorldNo 2, nZoneNo 3, nServerIDFrom 4, pIP 5, nPort 6, nBackLog 7, nMaxAccept 8 }
+    return 1                                                       # SERVER_INFO definition 1 (0x24 bytes), pdb2016
+CServerInfo::GetServerInfo(out, type, world, zone, from) = GetServerIndex → GetServerInfo(out, i), 0 if -1   @ FUN_00465ef0
+CCsl::GetDataInfo(i):  i ≥ m_NumDatas → null; m_ppDataTable[i] if the index table exists, else walk m_pDatas   @ FUN_00460b50
+CCsl::GetData(i, col): row as above; null if i or col out of range (col < format.NumParameter); returns
+    pData + Σ m_pCslParameterSize[type of columns 0..col-1]  (strings are stored as pointers)                  @ FUN_00460ba0
+CCsl::GetFormat(id): same pattern over the format list                                                        @ FUN_00460af0
+CCsl::AddFormat: append to the list, m_NumFormats++ (so a format's id = its #DEFINE order)                   @ FUN_00461150
+```
+
+The script parser itself (`CCsl::Read` / `ReadScript` / `ProcCmd` / `IncludeFile`, FUN_00461730 … FUN_004626f0) is
+called only from `ReadDefineScriptor` (W01 §2) and is not documented here (§5.9).
+
+### 5.3 World-login entry (0x0C0D / 0x0C0F helpers; corrects W01 §3.1)
+
+```pseudo
+PROTO_NC_USER_WILLLOGIN_REQ::operator=(dst, src):   (copy into the pending table, W01 §3.1)            @ FUN_00412d50
+    dst.netpacketheader.clienthandle (u16 @0) = src…; willlogin_worldno (u8 @2); usrregnum (u32 @3)
+    Name256Byte::operator=(dst.userid @7, src.userid)
+    validate_new[32] (u16 @0x107) copied word by word
+    spawnapps (Name5, 20 bytes @0x147)       # W01's "u32 extra[5]": forwarded to CharDB in 0x1036 (m_UserSwpawnApps)
+Name256Byte::Name256Byte(): zero all 256 bytes (64 dwords)          @ FUN_004129f0   (0x0C0F local copy of the user id)
+```
+
+`PROTO_NC_USER_WILLLOGIN_REQ` is 0x15B bytes and `PROTO_NC_USER_WILLLOGIN_ACK` = that + `u8 ok` *(pdb2016)*; W05
+annotations re-label the 0x0C0D fields with these names. Other struct copies the W01 handlers use:
+`PROTO_AVATARINFORMATION::operator=` FUN_00409db0 (CharDB 0x1405 new avatar: chrregnum, name, level, slot, loginmap,
+delinfo, shape, equip, nKQHandle, sKQMapName, nKQCoord, dKQDate, CharIDChangeData, TutorialInfo, i.e. the 0x82-byte
+AVATAR of W01 §6.1), `PROTO_NC_AVATAR_CREATE_REQ::operator=` FUN_00412f60 (client 0x1401: slotnum, name, char_shape),
+`Name3::Name3(char*)` FUN_00402090 / `Name3::operator=(char*)` FUN_00409770 (zero 12 bytes, `strncpy` ≤ 12: map
+names; 0x1001 / 0x101C, and `"RouT00"` for a tutorial character at CharDB 0x1005, W01 §4.2).
+
+### 5.4 Character blob cache: CharDB pushes (W01 §6.3 per handler)
+
+All pass `CharDB_CheckAlive` (returns 0 → link closed, §5.1), find the session with `Clients_GetByHandle(u16 @
+payload+0)` and do nothing when it is gone (return 1). Generic store `Session_StoreBlob(src, n, &ptr, &size)`
+FUN_00430780: keep the buffer if `size == n`, else free it and `new[n]`; then `memcpy`. The CharDB handlers call it
+with `src = payload + 2`, `n = len − 2` = payload length, so every blob holds the payload after the handle **plus
+the 2 bytes that follow the packet in the receive buffer** (original bug) W05-B15 *(inferred from `len` = 2 +
+payload, §5.1)*. Session offsets are the W01 §6.3 slots; names are the PDB `m_pCharData…` members.
+
+| Op | Handler *(pdb2016 name `fc_…`)* | FUN | Stores |
+|---|---|---|---|
+| 0x1007 | NC_CHAR_BASE_CMD | FUN_0040a1d0 | +0x560 `m_pCharDataBase` (PROTO_NC_CHAR_BASE_CMD 0x69: chrregnum, charid, slotno, Level, Experience, stones, HP/SP/LP, fame, Cen, logininfo, statdistribute, pk, prisonmin, adminlevel, flags) |
+| 0x1008 | NC_CHAR_SHAPE_CMD | FUN_0040a230 | +0x568 |
+| 0x100A | NC_CHAR_QUEST_DOING_CMD | FUN_0040a290 | +0x570 (chrregnum, bNeedClear, nNumOfDoingQuest, PLAYER_QUEST_INFO[]) |
+| 0x100B | NC_CHAR_QUEST_DONE_CMD | FUN_0040a2f0 | `CharDataStore` (quest done) FUN_00433210, below |
+| 0x10CC | NC_CHAR_QUEST_READ_CMD | FUN_0040a340 | +0x580 |
+| 0x10D5 | NC_CHAR_QUEST_REPEAT_CMD | FUN_0040a3a0 | +0x588 |
+| 0x100C | NC_CHAR_ABSTATE_CMD | FUN_0040a400 | +0x590 (chrregnum, u16 number, ABSTATEREADBLOCK[]) |
+| 0x100D | NC_CHAR_SKILL_CMD | FUN_0040a460 | `CharDataStore` (skill) FUN_004307d0, below |
+| 0x100E | NC_CHAR_SKILL_PASSIVE_CMD | FUN_0040a4b0 | +0x5c8 |
+| 0x100F | NC_CHAR_HOUSE_CMD | FUN_0040a510 | +0x5d0 |
+| 0x1011 | NC_CHAR_MASPUP_CMD | FUN_0040a6a0 | +0x5d8 |
+| 0x1013 | NC_CHAR_EMBLEM_CMD | FUN_0040a780 | +0x5e0 |
+| 0x1014 | NC_CHAR_PET_CMD | FUN_0040a7e0 | +0x5e8 |
+| 0x1015 | NC_CHAR_ARENA_CMD | FUN_0040a840 | +0x5f0 |
+| 0x1016 | NC_CHAR_SEAWAR_CMD | FUN_0040a8a0 | +0x5f8 |
+| 0x1017 | NC_CHAR_ITEM_CMD | FUN_0040a900 | `CharDataStore` (items) FUN_00430870, below |
+| 0x1018 | NC_CHAR_CHESTINFO_CMD | FUN_0040a950 | +0x630 |
+| 0x1019 | NC_CHAR_CHARTITLE_CMD | FUN_0040a9b0 | +0x640 |
+| 0x101A | NC_CHAR_KQMAP_CMD | FUN_0040aa10 | +0x648 (saved KQ return position, used by 0x1005, W01 §4.2) |
+| 0x101B | NC_CHAR_CHARGEDBUFF_CMD | FUN_0040aa70 | +0x650 |
+| 0x10D2 | NC_CHAR_SINGLE_OPTION_CMD (W01: "FREESTAT_SET_DB_ACK") | FUN_0040aad0 | +0x658 (PROTO_NC_CHAR_SINGLE_OPTION_CMD 0xf: chrregnum, resttime, autopick, mystery_vault, nChatBan, bFirstJoin); then **sets blob byte +0xe `bFirstJoin` = 1** (zones send their own value back in 0x402A, §5.5) |
+| 0x10CF | NC_CHAR_ITEMACTIONCOOLTIME_CMD | FUN_0040ab50 | +0x668 (W01 §6.3 lists no CharDB source for this slot) |
+| 0x10D8 | NC_CHAR_NEWBIE_GUIDE_VIEW_LIST_CMD | FUN_0040abb0 | +0x1ecf8 `m_pCharDataNewbieGuideViewList` (size at +0x1ecfc; W01 §6.3 names the size slot); sent once by §4.7 |
+| 0x10DC | NC_CHAR_COININFO_CMD | FUN_0040de50 | +0x6c0 |
+| 0x10E2 / 0x10E5 / 0x10E8 | NC_CHAR_CARDCOLLECT_CMD / _BOOKMARK_CMD / _REWARD_CMD | FUN_0040deb0 / FUN_0040df10 / FUN_0040df70 | +0x6c8 / +0x6d0 / +0x6d8 |
+| 0x10CA | NC_CHAR_GET_CHAT_BLOCK_SPAMER_DB_CMD | FUN_0040d6e0 | only if CHARDATA.chrregnum == u32 @payload+2: +0x1ece4 / +0x1ece8 = u32 @+6 / u32 @+0xa (BlockTime, DelayTime) |
+| 0x1114 | NC_CHAR_TUTORIAL_INFO_WORLD_CMD { u32 nCharNo, PROTO_TUTORIAL_INFO (u32 nTutorialState, u8 nTutorialStep) } | FUN_0040e4b0 | session by `Clients_FindByCharNo(nCharNo)`; `SetTutorialInfo` FUN_00433630: +0x1ed2e nCharNo, +0x1ed32 state, +0x1ed36 step |
+| 0x111E | NC_CHAR_CHAT_COLOR_CMD { u32 nCharNo, u8 nChatFontColorID, u8 nChatBalloonColorID } | FUN_0040e500 | by charNo; `ChatColor_SetFontColorID` FUN_00433800 → +0x1ed37, `ChatColor_SetBalloonColorID` FUN_00433810 → +0x1ed38 |
+| 0x1121 | NC_CHAR_USEITEM_MINIMON_INFO_CMD { u16 handle, u32 charNo, USEITEM_MINIMON_INFO } | FUN_0040e560 | by handle (charNo not checked); `SetUseItemMinimonInfo` FUN_00433bb0 copies 0x32 bytes (bNormalItem, bChargedItem, NormalItemList[12], ChargedItemList[12]) to +0x1ed5c |
+
+The 0x1114 / 0x111E / 0x1121 handlers also return 1 when the link or packet pointer is null (defensive checks that
+never fire). CharDB 0x1010 (friends), 0x1012 / 0x1097 / 0x1414 / 0x1416 (guild), 0x0844 / 0x0864 / 0x0869 (chat
+spam) and 0x10EC / 0x10EF / 0x10F4 (attendance) are feature handlers: §5.8.
+
+```pseudo
+CWMClientSession::CharDataStore(quest done) (blob +0x578 / size +0x57c):          @ FUN_00433210
+    in = { u32 chrregnum @0, u16 @4, u16 total @6, u16 count @8, u16 start @10, record[count] (10 bytes) @12 }
+    if blob exists and size != total: free it
+    if no blob: size = total; blob = new[total]; header = { chrregnum, u16 @4, total, 0, 0 }
+    copy the count records to blob + 12 + start × 10
+    # start × 10 + 12 + count × 10 is never compared with total: heap overflow on inconsistent chunks (original bug) W05-B17
+    # the header's count / start words stay 0; the zone side reads the records by total (W01 §7.2 0x1022 chunking)
+CWMClientSession::CharDataStore(skill chunk):                                     @ FUN_004307d0
+    in == null: log, return
+    k = in[4] >> 2 (in[4] & 0xfc must be ≤ 0x17, else ignored): chunk 0..5
+    store the whole chunk in +0x598 + 4k (size +0x5b0 + 4k), reuse when the size is equal
+CWMClientSession::CharDataStore(items, n):                                        @ FUN_00430870
+    order = in[0] & 0x7f (PacketOrder), part = in[1] (nPartMark)
+    part & 4 and order < 3: order 0 frees all three inventory chunks first; store in +0x600 + 4·order (size +0x60c + 4·order)
+    part & 8:  store in +0x618 (equipment)        part & 0x10: +0x620 (mini-house skin)        part & 0x20: +0x628 (action)
+    # several bits in one packet store the same bytes in several slots
+```
+
+### 5.5 Zone state saves (W01 §7.4 per handler)
+
+All pass `Zone_CheckAlive`; most find the session by `u16 wldmanhandle @payload+0` and require a CHARDATA blob whose
+chrregnum equals the payload's charNo (W01 §7.4). Sizes come from counts inside the payload and are never compared
+with `len` (original bug) W05-B16: a short or inconsistent packet makes the WM copy whatever follows it.
+
+| Op | Handler (`fc_NC_CHARSAVE_2WLDMAN_…`) | FUN | Check / blob written |
+|---|---|---|---|
+| 0x400F | QUEST_DOING_CMD | FUN_00429e50 | charNo @+2; +0x570 = payload+2, size 6 + 0x20 × u8 @+7 |
+| 0x4010 | QUEST_DONE_CMD | FUN_00429ec0 | charNo @+2; `CharDataStore` FUN_00433210 (§5.4) from payload+2 |
+| 0x4029 | QUEST_READ_CMD | FUN_00429f20 | charNo @+2; +0x580, size 6 + 2 × u16 @+6 |
+| 0x402B | QUEST_REPEAT_CMD | FUN_00429f90 | charNo @+2; +0x588, size 6 + 0x20 × u16 @+6 |
+| 0x4011 | ABSTATE_CMD { wldmanhandle, PROTO_NC_CHARSAVE_ABSTATE_REQ { handle (6), u16 abstatenum @+8, ABSTATEREADBLOCK[] } } | FUN_0042a000 | charNo @+4; rebuilds the CharDB layout { u32 chrregnum, u16 n, n × 0x24 } in a temp buffer → +0x590 |
+| 0x4012 | SKILL_CMD | FUN_0042a0b0 | charNo @+7; temp { u32 chrregnum, u8 @+2, u16 @+3, u16 n @+0xb, n × 0x10 } (9 + 0x10n bytes) → skill `CharDataStore` FUN_004307d0 |
+| 0x4013 | ITEM_CMD { wldmanhandle, u32 nCharNo, PacketOrder @+6, nPartMark @+7, itemstr } | FUN_0042a160 | charNo @+2; items `CharDataStore` FUN_00430870 from payload+6 with `len − 4` = payload − 2 bytes: 4 bytes past the packet (W05-B15) |
+| 0x4014 | CHESTINFO_CMD | FUN_0042a1c0 | charNo @+4; +0x630 = { u16 n @+8, u16[n] } |
+| 0x4016 | TITLE_CMD | FUN_0042a370 | charNo @+2; +0x640 = payload+6, size 0x407 + 2 × u16 @+0x40b |
+| 0x4019 | LINK_FROM_CMD { wldmanhandle, PROTO_NC_CHAR_LINKFROM_CMD (0x18) } | FUN_0042a460 | **no charNo check**; +0x660 = 0x18 bytes from payload+2; logs `DEBUG 1`, `DEBUG 2`, `DEBUG 3`, `DEBUG : %d : %d,%d` on every call (left-over debug output (original bug) W05-B18); sent once as 0x10B8 and freed (W01 §7.2) |
+| 0x4021 | NC_CHARSAVE_SET_CHAT_BLOCK_SPAMER_WM_CMD { WmHandle, CharNo, BlockTime, DelayTime } | FUN_0042c2a0 | charNo; +0x1ece4 BlockTime, +0x1ece8 DelayTime |
+| 0x402A | SINGLE_OPTION_CMD { WmHandle, chrregnum, resttime, autopick, mystery_vault, nChatBan, bFirstJoin } (0x11) | FUN_0042c300 | charNo; +0x658 = the 0xf-byte CharDB layout (bFirstJoin as sent by the zone) |
+| 0x402C | COININFO_CMD { wldmanhandle, u64 nCoin, u64 nExchangedCoin, u32 nCharNo @+0x12 } | FUN_0042c4c0 | charNo @+0x12; +0x6c0 = { nCoin, nExchangedCoin } (0x10) |
+| 0x4032 | CHAT_COLOR_CMD { nCharNo, nChatFontColorID, nChatBalloonColorID } | FUN_0042ccc0 | by charNo; +0x1ed37 / +0x1ed38 (FUN_00433800 / FUN_00433810) |
+| 0x4033 | PET_LINK_RESUMMON_CMD { nCharNo, bDoResummon @4, u64 xResummonCode @5, u16 nSummonSlot @0xd, nId @0xf, nRegNum @0x13 } | FUN_0042cd20 | by charNo; `PetSystem_SetDoResummon` FUN_00433910 +0x1ed39, `SetResummonCode` FUN_00433920 +0x1ed40 (u64), `SetSummonSlot` FUN_00433940 +0x1ed48, `SetId` FUN_00433960 +0x1ed4c, `SetRegNum` FUN_00433970 +0x1ed50 |
+| 0x4034 | ITEMACTIONCOOLTIME_CMD { nCharNo, u16 num, group[num] (10 bytes) } | FUN_0042cfc0 | by charNo; +0x668 = payload+4, size 6 + 10·num, i.e. 4 bytes past the records even for a consistent packet (W05-B16) |
+| 0x4036 | NC_CHARSAVE_USEITEM_MINIMON_INFO_WORLD_CMD { nWorldHandle, nCharNo, USEITEM_MINIMON_INFO } | FUN_0042d020 | charNo @+2; FUN_00433bb0 (0x32 bytes → +0x1ed5c) |
+| 0x111C | NC_CHAR_TUTORIAL_STEP_SAVE_CMD { nCharNo, PROTO_TUTORIAL_INFO } | FUN_0042cc40 | by charNo; `SetTutorialInfo` FUN_00433630 |
+| 0xCC0B | NC_MOVER_LINKDATA_WORLD_CMD { u32 charNo, … } (0x3d bytes) | FUN_0042c5e0 | by charNo, CHARDATA must exist; `MoverSystem_SetLinkData` FUN_00432fa0: lazily `new(0x3d)` at +0x1ed18 (allocation failure → return), copy 0x3d bytes |
+
+`MoverSystem_ClearLinkData` FUN_00432f70 frees +0x1ed18 (0x1001 character login, W01 §4.2); the 0x3d-byte copy
+goes to the next zone as NC_MOVER_ZONE_LINKDATA_ZONE_CMD (FUN_004330a0, W01 §6.3).
+
+### 5.6 Ping-test relay (OPTool ↔ WM ↔ client / CharDB / zone)
+
+An operator tool measures the round trip through every hop. Each hop writes its `timeGetTime()` stamps into the
+packet and forwards it unchanged; the WM writes the tool's session handle into `hTool` and sends the result back to
+that tool. Structs *(pdb2016)*, offsets from the payload start:
+
+```pseudo
+OPTool 0x0813 NC_MISC_PINGTEST_TOOL_WM_CLIENT_ZONE_DB (0x82: ID, hTool @4, ToolSendToWM, ToolRecvFromWM, Name5
+        TargetCharName @0xe, hWMClient @0x22, WMSendClient @0x24, WMRecvFromClient @0x28, ClientSendZone @0x2c,
+        ClientRecvZone @0x30, hZoneClient @0x34, zone/DB stamps @0x36..0x52, NETPACKETZONEHEADER @0x56, buylot @0x5c):   @ FUN_00425f10
+    hTool = tool session handle; WMSendClient = now
+    c = Clients_FindByCharName(TargetCharName)
+    none: hWMClient = 0; WMRecvFromClient = now; Send the tool 0x0813 (0x82 bytes)
+    else: hWMClient = c.handle; Send c 0x0813
+client GameFrameWork FUN_0049fba0: ClientSendZone == 0 → ClientSendZone = now, send 0x0813 to its zone connection;
+    else ClientRecvZone = now, send it back to the WM connection *(which of the two PgNet links is which: inferred)*
+client → WM 0x0813: WMRecvFromClient = now; Send the tool (by hTool) 0x0813         @ FUN_00415670 (W01 §5.3)
+OPTool 0x0814 NC_MISC_PINGTEST_TOOL_WM_DB (0x26: ID, hTool, ToolSendToWM, ToolRecvFromWM, WMSendDB @0xe,
+        WMRecvFromDB @0x12, DB stamps @0x16..0x22):                                   @ FUN_00426060
+    hTool = handle; WMSendDB = now; Send CharDB 0x0814
+CharDB 0x0814: WMRecvFromDB = now; Send the tool (by hTool, if still connected)        @ FUN_0040c460
+OPTool 0x0815 NC_MISC_PINGTEST_TOOL_WM_ZONE_DB (0x3a: …, WMTargetZoneNo @0xe, WMSendZone @0x12, WMRecvFromZone @0x16,
+        zone / DB stamps @0x1a..0x36):                                                @ FUN_00426130
+    hTool = handle; WMSendZone = now; z = Zones_Get(WMTargetZoneNo)
+    none: WMRecvFromZone = now; WMTargetZoneNo = 0xFFFFFFFF; back to the tool   else: Send z 0x0815
+zone 0x0815: WMRecvFromZone = now; to the tool                                        @ FUN_0042b180
+OPTool 0x0816 NC_MISC_PINGTEST_TOOL_WM_ZONE (0x22: …, WMTargetZoneNo @0xe, WMSendZone @0x12, WMRecvFromZone @0x16,
+        ZoneRecvFromWMS @0x1a, ZoneSendToWMS @0x1e): same as 0x0815 with size 0x22   @ FUN_00426260
+zone 0x0816: WMRecvFromZone = now; to the tool                                        @ FUN_0042b250
+```
+
+The other three client "accepted, no action" handlers of W01 §5.3: 0x0836 NC_MISC_APEX_CLIENT_CHCSTART_CMD
+FUN_00415790 logs "ERROR - SERVER IS NO-APEX VERSION, BUT CLIENT APEX VERSION COME. NC_MISC_APEX_CLIENT_CHCSTART_CMD"
+and returns 1; 0x0827 and 0x0832 (both registered to NC_MISC_XTRAP2_CLIENT_DATA_CMD FUN_00415a10) and 0x0834
+NC_MISC_HACK_SCAN_STORE_CMD FUN_00415bc0 only run `Client_CheckAlive`.
+
+### 5.7 Small helpers and the log systems
+
+| Function | What it does | Used by |
+|---|---|---|
+| `CWMClientSessionManager::Send(handle, pkt)` FUN_00438220 | slot = handle % max; sends only if slot.handle == handle and state == 1, else 0; checks the slot pointer for null after using it (dead check (original bug) W05-B21) | CharDB replies by client handle (0x0C13 …) |
+| `CWMClientSession::GetCharID` FUN_004351a0 | CHARDATA + 4 (charid), or a static zeroed Name5 when there is no CHARDATA | logs, 0x180C |
+| `CWMClientSession::ClearRaidReserve` FUN_00431660 | +0x1ecd0 = 0xFFFF (pending raid invitation) | 0x1001 (W02) |
+| `SetUserType` FUN_00433a90 / `SetUserTypeRewardEndTime` FUN_00433aa0 | +0x1ed54 / +0x1ed58 (W01 userKind / userKindUntil) | AccountDB 0x0C61 (W01 §3.3) |
+| `CWMClientSession::GetTutorialSelectedSlot` FUN_00433600 | byte +0x1ed2d | CharDB 0x1113 (W01) |
+| `GetShineServerIDName` FUN_0045a040 | `gpShineServerIDNames[id]`, id ∉ 0..20 → [10] | connect logs |
+| `CChatRestrictServer::Get(charNo)` FUN_0045cb90 | linear search over `n` (+0) entries of the charNo array at +0x8a0; returns entry +4 + 0x16·i or null | CharDB id change (W04 §14) |
+| `CHolyPromiseServer::Clear` FUN_00451000 | `CHolyPromise::Clear`, then the 3 handle words at +0x22c..+0x231 = 0xFFFF | logout (W04 holy promise) |
+| `CFriend::PartyChange` FUN_0045c430 | find the friend whose Name5 (5 dwords @+8) matches; set its party byte (+0x1e in the 0x48-byte entry); 1 if found | W04 §5 friend party state |
+| `CKQServer::Send_NC_KQ_VOTE_BAN_MSG_LOGOFF_CMD` FUN_004530e0 | if CHARDATA and inGame (+0x704): Send 0x5830 with payload size 1 and no data: the byte is whatever the stack buffer held (`CSendPacket` ctor FUN_0045fd30 clears only size / id; `CSendPacket::ID` FUN_0045fe70 copies nothing for a null source) (original bug) W05-B19. The 2017 struct is empty (`sizeof` 1) | KQ map login (W04 §6) |
+| `Raid::iterator::GetPartyRegNo` FUN_00462ae0, `Raid::GetSubLeader` FUN_004629c0, `Raid::GetLooter` FUN_00462a50, `Raid::GetLooting` FUN_00462a80 (raid + 0x24), `CLooting::reset` FUN_00464740 (4 types 0, looter −1), `GetItemLootingType` FUN_004646d0, `GetLooter` FUN_00464760 / `SetLooter` FUN_00464770 (+0x10), `CParty::operator[]` FUN_00464f50 (party no ≥ 4000 → `CParty::p_def`; else 0xd0-byte entries) | accessors | W02 (raid / party loot) |
+| `PROTO_NC_DATA_SEND2<PROTO_NC_RAID_MEMBER_LIST_CMD>` ctor FUN_004359c0 | zero-inits the 4 × 0x14 and 0x15 × 0x14 MEMBER_INFO arrays | W02 raid member list |
+| `std::list<AttendanceInfo>::push_back` FUN_0043b770 / `insert` FUN_0043b830 / `erase` FUN_0043b340 | STL | W04 §17.5 |
+
+Log systems besides `_DEBUGMSG` (§3): `cShineLogSystem` objects `gZoneLinktoErrorLog` ("ZoneLinktoError", one file per
+hour) and `gSocket_IOCP_Write` ("Socket_IOCP_Write", one file per day), set up by static initialisers (`SLS_SetLogName`
+FUN_004674c0; empty or ≥ 256-char names fall back to "ShineLog").
+
+```pseudo
+cShineLogSystem::SLS_AddLog(this, fmt, …):                                    @ FUN_00467530
+    if !SLS_bIsUse (+0): return true
+    name = "%s\%s_%04d-%02d-%02d %02d.txt" (SLSFI_HOUR) or "%s\%s_%04d-%02d-%02d.txt" (SLSFI_DAY)
+    if name != SLS_sOpenFileName: close the old file; fopen(name, "a+"); failure → _mkdir(".\Log") (CRT FUN_0046bcfc, also used by client 0x080F for `.\DebugClient`, W01 §5.3) and retry; fail → false
+    fprintf("%06d %s %s\t%s\n", SLS_nLogCount++, date, time.ms, vsprintf(fmt, …)); fflush
+```
+
+Callers: zone 0x101C (`NC_CHAR_ZONE_CHARDATA_REQ : CheckConnectionValidation Fail`, `… Invalid ClientHandle
+[CharID=%s]`, `… CharID Not Match [%s/%s]`), zone 0x104B (`NC_CHAR_REGISTNUMBER_REQ : CheckConnectionValidation
+Fail`), `CSocket_IOCP::Send` / `WriteCallback` (write errors). Nothing in the WM writes `SLS_bIsUse`, so both logs
+stay off (original bug) W05-B20 *(no write found in the export)*. `AssertClass::ac_AssertFail` FUN_00467340 appends
+"%s : AssertClass::ac_AssertFail : %s[%d]" to `ac_FileName` when `ac_Write2File` (the raid member list asserts).
+
+### 5.8 Triage of the W01 handlers `coverage.py` lists as undocumented
+
+coverage.py counts a handler only when a doc cites its `FUN_`; W01 described most of these by opcode. Where each is
+documented now:
+
+| Handlers | Where |
+|---|---|
+| CharDB blob pushes 0x1007 … 0x101B, 0x10CC, 0x10CF, 0x10D2, 0x10D5, 0x10D8, 0x10DC, 0x10E2 / 0x10E5 / 0x10E8, 0x10CA, 0x1114, 0x111E, 0x1121 | §5.4 |
+| Zone saves 0x400F … 0x4036, 0x111C, 0xCC0B | §5.5 |
+| Client 0x0827 / 0x0832 / 0x0834 / 0x0836; OPTool 0x0813 … 0x0816 | §5.6 |
+| AccountLogDB 0x800A FUN_004090c0 / 0x800C FUN_00409130 (data report) | W04 (cites both) |
+| CharDB 0x1414 FUN_0040c6e0, 0x1416 FUN_0040c880, 0x1012 FUN_0040a700, 0x1097 FUN_0040cdb0 (guild) | W03 |
+| CharDB 0x1010 FUN_0040a570 (friend list), 0x0844 FUN_0040d660, 0x0864 FUN_0040d980, 0x0869 FUN_0040dbf0 (chat spam), 0x10EC FUN_0040dfd0 / 0x10EF FUN_0040e010 / 0x10F4 FUN_0040e050 (attendance) | W04 |
+| Client 0x0840 FUN_00417140, 0x0846 FUN_00417b90, 0x085F FUN_00417ef0, 0x0861 FUN_004180f0, 0x10F1 FUN_00418410 | W04 §17 |
+| OPTool 0x2805 / 0x0828 FUN_00425930, 0x2809 FUN_00427790, 0x280C FUN_00425e20, 0x2811 FUN_00425d70, 0x280F FUN_004263f0, 0x2815 FUN_004264d0, 0x281B FUN_004265a0, 0x281D FUN_00426660, 0x2820 FUN_00427630, 0x2822 FUN_00426990, 0x2824 FUN_00427980, 0x2826 FUN_00426c10, 0x282B FUN_00427030, 0x9425 FUN_00427cb0, 0xD001 … 0xD009 FUN_004270f0 / FUN_00427130 / FUN_00427170 / FUN_004271b0 / FUN_004271f0 | W04 (OPTool section; 0x2815 / 0x2820 / 0x2822 / 0x2824 / 0x282B with W03) |
+| OPTool 0x384E FUN_004274e0 (party member info) | W02 |
+
+Lost zone and character login (promised in §4.5): `CWMZoneSessionManager::GetServiceMapZoneNo(map)` FUN_004392c0
+returns the zone number of the first service-map entry with `active == 1` and the same 12-byte name (else −1); CharDB
+0x1005 `fc_NC_CHAR_CHARDATA_ACK` FUN_00410040 then needs `GetZoneSession(zoneNo)` ≠ null and the zone's IP/port. The
+zone release (§4.5) clears only the mapping, so the lookup succeeds and `GetZoneSession` fails: the client gets
+0x1002 { 0x145 } (W01 §4.2), confirmed.
+
+### 5.9 Uncertain (part 4)
+
+- §5.2: with the shipped `ServerInfo.txt` the zone rows for zone-type peers hold `"0.0.0.0"`, and the WM compares that
+  string with the zone's socket address. Either that install's zones connected through a patched exe or the file
+  differs from the one used in production; the 2016 code itself only accepts an exact (case-insensitive) string match.
+- §5.4 B15 rests on `len` = 2 + payload (`CPacket::GetDataSize` returns the frame's length byte). If the receive path
+  passes a different `len`, the CharDB copies would be exact and the zone item copy 2 bytes long instead of 4.
+- The `CCsl` script parser (format / data / include / remark handling) is shared by all servers and is read here only
+  through its accessors.
+
+---
+
+<!-- The sweep part completes the bug table and adds "Not reconstructed / uncertain" and "Coverage boundary". -->
 
 ## Original-server bugs (so far; completed in the sweep part)
 
@@ -928,3 +1255,13 @@ nGuideViewList[] }` *(pdb2017)* matches the 2016 send. Layout: `annotations/W05.
 | W05-B9 | `CWMClientSessionManager::ActiveSession` FUN_00438a60 | `m_LogoutType` is set to 0x786 only by the constructor, never per connection | a session closed without an explicit reason (socket drop, heartbeat, login timeout, service stop) reports the previous slot user's reason to AccountDB 0x0C11, AccountLogDB 0x0722 and CharDB 0x1037 | reset `m_LogoutType` to 0x786 in `ActiveSession` |
 | W05-B10 | CharDB 0x0C13 `fc_NC_USER_AVATARINFO_ACK` FUN_0040ede0 | DB-error path calls `CWMClientSession::Close` directly instead of setting state 3 | `Client_OnClosed` runs again when `ProcessDisconnect` sees the dead socket: duplicate 0x0C11 / 0x0722 / 0xC803 / 0x0C19 *(inferred)* | set `m_Status = 3` and let `ProcessDisconnect` close |
 | W05-B11 | `NewbieGuideViewListRefresh` FUN_00432ce0 | failure log names `CWMClientSession::ChatBlockSpamFilterRefresh` | misleading log line | log its own name |
+| W05-B12 | zone 0x0802 FUN_004283e0 | "no info" log `WolrdNo=%d, ZoneNo=%d, IP=%s` gets two arguments | `%s` reads a stray stack value: garbage or a fault while logging a zone with an unknown number | pass the peer IP |
+| W05-B13 | zone 0x0802 FUN_004283e0 | `server_from_world_num` is stored but neither used for the ServerInfo lookup nor compared with the WM's world | a zone configured for another world (same zone number and IP) registers and is stored with the wrong world | refuse a world mismatch |
+| W05-B14 | CharDB `fc_dummyfunction` FUN_00409ae0 | `DummyCount` is global and never reset; from the 11th unknown CharDB packet of the process lifetime each one returns 0 | rare unknown packets accumulate over days until one closes the CharDB link (`CLOSE_CHAR_DB`) | count per connection or per time window |
+| W05-B15 | CharDB blob pushes (§5.4), zone 0x4013 FUN_0042a160 | copies `len − 2` (zone items `len − 4`) bytes from payload+2 (+6); `len` = 2 + payload | each blob holds 2 (items 4) bytes read past the packet; they go to the zones in 0x101C *(inferred from `len`)* | copy `len − 4` (`len − 8`) |
+| W05-B16 | zone dept-16 saves (§5.5) | blob sizes from counts inside the payload, never compared with `len`; 0x4034 even adds 4 bytes to a consistent count | a short or inconsistent zone packet copies receive-buffer bytes into the character state, saved back to the DB | bound the size by `len` |
+| W05-B17 | `CharDataStore` (quest done) FUN_00433210 | writes `count` 10-byte records at `12 + start × 10` without checking the allocated `total` | heap overflow if a CharDB / zone chunk is inconsistent | check `12 + (start + count) × 10 ≤ total` |
+| W05-B18 | zone 0x4019 FUN_0042a460 | four `DEBUG …` log lines per call; no charNo check (all other saves check it) | log noise on every map change; a stale handle writes another character's link-from data | drop the debug lines; check charNo |
+| W05-B19 | `CKQServer::Send_NC_KQ_VOTE_BAN_MSG_LOGOFF_CMD` FUN_004530e0 | 0x5830 sent with a 1-byte payload and a null source | one uninitialised stack byte on the wire | send 0 bytes or a zeroed byte |
+| W05-B20 | `cShineLogSystem` `gZoneLinktoErrorLog` / `gSocket_IOCP_Write` | `SLS_bIsUse` is never set | the ZoneLinktoError and Socket_IOCP_Write logs are never written; those errors leave no trace | enable them (config or init) |
+| W05-B21 | `CWMClientSessionManager::Send` FUN_00438220 | null check of the slot pointer after reading through it | none (the array pointer is never null) | check before use |

@@ -4,5 +4,6 @@
   "DAT_006d52e0": "g_ShnDataFile",
   "DAT_006c5220": "g_DataFileServer",
   "DAT_006c54ac": "g_CharClassDataBox",
-  "DAT_004975f4": "g_bLogNoSessionBufferOnce"
+  "DAT_004975f4": "g_bLogNoSessionBufferOnce",
+  "DAT_006d4c3c": "DummyCount"
 }
