@@ -17,7 +17,7 @@ The 2016 zone contains three separate mechanisms, of which only the second has a
 | # | Mechanism | Tables | Per-player state | 2016 status |
 |---|---|---|---|---|
 | A | **Skill-effect sets** (legacy): equipped pieces per set → up to 10 "set effects" → per-cast multipliers (`SetIndex`, base 1000) on heal, damage, SP cost, cooldown, … of listed skills | `SetItem.shn`, `SetItemEffect.shn` | `ShinePlayer::sp_SetItemEffect` (`PlayerSetEffect`, p+0x2a7e0), `sp_SetEffectForJustSkill` (p+0x2a7de) | **dead**: neither table is loaded, the global tables stay empty, every multiplier stays 1000 (§3.9) |
-| B | **Item-action sets**: equipped pieces with the same `ItemInfo.SetItemIndex` name → `SetEffect.shn` row (set, count) → item action id added to / removed from the player's item actions | `SetEffect.shn` (+ `ItemInfo.SetItemIndex`) | the player's item-action list | live (§4, part 2) |
+| B | **Item-action sets**: equipped pieces with the same `ItemInfo.SetItemIndex` name → `SetEffect.shn` row (set, count) → item action id added to / removed from the player's item actions | `SetEffect.shn` (+ `ItemInfo.SetItemIndex`) | the player's item-action list | live (§4) |
 | C | **Set-item abstate values**: up to 4 `{SetIndex, value}` pairs stored in an abnormal state when it is set, refitting the stats while it lasts; saved and restored with the state | — | `AbstateElementInObject::aeo_SetItemEffect` (`SetItemAbstateEffect`) | fed from mechanism A's `g_SetEffect`, so new states store nothing; DB-restored values still apply (§5, part 3) |
 
 ## 2. Tables
@@ -61,7 +61,7 @@ SkillGroup within From…To *(inferred)*), but the loader that would do that con
 | `ItemActionID` (2:2) | `u16 ItemActionID` | 0x21 | `ItemAction.shn` id granted at that count |
 
 No duplicate (set, count) pairs. Loaded at boot by `Table::Load<SetEffectTable>` @ FUN_005b5ec0 (Z01 §2.3, Z10 §7.1
-"Table::Load<…>: SetEffect"); the loader, `SetEffectTable::FindActionID` @ FUN_005c7eb0 and the use are §4 (part 2).
+"Table::Load<…>: SetEffect"); the loader, `SetEffectTable::FindActionID` @ FUN_005c7eb0 and the use are §4.
 
 ## 3. Mechanism A: skill-effect sets (legacy, dead in 2016)
 
@@ -261,10 +261,256 @@ would change game balance relative to 2016.
 
 ## 4. Mechanism B: item-action sets (`SetEffect.shn`)
 
-*(Part 2: `SetEffectTable` loader FUN_005b1ec0 / FUN_005b5ec0 / FUN_005b35b0, `SetEffectTable::FindActionID` FUN_005c7eb0,
-`so_EqualSetitemIndexNameCount` FUN_00549a70, the item-action hooks `icr_Apply` FUN_0048ca20 / FUN_0048cc60,
-`so_ply_ItemAction_UnEquip` FUN_00565020, `sp_ItemActionSetup` FUN_00566420, `Send_SETITEMHEALEFFECT` FUN_005cfbb0,
-`RecoverTypeEffect::_execute` FUN_005cfc70.)*
+The only set mechanism with an effect in 2016. A set is a **name**: every `ItemInfo` row whose `SetItemIndex` is not
+`"-"` belongs to the set of that name. The number of equipped cells holding an item of the set is the piece count; each
+`SetEffect.shn` row (set, `Count`) grants its `ItemActionID` while at least `Count` pieces are worn. The granted id is an
+ordinary item action (`ItemAction.shn` → `ItemActionCondition.shn` / `ItemActionEffect.shn`), registered in the player's
+`ItemActionObserveManager` (`sp_ItemActionObserves`, player vt 0x5d0 `so_GetItemActionObserves` @ FUN_00560830) with the
+key `0xFFFF`. What an item action does once registered (conditions, effects, cooldowns) is Z17's subject; §4.4 lists
+only what the set-granted actions use and the two effect classes that exist for sets.
+
+### 4.1 Table load and lookup
+
+```pseudo
+Table::Load<SetEffectTable>("SetEffect.shn")                          @ FUN_005b5ec0
+    # called once from ZoneServer_zs_start_sleep @ FUN_005b67c0 (Z01 §2.3), between AmpCmdInit and ActionEffectItem.shn
+    path = GetTableDir() + name                                       # "../9Data/Shine/SetEffect.shn" (Z01 §2.3)
+    if not ITableBase<SetEffect,SetEffectTable>::Load(path, true):
+        shineassert "Fail to read  : SetEffect.shn"; ShineExit(same text)   # the zone does not start
+
+ITableBase<SetEffect,SetEffectTable>::Load(path, _):                  @ FUN_005b35b0
+    if ms_pkTable == NULL: ms_pkTable = new SetEffectTable (0xC4 bytes)   # ctor @ FUN_005b1ec0: CDataReader at +4,
+                                                                          #   m_acFilename[128] at +0x44 = "" ; registers the
+                                                                          #   atexit destructor @ FUN_006a02c0 once
+    m_kDataReader.ClearBF(); ok = m_kDataReader.Read(path)            # generic SHN reader (cipher: tools/protocol-re/shn.py)
+    if not ok or m_pHead == NULL or m_pHead.nVersionKey != 0x10: return false   # HEAD+0 = file u32 @0 (SetEffect.shn: 16)
+    strcpy(m_acFilename, path)
+    return vt[1]()                                                    # SetEffectTable vt 1 = FUN_005af8d0, returns 1: no row check
+
+ITableBase<SetEffect,SetEffectTable>::GetTotal() = m_pHead ? m_pHead.nNumOfRecord : 0       @ FUN_005c7e30
+destructors: scalar deleting dtor @ FUN_005b1f00 (ClearBF, ~CDataReader, free); atexit @ FUN_006a02c0 (vt 0 + delete, ms_pkTable = NULL)
+
+SetEffectTable::FindActionID(char *setName, int count, u16 *actionId) → bool        @ FUN_005c7eb0
+    if count == 0 or actionId == NULL: return false
+    for i in 0 .. GetTotal()−1:                                       # linear scan, file order, first match wins
+        row = GetRecord(i)                                            # SetEffect row, §2.3
+        if strcmp(setName, row.SetItemIndex) == 0 and row.Count == count:   # exact count, case-sensitive
+            *actionId = row.ItemActionID; return true
+    return false
+```
+
+The rows are used in place (`GetRecord`), no copy, no index; with 1,043 rows a lookup is ≤ 1,043 `strcmp`.
+
+### 4.2 Piece count: `ShinePlayer::so_EqualSetitemIndexNameCount` @ FUN_00549a70 (player vt 0x5cc)
+
+```pseudo
+so_EqualSetitemIndexNameCount(p, char *setName) → int
+    if setName == NULL or strcmp("-", setName) == 0: return 0          # "-" = no set (14,062 of 14,989 ItemInfo rows)
+    n = 0
+    for slot in 0 .. 29:                                              # every ItemEquipEnum slot (MAX_ITEMEQUIPENUM = 30)
+        cell = p.sp_Item.itembag.ci_Equipment.vt[0](slot)
+        if cell and (info = ItemDataBox[cell.itemid]) != NULL and strcmp(info.data.SetItemIndex, setName) == 0:
+            n += 1
+    return n
+```
+
+Piece-count rules (code + the 2016 data):
+
+- **Cells, not distinct items, are counted.** Two copies of the same item count twice. Rings have the single `Equip` value
+  15 (`ITEMEQUIP_LEFTRING`) in `ItemInfo` but can go into slot 15 or 16 (Z04 §5.2), so two rings of one set count 2. The
+  data relies on it: 11 rows need more pieces than the set has distinct equip locations (`GabrielleSet` / `GlorySet` /
+  `StrikingSet` / `PointSet` 3 = necklace + 2 rings; `WarNSet` and `Arena_70Acc` … `Arena_115Acc` 4 = necklace +
+  earring + 2 rings; `SetValen` 2 = 2 rings).
+- **Every equipment slot counts**, the costume slots included: 9 costume items (`ITEMCLASS_DECORATION`, slots 8 / 20 / 22
+  `BODYACC` / `LEGACC` / `SHOESACC`) form the 3-piece sets `CosMusaAcRate`, `CosMusaCri`, `CosMusaAllStat`. Weapons count
+  as one piece each (11 `Lab_*` / `BrillianceSet` weapons, slots 10 / 12).
+- **KQ items** (`ITEMCLASS_KQ` 17, `KQSTEP` 21) are not equipment and none has a set name: nothing to count.
+- Pieces by class: 490 armour (6), 375 boots (8), 42 accessories (4), 11 weapons (5), 9 decorations (10); 927 items in
+  260 sets. Every set name used by an item has `SetEffect` rows; 133 `SetEffect` sets have no item (dead rows).
+- Thresholds need not be consecutive: the 10 `Lab_*` sets have rows at 2, 4 and 5 only, the three costume sets only at 3.
+  A count without a row grants nothing.
+- No level, class or durability check: a worn piece counts even when its own stats would not apply *(inferred: the
+  function reads nothing but the name)*.
+
+### 4.3 When the set action ids are added and removed
+
+Invariant kept by the four call sites: while the player wears *n* pieces of set *S*, every `SetEffect` row (S, c) with
+c ≤ n has its action registered once. Each equip or unequip changes *n* by one, so each hook only adds or removes the
+row at exactly the current count; the login setup adds all rows 1…n.
+
+```pseudo
+InvenCellReleaser_EquipLocation::icr_Apply(obj, lockedCell, _)       @ FUN_0048ca20   (equip lock applied, Z05 §1.4)
+    obj.so_ply_ChangeBriefInfo(equipcell, slot) and for the other slot if any (vt 0x608); so_allparametercalculate (vt 0x57c);
+    look re-broadcast (vt 0x4b4); position restored                    # Z05 §1.4 / Z12 §2
+    cell = lc.equipchange.equipcell; p = ShineDynamicCast<ShinePlayer>(obj)
+    if cell and p and p.so_GetItemActionObserves() and ItemDataBox[cell.itemid]:
+        doWithActionIDs<ItemAcion_Add>(cell.itemid, p)   else assert "…icr_Apply itemaction Can`t Add ActionID. ShineItemID="
+        if cell.itemid != 0xFFFF:
+            if ItemInfo.Class == ITEMCLASS_WEAPON: the 3 gem ids of the weapon → doWithActionIDs<ItemAcion_Add>   # Z17
+            name = ItemInfo.SetItemIndex
+            n = p.so_EqualSetitemIndexNameCount(name)                  # the new piece is already in the cell
+            if SetEffectTable::FindActionID(name, n, &id):
+                if not p.so_AddItemAction(id, 0xFFFF):                 # vt 0x5d8 @ FUN_00560840 → ItemActionObserveManager::AddAction
+                    shineassert "InventoryLocking::InvenCellReleaser_EquipLocation::icr_Apply Setitem Can`t Add ActionID", id
+
+InvenCellReleaser_UnEquipInfo::icr_Apply(obj, lockedCell, _)         @ FUN_0048cc60
+    p = obj if its RTTI chain contains ShinePlayer
+    if p and p.so_GetItemActionObserves() and (cell = lc.equipchange.equipcell):
+        doWithActionIDs<ItemAcion_Del>(cell.itemid, p)  else assert "InvenCellReleaser_UnEquipInfo::icr_Apply ItemAction Can`t Del ActionID. ShineItemID="
+        if ItemDataBox[cell.itemid] and cell.itemid != 0xFFFF:
+            weapon: the 3 gem ids → doWithActionIDs<ItemAcion_Del>
+            n = p.so_EqualSetitemIndexNameCount(SetItemIndex)          # the leaving piece is still in the cell
+            if FindActionID(SetItemIndex, n, &id) and not p.so_DelItemAction(id, 0xFFFF):   # vt 0x5dc @ FUN_00560880
+                shineassert "ShineObjectClass::ShinePlayer::sp_NC_ITEM_EQUIP_REQ SetItem Can`t Del ActionID", id
+                # log text names the equip handler, not the releaser (original bug) Z21-B6
+
+ShinePlayer::so_ply_ItemAction_UnEquip(p, cell)   (player vt 0x5e0)  @ FUN_00565020
+    # only caller: ItemInventory::ii_DropAll @ FUN_00529a70 for a cell of the equipment (inven & 0xFC00 == 0x2000),
+    # before the cell is cleared (Z05 §3.1: dropping an equipped item)
+    if cell and p.so_GetItemActionObserves() and id = cell.iic_ItemIdent() != 0xFFFF and ItemDataBox[id].data:
+        doWithActionIDs<ItemAcion_Del>(id, p)   else assert "ShinePlayer::so_ply_ItemAction_UnEquip. ShineItemID="
+        weapon: the 3 gem ids → Del (same assert)
+        n = so_EqualSetitemIndexNameCount(SetItemIndex)                # cell still filled
+        if FindActionID(SetItemIndex, n, &id) and not so_DelItemAction(id, 0xFFFF):
+            shineassert "ShinePlayer::so_ply_ItemAction_UnEquip. SetItem Can`t Del ActionID", id
+
+ShinePlayer::sp_ItemActionSetup(p)                                   @ FUN_00566420
+    # only caller: sp_NC_MAP_LOGINCOMPLETE_CMD @ FUN_00443390 (Z01 §6), i.e. on every zone entry
+    ItemActionObserveManager::Clear(p.sp_ItemActionObserves)          # drops every action, item, set and abstate alike
+    if not p.so_GetItemActionObserves(): return
+    seen = vector<string>()                                           # set names already handled
+    for slot in 0 .. 29:
+        cell = equipment[slot]; if not cell or not ItemDataBox[cell.ident]: continue
+        doWithActionIDs<ItemAcion_Add>(ident, p)  else assert "ShinePlayer::so_GetItemActionObserves itemAction Can`t Add ActionID. ShineItemID="
+        if ident == 0xFFFF: return                                    # dead: ItemDataBox[0xFFFF] is NULL (original bug) Z21-B3
+        weapon: the 3 gem ids → Add (same assert)
+        name = ItemInfo.SetItemIndex
+        if name ∉ seen:
+            seen.push(name)
+            n = so_EqualSetitemIndexNameCount(name)                    # 0 for "-": nothing
+            for c in 1 .. n:
+                if FindActionID(name, c, &id) and not so_AddItemAction(id, 0xFFFF):
+                    shineassert "ShinePlayer::so_GetItemActionObserves Setitem Can`t Add ActionID", id
+    for each abnormal state s of p (p vt 0x52c container, +0xcb4 … list):    # abstate-granted actions, Z17
+        if ActionEffectAbStateTable::FindActionID(abstate name, &id): so_AddItemAction(id, 0xFFFF) else assert "… Abstate Can`t Add ActionID"
+    ItemActionObserveManager::SendCoolTimes2Client(p.so_GetItemActionObserves())     # Z17
+```
+
+Ordering, which the "count includes / excludes the piece" comments depend on: `icl_Apply_N_Free` applies the reservations
+of a lock index in list order (Z05 §1.3), and both requests reserve in the right order: `sp_NC_ITEM_UNEQUIP_REQ`
+@ FUN_0053a990 reserves `UnEquipInfo` (lock-list vt 0x54 = `icl_UnEquipInfo` @ FUN_004894b0) before the two cell moves
+(vt 0x30 / 0x40) and the `EquipLocation` (vt 0x50 = `icl_EquipLocation` @ FUN_00489380) of the now empty cell;
+`sp_NC_ITEM_EQUIP_REQ` @ FUN_0052b8d0 does `UnEquipInfo` → moves → `EquipLocation` for every conflicting item and then
+for the item being replaced (if the slot held one), then the moves and `EquipLocation` of the new item. So a swap of two
+pieces of the same set removes the row at *n* and adds it again. *(inferred: that the list is walked in insertion order;
+the releasers read the item id from the cell, so the opposite order would remove nothing on unequip)*
+
+Registration semantics (`ItemActionObserveManager::AddAction` @ FUN_005d17f0 / `DelAction` @ FUN_005d15e0, details in Z17):
+`AddAction` appends a new observer for the action id (no duplicate check), so an id granted twice (by two sets — the
+1,043 rows use only 401 distinct action ids — or by a set and an item) is registered twice; `DelAction` removes the
+first observer with the same (id, key). Since every set observer has key 0xFFFF (as do abstate-granted ones), removing a
+set's row removes one copy and the others stay: correct for duplicates. `AddAction` fails when the id is not in
+`ItemActions::_actions` (the `find` result's action pointer is NULL, *(inferred)* for the end node) or the observer buffer is full ("ItemActionObserveBuffer::alloc Buffer Full"); every
+`SetEffect.ItemActionID` exists in `ItemAction.shn`.
+
+Equipped items leave the equipment only through these paths in the 2016 zone (the only callers of `so_DelItemAction`
+are the two hooks above and `ase_DetachObject` @ FUN_00402000 for abstate actions); other removals of an equipped item,
+if any exist, would leave the set action registered until the next zone entry *(inferred; Z04 / Z05 own the removal
+paths)*.
+
+### 4.4 What the set-granted actions do
+
+Statistics of the 401 distinct action ids reachable from `SetEffect.shn` (`ItemActionEffect.EffectActivity` / the
+condition's `ConditionActivity`, enum `ActionActivityType`):
+
+| Effect activity | Actions | Meaning (Z17 owns the effect classes) |
+|---|---|---|
+| 5 `AAT_SkillEffectIncreaseType` (`ActionImpowerTypeEffect`) | 295 | skill empowerment, condition 7 `AAT_ActiveSkillGroupIndex` (the skill group cast) |
+| 2 `AAT_ABSTATEINDEX` (`AbStateTypeEffect`) | 64 | an abnormal state (value = abstate id, e.g. 507, 525, 541) |
+| 1 `AAT_RecoverType` (`RecoverTypeEffect`, below) | 32 | 12 × `RT_HPABSOLUTEPLUS` (5…30 HP), 18 × `RT_SPABSOLUTEPLUS` (5…21 SP), 2 × `RT_HPABSOLUTEMINUS` |
+| 9 `AAT_SetItemEffectType` (`ActionEffectTypeEffect`) | 10 | damage rate 1100 / 900 (× 1.1 / × 0.9) against / from one mob type (`ObjectTarget` / `SubjectTarget` = `ATT_MobType` 0, 1, 2, 3, 5) |
+
+Conditions: 295 × activity 7, 70 × 8 (`AAT_ActionETCType`), 10 × 6 (`AAT_ActionRangeType`), the rest attack-type
+conditions; 28 actions have a `CoolTime`.
+
+```pseudo
+MakeEffect(ItemActionEffect *e)                                       @ FUN_005d0060  (one IActEffect per ItemActionEffect row)
+    e.EffectTarget must be ATT_TargetType (0) else assert "USE TargetType for EffectTarget" + ShineExit
+    EffectActivity 0 → AttackTypeEffect, 1 → RecoverTypeEffect, 2 → AbStateTypeEffect, 3 → DispelAttrTypeEffect,
+                   5 → ActionImpowerTypeEffect, 9 → ActionEffectTypeEffect (the set-item effect class),
+                   8 → assert "ActionETCType Effect is exist yet" + ShineExit, other → "Unexpected condition type" + ShineExit
+    # IActEffect = { vtable, ItemActionEffect *_effectData @4 }; vt 4 fallback, 5 _execute, 6 _typeValidationCheck
+
+ActionEffectTypeEffect   (vt: fallback @ FUN_005d0010, _execute = AttackTypeEffect::_execute @ FUN_005d0000,
+                          _typeValidationCheck = AttackTypeEffect::_typeValidationCheck @ FUN_005cfb80)
+    _typeValidationCheck(arg) = (u16)e.EffectActivity == arg.effect.type and e.EffectActivityValue == arg.effect.subtype
+    _execute(arg, obj)        = e.Value                                # a rate, base 1000
+    fallback(arg)             = 1000 when (u16)e.EffectActivity == arg.effect.type and subtype == AT_SKILL (1);
+                                asserts "Unknown effect.subtype.actionEffectType" for AT_NORMAL or other subtypes
+    # IActEffect::_typeValidationCheck @ FUN_005cfb50 (the default) is false for activities 0, 5, 9: those need a typed match
+    # enum SetItemEffectType { SIET_DEFAULT 0, SIET_DAMAGE_RATE_INCREASE 1 } *(pdb2016)*: the 10 rows have
+    # EffectActivityValue 1 = SIET_DAMAGE_RATE_INCREASE, numerically AT_SKILL
+
+ItemActionObserveManager::EventRun_IncDmgRate(m, att, def, AttackType condSub, ActionResults *out)   @ FUN_005d2010
+    if out and att and def:
+        arg = { condition {AAT_AttackType, condSub}, effect {AAT_SetItemEffectType, AT_SKILL}, me = m.owner,
+                subject = att, object = def }
+        return _EventRun(m, out, arg, 0xFFFF)                          # Z17: runs every matching observer, collects rates
+    # callers: roe_AttackPower of the four rules (NormalPY @ FUN_00506660, NormalMA @ FUN_005068d0,
+    # PhisycalSkill @ FUN_00506b40, MagicalSkill @ FUN_00506ed0), for the attacker's and the defender's manager;
+    # the collected rate scales min/max attack (Z03 §4.6, "item actions of either side match")
+```
+
+```pseudo
+RecoverTypeEffect::_execute(arg, ShineObject *t) → 0                 @ FUN_005cfc70
+    v = e.Value (u16); switch e.EffectActivityValue (enum RecoverType):
+      0 RT_HPABSOLUTEPLUS:  t.so_GainHP(v) (vt 0x504);                 Send_SETITEMHEALEFFECT(t, isheal 1, v)
+      1 RT_HPRATEPLUS:      t.so_GainHP(MaxHP·v/1000);                 Send_SETITEMHEALEFFECT(t, 1, MaxHP·v/1000)
+      2 RT_SPABSOLUTEPLUS:  t.so_GainSP(v) (vt 0x4fc)                  # SP: no packet
+      3 RT_SPRATEPLUS:      t.so_GainSP(MaxSP·v/1000)
+      4 RT_HPABSOLUTEMINUS: d = v
+      5 RT_HPRATEMINUS:     d = MaxHP·v/1000
+          d = t.so_ply_CheckDamageAbsorption(d) (vt 0xbe8); d = t.so_smo_LastDamageOperation(d, 0) (vt 0xdb4)   # Z03
+          if d < t.so_GetHP(): t.so_DamagedBy(arg.me, d, 1000, 1) (vt 0x5c0)
+          else:                t.so_KilledBy(arg.me, t.so_GetHP()) (vt 0x5bc)
+          Send_SETITEMHEALEFFECT(t, isheal 0, d)
+      6 RT_SPABSOLUTEMINUS: t.so_LostSP(v) (vt 0x4f8)
+      7 RT_SPRATEMINUS:     t.so_LostSP(MaxSP·v/1000)
+      other: nothing
+    t.so_mobile_NotifyParameterChange(1) (vt 0x34)                    # every case, also "other"; Z12 §4
+    # MaxHP / MaxSP = vt 0x4f0 / 0x4f4. ShinePlayer::so_GainHP @ FUN_00559ca0: CurHP += v, then
+    # "if so_GetHP() <= CurHP: CurHP = so_GetHP()" — so_GetHP @ FUN_00559b70 is CurHP itself, so the cap never
+    # applies and a set heal can lift a player's HP above MaxHP (original bug) Z21-B4 (the mob twin is Z09-B126).
+    # ShinePlayer::so_GainSP @ FUN_00559bc0 caps at so_MaxSP correctly; so_LostSP @ FUN_00559b90 floors at 0.
+```
+
+The heal is not otherwise sent to the healed player: no HP packet is built here, the client only gets the number
+(§4.5); `so_mobile_NotifyParameterChange` sends `0x1035` changes of the maximum stats only (Z12 §4). *(inferred: the
+client's HP gauge follows with the next HP update)*
+
+### 4.5 `0x206F NC_ACT_SETITEMHEALEFFECT` (Z→C broadcast)
+
+Struct `PROTO_NC_ACT_SETITEMHEALEFFECT` *(pdb2016; the 2017 client PDB has the same 5 bytes)*:
+
+| Off | Type | Field | Value |
+|---|---|---|---|
+| 0 | u16 | `who` | handle of the healed / damaged object (`so_handle`) |
+| 2 | u8 bit 0 | `flag.isheal` | 1 = HP gained (recover types 0 / 1), 0 = HP lost (4 / 5); bits 1–7 keep whatever the shared send buffer held (only bit 0 is merged) (original bug) Z21-B7 |
+| 3 | u16 | `hpchange` | amount, the 32-bit value truncated to 16 bits (original bug) Z21-B5 |
+
+```pseudo
+Send_SETITEMHEALEFFECT(ShineObject *t, u8 isheal, u32 amount)          @ FUN_005cfbb0
+    if t == NULL: return
+    pkt = gpp.pp_NetCommand(8, 0x6F); pkt.who = t.handle; pkt.flag.isheal = isheal & 1; pkt.hpchange = (u16)amount
+    t.so_AllOfRange(allofrangearg++ (visit stamp), t.location, range 0 (map sight), AxialListPacketBroadcast(pkt, 7 bytes),
+                    include self = 1, 0xFFFF)                          # every player in sight of t, t itself included (Z01 §3.2; Z09 knowledge "range queries")
+    # only caller: RecoverTypeEffect::_execute (other functions merely share its EH handler)
+```
+
+Client: `GameFrameWork::On_NC_ACT_SETITEMHEALEFFECT` *(pdb2017 name; 2016 client FUN_0049bd20)* calls FUN_00692d10
+(`DAT_00b441d0`, who, hpchange, style = isheal·4 | 1, 0): if the object is known and close enough to the camera, it
+spawns a floating number (`sprintf "%u"`, one digit sprite per character) in style 5 (heal) or 1 (damage). Nothing else
+(no HP gauge change) *(inferred from the code shape: FUN_00692d10 is the shared damage/heal number display)*.
 
 ## 5. Mechanism C: set-item values in abnormal states
 
@@ -278,13 +524,22 @@ and restore at login; `siae_ParameterRefit` FUN_005108c0 is Z12 §2.5.)*
 |---|---|---|---|---|
 | Z21-B1 | `sp_SetItemCheck` FUN_00510b50, `sic_SetItemDefine` FUN_00510370, `siel_AppendEffect` FUN_005104c0 (§3.2) | `SetItem.shn` / `SetItemEffect.shn` are never loaded; `sic_TotalNumber` stays 0, `ItemDataBoxIndex.SetItemIndex` stays 0xFFFF, `setitemeffectlist` stays empty | the legacy skill-effect set bonuses (235 described effects) never apply; all `g_SetEffect` multipliers are 1000; the code runs on every equip change and cast for nothing | legacy path superseded by `SetEffect.shn` item actions *(inferred)*, left wired in |
 | Z21-B2 | `sp_SetItemCheck` FUN_00510b50 (§3.3) | `break` when `ItemDataBox[id]` is NULL | pieces after an unknown item id in the bag are not counted (moot while B1 holds) | `continue` |
+| Z21-B3 | `sp_ItemActionSetup` FUN_00566420 (§4.3) | after `ItemDataBox[ident]` succeeded, `ident == 0xFFFF` returns from the whole setup | dead: `ItemDataBox::operator[]` @ FUN_00419020 returns NULL for 0xFFFF; if reached, the remaining slots, the abstate actions and `SendCoolTimes2Client` would be skipped | `continue` (skip an empty cell) |
+| Z21-B4 | `ShinePlayer::so_GainHP` FUN_00559ca0, reached from `RecoverTypeEffect::_execute` FUN_005cfc70 (§4.4) | caps CurHP at `so_GetHP` (= CurHP) instead of `so_MaxHP` | set (and other item-action) heals `RT_HPABSOLUTEPLUS` / `RT_HPRATEPLUS` can raise a player's HP above MaxHP until the next clamp (e.g. after an equip change, Z12 §3.2); 12 set actions heal HP | cap at `so_MaxHP` (player twin of Z09-B126) |
+| Z21-B5 | `Send_SETITEMHEALEFFECT` FUN_005cfbb0 (§4.5) | `hpchange` is u16, the amount u32 | amounts ≥ 65,536 (rate types on very high MaxHP) show wrapped; latent with the 2016 set data (absolute 5…30) | u32 field, or clamp to 0xFFFF |
+| Z21-B6 | `InvenCellReleaser_UnEquipInfo::icr_Apply` FUN_0048cc60 (§4.3) | the set-action delete failure logs "ShineObjectClass::ShinePlayer::sp_NC_ITEM_EQUIP_REQ SetItem Can`t Del ActionID" | misleading log (names the equip handler) | the releaser's own name |
+| Z21-B7 | `Send_SETITEMHEALEFFECT` FUN_005cfbb0 (§4.5) | only bit 0 of the `flag` byte is written (`b ^= (b ^ isheal) & 1`) | bits 1–7 carry stale buffer bytes to the client; harmless, the client masks bit 0 | write the whole byte |
 
 ## 6. Not reconstructed / uncertain
 
 - How the legacy tables were meant to be loaded (`SkillGroup` + `From`/`To` → `skilllist`, set name → set id in
   `ItemDataBoxIndex.SetItemIndex`): no loader exists in the 2016 zone; the mapping in §2.2 is *(inferred)* from the
   member names. The 2015 zone could be diffed for an older loader (not documented here: 2015 is out of scope).
-- Parts 2–3 pending (§4, §5).
+- Whether `icl_Apply_N_Free` walks the lock list strictly in insertion order (§4.3 relies on it; the list class
+  is `InventoryLocking::InventoryCellLockList`, Z05 §1.2–1.3).
+- What the client does with `0x206F` beyond the floating number (FUN_00692d10 is unnamed in the 2016 client; the 2017
+  PDB names only the handler). Whether the player's HP gauge is refreshed after a set heal (§4.4).
+- Part 3 pending (§5).
 
 ## 7. Coverage boundary
 
