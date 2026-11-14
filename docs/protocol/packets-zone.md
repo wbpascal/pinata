@@ -9286,7 +9286,7 @@ Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · pa
 
 ### `0xb022` NC_RAID_MEMBERINFORM_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_RAID_MEMBERINFORM_CMD`, 16 bytes
+**Verified layout** (basis: zone FUN_005cd8f0 (0x10))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -9301,14 +9301,12 @@ Sent from `FUN_005cd8f0` (`FUN_005cd8f0`) · payload 16 bytes
 
 ### `0xb023` NC_RAID_MEMBERCLASS_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_RAID_MEMBERCLASS_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_005cd9c0, FUN_005cda50, FUN_005ce190 (1 + 0x3a·n; FUN_005cda50 sends 2 bytes short, Z14-B12))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | nNum |  |
-| 1 | RAID_MEMBERCLASS[nNum] | RaidMembers | variable length, element RAID_MEMBERCLASS |
-
-Element `RAID_MEMBERCLASS` (58 bytes): +0 u16 nPartyNo, +2 u8 nPartyIndex, +3 u8 nSlotIndex, +4 char[20] charid, +24 u8 chrclass, +25 u8 level, +26 u32 maxhp, +30 u32 maxsp, +34 u32 maxlp, +38 u32 hp, +42 u32 sp, +46 u32 lp, +50 u32 loc.x, +54 u32 loc.y
+| 1 | RAID_MEMBERCLASS[n] | RaidMembers | 0x3a: u16 nPartyNo, u8 nPartyIndex, u8 nSlotIndex, Name5 charid @4, u8 chrclass @0x18, u8 level @0x19, u32 maxhp @0x1a, maxsp @0x1e, maxlp @0x22, hp @0x26, sp @0x2a, lp @0x2e, SHINE_XY_TYPE loc @0x32 |
 
 Sent from `FUN_005cd9c0` (`FUN_005cd9c0`) · payload 59 bytes
 
@@ -9322,14 +9320,12 @@ Fill: +1: FUN_005cd5a0 (no direct writes found)
 
 ### `0xb026` NC_RAID_LOCATION_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_RAID_LOCATION_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_005cdb50, FUN_005cdc00 (1 + 0xc·n; FUN_005cdc00 length wrong, Z14-B13))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | nNum |  |
-| 1 | PROTO_NC_RAID_LOCATION_CMD::Memberinfo[nNum] | RaidMembers | variable length, element PROTO_NC_RAID_LOCATION_CMD::Memberinfo |
-
-Element `PROTO_NC_RAID_LOCATION_CMD::Memberinfo` (12 bytes): +0 u16 nPartyNo, +2 u8 nPartyIndex, +3 u8 nSlotIndex, +4 u32 loc.x, +8 u32 loc.y
+| 1 | Memberinfo[n] | RaidMembers | 0xc: u16 nPartyNo, u8 nPartyIndex, u8 nSlotIndex, u32 x, u32 y |
 
 Sent from `FUN_005cdb50` (`FUN_005cdb50`) · payload 13 bytes
 
@@ -11350,6 +11346,14 @@ to every participant still in the party/raid; client: 0x2008 → '%s acquired th
 |---|---|---|---|
 | 0 | u16 | err | 0xB50 started, 0xB51, 0xB53 |
 
+### `0x4420` NC_QUEST_JOBDUNGEON_LINK_FAIL_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_005a8d30, FUN_005bfde0 (so_SendErrorCode 17/32))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x30C2 |
+
 ### `0x4829` NC_SKILL_SOMEONEREVAVALTOME_CMD (S→C)
 
 **Verified layout** (basis: zone FUN_0057ab90; client FUN_00575f30)
@@ -11776,6 +11780,19 @@ no payload; whole map on `battlestop guild.`; client ends the tournament display
 | 0 | u16 | mobhandle | mob |
 | 2 | u32 | mobguild | mob+0x22ec |
 
+### `0x7494` NC_GUILD_STORAGEWITHDRAW_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00474cf0 / FUN_004752d0 (0x21))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | type |  |
+| 1 | u8 | isBuy |  |
+| 2 | Name5 | charid |  |
+| 22 | u16 | item |  |
+| 24 | u8 | slot |  |
+| 25 | u64 | lot|cen |  |
+
 ### `0x74D2` NC_GUILD_TOURNAMENT_DICEGAME_START_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone GuildTournamentSystem::DiceGameStart FUN_0047ada0 (Pine DiceGameStart); client GuildTask FUN_006b63a0)
@@ -11839,6 +11856,34 @@ to the live players of the map (AxialListPacketBroadcast, 0x16 bytes with the op
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x14C0 ok |
+
+### `0x9873` NC_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00470b50, FUN_00471550 (0x29))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | who | 3 = academy reward |
+| 1 | u8 | type | 0 item, 1 lot item, 2 money |
+| 2 | Name5 | charid |  |
+| 22 | u16 | item |  |
+| 24 | u8 | slot |  |
+| 25 | u64 | lot|cen |  |
+| 33 | u64 | storage_cen |  |
+
+### `0x9875` NC_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00470b50, FUN_004716d0 (0x29))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | who |  |
+| 1 | u8 | type |  |
+| 2 | Name5 | charid |  |
+| 22 | u16 | item |  |
+| 24 | u8 | slot |  |
+| 25 | u64 | lot|cen |  |
+| 33 | u64 | storage_cen |  |
 
 ### `0xBC1C` NC_GAMBLE_ENTER_PLAYER_DIRECT_CMD (hand-named) (S→C)
 
@@ -12638,6 +12683,24 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 0 | bytes[0x174] | request | copy of 0x7C13 |
 | 372 | u16 | err | 0xDC0 not found, 0xDC1/0xDC2 so_Prison_Go result |
 
+### `0xa401` NC_INSTANCE_DUNGEON_EMPTY_DUNGEON_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_004868d0 (5))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Category |  |
+| 1 | u32 | RegisterNumber |  |
+
+### `0xa403` NC_INSTANCE_DUNGEON_RESET_COUNTDOWN_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_004868d0, FUN_00486710, FUN_00485290 (5))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Category |  |
+| 1 | u32 | RegisterNumber |  |
+
 ### `0xa408` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_REQ (Z→WM)
 
 **Verified layout** (basis: zone FUN_004c35d0)
@@ -12679,6 +12742,15 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 7 | u16 | nError |  |
 | 9 | i32 | eLevelType |  |
 | 13 | Name3 | sMapName |  |
+
+### `0xa419` NC_INSTANCE_DUNGEON_MAP_REGIST_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_00462af0 (2 + 0xd·n))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMapCount |  |
+| 2 | SHINE_INDUN_INFO[n] | sIndunInfos | 0xd: char MapIDClient[12] + NUL, u8 ModeIDLv |
 
 ### `0x0811` NC_MISC_ZONERINGLINKTEST_RNG (Z→Z (ring))
 
@@ -12754,6 +12826,17 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 3 | u32 | start.regnum |  |
 | 7 | Name5 | charid | kicked character |
 
+### `0x10b1` NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_005a8a70, FUN_00485120 (0xb))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | i32 | Category | owner category; Start.handle = 0xFFFF, Start.regnum = owner regnum |
+
 ### `0x1810` NC_MAP_EXPBONUS_RNG (Z→Z (ring))
 
 **Verified layout** (basis: zone &expbonus ac_BonusExp FUN_0041e190 → zrpb_Request FUN_005a79a0 (writes, 0x0B bytes); ring handler forwards and applies; PDB 2016 PROTO_NC_MAP_EXPBONUS_RNG)
@@ -12789,27 +12872,125 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 11 | u32 | bride | bride charNo (&weddingreset: GM charNo) |
 | 15 | u8 | RecallCount | partners recalled so far; 0 back at the origin = cancel the hall reservation |
 
-### `0x10b1` NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG (Z→Z ring)
+### `0x441f` NC_QUEST_JOBDUNGEON_FIND_RNG (Z→Z (ring))
 
-**Verified layout** (basis: zone FUN_005a8a70)
-
-| Off | Type | Field | Notes |
-|---|---|---|---|
-| 0 | ZONERINGLINKAGESTART | Start | machine own, handle 0xFFFF, regnum |
-| 7 | i32 | Category |  |
-
-### `0xa404` NC_INSTANCE_DUNGEON_FIND_RNG (Z→Z ring)
-
-**Verified layout** (basis: zone FUN_0050f070)
+**Verified layout** (basis: zone FUN_005a8d30, FUN_005bfde0 (0x73))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | ZONERINGLINKAGESTART | Start | machine, handle, regnum |
-| 7 | i32 | InstanceCategory |  |
-| 11 | u32 | IDRegisterNumber |  |
-| 15 | ORToken | Argument | 20-byte key |
-| 35 | char[33] | ServerMapName |  |
-| 68 | u16 | Error | 2 on request |
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u16 | nError | 0x30C0 found, 0x30C1 searching, 0x30C2 refused |
+| 9 | char[33] | ClientMapName | cluster name |
+| 42 | char[33] | ServerMapName | instance map (Name3 + NUL) when found |
+| 75 | char[33] | ScriptName | film to play |
+| 108 | u16 | QuestScript.nQuestID |  |
+| 110 | u8 | QuestScript.nQSC | 3 |
+| 111 | u32 | QuestScript.nResult | 0 fail, 2 refused |
+
+### `0x7493` NC_GUILD_STORAGEWITHDRAW_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_00474f10 (0x2c); not forwarded (Z14-B10))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u32 | gldregnum |  |
+| 11 | u8 | type | item / money |
+| 12 | u8 | slot |  |
+| 13 | u8 | isBuy | bought with guild tokens |
+| 14 | Name5 | charid | who withdrew |
+| 34 | u16 | item |  |
+| 36 | u64 | lot|cen | union |
+
+### `0x9872` NC_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_00473050 (0x35))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u32 | gldregnum | storage owner guild |
+| 11 | u8 | why | ≠0: members get 0x9873 |
+| 12 | u8 | who |  |
+| 13 | u8 | type | 0 item, 1 lot item, 2 money |
+| 14 | u8 | slot |  |
+| 15 | Name5 | charid |  |
+| 35 | u16 | item |  |
+| 37 | u64 | lot|cen |  |
+| 45 | u64 | storage_cen | new storage money (type 2) |
+
+### `0x9874` NC_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_00473160 (0x35, same layout as 0x9872))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u32 | gldregnum |  |
+| 11 | u8 | why |  |
+| 12 | u8 | who |  |
+| 13 | u8 | type | 0 item, 1 lot item, 2 money |
+| 14 | u8 | slot |  |
+| 15 | Name5 | charid |  |
+| 35 | u16 | item |  |
+| 37 | u64 | lot|cen | added (type 1/2) |
+| 45 | u64 | storage_cen |  |
+
+### `0x9884` NC_GUILD_ACADEMY_REWARDSTORAGE_ITEM_INFO_ZONE_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_00473270 (0xb0))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u32 | nGldregnum |  |
+| 11 | u8 | Who |  |
+| 12 | Name5 | Charid |  |
+| 32 | u8 | Type | 0/1 move, 2 split, 3 merge, 4 swap |
+| 33 | SHINE_INVEN_SLOT_INFO | From | 0x10: key 8, ITEM_INVEN, u16 ItemID, u32 Lot |
+| 49 | SHINE_INVEN_SLOT_INFO | To |  |
+| 65 | ItemTotalInformation | ChangeIteminfo | item now at the destination |
+
+### `0x9885` NC_GUILD_ACADEMY_REWARDSTORAGE_REWARD_ZONE_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_0046e750, FUN_00473370 (0x30 + 9n))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u32 | nGuildNo |  |
+| 11 | Name5 | sCharID | rewarded academy member |
+| 31 | u64 | Reward_Cen | money paid to the member |
+| 39 | u64 | Storage_Cen | new storage money |
+| 47 | u8 | Reward_ItemNum | n |
+| 48 | EACH_MODIFY_ITEM[n] | Reward_ItemInfo | 9 B: u8 nStatus (0 remove, 1 reduce), u16 nItemID, ITEM_INVEN nLocation, u32 nLot |
+
+### `0xa404` NC_INSTANCE_DUNGEON_FIND_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_00487510, FUN_005a92e0 (0x46))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | i32 | InstanceCategory | INSTANCE_DUNGEON::CATEGORY 0 party / 3 raid |
+| 11 | u32 | IDRegisterNumber | partyNo / raidNo |
+| 15 | ORToken | Argument | InstanceDungeon row key (20 B) |
+| 35 | char[33] | ServerMapName | instance map, set by the hosting zone |
+| 68 | u16 | Error | 0 found, 1 no free instance, 2 not handled (initial), 3 full |
 
 ### `0x1095` NC_CHAR_WEDDING_PARTNER_INFO_RNG (ring)
 
