@@ -375,3 +375,256 @@ row by row (format index and every value) with `tools/protocol-re/csl.py`:
 The shipped scripts use only `#DEFINE`, `#ENDDEFINE`, `#INCLUDE`, `#END`, `<INTEGER>`, `<STRING>`, `;` remarks
 (`DefaultCharacterData.txt`, also after values), CRLF line ends, tab + comma separators, and no trailing line break
 after `#END`. A rebuild that writes new files should keep exactly that subset.
+
+## 5. The other servers' copies
+
+### 5.1 Method and result
+
+Every same-name function was compared at instruction level (objdump of the 2016 exe, absolute addresses normalised; the
+method of S02's `tools/protocol-re/asmcmp.py`, extended to the data servers in a scratch copy):
+
+- **Account, AccountLog**: functions by their NA2016 PDB names (`re-data/exports/account-pdb`, `accountlog-pdb`
+  *(pdb2016)*), compared with the zone copy.
+- **Character, GameLog** (no PDB): the copy was found by its strings (`"FILE PROCESSING - %s "` → `ReadScript`
+  FUN_00446f50 / FUN_0040e7c0, `"%s - FORMAT DEFINING, UNKNOWNED PARAMATER."` → `MakeFormat` FUN_00445700 /
+  FUN_0040cf70, `"Include Format %d Defined, %d Errors"` → `ReadScriptDone` FUN_00445d80 / FUN_0040d5f0), then every
+  Account function was matched to the most similar function in 0x43a000–0x44c000 / 0x402000–0x414000. Every library
+  function finds a partner with similarity 1.000, in the same address order as in Account; the names in
+  `tools/protocol-re/names/{character,gamelog}/Z19.json` come from that match (the official names of identical code).
+
+Result:
+
+- **`CToken` (15), `CCsl` (29), `CGdp` (24) are identical in all seven 2016 builds** (Zone, WM, Login per S02 §2.7 /
+  §3.6; Account, AccountLog, Character, GameLog here). The only differences lie after the final `ret` of
+  `CCsl::MakeData`, `ProcRemark`, `ProcCmd` and `CGdp::CreateFileA`: their inline jump tables, which hold absolute
+  addresses.
+- **Constant tables equal.** `pCslCmd` (10 commands), `pCslParameter` (18 types + `#ENDDEFINE`), `pCslParameterSize`
+  (20 sizes) and `pCslRemarks` (3 null slots, then `#SEPRATOR`, `#REMARKLINE`, `#REMARKSTART`, `#REMARKEND`) have the
+  same content and relative layout in every exe (`pCslParameterSize` = `pCslParameter` − 0x50, `pCslCmd` =
+  `pCslParameter` + 0x4c, `pCslRemarks` = `pCslCmd` + 0x28). `pCslCmd`: Zone 0x873864, WM 0x497b34, Login 0x43075c,
+  Account 0x448584, AccountLog 0x4433b4, Character 0x4df7ac, GameLog 0x44a3b4. The default marker strings `"*/"`,
+  `"/*"`, `", \t\r\n"` that `ProcRemark` restores are byte-equal (Zone 0x70cae0, Account 0x434164, AccountLog
+  0x42f724, Character 0x4bbe68, GameLog 0x435acc). All 40 result-message strings of S02 §2.6 occur in every exe.
+- **Build-specific members.** Zone: `CToken::GetTokenID` (quest scripts), no `CCsl::ViewResultMsg`. WM / Login:
+  `CCsl::ViewResultMsg`, no `GetTokenID` (S02 §2.7). The four data servers: neither. So the format of §2 holds for
+  every server's config files unchanged.
+- **`CServerInfo` is per server** (a thin wrapper compiled with each server, not part of the library): the data
+  servers share one variant (Account = AccountLog = Character = GameLog, all members identical), which differs from the
+  zone's (§5.3).
+
+`m_bIsGDPOpen` is set only by `CGdp::Open`, and `CGdp::Open` has no caller outside `CGdp` in Account and the zone; the
+data servers therefore also read every config file as a plain file (S02 §3.2).
+
+### 5.2 Function addresses per build
+
+WM and Login addresses: S02 §2.7 / §3.6. `–` = no such function in that build. The data servers' `~CServerInfo`
+(Close + `~CToken`, same code as `~CCsl`) is a jump thunk to `~CCsl` in Character and GameLog.
+
+| Function | Zone | Account | AccountLog | Character | GameLog |
+|---|---|---|---|---|---|
+| `CServerInfo::~CServerInfo` | – | FUN_00401000 | FUN_00401000 | FUN_0043ed60 (thunk → ~CCsl) | FUN_00401000 (thunk → ~CCsl) |
+| `CToken::CToken` | FUN_0063aea0 | FUN_00406ef0 | FUN_00406ac0 | FUN_00442350 | FUN_0040b280 |
+| `CToken::Close` | FUN_0063af10 | FUN_00406f60 | FUN_00406b30 | FUN_004423c0 | FUN_0040b2f0 |
+| `CToken::SetSeprator` | FUN_0063af70 | FUN_00406fc0 | FUN_00406b90 | FUN_00442420 | FUN_0040b350 |
+| `CToken::my_tcstok` | FUN_0063af90 | FUN_00406fe0 | FUN_00406bb0 | FUN_00442440 | FUN_0040b370 |
+| `CToken::GetToken` | FUN_0063b010 | FUN_00407060 | FUN_00406c30 | FUN_004424c0 | FUN_0040b3f0 |
+| `CToken::GoBegin` | FUN_0063b090 | FUN_004070e0 | FUN_00406cb0 | FUN_00442540 | FUN_0040b470 |
+| `CToken::GoNextLine` | FUN_0063b150 | FUN_004071a0 | FUN_00406d70 | FUN_00442600 | FUN_0040b530 |
+| `CToken::GoStartString` | FUN_0063b1a0 | FUN_004071f0 | FUN_00406dc0 | FUN_00442650 | FUN_0040b580 |
+| `CToken::SaveTokenPositon` | FUN_0063b1f0 | FUN_00407240 | FUN_00406e10 | FUN_004426a0 | FUN_0040b5d0 |
+| `CToken::RestoreTokenPositon` | FUN_0063b200 | FUN_00407250 | FUN_00406e20 | FUN_004426b0 | FUN_0040b5e0 |
+| `CToken::IsTokenID` | FUN_0063b270 | FUN_004072c0 | FUN_00406e90 | FUN_00442720 | FUN_0040b650 |
+| `CToken::~CToken` | FUN_0063b310 | FUN_00407300 | FUN_00406ed0 | FUN_00442760 | FUN_0040b690 |
+| `CToken::Open` | FUN_0063b3a0 | FUN_00407390 | FUN_00406f60 | FUN_004427f0 | FUN_0040b720 |
+| `CToken::OpenFromMemory` | FUN_0063b4b0 | FUN_004074a0 | FUN_00407070 | FUN_00442900 | FUN_0040b830 |
+| `CToken::GetTokenString` | FUN_0063b570 | FUN_00407560 | FUN_00407130 | FUN_004429c0 | FUN_0040b8f0 |
+| `CGdp::Clear` | FUN_0063b660 | FUN_0040bba0 | FUN_00407220 | FUN_00444180 | FUN_0040b9e0 |
+| `CGdp::GdpSetFilePointer` | FUN_0063b6e0 | FUN_0040bc20 | FUN_004072a0 | FUN_00444200 | FUN_0040ba60 |
+| `CGdp::GdpDecryptData` | FUN_0063b760 | FUN_0040bca0 | FUN_00407320 | FUN_00444280 | FUN_0040bae0 |
+| `CGdp::GdpWriteChunk` | FUN_0063b7a0 | FUN_0040bce0 | FUN_00407360 | FUN_004442c0 | FUN_0040bb20 |
+| `CGdp::GdpUpdateChunk` | FUN_0063b860 | FUN_0040bda0 | FUN_00407420 | FUN_00444380 | FUN_0040bbe0 |
+| `CGdp::UpdateWriteDataInfo` | FUN_0063b8c0 | FUN_0040be00 | FUN_00407480 | FUN_004443e0 | FUN_0040bc40 |
+| `CGdp::GdpSearchFile` | FUN_0063b960 | FUN_0040bea0 | FUN_00407520 | FUN_00444480 | FUN_0040bce0 |
+| `CGdp::GdpDeleteFile` | FUN_0063b9c0 | FUN_0040bf00 | FUN_00407580 | FUN_004444e0 | FUN_0040bd40 |
+| `CGdp::GdpDeleteFile` (2nd overload) | FUN_0063ba40 | FUN_0040bf80 | FUN_00407600 | FUN_00444560 | FUN_0040bdc0 |
+| `CGdp::CloseHandle` | FUN_0063ba70 | FUN_0040bfb0 | FUN_00407630 | FUN_00444590 | FUN_0040bdf0 |
+| `CGdp::ReadFile` | FUN_0063bab0 | FUN_0040c000 | FUN_00407670 | FUN_004445d0 | FUN_0040be30 |
+| `CGdp::WriteFile` | FUN_0063bb40 | FUN_0040c090 | FUN_00407700 | FUN_00444660 | FUN_0040bec0 |
+| `CGdp::GetFileSize` | FUN_0063bc30 | FUN_0040c180 | FUN_004077f0 | FUN_00444750 | FUN_0040bfb0 |
+| `CGdp::SetFilePointer` | FUN_0063bc70 | FUN_0040c1c0 | FUN_00407830 | FUN_00444790 | FUN_0040c000 |
+| `CGdp::fclose` | FUN_0063bd40 | FUN_0040c290 | FUN_00407900 | FUN_00444860 | FUN_0040c0d0 |
+| `CGdp::CGdp` | FUN_0063bd90 | FUN_0040c2e0 | FUN_00407950 | FUN_004448b0 | FUN_0040c120 |
+| `CGdp::GdpCloseFile` | FUN_0063bdb0 | FUN_0040c300 | FUN_00407970 | FUN_004448d0 | FUN_0040c140 |
+| `CGdp::GdpMakeEmptyChunk` | FUN_0063bdf0 | FUN_0040c340 | FUN_004079b0 | FUN_00444910 | FUN_0040c180 |
+| `CGdp::GdpClose` | FUN_0063c1e0 | FUN_0040c730 | FUN_00407da0 | FUN_00444d00 | FUN_0040c570 |
+| `CGdp::Open` | FUN_0063c290 | FUN_0040c7e0 | FUN_00407e50 | FUN_00444db0 | FUN_0040c620 |
+| `CGdp::Open` (2nd overload) | FUN_0063c350 | FUN_0040c8a0 | FUN_00407f10 | FUN_00444e70 | FUN_0040c6e0 |
+| `CGdp::~CGdp` | FUN_0063c380 | FUN_0040c8d0 | FUN_00407f40 | FUN_00444ea0 | FUN_0040c710 |
+| `CGdp::GdpGetEmptyChunk` | FUN_0063c390 | FUN_0040c8e0 | FUN_00407f50 | FUN_00444eb0 | FUN_0040c720 |
+| `CGdp::CreateFileA` | FUN_0063c3d0 | FUN_0040c920 | FUN_00407f90 | FUN_00444ef0 | FUN_0040c760 |
+| `CCsl::VarClear` | FUN_00650710 | FUN_0040cb90 | FUN_00408200 | FUN_00445160 | FUN_0040c9d0 |
+| `CCsl::MakeFormatTable` | FUN_00650780 | FUN_0040cc00 | FUN_00408270 | FUN_004451d0 | FUN_0040ca40 |
+| `CCsl::MakeDataTable` | FUN_00650800 | FUN_0040cc80 | FUN_004082f0 | FUN_00445250 | FUN_0040cac0 |
+| `CCsl::AddResultMsg` | FUN_00650880 | FUN_0040cd00 | FUN_00408370 | FUN_004452d0 | FUN_0040cb40 |
+| `CCsl::GetFormat` | FUN_00650900 | FUN_0040cd80 | FUN_004083f0 | FUN_00445350 | FUN_0040cbc0 |
+| `CCsl::GetNumDatas` | FUN_00650950 | FUN_0040cdd0 | FUN_00408440 | FUN_004453a0 | FUN_0040cc10 |
+| `CCsl::GetDataInfo` | FUN_00650960 | FUN_0040cde0 | FUN_00408450 | FUN_004453b0 | FUN_0040cc20 |
+| `CCsl::GetData` | FUN_006509b0 | FUN_0040ce30 | FUN_004084a0 | FUN_00445400 | FUN_0040cc70 |
+| `CCsl::ProcRemark` | FUN_00650aa0 | FUN_0040cf20 | FUN_00408590 | FUN_004454f0 | FUN_0040cd60 |
+| `CCsl::MakeFormat` | FUN_00650cb0 | FUN_0040d130 | FUN_004087a0 | FUN_00445700 | FUN_0040cf70 |
+| `CCsl::AddFormat` | FUN_00650f60 | FUN_0040d3e0 | FUN_00408a50 | FUN_004459b0 | FUN_0040d220 |
+| `CCsl::GetDataToken` | FUN_00650fa0 | FUN_0040d420 | FUN_00408a90 | FUN_004459f0 | FUN_0040d260 |
+| `CCsl::Parameter_filename` | FUN_00651020 | FUN_0040d4a0 | FUN_00408b10 | FUN_00445a70 | FUN_0040d2e0 |
+| `CCsl::MakeData` | FUN_00651050 | FUN_0040d4d0 | FUN_00408b40 | FUN_00445aa0 | FUN_0040d310 |
+| `CCsl::ProcData` | FUN_006512a0 | FUN_0040d720 | FUN_00408d90 | FUN_00445cf0 | FUN_0040d560 |
+| `CCsl::ReadScriptDone` | FUN_00651330 | FUN_0040d7b0 | FUN_00408e20 | FUN_00445d80 | FUN_0040d5f0 |
+| `CCsl::Read` | FUN_00651540 | FUN_0040d9c0 | FUN_00409030 | FUN_00445f90 | FUN_0040d800 |
+| `CCsl::WriteFormat` | FUN_00651780 | FUN_0040dc00 | FUN_00409270 | FUN_004461d0 | FUN_0040da40 |
+| `CCsl::WriteData` | FUN_006518a0 | FUN_0040dd20 | FUN_00409390 | FUN_004462f0 | FUN_0040db60 |
+| `CCsl::ClearFormats` | FUN_006519b0 | FUN_0040de30 | FUN_004094a0 | FUN_00446400 | FUN_0040dc70 |
+| `CCsl::ClearDatas` | FUN_00651a20 | FUN_0040dea0 | FUN_00409510 | FUN_00446470 | FUN_0040dce0 |
+| `CCsl::Close` | FUN_00651a90 | FUN_0040df10 | FUN_00409580 | FUN_004464e0 | FUN_0040dd50 |
+| `CCsl::Clear` | FUN_00651b10 | FUN_0040dfa0 | FUN_00409600 | FUN_00446560 | FUN_0040ddd0 |
+| `CCsl::~CCsl` | FUN_00651bf0 | FUN_0040e080 | FUN_004096e0 | FUN_00446640 | FUN_0040deb0 |
+| `CCsl::CCsl()` | FUN_00651c50 | FUN_0040e0e0 | FUN_00409740 | FUN_004466a0 | FUN_0040df10 |
+| `CCsl::CCsl(parent)` | FUN_00651cb0 | FUN_0040e140 | FUN_004097a0 | FUN_00446700 | FUN_0040df70 |
+| `CCsl::IncludeFile` | FUN_00651ea0 | FUN_0040e330 | FUN_00409990 | FUN_004468f0 | FUN_0040e160 |
+| `CCsl::ProcCmd` | FUN_00652000 | FUN_0040e490 | FUN_00409af0 | FUN_00446a50 | FUN_0040e2c0 |
+| `CCsl::ReadScript` | FUN_00652500 | FUN_0040e990 | FUN_00409ff0 | FUN_00446f50 | FUN_0040e7c0 |
+| `CServerInfo::CServerInfo` | FUN_0064d0e0 | FUN_0040f580 | FUN_0040b610 | FUN_0043eb40 | FUN_0040fde0 |
+| `CServerInfo::ReadServerInfo` | FUN_0064d0f0 | FUN_0040f590 | FUN_0040b620 | FUN_00449410 | FUN_0040fdf0 |
+| `CServerInfo::GetMyServerInfo` | FUN_0064d130 | FUN_0040f5c0 | FUN_0040b650 | FUN_00449440 | FUN_0040fe20 |
+| `CServerInfo::GetServerInfo(info, row)` | FUN_0064d1c0 | FUN_0040f650 | FUN_0040b6e0 | FUN_004494d0 | FUN_0040feb0 |
+| `CServerInfo::GetServerIndex` | FUN_0064d270 | FUN_0040f700 | FUN_0040b790 | FUN_00449580 | FUN_0040ff60 |
+| `CServerInfo::GetODBCInfo` | – | FUN_0040f7d0 | FUN_0040b860 | FUN_00449650 | FUN_00410030 |
+| `CServerInfo::GetServerInfo(info, id, world, zone[, from])` | FUN_0064d420 | FUN_0040f880 | FUN_0040b910 | FUN_00449700 | FUN_004100e0 |
+| `CToken::GetTokenID` | FUN_0063b2b0 | – | – | – | – |
+| `CServerInfo::GetNumOfData` | FUN_0064d120 | – | – | – | – |
+| `CServerInfo::GetNationName` | FUN_0064d350 | – | – | – | – |
+| `CServerInfo::GetWorldName` | FUN_0064d3a0 | – | – | – | – |
+
+### 5.3 The data servers' `CServerInfo`
+
+Members of the data-server variant (Account addresses; the others in §5.2). The structs are the same as in the zone
+(`MY_SERVER`, `SERVER_INFO`, `ODBC_INFO`, Z10 §6.5) *(pdb2016)*; string members point into the row data (the CSL row
+stores strings inline, S02 knowledge), so they stay valid until the next `ReadServerInfo` / `Close`.
+
+```pseudo
+CServerInfo::ReadServerInfo(file):        Clear(); return ReadScript(file, hWnd 0, msgId 0x401, mem 0)   @ FUN_0040f590
+GetMyServerInfo(out MY_SERVER):                                                                    @ FUN_0040f5c0
+    first row with dwID == 0 (MY_SERVER): pServiceName = col 0, pDisplayName = col 1, nServerID = col 2,
+        nWorldNo = col 3, nZoneNo = col 4; return 1;  no such row: return 0
+GetServerInfo(out SERVER_INFO, row):                                                               @ FUN_0040f650
+    if GetDataInfo(row).dwID != 3: return 0          # no range check on row (GetDataInfo returns null → crash,
+                                                     #   the zone's copy is the same; callers pass an index from GetServerIndex)
+    pName = col 0, nServerID 1, nWorldNo 2, nZoneNo 3, nServerIDFrom 4, pIP 5, nPort 6, nBackLog 7, nMaxAccept 8; return 1
+GetServerIndex(id, world, zone):                                                                    @ FUN_0040f700
+    first row with dwID == 3 (SERVER_INFO) and col1 == id, col2 == world, col3 == zone → its index; else −1
+    # the zone's GetServerIndex FUN_0064d270 also compares col 4 (nServerIDFrom) with a 4th argument;
+    # the data servers' rows have one SERVER_INFO row each (nServerIDFrom 0), so the 3-key search finds it
+GetServerInfo(out SERVER_INFO, id, world, zone):  i = GetServerIndex(id, world, zone); i == −1 → 0; else GetServerInfo(out, i)   @ FUN_0040f880
+GetODBCInfo(out ODBC_INFO, dbId, world):                                                            @ FUN_0040f7d0
+    first row with dwID == 4 (ODBC_INFO) and col1 == dbId, col2 == world:
+        pName = col 0, nDBID = dbId, nWorldNo = world, pConnectInfo = col 3, pStartupCmd = col 4; return 1
+    else return 0                                    # caller: CSessionWorker::DB_Init FUN_00405f20 (D01 §1)
+```
+
+As in the zone, the format indices 0, 3, 4 are fixed by the order of the `#DEFINE`s across the server file and the
+included `ServerInfo.txt` (`MY_SERVER` 0 in `DataServerInfo_*.txt`, then `NATION_NAME` 1, `WORLD_NAME` 2,
+`SERVER_INFO` 3, `ODBC_INFO` 4; §3).
+
+### 5.4 Which files each server reads, and when
+
+Every server's start function first sets the process's current directory to the exe's directory
+(`GetModuleFileNameA`, cut at the last `\`, `_chdir`; read in Account `DataServer::Start` FUN_00401d20, the same
+`_chdir` call sits in Login `LoginServer::Start` FUN_00402f30, WM `WorldManagerServer::Start` FUN_00407190, Zone
+`ZoneServer::zs_start` FUN_005ab520, AccountLog FUN_00401d60, Character FUN_00402570, GameLog FUN_00401de0). Every
+relative path below, and the include paths inside the files (§2.6, relative to the including file), therefore start
+at the server's install directory.
+
+| Server | File (paths tried in order) | Read by | Object | On failure |
+|---|---|---|---|---|
+| Login | `LoginServerInfo.txt` | `LoginServer::ReadDefineScriptor` FUN_00401380 (L00 §2 `LoadServerInfo`, L01 §1.2) | `gServer.m_ServerInfo` (+0) | `ViewErrorMsg` prints the result messages (S02 §2.5); start fails |
+| WM | `WMServerInfo.txt` | `WorldManagerServer::ReadDefineScriptor` FUN_00403e70 (W01 §2, W05 §1) | `m_ServerInfo` (+0) | same |
+| Zone | `ZoneServerInfo/ZoneServerInfo.txt`, then `../9Data/ServerInfo/ZoneServerInfo.txt` | `zs_start` FUN_005ab520 and `zs_ServiceThreadFunction` FUN_005a9d90 (§3) | `zs_serverinfo.serverinfo` (+0x40) | assert text + `ShineExit` |
+| Account | `DataServerInfo_Account.txt` | `DataServer::ReadDefineScriptor` FUN_00401360 | `m_ServerInfo` (+0) | log, `Start` returns −1 |
+| AccountLog | `DataServerInfo_AccountLog.txt` | `DataServer::ReadDefineScriptor` FUN_00401380 | `m_ServerInfo` (+0) | same |
+| Character | `DataServerInfo_Character.txt` | `DataServer::ReadDefineScriptor` FUN_004013b0 | +0 | log, `Start` FUN_00402570 returns −1 |
+| Character | `../../9Data/Shine/DefaultCharacterData.txt`, then `../9Data/Shine/DefaultCharacterData.txt` | `GameData_Load` FUN_00401550 (D02 §1) | second `CServerInfo` at +0x209890 | log `"*FAILED GLOBAL GAME DATA READ - DefaultCharacterData.txt"`, return 0 → start stops |
+| Character | `../../9Data/Shine/TutorialCharacterData.txt`, then `../9Data/Shine/TutorialCharacterData.txt` | `GameData_Load` FUN_00401550 | third `CServerInfo` at +0x209f4c | same text with `TutorialCharacterData.txt` |
+| GameLog | `DataServerInfo_GameLog.txt` | `DataServer::ReadDefineScriptor` FUN_00401370 (D05 §1.1) | +0 | log, `Start` returns −1 (D05 §7.1) |
+
+All four `DataServerInfo_*.txt` define `MY_SERVER` and `#INCLUDE "../9Data/ServerInfo/ServerInfo.txt"`, which from
+`Account/`, `AccountLog/`, `w00_Character/`, `w00_GameLog/` is the shared `Files/Server/2016/9Data/ServerInfo/ServerInfo.txt`.
+For the Character server's two data scripts only the second path exists in the 2016 layout (`w00_Character/../9Data/Shine/`);
+the first attempt fails with a file-open error, and the second `ReadServerInfo` starts with `Clear()`, so the failed
+attempt leaves nothing behind. The Character server's three `CServerInfo` objects are built by its `DataServer`
+constructor FUN_00401f20 (three calls of `CServerInfo::CServerInfo` FUN_0043eb40, at +0, +0x209890, +0x209f4c). Its rows
+are read by D02's typed readers (D02 §3.3: format indices CHARACTER 0, ITEM 1, SKILL 2, QUEST 3, MAXSHAPE 4, SHORTCUT 5;
+TUTORIAL_CHARACTER 0, DEFAULT_ITEM 1, TUTORIAL_ITEM 2). Both scripts parse with 0 errors (§4); `DefaultCharacterData.txt`
+must keep CRLF line ends (LF loses 25 rows, S02-B16).
+
+```pseudo
+DataServer::ReadDefineScriptor(this):       @ Account FUN_00401360, AccountLog FUN_00401380, Character FUN_004013b0, GameLog FUN_00401370
+    # the four are identical apart from the file name (instruction-level compare)
+    if !CServerInfo::ReadServerInfo(&this.m_ServerInfo, "DataServerInfo_<Server>.txt"):
+        log "*FAILED SCRIPTOR READ* " + file;  CToken::Close(&this.m_ServerInfo);  return 0
+        # the result messages are never printed: the data servers have no ViewErrorMsg / ViewResultMsg
+    log "<SUCCESSED SCRIPTOR READ> " + file;  CToken::Close(&this.m_ServerInfo)    # already closed by ReadScript; frees nothing new
+    if !GetMyServerInfo(&this.m_MyServer (+0x4f8)):  log "*FAILED GetMyServerInfo*"; return 0
+    log "<I AM THE %s, %s, WorldNo=%d, ZoneNo=%d>" (pDisplayName, GetShineServerIDName(nServerID), nWorldNo, nZoneNo)
+    if !GetServerInfo(&info, m_MyServer.nServerID, .nWorldNo, .nZoneNo):
+        log "FATAL ERROR - Can't found ServerInfo on funcition 'DataServer::ReadDefineScriptor()', need check scriptor data."
+        return 0
+    m_ConnectSocket_BindIP (+0x50c, 16 bytes) = strncpy(info.pIP, 16); [15] = 0;  return 1
+```
+
+`DataServer::Start` returns −1 when this fails (Account FUN_00401d20; Character FUN_00402570 also requires
+`GameData_Load`). The later `SERVER_INFO` / `ODBC_INFO` lookups (`Start_Acceptor`, `DB_Init`) are the framework's
+(D01 §1, D05 §1.1).
+
+## 6. Original-server bugs
+
+Z19 found no new bug: every defect of the reader is one of S02's, and the copies of all seven servers share them
+(§5.1). Cross-reference of those that can affect a config file, with the zone and data-server addresses
+(WM / Login addresses in S02 §5):
+
+| S02 bug | Function | Zone / Account / AccountLog / Character / GameLog | Effect on the config files |
+|---|---|---|---|
+| S02-B11 | `CCsl::MakeData` (`<ARRAYSRT>`) | FUN_00651050 / FUN_0040d4d0 / FUN_00408b40 / FUN_00445aa0 / FUN_0040d310 | none shipped use array types; a file that did would misread later columns |
+| S02-B12 | `CCsl::MakeFormat` (inheritance) | FUN_00650cb0 / FUN_0040d130 / FUN_004087a0 / FUN_00445700 / FUN_0040cf70 | not used by the shipped files |
+| S02-B13 | `CToken::GoStartString` / `GetTokenString` | FUN_0063b1a0, FUN_0063b570 / FUN_004071f0, FUN_00407560 / FUN_00406dc0, FUN_00407130 / FUN_00442650, FUN_004429c0 / FUN_0040b580, FUN_0040b8f0 | a missing closing quote or `""` reads past the buffer |
+| S02-B14 | `CToken::my_tcstok` | FUN_0063af90 / FUN_00406fe0 / FUN_00406bb0 / FUN_00442440 / FUN_0040b370 | a file without `#END` that ends in whitespace fails (§4 "Without `#END`") |
+| S02-B15 | `CCsl::CCsl(parent)` | FUN_00651cb0 / FUN_0040e140 / FUN_004097a0 / FUN_00446700 / FUN_0040df70 | EOF inside a row of `ServerInfo.txt` (included) uses an uninitialised pointer |
+| S02-B16 | `CToken::GoNextLine` | FUN_0063b150 / FUN_004071a0 / FUN_00406d70 / FUN_00442600 / FUN_0040b530 | LF-only `DefaultCharacterData.txt` loses 25 of 530 rows (§4) |
+| S02-B18 | `CCsl::IncludeFile` | FUN_00651ea0 / FUN_0040e330 / FUN_00409990 / FUN_004468f0 / FUN_0040e160 | an include path with a space or comma fails the read |
+| S02-B19 | `ProcRemark` / `MakeFormat` / `MakeData` (unbounded copies) | FUN_00650aa0, FUN_00650cb0, FUN_00651050 / FUN_0040cf20, FUN_0040d130, FUN_0040d4d0 / FUN_00408590, FUN_004087a0, FUN_00408b40 / FUN_004454f0, FUN_00445700, FUN_00445aa0 / FUN_0040cd60, FUN_0040cf70, FUN_0040d310 | a string value over 511 bytes (e.g. a long ODBC connect string) overflows the row |
+| S02-B20 | `CCsl::GetDataToken` | FUN_00650fa0 / FUN_0040d420 / FUN_00408a90 / FUN_004459f0 / FUN_0040d260 | EOF in a row is counted as a format error (diagnostics only) |
+| S02-B21 | `CCsl::MakeData` (`[…]` types) | as S02-B11 | not used by the shipped files |
+
+S02-B17 (`#READ` handle leak) and S02-B22 (dead constructor path) are unreachable from the shipped files.
+
+## 7. Not reconstructed / uncertain
+
+- Character `CServerInfo::CServerInfo` FUN_0043eb40 is identified by identical code (Account FUN_0040f580) and by being
+  the only caller of `CCsl::CCsl()` FUN_004466a0; it sits far from the other `CServerInfo` members (FUN_00449410 …),
+  unlike in the other builds. Whether the Character / GameLog `~CServerInfo` thunks (FUN_0043ed60, FUN_00401000) are
+  the original destructor or linker folding onto `~CCsl` cannot be told from the code (same behaviour either way).
+- The `<I AM THE …>` and `*FAILED SCRIPTOR READ*` argument lists follow the format strings and the pushed
+  addresses; the export drops the varargs of `_DebugMessageNew` / `Log`.
+- `msgId 0x401` / `hWnd`: stored and never used in any of the seven builds (§2.8); their purpose is *(inferred)*.
+- The 2015 server builds were not compared (out of scope: only 2016 is documented).
+
+## 8. Coverage boundary
+
+| Found (function / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| `CToken` / `CCsl` / `CGdp` pseudocode (all builds) | S02 (done) §2.2–§2.3, §3 | identical code (§5.1); this document cites S02 instead of repeating it |
+| `CGdp` container mode (`GdpSearchFile`, `GdpMakeEmptyChunk`, `GdpWriteChunk`, `Open` …, §5.2 rows) | S02 (done) §3.3–§3.5 | dead in every server (`m_bIsGDPOpen` never set, §5.1); S02 documents it |
+| Zone `CServerInfo` lookups (`GetNationName`, `GetWorldName`, `GetNumOfData`, 4-key `GetServerIndex`) and what the rows mean | Z10 (done) §1.1, §6.5 | the zone's consumers of the rows |
+| WM / Login `ReadDefineScriptor`, `ViewErrorMsg`, `GetNumOfWorld` / `GetWorldName` | W01 §2, W05 (done) §5.2 / §6.2, L00 §2 (done), L01 (done) §1, S02 (done) §2.5 / §4.3 | their callers and the row meanings are documented there |
+| Data-server `Start`, `Start_Acceptor` (2nd `GetServerInfo`), `CSessionWorker::DB_Init` (`GetODBCInfo` caller) | D01 (done) §1, D05 (done) §1.1 | framework start sequence and DB connection; this document gives only the config read (§5.4) |
+| Character `GameData_Load` FUN_00401550 (SHN tables, MapInfo) and the typed row readers of `DefaultCharacterData` / `TutorialCharacterData` | D02 (done) §1, §3.3, §8 | what the character server does with those rows; the CSL read itself is §5.4 |
+| Contents and meaning of each config file (IDs, ports, ODBC rows, `_ServerGroup.txt`) | `docs/knowledge/X03.md` §4–§5, Z10 knowledge "Server config files", W05 §5.2 | deployment knowledge, not the reader |
+| `9Data/ServerInfo/_ServerGroup.txt` | Z10 (done) §1.1 | not a CSL script: only the zone reads it (`zs_start`, `fopen` + `fscanf("%s")`, one word); no other 2016 exe references it |
+| Zone quest scripts over the bare `CToken` (`CQuestParserScript`, `GetTokenID`) | Z15 (scope: quest engine) | uses only the tokenizer, not `CCsl`; S02 §2.5 for `GetTokenID` |
