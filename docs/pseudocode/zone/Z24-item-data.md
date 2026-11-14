@@ -151,15 +151,15 @@ ShinePlayer::sp_ItemUseBroadcast(p, entry, itemID)                              
 | wide | `uie_Load` pass 2 | ItemUseEffect.shn rows | ui_bytable (action items: unchanged) | ItemUseSkill | the row |
 | tough | `ItemUseFunction::iuf_Load` FUN_0049b770 (§2) | ItemUseFunction.txt rows | by `UseFunction` | "UseSkill" / "UseSilverWings" | reset to `uie_DefStruct`; `broadcast` set for every row |
 | tough | `MagicContainer::mc_Load` FUN_0049c7f0 (Z09) | TreasureReward.txt boxes | — | — | — |
-| tough | `ChargedItemEffectDataBox<ChargedItemEffect / MiniHouse / MiniHouseFurniture>::cideb_Load` (part 3) | | | | |
-| sun | `RidePetDataBox::rpdb_Load`, `ChargedItemEffectDataBox<RIDING>::cideb_Load` (part 3) | | | | |
+| tough | `ChargedItemEffectDataBox<ChargedItemEffect / MiniHouse / MiniHouseFurniture>::cideb_Load` FUN_005af300 / FUN_005af4d0 / FUN_005af6d0 (§6.3) | every ChargedEffect / MiniHouse / MiniHouseFurniture row, except items of class ACTIONITEM, GBCOIN, CAPSULE | ui_chargedbuff; ui_minihouse; ui_minihousefurniture | "UseSkill" | reset |
+| sun | `RidePetDataBox::rpdb_Load` FUN_00450270 → `ChargedItemEffectDataBox<RIDING>::cideb_Load` FUN_00450070 (§6.4) | Riding.shn items (same class filter); their FeedType food items | ui_ride; ui_horsefood | "UseRide"; "UseSkill" | reset |
 | full | `MysteryVaultTable::DataProcess` FUN_005c8590 (§4) | every MysteryVaultServer.shn box | ui_mysterybolt | "UsePresentBox" | reset |
 | sleep | `cStateItemDataBox::sidb_Load` FUN_0058c920 (§3) | every StateItem.shn item | ui_ByAbstate | ItemUseSkill | reset |
 | long | `MoverDataBox::mvdb_Load` FUN_004bf960 (§5.3) | MoverHG.shn food items (FeedType ≠ `-`); MoverItem.shn summon items | ui_horsefood; ui_ride | "UseSkill"; "UseRide" | reset |
 
 `uie_SetChargedBuffer` replaces the effect row by `uie_DefStruct`, so an item that is both in ItemUseEffect.shn and
 in a later table silently loses its use-effect row (no warning). 2016: ItemUseEffect, ItemUseFunction, StateItem and
-MysteryVaultServer have no item in common (checked pairwise); the Mover tables overlap ChargedEffect and Riding (§5.5); §6 checks its own.
+MysteryVaultServer have no item in common (checked pairwise); ChargedEffect overlaps MiniHouse (159 items) and MoverItem (221), Riding overlaps MoverItem (`Coll`) and MoverHG (food `Hay`); details §6.6.
 
 ### 1.6 Invariants with the 2016 data
 
@@ -567,19 +567,244 @@ So a riding item (`ui_ride`) is a "mover" when it is in MoverItem.shn, otherwise
   mover has its own skills.
 - MoverHG and MoverItem: one row per mover, same 461 MoverIDX as MoverMain, no unknown mover, no duplicate.
 - FeedType: 298 × `-`, 163 rows with 7 food items (LifeDust 123, Hay 18, FlyStone 15, Djewel 4, Sap, Dew, Scales);
-  all exist, all `ITEMCLASS_FEED` (22). The other 6 FEED items (JewelCarrot01_1/2/3/5/6, Meat) are no mover's food
-  and keep the stage-wide actor (`ui_base`, §1.3) unless a part-3 table writes them.
+  all exist, all `ITEMCLASS_FEED` (22). The other 6 FEED items (JewelCarrot01_1/2/3/5/6, Meat) are no mover's food:
+  JewelCarrot01_1/2/3/5/6 are EE_FEED ChargedEffect items (`ui_chargedbuff`, §6.6), `Meat` keeps the
+  stage-wide actor (`ui_base`, §1.3).
 - MoverItem: 461 distinct summon items, all `ITEMCLASS_RIDING` (23), all with ItemUseSkill "UseRide". The only RIDING
-  item without a MoverItem row is `Claude` (stays `ui_base` unless §6 writes it).
+  item without a MoverItem row is `Claude`: a Riding.shn horse (`ui_ride` from `rpdb_Load`, §6.6).
 - Overlap with the other writers of `useditemeffect` (§1.5): none with ItemUseEffect, ItemUseFunction (empty),
   StateItem, MysteryVaultServer (box column), MiniHouse, MiniHouseFurniture; no item is both food and summon item.
   **221 summon items also have a ChargedEffect.shn row** and `Coll` also has a Riding.shn row: mvdb_Load runs last
   (stage long), so their `useditemeffect` entry ends as `ui_ride` + "UseRide" + `uie_DefStruct`, and
-  `mvdb_GetMoverType` makes `Coll` a mover, not a Riding.shn horse (what §6's writes for them meant: part 3).
+  `mvdb_GetMoverType` makes `Coll` a mover, not a Riding.shn horse. What the earlier ChargedEffect / Riding writes
+  meant is lost only for the actor: their rows stay in `chargedbuffdatabox` / `ridedatabox` (§6.6).
 
 ## 6. `ChargedItemEffectDataBox` and `RidePetDataBox` (ChargedEffect, MiniHouse, MiniHouseFurniture, Riding)
 
-*(part 3)*
+Four item-keyed tables built by one template, `ChargedItemEffectDataBox<T>` (a `BinaryDataBox<T>` plus an array of
+`{item ID, row}`), each loaded once with an actor and a use skill that it writes into `useditemeffect` for every listed
+item. `RidePetDataBox` is the RIDING instance plus a food pass. Consumers: charged buffs Z12 / Z07 §4, mini-house
+Z07 §6, horses Z13 (§10).
+
+### 6.1 Data structures
+
+```pseudo
+ChargedItemEffectDataBox<T> : BinaryDataBox<T>          # BinaryData (0x40) + T bdb_defaultblock at +0x40
+    CIDEB_Element<T>* cideb_Array                        # new[cideb_Total], one per file row, file order; ctor null
+    int               cideb_Total                        # = reader row count (static storage: 0 before the load)
+CIDEB_Element<T> (8) { u16 ce_ItemID +0 (ItemInfo ID of T.ItemID); T* ce_Data +4 (the reader's row) }
+ChargedItemEffectFinger (4) { int cief_Finger }          # iteration cursor; "home" = −1, end = −10
+RidePetDataBox : ChargedItemEffectDataBox<RIDING> { }    # no own members; vftable RidePetDataBox
+```
+
+| Global | Addr | Type (size) | `cideb_Array` / `cideb_Total` | Dyn. initializer / atexit dtor / scalar-deleting dtor | Loaded by (stage) |
+|---|---|---|---|---|---|
+| `chargedbuffdatabox` | 0xaa4280 | `ChargedItemEffectDataBox<ChargedItemEffect>` (0x74) | +0x6c / +0x70 | FUN_006953e0 / FUN_0069c950 / FUN_0044fbb0 | `zs_start_tough` FUN_005b0540 |
+| `minihousedatabox` | 0xaa42f8 | `ChargedItemEffectDataBox<MiniHouse>` (0xb8) | +0xb0 / +0xb4 | FUN_00695420 / FUN_0069c980 / FUN_0044fc20 | tough |
+| `minihousefurnituredatabox` | 0xaa3fb0 | `ChargedItemEffectDataBox<MiniHouseFurniture>` (0xdc) | +0xd4 / +0xd8 | FUN_00695460 / FUN_0069c9b0 / FUN_0044fca0 | tough |
+| `ridedatabox` | 0xaa40d8 | `RidePetDataBox` (0x1a4) | +0x19c / +0x1a0 | FUN_006954a0 / FUN_0069c9f0 / FUN_0044fb30 | `zs_start_sun` FUN_005adbd0 |
+
+Initializer: `BinaryData` ctor, `bdb_defaultblock` zeroed (row size bytes), vftable, `cideb_Array = null`, `atexit`
+(dtor). Dtors: `delete cideb_Array` if set, then `~BinaryData`. `ChargedItemEffect` 0x2b, `MiniHouse` 0x6f,
+`MiniHouseFurniture` 0x94, `RIDING` 0x15a: `bdb_defaultblock` + row size, rounded up to 4, is the array's offset.
+
+### 6.2 Files, readers, column maps
+
+| File (`../9Data/Shine/`) | Row struct | Reader | key | row size | rows 2016 |
+|---|---|---|---|---|---|
+| ChargedEffect.shn | `ChargedItemEffect` | `BinaryDataBox<ChargedItemEffect>::bdb_ReadData` FUN_005ae790 | 0x8d (141) | 0x2b | 4542 |
+| MiniHouse.shn | `MiniHouse` | `BinaryDataBox<MiniHouse>::bdb_ReadData` FUN_005ae840 | 0x1e8 (488) | 0x6f | 356 |
+| MiniHouseFurniture.shn | `MiniHouseFurniture` | `BinaryDataBox<MiniHouseFurniture>::bdb_ReadData` FUN_005ae8f0 | 0x3f9 (1017) | 0x94 | 89 |
+| Riding.shn | `RIDING` | `BinaryDataBox<RIDING>::bdb_ReadData` FUN_0044fd50 | 0x15d1 (5585) | 0x15a | 2 |
+
+The Z20 §2.1 template (`CDataReader::Read(path, key, size)`; readfail → assert "BinaryDataBox<T>::bdb_ReadData :
+readfail" (path), a second assert with the "Code:%X:%d\tSHN:%X:%d" text, `ShineExit`); the 2016 files pass (keys and
+sizes = `S01-shn-structs.tsv`; NA2016's ChargedEffect has 4546 rows). Paths fixed in the callers (§6.3, §6.4), no
+per-world override. Columns = members in file order (S01 "same"). Every file starts with `u16 Handle` +0x00 (unique
+per file, §6.3) and `char ItemID[32]` +0x02 (item InxName; fatal if not in ItemInfo; becomes `ce_ItemID`).
+"Read by" = functions that read the member (`->member` in the PDB decompile; bodies in the consumer items, §10); for
+member names shared by several row structs (`Handle`, `KeepTime_Hour`, `Tick`, `RunSpeed`, `CastingTime`,
+`CoolTime`) the function is assigned to a struct by its subsystem *(inferred)*.
+
+ChargedItemEffect (0x2b, packed):
+
+| Column (type:size) | Member | Off | Use |
+|---|---|---|---|
+| Handle (2:2) | `u16 Handle` | 0x00 | the charged-buff id a player's stored buffs refer to: `cideb_FindFromHandle` FUN_00450390 (§6.5) from `so_CharChargedBuffData` 0044e1e0 (Z12 §6.8), `ciee_Free` 00450a50, `sp_ChargedItemTest` 00451360, GM command Z11 l.1099 |
+| ItemID (9:32) | `char ItemID[32]` | 0x02 | the item; `cideb_GetItemID` FUN_0044fa10 (§6.5) by 14 callers (capsule, term extend, chat colour, weapon/shield endure charge, buy-all, `so_RecalcEquipParam`, …) |
+| KeepTime_Hour (2:2) | `u16 KeepTime_Hour` | 0x22 | hours; `so_ply_ChargedBuff` 005970c0, `sp_NC_ITEM_TERMEXTEND_REQ` 0051eb40, `sp_MakeCapsuleItem` 0049cce0, `sp_SmallItemActivCheck<ItemInform_ActionItem>` 005697e0 |
+| EffectEnum (11:4) | `EffectEnumerate EffectEnum` | 0x24 | `EE_*` 0 … 39 (`MAX_EFFECTENUMERATE` 40): 0 SILVERWINGCOOLTIME, 1 NOLOSTINKILLED, 2 MOREINVENTORY, 3 MORESTORAGE, 4 MOREBOOTHSLOT, 5 FASTMINING, 6–8 MOREHP/SP/HSPSTONE, 9 COSTUM, 10 AKPOWER, 11 DPPOWER, 12 ALLPOWER, 13–15 HP/SP/ALLINCREASE, 16 DROP_RATE, 17 FEED, 18 EXP_RATE, 19 STATUS, 20–22 ITEMAT/ITENDF/ITEMAL_RATE, 23–25 PRODUCTSPEED/MASTERY/ALLRATE, 26 JUSTREVIVE_HP, 27 ENDURE_KIT, 28 WEAPON_MAXENDURE, 29 ADDPRODSKILL, 30 JUSTRREVIVAL, 31 SETABSTATE, 32 GBCOIN, 33 STORAGE_ANYWHERE, 34 LPINCREASE, 35 AUTOPATHFIND, 36 CHATCOLOR, 37 TERMEXTEND, 38 EXPHOLD, 39 CLASSCHANGE. Read by `ChargedItemEffectList::ChargedItemEffectElement::ciee_Activ` 00450550, `ciee_AfterLoginComplete` 00417910, `ChargedEffectChatColorItemFree::lid_Call` 00450fe0, `so_RecalcEquipParam` 004cab70, `WeaponCostumInitCharge` 00517d40, `sp_NC_ITEM_WEAPONENDURE_CHARGE_REQ` 00519470 / `…SHIELDENDURE…` 00519a10, `sp_NC_ITEM_CHAT_COLOR_CHANGE_REQ` 0051e580, `so_ply_ChatColorInfoApply` 00563ac0 / `…Clear` 00564a70, `sp_NC_ITEM_TERMEXTEND_REQ`, `so_ply_MH_FurnitureEndureUse` 00571550, `so_ply_ChargedBuff`, `UseItemChargedBuff::uib_CanUseItem` 00598310 |
+| EffectValue (2:2) | `u16 EffectValue` | 0x28 | amount / rate of the effect; the same readers plus `sp_CanChargedEnchant` 00418080, `sp_Gamble_UseCoinItem` 006174e0 |
+| StaStrength (1:1) | `u8 StaStrength` | 0x2a | abstate strength *(inferred: for EE_SETABSTATE)*; `ciee_AfterLoginComplete`, `sp_CanChargedEnchant`, `smo_SwingDamage` 00433a70, `so_ply_ChargedBuff` |
+
+MiniHouse (0x6f; the house-skin items):
+
+| Column | Member | Off | Use |
+|---|---|---|---|
+| Handle (2:2), ItemID (9:32) | `u16 Handle`, `char ItemID[32]` | 0x00, 0x02 | as above; looked up by item with `cideb_GetItemID` FUN_00531820 (`sp_MiniHouseActivCheck` 00534fe0) |
+| DummyType, Backimage (9:32) | `char[32]` | 0x22, 0x42 | no reader found *(inferred: client presentation)* |
+| KeepTime_Hour (2:2) | `u16` | 0x62 | hours; `sp_MiniHouseActivCheck` (also `sp_DecorationActivCheck` 00534c60 by name) |
+| HPTick, SPTick, HPRecovery, SPRecovery (2:2) | `u16` | 0x64, 0x66, 0x68, 0x6a | in-house regeneration: `ShinePlayer::MiniHouseStr::mhs_Init` 00534a30 |
+| Casting (2:2) | `u16` | 0x6c | no reader found by name |
+| Slot (1:1) | `u8` | 0x6e | `mhs_Init` |
+
+MiniHouseFurniture (0x94; the furniture items):
+
+| Column | Member | Off | Use |
+|---|---|---|---|
+| Handle (2:2), ItemID (9:32) | `u16`, `char[32]` | 0x00, 0x02 | as above; `cideb_GetItemID` FUN_00543400 (`icr_Apply` 0048a560, `smh_FurnitureActiveCheck` 005472e0); iterated with `cideb_Next` FUN_00514ae0 / `cideb_GetIndex` FUN_00514b10 (`so_mh_DiceTaiSai_GetExpectIncomeMoney` 00516970, `so_mh_SaveMHInven` 005435d0, `so_mh_CreateFurniture` 00544f00, `so_mh_CanFurnitureEmotion` 005485c0, `so_ply_MH_FurnitureEndureUpdate` 00570fe0, `so_ply_MH_FurnitureEndureUse`) |
+| FurnitureType (9:32) | `char[32]` | 0x22 | no reader found |
+| InvenType (9:32) | `char[32]` | 0x42 | `so_mh_Move2MiniHouseFurniture` 005354a0, `smh_SendFurnitureInfo` 00546930 |
+| GameType (11:4) | `GameType` | 0x62 | `GT_NOGAME 0`, `GT_DICE 1` (`MAX_GAMETYPE 2`): `sp_DiceTaiSaiItemIDChange` 00514b40, `so_mh_DiceTaiSai_GetExpectIncomeMoney`, `so_mh_SaveMHInven`, `so_mh_CreateFurniture`, `smh_FurnitureActiveCheck` |
+| CanSet (1:1) | `u8` | 0x66 | `so_mh_CreateFurniture` |
+| Backimage (9:32) | `char[32]` | 0x67 | no reader found |
+| WALL, BOTTOM, CEILING, IsAnimation (1:1) | `u8` | 0x87 … 0x8a | no reader found |
+| Weight (2:2) | `u16` | 0x8b | no reader found |
+| KeepTime_Hour (2:2) | `u16` | 0x8d | `icr_Apply`, `so_mh_Move2MiniHouseFurniture`, `smh_FurnitureActiveCheck` |
+| KeepTime_Endure (2:2) | `u16` | 0x8f | `so_mh_SaveMHInven`, `so_mh_CreateFurniture`, `so_mh_EndureGradeDownTimeUpdate` 00547f60, `so_mh_DoingEndureGradeDown` 00548270, `so_ply_MH_FurnitureEndureUpdate`, `so_ply_MH_FurnitureEndureUse` |
+| Grip, MHEmotionID (1:1) | `u8` | 0x91, 0x93 | no reader found |
+| MaxSlot (1:1) | `u8` | 0x92 | `so_mh_CanFurnitureEmotion` |
+
+RIDING (0x15a; the horse items of the old ride system, `sp_HorseCast`):
+
+| Column | Member | Off | Use |
+|---|---|---|---|
+| Handle (2:2), ItemID (9:32) | `u16`, `char[32]` | 0x00, 0x02 | as above; `cideb_GetItemID` FUN_0043caa0 (`sp_RideInitialize` 0043d140); iterated with `cideb_Next` FUN_0044f9e0 / `cideb_GetIndex` FUN_0045e0b0 (`sp_NC_ITEM_MOVER_UPGRADE_REQ` 0051c850, Z04 §9.5) |
+| Name, BodyType, Shape (9:32) | `char[32]` | 0x22, 0x42, 0x62 | no reader found *(inferred: client presentation)* |
+| UseTime (2:2) | `u16` | 0x82 | `sp_HorseOn` 0045f270, `sp_NC_ITEM_MOVER_UPGRADE_REQ` |
+| FeedType (9:32) | `char[32]` | 0x84 | food item InxName or `-`: `rpdb_Load` (§6.4), `sp_GetHorseFeed` 0045d510, `sp_NC_ACT_RIDE_FEEDING_REQ` 0045f9e0, `sp_NC_ITEM_MOVER_UPGRADE_REQ` |
+| Texture (9:32) | `char[32]` | 0xa4 | no reader found |
+| FeedGauge (2:2) | `u16` | 0xc4 | `so_ply_HorseFeed` 0045eaa0, `sp_NC_ACT_RIDE_FEEDING_REQ` |
+| HGauge (2:2) | `u16` | 0xc6 | `sp_HorseNotHungry` 0045d460, `so_ply_HorseFeed`, `sp_NC_ACT_RIDE_FEEDING_REQ`, `ShinePlayer::so_Routine` 0056c790 |
+| InitHgauge (2:2) | `u16` | 0xc8 | no reader found |
+| Tick (2:2) | `u16` | 0xca | `sp_HorseOn`, `so_Routine` |
+| UGauge (2:2) | `u16` | 0xcc | `so_Routine` |
+| RunSpeed, FootSpeed (2:2) | `u16` | 0xce, 0xd0 | `sp_HorseOn` (RunSpeed also `so_RunSpeed` 005567b0) |
+| CastingTime (2:2) | `u16` | 0xd2 | ms; `sp_HorseCast` 0045e0e0 |
+| CoolTime (3:4) | `u32` | 0xd4 | `sp_HorseOn` |
+| IconFileN (9:16), IconIndex (2:2), ImageN / ImageH / ImageE (9:16) | | 0xd8, 0xe8, 0xea, 0xfa, 0x10a | no reader found *(inferred: client UI)* |
+| DummyA, DummyB (9:32) | `char[32]` | 0x11a, 0x13a | no reader found |
+
+### 6.3 `cideb_Load` (one template, four instances)
+
+`ChargedItemEffectDataBox<RIDING / ChargedItemEffect / MiniHouse / MiniHouseFurniture>::cideb_Load`
+FUN_00450070 / FUN_005af300 / FUN_005af4d0 / FUN_005af6d0: the four bodies are identical but for the types (diffed).
+
+```pseudo
+ChargedItemEffectDataBox<T>::cideb_Load(this, path, actor, skill)              @ FUN_005af300 (and the three above)
+    bdb_ReadData(this, path)                       # per-T reader, §6.2; failure exits
+    cideb_Total = reader row count
+    cideb_Array = new CIDEB_Element[cideb_Total]   # 8 × n, saturating; no null check; an old array is not freed
+    for i in 0 … cideb_Total−1:
+        r = GetRecord(i)                           # (i < count always; the default-block branch is dead)
+        r == null: assert "ChargedItemEffectDataBox::cideb_Load : Null argument" (i); ShineExit("ChargedItemEffectDataBox<T>::cideb_Load")   # dead
+        v = itemdatabox.idb_btree[r.ItemID]        # BTree::operator[] FUN_0063cc30 (inlined idb_2itemid)
+        cideb_Array[i] = { ce_ItemID = (v == 0xffffffff ? 0xffff : u16 v), ce_Data = r }
+        ce_ItemID == 0xffff: assert "ChargedItemEffectDataBox::cideb_Load : Invalid item" (r.ItemID); ShineExit(same)
+        for j in 0 … i−2:                          # loop bound j < i − 1: row i−1 is never compared
+            if cideb_Array[j].ce_Data.Handle == r.Handle:
+                assert "ChargedItemEffectDataBox<T>::cideb_Load : Same Handle" (Handle); ShineExit(same)
+            # (original bug) Z24-B9: a Handle equal to the previous row's is not detected (2016: §6.6)
+        # inlined ItemDataBox::operator[] (FUN_00419020): id < idb_maxItemhandle and idb_index[id].data set,
+        #   data.ID ≠ id → assert "ItemDataBox::operator [] :Invalid Item index" (id × 10000 + ID), no exit, no write
+        if itemdatabox[ce_ItemID].Class ∉ {ITEMCLASS_ACTIONITEM 27, ITEMCLASS_GBCOIN 28, ITEMCLASS_CAPSULE 29}:
+            uie_SetChargedBuffer(useditemeffect, ce_ItemID, actor, skill)       # FUN_005963e0 (§1.4): actor + skill,
+                                                                                # effect row reset to uie_DefStruct
+        # action items, GB coins and capsules keep the entry an earlier stage gave them (their own actor);
+        # they still get an element, so cideb_GetItemID finds their row
+```
+
+No check that an item appears only once (the second row's `uie_SetChargedBuffer` repeats the same write;
+`cideb_GetItemID` returns the first row, a later one is reachable only by `Handle`), nor of `KeepTime_Hour`,
+`EffectEnum` (< 40) or `GameType` (< 2) ranges. `Handle` uniqueness costs n²/2 comparisons (ChargedEffect: ~10⁷).
+
+Callers and arguments:
+
+| Caller | Box | File | Actor (Z04 §6.3) | Skill (`uie_UseSkillID`, §1.4) |
+|---|---|---|---|---|
+| `zs_start_tough` FUN_005b0540 (after `iuf_Load`, `mc_Load`, `mas_Load`) | `chargedbuffdatabox` | ChargedEffect.shn | `ui_chargedbuff` (`UseItemChargedBuff`) | "UseSkill" |
+| same, next | `minihousedatabox` | MiniHouse.shn | `ui_minihouse` (`UseItemMiniHouse`) | "UseSkill" |
+| same, next | `minihousefurnituredatabox` | MiniHouseFurniture.shn | `ui_minihousefurniture` (`UseItemMiniHouseFurniture`) | "UseSkill" |
+| `RidePetDataBox::rpdb_Load` (§6.4) | `ridedatabox` | Riding.shn | `ui_ride` (`UseItemRide`) | "UseRide" |
+
+A missing skill gives `skill = null` (assert only, Z10 §7.1 note); `mvdb_Load` exits in that case ("Food skill null"),
+these callers do not. The stage then runs `mhoadb_Load`, `kqrt_Load`, the AI script containers (Z10 §7.1).
+
+### 6.4 `RidePetDataBox::rpdb_Load` and `zs_start_sun`
+
+```pseudo
+zs_start_sun()                                                                  @ FUN_005adbd0 (Z10 §7.1)
+    RidePetDataBox::rpdb_Load(ridedatabox)                                      @ FUN_00450270
+    UseItemRide::uir_SetSkill(ui_ride, uie_UseSkillID("UseRide"))               @ FUN_00653a60: uir_RideSkill = arg
+    UseItemPet::uip_SetSkill(ui_Pet, uie_UseSkillID("UseSumPup"))               @ FUN_00596b10: uip_PetSummonSkill = arg; returns 1
+    MobRoamingSet::mrs_Load(worldname), MiscDataTable::mdt_Load                 # Z09 / Z10
+    # uir_RideSkill is read by UseItemRide::uib_CanUseItem 005988b0 (sdi_Activ.ID, no null test); both pointers
+    # dangle after &reloaddata ActiveSkill (Z20 §7 table)
+
+RidePetDataBox::rpdb_Load(this)                                                 @ FUN_00450270
+    cideb_Load(this, "../9Data/Shine/Riding.shn", &ui_ride, uie_UseSkillID("UseRide"))      @ FUN_00450070 (§6.3)
+    for each element e (finger −1, cideb_Next):                                 # inlined
+        if e.ce_Data.FeedType[0] == '-': continue                              # only the first char is tested
+        food = itemdatabox.idb_btree[e.ce_Data.FeedType]                       # FUN_0063cc30, 0xffff = none
+        food == 0xffff: assert "RidePetDataBox::rpdb_Load : Invalid food" (FeedType); ShineExit("RidePetDataBox::rpdb_Load")
+        uie_SetChargedBuffer(useditemeffect, food, &ui_horsefood, uie_UseSkillID("UseSkill"))
+            # skill looked up again per row; the food item's class is not checked (cf. §5.3 MoverHG)
+```
+
+### 6.5 Accessors
+
+```pseudo
+cideb_Next(this, finger) → bool       # RIDING FUN_0044f9e0, ChargedItemEffect FUN_00570cf0, MiniHouseFurniture FUN_00514ae0
+    if finger.cief_Finger ≥ −1 and ++finger.cief_Finger < cideb_Total: return true
+    finger.cief_Finger = −10; return false                # once ended, stays ended until reset
+    # reset ("home") = cief_Finger = −1: callers use PassiveDataBox::sdb_Home FUN_0050ffc0 (identical-code folding; it
+    # just writes −1); the finger's constructor is folded into the empty ShineMobileObject::so_ShineMobileObject FUN_00450350
+
+cideb_GetIndex(this, finger) → CIDEB_Element*         # RIDING FUN_0045e0b0, MiniHouseFurniture FUN_00514b10
+    return 0 ≤ cief_Finger < cideb_Total ? &cideb_Array[cief_Finger] : null
+
+ChargedItemEffectDataBox<ChargedItemEffect>::cideb_GetItem(this, finger) → u16 = cideb_Array[cief_Finger].ce_ItemID    @ FUN_00570d40
+ChargedItemEffectDataBox<ChargedItemEffect>::cideb_Get(this, finger) → ChargedItemEffect* = cideb_Array[cief_Finger].ce_Data  @ FUN_00570d20
+    # neither checks the finger (callers loop with cideb_Next first: so_ply_MH_FurnitureEndureUse 00571550)
+
+cideb_GetItemID(this, itemID) → CIDEB_Element*        # RIDING FUN_0043caa0, ChargedItemEffect FUN_0044fa10,
+    for i in 0 … cideb_Total−1:                       #   MiniHouse FUN_00531820, MiniHouseFurniture FUN_00543400
+        if cideb_Array[i].ce_ItemID == itemID: return &cideb_Array[i]      # first row of the item, linear search
+    return null
+
+ChargedItemEffectDataBox<ChargedItemEffect>::cideb_FindFromHandle(this, int handle) → ChargedItemEffect*   @ FUN_00450390
+    first row with u32(Handle) == handle, else null   # linear search; callers: so_CharChargedBuffData (Z12 §6.8), ciee_Free, sp_ChargedItemTest
+```
+
+### 6.6 Invariants with the 2016 data
+
+- **ChargedEffect.shn** 4542 rows, Handles 9 … 4865, not in row order. **Handle 1738 occurs twice, in adjacent rows**
+  1709 (`Cos_Uniform_USA_Boots01_2`, KeepTime 0) and 1710 (`Hat_Uniform01`, KeepTime 168; both EE_COSTUM value 1): the
+  load accepts it only because of Z24-B9; `cideb_FindFromHandle(1738)` always returns the boots row. No other duplicate.
+- All ItemIDs exist; 4533 distinct items, 8 with more than one row (APower2, DPower2, ADPower1, MightyPotion01_1,
+  Cos_Made006_16/17/18 twice, JustRevival three times; e.g. APower2 KeepTime 2 h and 1 h): by item the first row wins.
+- EffectEnum: EE_COSTUM 3692 rows (the item's own lifetime: costumes, equipment, house skins, mounts),
+  EE_WEAPON_MAXENDURE 610, the other 31 used kinds ≤ 25 rows each; unused: 0, 20, 21, 23, 24, 26, 29.
+- Class filter: 85 rows not written (75 `ITEMCLASS_ACTIONITEM`, all also ItemUseEffect.shn rows, so they keep their
+  stage-wide action entry, §1.3; 7 CAPSULE; 3 GBCOIN with EE_GBCOIN); 4448 items get `ui_chargedbuff` + "UseSkill".
+  Among them the FEED items JewelCarrot01_1/2/3/5/6 (EE_FEED), and many equipment items (weapons, armour,
+  costumes) whose use entry is then `ui_chargedbuff`.
+- **MiniHouse.shn** 356 rows, Handles 0 … 358 unique, all `ITEMCLASS_HOUSESKIN` (18). **MiniHouseFurniture.shn**
+  89 rows, Handles 0 … 1008 unique, all `ITEMCLASS_FURNITURE` (9). No duplicate items in either.
+- **Riding.shn** 2 rows, both `ITEMCLASS_RIDING`: `Coll` (Handle 0, FeedType `Hay`, an `ITEMCLASS_FEED` item) and
+  `Claude` (Handle 1, FeedType `-`).
+- Overlaps between the writers of `useditemeffect` (§1.5; last stage wins):
+  - 159 MiniHouse items also have a ChargedEffect row (EE_COSTUM, their lifetime): MiniHouse loads after ChargedEffect
+    in the same stage, so they end as `ui_minihouse`.
+  - 221 ChargedEffect items are MoverItem summon items (EE_COSTUM): they end as `ui_ride` + "UseRide" (§5.3, stage long).
+  - `Coll` (Riding.shn, stage sun) is also a MoverItem summon item: `mvdb_Load` writes the same actor and skill again,
+    so its entry does not change, but `mvdb_GetMoverType` makes it a mover (MVST_MOVER), so its Riding.shn row is
+    reached only by the `ridedatabox` lookups (§6.2 RIDING Handle row). `Claude` is the only Riding.shn horse.
+  - `Hay` (Coll's food) is also a MoverHG food: written by `rpdb_Load` and again by `mvdb_Load` with the same values.
+  - None with ItemUseEffect (rows written), ItemUseFunction, StateItem, MysteryVaultServer.
+  - The last FEED item without a writer is `Meat`: it keeps the stage-wide `ui_base` entry (§1.3).
+- The ChargedEffect rows of mini-house and mount items stay in `chargedbuffdatabox`: lookups by item
+  (`cideb_GetItemID`: lifetime, term extension) still find them; only the use actor is replaced.
 
 ## 7. `CharClassDataBox` and the other helpers
 
@@ -589,7 +814,8 @@ So a riding item (`ui_ride`) is a "mover" when it is in MoverItem.shn, otherwise
 
 `&reloaddata` (Z11 §8.6) only accepts `ActiveSkill` and reruns `SkillDataBox::sdb_Load`. None of the tables of this
 item can be reloaded at run time: `useditemeffect` (ItemUseEffect.shn), ItemUseFunction.txt, StateItem.shn,
-MysteryVaultServer.shn and the five Mover*.shn files (`mvdb_Load`, §5) are read once at start; after `&reloaddata ActiveSkill` every `useskill` of §1.5 dangles
+MysteryVaultServer.shn, the five Mover*.shn files (`mvdb_Load`, §5) and ChargedEffect / MiniHouse /
+MiniHouseFurniture / Riding.shn (`cideb_Load`, §6; a second call would leak the old `cideb_Array` and re-read the reader) are read once at start; after `&reloaddata ActiveSkill` every `useskill` of §1.5 dangles
 (Z20 §7). (`ITableBase::Load` clears and re-reads its reader, so a second `Table::Load<MysteryVaultTable>` would
 re-run `DataProcess` and insert every row again into the never-cleared `sm_ItemLists`; nothing calls it twice.)
 
@@ -605,8 +831,15 @@ re-run `DataProcess` and insert every row again into the never-cleared `sm_ItemL
 | Z24-B6 | `MysteryVaultTable::DataProcess` | asserts "InSert Fail" when `multimap::insert` returns `end()` | dead check | – |
 | Z24-B7 | `MoverDataBox::mvdb_Load` FUN_004bf960 | MoverIDX (MoverMain) and ItemIDX (MoverItem) go into BTrees whose `bt_Insert` overwrites an equal key; only MoverID and per-mover duplicates are checked | a second mover with the same name silently takes all Ability / HG / Item / UseSkill rows of that name (the first has none); an item named by two movers summons only the last; latent in 2016 (all unique) | fatal "duplicate" check on the names too |
 | Z24-B8 | `mvdb_Load` | the fatal texts of the HG / Item / UseSkill loops say "MoverMain Data defblock" / "Data duplicate in MoveMain.shn", an unknown mover is reported as "Data duplicate … invalid mover"; the five default-block checks can never fire | misleading Assert log on bad data; dead checks | name the file and the real error |
+| Z24-B9 | `ChargedItemEffectDataBox<T>::cideb_Load` FUN_00450070 / FUN_005af300 / FUN_005af4d0 / FUN_005af6d0 | the "Same Handle" check compares row i with rows 0 … i−2 (`j < i − 1`, confirmed in the disassembly at 0x5af3e8 … 0x5af42e) | a Handle equal to the previous row's passes; 2016 ChargedEffect.shn rows 1709 / 1710 share Handle 1738, and `cideb_FindFromHandle` maps a stored buff 1738 always to the first one (`Cos_Uniform_USA_Boots01_2`, not `Hat_Uniform01`) | `j < i` |
 
 ## 9. Not reconstructed / uncertain
+
+- §6.2 "no reader found" (ChargedEffect none; MiniHouse DummyType, Backimage, Casting; MiniHouseFurniture
+  FurnitureType, Backimage, WALL/BOTTOM/CEILING, IsAnimation, Weight, Grip, MHEmotionID; RIDING Name, BodyType, Shape,
+  Texture, InitHgauge, icons, DummyA/B) is the same `->member` name search as §5.2; members shared by several row
+  structs were assigned to a struct by the function's subsystem *(inferred)*. EE_COSTUM as the item's own lifetime
+  is *(inferred)* from the item classes that carry it.
 
 - §5.2 "no reader found" (MoverAbility WC/MA/AC/MR/TH/TB, MoverHG CreateHG) comes from a search for `->member` in the
   PDB decompile of the whole zone; a read through a raw offset or a copied row would be missed (Z13 reads the bodies).
@@ -627,3 +860,9 @@ re-run `DataProcess` and insert every row again into the never-cleared `sm_ItemL
 | `UseItemRide::uib_DirectUse` FUN_005995b0, `UseItemHorseFood` actor | Z04 §6.3 (done; actor table row "UseItemRide" / "UseItemHorseFood") | the ride dispatch is summarised in §5.4 because it is `mvdb_GetMoverType`'s only caller; `sp_HorseCast` / `sp_MoverSystem_Cast` bodies are Z13 |
 | `sp_NC_ITEM_MOVER_UPGRADE_REQ` FUN_0051c850 (reads `pHG.FeedType`) | Z04 §9.5 (done) | handler; this item only documents the row it reads |
 | `ItemDataBox::idb_Load` FUN_00649780, `idb_MakeSpecialID` | Z04 (done) | source of `idb_btree`, `idb_specialid`; `ItemDataBox::ReadData` is part 4 of this item |
+| Mini-house table consumers: `sp_MiniHouseActivCheck` 00534fe0, `mhs_Init` 00534a30, `so_mh_CreateFurniture` 00544f00, `so_mh_SaveMHInven` 005435d0, `so_mh_Move2MiniHouseFurniture` 005354a0, `smh_SendFurnitureInfo` 00546930, `smh_FurnitureActiveCheck` 005472e0, `so_mh_CanFurnitureEmotion` 005485c0, endurance `so_mh_EndureGradeDownTimeUpdate` 00547f60 / `so_mh_DoingEndureGradeDown` 00548270 / `so_ply_MH_FurnitureEndureUpdate` 00570fe0 / `so_ply_MH_FurnitureEndureUse` 00571550, dice `so_mh_DiceTaiSai_GetExpectIncomeMoney` 00516970 / `sp_DiceTaiSaiItemIDChange` 00514b40 | Z13 (open; plan line 11 "furniture create/rearrange/delete …, endurance, … the in-house dice game state, furniture emotions") | they read the MiniHouse / MiniHouseFurniture rows (§6.2 lists which member each reads); the house object is Z13's |
+| Riding.shn horse consumers: `sp_HorseCast` 0045e0e0, `sp_HorseOn` 0045f270, `so_ply_HorseFeed` 0045eaa0, `sp_HorseNotHungry` 0045d460, `sp_GetHorseFeed` 0045d510, `sp_NC_ACT_RIDE_FEEDING_REQ` 0045f9e0 (Z02 §9.1), `sp_RideInitialize` 0043d140, `UseItemRide::uib_CanUseItem` 005988b0 | Z13 (open; plan line 16 "Mounts: …, hunger (link to Z02 §9.1)") and Z04 §6.3 (actor) | readers of the RIDING rows (§6.2); the ride lifecycle is Z13's |
+| Charged-buff consumers by item: `sp_NC_ITEM_WEAPONENDURE_CHARGE_REQ` 00519470, `…SHIELDENDURE…` 00519a10, `sp_NC_ITEM_CHAT_COLOR_CHANGE_REQ` 0051e580, `sp_NC_ITEM_TERMEXTEND_REQ` 0051eb40, `UseItemChargedBuff::uib_CanUseItem` 00598310 | Z04 (done; cites each handler) | handlers that look up a ChargedEffect row by item; this item only documents the table |
+| `so_CharChargedBuffData` 0044e1e0, `so_ply_ChargedBuff` 005970c0, `ciee_Free` 00450a50, `sp_ChargedItemTest` 00451360 (GM) | Z12 §6.8 (done), Z11 (done) | stored charged buffs → `cideb_FindFromHandle` |
+| `WeaponCostumInitCharge` 00517d40 (EE_WEAPON_MAXENDURE rows) | Z17 (open; plan "Costume weapon/shield charges … how charges are refilled") | costume charge consumer |
+| Charged-buff effect application `ChargedItemEffectElement::ciee_Activ` 00450550, `ciee_AfterLoginComplete` 00417910, `ChargedEffectChatColorItemFree::lid_Call` 00450fe0, `sp_CanChargedEnchant` 00418080 | **open: decided in the sweep part (5)** | no doc cites them yet; they apply EffectEnum / EffectValue / StaStrength (§6.2) |
