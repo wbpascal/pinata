@@ -5196,11 +5196,11 @@ Sent in reply to `0x2454` NC_BAT_ABSTATE_ERASE_REQ on ShineObjectClass::ShinePla
 
 ### `0x2456` NC_BAT_SUMEONESKILLCUT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_BAT_SUMEONESKILLCUT_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_004083a0 (AbnormalStateReinforcedMove::ase_PreAttachObject), to the bearer's sight incl. the bearer; client GameFrameWork::On_NC_BAT_SUMEONESKILLCUT_CMD FUN_0049bcd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | caster |  |
+| 0 | u16 | caster | handle of the object whose skill is cut (the knocked-back bearer); client: if that character is in a skill action, Char::CancelSkillAction + ApplicateSkillSeqImmediately |
 
 Sent from `AbnormalStateContainer::AbnormalStateReinforcedMove::ase_PreAttachObject` (`FUN_004083a0`) · payload 2 bytes
 

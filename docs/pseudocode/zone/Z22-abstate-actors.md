@@ -18,9 +18,9 @@ expiry) and `docs/pseudocode/zone/Z12-stats.md` §2.5 / §4.1 (stat matrix, `roe
 - **bearer** = the object that carries the state (the routine's `ShineMobileObject *` argument), **caster** = the
   setter stored in `e.aeo_Caster`.
 
-Parts done: §1–§11 (framework, base actor, damage over time, area damage, heal over time, detach actions, rate
-actors, damage / skill / death hooks). Still to come (see `docs/plan/status/Z22.md`): the `AbnormalStateElement`
-subclasses (part 3).
+Parts done: §1–§12 (framework, base actor, damage over time, area damage, heal over time, detach actions, rate
+actors, damage / skill / death hooks, element classes). Still to come (see `docs/plan/status/Z22.md`): the sweep
+(knowledge file, gap check, final bugs / boundary).
 
 ## 1. Framework
 
@@ -111,7 +111,7 @@ The destructor of every class is the shared `~SubAbnormalStateActor` @ FUN_00402
 ### 1.3 How an element reaches its actor (the element layer)
 
 Every `ABSTATEINDEX` has one `AbnormalStateElement` object (`abstatetemplate.asl_AbstateList`, built by
-`AbnormalStateList::AbnormalStateList` @ FUN_0040f1e0; the subclasses are part 3). Its slots dispatch to the actor:
+`AbnormalStateList::AbnormalStateList` @ FUN_0040f1e0; the subclasses are §12). Its slots dispatch to the actor:
 
 ```pseudo
 asl_Routine(list, o)  (every object tick, Z03 §6.4)                                   @ FUN_00406840
@@ -155,9 +155,9 @@ ase_AfterEnchant(o)                                                             
 
 Consequences for the actors:
 
-- `sasa_Routine` runs **only** for states whose element is an `AbnormalStateTickRoutine` (every `SAA_TICK` ms; 189
-  states, all damage / heal / area states) or an `AbnormalStateEachTickRoutine` (every object tick; the 21 fear
-  states). The other element classes (`ElementNormal`, `PartyEnchant`, `RestCount`, `ReinforcedMove`, …) never call
+- `sasa_Routine` runs **only** for states whose element is an `AbnormalStateTickRoutine` (every `SAA_TICK` ms; 132
+  states, all damage / heal / area states) or an `AbnormalStateEachTickRoutine` (every object tick; the 20 fear
+  states; class table §12.2). The other element classes (`ElementNormal`, `PartyEnchant`, `RestCount`, `ReinforcedMove`, …) never call
   slot 0x0c, so an abstate whose `SubAbState.Type` maps to a routine actor but whose element is `ElementNormal`
   never ticks. In the 2016 data that happens for StaChainLightningStun (84) and StaThunderBolt (89) (Type 22, rows
   with `SAA_TICK` + `SAA_DOTDAMAGE`; ThunderBolt's damage is 0, ChainLightningStun's KeepTime equals its tick, so at
@@ -317,7 +317,7 @@ Rows of the Poison / Disease kinds in the 2016 `SubAbState.shn` (distinct InxNam
 
 `SAA_DOTDIEDAMAGE`, `SAA_HPRATEDAMAGE`, `SAA_DOTWCRATE` and `SAA_DOTMARATE` appear only in area kinds (§4.1) and the
 bomb. Type 27 DOTDAMAGE and 67 KNOCKBACK have no ticking rows (67 rows are knock-back moves; their element is
-`AbnormalStateReinforcedMove`, part 3).
+`AbnormalStateReinforcedMove`, §12.7).
 
 ### 3.2 Poison actor  @ FUN_0040d4c0 (types 22, 27, 33, 67, 83, 84, 94)
 
@@ -792,7 +792,7 @@ reductions (0x30 / 0x50 / 0x68) are applied, and `ShieldHPRate` / the damage-dow
 
 `aeo_RestCount` holds the remaining shield points; it is filled by the element's `ase_MaxRestCount` when the state
 is set (`aeo_Set`, element vt 0x28: `AbnormalStateRestCount` = the row's value of its action, e.g. `SAA_SHIELDAMOUNT`;
-`AbnormalStateRestCountHPRate` = bearer MaxHP × the value / 1000; element classes in part 3).
+`AbnormalStateRestCountHPRate` = bearer MaxHP × the value / 1000; §12.3).
 
 ```pseudo
 SubAbnormalStateActorShield::sasa_Act_DamegeAbsorpt(o, e, &dmg):                       @ FUN_00407370
@@ -841,7 +841,7 @@ SubAbnormalStateActorHideDamage::sasa_Act_AttackCount(e):       (after each smo_
 - 106 HIDEDAMAGE: SubStaHideWC (`SAA_TOTALDAMAGERATE` 2000, `SAA_MONSTERSTICK` 1): double damage on the bearer's
   hits and skills (slot 0x2c is the LastDmgRatio function); the state ends after `aeo_RestCount` normal swings
   (`smo_SwingDamage` is the only caller of slot 0x40; skills do not count). Its RestCount comes from the element
-  (part 3).
+  (§12.3: `SAA_MONSTERSTICK` 1).
 
 ### 9.5 Time attack (type 77)  @ FUN_0040ba30
 
@@ -1020,6 +1020,271 @@ client's 0x1102 NC_CHAR_REBIRTH_CMD then calls `sp_ReviveNow(p, nHealRate)` (Z07
 `bIsRebirth` (the "not set" value is the character `'0'` = 0x30, which every reader compares against, so the actor's
 1 counts as set). Both values are cleared at login complete, on revive and on 0x1103 NC_CHAR_REBIRTH_REJECT_CMD.
 
+## 12. Element classes (`AbnormalStateElement` subclasses)
+
+The element is the per-`ABSTATEINDEX` **template** object in `abstatetemplate` (one `AbnormalStateList`, §1.3); it
+holds no per-bearer state (that is the `AbstateElementInObject`, Z03 §6.2). Class layouts *(pdb2016)*, slot
+targets from the RTTI vftables (`tools/protocol-re/rtti.py`).
+
+### 12.1 Slots and callers
+
+Every element vftable has 11 slots. Base stubs are folded functions named after unrelated classes in the decomp
+(`549070` / `4c2450` = empty, `5af8d0` = return 1, `4b8d20` / `401a80` = return 0, `450350` = return this).
+
+| Slot | Meaning | Base | Overridden by | Called from |
+|---|---|---|---|---|
+| 0x00 | `ase_IndexString()` → class tag | `401510` (no tag) | every class: `"Normal"` FUN_00401520, `"Party"` FUN_00401530, `"GldAca"` FUN_00401540, `"WedCpl"` FUN_00401550, `"Recover"` FUN_00401560, `"ReinforcedMove"` FUN_00401570, `"RestCount"` FUN_00401580, `"Tick"` FUN_00401590, `"EachTick"` FUN_004015a0, `"Hide"` FUN_004015b0, `"Polymorph"` FUN_004015c0, `"RestCountHPRate"` FUN_004015d0 | no slot call found (debug text) |
+| 0x04 | `ase_Routine(bearer, slot, e, &removed)` → bool | 00406910 (expiry, §1.3) | Tick 00406a40, EachTick 00406b70 (§1.3), Party 0040ebc0, WedCpl 0040e5e0, GldAca 0040ef70, Polymorph 00406c80, Hide 00409c10 | `ListIter_ObjectAbStateRoutine::lid_Call` FUN_004067e0 (§1.3) |
+| 0x08 | `ase_SetMain(entry)` | empty | Party / WedCpl 00408680, GldAca 004087b0 | `aeo_Set` FUN_0040a340, every set |
+| 0x0c | "is a party enchant" *(our name; no symbol)* | return 0 | Party, WedCpl, GldAca: return 1 | `aeo_Set` (tick interval), `aeo_IsPartyChant` FUN_00409ab0, `aeo_InformAfterLogin` FUN_00409a20, `asl_Store` FUN_0040afd0 (Z12 §6.4: party states restored with setter = the player and no bitmap bit), `so_Dispel` FUN_0042bf70, `so_SkillEnchant` FUN_00431ca0 |
+| 0x10 | unknown | empty | none | none |
+| 0x14 | `ase_GetActMilliSec()` | FUN_00401480: 999 999 999 | Party / WedCpl / GldAca FUN_004014a0: 5000 | **none**: `aeo_Set` hard-codes the 5 s party interval instead (dead slot) |
+| 0x18 | `ase_PreAttachObject(setter, bearer, strength, …)` | empty | ReinforcedMove 004083a0 | `aeo_Set`, every set (also refreshes), before the element is filled |
+| 0x1c | `ase_AttachObject(e, o)` | 00401d40 (§1.3) | ReinforcedMove 00401db0 (Z18) | `asl_AbstateSet` FUN_0040d020 |
+| 0x20 | `ase_DetachObject(e, o)` | 00402000 (§1.3) | Recover 004084e0 (§1.3), ReinforcedMove 004085b0 | `asl_AbstateReset` FUN_0040a930 |
+| 0x24 | `ase_This()` → element | `450350` return this | base, Party, WedCpl, RestCount, RestCountHPRate: FUN_00401820 = assert "AbnormalStateElement *AbnormalStateElement::ase_This called" + `ShineExit` | only the `AbnormalStateList` ctor; the classes whose `ase_This` aborts are stored by address instead |
+| 0x28 | `ase_MaxRestCount(entry, strength, bearer)` → `aeo_RestCount` | `401a80`: 0 | RestCount 00401a90, RestCountHPRate 00401ab0 (§12.3) | `aeo_Set` |
+
+(`AbnormalStateList::operator[](i)` FUN_00401850 = `asl_AbstateNode[i].asn_Abstate` for i < 0x318, else null.)
+
+### 12.2 Which abstate uses which class  (`AbnormalStateList::AbnormalStateList` @ FUN_0040f1e0)
+
+The constructor builds one member per class name (`asl_<NAME>`, 932 members) and fills
+`asl_AbstateNode[0x318]` (and the `asl_AbstateList` list of 0x318 entries, `l_MakeList`). All 792 indices get an
+element *(join of the ctor's `asl_AbstateNode[i] = …asl_X` lines; the part-1 join missed 13 multi-line ones)*:
+
+| Class | Indices | Which |
+|---|---|---|
+| `AbnormalStateElementNormal` | 598 | everything else (no routine, base expiry only) |
+| `AbnormalStateTickRoutine` (`Metronome astr_Tick`, unused: the tick lives in the bearer's element) | 132 | DoT / HoT / area / magic-field states (§3–§6) |
+| `AbnormalStateEachTickRoutine` | 20 | the fear states (§6): 85, 113–115, 316–325, 343, 371, 625, 626, 639, 664 |
+| `AbnormalStatePartyEnchant` (`aspe_Soul[5]`, `aspe_SklIdxMain`, `aspe_SkillIndex[5]`) | 14 | 3 MightySoulMain, 18 BlessingMain, 26 MentalShoutMain, 29 DivineWeaponWCMain, 53 WindChargeMain, 59 MistChargeMain, 90 SoulEdgeMain, 602 SenPartyHPUpMain, 716 MoverStatUpParty, 733–737 E_UserComeback_Main01…05 |
+| `AbnormalStateCouplePartyEnchant` (same members) | 1 | 293 WeddingBuff |
+| `AbnormalStateGuildAcademyMasterEnchant` (`asgame_Soul`, `asgame_SklIdxMain`, `asgame_SkillIndex`) | 2 | 297 AcaMsBuf10PMain, 299 AcaMsBuf7PMain |
+| `AbnormalStateRestCount` (`asrc_RestCount` unused, `asrc_Action`) | 8 | 15 Buckler (`SAA_COUNT`), 16 Neglect, 28 DivineShield, 333 KarenDivine, 459 AdlUBAUP, 460 AdlUBADOWN, 596 DmgShield (all `SAA_SHIELDAMOUNT`), 493 HideWC (`SAA_MONSTERSTICK`) |
+| `AbnormalStateRestCountHPRate` (`asrc_Action`) | 1 | 590 LightTouch (`SAA_SHIELDRATE`) |
+| `AbnormalStateReinforcedMove` | 13 | 346–349 KnockBack / KnockBackFly / KnockBackRoll / FatalKnockBack, 383 GTIKnockBackRoll, 504 MineFireVivi, 546 EnKnockBackRate, 559 AwayBackSpot, 633 / 634 Siren_KnockBack1 / 2, 662 B_Albi_Knock, 691 Arena_DragOut, 768 SDVale01_Knock |
+| `AbnormalStateElementRecover` | 1 | 350 CannotControl |
+| `AbnormalStatePolymorph` | 1 | 97 Polymorph |
+| `AbnormalStateHide` (`ash_SubLayer` = 3) | 1 | 288 GMHideMode |
+
+So the counts in §1.3 are: 132 ticking states and 20 fear states. The class has 140 more members (57
+`TickRoutine`: FOODHP00…, FOODSP00…, FOODTYPEA/B00…15, GTIVIRUSRTMAIN / MOVEMAIN, STA_BLA_DOT, STA_BHKARENDOT /
+DOTHEAL; RestCount NEGLECT2…5, REUJELBLESSING, BHKARENDIVINE; RestCountHPRate MAGICSAFEGUARD; PartyEnchant
+STA_DODGEMAIN; ReinforcedMove FETTERCHAIN, TIEARROW, BLA_KNOCK; EachTick BLA_FEAR; 72 `ElementNormal`, e.g. the
+GMEVENTEXPUP / DROPUP and CHRTITLE*UP/DOWN sets) that no node points to: their names are not in the 2016
+`ABSTATEINDEX` enum (newer or removed states compiled into the class), so they are dead. NEGLECT2…5 and the three
+others also never get `asrc_Action`.
+
+### 12.3 Rest counts  @ FUN_00401a90, FUN_00401ab0
+
+```pseudo
+AbnormalStateRestCount::ase_MaxRestCount(entry, strength, bearer)                       @ FUN_00401a90
+    return assa_FindEffect(entry.subabstate[strength], this.asrc_Action)      # the row's value of that action
+AbnormalStateRestCountHPRate::ase_MaxRestCount(entry, strength, bearer)                 @ FUN_00401ab0
+    bearer null: return 0
+    return bearer.so_MaxHP() (vt 0x4f0) × assa_FindEffect(row, asrc_Action) / 1000    # 64-bit multiply / divide
+# aeo_Set stores the result in e.aeo_RestCount (+0x54) on every set and refresh; other classes give 0
+```
+
+| Index | Row | Action → RestCount | Consumer |
+|---|---|---|---|
+| 28 DivineShield | SubStaDivineShield ×18 (Type 16) | `SAA_SHIELDAMOUNT` 1040, 1352, … | Shield `sasa_Act_DamageAbsorb` §9.2 |
+| 16 Neglect, 596 DmgShield | Type 16 | `SAA_SHIELDAMOUNT` 1 000 000 000 (7 s / 0.5 s) | §9.2 (absorbs everything) |
+| 333 KarenDivine | Type 16 | 999 999 | §9.2 |
+| 459 / 460 AdlUBAUP / DOWN | Types 92 / 93 | `SAA_SHIELDAMOUNT` 60 000 | §9.6 damage-down actors |
+| 15 Buckler | Type 59 | `SAA_COUNT` 2 (blocks) | RangeIntercept §9.3 |
+| 493 HideWC | Type 106 | `SAA_MONSTERSTICK` 1 (swings) | HideDamage §9.4 |
+| 590 LightTouch | SubStaLightTouch ×16 (Type 115) | MaxHP × `SAA_SHIELDRATE` (250, 260, …) / 1000 | ShieldHPRate §9.2 |
+
+### 12.4 Party enchant  @ FUN_00408680, FUN_00405280, FUN_0040ebc0
+
+A party "main" state sits on the caster (self-cast skill, or restored at login with setter = the player, Z12 §6.4)
+and every 5 s hands one of five member states (`PartyState1…5` of AbState.shn) to the party members around the caster
+and to itself. The choice depends on how many members are near.
+
+```pseudo
+AbnormalStatePartyEnchant::ase_SetMain(entry)              (element slot 0x08, every aeo_Set)   @ FUN_00408680
+    this.aspe_SklIdxMain = entry                           # the shared template: last set entry wins (one AbState per index)
+    if this.aspe_SkillIndex[0] already resolved: return    # once per server run
+    for i in 0..4: aspe_FindSubState(i, entry.index.PartyState<i+1>)                                  @ FUN_00405280
+        # dic_abstate.as_BTreeID[name] → AbStateStr (id > as_maxhandle: assert "as_FromID : Invalid skill id");
+        # aspe_SkillIndex[i] = it, aspe_Soul[i] = its AbStataIndex; missing name → stop
+    any missing: assert "…AbnormalStatePartyEnchant::ase_SetMain"; aspe_SkillIndex[0] = null (retried next set)
+
+aeo_Set, party classes (slot 0x0c true):                   (FUN_0040a340, the part Z03 §6.2 summarises)
+    e.aeo_Tick.nextaction = { m_TickInterval = 50 (5 s in 0.1-s ticks), m_NextTick = now − SAA_TICK·10/1000 }
+        # main rows have no SAA_TICK → first routine run on the next clock tick
+    if e.aeo_PartyEnchant[0].skillindex null: aeo_FindSubState(e, i, PartyState<i+1>) for i 0..4  @ FUN_00406670
+        # a per-bearer copy of the five {soul, skillindex}; any failure nulls [0]; nothing ever reads the copy
+    # other classes: interval = SAA_TICK·10/1000, m_NextTick = now
+
+AbnormalStatePartyEnchant::ase_Routine(bearer, slot, e, &removed)                      @ FUN_0040ebc0
+    base ase_Routine (expiry); if removed or e.aeo_Tick.nextaction.m_NextTick >= now: return 1
+    m_NextTick += 50
+    caster = e.aeo_Caster.obj                              # raw pointer, not checked with aeo_GetCaster (§1.4)
+    caster null: e.aeo_Tick.terminate = now; return 1      # main state ends on the next walk
+    if caster.so_PartyRegistNumber() (vt 0x550) == 0xFFFF (no party):
+        asl_AbstateSet(bearer list, setter caster, aspe_Soul[0], e.aeo_Strength, aspe_SkillIndex[0], bearer, now,
+                       keep 0 (row KeepTime + 999 ms), EF_PARTYBUFF2ME, no data)      # result not checked (original bug) Z22-B15
+        rest = (e.aeo_Tick.terminate − now) × 100 ms
+        bearer.so_AbnormalState_Inform (vt 0x3f0)(aspe_Soul[0], rest, 0)     → 0x242A NOEFFECT to the bearer
+        so_AbnormalState_BroadcastSet(bearer, aspe_Soul[0], rest, strength)  → 0x2427 / 0x1C18 (Z03 §6.3)
+        return 1
+    scan = AxialListNearScanParty { alnsp_PartyRegnum = caster's party }
+    so_AllOfRange(caster, sight, caster.location, main.index.PartyRange, no sector, scan, includeSelf 0, 0xffff)
+        # alns_ValidObject @ FUN_00401880: o.so_PartyRegistNumber() == alnsp_PartyRegnum (mobs answer 0xFFFF);
+        # plus ali_Work's base filter (§1.4: modes 0 / 3 out, max 200, no 291 / 499 holders)
+    qsort(scan, alns_Compare)                              # nearest first
+    n = clamp(scan.count, 0, 4)                            # other members near the caster
+    alnsp_Buffing(scan, main.index.PartyEnchantNumber, caster, aspe_Soul[n], strength, aspe_SkillIndex[n], 0)
+    if asl_AbstateSet(bearer, setter caster, aspe_Soul[n], strength, aspe_SkillIndex[n], bearer, now, keep 0,
+                      EF_PARTYBUFF2ME):
+        restTicks = e.aeo_Tick.terminate − now
+        restTicks < 6 000 000 (≈ 6.9 days): t = restTicks × 100 ms, effect 0;   else: t = 900 000 000, effect 1
+        bearer.so_AbnormalState_Inform(aspe_Soul[n], t, effect);  so_AbnormalState_BroadcastSet(bearer, aspe_Soul[n], t, strength)
+    return 1                                               # never stops the walk
+
+AxialListNearScanParty::alnsp_Buffing(scan, max, caster, soul, strength, entry, 0)      @ FUN_0040e250
+    for the first min(max, scan.count) members m (nearest first):
+        if m.smo_GetMode() (vt 0x484) ≠ 3 (dead):
+            if asl_AbstateSet(m list, setter caster, soul, strength, entry, m, now, keep 0, EF_PARTYBUFF2MEMBER):
+                so_AbnormalState_BroadcastSet(m, soul, −1, strength);  m.so_AbnormalState_Inform(soul, 0xFFFFFFFF, 0)
+```
+
+Effects for the client: members get 0x242A `NC_BAT_ABSTATEINFORM_NOEFFECT_CMD {abstate, keeptime 0xFFFFFFFF}`
+(no timer) and the sight 0x2427 / 0x1C18 with keep −1; the caster's own copy carries the main state's remaining time.
+The member state really lasts its `SubAbState.KeepTime` + 999 ms (6 s + 1 s for most rows, 5 s for the Comeback rows,
+10 s for MoverStatUp), so it is refreshed every 5 s while the member stays within `PartyRange` and expires (0x2428)
+within ~2 s after leaving. Ending the main state removes nothing directly; the member and self states run out the
+same way. 2016 data *(AbState.shn × SubAbState.shn)*:
+
+| Main (index) | Main keep | PartyState1…5 (n = 0…4 members near) | PartyRange / PartyEnchantNumber |
+|---|---|---|---|
+| MightySoulMain (3) | 30 min | MightySoul (4, Type 38, 60 s), MightySoul2…5 (10–13, Type 0, `SAA` 1 = 112 / 162 / 212 / 312) | 1600 / 5 |
+| BlessingMain (18) | 60 min | Blessing, Blessing2…5 (19, 36–39, Type 4) | 1600 / 5 |
+| MentalShoutMain (26) | 60 min | MentalShout, …2…5 (27, 40–43, Type 14) | 1600 / 5 |
+| DivineWeaponWCMain (29) | 60 min | DivineWeaponWC, …2…5 (30, 44–47, Type 2) | 1600 / 5 |
+| WindChargeMain (53) | 60 min | Dodge (50) ×5 | 1600 / 5 |
+| MistChargeMain (59) | 10 min | MistCharge, …2…5 (60, 71–74, Type 37) | 1600 / 5 |
+| SoulEdgeMain (90) | 30 min | SoulEdge, …2…5 (81, 91–94, Type 40) | 1600 / 5 |
+| SenPartyHPUpMain (602) | 60 min | SenPartyHPUp (603, 0 ‰), SenPartyHPUp1 (604, 300 ‰) ×4 (Type 24, max HP) | 2400 / 5 |
+| MoverStatUpParty (716) | 10 min | MoverStatUp (717) ×5 | 1000 / 5 |
+| E_UserComeback_Main01…05 (733–737) | 10 / 20 / 30 / 60 / 120 min | E_UserComeback01…05 (738–742) ×5 (Type 110 `SAA` 108 = 20…100: exp rate, §8) | 2400 / 10 |
+
+### 12.5 Couple party enchant (wedding)  @ FUN_0040e5e0
+
+`AbnormalStateCouplePartyEnchant` inherits the party element (`ase_SetMain` FUN_00408680, slots 0x0c / 0x14); only
+the routine differs. Its one user is StaWeddingBuff (293; KeepTime 4 000 000 000 ms) with five times StaWeddingSub01
+(294, Type 0, 6 s, `SAA` 39 = 50), range 1600, PartyEnchantNumber 5.
+
+```pseudo
+AbnormalStateCouplePartyEnchant::ase_Routine(bearer, slot, e, &removed)                 @ FUN_0040e5e0
+    base ase_Routine; if removed or not due: return 1;  m_NextTick += 50
+    caster null: terminate = now; return 1
+    caster not in a party (vt 0x550 == 0xFFFF): return 1   # nothing, not even the self copy
+    scan = AxialListNearScanCoupleParty { alnsp_PartyRegnum = caster's party,
+                                          alnsp_PartnerRegnum = caster.so_ply_WeddingStatus() (vt 0x958).Partner.RegisterNumber }
+    so_AllOfRange(caster, …, PartyRange, scan, includeSelf 0);  qsort nearest first
+        # alns_ValidObject @ FUN_004018c0: same party and o.so_GetCharRegistNumber() (vt 0x344) == partner
+    n = clamp(scan.count, 0, 4)                            # 0 or 1 in practice
+    AxialListNearScanCoupleParty::alnsp_Buffing(scan, PartyEnchantNumber, caster, aspe_Soul[n], strength,
+                                                aspe_SkillIndex[n], 0)                 @ FUN_0040e380
+        # as §12.4's Buffing, but Inform(soul, 0xFFFFFFFF, effect 1) → 0x2429 NC_BAT_ABSTATEINFORM_CMD
+    if scan.count > 0:                                     # the partner is near
+        asl_AbstateSet(bearer, caster, aspe_Soul[n], strength, aspe_SkillIndex[n], bearer, now, keep 0, EF_PARTYBUFF2ME)
+        t = restTicks < 6 000 000 ? restTicks × 100 ms : 900 000 000      # the wedding main always gives 900 000 000
+        bearer.so_AbnormalState_Inform(aspe_Soul[n], t, 1); so_AbnormalState_BroadcastSet(bearer, aspe_Soul[n], t, strength)
+        # sent whatever asl_AbstateSet returned (original bug) Z22-B15
+    return 1
+```
+
+The wedding status itself is not checked: an unmarried caster's partner number is whatever `sp_WeddingData` holds
+(0 *(inferred)*), which no party member has.
+
+### 12.6 Guild academy master enchant  @ FUN_004053c0, FUN_004087b0, FUN_0040ef70
+
+```pseudo
+AbnormalStateGuildAcademyMasterEnchant::ase_SetMain(entry)                              @ FUN_004087b0
+    asgame_SklIdxMain = entry; if asgame_SkillIndex unresolved: asgame_FindSubState(entry.index.PartyState1)  @ FUN_004053c0
+        (same lookup as aspe_FindSubState, one sub-state: asgame_SkillIndex / asgame_Soul); failure: assert, null
+
+AbnormalStateGuildAcademyMasterEnchant::ase_Routine(bearer, slot, e, &removed)          @ FUN_0040ef70
+    base ase_Routine; if removed or not due: return 1;  m_NextTick += 50
+    caster null: terminate = now; return 1
+    scan = AxialListNearScanGuildAcademy { alnsga_GuildRegnum = caster.so_mobile_GetGuildRegnum() (vt 0x818, m_nMyGuildNo) }
+    so_AllOfRange(caster, …, PartyRange, scan, includeSelf 0);  qsort nearest first
+        # alns_ValidObject @ FUN_00401920: o.so_ply_isAcademyGuildMember() (vt 0x858) == 0 → o's guild == the caster's guild;
+        #   == 1 → o.so_ply_GetMyGuildAcademyNo() (vt 0x85c) == the caster's guild; mobs answer 0 / 0
+    AxialListNearScanGuildAcademy::alnsga_Buffing(scan, scan.count, caster, asgame_Soul, strength, asgame_SkillIndex, 0)
+                                                                                         @ FUN_0040e4b0
+        # as §12.4's Buffing (effect 0); every scanned member, PartyEnchantNumber is not used (original bug) Z22-B14
+    asl_AbstateSet(bearer, caster, asgame_Soul, strength, asgame_SkillIndex, bearer, now, keep 0, EF_PARTYBUFF2ME)  # unchecked (original bug) Z22-B15
+    bearer.so_AbnormalState_Inform(asgame_Soul, restTicks < 6 000 000 ? 0xFFFFFFFF : 900 000 000, 1)
+    so_AbnormalState_BroadcastSet(bearer, asgame_Soul, 900 000 000, strength)          # (original bug) Z22-B14
+    return 1
+```
+
+Data: StaAcaMsBuf10PMain (297) / 7PMain (299), main row SubStaKeepTime_70Sec (70 s), PartyState1 StaAcaMsBuf10P (298)
+/ 7P (300) (Type 63, 6 s, four stat actions 4 / 6 / 46 / 16 = 100 resp. 70), PartyRange 3000. A caster without a
+guild (`m_nMyGuildNo` 0 *(inferred)*) would buff every guildless non-academy player and every mob in range; the
+masters these states are made for always have a guild.
+
+### 12.7 Forced movement and recover  @ FUN_004083a0, FUN_004085b0, FUN_004084e0
+
+```pseudo
+AbnormalStateReinforcedMove::ase_PreAttachObject(setter, bearer, strength, …)  (slot 0x18, every set)  @ FUN_004083a0
+    if bearer and setter:
+        if bearer.smo_GetMode() == 4 (camp / tent): bearer.so_ply_ReinforceFoldtent() (vt 0x488)
+        bearer.so_ply_AllCastCancel() (vt 0x8d0)           # players; mobs: folded no-ops
+        skilleffectapplyer.sbec_SkillCancel(bearer)        # drops the bearer's pending skill blasts (Z03)
+        0x2456 NC_BAT_SUMEONESKILLCUT_CMD { u16 caster = bearer.handle } to the bearer's sight range incl. the bearer
+AbnormalStateReinforcedMove::ase_AttachObject  @ FUN_00401db0 — the knock-back / pull movement (vt 0xa28), Z18 (Z09 §31.5)
+AbnormalStateReinforcedMove::ase_DetachObject(e, o)                                     @ FUN_004085b0
+    ase_DetachObject (base, §1.3); if o: o.so_SendSpeedInformation(0) (vt 0xd4c)       # players: speed back to normal
+AbnormalStateElementRecover::ase_DetachObject  @ FUN_004084e0: the same (§1.3)
+```
+
+0x2456 layout `{u16 caster}` (2 bytes, *(pdb2016)* `PROTO_NC_BAT_SUMEONESKILLCUT_CMD`, packets-zone.md). Client
+`GameFrameWork::On_NC_BAT_SUMEONESKILLCUT_CMD` FUN_0049bcd0: looks the handle up (`CharMgr`); if that character is
+in a skill action (vt 0x1f0) it calls `Char::CancelSkillAction` and `AttackSequenceManager::ApplicateSkillSeqImmediately`
+(the cast animation is cut).
+
+StaCannotControl (350), the only `ElementRecover` state, has no SubAbState row (`SubAbState` = "-"), so
+`so_AbnormalState_Set` finds no sub-state and the set fails *(inferred: aeo_Set needs `subabstate[strength].assa_info`)*;
+its setter `smo_ShootMeTo` (Z09 §9.3: "same for 350 StaCannotControl") still sends the 0x2429 inform.
+
+### 12.8 Polymorph and GM hide  @ FUN_00406c80, FUN_00409c10
+
+```pseudo
+AbnormalStatePolymorph::ase_Routine(bearer, slot, e, &removed)                          @ FUN_00406c80
+    base ase_Routine (expiry)
+    if removed: bearer.smo_ply_Polymorph(null) (vt 0xeb0, Z09 §28.3 `smo_ply_Polymorph` @ FUN_004a5830)   # back to the own look
+    return 1
+    # StaPolymorph (97): SubStaKeepTime_5Min. Only the expiry path restores the look here; an early reset (vt 0x650)
+    #   runs only the detach, which this class does not override (see §13)
+
+AbnormalStateHide::ase_Routine(bearer, slot, e, &removed)                               @ FUN_00409c10
+    base ase_Routine (expiry)
+    if &removed == null: bearer.so_layer.layer→l_Sub = this.ash_SubLayer (3)
+        # tests the pointer, which is never null: the sub-layer refresh never runs (original bug) Z22-B13
+    return 1
+```
+
+StaGMHideMode (288) is set by the GM `&hide` command, which writes `l_Sub = 3` itself; `&show` resets the state and
+writes 0 (Z11 §3.1, `ac_Hide` FUN_0041a3a0 / `ac_Show` FUN_0041a4d0). Its keep time (SubStaKeepTime_Eternal,
+4 200 000 000 ms) makes the expiry branch practically unreachable.
+
+### 12.9 Element side effects elsewhere
+
+- `aeo_InformAfterLogin(e, p)` @ FUN_00409a20: for non-party states (slot 0x0c false) sends
+  `Inform(index, ⌈rest ticks / 10⌉ × 1000 ms, 0)` (0x242A) and `BroadcastSet(index, same, strength)`; party mains are
+  skipped (their routine informs the copies).
+- `aeo_IsPartyChant(e)` @ FUN_00409ab0 = element slot 0x0c of `e.aeo_Index` (0 when no element).
+- `so_SkillEnchant` (FUN_00431ca0): after setting a skill's state, sets the bitmap bit and sends Inform /
+  BroadcastSet (keep × `SET_ABSTATEKEEPTIMERATE`) only for non-party states. The function as a whole is not
+  documented by any item (see §14).
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1036,8 +1301,11 @@ client's 0x1102 NC_CHAR_REBIRTH_CMD then calls `sp_ReviveNow(p, nHealRate)` (Z07
 | Z22-B10 | PartyRecharge `sasa_Act_Killed` 00407730 | tests `&e.aeo_SetItemEffect != null` (an address inside the element) | dead check: the set-item factor always applies (harmless: base 1000) | test whether a set-item effect is stored |
 | Z22-B11 | `SubAbnormalStateDamageMinus::sasa_Act_DamageMinusRate` 00402300 (slot 0x4c) | no caller in the 2016 zone | dead code | remove, or call it where a flat damage-minus rate was planned |
 | Z22-B12 | `SubAbnormalStateMaxHP` 00401990 | sends the new max HP to the players targeting the bearer only when the state is set (`sasa_AfterEnchant`); no detach override | observers' target frames keep the raised max HP / SP after the state ends, until the next target info | also refresh them on detach |
+| Z22-B13 | `AbnormalStateHide::ase_Routine` 00409c10 | tests the `removed` **pointer** for null instead of the flag | the per-tick write of `ash_SubLayer` (3) to the GM's `so_layer.layer→l_Sub` never runs; GM hide relies on `ac_Hide`'s own write | `if (!*removed)` (keep the hidden sub-layer while the state lasts) |
+| Z22-B14 | `AbnormalStateGuildAcademyMasterEnchant::ase_Routine` 0040ef70 | buffs every scanned guild / academy member (up to 200), ignoring `PartyEnchantNumber` (5); informs the master with keep 0xFFFFFFFF while < 6 000 000 ticks remain (always: the main lasts 70 s) and broadcasts 900 000 000 ms | unlimited targets; the master's client and sight show a wrong (endless) time for its own copy, where the party routine sends the real remaining time | cap at `PartyEnchantNumber`; send the remaining time as `AbnormalStatePartyEnchant::ase_Routine` does |
+| Z22-B15 | `AbnormalStatePartyEnchant::ase_Routine` 0040ebc0 (no-party branch), `…CouplePartyEnchant::ase_Routine` 0040e5e0, `…GuildAcademyMasterEnchant::ase_Routine` 0040ef70 | send `so_AbnormalState_Inform` / `BroadcastSet` for the bearer's own copy without checking `asl_AbstateSet`'s result (the party-member path and the in-party branch do check) | when the set is refused (a stronger copy present, a refusing map, …) the client is told of a state / time the server did not set | inform only after a successful set |
 
-## 12. Not reconstructed / uncertain
+## 13. Not reconstructed / uncertain
 
 - The floating-point steps of `roe_AttackPowerCalcDamage` were read from the x87 instructions (the decompiler hides
   them behind `_ftol2_sse`); operand order is certain, but `roe_DefendPower`'s own formula is Z03 §4.6's.
@@ -1052,9 +1320,18 @@ client's 0x1102 NC_CHAR_REBIRTH_CMD then calls `sp_ReviveNow(p, nHealRate)` (Z07
   `docs/knowledge/Z09.md`; not re-read here.
 - How a `SubAbState` row with Strength 999 (SubStaE_UserComeback_Main01…05) is stored and found by `aeo_Set`
   (`AbStateStr.subabstate[strength]`) was not checked; the chain of §7.3 assumes the row is reachable.
-- Part 3 items are listed in `docs/plan/status/Z22.md`.
+- Element vt slot 0x0c has no symbol name ("is a party enchant" is ours) and slot 0x10 has no override and no caller;
+  neither name is in the 2016 PDB dump (no method lists).
+- `AbnormalStatePolymorph` resets the look only on expiry (§12.8). Whether an early reset of StaPolymorph (dispel,
+  `so_AbnormalState_Reset`) restores it elsewhere (the Type 38 actor's detach, `sp_nPolymorphAbstateIndex`) was not
+  followed; Z09 §28.3 documents `smo_ply_Polymorph`.
+- The party routines use `e.aeo_Caster.obj` without the register-number check of `aeo_GetCaster`; safe while the
+  caster is the bearer (self-cast mains, login restore with setter = the player), a dangling pointer otherwise
+  *(inferred: no other setter was found, but `so_SkillEnchant` was not read whole)*.
+- The ctor's member → index join is a regex over the decompiled ctor (scratch script); all 792 nodes resolved, but
+  a member assigned through an unusual expression would be misattributed.
 
-## 13. Coverage boundary
+## 14. Coverage boundary
 
 (Preliminary, completed in the sweep part.)
 
@@ -1066,4 +1343,5 @@ client's 0x1102 NC_CHAR_REBIRTH_CMD then calls `sp_ReviveNow(p, nHealRate)` (Z07
 | `so_Heal` / `so_recoversp`, `so_DamagedBy` / `so_KilledBy`, `roe_DefendPower`, level-gap and angle tables | Z03 §4, §7 (done) / Z09 §17.3 | combat core, already documented |
 | `so_Dispel` FUN_0042bf70, `so_SkillCure` FUN_0042c440 (whole bodies; §7.1 has only the flag writes) | this item, sweep part (Z03 is done and does not document them) | small gap |
 | `sp_RemoveField` FUN_00440b40 (map change; §7.1 has only the `f_SystemRemove` write) | to be checked in the sweep (Z01 mentions it) | map-change code, not an actor |
-| `AbnormalStateRestCount` / `RestCountHPRate::ase_MaxRestCount` FUN_00401a90 / FUN_00401ab0 (shield points, counts) | this item, part 3 | element layer |
+| `AbnormalStateReinforcedMove::ase_AttachObject` FUN_00401db0 (knock-back / pull movement) | Z18 (Z09 §31.5 row "Skill-side helpers … skill movers 00401db0", owner Z03) | movement code; §12.7 documents the element's other slots |
+| `ShineMobileObject::so_SkillEnchant` FUN_00431ca0 (skill → abstate application; §12.9 has only the party test) | to be decided in the sweep (no item plan names it; Z03 is done and does not cite it) | skill side, not an element |
