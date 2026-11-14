@@ -2933,6 +2933,255 @@ BriefInfoExchangeMover (batches for a player entering sight, Z02 §5.2):
 
 ---
 
+## 9. Minimon auto-use, the card reward condition, client handling of codes without text
+
+Part 9 closes the smaller open points of Z07 §12. §9.1–§9.6 are the minimon (pup) auto-use system behind Z07 §4.1
+(the request handlers are there; this section corrects their list kinds and adds the tables, login, save, routine and
+client side). §9.7 is `cca_IsRewardCondition` (Z07 §7), §9.8 the client handling of the Z07 result codes that have no
+text in `client-error-codes.json`.
+
+### 9.1 Tables: `MinimonInfo.shn`, `MinimonAutoUseItem.shn`
+
+Both are loaded at zone start by `ZoneServer_zs_start_sleep` (Z01 §2.3). Any failing row asserts and aborts the
+load (return 0).
+
+```pseudo
+CMinimonDataBox gMinimonDataBox   (std::map<u16 itemId, MinimonInfo>)        ctor @ FUN_004a2a40
+mmdb_Load:                                                                    @ FUN_004a27f0 (row reader FUN_004a1ae0, row 0x28)
+    MinimonInfo { char ItemIDX[32]; MinimonEquipPos MinimonEquipPos; MinimonRoleType MinimonRole }   (pdb2016)
+    per row: itemId = idb_2itemid(ItemIDX); 0xFFFF → assert "invalid itemid", fail
+             itemId already in the map → assert "duplication item", fail
+             map[itemId] = row
+mmdb_GetMinimonType(itemId):                                                  @ FUN_004a25e0
+    itemId == 0xFFFF or not in the map → MRT_NONE (0); else row.MinimonRole
+    # MinimonRoleType: 0 MRT_NONE, 1 MRT_PICK (auto-pick), 2 MRT_USEITEM (auto-use)
+    # MinimonEquipPos (0 LEFT, 1 RIGHT, 2 BOTH, 3 NONE) has no server reader: the zone only ever asks for the role
+
+CMinimonAutoUseItemDataBox gMinimonAutoUseItemDataBox   (std::map<MAUI_Type, vector<u16 itemId>>)   ctor @ FUN_00467490
+mauidb_Load:                                                                  @ FUN_004a2b80 (row 0x24)
+    MinimonAutoUseItem { MAUI_Type MAUItem; char ItemIDX[32] }   (pdb2016)
+    per row: itemId = idb_2itemid(ItemIDX); 0xFFFF → assert "invalid itemid", fail
+             append itemId to map[MAUItem] (duplicates are kept, harmless)
+mauidb_CanUseItem(type, itemId):                                              @ FUN_004a2620
+    type > MAUI_BUFFITEM (2) → 0; itemId == 0xFFFF → 0
+    1 if itemId is in map[type] (the lookup key is `type`, checked in the assembly at 0x4a263b), else 0
+    # MAUI_Type: 0 MAUI_NONE, 1 MAUI_CHARGED, 2 MAUI_BUFFITEM
+```
+
+2016 data: `MinimonInfo.shn` has 534 rows: 387 single-slot minimons (pos 0; role 0 ×158, role 1 ×229) and 147 `*_BOTH`
+minimons (pos 2; role 0 ×34, role 1 ×80, **role 2 ×33**). Only the 33 `*_BOTH` rows with role 2 can drive auto-use.
+`MinimonAutoUseItem.shn` has 132 type-1 rows (premium items: `EXPCard*`, `SoulPower*`, `ADPower*`, `Huntervoucher*`,
+`HPIncrease*` …) and 89 type-2 rows (shop potions and scrolls: `*ResiPotion`, `*Scroll`, `*ACMRPotion` …).
+
+**Correction to Z07 §4.1:** the **normal** list (`NormalItemList`, 0x1124) takes `MAUI_BUFFITEM` (2) items, the
+**charged** list (`ChargedItemList`, 0x1128) takes `MAUI_CHARGED` (1) items. Z07's "kind 1 normal, 2 charged" is the wrong
+way round, and its "kind 1 auto-pick, 2 auto-use" for `FUN_004a25e0` is right (MRT_PICK / MRT_USEITEM). The Z04 §5.1
+equip hook that calls `FUN_004a25e0` "kind 1 → mount, dismount" is the auto-pick role: `FUN_005654d0` is `sp_SetAutoPick(p, 0)`
+(Z07 §3.6), not a dismount (§9.5).
+
+### 9.2 Player state, login and saving
+
+`ShinePlayer` members *(pdb2016)*: `sp_UseItemMinimonCheckTime` +0x2abe8 (u32 next tick), `sp_UseItemMinimon` +0x2abec
+(`USEITEM_MINIMON_INFO` 0x32 bytes: `u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12], u16 ChargedItemList[12]`),
+`sp_UseItemMinimon_LoginSlot` +0x2ac1e (`u8 NormalSlotList[12], u8 ChargedSlotList[12]`). Brief flag
+`PROTO_NC_BRIEFINFO_LOGINCHARACTER_CMD.IsUseItemMinimon` (brief +0xea).
+Player vt: 0xe50 `so_ply_SetUseItemMinimon`, 0xe54 `so_ply_UseItemMinimon_IsUse`, 0xe58 `so_ply_UseItemMinimon_Off`,
+0xe5c `so_ply_UseItemMinimon_SlotItemCheck`.
+
+```pseudo
+WM 0x1122 NC_CHAR_USEITEM_MINIMON_INFO_ZONE_CMD { u16 nSessionHandle, u32 nCharNo, USEITEM_MINIMON_INFO }   @ FUN_005a5d80
+    p = object by handle; none, or charNo mismatch → log "pPlayer NULL", drop
+    p.vt[0xe50](&info)
+
+so_ply_SetUseItemMinimon(info):                                    @ FUN_005617c0
+    copy info into sp_UseItemMinimon
+    for each NormalItemList slot ≠ 0xFFFF:  LoginSlot.NormalSlotList[slot] = 1
+        not CanUseItem(MAUI_BUFFITEM, id) or inventory lot of id < 1 → slot = 0xFFFF
+    same for ChargedItemList with MAUI_CHARGED (LoginSlot.ChargedSlotList)
+    sp_UseItemMinimonCheckTime = g_Now
+    if neither equip slot 25 (MINIMON) nor 28 (MINIMON_R) holds an MRT_USEITEM minimon: bNormalItem = bChargedItem = 0
+    a list with no slot left → its flag = 0
+    brief.IsUseItemMinimon = vt[0xe54]()            # bNormalItem == 1 or bChargedItem == 1   @ FUN_00561b60
+    # the inventory and equipment must already be loaded when 0x1122 arrives (blob order, Z07 §1.2) (inferred)
+
+at LOGINCOMPLETE (sp_NC_MAP_LOGINCOMPLETE_CMD FUN_00443390, Z01): sp_SendUseItemMinimonInfo_Client    @ FUN_00561990
+    p ← 0x1123 NC_CHAR_USEITEM_MINIMON_INFO_CLIENT_CMD { USEITEM_MINIMON_INFO }          (0x32 bytes)
+    to the players in range (so_AllOfRange) 0x112C NC_CHAR_USEITEM_MINIMON_USE_BROAD_CMD { u16 nCharHandle = p, u8 bUse = brief flag }
+
+sp_SaveUseItemMinimonInfo_DB (from ws_save2DB FUN_00455a10, Z11):          @ FUN_00563d80
+    Character DB ← 0x4035 NC_CHARSAVE_USEITEM_MINIMON_INFO_DB_CMD { u32 nCharNo, USEITEM_MINIMON_INFO,
+                    u8 DelSlotList_Normal[12] = (NormalItemList[i] == 0xFFFF), u8 DelSlotList_Charged[12] = (… == 0xFFFF) }  (0x4E)
+    # D02 §6: the DB writes every slot that is set or flagged deleted, i.e. all 24 slots on every save.
+    # sp_UseItemMinimon_LoginSlot is written at login and never read (original bug) Z13-B62
+sp_SaveUseItemMinimonInfo_World (from ws_save2worldmanager FUN_004536f0):  @ FUN_00563e70
+    WM ← 0x4036 NC_CHARSAVE_USEITEM_MINIMON_INFO_WORLD_CMD { u16 nWorldHandle (vt 0x340), u32 nCharNo, USEITEM_MINIMON_INFO }  (0x38)
+    # the WM keeps it for the next zone's 0x1122 (W05 §5.5)
+```
+
+### 9.3 The ON / OFF requests (Z07 §4.1, completed)
+
+```pseudo
+0x1124 NORMAL_ITEM_ON_REQ { u16 NormalItemList[12] }   @ FUN_005642e0 → sp_UseItemMinimon_NormalOn FUN_00561d90   (no length check)
+    answers SendErrorCode(4, 0x125, code) = 0x1125 NC_CHAR_USEITEM_MINIMON_NORMAL_ITEM_ON_ACK { u16 code }
+    if neither slot 25 nor 28 holds an MRT_USEITEM minimon:     0x3629
+    for each slot i with id ≠ 0xFFFF:
+        id appears in another slot of the request:            SendErrorCode(4, 0x362D, 0x362C)  (Z07-B8: code as cmd)
+        not CanUseItem(MAUI_BUFFITEM, id):
+            CanUseItem(MAUI_CHARGED, id) → 0x362C           (a premium item: belongs in the charged list)
+            else                         → 0x362A           (not an auto-use item)
+    NormalItemList = request list (no inventory check; the routine drops missing items, §9.4)
+    all slots empty: 0x362B                    # bNormalItem is left as it was (original bug) Z13-B63
+    else bNormalItem = 1, sp_UseItemMinimon_UseSet(p, 1) (0x112C to the range if the brief flag changes), 0x3628
+
+0x1128 CHARGED_ITEM_ON_REQ { u16 ChargedItemList[12] }  @ FUN_00564460 → sp_UseItemMinimon_ChargedOn FUN_00561f40
+    same with MAUI_CHARGED as the list type and MAUI_BUFFITEM as the "other list":
+    no minimon 0x3639, duplicate 0x363D, in the normal list 0x363C, invalid 0x363A, empty 0x363B, ok 0x3638
+    0x3638 / 0x363B / 0x3639 go out on 0x1129; 0x363A / 0x363C / 0x363D on 0x1125 (Z07-B9)
+
+0x1126 NORMAL_ITEM_OFF_REQ (no payload)   @ FUN_00564390
+0x112A CHARGED_ITEM_OFF_REQ (no payload)  @ FUN_00564510
+    if the list's flag is set: flag = 0; p ← 0x1127 / 0x112B (opcode only, so_SendProtocol);
+        if the other flag is not 1: sp_UseItemMinimon_UseSet(p, 0)
+    flag not set: no answer
+
+so_ply_UseItemMinimon_Off (vt 0xe58):     @ FUN_00563ef0    = both OFF requests in a row (0x1127 / 0x112B for each list that was on)
+sp_UseItemMinimon_UseSet(p, on):          @ FUN_00561aa0    brief flag ≠ on → set it; 0x112C { p, on } to the range
+```
+
+### 9.4 The auto-use routine
+
+```pseudo
+player so_Routine (FUN_0056c790, Z09 §2.3): if vt[0xe54]() and sp_UseItemMinimonCheckTime <= g_Now:
+    sp_UseItemMinimonCheckTime = g_Now + 10 (1 s); sp_UseItemMinimon_Routine(p)
+
+sp_UseItemMinimon_Routine:                                          @ FUN_00564d40
+    only on a map whose FieldList row allows items (+0x9e, Z09 §2.3), not in a gamble game (vt 0xb24
+    so_Gamble_IsJoinAnyGamble(0)), no inventory lock pending (lock list vt 0x10), no NPC menu (sp_NPCProcess
+    dmc_Control bit 3), no quest reward request pending (vt 0xae0 so_GetIsQuestRewardReq):
+        sp_UseItemMinimon_NormalRoutine; sp_UseItemMinimon_ChargedRoutine
+
+sp_UseItemMinimon_NormalRoutine:                                    @ FUN_00564040
+    if bNormalItem: for slot 0..11:
+        stop the pass if casting (vt 0xea0 smo_DuringCast), StaEthereal (vt 0x9e4 sp_IsEthereal = abstate 326)
+            or captivated (vt 0xf20 smo_IsCaptivate)
+        id = NormalItemList[slot]; 0xFFFF → next
+        cell = sp_FindItemFromInventory(id)
+        none: if inventory lot of id < 1 → sp_UseItemMinimon_NormalSlotClear(slot)
+        else: e = useditemeffect[id]; skip when e's UseEffectA == UE_ABSTATE and the same abstate with the same
+              strength (UseAbstateIndex, UseValueA) is already on p (asl_Check_SameAbstate)
+              else sp_UseItemMonimon_UseItem(p, inventory slot, cell)
+sp_UseItemMinimon_ChargedRoutine:                                   @ FUN_00564230
+    same over ChargedItemList with sp_UseItemMinimon_ChargedSlotClear and **without** the same-abstate skip; a running
+    premium effect is refused by the item's own `uib_CanUseItem` (e.g. `UseItemChargedBuff` FUN_00598310, Z04 §6.3)
+
+sp_UseItemMonimon_UseItem(p, slot, cell):                           @ FUN_00561b80   (returns 1 if a cast was started)
+    inventory cell (9, slot) locked (lock list vt 0xc) → 0
+    item data (ItemInfo + ItemInfoServer) missing → 0
+    p.level < DemandLv, lot 0 or > MaxLot, KQ/PK map (FieldList +0x67) without ItemInfoServer.PK_KQ_USE,
+    Type ≠ ITEMTYPE_EXH, UseClass refuses p's class → 0
+    e = useditemeffect[id]; no actor → 0
+    e.actor.uib_CanUseItem(p, cell) ≠ 0x700 → 0                    # no error is sent: the minimon just skips the item
+    if e.actor.uib_DirectUse(p, slot, cell) (vt 8) → 0             # used at once (the actor answers itself)
+    no use-skill, or Fear (+0x1e78 bit 2) and skill ≠ 0x7213, or skill on cooldown → 0
+    start the item cast like ItemUse_Inventory (Z04 §6.1): smo_SkillCast cleared, scs_BlastTime = g_Now + CastTime·10/1000,
+        scs_Skill, scs_UseItem { cooltime_millisec = DlyTime, itemdata, invenslot = slot, bAutoUse = 1 } → 1
+    # differences from the 0x3015 path: no mode check, no Lua "use item" trigger at the start, no 0x302 "casting"
+    # test (the routine stops instead), no error answers
+
+cast end (ShineMobileObject::so_Routine FUN_0056a080): scs_UseItem.itemdata set →
+    smo_ply_SkillCoolTime(scs_Skill, Silver Wing ? so_ply_SilverWingCoolTime() : cooltime_millisec)
+    (Silver Wing also so_ply_NewSkillCoolTime); smo_ply_ItemUse(itemdata, invenslot, bAutoUse) (vt 0xed0);
+    scs_BlastTime = 0; vt 0xf00 smo_SetEffectForJustSkillClear
+
+smo_ply_ItemUse(itemdata, slot, bAutoUse):                          @ FUN_0053fd10   (shared with 0x3015, Z04 §6.1)
+    cell = inventory[slot]; item data of the cell's id missing or ≠ id → assert, return
+    lot < 1 → assert "Try to use lot 0 item", vt 0x91c so_ply_ItemUseResultPacket(0x703, 9)
+    code = actor.uib_CanUseItem(p, cell) (re-checked at the end of the cast); ≠ 0x700 → so_ply_ItemUseResultPacket(code, 9)
+    if bAutoUse == 0: p ← 0x301A (dept 12 cmd 0x1a, opcode only)    # a minimon use sends no 0x301A
+    sp_ItemUseBroadcast(e, id); skill 0x7210 → so_ply_NewSkillCoolTime(0x7210, so_ply_SilverWingCoolTime() / 1000)
+    actor.uib_AfterCast(p, inventory, itemdata, slot) (vt 0xc)      # consumes the item and applies the effect
+    map Lua script: event 0x20 `ItemUse` (mapName, p, id) (Z09 §14.3)
+
+sp_UseItemMinimon_NormalSlotClear(slot) / ChargedSlotClear(slot):    @ FUN_00563f60 / FUN_00564150
+    slot >= 12 → nothing
+    p ← 0x112D NC_CHAR_USEITEM_MINIMON_NOTICE_CMD { u16 nErr = 0x3648, u16 nItemID = list[slot] }
+    list[slot] = 0xFFFF
+    if every slot of the list is now empty and its flag is set: flag = 0, p ← 0x1127 / 0x112B,
+        other flag ≠ 1 → sp_UseItemMinimon_UseSet(p, 0)
+```
+
+### 9.5 Item changes and equipment hooks
+
+- `so_ply_UseItemMinimon_SlotItemCheck(id)` (vt 0xe5c) @ FUN_00564c90, called by the `CellChange` / `CellClear`
+  releasers (Z05 §1.4) with the id that left the cell: if bNormalItem == 1 and id is in the normal list, clear that slot
+  (above) when the inventory lot of id is now 0; otherwise the same for the charged list (first matching slot only).
+- The same releasers call `so_ply_UseItemMinimon_Off` (vt 0xe58) when the cell they empty held an MRT_USEITEM minimon
+  (Z05 §1.4 says "usage class 2": it is `mmdb_GetMinimonType`). `sp_NC_ITEM_EQUIP_REQ` (FUN_0052b8d0, Z04 §5.1), when it
+  swaps out an equipped item: old item MRT_PICK and new item not MRT_PICK → `sp_SetAutoPick(p, 0)`; old item MRT_USEITEM
+  → `so_ply_UseItemMinimon_Off`. Neither checks whether the other minimon slot still holds an MRT_USEITEM minimon (only
+  `*_BOTH` minimons have that role, so in 2016 only a slot-25/28 swap with a second role-2 minimon hits it)
+  (original bug) Z13-B61. `sp_IsAutoPickEnableState(slot)` @ FUN_00560380 = "the item in equip slot `slot` is MRT_PICK"
+  (auto-pick, Z07 §3.6).
+- Equipping an MRT_USEITEM minimon does not turn auto-use on: the client has to send 0x1124 / 0x1128 again.
+
+### 9.6 Client side (2016 client, `GameFrameWork`)
+
+| Packet | Client handler | What the client does |
+|---|---|---|
+| 0x1123 INFO_CLIENT_CMD | @ FUN_0049dae0 → FUN_00429e20 | auto-buff window: `bNormalItem` → normal button ON (FUN_00429920(1)), `bChargedItem` → premium button ON (FUN_004299b0(1)); copies both 12-id lists into the window slots |
+| 0x1125 NORMAL_ITEM_ON_ACK | @ FUN_004b4600 | 0x3628: button ON + "Activate auto buff"; 0x362B: "There are no items registered in the window."; every other code (0x3629, 0x362A, 0x362C, and 0x363A/0x363C/0x363D sent here by Z07-B9) is ignored |
+| 0x1129 CHARGED_ITEM_ON_ACK | @ FUN_004b4650 | 0x3638: premium button ON; 0x363B: same "no items" text; 0x3639 ignored |
+| 0x1127 / 0x112B OFF_ACK | FUN_00429920(0) / FUN_004299b0(0) | button OFF + "Deactivate (premium) auto buff" |
+| 0x112C USE_BROAD_CMD | @ FUN_0049db70 | character by `nCharHandle` → FUN_00633f10(char, bUse ≠ 0) (shows / hides the minimon's auto-use state) |
+| 0x112D NOTICE_CMD | @ FUN_0049dbb0 | only `nErr == 0x3648`: removes `nItemID` from the first matching normal and premium slot and shows "%s supply has reached zero." with the item name |
+
+Client senders (window FUN_00429750 / the premium twin, packet builders FUN_004a6f70 0x1124, FUN_004a6ff0 0x1126,
+FUN_004a7030 0x1128, FUN_004a70b0 0x112A): the button sends OFF when the list is on, else ON with the 12 slot ids.
+Dropping an item into a slot (FUN_00429a40) refuses a second copy of the same item locally ("You cannot register the same
+type of item twice.") and sends OFF first when the list is on. The client does not filter by `MinimonAutoUseItem`; the
+server's 0x362A / 0x362C / 0x363A / 0x363C refusals are silent in the 2016 client.
+
+### 9.7 `cca_IsRewardCondition` (Z07 §7, return values from the assembly)
+
+`CollectCardReward` row *(pdb2016)*: `{ u16 CC_RewardID; CardReward CC_CardRewardType (+2); u16 CC_CardLot (+6);
+char CC_RewardItemInx[64]; u16 CC_RewardLot }`; `CardReward`: 0 CR_ALL, 1 CR_S, 2 CR_A, 3 CR_B, 4 CR_C.
+`CollectCard.CC_CardGradeType` (+0x22): `CardGrade` 0 S, 1 A, 2 B, 3 C.
+
+```pseudo
+CardCollectionAlbum::cca_IsRewardCondition(album, row):            @ FUN_00628d60
+    count[0..3] = 0
+    for each album entry (11 bytes, card id at +8):
+        card = g_CollectCard_CardID[id] (id < table size, row ≠ null); grade = card.CC_CardGradeType (signed)
+        if grade < 4: count[grade] += 1
+    switch row.CC_CardRewardType (jump table at 0x628ec0):
+        CR_ALL: n = count[0] + count[1] + count[2] + count[3]
+        CR_S / CR_A / CR_B / CR_C: n = count[type − 1]
+        other (> 4): return 1                                      # unreachable with the 2016 data
+    return n >= row.CC_CardLot ? 1 : 0                              # signed compare (jge at 0x628e3c), u16 lot
+```
+
+So 1 = condition met (the 0xC410 handler goes on to the DB), 0 = 0x2BAC "Unable to receive reward (more cards needed)".
+Every album entry counts once (the album holds one entry per registered card). 2016 data: 18 reward rows, 3 each of
+types 0–3 and 6 of type 4; 334 cards (S 39, A 81, B 91, C 123).
+
+### 9.8 Client handling of result codes without text (Z07 §12)
+
+The generic text lookup `ErrMsgTable::GetErrMsg` (client FUN_00416430) returns, for a code it does not list, the text
+0xb4d3f216 "An unidentified error code has occurred." formatted as `"%s: %d"` with the code. "No text" therefore means either that generic line or a handler that
+never looks the code up.
+
+| Family (Z07 §) | Answer packet → client handler | Codes without text | What the user sees |
+|---|---|---|---|
+| 0xAC1–0xAC7 stat points (§2.4) | 0x1061 / 0x1067 → `StatPointReqTask` FUN_006ab090 | all | the task ends with event 0x19 and a string `"err: %d"` for its listeners; no message box or chat text *(inferred: event 0x19 = task failed)* (0x105F / 0x1065 success refresh the stat window via FUN_006629d0) |
+| 0x3628–0x363D minimon (§4.1) | 0x1125 / 0x1129 (§9.6) | all | only ok and "empty list" have an effect; the other codes are ignored |
+| 0x3648 minimon notice | 0x112D (§9.6) | 0x3648 | own text "%s supply has reached zero." |
+| 0x3658–0x365C charged buff erase (§4.2) | 0x112F → FUN_004a7140 | 0x3658, 0x365B | 0x3658: runs the `ChargedOff` UI script *(inferred: removes the buff icon)*; others through `ErrMsgTable` (0x365B → generic line; 0x3659 / 0x365A / 0x365C have texts) |
+| 0x16C0–0x16CF furniture effects (§6.10) | 0x8C41 → FUN_00499a20 (§3.6) | 0x16C0, 0x16C6–0x16C9, 0x16CF | 0x16C0 nothing; 0x16C7 / 0x16C8 / 0x16CF `ObjEffErrMsg` (message built from the effect row); 0x16C6 / 0x16C9 generic line |
+| 0x19D0–0x19DF portal effects (§6.10) | 0x8C57 | all | ignored (no client handler, §3.6) |
+| 0x2B90–0x2BAE card collection (§7) | 0xC40B FUN_004bba90, 0xC40F FUN_004b37c0, 0xC413 FUN_004b3850 | 0x2B90, 0x2BA0, 0x2BA8 | these are the success codes, handled by value: 0x2B90 adds the card to the album and shows "%s card is registered."; 0x2BA0 "Card has been registered to / excluded from your collection."; 0x2BA8 "Selected item has been moved to your Reward Inventory"; every other code through `ErrMsgTable` (all have texts) |
+
+---
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -2997,6 +3246,9 @@ BriefInfoExchangeMover (batches for a player entering sight, Z02 §5.2):
 | Z13-B58 | `ShineMover::so_mobile_IsEnemy` FUN_004309a0 | after the PK test (`fm_PKField == 1`) it returns false whenever the field has a MapInfo row; the KQ / party-battle / guild-war tests run only with a null MapInfo and then read `KingdomMap` through it | a mover never treats players as enemies outside PK fields and captivation; the rest is dead (no effect in 2016: movers cannot attack) | the player rule: PK field ≠ 0, or MapInfo and KingdomMap == 4, then party battle, guild war, tournament |
 | Z13-B59 | `ShineMover::so_smv_SkillBash_Location` FUN_00580cf0 | the cooldown failure 0xFC8 goes to the mover's own `so_SendErrorCode` (vt 0x308 of `this`), not to the rider | the rider would get no answer (unreachable in 2016: no handler for 0xCC0F) | send to the rider like every other check |
 | Z13-B60 | `sp_MoverSystem_MapLogin` FUN_0045d9e0 with `so_Routine` | a passenger who links without the owner (link data with only its own seat) rebuilds the owner's mover, boards it, and the next routine tick dismounts it and frees the mover | the passenger and its sight see a summon, 0xCC02 / 0xCC04 and a dismount 0xCC06 / 0xCC08 within one tick | do not rebuild a mover whose owner is not coming (no master booking) |
+| Z13-B61 | `InvenCellReleaser_CellChange` / `CellClear` (Z05 §1.4), `sp_NC_ITEM_EQUIP_REQ` FUN_0052b8d0 (§9.5) | removing or swapping out an MRT_USEITEM minimon calls `so_ply_UseItemMinimon_Off` without checking the other minimon slot (25 / 28) | with two role-2 `*_BOTH` minimons, taking one off (or swapping it for another role-2 minimon) turns both auto-use lists off; the player must switch them on again | turn auto-use off only when no MRT_USEITEM minimon remains, as `so_ply_SetUseItemMinimon` checks at login |
+| Z13-B62 | `so_ply_SetUseItemMinimon` FUN_005617c0 / `sp_SaveUseItemMinimonInfo_DB` FUN_00563d80 | `sp_UseItemMinimon_LoginSlot` records the slots filled at login but is never read; the save flags every empty slot as deleted | every save sends 24 `usp_Item_setAutoMon` calls (D02 §6) instead of only the changed slots | set `DelSlotList` only for slots that were filled at login (`LoginSlot`) and are empty now |
+| Z13-B63 | 0x1124 / 0x1128 ON with an all-empty list (§9.3) | the empty list is stored, the answer is 0x362B / 0x363B, but `bNormalItem` / `bChargedItem` keep their old value | a list that was on stays "on" with no items (the client shows "no items registered" and keeps its button state); harmless, the 2016 client sends OFF first when the list is on | clear the flag (and the brief flag) on an empty list |
 
 ## Not reconstructed / uncertain
 
@@ -3044,6 +3296,13 @@ BriefInfoExchangeMover (batches for a player entering sight, Z02 §5.2):
   *(inferred)*; whether the damage pipeline (Z03) calls `so_KilledBy` instead of `so_DamagedBy` when HP would go below 0
   was not traced (no mover can be damaged in 2016). The callers of `smo_ply_SendSpeedInformation` (vt 0xeb8, no virtual
   call found) were not traced. The client's `AddMover` FUN_00646c50 internals (model, seat nodes) were not read.
+- Minimon (§9): that the inventory is already loaded when WM 0x1122 arrives (otherwise every slot is dropped at login) is
+  *(inferred)* from the blob order. Which players `so_AllOfRange` reaches with 0x112C (whether the sender is included) and
+  what client FUN_00633f10 shows for `bUse` were not traced. Whether an MRT_USEITEM minimon must still be equipped while
+  the routine runs: the routine itself does not check (only the ON requests and the login copy do; removing it turns the
+  lists off through §9.5).
+- 0xAC* stat answers: the listener of `StatPointReqTask`'s event 0x19 (the stat window) was not read; that it shows
+  nothing is *(inferred)* from the absence of a text lookup in the task.
 
 ## Coverage boundary
 

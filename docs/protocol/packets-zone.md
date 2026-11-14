@@ -188,11 +188,11 @@ Handler `FUN_00576480`
 
 ### `0x1124` NC_CHAR_USEITEM_MINIMON_NORMAL_ITEM_ON_REQ
 
-**Verified layout** (basis: zone FUN_00561d90)
+**Verified layout** (basis: zone FUN_005642e0 → sp_UseItemMinimon_NormalOn FUN_00561d90; client FUN_004a6f70)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16[12] | NormalItemList | -1 = empty |
+| 0 | u16[12] | NormalItemList | item ids, 0xFFFF empty; must be MAUI_BUFFITEM (2) items, no duplicates; no length check |
 
 Handler `FUN_005642e0`
 
@@ -3133,14 +3133,11 @@ Sent from `FUN_005e72f0` (`FUN_005e72f0`) · payload 1 bytes
 
 ### `0x1123` NC_CHAR_USEITEM_MINIMON_INFO_CLIENT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_INFO_CLIENT_CMD`, 50 bytes
+**Verified layout** (basis: zone sp_SendUseItemMinimonInfo_Client FUN_00561990 (at LOGINCOMPLETE); client FUN_0049dae0 → FUN_00429e20)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | UseItemMinimonInfo.bNormalItem |  |
-| 1 | u8 | UseItemMinimonInfo.bChargedItem |  |
-| 2 | u16[12] | UseItemMinimonInfo.NormalItemList |  |
-| 26 | u16[12] | UseItemMinimonInfo.ChargedItemList |  |
+| 0 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot; the client sets its two auto-buff buttons and slot ids |
 
 Sent from `FUN_00561990` (`FUN_00561990`) · payload 50 bytes
 
@@ -3162,12 +3159,12 @@ Sent from `FUN_00561aa0` (`FUN_00561aa0`) · payload 3 bytes
 
 ### `0x112d` NC_CHAR_USEITEM_MINIMON_NOTICE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_NOTICE_CMD`, 4 bytes
+**Verified layout** (basis: zone sp_UseItemMinimon_NormalSlotClear FUN_00563f60 / ChargedSlotClear FUN_00564150; client FUN_0049dbb0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nErr |  |
-| 2 | u16 | nItemID |  |
+| 0 | u16 | nErr | always 0x3648 (item ran out); the client acts only on 0x3648 |
+| 2 | u16 | nItemID | item removed from the list; client: "%s supply has reached zero." |
 
 Sent from `FUN_00563f60` (`FUN_00563f60`) · payload 4 bytes
 
@@ -12001,6 +11998,16 @@ Empty payload.
 |---|---|---|---|
 | 0 | u16 | err | 0x3080 success (ignored by the client), 0x3081 / 0x3082 player side, 0x3083 no mover data, 0x3084 seat out of range, 0x3085 not your seat, 0x3086 seat empty |
 
+### `0x1122` NC_CHAR_USEITEM_MINIMON_INFO_ZONE_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_005a5d80 → so_ply_SetUseItemMinimon FUN_005617c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSessionHandle | zone object handle |
+| 2 | u32 | nCharNo | must match the player |
+| 6 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot; slots failing MinimonAutoUseItem or with lot 0 are dropped |
+
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_004cd5c0)
@@ -12595,6 +12602,17 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 0 | u16 | bEnable |  |
 | 2 | u32 | charNo |  |
 
+### `0x4035` NC_CHARSAVE_USEITEM_MINIMON_INFO_DB_CMD (Z→DB)
+
+**Verified layout** (basis: zone sp_SaveUseItemMinimonInfo_DB FUN_00563d80 (from ws_save2DB); Character FUN_0042de30 (D02 §6))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot |
+| 54 | u8[12] | DelSlotList_Normal | 1 = slot empty (every empty slot, Z13-B62) |
+| 66 | u8[12] | DelSlotList_Charged | same for the charged list |
+
 ### `0x4812` NC_SKILL_EMPOWALLOC_DB_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_0044f150)
@@ -12792,6 +12810,16 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 13 | u16 | nSummonSlot | inventory slot of the pet item |
 | 15 | u32 | nId | pet id |
 | 19 | u32 | nRegNum | pet DB key |
+
+### `0x4036` NC_CHARSAVE_USEITEM_MINIMON_INFO_WORLD_CMD (Z→WM)
+
+**Verified layout** (basis: zone sp_SaveUseItemMinimonInfo_World FUN_00563e70 (from ws_save2worldmanager); WM FUN_0042d020)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nWorldHandle | so_GetWMSHandle (vt 0x340) |
+| 2 | u32 | nCharNo |  |
+| 6 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot |
 
 ### `0x580e` NC_KQ_Z2W_MAKE_ACK (Z→WM)
 
