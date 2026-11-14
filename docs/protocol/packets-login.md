@@ -23,13 +23,13 @@ Heuristic extraction: verify a layout against the cited function before relying 
 
 ### WORLD (18 bytes)
 
-Basis: login FUN_0040a020 + world-list builder (decomp ~line 6719)
+Basis: login InitWorldManagerInfo FUN_00409eb0, GetWorldManagerConnectInfo FUN_0040a020, client WorldSelectWin::UpdateServerList FUN_00473b80; official element = PROTO_NC_USER_LOGIN_ACK.WorldInfo (pdb2016)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | world_no |  |
-| 1 | char[16] | world_name | from 9Data/ServerInfo WORLD_NAME |
-| 17 | u8 | status | set to 2 at load; world select fails while status < 5 |
+| 0 | u8 | world_no | worldno (pdb2016) |
+| 1 | char[16] | world_name | worldname (Name4, pdb2016); from ServerInfo WORLD_NAME |
+| 17 | u8 | status | worldstatus = WORLD_MANAGER_SERVER_USER_STATUS (pdb2016): 0 CLOSED (configured world, WM not connected), 2 EMPTY (world without a WM client-port row), 4 UNKNOWN, 5 FULL, 6..10 WMSUS_1..5 load bands (WM connected; L01 §3); the server lets world select pass for status >= 5 |
 
 ## Client → server
 
@@ -425,6 +425,49 @@ Empty payload.
 
 answered with bare 0x0805
 
+### `0x0803` NC_MISC_S2SCONNECTION_ACK (Login→WM, AccountDB/AccountLogDB→Login)
+
+**Verified layout** (basis: sent to the WM by FUN_00408170 (CSendPacket::ID(0x803, 3, …)); received from the DB links by FUN_00404fb0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | echo_data | copied from the 0x0802 |
+| 1 | u16 | error | Login always sends 0 |
+
+### `0x2812` NC_OPTOOL_LOGIN_USER_RATABLE_GET_REQ (OPTool→Login)
+
+**Verified layout** (basis: FUN_00407c90)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nWorldNo | index into m_LoginUserRatable[256] |
+
+answered with 0x2813 { u8 nWorldNo, LOGIN_USER_RATABLE RateTable }; no length check (L01-B5)
+
+### `0x2814` NC_OPTOOL_LOGIN_USER_RATABLE_SET_CMD (OPTool→Login)
+
+**Verified layout** (basis: FUN_00407d50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nWorldNo | 0xFF = all 256 entries |
+| 1 | u16 | RateTable.nWMSUS_1 | % threshold, never used (L01-B4) |
+| 3 | u16 | RateTable.nWMSUS_2 | % of MaxOfUser for status 7 |
+| 5 | u16 | RateTable.nWMSUS_3 | % for status 8 |
+| 7 | u16 | RateTable.nWMSUS_4 | % for status 9 |
+| 9 | u16 | RateTable.nWMSUS_5 | % for status 10 |
+| 11 | u16 | RateTable.nWMSUS_FULL | % for status 5 (full) |
+
+13 bytes; no answer; no length or value check (L01-B5); defaults 3, 5, 8, 10, 30, 95
+
+### `0x2818` NC_OPTOOL_LOGON_PROCESS_TIME_VIEW_REQ (OPTool→Login)
+
+**Verified layout** (basis: FUN_00407df0)
+
+Empty payload.
+
+answered with 0x2819 NC_OPTOOL_LOGON_PROCESS_TIME_VIEW_ACK, all six u32 counters 0 (L01-B10)
+
 ### `0x0805` NC_MISC_HEARTBEAT_ACK (S→C)
 
 **Verified layout** (basis: FUN_004060b0 sends raw 02 05 08)
@@ -440,4 +483,30 @@ Empty payload.
 | 0 | u8 | bSuccess | always 1 (pdb2017 name) |
 
 L00 name was '?'
+
+### `0x0808` NC_MISC_USER_COUNT_CMD (WM→Login)
+
+**Verified layout** (basis: CParserWorldManager::fc_NC_MISC_USER_COUNT_CMD FUN_00408580 → SetWorldManagerConnectInfo FUN_0040a0c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | NumOfUser | players on the world |
+| 2 | u16 | MaxOfUser | capacity; the load band is NumOfUser against pct(MaxOfUser) of m_LoginUserRatable[world] |
+
+world = the session's m_Connected_World; the first 0x0808 after a WM connects broadcasts 0x0C1C to every client (L01 §3)
+
+### `0x0802` NC_MISC_S2SCONNECTION_REQ (WM→Login, Login→AccountDB/AccountLogDB)
+
+**Verified layout** (basis: received from the WM: FUN_00408170; sent to AccountDB / AccountLogDB: FUN_00403a40 / FUN_00404f50 (raw frame 09 02 08 …))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | echo_data | echoed in 0x0803; Login sends 0 |
+| 1 | u8 | server_to_id | receiver type: 0 AccountDB, 1 AccountLog, 4 Login (WM link closed unless 4) |
+| 2 | u8 | server_from_id | sender type (Login = 4) |
+| 3 | u8 | server_from_world_num | WM: indexes the world mapping without a bound (L01-B1) |
+| 4 | u8 | server_from_zone_num |  |
+| 5 | u16 | key | must equal server_to_id + server_from_id (not a secret) |
+
+7 bytes, PROTO_NC_MISC_S2SCONNECTION_REQ (pdb2016). L00 §5.1 shows only { myServerId, myWorld, myZone }
 
