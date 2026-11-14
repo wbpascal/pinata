@@ -1,0 +1,13 @@
+{
+  "FUN_005b07a0": "ZoneServer::zs_LuaFromHTML",
+  "FUN_005b0f60": "ZoneServer::zs_start_old",
+  "FUN_005a9d90": "ZoneServer::zs_ServiceThreadFunction",
+  "FUN_005d7bc0": "LuaScript::ls_FunctionCall",
+  "FUN_005d7ca0": "LuaScriptSecurity::ls_FuncSet",
+  "FUN_005d6000": "LuaScript::LuaScript",
+  "FUN_0069b7c0": "_dynamic_initializer_for__g_LUA_SCRIPT_SECURITY__",
+  "FUN_00613f20": "LuaScriptSecurity::_scalar_deleting_destructor_",
+  "DAT_14d6fcd8": "g_LuaArgument",
+  "DAT_14d6fdf0": "g_LUA_SCRIPT_SECURITY",
+  "DAT_00870dd8": "g_LUA_SCRIPT_SECURITYFactor"
+}
