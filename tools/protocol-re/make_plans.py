@@ -529,6 +529,32 @@ ITEMS = [
       done="All 221 functions of `docs/knowledge/Z09.md` §3 are cited as `FUN_…` and described, the packets 0x2442 / 0x2443 have "
            "layouts and client handlers, every Z09 §31.5 open point of these owners is answered or argued open, and the "
            "depth-1 gap check of the output lists only functions with an owner whose plan line includes them."),
+ dict(id="Z19", phase=2, title="Shared config-script reader CCsl and the server config file format (all servers; added by Z10)",
+      out="docs/pseudocode/zone/Z19-config-script.md", deps=["Z01"], scope=[],
+      goal="Every 2016 server reads its `*ServerInfo.txt` (and the shared `9Data/ServerInfo/ServerInfo.txt` it includes) "
+           "through the same `CCsl` library (29–30 functions per binary, ~1.5k decompiled lines in the zone), which no item "
+           "documents: Z10 §1.1 / §6.5 only cover the `CServerInfo` lookups on top of it. Reconstruct the file format and the "
+           "parser so a rebuild can read the original config files unchanged.",
+      steps=["Read `docs/pseudocode/zone/Z10-certification.md` §1.1 and §6.5 (the `CServerInfo` lookups, CSL `dwID` = index of "
+             "the `#DEFINE`, SERVER_INFO fields) and `docs/knowledge/Z10.md` first.",
+             "Zone copy, PDB names (`clean.py re-data/exports/zone-pdb - <addr> …`): `CCsl::ReadScript` 00652500, `Read` 00651540, "
+             "`ReadScriptDone` 00651330, `ProcCmd` 00652000 (`#DEFINE` / `#ENDDEFINE` / `#INCLUDE` / `#END` …), `IncludeFile` "
+             "00651ea0, `ProcRemark` 00650aa0, `MakeFormat` 00650cb0 / `AddFormat` 00650f60 (type tokens `<STRING>`, `<INTEGER>`, …, "
+             "`m_pCslParameterSize`), `MakeData` 00651050 / `ProcData` 006512a0 / `GetDataToken` 00650fa0 (row parsing, quoting, "
+             "separators), `MakeFormatTable` 00650780 / `MakeDataTable` 00650800, `GetFormat` 00650900, `AddResultMsg` 00650880 "
+             "(error messages), `WriteFormat` 00651780 / `WriteData` 006518a0, the clear / ctor / dtor functions. The accessors "
+             "`GetNumDatas` / `GetDataInfo` / `GetData` are already in Z10 §6.5 / §11: cite, do not redo.",
+             "Format spec: comment syntax, every directive, every parameter type and its stored size, string limits, include "
+             "path resolution (relative to what), what an unknown row name or a wrong field count does, error reporting (the "
+             "`0x401` flags of `ReadServerInfo`). Test the spec against every `*ServerInfo.txt` and `ServerInfo.txt` in "
+             "`Files/Server/2016` (a short Python reader in the doc, run on them).",
+             "Other servers: confirm Login, WM, Account, AccountLog use the same functions (names in `re-data/exports/<bin>-pdb`, "
+             "compare sizes / a diff of 3–4 functions); Character and GameLog (no PDB): find the copy by its strings. Record "
+             "differences, if any; list which config files each server reads with it.",
+             "Bugs as `Z19-B<n>`; Coverage boundary as usual."],
+      done="The config file format is specified (directives, types, limits, errors) with a reader tested on every 2016 config "
+           "file, every `CCsl` function of the zone is cited as `FUN_…`, and the other servers' copies are confirmed or their "
+           "differences recorded."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "

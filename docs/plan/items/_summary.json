@@ -208,6 +208,14 @@
   "\u2013"
  ],
  [
+  "Z19",
+  2,
+  "Shared config-script reader CCsl and the server config file format (all servers; added by Z10)",
+  "Z01",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "D01",
   2,
   "Account and AccountLog servers",

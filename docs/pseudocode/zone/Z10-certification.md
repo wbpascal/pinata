@@ -7,7 +7,8 @@ Source binary: `Files/Server/2016/w00_Zone00/5ZoneServer2.exe` (the four zone ex
 calls were read from the raw instructions (`objdump -d -M intel --start-address=…`). The replacement answer comes from
 `Files/Server/NA2016/GamigoZR/GamigoZR.exe` (.NET IL, read with a metadata/IL parser; §4) and the keys from
 `Files/Server/NA2016/GBO.reg` / `Fantasy.reg`. Evidence markers: *(pdb2016)*, *(inferred)*; nothing here is
-*(captured)* yet. This item has no client-facing packets.
+*(captured)* yet. This item owns no client-facing packets; the two it influences (0x0830 and 0x203E) are cross-checked with the
+client in §5.4.
 
 Related: Z01-core §2 (startup, data tables per stage; its "order unknown" and "retry once" statements are superseded
 by §2 and §4 here), `docs/knowledge/Z01.md` §7, `docs/knowledge/S01.md` §1.5.
@@ -28,7 +29,7 @@ zs_ServiceThreadFunction                     @ FUN_005a9d90  (Z01 called it "zs_
             ls_FunctionCall("chrlghk")       # all zs_start_* data stages + run/walk factors
     g_ZoneServer = server
     ls_FunctionCall("tmfpemfjs")             # all zs_service_* : IOCP, sockets, main thread, acceptor, 2 threads
-    wait while server.running
+    wait (Sleep 1 s) while zs_mainthread.activ; then zs_mainthread.stop = 1      (§6.6; zs_ServiceThread.activ stays 1)
 main thread, once per world minute           # certification counter / kill switch, lsf_Factor × 1.01, script's xlrfunction (§6.1)
 certification thread, every 10 s             # answers the challenge over HTTP: act=<x> → [I][M]<2x³−3x²+5x−7> (§6.2)
 ```
@@ -71,11 +72,16 @@ ZoneServer::zs_start(server, cmdline) → int:                               @ F
         missing → assert "zs_start : Fail to read ServerGroup.txt"; no word → "… Fail to read ServerGroup"; both ShineExit("ZoneServer::zs_start")
     ReadServerInfo("ZoneServerInfo/ZoneServerInfo.txt") else ("../9Data/ServerInfo/ZoneServerInfo.txt") else ShineExit
     GetMyServerInfo(→ zs_serverinfo.myserver) else assert "Fail Serverinfo" + ShineExit
-    GetServerInfo(type 6, myserver.nWorldNo, nZoneNo, type 6) → ConnectSocket_BindIP (16 bytes)
+    GetServerInfo(nServerID 6 = zone, myserver.nWorldNo, nZoneNo, nServerIDFrom 6) → ConnectSocket_BindIP   @ FUN_0064d420
+        # the zone↔zone listen row of this zone (ServerInfo.txt: e.g. "PG_W00_Z00", 6, 0, 0, 6, "0.0.0.0", 9218);
+        # its pIP (strncpy 16, NUL at [15]) is the local address outgoing connections bind to; the 6 is a literal, not myserver.nServerID
         else assert "Get BindServerInfo Fail" + ShineExit("ZoneServer::zs_start - BindIP")
     if !ParseCmd(server, cmdline): return −2
     GetWorldName(myserver.nWorldNo) → zs_serverinfo.worldname (Name4, from pWorldDataPath)
-        else assert "zs_start : Cannot found WorldName" (no exit) and return 0 without starting
+        else assert "zs_start : Cannot found WorldName" (no exit) and return 0 without starting      # (original bug) Z10-B30
+        # @ FUN_0064d3a0: the WORLD_NAME row (CSL dwID 2) with that nWorldNo → {nWorldNo, pWorldName, pWorldDataPath}
+    Singleton<WinService>::getInstance()   (inlined here; out of line @ FUN_005aa2c0): new 0x44 bytes,
+        WinService::WinService @ FUN_00653340 (vftable, empty serviceName, handleServiceEvent = INVALID_HANDLE_VALUE), vt[0]
     WinService::startDispatcher("ZoneServer", OnStart_Service, OnStop_Service)                @ FUN_006535b0
         # the literal "ZoneServer", not pServiceName: harmless, the SCM ignores the name of an own-process service
         StartServiceCtrlDispatcherA({name, serviceLoop}); outside the SCM it fails → returns false (ignored)
@@ -84,6 +90,8 @@ ZoneServer::zs_start(server, cmdline) → int:                               @ F
 ZoneServer::ParseCmd(server, cmdline) → bool:                              @ FUN_005aab10
     args = up to 5 tokens of cmdline (delimiters " \t,\"")
     no args: queryServiceStatus(myserver.pServiceName) succeeds → "<SERVICE START>": return true
+             # @ FUN_00653290: OpenSCManagerA(GENERIC_READ) → OpenServiceA(SERVICE_QUERY_STATUS) → QueryServiceStatus;
+             # true with dwCurrentState, false with GetLastError() (both written to the same out value)
              else args[0] = "UPLOAD"                                       # not installed: install it
     "UPLOAD": uploadService(pServiceName, pDisplayName, module path)       @ FUN_00653050
                   CreateServiceA(SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START, SERVICE_ERROR_IGNORE,
@@ -288,7 +296,7 @@ The `.reg` files write `HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\…`, which is t
 
 | Situation | What happens |
 |---|---|
-| no server on 127.0.0.1:58492 and cert1.fo.gamigo unreachable | each attempt: empty body → `sscanf` fails → `Interval` 0 → `Interval = 100`, `Sleep(1000)`, `   Fly`. Then `zs_ServiceThreadFunction` calls `ls_FunctionCall("tmfpemfjs")` on a `LuaScript` whose `ls_LuaObject` is still NULL (only `ls_FromString` creates a state) → `lua_getglobal(NULL, …)` dereferences NULL → access violation, the zone process dies *(inferred from the Lua 5.2.1 source)* (original bug) Z10-B6 |
+| no server on 127.0.0.1:58492 and cert1.fo.gamigo unreachable | each attempt: empty body → `sscanf` fails → `Interval` 0 → `Interval = 100`, `Sleep(1000)`, `   Fly`. Then `zs_ServiceThreadFunction` calls `ls_FunctionCall("tmfpemfjs")` on a `LuaScript` whose `ls_LuaObject` is still NULL (only `ls_FromString` creates a state) → `lua_getglobal(NULL, …)` dereferences NULL → access violation, caught by `MiniDumper::TopLevelFilter` (Z09 §30.1): a `.mdmp` file is written and the zone process dies; Message.txt ends with `   Fly` *(crash inferred from the Lua 5.2.1 source)* (original bug) Z10-B6 |
 | answer with a bad header (`Interval` ∉ 1…10080, or `MaxSkip` ∉ 0…10) | as above (the defaults 100 / 5 are written and never used) |
 | no `HKLM\SOFTWARE\GBO` key | the encrypted text is expanded as if it were plain → Lua syntax error → `Script error`; the fallback host is tried; `ls_FromString` left a fresh Lua state, so `tmfpemfjs` is not found → `function call error`, `zs_ServiceThreadFunction` returns -3 (0xFFFFFFFD) as its thread exit code, which nobody reads: no services start, nothing listens, the Windows service stays RUNNING (§6.6, (original bug) Z10-B19) |
 | `Natural` = 0 and `Desert` > 0 | 64-bit remainder by zero in `hs_Decoding` → divide-by-zero exception, crash (original bug) Z10-B4 |
@@ -322,7 +330,7 @@ HTTPString::hs_Decoding(text, N, D):                       @ FUN_00613750
     text = out                                             # the header is gone; hs_Offset keeps its value
 
 HTTPString::hs_Next(text) → int:                           @ FUN_006135f0
-    skip characters < '!' (spaces, CR, LF, tabs, control bytes)
+    skip characters < '!' as a signed char: spaces, CR, LF, tabs, control bytes **and every byte ≥ 0x80**
     at end: hs_Offset += 1; return -1
     ch = text[hs_Offset++]
     ch < '0' → 0;  '0'…'9' → ch-'0';  ':'…'@' → 10;  'A'…'F' → ch-'A'+10;  > 'F' → 15     # lower case reads as 15
@@ -379,7 +387,7 @@ Re-encrypting each decrypted block with e returns the original c for all 340 blo
 
 ```python
 def hs_next(s, st):                      # st = [offset]
-    while st[0] < len(s) and s[st[0]] < '!': st[0] += 1
+    while st[0] < len(s) and not 0x21 <= ord(s[st[0]]) < 0x80: st[0] += 1   # signed char: bytes >= 0x80 are skipped too (s = latin-1 text)
     if st[0] >= len(s): st[0] += 1; return -1
     ch = ord(s[st[0]]); st[0] += 1
     if ch < 0x30: return 0
@@ -585,12 +593,12 @@ thread, `tmfpemfjs` on the service thread, `xlrfunction` on the main thread (§6
 | Lua name | C function | Arguments | Returns | Effect |
 |---|---|---|---|---|
 | `vmflsxm` | `cpp_Print` FUN_005d5c70 | text | 0 | `sprintf(buf[256], "Script : %s", text)` and append it as one line to `Message.txt` (unbounded: (original bug) Z10-B17) |
-| `fpwltmxmcheck` | `cpp_RegCheck` FUN_005d5ce0 | subkey, value name | 1 string | `RegOpenKeyExA(HKLM, "SOFTWARE\\" + subkey, KEY_QUERY_VALUE \| KEY_WOW64_32KEY)`, `RegQueryValueExA(value)` into a 255-byte buffer with size 256; the buffer as a string. Missing key or value → uninitialised stack bytes are returned (original bug) Z10-B16 |
+| `fpwltmxmcheck` | `cpp_RegCheck` FUN_005d5ce0 | subkey, value name | 1 string | `RegOpenKeyExA(HKLM, "SOFTWARE\\" + subkey, KEY_QUERY_VALUE \| KEY_WOW64_32KEY)`, `RegQueryValueExA(value)` into a 255-byte buffer with size 256; the buffer as a string. Missing key or value → uninitialised stack bytes are returned (original bug) Z10-B16. The subkey is appended to `"SOFTWARE\\"` in a 256-byte stack buffer by an inline unbounded `strcat`: a subkey longer than 246 characters overflows the stack (original bug) Z10-B28 |
 | `dhsmfskfWk` | `cpp_CurrentTime` FUN_005d5e10 | none | 5 numbers | first: if `!lsf_IsFreeze && lsf_IsRecover`: `lsf_Factor = 1.0` (§6.3). Then pushes `chargeditemcheck.ct_Current` (DAT_00aa43b8, the world time of the last per-minute block, Z09 §1.2): year **−2000** (two digits: 16 for 2016), month 1–12, day, hour, minute |
 | `zs_service_multisocket` | FUN_00570b00 | none | 0 | nothing: an empty function, ICF-folded with `CGambleObject::GDTSO_GetGameStatus` (returns 0 in EAX, read as "0 results") |
 | `zs_service_acceptor` | LAB_005aa7c0 (`ZoneServer_zs_service_acceptor`) | none | 0 | `zs_Start_Acceptor` FUN_005a9c60 (§6.5); false → `ac_AssertFail "ZoneServer::zs_servicestart : Acceptor fail"` + `ShineExit` |
 | `zs_service_mainthread` | LAB_005ad780 | none | 0 | start `zs_mainthreadfunction` (§6.1); failure → `MainThread fail` + `ShineExit` |
-| `zs_service_iocp` | FUN_005aa800 | none | 0 | `CIOCP::Start(zs_IOCP, 2 × CPUs + 1 workers, wait = 1)` FUN_006505f0; result ignored |
+| `zs_service_iocp` | FUN_005aa800 | none | 0 | `CIOCP::Start(zs_IOCP, 2 × CPUs + 1 workers, wait = 1)` FUN_006505f0; result ignored (0 = no completion port: the start goes on without IOCP) (original bug) Z10-B29 |
 | `zs_service_stackchecker` | LAB_005ab800 | none | 0 | start `zs_stackcheckfunc` (§6.4); failure → `StackCheck fail` + `ShineExit` |
 | `zs_service_certification` | LAB_005ac9b0 | none | 0 | start `zs_certification` (§6.2); failure → `Certification fail` + `ShineExit` |
 | `zs_start_moon` … `zs_start_sun` (16) | Z01-core §2.2 | none | 0 | the data stages (§7, part 3); `zs_start_long` FUN_005b8c00 also resets the speed factors to 5 / 10 (§5.4) |
@@ -685,11 +693,15 @@ ShineMover::so_RunSpeed / so_WalkSpeed:   @ FUN_0055ec40 / FUN_0055eb20   (mount
 Both values reach the client in `0x203E NC_ACT_MOVESPEED_CMD { u16 walkSpeed, u16 runSpeed }`
 (`ShinePlayer::so_SendSpeedInformation` FUN_00459540, Z02 §2.2) and are used by the server's own movement checks. The
 setters do not resend 0x203E; changing them at run time (from `xlrfunction`) would only reach a player on the next
-speed update *(inferred)*. `chrattackspeed` and `shoutlevel` / `shoutdelay` are not touched by the script: the 0x0830
+speed update *(inferred)*. Client side: `GameFrameWork::On_NC_ACT_MOVESPEED_CMD` FUN_00499e90 (client 2016, name from
+the 2017 PDB via C02) converts both u16 to float and sets the player's walk speed (vt 0x104, field 0) and run speed
+(vt 0x108, field 1) with no range check, so the 5 / 10 trap of a script that never restores the speeds is visible on the
+client as well: the character crawls. `chrattackspeed` and `shoutlevel` / `shoutdelay` are not touched by the script: the 0x0830
 `NC_MISC_SERVERPARAMETER_ACK { u8 shoutlevel, u16 shoutdelay }` (Z01-core §9, `sp_NC_MISC_SERVERPARAMETER_REQ`
 FUN_005517c0) sends the `ChrCommon.txt` values 5 / 2, and `sp_NC_ACT_SHOUT_CMD` FUN_00458e80 (Z02) uses them as the
 shout level bound and the delay (`shoutdelay × 10` ticks = seconds). This answers Z01-core's open question: the
-writer of DAT_0da5047c / DAT_0da50480 is `scp_Load`.
+writer of DAT_0da5047c / DAT_0da50480 is `scp_Load`. The 2016 client has no handler for 0x0830 (Z01-core §9,
+(original bug) Z01-B5): the shout values are sent but dropped, so only the server-side shout checks use them.
 
 ## 6. Threads and the run-time certification
 
@@ -758,7 +770,8 @@ ZoneServer::zs_certification(server):                      @ FUN_005ab9c0  (thre
             Count += 1
             CertifyArg = 0                                  # no lock with the main thread: a challenge set meanwhile is lost (original bug) Z10-B18
         Sleep(10000)
-        if zs_Certify.stop: zs_Certify.activ = 0; return 0  # stop is never set by anything: the thread runs until the process ends
+        if zs_Certify.stop (+0x31):                         # never set by anything: the thread runs until the process ends
+            zs_stackcheck.activ (+0x10) = 0; return 0       # wrong block, copied from zs_stackcheckfunc; zs_Certify.activ stays 1 (original bug) Z10-B27
 ```
 
 The request is the boot request of §2.3 with `act=<challenge>` instead of `act=boot`, e.g. for challenge 17:
@@ -809,7 +822,14 @@ ZoneServer::zs_stackcheckfunc(server):                     @ FUN_005a9f10  (thre
 `fca_printf(prefix)` creates (mode `"w"`) `<prefix><YYYYMMDDHH>.txt` (world-adjusted time `mysecond`), e.g.
 `ShineStackStruct2016111412.txt`, writes the prefix, 64 lines `"%d/%d"` (the ring `fca_NetCommand[64]` of the last
 handled opcodes, dept/cmd *(inferred from the type)*) and every non-NULL entry of `fca_stack[128]` (the profiler's
-function-name stack, filled by the `pr_Entrance` prologues) as `"%c %s[%u]"`. So a hung main loop leaves, every 10 s,
+function-name stack) as `"%c %s[%u]"`. `mysecond` FUN_00450360 = `_time32() + diffence2world` (the WM world-time
+offset, Z09 §1.2). The stack is filled inline by every profiled function's prologue (next to its `pr_Entrance` call):
+`fca_stack[fca_stackpoint] = "<Class::method>"; fca_Flag[fca_stackpoint] = -1; fca_stackpoint++`, and `fca_stackpoint--`
+before `pr_Exit`. The opcode ring is written by `FunctionCallingAnalyzer::fca_NetCommandStorage` FUN_00467900
+(`fca_NetCommand[ptr] = *cmd; ptr = (ptr + 1) & mask; fca_NetCommand[ptr].protocol = 0`, so the entry after the newest
+is always 0), called by the six `zbs_Parsing` functions (ClientSession FUN_004fb9f0, WorldManagerSession FUN_004fb8e0,
+GameLogSession FUN_004fb7d0, GameDBSession FUN_004fb6c0, ZoneListenSession FUN_004fb4a0, OPToolSession FUN_004fb3a0)
+just before they dispatch the packet. So a hung main loop leaves, every 10 s,
 the name of the function it is stuck in; within one hour the file is overwritten. It is purely diagnostic: no restart,
 no exit. It is unrelated to certification apart from being started by the script.
 
@@ -817,8 +837,11 @@ no exit. It is unrelated to certification apart from being started by the script
 
 ```pseudo
 zs_service_iocp:   CIOCP::Start(zs_IOCP, n = 2·dwNumberOfProcessors + 1, wait = 1)      @ FUN_005aa800 → FUN_006505f0
-    create the completion port once; Stop(-1) old workers; n worker threads CIOCP::WorkThread (Sleep 50 ms after each);
-    wait until every worker left status 1; m_NumOfWorkThread = n
+    create the completion port once (CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0)); failure → return 0;
+    Stop(-1) old workers; n worker threads CIOCP::WorkThread (status 1 before CreateThread, Sleep 50 ms after each;
+    the CreateThread result is stored, never checked);
+    wait until every worker left status 1 (Sleep 50 per poll, no timeout); m_NumOfWorkThread = n; return n
+    # a worker whose CreateThread failed stays at status 1 forever: the wait never ends, the start hangs (original bug) Z10-B29
     # worker status (WORKER, 0x14 bytes each): 0 none, 1 starting, 2 running, 3 stop requested, 4 ended
 CIOCP::WorkThread(worker):                                                               @ FUN_00650520
     log "<IOCP WORKTHREAD #%d RUNNING>"; worker.status = 2
@@ -843,6 +866,41 @@ zs_service_acceptor → ZoneServer::zs_Start_Acceptor:                          
     for every ServerInfo entry with this server's (nServerID, nWorldNo, nZoneNo):
         Listen_Add(zs_Acceptor, pIP, nPort, nServerIDFrom, nBackLog)               else "Listen fail" → false
     true                                   # false → "Acceptor fail" + ShineExit (§6)
+    # row lookup: GetServerInfo(id, world, zone, from) @ FUN_0064d420 = GetServerIndex @ FUN_0064d270 (first SERVER_INFO
+    # row, CSL dwID 3, whose fields 1-4 equal nServerID, nWorldNo, nZoneNo, nServerIDFrom) + GetServerInfo(index)
+    # @ FUN_0064d1c0 (dwID must be 3; fills pName, nServerID, nWorldNo, nZoneNo, nServerIDFrom, pIP, nPort, nBackLog,
+    # nMaxAccept). "type 0x14" is nServerIDFrom 20 = clients; the loop over GetNumOfData @ FUN_0064d120 rows then opens
+    # every row of this zone: from 20 (clients, 9210, backlog 100, 1700), 6 (other zones, 9218), 8 (OPTool, 127.0.0.1:9211)
+ClientSessionManager::InitSessions(mgr, n = nMaxAccept):                                @ FUN_0045c4c0
+    FreeSessions; delete the old ClientSession array
+    ZoneBaseSessionManager::InitSessions(n) @ FUN_005a6ab0: n list nodes {pSession = 0, up, down} (0x0c each) chained
+        as the empty list; m_MaxSessions = n, m_NumSessions = 0, no active session
+    new ClientSession[n] (0x110 bytes each); node i → session i; session i.cs_sessionhandle = i; always returns 1
+CSocket_Acceptor::Listen_Start(acc):                                                    @ FUN_00652fa0
+    already running → true. InetAddress::WinSockStart(2, 2) @ FUN_00653840 (WSAStartup 2.2, exact version or
+    WSACleanup + false); the 10 listen slots = EMPTY; start AcceptThreadRing; wait (Sleep 5) until it runs; true
+CSocket_Acceptor::Listen_Add(acc, ip, port, userData = nServerIDFrom, backlog):         @ FUN_00652820
+    under m_ListenBF_CS: fewer than 10 listens and a free slot → copy ip, port, backlog, userData; Work = ADD
+    wait (Sleep 10) while Work == ADD (the accept thread does the work); ADD_ERROR → log "*FAILED Listen_Add - IP = %s:%d",
+    free the slot, false; otherwise true. No free slot → false
+CSocket_Acceptor::AcceptThreadRing(acc):            (thread)                            @ FUN_00652be0
+    m_bActiveAcceptThread = 1 (stop already set → 0, return)
+    loop: for each of the 10 slots, under m_ListenBF_CS:
+        ADD:    socket(AF_INET, SOCK_STREAM); SO_REUSEADDR 1; FIONBIO 1; SO_SNDBUF 32 KB; bind(inet_addr(ip), port);
+                listen(backlog); getsockname → Work = ACTIVE
+                socket()/bind/listen failure → Work = ADD_ERROR and WSACleanup(); the socket is not closed (original bug) Z10-B33
+        DEL:    closesocket; Work = EMPTY
+        ACTIVE: if fewer than 1299 accepted connections wait in the ring: select(timeout 0) and accept;
+                FIONBIO 1, SO_SNDBUF 32 KB; SetAccepted(sock, addr, userData) else shutdown + closesocket.
+                After one accept the remaining slots are skipped this round and the round restarts at slot 0 without
+                sleeping, so a constant stream on the client listen (slot 0) starves the zone and OPTool listens (original bug) Z10-B34
+    no accept this round → Sleep(1); m_bAcceptThreadStop → m_bActiveAcceptThread = 0, return
+CSocket_Acceptor::SetAccepted(acc, sock, addr, userData):                               @ FUN_00652a10
+    under m_AcceptBF_CS: ring of 1300 (0x514) full → false; a connection from the same IPv4 address still waiting in
+    the ring → false (the new one is closed); else append {sock, addr, userData, AcceptTime = CGTimer::GetTime()}; true
+    # the main loop takes them with GetAccepted (zs_connect, Z18 / Z01-core §10)
+# CSocket_Acceptor::Stop FUN_006527b0 (shutdown + close m_ListenSocket, stop the thread) has no caller: the listens
+# are never closed while the zone runs.
 ```
 
 The script order (§4.3) starts the IOCP before the acceptor and the main thread before the acceptor; the two
@@ -1049,7 +1107,8 @@ zs_start_long():                                           @ FUN_005b8c00
     CGambleObjectManager::gom_Init()                       @ FUN_00615a00
         walk the NPC pool (type 4): count NPCs whose MobInfo.Type (vt 0x708 → mobdatabox) is MT_GB_DICE / MT_GB_SLOTMACHINE;
         allocate that many CGambleDiceTaiSaiObject (0x570) / SlotMachineCluster (0xb8); bind each to its NPC (vt +8),
-        a bind failure returns 0 (result ignored by the stage)
+        the first bind failure (vt +8 false) returns 0 at once, so the NPCs after it stay unbound; no NPC pool → 0;
+        the stage ignores the result and logs nothing (original bug) Z10-B31
     CLCReward::clcr_Load; MoverDataBox::mvdb_Load          @ FUN_004bf960  # reads useditemeffect (wide), itemdatabox (home)
 ```
 
@@ -1061,6 +1120,12 @@ WeaponAttrib, WeaponTitleData, MiniHouseFurnitureObjEffect, MiniHouseEndure, Dic
 MapLinkPoint, MapWayPoint, the 14 View tables, SingleData, MarketSearchInfo, ItemMoney, PupMain, ChatColor,
 TermExtendMatch, MinimonInfo, MinimonAutoUseItem, ChargedDeletableBuff. They are loaded by home, wide, tough, sun,
 moon, sink, star and sleep itself; none by full, open or long.
+
+`InitDataFileCheckSum` FUN_006311a0 lower-cases the file name, takes its tokens, finds the entry by name, then sets
+`Marking = true` and `InitCheckSumCnt += 1` (refused once the count exceeds 49) **without testing whether the entry was
+already marked**; `isFileLoadAllComplete` FUN_006313f0 only tests `InitCheckSumCnt == 49`. So it counts loads, not
+files: a script that calls a SHN-loading stage twice (any Lua global can be called again, §5.2) gets a count of 50 or
+more and the zone exits at the end of `sleep` with the first unmarked name, of which there is none *(inferred: `NotLoadFileName` not traced for this case)* (original bug) Z10-B32.
 
 ### 7.2 Dependencies between the stages
 
@@ -1149,7 +1214,7 @@ Every `(original bug)` tag of this document, in ID order.
 | Z10-B3 | ZoneServer::zs_LuaFromHTML FUN_005b07a0 | the `RegQueryValueExA` size variable (in/out) is not reset between `Natural` and `Desert` | if `Desert`'s string (with NUL) is longer than `Natural`'s, the second query fails with `ERROR_MORE_DATA`, D stays 0 and the script decodes to garbage (GBO.reg: 10 vs 7 bytes, works) | reset the size to 256 before each query |
 | Z10-B4 | zs_LuaFromHTML / HTTPString::hs_Decoding FUN_00613750 | a zero key only logs `   Code`; decoding runs anyway | `Natural` = 0 with `Desert` > 0: 64-bit remainder by zero → divide-by-zero exception, the zone crashes | abort the start with a clear error |
 | Z10-B5 | HTTPString::hs_HTMMRead FUN_00613440 | always returns true; connection errors only go to `printf("Error! %d")` | a Windows service has no console: a failed fetch leaves no trace except `   Fly` in Message.txt | return the error and log it |
-| Z10-B6 | ZoneServer::zs_ServiceThreadFunction FUN_005a9d90 / LuaScript::ls_FunctionCall FUN_005d7bc0 | calls `tmfpemfjs` even when no script was ever loaded; `ls_LuaObject` is still NULL | `lua_getglobal(NULL, …)`: access violation, the zone dies without a message when no certification server answers *(crash inferred from the Lua 5.2.1 source)* | check the result of `zs_start_old` and stop cleanly |
+| Z10-B6 | ZoneServer::zs_ServiceThreadFunction FUN_005a9d90 / LuaScript::ls_FunctionCall FUN_005d7bc0 | calls `tmfpemfjs` even when no script was ever loaded; `ls_LuaObject` is still NULL | `lua_getglobal(NULL, …)`: access violation when no certification server answers; the zone dies with only a minidump (`MiniDumper::TopLevelFilter`, Z09 §30.1) and `   Fly` as the last Message.txt line, no explicit error *(crash inferred from the Lua 5.2.1 source)* | check the result of `zs_start_old` and stop cleanly |
 | Z10-B7 | zs_LuaFromHTML FUN_005b07a0 | on a bad header writes `Interval = 100` or `MaxSkip = 5`, then abandons the attempt | dead stores: the defaults are never used | either start with the defaults or drop them |
 | Z10-B8 | zs_LuaFromHTML FUN_005b07a0 | retry loop with counter `0`, `++`, `if counter > 0 return false` | exactly one attempt per host (plus a 1 s sleep); the loop never repeats | several retries (e.g. `counter > N`) |
 | Z10-B9 | zs_LuaFromHTML FUN_005b07a0 | if `HKLM\SOFTWARE\GBO` cannot be opened, decryption is skipped silently and the hex text is run as Lua | `Script error` with no hint that the key is missing | log the missing key and stop |
@@ -1170,6 +1235,14 @@ Every `(original bug)` tag of this document, in ID order.
 | Z10-B24 | WinMain FUN_0049d910 | writes `Size.txt` (`"235/99"`) before `zs_start` changes to the exe folder, with an unchecked `fopen` | under the SCM the file lands in the service's working directory (normally `System32`); where it cannot be created, `fprintf(NULL)` crashes the zone before it starts | write it after `chdir`, check the handle (or drop it) |
 | Z10-B25 | WinService::onServiceStop FUN_00653200 | closes the service event only when it equals `INVALID_HANDLE_VALUE` (and then closes -1) | the real event handle is never closed (harmless: the process ends right after) | `if event != INVALID_HANDLE_VALUE` |
 | Z10-B26 | ShineCommonParameter::scp_Load FUN_004c9be0 (stage `house`) | the read error says `PrimaryParameterTable::ppt_Load`; every missing key and every wrong type is reported as `NULL(MaxExpBonus)` / `TYPE(MaxExpBonus)` | a broken `ChrCommon.txt` points the operator at the wrong key (or the wrong loader) | name the key that failed |
+| Z10-B27 | ZoneServer::zs_certification FUN_005ab9c0 (stop path) | on `zs_Certify.stop` (+0x31) clears `zs_stackcheck.activ` (+0x10), not `zs_Certify.activ` (+0x30) | dead in practice (nothing sets `zs_Certify.stop`); if a stop were ever added, the certification block would stay "active" and the stack checker's would read as stopped | `zs_Certify.activ = 0` (same copy-paste family as B14) |
+| Z10-B28 | cpp_RegCheck FUN_005d5ce0 (`fpwltmxmcheck`) | appends the Lua subkey to `"SOFTWARE\\"` in a 256-byte stack buffer with an unbounded inline `strcat` | a subkey longer than 246 characters overflows the stack (script-controlled, so low impact) | bounded copy, reject long names |
+| Z10-B29 | CIOCP::Start FUN_006505f0 / zs_service_iocp FUN_005aa800 | `CreateThread` result not checked; the wait loop polls `WorkerStatus == 1` with no timeout; the stage ignores `Start`'s return | a failed worker thread hangs the start forever (the SCM sees RUNNING, §6.6); a failed `CreateIoCompletionPort` lets the zone run with no IOCP: no socket I/O completes | check the handle, time out the wait, fail the stage on 0 |
+| Z10-B30 | ZoneServer::zs_start FUN_005ab520 | `GetWorldName` failure only asserts (log), skips `startDispatcher` and returns 0 | under the SCM the service start times out; the process exits with code 0 and no ExitLog | `ShineExit` like the other `zs_start` failures |
+| Z10-B31 | CGambleObjectManager::gom_Init FUN_00615a00 (stage `long`) | returns 0 at the first failed bind (and when the NPC pool is missing); `zs_start_long` ignores the result | the gamble NPCs after the failing one have no game object; nothing is logged | bind the rest, log and fail the stage |
+| Z10-B32 | CShnDataFileCheckSum::InitDataFileCheckSum FUN_006311a0 / isFileLoadAllComplete FUN_006313f0 (end of `sleep`) | counts calls, not distinct files (no test of `Marking`); the check is `InitCheckSumCnt == 49` | a SHN loaded twice (a stage called twice by the script) makes the count 50+: the zone exits at the end of `sleep` naming no file; a missing file plus a duplicate would pass | count only first marks, or test every `Marking` |
+| Z10-B33 | CSocket_Acceptor::AcceptThreadRing FUN_00652be0 (ADD) | on a `socket` / `bind` / `listen` failure sets ADD_ERROR and calls `WSACleanup()`; the socket is not closed | one Winsock reference is released per failed listen (the start then ends with "Listen fail" + ShineExit, so only the leak in between matters) | `closesocket`, no `WSACleanup` |
+| Z10-B34 | CSocket_Acceptor::AcceptThreadRing FUN_00652be0 (ACTIVE) | after one accept it skips the remaining listen slots and restarts at slot 0 without sleeping | a steady stream of client connections (slot 0, port 9210) starves the zone↔zone and OPTool listens *(inferred from the loop; not observed)* | serve every slot each round |
 
 ## 10. Not reconstructed / uncertain
 
@@ -1208,9 +1281,9 @@ Everything this item reached but does not describe itself.
 | `Movie::CinemaComplex::cc_PlayFilm` FUN_005089a0 (stage `open`, per-map scenario film) | Z09 §27.2 (done; documents it) | scenario engine |
 | `ZoneServer::zs_mainthreadfunction` FUN_005aca30 apart from the certification part, `rndbox`, world time from WM `0x0821` | Z09 §1.1, §1.2, §8 (done; documented) | §6.1 documents only the certification lines of the per-minute block |
 | `LuaScriptScenario::lss_FuncExec` FUN_00461a90 / `lss_Routine` FUN_00507200 (the other callers of `ls_FunctionCall`) | Z09 §14.1 (done; documents them) | AI / scenario Lua host, a separate `lua_State` from the start script |
-| Socket completion handlers that `CIOCP::WorkThread` calls (`CSocket_IOCP` Receive / Close / Shutdown, `ZoneBaseSession`, `ClientSessionManager` incl. `csm_AddClientSessionToIPGroup` FUN_0045c720 with its "not certified yet" text, which is about sessions, not this certification) | Z18 (open; plan: "Z09's coverage boundary (§31) assigns 221 zone functions … to Z01", row "Network and sessions") | network core; §6.5 documents the worker loop and the acceptor start |
-| Diagnostics used by the threads: `FunctionCallingAnalyzer` (`fca_stack` / `fca_NetCommand`), `FunctionProfiler`, `AssertClass`, `MiniDumper::MinidumpCallStack` | Z18 (open; Z09 §31 row "Diagnostics and logging", owner Z01) and Z09 §30.1 (the exception filter) | §6.4 documents what the stack checker writes; the ring filling is shared instrumentation |
-| `CServerInfo::ReadServerInfo` / `GetServerInfo` / `GetMyServerInfo` / `GetWorldName` (ServerInfo file parsing) | Z01-core §1 / §2.1 (done; the files and the fields used) and Z18 (open; Z09 §31 "Network and sessions" row lists `CServerInfo`) | configuration parser, shared by all start code |
+| Socket completion handlers that `CIOCP::WorkThread` calls (`CSocket_IOCP` Receive / Close / Shutdown, `ZoneBaseSession`, `ClientSessionManager` incl. `csm_AddClientSessionToIPGroup` FUN_0045c720 with its "not certified yet" text, which is about sessions, not this certification) | Z18 (open; plan: "Z09's coverage boundary (§31) assigns 221 zone functions … to Z01", row "Network and sessions") | network core; §6.5 documents the worker loop and the whole acceptor start (`InitSessions`, `Listen_Start`, `Listen_Add`, `AcceptThreadRing`, `SetAccepted`, `WinSockStart`); `GetAccepted` 00652980 (the main loop's side) is in Z18's list |
+| Diagnostics used by the threads: `FunctionProfiler` (`pr_Entrance` / `pr_Exit` / `pr_Report`), `AssertClass`, `MiniDumper::MinidumpCallStack` | Z18 (open; its list, `docs/knowledge/Z09.md` §3, takes the Z09 §31.2 row "Diagnostics and logging": `pr_Report` 004680d0, `MinidumpCallStack` 0064e5f0, `AssertClass` operator() 00401110) and Z09 §30.1 (the exception filter) | §6.4 documents the `FunctionCallingAnalyzer` part itself (`fca_printf`, `fca_NetCommandStorage`, the inline stack filling, `mysecond`) |
+| `CServerInfo::ReadServerInfo` FUN_0064d0f0 (`CCsl::ReadScript` of the ServerInfo file) and the `CCsl` script reader (`ReadScript`, `GetFormat`; the accessors `GetNumDatas` FUN_00650950, `GetDataInfo` FUN_00650960, `GetData` FUN_006509b0 return the row count, the row with its `dwID` = index of its `#DEFINE`, and a pointer to field n) | Z18 (open; its list includes `ReadServerInfo 0064d0f0` and `GetServerInfo 0064d420` from the Z09 §31.2 row "Network and sessions") for `ReadServerInfo`; the `CCsl` parser itself (same library in every server, no item documents it) → **Z19** (new, added by Z10: plan "Reconstruct the file format and the parser") | the lookups the zone start uses (`GetMyServerInfo` FUN_0064d130, `GetServerIndex` FUN_0064d270, both `GetServerInfo` FUN_0064d420 / FUN_0064d1c0, `GetNumOfData` FUN_0064d120, `GetNationName` FUN_0064d350, `GetWorldName` FUN_0064d3a0) are documented here, §1.1 / §2.2 / §6.5 |
 | Readers of `scp_param` members other than the speeds and the shout values (`levellimit`, `maxexpbonus`, rest-exp / buff times, `LostExpLevel`, `nextexp`, `commonparam`, `freestat*`) | Z12 (open; plan: "Level/exp: `g_LevelExp` (DAT_0da504a8 …), the stat-point table DAT_0da50968 (loader, file, columns)"), Z07 (done) for the free-stat handlers | §5.4 documents the loader and every member's offset; using them is the stat / exp model |
 | `ParamXxxServer.txt` files loaded next to ChrCommon by `CharClassManager::ccm_Load` FUN_0044a5c0 (stage `house`) | Z12 (open; plan: "class base stats per level from class data `p.vt[0x49c]() + 0x10858`") | per-class parameters, part of the stat model |
 | The 2015 zone (`Files/Server/2015/w00_Zone00`) | out of scope by the plan ("only to see whether the mechanism changed") | §8 records the diff |
