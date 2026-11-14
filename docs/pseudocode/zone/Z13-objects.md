@@ -367,6 +367,9 @@ Z06), `u8 mhs_Activ` (+0x68; written by map login, 0x8C01 and `sp_MiniHouseActiv
 Readers of the other fields: `sp_MakeTentBriefInfo` @ FUN_0056e720 (Z02 §7: camp brief = `{u16 minihouse = row.Handle,
 10 × 0xFF}`, fails without a skin), `so_ply_StreetBoothSlot` @ FUN_0055a2d0 (player vt 0x494, Z06 §2: booth slots =
 min(20, charged-item bonus + mhs_BoothSlot)) and the rest-mode recovery below.
+The skin item lives in the mini-house box (`ci_MiniHouse`, inventory type 12; `cim_minihouse` FUN_00642e20). Its attribute
+class `ItemAttrCls_MiniHouseSkin`: `iac_itemcreate` FUN_0063f1c0 zeroes the attribute's first dword, `iac_SetDeteleDateTime`
+FUN_00640110 writes the expiry through `iac_SetEndTime` (time-limited skins expire through `sp_ChargedItemLimitCheck`, §2.7).
 
 ```pseudo
 sp_RecoverPoint_House()       @ FUN_0056b3b0    # p.recoverFunc (+0x29628) while resting in the tent / house (Z02 §7, Z09 §2.4)
@@ -427,7 +430,8 @@ Z07 §6.3; `ts_Limit = 0`, no-op functions, `TSCW_NONE`), `isCastMiniHouse = 0`,
 ### 1.7 Brief info: `0x1C13` / `0x1C14`
 
 `BriefInformationMiniHouse` ctor @ FUN_00549190: a 0x43-byte packet buffer, length 0x42, opcode `0x1C13
-NC_BRIEFINFO_MINIHOUSEBUILD_CMD`, body = the 0x40-byte `PROTO_NC_BRIEFINFO_MINIHOUSEBUILD_CMD` of §1.2 (client handler
+NC_BRIEFINFO_MINIHOUSEBUILD_CMD`, body = the 0x40-byte `PROTO_NC_BRIEFINFO_MINIHOUSEBUILD_CMD` of §1.2 (copied with its
+`operator=` FUN_00555da0: handle, camp, charid, coord, title[21]; client handler
 GameFrameWork FUN_006c09e0). It is sent single when a house appears to one viewer (`so_SendMyBriefInfo`).
 
 Sight exchange (Z02 §5.2, `BriefInfoExchanger`; kind 3 = mini-house):
@@ -485,6 +489,11 @@ their real behaviour is the body:
 | 0x2d8–0x2e4 | furniture emotions | §3 |
 | 0x4a4 / 0x4ac / 0x4c4 / 0x4c8 / 0x4d0 / 0x768 | RemakeHandle / so_Routine / FillBriefInformation / SendMyBriefInfo / ObjectType / TentDistance | §1.1, §1.2 |
 
+`ShineObject` base bodies of house slots that matter when the slot is called on another object: `so_mh_BuildingMiniHouse`
+FUN_00542260 → 1, `so_mh_CompulsionMoveTo` FUN_00542250 → 0x11C1. The player-side endurance slots have base bodies
+`so_ply_MH_FurnitureEndureUse` FUN_0056ed50 → 0x1184 and `so_ply_MH_FurnitureEndureUpdate` FUN_0056ed40 → 0x1A70; the
+player overrides both (§3.3).
+
 Z07 §6.1 corrections: vt 0x90 is "p (or its character) is not inside yet" (false → 0x1185 in VISITREADY / VISIT, not
 "full"); "furniture usable" vt 0x158 is `so_mh_CanObjAni`.
 
@@ -495,7 +504,7 @@ Z07 §6.1 corrections: vt 0x90 is "p (or its character) is not inside yet" (fals
 ### 2.1 Data
 
 **Boxes.** `smh_Furniture` (`MiniHouseInven`, +0x5c4) = `u16 FurnitureHandle` + four `ItemFurnicherBox` (each 98 cells
-of 0x74 bytes, `ib_BagSizeInput` @ FUN_006433d0 / `ib_BagSizeOutput` @ FUN_006433e0 = 0x62; the cell getter
+of 0x74 bytes; ctor FUN_00644aa0 / dtor FUN_00643370 construct / destroy the cell array, `ib_BagSizeInput` @ FUN_006433d0 / `ib_BagSizeOutput` @ FUN_006433e0 = 0x62; the cell getter
 `ItemInventory::ib_GetInventoryCell` @ FUN_00643000 returns a shared static cell for an index past the end, never null):
 
 | Index | Box | Inventory type (`ITEM_INVEN.Inven >> 10`) | `MiniHouseFurniture.InvenType` |
@@ -546,7 +555,8 @@ iac_SetEndureEndTime(item, addHours, maxHours, now):   @ FUN_0063fda0 (vt 0x90)
 ```
 
 **`MiniHouseFurniture.shn`** (89 rows; `ChargedItemEffectDataBox<MiniHouseFurniture>` `minihousefurnituredatabox`, loaded by
-`cideb_Load` @ FUN_005af6d0 from `../9Data/Shine/MiniHouseFurniture.shn` at zone start (`zs_start_tough`): every row's
+`cideb_Load` @ FUN_005af6d0 from `../9Data/Shine/MiniHouseFurniture.shn` at zone start (`zs_start_tough`; rows of 0x94 bytes,
+`bdb_ReadData` FUN_005ae8f0, read failure → `ShineExit`): every row's
 `ItemID` (inx name) must resolve in `itemdatabox`, else `ShineExit`; the duplicate-Handle test is Z13-B1; for each item
 whose class is not ActionItem / GBCoin / Capsule the box registers its use effect with `uie_SetChargedBuffer`).
 Columns *(pdb2016)*: `Handle, ItemID[32], FurnitureType[32], InvenType[32], GameType (0 GT_NOGAME, 1 GT_DICE), CanSet,
@@ -807,6 +817,23 @@ the room does not stop the clock. The removal of expired items is `sp_ChargedIte
 `so_DiceTaiSaiChargedItemLimitCheck`, called right after (§1.2; the same `sp_ChargedItemLimitCheck` runs on the player's
 own bags every minute, Z09 §2.4).
 
+```pseudo
+ShinePlayer::sp_ChargedItemLimitCheck(box, invenType)       player vt 0x38                 @ FUN_00451530
+    for each cell of box with an item, skipping cells the lock list (vt 0x7d4) holds (UnlockedInventoryIterator):
+        attr = cell.iic_AttrProc
+        if attr.class (attr vt 0x28) == ITEMCLASS_RIDING (23) and p.mode (vt 0x484) == 6 (riding): skip   # the mount in use
+        end = attr.iac_GetDeleteDateTime(cell) (attr vt 0x34); null (no time limit) → skip
+        if end.year ≠ 0 and end < chargeditemcheck.ct_Current (year, month, day, hour, minute compared in that order;
+           an equal minute is not yet expired):
+            sp_ItemDelete(cell, invenType, slot, end)                                         @ FUN_00451090
+                # = sp_DestroyItem(p.handle, cell, key = invenType << 10 | slot) FUN_00527870 (Z09 §23.8: 0x3459
+                #   to the item DB, cell cleared); the name fetch (vt 0x56c) and `end` are unused (stripped logging, inferred)
+```
+
+For a house box the key is `3 << 10 | slot` (13 / 14 / 16 for the others) and the player is the **owner**, so the owner
+receives the item-change answers of furniture that expires while a visitor is inside. A locked cell (a create / rearrange /
+delete waiting for its DB answer) is skipped until the next minute.
+
 ### 2.8 Other furniture helpers
 
 - `so_mh_GetItemCellByFurnitureHandle(handle)` @ FUN_00547700 (house vt 0x54): owner must exist; first cell of the four
@@ -1052,6 +1079,23 @@ UseItemFurnitureEndureKit::uivpb_SendErrorCode(p, code)     actor vt 0x18  @ FUN
     # called by uib_AfterCast when the kit cell changed or has lot 0 (code 0x702)
     p ← 0x3034 with Error written at payload +4 but pp_SetPacketLen(6) = 4 payload bytes: the code is not on the wire,
         the client reads `Error` past the packet (original bug) Z13-B17 (also the assert text names smh_SendFurnitureInfo)
+
+UseItemVariationProtocolBase::uib_AfterCast(p, bag, info, slot)   actor vt 0xc   @ FUN_0059a530
+    # shared by the "variation" item actors (one DB request that both consumes the item and carries the effect)
+    cell = bag[slot]
+    if cell.id ≠ info.ID: assert "Item Changed"; actor.uivpb_SendErrorCode(p, 0x702) (vt 0x18); return
+    lot = cell.attr.lot (attr vt 0x1c); lot ≤ 0: assert "Zero lot"; uivpb_SendErrorCode(p, 0x702); return
+    n = actor.uivpb_ProtocolMake(buf) (vt 0x14)          # opcode + effect fields, then the common tail:
+    tail PROTO_NC_ITEMDB_USE_VARIATION_ITEM_REQ (0x15, pdb2016) {
+        header { u16 p.handle, u32 p.charNo }, attr PROTO_CHANGEATTR { u64 cell key, u16 itemid, u16 attrLen },
+        u16 lockindex = lock list (vt 0x7d4).lockindex, u8 isClear }
+    lot == 1: isClear 1 (the item is deleted), packet = n + 2 bytes
+    lot > 1:  isClear 0, copy of the cell with lot − 1 (attr vt 0x20), itemid, attrLen and the attribute bytes
+              (`iti_fill2buffer_atrib`) appended after the tail
+    Item DB ← the packet (socket `sock2gameDB`)
+    lock the cell under lockindex: lot < 2 → lock list vt 0x30 (delete lock), else vt 0x40 (change lock with the new lot);
+    lock list vt 0x58(lockindex, copy, key 0x2400 | slot, actor)   # the DB answer runs the actor's effect (Z04 knowledge: releasers)
+    lockindex += 1
 
 so_ply_MH_FurnitureEndureUpdate(p, ack PROTO_NC_ITEMDB_FURNITURE_ENDURE_ACK)   player vt 0x140  @ FUN_00570fe0
     # DB answer 0x348C with Error 0x700 (Z05 §9.7, which sends 0x3034 { Error } for a result ≠ 0x1A70)
@@ -1469,6 +1513,40 @@ the skill's own (Z03).
   You are now single.", 0x1387 "Your spouse refused to get a divorce.", 0x1389 OK dialog (TextData2) annulment; other codes
   through `ErrMsgTable::GetErrMsg` (0x1381–0x1383, 0x1388 have texts).
 
+### 4.8 The annulment item (`UseItemImmediateDivorce`, instant divorce)
+
+The item's use effect (Z04 §6 actor table) opens a yes/no server menu; "Yes" sends the divorce to the Character DB with
+`Reason 2`, which the DB executes at once (`p_Char_Wedding_Divorce_Do_by_Item`, D02 §11: Main 3, Sub 1 for the user / 2 for
+the partner, delay 5 s); §4.4 `DelayLimit` → `so_ply_DivorceProcess` then finishes it on both sides (the partner gets 0x1389).
+
+```pseudo
+UseItemImmediateDivorce::uib_CanUseItem(p, item)                                   @ FUN_005967e0
+    return (p.wedding.Status & 0xF) == 2 ? 0x700 (ok) : 0x704 "The selected item is not usable."
+    # the sub-status is not checked: an annulment also works while a divorce application is pending
+
+UseItemImmediateDivorce::uib_DirectUse(p, slot, item)                              @ FUN_00596810
+    if !sma_IsReady(p.servermenuactor): return 1                     # another menu is open: nothing happens, no result packet
+    arg.smli_NPCHandle = 0x2400 | (slot & 0x3FF)                       # inventory key of the item
+    arg.lockindex = lock list (p vt 0x7d4).lockindex; lock the cell under it (lock list vt 0x30); lockindex += 1
+    sp_ServerMenuTitle(MenuString "InstantDivorce" = "Item will be consumed and cannot be cancelled once used")
+        item "Yes" → smfm_ImmediateDivorce(arg); item "No" → smfm_ImmediateDivorceCancel(arg)
+    sp_ServerMenuOpen(0, 0xFFFF, no position, 1000)                    # menu protocol: Z02 §6 (server menus)
+    p.so_ply_ItemUseResultPacket(0x700, 9) (vt 0x91c)
+    return 1
+
+ServerMenuFuncter::smfm_ImmediateDivorce(p, arg)                                  @ FUN_0050f430
+    unlock arg.lockindex (lock list vt 0x28)
+    Character DB ← 0x108D NC_CHAR_WEDDING_DIVORCE_DO_REQ { u16 p.handle, u32 p.charNo, u32 Partner.RegisterNumber, u8 Reason 2 }
+    sp_DestroyItem(p.handle, inventory cell (arg.smli_NPCHandle & 0x3FF), key 0x2400 | slot)
+    # no re-check of Main == 2 or of the cell's item id at "Yes" time, and the item is destroyed before (and whatever)
+    # the DB answers (original bug) Z13-B64
+
+ServerMenuFuncter::smfm_ImmediateDivorceCancel(p, arg)                            @ FUN_0050f5a0
+    unlock arg.lockindex; smfm_Cancel(p, arg)                          # item kept
+```
+
+The 0x108E answer is handled like any `DIVORCE_DO` answer (Z07 §5.2: reload of 0x1081 for both partners).
+
 ---
 
 ## 5. Pets, player side: `PetInfoPlayer` and the summon flow
@@ -1492,7 +1570,7 @@ listed by hand (they agree):
 | +0x10 | 0x2ab70 | `nCastingLockIndex` | inventory lock index taken for the cast |
 | +0x12 | 0x2ab72 | `nCastSlot` | inventory slot being cast (0xFFFF none) |
 | +0x14 | 0x2ab74 | `nSummonSlot` | inventory slot of the summoned pet item (0xFFFF none) |
-| +0x16 / +0x18 | 0x2ab76 / 78 | `nWalkSpeed` / `nRunSpeed` | both = `CPetData::GetPetSpeed(PetIDX)` (`sp_PetSystem_FillCommonInfo`) |
+| +0x16 / +0x18 | 0x2ab76 / 78 | `nWalkSpeed` / `nRunSpeed` | both = `CPetData::GetPetSpeed(PetIDX)` (`sp_PetSystem_FillCommonInfo` FUN_004d20c0) |
 | +0x1c | 0x2ab7c | `nId` | pet id (`CPetData::GetPetID`, from the item's `InxName`) |
 | +0x20 | 0x2ab80 | `nHandle` | pet object handle |
 | +0x24 | 0x2ab84 | `nRegNum` | pet DB key (`0xFFFFFFFF` = not created yet) |
@@ -1521,11 +1599,11 @@ sp_PetSystem_InitPetInfoLink(p):            @ FUN_004d2090
 
 | Method | @ | Behaviour |
 |---|---|---|
-| `iac_GetAttrSize` / `iac_fill2buffer` / `iac_fill2struct` | 0063ecd0 / 0063ea00 / 0063ebf0 | 0x1a; copy the 26 bytes verbatim (client and DB see `bSummoning`) |
-| `iac_itemcreate` | 0063f470 | RegNum = 0xFFFFFFFF, PetID = 0xFFFFFFFF, name and `bSummoning` = 0 |
-| `iac_GetPetRegistNumber` / `iac_GetPetName` | 004d06d0 / 004d0650 | RegNum (null ITI → 0xFFFFFFFF); the 16 name bytes as `Name4` (null → "") |
-| `iac_SetPetName` | 004d05f0 | copies `min(len, 16)` bytes and terminates (byte 16 = +0x22 when longer) |
-| `iac_SetDuringPetSummon` | 00517d00 | `bSummoning = v`; only ever called with 1 (Z13-B37) |
+| `iac_GetAttrSize` / `iac_fill2buffer` / `iac_fill2struct` | FUN_0063ecd0 / FUN_0063ea00 / FUN_0063ebf0 | 0x1a; copy the 26 bytes verbatim (client and DB see `bSummoning`) |
+| `iac_itemcreate` | FUN_0063f470 | RegNum = 0xFFFFFFFF, PetID = 0xFFFFFFFF, name and `bSummoning` = 0 |
+| `iac_GetPetRegistNumber` / `iac_GetPetName` | FUN_004d06d0 / FUN_004d0650 | RegNum (null ITI → 0xFFFFFFFF); the 16 name bytes as `Name4` (null → "") |
+| `iac_SetPetName` | FUN_004d05f0 | copies `min(len, 16)` bytes and terminates (byte 16 = +0x22 when longer) |
+| `iac_SetDuringPetSummon` | FUN_00517d00 | `bSummoning = v`; only ever called with 1 (Z13-B37) |
 
 Items made by item mix (`sp_NC_ITEM_MIX_ITEM_REQ` FUN_00521540) and by `sp_CreateItemByAdmin` FUN_00527270 get
 `nPetID = CPetData::GetPetID(GetPetIDX(ItemInfo.InxName))`, RegNum 0xFFFFFFFF, empty name, `bSummoning = 0`.
@@ -1702,7 +1780,9 @@ Client (`GameFrameWork`, FUN_004bb170, 2017 `On_NC_PET_ASK_NEW_NAME_REQ`): looks
 the naming dialog for `nPetHandle` with "You're my new master! Hello! What are you going to call me?" (`nFirstSummon` ≠ 0) or
 "What name should I answer to?" (0) and answers `0xD406 {u16 0x34C0, u16 nPetHandle}`; not found → `0xD406 {0x34C1, handle}`,
 which the server ignores (naming stays `MODIFY_WAIT`, the pet stays unnamed until the next summon). The rest of the naming
-exchange (0xD406 → `MODIFIABLE`, 0xD407 / 0xD403 / 0xD404 → `FIXED`, 0xD409 cancel → `FIXED`) is Z07 §9.
+exchange (0xD406 → `MODIFIABLE`, 0xD407 / 0xD403 / 0xD404 → `FIXED`, 0xD409 cancel → `FIXED`) is Z07 §9; its two
+senders are `sp_Send_NC_PET_SET_NAME_ACK` FUN_004d0af0 (0xD408 `{u16 err, u32 petID}`, from `gds_NC_PET_SET_NAME_DB_ACK`) and
+`sp_Send_NC_PET_SET_NAME_CANCEL_ACK` FUN_004d0b60 (0xD40A, same body, from 0xD409); both send nothing when petID = 0xFFFFFFFF.
 `sp_Send_NC_PET_SET_NAME_DB_REQ` FUN_004d1110 (0xD403 `{u16 p.handle, u32 nRegNum, Name4 name}`, only for names of 4+
 characters and a known RegNum).
 
@@ -1815,6 +1895,13 @@ sp_PetSystem_LinkResummon(p) → ok:                                 @ FUN_004d2
 The "code" is a fixed offset of the character number, a plausibility check only. A pet that was still being summoned or
 named at the link (states 1–4) is not carried over.
 
+**WM side (sweep).** The WM keeps the last 0x4033 record in the client session and sends it as 0xD412 on **every**
+`0x101C NC_CHAR_ZONE_CHARDATA_REQ` (`CWMClientSession::PetSystem_SendToZone`, WM FUN_00433980, called from
+`Zone_CharDataReq_101C` WM FUN_00428ba0, W01 §6.3); it never clears it (only a new session starts empty). So a link in
+states 1–4 or 8 (no 0x4033 sent) hands the new zone the record of an **earlier** link: if that record had
+`bDoResummon = 1` and the pet item is still in the recorded slot, the pet is virtually re-cast at login although it was
+not summoned when the player left (original bug) Z13-B65.
+
 ### 5.9 Other pet hooks in player code
 
 - **Chat calling** (`sp_NC_ACT_CHAT_REQ` FUN_0045a400): after a normal chat line is broadcast (not an `&` command, map
@@ -1888,15 +1975,15 @@ other priorities, PupIDX "-" = every pet); PupFactorCondition 64 rows (4 mind ty
 
 | Getter | @ | Returns |
 |---|---|---|
-| `GetPetID(PupIDX)` | 004cef80 | PupMain.PupID of the row with that PupIDX, else 0xFFFFFFFF |
-| `GetPetIDX(u32 PupID)` | 004ceff0 | PupIDX of that PupID, else null |
-| `GetPetIDX(char* ItemIDX)` | 004cf030 | PupIDX of the row whose ItemIDX is the item's InxName, else null (null arg → null) |
-| `GetPetSpeed(PupIDX)` | 004cf0b0 | PupSpeed, else 0xFFFFFFFF |
-| `GetPetInitMindRange` / `GetPetInitStressRange(out BRange, PupIDX)` | 004cf130 / 004cf1c0 | {Min, Max} of the PupServer row; **no row: the output is left untouched** (Z13-B47) |
-| `GetPetMindType(u8 mind)` | 004cf250 | the first PupMind row with Min ≤ mind ≤ Max, else `MAX_PUPMINDTYPEENUM` (4) |
-| `GetPetTendencyModifyData` | 004cf440 | §5.7 |
-| `GetPetActionCaseFlexible(u8 mind, u8 stress)` | 004cf290 | below |
-| `GetPetActionBundleFlexible(prio, case, PupIDX)` | 004cf690 | below |
+| `GetPetID(PupIDX)` | FUN_004cef80 | PupMain.PupID of the row with that PupIDX, else 0xFFFFFFFF |
+| `GetPetIDX(u32 PupID)` | FUN_004ceff0 | PupIDX of that PupID, else null |
+| `GetPetIDX(char* ItemIDX)` | FUN_004cf030 | PupIDX of the row whose ItemIDX is the item's InxName, else null (null arg → null) |
+| `GetPetSpeed(PupIDX)` | FUN_004cf0b0 | PupSpeed, else 0xFFFFFFFF |
+| `GetPetInitMindRange` / `GetPetInitStressRange(out BRange, PupIDX)` | FUN_004cf130 / FUN_004cf1c0 | {Min, Max} of the PupServer row; **no row: the output is left untouched** (Z13-B47) |
+| `GetPetMindType(u8 mind)` | FUN_004cf250 | the first PupMind row with Min ≤ mind ≤ Max, else `MAX_PUPMINDTYPEENUM` (4) |
+| `GetPetTendencyModifyData` | FUN_004cf440 | §5.7 |
+| `GetPetActionCaseFlexible(u8 mind, u8 stress)` | FUN_004cf290 | below |
+| `GetPetActionBundleFlexible(prio, case, PupIDX)` | FUN_004cf690 | below |
 
 ```pseudo
 GetPetActionCaseFlexible(mind, stress) → PupCaseTypeEnum             @ FUN_004cf290
@@ -1933,33 +2020,33 @@ Overridden slots (rest = `ShineMob`) *(vtable diff, rtti.py)*:
 
 | Slot | Method | @ | Behaviour |
 |---|---|---|---|
-| 0x0 / 0x4 | `GetRTTI` / vector deleting dtor | 005571d0 / 00557a60 | |
-| 0x344 | (`so_MiscTable` fold) | 005572e0 | returns +0x2568 (`spt_nPetRegNum`) |
-| 0x4a0 | `so_Getabstatebit` | 00557360 | returns the **shared** static `ShineObject::so_emptyabstate` (Z13-B43) |
-| 0x4a4 | `so_RemakeHandle(i)` | 00557310 | `i + 0x5c56` for `i ≤ 0x5db` (1500 pet handles 0x5C56…0x6231), else 0xFFFF |
-| 0x4ac | `so_Routine` | 0056c1e0 | §6.4 |
-| 0x4b8 | (`so_OverlapFactor` fold) | 00557240 | `mode ≠ 3` |
-| 0x4c4 | `so_FillBriefInformation(dst)` | 00557490 | copies the 0x3f-byte brief (`PROTO_NC_BRIEFINFO_REGENPET_CMD::operator=` FUN_005571e0) |
-| 0x4c8 | `so_SendMyBriefInfo(rcv)` | 00557260 | §6.5 |
-| 0x4d0 | `so_ObjectType` | 005572d0 | 12 |
-| 0x4f0 / 0x4f4 | `so_MaxHP` / `so_MaxSP` | 005572f0 / 00557300 | 1 (cached in +0xea8 / +0xeac) |
-| 0x514 / 0x518 | `so_WalkSpeed` / `so_RunSpeed` | 005574b0 / 00557500 | master's `sp_PetInfo.nWalkSpeed` / `nRunSpeed` (§5.1, = PupSpeed) when `spt_FindMaster` gives a player, else 1000 |
-| 0x56c | `so_CharName` | 005573a0 | the **master's** `sp_PetInfo.sName` (16 bytes) copied into a static `Name5` (`charID`, NUL at byte 16); null when `spt_pMaster` is no player |
-| 0x5ac, 0x89c | (fold) | 004b8d20 | 0 |
-| 0x6cc | `so_BodySize` | 00559910 | 50 |
-| 0x700 | (fold `EmptyHandler`) | 00509900 | no-op |
-| 0x708 | (fold) | 005550b0 | 0xFFFF |
-| 0x714 | (fold) | 00570b00 | 0 |
-| 0x72c | `so_mobile_IsEnemy` | 0042f3a0 | false |
-| 0x8cc | (fold) | 00647230 | 2 |
-| 0x980 / 0xe94 | `so_mobile_ICanDamageTo` / `smo_ICanHealTo` | 004350f0 / 00435770 | false (Z09 §8.4) |
-| 0x9b8 | `so_mob_CanBeAttackedByPlayer` | 004a5d80 | false |
-| 0xe04 | (fold) | 00549070 | no-op (the mob's KQ team type setter) |
-| 0xe08 | (`so_GetKQTeamType` fold) | 005551b0 | 2 (none) |
-| 0xe48 | `so_SetAnimationBriefInfo(s)` | 00557370 | `strncpy(brief.sAnimationIndex, s, 32)` (from `ShineMob::so_SetAnimation` / `so_ResetAnimation`, Z09) |
-| 0xf68 | (fold) | 005af8d0 | 1 |
-| 0xf6c | `sm_BriefLocateSet` | 004b10f0 | copies the brief's x, y, dir to the mob location block (+0x1f84…+0x1f8c) |
-| 0xf70 | `sm_InitBriefInfo(h, id)` | 004b1200 | `bip_InitBriefInfo` |
+| 0x0 / 0x4 | `GetRTTI` / vector deleting dtor | FUN_005571d0 / FUN_00557a60 | |
+| 0x344 | (`so_MiscTable` fold) | FUN_005572e0 | returns +0x2568 (`spt_nPetRegNum`) |
+| 0x4a0 | `so_Getabstatebit` | FUN_00557360 | returns the **shared** static `ShineObject::so_emptyabstate` (Z13-B43) |
+| 0x4a4 | `so_RemakeHandle(i)` | FUN_00557310 | `i + 0x5c56` for `i ≤ 0x5db` (1500 pet handles 0x5C56…0x6231), else 0xFFFF; same mapping as `ShineObjectHandleUnion::sohu_SetPetHandle` FUN_00549040 |
+| 0x4ac | `so_Routine` | FUN_0056c1e0 | §6.4 |
+| 0x4b8 | (`so_OverlapFactor` fold) | FUN_00557240 | `mode ≠ 3` |
+| 0x4c4 | `so_FillBriefInformation(dst)` | FUN_00557490 | copies the 0x3f-byte brief (`PROTO_NC_BRIEFINFO_REGENPET_CMD::operator=` FUN_005571e0) |
+| 0x4c8 | `so_SendMyBriefInfo(rcv)` | FUN_00557260 | §6.5 |
+| 0x4d0 | `so_ObjectType` | FUN_005572d0 | 12 |
+| 0x4f0 / 0x4f4 | `so_MaxHP` / `so_MaxSP` | FUN_005572f0 / FUN_00557300 | 1 (cached in +0xea8 / +0xeac) |
+| 0x514 / 0x518 | `so_WalkSpeed` / `so_RunSpeed` | FUN_005574b0 / FUN_00557500 | master's `sp_PetInfo.nWalkSpeed` / `nRunSpeed` (§5.1, = PupSpeed) when `spt_FindMaster` gives a player, else 1000 |
+| 0x56c | `so_CharName` | FUN_005573a0 | the **master's** `sp_PetInfo.sName` (16 bytes) copied into a static `Name5` (`charID`, NUL at byte 16); null when `spt_pMaster` is no player |
+| 0x5ac, 0x89c | (fold) | FUN_004b8d20 | 0 |
+| 0x6cc | `so_BodySize` | FUN_00559910 | 50 |
+| 0x700 | (fold `EmptyHandler`) | FUN_00509900 | no-op |
+| 0x708 | (fold) | FUN_005550b0 | 0xFFFF |
+| 0x714 | (fold) | FUN_00570b00 | 0 |
+| 0x72c | `so_mobile_IsEnemy` | FUN_0042f3a0 | false |
+| 0x8cc | (fold) | FUN_00647230 | 2 |
+| 0x980 / 0xe94 | `so_mobile_ICanDamageTo` / `smo_ICanHealTo` | FUN_004350f0 / FUN_00435770 | false (Z09 §8.4) |
+| 0x9b8 | `so_mob_CanBeAttackedByPlayer` | FUN_004a5d80 | false |
+| 0xe04 | (fold) | FUN_00549070 | no-op (the mob's KQ team type setter) |
+| 0xe08 | (`so_GetKQTeamType` fold) | FUN_005551b0 | 2 (none) |
+| 0xe48 | `so_SetAnimationBriefInfo(s)` | FUN_00557370 | `strncpy(brief.sAnimationIndex, s, 32)` (from `ShineMob::so_SetAnimation` / `so_ResetAnimation`, Z09) |
+| 0xf68 | (fold) | FUN_005af8d0 | 1 |
+| 0xf6c | `sm_BriefLocateSet` | FUN_004b10f0 | copies the brief's x, y, dir to the mob location block (+0x1f84…+0x1f8c) |
+| 0xf70 | `sm_InitBriefInfo(h, id)` | FUN_004b1200 | `bip_InitBriefInfo` |
 
 Not overridden and relevant: vt 0x91c is the `ShineMob` no-op (FUN_00509900), so the `(0x702, 9)` item-use error that
 `spt_SummonPet` sends to the **pet** when `FillCommonInfo` fails goes nowhere (original bug) Z13-B42 (the player still gets
@@ -2097,13 +2184,13 @@ handle: object type 12 → `spt_FindMaster` → a player (type 2) → `sp_PetInf
 
 | Function | @ | Behaviour |
 |---|---|---|
-| `cPet_Unsummon(masterHandle)` | 005d65a0 | the handle is the **master** (player, state 5/6): `sp_PetSystem_ChangeTendency(PFC_S_MOVER)`, `sp_PetSystem_Unsummon` (§5.6); true, or nil + "Unsummon pet fail" |
-| `cPet_IsMasterCalling(pet)` | 005e9320 | `nCallingState == PNCS_CALLING` → true and resets it to NONE; else false |
-| `cPet_GetMind` / `cPet_GetStress(pet)` | 005e9520 / 005e9720 | `(u8)(nMindMil / 1000)` / `(u8)(nStressMil / 1000)` (applied value, without the pending diff) |
-| `cPet_GetWalkSpeed` / `cPet_GetRunSpeed(pet)` | 005e9920 / 005e9b10 | `nWalkSpeed` / `nRunSpeed` (§5.1) |
-| `cPet_GetActionRecord(pet, mode)` | 005e9d00 | below |
-| `cPet_ChangeMind(pet, action)` | 005ea1d0 | arg 2 must be a string; raises one tendency condition via `sp_PetSystem_ChangeTendency` and returns true (below) |
-| `cPet_SaveTendency(pet)` | 005ea410 | `sp_PetSystem_ApplyChangedTendency` (§5.7) only, returns true; nothing goes to the DB (original bug) Z13-B45. Its "not summoned" assert text says `cPet_ChangeMind` |
+| `cPet_Unsummon(masterHandle)` | FUN_005d65a0 | the handle is the **master** (player, state 5/6): `sp_PetSystem_ChangeTendency(PFC_S_MOVER)`, `sp_PetSystem_Unsummon` (§5.6); true, or nil + "Unsummon pet fail" |
+| `cPet_IsMasterCalling(pet)` | FUN_005e9320 | `nCallingState == PNCS_CALLING` → true and resets it to NONE; else false |
+| `cPet_GetMind` / `cPet_GetStress(pet)` | FUN_005e9520 / FUN_005e9720 | `(u8)(nMindMil / 1000)` / `(u8)(nStressMil / 1000)` (applied value, without the pending diff) |
+| `cPet_GetWalkSpeed` / `cPet_GetRunSpeed(pet)` | FUN_005e9920 / FUN_005e9b10 | `nWalkSpeed` / `nRunSpeed` (§5.1) |
+| `cPet_GetActionRecord(pet, mode)` | FUN_005e9d00 | below |
+| `cPet_ChangeMind(pet, action)` | FUN_005ea1d0 | arg 2 must be a string; raises one tendency condition via `sp_PetSystem_ChangeTendency` and returns true (below) |
+| `cPet_SaveTendency(pet)` | FUN_005ea410 | `sp_PetSystem_ApplyChangedTendency` (§5.7) only, returns true; nothing goes to the DB (original bug) Z13-B45. Its "not summoned" assert text says `cPet_ChangeMind` |
 
 ```pseudo
 cPet_GetActionRecord(pet, mode) → (aiType, SM_Inx, ActionEffectID, SoundFile)      @ FUN_005e9d00
@@ -2197,8 +2284,8 @@ FUN_0055a7a0 (the object only while `eMoverSystemType == MVST_MOVER`), 0xc78 `Se
 
 | Table | Loader | Rows (2016) | Use |
 |---|---|---|---|
-| `Riding.shn` (`RIDING`, 0x15a) | `RidePetDataBox::rpdb_Load` FUN_00450270 (`zs_start_sun`): `ChargedItemEffectDataBox<RIDING>::cideb_Load` (same template as §1.6) registers each row's item with `ui_ride` (`UseEffect::UseItemRide`) and skill "UseRide"; every `FeedType` ≠ "-" must be an item ("RidePetDataBox::rpdb_Load : Invalid food" → `ShineExit`) and is registered with `ui_horsefood` and skill "UseSkill" | 2 (Coll: feed Hay, FeedGauge 100, HGauge 1000, InitHgauge 1000, Tick 20000 ms, UGauge 4, Run 1300, Foot 1100, cast 1000 ms, cool 3000 ms; Claude: no feed, UGauge 0) | horses |
-| `MoverMain.shn` (`MoverMain` {MoverID, MoverIDX, CastingTime, CoolTime, RunSpeed, WalkSpeed, DurationHour, MaxCharSlot}) | `MoverDataBox::mvdb_Load` FUN_004bf960 (`zs_start_long`) | 461 (437 with 1 seat, 24 with 2; DurationHour 0 for 185) | `mvdb_Index[MoverID]` (array of `MoverDataBoxIndex` {pBase, pAbility, pHG, pSummonItem, vUseSkill}); BTree MoverIDX → MoverID; duplicate ID → exit |
+| `Riding.shn` (`RIDING`, 0x15a) | `RidePetDataBox::rpdb_Load` FUN_00450270 (`zs_start_sun`): `ChargedItemEffectDataBox<RIDING>::cideb_Load` FUN_00450070 (same template as §1.6; `bdb_ReadData` FUN_0044fd50 reads 0x15a-byte rows, read failure → `ShineExit`; lookups `cideb_GetItemID` FUN_0043caa0 linear by item id, finger iteration `cideb_Next` FUN_0044f9e0 / `cideb_GetIndex` FUN_0045e0b0) registers each row's item with `ui_ride` (`UseEffect::UseItemRide`) and skill "UseRide"; every `FeedType` ≠ "-" must be an item ("RidePetDataBox::rpdb_Load : Invalid food" → `ShineExit`) and is registered with `ui_horsefood` and skill "UseSkill" | 2 (Coll: feed Hay, FeedGauge 100, HGauge 1000, InitHgauge 1000, Tick 20000 ms, UGauge 4, Run 1300, Foot 1100, cast 1000 ms, cool 3000 ms; Claude: no feed, UGauge 0) | horses |
+| `MoverMain.shn` (`MoverMain` {MoverID, MoverIDX, CastingTime, CoolTime, RunSpeed, WalkSpeed, DurationHour, MaxCharSlot}) | `MoverDataBox::mvdb_Load` FUN_004bf960 (`zs_start_long`; the five `BinaryDataBox`es are built by FUN_004bf6f0 with default rows of 0x33 MoverMain, 0x61 MoverAbility, 0x4a MoverHG, 0x40 MoverItem, 0x40 MoverUseSkill bytes; `MoverDataBoxIndex` dtor FUN_004bf920 frees `vUseSkill`) | 461 (437 with 1 seat, 24 with 2; DurationHour 0 for 185) | `mvdb_Index[MoverID]` (array of `MoverDataBoxIndex` {pBase, pAbility, pHG, pSummonItem, vUseSkill}); BTree MoverIDX → MoverID; duplicate ID → exit |
 | `MoverAbility.shn` | same | 0 | mover combat stats (`Parameter::Container::c_StoreMover` FUN_0055e8d0 for the mover object: WC/MA min/max, AC, MR, TH, TB; move/HP/SP recovery 1000) |
 | `MoverHG.shn` ({MoverIDX, FeedType, RestoreAmount, MaxHG, CreateHG, Tick, ConsumeHG}) | same; each `FeedType` ≠ "-" registered with `ui_horsefood` / "UseSkill" ("Food skill null" → exit) | 461 (163 with a feed, e.g. LifeDust) | mover hunger (§8) |
 | `MoverItem.shn` ({MoverIDX, ItemIDX}) | same; BTree ItemIDX → MoverID; each item registered with `ui_ride` / "UseRide" ("Ride skill null" → exit) | 461 | item → mover |
@@ -2599,6 +2686,10 @@ Overridden slots (the rest are the `ShineMobileObject` defaults; mover-system sl
 Not overridden and relevant: vt 0xa4c `so_ply_SendMoveFail` is the folded no-op FUN_00417480 on a mover (§8.7), vt 0x3f0
 `so_AbnormalState_Inform` is a folded no-op, vt 0xa48 `so_mobile_StopHere` and vt 0xa10 `so_mobile_SendMyMoveInfo` are the
 `ShineMobileObject` ones (Z02 §1, Z09 §9).
+
+`ShineObject` base bodies of the mover slots (what a call on a non-mover returns): `so_smv_SummonMover` FUN_0055f370 → 0,
+`so_smv_MasterSetAbsCheck` FUN_0055fa60 → 0, `so_smv_GetMyBookingSlot` FUN_0055fa00 → 10 (= no seat), `so_smv_CanUseFeedItem`
+FUN_0055f830 → 0x701. Only movers reach them in the 2016 code (the callers check the object type first).
 
 ### 8.2 Summon
 
@@ -3249,6 +3340,8 @@ never looks the code up.
 | Z13-B61 | `InvenCellReleaser_CellChange` / `CellClear` (Z05 §1.4), `sp_NC_ITEM_EQUIP_REQ` FUN_0052b8d0 (§9.5) | removing or swapping out an MRT_USEITEM minimon calls `so_ply_UseItemMinimon_Off` without checking the other minimon slot (25 / 28) | with two role-2 `*_BOTH` minimons, taking one off (or swapping it for another role-2 minimon) turns both auto-use lists off; the player must switch them on again | turn auto-use off only when no MRT_USEITEM minimon remains, as `so_ply_SetUseItemMinimon` checks at login |
 | Z13-B62 | `so_ply_SetUseItemMinimon` FUN_005617c0 / `sp_SaveUseItemMinimonInfo_DB` FUN_00563d80 | `sp_UseItemMinimon_LoginSlot` records the slots filled at login but is never read; the save flags every empty slot as deleted | every save sends 24 `usp_Item_setAutoMon` calls (D02 §6) instead of only the changed slots | set `DelSlotList` only for slots that were filled at login (`LoginSlot`) and are empty now |
 | Z13-B63 | 0x1124 / 0x1128 ON with an all-empty list (§9.3) | the empty list is stored, the answer is 0x362B / 0x363B, but `bNormalItem` / `bChargedItem` keep their old value | a list that was on stays "on" with no items (the client shows "no items registered" and keeps its button state); harmless, the 2016 client sends OFF first when the list is on | clear the flag (and the brief flag) on an empty list |
+| Z13-B64 | `smfm_ImmediateDivorce` FUN_0050f430 (annulment item, "Yes") | sends 0x108D Reason 2 and destroys the item without re-checking the married state or the cell, and before the DB answers | if the couple is already divorced when "Yes" is chosen (the partner annulled first), the item is still consumed and the DB answers 0x108E Success 0 | re-check `Main == 2` and destroy only on success |
+| Z13-B65 | WM 0xD412 after a link without 0x4033 (§5.8) | the WM re-sends the record of an earlier link; the zone sends no 0x4033 in pet states 1–4 / 8 | a pet that was unsummoned and is being cast or named again at the link is re-summoned from the old record at the next map login (if its item is still in the recorded slot) | send 0x4033 with `bDoResummon = 0` in every state, or clear the WM record after 0xD412 |
 
 ## Not reconstructed / uncertain
 
@@ -3279,9 +3372,8 @@ never looks the code up.
   offsets only; that the band is the target map's entry level is *(inferred)*. Whether the 2016 Character DB ever writes
   sub-status 8 (DivorceLimit case 8) is unknown (w00 writes 4). The client's answer to the 0x1384 dialog (0x205C accept /
   0x205E refuse) was not traced in the client.
-- Pets (§5): the meaning of `FieldAttr.KingdomQuestMap == 2` (refused without a 0xD411) is not identified. Whether the
-  WM drops its re-summon record after sending 0xD412, and what happens with a stale record when the next 0x4033 is
-  skipped (states 1–4 / 8 at the link), was not traced (W01). The pet is removed by 0x1805 (§6.4); what the client does with `bSummoning` was not
+- Pets (§5): the meaning of `FieldAttr.KingdomQuestMap == 2` (refused without a 0xD411) is not identified. The WM's
+  re-summon record is answered in §5.8 (kept for the session, Z13-B65). The pet is removed by 0x1805 (§6.4); what the client does with `bSummoning` was not
   traced (the 0x1C1C handler does not read the item). Pets (§6): the client effect of the polluted abstate bit 291
   (Z13-B43), whether the StaImmortal set in `spt_Regenerate` ever succeeds (HP test before HP = 1), and what player mode 7
   is in `spt_FindMaster` are *(inferred)* / open; `GetPetActionBundleFlexible`'s random pick is read through garbled decompiler output. That the lock list keeps an unreleased cast lock until relog (Z13-B34) is *(inferred)*.
@@ -3294,8 +3386,9 @@ never looks the code up.
 - Mover object (§8): the meaning of the parameter-container offset +0xc40 (read as the master's `MoveSpeed` ‰, the same
   as `p+0x1c00`) is *(inferred)* from the offsets; `so_DamagedBy`'s unused name fetches being stripped logging is
   *(inferred)*; whether the damage pipeline (Z03) calls `so_KilledBy` instead of `so_DamagedBy` when HP would go below 0
-  was not traced (no mover can be damaged in 2016). The callers of `smo_ply_SendSpeedInformation` (vt 0xeb8, no virtual
-  call found) were not traced. The client's `AddMover` FUN_00646c50 internals (model, seat nodes) were not read.
+  was not traced (no mover can be damaged in 2016). `smo_ply_SendSpeedInformation` (vt 0xeb8) has no caller: no virtual call
+  through slot 0xeb8 and no direct call of the mover's FUN_00456850 or the player's FUN_00459490 (which sends 0x203E
+  `{walk, run}` to the player only when the speeds changed) exist in the 2016 zone (sweep); dead code. The client's `AddMover` FUN_00646c50 internals (model, seat nodes) were not read.
 - Minimon (§9): that the inventory is already loaded when WM 0x1122 arrives (otherwise every slot is dropped at login) is
   *(inferred)* from the blob order. Which players `so_AllOfRange` reaches with 0x112C (whether the sender is included) and
   what client FUN_00633f10 shows for `bUse` were not traced. Whether an MRT_USEITEM minimon must still be equipped while
@@ -3306,4 +3399,22 @@ never looks the code up.
 
 ## Coverage boundary
 
-(Filled in by the sweep part.)
+Sweep method: every zone function whose PDB name matches the subsystems (mini house, furniture, wedding, divorce, pet,
+mover, horse, riding, minimon), every callee of the functions cited here, every string of the subsystems in
+`strings.tsv`, and every zone handler of depts 35 / 51 / 53 / 43 and the wedding opcodes, checked against all docs.
+What remains uncited after this part:
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| House TaiSai methods (house vt 0x1bc–0x2a8): `so_mh_DiceTaiSai_BroadModeChangeLeave` FUN_005129c0, `so_mh_RankSort` FUN_00516ee0 / `RankSortCompare` FUN_005144d0, `so_mh_ClearDiceBettingInfo` FUN_005118e0, `ClearGamerBettingInfo` FUN_00511990, `Set/IsCreateDice` FUN_005144f0 / FUN_00514540, `Set/IsDeleteDice` FUN_00514580 / FUN_005145d0, `Set/IsLeaveOwner` FUN_00514630 / FUN_00514650, `Set/IsBlowGame` FUN_00514600 / FUN_00514620, `IsActiveDice` FUN_00511790 / FUN_00511760, `SetDiceHistory` FUN_00511960, `GetTaiSaiGamerCnt` FUN_005144c0, `GetGameMode` FUN_00514a30, and the `ShineObject` defaults (`so_mh_DiceTaiSai_Out` FUN_00512150, `BroadOut` FUN_00512450, `ModeChange` FUN_00512560, `BroadSetTimer` FUN_00513020, `CanBettingCancel` FUN_00513400, `CanDiceRoll` FUN_00513cf0, `GetExpectIncomeMoney` FUN_00514050, `GetRank` FUN_00514060); 0xAC28 LARGE_AMOUNT_REQ | Z06 §3 (done) | the dice table's state, join / leave / mode change, betting, roll and ranking are written there (§3.1–§3.5, 0xAC28 §3.4 + Z06-B16); this item only links the house's calls into it (§1.2, §2.4, §3.2) |
+| `UseItemVariationProtocolBase` actors other than the endurance kit; `uib_AfterCast` itself is written in §3.3 | Z04 §6 (done) | the actor table and item-use pipeline are Z04's; §3.3 documents the shared AfterCast because the kit reaches it |
+| `ShinePlayer::so_SaveItem_Part` FUN_00456030 (WM item save, includes the mini-house skin box 12) | Z01 §8.4 (done) | the character save to the WM (0x4013 items, part marks per box) is Z01's `WholeSaver`; nothing house-specific beyond the box list |
+| `sp_ServerMenuTitle` / `sp_ServerMenuItem` FUN_0054e8a0 / FUN_0054e990 (annulment menu, §4.8; hall menus §4) | Z02 §6 (done) | the server-menu builder and 0x3C01 are documented there (menu built with Title / Item, sent by `sp_ServerMenuOpen`) |
+| Ring travel `ZoneListenSession::zls_TravelComplete` FUN_0045b1f0 (wedding ring refresh §4.5, partner summon §4.6) | Z01 §10 (done) | the zone ring (RNG packets travel all zones and return to the origin) is Z01's zone↔zone relay; §4.5 / §4.6 state what the origin does when the packet comes back |
+| WM storage of the pet re-summon record (0x4033 / 0xD412) and the mover link data (0xCC0B / 0xCC0C) | W01 §6.3 ("pet re-summon", "mover link data" rows), W05 (0x4033 row) | WM-side storage and re-send; the zone side and the stale-record effect are §5.8 / §7.7 here |
+| Callees of the context functions this doc only cites for one branch (player login FUN_00443390, logout FUN_00558900, player routine FUN_0056c790, death FUN_00433be0, WM save FUN_004536f0, item move FUN_0052b8d0, …): KQ, guild tournament, card collection, quest, equipment-conflict and abstate helpers | Z01, Z03, Z04, Z08, Z09 (done; they cite those context functions) | not reached through the house / wedding / pet / mount / minimon logic; listed by `coverage`-style scans only because a context function is cited here |
+| Library and template code: `std::map` / `std::vector` instantiations (MinimonInfo, PET_AI_TYPE maps), `BinaryDataBox<…>` / data-box ctors and dtors (FUN_004bf7f0, FUN_004c05c0, FUN_004c0310, FUN_004a29b0, FUN_004a1b80, FUN_004bf3d0, FUN_004a1ad0, FUN_004bf550, FUN_004bf490, FUN_004bf310, FUN_004bf950), `ShineMover::GetRTTI` FUN_0055e9b0, `ShineDateTime::operator+=` FUN_0059ead0 / `toTime_t` FUN_00517a10, `Parameter::Container::c_clear` FUN_0043c370, `ItemBag::ib_GetItemLot` FUN_00642e80, `idb_GetItemInxName` FUN_006487d0, `uie_SetChargedBuffer` FUN_005963e0, item-box iterators | none needed | no subsystem behaviour; what each call means is stated at the call site (date compare / add, lot read, name lookup, use-effect registration) |
+| Client presentation: `AddMover` FUN_00646c50 internals (model, seat nodes), the `StatPointReqTask` event-0x19 listener, client FUN_00633f10 (minimon `bUse`) | none (client rendering) | the spec records what the client does with each field and code (§3.6, §5.10, §7.9, §8.11, §9.6, §9.8); scene-graph and widget code is not protocol behaviour |
+| Opcodes without a 2016 handler or client sender: 0x8C15 KICKOUTCANCEL_REQ, 0x8C1A ARRANGEMODE_REQ, 0x8C28 COMPULSIONMOVETO_REQ, OWNERBLOG 0x8C35 / 0x8C37, mover skills 0xCC0E / 0xCC0F | this doc §1.5, §8.9 | documented as unreachable; nothing more to reconstruct |
+
+No follow-up item was needed: everything found is either documented here or in a finished item's output (cited above).
