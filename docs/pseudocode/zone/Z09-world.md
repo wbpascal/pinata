@@ -45,7 +45,8 @@ auto-registered nodes (save link, GT portal / NPC / item box, party scenario cod
 scenario book shelf (Pine or Lua books, reload) and the dialog-string files (`Script/*.txt`). §23–§26 the Pine action
 nodes, §27 films and the boss-field tables, §28 the sweep additions (map query functions per map kind, heal reports,
 the rest of `MiscDataTable.txt`, answers to the sweep leftovers, the `OptionReader` text-table format, the dead
-`CFindWay` path finder, the methods reached only through vtables, the data-file and opcode check).
+`CFindWay` path finder, the methods reached only through vtables, the data-file and opcode check), §29 the original-server bugs
+register (Z09-B1 … B126), §30 what is not reconstructed or uncertain.
 
 ---
 
@@ -1868,7 +1869,7 @@ MobAttackSequence::AttackElement4Mob::ae4m_NextSkill(rec, m, pos, advance)     @
             # (original bug) Z09-B7: +0x1250 is read without a null check; only Karen.txt has NextSkill rows
             #   (disassembly 0x4a999b: `mov eax,[rec+0x1250]; movzx ecx,[eax+0xe]`). For the other 288 sequence mobs the
             #   list is never created, so every advancing select would fault; no writer of +0x1250 other than the loader and
-            #   no zone-wide exception trap were found. Uncertain how 2016 servers survived this (sweep / review: check SEH)
+            #   no zone-wide exception trap were found: a fault ends the zone with a minidump (§30.1); open why 2016 servers survived
         if found and to != 0xFFFF and some weapon ≥ 1 has skill to: m.chainedSkill = to
     return result
 
@@ -9835,3 +9836,263 @@ owns, i.e. cites more of than any other doc, against every doc) found these; all
   (`ShineMiniHouse::smh_SendFurnitureInfo`), 0x8C4F (`ShineMiniHouse::so_Routine`), 0x1059 / 0x105A
   (`so_ply_ClassChange`), 0x2442 / 0x2443 (`ShineMobileObject::smo_SkillBash_Blast_Trap`), 0x74F2
   (`GuildTournamentSystem::PlayerRegister`).
+
+---
+
+## 29. Original-server bugs (decide for a rebuild)
+
+Behaviour of the 2016 zone world simulation that looks unintended, one row per `Z09-B<n>`; the "Where" column links the
+section that describes it (with the function). A faithful rebuild reproduces it; a fixed rebuild should change it
+deliberately. Every row is read in the code (the PDB names and types of the 2016 build confirm several, noted in
+their sections); none was observed in a capture. Rows marked *(inferred)* in the effect column describe a consequence
+deduced from the code, not observed.
+
+### 29.1 Objects, mob core, AI, movement, spawns, drops (parts 1–7, R1, R2)
+
+| # | Where | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z09-B1 | `so_scene_Duplicate` FUN_0050dda0, §5.8 | allocates one object, then calls its `so_mob_Regenerate` `n` times | Pine / Lua duplicate of `n` objects spawns one copy | allocate and regenerate `n` objects |
+| Z09-B2 | `NPCManager::nm_DynamicRegenerateNPC` FUN_004c6cd0, §5.9 | with all 1024 `nm_BufferArray` slots used, the loop ends at index 0x400 and writes the entry there | overwrites `nm_BufferPoint` (count) and `nm_NPCInfo`; corrupts the NPC manager *(inferred)* | take the "nm_BufferArray Full" branch (free, fail) |
+| Z09-B3 | `so_scene_Duplicate` FUN_0050dda0, §5.8 | passes the stored direction byte (degrees / 2) where degrees are expected; it is halved again | duplicates face half the original angle | pass `dir × 2` |
+| Z09-B4 | `ShineMob::so_RescueRoutine` FUN_00569050, §6.6 | `lastSeenHP` starts and is reset at 60000 | for a friend with more than 60000 HP (155 race-typed mob kinds in 2016 data) a helper only joins once the friend is below 60000 HP | start at the friend's current / max HP |
+| Z09-B5 | – (§6.5) | **withdrawn in R1**: the "mob HP full" call is the map-script interrupt `sim_MobHPFull`, not a bug | – | – |
+| Z09-B6 | `MobAttackSequence::mas_Load` FUN_004a8990, §7.6 | the `*RepeatStart` marker row is stored as one more sequence value (0xFFFF, a normal attack) | each repeat cycle has an extra normal-attack step | skip the marker / store the repeat position only |
+| Z09-B7 | `AttackElement4Mob::ae4m_NextSkill` FUN_004a9730, §7.6 | reads the NextSkill list (`rec+0x1250`) without a null check | only Karen.txt has NextSkill rows; an advancing select on any of the other 288 sequence mobs dereferences null (no exception trap found; how 2016 servers survived it is open, §30) | check for a null list |
+| Z09-B8 | Lua `cMobWeaponRate` FUN_005f3e30, §8.2 | rate loop starts at Lua argument 1, the handle | weapon 0 gets the handle as its rate, every rate shifts by one | start at argument 2 |
+| Z09-B9 | `MobChat::MobChatManager::mcm_Load` FUN_004af640, §8.6 | looks up table `"RACERESCU"`; `MobChat.txt` declares `RACERESCUE`, the parser compares 20 bytes | the 32 race-rescue chat lines are never loaded; rescue shouts never happen | look up `RACERESCUE` |
+| Z09-B10 | `ShineMob::so_Shout` FUN_00459250, §8.7 | sends `len + 0x1A` bytes (the player version sends `len + 0x19`) | one stale buffer byte after every mob / NPC shout | `len + 0x19` |
+| Z09-B11 | `so_mob_SetWeaponAsScript` FUN_004ab5e0 / `mab_Think`, §8.1 | an ordered script skill without enough SP gives −1 and `mab_Think` returns before the order is consumed | the mob stalls (no attack, no other weapon) until SP regenerates | drop the order or fall back to the normal choice |
+| Z09-B12 | `cMobWeaponRate` FUN_005f3e30 and Pine `ShineMobWeaponRate`, §8.2 | a rate of 0 ends the rate list | a script cannot disable one weapon while giving later ones a rate | use the argument count as the end |
+| Z09-B13 | sight delete workers (`ali_Work` FUN_004bdfe0 and twin), §9.6 | second send calls `o.sendObject.pcb_Append(other, packet)` with the wrong object argument | when o's buffer is full (> 0x17FF bytes) the flush goes to the wrong object *(inferred)* | pass `o` |
+| Z09-B14 | `so_MoveByServer` FUN_00569510, §9.3 | remembers `lastCmd` (0x49) as the object's last move | a player entering sight gets 0x2049 NC_ACT_REINFORCE_RUN_CMD with a 22-byte move payload it misreads as a destination | remember the move command actually sent |
+| Z09-B15 | `MoveManager` step throttle FUN_004be7e0, §9.1 | the unsigned "time since last step" subtraction is reversed | the 100-ms step throttle never skips a step | skip steps < 100 ms apart |
+| Z09-B16 | `mbg_Set` FUN_004b1f30, §10.3 | `RangeDegree` (`rgs_Rotate`, ulong) is used unsigned | negative region rotations become ≈ 2³² degrees (−2° → 353.9°) | signed degrees |
+| Z09-B17 | `MobHatchery::mh_Load` FUN_004b6330, §10.3 | when a `World/` override regen file exists it is opened and then nothing is parsed | a map with an override file gets no mobs from either file | parse the override file |
+| Z09-B18 | `mb_regen` FUN_004b2cf0, §10.4 | a family member whose leader object is gone returns 0xFFFF without freeing the allocated mob | pool slot leak per failed member spawn | free the object |
+| Z09-B19 | Lua `cMobRegen_Obj` FUN_005d8690, §10.7 | direction taken from the new pool object (`newMob+0x6a`), not the source object | spawned mob faces a stale direction | the source object's direction |
+| Z09-B20 | `ItemDropFromMob::dilfs_DropByRate` FUN_0048e920, §11.2 | the drop count `Num` is decremented in the shared table record | a limited drop (`Num` > 0) runs out for the whole server, not per kill / per mob *(inferred)* | count per drop event |
+| Z09-B21 | drop sight broadcast FUN_00567ff0, §11.3 | the "quest only" byte is the low byte of the stack cookie | random quest-only flag on drop briefs | the drop's real flag |
+| Z09-B22 | `sp_partyitemdistribute` FUN_0052f630, §11.5 | the share is `amount / count(near)` (near = within 1000 units), but it is paid through all 5 member slots (absent, far, unused ones included) | members out of range are paid too, so more money is paid out than dropped whenever not everyone is near | pay only the near members |
+| Z09-B23 | `sp_partyitemdistribute` FUN_0052f630, §11.5 | each share is at least 1 coin | a small amount creates money (n × 1 > amount); the raid version splits exactly | exact split |
+| Z09-B24 | `GMEventManager` ctor FUN_0046dbd0, §3 | the map-kind tables are filled by a static constructor before `mdb_Load` has read the maps | GM events that select maps by kind match no map | fill the tables after map load |
+| Z09-B25 | `mdbe_DoorAction` (4-arg) FUN_0049e080, §9.2 | close / break ORs block bits through a null row pointer when a door row lies outside the map | crash on a misplaced door row *(inferred)* | bounds check |
+
+### 29.2 World objects and script infrastructure (parts 8a–9c)
+
+| # | Where | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z09-B26 | `AxialListMagicFieldDamage::almfd_ApplyDamage` FUN_005682c0, §12.5 | "unkillable" and "behind a wall" leave the whole target loop, not the current target | every target after the first such one gets no damage and no abstate that tick | skip that target, continue |
+| Z09-B27 | magic-field brief exchange (`bixmfm_Exchange` / `bixmfm_Send`), §12.6 | `ShineMagicField` does not override vt 0x4c4 and the exchanger never counts | 0x1C0D NC_BRIEFINFO_MAGICFIELDSPREAD is never sent: a player who enters the map or changes layer next to an active field does not see it | send fields with the other briefs |
+| Z09-B28 | `so_mgcfld_MagicFieldSpread_Friend` FUN_0057ee80, §12.3 | the duration bonus is computed on the skill's KEEP time while the heal field lives for PARTY | a duration bonus never lengthens a heal field | compute the bonus on the time actually used |
+| Z09-B29 | `AxialListMagicFieldHeal::almfh_ApplyHeal` FUN_0056d2c0, §12.5 | a refused abstate (stronger one present, immune) is still flagged in the brief bits and announced with its full KeepTime | clients show a state the target does not have | flag only on success |
+| Z09-B30 | `almfh_ApplyHeal` FUN_0056d2c0, §12.5 | reads the scratch global `setitemskilleffect`, which casts fill and `so_Routine` resets | the heal amount uses whatever set-item effect the last processed object left *(inferred from the call order)* | the field caster's own set effect |
+| Z09-B31 | `ShineMover::so_mobile_ICanDamageTo` FUN_004368c0, §8.4 (player twin FUN_004361a0) | in the KQ branch the raid test compares the mover's own raid number with itself | a mover (or player) in a raid treats every raided target as same-raid on KQ maps (cannot hit it) | compare with the target's raid number |
+| Z09-B32 | `sm_serv_VanishReserv` / `AxialListMobSuicide::alms_SelfKill`, §13.3 | the dead flag is set before `alms_SelfKill`, which returns at once for dead objects | a vanishing servant never gets its self-kill and 0x243C death packet; it just stops and disappears with 0x1805 | kill first, then mark |
+| Z09-B33 | `ShineDoor::so_door_Build` + 0x6C09, §13.1 | the build brief carries an empty `blockindex`; 0x6C09 carries no name | clients that saw the door built never switch its block; server and client collision disagree until they re-enter sight | send the block name at build |
+| Z09-B34 | `ShineEffectObject` `seo_Detach`, §13.2 | raw pointer to the followed object, never cleared | after that object is freed, the effect follows whatever reuses the pool slot until it vanishes *(effect inferred)* | clear on removal / store a handle |
+| Z09-B35 | Lua `cExecCheck` FUN_005d82a0, §14.6 | `strcpy` into `LuaScriptScenario::ls_Pointer` without a length limit | a name of 256+ characters overwrites `g_LUA_SCRIPT_SECURITY` behind it (2016 names are short) | bounded copy |
+| Z09-B36 | `cTriggerRegist` vectors (§14.5) | trigger elements are never removed; they keep raw object pointers | a trigger outlives its object and fires for the pooled slot's next user; registering twice fires twice (no 2016 script registers one) | remove with the object, refuse duplicates |
+| Z09-B37 | `ShinePlayer::sp_CastingBarFree` FUN_00570bd0, §14.6 | clears `brief.sAnimation` before copying it into 0x2075 | the cancel's NC_ACT_ANIMATION_STOP_CMD names "" (the client may not stop the animation) *(inferred effect)* | copy first, then clear |
+| Z09-B38 | `ShinePlayer::sp_Schedule_CastingBar` FUN_00576100, §14.6 | when the target NPC is gone / far / the mode is wrong nothing is reset or sent | the casting-bar handle and animation stay set | reset and send 0x2075 in every case |
+| Z09-B39 | `RankingValue` producers (heal over time FUN_0040e910, item heals), §14.3 | heal amounts are added to *dealt* too | ranking scripts count heals as damage dealt (no 2016 script uses the event) | healed only |
+| Z09-B40 | `LuaScript::ls_FunctionCall` FUN_005d7bc0, §14.1 | after a failed `lua_pcallk` the error value is not popped | each failure costs one stack slot of that state; after 1 000 000 failures every call fails *(inferred)* | `lua_pop` the error |
+| Z09-B41 | `so_AIScriptFuncExec` family (FUN_004ab3f0 …), §14.3 | none checks that the function name is set | a click / menu answer / bar end on an object whose script lacks `NPCClick` / `NPCMenu` calls Lua with "" and leaves an error on the stack (B40) | skip empty names (as the callers of 0x58 / 0x74 / 0xac do) |
+| Z09-B42 | `sp_NC_ACT_NPCCLICK_CMD` FUN_004c4b70 → `sim_NPCClick`, §15.3 | the `index[32]` argument is an uninitialised stack buffer | `NPCClickIndex` interrupts never fire (compare with garbage) | pass the NPC's index name |
+| Z09-B43 | `sib_BlastCheck` of AreaEntry / AreaLeave FUN_00509f70 / FUN_0050a0f0, §15.4 | the blast flag is not cleared when the interrupt fires | one client report keeps the interrupt armed: it fires again on later re-checks while the player is still inside / outside and `num` > 0 *(inferred effect)* | clear the flag |
+| Z09-B44 | `ScriptInterruptManager::sim_Alloc` FUN_00509b10, §15.2 | `sib_Argument` is not cleared on allocation | kinds that set only part of it read the previous user's bytes (e.g. the `deadindex` `_NONE_` compare) | zero the argument |
+| Z09-B45 | `ScriptInteruptWinGuild::UpdateArgument` FUN_0050d0a0, §15.6 | the winning guild number lives in one global object for all maps | two guild-tournament maps reporting before `waitinterrupt` both read the later winner | per-map storage |
+| Z09-B46 | `ActionGen_OptionReader` "RestoreRate", §16.1 | HP and SP types are swapped | a "RestoreRate HP" row restores SP only | map HP → HP |
+| Z09-B47 | `RestoreRateAction::exe` FUN_005c15f0, §16.5 | the HP case falls through into the SP case | with B46, a "RestoreRate SP" row restores HP and SP | `break` after HP |
+| Z09-B48 | `DamageAbsorbAction::exe` FUN_005c11a0, §16.6 | every protector reads the original `sp_nDamageAbsorb`, not what the previous one left | two protectors both take the full damage; if the second dies its remainder overwrites the first one's 0 and the player is hurt anyway | chain the remaining amount |
+| Z09-B49 | `NeighborhoodChecker` scan with `DetectCha` 0, §16.3 | the scan covers the whole sight but the leave test compares d² with 0 | `IDLeviathanGate01` calls `InteractWithNPC` for every player in sight each tick; `DT_RadionOre`'s `AttackMob` observer lives for one tick *(inferred effect)* | treat 0 as "sight" in both tests, or give the rows a range |
+| Z09-B50 | `SkillCondition` (FUN_00615e70), §16.4 | nothing produces `EV_SKILL` (§14.8) | "Skill" trigger conditions never fire | raise `EV_SKILL` on skill use |
+| Z09-B51 | `CondGen_OptionReader` / `createCondition_` FUN_005c29c0, §16.1 | `while name == "Term"` copies ConditionB into itself | a row with ConditionA and ConditionB both "Term" hangs the loader | one level of Term, or error |
+| Z09-B52 | `createCondition_` FUN_005c29c0, §16.1 | an unknown condition name asserts (not fatal) and becomes a NoneCondition | a misspelt condition fires at once | fatal error, like actions |
+| Z09-B53 | `DamageAbsorbAction::exe` FUN_005c11a0, §16.6 | 0x2449 flag bits 3–7 are left from the previous packet in the shared buffer | stale damage flags shown by clients | zero the byte |
+| Z09-B54 | `NoticeAction::exe` FUN_005c1700, §16.5 | 0x2011 NC_ACT_NOTICE_CMD byte 0 is never written | stale byte on the wire (the client ignores it *(inferred)*) | zero it |
+| Z09-B55 | `AxialListSetAbstateInArea::alsa_SetAbstate` FUN_004c1c20, §17.4 | the result of vt 0x638 is not checked; the applied strength replaces the argument | a refused state is still flagged and announced; later players get the previous player's applied strength | check the result, keep `strength` |
+| Z09-B56 | Lua `cSetAbstate_Range` FUN_005f2560, §17.4 | the strength register is replaced by `g_NewAbstateStrength` after every success | the 2nd, 3rd … objects get the previous one's applied strength | keep `strength` |
+| Z09-B57 | Lua `cDamaged` FUN_005f10d0, §17.3 | 0x243C carries abstate 0x1C1 = 449 (STA_MOBACPLUS); the other kill paths send 0x318 (none) | clients play STA_MOBACPLUS's view effect (if any) on script damage deaths | 0x318 |
+| Z09-B58 | Lua `cFreeStatInit` FUN_005e7dc0, §17.8 | 0x111A `nMaxStat` (payload byte 4) is never written | stale byte (unused in 2016; D02 does not read it) | the real maximum |
+
+### 29.3 Lua C functions (parts 10–12)
+
+| # | Where | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z09-B59 | `cFindNearestMobList` FUN_005e6eb0, §18.5 | pushes the handles before `lua_checkstack` | more than about 20 matching mobs write past the Lua stack (LUA_MINSTACK 20): heap corruption | check first |
+| Z09-B60 | `cGetTargetList` FUN_005f0e40, §18.5 | no `lua_checkstack` at all | more than about 20 targets overrun the Lua stack (as B59) | check the stack |
+| Z09-B61 | `cFindNearPlayer` FUN_005f37d0, §18.5 | a classList value is popped only when it is non-zero | a 0 in the list stays on the stack and becomes the next `lua_next` key (Lua error or wrong walk) | always pop |
+| Z09-B62 | `cRandomInt` FUN_005eed70, §18.1 | a range of more than 100 values (or max < min) always returns min (RandomRing has rings up to 100) | `cRandomInt(1, #PlayerAggroList)` (34 calls in 2016 scripts) returns 1 once a list has over 100 entries | a real random range |
+| Z09-B63 | `cObjectCount` FUN_005e26c0, §18.5 | the count saturates at 200 (the scan buffer) | "more than 200 of a kind" reads as 200 | count without the buffer limit |
+| Z09-B64 | `cObjectSound` FUN_005ea6f0, §18.6 (0x207A) | always copies 32 bytes of the name | bytes after a short name's NUL come from the Lua heap; a 32+ name is unterminated | bounded copy with NUL |
+| Z09-B65 | `cMapMark*` (FUN_005df860, `cMapMark_FieldSight` FUN_005e0640), §18.6 | entries are written into the send buffer before the length is checked | a large mark table writes past the send buffer | check before writing |
+| Z09-B66 | `cGetScriptString` FUN_005e8b30, §18.4 | unbounded `sprintf` into a 256-byte stack buffer | a long text or long script arguments overrun the stack | `snprintf` |
+| Z09-B67 | `cIsMovable` FUN_005da9c0, §18.2 | the found-object test is skipped: a missing object returns 1 (movable) | scripts treat a vanished object as movable | return nothing for missing objects |
+| Z09-B68 | `cObjectFind`, `cGetNearObjListByCoord` FUN_005f4ef0 and the other ByCoord function, §18.5 | the method (and for `so_mobile_GetIdxName` the value) string is not checked | a missing argument passes null to `strncpy` / the compare: crash | check the argument |
+| Z09-B69 | `cNPCChatTest` FUN_005db4b0, §19.3 | `strcpy` of the text into a 256-byte stack buffer | a 256+ character text overruns the stack | bounded copy |
+| Z09-B70 | `cNoticeRedWarningCode` / `cNoticeString` FUN_005e16e0, §19.3 | `strlen` / `so_ply_Notice` on a missing or non-string text slot | null text: zone crash as soon as the map holds a player | check the argument |
+| Z09-B71 | `cSomebodyShout` FUN_005e5150, §19.3 | itemLinkDataCount (byte 0), speaker bytes 2…19 and flag bits 2…7 are never written | a stale non-zero count makes the client parse `count × 0x67` bytes of item links past the packet | zero the header |
+| Z09-B72 | `cScriptMsg` FUN_005ebb40 / `_World` / `cSimpleChatScriptMsg`, §19.1 | always copies 32 bytes of the message index | stale Lua-heap bytes after a short index; a 32+ index is unterminated | bounded copy with NUL |
+| Z09-B73 | `cScriptMessage` FUN_005dcbe0 family (0x6C15 [31], 0x6C12 [16], 0x6C11 [32]), §19.1 | `strncpy(…, n)` never writes the last index byte | an index of n+ characters keeps the shared buffer's byte; the client lookup fails unless it is 0 | write the NUL |
+| Z09-B74 | `cCameraMove` FUN_005dbe30 (and the effect-timer twin), §19.4 | the "< 2" test is signed | a negative moveType is stored as the camera state and sent as 0x80…0xFF, which the client ignores | unsigned test / reject |
+| Z09-B75 | message builders of §19 | each string length is stored as `strlen & 0xFF` and that many bytes are copied | strings of 256+ characters are cut to length mod 256 | reject or clamp to 255 |
+
+### 29.4 Pine engine (parts 14a–14c)
+
+| # | Where | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z09-B76 | `PineScriptReader` token readers, §20.3 | strings, numbers and names are appended to the 256-byte `tr_Buffer` without a length check | a 256+ character token overwrites `tr_BufPnt` / `tr_ErrCode` / `tr_Line` on `pes_Load`'s stack | length check |
+| Z09-B77 | token reader comment rule, §20.3 | `;` starts a comment inside strings too | `"a;b"` loses `;b"` and the line end; the string continues on the next line (no 2016 script has one) | ignore `;` in strings |
+| Z09-B78 | `pes_Load` FUN_004d6c40, §20.2 | `tr_ErrCode` is set but never read; a token error at top level reads as end of file | load errors report a line only; a bad token ends the file "successfully" and the rest is ignored | report the error, fail the load |
+| Z09-B79 | `pst_GetNumber`, §20.4 | ignores a `-` | no negative numbers: `0 - 1` reads back as 1; `"-1" + 1` = `"-2"` | signed numbers |
+| Z09-B80 | `Express::sa_Calculate` FUN_004d8640, §20.5 | no precedence, right-associative | `a - b - c` = `a - (b - c)`, `a * b + c` = `a * (b + c)` (2016 scripts bracket everything that matters) | usual precedence, left-assoc |
+| Z09-B81 | concatenation / arithmetic on tokens, §20.4 | append to the 256-byte token without a length check | a 256+ character value overwrites the following stack / variable storage | length check |
+| Z09-B82 | `vs_FindVariable` FUN_004d69f0, §20.6 | a missing variable returns the shared static `deftkn` | action nodes write results into it; later missing-variable reads see that value | fail the statement |
+| Z09-B83 | `Term::sa_Load` FUN_004dbde0, §20.5 | a non-`(` token is not pushed back | a failed term eats one token; wrong where a caller treats it as "no further argument" | unget the token |
+| Z09-B84 | `Statement::sa_Load` FUN_004d85d0, §21.2 | a failed candidate node is freed but `s_Statement` keeps pointing at it | the statement's destructor frees it again (double free), e.g. on reload (see B96) | clear the pointer |
+| Z09-B85 | `StateAssignment::sa_Step` FUN_004db110, §21.5 | the expression is computed straight into the target variable | `X = 1 + X` reads the partial value 1 for X (gives 2) | compute into a temporary |
+| Z09-B86 | `Statement::sa_Step` FUN_004d8250 / `Block`, §21.4 | `b_VarStackPoint` belongs to the block, not to the stack entry | a block on the stack twice (recursion) loses the outer run's variable mark; both restore the inner one | store the mark per stack entry |
+| Z09-B87 | `StateIf::sa_Load` FUN_004de670, §21.5 | an `if` without `then` drops the true branch | the block after it runs always | require `then` / error |
+| Z09-B88 | node deletes (§21.2), `List<Block>::l_Enlargement` FUN_004e13b0 | nodes are freed without their destructors; the list enlargement leaks the old array | memory leak per failed candidate and per unloaded script | virtual destructor / free the old array |
+| Z09-B89 | `@Random` `SysFuncRand` FUN_004d77d0, §22.2 | `a + rand() % (b − a + 1)` without `b ≥ a` | `b == a − 1` divides by zero (zone crash); `b < a − 1` gives values ≥ a | check the range |
+| Z09-B90 | `@RestSec` `SysFuncShineRestSecond` FUN_004e42e0, §22.2 | `tl_IsActiv` not tested; unsigned subtraction | without a limit or after it ran out the result is about 429 million instead of 0 | 0 when inactive / expired |
+| Z09-B91 | KQ score functions (`alkqr_CalcScore` FUN_004e2f80, `zerosumWorker` FUN_004e55d0), §22.3 | score = 0 when the sum is negative, then overwritten with the sum (zerosum has no clamp) | negative KQ scores stay negative | keep the clamp |
+| Z09-B92 | `@Range` `SysFuncShineRange` FUN_004e72b0, §22.2 | no length check of the result token | more than about 50 values overrun the 256-byte token (unused in 2016) | length check |
+| Z09-B93 | `@Range` FUN_004e72b0, §22.2 | `to < from − 1` gives a negative vector size | `std::length_error` / `bad_alloc` thrown inside a script step | check the order |
+| Z09-B94 | `BroadcastCode::sa_Step` FUN_004f7ae0, §22.4 | the handle form needs two arguments but the node registers max 1 | a statement with a handle never loads; the handle branch is dead | allow 2 arguments |
+| Z09-B95 | the six `@mobregen`-family builders, §22.2 | the second free is `List::l_Free` on `shineobjmanager`'s 13-entry base list with the handle as index | a no-op (or an unrelated unlink for handles 0…12 *(inferred)*); doors stay allocated and unbuilt until the pool walk reclaims them | the pool free |
+| Z09-B96 | `ScenarioBookShelf::sbs_Read`, §22.5 | ignores `sb_Load`'s result; a failed Pine book only asserts | the zone keeps a half-loaded book with B84's dangling pointer: double free at its next `sbsReLoad` | fail like the Lua path |
+
+### 29.5 Pine action nodes, films, sweep (parts 15a–17b)
+
+| # | Where | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z09-B97 | `ShineChange2Mob::sa_Step` FUN_004ed1e0 / `ShineChange2NPC` FUN_004ed4c0, §23.2 | after a failed regenerate the object is freed a second time | the second free only logs (no damage) | one free |
+| Z09-B98 | change2mob / change2npc / change2door (`os_ObjectChange`), §23.2 | on a non-bandit a second object is built at the old one's place; the old one is never removed | both objects stay; the script loses its handle to the old one | free the old object first, as `exchange2mob` does *(inferred)* |
+| Z09-B99 | `ShineChange2NPC::sa_Step` FUN_004ed4c0, §23.2 | tests the **new** pool-4 object for bandit | dead check (a pool-4 object is always an NPC) | test the old object |
+| Z09-B100 | `ShineChatWindowRange::sa_Step` FUN_004f5520, §23.5 | reads argument 2 as the range; argument 1 is never read | the range is the mob name's number (0 for names) *(inferred)*; 25 uses in 2016 books | argument 1 = range |
+| Z09-B101 | `ShineBattleStart::sa_Step` FUN_004f3cb0, §23.6 | `battlestart guild`'s 0x7483 bytes 8–13 (`nGuildTourNamentType`, `nGuildMyRegNumber`) are not written | stale send-buffer bytes | fill them |
+| Z09-B102 | `ShineItemDrop::sa_Step` FUN_004eff00, §24.1 | a failed roll returns 1 without pop | the node retries every pass until it drops; a rate ≤ 0 stalls the film for good | pop after one roll |
+| Z09-B103 | `ShineItemErase::sa_Step` FUN_004f0570, §24.2 | `os_ShineObject` result used without a null check | handle 65535 (object gone) crashes the zone | check the object |
+| Z09-B104 | `ShineItemOwner::sa_Step` FUN_004f4ec0, §24.3 | compares the stored 0xFFFF with 0xFFFFFFFF | the unknown-item check is dead; the walk runs for item 0xFFFF and finds nothing | compare with 0xFFFF |
+| Z09-B105 | `ShineExchange2Mob::sa_Step` FUN_004ed650, §24.5 | frees the old object before the new one is ready | on any later failure neither object is left and the variable holds a freed handle; three failures also leak the new mob slot | build first, then free |
+| Z09-B106 | `ShineGuildTorunamentResult::sa_Step` FUN_004f6290, §24.8 | without a GT system the four A/B fields of 0x74E2 keep old send-buffer bytes | stale result fields on clients | zero them |
+| Z09-B107 | `ShineItemAttrSet` FUN_004f37a0 / `findplayer`, §24.2 / §24.4 | an argument evaluated into the shared buffer is used without checking the result | a failed argument passes the previous token (unused in 2016) | check the result |
+| Z09-B108 | `DiceGameStart` node, §24.8 | without a GT system returns 0 without pop | the film ends | pop and continue |
+| Z09-B109 | `ShineQuestMobkill::sa_Step` FUN_004f8270, §25.6 | the per-player repeat count is capped by the number of players on the map | fewer kills credited than `count` when few players are on the map | cap by `count` only |
+| Z09-B110 | `ShineMobRegen::sa_Step` (copy branch) / `sbr_MakeBeggar` FUN_004eb630, §25.1 | a mob / NPC / door handle reaches the 0xEB-byte brief copy, whose source (vt 0x6d0) is null for them | zone crash | player handles only |
+| Z09-B111 | `ShinePlayerWalk::sa_Step` FUN_004f6d40 and `collect`, §25.2 / §25.4 | argument results not checked | a failed y keeps the token of x (walk to x, x) | check each argument |
+| Z09-B112 | `ShineSomeoneShout::sa_Step` FUN_004eeeb0, §26.2 | itemLinkDataCount (byte 0) never written; u8 text length | as B71 (client parses links past the packet); 256+ texts wrap | zero the header, clamp |
+| Z09-B113 | `ShineSuicide::sa_Step` FUN_004f1980, §26.4 | the unknown-name assert does not return | the walk runs with id 0xFFFF and kills every mob of the map | return after the assert |
+| Z09-B114 | `waitidle` node, §26.5 | the target object is always null (no target argument) | `waitidle` never waits and asserts every time (no loaded 2016 book uses it) | resolve a target (the boss) |
+| Z09-B115 | `AxialListTeleport::ali_Work` FUN_004286e0 (`teleportall`), §26.4 | the "anywhere" and "x y" forms test the walker's kind (the centre flag), not the visited object | those forms teleport nobody; only "split" works | test `o` |
+| Z09-B116 | `ShineTimeLimit` / `ShineScriptFile::sa_Step`, §26.5 / §26.2 | a failed argument returns 0 | the film ends | assert, pop and continue |
+| Z09-B117 | `ShineEndOfKingdomQuest::sa_Step` FUN_004f5fc0, §26.1 | the "Invalid Shine Quest" assert does not return | WM still gets 0x5810 NC_KQ_Z2W_END_CMD { Handle = −1 } | return |
+| Z09-B118 | `ShineSpawn::sa_Step` FUN_004f7eb0 and other optional slots, §26.3 / §26.4 | optional argument slots dereferenced without a null check (`spawn` with 1 argument, `teleport` with < 3, short `teleportall` forms) | null expression → zone crash when the node steps | check the slot |
+| Z09-B119 | `Movie::CinemaComplex::cc_PlayFilm` FUN_005089a0, §27.2 | for an unknown book (or type 0) cell i stays allocated | lost film slot; a later drop of it crashes on a null film | free the cell |
+| Z09-B120 | `Movie::TimeLimit` `tl_IsActiv`, §27.4 | written, never read | in a film without `timelimit`, `TimeOut` fires at a time left over from the cell's previous film (or uninitialised) and broadcasts 0x0810 with it (every 2016 `TimeOut` book sets a limit) | test `tl_IsActiv` |
+| Z09-B121 | `so_AllOfRangeMiniHouse` (member-function form) FUN_00554100, §28.1 | empty stub | on a mini-house map every member-function range call reaches nobody | implement like the other forms |
+| Z09-B122 | mini-house member walk, §28.1 | runs from slot `5 − EnterGMCount` to `EnterPlayerCount − 1`; `so_mh_Enter` FUN_00543cb0 fills players from 0 up, GMs from 4 down | with no GM inside walks reach only the caller; with GMs some members are skipped | walk 0…players−1 and 5−GMs…4 |
+| Z09-B123 | `SpyNet` agent constructor, §28.2 | fills 16 slots with `SRT_GETHEAL`, no `SRT_EOR` | every analysis pass for a never-healed target reads 16 null reports and logs "Cannot found EOR" (log spam, no aggro change) | `ea_Clear` in the constructor |
+| Z09-B124 | `ExpandSkill` reader (`MiscDataTable`), §28.3 | a `Skill` word that is itself a skill name advances the record counter twice | the next record is skipped (latent: no 2016 base name is a skill) | advance once |
+| Z09-B125 | `ORTable::ort_ReadData` FUN_006480a0, §28.6 | "Undefined command" stops reading but `ok` stays true | `or_Read` reports success for a truncated table | return false |
+| Z09-B126 | `ShineMob::so_GainHP` FUN_00556a00 (vt 0x504), §28.8 | caps HP at `so_GetHP` (current HP) instead of `so_MaxHP` | the cap never applies; a mob's HP can pass its maximum (latent: only `RecoverTypeEffect::_execute` FUN_005cfc70 heals through it) | cap at MaxHP |
+
+---
+
+## 30. Not reconstructed / uncertain
+
+Collected from the "open points" subsections of §6–§28 (items answered later, in §21.8 / §22.7 / §23.9 / §24.9 /
+§27.7 / §28, are left out) and the "not traced" notes inside the pseudocode. Smaller *(inferred)* marks stay where they
+are; the bug consequences marked *(inferred)* are listed in §29. Items that belong to another item's code are only
+named here; §31 gives their owners.
+
+### 30.1 Answered in this part
+
+- **Z09-B7: does the zone survive a fault?** No. The only exception trap is the process-wide filter
+  `MiniDumper::TopLevelFilter` FUN_0064e810 *(pdb2016)*, installed by `MiniDumper::MiniDumper` FUN_0064eb00
+  (`SetUnhandledExceptionFilter`). It loads `DBGHELP.DLL`, writes `<exe>_<time>.mdmp` with `MiniDumpWriteDump` and
+  returns 1 (`EXCEPTION_EXECUTE_HANDLER`) on success, 0 otherwise: either way the process ends. Every "crash" in §29
+  (B7, B70, B89, B103, B110, B118, …) stops the zone and leaves a minidump. `EHConvertSimpleException` FUN_00654060
+  (exception code → name, e.g. "EXCEPTION_ACCESS_VIOLATION") is the CRT's text helper. Still open: why 2016 servers did
+  not crash on B7 (whether any of the 288 non-Karen sequence mobs ever reaches the advancing select; not traced per
+  tactic).
+
+### 30.2 Main loop, player tick, mob core (§1, §2, §5)
+
+- §1.1: the two per-tick caches reset each pass (`ShineObject::so_CostumWeaponChargeing` / `so_CostumShieldChargeing`,
+  item SerialNumber = −1): their readers were not traced (costume weapon charging is item code).
+- §1.5: the session pools' keep-alives FUN_005aae80 / FUN_005ab2c0 polled by `zs_disconnect` were not opened (Z01's
+  session layer).
+- §2.4: the meaning of the party record's first byte (`+0x29244 < 2`) in `sp_SendPartyMemberInform` FUN_0056e340.
+- §5.5: the tick argument of the routine thunk was not traced further.
+
+### 30.3 Spawns and drops (§10, §11)
+
+- §10.11: whether a pool handle can be reused by another object before the 1-s regen tick sees the death (which would
+  delay that breeder) depends on the pool's reuse order; not checked.
+- §10.11: breeder members `+0x60` (bandit) and the timestamps `+0x4c` / `+0x50` are not set by the ctor or `mb_Set`;
+  file breeders rely on zeroed hatchery memory *(inferred)*. Arguments 5, 12, 13 of `mh_MobBreed` and the `mbg_RegenLoc`
+  out value are unused; the group key "Def" is stored and never compared.
+- §11.9: how `ItemAttr` vt 0x2c turns MinQtty / MaxQtty and the `Upgrade00…15` weights into lot and upgrade (Z04's
+  item model); the same for the synthetic row of Pine `itemdrop` (§24.9: MinQtty = MaxQtty = 1, no weights; whether
+  it reads the uninitialised InxName bytes).
+- §11.9: `dropitemanalyzer` (DAT_0cf15b40, 256 buckets × 500 `{mobId, itemId, count}`) has no reader in the zone; the
+  drop object's `+0x204` (flag 1 from `so_IsDropping`) is never read by the drop functions found.
+
+### 30.4 Movement, sight, world objects (§9, §12, §13, §27)
+
+- §9.8: `MainChar+0x20 / +0x2c` (the client's 0x2049 guard) and player byte `+0x7f36` (cleared by pushes) are not
+  identified; the meaning of `GetParam()+0xcce` bits 0 / 1 (which abstates set them) is Z03 §6.
+- §27.7: the 0x1C08 layout a boss sends through `so_BroadcastBriefInfo` to players outside its sight, and whether the
+  client keeps such a far object (C01 / Z02 §5).
+- §26.8: whether a `sublayershift` without `logout` leaves stale objects on clients (sight refresh, Z02 §5).
+- §12.8: which SubAbState kinds use the "MagicField" actor and how often its `sasa_Routine` runs (Z03 §6.1); the client
+  byte `+0x213 == 0x42` / vt 0xd4 in `On_NC_BRIEFINFO_MAGICFIELDSPREAD_CMD` (a caster animation) was not traced;
+  `almfd_BattleField` / `slmfd_GuildWarMap` are filled and never read (maybe a planned guild-war rule).
+- §13.4: the `namestring` copy in `bixd_Exchange` (receiver's name into a ring) has no reader (leftover debug code).
+
+### 30.5 Script infrastructure and Lua functions (§14–§19)
+
+- §14.10: `RankingValue` (map event 0xac): no 2016 script sets it, so the intended meaning of its three values is read
+  from the call sites only (B39).
+- §14.10: `cTimer_Obj` sends through the player's data stream (vt 0x2f8), the other timer functions through the game
+  stream (vt 0x2fc); what separates the streams is Z01's. `cmc_AllowMode` 0x78 refuses player modes 3–6; the mode names
+  are Z02's.
+- §15.9: `so_AllInMap1`'s last argument (0 for area requests, 1 for the counters) is passed to the map's
+  `fm_fp_AllInMap2` broadcast function; its meaning was not read.
+- §16.9: whether a hit on `DT_RadionOre` ever meets its `AttackMob` observer (B49) depends on the walk order of the ore
+  and the player in the same tick; not traced.
+- §17.9: whether a 2016 script animates a player with `cAnimate` (the player's own client would not get 0x2074) was not
+  checked. `cSetAbstateInArea`'s range is `BMPInfo.AreaCenter_X`: bitmaps whose centre is not their half size reach only
+  part of the bitmap *(inferred from the member order)*. View-slot storage across logout for `cViewSlotEquip` is Z05 / Z07.
+- §19.6: which `TextData` / sound a `cEffectMsg` type plays (client `EffectMsg` table); whether a 2016 client dialog
+  opened by `cNPCMenuOpen` answers with 0x2073 or 0x201D (client NPC dialog code, C01).
+
+### 30.6 Pine engine and action nodes (§20–§26)
+
+- §21.8: whether a handler block reached through `call InterruptBlock.` can re-enter a block already on the stack
+  (B86) depends on each book's interrupt targets; not traced per book.
+- §23.9: keep times above 2³¹ − 1 (`4200000000`, `4000000000` in `JobChange1.ps`, `GordonMaster.ps`, `Monkey.ps`) pass
+  `pst_GetNumber` (`int`) with the same 32-bit pattern; whether `so_AbnormalState_Set` (vt 0x638) reads them as
+  unsigned (about 48 days) or negative was not traced.
+- §23.9: `chatwin` / `chatwinrange` `sprintf` into the global send buffer before the `< 256` check: the buffer capacity
+  (`gpp.pp_BufferSize`, set statically) and a dialog string with more `%s` than values (stack garbage) were not traced.
+- §24.9: `som_FindPlayer`'s name comparison (case, which player list) for `findplayer`; `iac_itemcreate`'s parsing of
+  the `itemattrset` attribute string (Z04 / Z05).
+- §25.8: whether the bandit's `sm_LoginLoc.currentcoord` (the copied brief coordinate, garbage for a beggar) is read
+  anywhere (no reader found by member name).
+- Owned by other items and not traced here (§24.9, §25.8, §26.8): `GuildTournamentSystem::EndBattle` / `Clear` /
+  `FlagRegister` / `GateRegister`, `DiceGame::Start`, `ShinePlayer::sp_KQReward`, `so_ply_KQRewardStruct`,
+  `kqcl_GetMobKill`, the bounds of `guildtournamentinfo` (slot 255 written by `fm_GuildTournamentClear` when the seed is
+  not set) (Z16); `QuestPlayer_ScriptMobKill(_All)`, `CQuestZone::PsEnd`, `QuestPlayer_ScenarioDone_Server` (Z15);
+  `CT_KQSuccess` / `CT_KQFail` (Z07); other setters of `sp_SetRollBackPosEvent` (`wms_NC_CHAR_ZONE_LINK_FROM_CMD`
+  FUN_00476600, Z08); the wedding-hall registration `weddinghall.Groom` / `.Bride` (Z13).
+
+### 30.7 Not reconstructed on purpose
+
+- `CFindWay` (§28.7): the old path finder has no caller in 2016; its algorithm is summarised, not written out.
+- `MobBehaviorDescript/` (`DefaultBehavior.ps`, 7 `KQ/*.ps`): no zone code reads the folder (§20.1); the files are not
+  documented.
+- `sdc_Setsixpoint` FUN_004607f0 (drop-spot rings, §11): only its use is described; the point placement inside was
+  not written out (cosmetic).
