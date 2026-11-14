@@ -8601,18 +8601,18 @@ no payload read
 
 ### `0x0c0d` NC_USER_WILLLOGIN_REQ (Login→WM)
 
-**Verified layout** (basis: wm FUN_00424950)
+**Verified layout** (basis: wm FUN_00424950, FUN_00412d50 (PROTO_NC_USER_WILLLOGIN_REQ::operator=))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | loginHandle |  |
-| 2 | u8 | worldNo |  |
-| 3 | u32 | userNo |  |
-| 7 | char[256] | userId |  |
-| 263 | u16[32] | validate | XOR of all 32 words = table slot |
-| 327 | u32[5] | extra |  |
+| 0 | u16 | netpacketheader.clienthandle | Login's client handle |
+| 2 | u8 | willlogin_worldno |  |
+| 3 | u32 | usrregnum |  |
+| 7 | char[256] | userid | Name256Byte |
+| 263 | u16[32] | validate_new | XOR of all 32 words = pending-table slot (W01 §3.1) |
+| 327 | char[20] | spawnapps | Name5; W01's extra[5]; forwarded to CharDB in 0x1036 |
 
-0x15B bytes; W01 name was 'world login request (ours)'
+0x15B bytes (pdb2016). Names from the 2016 WM PDB
 
 ### `0xd001` NC_EVENT_GET_ALL_EVENT_INFO_REQ (OPTool→WM)
 
@@ -8681,27 +8681,122 @@ size 0x553
 
 size 3
 
-### `0x0802` NC_MISC_S2SCONNECTION_REQ (S2S)
+### `0x0813` NC_MISC_PINGTEST_TOOL_WM_CLIENT_ZONE_DB (OPTool↔WM↔C)
 
-**Verified layout** (basis: wm FUN_004246c0 / FUN_004283e0)
+**Verified layout** (basis: wm FUN_00425f10, FUN_00415670; client FUN_0049fba0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | echo | returned in 0x0803 |
-| 1 | u8 | server_id_to |  |
-| 2 | u8 | server_id_from |  |
-| 3 | u8 | worldNo |  |
-| 4 | u8 | zoneNo |  |
-| 5 | u16 | key | server_id_to + server_id_from |
+| 0 | u32 | ID |  |
+| 4 | u16 | hTool | WM writes the tool's session handle |
+| 6 | u32 | ToolSendToWM |  |
+| 10 | u32 | ToolRecvFromWM |  |
+| 14 | char[20] | TargetCharName | Name5; WM looks the character up |
+| 34 | u16 | hWMClient | client handle, 0 = not found |
+| 36 | u32 | WMSendClient | WM stamp |
+| 40 | u32 | WMRecvFromClient | WM stamp (also when not found) |
+| 44 | u32 | ClientSendZone | client stamp; 0 = first pass |
+| 48 | u32 | ClientRecvZone | client stamp |
+| 52 | u16 | hZoneClient |  |
+| 54 | u32 | ZoneSendToDB |  |
+| 58 | u32 | ZoneRecvFromDB |  |
+| 62 | u32 | ZoneSendToClient |  |
+| 66 | u32 | ZoneRecvFromClient |  |
+| 70 | u32 | DBRecvFromZone |  |
+| 74 | u32 | DBSendToZone |  |
+| 78 | u32 | DBSendToODBC |  |
+| 82 | u32 | DBRecvFromODBC |  |
+| 86 | bytes[6] | header | NETPACKETZONEHEADER |
+| 92 | bytes[38] | buylot | PROTO_NC_ITEMDB_BUYLOT_REQ |
+
+0x82 bytes (pdb2016; the 2017 PDB has 0xa4). Path tool → WM → client → zone → client → WM → tool
+
+### `0x0814` NC_MISC_PINGTEST_TOOL_WM_DB (OPTool↔WM↔CharDB)
+
+**Verified layout** (basis: wm FUN_00426060, FUN_0040c460)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ID |  |
+| 4 | u16 | hTool | WM writes the tool's handle |
+| 6 | u32 | ToolSendToWM |  |
+| 10 | u32 | ToolRecvFromWM |  |
+| 14 | u32 | WMSendDB | WM stamp |
+| 18 | u32 | WMRecvFromDB | WM stamp |
+| 22 | u32 | DBRecvFromWM |  |
+| 26 | u32 | DBSendToWM |  |
+| 30 | u32 | DBSendToODBC |  |
+| 34 | u32 | DBRecvFromODBC |  |
+
+0x26 bytes
+
+### `0x0815` NC_MISC_PINGTEST_TOOL_WM_ZONE_DB (OPTool↔WM↔Zone)
+
+**Verified layout** (basis: wm FUN_00426130, FUN_0042b180)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ID |  |
+| 4 | u16 | hTool | WM writes the tool's handle |
+| 6 | u32 | ToolSendToWM |  |
+| 10 | u32 | ToolRecvFromWM |  |
+| 14 | u32 | WMTargetZoneNo | 0xFFFFFFFF in the reply when the zone is not connected |
+| 18 | u32 | WMSendZone | WM stamp |
+| 22 | u32 | WMRecvFromZone | WM stamp |
+| 26 | u32 | ZoneSendToDB |  |
+| 30 | u32 | ZoneRecvFromDB |  |
+| 34 | u32 | ZoneSendToWMS |  |
+| 38 | u32 | ZoneRecvFromWMS |  |
+| 42 | u32 | DBRecvFromZone |  |
+| 46 | u32 | DBSendToZone |  |
+| 50 | u32 | DBSendToODBC |  |
+| 54 | u32 | DBRecvFromODBC |  |
+
+0x3a bytes
+
+### `0x0816` NC_MISC_PINGTEST_TOOL_WM_ZONE (OPTool↔WM↔Zone)
+
+**Verified layout** (basis: wm FUN_00426260, FUN_0042b250)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | ID |  |
+| 4 | u16 | hTool | WM writes the tool's handle |
+| 6 | u32 | ToolSendToWM |  |
+| 10 | u32 | ToolRecvFromWM |  |
+| 14 | u32 | WMTargetZoneNo | 0xFFFFFFFF when the zone is not connected |
+| 18 | u32 | WMSendZone | WM stamp |
+| 22 | u32 | WMRecvFromZone | WM stamp |
+| 26 | u32 | ZoneRecvFromWMS |  |
+| 30 | u32 | ZoneSendToWMS |  |
+
+0x22 bytes
+
+### `0x0802` NC_MISC_S2SCONNECTION_REQ (S2S)
+
+**Verified layout** (basis: wm FUN_004283e0 (zone), FUN_00424e20 (OPTool))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | echo_data | returned in 0x0803 |
+| 1 | u8 | server_to_id | must equal the WM's MY_SERVER id (5) |
+| 2 | u8 | server_from_id | stored as m_Connected_Server_ID |
+| 3 | u8 | server_from_world_num | stored, not checked (W05-B13) |
+| 4 | u8 | server_from_zone_num | ServerInfo row (6, WM world, zone, 6) must exist and its IP equal the peer's |
+| 5 | u16 | key | server_to_id + server_from_id |
+
+7 bytes. A failed check returns 0 from the handler: the zone link is closed (W05 §5.1/§5.2)
 
 ### `0x0803` NC_MISC_S2SCONNECTION_ACK (S2S)
 
-**Verified layout** (basis: wm FUN_00424720 / FUN_004283e0)
+**Verified layout** (basis: wm FUN_004283e0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | echo |  |
-| 1 | u16 | result | 0 = ok |
+| 0 | u8 | echo_data |  |
+| 1 | u16 | error | always 0 (failures close the link instead) |
+
+3 bytes
 
 ### `0x3809` NC_PARTY_MEMBER_LIST_CMD (S→C)
 
@@ -9170,6 +9265,17 @@ raw long frame, len 0x143 + n
 
 sent on every map login once 0x0844 arrived
 
+### `0x0849` NC_MISC_SERVER_TIME_NOTIFY_CMD (WM→C)
+
+**Verified layout** (basis: wm FUN_00437e30, FUN_00432e10; client FUN_004a4420)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | tm | dCurrentTM | localtime() at send time (9 × i32: sec, min, hour, mday, mon, year, wday, yday, isdst) |
+| 36 | i8 | nTimeZone | (mktime(local) − mktime(gmtime)) / 3600, truncated; standard-time offset (inferred) |
+
+37 bytes. Every 60 s to all client sessions with m_bCharDataValid (+0x704, W01 inGame) == 1, first send aligned to the next full minute; once per character login at the first 0x180C (flag +0x1ed00 set by CharDB 0x1007). Client shows it as "%H:%M GMT(+n)" (FUN_0057d8f0): HH:MM of the last 0x0849 (elapsed seconds only added to tm_sec, not shown), date tooltip "%Y-%m-%d (%a)"
+
 ### `0x0860` NC_MISC_SPAMMER_REPORT_ACK (WM→C)
 
 **Verified layout** (basis: wm FUN_00417ef0; client FUN_0049cb10)
@@ -9210,6 +9316,17 @@ sent on every map login once 0x0844 arrived
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | Name8 | sMobIndex | NpcSchedule.shn Mob_Inx |
+
+### `0x10d9` NC_CHAR_CLIENT_NEWBIE_GUIDE_VIEW_LIST_CMD (WM→C)
+
+**Verified layout** (basis: wm FUN_00432ce0; client FUN_004ba310)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nGuideViewNum | number of guide ids that follow |
+| 1 | u8[nGuideViewNum] | nGuideViewList | guide ids already seen (client keeps ids < 0xC5) |
+
+nGuideViewNum + 1 bytes, copied from the CharDB 0x10D8 blob at the first map login (0x180C) of a character; blob freed after a successful send. Struct name PROTO_NC_CHAR_NEWBIE_GUIDE_VIEW_LIST_CMD (pdb2017).
 
 ### `0x10ed` NC_CHAR_EVENT_ATTENDANCE_LIST_CLIENT_CMD (WM→C)
 
@@ -9583,6 +9700,16 @@ size 0x17
 | 0 | Name5 | sTarget |  |
 
 size 0x14
+
+### `0x5830` NC_KQ_VOTE_BAN_MSG_LOGOFF_CMD (WM→C)
+
+**Verified layout** (basis: wm FUN_004530e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | (uninitialised) | CSendPacket::ID with size 1 and a null source (W05-B19) |
+
+1 byte; the struct is empty (sizeof 1)
 
 ### `0x5832` NC_KQ_JOIN_LIST_ACK (WM→C)
 
@@ -10980,6 +11107,33 @@ size 4
 | 14 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 16 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
 
+### `0x441c` NC_QUEST_RESET_TIME_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00439d20 (from FUN_0043a120))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | tResetYearQuest | 1 Jan 00:00 local |
+| 4 | i32 | tResetMonthQuest | 1st of the month 00:00 |
+| 8 | i32 | tResetWeekQuest | Monday 00:00 |
+| 12 | i32 | tResetDayQuest | today 00:00 |
+
+16 bytes, broadcast to all zones at the first main-loop pass after local midnight
+
+### `0x441d` NC_QUEST_RESET_TIME_ZONE_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00439e30 (from 0x101C handler))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | = charregistnumber of the zone's 0x101C NETPACKETZONEHEADER (the zone puts charNo there) |
+| 4 | i32 | tResetYearQuest |  |
+| 8 | i32 | tResetMonthQuest |  |
+| 12 | i32 | tResetWeekQuest |  |
+| 16 | i32 | tResetDayQuest |  |
+
+20 bytes, per character at map login
+
 ### `0x5833` NC_KQ_LINK_TO_FORCE_BY_BAN_CMD (WM→Zone)
 
 **Verified layout** (basis: wm FUN_004531a0)
@@ -11183,6 +11337,14 @@ size 0x553
 | 0 | u16 | nEventNo |  |
 
 size 2
+
+### `0x0804` NC_MISC_HEARTBEAT_REQ (WM→peer)
+
+**Verified layout** (basis: wm FUN_0042fda0)
+
+Empty payload.
+
+raw 3 bytes 02 04 08; sent once after 30 s without any received packet; no packet within 180 s more → the WM closes the link ("ERROR - HEARTBEAT OVERTIME")
 
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→zone)
 
