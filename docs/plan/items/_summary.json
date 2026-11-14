@@ -240,6 +240,22 @@
   "\u2013"
  ],
  [
+  "Z21",
+  2,
+  "Zone: set items (SetItem / SetItemEffect / SetEffect tables, set detection, set-item abstates and skill effects; added by Z12)",
+  "Z03, Z12",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "Z22",
+  2,
+  "Zone: abnormal-state actor classes (SubAbnormalStateActor* bodies: DoT/HoT, area damage, bomb, detach, rate buffs; added by Z12)",
+  "Z03, Z18",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "D01",
   2,
   "Account and AccountLog servers",

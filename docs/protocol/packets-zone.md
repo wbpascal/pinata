@@ -3016,11 +3016,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b640`) ·
 
 ### `0x10d4` NC_CHAR_MYSTERYVAULT_UI_STATE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_MYSTERYVAULT_UI_STATE_CMD`, 1 bytes
+**Verified layout** (basis: zone FUN_00443390; client GameFrameWork::On_NC_CHAR_MYSTERYVAULT_UI_STATE_CMD FUN_004b33b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | mystery_vault |  |
+| 0 | u8 | mystery_vault | 1 and a mystery-vault item in the inventory: client opens MysteryVaultWin; else ignored |
 
 Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePlayer (`FUN_00443390`, ShineObjectClass::ShinePlayer::sp_NC_MAP_LOGINCOMPLETE_CMD) · payload 1 bytes
 
@@ -10336,6 +10336,14 @@ Empty payload.
 
 Empty payload.
 
+### `0x4025` NC_CHARSAVE_UI_STATE_SAVE_REQ (C→Z)
+
+**Verified layout** (basis: zone FUN_00562f40 (pdb2016 struct); Z12 §7.1)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | btMysteryType | stored unchecked in sp_MysteryVaultUI and sent to GameDB 0x4027 |
+
 ### `0x10d2` NC_CHAR_FREESTAT_SET_DB_ACK (DB→Z)
 
 **Verified layout** (basis: zone FUN_0058be50)
@@ -12088,6 +12096,19 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 2 | u32 | chrregnum | ref charNo |
 | 6 | u32 | academyNo | → m_nMyGuildAcademyNo |
 
+### `0x10b8` NC_CHAR_ZONE_LINK_FROM_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_00476600 (PROTO_NC_CHAR_LINKFROM_CMD, pdb2016); Z12 §7.3)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER |
+| 2 | u32 | charregistnumber | NETPACKETZONEHEADER |
+| 6 | u32 | chrregnum | player lookup |
+| 10 | Name3 | map | roll-back map (server and client name) |
+| 22 | u32 | coord.x |  |
+| 26 | u32 | coord.y |  |
+
 ### `0x10cd` NC_CHAR_ZONE_QUEST_READ_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_0044b640 / CQuest FUN_0062f890)
@@ -12099,6 +12120,21 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 6 | u32 | chrregnum |  |
 | 10 | u16 | nNumOfReadQuest |  |
 | 12 | u16[n] | QuestReadIDArray |  |
+
+### `0x10d3` NC_CHAR_ZONE_SINGLE_OPTION_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_005a6200 (PROTO_NC_CHAR_SINGLE_OPTION_CMD, pdb2016); Z12 §7.1)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER |
+| 2 | u32 | charregistnumber | NETPACKETZONEHEADER |
+| 6 | u32 | chrregnum | not read; lookup uses the header charNo |
+| 10 | i32 | resttime | time_t of the last GameDB save (dRestExpLastExecuteTime); rest-exp buff input |
+| 14 | u8 | autopick | → sp_MiscFlag.IsAutoPickUp + brief IsAutoPick |
+| 15 | u8 | mystery_vault | → sp_MysteryVaultUI (sent as 0x10D4 at login complete) |
+| 16 | u32 | nChatBan | → sp_Spammer_ChatBan (≠ 0: chat/shout/roar blocked) |
+| 20 | u8 | bFirstJoin | ≠ 0 (CharDB copy): apply RestExpAbstateApplication |
 
 ### `0x10d6` NC_CHAR_ZONE_QUEST_REPEAT_CMD (WM→Z)
 
@@ -12799,6 +12835,32 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 0 | u16 | killerWmHandle |  |
 | 2 | u32 | killerCharNo |  |
 | 6 | u32 | pkCount |  |
+
+### `0x4019` NC_CHARSAVE_2WLDMAN_LINK_FROM_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_004788c0 (pdb2016 struct); Z12 §7.3)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wldmanhandle | so_GetWMSHandle |
+| 2 | u32 | linkfrom.chrregnum |  |
+| 6 | Name3 | linkfrom.map | current field map |
+| 18 | u32 | linkfrom.coord.x | current position |
+| 22 | u32 | linkfrom.coord.y |  |
+
+### `0x402a` NC_CHARSAVE_2WLDMAN_SINGLE_OPTION_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_00563050 (pdb2016 struct); Z12 §7.2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | WmHandle | so_GetWMSHandle |
+| 2 | u32 | chrregnum |  |
+| 6 | i32 | resttime | always 0 |
+| 10 | u8 | autopick | brief IsAutoPick |
+| 11 | u8 | mystery_vault | sp_MysteryVaultUI |
+| 12 | u32 | nChatBan | sp_Spammer_ChatBan |
+| 16 | u8 | bFirstJoin | always 0 |
 
 ### `0x580e` NC_KQ_Z2W_MAKE_ACK (Z→WM)
 

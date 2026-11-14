@@ -649,6 +649,58 @@ ITEMS = [
              "Bugs as `Z20-B<n>`; Coverage boundary as usual."],
       done="`sdb_Load`, `sdi_SetArgument`, `sdi_Clear` and `pdb_Load` are written as pseudocode with a column → member map for "
            "every skill table, and every SkillDataBox / PassiveDataBox function of the zone is cited as `FUN_…`."),
+ dict(id="Z21", phase=2, title="Zone: set items (SetItem / SetItemEffect / SetEffect tables, set detection, set-item abstates and skill effects; added by Z12)",
+      out="docs/pseudocode/zone/Z21-set-items.md", deps=["Z03", "Z12"], scope=[],
+      goal="Wearing several pieces of an item set grants extra stats, abnormal states, item actions and skill bonuses. "
+           "Z12 §2.5 documents only how the set-item abstate refits the stat matrix (`siae_ParameterRefit`) and Z03 only "
+           "reads the resulting skill bonuses (`g_SetEffect`), but no item documents how the zone detects a set, which "
+           "tables define it and what is stored, saved and restored (about 900 decompiled lines, ~30 functions in "
+           "`SetItemData::*`). Reconstruct the subsystem so a rebuild can load the original tables unchanged.",
+      steps=["Read `docs/pseudocode/zone/Z12-stats.md` §2.5 (`siae_ParameterRefit` FUN_005108c0, bug Z12-B3, the ≥ 1000 "
+             "`eb_Index` codes) and §6.4 (`siae_SetItemEffectRestore` at login), `docs/pseudocode/zone/Z03-combat.md` (every "
+             "`g_SetEffect` DAT_1325edb0 reader, `smo_ply_SetItemEffect` vt 0xef8) and the Z01 / Z10 loader tables for "
+             "`SetItem.shn`, `SetItemEffect.shn`, `SetEffect.shn` first.",
+             "PDB names (`clean.py re-data/exports/zone-pdb - <addr> …`): `sp_SetItemCheck` 00510b50, "
+             "`SetItemClassifier::sic_SetItemDefine` 00510370, `SetItemEffectList::siel_AppendEffect` 005104c0, "
+             "`aeo_SetItemEffectStore` 00510670, `aeo_SetItemActionEffect` 00510810, `aeo_FillSetItemEffect` 004534f0, "
+             "`SetItemAbstateEffect::siae_*` 00510030…00510350, `EffectDescription` / `EffectByPiece` 00510200…00510240 and "
+             "`ed_Compare` 004a2ed0, `SkillEffect::se_Clear` 005105e0 / `operator[]` 00510010, "
+             "`ShineMobileObject::smo_ply_SetItemEffect` 00510c80 and `ShinePlayer::smo_ply_SetItemEffect` 00510d20, "
+             "`SetEffectTable` (ctor 005b1ec0, `Table::Load<SetEffectTable>` 005b5ec0, `ITableBase::Load` 005b35b0, "
+             "`FindActionID` 005c7eb0), `Send_SETITEMHEALEFFECT` 005cfbb0 / `RecoverTypeEffect::_execute` 005cfc70, and the "
+             "item-action hooks that add / remove set action ids (`icr_Apply` 0048ca20 / 0048cc60, "
+             "`so_ply_ItemAction_UnEquip` 00565020, `sp_ItemActionSetup` 00566420; strings \"Setitem Can`t Add ActionID\").",
+             "Row structs from the 2016 PDB against `docs/knowledge/S01-shn-structs.tsv` and `shn.py` of the three tables; record "
+             "the column → member map and the piece-count rules (which pieces count, duplicates, costume / KQ items).",
+             "Packets: the set-item heal effect and any client notification (client handlers via `re-data/client-handlers.json`), "
+             "how the set abstate is saved (`p_Char_SetStateWithSetItemAndRestTime`, D02) and restored at login.",
+             "Bugs as `Z21-B<n>`; Coverage boundary as usual."],
+      done="Set detection, every `SetItemData::*` function and the three table loaders are written as pseudocode with their "
+           "column → member maps, and every set-item function of the zone is cited as `FUN_…`."),
+ dict(id="Z22", phase=2, title="Zone: abnormal-state actor classes (SubAbnormalStateActor* bodies: DoT/HoT, area damage, bomb, detach, rate buffs; added by Z12)",
+      out="docs/pseudocode/zone/Z22-abstate-actors.md", deps=["Z03", "Z18"], scope=[],
+      goal="Every abnormal state runs its effect through `AbnormalStateContainer::SubAbnormalStateActor*` objects (one class "
+           "per `SubAbstateAction` kind). Z03 §6 documents the abstate container, the SubState → actor table and the "
+           "matrix enchant, but lists the individual actor bodies as not reconstructed (`docs/pseudocode/zone/Z03-combat.md` "
+           "'Not reconstructed', 'Abnormal states'); Z12 and Z18 only touch a few (`sasa_GetDamage` of Poison, bomb DoT "
+           "damage for Z12-B7). 70 actor functions (~2.9k decompiled lines), 55 of them (~1.9k) cited by no doc. "
+           "Reconstruct each actor's attach / routine / detach / apply so a rebuild reproduces every abstate effect.",
+      steps=["Read `docs/pseudocode/zone/Z03-combat.md` §6 (abstate container, SubState → actor table, `asl_Routine`) and its "
+             "'Not reconstructed' bullet, `docs/pseudocode/zone/Z12-stats.md` §2.5 (`aeo_ParameterEnchant`, which actions "
+             "write the matrix) and §4.1 (B6 / B7, free-stat DoT slots), and Z18's output for the actor functions it took "
+             "from Z09 §31 (do not redo them).",
+             "List every `AbnormalStateContainer::SubAbnormalStateActor*` function in `re-data/exports/zone-pdb/decomp.c` "
+             "(`//==== FUNC` lines) with its vftable (`tools/protocol-re/rtti.py`), and read them per class with "
+             "`clean.py re-data/exports/zone-pdb - <addr> …`. Largest first: AreaDamage `sasa_Routine` 0040d640, DmgState "
+             "`sasa_Routine` 0040dc60, DetachProcess `sasa_DetachObject` 0040c1c0, Bomb `sasa_ApplyAbstate` 0040c640 (with "
+             "`sasa_SetAbstateToArea_TargetNum` 0040b670 and `AxialListNearScanEnemyorAll` 004c1830), Poison "
+             "`sasa_GetDamage` 0040b360, DropUpRate / ExpUpRate `sasa_DetachObject` 00409230 / 00408f90.",
+             "Per actor: the `SubAbState.shn` columns it reads (`AbStateStrArgument`), timers (`aeo_Tick`), the packets it "
+             "sends (damage / heal / state broadcasts, with layouts and client handlers via `re-data/client-handlers.json`), "
+             "and the objects it touches (caster lookup `aeo_GetCaster`, area scans).",
+             "Bugs as `Z22-B<n>`; Coverage boundary as usual."],
+      done="Every `SubAbnormalStateActor*` function of the zone is cited as `FUN_…` and described, with the SHN columns, "
+           "timers and packets of each actor class."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "

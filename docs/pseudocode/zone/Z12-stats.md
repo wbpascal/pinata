@@ -228,7 +228,7 @@ so_RecalcEquipParam(p):
     ItemPowerRate.Rate.WCmin = WCmax = MAmin = MAmax = atk;  ItemPowerRate.Rate.AC = MR = def
     Upgrade.Plus = eraser_plus; Upgrade.Rate = eraser_rate
     Item.Rate.CriDamRate = 0
-    skipLeft = RIGHTHAND (slot 12) item exists, has ItemInfoServer, and its ItemEquipTable row (iet_GetArray(ISET_Index)) has
+    skipLeft = RIGHTHAND (slot 12) item exists, has ItemInfoServer, and its ItemEquipTable row (iet_GetArray(ISET_Index) @ FUN_004930d0, null for an index ≥ 34) has
                Equ_LeftHand == 2                                   # the right-hand item also occupies the left hand (inferred: two-hander)
     p.sp_MovingShot = 0; p.sp_PreventAttack = 0
     for each equipment slot s (ItemBoxIterItem over p.sp_Item.itembag.ci_Equipment):
@@ -258,7 +258,7 @@ so_RecalcEquipParam(p):
             Item.Rate.ResistPoison/ResistDeaseas/ResistCurse/ResistMoveSpdDown += the four Resist* columns
             ItemPowerRate.Rate.TH += ToHitRate − 1000;  ItemPowerRate.Rate.TB += ToBlockRate − 1000
             Item.Plus.MaxHP += MaxHP;  Item.Plus.MaxSP += MaxSP
-        if KQItemDataBox[itemid] (KQItem.shn):
+        if KQItemDataBox[itemid] (KQItem.shn; kqidb_GetData @ FUN_0064bc60, a std::map lookup):
             ItemPowerRate.Rate.MoveSpeed += MoveSpdRate (a delta: KQ_InvincibleHammer 350 → ×1.35);  Item.Plus.AbsoluteAttack += AbsoluteAttack
         # enhancement
         if cell.attr.vt[0x28]() == 0x26 (ITEMCLASS_BRACELET):
@@ -266,7 +266,7 @@ so_RecalcEquipParam(p):
             u = BRAccUpgradeDataBox[d.BasicUpInx] (BRAccUpgradeInfo: UpFactor, u16 BRAccUpdata[21]); v = u.BRAccUpdata[lv]
         else:
             lv = cell.attr.vt[0x30](cell); if lv == 0: continue; if lv >= 13: assert; continue
-            u = UpgradeDataBox[d.BasicUpInx] (UpGradeInfo: UpFactor, u16 Updata[12]); v = u.Updata[lv − 1]
+            u = UpgradeDataBox[d.BasicUpInx] (operator[] @ FUN_004c8e50, null only for an index > udb_Number; UpGradeInfo: UpFactor, u16 Updata[12]); v = u.Updata[lv − 1]
         if u: switch u.UpFactor:
             UPG_AC: Upgrade.Plus.AC += v          UPG_WC: Upgrade.Plus.WCmin/WCmax += v      UPG_SHIELDAC: Upgrade.Plus.ShieldAC += v
             UPG_MA: Upgrade.Plus.MAmin/MAmax += v  UPG_MR: Upgrade.Plus.MR += v                UPG_WC_MA: WC and MA += v
@@ -313,7 +313,7 @@ ShinePlayer::smo_ply_WeaponTitleSet(p, mobId):
     t = CWeaponTitleZone::GetLevelData(&gWeaponTitle, mobId, w)    @ FUN_0059d6a0
         # the weapon has three title slots in its attributes: {u16 mob group at +5, u16 mob at +7, u32 kills & 0x0FFFFFFF at +9} (6 bytes each)
         # first slot whose mob species matches (MobDataBox::mdb_SpeciesDistance(slot.group, mobId) >= 0) →
-        # CWeaponTitle::GetLevelData(slot.mob, slot.kills) = the WEAPON_TITLE_DATA row of the reached level (WeaponTitleData.shn)
+        # CWeaponTitle::GetLevelData(slot.mob, slot.kills) @ FUN_00635a10 = the WEAPON_TITLE_DATA row of the reached level (WeaponTitleData.shn)
     if t:
         WeaponTitle.Rate.WCmin = WeaponTitle.Rate.MAmin = t.MinAdd;  WeaponTitle.Rate.WCmax = WeaponTitle.Rate.MAmax = t.MaxAdd
         for (ref, type, value) in SP1, SP2, SP3: sp_WeaponTitleOption(p, ref, type, value)      @ FUN_005671a0
@@ -366,7 +366,8 @@ cpl_RecalcParam(list, P, bag):
 Every field is **assigned**, not added: when two learned passives set the same field, the one with the higher id wins
 (each passive level is its own id; *(inferred)* only one level of a passive is learned at a time). The special
 fields (`PassiveHealRate`, the `ChangeByConditionParam`s, `DMGMinusRate`) are not reset here, only by `c_clear`
-(object construction `ShineMobileObject::ShineMobileObject` @ FUN_005591c0 and every map login,
+(object construction `ShineMobileObject::ShineMobileObject` @ FUN_005591c0, whose `Parameter::Container::Container` @ FUN_004c98a0
+only sets the seven `ChangeByConditionParam`s to id 0xFFFF / zero, and every map login,
 `so_FirstActionAfterSocketConnect` @ FUN_00554870), so a passive that is unlearned keeps its special-field effect until
 the next map login (original bug) Z12-B2.
 
@@ -874,7 +875,7 @@ sp_NextSaveExperience(p):
 
 `RestExpCalculate` @ FUN_0059d4b0 copies `MinNeedTime` (21600 s), `DefaultBonusTime` (600), `IntervalTime` (3600),
 `AddBuffTime` (600), `MaxBuffTime` (7200) from `scp_param` into `m_NeedTime, m_FirstAddBuffTime, m_InterValTime,
-m_AddBuffTime, m_BuffMaxTime`. The caller (a stack object in `wms_NC_CHAR_ZONE_SINGLE_OPTION_CMD` @ FUN_005a6200, part 4)
+m_AddBuffTime, m_BuffMaxTime`. The caller (a stack object in `wms_NC_CHAR_ZONE_SINGLE_OPTION_CMD` @ FUN_005a6200, §7.1)
 passes the time of the last logout.
 
 ```pseudo
@@ -886,7 +887,7 @@ RestExpAbstateApplication(calc, p, &lastTime):
     else:
         add = (off > 0 and off ≥ NeedTime) ? min(((off − NeedTime) / IntervalTime + 1) × AddBuffTime × 1000, BuffMaxTime × 1000) : 0
         e = asl_Abstate_IsSet(p.abstates, STA_RESTEXP); if !e: return false
-        ms = e.aeo_GetRestTime() + add
+        ms = e.aeo_GetRestTime() + add     # @ FUN_00408990: remaining ticks rounded up to whole seconds (÷ 10), × 1000
     if ms != 0:
         ms = min(ms, BuffMaxTime × 1000)
         row = dic_abstate.as_FromIndex(STA_RESTEXP)
@@ -937,7 +938,7 @@ length including the opcode, "Packet Too Long" asserts and drops).
 | 0x101D CHARDATA_ACK | `u16 wldmanhandle` | Z07 §1.4 → `so_StoreCharData` (0x4b4) @ FUN_0055ab60 | `sp_CharBriefInfo`, `sp_MiscFlag.DataRecieve` | (0x1802 login ACK, Z07 §1.4) |
 
 The other blobs of W01 §6.3 have their own owners: 0x1031 title (Z07 §1.3), 0x10D3 single option and 0x10B8 link-from
-(part 4 of this item, Z07 §1.2), 0x10D0 item cool-times (Z07 §1.2), card collection, chat colour, minimon, tutorial, coin,
+(§7 of this item), 0x10D0 item cool-times (Z07 §1.2), card collection, chat colour, minimon, tutorial, coin,
 repurchase list, mover link data (Z07 §1.2 table). **0x1026 (house), 0x1028 ("maspup"), 0x102A (emblem), 0x102B (pet),
 0x102C (arena), 0x102D (sea war) have no handler in the 2016 zone** (no `pft_Store` for dept 4 cmd 38, 40, 42–45 in
 `handlers.json`): a WM that sends them has them dropped by the parser.
@@ -1072,11 +1073,12 @@ so_charskilldata(p, b { u32 chrregnum, PARTMARK PartMark @4 {bIsStart:1, bIsEnd:
             csl_Toggle_Store(r.skillid)                                            @ FUN_00448c60
                 row = skilldatabox[skillid] (null: assert "INVALID Skill Data"); if row.sdi_ToggleData not empty:
                     csl_ToggleSkill.push({ skillid, bSkillOn = toggle state of row.sdi_PrevSkill's skill if listed, else 0 })
+                    # lookup: csl_Toggle_GetToggleSkill @ FUN_00445680 (linear search of csl_ToggleSkill by id)
             csl_SkillNumber++
         if csl_SkillNumber == nMaxNum:                                    # last chunk
             csl_CheckDefSkill()                                                    @ FUN_00447fb0
                 # appends every `defskill` id missing from the list (cs_EndOfCooltime = now, rest 0); `defskill`
-                # (DefSkillData @ 0x0af0d288, 32 × {u16 skill, u8 exist, u8 only2mage}, dsd_Max) is never written in the
+                # (DefSkillData @ 0x0af0d288, 32 × {u16 skill, u8 exist, u8 only2mage}, dsd_Max, read by dsd_GetSkillMaxNum @ FUN_0045d370) is never written in the
                 # 2016 zone (only the atexit initialiser), so dsd_Max = 0 and this is a no-op (dead code)
             sort csl_Skill by CharSkill::cs_Compare_STLVer
     if csl_SkillNumber != nMaxNum: return                                 # wait for the next chunk
@@ -1113,7 +1115,7 @@ so_charpassivedata(p, b { u16 number, u16 passive[number] @2 })                @
         for each id: id >= 1000: assert "Invalid passive"; next
                      set bit id in cpl_Passive (if < bs_maxbit)
                      cpl_StoreSetAbstateList(id)                                    @ FUN_00447340
-                         s = passivedatabox.sdb_GetSetAbstate(id); if s: if s.pssabs_Prev (lower step) is listed, remove it;
+                         s = passivedatabox.sdb_GetSetAbstate(id) (@ FUN_00584f20, linear search by pssabs_nID); if s: if s.pssabs_Prev (lower step) is listed, remove it;
                          append s                                     # passive-granted abstates, read by §2.4
     p ← 0x103E NC_CHAR_CLIENT_PASSIVE_CMD { u16 number, u16 passive[number] }   # as received, invalid ids included
 ```
@@ -1133,7 +1135,7 @@ so_StoreInventoryFromServer(p, b: PROTO_NC_CHAR_ITEM_CMD)                       
           none             → no store; `box` keeps the low byte of the body pointer (original bug) Z12-B12
         # both initialisers, per record: skip it unless location.Type == box; Pos ≥ bag size: assert "Invalid slot";
         # else iti_fill2struct_whole (default attribute class, item data) into the cell at Pos, and set the cell's
-        # attribute class from itmattcontainer[itemid] (isb_: ItemInform_ActionItem::sii_Import). Next record at
+        # attribute class from itmattcontainer[itemid] (isb_: ItemInform_ActionItem::sii_Import @ FUN_00643410; the item copy is iti_fill2struct_whole @ FUN_00640810). Next record at
         # +1+datasize. Cells not in the packet are not cleared (the bags start empty at object creation).
     for every item of ci_Inventory: item.attrclass.vt[0x44](item)     # only ItemAttrCls_ItemChest overrides it
                                                                      # (iac_Getitemchest @ FUN_0063e410 returns a pointer,
@@ -1142,7 +1144,7 @@ so_StoreInventoryFromServer(p, b: PROTO_NC_CHAR_ITEM_CMD)                       
     hdr = gpp+2: { u8 numofitem, u8 box @1, u8 flag @2 (bit 0 invenclear), PROTO_ITEMPACKET_INFORM[ ] @3 }
     if box == 15:
         size = isb_FullBufferItem2Client(ActionBox, &numofitem, records, 15)          @ FUN_0044d6d0
-            # every non-empty cell (iic_ItemIdent ≠ 0xFFFF): sii_Export, location = (15 << 10) | slot, iti_fill2buffer_union
+            # every non-empty cell (iic_ItemIdent ≠ 0xFFFF): sii_Export (@ FUN_00643440), location = (15 << 10) | slot, iti_fill2buffer_union
             # with the cell's attribute class, datasize = 2 + item bytes; stops after ≥ 8000 bytes
         numofitem ≠ ItemCmd.numofitem: assert "ItemNumber not match" (still sent)
         flag bit 0 = 1;  p ← 0x1047 { hdr, records }                  # one packet
@@ -1175,6 +1177,7 @@ so_ply_Getchestinform(p, b { u16 itemnum, u16 location[itemnum] @2 })          @
 so_Storegamedata(p, b: PROTO_GAMEDATA_CMD { ZoneServer zone { u8 bIsGM }, Client client @1 { u16 partyno, u16 nRaidNo } })   @ FUN_0044c220
     p.sp_GameData = b (5 bytes)
     p.sp_GameData.client.partyno = partymanufacture.pm_FindParty(charNo)   # the zone's own party table wins
+        # pm_FindParty @ FUN_004ccd30: linear search of the 4000 party slots for a member with that charNo, 0xFFFF if none
     p ← 0x1048 NC_CHAR_CLIENT_GAME_CMD { u16 partyno, u16 nRaidNo }        # 4 bytes; the client ignores it (C01)
 
 so_CharChargedBuffData(p, b { u16 NumOfChargedBuff, PROTO_CHARGEDBUFF_INFO[n] @2 })   @ FUN_0044e1e0
@@ -1210,6 +1213,22 @@ so_StoreCharData(p, handle, tag)                                               @
             emoticon = { id 0xFF, frame 0 }; chartitle = title; polymorph = 0xFFFF; handle = handle
     sp_BriefEquipmentSetting()                                                     @ FUN_00576010
         mode 0–3: so_briefequipset (vt 0x5c8 @ FUN_0054df70); 4, 5: so_BriefEquipSetBackup; 6: so_BriefEquipSetRiding
+        # so_briefequipset @ FUN_0054df70: for the 20 view slots (1 head, 0x18 mouth, 0xc right hand, 7 body, 10 left hand,
+        #   0x13 pants, 0x15 boots, 0x16 acc. boots, 0x14 acc. pants, 8 acc. body, 0x1b acc. head A, 0x1c minimon R, 0x1a eye,
+        #   0xb acc. left, 0xd acc. right, 9 acc. back, 0x11 costume effect, 0x12 acc. hip, 0x19 minimon, 0x1d acc. shield)
+        #   brief.shapedata.notcamp.equip.Equ_* = ie_GetItemID(slot) @ FUN_00643840 (0xFFFF outside 1…29; a view-slot
+        #   override ie_ViewSlot[slot].nItemID when nMainSlot ≠ 0, else the equipped item id);
+        #   equip.upgrade {lefthand, righthand, body, leg, shoes} (4-bit each) = ie_GetUpgrade(10, 0xc, 7, 0x13, 0x15)
+        #   @ FUN_00643880 (0 for a view-slot override or an empty cell, else the item attribute's vt 0x30);
+        #   sp_attackspeed.attackspeed = 7
+        # so_BriefEquipSetRiding @ FUN_0054e280: the same code line for line (the riding look is drawn by the client)
+        # so_BriefEquipSetBackup @ FUN_0054e590: the same item ids into the live brief, but the five upgrade nibbles into
+        #   sp_MiniHouse.mhs_Backup.bib_BriefInfo.equip.upgrade (the brief saved when entering a house / camp, Z07 §6),
+        #   so the live brief keeps its previous upgrade nibbles in modes 4 / 5
+        #   while the 20 item ids overwrite the live brief's shapedata union, which in modes 4 / 5 holds the
+        #   CHARBRIEFINFO_CAMP / _BOOTH data (minihouse handle, signboard) (original bug) Z12-B15
+        # sp_BriefEquipmentSetting's only caller is so_StoreCharData, where the mode is still 0 (login), so the
+        # Backup / Riding branches are dead in practice (other callers of vt 0x5c8 not traced here)
     sp_MiscFlag.DataRecieve = 1
 ```
 
@@ -1230,6 +1249,154 @@ ShinePlayer::sp_LoginInit(p)                                                    
 
 ---
 
+## 7. Single options, link-from position, title refresh (Z07 §12 open points)
+
+### 7.1 NC_CHAR_ZONE_SINGLE_OPTION_CMD `0x10D3` (WM → zone) @ FUN_005a6200
+
+Body = `NETPACKETZONEHEADER` + `PROTO_NC_CHAR_SINGLE_OPTION_CMD` *(pdb2016)*, 0x15 bytes; the WM's +0x658 blob (W05 §5.4,
+filled at character login from CharDB 0x10D2 = `usp_Character_getSingleOption` `bMysteryBolt, bAutoPick,
+dRestExpLastExecuteTime, nChatBan` (D06 §8.5), and on every map change from the leaving zone's 0x402A, §7.2).
+
+```pseudo
+0x10D3 NC_CHAR_ZONE_SINGLE_OPTION_CMD { u16 clienthandle, u32 charregistnumber,           # header
+        u32 chrregnum @6, i32 resttime @0xa (time_t), u8 autopick @0xe, u8 mystery_vault @0xf, u32 nChatBan @0x10,
+        u8 bFirstJoin @0x14 }   (no length check)                                   @ FUN_005a6200
+    if charregistnumber == 0xFFFFFFFF: return
+    p = som_FindPlayer(charregistnumber); needs p, not closing (vt 0x300), a ShinePlayer (body chrregnum not read)
+    if bFirstJoin:                                    # the WM sets it to 1 when CharDB sends the blob (W05 §5.4)
+        RestExpCalculate calc (FUN_0059d4b0, §5.4); calc.RestExpAbstateApplication(p, &resttime)     @ FUN_0059d510
+        # resttime = dRestExpLastExecuteTime: written by usp_Character_setRestExpExecTime (GETDATE()) on every
+        # GameDB save, 0x401A in ws_save2DB FUN_00455a10 (Z01 §8.4, D02 §6) → offline time ≈ now − last save before logout
+    sp_SaveAutoPick(p, autopick)                                                     @ FUN_00560340
+        sp_MiscFlag.IsAutoPickUp (p+0x5cb9 bit 3) = autopick & 1; sp_CharBriefInfo.bic_BriefInfo.IsAutoPick = autopick
+        # no minimon check here; sp_NC_MAP_LOGINCOMPLETE_CMD (Z01 §6) re-applies it with sp_SetAutoPick(sp_GetAutoPick())
+        # (FUN_005654d0 / FUN_00560370, Z07 §3.6) only if a minimon with auto-pick is equipped (sp_IsAutoPickEnableState)
+    sp_SetMysteryVaultUI(p, mystery_vault)            # sp_MysteryVaultUI (p+0x2aa44)                @ FUN_00560a10
+    so_SetSpamerChatBan(p, nChatBan) (vt 0xae8)       # sp_Spammer_ChatBan (p+0x2aa54)               @ FUN_00560a20
+```
+
+The three values and who reads them:
+
+| Member | Read by | Effect |
+|---|---|---|
+| `IsAutoPickUp` / brief `IsAutoPick` | `sp_GetAutoPick` @ FUN_00560370 (login complete, `gds_NC_ITEMDB_DESTROY_ACK` / `UNEQUIPSUC_ACK`), the brief-info copy (`PROTO_NC_BRIEFINFO_LOGINCHARACTER_CMD::operator=` @ FUN_004b0bf0) | minimon auto-loot (Z07 §3.6) |
+| `sp_MysteryVaultUI` | `sp_NC_MAP_LOGINCOMPLETE_CMD`: `p ← 0x10D4 NC_CHAR_MYSTERYVAULT_UI_STATE_CMD { u8 mystery_vault }` (Z01 §6) | client `GameFrameWork::On_NC_CHAR_MYSTERYVAULT_UI_STATE_CMD` FUN_004b33b0: value 1 and a mystery-vault item in the inventory (`Inventory::FindMysteryVault`, slot < 0xC0) → close the raid-add window if open, `MysteryVaultWin::OnReachTheLevel(level, item +0x7f)`, open the mystery-vault window; any other value: nothing |
+| `sp_Spammer_ChatBan` | `sp_IsSpameChatBan` @ FUN_00560a30 (≠ 0) in `sp_NC_ACT_CHAT_REQ` FUN_0045a400, `sp_NC_ACT_SHOUT_CMD` FUN_00458e80, `sp_NC_ACT_ROAR_REQ` FUN_005404d0 | spammer chat ban (Z02 §3; set through GM 0x0863 → `usp_Character_setChatBan`, D02 §9) |
+
+The mystery-vault flag is also changed by the client:
+
+```pseudo
+0x4025 NC_CHARSAVE_UI_STATE_SAVE_REQ { u8 btMysteryType }   (C→Z; 2016 log name sp_NC_MISC_DB_UI_STATE_SAVE_REQ)   @ FUN_00562f40
+    # no mode check, no value check, no length check
+    GameDB ← 0x4027 NC_CHARSAVE_DB_UI_STATE_SAVE_REQ { u16 clienthandle = p.handle (p+4), u32 charNo, u8 btMysteryType }
+    p.sp_MysteryVaultUI = btMysteryType
+    # GameDB answers 0x4028 → p ← 0x4026 NC_CHARSAVE_UI_STATE_SAVE_ACK { u16 err } (Z01 §8.4, D02 §6 0x4027:
+    # 0x2158 ok / 0x2159 failed); the 2016 client has no handler for 0x4026 (C01 dropped-opcode list)
+```
+
+### 7.2 Saving the options back to the WM: `sp_SingleOptionSave2World` @ FUN_00563050
+
+Called from `WholeSaver::ws_save2worldmanager` @ FUN_004536f0 (Z01 §8.4: every WM save, i.e. map change and logout):
+
+```pseudo
+WM ← 0x402A NC_CHARSAVE_2WLDMAN_SINGLE_OPTION_CMD { u16 WmHandle = so_GetWMSHandle (vt 0x340), u32 chrregnum (vt 0x344),
+        i32 resttime = 0, u8 autopick = brief.IsAutoPick, u8 mystery_vault = sp_MysteryVaultUI,
+        u32 nChatBan = sp_Spammer_ChatBan, u8 bFirstJoin = 0 }                       # 0x11 bytes
+```
+
+So the next zone gets `bFirstJoin = 0` and no rest-exp recalculation on a map change; `resttime = 0` is never used there.
+The WM keeps the zone's copy (W05 §5.4, 0x402A row), so a chat ban set while the character is online survives map
+changes only through this save.
+
+### 7.3 NC_CHAR_ZONE_LINK_FROM_CMD `0x10B8` (WM → zone): the roll-back position @ FUN_00476600
+
+Body = header + `PROTO_NC_CHAR_LINKFROM_CMD` *(pdb2016)* `{ u32 chrregnum @6, Name3 map @0xa, SHINE_XY_TYPE coord @0x16 }`
+(0x1e bytes). The WM sends it once after the character data, from its +0x660 slot, which only the zone's 0x4019 fills
+(W01 §6.3 table, W05 0x4019 row).
+
+```pseudo
+0x10B8 NC_CHAR_ZONE_LINK_FROM_CMD   @ FUN_00476600
+    p = som_FindPlayer(chrregnum)                    # body chrregnum, not the header; no closing / type check
+    if p:
+        e = new RollBackPosCallBackEvent(map, map, coord.x, coord.y)                 @ FUN_00444970
+            # m_RollBackPos (NPCManager::LinkInformTemplete, 0x61 bytes): linktoserver = linktoclient = map (12 chars),
+            # coordx, coordy; index, direct, Party left as allocated (operator new, not cleared)
+        sp_SetRollBackPosEvent(p, e)                                                 @ FUN_00570b30
+            if p.sp_punMarkEvent: delete it (vt 0 with 1)
+            p.sp_punMarkEvent (p+0x5e08) = e
+```
+
+The only producer is the guild-tournament observer entry `sp_Guild_Tournamnet_Observer_Enter` @ FUN_004788c0 (Z11 §6.3
+summary, Z16): when the tournament map is on another zone, the leaving zone sends
+`WM ← 0x4019 NC_CHARSAVE_2WLDMAN_LINK_FROM_CMD { u16 wmHandle, u32 chrregnum, map = current field's map name, coord =
+current position }` (0x1a bytes) before the link; on the same zone it builds the event directly with
+`RollBackPosCallBackEvent(ShineObject*)` @ FUN_00444a40 (current map's server and client names, current position).
+
+`RollBackPosCallBackEvent` vftable *(pdb2016 + rtti)*: slot 0 deleting destructor (`CallBackEvent`'s), slot 1
+`doEventRun` @ FUN_00444a10 = `obj.so_LinkTo(&m_RollBackPos, 6, 9, 10)` (vt 0x600), slot 2 = event type, an
+identical-code-folded `return 1` (shown as `CGambleDiceTaiSaiObject::go_Get_GambleType` FUN_00557bb0; the
+`CallBackEvent` base slot is a folded `return 0`, FUN_00570b00). `GetLinkData` @ FUN_00444a30 returns `&m_RollBackPos`.
+
+Readers of the stored event:
+
+```pseudo
+sp_RunRollBackPosEvent(p) → bool                                                     @ FUN_00570b80
+    e = p.sp_punMarkEvent; if !e: return false
+    p.sp_punMarkEvent = null
+    if p.smo_GetMode() (vt 0x484) != 0: e.doEventRun(p)      # link back to the stored position
+    delete e; return true
+    # callers: observer leave sp_NC_GUILD_TOURNAMENT_OBSERVER_OUT_REQ FUN_00476cc0 and sp_Guild_Tournamnet_Observer_Out
+    # FUN_00475ba0 (no event and on a tournament map: sp_2Roumen), the "observer" link-to of the map script
+    # AxialListLinkToByObserver::ali_Work FUN_00428530 (Z09 §25.4), &observer GM commands (Z11 §6.3)
+
+so_LinkTo(p, link, …) (vt 0x600) @ FUN_0049ad30, first step:
+    if p.sp_punMarkEvent and its type (slot 2) == 1:
+        copy m_RollBackPos (0x61 bytes) over the caller's `link`           # any link while the event is set goes there
+        sp_SetRollBackPosEvent(p, null)                                     # deletes the event
+    … (the rest of so_LinkTo: Z01 §7.1)
+
+so_SaveLocation(p, out PROTO_NC_CHARSAVE_LOCATION_CMD) @ FUN_004542f0 (location part of every save, Z01 §8.4):
+    if p.sp_punMarkEvent and its type == 1:
+        out.map = linktoserver (strncpy 12), out.coord = (coordx, coordy)  # logging out as an observer saves the return point
+    else: the normal rules (guild-tournament map, revive city, gamble map → sp_Gamble_PrevMapName, else current position)
+    # then KQ fields, the "RouN" (6445, 8630) fallback for coordinates < 11
+```
+
+Nothing else clears `sp_punMarkEvent`: it is set to null only in the `ShinePlayer` constructor (FUN_0055bc80), which runs
+once per pool slot (`som_Initialize`, Z01 §4.2), not per login, and neither logout nor `som_FreeObject` deletes it. A
+player who disconnects or logs out while holding the event (an observer on a tournament map, or a player whose 0x10B8
+arrived on a zone where no link followed) leaves it in the pooled object; the next character that gets that pool slot
+has its first `so_LinkTo` redirected to the stale position and its saves write that position as its location
+(original bug) Z12-B14 (the effect on the next character is *(inferred)* from the pool reuse; not observed).
+
+### 7.4 Title progress reset: `CCharacterTitleData::IsTitleRefresh` @ FUN_0062e120
+
+```pseudo
+IsTitleRefresh(gCharacterTitleData, type) → int
+    row = CharacterTitleData.shn record[type] (CHARACTER_TITLE_DATA, 0xac bytes; record index = Type, 128 rows)
+    return row and row.Refresh (+8, TitleRefreshType) == TRT_REFRESH (0)       # TRT_KEEP = 1
+```
+
+Users: the 0x1031 handler (Z07 §1.3) zeroes `TitleValues[type]` of every refresh type when
+`CHARACTER_TITLE_READBLOCK.nFirstConnection` (body +6) is 0, and `CCharacterTitleZone::TitleValues_SaveCheck` @ FUN_005ca760
+(from `so_SaveToDB_CharTitle` FUN_004540d0) never marks a refresh type for the DB save (else `m_TitleValues[type].bTitleSave`).
+`nFirstConnection` is 0 in the CharDB blob (character server `FUN_0046d2c0` zeroes the first two bytes before
+`p_Char_GetTitleAll`'s rows) and 1 in the zone's own copy (`so_SaveCharTitle` @ FUN_00453f30 → WM 0x4016), so the PDB name
+reads inverted: 0 = "loaded from the DB". Net rule: a refresh-type title's progress lives only from login to logout
+(kept across map changes, never saved, reset at the next login). In the 2016 data only type 3 (Fiesta Citizen /
+Defender / Guardian / Guard Captain, values 480 … 5760) and the empty type 10 have `Refresh = 0`; the other 126 rows are
+`TRT_KEEP`.
+
+### 7.5 Small helpers found in the sweep
+
+| Function | Reached from | Behaviour |
+|---|---|---|
+| `ShineObject::so_MapMarkingAtDefaultCoord` @ FUN_00466b50 | `wms_NC_CHAR_ZONE_CHARDATA_ACK` FUN_005a3590 (0x101D, Z07 §1.4) | map name from vt 0x4bc → `mapdatabox` B-tree id; unknown id or no `MapInfo`: return `FM_MAPNOTEXIST`; else location = (`RegenX`, `RegenY`) of that map and `so_MapMarking(obj, 0)` (places the object at the map's default regen point) |
+| `ChargedItemEffectDataBox<MiniHouseFurniture>::cideb_GetItemID` @ FUN_00543400 | furniture relocation `icr_Apply` FUN_0048a560 (Z05) | linear search of `cideb_Array[cideb_Total]` for `ce_ItemID == id`; null if none |
+| `CharaterSkillList` / list STL helpers: `std::_Sort<CharSkill*>` @ FUN_004476d0, `vector<CharSkill>` growth @ FUN_00447c00, `_List_val<PSSetAbstateIndex*>` node @ FUN_00446430, `vector<CardBookmarkInfo>::push_back` (reused for `csl_ToggleSkill`) @ FUN_00448050 | `csl_Store` (§6.5), `cpl_StoreSetAbstateList` (§6.6), `csl_Toggle_Store` | container boilerplate; the callers' pseudocode gives the behaviour |
+
+---
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1247,11 +1414,13 @@ ShinePlayer::sp_LoginInit(p)                                                    
 | Z12-B11 | `CharaterSkillList::csl_Store` @ FUN_00449360 | the vector is sized `nMaxNum` on the first chunk; later records are written at `csl_SkillNumber` without a bound check (only `number < 3000` per chunk) | a WM whose chunks add up to more than `nMaxNum` writes past the vector (heap corruption) and the client list is never sent (`csl_SkillNumber` never equals `nMaxNum`) | check `csl_SkillNumber < nMaxNum` per record |
 | Z12-B12 | `so_StoreInventoryFromServer` @ FUN_0044ddf0 | when `nPartMark` has none of the bits 4/8/0x10/0x20, nothing is stored but the box number used for the client copy is the low byte of the body pointer | a malformed last chunk sends a random box (or nothing when the byte is ≥ 17) | return without a client copy |
 | Z12-B13 | `so_CharChargedBuffData` @ FUN_0044e1e0 | a buff id missing from `chargedbuffdatabox` is skipped, but its 14-byte slot in the client copy is still counted (`NumOfChargedBuff` unchanged, the output pointer advances) | the client gets a record of stale `gpp` bytes and shows a bogus charged buff | compact the list and send the stored count |
+| Z12-B14 | `sp_SetRollBackPosEvent` @ FUN_00570b30 / pool reuse | `sp_punMarkEvent` (the roll-back position of 0x10B8 / observer entry) is cleared only by the `ShinePlayer` constructor (once per pool slot), `sp_RunRollBackPosEvent` and `so_LinkTo`; logout and `som_FreeObject` leave it | the event leaks with the slot; the next character in that slot is linked to the stale position on its first `so_LinkTo` and saves it as its location *(inferred effect)* | delete the event at logout / object free |
+| Z12-B15 | `so_BriefEquipSetBackup` @ FUN_0054e590 | writes the five upgrade nibbles into the house backup brief (`mhs_Backup.bib_BriefInfo`) but the 20 equipment ids into the live brief, whose `shapedata` union holds the camp / booth data in modes 4 / 5 | camp handle / booth signboard bytes overwritten by item ids; unreachable in 2016 (the only caller, `sp_BriefEquipmentSetting` from `so_StoreCharData`, runs in mode 0) | write the ids into the backup brief too |
 
 ## N. Not reconstructed / uncertain
 
 - §6.4: the `so_AbnormalState_Set` call for states with a remaining time shows only eight arguments in the decompile;
-  `how` / `origin` were not checked in the assembly. The `party` test is read from the element classes' vt 0xc bodies.
+  `how` / `origin` were not checked in the assembly. The `party` test is read from the element classes' vt 0xc bodies (the same slot `aeo_IsPartyChant` @ FUN_00409ab0 calls).
 - §6.8: the meaning of the chest-location numbers (cells inside treasure chests) is inferred from `tcm_PutInto` taking
   `sp_ChestItemBox` (Z11 §8.4 `&kqreward`, Z09 §10.10); `TreasureChestLocationManager` was not read beyond
   its constructor (`BitSet(8)`).
@@ -1267,7 +1436,15 @@ ShinePlayer::sp_LoginInit(p)                                                    
 - §3.3: the clockwatch tick unit (100 ms) behind `RecoverTick` is inferred from `ms × 10 / 1000`.
 - §5.3: no reader of `sp_NextSaveExp` acts on it; a GameLog or DB path keyed on it was not found (searched by member name).
 - `ItemPowerRate.Plus`, `Upgrade.Rate`, `WeaponTitle.Plus`, `LastTune.Plus` have no writer in the 2016 zone (searched by
-  member name and `p+` offset); whether a reader exists is checked in the sweep.
+  member name and `p+` offset). Their readers are `c_MakeTotal` (§1.3) and the `roe_*` display formulas (§4.2, e.g.
+  `roe_MinWC` reads `L13` at P+0xa5c), which therefore always see 0 / 1000; no other reader was found (p+ and P-relative
+  offset search, sweep).
+- §7.3: `RollBackPosCallBackEvent` from 0x10B8 uses the one map name for both `linktoserver` and `linktoclient` (the WM
+  packet carries only one); for a map whose client name differs (instanced maps) the client would get the server name.
+  Whether such a map can be the observer's origin was not checked.
+- §7.1: who sends 0x4025 in the client (which UI action stores `btMysteryType`) was not traced; only the 0x10D4 reader.
+- `UpgradeDataBox::operator[]` @ FUN_004c8e50 returns `udb_UpgradeInfoList[udb_Number]` for an index equal to the count;
+  whether the list has `udb_Number + 1` entries (loader not read) decides whether that is a read past the end.
 - The meaning of `ItemEquipTable.Equ_LeftHand == 2` (two-handed weapon in the right hand) and of `attr.vt[0x9c]` (costume
   charge left) is inferred; Z17 owns the costume charges.
 - `SAA_ALLSTATEPLUS` (39) goes into the rate cluster while `SAA_ALLSTATPLUS` (119) is flat; data `SubStaEventAllStatsUp`
@@ -1275,3 +1452,28 @@ ShinePlayer::sp_LoginInit(p)                                                    
 - The ≥ 1000 `eb_Index` codes in `siae_ParameterRefit` pass 2 do not match the `SetIndex` enum; their source
   (`aeo_SetItemEffectStore`) was not traced.
 - `pmv.pmv_var` (passive mastery column table) was read only through its use; its initialiser was not opened.
+
+---
+
+## N+1. Coverage boundary
+
+The plan has no scope table (`coverage.py Z12` does not apply). The sweep took every `FUN_` this document cites (194
+roots; two of them, FUN_00499810 / FUN_00662de0 in §4.3, are client addresses and were dropped), listed their direct
+callees in the zone export that no doc cites (80; helpers referenced by more than 25 functions and bodies under 6 lines
+skipped), documented the ones that belong here (§2.2, §2.3, §5.4, §6.4–§6.9, §7.5, §1 via `Container::Container`) and
+assigns the rest below. Strings (`Parameter::`, `CharClass`, `ChrCommon`, `RestExp`, `SetItem`, `CharacterTitle`,
+`RollBack`) and the dept-4 WM → zone opcodes of W01 §6.3 were checked the same way. Addresses handed to another item are
+written without `FUN_` so that they still count as uncovered.
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| Set-item subsystem: `sp_SetItemCheck` 00510b50, `sic_SetItemDefine` 00510370, `siel_AppendEffect` 005104c0, `aeo_SetItemEffectStore` 00510670, `aeo_SetItemActionEffect` 00510810, `siae_*` 00510030…00510350 (incl. `siae_SetItemEffectStore` 005100f0; the restore 005102b0 is cited in §6.4), `SkillEffect::se_Clear` 005105e0 / `operator[]` 00510010, `smo_ply_SetItemEffect` 00510c80 / 00510d20, `SetEffectTable` (`FindActionID` 005c7eb0, loader 005b5ec0), `Send_SETITEMHEALEFFECT` 005cfbb0, `ItemBoxIterator::ibi_Get` 0043c100; tables `SetItem.shn`, `SetItemEffect.shn`, `SetEffect.shn` | new item **Z21** (added by Z12) | ~900 decompiled lines with their own tables, item-action hooks and packets; Z12 only documents how the finished set abstate refits the matrix (§2.5, B3) and Z03 only reads `g_SetEffect`; no item, open or planned, lists it (`rg -i setitem docs/plan/items make_plans.py`) |
+| Abnormal-state actor bodies reached from the bomb DoT path of B7: `SubAbnormalStateActorBomb::sasa_ApplyAbstate` (cited in §4.1), `sasa_SetAbstateToArea_TargetNum` 0040b670, `AxialListNearScanEnemyorAll` 004c1830, and the other 55 uncited `SubAbnormalStateActor*` functions | new item **Z22** (added by Z12) | Z03 (done) lists the actor classes as not reconstructed (Z03 'Not reconstructed', 'Abnormal states'); ~1.9k uncited lines, outside the stat model |
+| Callees of `sp_NC_MAP_LOGINCOMPLETE_CMD` (cited in §1.4 / §7.1 as a trigger): `sp_RemoveKQItem` 0050f8c0, `sp_ItemInvenDelete` 0051c590, `sp_MoverSystem_MapLogin` 0045d9e0, `sp_KeepFromDoubleLogin` 0043cc90, `sp_EscapeFromEmptyID` 00440910, `mhs_Init` 00534a30, `sp_PetSystem_VirtualCast` 004d2180, `sp_SkinPolymorph` 004a3280, `sp_GetJoinKQTeamType` 00563990, `sp_RegistNumberVarification` 00551950, `sp_GhostBan` 0043f3d0, `sp_ConnectFromWhere` 0043f1f0, `asl_SendAfterLogin` 0040aed0, the reset helpers 00577e30, 0043bdb0, 00440d20, 0043d500, 00490c30, 0043be00, 0043bf90, 0043c250, `mbdb_GetModeIDLvType` 00462870, `GetStateData` 005ca9b0, `sp_SetCharTitleChangeAvailableTime` 00560900, `vector` resizes 004b40f0 / 004432e0, `lt_Next` 00402740 | Z18 (its list: Z09 §31 rows, `docs/knowledge/Z09.md` §3) | all are in Z09 §31's address rows that Z18 documents; the login burst is Z01 §6 |
+| Other Z09 §31 addresses reached here: `CQuestZone::InitNewPlayer` 005b9d40, `ProtocolLogger::pl_Clear` 005528a0, `sp_KQElementFunction` 00499710, `aeo_GetCaster` 00401b90, `DamageByAngle::DamageTable::operator[]` 0045c9a0, `ItemActionArgument` 0042aad0, `ie_DecoActList_Insert` 00643940, `Container::IsNoAttack` 004c8ea0, mount helpers `sp_HorseFree` 0045d3e0, `mvdb_GetData_ItemIndex` 004bf2c0, `GetUpgradeEffectInfo` 004c0460, `CheckNewTitle` 005cb5f0 | Z18 (same list) | reached only through triggers this document cites (`so_FirstActionAfterSocketConnect`, `sp_ReviveNow`, bomb / damage paths, `sp_HorseOn`, title saves) |
+| `sp_RideInitialize` 0043d140 (from `sp_LoginInit`, §6.9), `sp_MakeRideBriefInfo` 0056e800 (from `sp_HorseOn`) | Z13 (plan: "the mover lifecycle are written as pseudocode") | mount state at login and while riding; Z12 only names the calls |
+| `KQPlayerInform::kqpi_KnockDownMinus` 00496d70 (from `sp_ReviveNow`) | Z16 (kingdom quest element) | KQ scoring on revive; Z12 cites `sp_ReviveNow` only as a matrix trigger |
+| `SkillDataBox::sdb_SpecSkillStruct` 0046a410 (from `so_Routine`) | Z20 (its plan lists 0046a410) | skill data box |
+| `RollBackPosCallBackEvent` producer `sp_Guild_Tournamnet_Observer_Enter` (§7.3) and the observer-out handlers | Z16 (guild tournament system) and Z11 §6.3 (done, summarises the entry) | §7.3 documents the event, its storage and every reader; the tournament flow is Z16's |
+| WM side of the single-option and link-from blobs (0x10D2, 0x402A, 0x4019, +0x658 / +0x660) | W05 §5.4 and its 0x402A / 0x4019 rows (done, documents them) | zone side in §7 |
+| `usp_Character_setRestExpExecTime` / `getSingleOption` (CharDB) | D02 §6 / D06 §8.5 (done, document them) | cited in §7.1 for the meaning of `resttime` |

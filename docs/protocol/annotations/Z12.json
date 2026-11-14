@@ -1233,6 +1233,216 @@
       "0xe: u32 ChargedBuffKey, u16 ChargedBuffID, ShineDateTime UseTime, ShineDateTime EndTime (year:8 month:5 date:6 hour:6 minute:7)"
      ]
     ]
+   },
+   "0x10d3": {
+    "dir": "WM→Z",
+    "name": "NC_CHAR_ZONE_SINGLE_OPTION_CMD",
+    "basis": "zone FUN_005a6200 (PROTO_NC_CHAR_SINGLE_OPTION_CMD, pdb2016); Z12 §7.1",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "NETPACKETZONEHEADER"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "NETPACKETZONEHEADER"
+     ],
+     [
+      6,
+      "u32",
+      "chrregnum",
+      "not read; lookup uses the header charNo"
+     ],
+     [
+      10,
+      "i32",
+      "resttime",
+      "time_t of the last GameDB save (dRestExpLastExecuteTime); rest-exp buff input"
+     ],
+     [
+      14,
+      "u8",
+      "autopick",
+      "→ sp_MiscFlag.IsAutoPickUp + brief IsAutoPick"
+     ],
+     [
+      15,
+      "u8",
+      "mystery_vault",
+      "→ sp_MysteryVaultUI (sent as 0x10D4 at login complete)"
+     ],
+     [
+      16,
+      "u32",
+      "nChatBan",
+      "→ sp_Spammer_ChatBan (≠ 0: chat/shout/roar blocked)"
+     ],
+     [
+      20,
+      "u8",
+      "bFirstJoin",
+      "≠ 0 (CharDB copy): apply RestExpAbstateApplication"
+     ]
+    ]
+   },
+   "0x10b8": {
+    "dir": "WM→Z",
+    "name": "NC_CHAR_ZONE_LINK_FROM_CMD",
+    "basis": "zone FUN_00476600 (PROTO_NC_CHAR_LINKFROM_CMD, pdb2016); Z12 §7.3",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "NETPACKETZONEHEADER"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "NETPACKETZONEHEADER"
+     ],
+     [
+      6,
+      "u32",
+      "chrregnum",
+      "player lookup"
+     ],
+     [
+      10,
+      "Name3",
+      "map",
+      "roll-back map (server and client name)"
+     ],
+     [
+      22,
+      "u32",
+      "coord.x",
+      ""
+     ],
+     [
+      26,
+      "u32",
+      "coord.y",
+      ""
+     ]
+    ]
+   },
+   "0x10d4": {
+    "dir": "S→C",
+    "name": "NC_CHAR_MYSTERYVAULT_UI_STATE_CMD",
+    "basis": "zone FUN_00443390; client GameFrameWork::On_NC_CHAR_MYSTERYVAULT_UI_STATE_CMD FUN_004b33b0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "mystery_vault",
+      "1 and a mystery-vault item in the inventory: client opens MysteryVaultWin; else ignored"
+     ]
+    ]
+   },
+   "0x402a": {
+    "dir": "Z→WM",
+    "name": "NC_CHARSAVE_2WLDMAN_SINGLE_OPTION_CMD",
+    "basis": "zone FUN_00563050 (pdb2016 struct); Z12 §7.2",
+    "fields": [
+     [
+      0,
+      "u16",
+      "WmHandle",
+      "so_GetWMSHandle"
+     ],
+     [
+      2,
+      "u32",
+      "chrregnum",
+      ""
+     ],
+     [
+      6,
+      "i32",
+      "resttime",
+      "always 0"
+     ],
+     [
+      10,
+      "u8",
+      "autopick",
+      "brief IsAutoPick"
+     ],
+     [
+      11,
+      "u8",
+      "mystery_vault",
+      "sp_MysteryVaultUI"
+     ],
+     [
+      12,
+      "u32",
+      "nChatBan",
+      "sp_Spammer_ChatBan"
+     ],
+     [
+      16,
+      "u8",
+      "bFirstJoin",
+      "always 0"
+     ]
+    ]
+   },
+   "0x4019": {
+    "dir": "Z→WM",
+    "name": "NC_CHARSAVE_2WLDMAN_LINK_FROM_CMD",
+    "basis": "zone FUN_004788c0 (pdb2016 struct); Z12 §7.3",
+    "fields": [
+     [
+      0,
+      "u16",
+      "wldmanhandle",
+      "so_GetWMSHandle"
+     ],
+     [
+      2,
+      "u32",
+      "linkfrom.chrregnum",
+      ""
+     ],
+     [
+      6,
+      "Name3",
+      "linkfrom.map",
+      "current field map"
+     ],
+     [
+      18,
+      "u32",
+      "linkfrom.coord.x",
+      "current position"
+     ],
+     [
+      22,
+      "u32",
+      "linkfrom.coord.y",
+      ""
+     ]
+    ]
+   },
+   "0x4025": {
+    "dir": "C→Z",
+    "name": "NC_CHARSAVE_UI_STATE_SAVE_REQ",
+    "basis": "zone FUN_00562f40 (pdb2016 struct); Z12 §7.1",
+    "fields": [
+     [
+      0,
+      "u8",
+      "btMysteryType",
+      "stored unchecked in sp_MysteryVaultUI and sent to GameDB 0x4027"
+     ]
+    ]
    }
   }
  }
