@@ -256,6 +256,22 @@
   "\u2013"
  ],
  [
+  "Z23",
+  2,
+  "Zone: per-player active skill list (CharaterSkillList / MoverSkillList: toggle skills, cooldowns and delay groups, empower, mastery, skill buffers; added by Z20)",
+  "Z03, Z20",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "Z24",
+  2,
+  "Zone: item-side data loaders (UsedItemEffect, ItemUseFunction, ChargedItemEffectDataBox, MoverDataBox, cStateItemDataBox, MysteryVaultTable, RidePetDataBox) and CharClassDataBox (added by Z20)",
+  "Z01, Z04, Z20",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "D01",
   2,
   "Account and AccountLog servers",

@@ -1,0 +1,12 @@
+{
+  "FUN_00447e30": "SkillDataBox::SkillDataIndex::SkillDataIndex",
+  "FUN_00698ef0": "`dynamic_initializer_for_'skilldatabox''",
+  "FUN_00698f10": "`dynamic_initializer_for_'passivedatabox''",
+  "FUN_0057b4d0": "CharacterPassiveList::cpl_UnLearn",
+  "FUN_00447aa0": "CharacterPassiveList::cpl_Store",
+  "FUN_00447810": "CharacterPassiveList::psl_Store",
+  "FUN_00445810": "CharacterPassiveList::cpl_PreSkillCheck",
+  "FUN_00446a10": "CharacterPassiveList::cpl_SetAbstate",
+  "FUN_00447340": "CharacterPassiveList::cpl_StoreSetAbstateList",
+  "FUN_00445940": "CharacterPassiveList::cpl_RecalcParam"
+}

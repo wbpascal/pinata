@@ -2595,6 +2595,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeCen` (`FUN_00517f70`) · 
 
 ### `0x1035` NC_CHAR_CHANGEPARAMCHANGE_CMD
 
+**Verified layout** (basis: zone FUN_00503c10 / FUN_004c9660; client User::ChangeChangeParam)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | changenum |  |
+| 1 | CHAR_PARAMCHANGE_CMD[changenum] | param | {u8 flag, u32 value}; flag 0-3 STR END DEX INT, 5 SPR, 6 WCmin, 7 WCmax, 8 AC, 9 TH, 10 TB, 11 MAmin, 12 MAmax, 13 MR, 14 MH, 15 MB, 0x10 MaxHP, 0x11 MaxSP, 0x12-0x1b free-stat WC AC MA MR TH TB Cri Block MaxHP MaxSP, 0x24 MaxLP (Z12 §4.3) |
+
 Sent from `ShineObjectClass::ShinePlayer::smo_NotifyParameterChange` (`FUN_00503c10`) · payload variable (iVar5)
 
 Fill: +0: FUN_004c9660; +0: FUN_004c9660; +0: FUN_004c9660
@@ -2605,14 +2612,14 @@ Fill: +0: FUN_004c9660; +0: FUN_004c9660; +0: FUN_004c9660
 
 ### `0x1038` NC_CHAR_CLIENT_BASE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_BASE_CMD` (struct shared under the base name, inferred), 105 bytes
+**Verified layout** (basis: zone FUN_0044d890; client FUN_006631f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u32 | chrregnum |  |
-| 4 | char[20] | charid | Name5 |
+| 4 | Name5 | charid |  |
 | 24 | u8 | slotno |  |
-| 25 | u8 | Level |  |
+| 25 | u8 | Level | ≥151 → disconnect 0x689 |
 | 26 | u64 | Experience |  |
 | 34 | u16 | CurPwrStone |  |
 | 36 | u16 | CurGrdStone |  |
@@ -2623,21 +2630,16 @@ Fill: +0: FUN_004c9660; +0: FUN_004c9660; +0: FUN_004c9660
 | 50 | u32 | CurLP |  |
 | 54 | u32 | fame |  |
 | 58 | u64 | Cen |  |
-| 66 | char[12] | logininfo.currentmap | Name3 |
-| 78 | u32 | logininfo.currentcoord.xy.x |  |
-| 82 | u32 | logininfo.currentcoord.xy.y |  |
-| 86 | u8 | logininfo.currentcoord.dir |  |
-| 87 | u8 | statdistribute.Strength |  |
-| 88 | u8 | statdistribute.Constitute |  |
-| 89 | u8 | statdistribute.Dexterity |  |
-| 90 | u8 | statdistribute.Intelligence |  |
-| 91 | u8 | statdistribute.MentalPower |  |
-| 92 | u8 | statdistribute.RedistributePoint |  |
+| 66 | Name3 | logininfo.currentmap | map = FieldAttr.mapidclient |
+| 78 | u32 | currentcoord.x |  |
+| 82 | u32 | currentcoord.y |  |
+| 86 | u8 | currentcoord.dir |  |
+| 87 | CHARSTATDISTSTR | statdistribute | Str Con Dex Int Men RedistributePoint |
 | 93 | u8 | pkyellowtime |  |
 | 94 | u32 | pkcount |  |
 | 98 | u16 | prisonmin |  |
 | 100 | u8 | adminlevel |  |
-| 101 | u32 | flags | PROTO_NC_CHAR_BASE_CMD::<unnamed-type-flags> (union: bin, str) |
+| 101 | u32 | flags |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_charbasedata` (`FUN_0044d890`) · payload 105 bytes
 
@@ -2651,6 +2653,15 @@ Fill: +0: FUN_0044ac80 (no direct writes found); +66: FUN_004662e0 (no direct wr
 
 ### `0x1039` NC_CHAR_CLIENT_SHAPE_CMD
 
+**Verified layout** (basis: zone FUN_0044ae80; client FUN_006614c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | race:2 chrclass:5 gender:1 |  |
+| 1 | u8 | hairtype |  |
+| 2 | u8 | haircolor |  |
+| 3 | u8 | faceshape |  |
+
 Sent from `ShineObjectClass::ShinePlayer::so_charsharpdata` (`FUN_0044ae80`) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -2659,16 +2670,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_charsharpdata` (`FUN_0044ae80`) · 
 
 ### `0x103a` NC_CHAR_CLIENT_QUEST_DOING_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_QUEST_DOING_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+**Verified layout** (basis: zone FUN_0044b3c0; client FUN_00727fd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u32 | chrregnum |  |
-| 4 | u8 | bNeedClear |  |
+| 4 | u8 | bNeedClear | 1 = empty the quest array first |
 | 5 | u8 | nNumOfDoingQuest |  |
-| 6 | PLAYER_QUEST_INFO[nNumOfDoingQuest] | QuestDoingArray | variable length, element PLAYER_QUEST_INFO |
-
-Element `PLAYER_QUEST_INFO` (32 bytes): +0 u16 ID, +2 u8 Status, +3 i64 Data.StartTime, +11 i64 Data.EndTime, +19 u32 Data.RepeatCount, +23 u8 Data.ProgressStep, +24 u8[5] Data.End_NPCMobCount, +29 u8 Data.End_Location|End_Scenario, +30 u16 Data.End_RunningTimeSec
+| 6 | PLAYER_QUEST_INFO[n] | QuestDoingArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
 
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDoing` (`FUN_0044b3c0`) · payload variable (iVar8)
 
@@ -2678,7 +2687,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDoing` (`FUN_0044b3c0`) �
 
 ### `0x103b` NC_CHAR_CLIENT_QUEST_DONE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_QUEST_DONE_CMD` (struct shared under the base name, inferred), 12 bytes + variable tail
+**Verified layout** (basis: zone FUN_0044b500; client FUN_007280b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -2687,9 +2696,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDoing` (`FUN_0044b3c0`) �
 | 6 | u16 | nTotalDoneQuestSize |  |
 | 8 | u16 | nDoneQuestCount |  |
 | 10 | u16 | nIndex |  |
-| 12 | PLAYER_QUEST_DONE_INFO[nDoneQuestCount] | QuestDoneArray | variable length, element PLAYER_QUEST_DONE_INFO |
-
-Element `PLAYER_QUEST_DONE_INFO` (10 bytes): +0 u16 ID, +2 i64 tEndTime
+| 12 | PLAYER_QUEST_DONE_INFO[n] | QuestDoneArray | {u16 ID, i64 tEndTime} (10 bytes) |
 
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDone` (`FUN_0044b500`) · payload variable (iVar7)
 
@@ -2700,18 +2707,16 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDone` (`FUN_0044b500`) ·
 
 ### `0x103d` NC_CHAR_CLIENT_SKILL_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_CLIENT_SKILL_CMD`, 10 bytes + variable tail
+**Verified layout** (basis: zone FUN_0044bf20 / FUN_00445460; client Skill::InitSkill FUN_006a0690)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | restempow |  |
-| 1 | u8 | PartMark.bIsStart|bIsEnd|nOrder | bits bIsStart:1@0, bIsEnd:1@1, nOrder:6@2 |
-| 2 | u16 | nMaxNum |  |
-| 4 | u32 | skill.chrregnum |  |
-| 8 | u16 | skill.number |  |
-| 10 | PROTO_SKILLREADBLOCKCLIENT[skill.number] | skill.skill | variable length, element PROTO_SKILLREADBLOCKCLIENT |
-
-Element `PROTO_SKILLREADBLOCKCLIENT` (12 bytes): +0 u16 skillid, +2 u32 cooltime, +6 u8 empow.damage|sp, +7 u8 empow.keeptime|cooltime, +8 u32 mastery
+| 0 | u8 | restempow | TotalSkillEmpower − EmpowerSummary |
+| 1 | PARTMARK | PartMark | bIsStart → client clears |
+| 2 | u16 | nMaxNum | visible skills |
+| 4 | u32 | chrregnum |  |
+| 8 | u16 | number | ≤ 500 |
+| 10 | PROTO_SKILLREADBLOCKCLIENT[number] | skill | 0xc: u16 skillid, u32 cooltime (remaining s), u16 empow, u32 mastery |
 
 Sent from `ShineObjectClass::ShinePlayer::so_charskilldata` (`FUN_0044bf20`) · payload variable (iVar5)
 
@@ -2726,6 +2731,13 @@ Fill: +4: FUN_00445460 (no direct writes found)
 
 ### `0x103e` NC_CHAR_CLIENT_PASSIVE_CMD
 
+**Verified layout** (basis: zone FUN_0044e5a0; client FUN_0069f430)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | number |  |
+| 2 | u16[number] | passive | ids < 1000 stored |
+
 Sent from `ShineObjectClass::ShinePlayer::so_charpassivedata` (`FUN_0044e5a0`) · payload variable (iVar1)
 
 | Off | Type | Value / source |
@@ -2734,6 +2746,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_charpassivedata` (`FUN_0044e5a0`) �
 | 2 | bytes[?] | `FID_conflict__memcpy from param_1 + 1` |
 
 ### `0x1048` NC_CHAR_CLIENT_GAME_CMD
+
+**Verified layout** (basis: zone FUN_0044c220; client ignores)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | partyno |  |
+| 2 | u16 | nRaidNo |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_Storegamedata` (`FUN_0044c220`) · payload 4 bytes
 
@@ -2765,14 +2784,12 @@ Sent in reply to `0x1031` NC_CHAR_ZONE_CHARTITLE_CMD on WorldManagerSession (`FU
 
 ### `0x104a` NC_CHAR_CLIENT_CHARGEDBUFF_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_CHARGEDBUFF_CMD` (struct shared under the base name, inferred), 2 bytes + variable tail
+**Verified layout** (basis: zone FUN_0044e1e0; client FUN_00477370 / FUN_006d2540)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | NumOfChargedBuff |  |
-| 2 | PROTO_CHARGEDBUFF_INFO[NumOfChargedBuff] | ChargedBuff | variable length, element PROTO_CHARGEDBUFF_INFO |
-
-Element `PROTO_CHARGEDBUFF_INFO` (14 bytes): +0 u32 ChargedBuffKey, +4 u16 ChargedBuffID, +6 u32 UseTime.year|month|date|hour|minute, +10 u32 EndTime.year|month|date|hour|minute
+| 2 | PROTO_CHARGEDBUFF_INFO[n] | ChargedBuff | 0xe: u32 ChargedBuffKey, u16 ChargedBuffID, ShineDateTime UseTime, ShineDateTime EndTime (year:8 month:5 date:6 hour:6 minute:7) |
 
 Sent from `ShineObjectClass::ShinePlayer::so_CharChargedBuffData` (`FUN_0044e1e0`) · payload variable (iVar5)
 
@@ -2830,11 +2847,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ClassChange` (`FUN_004521b0`) �
 
 ### `0x105b` NC_CHAR_STAT_REMAINPOINT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_STAT_REMAINPOINT_CMD`, 1 bytes
+**Verified layout** (basis: zone FUN_0058bd10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | remain |  |
+| 0 | u8 | remain | StatTable stat[class] − spent points |
 
 Sent from `GameDBSession::gds_NC_CHAR_STAT_DECPOINTFAIL_DB_ACK` (`FUN_0058bd10`) · payload 1 bytes
 
@@ -2888,11 +2905,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_BroadcastGuildInfo` (`FUN_0056e
 
 ### `0x106f` NC_CHAR_FAMECHANGE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_FAMECHANGE_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_00518070)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | fame |  |
+| 0 | u32 | fame | new total |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeFame` (`FUN_00518070`) · payload 4 bytes
 
@@ -2982,13 +2999,13 @@ Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePla
 
 ### `0x10ce` NC_CHAR_CLIENT_QUEST_READ_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_QUEST_READ_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+**Verified layout** (basis: zone FUN_0044b640; client FUN_007281b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u32 | chrregnum |  |
 | 4 | u16 | nNumOfReadQuest |  |
-| 6 | u16[nNumOfReadQuest] | QuestReadIDArray | variable length |
+| 6 | u16[n] | QuestReadIDArray |  |
 
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b640`) · payload variable (iVar6)
 
@@ -2999,11 +3016,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b640`) ·
 
 ### `0x10d4` NC_CHAR_MYSTERYVAULT_UI_STATE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_MYSTERYVAULT_UI_STATE_CMD`, 1 bytes
+**Verified layout** (basis: zone FUN_00443390; client GameFrameWork::On_NC_CHAR_MYSTERYVAULT_UI_STATE_CMD FUN_004b33b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | mystery_vault |  |
+| 0 | u8 | mystery_vault | 1 and a mystery-vault item in the inventory: client opens MysteryVaultWin; else ignored |
 
 Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePlayer (`FUN_00443390`, ShineObjectClass::ShinePlayer::sp_NC_MAP_LOGINCOMPLETE_CMD) · payload 1 bytes
 
@@ -3013,15 +3030,13 @@ Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePla
 
 ### `0x10d7` NC_CHAR_CLIENT_QUEST_REPEAT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_QUEST_REPEAT_CMD` (struct shared under the base name, inferred), 6 bytes + variable tail
+**Verified layout** (basis: zone FUN_0044b770; client FUN_00728280)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u32 | chrregnum |  |
 | 4 | u16 | nNumOfRepeatQuest |  |
-| 6 | PLAYER_QUEST_INFO[nNumOfRepeatQuest] | QuestRepeatArray | variable length, element PLAYER_QUEST_INFO |
-
-Element `PLAYER_QUEST_INFO` (32 bytes): +0 u16 ID, +2 u8 Status, +3 i64 Data.StartTime, +11 i64 Data.EndTime, +19 u32 Data.RepeatCount, +23 u8 Data.ProgressStep, +24 u8[5] Data.End_NPCMobCount, +29 u8 Data.End_Location|End_Scenario, +30 u16 Data.End_RunningTimeSec
+| 6 | PLAYER_QUEST_INFO[n] | QuestRepeatArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
 
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b770`) · payload variable (iVar8)
 
@@ -3050,16 +3065,14 @@ Sent from `FUN_00615d10` (`FUN_00615d10`) · payload 16 bytes
 
 ### `0x10df` NC_CHAR_CHANGEBYCONDITION_PARAM_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_CHANGEBYCONDITION_PARAM_CMD`, 6 bytes + variable tail
+**Verified layout** (basis: zone FUN_004cbb30 / FUN_004cbcd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nSkillID |  |
-| 2 | u16 | nChangeRate |  |
+| 0 | u16 | nSkillID | cbcp_nID |
+| 2 | u16 | nChangeRate | cbcp_nCondition |
 | 4 | u16 | nParamNum |  |
-| 6 | CHAR_CHANGEBYCONDITION_PARAM[nParamNum] | aParam | variable length, element CHAR_CHANGEBYCONDITION_PARAM |
-
-Element `CHAR_CHANGEBYCONDITION_PARAM` (6 bytes): +0 u8 nFlag, +1 u8 nIndex, +2 u32 nValue
+| 6 | CHAR_CHANGEBYCONDITION_PARAM[nParamNum] | aParam | {u8 nFlag (0x1c WCmin … 0x21 MR, 0x23 TB), u8 nIndex, u32 nValue} |
 
 Sent from `FUN_004cbb30` (`FUN_004cbb30`) · payload variable (iVar4)
 
@@ -4900,11 +4913,11 @@ Sent from `FUN_005835e0` (`FUN_005835e0`) · payload 12 bytes
 
 ### `0x2446` NC_BAT_FAMEGAIN_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_BAT_FAMEGAIN_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_0042df00)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | famegain |  |
+| 0 | u32 | famegain | added fame (level on level-up), cap 1,000,000 |
 
 Sent from `ShineObjectClass::ShinePlayer::so_GainFame` (`FUN_0042df00`) · payload 4 bytes
 
@@ -6298,11 +6311,11 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendMyInform2PartyMember` (`FUN_005
 
 ### `0x384a` NC_PARTY_MEMBERMAPOUT
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_PARTY_MEMBERMAPOUT`, 20 bytes
+**Verified layout** (basis: zone FUN_0056dd80 sp_partylogout (0x14; to each live party member object, not in a raid); client FUN_0049a750)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | memberid | Name5 |
+| 0 | Name5 | memberid | name of the member leaving the map |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · payload 20 bytes
 
@@ -9266,11 +9279,11 @@ Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · pay
 
 ### `0xb021` NC_RAID_MAPOUT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_RAID_MAPOUT_CMD`, 20 bytes
+**Verified layout** (basis: zone FUN_0056dd80 sp_partylogout (0x14; rt_Broadcast to raid members on the map); client FUN_0049bfd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | sCharID | Name5 |
+| 0 | Name5 | sCharID | name of the member leaving the map |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · payload 20 bytes
 
@@ -9284,7 +9297,7 @@ Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · pa
 
 ### `0xb022` NC_RAID_MEMBERINFORM_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_RAID_MEMBERINFORM_CMD`, 16 bytes
+**Verified layout** (basis: zone FUN_005cd8f0 (0x10))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -9299,14 +9312,12 @@ Sent from `FUN_005cd8f0` (`FUN_005cd8f0`) · payload 16 bytes
 
 ### `0xb023` NC_RAID_MEMBERCLASS_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_RAID_MEMBERCLASS_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_005cd9c0, FUN_005cda50, FUN_005ce190 (1 + 0x3a·n; FUN_005cda50 sends 2 bytes short, Z14-B12))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | nNum |  |
-| 1 | RAID_MEMBERCLASS[nNum] | RaidMembers | variable length, element RAID_MEMBERCLASS |
-
-Element `RAID_MEMBERCLASS` (58 bytes): +0 u16 nPartyNo, +2 u8 nPartyIndex, +3 u8 nSlotIndex, +4 char[20] charid, +24 u8 chrclass, +25 u8 level, +26 u32 maxhp, +30 u32 maxsp, +34 u32 maxlp, +38 u32 hp, +42 u32 sp, +46 u32 lp, +50 u32 loc.x, +54 u32 loc.y
+| 1 | RAID_MEMBERCLASS[n] | RaidMembers | 0x3a: u16 nPartyNo, u8 nPartyIndex, u8 nSlotIndex, Name5 charid @4, u8 chrclass @0x18, u8 level @0x19, u32 maxhp @0x1a, maxsp @0x1e, maxlp @0x22, hp @0x26, sp @0x2a, lp @0x2e, SHINE_XY_TYPE loc @0x32 |
 
 Sent from `FUN_005cd9c0` (`FUN_005cd9c0`) · payload 59 bytes
 
@@ -9320,14 +9331,12 @@ Fill: +1: FUN_005cd5a0 (no direct writes found)
 
 ### `0xb026` NC_RAID_LOCATION_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_RAID_LOCATION_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_005cdb50, FUN_005cdc00 (1 + 0xc·n; FUN_005cdc00 length wrong, Z14-B13))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | nNum |  |
-| 1 | PROTO_NC_RAID_LOCATION_CMD::Memberinfo[nNum] | RaidMembers | variable length, element PROTO_NC_RAID_LOCATION_CMD::Memberinfo |
-
-Element `PROTO_NC_RAID_LOCATION_CMD::Memberinfo` (12 bytes): +0 u16 nPartyNo, +2 u8 nPartyIndex, +3 u8 nSlotIndex, +4 u32 loc.x, +8 u32 loc.y
+| 1 | Memberinfo[n] | RaidMembers | 0xc: u16 nPartyNo, u8 nPartyIndex, u8 nSlotIndex, u32 x, u32 y |
 
 Sent from `FUN_005cdb50` (`FUN_005cdb50`) · payload 13 bytes
 
@@ -10362,6 +10371,14 @@ Empty payload.
 
 Empty payload.
 
+### `0x4025` NC_CHARSAVE_UI_STATE_SAVE_REQ (C→Z)
+
+**Verified layout** (basis: zone FUN_00562f40 (pdb2016 struct); Z12 §7.1)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | btMysteryType | stored unchecked in sp_MysteryVaultUI and sent to GameDB 0x4027 |
+
 ### `0x749c` NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ (C→Z)
 
 **Verified layout** (basis: zone sp_NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ FUN_004783c0; pdb2016 struct)
@@ -10840,6 +10857,17 @@ no 0x74DC reply in 2016. Z16 §6.4
 | 1 | u16 | shoutdelay | DAT_0da50480 (pdb2017 name) |
 
 PROTO_NC_MISC_SERVERPARAMETER_ACK, the alias at this opcode value (C02 §2); 3 bytes as in the 2016 send
+
+### `0x1047` NC_CHAR_CLIENT_ITEM_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_0044ddf0 / FUN_00643d40 / FUN_0044d6d0; client FUN_00477330)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | numofitem |  |
+| 1 | u8 | box | 9/8/12/15 |
+| 2 | u8 | flag | bit 0 invenclear (first packet of the box); bits 1-7 stale |
+| 3 | PROTO_ITEMPACKET_INFORM[] | ItemArray | {u8 datasize, u16 location, item data}; ≤ ~8000 bytes per packet |
 
 ### `0x1061` NC_CHAR_STAT_INCPOINTFAIL_ACK (S→C)
 
@@ -11458,6 +11486,14 @@ to every participant still in the party/raid; client: 0x2008 → '%s acquired th
 |---|---|---|---|
 | 0 | u16 | err | 0xB50 started, 0xB51, 0xB53 |
 
+### `0x4420` NC_QUEST_JOBDUNGEON_LINK_FAIL_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_005a8d30, FUN_005bfde0 (so_SendErrorCode 17/32))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x30C2 |
+
 ### `0x4829` NC_SKILL_SOMEONEREVAVALTOME_CMD (S→C)
 
 **Verified layout** (basis: zone FUN_0057ab90; client FUN_00575f30)
@@ -11884,6 +11920,19 @@ no payload; whole map on `battlestop guild.`; client ends the tournament display
 | 0 | u16 | mobhandle | mob |
 | 2 | u32 | mobguild | mob+0x22ec |
 
+### `0x7494` NC_GUILD_STORAGEWITHDRAW_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00474cf0 / FUN_004752d0 (0x21))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | type |  |
+| 1 | u8 | isBuy |  |
+| 2 | Name5 | charid |  |
+| 22 | u16 | item |  |
+| 24 | u8 | slot |  |
+| 25 | u64 | lot|cen |  |
+
 ### `0x74D2` NC_GUILD_TOURNAMENT_DICEGAME_START_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone GuildTournamentSystem::DiceGameStart FUN_0047ada0 (Pine DiceGameStart); client GuildTask FUN_006b63a0)
@@ -11948,6 +11997,34 @@ to the live players of the map (AxialListPacketBroadcast, 0x16 bytes with the op
 |---|---|---|---|
 | 0 | u16 | err | 0x14C0 ok |
 
+### `0x9873` NC_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00470b50, FUN_00471550 (0x29))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | who | 3 = academy reward |
+| 1 | u8 | type | 0 item, 1 lot item, 2 money |
+| 2 | Name5 | charid |  |
+| 22 | u16 | item |  |
+| 24 | u8 | slot |  |
+| 25 | u64 | lot|cen |  |
+| 33 | u64 | storage_cen |  |
+
+### `0x9875` NC_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00470b50, FUN_004716d0 (0x29))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | who |  |
+| 1 | u8 | type |  |
+| 2 | Name5 | charid |  |
+| 22 | u16 | item |  |
+| 24 | u8 | slot |  |
+| 25 | u64 | lot|cen |  |
+| 33 | u64 | storage_cen |  |
+
 ### `0xBC1C` NC_GAMBLE_ENTER_PLAYER_DIRECT_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone ShineObject::so_DirectInfoBroadcast FUN_00553510 (cSetObjectDirect FUN_005e8fa0, mob skill facing); client MHDiceGameTask FUN_007069b0)
@@ -11993,6 +12070,236 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nError | 0x3080 (sent on success), 0x3081, 0x3082 |
+
+### `0x101f` NC_CHAR_ZONE_BASE_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044d890 so_charbasedata)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | Name5 | charid |  |
+| 30 | u8 | slotno |  |
+| 31 | u8 | Level | ≥151 → disconnect 0x689 |
+| 32 | u64 | Experience |  |
+| 40 | u16 | CurPwrStone |  |
+| 42 | u16 | CurGrdStone |  |
+| 44 | u16 | CurHPStone |  |
+| 46 | u16 | CurSPStone |  |
+| 48 | u32 | CurHP |  |
+| 52 | u32 | CurSP |  |
+| 56 | u32 | CurLP |  |
+| 60 | u32 | fame |  |
+| 64 | u64 | Cen |  |
+| 72 | Name3 | logininfo.currentmap |  |
+| 84 | u32 | currentcoord.x |  |
+| 88 | u32 | currentcoord.y |  |
+| 92 | u8 | currentcoord.dir |  |
+| 93 | CHARSTATDISTSTR | statdistribute | Str Con Dex Int Men RedistributePoint |
+| 99 | u8 | pkyellowtime |  |
+| 100 | u32 | pkcount |  |
+| 104 | u16 | prisonmin |  |
+| 106 | u8 | adminlevel |  |
+| 107 | u32 | flags |  |
+
+### `0x1020` NC_CHAR_ZONE_SHAPE_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044ae80 so_charsharpdata)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u8 | race:2 chrclass:5 gender:1 |  |
+| 7 | u8 | hairtype |  |
+| 8 | u8 | haircolor |  |
+| 9 | u8 | faceshape |  |
+
+### `0x1021` NC_CHAR_ZONE_QUEST_DOING_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044b3c0 / CQuest FUN_0062f6e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u8 | bNeedClear | 1 = empty the quest array first |
+| 11 | u8 | nNumOfDoingQuest |  |
+| 12 | PLAYER_QUEST_INFO[n] | QuestDoingArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
+
+### `0x1022` NC_CHAR_ZONE_QUEST_DONE_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044b500 / CQuest FUN_0062f7c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u16 | nTotalDoneQuest |  |
+| 12 | u16 | nTotalDoneQuestSize |  |
+| 14 | u16 | nDoneQuestCount |  |
+| 16 | u16 | nIndex |  |
+| 18 | PLAYER_QUEST_DONE_INFO[n] | QuestDoneArray | {u16 ID, i64 tEndTime} (10 bytes) |
+
+### `0x1023` NC_CHAR_ZONE_ABSTATE_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044e0e0 / asl_Store FUN_0040afd0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u16 | number | < 792 |
+| 12 | ABSTATEREADBLOCK[number] | abstate | 0x24: u16 abstateid, u8 strength, u32 pasttime ms @3, u32 resttime ms @7, u16 restcount @0xb, SKILL_EMPOWER @0xd, u8 caster nLevel @0xf, i32 caster nAttackPower @0x10, {u16 Index,u16 Value}[4] setitem @0x14 |
+
+### `0x1024` NC_CHAR_ZONE_SKILL_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044bf20 / csl_Store FUN_00449360)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | PARTMARK | PartMark | bIsStart:1 bIsEnd:1 nOrder:6 |
+| 11 | u16 | nMaxNum | total over all chunks |
+| 13 | u16 | number | < 3000 |
+| 15 | PROTO_SKILLREADBLOCK[number] | skill | 0x10: i32 savetime, u16 skillid @4, u32 cooltime s @6, u16 empow @0xa, u32 mastery @0xc |
+
+### `0x1025` NC_CHAR_ZONE_PASSIVE_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044e5a0 / cpl_Store FUN_00447aa0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u16 | number |  |
+| 8 | u16[number] | passive | ids < 1000 stored |
+
+### `0x1029` NC_CHAR_ZONE_GUILD_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044b9c0 → FUN_0055a1f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | guildNo | → m_nMyGuildNo |
+
+### `0x102e` NC_CHAR_ZONE_ITEM_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044ddf0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u8 | PacketOrder | nPacketOrderNum:7, nIsLastOfInven:1 (bit 7: send the client copy) |
+| 7 | u8 | nPartMark | 4 inventory(9), 8 equipment(8), 0x10 mini-house(12), 0x20 action box(15) |
+| 8 | u8 | numofitem |  |
+| 9 | PROTO_ITEMPACKET_TOTAL[] | ItemArray | {u8 datasize, u16 location (Pos:10, Type:6), item data}; next at +1+datasize |
+
+### `0x102f` NC_CHAR_ZONE_CHESTINFO_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044c8a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u16 | itemnum |  |
+| 8 | u16[itemnum] | location | bits set in sp_ChestItemBox |
+
+### `0x1030` NC_CHAR_ZONE_GAME_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044c220)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u8 | zone.bIsGM |  |
+| 7 | u16 | client.partyno | replaced by pm_FindParty |
+| 9 | u16 | client.nRaidNo |  |
+
+### `0x1032` NC_CHAR_ZONE_CHARGEDBUFF_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044bcf0 → FUN_0044e1e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u16 | NumOfChargedBuff |  |
+| 8 | PROTO_CHARGEDBUFF_INFO[n] | ChargedBuff | 0xe: u32 ChargedBuffKey, u16 ChargedBuffID, ShineDateTime UseTime, ShineDateTime EndTime (year:8 month:5 date:6 hour:6 minute:7) |
+
+### `0x1098` NC_CHAR_GUILD_ACADEMY_ZONE_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044bad0 → FUN_0055a530)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | academyNo | → m_nMyGuildAcademyNo |
+
+### `0x10b8` NC_CHAR_ZONE_LINK_FROM_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_00476600 (PROTO_NC_CHAR_LINKFROM_CMD, pdb2016); Z12 §7.3)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER |
+| 2 | u32 | charregistnumber | NETPACKETZONEHEADER |
+| 6 | u32 | chrregnum | player lookup |
+| 10 | Name3 | map | roll-back map (server and client name) |
+| 22 | u32 | coord.x |  |
+| 26 | u32 | coord.y |  |
+
+### `0x10cd` NC_CHAR_ZONE_QUEST_READ_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044b640 / CQuest FUN_0062f890)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u16 | nNumOfReadQuest |  |
+| 12 | u16[n] | QuestReadIDArray |  |
+
+### `0x10d3` NC_CHAR_ZONE_SINGLE_OPTION_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_005a6200 (PROTO_NC_CHAR_SINGLE_OPTION_CMD, pdb2016); Z12 §7.1)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER |
+| 2 | u32 | charregistnumber | NETPACKETZONEHEADER |
+| 6 | u32 | chrregnum | not read; lookup uses the header charNo |
+| 10 | i32 | resttime | time_t of the last GameDB save (dRestExpLastExecuteTime); rest-exp buff input |
+| 14 | u8 | autopick | → sp_MiscFlag.IsAutoPickUp + brief IsAutoPick |
+| 15 | u8 | mystery_vault | → sp_MysteryVaultUI (sent as 0x10D4 at login complete) |
+| 16 | u32 | nChatBan | → sp_Spammer_ChatBan (≠ 0: chat/shout/roar blocked) |
+| 20 | u8 | bFirstJoin | ≠ 0 (CharDB copy): apply RestExpAbstateApplication |
+
+### `0x10d6` NC_CHAR_ZONE_QUEST_REPEAT_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_0044b770 / CQuest FUN_0062f960)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u16 | nNumOfRepeatQuest |  |
+| 12 | PLAYER_QUEST_INFO[n] | QuestRepeatArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
 
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→Z)
 
@@ -12658,6 +12965,15 @@ sent length is one byte longer than the packet (Z11-B38); answer 0x5816 / 0x5817
 | 6 | u8 | nPetMind | clamped to gPetData mind min..max |
 | 7 | u8 | nPetStress | clamped to gPetData stress min..max |
 
+### `0x1070` NC_CHAR_FAMESAVE_CMD (Z→DB)
+
+**Verified layout** (basis: zone FUN_00518160)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | charregnum |  |
+| 4 | u32 | fame |  |
+
 ### `0x10d1` NC_CHAR_FREESTAT_SET_DB_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_0058ad10 / FUN_0058b3f0)
@@ -13135,6 +13451,32 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 12 | u16 | nIndex | records sent in earlier packets |
 | 14 | PLAYER_QUEST_DONE_INFO[n] | QuestDoneArray | 10 each: u16 ID, i64 tEndTime |
 
+### `0x4019` NC_CHARSAVE_2WLDMAN_LINK_FROM_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_004788c0 (pdb2016 struct); Z12 §7.3)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wldmanhandle | so_GetWMSHandle |
+| 2 | u32 | linkfrom.chrregnum |  |
+| 6 | Name3 | linkfrom.map | current field map |
+| 18 | u32 | linkfrom.coord.x | current position |
+| 22 | u32 | linkfrom.coord.y |  |
+
+### `0x402a` NC_CHARSAVE_2WLDMAN_SINGLE_OPTION_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_00563050 (pdb2016 struct); Z12 §7.2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | WmHandle | so_GetWMSHandle |
+| 2 | u32 | chrregnum |  |
+| 6 | i32 | resttime | always 0 |
+| 10 | u8 | autopick | brief IsAutoPick |
+| 11 | u8 | mystery_vault | sp_MysteryVaultUI |
+| 12 | u32 | nChatBan | sp_Spammer_ChatBan |
+| 16 | u8 | bFirstJoin | always 0 |
+
 ### `0x580e` NC_KQ_Z2W_MAKE_ACK (Z→WM)
 
 **Verified layout** (basis: zone FUN_00497790)
@@ -13267,6 +13609,24 @@ only by the hosting zone. Z16 §6.2
 | 0 | bytes[0x174] | request | copy of 0x7C13 |
 | 372 | u16 | err | 0xDC0 not found, 0xDC1/0xDC2 so_Prison_Go result |
 
+### `0xa401` NC_INSTANCE_DUNGEON_EMPTY_DUNGEON_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_004868d0 (5))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Category |  |
+| 1 | u32 | RegisterNumber |  |
+
+### `0xa403` NC_INSTANCE_DUNGEON_RESET_COUNTDOWN_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_004868d0, FUN_00486710, FUN_00485290 (5))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Category |  |
+| 1 | u32 | RegisterNumber |  |
+
 ### `0xa408` NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_REQ (Z→WM)
 
 **Verified layout** (basis: zone FUN_004c35d0)
@@ -13308,6 +13668,15 @@ only by the hosting zone. Z16 §6.2
 | 7 | u16 | nError |  |
 | 9 | i32 | eLevelType |  |
 | 13 | Name3 | sMapName |  |
+
+### `0xa419` NC_INSTANCE_DUNGEON_MAP_REGIST_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_00462af0 (2 + 0xd·n))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMapCount |  |
+| 2 | SHINE_INDUN_INFO[n] | sIndunInfos | 0xd: char MapIDClient[12] + NUL, u8 ModeIDLv |
 
 ### `0x0811` NC_MISC_ZONERINGLINKTEST_RNG (Z→Z (ring))
 
@@ -13383,6 +13752,17 @@ only by the hosting zone. Z16 §6.2
 | 3 | u32 | start.regnum |  |
 | 7 | Name5 | charid | kicked character |
 
+### `0x10b1` NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_005a8a70, FUN_00485120 (0xb))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | i32 | Category | owner category; Start.handle = 0xFFFF, Start.regnum = owner regnum |
+
 ### `0x1810` NC_MAP_EXPBONUS_RNG (Z→Z (ring))
 
 **Verified layout** (basis: zone &expbonus ac_BonusExp FUN_0041e190 → zrpb_Request FUN_005a79a0 (writes, 0x0B bytes); ring handler forwards and applies; PDB 2016 PROTO_NC_MAP_EXPBONUS_RNG)
@@ -13418,27 +13798,125 @@ only by the hosting zone. Z16 §6.2
 | 11 | u32 | bride | bride charNo (&weddingreset: GM charNo) |
 | 15 | u8 | RecallCount | partners recalled so far; 0 back at the origin = cancel the hall reservation |
 
-### `0x10b1` NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG (Z→Z ring)
+### `0x441f` NC_QUEST_JOBDUNGEON_FIND_RNG (Z→Z (ring))
 
-**Verified layout** (basis: zone FUN_005a8a70)
-
-| Off | Type | Field | Notes |
-|---|---|---|---|
-| 0 | ZONERINGLINKAGESTART | Start | machine own, handle 0xFFFF, regnum |
-| 7 | i32 | Category |  |
-
-### `0xa404` NC_INSTANCE_DUNGEON_FIND_RNG (Z→Z ring)
-
-**Verified layout** (basis: zone FUN_0050f070)
+**Verified layout** (basis: zone FUN_005a8d30, FUN_005bfde0 (0x73))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | ZONERINGLINKAGESTART | Start | machine, handle, regnum |
-| 7 | i32 | InstanceCategory |  |
-| 11 | u32 | IDRegisterNumber |  |
-| 15 | ORToken | Argument | 20-byte key |
-| 35 | char[33] | ServerMapName |  |
-| 68 | u16 | Error | 2 on request |
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u16 | nError | 0x30C0 found, 0x30C1 searching, 0x30C2 refused |
+| 9 | char[33] | ClientMapName | cluster name |
+| 42 | char[33] | ServerMapName | instance map (Name3 + NUL) when found |
+| 75 | char[33] | ScriptName | film to play |
+| 108 | u16 | QuestScript.nQuestID |  |
+| 110 | u8 | QuestScript.nQSC | 3 |
+| 111 | u32 | QuestScript.nResult | 0 fail, 2 refused |
+
+### `0x7493` NC_GUILD_STORAGEWITHDRAW_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_00474f10 (0x2c); not forwarded (Z14-B10))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u32 | gldregnum |  |
+| 11 | u8 | type | item / money |
+| 12 | u8 | slot |  |
+| 13 | u8 | isBuy | bought with guild tokens |
+| 14 | Name5 | charid | who withdrew |
+| 34 | u16 | item |  |
+| 36 | u64 | lot|cen | union |
+
+### `0x9872` NC_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_00473050 (0x35))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u32 | gldregnum | storage owner guild |
+| 11 | u8 | why | ≠0: members get 0x9873 |
+| 12 | u8 | who |  |
+| 13 | u8 | type | 0 item, 1 lot item, 2 money |
+| 14 | u8 | slot |  |
+| 15 | Name5 | charid |  |
+| 35 | u16 | item |  |
+| 37 | u64 | lot|cen |  |
+| 45 | u64 | storage_cen | new storage money (type 2) |
+
+### `0x9874` NC_GUILD_ACADEMY_REWARD_STORAGE_DEPOSIT_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_00473160 (0x35, same layout as 0x9872))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u32 | gldregnum |  |
+| 11 | u8 | why |  |
+| 12 | u8 | who |  |
+| 13 | u8 | type | 0 item, 1 lot item, 2 money |
+| 14 | u8 | slot |  |
+| 15 | Name5 | charid |  |
+| 35 | u16 | item |  |
+| 37 | u64 | lot|cen | added (type 1/2) |
+| 45 | u64 | storage_cen |  |
+
+### `0x9884` NC_GUILD_ACADEMY_REWARDSTORAGE_ITEM_INFO_ZONE_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_00473270 (0xb0))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u32 | nGldregnum |  |
+| 11 | u8 | Who |  |
+| 12 | Name5 | Charid |  |
+| 32 | u8 | Type | 0/1 move, 2 split, 3 merge, 4 swap |
+| 33 | SHINE_INVEN_SLOT_INFO | From | 0x10: ItmeReg (item key) 8 B @0, u16 ItemID @8, ITEM_INVEN inven @0xa, u32 Lot @0xc (pdb2016) |
+| 49 | SHINE_INVEN_SLOT_INFO | To |  |
+| 65 | ItemTotalInformation | ChangeIteminfo | item now at the destination |
+
+### `0x9885` NC_GUILD_ACADEMY_REWARDSTORAGE_REWARD_ZONE_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_0046e750, FUN_00473370 (0x30 + 9n))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | u32 | nGuildNo |  |
+| 11 | Name5 | sCharID | rewarded academy member |
+| 31 | u64 | Reward_Cen | money paid to the member |
+| 39 | u64 | Storage_Cen | new storage money |
+| 47 | u8 | Reward_ItemNum | n |
+| 48 | EACH_MODIFY_ITEM[n] | Reward_ItemInfo | 9 B: u8 nStatus (0 remove, 1 reduce), u16 nItemID, ITEM_INVEN nLocation, u32 nLot |
+
+### `0xa404` NC_INSTANCE_DUNGEON_FIND_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_00487510, FUN_005a92e0 (0x46))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.machine | origin zone |
+| 1 | u16 | Start.handle | origin object handle |
+| 3 | u32 | Start.regnum | origin charNo / group regnum |
+| 7 | i32 | InstanceCategory | INSTANCE_DUNGEON::CATEGORY 0 party / 3 raid |
+| 11 | u32 | IDRegisterNumber | partyNo / raidNo |
+| 15 | ORToken | Argument | InstanceDungeon row key (20 B) |
+| 35 | char[33] | ServerMapName | instance map, set by the hosting zone |
+| 68 | u16 | Error | 0 found, 1 no free instance, 2 not handled (initial), 3 full |
 
 ### `0x1095` NC_CHAR_WEDDING_PARTNER_INFO_RNG (ring)
 
