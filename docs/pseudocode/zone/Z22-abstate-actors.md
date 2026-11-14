@@ -73,7 +73,7 @@ stub address). "Override" lists the classes that replace the slot.
 
 | Slot | Name *(pdb2016)* | Base behaviour | Overrides | Called from |
 |---|---|---|---|---|
-| 0x00 | `sasa_IndexString` | "Actor" @ FUN_004015e0 | every class: its own name (FUN_00401600…00401810) | logging |
+| 0x00 | `sasa_IndexString` | "Actor" @ FUN_004015e0 | every class: its own name (FUN_00401620, FUN_00401630, FUN_00401640, FUN_00401650, FUN_00401660, FUN_00401670, FUN_00401680, FUN_00401690, FUN_004016a0, FUN_004016b0, FUN_004016c0, FUN_004016d0, FUN_004016e0, FUN_00401700, FUN_00401710, FUN_00401720, FUN_00401730, FUN_00401740, FUN_00401750, FUN_00401760, FUN_00401770, FUN_00401780, FUN_00401790, FUN_004017a0, FUN_004017c0, FUN_004017d0, FUN_004017e0, FUN_004017f0, FUN_00401800) | logging |
 | 0x04 | `sasa_AttachObject(e, o)` | §2.1 @ FUN_0040bbd0 | Dispel 0040ca20 (§7.4), Captivate 0040d3f0 (Z03 §6.6) | `ase_AttachObject` (§1.3) |
 | 0x08 | `sasa_DetachObject(e, o)` | §2.2 @ FUN_0040bc60 | DetachProcess 0040c1c0, Bomb 0040c520, ExpUpRate 00408f90, DropUpRate 00409230 (§7), Captivate 0040d460 | `ase_DetachObject` (§1.3) |
 | 0x0c | `sasa_Routine(e, bearer, index) → bool` | §2.3 @ FUN_00406d50 | Poison 0040d4c0, Disease 0040b8a0, AreaDamage 0040d640, DmgState 0040dc60, HPHeal 00406e90, SPHeal 00407030, HPSPHeal 00407120, MagicField 00408d80, Fear 00406e30 | `AbnormalStateTickRoutine::ase_Routine`, `AbnormalStateEachTickRoutine::ase_Routine` (§1.3), base `sasa_DetachObject` (§2.2) |
@@ -183,7 +183,7 @@ aeo_GetCaster(e) → obj | null                                                 
 aeo_FindCasterObject(e, near) → player | null                                            @ FUN_00402800
     c = e.aeo_Caster.obj
     if c and c.so_ObjectType() (vt 0x4d0) == 2 (player) and not c.so_IsEmpty() (vt 0x300)
-         and c.charRegNum == e.aeo_Caster.chrregnum and dist²(c, near) < 100,000,000 (10,000 units):
+         and c.charRegNum == e.aeo_Caster.chrregnum and dist²(c, near) < 6,250,000 (0x5F5E10: 2,500 units):
         return c
     e.aeo_Caster.obj = null; return null                  # mob casters are never "found": their DoT / HoT
                                                           #   is applied with attacker = null (and the pointer is wiped)
@@ -191,11 +191,15 @@ aeo_GetCasterLevel / aeo_GetCasterAttackPower  @ FUN_00401260 / FUN_00401270  = 
     (the snapshot aeo_Set takes for SAA_DOTWCRATE / SAA_DOTMARATE rows, Z03 §6.2)
 aeo_GetRestCount @ FUN_004011f0 = e.aeo_RestCount;  aeo_GetIndexStrength @ FUN_00401230 = abstateidentarray[index].str
 aeo_TickStruct @ FUN_0042ab00 = &e.aeo_Tick  ({start, terminate, Metronome nextaction})
+AbstateElementInObject ctor @ FUN_00406550 (per slot of the object's element vector, filled by FUN_00431a30): Metronome
+    and aeo_SetItemEffect constructed, aeo_Index = 0x318 (free), aeo_PartyEnchant[0…4].skillindex = null,
+    aeo_Caster.nLevel = 0, .nAttackPower = 0; nothing else is cleared (aeo_Set writes the rest)
 
 so_AbnormalState_Set_Simple(o, setter, index, strength, inform) → bool   (vt 0x644)     @ FUN_004163d0
     index ≥ 0x318: assert "as_FromIndex : Invalid skill idx", return 0
     s = dic_abstate.as_StateIndexList[index]; s null or s.subabstate[strength] missing: return 0
-    ok = o.so_AbnormalState_Set (vt 0x638)(setter, index, strength, s, g_CurrTick, 0, keep −1, 0, 0, 0)   (Z03 §6.2)
+    ok = o.so_AbnormalState_Set (vt 0x638)(setter, index, strength, s, g_CurrTick, extraKeep 0, restCount −1, keep 0
+                                         (→ row KeepTime + 999), EnchantFrom 0, null)   (Z03 §6.2)
     if not ok: return inform ? 0 : 1
     if inform:                                            # g_NewAbstateStrength = the strength aeo_Set settled on
         so_AbnormalState_BitSet(o, index); o.so_AbnormalState_Inform (vt 0x3f0)(index, row(str).KeepTime, 1)
@@ -330,7 +334,7 @@ SubAbnormalStateActorPoison::sasa_Routine(e, bearer, index) → bool:
     if e null: return 0                                   # Z22-B1
     if bearer null: return 0
     if bearer has STA_IMMORTAL (291) or STA_ADLFLOUSSIERIMT (499): return 0      # Z22-B1: also blocks the rest
-    caster = aeo_FindCasterObject(e, bearer.location)     # a player within 10,000 units, else null (§1.4)
+    caster = aeo_FindCasterObject(e, bearer.location)     # a player within 2,500 units, else null (§1.4)
     dmg = sasa_GetDamage(e, bearer, bearer.location)
     if dmg ≠ 0: bearer.so_mobile_DamageOverTime (vt 0x730)(caster, dmg, index, send = 1, out = null)   (§3.5)
     return SubAbnormalStateActor::sasa_Routine(e, bearer, index)       # §2.3, returns 1
@@ -407,14 +411,14 @@ Also used by magic fields (Z09 §12.5, index 0x318) and the area actors (with `s
 ShineMobileObject::so_mobile_DamageOverTime(o, attacker, dmg, abIndex, send, *outDmg):
     if attacker: for each element of attacker: aeo_Attack (FUN_004a42a0: states whose MiscData reset
         condition "attack" is set end now)                # dealing DoT counts as attacking
-    if o.sp_IsEthereal() (vt 0x9e4; mobs 0): return
+    if o.sp_IsEthereal() (vt 0x9e4; mobs 0): return     # no packet, *outDmg untouched
     P = o.so_parameter() (Parameter::Container, smo_Param)
     miss = false
     if P.MissPercentFix (+0xcd0, ‰) ≠ 0:                  # SAA_MISSRATE (GTI states)
         if attacker null:                miss = rand1000 < MissPercentFix
         else if P.RangeOver (+0xda8) ≠ 0 and dist²(o, attacker) > RangeOver²:
                                          miss = rand1000 < MissPercentFix     # SAA_RANGEOVER: only far attackers
-    if miss:
+    if miss:                                             # sent even when send = 0 (area actors, §4.2)
         to sight of o (so_AllOfRange, incl. o): 0x243C NC_BAT_DOTDAMAGE_CMD {
             u16 object = o.handle, u32 resthp = o.HP, u16 damage = 0,
             u16 abstate = abIndex == 0x318 ? 0xFFFF : abIndex, u16 hpchangeorder = o.so_mobile_GetHPChangeOrder (vt 0x7e8),
@@ -484,8 +488,10 @@ SubAbnormalStateActorAreaDamage::sasa_Routine(e, bearer, index) → bool:
         if bearer null: return 0                          # (checked per target; unreachable from the tick path)
         d = sasa_GetDamage(e, t, bearer.location)         # §3.3 with t as the victim
         if d ≠ 0:
-            got = 0; t.so_mobile_DamageOverTime(c, d, index, send = 0, &got)        # §3.5 without its own packet
-            records[i] = { object = t.handle, resthp = t.HP (after), damage = got, hpchangeorder = t.vt[0x7e8]() }
+            got = 0; t.so_mobile_DamageOverTime(c, d, index, send = 0, &got)        # §3.5; on a miss it still
+                                                          #   broadcasts its own 0x243C miss (Z22-B20)
+            records[i] = { object = t.handle, resthp = t.HP (vt 0x4e8, raw), damage = got, hpchangeorder = t.vt[0x7e8]() }
+                                                          # written whenever d ≠ 0, also on miss / ethereal (got 0)
     to sight of the caster (so_AllOfRange around c): 0x245A NC_BAT_AREADOTDAMAGE_CMD {
         u16 abstate = e.aeo_Index, u16 Centerobject = c.handle, u8 num, targetinfo target[num] = records[0 … num−1] }
                                                           # 7 + 12·num bytes with the opcode
@@ -495,7 +501,12 @@ SubAbnormalStateActorAreaDamage::sasa_Routine(e, bearer, index) → bool:
 - The damage is centred on the **caster** and credited to the caster (`so_DamagedBy(c, …)`), while the state sits on
   the bearer; for the self-buff kinds (BurnPainFoe: the caster carries the state) both are the same object.
   `TARGETALL` makes it hit players, mobs and servants alike (friend or foe), `TARGETNOTME` additionally spares the
-  caster; without them only the caster's enemies are hit. Targets in miss / immortal states get an all-zero record.
+  caster; without them only the caster's enemies are hit. Targets skipped by the 499 / mode 3 / dead / 291 test or
+  with `d = 0` get an all-zero record. A target that **misses** (SAA_MISSRATE, §3.5) gets a full record
+  `{handle, HP, damage 0, order}` in the 0x245A **and** its own 0x243C with `IsMissDamage = 1`, because the miss
+  branch of `so_mobile_DamageOverTime` ignores `send` (original bug) Z22-B20; an ethereal target gets the same
+  record without a 0x243C. The record's `resthp` is the raw HP, while the single-target 0x243C sends
+  `HP − so_batobj_GetDamage()` (HP minus damage reserved by pending hits), so the two packets can show different HP.
 - `num` counts scanned targets, not damaged ones: a target that was skipped or took no damage still occupies a record
   with `object = 0` (original bug) Z22-B2.
 
@@ -505,7 +516,7 @@ Client `FUN_004b62f0`: looks up `Centerobject` (unknown → ignored); with `num 
 effect on the centre (attachment point "Ground" / "HairLink" / "Chest" from the effect table); otherwise it plays the
 centre effect, then per record: unknown `object` (also 0) skipped; damage number when `damage > 0` and the abstate is
 not 14 / 339 / 0x318; `resthp == 0` → death; HP bar from `resthp` / `hpchangeorder`; the abstate's hit effect on the
-target. Sender list in `re-data/client-handlers.json`: only this routine.
+target. Sender list in `re-data/client-handlers.json`: this routine and the dead DmgState routine FUN_0040dc60 (§4.3).
 
 ### 4.3 DmgState actor (dead code)  @ FUN_0040dc60
 
@@ -599,8 +610,9 @@ abstate's effect plays (§3.5).
 
 - **MagicField** (type 107) `sasa_Routine` @ FUN_00408d80: Z09 §12.2 (2). The 2016 users are StaEglack04 (494) and
   StaEglackMad04 (501) (`SAA_TICK` + `SAA_SETACTIVESKILL`, TickRoutine elements): every tick a magic field of that
-  skill appears at the bearer's feet. Its two `return 0` paths (missing skill / no free object / caster gone) stop
-  the bearer's abstate walk for the tick (Z22-B1). This answers Z09 §12.8's open point "which SubAbState kinds use
+  skill appears at the bearer's feet. It returns 0 in five cases (null element or bearer, missing skill, no free object,
+  caster gone, a skill with neither `MAGICFIELD_KEEP` nor `MAGICFIELD_PARTY` (the allocated object is freed)); each
+  stops the bearer's abstate walk for the tick (Z22-B1). This answers Z09 §12.8's open point "which SubAbState kinds use
   the magic-field actor".
 - **Fear** (type 28) `sasa_Routine` @ FUN_00406e30: sets `smo_Flag.InFear` (Z03 §6.6, bit 2); runs every object tick
   (EachTickRoutine).
@@ -786,7 +798,10 @@ ShineMobileObject::so_SkillCure(c, t, smash, bo) → bool                       
 ShineMobileObject::so_Dispel(c, t, smash, bo, mask) → bool                              @ FUN_0042bf70
     if t null or dead: return 0
     if t.so_MiscTable (vt 0x984).mds_Dead.ByDebuff (+0x58 bit 0) and mask & 0x02:   # servant row Debuff = Dead (Z09 §10)
-        t.so_DamagedBy (vt 0x5c0)(t, t.so_GetHP (vt 0x4e8)(1000, 1)); return 1       # killed, the attacker is t itself
+        t.so_DamagedBy (vt 0x5c0)(t, t.so_GetHP (vt 0x4e8)(), aggro 1000, 1); return 1   # the attacker is t itself
+        # (disassembly 0x42c00e–0x42c02b: push 1; push 0x3e8; call [vt+0x4e8]; push eax; push t; call [vt+0x5c0]).
+        # ShineMob::so_DamagedBy FUN_00431750 (servants use it too) only does sm_HP −= dmg (→ 0) plus aggro / Lua /
+        # hit-list work; it neither calls so_KilledBy nor the dead check (see §13)
     result = 0; picks = 1; chosen = null
     # pass 1: dispel, oldest first
     for each element x of t (next index read before x):
@@ -1061,7 +1076,10 @@ ShinePlayer::sp_ChineCastCut(p):                                                
 ```
 
 So a cooldown-remove state (SubStaCrossCastingCoolTime / SubStaNatureCastingCoolTime / SubStaChainCastingCoolTime /
-SubStaBH_Helga_None, no actions) lets exactly one skill skip its cooldown and then all such states end. The flag
+SubStaBH_Helga_None, no actions) lets exactly one skill of a **player** skip its cooldown and then all such states
+end. On mobs and servants vt 0xf60 is the empty base stub FUN_00417480 (RTTI: `ShineMob`, `ShineServant` and
+`ShineMobileObject` slot 0xf60; folded, PDB name `so_Gamble_ChangeCoin`), so the states are never used up: every skill
+skips its cooldown until the state expires, and `ChineCast` stays set (original bug) Z22-B21. The flag
 name `ChineCast` ("chain cast") is the PDB name of Z03 §6.6's bit 6.
 
 ### 10.4 SP cost  @ FUN_004021d0
@@ -1103,7 +1121,9 @@ the matrix actions (`SAA_MAXHPPLUS` / `MAXSPPLUS` / `MAXHPRATE` / `MAXSPRATE`). 
 the virtual `so_SkillEnchant` (player and mob vt 0x5a0 both = FUN_00431ca0) and sets `r.isenchant` when that returns 1,
 `r.isresist |= resisted`. Then it calls `smo_Dispel` (§7.5) **and** runs a second, inline copy of `smo_Dispel`'s body
 (checked in the disassembly: `call 0x57d8e0` at 0x58295c, then the inline vt 0x5a4 / 0x5a8 calls at 0x582aeb /
-0x582b0c): every cure / dispel / steal of that path runs twice (original bug) Z22-B16. The other caller,
+0x582b0c): every cure / dispel / steal of that path runs twice (original bug) Z22-B16. Only the `so_SkillEnchant` call
+sits inside `if (!isImmune)`: `smo_Dispel` and its inline copy run whatever the immunity, so a target that resists
+the skill's states as immune still loses its buffs to dispel / steal (original bug) Z22-B22. The other caller,
 `ShineMobileObject::smo_old_skill_blast` FUN_00579b50 (and its player override FUN_0057be40), sits in vt slot 0xea4,
 which nothing calls (no `[reg + 0xea4]` call in the 2016 disassembly): dead code.
 
@@ -1483,6 +1503,9 @@ writes 0 (Z11 §3.1, `ac_Hide` FUN_0041a3a0 / `ac_Show` FUN_0041a4d0). Its keep 
 | Z22-B17 | `so_SkillCure` FUN_0042c440, `so_Dispel` FUN_0042bf70 | each candidate state passes `rand(1000) < 1001` first | dead check (always true) | a per-state success rate (a skill or row column) was probably planned |
 | Z22-B18 | `so_Dispel` FUN_0042bf70 | a dispel with only `sdi_DISPELRANDOM` returns 0 even when its pick was removed; DISPELONE / DISPELALL / BOMBDISPELALL / a steal return 1 | harmless today: both callers ignore the result | return 1 when the random pick removes a state |
 | Z22-B19 | `so_Dispel` FUN_0042bf70 (steal) | the stolen copy is set with the victim's start tick and keep 0 (`aeo_Set`: ends at start + row KeepTime), but Inform / BroadcastSet send the full `KeepTime` | the thief's copy ends earlier than its client shows; a state set more than `KeepTime` ago (e.g. extended by a passive) is stolen already expired | set the copy with `now` and the victim's remaining time, and send that |
+| Z22-B20 | `so_mobile_DamageOverTime` FUN_00409cd0 (miss branch) via AreaDamage `sasa_Routine` FUN_0040d640 | the miss branch broadcasts 0x243C `IsMissDamage = 1` without checking `send`; the area routine (send = 0) still writes the target's 0x245A record `{handle, HP, 0, order}` | an area-DoT miss reaches the client twice (a single-target miss packet plus an area record with damage 0) | honour `send` in the miss branch and mark the miss in the area record (or skip it) |
+| Z22-B21 | `smo_SkillCooltimeSet` FUN_0057c5b0 → vt 0xf60 on `ShineMob` / `ShineServant` (stub FUN_00417480) | only the player override `smo_ChineCastCut` FUN_005794d0 ends the cooldown-ignore states; mobs and servants have the empty base stub | a mob or servant with a type-31 state skips every skill cooldown until the state expires; `smo_Flag.ChineCast` stays set | end the states on mobs too (move `sp_ChineCastCut` into `ShineMobileObject`) |
+| Z22-B22 | `smo_SkillBlast` FUN_00581160 (`mha_HitStep < 0`) | `so_SkillEnchant` is skipped for an immune target, `smo_Dispel` and its inline copy are not | an immune target is still cured / dispelled / robbed (twice, Z22-B16) | *(inferred)* skip the hostile removers for immune targets too (friendly cures may be intended) |
 
 ## 13. Not reconstructed / uncertain
 
@@ -1510,8 +1533,10 @@ writes 0 (Z11 §3.1, `ac_Hide` FUN_0041a3a0 / `ac_Show` FUN_0041a4d0). Its keep 
   logs out; whether any 2016 `ActiveSkill` row with a party-main abstate targets others was not checked.
 - When `smo_SkillBlast`'s `hit.mha_HitStep` is negative (§10.7 path) was not traced into the blast container
   (`SkillBlastEffect.sbe_MultiHitArgument` starts at −1; Z03 §5.4).
-- `so_GetHP (vt 0x4e8)(1000, 1)` in the servant kill of `so_Dispel` is read as "full current HP" from the arguments
-  (rate 1000); the two-argument form of `so_GetHP` was not opened.
+- The servant kill of `so_Dispel` (§7.5) is `so_DamagedBy(t, HP, 1000, 1)` (disassembly checked). `ShineMob::so_DamagedBy`
+  FUN_00431750 sets `sm_HP` to 0 but does not start the death; whether a later dead check (vt 0x8d4, e.g. from the
+  servant's own tick) then kills the servant was not traced, unlike the DoT path, which calls `so_KilledBy` when
+  the damage reaches the HP (§3.5).
 - The ctor's member → index join is a regex over the decompiled ctor (scratch script); all 792 nodes resolved, but
   a member assigned through an unusual expression would be misattributed.
 
