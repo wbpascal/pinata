@@ -1372,11 +1372,11 @@ Handler `FUN_00578910`
 
 ### `0x440b` NC_QUEST_CLIENT_SCENARIO_DONE_REQ
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_QUEST_CLIENT_SCENARIO_DONE_REQ`, 2 bytes
+**Verified layout** (basis: zone FUN_005bdad0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nScenarioID |  |
+| 0 | u16 | nScenarioID | checked off in every doing quest whose end condition is this scenario |
 
 Handler `FUN_005789f0`
 
@@ -6416,11 +6416,11 @@ Sent from `CQuestZone::Send_NC_QUEST_GIVE_UP_ACK` (`FUN_005bad20`) · payload 4 
 
 ### `0x440c` NC_QUEST_CLIENT_SCENARIO_DONE_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_QUEST_CLIENT_SCENARIO_DONE_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_005bb0c0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nScenarioID |  |
+| 0 | u16 | nScenarioID | sent only when some doing quest was updated |
 
 Sent from `CQuestZone::Send_NC_QUEST_CLIENT_SCENARIO_DONE_ACK` (`FUN_005bb0c0`) · payload 2 bytes
 
@@ -6445,13 +6445,13 @@ Sent from `CQuestZone::Send_NC_QUEST_NOTIFY_MOB_KILL_CMD` (`FUN_005bdb00`) · pa
 |---|---|---|
 | 0 | u8 | `(char)(param_1[1] - *param_1 >> 2)` |
 
-### `0x440e` ?
+### `0x440e` NC_QUEST_SCENARIO_RUN_CMD (hand-named)
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_QUEST_SCENARIO_RUN_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_005bb200)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nScenarioID |  |
+| 0 | u16 | nScenarioID | no 2016 client handler |
 
 Sent from `CQuestZone::Send_NC_QUEST_SCENARIO_RUN_CMD` (`FUN_005bb200`) · payload 2 bytes
 
@@ -10636,6 +10636,17 @@ Empty payload.
 | 7 | PLAYER_QUEST_INFO | QuestInfo | 0x20 |
 | 39 | u16 | ErrorType | 0xB41 ok |
 
+### `0x4406` NC_QUEST_DB_CLEAR_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_005bf640)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle |  |
+| 2 | u32 | charregistnumber |  |
+| 6 | u16 | nQuestID | must equal the current command's quest id |
+| 8 | u16 | ErrorType | 0xB41 ok, else error 0xC00 |
+
 ### `0x441b` NC_QUEST_DB_DONE_ACK (DB→Z)
 
 **Verified layout** (basis: zone FUN_005bfb30)
@@ -12405,6 +12416,27 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 |---|---|---|---|
 | 0 | u16 | bEnable |  |
 | 2 | u32 | charNo |  |
+
+### `0x4403` NC_QUEST_DB_SET_INFO_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_005baa80)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | player handle p+4 |
+| 2 | u32 | charregistnumber | p.vt 0x344 |
+| 6 | u8 | nQSC | script command that caused it: 6 ACCEPT, 7 CANCEL, 8 PROGRESS, 9 FAILED, 12 ABORT, 28 REPEAT_QUEST_GIVE_UP |
+| 7 | PLAYER_QUEST_INFO | QuestInfo | 0x20: u16 ID, u8 Status, PLAYER_QUEST_DATA (StartTime i64, EndTime i64, RepeatCount u32, ProgressStep u8, End_NPCMobCount[5], flags u8, End_RunningTimeSec u16) |
+
+### `0x4405` NC_QUEST_DB_CLEAR_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_005babd0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle |  |
+| 2 | u32 | charregistnumber |  |
+| 6 | u16 | nQuestID | only sent when the stale u32 at buffer+4 is non-zero (Z15-B9) |
 
 ### `0x4812` NC_SKILL_EMPOWALLOC_DB_REQ (Z→DB)
 
