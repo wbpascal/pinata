@@ -82,8 +82,10 @@ bug IDs (they matter only for files the 2016 set does not contain; §4 lists wha
   empty string; a string may contain delimiters, `;`, `{}` and line breaks. A missing quote makes the original read
   past the buffer (S02-B13), as does `""` directly followed by another string column (S02-B13).
 - **End of file**: a file whose last token is followed by delimiters produces one final empty token, which is an
-  unknown item (error, S02-B14). So every top-level file and include must end with `#END` (all shipped files do, with
-  no line break after it) or with a token and no trailing whitespace.
+  unknown item (error, S02-B14). The same happens when the file's last byte is the closing `"` of a quoted value: after
+  `GetTokenString` FUN_0063b570 the token start points at the terminating NUL, so the next `GetToken` returns `""` →
+  `'' - UNKNOWNED.`. So every top-level file and include must end with `#END` (all shipped files do, with no line
+  break after it) or with a non-quoted token and no trailing whitespace.
 
 ### 2.2 Remarks
 
@@ -95,7 +97,7 @@ strings, which are found by the quote scan above):
 | starts with `;` (the line-remark marker, case-sensitive prefix) | the rest of the line is ignored. Implementation: if the byte after the token's delimiter is not LF, skip to the next LF. With CRLF files this is exact; with LF-only files a remark token that ends at the line end also eats the next line (S02-B16) |
 | exactly `/*` | start a block remark: every following token is ignored up to a token that is exactly `*/` (no nesting; markers must be separate tokens: `/*x` is not a block start, `x*/` not an end) |
 | exactly `*/` outside a block | ignored |
-| `#SEPRATOR t` / `#REMARKLINE t` / `#REMARKSTART t` / `#REMARKEND t` | the next token becomes the delimiter set / line marker / block start / block end (end of file: back to `", \t\r\n"`, `;`, `/*`, `*/`). Unbounded copy into 64-byte fields (S02-B19). Inside an include they change the include only; an include's `#REMARKLINE` / `#REMARKSTART` / `#REMARKEND` affect only the prefix test, not the whole-token tests (S02 §2.3.6) |
+| `#SEPRATOR t` / `#REMARKLINE t` / `#REMARKSTART t` / `#REMARKEND t` | the next token becomes the delimiter set / line marker / block start / block end (end of file: back to `", \t\r\n"`, `;`, `/*`, `*/`). Unbounded copy into 64-byte fields (S02-B19). Inside an include they change the include only, and only partly: the include's `CCsl(parent)` FUN_00651cb0 copies the parent's `m_CslRemarks` pointer array, whose slots 0–2 point at the **parent's** `m_CslRemarkLine` / `m_CslRemarkStart` / `m_CslRemarkEnd`. So in an include `#SEPRATOR` works; `#REMARKLINE` changes only the prefix test (default branch of `ProcRemark` FUN_00650aa0, `_mbsnbcmp` against the child's `m_CslRemarkLine`), while the whole-token line-marker test keeps the parent's; `#REMARKSTART` / `#REMARKEND` write the child's +0x440 / +0x480, which nothing reads: no effect at all (S02 §2.3.6 for `#REMARKLINE`) |
 
 The defaults are restored by every `CServerInfo::ReadServerInfo` (`CCsl::Clear` FUN_00651b10).
 
@@ -180,7 +182,9 @@ NAME value value …     one value per column of the format NAME; delimiters, li
 A sequence of chunks `{u32 id, u32 size, size bytes}` (little-endian), read until the summed `8 + size` reaches the file
 size: id 0x11111111 = format `{char Format[64]; i32 NumParameter; i32 type[NumParameter]}` (size `0x44 + 4·n`), id
 0x22222222 = row `{u32 dwID, u32 dwSize, dwSize bytes}` (size `dwSize + 8`; `dwID` taken as is). An unknown id or a
-short read fails the `#READ`; an empty file succeeds. `#WRITE` writes all formats, then all rows. `CCsl::Read`
+`ReadFile` that returns FALSE fails the `#READ`; an empty file succeeds. A **short** read is not detected: only the
+BOOL of `CGdp::ReadFile` FUN_0063bab0 (= Win32 `ReadFile`, TRUE at end of file) is tested, never the bytes-read count,
+and neither `NumParameter` nor the row's `dwSize` is checked against the chunk size (Z19-B1). `#WRITE` writes all formats, then all rows. `CCsl::Read`
 FUN_00651540, `ProcCmd` cases 6–9 FUN_00652000, S02 §2.3.7 (handle leak S02-B17). No 2016 script uses them.
 
 ### 2.8 Result and diagnostics
@@ -265,9 +269,10 @@ class Csl:
         if not include: s.seps, s.rline, s.rstart, s.rend, s.inblock = ', \t\r\n', ';', '/*', '*/', False
         while True:
             t = s.word()
-            if t is None or t.upper() == '#END': break    # file ending in a delimiter yields '' (S02-B14) → UNKNOWNED
-            if s.remark(t): continue
+            if t is None: break
+            if s.remark(t): continue                     # remarks first, as ReadScript: '/* #END */' is skipped
             u = t.upper()
+            if u == '#END': break                        # file ending in a delimiter yields '' (S02-B14) → UNKNOWNED
             if u == '#DEFINE': s.define()
             elif u == '#INCLUDE':
                 name = s.string(); st = (s.b, s.p, s.base, s.seps, s.rline, s.rstart, s.rend, s.inblock)
@@ -358,7 +363,7 @@ if __name__ == '__main__':
 Known simplifications against the original (none reachable with the shipped files): `<HEX>` takes only a pure hex
 token (`sscanf("%x")` also accepts `0x` prefixes and trailing garbage); `<FLOAT>` takes only what Python's `float`
 parses (`atof` takes the longest numeric prefix); the S02-B13 over-read and the include-remark quirk of §2.2 are not
-emulated; `#READ` / `#WRITE*` are refused.
+emulated (an include's `#REMARKSTART` / `#REMARKEND` / `#REMARKLINE` act fully here, until the include ends); `#READ` / `#WRITE*` are refused.
 
 **Test.** Run on every CSL script of `Files/Server/2016` (the eleven `*ServerInfo.txt` incl. the shared one, and the two
 `9Data/Shine/*CharacterData.txt` scripts, which the Character server reads with the same reader *(S02 §2.4; checked
@@ -412,8 +417,9 @@ Result:
   servers share one variant (Account = AccountLog = Character = GameLog, all members identical), which differs from the
   zone's (§5.3).
 
-`m_bIsGDPOpen` is set only by `CGdp::Open`, and `CGdp::Open` has no caller outside `CGdp` in Account and the zone; the
-data servers therefore also read every config file as a plain file (S02 §3.2).
+`m_bIsGDPOpen` is only ever cleared (`CGdp::Clear`, `GdpClose`, `~CGdp`; §1.1), in Account as in the zone: no
+function sets it. `CGdp::Open(ulong)` FUN_0063c290 and `CGdp::Open(char*)` FUN_0063c350 require it to be set already
+and set only `m_bIsOpen`. The data servers therefore also read every config file as a plain file (S02 §3.2).
 
 ### 5.2 Function addresses per build
 
@@ -585,9 +591,15 @@ DataServer::ReadDefineScriptor(this):       @ Account FUN_00401360, AccountLog F
 
 ## 6. Original-server bugs
 
-Z19 found no new bug: every defect of the reader is one of S02's, and the copies of all seven servers share them
-(§5.1). Cross-reference of those that can affect a config file, with the zone and data-server addresses
-(WM / Login addresses in S02 §5):
+One new bug, in the binary chunk reader (found in the review; S02 lists only the handle leak S02-B17 for that
+function). Same code in all seven builds (§5.1):
+
+| ID | Function | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z19-B1 | `CCsl::Read` FUN_00651540 (`#READ`; Account FUN_0040d9c0, AccountLog FUN_00409030, Character FUN_00445f90, GameLog FUN_0040d800) | only the BOOL of `CGdp::ReadFile` FUN_0063bab0 is tested, never the bytes-read count (`ebp-4`, passed at 0x6515ae / 0x651601); a chunk's `NumParameter` (+0x48) drives `memcpy(…, n·4)` and a row's `dwSize` (+0xc) drives `new` + `memcpy`, neither checked against the chunk `size` (original bug) | a truncated chunk is accepted with uninitialised heap bytes (`operator new[]` does not zero), the loop then reaches the file size and `Read` returns 1; an inconsistent `NumParameter` / `dwSize` reads past the heap buffer | compare bytes read with the requested size; check `0x44 + 4·n == size` and `dwSize + 8 == size`. Unreachable from the shipped files (no script uses `#READ`) |
+
+The other defects of the reader are S02's, and the copies of all seven servers share them (§5.1). Cross-reference of
+those that can affect a config file, with the zone and data-server addresses (WM / Login addresses in S02 §5):
 
 | S02 bug | Function | Zone / Account / AccountLog / Character / GameLog | Effect on the config files |
 |---|---|---|---|
@@ -627,4 +639,4 @@ S02-B17 (`#READ` handle leak) and S02-B22 (dead constructor path) are unreachabl
 | Character `GameData_Load` FUN_00401550 (SHN tables, MapInfo) and the typed row readers of `DefaultCharacterData` / `TutorialCharacterData` | D02 (done) §1, §3.3, §8 | what the character server does with those rows; the CSL read itself is §5.4 |
 | Contents and meaning of each config file (IDs, ports, ODBC rows, `_ServerGroup.txt`) | `docs/knowledge/X03.md` §4–§5, Z10 knowledge "Server config files", W05 §5.2 | deployment knowledge, not the reader |
 | `9Data/ServerInfo/_ServerGroup.txt` | Z10 (done) §1.1 | not a CSL script: only the zone reads it (`zs_start`, `fopen` + `fscanf("%s")`, one word); no other 2016 exe references it |
-| Zone quest scripts over the bare `CToken` (`CQuestParserScript`, `GetTokenID`) | Z15 (scope: quest engine) | uses only the tokenizer, not `CCsl`; S02 §2.5 for `GetTokenID` |
+| Zone quest scripts over the bare `CToken` (`CQuestParserScript`, `GetTokenID`) | Z15 (open; its plan names `QuestScript_Next` FUN_006387f0 = `CQuestParserScript::ParserNext` *(pdb2016)*) | uses only the tokenizer, not `CCsl`; S02 §2.5 for `GetTokenID` |
