@@ -628,6 +628,340 @@ So a fully absorbed hit is shown to clients only as the protector's 0x2449; the 
 
 ---
 
+## 4. Z04: items, equipment, set items, random options
+
+Owner text: `Z04-items.md` (§1 data model, §5 equipment, §9 upgrades, §11 random options), knowledge Z04; persistence and
+the `0x34xx` answers: `Z05-itemdb.md`. Answers the Z09 §31.5 "Items" points: `ItemAttr` vt 0x2c (§4.5), `so_ply_EquipmentChange`
+and the view slots (§4.3), the `sp_DestroyItem` overloads (§4.4).
+
+### 4.1 Item tables and `ItemDataBox` accessors
+
+`ItemDataBox::idb_Load` FUN_00649780 (Z01 §2.3 "home") loads seven boxes into `itemdatabox.idb_BinData` and builds
+`idb_index[itemID]` (`ItemDataBoxIndex`, 0x28 bytes: `data` ItemInfo*, `dataserv` ItemInfoServer*, `itemoption`
+GradeItemOption*, `MovingShot`, `AttackAngle`, `SetItemIndex`, `HitTimeArray[3]`, `itemdroplog`, `ItemSortOrder`,
+`eDelConditionType`, `pBuyItemData` ItemMoney*). The readers are the generic `bdb_ReadData` of §1.7 (key, row size):
+
+| Function | Address | What it does / where it plugs in |
+|---|---|---|
+| `BinaryDataBox<ItemInfo>::bdb_ReadData` | FUN_00648a50 | `ItemInfo.shn`, key 0x4b67, row 0x17a (offsets: Z04 §1.2) |
+| `BinaryDataBox<ItemInfo>::operator[](i)` | FUN_004ae550 | row `i`; `i` ≥ row count → `bdb_defaultblock` |
+| `BinaryDataBox<ItemInfoServer>::bdb_ReadData` | FUN_00648b10 | `ItemInfoServer.shn`, key 0x12a2, row 0xde (`ISET_Index`, `RandomOptionDropGroup` +0x89, `ItemSort_Index` …) |
+| `BinaryDataBox<ItemMoney>::bdb_ReadData` | FUN_00648df0 | `ItemMoney.shn`, key 0x37, row 0x42 `{IM_ItemIDX[32], IM_MoneyIDX[32], u16 IM_MoneyLot}` (540 rows): price of an item in "item money" (Z04 §2.2) → `idb_index[].pBuyItemData` |
+| `BinaryDataBox<ItemSort>::bdb_ReadData` | FUN_00648ca0 | `ItemSort.shn`, key 1, row 0x20 (one column `ItemSort_Index`, 59 rows `IS_MYSTERYVAULT` … ): its row number is `ItemSortOrder`, matched by `ItemInfoServer.ItemSort_Index` (no match → "idb_Load : Invalid ItemSort Index", exit); the auto-arrange order of 0x304A (Z04 §12.5) |
+| `ItemDataBox::idb_GetItemInxName(id)` | FUN_006487d0 | `ItemInfo.InxName` of `id`, null for 0xFFFF / unknown; 11 callers (mover / pet / riding logs and lookups) |
+| `ItemDataBox::idb_iter_next(&i)` / `idb_iter_Get(&i)` | FUN_004900a0 / FUN_004900c0 | walk all `idb_Itemspacies` ItemInfo rows (`++i < count`; `Get` = `ItemInfo[i].ID`, 0xFFFF past the end); only user `DropItemListInGroup::dilig_StoreItem` FUN_0048e6b0 (Z09 §11.2: drop groups that name items by pattern) |
+
+`ItemInvenDel.shn` (the seventh box; the reader is a folded copy shown as `BinaryDataBox<CollectCardMobGroup>::bdb_ReadData`, row
+`{InxName[32], u32 DelCondition}`) sets `idb_index[].eDelConditionType`; its 19 rows (snowballs, eggs, `E_M_RentaBoard01…05`, …) are
+all `DCT_LINKIN_ALL` (1), used by §4.4 `sp_ItemInvenDelete`.
+
+### 4.2 Equipment slot rules: `EquipEnumChanger` and `ItemServerEquipTypeInfo`
+
+`ItemServerEquipTypeInfo.shn` (34 rows; `ItemEquipTable g_ItemEquipTable`, loader FUN_00493140, Z01 §2.3 "moon";
+`iet_GetArray(ISET_Index)` FUN_004930d0, null for an index ≥ 34) has one byte per equipment column: **1** = the item
+goes into this slot, **2** = the item also covers this slot (whatever is there must come off), 0 = unrelated.
+`ItemInfoServer.ISET_Index` selects the row. The global `EquipEnumChanger equipman` maps `ItemEquipEnum` (Z04 §1.1) to the
+row's byte offset (`eec_Column[30]`, filled by its static initializer FUN_00695690; −1 = no column):
+
+| Slot | 1 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Column | Head | Neckles | Body | AccBody | AccBack | LeftHand | AccLeftHand | RightHand | AccRightHand | Bracelet | RingA | RingB | CosEff | AccHip | Pant |
+| **Slot** | **20** | **21** | **22** | **23** | **24** | **25** | **26** | **27** | **28** | **29** | 0, 2–5 | | | | |
+| Column | AccPant | Boot | AccBoot | Ear | AccMouth | MiniMon | AccEye | AccHead | MiniMon_R | AccShield | none | | | | |
+
+Examples from the 2016 table: row 22 `RightHand 1, LeftHand 2` (a two-handed weapon empties the left hand), row 23
+`RightHand 2, LeftHand 1`, row 28 `RightHand 1` + `LeftHand / AccLeftHand / AccRightHand / AccShield 2`, row 3 `MiniMon 1,
+MiniMon_R 1` (either minimon slot), row 18 `RingA 1, RingB 1`.
+
+```pseudo
+EquipEnumChanger::eec_Next(&i)                          @ FUN_00460e70
+    do ++i while i ≤ 29 and eec_Column[i] == −1;  returns i ≤ 29        # iterates the 25 real slots, start i = −1
+EquipEnumChanger::eec_GetColumn(&i, &slot)              @ FUN_00460f40
+    0 ≤ i ≤ 29: slot = i, return eec_Column[i];  else slot = NONE, return eec_Column[0] (−1)
+eec_EquipLocation(ItemInfoServer s, ItemBag equipment)  @ FUN_00460ff0
+    row = iet_GetArray(s.ISET_Index); none → ITEMEQUIP_NONE (0)        # EQUIP answers 0x283, Z04 §5.1
+    for each slot with row[column] == 1: if equipment[slot] is empty → return slot;  remember the first such slot
+    return the first "1" slot (all occupied: the item replaces what is there), or NONE when the row has no "1"
+eec_EquipSlotCheck(s, slot)                             @ FUN_00461a30   (MINIMON_EQUIP, Z04 §5.3)
+    s and 1 ≤ slot ≤ 29 and row exists: row[column(slot)] == 1
+eec_GetEquipSlotList(out[], &n, s)                      @ FUN_00461590
+    append every slot with row[column] == 2                 # the extra slots a view item covers (§4.3)
+eec_ConflictWithNewEquip(s, cells[], &n, equipment, lockList)   @ FUN_004611c0
+    for each slot not yet in cells[] with row(s)[column] == 2 and an item in equipment[slot]:
+        cells[n++] = {slot, cell}           # what the new item pushes off (lockList is not used)
+eec_ConflictWithOldEquip(cells[], &n, equipment, newSlot, lockList)  @ FUN_00461360
+    for each slot not yet in cells[] with an item w:
+        w has no ItemDataBox row: stop scanning (return)
+        w has no ItemInfoServer, or no equip row, or row(w)[column(newSlot)] == 2: cells[n++] = {slot, cell}
+        # worn items that cover newSlot (e.g. a two-hander when a shield is equipped)
+eec_ConflictWithNewViewSlot(equip, slots[], &n, s)      @ FUN_004616c0
+    for each slot not yet in slots[] with row(s)[column] == 2 and ie_ViewSlot_GetItemID(slot) ≠ 0xFFFF: slots[n++] = slot
+eec_ConflictWithOldViewSlot(equip, slots[], &n, newSlot)  @ FUN_00461840
+    for each slot not yet listed whose view item v ≠ 0xFFFF: v unknown → stop;
+        v without ItemInfoServer / equip row, or row(v)[column(newSlot)] == 2 → slots[n++] = slot
+```
+
+Callers: `sp_NC_ITEM_EQUIP_REQ` FUN_0052b8d0 (Z04 §5.1: location + both conflict lists, then the view-slot pair),
+`sp_NC_ITEM_RINGEQUIP_REQ` FUN_0052c5b0 / `sp_NC_ITEM_MINIMON_EQUIP_REQ` FUN_0052d020 (location only), `sp_NC_ITEM_UNEQUIP_REQ`
+FUN_0053a990 (view-slot pair), the view-slot functions `so_ply_ViewSlot_Equip` FUN_0052b110 (Z09 §17.8) /
+`so_ply_ViewSlot_UnEquip` FUN_0052b3c0 (Z11 §3.4) / `so_ply_DecoActList_Cehck` FUN_0052b6b0 (Z05 §5.4), and
+`so_RecalcEquipParam` FUN_004cab70 (Z12) through `iet_GetArray`. An item whose equip row is missing counts as covering
+every slot in the two "Old" scans *(inferred: a data safety net; with the 2016 tables every equippable item has a row)*.
+
+### 4.3 View slots and `so_ply_EquipmentChange`
+
+`ItemEquipment` (the equipment box `p+0x7fd8`) carries `ie_ViewSlot[30]` (`EquipmentViewSlot {u8 bEquip, u8 nMainSlot,
+u16 nItemID}`): slot *i* shows item `nItemID` put on through main slot `nMainSlot` (0 = slot not overridden). These are
+the costume previews of `cViewSlotEquip` / `&vie` (Z09 §17.8, Z11 §3.4); `bEquip` is a "re-send this slot" mark set while
+equipment changes (`so_ply_DecoActList_Cehck`, Z05 §5.4) and consumed by `so_ply_ViewSlot_EquipInfoSend` FUN_0052b5e0
+(Z05 §5.1, named `EquipViewSlot_Flush` there). Nothing of it is stored in the DB.
+
+| Function | Address | What it does |
+|---|---|---|
+| `ie_ViewSlot_Set(slot, main, id)` | FUN_00643630 | 1 ≤ slot ≤ 29: `{bEquip 0, nMainSlot main, nItemID id}` |
+| `ie_ViewSlot_Clear(main)` | FUN_00643660 | 1 ≤ main ≤ 29: every one of the 30 slots whose `nMainSlot == main` → `{0, 0, 0xFFFF}` (the item and the slots it covers) |
+| `ie_ViewSlot_ClearAll` | FUN_00643720 | all 30 → `{0, 0, 0xFFFF}` |
+| `ie_ViewSlot_UseCheck(slot)` / `ie_ViewSlot_GetItemID(slot)` | FUN_00643750 / FUN_006437b0 | `nMainSlot ≠ 0` / `nItemID` (0xFFFF out of range) |
+| `ie_ViewSlot_UseCheckAll` | FUN_00643780 | any slot with `bEquip` or an item |
+| `ie_ViewSlot_SetEquipWork` / `GetEquipWork` / `ClearEquipWork` | FUN_006437e0 / FUN_00643800 / FUN_00643820 | the `bEquip` mark (1…29) / clear all 30 |
+| `ie_GetItemID(slot)` / `ie_GetUpgrade(slot)` | FUN_00643840 / FUN_00643880 | what sight sees: the view item when `nMainSlot ≠ 0`, else the real item / its upgrade (attr vt 0x30; 0 for a view slot) |
+| `ie_DecoActList_Insert(id)` | FUN_00643940 | appends to `ie_DecoActList[30]` while `ie_DecoActCount` < 30 (silently drops more); filled by `sp_DecorationActivCheck` FUN_00534c60 (Z09 §2.4, Z12) |
+| `ie_DecoActList_ClearAll` / `_Count` / `_Get(i)` | FUN_006438c0 / FUN_00643970 / FUN_00643980 | reset to 30 × 0xFFFF, count 0 / the count / entry *i* |
+
+```pseudo
+ShinePlayer::so_ply_EquipmentChange(itemID, slot, ItemTotalInformation* info, broadcast)   vt 0xd60   @ FUN_0052ce60
+    cls = itmattcontainer[itemID]          # ItemAttributeClassContainer::operator[] FUN_0063e2a0; 0xFFFF / unknown /
+                                           # class > 38 → iacc_default (the base class)
+    item = info ? info.iti_itemstruct : { itemid = itemID, attribute zeroed }
+    len = cls.iac_equipbriefinfo (vt 0x24)(p.handle, g_buf, item, slot, &titleMob, &titleLevel)
+    len ≤ 0: return                                        # amulets and bracelets: nothing is shown
+    if p.so_GetCharacterTitle (vt 0x420).m_CurrentTitle == 10 (the weapon title):
+        CCharacterTitle::SetCurrentTitle(t, 10, titleLevel, titleMob, null)   @ FUN_0062e2e0
+        # titleMob / titleLevel are written only by the weapon class; for every other item they are uninitialised
+        # stack bytes (disassembly 0x52ceee–0x52cf25: only their addresses are pushed) (original bug) Z18-B9
+    broadcast == 1: so_AllOfRange broadcast of g_buf (len) around p      # AxialListPacketBroadcast, sight range
+    else: send to p only (so_GetGameSocketStream vt 0x2fc → send)
+```
+
+The four packets, one per class group (`vt 0x24` implementations):
+
+| Builder | Address | Classes | Packet (payload, 2016 PDB struct *(pdb2016)*) |
+|---|---|---|---|
+| `ItemAttributeClass::iac_equipbriefinfo` | FUN_0063f7e0 | base + 29 classes (and 0xFFFF) | `0x1C04 NC_BRIEFINFO_UNEQUIP_CMD {u16 handle, u8 slot}` (3) |
+| `ItemAttrCls_Decoration::iac_equipbriefinfo` | FUN_0063f910 | Decoration, CostumWeapon, CostumShield | `0x1C02 NC_BRIEFINFO_CHANGEDECORATE_CMD {u16 handle, u16 item, u8 nSlotNum}` (5) |
+| `ItemAttrCls_Armor::iac_equipbriefinfo` | FUN_0063f8d0 | Armor, Boot, Shield | `0x1C03 NC_BRIEFINFO_CHANGEUPGRADE_CMD {u16 handle, u16 item, u8 upgrade, u8 nSlotNum}` (6) |
+| `ItemAttrCls_Weapon::iac_equipbriefinfo` | FUN_0063f820 | Weapon | `0x1C05 NC_BRIEFINFO_CHANGEWEAPON_CMD {CHANGEUPGRADE upgradeinfo, u16 currentmobid, u8 currentkilllevel}` (9) |
+| `ItemAttrCls_Amulet::iac_equipbriefinfo` | FUN_0063f810 | Amulet, Bracelet | returns 0: nothing |
+
+Weapon: `upgrade` = `weapon.upgrade`; the title mob is the `mobkills[k]` entry (3 × `{u16 monster, u32 count:28}` at attr
++7) whose monster equals `weapon.CharacterTitleMobID` (+0x19): `currentmobid` = that monster, `currentkilllevel` =
+`CWeaponTitle::GetLevel(monster, count)`; no match → `0xFFFF, 0`. `upgradeinfo.nSlotNum` (payload +5) is never written:
+a stale `g_buf` byte (original bug) Z18-B10; the client ignores it.
+
+Client (`GameFrameWork`, 2016 client; names from the 2017 PDB *(pdb2017)*): `On_NC_BRIEFINFO_UNEQUIP_CMD` FUN_004a08f0
+(`Char::UnEquip(slot)`; weapon slot 12 with the weapon title shown → title cleared; slot 17 → aura effect re-enabled),
+`On_NC_BRIEFINFO_CHANGEDECORATE_CMD` FUN_004a0710 (`Char::Equip(item)`, remembers `nSlotNum`; slot 17 hides the aura),
+`On_NC_BRIEFINFO_CHANGEUPGRADE_CMD` FUN_004a0780 (`CharShape::Equip(item, upgrade)`, `Char::Equip`),
+`On_NC_BRIEFINFO_CHANGEWEAPON_CMD` FUN_004a07e0 (`Char::Equip(item, upgrade)`; if that char shows title type 10 and the
+item's class is 5 (weapon): `currentmobid` 0xFFFF → title off, else `WeaponTitleTab::GetWeaponTitleStringByLevel(mob, level)`).
+No error codes. Layouts in `annotations/Z18.json`.
+
+Callers of vt 0xd60 are only the view-slot functions (`so_ply_ViewSlot_Equip` / `_UnEquip` / `_UnEquipAll` /
+`_EquipInfoSend`), all with `broadcast = 1`; the brief info of a real equip / unequip goes out through the 0x3411 /
+0x3414 answers (Z05 §5.1). In `so_ply_ViewSlot_EquipInfoSend` FUN_0052b5e0 the item id is not reset per slot: a marked slot
+without a view item re-sends the id of the previous marked view slot (original bug) Z18-B11.
+
+### 4.4 Destroying items: the `sp_DestroyItem` family and `0x3459`
+
+All of them send `0x3459 NC_ITEMDB_DESTROY_REQ` to the Character DB (`sock2gameDB`) and reserve the cells under the
+current lock index (Z04 §1.4); the DB answer `0x345A` applies the reservations (Z05 §6.4). Payload (layout as Z11 §4.3,
+completed here; the 2016 PDB has no struct for it):
+
+```
++0x00 u16 handle      +0x02 u32 charNo (vt 0x344)     +0x06 u16 lockIndex
++0x08 u8  flags: bits 0–6 = number of keys, bit 7 = one cell keeps a rest (partial destroy)
++0x09 u16 itemID      +0x0b u64 key      +0x13 u16 attrOffset (payload offset of the attribute bytes)   +0x15 u16 inven
+      # +0x09…+0x16: the rewritten cell, valid only with bit 7
++0x17 u64 keys[count]   then (bit 7) the rewritten cell's attribute bytes (attr vt 4)
+```
+
+```pseudo
+sp_DestroyItem(h, cell, ITEM_INVEN* inv)        "sp_DestroyItemA"                     @ FUN_00527870
+    0x3459 { h, charNo, lockIndex, flags = 1, keys = [cell.key] }  (0x19 + 8 bytes)
+    if inv is an equipment cell (type 8): lock vt 0x54 (equip location, slot, cell)
+    lock vt 0x30 icl_ClearItem(lockIndex, cell, inv, inv)
+    if type 8: lock vt 0x50 (unequip reservation, slot, cell, −1, 0)
+    lockIndex += 1;  return true
+    # callers: sp_ItemDelete FUN_00451090, sp_HorseItemSave FUN_0045e810, so_ply_Script_CostumeTakeOff FUN_005191b0,
+    # sp_UseAmountHP / SP FUN_0059c500 / FUN_00596e30, so_ply_ChestBoxOpenAck FUN_00598e90, and the overload below
+
+sp_DestroyItem(h, itemID, ItemBag* bag, invenType)                                    @ FUN_00527a70
+    first cell of `bag` holding itemID that no lock reserves (UnlockedInventoryIterator, ItemBoxIterIdent):
+        sp_DestroyItemA(h, cell, invenType << 10 | slot);  none: false
+    # callers so_scene_EraseItem FUN_0050dba0 (equipment, type 8; Z09 §17.8 cItemErase) and so_ply_DivorceProcess
+    # FUN_0059f550 (the wedding present, from two bags)
+
+sp_DestroyItem(h, itemID, count, LinkInformTemplete* link)   "sp_DestroyItemB"         @ FUN_00527b60
+    owned = sum of lots (attr vt 0x1c) of itemID over the unlocked inventory (type 9) cells
+    count ≤ 0: count = owned;  count > owned: assert "…Try to delete too many lot", false
+    for each unlocked cell c with itemID, in slot order:
+        if lot(c) ≤ count: keys += c.key; lock vt 0x30 (clear c); count −= lot(c); stop at 0
+        else:  copy = c with lot − count (attr vt 0x20); lock vt 0x40 (replace c by copy)
+               flags |= 0x80; itemID/key/inven/attrOffset = copy; attribute bytes after the keys; stop
+    if link: lock vt 0x6c(lockIndex, link)      # a map link carried out when the DB confirms *(inferred: slot not
+                                                 # opened)*; instance-dungeon entry fees: wms_…LEVEL_SELECT_JOIN… FUN_00485b90, zls_…FIND_RNG… FUN_00487510)
+    send; lockIndex += 1; true
+    # callers: the Lua cInvenItemDestroy (Z09 §17.8), so_scene_EraseItem, ride feeding FUN_0045f9e0, the wedding
+    # propose answer FUN_0059f900 (ring) and hall guest entry FUN_0059fcb0 (invitation card), the two dungeon entries above
+
+sp_DestroyItem(h, ItemTotalInformation* info, ITEM_INVEN* inv)   (small-item box)        @ FUN_00566f00
+    0x3459 { h, charNo, lockIndex, keys = [info.key] }; lock vt 0x44(lockIndex, inv, empty item, inv, inv)
+    # replace the small cell by an empty one *(inferred from the arguments)*; icl_IncIndex
+sp_SmallItemDelete<ItemInform_ActionItem>(cell, type, slot, ShineDateTime*)              @ FUN_00569b80
+    cell: ItemInform_ActionItem::sii_Export(cell → info) (FUN_00643440: key, itemid, lot = iiai_Attribute);
+    copies the char name into the name ring (unused here); sp_DestroyItem(p.handle, &info, type << 10 | slot)
+    # only caller sp_SmallChargedItemLimitCheck FUN_0056b900 (expired action items, Z09 §2.4)
+
+sp_ItemInvenDelete(DelConditionType cond)                                             @ FUN_0051c590
+    one 0x3459 with every unlocked inventory item whose idb_index[].eDelConditionType == cond (≠ NONE); each cell is
+    re-checked with lock vt 0x0c and reserved with vt 0x30; nothing found → nothing sent
+    # only caller sp_NC_MAP_LOGINCOMPLETE_CMD FUN_00443390 with DCT_LINKIN_ALL (1): the ItemInvenDel.shn event items
+    # (§4.1) vanish at every map login
+```
+
+The 7-bit key count of `sp_DestroyItemB` and `sp_ItemInvenDelete` wraps past 127 keys as in Z11-B8 (original bug)
+Z18-B13 (latent: 19 such event items; a 128-cell destroy of one item id is needed for B).
+
+### 4.5 Drop attributes (`ItemAttr` vt 0x2c), random options and card drops
+
+`iac_DropItemMake(ItemTotalInformation* item, ItemGroup* row, int roll, u16 mobID)` is vt 0x2c, called by the mob
+drop `dilig_Drop` FUN_0048e260 (Z09 §11.2, `roll` = rand 0…999) and the Pine `itemdrop` node (Z09 §24.1) with its synthetic
+row. `ItemGroup` (`DropItemStruct::ItemGroup`, 0x64): `+0x3c ig_quantitylow`, `+0x3e ig_quantityhigh`, `+0x40
+ig_upgraderate[16]`. No implementation reads `ig_itemid` (the uninitialised name bytes of `itemdrop`'s row are harmless).
+
+| Implementation | Address | Classes | Effect |
+|---|---|---|---|
+| `ItemAttributeClass::iac_DropItemMake` | FUN_0063f940 | 16 classes (ActionItem, Amount, BindItem, Capsule, Costum*, Decoration, Furniture, GBCoin, ItemChest, KingdomQuestItem, MiniHouseSkin, Pet, Riding, SkillScroll, WeaponTitleLicence) | nothing, true |
+| `ItemAttrCls_ByteLot::iac_DropItemMake` | FUN_0063fab0 | ByteLot, Enchant, Feed, NoEffect, RecallScroll, UpSource, Upgrade Red/Blue/Gold gems | u8 lot = low + (high − low + 1)·roll / 1000 |
+| `ItemAttrCls_WordLot::iac_DropItemMake` | FUN_0063f950 | WordLot, ActiveSkill, KQStep, QuestLot | same, u16 lot |
+| `ItemAttrCls_DwrdLot::iac_DropItemMake` | FUN_0063f990 | DwrdLot | same, u32 lot |
+| `ItemAttrCls_Amulet::iac_DropItemMake` | FUN_0063e6c0 | Amulet, Bracelet | `upgrade` = 0, then `iac_ClearItemOptionUpgrade` (vt 0x84, FUN_0063e7e0): the 8 upgrade-option elements zeroed, `UpgradeOption.optionnumber` = 1 |
+| `ItemAttrCls_Armor::iac_DropItemMake` | FUN_0063fa60 | Armor, Boot, Shield | see below; `option.optionnumber` = 1 |
+| `ItemAttrCls_Weapon::iac_DropItemMake` | FUN_0063f9d0 | Weapon | see below; `mobkills[3].monster` = 0xFFFF, counts / title 0, `option.optionnumber` = 1, 3 gem sockets `{0xFFFF, 0}`, `maxSocketCount` = `EnchantSocketRateData::GetSocketRateData()` (FUN_0064c5c0, `sm_pSocketRateData`) vt 0 (itemID), `createdSocketCount` 0 |
+| `ItemAttrCls_CardCollect_Close::iac_DropItemMake` | FUN_0063faf0 | closed collection card | `g_CardCollectMake(mobID, &card)` (below); its result is the drop decision |
+| (folded, FUN_00510f50) | FUN_00510f50 | open collection card | returns 0: an open card never drops |
+
+```pseudo
+Armor / Weapon upgrade from the group row:
+    for i in 0…15: if roll < ig_upgraderate[i]: upgrade = i; break       # per-entry test, not cumulative
+    upgrade = 0                                                          # unconditional overwrite
+    # the Upgrade00…15 weights of ItemDropGroup never take effect (original bug) Z18-B8; drops get their upgrade
+    # only from dilig_Drop's upMin…upMax roll (Item_ForcedUpgrade, Z09 §11.2)
+
+g_CardCollectMake(mobID, ShineItemAttr_MobCardCollect_Unident* card)       @ FUN_00628880
+    mob row (mobdatabox) → CollectCardMobGroup by mob InxName (g_CollectCardMobGroup_MobGroup); none → false
+    card.Group = CC_CardMobGroup; card.CardID = 0xFFFF; W = 0
+    for each CollectCard c of that group (g_CollectCard_MobGroup):
+        w = CollectCardDropRate[c.CC_CardID].CC_CardGetRate (linear search; a card without a row would be a null read,
+            latent: all 334 cards have one); W += w
+        if rand(1 000 000)·W / 1 000 000 < w: card.CardID = c.CC_CardID       # one-pass weighted pick (reservoir)
+    CardID ≠ 0xFFFF: c = CollectCard[CardID]; card.Star = 0, S = 0
+        for each CollectCardStarRate r of c.CC_CardGradeType: S += r.CC_StarRate; same pick → card.Star = r.CC_StarLot
+        return card.Star ≠ 0
+    return false
+    # the card table semantics (groups, stars, rewards) are Z07's collection cards (part 4 of this item)
+```
+
+```pseudo
+ItemRandomOption::RandomOptionTable::rot_FillOption(ItemOptionStorage* s, RandomOptionDatum* d)   @ FUN_00493590
+    s.optionnumber = 1 (bit 0 "identified", count 0)
+    d or d.rod_RandomOptionMaker (RandomOptionList L) null: assert "Null datum", return
+    r = rb_1000(); n = first rol_Count entry {count, weight} with r < weight (r −= weight per entry)   # RandomOptionCount.shn
+    n < 1: assert "Option Counter bug", return (no options)
+    n = min(n, number of option types of L) ("Too many option"), min(n, 50) ("Large then")
+    idx = 0…types−1 shuffled (swap idx[i] with idx[rand(types)] for each i)
+    for k in 0…n−1: t = L.rol_Option[idx[k]] (0x14 bytes: {u8 type, vector {min, max, weight}})
+        pick a range by weight with rb_1000 as above (none: 0…0); min > max → assert "Min/Max error", min = max
+        s.optionlist[k] = { type, min + rb_largerandom(max − min + 1) }
+    s.optionnumber = (s.optionnumber & 1) | n << 1
+    # optionlist has 8 elements but n is capped at 50 (original bug) Z18-B14, latent: RandomOptionCount.shn counts are 1…5
+```
+
+`RandomOptionTable::operator[](name)` FUN_00493ff0 (lookup by `rol_Index`, shared `returnstr` result) is Z11 §9.3.
+Callers of `rot_FillOption`: mob drops and `itemdrop` (Z09 §11.2 / §24.1), treasure chests (Z09 §10.10), `&makeitem` (Z11 §4.3, Z11-B13).
+
+### 4.6 Upgrade helpers
+
+```pseudo
+Item_GetUpgradeLimit(itemID)                            @ FUN_0053b2a0
+    ItemInfo.UpLimit (+0xf0); unknown / mismatching id → 0 (assert on mismatch)
+    # callers Item_Upgrade FUN_0053ca10 (Z04 §9.4), Item_ForcedUpgrade FUN_0053c510
+Item_AdjUpgradeLevel(SHINE_ITEM_STRUCT* it, s8 delta)   @ FUN_0053b560
+    by ItemInfo.Class: amulet / bracelet: amulet.upgrade (attr +8) += delta; weapon / shield / armor / boot:
+        upgrade (attr +0) += delta; other classes: 0, unchanged.  returns the new level
+Item_AdjFailCount(it, n, set)                           @ FUN_0053b700
+    same classes: set ? upgradefailcount = n : += n   (amulet / bracelet attr +0xa, the others attr +2); returns it
+    # both: an id without ItemDataBox row dereferences a null index (original bug) Z18-B12, latent (callers pass items
+    # they already looked up). Callers: the three UPGRADE handlers (Z04 §9.1–9.3), Item_ForcedUpgrade, MIX_ITEM (§12.12)
+```
+
+### 4.7 Item use broadcasts and use-effect table
+
+```pseudo
+ShinePlayer::sp_ItemUseBroadcast(UIE_Functions* f, itemID)      @ FUN_0053f840
+    f.broadcast == 0: nothing
+    broadcast to the sight range: 0x3029 NC_ITEM_SOMEONEUSE_CMD { u16 user = p.handle, SHINE_XY_TYPE useloc = p.position,
+        u16 useditem = itemID }   (12 bytes, 2016 PDB struct)
+    # only caller smo_ply_ItemUse FUN_0053fd10 (the use path of Z04 §6.1)
+    # client On_NC_ITEM_SOMEONEUSE_CMD FUN_004af820: char by handle, ItemInfo row of useditem → char vt 0xc4, then
+    # EffectMgr::CreateEffect(the row's InxName): plays the item's use effect on that character; useloc is not read
+
+Send_SETITEMHEALEFFECT(ShineObject* o, isheal, amount)        @ FUN_005cfbb0
+    o null: nothing;  broadcast around o: 0x206F NC_ACT_SETITEMHEALEFFECT { u16 who = o.handle, u8 flag (bit 0 isheal),
+        u16 hpchange = amount (truncated to 16 bits) }   (5 bytes)
+    # caller RecoverTypeEffect::_execute FUN_005cfc70 (Z09 §28.8: HP recover kinds 0 / 1 isheal 1, HP-damage kinds 4 / 5 isheal 0)
+    # client On_NC_ACT_SETITEMHEALEFFECT FUN_0049bd20: TextEffMgr::AddNumTextEff(who, hpchange, isheal·4 | 1): a floating number
+```
+
+`UseEffect::UsedItemEffect` (`g_ItemUseTable`, Z04 §6.1): `uie_FuncStruct[uie_MaxItemID]` of `UIE_Functions {ItemUseEffect*
+useeffectstruct, UseItemBase* useitemclass, SkillDataIndex* useskill, u8 broadcast}`. `operator[](id)` FUN_004878e0 (id ≥
+max → entry 0); `uie_SetChargedBuffer(id, actor, skill)` FUN_005963e0 (default effect struct, actor, skill: how the charged
+item tables of 11 loaders register their items); `uie_UseSkillID(name)` FUN_0059cba0 (Z20 §7 table: skill by name, active only).
+
+### 4.8 Small state holders, set items and the rest
+
+| Function | Address | What it does / where it plugs in |
+|---|---|---|
+| `CSellItemManager::CSellItemManager` | FUN_0050eb60 | the buy-back list `p+0x2ac38` (Z04 §2.5): `List<SellItemInfo>` of 42 (`l_MakeList(0x2a)`) over `simg_SellItemNode[42]`, each item cleared (key −1, itemid 0xFFFF); built by the player ctor FUN_0055bc80 |
+| `ItemAccountStorage::ItemAccountStorage` / `ItemRewardStorage::ItemRewardStorage` | FUN_00644910 / FUN_00644c20 | 576 (0x240) / 24 inventory cells of 0x74 bytes: account storage `p+0x18258` and reward inventory `p+0x28760` (Z04 §1.1) |
+| `InventoryCellLockList::icll_ClearItem` | FUN_00440d20 | `icll_AllLock = 0` and erase every `LockedCell` of `icll_List`; at login complete (no reservation survives a map change) |
+| `ItemBag::ib_GetItemLot(id)` | FUN_00642e80 | sum of lots (attr vt 0x1c) of `id` over the whole bag; via `so_GetItemLot` FUN_0055da60 and the minimon auto-use routines (Z07 §3.6) |
+| `ItemBoxIterEmpty::ItemBoxIterEmpty(bag, effect)` | FUN_0043c050 | an iterator over empty cells; limit = `bag.vt[4](effect)` (usable size with the extra-inventory effect) or `bag.vt[8]()` (full size); 18 users (`sp_GetEmptyItemInventoryCount` FUN_00560910, EQUIP, RELOC, chests …) |
+| `ItemTotalInformation::iti_clear` | FUN_00470cf0 | key = −1, item struct zero, itemid 0xFFFF |
+| `ItemTotalInformation::iti_fill2buffer_whole(cls, inven, buf)` | FUN_006407d0 | writes `{u64 key, u16 inven}` then the class's item bytes (attr vt 4) and returns the end; the record of the inventory / storage / chest lists (`ci_FillBufferTotal` FUN_006444b0, `ci_FillBufferInventoryTotal` FUN_00644220, `simg_FillBuffer_Server` FUN_0050e4d0, `tcm_PutInto` FUN_00595f50, `ilm_PutInto` FUN_00595890, `isb_FullBufferItem2Server` FUN_00455860) |
+| `ItemInform_ActionItem::sii_Export` | FUN_00643440 | §4.4 (small-item cell → ItemTotalInformation); also the small-bag lists of Z12 §6.7 |
+| `ShinePlayer::sp_GetAutoPick` | FUN_00560370 | `sp_MiscFlag.IsAutoPickUp` (Z12 §7.1, Z07 §3.6) |
+| `ShinePlayer::sp_GetItemWhoEquip_ClassGroup` | FUN_005630f0 | class mask of the player's class line for `sp_KQReward` FUN_0052da70 → `tcm_ItemMake(…, 7, row, mask)`: `smo_CharClass.cc_ClassType` (vt 0x48, the line's base class 1 / 6 / 11 / 16 / 21 / 26) → bits base…base+4 (Sentinel 26…27); no class object or another value → 1 |
+| `SetItemData::SkillEffect::operator[](i)` / `se_Clear` | FUN_00510010 / FUN_005105e0 | `se_Argument[17]` (per `SetIndex`, base 1000 = ×1; i ≥ 17 → 1000) / all 17 = 1000; the set-item skill multipliers read by heal-over-time, enchant, cooldown, SP check (Z03, Z12) and cleared by `smo_ply_SetItemEffect` FUN_00510c80 and `so_Routine` |
+| `SetItemData::SetItemAbstateEffect` ctor | FUN_00510350 | Z11 §9.2 (4 slots `{index 0, Argument_Base1000 1000}`) |
+| `SetItemData::EffectDescription::ed_Compare` | FUN_004a2ed0 | `*(u16*)a − *(u16*)b`; a folded comparator shared by 12 sorted tables (`siel_AppendEffect` FUN_005104c0, MiscDataTable, MagicContainer, MobAttackSequence) |
+| `ItemLotInspector` ctor / `ili_Clear` / `ili_Reset` | FUN_00490be0 / FUN_00490c30 / FUN_0043bf90 | below |
+
+**`ItemLotInspector`** (`sp_ItemLotInspector`, the `p+0x1ea8` of Z05 §1.1): a 64-entry ring (`ili_ArrayPointer` mask 0x3f)
+of `InspectNote {ili_Action, ili_ItemID, ili_From[2], ili_To[2] {Activ, Locate, Item}, ili_MoveLot, ili_TotalLot,
+ili_StorageCount}` recording each RELOC / SPLIT (Z04 §4) as a dupe check. The handlers fill the current note
+(`ili_SetTo(k, inven)` FUN_005317b0, `ili_TotalLotFrom(p)` FUN_005317e0 = `so_ply_CalcTotalLot` vt 0x970 FUN_00490c60:
+lots in inventory + account storage when it is open); the DB answer calls `so_ply_ItemLotInspecting(check)` FUN_00491f90
+(Z05 §1.1 / §4, named `ItemLotInspector_CheckAndReset` there): `check` → `ili_Check` FUN_00491c30, then advance the ring and
+clear the new note. `ili_Check`: no action → ok; mini-house / reward-box moves are skipped; otherwise `ili_ItemCheck`
+FUN_004919d0 (each "from" item id = the note's id) and the total lot must equal the recorded one; any mismatch writes
+`ItemMSLog` (" ItemID not match ", " From0 Null ", " TotalItemNumber Not Match ") and `ili_History` FUN_00490cf0 (dumps
+all 64 notes: `Act`, `From0/1`, `To0/1`, `MoveLot`, `TotalLot`). Nothing else happens (Z05-B3: the result is ignored).
+ctor: mask 0x3f, pointer 1, note cleared; `ili_Clear` (all 64 notes: item 0xFFFF, action 0) and `ili_Reset` (advance +
+clear) run at login complete (Z01 §6).
+
+---
+
 ## 5. Z06: trade, booths, gambling (constructors)
 
 | Function | Address | What it does / where it plugs in |
@@ -652,6 +986,13 @@ So a fully absorbed hit is shown to clients only as the protector's 0x2449; the 
 | Z18-B5 | Z03 `ActorCluster::ActorCluster` FUN_00405a10, §3.1 | slot 67 KNOCKBACK gets the Poison actor (the register still holds `&ac_POISON`); the `ac_DOTWCRATE` actor (`SubAbnormalStateActorDmgState`) is constructed but put in no slot | the DmgState actor (its `sasa_Routine` FUN_0040dc60) is dead code; the 17 knock-back rows run Poison's routine (what that does with rows that have only `SAA_AWAY*` actions: Z22) | 67 → the base actor or `ac_DOTWCRATE`; intent unknown |
 | Z18-B6 | Z03 `so_Dispel` FUN_0042bf70, `so_SkillCure` FUN_0042c440, §3.4 | every element is guarded by `well512_GetRandom(1000) < 1001` | the guard is always true (dead check) | a per-state dispel / cure chance |
 | Z18-B7 | Z03 `smo_SkillBash_Blast_Trap(Obj)` FUN_005838a0, 0x2442, §3.6 | a single-target trap skill hits `o.smo_SkillCast.scs_BattleSkill.target` with `scs_Empower`, not the target and empower it was given; `Last` = ENEMYUSER is not handled (assert, no blast) | `blastMode` 2 / 4 single-target traps hit the servant's stale cast target (or nobody); 0x2442 still names the given target. ENEMYUSER trap skills on an object do nothing (the Loc version handles them) | use `t` and `empower`; add the ENEMYUSER scanner |
+| Z18-B8 | Z04 `ItemAttrCls_Armor::iac_DropItemMake` FUN_0063fa60 / `ItemAttrCls_Weapon::iac_DropItemMake` FUN_0063f9d0, §4.5 | the upgrade picked from `ig_upgraderate[16]` is overwritten with 0 right after (and the pick tests each weight alone, not cumulatively) | the `Upgrade00…15` weights of `ItemDropGroup` never apply; dropped armour / weapons get only `dilig_Drop`'s upMin…upMax upgrade | keep the picked level (cumulative weights) |
+| Z18-B9 | Z04 `so_ply_EquipmentChange` FUN_0052ce60, §4.3 | with the weapon title (type 10) active, `SetCurrentTitle(10, level, mob)` is called with two stack variables that only the weapon builder writes | equipping / clearing any non-weapon view slot sets the server-side weapon title to garbage mob / level (title string from `GetTitleString(10, garbage)`) | update the title only for the weapon class |
+| Z18-B10 | Z04 `ItemAttrCls_Weapon::iac_equipbriefinfo` FUN_0063f820, 0x1C05 | `upgradeinfo.nSlotNum` (payload +5) is not written | one stale `g_buf` byte on the wire; the client does not read it | write the slot as the armour builder does |
+| Z18-B11 | Z05 `so_ply_ViewSlot_EquipInfoSend` FUN_0052b5e0, §4.3 | the item id variable is set only for slots in use and not reset per slot | a slot marked for re-send without a view item is re-sent with the previous marked slot's item | reset to 0xFFFF per slot (send the real item) |
+| Z18-B12 | Z04 `Item_AdjUpgradeLevel` FUN_0053b560 / `Item_AdjFailCount` FUN_0053b700, §4.6 | an item id without `ItemDataBox` row leaves the index pointer null and reads `->data->Class` | crash; latent (callers pass items they looked up) | return 0 as for other classes |
+| Z18-B13 | Z04 `sp_DestroyItem` B FUN_00527b60, `sp_ItemInvenDelete` FUN_0051c590, §4.4 | key count in 7 bits (as Z11-B8) | more than 127 keys wrap the count (latent) | a wider count or several requests |
+| Z18-B14 | Z04 `RandomOptionTable::rot_FillOption` FUN_00493590, §4.5 | the option count is capped at 50 while `ItemOptionStorage` has 8 elements | a count > 8 would overwrite the attribute bytes after the options; latent (2016 counts 1…5) | cap at 8 |
 
 ## 8. Not reconstructed / uncertain
 
@@ -670,3 +1011,11 @@ So a fully absorbed hit is shown to clients only as the protector's 0x2449; the 
   consume it is unknown (design or bug).
 - §3.6: the visible effect of 0x2442 / 0x2443 on the client (`Char::ActSkill` animation path) was not followed beyond
   the vtable names *(pdb2017)*.
+- §4.2: the two "Old" conflict scans count a worn / view item without `ItemInfoServer` or equip row as covering every
+  slot; whether that is a deliberate safety net or an oversight is open (no such item in the 2016 tables).
+- §4.3 / Z18-B9: what the garbage weapon title changes for other players (brief info, title packets) is Z07's title
+  code (part 4 of this item).
+- §4.4: lock-list slots 0x44 (small-cell replace) and 0x6c (`LinkInformTemplete` carried with the lock) were read only
+  from their call sites; the `0x345A` side that applies them is Z05 §6.4.
+- §4.8: `ili_Check` skips notes whose first target is type 3 / 12–16 or whose first source is type 2 (mini-house and
+  reward boxes); type 12 is not a box Z04 §1.1 lists *(inferred: a reserved mini-house type)*.

@@ -5582,14 +5582,16 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_GuildStorageWithdrawAck` (`FUN_
 
 ### `0x3029` NC_ITEM_SOMEONEUSE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_SOMEONEUSE_CMD`, 12 bytes
+**Verified layout** (basis: zone FUN_0053f840 (sp_ItemUseBroadcast); client FUN_004af820)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | user |  |
+| 0 | u16 | user | player handle |
 | 2 | u32 | useloc.x |  |
 | 6 | u32 | useloc.y |  |
-| 10 | u16 | useditem |  |
+| 10 | u16 | useditem | ItemInfo ID |
+
+broadcast to sight when UIE_Functions.broadcast is set; client plays the item's effect (ItemInfo InxName) on the user, useloc unread
 
 Sent from `FUN_0053f840` (`FUN_0053f840`) · payload 12 bytes
 
@@ -10993,6 +10995,57 @@ Z09 §13.2
 
 Z09 §13.2
 
+### `0x1c02` NC_BRIEFINFO_CHANGEDECORATE_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_0063f910 (ItemAttrCls_Decoration::iac_equipbriefinfo) via so_ply_EquipmentChange FUN_0052ce60; client FUN_004a0710)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | player |
+| 2 | u16 | item | ItemInfo ID |
+| 4 | u8 | nSlotNum | ItemEquipEnum |
+
+Decoration / CostumWeapon / CostumShield items; broadcast to sight by the view-slot functions; client: Char::Equip(item), slot 17 hides the aura
+
+### `0x1c03` NC_BRIEFINFO_CHANGEUPGRADE_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_0063f8d0 (ItemAttrCls_Armor::iac_equipbriefinfo); client FUN_004a0780)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | player |
+| 2 | u16 | item | ItemInfo ID |
+| 4 | u8 | upgrade | attr +0 |
+| 5 | u8 | nSlotNum | ItemEquipEnum |
+
+Armor / Boot / Shield; client: CharShape::Equip(item, upgrade) + Char::Equip
+
+### `0x1c04` NC_BRIEFINFO_UNEQUIP_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_0063f7e0 (ItemAttributeClass::iac_equipbriefinfo, base class and item 0xFFFF); client FUN_004a08f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | player |
+| 2 | u8 | slot | ItemEquipEnum |
+
+also sent for items of the 29 classes without own builder; client: Char::UnEquip(slot), weapon-title reset on slot 12
+
+### `0x1c05` NC_BRIEFINFO_CHANGEWEAPON_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_0063f820 (ItemAttrCls_Weapon::iac_equipbriefinfo); client FUN_004a07e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | player |
+| 2 | u16 | item | ItemInfo ID |
+| 4 | u8 | upgrade | weapon.upgrade |
+| 5 | u8 | nSlotNum | never written: stale g_buf byte (Z18-B10); client ignores it |
+| 6 | u16 | currentmobid | mobkills entry matching CharacterTitleMobID, else 0xFFFF |
+| 8 | u8 | currentkilllevel | CWeaponTitle::GetLevel(mob, kills), else 0 |
+
+client: Char::Equip(item, upgrade); title type 10 shown and item class 5 → weapon title by (mob, level) or off for 0xFFFF
+
 ### `0x1c19` NC_BRIEFINFO_ABSTATE_CHANGE_LIST_CMD (S→C)
 
 **Verified layout** (basis: zone FUN_0043cc00)
@@ -11113,6 +11166,18 @@ to the player only, after every server-side stop (mm_Step stop, block-check roll
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x1381 0x1382 0x1383 0x1388 |
+
+### `0x206f` NC_ACT_SETITEMHEALEFFECT (S→C)
+
+**Verified layout** (basis: zone FUN_005cfbb0 (Send_SETITEMHEALEFFECT); client FUN_0049bd20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | who | object handle |
+| 2 | u8 | flag | bit 0 isheal |
+| 3 | u16 | hpchange | amount, truncated to 16 bits |
+
+broadcast around the object by RecoverTypeEffect::_execute; client: floating number (TextEffMgr::AddNumTextEff, style isheal*4|1)
 
 ### `0x207A` NC_ACT_OBJECT_SOUND_CMD (hand-named) (S→C)
 
@@ -12580,6 +12645,24 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 12 | u64 | chest |  |
 | 20 | u8 | relocnum |  |
 | 21 | bytes | reloc | relocnum × {u64 key, u16 new location} |
+
+### `0x3459` NC_ITEMDB_DESTROY_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_00527870 / FUN_00527b60 / FUN_00566f00 / FUN_0051c590 (sp_DestroyItem family, sp_ItemInvenDelete))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | player handle |
+| 2 | u32 | charNo |  |
+| 6 | u16 | lockIndex | InventoryLocking index |
+| 8 | u8 | flags | bits 0-6 key count, bit 7 partial (rewritten cell valid) |
+| 9 | u16 | itemID | rewritten cell (bit 7) |
+| 11 | u64 | key | rewritten cell (bit 7) |
+| 19 | u16 | attrOffset | payload offset of the attribute bytes (bit 7) |
+| 21 | u16 | inven | rewritten cell ITEM_INVEN (bit 7) |
+| 23 | u64[] | keys | count entries; then the rewritten cell's attribute bytes |
+
+to the Character DB (sock2gameDB); answer 0x345A (Z05 §6.4); no 2016 PDB struct
 
 ### `0x345f` NC_ITEMDB_DEPOSIT_REQ (Z→DB)
 
