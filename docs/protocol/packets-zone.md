@@ -12118,6 +12118,19 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
 
+### `0x4801` NC_SKILL_SKILLTEACH_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone ac_learnskill FUN_0041c290 (0x11 bytes incl. opcode); D04 §2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | handle | zone object handle |
+| 2 | u32 | charNo | ref |
+| 6 | u32 | chrregnum | = charNo |
+| 10 | u16 | skillid |  |
+| 12 | u8 | ispassive | 0 from &learnskill |
+| 13 | u16 | removeid | 0xFFFF = none |
+
 ### `0x10d1` NC_CHAR_FREESTAT_SET_DB_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_0058ad10 / FUN_0058b3f0)
@@ -12359,19 +12372,6 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 |---|---|---|---|
 | 0 | u16 | bEnable |  |
 | 2 | u32 | charNo |  |
-
-### `0x4801` NC_SKILL_SKILLTEACH_REQ (Z→DB)
-
-**Verified layout** (basis: zone FUN_0046c820 (production skill))
-
-| Off | Type | Field | Notes |
-|---|---|---|---|
-| 0 | u16 | zonehandle |  |
-| 2 | u32 | chrregnum |  |
-| 6 | u32 | chrregnum2 | same value |
-| 10 | u16 | skill |  |
-| 12 | u8 | ispassive | 0 here |
-| 13 | u16 |  | 0xFFFF here |
 
 ### `0x4812` NC_SKILL_EMPOWALLOC_DB_REQ (Z→DB)
 
@@ -12646,6 +12646,29 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 7 | u16 | nError |  |
 | 9 | i32 | eLevelType |  |
 | 13 | Name3 | sMapName |  |
+
+### `0x106b` NC_CHAR_KICKPLAYEROUT_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone zls_NC_CHAR_KICKPLAYEROUT_RNG FUN_0045bc30 (reads, forwards 0x1E bytes); &kickout ac_KickOutPlayer FUN_0041cec0 / zrpb_Request FUN_005a76f0 build this layout but send it as 0x1068 (Z11-B6); PDB 2016 PROTO_NC_CHAR_KICKPLAYEROUT_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine | origin zone number (< 10) |
+| 1 | u16 | start.handle | GM object handle at the origin |
+| 3 | u32 | start.regnum | GM charNo |
+| 7 | u8 | tmp | padding, never written by &kickout |
+| 8 | Name5 | charid | character to kick (20 bytes) |
+
+### `0x106c` NC_CHAR_PLAYERBANNED_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone FUN_0045bc30 (builds, 0x1D bytes), zls_NC_CHAR_PLAYERBANNED_RNG FUN_0045bdf0 (forwards); PDB 2016 PROTO_NC_CHAR_PLAYERBANNED_RNG)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.machine |  |
+| 1 | u16 | start.handle |  |
+| 3 | u32 | start.regnum |  |
+| 7 | Name5 | charid | kicked character |
 
 ### `0x10b1` NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG (Z→Z ring)
 

@@ -1,0 +1,10 @@
+{
+  "_about": "Z11: packets built or read by the GM ampersand commands. Offsets are payload offsets (after the opcode). Zone-ring packets start with ZONERINGLINKAGESTART { u8 machine, u16 handle, u32 regnum } (pdb2016).",
+  "packets": {
+    "zone": {
+      "0x106b": {"dir": "Z→Z (ring)", "name": "NC_CHAR_KICKPLAYEROUT_RNG", "basis": "zone zls_NC_CHAR_KICKPLAYEROUT_RNG FUN_0045bc30 (reads, forwards 0x1E bytes); &kickout ac_KickOutPlayer FUN_0041cec0 / zrpb_Request FUN_005a76f0 build this layout but send it as 0x1068 (Z11-B6); PDB 2016 PROTO_NC_CHAR_KICKPLAYEROUT_RNG", "fields": [[0, "u8", "start.machine", "origin zone number (< 10)"], [1, "u16", "start.handle", "GM object handle at the origin"], [3, "u32", "start.regnum", "GM charNo"], [7, "u8", "tmp", "padding, never written by &kickout"], [8, "Name5", "charid", "character to kick (20 bytes)"]]},
+      "0x106c": {"dir": "Z→Z (ring)", "name": "NC_CHAR_PLAYERBANNED_RNG", "basis": "zone FUN_0045bc30 (builds, 0x1D bytes), zls_NC_CHAR_PLAYERBANNED_RNG FUN_0045bdf0 (forwards); PDB 2016 PROTO_NC_CHAR_PLAYERBANNED_RNG", "fields": [[0, "u8", "start.machine", ""], [1, "u16", "start.handle", ""], [3, "u32", "start.regnum", ""], [7, "Name5", "charid", "kicked character"]]},
+      "0x4801": {"dir": "Z→CharDB", "name": "NC_SKILL_SKILLTEACH_REQ", "basis": "zone ac_learnskill FUN_0041c290 (0x11 bytes incl. opcode); D04 §2", "fields": [[0, "u16", "handle", "zone object handle"], [2, "u32", "charNo", "ref"], [6, "u32", "chrregnum", "= charNo"], [10, "u16", "skillid", ""], [12, "u8", "ispassive", "0 from &learnskill"], [13, "u16", "removeid", "0xFFFF = none"]]}
+    }
+  }
+}

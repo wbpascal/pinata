@@ -157,8 +157,8 @@ two digits *(inferred: the hour)*, opened with `"a+"` by `dl_FilePoint` FUN_0041
 | Function | Meaning |
 |---|---|
 | `ac_Scanf(text)` FUN_0041a290 | `sscanf(text, "%d")`, the parsed int (0 for no number) |
-| `ac_TempLinkUsage(p)` FUN_0041a210 | four usage lines of `&templink` (§2 row, part 2) |
-| `ac_MobBreedUsage(p)` FUN_0041a260 | two usage lines of `&mobbreed` (part 2) |
+| `ac_TempLinkUsage(p)` FUN_0041a210 | four usage lines of `&templink` (§4.1) |
+| `ac_MobBreedUsage(p)` FUN_0041a260 | two usage lines of `&mobbreed` (§4.2) |
 
 Numbers are read with `atoi` or `ac_Scanf`: a missing or non-numeric argument reads as 0, never as an error.
 
@@ -177,8 +177,8 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 6 | `&캐추적` | ac_FindPlayer `0041d050` | 10 | (part 3) | | | |
 | 7 | `&mfind` | ac_FindMob `0041cf90` | 10 | (part 3) | | | |
 | 8 | `&몹추적` | ac_FindMob `0041cf90` | 10 | (part 3) | | | |
-| 9 | `&kickout` | ac_KickOutPlayer `0041cec0` | 10 | (part 2) | | | |
-| 10 | `&추방` | ac_KickOutPlayer `0041cec0` | 10 | (part 2) | | | |
+| 9 | `&kickout` | ac_KickOutPlayer `0041cec0` | 10 | `<charName>` | disconnect a player of this zone (reason 0x68B); other zones: broken, never kicked (B6) | 0x0C1A to WM via so_Disconnect (Z01 §8.3); ring 0x1068; 0x2011 | §4.5 |
+| 10 | `&추방` | ac_KickOutPlayer `0041cec0` | 10 | `<charName>` | disconnect a player of this zone (reason 0x68B); other zones: broken, never kicked (B6) | 0x0C1A to WM via so_Disconnect (Z01 §8.3); ring 0x1068; 0x2011 | §4.5 |
 | 11 | `&linkto` | ac_LinkTo `0041a7e0` | 10 | `[<map> [<x> <y>]]` / `-` | teleport to a map (default regen point) or, without argument, to a free spot of the current map; `-` = back to the normal location | 0x1809 (same zone) or zone change (Z01 §6) | §3.1 |
 | 12 | `&이동` | ac_LinkTo `0041a7e0` | 10 | `[<map> [<x> <y>]]` / `-` | teleport to a map (default regen point) or, without argument, to a free spot of the current map; `-` = back to the normal location | 0x1809 (same zone) or zone change (Z01 §6) | §3.1 |
 | 13 | `&psummon` | ac_SummonPlayer `0041d140` | 10 | (part 3) | | | |
@@ -198,36 +198,36 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 27 | `&parameterview` | ac_ParameterView `0041e7d0` | 100 | (part 3) | | | |
 | 28 | `&adminlevel` | ac_AdminLevel `0041a650` | 1 | — | "Admin level is %d" | 0x2011 | §3.2 |
 | 29 | `&serverindex` | ac_ServerIndex `0041a730` | 100 | — | prints the build tag "20120409-Hero[Release]-1" | 0x2011 | §3.2 |
-| 30 | `&makeitem` | ac_MakeItem `0041b8a0` | 100 | (part 2) | | | |
-| 31 | `&cleariv` | ac_ClearInventory `0041bbd0` | 1 | (part 2) | | | |
+| 30 | `&makeitem` | ac_MakeItem `0041b8a0` | 100 | `<InxName> [-u<n>] [-s<n>] [-l<n>] [-p<t>/<v>] [-pi] [-e<n>] [-n<n>] …` | create an item (full stack, random options, amulet upgrade steps) in the first free inventory cell; unknown name or full inventory: silent | DB 0x3401 → 0x3402, client cell change (Z05 §9.1) | §4.3 |
+| 31 | `&cleariv` | ac_ClearInventory `0041bbd0` | 1 | — | delete every unlocked inventory item | DB 0x3459 → 0x345A, client 0x3001 (Z05 §6.4) | §4.3 |
 | 32 | `&dimension` | ac_Dimension `0041a5a0` | 100 | `<n>` | leave sight, layer main number = n | — | §3.1 |
 | 33 | `&doorbuild` | ac_DoorBuild `0041aa50` | 100 | `<mobIndex> <x> <y> <dir> <scale>` | spawn a door object (kind 7) on the current map/layer | door appear (Z09 §13.1) | §3.3 |
-| 34 | `&mobbreed` | ac_MobBreed `0041b510` | 50 | (part 2) | | | |
-| 35 | `&mb` | ac_MobBreed_simple `0041b790` | 50 | (part 2) | | | |
-| 36 | `&fullpoint` | ac_fullpoint `0041be90` | 50 | (part 2) | | | |
-| 37 | `&summonplayer` | ac_summonplayer `0041bf50` | 100 | (part 2) | | | |
-| 38 | `&performance` | ac_performance `0041c8d0` | 10 | (part 2) | | | |
-| 39 | `&sethp` | ac_Sethp `0041c9d0` | 100 | (part 2) | | | |
-| 40 | `&setsp` | ac_Setsp `0041cad0` | 100 | (part 2) | | | |
-| 41 | `&dist` | ac_Dist `0041cbc0` | 10 | (part 2) | | | |
-| 42 | `&coord` | ac_CurrentLoc `0041cd60` | 10 | (part 2) | | | |
+| 34 | `&mobbreed` | ac_MobBreed `0041b510` | 50 | `<Mob> <num 1–64> <regenSec> <Y/n family> <count ≤250> [<region> [<dropMob> [<level>]]]` | breed num mob breeders at the GM, each respawning count times | mob appear (Z09); 0x2011 "Mob : %d" | §4.2 |
+| 35 | `&mb` | ac_MobBreed_simple `0041b790` | 50 | `<Mob>` | spawn one mob at the GM, once | mob appear (Z09); 0x2011 | §4.2 |
+| 36 | `&fullpoint` | ac_fullpoint `0041be90` | 50 | — | CurHP/CurSP = max | none | §4.4 |
+| 37 | `&summonplayer` | ac_summonplayer `0041bf50` | 100 | `<charName>` | link a player of this zone to the GM's position; refused in a mini-house | 0x1809 or zone change (Z01 §7.1) | §4.5 |
+| 38 | `&performance` | ac_performance `0041c8d0` | 10 | `[n]` (unused) | print the main-loop rate | 0x2011 | §4.5 |
+| 39 | `&sethp` | ac_Sethp `0041c9d0` | 100 | `<n>` | CurHP = n clamped to 1…MaxHP | none | §4.4 |
+| 40 | `&setsp` | ac_Setsp `0041cad0` | 100 | `<n>` | CurSP = n clamped to 1…MaxSP | none | §4.4 |
+| 41 | `&dist` | ac_Dist `0041cbc0` | 10 | — | distance to the target in grid units | 0x2011 | §4.5 |
+| 42 | `&coord` | ac_CurrentLoc `0041cd60` | 10 | — | handle, map, x, y, direction of the target (or self) | 0x2011 | §4.5 |
 | 43 | `&scrint` | ac_ScriptInterrupt `0041abe0` | 10 → **50** | `<block>` | raise an admin interrupt with that call block on the map's cinema script | — | §3.3 |
 | 44 | `&timer` | ac_Timer `0041ad10` | 50 | `<sec>` | show a countdown to every player of the map | 0x0810 to the map | §3.3 |
-| 45 | `&templink` | ac_TempLink `0041b2f0` | 10 → **50** | (part 2) | | | |
-| 46 | `&oxblock` | ac_OXBlock `0041b1f0` | 100 → **50** | (part 2) | | | |
+| 45 | `&templink` | ac_TempLink `0041b2f0` | 10 → **50** | `<uses> <mapSrv> <mapCli> <x> <y> [<lvFrom> <lvTo> [<party>]]` | targeted gate NPC links to that point for n uses; −1 closes it | 0x2011 on errors | §4.1 |
+| 46 | `&oxblock` | ac_OXBlock `0041b1f0` | 100 → **50** | `O…` / `C…` | open / close the door block "OXBlock" (first door of the map) | 0x6C09 to the map | §4.1 |
 | 47 | `&z` | ac_NoticeZone `0041aeb0` | 10 | `<text…>` | notice line to every player of the map | 0x2011 to the map | §3.3 |
 | 48 | `&ㅋ` | ac_NoticeZone `0041aeb0` | 10 | `<text…>` | notice line to every player of the map | 0x2011 to the map | §3.3 |
 | 49 | `&gmchat` | ac_GMChat `0041b030` | 1 | — | GM chat colour on; WM keeps it | WM 0x083D | §3.5 |
 | 50 | `&gldcollectclear` | ac_GuildCollectClear `0041ae10` | 100 | — | nothing (empty body) | — | §3.6 |
 | 51 | `&gldcollectset` | ac_GuildCollectSet `0041ae60` | 100 | — | nothing (empty body) | — | §3.6 |
-| 52 | `&questgiveup` | ac_questgiveup `0041c190` | 100 | (part 2) | | | |
-| 53 | `&questrecieve` | ac_questrecieve `0041c140` | 100 | (part 2) | | | |
-| 54 | `&questcomplete` | ac_questcomplete `0041c1e0` | 100 | (part 2) | | | |
-| 55 | `&learnskill` | ac_learnskill `0041c290` | 100 | (part 2) | | | |
-| 56 | `&skillcooltime` | ac_skillcooltime `0041c3c0` | 100 | (part 2) | | | |
-| 57 | `&setabstate` | ac_Setabstate `0041c410` | 100 | (part 2) | | | |
-| 58 | `&resetabstate` | ac_resetabstate `0041c620` | 100 | (part 2) | | | |
-| 59 | `&setabstatetarget` | ac_SetAbstateTarget `0041c6e0` | 100 | (part 2) | | | |
+| 52 | `&questgiveup` | ac_questgiveup `0041c190` | 100 | — | nothing (empty body) | — | §4.6 |
+| 53 | `&questrecieve` | ac_questrecieve `0041c140` | 100 | — | nothing (empty body) | — | §4.6 |
+| 54 | `&questcomplete` | ac_questcomplete `0041c1e0` | 100 | `<n>` (ignored) | nothing | — | §4.6 |
+| 55 | `&learnskill` | ac_learnskill `0041c290` | 100 | `<skillId>` | learn an active skill, no checks | DB 0x4801 → 0x4802 → client 0x4804 (Z03 §9.3) | §4.4 |
+| 56 | `&skillcooltime` | ac_skillcooltime `0041c3c0` | 100 | — | nothing (empty body) | — | §4.6 |
+| 57 | `&setabstate` | ac_Setabstate `0041c410` | 100 | `<AbState> [<keepMs>] [<strength 1–39>]` | set an abnormal state on self | 0x2429, 0x2427, 0x1C18 (Z03 §6.3) | §4.4 |
+| 58 | `&resetabstate` | ac_resetabstate `0041c620` | 100 | — | clear every abnormal state of self | 0x2428 per state (Z03 §6.4) | §4.4 |
+| 59 | `&setabstatetarget` | ac_SetAbstateTarget `0041c6e0` | 100 | `<AbState> [<keepMs>] [<strength 1–39>]` | set an abnormal state on the target | as &setabstate, keep time of the row (B5) | §4.4 |
 | 60 | `&resetabstatetarget` | ac_ReSetAbstateTarget `00423ba0` | 100 | (part 6) | | | |
 | 61 | `&kqreward` | ac_KQReward `00423cc0` | 100 | (part 6) | | | |
 | 62 | `&killallmob` | ac_killallmob `0041d3c0` | 50 | (part 3) | | | |
@@ -239,7 +239,7 @@ Order = registration order in FUN_00425b70 (= `ampcmd` list order). "Level": bui
 | 68 | `&endofkq` | ac_EndOfKingdomQuest `0041dbd0` | 100 | (part 3) | | | |
 | 69 | `&guildtournament` | ac_GuildTournament `0041da30` | 100 | (part 3) | | | |
 | 70 | `&zonelink` | ac_ZoneLinkTest `0041d950` | 100 | (part 3) | | | |
-| 71 | `&block` | ac_BlockMatrix `0041ccb0` | 100 | (part 2) | | | |
+| 71 | `&block` | ac_BlockMatrix `0041ccb0` | 100 | — | nothing (calls an empty body) | — | §4.5 |
 | 72 | `&emptymap` | ac_EmptyMap `0041d850` | 100 | (part 3) | | | |
 | 73 | `&serversocketcut` | ac_ServerSocketCut `0041d760` | 100 | (part 3) | | | |
 | 74 | `&staticdamage` | ac_staticdamage `0041dfd0` | 50 | (part 3) | | | |
@@ -536,6 +536,277 @@ ShinePlayer::so_ply_ViewSlot_UnEquip(p, slot)                          @ FUN_005
 `&gldcollectset` (100) have empty bodies (FUN_0041ae10, FUN_0041ae60: only the profiler entry). Development leftovers
 *(inferred)*. The FiestaHeroes list *(fh-doc)* carries them without description.
 
+## 4. Commands, part 2 (handlers FUN_0041b1f0 … FUN_0041cec0)
+
+### 4.1 Gates and doors: `&oxblock`, `&templink`
+
+```pseudo
+&oxblock O… | C…   ac_OXBlock                                       @ FUN_0041b1f0
+    action = args[0][0] == 'O' ? 1 (open) : args[0][0] == 'C' ? 0 (close) : else wall "&oxblock Open or &oxblock Close"; return
+        # only the first letter counts, upper case only ("open" is refused)
+    so_AllInMap(gm, AxialListDoorAction{ alda_BlockIndex = "OXBlock", alda_DoorAction = action }, includeSelf 0)
+AxialListDoorAction::ali_Work(it, gm, o) → continue                  @ FUN_0041b130
+    return o.vt[0x318](blockIndex, action) == 0
+        # doors: ShineDoor::so_door_DoorAction FUN_00550770 (Z09 §13.1) switches the map's .shbd block "OXBlock",
+        #   stores the name in the door's brief info and sends 0x6C09 NC_SCENARIO_DOORSTATE_CMD to the map; returns 1
+        # every other object: folded "return 0" (FUN_004021b0) → keep walking
+    # the walk stops at the first door of the map, whatever block it was built for: on a map with several doors only
+    # that one gets the state broadcast and the block name "OXBlock" *(inferred: the OX-quiz map has one door)*;
+    # no door on the map: nothing, no message
+```
+
+`&templink` turns the targeted gate NPC (role `Gate`, `NPCRole_Portal`, Z02 §6.5) into a temporary link to any point.
+
+```pseudo
+&templink <LinkNumber> <MapNameServer> <MapNameClient> <X> <Y> [<LevelFrom> <LevelTo> [<PartyLinkable>]]
+    ac_TempLink                                                      @ FUN_0041b2f0
+    t = gm.so_CurrentTargetObject() (vt 0x75c); none: wall "Target needed"; return
+    argnum < 6 (fewer than 5 arguments): the four lines of ac_TempLinkUsage (§1.6); return
+        # the example line reads "ex    : &mobbreed  10 Rou Rou 7828 4325 1 150 0": copy-paste text (original bug) Z11-B10
+    n = ac_Scanf(args[0])
+    tmpl = LinkInformTemplete (0x61 bytes) {                         # NPCManager::LinkInformTemplete (pdb2016)
+        index[20]      = never written: stack bytes                  # (original bug) Z11-B9
+        linktoserver[33] = args[1] (strncpy 33), linktoclient[33] = args[2],
+        coordx = ac_Scanf(args[3]), coordy = ac_Scanf(args[4]), direct = 0,
+        Party = argnum > 8 ? (u8) ac_Scanf(args[7]) : 0 }
+    (from, to) = argnum > 7 ? ((u16) ac_Scanf(args[5]), (u16) ac_Scanf(args[6])) : (1, shineparam.levellimit)
+        # with exactly 6 arguments LevelFrom alone is ignored
+    if to < from: ac_TempLinkUsage; return
+    npc = NPCManager::nm_FindNPCFunc(npcmanager, t.handle)          # FUN_00418f10; also matches only NPC handles
+    npc missing or npc.func (role) missing: wall "Target is not NPC"; return
+    npc.func.vt[0x30](gm, n, &tmpl, from, to)
+        # NPCRole_Portal::nrb_LinkBrench FUN_004c7ab0 (all four portal roles):
+        #     nrb_BrenchNumber = n; nrb_BrenchSpot = tmpl; nrb_levelFrom = from; nrb_levelTo = to
+        # every other role: NPCRoleBase::nrb_LinkBrench FUN_004c7a00 → gm notice "Not gate"
+```
+
+Effect on the gate (`NPCRole_Portal::nrb_Role` FUN_004c2ef0, the branch Z02 §6.5 does not show), state in the role
+object (`+0x18 nrb_BrenchNumber`, `+0x1c nrb_BrenchSpot`, `+0x7e/+0x80 levels`), not saved, lost at restart:
+
+```pseudo
+NPCRole_Portal.nrb_Role(p, …):                                      @ FUN_004c2ef0
+    nrb_BrenchNumber < 0: the gate does nothing at all (closed)           # "&templink -1 …"
+    nrb_BrenchNumber == 0: normal LinkTable behaviour (Z02 §6.5)          # initial state *(inferred)*
+    nrb_BrenchNumber > 0: destination = nrb_BrenchSpot, no field-entry check (ENTER_MAP_ERR_NONE);
+        yes/no server menu as for one destination; the menu argument has sml_isTemplink = 1 and the temp levels,
+        so smfm_Link checks the player's level against [from, to] instead of the field's condition
+ServerMenuFuncter.smfm_Link → role.vt[0x34](row) = NPCRole_Portal::nrb_LinkBrenchCheck(row) → allowed  @ FUN_004c7b90
+    nrb_BrenchNumber < 0: false (no link)
+    row == nrb_BrenchSpot (all 0x61 bytes): nrb_BrenchNumber < 1 → false; else nrb_BrenchNumber −= 1, true
+    other rows: true
+    (other roles: NPCRoleBase::nrb_LinkBrenchCheck FUN_004c7b40 → false)
+```
+
+So `LinkNumber` is the number of uses; when it reaches 0 the gate is back to its LinkTable. The usage note "Permanantly
+change if linknumber is large then 10000" has no code behind it: a large number is just many uses. `-1` closes the gate
+until the next `&templink`. *(fh-doc)* agrees ("for amount teleports or until &templink is called again with amount -1").
+
+### 4.2 Mobs: `&mobbreed`, `&mb`
+
+```pseudo
+&mobbreed <MobIndex> <MobNumber> <RegenSec> <Family Y|n> <RegenNumber> [<RegenRegionIndex> [<ItemDropMobIndex> [<MobLevel>]]]
+    ac_MobBreed                                                       @ FUN_0041b510
+    argnum < 6: usage lines (as ac_MobBreedUsage); return
+    mobId = mobdatabox.mdb_btree[args[0]] (MobInfo InxName); missing: wall "Invalid mob index" + usage; return
+    num = ac_Scanf(args[1]); not 1…64: wall "MobNumber wrong" + usage; return
+    regenSec = ac_Scanf(args[2]); family = args[3][0] ∈ {'Y','y'}
+    count = min(ac_Scanf(args[4]), 250)             # unsigned compare: a negative number also becomes 250
+    region = argnum > 6 ? args[5] : "-"
+    dropMob = argnum < 8 or args[6][0] == '-' ? 0xFFFF : mdb_2MobID(args[6]); 0xFFFF there: wall "DropMobIndex wrong" + usage; return
+    level = argnum > 8 ? ac_Scanf(args[7]) : −1
+    MobHatchery::mh_MobBreed(mobhatchery, gm.so_Field map, gm position, 0, mobId, null, num, regenSec, family, count,
+                             key "Def", bandit null, region, dropMob, level, gm.so_GetLayerRegNum())    @ FUN_004b6960
+        # Z09 §10.6: num breeders around a radius-50 circle at the GM's position, each regenerates its mob `count`
+        # times every regenSec s; family → mobs die together; region and dropMob are passed but unused (Z09 §10.6)
+    wall "Mob : %d" (mobId)
+
+&mb <MobIndex>   ac_MobBreed_simple                                   @ FUN_0041b790
+    mobId as above (missing: "Invalid mob index" + usage)
+    mh_MobBreed(…, mobId, num 1, regen 0, family 0, count 1, key "Def", null, "-", 0xFFFF, −1, layer)  # one mob, once
+    wall "Mob : %d"
+```
+
+The mobs are normal world mobs (sight, AI, drops, Z09); the group is freed when its breeders are spent.
+
+### 4.3 Items: `&makeitem`, `&cleariv`
+
+```pseudo
+&makeitem <ItemInxName> [-<opt> …]   ac_MakeItem                        @ FUN_0041b8a0
+    id = itemdatabox.idb_btree[args[0]] (0xFFFF when missing)
+    info.key = ItemTotalInformation::iti_mkregnum(id, 0, zoneNo, worldNo)  # FUN_00640710; key kind 0 = GM make *(inferred)*
+    info.itemid = id
+    id ≥ idb_maxItemhandle or no ItemInfo row: return, no message       # unknown names fail silently
+    row.ID ≠ id: assert "ItemDataBox::operator [] :Invalid Item index"; return
+    (ItemInfo null → wall "Invalid item": dead, already excluded)       # (original bug) Z11-B12
+    cls = itmattcontainer[id]                                           # ItemAttributeClass per item class (Z04)
+    cls.iac_itemcreate(id, &info, "-o")                                 # vt 0x14: class defaults
+    cls.iac_itemcreate(id, &info, "-l<ItemInfo.MaxLot>")                # a full stack by default
+    for a in args[1] … args[11] while a[0] == '-': cls.iac_itemcreate(id, &info, a)      # GM options, in order
+    if ItemInfoServer.RandomOptionDropGroup names a RandomOption table and cls.vt[0x70](&item) (option storage) ≠ null:
+        ItemRandomOption::RandomOptionTable::rot_FillOption(storage, table)   # FUN_00493590: random options as for a drop
+        # rot_FillOption starts with optionnumber = 1 (identified, no options): "-p" options of the GM are discarded
+        # for every item with a RandomOptionDropGroup (original bug) Z11-B13
+    if ItemInfo.Class == ITEMCLASS_AMULET and (u = cls.vt[0x30] iac_Getupgrade(&info)) > 0:
+        for i in 1 … u: stop when not AccUpGradeDataBox::augdb_RandomOptionUpgrade(&gAccUpGradeDataBox, &item, &e, 1, i)
+            # one accessory-upgrade option step per upgrade level (below)
+    ShinePlayer::sp_MakeItem(gm, handle, &info)                         # FUN_00528690 (Z09 §24.2): first free unlocked
+        # inventory cell → sp_CreateItemByAdmin → Character DB 0x3401 NC_ITEMDB_ADMINCREATE_REQ (Z05 §9.1); the ACK puts the
+        # item in the cell and the client gets the cell change. Inventory full: nothing, no message.
+```
+
+Options (`ItemAttributeClass::iac_itemcreate`, vt 0x14 of the item's attribute class; the letter is `opt[1]`, either
+case, the number is `sscanf(opt + 2, "%d")`). The same parser serves the scene `itemcreate` / `costumecreate` nodes
+(Z09 §24.2):
+
+| Attribute class (FUN_) | `-o` (defaults) | Other options |
+|---|---|---|
+| base `ItemAttributeClass` 00640690 | key −1, item struct zeroed, itemid 0xFFFF | — (no 2016 class uses the base body) |
+| Weapon 0063ee40 | no upgrade/strengthen, 3 mob-kill counters 0xFFFF, no title (`CharacterTitleMobID` 0xFFFF), option count 0 + identified, gem sockets empty, `maxSocketCount` 0 | `-u<n>` upgrade, `-s<n>` strengthen, `-e<n>` maxSocketCount (n > 1 → 2), `-p…` option |
+| Armor, Boot 0063f010; Shield 0063ef70 | no upgrade, identified, no delete time | `-u<n>`, `-s<n>`, `-p…` |
+| Amulet 0063eda0; Bracelet 0063f4a0 | upgrade 0, options cleared (vt 0x84 iac_ClearItemOptionUpgrade), identified | `-u<n>` upgrade, `-p…`; every call also sets "not bound" |
+| ByteLot (9 classes) 0063f330, WordLot / ActiveSkill / QuestLot 0063f430, DwrdLot 0063ed60 | — | `-l<n>` lot (byte / word / dword) |
+| BindItem 0063f120 | = `-n1` | `-n<n>` n portal slots `{ map 0xFFFF, x 10000, y 10000 }` *(inferred from the constants)* |
+| KQStep 0063f1e0 | step 0 | `-s<n>` step |
+| ItemChest 0063f1a0 | low 4 bits of the first attribute byte cleared (content count *(inferred)*) | — |
+| Riding 0063f230, CostumWeapon/CostumShield 0063f300, Amount 0063f280, Furniture 0063f0b0, Pet 0063f470, Capsule 0063f370, Decoration 0063f100, MiniHouseSkin/ActionItem 0063f1c0, CardCollect 0063f3b0, CardCollect_Close 0063f390 | every call (whatever the option) re-applies the defaults: riding hunger/HP from the riding table, costume charge, Amount = MaxLot, furniture position (276, 389, 6) and no end time, pet not summoned, card serial (CardCollect: random `(a·100 + 101 + b)·10000 + rand 1000`), … | — |
+| GBCoin, KingdomQuestItem, SkillScroll, WeaponTitlaLicence | no-op FUN_004c2450 | — |
+
+```pseudo
+ItemAttributeClass::iac_Setoption(storage, opt)                         @ FUN_0063ece0   ("-p…")
+    opt[2] ∈ {'I','i'}: optionnumber bit 0 = 1 (identified); return
+    n = optionnumber >> 1; if n < 8 and sscanf(opt + 2, "%d/%d") == 2:
+        optionlist[n] = { itemoption_type = first, itemoption_value = second }; optionnumber += 2   # up to 8 options
+AccUpGradeDataBox::augdb_RandomOptionUpgrade(box, item, &e, step, level) → bool    @ FUN_005c5c60
+    item must be an amulet with an ItemInfoServer row; level 0: cls.vt[0x84] clear the upgrade options, true
+    table = RandomOption[RandomOptionDropGroup]; factors = AccUpGradeInfo map for ItemInfo.BasicUpInx (missing: false)
+    step ≥ 0: candidates = upgrade options already present that have a factor; then the random options
+        (value ≠ 0) not yet in the list; if fewer than table.MaxOpCount: candidates = every option type of the factor map
+    step < 0: candidates = the random options present (value ≠ 0)
+    none: false; shuffle (10 passes), take one type t (t < 15 else false)
+    value = cls.vt[0x7c](item, t) + augdb_GetOptionUpGradeValue(BasicUpInx, t, step > 0, level) · step
+    clamp to [0, augdb_GetOptionUpGradeLimit(BasicUpInx, t, step > 0, level)]; cls.vt[0x80](item, t, value) (store); true
+```
+
+Other callers (one step at a time; Z04 owns them): `sp_NC_ITEM_UPGRADE_REQ` FUN_0053d220 (Z04 §9.1, "stat info =
+FUN_005c5c60(…, +1, lv)"), `sp_NC_ITEM_NEW_UPGRADE_REQ` FUN_0053e360, `sp_NC_ITEM_BRACELET_UPGRADE_REQ` FUN_0053ec40,
+`Item_ForcedUpgrade` FUN_0053c510, `sp_NC_ITEM_MIX_ITEM_REQ` FUN_00521540. `&makeitem` replays one step per level 1…u, so
+a GM-made `+u` amulet carries the same kind of option growth as an upgraded one *(inferred)*.
+
+```pseudo
+&cleariv   ac_ClearInventory   (level 1: any admin)                    @ FUN_0041bbd0
+    it = UnlockedInventoryIterator(inventory type 9, gm.sp_Item.itembag.ci_Inventory, lock list vt 0x7d4)
+        # only cells not reserved by another request (trade, pending DB answer …)
+    no such item: return
+    gpp = 0x3459 NC_ITEMDB_DESTROY_REQ {                                # to the Character DB (sock2gameDB)
+        u16 handle = gm.handle, u32 charNo (vt 0x344), u16 lockindex = current lock index of the lock list,
+        u8 flags = number of keys (bits 0–6), bit 7 = 0 (no item rewrite; itemId/key/attrOffset bytes stale, unread)
+        u64 keys[] at payload 0x17 }
+    for every unlocked cell c with an item whose ItemInfo row exists (else assert, skipped):
+        keys[count & 0x7F] = c.key; count = (count & 0x80) | ((count + 1) & 0x7F)
+        lock list vt 0x30 icl_ClearItem(c, 0x2400 | slot)                # reserve "clear this cell" under the lock index
+    if count & 0x7F: send (0x19 + 8·count bytes), icl_IncIndex
+        # Character DB deletes the keys and answers 0x345A (D03 §7.5); the zone applies the reservations (Z05 §6.4):
+        # cells emptied, client gets the 0x3001 cell changes, quest item-count hooks run
+    # more than 127 items (the inventory has 192 cells): the 7-bit count wraps (original bug) Z11-B8
+```
+
+### 4.4 Character state: `&fullpoint`, `&sethp`, `&setsp`, `&learnskill`, abstates
+
+```pseudo
+&fullpoint   ac_fullpoint                                             @ FUN_0041be90
+    CurHP = gm.so_MaxHP() (vt 0x4f0); CurSP = gm.so_MaxSP() (vt 0x4f4)
+&sethp <n>   ac_Sethp                                                 @ FUN_0041c9d0
+    ShinePlayer::sp_HPChangeCheck(gm, n, 0, "AmpersandCommand::ac_Sethp")   # FUN_0055e130: calls vt 0x4e8 and 0x484,
+                                                                            # discards both: no effect
+    CurHP = clamp(ac_Scanf(args[0]), 1, so_MaxHP())        # 0 / missing / non-numeric → 1
+&setsp <n>   ac_Setsp                                                 @ FUN_0041cad0
+    CurSP = clamp(ac_Scanf(args[0]), 1, so_MaxSP())
+# none of the three sends a packet: the GM's client keeps the old bars until the next HP/SP update (regeneration,
+# damage, a stat packet) *(inferred)*; the values are saved with the character (Z07 CurHP +0x7f67)
+```
+
+```pseudo
+&learnskill <skillId>   ac_learnskill                                @ FUN_0041c290
+    send Character DB 0x4801 NC_SKILL_SKILLTEACH_REQ (0x11 bytes) {
+        u16 handle, u32 charNo, u32 chrregnum = charNo, u16 skillid = (u16) ac_Scanf(args[0]), u8 ispassive = 0, u16 removeid = 0xFFFF }
+    (too long: assert "AmpersandCommand::ac_learnskill : Packet Too Long", never)
+    # no check here: not the skill table, class, level, or whether it is known. The DB (D04 §2, 0x4801) refuses a known
+    # skill (0x4803 → client 0x4805 "Failed to learn the skill."); success 0x4802 → the zone adds the skill and sends
+    # 0x4804 NC_SKILL_SKILL_LEARNSUC_CMD (Z03 §9.3). Any number is stored, also ids without an ActiveSkill row *(inferred)*
+```
+
+```pseudo
+&setabstate <AbStateInxName> [<keepMs>] [<strength>]   ac_Setabstate   @ FUN_0041c410
+    idx = dic_abstate.as_BTreeID[args[0]]; > as_maxhandle: assert "…as_FromID : Invalid skill id"; no row: nothing
+    keep = args[1] non-empty ? ac_Scanf(args[1]) : 0;  strength = args[2] non-empty ? ac_Scanf(args[2]) : 1, outside 1…39 → 1
+    sub = entry.subabstate[strength] (missing: nothing); keep == 0 → keep = sub.KeepTime
+    if gm.so_AbnormalState_Set(setter gm, entry.AbStataIndex, strength, entry, now, 0, 0xFFFFFFFF, keep, 0, 0) (vt 0x638, Z03 §6.2):
+        so_AbnormalState_BitSet(gm, idx); s = g_NewAbstateStrength (outside 1…39 → 1)
+        if entry.subabstate[s]: gm.so_AbnormalState_Inform(idx, keep, 1) (vt 0x3f0 → 0x2429);
+                                so_AbnormalState_BroadcastSet(gm, idx, keep, s) (0x2427 / 0x1C18, Z03 §6.3)
+&setabstatetarget <AbStateInxName> [<keepMs>] [<strength>]   ac_SetAbstateTarget   @ FUN_0041c6e0
+    t = gm.so_CurrentTargetObject(); none: nothing; entry = AbState::as_FromName(args[0]); none: nothing
+    same parsing; t.so_AbnormalState_Set(setter gm, …, keep, …)           # player or mob
+    on success: bit set; t.Inform(idx, sub'.KeepTime, 1) (players only send); BroadcastSet(t, idx, sub'.KeepTime, s)
+        # sub' = row of the resulting strength: a given keepMs is used for the state but not for the packets
+        # (original bug) Z11-B5
+&resetabstate   ac_resetabstate                                       @ FUN_0041c620
+    for idx in 0 … 0x317: gm.so_AbnormalState_Reset(idx) (vt 0x650, Z03 §6.4)   # every state of the GM (and its mover)
+```
+
+### 4.5 Players and information
+
+```pseudo
+&summonplayer <charName>   ac_summonplayer                             @ FUN_0041bf50
+    in a mini-house (vt 0x130): wall "fail to 'summonplayer' : not allowed to do 'summonplayer' in the MH"; return
+    t = som_FindPlayer(Name5 = args[0] (20)); this zone only; not found: nothing, no message
+    t in a mini-house: the same "fail to 'summonplayer' …" line
+    t.so_LinkTo({ server map = client map = gm's map name (12), x, y = gm position }, 6, 9, 10)   (vt 0x600, Z01 §7.1)
+    # the zone-wide version through the zone ring is &psummon (part 3)
+
+&kickout, &추방 <charName>   ac_KickOutPlayer                          @ FUN_0041cec0
+    gpp payload = PROTO_NC_CHAR_KICKPLAYEROUT_RNG { ZONERINGLINKAGESTART start (7), u8 tmp (not written), Name5 charid (20) }
+    ZoneRingPacketKickPlayerOut::zrpb_Request(gm, gpp)                 @ FUN_005a76f0
+        t = som_FindPlayer(charid)
+        t present and on a map:
+            t.so_Disconnect(0x68B, 0, 0) (vt 0x5f8)                    # Z01 §8.3: "kicked by a GM"
+            vt 1 zrpb_Success(gm, …) @ FUN_005a7e10: gm notice "%s is banned"
+        else → zone ring (zcs_Send, 0x1E bytes): opcode 0x1068 NC_CHAR_PLAYERSEARCH_RNG with
+            start = { machine = own zone no, handle = gm handle, regnum = gm charNo }
+            # (original bug) Z11-B6: 0x1068 is the player *search*; with the kick layout the other zones read the name
+            # one byte early ([tmp, charid[0…18]]), find nobody, and the packet returns to this zone, where
+            # ZoneRingPacketFindPlayer::zrpb_Failure prints "%s is not in game" for that shifted name.
+            # A player in another zone is never kicked.
+```
+
+The intended path is still in the ring handlers (Z01 §10): `zls_NC_CHAR_KICKPLAYEROUT_RNG` FUN_0045bc30 (0x106B: found
+here → `so_Disconnect(0x68B)`, answer 0x106C `PROTO_NC_CHAR_PLAYERBANNED_RNG { start, Name5 charid }` (0x1D bytes); not
+found → forward; back at the origin → `zrpb_Failure` FUN_005a8290 "%s is not in game") and `zls_NC_CHAR_PLAYERBANNED_RNG`
+FUN_0045bdf0 (forward; at the origin → `zrpb_Failure` too, reading the name at the 0x106B offset: the GM would see the
+kicked player's name minus its first letter "… is not in game" (original bug) Z11-B7). Nothing in 2016 sends 0x106B, so
+both are dead.
+
+```pseudo
+&dist   ac_Dist                                                       @ FUN_0041cbc0
+    t = current target; none: nothing; wall "Distance : %d Grid" (isqrt of so_DistanceSquar(gm, t))
+&coord   ac_CurrentLoc                                                @ FUN_0041cd60
+    o = current target, else gm; gm without a map: nothing
+    wall "Location[%d] : %s/%d/%d/%d"  (o.handle, gm's map name, o.x, o.y, o direction byte)
+        # the map is always the GM's (the target is in sight, so the same map)
+&performance [n]   ac_performance                                     @ FUN_0041c8d0
+    wall "Main performance : %g loop/sec"  (PerformanceChecker::pc_loopPERsecond(&performancechech): main-loop rate)
+    n = args[0] ? ac_Scanf(args[0]) : 10; never used (original bug) Z11-B11
+&block   ac_BlockMatrix                                               @ FUN_0041ccb0
+    calls FUN_00549070 (a bare `ret 4`, the folded empty body) with the map's block info (+0x14) and args: nothing
+    # the block-matrix dump of the development build is compiled out *(inferred)*
+```
+
+### 4.6 Empty quest and cool-time words
+
+`&questrecieve` FUN_0041c140, `&questgiveup` FUN_0041c190 and `&skillcooltime` FUN_0041c3c0 are empty (profiler only).
+`&questcomplete` FUN_0041c1e0 parses `ac_Scanf(args[0])` and drops it. The working quest debug words are `&queststart` /
+`&questread` (§3.4).
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -544,11 +815,26 @@ ShinePlayer::so_ply_ViewSlot_UnEquip(p, slot)                          @ FUN_005
 | Z11-B2 | `ListIter_AmpCmdArgument` FUN_00427550 | `strncpy(arg, word, 32)` into 33-byte slots; byte 32 never written | a word of 32+ characters has no terminator: handlers read stack garbage and the next argument | copy 32 and terminate |
 | Z11-B3 | `&movelayer` FUN_00419930 | checks only `< 2` on signed `atoi` values | negative layer type / number type reach `so_ply_MoveNewLayer` | `0 ≤ v < 2` |
 | Z11-B4 | `&z` FUN_0041aeb0 | loops `argnum` times (word included) over `args` | every notice ends with a space; with 12 arguments the 13th read is `liaca_argnum` (one control byte) | loop over `argnum − 1` |
+| Z11-B5 | `&setabstatetarget` FUN_0041c6e0 | sets the state with the GM's keep time but sends 0x2429 / 0x1C18 with the strength row's `KeepTime` | with a keepMs argument the target's and the viewers' timers show the wrong duration (`&setabstate` sends the given time) | send `keep` as `ac_Setabstate` does |
+| Z11-B6 | `&kickout` `ZoneRingPacketKickPlayerOut::zrpb_Request` FUN_005a76f0 | a player not in this zone is looked for with opcode 0x1068 NC_CHAR_PLAYERSEARCH_RNG in the 0x106B kick layout | other zones read the name one byte early, nobody is found, the GM gets "<garbled name> is not in game"; GMs can only kick players of their own zone | write 0x106B NC_CHAR_KICKPLAYEROUT_RNG |
+| Z11-B7 | 0x106C `zls_NC_CHAR_PLAYERBANNED_RNG` FUN_0045bdf0 | at the origin calls `zrpb_Failure`, which reads the name at the 0x106B offset (+8) | a successful remote kick would be reported as "<name without first letter> is not in game" (dead in 2016: 0x106B is never sent, B6) | call `zrpb_Success` ("%s is banned") |
+| Z11-B8 | `&cleariv` FUN_0041bbd0 | key count kept in 7 bits while the loop reserves every unlocked cell (inventory: 192 cells) | 128 items: no packet, all cells stay reserved; more: the DB deletes only the last n−128 keys, the ACK still empties all n cells in memory; the rest returns at the next login | split into several 0x3459 of ≤ 127 keys |
+| Z11-B9 | `&templink` FUN_0041b2f0 | `LinkInformTemplete.index[20]` of the temp link is never written | 20 stack bytes in the gate's `nrb_BrenchSpot` (compared byte-wise by `nrb_LinkBrenchCheck`, so still consistent) | zero the template |
+| Z11-B10 | `ac_TempLinkUsage` FUN_0041a210 / `&templink` | the example line starts with "&mobbreed" | misleading help text | "&templink" |
+| Z11-B11 | `&performance` FUN_0041c8d0 | parses an optional number (default 10) and never uses it | none (dead code) | a sample period that was removed *(inferred)* |
+| Z11-B12 | `&makeitem` FUN_0041b8a0 | "Invalid item" only after the row was already found; an unknown name or a full inventory returns without a message | the GM gets no feedback for a typo or a full bag | notice for every failure |
+| Z11-B13 | `&makeitem` FUN_0041b8a0 | rolls random options (`rot_FillOption` FUN_00493590 resets the option count) after the GM's `-p` options | `-p<type>/<value>` works only on items without a RandomOptionDropGroup | skip the roll when the GM gave options |
 
 ## Not reconstructed / uncertain
 
 - The `tokenize` helper is identified by its argument list only (§1.2); quoting and escaping follow that reading.
 - `AmpersandCommandLog` file name: the third `%02d` is assumed to be the hour.
 - Who sets `tCharacter.nAdminLevel` in production (operator tool, direct SQL) is outside the binaries.
+- §4.1 `&oxblock`: which door of the OX-quiz map is first in the `so_AllInMap` walk was not checked against the map
+  scripts; with one door per map the result is the same.
+- §4.3: the attribute fields hit by the `-o` defaults are read through unions in the decompilation; the BindItem portal
+  layout `{u16 map, u32 x, u32 y}` and the ItemChest count bits are *(inferred)* from the constants. The meaning of key
+  kind 0 in `iti_mkregnum` (GM make) is inferred from the other callers (2 scene, 3 mob drop, 6 chest, 7 costume).
+- §4.4: how the GM's client learns the HP/SP set by `&fullpoint` / `&sethp` / `&setsp` (no packet is sent) was not traced.
 
 (Parts 2–6 add their commands as §4–§8; the sweep part adds the coverage boundary.)
