@@ -145,7 +145,7 @@
       19,
       "u16",
       "attr",
-      "0 when deleting, else the constant 0x15 (offset of the attribute block after the opcode, inferred)"
+      "0 when deleting, else 0x15 = (attribute start − buffer) − 2, the payload offset of the attribute block"
      ],
      [
       21,
@@ -154,12 +154,12 @@
       "only when isdelete = 0: the item's attribute block with lot − 1 (item class vt 4)"
      ]
     ],
-    "notes": "0x17 bytes when deleting, else 0x17 + attribute block; to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4."
+    "notes": "payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block at payload offset attr = 0x15 (computed in the code); to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4."
    },
    "0x9006": {
     "dir": "Z→DB",
     "name": "NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ",
-    "basis": "zone UseEffect::UseItemStatClear::uib_DirectUse FUN_00599990 (ui_StatClearEmpow.uisc_DBReqCommand = 6) → ShinePlayer::sp_StatEmpowInitialize FUN_005183f0; PROTO_NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ (pdb2017, header = 6-byte ref)",
+    "basis": "zone UseEffect::UseItemStatClear::uib_DirectUse FUN_00599990 (ui_StatClearEmpow.uisc_DBReqCommand = 6) → ShinePlayer::sp_StatEmpowInitialize FUN_005183f0; PROTO_NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ (pdb2016 size 0x15, pdb2017; header = 6-byte ref)",
     "fields": [
      [
       0,
@@ -201,7 +201,7 @@
       19,
       "u16",
       "attr",
-      "0 when deleting, else the constant 0x15 (offset of the attribute block after the opcode, inferred)"
+      "0 when deleting, else 0x15 = (attribute start − buffer) − 2, the payload offset of the attribute block"
      ],
      [
       21,
@@ -210,7 +210,7 @@
       "only when isdelete = 0: the item's attribute block with lot − 1 (item class vt 4)"
      ]
     ],
-    "notes": "0x17 bytes when deleting, else 0x17 + attribute block; to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4."
+    "notes": "payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block at payload offset attr = 0x15 (computed in the code); to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4."
    }
   }
  }

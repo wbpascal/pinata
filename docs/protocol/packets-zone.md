@@ -13323,14 +13323,14 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 8 | u64 | restatitemkey | the reset item's registration key |
 | 16 | u16 | restatitemid | the reset item's ItemInfo ID |
 | 18 | u8 | isdelete | 1 when the item has 1 left (delete), else 0 |
-| 19 | u16 | attr | 0 when deleting, else 0x15 = offset of the attribute block after the opcode |
+| 19 | u16 | attr | 0 when deleting, else 0x15 = (attribute start − buffer) − 2, the payload offset of the attribute block |
 | 21 | bytes | attribute | only when isdelete = 0: the item's attribute block with lot − 1 (item class vt 4) |
 
-0x17 bytes when deleting, else 0x17 + attribute block; to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4.
+payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block at payload offset attr = 0x15 (computed in the code); to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4.
 
 ### `0x9006` NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ (Z→DB)
 
-**Verified layout** (basis: zone UseEffect::UseItemStatClear::uib_DirectUse FUN_00599990 (ui_StatClearEmpow.uisc_DBReqCommand = 6) → ShinePlayer::sp_StatEmpowInitialize FUN_005183f0; PROTO_NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ (pdb2017, header = 6-byte ref))
+**Verified layout** (basis: zone UseEffect::UseItemStatClear::uib_DirectUse FUN_00599990 (ui_StatClearEmpow.uisc_DBReqCommand = 6) → ShinePlayer::sp_StatEmpowInitialize FUN_005183f0; PROTO_NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ (pdb2016 size 0x15, pdb2017; header = 6-byte ref))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -13340,10 +13340,10 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 8 | u64 | restatitemkey | the reset item's registration key |
 | 16 | u16 | restatitemid | the reset item's ItemInfo ID |
 | 18 | u8 | isdelete | 1 when the item has 1 left (delete), else 0 |
-| 19 | u16 | attr | 0 when deleting, else 0x15 = offset of the attribute block after the opcode |
+| 19 | u16 | attr | 0 when deleting, else 0x15 = (attribute start − buffer) − 2, the payload offset of the attribute block |
 | 21 | bytes | attribute | only when isdelete = 0: the item's attribute block with lot − 1 (item class vt 4) |
 
-0x17 bytes when deleting, else 0x17 + attribute block; to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4.
+payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block at payload offset attr = 0x15 (computed in the code); to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4.
 
 ### `0xac23` NC_DICE_TAISAI_DB_DICE_ROLL_RESULT_REQ (Z→DB)
 

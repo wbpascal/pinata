@@ -68,7 +68,8 @@ fills it from `MoverUseSkill.shn` on every summon (§9.1); that table is empty i
 | Slot | ShinePlayer | Other classes (ShineMover, ShineMob) |
 |---|---|---|
 | 0x374 | `so_ply_NewSkillCoolTime` FUN_00569260 (sends 0x4821) | no-op |
-| 0x3d8 | `so_ply_SilverWingCoolTime` FUN_005596b0 = `cec_SilverWingCoolTime_Minute · 60000` (ms) | – |
+| 0x3d8 | `so_ply_SilverWingCoolTime` FUN_005596b0 = `cec_SilverWingCoolTime_Minute · 60000` (ms); callers `so_Routine` FUN_0056a080 and `smo_ply_ItemUse` FUN_0053fd10 (§3.6) | – |
+| 0xed0 | `smo_ply_ItemUse` FUN_0053fd10 (item-use step of an item cast, Z04; §3.6 for its 0x4821) | – |
 | 0xbc4 / 0xbc8 / 0xbcc / 0xbd0 | `so_ply_ToggleSkill_IsOn` / `_On` / `_Off` / `_AllOff` (§2.3) | folded stubs (`IsOn` returns 0, the others do nothing) |
 | 0xbd4 | `so_ply_DmgCoolTimeDown` FUN_00579680 (§3.4) | no-op |
 | 0xea8 | `smo_ply_SkillCoolTimeUpdate` FUN_005596f0 → `csl_UpdateCoolTime` | mover: FUN_0055e9e0 → `msl_UpdateCoolTime`; mob: no-op |
@@ -240,7 +241,20 @@ FUN_00454b10 (called per state by `so_SaveAbstate` FUN_00454d80, Z07), which wri
 the caster and `StaBurnPainFoe` on the target, both `AbStateSaveType 0` (no flag set). So after a link to another zone
 server or a re-login the caster has neither the toggle (`csl_Store` loads it as off) nor its state: both sides agree.
 Per saved state `lid_Call` writes one 0x24-byte `ABSTATEREADBLOCK` (id, strength, rest count, elapsed ms
-`(g_Now − start)·1000/10`, rest time, set-item effect, caster level and attack power); the save path itself is Z07's.
+`(g_Now − start)·1000/10`, rest time, set-item effect, caster level and attack power).
+
+```pseudo
+ShinePlayer::so_SaveAbstate(p, PROTO_NC_CHARSAVE_ABSTATE_REQ* out, Name5* charid, bool logoff) → int   @ FUN_00454d80
+    out.abstatenum = 0
+    buf = g_AbstateNeverShelter.as_GetAbstateBuffer(charNo (vt 0x344))      # states kept aside for this character
+    if buf: AbstateBuffer::ab_SaveAbstate(buf, out, logoff)                  # FUN_00417b90: same test, IsSaveLogoff if
+                                                                             # logoff else IsSaveLink, and only states not yet
+                                                                             # ended (tick ≤ terminate); same 0x24-byte block
+    for each state in the list at p+0xe7c: AbnormalStateSaver::lid_Call      # FUN_00454b10; stops when 0x2c + 0x24·n > 8000
+    return out.abstatenum == 0 ? 0 : abstatenum·0x24 + 8                     # payload length for the 0x4007 save (Z01 §8.4)
+```
+
+The shelter buffer applies the same save-type test, so BurnPain states (type 0) are not saved through it either.
 
 ### 2.5 Switching by cast
 
@@ -267,6 +281,24 @@ The cast is the normal skill path (Z03 §5.2–5.4); toggle skills add three ste
 
 So the "on" cast applies the skill's abstates like any buff, and the "off" cast removes them from the caster. Because
 the target of BurnPain is the caster (`First` = ME), both happen on the same object.
+
+**The field-cast path has none of these steps.** `csl_Toggle_CanUseSkill` has two callers only (OBJ_CAST above and
+`csl_Toggle_CheckOnOff`, §2.4). `sp_NC_BAT_SKILLBASH_FLD_CAST_REQ` FUN_0057f400 (0x2441, Z03 §5.5) refuses a skill only
+when `SkillTargetState == TS_NONE` (BurnPain01–06 have 0 = TS_LIVE), and its blast `smo_SkillBash_Blast` (location)
+FUN_0057cb10 never reads `sdi_ToggleData` or calls vt 0xbc4 / 0xbc8 / 0xbcc:
+
+```pseudo
+# toggle skill s sent as 0x2441 FLD_CAST (any client can do so; the 2016 client sends toggle skills as OBJ_CAST):
+    no HP / weapon condition (csl_Toggle_CanUseSkill not called)
+    no on/off switch, no 0x245C / 0x245D
+    blast: sbec_Store as usual → so_SkillEnchant (step 3 above) tests the *current* flag:
+        flag on:  normal abstate roll → the states are applied again (refreshed)
+        flag off: RemoveSkillAbstates, no roll
+    so_Routine cooldown (§3.1): skipped while the flag is on, set (DlyTime + group) while it is off
+```
+
+(original bug) Z23-B20: while a toggle skill is on, a crafted field cast of it refreshes its abnormal states with no
+cooldown and no condition check *(inferred from the steps above, each read in the code)*.
 
 ## 3. Cooldowns and delay groups
 
@@ -320,9 +352,11 @@ CharaterSkillList::csl_SetCoolTime(list, skill, dly, group, groupDly, reduction)
         if csl_GetDelayGroup(list, x.cs_SkillId, &unused) == group:
             end = g_Now + (int)((groupDly − reduction)·10)/1000 − 3
             if x.cs_EndOfCooltime < end: x.cs_EndOfCooltime = end                             # only lengthens
-    # (original bug) Z23-B3: group 0 means "no group" for 1230 of the 2791 2016 skills but is matched like any group:
-    # casting a group-0 skill with DlyTimeGroup > 0 (MineMelee_W / EggMelee_W 5 s, MineRange_W / EggRange_W 15 s) puts
-    # every other learned group-0 skill on that cooldown. With DlyTimeGroup 0 the end is g_Now − 3, which never lengthens.
+    # (original bug) Z23-B3 (latent): group 0 means "no group" for 1230 of the 2791 2016 skills but is matched like any
+    # group: a group-0 skill with DlyTimeGroup > 0 would put every other learned group-0 skill on that cooldown. The only
+    # such rows (MineMelee_W / EggMelee_W 5 s, MineRange_W / EggRange_W 15 s) are mob weapons (`MobWeapon.shn`), and for
+    # mobs vt 0xeac is a no-op (§1.3), so no player skill triggers it in 2016. With DlyTimeGroup 0 the end is g_Now − 3,
+    # which never lengthens.
 
 CharaterSkillList::csl_GetDelayGroup(list, skillId, &groupDly) → int:  @ FUN_00448950
     s = SkillDataBox[skillId]
@@ -369,8 +403,19 @@ ShinePlayer::sp_ChineCastCut(p):                                        @ FUN_00
 The actor class `SubAbnormalStateActorIgnoreCoolTime` (index string "IgnoreCoolTime" from its `sasa_IndexString`
 FUN_00401710, the `ac_COOLTIMEREMOVE` member
 of the actor table) is the only one whose slot 0x20 returns 1 (FUN_00500380); all others return 0 (FUN_00615e70).
-Effect: while the caster has such a state, the next non-toggle skill blast sets no cooldown and consumes the state. The
-abnormal states that carry the `COOLTIMEREMOVE` sub-state are data (`SubAbState.shn`, Z03 §6).
+Effect: while the caster has such a state, the next non-toggle skill blast sets no cooldown and consumes the state.
+
+The states that carry it (`SubAbState.shn` rows with `Type` = 31, the actor index of `COOLTIMEREMOVE`; their
+`AbState.shn` row names the sub-state in `SubAbState`; skills from `ActiveSkill.shn` by state name):
+
+| SubAbState (ID, KeepTime) | AbState (ID) | Set by the skills |
+|---|---|---|
+| SubStaCrossCastingCoolTime (740, 25 s) | StaCrossCastingCoolTime (115, DispelIndex 1 = good, SaveType 1) | CrossCasting01 (1860), DynastyCombo01 (7110) |
+| SubStaNatureCastingCoolTime (1220, 25 s) | StaNatureCastingCoolTime (213, same) | NatureCasting01 (4300) |
+| SubStaChainCastingCoolTime (1660, 25 s) | StaChainCastingCoolTime (308, same) | ChainCasting01 (6340) |
+| SubStaBH_Helga_None (9331, 25 s) | StaBH_Helga_None (8975, SaveType 0) | BH_Helga_Skill_N_None (29354), a skill of the BH_Helga boss: for a mob the free cast changes nothing (vt 0xeac is a no-op, §1.3) |
+
+So one skill after CrossCasting / NatureCasting / ChainCasting / DynastyCombo (within 25 s) is free of its cooldown.
 
 `smo_ChineCastCut` is also called from the blast for `SS_WARPING` skills (Z03 §5.4, after `smo_WarpForward`), where it
 consumes the IgnoreCoolTime states without the cooldown check.
@@ -439,7 +484,8 @@ produce recipes. They pass group 0 / group delay 0 / no reduction, so the group 
 | Caller | Skill | Cooldown passed to vt 0xeac | Extra 0x4821 |
 |---|---|---|---|
 | `so_Routine` FUN_0056a080, produce cast (recipe set) | the recipe skill | `DlyTime` | – (only if a rate applied, §3.2); then `smo_ply_ItemProduce` (Z07) |
-| `so_Routine`, item cast, silver wing (`idb_specialid.sii_silverwing`) | cast skill | `so_ply_SilverWingCoolTime()` (ms) | `{ skill, sec = SilverWingCoolTime }` **in ms** (original bug) Z23-B5 |
+| `so_Routine`, item cast, silver wing (`idb_specialid.sii_silverwing`) | cast skill | `so_ply_SilverWingCoolTime()` (ms) | `{ skill, sec = SilverWingCoolTime }` **in ms** (original bug) Z23-B5; then `smo_ply_ItemUse` (next row) |
+| `ShinePlayer::smo_ply_ItemUse` FUN_0053fd10 (vt 0xed0, called by `so_Routine` right after the item-cast rows above; item use itself is Z04) | – (sets nothing) | – | when the item's `uib_UseItem` returns 0x700 and `smo_SkillCast.scs_Skill` == 0x7210 (UseSilverWings): `{ 0x7210, so_ply_SilverWingCoolTime() / 1000 }` in seconds. It overwrites the ms value of Z23-B5 in the client (`SetLastCoolTime` FUN_006a07a0 keeps the last one) |
 | `so_Routine`, other item casts | cast skill | `scs_UseItem.cooltime_millisec` | – |
 | `GameDBSession::gds_NC_ITEMDB_MAPLINK_ITEM_CONSUME_ACK` FUN_004698a0 (Z05 §8.5), err 0x3748 | `skillID` of the answer | `skillCoolTime` | `{ skillID, skillCoolTime / 1000 }` |
 | `ShinePlayer::sp_PetSystem_Summon` FUN_004d2640 (Z13) | `ui_Pet` summon skill | `gPetData.m_nSummonCoolTimeMil` | `{ skill, ms / 1000 }` |
@@ -563,9 +609,9 @@ ShinePlayer::sp_StatEmpowInitialize(p, dbcmd, errcmd, slot, item)               
         u64 restatitemkey   = it.key
         u16 restatitemid    = it.id
         u8  isdelete        = lot == 1
-        u16 attr            = isdelete ? 0 : 0x15          # a constant: offset of the attribute bytes after the opcode (inferred)
+        u16 attr            = isdelete ? 0 : 0x15          # (attribute start − buffer) − 2 = payload offset of the attribute block
         [attribute block of the item with lot − 1]          # only when not deleting (class vt 0x20 sets the lot, vt 4 writes it)
-    }                                                       # 0x17 bytes + attribute block
+    }                                                       # payload 0x15 (struct size, pdb2016) + attribute block; 0x17 with the opcode
     lot == 1: lock the cell for deletion (lock list vt 0x30, location 0x2400 | slot)
     else:     lock the cell for an update to the copy with lot − 1 (lock list vt 0x40)
     counter += 1
@@ -587,7 +633,8 @@ CharaterSkillList::csl_AddMastery(this, ShinePlayer* p, u16 skill, int gain)    
     send p: 0x481D NC_SKILL_SKILLEXP_CLIENT_CMD { u16 skill, u32 mastery = s.cs_Mastery }   # 8 bytes with opcode
 
 # only caller: ShinePlayer::smo_ply_ItemProduce FUN_0046c2d0 (vt 0xecc, Z07: produce cast finished), after
-# ip_ProduceCheck == 0xB01 and the GameDB 0x3457 produce request was sent:
+# ip_ProduceCheck == 0xB01 and the GameDB 0x3457 produce request was built: on both branches of pp_SetPacketLen, so the
+# gain is also applied when the request was too long and never sent (assert path):
     csl_AddMastery(p.sp_SkillList, p, recipeSkill,
                    (u16 sp_ChargedItem.ci_Effect.cec_ProductMasteryRate · recipe.index.MasteryGain) / 1000)
                    # ‰ rate of the charged-item effects (Z12); the gain is applied before the DB answers the produce
@@ -657,7 +704,7 @@ CharaterSkillList::csl_PreProduceCheck(this, ShinePlayer* p, u16 skill, ProductI
     return total < recipe.index.NeededMasteryGain ? 0x711 : 0x700            # 0x711 "You need more skill experience to learn the selected skill."
 ```
 
-`0x700` is success (no text); the other texts are from `client-error-codes.json`. `skill` is not used by
+`0x700` is success (no text); 0x702 (all the data-error returns) is "You cannot use this"; the other texts are from `client-error-codes.json`. `skill` is not used by
 `csl_PreProduceCheck`. The production base skills `sdb_SpecSkill.ss_*ProductMain` are Z20's (§1.3).
 
 ### 6.3 Learning and the default skills
@@ -668,7 +715,7 @@ CharaterSkillList::csl_PreProduceCheck(this, ShinePlayer* p, u16 skill, ProductI
 - `csl_CheckDefSkill` FUN_00447fb0 (called by `csl_Store` once the last DB chunk is in, Z12 §6.5): for each of
   `defskill.dsd_GetSkillMaxNum()` ids (`DefSkillData::dsd_GetSkillID` FUN_0045d380: `dsd_Array[i].skill` if
   `i < dsd_Max`, else 0; stops at the first 0 return) that no entry
-  has (linear search over `csl_SkillNumber` entries), push `{ id, cs_EndOfCooltime = g_Now, empower 0, mastery 0,
+  has (linear search over the first n entries, n = `csl_SkillNumber` taken before the loop, so a default ID listed twice would be pushed twice; the loop also stops at the first `dsd_GetSkillID` that fails), push `{ id, cs_EndOfCooltime = g_Now, empower 0, mastery 0,
   cs_bSave 0 }` and `csl_SkillNumber++`; `csl_Store` sorts afterwards. Dead in 2016: `defskill` is never filled
   (Z12 §6.5). So the item pseudo-skills (29200 UseSilverWings …, §3.6) come from the character's DB skill rows like
   any other skill (D02: the character-create / login paths insert missing default rows with `p_Skill_Set`).
@@ -930,6 +977,15 @@ IsCostumShield, iscritical, ismissed, isshieldblock, isheal, isenchant, isresist
 With `t == null` both this function and `smo_SkillResultPacket` (`t.so_LocateInfo`) dereference null
 (original bug) Z23-B17; latent, as `so_Routine` only calls the object blast with a target (Z03 §5.4) *(inferred)*.
 
+### 8.6 `RandomBox` (the dispel / steal pick of §8.3)
+
+The constructor `RandomBox::RandomBox` FUN_0063cdb0 (global `rndbox`, seeded with `srand(time)`) fills box n = 0…100
+with 0x4000 u16 slots `⌊i·n / 0x4000⌋` (each of 0…n−1 equally often), swaps every slot with a `rand()`-scaled index
+(no swap when the index is ≥ 0x4000) and clears values ≥ n (none). `operator[]` (n = 1…100, else 0) advances box n's
+ring pointer and returns the slot, so `rndbox[n] == 0` has chance 1/n and the reservoir pick is uniform. The ring
+repeats every 16384 draws of the same n. `rb_1000` FUN_004012a0, `rb_random` FUN_0063ccf0 and `rb_largerandom`
+FUN_0063ccc0 (n ≤ 100 → box, else Well512) use the `cWell512Random` member instead.
+
 ## 9. Mount skills (`ShineMover`)
 
 The skill code of mounts is complete but **unused in 2016**: `MoverUseSkill.shn` has no rows, and the two cast entry
@@ -1052,9 +1108,9 @@ Same as the player version except the null checks and the inverted dispel test. 
 |---|---|---|---|---|
 | Z23-B1 | `csl_Toggle_SetOnOff` FUN_00448ce0 | the upward walk starts at `sdi_NextSkill` but continues through `sdi_PrevSkill` | only one step above the cast step is updated; casting a lower step leaves higher learned steps with the old flag | follow `sdi_NextSkill` |
 | Z23-B2 | `csl_Toggle_AllOffAndReset` FUN_00448fa0 (tent, mount) | calls `so_ply_ToggleSkill_Off` for every learned toggle step without testing `cts_bSkillOn`, and removes the skill's abstates whatever set them | one 0x245D per learned step even when off; the client starts each skill's cooldown display (`RecordSkillUse`) | only switch off the entries that are on |
-| Z23-B3 | `csl_SetCoolTime` FUN_00448ab0 | group number 0 is matched like a real delay group | casting MineMelee_W / MineRange_W / EggMelee_W / EggRange_W (group 0, DlyTimeGroup 5 s / 15 s) cools down every other learned group-0 skill | skip group 0 |
+| Z23-B3 | `csl_SetCoolTime` FUN_00448ab0 (latent) | group number 0 is matched like a real delay group | a player skill of group 0 with `DlyTimeGroup` > 0 would cool down every other learned group-0 skill; in 2016 only mob weapons (MineMelee_W / MineRange_W / EggMelee_W / EggRange_W) have such rows, and mobs keep no cooldown list | skip group 0 |
 | Z23-B4 | `msl_SetCoolTime` FUN_00449270 | compares `DlyTimeGroup` (ms) of the other mount skills with the group number | the shared delay of mount skills hits the wrong skills (or none) | compare `DlyGroupNum` |
-| Z23-B5 | `ShineMobileObject::so_Routine` FUN_0056a080, silver-wing item cast | 0x4821 `sec` = `so_ply_SilverWingCoolTime()` in **ms** | client shows a cooldown 1000× too long (60 min → 3 600 000 s) | `/ 1000` as in `so_ply_ChargedBuff` |
+| Z23-B5 | `ShineMobileObject::so_Routine` FUN_0056a080, silver-wing item cast | 0x4821 `sec` = `so_ply_SilverWingCoolTime()` in **ms** | the client first gets the ms value; on a successful use of a 0x7210 item `smo_ply_ItemUse` sends the right seconds right after, so the wrong display survives only when the item use fails (error ≠ 0x700, the server cooldown is set anyway) or when the silver-wing item casts another skill: then a cooldown 1000× too long (60 min → 3 600 000 s) | `/ 1000` as in `so_ply_ChargedBuff` |
 | Z23-B6 | `gds_NC_ITEMDB_MAPLINK_ITEM_CONSUME_ACK` FUN_004698a0, `sp_PetSystem_Summon` FUN_004d2640 | send their own 0x4821 with the unshortened time after `smo_ply_SkillCoolTime` already sent the shortened one | with a cooldown set-item rate or item action, the client shows a longer cooldown than the server keeps | send once, after the rate |
 | Z23-B7 | `so_Send_NC_CHARSAVE_2WLDMAN_SKILL_CMD` FUN_00455780 (0x4012) | `skill.handle.bufferlocation` (payload +5, 2 bytes) is never written | leftover bytes of the previous packet in `gpp` go to the WM, which ignores them | write 0 or the zone's buffer index |
 | Z23-B8 | `csl_EmpowerAlloc` FUN_00448570 (0x4811) | `minus` is checked against the line sum of all learned steps but subtracted from the request's step | removing a point that sits on a lower step wraps the field of the higher step to 15; the DB refuses (> 5, 0x885) and the zone disconnects the player (0x68A) | check and subtract on the same step, or move points to the new step on learning |
@@ -1069,6 +1125,8 @@ Same as the player version except the null checks and the inverted dispel test. 
 | Z23-B17 | `smo_SkillBash_Blast` FUN_0057cd40 → `smo_ClearSkillResultBuffer_Miss` FUN_0057a550 (latent) | the cross-counter failure branch for `t == null` reads `t`'s HP and position | null dereference (crash) if ever reached | send the miss without a target entry |
 | Z23-B18 | `so_smv_SkillBash_Location` FUN_00580cf0 (latent) | mount without a field gets 0xFCC | "Cannot use the skill on Fear State." | 0xFC3 as in the object version |
 | Z23-B19 | `so_smv_SkillBash_Object` FUN_00580800 (latent) | the `smo_ICanHealTo` test runs for enemy / all skills with `Area != 0`; friendly skills get no target test | heal-blocked targets refuse enemy area skills; friendly skills reach any target | test friendly HEALING skills with `Area == 0`, as the player version |
+| Z23-B20 | `sp_NC_BAT_SKILLBASH_FLD_CAST_REQ` FUN_0057f400 → `smo_SkillBash_Blast` (location) FUN_0057cb10 | no toggle handling: no `csl_Toggle_CanUseSkill`, no on/off switch; `so_SkillEnchant` and the `so_Routine` cooldown use the current flag | a field cast of a toggle skill that is on refreshes its states with no cooldown and no HP / weapon condition (§2.5) | refuse toggle skills in the field cast (or run the same three steps) |
+| Z23-B21 | `smo_ply_SkillCoolTime` FUN_0055b6a0 called outside a blast: map-link consume FUN_004698a0, `sp_PetSystem_Summon` FUN_004d2640, `sp_HorseOn` FUN_0045f270, `sp_MoverSystem_SummonItem` FUN_0045ec10 | reads the scratch global `setitemskilleffect`, which `so_Routine` reloads only before a blast | the cooldown rate (§3.2) of whatever object last ran a blast (another player, a mob) is applied to this player's item cooldown, and a 0x4821 with that time is sent *(inferred: `smo_ply_SetItemEffect` vt 0xef8, the global's loader, is called only by `so_Routine`, the OBJ / FLD cast requests and `sp_NC_ITEM_USE_ACTIVESKILL_REQ`)* | pass the player's own set-item effect (as Z09-B30 for `almfh_ApplyHeal`) |
 
 ## 11. Not reconstructed / uncertain
 
@@ -1078,21 +1136,15 @@ Same as the player version except the null checks and the inverted dispel test. 
   switches it on again *(inferred)*.
 - Whether the 2016 client applies `SS_DMGCOLLTIMEDOWN` to its own cooldown display (the server sends nothing, §3.4).
 - `setitemskilleffect` is a global reloaded by `so_Routine` before each blast; for the non-cast callers of
-  `smo_ply_SkillCoolTime` (§3.6) it holds whatever the last routine left in it *(inferred)*.
+  `smo_ply_SkillCoolTime` (§3.6) it holds whatever the last routine left in it *(inferred)*: (original bug) Z23-B21.
 
 - Which step ID the 2016 client sends in 0x4811 `skill` (decides how often Z23-B8 happens) and in 0x4824 (§6.4):
   the client side of the skill window is not read here.
-- `csl_AddMastery` runs right after the GameDB 0x3457 produce request is sent; if the DB refuses the produce, the
-  mastery gain stays *(inferred; the 0x3457 answer is Z05/Z07)*.
+- `csl_AddMastery` runs right after the GameDB 0x3457 produce request is built (sent or not, §5); if the DB refuses the
+  produce, the mastery gain stays *(inferred; the 0x3457 answer is Z05/Z07)*.
 
 - §8: whether an ended state (`terminate = g_Now`) stays visible to the second dispel run of the same blast
   (Z23-B13) depends on when the abstate tick drops it (Z03 §6); the effects listed in §8.4 assume it stays.
-- §8.3: `RandomBox` as read: the constructor `RandomBox::RandomBox` FUN_0063cdb0 (global `rndbox`, seeded with
-  `srand(time)`) fills box n = 0…100 with 0x4000 u16 slots `⌊i·n / 0x4000⌋` (each of 0…n−1 equally often), swaps
-  every slot with a `rand()`-scaled index (no swap when the index is ≥ 0x4000) and clears values ≥ n (none). `operator[]`
-  (n = 1…100, else 0) advances box n's ring pointer and returns the slot, so `rndbox[n] == 0` has chance 1/n and the
-  reservoir pick is uniform. The ring repeats every 16384 draws of the same n. `rb_1000` FUN_004012a0, `rb_random`
-  FUN_0063ccf0 and `rb_largerandom` FUN_0063ccc0 (n ≤ 100 → box, else Well512) use the `cWell512Random` member instead.
 - §9.2: the mover modes (1, 2) have no names in the 2016 PDB; which mode a ridden mount is in is Z13's.
 
 ## 12. Coverage boundary
@@ -1105,16 +1157,15 @@ Found while following the functions of this item, but documented elsewhere or le
 | `sp_PetSystem_Summon` FUN_004d2640 (rest), `sp_PetSystem_LinkResummon` FUN_004d2a40 | Z13 (open; plan "Pets: the summon/unsummon flow …, the resummon after a map link") | §3.6 has the summon cooldown lines only |
 | silver-wing item: `sp_SilverWingMenu` FUN_0059c090, `smfm_Silverwing_Portal` FUN_0059bbe0, `smfm_Silverwing_LocSet` FUN_0059bff0, `smfm_Silverwing_Cancel` FUN_0059bb30, `sp_SilverWing_PortalCast` FUN_00597b30 (beyond its cooldown check, §3.6), `sp_SilverWing_PortalBlast` FUN_00597cf0, `UseItemSilverWing::uib_CanUseItem` FUN_00598000 / `uib_AfterCast` FUN_0053ff70 | new item **Z25** (added by Z23) | an item-use and teleport flow (server menu, saved location, link); Z04 (done) lists the class only by address, no open item covers it |
 | item-action cooldowns: `ItemActionObserveManager::SetCoolTime` FUN_005d1b60, `SendCoolTimes2Client` FUN_005d0d30, `SendCoolTimes2World` FUN_005d0fa0, item actions run by `EventRunBySkillGroupIndex` | Z17 (open; goal "what an item action is …, when it fires, its cooldowns") | a separate cooldown store keyed by action group, not `CharSkill.cs_EndOfCooltime` |
-| `SubAbState.shn` rows with the `COOLTIMEREMOVE` sub-state (which abnormal states give a free cast, §3.3) | Z03 §6.1 (actor table row "31 COOLTIMEREMOVE") | table data; §3.3 documents the effect on the cooldown |
 | abstate actor bodies reached from here: `sasa_DetachObject` FUN_0040c1c0 / FUN_00409230 / FUN_00408f90, `sasa_Act_LastDamegeInterceptByDef` FUN_0040ba30 (calls `aeo_Set`) | Z22 (open; plan lists the DetachProcess / DropUpRate / ExpUpRate bodies) | actor behaviour, not skill-list state; §8 only needs that dispel ends a state |
 | abstate tick that drops ended states (decides the second dispel run, Z23-B13) | Z03 §6.4 (expiry and removal) | §11 records the open timing question |
-| abnormal-state save path `so_SaveAbstate` FUN_00454d80 (rest of `AbnormalStateSaver`) | Z07 (owner per Z03 §6, line "Z07 owns the save path") | §2.4 uses only `lid_Call`'s save-type test, cited there |
+| the 0x4007 abstate save packet around `so_SaveAbstate` (`ws_save2DB`, its sending and DB side) | Z01 §8.4 (0x4007 in the save sequence), D02 | `so_SaveAbstate` FUN_00454d80, `ab_SaveAbstate` FUN_00417b90 and `lid_Call` are documented here (§2.4) |
 | `ws_save2DB` FUN_00455a10 / `ws_save2worldmanager` FUN_004536f0 (when the skill saves run) | Z01 §8.4 | §7 documents what the skill part writes |
 | produce cast and its checks (`sp_NC_ACT_PRODUCE_CAST_REQ` FUN_0046cf90, `ip_ProduceCheck`, the GameDB 0x3457 answer) | Z02 §8, Z07 §11 | §5 covers the mastery gain and 0x481D only |
 | `uib_Effect` FUN_00599d30 of the skill scroll (0x4801 NC_SKILL_SKILLTEACH_REQ) | Z20 §5.2 table, Z04 §6 | §6.2 covers the skill-list checks of `uib_CanUseItem` |
 | `MoverUseSkill.shn` loader (`MoverDataBox::mvdb_Load` FUN_004bf960) | Z24 (open; plan lists `mvdb_Load` 004bf960) | data loader; §9.1 states the 2016 file has 0 rows |
 | mob tactics `mab_Think` FUN_004bba00 / FUN_004b99e0 (callers of the mount `so_ply_CanMyTarget`, §9.3) | Z09 §7 | world simulation |
-| `RandomBox` (`operator[]` FUN_00427c30, constructor FUN_0063cdb0) | documented here (§11, §8.3 note) | a small utility no item documents; Z11 §11 and Z16 left its contents as inferred, which §11 now settles |
+| `RandomBox` (`operator[]` FUN_00427c30, constructor FUN_0063cdb0) | documented here (§8.6) | a small utility no item documents; Z11 §11 and Z16 left its contents as inferred, which §8.6 now settles |
 | GM commands `&skillcooltime`, `&ignoreskillcooltime`, `&itemactioncooltimereset` | Z11 §8.5 | §3.2 cites the ignore flag they set |
 | GameDB answers of the empower resets (0x480D / 0x480E, 0x9008 / 0x900A) and their DB side | Z03 §9.2, Z08 §11, D03 / D04 | §4 documents the list functions and the charged reset request (FUN_00599990 / FUN_005183f0) that Z08 left uncited |
 | `csl_Store`, `so_charskilldata` FUN_0044bf20 (0x103D client list) | Z12 §6.5 | §7.4 links to it |
