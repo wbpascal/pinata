@@ -109,6 +109,10 @@ CQuestData::QuestData_HashDataIn():        # build the two indexes              
 | `GetStartNPC(id)` @ FUN_00636030 | `Start.NPCID` when the quest exists and `Start.bNPC`, else 0xFFFF |
 | `GetQuestScriptStart/Doing/End(id)` @ FUN_00636080 / FUN_006360d0 / FUN_00636120 | the script pointer; unknown quest → `m_pNULLSTR` (""), which `ParserStart` refuses (§2.4) |
 
+Log object: a static initializer creates a log list named `QuestLog` (`EraseOldLogList("QuestLog")`, FUN_0069b150; destructor
+FUN_006a06b0), but no 2016 zone function writes to it; the quest error lines (e.g. "QUEST UN-DRIVED COMMAND" in
+`Recv_NC_QUEST_SCRIPT_CMD_ACK`, time from `GetCurrentTimeString` FUN_0064f050) go to `_DebugMessageNew(1, "Msg", …)`.
+
 ### 1.2 `QUEST_DATA` row layout *(pdb2016; offsets confirmed by the 2016 loader and by Z08's reads)*
 
 | Off | Field | Meaning / values |
@@ -760,14 +764,16 @@ CQuestZone::QuestPlayer_ScenarioRun(questId, qsc) → int:                      
     switch qsc.Data.nScenarioID:
     8:  job dungeon "Job1_Dn01", Pine film "Promote/JobChange1"            ┐ ZoneRingPacketFindJobDungeon::zrpb_Request(
     11: map "Rou", film "Promote/JobChange2-1"                             │   &zonringpack_findJobdungeon, p, map, film, &ack{nResult 0})
-    12: "Job2_Dn01", "Promote/Job2_Gamb/Job2_Gamb"                         │ (Z14): finds or creates the instance in any zone;
+    12: "Job2_Dn01", "Promote/Job2_Gamb/Job2_Gamb"                         │ (FUN_005a8d30, Z14): finds or creates the instance in any zone;
     13: "Job2_Dn02", "Promote/Job2_Forest/Job2_Forest"                     ┘ if it returns with ack.nResult == 2: Recv_NC_QUEST_SCRIPT_CMD_ACK(&ack)
         # otherwise the answer comes later through the zone ring 0x441F (zls_NC_QUEST_JOBDUNGEON_FIND_RNG FUN_005bfde0,
-        # Z14): player in a mode outside cmc_AllowMode 0x46 → message 0x30C2 and ack nResult 2; dungeon found (0x30C0)
+        # Z14): player in a mode outside cmc_AllowMode 0x46 → so_SendErrorCode (vt 0x308) 0x4420
+        # NC_QUEST_JOBDUNGEON_LINK_FAIL_CMD { u16 nError = 0x30C2 } (its only sender; client FUN_004b4430 shows text
+        # 0x7aafcf08 "You cannot teleport to the saved locaion in current state." for 0x30C2 only) and ack nResult 2; dungeon found (0x30C0)
         # → the player is sent to it (p.vt 0x600) and no ack (the dungeon's Pine script finishes the quest step:
         # `scinariocode` → ScenarioDone_Server, `returnvalue` → PsEnd, Z09 §26.1 / §25.6); not found → ack nResult 0
     9, 14: c = p.vt 0x3d4 so_ply_FirstJobChange()                 # below
-           if c: CAnnounceSystem::AnnounceSystem_ClassUp(&gAnnounceSystem, p.so_CharName(), c)
+           if c: CAnnounceSystem::AnnounceSystem_ClassUp(&gAnnounceSystem, p.so_CharName(), c)   # FUN_005b9030: below
            ack.nResult = (c != 0); Recv_NC_QUEST_SCRIPT_CMD_ACK(&ack)          # synchronous: the script continues at once
     15: nothing (no packet, no wait)                              # the client has a `Scenario_15` class (FUN_006b0400)
                                                                   # *(inferred: a client-side step answered with 0x4402)*
@@ -776,6 +782,28 @@ CQuestZone::QuestPlayer_ScenarioRun(questId, qsc) → int:                      
     other (incl. 10, 26):                                         # client scenarios
         m_bWaitResult = 1; Send_NC_QUEST_SCRIPT_CMD_REQ(m_ParsingQuestID, m_pQSC)   # 0x4401 Cmd 3; resumes on 0x4402
     return 1
+ZoneRingPacketFindJobDungeon::zrpb_Request(p, map, film, ack) (Z14 owns the ring transport)    @ FUN_005a8d30
+    if any argument NULL: return                                  # no ack (server SCENARIO: no wait flag, §3.1): stuck
+    if (1 << p.smo_GetMode() (vt 0x484)) & 0x46 == 0:             # static cmc_AllowMode 0x46 = modes 1, 2, 6
+        p.so_SendErrorCode(0x11, 0x20, 0x30C2) → 0x4420 NC_QUEST_JOBDUNGEON_LINK_FAIL_CMD { nError 0x30C2 }; ack.nResult = 2
+        return                                                    # the caller then runs Recv_NC_QUEST_SCRIPT_CMD_ACK
+    if !p.so_ply_IsLink_OutMap_AndSendErrorMsg() (vt 0xa74): return   # no ack, script stuck (original bug) Z15-B45
+    if map = cm_FindEmpty(map) in this zone: p.so_ply_2JobDungeon(map, film) (vt 0x3d0, Z09 §27 / Z14)   # no ack
+    else: zone ring 0x441F { u8 zoneNo, u16 handle, u32 charRegNo, u16 0x30C1, char map[33] +0xB, mapId[33] +0x2C = 0,
+                             char film[33] +0x4D, ack (7 bytes) +0x6E }  (0x75 bytes)  → the other zones answer 0x441F
+                             through zls_NC_QUEST_JOBDUNGEON_FIND_RNG FUN_005bfde0 (code 0x30C0 found / other: not found)
+ShinePlayer::so_ply_IsLink_OutMap_AndSendErrorMsg() → bool:                      @ FUN_005603d0
+    if !so_Field: return 0
+    attr = so_Field.fm_FieldOption (FieldOption::FieldAttr, FieldAttribute data)
+    if !attr.LinkOut (+0x6c): so_SendErrorCode(6, 0x1D, 0x1E42) → 0x181D NC_MAP_LINK_FAIL_CMD; return 0   # map forbids links out
+    if attr.SystemMap (+0x6d) == 1: so_SendErrorCode(6, 0x1D, 0x1E41); return 0                       # system map
+    return 1
+    # client On_NC_MAP_LINK_FAIL_CMD FUN_004b0e70: for 0x1E41 / 0x1E42 adds system message TextData2 0x35ac8487,
+    # whose 2016 text is a single blank: the player sees no reason
+CAnnounceSystem::AnnounceSystem_ClassUp(name, class) → int:                         @ FUN_005b9030
+    if AnnounceData.shn has ≤ 5 rows: return 0                     # row 5 = "\"%s\" has just become level %s. Congratulations!"
+    text = sprintf(row5.Message, name, ClassName.shn[class] name)   # the "level %s" wording is the shipped text
+    Send_PROTO_NC_ANNOUNCE_Z2W_CMD(type 5, text) @ FUN_005b8d30 → WM 0x6401 (W01: re-broadcast to the world); return 1
 ```
 
 2016 data *(data)*: `SCENARIO 8` (10×, quests 60006/60010/60011…), 12 (10×), 13 (7×) in Start/Doing scripts; 9 and 14
@@ -995,6 +1023,12 @@ CQuest::CQuest(questData):                                                      
                            0 NORMAL 5, 1 STORY / 4 INSTANCE_DUNGEON / 10 DAILY_QUEST 0xB
 CQuest::~CQuest(): free(m_pQuestArray); delete[] m_pQuestListWithNPC; counters 0                @ FUN_0062f0f0
 
+# the per-player object: ShinePlayer.sp_QuestDiary (p + 0x173e8, reached through vt 0x808 so_ply_QuestDiary   @ FUN_0055a270)
+ShineQuestDiary::ShineQuestDiary(): CQuestZone::CQuestZone(&sqd_QuestDiary, &gQuestData)   @ FUN_00578040
+ShineQuestDiary::~ShineQuestDiary() / CQuestZone::~CQuestZone(): vftable = CQuestZone; ~CQuestParserScript(m_ScriptParser);
+    ~CQuest()                                                                       @ FUN_00578060 / FUN_005b9a80
+# The diary lives as long as the ShinePlayer object (pool object, §4.1 capacity); InitNewPlayer (§3.8) resets it per login.
+
 CQuest::InitQuestBF(n) → int:                                                       @ FUN_0062f130
     if m_NumOfQuestBF < n: free(m_pQuestArray); m_pQuestArray = NULL; m_NumOfQuestBF = 0
     if !m_pQuestArray: m_pQuestArray = malloc(n·0x20) zero-filled (fail → m_NumOfQuest = 0; return 0); m_NumOfQuestBF = n
@@ -1024,8 +1058,9 @@ GetNumOfDoingQuest() → int:     number of records with Status 6 ING, 7 FAILED 
 
 ### 4.2 Loading the diary at login (WM 0x1021 / 0x1022 / 0x10CD / 0x10D6)
 
-The WM sends the character's quest lists when the player enters the map (Z07 §1.2); `so_StoreQuestDoing/Done/Read/
-Repeat` (0044b3c0…, §5) hand them to these four functions. Each record is merged with `SetQuestInfo`-or-append
+The WM sends the character's quest lists when the player enters the map (Z07 §1.2: `wms_NC_CHAR_ZONE_QUEST_DOING_CMD`
+FUN_0044af80, `…_DONE_CMD` FUN_0044b090, `…_READ_CMD` FUN_0044b1a0, `…_REPEAT_CMD` FUN_0044b2b0 find the player and call
+ShinePlayer vt 0x67c…0x688); `so_StoreQuestDoing/Done/Read/Repeat` (0044b3c0…, §5.7) hand them to these four functions. Each record is merged with `SetQuestInfo`-or-append
 semantics (inlined); the return value is 1 when every record found a place.
 
 ```pseudo
@@ -1727,6 +1762,8 @@ CQuestZone::MakeStruct_NC_CHARSAVE_QUEST_DOING_REQ(out) → n:                  
     if !m_pPlayer: return 0
     out = { handle (6, filled by the caller), u8 bNeedClear = 1, u8 nNumOfDoingQuest = n, PLAYER_QUEST_INFO[n] @+8 }
     n = records with Status ∈ {6 ING, 7 FAILED, 8 REWARD}, copied in diary order; stop once the end offset passes 7999
+    # the GameDB answer 0x4006 NC_CHARSAVE_QUEST_DOING_ACK is ignored (GameDBSession::NC_CHARSAVE_QUEST_DOING_ACK FUN_004553b0,
+    # a no-op shared with 0x401B, Z01): a failed save is never noticed by the zone
 
 so_SaveQuestDoing(PROTO_NC_CHARSAVE_2WLDMAN_QUEST_DOING_CMD*)  vt 0x394 @ FUN_004534b0 → (ws_save2worldmanager, WM 0x400F)
 CQuestZone::MakeStruct_NC_CHARSAVE_2WLDMAN_QUEST_DOING_CMD(out) → n:                @ FUN_005bb980
@@ -1862,8 +1899,12 @@ CQuestZone::QuestPlayer_NotCheckNPC(nQuestID) → int:   "start without an NPC" 
 `m_QuestClickNPC` is not set by this path: it keeps the last NPC click, so a 0x440F select-start (§4.7) after a 0x4414
 start compares against that older NPC. Data *(2016)*: 663 quests are start-able this way (20 by a start item, the rest by
 `Start.bIsWaitListProgress`), 616 can be finished this way (start item or `End.bIsWaitListProgress`), all with a reward
-NPC. The client sends 0x4414 from its quest list ("progress from the list", wait-list flags) *(inferred from the field
-names)*.
+NPC. The client sends 0x4414 `{u16 questId}` from `GameFrameWork::NcQuestStartReq` (client FUN_004a58e0) in three places:
+the epic-quest window's accept button (`EpicQuestWin::OnQuestAccept` FUN_00600950, selected quest), the quest window's
+second button (`CQuestWin2::OnGiveUp` FUN_00602ef0, names from `names/client`): on the second list tab it always sends
+0x4414 for the selected quest; on the first tab it sends 0x4414 when the client's own `GetNewQuestStatus` says 8 REWARD,
+otherwise it opens a confirmation box whose OK posts frame message 0x101 → 0x4407 give-up; and frame message 0x102 in the
+`GameFrameWork` message dispatcher FUN_00494890 (posted by a message box on close).
 
 ### 6.2 Mob kills: `so_KilledBy` → party / raid → the diary
 
@@ -1913,7 +1954,7 @@ CQuestZone::QuestActionMobKill(rec, row, a, mob) → int:                       
     switch row.Action[a].ThenType:
       1 DROP_ITEM:                                                # the only ThenType of the 2016 data (§1.2)
         item = (u16) ThenTarget
-        need = GetSuccessItemCount(row, item) (§3.8); have = sp_GetItemInvenLot(item)
+        need = GetSuccessItemCount(row, item) (§3.8); have = sp_GetItemInvenLot(item)   # FUN_005280d0: sum of the lot (vt 0x1c of each item's class) over every inventory cell holding item id `item`, limit = the charged-extended bag size
         if have < need and well512_GetRandom(1 000 000) < ThenPersent:     # chance in millionths
             n = (ThenCountMax − ThenCountMin) × well512_GetRandom(1 000 000) / 999 999 + ThenCountMin
             n = min(n, need − have)
@@ -2132,6 +2173,12 @@ server (D04 §1.2, §5.3 here). Every number of the range was searched in the zo
 
 A refused 0x4414 (`QuestPlayer_NotCheckNPC` 0) and a refused give-up of Z08-B6 (§4.7) send no code at all.
 
+Two quest packets carry codes outside this range. `0x4413 NC_QUEST_ERR { u16 err }` *(pdb2017 name)* is never sent by the
+2016 zone, WM or Character server (no send site, no `so_SendErrorCode(0x11, 0x13, …)`); the client handler FUN_0049bda0
+would show the error-code text of `err` (client FUN_00416430). `0x4420 NC_QUEST_JOBDUNGEON_LINK_FAIL_CMD { u16 nError }`
+is sent only with 0x30C2 (job-change dungeon refused in the current mode, §3.6); the client FUN_004b4430 reacts to 0x30C2
+only ("You cannot teleport to the saved locaion in current state.").
+
 ---
 
 <!-- The sweep (part 6) numbers the bugs section, completes the uncertain list and adds the coverage boundary. -->
@@ -2184,6 +2231,7 @@ A refused 0x4414 (`QuestPlayer_NotCheckNPC` 0) and a refused give-up of Z08-B6 (
 | Z15-B42 | Lua `cGetQuestHero_NPC` / `AxialQuesterFind::ali_Work` FUN_00429c80 | `aqf_QuestID` is never tested | returns the first player in range, not one with the quest (unused in 2016) | require the quest in the player's diary |
 | Z15-B43 | Lua `cGetQuestHero_ItemUse` FUN_005d9140 | looks up map and item, then returns nothing | no effect, no result (unused in 2016) | finish or remove |
 | Z15-B44 | `sp_OpenClassChangeMenu` FUN_0051fd10 (Lua `cClassChangeOpen`) | a wrong mode is answered with `so_SendErrorCode` on opcode 0x3060 (2-byte payload); an invalid class with 0x305F | the client reads the short 0x3060 as the 11-byte menu and opens the class-change window with class 0x81 and a stale price | send the full struct with `nError` 0x3681 (and have the client check it) |
+| Z15-B45 | `ZoneRingPacketFindJobDungeon::zrpb_Request` FUN_005a8d30 (SCENARIO 8/11/12/13) | NULL arguments or a map that forbids links out (`so_ply_IsLink_OutMap_AndSendErrorMsg` 0) return without an ack | the quest script stays on SCENARIO without a wait and never resumes | answer the ack with nResult 0 / 2 |
 
 ## Not reconstructed / uncertain (so far)
 
@@ -2193,9 +2241,8 @@ A refused 0x4414 (`QuestPlayer_NotCheckNPC` 0) and a refused give-up of Z08-B6 (
 - Where the 2016 client starts a client-side SCENARIO (Cmd 3 has no case in `On_NC_QUEST_SCRIPT_CMD_REQ` FUN_004ba970;
   `ScenarioMgr::RunScenario` FUN_006b00b0 is reached from FUN_0047b7c0 (a chat command) and the dialog parser
   FUN_005f80f0): not traced; and what scenario 15 (server: no packet, no wait) does on the client (`Scenario_15`).
-- `ZoneRingPacketFindJobDungeon::zrpb_Request` and when it returns `nResult 2` synchronously: Z14.
 - Whether the client closes its NPC dialog by itself after the last SAY (the server never sends END, Z15-B12).
 - Who counts as the killer for pet and summon kills (`so_KilledBy` `param_1`): Z03 §8.1; the quest path credits only
   player killers (§6.2).
 - Whether anything fills inventory type 7 (`ci_QuestBox`, §6.3); no writer was found from the quest functions.
-- Where the 2016 client sends 0x4414 NC_QUEST_START_REQ from (quest list / wait-list window): not traced (§6.1).
+- Which client message box posts frame message 0x102 (the third 0x4414 sender, §6.1): not traced.
