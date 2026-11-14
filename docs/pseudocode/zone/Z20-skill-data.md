@@ -119,9 +119,9 @@ BinaryDataBox<T>::bdb_ReadData(this, path) → this             @ FUN_00585030, 
         #   ac_Write2File, appends "<text> : AssertClass::ac_AssertFail : <msg>[<n>]" to Assert<YYYYMMDD><hh>.txt;
         #   the file name comes from AssertClass::ac_DateTime FUN_0063c640 *(inferred: the "%02d" is the hour)*)
     AssertFail sprintf("Code:%X:%d\tSHN:%X:%d", KEY_T, KEY_T, m_pHead->nVersionKey, m_pHead->nVersionKey)
-        # (args read in the disassembly) the row size is never printed, so a size mismatch shows two equal keys;
-        # when the file could not be opened at first load m_pHead is still null and this read faults before
-        # ShineExit (original bug) Z20-B1
+        # (args read in the disassembly) the row size is never printed, so a size mismatch shows two equal keys
+        # (original bug) Z20-B1; a null m_pHead is tested first (test/je at 0x585071 and in all 7 readers) and
+        # prints 0 for both version values, so a missing file still reaches ShineExit
     ShineExit("BinaryDataBox<T>::bdb_ReadData")                                   # process ends
 ```
 
@@ -177,7 +177,13 @@ SkillHitType; the row count defines `sdb_MaxValid`.
 
 **ActiveSkillGroup.shn → `ActiveSkillGroup` (0x24)**: InxName (char[32]) = skill name → the row is appended to that
 skill's `sdi_ActiveSkillGroups`; ActiveSkillGroupIndex (`ActiveSkillGroupIndex` enum, 0 NONE … 118 SunLight, 119 MAX)
-is kept in the row.
+is kept in the row (+0x20). The box itself never reads it; the only readers are item actions: the four
+`RulesOfEngagementPhisycalSkill` / `RulesOfEngagementMagicalSkill` `roe_CriticalRateByGlobalAction` (FUN_00504d30 /
+FUN_00504ee0) and `roe_HitRateByGlobalAction` (FUN_005055a0 / FUN_005058d0) run, for each group row of the attack's
+skill, an `AAT_ActiveSkillGroupIndex` condition (subtype = that row's ActiveSkillGroupIndex) through
+`ItemActionObserveManager::EventRun` on the attacker's item-action manager (vt 0x5d0) and add the plus value to the
+rate; `ItemActionObserveManager::EventRunBySkillGroupIndex` FUN_005d1f50 does the same with effect
+`AAT_SkillEffectIncreaseType`. What the conditions and effects do is Z17 (§9).
 
 **ToggleSkill.shn → `ToggleSkill` (0x26)**: TS_SkillInx (char[32]) = skill name → appended to `sdi_ToggleData`;
 TS_Condition (`ToggleSkillEnum`, only `TS_HPRATEOFF` = 0), TS_Value (u16). 2016 data: `BurnPain01`–`06`, all
@@ -338,7 +344,7 @@ The DemandSk check reads element i−1 also for i = 0, and the two "same line" c
 last element, outside the array (original bug) Z20-B3; with the 2016 data neither fires (the lowest ID 0 is
 `"Slice and Dice [01]"`, step 1; the highest ID 60000 has a name without `]`).
 
-2016 data: 1544 step names, 49 delay-group warnings (my reproduction of the rule), about 24 step-number warnings.
+2016 data: 1544 step names, 49 delay-group warnings (my reproduction of the rule), 27 step-number warnings (my reproduction of the rule).
 
 ### 3.3 Invariants a rebuild needs (with the 2016 data)
 
@@ -590,7 +596,7 @@ The `BinaryDataBox<PassiveSkillInfo>` destructors FUN_00585250 (plain) / FUN_005
 
 Both readers are the same template as the active-skill readers (§2.1): `CDataReader::Read(this, path, key, rowsize)`
 with key 0x20f4 (PassiveSkill) / 0xa9 (PSkillSetAbstate); on failure `AssertFail "BinaryDataBox<T>::bdb_ReadData :
-readfail" <path>`, the `"Code:%X:%d\tSHN:%X:%d"` line (same null `m_pHead` dereference, Z20-B1) and
+readfail" <path>`, the `"Code:%X:%d\tSHN:%X:%d"` line (row size not printed, Z20-B1; null `m_pHead` printed as 0) and
 `ShineExit("BinaryDataBox<T>::bdb_ReadData")`.
 
 Because the rows are used as they are, the column meaning is defined by the readers (§6.5 for the details):
@@ -640,7 +646,7 @@ PassiveDataBox::pdb_Load(this, Name4* unused)                          @ FUN_005
   # 2. special skill
   v = skillnametree[“PowerofLove01”]
       0xFFFFFFFF: fatal "PassiveDataBox::sdb_MakeSpecialSkill : Invalid Skill" "PowerofLove01"
-  sdb_SpecSkill.ss_PowerOfLove = (u16) v       # ispassive not checked (Z20-B7)
+  sdb_SpecSkill.ss_PowerOfLove = (u16) v       # ispassive not checked (original bug) Z20-B7
   # 3. set-abstate index
   pdb_nMaxPSkillSetAbstateNum = PSkillSetAbstate row count
   pdb_pPSkillSetAbstate = new PSSetAbstateIndex[n]     # NOT initialised
@@ -750,11 +756,15 @@ CharacterPassiveList::cpl_RecalcParam(this, Container* param, ItemBag* bag)   @ 
     weapon = item ID in equipment slot 12, or slot 10 if empty (0xFFFF) *(inferred: slot meaning)*
     for id in 0 … 999 with bit id set:
         r = passive row by ID (§6.4; unknown → default block)
-        if r.WeaponMastery ≠ 0 and the weapon's ItemInfo is valid:
+        if r.WeaponMastery ≠ 0 and weapon < idb_maxItemhandle and idb_index[weapon].data ≠ null:
+          if idb_index[weapon].data->ID ≠ weapon:
+            AssertFail "ItemDataBox::operator [] :Invalid Item index", (bit id * 10000 + data->ID)  # log only;
+            # no mastery from this row *(the multiplier is the loop variable as decompiled)*
+          else:
             rateCol = pmv.pmv_var[TwoHand & 1][0][WeaponType]; plusCol = pmv.pmv_var[TwoHand & 1][1][WeaponType]
-                (WeaponType ≥ 22: pmv_var[1][0][0] / [1][1][0]; table below)
-            staff / wand: Plus.MagicalWeaponMastery = r[plusCol] (if ≠ 0); Rate.MagicalWeaponMastery = r[rateCol] + 1000 (if ≠ 0)
-            else:         Plus/Rate.PhisycalWeaponMastery the same way
+                  (WeaponType ≥ 22: pmv_var[1][0][0] / [1][1][0]; table below)
+              staff / wand: Plus.MagicalWeaponMastery = r[plusCol] (if ≠ 0); Rate.MagicalWeaponMastery = r[rateCol] + 1000 (if ≠ 0)
+              else:         Plus/Rate.PhisycalWeaponMastery the same way
         each other column as in §6.2, assigned only when ≠ 0 (CastingTime: when ≠ 1000)
         # assignments, not sums: for each member the highest learned ID with a non-zero value wins
 ```
@@ -848,7 +858,7 @@ field its slice `orr_Buffer + orr_Pointer` via `field.vt[1]` and advances `orr_P
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
-| Z20-B1 | `BinaryDataBox<T>::bdb_ReadData` (5 skill readers, §2.1) | on a failed read the second log line dereferences `m_pHead`, which is still null when the file could not be opened at startup; the row-size check result is never printed | missing file: access violation instead of the `ShineExit` line; row-size mismatch: the log shows two equal keys | print only when `m_pHead` is set; include expected/actual row size |
+| Z20-B1 | `BinaryDataBox<T>::bdb_ReadData` (5 skill readers, §2.1) | on a failed read the second log line prints the expected key and the file's `nVersionKey` (0 when `m_pHead` is null, which is tested) but never the row size | a row-size mismatch logs two equal keys, so the cause of the fatal exit is not visible (cosmetic) | include expected / actual row size |
 | Z20-B2 | `sdb_Load` "Index not match" (§3.1 step 4) | compares ActiveSkill `InxName` only up to its own NUL against the server row's | a server row whose `InxName` is longer (or an empty ActiveSkill name) passes | compare both names fully (`strcmp`) |
 | Z20-B3 | `sdb_Load` warnings (§3.2) | DemandSk check reads element −1 for i = 0; "same line" SP / nT checks read element `sdb_MaxValid` for the last skill | heap read outside the array when the lowest-ID skill has a step > 1 name or the highest-ID skill has a step name; a crash or a bogus warning at load (not with 2016 data) | skip i = 0 / the last element |
 | Z20-B4 | `sdb_Load` (§3.3) | duplicate skill IDs are not detected | 2016: ID 9034 (`KQRoboAtkSk2`, `GoMasterAtkSkill2`): both names resolve to the same one of the two rows, the other is never used | reject duplicates at load |
@@ -898,10 +908,11 @@ every `&skillnametree` / `passivedatabox` reference is cited; the strings of the
 | Callees of §7 holder sites listed in Z09 §31.2 (`Parameter::Container` ctor / `c_clear` / `IsNoAttack`, `ItemActionObserveManager::EventRunBySkillGroupIndex` / `GetRateAppliValue`, `MultiHitArgument`, `SkillBlastEffect` vector helpers, `sds_Initialize`, `BattleObjectStruct`, `ListTraveler`, `ItemActionArgument`, `se_Clear`, `learnSkill` 005a1790, `PROTO_NC_CHAR_WEDDINGDATA_ACK::operator=`, mover-upgrade accessors, `UsedItemEffect::operator[]`, `ed_Compare`, `lua_next`) | Z09 §31.2 / §31.4 rows (owners Z12, Z13, Z17, Z18 as assigned there) | already assigned by Z09's boundary; this item reaches them only through code it cites as a pointer holder or name-trie reader |
 | Who fills the passive `Plus` / `Rate` blocks into the final stats, the `ChangeByConditionParam` slot logic (`cbcp_nChangeParam`, `cbcp_nCharged`) and the cast-time use of `Rate.CastingTime` (§6.5, §8, Z20-B10) | Z12 (plan line 12: "`so_allparametercalculate` … what fills each layer … passives") | stat calculation; this item documents only what `cpl_RecalcParam` writes |
 | `CharacterPassiveList` callers: `so_charpassivedata` 0044e5a0 (Character DB passive list) | Z12 (plan line 14 lists `so_charpassivedata` FUN_0044e5a0) | login data parsing; §6.5 documents `cpl_Store` it calls |
-| `so_LearnPassive` 00559e50, `so_UnlearnSkillAck` 0057f200, `so_LearnSkill` 0055bbf0 (vt 0x620 / 0x624), the 0x4802 / 0x4803 answers | Z03 §9.3 / §9.5 (done, documented there) | the learn / unlearn flow; §5.2 / §6.5 document the list functions they call |
+| `so_LearnPassive` 00559e50, `so_UnlearnSkillAck` 0057f200, `so_LearnSkill` 0055bbf0 (vt 0x620 / 0x624), the 0x4802 / 0x4803 answers | Z03 §9.3 / §9.5 (done; documents the learn / unlearn packet flow, calling the list functions only as `p.vt[0x620]()` / `p.vt[0x624](skillid)`, without these addresses) | this document covers the bodies: `so_LearnSkill` → `csl_Learn` (§5.2), `so_LearnPassive(u16 id)` = `psl_Store(sp_Passive, id, vt[0x56c]())` (§6.5) |
 | `Gather.shn` loader `gt_Load` 0046a660 (writes `skillnametree`, §5.2) | Z02 §8 (done, documented there) | §5.2 records only the trie side effect and its invariant |
 | Load-time tables that look skills up by name: `MiscDataTable::mdt_*`, `MobAttackSequence::mas_Load` / `sc_Store`, `MobDataBox::mdb_SkillStore`, `NPCAction` option readers, Lua `cNPCSkillUse` / `cSkillBlast` / `cSkillDamageCalculate` / `cMagicFieldSpread` | Z09 (done; each cited in `docs/pseudocode/zone/Z09-world.md`) | §5.2 states their lookup behaviour; their tables are world content |
 | MSVC STL internals under `csl_Learn`'s `std::_Sort` / `push_back` (`_Unguarded_partition` 00446c50, `_Make_heap` 00445fc0, `_Insertion_sort1` 00446110, `_Sort_heap` 00447040, `vector<CharSkill>` growth 00447580) | library code (no item) | standard introsort and vector growth; a rebuild uses any sort by `cs_SkillId` |
 | `CDataReader` (read, decrypt, row index, checksum) | W05 §3.1 / S01 §6 (done, documented) | the generic SHN reader under every `BinaryDataBox<T>` |
 | The `BTree` callers on other tries (item `idb_btree`, abstate, mob, map, NPC, mini-house …) | the owners of those functions | `BTree::operator[]` / `bt_Insert` are shared helpers (over 25 callers); only `skillnametree` users are this item's (§5.2) |
+| `RulesOfEngagementPhisycalSkill` / `…MagicalSkill::roe_CriticalRateByGlobalAction` 00504d30 / 00504ee0, `roe_HitRateByGlobalAction` 005055a0 / 005058d0, `ItemActionObserveManager::EventRunBySkillGroupIndex` 005d1f50 (the only readers of `sdi_ActiveSkillGroups`, §2.2) | Z17 (open; plan line 12: "what triggers a check (item use, equip, hit, …), each condition and effect type") | item-action triggers on hit / crit rate and skill effects; §2.2 records which box member they read |
 | `ActiveSkillGroupCondition` (item-action condition on a skill group, ctor 005cedd0) | Z17 (plan: item actions) | an `ItemActionCondition` validator; it only names `ActiveSkillGroupIndex`, it does not read the box |
