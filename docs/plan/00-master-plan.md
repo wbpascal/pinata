@@ -113,6 +113,8 @@ continue the open phase-2 items with the PDB exports as their main reading sourc
 | [Z20](items/Z20.md) | Zone: skill data box loader (`SkillDataBox::sdb_Load`, `SkillDataIndex` build, `PassiveDataBox`) (added by Z11) | Z01, Z03 |
 | [Z21](items/Z21.md) | Zone: set items (`SetItem` / `SetItemEffect` / `SetEffect` tables, set detection, set-item abstates and skill effects) (added by Z12) | Z03, Z12 |
 | [Z22](items/Z22.md) | Zone: abnormal-state actor classes (`SubAbnormalStateActor*` bodies: DoT/HoT, area damage, bomb, detach, rate buffs) (added by Z12) | Z03, Z18 |
+| [Z23](items/Z23.md) | Zone: per-player active skill list (`CharaterSkillList` / `MoverSkillList`: toggle skills, cooldowns, delay groups, empower, mastery) (added by Z20) | Z03, Z20 |
+| [Z24](items/Z24.md) | Zone: item-side data loaders (`UsedItemEffect`, `ItemUseFunction`, `ChargedItemEffectDataBox`, `MoverDataBox`, `cStateItemDataBox`, `MysteryVaultTable`, `RidePetDataBox`) and `CharClassDataBox` (added by Z20) | Z01, Z04, Z20 |
 | [D01](items/D01.md) | Account + AccountLog servers (resolves open Login error conditions) | – |
 | [D02](items/D02.md) | Character server: characters, avatars, save/load | – |
 | [D03](items/D03.md) | Character server: items, economy, pets, house | D02 |
