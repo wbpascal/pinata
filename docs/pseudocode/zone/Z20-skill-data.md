@@ -41,8 +41,9 @@ class SkillDataBox {                                   // 0x4e0
           0x3f8 BinaryDataBox<ActiveSkillGroup>       SkillGroup  // ActiveSkillGroup.shn
           0x45c BinaryDataBox<ToggleSkill>            ToggleInfo  // ToggleSkill.shn
         }
-  0x4c4 ulong sdb_ActivSkillNum     // = ActiveSkill row count
-  0x4c8 ulong sdb_MaxSkillHandle    // = max(ActiveSkillInfoServer.ID) + 1; not read by the loader itself
+  0x4c4 ulong sdb_ActivSkillNum     // = ActiveSkill row count; read only by sdb_Load's own row-count check
+  0x4c8 ulong sdb_MaxSkillHandle    // = max(ActiveSkillInfoServer.ID) + 1; no reader outside sdb_Load (only
+                                    //   its "Error in record number" message prints the old value)
   0x4cc SkillDataIndex* sdb_ValidArray   // new[sdb_MaxValid], sorted by ID after load
   0x4d0 ulong sdb_MaxValid          // = ActiveSkillInfoServer row count = number of SkillDataIndex
   0x4d4 SpecialSkill sdb_SpecSkill  // 6 × u16 skill IDs, §3.1 step 9
@@ -185,8 +186,8 @@ IPT_TARGET 1 / IPT_SPOT 2 → `EffectTarget`), AS_IsDirection (u8 → `bIsDirect
 
 ### 3.1 Pseudocode
 
-`sdb_Load(this, Name4* unused)`: the parameter is never read (startup passes the world name *(inferred)*,
-`&reloaddata` passes NULL). Every failure below is `AssertFail <text>` (log only) followed by `ShineExit(<name>)`
+`sdb_Load(this, Name4* unused)`: the parameter is never read (startup `zs_start_wide` FUN_005ad9a0 passes
+`&zoneserver.zs_serverinfo.worldname`, `&reloaddata` passes NULL). Every failure below is `AssertFail <text>` (log only) followed by `ShineExit(<name>)`
 (process exit) unless marked *non-fatal*.
 
 ```pseudo
@@ -354,7 +355,7 @@ last element, outside the array (original bug) Z20-B3; with the 2016 data neithe
   `sdi_NextSkill` (the loop runs in ID order).
 - **Unknown ID.** `operator[]` returns null for an ID that has no row (no default block); callers must test it.
 - **Reload (`&reloaddata`, Z11 §8.6).** `sdb_Load` deletes the old `SkillDataIndex` array before building the new
-  one, so every `SkillDataIndex*` kept elsewhere dangles (Z11-B37; the holders are listed in §7, part 2). The
+  one, so every `SkillDataIndex*` kept elsewhere dangles (Z11-B37; the holders are listed in §7). The
   readers re-read their files into the same buffers when the new file is not larger (W05 §3.1 `CDataReader::Read`),
   so `ActiveSkillInfo*` / `ActiveSkillInfoServer*` row pointers kept elsewhere then point at whatever row now lies at
   that offset; a larger file frees the old buffer. `skillnametree` is never cleared: names removed from the files
@@ -371,6 +372,10 @@ SkillDataBox::SkillDataIndex::sdi_SetArgument(e, SkillSpecial index, int value) 
     member = MAP[index]  (table below); none: return (ignored)
     member.exist = 1;  member.value = value
     SS_DASH2 additionally: sdi_WARPING.value = value   (sdi_WARPING.exist is left as it was)
+        # intended: smo_SkillBash_Blast FUN_0057cd40 tests sdi_WARPING_TARGET.exist, computes the spot next to the
+        # target and calls smo_WarpTo FUN_004a7de0, which uses sdi_WARPING.value as the free-cell search radius
+        # (so_FindBlockLocate); SS_WARPING / SS_DASH skills test sdi_WARPING.exist (smo_WarpTo / smo_WarpForward
+        # FUN_004a83e0, value = forward distance)
     SS_SETABSTATEFRIEND / SS_SETABSTATEME / SS_DISPELABSTATE:
         if as_FromID(dic_abstate, (u16)value) == null:
             fatal "SkillDataIndex::sdi_SetArgument : SS_SETABSTATEFRIEND invalid abstate"
@@ -470,12 +475,276 @@ name index (`dic_abstate.as_BTreeID`).
 
 ## 6. PassiveDataBox
 
-*(part 2: `PassiveDataBox` ctor FUN_00585790, `pdb_Load` FUN_005858d0, `sdb_GetSetAbstate` FUN_00584f20,
-`sdb_SpecSkillStruct` FUN_0059ebe0, accessors; PassiveSkill.shn / PSkillSetAbstate.shn column maps)*
+Passive skills get no index structure: the zone uses the `PassiveSkillInfo` rows of PassiveSkill.shn directly,
+through an ID-indexed pointer array. PSkillSetAbstate.shn adds "passive sets an abnormal state on a condition" rows.
+Loaded once at startup (`zs_start_wide` FUN_005ad9a0, right after `sdb_Load`); there is no reload path
+(`pdb_Load` has no other caller).
+
+### 6.1 Data structures
+
+```
+class PassiveDataBox {                                  // 0x1e4, global passivedatabox
+  0x000 PassiveSkillInfo* pdb_default                   // = &pdb_databox.bdb_defaultblock (set by the ctor)
+  0x004 BinaryDataBox<PassiveSkillInfo> pdb_databox     // PassiveSkill.shn (row 0xfe), default block at +0x40
+  0x144 PassiveSkillInfo** pdb_index                    // new[pdb_maxpassiveID]; [id] = row, or the default block
+  0x148 int pdb_passivenumber                           // = PassiveSkill row count
+  0x14c int pdb_maxpassiveID                            // = max(ID) + 1 = length of pdb_index
+  0x150 SpecialSkill sdb_SpecSkill { u16 ss_PowerOfLove }   // ID of "PowerofLove01"
+  0x154 BinaryDataBox<PSkillSetAbstate> pdb_SetAbstateDataBox   // PSkillSetAbstate.shn (row 0x47)
+  0x1dc int pdb_nMaxPSkillSetAbstateNum                 // = PSkillSetAbstate row count
+  0x1e0 PSSetAbstateIndex* pdb_pPSkillSetAbstate        // new[pdb_nMaxPSkillSetAbstateNum], one per row
+}
+struct PassiveDataBox::PSSetAbstateIndex {              // 0x10
+  0x0 u16 pssabs_nID                                    // passive skill ID of the row's PS_InxName
+  0x4 PSkillSetAbstate* pssabs_pPSkillSetAbstate        // the row
+  0x8 PSSetAbstateIndex* pssabs_Prev                    // entry of the passive named in this passive's DemandSk
+  0xc PSSetAbstateIndex* pssabs_Next                    // entry whose Prev is this one (last writer wins)
+}
+```
+
+```pseudo
+_dynamic_initializer_for_'passivedatabox'                               @ FUN_00698f10
+    PassiveDataBox::PassiveDataBox(&passivedatabox); atexit(FUN_0069f160)
+PassiveDataBox::PassiveDataBox(this)                                    @ FUN_00585790
+    construct both readers (BinaryData ctor), vftables BinaryDataBox<PassiveSkillInfo> / <PSkillSetAbstate>
+    memset(pdb_databox.bdb_defaultblock, 0, 0xfe); memset(pdb_SetAbstateDataBox.bdb_defaultblock, 0, 0x47)
+    pdb_default = &pdb_databox.bdb_defaultblock
+    default.ID = 0xFFFF
+    default.MstRt{Sword1, Hammer1, Sword2, Axe2, Mace1, Bow2, CrossBow2, Wand2, Staff2} = 1000
+        # MstRtClaw, MstRtDSword stay 0; CastingTime stays 0 (cpl_RecalcParam's neutral value is 1000, §6.5)
+        # (original bug) Z20-B10
+    (the other default members are written 0 again); pdb_index = null; pdb_nMaxPSkillSetAbstateNum = 0;
+    pdb_pPSkillSetAbstate = null       # pdb_passivenumber / pdb_maxpassiveID: static zero until pdb_Load
+_dynamic_atexit_destructor_for_'passivedatabox'                         @ FUN_0069f160
+    delete[] pdb_pPSkillSetAbstate (if set); destroy pdb_SetAbstateDataBox, then pdb_databox (BinaryData dtor)
+    # pdb_index is never freed (process exit)
+```
+
+The `BinaryDataBox<PassiveSkillInfo>` destructors FUN_00585250 (plain) / FUN_005854b0 (scalar-deleting) and
+`BinaryDataBox<PSkillSetAbstate>` scalar-deleting destructor FUN_005854e0 only reset the vftable and run the
+`BinaryData` destructor, like the active-skill boxes (§1.2).
+
+### 6.2 Tables and column → member map
+
+| File | Reader | Row | Rows (2016) | Map |
+|---|---|---|---|---|
+| `../9Data/Shine/PassiveSkill.shn` | `BinaryDataBox<PassiveSkillInfo>::bdb_ReadData` FUN_00585260 | 0xfe | 503 | 48 columns = the 48 `PassiveSkillInfo` members, same names, order and offsets (checked against `shn.py`) |
+| `../9Data/Shine/PSkillSetAbstate.shn` | `BinaryDataBox<PSkillSetAbstate>::bdb_ReadData` FUN_00585310 | 0x47 | 16 | 5 columns = the 5 `PSkillSetAbstate` members, same names, order and offsets |
+
+Both readers are the same template as the active-skill readers (§2.1): `CDataReader::Read(this, path, key, rowsize)`
+with key 0x20f4 (PassiveSkill) / 0xa9 (PSkillSetAbstate); on failure `AssertFail "BinaryDataBox<T>::bdb_ReadData :
+readfail" <path>`, the `"Code:%X:%d\tSHN:%X:%d"` line (same null `m_pHead` dereference, Z20-B1) and
+`ShineExit("BinaryDataBox<T>::bdb_ReadData")`.
+
+Because the rows are used as they are, the column meaning is defined by the readers (§6.5 for the details):
+
+| Column (PassiveSkillInfo member) | Type | Read by | Meaning |
+|---|---|---|---|
+| ID | u16 | pdb_Load, every lookup | passive skill ID; index into `pdb_index` and into the player's 1000-bit `cpl_Passive` |
+| InxName | char[32] | pdb_Load (`skillnametree`, ispassive 1), class-change code (`itemdatabox.idb_btree` lookup) | unique name |
+| Name | char[32] | – (not read by the loader or the readers below) | display name |
+| WeaponMastery | u32 | cpl_RecalcParam | ≠ 0: the row is a weapon mastery (Mst* columns apply to the equipped weapon) |
+| DemandSk | char[32] | pdb_Load (set-abstate chain), cpl_PreSkillCheck (scroll use) | prerequisite passive `InxName`, `-` = none |
+| MstRtTmp, MstPlTmp | u32 | – | zeroed by pdb_Load for every row; the "no mastery" slot of the `pmv` table |
+| MstRt<Weapon> (11 columns) | u32 | cpl_RecalcParam | weapon damage rate bonus in ‰ (Rate = value + 1000) for that weapon class |
+| MstPl<Weapon> (11 columns) | u32 | cpl_RecalcParam | flat weapon damage bonus |
+| SPRecover, TB, MaxSP, MaxLP, Intel | u32 | cpl_RecalcParam | Plus.SPRecover / TB / MaxSP / MaxLP / Int |
+| CastingTime | u32 | cpl_RecalcParam | Rate.CastingTime (1000 = neutral) |
+| MACriRate | u16 | cpl_RecalcParam | Rate.MagCriDamRate |
+| WCRateUp, MARateUp | u32 | cpl_RecalcParam | Rate.WCmin/WCmax, Rate.MAmin/MAmax = value + 1000 |
+| HpDownDamegeUp, DownDamegeHp | u16 | cpl_RecalcParam | WC/MA min/max rate + HpDownDamegeUp while HP ≤ DownDamegeHp (both ≠ 0) |
+| HpDownAcUp, DownAcHp | u16 | cpl_RecalcParam | AC/MR rate + HpDownAcUp while HP ≤ DownAcHp (both ≠ 0) |
+| MoveTBUpPlus | u16 | cpl_RecalcParam | moving TB plus (condition 1000) |
+| HealUPRate, KeepTimeBuffUPRate, CriDmgUpRate, DMG_MinusRate | u16 | cpl_RecalcParam | PassiveHealRate, PassiveBuffKeepTimeUPRate, PassiveCriDamageRatePlus, DMGMinusRate |
+| ActiveSkillGroupInx | `ActiveSkillGroupIndex` (u32) | – (no reader by member name; sweep part 3) | 2016: 0 in 495 rows, 98 / 99 in 4 each |
+
+PSkillSetAbstate.shn: `PS_InxName` char[32] (passive `InxName`), `PS_Condition` `PS_ConditionEnum`
+(PS_CBOWATKRATEKNOCKBACK 0, PS_SKILLSPUSEDOWN 1, PS_AREAENEMYSPDOWN 2, PS_MEDMGMISSCRIUPRATE 3), `PS_ConditioRate`
+u16 (chance in ‰), `PS_AbStateInx` char[32] (abstate name, `dic_abstate.as_FromName`), `Strength` u8 (abstate
+strength).
+
+### 6.3 `PassiveDataBox::pdb_Load`
+
+```pseudo
+PassiveDataBox::pdb_Load(this, Name4* unused)                          @ FUN_005858d0
+  # parameter never read; zs_start_wide passes &zoneserver.zs_serverinfo.worldname
+  pdb_databox.bdb_ReadData("../9Data/Shine/PassiveSkill.shn")              @ FUN_00585260
+  pdb_SetAbstateDataBox.bdb_ReadData("../9Data/Shine/PSkillSetAbstate.shn") @ FUN_00585310
+  # 1. ID index
+  pdb_passivenumber = PassiveSkill row count
+  pdb_maxpassiveID = max(row.ID) + 1          # 0 + 1 = 1 for an empty table
+  pdb_index = new PassiveSkillInfo*[pdb_maxpassiveID]
+      null: fatal "PassiveDataBox::pdb_Load : Fail to alloc memory"
+  every slot = &pdb_databox.bdb_defaultblock
+  for each row i:
+      if pdb_index[row.ID] ≠ default block: fatal "PassiveDataBox::pdb_Load : Dublicate id" (prints ID)
+      pdb_index[row.ID] = row;  row.MstPlTmp = 0;  row.MstRtTmp = 0      # writes into the reader's buffer
+      bt_Insert(skillnametree, row.InxName, {skill = row.ID, ispassive = 1})   # §5.2; overwrites an equal name
+  # 2. special skill
+  v = skillnametree[“PowerofLove01”]
+      0xFFFFFFFF: fatal "PassiveDataBox::sdb_MakeSpecialSkill : Invalid Skill" "PowerofLove01"
+  sdb_SpecSkill.ss_PowerOfLove = (u16) v       # ispassive not checked (Z20-B7)
+  # 3. set-abstate index
+  pdb_nMaxPSkillSetAbstateNum = PSkillSetAbstate row count
+  pdb_pPSkillSetAbstate = new PSSetAbstateIndex[n]     # NOT initialised
+      null: fatal "PassiveDataBox::pdb_Load : Fail to alloc memory"
+  for k in 0 … n−1 (row r_k):
+      v = skillnametree[r_k.PS_InxName]
+          0xFFFFFFFF: fatal "PassiveDataBox::sdb_MakeSpecialSkill : Invalid Skill" <PS_InxName>
+      if (u16)v == 0xFFFF or (v & 0xFFFF) ≥ pdb_maxpassiveID: skip (entry k stays uninitialised) (original bug) Z20-B6
+      e_k = { pssabs_nID = (u16)v, pssabs_pPSkillSetAbstate = r_k, Prev = null, Next = null }
+      d = pdb_index[(u16)v].DemandSk           # (u16)v may be an ACTIVE skill's ID (Z20-B7)
+      if d ≠ "-":
+          w = skillnametree[d]
+              0xFFFFFFFF: fatal "PassiveDataBox::sdb_MakeSpecialSkill : Invalid Skill" <d>
+          j = the first entry (0 … n−1, including later, not yet written ones) with pssabs_nID == (u16)w
+          found: e_k.Prev = &e_j;  e_j.Next = &e_k
+          # not found: Prev stays null (no message)
+```
+
+The fatal messages say `sdb_MakeSpecialSkill`: the set-abstate step reuses the special-skill error text (the
+function `PassiveDataBox::sdb_MakeSpecialSkill` exists only as these strings, inlined here).
+
+### 6.4 Lookups and iteration
+
+```pseudo
+passive row by ID (inlined in every reader: cpl_RecalcParam, uib_CanUseItem FUN_0059d1b0, …)
+    id < pdb_maxpassiveID ? pdb_index[id] : pdb_default        # an unknown ID gives the default block (ID 0xFFFF)
+
+PassiveDataBox::sdb_Home(this, int* i): *i = −1                          @ FUN_0050ffc0
+PassiveDataBox::sdb_Next(this, int* i): return ++*i < pdb_passivenumber  @ FUN_00584f00
+PassiveDataBox::sdb_Get(this, int* i) → PassiveSkillInfo*                @ FUN_00585d10
+    *i ≥ pdb_passivenumber: pdb_default;  else row *i (file order, not ID order)
+    # callers: ac_AllLearnSKill FUN_004212e0 (Z11), sp_NC_ITEM_CLASS_CHANGE_REQ FUN_0051f5c0,
+    #          sp_OpenClassChangeMenu FUN_0051fd10
+    # FUN_0050ffc0 is a shared body (identical-code folding): sp_NC_ITEM_MOVER_UPGRADE_REQ FUN_0051c850 and
+    #          sp_Gamble_UseCoinItem FUN_006174e0 call it as another class's "set to −1"
+
+PassiveDataBox::sdb_GetSetAbstate(this, u16 id) → PSSetAbstateIndex* or null   @ FUN_00584f20
+    linear scan of all pdb_nMaxPSkillSetAbstateNum entries (uninitialised ones included, Z20-B6); first with
+    pssabs_nID == id                     # a passive with two PSkillSetAbstate rows: only the first is ever used
+    # caller: CharacterPassiveList::cpl_StoreSetAbstateList FUN_00447340
+
+PassiveDataBox::sdb_SpecSkillStruct(this) = &sdb_SpecSkill               @ FUN_0059ebe0
+    # caller: ShinePlayer::so_RecalcLastParam FUN_004cb570 (knows ss_PowerOfLove: four parameters +0x32)
+    # ss_PowerOfLove read directly: so_ply_DivorceProcess FUN_0059f550, gds_NC_CHAR_WEDDING_DO_ACK FUN_005a1830
+```
+
+`std::_List_val<PSSetAbstateIndex*>::_Buynode` FUN_00446430 is the node allocator of `cpl_SetAbstateList`
+(`new` 0xc {next, prev, value}; `bad_alloc` on failure).
+
+### 6.5 The per-player side: `CharacterPassiveList`
+
+`ShinePlayer::sp_Passive` is a `CharacterPassiveList` (0x18): `BitSet cpl_Passive` (1000 bits, ctor FUN_00447200)
+and `std::list<PSSetAbstateIndex*> cpl_SetAbstateList` (dtor FUN_004472c0 frees all nodes, then the BitSet). It holds
+only IDs and pointers into `passivedatabox.pdb_pPSkillSetAbstate`, so passive IDs must stay below 1000. Who fills it
+(`so_charpassivedata` FUN_0044e5a0 from the Character DB, learning, unlearning) is Z12 / Z03; the functions that touch the
+PassiveDataBox:
+
+```pseudo
+CharacterPassiveList::cpl_Store(this, PROTO_NC_CHAR_SKILL_PASSIVE_CMD* p, Name5 char)   @ FUN_00447aa0
+    for each u16 id in p (count p.number):          # from so_charpassivedata FUN_0044e5a0
+        id ≥ 1000: AssertFail "CharacterPassiveList::cpl_Store : Invalid passive" id (char name in namestring); next
+        set bit id (if id < bs_maxbit); cpl_StoreSetAbstateList(id)
+CharacterPassiveList::psl_Store(this, u16 id, Name5 char)               @ FUN_00447810   (so_LearnPassive FUN_00559e50)
+    id ≥ 1000: same assert; return
+    set bit id; cpl_StoreSetAbstateList(id)
+    player = som_FindPlayer(char); if found: for the cpl_SetAbstateList entries with PS_Condition == PS_AREAENEMYSPDOWN (2):
+        same roll-and-apply as cpl_SetAbstate below, target = caster = the player (inlined copy)
+CharacterPassiveList::cpl_StoreSetAbstateList(this, u16 id)             @ FUN_00447340
+    e = passivedatabox.sdb_GetSetAbstate(id); null: return
+    if e.pssabs_Prev: remove the first list node whose entry's pssabs_nID == e.pssabs_Prev.pssabs_nID
+        # replaces the previous level of the same passive; the scan stops early at a node with a null value
+    append e
+CharacterPassiveList::cpl_UnLearn(this, u16 id)                         @ FUN_0057b4d0   (so_UnlearnSkillAck FUN_0057f200)
+    id > 999: AssertFail "CharacterPassiveList::cpl_Store : Invalid passive" id   (continues)
+    if bit id is set (read before the bound check) and id < bs_maxbit: clear bit id   (original bug) Z20-B8
+    # cpl_SetAbstateList is not touched: the passive's set-abstate entry stays (original bug) Z20-B9
+CharacterPassiveList::cpl_IsLearn(this, u16 id) = bit id                @ FUN_004193b0   (no bound check)
+CharacterPassiveList::cpl_PreSkillCheck(this, player, char* demand) → bool   @ FUN_00445810
+    demand[0] == '-': true
+    v = skillnametree[demand]                  # not checked for 0xFFFFFFFF nor ispassive (original bug) Z20-B8
+    bit (v & 0xFFFF) set: true;  else player.vt[0x91c/4](0x70c, 9, …) (error message to the player, Z03/Z07); false
+CharacterPassiveList::cpl_SetAbstate(this, PS_ConditionEnum c, caster, target, u8 flag, ulong)   @ FUN_00446a10
+    # via ShinePlayer::so_ply_PassiveSetAbstate FUN_005798e0 (vtable; trigger points are Z03)
+    caster, target non-null, list non-empty, c < 4, else return
+    for each entry e in list order (stops at a null value):
+        row = e.pssabs_pPSkillSetAbstate; null: AssertFail "… : INVALID PSkillSetAbstate Data" e.pssabs_nID; stop
+        row.PS_Condition ≠ c: next
+        c gate: 0 PS_CBOWATKRATEKNOCKBACK needs flag and the caster's weapon (vt[0x7ac/4]) to be WT_CROSSBOW;
+                1, 2: none; 3 PS_MEDMGMISSCRIUPRATE needs flag; gate fails: return
+        if rb_1000() < row.PS_ConditioRate:
+            a = dic_abstate.as_FromName(row.PS_AbStateInx); null / no index: AssertFail "… : INVALID Abstate (Index) Data"; stop
+            target.vt[0x634/4](a) == 1 (already has it): stop
+            target.vt[0x644/4](caster, a.index.AbStataIndex, row.Strength, 1); next entry
+        else stop                              # only entries up to the first failed roll are tried
+CharacterPassiveList::cpl_RecalcParam(this, Container* param, ItemBag* bag)   @ FUN_00445940
+    # via ShinePlayer::so_RecalcPassiveParam FUN_004cb4a0 (resets the passive plus/rate block first)
+    weapon = item ID in equipment slot 12, or slot 10 if empty (0xFFFF) *(inferred: slot meaning)*
+    for id in 0 … 999 with bit id set:
+        r = passive row by ID (§6.4; unknown → default block)
+        if r.WeaponMastery ≠ 0 and the weapon's ItemInfo is valid:
+            rateCol = pmv.pmv_var[TwoHand & 1][0][WeaponType]; plusCol = pmv.pmv_var[TwoHand & 1][1][WeaponType]
+                (WeaponType ≥ 22: pmv_var[1][0][0] / [1][1][0]; table below)
+            staff / wand: Plus.MagicalWeaponMastery = r[plusCol] (if ≠ 0); Rate.MagicalWeaponMastery = r[rateCol] + 1000 (if ≠ 0)
+            else:         Plus/Rate.PhisycalWeaponMastery the same way
+        each other column as in §6.2, assigned only when ≠ 0 (CastingTime: when ≠ 1000)
+        # assignments, not sums: for each member the highest learned ID with a non-zero value wins
+```
+
+`PassiveMasteryVariable` `pmv` (ctor FUN_00444db0, initializer FUN_00695330): `pmv_var[twohand][0 = rate, 1 =
+plus][WeaponTypeEnum]` = byte offset of the PassiveSkillInfo column. Every entry not listed is MstRtTmp / MstPlTmp
+(zeroed by pdb_Load, so no bonus):
+
+| twohand | Weapon type → Rt / Pl column |
+|---|---|
+| 0 | WT_SWORD → Sword1, WT_MACE → Mace1, WT_HAMMER → Hammer1, WT_DSWORD → DSword, WT_CLAW → Claw |
+| 1 | WT_BOW → Bow2, WT_STAFF → Staff2, WT_AXE → Axe2, WT_CROSSBOW → CrossBow2, WT_WAND → Wand2, WT_DSWORD → DSword, WT_CLAW → Claw, WT_TSWORD → Sword2 (two-handed WT_SWORD → MstPlTmp for both, also no bonus) |
+
+### 6.6 Invariants a rebuild needs (with the 2016 data)
+
+- IDs: unique (duplicate = fatal), 0 … 842 in 2016 (503 rows, 340 unused IDs in the range); must be < 1000 or the
+  player list refuses them (`cpl_Store` / `psl_Store`) and `cpl_RecalcParam` never looks at them.
+- Unknown IDs (gaps, ≥ `pdb_maxpassiveID`) resolve to the default block, never null (Z20-B10).
+- `InxName` shares `skillnametree` with the active skills: passives are inserted after the actives at startup, so a
+  name in both tables would resolve to the passive; `&reloaddata ActiveSkill` re-inserts the actives and would flip it
+  back. 2016: no name in both tables (156 numeric IDs exist in both, §3.3).
+- `PowerofLove01` must exist (2016: ID 400, passive). Every `PS_InxName` and every non-`-` `DemandSk` of a
+  set-abstate passive must be a known name (fatal otherwise). 2016: all 16 PSkillSetAbstate rows name passives, no
+  name twice, conditions 1 × 8, 2 × 4, 3 × 4; four chains of four levels (MagicDance, DeepFear, Shame, PointAttack)
+  whose prerequisite row always comes earlier in the file, so the uninitialised-entry paths of Z20-B6 are not hit.
+- All 503 `DemandSk` values are `-` or a passive name. 34 rows (WCMastery01–13, MAMastery01–13, LightMastery01–05,
+  BackgroundDefenseG01/J01/S01) have CastingTime 0 instead of the neutral 1000 (§8).
 
 ## 7. Holders of `SkillDataIndex*`
 
-*(part 2: the objects that keep `SkillDataIndex*` past a call, settling Z11-B37's holder list)*
+Settles the holder list of Z11-B37 (`&reloaddata ActiveSkill` deletes and reallocates `sdb_ValidArray`, §3.1). Found
+by scanning every 2016 PDB type for members of type `SkillDataIndex*` / `AreaSkillInfo*` / skill-row pointers, then
+every write to those members. No struct outside the two boxes keeps a pointer to an `ActiveSkillInfo`,
+`ActiveSkillInfoServer`, `ActiveSkillGroup`, `ToggleSkill` or `AreaSkill` row.
+
+| Holder (member) | Set by | Lifetime | After `&reloaddata ActiveSkill` |
+|---|---|---|---|
+| `UseEffect::UIE_Functions::useskill` in `useditemeffect.uie_FuncStruct[itemID]` | `UsedItemEffect::uie_Load` FUN_0059cc30 (stage wide, after sdb_Load) and `uie_SetChargedBuffer` FUN_005963e0 from `ChargedItemEffectDataBox<…>::cideb_Load` (Riding FUN_00450070, ChargedEffect FUN_005af300, MiniHouse FUN_005af4d0, MiniHouseFurniture FUN_005af6d0), `RidePetDataBox::rpdb_Load` FUN_00450270, `ItemUseFunction::iuf_Load` FUN_0049b770, `MagicContainer::mc_Load` FUN_0049c7f0, `MoverDataBox::mvdb_Load` FUN_004bf960, `cStateItemDataBox::sidb_Load` FUN_0058c920, `MysteryVaultTable::DataProcess` FUN_005c8590; pointer from `uie_UseSkillID` FUN_0059cba0 | process | **dangles** (never rebuilt): every item use reads the freed array |
+| `UseEffect::UseItemRide::uir_RideSkill` (`ui_ride`), `UseEffect::UseItemPet::uip_PetSummonSkill` (`ui_Pet`) | `uir_SetSkill` FUN_00653a60 / `uip_SetSkill` FUN_00596b10 in `zs_start_sun` FUN_005adbd0 ("UseRide", "UseSumPup") | process | **dangles** |
+| `NPCAction::SkillAction::skillIndex_` | ctor FUN_005c0fe0 (`operator[]`; fatal "SkillAction::SkillAction : Invalid skill index") from `ActionGen_OptionReader::operator()` FUN_005c18c0 | NPC action tables (load time *(inferred)*) | **dangles** |
+| `ShineMagicField::smfm_skillindex` (+0x1bc) | `so_mgcfld_MagicFieldSpread` FUN_0057ea30 / `…_Friend` FUN_0057ee80 | until the field expires | dangles while a field exists |
+| `SkillEffectApply::SkillBlastEffect::sbe_SkillIndex` in each object's `SkillBlastEffectContainer::sbec_List` | `sbec_Store` FUN_00438380, `MobExplosionBase::meb_Explosion` FUN_004a7960 | until the blast tick | dangles for pending hits |
+| `ShineMobileObject::smo_SkillCast.scs_ProduceSkill.sklidx` (obj+0x1d84+0x14) | `smo_SkillBash_Casting` FUN_0057bef0, cleared by `SkillCastStruct::scs_Clear` FUN_005691f0 | one cast | dangles for casts in progress |
+| `AxialListLimitAreaScan::allas_pArea` (`AreaSkillInfo*`, element of `sdi_Area`) | ctor FUN_004c19c0, `allas_Init` FUN_004c19f0 / FUN_004c1a00 | one scan *(inferred)* | – |
+| `EngageArgument::sklinfo`, `EngageFlag::efm_sklinfo`, `SmashArgument::sklidx` | `EngageArgument` ctor FUN_0042abf0, `smo_SkillBlast` FUN_00581160, `so_attack` FUN_0042cab0 | stack, one call | – |
+| `SkillDataIndex::sdi_PrevSkill` / `sdi_NextSkill` | sdb_Load step 8 | the array | rebuilt |
+
+Not holders (they keep skill IDs and look the index up on use): `CharaterSkillList` (`CharSkill.cs_SkillId`,
+`CharacterToggleSkill.cts_nSkillID`), `MoverSkillList::MoverSkill.ms_SkillID`, `SkillCastStruct.scs_Skill`,
+`MobAttackSequence` (`ae4m_skillID[500]`, `SkillChange.sc_From/sc_To`), `DefSkillData`, `MiscData_Skill`,
+`NPCAction::SkillCondition::skillID_`, the abnormal states (no skill-pointer member). The `sdb_BinData` rows the
+index points to live in the reader buffers, which `CDataReader::Read` reuses when the new file is not larger (§3.3),
+but no holder outside the index keeps a row pointer, so that only matters for the index itself.
+
+`uir_SetSkill`'s body (store the argument at +4) is shared by identical-code folding: `DiceGame::Start` FUN_00478ef0,
+`ShineMobileObject` ctor FUN_005591c0 and `DataRecordArgument::lid_Call` FUN_00647510 call FUN_00653a60 for
+unrelated "set member +4" writes; those are not skill holders.
 
 ## Original-server bugs
 
@@ -486,15 +755,24 @@ name index (`dic_abstate.as_BTreeID`).
 | Z20-B3 | `sdb_Load` warnings (§3.2) | DemandSk check reads element −1 for i = 0; "same line" SP / nT checks read element `sdb_MaxValid` for the last skill | heap read outside the array when the lowest-ID skill has a step > 1 name or the highest-ID skill has a step name; a crash or a bogus warning at load (not with 2016 data) | skip i = 0 / the last element |
 | Z20-B4 | `sdb_Load` (§3.3) | duplicate skill IDs are not detected | 2016: ID 9034 (`KQRoboAtkSk2`, `GoMasterAtkSkill2`): both names resolve to the same one of the two rows, the other is never used | reject duplicates at load |
 | Z20-B5 | `GetSkillIndexByName` (§5.1) | casts the `skillnametree` value to `u16`, dropping `ispassive` | latent: a passive skill's name would yield the active skill with the same ID (156 shared IDs in 2016) or null | refuse entries with `ispassive = 1` |
+| Z20-B6 | `pdb_Load` set-abstate index (§6.3) | `new PSSetAbstateIndex[n]` is not initialised; a row whose name resolves to ID 0xFFFF or ≥ `pdb_maxpassiveID` is skipped and its entry left as garbage; the prerequisite search scans all n entries, later unwritten ones included | latent (2016: all 16 rows valid, prerequisites always earlier): `sdb_GetSetAbstate` / the Prev search can match a garbage `pssabs_nID` and hand out a wild `PSkillSetAbstate*` | zero the array, compact skipped rows, search only entries written so far |
+| Z20-B7 | `pdb_Load` name lookups (§6.3) | `PowerofLove01`, `PS_InxName` and `DemandSk` are resolved in the shared `skillnametree` without checking `ispassive` | latent: an active skill's name yields the passive with the same number, or the default block, whose empty `DemandSk` then fails the lookup and ends the process with "Invalid Skill" and an empty name | accept only `ispassive = 1` entries |
+| Z20-B8 | `cpl_PreSkillCheck`, `cpl_UnLearn` (§6.5) | the bit index is not bounded: `cpl_PreSkillCheck` tests bit `0xFFFF` for an unknown name (and the passive bit of an active skill's number); `cpl_UnLearn` logs an ID > 999 but reads `bs_bitlist[id >> 3]` before its `bs_maxbit` check | heap read up to 8 KB past the 125-byte bit list; a bogus "prerequisite learned" | bound the index (`< bs_maxbit`) and check the lookup result |
+| Z20-B9 | `cpl_UnLearn` (§6.5) | clears the bit but leaves the passive's `PSSetAbstateIndex` in `cpl_SetAbstateList` | after unlearning a set-abstate passive (MagicDance, DeepFear, Shame, PointAttack) its proc keeps firing until the list is rebuilt at the next login *(inferred: no other remover found)* | remove the entry (and restore the previous level) |
+| Z20-B10 | `PassiveDataBox` ctor default block (§6.1) | `CastingTime` 0 and `MstRtClaw` / `MstRtDSword` 0, while `cpl_RecalcParam` treats 1000 as the neutral cast rate | a learned bit with no row (an ID that is a gap, or ≥ `pdb_maxpassiveID`, e.g. from stale Character DB data) sets `Rate.CastingTime = 0` | default `CastingTime = 1000` like the other rates |
 
 ## 8. Not reconstructed / uncertain
 
-- `SS_DASH2` sets `sdi_WARPING_TARGET` and copies the value into `sdi_WARPING.value` without setting
-  `sdi_WARPING.exist`; whether the copy is meant for code that reads `sdi_WARPING.value` after testing
-  `sdi_WARPING_TARGET.exist` depends on the readers (Z03); not classified as a bug.
 - Which of the two ID-9034 rows `bsearch` returns (MSVC `qsort` order of equal keys) was not simulated.
-- The per-world parameter of `sdb_Load` (`Name4*`) is unused; whether startup passes a world name or NULL was not
-  read (Z10 §7 shows only the call).
+- What `Rate.CastingTime = 0` does: 34 PassiveSkill rows (WCMastery, MAMastery, LightMastery, BackgroundDefense)
+  have CastingTime 0, so `cpl_RecalcParam` writes 0 for players who learned them (Z20-B10 is the same value from the
+  default block); the reader of `PassiveSkill.Rate.CastingTime` is not reached by member name (the parameter sum is
+  Z12 / Z03). If it multiplies, those passives make casting instant; if 0 is skipped, the data is harmless.
+- `cpl_StoreSetAbstateList` removes the previous level only when it is already in the list: if the Character DB lists
+  a higher level before a lower one (`cpl_Store` keeps the packet order), both entries stay. The DB order was not
+  checked (Z12 / `p_Char_GetPassive…` procedures).
+- `PassiveSkillInfo.ActiveSkillGroupInx` (8 rows ≠ 0 in 2016) has no reader by member name; the sweep part
+  looks for offset reads (+0xf8).
 - The 49 delay-group / 24 step-number warnings are my reproduction of the rules over the 2016 data, not a run of
   the server.
 
