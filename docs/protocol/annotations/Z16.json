@@ -1085,6 +1085,326 @@
      ]
     ],
     "notes": "0x21 bytes. Z16 §6.7"
+   },
+   "0x7481": {
+    "dir": "WM→Z",
+    "name": "NC_GUILD_TOURNAMENT_START_CMD",
+    "basis": "zone wms_NC_GUILD_TOURNAMENT_START_CMD FUN_00477a10 + wms_GuildTournamantStart FUN_00476de0; PROTO_NC_GUILD_TOURNAMENT_START_CMD (pdb2016)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nTournamentSeed",
+      "0…32 accepted (bound 33, Z16-B17)"
+     ],
+     [
+      1,
+      "u16",
+      "nTournamentMapNo",
+      "overwritten with GTMap[seed].mapid before use"
+     ],
+     [
+      3,
+      "u16",
+      "nExploerTimeMin",
+      "film token arg 3"
+     ],
+     [
+      5,
+      "u16",
+      "nWaitPlayTimeSec",
+      "read by nobody on the zone"
+     ],
+     [
+      7,
+      "u16",
+      "nPlayTimeMin",
+      "film token arg 4"
+     ],
+     [
+      9,
+      "u32",
+      "nNo1",
+      "guild A number, film token arg 1"
+     ],
+     [
+      13,
+      "u32",
+      "nNo2",
+      "guild B number, film token arg 2"
+     ]
+    ],
+    "notes": "0x11 bytes; sent to every zone, only the zone hosting GTMap[seed].mapname creates the match. Z16 §6.2"
+   },
+   "0x74e3": {
+    "dir": "WM→Z",
+    "name": "NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_REQ",
+    "basis": "zone wms_NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_REQ FUN_004766f0; PROTO_NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_REQ (pdb2016)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "hWMChar",
+      "WM handle, echoed"
+     ],
+     [
+      2,
+      "u32",
+      "nCharNo",
+      "−1 or not on this zone: ignored"
+     ],
+     [
+      6,
+      "u32",
+      "nGTNo",
+      ""
+     ],
+     [
+      10,
+      "u32",
+      "nGuildNo",
+      ""
+     ],
+     [
+      14,
+      "u8",
+      "nMinLevel",
+      "not checked by the zone"
+     ],
+     [
+      15,
+      "u16",
+      "nMinMember",
+      "not checked by the zone"
+     ],
+     [
+      17,
+      "u64",
+      "nProposalMoney",
+      "checked against money + pending lock-list change"
+     ]
+    ],
+    "notes": "0x19 bytes. Z16 §6.7"
+   },
+   "0x74e4": {
+    "dir": "Z→WM",
+    "name": "NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_ACK",
+    "basis": "zone FUN_004766f0 (error path) and GameDBSession::gds_NC_GUILD_TOURNAMENT_DB_JOIN_NEW_ACK FUN_00476a10 (DB answer); PROTO_NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_ACK (pdb2016)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "Error",
+      "0x1C42 no guild, 0x1C44 not enough money (from 0x74E3); else the DB's Error (0x1C40 ok)"
+     ],
+     [
+      2,
+      "u16",
+      "hWMChar",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      8,
+      "u32",
+      "nGTNo",
+      ""
+     ],
+     [
+      12,
+      "u32",
+      "nGuildNo",
+      ""
+     ],
+     [
+      16,
+      "u8",
+      "nMinLevel",
+      "copied on the 0x74E3 path; NOT written on the 0x74E6 path (stale buffer bytes, Z08-B13)"
+     ],
+     [
+      17,
+      "u16",
+      "nMinMember",
+      "as nMinLevel"
+     ],
+     [
+      19,
+      "u64",
+      "nProposalMoney",
+      ""
+     ]
+    ],
+    "notes": "0x1b bytes. Z16 §6.7"
+   },
+   "0x74e6": {
+    "dir": "CharDB→Z",
+    "name": "NC_GUILD_TOURNAMENT_DB_JOIN_NEW_ACK",
+    "basis": "zone GameDBSession::gds_NC_GUILD_TOURNAMENT_DB_JOIN_NEW_ACK FUN_00476a10; PROTO_NC_GUILD_TOURNAMENT_DB_JOIN_NEW_ACK (pdb2016)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.handle",
+      "player handle; object must exist, not be empty"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "must equal the object's charNo"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "0x1C40: icl_Apply_N_Free (money taken), else icl_Free"
+     ],
+     [
+      8,
+      "u16",
+      "Error",
+      "0x1C40 success"
+     ],
+     [
+      10,
+      "u16",
+      "hWMChar",
+      ""
+     ],
+     [
+      12,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      16,
+      "u32",
+      "nGTNo",
+      ""
+     ],
+     [
+      20,
+      "u32",
+      "nGuildNo",
+      ""
+     ],
+     [
+      24,
+      "u8",
+      "nMinLevel",
+      "not relayed"
+     ],
+     [
+      25,
+      "u16",
+      "nMinMember",
+      "not relayed"
+     ],
+     [
+      27,
+      "u64",
+      "nProposalMoney",
+      ""
+     ]
+    ],
+    "notes": "0x23 bytes; relayed to the WM as 0x74E4 first, then the lock list is settled. Z16 §6.7"
+   },
+   "0x5836": {
+    "dir": "Z→C",
+    "name": "NC_KQ_SCORE_INFO_CMD",
+    "basis": "zone Lua cScoreInfo FUN_005e3790 / cScoreInfo_AllInMap FUN_005e3970; PROTO_NC_KQ_SCORE_INFO_CMD (pdb2016); client On_NC_KQ_SCORE_INFO_CMD FUN_0049d8b0",
+    "fields": [
+     [
+      0,
+      "u32[2]",
+      "nScore",
+      "both zeroed, then nScore[i] = Lua arg 3 + i for i < min(n, 2); red, blue"
+     ]
+    ],
+    "notes": "8 bytes; KQ team-score window (KQScoreWin::SetScore). Sent by map scripts (Z09 §28.12)"
+   },
+   "0x583c": {
+    "dir": "Z→C",
+    "name": "NC_KQ_SCORE_BOARD_INFO_CMD",
+    "basis": "zone Lua cScoreBoard FUN_005ed860 / cScoreBoard_AllInMap FUN_005edad0; PROTO_NC_KQ_SCORE_BOARD_INFO_CMD (pdb2016); client FUN_0049af40",
+    "fields": [
+     [
+      0,
+      "u8",
+      "bUseRound",
+      "toboolean(arg 2)"
+     ],
+     [
+      1,
+      "u8",
+      "nRound",
+      "arg 3"
+     ],
+     [
+      2,
+      "u8",
+      "Red.nWinFlag",
+      "min(arg 4, 5): rounds won"
+     ],
+     [
+      3,
+      "u8",
+      "Red.nScore",
+      "min(arg 5, 99)"
+     ],
+     [
+      4,
+      "u8",
+      "Blue.nWinFlag",
+      "min(arg 6, 5)"
+     ],
+     [
+      5,
+      "u8",
+      "Blue.nScore",
+      "min(arg 7, 99)"
+     ]
+    ],
+    "notes": "6 bytes; KDTeamScoreWin. Sent by map scripts (Z09 §28.12)"
+   },
+   "0x583d": {
+    "dir": "Z→C",
+    "name": "NC_KQ_WINTER_EVENT_2014_SCORE_CMD",
+    "basis": "zone Lua cWinter_Event_ScoreBoard_AllInMap FUN_005edcf0; PROTO_NC_KQ_WINTER_EVENT_2014_SCORE_CMD (pdb2016); client On_NC_KQ_WINTER_EVENT_2014_SCORE_CMD FUN_004ae2b0",
+    "fields": [
+     [
+      0,
+      "u8",
+      "Red.nWinFlag",
+      "0"
+     ],
+     [
+      1,
+      "u8",
+      "Red.nScore",
+      "arg 2 (no limit)"
+     ],
+     [
+      2,
+      "u8",
+      "Blue.nWinFlag",
+      "0"
+     ],
+     [
+      3,
+      "u8",
+      "Blue.nScore",
+      "arg 3 (no limit)"
+     ]
+    ],
+    "notes": "4 bytes; broadcast to the map; KDSoccer_W. Z09 §28.12"
    }
   }
  }

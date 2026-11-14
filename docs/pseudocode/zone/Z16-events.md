@@ -40,6 +40,8 @@ Debug log channels (all off unless enabled in the zone's debug config): `KQLoggi
 ```pseudo
 KingdomQuest::KQElement {                                     # 0x42c bytes, one per running KQ
     u32 kqe_Stop                +0x000   # end tick = LimitTime · 600 + now (set by kqe_QuestStart; 100-ms ticks)
+                                         # write-only: kqe_QuestStart and KQElement::operator= FUN_00499140 are its
+                                         # only writers, nothing reads it (no zone-side KQ time limit, see §2.2)
     PROTO_KQ_INFO kqe_kqinfo    +0x004   # copy of the WM's 0x580D body (0x179 bytes, below)
     KQElementMap kqe_mapinfo[4] +0x180   # 0x24 each: PROTO_KQ_MAP_INFO mapinfo (0x1a) +0, FieldMap* fld +0x1c,
                                          #   MapInfo* mapinf +0x20 (row of MapInfo.shn for MapBase)
@@ -262,7 +264,9 @@ slot 0…3 in use, 0x98C script not found. Strings in the binary also name ERR_K
     el = kqc_SearchHandle(KQInfo.Handle); none: assert "…Not exist KingdomQuest"; return
     if el.kqe_mapinfo[0].fld (map 0 is local):
         KQElement::kqe_QuestStart(el)                                     @ FUN_004953e0
-            el.kqe_Stop = el.LimitTime · 600 + now                        # minutes → 100-ms ticks
+            el.kqe_Stop = el.LimitTime · 600 + now                        # minutes → 100-ms ticks; never read:
+                # the zone enforces no time limit itself; the KQ ends when the map script calls cEndOfKingdomQuest
+                # (it reads the limit through cGetKQLimitSecond, §3.5) or the WM ends it (§2.5)
             for each map slot with a local instance f:
                 f.fm_Multiflex.cc_DropFilm(kqe_Script)                    # stop a film of that name (Z09 §27.5)
                 f.fm_BlockInfo.mbi_DoorBlockInform.mda_CloseAllDoor()     # FUN_0049e1e0: every door → DA_CLOSE
@@ -271,7 +275,9 @@ slot 0…3 in use, 0x98C script not found. Strings in the binary also name ERR_K
         for each joiner j: el.kqe_PlayerList.kqpil_InsertPlayerInfo(j.chrregnum, j.nTeamType, isJoiner 1)
     slot = kqentrance[this body]                                          # §1.5 (≤ 100 joiners)
     link = { linktoserver = el map 0 MapName, linktoclient = map 0 MapBase, coordx/coordy = map 0 MapInfo RegenX/RegenY }
-        # index[20], direct and Party stay uninitialised stack bytes; so_LinkTo reads only names and coordinates (Z09 §17.7)
+        # index[20], direct and Party stay uninitialised stack bytes; so_LinkTo (FUN_0049ad30) itself reads only the
+        # names and coordinates (Z09 §17.7), but its link-reserve path (vt 0x3fc so_LinkToReserv) copies the whole
+        # struct; whether those bytes are read later was not traced (Z01 §7.1, N.)
     for d in sec[] = {0, 2, 5, 7, 10}:
         k = kqgate.kqg_keeper[++kqg_keeperpoint & 0xff]                   # ring of 256, no in-use check
         e = zonevent.New(); none: assert "…EventReserve error"; stop
@@ -844,7 +850,8 @@ PlayerRegister(p) → bool                                  @ FUN_0047f970
         u16 nGuildTourNamentType = type, u32 nGuildMyRegNumber = p.guildNo (0 → assert)}            # 14 bytes
     → WM 0x74C8 NC_GUILD_TOURNAMENT_ZONE_FIGHTER_ENTER_CMD {u8 nTournamentSeed = seed, u32 nGuildNo, u32 nCharNo}
         # WM sets the character's inArena flag (W03 §8.3)
-    A.SendPlayerAllScoreInfo(p, 1); (A.no == B.no ? A : B).SendPlayerAllScoreInfo(p, 0)    # §5: full score lists
+    A.SendPlayerAllScoreInfo(p, 1); (A.no == B.no ? A : B).SendPlayerAllScoreInfo(p, 0)    # §5.2: full score lists to p,
+                                                                    # p's own row to the whole map
     if g.m_FlagMultiple > 1: → p 0x74F2 NC_GUILD_TOURNAMENT_ITEM_FLAG_CMD {u8 FlagScoreMultiple, u32 nGuildRegNo = g.no}
     true
 
@@ -964,7 +971,8 @@ DeadPlayer(victim, killer)                                 @ FUN_0047e640
         vm.m_unDeCreaseScore += s; vm.m_DieCount++
         → all in the map (anchor vg.m_pManageruser / CheckManagerUser) 0x74DD {0, vg.no, vg.all, vg.capt, 1, [victim row]}
         → same anchor 0x74DD {0, kg.no, kg.all, kg.capt, 1, [killer row]}
-    → victim's guild members in range (AxialListPacketBroadcastByGuild, so_AllOfRange with the all-of-range argument)
+    → victim's guild members in range (AxialListPacketBroadcastByGuild, victim.so_AllOfRange with the all-of-range
+        argument, centred on so_mob_RegenLocation(killer); 0x74DF below uses the same centre)
         0x74DE NC_GUILD_TOURNAMENT_PLAYERDIEMSG_CMD {Name5 VictimCharID, Name5 MurderCharID, int VictimGuildGrade = vm.grade}
     → killer's guild members likewise 0x74DF NC_GUILD_TOURNAMENT_PLAYERKILLMSG_CMD {same body}
     ChangeAdvanRule()
@@ -1126,6 +1134,23 @@ GuildGroup::SetSkillPoint(n)                                 @ FUN_0047afa0
         → anchor only (data stream vt 0x2f8) 0x74CE NC_GUILD_TOURNAMENT_SKILLPOINT_CMD {u16 wSkillPoint = (u16)n}
         # client FUN_006b2660: updates GTTSkillWin / GTTMiniSkillWin and opens the mini skill window
         # only the manager user sees the points; PlayerUnRegister re-sends them to a new manager (§4.4)
+
+GuildGroup::SendPlayerAllScoreInfo(p, mask)                  @ FUN_0047f260   (PlayerRegister and map login, §4.4)
+    p NULL: return
+    pkt = SendScorePacket {PartMask, regNumber m_GuildNumber, unAllScore m_unAllGuildScore,
+                           unCaptureFlagCount m_nCaptureFlagCount}                       (§4.6)
+    self = −1
+    for each entry e (0x1c bytes) of m_vecGuildMembers, index i:
+        e.handle == p's zone handle: self = i
+        object at e.handle live: append row {CharID = its so_CharName (vt 0x56c), the entry's increase / decrease
+            score, die / kill count, grade, capture-flag count}           # dead or offline entries send no row
+        rows > 200: pkt.SendtoPlayer(p, mask); mask = 0     # the row vector is not emptied (original bug) Z16-B14
+    pkt.SendtoPlayer(p, mask)                               # → p 0x74DD: every live member's row of this side
+    self ≥ 0 (p belongs to this side) and its object is live:
+        → all in p's map (SendtoAllinMap(p, 0)) 0x74DD {PartMask 0, regNumber, unAllScore, unCaptureFlagCount,
+            unPlayerNum 1, [p's row]}
+        # so every fighter registration also announces the newcomer's row to the whole map (both sides, observers)
+    # the callers pass mask 1 for group A and 0 for group B: the client clears its score windows once, then adds B
 ```
 
 ### 5.3 Guild skills: 0x74CF and the cool-downs
@@ -1293,6 +1318,9 @@ GuildTournamentSystem::MakeGTItemTargets(out, box, p, row)   @ FUN_0047be70
 `GuildGroup::SetFlagMultiple(n)` @ FUN_00479bd0: → all in the map of the first live member 0x74F2
 NC_GUILD_TOURNAMENT_ITEM_FLAG_CMD {u8 FlagScoreMultiple = n, u32 nGuildRegNo = m_GuildNumber} (layout §4.4); m_FlagMultiple
 = n; n > 1 → m_FlagMultiplelTime delay 600 (60 s); timer enabled iff n > 1. Update (§4.3) multiplies the flag score by it.
+Client GuildTask FUN_006b6d40: FlagScoreMultiple > 1 → starts an effect on the object it keeps for that guild's side
+(+0xbac / +0xbb0, chosen by `nGuildRegNo`; *(inferred)* the side marker) and shows TextData 0x21288084 "%s"War Cry"starts to work, Get double points from your
+territories"; ≤ 1 → removes the effect and shows 0x24221e32 "Ended %s "War Cry"" (both sides see both texts).
 
 ### 5.6 The dice game
 
@@ -1387,6 +1415,10 @@ overwrites it with `GTMap[seed].mapid` = 0. The instance is chosen by seed. The 
 / 06. Round-1 seeds k and k + 8 share one instance, and the WM runs them at different times (Time_Match_161 for slots
 0–7, Time_Match_162 for 8–15). The odd GTMap entries are never used.
 
+The lookups below index `GTMap[gta_Struct.nTournamentMapNo].mapid`, and `nTournamentMapNo` was already replaced by
+`GTMap[seed].mapid`: the row is `GTMap[GTMap[seed].mapid].mapid`, a double mapping *(inferred: probably meant
+`GTMap[seed].mapid` once)*. It is harmless only because every 2016 `mapid` is 0.
+
 **Z08-B12 settled.** `0x7481` accepts `seed ≤ 32` (assembly at 0x477a77: `cmp 0x20, seed; sbb; inc; jne`), but both
 tables have 32 entries. `guildtournamentinfo[32]` is `GTMap[0…2]`: its `nTournamentSeed` byte is `GTMap[0].mapid` (0 ≠ 0xFF,
 so the handler asserts "Seed not empty" and writes 0xFF there), and the start overwrites GTMap[0] / [1] and part of [2] with
@@ -1417,7 +1449,8 @@ GetLinkData(&link, p) → bool                                            @ FUN_
     FieldAttr of MapIDClient (none: false)
     side = (p.guild (vt 0x818) == nNo2) ? 1 : 0          # guild B → regen slot 1; guild A and everyone else (observers) → 0
     link.coordx / coordy = FieldAttr.regenloc[side]; true
-    # link.index[20], direct and Party are not written (stack bytes); so_LinkTo's use of them was not traced
+    # link.index[20], direct and Party are not written (stack bytes); so_LinkTo reads only names / coordinates,
+    # the copy made by its link-reserve path (vt 0x3fc) was not traced (as §2.2)
 ```
 
 ### 6.2 Start: 0x7481 NC_GUILD_TOURNAMENT_START_CMD (WM → every zone)
@@ -1470,7 +1503,8 @@ FieldMap::fm_GetGuildTournamentSystem() = fm_pGuildTournamentSystem    @ FUN_004
 GuildTournamentSystem::SetGuildMemberGrade(charNo, grade)  (static)   @ FUN_0047ccd0
     sm_mapGuildMemberGrades[charNo] = grade
     # one static map for all instances, never cleared: it keeps every fighter's last grade for the zone's lifetime;
-    # read by PlayerRegister (§4.4). A fighter who enters before 0x74C7 arrives is not registered (§4.4 log)
+    # read by PlayerRegister (§4.4). A fighter who enters before 0x74C7 arrives (or whose charNo is missing from it)
+    # is not registered, and as IsPlayerRegister is then false too, the map-login hook sends them to Roumen (§4.4)
 ```
 
 ### 6.3 Recall: 0x749B prompt, 0x749C answer, summon
@@ -1530,11 +1564,13 @@ ShinePlayer::so_ply_Summon2GuildTournament(start, gtms, mapinfo)  (vt 0x924)   @
     q = ShinePlayer at nPlayerHnd (RTTI check); none: return
     err 0x1B60: sp_Guild_Tournamnet_Observer_Enter(q, seed)
     err 0x1B61: q ← 0x74D8 {0x1B61};  err 0x1B62: q ← 0x74D8 {0x1B54 "Relevant Guild Tournament is not in Progress"}
-        (_ErrorSendPlayer<…OBSERVER_ENTER_ACK> FUN_004781a0: 11-byte payload, only err written)
+        (_ErrorSendPlayer<…OBSERVER_ENTER_ACK> FUN_004781a0: 11-byte payload, only err written: stale seed /
+        nGuildRed / nGuildBlue bytes (original bug) Z16-B22; the client reads them only for 0x1B40)
     other codes: nothing
 
 ShinePlayer::sp_Guild_Tournamnet_Observer_Enter(p, seed)                @ FUN_004788c0   (also GM `&observerlinkto`, Z11 §6.3)
     seed 0xFF or > 31: p ← 0x74D8 {0x1B42 "It is not the Guild Tournament Map"}; return
+        # 11-byte payload, only err written: 9 stale g_buf bytes (original bug) Z16-B22
     p.mode ∈ {0, 3, 5, 7}: return (silent)
     p.so_AbnormalState_Set_Simple(0x121 StaObserverHideMode, 1, 0) (vt 0x644) fails: return (silent)
     mode 4: stand up
@@ -1542,6 +1578,8 @@ ShinePlayer::sp_Guild_Tournamnet_Observer_Enter(p, seed)                @ FUN_00
     p ← 0x74D8 NC_GUILD_TOURNAMENT_OBSERVER_ENTER_ACK {u16 err 0x1B40, u8 nTournamentSeed, u32 nGuildRed = nNo1,
         u32 nGuildBlue = nNo2}                                        # 11 bytes, data stream
     machine = fo_GetMechineNumber(server group, fieldserial[link.linktoserver], own zone); −1: assert, return
+        # by then the client already has 0x1B40 (quit button shown) and StaObserverHideMode stays set with no link
+        # (failure order, see N.)
     instance on this zone: so_LinkTo(link, 6, 9, 10); sp_SetRollBackPosEvent(new RollBackPosCallBackEvent(p) (0x68))
         # the roll-back event brings the observer back to where they stood (sp_RunRollBackPosEvent)
     other zone: → WM 0x4019 NC_CHARSAVE_2WLDMAN_LINK_FROM_CMD {u16 wldmanhandle (vt 0x340), u32 chrregnum,
@@ -1566,6 +1604,8 @@ ShinePlayer::sp_Guild_Tournamnet_Observer_Out(p, 0)                     @ FUN_00
 0x74CA NC_GUILD_TOURNAMENT_FLAGCAPTURE_REQ {u16 hTargetFlag}  @ FUN_00475b80 → so_ply_FlagCaptureCast (vt 0x930)
 ShinePlayer::so_ply_FlagCaptureCast(p, hFlag)                            @ FUN_00477d90
     errors → sp_NC_GUILD_TOURNAMENT_FLAGCAPTURE_ACK(err) FUN_00475cd0 = p ← 0x74CB {u16 err} (game stream vt 0x2fc)
+        # client GuildTask FUN_006b3670: 0x1B40 → nothing; any other code → its ErrMsgTable text (FUN_00416430) in
+        # the system message channel (0x19); texts in Z08 §8.1
     no map or no tournament system on it: 0x1B42
     IsFlagCapture(p, hFlag) (§4.5; the flag already belongs to p's guild): 0x1B48
     not IsPlayerRegister(p): 0x1B4F
@@ -1674,7 +1714,7 @@ and only the map test gives the "location" code.
 | Z16-B3 | 0x580D @ FUN_00497790 | maps claimed in earlier loop passes keep `fm_KQHandle` / `fm_KQID` when a later check or the container allocation fails | the instance is unusable for every later KQ ("Not empty2") until restart | reset the claimed maps on every error exit |
 | Z16-B4 | 0x581A @ FUN_00496990 | links to map 0 for any known handle without checking the player is a joiner (and masks only the low 16 bits) | a non-joiner can be linked into the KQ map; it bounces to Roumen at map login unless GM | check `kqpil_IsKQJoiner` before the link |
 | Z16-B5 | `sp_GetJoinKQTeamType` FUN_00563990 | compares the 32-bit `fm_KQHandle` with 0xFFFF | on a KQ map without a KQ, every map login logs "Cannot found KQ Element" | compare with 0xFFFFFFFF |
-| Z16-B6 | Lua `cGetKQLimitSecond` FUN_005e5390 | tests the u16 `LimitTime` against 0xFFFFFFFF | dead check: the nil branch can never be taken, every KQ returns `LimitTime · 60` (0 for `LimitTime` 0) | compare with the u16 "no limit" value (0xFFFF, *(inferred)*) |
+| Z16-B6 | Lua `cGetKQLimitSecond` FUN_005e5390 | tests the u16 `LimitTime` against 0xFFFFFFFF | dead check: the nil branch can never be taken, every KQ returns `LimitTime · 60`; 2016 `KingdomQuest.shn` row 3 "Gold Hill Adventure" has `LimitTime` 65535, so its script gets 3,932,100 s instead of nil (no limit) | compare with the u16 "no limit" value 0xFFFF (the value the 2016 table uses for that row) |
 | Z16-B7 | `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 / `sp_ReviveReqProcess` FUN_00451bd0 | the `bs_ClearAtLink` reset runs only off KQ maps, where `so_GetBattleStat` returns the shared `so_DefBattleStat` | a player's KQ statistics are never reset by it; only the shared default object (written by every non-KQ fight) is cleared | keep the statistics per player and reset them at the link out of the KQ |
 | Z16-B8 | `AxialListKQReward::ali_Work` FUN_00428490 (`reward` / `cReward`) | rewards every player on the map whose kill count reaches `DemandMobKill`, without a joiner or admin-level check (the result list skips GMs) | with `DemandMobKill` 0 GMs and non-joiners on the map get the KQ reward chest, cen, fame and EXP | reward joiners only (`kqpil_IsKQJoiner`), skip GMs |
 | Z16-B9 | `GuildTournamentSystem::Update` FUN_0047e0e0 | the win-score lookup tests whether the GTIGetRateGap table has rows, then reads row 0 of GTWinScore | an empty or missing GTIGetRateGap falls back to 2000 points although GTWinScore says 4000; an empty GTWinScore with a non-empty GTIGetRateGap reads a missing row | test the GTWinScore table it reads |
@@ -1690,13 +1730,16 @@ and only the map test gives the "location" code.
 | Z16-B19 | `IsAccessTime` FUN_004757f0 / `sp_IsGuildTournamentAccessTime` FUN_00475830 / `so_ply_GuildTournament_isSummon` FUN_00475890 | entry window = `nExploerTimeMin · 4800 / 10` ticks = 480 ticks per minute with ticks of 0.1 s | players can answer the recall only for 80 % of the configured entry time; afterwards 0x749C gets 0x1444 "Entry Time is Over" | `nExploerTimeMin · 600` ticks |
 | Z16-B20 | `so_ply_GuildTournament_isSummon` FUN_00475890 (+ `wms_GuildTournamentCheck` FUN_004776a0) | the seed loop returns at the first entry of the player's guild whose window is over; entries are only reset by `fm_GuildTournamentClear` on the hosting zone (the check fallback and non-hosting zones keep them) | a guild's earlier-round entry (lower seed) hides its next match: no 0x749B prompt at map login and `nTournamentSeed` stays 0xFF, so 0x749C fails with 0x1441; repeated "Seed not empty" asserts at the next start | skip (`continue`) entries whose window is over; reset the entry on every zone at the end (0x7482 / a WM broadcast) |
 | Z16-B21 | `ShineMover::so_mobile_IsEnemy` FUN_004309a0 | tests `fm_MapInfo != null → not an enemy` (inverted against the mover's `so_mobile_ICanDamageTo`) before the KQ, party-battle, guild-war and tournament tests; the code after it would read `KingdomMap` through the null pointer (address 0x3a) | on every map (all have a MapInfo row) a mover's enemy test fails for player and mover targets except on PK fields or when captivated: the `fm_GuildTournamentEnemy` branch is dead | `fm_MapInfo == null → false`, as in `so_mobile_ICanDamageTo` |
+| Z16-B22 | `sp_Guild_Tournamnet_Observer_Enter` FUN_004788c0 (seed check) / `_ErrorSendPlayer<…OBSERVER_ENTER_ACK>` FUN_004781a0 | the 0x74D8 error answers (0x1B42, 0x1B61, 0x1B54) are sent with the full 11-byte payload but only `err` written | 9 stale g_buf bytes on the wire (the client reads them only for 0x1B40) | write the error with a zeroed body |
 
 ## N. Not reconstructed / uncertain
 
-- Parts 1–6 written (KQ §1–§3, GT core §4, groups / skills / items / dice §5, match lifecycle §6, sweep); the
-  fresh-context review follows, see `docs/plan/status/Z16.md`.
-- §6.1 `GetLinkData`: `LinkInformTemplete.index[20]`, `direct` and `Party` are left as stack bytes; whether `so_LinkTo`
-  (mode 6, 9, 10) reads them was not traced (Z01 §7.1).
+- Parts 1–6 written (KQ §1–§3, GT core §4, groups / skills / items / dice §5, match lifecycle §6, sweep), reviewed
+  with fresh context in part 7 (findings and fixes in `docs/plan/status/Z16.md`).
+- `PROTO_KQ_MAP_INFO::PROTO_KQ_MAP_INFO` FUN_004194d0 is the trivial constructor of the 0x1a-byte map slot (§1.2).
+- §2.2 / §6.1 `GetLinkData`: `LinkInformTemplete.index[20]`, `direct` and `Party` are left as stack bytes. `so_LinkTo`
+  FUN_0049ad30 itself reads only the names and coordinates; its link-reserve path (vt 0x3fc `so_LinkToReserv`) copies
+  the whole struct into the reserve queue, and whether a later reader uses the three fields was not traced (Z01 §7.1).
 - §6.4: if `GetLinkData` fails after `StaObserverHideMode` was set, nothing removes the abstate; not reachable with the
   2016 Field.txt (row 0 exists), so not counted as a bug.
 - §6.2: the token `nNo1 nNo2 nExploerTimeMin nPlayTimeMin` is what `Guild/GuildTournament` receives; how the script
@@ -1714,7 +1757,13 @@ and only the map test gives the "location" code.
   was not settled, so it is not counted as a bug (Z16-B21 is the inverted MapInfo test after it).
 - 0x580C NC_KQ_START_CMD (empty struct *(pdb2017)*): neither the 2016 zone nor the WM sends it; the client accepts and
   ignores it (`re-data/client-handlers.json`). The KQ start is 0x580F (WM → zone) and the gate keeper (§2.2–§2.3).
-- §4.6: the range of the 0x74DE / 0x74DF broadcasts (`allofrangearg`) was not resolved; read as the whole map.
+- §4.6: the radius of the 0x74DE / 0x74DF broadcasts (`allofrangearg`) was not resolved (read as the whole map); both
+  are centred on the killer's location.
+- §6.4: `sp_Guild_Tournamnet_Observer_Enter` sends 0x74D8 {0x1B40} and keeps StaObserverHideMode before
+  `fo_GetMechineNumber` is checked; on −1 the client shows the quit button but no link follows. The GM path
+  `&observerlinkto` (Z11 §6.3) skips the WM's "pair fighting" check, so for a seed without a match `GetLinkData`
+  uses the entry's empty `gta_Field` and whatever `nTournamentMapNo` it holds; what `fieldserial[""]` /
+  `fo_GetMechineNumber` then return was not traced (GM-only, not counted as a bug).
 - `bs_SkillBlast`: the `so_Routine` branch that counts it tests `scs_ProduceSkill.sklidx`; whether that is every
   skill blast or only the production-skill step was not traced (Z03).
 - 0x5817 after `sp_KQReward`: what the client shows for a reward-box chest whose DB rows were never created
@@ -1731,7 +1780,7 @@ and only the map test gives the "location" code.
 | GT client ↔ WM and WM ↔ DB packets 0x747A–0x7480, 0x7485–0x749A, 0x74AA / 0x74AB, 0x74C3 / 0x74C4, 0x74E7–0x74EE, 0x74F6–0x74F9, `GuildTournamentRequire.shn`, `GuildTournamentReward.shn`, the WM side of 0x7481 / 0x7482 / 0x74C8 / 0x74C9 / 0x74E3–0x74E6 / 0x4019 | W03 §8 (done; documents them), D04 §6.4, D06 | WM scheduling, entry, rewards and DB rows; §6 documents the zone side and links W03 §8 where the two meet |
 | KQ reward DB packet (dept 22 to the Character DB) behind 0x5815 | D04 §3 (done) | DB side of `sp_KQReward`; Z16 §3.4 links it, Z11 §8.4 documents `sp_KQReward` |
 | Pine KQ / GT nodes and `@` functions (`AxialListKQResult` FUN_004e5390 / 004e5790 / 004e5d20 …, `SysFuncShineKQTop` / `KQResultList`, `ShineSendKQResult`, `ShineEndOfKingdomQuest`, `ShineEndOfGuildTournament`, `ShineDiceGameStart`, `GTMobRegenKey`, `linkto` by observer) | Z09 §22.3, §24.7, §24.8, §25.4, §25.6, §25.7, §26.1 (done) | map-script statements that only call the objects documented here (plan: "Map scripts … belong to Z09") |
-| KQ / GT packets sent only from Pine nodes: 0x5836 / 0x583C / 0x583D, 0x7484, 0x74E0, 0x74E2, 0x748D | Z09 §28.12, §23.6, §19.5, §24.8, §25.2 (done) | their senders are script nodes; layouts are in Z09's annotations |
+| KQ / GT packets sent only from Pine nodes: 0x5836 / 0x583C / 0x583D, 0x7484, 0x74E0, 0x74E2, 0x748D | Z09 §28.12, §23.6, §19.5, §24.8, §25.2 (done) | their senders are script nodes; layouts: 0x7484 / 0x74E0 / 0x74E2 / 0x748D in Z09's annotations, 0x5836 / 0x583C / 0x583D in Z16's (from the Lua senders of Z09 §28.12 + pdb2016) |
 | KQ dialog scripts `KQ*.txt` (`KQScriptManager::kqsm_Load` FUN_0064cee0) and `MobRegen/KingdomQuest/*.txt` (`KQRegenTable` FUN_004b3220 / 004b26b0) | Z09 §22.6, §10.6 (done) | script data, loaded at start-up; the KQ element only names the script |
 | GM commands `&kingdomquest`, `&EndOfKingdomQuest`, `&Reroadkingdomquest`, `&kqreward`, `&GuildTournament`, `&StartGuildTournament`, `&FlagCapture`, `&GuildTournamentItemEffect`, `&ObserverLinkTo`, `&ObserverOut` | Z11 §5.5, §6.3, §7.2, §8.4 (done) | GM command parsing; §3.6 / §6 link the objects they call |
 | `GTIView.shn` (`gSHNView_GTIView`, initializer FUN_00699990) | Z01 start table (done: "checksum only"), Z10 SHN check | the zone reads it only for the client checksum list (`CShnDataFileCheckSum` entry 0x26); the item names come from the client's copy (§5.5) |
