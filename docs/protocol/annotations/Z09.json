@@ -1611,6 +1611,108 @@
         "basis": "zone Pine ShineBattleStop::sa_Step FUN_004f4070 (AxialListProtocolSend 0x1d/0x84); client GuildTask::Recv_NC_GUILD_TOURNAMENTSTOP_CMD FUN_006b3240",
         "fields": [],
         "notes": "no payload; whole map on `battlestop guild.`; client ends the tournament display (Z09 §23.6)"
+      },
+      "0x74E2": {
+        "dir": "S→C",
+        "name": "NC_GUILD_TOURNAMENTSTOPMSG_CMD",
+        "basis": "zone PineEventScriptNode::ShineGuildTorunamentResult::sa_Step FUN_004f6290 (gtresult result); client GuildTask FUN_006b6800",
+        "fields": [
+          [
+            0,
+            "u32",
+            "WinnerGuild",
+            "script argument 0"
+          ],
+          [
+            4,
+            "u32",
+            "LoseGuild",
+            "script argument 1"
+          ],
+          [
+            8,
+            "u32",
+            "AGuildRegNumber",
+            "GuildTournamentSystem::EndBattle; stale buffer bytes on a map without a GT system (Z09-B106)"
+          ],
+          [
+            12,
+            "u16",
+            "AGuildScore",
+            "EndBattle"
+          ],
+          [
+            14,
+            "u32",
+            "BGuildRegNumber",
+            "EndBattle"
+          ],
+          [
+            18,
+            "u16",
+            "BGuildScore",
+            "EndBattle"
+          ]
+        ],
+        "notes": "to the live players of the map (AxialListPacketBroadcast, 0x16 bytes with the opcode); Z09 §24.8"
+      },
+      "0x74D2": {
+        "dir": "S→C",
+        "name": "NC_GUILD_TOURNAMENT_DICEGAME_START_CMD",
+        "basis": "zone GuildTournamentSystem::DiceGameStart FUN_0047ada0 (Pine DiceGameStart); client GuildTask FUN_006b63a0",
+        "fields": [
+          [
+            0,
+            "u32",
+            "AGuildRegNumber",
+            "group A manager vt 0x818"
+          ],
+          [
+            4,
+            "u16",
+            "AGuildDelegate",
+            "so_GetZoneHandle_ItemLooter(A manager)"
+          ],
+          [
+            6,
+            "Name5",
+            "AGuildDelegateName",
+            "A manager CharName (vt 0x56c)"
+          ],
+          [
+            26,
+            "u32",
+            "BGuildRegNumber",
+            "group B manager vt 0x818"
+          ],
+          [
+            30,
+            "u16",
+            "BGuildDelegate",
+            "so_GetZoneHandle_ItemLooter(B manager)"
+          ],
+          [
+            32,
+            "Name5",
+            "BGuildDelegateName",
+            "B manager CharName"
+          ]
+        ],
+        "notes": "payload 0x34; to every player of A's map (so_AllInMap includeSelf 1); only when both groups have a manager user; Z09 §24.8"
+      },
+      "0x5812": {
+        "dir": "S→C",
+        "name": "NC_KQ_COMPLETE_CMD",
+        "basis": "zone AxialListGTEnd::ali_Work FUN_00428870 (Pine gtresult suc); client FUN_004a31f0",
+        "fields": [],
+        "notes": "empty; to every map object whose guild regnum (vt 0x818) equals the script's guild (so_SendProtocol vt 0x304); Z09 §24.8"
+      },
+      "0x5813": {
+        "dir": "S→C",
+        "name": "NC_KQ_FAIL_CMD",
+        "basis": "zone AxialListGTEnd::ali_Work FUN_00428870 (Pine gtresult with a word other than suc/result); client FUN_004a3270",
+        "fields": [],
+        "notes": "empty; same recipients as 0x5812; Z09 §24.8"
       }
     }
   }

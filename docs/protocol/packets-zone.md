@@ -11428,6 +11428,22 @@ Empty payload.
 
 empty payload
 
+### `0x5812` NC_KQ_COMPLETE_CMD (S→C)
+
+**Verified layout** (basis: zone AxialListGTEnd::ali_Work FUN_00428870 (Pine gtresult suc); client FUN_004a31f0)
+
+Empty payload.
+
+empty; to every map object whose guild regnum (vt 0x818) equals the script's guild (so_SendProtocol vt 0x304); Z09 §24.8
+
+### `0x5813` NC_KQ_FAIL_CMD (S→C)
+
+**Verified layout** (basis: zone AxialListGTEnd::ali_Work FUN_00428870 (Pine gtresult with a word other than suc/result); client FUN_004a3270)
+
+Empty payload.
+
+empty; same recipients as 0x5812; Z09 §24.8
+
 ### `0x6802` NC_BOOTH_OPEN_ACK (S→C)
 
 **Verified layout** (basis: zone FUN_0058e900 (codes from disassembly); client FUN_004a87b0)
@@ -11740,6 +11756,21 @@ no payload; whole map on `battlestop guild.`; client ends the tournament display
 | 0 | u16 | mobhandle | mob |
 | 2 | u32 | mobguild | mob+0x22ec |
 
+### `0x74D2` NC_GUILD_TOURNAMENT_DICEGAME_START_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone GuildTournamentSystem::DiceGameStart FUN_0047ada0 (Pine DiceGameStart); client GuildTask FUN_006b63a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | AGuildRegNumber | group A manager vt 0x818 |
+| 4 | u16 | AGuildDelegate | so_GetZoneHandle_ItemLooter(A manager) |
+| 6 | Name5 | AGuildDelegateName | A manager CharName (vt 0x56c) |
+| 26 | u32 | BGuildRegNumber | group B manager vt 0x818 |
+| 30 | u16 | BGuildDelegate | so_GetZoneHandle_ItemLooter(B manager) |
+| 32 | Name5 | BGuildDelegateName | B manager CharName |
+
+payload 0x34; to every player of A's map (so_AllInMap includeSelf 1); only when both groups have a manager user; Z09 §24.8
+
 ### `0x74E0` NC_GUILD_TOURNAMENT_STARTMSG_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone cStartMsg_AllInMap FUN_005e3af0; client GuildTask FUN_006b38b0)
@@ -11749,6 +11780,21 @@ no payload; whole map on `battlestop guild.`; client ends the tournament display
 | 0 | s32 | nStartBeforeTime | always 5; the client acts only on 5 (count-down effect + sound) |
 
 map-wide; also the Pine node ShineBattleStart
+
+### `0x74E2` NC_GUILD_TOURNAMENTSTOPMSG_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone PineEventScriptNode::ShineGuildTorunamentResult::sa_Step FUN_004f6290 (gtresult result); client GuildTask FUN_006b6800)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | WinnerGuild | script argument 0 |
+| 4 | u32 | LoseGuild | script argument 1 |
+| 8 | u32 | AGuildRegNumber | GuildTournamentSystem::EndBattle; stale buffer bytes on a map without a GT system (Z09-B106) |
+| 12 | u16 | AGuildScore | EndBattle |
+| 14 | u32 | BGuildRegNumber | EndBattle |
+| 18 | u16 | BGuildScore | EndBattle |
+
+to the live players of the map (AxialListPacketBroadcast, 0x16 bytes with the opcode); Z09 §24.8
 
 ### `0x8c04` NC_MINIHOUSE_BUILDING_ACK (S→C)
 

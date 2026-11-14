@@ -3580,7 +3580,7 @@ is exhausted, shuffles one random point of the next ring to the front (`RandomBo
 |---|---|---|
 | `ShinePlayer::sp_QuestItemGet` FUN_00528240 | Z15 | quest drop, looter = the player, questOnly 1 |
 | `ShinePlayer::sp_KQItemDrop` FUN_00496f00 | Z16 | KQ reward drop through `so_IsDropping` |
-| Pine `ShineItemDrop::sa_Step` FUN_004eff00 | part 15 | |
+| Pine `ShineItemDrop::sa_Step` FUN_004eff00 | §24.1 | killer-only looter, no lot factor; failed roll retries (B102) |
 | Lua `cDropItem` FUN_005d9a30 | part 13 | |
 | Lua `cSetItemDropMobID(handle, mobName)` FUN_005ebea0 | here | mob+0x2558 = mob ID of `mobName` (0xFFFF if unknown), so the mob drops another mob's table; handle −1 pushes false |
 | Lua `cSetNPCIsItemDrop(handle, 0/1)` FUN_005daf40 | here | vt 0xbb0 → +0x250c; other values: nothing, returns 0 |
@@ -6847,7 +6847,7 @@ in the 46 `.ps` files of 2016 / files that use it (counted from the files, the l
 | 20 | `change2mob` | `ShineChange2Mob` | FUN_004e9440 | yes | 1 | 2/1 | part 15 |
 | 21 | `change2door` | `ShineChange2Door` | FUN_004e94b0 | yes | 1 | 0/0 | part 15 |
 | 22 | `change2npc` | `ShineChange2NPC` | FUN_004e9520 | yes | 1 | 3/2 | part 15 |
-| 23 | `exchange2mob` | `ShineExchange2Mob` | FUN_004e9590 | yes | 1 | 2/2 | part 15 |
+| 23 | `exchange2mob` | `ShineExchange2Mob` | FUN_004e9590 | yes | 1 | 2/2 | §24.5 |
 | 24 | `dooropen` | `ShineDoorOpen` | FUN_004e9600 | yes | 1 | 32/9 | §13 |
 | 25 | `doorclose` | `ShineDoorClose` | FUN_004e9670 | yes | 1 | 40/9 | §13 |
 | 26 | `vanish` | `ShineObjectVanish` | FUN_004e96e0 | yes | 0 | 21/5 | part 15 |
@@ -6866,11 +6866,11 @@ in the 46 `.ps` files of 2016 / files that use it (counted from the files, the l
 | 39 | `linkto` | `ShineLinkTo` | FUN_004e9c90 | yes | 4 | 64/34 | part 15 |
 | 40 | `whoclickme` | `ShineWhoClickMe` | FUN_004e9d70 | yes | 1 | 28/7 | part 15 |
 | 41 | `whokillme` | `ShineWhoKillMe` | FUN_004e9de0 | yes | 1 | 1/1 | part 15 |
-| 42 | `itemdrop` | `ShineItemDrop` | FUN_004e9d00 | yes | 2 | 21/7 | part 15 |
-| 43 | `invensearch` | `ShineInvenSearch` | FUN_004e9e50 | yes | 2 | 12/3 | part 15 |
-| 44 | `itemcreate` | `ShineItemCreate` | FUN_004e9ec0 | yes | 1 | 2/2 | part 15 |
-| 45 | `itemerase` | `ShineItemErase` | FUN_004e9f30 | yes | 1–2 | 32/9 | part 15 |
-| 46 | `findhandle` | `ShineFindHandle` | FUN_004e9fa0 | yes | 2 | 7/3 | part 15 |
+| 42 | `itemdrop` | `ShineItemDrop` | FUN_004e9d00 | yes | 2 | 21/7 | §24.1 |
+| 43 | `invensearch` | `ShineInvenSearch` | FUN_004e9e50 | yes | 2 | 12/3 | §24.3 |
+| 44 | `itemcreate` | `ShineItemCreate` | FUN_004e9ec0 | yes | 1 | 2/2 | §24.2 |
+| 45 | `itemerase` | `ShineItemErase` | FUN_004e9f30 | yes | 1–2 | 32/9 | §24.2 |
+| 46 | `findhandle` | `ShineFindHandle` | FUN_004e9fa0 | yes | 2 | 7/3 | §24.4 |
 | 47 | `abstateset` | `ShineAbstatSet` | FUN_004ea010 | yes | 3–4 | 26/15 | part 15 |
 | 48 | `abstatereset` | `ShineAbstatReset` | FUN_004ea080 | yes | 1 | 9/2 | part 15 |
 | 49 | `suicide` | `ShineSuicide` | FUN_004ea0f0 | yes | 0 | 32/7 | part 15 |
@@ -6883,40 +6883,40 @@ in the 46 `.ps` files of 2016 / files that use it (counted from the files, the l
 | 56 | `aggro` | `ShineAggro` | FUN_004ea400 | yes | 2 | 2/1 | part 15 |
 | 57 | `mobweaponrate` | `ShineMobWeaponRate` | FUN_004ea470 | yes | 1–8 | 40/4 | part 15 |
 | 58 | `mobdetectrange` | `ShineMobDetectRange` | FUN_004ea4e0 | yes | 1 | 10/5 | part 15 |
-| 59 | `heal` | `ShineHeal` | FUN_004ea550 | yes | 1 | 5/5 | part 15 |
+| 59 | `heal` | `ShineHeal` | FUN_004ea550 | yes | 1 | 5/5 | §24.6 |
 | 60 | `animate` | `ShineAnimate` | FUN_004ea5c0 | yes | 1 | 11/6 | part 15 |
-| 61 | `duplicate` | `ShineDuplicate` | FUN_004ea630 | yes | 1 | 0/0 | part 15 |
+| 61 | `duplicate` | `ShineDuplicate` | FUN_004ea630 | yes | 1 | 0/0 | §24.5 |
 | 62 | `waitidle` | `ShineWaitIdle` | FUN_004ea6a0 | — | 0 | 11/6 | part 15 |
-| 63 | `deathcountclear` | `ShineDeathCountClear` | FUN_004ea710 | — | 0 | 4/1 | part 15 |
-| 64 | `itemattrset` | `ShineItemAttrSet` | FUN_004ea780 | yes | 2 | 0/0 | part 15 |
+| 63 | `deathcountclear` | `ShineDeathCountClear` | FUN_004ea710 | — | 0 | 4/1 | §24.6 |
+| 64 | `itemattrset` | `ShineItemAttrSet` | FUN_004ea780 | yes | 2 | 0/0 | §24.2 |
 | 65 | `scinariocode` | `ShineScinarioCode` | FUN_004ea7f0 | yes | 1 | 1/1 | part 15 |
 | 66 | `battlestart` | `ShineBattleStart` | FUN_004ea860 | yes | 0–2 | 10/8 | part 15 |
 | 67 | `battlestop` | `ShineBattleStop` | FUN_004ea8d0 | yes | 0 | 22/8 | part 15 |
 | 68 | `sendquestresult` | `ShineSendKQResult` | FUN_004ea940 | yes | 1 | 17/8 | part 15 |
-| 69 | `invidualreward` | `ShineInvidualReward` | FUN_004ea9b0 | — | 2 | 15/8 | part 15 |
+| 69 | `invidualreward` | `ShineInvidualReward` | FUN_004ea9b0 | — | 2 | 15/8 | §24.7 |
 | 70 | `returnvalue` | `ShineReturnValue` | FUN_004eaa20 | — | 2 | 6/1 | part 15 |
 | 71 | `sublayershift` | `ShineSubLayerShift` | FUN_004eaa90 | yes | 2 | 0/0 | part 15 |
 | 72 | `teleport` | `ShineTeleport` | FUN_004eab00 | yes | 1–3 | 13/4 | part 15 |
-| 73 | `itemowner` | `ShineItemOwner` | FUN_004eab70 | yes | 2 | 2/1 | part 15 |
+| 73 | `itemowner` | `ShineItemOwner` | FUN_004eab70 | yes | 2 | 2/1 | §24.3 |
 | 74 | `mobattr` | `ShineMobAttribute` | FUN_004eabe0 | yes | 2 | 4/1 | part 15 |
 | 75 | `collect` | `ShineObjectCollect` | FUN_004eac50 | yes | 4 | 0/0 | part 15 |
 | 76 | `endofkq` | `ShineEndOfKingdomQuest` | FUN_004eacc0 | — | 0 | 43/21 | part 15 |
-| 77 | `endofgt` | `ShineEndOfGuildTournament` | FUN_004ead30 | — | 2 | 4/2 | part 15 |
-| 78 | `gtresult` | `ShineGuildTorunamentResult` | FUN_004eada0 | yes | 1–2 | 4/2 | part 15 |
+| 77 | `endofgt` | `ShineEndOfGuildTournament` | FUN_004ead30 | — | 2 | 4/2 | §24.8 |
+| 78 | `gtresult` | `ShineGuildTorunamentResult` | FUN_004eada0 | yes | 1–2 | 4/2 | §24.8 |
 | 79 | `costumecreate` | `ShineCostumeCreate` | FUN_004eae10 | yes | 3 | 0/0 | part 15 |
 | 80 | `costumetakeoff` | `ShineCostumeTakeOff` | FUN_004eae80 | yes | 2 | 0/0 | part 15 |
 | 81 | `weddingcomplete` | `ShineWeddingComplete` | FUN_004eaef0 | — | 2 | 1/1 | part 15 |
 | 82 | `playerwork` | `ShinePlayerWalk` | FUN_004eaf60 | yes | 2 | 6/1 | part 15 |
-| 83 | `findplayer` | `ShineFindPlayer` | FUN_004eafd0 | yes | 1–2 | 6/1 | part 15 |
+| 83 | `findplayer` | `ShineFindPlayer` | FUN_004eafd0 | yes | 1–2 | 6/1 | §24.4 |
 | 84 | `teleportall` | `ShineTeleportAll` | FUN_004eb040 | yes | 0–4 | 1/1 | part 15 |
 | 85 | `briefeffect` | `ShineBriefEffect` | FUN_004eb0b0 | yes | 1 | 2/1 | part 15 |
 | 86 | `banfromarea` | `ShineBanFromArea` | FUN_004eb120 | — | 5 | 3/1 | part 15 |
 | 87 | `RegisteFlag` | `ShineRegesteFlag` | FUN_004eb190 | — | 3 | 10/2 | part 15 |
 | 88 | `RegisteGate` | `ShineRegesteGate` | FUN_004eb200 | — | 4 | 20/2 | part 15 |
-| 89 | `DiceGameStart` | `ShineDiceGameStart` | FUN_004eb270 | — | 1 | 2/2 | part 15 |
+| 89 | `DiceGameStart` | `ShineDiceGameStart` | FUN_004eb270 | — | 1 | 2/2 | §24.8 |
 | 90 | `revival` | `ShineRevival` | FUN_004eb2e0 | yes | 0 | 5/5 | part 15 |
 | 91 | `spawn` | `ShineSpawn` | FUN_004eb350 | — | 1–2 | 7/3 | part 15 |
-| 92 | `hpset` | `ShineHPSet` | FUN_004eb3c0 | yes | 1 | 1/1 | part 15 |
+| 92 | `hpset` | `ShineHPSet` | FUN_004eb3c0 | yes | 1 | 1/1 | §24.6 |
 | 93 | `questmobkill` | `ShineQuestMobkill` | FUN_004eb430 | — | 3 | 10/9 | part 15 |
 | 94 | `RegisterGTPortal` | `RegisterGTPortal` | FUN_004f8610 | — | 4 | 10/2 | §22 |
 | 95 | `SaveLinkto` | `SaveLinkto` | FUN_004f8680 | — | 4 | 2/2 | §22 |
@@ -7348,7 +7348,7 @@ os_ObjectChange(n, arg, ps, &ip, o, h) → ok                 @ FUN_004ecec0   #
         r ≠ 0 → return 0                                    # no free of h here (the mob branch frees it)
     else: r = o.so_mob_Regenerate(map, x, y, dir, h, mobId, null, −1, 0, 0, −1, 1, 0, 0)
         r ≠ 0 → som_FreeObject(h, REMOVE_NOW, 0x16), return 0
-    v = "<h>"; return 1                                     # the old object is left in place: removing it is the caller's job (part 15)
+    v = "<h>"; return 1                                     # the old object is left in place: removing it is the caller's job (only `exchange2mob` does, §24.5)
 ```
 
 `so_mob_Regenerate` / `so_door_Build` return 0 on success (an error code), hence "r ≠ 0 = failure".
@@ -7407,7 +7407,7 @@ and unbuilt until the pool walk reclaims them (§13).
 @DeathNum(mobName)     SysFuncShineDeadNumber @ FUN_004e4780 # 16 uses
     unknown name: ps_assert "…SysFuncShineCount… MobName wrong" (Count's text), null; argument fails: null
     result = MobDeadCount::mdc_DeadCountGet(theater.t_Field.fm_MobDeadCount, mobId) (FUN_004b08f0); no field → 0
-    # the per-map death counter of §5.1 (`MobDeadCount`; reset by the `deathcountclear` statement, part 15)
+    # the per-map death counter of §5.1 (`MobDeadCount`; reset by the `deathcountclear` statement, §24.6)
 @CircularScatter(x, y, r) SysFuncShineCircularScatter @ FUN_004e4940
     any argument fails → null
     MobRegenClass::MobRegenLoc_Circular(x, y, r) FUN_004b0e60 + mrlc_Get FUN_004b0e80 (the circle spawn point of §10.4)
@@ -7741,7 +7741,7 @@ change2door obj mobName.               ShineChange2Door::sa_Step  @ FUN_004ed350
   So in 2016 only the in-place `so_bandit_ChangeType` path runs; the object, its handle and its brief info stay.
 - (original bug) Z09-B98: on a non-bandit, the three nodes build a second object at the old one's place and write
   its handle into the target variable, but never remove the old object (`os_ObjectChange` leaves it, §22.1). Both stay
-  in the world and the script has lost its handle to the old one. `exchange2mob` (part 15b) unmarks and frees the old
+  in the world and the script has lost its handle to the old one. `exchange2mob` (§24.5) unmarks and frees the old
   object first, which is what a "change" most likely meant too *(inferred)*.
 - (original bug) Z09-B97: when `so_mob_Regenerate` fails, `os_ObjectChange` already frees the new handle (reason 0x16)
   and returns 0; the node frees it again. `som_FreeObject` (FUN_00557d70) finds no object and logs "Try to free
@@ -7967,9 +7967,391 @@ and moves the costume into that cell *(inferred from the calls; the item DB answ
   `battlestart guild`; `chatwinrange` loads but shows nothing (B100).
 - §22.7 open question: after `os_ObjectChange` nobody removes the old object in `change2mob` / `change2npc` /
   `change2door` (B98); a failed door build is freed by `ShineChange2Door` (reason 0x1a). `exchange2mob` removes the old
-  object (part 15b).
+  object (§24.5).
 - Keep times above 2³¹ − 1 (`4200000000`, `4000000000` in `JobChange1.ps`, `GordonMaster.ps`, `Monkey.ps`) pass through
   `pst_GetNumber` (`int`) and arrive with the same 32-bit pattern; whether `so_AbnormalState_Set` (vt 0x638) reads them
   as unsigned (about 48 days) or as a negative keep was not traced.
 - `chatwin` / `chatwinrange` `sprintf` into the global send buffer before the `< 256` check; the buffer capacity
   (`gpp.pp_BufferSize`, set statically) and a dialog string with more `%s` than values (stack garbage) were not traced.
+
+## 24. Scripts 11: Pine action nodes D–I (items, drops, finding objects and players, heal / HP, guild-tournament end)
+
+The `sa_Step` bodies of the 17 `Shine*` action statements whose class names start with D–I and that no earlier section
+covers (§21.2 rows 23, 42–46, 59, 61, 63, 64, 69, 73, 77, 78, 83, 89, 92). Already documented, not repeated here:
+`ShineDoorBuild` / `ShineDoorOpen` / `ShineDoorClose` / `ShineEffectObject` / `ShineEffectLocate` (§13),
+`ShineInterruptSet` / `ShineInterruptErase` / `ShineInterruptClear` (§15); `ShineEndOfKingdomQuest` belongs to part 15d.
+They load with `OtherStatement::sa_Load` and read target and arguments as §22.1 describes; the common shape of §23.1
+holds (trace line, copied assert texts are log text only), with the exceptions noted per node (`itemdrop` can wait,
+`DiceGameStart` can end the film). Class, member and function names are *(pdb2016)*. Packets sent here: 0x5812 /
+0x5813 / 0x74E2 (guild-tournament result), 0x74D2 (dice game, via `GuildTournamentSystem`), 0x7482 to the WM, 0x3401
+and 0x3449 to the item DB (item create / attribute change), 0x3459 (item erase, via `sp_DestroyItem`), the drop
+object's 0x1C0A (§11.3).
+
+| Keyword | Class | ctor | `sb_CloneMe` | `sa_Step` | § |
+|---|---|---|---|---|---|
+| `itemdrop` | `ShineItemDrop` | FUN_004e8960 | FUN_004e9d00 | FUN_004eff00 | 24.1 |
+| `itemcreate` | `ShineItemCreate` | FUN_004e89a0 | FUN_004e9ec0 | FUN_004f0810 | 24.2 |
+| `itemerase` | `ShineItemErase` | FUN_004e89c0 | FUN_004e9f30 | FUN_004f0570 | 24.2 |
+| `itemattrset` | `ShineItemAttrSet` | FUN_004e8c20 | FUN_004ea780 | FUN_004f37a0 | 24.2 |
+| `invensearch` | `ShineInvenSearch` | FUN_004e8980 | FUN_004e9e50 | FUN_004f09e0 | 24.3 |
+| `itemowner` | `ShineItemOwner` | FUN_004e8d40 | FUN_004eab70 | FUN_004f4ec0 | 24.3 |
+| `findhandle` | `ShineFindHandle` | FUN_004e89e0 | FUN_004e9fa0 | FUN_004f0ca0 | 24.4 |
+| `findplayer` | `ShineFindPlayer` | FUN_004e8e80 | FUN_004eafd0 | FUN_004f9720 | 24.4 |
+| `exchange2mob` | `ShineExchange2Mob` | FUN_004e8700 | FUN_004e9590 | FUN_004ed650 | 24.5 |
+| `duplicate` | `ShineDuplicate` | FUN_004e8bc0 | FUN_004ea630 | FUN_004f3430 | 24.5 |
+| `heal` | `ShineHeal` | FUN_004e8b80 | FUN_004ea550 | FUN_004f3070 | 24.6 |
+| `hpset` | `ShineHPSet` | FUN_004e8fa0 | FUN_004eb3c0 | FUN_004f8060 | 24.6 |
+| `deathcountclear` | `ShineDeathCountClear` | FUN_004e8c00 | FUN_004ea710 | FUN_004f36a0 | 24.6 |
+| `invidualreward` | `ShineInvidualReward` | FUN_004e8cc0 | FUN_004ea9b0 | FUN_004f4470 | 24.7 |
+| `endofgt` | `ShineEndOfGuildTournament` | FUN_004e8dc0 | FUN_004ead30 | FUN_004f6100 | 24.8 |
+| `gtresult` | `ShineGuildTorunamentResult` | FUN_004e8de0 | FUN_004eada0 | FUN_004f6290 | 24.8 |
+| `DiceGameStart` | `ShineDiceGameStart` | FUN_004e8f40 | FUN_004eb270 | FUN_004f9cc0 | 24.8 |
+
+Use in the 17 Pine books loaded in 2016 (§22.5; the §21.2 counts include files that are not loaded): `itemerase`
+27 (KQHBat1–5, GordonMaster, JobChange2-1), `itemdrop` 9 (KQHBat1–5, GordonMaster), `invidualreward` 10 (KQHBat1–5),
+`findplayer` 6 (Wedding), `invensearch` 3, `itemowner` 2 (GordonMaster), `exchange2mob` 2 (GordonMaster, JobChange2-1),
+`itemcreate` 2, `findhandle` 2 (JobChange1, JobChange2-1), `endofgt` 2, `gtresult` 2, `DiceGameStart` 1
+(GuildTournament), `hpset` 1 (Monkey). Not used by a loaded book: `heal` (only in unloaded files), `duplicate`,
+`deathcountclear`, `itemattrset`.
+
+### 24.1 Script drops: `itemdrop`
+
+```pseudo
+itemdrop dropper item rate.          ShineItemDrop::sa_Step   @ FUN_004eff00   # KQHBat1.ps: itemdrop InterruptArg Maul 1000000.
+    dropper = os_ShineObject(ps); null: assert "…Null dropper", pop
+    k = dropper.vt[0x80c] so_mobile_WhoIsKillMe (FUN_00555740, the killer's handle); killer = som_GetObject(k)
+        killer: killerHandle = k, killerCharNo = killer.vt[0x344] (players: charNo); none: 0xFFFF, −1
+    item = argument 0 → ItemInfo InxName (`itemdatabox.idb_btree`); fails: assert "…no item", pop; unknown name:
+        assert "…Item Not Found", pop
+    rate = argument 1 (fails: assert "…no droprate", pop)
+    if well512_GetRandom(1 000 000) >= rate:               # rate in millionths, as ItemDropTable's DrItemR (§11.2)
+        return 1 WITHOUT pop                                # (original bug) Z09-B102: the node runs again next pass
+    info = { key = iti_mkregnum(item, 3, zoneNo, worldNo) (the mob-drop key type, §11.2), itemid = item }
+    cls  = itmattcontainer[item]
+    row  = a local ItemDropGroup row: MinQtty = MaxQtty = 1 (+0x3c = 0x10001), the 16 Upgrade weights 0, +0…+0x10 zero
+           (the InxName bytes +0x14…+0x3b are left uninitialised; whether vt 0x2c reads them was not traced)
+    if not cls.vt[0x2c](&info, &row, rand(1000), dropper.vt[0x708] mob ID):   # the same attribute builder as
+        return 1 WITHOUT pop                                                   # `dilig_Drop` (§11.2): lot 1, no upgrade
+    ItemDataBox row or its ItemInfoServer missing: pop (no drop, no log)
+    if ItemInfoServer.RandomOptionDropGroup (+0x89) names a RandomOption table: rot_FillOption(cls.vt[0x70](&info), table)
+    looter = ShineMultiTypeHandle() {ALL, −1}; killer: SetShineObject(killer) → {ALONE, killer.vt[0x344]}
+    ShineObject::so_IsDropping(dropper, &info, ONLY_REGISTNUMBER, &looter, killerHandle, killerCharNo, cls, …)   # §11.3
+        fails: assert "…Drop fail"
+    pop
+```
+
+- Unlike a mob's own drop (§11.2) there is no lot factor, no lot cap, no forced upgrade, no `ItemDropFromMob` table and
+  no party or raid looter: the item belongs to the killer **alone** (`IsCanItemPick` kind 0: `h.id == p.charNo`, §11.4)
+  until `ownerUntil`, or to anybody when the dropper has no live killer. The 2016 uses drop KQ items (`Maul`, keys,
+  `KQ_FireSword`, …) on the object of an `ObjectDead` interrupt (`InterruptArg`). `questOnly` comes from the stack
+  cookie as for every `so_IsDropping` caller (B21).
+- (original bug) Z09-B102: a failed roll (and a failed attribute build) returns 1 without `ps_Pop`, which by the step
+  convention (§21.4) means "step me again next pass". The node rolls again on every main-loop pass until it succeeds,
+  so the rate only delays the drop (expected 10⁶ / rate passes) and blocks the rest of the film meanwhile; with
+  `rate ≤ 0` the roll never succeeds and the film never continues. All 2016 uses pass 1 000 000 (always drops), so the
+  bug is latent. Likely intent: pop on a failed roll (no drop).
+
+### 24.2 Player items: `itemcreate`, `itemerase`, `itemattrset`
+
+```pseudo
+itemcreate obj item.                 ShineItemCreate::sa_Step  @ FUN_004f0810   # JobChange1.ps: itemcreate PlayerHandle "JOB_GradeSymbol".
+    o = os_ShineObject(ps); null → pop
+    item = argument 0 (fails: assert "…no Item", pop); unknown name (or ID 0xFFFF): nothing
+    o.vt[0x8b4](item)                    # players: ShinePlayer::so_scene_CreateItem FUN_0050d770; others: folded no-op FUN_00549070
+    pop
+ShinePlayer::so_scene_CreateItem(p, item)                                @ FUN_0050d770
+    info.key = iti_mkregnum(item, 2, zoneNo, worldNo); info.itemid = item
+    ItemDataBox row missing: assert "…so_scene_CreateItem : Invalid item"; ItemInfo missing: nothing
+    cls = itmattcontainer[item]; cls.vt[0x14] iac_itemcreate(item, &info, "-o")   # default attributes (Z05's option syntax, §23.8)
+    cls.vt[0x20](&info.item, 1)                                                    # lot 1
+    ShinePlayer::sp_MakeItem(p, p.handle, &info)                         @ FUN_00528690
+        first empty, unlocked inventory cell (ItemBoxIterEmpty over `ci_Inventory`, limit with the charged-effect
+            expansions, lock list vt 0x7d4, inventory type 9); none: nothing (no message, the item is not made)
+        ShinePlayer::sp_CreateItemByAdmin(p, 9, cell, &info, cellPtr) (FUN_00527270)   # → 0x3401 NC_ITEMDB_ADMINCREATE_REQ (Z05 §9.1)
+
+itemerase all item.                  ShineItemErase::sa_Step   @ FUN_004f0570   # KQHBat1.ps: itemerase all Maul.
+itemerase obj item [count].                                                       # JobChange2-1.ps: itemerase PlayerHandle "Job2_STpiece1".
+    item = argument 0 (fails: assert "…no Item", pop); unknown name → item ID 0xFFFF (not checked)
+    if the target word (i_GetToken, lower-cased) == index_all "all":
+        theater.t_CenterFlag null: assert "Movie::Theater::t_AllInMap : Null flag"
+        else so_AllInMap(t_CenterFlag, AxialListItemErase4All{item} (ctor FUN_004285a0), includeSelf 0)
+            AxialListItemErase4All::ali_Work FUN_00429750: every object o: o.vt[0x8b8] so_scene_EraseItem(item, −1)
+    else:
+        o = os_ShineObject(ps)                           # no null check: (original bug) Z09-B103
+        if argument 1 exists: count = its number (fails: assert "…no Num", pop without erasing)
+        else count = −1
+        o.vt[0x8b8] so_scene_EraseItem(item, count)
+    pop
+    # so_scene_EraseItem: players ShinePlayer::so_scene_EraseItem FUN_0050dba0 (sp_DestroyItem of `count` lots from the
+    # inventory, −1 / ≤ 0 = all, more than owned → nothing; then the first matching equipped cell), drop items
+    # ShineDropItem::so_scene_EraseItem FUN_0050dc70 (§11.4), others: folded no-op FUN_00509900. Full text: §17.8 cItemErase.
+
+itemattrset obj item attrString.     ShineItemAttrSet::sa_Step @ FUN_004f37a0   # unused in 2016
+    o = os_ShineObject(ps); null → pop
+    item = argument 0 (fails: assert "…no Item"; unknown: assert "…Item Invalid"; both pop)
+    argument 1 is evaluated into the same buffer, result NOT checked: (original bug) Z09-B107
+    o.vt[0x8b0](item, attrString)        # players: ShinePlayer::so_scene_ItemAttrSet FUN_0050d8c0; others: folded no-op FUN_00509900
+    pop
+ShinePlayer::so_scene_ItemAttrSet(p, item, attrString)                  @ FUN_0050d8c0
+    first unlocked inventory cell (type 9) holding item (ItemBoxIterIdent); none: nothing
+    copy = the cell's item (0x6f bytes); cls = itmattcontainer[copy.itemid]; cls.vt[0x14](copy.itemid, &copy, attrString)
+        # rebuilds the attributes from the option string, as the GM make-item command parses it (Z05)
+    p.sp_Item.invenlocklist.vt[0x40](lockIndex, cell, &copy, 0x2400 | cell, …)   # lock the cell until the DB answers
+    → item DB 0x3449 NC_ITEMDB_ITEMCHANGE_REQ { u16 handle, u32 charNo, u16 lockIndex, u64 key, u16 itemid,
+          attr (cls.vt[0xc] bytes) }   (length 0x14 + attribute size; too long: assert with the copied text
+          "…so_scene_KQStepSet : Packet Too Long"); lockIndex += 1      # answer 0x344A: Z05 §5.4
+```
+
+- `itemcreate` gives one lot of a new item into the first free inventory cell; a full inventory loses the item without
+  any message. JobChange1 / JobChange2-1 give the promotion symbols this way.
+- (original bug) Z09-B103: `itemerase obj …` calls `o.vt[0x8b8]` without testing `os_ShineObject`'s result. A handle
+  outside every pool (`som_GetObjectAbsolute` → null, e.g. the `65535` that `findhandle` writes when it finds
+  nothing, §24.4) crashes the zone; a stale handle acts on whatever object now uses the slot (`som_GetObjectAbsolute`
+  does not check the slot is in use). Likely intent: `null → pop` as in `itemcreate`.
+- (original bug) Z09-B107: `itemattrset` (and `findplayer`'s map argument, §24.4) ignore a failed argument: the
+  node continues with what the shared 256-byte token holds (the item name here). Unused in 2016.
+
+### 24.3 Searching inventories: `invensearch`, `itemowner`
+
+```pseudo
+invensearch var player item.         ShineInvenSearch::sa_Step @ FUN_004f09e0   # GordonMaster.ps: invensearch Slot Opener KeyDropIndex.
+    v = os_Ident.i_GetVariable(ps); missing: assert "…ShineInvenSearch::sa_Step", pop
+    v = ""                                                        # cleared before anything else
+    h = number of argument 0 (fails: assert "…no Player"); o = som_GetObject(h) (in use); none: assert "…No player"
+    item = argument 1 (fails: assert "…no Item"; unknown: assert "…Item Invalid")
+    it = ItemBoxIterIdent(o.so_ItemInventory (vt 0x47c).ci_Inventory (+0xe54), item, o.vt[0x498] charged effects)
+        # ItemBoxIterIdent ctor FUN_0043c0a0: limit = bag vt 4 (with the charged inventory expansions) or vt 8
+    if ItemBoxIterator::ibi_Home(it) (FUN_0043c0e0, first cell whose item ID == item, ibi_isvalid FUN_0043cbe0):
+        v = "<cell index>"                                        # pst_MergeNumber(v, it.ibi_finger)
+    pop
+    # non-players: `so_ItemInventory` FUN_00554ef0 returns the empty `so_defiteminven` → never found
+    # scripts test `if Slot =!= ""` (has the item) and then `itemerase all …` / `itemerase Opener … 1`
+
+itemowner var item delimiter.        ShineItemOwner::sa_Step   @ FUN_004f4ec0   # GordonMaster.ps: itemowner Sword "KQ_FireSword" " ".
+    item = argument 0 (fails: assert "…no item", pop); unknown name → 0xFFFF, then a dead check:
+        (original bug) Z09-B104: compares the stored 0xFFFF with 0xFFFFFFFF, so it never pops early; the walk runs
+        for item 0xFFFF and finds nothing
+    delim = argument 1 (fails: assert "…no delimiter", pop); v = os_Ident.i_GetVariable (missing: assert "…No variable", pop)
+    t_AllInMap(theater, AxialListFindItemOwner{item, delim, v, n = 0}) (ctor FUN_004eb990)
+        AxialListFindItemOwner::ali_Work FUN_004eb9e0, every object o of the map:
+            o's inventory (as invensearch, first cell with the item) has the item:
+                n == 0: v = "<o.handle>"  else: v = v + delim + "<o.handle>"     (pst_Merge, pst_MergeNumber);  n += 1
+    pop
+```
+
+- `itemowner` writes the variable only when somebody owns the item: with no owner the variable keeps its old value
+  (GordonMaster declares it `""` right before, so 2016 is not affected). The list has no trailing delimiter;
+  GordonMaster splits it with `@RemoveFirst("Sword" " ")` (§22.2).
+- The search is the inventory only (`ci_Inventory`, type 9): equipped items and the quest / mini-house / action boxes
+  are not searched.
+
+### 24.4 Finding objects and players: `findhandle`, `findplayer`
+
+```pseudo
+findhandle var what skip.            ShineFindHandle::sa_Step  @ FUN_004f0ca0   # JobChange1.ps: findhandle PlayerHandle "Player" 0.
+    v = os_Ident.i_GetVariable(ps); missing: assert "…ShineFindHandle::sa_Step", pop
+    what = argument 0 (fails: assert "…no mob", pop); lower-cased copy == index_ply "player" (FUN_006975e0)?
+        yes: kind 2 (player), id 0xFFFF
+        no:  kind 5 (mob), id = MobInfo ID of `what` (unknown → 0xFFFF)
+    skip = number of argument 1 (fails: assert "…no skip", pop)
+    t_AllInMap(theater, AxialListMobFind{id, handle = 0xFFFF, skip, kind})
+        AxialListMobFind::ali_Work FUN_00428130: o.so_ObjectType (vt 0x4d0) == kind and o.vt[0x708] == id:
+            skip < 1: handle = o.handle, stop the walk;  else skip −= 1
+    v = "<handle>"                                     # 65535 when nothing matched
+    pop
+```
+
+- Players match because their vt 0x708 is the folded `return 0xFFFF` (FUN_005550b0); mobs return their mob ID
+  (`so_mob_MobID` FUN_00556ab0). Only kind 5: NPCs (4), bandits (8), servants (10) are never found by name. `skip`
+  picks the n-th match in map walk order (0 = first).
+
+```pseudo
+findplayer var charName [mapName].   ShineFindPlayer::sa_Step  @ FUN_004f9720   # Wedding.ps: findplayer GroomHandle GroomName "Wedding".
+    v = os_Ident.i_GetVariable(ps); missing: assert (copied text "…ShineFindHandle::sa_Step"), pop
+    name = argument 0 (fails: assert "…no part", pop; v unchanged), copied into a Name5 (20 bytes, strncpy)
+    p = ShineObjectManager::som_FindPlayer(name)        # every player of the zone, any map
+    if argument 1 exists:
+        evaluate it (fails: assert "…no area", then continues with the buffer: Z09-B107)
+        f = fieldlist search for the map ID (Name3, 12 bytes); f missing, p missing or p.so_Field ≠ f: p = none
+    v = p ? "<p.handle>" : "0"
+    pop
+```
+
+- Wedding.ps finds the groom and the bride by the names its film was given and restricts the search to map `Wedding`
+  where the ceremony runs.
+
+### 24.5 Replacing and copying objects: `exchange2mob`, `duplicate`
+
+```pseudo
+exchange2mob obj mobName.            ShineExchange2Mob::sa_Step @ FUN_004ed650  # GordonMaster.ps: exchange2mob MidBossHandle "KQ_G_AncientStatue".
+    old = os_ShineObject(ps); null → pop
+    x, y, dir = old's position and direction
+    old.vt[0x33c] so_Unmark(0, broadcast 1, reason 3)              # disappears from sight (§12 notes)
+    som_FreeObject(old.handle, REMOVE_NOW, 0x1c)                   # removed BEFORE the new one exists
+    o = som_AllocObject(&h, pool 5 mob); none: assert "…Too many mob", pop
+    map = Movie::Theater::t_MapNameServer(theater); none: assert "…ShineExchange2Mob::os_ObjectRegen : Not map name", pop
+    name = argument 0 (fails: assert "…os_ObjectChange", pop); mob ID unknown: assert "…os_ObjectRegen : Invalid mob", pop
+    r = o.vt[0x6e0] so_mob_Regenerate(map, x, y, dir, h, mobId, brief null, −1, 0, 0, −1, 1, 0, 0)   # §5.3
+    r == 0: target variable = "<h>"
+    else:   assert "…os_ObjectRegen : Marking fail"; som_FreeObject(h, REMOVE_NOW, 0x1d)
+    pop
+```
+
+- This answers the part 15a question (§23.2): unlike `change2mob` / `change2npc` (B98), `exchange2mob` removes the old
+  object (unmark + free, reason 0x1c) and builds the new mob in its place, then points the target variable at it. Pool
+  kind 5 means the new object is always a mob, also when the old one was an NPC (JobChange2-1 turns its NPC into the
+  `Job2_Zombie` mob).
+- (original bug) Z09-B105: the old object is freed first and every later failure (pool full, no map, failed argument,
+  unknown mob name) leaves the map without either object while the variable still holds the freed handle; on the three
+  failures after the allocation the new slot is also never freed (a mob slot in mode 0 is skipped by
+  `ShineMob::so_Routine`, §5.4, so it stays allocated). Only a failed `so_mob_Regenerate` frees it. Likely intent:
+  check the new mob first, then remove the old one.
+
+```pseudo
+duplicate obj n.                     ShineDuplicate::sa_Step   @ FUN_004f3430   # unused in 2016
+    o = os_ShineObject(ps); o and argument 0: o.vt[0x8c0] so_scene_Duplicate(n)   # mobs / NPCs: FUN_0050dda0 (§5.2
+        # table: one copy allocated, regenerated n times: Z09-B1, B3); players / doors: folded no-op FUN_00549070
+    pop
+```
+
+### 24.6 HP and death counts: `heal`, `hpset`, `deathcountclear`
+
+```pseudo
+heal obj amount.                     ShineHeal::sa_Step        @ FUN_004f3070   # only in unloaded books
+    o = os_ShineObject(ps); o and argument 0:
+        o.vt[0x4e4] so_Heal(amount)                       # as Lua cHeal (§17.3): HP += amount × HealRate ‰, capped at MaxHP
+        so_AllOfRange(o, sight, ShineObject::so_ply_Send2WhoTargetMe FUN_00568ee0)   # new HP to everyone targeting o
+        trace "    HP <o.vt[0x4e8]>"
+    pop                                                   # amount 0 is not filtered (cHeal filters it)
+
+hpset var hp.                        ShineHPSet::sa_Step       @ FUN_004f8060   # Monkey.ps: hpset BossHandle 99999999.
+    argument 0 evaluated once and discarded (fails: assert with the copied text "…ShineSpawn::sa_Step : no script", pop)
+    v = os_Ident.i_GetVariable(ps) (missing: assert, pop); o = som_GetObjectAbsolute(number of v) (none: assert "…No Object", pop)
+    hp = number of argument 0 (evaluated again; fails: assert "…no hp")
+    o.vt[0xaac] so_SetHP(hp)                              # mobs / NPCs: ShineMob::so_SetHP FUN_00552d40, HP = min(hp, MaxHP);
+                                                          # players / doors: ShineObject::so_SetHP FUN_00552cf0 does nothing
+    pop                                                   # no packet: the new HP shows with the next HP / brief packet
+
+deathcountclear.                     ShineDeathCountClear::sa_Step @ FUN_004f36a0   # unused by loaded books
+    MobDeadCount::mdc_Clear(theater.t_Field.fm_MobDeadCount)   @ FUN_004b07b0   # memset the (maxmobhandle + 1) u16 counters to 0
+    pop
+    # the counters of §5.1 (`mdc_Count` from `ShineMob::so_KilledBy`), read by `@DeadCount` (§22.2); t_Field is not
+    # tested for null (map films always have a field *(inferred)*)
+```
+
+- Monkey.ps uses `hpset BossHandle 99999999.` to fill its boss's HP to MaxHP (the min clamps it).
+
+### 24.7 KQ rewards: `invidualreward`
+
+```pseudo
+invidualreward player rewardIndex.   ShineInvidualReward::sa_Step @ FUN_004f4470   # KQHBat1.ps: invidualreward PlayerHandle "HERO_" % InitFlag % "_" % Count.
+    h = number of argument 0 (fails: assert with the copied text "…ShineSendKQResult::sa_Step : no Player", pop)
+    p = som_GetObject(h) (in use); none → pop
+    index = argument 1 (fails: assert "…ShineSendKQResult::sa_Step : no Reward", pop)
+    p.vt[0x770](index)                     # players: ShinePlayer::so_ply_KQRewardIndex FUN_0052ea80; others: folded no-op FUN_00549070
+    pop
+ShinePlayer::so_ply_KQRewardIndex(p, index)                              @ FUN_0052ea80
+    row = KQRewardDataBox::operator[](kqreward, index)    # KINGDOM_QUEST_REW by index name; unknown → nothing
+    ShinePlayer::sp_KQReward(p, row) (FUN_0052da70)       # the KQ reward itself: Z16
+```
+
+- KQHBat1–5 build the index from the player's rank and the battle round (`HERO_<flag>_<n>`), so each ranked player gets
+  the reward row of their place.
+
+### 24.8 Guild-tournament end: `gtresult`, `endofgt`, `DiceGameStart`
+
+The guild tournament itself (`GuildTournamentSystem`, groups, dice game, scores) is Z16; these three nodes are its map
+script's hooks (`Guild/GuildTournament.ps`: blocks `EndOfTournament`, `CancelOfTournament`, `DiceGame`).
+
+```pseudo
+gtresult suc guild.                  ShineGuildTorunamentResult::sa_Step @ FUN_004f6290
+gtresult result winner loser.                                    # GuildTournament.ps: gtresult Result Winner Loser.
+gtresult <other word> guild.
+    g = number of argument 0 (fails: assert with the copied text "…ShineFindHandle::sa_Step : no skip", pop)
+    word = os_Ident.i_GetToken lower-cased
+    word == index_suc "suc" (FUN_006976a0):
+        so_AllInMap(t_CenterFlag, AxialListGTEnd{0x16, 0x12, g} (ctor FUN_00428840), includeSelf 0)   # null flag: assert
+    word == index_Result "result" (FUN_00697a60):
+        l = number of argument 1 (fails: the same "no skip" assert, pop)
+        pkt 0x74E2 NC_GUILD_TOURNAMENTSTOPMSG_CMD { u32 WinnerGuild = g, u32 LoseGuild = l, u32 AGuildRegNumber,
+            u16 AGuildScore, u32 BGuildRegNumber, u16 BGuildScore }       # payload 0x14 (pdb2016 struct)
+        field = Movie::Theater::GetFieldMap (FUN_005074b0); field has a GuildTournamentSystem:
+            GuildTournamentSystem::EndBattle(gt, &result) (FUN_004803f0, Z16) fills the four A/B fields
+        else the four fields keep the old send-buffer bytes: (original bug) Z09-B106
+        t_AllInMap(theater, AxialListPacketBroadcast(0x74E2, 0x16 bytes))   # live players of the map (§23.1)
+    any other word:
+        t_AllInMap(theater, AxialListGTEnd{0x16, 0x13, g})
+    pop
+AxialListGTEnd::ali_Work(o)                                         @ FUN_00428870
+    o.vt[0x818] guild regnum == g: o.vt[0x304] so_SendProtocol(0x16, cmd)   # an empty packet
+        # players: ShinePlayer::so_mobile_GetGuildRegnum FUN_0056d950; others: folded `return 0` → only g == 0 matches
+        # them, and non-players ignore so_SendProtocol
+```
+
+- `suc` sends `0x5812 NC_KQ_COMPLETE_CMD`, any other word `0x5813 NC_KQ_FAIL_CMD` (both empty) to every member of guild
+  `g` on the map. The 2016 client handles them in the game scene (FUN_004a31f0 / FUN_004a3270): it shows its
+  "complete" / "fail" window (`+0x994` / `+0x998`) and plays sound 0 / 1 *(inferred from the code shape)*. The 2016
+  GuildTournament.ps uses only the `result` form, so these two are never sent there.
+- `0x74E2` client (GuildTask FUN_006b6800, C01): shows "%s Guild won %s Guild by %d vs %d" / "…lost…" (`GuildTWin` /
+  `GuildTSLose`) and asks "Do you want to quit the Guild Tournament?". The cancel block sends `gtresult Result 0 0.`
+  (WinnerGuild = LoseGuild = 0).
+
+```pseudo
+endofgt winner loser.                ShineEndOfGuildTournament::sa_Step @ FUN_004f6100   # GuildTournament.ps: endofgt Winner Loser.
+    w = number of argument 0, l = number of argument 1
+        (either fails: assert with the copied text "…ShineChatWindowRange::sa_Step", pop)
+    field = theater.t_Field; none → pop
+    FieldMap::fm_ClearObject(field, 0xb0)                  @ FUN_00495a10
+        so_AllInMap(field.fm_SlantedListPoint.flag[2], AxialListObjectClear{0xb0}, 1)
+        AxialListObjectClear::ali_Work FUN_00495940: kind bit set in 0xb0 (4 NPC, 5 mob, 7 door) → o.vt[0x3f4]
+            so_RetrateFromMap (removed next tick, §13)
+    FieldMap::fm_GuildTournamentEnd(field, w, l)           @ FUN_00475fa0
+        field seed (fm_GuildTournamentInform.seed) 0xFF, or guildtournamentinfo[seed].nTournamentSeed 0xFF:
+            assert "…Seed not set" / "…Seed not set<2>", nothing sent
+        → WM 0x7482 NC_GUILD_TOURNAMENT_END_CMD { u8 seed, u16 nTournamentMapNo, u8 (w == l), u32 w, u32 l }
+            (W03; too long: assert with the copied text "…ShineEndOfKingdomQuest::sa_Step : Packet Too Long")
+        guildtournamentinfo[seed].gta_Result2WMS = 1
+    FieldMap::fm_GuildTournamentClear(field)               @ FUN_00475a30
+        guildtournamentinfo[seed].nTournamentSeed = 0xFF, .gta_MatchStartTime = 0; field seed = 0xFF
+        GuildTournamentSystem::Clear(gt) when the map has one (Z16)
+    pop
+```
+
+- `fm_GuildTournamentClear` indexes `guildtournamentinfo[seed]` without the 0xFF test that `fm_GuildTournamentEnd`
+  makes; whether the array has a slot 255 was not checked (Z16, see §24.9).
+
+```pseudo
+DiceGameStart seconds.               ShineDiceGameStart::sa_Step @ FUN_004f9cc0   # GuildTournament.ps: DiceGameStart 15.
+    s = number of argument 0 (fails: assert "…no Object", pop)
+    map = t_MapNameServer(theater) (none: assert "…Not map name"); field = fieldlist search (ListSearchSame<FieldMap>)
+    field and field.fm_GetGuildTournamentSystem (FUN_00463290):
+        GuildTournamentSystem::DiceGameStart(gt, s × 10)  @ FUN_0047ada0; pop
+    else: return 0 WITHOUT pop                         # (original bug) Z09-B108: the film ends
+GuildTournamentSystem::DiceGameStart(gt, ticks)                            @ FUN_0047ada0   (Z16)
+    A, B = the manager users of group A / B (GuildGroup::CheckManagerUser when unset); either missing: nothing
+    DiceGame::Start(gt.m_diceGame, ticks, A.charNo, B.charNo)
+    to every live player of A's map (so_AllInMap(A, …, includeSelf 1)):
+        0x74D2 NC_GUILD_TOURNAMENT_DICEGAME_START_CMD { u32 AGuildRegNumber = A.vt[0x818], u16 AGuildDelegate =
+            ShineObject::so_GetZoneHandle_ItemLooter(A), Name5 AGuildDelegateName = A.vt[0x56c], u32 BGuildRegNumber,
+            u16 BGuildDelegate, Name5 BGuildDelegateName }   # payload 0x34 (pdb2016 struct)
+```
+
+- Client (GuildTask FUN_006b63a0, C01): shows "The Dice will be rolled automatically after 5 seconds". The dice game
+  (rolls, result, `interruptset TimeOut … "fnDieGameEnd"` in the script) is Z16.
+- (original bug) Z09-B108: on a map without a guild-tournament system (or without a map name) the node returns 0
+  without popping, which ends the whole film (§21.4), while its argument failure pops like every other node. The 2016
+  script runs it only on the tournament map, so it is latent. Likely intent: pop.
+
+### 24.9 2016 use, answers and open points
+
+- Part 15a's open question (who removes the old object after `os_ObjectChange`): only `exchange2mob` removes it
+  (§24.5); `change2*` leave it (B98).
+- The Pine drop paths (`itemdrop`) now join the Lua one (`cDropItem`, §11.8) and the mob drops (§11) at
+  `so_IsDropping`; B21 (questOnly from the cookie) applies to all of them.
+- Not traced (Z16): `GuildTournamentSystem::EndBattle` (how the A/B scores are computed), `GuildTournamentSystem::Clear`,
+  `DiceGame::Start`, `ShinePlayer::sp_KQReward`, the bounds of `guildtournamentinfo` (slot 255 written by
+  `fm_GuildTournamentClear` when the seed is not set).
+- Not traced (Z04 / Z05): what `cls.vt[0x2c]` does with the synthetic row of `itemdrop` (MinQtty = MaxQtty = 1, no
+  upgrade weights) and whether it reads the uninitialised InxName bytes; `iac_itemcreate`'s parsing of the `itemattrset`
+  attribute string.
+- `som_FindPlayer`'s name comparison (case, which player list) was not traced (`findplayer`).
