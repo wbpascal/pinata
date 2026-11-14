@@ -58,9 +58,11 @@ Bullets: what is unknown, why, and where to look next (functions, tables, other 
 ## Coverage boundary
 
 Everything you found but did not cover, each with the argument why it is outside this item. Running out of context is
-not a reason; that goes to the status file as remaining work. (Rows below are made-up examples of the form.)
+not a reason; that goes to the status file as remaining work. A finished item (status `**State:** done`) is a valid
+"Covered by" only if its output already documents the thing (cite the §): fix small gaps in your own output,
+create a follow-up item for larger ones (plan step 8). (Rows below are made-up examples of the form.)
 
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
 | `FUN_004a1230` mob drop roll | Z09 (scope: "drops") | reached from 0x2401 only after the kill; drop logic is world simulation |
-| zone↔WM `0x3C12` relay | **new item proposed** (status file) | no item lists dept 0x0F; does not fit any existing scope |
+| zone↔WM `0x3C12` relay | new item Z18 (added by this item) | no item lists dept 0x0F; does not fit any existing scope |

@@ -283,9 +283,12 @@ ITEMS = [
       goal="The zone does not start on its own: it downloads an encrypted Lua script from a certification server "
            "(127.0.0.1:58492, fallback cert1.fo.gamigo:80), decrypts it with registry keys HKLM\\SOFTWARE\\GBO "
            "`Natural`/`Desert` and runs it; the script calls the registered `zs_service_*` / `zs_start_*` stages "
-           "(Z01-core §2). Only the zone uses this (no other server binary has these strings). The script itself is "
-           "not recoverable. Reconstruct the mechanism around it and infer what the script must do, so a rebuilt "
-           "server knows which stage order and which values to use, and whether the certification can stop the server.",
+           "(Z01-core §2). Only the zone uses this (no other server binary has these strings). The original Gamigo "
+           "script is lost, but a working replacement answer exists: the NA2016 service `_GamigoZR` "
+           "(`Files/Server/NA2016/GamigoZR/GamigoZR.exe`) serves it on 127.0.0.1:58492 (S01 §1.5). Reconstruct the "
+           "mechanism, decrypt that answer to recover the script it carries, and from both state what the script must "
+           "do, so a rebuilt server knows which stage order and which values to use, and whether the certification "
+           "can stop the server.",
       steps=["Read `docs/pseudocode/zone/Z01-core.md` §2 and `docs/knowledge/Z01.md` §1/§7 first. The stage functions and "
              "several entry points are not in `decomp.c`; decompile them against the persistent Ghidra project with a "
              "headless script (`analyzeHeadless re-data/ghidra zone -process -noanalysis -readOnly`, `createFunction` + "
@@ -294,6 +297,18 @@ ITEMS = [
              "FUN_00613750 (key setup from the two registry int64s), FUN_00613950 (decrypt), FUN_005d6d40 (Lua dostring). "
              "Document the wire format, what the request carries (world/zone numbers, version?), the `[a][b]` header "
              "checks (1 ≤ a ≤ 0x2760, b < 11) and the cipher as pseudocode with test vectors if possible.",
+             "The GamigoZR answer (S01 §1.5, read it first): a .NET 4 Windows service \"Gamigo_Zone_Response_Service\" "
+             "(2019, private-server tool, installed by `install.bat` / `_Install Services.ps1` as `_GamigoZR` and started "
+             "5 s before the zones by `Start Services.ps1`), an `HttpListener` on `http://127.0.0.1:58492/` (the zone's "
+             "primary certification address; the zone falls back to cert1.fo.gamigo:80, which no longer answers). Its "
+             "UTF-16 strings hold the header `[10000][10][{( USA V.0.001 )}]` and 42 hex lines (2 680 hex digits). "
+             "Read its IL (e.g. `monodis`/`ilspycmd` if installed, else parse the .NET metadata with Python) to get "
+             "the line order and the exact HTTP reply (status, headers, body framing), check that the header passes "
+             "the `[a][b]` checks, then decrypt the body with the zone's cipher. The registry keys `Natural`/`Desert` "
+             "are not in the repo: look for them in the NA2016 files (`*.reg`, `*.ps1`, `*.bat`, readme) and, if absent, "
+             "say whether the cipher can be solved without them (known plaintext: the script must call `zs_*` names). "
+             "If the decrypted script is recovered, document it in full: it replaces the inferred stage order below "
+             "and gives the real values (run/walk factors, server parameters). Do not run the service or the zone.",
              "Threads: `zs_service_certification` (thread FUN_005ab9c0) and `zs_service_stackchecker` (thread "
              "FUN_005a9f10). What do they check, how often, against what, and what happens on failure (log, shutdown, "
              "silent misbehaviour)? Look for time/expiry checks (`dhsmfskfWk` date helper, DAT_00aa43b8).",
@@ -839,9 +854,16 @@ not done (no status file: part 1). Do only that part, close it (step 6) and end 
    original-server bugs table and an "uncertain / not reconstructed" section to your output.
 8. Also end your output with a "Coverage boundary" section: one row per thing you found but did not cover (function,
    packet, table, behaviour) with an argument why it is out of bounds for this item: either the existing item that
-   covers it (ID and the line of its plan or scope table that includes it) or, if no item does, a proposed new item
-   (title, scope, why it does not fit here) added to `docs/plan/status/{id}.md` under "Proposed follow-up items" for the
-   user to accept. "Too large" or "ran out of context" is not out of bounds: that is unfinished work for the status file.
+   covers it (ID and the line of its plan or scope table that includes it) or, if no item does, a new follow-up item
+   you create yourself (after `rg` in `docs/plan/items/*.md` and `make_plans.py` confirms no item, open or planned,
+   covers it): add a `dict(id=…)` to `ITEMS` in `tools/protocol-re/make_plans.py` (next free ID of its area; title ends
+   "(added by {id})"; goal, steps naming the functions/§ to start from, done), run `python3 -I tools/protocol-re/make_plans.py`,
+   add its row to the item table and the order list in `docs/plan/00-master-plan.md`, list it in
+   `docs/plan/status/{id}.md` under "Follow-up items created", and name it in the boundary row (example: commit bcb1031, W05 added by W04). "Too large" or "ran out of context" is not out of bounds: that is unfinished work for the status file.
+   **Never hand work to a finished item.** Before naming an item, read the first line of its status file. If it is
+   `**State:** done`, name it only when its output already documents the thing (cite the §); nobody will reopen it.
+   Otherwise: a small gap (a function, a packet layout, a code meaning; under ~1 h of work) you document now in your
+   own output; a larger one becomes a new follow-up item as above, never a row pointing at the done item.
 9. Review part: **review with fresh context** before marking the item done. The reviewer must not share your reading
    of the code. The review task is `docs/plan/review-prompt.md` (with `<ID>` = `{id}`).
    - If your agent tool can start a fresh-context subagent (not a fork of your session), give it that file's text with
@@ -856,6 +878,8 @@ not done (no status file: part 1). Do only that part, close it (step 6) and end 
 
 - Only write your own files: `{out}`, `docs/knowledge/{id}.md`, `docs/plan/status/{id}.md`,
   `tools/protocol-re/names/<bin>/{id}.json`, `docs/protocol/annotations/{id}.json`.
+  Exception: creating a follow-up item (step 8) adds to `make_plans.py`, `docs/plan/items/` and `00-master-plan.md`;
+  never change existing items there.
 - Mark deductions *(inferred)*. Never invent names; derive them from strings, client texts, or label them as ours.
 - Never leave a half-documented handler at the end of a session; list unfinished ones in the status file.
 """

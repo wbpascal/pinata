@@ -14,7 +14,7 @@ Read: `docs/plan/items/<ID>.md` (the plan and scope table), the item's output fi
 Check:
 
 - each coverage gap: in scope and must be documented, or correctly outside (which item covers it)?
-- each "Coverage boundary" row: does the named item's plan or scope table really include it? Is the argument sound?
+- each "Coverage boundary" row: does the named item's plan or scope table really include it? Is the argument sound? A row naming a new item: does it exist in `make_plans.py` and the master plan, and is it not a duplicate of an existing item? If the named item is already done (`**State:** done`), does its output document it? If not, the row is a finding: small gap → document it here, larger → new follow-up item.
 - scope-table handlers, packets, error codes and client cross-checks that are thin or absent
 - re-read 5–10 of the item's claims in the code (`clean.py`), preferring *(inferred)* ones and field meanings, and report
   any that the code contradicts

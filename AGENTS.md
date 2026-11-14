@@ -116,7 +116,11 @@ The files here are big: `decomp.c` 15 MB with lines up to 6,700 chars, `strings.
    - a "Not reconstructed / uncertain" section at the end
    - be exhaustive: the scope table is the starting point; follow everything it reaches until what remains clearly
      belongs to another item, then end with a "Coverage boundary" section arguing, per uncovered thing, which existing
-     item covers it or which new item you propose (in the status file)
+     item covers it or which follow-up item you created for it
+     (never an item whose status is `**State:** done` unless its output already documents it: fix small gaps
+     yourself, create a follow-up item for larger ones)
+   - **follow-up items**: if nothing open or planned covers it, create the item yourself (plan step 8: a `dict` in
+     `ITEMS` of `tools/protocol-re/make_plans.py`, regenerate, row in `docs/plan/00-master-plan.md`); no need to ask
    - **original-server bugs**: mark every behaviour that looks unintended (wrong opcode or code, unchecked input,
      uninitialised bytes, a code the client does not handle, dead checks, …) with the literal tag `(original bug)`
      where you describe it, and list them all in an "Original-server bugs" section before "Not reconstructed": one
