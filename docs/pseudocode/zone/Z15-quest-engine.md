@@ -152,7 +152,8 @@ What the shipped 2016 table uses *(data)*: Types 0 (1350), 1 (518), 2 (237), 3 (
 start NPC (2093), item (20), prerequisite quest (1385), class (127), gender (2); never location, race or date. End
 conditions: NPC/mob list (action 0 reward NPC 2293×, action 1 kill 953×, target group 2 in 158), item list, level (9),
 scenario (3), wait-list progress (597); never location, race, class or time limit. 678 quests have actions (976
-entries: IfType 1 MOB_KILL / 2 GATHER, ThenType always 1 DROP_ITEM). Rewards: EXP / MONEY primary in almost every
+entries: IfType 1 MOB_KILL / 2 GATHER, ThenType always 1 DROP_ITEM; the 18 GATHER entries, in quests 20005 and 20006
+(IfTarget 5100 "Flower", DROP_ITEM 3486 at 1 %, count 1), never fire: the zone tests only IfType 1, §3.8, Z15-B46). Rewards: EXP / MONEY primary in almost every
 quest, ITEM primary 530× and selectable 362×, FAME 17×, one selectable EXP; never abstate, pet, mini-house, title or
 kill points.
 
@@ -937,6 +938,8 @@ IsConnectionEnd(row, i, mobId) → int:                                         
     MobDataBox::mdb_IsSpeciesDistanceByQuest(NPCMobID, mobId, TargetGroup) (FUN_00641020, §6)
 IsConnectionAction(row, i, mobId) → int:                                                        @ FUN_005b9b60
     same raid rule; Action[i].IfType == 1 MOB_KILL and mdb_IsSpeciesDistanceByQuest(IfTarget, mobId, TargetGroup)
+    # the only IfType test in the zone (QuestActionMobKill and IsQuestDropItem read ThenType only): IfType 2 GATHER,
+    # 3 TOUCH_OBJECT, 4 AREAINFO actions never fire (original bug) Z15-B46; 18 GATHER entries in 2016 (§1.2)
 
 CQuestZone::InitNewPlayer():                                                       @ FUN_005b9d40
     if !m_pQuestData: assert "CQuestZone::InitNewPlayer : m_pQuestData NULL"; m_pQuestData = &gQuestData
@@ -1334,7 +1337,8 @@ re-checked only inside `IsRewardAbleQuest` (which tests the area itself, not the
 
 A daily quest needs `Type 10`; `nDailyQuestType` on another type has no effect. `Repeatable` together with `Type 10`
 would give REPEAT and skip the period test. The 40-quest limit counts ING, FAILED and REWARD records
-(`GetNumOfDoingQuest`); `QuestNext` ACCEPT refuses the 40th with 0xC0F (§3.3).
+(`GetNumOfDoingQuest`); `QuestNext` ACCEPT goes ahead while fewer than 40 are counted (`< 0x28`), so the 40th is
+accepted and a 41st is refused with 0xC0F (§3.3).
 
 ### 4.7 Give-up, select-start, read and the SET_INFO answer
 
@@ -1552,7 +1556,7 @@ CQuestZone::Send_NC_QUEST_DB_DONE_REQ(questId, sel) → int:                    
         +0x00 NETPACKETZONEHEADER { u16 clienthandle = p.handle (p+4); u32 charregistnumber = p.vt 0x344 }
         +0x06 u32 UserNo = p.vt 0x348 so_GetUserRegistNumber()
         +0x0A u16 NPCID  = CQuest::GetRewardNPC(questId)          # first End NPC with action 0; 0xFFFF (§4.4)
-        +0x2D…+0x51 zeroed: nMoney, nExp, nFame, nCur_*, CT_Type, CT_ElementNo, nCur_CT_ElementValue
+        +0x2D…+0x4F zeroed (buf+0x2F…+0x51): nMoney, nExp, nFame, nCur_*, CT_Type, CT_ElementNo, nCur_CT_ElementValue
         +0x50 u16 nLockIndex = 0, +0x52 u8 nItemCreateCount = 0 }
     if !(rec = GetQuestInfo(questId)): return 0
     req.QuestInfo (+0x0D, 0x20) = copy of rec; CQuest::SetQuestDone(&req.QuestInfo)
@@ -1593,7 +1597,9 @@ CQuestZone::Send_NC_QUEST_DB_DONE_REQ(questId, sel) → int:                    
             attr = cls.vt 4(item, attr)                          # writes the attribute bytes, returns the new end
             L.vt 0x40 icl_StoreItem(lock, cell, &{key, item}, &location, &location)   # CellChange reservation (Z05 §1.4)
             it.Next()
-    pp_SetPacketLen(attr − buffer); too long → assert "Send_NC_QUEST_DB_DONE_REQ : Packet Too Long" (no send)
+    pp_SetPacketLen(attr − buffer); too long → assert "Send_NC_QUEST_DB_DONE_REQ : Packet Too Long" (no send), but the
+        lines below still run: reservations held, flag 1, script waiting, return 1, and no answer will ever come;
+        unreachable with at most 12 creates of 0x26 bytes plus their attributes in the packet buffer *(inferred)*
     else → GameDB (Character server, D04 §1.2) 0x441A, total payload 0x53 + n × 0x26 + attribute bytes
     L.icll_index += 1
     p.vt 0xae4 so_SetIsQuestRewardReq(1)
@@ -1687,8 +1693,11 @@ refuses: `sp_NC_ITEM_USE_REQ` FUN_005416b0 (fail code 0x701 "Cannot use the item
 `sp_NC_ITEM_CHAT_COLOR_CHANGE_REQ` FUN_0051e580, `sp_NC_ITEM_TERMEXTEND_REQ` FUN_0051eb40,
 `sp_NC_ITEM_CLASS_CHANGE_REQ` FUN_0051f5c0, `sp_NC_ITEM_RANDOMOPTION_CHANGE_REQ` FUN_00520e40,
 `sp_NC_ITEM_USE_ACTIVESKILL_REQ` FUN_00540b90, and the minimon auto-use routine `sp_UseItemMinimon_Routine`
-FUN_00564d40 (skips its run). Their own replies are Z04's. If the DB never answers, the flag stays 1 until the player
-object is rebuilt (relog / map change) *(inferred)*.
+FUN_00564d40 (skips its run). Their own replies are Z04's. Nothing else writes p+0x2AA50: the `ShinePlayer` constructor
+FUN_0055bc80 does not initialise it and no raw write or memset of that offset exists in the zone. So if a 0x441B is lost
+(Character server down, connection dropped) the flag stays 1 for the rest of the session, and also for the next
+character that gets the same pooled player object: quests cannot be started or finished and the items above cannot be
+used (original bug) Z15-B47. Its value in a fresh pool object depends on the open zero-fill question (§9).
 
 ### 5.5 The older two-step path: `0x345C NC_ITEMDB_QUESTREWARD_ACK`
 
@@ -1982,8 +1991,34 @@ full counters do no harm. The client also recomputes the status itself (its own 
 
 Kill credit goes to every party member within 1000 units of the killer, or every raid member near the mob, each for
 their own quests; a player in a raid gets credit only for RAID (type 8) quests, a player outside a raid only for the
-other types (`IsConnectionEnd`, §3.8). Non-player killers credit nobody (the base `so_ply_QuestCheck` is empty) *(Z03 decides who
-"killer" is for pet and summon kills)*.
+other types (`IsConnectionEnd`, §3.8).
+
+Who the killer is: `so_KilledBy` is ShineMob vt 0x5bc, and every damage path calls it with the object that dealt the
+blow (`so_attack` FUN_0042cb80, `so_smash` FUN_0042c650, `so_skillsmash` FUN_0042ba90, `smo_AttackedDamage`
+FUN_0042aeb0, damage over time `so_mobile_DamageOverTime` FUN_00409cd0 with the stored caster, skill damage
+`SkillDamageSender::sds_TemplateStore` FUN_005803c0, `AxialListDeathAura::ali_Work` FUN_0055e190, NPC `DieAction` /
+`DamageAbsorbAction` FUN_005c10c0 / FUN_005c11a0, Lua `cKillObject` FUN_005e6d40; gathering `sp_GatherComplete`
+FUN_0046b2f0 kills the gathered object with the player as killer). Quest credit uses this last hitter, not the looter of
+`el_FindLooter` and not the top damage dealer. What a non-player killer gives (resolved with `rtti.vtables`):
+
+| Killer object | vt 0x550 party | vt 0xa84 raid | vt 0x7f4 QuestCheck | Quest credit |
+|---|---|---|---|---|
+| `ShinePlayer` | its party | its raid | the diary | as above |
+| `ShineServant` (summon), `ShineMob`, `ShinePet`, … | 0xFFFF (FUN_005550b0) | 0 (FUN_00570b00) | empty FUN_00578070 | nobody, not even the summoner |
+| `ShineMover` (vehicle) | the master's party (FUN_0055ee50) | the master's raid (FUN_00560480) | empty | master in a party: every member within 1000 of the mover; in a raid: raid members near the mob; master alone: nobody (original bug) Z15-B48 |
+
+Z03 §8.1 calls FUN_005cbe70 `killer.questDiary.MobKill`; it is not quest code but the kill-count title. The only quest
+path from a kill is the one above.
+
+```pseudo
+# in so_KilledBy, before the drops: killer.vt 0x420 so_GetCharacterTitle() (players: their title object FUN_0055a1b0;
+# every other object: the shared dummy so_DefCharTitle, FUN_005550e0; what its m_pPlayer holds was not checked)
+CCharacterTitleZone::CT_KillMob(mobId):                                            @ FUN_005cbe70
+    row = MobDataBox[mobId]; missing → return; row.ID ≠ mobId → assert "MobDataBox::operator [] :Invalid mob index"; return
+    if m_pPlayer.vt 0x4d8 level (u8) <= row.Level + 10:
+        m_TitleValues[11].TitleValue += 1 (u64); m_TitleValues[11].bTitleSave = 1
+        CheckNewTitle(11)                                    # title unlocking: Z18 (Z07 section)
+```
 
 ```pseudo
 # scripted kills: Pine `questmobkill` (Z09 §25.6) and Lua cQuestMobKill / cQuestMobKill_AllInMap (§6.5)
@@ -2148,7 +2183,10 @@ an id the quest is 0xFFFF and nothing happens). `&questrecieve` FUN_0041c140, `&
 
 Quest-local numbers without a client error-table text (the client table has only an empty 0x0B48 entry); no 2016 or
 2017 PDB enum names them. Script errors 0xC00…0xC10 are §3.10; the DONE reward codes 0xBC2…0xBC5 belong to the Character
-server (D04 §1.2, §5.3 here). Every number of the range was searched in the zone, Character and WM code.
+server (D04 §1.2, §5.3 here). Every number of the range was searched in the zone, Character and WM code. 0xB5B…0xBFF hold no quest codes: the 0x0Bxx
+block is shared with the item-DB results (0xB01 produce, 0xB81 / 0xB82 destroy (D03), 0xBC1 quest-reward success and
+0xBC2…0xBC5 its failures (D04 §1.2, §5.3, §5.5 here)); no quest or scenario function of the zone uses another number
+of 0xB5B…0xBFF.
 
 | Code | Set by | Meaning | Client |
 |---|---|---|---|
@@ -2230,18 +2268,19 @@ only ("You cannot teleport to the saved locaion in current state.").
 | Z15-B43 | Lua `cGetQuestHero_ItemUse` FUN_005d9140 | looks up map and item, then returns nothing | no effect, no result (unused in 2016) | finish or remove |
 | Z15-B44 | `sp_OpenClassChangeMenu` FUN_0051fd10 (Lua `cClassChangeOpen`) | a wrong mode is answered with `so_SendErrorCode` on opcode 0x3060 (2-byte payload); an invalid class with 0x305F | the client reads the short 0x3060 as the 11-byte menu and opens the class-change window with class 0x81 and a stale price | send the full struct with `nError` 0x3681 (and have the client check it) |
 | Z15-B45 | `ZoneRingPacketFindJobDungeon::zrpb_Request` FUN_005a8d30 (SCENARIO 8/11/12/13) | NULL arguments or a map that forbids links out (`so_ply_IsLink_OutMap_AndSendErrorMsg` 0) return without an ack | the quest script stays on SCENARIO without a wait and never resumes | answer the ack with nResult 0 / 2 |
+| Z15-B46 | `IsConnectionAction` FUN_005b9b60 (the only `Action[].IfType` reader) | accepts only IfType 1 MOB_KILL | IfType 2 GATHER / 3 TOUCH_OBJECT / 4 AREAINFO actions never fire: the 18 GATHER entries of quests 20005 / 20006 (flower 5100 → item 3486) never drop | test each IfType against its event (gather complete, object touch, area) |
+| Z15-B47 | `sp_IsQuestRewardReq` p+0x2AA50 (§5.4) | set by DONE_REQ, cleared only by quest DB answers; not reset by the `ShinePlayer` constructor FUN_0055bc80 or at login | a lost 0x441B blocks quests and many item uses for the session and for the next character on that pooled object | clear it in the player init and on DB reconnect / timeout |
+| Z15-B48 | `pm_QuestCheck` FUN_004ccbf0 with a `ShineMover` killer (§6.2) | the mover forwards party and raid to its master but its own `so_ply_QuestCheck` is the empty base | a master alone gets no quest credit for mover kills, a master in a party or raid does (party members, master included, within 1000 of the mover) | credit the master when alone too |
 
 ## 9. Not reconstructed / uncertain
 
-- Whether the `CQuestZone` objects are zero-filled when the player pool is allocated (decides whether Z15-B2 crashes
-  or reads garbage).
+- Whether the `CQuestZone` objects and the `ShinePlayer` objects are zero-filled when the player pool is allocated
+  (decides whether Z15-B2 crashes or reads garbage, and the first value of the reward flag `sp_IsQuestRewardReq`, §5.4).
 - `IS_ABSTATE` always writes RESULT (§3.3); its 2016-struct target variable is unused by parser and interpreter.
 - Where the 2016 client starts a client-side SCENARIO (Cmd 3 has no case in `On_NC_QUEST_SCRIPT_CMD_REQ` FUN_004ba970;
   `ScenarioMgr::RunScenario` FUN_006b00b0 is reached from FUN_0047b7c0 (a chat command) and the dialog parser
   FUN_005f80f0): not traced; and what scenario 15 (server: no packet, no wait) does on the client (`Scenario_15`).
 - Whether the client closes its NPC dialog by itself after the last SAY (the server never sends END, Z15-B12).
-- Who counts as the killer for pet and summon kills (`so_KilledBy` `param_1`): Z03 §8.1; the quest path credits only
-  player killers (§6.2).
 - Whether anything fills inventory type 7 (`ci_QuestBox`, §6.3); no writer was found from the quest functions.
 - Which client message box posts frame message 0x102 (the third 0x4414 sender, §6.1): not traced.
 - Whether other 2016 data sets (other regions' `QuestData.shn`) use the latent paths this item marks as unused in the
@@ -2271,7 +2310,7 @@ cited in §1–§7, and compared them with the addresses cited in `docs/pseudoco
 | ITEMDB quest packets 0x3404 NC_ITEMDB_QUESTALL_REQ … 0x3409, 0x345D NC_ITEMDB_QUESTITEMGET_REQ, 0x345B / 0x345C QUESTREWARD | D03 (done) §7.1, §7.5 | Character-server item procedures; the zone's (dead) 0x345C path is §5.5 |
 | WM side of the diary lists 0x1021 / 0x1022 / 0x10CD / 0x10D6 and the char-save chunks 0x4010 | W05 (done) §5.4 (0x4010 row: `CharDataStore` FUN_00433210) | the WM caches and forwards the blobs; the zone's merge and save are §4.2 and §5.7 |
 | GM commands `&queststart`, `&questread`, `&questrecieve`, `&questgiveup`, `&questcomplete` | Z11 (done) §3.4, §4.6 | §6.6 links them; their quest calls are the functions of §2.7 / §4.7 |
-| Who is credited for pet / summon kills (`so_KilledBy` `param_1`) | Z03 (done) §8.1 | combat attribution; §6.2 starts at the credited player |
+| `CCharacterTitleZone::CheckNewTitle(11)` called from `CT_KillMob` FUN_005cbe70 (§6.2; Z03 §8.1 misnames it a quest-diary kill) | Z18 (open; plan: "Z07 section: `CCharacterTitleZone::CheckNewTitle`") | `CT_KillMob` itself is documented in §6.2; the unlock check is the title subsystem |
 | NPC menu path that reaches `QuestPlayer_NPCClick` | Z02 (done), NPC menus | §6.1 starts at the click check Z02 calls |
 | Compiler / library code with no behaviour: `QUEST_DATA` hash-map and list instantiations FUN_00635b00…FUN_00636760, `std::_Uninit_def_fill_n<MobOfQuest>` FUN_005c0060, `BinaryDataBox<QuestSpecies>` dtors FUN_00641400 / FUN_00641990, static init / atexit of `icll_Releaser_QuestReward` FUN_00696240 / FUN_0069d230 and of `gQuestData` FUN_0069f880, `cmc` atexit destructors FUN_0069e6e0 / FUN_0069e6f0 / FUN_0069f790 / FUN_006a06c0, `__unwindfunclet$…` handlers | none needed | containers, static construction / destruction and exception unwinding; the objects they build are documented (§1.1 hash map, §5.3 releaser, §6.3 `QuestSpecies`) |
 
