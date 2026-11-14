@@ -1,0 +1,8 @@
+{
+  "FUN_00510200": "SetItemData::EffectDescription::EffectDescription",
+  "FUN_00510230": "SetItemData::EffectDescription::~EffectDescription",
+  "FUN_00510240": "SetItemData::EffectByPiece::EffectByPiece",
+  "DAT_1326ff0c": "setitemskilleffectqueue_mq_Buffer0_content",
+  "DAT_13272308": "setitemskilleffectqueue_mq_Pointer_value",
+  "DAT_1327230c": "setitemskilleffectqueue_mq_Pointer_mask"
+}
