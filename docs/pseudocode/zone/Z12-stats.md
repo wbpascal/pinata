@@ -500,6 +500,408 @@ not identified; inferred from the name: a wedding/couple passive)*. No other wri
 | PowerOfLove passive | LastTune.Rate | five stats +5 % |
 | — | ItemPowerRate.Plus, Upgrade.Rate, WeaponTitle.Plus, LastTune.Plus | never written (always 0 / 1000) |
 
+## 3. Maxima: HP, SP, LP and the soul-stone stock
+
+All maxima are computed on demand from the layers (they are not in `Total`, §1.3). The class object is
+`p.vt[0x49c]()` `so_CharacterClass` (= `p+0xfbc`, §2.1); its slot `+0x20` is `MaxHP`, `+0x24` `MaxSP`, `+0x28` `MaxLP`,
+`+0x2c` `LPRecover`, `+0x30` `LPTick`, `+0x34` `LPRecoveryRoutine`, `+0x38` `cc_ClassType`.
+
+### 3.1 Class slots
+
+| Slot | `CharClass` (all 25 non-LP classes) | `CharClassSentinel` / `CharClassSavior` | `CharClassMob` |
+|---|---|---|---|
+| +0x20 MaxHP | `CharClass::MaxHP` @ FUN_00449610 | same | `CharClassMob::MaxHP` @ FUN_004496f0 = `MobInfo.MaxHP` of `o.vt[0x70c]()` (+0x46) |
+| +0x24 MaxSP | `CharClass::MaxSP` @ FUN_00449660 | `CharClassSentinel::MaxSP` @ FUN_0064f610 `return 1` | as CharClass |
+| +0x28 MaxLP | `return 0` (FUN_00570b00, a folded stub) | `CharClassSentinel::MaxLP` @ FUN_0044a830 = `SingleData["SenMaxLP"]` | `return 0` |
+| +0x2c LPRecover | `return 0` | @ FUN_0044a870 = `SingleData["SenSPRecover_Amount"]` | `return 0` |
+| +0x30 LPTick | `return 0` | @ FUN_0044a8b0 = `SingleData["SenSPRecover_Time"]` × 1000 (ms) | `return 0` |
+| +0x34 LPRecoveryRoutine | no-op (FUN_00549070, folded) | @ FUN_00449a50 (§3.4) | no-op |
+| +0x38 cc_ClassType | `return 0` | 26 / 27 | 28 |
+
+`cc_ClassType` returns the class id (`CharClassFighter` 1 … `CharClassSavior` 27, one `mov eax, n; ret` stub per class)
+and is the column index into `ChrCommon.txt StatTable` (§5.1). `SingleData` = `gSingleData` (`CSingleDataMap::GetValue`,
+the `SingleData.shn` key → u16 table that W05 §3.3 documents for the WM; the zone loads the same file).
+
+```pseudo
+CharClass::MaxHP(cls, o, cl = &Total):  row = cls.cc_array[o.so_GetLevel()]          @ FUN_00449610
+    return row.LevelHP + (cl.Con − row.constitution) × 5          # 5 HP per END point above the class table's END
+CharClass::MaxSP(cls, o, cl = &Total):                                                 @ FUN_00449660
+    return row.LevelSP + (cl.Men − row.mentalpower) × 5           # 5 SP per SPR point above the table's SPR
+```
+
+`cc_array[level]` is indexed without a bound check here (`so_GetLevel` is a u8; levels > 150 would read past the array;
+`c_Storepure` guards the same access with `< 0x97`) *(inferred: unreachable, `LevelLimit` = 125)*.
+
+### 3.2 `ShinePlayer::sp_MaxHP` @ FUN_0054a670 and `sp_MaxSP` @ FUN_0055a8b0
+
+```pseudo
+sp_MaxHP(p):
+    base = cls.MaxHP(p, &P.Total) + so_ply_FreeStatCon(p).MaxHP (vt 0x474, §4.1) + P.Item.Plus.MaxHP_2
+    p.+0xea8 = (P.AbnormalState.Rate.MaxHP − 1000 + p.sp_ChargedItem.ci_Effect.cec_MaxHPRate) × base / 1000
+    p.+0xea8 += P.Item.Plus.MaxHP + P.AbnormalState.Plus.MaxHP
+    if P.ChangeAbilityInfo (P+0xcd4) != 0xFFFF and mobdatabox[it]:  p.+0xea8 = MobInfo.MaxHP      # polymorph (SAA_METAABILITY)
+    return p.+0xea8                                               # signed int arithmetic, truncating
+
+sp_MaxSP(p):
+    base = cls.MaxSP(p, &P.Total) + so_ply_FreeStatMen(p).MaxSP (vt 0x478)
+    p.+0xeac = (P.AbnormalState.Rate.MaxSP − 1000 + cec_MaxSPRate) × base / 1000
+    p.+0xeac += P.Item.Plus.MaxSP + P.PassiveSkill.Plus.MaxSP + P.AbnormalState.Plus.MaxSP
+    if P.ChangeAbilityInfo != 0xFFFF and mobdatabox[it]:  p.+0xea8 = MobInfo.MaxHP               # (original bug) Z12-B4
+    return p.+0xeac
+
+ShinePlayer::so_MaxHP (vt 0x4f0) @ FUN_0055ac10 / so_MaxSP (vt 0x4f4) @ FUN_0055ac50:
+    sp_MaxHP(p) / sp_MaxSP(p); a result < 1 is stored as 1; CurHP / CurSP (p.sp_CharData.toclient.basedata) clamped to it
+```
+
+So `cec_MaxHPRate` / `cec_MaxSPRate` (charged items; 1000 by default, `so_ChargedEffectContainerClear`, Z10 §1.1) and the
+abstate rate add their per-mille excess, and only the class value, the free-stat bonus and the random-option `MaxHP_2`
+are scaled; item and abstate flat bonuses are added after the rate. `Item.Rate`, `PassiveSkill.Plus.MaxHP` and all
+`LastTune` cells are not read. `MaxHP` / `MaxSP` of `PassiveSkill.Rate`, `ItemPowerRate` and `Upgrade` are not read
+either. A polymorphed player (P+0xcd4 = mob id) gets the mob's MaxHP; its MaxSP stays the player's (Z12-B4: the
+polymorph branch of `sp_MaxSP` overwrites the HP cache with the mob's MaxHP and returns the unchanged SP value).
+
+Callers: `so_MaxHP`/`so_MaxSP` (vt 0x4f0/0x4f4: everything that clamps or refills HP/SP, the notify §4) and
+`so_fill_CHAR_PARAMETER_DATA` (§4.3, calls `sp_MaxHP` / `sp_MaxSP` directly, without the ≥ 1 clamp).
+
+`sp_RecoverPoint_HPAfterItemEquip` @ FUN_0056b280 (installed as the one-shot `sp_RecoverPoint` hook by
+`so_RecalcEquipParam`, §2.2): `c_MakeTotal(P)`; clamp CurHP to `so_MaxHP` and CurSP to `so_MaxSP`;
+`so_AllOfRange(…, so_ply_Send2WhoTargetMe)` (the HP to everyone targeting `p`, Z09 §2.4); then the hook is reset to
+the no-op (`so_Gamble_ChangeCoin` is the folded empty function).
+
+### 3.3 LP (Sentinel / Savior): `so_ply_Sen_MaxLP` (vt 0xd94) @ FUN_005611e0 and the recovery
+
+`p.sp_Sen_LP` (`ShinePlayer::LPInfo`) = `{ nCurLP, nMaxLP, nCurLPRecover, nLastLP, nLastMaxLP, RecoverTick {m_NextTick,
+m_TickInterval} }` (member names *(pdb2016)*).
+
+```pseudo
+so_ply_Sen_MaxLP(p):                                                     # vt 0xd94
+    t = round((float)(P.AbnormalState.Rate.MaxLP × cls.MaxLP()) / 1000.0)  # products converted as unsigned
+    t = round((float)(cec_MaxLPRate × t) / 1000.0)
+    p.sp_Sen_LP.nMaxLP = t + P.AbnormalState.Plus.MaxLP + P.PassiveSkill.Plus.MaxLP
+    return nMaxLP                                                        # 0 + bonuses for every other class
+
+so_ply_Sen_RecalcLPRecover(p):                       @ FUN_00561330      # vt 0xda4; run by the per-tick abstate rebuild (§1.4)
+    nCurLPRecover = round((float)(P.AbnormalState.Rate.LPRecover × cls.LPRecover()) / 1000.0) + P.AbnormalState.Plus.LPRecover
+so_ply_Sen_GetLPRecover (vt 0xda0) @ FUN_00561320 = nCurLPRecover
+so_ply_Sen_GetLPRecoverInterval (vt 0xda8) @ FUN_005613c0 = cls.LPTick()
+so_ply_Sen_GetLP (vt 0xd90) @ FUN_005611d0 = nCurLP
+so_ply_Sen_GainLP(n) (vt 0xd98) @ FUN_005612c0:  nCurLP = min(nCurLP + n, nMaxLP)
+so_ply_Sen_LostLP(n) (vt 0xd9c) @ FUN_005612f0:  nCurLP = (n < nCurLP) ? nCurLP − n : 0
+
+so_ply_Sen_InitLP(p):                                @ FUN_00563920      # vt 0xd8c; called by sp_NC_MAP_LOGINCOMPLETE_CMD @ FUN_00443390
+    GainLP(MaxLP())                                  # full LP at every map login
+    nLastLP = nLastMaxLP = 0xFFFFFFFF                # forces the first 0x245F / 0x1035 MaxLP entry
+    RecoverTick.m_TickInterval = LPRecoverInterval() × 10 / 1000;  m_NextTick = now + interval     # clockwatch ticks (100 ms, inferred)
+
+CharClassSentinel::LPRecoveryRoutine(cls, p):        @ FUN_00449a50      # class slot +0x34, run every player tick (Z09 §2.3)
+    if p.smo_GetMode() (vt 0x484) != 3 (dead) and so_ply_Sen_LP_Tick(p) (vt 0xdac):
+        so_ply_Sen_GainLP(p, so_ply_Sen_GetLPRecover(p))
+so_ply_Sen_LP_Tick(p):                               @ FUN_005613e0
+    if RecoverTick.m_NextTick < clockwatch.cw_CurrTick: m_NextTick += m_TickInterval; return 1   # one step per tick, no catch-up
+    return 0
+```
+
+The client learns LP through `0x245F NC_BAT_LPCHANGE_CMD` (`sp_SendLPinform`, Z09 §2.4) and MaxLP through the `0x1035`
+entry 0x24 (§4.2). LP costs and LP damage are Z03's (skill cost §5.3).
+
+### 3.4 Soul-stone stock maxima
+
+`PrimaryParameter.hpsoulstone` / `spsoulstone` (+0x1c / +0x28, §2.1) = `PointSoulStone { soul, maxsoul, buysoul }` of the
+level row. The stock limit is `maxsoul × cec_HPStoneLimit / 1000` (resp. `cec_SPStoneLimit`; `sp_ChargedItem.ci_Effect`
+`p+0x2a5a2 / p+0x2a5a4`, 1000 by default, raised by charged "stone bag" items *(inferred)*):
+
+- `so_fill_CHAR_PARAMETER_DATA` (§4.3) sends it as `MaxHPStone` / `MaxSPStone` (`& 0xFFFF`).
+- `sp_PointStoneBuy` @ FUN_00588510 (Z04 §13.1) refuses a purchase with `0x742` when `have + number + reserved >
+  maxsoul × limit / 1000`; the price is `buysoul × number`.
+- `soul` is the heal amount of one stone (Z04 §13.2).
+
+---
+
+## 4. The refresh: `so_mobile_NotifyParameterChange` (vt 0x34) @ FUN_00503c10
+
+The profiler string calls it `ShinePlayer::smo_NotifyParameterChange`. It finishes every rebuild: it is the only place
+apart from `so_allparametercalculate` and `sp_RecoverPoint_HPAfterItemEquip` that runs `c_MakeTotal`, it replaces the
+displayed attack/defence cells of `Total` by the combat-formula values, and with `send = 1` it sends the differences.
+
+### 4.1 Free-stat bonus rows (`ChrCommon.txt`, Z10 §5.4)
+
+```pseudo
+so_ply_FreeStatStr/Int/Dex/Con/Men(p)   vt 0x468 / 0x46c / 0x470 / 0x474 / 0x478     @ FUN_0055a350 / 0055a390 / 0055a3d0 / 0055a410 / 0055a450
+    n = p.so_GetStatDistStr() (vt 0x424, = p.sp_CharData…statdistribute = p+0x7f94) [stat]      # spent points STR, END, DEX, INT, SPR
+    return shineparam.scp_param.freestat<Xxx>[n > MaxFreeStat ? 0 : n]                          # row pointer
+ShineObject::so_ply_FreeStat* @ FUN_00555140 … FUN_00555180 (mobs, NPCs): freestat<Xxx>[0] (the all-zero row)
+```
+
+| Table (row struct, 2016 values for 1 / 10 / 180 points) | Field | Read by |
+|---|---|---|
+| `FreeStatStrTable` `{Stat, WCAbsolute, checksum}`: 1 / 12 / 216 | WCAbsolute | `NormalPY::roe_Damage` +att (Z03 §4.6), notify WCmin/WCmax, 0x1035 #0x12, `NormalMA::roe_FreeStateAttackPower` (Z12-B6) |
+| `FreeStatIntTable` `{Stat, MAAbsolute}`: 1 / 12 / 216 | MAAbsolute | `NormalMA::roe_Damage` +att, notify MAmin/MAmax, #0x14, `NormalPY::roe_FreeStateAttackPower` (Z12-B6) |
+| `FreeStatDexTable` `{Stat, THRate, TBRate}`: 3,2 / 30,20 / 280,230 | THRate (+1), TBRate (+3) | every `roe_HitRate` (Z03 §4.3: TH + att, TB + def), notify TH / TB, #0x16 / #0x17 |
+| `FreeStatConTable` `{Stat, ACAbsoulte, BlockRate, MaxHP}`: 1,1,5 / 5,10,50 / 90,100,900 | ACAbsoulte (+1) | `NormalPY::roe_Damage` −def, notify AC, #0x13, `NormalMA::roe_FreeStateDefendPower` (Z12-B7) |
+| | BlockRate (+3) | `NormalPY::roe_ShieldBlock` @ FUN_004ff860 (added when the shield block rate > 0), #0x19 |
+| | MaxHP (+5) | `sp_MaxHP` (§3.2), #0x1a |
+| `FreeStatMenTable` `{Stat, MRAbsolute, CriRate, MaxSP}`: 1,2,5 / 5,20,50 / 90,130,900 | MRAbsolute (+1) | `NormalMA::roe_Damage` −def, notify MR, #0x15, `NormalPY::roe_FreeStateDefendPower` (Z12-B7) |
+| | CriRate (+3) | `RulesOfEngagement::roe_FreeStatCriRate` @ FUN_004ffdb0: `rate + CriRate` (NormalPY, NormalMA and MagicalSkill critical rates; not PhisycalSkill), #0x18 |
+| | MaxSP (+5) | `sp_MaxSP` (§3.2), #0x1b |
+
+So spent stat points act only through these rows; they never enter the matrix (§2.1 confirmed).
+The two `roe_FreeState*` vtable slots (+0x30 attack, +0x34 defence) are only used by `roe_GetAttackPower` @ FUN_005045e0
+(`AttackPower + slot 0x30`, the DoT snapshot of `aeo_Set` @ FUN_0040a340, Z03 §6.2) and `roe_AttackPowerCalcDamage`
+@ FUN_005047d0 (`DefendPower + slot 0x34`, the DoT / bomb damage of `sasa_GetDamage` @ FUN_0040b360 and
+`SubAbnormalStateActorBomb::sasa_ApplyAbstate` @ FUN_0040c640). Both slots are wrong:
+
+```pseudo
+NormalPY::roe_FreeStateAttackPower(ctx)  @ FUN_005003c0 = att ? att.FreeStatInt.MAAbsolute : 0     # physical rule set reads INT (original bug) Z12-B6
+NormalMA::roe_FreeStateAttackPower(ctx)  @ FUN_00500390 = att ? att.FreeStatStr.WCAbsolute : 0     # magical rule set reads STR
+NormalPY::roe_FreeStateDefendPower(ctx)  @ FUN_00500420 = att ? att.FreeStatMen.MRAbsolute : 0     # attacker, and the magic stat (original bug) Z12-B7
+NormalMA::roe_FreeStateDefendPower(ctx)  @ FUN_005003f0 = att ? att.FreeStatCon.ACAbsoulte : 0
+    # sasa_GetDamage builds its EngageArgument with att = NULL, def = victim → the defence term is always 0
+```
+
+(The PhisycalSkill / AlwaysCritical rule sets share the NormalPY slots, MagicalSkill the NormalMA ones.)
+
+### 4.2 The notify
+
+```pseudo
+so_mobile_NotifyParameterChange(p, send):                               @ FUN_00503c10
+    m = p.so_ply_ChargedStatPlus() (vt 0x8e0, cec_MoreStat)
+    p.sp_LastStat.last.Str/Con/Int/Dex/Men −= m                         # see the note below
+    c_MakeTotal(P)                                                      # §1.3
+    ctx = EngageArgument(att = p, def = p)
+    if P.ChangeAbilityInfo == 0xFFFF:                                   # not polymorphed: the combat formulas on the static roe_normalPY
+        Total.WCmin = (int) roe_MinWC(ctx) + FreeStatStr.WCAbsolute     # RulesOfEngagement::roe_MinWC @ FUN_004fdbe0 (Z03 §4.6)
+        Total.WCmax = (int) roe_MaxWC(ctx) + FreeStatStr.WCAbsolute     # @ FUN_004fea10
+        Total.MAmin = (int) roe_MinMA(ctx) + FreeStatInt.MAAbsolute − P.Item.Plus.MAmin      # @ FUN_004fd640 (formula below)
+        Total.MAmax = (int) roe_MaxMA(ctx) + FreeStatInt.MAAbsolute − P.Item.Plus.MAmax      # @ FUN_004fd910
+        Total.AC    = (int) roe_AC(ctx) + FreeStatCon.ACAbsoulte        # @ FUN_004fcbc0 (Z03 §4.6 roe_DefendPower: Total(END) + Total(AC))
+        Total.MR    = (int) roe_MR(ctx) + FreeStatMen.MRAbsolute        # @ FUN_004fd3b0
+        Total.TH    = (int) roe_TH(ctx) + FreeStatDex.THRate            # @ FUN_004fc700: max(Total(DEX),1) + Total(TH), min 1
+        Total.TB    = (int) roe_TB(ctx) + FreeStatDex.TBRate            # @ FUN_004fc950
+    else:                                                               # polymorphed into mob m = mobdatabox[ChangeAbilityInfo]
+        m missing → assert "…Not Find MobID :" (no further work, nothing sent)
+        Total.AC, MR, TB = MobInfoServer AC, MR, TB
+        Total.WCmin/WCmax/MAmin/MAmax/TH = m.weapon MinWC/MaxWC/MinMA/MaxMA/TH if m.weaponnumber == 0 else 0
+    if !send: return                                                    # Total keeps the values above; sp_LastStat untouched
+    body = PROTO_NC_CHAR_BASEPARAMCHANGE_CMD at gpp+2 { u8 changenum = 0, CHAR_PARAMCHANGE_CMD param[] {u8 flag, u32 value} }
+    add(flag, new, old) = Cluster::c_compareelement @ FUN_004c9660: if new != old: param[changenum++] = {flag, new}
+    hp = so_MaxHP() (vt 0x4f0); sp = so_MaxSP() (vt 0x4f4)              # also clamps CurHP / CurSP
+    add(0x10, hp, last.lastmaxhp); add(0x11, sp, lastmaxsp); lastmaxhp = hp; lastmaxsp = sp
+    lp = so_ply_Sen_MaxLP(); add(0x24, lp, sp_GetLastMaxLP() @ FUN_00561430); sp_SetLastMaxLP(lp) @ FUN_00561440
+    add(0x12, Str.WCAbsolute, −1); add(0x13, Con.ACAbsoulte, −1); add(0x14, Int.MAAbsolute, −1); add(0x15, Men.MRAbsolute, −1)
+    add(0x16, Dex.THRate, −1); add(0x17, Dex.TBRate, −1); add(0x18, Men.CriRate, −1); add(0x19, Con.BlockRate, −1)
+    add(0x1a, Con.MaxHP, −1); add(0x1b, Men.MaxSP, −1)                  # compared with 0xFFFFFFFF: these ten are always sent
+    copy = Total                                                        # 51 ints
+    atk = cec_AttackForceRate1024; def = cec_DefendForceRate1024         # so_ply_ChargedEffectContainer (vt 0x498) +0x12 / +0x14
+    Total.WCmin/WCmax/MAmin/MAmax = v × atk / 1024;  Total.AC/MR = v × def / 1024           # (signed, rounded toward 0)
+    n = Cluster::c_compare(Total, last, body) @ FUN_004c96f0:
+        add for Str 0, Con 1, Dex 2, Int 3, Men 5, WCmin 6, WCmax 7, AC 8, TH 9, TB 10, MAmin 11, MAmax 12, MR 13, MH 14, MB 15
+        (flag 4 Wizdom is never sent); returns the total changenum
+    if n > 0 (always: the ten free-stat entries):
+        send p (game stream): 0x1035 NC_CHAR_CHANGEPARAMCHANGE_CMD, length 3 + 5·changenum
+        (pp_SetPacketLen fails → assert "…smo_NotifyParameterChange : Packet Too Long")
+    ChangeByConditionParam::cbcp_MakeParam(P.PassiveHPDownRateWCMin, copy.WCmin, atk, 0x1c, p)   @ FUN_004cbb30
+                                       (…WCMax, copy.WCmax, atk, 0x1d), (…MAMin, copy.MAmin, atk, 0x1e), (…MAMax, copy.MAmax, atk, 0x1f),
+                                       (…AC, copy.AC, def, 0x20), (…MR, copy.MR, def, 0x21)
+    cbcp_MakeParam_Plus(P.PassiveMovingTBPlus, copy.TB, 0x400, 0x23, p)                       @ FUN_004cbcd0
+    Total = copy                                                        # undo the force-rate scaling
+    so_BackupParameter(&sp_LastStat.last) (vt 0x358) @ FUN_0052b0f0: last = Total
+```
+
+Notes on the comparison:
+- `last` stores the **unscaled** `Total`, but the comparison uses the scaled one, so with a charged attack/defence
+  force item (`cec_*ForceRate1024` ≠ 1024) WC/MA/AC/MR are re-sent on every refresh *(inferred: harmless traffic)*.
+- `last.Str…Men −= cec_MoreStat` before the comparison makes STR/END/DEX/INT/SPR differ whenever a charged "stat up"
+  item is active, so they too are re-sent each time *(inferred; the intent is unclear, the values sent are correct)*.
+- `sp_LastStat.lastmaxhp/lastmaxsp/lasthp/lastsp` and `nLastLP/nLastMaxLP` are set to 0xFFFFFFFF by
+  `sp_NC_MAP_LOGINCOMPLETE_CMD` @ FUN_00443390 (and `so_ply_Sen_InitLP`), so the first refresh after a map login sends
+  MaxHP, MaxSP and MaxLP. `last` itself is not reset there.
+
+`roe_MinMA` / `roe_MaxMA` (Z03 §4.6 leaves the magical side "not traced"; cells as `layer.member`, `T(x)` = the
+`Total` formula of Z03 §4.1 recomputed in double: `(L0+L1)·L12·L10·L4·L14/10¹² + L5+L7+L9+L11+L13`):
+
+```pseudo
+roe_MinMA(ctx):                                                          @ FUN_004fd640
+    int  = max(T(Int), 1)
+    rst  = T(MAmin) + int + L9.MagicalWeaponMastery + L1.MAmin × L10.MagicalWeaponMastery × L8.MAmax / 10⁶
+    return max(rst × L4.MAmin / 1000, 1)
+roe_MaxMA(ctx): the same with MAmax everywhere                          @ FUN_004fd910
+```
+
+`L4` (ItemPowerRate.Rate) thus scales MA twice (inside `T(MAmin)` and at the end) while `roe_MinWC` applies it once
+*(inferred: may be intended, the two formulas are built differently)*; `roe_MinMA` reads the weapon-title **max** cell
+`L8.MAmax` (P+0x68c) where `roe_MinWC` reads `L8.WCmin` (original bug) Z12-B5. (`roe_MinWC` reads `L12.WCmax` (P+0x9a8)
+as its abstate rate; `SAA_WCRATE` writes both cells with the same value, §2.5, so that has no effect.)
+
+`Total.MAmin/MAmax` then subtract the flat item MA again (`− Item.Plus.MAmin/MAmax`, p+0x10b4/+0x10b8), WC does not
+*(inferred: the client adds the weapon's MA itself; not checked)*.
+
+### 4.3 Packets
+
+```pseudo
+0x1035 NC_CHAR_CHANGEPARAMCHANGE_CMD (Z→C) { u8 changenum; CHAR_PARAMCHANGE_CMD param[changenum] { u8 flag; u32 value } }
+```
+
+| flag | value | client field (`User::ChangeChangeParam` *(pdb2017 client)*) |
+|---|---|---|
+| 0, 1, 2, 3 | Total STR, END, DEX, INT | `param.Strength/Constitute/Dexterity/Intelligence.change` |
+| 4 | (never sent) | `param.Wizdom.change` |
+| 5 | Total SPR | `param.MentalPower.change` |
+| 6, 7, 8, 9, 10, 11, 12, 13 | WCmin, WCmax, AC, TH, TB, MAmin, MAmax, MR (after §4.2 and the force rates) | `WClow, WChigh, AC, TH, TB, MAlow, MAhigh, MR .change` |
+| 14, 15 | Total MH, MB (c_MakeTotal value) | `MH, MB .change` |
+| 0x10, 0x11 | MaxHP, MaxSP | `param.MaxHp` (+ main character HP bar), `param.MaxSp` |
+| 0x12 … 0x1b | free-stat WC, AC, MA, MR, TH, TB, critical, block, MaxHP, MaxSP | `m_kFreeStatPoint.dwFreeWC … dwFreeMAXSP` (the character window's "+n" column) |
+| 0x24 | MaxLP | `param.MaxLp` |
+
+Client: 2016 `FUN_00499810` → `FUN_00662de0` (= 2017 `GameFrameWork::On_NC_CHAR_CHANGEPARAMCHANGE_CMD` → `User::ChangeChangeParam`),
+then the status bars are redrawn. Unknown flags are ignored.
+
+```pseudo
+0x10DF NC_CHAR_CHANGEBYCONDITION_PARAM_CMD (Z→C) { u16 nSkillID; u16 nChangeRate; u16 nParamNum;
+                                                  CHAR_CHANGEBYCONDITION_PARAM aParam[nParamNum] { u8 nFlag; u8 nIndex; u32 nValue } }
+cbcp_MakeParam(c, base, charged, flag, p):                               @ FUN_004cbb30
+    if (c.cbcp_nCondition or c.cbcp_nChange) and c.cbcp_nMaxValueNum and (base, charged) != (c.cbcp_nChangeParam, c.cbcp_nCharged):
+        c.cbcp_nChangeParam = base; c.cbcp_nCharged = charged
+        for i < nMaxValueNum: c.cbcp_pValue[i] = base × i × c.cbcp_nChange / 1000       # bonus at step i of the HP-loss curve
+        send p: 0x10DF { nSkillID = c.cbcp_nID, nChangeRate = (u16) c.cbcp_nCondition, nParamNum = nMaxValueNum,
+                         aParam[i] = { flag, i, (c.cbcp_pValue[i] + base) × charged >> 10 } }       # len 8 + 6·n
+        (more than 7999 bytes → assert "cbcp_FillSendBuffer: Buffer Over"; pp_SetPacketLen fails → "cbcp_SendBuffer : Packet Too Long")
+cbcp_MakeParam_Plus (TB curve):                                           @ FUN_004cbcd0
+    same, but cbcp_pValue[i] = c.cbcp_nChange × (i + 1)                   # flat steps; charged = 0x400 (no scaling)
+```
+
+`nFlag` uses the 0x1035 numbering of the target cell: 0x1c WCmin, 0x1d WCmax, 0x1e MAmin, 0x1f MAmax, 0x20 AC, 0x21 MR,
+0x23 TB (0x22 unused). The `ChangeByConditionParam` blocks are the passive "lower HP → more attack/defence" curves
+(`PassiveHPDownRate*`, `PassiveMovingTBPlus`, filled by `cbcp_SetCondition`, §2.4); the packet is sent only when the
+base value or the force rate changed. Client: `GameFrameWork::On_NC_CHAR_CHANGEBYCONDITION_PARAM_CMD` *(pdb2017 client;
+2016 FUN_0049cec0)* enables the character window's condition display for passive `nSkillID`, sets the section rate
+`nChangeRate` and stores each `{nFlag, nIndex, nValue}` (`CharInfoWin::SetConditionInfo`).
+
+`so_fill_CHAR_PARAMETER_DATA` @ FUN_005a2e00 (Z07 §1.5, for 0x1802 and `0x240C` level-up) calls the notify with
+`send = 0` first, so its `change` values are the §4.2 cells. Exp indexing (corrects Z07 §1.5):
+`PrevExp = nextexp[level − 1]`, `NextExp = nextexp[level]` (§5.1).
+
+Callers of the notify: with `send = 1`: `ShineMobileObject::so_Routine` (the `parameterchange` path, §1.4),
+`ShinePlayer::so_Routine` @ FUN_0056c790, `so_ply_ChargedBuff` @ FUN_005970c0, `ciee_Free` @ FUN_00450a50,
+`~ChargedEffectListRouter` @ FUN_00450e80, `sp_NC_CHAR_CHARGEDBUFF_ERASE_REQ` @ FUN_005645e0, `so_ply_InitFreeStat`
+@ FUN_00518ab0, `RecoverTypeEffect::_execute` @ FUN_005cfc70, the GM commands `&godmode`, `&hpchange`, `&spchange`,
+`&gmtestmode` (Z11); with `send = 0`: `so_KilledBy` @ FUN_00432240 and `so_fill_CHAR_PARAMETER_DATA`; with a
+computed flag: `sp_MoverSystem_SummonItem` @ FUN_0045ec10, `sp_HorseOn` @ FUN_0045f270, `icr_Apply` (furniture
+relocation) @ FUN_0048a560, `sp_DecorationActivCheck` @ FUN_00534c60.
+
+---
+
+## 5. Level and experience
+
+### 5.1 Tables (`ChrCommon.txt`, loader Z10 §5.4)
+
+`shineparam.scp_param` (`ShineParameter`, DAT_0da50470) members used here:
+
+| Member | Address | Use |
+|---|---|---|
+| `levellimit` (u8, 125) | DAT_0da50484 | Z03's `g_MaxLevel`: no exp at or above it (`sp_GainExp`); also the level caps of portals / instance gates / `&templink` |
+| `LostExpLevel` (u8, 21) | DAT_0da504a8 | death exp loss starts at this level (`sp_LostExperienceByKilled` @ FUN_0042e210, Z03 §7.2) |
+| `MaxFreeStat` (u8, 180) | DAT_0da504a9 | per-stat cap: index guard of the free-stat rows (§4.1) and `so_ply_StatIncrease` @ FUN_0058b0c0 |
+| `nextexp[151]` (u64) | DAT_0da504b0 | `nextexp[l]` = cumulative exp at which level `l + 1` starts (StatTable column `NextExp` of row `l`; `nextexp[0] = 0`) |
+| `commonparam[151]` (row ptr) | DAT_0da50968 | StatTable row per level (`commonparam[0] = commonparam[1]`) |
+| `RestExpRate`, `MaxExpBonus` | +0x20, +0x18 | loaded but never read by the 2016 zone (searched by member name) |
+| `MinNeedTime`, `DefaultBonusTime`, `IntervalTime`, `AddBuffTime`, `MaxBuffTime` | +0x24 … +0x34 | rest-exp buff (§5.4) |
+
+So the "`g_LevelExp` DAT_0da504a8, u64 per level" of Z03 / Z07 is the address of `nextexp[−1]`: every read in the code
+is `nextexp[level − 1]` (start of the current level) or `nextexp[level]` (start of the next). At level 0 the first would
+read `LostExpLevel`, `MaxFreeStat` and six padding bytes as a u64; no player has level 0 (the DB starts at 1), so
+`MaxFreeStat` merely lies next to the table. StatTable 2016: level 1 `NextExp 10`, level 10 `2350`, level 20 `43539`,
+level 150 `1469080243062`.
+
+StatTable columns after `NextExp`: `dummy`, then one u16 per class in `cc_ClassType` order (`Fig, Cfig, War, Gla, Kni,
+Cle, Hcle, Pal, Hol, Gua, Arc, Harc, Sco, Sha, Ran, Mag, Wmag, Enc, Warl, Wiz, Jok, Chs, Cru, Cls, Ass, Sen, Sav`) =
+`CommonParameter.stat[28]` (+0x33), `ExpLostAtPvP` (u32), `CheckSum`. `stat[class]` = **total stat points owned at that
+level**: `sp_CalcTotalStat` @ FUN_00517cc0 = `commonparam[level].stat[cls.cc_ClassType()]` (Z07's `FreeStat_Max`).
+2016 values: the five base classes 1 point per level (level 20: 20), the first promotions start at 25 at level 20,
+… level 150: Fig 150, Cfig 155, War 165, Gla/Kni 180, Sen 165, Sav 180. `ExpLostAtPvP` (level 20: 300, 150: 681220) is the
+exp lost on a PK-field death by a player (`sp_LostExpWhenKilledByPlayerInPKField` @ FUN_0042e130, Z03 §7.2).
+`sp_CalcCurrentStat` @ FUN_0044a980 = sum of the five spent-point bytes (Z07 `FreeStat_Spent`).
+
+### 5.2 Level-up side effects (completing Z03 §8.3)
+
+After the level-up packets of Z03 §8.3, `sp_GainExp` @ FUN_0042d830 continues:
+
+```pseudo
+    free = so_ply_TotalSkillEmpower(p) − csl_EmpowerSummary(p.skills)
+        so_ply_TotalSkillEmpower (vt 0x6b8) @ FUN_00559fd0 = cls.cc_array[level < 0x97 ? level : 0].SkillPwrPt   # PrimaryParameter +0x7c
+        if free > 0: send p 0x4810 NC_SKILL_EMPOWPOINT_CMD { u8 restempow = free }
+    sp_StatRemainSend(p)                                                @ FUN_0058bd10
+        total = commonparam[level].stat[cls.cc_ClassType()]; spent = sp_CalcCurrentStat(p)
+        spent > total → assert "sp_StatRemainSend : Too many StatPoint", nothing sent
+        else send p (data stream, vt 0x2f8): 0x105B NC_CHAR_STAT_REMAINPOINT_CMD { u8 remain = total − spent }   # 3 bytes
+        # profiler label copy-pasted as "gds_NC_CHAR_STAT_DECPOINTFAIL_DB_ACK", length assert as "so_charbasedata"
+    so_GainFame(p, level) (vt 0x20)                                     @ FUN_0042df00
+        if fame < 1,000,000: fame += level (capped at 1,000,000, the gain reduced accordingly)
+            send p: 0x2446 NC_BAT_FAMEGAIN_CMD { u32 famegain }          # client: basedata.fame += famegain
+    so_ply_SaveFame(p) (vt 0x450)                                       @ FUN_00518160
+        → CharDB (sock2gameDB): 0x1070 NC_CHAR_FAMESAVE_CMD { u32 charregnum = vt 0x344, u32 fame }    # D02: p_Char_FameSet, no reply
+    so_ply_ChangeFame(p) (vt 0x44c)                                     @ FUN_00518070
+        send p: 0x106F NC_CHAR_FAMECHANGE_CMD { u32 fame }               # client: basedata.fame = fame
+    p.sp_NextSaveExp = sp_NextSaveExperience(p)                         # §5.3
+    p.sp_CharBriefInfo.bic_BriefInfo.Level = level
+    so_Gamble_ChangeExchangedCoin(p) (vt 0xb18)                         @ FUN_00617360
+        cap = GambleExchangeMaxCoin row whose first byte == level (u32 at +1), else 0
+        send p: 0xBC05 NC_GAMBLE_EXCHANGECOIN_CHANGE_CMD { u64 remain = (cap > p.sp_Gamble_nTotalExchangedCoin) ? cap − total : 0 }   # Z06 §4.1 (coin exchange cap per level)
+    GMEventManager::GMEM_CheckAllConditionAndApply(&gGMEventManager, p) @ FUN_0046d8e0     # GM events by level/class/map (Z09 §3)
+```
+
+So a level-up gives `level` fame points (one-off; the name "fame" is the PDB's `basedata.fame`). `sp_StatRemainSend`
+also runs at map login (`sp_NC_MAP_LOGINCOMPLETE_CMD`), after a class change (`so_ply_ClassChange` @ FUN_004521b0)
+and after `&levelup` (`so_AmpersandCommand_LevelUp` @ FUN_0042fa00, Z11).
+
+Client: `On_NC_CHAR_STAT_REMAINPOINT_CMD` sets `m_iRemainStatPoint = remain`; `On_NC_BAT_FAMEGAIN_CMD` adds,
+`On_NC_CHAR_FAMECHANGE_CMD` sets the fame *(pdb2017 client; 2016 inline in FUN_004be490 / FUN_0049a580)*.
+
+### 5.3 `sp_NextSaveExperience` @ FUN_0042d6f0
+
+```pseudo
+sp_NextSaveExperience(p):
+    lo = nextexp[level − 1]; hi = nextexp[level]; range = hi − lo
+    if range == 0: return lo
+    k = (exp − lo) × 16 / range                                         # u64, truncating
+    return lo + (k + 1) × range / 16                                    # the next 1/16 mark of the current level
+```
+
+`sp_GainExp` refreshes `sp_NextSaveExp` (p+0x7fb0) when the exp passes it; nothing in the 2016 zone acts on the mark
+(readers: `sp_GainExp`, `&levelup`, `sp_NC_MAP_LOGINCOMPLETE_CMD`, all only writing it) *(inferred: a leftover of an
+"exp save every 1/16 level" scheme; the exp now goes to the WM with every gain, 0x1073)*.
+
+### 5.4 Rest-exp buff: `RestExpCalculate::RestExpAbstateApplication` @ FUN_0059d510
+
+`RestExpCalculate` @ FUN_0059d4b0 copies `MinNeedTime` (21600 s), `DefaultBonusTime` (600), `IntervalTime` (3600),
+`AddBuffTime` (600), `MaxBuffTime` (7200) from `scp_param` into `m_NeedTime, m_FirstAddBuffTime, m_InterValTime,
+m_AddBuffTime, m_BuffMaxTime`. The caller (a stack object in `wms_NC_CHAR_ZONE_SINGLE_OPTION_CMD` @ FUN_005a6200, part 4)
+passes the time of the last logout.
+
+```pseudo
+RestExpAbstateApplication(calc, p, &lastTime):
+    if !p: return false
+    now = _time32(); off = now − lastTime
+    if !p.so_AbnormalState_IsSet(345 StaRestExp) (vt 0x3e4):
+        ms = (off > 0 and off ≥ NeedTime) ? min(((off − NeedTime) / IntervalTime × AddBuffTime + FirstAddBuffTime) × 1000, BuffMaxTime × 1000) : 0
+    else:
+        add = (off > 0 and off ≥ NeedTime) ? min(((off − NeedTime) / IntervalTime + 1) × AddBuffTime × 1000, BuffMaxTime × 1000) : 0
+        e = asl_Abstate_IsSet(p.abstates, STA_RESTEXP); if !e: return false
+        ms = e.aeo_GetRestTime() + add
+    if ms != 0:
+        ms = min(ms, BuffMaxTime × 1000)
+        row = dic_abstate.as_FromIndex(STA_RESTEXP)
+        if row and p.vt[0x638](p, row.index, strength 1, row, now_tick, 0, −1, keep = ms, 0, 0):        # set / replace the state
+            so_AbnormalState_BitSet(p, row.index)
+            if row.subabstate[1].assa_info: p.vt[0x3f0](row.index, assa_info.KeepTime, 1);
+                                             so_AbnormalState_BroadcastSet(p, row.index, assa_info.KeepTime, 1)
+    return true
+```
+
+With the 2016 values: after 6 h offline a fresh buff lasts 10 min, plus 10 min per further full hour, at most 2 h; an
+existing buff is extended by (full hours past 6 h + 1) × 10 min. `so_AbnormalState_Inform` (vt 0x3f0) and the broadcast carry the row's `KeepTime`, not `ms`
+(original bug) Z12-B8. The exp bonus itself is the abstate's `SubAbnormalStateActorExpUpRate` (Z03 §8.2), not
+`RestExpRate`.
+
 ---
 
 ## Original-server bugs
@@ -509,9 +911,21 @@ not identified; inferred from the name: a wedding/couple passive)*. No other wri
 | Z12-B1 | `Parameter::Cluster::operator*=` @ FUN_004c9160 | the `CriDam` line appears twice; `MACri`, `MagCriDam` once | a CriDam rate ≠ 1000 in ItemPowerRate/AbnormalState/PassiveSkill/LastTune.Rate is applied squared | multiply once (the second line was probably meant for another member) |
 | Z12-B2 | `cpl_RecalcParam` @ FUN_00445940 | the special fields (`PassiveHealRate`, `PassiveBuffKeepTimeUPRate`, `PassiveCriDamageRatePlus`, `DMGMinusRate`, the seven `ChangeByConditionParam`s) are assigned but never reset by the recalculation | after a passive is removed (unlearn, class change) its special effect stays until the next map login | reset them in `so_RecalcPassiveParam` like the clusters |
 | Z12-B3 | `siae_ParameterRefit` @ FUN_005108c0, code 1008 | `MaxSP = arg × newMaxHP / 1000` | the set-item HP/SP-max modifier replaces the state's MaxSP bonus by one derived from its MaxHP bonus | `MaxSP = arg × MaxSP / 1000` (as in pass 1, code 14) |
+| Z12-B4 | `sp_MaxSP` @ FUN_0055a8b0 | the polymorph branch (`ChangeAbilityInfo` set) writes `MobInfo.MaxHP` into the MaxHP cache `p+0xea8` and returns the player's MaxSP | a polymorphed player keeps its own MaxSP; the HP cache is overwritten (harmless, `sp_MaxHP` writes the same value) | `p+0xeac = MobInfo.MaxSP` |
+| Z12-B5 | `RulesOfEngagement::roe_MinMA` @ FUN_004fd640 | reads the weapon-title cell `L8.MAmax` (P+0x68c) | the weapon title's `MaxAdd` scales the **minimum** magic attack (displayed and in combat) | `L8.MAmin` (P+0x688), as `roe_MinWC` reads `L8.WCmin` |
+| Z12-B6 | `NormalPY/NormalMA::roe_FreeStateAttackPower` @ FUN_005003c0 / FUN_00500390 | the physical rule set adds `FreeStatInt.MAAbsolute`, the magical one `FreeStatStr.WCAbsolute` | DoT snapshots (`roe_GetAttackPower`) of physical states grow with spent INT, magical ones with STR | physical STR, magical INT (as `roe_Damage`) |
+| Z12-B7 | `NormalPY/NormalMA::roe_FreeStateDefendPower` @ FUN_00500420 / FUN_005003f0 | read the **attacker** (`ctx.att`), and the other kind's stat (PY: Men.MRAbsolute, MA: Con.ACAbsoulte); the only caller (`roe_AttackPowerCalcDamage` from DoT / bomb damage) passes `att = NULL` | the free-stat defence never reduces DoT / bomb damage (always 0) | `ctx.def`, PY Con.ACAbsoulte, MA Men.MRAbsolute |
+| Z12-B8 | `RestExpAbstateApplication` @ FUN_0059d510 | `so_AbnormalState_Inform` / `BroadcastSet` get `SubAbState.KeepTime` of the row, not the computed duration | the client shows the rest-exp buff with the table duration, not the real remaining time | pass `ms` |
 
 ## N. Not reconstructed / uncertain
 
+- §4.2: why the notify subtracts `cec_MoreStat` from `sp_LastStat.last` and why `Total.MAmin/MAmax` subtract the flat
+  item MA (`Item.Plus.MAmin/MAmax`) while WC does not; the client side (how `CharInfoWin` combines `change` with item
+  values) was not traced.
+- §4.2 `roe_MR` / `roe_TB` / `roe_MaxWC` were checked only for the cells they read (offset lists), not line by line;
+  their formulas are taken as the magical / evasion analogues of `roe_AC` / `roe_TH` / `roe_MinWC` *(inferred)*.
+- §3.3: the clockwatch tick unit (100 ms) behind `RecoverTick` is inferred from `ms × 10 / 1000`.
+- §5.3: no reader of `sp_NextSaveExp` acts on it; a GameLog or DB path keyed on it was not found (searched by member name).
 - `ItemPowerRate.Plus`, `Upgrade.Rate`, `WeaponTitle.Plus`, `LastTune.Plus` have no writer in the 2016 zone (searched by
   member name and `p+` offset); whether a reader exists is checked in the sweep.
 - The meaning of `ItemEquipTable.Equ_LeftHand == 2` (two-handed weapon in the right hand) and of `attr.vt[0x9c]` (costume

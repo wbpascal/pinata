@@ -2595,6 +2595,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeCen` (`FUN_00517f70`) · 
 
 ### `0x1035` NC_CHAR_CHANGEPARAMCHANGE_CMD
 
+**Verified layout** (basis: zone FUN_00503c10 / FUN_004c9660; client User::ChangeChangeParam)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | changenum |  |
+| 1 | CHAR_PARAMCHANGE_CMD[changenum] | param | {u8 flag, u32 value}; flag 0-3 STR END DEX INT, 5 SPR, 6 WCmin, 7 WCmax, 8 AC, 9 TH, 10 TB, 11 MAmin, 12 MAmax, 13 MR, 14 MH, 15 MB, 0x10 MaxHP, 0x11 MaxSP, 0x12-0x1b free-stat WC AC MA MR TH TB Cri Block MaxHP MaxSP, 0x24 MaxLP (Z12 §4.3) |
+
 Sent from `ShineObjectClass::ShinePlayer::smo_NotifyParameterChange` (`FUN_00503c10`) · payload variable (iVar5)
 
 Fill: +0: FUN_004c9660; +0: FUN_004c9660; +0: FUN_004c9660
@@ -2830,11 +2837,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ClassChange` (`FUN_004521b0`) �
 
 ### `0x105b` NC_CHAR_STAT_REMAINPOINT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_STAT_REMAINPOINT_CMD`, 1 bytes
+**Verified layout** (basis: zone FUN_0058bd10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | remain |  |
+| 0 | u8 | remain | StatTable stat[class] − spent points |
 
 Sent from `GameDBSession::gds_NC_CHAR_STAT_DECPOINTFAIL_DB_ACK` (`FUN_0058bd10`) · payload 1 bytes
 
@@ -2888,11 +2895,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_BroadcastGuildInfo` (`FUN_0056e
 
 ### `0x106f` NC_CHAR_FAMECHANGE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_FAMECHANGE_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_00518070)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | fame |  |
+| 0 | u32 | fame | new total |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeFame` (`FUN_00518070`) · payload 4 bytes
 
@@ -3050,16 +3057,14 @@ Sent from `FUN_00615d10` (`FUN_00615d10`) · payload 16 bytes
 
 ### `0x10df` NC_CHAR_CHANGEBYCONDITION_PARAM_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_CHANGEBYCONDITION_PARAM_CMD`, 6 bytes + variable tail
+**Verified layout** (basis: zone FUN_004cbb30 / FUN_004cbcd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nSkillID |  |
-| 2 | u16 | nChangeRate |  |
+| 0 | u16 | nSkillID | cbcp_nID |
+| 2 | u16 | nChangeRate | cbcp_nCondition |
 | 4 | u16 | nParamNum |  |
-| 6 | CHAR_CHANGEBYCONDITION_PARAM[nParamNum] | aParam | variable length, element CHAR_CHANGEBYCONDITION_PARAM |
-
-Element `CHAR_CHANGEBYCONDITION_PARAM` (6 bytes): +0 u8 nFlag, +1 u8 nIndex, +2 u32 nValue
+| 6 | CHAR_CHANGEBYCONDITION_PARAM[nParamNum] | aParam | {u8 nFlag (0x1c WCmin … 0x21 MR, 0x23 TB), u8 nIndex, u32 nValue} |
 
 Sent from `FUN_004cbb30` (`FUN_004cbb30`) · payload variable (iVar4)
 
@@ -4900,11 +4905,11 @@ Sent from `FUN_005835e0` (`FUN_005835e0`) · payload 12 bytes
 
 ### `0x2446` NC_BAT_FAMEGAIN_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_BAT_FAMEGAIN_CMD`, 4 bytes
+**Verified layout** (basis: zone FUN_0042df00)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | famegain |  |
+| 0 | u32 | famegain | added fame (level on level-up), cap 1,000,000 |
 
 Sent from `ShineObjectClass::ShinePlayer::so_GainFame` (`FUN_0042df00`) · payload 4 bytes
 
@@ -12163,6 +12168,15 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 2 | u32 | nPetRegNum | sp_PetInfo.nRegNum |
 | 6 | u8 | nPetMind | clamped to gPetData mind min..max |
 | 7 | u8 | nPetStress | clamped to gPetData stress min..max |
+
+### `0x1070` NC_CHAR_FAMESAVE_CMD (Z→DB)
+
+**Verified layout** (basis: zone FUN_00518160)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | charregnum |  |
+| 4 | u32 | fame |  |
 
 ### `0x10d1` NC_CHAR_FREESTAT_SET_DB_REQ (Z→DB)
 

@@ -1,0 +1,115 @@
+{
+ "_about": "Z12 (zone stat calculation, level/exp): layouts verified in the 2016 zone and the 2017 client handlers",
+ "packets": {
+  "zone": {
+   "0x1035": {
+    "dir": "S→C",
+    "name": "NC_CHAR_CHANGEPARAMCHANGE_CMD",
+    "basis": "zone FUN_00503c10 / FUN_004c9660; client User::ChangeChangeParam",
+    "fields": [
+     [
+      0,
+      "u8",
+      "changenum",
+      ""
+     ],
+     [
+      1,
+      "CHAR_PARAMCHANGE_CMD[changenum]",
+      "param",
+      "{u8 flag, u32 value}; flag 0-3 STR END DEX INT, 5 SPR, 6 WCmin, 7 WCmax, 8 AC, 9 TH, 10 TB, 11 MAmin, 12 MAmax, 13 MR, 14 MH, 15 MB, 0x10 MaxHP, 0x11 MaxSP, 0x12-0x1b free-stat WC AC MA MR TH TB Cri Block MaxHP MaxSP, 0x24 MaxLP (Z12 §4.3)"
+     ]
+    ]
+   },
+   "0x10df": {
+    "dir": "S→C",
+    "name": "NC_CHAR_CHANGEBYCONDITION_PARAM_CMD",
+    "basis": "zone FUN_004cbb30 / FUN_004cbcd0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nSkillID",
+      "cbcp_nID"
+     ],
+     [
+      2,
+      "u16",
+      "nChangeRate",
+      "cbcp_nCondition"
+     ],
+     [
+      4,
+      "u16",
+      "nParamNum",
+      ""
+     ],
+     [
+      6,
+      "CHAR_CHANGEBYCONDITION_PARAM[nParamNum]",
+      "aParam",
+      "{u8 nFlag (0x1c WCmin … 0x21 MR, 0x23 TB), u8 nIndex, u32 nValue}"
+     ]
+    ]
+   },
+   "0x105b": {
+    "dir": "S→C",
+    "name": "NC_CHAR_STAT_REMAINPOINT_CMD",
+    "basis": "zone FUN_0058bd10",
+    "fields": [
+     [
+      0,
+      "u8",
+      "remain",
+      "StatTable stat[class] − spent points"
+     ]
+    ]
+   },
+   "0x2446": {
+    "dir": "S→C",
+    "name": "NC_BAT_FAMEGAIN_CMD",
+    "basis": "zone FUN_0042df00",
+    "fields": [
+     [
+      0,
+      "u32",
+      "famegain",
+      "added fame (level on level-up), cap 1,000,000"
+     ]
+    ]
+   },
+   "0x106f": {
+    "dir": "S→C",
+    "name": "NC_CHAR_FAMECHANGE_CMD",
+    "basis": "zone FUN_00518070",
+    "fields": [
+     [
+      0,
+      "u32",
+      "fame",
+      "new total"
+     ]
+    ]
+   },
+   "0x1070": {
+    "dir": "Z→DB",
+    "name": "NC_CHAR_FAMESAVE_CMD",
+    "basis": "zone FUN_00518160",
+    "fields": [
+     [
+      0,
+      "u32",
+      "charregnum",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "fame",
+      ""
+     ]
+    ]
+   }
+  }
+ }
+}
