@@ -837,7 +837,7 @@ usp_CharacterLoadingDetailInfo(@nCharNo int in, @nSeqNo int in, @nErrorNo smalli
 
 | Table | Columns | Source |
 |---|---|---|
-| `tCharacterLoading` | nCharNo int, nSeqNo int (per character, 1, 2, …), dWorldTime datetime, sLoadingMapName nvarchar(16), nFailType smallint, nLoadingFailCnt smallint, **sFromMapName nvarchar(16), sFromZoneIP varchar(16), sToZoneIP varchar(16), nToZonePort smallint**; key (nCharNo, nSeqNo) | first six *(db-backup)*; bold ones from the 2016 binds, names *(pdb2017)*, types ours; no key constraint name in the backups |
+| `tCharacterLoading` | nCharNo int, nSeqNo int (per character, 1, 2, …), dWorldTime datetime, dDBTime datetime = getdate() (not bound), sLoadingMapName varchar(16), nFailType smallint, nLoadingFailCnt smallint, PK `PK_tCharLoading` (nCharNo, nSeqNo) (restore, §9.3), **sFromMapName varchar(16), sFromZoneIP varchar(16), sToZoneIP varchar(16), nToZonePort smallint**; key (nCharNo, nSeqNo) | first six *(db-backup)*; bold ones from the 2016 binds, names *(pdb2017)*, types ours; no key constraint name in the backups |
 | `tCharacterLoadingDetailInfo` *(ours)* | nCharNo int, nSeqNo int, nDetailNo int identity, nErrorNo smallint, nErrorData int; key (nCharNo, nSeqNo, nDetailNo) | the bound values; one row per CLBD_ErrorData entry, several per report, hence the identity |
 
 Values that make the insert fail, all from the client without a check *(inferred from the ODBC conversion rules)*:
@@ -873,14 +873,14 @@ writes (§5.2).**
 So D02-B19 is a backup mismatch, not a 2016 bug. A rebuild:
 
 ```pseudo
-ALTER TABLE tCharacter ADD sLinkScrollDestMap nvarchar(16) NOT NULL DEFAULT ''    (ours; '' = none)
+ALTER TABLE tCharacter ADD sLinkScrollDestMap varchar(16) NOT NULL DEFAULT ''     (ours; '' = none)
 p_Char_GetAllData(@nCharNo int): the backups' SELECT plus, as the 37th item after dDeletedDate,
     ISNULL(sLinkScrollDestMap, '') AS sLinkScrollDestMap
 ```
 
 Type: `DB_GetStr` passes the column's `SQL_DESC_LENGTH` as the buffer length, so the declared length must stay ≤ 20 to
-fit the 21-byte buffer; `nvarchar(16)` matches `sLoginZone` (the backups' position-save procedure that also writes the KQ columns declares
-`@sLoginZone nvarchar(16)`, `@sKQMap nvarchar(16)`). A NULL value would make `SQLGetData` fail (no indicator, 22002) and leave the buffer empty,
+fit the 21-byte buffer; `varchar(16)` matches the `sLoginZone` and `sKQMap` columns (restore, §9.3; the backups' position-save
+procedure declares its parameters `@sLoginZone nvarchar(16)`, `@sKQMap nvarchar(16)`, which convert). A NULL value would make `SQLGetData` fail (no indicator, 22002) and leave the buffer empty,
 also "no override", but NOT NULL keeps it clean.
 
 ### 6.3 `usp_Character_setFriendpoint` (2 markers, 3 binds) and `usp_Character_getFriendpoint`
@@ -1170,3 +1170,246 @@ With the result codes D03 §6.2 found in the bodies (−101, −201, −202, −
 strongest compatibility the backups can give. Whether the bodies are the official 2016 ones or a private server's
 rewrite cannot be decided; a rebuild follows them. (`usp_Item_Get_EnchantAll` returns rows and `@nRet`: the wrapper does
 not test `@nRet`, so the D06-B1 timing does not matter there.)
+
+## 9. Table schema of the 2016 servers
+
+### 9.1 Source and method
+
+- **Restore done** (part 6): all eight backups restored into SQL Server 2022 (Linux, amd64 image under OrbStack/Docker on
+  the arm64 host). Database versions: `Account`, `w00_Character`, `w00_GameLog` were written by SQL Server 2017 (version
+  869, files under `MSSQL14`, backup of 2019-06-03), `AccountLog`, `StatisticsData`, `Character`, `GameLog`,
+  `OperatorTool` by SQL Server 2008 R2 (661). So the column types, nullability, defaults, identity seeds, keys, indexes and
+  foreign keys below are read from the restored catalogs (`sys.columns`, `sys.indexes`, `sys.foreign_keys`,
+  `sys.default_constraints`), not from `bak.py`; they are *(db-backup)* facts about the private-server databases.
+- **Which database each server opens:** `9Data/ServerInfo/ServerInfo.txt` `ODBC_INFO`: Account (index 0) → `Account`,
+  AccountLog (1) → `AccountLog`, Statistics (2) → `StatisticsData`, Character (10) → `w00_Character`, GameLog (11) →
+  `w00_GameLog`; all with `Driver={SQL Server}` and the startup command `SET LOCK_TIMEOUT 5000;` (§7.3). `Character.bak` and
+  `GameLog.bak` are older copies of the last two (§9.7 lists the column differences); `OperatorTool` is used by no 2016
+  server binary.
+- **Which tables:** for every procedure a binary calls (`bak.py cover <bin>`), in its server's database, the transitive
+  closure of `sys.sql_expression_dependencies` (procedures calling procedures included). Dynamic SQL is invisible to
+  that view: of the called procedures only `p_Item_GetStorageEmptyList` uses `sp_executesql` (adds `tItemStorageFindEmpty`;
+  every other `EXEC(`/`sp_executesql` hit is an operator-tool or maintenance procedure no binary calls). Result:
+  8 Account tables, 5 AccountLog, 1 Statistics, 70 Character (+ `Account.dbo.tChargeItem`, read cross-database by
+  `usp_ChargeItem_Draw` / `usp_ChargeItem_GetList`, so `Account` and `w00_Character` must live on one instance), 1 GameLog.
+  Plus the tables of the procedures that have no source (§9.6, *ours*).
+- **Not used by any 2016 call** (a rebuild can leave them out): `Account` 26 of 34 tables (tCash, tCashLog, tOrder, tPay*,
+  tChannelLog, tItem, tTutorial, event and one-off copy tables…), `AccountLog` 5 of 10 (tUser, tUserLog, tEventWorldCup,
+  tEvent_Friend*), `StatisticsData` 12 of 13 (the day/age/gender/location statistics the operator tool fills and reads),
+  `w00_Character` 43 of 112 (old `tPet` / `tPetSkill`, `tParty*`, `tArena*`, `tMasterPupils`, `tKingdomQuest`, `tRestExp`,
+  `tAutoPick`, `tGMItemReward*`, `tMinihouseGuest`, statistics, backups and temp tables), `w00_GameLog` `TEMP_QuestComplete`,
+  all of `OperatorTool` (tOperator, tMenuAuth, tOpLog).
+- **Collation:** every database `SQL_Latin1_General_CP1_CI_AS` (old `GameLog` `Latin1_General_CI_AS`): comparisons are
+  case-insensitive, so character names (`tCharacter.sID`, uniqueness checked by `p_Char_Create`, no unique index) and
+  account IDs are unique regardless of case. A rebuild on another engine must keep that.
+- **Constraint names:** names of the form `PK__<table>__<hex>`, `FK__<tab>__<col>__<hex>`, `DF__…` were generated by SQL
+  Server (they differ between the two Character backups); no procedure refers to a constraint by name, so a rebuild may
+  name them freely. Explicit names are given below; generated default names are omitted.
+
+### 9.2 Types: what the 2016 binds put into these columns
+
+Every `SQLBindParameter` of the four binaries (360 wrapper functions with a literal call string, 1,546 binds; the one
+run-time call string is §7.2) was compared with `sys.parameters` of the called procedure (w00 version first):
+
+- **Unsigned C types into signed SQL types, everywhere.** The servers bind their unsigned fields as `SQL_C_ULONG` →
+  `int` (533 binds), `SQL_C_UBIGINT` → `bigint` (207), `SQL_C_USHORT` → `smallint` (105), `SQL_C_TINYINT` (signed) →
+  `tinyint` (23), `SQL_C_UTINYINT`/`SQL_C_ULONG` → `bit` (10). A value outside the SQL type's range (an u32 ≥ 2³¹, an u16 ≥
+  32768, a negative i8) makes the driver fail the call with SQLSTATE 22003 (numeric value out of range) *(inferred from
+  the ODBC conversion rules)*: the wrapper logs its `SQL_ERROR` line and the handler takes its failure path. In practice
+  the values (character numbers, item IDs, levels, slots) stay far below the limits; a rebuild keeps the signed types of
+  the columns below and treats out-of-range values as errors, as 2016 did. `bit` parameters receive any non-zero byte as 1.
+- **Narrow strings into nvarchar.** Strings are bound `SQL_C_CHAR` with SQL type `SQL_WVARCHAR` (−9) and land in
+  `nvarchar` parameters; several target columns are `varchar` (e.g. `tCharacter.sLoginZone`, `sKQMap` `varchar(16)`,
+  `tAccountLog.sIP varchar(16)`), which is lossless for the ASCII map names and IPs the servers send. Column sizes are the
+  limits the procedures truncate to; the binds pass `columnSize = 0` (§1.2).
+- **Real mismatches** (direction or count; everything else lines up with the w00 / backup signatures):
+
+| Wrapper | 2016 bind | Backup procedure | Effect | § |
+|---|---|---|---|---|
+| Account `usp_User_LoginGame` (FUN_00419440) | 5 params | 6 (`@userNo`, `@authID` output at 3–4) | the TW database's own 5-param procedure | §2.4 |
+| Character `usp_CharacterLoading` (FUN_0045c360) | 11 params | 6 | 2016 table had more columns | §6.1 |
+| Character `usp_Character_setFriendpoint` (FUN_00460710) | 2 markers, 3 binds | 3 params | harmless with w00's `@nRet = 0` default | §6.3 |
+| Character `p_Item_GetStorageEmptyList` (FUN_00464b40) | `@nRet` (4) bound **input** (`SQL_PARAM_INPUT`, buffer pre-set 0) | `@nRet int OUTPUT` | the wrapper's `nRet != 0` test never sees the procedure's value: dead check (original bug) D06-B8; rows are read regardless | D03 §7.2 |
+| Account `usp_Item_setSerialKey` (FUN_004190d0) | `@serialKey` `SQL_C_ULONG`/`SQL_INTEGER` | `bigint` | keys ≥ 2³² cannot be passed (32-bit field) | D01 |
+| Character `p_Guild_SetWar` (FUN_00454420) | `@nWarEnemy` `SQL_C_UBIGINT`/`SQL_BIGINT` | `int` | guild numbers fit; a value ≥ 2³¹ fails (22003) | D04 |
+| Character `usp_GuildAcademy_getReward` (FUN_00456190) | `@nLevel` `SQL_C_USHORT`/`SQL_SMALLINT` | `tinyint` | levels > 255 fail; the procedure answers −1513 for 0 | D04 |
+
+  The ternary pairs of §7.1 (`p_Item_Create` / `…_UseEmptyStorage`, `p_Item_SetStorageAndOwner` / `…_UseEmptyStorage`)
+  bind `@nStorage` as output only in the `_UseEmptyStorage` branch, whose procedure declares it `OUTPUT`: consistent.
+
+### 9.3 Tables (from the restore)
+
+Per table: number of called procedures that reach it, rows present in the backup (only where non-zero; seed rows in
+§9.5), columns in `column_id` order as `name type [IDENTITY(seed)] [NULL] [=default] [explicit default name]`
+(`NOT NULL` unless `NULL` is given), then keys. No called procedure returns `SELECT *` (only inside `EXISTS` / a derived
+table, e.g. `usp_Character_getGameOption`); they name their result columns, so the column order is the backup's, not a
+requirement; the order of the *result* columns is what the binaries depend on, and
+that is given by the procedure bodies (D02–D05) and §5–§8.
+
+#### `Account`
+
+- **`tChargeItem`** (Account `usp_ReturnUser_SetUserItem`; Character `usp_ChargeItem_Draw` / `usp_ChargeItem_GetList` read it as `Account.dbo.tChargeItem`; 1 row in the backup): `rowNo int IDENTITY(1)` · `userNo int` · `orderNo int` · `goodsNo int` · `amount int =1` · `registerDate datetime =getdate()` · `isDraw tinyint =0` · `drawDate datetime NULL =getdate()`. PK `PK_tChargeItem_NC` (rowNo) nonclustered.
+- **`tReturnUser`** (2 procs): `nRowNo int IDENTITY(1)` · `dDate datetime` · `nUserNo int` · `nItemNo int`. PK `PK_tReturnUser_nRowNo_NC` (nRowNo) nonclustered.
+- **`tSerialKey`** (1 proc): `userNo int` · `serialKey bigint` · `registerDate datetime =getdate()`. PK `PK_tSerialKey_CL` (userNo); FK `FK__tSerialKe__userN__5629CD9C` userNo → tUser.nUserNo.
+- **`tUser`** (5 procs; 1 row in the backup): `nUserNo int IDENTITY(100)` · `sUserID nvarchar(60)` · `sUserPW nvarchar(32)` · `sUserName nvarchar(10) NULL` · `bIsBlock bit =0` · `bIsDelete bit =0` · `nAuthID tinyint =1` · `sUserIP nvarchar(30)` · `dDate datetime =getdate()` · `sUserNo int NULL` · `blsBlock tinyint NULL` · `blsDelete tinyint NULL`. PK `PK_tUser_CL` (nUserNo); FK `FK__tUser__nAuthID__7E6CC920` nAuthID → tUserAuth.nAuthID.
+- **`tUserAuth`** (3 procs; 5 rows in the backup): `nAuthID tinyint` · `sAuthName nvarchar(11)` · `bIsLoginAble tinyint =0`. PK `PK_tUserAuth_CL` (nAuthID).
+- **`tUserBlock`** (3 procs): `nBlockNo int IDENTITY(1)` · `nUserNo int` · `nType tinyint =1` · `dBlockDate datetime =getdate()` · `nTimeValue int =1` · `dEndDate datetime =getdate()` · `bStatus bit =1` · `sComment nvarchar(200) NULL`. PK `PK_tUserBlock_NC` (nBlockNo) nonclustered; FK `FK__tUserBloc__nUser__0BC6C43E` nUserNo → tUser.nUserNo.
+- **`tUserMergeYet`** (1 proc): `nuserno int IDENTITY(100)`. PK `PK__tUserMer__E789114E0A05505D` (nuserno).
+- **`tUserOption`** (1 proc): `nUserNo int` · `sEmail nvarchar(200) NULL` · `sJuminNo nvarchar(50) NULL` · `sPhoneNo nvarchar(20) NULL` · `nZipNo int NULL` · `sAddress nvarchar(90) NULL` · `bIsMail bit` · `sChannel nvarchar(20)` · `nAffiliateID varchar(50) NULL` · `szAffiliateSubID varchar(50) NULL` · `szCountryCode varchar(50) NULL`. FK `FK_tUserOption_nUserNo` nUserNo → tUser.nUserNo cascade.
+
+#### `AccountLog`
+
+- **`tAccountLog`** (2 procs): `nLogNo bigint IDENTITY(1)` · `sUserID nvarchar(16) NULL` · `nType tinyint` · `nUserNo int NULL` · `nPlayMin smallint NULL` · `sUserPassword nvarchar(16) NULL` · `nWorldNo tinyint NULL` · `nErrorCode smallint NULL` · `sIP varchar(16) NULL` · `dDate datetime =getdate()`. PK `PK__tAccountLog__1ED998B2` (nLogNo); IX `XIE1tAccountLog_Date` (dDate); IX `XIE2tAccountLog_UserNo` (sUserID); IX `XIE3tAccountLog_Type` (nType).
+- **`tEventiPad`** (1 proc): `nUserNo int` · `nTicket int` · `sys_create_date datetime =getdate()` · `sys_update_date datetime =getdate()`. PK `PK_tEventiPad_CL` (nUserNo).
+- **`tIPBlock`** (1 proc): `sIPStart nvarchar(20)` · `sIPEnd nvarchar(20)` · `sDesc nvarchar(30) NULL` · `dDate datetime =getdate() [DF_tIPBlock_dDate]`. PK `PK_tIPBlock` (sIPStart,sIPEnd).
+- **`tLogout`** (1 proc): `rowNo int IDENTITY(1)` · `logDate datetime =getdate()` · `worldNo tinyint NULL` · `userNo int` · `charNo int` · `class tinyint` · `level tinyint` · `experience bigint` · `playTime smallint =0`. IX `IX_tLogout` (userNo).
+- **`tReport`** (3 procs): `nRegNumber int IDENTITY(1)` · `nReporter int` · `sReporterCharID nvarchar(16)` · `nWorldNo tinyint` · `dReportDate datetime NULL =getdate() [DF_tReport_dReportDate]` · `sHarmer nvarchar(16) NULL` · `sReportType nvarchar(16) NULL` · `sReason nvarchar(512) NULL` · `sChatLog ntext NULL` · `nResult tinyint NULL =0 [DF_tReport_nResult]` · `sRemark nvarchar(128) NULL`. PK `PK_tReport` (nRegNumber); IX `IX_ReportNo_WorldNo_dDate` (nReporter,nWorldNo,dReportDate).
+
+#### `StatisticsData`
+
+- **`tSameTimeChar`** (1 proc; 2 rows in the backup): `nIndex int IDENTITY(1)` · `dDate datetime =getdate()` · `nWorld tinyint` · `nCount int`. PK `PK__tSameTimeChar__00551192` (nIndex).
+
+#### `w00_Character`
+
+- **`tAttendance`** (3 procs): `nCharNo int` · `dAttendanceDate datetime`. PK `PK_tAttendance_CL` (nCharNo,dAttendanceDate). *(w00 only.)*
+- **`tAttendanceReward`** (2 procs): `nCharNo int` · `dEventDate datetime` · `dRewardDate datetime` · `nRewardID int`. no key, no index. *(w00 only.)*
+- **`tAutoMon`** (2 procs; 24 rows in the backup): `nCharNo int` · `nType tinyint` · `nSlot tinyint` · `nItemID int NULL`. PK `PK_tAutoMon_CL` (nCharNo,nType,nSlot). *(w00 only.)*
+- **`tCharacter`** (90 procs; 1 row in the backup): `nCharNo int IDENTITY(1)` · `sID nvarchar(40)` · `nUserNo int` · `nAdminLevel tinyint =0` · `nPS int =0` · `nGS int =0` · `dCreateDate datetime =getdate()` · `bDeleted tinyint =0` · `nLoginZoneX int =5963` · `nLoginZoneY int =9793` · `nLoginZoneD tinyint =90` · `nPKYellowTime tinyint =0` · `dDeletedDate datetime =getdate() [DF_tCharacter_dDeletedDate]` · `nAP smallint =0` · `sLoginZone varchar(16) ='Rou'` · `nPKCount int =0` · `nLevel smallint =1` · `nExp bigint =0` · `nSlotNo tinyint =0` · `nHP smallint =100` · `nSP smallint =100` · `nHPS smallint =100 [DF_tCharacter_nHP2]` · `nSPS smallint =100 [DF_tCharacter_nSP2]` · `dLastLoginDate datetime =getdate()` · `nLoginCount int =0` · `nCreateWorld tinyint =0` · `nFame int =0` · `nPrisonMin smallint =0` · `nPlayMin int =0` · `nFlags int =0` · `nMoney bigint =0 [DF_tCharacter_nMoney]` · `nStrength tinyint =0 [DF_tCharacter_nStrength]` · `nConstitute tinyint =0 [DF_tCharacter_nConstitute]` · `nDexterity tinyint =0 [DF_tCharacter_nDexterity]` · `nIntelligence tinyint =0 [DF_tCharacter_nIntelligence]` · `nMentalPower tinyint =0 [DF_tCharacter_nMentalPower]` · `nRedistributePoint tinyint =0 [DF_tCharacter_nRedistributePoint]` · `nKQHandle int =-1 [DF_tCharacter_nKQHandle]` · `sKQMap varchar(16) ='' [DF_tCharacter_sLoginZone1]` · `nKQX int =0 [DF_tCharacter_nLoginZoneX1]` · `nKQY int =0 [DF_tCharacter_nLoginZoneY1]` · `nKQD tinyint =90 [DF_tCharacter_nLoginZoneD1]` · `dKQDate datetime =getdate() [DF_tCharacter_dKQDate]` · `nFriendPoint int NULL` · `nLastFriendPoint int NULL`. PK `PK__tCharacter__2610A626` (nCharNo). *w00 only: nFriendPoint, nLastFriendPoint.*
+- **`tCharacterChangeID`** (5 procs): `nRowNo int IDENTITY(1)` · `sys_create_date datetime =getdate()` · `sys_update_date datetime NULL` · `nUserNo int` · `nCharNo int` · `bFlag bit =0` · `bInit bit =0` · `sOldID nvarchar(50) NULL` · `sNewID nvarchar(50) NULL`. PK `PK_tCharacterChangeID_NC` (nRowNo) nonclustered; FK `FK_tCharacter_tCharacterChangeID_nCharNo` nCharNo → tCharacter.nCharNo.
+- **`tCharacterChargedBuffer`** (3 procs): `nNo int IDENTITY(1)` · `nCharNo int` · `nKey int` · `nID smallint =0 [DF_tCharacterChargedBuffer_nID]` · `dUseDate datetime` · `dEndDate datetime`. PK `PK_tCharacterChargedBuffer` (nNo) nonclustered; FK `FK_tCharacterChargedBuffer_tCharacter` nCharNo → tCharacter.nCharNo.
+- **`tCharacterGameOption`** (3 procs; 28 rows in the backup): `nCharNo int` · `sys_create_date datetime =getdate()` · `nOptionNo smallint` · `nValue tinyint`. PK `PK_tCharacterGameOption_CL` (nCharNo,nOptionNo,nValue); FK `FK_tCharacterGameOption_tCharacter_nCharNo` nCharNo → tCharacter.nCharNo cascade; FK `FK_tCharacterGameOption_tGameOptionInit_nOptionNo` nOptionNo → tGameOptionInit.nOptionNo. *(w00 only.)*
+- **`tCharacterKeyMap`** (5 procs; 95 rows in the backup): `nCharNo int` · `nFunctionNo smallint` · `sys_create_date datetime =getdate()` · `sys_update_date datetime NULL` · `nExtendedKey tinyint NULL` · `nASCIICode tinyint NULL`. PK `PK_tCharacterKeyMap_CL` (nCharNo,nFunctionNo); FK `FK_tCharacter_tCharacterKeyMap_nCharNo` nCharNo → tCharacter.nCharNo cascade; FK `FK_tKeyMapInit_tCharacterKeyMap_nFunctionNo` nFunctionNo → tKeyMapInit.nFunctionNo. *(w00 only.)*
+- **`tCharacterLoading`** (1 proc): `nCharNo int` · `nSeqNo int` · `dWorldTime datetime` · `dDBTime datetime =getdate() [DF_tCharLoading_dDBTime]` · `sLoadingMapName varchar(16)` · `nFailType smallint` · `nLoadingFailCnt smallint`. PK `PK_tCharLoading` (nCharNo,nSeqNo).
+- **`tCharacterOptions`** (15 procs; 1 row in the backup): `nCharNo int` · `sShortCutData varbinary(1024) NULL` · `sShortCutSize varbinary(24) NULL` · `sVideo varbinary(60) NULL` · `sSound varbinary(1) NULL` · `sGame varbinary(64) NULL` · `sWindowsPos varbinary(392) NULL` · `sKeyMapping varbinary(308) NULL`. PK `PK_tCharacterOptions` (nCharNo).
+- **`tCharacterShape`** (8 procs; 1 row in the backup): `nCharNo int` · `nClass tinyint =0` · `nRace tinyint =0` · `nGender tinyint =0` · `nHairType tinyint =0` · `nHairColor tinyint =0` · `nFaceShape tinyint =0`. PK `PK__tCharacterShape__336AA144` (nCharNo).
+- **`tCharacterShortCut`** (2 procs; 4 rows in the backup): `nCharNo int` · `nSlotNo tinyint` · `sys_create_date datetime =getdate()` · `sys_update_date datetime =getdate()` · `nCodeType smallint` · `nCodeNo smallint` · `nValue int`. PK `PK_tCharacterShortCut_CL` (nCharNo,nSlotNo); FK `FK_tCharacter_tCharacterShortCut_nCharNo` nCharNo → tCharacter.nCharNo cascade. *(w00 only.)*
+- **`tCharacterSingleOption`** (8 procs; 1 row in the backup): `nCharNo int` · `sys_create_date datetime =getdate()` · `sys_update_date datetime NULL` · `bMysteryBolt bit =1` · `bAutoPick bit =0` · `dRestExpLastExecuteTime datetime =getdate()` · `nChatBan int =0` · `nAutoBuff tinyint =0` · `nAutoChargedBuff tinyint =0`. PK `PK_tCharacterSingleOption_CL` (nCharNo); FK `FK_tCharacter_tCharacterSingleOption_nCharNo` nCharNo → tCharacter.nCharNo. *w00 only: nChatBan, nAutoBuff, nAutoChargedBuff.*
+- **`tCharacterState`** (2 procs): `nCharNo int` · `nStateNo smallint` · `nStateLevel smallint` · `nStateTime int` · `nStateCount smallint =0 [DF_tCharacterState_nStateCount]` · `nStatePowerDemage tinyint =0 [DF_tCharacterState_nStatePowerDemage]` · `nStatePowerSP tinyint =0 [DF_tCharacterState_nStatePowerDemage1]` · `nStatePowerKeepTime tinyint =0 [DF_tCharacterState_nStatePowerDemage2]` · `nStatePowerCoolTime tinyint =0 [DF_tCharacterState_nStatePowerDemage3]` · `nSetItemIndexA smallint =0` · `nSetItemValueA smallint =0` · `nSetItemIndexB smallint =0` · `nSetItemValueB smallint =0` · `nSetItemIndexC smallint =0` · `nSetItemValueC smallint =0` · `nSetItemIndexD smallint =0` · `nSetItemValueD smallint =0` · `nRestTime int =0` · `nCasterLevel smallint =0` · `nCasterAttackPower int =0`. PK `PK__tCharacterState__3552E9B6` (nCharNo,nStateNo). *w00 only: nCasterLevel, nCasterAttackPower.*
+- **`tCharacterTitle`** (2 procs; 8 rows in the backup): `nNo bigint IDENTITY(1)` · `dDate datetime =getdate() [DF_tCharacterTitle_dDate]` · `nCharNo int` · `nType tinyint` · `nElementNo tinyint` · `nElementValue bigint =0 [DF_tCharacterTitle_nElementValue]`. UQ `IX_tCharacterTitle` (nCharNo,nType,nElementNo) clustered; PK `PK_tCharacterTitle` (nNo) nonclustered; FK `FK_tCharacterTitle_tCharacter` nCharNo → tCharacter.nCharNo cascade.
+- **`tChatBlock`** (5 procs): `nUserNo int` · `nCharNo int` · `dDate datetime =getdate()`. PK `PK_tChatBlock_CL` (nUserNo,nCharNo).
+- **`tChatColor`** (3 procs): `nCharNo int` · `nFontColorID tinyint` · `nBalloonColorID tinyint` · `dDate datetime =getdate()`. PK `PK_tChatColor_nCharNo_CL` (nCharNo). *(w00 only.)*
+- **`tCollectionCard`** (3 procs): `nCharNo int` · `nCardID int` · `nSerialNo bigint` · `nStarNumber tinyint` · `dDate datetime =getdate()`. PK `PK_tCollectionCard_nCharNo_nCardID_CL` (nCharNo,nCardID); FK `FK_tCollectionCard_tCharacter_nCharNo` nCharNo → tCharacter.nCharNo. *(w00 only.)*
+- **`tCollectionFavorites`** (2 procs): `nCharNo int` · `nSlotNo tinyint` · `nCardID int` · `dDate datetime =getdate()`. PK `PK_tCollectionFavorites_nCharNo_nSlotNo_nCardID_CL` (nCharNo,nSlotNo,nCardID); FK `FK_tCollectionFavorites_tCollectionCard_nCharNo_nCardID` nCharNo → tCollectionCard.nCharNo, nCardID → tCollectionCard.nCardID. *(w00 only.)*
+- **`tCollectionReward`** (2 procs): `nCharNo int` · `nReward int` · `dDate datetime =getdate()`. PK `PK_tCollectionReward_nCharNo_nReward_CL` (nCharNo,nReward). *(w00 only.)*
+- **`tCollectionSerialCount`** (2 procs): `nCardID int` · `sys_create_date datetime =getdate()` · `sys_update_date datetime NULL` · `nCount bigint`. PK `PK_tCollectionSerialCount_nCardID_CL` (nCardID). *(w00 only.)*
+- **`tDice`** (3 procs): `nGameNo int IDENTITY(1)` · `nCharNo int` · `nItemKey bigint` · `sDice nvarchar(3)` · `dDate datetime =getdate()`. PK `PK_tDice_NC` (nGameNo) nonclustered.
+- **`tDiceLog`** (2 procs): `nGameNo int` · `nCustomCharNo int` · `nSlotNo tinyint` · `nBattingMoney bigint` · `nBattingRate int` · `bStatus bit` · `nTaxRate int` · `nDividend bigint`. PK `PK_tDiceLog_CL` (nGameNo,nCustomCharNo,nSlotNo); FK `FK__tDiceLog__5B988E2F` nGameNo → tDiceResult.nGameNo, nCustomCharNo → tDiceResult.nCustomCharNo.
+- **`tDicePayLog`** (1 proc): `nCharNo int` · `nItemKey bigint` · `nTotalDividend bigint` · `dDate datetime =getdate()`. PK `PK_tDicePayLog_CL` (nCharNo,nItemKey).
+- **`tDiceResult`** (2 procs): `nGameNo int` · `nCustomCharNo int` · `nBeforeMoney bigint` · `nTotalDividend bigint` · `nAfterMoney bigint`. PK `PK_tDiceResult_CL` (nGameNo,nCustomCharNo); FK `FK__tDiceResu__nGame__5D80D6A1` nGameNo → tDice.nGameNo.
+- **`tFriend`** (8 procs): `nCharNo int` · `nFriendCharNo int` · `nFlags tinyint =0` · `dDate datetime =getdate() [DF_tFriend_dDate]`. PK `PK_tFriend_CL` (nCharNo,nFriendCharNo).
+- **`tGambleCoin`** (8 procs): `nCharNo int` · `sys_update_date datetime NULL` · `nCoin bigint =0` · `dDate datetime =getdate()`. PK `PK_tGambleCoin_CL` (nCharNo); FK `FK_tGambleCoin_tCharacter_nCharNo` nCharNo → tCharacter.nCharNo. *(w00 only.)*
+- **`tGambleCoinExchangeLog`** (6 procs): `nLogNo bigint IDENTITY(1)` · `nCharNo int` · `dDate datetime =getdate()` · `nExchangedCoin bigint` · `nStatus tinyint` · `nBeforeCoin bigint =0` · `nAfterCoin bigint =0` · `nBeforeMoney bigint =0` · `nAfterMoney bigint =0`. PK `PK_tGambleCoinExchangeLog_NC` (nLogNo) nonclustered. *(w00 only.)*
+- **`tGambleDice`** (2 procs): `nGameNo int IDENTITY(1)` · `sDice nvarchar(3)` · `dDate datetime =getdate()`. PK `PK_tGambleDice_NC` (nGameNo) nonclustered. *(w00 only.)*
+- **`tGambleDiceLog`** (2 procs): `nGameNo int` · `nCharNo int` · `nSlotNo tinyint` · `nBattingMoney bigint` · `nBattingRate int` · `bStatus bit` · `nTaxRate int` · `nDividend bigint` · `dDate datetime =getdate()`. PK `PK_tGambleDiceLog_CL` (nGameNo,nCharNo,nSlotNo); FK `FK_tGambleDiceLog_tGambleDiceResult_nGameNo` nGameNo → tGambleDiceResult.nGameNo, nCharNo → tGambleDiceResult.nCharNo. *(w00 only.)*
+- **`tGambleDiceResult`** (1 proc): `nGameNo int` · `nCharNo int` · `nBeforeMoney bigint` · `nTotalDividend bigint` · `nAfterMoney bigint` · `dDate datetime =getdate()`. PK `PK_tGambleDiceResult_CL` (nGameNo,nCharNo); FK `FK_tGambleDiceResult_tGambleDice_nGameNo` nGameNo → tGambleDice.nGameNo. *(w00 only.)*
+- **`tGambleJackpot`** (2 procs): `sGameName nvarchar(20)` · `nBattingUnit bigint` · `sys_create_date datetime =getdate()` · `sys_update_date datetime =getdate()` · `nJackpotCoin bigint =0`. no key, no index. *(w00 only.)*
+- **`tGambleJackpotLog`** (2 procs): `nLogNo bigint IDENTITY(1)` · `sGameName nvarchar(20)` · `nBattingUnit bigint` · `sID nvarchar(80)` · `nJackpotCoin bigint =0` · `nGameNo bigint`. PK `PK_tGambleJackpotLog_NC` (nLogNo) nonclustered; FK `FK_tGambleJackpotLog_tGambleSlotMachineLog_nCharNo` nGameNo → tGambleSlotMachineLog.nGameNo. *(w00 only.)*
+- **`tGambleSlotMachineLog`** (1 proc): `nGameNo bigint IDENTITY(1)` · `nCharNo int` · `dDate datetime =getdate()` · `nBattingUnit bigint` · `nBatting tinyint` · `sGameResult nvarchar(10)` · `bIsWin bit` · `nPrizeCoin bigint =0`. PK `PK_tGambleSlotMachineLog_NC` (nGameNo) nonclustered; FK `FK_tGambleSlotMachineLog_tCharacter_nCharNo` nCharNo → tCharacter.nCharNo. *(w00 only.)*
+- **`tGameOptionInit`** (1 proc; 28 rows in the backup): `nOptionNo smallint` · `sys_create_date datetime =getdate()` · `sys_update_date datetime NULL` · `nDefaultValue tinyint NULL` · `bIsActive bit` · `sDescription nvarchar(100) NULL` · `sDescriptionLocal nvarchar(100) NULL`. PK `PK_tGameOptionInit_CL` (nOptionNo). *(w00 only.)*
+- **`tGuild`** (18 procs; 1 row in the backup): `nNo int IDENTITY(1)` · `sName nvarchar(18)` · `sPassword nvarchar(10)` · `nMaxMembers smallint =15` · `nMoney bigint =0` · `nType tinyint =0 [DF_tGuild_nType]` · `nGrade tinyint =1` · `nFame int =0 [DF_tGuild_nFame]` · `nStoneLevel smallint =1` · `nExp bigint =0` · `dCreateDate datetime =getdate()` · `dWarRequestDate datetime =getdate() [DF_tGuild_dWarRequestDate]` · `dWarStartDate datetime =getdate() [DF_tGuild_dWarStartDate]` · `dWarEndDate datetime =getdate() [DF_tGuild_dWarEndDate]` · `nWarEnemy int =0 [DF_tGuild_nWarEnemy]` · `nWarWinCount int =0 [DF_tGuild_nWarWinCount]` · `nWarLoseCount int =0 [DF_tGuild_nWarLoseCount]` · `nWarDrawCount int =0 [DF_tGuild_nWarDrawCount]` · `nDismissStatus tinyint =0 [DF_tGuild_nDeleteStatus]` · `dDismissDate datetime =getdate() [DF_tGuild_dDeleteDate]` · `sIntro nvarchar(128) ='' [DF_tGuild_sIntro]` · `dNotifyDate datetime =getdate() [DF_tGuild_dNotifyDate]` · `sNotifyCharID nvarchar(17) ='' [DF_tGuild_sNotifyCharID]` · `sNotify nvarchar(512) ='' [DF_tGuild_sNotify]`. PK `PK__tGuild__41B8C09B` (nNo). *Character.bak only: dMasterChange datetime ='2000-01-01 00:00:00.000' [DF_tGuild_dMasterChange].*
+- **`tGuildAcademy`** (10 procs; 1 row in the backup): `nNo int` · `nMasterCharNo int` · `nMaxMember smallint` · `nMoney bigint =0` · `nPoint int =0` · `dBuffEndTime datetime NULL` · `dNotifyDate datetime NULL` · `sNotify varchar(512) NULL` · `sIntro nvarchar(128) NULL`. PK `PK_tGuildAcademy_CL` (nNo); FK `FK__tGuildAca__nMast__6521F869` nMasterCharNo → tCharacter.nCharNo; FK `FK__tGuildAcade__nNo__66161CA2` nNo → tGuild.nNo cascade. *Character.bak differs: sNotify nvarchar(512) NULL.*
+- **`tGuildAcademyGraduate`** (4 procs): `nNo int` · `nCharNo int` · `sID nvarchar(40)` · `nClass tinyint` · `nJoinLevel smallint` · `dJoinDate datetime =getdate()` · `nGraduateLevel smallint` · `dGraduateDate datetime =getdate()`. PK `PK_tGuildAcademyGraduate_CL` (nNo,nCharNo).
+- **`tGuildAcademyHistory`** (2 procs; 1 row in the backup): `nAcademyID int` · `nCharNo int` · `sID nvarchar(50)` · `dDate datetime` · `nAction int`. no key, no index. *(w00 only.)*
+- **`tGuildAcademyMember`** (8 procs): `nNo int` · `nCharNo int` · `nJoinLevel smallint` · `dJoinDate datetime =getdate()` · `nGrade tinyint NULL =255` · `sIntro nvarchar(128) NULL` · `nChatBanTime int =0`. PK `PK_tGuildAcademyMember_CL` (nNo,nCharNo); FK `FK__tGuildAca__nChar__670A40DB` nCharNo → tCharacter.nCharNo; FK `FK__tGuildAcade__nNo__67FE6514` nNo → tGuildAcademy.nNo cascade. *w00 only: nChatBanTime.*
+- **`tGuildAcademyRanking`** (2 procs): `nRowNo int IDENTITY(1)` · `dDate datetime =getdate()` · `nRanking int` · `nGuildNo int` · `sGuildName nvarchar(18)` · `nMasterNo int` · `sMasterID nvarchar(40)` · `nPoint int` · `nCount int`. PK `PK_tGuildAcademyRanking_NC` (nRowNo) nonclustered.
+- **`tGuildAcademyReward`** (4 procs): `nNo int` · `nLevel smallint` · `nTypeID tinyint` · `nValue bigint NULL` · `nItemID int NULL`. PK `PK_tGuildAcademyReward_CL` (nNo,nLevel,nTypeID); FK `FK__tGuildAca__nType__68F2894D` nTypeID → tGuildAcademyRewardType.nTypeID; FK `FK__tGuildAcade__nNo__69E6AD86` nNo → tGuildAcademy.nNo cascade.
+- **`tGuildEmblem`** (3 procs; 1 row in the backup): `nGuildNo int` · `nColor int` · `nIcon int` · `dCreated datetime` · `dUpdated datetime` · `nUnk int`. no key, no index. *(w00 only.)*
+- **`tGuildMember`** (15 procs; 1 row in the backup): `nNo int` · `nCharNo int` · `dJoinDate datetime =getdate()` · `nGrade tinyint =0` · `nFlags int =0` · `nExpRatio smallint =0 [DF_tGuildMember_nExpRatio]` · `sIntro nvarchar(64) ='' [DF_tGuildMember_sIntro]`. PK `PK__tGuildMember__1FCDBCEB` (nNo,nCharNo); UQ `IX_tGuildMember` (nCharNo); FK `FK_tGuildMember_tGuild` nNo → tGuild.nNo cascade.
+- **`tGuildToken`** (5 procs): `nNo int` · `nToken bigint`. no key, no index.
+- **`tGuildTournament`** (4 procs; 10 rows in the backup): `nGTNo int` · `nType smallint` · `nData int` · `nGuildNo int NULL`. PK `PK_tGuildTournament` (nGTNo,nType). *w00 only: nGuildNo.*
+- **`tGuildTournamentRegist`** (5 procs): `nGTNo int` · `nNo int` · `nMoney bigint` · `dDate datetime =getdate()` · `nSeed int =0` · `bChoice bit =0`. PK `PK_tGuildTournamentRegist_CL` (nGTNo,nNo).
+- **`tHolyPromise`** (9 procs): `nCharNo int` · `nUpCharNo int` · `nFlags tinyint` · `dRegDate datetime =getdate() [DF_tHolyPromise_dRegDate]` · `dRejoinableDate datetime =getdate() [DF_tHolyPromise_dLeaveDate]` · `dMemberAcceptableDate datetime =getdate() [DF_tHolyPromise_dKickDate]`. PK `PK_tHolyPromise` (nCharNo,nUpCharNo); FK `FK_tHolyPromise_tCharacter` nCharNo → tCharacter.nCharNo cascade.
+- **`tHolyPromiseReward`** (3 procs): `nCharNo int` · `nSeqNo int` · `nType tinyint` · `nMoney bigint` · `nRemainMoney bigint` · `nReceiptCharNo int` · `dDate datetime =getdate() [DF_tHolyPromiseReward_dDate]`. PK `PK_tHolyPromiseReward` (nCharNo,nSeqNo).
+- **`tInGameGuide`** (2 procs; 15 rows in the backup): `nCharNo int` · `nGuideNo int NULL`. no key, no index. *(w00 only.)*
+- **`tItem`** (44 procs; 3 rows in the backup): `nItemKey bigint` · `nStorageType tinyint` · `nOwner bigint` · `nStorage smallint` · `nItemID int` · `nFlags int =0` · `dDate datetime =getdate()`. PK `PK_tItem_nItemKey_NC` (nItemKey) nonclustered.
+- **`tItemActionCoolTime`** (2 procs): `nCharNo int` · `nActionGroup smallint` · `sys_create_date datetime =getdate()` · `dEndTime datetime`. PK `PK_tItemActionCoolTime_CL` (nCharNo,nActionGroup); FK `FK_tCharacter_tItemActionCoolTime_nCharNo` nCharNo → tCharacter.nCharNo. *(w00 only.)*
+- **`tItemEnchant`** (4 procs): `nItemKey bigint` · `nSlot tinyint` · `nGemItemID int` · `nRestCount tinyint`. PK `PK_tItemEnchant_CL` (nItemKey,nSlot); FK `FK_tItemEnchant_tItem_nItemKey` nItemKey → tItem.nItemKey cascade. *(w00 only.)*
+- **`tItemMobList`** (4 procs): `nItemKey bigint` · `nMobID smallint` · `nGrade tinyint =1 [DF_tItemMobList_nGrade]` · `nKillCount int =0`. PK `PK__tItemMobList__2724C5F0` (nItemKey,nMobID); FK `FK_tItem_tItemMobList_nItemKey` nItemKey → tItem.nItemKey cascade.
+- **`tItemOptions`** (26 procs; 13 rows in the backup): `nItemKey bigint` · `nOptionType smallint` · `nOptionData bigint`. PK `PK__tItemOptions__290D0E62` (nItemKey,nOptionType); FK `FK_tItem_tItemOptions_nItemKey` nItemKey → tItem.nItemKey cascade.
+- **`tItemStorageFindEmpty`** (1 proc; 65536 rows in the backup): `nStorage int`. PK `PK_tItemStorageFindEmpty_CL` (nStorage). *(w00 only.)*
+- **`tItemTitle`** (3 procs): `nItemKey bigint` · `nTitleType smallint =0` · `sTitle nvarchar(24)` · `nTitleCharNo int =0`. PK `PK__tItemTit__3556903A78E68B7D` (nItemKey); FK `FK_tItem_tItemTitle_nItemKey` nItemKey → tItem.nItemKey cascade.
+- **`tKeyMapInit`** (2 procs; 95 rows in the backup): `nFunctionNo smallint` · `sys_create_date datetime =getdate()` · `sys_update_date datetime NULL` · `nExtendedKey tinyint NULL` · `nASCIICode tinyint` · `sDescription nvarchar(1000) NULL`. PK `PK_tKeyMapInit_CL` (nFunctionNo). *(w00 only.)*
+- **`tLog_GuildMasterChange`** (1 proc): `nRowNo bigint IDENTITY(1)` · `nGuildNo int` · `dDate datetime =getdate()` · `nOldGuildMaster int` · `nNewGuildMaster int`. PK `PK_tLog_GuildMasterChange_NC` (nRowNo) nonclustered. *(w00 only.)*
+- **`tMarriage`** (12 procs; 1 row in the backup): `nCharNo int` · `nPartnerCharNo int` · `nStatus tinyint =0 [DF_tMarriage_nStatus]` · `nSubStatus tinyint =0 [DF_tMarriage_nSubStatus]` · `dWhen datetime` · `dSubWhen datetime` · `nMarriageCount tinyint =0 [DF_tMarriage_nMarriageCount]` · `nDivorceCancel tinyint =0 [DF_tMarriage_nDivorceCancel]`. PK `PK_tMarriage` (nCharNo,nPartnerCharNo).
+- **`tMinihouse`** (2 procs): `nCharNo int` · `nVisitor int =0` · `dDate datetime =getdate()`. PK `PK_tMinihouse_CL` (nCharNo); FK `FK__tMinihous__nChar__7187CF4E` nCharNo → tCharacter.nCharNo.
+- **`tMinihouseGate`** (3 procs): `nCharNo int` · `nItemID int` · `bType tinyint =1` · `dDate datetime =getdate()` · `dEndDate datetime NULL`. PK `PK_tMinihouseGate_CL` (nCharNo,nItemID); FK `FK__tMinihous__nChar__727BF387` nCharNo → tMinihouse.nCharNo.
+- **`tPrison`** (5 procs): `nPrisonNum bigint IDENTITY(1)` · `nCharID int` · `dPrisonDate datetime =getdate() [DF_tPrison_dPrisonDate]` · `nMinute smallint` · `sReason nvarchar(16) NULL` · `nRegNumber bigint NULL =0 [DF_tPrison_nRegNumber]` · `sGmID nvarchar(16) NULL` · `sRemark nvarchar(64) NULL`. PK `PK_tPrison` (nPrisonNum) nonclustered.
+- **`tQuest`** (3 procs): `nCharNo int` · `nQuestNo int` · `nStatus tinyint` · `sData varbinary(100)`. PK `PK__tQuest__3E52440B` (nCharNo,nQuestNo).
+- **`tSkill`** (9 procs; 25 rows in the backup): `nCharNo int` · `nSkillNo smallint` · `nSkillLevel tinyint =1` · `nSkillExp int =0` · `nSkillWriteTime bigint =0 [DF_tSkill_dSkillWriteTime]` · `nSkillCoolTime int =0 [DF_tSkill_nSkillCoolTime_1]` · `nSkillPowerDemage tinyint =0 [DF_tSkill_nSkillPowerDemage]` · `nSkillPowerSP tinyint =0 [DF_tSkill_nSkillPowerSP]` · `nSkillPowerKeepTime tinyint =0 [DF_tSkill_nSkillPowerKeepTime]` · `nSkillPowerCoolTime tinyint =0 [DF_tSkill_nSkillPowerCoolTime]`. PK `PK__tSkillCharList__7814D14C` (nCharNo,nSkillNo).
+- **`tSpamBlockTime`** (2 procs): `nCharNo int` · `sys_create_date datetime =getdate()` · `sys_update_date datetime NULL` · `nBlockTime int =0` · `nStandbyTime int =0`. PK `PK_tSpamBlockTime_CL` (nCharNo).
+- **`tSpamFilter`** (2 procs): `nUserNo int` · `sys_create_date datetime =getdate()` · `sys_update_date datetime NULL` · `bIsSpamSpread bit =0` · `bIsSpamBlock bit =0` · `nSpamFilterRate tinyint =100`. PK `PK_tSpamFilter_CL` (nUserNo).
+- **`tTutorial`** (3 procs; 1 row in the backup): `nUserNo int` · `nCharNo int` · `nState tinyint` · `nStep tinyint` · `dDate datetime =getdate()`. PK `PK_tTutorial_nUserNo_nCharNo_CL` (nUserNo,nCharNo). *(w00 only.)*
+- **`tUserMoney`** (3 procs): `nUserNo int` · `nUserMoney bigint =0 [DF_tUserMoney_nStorageMoney]`. PK `PK_tUserMoney` (nUserNo).
+
+#### `w00_GameLog`
+
+- **`tGameLog`** (22 procs; 69 rows in the backup): `nLogNo bigint IDENTITY(1)` · `dDate datetime =getdate()` · `nType int` · `nCharNo int NULL` · `sMap varchar(16) NULL` · `nMapX int NULL` · `nMapY int NULL` · `nMapZ int NULL` · `nTargetCharNo int NULL` · `nTargetID int NULL` · `nItemKey bigint NULL` · `nInt1 int NULL` · `nInt2 int NULL` · `nInt3 int NULL` · `nBigint1 bigint NULL`. PK `PK__tGameLog__182C9B23` (nLogNo).
+
+### 9.4 Private-server additions in the restored tables
+
+Not 2016; a rebuild leaves them out:
+
+- `Account.tUser.sUserNo`, `blsBlock`, `blsDelete` (nullable, NULL in the backup's only row, read by no procedure; the
+  `bls…` spelling copies `bIs…` with an `l`).
+- `Account.tUserMergeYet` (identity seed 100) and the `HttpGetMethod` call in `usp_User_USloginGame` that reads it ("added
+  by John", D01): `dbo.HttpGetMethod` is not in the backup (an assembly or linked procedure), so the restored
+  `usp_User_USloginGame` fails for any account listed in `tUserMergeYet` (empty in the backup).
+- `w00_Character.tGuildEmblem`, `tGuildAcademyHistory` (created by `Fixes/Guild Emblem`, `Fixes/Guild Academy History`;
+  their procedures are private-server reconstructions, D04 knowledge) and `tGuildHistory` (only in
+  `Fixes/Guild History/tGuildHistory.sql`: `nGuildID int, nCharNo int, sID nvarchar(50), dDate datetime, nAction int`, all
+  NOT NULL, no key; used by the Fixes-only `usp_Guild_setHistory` / `usp_Guild_getHistoryList`, which the 2016 binary
+  calls with 5 and 3 parameters). The 2016 tables behind these calls are unknown; the Fixes shapes are the only evidence.
+- `Account.tUserAuth` rows (0 Player, 1 Tester, 2 Staff, 3 Developer, 4 Owner, all loginable) are the private server's
+  naming; the binaries only test `nAuthID` (D01).
+
+### 9.5 Seed rows a rebuild must load
+
+Tables whose rows are configuration, not player data (the other non-empty tables hold the backup's single test
+account / character):
+
+- **`tKeyMapInit`** (w00 only, 95 rows, `nFunctionNo:nExtendedKey/nASCIICode`; `p_Char_Create` and
+  `usp_Character_initKeyMap` copy them into `tCharacterKeyMap`; `sDescription` Korean,
+  not needed): 0:0/121 1:0/27 2:0/67 3:0/73 4:0/75 5:0/76 6:0/70 7:0/72 8:0/86 9:0/13 10:17/78 11:17/71 12:17/80 13:17/87
+  14:0/222 15:0/88 16:0/71 17–20:0/0 21:0/82 22:17/65 23:0/87 24:0/83 25:0/0 26:0/65 27:0/68 28:0/90 29:0/32 30:0/38
+  31:0/40 32:0/37 33:0/39 34:0/36 35:0/84 36:0/81 37:0/69 38:0/245 39:0/66 40:0/80 41:0/77 42:0/85 43:16/90 44–45:0/0
+  46:0/35 47–55:0/49…57 (keys `1`–`9`) 56:0/48 57:0/189 58:0/187 59–67:16/49…57 68:16/48 69:16/189 70:16/187
+  71–79:18/49…57 80:18/48 81:18/189 82:18/187 83–94:0/0. (`nExtendedKey` 16 / 17 / 18 = Shift / Ctrl / Alt, the Windows
+  virtual-key codes `VK_SHIFT` / `VK_CONTROL` / `VK_MENU`; `nASCIICode` = the virtual-key code *(inferred)*.)
+- **`tGameOptionInit`** (w00 only, 28 rows, `nOptionNo:nDefaultValue`, all `bIsActive = 1`; read by
+  `usp_Character_getGameOption` as the default for options a character has not stored): 0:1 1:1 2:1 3:1 4:0 5:1 6:0 7:1 8:1 9:1 10:1 11:1 12:0
+  13:0 14:0 15:0 16:1 17:0 18:0 19:0 20:1 21:0 22:0 23:0 24:1 25:1 26:1 27:1.
+- **`tItemStorageFindEmpty`** (w00 only): the numbers 0–65535 (65,536 rows, one `nStorage int` each), the slot list
+  `p_Item_GetStorageEmptyList` left-joins against `tItem` to find the first free slots of a storage (D03 §7.2).
+- **`tUserAuth`** (Account): one row per `nAuthID` the servers use (0 = player; `bIsLoginAble` 1); names see §9.4.
+- `tGuildTournament` (10 rows) is the schedule of the backup's last tournament (`nGTNo` = a Unix time, `nType` 0 / 4000+
+  with times in `nData`), written by the procedures, not seed data.
+
+### 9.6 Tables and columns the 2016 servers need that no backup has (*ours*)
+
+| Table / column | Database | Defined in | Live in 2016 |
+|---|---|---|---|
+| `tUserPlayTime` | portal DB, not Fiesta's | §2.3 | no (KR teen protection) |
+| `tSameTimeCharClass (nIndex, nClass, nCount)` | StatisticsData | §3.1 | yes (WM 0x080A) |
+| `tEventL20` | AccountLog | §3.2 | no |
+| `tLoginChannel` | w00_GameLog | §4.1 | yes (every character login) |
+| `tPetInfo` | w00_Character | §5.1 | yes |
+| `tCharacter.sLinkScrollDestMap` | w00_Character | §5.2, §6.2 | yes (`p_Char_GetAllData` column 37); `varchar(16)` like `sLoginZone` (§9.3) |
+| `tMiniHouseURL` | w00_Character | §5.4 | no |
+| `tGuildTournamentRegist.bRefundNotice` | w00_Character | §5.6 | yes |
+| `tCharacterLoading` + `sFromMapName, sFromZoneIP, sToZoneIP, nToZonePort` | w00_Character | §6.1 | yes |
+| `tCharacterLoadingDetailInfo` | w00_Character | §6.1 | yes |
+| `tPromotionUser`, `tPromotionReward` | w00_Character | §6.4 | no |
+
+The private-server shapes `tGuildEmblem`, `tGuildAcademyHistory`, `tGuildHistory` (§9.4) stand in for unknown 2016 tables.
+
+### 9.7 `Character.bak` / `GameLog.bak` against the w00 copies
+
+For the tables in §9.3, the older `Character.bak` differs only in: `tCharacter` lacks `nFriendPoint`, `nLastFriendPoint`;
+`tCharacterSingleOption` lacks `nChatBan`, `nAutoBuff`, `nAutoChargedBuff`; `tCharacterState` lacks `nCasterLevel`,
+`nCasterAttackPower` (its 19-param save procedure, §7.2); `tGuildAcademyMember` lacks `nChatBanTime`; `tGuildTournament`
+lacks `nGuildNo`; `tGuild` has an extra `dMasterChange datetime = '2000-01-01'` (w00 logs master changes in
+`tLog_GuildMasterChange` instead); `tGuildAcademy.sNotify` is NULL-able. 29 of the §9.3 Character tables exist only in
+w00 (attendance, auto-minimon, game option / key map / short-cut, chat colour, card collection, gamble coin / dice /
+jackpot / slot machine, emblem, academy history, in-game guide, item-action cool time, enchant, storage-find helper,
+master-change log, tutorial). Every one is reached by a procedure the 2016 binary calls with w00's parameter count, which
+is the reason to follow w00 (D02 knowledge). `tGameLog` is identical in `GameLog.bak` and `w00_GameLog.bak`.
