@@ -470,6 +470,252 @@ ShinePlayer::sp_RemoveKQItem(p, type)                             @ FUN_0050f8c0
 So KQ items vanish from the character outside KQ maps, and drop-flagged ones are left on the KQ map whenever the holder
 leaves it.
 
+## 3. KQ scoring, end, results and rewards
+
+A KQ ends from its map script. The 2016 data has two script kinds: the Pine books (`9Data/Shine/Script/…`, the
+`KQHBat*`, UnderHall, Honeying, GordonMaster books; nodes in Z09 §24.7, §25.6, §26.1) and the Lua scripts
+(`9Data/Shine/LuaScript/KQ/<name>/`, 18 KQs: AntiHenis, EmperorSlime, GoldHill, HMiniDragon, KDArena, KDCake, KDEgg,
+KDFargels, KDMine, KDSoccer, KDSoccer_W, KDSpring, KDWater, Kingkong, KingSlime, LegendOfBijou, MaraPirate, MiniDragon).
+Both use the same zone objects. The order in a script is: results (window + title counters + GameLog), rewards, send
+the players home, end. For example GoldHill `Progress.lua`: `cQuestResult(map, "Success")`, `cReward(map, "KQ")`, …,
+`cEndOfKingdomQuest(map)`.
+
+| Step | Pine node (Z09) | Lua function (this §) | Zone object |
+|---|---|---|---|
+| per-player battle score | — | — | `BattleStat` (§3.1) |
+| ranking packets 0x5814 / 0x5821 | `@KQResultList`, `@KQTopList` (§22.3) | `cScoreResultList`, `cScoreTopList` (Z09 §28.12) | `AxialListKQResult` (Z09 §22.3) |
+| result for the whole map | `questresult` (§25.6) | `cQuestResult` | `AxialListKQEnd(Lua)` (§3.3) |
+| result for one player | `sendquestresult` (§26.1) | `cQuestResult_Individual` | vt 0x304 (§3.3) |
+| reward for the whole map | `reward` (§25.6) | `cReward` | `AxialListKQReward(Lua)` (§3.4) |
+| reward by row name, one player | `invidualreward` (§24.7) | `cKQRewardIndex` | `so_ply_KQRewardIndex` (§3.4) |
+| end | `endofkq` (§26.1) | `cEndOfKingdomQuest` | `wms_EndOfKQPacket` (§2.5, §3.2) |
+
+### 3.1 Battle statistics: `BattleStat`
+
+```pseudo
+BattleStat {                                   # 0x2c (pdb2016); one per KQ joiner record (KQPlayerInform +8, §1.3)
+    u8  bs_ClearAtLink +0                      # see below
+    i32 bs_KillScore +4, bs_DamageAmount +8, bs_HealAmount +0xc, bs_SkillBlast +0x10, bs_CriticalNum +0x14,
+        bs_HittedNum +0x18, bs_KnockDownNum +0x1c, bs_Dead +0x20, bs_Kill +0x24
+    u32 bs_Score +0x28                         # PvP rating, starts at 10000
+}
+BattleStat::bs_Clear()                                            @ FUN_0043be00
+    every counter = 0, bs_Score = 10000 (bs_ClearAtLink untouched)
+so_GetBattleStat (vt 0x428):
+    ShinePlayer                                                   @ FUN_00498d60   (§1.3)
+        on a KQ map with the player listed: &record.kqpi_BattleStat; else &ShineObject::so_DefBattleStat
+    every other object (ShineObject)                              @ FUN_00496eb0
+        &ShineObject::so_DefBattleStat (DAT_132729c4)            # one static shared by all mobs, NPCs and non-KQ players
+```
+
+Writers (every caller of vt 0x428; the shared default object takes the writes of every non-KQ attacker or victim):
+
+| Counter | Changed by | Where |
+|---|---|---|
+| `bs_DamageAmount` += dmg | the **attacker**, on every hit that does not kill | `ShineObject::so_DamagedBy` FUN_0042d130, `ShineMover::so_DamagedBy` FUN_0042d170, `ShinePlayer::so_DamagedBy` FUN_00431500, `ShineMob::so_DamagedBy` FUN_00431750 (Z03 §7) |
+| `bs_DamageAmount` += dmg, `bs_KillScore` += victim.`smo_BattleKillScore` (vt 0xee8) | the **killer**, on the killing hit | `ShineMobileObject::so_KilledBy` FUN_00432240 (Z03 §7.1); `smo_BattleKillScore`: players 150 (FUN_0055a300), mobs `MobInfoServer.KQKillPoint` (FUN_00556b70) |
+| `bs_HittedNum` += 1 | the player **hit**, when the hit counts (5th argument `countHit` ≠ 0) | `ShinePlayer::so_DamagedBy` FUN_00431500 |
+| `bs_CriticalNum` += 1 | the attacker, per critical hit | `RulesOfEngagement::roe_CalcDamage` FUN_00505c00 (Z03 §4) |
+| `bs_SkillBlast` += 1 | the caster, on the routine step that runs a cast with `smo_SkillCast.scs_ProduceSkill.sklidx` set | `ShineMobileObject::so_Routine` FUN_0056a080 (Z03) |
+| `bs_KnockDownNum` += 50 | the player who dies (every death: by a player, a mob or nothing) | `ShinePlayer::so_KilledBy` FUN_00433be0 (Z03 §7.2), right after `kqpi_KnockDownPlus` |
+| `bs_Dead` += 1, killer `bs_Kill` += 1, rating transfer | player killed by a player (a pet / summon kill counts for its owner) | `ShinePlayer::so_KilledBy` FUN_00433be0 |
+| `bs_HealAmount` | never written (always 0) | — |
+| `bs_ClearAtLink` | see below | `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390, `sp_ReviveReqProcess` FUN_00451bd0 |
+
+```pseudo
+rating transfer in ShinePlayer::so_KilledBy(victim v, killer k)   @ FUN_00433be0
+    sv = v.bs_Score, sk = k.bs_Score  (as floats); f = min(sv, sk) / (sv + sk)
+    sk ≤ sv: f = 1 − f            # weaker or equal killer: f in [0.5, 1)
+    else:    f = 2·f²              # stronger killer: f < 0.5
+    d = (int)(f · 1000)            # x87 truncation
+    v.bs_Score = max(v.bs_Score − d, 1000)  (unsigned compare; d < 1000 and the score never falls below 1000, so no wrap)
+    k.bs_Score += d
+
+bs_ClearAtLink:
+    map login on a map with fm_KQHandle == −1 (sp_NC_MAP_LOGINCOMPLETE_CMD, Z01 §6):
+        s = p.so_GetBattleStat()                 # off a KQ map this is always the shared so_DefBattleStat
+        s.bs_ClearAtLink ≠ 0: bs_Clear(s);  s.bs_ClearAtLink = 1
+    death-menu revive (sp_ReviveReqProcess, Z07 §3.1, after it picked the revive point, either choice):
+        p.so_GetBattleStat().bs_ClearAtLink = 0
+    # (original bug) Z16-B7: the clear only ever reaches the shared default object (a KQ map has fm_KQHandle ≠ −1, and
+    #   off a KQ map so_GetBattleStat never returns a joiner record), so it never resets a player's statistics
+```
+
+So a joiner's statistics live exactly as long as its `KQPlayerInform` record: from `kqpil_InsertPlayerInfo` (0x580F,
+fresh 10000 rating) to `kqpil_DeletePlayerInfo` (0x583B) or the next KQ in the same container slot. Readers: the
+score functions of `AxialListKQResult` (Z09 §22.3: `alkqr_Score_Default` = kill score − knock-downs; `zerosumWorker`
+= `bs_Score` with `bs_Kill` / `bs_Dead` shown). So each death costs 50 points in the default ranking, a killed mob
+gives its `KQKillPoint`, a killed player 150.
+
+### 3.2 End: `cEndOfKingdomQuest`
+
+```pseudo
+Lua cEndOfKingdomQuest(mapName) → 1 | nil                         @ FUN_005df1f0   # 25 calls in the 2016 Lua KQs
+    f = FieldContainer::fc_FindMap(mapName); none: return nil
+    f.fm_KQHandle == −1: assert "cEndOfKingdomQuest : Invalid Shine Quest"; return nil
+        # the scripts then log "ReturnToHome::Function cEndOfKingdomQuest failed"
+    WorldManagerSession::wms_EndOfKQPacket(f.fm_KQHandle)        # → WM 0x5810 + kqpl_EndOfKQ (§2.5)
+    FieldMap::fm_ClearObject(f, 0xb0)                             # NPCs, mobs, doors removed next tick (Z09 §24.8)
+    return 1
+```
+
+Same effect as the Pine `endofkq` (Z09 §26.1), without its missing return (Z09-B117). The element itself goes when
+the WM answers with 0x5811 (§2.5). Other end paths: the GM word `&endofkq <handle>` (Z11 §5.5: no map clear) and the
+WM's own end (time limit, W04 §6), which sends 0x5811 directly.
+
+### 3.3 Results: `cQuestResult`, `cQuestResult_Individual` and `AxialListKQEnd`
+
+```pseudo
+Lua cQuestResult(mapName, word) → 1 | nil                         @ FUN_005e30d0   # 21 calls
+    f = fc_FindMap(mapName); c = fm_GetCenterObject(f); either null or word not a string: return nil
+    word == "Success" (exact, case-sensitive): it = AxialListKQEndLua(0x16, 0x12)      # ctor FUN_004289d0
+    word == "Fail":                            it = AxialListKQEndLua(0x16, 0x13)
+    other: return nil                                             # nothing done
+    so_AllInMap(c, it, includeSelf 0)
+    fm_ClearObject(f, 0x1b0)                                      # also the bandits (kind 8); the Pine node does the same
+    return 1
+
+AxialListKQEnd / AxialListKQEndLua :: ali_Work(o)                 @ FUN_00429e00   # one body for both classes (vftables)
+    o is not a player (vt 0x4d0 ≠ 2): continue
+    cmd == 0x12 ? o.so_ply_KQSuccess() (vt 0x7fc, FUN_0055ae10) : o.so_ply_KQFail() (vt 0x800, FUN_0055ae30)
+        both: o's map FieldAttr.KingdomQuestMap (+0x36) == 1:
+            CCharacterTitleZone::CT_KQSuccess FUN_005cbfb0 / CT_KQFail FUN_005cbfd0:
+            m_TitleValues[ID_KQ_SUCCESS 21 / ID_KQ_FAIL 22].TitleValue += 1 (u64), bTitleSave = 1, CheckNewTitle(id)
+            # CHARACTER_TITLE_TYPE (pdb2016); ID_KQ_ATT 20 is counted at the pull-in (CT_KQJoin FUN_005cbf90, §2.3);
+            # title award logic CheckNewTitle FUN_005cb5f0 is Z18's
+    o has a map: → GameLog 0x0442 NC_LOG_GAME_KQ_LEAVE {
+            u32 chrregnum = charNo (vt 0x344); MAPPOS mappos { Name3 MapName = map fm_MapID; u32 x, y = o's position };
+            u16 KQ_ID = map.fm_KQID; u32 KQ_Handle = map.fm_KQHandle; u8 Leave_Status = (cmd == 0x12) }   # 0x1f bytes
+        (too long: assert with the copied text "KingdomQuestGate::KingdomQuestGateKeeper::erb_happen : Packet Too Long")
+    o.so_SendProtocol(0x16, cmd) (vt 0x304)       # empty 0x5812 NC_KQ_COMPLETE_CMD / 0x5813 NC_KQ_FAIL_CMD
+    continue
+
+Lua cQuestResult_Individual(handle, word) → 1 | nil               @ FUN_005ecca0   # not called by the 2016 scripts
+    o = som_GetObject(handle); a player (vt 0x4d0 == 2); word "Success" → cmd 0x12, "Fail" → 0x13, else nil
+    o.so_SendProtocol(0x16, cmd); return 1        # the window packet only: no title counter, no GameLog, no clear
+```
+
+So the KQ result shown to the client is the empty 0x5812 / 0x5813 (client game scene FUN_004a31f0 / FUN_004a3270: the
+complete / fail window and its sound, Z09 §24.8). Every player on the map gets it, joiner or not (GMs too). The Pine
+`questresult` reads the word differently (lower-cased; `suc` = success, any other word = fail, Z09 §25.6).
+
+### 3.4 Rewards: `cReward`, `cKQRewardIndex`, `sp_KQReward` and 0x5815–0x5817
+
+```pseudo
+Lua cReward(mapName, word) → 1 | nil                              @ FUN_005df060   # 11 calls: cReward(map, "KQ")
+    f = fc_FindMap(mapName); c = fm_GetCenterObject(f); word a string; else nil
+    word == "KQ" (exact):
+        f.fm_KQHandle == −1: assert "cReward : No KQ info"; return nil
+        it = AxialListKQRewardLua(f.fm_KQHandle)                  # ctor FUN_004288c0 = AxialListKQReward FUN_00428410:
+                                                                  #   alkqrl_kqe = kqc_SearchHandle(handle),
+                                                                  #   alkqrl_DemandKill = kqe.DemandMobKill (left unset when null)
+        so_AllInMap(c, it, 0)
+    return 1                                                      # also for another word, when nothing was done
+
+AxialListKQReward / AxialListKQRewardLua :: ali_Work(o)           @ FUN_00428490   # one body for both classes
+    no kqe: continue
+    kills = kqcl_GetMobKill(&g_KQContributeList, kqe.kqe_kqinfo.Handle, o)   # FUN_00499d80 (§1.4); 0 when not listed
+        # Z09 §25.6 calls the key "kqinfo id": it is the first u32 of PROTO_KQ_INFO, the Handle
+    kills ≥ DemandKill: o.vt[0x76c](kqe) = so_ply_KQRewardStruct      (players; other objects: no-op FUN_00549070)
+    else: o.so_SendErrorCode(0x16, 0x23, 0x1104) (vt 0x308)
+        → 0x5823 NC_KQ_NOREWARD_CMD { u16 err = 0x1104 }   (client FUN_004b0830: "You haven't hunted enough monsters to
+          receive a reward.")
+    # no joiner and no GM check (original bug) Z16-B8: with DemandMobKill 0 (30 of the 57 KingdomQuest.shn rows) every
+    #   player on the map gets the reward, GMs watching the KQ (§2.4 "Doing KQ") and non-joiners included
+
+Lua cKQRewardIndex(handle, indexString)                           @ FUN_005e4000   # 7 calls (KDArena: per team result)
+    o = som_GetObject(handle); o and not leaving (vt 0x300 so_IsEmpty ≠ 1) and indexString a string:
+        o.vt[0x770](indexString) = so_ply_KQRewardIndex
+    returns nothing                                               # no KQ, map or kill check: the script decides
+
+ShinePlayer::so_ply_KQRewardStruct(p, kqe) (vt 0x76c)              @ FUN_0052e9c0
+    row = KQRewardDataBox::operator[](kqreward, kqe.kqe_kqinfo.RewardIndex)   # FUN_0049a950, linear search on ID
+    row: sp_KQReward(p, row)
+ShinePlayer::so_ply_KQRewardIndex(p, name) (vt 0x770)              @ FUN_0052ea80
+    row = KQRewardDataBox::operator[](kqreward, name)             # FUN_0049a9a0, linear search on IndexString
+    row: sp_KQReward(p, row)
+```
+
+Callers of vt 0x76c: `AxialListKQReward(Lua)::ali_Work`, the GM word `&kqreward` (Z11 §8.4). Callers of vt 0x770: the
+Pine `invidualreward` (Z09 §24.7), `cKQRewardIndex`. `sp_KQReward` FUN_0052da70 itself is fully written in Z11 §8.4. In
+short: the player must be alive and present; a treasure chest of `KQBoxItemIDX` (default
+`idb_specialid.sii_kqrewardchest`) is filled from the 15 `Reward[i]` `ShineReward` rows, each kept with chance
+`RewardRate[i]` / 1000; item rewards go into the chest; EXP, cen and fame are summed. The chest goes to reward-box
+slot 0 (box 2) and its contents into `ItemsInChest` (Z09 §10.10). Then `0x5815 NC_KQ_REWARD_REQ` goes to the
+Character DB, cen and fame are reserved under the inventory lock index, and the EXP is given at once
+(`sp_GainExp`, before the DB answers). It is the only sender of 0x5815.
+
+`KingdomQuestRew.shn` (2016): 64 rows, 43 named (`IndexString`, e.g. `HERO_1_0` … for the KQHBat books,
+`REW_KQ_ARENA_WIN/LOSE/DRAW` for KDArena) and 21 found by `ID` = `KingdomQuest.shn` `RewardIndex` (22 distinct values
+there). Six filler rows have ID 0 and no name; `operator[](0)` finds the first ID-0 row (`KQBox_KingSlime`).
+
+```pseudo
+0x5815 NC_KQ_REWARD_REQ (zone → Character DB) { u32 fame; u64 cen; PROTO_NC_ITEMDB_CREATEITEMLIST_REQ itmlst {
+        header { u16 handle, u32 charNo }, u32 owner, u16 lockindex, u16 map, u64 price = 0, items } }   # sp_KQReward
+    DB side: D04 §3 (CreateChestItemList, p_Char_MoneyAdd, AddCharFame) → 0x5816 or 0x5817
+
+0x5816 NC_KQ_REWARDSUC_ACK { NETPACKETZONEHEADER header { u16 handle, u32 charNo }; u16 lockindex }   (8)
+        GameDBSession::gds_NC_KQ_REWARDSUC_ACK                    @ FUN_0052e570
+    p = som_GetObject(header.handle); p, not leaving (vt 0x300 == 0) and p.charNo (vt 0x344) == header.charNo; else ignore
+    L = p.so_ply_GetInventoryLockList() (vt 0x7d4)
+    L.icl_Apply_N_Free(p, lockindex, 0) (vt 0x1c, FUN_0048be90, Z05 §1.3)   # applies the cen and fame reservations (their
+                                                                             # releasers, Z05 §1.4, update the client)
+    nothing applied: LockIndexLog "GameDBSession::gds_NC_KQ_REWARDSUC_ACK : <lockindex>"
+
+0x5817 NC_KQ_REWARDFAIL_ACK { header; u16 lockindex; u16 error }   (0xA)   GameDBSession::gds_NC_KQ_REWARDFAIL_ACK @ FUN_0052e680
+    same player check; L.icl_Free(lockindex) (vt 0x28, FUN_0048b2c0)   # cen / fame reservations dropped
+    # error (0x1101 chest, 0x1102 money; 0x1103 fame is dead code, D04-B7) is neither logged nor shown
+```
+
+On a failure the EXP stays given and the chest contents stay in `ItemsInChest` without DB rows *(inferred from the
+order in sp_KQReward; what the zone shows for that reward box is Z09 §10.10's)*. A player who left before the answer
+loses only the in-memory update; the DB already holds cen and fame.
+
+### 3.5 Other KQ Lua functions
+
+```pseudo
+Lua cGetKQLimitSecond(mapName) → seconds | nil                    @ FUN_005e5390   # 10 calls
+    f = fc_FindMap(mapName) with fm_KQHandle ≠ −1; el = kqc_SearchHandle(f.fm_KQHandle); else nil
+    m = kqe_GetKQLimitMin(el) (FUN_005e4d20, u16 LimitTime)
+    m ≠ 0xFFFFFFFF: return m · 60                 # the check compares a u16 with 0xFFFFFFFF: always true (original bug) Z16-B6
+    else nil
+
+Lua cGetKQTeamType(handle) → 0 | 1 | 2                            @ FUN_005e81c0   # 11 calls; scripts use team + 1
+    o = som_GetObject(handle); o: o.so_GetKQTeamType() (vt 0xe08) & 0xff (§2.4); no handle or object: 2 (none)
+
+Lua cIsKQJoiner(handle) → boolean                                 @ FUN_005e82d0   # 4 calls
+    o = som_GetObject(handle); o: o.so_ply_IsKQJoiner() (vt 0xe10, FUN_005615d0 for players, §1.3) ≠ 0; else false
+
+Lua cShowKQTimerWithLife(mapName, seconds) → 1 | nil              @ FUN_005e54f0   # 12 calls
+    f = fc_FindMap(mapName); c = fm_GetCenterObject(f); null: nil
+    broadcast to the map (AxialListPacketBroadcast over c, so_AllInMap):
+        0x0810 NC_MISC_RESTMINUTE_CMD { u8 flag = 1; u16 second = (int)seconds }     # 3 bytes, truncated to 16 bits
+    return 1
+Lua cShowKQTimerWithLife_Obj(handle, seconds) → 1 | nil           @ FUN_005e5690   # 10 calls (map login of one player)
+    o = som_GetObject(handle), a player (vt 0x4d0 == 2); else nil
+    o ← 0x0810 { 1, (u16) seconds } (data stream, vt 0x2f8; "cShowKQTimerWithLife_Obj : Packet Too Long" on overflow)
+    return 1
+```
+
+Client 0x0810 (GameFrameWork FUN_004997a0, C01): flag 1 → `KQuestTimeWin::ResetTime(second)`: the KQ time window
+counts down from `second`. "WithLife" only names that window: it also shows the lives (0x5818, §2.4) and the
+kills still needed (0x5822, §1.4), but these functions send only the time. The third Lua sender of 0x0810,
+`cVanishTimer` FUN_005e5840, is a general script timer (Z09 Lua table).
+
+### 3.6 Logout log and GM words
+
+```pseudo
+ShinePlayer::so_LogoutLog(p, reason) (vt 0x910)                   @ FUN_00549f90
+    p has a mode, is not dead (mode ≠ 0, ≠ 3) and has a map; map without FieldAttr: assert "…so_LogoutLog : NULLOp"
+    map FieldAttr.KingdomQuestMap (+0x36) ≠ 0:
+        KQLogoutLog "<reason> : <charName>[<handle>/<userNo vt 0x348>/<charNo>]<mapName>/<x>/<y>"
+    # callers: so_banning FUN_00558b70 (reason "Ban"), ZoneServer::zs_disconnect FUN_005abb60 ("Socket"); a file log only
+```
+
+GM words: `&endofkq` and `&Reroadkingdomquest` are in Z11 §5.5, and `&kqreward`, `&kingdomquest` and `&bigbang` in
+Z11 §8.4 (`&kingdomquest` starts a map script without a KQ element, so `cReward` / `reward` find no KQ handle there
+*(inferred from Z11 §8.4)*).
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -479,11 +725,17 @@ leaves it.
 | Z16-B3 | 0x580D @ FUN_00497790 | maps claimed in earlier loop passes keep `fm_KQHandle` / `fm_KQID` when a later check or the container allocation fails | the instance is unusable for every later KQ ("Not empty2") until restart | reset the claimed maps on every error exit |
 | Z16-B4 | 0x581A @ FUN_00496990 | links to map 0 for any known handle without checking the player is a joiner (and masks only the low 16 bits) | a non-joiner can be linked into the KQ map; it bounces to Roumen at map login unless GM | check `kqpil_IsKQJoiner` before the link |
 | Z16-B5 | `sp_GetJoinKQTeamType` FUN_00563990 | compares the 32-bit `fm_KQHandle` with 0xFFFF | on a KQ map without a KQ, every map login logs "Cannot found KQ Element" | compare with 0xFFFFFFFF |
+| Z16-B6 | Lua `cGetKQLimitSecond` FUN_005e5390 | tests the u16 `LimitTime` against 0xFFFFFFFF | dead check: the nil branch can never be taken, every KQ returns `LimitTime · 60` (0 for `LimitTime` 0) | compare with the u16 "no limit" value (0xFFFF, *(inferred)*) |
+| Z16-B7 | `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 / `sp_ReviveReqProcess` FUN_00451bd0 | the `bs_ClearAtLink` reset runs only off KQ maps, where `so_GetBattleStat` returns the shared `so_DefBattleStat` | a player's KQ statistics are never reset by it; only the shared default object (written by every non-KQ fight) is cleared | keep the statistics per player and reset them at the link out of the KQ |
+| Z16-B8 | `AxialListKQReward::ali_Work` FUN_00428490 (`reward` / `cReward`) | rewards every player on the map whose kill count reaches `DemandMobKill`, without a joiner or admin-level check (the result list skips GMs) | with `DemandMobKill` 0 GMs and non-joiners on the map get the KQ reward chest, cen, fame and EXP | reward joiners only (`kqpil_IsKQJoiner`), skip GMs |
 
 ## N. Not reconstructed / uncertain
 
-- Part 1 only (KQ core). KQ end, results and rewards (§3) and the guild tournament (§4 ff.) follow in later parts; see
-  `docs/plan/status/Z16.md`.
+- Parts 1–2 (KQ). The guild tournament (§4 ff.) follows in later parts; see `docs/plan/status/Z16.md`.
+- `bs_SkillBlast`: the `so_Routine` branch that counts it tests `scs_ProduceSkill.sklidx`; whether that is every
+  skill blast or only the production-skill step was not traced (Z03).
+- 0x5817 after `sp_KQReward`: what the client shows for a reward-box chest whose DB rows were never created
+  (the contents are already in `ItemsInChest`) was not traced.
 - How the client produces `EncHandle` for 0x581A (Z08 open point) is still open.
 - 0x5818 `number = 0` for unlimited revives: whether the client shows 0 or hides the counter was not traced in
   `KQuestTimeWin::SetRestLife`.

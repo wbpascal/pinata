@@ -10181,6 +10181,27 @@ Sent from `FUN_004d0bd0` (`FUN_004d0bd0`) · payload 18 bytes
 
 ## Hand-verified packets without a generated section
 
+### `0x5816` NC_KQ_REWARDSUC_ACK (CharDB→Z)
+
+**Verified layout** (basis: zone GameDBSession::gds_NC_KQ_REWARDSUC_ACK FUN_0052e570; PROTO_NC_KQ_REWARDSUC_ACK (pdb2017))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle | player handle |
+| 2 | u32 | header.charNo | must match the player |
+| 6 | u16 | lockindex | icl_Apply_N_Free(p, lockindex, 0) |
+
+### `0x5817` NC_KQ_REWARDFAIL_ACK (CharDB→Z)
+
+**Verified layout** (basis: zone GameDBSession::gds_NC_KQ_REWARDFAIL_ACK FUN_0052e680; PROTO_NC_KQ_REWARDFAIL_ACK (pdb2017))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle |  |
+| 2 | u32 | header.charNo | must match the player |
+| 6 | u16 | lockindex | icl_Free(lockindex) |
+| 8 | u16 | error | 0x1101 / 0x1102 (D04); not read |
+
 ### `0x0806` NC_MISC_SEED_REQ (C→S)
 
 **Verified layout**
@@ -12204,6 +12225,24 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 12 | u8 | ispassive | 0 from &learnskill |
 | 13 | u16 | removeid | 0xFFFF = none |
 
+### `0x5815` NC_KQ_REWARD_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone ShinePlayer::sp_KQReward FUN_0052da70 (Z11 §8.4); PROTO_NC_KQ_REWARD_REQ (pdb2016))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | fame | sum of SRT_HONOR rewards |
+| 4 | u64 | cen | sum of SRT_MONEY rewards (high half 0) |
+| 12 | u16 | itmlst.header.handle | player handle |
+| 14 | u32 | itmlst.header.charNo |  |
+| 18 | u32 | itmlst.owner | charNo |
+| 22 | u16 | itmlst.lockindex | inventory lock index (cen / fame reserved under it) |
+| 24 | u16 | itmlst.map | MapInfo id, 0xFFFF unknown |
+| 26 | u64 | itmlst.price | 0 |
+| 34 | PROTO_ITEM_CMD | itmlst.itemlist | u8 count, per item {u8 len, u16 inven, item data}: chest at reward box 2 slot 0, contents at 0x2800 |
+
+sent length is one byte longer than the packet (Z11-B38); answer 0x5816 / 0x5817
+
 ### `0xd401` NC_PET_SET_TENDENCY_DB_REQ (Z→CharDB)
 
 **Verified layout** (basis: zone ShinePlayer::sp_Send_NC_PET_SET_TENDENCY_DB_REQ FUN_004d1040 (10 bytes incl. opcode; &setpetinfo FUN_00422590); D03 (FUN_0042b920))
@@ -12573,6 +12612,22 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 20 | u32 | y |  |
 | 24 | u16 | kqId |  |
 | 26 | u32 | kqHandle |  |
+
+### `0x0442` NC_LOG_GAME_KQ_LEAVE (Z→GameLog)
+
+**Verified layout** (basis: zone AxialListKQEnd::ali_Work FUN_00429e00 (questresult / cQuestResult); PROTO_NC_LOG_GAME_KQ_LEAVE (pdb2017))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum | charNo |
+| 4 | Name3 | mappos.MapName | fm_MapID |
+| 16 | u32 | mappos.x |  |
+| 20 | u32 | mappos.y |  |
+| 24 | u16 | KQ_ID | fm_KQID |
+| 26 | u32 | KQ_Handle | fm_KQHandle |
+| 30 | u8 | Leave_Status | 1 success (0x5812), 0 fail (0x5813) |
+
+0x1f bytes; one per player on the map at the KQ result
 
 ### `0xc80f` NC_SYSLOG_CHAR_QUEST_STARTED (Z→GameLog)
 
