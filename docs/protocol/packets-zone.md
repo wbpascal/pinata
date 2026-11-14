@@ -13311,6 +13311,40 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 50 | u16 | echo.licenseitem |  |
 | 52 | u16 | echo.weaponitem |  |
 
+### `0x9005` NC_CHARGED_STAT_INITIALIZE_DB_REQ (Z→DB)
+
+**Verified layout** (basis: zone UseEffect::UseItemStatClear::uib_DirectUse FUN_00599990 (ui_StatClearStat.uisc_DBReqCommand = 5) → ShinePlayer::sp_StatEmpowInitialize FUN_005183f0; PROTO_NC_CHARGED_STAT_INITIALIZE_DB_REQ (pdb2017, header = 6-byte ref))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle | player's zone handle (obj+4) |
+| 2 | u32 | header.charno | charNo (vt 0x344) |
+| 6 | u16 | lockindex | inventory lock-list counter (incremented after the send) |
+| 8 | u64 | restatitemkey | the reset item's registration key |
+| 16 | u16 | restatitemid | the reset item's ItemInfo ID |
+| 18 | u8 | isdelete | 1 when the item has 1 left (delete), else 0 |
+| 19 | u16 | attr | 0 when deleting, else 0x15 = offset of the attribute block after the opcode |
+| 21 | bytes | attribute | only when isdelete = 0: the item's attribute block with lot − 1 (item class vt 4) |
+
+0x17 bytes when deleting, else 0x17 + attribute block; to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4.
+
+### `0x9006` NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ (Z→DB)
+
+**Verified layout** (basis: zone UseEffect::UseItemStatClear::uib_DirectUse FUN_00599990 (ui_StatClearEmpow.uisc_DBReqCommand = 6) → ShinePlayer::sp_StatEmpowInitialize FUN_005183f0; PROTO_NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ (pdb2017, header = 6-byte ref))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle | player's zone handle (obj+4) |
+| 2 | u32 | header.charno | charNo (vt 0x344) |
+| 6 | u16 | lockindex | inventory lock-list counter (incremented after the send) |
+| 8 | u64 | restatitemkey | the reset item's registration key |
+| 16 | u16 | restatitemid | the reset item's ItemInfo ID |
+| 18 | u8 | isdelete | 1 when the item has 1 left (delete), else 0 |
+| 19 | u16 | attr | 0 when deleting, else 0x15 = offset of the attribute block after the opcode |
+| 21 | bytes | attribute | only when isdelete = 0: the item's attribute block with lot − 1 (item class vt 4) |
+
+0x17 bytes when deleting, else 0x17 + attribute block; to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4.
+
 ### `0xac23` NC_DICE_TAISAI_DB_DICE_ROLL_RESULT_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_005161d0; = PDB)

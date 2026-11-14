@@ -81,6 +81,10 @@ fills it from `MoverUseSkill.shn` on every summon (§9.1); that table is empty i
 | 0x97c | `so_UnlearnSkillAck` FUN_0057f200 (§6.4) | – |
 | 0xaec | `so_Send_NC_CHARSAVE_2WLDMAN_SKILL_CMD` FUN_00455780 (§7.3) | – |
 | 0xecc | `smo_ply_ItemProduce` FUN_0046c2d0 (§5) | – |
+| 0x91c | `so_ply_ItemUseResultPacket` FUN_0045e610 (item-use answer, Z04) | – |
+| 0xed4 / 0xec0 | `smo_CastAbort` / `smo_ply_NextBashTime` (Z03 §5) | – |
+| 0xedc | `smo_SPCheck` FUN_0055bc20 (§4) | mob FUN_005557f0 (SP test and pay), mover FUN_0055eeb0 (true) |
+| 0xee0 | `smo_SPCheckConsume` FUN_0055bc50 (Z03 §5.4) | – |
 
 ## 2. Toggle skills
 
@@ -224,10 +228,19 @@ Callers:
 | Caller | Call | When |
 |---|---|---|
 | `ShinePlayer::so_Routine` FUN_0056c790 (Z09 §2.1) | `csl_Toggle_CheckOnOff` | every tick |
-| `ShinePlayer::so_LinkTo` FUN_0049ad30 (Z01 / Z09) | `csl_Toggle_AllOff` | both link-out branches: in the same-server branch after the link packet to the client and before the game stream is replaced by the dummy container; in the other branch after the save to DB / WM and before 0xC809. The player gets 0x245D for each skill that was on; the abstates are not removed (see §Not reconstructed) |
+| `ShinePlayer::so_LinkTo` FUN_0049ad30 (Z01 / Z09) | `csl_Toggle_AllOff` | both link-out branches: in the same-server branch after the link packet to the client and before the game stream is replaced by the dummy container; in the other branch after the save to DB / WM and before 0xC809. The player gets 0x245D for each skill that was on; the abstates are not removed (for a link to another zone server they are not carried either: §2.4 note below) |
 | `sp_NC_ACT_PITCHTENT_REQ` FUN_00457760 (Z02) | `csl_Toggle_AllOffAndReset` | the tent shape was built (just before mode 4 is set) |
 | `sp_NC_MOVER_RIDE_ON_REQ` FUN_00563270 (Z09 mover section) | `csl_Toggle_AllOffAndReset` | the mount is visible and within 300 units, before `sp_MoverSystem_GetOn` |
 | `sp_MoverSystem_Cast` FUN_0045d550 (mount item cast, Z13) | `csl_Toggle_AllOffAndReset` | the mount item is valid, before the 0x2047 ride cast starts |
+
+Toggle states across a link: the character's abnormal states are saved through `AbnormalStateSaver::lid_Call`
+FUN_00454b10 (called per state by `so_SaveAbstate` FUN_00454d80, Z07), which writes a state only when its
+`AbState.AbStateSaveType` row in `AbStateSaveTypeInfo.shn` has `IsSaveLogoff` (save to the DB, `ass_bSaveToDB`) or
+`IsSaveLink` (otherwise) set. The only toggle skill line, BurnPain01–06 (`ToggleSkill.shn`), sets `StaBurnPainMe` on
+the caster and `StaBurnPainFoe` on the target, both `AbStateSaveType 0` (no flag set). So after a link to another zone
+server or a re-login the caster has neither the toggle (`csl_Store` loads it as off) nor its state: both sides agree.
+Per saved state `lid_Call` writes one 0x24-byte `ABSTATEREADBLOCK` (id, strength, rest count, elapsed ms
+`(g_Now − start)·1000/10`, rest time, set-item effect, caster level and attack power); the save path itself is Z07's.
 
 ### 2.5 Switching by cast
 
@@ -315,6 +328,7 @@ CharaterSkillList::csl_GetDelayGroup(list, skillId, &groupDly) → int:  @ FUN_0
     s = SkillDataBox[skillId]
     if s: groupDly = s.DlyTimeGroup; return s.DlyGroupNum
     if bsearch(recipebook (0x4c-byte rows), skillId) (a produce "skill"): groupDly = 0; return 0
+        # comparator: `GatherProduce::RecipeBook::rb_Compare` FUN_0046a470 = first u16 of a − first u16 of b (ID order)
     assert "CharaterSkillList::csl_GetDelayGroup : Cannot found Skill"; return −1                # groupDly untouched
 
 ShinePlayer::so_ply_NewSkillCoolTime(p, skill, sec):                    @ FUN_00569260   (vt 0x374)
@@ -352,7 +366,8 @@ ShinePlayer::sp_ChineCastCut(p):                                        @ FUN_00
         if its actor.vt[0x20](e): e.endTime (+0x20) = g_Now                   # expires on the next abstate tick (→ 0x2428 erase, Z03 §6.4)
 ```
 
-The actor class `SubAbnormalStateActorIgnoreCoolTime` (index string "IgnoreCoolTime", the `ac_COOLTIMEREMOVE` member
+The actor class `SubAbnormalStateActorIgnoreCoolTime` (index string "IgnoreCoolTime" from its `sasa_IndexString`
+FUN_00401710, the `ac_COOLTIMEREMOVE` member
 of the actor table) is the only one whose slot 0x20 returns 1 (FUN_00500380); all others return 0 (FUN_00615e70).
 Effect: while the caster has such a state, the next non-toggle skill blast sets no cooldown and consumes the state. The
 abnormal states that carry the `COOLTIMEREMOVE` sub-state are data (`SubAbState.shn`, Z03 §6).
@@ -458,6 +473,23 @@ index = points − 1 into the `nT0…nT3` columns). Allocation is
 `sp_NC_SKILL_EMPOWALLOC_REQ` 0x4811 + `csl_EmpowerAlloc` (Z03 §9.1); this section adds the list functions and two
 corrections to that section.
 
+SP before the blast: `ShineMobileObject::so_Routine` FUN_0056a080 (§3.1) calls `smo_SPCheck` (vt 0xedc) with the
+cast's skill, `SkillDataIndex` and `scs_Empower` before each blast pass; a false result runs `smo_CastAbort` (vt 0xed4)
+and `smo_ply_NextBashTime` (vt 0xec0) and ends the routine without a blast. The cast request itself makes the same
+test (Z03 §5.2, `consume = false`).
+
+```pseudo
+ShineMobileObject::smo_SPCheck(o, skill, s, empower) → bool                                    @ FUN_005557f0   (mob)
+    if o.smo_Flag.InSkillShift: return true                      # second pass of a two-phase blast: already checked
+    if s.sdi_Activ.SP ≤ o.so_GetSP() (vt 0x4ec): o.so_LostSP(s.sdi_Activ.SP) (vt 0x4f8); return true
+    return false
+ShinePlayer::smo_SPCheck(p, skill, s, empower) → bool                                          @ FUN_0055bc20   (vt 0xedc)
+    if p.smo_Flag.InSkillShift: return true
+    return csl_SPCheck(p.sp_SkillList, p, skill, s, empower, consume = 0)   # Z03 §5.3: test only
+    # the cost is paid after the blast by smo_SPCheckConsume (vt 0xee0, FUN_0055bc50, consume = 1; Z03 §5.4)
+ShineMover::smo_SPCheck(...) = true                                                            @ FUN_0055eeb0
+```
+
 ```pseudo
 CharaterSkillList::csl_MaximumSkill(this, u16 skill) → u16                                    @ FUN_00448240
     e = skilldatabox[skill]                          # SkillDataBox::operator[] FUN_00448140: bsearch, null if unknown
@@ -511,7 +543,35 @@ Resets (both clear every entry's counters in memory after the DB has reset them)
 | Path | Function | Then |
 |---|---|---|
 | empower-reset item: GameDB 0x480D NC_SKILL_EMPOW_RESET_DB_SUC_ACK (Z03 §9.2) | `ShinePlayer::so_ply_skillempowerclear` FUN_0055a010 (vt 0x6bc) = `csl_EmpowerClear` | 0x480F { u8 totalempow } |
-| charged item: GameDB 0x9008 NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_SUC_ACK FUN_00518780 (Z08) | `ShinePlayer::so_ply_InitSkillEmpow` FUN_00518c00 (vt 0x37c): `csl_EmpowerClear`, then send 0x900D NC_CHARGED_SKILLEMPOW_INITIALIZE_SUC_CMD { u8 = vt 0x6b8() − csl_EmpowerSummary() } (3 bytes) | client `GameFrameWork::On_NC_CHARGED_SKILLEMPOW_INITIALIZE_SUC_CMD` FUN_0049b330: `Skill::ClearLearnActSkillInfo`, `Skill::SetRestEmpowerPoint(u8)`, `SkillIcon::RefreshSkillInfoAll` |
+| charged item: request below; GameDB 0x9008 NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_SUC_ACK FUN_00518780 (Z08 §11) | `ShinePlayer::so_ply_InitSkillEmpow` FUN_00518c00 (vt 0x37c): `csl_EmpowerClear`, then send 0x900D NC_CHARGED_SKILLEMPOW_INITIALIZE_SUC_CMD { u8 = vt 0x6b8() − csl_EmpowerSummary() } (3 bytes) | client `GameFrameWork::On_NC_CHARGED_SKILLEMPOW_INITIALIZE_SUC_CMD` FUN_0049b330: `Skill::ClearLearnActSkillInfo`, `Skill::SetRestEmpowerPoint(u8)`, `SkillIcon::RefreshSkillInfoAll` |
+
+The charged reset request (Z08 §11 describes only the DB answers; D03 the DB side):
+
+```pseudo
+UseEffect::UseItemStatClear::uib_DirectUse(this, p, slot, item)                                @ FUN_00599990
+    # two static instances (Z04 item-use table, `iuf_Load` FUN_0049b770 keys "StatClearStat" / "StatClearEmpow"):
+    #   ui_StatClearStat  { uisc_DBReqCommand 5, uisc_ErrCommand 14 }   ui_StatClearEmpow { 6, 15 }   (read from the exe data)
+    sp_StatEmpowInitialize(p, uisc_DBReqCommand, uisc_ErrCommand, slot, item)
+    p.so_ply_ItemUseResultPacket(0x700, 9) (vt 0x91c)                # item-use answer, Z04
+    return true
+
+ShinePlayer::sp_StatEmpowInitialize(p, dbcmd, errcmd, slot, item)                             @ FUN_005183f0
+    it = inventory item at slot; lot = it.class.vt[0x1c](it)        # remaining count
+    GameDB ← 0x9000 | dbcmd  (0x9005 NC_CHARGED_STAT_INITIALIZE_DB_REQ / 0x9006 NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ) {
+        ref { u16 p.handle, u32 charNo (vt 0x344) }
+        u16 lockindex       = p.invenlocklist counter
+        u64 restatitemkey   = it.key
+        u16 restatitemid    = it.id
+        u8  isdelete        = lot == 1
+        u16 attr            = isdelete ? 0 : 0x15          # a constant: offset of the attribute bytes after the opcode (inferred)
+        [attribute block of the item with lot − 1]          # only when not deleting (class vt 0x20 sets the lot, vt 4 writes it)
+    }                                                       # 0x17 bytes + attribute block
+    lot == 1: lock the cell for deletion (lock list vt 0x30, location 0x2400 | slot)
+    else:     lock the cell for an update to the copy with lot − 1 (lock list vt 0x40)
+    counter += 1
+    # errcmd is not used here; the DB-fail answers send 0x900E / 0x900F themselves (Z08 §11). Nothing is checked:
+    # the item-use layer (Z04) already validated the item.
+```
 
 ## 5. Mastery (production skills)
 
@@ -606,7 +666,8 @@ CharaterSkillList::csl_PreProduceCheck(this, ShinePlayer* p, u16 skill, ProductI
   the pseudocode); `so_LearnSkill` then sets bit 0 of `sp_CharData.toclient.basedata.flags` *(inferred: "character
   data changed", read by the save)*.
 - `csl_CheckDefSkill` FUN_00447fb0 (called by `csl_Store` once the last DB chunk is in, Z12 §6.5): for each of
-  `defskill.dsd_GetSkillMaxNum()` ids (`DefSkillData::dsd_GetSkillID`, stops at the first 0 return) that no entry
+  `defskill.dsd_GetSkillMaxNum()` ids (`DefSkillData::dsd_GetSkillID` FUN_0045d380: `dsd_Array[i].skill` if
+  `i < dsd_Max`, else 0; stops at the first 0 return) that no entry
   has (linear search over `csl_SkillNumber` entries), push `{ id, cs_EndOfCooltime = g_Now, empower 0, mastery 0,
   cs_bSave 0 }` and `csl_SkillNumber++`; `csl_Store` sorts afterwards. Dead in 2016: `defskill` is never filled
   (Z12 §6.5). So the item pseudo-skills (29200 UseSilverWings …, §3.6) come from the character's DB skill rows like
@@ -622,7 +683,7 @@ CharaterSkillList::csl_UnLearn(this, u16 skill)                                 
     if csl_Skill is empty: return
     it = lower_bound(csl_Skill, skill)
     if not (skill < it.cs_SkillId):                      # it is not compared with end first (original bug) Z23-B10
-        csl_Skill.erase(it); csl_SkillNumber -= 1
+        csl_Skill.erase(it); csl_SkillNumber -= 1        # vector::erase FUN_0057e8e0: moves the later 0x14-byte entries down
     # csl_ToggleSkill is not touched, nothing is switched off, nothing is sent here (original bug) Z23-B11
 ```
 
@@ -801,8 +862,8 @@ ShineMobileObject::so_Dispel(a, d, arg, bos, mask) → bool:              @ FUN_
             if s.sdi_DISPELONE:   e.aeo_Tick.terminate = g_Now;  return true           # the first match only
             if s.sdi_DISPELALL:   e.aeo_Tick.terminate = g_Now;  removed = true;  continue
             if s.sdi_DISPELRANDOM:                            # reservoir pick, uniform over the matches
-                if n == 1 or rndbox[n] == 0: pick = e         # rndbox[n] (RandomBox::operator[] FUN_00427c30): pre-rolled
-                n += 1                                        #   number for 1 <= n <= 100 (below n, inferred), 0 above 100
+                if n == 1 or rndbox[n] == 0: pick = e         # rndbox[n] (RandomBox::operator[] FUN_00427c30): next value of
+                n += 1                                        #   box n's shuffled ring (uniform 0…n−1, below); 0 for n > 100
             if s.sdi_BOMBDISPELALL: e.f_Dispeled = 1;  e.aeo_Tick.terminate = g_Now;  removed = true
     for e in d's list, walked through the other link (+6) from the end:   # pass 2: steal one buff
         if rand(1000) < 1001 and mask has bit ab(e).DispelIndex and s.sdi_STEALENCHANT:
@@ -985,7 +1046,7 @@ Same as the player version except the null checks and the inverted dispel test. 
 `MobActionAttack::mab_Think` FUN_004bba00 and `MobActionTargetting::mab_Think` FUN_004b99e0 (vt 0x760 at 0x4bbe7c /
 0x4b9d11; Z09 §7.1 / §7.2), when the object they test is a mount.
 
-## Original-server bugs
+## 10. Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
@@ -1009,12 +1070,12 @@ Same as the player version except the null checks and the inverted dispel test. 
 | Z23-B18 | `so_smv_SkillBash_Location` FUN_00580cf0 (latent) | mount without a field gets 0xFCC | "Cannot use the skill on Fear State." | 0xFC3 as in the object version |
 | Z23-B19 | `so_smv_SkillBash_Object` FUN_00580800 (latent) | the `smo_ICanHealTo` test runs for enemy / all skills with `Area != 0`; friendly skills get no target test | heal-blocked targets refuse enemy area skills; friendly skills reach any target | test friendly HEALING skills with `Area == 0`, as the player version |
 
-## Not reconstructed / uncertain
+## 11. Not reconstructed / uncertain
 
-- Whether toggle abnormal states survive a zone change: `so_LinkTo` switches the toggles off without removing the
-  states, and `csl_Store` loads every toggle as off. If the states are saved with the character's abstates (Z03 §6,
-  `NC_CHARSAVE_ABSTATE`), the player arrives with the states on and the toggle off; the next cast then switches it
-  on again *(inferred; the abstate save path is not read here)*.
+- Toggle states and the same-server link branch of `so_LinkTo`: the states are not saved (§2.4 note), but whether the
+  player object, and with it `StaBurnPainMe`, survives a map change inside the same zone process is not read here
+  (Z01 / Z09 link code). If it does, the player keeps the state with the toggle marked off, and the next cast
+  switches it on again *(inferred)*.
 - Whether the 2016 client applies `SS_DMGCOLLTIMEDOWN` to its own cooldown display (the server sends nothing, §3.4).
 - `setitemskilleffect` is a global reloaded by `so_Routine` before each blast; for the non-cast callers of
   `smo_ply_SkillCoolTime` (§3.6) it holds whatever the last routine left in it *(inferred)*.
@@ -1026,8 +1087,36 @@ Same as the player version except the null checks and the inverted dispel test. 
 
 - §8: whether an ended state (`terminate = g_Now`) stays visible to the second dispel run of the same blast
   (Z23-B13) depends on when the abstate tick drops it (Z03 §6); the effects listed in §8.4 assume it stays.
-- §8.3: the meaning of `RandomBox` slots (pre-shuffled numbers below `n`) is inferred from the name and the reservoir use;
-  its fill routine is not read here.
+- §8.3: `RandomBox` as read: the constructor `RandomBox::RandomBox` FUN_0063cdb0 (global `rndbox`, seeded with
+  `srand(time)`) fills box n = 0…100 with 0x4000 u16 slots `⌊i·n / 0x4000⌋` (each of 0…n−1 equally often), swaps
+  every slot with a `rand()`-scaled index (no swap when the index is ≥ 0x4000) and clears values ≥ n (none). `operator[]`
+  (n = 1…100, else 0) advances box n's ring pointer and returns the slot, so `rndbox[n] == 0` has chance 1/n and the
+  reservoir pick is uniform. The ring repeats every 16384 draws of the same n. `rb_1000` FUN_004012a0, `rb_random`
+  FUN_0063ccf0 and `rb_largerandom` FUN_0063ccc0 (n ≤ 100 → box, else Well512) use the `cWell512Random` member instead.
 - §9.2: the mover modes (1, 2) have no names in the 2016 PDB; which mode a ridden mount is in is Z13's.
 
-(The coverage boundary is written in the sweep part.)
+## 12. Coverage boundary
+
+Found while following the functions of this item, but documented elsewhere or left to another item.
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| `sp_MoverSystem_Cast` FUN_0045d550, `UseItemRide::uib_DirectUse` FUN_005995b0, `sp_RideInitialize` FUN_0043d140, `so_ply_LayerMoverRideOn` FUN_0054aef0, `ShineMover::so_Routine` FUN_0056af60, `so_smv_SummonMover` FUN_0055fdf0 (all but their skill-list lines, §2.4 / §9.1) | Z13 (open; plan "Mounts: mover creation (which item or NPC allocates a `ShineMover`) …") | mount lifecycle; only the toggle switch-off, the mover skill list and the ride cooldown are skill-list state |
+| `sp_PetSystem_Summon` FUN_004d2640 (rest), `sp_PetSystem_LinkResummon` FUN_004d2a40 | Z13 (open; plan "Pets: the summon/unsummon flow …, the resummon after a map link") | §3.6 has the summon cooldown lines only |
+| silver-wing item: `sp_SilverWingMenu` FUN_0059c090, `smfm_Silverwing_Portal` FUN_0059bbe0, `smfm_Silverwing_LocSet` FUN_0059bff0, `smfm_Silverwing_Cancel` FUN_0059bb30, `sp_SilverWing_PortalCast` FUN_00597b30 (beyond its cooldown check, §3.6), `sp_SilverWing_PortalBlast` FUN_00597cf0, `UseItemSilverWing::uib_CanUseItem` FUN_00598000 / `uib_AfterCast` FUN_0053ff70 | new item **Z25** (added by Z23) | an item-use and teleport flow (server menu, saved location, link); Z04 (done) lists the class only by address, no open item covers it |
+| item-action cooldowns: `ItemActionObserveManager::SetCoolTime` FUN_005d1b60, `SendCoolTimes2Client` FUN_005d0d30, `SendCoolTimes2World` FUN_005d0fa0, item actions run by `EventRunBySkillGroupIndex` | Z17 (open; goal "what an item action is …, when it fires, its cooldowns") | a separate cooldown store keyed by action group, not `CharSkill.cs_EndOfCooltime` |
+| `SubAbState.shn` rows with the `COOLTIMEREMOVE` sub-state (which abnormal states give a free cast, §3.3) | Z03 §6.1 (actor table row "31 COOLTIMEREMOVE") | table data; §3.3 documents the effect on the cooldown |
+| abstate actor bodies reached from here: `sasa_DetachObject` FUN_0040c1c0 / FUN_00409230 / FUN_00408f90, `sasa_Act_LastDamegeInterceptByDef` FUN_0040ba30 (calls `aeo_Set`) | Z22 (open; plan lists the DetachProcess / DropUpRate / ExpUpRate bodies) | actor behaviour, not skill-list state; §8 only needs that dispel ends a state |
+| abstate tick that drops ended states (decides the second dispel run, Z23-B13) | Z03 §6.4 (expiry and removal) | §11 records the open timing question |
+| abnormal-state save path `so_SaveAbstate` FUN_00454d80 (rest of `AbnormalStateSaver`) | Z07 (owner per Z03 §6, line "Z07 owns the save path") | §2.4 uses only `lid_Call`'s save-type test, cited there |
+| `ws_save2DB` FUN_00455a10 / `ws_save2worldmanager` FUN_004536f0 (when the skill saves run) | Z01 §8.4 | §7 documents what the skill part writes |
+| produce cast and its checks (`sp_NC_ACT_PRODUCE_CAST_REQ` FUN_0046cf90, `ip_ProduceCheck`, the GameDB 0x3457 answer) | Z02 §8, Z07 §11 | §5 covers the mastery gain and 0x481D only |
+| `uib_Effect` FUN_00599d30 of the skill scroll (0x4801 NC_SKILL_SKILLTEACH_REQ) | Z20 §5.2 table, Z04 §6 | §6.2 covers the skill-list checks of `uib_CanUseItem` |
+| `MoverUseSkill.shn` loader (`MoverDataBox::mvdb_Load` FUN_004bf960) | Z24 (open; plan lists `mvdb_Load` 004bf960) | data loader; §9.1 states the 2016 file has 0 rows |
+| mob tactics `mab_Think` FUN_004bba00 / FUN_004b99e0 (callers of the mount `so_ply_CanMyTarget`, §9.3) | Z09 §7 | world simulation |
+| `RandomBox` (`operator[]` FUN_00427c30, constructor FUN_0063cdb0) | documented here (§11, §8.3 note) | a small utility no item documents; Z11 §11 and Z16 left its contents as inferred, which §11 now settles |
+| GM commands `&skillcooltime`, `&ignoreskillcooltime`, `&itemactioncooltimereset` | Z11 §8.5 | §3.2 cites the ignore flag they set |
+| GameDB answers of the empower resets (0x480D / 0x480E, 0x9008 / 0x900A) and their DB side | Z03 §9.2, Z08 §11, D03 / D04 | §4 documents the list functions and the charged reset request (FUN_00599990 / FUN_005183f0) that Z08 left uncited |
+| `csl_Store`, `so_charskilldata` FUN_0044bf20 (0x103D client list) | Z12 §6.5 | §7.4 links to it |
+| Z03 §9.5 says `csl_UnLearn` also removes the lower steps; Z03 §9.1 shortens `csl_EmpowerAlloc` | corrected here (§6.4, §4) | Z03 is done; the full reading is in this file |
+

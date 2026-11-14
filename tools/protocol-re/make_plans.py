@@ -772,6 +772,29 @@ ITEMS = [
              "Bugs as `Z24-B<n>`; Coverage boundary as usual."],
       done="Every function listed above is cited as `FUN_…` with pseudocode, every file it loads has a column → member map, "
            "and the reload behaviour (which tables `&reloaddata` can rebuild, Z11 §8.6) is stated for each."),
+ dict(id="Z25", phase=2, title="Zone: silver-wing teleport item (saved location, server menu, portal cast and blast; added by Z23)",
+      out="docs/pseudocode/zone/Z25-silver-wing.md", deps=["Z02", "Z04", "Z23"], scope=[],
+      goal="Z04 lists `UseItemSilverWing` only by address in its item-use table and Z23 §3.6 only its cooldown check; the "
+           "flow in between is cited by no doc: the server menu the item opens, saving a location in the item, the "
+           "portal cast and the blast that links the player. Document it so a rebuild keeps the same menu, checks, "
+           "cooldown and link.",
+      steps=["Read `docs/pseudocode/zone/Z04-items.md` §6 (item-use framework: `uib_CanUseItem` / `uib_DirectUse` / "
+             "`uib_AfterCast` / `uib_Effect`, the table near line 580), Z02 (server menus: `sp_ServerMenuOpen`, "
+             "`ServerMenuFuncter`), Z23 §3.2 / §3.6 (`csl_CoolTimeCheck`, `so_ply_SilverWingCoolTime`, bug Z23-B5) and the "
+             "Z01 link path (`so_LinkTo`). Do not redo those.",
+             "PDB names (`clean.py re-data/exports/zone-pdb - <addr> …`): `UseItemSilverWing::uib_CanUseItem` 00598000, "
+             "`uib_DirectUse` 0059c260, `uib_AfterCast` 0053ff70; `ShinePlayer::sp_SilverWingMenu` 0059c090 (menu strings "
+             "SilverWingTitle / SilverWingPortal / SilverWingLocSet, the portal entry only when the item holds a location); "
+             "the menu functors `ServerMenuFuncter::smfm_Silverwing_Portal` 0059bbe0, `smfm_Silverwing_LocSet` 0059bff0 and "
+             "`smfm_Silverwing_Cancel` 0059bb30; `sp_SilverWing_PortalCast` 00597b30 (cast struct fill, cooldown check, error 0x70D); "
+             "`sp_SilverWing_PortalBlast` 00597cf0 (map / position from the item attribute, vt 0x304 / 0x91c / 0x600: the "
+             "link) and who calls it from the cast routine (`ShineMobileObject::so_Routine` FUN_0056a080 item branch, "
+             "Z23 §3.6); `itemdatabox.idb_specialid.sii_silverwing`; the item attribute layout that stores the location "
+             "and its DB update.",
+             "Client: the menu packets and the portal effect (C01 handlers); error codes via `client-error-codes.json`.",
+             "Bugs as `Z25-B<n>`; Coverage boundary as usual."],
+      done="Every function listed above is cited as `FUN_…` with pseudocode, the saved-location format and the "
+           "menu → cast → blast → link flow are specified, and every packet has a layout and client handler."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
