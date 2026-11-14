@@ -478,3 +478,298 @@ rebuild should follow it. The `tLevelUpInfo` block ("이벤트 랭킹용으로 �
 event-time addition of the older database; that the live 2016 database still had it is possible but not shown by
 anything *(db-backup)*. The binary cannot decide it (same call either way); D05's statement stays open for the live
 database, settled for the rebuild.
+
+## 5. Character DB (`w00_Character`), Character server: pets, link scroll, mini house, guild
+
+Code: `re-data/exports/character` (no 2016 PDB for this exe; wrapper names `SQL_<procedure>` from D02/D03/D04's names
+files). Parameter names come from the `CSQLP*::SQL_*` structs of the Account PDB, the same shared library
+(`docs/knowledge/S01.md` §4.2) *(pdb2016; offsets checked against the Character wrappers below)*. Return values of the
+wrappers whose decompilation shows `void` are read from the assembly (`objdump` of `w00_Character/Character Release.exe`).
+
+### 5.1 Pets: `usp_Pet_setCreate`, `usp_Pet_getInfo`, `usp_Pet_setName`, `usp_Pet_setTendency`, `usp_Pet_setDelete`
+
+No 2016 backup has a pet procedure. `Character.bak` / `w00_Character.bak` hold an older, unrelated pet table `tPet`
+(default constraints on `nPetNumber, sInfo, nFlags, nAssignName, nLevel, nExp, nSatiety, nSpeed, nAbilityType,
+nAbilityValue, nSkinColor, dDate`) and `tPetSkill` (FK `nPetK…` → `tPet`) *(db-backup)*: no master, mind or stress
+column, so the 2016 procedures used another table. The NA2016 `World00_Character.bak` adds third-party versions of three
+of them (author "Sam \"Saze\" V.", 2019, over `tPetNew`); they are not 2016 and differ in the result convention (below).
+
+Shared contract (all five wrappers, `CSQLPPet`):
+
+- **`@nRet` = 0 means success.** Each wrapper sets `nRet = 0` before the call and logs `"ERROR - CSQLPPet::usp_Pet_<x>,
+  ret(%d), nRet(%d)"` when `rc ∉ {0,1}` or `nRet ≠ 0`. For the three without a result set (setName, setTendency,
+  setDelete) the wrapper returns 1 only when `rc ∈ {0,1}` and `nRet == 0` (asm: `mov al,1` / `xor al,al` before `ret 8`
+  @ 0x467430 / 0x467540 / 0x467810). The NA2016 procedures set `@nRet = @@ROWCOUNT` (= 1 on success): with them every
+  rename fails (0x3419). A rebuild must answer 0.
+- **For setCreate / getInfo the row decides.** These two return a row; the wrapper's flag starts at 1 (`mov byte
+  [ebp-0x105], 1`) and is cleared on `rc ∉ {0,1}` or `nRet ≠ 0` (@ 0x467393 / 0x467754), then the row is fetched anyway;
+  no row → log `"…, fetch error"`, return 0. With the SQL Server drivers `@nRet` is not yet returned while the row is
+  pending (§1.2), so in practice: row returned and call ok → success; no row → failure. (Same dead-check pattern as
+  D06-B1.)
+- All numbers are bound `SQL_C_ULONG → INTEGER`, mind / stress `SQL_C_UTINYINT → TINYINT`, the name `SQL_C_CHAR →
+  WVARCHAR` from a 16-byte `Name4` the handler copies into the 17-byte struct field and NUL-terminates (`SQL_PET_*`
+  `sPetName[17]`). Names are 4–16 characters (zone check, Z07 §9); a new pet is created with the name `""`.
+- `nMasterRegNum` is the zone's `ShinePet::spt_nMasterRegNum` (`spt_CreatePet` @ zone FUN_0055d290 fills 0xD40D with it)
+  = the owner's character number *(inferred from the name)*.
+
+Table *(ours, after the PDB field names)*:
+
+```
+tPetInfo ( nPetRegNum   int IDENTITY(1,1) PRIMARY KEY,     -- the pet item's option 2700 (D03 §1.3)
+           nMasterRegNum int NOT NULL,                     -- tCharacter.nCharNo
+           sPetName     nvarchar(16) NOT NULL DEFAULT '',
+           nPetMind     tinyint NOT NULL, nPetStress tinyint NOT NULL,
+           bDeleted     bit NOT NULL DEFAULT 0, dCreateDate datetime NOT NULL DEFAULT getdate() )
+```
+
+```pseudo
+usp_Pet_setCreate(@nMasterRegNum int in, @sPetName nvarchar(16) in, @nPetMind tinyint in, @nPetStress tinyint in,
+                  @nRet int out)                                    (names pdb2016 SQL_PET_CREATE)
+    called by : SQL_usp_Pet_setCreate @ FUN_00467260 ← 0xD40D NC_PET_CREATE_DB_REQ @ FUN_0042b6b0 (D03 §13)
+    binds     : 1 in ULONG→INTEGER +0; 2 in CHAR→WVARCHAR buf 0x10 +4; 3 in UTINYINT→TINYINT +0x15; 4 same +0x16;
+                5 out SLONG→INTEGER +0x1c
+    result    : one row, column 1 → DB_GetU32 → nPetRegNum (+0x18)
+                handler: wrapper 0 → 0xD40E nError 0x3409, RegNum −1; RegNum == 0xFFFFFFFF → 0x3400; else 0x3408
+    body      : SET NOCOUNT ON; SET @nRet = 0
+                INSERT tPetInfo (nMasterRegNum, sPetName, nPetMind, nPetStress) VALUES (…)
+                IF @@ERROR <> 0: SET @nRet = -1; SELECT CAST(-1 AS int); RETURN       -- → 0x3400 (handled refusal)
+                SELECT CAST(SCOPE_IDENTITY() AS int) AS nPetRegNum
+    evidence  : binds, fetch and codes read in the code; body inferred. Returning a −1 row for a refusal is what the
+                handler's 0x3400 branch expects (inferred; no limit on pets per master is visible anywhere).
+
+usp_Pet_getInfo(@nPetRegNum int in, @nRet int out)                  (SQL_PET_GET_INFO)
+    called by : SQL_usp_Pet_getInfo @ FUN_00467670 ← 0xD40B NC_PET_LOAD_INFO_DB_REQ @ FUN_0042bcc0 (D03 §13), and
+                CGameDB_Item_GetItemOptions @ FUN_004681a0 for every pet item (class 36, option 2700 ≠ −1) it loads:
+                on success it copies the 16-char name into the attribute (+8) (D03 §1.3); failure keeps the item's name
+    binds     : 1 in ULONG→INTEGER +0; 2 out SLONG→INTEGER +0x1c
+    result    : one row: DB_GetU32 nMasterRegNum (+4), DB_GetStr sPetName (+8, field zeroed first), DB_GetU8 nPetMind
+                (+0x19), DB_GetU8 nPetStress (+0x1a). Handler: 0x3420 with name / mind / stress, else 0x3421 (name "",
+                0, 0). The master number is read but not sent or checked.
+    body      : SET NOCOUNT ON; SET @nRet = 0
+                SELECT nMasterRegNum, sPetName, nPetMind, nPetStress FROM tPetInfo
+                 WHERE nPetRegNum = @nPetRegNum AND bDeleted = 0
+                IF @@ROWCOUNT = 0: SET @nRet = -1                          -- no row → wrapper 0
+    evidence  : column order = fetch order (code); NA2016's third-party version has the same column order.
+
+usp_Pet_setName(@nPetRegNum int in, @sPetName nvarchar(16) in, @nRet int out)   (SQL_PET_SET_NAME)
+    called by : SQL_usp_Pet_setName @ FUN_00467430 ← 0xD403 NC_PET_SET_NAME_DB_REQ @ FUN_0042ba70 (0xD404 0x3418 ok /
+                0x3419), and ItemAttr_Save @ FUN_0046a730 case 0x24 (pet item, RegNum ≠ −1, after the option row is
+                saved; result ignored)
+    binds     : 1 in ULONG→INTEGER +0; 2 in CHAR→WVARCHAR buf 0x10 +4; 3 out SLONG→INTEGER +0x18
+    body      : SET NOCOUNT ON; UPDATE tPetInfo SET sPetName = @sPetName WHERE nPetRegNum = @nPetRegNum AND bDeleted = 0
+                SET @nRet = CASE WHEN @@ERROR = 0 AND @@ROWCOUNT = 1 THEN 0 ELSE -1 END
+
+usp_Pet_setTendency(@nPetRegNum int in, @nPetMind tinyint in, @nPetStress tinyint in, @nRet int out)  (SQL_PET_SET_TENDENCY)
+    called by : SQL_usp_Pet_setTendency @ FUN_00467540 ← 0xD401 NC_PET_SET_TENDENCY_DB_REQ @ FUN_0042b920 (no answer;
+                failure logged "ERROR - fc_NC_PET_SET_TENDENCY_DB_REQ, (nPetRegNum=%d)")
+    binds     : 1 in ULONG→INTEGER +0; 2 in UTINYINT→TINYINT +4; 3 same +5; 4 out SLONG→INTEGER +8
+    body      : UPDATE tPetInfo SET nPetMind = @nPetMind, nPetStress = @nPetStress WHERE nPetRegNum = @nPetRegNum;
+                @nRet as setName
+
+usp_Pet_setDelete(@nPetRegNum int in, @nMasterRegNum int in, @nRet int out)     (SQL_PET_DELETE)
+    called by : SQL_usp_Pet_setDelete @ FUN_00467810 ← 0xD40F NC_PET_REMOVE_DB_REQ @ FUN_0042bf30 (0xD410 0x3428 /
+                0x3429). Dead in 2016: no zone code sends 0xD40F (`rg -w 0xd40f` in both zone exports: none).
+    binds     : 1 in ULONG→INTEGER +0; 2 in ULONG→INTEGER +4; 3 out SLONG→INTEGER +8
+    body      : UPDATE tPetInfo SET bDeleted = 1 WHERE nPetRegNum = @nPetRegNum AND nMasterRegNum = @nMasterRegNum;
+                @nRet as setName (soft delete *(inferred)*: the master check suggests a guarded delete, the
+                "setDelete" name a flag)
+```
+
+### 5.2 `usp_LinkScroll_SetDestMap` — remember where a map-link scroll sends the character
+
+```pseudo
+usp_LinkScroll_SetDestMap(@nCharNo int in, @sDestMapName nvarchar(12) in, @nRet int out)
+                                                    (names pdb2016 CSQLPCharacter::SQL_MAPLINK_SCROLL_DEST: nRet +0,
+                                                     nCharNo +4, destMapName[13] +8)
+    called by : SQL_usp_LinkScroll_SetDestMap @ FUN_00460950 ←
+                0x34C9 NC_ITEMDB_MAPLINK_ITEM_CONSUME_REQ @ FUN_0042fd10 after the scroll was consumed (dest = mapName)
+                0x34CF NC_ITEMDB_RESET_SCROLL_LINK_MAP_INFO_CMD @ FUN_00430290 (dest = "", all 13 bytes zero)
+                (both D03 §6.5), failure logged "… sp call fail SET MapLinkScrollDest charRegNum %u", no other effect
+    binds     : 1 in ULONG→INTEGER +4; 2 in CHAR→WVARCHAR buf 0xd +8; 3 out SLONG→INTEGER +0 (not preset: the handlers
+                zero it)
+    result    : wrapper returns 1 when rc ∈ {0,1} (asm @ 0x460a6a), whatever @nRet is; @nRet ≠ 0 is only logged
+                ("ERROR - CSQLPCharacter::usp_LinkScroll_SetDestMap nRet(%d), nCharNo(%d)")
+    body      : SET NOCOUNT ON
+                UPDATE tCharacter SET sLinkScrollDestMap = @sDestMapName WHERE nCharNo = @nCharNo   (column ours)
+                SET @nRet = CASE WHEN @@ERROR = 0 AND @@ROWCOUNT = 1 THEN 0 ELSE -1 END
+```
+
+What the value is for *(inferred, strong)*: the zone sends 0x34CF at every `sp_NC_MAP_LOGINCOMPLETE_CMD` (zone
+FUN_00443390, Z01 §6), i.e. the destination is cleared as soon as the character has arrived on any map. The only reader
+that fits is the 37th column of `p_Char_GetAllData` that the 2016 Character server reads at login (D02 §4.1, D02-B19):
+a 12-character map name that, when non-empty and in MapInfo, replaces the login map and puts the character on that map's
+regen point. Together: a character that used a map-link scroll and dropped before arriving logs in on the destination
+map. So the rebuild's column lives in `tCharacter` and `p_Char_GetAllData` returns it as its last column (part 4 of this
+item, §6, settles the GetAllData side). The 2016 binary itself never compares anything despite the code name
+`…COMPARE_MAP_REQ`; the 2017 name `RESET_SCROLL_LINK_MAP_INFO_CMD` describes what it does.
+
+### 5.3 `p_Item_MiniHouse_Effect_Resource_Del` — pay a mini-house furniture effect
+
+```pseudo
+p_Item_MiniHouse_Effect_Resource_Del(@nOwner int in, @nNeedMoney bigint in, @nNeedItemKey bigint in,
+        @nNeedItemOptionType smallint in, @nNeedItemLot int in, @nRet int out)
+                                        (names pdb2016 CSQLPItem::SQL_ITEM_MINIHOUSE_EFFECT_RESOURCE_DEL)
+    called by : SQL_p_Item_MiniHouse_Effect_Resource_Del @ FUN_00462e70 ← 0x347D NC_ITEMDB_MINIHOUSE_EFFECT_DEMANDGOOD_REQ
+                @ FUN_0041a230 (D03 §7.6) ← zone sp_NC_MINIHOUSE_FURNITURE_EFFECT_REQ @ FUN_00574a30 (Z07 §6.10)
+    binds     : 1 in ULONG→INTEGER +0 (charNo); 2 in UBIGINT→BIGINT +8 (nDemandMoney); 3 in UBIGINT→BIGINT +0x10 (item
+                key); 4 in SSHORT→SMALLINT +0x18 = ItemLotOption(nDemandItemID) or 0xFFFE (sent as −2) when the item id is
+                0xFFFF or the item has no lot option; 5 in ULONG→INTEGER +0x1c (nNeedItemLot); 6 out ULONG→INTEGER +0x20,
+                preset −1
+    result    : the wrapper returns @nRet without looking at rc (a failed call leaves −1). Handler: 0 → 0x1700 (zone plays
+                the effect), 1 → 0x1702, 2 → 0x1703, 3 → 0x1704, 4 → 0x1705, 5 → 0x1706, other → 0x1701; the zone turns
+                them into 0x8C41 codes 0x16D1…0x16D5 / 0x16D0 (Z05 §9.6; no client text in the error table)
+    body (inferred from p_Item_Furniture_Endure_Update, Character.bak, "2008.10 By Lunar", the mini-house furniture
+          procedure whose codes 1–5 match the five handled ones):
+        SET NOCOUNT ON; SET @nRet = 0
+        item = (@nNeedItemOptionType <> -2) OR the key is an item of @nOwner     -- see the money-only case below
+        IF item:
+            EXEC p_Item_IsValidOwner @nNeedItemKey, @nOwner, @t OUTPUT;  @t <> 0 → SET @nRet = @t (1 not found, 2 owner); RETURN
+        BEGIN TRAN
+        IF @nNeedMoney > 0: EXEC p_Char_MoneySub @nOwner, @nNeedMoney, @r OUTPUT; @r <> 1 → ROLLBACK, @nRet = 3, RETURN
+        IF item:
+            IF @nNeedItemOptionType = -2 OR @nNeedItemLot <= 1:
+                 EXEC p_Item_Delete @nNeedItemKey, @r OUTPUT;  @r <> 0 → ROLLBACK, @nRet = 5, RETURN
+            ELSE EXEC p_Item_SetOption @nNeedItemKey, @nNeedItemOptionType, @nNeedItemLot - 1, @r OUTPUT
+                                                                          @r <> 0 → ROLLBACK, @nRet = 4, RETURN
+        COMMIT
+```
+
+- The lot the zone sends is the stack's **current** lot (`local_8c` = the attribute's lot getter, before the zone's own
+  `lot − 1` for its cell), so the procedure stores `lot − 1` or deletes the item at 1; the furniture family procedure
+  instead receives the lot after use. Code meanings 1 / 2 / 3 / 5 follow that family procedure and `p_Item_IsValidOwner`;
+  4 (lot write failed) is the remaining step *(inferred)*.
+- **Money-only effects (original bug) D06-B2.** For an effect with a money cost and no item, the zone writes item id
+  0xFFFF but leaves the key (+0xA…+0x11) and lot (+0x14) of its global send buffer unwritten (zone FUN_00574a30), so the
+  Character server passes a stale key from the previous packet. The option type is −2 then, as for a real non-stackable
+  item. A procedure that always checks the key fails the effect with 1 (or deletes an unrelated item of the same owner
+  when the stale key happens to be one). The body above therefore treats "type −2 and the key not owned" as "no item";
+  a rebuild of the zone should zero the key and lot.
+- No source and no table needed beyond `tItem` / `tItemOptions` / `tCharacter.nMoney` (D03's tables).
+
+### 5.4 `p_MiniHouseURL_Get`, `p_MiniHouseURL_Set` — the house owner's blog address
+
+```pseudo
+p_MiniHouseURL_Get(@nUserNo int in, @sURL nvarchar(254) out)        (names ours)
+    called by : SQL_p_MiniHouseURL_Get @ FUN_0045aaa0 ← 0x8C39 NC_MINIHOUSE_DB_OWNERBLOG_GET_REQ @ FUN_00417ac0 (D03 §8)
+    binds     : 1 in ULONG→INTEGER (by value on the stack); 2 **out** SQL_C_CHAR → WVARCHAR, bufferLength 0xff into the
+                handler's zeroed 0x200 buffer, with a real indicator (preset SQL_NTS −3): the only output in this part
+                that may be NULL — NULL leaves the buffer empty and still succeeds
+    result    : ok = rc ∈ {0,1} (truncation is SUCCESS_WITH_INFO, so a longer URL arrives cut to 254 bytes). Handler: 0x8C3A
+                Error 0x11DA with bloglen = min(strlen, 255) and the string; fail → 0x11DB ("Unable to navigate to room
+                host's blog.")
+    body      : SELECT @sURL = sURL FROM tMiniHouseURL WHERE nUserNo = @nUserNo        (no row → NULL → empty, ok)
+
+p_MiniHouseURL_Set(@nUserNo int in, @sURL nvarchar(255) in)
+    called by : SQL_p_MiniHouseURL_Set @ FUN_0045ab20 ← 0x8C3B NC_MINIHOUSE_DB_OWNERBLOG_SET_REQ @ FUN_00417c80
+    binds     : 1 in ULONG→INTEGER; 2 in CHAR→WVARCHAR buffer 0xff (the request's `blogaddr` up to its NUL; `bloglen` is
+                not used); no output parameter
+    result    : ok = rc ∈ {0,1}; 0x8C3C 0x11DA, else 0x11DC ("Unable to save blog address.")
+    body      : MERGE tMiniHouseURL (upsert sURL for nUserNo)
+table *(ours)*: tMiniHouseURL (nUserNo int PRIMARY KEY, sURL nvarchar(255) NOT NULL)
+```
+
+- Keyed by the **user** (account) number, not the character: the request carries `nUserNo` (PDB 2017
+  `PROTO_NC_MINIHOUSE_DB_OWNERBLOG_*_REQ`), and the call runs on the Character DB connection.
+- Dead in 2016: no zone code sends 0x8C39 / 0x8C3B (`rg -w` in both zone exports, decimal too) and the zone has no handler
+  for their answers; the client still has handlers for 0x8C36 / 0x8C38 (opcodes.json). Neither backup has a URL or blog
+  column (only an old `tMiniHouse` with `sData`, unrelated to `tMinihouse`).
+
+### 5.5 `p_Guild_SetMoney` — set a guild's money
+
+```pseudo
+p_Guild_SetMoney(@nNo int in, @nMoney bigint in, @nRet tinyint out)   (names pdb2016 CSQLPGuild::SQL_GUILD_SET_MONEY:
+                                                                       nNo +0, __int64 nMoney +8, uchar nRet +0x10)
+    called by : SQL_p_Guild_SetMoney @ FUN_00453e00 ← 0x74AA NC_GUILD_TOURNAMENT_DB_REWARD_CREATE_REQ @ FUN_004076a0,
+                reward types 2 ID_GUILD_MONEY and 5 ID_GUILD_MONEY_DIVISION (D04 §6.4), after p_Guild_Get
+    binds     : 1 in ULONG→INTEGER +0; 2 in **SQL_C_ULONG** → BIGINT +8 (the low 32 bits of the new total:
+                D04-B21); 3 out UTINYINT→TINYINT +0x10, preset 0
+    result    : ok = rc ∈ {0,1} and @nRet == 1
+    body (from p_Guild_SetExp / p_Guild_SetFame, Character.bak, "2006.2 By CJC", same signature shape):
+        SET NOCOUNT ON; SET @nRet = 0
+        UPDATE tGuild SET nMoney = @nMoney WHERE nNo = @nNo
+        SET @nRet = @@ROWCOUNT;  IF @@ERROR <> 0 OR @nRet <> 1: SET @nRet = 0
+```
+
+The family's convention (`tinyint` 1 = ok, 0 = guild not found) is exactly what the wrapper tests; `tGuild.nMoney` is a
+column `p_Guild_Get` returns. A rebuild that fixes D04-B21 binds `SQL_C_UBIGINT`; the procedure is the same.
+
+### 5.6 `usp_GuildTournament_setRefundNotice` — mark a refund as announced
+
+```pseudo
+usp_GuildTournament_setRefundNotice(@nGTNo int in, @nNo int in, @nRet int out)
+                                        (names pdb2016 CSQLPGuild::SQL_GUILD_TOURNAMENT_REFUND_NOTICE_SET)
+    called by : SQL_usp_GuildTournament_setRefundNotice @ FUN_00455590 ← 0x74F9 NC_GUILD_TOURNAMENT_REFUND_NOTICE_DB_SET_REQ
+                @ FUN_00408ae0 (D04 §6.4; no answer, failure logged) ← WM Client_SendRefundNotice FUN_00430e30 (W03 §8.4),
+                right after it sent 0x74F8 NC_GUILD_TOURNAMENT_REFUND_NOTICE_CMD { u64 nRefundMoney } to a member of a
+                guild whose entry was not chosen
+    binds     : 1 in ULONG→INTEGER +0; 2 in ULONG→INTEGER +4; 3 out ULONG→INTEGER +8, preset 0
+    result    : ok = rc ∈ {0,1} and @nRet == 0 (asm @ 0x45568b); log string "CSQLPGuild::usp_GuildTournament_Refund_Notice_Set"
+    body (family: Ko Dong Gyun's usp_GuildTournament_* 2009, codes −1411 / −1412 / −1493):
+        SET NOCOUNT ON; SET @nRet = 0
+        IF ISNULL(@nGTNo,0) <= 0: SET @nRet = -1411; RETURN;   IF ISNULL(@nNo,0) <= 0: SET @nRet = -1412; RETURN
+        UPDATE tGuildTournamentRegist SET bRefundNotice = 1 WHERE nGTNo = @nGTNo AND nNo = @nNo
+        IF @@ERROR <> 0: SET @nRet = -1493
+```
+
+- `bRefundNotice` is a 2016 column the backups' `tGuildTournamentRegist (nGTNo, nNo, nMoney, nSeed, bChoice, dDate)` does
+  not have (constraint names `DF__tGuildTou__nSeed`, `__bChoi`, `__dDate`; `bak.py names` / UTF-16 scan of Character.bak).
+  The 2016 `getRegistList` returns it as the 4th column (§5.7) and the WM keeps it as `GT_EnterList.bIsRefundNotice`
+  *(pdb2017 field name; W03 §8.1)*. Column name ours.
+- **Who pays the refund (original bug, inferred) D06-B3.** The WM broadcasts the unchosen entries to all zones as
+  0x74F4 NC_GUILD_TOURNAMENT_GOLD_REFUND_ZONE_CMD, but the 2016 zone handler is empty (Z08 §8.2, LAB_00476c00), and none of
+  the Character-server procedures on the refund path receives money or a character (`setRefundNotice` has only tournament
+  and guild). Unless the lost 2016 `usp_GuildTournament_setChoice` paid the fee back itself (the backups' version only sets
+  `bChoice`, §5.7), no 2016 component returns the money that 0x74F8 announces. `tGuildTournamentRegist` keeps no
+  character number, so a DB-side refund could only go to the guild (`tGuild.nMoney`) *(inferred)*. A rebuild should pay
+  it in `setChoice` (to the guild) or implement the zone's 0x74F4.
+
+### 5.7 D04 version mismatches
+
+**`usp_GuildTournament_setRegist` (D04 §6.4, 0x74E5): −1424 and the money.** `bak.py` shows the w00 body as truncated, but
+the full text is in `w00_Character.bak` (UTF-16 at file offset 0x43ca68, again at 0x43d1ee). It adds, after the
+level / member check (comment "2011.8.22 by kodong"):
+
+```sql
+SELECT TOP 1 @prevGTNo = nGTNo FROM tGuildTournament WHERE nGTNo < @nGTNo ORDER BY nGTNo DESC
+IF @prevGTNo IS NOT NULL BEGIN
+    SELECT @prevWinnerNo = nGuildNo FROM tGuildTournament
+     WHERE nGTNo = @prevGTNo AND nType >= 3028 AND nType <= 3029 AND nData = 1
+    IF @prevWinnerNo = @nNo BEGIN SET @nRet = -1424 RETURN END
+END
+```
+
+So **−1424 (→ 0x1C47) = the guild won the previous tournament** and may not register for the next one: rows 3028 / 3029
+are `3000 + slot` result rows of the final pair (slots 28 / 29, W03 §8.4: the last round is pair 28) and `nData = 1` is a
+win (`usp_GuildTournament_setResult`, D04 §6.4). The 2016 handler maps exactly −1421…−1424, so the 2016 procedure is the
+w00 version (Character.bak's 2009 version lacks −1424). Both versions take the fee in the same transaction (`EXEC
+p_Char_MoneySub @nCharNo, @nMoney` → −1423 on failure) before inserting `(nGTNo, nNo, nMoney, nSeed = RAND()·100000)`:
+the DB does charge the character, and the zone's `lock.apply` on 0x1C40 (Z08 §8.2) mirrors it in memory (the usual
+DB-first money pattern).
+
+**`usp_GuildTournament_getRegistList`.** Character.bak and w00 have the same 2009 body: `SELECT nNo … WHERE nGTNo =
+@nGTNo` (−1411 for an invalid number). The 2016 readers fetch four columns: U32 guild, 64-bit money (I64 in 0x7485 / 0x74EB,
+U64 in 0x74F6), and two flags (U8 in 0x74EB, I32 in 0x74F6) = `GT_EnterList {nGuildNo, bIsChoice, bIsRefundNotice,
+nRefundMoney}`. A rebuild returns
+
+```sql
+SELECT nNo, nMoney, CAST(bChoice AS tinyint), CAST(bRefundNotice AS tinyint)
+  FROM tGuildTournamentRegist WITH (NOLOCK) WHERE nGTNo = @nGTNo
+```
+
+(`tinyint` converts to both U8 and I32; the column order is the fetch order, the money column carries the refund amount
+= the paid fee *(inferred)*.)
+
+**`usp_Character_getKeyMap` −2721 / −2725 (D04 §5.2, 0x7057).** The w00 procedure (Ko Dong Gyun 2010.09.13) returns no
+result set and `@nRet = −2725` when the character has no `tCharacterKeyMap` rows; −2721 is the family's "not found
+nCharNo" (`usp_Character_getShortCutList`, same author and date). The 2016 handler only skips its log line for −2721;
+both values give the same behaviour (no answer, D04-B14). For a rebuild the difference is cosmetic; −2721 keeps the
+2016 log quiet. After `usp_Character_initKeyMap` the rows always exist unless `tKeyMapInit` is empty.
+
+**`usp_GuildAcademy_withdrawMoney` 1–6 (D04 §9.3, 0x986B).** Both backups (2008.5.14, w00 adds `UPDLOCK, HOLDLOCK`
+2011.7.11) return 0 or −1511 / −1512 / −1514 / −1524 / −1525 / −1527 / −1593. The 2016 wrapper (@ FUN_00456510) passes
+`nRet` through unchanged, and the handler switches on 1…6 (→ 0xF99…0xF9E), other → 0xF98. So the 2016 procedure had
+positive codes; their order most likely follows the six checks in the procedure *(inferred, weak)*: 1 invalid guild
+number, 2 invalid character number, 3 invalid amount, 4 character not found / deleted, 5 academy not found, 6 not enough
+academy money; a DB error falls to 0xF98. In 2016 the handler only calls it with `0 < amount ≤` the money it has just
+read (D04 §9.3), so only 6 (concurrent withdrawal) and DB errors are reachable. A rebuild can keep the w00 body and map
+its negative codes to 1–6 in that order; nothing outside the Character server sees the codes except 0x986C's `Error`.
