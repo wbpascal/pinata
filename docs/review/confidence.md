@@ -3188,7 +3188,8 @@ Knowledge files (`docs/knowledge/`):
 ## 3. Adversarial re-check
 
 State: §3.1–§3.2 (part 4), §3.3 (part 5: ITEMDB order, zone ↔ WM hand-over) and §3.4 (parts 6 and 6b: low zone rows
-Z01–Z13) done. Part 7 adds §3.5 (low client-facing Login / WM packets, remaining class B / R / O hits).
+Z01–Z13) and §3.5 (part 7: low client-facing Login / WM packets, remaining class B / R / O hits) done. §3 is
+complete; what stayed open or was not re-checked is listed per part and goes to the scenarios (parts 8 and 9).
 
 ### 3.1 Method
 
@@ -3588,7 +3589,102 @@ Part 6b result (§3.4.7–§3.4.12): 27 rows over the 60 low rows of Z05–Z13: 
 
 ### 3.5 Part 7: low ratings in client-facing Login / WM packets; remaining class B, R, O hits
 
-Open (part 7).
+Scope: the 44 low rows of the Login and WM documents (L00 5, W01 10, W02 5, W03 11, W04 10, W05 3; L01 has none),
+the class B / R keyword hits left in L00, W01, Z01, Z02, Z04 and D02 (`X02-rate.py` `KW['B']`, `KW['R']`: 21 lines,
+none in W01), and the two questions earlier parts left open (I12 of §3.3.1, the reachability behind X02-B9 of
+§3.4.7). 40 rows: 21 confirmed, 4 refined, 3 corrected, 5 superseded, 6 not re-checked, 1 addition (E30). Names are from the 2016 `Login.pdb` /
+`WorldManager.pdb` / `Zone.pdb` *(pdb2016)*; code was read in `login-pdb`, `wm-pdb`, `zone-pdb` and (no PDB)
+`character`.
+
+#### 3.5.1 Method: a return-value census instead of single re-reads
+
+Class B's largest group is "a Login / WM handler *ignores* a packet" where the handler returns 0 and the parser
+closes the session (README §5.2 rows 4–6, §5.3 row 5; rule: L01 §4.1, W05 §5.1). Instead of re-reading the lines
+that say "ignored" or "no-op", every registered handler of both servers was scanned (`handlers.json` → body in
+`<bin>-pdb/decomp.c`): the `return 0` statements beyond the one that follows `CheckConnectionValidation`, and the
+handlers whose return value is assigned from a call (`return iVar; … iVar = …::Send(…)`).
+
+| Server | Handlers | `return 0` outside the validation test | Result returned from a call |
+|---|---|---|---|
+| Login | 45 | 0x0C06, 0x0C18 (both known: README §5.2), 0x0803 on a failed validation, WM-link 0x0C0E (E5) | 16 from a send (13 to the peer itself or a DB link) |
+| WM | 462 | 14 handlers: 0x0803 ×5 (failed validation), 0x7504 and 0x2010 (validation only, written as `if … return 1; return 0`), 0x7001, 0x7002 (E23), 0x3802 (E12), 0x8001 (validation only), 0xB001 (a failed send to the requester), 0x980D (E18), zone 0x101C (6, W01 §7.2 / §3.3.2) | 229; 66 client handlers return only `Send(requester)`; the others are E30 |
+
+A zone handler returns `void` (E31): this error class does not exist there.
+
+#### 3.5.2 Login (L00: 5 low rows, 4 keyword lines)
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| E1 | §3.1 `lastRecvTime`; §3.2 "the packet is ignored" after a failed `<Peer>_CheckAlive`, unregistered opcodes ignored; §4 0x0C06 / 0x0C18 "no-op"; §5.1 0x0801 reply; §5.3 token, 0x0C36 order; §5.4 OPTool queries | superseded | README §5.2, the rows on §3.1, §3.2, §4, §5.1, §5.3 and §5.4 (L01 §4.1–§4.4, S02 §1.6). Re-read on the way: `CParserClient::fc_NC_USER_LOGIN_REQ` @ FUN_00406950 and `fc_NC_USER_NORMALLOGOUT_CMD` @ FUN_004062e0 are a bare `return 0` (client closed); `CheckConnectionValidation` @ FUN_00405f60 returns 0 when the session state ≠ 1 |
+| E2 | §4 0x0805 "no-op" @ LAB_004074a0 | confirmed | One shared `return 1` (`CParserWorldManager::fc_NC_MISC_HEARTBEAT_ACK` @ FUN_004074a0, registered for 0x0805 in all five Login parsers): the session stays open |
+| E3 | §5.3 0x0823 "no-op" @ FUN_00408660 | confirmed | `CParserWorldManager::fc_NC_MISC_START_THE_BOOM_CMD`: `return CheckConnectionValidation(…) != 0`, nothing else |
+| E4 | §5.2 "0x0C2B / 0x0C3C / 0x0C41 / 0x0C4E: same shape for the legacy login variants" | refined (class R) | The four AccountLogDB answers (`fc_NC_USER_IS_IP_BLOCK_ACK` @ FUN_00405c80, `…_GER_…` @ FUN_00405180, `…_TW_…` @ FUN_004054c0, `…_JP_…` @ FUN_004056c0) and the AccountDB answers that lead to them (0x0C3A GER @ FUN_00404990 → 0x0C3B, 0x0C3F TW @ FUN_00403b50 → 0x0C40, 0x0C4C JP @ FUN_00403cd0 → 0x0C4D) are complete handlers, but **no Login function sends the first request of any of these chains**: the image has no 0x0C29, 0x0C2A, 0x0C39, 0x0C3E, 0x0C4B (no literal, no `sends` entry), and the client requests of those regions are refused at once: 0x0C1D `fc_NC_USER_LOGIN_NETMARBLE_REQ` @ FUN_00406280 → 0x0C09 `{0x4A}` + close, 0x0C20 `fc_NC_USER_LOGIN_OUTSPARK_REQ` @ FUN_004063d0 → 0x0C09 `{0x4C}` + close. In 2016 only the US chain (client 0x0C5A → AccountDB 0x0C5B / 0x0C5C → AccountLogDB → 0x0C5E) and the token login 0x0C37 can run; the seven handlers are reachable only if a DB server sends their opcode unasked. The same holds for 0x0C27 `fc_NC_USER_TEENAGER_ACK` @ FUN_00404050: neither Login nor the WM sends 0x0C26 |
+| E5 | (addition, from the census) Login ← WM 0x0C0E `fc_NC_USER_WILLLOGIN_ACK` @ FUN_00408870 | confirmed, with one branch added | An invalid client handle is logged and returns 1. With a non-zero success byte and no connect info for the world (`GetWorldManagerConnectInfo` = 0) the client is closed **and the handler returns 0: the WM link is closed** by the parser (L01 §4.1). L00 §5.3 describes the client side of this branch only; not compared with L01's text |
+
+#### 3.5.3 WorldManager (W01 10, W02 5, W03 11, W04 10, W05 3 low rows)
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| E6 | W01 §1, §2 (listeners, CharDB link state, link loss, heartbeat), §4.1 (bad-name check, delete → 0x1408, `shape` bits, rename right +0x77), §5.1, §5.4, §6.1, §6.2, §6.3, §7.1, W01-B5 | superseded | README §5.3 (every W01 row) and §5.9 (W01-B5 withdrawn by X01); nothing weak is left in these sections beside E7 and E8 |
+| E7 | W01 §2: 0x0808 `{u16 currentUsers, u16 max}`, "Login derives the world status byte from it *(inferred)*" | confirmed | Login `CParserWorldManager::fc_NC_MISC_USER_COUNT_CMD` @ FUN_00408580 → `CLoginWorldManagerSessionManager::SetWorldManagerConnectInfo` FUN_0040a0c0 (status bands: L01 §3); on the first 0x0808 of a WM link (`m_bFirstConnectForBroadCastWorldStatus`) it also runs `CLoginClientSessionManager::BroadCastWorldStatus` |
+| E8 | W01 §4.1: FUN_004382d0 "drop the character from WM-side registries *(inferred)*" | superseded, name added | W04 names it `Clients_OnCharacterDeleted`; official `CWMClientSessionManager::AvatarErase(charNo)`. Head re-read: for every in-game session (+0x704 = 1) that has the character as a friend, 0x540C `{Name5 charid}` is sent and the friend entry deleted; the rest of the body (academy member lists) was not re-read |
+| E9 | W02 §1.2, §2.3, §2.4, §4.2: `Party_GetRole` FUN_00464b70 | refined (class N) | `CParty::MemberLeaveCheck(partyNo, charNo)` (`S01-renames.tsv`): not a role but what a leave would do: 4 = slot empty (not a raid party), 3 = not a member, 0 = raid-type party, 2 = fewer than 3 members (the party ends), else 1 for member index 0 (the master) and 0 for the others. In 0x3805 @ FUN_00419bb0: results 0 / 1 / 2 send 0x3807 `{Name5 charid, 0x4C6}` to member 0, result 2 also clears that member's party slot, 3 / 4 send nothing; `CParty::MemberLeave` runs in every case. W02's text follows these values; only the name misleads |
+| E10 | W02 §2.3: the pending member "stays until reject, accept, logout or a new 0x3802 hits 0x4CB *(inferred)*" | confirmed for the reject | 0x3805 sets the sender's party slot to 0xFFFF before anything else and calls `MemberLeave`; when member 0's session is gone or holds another character it only removes the sender. The other three exits were not re-read |
+| E11 | W02 §7, W02-B6: 0x4D1 "level gap" is never sent | confirmed | The only 0x4D1 of the WM image is in `fc_NC_PARTY_JOIN_REQ` @ FUN_0041a940, after `CParty::MemberIsJoinableLevel` @ FUN_00464ad0: `abs(minLevel − lv) < 1001 && abs(maxLevel − lv) < 1001` over `u8` levels, always true |
+| E12 | (addition, census) 0x3802 `fc_NC_PARTY_JOIN_REQ` | confirmed, one branch added | With `m_pCharDataBase` or `m_pCharDataShape` null (a session not yet in the game) the handler returns 0: the client is closed, not answered |
+| E13 | W03 §1.2, §8.1: `GT_COND_INFO`, `GUILD_ACADEMY_CLIENT`, `GUILD_EMBLEM_STATE`, `GUILD_SERVER`, `GUILD_TOURNAMENT_LIST` *(pdb2017)* | refined (class P reversed) | All five types are in the 2016 `WorldManager.pdb` (sizes 0x2b, 0x2e0, enum, 0x14, 0x15 = the offsets W03 uses): 2016 facts. The two README §5.3 rows on §1.2 (+0x438 = `CGuildWar`) and §8.1 (`JoinMoney` u32) stand |
+| E14 | W03 §2.5: the trailing `err 0x0CDB` of 0x740C is dead code | not re-checked | Tail read only: `if (r == 0) return Send_NC_GUILD_MEMBER_JOIN_ERR(0xCDB); return 1` @ FUN_00419db0; the two helpers that produce `r` were not opened. The handler returns the helper's result on its three error exits (0xCDE, 0xCD8, 0xCDB) |
+| E15 | W03 §3.5 "0x0D1A / 0x0D1B are ignored silently" (client) | not re-checked | A statement about result codes in the client's handler, which was not opened in this part |
+| E16 | W03 §4.5: CharDB 0x1414 / 0x1416 "(else ignored)" without a client session | confirmed | `fc_NC_AVATAR_GUILD_DATA_ACK` @ FUN_0040c6e0 and `fc_NC_AVATAR_GUILD_MEMBER_DATA_ACK` @ FUN_0040c880 return 1 (link kept). Addition: 0x1414 looks the session up by handle only; the 0x1408 it then sends carries **that session's** `m_UserNo` and the packet's `chrregnum`, so after a handle reuse the delete runs under the new session's account (CharDB's owner test decides; D02's delete was not re-read) |
+| E17 | W03 §5, W03-B31: 0x179C "may not ban yourself" is never sent | confirmed | No 0x179C in the WM image. 0x17A4 has one site, `CGuildAcademyMemberServer::Recv_NC_GUILD_ACADEMY_MEMBER_LEAVE_REQ` @ FUN_0044b990; "`LeastJoinTime` *(inferred)*" was not re-read |
+| E18 | W03 §5 0x980D: "both set or none → 0x980E {0, 0, 0}" | **corrected** | `fc_NC_GUILD_ACADEMY_MEMBER_LIST_REQ` @ FUN_00422120: no character data, or the session's guild number **and** academy guild number both set → `return 0`: the client is **closed**, no 0x980E. 0x980E with zeros is sent when both are 0, when the guild is not found, or when the academy guild is not found. (The two session fields are shown under wrong member names in `wm-pdb`, W14 of §3.3.2; W03's reading of them is used here) |
+| E19 | W03 §9.2: "no-op CharDB handlers" 0x7465, 0x748F, 0x7498, 0x749A (§8.4) | confirmed | All four are registered to `fc_NC_GUILD_DB_INTRO_ACK` @ FUN_0040bb50, which calls `CGuildManager::Recv_NC_GUILD_DB_INTRO_ACK` @ FUN_0045abc0 = `return 1` |
+| E20 | W03 §9.2: 0x74EF "(else ignored)" without the OPTool session | confirmed | `fc_NC_GUILD_DB_DELETE_CANCEL_ACK` @ FUN_0040bac0: session lookup by `hTool`, `Recv_…` only when found, returns 1 |
+| E21 | W04 §4.1: 0x281A "no-op stub" LAB_00414e40 | confirmed | The WM's shared `return 1` (PDB name `CParserZone::fc_NC_MISC_HEARTBEAT_ACK`, an identical-code fold), registered for 0x0805 on all eight links and for OPTool 0x281A |
+| E22 | W04 §6.4: 0x5801 / 0x5809 `{StartHandle, EndHandle}` "(ignored)" | confirmed | `fc_NC_KQ_LIST_REQ` @ FUN_00413980 and `fc_NC_KQ_SCHEDULE_REQ` @ FUN_00413e00 never read the payload; both answer every time (0x5802 / 0x580A, handles 0xFFFFFFFF when the list is empty) |
+| E23 | W04 §8.2: 0x7001 `NC_CHAR_OPTION_GET_ALL_REQ` "no-op (the parser returns)", 0x7002 "no-op (empty function)" | **corrected**, X02-B10 | FUN_00413fd0 and FUN_00413fe0 are `return 0`: a client that sends either opcode is **disconnected** (`CParserClient::Parser`, W05 §4.5 "a handler returns 0"). The 2016 client export holds neither constant, so the real client does not trip it *(text search only; an opcode built from dept and cmd would not show)* |
+| E24 | W04 §10: 0x0F46 "There is no chatting log." is never sent by the WM | confirmed | No 0x0F46 in the WM image, and none in the zone image |
+| E25 | W04 §8.3 "unreachable: the DB caps n at 95"; §12.3 the dice-game test drops 0x9405's answer | not re-checked | Neither function was opened. §12.3's 0x940A row is superseded (README §5.3 last row, X01-B6) |
+| E26 | W04 §15.2: zone 0xBC1D `NC_GAMBLE_WORLD_PREVMAPNAME_CMD` "else ignored" | confirmed | `CParserZone::fc_NC_GAMBLE_WORLD_PREVMAPNAME_CMD` @ FUN_0042c570 stores three u32 only when the session exists, has character data and `chrregnum` equals the packet's; returns 1 either way |
+| E27 | W04 §6.1, §6.5 `KQ_CanReturnToMap`; §9 0x7C07 scene; W05 §1.4, §3.2, §5.2 | superseded | README §5.3 (`CKQServer::IsExisted`; captured 0x7C07; `m_Packet` slots; class mask bit n = class n; CSL row strings inline) |
+| E30 | (addition, census) a handler that returns the result of a send **to a third party** | X02-B11 | `CSocket_IOCP::Send` returns 0 when the target socket is already closed or `WriteFile` fails at once (S02 §1.5). Read: Login-link 0x0C36 `fc_NC_USER_CREATE_OTP_ACK` @ FUN_00424a70 returns `Send(client, 0x0C34)`; CharDB 0x1113 `fc_NC_CHAR_TUTORIAL_MAKE_ITEM_ACK` @ FUN_0040e2c0 returns `Send(client, 0x1002)` on both failure exits; client 0x5401 `fc_NC_FRIEND_SET_REQ` @ FUN_0041ca90 and 0x9401 `fc_NC_HOLY_PROMISE_SET_UP_REQ` @ FUN_00421990 end in one shared `return Send(target or requester, …)`. A 0 closes the **link the packet came in on** (Login link, CharDB link → `CLOSE_CHAR_DB`, W05 §1.5) or the **requesting** client. Same shape by the text census, bodies not opened: client 0x9405, 0x7C01, 0x0813 / 0x0815 / 0x0816, 0x2014; CharDB 0x9888. The window (a session still found by `GetSession` whose socket is already closed) is *(inferred)* |
+
+#### 3.5.4 Remaining class B / R lines in Z01, Z02, Z04, D02, and the two open questions
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| E31 | Z01 §3.3: 0x0805 "no-op" @ FUN_00509900 / FUN_00549070, 0x0803 @ LAB_004c8180; §8.4 0x401B / 0x401D; §9 0x0823 | confirmed | Both functions are empty `void` bodies (their PDB names, `CGambleObject::go_SMC_WinRank` and `ShineObject::so_ply_CollectCardOpen`, are folds). Zone handlers have no return value, so "no-op" cannot hide a close as it does in Login / WM. The LAB_ entries were not opened |
+| E32 | Z01 §7.2, Z01-B3: 0x1142 "is never sent by this handler" | superseded | §3.4.2 (part 6: the wing-fly path). The one 0x1142 of the zone image is in `sp_NC_MAP_WING_FLY_REQ` @ FUN_00589f00 |
+| E33 | Z01-B5: the client has no handler for 0x0830, 0x0C24, 0x4026 | confirmed | None of the three is among the 901 opcodes of `re-data/client-handlers.json` |
+| E34 | Z02 §6.1: NPC role `JobManager` = "no-op (FUN_004c2450)"; §8 / Z02-B5 produce handlers "probably legacy" | confirmed / superseded | FUN_004c2450 is the shared empty function (§3.4.2). Z02-B5 was narrowed by README §5.4 / §5.9 (0x2035 is live); none of 0x2036 / 0x2038 / 0x203A / 0x203B is in `client-handlers.json` |
+| E35 | Z04 §6.3: `UseEffect` base defaults "CanUse FUN_00596480 (0x700), DirectUse FUN_00514570 (false), Effect = no-op" (Q27 of §3.4.5) | confirmed | RTTI table of `UseEffect::UseItemBase`: slot +4 `uib_CanUseItem` FUN_00596480, +8 `uib_DirectUse` FUN_00514570, +0xc FUN_00402370 (an empty fold), +0x10 FUN_004c2450 (empty). Subclasses such as `UseItemAmountHP`, `UseItemCapsule`, `UseItemChest` keep the empty +0x10 and act in `uib_DirectUse`; `UseItemByAbstate`, `UseItemByTable`, `UseItemChargedBuff` override `uib_Effect` (the first eleven tables of the RTTI list were compared, not all) |
+| E36 | Z04 §1.1 reward inventory "not reachable by SPLIT"; §13.2 `p+0x173bc = no-op` | superseded / not re-checked | §1.1: V5 of §3.4.7. §13.2 was not opened |
+| E37 | X02-B9 (§3.4.7 V2): is `ii_DropLot` reachable? Z04-B4 says never | **refined** | Call chain: `sp_NC_ITEM_DROP_REQ` @ FUN_00529f50 lets a request pass to `ItemDropper::id_Drop` only when `cell.lot ≤ req.lot`; the confirmation comes back later through the server menu, `ServerMenuFuncter::smfm_ItemDropWarn` @ FUN_0048da60 → `sp_ItemDropOK` @ FUN_0052b060, which reads the cell's lot **again** and calls `ItemInventory::ii_DropLot` @ FUN_00529c20 when `req.lot < cell.lot`, else `ii_DropAll`. So the partial path is not dead code: it runs when the stack grew between the request and the menu answer. Whether anything can add to a stack while the drop menu is open (pick-up, quest reward, mail) was not established: scenario (part 8). Z04-B4 and X02-B9 are "latent", not "unreachable" |
+| E38 | D02 §2: 0x0801 / 0x0805 "return 1 (no-op)" @ FUN_0043c7a0, FUN_004503c0 | not re-checked | Character has no PDB; D01 §1.1 states the parser rule for the DB servers ("the message says disconnect, the code does not") and was not re-read either |
+| E39 | D02 §7.1: "0x105D and 0x1063 are legacy: the 2016 zone sends only 0x10D1" | confirmed | Neither constant is in the zone or the WM image; 0x10D1 is written at two sites, `sp_NC_CHAR_STAT_INCPOINT_REQ` @ FUN_0058ad10 and `sp_NC_CHAR_STAT_DECPOINT_REQ` @ FUN_0058b3f0 |
+| E40 | D02-B18: the promotion reward table is never loaded | confirmed | `DAT_006ec934` has two references in the Character image, both reads in the 0xA004 handler FUN_0041eff0 (`!= 0 && i < *(p + 0x28)`); no SHN or text file of the 2016 data set carries a promotion table name. A write through the owning object's address would not show in this search: D02's *(inferred)* stays |
+| E41 | I12 of §3.3.1; D02 §4 (note at 0x1037): "position and money are saved by the zone's dept-16 messages" | **corrected** (money) | Position: yes (0x4018 / `PROTO_NC_CHARSAVE_ALL_REQ`, I12). Money: **no message saves it as a value.** The Character image has no "set money" call: its `{CALL …}` strings that touch character money are `p_Char_MoneyAdd`, `p_Char_MoneySub`, `p_Char_MoneyMove`, `p_Char_MoneyGet` (and `p_Char_CreateSetDefaultData` at creation, D02 §3.3), all relative (their callers: D03, D04). `tCharacter.nMoney` therefore changes only by the deltas of committed operations; the zone's `Cen` is loaded from `p_Char_GetAllData` column 13 (D02 §4.1) and never written back as a value. A zone-side change with no DB message behind it would be lost at logout *(inferred)* |
+| E42 | D01 / D02 low rows (9 + 19) | not re-checked | 25 of the 28 are low through *(db-backup)* statements or the D06 list of procedures that differ between the backups: SQL bodies, not client-facing packets. D06 re-read them; what a body really does on the 2016 server is a DB experiment (part 9), not a static question |
+
+#### 3.5.5 What part 7 adds for later parts
+
+- **Original-server bugs found:** X02-B10 WM 0x7001 / 0x7002 are registered to `return 0` (a client sending either
+  is disconnected; latent with the 2016 client). X02-B11 handler result = result of a send to a third party (E30):
+  the wrong party pays for a dead socket, up to the CharDB link.
+- **Error classes seen:** B 3 (E18, E23, and E5 / E12 as missed branches), R 2 (E4 unreachable chains presented as
+  variants; E37 "unreachable" that is latent), N 1 (E9), P reversed 1 (E13), F 1 (E41: a save message assumed to
+  carry a field it does not have). No opcode identity (class O) error was found in the six documents.
+- **23 of the 44 low Login / WM rows carry a README §5 row** (L00 5 of 5, W01 10 of 10, W05 3 of 3, W03 3 of 11,
+  W04 2 of 10, W02 0 of 5): in L00 and W01 almost everything weak was already replaced by L01 / W05. The WM documents written before W05 (W02–W04) still hold the "ignored" wording: read it as
+  "the handler returns 1" only where a row above says so.
+- **Census tool for X01 / a rebuild:** the two tables of §3.5.1 are the complete list of Login / WM handlers
+  that close a session by their return value; a rebuild must keep `return 0` = close.
+- **Scenario inputs** (part 8): a stack that grows while the drop confirmation is open (E37: expect 0x3419 and a
+  ground object); a test client sending 0x7001 (E23: disconnect) and 0x980D from a session with no guild (E18:
+  0x980E zeros); 0x3802 before the character is in the game (E12: disconnect); a friend request to a player whose
+  client was just killed (E30: the requester may be dropped); money check after a kill of the zone process
+  (E41: the DB value is the sum of committed deltas). DB setups (part 9): `tCharacter.nMoney` can be edited with
+  the character logged out, no other table mirrors it (E41).
 
 ## 4. Coverage gaps of items without a review part
 
