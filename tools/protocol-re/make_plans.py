@@ -706,8 +706,8 @@ ITEMS = [
              "Bugs as `Z22-B<n>`; Coverage boundary as usual."],
       done="Every `SubAbnormalStateActor*` function of the zone is cited as `FUN_…` and described, with the SHN columns, "
            "timers and packets of each actor class."),
- dict(id="Z23", phase=2, title="Zone: skill special effects (dispel / cure bodies, SkillSpecial handlers of smo_SkillBlast, reflection damage; added by Z17)",
-      out="docs/pseudocode/zone/Z23-skill-specials.md", deps=["Z03", "Z22"], scope=[],
+ dict(id="Z25", phase=2, title="Zone: skill special effects (dispel / cure bodies, SkillSpecial handlers of smo_SkillBlast, reflection damage; added by Z17)",
+      out="docs/pseudocode/zone/Z25-skill-specials.md", deps=["Z03", "Z22"], scope=[],
       goal="Z03 §5 summarises `smo_SkillBlast` (FUN_00581160, ~1000 decompiled lines) but lists its `SkillSpecial` handlers "
            "(mana burn, dispel variants, HP→SP, jump / dash, chain targets, steal enchant, summon, metamorphosis), "
            "`smo_Dispel` and `smo_ReflectionDamage` (0x245B) as only named (`docs/pseudocode/zone/Z03-combat.md` 'Not "
@@ -726,7 +726,7 @@ ITEMS = [
              "(`ActiveSkill.shn` / `ActiveSkillInfoServer.shn`), state changes, packets (layouts, client handlers via "
              "`re-data/client-handlers.json`, codes via `docs/protocol/client-error-codes.json`).",
              "`smo_ReflectionDamage` 0055dbc0 and packet 0x245B; any other function these reach that no doc cites.",
-             "Bugs as `Z23-B<n>`; Coverage boundary as usual (no scope table: do the caller / callee check by hand)."],
+             "Bugs as `Z25-B<n>`; Coverage boundary as usual (no scope table: do the caller / callee check by hand)."],
       done="`so_Dispel`, `so_SkillCure`, `smo_ReflectionDamage` and every special-effect branch of `smo_SkillBlast` are "
            "described with their SHN columns, state changes and packets, each sent packet has a layout and client handler."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],

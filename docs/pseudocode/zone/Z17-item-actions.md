@@ -1158,7 +1158,7 @@ target not an enemy (vt 0x72c `so_mobile_IsEnemy` false): `SE_CURE` → 0x18; el
 `DISPELDISEASE`, 0x10 `DISPELPOISON`, 0x20 `DISPELCURSE`, 0x400 `BOMBDISPELALL` from the skill's flags; enemy target:
 without `DISPELDEEPER` → 2, or 0x200 with `DETECT`; with `DISPELDEEPER` → 0x100 when the target carries the caster's own
 `STA_DEEPER` state (`aeo_IsMine`), else 0. The bodies of `so_Dispel` / `so_SkillCure` (which states a mask bit removes)
-are the follow-up item Z23 (§6).
+are the follow-up item Z25 (§6).
 
 ## 4. Costume weapon / shield charges and the action-item box
 
@@ -1512,7 +1512,7 @@ skill branch (§4.2). The ID is not reused.
 | `&iareset` `ac_ItemActionCoolTimeReset` FUN_00421990 | Z11 §7.4 (done, documented) | GM command; its effect is `ResetCoolTime` (§2.5) |
 | set-item subsystem (`SetItem` / `SetItemEffect` / `SetEffect` tables, set detection, `siae_*` getters other than §2.8, `SET_HEALRATE`) | Z21 (planned: "set items … set-item abstates and skill effects") | §1.7 / §2.8 / §3.2 cite only the item-action entry points |
 | abnormal-state actors and their routines (other than the three item-action readers in §2.8); `so_mobile_HPHealOverTime` FUN_0040e910 | Z22 (planned: `SubAbnormalStateActor*` bodies); Z09 §12.5 (done, documents `so_mobile_HPHealOverTime`) | combat / abstate mechanics; `smo_Dispel` FUN_0057d8e0 is now §3.7 |
-| skill cast and blast internals: `smo_SkillBlast` special branches, `so_Dispel` FUN_0042bf70 / `so_SkillCure` FUN_0042c440 (what a dispel mask removes), `smo_ReflectionDamage` | Z23 (created by this item: Z03 lists them as only named, no item had them) | §3.4.3 documents only the item-action hooks, §3.7 the `smo_Dispel` mask |
+| skill cast and blast internals: `smo_SkillBlast` special branches, `so_Dispel` FUN_0042bf70 / `so_SkillCure` FUN_0042c440 (what a dispel mask removes), `smo_ReflectionDamage` | Z25 (created by this item: Z03 lists them as only named, no item had them) | §3.4.3 documents only the item-action hooks, §3.7 the `smo_Dispel` mask |
 | passive-skill abstates (`so_ply_PassiveSetAbstate` vt 0xbf8, `cpl_SetAbstate` FUN_00446a10) | Z03 §4.2 / Z12 §2.4 | not item actions (correction in `docs/knowledge/Z17.md`) |
 | skill target lists (`alsst_*`, `alsst_MakeRandomTargetList` FUN_0057e4e0) | Z18 (planned; Z09 §31.2 "Skills, attacks and target scans" → Z03 leftovers, `docs/knowledge/Z09.md` §3) | target scans, not item actions |
 | skill / mover cool-downs (`csl_SetCoolTime` FUN_00448ab0, `msl_SetCoolTime` FUN_00449270), swing cycle (`smo_ply_NextBashTime` FUN_0055ac90, hit queue FUN_00577390 / FUN_00577cd0) | documented here: §3.7, §4.2 | Z03 (done) names them without address; small gaps, closed in this item |

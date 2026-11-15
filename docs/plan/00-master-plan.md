@@ -113,7 +113,7 @@ continue the open phase-2 items with the PDB exports as their main reading sourc
 | [Z20](items/Z20.md) | Zone: skill data box loader (`SkillDataBox::sdb_Load`, `SkillDataIndex` build, `PassiveDataBox`) (added by Z11) | Z01, Z03 |
 | [Z21](items/Z21.md) | Zone: set items (`SetItem` / `SetItemEffect` / `SetEffect` tables, set detection, set-item abstates and skill effects) (added by Z12) | Z03, Z12 |
 | [Z22](items/Z22.md) | Zone: abnormal-state actor classes (`SubAbnormalStateActor*` bodies: DoT/HoT, area damage, bomb, detach, rate buffs) (added by Z12) | Z03, Z18 |
-| [Z23](items/Z23.md) | Zone: skill special effects (dispel / cure bodies, `SkillSpecial` handlers of `smo_SkillBlast`, reflection damage) (added by Z17) | Z03, Z22 |
+| [Z25](items/Z25.md) | Zone: skill special effects (dispel / cure bodies, `SkillSpecial` handlers of `smo_SkillBlast`, reflection damage) (added by Z17) | Z03, Z22 |
 | [D01](items/D01.md) | Account + AccountLog servers (resolves open Login error conditions) | – |
 | [D02](items/D02.md) | Character server: characters, avatars, save/load | – |
 | [D03](items/D03.md) | Character server: items, economy, pets, house | D02 |
@@ -150,7 +150,7 @@ follow-up session.
 1c. S01, then its follow-ups (`docs/knowledge/S01.md`) for finished items
 2. Z02, Z03, Z04, W02 (core gameplay)
 3. Z07, Z08, Z05, Z06, W03, W04
-4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, Z19, Z20, Z21, Z22, Z23, W05, S02, L01, then D06
+4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, Z19, Z20, Z21, Z22, Z25, W05, S02, L01, then D06
 5. P02 again with fuller captures, then X01
 6. X02 → user records its scenarios → P02 → X02 again (repeat until the low ratings are gone or not worth a capture)
 
