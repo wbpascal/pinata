@@ -578,6 +578,8 @@ Handler `FUN_00418410`
 |---|---|---|---|
 | 0 | u8 | bIsSkip |  |
 
+**Captured** (P02, `capture-validation.md`; s14): `bIsSkip`: 1 (tester chose skip, 1.34 s after 0x1110)
+
 Handler `FUN_00418cb0`
 
 | Off | Type | Checks in handler | Notes |
@@ -3139,6 +3141,8 @@ Sent from `FUN_0044fae0` (`FUN_0044fae0`) · payload 9 bytes
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | | | (empty) | |
+
+**Captured** (P02, `capture-validation.md`; s14): `(unset)`: one uninitialised byte (0xD5): CSendPacket::ID(…, 0x1110, 1, NULL) (P02-B28); `layout`: captured 1-byte variant; the PDB struct is empty
 
 Sent in reply to `0x7486` NC_GUILD_TOURNAMENT_DB_GET_ACK on CParserCharDB (`FUN_0040eff0`) · payload 14 bytes · raw header
 
@@ -8998,6 +9002,8 @@ session copy not updated (W04-B60)
 | 21 | u8 | len | ≥ 0x81 → 0x200E 0x0F6B |
 | 22 | char[len] | content | then itemLinkDataCount × 0x67 item links |
 
+**Captured** (P02, `capture-validation.md`; s14): `receiver`: Test1235 / X14B; `content`: "x14 whisper B", "X14Nobody" (the second whisper names an online player: 0x200E not reached)
+
 ### `0x2014` NC_ACT_PARTYCHAT_REQ (C→WM)
 
 **Verified layout** (basis: wm FUN_00413510)
@@ -10060,6 +10066,8 @@ size 0x42 + RewardNum
 
 size 0x17 + len + count·0x67. Also sent by Spam_AlertGMs FUN_00432bb0 (gold-spammer alert to GMs) with itemLinkDataCount unwritten (W04-B54), talker = reported character, content = SpamerReport.shn SR_Message
 
+**Captured** (P02, `capture-validation.md`; s14): `talker`: X14B / Test1235; `flag`: 0x54 / 0x04: bit 0 (bIsGM) 0 for both, also for the admin-level-100 GM; bits 1–7 stale (P02-B29)
+
 ### `0x200e` NC_ACT_WHISPERFAIL_ACK (WM→C)
 
 **Verified layout** (basis: wm FUN_0041c610)
@@ -10079,6 +10087,8 @@ size 0x17 + len + count·0x67. Also sent by Spam_AlertGMs FUN_00432bb0 (gold-spa
 | 1 | Name5 | receiver | receiver's stored name |
 | 21 | u8 | len |  |
 | 22 | char[len] | content | then item links |
+
+**Captured** (P02, `capture-validation.md`; s14): `receiver`: stored spelling; `content`: echo
 
 ### `0x2011` NC_ACT_NOTICE_CMD (WM→C)
 
@@ -12177,6 +12187,8 @@ all zones
 | 0 | u16 | zoneHandle | session +0x118 |
 | 2 | u32 | charNo |  |
 
+**Captured** (P02, `capture-validation.md`; s14): `zoneHandle / charNo`: the whisper sender (8001 / 8 and 8000 / 2), on the sender zone's broadcast link W00_WM#2
+
 ### `0x6007` NC_CT_ADD_FRIEND_CMD (WM→Zone)
 
 **Verified layout** (basis: wm FUN_00411600)
@@ -13045,6 +13057,14 @@ size 0x12, not checked
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `nGuideView`: 131, 142 (shop) = the client 0x10DA values
 
+### `0x1112` NC_CHAR_TUTORIAL_MAKE_ITEM_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s14): `nSessionHandle`: WM session 1; `nCreateWorldNo`: 0; `nCharNo`: 8; `nUserNo`: 104; `bIsSkip`: 1 = 0x1111
+
+### `0x1113` NC_CHAR_TUTORIAL_MAKE_ITEM_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s14): `rErrorType`: 0x31E8 ok; `bIsSkip`: echo; WM then runs TutorialLoginProcess (CharDB 0x1004 6 ms later)
+
 ### `0x1114` NC_CHAR_TUTORIAL_INFO_WORLD_CMD (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `TutorialInfo.nTutorialState|nTutorialStep`: 2 / 0 = the 0x0C13 TutorialInfo
@@ -13212,6 +13232,10 @@ size 0x12, not checked
 ### `0x7504` NC_GUILD_EMBLEM_INFO_DB_ACK (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; s37): `PartMask`: 2; `nNumOfEmblem`: 0
+
+### `0x750c` NC_GUILD_EMBLEM_LEVELUP_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; s14): `nCharNo`: 2: after 0x4002 of the `&linkto` save, level 120 ≥ 60 (Z01 §8.4)
 
 ### `0x9427` NC_HOLY_PROMISE_DB_GET_UP_ACK (CharDB→WM)
 

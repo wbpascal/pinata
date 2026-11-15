@@ -3066,6 +3066,100 @@
      ]
     ],
     "notes": "P02 batch 3 (§17.3): the 1-byte payload of an empty request; W03 §11 lists the 0x7456 byte as an observation without a bug ID; not captured: the 0x9804 answer sets the link to state 1 when dAggregationDate is 0"
+   },
+   "0x3467": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_CREATEMUSHROOM_REQ",
+    "basis": "zone ShinePlayer::sp_MakeMiniHouse @ FUN_0043eab0 (Z13 §1.6; buffer offsets −2 = payload); character FUN_00408ba0 (D03 §7.1); pdb2016 PROTO_ITEM_CREATE (0x26)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8001)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "8 (X14B)"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "sp_Item.invenlocklist counter (0 at the first map login)"
+     ],
+     [
+      8,
+      "u32",
+      "owner",
+      "charNo (vt 0x344)"
+     ],
+     [
+      12,
+      "MAPPOS",
+      "map",
+      "player map and position at the map login (RouN 6888, 7045)"
+     ],
+     [
+      32,
+      "u16",
+      "location",
+      "0x3000 | slot: mini-house box 12, slot 0"
+     ],
+     [
+      34,
+      "u64",
+      "createitemregnum",
+      "iti_mkregnum(id, 5, zone, world); the same key goes to GameLog 0x044F"
+     ],
+     [
+      42,
+      "u16",
+      "createitemid",
+      "itemdatabox.idb_specialid.sii_MiniHouse_MushRoom = 31000 House_MushRoom"
+     ],
+     [
+      44,
+      "u16",
+      "attr",
+      "constant 0x002E = 46 = payload offset of the attribute block (written as `end − start − 2`), not a length"
+     ],
+     [
+      46,
+      "bytes",
+      "attributes",
+      "iti_fill2buffer_atrib of the item class ('-o' default): 4 zero bytes for 31000"
+     ]
+    ],
+    "notes": "P02 batch 3 (§18.7): first annotation; evidence capture:s14 (113.363, sent on the first 0x1803 of a new character)"
+   },
+   "0x3468": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_CREATEMUSHROOMSUC_ACK",
+    "basis": "character FUN_00408ba0 (D03 §7.1); zone FUN_0043ee30 → so_ply_MakeMiniHouse FUN_0043f010 (Z05 §9.5)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "echo of 0x3467"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "echo"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "echo of 0x3467 lockindex"
+     ]
+    ],
+    "notes": "P02 batch 3 (§18.7): evidence capture:s14 (113.397, 34 ms after 0x3467, same link W00_CDB#5)"
    }
   }
  },
@@ -4486,6 +4580,104 @@
      "PartMask": "3",
      "RankData.dAggregationDate": "0 → m_bAcademyRankInit = 1, link state 1, no 0x9805",
      "RankData.NumOfEachRankingData": "0"
+    }
+   },
+   "0x200c": {
+    "dir": "C→WM",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "receiver": "Test1235 / X14B",
+     "content": "\"x14 whisper B\", \"X14Nobody\" (the second whisper names an online player: 0x200E not reached)"
+    }
+   },
+   "0x200d": {
+    "dir": "WM→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "talker": "X14B / Test1235",
+     "flag": "0x54 / 0x04: bit 0 (bIsGM) 0 for both, also for the admin-level-100 GM; bits 1–7 stale (P02-B29)"
+    }
+   },
+   "0x200f": {
+    "dir": "WM→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "receiver": "stored spelling",
+     "content": "echo"
+    }
+   },
+   "0x1111": {
+    "dir": "C→S",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "bIsSkip": "1 (tester chose skip, 1.34 s after 0x1110)"
+    }
+   },
+   "0x1110": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "(unset)": "one uninitialised byte (0xD5): CSendPacket::ID(…, 0x1110, 1, NULL) (P02-B28)",
+     "layout": "captured 1-byte variant; the PDB struct is empty"
+    },
+    "layout": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "never written (P02-B28)"
+     ]
+    ]
+   },
+   "0x1112": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "nSessionHandle": "WM session 1",
+     "nCreateWorldNo": "0",
+     "nCharNo": "8",
+     "nUserNo": "104",
+     "bIsSkip": "1 = 0x1111"
+    }
+   },
+   "0x1113": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "rErrorType": "0x31E8 ok",
+     "bIsSkip": "echo; WM then runs TutorialLoginProcess (CharDB 0x1004 6 ms later)"
+    }
+   },
+   "0x6006": {
+    "dir": "WM→Zone",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "zoneHandle / charNo": "the whisper sender (8001 / 8 and 8000 / 2), on the sender zone's broadcast link W00_WM#2"
+    }
+   },
+   "0x750c": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "nCharNo": "2: after 0x4002 of the `&linkto` save, level 120 ≥ 60 (Z01 §8.4)"
     }
    }
   },
@@ -6385,6 +6577,137 @@
      "nError": "0x2940",
      "JackPotPrice": "0",
      "RankNumber": "0 (so D03-B22's trailing rank bytes do not show)"
+    }
+   },
+   "0x1c01": {
+    "dir": "C→S",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "nMyHnd": "own handle (8000 / 8001)",
+     "ReceiveNetCommand": "opcode of the packet that named the unknown handle: 0x201A or 0x2018 (18 requests)",
+     "hnd": "the unknown player / mob handle; answer = its appear packet + last move (+ the requester's 0x1C19 to the object, Z02-B3)"
+    }
+   },
+   "0x1c06": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "handle": "8000 / 8001",
+     "charid": "Test1235 / X14B",
+     "coord": "server position",
+     "mode": "1 normal, 2 combat stance",
+     "chrclass": "11 archer / 16 mage (= shape bits 2–6)",
+     "chartitle": "Type 9, ElementNo 3 = 0x1049 CurrentTitle / Element",
+     "Level": "120 / 1",
+     "nKQTeamType": "2 = 0x583A",
+     "size": "235 bytes (0xEB) in all 544"
+    }
+   },
+   "0x2021": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "handle": "sender (8001)",
+     "emoticonid": "7, 9, 10, 23–26 (ActionViewInfo stand, laugh, cry, dances); also sent to the sender itself (includeSelf 1)"
+    }
+   },
+   "0x2025": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "handle": "jumper (8001); not to the jumper itself (includeSelf 0)"
+    }
+   },
+   "0x2009": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "handle": "8001",
+     "mode": "2 (combat stance); not to the sender"
+    }
+   },
+   "0x201f": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "speaker": "Test1235",
+     "flag": "0x78 / 0x74: bit 0 GMColor 0, bit 1 isMob 0, bits 2–7 stale gpp byte (P02-B29)",
+     "content": "echo of 0x201E, also to the shouter"
+    }
+   },
+   "0x201e": {
+    "dir": "C→S",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "content": "\"shout\", \"x14 shout A\" (level 120: relayed); \"test\" (level 1: dropped silently)"
+    }
+   },
+   "0x2020": {
+    "dir": "C→S",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "emoticonid": "7 stand, 9 laugh, 10 cry, 23–26 dances"
+    }
+   },
+   "0x2449": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "attacker / defender": "B (8001) ↔ Slime 5375, both directions",
+     "resthp": "defender HP after the hit",
+     "damageindex": "= the 0x2447 of the same swing"
+    }
+   },
+   "0x244f": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "caster": "8001",
+     "skill": "6000 (mage basic skill)",
+     "targetobj": "5375",
+     "index": "1, 2, 3 = 0x244E index of the caster"
+    }
+   },
+   "0x1809": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "mapIndex": "150 = MapInfo RouN",
+     "x / y": "4975, 5825 (BlockingDistribute free spot for `&linkto` without arguments)"
+    }
+   },
+   "0x044f": {
+    "dir": "Zone/WM/Character→GameLog",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "chrregnum / itemmaker": "8 / 8",
+     "itemkey": "= 0x3467 createitemregnum",
+     "itemid": "31000",
+     "iteminvento": "0x3000; sent by the Character server after 0x3468"
     }
    }
   },

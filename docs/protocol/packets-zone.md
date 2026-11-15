@@ -421,6 +421,8 @@ Handler `FUN_0055b430`
 | 2 | u16 | ReceiveNetCommand | opcode of the packet that named the unknown handle |
 | 4 | u16 | hnd | handle the client does not know |
 
+**Captured** (P02, `capture-validation.md`; s14): `nMyHnd`: own handle (8000 / 8001); `ReceiveNetCommand`: opcode of the packet that named the unknown handle: 0x201A or 0x2018 (18 requests); `hnd`: the unknown player / mob handle; answer = its appear packet + last move (+ the requester's 0x1C19 to the object, Z02-B3)
+
 Handler `FUN_0043e460`
 
 | Off | Type | Checks in handler | Notes |
@@ -612,6 +614,8 @@ Handler `FUN_004c4910`
 | 1 | u8 | len |  |
 | 2 | char[len] | content | followed by itemLinkDataCount × 0x67-byte item links |
 
+**Captured** (P02, `capture-validation.md`; s14): `content`: "shout", "x14 shout A" (level 120: relayed); "test" (level 1: dropped silently)
+
 Handler `FUN_00458e80`
 
 | Off | Type | Checks in handler | Notes |
@@ -626,6 +630,8 @@ Handler `FUN_00458e80`
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | emoticonid | ActionViewInfo.nIndex; CHARGED (type 2) rows refused |
+
+**Captured** (P02, `capture-validation.md`; s14): `emoticonid`: 7 stand, 9 laugh, 10 cry, 23–26 dances
 
 Handler `FUN_00458740`
 
@@ -3730,6 +3736,8 @@ Sent in reply to `0x2005` NC_ACT_RUN_REQ on ShineObjectClass::ShinePlayer (`FUN_
 | 0 | u16 | handle |  |
 | 2 | u8 | mode |  |
 
+**Captured** (P02, `capture-validation.md`; s14): `handle`: 8001; `mode`: 2 (combat stance); not to the sender
+
 Sent in reply to `0x2008` NC_ACT_CHANGEMODE_REQ on ShineObjectClass::ShinePlayer (`FUN_00457560`, ShineObjectClass::ShinePlayer::sp_NC_ACT_CHANGEMODE_REQ) · payload 3 bytes
 
 | Off | Type | Value / source |
@@ -3887,6 +3895,8 @@ Sent from `ShineObjectClass::ShinePlayer::InteractWithNPC` (`FUN_004c4660`) · p
 | 22 | u8 | len |  |
 | 23 | u8[len] | content | variable length |
 
+**Captured** (P02, `capture-validation.md`; s14): `speaker`: Test1235; `flag`: 0x78 / 0x74: bit 0 GMColor 0, bit 1 isMob 0, bits 2–7 stale gpp byte (P02-B29); `content`: echo of 0x201E, also to the shouter
+
 Sent from `ShineObjectClass::ShineMobileObject::smo_Shout` (`FUN_00459080`) · payload variable (iVar1)
 
 | Off | Type | Value / source |
@@ -3932,6 +3942,8 @@ Sent from `FUN_005e5150` (`FUN_005e5150`) · payload variable (byte)
 | 0 | u16 | handle |  |
 | 2 | u8 | emoticonid |  |
 
+**Captured** (P02, `capture-validation.md`; s14): `handle`: sender (8001); `emoticonid`: 7, 9, 10, 23–26 (ActionViewInfo stand, laugh, cry, dances); also sent to the sender itself (includeSelf 1)
+
 Sent from `ShineObjectClass::ShinePlayer::sp_DoEmotion` (`FUN_00458860`) · payload 3 bytes
 
 | Off | Type | Value / source |
@@ -3964,6 +3976,8 @@ Sent in reply to `0x2022` NC_ACT_EMOTICONSTOP_CMD on ShineObjectClass::ShinePlay
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | handle |  |
+
+**Captured** (P02, `capture-validation.md`; s14): `handle`: jumper (8001); not to the jumper itself (includeSelf 0)
 
 Sent in reply to `0x2024` NC_ACT_JUMP_CMD on ShineObjectClass::ShinePlayer (`FUN_0045a250`, ShineObjectClass::ShinePlayer::sp_NC_ACT_JUMP_CMD) · payload 2 bytes
 
@@ -5265,6 +5279,8 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`
 
 broadcast to sight except attacker and defender; carries no damage number
 
+**Captured** (P02, `capture-validation.md`; s14): `attacker / defender`: B (8001) ↔ Slime 5375, both directions; `resthp`: defender HP after the hit; `damageindex`: = the 0x2447 of the same swing
+
 Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`) · payload 13 bytes
 
 | Off | Type | Value / source |
@@ -5357,6 +5373,8 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 | 2 | u16 | skill |  |
 | 4 | u16 | targetobj |  |
 | 6 | u16 | index |  |
+
+**Captured** (P02, `capture-validation.md`; s14): `caster`: 8001; `skill`: 6000 (mage basic skill); `targetobj`: 5375; `index`: 1, 2, 3 = 0x244E index of the caster
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_0057bef0`) · payload 8 bytes
 
@@ -11366,6 +11384,8 @@ PROTO_NC_MISC_SERVERPARAMETER_ACK, the alias at this opcode value (C02 §2); 3 b
 
 Z01 name was 'link inside the same zone (ours)'
 
+**Captured** (P02, `capture-validation.md`; s14): `mapIndex`: 150 = MapInfo RouN; `x / y`: 4975, 5825 (BlockingDistribute free spot for `&linkto` without arguments)
+
 ### `0x1812` NC_MAP_FREEPKZONE_ON_CMD (S→C)
 
 **Verified layout** (basis: zone cSetFreeBattle FUN_005ebfe0 (AxialListProtocolSend 6/0x12); client FUN_004b4eb0)
@@ -15586,6 +15606,10 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; shop): `iteminvenfrom`: inventory; `iteminvento`: account storage 0x1800–0x1802; `guildregnum`: 0
 
+### `0x044f` NC_LOG_GAME_ITEM_CREATE (Zone/WM/Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s14): `chrregnum / itemmaker`: 8 / 8; `itemkey`: = 0x3467 createitemregnum; `itemid`: 31000; `iteminvento`: 0x3000; sent by the Character server after 0x3468
+
 ### `0x0c18` NC_USER_NORMALLOGOUT_CMD (C→S)
 
 **Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `LogoutType`: 0, 10.04 s after 0x1071
@@ -15625,6 +15649,10 @@ Z01 name was 'map login done (ours)'
 ### `0x111f` NC_CHAR_ZONE_CHAT_COLOR_CMD (WM→Z)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nChatFontColorID`: 0; `nChatBalloonColorID`: 0
+
+### `0x1c06` NC_BRIEFINFO_LOGINCHARACTER_CMD (S→C)
+
+**Captured** (P02, `capture-validation.md`; s14): `handle`: 8000 / 8001; `charid`: Test1235 / X14B; `coord`: server position; `mode`: 1 normal, 2 combat stance; `chrclass`: 11 archer / 16 mage (= shape bits 2–6); `chartitle`: Type 9, ElementNo 3 = 0x1049 CurrentTitle / Element; `Level`: 120 / 1; `nKQTeamType`: 2 = 0x583A; `size`: 235 bytes (0xEB) in all 544
 
 ### `0x1c08` NC_BRIEFINFO_REGENMOB_CMD (S→C)
 

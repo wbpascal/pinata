@@ -2138,6 +2138,204 @@ The 0x0804 / 0x0805 heartbeats of the new links run as in §7.1. After this part
 packets** (was 28) and `s21d` with 2 (0x3401 / 0x3402, part 19); `pcap_decode.py --selftest` has a case for the nested
 element type.
 
+## 18. Second client in sight, batch 3 (`s14`) *(captured)*
+
+Scenario 14 (`capture-scenarios.md` §3.14). Client A = `admin` / Test1235 (level 120 archer, admin level 100, zone
+handle 8000, WM session 0), client B = `testaccountB`, which creates the mage `X14B` (`chrregnum` 8, handle 8001, WM
+session 1). Both clients run on 172.16.42.231 and use zone 9210. The notes give no times, so the times below are
+capture seconds. Code: Z02 §2–§5, Z09 §9.6 / §11.4, Z11 §3.1, Z01 §3.2 / §8.4, W01 §4.2, W04 §2.1, Z13 §1.6, D03 §7.1.
+`s14` decodes with **0 issue packets** after this part (the 0x1110 byte was the only one, §18.7).
+
+### 18.1 What happened
+
+| t (s) | Event | On the wire |
+|---|---|---|
+| 8.9–52.4 | A logs in, map login at RouN 6443, 9850 | batch-1 burst (§5.1) |
+| 82.0–92.2 | B logs in, creates X14B | 0x1401 → CharDB 0x1402 / 0x1405, AccDB 0x140D, GameLog 0x0411 / 0xC804, client 0x1406 (as in §16, `s37`) |
+| 105.1–107.1 | B selects the character, tutorial popup, skip | §18.7 |
+| 107.1–113.4 | B's map login at RouN 6888, 7045 | §5.1 burst, plus the mushroom house (§18.7) |
+| 151.4–154.5 | B jumps 6 × out of A's sight | 6 × C 0x2024, no 0x2025 to anyone |
+| 156.75 | B runs north into A's sight | 0x1C06 both ways (§18.2) |
+| 183.1–209.0 | B emotes 7 ×, jumps once | §18.3 |
+| 237.9–325.2 | shouts and whispers | §18.4 |
+| 305.3–381.6 | A targets B; B fights Slime 5375, 3 × Magic Missile, the slime dies | §18.5 |
+| 392.5–506.3 | A: `&hide`, `&show`, `&dimensio 1` (typo), `&dimension 1`, `&dimension -1` × 2, `&dimension 70000`, `&dimension 0`, `&linkto` | §18.6 |
+| 549.1 | capture ends (no logout in the file) | – |
+
+### 18.2 Entering sight, 0x1C06 and 0x1C01
+
+- **B walks in.** At 156.753 the zone sends B `0x1C06 NC_BRIEFINFO_LOGINCHARACTER_CMD` for A, then `0x1C19` with A's
+  6 abstates. A gets the same two packets for B 33 ms later, from the same exchanger call (B's last `0x2019` put
+  B ≈ 1 534 units from A; `MapInfo.Sight` of RouN is 1600). After that, B's moves reach A as `0x201A` (95 ×) and
+  `0x2013` (16 ×). **Confirms** Z09 §9.6 (`AxialListBriefExchangerAtMove::ali_Work` @ FUN_004bdde0: appear packet
+  plus abstate list, both directions) and the 1600 radius of §6.1.
+- **0x1C07 never seen.** No map login of the capture (B at 113.4, A at 506.4) had another player in sight, so
+  `bixc_Send` (Z02 §5.2) had nothing to batch. Status **never seen**.
+- **0x1C06 layout** (pdb2016, 0xEB = 235 bytes in all 544): `charid`, `coord` (server position), `mode` (1 / 2),
+  `chrclass` 11 / 16 (= bits 2–6 of the shape byte), `Level` 120 / 1, `chartitle` {9, 3, 0} = A's `0x1049`,
+  `nKQTeamType` 2 = `0x583A`, `abstatebit` with the bits of A's abstates. **Confirmed** field by field (Z02 §1).
+- **0x1C01 NC_BRIEFINFO_INFORM_CMD** (18 ×, `{nMyHnd, ReceiveNetCommand, hnd}`): the client sends it when a
+  `0x201A` / `0x2018` names a handle it does not know (`ReceiveNetCommand` = 0x201A or 0x2018). Every request got the
+  object's appear packet (0x1C06 for players, 0x1C08 for mobs) followed by its last move, within 3–20 ms.
+  **Confirms** Z02 §5.1 and C01's `GetCharByHandle` path. In both player cases (416.915 B asks for A; 493.847 A asks
+  for B), the requester's `0x1C19` goes to the **other** player (A gets B's list at 416.929; B gets A's 6 abstates at
+  493.861), and the requester gets no abstate list. **Confirms Z02-B3 on the wire.**
+
+### 18.3 Moves, emotes, jumps, stance
+
+- B only **ran** (`0x2019` 216 ×, no `0x2017`). A got B's runs as `0x201A {handle, from, to, speed 127,
+  moveattr}` and B's stops as `0x2013`, so walking (`0x2018` from a player) is not in this capture. The notes'
+  "sat" has no packet: B sent `0x2020 {7}` (ActionViewInfo `stand`), and no `0x2020 {6}` (sit) appears.
+- **Emotes** `0x2020 {emoticonid}` 7, 9, 10, 25, 26, 23, 24 (stand, laugh, cry, Dance 2–5): every one comes back to B
+  itself 6–20 ms before it reaches A, because `sp_DoEmotion` @ FUN_00458860 broadcasts with `includeSelf` 1. B never
+  sent `0x2022`, so `0x2022` / `0x2023` (stop emote) are **never seen**.
+- **Jump** `0x2024` (no payload): only the jump in sight (193.435) produced `0x2025 {handle 8001}`, to A only
+  (`includeSelf` 0, FUN_0045a250). **Stance** `0x2008 {2}` → A `0x2009 {8001, 2}` (351.361), not echoed to B
+  (FUN_00457560). **Confirms** Z02 §2.4, §2.5, §4.
+
+### 18.4 Chat: shout and whisper
+
+- **Shout.** B (level 1) sent `0x201E "test"` (237.918), and nobody got a `0x201F`. A (level 120) shouted twice, 36 s
+  apart, and both lines went to A **and** B as `0x201F {speaker "Test1235", flag, len, content}`. **Confirms** Z02 §3.2:
+  the level check fails silently (so `g_ShoutLevel` is between 1 and 119 *(inferred)*; 0x0830 is not in the capture),
+  and `so_AllInMap(…, includeSelf 1)` echoes the line to the shouter. B was in A's sight both times, so the "whole map,
+  also out of sight" part is not tested. The `flag` byte was 0x78, then 0x74: `smo_Shout` @ FUN_00459080 clears bit 1
+  and writes bit 0 (`vt 0xef4` GM colour, 0 for A), and leaves bits 2–7 as the shared buffer `gpp` held them
+  (original bug) P02-B29. The client (`On_NC_ACT_SOMEONESHOUT_CMD` @ FUN_004a0ec0) tests only bits 0 and 1.
+- **Whisper.** B → WM `0x200C {receiver "Test1235", "x14 whisper B"}` (298.517). 11 ms later the WM sent A
+  `0x200D {talker "X14B", flag 0x54, …}`, B `0x200F` (echo), and the sender's zone `0x6006 NC_CT_CHARTTING_CMD
+  {zoneHandle 8001, charNo 8}`, all in the same ms; `0x6006` went on the zone's broadcast link W00_WM#2. A → `0x200C {receiver
+  "X14B", content "X14Nobody"}` (325.162) is an ordinary whisper to B: `0x200D {talker "Test1235", flag 0x04}`,
+  `0x200F`, `0x6006 {8000, 2}`. The notes' "A whispered X14Nobody" put the name in the text. So `0x200E
+  NC_ACT_WHISPERFAIL_ACK` (unknown name) is **never seen**. **Confirms** W04 §2.1 (order, fields, `0x6006`). The flag's bit 0
+  (`bIsGM`) is 0 for both, even for A with admin level 100: the WM's GM bit is not the zone admin level. Bits 1–7
+  (0x54, 0x04) are stale stack bits as W04 §2.1 says, with no bug ID there; they are added to P02-B29.
+
+### 18.5 Combat seen by a third player
+
+B hit Slime 5375 next to A (351.3–358.8), then cast skill 6000 three times (366.6, 368.8, 371.1); the slime died at
+381.576.
+
+- A (bystander) got `0x2447 SWING_START` for both directions, **`0x2449 NC_BAT_SOMEONESWING_DAMAGE_CMD`** (13 bytes:
+  `{attacker, defender, flag, resthp, hpchangeorder, damageindex, attacksequence}`, 14 ×, the same `damageindex` as
+  the `0x2447`), **`0x244F NC_BAT_SOMEONESKILLBASH_HIT_OBJ_START_CMD {caster 8001, skill 6000, targetobj 5375, index
+  1..3}`** 14–35 ms after B's own `0x244E` / `0x2435`, and the same `0x2457` blast / `0x2452` damage as B. B got none
+  of the `SOMEONE` forms. **Confirms** Z03 §3 / §5 ("to sight, not o"). `0x242E` and `0x2438` (named in the scenario's
+  prediction) did not occur: no other skill path was used.
+- A had B targeted (305.262), so A got `0x2402` twice per change: `order 0` for B and `order 1` for B's target (A
+  itself at first, then 5375, then `65535` at 348.546 when B dropped its target). This is the batch-2 pattern (§9.7)
+  seen from a third player.
+- The slime's drop `0x1C0A {handle 10500, itemid 3001 LowMeat}` reached B with `attr 8` and A with `attr 0` (371.582).
+  At 391.549 (+20.0 s) both got it again with `attr 8`, and at 431.656 (+60.07 s) B got `0x1805 {10500}`. A, in another
+  layer by then (§18.6), got no `0x1805`. **Confirms** Z09 §11.4 (owner-only time, then a re-broadcast with fresh
+  pickable bits, `so_Routine` vanish, the first handle of the 10500 pool), with the times 20 s / 60 s.
+- Mob chat `0x2002` from handle 5375 reached both players (sight broadcast, Z09 §8.6).
+
+### 18.6 GM visibility: `&hide`, `&show`, `&dimension`, `&linkto`
+
+| t (s) | A's command | A got | B got | Matches |
+|---|---|---|---|---|
+| 392.450 | `&hide` | `0x242A {288 STA_GMHIDEMODE, keepTime 4 200 000 000}` | `0x1805 {8000}` (16 ms) | Z11 §3.1: `so_Logout` + abstate inform (the NOEFFECT form `0x242A`) |
+| 405.082 | `&show` | `0x2428 {8000, 288}` | `0x2428 {8000, 288}`, nothing else | V24: no appear broadcast. B gets the reset for a handle its client no longer knows |
+| 409.232 | (B steps) | B's `0x201A` | nothing | the exchanger skips A: A is within sight of B's old position |
+| 416.894 | (A steps) | – | A's `0x201A` → B `0x1C01 {8000, 0x201A}` → `0x1C06` + `0x201A` | B sees A again only after **A** moves. The notes say "after B stepped": B's own step did nothing |
+| 428.574 | `&dimensio 1` | `0x2011 "Invalid command : &dimensio"` (10 ms) | nothing | Z02 §3.3 (no element took the word, admin level ≠ 0) |
+| 431.166 | `&dimension 1` | – | `0x1805 {8000}` | `so_Logout` while A's `l_Main` was still 0 |
+| 431.2–451.4 | (both move) | **appear + delete storm** (below) | **storm** | (original bug) P02-B27 |
+| 451.474 | `&dimension -1` | nothing | **no** `0x1805` | logout broadcast filtered: A's `l_Main` 1 ≠ B's 0 |
+| 456.960 | `&dimension -1` | – | `0x1805 {8000}` | `l_Main` −1 passes the "either is −1" rule of `AxialListPacketBroadcast` (Z01 §3.2) |
+| 457–473 | (both move) | storm, **plus** B's ordinary `0x201A` / `0x2013` broadcasts (16 + 2) | storm | −1 = receives every layer's broadcasts |
+| 473.194 | `&dimension 70000` | – | `0x1805 {8000}` | sent while A was at −1; no range check (V24) |
+| 492.149 | `&dimension 0` | nothing | **no** `0x1805`, no `0x1C06` | logout filtered (70000 ≠ 0); the command does not re-enter the map (V24) |
+| 493.821 | (B steps) | B's `0x201A` → A `0x1C01` → `0x1C06` + `0x201A` | only A's `0x1C19` (Z02-B3) | A sees B again; B gets **no** appear packet for A (the notes say B saw A after stepping; the wire disagrees) |
+| 506.256 | `&linkto` (no argument) | `0x1809 NC_MAP_LINKSAME_CMD {mapIndex 150, x 4975, y 5825}`, then the A-side burst of §10.2 | `0x1805 {8000}` | Z11 §3.1 (`bd_FindEmptyCoord`), Z01 §7.1. 150 = MapInfo `RouN` |
+
+**The storm (P02-B27).** `ac_Dimension` @ FUN_0041a5a0 runs `so_Logout(gm)`, then
+`**(int **)(gm+0x76) = ac_Scanf(arg)`: it writes `so_layer.layer→l_Main` (`SubLayer::Layer`, pdb2016) and nothing else.
+The two sight workers compare that layer in different ways:
+
+- `so_AllOfRangeNomal` @ FUN_0054c900 picks the objects by `so_slantedlist.LayerRegistInfo.LayerRegNumberUnion`
+  (the tutorial / char-number layer, which `&dimension` leaves unchanged) or `nViewType`. So the GM stays in every
+  range query of its map.
+- `so_DistanceSquar(obj)` @ FUN_004028f0 returns 999 999 999 when the two `l_Main` differ.
+
+So for every server step of any mobile object within the sight range of the GM (`mm_Step` → `smo_NewObjBriefInfoChange` /
+`smo_OldObjectDelete`), both workers see "out of sight": `AxialListBriefExchangerAtMove::ali_Work` @ FUN_004bdde0
+sends the appear packet (`0x1C06` / `0x1C08` + the last move + `0x1C19`) both ways, and `AxialListBriefDeleteAtMove::ali_Work`
+@ FUN_004bdfe0 sends `0x1C0E` both ways right after it. Captured: 136 such pairs to each player in 431–451 s, 93 in
+457–473 s, 40 in 473–492 s, each pair 3 per server step. For the mobs around A: 1 995 `0x1C08`, 1 292 `0x1C0E` and
+940 `0x2018` in 20 s, **374 KB to A in 20 s** against about 7 KB in the 236 s before. When A asks with `0x1C01` for such a
+mob, the mob's appear packet is followed by the next delete in the same tick. The visible result is right (B never
+keeps A; A never keeps B), but every object that moves near the GM costs both clients an appear + delete per step.
+Plain broadcasts (`0x201A`, `0x2013`, logout `0x1805`) use `AxialListPacketBroadcast`'s `l_Main` test and are
+filtered correctly: in the dimension-1 and 70000 windows no ordinary `0x201A` crossed between A and B, only the resent
+last move inside each appear. With `&dimension 0` the storm stops (`l_Main` equal again).
+
+**Corrections / extensions.** Z11 §3.1 "objects of another main layer do not see each other" *(inferred)* holds for
+broadcasts only. Brief info is exchanged and deleted again on every step (P02-B27). `-1` is a wildcard for
+broadcasts (the GM hears all layers) but not for `so_DistanceSquar`. The V24 predictions hold: no appear broadcast on `&show`, no range test (−1,
+70000 accepted), no re-entry on `&dimension 0`.
+
+### 18.7 New character: tutorial popup and the mushroom house
+
+- **Tutorial popup.** `0x1001 {slot 0}` (105.099) → WM `0x1110 NC_CHAR_TUTORIAL_POPUP_REQ` 6 ms later, with **one
+  byte** (0xD5): `CParserClient::fc_NC_CHAR_LOGIN_REQ` @ FUN_00422be0 calls `CSendPacket::ID(&p, 0x1110, 1, NULL)`
+  (the same pattern as P02-B2) (original bug) P02-B28. W01 §4.2 says "(empty)". The client reads no payload (C01). B
+  answered `0x1111 {bIsSkip 1}` after 1.34 s. The WM sent CharDB `0x1112 {nSessionHandle 1, nCreateWorldNo 0, nCharNo 8,
+  nUserNo 104, bIsSkip 1}` (4 ms), and CharDB answered `0x1113 {1, 8, rErrorType 0x31E8, bIsSkip 1}` (25 ms). 6 ms
+  later the WM sent `0x1004`, so `TutorialLoginProcess` follows the normal 0x1001 path (W01 §6.2). No `0x111D` was sent (skip = 1). The
+  character blob then carried `0x1114 {nTutorialState 2, nTutorialStep 0}`, and the zone got `0x1115` with the same
+  values. **Confirms** W01 §4.2 / §6.2 and D02 §8 (0x1112 / 0x1113 layout). `0x1003` reached the client at 107.092,
+  1.99 s after `0x1001` (most of it the popup wait).
+- **Mushroom house.** On B's first `0x1803` (113.352), the zone sent CharDB `0x3467 NC_ITEMDB_CREATEMUSHROOM_REQ` on
+  W00_CDB#5 in the same ms as the §10.2 requests. Layout (first annotation, `annotations/P02.json`): `{ref, lockindex 0,
+  owner 8, MAPPOS {RouN, 6888, 7045}, location 0x3000, key, itemid 31000 House_MushRoom, attr 0x002E, attributes[4] = 0}`.
+  The u16 before the attributes is the constant 46, the payload offset of the attribute block
+  (`sp_MakeMiniHouse` @ FUN_0043eab0 writes `end − start − 2`), not a length (Z13 §1.6 calls it `attrLen`). Then
+  `0x3468 {ref, lockindex}` came back (34 ms), the Character server logged GameLog `0x044F {8, 8, key, 31000, 0x3000}`
+  on W00_GLDB#1, and the client got `0x3001 NC_ITEM_CELLCHANGE_CMD {0x3000, 0x3000, 31000, attributes 0}` (13 ms).
+  At the next per-minute block (WM `0x0821`, 121.398), the zone wrote the house's attribute with ItemDB `0x3449
+  {lockindex 1, key, 31000, attribute ffecbb76}` → `0x344A {err 0x0901}`. At the same time the client got
+  `0x9010 NC_CHARGED_BOOTHSLOTSIZE_CMD {size 5}` (it was 0 at the map login) and a second `0x3001` with the new
+  attribute. **Confirms** Z13 §1.6, Z05 §9.5, D03 §7.1. A, who already owns 31000, got `0x9010 {5}` in its login burst.
+- **0x750C NC_GUILD_EMBLEM_LEVELUP_CMD {nCharNo 2}**, zone → WM W00_WM#10, 5 ms after CharDB's `0x4002` of A's
+  `&linkto` save (506.357 → 506.362). **Confirms** Z01 §8.4 (level ≥ 60 → `0x750C`) and W03 §3.11 (the WM handler).
+
+### 18.8 Opcodes
+
+Batch 1–2 opcodes recur unchanged (create: §16.4; map login and in-world: §5.2, §6.2, §8.2, §9.7, §10.8). New types:
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| C→S | 0x1C01 | NC_BRIEFINFO_INFORM_CMD | 18 | 6 | confirmed | §18.2; Z02-B3 captured |
+| S→C | 0x1C06 | NC_BRIEFINFO_LOGINCHARACTER_CMD | 544 | 235 | confirmed | 2 by sight, 2 on request, 540 in the P02-B27 storm |
+| S→C | 0x1C07 | NC_BRIEFINFO_CHARACTER_CMD | 0 | – | never seen | no player in sight at a map login |
+| C→S / S→C | 0x2024 / 0x2025 | NC_ACT_JUMP_CMD / NC_ACT_SOMEEONEJUMP_CMD | 7 / 1 | 0 / 2 | confirmed | not to the jumper |
+| C→S / S→C | 0x2020 / 0x2021 | NC_ACT_EMOTICON_CMD / NC_ACT_SOMEONEEMOTICON_CMD | 7 / 14 | 1 / 3 | confirmed | also to the sender |
+| C→S / S→C | 0x2022 / 0x2023 | NC_ACT_EMOTICONSTOP_CMD / …SOMEONEEMOTICONSTOP_CMD | 0 | – | never seen | no emote stop |
+| S→C | 0x2009 | NC_ACT_SOMEONECHANGEMODE_CMD | 1 | 3 | confirmed | `{8001, 2}`, not to the sender |
+| C→S | 0x201E | NC_ACT_SHOUT_CMD | 3 | 6–13 | confirmed | level-1 shout dropped silently |
+| S→C | 0x201F | NC_ACT_SOMEONESHOUT_CMD | 4 | 28 / 34 | **corrected** (flag) | bits 2–7 stale (P02-B29); also to the shouter |
+| C→WM | 0x200C | NC_ACT_WHISPER_REQ | 2 | 31 / 35 | confirmed | §18.4 |
+| WM→C | 0x200D | NC_ACT_SOMEONEWHISPER_CMD | 2 | 32 / 36 | confirmed | flag bit 0 = 0 for the admin too |
+| WM→C | 0x200F | NC_ACT_WHISPERSUCCESS_ACK | 2 | 31 / 35 | confirmed | same ms as 0x200D |
+| WM→C | 0x200E | NC_ACT_WHISPERFAIL_ACK | 0 | – | never seen | the "unknown name" step named an online player |
+| WM→Zone | 0x6006 | NC_CT_CHARTTING_CMD | 2 | 6 | confirmed | sender's zone handle / charNo, broadcast link |
+| S→C | 0x2449 | NC_BAT_SOMEONESWING_DAMAGE_CMD | 14 | 13 | confirmed | bystander form, both directions |
+| S→C | 0x244F | NC_BAT_SOMEONESKILLBASH_HIT_OBJ_START_CMD | 3 | 8 | confirmed | bystander form of 0x244E |
+| S→C | 0x1809 | NC_MAP_LINKSAME_CMD | 1 | 10 | confirmed | `{150, 4975, 5825}` |
+| WM→C | 0x1110 | NC_CHAR_TUTORIAL_POPUP_REQ | 1 | 1 | **corrected** (size) | 1 unwritten byte (P02-B28); was the capture's only decoder issue |
+| C→WM | 0x1111 | NC_CHAR_TUTORIAL_POPUP_ACK | 1 | 1 | confirmed | `bIsSkip 1` |
+| WM→CharDB | 0x1112 | NC_CHAR_TUTORIAL_MAKE_ITEM_REQ | 1 | 12 | confirmed | D02 §8 |
+| CharDB→WM | 0x1113 | NC_CHAR_TUTORIAL_MAKE_ITEM_ACK | 1 | 9 | confirmed | `0x31E8` ok |
+| Zone→CharDB | 0x3467 | NC_ITEMDB_CREATEMUSHROOM_REQ | 1 | 50 | confirmed, **first layout** | `attr` = constant offset 46 (§18.7) |
+| CharDB→Zone | 0x3468 | NC_ITEMDB_CREATEMUSHROOMSUC_ACK | 1 | 8 | confirmed, **first layout** | `{ref, lockindex}` |
+| Character→GameLog | 0x044F | NC_LOG_GAME_ITEM_CREATE | 1 | 20 | confirmed | D03 §7.1 |
+| Zone→WM | 0x750C | NC_GUILD_EMBLEM_LEVELUP_CMD | 1 | 4 | confirmed | after 0x4002, level 120 |
+| WM→CharDB, CharDB→WM, WM→AccountDB, WM→GameLog | 0x1402, 0x1405, 0x140D, 0x0411, 0xC804 | (character create) | 1 each | 33, 133, 50, 4, 9 | confirmed | as in §16.4 (`s37`); 0x140D +0x1E..+0x30 again stale (P02-B24), partly other values (`… 00 70 9e … 00 72 00 …`) |
+
+The 0x1C08 / 0x1C0E / 0x2018 counts of this capture (3 255 / 2 736 / 2 072) are mostly the P02-B27 storm (§18.6).
+
 ## 11. Message order against README §2 and the pseudocode
 
 README §2 is a sketch of the login → WM → zone chain. Against the seven captures (details in the sections cited;
@@ -2211,6 +2409,9 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B24 | WM `fc_NC_AVATAR_CREATEDATASUC_ACK` @ FUN_004113c0 → AccountDB 0x140D | `sCharName` is `char[40]` *(pdb2016)*; the WM writes 20 name bytes and one zero byte, bytes +0x1E..+0x30 are stack residue (§16.3) | 19 stale WM bytes per character creation on the AccountDB link; the Account server drops 0x140D unread, so no effect | copy the name into a zeroed 40-byte field |
 | P02-B25 | shared `CSocket_Acceptor::SetAccepted` @ FUN_00463c40 (S02 §1.4), WM zone listener; the same class serves the WM client listener and Login / Zone (S02 §1.9) | refuses and closes a socket while another one from the same IPv4 address waits in the accepted ring; the ring is drained once per main pass (§17.4) | every zone start loses its 2nd and 4th WM link (8 of 16 in both captures) and reconnects them 26–29 s later, half again refused, 20 s more; a zone runs ≈ 30 s on 2 links and ≈ 50 s until it has 4; two clients behind one NAT address that connect within one pass lose the second connection | exempt server listeners, or compare address and port, or drain the ring in the accept thread |
 | P02-B26 | WM `CWMZoneSessionManager::SetServiceMapZoneNo` @ FUN_004391d0 (zone 0x180F, W01 §7.1 `Zones_AddMap`) | a new map entry stores `Vaild`, name, `ZoneNo` and `CanParty` but not `IsReleaseMap`; only the update path (a second registration of the same map) stores all three (§17.4) | masked: every zone registers its maps on each link that registers (2–4 times), so the flag is set one 0x180F later; a zone left with a single WM link would keep `IsPartyReleaseMap` 0 for all its maps (no leave-party on entering `Job*_Dn*`, `Wedding`, `Rou00`… after a fresh WM start) | store `IsReleaseMap` in the new-entry path too |
+| P02-B27 | zone `AmpersandCommand::ac_Dimension` @ FUN_0041a5a0 (Z11 §3.1) with the sight workers `AxialListBriefExchangerAtMove::ali_Work` @ FUN_004bdde0 / `AxialListBriefDeleteAtMove::ali_Work` @ FUN_004bdfe0 (Z09 §9.6) | `&dimension n` writes only `so_layer.layer→l_Main`; `so_AllOfRangeNomal` @ FUN_0054c900 still selects the GM by the unchanged `LayerRegistInfo`, while `so_DistanceSquar` @ FUN_004028f0 returns 999 999 999 across `l_Main` values, so both workers fire on every step (§18.6) | while a GM is in another dimension, every server step of a player or mob within sight sends an appear packet (+ last move + abstates) and a 0x1C0E both ways: 374 KB to the GM in 20 s near a mob group, 136 appear / delete pairs to the other player | set the slanted-list layer as well (or test `l_Main` in the range query), and re-enter the map (`so_ExchageBriefInfo`) after the change |
+| P02-B28 | WM `CParserClient::fc_NC_CHAR_LOGIN_REQ` @ FUN_00422be0 → client 0x1110 (W01 §4.2) | `CSendPacket::ID(&p, 0x1110, 1, NULL)` declares a 1-byte payload and writes none (§18.7) | one stale WM byte (0xD5) in every tutorial popup; the client reads no payload | payload size 0 (PROTO struct empty), as P02-B2 |
+| P02-B29 | zone `ShineMobileObject::so_Shout` @ FUN_00459080 → 0x201F (Z02 §3.2); WM whisper 0x200D (W04 §2.1) | `smo_Shout` writes only bits 0 / 1 of `flag`; bits 2–7 keep the shared buffer `gpp` byte (0x78, 0x74 captured). The WM's 0x200D flag has bits 1–7 from the stack (0x54, 0x04; W04 states it without an ID) (§18.4) | stale bits on the wire; both clients test only bits 0 / 1, so no visible effect | write the whole byte (`flag = GMColor + (isMob << 1)`) |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -2233,6 +2434,8 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | Z30-B8 | 0x7446 payload byte 0x11 in all 8 = the preceding 0xA419 `nMapCount` (17) left in `gpp` | §17.4 |
 | Z09-B72 | 0x207D `sScriptMsgIndex` "E_Olympic_A04" + 18 heap bytes, different per start | §17.4 |
 | W04-B43 | WM → CharDB 0xA41A once per WM start, no answer | §17.4 |
+| Z02-B3 | `s14` 416.929 / 493.861: after a player's 0x1C01 for the other player, the requester's 0x1C19 goes to the other player; the requester gets none | §18.2 |
+| W04 (0x200D flag, no ID) | bits 1–7 stale (0x54 / 0x04), joined into P02-B29 | §18.4 |
 
 ## 13. Discrepancies per work item
 
@@ -2307,6 +2510,12 @@ creates for the README register.
 | Z01 | `Z01-core.md` §3.3 (0x0803 → 0x180F, 0xA419, 0x7446) | 0x180F / 0xA419 go out on every registering link; 0x7446 once per process (guard `gz_IsSendReq`, Z30's annotation) (§17.4) | extended → batch-3 follow-up |
 | Z09 | `Z09-world.md` §1.5 (`reconnectAt = g_Now + pool.reconnectSeconds · 10`) | the values: WM 20 s, GameDB 20 s, GameLog 600 s (`dynamic_initializer_for_'sock2gameDB'` @ FUN_0069afc0 and neighbours); captured 20.0 s; `sb_Routine` returns at the first entry not yet due (§17.4) | extended → batch-3 follow-up |
 | S02 | `S02-library.md` §1.4 per-IP admission rule ("several zones started together … lose all but the first", *inferred*) | confirmed per zone: of 4 links opened within 2 ms the 1st and 3rd survive; tagged P02-B25 (§17.4) | confirmed + bug ID → batch-3 follow-up |
+| Z11 / Z09 | `Z11-gm-commands.md` §3.1 `&dimension` ("objects of another main layer do not see each other" *(inferred)*), `Z09-world.md` §9.6 (the at-move workers' `dist²` test) | true for broadcasts (`AxialListPacketBroadcast`'s `l_Main` test; −1 = hears every layer); the at-move workers use `so_DistanceSquar`, which is 999 999 999 across `l_Main`, while the range query ignores `l_Main`: appear + delete on every step (P02-B27, §18.6) | extended → batch-3 follow-up |
+| Z11 | `Z11-gm-commands.md` §3.1 `&show` ("the others see the GM again on their next sight exchange" *(inferred)*) | they see the GM after the **GM's** next move: its `0x201A` makes their client ask with `0x1C01`; their own steps do nothing (the exchanger skips objects already within range); `&hide`'s inform is the `0x242A` NOEFFECT form (§18.6) | extended → batch-3 follow-up |
+| W01 | `W01-core.md` §4.2 (0x1001: "send 0x1110 (empty)") | 0x1110 carries one unwritten byte (P02-B28, §18.7) | corrected → batch-3 follow-up |
+| Z13 | `Z13-objects.md` §1.6 (0x3467 `u16 attrLen`) | the u16 at +0x2C is the constant 0x2E (payload offset of the attribute block), not a length; D03 §7.1 `attr16` is right (§18.7) | corrected → batch-3 follow-up |
+| Z02 | `Z02-actions.md` §3.2 (0x201F `flag = GMColor (bit 0), isMob (bit 1) = 0`) | bits 2–7 are not written (stale `gpp` byte, P02-B29) (§18.4) | extended → batch-3 follow-up |
+| X02 | `capture-scenarios.md` §3.14 steps (2), (4), (6) and the `s14` notes | no walk and no sit on the wire (only runs and `stand`); the "name not online" whisper went to X14B with the text `X14Nobody` (0x200E not reached); the shout was never out of sight; notes "B saw A after B stepped" for `&show` and `&dimension 0` disagree with the wire (A's step for `&show`; no appear for `&dimension 0`) (§18.3, §18.4, §18.6) | reach limited → batch-3 follow-up |
 
 In batch 1 (§3–§6) no discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held (batch 2's rows for Z03, Z09, Z12, Z13 and W03 are above). Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
 timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
@@ -2406,6 +2615,13 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
   first main-loop pass (from the first-retry delay) is *inferred* (data loading), not read; that a WM restart under
   running zones brings no new 0x7446 is read from the guard, not captured; zone 3's 255 maps were not checked against
   `World/Field.txt` (the count is the zone's `FieldMap` list, `fc_MapRegist` has no cap).
+- Batch 3, second client (§18): the notes say B saw A again after B stepped (after `&dimension 0`), but B received
+  no appear packet for A until A's `&linkto`. Either the client builds an object from the stray `0x1C19` (Z02-B3) or
+  the tester saw something else; the client's 0x1C19 handler FUN_004a5560 was not read for unknown handles. Why
+  each step yields exactly three appear / delete pairs (`mm_Step` sub-steps per tick) is *inferred*. Which field
+  makes `vt 0xef4` (zone GM colour) and the WM's `bIsGM` 0 for an admin-level-100 character (an account flag, not
+  `nAdminLevel`, *inferred*) was not traced. The mushroom house's attribute `ffecbb76` (0x3449 at the first
+  per-minute block) was not decoded. `g_ShoutLevel` is bounded only (1 ≤ value < 120).
 
 ## 15. Coverage boundary
 
@@ -2482,3 +2698,5 @@ W04 packets P02 cannot override (W04.json sorts after P02.json): WM `0x7C07` 4-b
 | 0x10D2 single-option column names (ours), Character server's GameLog link, link carrying the WM broadcasts (§14 *(inferred)*) | X02 (plan: "adversarially re-check load-bearing claims") | the layouts and orders hold whatever the names; a zone-start capture shows the 0x0802 registration order |
 | Character / GameLog servers' acceptors (they take 4 links of one address within 1 ms, no per-IP refusal, §17.1) | D08 (plan: "the Character and GameLog process layers are matched and their differences stated") | the difference is in the DB servers' own process layer, not documented by S02 (Login / WM / Zone only) |
 | cause of the first WM stop in `s37` (§17.6) | P02 (next batch, needs the WM log) | not on the wire; the code paths are named in §17.6 |
+| `s14` steps not on the wire: unknown-name whisper 0x200E, emote stop 0x2022 / 0x2023, a player walk (0x2017 / 0x2018), sit, a shout out of sight, 0x1C07 at a map login (§18.8) | P02 (next batch, re-recorded scenario 14 steps (2)–(4) / a map login next to a player) | the layouts are W04 §2.1 / Z02 §2–§5's; only the capture is missing |
+| P02-B27's storm also hits the client side (rendering of 136 appear / delete pairs) | – (client behaviour, out of the server spec) | the server bug and its fix are in §12; what the 2016 client does with each pair is not needed for a rebuild |
