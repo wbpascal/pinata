@@ -65,8 +65,14 @@ Every function of the zone-pdb export that names an `sdi_*` special, outside `sd
 | JUMP, RECALL | smo_SkillBlast §2.5 / §2.6, smo_JumpTo FUN_0057db20 (Z09 §9.3) |
 | SETABSTATEME, NOTTARGET, ABKEEPTIME | smo_SkillBash_Blast(Obj) §6.2, smo_MagicFieldSpread FUN_0057c880 (Z09 §12.2) |
 
-`SS_MOVE_CHR`, `SS_HIDE_CHR_START` / `_END` and the other enum values without a member are dropped by
-`sdi_SetArgument` (Z20 §4).
+`SS_MOVE_CHR`, `SS_HIDE_CHR_START` / `_END` and the other enum values without a member (SS_HIDE 29, SS_Silience 30,
+SS_MESMERIZE 31, SS_SUMMON 32, SS_METAMORPHOSIS 33, SS_DISPELBUFF 37, SS_HPRATE 39) are dropped by `sdi_SetArgument`
+(Z20 §4). Z20 §4 leaves open whether other code reads them from the row: **nothing does**. The only reader of
+`ActiveSkillInfo.SpecialIndexA … SpecialValueE` (+0x213 … +0x237, unaligned) in the zone is `sdb_Load` FUN_00585f40
+(the five `sdi_SetArgument` calls); no zone-pdb function names `SpecialIndex*`, and the disassembly has no other
+`0x213 / 0x21b / 0x223 / 0x22b / 0x233(%reg)` load of the row (the five hits outside `sdb_Load` are in CRT / log
+code). So these specials (2016 data: SS_SUMMON 42 slots, MOVE_CHR / HIDE_CHR_START / _END 22 each, …) have **no
+server effect**; summons and metamorphoses go by `EffectType` and the abstates (§6.1, Z09 §13.3), if at all.
 
 ### 1.2 Globals and structures
 
@@ -184,7 +190,10 @@ extra, restCount, keepMs, how, origin)` passes `extra` and `keepMs` through `asl
 
 `ShineMobileObject::smo_SkillBlast(a = caster, s, d = target, empower, fixedDamage, hit, depth, bmpRate)`. Callers:
 `sbe_BlastObject` FUN_00583bc0, `alsst_SkillBlast` FUN_00582de0, `alsst_SkillBlast_RandomTarget` FUN_00583180
-(Z03 §5.6, Z17). `depth` is the chain step (1 for the first target), `bmpRate` the `AreaSkill` bitmap rate (1000 for
+(Z03 §5.6, Z17) and the servant blast `smo_SkillBash_Blast_Trap(Obj)` FUN_005838a0 (fixedDamage −1, its own
+`MultiHitArgument`, depth 1, rate 1000; Z18). `depth` is the chain step: 1 for a single target (`sbe_BlastObject`,
+Trap(Obj)), 2, 3 … for chain waves (§6.8), but **−1** for every target of the area loops `alsst_*` (§6.7), which only
+SS_DMGDOWNRATE reads (§2.5, Z25-B21). `bmpRate` the `AreaSkill` bitmap rate (1000 for
 single targets). Every exit path runs the `BattleObjectStruct` destructor; nothing is returned.
 
 ### 2.1 Entry filters  (0x581160 – 0x5812f0)
@@ -307,6 +316,9 @@ result at all (no caller passes null *(inferred from the three callers, which pa
             if s.sdi_MAXDMGDOWNRATE.exist == 1 and sdi_MAXDMGDOWNRATE.value < cut: cut = sdi_MAXDMGDOWNRATE.value
             dmg = dmg − cut · dmg / 1000                        # signed /1000 (magic −0x10624dd3), so each chain
                                                                 #   step loses value‰, the first target already one step
+                # area targets (alsst_*, depth −1): cut = −value, so dmg grows by value‰ (the cap only limits from
+                #   above). (original bug) Z25-B21: DT_TFocalor_Skill04_W (TargetNumber 5, HitID 30, 300 / 910) deals
+                #   +30 % to its first-wave area targets; its chain waves (depth 2, 3 …, §6.7) get the cut
         # SS_JUMP (Judge01…06, value 200): the caster leaps to the target
         if s.sdi_JUMP.exist == 1 and not smo_JumpTo(a, d.so_LocateInfo.location, s, a):   # FUN_0057db20 (Z09):
             return                                              #   lands sdi_JUMP.value beyond the target, 0x482D NC_SKILL_JUMP_CMD
@@ -596,8 +608,12 @@ sds_TemplateStore(this = &skilldamagesender, a, r, absAggro, rateAggro, healOnHi
         before = t.so_GetHP(); t.so_Heal(r.hpchange); r.hpchange = t.so_GetHP() − before    # actual gain
         t.so_SpyAgent() (vt 0x480) report ring: { SRT_GETHEAL 1, healer a, amount = rec.hpchange (the requested
             heal, not the actual gain), rateAggro }            # read by mob aggro (Z09 §28.2, which says "HP actually healed")
-        Lua ranking hook 0xac (fm_LuaScriptFuncExec) on a's map with heal = actual gain, then on t's map,
-            each only if that object is a player and the map script has a RankingValue      # Z16 / Z09
+        Lua ranking hook 0xac (fm_LuaScriptFuncExec), each only if that object is a player (vt 0xbbc) on a map whose
+            script has a RankingValue (Z09 §14 table: `LuaArgumentRankingValue(map, p, dealt, taken, healed)` FUN_005d7a40):
+            a's map:  LuaArgumentRankingValue(map, a, dealt = gain, taken = 0, healed = 0)
+            t's map:  LuaArgumentRankingValue(map, t, dealt = 0, taken = 0, healed = gain)
+            # (original bug) Z25-B22: the healer's heal is ranked as damage dealt, and the healed target is ranked
+            #   as the one who did the healing
     rec.hpchange = r.hpchange;  rec.resthp = t.so_GetHP()
     a.vt[0xbf8](0, t, r.isdamage, 0); a.vt[0xbf8](3, a, r.ismissed, 0)    # player: so_ply_PassiveSetAbstate (Z17)
     if not t.smo_GetFlagDamageAbsorb() (vt 0xbec, smo_Flag.DamageAbsorb): sds_List.push_back(rec)
@@ -642,7 +658,8 @@ the packet takes the real HP.
     ab = 0x318 (none)
     for e in list (oldest first): if aeo_GetIndexArgument(e).assa_IsHaveEffect(SAA_REFLECTDAMAGE): ab = e.aeo_Index; break
     if ab == 0x318: assert "ShineMobileObject::smo_ReflectionDamage Not Find Aicton" (0); return
-    broadcast to a's sight (so_AllOfRange_Simple(a, …, 0); players only *(inferred: the simple broadcaster)*):
+    broadcast to a's sight (so_AllOfRange_Simple FUN_00553c20 = so_AllOfRange(a, allofrangearg, a.pos, radius 0,
+        no sector, it, 1, 0xffff): the same sight broadcast as the 0x2457 of §6.2):
         0x245B NC_BAT_REFLECTIONDAMAGE_CMD {                    # 14 bytes
             u16 abstate          = ab                          # ABSTATEINDEX of d's (first) reflecting state
             u16 ReflectionObject = d.handle
@@ -809,6 +826,8 @@ chain skill blasts at the target's **position** (the location blast), not at the
                 { u16 index = o.smo_SkillIndexLastCasting, u16 caster = o.handle, u16 skill = s.ID }   # caster only
             smo_ClearSkillResultBuffer_Miss(o, t)                 # Z23 §8.5
             smo_SkillResultPacket(o, s, t.pos)                    # §6.9: sends nothing
+                # (original bug) Z25-B23: t == null enters this path and then reads t.pos (null dereference);
+                #   dead in 2016 because so_Routine only calls the object blast with a target (§6.1)
             return                                                # (original bug) Z25-B15: the miss result is never sent
         InSkillShift = 1;  fixedDamage = dmg * 2                  # no arming pass; fixed damage skips the hit roll (§2.2)
     if s.IsMovingSkill: InSkillShift = 1
@@ -1080,6 +1099,7 @@ AxialListScanSkillTarget::alsst_SkillBlast(scan, s, empower, n = s.TargetNumber,
         if s.EffectType == SE_HEALING and not attacker.smo_ICanHealTo (vt 0xe94)(t): continue    # Z09 §8.4
         h = hit ?? MultiHitArgument()                             # sbe always passes its own
         smo_SkillBlast(attacker, s, t, empower, fixedDamage −1, h, depth −1, rate = scan.vt[8](i))   # §2; rate: §6.6
+            # depth −1 turns SS_DMGDOWNRATE into a bonus for these targets: (original bug) Z25-B21 (§2.5)
         if hit and first step: mdt_SkillBlast_Summon(attacker, t, s.ID, t.pos, MST_MULTI)        # Z09 §13.3
         if s.sdi_RANDOMTARGETNUMBER.exist:                        # area chain skill: a chain from every hit target
             attacker.smo_LightningWaveSkill (vt 0xbf4)(s, sbec_GetIndex(), from = t, to = null, scan.alsst_nEffectForJustSkill, depth 2)
@@ -1186,6 +1206,9 @@ It sends no 0x2452. This corrects Z23 §8.5 and Z03 §5.4, which read it as the 
 | Z25-B18 | `sbe_BlastLocate` §6.5 | `Last` = TARGET_ME is not a case: assert "Invalid TargetType" after the cost is paid | `Dash01` logs an assert on every cast (no other effect: the dash is done in §6.3) | treat ME like NONE |
 | Z25-B19 | `so_Routine` §6.1 / `sbe_BlastObject` §6.5 | mobs: vt 0xedc and vt 0xee0 are both `smo_SPCheck` FUN_005557f0, which pays SP; players: a WHOLEAGGRORATE skill pays at vt 0xee0 in `so_Routine` and again in the blast | mob skills cost twice their SP (latent for players: no 2016 WHOLEAGGRORATE skill) | test only at cast end, pay once at the blast |
 | Z25-B20 | `mht_Load` §6.4.1 | writes row k of an ID into `mhe_Array[mhe_ArrayCnt]` without checking `mhe_ArrayCnt < 10` | an 11th row of one ID overwrites `mhe_ArrayCnt` (+0xa4) and the next element (2016 data: at most 10 rows, latent) | refuse (assert) more than 10 rows per ID |
+| Z25-B21 | `smo_SkillBlast` §2.5 SS_DMGDOWNRATE | `cut = value · depth`, and the area loops `alsst_*` pass depth −1 | area targets of a DMGDOWNRATE skill take +value‰ damage instead of −value‰ (2016: `DT_TFocalor_Skill04_W` +30 % on its first-wave area targets) | depth 1 for area targets (or `cut = 0` below depth 1) |
+| Z25-B22 | `sds_TemplateStore` §3 Lua ranking 0xac | caster's map gets `(dealt = heal, healed = 0)`, target's map `(healed = heal)` | ranking maps count heals as the healer's damage dealt and credit the healed player with healing done | caster: `healed = heal`; target: nothing (or `taken`) |
+| Z25-B23 | `smo_SkillBash_Blast(Obj)` §6.2 CROSSCOUNTER | `t == null` is tested, then the failure path reads `t.pos` | null dereference if reached (dead in 2016: `so_Routine` always passes a target) | return before reading t |
 
 ## 7. Not reconstructed / uncertain
 
@@ -1194,8 +1217,6 @@ It sends no 0x2452. This corrects Z23 §8.5 and Z03 §5.4, which read it as the 
 - `so_dummypacketcontainer`'s send (§2.8, mobs) is taken to send nothing from its name *(inferred)*.
 - Client text 0x0A653383 (0x242A for a curse, §2.8) is in none of the 2016 `TextData*.shn`; what the client shows
   for a missing id was not traced.
-- `ShineObject::so_AllOfRange_Simple`'s receiver set for 0x245B (players in sight of the attacker) is *(inferred)*
-  from the broadcaster's name.
 - Client FUN_0057eeb0 calls in the 0x245B handler (own character hit): which HUD element they refresh is not traced.
 
 ## 8. Coverage boundary
@@ -1229,7 +1250,7 @@ It sends no 0x2452. This corrects Z23 §8.5 and Z03 §5.4, which read it as the 
 | `almfh_ApplyHeal` FUN_0056d2c0 and the magic-field functions reading `sdi_MAGICFIELD_*` / SETABSTATEFRIEND | Z09 §12.2 – §12.5 (done) | magic fields are Z09's, as the plan says |
 | `sbec_Routine` FUN_00437fc0 (REVIVAL, fires queued effects) | Z03 §5.6 (done) | effect queue tick; §6.4 covers the queuing |
 | cast handlers FUN_0057fa50 / FUN_0057f400 / FUN_00540b90 and mover casts FUN_00580800 / FUN_00580cf0 (HOLDME, SHOOTME, REVIVAL, AttackDist) | Z03 §5.2 / §5.5, Z04 §12.7, Z13 (done) | cast-time checks of the specials |
-| `smo_SkillBash_Blast_Trap` FUN_005835e0 / FUN_005838a0 | Z09 §8.8 (done) | servant explosions |
+| `smo_SkillBash_Blast_Trap` FUN_005835e0 (Loc) / FUN_005838a0 (Obj), 0x2442 / 0x2443 | Z18 (open; its plan names 0x2442 / 0x2443 and `smo_SkillBash_Blast_Trap`) | servant explosions. Z09 §8.8 only names the calls (Z09 §31.3 points to Z03, which has nothing on them). Seen in passing: Trap(Obj) calls `smo_SkillBlast` (§2) on the servant's `scs_BattleSkill.target` with `scs_Empower`, not on its own arguments; Trap(Loc) passes a null `hit` to `alsst_SkillBlast` *(for Z18 to confirm)* |
 | `sdi_Clear` / `sdi_SetArgument` FUN_00584500 / FUN_00584800, `sdb_Load` FUN_00585f40 | Z20 §4 (done) | fill the special members from the SHN |
-| player normal-attack combo `sp_MultiHitNotIndex` (`sp_Schedule_SwingDamage` FUN_0042f550, item `HitTimeArray`), `smo_ply_GetMultiHitSequance` FUN_0042b050 | Z03 §3.2 (done) | swing combo, not the skill MultiHit table |
+| player normal-attack combo `sp_MultiHitNotIndex` (`sp_Schedule_SwingDamage` FUN_0042f550, item `HitTimeArray`), | Z03 §3.2 (done) | swing combo, not the skill MultiHit table. `smo_ply_GetMultiHitSequance` FUN_0042b050 (not in Z03) is only `return sp_MultiHitNotIndex` (u16), documented here |
 | container code reached from §6 (`std::deque` / `std::vector` helpers FUN_0057dfb0, FUN_00577990, FUN_00437f30, FUN_00437ec0, FUN_0057e0a0, FUN_0057e060, FUN_00576df0, FUN_0057de20, FUN_00437000, FUN_00437b20, FUN_00447600; `BinaryDataBox<AbnormalStateInfo>::bdb_ReadData` FUN_00416a00; `TargetObject::to_GetTargetObject` FUN_0042abe0; `~AxialListScanSkillTarget` FUN_0057e320) | none needed | STL / reader boilerplate with no game logic |
