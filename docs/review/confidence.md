@@ -10,7 +10,7 @@ finds go to `docs/knowledge/X02.md` §0; the capture scenarios that follow from 
 |---|---|---|
 | 1 | Error classes: what went wrong so far, with counts | done (part 1) |
 | 2 | Rating of every pseudocode section and knowledge struct table | done (parts 2–3) |
-| 3 | Adversarial re-check of the load-bearing claims | §3.2 done (part 4), §3.3 done (part 5); §3.4–§3.5 open (parts 6–7) |
+| 3 | Adversarial re-check of the load-bearing claims | §3.2 done (part 4), §3.3 done (part 5), §3.4 Z01–Z04 done (part 6); §3.4 Z05–Z13 and §3.5 open (parts 6b, 7) |
 | 4 | Coverage gaps of items finished without a review part | open (part 10) |
 
 ## 1. Error classes
@@ -3187,8 +3187,8 @@ Knowledge files (`docs/knowledge/`):
 
 ## 3. Adversarial re-check
 
-State: §3.1–§3.2 (part 4) and §3.3 (part 5: ITEMDB order, zone ↔ WM hand-over) done. Parts 6–7 add §3.4 (low client-facing zone
-packets) and §3.5 (low client-facing Login / WM packets, remaining class B / R / O hits).
+State: §3.1–§3.2 (part 4), §3.3 (part 5: ITEMDB order, zone ↔ WM hand-over) and §3.4 for Z01–Z04 (part 6) done. Part 6b
+adds Z05–Z13 to §3.4, part 7 adds §3.5 (low client-facing Login / WM packets, remaining class B / R / O hits).
 
 ### 3.1 Method
 
@@ -3399,7 +3399,111 @@ handlers Z05 read one by one.
 
 ### 3.4 Part 6: low ratings in client-facing zone packets
 
-Open (part 6).
+State: Z01–Z04 and the handle-trusting handlers of §3.2.6 done (part 6). Z05–Z13 (60 low rows) are part 6b.
+
+§2 rates 110 zone pseudocode sections low (Z01 11, Z02 9, Z03 17, Z04 13, Z05 10, Z06 6, Z07 16, Z08 8, Z09 10,
+Z10 3, Z11 2, Z12 3, Z13 1). For each one the reason was split into its parts with one script: the README §5 rows
+that name the section (`sup`: a later item already corrected a statement in it) and the lines that carry
+*(inferred)*, *(pdb2017)* or a class B / R keyword. A section that is low **only** because of `sup` rows gets the
+verdict superseded with the place of the correction; where the superseding statement could be attacked in one
+read, it was (marked "re-read"). The remaining weak lines were re-read in `zone-pdb` and on the client side
+(`re-data/client-handlers.json`, client `clean.py`, `TextData*.shn`). Sections with no client-facing packet
+(process structure, loaders, the stat matrix, formulas) are listed in one row per document and not re-read here:
+their `sup` rows already say what is wrong.
+
+Result: 38 rows: 10 confirmed, 8 refined, 2 corrected, 15 superseded, 3 not re-checked.
+
+#### 3.4.1 Handlers that trust the handle alone (the list of §3.2.6)
+
+| # | Handler | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| T1 | `gds_NC_HOLY_PROMISE_DB_GET_CEN_REWARD_ACK` @ FUN_00483d10 | confirmed, harmless | Forwards to vt 0x9d0 `so_ply_HolyPromiseGetCenReward` @ FUN_00483dd0, which only relays client 0x943D `{u16 nError, u64 nMoney}` (length 0xc). No state changes: a stale answer shows the next holder of the handle another character's amount. The sibling `…WITHDRAW…` @ FUN_00484040 is the one that pays (Z08-B14) |
+| T2 | `gds_NC_MISC_PINGTEST_CLIENT_ZONE_DB` @ FUN_00550fc0 | refined (Z01 §9, Z01-B6) | The handle is not the header's: it is `hZoneClient` at payload +0xc of `PROTO_NC_MISC_PINGTEST_CLIENT_ZONE_DB` (0x5a bytes; the stamps are `ZoneRecvFromDB` +0x12 and `ZoneSendToClient` +0x16). The lot + 1 **and the 0x0812 answer to the client** are both inside the "cell 0 holds item 0x9C9" test. See Q5 for the request side |
+| T3 | `gds_NC_MISC_PINGTEST_TOOL_WM_CLIENT_ZONE_DB` @ FUN_00551130 | confirmed | Copies the struct, stamps +0x3a / +0x3e, relays 0x0813 (0x84 with the opcode) to the object at +0x34. No state |
+| T4 | `gds_NC_CHARSAVE_DB_UI_STATE_SAVE_ACK` @ FUN_00551360 | confirmed, harmless | Relays 0x4026 `{u16}` (the word after the header) to the holder. The 2016 client has no handler for 0x4026 (Z01-B5; no entry in `client-handlers.json`) |
+| T5 | `gds_NC_CHAR_REGNUM_VARIFICATION_ACK` @ FUN_00551a80 (Z07 §10.2, rated high) | refined, X02-B4 | The struct is `{u16 zonehandle, u32 charregnum, u8 iscorrect}`: no header. vt 0x9f0 `so_ply_RegistNumberVarifyCheck` @ FUN_00551bb0 **does** compare `charregnum` with `sp_CharData.toclient.basedata.chrregnum`, but a mismatch is treated like `iscorrect == 0`: log to `InvalidRegistLog`, set the mode byte (`*(p+0xe9c)`) to 0, return 0 → `so_Disconnect(0x689)`. So an answer that arrives after the handle was reused disconnects the new holder (original bug), latent: it needs a logout and a new login on the same handle within one DB round trip. Z07's one line is right for the normal case |
+| T6 | `gds_NC_MINIHOUSE_DB_PORTAL_LIST_ACK` @ FUN_0056ed60 | confirmed | vt 0xfc `so_ply_MH_SetMHPortalList` @ FUN_0056f660: the holder must be in a mini-house (vt 0x130), the house object (vt 0x138) must exist and its owner number (vt 0x80) must equal the holder's (vt 0x344); then `Error == 0x1A08` and `nPortalCnt < 0x33` → house vt 0x104, client 0x8C4B `{u16 n, n × {u16, u32}}`, house vt 0xd8. The owner test stands in for the character test; Z07 §6 text holds |
+| T7 | `gds_NC_MINIHOUSE_DB_PORTAL_ADD_ACK` @ FUN_0056eef0 | refined | vt 0x100 `so_ply_MH_AddMHPortal` @ FUN_0056fa10 applies (`Error == 0x1A10`: lock list vt 0x1c) or frees (else: vt 0x28) `lockindex` on the **holder's** lock list before any identity test; only then come the in-house and owner tests of T6, house vt 0x108 (`so_mh_AddPortal`, Z13) and client 0x8C4C. Same pattern as the ITEMDB handlers of I6: a stale answer touches a lock of the wrong player. Z07's "not traced further" is traced in Z13 |
+| T8 | `…PORTAL_DEL_ACK` @ FUN_0056f080, `…VISITER_COUNT_ACK` @ FUN_0056f1f0 | confirmed | Both only log when the object is gone and do nothing when it exists (Z07: "no effect", "dead") |
+| T9 | `wms_NC_CHAR_TUTORIAL_INFO_ZONE_CMD` @ FUN_0044d3d0 | refined, X02-B5 | `PROTO_NC_CHAR_TUTORIAL_INFO_ZONE_CMD` = `{u16 nSessionHandle, u32 nCharNo, PROTO_TUTORIAL_INFO}`; the handler never reads `nCharNo` and calls vt 0xdf8 `so_ply_SetTutorialInfo` @ FUN_00561500, which writes `sp_TutorialInfo.nTutorialState / nTutorialStep` of whoever holds the handle (original bug), latent |
+| T10 | `wms_NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_ACK` @ FUN_00478be0 | refined, X02-B6 | `{u16 err, u8 nTournamentSeed, u16 nPlayerHnd}`: the packet carries no character number, so the zone cannot test one. After an RTTI test for `ShinePlayer`, `err == 0x1B60` runs `sp_Guild_Tournamnet_Observer_Enter(seed)` (a map change) on the holder; 0x1B61 → client error 0x1B61, 0x1B62 → 0x1B54, others ignored (Z08 and Z16 text confirmed). A reused handle moves the wrong player (original bug, in the packet design), latent |
+| T11 | `wms_NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ACK` @ FUN_00485540, `…_JOIN_ACK` @ FUN_00485b90 | confirmed; §3.2.6 corrected | False positives of the text count: both look the player up by **character number** (`som_FindPlayer(first dword)`, then vt 0xbbc), then test the NPC (`nm_FindNPCFunc`, object type 4, distance² ≤ 1 000 000). The handle they pass to `som_GetObject` is the NPC's. No handle trust here |
+
+Of the 14 handlers, one pays money (known, Z08-B14), four change state of the wrong player in a handle-reuse race
+(T5, T7, T9, T10), the rest relay or do nothing. All are latent: a handle is reused only after a logout, and the
+answer must cross it.
+
+#### 3.4.2 Z01 (11 low rows)
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| Q1 | 0x0804 / 0x0805 from a client are a no-op @ FUN_004c2450 (Z01 §3.3; the same function as "JobManager: no-op" in Z02 §6.1) | confirmed | FUN_004c2450 is an empty function (`return`). Its PDB name `CQuest::Occure_LevelChange` is an identical-code fold (H4); it also fills `ShinePlayer` slots 0xa44 and 0xcec. Registered for 0x0804 and 0x0805 of the player parser (`handlers.json`). Which of them the session lets through before 0x1803: Z18 §1.3 |
+| Q2 | the seed is the answer to 0x0806 (Z01 §5.1) | superseded | Z18 §1.3 (sent at accept; the 0x0806 handler is unreachable in practice, Z18-B2). Not re-read |
+| Q3 | 0x1814 `NC_MAP_WING_SAVE_REQ`: codes 0x1146 / 0x1143 / 0x1141 / 0x1144, no reply without a wing (Z01 §7.2, Z01-B3) | refined | `sp_NC_MAP_WING_SAVE_REQ` @ FUN_00589c80: allowed modes mask 0x46 (1, 2, 6); wing = `sp_FindItemFromInventory(idb_specialid.sii_SparrowWing)` with attribute class 13. One gate is missing in Z01: before the slot is written, vt 0xa78 `so_ply_IsLink_In_MapAndSendErrorMsg` must return true; when it does not, the handler itself sends nothing (that function sends its own message, by its name; not read). Z01-B3 holds, and also covers a wing whose attribute class is not 13. Client FUN_004aeed0 has texts for 0x1141, 0x1143, 0x1144, 0x1146 only |
+| Q4 | 0x1816 `NC_MAP_WING_FLY_REQ` queues a teleport; "the teleport itself runs when the cast ends *(inferred)*" (Z01 §7.2) | refined (inferred → read), X02-B7 | `sp_NC_MAP_WING_FLY_REQ` @ FUN_00589f00 as documented (`sp_CanRecallInThisMap`, `sii_WingStone`, `ui_SparrowWingStone.uib_AfterCast`, ring `queue_sparrowfly`, index in `sp_SparrowFly`). The other end, cited by no document: `UseEffect::UseItemWingStone::uib_Effect` @ FUN_0059a270 calls vt 0x918 `so_ply_SparrowWingFly` @ FUN_0058a1a0: index < 0x80, the entry's handle must equal the player's, the map id must be valid → client 0x301A `NC_ITEM_USECOMPLETE_CMD` (no body), `so_ply_ItemUsePacket(0x700, 9)`, vt 0x600 link to `{map name, x, y}` with arguments (6, 9, 10). Every failure only logs to `ChargedItemLog` ("Fly Null", "Fly Null map"): the stone is gone and the client gets nothing. The ring entry can be overwritten by later requests of other players before the cast ends (original bug), latent |
+| Q5 | 0x0812 ping test (Z01 §9, Z01-B6) | refined | `sp_NC_MISC_PINGTEST_CLIENT_ZONE_DB` @ FUN_005509a0: **everything** after the two stamps (`hZoneClient` +0xc, `ZoneRecvFromClient` +0x1a) is inside the "cell 0 holds 0x9C9" test, the send to the GameDB too. Without that item a client's 0x0812 gets no answer at all. The appended part is the struct's `header` (+0x2e) and `buylot` (`PROTO_NC_ITEMDB_BUYLOT_REQ`, +0x34) with the item serialised at lot + 1. Character `fc_NC_MISC_PINGTEST_CLIENT_ZONE_DB` @ FUN_004167e0 stamps two times and echoes the first 0x5a bytes: it never reads `buylot`, so **no DB row changes**. B6's effect is therefore: the zone's lot runs ahead of the DB by one per round trip (T2), until a later ITEMDB message writes that stack's lot. The 2016 client has no 0x0812 handler |
+| Q6 | 0x082F → 0x0830 `{u8 shoutlevel, u16 shoutdelay}`, names *(pdb2017)*, "source not found" (Z01 §9) | confirmed, mark resolved | `sp_NC_MISC_SERVERPARAMETER_REQ` @ FUN_005517c0 writes `shineparam.scp_param.shoutlevel` and `.shoutdelay` (2016 PDB member names; length 5). They are fields of the common parameter block (`ShineCommonParameter`, loaded by `scp_Load`, README §5.4). Z01-B5 confirmed: `client-handlers.json` has no handler for 0x0830, 0x0C24 or 0x4026 |
+| Q7 | 0x0C23 → 0x0C24 `{u32 userNo}` (Z01 §9) | confirmed | `sp_NC_USER_REGISENUMBER_REQ` @ FUN_0056e8b0: vt 0x348, length 6 |
+| Q8 | 0x0C32 sets `p+0x2a800`, "meaning not traced" (Z01 §9) | superseded | M14 / L5: `sp_isPossibleNewConnect` |
+| Q9 | Z01 §1, §2.1, §2.3, §4, §4.1, §8 (no client packet), 0x0823 "no-op @ LAB_005a47b0" (WM → zone) | not re-checked | Their `sup` rows (README §5.4) and §3.2.3 / §3.3.3 above say what is wrong; nothing client-facing is left in them |
+
+#### 3.4.3 Z02 (9 low rows)
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| Q10 | `p.vt[0xa38](4, id, 0)` is a "script / quest hook" *(inferred)* (Z02 §4) | superseded, re-read | Slot 0xa38 = `ShinePlayer::notifyObservers` @ FUN_00577c10 (`rtti.py`), as Z09 §14.8 says |
+| Q11 | "so_Routine makes the pet dance (FUN_004d2470(p, 1))" (Z02 §4); "FUN_004d2470(p, 5)  # pet reaction *(inferred)*" (Z02 §8) | **corrected** | FUN_004d2470 = `sp_PetSystem_ChangeTendency(PupFactorConditionTypeEnum)`: only with a pet out (`sp_PetInfo.nSummonState` = `PSST_1ST_SUMMONED` or `PSST_RESUMMONED`) it reads the pet's mind type (`CPetData::GetPetMindType(nMindMil / 1000)`) and the `TendencyModifyData` for the condition, and adds the amount to `sp_PetInfo.nStressDiffMil` (`PF_STRESS`) or `nMindDiffMil` (`PF_MIND`). It sends nothing and moves nothing: the argument says what the **master** did (1 = `PFC_S_DANCE`, 5 = `PFC_S_GATHER`, 6 `PFC_S_PROD`, 7 `PFC_S_MOVER`, 8 / 9 revival, 10 `PFC_S_RESTHOUSE`, 11 `PFC_S_STORE`). Any pet animation the client shows comes from elsewhere |
+| Q12 | the zone never sends 0x1C0E (Z02 §5) | superseded *(captured)* | Z09 §9.6, P02 |
+| Q13 | NPC role `JobManager`: no-op FUN_004c2450 (Z02 §6.1) | confirmed | Q1: the empty function |
+| Q14 | ID / mode-ID / random-multi gates not traced (Z02 §6.5) | superseded | Z08 §5.2. T11 re-read the two WM answers of the mode-ID gate: 0xA40C is sent only inside the NPC range, and `sp_SetModeIDWaitState(0)` follows it |
+| Q15 | Z02 §8: 0x2035 "probably legacy" *(inferred)*; 0x2032 timing; `GatherType` *(pdb2017)* | superseded; enum confirmed | Z07 §11 (the path is live), Z09 §11.2 (Z09-B128). `GatherType` in the 2016 `Zone.pdb`: `GT_HERBING` 0, `GT_MINING` 1, `GT_WOODCUTTING` 2, `GT_FISHING` 3: the *(pdb2017)* mark can go |
+| Q16 | wedding Main / Sub values *(inferred)*, partner choice not traced (Z02 §10) | superseded | Z07 §5.1, §5.3; Z13 knowledge §2. Not re-read |
+| Q17 | area reports 0x6C05…0x6C08 unchecked (Z02 §12, Z02-B12) | superseded | Z09 §15.8 ("too strong"). Not re-read |
+
+Z02 §1 and its bug table have no weak line of their own beyond these.
+
+#### 3.4.4 Z03 (17 low rows)
+
+Every low row of Z03 is low because of `sup` rows; the document has one *(inferred)* line outside them (§4.6, the
+order of an FPU sum), which is a formula and not a packet.
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| Q18 | `smo_SkillResultPacket` sends 0x2452 with one missed entry (Z03 §5.4) | superseded, re-read | FUN_0057a630 writes only the department bits (`op & 0x3ff \| 0x2400`) into the shared buffer, sets no length and sends nothing; it then calls vt 0x40 of the object returned by vt 0x49c. The README row (Z25) is right |
+| Q19 | mob melee through `so_attack` / `so_Bash`, 0x2406 / 0x2407 / 0x242C–0x2431 (Z03 §3.5, §7.1) | superseded | Dead in 2016: Z09 §7.3, §7.8, X01 §6.2.2. Not re-read |
+| Q20 | Z03 §5.6: two random numbers, keep-time bonus, one abstate loop, vt 0xbf4 | superseded | Z25 §2.2, §2.4; Z21 §5.7; Z22 §10.7 (four rows). Not re-read |
+| Q21 | Z03 §6.1 actor table and list size, §6.2 `asl_AbstateSet` | superseded | Z18 §3.1–§3.2, Z22 §1, §7; the element layout was re-read in part 4 (C13–C18) |
+| Q22 | Z03 §2, §3.3, §4.1–§4.6, §5, §5.1, §8.2 (no client packet of their own) | not re-checked | Formulas and tables; their corrections are Z12 §1, §4, Z09 §8.4–§8.5, Z25 §1.1, Z29 §2.6, Z10 §6 |
+
+#### 3.4.5 Z04 (13 low rows)
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| Q23 | client 0x300A: "inventory full" is shown for "`0x34a`/`0x346`, reached through nested branches the decompiler merged *(inferred)*"; "`0x342` silent" (Z04 §3.3) | **corrected**, X02-B8 | Client FUN_004aba00, branch by branch: 0x341 obtained; 0x344 → too far; 0x345 → no right; **0x346 → `TextData` 0xf4f9e3f0 "Inventory is full."**; 0x34b → `DropItemMgr::Remove(handle)` and no text; 0x2001 / 0x2002 / 0x2003 / 0x2005 / 0x2009 dice texts; 0x34c **and 0x2004** → "You don't have an item that allows you to roll the dice."; 0x34d; 0x34e → "The game continues with dice acquisition."; 0x342 → `TextData2` 0x17290d37, whose text is one space (a blank system line, not nothing); **every other code, 0x34a and 0x343 included**, → 0x35b67a82 "Failed to obtain the item.". So the lot-inspector refusal 0x34a of `so_ply_PickupItem` (the "max owned" limit) reaches the player as the generic failure (original bug: a code the client does not know). Server side re-read with it, `sp_NC_ITEM_PICK_REQ` @ FUN_00530a50: 0x342 (mode not in 1 / 2 / 6, `duplicatemenustate.dmc_Control & 0xc`, or the lock list busy), 0x34b with the handle (object gone), 0x343 (not visible, not an item object, no item data), 0x344 (distance² > 0x3d08), 0x345 (`so_drpitm_CanLooting` false), 0x34c (drop vt 0xaa8), then the raid (vt 0xa84) or party (vt 0x550) looting switch (`LOOTING_TYPE_FREE / ORDER / LOOTER / DICE`: `sp_RaidItemsidtribute`, `sp_partyitemdistribute`, `sp_DicePicking`, whose failure is 0x2003), else `so_ply_PickupItem` (vt 0x798) |
+| Q24 | 0x304E: `smo_SkillBlastOption(p) == 2` "a blast is pending" (Z04 §12.7) | superseded, re-read | The comparison in `sp_NC_ITEM_USE_ACTIVESKILL_REQ` @ FUN_00540b90 is against the enum member `SB_SILENCE` (Z18 §3.1) |
+| Q25 | `ItemMenu_Open` (Z04 §1.5, §3.1, §3.2); `p+0xaad8*4` (§3.2) | superseded | The function is `itembreakmenu` (README §4.8); the member is `sp_PetInfo` (P1, §3.2.5). The drop and break handlers themselves were not re-read |
+| Q26 | Z04 §8.3 (0x302D tail byte), §8.4 (0x3034 codes), §9.4 (bracelet row), §10.1 (gem charge count), §12.2 (endure kits) | superseded | P02-B3 *(captured)*; Z13 §3.3; Z18 §4.9; Z17 knowledge (two rows). Not re-read |
+| Q27 | reward inventory "not reachable by SPLIT" (Z04 §1.1); UseEffect "Effect = no-op" (§6.3) | not re-checked | Class R / B keyword hits. FUN_00514570 in the §6.3 line is `UseEffect::UseItemBase::uib_DirectUse` by the PDB, which fits; the SPLIT claim needs the split handler's box test and is left for part 6b's item pass (Z05 §4) |
+
+#### 3.4.6 What this part adds for later parts
+
+- **Original-server bugs found** (for the table of the sweep part): X02-B4 a late 0x10B4 disconnects the next
+  holder of the handle (T5); X02-B5 tutorial info written without the `nCharNo` test (T9); X02-B6 tournament
+  observer answer keyed by handle only (T10); X02-B7 `queue_sparrowfly` entry overwritten before the cast ends:
+  stone used, no teleport, no message (Q4); X02-B8 pick-up code 0x34a has no client text (Q23). B4–B7 are latent.
+- **Error classes seen:** N 2 (Q11: a function named from where it is called; Q1's fold), C 2 (Q23: client codes
+  listed from the texts, not from the branches; Q5: "the client is answered" never tested without the item),
+  R 1 (T11: a text count that took an NPC handle for a player handle). The 15 superseded rows confirm §1's
+  picture for Z02–Z04: the later items already found the errors, and the old text was not edited.
+- **`sup`-only rows cost little:** 26 of the 50 low rows of Z01–Z04 are low only through README §5 rows. A reader
+  who applies README §5 gets a medium document; no rating was changed by hand, because the old text is still there.
+- **Scenario inputs** (part 8): wing save and fly (Q3, Q4: expect 0x1815 / 0x1817 codes, then 0x301A and a map
+  link at cast end; also a save with no wing: expect silence); a pick-up over the lot limit of an item (Q23:
+  expect 0x300A `{0x34a}` and "Failed to obtain the item."); an emote and a gather with a pet out, then the pet's
+  mind / stress values (Q11); 0x0812 sent by a test client with and without item 0x9C9 in cell 0 (Q5).
+- **For part 6b:** the same script (`weak.py` in the notes) prints the `sup` rows and weak lines for Z05–Z13;
+  Z07 (16), Z05 (10), Z09 (10), Z08 (8) are the large ones. Z05 §10 (client handling of 64 answers) and Z06 §2
+  (booth, 4 rows with the `g_NoBooth` name) have weak lines of their own.
 
 ### 3.5 Part 7: low ratings in client-facing Login / WM packets; remaining class B, R, O hits
 
