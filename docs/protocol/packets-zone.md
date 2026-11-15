@@ -49,6 +49,17 @@ Basis: Character server FUN_0046bff0 (reads SQL columns in this order with SQLGe
 | 125 | u32 | TutorialInfo.nTutorialState | default 3 when no tutorial row; L00 name 'tutorial_state (inferred)' |
 | 129 | u8 | TutorialInfo.nTutorialStep | L00 name 'tutorial_step (inferred)' |
 
+### USEITEM_MINIMON_INFO (50 bytes)
+
+Basis: 2016 Zone.pdb (pdb2016) struct USEITEM_MINIMON_INFO, size 0x32; referenced by Z13's 0x1123 annotation; 7 captured 0x1123 (50 bytes) decode in full
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bNormalItem |  |
+| 1 | u8 | bChargedItem |  |
+| 2 | u16[12] | NormalItemList | item ids, 0xFFFF = empty |
+| 26 | u16[12] | ChargedItemList | item ids, 0xFFFF = empty |
+
 ## Client → server
 
 ### `0x0812` NC_MISC_PINGTEST_CLIENT_ZONE_DB

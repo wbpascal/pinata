@@ -1441,5 +1441,37 @@
     "note": "capture-validation §6"
    }
   }
+ },
+ "structs": {
+  "USEITEM_MINIMON_INFO": {
+   "size": 50,
+   "basis": "2016 Zone.pdb (pdb2016) struct USEITEM_MINIMON_INFO, size 0x32; referenced by Z13's 0x1123 annotation; 7 captured 0x1123 (50 bytes) decode in full",
+   "fields": [
+    [
+     0,
+     "u8",
+     "bNormalItem",
+     ""
+    ],
+    [
+     1,
+     "u8",
+     "bChargedItem",
+     ""
+    ],
+    [
+     2,
+     "u16[12]",
+     "NormalItemList",
+     "item ids, 0xFFFF = empty"
+    ],
+    [
+     26,
+     "u16[12]",
+     "ChargedItemList",
+     "item ids, 0xFFFF = empty"
+    ]
+   ]
+  }
  }
 }
