@@ -26,7 +26,7 @@ and the bucket rules are in `docs/plan/status/Z31.md` and `docs/plan/status/Z31-
 | 5 | `ShineObject`, `ShineMobileObject` and the other object classes | 138 / 1 731 |
 | 6 | abstate containers, character classes, mob AI, rules of engagement, use effects | 109 / 1 774 |
 | 7 | table templates (`BinaryDataBox<…>`, `ITableBase<…>`, `IIDTableBase<…>`, `SHND::CommonData<…>`, `Table`) | 201 / 4 103 |
-| 8 | the other data loaders and SHN / text parsers | ≈ 2 200 |
+| 8 | the other data loaders and SHN / text parsers | 67 / 1 927 |
 | 9 | NPC roles, merchants, booths, guild, events, kingdom quest, Lua glue | 111 / 2 822 |
 | 10 | sessions, packet containers, `AxialList*` visitors, map clusters, path finding, library classes | ≈ 3 100 |
 | 11 | open points of Z01-Z04 (`confidence.md` §4.6 rows 5-8) | – |
@@ -1909,6 +1909,317 @@ runs is FUN_005aff00.
 | `ITableBase<ItemActionCondition, ItemActionConditions>` | FUN_005cf050 | `ItemActionConditions::DataProcess` FUN_005cf820 (Z17) |
 | `ITableBase<ItemActionEffect, ItemActionEffects>` | FUN_005d01c0 | `ItemActionEffects::DataProcess` FUN_005d0790 (Z17) |
 
+## 8. Other loaders and parsers: item options, random options, sockets, accessory upgrades, key tables, area bitmaps, lot analyser, `OptionReader` remainder
+
+These are the start-up loaders that hold their own data structure next to (or instead of) a `BinaryDataBox<T>`, and the
+parts of the `OptionReader` text parser that Z09 §28.6 left uncited. The stage that runs each loader is Z01 §2.3.
+The §7.1 rows that point to "§8" (`ItemOptions`, `RandomOption`, `RandomOptionCount`, `AccUpGradeInfo`) are
+documented here.
+
+### 8.1 Item option cards (`ItemOptionsData`, `ItemOptions.shn`)
+
+`itemoptiondata` (global, 0x46ac bytes) is a `BinaryDataBox<ItemOptions>` plus `OptionCardStack iod_optionlist[500]`
+(+0x5c, 0x24 each: `CardDeck::CardStack ocs_cardstack` +0, `ItemOptions* ocs_Number` +0x20) *(pdb2016)*.
+`ItemOptions` (0x19) = `{u16 OptionDegree, ITEM_OPTION_TYPE Type +2, u8 Interval +6, u16 Rate[9] +7}`. `ITEM_OPTION_TYPE`
+*(pdb2016)*: 0 `IOT_NUMBER` (the option-count row), 1 STR, 2 INT, 3 DEX, 4 MEN, 5 CON, 6 TH, 7 TB, 8 AC, 9 WC, 10 MA,
+11 MR. The card decks are the `CardDeck` lists of Z09 §28.10.
+
+```pseudo
+ItemOptionsData::iod_Load(iod)                                         @ FUN_0064cbc0  (Z01 §2.3)
+    bdb_ReadData("../9Data/Shine/ItemOptions.shn")                     # key 0x62e, row 0x19 (§7.1)
+    every iod_optionlist[d].ocs_Number = null
+    for each row r (file order, row index i):
+        s = iod_optionlist[r.OptionDegree]                             # no bound check against 500 (original bug) Z31-B12
+        if r.Type == 0 (IOT_NUMBER):                                   # "ocs_Init"
+            s.ocs_Number already set: fatal "ItemOptionsData::OptionCardStack::ocs_Init : already initialized"
+            s.ocs_Number = &r; empty s's deck (ListEraser over the cards)
+        else:                                                          # "ocs_cardinsert"
+            s.ocs_Number null: fatal "…::ocs_cardinsert : not initializes"   # the count row must come first
+            CardStack::cs_InsertTop(s.ocs_cardstack, card = i)         # the card is the row index
+    for every stack with ocs_Number set: CardStack::cs_Suffle(50)      # once, at start-up (CRT rand(), Z09 §28.10)
+    bdb_defaultblock.OptionDegree = 0xFFFF                             # +0x40, the "not found" marker
+
+OptionCardStack::ocs_selectnumber(s, row) -> int                       @ FUN_0064c4f0
+    r = well512_GetRandom(1000)                                        # 0…999
+    i = 0; while i < 9: if r <= row.Rate[i]: break; r -= row.Rate[i]; i += 1
+        # `<=`: index 0 gets Rate[0] + 1 chances in 1000 and the last non-zero rate one less (original bug) Z31-B13
+    i == 9: assert "…ocs_selectnumber : Error in random select" (OptionDegree), i = 0
+    row.Interval == 1: return i + 1
+    off = 1 <= Interval <= 100 ? next value of the shuffled ring rndbox.rb_box[Interval] (0…Interval−1, Z28 §4.1) : 0
+    v = Interval × i + off; v > 255: assert "…Too large value", v = 255
+    return v
+
+OptionCardStack::ocs_make(s, ItemOptionStorage* o) -> bool              @ FUN_0064c8a0
+    o.fixed.optionnumber &= 1                                          # keep the "identified" bit, count 0
+    s.ocs_Number null: return false                                    # a degree without an IOT_NUMBER row
+    n = ocs_selectnumber(s, s.ocs_Number)                              # how many options
+    while count(o) < n:
+        card = top card of the deck; none: assert "…ocs_make : Error in selecting" (degree), return false
+        take it off and put it back at the bottom (cs_InsertBottom; fails: assert "…Error in card recycle")
+        row = ItemOptions[card] (default block past the end)
+        row.OptionDegree == 0xFFFF: assert "…Option not found", return false
+            # dead: the u16 is zero-extended and compared with −1, so the test never fires (original bug) Z31-B12
+        row.Type == 0 or > 11: assert "…ocs_make : Invalid Option", return false
+        o.optionlist[count].itemoption_type  = row.Type
+        o.optionlist[count].itemoption_value = ocs_selectnumber(s, s.ocs_Number)
+            # the value is drawn from the IOT_NUMBER row, not from the option's own row: Rate / Interval of the
+            # rows of type 1-11 are never read (original bug) Z31-B11
+        count += 1                                                     # count > 8 (optionlist has 8) unchecked (Z31-B12)
+    return true
+```
+
+Callers of `ocs_make`: the reward item creators `ItemAttrCls_Amulet` / `_Weapon` / `_Armor` / `_Bracelet::iac_itemcreate`
+(§3.5.1) with `iod_optionlist[reward.OptionDegree]`. Because the deck is shuffled once and every item takes the next
+cards and puts them back at the bottom, the option types rotate zone-wide in one fixed order per degree; two items made
+one after the other never repeat a type until the deck has gone round *(inferred from the card handling)*. The 2016
+table has degree 1 (count row 995 / 5 ‰ for 1 / 2 options; types 1-5) and degree 2 (count row 900 / 90 / 9 / 1 ‰ for
+1-4 options; types 1-11, types 6-11 with `Interval` 10). With Z31-B11 every value is 1-2 (degree 1) or 1-4 (degree 2).
+
+Plumbing: `OptionCardStack::OptionCardStack` FUN_0064c4d0 (the `CardStack` ctor; called by the array constructor of
+`itemoptiondata`'s dynamic initializer); `ItemOptionsData::`scalar deleting destructor'` FUN_0064cab0 (destroys the 500
+stacks and the box; vftable slot 0, only image reference, never called).
+
+### 8.2 Random options of dropped items (`ItemRandomOption::RandomOptionTable`)
+
+`RandomOptionTable {vector<RandomOptionList> rot_OptionList}`; `RandomOptionList` (0x40) = `{Name8 rol_Index,
+vector<OptionCountTable {int oct_Number, int oct_Rate}> rol_Count +0x20, vector<OptionTable> rol_Option +0x30}`;
+`OptionTable` (0x14) = `{RandomOptionType ot_Type, vector<ValueList {int vl_Min, vl_Max, vl_Rate}> ot_ValueList}`
+*(pdb2016)*. The user is `rot_FillOption` (Z18 §4.5, FUN_00493590) and the GM command of Z11 (`std::_Find` FUN_00493490).
+
+```pseudo
+ItemRandomOption::RandomOptionTable::rot_Load(t, Name4*)               @ FUN_00494570  (stage "home", Z01 §2.3)
+    # 1. option counts: stack BinaryDataBox<RandomOptionCount> (key 0x12, row 0x25)
+    bdb_ReadData("../9Data/Shine/RandomOptionCount.shn")
+    for each row {char InxName[33], u16 LimitCount +0x21, u16 LimitDropRate +0x23}:
+        name = first 32 bytes of InxName
+        L = list with rol_Index == name; none: push_back {name, empty, empty} and find it again
+        none even then: fatal "ItemRandomOption::RandomOptionTable::rot_Load : Not appended in list"
+        L.rol_Count.push_back({oct_Number = LimitCount, oct_Rate = LimitDropRate})
+    # 2. option values: stack reader, CDataReader::Read("../9Data/Shine/RandomOption.shn", key 0x5d, row 0x31)
+    #    fails: assert "BinaryDataBox<T>::bdb_ReadData : readfail" + ShineExit (the box template inlined)
+    for each row {char DropItemIndex[33], RandomOptionType +0x21, u32 Min +0x25, u32 Max +0x29, u32 TypeDropRate +0x2d}:
+        L = list named DropItemIndex (32 bytes); none: fatal "…rot_Load : RandomOptionIndex out of CountList"
+        T = RandomOptionList::rol_FindOption(L, type); null: fatal "…rot_Load : Null RandomOption"
+        T.ot_ValueList.push_back({Min, Max, TypeDropRate})
+    # 3. checks, per list (all fatal, with the list name)
+    sum of L.rol_Count[].oct_Rate != 1000: "…rot_Load : Count not 1000"
+    for each T of L: sum of T.ot_ValueList[].vl_Rate != 1000: "…rot_Load : Option not 1000"
+
+RandomOptionList::rol_FindOption(L, type) -> OptionTable*               @ FUN_00493f20
+    linear search of L.rol_Option for ot_Type == type: found → return it
+    else push_back {type, empty} and search again (found → it, else null)
+```
+
+A list therefore exists only for names that appear in `RandomOptionCount.shn` (2016: 5 928 count rows, 11 456 option
+rows). `RandomOptionList::~RandomOptionList` FUN_00493e00 frees `rol_Option` (the element destructor is a folded
+`_Destroy_range`) and `rol_Count`; its caller is the unwind path of `rot_Load`.
+
+### 8.3 Gem socket count (`EnchantSocketRateTable`, `EnchantSocketRate.shn`)
+
+`Table::Load<EnchantSocketRateTable>` (§7.3) ends in this table's `DataProcess`:
+
+```pseudo
+EnchantSocketRateTable::DataProcess(t) -> true                          @ FUN_005c8070
+    once: RateDataProcess = EnchantSocketRateDataChild (a static object; its vftable is the whole object)
+    EnchantSocketRateData::SetSocketRateData(&RateDataProcess)          @ FUN_0064c5d0: sm_pSocketRateData = it
+    # EnchantSocketRateData::GetSocketRateData FUN_0064c5c0 returns it (Z18 §4.5, iac_DropItemMake)
+
+EnchantSocketRateDataChild::iod_GetSocketCount(this, itemID) -> u8      @ FUN_005c7fd0  (vt slot 0)
+    d = itemdatabox[itemID]; none: return 0
+    for each EnchantSocketRate row r (GetTotal() rows, file order):
+        r == null: return 0
+        if r.ItemGradeType == d.ItemGradeType:
+            x = rb_largerandom(Socket0 + Socket1 + Socket2) − Socket0     # uniform 0…n−1
+            return x < 0 ? 0 : (x < Socket1 ? 1 : 2)
+    assert "EnchantSocketRateDataChild::iod_GetSocketCount UnKnow Grade Type" (grade); return 0
+```
+
+So `Socket0` / `Socket1` / `Socket2` are the weights of 0 / 1 / 2 sockets. The result is the weapon's `maxSocketCount`
+in `ItemAttrCls_Weapon::iac_DropItemMake` (Z18 §4.5). 2016 rows (`GradeType` *(pdb2016)*): 0 NORMAL 0 / 100 / 100,
+1 NAMED 0 / 100 / 80, 2 RARE 0 / 100 / 40, 5 SET 0 / 100 / 20, 3 UNIQUE 0 / 100 / 10: every dropped weapon gets 1 or 2
+sockets; grades 4 CHARGE, 6 LEGENDARY and 7 MYTHIC have no row (assert, 0 sockets).
+
+### 8.4 Accessory upgrades (`AccUpGradeDataBox`, `AccUpGradeTable`)
+
+`gAccUpGradeDataBox` (0xc0) = `{BinaryDataBox<AccUpGradeInfo> augdb_bdbAccUpGrade, map<u16, map<RandomOptionType,
+ACC_UPGRADE_FACTOR {AccUpGradeInfo* pSuccess, *pFail}>> augdb_AccUpGradeData +0xb0}` *(pdb2016)*. The readers of the map
+are Z11 §9.3 (`augdb_GetAccUpGradeFactor…`, `augdb_RandomOptionUpgrade`).
+
+```pseudo
+AccUpGradeDataBox::augdb_Load(b) -> true                                @ FUN_005c69b0  (Z01 §2.3)
+    bdb_ReadData("../9Data/Shine/AccUpGradeInfo.shn")                   # key 3999, row 0x70 (§7.1)
+    for each row r {u16 ID, char InxName[32] +2, RandomOptionType UpFactor +0x22, u16 Success +0x26, 12 × {Min, Max, Limit}}:
+        r is the default block: fatal "AccUpGradeDataBox::augdb_Load - def data block"
+        inner = augdb_AccUpGradeData[r.ID] (created empty if missing)
+        f = inner[r.UpFactor] (created {null, null} if missing)
+        r.Success == 1 ? f.pSuccess = &r : f.pFail = &r                # a later row with the same key replaces the earlier
+```
+
+Constructor `AccUpGradeDataBox::AccUpGradeDataBox` FUN_005c6e00 (box with a zeroed default block, empty map; caller:
+the dynamic initializer of `gAccUpGradeDataBox`) and destructor FUN_005c6d70 (frees the map; its atexit destructor).
+
+`AccUpGradeTable` is a different table: `ITableBase<AccUpgrade, AccUpGradeTable>` over `AccUpgrade.shn` (row `{u32 ID,
+u16 CriFail, DownFail, NormalFail, nCon, LuckySuc}`, the `ItemUpgrade.shn` layout). `zs_start_full` calls
+`Table::Load<AccUpGradeTable>("AccUpGrade.shn")` FUN_005b4f40 → `ITableBase<AccUpgrade, AccUpGradeTable>::Load`
+FUN_005b2500 (the §7.3 template: `new AccUpGradeTable` FUN_005b1020, the §7.3 constructor, default `DataProcess`).
+`ITableBase<AccUpgrade, AccUpGradeTable>::GetByIndex(i)` FUN_0053c740 = `GetRecord(i)` of the singleton's reader; its
+caller is `Item_Upgrade_Table_mode` FUN_0053ca10 for amulets (Z04 §9.4: the override of the `ItemUpgrade` row; a
+missing row asserts "Item_Upgrade Not Found AccUpgrade Index :").
+
+### 8.5 Small key tables: `ItemMixData`, `CSingleDataMap`, `CBadNameFilterData`
+
+```pseudo
+ItemMixData::Read(m, path, key, rowSize) -> int                         @ FUN_00635450
+    # zs_start_star: Read(&gItemMixData, "../9Data/Shine/ItemMix.shn", 0x2c, 0x40); 0 → fatal "Fail to read 'ItemMix.shn'"
+    clear m.m_ItemMixDataMap (std::map<string, string>)
+    CDataReader::Read(&m.m_ItemMixDataReader, path, key, rowSize) fails: return 0
+    for each row {char Raw_ItemIDX[32], char Mix_ItemIDX[32] +0x20}:
+        Raw_ItemIDX already a key: return 0                             # one duplicate stops the zone
+        insert Raw_ItemIDX → Mix_ItemIDX
+    return 1                                                            # the reader keeps the file in memory
+```
+
+The reader of the map is `ItemMixData::GetMixItemIndex` FUN_00635820 (Z30 §9). 2016: 98 rows, no duplicate. Plumbing:
+ctor FUN_006353a0 (reader + empty map; `gItemMixData`'s dynamic initializer), dtor FUN_00635100 (map, then reader).
+
+```pseudo
+CSingleDataMap::InitSingleDataArray(m, path, key, rowSize) -> int        @ FUN_0062ee90
+    # zs_start_sleep: (&gSingleData, "../9Data/Shine/SingleData.shn", 7, 0x22); 0 → ShineExit("ZoneServer::zs_start_old")
+    stack CDataReader; Read fails: return 0
+    for each row {char SingleDataIDX[32], u16 SingleDataValue +0x20}: null row → return 0
+        m.m_SingleData[SingleDataIDX] = SingleDataValue                 # std::map<string, u16>; a duplicate overwrites
+    return 1                                                            # the reader is freed
+```
+
+Same code and file as the WM's (W05 §3.2 row 24, §3.3 `GetValue`; 41 keys such as `KQVote_VoteLimitTime`,
+`SenMaxLP`, `LimitRandomOption`, `MixMinUpgrade`). Zone readers: `CSingleDataMap::GetValue` (26 call sites; Z12 §3.1 for
+the Sentinel values). Plumbing: ctor FUN_0062f080 (empty map; `gSingleData`'s dynamic initializer), dtor FUN_0062f020.
+
+```pseudo
+CBadNameFilterData::ReadBadNameFilterData(f, path) -> int               @ FUN_0042a9a0
+    # zs_start_sleep: (&gBadNameFilterData, "../9Data/Shine/BadNameFilter.shn"); 0 → ShineExit("ZoneServer::zs_start_old")
+    CDataReader::Read(&f.m_BadNameFilterData, path, 0x12, 0x24) fails, or 0 rows: return 0
+    for each row {char BadName[32], u32 Type +0x20}: _mbsupr(BadName)    # upper-cased in place
+    return 1
+```
+
+Same as the WM's `CDataFileServer::ReadBadNameFilterData` (W05 §3.2 row 19). The zone's only test is
+`CBadNameFilterData::GetIsBadName` FUN_0042aa10 in the pet rename `sp_NC_PET_SET_NAME_R` (Z07). (The row count comes
+through `cChatColorDataBox::ccdb_GetMaxNum`, a folded "record count" accessor.)
+
+### 8.6 Area bitmaps (`BmpDataBox`, `BMP.shn`, `AreaBMP/*.bmp`)
+
+`bmpdatabox` = `{vector<BmpDataInfo*> bdb_vBmpDataList, BTree bdb_BmpTree +0x10, u32 bdb_nMaxBmpSize +0x414}`;
+`BmpDataInfo` = `BMPInfo {int AreaCenter_X, AreaCenter_Y, AreaSize, AreaSize_X, AreaSize_Y; u8** AreaBMP}` *(pdb2016)*.
+The area skills copy the `BMPInfo` per step (Z20 §3.1, `sdb_Load` step 10, `bdb_GetBmpDataInfo` FUN_00439520).
+
+```pseudo
+BmpDataBox::bdb_ReadData(b) -> true                                      @ FUN_00439550  (Z01 §2.3)
+    stack CDataReader: Read("../9Data/Shine/BMP.shn", 0x2c, 0x40) fails: fatal "Fail to read BMPIndex.shn"
+    for each row i {char BMPIndex[32], char FileName[32] +0x20}:
+        info = new BmpDataInfo (all zero)
+        bdi_LoadBmpFile(info, FileName) false: fatal "BmpDataBox::bdb_ReadData : BMP file Load Fail"
+        BTree::bt_Insert(&b.bdb_BmpTree, BMPIndex, i); b.bdb_vBmpDataList.push_back(info)
+
+BmpDataInfo::bdi_LoadBmpFile(info, name) -> bool                        @ FUN_004390f0
+    f = fopen(sprintf("../9Data/%sAreaBMP/%s.bmp", "Shine/", name), "rb"); none: fatal "SBmpDataInfo::bdi_LoadBmpFile : BMP file name error"
+    every check below is fatal ("BmpDataInfo::bdi_LoadBmpFile : BMP file …"):
+        14-byte file header read ("header info error"); bfType == "BM"; bfSize == file length ("File Size Error");
+        both reserved words 0 ("Reserved Error"); 40-byte info header read ("info error"); biCompression == 0;
+        biBitCount 1 or 8 ("bit error - biBitCount "); biWidth and biHeight <= 8000 ("size error ", 8000)
+    AreaSize_X = biHeight, AreaSize_Y = biWidth, AreaCenter_X = biHeight / 2, AreaCenter_Y = biWidth / 2
+    AreaBMP = malloc(biHeight pointers), each row malloc(biWidth); a failed malloc → return false
+    if biBitCount == 8:
+        read the 256-entry palette ("RGBQuad Error"); seek to bfOffBits
+        for x in 0…AreaSize_X−1 (file rows, bottom-up): read one row padded to 4 bytes (short read → return false)
+            for y in 0…AreaSize_Y−1: red = palette[pixel].rgbRed
+                AreaBMP[x][AreaSize_Y − 1 − y] = red < 201 ? red / 2 : 100           # 0…100
+    # biBitCount == 1 passes the checks but no pixel is read: AreaBMP stays uninitialised heap (original bug) Z31-B14
+    AreaSize = max over the cells with value 1 of (int) sqrt((x − AreaCenter_X)² + (y − AreaCenter_Y)²)
+    return true
+```
+
+2016: `BMP.shn` has 52 rows; all 52 files exist (some named `.BMP`, matched case-blind by Windows), all 8-bit, at most
+2800 × 2800. The one 1-bit file in the folder (`SW_FFocalor_Skill05_N.bmp`) is not in `BMP.shn`, so Z31-B14 is latent.
+
+### 8.7 Inventory item-count changes (`ItemLotAnalyser::LotAnalyser`)
+
+`itemlotanalyser` (global, 0x618) = `List<LotChanger>` of 192 entries over `LotChanger la_Array[192]` (+0x18),
+`LotChanger` (8) = `{u16 item, int delta +4}` *(pdb2016)*. `icl_Apply_N_Free` (Z05 §1.3) empties it, lets the releasers
+fill it, then calls `p.so_ply_ItemLotChange(entry.item, entry.delta)` (vt 0x7f8, Z15 §4.5: the quest item counters) for
+each entry.
+
+```pseudo
+ItemLotAnalyser::LotAnalyser::la_Store(a, ITEM_INVEN* where, ItemInventoryCell* cell, int sign)   @ FUN_0048a170
+    # callers: InvenCellReleaser_CellClear::icr_Apply (−1, before the cell is cleared),
+    #          InvenCellReleaser_CellChange::icr_Apply (−1 for the old item, +1 after the new one is stored)
+    if (where.Inven & 0xFC00) != 0x2400: return                        # inventory type 9 (the bag) only
+    lot = cell.attr.vt[0x1c](&cell.item)                               # iac_GetLot (§3.5)
+    id = cell.item.itemid; id == 0xFFFF: return
+    e = first entry with e.item == id (ListSearchSame, compare FUN_004b6aa0)
+    found: e.delta += lot × sign
+    else: e = next free entry (none: assert "ItemLotAnalyser::ItemLotAnalyser::ila_Store : List leck")
+          e.delta = lot × sign
+          # e.item is never written (original bug) Z31-B15: entries keep item 0 from the zero-initialised array
+```
+
+So in 2016 the search never matches a real item (every entry says item 0), each stored cell takes a new entry, and
+`icl_Apply_N_Free` reports `so_ply_ItemLotChange(0, delta)`: the quest hooks are asked about item 0 instead of the
+changed item (see knowledge §0 for the correction to Z05 §1.3 / Z15 §4.5). Plumbing: `LotAnalyser::LotAnalyser`
+FUN_0048c5f0 (`l_MakeList(192)`, content pointers into `la_Array`; `itemlotanalyser`'s dynamic initializer),
+`ListSearchSame<LotChanger>::~ListSearchSame` FUN_0048a160 (resets the iterator vftable; inlined in `la_Store`).
+
+### 8.8 `OptionReader` remainder (Z09 §28.6)
+
+ORField vftables *(read from RTTI)*: `{0 orf_CompareContent(char* value, ORToken* key), 4 orf_Alloc(buffer), 8 orf_Read
+(reader), 0xc data pointer FUN_005d6dc0 (`return +8`), 0x10 type}`; type = 1 index (FUN_00557bb0), 2 string
+(FUN_00647230), 3 byte (FUN_00556e40), 4 word (FUN_00449740), 5 dwrd (FUN_0063e3a0) (all folded constants). Field layout
+`{vftable, ORColumnHeader* +4, data* +8}`. Column headers: `{0 ortr_SetLength(reader, args), 4 type}` with the same type
+constants.
+
+| Function | Address | Behaviour | Caller |
+|---|---|---|---|
+| `ORFieldIndex::orf_Alloc` (shared by all five field classes) | FUN_00653be0 | `data = buffer`; returns the header's length (`+4`, folded accessor FUN_0045ff90), so the record buffer advances column by column | `ORRecord::orr_AllocObject` (Z20 §7) |
+| `ORFieldIndex::orf_CompareContent` | FUN_00653ad0 | true when the 20-byte key equals the field's index token | vt 0 |
+| `ORFieldString::orf_CompareContent` | FUN_00653b10 | `strcmp(field, value) == 0` (case-sensitive) | vt 0 |
+| `ORFieldByte` / `ORFieldWord` / `ORFieldDwrd::orf_CompareContent` | FUN_00653bb0 / FUN_00653c50 / FUN_00653cd0 | `sscanf(value, "%d")` equals the stored number | vt 0 |
+| `ORFieldWord::orf_Read` | FUN_00653c00 | `ortr_ReadNumber`; a read error or a value ≥ 0x10000 → "Cannot read word data", false; else stores the low 16 bits (negative values pass, `-1` = 0xFFFF) | vt 8 (`ort_ReadData`) |
+| `ORColumnHeader::ortr_SetLength` | FUN_00647150 | base: returns `orch_Length` (+4); the string header's override is FUN_00647160 (Z09 §28.6) | `ort_ReadColumnHeader` |
+| `ColumnCheckArgument::lid_Call` | FUN_00647000 | per field: empty column name → found, stop; same column name (20 bytes) → found = field.vt[0](value, key), stop; else go on | `RecordDataCompareArgument::lid_Call` FUN_006475a0 (`or_SelectFrom`) |
+| `ColumnNameArgument::lid_Call` | FUN_006474b0 | reads the next name (`ortr_ReadString`, no braces); none → "Column type-name mismatch", stop; else column name = first 20 bytes | `ORTable::ort_ReadColumnName` FUN_006477a0 |
+| `MakePrimaryKeyColumn::lid_Call` | FUN_00646f70 | on the key column: if its type is 1 (index), `okl_AddKey(keylist, field data, record)`; other types add nothing; stop | `MakePrimaryKey::lid_Call` FUN_00647410 |
+| `OrderArgument::lid_Call` | FUN_00646fe0 | counts down `oa_target`; at 0 keeps the record and stops | `or_SelectFromOrder` FUN_00647a60 |
+| `OptionReader::or_ClearError` | FUN_00645ef0 | error = {line 0, "Noerr", flag 0} | `SoulDamageContainer::sdc_Load`, `MobHatchery::mh_Load`, `MobRoamingSet::mrs_Load` |
+| `OptionReader::~OptionReader` | FUN_006467d0 | frees the file name string, destroys the 32 tables and the table list, then the `TokenArgument` | 42 loaders with a stack or member reader (Z09 §28.6 list) |
+| `TokenArgument::~TokenArgument` | FUN_00645e60 | five empty member destructors (folded `so_Gamble_ChangeCoin`) | unwind funclets of the `OptionReader` ctor / dtor |
+| `ORTable::operator=` | FUN_00646230 | member copy: name, record length, the 512 header pointers, the record list and key pointer (shallow) | `List<ORTable>::l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` |
+| `ListArray<ORRecord>::~ListArray` | FUN_00646180 | destroys the record array (0x808 each) | unwind funclets of the `ORTable` ctor / dtor |
+| `SafePointer<OptionReader>::~SafePointer` | FUN_004b14d0 | `~OptionReader` + `delete` of the held reader | unwind funclet of `MobHatchery::mh_Load` |
+| `ListEraser<ORTable>` / `ListEraser<ORRecord>::~ListEraser`, `ColumnNameArgument::~…`, `MakePrimaryKeyColumn::~…` | FUN_006462e0 / FUN_00647590 / FUN_006474a0 / FUN_00647580 | reset the iterator vftable | `l_MakeList` and unwind funclets |
+
+`FieldOption` (the map option file reader of `FieldContainer`, Z09) is an `OptionReader` with no members of its own:
+ctor FUN_0064cd20 = `OptionReader::OptionReader`, dtor FUN_0063e150 = the inlined `~OptionReader`; callers
+`FieldContainer`'s ctor / dtor and `kqscriptmanager`'s dynamic initializer / atexit destructor.
+
+### 8.9 Constructors and destructors of the other loader-owned objects
+
+| Object | Function | Behaviour | Caller |
+|---|---|---|---|
+| `FieldContainer` (`fieldlist`, 0x54090: `List<FieldMap>` of 512, `FieldOption fc_FieldOption` +0x18, `FieldMap fc_Array[512]` +0x11070, `fc_GuildTournamentMap` +0x54070, `fc_InstanceDungeon` +0x54078, `fc_TutorialMap` +0x54084) | ctor FUN_00466900 | `l_MakeList(512)`, `FieldOption` ctor, 512 `FieldMap` ctors, content pointers into `fc_Array` | `fieldlist`'s dynamic initializer |
+| | dtor FUN_00465550, scalar deleting dtor FUN_00466a30 | frees `fc_GuildTournamentMap.attr` and `fc_InstanceDungeon.Attribute`, the 512 maps, the reader and the list | atexit; the scalar dtor (vt 0) has no caller |
+| `FieldMap::fm_GetCenterObject` | FUN_00463510 | returns `fm_SlantedListPoint.flag[2]`, the map's centre object (axial flag, Z09 §12.7) | 64 callers (every "objects of a map" walk: `ac_SetPVP`, `mc_Routine`, `sp_EscapeFromEmptyID`, …) |
+| `MapDataBox` (`mapdatabox`, 0x51c) | ctor FUN_0064eed0, dtor FUN_0064ef60 | box with a zeroed `MapInfo` default block, `BTree mdb_btree`, `mdb_index` null, `mdb_maxmapid` 0 / frees `mdb_index`, the tree and the box | dynamic initializer / atexit (loader `mdb_Load`, Z09) |
+| `MapBlockInformationBox` array element (`blockinfobox.mbib_array[256]`) | FUN_0049dfe0 | `mapid` cleared, `AreaInfoData` ctor, 32 `MapDoorBlockElement`s, the four block buffers null | `blockinfobox`'s dynamic initializer (loader `mbib_Load` FUN_0049e940, Z09 §9.2) |
+| `KQItemDataBox` (`gKQItemDataBox`, `map<u16, KQItem>`) | dtor FUN_0064bf90 | frees the map | atexit (loader Z16) |
+| `BRAccUpgradeDataBox` (`gBRAccUpgradeDataBox`) | dtor FUN_0043ba60 | frees `m_upgradeInfoList`, `m_upgradeList`, both boxes | atexit (loader `LoadBRAccUpgradeData` FUN_0043bb00, Z18) |
+| `cStateItemDataBox` (`gStateItemDataBox`, `vector<SIDB_Element>`) | dtor FUN_0058c810 | frees the vector | atexit and the unwind of `g_KQContributeList`'s initializer (loader Z24 / Z20) |
+| `ItemActionItemBox` (42 small cells of 0x14) | dtor FUN_00644bc0 | empty cell destructors, base vftable | `CharacterInventory::~CharacterInventory`, `sp_Item`'s dtor (§3.4) |
+| `ItemActionObserveBuffer` (Z17 §2.1, the 5000-observer pool) | scalar deleting dtor FUN_005d1560 | destroys the 5000 observers and the list | vftable slot 0 only (the pool is a function-local static, never deleted) |
+| `ItemActionObserve` | scalar deleting dtor FUN_005d0a00 | resets the vftable | vftable slot 0 only |
+| `ListEraser<ItemActionObserve>` | `lid_Call` FUN_005538d0, dtor FUN_005d0c10 | `list.vt[0xc](index)` (free the node), continue / reset the vftable | `List<ItemActionObserve>::l_MakeList` (the RTTI also lists it under the lot-changer and script-interrupt erasers: identical code) |
+| `CDataReader` | dtor FUN_0062a140 | frees the file buffer (`m_pHead`) when `m_nBFSize` != 0 and the row array when `m_nDataArraySize` != 0; zeroes sizes and checksum | 87 callers: every stack reader (`bdb_ReadData` of BMP, `MCC_DataRead`, `CPetData::ReadData`, the `ITableBase` destructors, …) |
+| `ITableBase` constructors of the item tables | `AccUpGradeTable` FUN_005b1020, `ActionRangeFactors` FUN_005b1660, `ItemActionConditions` FUN_005b16a0, `ItemActionEffects` FUN_005b16e0, `ItemActions` FUN_005b1720, `ActionEffectItemTable` FUN_005b1f80, `ActionEffectAbStateTable` FUN_005b1fc0 | the §7.3 `T::T()` template | each table's `ITableBase<…>::Load` (§7.3; `DataProcess` bodies Z17 / Z21) |
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1923,7 +2234,11 @@ runs is FUN_005aff00.
 | Z31-B8 | `AttackRhythm_Range::arb_Next` FUN_00427d50 §6.3 | `ca_point = (ca_point + 1) & 2`: from 0 the point stays 0 | every archer-line swing broadcasts animation 0 in 0x2447 | alternate the animations (`& 1` or `% 2`) *(inferred)* |
 | Z31-B9 | `EngSklAtt::esa_masicaldamage` FUN_004fc630 §6.4 | advances the random box of `MaxMA − MinMA` but returns only `ena_physicdamage` (1): `MinMA` and the spread are never added | none in 2016 (`EngSklAtt` has no caller) | `MinMA + spread + slot 0xc`, as the physical twin |
 | Z31-B10 | `LevelGap_Player_to_Player::GetLevelCapRate` FUN_005c81c0 §7.3 | reads the cell at `DefLv[def]` = column `TargetLv(def+1)`; `def < 150` sends a level-150 defender to the default | PvP level-gap rates shifted one target level; level-150 defenders always 1000 ‰; none in 2016 (every cell 1000) | `DefLv[def − 1]` with `def <= 150` *(inferred: the file's header row labels column N as level N)* |
-
+| Z31-B11 | `ItemOptionsData::OptionCardStack::ocs_make` FUN_0064c8a0 §8.1 | draws every option value with `ocs_selectnumber(ocs_Number)`, the degree's IOT_NUMBER (count) row | the `Rate` / `Interval` columns of the type rows 1-11 of `ItemOptions.shn` are never used; reward items get option values 1-2 (degree 1) or 1-4 (degree 2), never the Interval-10 values of TH / TB / AC / WC / MA / MR | `ocs_selectnumber(row)` with the card's own row *(inferred)* |
+| Z31-B12 | `iod_Load` FUN_0064cbc0 / `ocs_make` §8.1 | `OptionDegree` indexes the 500 stacks unchecked; the "Option not found" test compares the zero-extended u16 with −1 (dead); the option count is not capped at the 8 `optionlist` slots | none in 2016 (degrees 1-2, at most 4 options; card indexes are always valid rows) | bound `OptionDegree` < 500, compare with 0xFFFF, cap the count at 8 |
+| Z31-B13 | `OptionCardStack::ocs_selectnumber` FUN_0064c4f0 §8.1 | picks index i with `r <= Rate[i]` for r in 0…999 | index 0 is 1 ‰ more likely and the last non-zero rate 1 ‰ less likely than the table says | `r < Rate[i]` |
+| Z31-B14 | `BmpDataInfo::bdi_LoadBmpFile` FUN_004390f0 §8.6 | accepts 1-bit bitmaps but reads pixels only for 8-bit ones | a 1-bit area bitmap would give a skill area of uninitialised heap bytes and a random `AreaSize`; latent (all 52 `BMP.shn` files are 8-bit) | refuse 1-bit files or decode them |
+| Z31-B15 | `ItemLotAnalyser::LotAnalyser::la_Store` FUN_0048a170 §8.7 | a new `LotChanger` gets only `delta`; `item` is never written | every inventory change applied through the lock list (the only caller of vt 0x7f8) is reported to the quest item hooks as item 0 (`so_ply_ItemLotChange(0, delta)`), so the quest item counters are not updated when items enter or leave the bag *(effect on quest completion not traced)*; the same item stored twice takes two entries | `e.item = id` when the entry is allocated |
 ## Not reconstructed / uncertain
 
 - §2.1: who sends the item-use DB confirmation that runs `uib_Effect` is Z05's `InvenCellReleaser_ItemUse` path
@@ -1962,6 +2277,13 @@ runs is FUN_005aff00.
   comparison; the client's reaction to 0x726 (no text in `client-error-codes.json`) was not checked.
 - §6.7: `CharaterSkillList::~CharaterSkillList`'s export ends after the first `operator delete`; that it frees both
   vectors is the standard `std::vector` destructor pair *(inferred)*.
+- §8.1: the zone-wide rotation of option types (one deck per degree, never reshuffled after start-up) is read from the
+  card handling; whether the designers meant a per-item draw was not checked against the client or a capture.
+- §8.6: the meaning of the cell values (0…100 = red / 2, 1 = inside the area) is taken from the loader and the `AreaSize`
+  test only; the skill code that reads `AreaBMP` is Z20 / Z25.
+- §8.7: Z31-B15's effect assumes no quest counts item 0. vt 0x7f8 has no caller besides the two `icl_Apply_N_Free`
+  forms, so the lot list is the only feed of `QuestPlayer_TakeItem` / `DestroyItem` (Z15 §4.5); whether the quest end
+  check re-counts the inventory (`GetQuestPlayerItemLot`), so that item quests still complete, was not traced (Z15).
 
 ## Coverage boundary
 
@@ -1986,5 +2308,7 @@ Filled in by the sweep part; rows found so far:
 | auto-arrange sort and step scheduling (`so_ply_ArrangeInven` FUN_00563500) | this item, part 10 (§11, Z04 open point) | §4.9 documents the grade rank and the login init |
 | the owners of the `BinaryDataBox<T>` instances (`mdb_Load`, `idb_Load`, `mvdb_Load`, `sma_Load`, … in the §7.1 table) | the item named in each row (Z09, Z13, Z27, Z06, …; done) or this item §8 / §9 | §7.1 documents only the box template, the readers' keys and the destructors |
 | the gamble rules that read `g_BanTime`, `g_TaxRate`, `g_EventCode`, `g_GBReward` (`go_Init` FUN_00614f10, `go_PlayerAction` FUN_00615180, `go_Enter_Player` FUN_00620d00, `SMS_StopButton` FUN_00625340) | Z06 §4-§5 (done), Z32 | §7.2 documents the tables and the finders |
-| `EnchantSocketRateTable::DataProcess` FUN_005c8070, `iod_GetSocketCount` FUN_005c7fd0 | this item, part 7 (§8, `EnchantSocketRate*`) | §7.3 documents the load template and the singleton |
 | the guild tournament, GTI, item action and action effect `ITableBase` tables (their `Load` / `DataProcess`) | Z16, Z11, Z17, Z21 (done) | §7.4 lists only their destructors and `GetTotal` |
+| the users of the §8 tables: `rot_FillOption` (random options), `iac_DropItemMake` (sockets), `augdb_*` getters, `Item_Upgrade_Table_mode`, `GetMixItemIndex`, `CSingleDataMap::GetValue`, `GetIsBadName`, the area-skill readers of `AreaBMP` | Z18 §4.5, Z11 §9.3, Z04 §9.4, Z30 §9, W05 §3.3 / Z12 §3.1, Z07, Z20 §3.1 (done) | §8 documents only the loaders and their data structures |
+| `so_ply_ItemLotChange` and the quest item hooks it calls | Z15 §4.5 (done) | §8.7 documents the list that feeds it (Z31-B15) |
+| the loaders of `MapDataBox`, `KQItemDataBox`, `cStateItemDataBox`, `BRAccUpgradeDataBox`, `MapBlockInformationBox`, `FieldContainer::fc_Load` | Z09, Z16, Z24 / Z20, Z18, Z09 §9.2 (done) | §8.9 documents only their constructors and destructors |
