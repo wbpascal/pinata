@@ -127,8 +127,13 @@ def key(i):
 
 EXTRA = []        # (group name, row dict with id, handler, beh, eff, intent, ev, owner)
 # ID -> (mark, note): mark = Superseded (the bug as stated does not exist), Narrowed (part of it, or its effect, is
-# wrong), Extended (a later item adds the cause or more effect). README §5.9 lists the same entries with sources.
+# wrong), Extended (a later item adds the cause or more effect), Withdrawn (the owning item itself withdrew the entry
+# but kept the row; evidence column becomes "withdrawn"). README §5.9 lists the same entries with sources.
 SUPERSEDED = {
+    'W05-B7': ('Withdrawn', 'W05 review: `ReadGlobalGameData` does pass the path for `%s`; not a bug'),
+    'W05-B12': ('Withdrawn', 'W05 review: the 0x0802 log gets all its arguments; not a bug'),
+    'Z09-B5': ('Withdrawn', 'Z09 R1: the call is the map-script interrupt `sim_MobHPFull`; not a bug'),
+    'Z11-B11': ('Withdrawn', 'Z11 sweep: the number is used (`pr_SetCount` FUN_00468180); not a bug'),
     'W01-B5': ('Superseded', 'X01: the XOR key is Login\'s per-world counter, +1 per world select (`GetClientValidation` FUN_0040a200, L01 §2.5), so pending logins take consecutive slots; a slot is reused only after 2048 selects'),
     'Z02-B5': ('Narrowed', 'Z07 §11: the 0x2035 / 0x2039 produce path is live (client `ProductTask` sends both); only the result packets are unused'),
     'Z02-B12': ('Narrowed', 'Z09 §15.8: the report only arms the interrupt, which fires when the server\'s own `.aid` geometry agrees; a false report can only choose which inside player counts'),
@@ -182,7 +187,8 @@ if sys.argv[1] in ('md', 'write'):
             if i in SUPERSEDED:
                 mark, note = SUPERSEDED[i]
                 c[1] = f"**{mark}** ({note}; [§5.9](#59-bug-register-entries-a-later-item-changed)): " + c[1]
-            out.append(f"| {i} | {c[0]} ({link}{also}) | {c[1]} | {c[2]} | {c[3]} | {evidence(c, i)} | {item} |")
+            ev = 'withdrawn' if SUPERSEDED.get(i, ('',))[0] == 'Withdrawn' else evidence(c, i)
+            out.append(f"| {i} | {c[0]} ({link}{also}) | {c[1]} | {c[2]} | {c[3]} | {ev} | {item} |")
         out.append('')
     text = '\n'.join(out)
     if sys.argv[1] == 'md':
