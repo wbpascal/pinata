@@ -3,7 +3,8 @@
 Source: the 2016 `Zone.exe` (`Files/Server/2016/Zone00`). Read the code with the 2016 PDB names
 (`python3 -I tools/protocol-re/clean.py re-data/exports/zone-pdb - 649780`); the class, member and enum names below are
 from the NA2016 `Zone.pdb` *(pdb2016)*, which belongs to the same build. Plain statements are read in the code;
-*(inferred)* marks deductions. No packet is sent or received here: this is start-up data loading.
+*(inferred)* marks deductions. The loader sends and receives no packet (start-up data loading); the only packet in this
+document is the `0x3459 NC_ITEMDB_DESTROY_REQ` that the `eDelConditionType` consumer sends at map login (§7.2).
 
 What this item adds to the existing docs: Z04 §1.2 uses the index (`g_ItemData` = `itemdatabox`), Z24 §7.3 covers the
 constructor and the dead stand-alone reader `ItemDataBox::ReadData`, Z24 §1.3 reads the special IDs, Z20 §2.1 documents
@@ -543,11 +544,13 @@ read `sii_JustReviveItem`, `sii_GuildReName`, `sii_GuildReType`).
   of them that are looked up by name must still exist in ItemInfo.shn, because a missing one stops the zone (§3.7).
   So the HP/SP potion slot rotation of §4 has no effect in 2016.
 - The three small readers no other doc cites, in one line each: `so_ply_SparrowWingExpand(p, n)` FUN_00589b10
-  (n capped at 10) finds the first GoddessWing in the inventory, and if its class is `ITEMCLASS_BINDITEM` (13) and it has
+  (ShinePlayer vt 0x914; its only caller is `UseItemMemoryFeather::uib_Effect` FUN_0059a320 (Z04 §6.3 table), which
+  passes n = 5; n is capped at 10) finds the first GoddessWing in the inventory, and if its class is `ITEMCLASS_BINDITEM` (13) and it has
   fewer than n saved locations, appends one location {map 0xFFFF, x 10000, y 10000}, writes the item to the DB
   (`sp_AttrChange2DB`) and sends code 0x700 through vt 0x91c; `UseItemMemoryFeather::uib_CanUseItem` FUN_00598ab0 returns
   0x701 when vt 0x47c fails, else looks for a GoddessWing (class 13) in the unlocked inventory: none → 0x718, more than
-  4 saved locations → 0x719, else 0x700 (OK); `sp_silverwing_Setloc` FUN_0059bc80 acts only when the given inventory
+  4 saved locations → 0x719, else 0x700 (OK) (so a Memory Feather raises the GoddessWing to at most 5 locations, the
+  two limits agree); `sp_silverwing_Setloc` FUN_0059bc80 acts only when the given inventory
   cell holds item `sii_silverwing` (location-save logic belongs to the silver-wing feature, §10).
 
 ### 7.2 Index members: consumers
@@ -562,7 +565,7 @@ read `sii_JustReviveItem`, `sii_GuildReName`, `sii_GuildReType`).
 | `SetItemIndex` | Z21 §3.2 (always 0xFFFF, Z21-B1) | — |
 | `itemdroplog` | `ShineDropItem::so_ItemDrop` FUN_0052a7a0 (Z09 §11.3): row present and `ItemID` == the dropped ID → GameLog 0x0798 | drop logging of the 57 IDs (§6.4) |
 | `ItemSortOrder` | `so_ply_ArrangeInven` FUN_00563500 (Z04 §12.5): sort key byte of each cell (0xFF for empty / unknown cells) | inventory auto-arrange order (§6.5) |
-| `eDelConditionType` | `sp_ItemInvenDelete(p, cond)` FUN_0051c590: deletes every inventory item whose condition is ≠ `DCT_NONE` and == cond; called only with `DCT_LINKIN_ALL` (1) by `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 (Z01 §6) | the 19 event items of §6.6 vanish at every map login |
+| `eDelConditionType` | `sp_ItemInvenDelete(p, cond)` FUN_0051c590 (block below): deletes every inventory item whose condition is ≠ `DCT_NONE` and == cond; called only with `DCT_LINKIN_ALL` (1) by `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 (Z01 §6) | the 19 event items of §6.6 vanish at every map login |
 | `pBuyItemData` | `NPCRole_Merchant::nrb_ItemBuyItemMoney` FUN_004c7590 (below), `so_ply_ItemBuyItemMoney` FUN_00526ac0 (Z04 §2.2: `IM_MoneyLot × lot` money items needed, lot capped at `MaxLot`) | item-money shop prices (§6.7) |
 
 ```pseudo
@@ -574,6 +577,38 @@ NPCRole_Merchant::nrb_ItemBuyItemMoney(npc, player, itemid, &moneyId, &moneyLot)
         moneyId  = idb_2itemid(e.pBuyItemData.IM_MoneyIDX)        # FUN_00418ff0: name looked up again at every buy
         moneyLot = e.pBuyItemData.IM_MoneyLot
     # moneyId 0xFFFF = "not an item-money item": the caller (Z04 §2.1) falls back to the normal buy
+```
+
+```pseudo
+ShinePlayer::sp_ItemInvenDelete(p, cond)                                        @ FUN_0051c590
+    # cond: DelConditionType; only caller sp_NC_MAP_LOGINCOMPLETE_CMD FUN_00443390 passes DCT_LINKIN_ALL (1)
+    L = p.vt[0x7d4]()                                     # InventoryCellLockList p+0xfaa8 (Z05 §1)
+    it = UnlockedInventoryIterator(L, inventory p.sp_Item.itembag.ci_Inventory, InvenType 9)
+    if not it.uii_Home(): return                          # no unlocked inventory cell
+    pkt = 0x3459 NC_ITEMDB_DESTROY_REQ {                  # global packet gpp, 0x19 + 8·count bytes
+        u16 handle  = p.handle (p+4)
+        u32 charNo  = p.vt[0x344]()
+        u16 lockindex = L.lockindex (L+4)
+        u8  count:7 = 0                                    # bit 7 kept
+        @0x19 u64 key[count]                               # the item's 8-byte registration key
+    }
+    do:
+        item = cell under it                               # null = empty cell
+        if item and item.ID < idb_maxItemhandle and idb_index[item.ID].data:
+            e = idb_index[item.ID]
+            if e.data.ID != item.ID: assert "ItemDataBox::operator [] :Invalid Item index", item.ID·10000 + e.data.ID
+            elif e.eDelConditionType ≠ DCT_NONE and e.eDelConditionType == cond:
+                slot = ITEM_INVEN(9, it.finger & 0x3ff)
+                if not L.vt[0x0c](9, slot):                # cell not locked by another request
+                    pkt.key[pkt.count] = item key; pkt.count += 1      # 7-bit counter
+                    L.vt[0x30](lockindex, item, slot)      # reserve "clear this cell" under the lock index (Z04 knowledge)
+                # a locked cell is skipped silently: the item survives until the next map login
+    while it.uii_Next()
+    if pkt.count:
+        if not pp_SetPacketLen(0x19 + 8·count): assert "ShinePlayer::sp_MakeItem : Packet Too Long"   # wrong function name in the text (original bug) Z27-B6
+        else: send pkt to the character DB (sock2gameDB)   # answer 0x345A DESTROY_ACK applies or frees the reservation (Z05 §6.4)
+        L.lockindex += 1                                   # also when the send was refused
+    # nothing changes in memory here; the client sees the cells vanish only after 0x345A (NC_ITEM_CELLCHANGE_CMD, Z05 §1)
 ```
 
 Matches of these member names in `ii_ItemMoneyBuyAll` FUN_005259a0, `sp_NC_ITEM_MOVER_UPGRADE_REQ` FUN_0051c850,
@@ -606,3 +641,51 @@ array (the old one leaks), the readers re-read their files into new images while
 `idb_btree` only gains / overwrites names (a renamed item would keep its old name too), `sii_JustReviveItem` keeps an old
 value if the JustRevival row is gone, and every `ItemSortOrder` / `eDelConditionType` / `pBuyItemData` default is
 reset only on the new array.
+
+## Original-server bugs
+
+| ID | Handler | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z27-B1 | `idb_Load` §3.3 / §3.8 | the index initialisation writes every member except `HitTimeArray[0..2]`; only items whose `WeaponType` has a WeaponAttrib row get it set | the 4 `WT_PRODUCTIONTOOL` weapons (4500, 4503, 4506, 35252) swing with heap contents: zero pages in practice → no auto-attack (§7.3) | initialise to 0 (or to a default one-hit {500, 0, 0}) |
+| Z27-B2 | `idb_Load` §3.4 | ItemSort row count and loop index are truncated to 8 bits | with ≥ 256 ItemSort rows, rows 256+ are never matched and every item using them stops the zone ("cannot find ItemSort"); 2016 has 59 rows, no effect | 32-bit count |
+| Z27-B3 | `idb_Load` §3.6 | a GradeItemOption name that is no ItemInfo InxName exits through the inlined `idb_MakeSpecialID` with "idb_MakeSpecialID : Wrong Item Id"; the two "(GradeItemOption) : Invalid Item Index" checks after it can never fire | misleading fatal text; dead checks; 2016 data passes | own check with the GradeItemOption text |
+| Z27-B4 | `idb_Load` §3.10 | "Invalid ItemInvenDel ID" (`id ≥ idb_maxItemhandle`) tests a value that came from the name trie, so is always valid | dead check, no effect | — (harmless defensive check) |
+| Z27-B5 | `idb_Load` §3.11 | "Duplicate ItemMoney IM_ItemIDX" logs `IM_MoneyIDX` | the fatal log names the money item instead of the duplicated item; 2016 data passes | log `IM_ItemIDX` |
+| Z27-B6 | `sp_ItemInvenDelete` §7.2 | the "Packet Too Long" assert text names `sp_MakeItem`; after it the lock index is still incremented with reservations recorded but no DB request sent | copy-pasted log text; in the (unreachable with 2016 inventories *(inferred)*) too-long case the reserved cells would stay locked with no answer to free them | own function name; free the reservations when the send is refused |
+
+## 9. Not reconstructed / uncertain
+
+- **Heap contents of `HitTimeArray`** for items without a WeaponAttrib row (Z27-B1): zero-filled pages is an
+  allocator deduction (§7.3), not visible in the code; a rebuild should pick an explicit value (0 matches 2016 practice).
+- **Offset-only reads**: "never read" for `AttackAngle` (§7.2) and for the 13 unread `sii_*` members (§7.1) comes from
+  searching the PDB-named export by member name; a read through a raw offset (`*(short *)(… + 0x1a)`) with a lost type
+  would not show; no offset search was made, so such a read cannot be excluded.
+- **Potion slot rotation** (§4: HP0←HPMPotion1, HP1←2, HP2←0, HP3←3, same for SP): deliberate or a slip is unknown; the
+  members are never read in 2016 (§7.1), so it has no visible effect.
+- **ID 9157**: its InxName differs between ItemInfo and ItemInfoServer (§6.2); `idb_Load` never compares the names
+  (only IDs), and the trie uses the ItemInfo name. Whether any data tool relies on the ItemInfoServer name is unknown.
+- **`sp_ItemInvenDelete` limits** (§7.2): the 7-bit key counter wraps at 128 entries and `pp_SetPacketLen`'s limit was
+  not looked up; both need more than 127 deletable event-item stacks in one inventory, which the 2016 inventory size
+  does not allow *(inferred)*.
+- `IM_MoneyLot` and `DelCondition` are not range-checked at load (§3.10, §3.11); what other values would do is only
+  described from their consumers (Z04 §2.2, §7.2).
+
+## 10. Coverage boundary
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| `ItemDataBox::ItemDataBox` FUN_0064b5d0, the dead `ItemDataBox::ReadData` FUN_006494f0 | Z24 §7.3 (done; documents both) | constructor and stand-alone reader, not reached from `idb_Load` |
+| `BTree::BTree` FUN_0063cb50, `BTree::~BTree` FUN_0063cb70 (from the ctor / `~ItemDataBox` FUN_00649700) | Z20 §5.2 (done; the `BTree` trie) | generic name-trie container; §1.1 / §3.4 only use it |
+| `operator new[]` FUN_00654f0b, `operator delete` FUN_0065677f, `operator delete[]` FUN_00656774 | none needed: MSVC runtime | CRT allocation functions, no game logic |
+| `BinaryDataBox<T>::bdb_ReadData` template, SHN decoding FUN_0062a0f0 / FUN_0062a9e0 | Z20 §2.1 (done; the template) | §2 cites the eight instances; the shared body is documented there |
+| other callers of the readers: FUN_00641580 (`<ItemDropLog>`) also reads `MobKillLog.shn` in `MobDataBox::mdb_Load` FUN_00641e60; FUN_00648d50 (`<CollectCardMobGroup>`) also reads `ActiveSkillGroup.shn` in `SkillDataBox::sdb_Load` FUN_00585f40 and the card table in `SHND::CommonData<CollectCardMobGroup,…>` FUN_005b7b10 | Z09 §5.1 / §28.5 (`mdb_Load`, done), Z20 §2.1 (`sdb_Load`, done; names the folding), Z07 §7 (card collection, done; `CollectCardMobGroup.shn`) | identical-code folding: one body per row size, each loader's own table |
+| `zs_start_home` FUN_005adce0 (only caller of `idb_Load`) and the loader order | Z10 §7.1 (done; stage scripts) | start-up stages; §8 only needs "runs once at start-up" |
+| the other loaders keeping pointers into item rows (`iba_Load`, `dic_Load`, `rpt_Load`, `igc_Load`) | Z24 §7.2 (done) | they read the finished index; §8 cites them for reload safety |
+| the 33 callers of `idb_2itemid` FUN_00418ff0, the callers of `ItemDataBox::operator[]` FUN_00419020 and of `idb_SpecialItems` FUN_00418fe0 | the item of each caller (§7.1 names the `sii_*` readers with their items; Z04 §1.2 the index use) | accessors over the finished table; the logic of each caller is its feature's |
+| `sp_silverwing_Setloc` FUN_0059bc80 (reads `sii_silverwing`) | Z26 (planned; plan step 1 names its only caller `smfm_Silverwing_LocSet` FUN_0059bff0) | silver-wing location saving; §7.1 records only the item-ID test |
+| `sp_Schedule_SwingStart` FUN_00430bc0 / `sp_Schedule_SwingDamage` FUN_0042f550 (read `HitTimeArray`; SwingStart dereferences the `operator[]` result without a null check) | Z03 §3.2 (done; documents the hitTime loop) | combat timing; §7.3 documents only what the 2016 data makes them do |
+| `0x3459 NC_ITEMDB_DESTROY_REQ` handling and the `0x345A` answer | D03 §7.5 (Character server), Z05 §6.4 (zone answer) | item-DB protocol; §7.2 documents only the request `sp_ItemInvenDelete` builds |
+| `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 (calls `sp_ItemInvenDelete`) | Z01 §6 (done) | map-login sequence |
+| `UseItemMemoryFeather::uib_CanUseItem` FUN_00598ab0, `uib_Effect` FUN_0059a320, `so_ply_SparrowWingExpand` FUN_00589b10 | covered here (§7.1); Z04 §6.3 lists the actor only by address | small gap of a done item, documented in this file |
+| `sp_ItemInvenDelete` FUN_0051c590 | covered here (§7.2) | Z12's boundary assigns it to Z04 (done, not documented there) and Z18 lists it among Z09's leftovers; the full block is now in §7.2 |
+| consumers of the other index members (`so_RecalcEquipParam` FUN_004cab70, `FillRandomOption` FUN_004ca9e0, `so_ItemDrop` FUN_0052a7a0, `so_ply_ArrangeInven` FUN_00563500, `so_ply_ItemBuyItemMoney` FUN_00526ac0) | Z12 §2.2, Z09 §11.3, Z04 §12.5, Z04 §2.2 (all done) | §7.2 links each; their logic is the feature's |
