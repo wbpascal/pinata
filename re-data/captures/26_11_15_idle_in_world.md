@@ -1,0 +1,3 @@
+- login with character "Test1235"
+- idle in world for a while (mobs surround the player)
+- logout to world select
