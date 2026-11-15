@@ -2453,6 +2453,7 @@ ShineGuildAcademyGuildBuff(cmd) FUN_0046e070 (Z08 §10: the 0x987A visitor)
 ShineGuildAcademyGuildBuff::lid_Call(v, o) → continue                                  @ FUN_0046e110   (over the player list)
     g = o.so_ply_isAcademyGuildMember() (vt 0x858) == 0 ? o.so_mobile_GetGuildRegnum() (vt 0x818)
       : == 1 ? o.so_ply_GetMyGuildAcademyNo() (vt 0x85c) : (the object pointer: never matches)
+    # the player body FUN_0055a540 returns m_nMyGuildAcademyNo != 0 (a bool): the third branch is dead
     for i < cmd.NumOfGuild: cmd.Guild[i] == g:
         sgagb_dic == null: stop
         o has abstate STA_ACAMSBUF10P (298) or STA_ACAMSBUF7P (300) (vt 0x3e4): stop      # the master buff wins
@@ -2815,9 +2816,10 @@ SlantedCoordList::ObjectYCoordNode::ocn_type FUN_00587d20 → 'Y' (0x59) (X node
 | `String::String()` / `String(char*)` | FUN_00653740 / FUN_006537d0 | own string class `{vptr, chData, stringLength, allocSize}`: 48-byte zeroed buffer / assign | `ZoneServer::ParseCmd` FUN_005aab10, `zs_start`, `WinService` (Z10 §1.1) |
 | `String::operator=(char*)` / `(String&)` | FUN_006536a0 / FUN_00653800 | grows `allocSize` in 48-byte steps (old buffer freed, new one zeroed), copies, recounts the length | same |
 | `String::makeUpper`, `~String`, scalar dtor | FUN_00653690 (`_mbsupr`), FUN_00653670, FUN_00653790 | | `ParseCmd` (command-line verbs are compared upper-case), `WinService` |
+| `operator==(String&, String&)` | FUN_00653820 | `_mbscmp(a.chData, b.chData) == 0` | `ZoneServer::ParseCmd` FUN_005aab10 (verb match after `makeUpper`) |
 | `WinService` scalar dtor | FUN_00653360 | vftable, `~String(serviceName)`, free | vt 0 |
 | `cWell512Random::cWell512Random` / `well512_InitState(seed[16])` | FUN_0063c990 / FUN_0063c9d0 | zero index, z0-z2 and the 16 state words / index and z cleared, state = seed | `RandomBox::RandomBox` FUN_0063cdb0: seed = 16 × `rand()` after `srand(_time32())` (Z23 §8.6) |
-| `type_info::~type_info`, scalar dtor, `operator==`, `_Type_info_dtor` | FUN_0065628a, FUN_0065629a, FUN_006562bb, FUN_006634f6 | MSVC run-time (RTTI name list under lock 0xe, `strcmp` of the decorated names) | CRT only *(inferred: library code)* |
+| `type_info::~type_info`, scalar dtor, `operator==`, `_Type_info_dtor` | FUN_0065628a, FUN_0065629a, FUN_006562bb, FUN_006634f6 (+ its unwind funclet FUN_0066355d `_unlock(0xe)`) | MSVC run-time (RTTI name list under lock 0xe, `strcmp` of the decorated names) | CRT only *(inferred: library code)* |
 | `FunctionProfiler::PerformanceRecorder::PerformanceRecorder` | FUN_00468460 | `pr_Array` = empty `std::map` (head node 0x38), `QueryPerformanceFrequency` (0 → 1), `pr_CheckLoopCount_Command = pr_CheckLoopCount_Real = −1` | initializer of `_PerformanceRecorder` (report: Z11 §4.5) |
 | `FunctionEntarance::~FunctionEntarance` | FUN_004028d0 | `fca_stackpoint −= 1`; `pr_Exit(fe_FunctionCode)`: the exit half of Z18 §1.6's ctor | 616 scope exits |
 | `DebugLogging::operator<<(char*)` / `(int)` / `(DebugLineFeed&)` | FUN_00419210 / FUN_0043be30 / FUN_00419290 | when `dl_ActivAll` and the log's `dl_Activ`: `"%.255s"` / `"%d"` to the log file (`dl_FilePoint` opens it); the line feed writes `'\n'`, flushes and closes the file | 129 / 78 / 127 log lines (`TooLongPacket`, `InvalidSessionCutLog`, …) |
@@ -3146,8 +3148,8 @@ the usable size, Z04 §4.1 shows no such refusal)*.
   that the guild buff makes right after. Whether `so_AbnormalState_Set` informs the client itself when its 9th argument is 0
   (master) and not 1 (guild) was not traced (Z03 §6.2 documents the set path but not that argument, `how`). If it does not, a master sees the
   buff only on the next brief-info or login refresh *(inferred)*.
-- §9.6: `ShineGuildAcademyGuildBuff::lid_Call` compares the guild list with the object pointer when `so_ply_isAcademyGuildMember`
-  returns neither 0 nor 1. Its body (FUN_0055a540) was not re-read; if it returns a bool, that branch is unreachable.
+- §9.6: `ShineGuildAcademyGuildBuff::lid_Call`'s third branch (object pointer compared with the guild list) is dead for
+  players: `so_ply_isAcademyGuildMember` FUN_0055a540 returns `m_nMyGuildAcademyNo != 0` (sweep, read).
 - §9.6: `GuildStorageElement::operator=` / `GuildAcademyRewardStorageElement::operator=` are reached only through the lists'
   Push / Pop slots. No call of those slots on the two storage lists was found (the storage code allocates with `l_AllocZ`
   and searches with `ListSearchSame`), so the copies are probably unused *(inferred)*.
@@ -3208,7 +3210,13 @@ the usable size, Z04 §4.1 shows no such refusal)*.
 
 ## Coverage boundary
 
-Filled in by the sweep part; rows found so far:
+Sweep (part 11, 2026-11-15): `X02-cov.py game zone` leaves 86 class-named functions (3 973 lines), all of them gamble
+classes; `Z31-parts.py` lists only its part G. A reach scan from the 1 759 zone functions this document cites (3 calls deep,
+the `coverage.py` rules: hubs, tiny and library functions skipped) finds 12 uncited functions: the gamble ones of the
+first row, the four Lua 5.2 internals of the second row; `operator==(String&, String&)` FUN_00653820 and the
+`_Type_info_dtor` funclet FUN_0066355d are now in §10.7. The 11 `FUN_` addresses of this text without a zone name are
+client functions (0x1C06 handler FUN_004a02f0, 0x1096 handler FUN_0049fe50, error text FUN_00416430, …).
+
 
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
@@ -3231,3 +3239,5 @@ Filled in by the sweep part; rows found so far:
 | the users of the §8 tables: `rot_FillOption` (random options), `iac_DropItemMake` (sockets), `augdb_*` getters, `Item_Upgrade_Table_mode`, `GetMixItemIndex`, `CSingleDataMap::GetValue`, `GetIsBadName`, the area-skill readers of `AreaBMP` | Z18 §4.5, Z11 §9.3, Z04 §9.4, Z30 §9, W05 §3.3 / Z12 §3.1, Z07, Z20 §3.1 (done) | §8 documents only the loaders and their data structures |
 | `so_ply_ItemLotChange` and the quest item hooks it calls | Z15 §4.5 (done) | §8.7 documents the list that feeds it (Z31-B15) |
 | the loaders of `MapDataBox`, `KQItemDataBox`, `cStateItemDataBox`, `BRAccUpgradeDataBox`, `MapBlockInformationBox`, `FieldContainer::fc_Load` | Z09, Z16, Z24 / Z20, Z18, Z09 §9.2 (done) | §8.9 documents only their constructors and destructors |
+| the 86 gamble functions left by `X02-cov.py game zone`: `CGambleDiceTaiSaiObject` (35, e.g. `GDTSO_DiceTaiSai_Result_DiceRoll` FUN_0061a350, `GDTSO_DiceTaiSai_Out` FUN_0061c330), `CGambleObject` (22, `go_MaxPlayerInObject` FUN_00614dc0), `DiceTaiSai::Init` FUN_00634330, `DiceTaiSaiDividind` (3), `CGambleObjectManager` (3), `SlotMachine::*` (22: `sma_1LineMatch` FUN_00621c10, `sma_ScreenMatch` FUN_00621dd0, `sma_CenterMatch` FUN_00621fa0, `smjpr_JackPotRateCalc` FUN_006220e0, `smsm_Shuffle` FUN_0061fa10, …) | Z32 (open; plan: "`CGambleDiceTaiSaiObject` 36 functions … the `SlotMachine::*` classes", list command `X02-cov.py game zone 1200 \| rg -e Gamble -e TaiSai -e SlotMachine`) | excluded from Z31 by its plan; the `rg` of Z32's list command matches all 86 (`DiceTaiSaiDividind`, `CGambleObjectManager` included) |
+| Lua 5.2 VM internals `close_state` FUN_0060c330, `luaC_freeallobjects` FUN_00602920, `luaF_close` FUN_006014c0, `luaE_freeCI` FUN_0060c1c0 (below `lua_close` FUN_0060c690, reached from the `LuaScript` dtor of §9.9) | no item (upstream code), as argued in Z11's boundary (`lua_close` row); host side Z09 §14.1 | unmodified third-party library: its behaviour is the published Lua 5.2 source; the host side (`LuaScript`) is Z09 |

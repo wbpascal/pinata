@@ -6175,11 +6175,13 @@ Sent from `FUN_00562cb0` (`FUN_00562cb0`) · payload 4 bytes
 
 ### `0x3049` NC_ITEM_EQUIP_BELONGED_CANCEL_USE_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_EQUIP_BELONGED_CANCEL_USE_ACK`, 2 bytes
+**Verified layout** (basis: zone sp_NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ FUN_0051b9a0 (refusals); success from the DB answer 0x34A7 (Z05 §5.3); client FUN_004b3940)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x2880 ok; 0x2882 mode, 0x2885 fear, 0x2886 captivated, 0x2883 no field, 0x2884 lock busy, 0x2887 NPC menu / storage open, 0x2888 bound cell missing, 0x288a bound item unknown, 0x288c not PutOnBelonged, 0x288d not bound, 0x2889 cancel cell missing, 0x288b cancel item unknown / lot < 1, 0x288e not ITEMFUNC_PUTON_CLEAR, 0x288f grade differs (Z31 §11.4) |
+
+client shows FUN_00416430(nError) for every code but 0x2880; 0x2883 / 0x2886 / 0x2888 / 0x2889 have no text (Z31-B27)
 
 Sent in reply to `0x3048` NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ on ShineObjectClass::ShinePlayer (`FUN_0051b9a0`, ShineObjectClass::ShinePlayer::sp_NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ) · payload 2 bytes
 
@@ -11730,6 +11732,14 @@ to the whole map instance (target 0xFFFF) or one object. The mob version sends l
 |---|---|---|---|
 | 0 | u16 | err | 0xB04 0xB07 0xB08 0xB09 0xB11 |
 
+### `0x203d` NC_ACT_REINFORCE_FOLDTENT_CMD (S→C)
+
+**Verified layout** (basis: zone so_ply_ReinforceFoldtent FUN_0055ae50 via so_SendProtocol(8, 0x3d) FUN_0054ef70; client FUN_004c4bc0 (no payload read))
+
+Empty payload.
+
+header only (2 bytes); name pdb2017; sent when the server folds the player's tent before a link / teleport (Z31 §11.3)
+
 ### `0x203e` NC_ACT_MOVESPEED_CMD (S→C)
 
 **Verified layout** (basis: zone FUN_00459540)
@@ -13568,6 +13578,18 @@ P02 part 11: 34 bytes on the wire; the pdb2016 struct (28) lacks the ref prefix
 answer 0x344A NC_ITEMDB_ITEMCHANGE_ACK (Z05 §5.4); this sender is one of 12
 
 **Captured** (P02, `capture-validation.md`; combat): `lockindex`: 2 / 1; `itemid`: 38043; `attribute`: ShineItemAttr_Riding 0x13 bytes: hungrypoint 760 → 750, deletetime 0x76bbecff (never), bitflag 0 (DuringRide cleared before the save)
+
+### `0x3014` NC_ITEM_SOMEONEPICK_CMD (Z→C)
+
+**Verified layout** (basis: zone ShinePlayer::sp_Send_NC_ITEM_SOMEONEPICK_CMD FUN_0052f0e0 (from so_ply_PickupItem FUN_0052faf0) via AxialListPacketBroadcast4ItemPickUp FUN_00428f40; client FUN_004abc20)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | pickerID | p.so_CharName (vt 0x56c) |
+| 20 | u16 | itemID | sp_pickitem.itemid |
+| 22 | u32 | nItemLot | sp_pickitem.itemlot (not read by the client) |
+
+0x1A bytes payload (0x1C with opcode); to every player in sight in a game mode, the picker excluded; the client prints 'expedition group has received an item' only for a member of its party
 
 ### `0x482c` NC_SKILL_ITEMACTIONCOOLTIME_CMD (Z→C)
 
