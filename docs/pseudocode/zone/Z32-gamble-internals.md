@@ -285,7 +285,344 @@ cd_Find({GameType, RewardType})    first row with both equal, else null         
 
 ## 3. Gamble-house TaiSai table (`CGambleDiceTaiSaiObject`)
 
-*(part 2)*
+One object per dealer NPC of MobInfo type `MT_GB_DICE` (23), bound by `gom_Init` (§2.4). The handlers that drive it (join, leave,
+bet, cancel, ranks) are Z06 §4.4; this section documents the object. Coins are the currency (`p+0x2aa70`, player vt 0xb04 get /
+0xb08 set, Z06 §4.1). The game is always in auto mode (`DTGM_AUTO`): the server rolls when the betting timer runs out; there is
+no manual mode in the gamble house (`bModeType` is always sent as 0).
+
+### 3.1 Layout, tables, states
+
+`CGambleDiceTaiSaiObject : CGambleObject` (0x570) *(pdb2016)*: `+0x18 GI_DiceTaiSai* DiceTaiSai` (never used by the methods read),
+`+0x1c GambleGamerInfo* G_GamerInfo` (one record per gamer, same index as `go_pEnterPlayerObj`), `+0x20 GambleDiceTaiSai
+G_DiceTaiSai`:
+
+| Offset (object) | Member | Meaning |
+|---|---|---|
+| +0x20 | `GambleActiveDice.MaxBetMoney` u32 | `GBDiceGame.MaxBetMoney` (150 000): the bet limit base (§1.5) |
+| +0x24 / +0x26 | `.CastTime` / `.DelayTime` u16 | betting time / stand-by time, **in ticks of 0.1 s** (`GBDiceGame` ms × 10 / 1000: 300 = 30 s, 150 = 15 s) |
+| +0x28 | `.UseMinLv` u16 | minimum level, always 0 (`go_CanLevel` slot 0x1c: `UseMinLv ≤ level`, so never refuses) |
+| +0x2a | `.GetSysRate` u16 | house cut, `GBTaxRate` row of game type 23 `.GB_TaxRate` (10); its use in the payout: §3.10 |
+| +0x2c / +0x38 | `.WinCode[3]` / `.LoseCode[3]` u32 | `GBEventCode` (type 23, GB_ANI 0…2) / (GB_ANI 3…5) `.GB_ECode`: 801100 801900 802200 / 801100 801400 801800 (0 if a row is missing) |
+| +0x44 | `nGameStatus` | `DICE_TAISAI_GAME_STATUS`: 0 `DTGS_NONE_BETTING` (board empty), 1 `DTGS_BETTING` (timer running), 2 `DTGS_ROLLING`, 3 `DTGS_STAND_BY` |
+| +0x48 / +0x4c | `bIsActiveTimerCheckTime` u8 / `nTimerCheckTime` u32 | the one timer: active flag and due tick (`clockwatch.cw_CurrTick`) |
+| +0x50 | `History[7]` (`DiceTaiSaiInfo`, 3 bytes each) | the last 7 throws, newest first |
+| +0x65 | `bIsAdminDice` u8 | GM-fixed throw pending (§3.9) |
+| +0x66 | `CurrentRollingDice` | the throw of the current round (or the GM-fixed one) |
+| +0x70 | `BettingInfo[52]` (`BettingSumInfo {u64 nMoney; u16 nPlayerCnt}`, 0x10) | per bet kind: total staked by all gamers and the number of gamers with a non-zero stake on it |
+| +0x3b0 | `nBetSumMoney` u64 | total staked on the board |
+| +0x3b8 / +0x568 | `nDiceRate[216]` u16 / `nDiceRateSum` u32 | outcome weights (`GBDiceRate`, GM-adjustable) and their sum, used by the roll (§3.10) |
+
+Gamer record `GambleGamerInfo` (0xe8): `+0 GI_DiceTaiSai DiceTaiSaiInfo { u8 bGameLeaveReserve; u8 bRoomLeaveReserve; +4
+DiceTaiSaiAllBetting BetInfo { u32 nBetMoney[52]; +0xd0 u32 nBetSumMoney }; +0xd8 u64 nTotalDividend }`, `+0xe0 u32 nTotalWinCnt`.
+`bGameLeaveReserve` = "leave when this round is over" (§3.7); `bRoomLeaveReserve` is cleared at Enter and never set in the gamble
+house (only the mini-house player record of the same type uses it, Z06 §3).
+
+State cycle (details in §3.6–§3.8, §3.10):
+
+```
+NONE_BETTING --first stake on an empty board (BroadSetTimer: timer = CastTime, 0xBC81 start)--> BETTING
+BETTING --last stake cancelled (BroadSetTimer cancel) / last gamer with stakes leaves (Out)--> NONE_BETTING  (0xBC81 stop)
+BETTING --timer due (go_Routine): CanAutoDiceRoll + DiceRoll ok → BroadDiceRoll, Result_DiceRoll--> ROLLING … STAND_BY (§3.10)
+STAND_BY --timer due (go_Routine): BroadLargeAmount, clear board and bets, reserved leaves, 0xBC80--> NONE_BETTING
+```
+
+Stakes are not taken from the coins when they are placed: betting only checks that the coins cover all own stakes (§3.6); the round
+result books the net amount (§3.10). Leaving during betting therefore simply removes the stakes (§3.7).
+
+### 3.2 Construction and initialisation
+
+```pseudo
+CGambleDiceTaiSaiObject()                                                      @ FUN_00618050
+    CGambleObject(); status NONE_BETTING; timer inactive, due 0; History, bIsAdminDice, CurrentRollingDice, BettingInfo[52],
+    nBetSumMoney all 0     (GambleActiveDice, nDiceRate and the gamer records are set by go_Init)
+~CGambleDiceTaiSaiObject()        base destructor only (G_GamerInfo, from malloc, is not freed: process exit only)   @ FUN_006180c0
+
+go_Init(npc)                      (vt 0x08, from gom_Init §2.4)                 @ FUN_00614f10
+    npc null → 0
+    go_pGambleNPCObj = npc; seats go_nMaxWhereStandCnt = 13; go_nWhoStandHnd = new u16[13], all 0xFFFF   (allocation failure → 0)
+    n = go_MaxPlayerInObject(MT_GB_DICE) (GBJoinGameMember: 6); n = 0 → 0
+    vt 0x34 go_Init_MaxPlayer(n) false → 0
+    row = GBDiceGame record 0 (gGBDiceGame); none → 0
+    MaxBetMoney, CastTime, DelayTime ← row; UseMinLv = 0
+    GetSysRate = (u16) GBTaxRate.cd_Find(GameType 23).<u32 at +4>       # COMDAT-shared CommonData<GBBanGame> find: the u32 at +4
+                                                                        # truncated to u16 is GB_TaxRate (10)
+        # (original bug) Z32-B1: the find result is not null-checked: a GBTaxRate.shn without a row 23 crashes the zone at start-up
+    WinCode[k] = GBEventCode.cd_Find({23, ANI k}).GB_ECode for k = 0, 1, 2; LoseCode[k] for ANI 3, 4, 5 (0 when no row)
+    CastTime = CastTime × 10 / 1000; DelayTime = DelayTime × 10 / 1000     # ms → 0.1 s ticks
+    vt 0xac GDTSO_SetDiceProbability(null, 0)        # load the weights (§3.9); its result is ignored
+    return 1
+go_Init_MaxPlayer(n)              (vt 0x34)                                     @ FUN_006180d0
+    go_Init_PlayerObject(n) (§2.2) false → 0; G_GamerInfo = malloc(n × 0xe8) (not zeroed: each record is cleared when a gamer
+    takes it, §3.4); return G_GamerInfo ≠ null
+GDTSO_GetGameStatus()             (vt 0x38) nGameStatus                          @ FUN_00618130
+```
+
+### 3.3 Player-side gamble state (`ShinePlayer::so_Gamble_*`)
+
+The player's current game type is `sp_Gamble_JoinType` (`GAMBLE_TYPE`, `p+0x2aa78`, Z06 §4.1: `GBT_BASE` 0 none, `GBT_DICETAISAI` 1,
+`GBT_SLOTMACHINE` 2).
+
+```pseudo
+so_Gamble_IsGambleHouse()        (player vt 0xaf8) current map's FieldList row +0x3a == 7          @ FUN_00615cf0
+so_Gamble_CharCoinData(PROTO_NC_CHAR_COININFO_CMD)   (vt 0xb00; Z06 §4.1, from WM 0x10DD)          @ FUN_00615d10
+    coins (vt 0xb08) = nCoin; exchanged coins (vt 0xb14) = nExchangedCoin
+    max = GBExchangeMaxCoin row whose Level == p's level (vt 0x4d8), first match; no match → 0
+        (a null record while scanning → return without sending)
+    remaining = max − exchanged if exchanged < max (and its high dword 0), else 0
+    p ← 0x10DE { u64 nCoin, u64 remaining }
+so_Gamble_CanJoinGamble(type)    (vt 0xb1c) sp_Gamble_JoinType == GBT_BASE (argument ignored)       @ FUN_00615e60
+so_Gamble_IsJoinThisGamble(type) (vt 0xb20) sp_Gamble_JoinType == type                              @ FUN_00615e80
+so_Gamble_IsJoinAnyGamble(out)   (vt 0xb24) *out = type (if out); type ≠ GBT_BASE                   @ FUN_00615ea0
+so_Gamble_SetGambleType(type)    (vt 0xb28) sp_Gamble_JoinType = type; 1                            @ FUN_00615ec0
+```
+
+Every TaiSai method below treats "p is in this game" as `vt 0xb20(GBT_DICETAISAI)`, and every broadcast goes to the gamers that
+pass it (all of them, in practice).
+
+### 3.4 Gamer records
+
+```pseudo
+GDTSO_GetDiceTaiSaiInfo(int i)          (vt 0xbc) &G_GamerInfo[i] for 0 ≤ i < count, else null          @ FUN_0061b830
+GDTSO_GetDiceTaiSaiInfo(ShineObject p)  (vt 0xb8) record of gamer p (go_Get_EnterPlayerIndex), else null @ FUN_0061b940
+GDTSO_GetDiceTaiSaiInfo(u16 handle)     (vt 0xb4) by object handle (0xFFFF → null)                       @ FUN_0061ba50
+GDTSO_GetDiceTaiSaiInfo(u32 charNo)     (vt 0xb0) by charNo (0xFFFFFFFF → null)                          @ FUN_0061bb70
+GDTSO_GetTotalWinCnt(int i / p / handle / charNo)   (vt 0xcc / 0xc8 / 0xc4 / 0xc0) &record.nTotalWinCnt, same lookups
+                                                    @ FUN_0061bc80 / FUN_0061bda0 / FUN_0061bec0 / FUN_0061bff0
+    # all eight return null when G_GamerInfo is null
+GDTSO_ClearDiceTaiSaiInfo()             (vt 0xa4)                                                        @ FUN_0061b490
+    count < max: record[count] (the one the next gamer gets) = all 0 (leave flags, stakes, nTotalDividend, nTotalWinCnt); 1
+    else 0
+GDTSO_GetDiceTaiSaiGameLeaveInfo(p, out u8)   (vt 0xd0)                                                   @ FUN_0061c110
+    p in this game and a gamer → *out = bGameLeaveReserve; 1.  Else 0
+GDTSO_SetDiceTaiSaiGameLeaveInfo(p, u8 v)     (vt 0xd4)                                                   @ FUN_0061c220
+    v ≠ 0, p in this game and a gamer → bGameLeaveReserve = v; 1.  Else 0      # cannot clear the flag
+```
+
+`nTotalWinCnt` is per seat-holding session: cleared at Enter, counted by the round result (§3.10), read by the current-rank list
+(`gom_GetDiceRankInfo`, §2.4).
+
+### 3.5 Joining
+
+Z06 §4.4 `0xBC64 GAME_JOIN_REQ` (FUN_0061ccc0) checks the field, the NPC, the distance, `go_CanEnter` (0x2615) and
+`go_CanWhereStand(nWhereStand)` (0x2616), sets the direction, then calls, in this order: `go_SendGameInfo` (must return 0x2610),
+`GDTSO_SendTaiSaiBettingInfo` (0x2610 or 0x2618), `GDTSO_DiceTaiSai_Enter` (0x2610) → `GDTSO_DiceTaiSai_BroadEnter`. The join
+answer is therefore sent **before** Enter; an Enter failure after it is not reported (all of Enter's refusals are checked earlier by the
+handler, so this is not reachable in practice).
+
+(original bug) Z32-B2: no TaiSai code writes the seat array `go_nWhoStandHnd` (neither the join handler nor Enter / Out / the
+round code read for this item mark or free a seat; *(inferred: no writer found; the slot-machine parts re-check the shared base)*):
+every seat < 13 stays "free", so `0x2616` (seat taken) is only returned for a seat number ≥ 13 and several gamers may stand on the
+same seat; `0xBC17` (Z06 §4.3) never answers `0x2606` and proposes the seats round-robin.
+
+```pseudo
+go_SendGameInfo(p)             (vt 0x24)                                                        @ FUN_006183d0
+    p null → 0x2617
+    p ← 0xBC65 NC_GAMBLE_DICE_TAISAI_GAME_JOIN_ACK {                    # 0x32 + 2n bytes
+        u16 nError = 0x2610
+        DiceTaiSaiInfo DiceHistory[7] = History (newest first)
+        u32 nGameStatus = nGameStatus;  u32 bModeType = 0 (DTGM_AUTO)
+        u16 nTimer = CastTime (ticks)
+        u32 nInterval = nTimerCheckTime − now if status is BETTING, else 0   (ticks left)
+        u16 nGetSysRate = GetSysRate;  u64 nMaxBetMoney = MaxBetMoney
+        u16 nUseMinLv = not written   # (original bug) Z32-B3: payload bytes 0x2f–0x30 keep whatever the shared send buffer held
+        u8 nGamerCnt = n;  u16 nGamerHnd[n] = handles of the current gamers except p
+    }
+    return 0x2610
+```
+
+Client (`MHDiceGameTask::Recv_NC_GAMBLE_DICE_TAISAI_GAME_JOIN_ACK` FUN_00707e10): 0x2610 → clears its gamer and bet maps, stores
+status, `nTimer / 10` and (the low 16 bits of) `nInterval / 10` as seconds, the sys rate and max bet; replays the history oldest
+first; adds the listed gamers and itself; status 1 draws the remaining time bar; status 2 or 3 sets "round in progress" (betting
+disabled); `nMaxBetMoney ≠ 0` shows "Lucky House Dice Game - MAX BET %d coins" (text 0x620ee2ae). It does not read `nUseMinLv`, so
+Z32-B3 has no visible effect. Other codes: 0x261B → its error-table message; 0x261A → a modal (text 0x236e0f79); 0x2615 / 0x2617 →
+the literal system message "%d" (a client formatting slip).
+
+```pseudo
+GDTSO_SendTaiSaiBettingInfo(p)    (vt 0x3c)                                                     @ FUN_006185f0
+    p null or G_GamerInfo null → 0x2619
+    status ≠ BETTING → 0x2618 (nothing sent)
+    entries = for every gamer g ≠ p in this game, every kind k with g.nBetMoney[k] ≠ 0: { u16 g.handle, u32 k, u32 g.nBetMoney[k] }
+    p ← 0xBC67 NC_GAMBLE_DICE_TAISAI_GAME_BETTING_INFO_CMD { u8 PartMask, u16 nBettingCnt, GDT_BettingInfo Betting[] (10 bytes) }
+        split when the packet would pass 7 500 bytes: PartMask bit 0 = first packet, bit 1 = last (one packet: 3); with at most
+        6 × 52 entries (3 125 bytes) one packet always suffices
+    return 0x2610
+```
+
+Client (FUN_00706fd0): a first part (bit 0) is applied, a later part only while it waits for one; each entry adds the amount to that
+gamer's stake on that kind and redraws the chip (`CheckBettingChip`).
+
+```pseudo
+GDTSO_DiceTaiSai_Enter(p)         (vt 0x40)                                                     @ FUN_00618890
+    p null → 0x2617;  count ≥ max → 0x2615;  p already in a gamble game (vt 0xb1c false) → 0x261B
+    p.sp_Gamble_JoinType = GBT_DICETAISAI (vt 0xb28)
+    vt 0xd4 SetGameLeaveInfo(p, 0)      # (original bug) Z32-B4: dead call: Set refuses 0 and p is not a gamer yet;
+                                        # ClearDiceTaiSaiInfo below does the reset
+    vt 0xa4 ClearDiceTaiSaiInfo() and vt 0x00 go_Enter_Player(p) (§2.2: may set the NPC's "game full" abstate) →
+        gom_SetNeedRecalDiceRankInfo(); return 0x2610
+    else p.sp_Gamble_JoinType = GBT_BASE; return 0x2617
+GDTSO_DiceTaiSai_BroadEnter(p)    (vt 0x44)                                                     @ FUN_00618a80
+    p null → 0x2617;  p not in this game or not a gamer → 0x261B
+    every other gamer ← 0xBC66 NC_GAMBLE_DICE_TAISAI_GAME_JOIN_CMD { u16 nPlayerHnd = p.handle };  return 0x2610
+```
+
+Client 0xBC66 (FUN_00708600): adds the gamer and shows "%s has entered." (text 0x7f90c3d5).
+
+### 3.6 Betting, cancelling and the betting timer
+
+The request structs are `PROTO_NC_GAMBLE_DICE_TAISAI_BETTING_REQ / _CANCEL_REQ { DiceTaiSaiBetting {u32 nBetting (kind), u32 nMoney},
+u16 index }` (Z06 §4.4); the handler passes the request's `DiceTaiSaiBetting` unchanged and calls `CanBetting`, `Betting`,
+`BroadSetTimer(bet, DTBT_BETTING)`, `BroadBetting` (cancel: `CanBettingCancel`, `BettingCancel`, `BroadSetTimer(bet,
+DTBT_BETTING_CANCEL)`, `BroadBettingCancel`).
+
+```pseudo
+GDTSO_DiceTaiSai_CanBetting(p, bet)   (vt 0x54)                                                 @ FUN_00618db0
+GDTSO_DiceTaiSai_Betting(p, bet)      (vt 0x58; repeats every check of CanBetting, then books)  @ FUN_0061c6c0
+    p or bet null → 0x2635;  p not in this game → 0x2634;  status ∉ {NONE_BETTING, BETTING} → 0x2636
+    bet.nMoney = 0 → 0x2637;  kind ∉ 0…51 → 0x2638;  p not a gamer → 0x2639
+    coins (vt 0xb04) < own nBetSumMoney + nMoney → 0x263A          # only compared when the coins' high dword is 0
+    not is_CanBettingMoney(kind, MaxBetMoney, own nBetMoney[kind] + nMoney) (gGBDiceTaiSaiDividind, §1.5) → 0x263B
+    # (original bug) Z32-B5: both sums are 32-bit and wrap: nMoney close to 2^32 passes both checks (e.g. own stake 100, nMoney
+    # 2^32 − 51: the sums are 49)
+    Betting only:
+        GDTSO_SetDiceTaiSaiAllBettingInfo(record, bet, out first) false → 0x2635
+        BettingInfo[kind].nMoney += nMoney (u64); BettingInfo[kind].nPlayerCnt += first; nBetSumMoney += nMoney (u64)
+    return 0x2630
+GDTSO_SetDiceTaiSaiAllBettingInfo(record, bet, out first)                                        @ FUN_006198c0
+    any null or nMoney = 0 → 0
+    first = (record.nBetMoney[kind] = 0); record.nBetSumMoney += nMoney; record.nBetMoney[kind] += nMoney (u32); 1
+```
+
+Z32-B5 effect: the gamer's record wraps to the small value, while the board (`BettingInfo[kind].nMoney`, `nBetSumMoney`, 64-bit) and
+the `0xBC73` broadcast carry the full `nMoney`. Cancels can only remove the recorded (small) amount, so the board total stays
+non-zero until the round's clear (§3.8): the "board empty" stop in `Out` and the cancel-stop of the timer then never fire for that
+round, and the other clients show a stake of about 4.29 × 10⁹. The payout uses the gamer's record (§3.10).
+
+```pseudo
+GDTSO_DiceTaiSai_BroadBetting(p, bet)   (vt 0x5c)                                                @ FUN_00619080
+    p or bet null → 0x2635
+    every other gamer ← 0xBC73 NC_GAMBLE_DICE_TAISAI_BETTING_CMD { u16 nPlayerHnd, u32 nBetting, u32 nMoney };  return 0x2630
+
+GDTSO_DiceTaiSai_CanBettingCancel(p, bet) (vt 0x60)                                              @ FUN_00619200
+GDTSO_DiceTaiSai_BettingCancel(p, bet)    (vt 0x64; same checks, then books)                     @ FUN_0061ca00
+    p or bet null → 0x2643;  p not in this game → 0x2644;  status ∉ {NONE_BETTING, BETTING} → 0x2647
+    nMoney = 0 → 0x2648;  kind ∉ 0…51 → 0x264B;  p not a gamer → 0x2649;  own nBetMoney[kind] < nMoney → 0x264A
+    BettingCancel only:
+        GDTSO_SetDiceTaiSaiAllBettingCancelInfo(record, bet, out emptied) false → 0x2643
+        BettingInfo[kind].nMoney −= nMoney; .nPlayerCnt −= emptied; nBetSumMoney −= nMoney
+    return 0x2640          # 0x2645 / 0x2646 are never returned (Z06 §4.4)
+GDTSO_SetDiceTaiSaiAllBettingCancelInfo(record, bet, out emptied)                               @ FUN_006199c0
+    any null, nMoney = 0 or nMoney > record.nBetMoney[kind] → 0
+    record.nBetSumMoney −= nMoney; record.nBetMoney[kind] −= nMoney; emptied = (record.nBetMoney[kind] = 0); 1
+GDTSO_DiceTaiSai_BroadBettingCancel(p, bet) (vt 0x68)                                            @ FUN_00619450
+    p or bet null → 0x2643
+    every other gamer ← 0xBC76 NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_CMD { u16 nPlayerHnd, u32 nBetting, u32 nMoney };  0x2640
+
+GDTSO_DiceTaiSai_BroadSetTimer(bet, type)   (vt 0x50)                                            @ FUN_006195d0
+    bet null or type > 1 → 0x2635
+    type DTBT_BETTING:
+        status ≠ NONE_BETTING → 0x2630 (timer already running: nothing)
+        Σ over the 52 kinds of BettingInfo[k].nPlayerCnt ≠ 1 → 0x2635          # only the very first stake starts the timer
+        timer active, due = now + CastTime
+        every gamer ← 0xBC81 NC_GAMBLE_DICE_TAISAI_TIMER_CMD { u8 bIsStart = 1, u16 nTimer = CastTime, u32 nInterval = CastTime }
+        status = BETTING
+    type DTBT_BETTING_CANCEL:
+        status ≠ BETTING → 0x2635
+        some kind still has nPlayerCnt ≠ 0 → 0x2630
+        every gamer ← 0xBC81 { 0, 0, 0 }; status = NONE_BETTING       # the timer flag stays set: when it falls due go_Routine
+                                                                      # finds status 0 and only clears it
+    return 0x2630    (the handlers ignore the result)
+```
+
+Client: `0xBC73` (FUN_00707420) ignores its own handle, adds the stake to that gamer, sets "betting" and redraws the chip;
+`0xBC76` (FUN_00707700) ignores its own handle, subtracts the stake and, when no gamer has a stake left, shows "All betting has been
+canceled." (text 0x8aa5acb9) and returns to status 0; `0xBC81` (FUN_007067d0) `bIsStart = 0` resets the time bar, otherwise it
+stores `nTimer / 10` seconds (`nInterval` is not read).
+
+### 3.7 Leaving
+
+`GDTSO_DiceTaiSai_Out` is called by `0xBC68 GAME_LEAVE_REQ` (Z06 §4.4) and by `go_PlayerUnmarking` / `GDTSO_ExcuteLeaveGame`
+(§3.10). On 0x2627 the handler sets `SetGameLeaveInfo(p, 1)` (leave at the end of the round); on 0x2620 / 0x2627 it calls
+`BroadOut(p, reserve)`.
+
+```pseudo
+GDTSO_DiceTaiSai_Out(p)            (vt 0x48)                                                     @ FUN_0061c330
+    p null → 0x2625;  p not in this game → 0x2623;  p not a gamer → 0x2624
+    status ROLLING or STAND_BY → 0x2627         # reserved: the caller decides (handler: SetGameLeaveInfo(p, 1))
+    record of p: for every kind k with a stake: SetDiceTaiSaiAllBettingCancelInfo(record, {k, nBetMoney[k]}) →
+        BettingInfo[k].nMoney −= stake; .nPlayerCnt −= emptied (always 1 here); nBetSumMoney −= stake
+        # nothing to refund: stakes were never taken from the coins
+    vt 0x04 go_Out_Player(p) false → 0x2624      (§2.2: also removes the NPC's "game full" abstate)
+    close the gap in G_GamerInfo (records after p move down one; memcpy of (new count − index) records)
+    p.sp_Gamble_JoinType = GBT_BASE
+    no gamer left → timer inactive, due 0
+    nBetSumMoney = 0:
+        status BETTING and every nPlayerCnt = 0 → every remaining gamer ← 0xBC81 { 0, 0, 0 }
+        status = NONE_BETTING
+    gom_SetNeedRecalDiceRankInfo(); return 0x2620
+GDTSO_DiceTaiSai_BroadOut(p, u8 reserve)   (vt 0x4c)                                             @ FUN_00618c40
+    p null → 0x2625
+    every gamer ≠ p in this game ← 0xBC6A NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_CMD { u8 bReserve = reserve, u16 nPlayerHnd = p.handle }
+    return 0x2620
+```
+
+The seat is not freed (none is ever marked, Z32-B2). Client `0xBC6A` (FUN_00707850): `bReserve = 1` only marks the gamer (removed
+at the next `0xBC80`); otherwise it drops that gamer's chips (in status 1), removes the gamer, shows "%s has stopped playing game."
+(text 0x37452093) and returns to status 0 when no stake is left on the board.
+
+### 3.8 Round routine and the round reset
+
+```pseudo
+go_Routine()                       (vt 0x20; gom_Routine every main-loop pass, §2.4)              @ FUN_006181e0
+    (calls a folded no-op, FUN_00417480)
+    timer inactive or not due → return
+    status BETTING:
+        vt 0x78 CanAutoDiceRoll() = 0x2650 and vt 0x7c DiceRoll() = 0x2650 →
+            vt 0x80 BroadDiceRoll(); vt 0x88 Result_DiceRoll()            (§3.10: ROLLING, then STAND_BY with DelayTime)
+    status STAND_BY:
+        vt 0xa0 BroadLargeAmount()            (§3.10)
+        vt 0x6c ClearDiceBettingInfo()        board cleared, status NONE_BETTING, history shifted
+        vt 0x74 ClearGamerBettingInfo()       every gamer's stakes and nTotalDividend 0
+        vt 0x9c ExcuteLeaveGame()             reserved gamers leave (§3.10)
+        every gamer ← 0xBC80 NC_GAMBLE_DICE_TAISAI_BET_START_CMD { u32 bModeType = 0 (DTGM_AUTO), DiceTaiSaiInfo
+            CurrentRollingDice }              # the throw just played
+        vt 0x70 SetDiceHistory()              History[0] = CurrentRollingDice; CurrentRollingDice = 0
+        status = NONE_BETTING
+    timer inactive                            # in every case, also when the roll checks failed (§3.10)
+GDTSO_ClearDiceBettingInfo()       (vt 0x6c)                                                       @ FUN_00619ad0
+    nBetSumMoney = 0; BettingInfo[52] = 0; status NONE_BETTING; History[1…6] = History[0…5] (the oldest is dropped); 1
+GDTSO_SetDiceHistory()             (vt 0x70)                                                       @ FUN_00619b70
+    History[0] = CurrentRollingDice; CurrentRollingDice = {0, 0, 0}; 1
+GDTSO_ClearGamerBettingInfo()      (vt 0x74)                                                       @ FUN_00619be0
+    every gamer record (by index): nBetMoney[52] = 0, nBetSumMoney = 0, nTotalDividend = 0 (leave flags and nTotalWinCnt kept); 1
+```
+
+Client `0xBC80` (FUN_00707bd0): stores the mode, adds the dice to its history, zeroes every gamer's stakes, resets the board,
+removes the gamers marked by a reserved `0xBC6A` (if the marked one is the player itself it sends `0xBC68 GAME_LEAVE_REQ` itself) and
+opens the dealer dialog "Please make your bet.\nWish you luck." (text 0x367e5072).
+
+### 3.9 GM: fixed throw and outcome weights
+
+Z11 §6.7 `&GB_DiceFix` / `&GB_DiceProbability` find the machine and call:
+
+```pseudo
+GDTSO_SetDiceFix(DiceTaiSaiInfo dice)       (vt 0xa8)                                             @ FUN_0061b5d0
+    dice null or status ∉ {NONE_BETTING, BETTING} → 0
+    bIsAdminDice = 1; CurrentRollingDice = dice; 1          # used by the next roll (§3.10); the dice are not range-checked here
+GDTSO_SetDiceProbability(DiceTaiSaiInfo* dice, u16 weight)  (vt 0xac)                            @ FUN_0061b6b0
+    dice null (reload):
+        nDiceRateSum = 0; for i = 0…215: rec = GBDiceRate record i (none → return 0, the sum is partial);
+            nDiceRate[i] = (u16) rec.Rate; nDiceRateSum += rec.Rate (u32)
+        # (original bug) Z32-B6: the weight is stored truncated to 16 bits but summed in full: a Rate above 65 535 makes the sum
+        # disagree with the weights (latent: every 2016 Rate is 100)
+    else:
+        i = ConvertDice(dice) (§1.2) false → 0
+        nDiceRateSum += weight − nDiceRate[i]; nDiceRate[i] = weight        # any status, takes effect at the next roll
+    return 1
+```
+
+### 3.10 Roll, result and payout
+
+*(part 3)*
 
 ## 4. Slot machines (`SlotMachine::*`)
 

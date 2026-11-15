@@ -9773,12 +9773,12 @@ Sent from `FUN_00553510` (`FUN_00553510`) · payload 3 bytes
 
 ### `0xbc1e` NC_GAMBLE_PLAYERACT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_PLAYERACT_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_00615180 (go_PlayerAction); client FUN_0071b4d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | playerhandle |  |
-| 2 | u32 | effect_body |  |
+| 2 | u32 | effect_body | GBEventCode.GB_ECode |
 
 Sent from `CGambleObject::go_PlayerAction` (`FUN_00615180`) · payload 6 bytes
 
@@ -9789,23 +9789,21 @@ Sent from `CGambleObject::go_PlayerAction` (`FUN_00615180`) · payload 6 bytes
 
 ### `0xbc65` NC_GAMBLE_DICE_TAISAI_GAME_JOIN_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_GAME_JOIN_ACK`, 50 bytes + variable tail
+**Verified layout** (basis: zone FUN_006183d0 (go_SendGameInfo); client FUN_00707e10)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
-| 2 | DiceTaiSaiInfo[7] | DiceHistory | element DiceTaiSaiInfo |
-| 23 | i32 | nGameStatus |  |
-| 27 | i32 | bModeType |  |
-| 31 | u16 | nTimer |  |
-| 33 | u32 | nInterval |  |
-| 37 | u16 | nGetSysRate |  |
-| 39 | u64 | nMaxBetMoney |  |
-| 47 | u16 | nUseMinLv |  |
+| 0 | u16 | nError | 0x2610 ok; 0x2611-0x261B refusals from the handler |
+| 2 | u8[21] | DiceHistory | DiceTaiSaiInfo[7], newest first |
+| 23 | u32 | nGameStatus | DICE_TAISAI_GAME_STATUS |
+| 27 | u32 | bModeType | always 0 (DTGM_AUTO) |
+| 31 | u16 | nTimer | CastTime in 0.1 s ticks; client /10 |
+| 33 | u32 | nInterval | ticks left if status BETTING else 0; client reads low u16 /10 |
+| 37 | u16 | nGetSysRate | GBTaxRate.GB_TaxRate |
+| 39 | u64 | nMaxBetMoney | GBDiceGame.MaxBetMoney |
+| 47 | u16 | nUseMinLv | never written (stale buffer, Z32-B3); client does not read |
 | 49 | u8 | nGamerCnt |  |
-| 50 | u16[nGamerCnt] | nGamerHnd | variable length |
-
-Element `DiceTaiSaiInfo` (3 bytes): +0 u8[3] nNumber
+| 50 | u16[] | nGamerHnd | other gamers |
 
 Sent from `CGambleDiceTaiSaiObject::go_SendGameInfo` (`FUN_006183d0`) · payload variable (iVar4)
 
@@ -9843,7 +9841,7 @@ Sent in reply to `0xbc64` NC_GAMBLE_DICE_TAISAI_GAME_JOIN_REQ on ShineObjectClas
 
 ### `0xbc66` NC_GAMBLE_DICE_TAISAI_GAME_JOIN_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_GAME_JOIN_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_00618a80; client FUN_00708600)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -9853,15 +9851,13 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadEnter` (`FUN_00618a80`
 
 ### `0xbc67` NC_GAMBLE_DICE_TAISAI_GAME_BETTING_INFO_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_GAME_BETTING_INFO_CMD`, 3 bytes + variable tail
+**Verified layout** (basis: zone FUN_006185f0; client FUN_00706fd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | PartMask |  |
+| 0 | u8 | PartMask | bit0 first part, bit1 last part |
 | 1 | u16 | nBettingCnt |  |
-| 3 | GDT_BettingInfo[nBettingCnt] | Betting | variable length, element GDT_BettingInfo |
-
-Element `GDT_BettingInfo` (10 bytes): +0 u16 nPlayerHnd, +2 i32 nBetting, +6 u32 nMoney
+| 3 | GDT_BettingInfo[] | Betting | {u16 nPlayerHnd, u32 nBetting, u32 nMoney}, 10 bytes each |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_SendTaiSaiBettingInfo` (`FUN_006185f0`) · payload variable (iVar12 + 0xc)
 
@@ -9886,11 +9882,11 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_ExcuteLeaveGame` (`FUN_0061b020`) · p
 
 ### `0xbc6a` NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_CMD`, 3 bytes
+**Verified layout** (basis: zone FUN_00618c40; client FUN_00707850)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | bReserve |  |
+| 0 | u8 | bReserve | 1 = leaves at the end of the round |
 | 1 | u16 | nPlayerHnd |  |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadOut` (`FUN_00618c40`) · payload 3 bytes
@@ -9950,13 +9946,13 @@ Sent in reply to `0xbc71` NC_GAMBLE_DICE_TAISAI_BETTING_REQ on ShineObjectClass:
 
 ### `0xbc73` NC_GAMBLE_DICE_TAISAI_BETTING_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_BETTING_CMD`, 10 bytes
+**Verified layout** (basis: zone FUN_00619080; client FUN_00707420)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nPlayerHnd |  |
-| 2 | i32 | BettingInfo.nBetting |  |
-| 6 | u32 | BettingInfo.nMoney |  |
+| 2 | u32 | nBetting | DICE_TAISAI_BETTING 0-51 |
+| 6 | u32 | nMoney | coins |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadBetting` (`FUN_00619080`) · payload 10 bytes
 
@@ -9984,13 +9980,13 @@ Sent in reply to `0xbc74` NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_REQ on ShineObjec
 
 ### `0xbc76` NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_CMD`, 10 bytes
+**Verified layout** (basis: zone FUN_00619450; client FUN_00707700)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nPlayerHnd |  |
-| 2 | i32 | BettingCancelInfo.nBetting |  |
-| 6 | u32 | BettingCancelInfo.nMoney |  |
+| 2 | u32 | nBetting |  |
+| 6 | u32 | nMoney |  |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadBettingCancel` (`FUN_00619450`) · payload 10 bytes
 
@@ -10067,12 +10063,12 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadLargeAmount` (`FUN_006
 
 ### `0xbc80` NC_GAMBLE_DICE_TAISAI_BET_START_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_BET_START_CMD`, 7 bytes
+**Verified layout** (basis: zone FUN_006181e0 (go_Routine); client FUN_00707bd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | i32 | bModeType |  |
-| 4 | u8[3] | CurrentRollingDice.nNumber |  |
+| 0 | u32 | bModeType | always 0 (DTGM_AUTO) |
+| 4 | u8[3] | CurrentRollingDice | the throw just played |
 
 Sent from `CGambleDiceTaiSaiObject::go_Routine` (`FUN_006181e0`) · payload 7 bytes
 
@@ -10084,13 +10080,13 @@ Sent from `CGambleDiceTaiSaiObject::go_Routine` (`FUN_006181e0`) · payload 7 by
 
 ### `0xbc81` NC_GAMBLE_DICE_TAISAI_TIMER_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_TIMER_CMD`, 7 bytes
+**Verified layout** (basis: zone FUN_006195d0, FUN_0061c330; client FUN_007067d0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | bIsStart |  |
-| 1 | u16 | nTimer |  |
-| 3 | u32 | nInterval |  |
+| 0 | u8 | bIsStart | 1 start, 0 stop |
+| 1 | u16 | nTimer | CastTime ticks (0 on stop); client /10 |
+| 3 | u32 | nInterval | CastTime ticks (0 on stop); client does not read |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadSetTimer` (`FUN_006195d0`) · payload 7 bytes
 

@@ -1,0 +1,16 @@
+{
+  "_about": "Z32: gamble-house TaiSai (CGambleDiceTaiSaiObject) and gamble-object packets read in the 2016 zone code (zone-pdb export, NA2016 Zone.pdb names) and checked against the 2016 client MHDiceGameTask handlers; offsets are payload offsets.",
+  "packets": {
+    "zone": {
+      "0xbc1e": {"dir": "S→C", "name": "NC_GAMBLE_PLAYERACT_CMD", "basis": "zone FUN_00615180 (go_PlayerAction); client FUN_0071b4d0", "fields": [[0, "u16", "playerhandle", ""], [2, "u32", "effect_body", "GBEventCode.GB_ECode"]]},
+      "0xbc65": {"dir": "S→C", "name": "NC_GAMBLE_DICE_TAISAI_GAME_JOIN_ACK", "basis": "zone FUN_006183d0 (go_SendGameInfo); client FUN_00707e10", "fields": [[0, "u16", "nError", "0x2610 ok; 0x2611-0x261B refusals from the handler"], [2, "u8[21]", "DiceHistory", "DiceTaiSaiInfo[7], newest first"], [23, "u32", "nGameStatus", "DICE_TAISAI_GAME_STATUS"], [27, "u32", "bModeType", "always 0 (DTGM_AUTO)"], [31, "u16", "nTimer", "CastTime in 0.1 s ticks; client /10"], [33, "u32", "nInterval", "ticks left if status BETTING else 0; client reads low u16 /10"], [37, "u16", "nGetSysRate", "GBTaxRate.GB_TaxRate"], [39, "u64", "nMaxBetMoney", "GBDiceGame.MaxBetMoney"], [47, "u16", "nUseMinLv", "never written (stale buffer, Z32-B3); client does not read"], [49, "u8", "nGamerCnt", ""], [50, "u16[]", "nGamerHnd", "other gamers"]]},
+      "0xbc66": {"dir": "S→C", "name": "NC_GAMBLE_DICE_TAISAI_GAME_JOIN_CMD", "basis": "zone FUN_00618a80; client FUN_00708600", "fields": [[0, "u16", "nPlayerHnd", ""]]},
+      "0xbc67": {"dir": "S→C", "name": "NC_GAMBLE_DICE_TAISAI_GAME_BETTING_INFO_CMD", "basis": "zone FUN_006185f0; client FUN_00706fd0", "fields": [[0, "u8", "PartMask", "bit0 first part, bit1 last part"], [1, "u16", "nBettingCnt", ""], [3, "GDT_BettingInfo[]", "Betting", "{u16 nPlayerHnd, u32 nBetting, u32 nMoney}, 10 bytes each"]]},
+      "0xbc6a": {"dir": "S→C", "name": "NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_CMD", "basis": "zone FUN_00618c40; client FUN_00707850", "fields": [[0, "u8", "bReserve", "1 = leaves at the end of the round"], [1, "u16", "nPlayerHnd", ""]]},
+      "0xbc73": {"dir": "S→C", "name": "NC_GAMBLE_DICE_TAISAI_BETTING_CMD", "basis": "zone FUN_00619080; client FUN_00707420", "fields": [[0, "u16", "nPlayerHnd", ""], [2, "u32", "nBetting", "DICE_TAISAI_BETTING 0-51"], [6, "u32", "nMoney", "coins"]]},
+      "0xbc76": {"dir": "S→C", "name": "NC_GAMBLE_DICE_TAISAI_BETTING_CANCEL_CMD", "basis": "zone FUN_00619450; client FUN_00707700", "fields": [[0, "u16", "nPlayerHnd", ""], [2, "u32", "nBetting", ""], [6, "u32", "nMoney", ""]]},
+      "0xbc80": {"dir": "S→C", "name": "NC_GAMBLE_DICE_TAISAI_BET_START_CMD", "basis": "zone FUN_006181e0 (go_Routine); client FUN_00707bd0", "fields": [[0, "u32", "bModeType", "always 0 (DTGM_AUTO)"], [4, "u8[3]", "CurrentRollingDice", "the throw just played"]]},
+      "0xbc81": {"dir": "S→C", "name": "NC_GAMBLE_DICE_TAISAI_TIMER_CMD", "basis": "zone FUN_006195d0, FUN_0061c330; client FUN_007067d0", "fields": [[0, "u8", "bIsStart", "1 start, 0 stop"], [1, "u16", "nTimer", "CastTime ticks (0 on stop); client /10"], [3, "u32", "nInterval", "CastTime ticks (0 on stop); client does not read"]]}
+    }
+  }
+}
