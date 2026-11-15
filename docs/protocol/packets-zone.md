@@ -2949,12 +2949,12 @@ Sent from `FUN_004a3120` (`FUN_004a3120`) · payload 8 bytes
 
 ### `0x10bd` NC_CHAR_CLIENT_AUTO_PICK_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_CLIENT_AUTO_PICK_ACK`, 3 bytes
+**Verified layout** (basis: pdb2016 PROTO_NC_CHAR_CLIENT_AUTO_PICK_ACK; zone sp_SetAutoPick FUN_005654d0 → sp_SendAutoPickToClient (error path _ErrorSendPlayer 0x1E01))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | err |  |
-| 2 | u8 | bEnable |  |
+| 0 | u16 | err | 0x1E00 ok, 0x1E01 no pick-up mini-mon. evidence: capture:idle_in_world 0x1E00 (2) |
+| 2 | u8 | bEnable | 1 at login, 0 later |
 
 Sent from `FUN_00560250` (`FUN_00560250`) · payload 3 bytes
 
@@ -2981,11 +2981,11 @@ Sent from `FUN_00560250` (`FUN_00560250`) · payload 3 bytes
 
 ### `0x10c6` NC_CHAR_ADMIN_LEVEL_INFORM_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_ADMIN_LEVEL_INFORM_CMD`, 1 bytes
+**Verified layout** (basis: pdb2016 PROTO_NC_CHAR_ADMIN_LEVEL_INFORM_CMD; zone sp_NC_MAP_LOGINCOMPLETE_CMD FUN_00443390 (only when adminlevel != 0))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nAdminLevel |  |
+| 0 | u8 | nAdminLevel | basedata.adminlevel. evidence: capture 100 (7) |
 
 Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePlayer (`FUN_00443390`, ShineObjectClass::ShinePlayer::sp_NC_MAP_LOGINCOMPLETE_CMD) · payload 1 bytes
 
@@ -3190,17 +3190,65 @@ Sent from `FUN_00563f60` (`FUN_00563f60`) · payload 4 bytes
 
 ### `0x1802` NC_MAP_LOGIN_ACK
 
-**Verified layout** (basis: FUN_005a3590 -> ShinePlayer vfunc 0x664 = FUN_005a3140 (so_fill_PROTO_NC_CHAR_MAPLOGIN_ACK))
+**Verified layout** (basis: pdb2016 PROTO_NC_CHAR_MAPLOGIN_ACK (0xF2) = {u16 charhandle, CHAR_PARAMETER_DATA param (0xE8), SHINE_XY_TYPE logincoord}; zone so_fill_PROTO_NC_CHAR_MAPLOGIN_ACK FUN_005a3140 / so_fill_CHAR_PARAMETER_DATA FUN_005a2e00 (Z07 §1.5))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | object_handle | this+4, the player's map object id |
-| 2 | u32[4] | ? | global table indexed by a byte |
-| 18 | u32[32] | stat pairs (inferred) | bytes 18-145, alternating this+0xfc0+4k / this+0x1bb4+4k: base and current value of each stat; bytes 50-57 are not written |
-| 146 | u32[6] | ? | computed values (146-169), e.g. products of this+0x2a5a2 by a table value |
-| 170 | u32[16] | ? | always 0 |
-| 234 | u32 | pos_x | player position (same source as move packets) |
-| 238 | u32 | pos_y |  |
+| 0 | u16 | charhandle | player object handle: 8000 + pool index (8000, 8002, 8003, 8004 on zone 9210; 8000, 8001 on 9212). capture:idle_in_world, capture:walk-run-portals (7 map logins) |
+| 2 | u64 | param.PrevExp | g_LevelExp[level] (72987672292 at level 120) |
+| 10 | u64 | param.NextExp | g_LevelExp[level+1] (83037947834) |
+| 18 | u32 | param.Strength.base | layer 0 (pure) |
+| 22 | u32 | param.Strength.change | layer 15 (total) |
+| 26 | u32 | param.Constitute.base | layer 0 (pure) |
+| 30 | u32 | param.Constitute.change | layer 15 (total) |
+| 34 | u32 | param.Dexterity.base | layer 0 (pure) |
+| 38 | u32 | param.Dexterity.change | layer 15 (total) |
+| 42 | u32 | param.Intelligence.base | layer 0 (pure) |
+| 46 | u32 | param.Intelligence.change | layer 15 (total) |
+| 50 | u32 | param.Wizdom.base | never written: stale send-buffer bytes (Z07-B7). evidence: ', though', 'ful.', 00x6 FF FF |
+| 54 | u32 | param.Wizdom.change | stale, see base |
+| 58 | u32 | param.MentalPower.base | layer 0 (pure) |
+| 62 | u32 | param.MentalPower.change | layer 15 (total) |
+| 66 | u32 | param.WClow.base | layer 0 (pure) |
+| 70 | u32 | param.WClow.change | layer 15 (total) |
+| 74 | u32 | param.WChigh.base | layer 0 (pure) |
+| 78 | u32 | param.WChigh.change | layer 15 (total) |
+| 82 | u32 | param.AC.base | layer 0 (pure) |
+| 86 | u32 | param.AC.change | layer 15 (total) |
+| 90 | u32 | param.TH.base | layer 0 (pure) |
+| 94 | u32 | param.TH.change | layer 15 (total) |
+| 98 | u32 | param.TB.base | layer 0 (pure) |
+| 102 | u32 | param.TB.change | layer 15 (total) |
+| 106 | u32 | param.MAlow.base | layer 0 (pure) |
+| 110 | u32 | param.MAlow.change | layer 15 (total) |
+| 114 | u32 | param.MAhigh.base | layer 0 (pure) |
+| 118 | u32 | param.MAhigh.change | layer 15 (total) |
+| 122 | u32 | param.MR.base | layer 0 (pure) |
+| 126 | u32 | param.MR.change | layer 15 (total) |
+| 130 | u32 | param.MH.base | layer 0 (pure) |
+| 134 | u32 | param.MH.change | layer 15 (total) |
+| 138 | u32 | param.MB.base | layer 0 (pure) |
+| 142 | u32 | param.MB.change | layer 15 (total) |
+| 146 | u32 | param.MaxHp | 3043 / 3033 = 0x1038.CurHP |
+| 150 | u32 | param.MaxSp | 2851 / 2841 |
+| 154 | u32 | param.MaxLp | 0 |
+| 158 | u32 | param.MaxAp | always 0 |
+| 162 | u32 | param.MaxHPStone | 441 |
+| 166 | u32 | param.MaxSPStone | 416 |
+| 170 | u32[4] | param.PwrStone | always 0 (16 bytes) |
+| 186 | u32[4] | param.GrdStone | always 0 |
+| 202 | u32 | param.PainRes.base | 0 |
+| 206 | u32 | param.PainRes.change | 0 |
+| 210 | u32 | param.RestraintRes.base | 0 |
+| 214 | u32 | param.RestraintRes.change | 0 |
+| 218 | u32 | param.CurseRes.base | 0 |
+| 222 | u32 | param.CurseRes.change | 0 |
+| 226 | u32 | param.ShockRes.base | 0 |
+| 230 | u32 | param.ShockRes.change | 0 |
+| 234 | u32 | logincoord.x | position after so_MapMarking; can differ from 0x1038 currentcoord (5874 -> 5899) |
+| 238 | u32 | logincoord.y |  |
+
+P02: replaces the '?' blocks of annotations.json; capture-validation §5.3
 
 Sent in reply to `0x101d` NC_CHAR_ZONE_CHARDATA_ACK on WorldManagerSession (`FUN_005a3590`, WorldManagerSession::wms_NC_CHAR_ZONE_CHARDATA_ACK) · payload 242 bytes
 
@@ -3323,11 +3371,11 @@ Fill: +0: FUN_0049b4c0 (no direct writes found)
 
 ### `0x1827` NC_MAP_FIELD_ATTRIBUTE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MAP_FIELD_ATTRIBUTE_CMD`, 4 bytes
+**Verified layout** (basis: pdb2016 PROTO_NC_MAP_FIELD_ATTRIBUTE_CMD; zone so_ply_SendFieldAttribute FUN_0054aa20 (vt 0xd3c, from LOGINCOMPLETE))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | i32 | eFieldMapType |  |
+| 0 | u32 | eFieldMapType | FIELD_MAP_TYPE (pdb2016): 0 NORMAL, 1 KINGDOMQUEST, 2 MINIHOUSE, 3 INSTANCEDUNGEON, 4 TUTORIAL = FieldOption byte +0x36. evidence: capture 0 on RouN, RouVal01, RouCos02 |
 
 Sent from `FUN_0054aa20` (`FUN_0054aa20`) · payload 4 bytes
 
@@ -5607,14 +5655,14 @@ Sent from `FUN_0053f840` (`FUN_0053f840`) · payload 12 bytes
 
 ### `0x302d` NC_ITEM_REWARDINVENOPEN_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_REWARDINVENOPEN_ACK`, 1 bytes + variable tail
+**Verified layout** (basis: pdb2016 PROTO_NC_ITEM_REWARDINVENOPEN_ACK; zone so_ply_FillRewardInven FUN_004fc310 + irs_FillBufferItem FUN_00644c80)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | itemcounter |  |
-| 1 | PROTO_ITEMPACKET_INFORM[itemcounter] | itemarray | variable length, element PROTO_ITEMPACKET_INFORM |
+| 0 | u8 | itemcounter | records that follow. evidence: capture:idle_in_world, capture:walk-run-portals = 0 |
+| 1 | bytes | itemarray | itemcounter × PROTO_ITEMPACKET_INFORM {u8 datasize, u16 location (Type 2), item}, then ONE stale byte (length = records + 2): P02-B3. evidence: 0x12, 0x10 |
 
-Element `PROTO_ITEMPACKET_INFORM` (106 bytes): +0 u8 datasize, +1 u16 location, +3 u16 info.itemid, +5 byte[101] info.itemattr
+P02: capture-validation §5.3
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_FillRewardInven` (`FUN_004fc310`) · payload variable (iVar2 + 3)
 
@@ -10269,6 +10317,14 @@ Sent from `FUN_004d0bd0` (`FUN_004d0bd0`) · payload 18 bytes
 
 Empty payload.
 
+### `0x1071` NC_CHAR_LOGOUTREADY_CMD (C→S)
+
+**Verified layout** (basis: pdb2016 enum NC_CHAR_LOGOUTREADY_CMD = 113; zone FUN_00558450 (Z07 §3.3))
+
+Empty payload.
+
+P02: empty body. evidence: capture size 0
+
 ### `0x1093` NC_CHAR_WEDDING_PARTNER_INFO_REQ (C→S)
 
 **Verified layout** (basis: zone FUN_005a0570)
@@ -10286,6 +10342,14 @@ Empty payload.
 **Verified layout**
 
 Empty payload.
+
+### `0x200b` NC_ACT_ENDOFTRADE_CMD (C→S)
+
+**Verified layout** (basis: zone sp_NC_ACT_ENDOFTRADE_CMD FUN_004c4a60 (no payload read, Z02 §6.4))
+
+Empty payload.
+
+P02: empty body. evidence: capture size 0
 
 ### `0x2022` NC_ACT_EMOTICONSTOP_CMD (C→S)
 
