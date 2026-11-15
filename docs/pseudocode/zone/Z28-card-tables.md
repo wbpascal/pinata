@@ -39,7 +39,8 @@ per-player vector of rewarded IDs (§5.1).
 
 `CollectCardGroupDesc.shn` (187 rows in the server folder, 227 in the client's) and `View/CollectCardView.shn` are not
 loaded as tables by the zone: GroupDesc is client-only (group names, §3.7), CollectCardView is only checksummed
-(`gSHNView_CollectCardView`, initialiser FUN_00699970; the view checksum list is Z01 §2.2).
+(`gSHNView_CollectCardView`, initialiser FUN_00699970; loaded with "the 14 View/*.shn" in `ZoneServer_zs_start_sleep`
+FUN_005b67c0 and listed in the SHN checksum list of `CShnDataFileCheckSum` FUN_00631450, both Z10 §7.1).
 
 ## 2. `SHND::CommonData<T, Cmp>`: the template
 
@@ -312,7 +313,50 @@ are exactly the enum range 61 … 112. The client ships the same file (rows iden
 - `CollectCardGroupDesc.shn` (`CC_CardMobGroup` u32, `CC_MobGroupName` char[64]): server copy 187 rows with Korean
   names (groups 1 … 187), client copy 227 rows in English up to group 234. Only the client reads it (`FUN_0045de90`,
   "CollectCardGroupDesc.shn InitError!!"); no zone string names it.
-- `View/CollectCardView.shn`: checksum only (Z01 §2.2).
+- `View/CollectCardView.shn`: a `CDataReader` view, loaded and checksummed only (Z10 §7.1); no zone code reads its rows.
+
+### 3.8 The folded DropRate reader also loads `PartyBonusByLvDiff.shn`
+
+`BinaryDataBox<CollectCardDropRate>::bdb_ReadData` FUN_00481440 is shared by identical-code folding with the
+4-byte-row `BinaryDataBox<PartyBonusByLvDiff>` (both rows are `{2-byte, 2-byte}`; Z20 §2.1). Its only other caller is
+the experience level-handicap loader, which Z03 §8.2 leaves open ("which loader fills which table was not traced").
+Documented here because the shared reader leads to it (only `PartyBonusByLvDiff`; `PartyBonusByMember` /
+`PartyBonusLimit` stay open, §7):
+
+```pseudo
+LevelHandicap4ExperienceDouble::LevelHandicap4ExperienceDouble()        @ FUN_00481260   # global lh4ed = g_ExpLvHandicap
+    double lh4ed_Table[301]               # index = level difference + 150 (−150 … +150)
+    table[0 … 149] = 1.2; table[150 … 300] = 0
+    table[140 … 145] = 1.2; [146] 1.15; [147] 1.1; [148] 1.05; [149 … 151] 1.0; [152] 0.95; [153] 0.85; [154] 0.75;
+    [155] 0.65; [156] 0.5; [157] 0.35; [158] 0.15; [159] 0.01; [160] 0.005      # built-in defaults, replaced by the file
+
+LevelHandicap4ExperienceDouble::lh4ed_Load(OptionReader* unused)        @ FUN_00481a80
+    # called by HitMeList::hml_Load FUN_004824d0 (zs_start_yellow, Z10 §7.1); no failure path: a missing file is the
+    # bdb_ReadData ShineExit of Z20 §2.1
+    rows = BinaryDataBox<PartyBonusByLvDiff>.bdb_ReadData("../9Data/Shine/PartyBonusByLvDiff.shn")   # FUN_00481440
+    for each row in file order: d = (i16) PB_LvDiff; f = PB_BonusRatio / 1000.0
+        if d < 151: table[d + 150 … 300] = f       # each row overwrites from its own difference up to +150
+        # d < −150 writes before the table (no lower bound) (original bug) Z28-B5, latent: 2016 minimum is −150
+
+LevelHandicap4ExperienceDouble::lh4ed_Handicap(u16 unused, int playerLevel, int mobLevel) → double   @ FUN_00481810
+    return table[playerLevel − mobLevel + 150]     # no range check (original bug) Z28-B6, latent (see below)
+```
+
+So the value for a difference x is the `PB_BonusRatio` (‰) of the last row in file order with `PB_LvDiff ≤ x`; with
+ascending rows that is the largest `PB_LvDiff ≤ x`. 2016 file (`PB_LvDiff` i16 stored as u16, `PB_BonusRatio` u16,
+31 rows), resulting factors (difference = player level − mob level):
+
+| Difference | Factor | Difference | Factor |
+|---|---|---|---|
+| −150 … −30 | 0 | 0, +1 | 1.0 |
+| −29 / −28 / −27 / −26 / −25 | 0.2 / 0.4 / 0.6 / 0.8 / 1.0 | +2 / +3 / +4 / +5 | 0.95 / 0.85 / 0.75 / 0.65 |
+| −24 … −5 | 1.2 | +6 / +7 / +8 | 0.5 / 0.35 / 0.15 |
+| −4 / −3 / −2 / −1 | 1.15 / 1.1 / 1.05 / 1.0 | +9 / +10 | 0.01 / 0.005 |
+| | | +11 … +150 | 0 |
+
+The file row 150 (ratio 0) only rewrites index 300. The defaults of the ctor differ only below −24 (1.2 down to −150
+instead of 0 below −30 and the −29…−25 ramp). 2016 MobInfo levels are 0…150, so the read stays inside the table as long as player levels stay ≤ 150 *(inferred:
+the player level cap was not checked here)*; a difference outside ±150 reads beyond the 301 doubles (Z28-B6).
 
 ---
 
@@ -535,3 +579,54 @@ the Character DB (`sock2gameDB`) as 0xC411, length 0x79. `CC_RewardLot` (+0x48) 
 in the PDB export), so the reward is always one item with class-default attributes (original bug) Z28-B4, latent: every
 2016 row has `CC_RewardLot` 1. The item ID is the client's `RewardItem`. It must match the row's `CC_RewardItemInx`
 (that is the `cd_Find` key), so the client can only choose among the rows of one ID (IDs 8 and 9, §3.5).
+
+---
+
+## 6. Original-server bugs
+
+| ID | Handler | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z28-B1 | `so_ply_CardRegist` FUN_00629c10 (§5.3) | a card not yet in the zone's album is appended with `RegistTime` taken from uninitialised stack memory | latent: the zone's album copy is only sent to the client after a fresh WM load (0x10E3, which carries the DB time); a resend from the zone copy would show a garbage registration time | set `RegistTime` to the current time (as the DB does) |
+| Z28-B2 | `so_ply_CardBookmarkRegist` FUN_00629d30 (§5.3) | clearing a slot (`CardID` 0xFFFF) that has no entry appends `{slot, 0xFFFF}` | harmless: an "empty" entry in the vector, sent as such | do nothing when the slot is already empty |
+| Z28-B3 | `g_CardCollectMake` FUN_00628880 (§4.2) | the DropRate row of a group's card is searched linearly; none → null pointer, `CC_CardGetRate` read at address 2 | latent access violation (zone crash) for a card without a `CollectCardDropRate` row; 2016 data has one row per card | skip the card (weight 0) or refuse the file at load |
+| Z28-B4 | `sp_NC_COLLECT_REWARD_REQ` FUN_00628ef0 (§5.4) | `CollectCardReward.CC_RewardLot` (+0x48) is never read | latent: the reward is always one item; every 2016 row has lot 1 | give `CC_RewardLot` items (or a stack of that size) |
+| Z28-B5 | `LevelHandicap4ExperienceDouble::lh4ed_Load` FUN_00481a80 (§3.8) | a row with `PB_LvDiff` < −150 writes before `lh4ed_Table` (only the upper bound 150 is checked) | latent memory corruption; the 2016 minimum is −150 | refuse or clamp differences below −150 |
+| Z28-B6 | `LevelHandicap4ExperienceDouble::lh4ed_Handicap` FUN_00481810 (§3.8) | `table[playerLevel − mobLevel + 150]` with no range check | latent out-of-bounds read for a level difference outside ±150 (2016 mob levels 0…150) | clamp the difference to ±150 |
+
+Observations that are not bugs: `icd_Indexing` FUN_005b3f40 never clears its index first (no reload exists, §2.3); the
+MobGroup row `RatmanWarlock` names no MobInfo mob (data, §3.2); `cca_Load` / `ccb_Load` / `ccr_Load` trust the WM's
+`number` (server-internal packet, §5.2).
+
+## 7. Not reconstructed / uncertain
+
+- `NC_COLLECT_CHARACTERDB_UP_GET_CARDCOUNT_CMD` (0xC414): neither the zone nor the WM has the constant. D03 §12 says the
+  Character DB loads the card serial counters with it; who sends it (if anyone) is D03's open point, not traced here.
+- The client's display of a sealed card (class 30): the 9 attribute bytes (`SerialNumber`, `CardID`, `Star`, `Group`)
+  reach the client with the item (§4.2). Whether the client shows card and star before opening was not checked in the
+  client export *(inferred: it can)*.
+- The `CommonData` vftable slots (`cd_Load`, `cd_Find`, …) are never called virtually as far as found: `zs_start_long`
+  calls the bodies directly (§2.1, *(inferred)* from the vftable references).
+- §3.8: the player level cap (needed to bound Z28-B6) was not checked; `PartyBonusByMember.shn` / `PartyBonusLimit.shn`
+  (`pebd_Load` FUN_00481bf0, `megag_Load` FUN_00481980) are the follow-up item Z29.
+- Random stream: `rb_1000000` FUN_0048dfb0 is the well512 generator shared by every zone roll (Z09); reproducing the
+  exact sequence of drops also needs the order of the other rolls between two card drops, which is Z09's.
+
+## 8. Coverage boundary
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| Choosing `CC_Closed` as a mob drop (`dilig_Drop`, drop groups) and script drops | Z09 §11.2 (drop roll), §24.1 (`itemdrop`) | `g_CardCollectMake` only runs after the drop table picked the item; the drop chance is the world simulation's |
+| `CCharacterTitleZone::TitleSetValue` called by `so_ply_CardRegist` | Z18 §6.2 | title progress logic; we only document which title the card table yields |
+| COLLECT dept handlers 0xC401–0xC413 (peeping, regist, bookmark, reward packets, errors) | Z07 §7 | the client/DB packets; this item documents the tables and per-player state they use |
+| Card opening packets 0x34A9 / 0x34AA / 0x34AB | Z05 §6.6 | item-DB rebuild flow; §4.4 only shows the attribute transfer |
+| `sp_CardCollectionSend` FUN_0044cc30, client packets 0x10E4 / 0x10E7 / 0x10EA | Z18 §6.5 | send after map login, documented there; §5.1 links it |
+| WM side of 0x10E2 / 0x10E5 / 0x10E8 → 0x10E3 / 0x10E6 / 0x10E9 | W01 §6.3, W05 | the WM caches and forwards the blobs; §5.2 starts at the zone handler |
+| Character DB card procedures (`usp_Collection_*`, serial numbering, 0xC40x DB answers) and the Character server's card blob load | D03 §12, D02 | DB server behaviour |
+| Character server `ItemAttrCls_CardCollect(_Close)` attribute write / read | D07 §1.3, §3.2 | other binary; the wire bytes there match §4.1 |
+| `View/CollectCardView.shn` (zone `gSHNView_CollectCardView` FUN_00699970, loaded in `zs_start_sleep` FUN_005b67c0; WM FUN_0045d8c0; Character FUN_00442cd0) | Z10 §7.1 (zone load + checksum list FUN_00631450), W05 (WM), D02 (Character) | a checksummed view table; no card logic reads it |
+| `CollectCardGroupDesc.shn` (client FUN_0045de90) | none needed | client-only display data (group names); no server binary names the file (§3.7), a rebuild ships it unchanged |
+| `HitMeList::hml_Load` FUN_004824d0 → `pebd_Load` FUN_00481bf0, `megag_Load` FUN_00481980, `pebd` initialiser FUN_006960f0, `nfis_ExpLimitCut` FUN_00482560 | new item Z29 (added by Z28) | reached only through §3.8 (the reader folded with ours); party experience tables, not card data; Z03 (done) left them untraced |
+| `SlotMachine::SlotMachineScreenManager` ctor FUN_00623860 calling FUN_00629150 | none needed | identical-code folding of the empty-vector ctor (§5.1); no card behaviour; slot machines are Z06 §5 |
+| ICF of `IndexedCommonData<CollectCard>::cd_Load` FUN_00629840 with the `ShinePlayer` ctor's `invenlocklist` setter | Z01 / Z04 | folding only; the player ctor is Z01's |
+| Registrations `protocolstore` FUN_004d37e0 / 004d4510 / 004d5520 / 004d5670 (the `pft_Store` lists) | Z10 §7.1 (`protocolstore` call in the start stages); Z07 §1.2, §7 (the handlers) | registration boilerplate (`handlers.json`); §5.2 and Z07 give the opcodes |
+| STL helpers (`vector<…>::_Reserve` / `reserve` / `push_back` FUN_005b6280, 005b6380, 005b7710, 005b3a70, 005b3c40, 0047a7b0, 00629410, 00629500; `std::_Xlength_error` FUN_00654e50; `vector<Observer>::reserve` FUN_00442170; `~ItemBoxIterator` FUN_0043bfe0) | none needed | container boilerplate (CLAUDE.md: skip); element sizes are in §2–§5 |

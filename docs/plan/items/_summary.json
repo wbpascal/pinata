@@ -304,6 +304,14 @@
   "\u2013"
  ],
  [
+  "Z29",
+  2,
+  "Zone: party experience tables (`PartyBonusByMember.shn` / `PartyBonusLimit.shn` loaders of `HitMeList::hml_Load` and their readers) (added by Z28)",
+  "Z03, Z28",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "D01",
   2,
   "Account and AccountLog servers",

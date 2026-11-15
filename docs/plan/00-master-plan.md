@@ -119,6 +119,7 @@ continue the open phase-2 items with the PDB exports as their main reading sourc
 | [Z26](items/Z26.md) | Zone: silver-wing teleport item (saved location, server menu, portal cast and blast) (added by Z23) | Z02, Z04, Z23 |
 | [Z27](items/Z27.md) | Zone: item table loader `ItemDataBox::idb_Load` (ItemInfo, ItemInfoServer, GradeItemOption, ItemDropLog, ItemSort, CollectCardMobGroup, ItemMoney; special item IDs) (added by Z24) | Z01, Z04, Z24 |
 | [Z28](items/Z28.md) | Zone: collection-card data tables and card roll (CollectCard*.shn `SHND::CommonData` loaders, `g_CardCollectMake`, album / bookmark loaders) (added by Z27) | Z07, Z09, Z27 |
+| [Z29](items/Z29.md) | Zone: party experience tables (`PartyBonusByMember.shn` / `PartyBonusLimit.shn` loaders of `HitMeList::hml_Load` and their readers) (added by Z28) | Z03, Z28 |
 | [D01](items/D01.md) | Account + AccountLog servers (resolves open Login error conditions) | – |
 | [D02](items/D02.md) | Character server: characters, avatars, save/load | – |
 | [D03](items/D03.md) | Character server: items, economy, pets, house | D02 |
@@ -155,7 +156,7 @@ follow-up session.
 1c. S01, then its follow-ups (`docs/knowledge/S01.md`) for finished items
 2. Z02, Z03, Z04, W02 (core gameplay)
 3. Z07, Z08, Z05, Z06, W03, W04
-4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, Z19, Z20, Z21, Z22, Z23, Z24, Z25, Z26, Z27, Z28, W05, S02, L01, then D06
+4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, Z19, Z20, Z21, Z22, Z23, Z24, Z25, Z26, Z27, Z28, Z29, W05, S02, L01, then D06
 5. P02 again with fuller captures, then X01
 6. X02 → user records its scenarios → P02 → X02 again (repeat until the low ratings are gone or not worth a capture)
 

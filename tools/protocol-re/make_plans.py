@@ -865,6 +865,29 @@ ITEMS = [
              "Bugs as `Z28-B<n>`; Coverage boundary as usual."],
       done="Every loader / finder / initialiser above and `g_CardCollectMake` are cited as `FUN_…` with pseudocode, every "
            "card table has a column → member map with its 2016 invariants, and the card / star roll is specified."),
+ dict(id="Z29", phase=2, title="Zone: party experience tables (`PartyBonusByMember.shn` / `PartyBonusLimit.shn` loaders "
+                               "of `HitMeList::hml_Load` and their readers) (added by Z28)",
+      out="docs/pseudocode/zone/Z29-exp-tables.md", deps=["Z03", "Z28"], scope=[],
+      goal="Z03 §8.2 documents the experience split but says \"which loader fills which table was not traced\". Z28 §3.8 "
+           "documents the level-handicap table (`lh4ed_Load`, `PartyBonusByLvDiff.shn`). The party bonus and the per-level "
+           "group experience cap are still undocumented. Document them so a rebuild loads the original files unchanged "
+           "and gives the same party experience.",
+      steps=["Read Z03 §8.2 (`el_ExpDistribute` FUN_004828b0, `ExperienceDistribute::lid_Call` FUN_00483360, `ed_GiveExperience` "
+             "FUN_00481890) and Z28 §3.8 (`lh4ed`). Do not redo those.",
+             "PDB names (`clean.py re-data/exports/zone-pdb - <addr> …`): `HitMeList::hml_Load` FUN_004824d0 (zs_start_yellow, "
+             "Z10 §7.1), `PartyExperienceBonusDouble::pebd_Load` FUN_00481bf0 (PartyBonusByMember.shn: `PB_PartyMember` u8 → "
+             "`pebd_Bonus[]` = ratio / 1000, `pebd_MaxNum` check with ShineExit \"Buffer max num\", \"Data error\" asserts), its "
+             "static initialiser `dynamic_initializer_for_'pebd'` FUN_006960f0 (built-in defaults; where `pebd_MaxNum` is set), "
+             "`MaxExpGainAtGroup::megag_Load` FUN_00481980 (PartyBonusLimit.shn: `PSE_ChrLv` u8 → `megag_ExpLimit[151]`, "
+             "unchecked index, \"Data error\" for a level 1…150 without a row) and its reader "
+             "`GroupExpDistribute::NearFriendInformationSummary::nfis_ExpLimitCut` FUN_00482560 (who calls it, what the cut "
+             "amount does).",
+             "How `lid_Call` FUN_00483360 reads `pebd_Bonus` (index range, the Z03 §8.2 table `g_PartyExpBonus` DAT_0075d480: "
+             "same object or not) and whether World/ExpRecalculation.txt (`ByPartyMem`, `ByLevelDiff`) overrides the SHN values.",
+             "Column → member map and 2016 invariants of both files (shn.py). Bugs as `Z29-B<n>`; Coverage boundary as usual."],
+      done="`hml_Load`, `pebd_Load`, the `pebd` initialiser, `megag_Load` and `nfis_ExpLimitCut` are cited as `FUN_…` with "
+           "pseudocode, both files have a column → member map with their 2016 invariants, and the party experience formula "
+           "with these tables is specified."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
