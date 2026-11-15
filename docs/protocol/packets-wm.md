@@ -10132,6 +10132,8 @@ broadcast raw to every client session
 | 34 | u8[5] | nlen |  |
 | 39 | u8[Σnlen] | sContent |  |
 
+**Captured** (P02, `capture-validation.md`; s21): `sScriptMsgIndex`: E_Olympic_A04 + the 0x207D heap bytes, relayed unchanged (Z09-B72)
+
 ### `0x2459` NC_BAT_CLIENT_MOB_KILL_ANNOUNCE_CMD (WM→C)
 
 **Verified layout** (basis: wm FUN_0042b490)
@@ -10303,6 +10305,8 @@ to every client session
 | 4 | u16 | nID |  |
 
 to every client session
+
+**Captured** (P02, `capture-validation.md`; s21): `nHandle / nID`: the skipped KQ, to every client
 
 ### `0x5826` NC_KQ_JOINING_ALARM_LIST (WM→C)
 
@@ -12814,6 +12818,18 @@ Z09 §26.1; the WM then ends the KQ and broadcasts 0x5811
 
 forwarded as 0x380A (W04-B19)
 
+### `0x6401` NC_ANNOUNCE_Z2W_CMD (Zone→WM)
+
+**Verified layout** (basis: zone Send_PROTO_NC_ANNOUNCE_Z2W_CMD FUN_005b8d30 (Z11 §7.3 AnnounceSystem_LevelMax, Z13 §4); WM FUN_0042ab50 (W01 §7); pdb2016 ANNOUNCE_MESSAGE)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | AnnounceMessage.AnnounceType | 4 = level announcement (AnnounceData.shn record 4) |
+| 1 | u8 | AnnounceMessage.SizeOfMessage | strlen + 1 (51) |
+| 2 | bytes | AnnounceMessage.Message | text with its NUL: "\"Test2\" has just become level 20. Congratulations!" |
+
+P02 batch 3 (§20.4): 53 bytes in s21; Z04.json types the payload as one ANNOUNCE_MESSAGE struct (2 bytes)
+
 ### `0x7445` NC_GUILD_ZONE_WAR_KILL_CMD (Zone→WM)
 
 **Verified layout** (basis: wm FUN_0044d1b0)
@@ -13152,6 +13168,18 @@ size 0x12, not checked
 ### `0x4032` NC_CHARSAVE_2WLDMAN_CHAT_COLOR_CMD (Zone→WM)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nChatFontColorID`: 0; `nChatBalloonColorID`: 0
+
+### `0x5811` NC_KQ_W2Z_DESTROY_CMD (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; s21): `hquest`: each KQ skipped at its start time (SetDoneSkip), to all four zones' broadcast links
+
+### `0x581e` NC_KQ_LIST_DELETE_ACK (WM→C)
+
+**Captured** (P02, `capture-validation.md`; s21): `DeleteQuestArray`: the KQs skipped this minute; one client per second
+
+### `0x6402` NC_ANNOUNCE_W2C_CMD (WM→C)
+
+**Captured** (P02, `capture-validation.md`; s21): `AnnounceMessage`: type 4, 51 bytes, relayed unchanged 88 ms after the zone's 0x6401, to both clients
 
 ### `0x7019` NC_CHAR_OPTION_DB_GET_SHORTCUTSIZE_REQ (WM→CharDB)
 

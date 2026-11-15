@@ -853,7 +853,7 @@ Handler `FUN_0042b900`
 | 0 | u8 | slot | inventory slot |
 | 1 | u32 | lot |  |
 
-**Captured** (P02, `capture-validation.md`; shop): `slot`: 1, 2 (inventory 9); `lot`: 1
+**Captured** (P02, `capture-validation.md`; shop, s21): `slot`: 1, 2 (inventory 9); s21: 1 / 0 (lot 1 each), 1 lot 3; `lot`: 1
 
 Handler `FUN_00539020`
 
@@ -1032,6 +1032,8 @@ Handler `FUN_0053d220`
 |---|---|---|---|
 | 0 | u64 | cen |  |
 
+**Captured** (P02, `capture-validation.md`; s21): `cen`: 1333 (deposit)
+
 Handler `FUN_00533dc0`
 
 | Off | Type | Checks in handler | Notes |
@@ -1046,6 +1048,8 @@ Handler `FUN_00533dc0`
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u64 | cen |  |
+
+**Captured** (P02, `capture-validation.md`; s21): `cen`: 1333 (withdraw)
 
 Handler `FUN_005342b0`
 
@@ -1359,6 +1363,8 @@ Handler `FUN_0051e580`
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nHaldle | repurchase list handle |
+
+**Captured** (P02, `capture-validation.md`; s21): `nHaldle`: repurchase handle of 0x305C
 
 Handler `FUN_00538580`
 
@@ -1696,6 +1702,8 @@ Handler `FUN_005936b0`
 |---|---|---|---|
 | 0 | u16 | number |  |
 
+**Captured** (P02, `capture-validation.md`; s21): `number`: 3
+
 Handler `FUN_00588d20`
 
 | Off | Type | Checks in handler | Notes |
@@ -1709,6 +1717,8 @@ Handler `FUN_00588d20`
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | number |  |
+
+**Captured** (P02, `capture-validation.md`; s21): `number`: 42
 
 Handler `FUN_00588e90`
 
@@ -3357,6 +3367,8 @@ Sent from `FUN_00561990` (`FUN_00561990`) · payload 50 bytes
 | 0 | u16 | nCharHandle |  |
 | 2 | u8 | bUse |  |
 
+**Captured** (P02, `capture-validation.md`; s21): `nCharHandle`: 8004 to the other player in sight only; `bUse`: 0
+
 Sent from `FUN_00561aa0` (`FUN_00561aa0`) · payload 3 bytes
 
 | Off | Type | Value / source |
@@ -4806,6 +4818,8 @@ Fill: +3: ShineObjectClass::ShinePlayer::vfunc[0x668] = FUN_005a2e00 (assumed cl
 | 0 | u16 | handle |  |
 | 2 | u16 | mobhandle |  |
 
+**Captured** (P02, `capture-validation.md`; s21): `handle`: 8003, one per level (25 for &levelup 25) to the other player; `mobhandle`: 0
+
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -4936,6 +4950,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_skillsmash` (`FUN_0042bd10`) · pay
 |---|---|---|---|
 | 0 | u16 | handle |  |
 | 2 | u32 | abstateIndex |  |
+
+**Captured** (P02, `capture-validation.md`; s21): `handle`: 8004 (X14B) to Test2 at X14B's map login; `abstateIndex`: 291 StaImmortal, 728 StaE_UserNewbie01
 
 Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastSet` (`FUN_004056a0`) · payload 6 bytes
 
@@ -5798,6 +5814,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_partyitemdistribute` (`FUN_0052f630
 | 0 | u64 | cen | storage money after the answer |
 | 8 | u16 | err | 0xf80 ok |
 
+**Captured** (P02, `capture-validation.md`; s21): `cen`: storage money after (1333); `err`: 0xF80 success
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_DepositAck` (`FUN_005340f0`) · payload 10 bytes
 
 | Off | Type | Value / source |
@@ -5814,6 +5832,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_DepositAck` (`FUN_005340f0`) ·
 |---|---|---|---|
 | 0 | u64 | cen | storage money |
 | 8 | u16 | err | 0xf80 ok |
+
+**Captured** (P02, `capture-validation.md`; s21): `cen`: storage money after (0); `err`: 0xF80 success
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_WithdrawAck` (`FUN_005345e0`) · payload 10 bytes
 
@@ -6336,7 +6356,7 @@ Fill: +1: FUN_0050e6b0 (no direct writes found)
 | 2 | u16 | ItemInfo.itemid |  |
 | 4 | byte[101] | ItemInfo.itemattr | SHINE_ITEM_ATTRIBUTE (union: blot, wlot, dlot, qstitm, amulet, weapon, armor, shield, boot, furniture, decorate, skillscroll, recallscroll, binditem, upsource, itemchest, weapontitlelicence, kingdomquest, minihouseskin, upgraderedgem, upgradebluegem, upgradegoldgem, kqstep, feed, riding, amount, costumweapon, costumshield, actionitem, Enchant, GBCoin, Capsule, MobCard_Unident, MobCard, NoEffect, ActiveSkill, Pet, Bracelet) |
 
-**Captured** (P02, `capture-validation.md`; shop): `nHandle`: 0, 1 (repurchase slots); `ItemInfo.itemid`: 3000 / 3001; `ItemInfo.itemattr`: 1 byte lot, then 100 stale bytes of the global send buffer (P02-B16)
+**Captured** (P02, `capture-validation.md`; shop, s21): `nHandle`: 0, 1 (repurchase slots); s21: 0…5 in sale order; `ItemInfo.itemid`: 3000 / 3001; `ItemInfo.itemattr`: 1 byte lot, then 100 stale bytes of the global send buffer (P02-B16); s21: lot sold (1 / 3), then the previous 0x3001 / 0x3425 bytes of gpp (P02-B16)
 
 Sent from `FUN_00537a20` (`FUN_00537a20`) · payload 105 bytes
 
@@ -6353,6 +6373,8 @@ Fill: +2: FUN_006406c0 (no direct writes found)
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nHandle | repurchase list entry |
+
+**Captured** (P02, `capture-validation.md`; s21): `nHandle`: the bought-back handle, before 0x305A
 
 Sent from `FUN_00537a20` (`FUN_00537a20`) · payload 2 bytes
 
@@ -6652,6 +6674,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_partylogout` (`FUN_0056dd80`) · pa
 | 12 | u32 | sp.recover |  |
 | 16 | u32 | sp.maxnum | row × p+0x2a5a4 / 1000 |
 | 20 | u32 | sp.price |  |
+
+**Captured** (P02, `capture-validation.md`; s21): `hp.recover`: 443; `hp.maxnum`: 100; `hp.price`: 55; `sp.recover`: 590; `sp.maxnum`: 114; `sp.price`: 37
 
 Sent from `NPCRole_Merchant::nrm_PortionStone` (`FUN_004c2d60`) · payload 24 bytes
 
@@ -7217,6 +7241,8 @@ Sent in reply to `0x4c15` NC_TRADE_CENBOARDING_REQ on ShineObjectClass::ShinePla
 |---|---|---|---|
 | 0 | u16 | player |  |
 
+**Captured** (P02, `capture-validation.md`; s21): `player`: 8003 to the other player only
+
 Sent from `ShineObjectClass::ShinePlayer::sp_HPStoneUse` (`FUN_00589180`) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -7230,6 +7256,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_HPStoneUse` (`FUN_00589180`) · pay
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | player |  |
+
+**Captured** (P02, `capture-validation.md`; s21): `player`: 8003 to the other player only
 
 Sent from `ShineObjectClass::ShinePlayer::sp_SPStoneUse` (`FUN_00588a40`) · payload 2 bytes
 
@@ -7525,6 +7553,8 @@ Sent from `CCharacterTitleZone::Send_NC_CT_SET_CURRENT_ACK` (`FUN_005ca9e0`) · 
 | 1 | u8 | Info.ElementNo:6 / ElementValue:2 | element 0-3; new status in bits 6-7 (ignored by the client) |
 
 sent on every title status change; client appends the element to its list and prints "Character Title [%s] acquired." (TextData 0x3564277a) (Z18 §6.2, Z18-B17)
+
+**Captured** (P02, `capture-validation.md`; s21): `Info`: same CT_INFO as the 0x6005 (0x2E80, 0x2E81)
 
 Sent from `CCharacterTitleZone::Send_NC_CT_SET_CMD` (`FUN_005cab90`) · payload 2 bytes
 
@@ -12031,7 +12061,7 @@ player tick, on change; also sent to every object targeting the player (so_ply_S
 |---|---|---|---|
 | 0 | u16 | code | 0x381 ok, 0x38f bound |
 
-**Captured** (P02, `capture-validation.md`; shop): `code`: 0x381 success ×2
+**Captured** (P02, `capture-validation.md`; shop, s21): `code`: 0x381 success ×2; s21: 0x381 ×6
 
 ### `0x3008` NC_ITEM_DROP_ACK (S→C)
 
@@ -15630,7 +15660,7 @@ Z01 name was 'map login done (ours)'
 
 ### `0x0449` NC_LOG_GAME_ITEM_SELL (Character→GameLog)
 
-**Captured** (P02, `capture-validation.md`; shop): `itembuyer`: 0; `itemlot`: 0; `itemmoney`: 3 / 4
+**Captured** (P02, `capture-validation.md`; shop, s21): `itembuyer`: 0; `itemlot`: 0; s21: lot left in the cell (3 / 8 / 2 / 1 after SELLLOT, 0 after SELLALL); `itemmoney`: 3 / 4; s21: 6 / 18
 
 ### `0x044c` NC_LOG_GAME_ITEM_INVEN_MOVE (Character→GameLog)
 
@@ -15655,6 +15685,18 @@ Z01 name was 'map login done (ours)'
 ### `0x045a` NC_LOG_GAME_ITEM_USEALL (Character→GameLog)
 
 **Captured** (P02, `capture-validation.md`; s21): `(all)`: {charNo, key, itemid}
+
+### `0x045e` NC_LOG_GAME_MONEY_DEPOSIT (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s21): `chrregnum`: 5; `deposit_money`: 1333; `userregnum`: 103; `user_result_money`: 1333 = storage balance after
+
+### `0x045f` NC_LOG_GAME_MONEY_WITHDRAW (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s21): `chrregnum`: 5; `withdraw_money`: 1333; `userregnum`: 103; `user_result_money`: 0 = storage balance after
+
+### `0x07fd` NC_LOG_GAME_DATA_TYPE_L (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s21): `nType`: 0x7F8 (2040) repurchase; `nTargetID`: item id; `nItemKey`: target stack key; `nInt1`: lot after; `nInt2`: cell; `nInt3`: price; `nBigint1`: nSellItemKey
 
 ### `0x0c18` NC_USER_NORMALLOGOUT_CMD (C→S)
 
@@ -15708,6 +15750,10 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; combat): `(payload)`: empty, at the summon 2.93 s later
 
+### `0x305a` NC_ITEM_REPURCHASE_ACK (S→C)
+
+**Captured** (P02, `capture-validation.md`; s21): `nError`: 0x3668 success; 0x3671 = current NPC is no Item / Weapon merchant (so_ply_CanItemRepurchase), silent in the client
+
 ### `0x340a` NC_ITEMDB_BUYALL_REQ (Zone→CharDB)
 
 **Captured** (P02, `capture-validation.md`; shop): `map`: RouN 5724, 8768 (player position); `location`: 0x2406; `attr`: 68 = attribute offset; `price_cen`: 69; `UserNo`: 103; `Vendor`: 28 (NPC mob id)
@@ -15730,7 +15776,7 @@ Z01 name was 'map login done (ours)'
 
 ### `0x3422` NC_ITEMDB_SELLALL_REQ (Zone→CharDB)
 
-**Captured** (P02, `capture-validation.md`; shop): `price`: 3 / 4 (SellPrice × lot); `nLot`: 1; `nDeleteChestItem`: 0
+**Captured** (P02, `capture-validation.md`; shop, s21): `price`: 3 / 4 (SellPrice × lot); s21: 6 / 18; `nLot`: 1; s21: 1 / 3; `nDeleteChestItem`: 0
 
 ### `0x342e` NC_ITEMDB_MERGE_REQ (Zone→CharDB)
 
@@ -15772,9 +15818,29 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; s21): `err`: 0xB81 (apply)
 
+### `0x345f` NC_ITEMDB_DEPOSIT_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s21): `lock`: 24; `userNo`: 103; `cen`: 1333
+
+### `0x3460` NC_ITEMDB_DEPOSIT_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s21): `storagemoney`: 1333 (balance after); `error`: 0xF80
+
+### `0x3461` NC_ITEMDB_WITHDRAW_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s21): `lock`: 25; `userNo`: 103; `cen`: 1333
+
+### `0x3462` NC_ITEMDB_WITHDRAW_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s21): `cen`: 0 (balance after); `err`: 0xF80
+
 ### `0x346b` NC_ITEMDB_ITEMBREAKSUC_ACK (CharDB→Zone)
 
 **Captured** (P02, `capture-validation.md`; s21): `lockindex`: 17
+
+### `0x34bc` NC_ITEMDB_REPURCHASE_LOT_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s21): `nError`: 0x3668
 
 ### `0x34cf` NC_ITEMDB_RESET_SCROLL_LINK_MAP_INFO_CMD (Zone→CharDB)
 
@@ -15792,9 +15858,21 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; shop): `err`: 0x2158 (8536) ok, 1–7 ms after 0x4027
 
+### `0x5003` NC_SOULSTONE_HP_BUY_ACK (S→C)
+
+**Captured** (P02, `capture-validation.md`; s21): `totalnumber`: 15 = 12 held + 3
+
+### `0x5004` NC_SOULSTONE_SP_BUY_ACK (S→C)
+
+**Captured** (P02, `capture-validation.md`; s21): `totalnumber`: 51 = 9 held + 42
+
 ### `0x500a` NC_SOULSTONE_SP_USESUC_ACK (S→C)
 
 **Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty, 1 ms after 0x5009; 0x240F next tick
+
+### `0x6005` NC_CT_DB_SET_CMD (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s21): `Info.Type`: 46 (Cleric level titles); `Info.ElementNo / ElementValue`: 0x80 / 0x81 = element 0 / 1, value 2
 
 ### `0xbcd5` NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_REQ (Zone→CharDB)
 
@@ -15827,6 +15905,10 @@ Z01 name was 'map login done (ours)'
 ### `0xc80e` NC_SYSLOG_CHAR_ITEM_SELL (Character→GameLog)
 
 **Captured** (P02, `capture-validation.md`; shop): `SellMoney`: 3 / 4; `Vendor`: 28
+
+### `0xc815` NC_SYSLOG_CHAR_ITEM_REBUY (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s21): `BuyMoney`: 6 (u64); `Vendor`: 28
 
 ### `0xd412` NC_PET_LINK_RESUMMON_CMD (WM→Z)
 

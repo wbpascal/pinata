@@ -1835,6 +1835,32 @@
      ]
     ],
     "notes": "P02 batch 2 (§7.5): the struct lacks the 6-byte ref; elements are variable length (P02 struct PROTO_SELL_ITEM_INFO_SERVER)"
+   },
+   "0x6401": {
+    "dir": "Zone→WM",
+    "name": "NC_ANNOUNCE_Z2W_CMD",
+    "basis": "zone Send_PROTO_NC_ANNOUNCE_Z2W_CMD FUN_005b8d30 (Z11 §7.3 AnnounceSystem_LevelMax, Z13 §4); WM FUN_0042ab50 (W01 §7); pdb2016 ANNOUNCE_MESSAGE",
+    "fields": [
+     [
+      0,
+      "u8",
+      "AnnounceMessage.AnnounceType",
+      "4 = level announcement (AnnounceData.shn record 4)"
+     ],
+     [
+      1,
+      "u8",
+      "AnnounceMessage.SizeOfMessage",
+      "strlen + 1 (51)"
+     ],
+     [
+      2,
+      "bytes",
+      "AnnounceMessage.Message",
+      "text with its NUL: \"\\\"Test2\\\" has just become level 20. Congratulations!\""
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.4): 53 bytes in s21; Z04.json types the payload as one ANNOUNCE_MESSAGE struct (2 bytes)"
    }
   },
   "zone": {
@@ -3481,6 +3507,262 @@
      ]
     ],
     "notes": "P02 batch 3 (§19.5): pdb2016 layout; restated so the decoder takes the array length from nDeleteChestItem (it read one element of the [0] array)"
+   },
+   "0x3425": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_SELLLOT_REQ",
+    "basis": "zone ItemInventory_ii_SellLot FUN_00538cb0 (Z04 §2.4); character FUN_00409ec0 (D03 §2.2); pdb2016 PROTO_NC_ITEMDB_SELLLOT_REQ (0x1a) + ref + attribute tail (the pdb2017 CharID / CharLevel are not in 2016)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "27 / 29 / 32 / 33"
+     ],
+     [
+      8,
+      "u64",
+      "iteminfo.attritemregnum",
+      "key of the sold stack"
+     ],
+     [
+      16,
+      "u16",
+      "iteminfo.attr",
+      "payload offset of the attribute (32), as in 0x343E"
+     ],
+     [
+      18,
+      "u16",
+      "iteminfo.location",
+      "the stack's cell (0x2401 / 0x2400)"
+     ],
+     [
+      20,
+      "u16",
+      "itemid",
+      "3500"
+     ],
+     [
+      22,
+      "u32",
+      "price",
+      "lot sold × ItemInfo.SellPrice (6)"
+     ],
+     [
+      26,
+      "u32",
+      "UserNo",
+      "103"
+     ],
+     [
+      30,
+      "u16",
+      "Vendor",
+      "mob id of the NPC (28 RouSmithJames)"
+     ],
+     [
+      32,
+      "bytes",
+      "attribute",
+      "the stack's attribute after the sale (lot 3 / 8 / 2 / 1)"
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.2): 33 bytes in s21 (the decoder read the pdb2016 struct without the ref)"
+   },
+   "0x3426": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_SELLLOTSUC_ACK",
+    "basis": "character FUN_00409ec0 (D03 §2.2); zone FUN_00539510 (Z05 §2.2)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "echo of 0x3425"
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.2): {ref, lockindex}; the pdb2016 struct lacks the ref"
+   },
+   "0x34bb": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_REPURCHASE_LOT_REQ",
+    "basis": "zone ItemInventory::ii_RepurchaseLot FUN_00538010 (Z04 §2.5); character FUN_0042e380 (D03 §2.2); pdb2016 PROTO_NC_ITEMDB_REPURCHASE_LOT_REQ (0x28) + attribute tail",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandleNum",
+      "zone handle of the player (8003)"
+     ],
+     [
+      2,
+      "u32",
+      "nCharRegNum",
+      "5"
+     ],
+     [
+      6,
+      "u16",
+      "nLockIndex",
+      "28 / 30 / 35 / 36 / 37"
+     ],
+     [
+      8,
+      "u16",
+      "nItemID",
+      "3500"
+     ],
+     [
+      10,
+      "u64",
+      "nItemAttrChange.attritemregnum",
+      "key of the target stack (cell 0), not of the sold item"
+     ],
+     [
+      18,
+      "u16",
+      "nItemAttrChange.attr",
+      "payload offset of the attribute (40)"
+     ],
+     [
+      20,
+      "u16",
+      "nItemAttrChange.location",
+      "target cell (0x2400)"
+     ],
+     [
+      22,
+      "u32",
+      "nPrice",
+      "ItemInfo.SellPrice × lot (6)"
+     ],
+     [
+      26,
+      "u64",
+      "nSellItemKey",
+      "key the sold item had (only logged, D03 §2.2)"
+     ],
+     [
+      34,
+      "u32",
+      "UserNo",
+      "103"
+     ],
+     [
+      38,
+      "u16",
+      "Vendor",
+      "28 (RouSmithJames)"
+     ],
+     [
+      40,
+      "bytes",
+      "attribute",
+      "the target stack's attribute after the buy-back (lot 9 / 10 / 11)"
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.2): 41 bytes in s21; the pdb2016 struct ends at Vendor (the pdb2017 CharID / CharLevel are not in 2016)"
+   },
+   "0x3441": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_SOULSTONEBUY_REQ",
+    "basis": "zone ShinePlayer_sp_PointStoneBuy FUN_00588510 (Z04 §13.1); character D03 §2.5; pdb2016 PROTO_NC_ITEMDB_SOULSTONEBUY_REQ (0x11) + ref",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u32",
+      "chrregnum",
+      "5"
+     ],
+     [
+      10,
+      "u8",
+      "flag",
+      "0 = HP stones, 1 = SP stones"
+     ],
+     [
+      11,
+      "u16",
+      "number",
+      "stones bought (3 / 42)"
+     ],
+     [
+      13,
+      "u64",
+      "price",
+      "number × price of 0x3C05 (165 / 1554)"
+     ],
+     [
+      21,
+      "u16",
+      "lockindex",
+      "40 / 41"
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.3): 23 bytes in s21 (the decoder read the pdb2016 struct without the ref)"
+   },
+   "0x3442": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_SOULSTONEBUYSUC_ACK",
+    "basis": "character D03 §2.5 (raw frame); zone FUN_00588800 (Z05 §2.4)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "echo of 0x3441"
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.3): {ref, lockindex}; the pdb2016 struct lacks the ref"
    }
   }
  },
@@ -5000,6 +5282,51 @@
     "fields": {
      "nCharNo": "2: after 0x4002 of the `&linkto` save, level 120 ≥ 60 (Z01 §8.4)"
     }
+   },
+   "0x6402": {
+    "dir": "WM→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "AnnounceMessage": "type 4, 51 bytes, relayed unchanged 88 ms after the zone's 0x6401, to both clients"
+    }
+   },
+   "0x2079": {
+    "dir": "WM→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "sScriptMsgIndex": "E_Olympic_A04 + the 0x207D heap bytes, relayed unchanged (Z09-B72)"
+    }
+   },
+   "0x5811": {
+    "dir": "WM→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "hquest": "each KQ skipped at its start time (SetDoneSkip), to all four zones' broadcast links"
+    }
+   },
+   "0x5825": {
+    "dir": "WM→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nHandle / nID": "the skipped KQ, to every client"
+    }
+   },
+   "0x581e": {
+    "dir": "WM→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "DeleteQuestArray": "the KQs skipped this minute; one client per second"
+    }
    }
   },
   "zone": {
@@ -5869,20 +6196,22 @@
    "0x3006": {
     "dir": "C→S",
     "captures": [
-     "shop"
+     "shop",
+     "s21"
     ],
     "fields": {
-     "slot": "1, 2 (inventory 9)",
+     "slot": "1, 2 (inventory 9); s21: 1 / 0 (lot 1 each), 1 lot 3",
      "lot": "1"
     }
    },
    "0x3005": {
     "dir": "S→C",
     "captures": [
-     "shop"
+     "shop",
+     "s21"
     ],
     "fields": {
-     "code": "0x381 success ×2"
+     "code": "0x381 success ×2; s21: 0x381 ×6"
     }
    },
    "0x3009": {
@@ -6017,12 +6346,13 @@
    "0x305c": {
     "dir": "S→C",
     "captures": [
-     "shop"
+     "shop",
+     "s21"
     ],
     "fields": {
-     "nHandle": "0, 1 (repurchase slots)",
+     "nHandle": "0, 1 (repurchase slots); s21: 0…5 in sale order",
      "ItemInfo.itemid": "3000 / 3001",
-     "ItemInfo.itemattr": "1 byte lot, then 100 stale bytes of the global send buffer (P02-B16)"
+     "ItemInfo.itemattr": "1 byte lot, then 100 stale bytes of the global send buffer (P02-B16); s21: lot sold (1 / 3), then the previous 0x3001 / 0x3425 bytes of gpp (P02-B16)"
     }
    },
    "0x3413": {
@@ -6166,11 +6496,12 @@
    "0x3422": {
     "dir": "Zone→CharDB",
     "captures": [
-     "shop"
+     "shop",
+     "s21"
     ],
     "fields": {
-     "price": "3 / 4 (SellPrice × lot)",
-     "nLot": "1",
+     "price": "3 / 4 (SellPrice × lot); s21: 6 / 18",
+     "nLot": "1; s21: 1 / 3",
      "nDeleteChestItem": "0"
     }
    },
@@ -6204,12 +6535,13 @@
    "0x0449": {
     "dir": "Character→GameLog",
     "captures": [
-     "shop"
+     "shop",
+     "s21"
     ],
     "fields": {
      "itembuyer": "0",
-     "itemlot": "0",
-     "itemmoney": "3 / 4"
+     "itemlot": "0; s21: lot left in the cell (3 / 8 / 2 / 1 after SELLLOT, 0 after SELLALL)",
+     "itemmoney": "3 / 4; s21: 6 / 18"
     }
    },
    "0x044c": {
@@ -7281,6 +7613,291 @@
     ],
     "fields": {
      "(all)": "{charNo, key, itemid}"
+    }
+   },
+   "0x301c": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "cen": "1333 (deposit)"
+    }
+   },
+   "0x301d": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "cen": "storage money after (1333)",
+     "err": "0xF80 success"
+    },
+    "note": "capture-validation §20.1; sent after 0x1033"
+   },
+   "0x301e": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "cen": "1333 (withdraw)"
+    }
+   },
+   "0x301f": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "cen": "storage money after (0)",
+     "err": "0xF80 success"
+    },
+    "note": "capture-validation §20.1"
+   },
+   "0x345f": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "lock": "24",
+     "userNo": "103",
+     "cen": "1333"
+    }
+   },
+   "0x3461": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "lock": "25",
+     "userNo": "103",
+     "cen": "1333"
+    }
+   },
+   "0x3460": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "storagemoney": "1333 (balance after)",
+     "error": "0xF80"
+    }
+   },
+   "0x3462": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "cen": "0 (balance after)",
+     "err": "0xF80"
+    }
+   },
+   "0x045e": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "chrregnum": "5",
+     "deposit_money": "1333",
+     "userregnum": "103",
+     "user_result_money": "1333 = storage balance after"
+    }
+   },
+   "0x045f": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "chrregnum": "5",
+     "withdraw_money": "1333",
+     "userregnum": "103",
+     "user_result_money": "0 = storage balance after"
+    }
+   },
+   "0x3059": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nHaldle": "repurchase handle of 0x305C"
+    }
+   },
+   "0x305a": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nError": "0x3668 success; 0x3671 = current NPC is no Item / Weapon merchant (so_ply_CanItemRepurchase), silent in the client"
+    }
+   },
+   "0x305d": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nHandle": "the bought-back handle, before 0x305A"
+    }
+   },
+   "0x34bc": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nError": "0x3668"
+    }
+   },
+   "0x07fd": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nType": "0x7F8 (2040) repurchase",
+     "nTargetID": "item id",
+     "nItemKey": "target stack key",
+     "nInt1": "lot after",
+     "nInt2": "cell",
+     "nInt3": "price",
+     "nBigint1": "nSellItemKey"
+    }
+   },
+   "0xc815": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "BuyMoney": "6 (u64)",
+     "Vendor": "28"
+    }
+   },
+   "0x3c05": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "hp.recover": "443",
+     "hp.maxnum": "100",
+     "hp.price": "55",
+     "sp.recover": "590",
+     "sp.maxnum": "114",
+     "sp.price": "37"
+    },
+    "note": "capture-validation §20.3 (level 33 Cleric)"
+   },
+   "0x5001": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "number": "3"
+    }
+   },
+   "0x5002": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "number": "42"
+    }
+   },
+   "0x5003": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "totalnumber": "15 = 12 held + 3"
+    }
+   },
+   "0x5004": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "totalnumber": "51 = 9 held + 42"
+    }
+   },
+   "0x6005": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "Info.Type": "46 (Cleric level titles)",
+     "Info.ElementNo / ElementValue": "0x80 / 0x81 = element 0 / 1, value 2"
+    }
+   },
+   "0x6004": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "Info": "same CT_INFO as the 0x6005 (0x2E80, 0x2E81)"
+    }
+   },
+   "0x2427": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "handle": "8004 (X14B) to Test2 at X14B's map login",
+     "abstateIndex": "291 StaImmortal, 728 StaE_UserNewbie01"
+    }
+   },
+   "0x112c": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nCharHandle": "8004 to the other player in sight only",
+     "bUse": "0"
+    }
+   },
+   "0x240d": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "handle": "8003, one per level (25 for &levelup 25) to the other player",
+     "mobhandle": "0"
+    }
+   },
+   "0x500b": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "player": "8003 to the other player only"
+    }
+   },
+   "0x500c": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "player": "8003 to the other player only"
     }
    }
   },

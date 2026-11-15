@@ -2550,6 +2550,178 @@ Types new in batch 3 (batch 1–2 types recur unchanged: §8.2, §7.6.1; `0x3001
 `0x0446` (`&getmoney` row) and `0x044F` (56) match their batch-2 rows (§7.6.1, §18.8). `0x0459` has 2 rows: the
 second (lock 31, lot 8) belongs to the step-9 potion use (§20).
 
+## 20. Items II, batch 3: storage money, selling and buying back, soul stones; world traffic (`s21`) *(captured)*
+
+`s21` steps 8–10 (storage, sell / buy back, soul stones) and the world traffic of the capture that the scenario did not
+ask for (level-up announcement and titles, KQ minute ticks, a script message, B's map login seen by A). Streams as in
+§19 (A = Test2, zone#1 / wm#1, handle 8003; B = X14B, zone#2 / wm#2, handle 8004; CharDB W00_CDB#1 / #2 / #3 / #17,
+GameLog W00_GLDB#1). Times are capture seconds. Decoder: the 18 issue packets left by part 19 (0x34BB ×5, 0x3425 /
+0x3426 ×4, 0x3441 / 0x3442 ×2, 0x6401) fit the P02.json layouts of this section; all six batch-3 captures now decode
+with 0 issue packets.
+
+### 20.1 Storage (step 8, Storage Keeper Raina)
+
+- **Open** (as §8.1): `0x200A {17092}` (mob 108 RouStoreRaina) 843.695 → `0x201C {108}` → the client's `0x201D {1}`
+  844.693 → 4 × `0x3444` pages 0–3 in 3 ms on 4 links → `0x3446` pages 2 / 3 / 1 (20 bytes, empty) at 844.707 and page 0
+  (126 bytes, 3 items) at 844.717 → `0x3C08` pages 1, 2, 3 at 844.713 and page 0 at 844.757: each page goes to the client
+  when its DB answer arrives (batch 2: 2, 3, 0, 1).
+- **Item in / out**: the HP-potion stack (cell 0, lot 12) to account-storage cell 3 (`0x300B 0x2400 → 0x1803`): `0x3428`
+  `ownerA 5, ownerB 103`, lock 22, GameLog `0x044C`, `0x3429`, two `0x3001`, `0x300C {0x241}`; back at 854.766 with
+  `ownerA 103, ownerB 5`, lock 23. The notes' "changed to page 2, back to page 1" sent **nothing**: the four pages are
+  loaded at open, and the 2016 client never sent `0x3028 NC_ITEM_OPENSTORAGEPAGE_REQ` (Z04 §7.2) in either batch.
+- **Money** (Z04 §7.1, D03 §5.1): deposit `0x301C {cen 1333}` 865.110 → `0x345F {ref, lock 24, userNo 103, cen 1333}`
+  +7 ms → GameLog `0x045E {chrregnum 5, deposit_money 1333, userregnum 103, user_result_money 1333}` and `0x3460 {ref,
+  lock 24, storagemoney 1333, error 0xF80}` in the same ms (+25 ms) → `0x1033 {298045}` and `0x301D {cen 1333, err
+  0xF80}` +26 ms. Withdraw `0x301E {1333}` 877.854 → `0x3461` lock 25 → `0x045F {5, 1333, 103, 0}` + `0x3462 {…, cen 0,
+  err 0xF80}` +87 ms → `0x1033 {299378}`, `0x301F {0, 0xF80}`. The ACK's `cen` is the **storage balance after**, the
+  10-byte success ACK is the PDB `{u64 cen, u16 err}` (the Z04-B8 error path was not reached); money before / after
+  299378 as in the notes. The GameLog field order is D05's `{chrregnum u32, money u32, userregnum u32, result u64}`; D03
+  §5.1 lists it as `{nUserNo, charNo, money, storageMoney}` (§13).
+- **Close**: `0x200B` and `0x304D` in the same ms (893.855), as §8.1.
+
+### 20.2 Selling and buying back (step 9, Blacksmith James)
+
+James (17084, mob 28 RouSmithJames, `Merchant Weapon`) answers the click with the quest dialog `0x4401` (quest 2524,
+§10.5); the client's `0x201D {1}` opens `0x3C09` (62 items). HP Potion 3500: `SellPrice` 6, `MaxLot` 50.
+
+| Time | Request | Cells 0 / 1 (lots) | DB | Client |
+|---|---|---|---|---|
+| 966.6 | `0x300D` 4 → cell 1 | 12 → 8 / 4 | (§19.3) | `0x300E {0x441}` |
+| 987.3 | `0x3006 {slot 1, lot 1}` | 8 / 3 | `0x3425` SELLLOT, lock 27 | `0x305C {h 0}` |
+| 991.6 | `0x3059 {0}` | **9** / 3 | `0x34BB` onto cell 0, lock 28 | `0x305D {0}`, `0x305A {0x3668}` |
+| 997.1 | `0x3006 {slot 0, lot 1}` | 8 / 3 | SELLLOT, lock 29 | `0x305C {h 1}` |
+| 999.5 | `0x3059 {1}` | 9 / 3 | `0x34BB`, lock 30 | `0x305D {1}`, `0x305A {0x3668}` |
+| 1001.3 | `0x3015` cell 0 | 8 / 3 | `0x343E` (§19.6) | `0x3016 {0x700}` |
+| 1015.6, 1025.1 | `0x3006 {slot 1, lot 1}` ×2 | 8 / 2, 8 / 1 | SELLLOT, locks 32 / 33 | `0x305C {h 2}`, `{h 3}` |
+| 1025.4 | `0x3006 {slot 1, lot 1}` | 8 / – | `0x3422` SELLALL, lock 34 | `0x305C {h 4}` |
+| 1068.3–1069.3 | `0x3059 {4}`, `{3}`, `{2}` | 9, 10, 11 / – | `0x34BB` ×3, locks 35–37 | `0x305D` + `0x305A {0x3668}` each |
+| 1075.7 | `0x300D` 3 → cell 1 | 8 / 3 | `0x3434` lock 38 | `0x300E {0x441}` |
+| 1092.3 | `0x3006 {slot 1, lot 3}` | 8 / – | SELLALL `price 18`, lock 39 | `0x305C {h 5}` |
+| 1095.0 | `0x200A {17164}` (the Anvil) | | | nothing |
+| 1117.7–1130.2 | `0x3059 {5}` ×19 | | none | `0x305A {0x3671}` each, no text |
+
+- **Sell** (Z04 §2.4, Z05 §2.2, D03 §2.2): `0x3006` → `0x3425` / `0x3422` 1–20 ms later → `0x3426` / `0x3423` 6–26 ms
+  later with GameLog `0x0449` + `0xC80E` in the same ms → `0x1033` (+cen), `0x3001` (lot left, or the cell emptied),
+  `0x305C`, `0x3005 {0x381}`. `req.lot < cell.lot` → SELLLOT, else SELLALL (the last single of cell 1 at 1025.4 went
+  as SELLALL). **0x3425** = D03's layout (ref + pdb2016 struct + attribute, P02.json): `iteminfo.attr` = 32 = payload
+  offset of the attribute (as 0x343E, §19.6), the attribute = the lot **left**, `price` = sold lot × 6, `Vendor` 28 =
+  James's mob id; `0x3426` = `{ref, lock}`. `0x0449 itemlot` = lot left (3 / 8 / 2 / 1, 0 after SELLALL).
+- **0x305C**: `nHandle` 0…5 in sale order; freed handles 0 and 1 were not reused by the next sale *(the allocator
+  `CSellItemManager` vt 0x18 / +8 was not read)*. `itemattr` = the sold lot (1, then 3) + 100 stale `gpp` bytes
+  (P02-B16, batch 2): bytes 1–2 are the `0x3001` sent just before (high byte of item id 3500, its lot), bytes 18–27 the
+  `0x3425` built in the same buffer (`price 6`, `UserNo 103`, `Vendor 28`), then text of earlier packets
+  ("…ess to Isya…"): client and link packets share `gpp`.
+- **Buy back** (Z04 §2.5, Z05 §2.2, D03 §2.2): `0x3059` → `0x34BB` 2–20 ms → GameLog `0x07FD` + `0x34BC {0x3668}` +
+  `0xC815` in the same ms → `0x1033` (−6), `0x3001` (cell 0 lot + 1), `0x305D {h}`, `0x305A {0x3668}`. Every buy-back
+  went onto **cell 0**, the potion sold from cell 1 too: `ii_RepurchaseLot` stacks onto the first unlocked cell of the
+  item with room and the sold key only reaches the logs (D03 §2.2 confirmed). `0x34BB` = pdb2016 struct + 1 attribute
+  byte (the target's lot after), `nItemAttrChange.attr` 40 = offset, `nItemAttrChange.attritemregnum` = cell 0's key,
+  `nSellItemKey` = the sold item's key. `0x07FD {nType 0x7F8, charNo 5, 0, 3500, target key, nInt1 lot after, nInt2
+  cell, nInt3 price 6, nBigint1 nSellItemKey}`; `0xC815 {103, 5, 3500, u64 6, Vendor 28}`. Buy-back price = `SellPrice`
+  × lot.
+- **The stack of 3 that could not be bought back** (notes "bug?"): settled. After the sale at 1092.3 the tester
+  clicked the Anvil next to James (17164, mob 9361; `World/NPC.txt` RouN 5645 / 8924, `NPCMenu 0`, role `NPCMenu
+  RandomOption` = `NPCRole_MenuOpen`) while James's shop window was open. `InteractWithNPC` @ FUN_004c4660 (Z02 §6.2)
+  stores the Anvil's role entry in `sp_NPCProcess.npc` and calls `NPCRole_MenuOpen::nrb_Role` @ FUN_004c4140 at once,
+  which returns without a packet because `dmc_CanMenuOpen(0)` fails (James's shop still holds menu bit 0): no reply on
+  the wire. `sp_NC_ITEM_REPURCHASE_REQ` @ FUN_00538580 then asks `so_ply_CanItemRepurchase` @ FUN_005379f0 (vt 0xe6c)
+  *(pdb2016)*: true only when the current role's slot 14 says so, i.e. `NPCRole_Merchant::nrb_CanItemRepurchase` @
+  FUN_004c7690 with `RoleArg0` "Item" or "Weapon"; every other role class has the shared "return 0" FUN_004b8d20 there.
+  So all 19 tries got `0x305A {0x3671}` without a DB request, and the client handler FUN_004b46a0 shows text only for
+  `0x366B` / `0x366C` / `0x366D`: silent, with James's window still open (original bug) P02-B31. The stack stays in the
+  list as handle 5. The two ends of the session (1165.8 `0x200B`, 1167.1 James again, no `0x201D`) retried nothing.
+- `so_ply_SellItemList_Insert` @ FUN_00537a20 inserts the sold item first and sends `0x305C` only when
+  `so_ply_CanItemRepurchase` holds: a sale at a SoulStone / Skill / WeaponTitle / Guild merchant (whose
+  `nrb_ItemSellPrice` is the same Merchant function) enters the server's list without telling the client *(read, not
+  captured)*.
+
+### 20.3 Soul stones (step 10, Healer Julia)
+
+- `0x200A {17085}` (mob 29 RouSoulMctJulia, `Merchant SoulStone`) 1206.546 → `0x201C {29}` (no quest dialog) →
+  `0x201D {1}` 1212.279 → `0x3C05 NC_MENU_SHOPOPENSOULSTONE_CMD {hp.recover 443, hp.maxnum 100, hp.price 55, sp.recover
+  590, sp.maxnum 114, sp.price 37}` 4 ms later (Z02 §6.5 `nrm_PortionStone`; first capture).
+- **Buy** (Z04 §13.1, Z05 §2.4, D03 §2.4): `0x5001 {3}` 1219.196 → `0x3441 {ref, chrregnum 5, flag 0, number 3, price
+  165, lock 40}` +7 ms (D03's layout = ref + pdb2016 struct, P02.json) → `0x3442 {ref, lock}` +11 ms → `0x1033 {299231}`,
+  `0x5003 {15}`, `0x3004 {0x201}` in the same ms. SP: `0x5002 {42}` → `flag 1`, `price 1554`, lock 41 → `0x5004 {51}`,
+  money 297677 (notes). Totals = held (12 / 9) + bought, under `maxnum`: `0x742` not reached. **No GameLog row**: no
+  `0x0458` from any server, as D05 says ("no 2016 sender"); D03 §2.4's "the zone logs 0x0458" is wrong (§13).
+- **HP stone at full HP**: no `0x5007` on the wire; the client refuses by itself, without a message.
+- **Use at 1 HP / 1 SP** (`&sethp 1` → `0x240E {1}`, `&setsp 1` → `0x240F {1}`): `0x5007` → `0x5008` +11 ms and B's
+  `0x500B {8003}` in the same ms → `0x240E {444}` +48 ms (1 + `hp.recover` 443); `0x5009` → `0x500A` +14 ms, B's
+  `0x500C {8003}` → `0x240F {591}` +45 ms. Confirms §9.6 / §10.4 from the bystander side: the other player gets
+  0x500B / 0x500C, the user does not.
+
+### 20.4 World traffic in the capture
+
+- **`&levelup 25`** (135.630, level 8 → 33): A gets 25 × `0x240C` in one ms, B 25 × `0x240D {8003, 0}` 14 ms later
+  (one per level; first bystander `0x240D`). Titles (`CT_LevelUp`, Z11 §7.3, Z18 §6.2): Test2 is class 6 → type 0x2E =
+  46 (`CharacterTitleData` "Apprentice Cleric" `Value0 10`, "High Cleric" `Value1 20`): CharDB `0x6005 {ref, 46,
+  0x80}` at 135.637 and `{46, 0x81}` at 135.642 (no answer, D04 §4.2), client `0x6004 {0x2E80}` /
+  `{0x2E81}` (`ElementNo` 0 / 1, `ElementValue` 2), each **before** the `0x240C` of level 10 / 20 in the stream.
+- **Level announcement**: level 20 passed → zone `0x6401 {AnnounceType 4, SizeOfMessage 51, "\"Test2\" has just become
+  level 20. Congratulations!"}` on W00_WM#13 at 135.642 → WM `0x6402` with the same 53 bytes to both clients 88 ms
+  later (W01 §7.6). **Z11-B30 captured**: a GM's `&levelup` announces world-wide. `0x6401` layout in P02.json (Z04.json
+  types it as one 2-byte `ANNOUNCE_MESSAGE`).
+- **Script message**: zone `0x207D` on W00_WM#11 at 146.087 → WM `0x2079` to both clients 6 ms later, the 39 bytes
+  unchanged: `"E_Olympic_A04"` + 18 stale bytes (Z09-B72, §17.4); confirms W04 §2.4's relay. A map script, not a step.
+- **B's map login seen by A** (89.9): `0x2427 {8004, 291 StaImmortal}`, `0x112C {8004, bUse 0}`, `0x2427 {8004, 728
+  StaE_UserNewbie01}`. `0x112C` reached A only: confirms §5.1 #12's *(inferred)* "the minimon broadcast excludes the
+  sender"; `0x2427` goes to the others in sight (Z03 §6.3).
+- **KQ minute ticks** (W04 §6.2 `SetDoneSkip` @ FUN_004548c0): from 756.8 on, every 60 s at hh:mm:00 (no skip at
+  1356) the WM skips the KQs whose start wait passed without joiners: per KQ `0x5811 {hquest}` to the four zones'
+  broadcast links (W00_WM#1 / #7 / #4 / #3, §17.4) and `0x5825 {nHandle, nID}` to both clients, then `0x581E
+  NC_KQ_LIST_DELETE_ACK` through `KQ_RefreshOneClient` (one client per second: wm#2 in the same second, wm#1 ≈ 0.9 s
+  later). 120 / 60 / 24 packets, 11 KQs at the first tick, 1–3 later; no `0x580B` (no joiners). Confirms W04 §6.2 /
+  §6.4.
+
+### 20.5 Opcodes
+
+Types new in batch 3 (`0x3001`, `0x3006`, `0x3005`, `0x3422` / `0x3423`, `0x0449`, `0xC80E`, `0x3444` / `0x3446`,
+`0x3C08`, `0x3428` / `0x3429`, `0x044C`, `0x5007`–`0x500A` recur as in §8.2 / §9.7):
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| C→S | 0x301C | NC_ITEM_DEPOSIT_REQ | 1 | 8 | confirmed | Z04 §7.1 |
+| S→C | 0x301D | NC_ITEM_DEPOSIT_ACK | 1 | 10 | confirmed | `{storage balance, 0xF80}`, after `0x1033` |
+| C→S | 0x301E | NC_ITEM_WITHDRAW_REQ | 1 | 8 | confirmed | Z04 §7.1 |
+| S→C | 0x301F | NC_ITEM_WITHDRAW_ACK | 1 | 10 | confirmed | `{0, 0xF80}` |
+| Z→CDB | 0x345F | NC_ITEMDB_DEPOSIT_REQ | 1 | 20 | confirmed | D03 §5.1 |
+| CDB→Z | 0x3460 | NC_ITEMDB_DEPOSIT_ACK | 1 | 18 | confirmed | balance after |
+| Z→CDB | 0x3461 | NC_ITEMDB_WITHDRAW_REQ | 1 | 20 | confirmed | D03 §5.1 |
+| CDB→Z | 0x3462 | NC_ITEMDB_WITHDRAW_ACK | 1 | 18 | confirmed | balance after |
+| CDB→GL | 0x045E | NC_LOG_GAME_MONEY_DEPOSIT | 1 | 20 | confirmed | D05 order; D03 §5.1's order **corrected** |
+| CDB→GL | 0x045F | NC_LOG_GAME_MONEY_WITHDRAW | 1 | 20 | confirmed | as 0x045E |
+| Z→CDB | 0x3425 | NC_ITEMDB_SELLLOT_REQ | 4 | 33 | **corrected** | ref + pdb2016 + attribute; `attr` = offset (P02.json) |
+| CDB→Z | 0x3426 | NC_ITEMDB_SELLLOTSUC_ACK | 4 | 8 | **corrected** | `{ref, lock}` (P02.json) |
+| C→S | 0x3059 | NC_ITEM_REPURCHASE_REQ | 24 | 2 | confirmed | 5 accepted, 19 refused |
+| S→C | 0x305A | NC_ITEM_REPURCHASE_ACK | 24 | 2 | confirmed; **bug** | `0x3668` ×5; `0x3671` ×19 silent (P02-B31) |
+| S→C | 0x305D | NC_ITEM_SELL_ITEM_DELETE_CMD | 5 | 2 | confirmed | before 0x305A |
+| Z→CDB | 0x34BB | NC_ITEMDB_REPURCHASE_LOT_REQ | 5 | 41 | **corrected** | pdb2016 + 1 attribute byte (P02.json) |
+| CDB→Z | 0x34BC | NC_ITEMDB_REPURCHASE_LOT_ACK | 5 | 10 | confirmed | `0x3668` |
+| CDB→GL | 0x07FD | NC_LOG_GAME_DATA_TYPE_L | 5 | 44 | confirmed | `nType 0x7F8`; `nInt3` = price |
+| CDB→GL | 0xC815 | NC_SYSLOG_CHAR_ITEM_REBUY | 5 | 20 | confirmed | D03 §2.2 |
+| S→C | 0x3C05 | NC_MENU_SHOPOPENSOULSTONE_CMD | 1 | 24 | confirmed | Z02 §6.5 |
+| C→S | 0x5001 / 0x5002 | NC_SOULSTONE_HP / SP_BUY_REQ | 1 / 1 | 2 | confirmed | Z04 §13.1 |
+| Z→CDB | 0x3441 | NC_ITEMDB_SOULSTONEBUY_REQ | 2 | 23 | **corrected** | ref + pdb2016 (P02.json); `flag` 0 HP / 1 SP |
+| CDB→Z | 0x3442 | NC_ITEMDB_SOULSTONEBUYSUC_ACK | 2 | 8 | **corrected** | `{ref, lock}` (P02.json) |
+| S→C | 0x5003 / 0x5004 | NC_SOULSTONE_HP / SP_BUY_ACK | 1 / 1 | 2 | confirmed | new total; with `0x3004 {0x201}` |
+| S→C | 0x500B / 0x500C | NC_SOULSTONE_HP / SP_SOMEONEUSE_CMD | 1 / 1 | 2 | confirmed | first capture: to the other player only |
+| S→C | 0x240D | NC_BAT_SUMEONELEVELUP_CMD | 25 | 4 | confirmed | first capture: one per level, to the others |
+| S→C | 0x2427 | NC_BAT_ABSTATESET_CMD | 4 | 6 | confirmed | first capture: the other player's abstates |
+| S→C | 0x112C | NC_CHAR_USEITEM_MINIMON_USE_BROAD_CMD | 1 | 3 | confirmed | first capture: to the others, not the sender |
+| Z→CDB | 0x6005 | NC_CT_DB_SET_CMD | 2 | 8 | confirmed | D04; no answer |
+| S→C | 0x6004 | NC_CT_SET_CMD | 2 | 2 | confirmed | Z18 §6.2 |
+| Z→WM | 0x6401 | NC_ANNOUNCE_Z2W_CMD | 1 | 53 | **corrected** | `{type, len, text[len]}` (P02.json) |
+| WM→C | 0x6402 | NC_ANNOUNCE_W2C_CMD | 2 | 53 | confirmed; **bug** | type 4 level announcement for a GM (Z11-B30) |
+| WM→C | 0x2079 | NC_ACT_SCRIPT_MSG_CMD | 2 | 39 | confirmed; **bug** | relay of 0x207D (Z09-B72) |
+| WM→Zone | 0x5811 | NC_KQ_W2Z_DESTROY_CMD | 120 | 4 | confirmed | per skipped KQ, 4 zones |
+| WM→C | 0x5825 | NC_KQ_JOINING_ALARM_END_CMD | 60 | 6 | confirmed | per skipped KQ, every client |
+| WM→C | 0x581E | NC_KQ_LIST_DELETE_ACK | 24 | 2 + 4n | confirmed | one client per second |
+
+`0x6006` (part-20 scope in the status file) does not occur in `s21`; its row is §18.8. Never sent by the 2016 client in
+batches 2–3: `0x3028` (storage page). Not reached: `0x3427` / `0x34BA` / `0x34B9` (buy-back onto an empty cell),
+`0x5005` / `0x3443` (soul-stone refusals).
+
 ## 11. Message order against README §2 and the pseudocode
 
 README §2 is a sketch of the login → WM → zone chain. Against the seven captures (details in the sections cited;
@@ -2627,6 +2799,7 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B28 | WM `CParserClient::fc_NC_CHAR_LOGIN_REQ` @ FUN_00422be0 → client 0x1110 (W01 §4.2) | `CSendPacket::ID(&p, 0x1110, 1, NULL)` declares a 1-byte payload and writes none (§18.7) | one stale WM byte (0xD5) in every tutorial popup; the client reads no payload | payload size 0 (PROTO struct empty), as P02-B2 |
 | P02-B29 | zone `ShineMobileObject::so_Shout` @ FUN_00459080 → 0x201F (Z02 §3.2); WM whisper 0x200D (W04 §2.1) | `smo_Shout` writes only bits 0 / 1 of `flag`; bits 2–7 keep the shared buffer `gpp` byte (0x78, 0x74 captured). The WM's 0x200D flag has bits 1–7 from the stack (0x54, 0x04; W04 states it without an ID) (§18.4) | stale bits on the wire; both clients test only bits 0 / 1, so no visible effect | write the whole byte (`flag = GMColor + (isMob << 1)`) |
 | P02-B30 | zone ITEMDB requests: `ac_ClearInventory` @ FUN_0041bbd0 and the `sp_DestroyItem` family (Z18 §4.4) → 0x3459; `sp_NC_ITEM_SPLIT_REQ` @ FUN_00539a40 → 0x3434; `ItemInventory_ii_DropAll` @ FUN_00529a70 → 0x3416 | 0x3459 without bit 7 leaves payload +9…+22 (`itemID`, `key`, `attrOffset`, `inven`) unwritten; 0x3434 leaves `lotcreate.attr` (+62) unwritten; 0x3416 copies the cell's whole 101-byte attribute union, of which a lot item uses 1 byte (§19.2–§19.4) | earlier `gpp` contents (text of other packets) and zone heap bytes reach the Character DB on every `&cleariv` / destroy / split / drop and come back in 0x3417; the Character server reads only the valid parts *(inferred from D03 §3.3 / §3.4 and Z18 §4.4)* | zero the fields (or the send buffer) before filling; copy only the class's attribute length |
+| P02-B31 | zone `ShinePlayer::InteractWithNPC` @ FUN_004c4660 (Z02 §6.2) with `sp_NC_ITEM_REPURCHASE_REQ` @ FUN_00538580 / `so_ply_CanItemRepurchase` @ FUN_005379f0 | clicking another NPC while a shop is open replaces `sp_NPCProcess.npc` without `sp_EndOfTrade`; when the new role cannot open (`NPCRole_MenuOpen` with menu bit 0 still set by the shop) nothing is sent, so the client keeps the shop window; every buy-back then fails `so_ply_CanItemRepurchase` and gets `0x305A {0x3671}`, a code the client shows no text for (§20.2) | the player cannot buy back (19 silent refusals in `s21` after an Anvil click next to the Blacksmith) | end the old trade (or refuse the click) before replacing the NPC, and answer a refused buy-back with a code the client shows |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -2656,6 +2829,9 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | Z04-B4 | `s21` 447.1: a part-stack drop answers `0x3008 {0x303}` without a menu | §19.4 |
 | Z11-B12 | `s21`: 3 `&makeitem` with a full inventory send nothing and show nothing | §19.2 |
 | Z11-B32 | `s21` 142.9: `&getmoney` → `0x300A {itemid 0, lot 0, 0x341}` (nothing picked since login) | §19.2 |
+| Z11-B30 | `s21` 135.642: `&levelup 25` of a GM passes level 20 and sends the world announcement 0x6401 → 0x6402 to every client | §20.4 |
+| Z09-B72 | `s21` 146.087: the WM relays 0x207D unchanged as 0x2079 to both clients, the 18 stale bytes included | §20.4 |
+| P02-B16 | `s21`: every 0x305C carries the bytes of the 0x3001 and the 0x3425 built just before in `gpp`, then older text | §20.2 |
 
 ## 13. Discrepancies per work item
 
@@ -2742,6 +2918,10 @@ creates for the README register.
 | Z05 | `Z05-itemdb.md` §3.1 (owner-only time "looting / 100 s", "g_Now is in seconds") | 20000 → 19.95 s: `g_Now` counts 0.1 s, as Z09 §11.4 says (§19.4) | corrected → batch-3 follow-up |
 | Z11 | `Z11-gm-commands.md` §7.4 (`&getmoney`: item id 0 *(inferred)*) | captured `0x300A {0, 0, 0x341}` (§19.2) | confirmed |
 | X02 | `tools/capture/21` outputs of `s21` (snapshot / prep) | they list Test1235 (`nCharNo` 2), not the scenario's Test2: no D03 check (§19.8) | contradicted → batch-3 follow-up |
+| Z04 | `Z04-items.md` §2.5 (0x3059: "`p.vt[0xe6c]()` (repurchase allowed, inferred) → 0x3671"; client 0x305A "otherwise Inventory is full.") | vt 0xe6c = `so_ply_CanItemRepurchase` @ FUN_005379f0: the current NPC is a Merchant with `RoleArg0` "Item" or "Weapon" (`nrb_CanItemRepurchase` @ FUN_004c7690); the client shows only `0x366B` / `0x366C` / `0x366D` ("Inventory is full."), every other code is silent (Z05 §2.2's table is right) (§20.2) | corrected → batch-3 follow-up |
+| D03 | `D03-character-items.md` §2.4 ("No GameLog entry is written (the zone logs `0x0458 SOULSTONEBUY`)") | nobody logs a soul-stone purchase: no 0x0458 on the wire, and D05 finds no 2016 sender (§20.3) | contradicted → batch-3 follow-up |
+| D03 | `D03-character-items.md` §5.1 (Log 0x045E / 0x045F `{ nUserNo, charNo, money, storageMoney }`) | `{chrregnum u32, money u32, userregnum u32, storage balance u64}` = D05's row (§20.1) | corrected → batch-3 follow-up |
+| X02 | `s21` notes, step 9 ("sold all 4 potions individually", "bought back 1 potion and used it", "could not buy back stack of 3 (bug?)") | 5 sales (one from cell 0) and 2 single buy-backs before the use; the stack failed because of an Anvil click with the shop open (P02-B31), not because it was a stack (§20.2) | contradicted → batch-3 follow-up |
 
 In batch 1 (§3–§6) no discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held (batch 2's rows for Z03, Z09, Z12, Z13 and W03 are above). Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
 timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
@@ -2758,7 +2938,7 @@ conditions), D02 §6 (12-byte save headers, ACKs only for 0x4001 / 0x4007, 0x401
 §3.1 / §6.2 / §6.3, Z15 §3.3 / §3.4 (SAY with the clicked NPC), Z12 §5.2 (0xBC05 cap), Z13 §8.2 / §8.3 / §8.6 / §8.7 /
 §8.10 (summon order, hunger, speed formula, 0x1C1A), Z09 §5.4 (10-s corpse) and D05's GameLog layouts (0x040A, 0x040F,
 0x0410, 0xC806, 0xC809). The sweep (part 14) confirms Z02 §6.4 (the client's `0x200B` in the tick of `0x304D` runs `sp_EndOfTrade`,
-which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level).
+which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second).
 
 ## 14. Not reconstructed / uncertain
 
@@ -2853,6 +3033,13 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
   (picker in the client's expedition list, FUN_006f7e30) is read from the call only. Which of drop, pick-merge, drop
   and destroy menu took the lock indices 14–16 was not traced (one of the four took none). The SQL snapshots of `s21`
   are of another character (§19.8): the D03 side of scenario 21 is checked only on the wire.
+- Batch 3, items II (§20): that freed repurchase handles are not reused at once is read from the wire only (the
+  `CSellItemManager` allocator, vt +8 / +0x18 of its pool, was not read; `simg_Initialize` @ FUN_0050e1b0 caps a stored
+  list at 42). That a sale at a non-Item / Weapon merchant enters the list without 0x305C is read, not captured. The
+  client's refusal of an HP stone at full HP (no 0x5007) was not read in the client. `hp.maxnum 100` / `sp.maxnum 114`
+  were not checked against the class table row of level 33 (Z02 §6.5 formula with the factor 1000 assumed). Why the
+  KQs skipped at each minute were scheduled then (KQ data) was not checked; `nrb_ItemSellPrice` of a non-Merchant role
+  (what a sale from the open shop window does after the Anvil click) was not read.
 
 ## 15. Coverage boundary
 
@@ -2932,3 +3119,5 @@ W04 packets P02 cannot override (W04.json sorts after P02.json): WM `0x7C07` 4-b
 | `s14` steps not on the wire: unknown-name whisper 0x200E, emote stop 0x2022 / 0x2023, a player walk (0x2017 / 0x2018), sit, a shout out of sight, 0x1C07 at a map login (§18.8) | P02 (next batch, re-recorded scenario 14 steps (2)–(4) / a map login next to a player) | the layouts are W04 §2.1 / Z02 §2–§5's; only the capture is missing |
 | P02-B27's storm also hits the client side (rendering of 136 appear / delete pairs) | – (client behaviour, out of the server spec) | the server bug and its fix are in §12; what the 2016 client does with each pair is not needed for a rebuild |
 | the 2016 client's own pick-right check on a drop object (`FUN_00610fc0`, §19.4) | – (client behaviour, out of the server spec) | the server's rule (Z09 §11.4 owner time, `so_drpitm_CanLooting`) and its timing are captured; a rebuilt server must answer 0x345 for a client that does ask |
+| buy-back onto an empty cell (`0x34B9` / `0x34BA`), sell / buy-back / soul-stone refusals (`0x3427`, `0x366B`–`0x366F`, `0x5005`, `0x3443`), the storage page request `0x3028` (§20.5) | X02 (plan: "write targeted capture scenarios"), then P02 again | the layouts are Z04 §2.5 / §7.2 / §13.1, Z05 §2.2 / §2.4 and D03 §2.2 / §2.4's; `s21` holds only successes and the P02-B31 refusal |
+| the 2016 client's own soul-stone check at full HP (no 0x5007, §20.3) | – (client behaviour, out of the server spec) | the server's 0x5007 handler (Z04 §13.2) answers whatever the client sends; a rebuilt server needs nothing from the client check |
