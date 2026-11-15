@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""X02 confidence ratings: gives every `##`-`####` heading of docs/pseudocode/**/*.md a baseline rating
-(high / medium / low) from the rules of docs/review/confidence.md §1.4 and writes one table per file into
-docs/review/confidence.md §2 (between the X02-RATINGS markers). Hand ratings live in OVERRIDE below and win.
+"""X02 confidence ratings: gives every `##`-`####` heading of docs/pseudocode/**/*.md and of docs/knowledge/*.md
+a baseline rating (high / medium / low) from the rules of docs/review/confidence.md §1.4 and writes one table per
+file into docs/review/confidence.md §2 (between the X02-RATINGS markers). Hand ratings live in X02-rate-hand.py
+and win (knowledge files: item key 'K:<ID>').
 
 usage (repo root):  python3 -I docs/plan/status/X02-rate.py write          # rewrite §2.3 ff. in confidence.md
                     python3 -I docs/plan/status/X02-rate.py stats          # per file: sections, high/medium/low
                     python3 -I docs/plan/status/X02-rate.py show W01 [low] # rows of one item (optionally one rating)
                     python3 -I docs/plan/status/X02-rate.py sig W01 4.2    # raw signals of one section
+                    python3 -I docs/plan/status/X02-rate.py pdbmiss K:Z01  # lines whose PDB member has another offset
+                    python3 -I docs/plan/status/X02-rate.py pdbcache       # rebuild X02-pdb-members.tsv (5 server PDBs)
+(`show` / `sig` / `pdbmiss` take 'K:<ID>' for the knowledge file of an item.)
 
 Signals per section (own body, up to the next heading of any level):
   cap      opcodes of the section with a capture evidence entry (annotations/P02.json `evidence`), of all its opcodes
@@ -16,11 +20,22 @@ Signals per section (own body, up to the next heading of any level):
   cli      lines that cite a client function (`client … FUN_…`)
   weak     *(inferred)* + *(pdb2017)* + *(fh-doc)* + *(db-backup)* markers
   B R U F  "Find more" keyword tests of confidence.md §1.2 (see KW below)
-  S        `p+0x…` offsets of a zone doc that S01-player-offsets.tsv does not list
+  S        `p+0x…` offsets of a zone doc that neither S01-player-offsets.tsv nor the 2016 Zone.pdb layout of
+           ShinePlayer / ShineMobileObject / ShineObject (members flattened 3 levels, X02-pdb-members.tsv) knows
+  pdb      knowledge files: lines that name a 2016 PDB member next to a `+0x…` offset; n of m agree with the PDB
   N        names of README §4.8 ("older names that mislead") used in the section; "(ours)" names in pre-S01 docs
   D        *(db-backup)* in D01-D05 (procedure bodies read before D06 compared the backup versions)
 Rating: see `rate()`; the legend printed into confidence.md §2.2 is the same text."""
-import re, sys, glob, json, os, collections
+import re, sys, glob, json, os, collections, subprocess, tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PDBCACHE = os.path.join(HERE, 'X02-pdb-members.tsv')
+PDBS = ['Zone00/Zone.pdb', 'WorldManager/WorldManager.pdb', 'Login/Login.pdb', 'Account/Account.pdb',
+        'AccountLog/AccountLog.pdb']
+PLAYER = ['ShineObjectClass::ShineObject', 'ShineObjectClass::ShineMobileObject', 'ShineObjectClass::ShinePlayer']
+IDENT = re.compile(r'[A-Za-z_]\w{4,}')
+HEXOFF = re.compile(r'\+\s?0x([0-9a-fA-F]+)\b|^\|\s*`?0x([0-9a-fA-F]+)`?\s*\|')
+PARAM = {0xfc0 + i * 4 for i in range(16 * 51)}      # smo_Param: 16 Parameter::Cluster of 51 int (Z12 §1.1)
 
 PRE_S01 = {'L00', 'W01', 'W02', 'W03', 'W04', 'Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08',
            'D01', 'D02', 'D03', 'D04', 'D05'}
@@ -71,6 +86,15 @@ def load_inputs():
                    for n in re.findall(r'`((?:p|usp)_\w+)`', l.split(' | ')[0])}
     tsv = open('docs/knowledge/S01-player-offsets.tsv', encoding='utf-8').read().splitlines()[1:]
     I['offs'] = {int(l.split('\t')[0], 16) for l in tsv if l.strip()}
+    I['poffs'] = set(); I['members'] = {}
+    for l in open(PDBCACHE, encoding='utf-8').read().splitlines()[1:]:
+        c = l.split('\t')
+        if c[0] == 'P':
+            I['poffs'].add(int(c[1], 16))
+        elif c[0] == 'M':
+            o = {int(x, 16) for x in c[2].split(',')}
+            if len(o) <= 12:             # a name with many offsets ("handle", "count") agrees with anything
+                I['members'][c[1]] = o
     readme = open('docs/pseudocode/README.md', encoding='utf-8').read().splitlines()
     # README §4.8: misleading names
     mis = {}; sup = collections.defaultdict(list); sec = None; default = None
@@ -169,7 +193,22 @@ def signals(item, s, I, secnums):
     g['S'] = 0
     if item.startswith('Z'):
         offs = {int(x, 16) for x in re.findall(r'\bp\+0x([0-9a-f]+)', t)}
-        g['Sbad'] = sorted(offs - I['offs']); g['S'] = len(g['Sbad'])
+        g['Sbad'] = sorted(offs - I['offs'] - I['poffs'] - PARAM); g['S'] = len(g['Sbad'])
+    g['pdbn'] = g['pdbok'] = 0; g['pdbmiss'] = []; g['offlines'] = 0
+    if s.get('kn'):
+        for l in t.splitlines():
+            hx = {int(a or b, 16) for a, b in HEXOFF.findall(l)}
+            if not hx:
+                continue
+            g['offlines'] += 1
+            names = [n for n in IDENT.findall(' '.join(re.findall(r'`([^`]+)`', l))) if n in I['members']]
+            if not names:
+                continue
+            g['pdbn'] += 1
+            if any(hx & I['members'][n] for n in names):
+                g['pdbok'] += 1
+            else:
+                g['pdbmiss'].append(l.strip()[:200])
     g['N'] = sorted(n for n, its in I['mis'].items() if (item in its or not its) and re.search(r'\b' + re.escape(n) + r'\b', t))
     g['ours'] = len(re.findall(r'\(ours\)|, ours\b|name is ours|names are ours', t))
     g['size'] = len(t)
@@ -187,6 +226,9 @@ def signals(item, s, I, secnums):
                     continue
                 n += len(v); where += v
         return n, sorted(set(map(str, where)))
+    if s.get('kn'):                      # README §5 and capture-validation name pseudocode §, not knowledge §
+        g['sup'], g['supwhere'], g['conf'], g['corr'] = 0, [], 0, 0
+        return g
     g['sup'], g['supwhere'] = hits(I['sup'])
     g['conf'] = hits(I['conf'])[0]; g['corr'] = hits(I['corr'])[0]
     return g
@@ -219,6 +261,13 @@ def rate(item, s, g, haskids):
     if g['S'] >= 2 or (g['S'] and pre):
         low.append('S: ' + ' '.join('p+0x%x' % o for o in g['Sbad'][:4]) + (' …' if g['S'] > 4 else ''))
         up.append('PDB member (`pdb.py` ShinePlayer)')
+    kn = bool(s.get('kn'))
+    if kn and pre and g['offlines'] >= 3 and not g['pdbn']:
+        low.append(f"S: {g['offlines']} offset lines, no 2016 PDB member named (pre-S01 names are ours)")
+        up.append('find the struct in the 2016 PDB (`pdb.py … types`), S01-renames.tsv')
+    if g['pdbn'] and g['pdbok'] * 2 < g['pdbn']:
+        note.append(f"{g['pdbn'] - g['pdbok']} PDB member(s) at another offset (nested or wrong: `X02-rate.py pdbmiss`)")
+        up.append('check the offsets with `pdb.py`')
     if g['N']:
         low.append('N: ' + ', '.join('`%s`' % n for n in g['N'][:3]) + (' …' if len(g['N']) > 3 else ''))
         up.append('README §4.8')
@@ -240,6 +289,8 @@ def rate(item, s, g, haskids):
         captured = False; note.append('capture shows the link packets, not the SQL')
     if BUGS.search(title):
         captured = False
+    if kn:
+        captured = False      # knowledge sections are fact lists: a mentioned captured opcode confirms no table
     ev = []
     if nops:
         ev.append(f"cap {ncap}/{nops}")
@@ -247,6 +298,9 @@ def rate(item, s, g, haskids):
         ev.append('cv ok')
     if g['cli']:
         ev.append(f"client×{g['cli']}")
+    if g['pdbn']:
+        ev.append(f"pdb {g['pdbok']}/{g['pdbn']}")
+    layout = kn and g['pdbn'] >= 3 and g['pdbok'] * 5 >= g['pdbn'] * 4
     if g['fun'] == 0 and nops == 0:
         if haskids and g['size'] < 1500 and not g['sup'] and not g['corr'] and not low:
             return '–', 'container (see its subsections)', ''
@@ -261,7 +315,9 @@ def rate(item, s, g, haskids):
         r = 'medium'
     elif low:
         r = 'low'
-    elif g['cli'] and not nops and g['fun']:
+    elif layout:
+        r = 'high'            # struct table: the offsets are the 2016 PDB's (second source for the layout)
+    elif g['cli'] and not nops and g['fun'] and not kn:
         r = 'high'            # client behaviour read in the client, no wire content in the §
     elif g['fun'] == 0 and nops == 0:
         r = 'medium' if not pre else 'low'
@@ -287,25 +343,73 @@ def files():
     return sorted(fs, key=key)
 
 
+def kfiles():
+    fs = sorted(glob.glob('docs/knowledge/*.md'))
+    key = lambda f: ('LWZDSCPX'.index(item_of(f)[0]) if item_of(f)[0] in 'LWZDSCPX' else 9, item_of(f))
+    return sorted(fs, key=key)
+
+
 def build():
     I = load_inputs(); res = []
-    for f in files():
+    for f in files() + kfiles():
+        kn = f.startswith('docs/knowledge/')
         item = item_of(f); secs = sections(f)
+        for s in secs:
+            s['kn'] = kn
+        hkey = ('K:' if kn else '') + item
         secnums = {s['num'] for s in secs if s['num']}
         rows = []
         for k, s in enumerate(secs):
             haskids = k + 1 < len(secs) and secs[k + 1]['level'] > s['level']
             g = signals(item, s, I, secnums)
             r, why, up = rate(item, s, g, haskids)
-            hand = OVERRIDE.get((item, s['num'])) or OVERRIDE.get((item, s['title']))
+            hand = OVERRIDE.get((hkey, s['num'])) or OVERRIDE.get((hkey, s['title']))
             for it, rx, mx, cwhy, cup in CAPS:
-                if it == item and re.match(rx, s['num'] or s['title']) and r != '–' and ORDER[r] > ORDER[mx]:
+                if it == hkey and re.match(rx, s['num'] or s['title']) and r != '–' and ORDER[r] > ORDER[mx]:
                     why = cwhy + ' (hand; baseline: ' + r + ': ' + why + ')'; r = mx; up = cup
             if hand:
                 r, why, up = hand[0], hand[1] + ' (hand; baseline: ' + r + ')', hand[2]
             rows.append((s, g, r, why, up))
-        res.append((f, item, rows))
+        res.append((f, hkey, rows))
     return res
+
+
+def pdbcache():
+    """X02-pdb-members.tsv: P rows = ShinePlayer members flattened 3 levels (absolute offset); M rows = every
+    member name of the five 2016 server PDBs that a pseudocode / knowledge document writes, with its offsets."""
+    words = set()
+    for f in files() + kfiles():
+        for bt in re.findall(r'`([^`\n]+)`', open(f, encoding='utf-8').read()):
+            words.update(IDENT.findall(bt))
+    members = collections.defaultdict(set); P = {}
+    with tempfile.TemporaryDirectory() as d:
+        for k, pdb in enumerate(PDBS):
+            out = os.path.join(d, f'{k}.json')
+            subprocess.run([sys.executable, '-I', 'tools/protocol-re/pdb.py', 'Files/Server/NA2016/' + pdb, 'json', out],
+                           check=True, stdout=subprocess.DEVNULL)
+            T = json.load(open(out, encoding='utf-8'))['types']
+            for t in T.values():
+                for f in t.get('fields', ()):
+                    if 'offset' in f and f['name'] in words:
+                        members[f['name']].add(f['offset'])
+            if k == 0:
+                def flat(tn, base, depth, path):
+                    for f in T.get(tn, {}).get('fields', ()):
+                        if 'offset' not in f:
+                            continue
+                        o = base + f['offset']
+                        P.setdefault(o, (path + f['name'], f['type']))
+                        if depth:
+                            flat(re.sub(r'\[\d+\]$', '', f['type']), o, depth - 1, path + f['name'] + '.')
+                for cls in PLAYER:
+                    flat(cls, 0, 3, '')
+    with open(PDBCACHE, 'w', encoding='utf-8') as fh:
+        fh.write('kind\toffset or name\tmember path or offsets\ttype\n')
+        for o in sorted(P):
+            fh.write(f'P\t0x{o:x}\t{P[o][0]}\t{P[o][1]}\n')
+        for n in sorted(members):
+            fh.write(f"M\t{n}\t{','.join('0x%x' % o for o in sorted(members[n]))}\t\n")
+    print('written', len(P), 'player members,', len(members), 'member names')
 
 
 def esc(t):
@@ -332,18 +436,22 @@ def counts(rows):
 
 
 def render(res):
-    out = ['### 2.3 Summary per file (generated)', '',
-           '| File | Item | Sections | high | medium | low | not rated | hand |', '|---|---|---|---|---|---|---|---|']
-    T = collections.Counter()
-    for f, item, rows in res:
-        h, m, l, n = counts(rows)
-        hand = sum(1 for r in rows if '(hand;' in r[3])
-        out.append(f"| `{f[len('docs/pseudocode/'):]}` | {item} | {len(rows)} | {h} | {m} | {l} | {n} | {hand} |")
-        T.update(dict(s=len(rows), h=h, m=m, l=l, n=n, hand=hand))
-    out.append(f"| **total** | | {T['s']} | {T['h']} | {T['m']} | {T['l']} | {T['n']} | {T['hand']} |")
-    out.append('')
+    out = ['### 2.3 Summary per file (generated)', '']
+    for kn, title in ((False, 'Pseudocode documents (`docs/pseudocode/`):'), (True, 'Knowledge files (`docs/knowledge/`):')):
+        out += [title, '', '| File | Item | Sections | high | medium | low | not rated | hand |', '|---|---|---|---|---|---|---|---|']
+        T = collections.Counter()
+        for f, item, rows in res:
+            if item.startswith('K:') != kn:
+                continue
+            h, m, l, n = counts(rows)
+            hand = sum(1 for r in rows if '(hand;' in r[3])
+            out.append(f"| `{f.split('/', 2)[2]}` | {item[-3:]} | {len(rows)} | {h} | {m} | {l} | {n} | {hand} |")
+            T.update(dict(s=len(rows), h=h, m=m, l=l, n=n, hand=hand))
+        out.append(f"| **total** | | {T['s']} | {T['h']} | {T['m']} | {T['l']} | {T['n']} | {T['hand']} |")
+        out.append('')
     for k, (f, item, rows) in enumerate(res, 4):
-        out += [f"### 2.{k} {item}: `{f[len('docs/pseudocode/'):]}`", ''] + table(rows) + ['']
+        kn = item.startswith('K:')
+        out += [f"### 2.{k} {item[-3:]}{' knowledge' if kn else ''}: `{f if kn else f.split('/', 2)[2]}`", ''] + table(rows) + ['']
     return out
 
 
@@ -352,6 +460,8 @@ BEGIN, END = '<!-- X02-RATINGS:BEGIN (generated by docs/plan/status/X02-rate.py 
 
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'stats'
+    if cmd == 'pdbcache':
+        return pdbcache()
     res = build()
     if cmd == 'stats':
         for f, item, rows in res:
@@ -362,6 +472,12 @@ def main():
                 for s, g, r, why, up in rows:
                     if len(sys.argv) < 4 or r == sys.argv[3]:
                         print(f"{s['num'] or short(s['title'], 30):10} {r:6} {short(s['title'], 50):50} | {why} | {up}")
+    elif cmd == 'pdbmiss':
+        for f, item, rows in res:
+            if item == sys.argv[2]:
+                for s, g, r, why, up in rows:
+                    for l in g['pdbmiss']:
+                        print(f"{s['num'] or short(s['title'], 20):8} {l}")
     elif cmd == 'sig':
         for f, item, rows in res:
             if item == sys.argv[2]:
