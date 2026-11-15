@@ -1,0 +1,203 @@
+{
+ "_about": "D07: Character server academy reward (0x986B/0x986C/0x9882) and guild tournament reward ITEM_OPT (0x74AA) (docs/pseudocode/db/D07-character-reward-items.md). Offsets after the opcode; names from the 2017 PDB, offsets confirmed in the 2016 code.",
+ "packets": {
+  "character": {
+   "0x986b": {
+    "dir": "Zone→CharDB",
+    "name": "NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_REQ",
+    "basis": "character FUN_0041de10",
+    "fields": [
+     [
+      0,
+      "NETPACKETZONEHEADER",
+      "packheader",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      10,
+      "u32",
+      "nGuildNo",
+      "academy (guild) number"
+     ],
+     [
+      14,
+      "u8",
+      "nLevel",
+      "level reached"
+     ]
+    ]
+   },
+   "0x986c": {
+    "dir": "CharDB→Zone",
+    "name": "NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_ACK",
+    "basis": "character FUN_0041de10 (disassembly)",
+    "fields": [
+     [
+      0,
+      "NETPACKETZONEHEADER",
+      "packheader",
+      "= request"
+     ],
+     [
+      6,
+      "u16",
+      "Error",
+      "0x18A0 ok, 0x188D reward read, 0x18A1 setup/money/storage/move, 0xF98-0xF9E withdraw, 0x44A/0x44B/0x44D split/create"
+     ],
+     [
+      8,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      12,
+      "u32",
+      "nGuildNo",
+      ""
+     ],
+     [
+      16,
+      "u64",
+      "nWantMoney",
+      "reward cen - paid"
+     ],
+     [
+      24,
+      "u32",
+      "nWantItemCnt",
+      "lot still missing (1 when no item, D07-B5)"
+     ],
+     [
+      28,
+      "u8",
+      "WantItem.nLevel",
+      "= request nLevel"
+     ],
+     [
+      29,
+      "u16",
+      "WantItem.nItemID",
+      "0xFFFF none"
+     ],
+     [
+      31,
+      "u8",
+      "WantItem.NumOfItemOption",
+      "option rows"
+     ],
+     [
+      32,
+      "u32",
+      "WantItem.ItemOption[0].nOptionType",
+      "REWARD_ITEM_OPTION 1 money 2 item 3 lot 4 upgrade"
+     ],
+     [
+      36,
+      "u64",
+      "WantItem.ItemOption[0].nOptionData",
+      ""
+     ],
+     [
+      44,
+      "u64",
+      "nSubAcademyMoney",
+      "cen paid"
+     ],
+     [
+      52,
+      "u64",
+      "nStorageMoney",
+      "academy money after (0 without cen reward, D07-B4)"
+     ],
+     [
+      60,
+      "u8",
+      "nModifyItemCnt",
+      ""
+     ],
+     [
+      61,
+      "EACH_MODIFY_ITEM[n]",
+      "ModifyItem",
+      "9 each: u8 nStatus (0 whole, 1 part), u16 nItemID, ITEM_INVEN nLocation (box 0), u32 nLot"
+     ]
+    ]
+   },
+   "0x9882": {
+    "dir": "CharDB→WM",
+    "name": "NC_GUILD_ACADEMY_DB_REWARD_WANT_CMD",
+    "basis": "character FUN_0041de10 (disassembly)",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "nGuildNo",
+      ""
+     ],
+     [
+      8,
+      "u64",
+      "nWant_Cen",
+      "cen not paid"
+     ],
+     [
+      16,
+      "u16",
+      "nWant_ItemID",
+      "reward item, 0xFFFF when nWant_ItemLot is 0"
+     ],
+     [
+      18,
+      "u32",
+      "nWant_ItemLot",
+      "lot not paid"
+     ]
+    ]
+   },
+   "0x74aa": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_TOURNAMENT_DB_REWARD_CREATE_REQ",
+    "basis": "character FUN_004076a0, FUN_00467c60",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nGTNo",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "OwnerGuildNum",
+      ""
+     ],
+     [
+      8,
+      "i32",
+      "nItem",
+      "record count"
+     ],
+     [
+      12,
+      "ITEM_OPT[nItem]",
+      "ItemOpt",
+      "0x21 each: u8 RewardType (GT_REWARD_TYPE) @0, u32 Value1 @1 (item id / amount / share per mille), u32 Value2 @5 (lot / min share), u32 Value3 @9 (weapon upgrade / max share), u32 IO_Str @0xD (opt 1), IO_Con @0x11 (5), IO_Dex @0x15 (3), IO_Int @0x19 (2), IO_Men @0x1D (4)"
+     ]
+    ]
+   }
+  }
+ }
+}
