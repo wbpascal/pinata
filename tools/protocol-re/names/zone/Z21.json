@@ -1,0 +1,18 @@
+{
+  "FUN_00510200": "SetItemData::EffectDescription::EffectDescription",
+  "FUN_00510230": "SetItemData::EffectDescription::~EffectDescription",
+  "FUN_00510240": "SetItemData::EffectByPiece::EffectByPiece",
+  "DAT_1326ff0c": "setitemskilleffectqueue_mq_Buffer0_content",
+  "DAT_13272308": "setitemskilleffectqueue_mq_Pointer_value",
+  "DAT_1327230c": "setitemskilleffectqueue_mq_Pointer_mask",
+  "FUN_006a02c0": "ITableBase<SetEffect,SetEffectTable>::ITableBase::_dynamic_atexit_destructor_for_instance",
+  "FUN_005b67c0": "ZoneServer_zs_start_sleep",
+  "FUN_006983c0": "_dynamic_initializer_for_setitemclassifier",
+  "FUN_006983f0": "_dynamic_initializer_for_setitemeffectlist",
+  "FUN_00698420": "_dynamic_initializer_for_setitemskilleffect",
+  "FUN_00698430": "_dynamic_initializer_for_setitemskilleffectqueue",
+  "FUN_0069e8c0": "_dynamic_atexit_destructor_for_setitemclassifier",
+  "FUN_0069e8e0": "_dynamic_atexit_destructor_for_setitemeffectlist",
+  "FUN_0069e900": "_dynamic_atexit_destructor_for_setitemskilleffect",
+  "FUN_0069e910": "_dynamic_atexit_destructor_for_setitemskilleffectqueue"
+}

@@ -11218,6 +11218,16 @@ to the player only, after every server-side stop (mm_Step stop, block-check roll
 |---|---|---|---|
 | 0 | u16 | err | 0x1381 0x1382 0x1383 0x1388 |
 
+### `0x206f` NC_ACT_SETITEMHEALEFFECT (S→C)
+
+**Verified layout** (basis: zone Send_SETITEMHEALEFFECT FUN_005cfbb0 (from RecoverTypeEffect::_execute FUN_005cfc70), broadcast to sight incl. self; client FUN_0049bd20 → FUN_00692d10 floating number)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | who | handle of the healed/damaged object |
+| 2 | u8 | flag | bit 0 isheal: 1 HP gained (RecoverType 0/1), 0 HP lost (4/5); bits 1-7 stale (Z21-B7) |
+| 3 | u16 | hpchange | amount, u32 truncated to 16 bits (Z21-B5) |
+
 ### `0x207A` NC_ACT_OBJECT_SOUND_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone cObjectSound FUN_005ea6f0 (to sight); client On_NC_ACT_OBJECT_SOUND_CMD FUN_0049d4d0; pdb2016 struct)
