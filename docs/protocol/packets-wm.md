@@ -60,6 +60,97 @@ Basis: 2016 Zone.pdb (pdb2016) struct USEITEM_MINIMON_INFO, size 0x32; reference
 | 2 | u16[12] | NormalItemList | item ids, 0xFFFF = empty |
 | 26 | u16[12] | ChargedItemList | item ids, 0xFFFF = empty |
 
+### tm (36 bytes)
+
+Basis: MSVC struct tm (9 × i32), used by W04 / D02 0x10EB / 0x10EC (P02 batch 2: the decoder could not parse 'tm (9×i32)')
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | tm_sec |  |
+| 4 | i32 | tm_min |  |
+| 8 | i32 | tm_hour |  |
+| 12 | i32 | tm_mday |  |
+| 16 | i32 | tm_mon |  |
+| 20 | i32 | tm_year |  |
+| 24 | i32 | tm_wday |  |
+| 28 | i32 | tm_yday |  |
+| 32 | i32 | tm_isdst |  |
+
+### PROTO_SELL_ITEM_INFO_SERVER (122 bytes)
+
+Basis: 2016 Zone.pdb PROTO_SELL_ITEM_INFO_SERVER (size 0x7a, a maximum): first byte nDataSize = bytes that follow (P02 batch 2: capture:shop 0x4037 / 0x1130 elements of 22 bytes with nDataSize 21); named `datasize` so that pcap_decode.py reads it as a variable-length element
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | datasize | nDataSize (pdb2016): length of the rest of the element |
+| 1 | u16 | nHandle |  |
+| 3 | u64 | nSellItemKey | SHINE_ITEM_REGISTNUMBER; −1 in capture:shop |
+| 11 | bytes | ItemTotalInfo | ItemTotalInformation, nDataSize − 10 bytes (item id first: 3000, 3001 in capture:shop) |
+
+### ITEM_INVEN (2 bytes)
+
+Basis: pdb2017 union ITEM_INVEN { Pos:10, Type:6 } (2 bytes); Z04 §1.1. P02 batch 2 part 11: no file defined it, so the decoder read every ITEM_INVEN field (D03 / D05 / Z04 annotations) as 1 byte
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | inven | type << 10 | slot (pdb2017 union Pos:10 / Type:6; Z04 §1.1). P02 part 11: without this entry the decoder read every ITEM_INVEN as 1 byte |
+
+### MAPPOS (20 bytes)
+
+Basis: pdb2016 PROTO_ITEM_CREATE.map (MapName u8[12], MapXY.x u32, MapXY.y u32; 20 bytes), used by D03's 0x340A annotation; captured 0x340A / 0x341C
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[12] | MapName |  |
+| 12 | u32 | x |  |
+| 16 | u32 | y |  |
+
+### MENUITEM (3 bytes)
+
+Basis: pdb2016 / pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD::MENUITEM (3 bytes); zone nrm_ShopMenuOpen FUN_004c26b0; client Market::SetWeapon FUN_006137c0; captured 0x3C09 / 0x3C0B
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slot | grid cell of the shop tab; a slot not above the previous one starts the next tab (client Market::SetWeapon FUN_006137c0) |
+| 1 | u16 | item | ItemInfo ID |
+
+### SHINE_COORD_TYPE (9 bytes)
+
+Basis: pdb2016 SHINE_COORD_TYPE { SHINE_XY_TYPE xy; u8 dir } (9 bytes). P02 batch 2 part 13: no file defined it, so the decoder read every SHINE_COORD_TYPE field (Z09 / Z13 annotations, e.g. 0x1C1A nCoord) as 1 byte
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | x |  |
+| 4 | u32 | y |  |
+| 8 | u8 | dir |  |
+
+### ABNORMAL_STATE_BIT (99 bytes)
+
+Basis: pdb2016 ABNORMAL_STATE_BIT { u8 statebit[99] }. P02 part 13: Z13's 0x1C1A annotation uses it; without a size the decoder read 1 byte
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | bytes[99] | statebit |  |
+
+### STRUCT_QSC (101 bytes)
+
+Basis: pdb2016 STRUCT_QSC (0x65 bytes). P02 part 13: Z08's 0x4401 annotation uses it; without a size it did not fit and the decoder fell back to pdb2016
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Cmd | QUEST_SCRIPT_COMMAND (pdb2016 enum: 0 ERROR, 1 END, 2 SAY, …) |
+| 4 | u8 | IsPigeonStartType |  |
+| 5 | bytes[96] | Data | union by Cmd; SAY = {u32 nID, u32 TalkerType, u16 NPCNo} (pdb2016), the rest is Z15-B11 leftovers |
+
+### CHARACTER_TITLE_DB_SAVE_VALUE (9 bytes)
+
+Basis: pdb2016 CHARACTER_TITLE_DB_SAVE::<unnamed-type-TitleValues> { u8 Type; u64 TitleValue } (9 bytes); the key is ours (the PDB type is unnamed)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Type | CHARACTER_TITLE_TYPE (pdb2016 enum) |
+| 1 | u64 | TitleValue |  |
+
 ## Client → server
 
 ### `0x080d` NC_MISC_GAMETIME_REQ
@@ -455,6 +546,8 @@ No payload fields read directly by the handler.
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | nGuideView |  |
+
+**Captured** (P02, `capture-validation.md`; shop): `nGuideView`: 131, 142; forwarded as CharDB 0x10DB {nCharNo, nGuideView}
 
 Handler `FUN_004182f0`
 
@@ -6308,7 +6401,7 @@ Sent in reply to `0x7c04` NC_PRISON_END_REQ on CParserClient (`FUN_004155f0`) ·
 | 4 | char[16] | sReason |  |
 | 20 | char[64] | sRemark |  |
 
-**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `err`: 0x0DB1 (not in prison); `nMinute`: 0; 4-byte short form, no sReason/sRemark
+**Captured** (P02, `capture-validation.md`; combat, idle_in_world, shop, walk-run-portals): `err`: 0x0DB1 (not in prison); `nMinute`: 0; 4-byte short form, no sReason/sRemark; `layout`: captured 4-byte variant {err, nMinute} (W04 §9.2 short form); the decoder uses it when the 84-byte annotation does not fit
 
 Sent in reply to `0x7c0f` NC_DATA_PRISON_GET_ACK on CParserCharDB (`FUN_0040c350`) · payload 84 bytes · raw header
 
@@ -8436,6 +8529,93 @@ stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
 | 2 | u8 | numofavatar | 0xFF = DB error (pdb2017 name) |
 | 3 | AVATAR[numofavatar] | avatar | 0x82 bytes each = PROTO_AVATARINFORMATION, W01 §6.1 (pdb2017 name) |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `netpacketheader.clienthandle`: echo; `numofavatar`: 2 (Test1235 slot 0, Test2 slot 1); `avatar`: dKQDate bits 30–31 differ between lists while bits 0–29 match the 0x101A date: uninitialised (P02-B7); delinfo +0x28..+0x2B again pointer-like (P02-B1)
+
+### `0x1008` NC_CHAR_SHAPE_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; p_Char_GetShape @ FUN_0046c5d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u8 | shape.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 (PROTO_AVATAR_SHAPE_INFO, pdb2016); evidence: capture:shop, capture:combat: 0x19 = race 1, class 6, gender 0 |
+| 3 | u8 | shape.hairtype | evidence: capture:shop, capture:combat: 2 |
+| 4 | u8 | shape.haircolor | evidence: capture:shop, capture:combat: 1 |
+| 5 | u8 | shape.faceshape | evidence: capture:shop, capture:combat: 4 (= the 0x0C13 AVATAR shape of Test2) |
+
+P02 batch 2 (§7.4): no PROTO_NC_CHAR_SHAPE_CMD in either PDB; body = PROTO_AVATAR_SHAPE_INFO
+
+### `0x100a` NC_CHAR_QUEST_DOING_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046cb00 (bNeedClear always 1))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u8 | bNeedClear | evidence: capture:shop, capture:combat |
+| 7 | u8 | nNumOfDoingQuest | evidence: capture:shop, capture:combat |
+| 8 | PLAYER_QUEST_INFO[nNumOfDoingQuest] | QuestDoingArray | variable length, element PLAYER_QUEST_INFO; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_QUEST_DOING_CMD at +2; without the handle the decoder misread every field
+
+### `0x100b` NC_CHAR_QUEST_DONE_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; SendQuestDone @ FUN_004288d0 (size 0x12 + 10n: 4 bytes past the array, P02-B8))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | nTotalDoneQuest | evidence: capture:shop, capture:combat |
+| 8 | u16 | nTotalDoneQuestSize | evidence: capture:shop, capture:combat |
+| 10 | u16 | nDoneQuestCount | evidence: capture:shop, capture:combat |
+| 12 | u16 | nIndex | evidence: capture:shop, capture:combat |
+| 14 | PLAYER_QUEST_DONE_INFO[nDoneQuestCount] | QuestDoneArray | variable length, element PLAYER_QUEST_DONE_INFO; evidence: capture:shop, capture:combat |
+| 14 | u8[4] | unwritten | (original bug) P02-B8: SendQuestDone sizes the part 0x12 + 10n, 4 bytes more than the header + records; evidence: capture:shop, capture:combat: 00 00 00 00 (n = 0) |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_QUEST_DONE_CMD at +2; without the handle the decoder misread every field
+
+### `0x100c` NC_CHAR_ABSTATE_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046c6e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | number | evidence: capture:shop, capture:combat |
+| 8 | ABSTATEREADBLOCK[number] | abstate | variable length, element ABSTATEREADBLOCK; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_ABSTATE_CMD at +2; without the handle the decoder misread every field
+
+### `0x100d` NC_CHAR_SKILL_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046c900)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u8 | PartMark.bIsStart|bIsEnd|nOrder | bits bIsStart:1@0, bIsEnd:1@1, nOrder:6@2; evidence: capture:shop, capture:combat |
+| 7 | u16 | nMaxNum | evidence: capture:shop, capture:combat |
+| 9 | u16 | number | evidence: capture:shop, capture:combat |
+| 11 | PROTO_SKILLREADBLOCK[number] | skill | variable length, element PROTO_SKILLREADBLOCK; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_SKILL_CMD at +2; without the handle the decoder misread every field
+
+### `0x100e` NC_CHAR_SKILL_PASSIVE_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046c900 (passive list))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u16 | number | evidence: capture:shop, capture:combat |
+| 4 | u16[number] | passive | variable length; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_SKILL_PASSIVE_CMD at +2; without the handle the decoder misread every field
+
 ### `0x1010` NC_CHAR_FRIEND_CMD (CharDB→WM)
 
 **Verified layout** (basis: wm FUN_0040a570)
@@ -8445,6 +8625,204 @@ stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
 | 0 | u16 | wmHandle |  |
 | 2 | u16 | count | > 100 clamped |
 | 4 | {u32 charNo, Name5 name, u8 flag}[n] | friends | 25 bytes each |
+
+### `0x1012` NC_CHAR_GUILD_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 13 (p_Guild_GetMyNo); the client-side GUILD_CLIENT tail is not sent)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | nGuildNo | evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_GUILD_CMD at +2; without the handle the decoder misread every field
+
+### `0x1017` NC_CHAR_ITEM_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; Send_NC_CHAR_ITEM_CMD @ FUN_004056a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u8 | PacketOrder.nPacketOrderNum|nIsLastOfInven | bits nPacketOrderNum:7@0, nIsLastOfInven:1@7; evidence: capture:shop, capture:combat |
+| 3 | u8 | nPartMark | evidence: capture:shop, capture:combat |
+| 4 | u8 | ItemCmd.numofitem | evidence: capture:shop, capture:combat |
+| 5 | PROTO_ITEMPACKET_TOTAL[ItemCmd.numofitem] | ItemCmd.ItemArray | variable length, element PROTO_ITEMPACKET_TOTAL; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_ITEM_CMD at +2; without the handle the decoder misread every field
+
+### `0x1019` NC_CHAR_CHARTITLE_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046d2c0 (p_Char_GetTitleAll))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u8 | nFirstConnection | written 0 (u16 0 at +2, then +3 overwritten); evidence: capture:shop, capture:combat: 0 |
+| 3 | u8 | CurrentTitle | row type 0, element 0 |
+| 4 | u8 | CurrentTitleElement | row type 0, element 1 |
+| 5 | u16 | CurrentTitleMobID | row type 0, element 2 |
+| 7 | u64[128] | TitleValues | rows with element 0xFF: value per title type (CHARACTER_TITLE_TYPE); evidence: capture:shop, capture:combat: all 0 |
+| 1031 | u16 | NumOfTitle | rows with element 0..3, title type < 0x80; evidence: capture:shop, capture:combat: 0 |
+| 1033 | {u8,u8}[NumOfTitle] | TitleArray | CT_INFO { u8 type, u8 value << 6 | element } |
+
+P02 batch 2 (§7.4): body = CHARACTER_TITLE_READBLOCK (0x407, Zone/WM pdb2016); 0x409 + 2n bytes
+
+### `0x101a` NC_CHAR_KQMAP_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; SQL_p_Char_GetKQMap @ FUN_0045a130)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | nKQHandle | evidence: capture:shop, capture:combat |
+| 6 | char[12] | sKQMapName | Name3; evidence: capture:shop, capture:combat |
+| 18 | u32 | nKQCoord.x | evidence: capture:shop, capture:combat |
+| 22 | u32 | nKQCoord.y | evidence: capture:shop, capture:combat |
+| 26 | u32 | dKQDate.year|month|day|hour|min|sec | bits year:4@0, month:4@4, day:5@8, hour:5@13, min:6@18, sec:6@24; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_KQMAP_CMD at +2; without the handle the decoder misread every field
+
+### `0x101b` NC_CHAR_CHARGEDBUFF_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046d680)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u16 | NumOfChargedBuff | evidence: capture:shop, capture:combat |
+| 4 | PROTO_CHARGEDBUFF_INFO[NumOfChargedBuff] | ChargedBuff | variable length, element PROTO_CHARGEDBUFF_INFO; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_CHARGEDBUFF_CMD at +2; without the handle the decoder misread every field
+
+### `0x1097` NC_CHAR_GUILD_ACADEMY_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 14; the client-side GUILD_ACADEMY_CLIENT tail is not sent)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | nGuildAcademyNo | evidence: capture:shop, capture:combat |
+| 6 | u8 | isGuildAcademyMember | evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_GUILD_ACADEMY_CMD at +2; without the handle the decoder misread every field
+
+### `0x10cc` NC_CHAR_QUEST_READ_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046ce50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | nNumOfReadQuest | evidence: capture:shop, capture:combat |
+| 8 | u16[nNumOfReadQuest] | QuestReadIDArray | variable length; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_QUEST_READ_CMD at +2; without the handle the decoder misread every field
+
+### `0x10cf` NC_CHAR_ITEMACTIONCOOLTIME_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046dd40 (usp_Character_getItemActionCoolTime))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u16 | num | row count; evidence: capture:shop, capture:combat: 0 |
+| 4 | ActionCooltime[num] | group | { u16 actionID, i64 expiredTime = mktime64(row ts) } (pdb2016 ActionCooltime, 10 bytes) |
+
+P02 batch 2 (§7.4): body = PROTO_NC_CHARSAVE_ITEMACTIONCOOLTIME_ACK (pdb2016); 4 + 10n bytes
+
+### `0x10d2` NC_CHAR_FREESTAT_SET_DB_ACK (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; step 19, FUN_0046dc00 (usp_Character_getSingleOption), SetOpcode size 0x11)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | nCharNo | evidence: capture:shop, capture:combat: 5 |
+| 6 | i32 | tTime | mktime(row column 3, a timestamp); evidence: capture:shop, capture:combat: 12:01:11 (shop) / 11:54:00 (combat) local, the same time as the 0x101A dKQDate: last save before the capture (inferred) |
+| 10 | u8 | nOption2 | row column 2; evidence: capture:shop, capture:combat: 0; = Z12's 0x10D3 `autopick` |
+| 11 | u8 | nOption1 | row column 1; evidence: capture:shop, capture:combat: 1; = Z12's `mystery_vault` |
+| 12 | u32 | nOption4 | row column 4; evidence: capture:shop, capture:combat: 0; = Z12's `nChatBan` |
+| 16 | u8 | bLoaded | always 1 from CharDB; = Z12's `bFirstJoin`: the WM also sets it to 1 when storing (fc_NC_CHAR_SINGLE_OPTION_CMD @ FUN_0040aad0) and to 0 after sending 0x10D3 (FUN_00428ba0) |
+
+P02 batch 2 (§7.4): the character load reuses opcode 0x10D2 (D02 annotates the 15-byte CharDB→Zone free-stat ack) for the 17-byte single-option block that the WM caches at +0x658 and sends to zones as 0x10D3. Field names are ours (the procedure's column names are not in the binary); with no row, +6..+15 stay 0 and bLoaded is still 1
+
+### `0x10d5` NC_CHAR_QUEST_REPEAT_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046ced0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | nNumOfRepeatQuest | evidence: capture:shop, capture:combat |
+| 8 | PLAYER_QUEST_INFO[nNumOfRepeatQuest] | QuestRepeatArray | variable length, element PLAYER_QUEST_INFO; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_QUEST_REPEAT_CMD at +2; without the handle the decoder misread every field
+
+### `0x10d8` NC_CHAR_NEWBIE_GUIDE_VIEW_LIST_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 24 (usp_InGameGuide_getViewList))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u8 | nGuideViewNum | evidence: capture:shop, capture:combat |
+| 3 | u8[nGuideViewNum] | nGuideViewList | variable length; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_NEWBIE_GUIDE_VIEW_LIST_CMD at +2; without the handle the decoder misread every field
+
+### `0x10dc` NC_CHAR_COININFO_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 25)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u64 | nCoin | evidence: capture:shop, capture:combat |
+| 10 | u64 | nExchangedCoin | evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_COININFO_CMD at +2; without the handle the decoder misread every field
+
+### `0x10e2` NC_CHAR_CARDCOLLECT_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 26)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | number | evidence: capture:shop, capture:combat |
+| 8 | PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform[number] | CardList | variable length, element PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_CARDCOLLECT_CMD at +2; without the handle the decoder misread every field
+
+### `0x10e5` NC_CHAR_CARDCOLLECT_BOOKMARK_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 27)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | number | evidence: capture:shop, capture:combat |
+| 8 | PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo[number] | ViewList | variable length, element PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD at +2; without the handle the decoder misread every field
+
+### `0x10e8` NC_CHAR_CARDCOLLECT_REWARD_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 28)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | number | evidence: capture:shop, capture:combat |
+| 8 | u16[number] | RewardID | variable length; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_CARDCOLLECT_REWARD_CMD at +2; without the handle the decoder misread every field
 
 ### `0x10ec` NC_CHAR_EVENT_ATTENDANCE_LIST_DB_ACK (CharDB→WM)
 
@@ -8459,6 +8837,8 @@ stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
 | 11 | tm (9×i32)[28] | AttendanceArray |  |
 | 1019 | u8 | RewardNum |  |
 | 1020 | u8[RewardNum] | RewardList | AR_IDs already claimed |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nError`: 0x2C00 ok; `tConnect`: echo; `AttendanceNum`: 0; `AttendanceArray`: stack garbage except the first 7 ints of element 0 (P02-B9); `RewardNum`: 0; the WM sends no 0x10ED (event over, nothing to claim)
 
 ### `0x10ef` NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_ACK (CharDB→WM)
 
@@ -8489,6 +8869,8 @@ stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
 | 0 | u16 | numoffriend |  |
 | 2 | {u32 charregnum,u16 friendpoint,u16 diffpoint}[n] | pointinfo | 8 each |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `numoffriend`: 1 (the character itself: D02 §4 step 2); `pointinfo`: {charregnum 5, friendpoint 0, diffpoint 0}; no second 0x541C after 0x1036 (no friends / same day)
+
 ### `0x702c` NC_CHAR_OPTION_IMPROVE_DB_GET_DATA_TYPE_CMD (CharDB→WM)
 
 **Verified layout** (basis: wm FUN_0040acb0)
@@ -8497,6 +8879,8 @@ stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
 |---|---|---|---|
 | 0 | u32 | nCharNo |  |
 | 4 | u32 | DataType | CHAR_OPTION_DATA_TYPE 0/1/2 → session +0x1ECD8 |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `DataType`: 2 = improved (usp_Character_chkKeyMap 1): 0x702D–0x702F follow, then the WM pushes 0x7032–0x7034 (§4.1)
 
 ### `0xa801` NC_CHAT_RESTRICT_DB_LIST_CMD (CharDB→WM)
 
@@ -8668,6 +9052,8 @@ size 0x28
 | 1 | SHORT_CUT_DATA[n] | ShortCutData | 7 each: u8 nSlotNo, u16 nCodeNo, i32 nValue |
 
 → CharDB 0x704B {u32 nCharNo, u8 n, data}
+
+**Captured** (P02, `capture-validation.md`; combat): `ShortCutData`: {9, 0, 0}, {9, 1, 38043}; `size`: 1 + 7n + 3 (3 trailing zero bytes; the WM forwards 5 + 7n); `layout`: captured 11-byte variant (n = 1 + 3-byte tail); the decoder uses it when the W04 layout does not fit
 
 ### `0x7039` NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_REQ (C→WM)
 
@@ -8893,6 +9279,8 @@ no payload read
 | 327 | char[20] | spawnapps | Name5; W01's extra[5]; forwarded to CharDB in 0x1036 |
 
 0x15B bytes (pdb2016). Names from the 2016 WM PDB
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `clienthandle`: Login client handle; `validate_new`: = the 32 words of the later client 0x0C0F; `spawnapps`: 'Original' at +0x147
 
 ### `0xd001` NC_EVENT_GET_ALL_EVENT_INFO_REQ (OPTool→WM)
 
@@ -10151,6 +10539,8 @@ session cache blob, sent once after CharDB 0x1005
 
 client: no handler for 0x7038/0x703A, 0x703C accepted and ignored
 
+**Captured** (P02, `capture-validation.md`; combat): `nError`: 0x2100 ok
+
 ### `0x703a` NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_ACK (WM→C)
 
 **Verified layout** (basis: wm FUN_0040af00)
@@ -10750,6 +11140,8 @@ size 0x48 + 6·n
 | 0 | u16 | handle |  |
 | 2 | u32 | userNo |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `clienthandle`: WM client handle 35000 / 32500; `usrregnum`: 103
+
 ### `0x1004` NC_CHAR_CHARDATA_REQ (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_00422be0)
@@ -10760,6 +11152,8 @@ size 0x48 + 6·n
 | 2 | u32 | charNo |  |
 | 6 | u32 | userNo |  |
 | 10 | u32 | time | day start - 1 day (inferred) |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `handle`: 35000 / 32500; `charNo`: 5; `userNo`: 103; `time`: 1794718800 = 15 Nov 06:00 local = CGambleSystemServer::GetSendExchangeCoinInitTime (next GBHouse GB_ResetTime 06:00:00) − 1 day
 
 ### `0x1036` NC_CHAR_LOGIN_DB (WM→CharDB)
 
@@ -10774,6 +11168,8 @@ size 0x48 + 6·n
 | 24 | u64 | money |  |
 | 32 | u32 | userNo |  |
 | 36 | u32[5] | extra |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `charNo|map|x|y|money`: = the 0x1007 CHARDATA values; `userNo`: 103; `extra`: u32[5] = char spawnapps[20] 'Original' (D02 name)
 
 ### `0x1037` NC_CHAR_LOGOUT_DB (WM→CharDB)
 
@@ -10799,6 +11195,8 @@ size 0x48 + 6·n
 | 4 | tm (9×i32) | tmEventStartDate | localtime(eventStart) |
 | 40 | tm (9×i32) | tmEventEndDate | localtime(eventEnd) |
 | 76 | i32 | tConnect | time(NULL) at first map login |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `tmEventStartDate`: 2015-11-09 00:00; `tmEventEndDate`: 2015-12-07 00:00 (28 days, ended); `tConnect`: time of the request (first map login, ≈ 4.4 s after 0x1003)
 
 ### `0x10ee` NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_REQ (WM→CharDB)
 
@@ -11036,6 +11434,8 @@ size 6
 
 W01 name was 'world user count (ours)'
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `currentUsers`: 1; `maxUsers`: 2500 (WM client listener nMaxAccept), every 30 s
+
 ### `0x0c0e` NC_USER_WILLLOGIN_ACK (WM→Login)
 
 **Verified layout** (basis: wm FUN_00424950)
@@ -11046,6 +11446,8 @@ W01 name was 'world user count (ours)'
 | 347 | u8 | ok | always 1 |
 
 W01 name was 'world login accepted (ours)'
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `request`: 0x15B request verbatim; `ok`: 1
 
 ### `0x0c35` NC_USER_CREATE_OTP_REQ (WM→Login)
 
@@ -11342,6 +11744,8 @@ size 4
 | 2 | u32 | netpacketzoneheader.charregistnumber | 0xFFFFFFFF (pdb2017 name) |
 | 6 | u32 | usrregnum | userNo (pdb2017 name) |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `netpacketzoneheader`: all 0xFF; `usrregnum`: 103; 4 copies (one per zone process) per event, 2 events per login
+
 ### `0x0c19` NC_USER_CONNECTCUT2ZONE_CMD (WM→Zone)
 
 **Verified layout** (basis: wm FUN_00437030 / FUN_00412df0)
@@ -11362,6 +11766,8 @@ size 4
 | 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
 | 6 | u16 | wldmanhandle | (pdb2017 name) |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `ref`: echoed; `wldmanhandle`: 35000 / 32500; last of 31–33 packets of one WM pass
+
 ### `0x101e` NC_CHAR_ZONE_CHARDATAFAIL_ACK (WM→Zone)
 
 **Verified layout** (basis: wm FUN_00428ba0)
@@ -11373,6 +11779,169 @@ size 4
 | 6 | u16 | err | 0x141 unknown handle, 0x590 name mismatch (pdb2017 name) |
 
 8 bytes in 2016; the 2017 struct (4 B) is {NETPACKETHEADER clienthandle, err}: 2017 replaced the 6-byte zone header with the 2-byte one
+
+### `0x101f` NC_CHAR_ZONE_BASE_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | Name5 | charid |  |
+| 30 | u8 | slotno |  |
+| 31 | u8 | Level | ≥151 → disconnect 0x689 |
+| 32 | u64 | Experience |  |
+| 40 | u16 | CurPwrStone |  |
+| 42 | u16 | CurGrdStone |  |
+| 44 | u16 | CurHPStone |  |
+| 46 | u16 | CurSPStone |  |
+| 48 | u32 | CurHP |  |
+| 52 | u32 | CurSP |  |
+| 56 | u32 | CurLP |  |
+| 60 | u32 | fame |  |
+| 64 | u64 | Cen |  |
+| 72 | Name3 | logininfo.currentmap |  |
+| 84 | u32 | currentcoord.x |  |
+| 88 | u32 | currentcoord.y |  |
+| 92 | u8 | currentcoord.dir |  |
+| 93 | CHARSTATDISTSTR | statdistribute | Str Con Dex Int Men RedistributePoint |
+| 99 | u8 | pkyellowtime |  |
+| 100 | u32 | pkcount |  |
+| 104 | u16 | prisonmin |  |
+| 106 | u8 | adminlevel |  |
+| 107 | u32 | flags |  |
+| 111 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1020` NC_CHAR_ZONE_SHAPE_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u8 | race:2 chrclass:5 gender:1 |  |
+| 7 | u8 | hairtype |  |
+| 8 | u8 | haircolor |  |
+| 9 | u8 | faceshape |  |
+| 10 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1021` NC_CHAR_ZONE_QUEST_DOING_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u8 | bNeedClear | 1 = empty the quest array first |
+| 11 | u8 | nNumOfDoingQuest |  |
+| 12 | PLAYER_QUEST_INFO[nNumOfDoingQuest] | QuestDoingArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1023` NC_CHAR_ZONE_ABSTATE_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u16 | number | < 792 |
+| 12 | ABSTATEREADBLOCK[number] | abstate | 0x24: u16 abstateid, u8 strength, u32 pasttime ms @3, u32 resttime ms @7, u16 restcount @0xb, SKILL_EMPOWER @0xd, u8 caster nLevel @0xf, i32 caster nAttackPower @0x10, {u16 Index,u16 Value}[4] setitem @0x14 |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1024` NC_CHAR_ZONE_SKILL_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | PARTMARK | PartMark | bIsStart:1 bIsEnd:1 nOrder:6 |
+| 11 | u16 | nMaxNum | total over all chunks |
+| 13 | u16 | number | < 3000 |
+| 15 | PROTO_SKILLREADBLOCK[number] | skill | 0x10: i32 savetime, u16 skillid @4, u32 cooltime s @6, u16 empow @0xa, u32 mastery @0xc |
+| 15 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1025` NC_CHAR_ZONE_PASSIVE_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u16 | number |  |
+| 8 | u16[number] | passive | ids < 1000 stored |
+| 8 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x102e` NC_CHAR_ZONE_ITEM_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u8 | PacketOrder | nPacketOrderNum:7, nIsLastOfInven:1 (bit 7: send the client copy) |
+| 7 | u8 | nPartMark | 4 inventory(9), 8 equipment(8), 0x10 mini-house(12), 0x20 action box(15) |
+| 8 | u8 | numofitem |  |
+| 9 | PROTO_ITEMPACKET_TOTAL[numofitem] | ItemArray | {u8 datasize, u16 location (Pos:10, Type:6), item data}; next at +1+datasize |
+| 9 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = next CharDB packet's first bytes while the blob is the CharDB 0x1017 copy (P02-B10); 4 = the first four bytes of the next zone packet on the same WM link once a zone 0x4013 save replaced it (P02-B11); evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1031` NC_CHAR_ZONE_CHARTITLE_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00428ba0 (ref + cached 0x1019 / 0x4016 blob = CHARACTER_TITLE_READBLOCK, pdb2016); zone reader @ FUN_005a39f0 (Z07 §1.3))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.clienthandle | NETPACKETZONEHEADER: the zone's player handle (echo of the 0x101C ref) |
+| 2 | u32 | ref.charregistnumber | NETPACKETZONEHEADER: charNo |
+| 6 | u8 | nFirstConnection | written 0 (u16 0 at +2, then +3 overwritten) |
+| 7 | u8 | CurrentTitle | row type 0, element 0 |
+| 8 | u8 | CurrentTitleElement | row type 0, element 1 |
+| 9 | u16 | CurrentTitleMobID | row type 0, element 2 |
+| 11 | u64[128] | TitleValues | rows with element 0xFF: value per title type (CHARACTER_TITLE_TYPE) |
+| 1035 | u16 | NumOfTitle | rows with element 0..3, title type < 0x80 |
+| 1037 | {u8,u8}[NumOfTitle] | TitleArray | CT_INFO { u8 type, u8 value << 6 | element } |
+| 1037 | bytes | overread | 2 bytes past the blob while it is the CharDB 0x1019 copy (P02-B10), 0 after a zone 0x4016 save; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.5): no annotation existed (the decoder had no layout). evidence: capture:shop, capture:combat: nFirstConnection 0 (CharDB) / 1 (zone save), NumOfTitle 0
+
+### `0x1032` NC_CHAR_ZONE_CHARGEDBUFF_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u16 | NumOfChargedBuff |  |
+| 8 | PROTO_CHARGEDBUFF_INFO[NumOfChargedBuff] | ChargedBuff | 0xe: u32 ChargedBuffKey, u16 ChargedBuffID, ShineDateTime UseTime, ShineDateTime EndTime (year:8 month:5 date:6 hour:6 minute:7) |
+| 8 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
 
 ### `0x104c` NC_CHAR_REGISTNUMBER_ACK (WM→Zone)
 
@@ -11386,6 +11955,157 @@ size 4
 | 10 | u32 | chrregnum | charNo; -1 = refused (pdb2017 name) |
 | 14 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 16 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `ref`: echoed; `usrregnum`: 103; `chrregnum`: 5; `loginreq`: echoed
+
+### `0x10cb` NC_CHAR_GET_CHAT_BLOCK_SPAMER_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00428ba0: SendCharData(0x10cb, session + 0x1ECE4 (W01 §6.3), 8), sent every time (inline 8 bytes, never null); PROTO_NC_CHAR_GET_CHAT_BLOCK_SPAMER_CMD (pdb2017 = pdb2016) after the ref; zone reader @ FUN_0044c9b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.clienthandle | NETPACKETZONEHEADER: the zone's player handle (echo of the 0x101C ref) |
+| 2 | u32 | ref.charregistnumber | NETPACKETZONEHEADER: charNo |
+| 6 | u32 | BlockTime | evidence: capture:shop, capture:combat: 0 |
+| 10 | u32 | DelayTime | evidence: capture:shop, capture:combat: 0 |
+
+P02 batch 2 (§7.5): the struct lacks the 6-byte ref
+
+### `0x10cd` NC_CHAR_ZONE_QUEST_READ_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u16 | nNumOfReadQuest |  |
+| 12 | u16[nNumOfReadQuest] | QuestReadIDArray |  |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10d0` NC_CHAR_ITEMACTIONCOOLTIME_ZONE_CMD (WM→Zone)
+
+**Verified layout** (basis: Z17.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | zone handle of the player |
+| 2 | u32 | header.charregistnumber | must equal the player's charNo |
+| 6 | u16 | num | records |
+| 8 | struct[num] | group | ActionCooltime, 10 bytes each (pdb2016) |
+| 8 | u16 | group[i].actionID | ItemAction id (key of ItemActions::_actions; cool-time entry +0x14) |
+| 10 | i64 | group[i].expiredTime | absolute _time64 end = now + rest seconds (rounded down) |
+| 10 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z17's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10d3` NC_CHAR_ZONE_SINGLE_OPTION_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER |
+| 2 | u32 | charregistnumber | NETPACKETZONEHEADER |
+| 6 | u32 | chrregnum | not read; lookup uses the header charNo |
+| 10 | i32 | resttime | time_t of the last GameDB save (dRestExpLastExecuteTime); rest-exp buff input |
+| 14 | u8 | autopick | → sp_MiscFlag.IsAutoPickUp + brief IsAutoPick |
+| 15 | u8 | mystery_vault | → sp_MysteryVaultUI (sent as 0x10D4 at login complete) |
+| 16 | u32 | nChatBan | → sp_Spammer_ChatBan (≠ 0: chat/shout/roar blocked) |
+| 20 | u8 | bFirstJoin | ≠ 0 (CharDB copy): apply RestExpAbstateApplication |
+| 21 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10d6` NC_CHAR_ZONE_QUEST_REPEAT_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u16 | nNumOfRepeatQuest |  |
+| 12 | PLAYER_QUEST_INFO[nNumOfRepeatQuest] | QuestRepeatArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10dd` NC_CHAR_ZONE_COININFO_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00428ba0 (ref + cached 0x10DC / 0x402C blob, PROTO_NC_CHAR_COININFO_CMD pdb2016 16 bytes); zone reader @ FUN_00617830 (Z07 §1.2))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.clienthandle | NETPACKETZONEHEADER: the zone's player handle (echo of the 0x101C ref) |
+| 2 | u32 | ref.charregistnumber | NETPACKETZONEHEADER: charNo |
+| 6 | u64 | nCoin | evidence: capture:shop, capture:combat: 0 |
+| 14 | u64 | nExchangedCoin | evidence: capture:shop, capture:combat: 0 |
+| 22 | bytes | overread | 2 bytes while the blob is the CharDB 0x10DC copy (P02-B10), 0 after a zone 0x402C save |
+
+P02 batch 2 (§7.5): the pdb2016 struct has no ref; decoded as ref + struct
+
+### `0x10e3` NC_CHAR_ZONE_CARDCOLLECT_CMD (WM→Zone)
+
+**Verified layout** (basis: Z28.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle | player object handle |
+| 2 | u32 | ref.charNo | must equal the player's charNo |
+| 6 | u32 | chrregnum | ignored |
+| 10 | u16 | number | trusted, no length check |
+| 12 | CardInform[number] | CardList | 11 bytes each: {i32 RegistTime, u32 SerialNumber, u16 CardID, u8 StarNumber} |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z28's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10e6` NC_CHAR_ZONE_CARDCOLLECT_BOOKMARK_CMD (WM→Zone)
+
+**Verified layout** (basis: Z28.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u32 | chrregnum | ignored |
+| 10 | u16 | number | trusted |
+| 12 | CardBookmarkInfo[number] | ViewList | 4 bytes each: {u16 Slot, u16 CardID} |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z28's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10e9` NC_CHAR_ZONE_CARDCOLLECT_REWARD_CMD (WM→Zone)
+
+**Verified layout** (basis: Z28.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u32 | chrregnum | ignored |
+| 10 | u16 | number | trusted |
+| 12 | u16[number] | RewardID | CollectCardReward.CC_RewardID values already taken |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z28's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1130` NC_CHAR_SELL_ITEM_INFO_ZONE_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00428ba0: ref + the blob of zone 0x4037 (CParserZone::fc_NC_CHARSAVE_SELL_ITEM_INFO_CMD @ FUN_0042d080 stores payload+6, len − 8 bytes: exact), sent once then freed; zone reader @ FUN_005a5e80 (Z07 §1.2))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.clienthandle | NETPACKETZONEHEADER: the zone's player handle (echo of the 0x101C ref) |
+| 2 | u32 | ref.charregistnumber | NETPACKETZONEHEADER: charNo |
+| 6 | u8 | NumOfSellItem | evidence: capture:shop 2 (the items sold before the map change) |
+| 7 | PROTO_SELL_ITEM_INFO_SERVER[NumOfSellItem] | SellItemList | variable: 1 + nDataSize bytes each; evidence: capture:shop items 3000, 3001 |
+
+P02 batch 2 (§7.5): the struct lacks the 6-byte ref; elements are variable length (P02 struct PROTO_SELL_ITEM_INFO_SERVER)
 
 ### `0x441c` NC_QUEST_RESET_TIME_CMD (WM→Zone)
 
@@ -11413,6 +12133,8 @@ size 4
 | 16 | i32 | tResetDayQuest |  |
 
 20 bytes, per character at map login
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5 (no ref); `tReset*`: 2026-01-01, 2026-11-01, Mon 2026-11-09, 2026-11-15 00:00 local: year / month / week / day start (W05 §2)
 
 ### `0x5833` NC_KQ_LINK_TO_FORCE_BY_BAN_CMD (WM→Zone)
 
@@ -11577,6 +12299,18 @@ broadcast to all zones
 | 6 | u16 | nError |  |
 | 8 | i32 | eLevelType |  |
 | 12 | Name3 | sMapName |  |
+
+### `0xbc01` NC_GAMBLE_ZONE_PREVMAPNAME_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00428ba0: if prevMap != "": SendCharData(0xbc01, prevMap, 12); prevMap = ""; zone reader @ FUN_00617750 (Z06))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.clienthandle | NETPACKETZONEHEADER: the zone's player handle (echo of the 0x101C ref) |
+| 2 | u32 | ref.charregistnumber | NETPACKETZONEHEADER: charNo |
+| 6 | char[12] | sPrevMapName | Name3; the map of the previous zone (zone 0xBC1D), sent only when not empty, then cleared; evidence: capture:shop RouN, capture:combat RouN, RouCos02 |
+
+P02 batch 2 (§7.5): the struct lacks the 6-byte ref
 
 ### `0xbc09` NC_GAMBLE_EXCHANGEDCOIN_INIT_CMD (WM→Zone)
 
@@ -11979,6 +12713,8 @@ then Pre u32 nPartySeqCharNo[5], Post {u16, u8, u8, u32[5]}; 0x32 bytes; 6 bytes
 | 6 | u16 | wldmanhandle | WM client handle (pdb2017 name) |
 | 8 | char[20] | charid | Name5; must equal the cached name (pdb2017 name) |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `ref`: {zone handle, charNo 5}; `wldmanhandle`: 35000 / 32500; `charid`: Test2
+
 ### `0x104b` NC_CHAR_REGISTNUMBER_REQ (Zone→WM)
 
 **Verified layout** (basis: wm FUN_0042f1e0)
@@ -11989,6 +12725,8 @@ then Pre u32 nPartySeqCharNo[5], Post {u16, u8, u8, u32[5]}; 0x32 bytes; 6 bytes
 | 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
 | 6 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 8 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `ref`: {zone handle 8015 / 8004 / 8013 / 8003 / 8014, charregistnumber −1 (not yet known)}; `loginreq`: {WM handle 35000 / 32500, Test2}
 
 ### `0x207d` NC_ACT_SCRIPT_MSG_WORLD_CMD (Zone→WM)
 
@@ -12218,6 +12956,8 @@ forwarded as 0x380A (W04-B19)
 
 size 0x12, not checked
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `sPrevMapName`: the map being left (RouN, RouN, RouCos02) = next 0xBC01
+
 ### `0x384e` NC_PARTY_MEMBERINFORM_REQ (zone→WM)
 
 **Verified layout** (basis: wm FUN_0042d5a0 (zone), FUN_004274e0 (OPTool))
@@ -12251,6 +12991,18 @@ size 0x12, not checked
 
 ## Captured packets without a section above
 
+### `0x0c5f` NC_USER_TUTORIAL_CAN_SKIP_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `clienthandle`: echo; `isSkip`: 0; sent 1–3 ms before 0x0C13 (D02 §3.1 order)
+
+### `0x1005` NC_CHAR_CHARDATA_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `netpacketheader.clienthandle`: echo; last of 37 packets (36 blocks + 0x1005), 17–19 ms after 0x1004
+
+### `0x1007` NC_CHAR_BASE_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `chrregnum`: 5; `charid`: 'Test2'; `Level`: 5; `Experience`: 22 (combat) → 30 (shop); `CurHPStone|CurSPStone`: 13 / 10; `Cen`: 99440; `currentmap|x|y`: RouN (5904, 6793) / (5724, 8768) = the 0x101A KQ position and the following 0x1036; `adminlevel`: 100
+
 ### `0x1012` NC_CHAR_GUILD_CMD (S→C)
 
 **Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `nGuildNo`: 0 (4-byte form)
@@ -12258,4 +13010,144 @@ size 0x12, not checked
 ### `0x1097` NC_CHAR_GUILD_ACADEMY_CMD (S→C)
 
 **Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `nGuildAcademyNo`: 0; `isGuildAcademyMember`: 0 (5-byte form)
+
+### `0x10db` NC_CHAR_DB_NEWBIE_GUIDE_VIEW_SET_CMD (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `nGuideView`: 131, 142 (shop) = the client 0x10DA values
+
+### `0x1114` NC_CHAR_TUTORIAL_INFO_WORLD_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `TutorialInfo.nTutorialState|nTutorialStep`: 2 / 0 = the 0x0C13 TutorialInfo
+
+### `0x111e` NC_CHAR_CHAT_COLOR_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nChatFontColorID|nChatBalloonColorID`: 0 / 0
+
+### `0x1120` NC_CHAR_SUPPORT_REWARD_CMD (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `eUserType`: 2; after the first 0x180C of a session only, on the main link
+
+### `0x1121` NC_CHAR_USEITEM_MINIMON_INFO_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nWorldHandle`: WM client handle (own field, no extra prefix); `UseItemMinimonInfo`: bNormalItem 0, bChargedItem 0, both lists 0xFFFF ×12
+
+### `0x400e` NC_CHARSAVE_2WLDMAN_ALL_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `all.handle.bufferlocation`: 0 (ws_savestorepoint); `all.level.level`: 5 / 6–8 (per &levelup step); `all.location.map`: map being left, with its position; `all.location.kqhandle`: −1
+
+### `0x400f` NC_CHARSAVE_2WLDMAN_QUEST_DOING_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `questdoing.bNeedClear`: 1; `questdoing.nNumOfDoingQuest`: 0
+
+### `0x4011` NC_CHARSAVE_2WLDMAN_ABSTATE_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `abstate.abstatenum`: 1 (9266)
+
+### `0x4013` NC_CHARSAVE_2WLDMAN_ITEM_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nPartMark`: 5, 8, 0x12, 0x22 per burst; `PacketOrder`: 0x80, 0x80, 0x81, 0x81 (P02-B14)
+
+### `0x4014` NC_CHARSAVE_2WLDMAN_CHESTINFO_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `chest.number`: 0
+
+### `0x4015` NC_CHARSAVE_2WLDMAN_GAME_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `game.zone.bIsGM`: 0; `game.client.partyno`: 0xFFFF; `game.client.nRaidNo`: 0xFFFF
+
+### `0x4016` NC_CHARSAVE_2WLDMAN_TITLE_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `CTData.TitleValues`: [9] death counter 1→2 (combat), [11] kills, [23]/[24] NPC sell/buy
+
+### `0x4017` NC_CHARSAVE_2WLDMAN_MISC_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `cen`: 99440 / 99378; `fame`: 14 / 35
+
+### `0x4021` NC_CHARSAVE_SET_CHAT_BLOCK_SPAMER_WM_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `BlockTime`: 0; `DelayTime`: 0
+
+### `0x4029` NC_CHARSAVE_2WLDMAN_QUEST_READ_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `questread.nNumOfReadQuest`: 0
+
+### `0x402b` NC_CHARSAVE_2WLDMAN_QUEST_REPEAT_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `questrepeat.nNumOfRepeatQuest`: 0
+
+### `0x402c` NC_CHARSAVE_2WLDMAN_COININFO_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCoin`: 0; `nExchangedCoin`: 0
+
+### `0x4032` NC_CHARSAVE_2WLDMAN_CHAT_COLOR_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nChatFontColorID`: 0; `nChatBalloonColorID`: 0
+
+### `0x7019` NC_CHAR_OPTION_DB_GET_SHORTCUTSIZE_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `WorldManagerHandle|nCharNo`: 35000 / 32500, 5; forwarded 3 ms after client 0x7004
+
+### `0x701a` NC_CHAR_OPTION_DB_GET_SHORTCUTSIZE_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `bSuccess`: 1; `Data.Data`: 24 bytes, forwarded to the client as 0x7005 (§4.1)
+
+### `0x7021` NC_CHAR_OPTION_DB_GET_WINDOWPOS_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `WorldManagerHandle|nCharNo`: forwarded after client 0x700C
+
+### `0x7022` NC_CHAR_OPTION_DB_GET_WINDOWPOS_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `bSuccess`: 1; `Data.Data`: 392 bytes → client 0x700D
+
+### `0x702d` NC_CHAR_OPTION_IMPROVE_DB_GET_SHORTCUTDATA_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `DBShortCutData.nShortCutDataCnt`: 6; `DBShortCutData.ShortCutData`: slots 0, 1 (code 4), 4 (code 3, skill 1500), 9 (code 1, item 38043 Wooden Horse), 10 / 11 (code 1, items 3500 / 3505 HP / SP Potion Tier 1)
+
+### `0x702e` NC_CHAR_OPTION_IMPROVE_DB_GET_KEYMAP_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `DBKeyMapData.nKeyMapDataCnt`: 95 (0x5F, the W04 §8.2 limit is < 0x60)
+
+### `0x702f` NC_CHAR_OPTION_IMPROVE_DB_GET_GAMEOPTION_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `DBGameOptionData.nGameOptionDataCnt`: 28
+
+### `0x704b` NC_CHAR_OPTION_IMPROVE_DB_SET_SHORTCUTDATA_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `DBShortCutData`: n 1: {9, 0, 0} then {9, 1, 38043} (combat), the 0x7037 entries (§4.2)
+
+### `0x704c` NC_CHAR_OPTION_IMPROVE_DB_SET_SHORTCUTDATA_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nError`: 0x2100 ok; `nCharNo`: 5
+
+### `0x7495` NC_GUILD_GUILDWARSTATUS_REQ (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `(empty)`: per minute, 3–20 ms after 0x0821, on sb_SocketStr[0]
+
+### `0x7496` NC_GUILD_GUILDWARSTATUS_ACK (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `warnumber`: 0
+
+### `0x9427` NC_HOLY_PROMISE_DB_GET_UP_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `DBError`: 0x1740 ok; `UpMemberInfo.PromiseCharNo`: −1 (no master)
+
+### `0x9429` NC_HOLY_PROMISE_DB_GET_MEMBER_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `DBError`: 0x1740; `nPart`: 3 (first | last); `nMemberCount`: 0
+
+### `0x9444` NC_HOLY_PROMISE_DB_GET_REMAIN_MONEY_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `nMoney`: 0
+
+### `0x987a` NC_GUILD_ACADEMY_ZONE_GUILD_BUFF_CMD (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `BuffName`: StaAcaGenalBuf + 17 stale bytes (P02-B13); `NumOfGuild`: 0
+
+### `0x987b` NC_GUILD_ACADEMY_ZONE_GUILD_ACADEMY_MASTER_BUFF_CMD (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `NumOfMaster`: 0
+
+### `0xc808` NC_SYSLOG_CHAR_LEVEL_UP (WM→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop): `UserNo`: 103; `CharNo`: 5; `CharLev`: 7, 6, 8: one per zone 0x1074, WM session order
 

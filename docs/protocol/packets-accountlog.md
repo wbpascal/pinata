@@ -59,6 +59,8 @@ Handler `FUN_00402470` (CParserAccountLog)
 | 4 | u8 | worldnum |  |
 | 5 | u8[4] | ip |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `usrregnum`: 103; `worldnum`: 0; `ip`: ac 10 2a e7 (network order)
+
 Handler `FUN_00402580` (CParserAccountLog)
 
 | Off | Type | Checks in handler | Notes |
@@ -138,6 +140,8 @@ Handler `FUN_004045a0` (CPFs)
 | 0 | u8 | worldno |  |
 | 1 | u16 | connectercount |  |
 | 3 | u16[64] | nEachClass |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `connectercount`: 1; `nEachClass`: [6] = 1 (class from the SHAPE byte 0x19 of the character in game)
 
 Handler `FUN_004026f0` (CParserAccountLog)
 
@@ -354,6 +358,8 @@ Handler `FUN_00402ec0` (CParserAccountLog)
 
 pdb2017 field names; offsets checked in the 2016 code
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `LoginData`: the 0x0C5C body; `nUserNo`: 103
+
 Handler `FUN_004038d0` (CParserAccountLog)
 
 | Off | Type | Checks in handler | Notes |
@@ -497,6 +503,8 @@ Handler `FUN_004028a0` (CParserAccountLog)
 | 4 | char[16] | UserIP |  |
 | 20 | Name5 | spawnapps | 2016 layout: 2017 inserts UserID[30] before it |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `UserIP`: '172.16.42.231' (filled: L00-B6 refuted); `spawnapps`: 'Original' at +0x14
+
 Handler `FUN_00403310` (CParserAccountLog)
 
 | Off | Type | Checks in handler | Notes |
@@ -561,6 +569,8 @@ Handler `FUN_004034e0` (CParserAccountLog)
 |---|---|---|---|
 | 0 | u32 | UserCount |  |
 | 4 | u8 | WorldNo |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `UserCount`: 1; `WorldNo`: 0
 
 Handler `FUN_00403560` (CParserAccountLog)
 
@@ -871,4 +881,22 @@ Sent in reply to `0x8009` NC_DATA_REPORT_CANCEL_REQ on CParserAccountLog (`FUN_0
 | 9 | char[128] | byRemark |  |
 
 Sent in reply to `0x800b` NC_DATA_REPORT_GET_REQ on CParserAccountLog (`FUN_004028a0`) · payload 137 bytes · raw header
+
+## Hand-verified packets without a generated section
+
+### `0x0809` NC_MISC_CONNECTER_REQ (AccountLogDB→WM)
+
+**Verified layout** (basis: CStatistics::Process @ AL:FUN_004064b0: raw {03, 0x0809, b} to every type-5 (WM) session when the local tm_min changes)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | unused | high byte of the CSession_Manager* parameter reused as the packet buffer (P02-B6, original bug); PROTO struct empty. evidence: capture:shop, capture:combat: 0x00, 4 times, once per minute |
+
+P02 batch 2: first hand layout (pdb2016/2017 struct is empty, the decoder warned 'size 1 != documented 0')
+
+## Captured packets without a section above
+
+### `0x0c5e` NC_USER_US_IS_IP_BLOCK_ACK (AccountLogDB→Login)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nClientHandle`: +0x161; `bUserIPBlock`: 0 at +0x163
 

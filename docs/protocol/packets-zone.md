@@ -60,6 +60,97 @@ Basis: 2016 Zone.pdb (pdb2016) struct USEITEM_MINIMON_INFO, size 0x32; reference
 | 2 | u16[12] | NormalItemList | item ids, 0xFFFF = empty |
 | 26 | u16[12] | ChargedItemList | item ids, 0xFFFF = empty |
 
+### tm (36 bytes)
+
+Basis: MSVC struct tm (9 × i32), used by W04 / D02 0x10EB / 0x10EC (P02 batch 2: the decoder could not parse 'tm (9×i32)')
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | tm_sec |  |
+| 4 | i32 | tm_min |  |
+| 8 | i32 | tm_hour |  |
+| 12 | i32 | tm_mday |  |
+| 16 | i32 | tm_mon |  |
+| 20 | i32 | tm_year |  |
+| 24 | i32 | tm_wday |  |
+| 28 | i32 | tm_yday |  |
+| 32 | i32 | tm_isdst |  |
+
+### PROTO_SELL_ITEM_INFO_SERVER (122 bytes)
+
+Basis: 2016 Zone.pdb PROTO_SELL_ITEM_INFO_SERVER (size 0x7a, a maximum): first byte nDataSize = bytes that follow (P02 batch 2: capture:shop 0x4037 / 0x1130 elements of 22 bytes with nDataSize 21); named `datasize` so that pcap_decode.py reads it as a variable-length element
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | datasize | nDataSize (pdb2016): length of the rest of the element |
+| 1 | u16 | nHandle |  |
+| 3 | u64 | nSellItemKey | SHINE_ITEM_REGISTNUMBER; −1 in capture:shop |
+| 11 | bytes | ItemTotalInfo | ItemTotalInformation, nDataSize − 10 bytes (item id first: 3000, 3001 in capture:shop) |
+
+### ITEM_INVEN (2 bytes)
+
+Basis: pdb2017 union ITEM_INVEN { Pos:10, Type:6 } (2 bytes); Z04 §1.1. P02 batch 2 part 11: no file defined it, so the decoder read every ITEM_INVEN field (D03 / D05 / Z04 annotations) as 1 byte
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | inven | type << 10 | slot (pdb2017 union Pos:10 / Type:6; Z04 §1.1). P02 part 11: without this entry the decoder read every ITEM_INVEN as 1 byte |
+
+### MAPPOS (20 bytes)
+
+Basis: pdb2016 PROTO_ITEM_CREATE.map (MapName u8[12], MapXY.x u32, MapXY.y u32; 20 bytes), used by D03's 0x340A annotation; captured 0x340A / 0x341C
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[12] | MapName |  |
+| 12 | u32 | x |  |
+| 16 | u32 | y |  |
+
+### MENUITEM (3 bytes)
+
+Basis: pdb2016 / pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD::MENUITEM (3 bytes); zone nrm_ShopMenuOpen FUN_004c26b0; client Market::SetWeapon FUN_006137c0; captured 0x3C09 / 0x3C0B
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slot | grid cell of the shop tab; a slot not above the previous one starts the next tab (client Market::SetWeapon FUN_006137c0) |
+| 1 | u16 | item | ItemInfo ID |
+
+### SHINE_COORD_TYPE (9 bytes)
+
+Basis: pdb2016 SHINE_COORD_TYPE { SHINE_XY_TYPE xy; u8 dir } (9 bytes). P02 batch 2 part 13: no file defined it, so the decoder read every SHINE_COORD_TYPE field (Z09 / Z13 annotations, e.g. 0x1C1A nCoord) as 1 byte
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | x |  |
+| 4 | u32 | y |  |
+| 8 | u8 | dir |  |
+
+### ABNORMAL_STATE_BIT (99 bytes)
+
+Basis: pdb2016 ABNORMAL_STATE_BIT { u8 statebit[99] }. P02 part 13: Z13's 0x1C1A annotation uses it; without a size the decoder read 1 byte
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | bytes[99] | statebit |  |
+
+### STRUCT_QSC (101 bytes)
+
+Basis: pdb2016 STRUCT_QSC (0x65 bytes). P02 part 13: Z08's 0x4401 annotation uses it; without a size it did not fit and the decoder fell back to pdb2016
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Cmd | QUEST_SCRIPT_COMMAND (pdb2016 enum: 0 ERROR, 1 END, 2 SAY, …) |
+| 4 | u8 | IsPigeonStartType |  |
+| 5 | bytes[96] | Data | union by Cmd; SAY = {u32 nID, u32 TalkerType, u16 NPCNo} (pdb2016), the rest is Z15-B11 leftovers |
+
+### CHARACTER_TITLE_DB_SAVE_VALUE (9 bytes)
+
+Basis: pdb2016 CHARACTER_TITLE_DB_SAVE::<unnamed-type-TitleValues> { u8 Type; u64 TitleValue } (9 bytes); the key is ours (the PDB type is unnamed)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Type | CHARACTER_TITLE_TYPE (pdb2016 enum) |
+| 1 | u64 | TitleValue |  |
+
 ## Client → server
 
 ### `0x0812` NC_MISC_PINGTEST_CLIENT_ZONE_DB
@@ -408,6 +499,8 @@ Handler `FUN_00457380`
 |---|---|---|---|
 | 0 | u8 | mode | 1 normal / 2 combat stance; others logged and ignored |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `mode`: 2 (combat stance) before attacking; no 0x2009 reaches the sender (so_AllOfRange u8 0)
+
 Handler `FUN_00457560`
 
 | Off | Type | Checks in handler | Notes |
@@ -500,6 +593,8 @@ Handler `FUN_00457fd0`
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | ack | 1 = open the role |
+
+**Captured** (P02, `capture-validation.md`; shop): `ack`: 1: after 0x201C (storage NPC 108, item merchant 88) and after a quest SAY 0x4401 (Blacksmith James 28): opens the NPC's role (0x3C08 / 0x3C09 / 0x3C0B) 4–47 ms later
 
 Handler `FUN_004c4910`
 
@@ -702,6 +797,8 @@ Handler `FUN_0042b7a0`
 
 no inline reply; failure code is sent on the next tick as 0x2434
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `skill`: 1500 Bash [01]; `target`: mob handle
+
 Handler `FUN_0057fa50`
 
 | Off | Type | Checks in handler | Notes |
@@ -750,6 +847,8 @@ Handler `FUN_0042b900`
 | 0 | u8 | slot | inventory slot |
 | 1 | u32 | lot |  |
 
+**Captured** (P02, `capture-validation.md`; shop): `slot`: 1, 2 (inventory 9); `lot`: 1
+
 Handler `FUN_00539020`
 
 | Off | Type | Checks in handler | Notes |
@@ -781,6 +880,8 @@ Handler `FUN_00529f50`
 |---|---|---|---|
 | 0 | u16 | itemhandle |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `itemhandle`: drop handles 10500–10502 from 0x1C0A
+
 Handler `FUN_00530a50`
 
 | Off | Type | Checks in handler | Notes |
@@ -795,6 +896,8 @@ Handler `FUN_00530a50`
 |---|---|---|---|
 | 0 | ITEM_INVEN | from |  |
 | 2 | ITEM_INVEN | to |  |
+
+**Captured** (P02, `capture-validation.md`; shop): `from`: 0x2406 / 0x2405 / 0x2404 (inventory); `to`: 0x1800 / 0x1801 / 0x1802 (account storage page 0)
 
 Handler `FUN_00537170`
 
@@ -827,6 +930,8 @@ Handler `FUN_00539a40`
 |---|---|---|---|
 | 0 | u8 | slot | inventory slot |
 
+**Captured** (P02, `capture-validation.md`; shop): `slot`: 6, 4 (inventory slot of 751)
+
 Handler `FUN_0052b8d0`
 
 | Off | Type | Checks in handler | Notes |
@@ -858,6 +963,8 @@ Handler `FUN_0052c5b0`
 | 0 | u8 | slotequip |  |
 | 1 | u8 | slotinven | must be empty |
 
+**Captured** (P02, `capture-validation.md`; shop): `slotequip`: 12 (right hand); `slotinven`: 4
+
 Handler `FUN_0053a990`
 
 | Off | Type | Checks in handler | Notes |
@@ -873,6 +980,8 @@ Handler `FUN_0053a990`
 |---|---|---|---|
 | 0 | u8 | invenslot |  |
 | 1 | u8 | invenType | 8 equipment, 9 inventory |
+
+**Captured** (P02, `capture-validation.md`; combat): `invenslot`: 3 (38043 Wooden Horse, a mover); `invenType`: 9
 
 Handler `FUN_005416b0`
 
@@ -2613,6 +2722,8 @@ Sent from `ShineObjectClass::ShineMiniHouse::smh_SendFurnitureInfo` (`FUN_005469
 |---|---|---|---|
 | 0 | u64 | cen |  |
 
+**Captured** (P02, `capture-validation.md`; shop): `cen`: 99371 = 99440 − BuyPrice 69; +3 / +4 = SellPrice
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeCen` (`FUN_00517f70`) · payload 8 bytes
 
 | Off | Type | Value / source |
@@ -2852,6 +2963,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_CharChargedBuffData` (`FUN_0044e1e0
 | 4 | u8 |  | always 50 |
 | 5 | u32 | canReviveHere | 0/1 |
 
+**Captured** (P02, `capture-validation.md`; combat): `reviveWaitSec`: 180; ``: 50 (pdb2017 priority); `canReviveHere`: 0 (pdb2017 eMenuType DMT_BASE)
+
 Sent from `ShineObjectClass::ShinePlayer::so_KilledBy` (`FUN_00433be0`) · payload 9 bytes
 
 | Off | Type | Value / source |
@@ -2898,7 +3011,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ClassChange` (`FUN_004521b0`) �
 |---|---|---|---|
 | 0 | u8 | remain | StatTable stat[class] − spent points |
 
-**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 73
+**Captured** (P02, `capture-validation.md`; combat, idle_in_world, shop, walk-run-portals): `_`: 73 (batch 1); batch 2: 5 at level 5, then 6 / 7 / 8 with each level-up (one point per level)
 
 Sent from `GameDBSession::gds_NC_CHAR_STAT_DECPOINTFAIL_DB_ACK` (`FUN_0058bd10`) · payload 1 bytes
 
@@ -2957,6 +3070,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_BroadcastGuildInfo` (`FUN_0056e
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u32 | fame | new total |
+
+**Captured** (P02, `capture-validation.md`; shop): `fame`: total: 14 (buy, unchanged), 20, 27, 35
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeFame` (`FUN_00518070`) · payload 4 bytes
 
@@ -3411,6 +3526,8 @@ Sent in reply to `0x101e` NC_CHAR_ZONE_CHARDATAFAIL_ACK on WorldManagerSession (
 
 Z01 name was 'object left sight (ours)'
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `objHandle`: the mover at a dismount (with 0xCC06), a dead mob 10.0 s after its kill, a dropped item in the frame of its 0x300A
+
 Sent from `ShineObjectClass::ShineObject::so_LogoutPacketBroadcast` (`FUN_00553a40`) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -3546,6 +3663,8 @@ Sent from `ShineObjectClass::ShineObject::so_AbnormalState_BroadcastSet` (`FUN_0
 | 6 | u8 | nChatBalloonColorID |  |
 | 7 | u8[len] | content | variable length |
 
+**Captured** (P02, `capture-validation.md`; combat): `handle`: 8003 = the sender: so_Chat's broadcast includes the sender (so_AllOfRange u8 1); `flag.GMColor|chatwin`: 2 (chatwin 1, no GM colour); `nChatFontColorID / nChatBalloonColorID`: 0; `content`: 'test'
+
 Sent from `ShineObjectClass::ShineMobileObject::so_Chat` (`FUN_00458c90`) · payload variable (param_5 * 0x67 + 9 + (uint)
 
 | Off | Type | Value / source |
@@ -3647,6 +3766,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_Notice` (`FUN_005977e0`) · pay
 | 0 | u16 | handle |  |
 | 2 | u32 | loc.x |  |
 | 6 | u32 | loc.y |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `handle`: mob stopping its chase before its first swing; `loc`: server position
 
 Sent from `ShineObjectClass::ShineMobileObject::so_mobile_StopHere` (`FUN_0045a0c0`) · payload 10 bytes
 
@@ -4085,6 +4206,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendHorseHungry` (`FUN_0045e510`) �
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | millisec |  |
+
+**Captured** (P02, `capture-validation.md`; combat): `millisec`: 3000 = MoverMain CastingTime
 
 Sent from `FUN_0045d550` (`FUN_0045d550`) · payload 2 bytes
 
@@ -4563,6 +4686,8 @@ Sent from `AxialListTargetInform::ali_Work` (`FUN_0042b0b0`) · payload 30 bytes
 | 0 | u32 | expgain |  |
 | 4 | u16 | mobhandle |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `expgain`: 1 / 2 / 4 = MonEXP × level handicap; `mobhandle`: dead mob; sent before the killing 0x2448
+
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 6 bytes
 
 | Off | Type | Value / source |
@@ -4579,6 +4704,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payloa
 | 0 | u8 | level |  |
 | 1 | u16 | mobhandle |  |
 | 3 | struct | newparam | CHAR_PARAMETER_DATA, 0xe8 bytes |
+
+**Captured** (P02, `capture-validation.md`; shop): `level`: 6 / 7 / 8; `mobhandle`: 0 (&levelup); `newparam`: pdb2016 CHAR_PARAMETER_DATA; PrevExp/NextExp 350/560, 560/840, 840/1200; Wizdom stale (Z07-B7)
 
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 235 bytes
 
@@ -5055,6 +5182,8 @@ Sent from `FUN_005835e0` (`FUN_005835e0`) · payload 12 bytes
 |---|---|---|---|
 | 0 | u32 | famegain | added fame (level on level-up), cap 1,000,000 |
 
+**Captured** (P02, `capture-validation.md`; shop): `famegain`: = the new level (6, 7, 8)
+
 Sent from `ShineObjectClass::ShinePlayer::so_GainFame` (`FUN_0042df00`) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -5073,6 +5202,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_GainFame` (`FUN_0042df00`) · paylo
 | 5 | u16 | attackspeed | ms |
 | 7 | u8 | damageindex | swing counter (low byte) |
 | 8 | u8 | attacksequence |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `attackspeed`: 1100 player (vt 0x50c), 1000 Hero Slime (MobWeapon AtkSpd); `damageindex`: player: restarts at 1 per 0x242B; mob: life-long swing count; `attacksequence`: player: counts across bashes (1–19); mob: 0; `actioncode`: animation 0–5, kept across bashes
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SwingStart` (`FUN_0042f3f0`) · payload 9 bytes
 
@@ -5101,6 +5232,8 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SwingStart` (`FUN_0042f3f0`)
 | 15 | u8 | attacksequence |  |
 
 sent to the attacker's and the defender's client only (owner for pets/servants)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `flag`: 0 in all 28, killing blows included: no dead bit is written (P02-B18); `resthp`: 0 on the killing blow; client takes death from it; `hpchangeorder`: per defender, +2–3 per hit
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`) · payload 16 bytes
 
@@ -5196,6 +5329,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_TargetChange` (`FUN_004a4680`) 
 | 0 | u16 | skill |  |
 | 2 | u16 | targetobj |  |
 | 4 | u16 | index | blast index tying START, BLAST and DAMAGE together |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `skill`: 1500; `targetobj`: = 0x2440 target; `index`: 3 / 4 (blast counter), ties 0x2457 / 0x2452
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_Volley` (`FUN_004a44a0`) · payload 6 bytes
 
@@ -5293,6 +5428,8 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 
 flag: bit0 isdamage, 1 iscritical, 2 ismissed, 3 isshieldblock, 4 isheal, 5 isenchant, 6 isresist, 7 IsCostumWeapon, 8 isDead, 9 isImmune, 10 IsCostumShield. 2016 header is 5 bytes; the 2017 struct adds kSkillID and pTarget before the array.
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `(layout)`: pdb2016: 5-byte header + 14 n (Z03 annotation type not decodable); `target.flag`: 0x2801 hit / 0x2901 kill; bits 11 and 13 stack garbage (P02-B19)
+
 Sent from `SkillEffectApply::SkillDamageSender::sds_Finish` (`FUN_00437110`) · payload variable ((byte)
 
 | Off | Type | Value / source |
@@ -5353,6 +5490,8 @@ Sent from `AbnormalStateContainer::AbnormalStateReinforcedMove::ase_PreAttachObj
 | 0 | u16 | index |  |
 | 2 | u16 | caster |  |
 | 4 | u16 | nSkillID |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `index`: = 0x244E index; `nSkillID`: 1500; 44–55 ms after 0x244E (IsMovingSkill: no arming pass)
 
 Sent from `ShineObjectClass::ShineMobileObject::so_Routine` (`FUN_0056a080`) · payload 6 bytes
 
@@ -5543,6 +5682,8 @@ Fill: +6: FUN_006406f0 (no direct writes found)
 | 6 | u16 | error | 0x341 ok |
 | 8 | u16 | itemhandle |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `itemid`: picked item (3001, 3005, 3004); `lot`: 1; `error`: 0x341 success; `itemhandle`: 0xFFFF always (Z05 §3.2)
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_itempickresult` (`FUN_005308d0`) · payload 10 bytes
 
 | Off | Type | Value / source |
@@ -5583,6 +5724,8 @@ Sent from `FUN_0052f0e0` (`FUN_0052f0e0`) · payload 26 bytes
 | 0 | u16 | error | 0x700 ok |
 | 2 | u16 | useditem |  |
 | 4 | u8 | invenType |  |
+
+**Captured** (P02, `capture-validation.md`; combat): `error`: 0x700 ×3; `useditem`: 38043 on the two uses; 0xFFFF on the forced dismount at the map link (Z13 §7.4 GetOff(1)); `invenType`: 9
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ItemUseResultPacket` (`FUN_0045e610`) · payload 5 bytes
 
@@ -6169,6 +6312,8 @@ Fill: +1: FUN_0050e6b0 (no direct writes found)
 | 2 | u16 | ItemInfo.itemid |  |
 | 4 | byte[101] | ItemInfo.itemattr | SHINE_ITEM_ATTRIBUTE (union: blot, wlot, dlot, qstitm, amulet, weapon, armor, shield, boot, furniture, decorate, skillscroll, recallscroll, binditem, upsource, itemchest, weapontitlelicence, kingdomquest, minihouseskin, upgraderedgem, upgradebluegem, upgradegoldgem, kqstep, feed, riding, amount, costumweapon, costumshield, actionitem, Enchant, GBCoin, Capsule, MobCard_Unident, MobCard, NoEffect, ActiveSkill, Pet, Bracelet) |
 
+**Captured** (P02, `capture-validation.md`; shop): `nHandle`: 0, 1 (repurchase slots); `ItemInfo.itemid`: 3000 / 3001; `ItemInfo.itemattr`: 1 byte lot, then 100 stale bytes of the global send buffer (P02-B16)
+
 Sent from `FUN_00537a20` (`FUN_00537a20`) · payload 105 bytes
 
 Fill: +2: FUN_006406c0 (no direct writes found)
@@ -6506,6 +6651,8 @@ Sent from `NPCRole_Merchant::nrm_PortionStone` (`FUN_004c2d60`) · payload 24 by
 | 11 | u8 | count |  |
 | 12 | bytes | items | count items of the page (FUN_00643b10) |
 
+**Captured** (P02, `capture-validation.md`; shop): `cen`: 0; `pages`: 16 (constant 0x10); `curpage`: 2, 3, 0, 1 (one per 0x3446, in link arrival order); `openType`: 0 (NPC); `count`: 0; `items`: 13 bytes with 0 items: one stray trailing byte (00), P02-B17
+
 Sent from `ShineObjectClass::ShinePlayer::so_accountstoragefill` (`FUN_0044c530`) · payload variable (iVar6 + 0xe)
 
 Fill: +11: FUN_00643b10
@@ -6538,6 +6685,8 @@ Sent from `FUN_0050fc00` (`FUN_0050fc00`) · payload 0 bytes
 
 Z01 name was 'UI state save result (ours)'
 
+**Captured** (P02, `capture-validation.md`; shop): `result`: 8536 = 0x2158 (CharDB ok); the 2016 client has no handler (Z01-B5)
+
 Sent in reply to `0x4028` NC_CHARSAVE_DB_UI_STATE_SAVE_ACK on GameDBSession (`FUN_00551360`, GameDBSession::gds_NC_CHARSAVE_DB_UI_STATE_SAVE_ACK) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -6552,6 +6701,8 @@ Sent in reply to `0x4028` NC_CHARSAVE_DB_UI_STATE_SAVE_ACK on GameDBSession (`FU
 |---|---|---|---|
 | 0 | u16 | nQuestID |  |
 | 2 | STRUCT_QSC | Command | 0x65 bytes: u32 Cmd, u8 IsPigeonStartType, Data; QSC_ERROR: Data={u32 cmd,u32 0,u16 code} |
+
+**Captured** (P02, `capture-validation.md`; shop): `nQuestID`: 10 / 947; `Command.Cmd`: 2 SAY; `Command.Data`: nID 230 / 18702, TalkerType 0 NPC, NPCNo 28 = m_nClickNPCNo (the clicked NPC); bytes 07 / 01 at Data+0xC / +0x10 unused
 
 Sent from `CQuestZone::Send_NC_QUEST_SCRIPT_CMD_REQ` (`FUN_005ba960`) · payload 103 bytes
 
@@ -6722,6 +6873,8 @@ Sent in reply to `0x480d` NC_SKILL_EMPOW_RESET_DB_SUC_ACK on GameDBSession (`FUN
 |---|---|---|---|
 | 0 | u8 | restempow | unspent empower points |
 
+**Captured** (P02, `capture-validation.md`; shop): `restempow`: 2, 3, 3
+
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 1 bytes
 
 | Off | Type | Value / source |
@@ -6808,6 +6961,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_ReviveNow` (`FUN_0057d290`) · payl
 |---|---|---|---|
 | 0 | u16 | skill |  |
 | 2 | u32 | sec |  |
+
+**Captured** (P02, `capture-validation.md`; combat): `skill`: 29206 UseRide; `sec`: 5 = MoverMain WoodenHorse01 CoolTime 5000
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_NewSkillCoolTime` (`FUN_00569260`) · payload 6 bytes
 
@@ -9540,6 +9695,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeCharIDUseAck` (`FUN_0051b
 |---|---|---|---|
 | 0 | u64 | nCoin |  |
 
+**Captured** (P02, `capture-validation.md`; shop): `nCoin`: 0 (CoinChange releaser of a cen-only purchase)
+
 Sent from `ShineObjectClass::ShinePlayer::so_Gamble_ChangeCoin` (`FUN_00617260`) · payload 8 bytes
 
 | Off | Type | Value / source |
@@ -9554,6 +9711,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_Gamble_ChangeCoin` (`FUN_00617260`)
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u64 | nExchangeCoin |  |
+
+**Captured** (P02, `capture-validation.md`; shop): `nExchangeCoin`: 10000 = GBExchangeMaxCoin row of levels 6, 7, 8 (nothing exchanged)
 
 Sent from `ShineObjectClass::ShinePlayer::so_Gamble_ChangeExchangedCoin` (`FUN_00617360`) · payload 8 bytes
 
@@ -10206,6 +10365,8 @@ Sent in reply to `0xc412` NC_COLLECT_REWARD_DB_ACK on GameDBSession (`FUN_00627a
 | 2 | u8 | nSlot | seat; 0 = driver (client opens the feed window) |
 | 3 | u8 | nGrade | mover upgrade grade |
 
+**Captured** (P02, `capture-validation.md`; combat): `nMoverHandle`: 22139 / 22138; `nSlot`: 0; `nGrade`: 0
+
 Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -10224,6 +10385,8 @@ Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 4 bytes
 | 2 | u16 | nMoverHandle |  |
 | 4 | u8 | nSlot |  |
 | 5 | u8 | nGrade |  |
+
+**Captured** (P02, `capture-validation.md`; combat): `nHandle`: the rider itself (the broadcast includes it); `nSlot`: 0; `nGrade`: 0
 
 Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 6 bytes
 
@@ -10256,6 +10419,8 @@ Sent from `FUN_0055f620` (`FUN_0055f620`) · payload 2 bytes
 |---|---|---|---|
 | 0 | u16 | nHungry | item hunger gauge; 0 → client forces walking |
 
+**Captured** (P02, `capture-validation.md`; combat): `nHungry`: 780 → 770 → 760 (zone A), 760 → 750 (zone B): MoverHG WoodenHorse01 ConsumeHG 10 every Tick 10000 ms after the summon
+
 Sent from `FUN_0055f0a0` (`FUN_0055f0a0`) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -10271,6 +10436,8 @@ Sent from `FUN_0055f0a0` (`FUN_0055f0a0`) · payload 2 bytes
 | 0 | u16 | nMoverHandle |  |
 | 2 | u16 | nWalk |  |
 | 4 | u16 | nRun |  |
+
+**Captured** (P02, `capture-validation.md`; combat): `nWalk / nRun`: 36 / 165 = MoverMain 1100 / 1300 × the rider's 33 / 127 / 1000 (Z13 §8.7); 0.39 / 0.47 s after 0xCC02
 
 Sent from `FUN_00456850` (`FUN_00456850`) · payload 6 bytes
 
@@ -10406,6 +10573,63 @@ Sent from `FUN_004d0bd0` (`FUN_004d0bd0`) · payload 18 bytes
 
 0x23 bytes; relayed to the WM as 0x74E4 first, then the lock list is settled. Z16 §6.7
 
+### `0x3411` NC_ITEMDB_EQUIPSUC_ACK (CharDB→Zone)
+
+**Verified layout** (basis: zone FUN_0052cba0 (Z05); pdb2016 struct without the 6-byte ref prefix)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | zone object handle of the player (NETPACKETZONEHEADER) |
+| 2 | u32 | charregistnumber | charNo |
+| 6 | u16 | lockindex | the request's lock index. evidence: capture:shop |
+
+P02 part 11: 8 bytes on the wire = ref + PROTO struct (pdb2016 gives only the 2-byte struct)
+
+### `0x3414` NC_ITEMDB_UNEQUIPSUC_ACK (CharDB→Zone)
+
+**Verified layout** (basis: zone FUN_0053b0a0 (Z05); pdb2016 struct without the 6-byte ref prefix)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | zone object handle of the player (NETPACKETZONEHEADER) |
+| 2 | u32 | charregistnumber | charNo |
+| 6 | u16 | lockindex | the request's lock index. evidence: capture:shop |
+
+P02 part 11: 8 bytes on the wire = ref + PROTO struct (pdb2016 gives only the 2-byte struct)
+
+### `0x341D` NC_ITEMDB_PICKALLSUC_ACK (hand-named) (CharDB→Zone)
+
+**Verified layout** (basis: character FUN_0040b760; zone FUN_00530110 (Z05 §3.2))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | zone object handle of the player (NETPACKETZONEHEADER) |
+| 2 | u32 | charregistnumber | charNo |
+
+### `0x3423` NC_ITEMDB_SELLALLSUC_ACK (CharDB→Zone)
+
+**Verified layout** (basis: zone FUN_005393e0 (Z05); pdb2016 struct without the 6-byte ref prefix)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | zone object handle of the player (NETPACKETZONEHEADER) |
+| 2 | u32 | charregistnumber | charNo |
+| 6 | u16 | lockindex | the request's lock index. evidence: capture:shop |
+
+P02 part 11: 8 bytes on the wire = ref + PROTO struct (pdb2016 gives only the 2-byte struct)
+
+### `0x3429` NC_ITEMDB_RELOCSUC_ACK (CharDB→Zone)
+
+**Verified layout** (basis: zone FUN_00533070 (Z05); pdb2016 struct without the 6-byte ref prefix)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | zone object handle of the player (NETPACKETZONEHEADER) |
+| 2 | u32 | charregistnumber | charNo |
+| 6 | u16 | lockindex | the request's lock index. evidence: capture:shop |
+
+P02 part 11: 8 bytes on the wire = ref + PROTO struct (pdb2016 gives only the 2-byte struct)
+
 ### `0x0806` NC_MISC_SEED_REQ (C→S)
 
 **Verified layout**
@@ -10471,6 +10695,8 @@ Empty payload.
 
 Empty payload.
 
+**Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty; no reply
+
 ### `0x242b` NC_BAT_BASHSTART_CMD (C→S)
 
 **Verified layout** (basis: zone FUN_00430fa0)
@@ -10479,11 +10705,15 @@ Empty payload.
 
 payload not read; attacks the server-side current target. Mode 2 only.
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `(payload)`: empty; 0x2447 15–31 ms later (next player tick)
+
 ### `0x2432` NC_BAT_BASHSTOP_CMD (C→S)
 
 **Verified layout** (basis: zone FUN_0042e700)
 
 Empty payload.
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `(payload)`: empty; 0x243D 20–44 ms later
 
 ### `0x2444` NC_BAT_SKILLBASH_CASTABORT_REQ (C→S)
 
@@ -10499,6 +10729,8 @@ Empty payload.
 |---|---|---|---|
 | 0 | u16 | itemid |  |
 | 2 | u32 | lot | clamped to MaxLot for stackables |
+
+**Captured** (P02, `capture-validation.md`; shop): `itemid`: 751 Long Mace (weapon shop, 0x3C09 tab 1); `lot`: 1
 
 ### `0x3019` NC_ITEM_USEABORT_CMD (C→S)
 
@@ -10529,6 +10761,8 @@ Empty payload.
 **Verified layout** (basis: zone FUN_0051c2b0)
 
 Empty payload.
+
+**Captured** (P02, `capture-validation.md`; shop): `(empty)`: sent by the client when the NPC storage window closes; no reply
 
 ### `0x3057` NC_ITEM_TERMEXTEND_REQ (C→S)
 
@@ -10566,11 +10800,15 @@ Empty payload.
 
 Empty payload.
 
+**Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty
+
 ### `0x5009` NC_SOULSTONE_SP_USE_REQ (C→S)
 
 **Verified layout** (basis: zone FUN_00589000)
 
 Empty payload.
+
+**Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty
 
 ### `0x4025` NC_CHARSAVE_UI_STATE_SAVE_REQ (C→Z)
 
@@ -10579,6 +10817,8 @@ Empty payload.
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | btMysteryType | stored unchecked in sp_MysteryVaultUI and sent to GameDB 0x4027 |
+
+**Captured** (P02, `capture-validation.md`; shop): `btMysteryType`: 1, once per 0x240C: the client's On_NC_BAT_LEVELUP_CMD sends it when a Mystery Vault is in the inventory
 
 ### `0x749c` NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ (C→Z)
 
@@ -10779,6 +11019,8 @@ no 0x74DC reply in 2016. Z16 §6.4
 | 8 | u64 | cen |  |
 | 16 | u8 | itemcounter |  |
 | 17 | bytes | itemarray | PROTO_ITEMPACKET_TOTAL[] |
+
+**Captured** (P02, `capture-validation.md`; shop): `curpage`: 0–3; `nOpenType`: 0; `cen`: 0; `itemcounter`: 0 (empty storage), 3 unused zero bytes after it
 
 ### `0x3456` NC_ITEMDB_BOOTHTRADE_ACK (DB→Z)
 
@@ -11223,6 +11465,8 @@ map-wide from the Lua setter, per player from so_ply_SendCanUseReviveItem (Z09 �
 
 one shared buffer per drop: the pickable bit is rewritten for each receiver just before the send; re-broadcast to the sight when the owner-only time ends and when a dice winner fails to pick
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `handle`: 10500–10502; `itemid`: 3001 / 3005 / 3004 (mob drops); `dropmobhandle`: killer mob handle; `attr`: 8 = looting bit 3 set for the killer (Z09 §11.3)
+
 ### `0x1C0C` NC_BRIEFINFO_MAGICFIELDSPREAD_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone BriefInformationMagicField ctor FUN_00549330 (length 0x12), filled in ShineMagicField::so_mgcfld_MagicFieldSpread FUN_0057ea30 / _Friend FUN_0057ee80, sent by vt 0x4c8 (folded FUN_00555280); client GameFrameWork::On_NC_BRIEFINFO_MAGICFIELDSPREAD_CMD FUN_004a09b0 → MagicField::AddMagicField FUN_00611a60; layout = pdb2016 PROTO struct)
@@ -11399,6 +11643,8 @@ full brief-info exchange batch to one player (login complete, regen, teleport, l
 | 2 | u8 | count |  |
 | 3 | ABSTATE_INFORMATION[count] | infoList | ABSTATE_INFORMATION × count |
 
+**Captured** (P02, `capture-validation.md`; combat): `handle`: regen mob (after its 0x1C08); `infoList`: {291 StaImmortal, 5000 ms, 1}; 0x2428 5.0 s later
+
 ### `0x1c1a` NC_BRIEFINFO_REGENMOVER_CMD (S→C)
 
 **Verified layout** (basis: zone BriefInformationMover FUN_0055e830 / FUN_0043c280 / FUN_0055ea10 (0x8b bytes); client FUN_00646e00)
@@ -11412,6 +11658,8 @@ full brief-info exchange batch to one player (login complete, regen, teleport, l
 | 19 | ABNORMAL_STATE_BIT | AbstateBit | 99 bytes; not read by the client handler |
 | 118 | u8 | nGrade |  |
 | 119 | u16[10] | nSlotHandle | rider per seat, 0xFFFF empty; not read by the client handler |
+
+**Captured** (P02, `capture-validation.md`; combat): `nID`: 160 (MoverMain WoodenHorse01); `nHP`: 0; `nCoord`: summon position {x, y, dir}; `nGrade`: 0; `nSlotHandle`: 10 × 0xFFFF: sent before the rider boards (0xCC02 follows)
 
 ### `0x1c1b` NC_BRIEFINFO_MOVER_CMD (S→C)
 
@@ -11491,7 +11739,7 @@ to the whole map instance (target 0xFFFF) or one object. The mob version sends l
 | 0 | u16 | walkspeed |  |
 | 2 | u16 | runspeed |  |
 
-**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 33 / 127
+**Captured** (P02, `capture-validation.md`; combat, idle_in_world, shop, walk-run-portals): `_`: 33 / 127; batch 2 also at a dismount, before 0xCC06
 
 ### `0x2041` NC_ACT_RIDE_FAIL_CMD (S→C)
 
@@ -11643,6 +11891,8 @@ player tick, on change (+0x172dc)
 
 Empty payload.
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `(payload)`: empty, same ms as 0x244E
+
 ### `0x243C` NC_BAT_DOTDAMAGE_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone AxialListMobSuicide::alms_SelfKill FUN_004f1720 (broadcast in sight, length 0xF); client FUN_004b5740)
@@ -11676,6 +11926,8 @@ only the self-kill send site of Z09 (cMobSuicide / ShineSuicide / servant vanish
 | 2 | u16 | attacker | killer handle (mob+0x1fba), 0xFFFF when none |
 
 2017 PDB alias of 0x244A (the zone→WM direction is NC_BAT_PKINPKFIELD_WMS_CMD, Z03). Sent once to sight when the mob's mode becomes 3.
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `dead`: mob handle; `attacker`: killer; 41–55 ms after a swing kill, same ms after a skill kill
 
 ### `0x245A` NC_BAT_AREADOTDAMAGE_CMD (hand-named) (S→C)
 
@@ -11743,6 +11995,8 @@ player tick, on change; also sent to every object targeting the player (so_ply_S
 |---|---|---|---|
 | 0 | u16 | code | 0x201 ok, 0x20a full, 0x20c fame, 0x20d bind item owned, 0x20f item-money short, 0x211 buy level |
 
+**Captured** (P02, `capture-validation.md`; shop): `code`: 0x201 success, after the 0x340B apply (Z05 §2.1)
+
 ### `0x3005` NC_ITEM_SELL_ACK (S→C)
 
 **Verified layout** (basis: zone 12/5; client FUN_004ab870)
@@ -11750,6 +12004,8 @@ player tick, on change; also sent to every object targeting the player (so_ply_S
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | code | 0x381 ok, 0x38f bound |
+
+**Captured** (P02, `capture-validation.md`; shop): `code`: 0x381 success ×2
 
 ### `0x3008` NC_ITEM_DROP_ACK (S→C)
 
@@ -11766,6 +12022,8 @@ player tick, on change; also sent to every object targeting the player (so_ply_S
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | code | 0x241 ok, 0x24a bound item |
+
+**Captured** (P02, `capture-validation.md`; shop): `code`: 0x241 success ×3
 
 ### `0x300e` NC_ITEM_SPLIT_ACK (S→C)
 
@@ -11784,6 +12042,8 @@ player tick, on change; also sent to every object targeting the player (so_ply_S
 | 0 | u16 | code | 0x281 ok, 0x293 weapon skin |
 
 no PDB struct of that name
+
+**Captured** (P02, `capture-validation.md`; shop): `code`: 0x281 ×3: two equips and the unequip (Z05-B2: unequip answers with EQUIP_ACK)
 
 ### `0x3013` NC_ITEM_UNEQUIP_ACK (S→C)
 
@@ -11862,6 +12122,26 @@ to every participant on the roller's map who is still in the party/raid; client 
 | 26 | u16 | PickItemID | drop+0x195 item ID at send time |
 
 to every participant still in the party/raid; client: 0x2008 → '%s acquired the %s item by rolling %d with the dice.' if PickItemID is a known item, else the error text
+
+### `0x3C09` NC_MENU_SHOPOPENTABLE_WEAPON_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone NPCRole_Merchant::nrm_ShopMenuOpen FUN_004c26b0 (Z02); pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD; client Market::SetWeapon FUN_006137c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | itemnum |  |
+| 2 | u16 | npc | NPC object handle |
+| 4 | MENUITEM[itemnum] | itemlist | 3 bytes each; the client opens a new tab at every slot that does not grow, chosen by the first item's class (5 weapon, 6-8 armour, else other) |
+
+### `0x3C0B` NC_MENU_SHOPOPENTABLE_ITEM_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone NPCRole_Merchant::nrm_ShopMenuOpen FUN_004c26b0 (Z02); pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD; client Market::SetWeapon FUN_006137c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | itemnum |  |
+| 2 | u16 | npc | NPC object handle |
+| 4 | MENUITEM[itemnum] | itemlist | 3 bytes each; the client opens a new tab at every slot that does not grow, chosen by the first item's class (5 weapon, 6-8 armour, else other) |
 
 ### `0x3c01` NC_MENU_SERVERMENU_REQ (S→C)
 
@@ -11981,6 +12261,8 @@ empty payload
 Empty payload.
 
 empty payload
+
+**Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty, 11 ms after 0x5007; 0x240E heal next tick; no 0x500B to self
 
 ### `0x5812` NC_KQ_COMPLETE_CMD (S→C)
 
@@ -12546,6 +12828,8 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 
 Empty payload.
 
+**Captured** (P02, `capture-validation.md`; combat)
+
 ### `0xcc07` NC_MOVER_RIDE_OFF_FAIL_CMD (S→C)
 
 **Verified layout** (basis: zone so_SendErrorCode 51/7 from FUN_0055f620 / FUN_0045d910 / FUN_0045f020 / FUN_00563420; client FUN_0049d250)
@@ -12628,6 +12912,8 @@ Empty payload.
 | 16 | u16 | nIndex |  |
 | 18 | PLAYER_QUEST_DONE_INFO[n] | QuestDoneArray | {u16 ID, i64 tEndTime} (10 bytes) |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `chrregnum`: 5; `nTotalDoneQuest`: 0; `nTotalDoneQuestSize`: 12 (the 0x100B value); `nDoneQuestCount`: 0; `nIndex`: 0; rebuilt by QuestDoneLIstSendToZone @ FUN_004332f0: 12 bytes, the P02-B8 tail of 0x100B is not forwarded
+
 ### `0x1023` NC_CHAR_ZONE_ABSTATE_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_0044e0e0 / asl_Store FUN_0040afd0)
@@ -12675,6 +12961,8 @@ Empty payload.
 | 2 | u32 | chrregnum | ref charNo |
 | 6 | u32 | guildNo | → m_nMyGuildNo |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `guildNo`: 0
+
 ### `0x102e` NC_CHAR_ZONE_ITEM_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_0044ddf0)
@@ -12711,6 +12999,8 @@ Empty payload.
 | 7 | u16 | client.partyno | replaced by pm_FindParty |
 | 9 | u16 | client.nRaidNo |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `zone.bIsGM`: 0; `client.partyno`: 0xFFFF (no party, re-read from the WM party registry); `client.nRaidNo`: 0xFFFF
+
 ### `0x1032` NC_CHAR_ZONE_CHARGEDBUFF_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_0044bcf0 → FUN_0044e1e0)
@@ -12731,6 +13021,8 @@ Empty payload.
 | 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
 | 2 | u32 | chrregnum | ref charNo |
 | 6 | u32 | academyNo | → m_nMyGuildAcademyNo |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `academyNo`: 0 (the 0x1097 isGuildAcademyMember byte is not forwarded)
 
 ### `0x10b8` NC_CHAR_ZONE_LINK_FROM_CMD (WM→Z)
 
@@ -12849,6 +13141,8 @@ PROTO_NC_CHAR_CARDCOLLECT_REWARD_CMD after the ref; from Character 0x10E8
 | 2 | u32 | nCharNo | must match the player |
 | 6 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot; slots failing MinimonAutoUseItem or with lot 0 are dropped |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `nSessionHandle`: the zone handle; `nCharNo`: 5; `UseItemMinimonInfo`: all 0xFFFF (the 0x1121 values)
+
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_004cd5c0)
@@ -12956,6 +13250,8 @@ PROTO_NC_CHAR_CARDCOLLECT_REWARD_CMD after the ref; from Character 0x10E8
 | 361 | SHINE_XY_TYPE[2] | TeamRegenXY |  |
 
 0x179 bytes; only the fields the zone reads are listed, full struct PROTO_KQ_INFO in Z16 §1.2
+
+**Captured** (P02, `capture-validation.md`; shop): `Handle`: 21; `ID`: 14; `Title`: Mean Giant Honeying[A]; `MapLink`: KDHoneying
 
 ### `0x580f` NC_KQ_W2Z_START_CMD (WM→Z)
 
@@ -13149,6 +13445,8 @@ Z16 §6.4
 | 20 | u8 | nGrade | mover upgrade grade |
 | 21 | u32[10] | nPassenger | charNo per seat, −1 empty; only the linking player's own seat is filled |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `nItemSlot`: 3; `nMoverID`: 160; `nMasterCharNo`: 5; `nPassenger`: {5, −1 ×9}: byte-for-byte the old zone's 0xCC0B (combat 43.720 → 44.358 only)
+
 ### `0x0821` NC_MISC_TIMEFROMWORLD_CMD (WM→zone)
 
 **Verified layout** (basis: zone FUN_004511a0)
@@ -13156,6 +13454,8 @@ Z16 §6.4
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | bytes[36] | tm | struct tm |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `tm`: 36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms
 
 ### `0x0825` NC_MISC_WHSHANDLEREPAIR_CMD (WM→zone)
 
@@ -13215,6 +13515,43 @@ Z16 §6.4
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `objHandle`: echoed; `mapIndex`: copied from 0x180D; `x`: copied; `zonePort`: copied; on the 0x180D link, 90–110 ms later; client 0x180A 10–16 ms later
+
+### `0x341C` NC_ITEMDB_PICKALL_REQ (hand-named) (Zone→CharDB)
+
+**Verified layout** (basis: zone ItemInventory_ii_PickAll FUN_0052f1b0 (Z04 §3.3); character FUN_0040b760 (D03 §3.4); pdb2016 PROTO_ITEM_CREATE)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | zone object handle of the player (NETPACKETZONEHEADER) |
+| 2 | u32 | charregistnumber | charNo |
+| 6 | u32 | owner | charNo |
+| 10 | MAPPOS | map | the picker's map and position (not the drop's: shop 144.969 x 16337 vs drop 16295) |
+| 30 | ITEM_INVEN | location | target cell (inventory 9) |
+| 32 | u64 | createitemregnum | item key (kept from the drop) |
+| 40 | u16 | createitemid |  |
+| 42 | u16 | attr | byte offset of the attribute in this payload (= 44), not a length |
+| 44 | bytes | attribute | class-specific, 1 byte (lot) for stackables |
+
+### `0x3428` NC_ITEMDB_RELOC_REQ (Zone→CharDB)
+
+**Verified layout** (basis: zone irm_Move FUN_00531860 (Z04 §4.1); pdb2016 PROTO_NC_ITEMDB_RELOC_REQ + ref prefix)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | zone object handle of the player (NETPACKETZONEHEADER) |
+| 2 | u32 | charregistnumber | charNo |
+| 6 | u32 | ownerA | owner of the source box (charNo 5) |
+| 10 | u32 | ownerB | owner of the target box (userNo 103 for account storage) |
+| 14 | u16 | lockindex |  |
+| 16 | u64 | item.relocitemregnum | key of the moved item |
+| 24 | ITEM_INVEN | item.newlocation | target cell |
+| 26 | ITEM_INVEN | inven_from | source cell |
+| 28 | u16 | nFromItemID |  |
+| 30 | u32 | nFromItemLot | 1 also for a non-stackable item |
+
+P02 part 11: 34 bytes on the wire; the pdb2016 struct (28) lacks the ref prefix
+
 ### `0x3449` NC_ITEMDB_ITEMCHANGE_REQ (Zone→GameDB)
 
 **Verified layout** (basis: zone ShinePlayer::sp_AttrChange2DB FUN_005979b0 (pdb2016 PROTO_NC_ITEMDB_ITEMCHANGE_REQ agrees))
@@ -13229,6 +13566,8 @@ Z16 §6.4
 | 18 | bytes | attribute | attribute class size (vt 0xc); silver wing / bind item 0x65 |
 
 answer 0x344A NC_ITEMDB_ITEMCHANGE_ACK (Z05 §5.4); this sender is one of 12
+
+**Captured** (P02, `capture-validation.md`; combat): `lockindex`: 2 / 1; `itemid`: 38043; `attribute`: ShineItemAttr_Riding 0x13 bytes: hungrypoint 760 → 750, deletetime 0x76bbecff (never), bitflag 0 (DuringRide cleared before the save)
 
 ### `0x482c` NC_SKILL_ITEMACTIONCOOLTIME_CMD (Z→C)
 
@@ -13647,6 +13986,8 @@ sent length is one byte longer than the packet (Z11-B38); answer 0x5816 / 0x5817
 | 0 | u32 | charregnum |  |
 | 4 | u32 | fame |  |
 
+**Captured** (P02, `capture-validation.md`; shop): `charregnum`: 5; `fame`: 14 (buy), 20, 27, 35 (each level)
+
 ### `0x10d1` NC_CHAR_FREESTAT_SET_DB_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_0058ad10 / FUN_0058b3f0)
@@ -13689,6 +14030,8 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 16 | u16 | lock |  |
 | 18 | u16 | equip | 0x2000|slot |
 
+**Captured** (P02, `capture-validation.md`; shop): `key`: 751's key; `inven`: 0x2404; `lock`: 5; `equip`: 0x200C
+
 ### `0x343b` NC_ITEMDB_ITEMTRADE_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_00594870, tb_FillCen FUN_00593aa0, tb_FillTradeBuffer FUN_00594090; = PDB)
@@ -13729,6 +14072,8 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 6 | u8 | page |  |
 | 7 | u32 | userNo |  |
 | 11 | u8 | fromAccountStorageCmd |  |
+
+**Captured** (P02, `capture-validation.md`; shop): `page`: 0, 1, 2, 3 on four links in the same ms; `userNo`: 103; `fromAccountStorageCmd`: 0 (NPC menu)
 
 ### `0x3450` NC_ITEMDB_GETFROMCHEST_REQ (Z→DB)
 
@@ -13814,6 +14159,8 @@ to the Character DB (sock2gameDB); answer 0x345A (Z05 §6.4); no 2016 PDB struct
 | 6 | u32 | userNo |  |
 | 10 | u16 | first |  |
 | 12 | u16 | last |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `userNo`: 103; `first`: 0; `last`: 23 (client 0x3020 page 0 at login)
 
 ### `0x346d` NC_ITEMDB_CHESTITEM_REQ (Z→DB)
 
@@ -13992,6 +14339,8 @@ to the Character DB (sock2gameDB); answer 0x345A (Z05 §6.4); no 2016 PDB struct
 | 4 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot |
 | 54 | u8[12] | DelSlotList_Normal | 1 = slot empty (every empty slot, Z13-B62) |
 | 66 | u8[12] | DelSlotList_Charged | same for the charged list |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `UseItemMinimonInfo`: bNormalItem / bChargedItem 0, all lists 0xFFFF; `DelSlotList_*`: 12 × 1: last packet of every ws_save2DB
 
 ### `0x4403` NC_QUEST_DB_SET_INFO_REQ (Z→DB)
 
@@ -14330,6 +14679,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 2 | u32 | charNo |  |
 | 6 | u64 | exp |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `exp`: new total per gain: 22→24→26→28→30 (combat), 30→31→35 (shop)
+
 ### `0x1074` NC_CHAR_LEVEL_CHANGED_CMD (Z→WM)
 
 **Verified layout** (basis: zone FUN_0042d830)
@@ -14339,6 +14690,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 0 | u16 | wmHandle |  |
 | 2 | u32 | charNo |  |
 | 6 | u8 | level |  |
+
+**Captured** (P02, `capture-validation.md`; shop): `level`: 6, 7, 8 after `&levelup 3` (shop 30.500)
 
 ### `0x244a` NC_BAT_PKINPKFIELD_WMS_CMD (Z→WM)
 
@@ -14364,6 +14717,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 12 | u16 | nIndex | records sent in earlier packets |
 | 14 | PLAYER_QUEST_DONE_INFO[n] | QuestDoneArray | 10 each: u16 ID, i64 tEndTime |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `nTotalDoneQuest`: 0; `nTotalDoneQuestSize`: 12; `nDoneQuestCount`: 0; `nIndex`: 0
+
 ### `0x4012` NC_CHARSAVE_2WLDMAN_SKILL_CMD (Z→WM)
 
 **Verified layout** (basis: zone ShinePlayer::so_Send_NC_CHARSAVE_2WLDMAN_SKILL_CMD FUN_00455780 + CharaterSkillList::csl_FillSendBuffer_Server FUN_00445260; WM FUN_0042a0b0 (W05); PROTO_NC_CHARSAVE_2WLDMAN_SKILL_CMD (pdb2016))
@@ -14379,6 +14734,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 13 | PROTO_SKILLREADBLOCK[number] | skill.skill | 16 bytes each: i32 savetime, u16 skillid, u32 cooltime (s left), u16 empow, u32 mastery |
 
 13 + 16*number bytes; sent by ws_save2worldmanager (so_LinkTo) with every skill (mode 0), one chunk per 500 skills. Z23 §7.3.
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `PartMark`: 3 (first | last); `nMaxNum`: 26; `skill.number`: 26; `savetime`: current time_t
 
 ### `0x4019` NC_CHARSAVE_2WLDMAN_LINK_FROM_CMD (Z→WM)
 
@@ -14406,6 +14763,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 12 | u32 | nChatBan | sp_Spammer_ChatBan |
 | 16 | u8 | bFirstJoin | always 0 |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `resttime`: 0 (written as 0); `autopick`: 0; `mystery_vault`: 1; `bFirstJoin`: 0 (written as 0)
+
 ### `0x4033` NC_CHARSAVE_2WLDMAN_PET_LINK_RESUMMON_CMD (Z→WM)
 
 **Verified layout** (basis: zone sp_PetLinkResummonInfo_Save2World FUN_004d1760 (ws_save2worldmanager); PDB2016 struct of the same name)
@@ -14418,6 +14777,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 13 | u16 | nSummonSlot | inventory slot of the pet item |
 | 15 | u32 | nId | pet id |
 | 19 | u32 | nRegNum | pet DB key |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `bDoResummon`: 0; `nSummonSlot`: 0xFFFF; `nId`: −1; `nRegNum`: −1
 
 ### `0x4034` NC_CHARSAVE_2WLDMAN_ITEMACTIONCOOLTIME_CMD (Z→WM)
 
@@ -14441,6 +14802,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 2 | u32 | nCharNo |  |
 | 6 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `UseItemMinimonInfo`: empty (0xFFFF lists)
+
 ### `0x580e` NC_KQ_Z2W_MAKE_ACK (Z→WM)
 
 **Verified layout** (basis: zone FUN_00497790)
@@ -14449,6 +14812,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 |---|---|---|---|
 | 0 | u32 | hquest |  |
 | 4 | u16 | err | 0x981 ok, 0x982 dup, 0x983 full, 0x984+i map i missing, 0x988+i map i busy, 0x98C script |
+
+**Captured** (P02, `capture-validation.md`; shop): `hquest`: 21 (= 0x580D Handle); `err`: 0x0981 ERR_KINGDOMQUEST_MAKE_NOERR, only from the zone hosting KDHoneying
 
 ### `0x5810` NC_KQ_Z2W_END_CMD (Z→WM)
 
@@ -14677,6 +15042,8 @@ only by the hosting zone. Z16 §6.2
 | 16 | u32 | nMasterCharNo | owner's charNo |
 | 20 | u8 | nGrade | mover upgrade grade |
 | 21 | u32[10] | nPassenger | charNo per seat, −1 empty; only the linking player's own seat is filled |
+
+**Captured** (P02, `capture-validation.md`; combat): `nItemSlot`: 3; `nMoverID`: 160; `nMasterCharNo`: 5; `nPassenger`: {5, −1 ×9}
 
 ### `0x0811` NC_MISC_ZONERINGLINKTEST_RNG (Z→Z (ring))
 
@@ -15116,6 +15483,8 @@ Z01 name was 'player disconnected (ours)'
 
 Z01 name was 'leaving for a link (ours)'
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `wmHandle`: 35000 / 32500; `charNo`: 5; first packet of every so_LinkTo, also on the same-zone revive (combat 102.376)
+
 ### `0x180c` NC_MAP_LINKEND_CMD (zone→WM)
 
 **Verified layout** (basis: zone FUN_00443390)
@@ -15135,6 +15504,8 @@ Z01 name was 'leaving for a link (ours)'
 | 46 | u8 | inGuildTournament |  |
 
 Z01 name was 'map login done (ours)'
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `objHandle`: zone player handle; `zoneNo`: 0 (9210) / 2 (9214); `always99`: 99 = GameLog 0x040F StoreType (map link); `exp`: total exp; `money`: cen
 
 ### `0x180d` NC_MAP_LINKRESERVE_REQ (zone→WM)
 
@@ -15158,6 +15529,8 @@ Z01 name was 'map login done (ours)'
 
 0x3b bytes; Z01 name was 'link reserve (ours)'
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `destMap`: RouCos02 / RouN = next 0x101F position; `mapIndex`: 2 (RouCos02), 150 (RouN); `zoneIp`: 172.16.42.214; `zonePort`: 9214 / 9210; `wmHandle2`: = wmHandle
+
 ### `0x0802` NC_MISC_S2SCONNECTION_REQ (zone→peer)
 
 **Verified layout** (basis: zone FUN_005a3210 / FUN_00468770 / FUN_0046a080)
@@ -15173,11 +15546,159 @@ Z01 name was 'map login done (ours)'
 
 ## Captured packets without a section above
 
+### `0x040a` NC_LOG_GAME_LOGIN (Zone/WM/Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `mappos`: login map / position; `Cen`: 99440; `usrregnum`: 103; `spawnapps`: 'Original'
+
+### `0x040f` NC_LOG_GAME_LINK (Zone/WM/Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `StoreType`: 99 (the WM's copy of 0x180C at every map login); `CharExp / CharMoney`: current values
+
+### `0x0410` NC_LOG_GMAE_LOGOUT_ZONEINFO (Zone/WM/Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `StoreType`: ws_save2DB reason: 2 zone link and revive, 8 level-up; `mappos`: position before the link
+
+### `0x041e` NC_LOG_GAME_LEVEL_UP (Zone→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop): `level`: 6 / 7 / 8; `currentexp`: 30 (unchanged by &levelup)
+
+### `0x042b` NC_LOG_GAME_MKED (Zone→GameLog)
+
+**Captured** (P02, `capture-validation.md`; combat): `mobid`: 2000 killer; `exp`: 0 lost (level 5 < 20)
+
+### `0x042d` NC_LOG_GAME_MK_GETEXPINFIELD (Zone→GameLog)
+
+**Captured** (P02, `capture-validation.md`; combat): `mobid`: 0 Slime; `number`: 4; `exp`: 8; only at the revive (P02-B20)
+
+### `0x0446` NC_LOG_GAME_ITEM_TAKE (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `mappos.MapName`: 'Need' (D03-B11); `mappos.x/y`: 0 (never written, stale); `itemlot`: 0; `iteminven`: 0x7512 / 0x4372 / 0x7511: never written (P02-B15)
+
+### `0x0448` NC_LOG_GAME_ITEM_BUY (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop): `itemseller`: 0; `itemlot`: 0 (non-stackable); `iteminven`: 0x2406; `itemmoney`: 69
+
+### `0x0449` NC_LOG_GAME_ITEM_SELL (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop): `itembuyer`: 0; `itemlot`: 0; `itemmoney`: 3 / 4
+
+### `0x044c` NC_LOG_GAME_ITEM_INVEN_MOVE (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop): `iteminvenfrom`: inventory; `iteminvento`: account storage 0x1800–0x1802; `guildregnum`: 0
+
 ### `0x0c18` NC_USER_NORMALLOGOUT_CMD (C→S)
 
 **Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `LogoutType`: 0, 10.04 s after 0x1071
 
+### `0x104e` NC_CHAR_REVIVE_REQ (C→S)
+
+**Captured** (P02, `capture-validation.md`; combat): `(payload)`: empty; answer 0x104F 4 ms later, then a full map login
+
+### `0x1080` NC_CHAR_WEDDINGDATA_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `header`: {zone handle, charNo}: every 0x1803 (Z01 §6)
+
+### `0x1081` NC_CHAR_WEDDINGDATA_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `Error`: 4834 = 0x12E2 (single: partner name lookup finds no row, D02 §7); the zone ignores it, no client 0x1081; `When / SubWhen`: 1582426906
+
+### `0x1099` NC_CHAR_GET_ITEMLIST_BY_TYPE_NUM_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nInvenType`: 2 (reward inventory, client 0x302C page 0); `from`: 0; `to`: 23
+
+### `0x109a` NC_CHAR_GET_ITEMLIST_BY_TYPE_NUM_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `Error`: 0x1200 in both captures: never written (D02-B13 captured); `ItemCmd.nPartMark`: 3; `numofitem`: 0
+
+### `0x10b3` NC_CHAR_REGNUM_VARIFICATION_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `zonehandle`: player handle; `zone_charid`: Test2; `charregnum`: 5: every 0x1803, first link packet of the burst
+
+### `0x10b4` NC_CHAR_REGNUM_VARIFICATION_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `iscorrect`: 1, 0–11 ms later
+
+### `0x1115` NC_CHAR_TUTORIAL_INFO_ZONE_CMD (WM→Z)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nSessionHandle`: zone handle; `nCharNo`: 5; `TutorialInfo`: {state 2, step 0} = 0x1114
+
+### `0x111f` NC_CHAR_ZONE_CHAT_COLOR_CMD (WM→Z)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nChatFontColorID`: 0; `nChatBalloonColorID`: 0
+
 ### `0x1c08` NC_BRIEFINFO_REGENMOB_CMD (S→C)
 
 **Captured** (P02, `capture-validation.md`; walk-run-portals): `mobid`: MobInfo ids (0, 1, 32, 178, 191, 2000, 10004 …); `mode`: 2; `nKQTeamType`: 2; `bRegenAni`: 0 for objects entering sight
+
+### `0x2048` NC_ACT_CANCELCASTBAR (S→C)
+
+**Captured** (P02, `capture-validation.md`; combat): `(payload)`: empty, at the summon 2.93 s later
+
+### `0x340a` NC_ITEMDB_BUYALL_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop): `map`: RouN 5724, 8768 (player position); `location`: 0x2406; `attr`: 68 = attribute offset; `price_cen`: 69; `UserNo`: 103; `Vendor`: 28 (NPC mob id)
+
+### `0x340b` NC_ITEMDB_BUYALLSUC_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop): `lockindex`: 0, 11 ms after the request
+
+### `0x3410` NC_ITEMDB_EQUIP_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop): `relocA`: 751 → 0x200C; `relocB.key`: key of 750 (in the slot) or −1 (empty slot); `relocB.newlocation`: 0x2406 / 0x2404; `lockindex`: 1, 6; `unequipnum`: 0
+
+### `0x3422` NC_ITEMDB_SELLALL_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop): `price`: 3 / 4 (SellPrice × lot); `nLot`: 1; `nDeleteChestItem`: 0
+
+### `0x344a` NC_ITEMDB_ITEMCHANGE_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; combat): `lockindex`: echo; `err`: 0x901 success
+
+### `0x34cf` NC_ITEMDB_RESET_SCROLL_LINK_MAP_INFO_CMD (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharRegNum`: 5, at every 0x1803 login completion (6 times, D06 §…)
+
+### `0x401a` NC_CHARSAVE_REST_EXP_LAST_EXEC_TIME_SAVE_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `handle.bufferlocation`: 0 (ws_savestorepoint, P02-B21); `handle.chrregnum`: 5: no zone ref, as D02 §6 says
+
+### `0x4027` NC_CHARSAVE_DB_UI_STATE_SAVE_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop): `btMysteryType`: 1 (copy of 0x4025)
+
+### `0x4028` NC_CHARSAVE_DB_UI_STATE_SAVE_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop): `err`: 0x2158 (8536) ok, 1–7 ms after 0x4027
+
+### `0x500a` NC_SOULSTONE_SP_USESUC_ACK (S→C)
+
+**Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty, 1 ms after 0x5009; 0x240F next tick
+
+### `0xc806` NC_SYSLOG_CHAR_ENTER_GAME (WM/Zone/Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `UserNo / CharNo`: 103 / 5
+
+### `0xc809` NC_SYSLOG_CHAR_ZONE_TRANSITION (WM/Zone/Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `DestZoneNo / SrcZoneNo`: 2 / 0 (RouN → RouCos02), 0 / 2 (&linkto RouN); not on a same-zone link; `CharLev`: 8 / 5
+
+### `0xc80a` NC_SYSLOG_CHAR_DEATH (Zone→GameLog)
+
+**Captured** (P02, `capture-validation.md`; combat): `ZoneNo`: 2; `AttackerType`: 1 mob; `AttackerID`: 2000; `DeathCoord`: player position
+
+### `0xc80b` NC_SYSLOG_CHAR_VICTORY (Zone→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `ZoneNo`: zone process number 0 / 2; `TargetType`: 1; `TargetID`: MobInfo id 0 / 2000; `KillCoord`: killer position
+
+### `0xc80d` NC_SYSLOG_CHAR_ITEM_BUY (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop): `BuyMoney`: 69; `Vendor`: 28
+
+### `0xc80e` NC_SYSLOG_CHAR_ITEM_SELL (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop): `SellMoney`: 3 / 4; `Vendor`: 28
+
+### `0xd412` NC_PET_LINK_RESUMMON_CMD (WM→Z)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5 (no ref); `bDoResummon`: 0; `nSummonSlot`: 0xFFFF; `nId / nRegNum`: −1 (= the zone 0x4033 values)
 

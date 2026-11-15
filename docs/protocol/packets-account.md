@@ -359,6 +359,8 @@ Handler `FUN_00403c80` (CParserAccount)
 
 pdb2017 field names; offsets checked in the 2016 code
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `clienthandle`: Login client handle (5600, 5200); `sPassword`: 32 lowercase hex chars = MD5 of the password (client-side hash, forwarded unchanged); `sUserIP`: '172.016.042.231' (%03d); `spawnapps`: 'Original'
+
 Handler `FUN_00402fe0` (CParserAccount)
 
 | Off | Type | Checks in handler | Notes |
@@ -381,6 +383,8 @@ Handler `FUN_00402fe0` (CParserAccount)
 |---|---|---|---|
 | 0 | u16 | nHandle |  |
 | 2 | u32 | nUserNo |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nHandle`: WM client handle 35000 / 32500 (= the following 0x0C14 worldmanager); `nUserNo`: 103
 
 Handler `FUN_00403220` (CParserAccount)
 
@@ -860,4 +864,18 @@ Sent in reply to `0x2807` NC_OPTOOL_CONNECT_BRIF_REQ on CPFs (`FUN_00405140`) ·
 |---|---|---|
 | 0 | bytes[170] | `in(0x2807)+0`; `memset 0` |
 | 1 | u8 | `DAT_0044b808` |
+
+## Captured packets without a section above
+
+### `0x0c10` NC_USER_LOGIN_DB (Login→AccountDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `usrregnum`: 103; `worldnum`: 0; `ip`: ac 10 2a e7
+
+### `0x0c5c` NC_USER_US_PASSWORD_CHECK_ACK (AccountDB→Login)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nError`: 0x41 ok; `nUserNo`: 103; `nAuthID`: 9; `nBlock`: 0; `bLoginAble`: 1
+
+### `0x0c61` NC_USER_RETURN_CHECK_ACK (AccountDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `bReturnUser`: 0; `tLastSec`: 174618 / 174902 s = seconds since account creation (usp_User_GetDatediffCreated fallback)
 

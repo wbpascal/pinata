@@ -577,3 +577,9 @@ world = the session's m_Connected_World; the first 0x0808 after a WM connects br
 
 7 bytes, PROTO_NC_MISC_S2SCONNECTION_REQ (pdb2016). L00 §5.1 shows only { myServerId, myWorld, myZone }
 
+## Captured packets without a section above
+
+### `0x0c16` NC_USER_KICKOFFFROMWORLD_CMD (Login→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `bytes 0..5`: never written (P02-B5): 76 27 d3 ef 76 00; `usrregnum`: 103 at +6; payload 10 bytes, not 4
+
