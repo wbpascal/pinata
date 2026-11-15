@@ -44,6 +44,8 @@ Basis: login InitWorldManagerInfo FUN_00409eb0, GetWorldManagerConnectInfo FUN_0
 
 L00 name was 'client key (sent after 0x0C67)'
 
+**Captured** (P02, `capture-validation.md`; all five): `XTrapClientKeyLength`: 29; `XTrapClientKey`: '33B543B0CA6E7C41E5D1D0651307' + NUL
+
 Handler `FUN_00406230`
 
 No payload fields read directly by the handler.
@@ -58,6 +60,8 @@ No payload fields read directly by the handler.
 
 L00 name was 'world select'
 
+**Captured** (P02, `capture-validation.md`; all five): `world_no`: 0
+
 Handler `FUN_00406970`
 
 | Off | Type | Checks in handler | Notes |
@@ -71,6 +75,8 @@ Handler `FUN_00406970`
 Empty payload.
 
 answered with 0x0C1C (same layout as 0x0C0A); L00 name was 'world list refresh'
+
+**Captured** (P02, `capture-validation.md`; all five)
 
 Handler `FUN_004062f0`
 
@@ -128,6 +134,8 @@ No payload fields read directly by the handler.
 
 L00 name was 'user login'
 
+**Captured** (P02, `capture-validation.md`; all five): `sUserName`: 'admin'; `sPassword`: masked; `spawnapps`: 'Original' + NUL padding (20 bytes)
+
 Handler `FUN_00406450` · packet length check: == 0x13e (length includes the opcode)
 
 | Off | Type | Checks in handler | Notes |
@@ -150,6 +158,8 @@ Handler `FUN_00406450` · packet length check: == 0x13e (length includes the opc
 
 client FUN_0046eb30 sends it right after receiving the seed, with the hard-coded key "20151116141627"; L00 name was 'version check'
 
+**Captured** (P02, `capture-validation.md`; all five): `sVersionKey`: '20151116141627' + NUL padding
+
 Handler `FUN_004060d0`
 
 | Off | Type | Checks in handler | Notes |
@@ -168,6 +178,8 @@ Handler `FUN_004060d0`
 
 sent immediately on accept
 
+**Captured** (P02, `capture-validation.md`; all five): `seed`: 355..368 over 9 connections, +1 per connection (CLoginClientSessionManager::ActiveSession)
+
 Sent from `FUN_00409610` (`FUN_00409610`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
@@ -183,6 +195,8 @@ Sent from `FUN_00409610` (`FUN_00409610`) · payload 2 bytes · raw header
 | 0 | u16 | error | client shows the text from its global error table (FUN_00416430): 0x42 'An unknown error has occurred.', 0x43/0x46 'DB error', 0x44 'Authentication failed.', 0x45 'Please check ID or Password.', 0x47 'The ID has been blocked.', 0x48 'The World Servers are down for maintenance.', 0x49 'Authentication timed out. Please try to log in again.', 0x4A 'Login failed.', 0x4B 'Please accept the agreement to continue.', 0x51 'You are not in our service area.'; other codes (0x4C, 0x4E, 0x52) -> 'An unidentified error code has occurred.: <code>' |
 
 session is closed afterwards; L00 name was 'login failed'
+
+**Captured** (P02, `capture-validation.md`; login-errors): `error`: 0x45 after a wrong password
 
 Sent in reply to `0x0c3f` NC_USER_TW_PASSWORD_CHECK_ACK on CParserAccountDB (`FUN_00403b50`) · payload 2 bytes · raw header
 
@@ -205,6 +219,8 @@ Sent in reply to `0x0c5c` NC_USER_US_PASSWORD_CHECK_ACK on CParserAccountDB (`FU
 
 L00 name was 'world list'
 
+**Captured** (P02, `capture-validation.md`; all five): `count`: 1; `worlds`: {world_no 0, world_name 'INITIO' (ServerInfo.txt WORLD_NAME), status 6}
+
 Sent in reply to `0x0c27` NC_USER_TEENAGER_ACK on CParserAccountDB (`FUN_00404050`) · payload variable ((uint)*local_2584 * 0x12 + 1)
 
 | Off | Type | Value / source |
@@ -225,6 +241,8 @@ Sent in reply to `0x0c27` NC_USER_TEENAGER_ACK on CParserAccountDB (`FUN_0040405
 | 19 | u16[32] | validate | client stores it and sends it to WM in 0x0C0F |
 
 L00 name was 'world select result'
+
+**Captured** (P02, `capture-validation.md`; all five): `world_status`: 6; `wm_ip`: '172.16.42.214'; `wm_port`: 9110; `validate`: 31 rand() words (< 0x8000) + check word; XOR of all 32 = per-world counter 1,3,4,5,6,8 in time order (GetClientValidation)
 
 Sent in reply to `0x0c0b` NC_USER_WORLDSELECT_REQ on CParserClient (`FUN_00406970`) · payload 83 bytes · raw header
 
@@ -262,6 +280,8 @@ Sent from `FUN_00409810` (`FUN_00409810`) · payload 2 bytes · raw header
 | 1 | WORLD[count] | worlds |  |
 
 L00 name was 'world list (refresh)'
+
+**Captured** (P02, `capture-validation.md`; all five): `count`: 1; `worlds`: same body as 0x0C0A
 
 Sent in reply to `0x0c1b` NC_USER_WORLD_STATUS_REQ on CParserClient (`FUN_004062f0`) · payload variable ((uint)*local_201c * 0x12 + 1)
 
@@ -307,6 +327,8 @@ Sent in reply to `0x0c65` NC_USER_CLIENT_VERSION_CHECK_REQ on CParserClient (`FU
 | 1 | char[n] | XTrapServerKey | always "" (pdb2017 name) |
 
 client FUN_0046f470: on receipt, opens the login UI and sends 0x0C04; L00 name was 'version OK'
+
+**Captured** (P02, `capture-validation.md`; all five): `XTrapServerKeyLength`: 1; `XTrapServerKey`: 1 byte, 00
 
 Sent in reply to `0x0c65` NC_USER_CLIENT_VERSION_CHECK_REQ on CParserClient (`FUN_004060d0`) · payload variable ((uint)(pcVar4 + (2 - ((int)param_1 + 0x2ab))))
 
@@ -526,6 +548,8 @@ Empty payload.
 | 0 | u8 | bSuccess | always 1 (pdb2017 name) |
 
 L00 name was '?'
+
+**Captured** (P02, `capture-validation.md`; all five): `bSuccess`: 1
 
 ### `0x0808` NC_MISC_USER_COUNT_CMD (WM→Login)
 

@@ -742,7 +742,9 @@ def to_json(res, rows):
 def run(path, ports, show_secrets=False, out_dir=None):
     res = decode_capture(path, ports, show_secrets)
     rows = build_report(res)
-    stem = os.path.join(out_dir or os.path.dirname(os.path.abspath(path)), os.path.basename(path))
+    out_dir = out_dir or os.path.dirname(os.path.abspath(path))
+    os.makedirs(out_dir, exist_ok=True)
+    stem = os.path.join(out_dir, os.path.basename(path))
     with open(stem + ".decoded.txt", "w") as f:
         write_decoded(res, f)
     with open(stem + ".report.md", "w") as f:
@@ -823,6 +825,10 @@ def selftest():
     pkts.append((tcp(S, C, 9210, 50001, 9000, frame(struct.pack("<HH", 0x0807, zseed))), None))
     e1, _ = xor(zb[1], zseed % 499)
     pkts.append((tcp(C, S, 50001, 9210, 7000 + 3, frame(e1)), None))
+    # second zone stream without SYN ("displayed packets" save, P02): the seed comes before the first client packet
+    z2seed = 5
+    pkts.append((tcp(S, C, 9212, 50003, 11000, frame(struct.pack("<HH", 0x0807, z2seed))), None))
+    pkts.append((tcp(C, S, 50003, 9212, 12000, frame(xor(struct.pack("<H", 0x1803), z2seed % 499)[0])), None))
 
     tmp = tempfile.mkdtemp()
     for fmt in ("pcapng", "pcap"):
@@ -852,7 +858,8 @@ def selftest():
                 ("login#1", C2S, 0x0C5A), ("login#1", C2S, 0x0C37), ("login#1", S2C, 0x0C0A),
                 ("login#1", S2C, 0x0C09), ("login#1", S2C, 0x0C05), ("login#1", S2C, unknown_op),
                 ("wm#1", C2S, 0x1001), ("wm#1", C2S, 0x0C0F), ("wm#1", C2S, 0x1001), ("wm#1", S2C, gen_op),
-                ("zone#1", C2S, 0x0806), ("zone#1", S2C, 0x0807), ("zone#1", C2S, 0x1803)]
+                ("zone#1", C2S, 0x0806), ("zone#1", S2C, 0x0807), ("zone#1", C2S, 0x1803),
+                ("zone#2", S2C, 0x0807), ("zone#2", C2S, 0x1803)]
         assert got == want, got
         login = dict(ps[3]["fields"])
         assert login["sUserName"] == "tester" and set(login["sPassword"]) == {"*"}, login   # L00 names (pdb2017)
@@ -876,6 +883,22 @@ def selftest():
         assert pdb_pick(docs["pdb"][0x0830], 3)["name"] == "NC_MISC_SERVERPARAMETER_ACK"   # alias layout by size
         f = decode_ann(b"\x02\x01\x00\x02\x00", [[0, "u8", "a.num", ""], [1, "u16[a.num]", "arr", ""]], {}, docs)
         assert f[0] == [("a.num", 2), ("arr", [1, 2])] and f[2] == 5 and not f[3], f
+        # type forms added by P02: [] = rest, bytes = rest, Outer::Inner suffix, inline {u8,u8}, name[i].x overlay, datasize
+        f = decode_ann(b"\x07\x01\x00\x02\x00", [[0, "u8", "k", ""], [1, "u16[]", "rest", ""]], {}, docs)
+        assert f[0] == [("k", 7), ("rest", [1, 2])] and not f[3], f
+        f = decode_ann(b"\x07abc", [[0, "u8", "k", ""], [1, "bytes", "tail", ""]], {}, docs)
+        assert f[0] == [("k", 7), ("tail", b"abc")] and not f[3], f
+        st = {"Outer::Inner": dict(size=2, fields=[[0, "u8", "x", ""], [1, "u8", "y", ""]])}
+        f = decode_ann(b"\x01\x02\x03\x04", [[0, "Inner[2]", "e", ""]], st, docs)
+        assert f[0] == [("e", [{"x": 1, "y": 2}, {"x": 3, "y": 4}])] and not f[3], f
+        f = decode_ann(b"\x02\x01\x02\x03\x04", [[0, "u8", "n", ""], [1, "{u8,u8}[n]", "p", ""]], {}, docs)
+        assert f[0] == [("n", 2), ("p", [{"f0": 1, "f1": 2}, {"f0": 3, "f1": 4}])] and not f[3], f
+        f = decode_ann(b"\x01\x00\x09\x02\x00\x08", [[0, "S[2]", "s", ""], [0, "u16", "s[i].a", ""], [2, "u8", "s[i].b", ""]], {}, docs)
+        assert f[0] == [("s", [{"a": 1, "b": 9}, {"a": 2, "b": 8}])] and not f[3], f
+        st = {"V": dict(size=3, fields=[[0, "u8", "datasize", ""], [1, "u8", "id", ""]])}
+        f = decode_ann(b"\x01\x05\x02\x06\xff", [[0, "V[]", "v", ""]], st, docs)
+        assert f[0] == [("v", [{"datasize": 1, "id": 5}, {"datasize": 2, "id": 6}])] and not f[3], f
+        assert [client_dir(d) for d in ("C→WM", "Z→C", C2S, "WM→Z")] == [C2S, S2C, C2S, "WM→Z"]
         f10 = dict(ps[10]["fields"])                         # C01 names it user_id, W01 (merged later) userId
         assert f10.get("userId", f10.get("user_id")) == "tester" and dict(ps[11]["fields"])["slot"] == 1
         assert any("not among the constants" in s for s in ps[12]["issues"]), ps[12]
@@ -885,6 +908,8 @@ def selftest():
         assert res["streams"][0]["seeds"][0]["seed"] == seed
         assert any("1 retransmitted" in s for s in res["streams"][0]["problems"]), res["streams"][0]["problems"]
         assert any("brute-forced start index" in s for s in res["streams"][2]["decrypt"])
+        z2 = res["streams"][3]                               # seed before the first client packet, no SYN (P02)
+        assert z2["seeds"][0]["seed"] == z2seed and not any("brute-forced" in s for s in z2["decrypt"]), z2
         rep = open(stem + ".report.md").read()
         assert "| login | C→S | 0x0C5A |" in rep and "secret" not in open(stem + ".decoded.txt").read()
         if fmt == "pcapng":

@@ -129,6 +129,7 @@ continue the open phase-2 items with the PDB exports as their main reading sourc
 | [D06](items/D06.md) | Database behaviour the backups do not give us: missing procedures, schema, inferred DB statements of D01–D05 (added by D02; run last, before X01) | D01–D05 |
 | [D07](items/D07.md) | Character server: D04 residue — academy reward storage merge (0x986B) and tournament reward item attributes (0x74AA) (added by D04) | D04, D03 |
 | [P02](items/P02.md) | Capture validation: confirm/correct layouts and message order with real traffic. **Recurring:** run after each batch of captures and after each phase | P01, captures |
+| [P04](items/P04.md) | Protocol README: zone seed on accept, server-initiated heartbeat, §2 flows as captured (added by P02) | P02 |
 
 The DB items (D01–D05) don't depend on the zone/WM items and can fill gaps in parallel runs.
 
@@ -158,7 +159,7 @@ follow-up session.
 2. Z02, Z03, Z04, W02 (core gameplay)
 3. Z07, Z08, Z05, Z06, W03, W04
 4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, Z19, Z20, Z21, Z22, Z23, Z24, Z25, Z26, Z27, Z28, Z29, Z30, W05, S02, L01, then D06
-5. P02 again with fuller captures, then X01
+5. P04 (README corrections from the first capture batch), P02 again with fuller captures, then X01
 6. X02 → user records its scenarios → P02 → X02 again (repeat until the low ratings are gone or not worth a capture)
 
 Large items (Z04, Z05, Z08, D03, D04) will probably need two or three sessions each. Starting a new session

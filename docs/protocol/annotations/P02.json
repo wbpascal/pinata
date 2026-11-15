@@ -1,5 +1,5 @@
 {
- "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it (tools ignore this key; capture-validation.md is the readable form). Capture names are re-data/captures/26_11_15_<name>.pcapng.",
+ "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it (`packets.py` renders each entry as a **Captured** line in packets-<server>.md; capture-validation.md has the full reasoning). Capture names are re-data/captures/26_11_15_<name>.pcapng.",
  "packets": {
   "login": {
    "0x0c37": {

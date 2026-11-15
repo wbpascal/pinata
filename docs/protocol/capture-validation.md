@@ -25,7 +25,8 @@ the code; where they disagree, the code was re-read and the finding is listed in
 | `idle_in_world` | log Test1235 into Roumen, idle among mobs, log out to character select, back to world select | login×2, wm, zone | 208 |
 | `walk-run-portals` | run, walk, town portal Roumen↔Forest of Mist several times, link portal Roumen→Forest of Tides | login, wm, zone×6 | 1057 |
 
-The pcapngs hold only the game packets (saved as "displayed packets"): no SYN/ACK frames, one frame per packet.
+The pcapngs hold only the game packets (saved as "displayed packets"): no SYN/ACK frames. Several game packets often share one frame (one TCP segment, §2.1): idle_in_world holds 208 packets in
+114 frames, walk-run-portals 1 057 in 566, up to 67 packets in one frame.
 
 ## 2. Transport
 
@@ -47,7 +48,7 @@ check of P01 picks the same start index). S→C traffic is plaintext.
 |---|---|---|
 | Login | 9 connections, seeds 355–368: consecutive inside each capture (359, 360, 361 in login-errors; 365, 366 in idle_in_world), the gaps are connections between captures | **confirmed** and extended: `CLoginClientSessionManager` starts the counter at `rand()` after `srand(time)` (ctor @ FUN_00409680); `ActiveSession` (@ FUN_00409700) sets `m_ClientSeed = (m_ClientSeed + 1) % 499` for every accepted client; `Send_NC_MISC_SEED_ACK` (@ FUN_00409610) sends it |
 | WM | 264, 266–269, 271: +1 per connection | same scheme (`m_ClientSeed + 1` in the WM client session manager, wm-pdb decomp) |
-| Zone | per process: port 9210 → 1 (idle) and 3, 4, 5 (walk); 9212 → 1, 2; 9214 → 1 | **contradicted** README §1.4 and §2: the zone sends `0x0807` **on accept**, unprompted. `ZoneServer::zs_connect` (@ FUN_005aa840) registers the socket with IOCP and calls `ClientSession::Send_NC_MISC_SEED_ACK(session, seed)` (@ FUN_0045b120) with the seed returned by ShinePlayer vtable slot `0x2f4`. The client never sent `0x0806 NC_MISC_SEED_REQ` in any capture; `sp_NC_MISC_SEED_REQ` (@ FUN_00451a30) is only a re-request path. The small values (first connection of a process = 1) fit a per-process counter starting at 0 *(inferred)* |
+| Zone | per process: port 9210 → 1 (idle) and 3, 4, 5 (walk); 9212 → 1, 2; 9214 → 1 | **contradicted** README §1.4 and §2: the zone sends `0x0807` **on accept**, unprompted. `ZoneServer::zs_connect` (@ FUN_005aa840) registers the socket with IOCP and calls `ClientSession::Send_NC_MISC_SEED_ACK(session, seed)` (@ FUN_0045b120) with the seed returned by ShinePlayer vtable slot `0x2f4` = `ShinePlayer::so_EncSeedSet` @ FUN_0054f660: `seed = seed + 1; if seed >= pe_encryptlen (499): seed = 0` on the global `seed` (DAT_13282f60, used only there), which also sets the session's cipher position. Hence first connection of a process = 1, then consecutive: **confirms** Z18 §1.3 (accept path). The client never sent `0x0806 NC_MISC_SEED_REQ` in any capture; `sp_NC_MISC_SEED_REQ` (@ FUN_00451a30) with its own `newseed` counter (Z01 §5.1) is the path Z18 §1.3 / Z18-B2 mark dead |
 
 ### 2.4 Heartbeat *(captured)*
 
@@ -106,7 +107,7 @@ Differences from the documented order:
 | C→S | 0x0C04 | NC_USER_XTRAP_REQ | 9 | 30 | confirmed | order: after the login request (§3.1) |
 | S→C | 0x0C05 | NC_USER_XTRAP_ACK | 9 | 1 | confirmed | `bSuccess = 1` always (the key is not checked, L00-B5) |
 | S→C | 0x0C09 | NC_USER_LOGINFAIL_ACK | 1 | 2 | confirmed | `0x45` for a wrong password (`login-server.md` §5.1) |
-| S→C | 0x0C0A | NC_USER_LOGIN_ACK | 8 | 19 | confirmed | 1 world: `{0, "INITIO", 6}`. The name is ServerInfo.txt `WORLD_NAME 0, "INITIO"`; the tester saw "Enid", so the client shows its own name for world 0 *(inferred, client lookup not traced)* |
+| S→C | 0x0C0A | NC_USER_LOGIN_ACK | 8 | 19 | confirmed | 1 world: `{0, "INITIO", 6}`. The name is ServerInfo.txt `WORLD_NAME 0, "INITIO"`. The scenario notes say the tester saw "Enid", but neither `Fiesta.bin` (2016) nor its `TextData*.shn` contains that string, so the 2016 client cannot have shown it: unexplained (probably another client install or a slip in the notes); §10 |
 | C→S | 0x0C1B | NC_USER_WORLD_STATUS_REQ | 10 | 0 | confirmed | every 10 s on the world list |
 | S→C | 0x0C1C | NC_USER_WORLD_STATUS_ACK | 10 | 19 | confirmed | same body as 0x0C0A |
 | C→S | 0x0C0B | NC_USER_WORLDSELECT_REQ | 6 | 1 | confirmed | `world_no = 0` |
@@ -129,7 +130,7 @@ Differences from the documented order:
 
 ## 4. World manager
 
-Streams: 7 WM connections (login-logout 1, login-errors 2, create-char 1, idle_in_world 1, walk-run-portals 1), 155
+Streams: 6 WM connections (login-logout 1, login-errors 2, create-char 1, idle_in_world 1, walk-run-portals 1), 155
 packets, 42 (dir, opcode) types. Code references are W01-core (`docs/pseudocode/wm/W01-core.md`), W03-guild, W04-social-misc,
 W05-process; function names from the WM PDB (`re-data/exports/wm-pdb`).
 
@@ -141,7 +142,7 @@ the P02 entries for 0x1406 / 0x140C / 0x182A, 69 of the 155 WM packets decode fr
 
 ### 4.1 Message order *(captured)*
 
-World login (all 7 connections):
+World login (all 6 connections):
 
 ```
 S 0x0807 seed                       +0      (on accept, W01 §3.2)
@@ -161,18 +162,26 @@ S 0x7032, 0x7033, 0x7034            +53 ms after 0x1003, before the zone has ans
                                     (SendToClient_CharOptionData @ FUN_00431680, called by CharDB 0x1005 after 0x1003)
   zone: … S 0x1802 NC_MAP_LOGIN_ACK
 C 0x7004, 0x700C, 0x7C06            same client tick, 7 ms after 0x1802 (the client asks on NC_MAP_LOGIN_ACK, C01)
-S 0x7005, 0x700D (CharDB round trip, 20–75 ms), 0x7C07 (WM answers itself, 4-byte form)
+S 0x7005, 0x700D (CharDB round trip, 20–75 ms), 0x7C07 (4-byte form; the WM sends it in the 0x7C06 handler
+                                    without a DB round trip, W04, yet it left 73–74 ms after 0x7C06, in the same TCP
+                                    segment as 0x700D, before it in idle and after it in walk; cause open, §10)
   zone: C 0x1803 NC_MAP_LOGINCOMPLETE_CMD, and in the same client tick:
 C 0x581B NC_KQ_LIST_REFRESH_REQ
 S 0x581C, 0x581D ×3                 answer to 0x581B (first refresh of the session only, §4.3)
 S 0x1097, 0x1012, 0x9414, 0x5826, 0x10D9, 0x0849, 0x182A   zone 0x180C map login done (fc_NC_MAP_LINKEND_CMD @ FUN_0042d8d0)
 ```
 
-The order of the 0x180C burst is exactly the call order in `fc_NC_MAP_LINKEND_CMD`: `FriendRefresh` (nothing: no
+The packets of the 0x180C burst come in the call order of `fc_NC_MAP_LINKEND_CMD` (wm-pdb). Its first calls sent
+nothing here (no party, no raid): `RaidRefresh` / `IsInRaid`, `PartyRefresh` with `SendPartyMemberList`,
+`SendPartyItemLooting`, `SendPartyLogin` / `SendPartyLoginInfo`. Then `FriendRefresh` (nothing: no
 friends), `GuildRefresh` (0x1097 academy, then 0x1012 guild), `GuildEmblemRefresh`, `ChatRestrictRefresh` (nothing),
 `HolyPromiseFirstLogon` (0x9414), `GuildTournamentGoldRefundNotice`, `ChatBlockSpamFilterRefresh` (nothing),
 `CKQServer::Send_NC_KQ_JOINING_ALARM_LIST` (0x5826), `NewbieGuideViewListRefresh` (0x10D9), `SendWMTimeToClientFirst`
-(0x0849), `LinkEndProcessing`, then 0x182A. The 0x581B answer and the 0x180C burst race: in walk-run-portals the KQ
+(0x0849), on the first join only (`GetFirstJoinSendData`, then `SetFirstJoinSendData`)
+`CWMClientSession::Send_NC_CHAR_SUPPORT_REWARD_CMD` @ FUN_00433ab0 (zone `0x1120`, server-internal: abstate 728, §5.1)
+and `cEvent_Attendance::Send_NC_CHAR_EVENT_ATTENDANCE_LIST_DB_REQ` (to the CharDB), then `LinkEndProcessing`, 0x182A,
+`0x5425 {u16 points}` only when `GetDiffFriendPoint() != 0` (never in the captures; reset by `SetDiffFriendPoint(0)`)
+and the GameLog `0x040F` (0x2C bytes, server-internal). The 0x581B answer and the 0x180C burst race: in walk-run-portals the KQ
 list came first (9.784 s, burst 9.812–9.858 s), in idle_in_world after the burst (41.793–41.798 s, list 41.798 s).
 
 Map change (walk-run-portals, 5 changes): zone A `0x180A NC_MAP_LINKOTHER_CMD` → new zone stream (`0x0807`, `0x1801`)
@@ -214,11 +223,11 @@ found no old session.
 
 | Dir | Opcode | Name | Seen | Size | Status | Notes |
 |---|---|---|---|---|---|---|
-| S→C | 0x0807 | NC_MISC_SEED_ACK | 7 | 2 | confirmed | §2.3 |
-| C→S | 0x0C0F | NC_USER_LOGINWORLD_REQ | 7 | 320 | confirmed | `userId` = `"admin"` + 251 NUL; `validate[32]` = the 0x0C0C words unchanged (all 7) |
-| S→C | 0x0C14 | NC_USER_LOGINWORLD_ACK | 7 | 133 | confirmed | `worldmanager` handle, 1 AVATAR (0x82); see §4.3 for the handle sequence and the AVATAR fields |
+| S→C | 0x0807 | NC_MISC_SEED_ACK | 6 | 2 | confirmed | §2.3 |
+| C→S | 0x0C0F | NC_USER_LOGINWORLD_REQ | 6 | 320 | confirmed | `userId` = `"admin"` + 251 NUL; `validate[32]` = the 0x0C0C words unchanged (all 6) |
+| S→C | 0x0C14 | NC_USER_LOGINWORLD_ACK | 6 | 133 | confirmed | `worldmanager` handle, 1 AVATAR (0x82); see §4.3 for the handle sequence and the AVATAR fields |
 | C→S | 0x080D | NC_MISC_GAMETIME_REQ | 11 | 0 | confirmed | after every 0x0C14 and with every zone `0x1801` (map change) |
-| S→C | 0x080E | NC_MISC_GAMETIME_ACK | 11 | 3 | confirmed | `{hour, minute, second}` = server local time (UTC+1); equal to the capture clock to the second in all 11 |
+| S→C | 0x080E | NC_MISC_GAMETIME_ACK | 11 | 3 | confirmed | `{hour, minute, second}` = server local time (UTC+1); equal to the capture clock to the second in 9 of 11. In login-logout (09:50:33 against 09:50:34.019) and login-errors (09:56:57 against 09:56:58.019) it is one second behind, ~20 ms after a capture-clock second boundary: the capture PC and the server have separate clocks that differ by a few tens of ms (see also 0x0849, §4.3) |
 | S→C | 0x0804 | NC_MISC_HEARTBEAT_REQ | 13 | 0 | confirmed (W05 §1.5) | 30.0 s after the last client packet (create-char 1.516 → 31.521, idle 41.784 → 71.789) |
 | C→S | 0x0805 | NC_MISC_HEARTBEAT_ACK | 18 | 0 | confirmed + extended | 13 answers (+1..12 ms), 5 unsolicited during map loading (§4.4) |
 | C→S | 0x1401 | NC_AVATAR_CREATE_REQ | 1 | 25 | confirmed + extended | `{slot 1, name "CharCreateTest", shape 0x19, hair 1, colour 1, face 5}`; field meanings §4.3 |
@@ -295,7 +304,10 @@ Never seen on the WM (documented client-facing paths not exercised): `0x0C15` (b
   - Equipment: `equip[4]` = 1250 in all lists; `equip[9]` = 35740 and `equip[18]` = 30817 in five lists, `0xFFFF` in
     walk-run-portals (unequipped between captures); `upgrade` bytes `00 00 f0`.
 - **0x0849 timing**: the periodic sends carry `tm_sec = 0` every time (idle 10:10:00, 10:11:00; walk 10:16:00 …
-  10:19:00) and leave the WM 32–88 ms after the full second by the capture clock. W05 §2.2 *(inferred)* "the send second
+  10:19:00) and are captured between 4 ms before (idle 10:10:00 at 10:09:59.996) and 88 ms after the full second
+  (idle 10:11:00 +32 ms; walk +34, +64, +88, +68 ms). The capture PC's clock is not the server's (0x080E, §4.2: a few
+  tens of ms apart, either sign), so the captures only bound the send to the full second ± that offset plus the loop latency.
+  Of the 8 × 0x0849, 6 are periodic and 2 first-join copies. W05 §2.2 *(inferred)* "the send second
   drifts by the loop latency" is **corrected**: `m_NextSendWMTime` is computed from `_time32()` (whole seconds), so the
   sub-second latency of a pass is dropped at every send and the grid stays on the full minute; a drift needs a pass
   late by ≥ 1 s. The first-join copy carries the current second (`tm_sec 1`, `11`). The periodic copy also reaches a
@@ -354,7 +366,9 @@ C 0x2001 NC_ACT_CHAT_REQ "&adminlevel", C 0x200B NC_ACT_ENDOFTRADE_CMD ×3
 S the 0x1803 burst (+6..18 ms, one server tick), then the next tick (+11..16 ms later) the parameter refresh
 ```
 
-The 0x1803 burst, captured order (identical in all 7 apart from the counts) against `sp_NC_MAP_LOGINCOMPLETE_CMD`
+The 0x1803 burst, captured order (identical in all 7 apart from the counts; two streams carry other packets inside it:
+walk-run-portals zone#1 has the 0x302D answer to the first-login 0x302C after the 0x2011 notice, zone#6 has 6 × 0x2018
+mob moves between 0x1C09 and 0x242A, both from work of the same server tick) against `sp_NC_MAP_LOGINCOMPLETE_CMD`
 @ FUN_00443390 (Z01 §6), with the call that sends each packet:
 
 | # | Packet(s) | Sent by (FUN_00443390 call order) | Captured |
@@ -387,7 +401,8 @@ Newbie abstate: in walk-run-portals and idle_in_world the client gets `0x2429 + 
 one tick after the burst, before the refresh, on the first map login of the session only; on every later map login 728 is
 already on the character and comes with the `asl_SendAfterLogin` batch (0x242A). Source (resolved in part 5): 728 =
 AbState.shn `StaE_UserNewbie01` (0x2D8). The WM's 0x180C handler (`fc_NC_MAP_LINKEND_CMD` @ FUN_0042d8d0) calls
-`Session_SendSupportReward` @ FUN_00433ab0 on the first map login only (W04 §17.5), which sends zone `0x1120
+`CWMClientSession::Send_NC_CHAR_SUPPORT_REWARD_CMD` @ FUN_00433ab0 (W04's `Session_SendSupportReward`) on the first map
+login only (W04 §17.5), which sends zone `0x1120
 NC_CHAR_SUPPORT_REWARD_CMD {nCharNo, eUserType 2}`; the zone handler @ FUN_005a5c70 (Z07 §1.2) sets abstate 0x2D8.
 userType 2 = "newbie": account signed up less than `UserNewbie_DaysAfterSignUp` (21) days ago (W01 §3.3), which fits
 the test account. The 10 min matches SubStaE_UserNewbie01 (exp +3 %, 10 min; Z22 §7.3). **Confirms**
@@ -402,7 +417,7 @@ a 10-entry 0x1035 *(captured)*; 4.93–5.02 s in all 7 streams.
 
 | Dir | Opcode | Name | Seen | Size | Status | Notes |
 |---|---|---|---|---|---|---|
-| S→C | 0x0807 | NC_MISC_SEED_ACK | 7 | 2 | confirmed | per zone process consecutive (§5.1): **confirms** Z01 §5.1 (global counter); first connection after start = 1 |
+| S→C | 0x0807 | NC_MISC_SEED_ACK | 7 | 2 | confirmed | per zone process consecutive (§5.1): **confirms** Z18 §1.3 (`so_EncSeedSet` @ FUN_0054f660, global `seed` + 1 mod 499, §2.3; not Z01 §5.1's `newseed`, which is the dead 0x0806 path); first connection after start = 1 |
 | C→S | 0x1801 | NC_MAP_LOGIN_REQ | 7 | 1590 | confirmed | `{u16 wm_handle, char charid[20], Name8 checksum[49]}` = pdb2016 `PROTO_NC_MAP_LOGIN_REQ` (0x636); wm_handle 12500 / 17500 = the WM session handle (§4.3); 49 × 32 hex digits, identical in all 7 |
 | S→C | 0x1038 | NC_CHAR_CLIENT_BASE_CMD | 7 | 105 | confirmed | Z12 §6.2; chrregnum 2, Level 120, map/coords of the **new** map on every link, adminlevel 100, prisonmin 0 |
 | S→C | 0x1039 | NC_CHAR_CLIENT_SHAPE_CMD | 7 | 4 | confirmed | `AE 04 00 00`, same as AVATAR.shape (§4.3) |
@@ -412,7 +427,7 @@ a 10-entry 0x1035 *(captured)*; 4.93–5.02 s in all 7 streams.
 | S→C | 0x10D7 | NC_CHAR_CLIENT_QUEST_REPEAT_CMD | 7 | 6 | confirmed | 0 records |
 | S→C | 0x103D | NC_CHAR_CLIENT_SKILL_CMD | 7 | 298 | confirmed | restempow 60, PartMark 3, nMaxNum = number = 24, 24 × 12-byte records (skills 4000, 4001, 4020 …) |
 | S→C | 0x103E | NC_CHAR_CLIENT_PASSIVE_CMD | 7 | 8 | confirmed | 3 passives (200, 201, 218) |
-| S→C | 0x1047 | NC_CHAR_CLIENT_ITEM_CMD | 28 | 3–726 | confirmed | 4 per login: box 9 (27 items), 8 (3), 12 (2), 15 (0); flag bit 0 = 1 in all, bits 1–7 stale (0x65, 0x19, 0xFD, 0x25: **confirms** Z12 §6 "flag bits 1–7 left from earlier gpp use"); the empty action box 15 is still sent (single-packet path), the 3 inventory chunks of W01 §6.3 arrive as one packet (box 9). Decoder cannot parse the `PROTO_ITEMPACKET_INFORM[]` tail (P01) |
+| S→C | 0x1047 | NC_CHAR_CLIENT_ITEM_CMD | 28 | 3–726 | confirmed | 4 per login: box 9 (27 items), 8 (3 in idle_in_world, 1 = the weapon in walk-run-portals: 73 bytes), 12 (2), 15 (0); flag bit 0 = 1 in all, bits 1–7 stale (0x65, 0x19, 0xFD, 0x25: **confirms** Z12 §6 "flag bits 1–7 left from earlier gpp use"); the empty action box 15 is still sent (single-packet path), the 3 inventory chunks of W01 §6.3 arrive as one packet (box 9). Decoder cannot parse the `PROTO_ITEMPACKET_INFORM[]` tail (P01) |
 | S→C | 0x1049 | NC_CHAR_CLIENT_CHARTITLE_CMD | 7 | 22 | confirmed | Current 9/3, MobID 0, 8 titles × {u8, u8} (Z07 §1.3) |
 | S→C | 0x104A | NC_CHAR_CLIENT_CHARGEDBUFF_CMD | 7 | 16 | confirmed | 1 buff (id 12) |
 | S→C | 0x1048 | NC_CHAR_CLIENT_GAME_CMD | 7 | 4 | confirmed | partyno 0xFFFF, nRaidNo 0xFFFF |
@@ -501,8 +516,9 @@ Documented zone-login opcodes never seen: 0x1804 NC_MAP_LOGINFAIL_ACK (no failur
   P02-B3. Z04 §8.3's layout `{u8 itemcounter, PROTO_ITEMPACKET_INFORM[]}` is right otherwise; the client reads
   `itemcounter` records and ignores the byte *(inferred)*.
 - **0x1047 box order** is the zone's (`so_StoreInventoryFromServer`, one 0x1047 per box once the last inventory chunk is
-  in): 9 inventory, 8 equipment, 12 mini-house, 15 action box. Equipment records: slot 8 (35740), slot 10 (weapon 1250),
-  slot 25 (30817), matching the 0x1C02/0x1C05/0x1C03 of the burst.
+  in): 9 inventory, 8 equipment, 12 mini-house, 15 action box. Equipment records (idle_in_world): slot 8 (35740), slot 10
+  (weapon 1250), slot 25 (30817), matching the 0x1C02/0x1C05/0x1C03 of the burst; walk-run-portals: slot 10 (1250) only,
+  matching its lone 0x1C05.
 - **Blob spacing**: the client copies arrive in groups 40–50 ms apart (37, 82, 128, 178, 220, 266, 313, 360, 425 ms), not
   back-to-back as the WM sends them. *(inferred: TCP/Nagle on the zone→client link with the client's delayed ACK; the
   zone forwards each blob the moment its handler runs)*.
@@ -584,8 +600,10 @@ Tides (± the client/server position lag). **Confirms** Z09 §9.6 (the plain `Ma
 idle 41.97 / 42.01 s past the minute, walk zone#1/#3/#5/#6 the same second (42.02–42.14 s past the minute, on both
 9210 and 9214), so all zone processes share the phase *(the phase is probably the processes' common start second,
 inferred)*. The ten entries are flags 0x12–0x1B (free-stat WC … MaxSP), the ones `smo_NotifyParameterChange` always sends
-(Z12 §4.2) *(which call produces the second packet was not traced; candidates: the minute block's vt 0x34 and the
-charged-buff dirty flag `p+0xe94` on the next tick, Z09 §2.4)*.
+(Z12 §4.2). The two packets come from two code points: the per-minute block (Z09 §2.4) sets `p+0xe94 = 1`
+(`smo_Abstate.parameterchange`, pdb2016) and calls `smo_NotifyParameterChange(1)` (vt 0x34) itself (first packet); on
+the next tick `ShineMobileObject::so_Routine` @ FUN_0056a080 (Z09 §5.5) sees the dirty flag, recalculates and calls
+`smo_NotifyParameterChange(1)` again (second packet), then clears the flag.
 
 **Expiry of time-limited items** (idle_in_world 82.1 s, inside the per-minute check):
 
@@ -650,9 +668,14 @@ In-world instances of §5 opcodes: 0x1035 (per-minute pairs, expiry, §6.1), 0x2
   instead of `NpcDialogWin::OpenNpcNormalDialog`, and never sends 0x201D; the window sends 0x181A and then 0x200B.
   (Z02 §6.2 says "the client shows the NPC's dialog and answers 0x201D", which holds for other NPCMenu NPCs.)
 - **0x3C01 `npcPosition`** (6457, 10501) is neither the gate's NPC.txt position (6477, 10579) nor the client's last
-  stop (6456, 10525) *(probably the server-side player position, as Z02 §6.6 says the actor stores; not traced)*.
+  stop (6456, 10525): it is the player's server-side position. `NPCRole_Portal::nrb_Role` @ FUN_004c2ef0 calls
+  `ShinePlayer::sp_ServerMenuOpen` @ FUN_0054eaa0 with a NULL `SHINE_XY_TYPE*`, and `sp_ServerMenuOpen` then writes
+  `*(p+0x66)` (`so_LocateInfo.location`, pdb2016) into `npcPosition` (packet +0x85 / +0x89) and stores the same point as the
+  menu actor's origin for the `limitRange` 1000 check (Z02 §6.6). The server position lags the client's last stop.
 - **0x2402 for NPCs**: hp / maxhp 0, sp / maxsp 100, level 0 (the NPC's vt 0x4e8 / 0x4f0 / 0x4ec / 0x4f4 / 0x4d8;
-  Gate_Town has MobInfo Level 0, MaxHP 0) *(why SP is 100 not traced)*.
+  Gate_Town has MobInfo Level 0, MaxHP 0). The SP slots resolve to `ShineMob::so_GetSP` @ FUN_00556940 (`sm_SP`) and
+  `ShineMob::so_MaxSP` @ FUN_00556920 (`sm_MobDataBox->serv->MaxSP`), and MobInfoServer.shn has `MaxSP` 100 for
+  Gate_Town (191) and MapLinkGate (32): the 100 is table data.
 - **0x1C0E delivery**: the player received the deletes caused by its own moves (o = player, second send of
   `ali_Work`), so Z09-B13 (wrong first argument of `pcb_Append`) has no visible effect while the buffer is not full
   *(captured, consistent with Z09's inferred effect)*.
@@ -737,17 +760,16 @@ No discrepancy for Z03, Z05, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: e
 
 ## 10. Not reconstructed / uncertain
 
-- **Second per-minute 0x1035** (one tick after the first, flags 0x12–0x1B): the first is `smo_NotifyParameterChange(1)`
-  in the per-minute block (Z09 §2.4); the second is probably the charged-buff dirty flag `p+0xe94 = 1` handled on the
-  next tick *(inferred, not traced; start from the reader of ShinePlayer +0xe94 in `so_Routine`)*.
+- **0x0849 / 0x080E clock offset**: the capture PC and server clocks differ by a few tens of ms, sign varying between
+  captures (§4.2, §4.3); a capture with the server's own clock (or NTP on both) would pin the send to the second.
+- **0x7C07 timing** (§4.1): the short form is sent in the 0x7C06 handler, yet leaves 73–74 ms after 0x7C06 together with
+  the CharDB-backed 0x700D. W05 §1.4 gives one client packet per session per pass, but the passes do not sleep in
+  normal operation (W05-B1), so that alone does not explain 74 ms *(not traced: the WM send path, S02)*.
 - **Per-minute phase** (42 s past the minute on every zone process): likely the common start second of the processes
   *(inferred; a capture after restarting one zone would settle it)*.
-- **0x3C01 `npcPosition`** (6457, 10501): neither the gate's NPC.txt position nor the client's last stop; probably the
-  server-side player position Z02 §6.6 stores *(not traced)*.
-- **0x2402 for NPCs** reports sp / maxsp 100 with hp 0 and level 0 *(source of the 100 not traced: NPC vt 0x4ec / 0x4f4)*.
 - **Client `World::LoadMap` heartbeats** (§4.4): which of the 8 call points fire per map load *(not traced)*.
-- *(inferred)* items carried from parts 1–4: world name "INITIO" shown as "Enid" (client-side name for world 0, §3.2);
-  the 0x112C range broadcast excludes the sender (§5.1 #12); 0x2011 `unk` values are buffer leftovers (§5.2); the
+- **World name "Enid"** in the scenario notes (§3.2): not in the 2016 client or its texts; unexplained.
+- *(inferred)* items carried from parts 1–4: the 0x112C range broadcast excludes the sender (§5.1 #12); 0x2011 `unk` values are buffer leftovers (§5.2); the
   client ignores the 0x302D trailing byte (§5.3); AVATAR KQ fields keep the last saved position (§4.3).
 - **Not captured at all**: combat beyond targeting, chat (other than `&adminlevel`), item use / trade / shops, party,
   guild, KQ, failure paths (0x0C15, 0x1002, 0x1804, 0x0C66, …; lists in §3.2, §4.2, §5.2). Statuses there stay
@@ -764,12 +786,17 @@ struct names also match a unique nested `Outer::Inner`; inline element types `{u
 `name[i].member` fields is read as the element layout; a struct whose first field is `datasize` takes 1 + datasize
 bytes per element (`PROTO_ITEMPACKET_INFORM`). `USEITEM_MINIMON_INFO` (pdb2016) is in `annotations/P02.json` `structs`.
 After the fix the five captures decode with one warning left (0x7C07 short form, below); `--selftest` passes.
+Review (part 6): `--out` creates its directory; `--selftest` now also covers every form above, `client_dir` and a
+seed before the first client packet of a stream without SYN. `tools/protocol-re/packets.py` renders the `evidence`
+block of `annotations/P02.json` as a **Captured** line under each packet of `packets-<server>.md` (all 92 entries), and
+lists the four without a generated section (WM 0x1012, 0x1097; zone 0x0C18, 0x1C08) at the end of the page.
 
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
 | 0x7C07 4-byte short form: the decoder warns "sReason needs 16 bytes" | W04 §9.2 (done; documents both forms) | the layout is right; `annotations/W04.json` has one entry for two sizes and sorts after P02.json, so P02 cannot override it; harmless warning |
-| README §2 / §1.4 / §1.5 rewrite | X01 (plan: "Corrections between items", "contradictions") | README's owner P01 is done; the corrected flows are in §7 and the knowledge Corrections table |
+| README §2 / §1.4 / §1.5 rewrite, Unknowns line "whether the zone also sends the seed unprompted" | **P04** (new, added by P02: `docs/plan/items/P04.md`) | README's owners P01 and L00 are done and X01 may write only `docs/pseudocode/README.md`; P04 corrects the README from §2 / §7 and the knowledge Corrections rows |
 | corrections to done items' pseudocode (§9) | X01 (same line) | P02 must not edit other items' output; X01 collects knowledge-file corrections |
 | opcodes and paths never captured (§10 last bullet) | X02 (plan: "write targeted capture scenarios"), then P02 again | needs new captures; P02 is recurring per batch |
-| second per-minute 0x1035, 0x3C01 `npcPosition`, NPC sp 100, LoadMap heartbeat points (§10) | X02 (plan: "adversarially re-check load-bearing claims … write targeted capture scenarios") | none changes a layout or an order; each needs either a targeted capture or a code read of a done item's subsystem (Z09 §2.4, Z02 §6.6, client C01) that X02's re-check covers |
-| WM `Session_SendSupportReward` @ FUN_00433ab0 → zone 0x1120 @ FUN_005a5c70 (abstate 728) | W04 §17.5, Z07 §1.2 (both done, both document it) | resolved and confirmed in §5.1; nothing left to document |
+| per-minute phase, clock offset, 0x7C07 timing, LoadMap heartbeat points (§10) | X02 (plan: "adversarially re-check load-bearing claims … write targeted capture scenarios") | none changes a layout or an order; each needs a targeted capture (zone restart, synced clocks, map loads with markers) |
+| second per-minute 0x1035, 0x3C01 `npcPosition`, NPC sp 100 | resolved here (review): §6.1 (0x1035), §6.3 | the second 0x1035 = the `so_Routine` dirty-flag pass after the per-minute block sets `p+0xe94` (`smo_Abstate.parameterchange`, Z09 §2.4 / §5.5, §6.1) |
+| WM `CWMClientSession::Send_NC_CHAR_SUPPORT_REWARD_CMD` @ FUN_00433ab0 → zone 0x1120 @ FUN_005a5c70 (abstate 728) | W04 §17.5, Z07 §1.2 (both done, both document it) | resolved and confirmed in §5.1; nothing left to document |
