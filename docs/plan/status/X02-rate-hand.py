@@ -82,3 +82,20 @@ OVERRIDE.update({
     ('K:C01', 'ZoneLoginNetFrameWork'): ('high', 'dispatch table: 18 of 24 opcodes captured (the character-load burst)', ''),
     ('K:C01', 'LinkFrameWork'): ('high', 'dispatch table: 15 of 22 opcodes captured (map links)', ''),
 })
+
+# ---- part 4: after the re-check of confidence.md §3.2 ----------------------------------------------------------
+OVERRIDE.update({
+    ('K:Z01', '3'): ('high', 're-checked (§3.2.2 H1–H3): every range bound re-read in sohu_HandleSplit FUN_00633650, all 13 '
+                     'object sizes are the class sizes of the 2016 Zone.pdb', ''),
+    ('K:Z01', '4'): ('medium', 're-checked (§3.2.3): all 36 offsets are 2016 PDB members; 2 meanings corrected (+0x29638 = '
+                     'character title, +0x2a800 = sp_isPossibleNewConnect, cleared by 0x0806 / 0x1801 only), 1 refined '
+                     '(+0x1c00 = total, not base); read with docs/knowledge/X02.md §0', 'capture of a field per member '
+                     '(0x1038 login burst for basedata)'),
+    ('K:Z01', '6'): ('medium', 're-checked (§3.2.1): lookup pattern confirmed with counts over 307 handlers; the "PDB offset '
+                     '= 2016 − 6" rule corrected (211 structs carry the header as a member) and "starts with" narrowed '
+                     '(R2–R4, R6); read with docs/knowledge/X02.md §0', 'a captured DB→zone answer per header form'),
+    ('K:Z03', '2'): ('medium', 're-checked (§3.2.4): every offset is a 2016 PDB member; names of 4 smo_Flag bits, the '
+                     'EngageArgument fields and the abstate element +0x70 corrected, stat matrix and battle statistics '
+                     'superseded by Z12 §1.1 / Z16 §3.1; read with docs/knowledge/X02.md §0', 'combat capture with an '
+                     'abstate set and removed by walking (aeo_MiscData reset condition)'),
+})

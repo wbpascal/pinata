@@ -10,7 +10,7 @@ finds go to `docs/knowledge/X02.md` §0; the capture scenarios that follow from 
 |---|---|---|
 | 1 | Error classes: what went wrong so far, with counts | done (part 1) |
 | 2 | Rating of every pseudocode section and knowledge struct table | done (parts 2–3) |
-| 3 | Adversarial re-check of the load-bearing claims | open (parts 4–7) |
+| 3 | Adversarial re-check of the load-bearing claims | §3.2 done (part 4); §3.3–§3.5 open (parts 5–7) |
 | 4 | Coverage gaps of items finished without a review part | open (part 10) |
 
 ## 1. Error classes
@@ -145,9 +145,10 @@ absence means "not re-read by anyone", not "confirmed": P02 lists what the captu
 ## 2. Ratings per document
 
 State: done. 45 pseudocode documents (2 031 headings: 78 high, 1 427 medium, 227 low, 299 not rated) and 52
-knowledge files (272 headings: 12 high, 199 medium, 29 low, 32 not rated); hand passes over Login, WM, the shared
-library and the DB servers (part 2), the zone documents and the knowledge files (part 3): 52 hand rows. The ratings
-are the input of §3; §3 and new captures change them (re-run the generator).
+knowledge files (272 headings: 13 high, 200 medium, 27 low, 32 not rated); hand passes over Login, WM, the shared
+library and the DB servers (part 2), the zone documents and the knowledge files (part 3), and 4 rows set by the
+re-check of §3.2 (part 4: `Z01.md` §3 → high, §4 and §6 low → medium, `Z03.md` §2 stays medium): 56 hand rows. The
+ratings are the input of §3; §3 and new captures change them (re-run the generator).
 
 ### 2.1 Method
 
@@ -346,9 +347,9 @@ Knowledge files (`docs/knowledge/`):
 | `W03.md` | W03 | 2 | 0 | 1 | 1 | 0 | 0 |
 | `W04.md` | W04 | 3 | 0 | 1 | 1 | 1 | 0 |
 | `W05.md` | W05 | 3 | 0 | 2 | 0 | 1 | 0 |
-| `Z01.md` | Z01 | 9 | 0 | 4 | 4 | 1 | 0 |
+| `Z01.md` | Z01 | 9 | 1 | 5 | 2 | 1 | 3 |
 | `Z02.md` | Z02 | 4 | 0 | 2 | 1 | 1 | 0 |
-| `Z03.md` | Z03 | 3 | 0 | 1 | 0 | 2 | 0 |
+| `Z03.md` | Z03 | 3 | 0 | 1 | 0 | 2 | 1 |
 | `Z04.md` | Z04 | 6 | 0 | 4 | 1 | 1 | 0 |
 | `Z05.md` | Z05 | 4 | 0 | 2 | 1 | 1 | 0 |
 | `Z06.md` | Z06 | 3 | 0 | 0 | 3 | 0 | 0 |
@@ -392,7 +393,7 @@ Knowledge files (`docs/knowledge/`):
 | `P03.md` | P03 | 5 | 0 | 5 | 0 | 0 | 0 |
 | `X01.md` | X01 | 4 | 0 | 4 | 0 | 0 | 0 |
 | `X03.md` | X03 | 19 | 0 | 15 | 0 | 4 | 0 |
-| **total** | | 272 | 12 | 199 | 29 | 32 | 6 |
+| **total** | | 272 | 13 | 200 | 27 | 32 | 10 |
 
 ### 2.4 L00: `login-server.md`
 
@@ -2702,10 +2703,10 @@ Knowledge files (`docs/knowledge/`):
 |---|---|---|---|
 | 1. Names (read this first) | medium | cap 0/4 | capture (class U) |
 | 2. Object class hierarchy (RTTI) | **low** | no function cited; pre-S01 prose without a function | cite and re-read the function |
-| 3. Object handles | medium | cap 0/1 | capture 0x202C |
-| 4. ShinePlayer members (offsets from the object start) | **low** | cap 4/11; pdb 0/1; weak inf3; 1 PDB member(s) at another offset (nested or wrong: `X02-rate.py pdbmiss`) | code or capture for the marked statements; check the offsets with `pdb.py`; capture 0x10C6, 0x181F, 0x7C05 |
+| 3. Object handles | **high** | re-checked (§3.2.2 H1–H3): every range bound re-read in sohu_HandleSplit FUN_00633650, all 13 object sizes are the class sizes of the 2016 Zone.pdb (hand; baseline: medium) |  |
+| 4. ShinePlayer members (offsets from the object start) | medium | re-checked (§3.2.3): all 36 offsets are 2016 PDB members; 2 meanings corrected (+0x29638 = character title, +0x2a800 = sp_isPossibleNewConnect, cleared by 0x0806 / 0x1801 only), 1 refined (+0x1c00 = total, not base); read with docs/knowledge/X02.md §0 (hand; baseline: low) | capture of a field per member (0x1038 login burst for basedata) |
 | 5. Globals | medium | cap 2/2 | capture (class U) |
-| 6. Conventions for reading zone handlers | **low** | no function cited; pre-S01 prose without a function; weak p171 | cite and re-read the function |
+| 6. Conventions for reading zone handlers | medium | re-checked (§3.2.1): lookup pattern confirmed with counts over 307 handlers; the "PDB offset = 2016 − 6" rule corrected (211 structs carry the header as a member) and "starts with" narrowed (R2–R4, R6); read with docs/knowledge/X02.md §0 (hand; baseline: low) | a captured DB→zone answer per header form |
 | 7. Startup | **low** | no function cited; pre-S01 prose without a function | cite and re-read the function |
 | 8. Open questions for other items | – | open points / boundary list, no claim to rate |  |
 | SHN loader check = DataVersionKey (C02 follow-up) | medium | read in code | second reading / client check |
@@ -2724,7 +2725,7 @@ Knowledge files (`docs/knowledge/`):
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
 | 1. Answers to open questions | – | open points / boundary list, no claim to rate |  |
-| 2. Shared mechanisms | medium | cap 2/8; pdb 0/10; 10 PDB member(s) at another offset (nested or wrong: `X02-rate.py pdbmiss`) | check the offsets with `pdb.py`; capture 0x1C18, 0x2427, 0x2428, 0x2429 … |
+| 2. Shared mechanisms | medium | re-checked (§3.2.4): every offset is a 2016 PDB member; names of 4 smo_Flag bits, the EngageArgument fields and the abstate element +0x70 corrected, stat matrix and battle statistics superseded by Z12 §1.1 / Z16 §3.1; read with docs/knowledge/X02.md §0 (hand; baseline: medium) | combat capture with an abstate set and removed by walking (aeo_MiscData reset condition) |
 | 3. Open questions for other items | – | open points / boundary list, no claim to rate |  |
 
 ### 2.58 Z04 knowledge: `docs/knowledge/Z04.md`
@@ -3186,7 +3187,145 @@ Knowledge files (`docs/knowledge/`):
 
 ## 3. Adversarial re-check
 
-Open (parts 4–7).
+State: §3.1–§3.2 (part 4) done. Parts 5–7 add §3.3 (ITEMDB order, zone ↔ WM hand-over), §3.4 (low client-facing zone
+packets) and §3.5 (low client-facing Login / WM packets, remaining class B / R / O hits).
+
+### 3.1 Method
+
+Each row is one claim that other items build on. For each, the function was re-read with
+`clean.py re-data/exports/zone-pdb - <addr>` and the claim was attacked from the side its author did not use: the
+2016 `Zone.pdb` type (`pdb.py … types`), the vtable slot's real target (`rtti.py`: slot → address → PDB name), every
+writer and reader of the member (a search of `zone-pdb/decomp.c` for the member name), and counts over all handlers
+of a session class instead of the two or three the author read. Verdicts:
+
+- **confirmed**: the attack failed; the evidence is named.
+- **refined**: the statement holds, but its name or its scope was wrong in a way that misleads a reader.
+- **corrected**: the statement is false; the correct one follows with `@ FUN_…`. Every corrected and refined row is
+  also in `docs/knowledge/X02.md` §0 for X01 and the owners.
+- **superseded**: a later item already recorded the correction (named); not repeated in `X02.md`.
+- **open**: static reading cannot settle it; it goes to a capture scenario (part 8).
+
+All names in this section are from the 2016 `Zone.pdb` *(pdb2016)* unless marked as ours.
+
+### 3.2 Part 4: the `ref` header, object handles, player members, Z03's shared mechanisms
+
+Result: 53 rows (each one line or one group of lines of the source): 34 confirmed, 8 refined, 7 corrected,
+4 superseded, 0 open. No new original-server bug.
+
+#### 3.2.1 The 6-byte `ref` header (`docs/knowledge/Z01.md` §6, `docs/knowledge/C02.md` §3)
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| R1 | the prefix is `NETPACKETZONEHEADER { u16 clienthandle; u32 charregistnumber }`, 6 bytes *(pdb2017)* (Z01 §6) | confirmed | same struct, size 6, in the 2016 `Zone.pdb` and `WorldManager.pdb`: no longer *(pdb2017)* |
+| R2 | "2017 `PROTO_*` structs mostly omit it, so a PDB offset = 2016 − 6" (Z01 §6, C02 §3) | **corrected** | The header is a **member** of 188 `PROTO_NC_*` structs of the 2016 `Zone.pdb` and 29 of `WorldManager.pdb` (211 different structs; first member in 178 / 23). All 197 of them that exist in the 2017 PDB carry it there too, at the same place. For these structs no offset shifts. The "− 6" rule holds only for the opcodes whose struct has **no** `NETPACKETZONEHEADER` member although the wire has one: the 81 server ↔ server opcodes of C02 §4 "same after the 6-byte header" (for example 0x3411 / 0x3414 / 0x3423 / 0x3428 / 0x3429, wire = header + struct *(captured)*, `docs/knowledge/P02.md` row S01). Rule for a reader: look for the member in the struct first; shift by 6 only when it is absent and the 2016 length says so |
+| R3 | the header is always the first field (Z01 §6 "start with") | **corrected** | Not always. In 16 of the 211 structs it sits later: after a `u16` error or count (`PROTO_NC_DICE_TAISAI_DB_*`, 9 structs at +2 / +4 / +6), after the 3-byte raw frame header of the `…_SEND` wrappers (+3: `PROTO_NC_CHAR_ZONE_CHARDATAFAIL_ACK_SEND`, `PROTO_NC_USER_KICKOFFFROMWORLD_CMD_SEND`), or at the end of the ping-test bodies (+0x2e / +0x56: `PROTO_NC_MISC_PINGTEST_CLIENT_ZONE_DB`, `…_TOOL_WM_CLIENT_ZONE_DB`) |
+| R4 | "WM→zone and DB→zone messages about a player start with the 6-byte `ref`" (Z01 §6) | refined | True for most, not all. Some answers about a player carry only a `u16` handle and no character number: `PROTO_NC_PET_SET_NAME_DB_ACK { u16 nError; u16 nMasterHandle; u32 nPetRegNum }` (8 bytes, no header), read as `som_GetObject(pkt+4)` by `GameDBSession::gds_NC_PET_SET_NAME_DB_ACK` @ FUN_004d1250. A handler's first lookup tells which form it is |
+| R5 | "handlers look the player up with `som_GetObject(ref.objHandle)` and usually compare `charNo` and `IsClosing`" (Z01 §6) | confirmed, with numbers | Counted over every `GameDBSession::gds_NC_*` and `WorldManagerSession::wms_NC_*` function: DB 186 handlers, 163 call `som_GetObject`, of those 147 compare vt 0x344 (`so_GetCharRegistNumber`), 108 test vt 0x300, 102 do both, **10 neither**; WM 121 handlers, 41 call it, 30 / 34 / 27, **4 neither**. The zone-ring handlers (`ZoneListenSession`, 24) never test vt 0x300 (9 look up, 9 compare the number). The 14 "neither" handlers are listed under §3.2.6 |
+| R6 | "zone-wide messages fill it with `{0xFFFF, -1}`" (Z01 §6) | refined | Also used in a per-player message: `ShinePlayer::so_RefreshWMSSocket` @ FUN_00552190 sends WM 0x0C31 as `{ header = {0xFFFF, 0xFFFFFFFF}, +6 u16 wmHandle (vt 0x340), +8 u32 charNo (vt 0x344) }`, 14 bytes with the opcode. `{0xFFFF, -1}` means "no zone object to answer to", not "zone-wide" |
+| R7 | handlers get `packet` pointing at the opcode; payload offset 0 = `packet + 2` (Z01 §6) | confirmed | `gds_NC_HOLY_PROMISE_DB_WITHDRAW_CEN_REWARD_ACK` @ FUN_00484040 reads the handle at `param_1[1]` (`NETCOMMAND` is 2 bytes); FUN_004d1250 reads +4 = payload +2, the `nMasterHandle` of its struct |
+| R8 | `vt[0x300]` = "IsClosing (also true when the session is closing)" (Z01 §4, §6) | refined | Official name `ShinePlayer::so_IsEmpty` @ FUN_00559880: `sp_WillDisconnect != 0`, or the session object's vt 0xc returns 0. "IsClosing" is our name |
+
+#### 3.2.2 Object handles and classes (`docs/knowledge/Z01.md` §2–§3)
+
+| # | Claim | Verdict | Evidence |
+|---|---|---|---|
+| H1 | the 13 handle ranges and type codes of §3 | confirmed | every bound re-read in `ShineObjectHandleUnion::sohu_HandleSplit` @ FUN_00633650 (Z01: `ObjectHandle_Decode`, our name): 8000, 0x251c, 0x2904, 0x34bc, 0x42bc, 0x43bc, 0x4bbc, 0x4fa4, 0x509e, 0x5486, 0x567a, 0x5a62, then 0x5c56…0x6231 for type 12; the subtracted bases give pool index = handle − range start |
+| H2 | the table has no hole | refined | handles 23138–23637 (after the movers, before the pets) decode to type 0xFF / index 0xFFFF. The table shows the jump but does not say so |
+| H3 | the object sizes of §3 (0x2568, 0x2c058, 0xd100, 0x28b, 0x188, 0x256c, 0x266c, 0x1d3, 0x1c8, 0x1f14, 0x2598, 0x202c, 0x25d4) | confirmed | all 13 are the class sizes in the 2016 `Zone.pdb` (`ShineMob`, `ShinePlayer`, `ShineMiniHouse`, `ShineDropItem`, `ShineAxialFlag`, `ShineNPC`, `ShineBandit`, `ShineEffectObject`, `ShineMagicField`, `ShineDoor`, `ShineServant`, `ShineMover`, `ShinePet`) |
+| H4 | `vt[0x4d0]` = object type (Z01 §4, Z03 §1) | confirmed | the `ShinePlayer` slot points at FUN_005551b0, `return 2`. The PDB names it `ShineObject::so_GetKQTeamType`: the linker folded identical bodies, the name belongs to another function with the same code *(inferred)*. Used as the type test (`!= 2` → "Not Player Handle", `!= 12` → "Not Pet Handle") in FUN_004d1250. Do not take the PDB name of this slot |
+
+#### 3.2.3 `ShinePlayer` members (`docs/knowledge/Z01.md` §4, 36 lines)
+
+Checked line by line against the 2016 class layout (`docs/knowledge/S01-player-offsets.tsv`) and, where the accessor
+is named, against the vtable slot's function.
+
+| # | Line | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| M1 | +0x04 handle, +0x66 → position, +0x6a → direction, +0x76 → layer, +0x7a → FieldMap | confirmed | `so_handle.sohu_Handle`, `so_LocateInfo.location` / `.direct` (pointers; `so_datasync` @ FUN_00559790 dereferences both), `so_layer.layer`, `so_Field` |
+| M2 | +0xe9c ptr → u8 mode, `vt[0x484]` | confirmed | `smo_Mode { u8 tempmode; u8 *mode }` at +0xe98; `smo_GetMode` @ FUN_00549800 returns `*smo_Mode.mode` |
+| M3 | +0x1c00 "base move speed" | refined | `smo_Param.Total.MoveSpeed`: the **total** layer (15) of stat 19, not a base value (layers: Z12 §1.1) |
+| M4 | +0x5cb8 flags: 0x02 linking out, 0x04 set by vt 0x4b4, 0x08 hide-except-me | confirmed, named | `sp_MiscFlag`: bit 1 `JustLink` (set only in `so_LinkTo` @ FUN_0049ad30), bit 2 `DataRecieve` (set in `so_StoreCharData` @ FUN_0055ab60 = vt 0x4b4), bit 3 `SoloingMode` (set by `sp_NC_MISC_HIDE_EXCEPT_ME_ON_CMD` @ FUN_0043e880, cleared by `…_OFF_CMD` @ FUN_00441940, `sp_NC_MAP_LOGINCOMPLETE_CMD` @ FUN_00443390 and `sp_ReviveNow` @ FUN_0057d290). Not in Z01: bit 0 `JustRevive` (set by `sp_ReviveReqProcess` @ FUN_00451bd0, read by `so_SaveLocation` @ FUN_004542f0), bits 4 / 5 `AccountStorage_opened` / `AStorageAnywhere_opened`, bit 6 `LinkReserv_link` (cleared in `so_Routine` @ FUN_0056c790), bit 7 `InAdminImmortal` |
+| M5 | +0x5e10 → ClientSession (`vt[0xa70]`), +0x7e28 / +0x7e2c send objects (`vt[0x2fc]` / `vt[0x2f8]`) | confirmed | `sp_SocketSession`; `sp_SocketContainer.gamestream` ← `so_GetGameSocketStream` @ FUN_00559870, `.datastream` ← `so_GetDataSocketStream` @ FUN_00559860 |
+| M6 | +0x7f32 ptr → character block | confirmed, named | `sp_CharBriefInfo.bic_BriefInfo` (pointer into the brief-info packet buffer `bic_pack` at +0x7e34) |
+| M7 | +0x7f39 userNo, +0x7f3d charNo, +0x7f41 name[20], +0x7f57 exp, +0x7f67 HP, +0x7f77 money, +0x7f7f map[12], +0x7f9f prison minutes | confirmed | `sp_CharData.usrregnum`, then `sp_CharData.toclient.basedata.{chrregnum, charid, Experience, CurHP, Cen, logininfo.currentmap, prisonmin}`; the two *(inferred)* marks (exp, money) can go (also Z07 §0). `+0x7f7f` is the **current** map of the login info, "savedMap" is our name |
+| M8 | +0x7f8b "position/direction snapshot", `vt[0x4c0]` | confirmed, named | `basedata.logininfo.currentcoord { xy, dir }`, written by `so_datasync` @ FUN_00559790 from the live position and direction |
+| M9 | +0x7fa1 u8, `vt[0x4d4]`, "0x10C6 at login" | confirmed, named | `basedata.adminlevel`; `so_AdministratorLevel` @ FUN_00559740 |
+| M10 | +0x8e2c inventory, +0xfaa8 InventoryLocking (`vt[0x7d4]`) | confirmed | `sp_Item.itembag.ci_Inventory`, `sp_Item.invenlocklist` (`so_ply_GetInventoryLockList` @ FUN_0055a1d0); lock index `icl_Index` at +0xfaac |
+| M11 | +0x17d5f trade partner, +0x17d7c last clicked NPC handle | confirmed | `sp_tradeboard.tb_opposit`, `sp_NPCProcess.npchandle` |
+| M12 | +0x2931c wmHandle (`vt[0x340]`), +0x29620 opcode 0x203E, +0x2a7d4 connectFrom, +0x2a798 logout time, +0x2aa54 chat block until, +0x2ab44 tutorial info, +0x2ab49 requestedName[20] | confirmed | `sp_extra.pecd_worldmanagerhandle`, `sp_SpeedNotice.sn_NetCommand`, `sp_ConnectFrom`, `sp_NormalLogoutTick`, `sp_Spammer_ChatBan`, `sp_TutorialInfo.nTutorialState`, `sp_LoginCharID` |
+| M13 | **+0x29638 "class/shape block", `vt[0x420]` (+0x488, +0x489, +0x48a)** | **corrected** | `sp_CharacterTitle`, a `CCharacterTitleZone` (0xcd0 bytes); vt 0x420 = `so_GetCharacterTitle` @ FUN_0055a1b0 returns its address. +0x488 / +0x489 are the current title's type and element (`CHARTITLE_BRIEFINFO`, Z12 §6.9, Z08 §7.2). It has nothing to do with class or shape (those are `sp_CharData.toclient.shape` at +0x7fa6). Later items use the right name (Z07 §1.3, Z18); still wrong in Z01 §4, in Z02-actions §3.1 / §3.2 (the calls FUN_005cc2a0 and FUN_005cc2d0 on `p+0x29638`, described as "class/shape block" hooks, are title counters) and in Z04-items §2.1 (`p.vt[0x420]` → FUN_005cc020, "quest/collection hook (inferred)", is a title hook) |
+| M14 | **+0x2a800 "flag set by 0x0C32, cleared at the start of every handler", `vt[0x330]`** | **corrected** | `sp_isPossibleNewConnect`; vt 0x330 = `so_SetPossibleNewConnect(v)` @ FUN_00549420. It is cleared in exactly two handlers, the first two packets of a new client connection: `sp_NC_MISC_SEED_REQ` 0x0806 @ FUN_00451a30 and `sp_NC_MAP_LOGIN_REQ` 0x1801 @ FUN_00452590 (plus the constructor). It is set to 1 by three callers: `sp_NC_USER_USE_BEAUTY_SHOP_CMD` 0x0C32 @ FUN_005520d0, `so_ply_ToNormalLoc` @ FUN_00552350 and `GameDBSession::gds_NC_ITEMDB_CLASS_CHANGE_ACK` @ FUN_00469590. Its one reader (vt 0x334 `so_GetPossibleNewConnect` @ FUN_0055a5c0) is `so_RefreshWMSSocket` @ FUN_00552190 (vt 0x338): only when the flag is 1 does it send WM 0x0C31 (R6). Meaning: "this player is about to reconnect to a zone; tell the WM to expect it" *(inferred from the three setters, each followed by a client reconnect)*. Z01-core §9 ("every handler clears it on entry") and the open point in its §12 are wrong the same way |
+| M15 | +0x2a944 u8 closing, `vt[0x300]` | confirmed | `sp_WillDisconnect`; see R8 |
+| M16 | +0x2aa40 next save time, `vt[0xac0](now, 600)` = now + 6000 | confirmed | `tAutoSaveTime`; `so_SetAutoSaveTime(t, n)` @ FUN_005608c0 stores `t + n * 10` |
+| M17 | "important vtable slots" list (0x2ec, 0x308, 0x338, 0x33c, 0x4d8, 0x57c, 0x5f8, 0x5fc, 0x600, 0x664, 0x784, 0x890, 0xa24) | confirmed | each slot resolves to the function of that name; two differ in prefix only: 0x338 is `so_RefreshWMSSocket` (its profiler string says `sp_…`), 0x784 is `so_ply_Notice` @ FUN_005977e0 (Z01: "send a system chat line") |
+
+#### 3.2.4 Z03's shared mechanisms (`docs/knowledge/Z03.md` §1–§2, Z03-combat §1, §4.2, §6.1)
+
+| # | Claim | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| C1 | flag byte `obj+0x1e78`: bit 2 Fear, bit 3 killed, bit 5 Captivate | confirmed | `smo_Flag`: bit 2 `InFear`, bit 3 `DeadProcessComplete`, bit 5 `InCaptivate` |
+| C2 | bit 0 "routine ran" | superseded | `Retrate` (README §5.5, Z09 §2.2) |
+| C3 | bit 1 "alternate (ranged) damage path", bit 4 "skill blast armed", bit 6 "ignore-cooldown", bit 7 "generic switch (vt 0xbf0)" | **corrected** (names and two meanings) | bit 1 `DuringFlying`, bit 4 `InSkillShift`, bit 6 `ChineCast`, bit 7 `DamageAbsorb` (vt 0xbf0 = `smo_SetFlagDamageAbsorb(v)` @ FUN_005558d0). Bit 7 is the damage-absorb switch of the shield actors, not a generic one; bit 1 marks an object in flight. Later items use the official names (Z22, Z23, Z25; `DuringFlying` in Z09); Z03 §6.6 and `Z03.md` §1 still carry ours |
+| C4 | `smo_SetCaptivate` = FUN_0055d570, vt 0xf1c | refined | FUN_0055d570 is the `ShineMobileObject` body (calls vt 0xa48, then sets bit 5). The **player's** slot 0xf1c is the override `ShinePlayer::smo_SetCaptivate` @ FUN_00564e50: it calls the base and, when switched on, allocates `m_pCaptivateAI` (a 0x324-byte `MobActionArgument` with the `targetting` actor and the player's own target selector), freed when switched off. A captivated player is driven by mob AI; Z11 §8.5 documents this for `&captivate`, Z03 §6.6 does not |
+| C5 | stat matrix `param[layer*0xcc + stat*4]`, 51 stats, "≥ 16 layers", layer names "1 item, 5/6 upgrade, 8 weapon title …" | superseded | `Parameter::Container` = exactly 16 `Parameter::Cluster` layers of 51 `int`; the layer and field names of Z03 are replaced by Z12 §1.1 (PDB members; `+0xcd0` = `MissPercentFix`, `+0xcdc` = `PassiveCriDamageRatePlus`, in addition to the rows of README §5.5) |
+| C6 | rule set at `obj+0x1e74` | confirmed | `smo_RulesOfNormalAttack` (`RulesOfEngagement *`): the pointer is the **normal-attack** rule set; a skill's rule set comes from its `SkillEntry +0x70` (same § of Z03) |
+| C7 | `hpchangeorder` = `++(u16 obj+0x1d78)` via vt 0x7e8 | confirmed | `smo_HPChangeOrder`; `so_mobile_GetHPChangeOrder` @ FUN_00555890 pre-increments and returns it. The "getter" changes state: every call consumes a number |
+| C8 | `+0x1d7c` dead flag (vt 0x28), cast state at `+0x1d84` (end time, skill id, target, xy, SkillEntry, produce recipe) | confirmed | `smo_BattleObject { u8 alreadydead; i32 damagereserve }`; `smo_SkillCast` = `SkillCastStruct` (0x2c): `scs_BlastTime`, `scs_Skill`, `scs_BattleSkill` (+8), `scs_ProduceSkill { sklidx, prdidx }` (+0x14), `scs_UseItem` (+0x1c), `scs_Empower` (+0x28), `scs_AttackCode` (+0x2a). Not in Z03: `damagereserve` and the use-item cast |
+| C9 | `player+0x7f37` deferred cast error, `player+0x7f36` cease-fire flag | confirmed | `sp_SkillFinish.scf_ErrorType` (u16), `sp_CeaseFireSender.cfs_Flag` |
+| C10 | `player+0x2a784` one-shot `TimeScheduler`, `player+0x173d0` delayed-hit queue | confirmed | `sp_TimerStr.ts_Limit`, `sp_NormalAttackDamageTick.nadt_DamageTime` |
+| C11 | battle statistics vt 0x428: "+4 kills-exp, +8 damage dealt/taken, +0x1c deaths×50, +0x20/+0x24 PvP deaths/kills, +0x28 PvP rating" | superseded | `BattleStat` (0x2c) per KQ joiner, one shared static for everything else; fields and every writer in Z16 §3.1 (`bs_KillScore`, `bs_DamageAmount` (dealt only), `bs_HealAmount` (never written), `bs_SkillBlast`, `bs_KnockDownNum` += 50 per death). Z03's table omits +0xc / +0x10 and that outside a KQ all objects write one object (`so_GetBattleStat` @ FUN_00498d60) |
+| C12 | `CharaterSkillList` at `player+0x17d0c` (entry +4 cooldown end, +8 empower bits) vs Z23's +0x17d08 | confirmed (both) | the object `sp_SkillList` starts at +0x17d08; +0x17d0c is its vector's first-element pointer `csl_Skill._Myfirst`, which the code reads directly. Entry layout: Z23 knowledge (0x14 bytes) |
+| C13 | inventory lock index at `player+0xfaac`, locks in `player+0xfaa8` | confirmed | M10 |
+| C14 | `BattleContext` (Z03 §4.2), our name, 0x2c bytes | confirmed, named, three fields corrected | `EngageArgument` (0x2c): `att`, `def`, `sklinfo`, **+0x0c `SKILL_EMPOWER empower`** (Z03: "reserved"), +0x0e `actionnumber`, +0x0f `attackcode`, +0x10 `iscritical`, +0x11 `ismiss`, +0x12 `isdead`, +0x13 `isshieldblock`, +0x14 `isresist`, **+0x15 `isDamege2Heal`** (missing in Z03), +0x16 `isImmune`, +0x18 `attackloc`, +0x1c `damagerate`, +0x20 `crirateadd`, **+0x24 `MultiHitArgument *pMultiHitArg`** (Z03: "ptr"), +0x28 `nBMPDamageRate` (Z03: "AP rate") |
+| C15 | `AbStateEntry` (Z03 §6.1): +0 AbState row, +4 save-type row, +8 resist slot, +0xc + strength·0x24 blocks, strength 1…39 | confirmed, named | `AbnormalStateDictionary::AbState::AbStateStr` (0x5ac): `index`, `pSaveTypeInfo`, `int *debuffresist`, `AbStateStrArgument subabstate[40]` (0x24 each: `assa_info`, `assa_Effect[4] { SubAbstateAction action; int value }`). The array has 40 entries (index 0 exists). `debuffresist` is typed as a pointer; Z03 reads it as a byte offset into the parameter block: not re-read here, see Z22 |
+| C16 | `AbstateElementInObject` 0x74 bytes; +0 flags, +4 index, +8 setter object, +0xc setter charNo, +0x10 level, +0x14 attack power, +0x18 strength, +0x1c set time, +0x20 end time, +0x24 next tick, +0x28 interval, +0x58 / +0x5c origin xy | confirmed | `aeo_Flag { f_Cured, f_Dispeled, f_SystemRemove }`, `aeo_Index`, `aeo_Caster { obj, chrregnum, nLevel, nAttackPower }`, `aeo_Strength`, `aeo_Tick { start, terminate, Metronome nextaction { m_NextTick, m_TickInterval } }`, `AbsSetData.CenterLoc` |
+| C17 | element "+0x54 actor private value" | refined | `int aeo_RestCount` |
+| C18 | **element "+0x70 skill id that set it"** | **corrected** | `MiscDataTable::MiscData_AbState *aeo_MiscData`, set in `aeo_Set` @ FUN_0040a340: the state's row of the misc-data table `{ u16 mdas_AbStateID; mdas_ResetCondition { run, walk, attack, attacked … }; mdas_ResetEquipment { eqwhere, eqclass } }`. `aeo_Run` @ FUN_004a41c0, `aeo_Walk` @ FUN_004a4230, `aeo_Attack` @ FUN_004a42a0, `aeo_Attacked` @ FUN_004a4310 and `aeo_ItemChange` @ FUN_004a4380 test it: it decides which player action removes the state. No skill id is stored in the element |
+| C19 | element fields not in Z03 | refined | +0x2c `aeo_PartyEnchant[5] { ABSTATEINDEX soul; AbStateStr *skillindex }` (the five `PartyState` links of the AbState row), +0x60 `SetItemData::SetItemAbstateEffect aeo_SetItemEffect` (0x10; Z21 §5) |
+| C20 | element list "at obj+0x1cc+0xcb0, 296 slots" | superseded | `AbstateListInObject { asl_Element[28]; List asl_List }` (0xcc8): 28 states per object (README §5.5, Z18 §3.2). `obj+0xe7c` is the list head, `obj+0xe94` = `smo_Abstate.parameterchange` (the recalculation request of Z03 §6.1: confirmed) |
+| C21 | vt 0x3e4 "HasAbstate" FUN_00555a20, vt 0x638 set, vt 0x650 reset, vt 0x430 "GetParam", vt 0xef0 → `so_DamagedBy` (0x5c0) / `so_KilledBy` (0x5bc), vt 0xed8 `smo_BashStop`, vt 0xbf8 | confirmed, named | `so_AbnormalState_IsSet`, `ShinePlayer::so_AbnormalState_Set` @ FUN_004162d0, `ShinePlayer::so_AbnormalState_Reset` @ FUN_00559ef0, `so_parameter` @ FUN_00555720, `smo_AttackedDamage` @ FUN_0042aeb0, `ShinePlayer::so_DamagedBy` @ FUN_00431500, `ShinePlayer::so_KilledBy` @ FUN_00433be0, `ShinePlayer::smo_BashStop` @ FUN_0042e840, `so_ply_PassiveSetAbstate` @ FUN_005798e0 (0xbf8: superseded, README §5.5) |
+
+#### 3.2.5 Candidates noted in part 3
+
+| # | Candidate | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| P1 | Z04-items §3.2: "class 36 PUP (minimon) and `p+0xaad8*4` in 1..8 (a minimon is summoned, inferred)" | **corrected** | `ItemBreaker::ib_OK` @ FUN_0048d0d0 tests `sp_PetInfo.nSummonState` (+0x2ab60) for `PSST_CASTING (1) … PSST_LINKING_RESUMMON (8)`, that is "not `PSST_NONE`": a **pet** is being summoned, is out, or is being put away (enum `ShinePlayer::PetSummonStateType`: 0 NONE, 1 CASTING, 2 CASTED, 3 WAIT_CREATING, 4 WAIT_1ST_LOADING, 5 1ST_SUMMONED, 6 RESUMMONED, 7 UNSUMMONNING, 8 LINKING_RESUMMON). `ITEMCLASS_PUP = 36` is the pet item class; the refusal is the pet packet 0xD411 `NC_PET_USE_ITEM_FAIL_ACK`. The minimon (auto-potion) state is another member, `sp_UseItemMinimon` at +0x2abec. `docs/knowledge/S01.md` §3.3 ("pet summon state") was right |
+| P2 | `Z03.md` +0x17d0c vs `Z23.md` +0x17d08 | confirmed (both) | C12 |
+| P3 | `X02-rate.py pdbmiss` lines of `K:Z01` and `K:Z03` (11 lines) | confirmed | all are members named next to another, correct, offset of the same line (`+0x7e28 / +0x7e2c`, `+0xfaac … +0xfaa8`, `+0x7f37 … +0x7f36`): no wrong offset among them |
+
+#### 3.2.6 What the re-check adds for later parts
+
+- **Handlers that trust the handle alone** (R5; no character-number and no `so_IsEmpty` test in the handler itself):
+  DB `gds_NC_HOLY_PROMISE_DB_GET_CEN_REWARD_ACK` @ FUN_00483d10, `…_WITHDRAW_CEN_REWARD_ACK` @ FUN_00484040,
+  `gds_NC_MISC_PINGTEST_CLIENT_ZONE_DB` @ FUN_00550fc0, `…_TOOL_WM_CLIENT_ZONE_DB` @ FUN_00551130,
+  `gds_NC_CHARSAVE_DB_UI_STATE_SAVE_ACK` @ FUN_00551360, `gds_NC_CHAR_REGNUM_VARIFICATION_ACK` @ FUN_00551a80,
+  `gds_NC_MINIHOUSE_DB_PORTAL_LIST_ACK` @ FUN_0056ed60, `…_PORTAL_ADD_ACK` @ FUN_0056eef0, `…_PORTAL_DEL_ACK`
+  @ FUN_0056f080, `…_VISITER_COUNT_ACK` @ FUN_0056f1f0; WM `wms_NC_CHAR_TUTORIAL_INFO_ZONE_CMD` @ FUN_0044d3d0,
+  `wms_NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_ACK` @ FUN_00478be0, `wms_NC_INSTANCE_DUNGEON_LEVEL_SELECT_CHECK_ACK`
+  @ FUN_00485540, `…_JOIN_ACK` @ FUN_00485b90. The count is a text test on the handler body: a handler that forwards
+  to a virtual which then checks is in this list too. Read so far: FUN_00484040 forwards to vt 0x9d4
+  (`so_ply_HolyPromiseWithdrawCenReward` @ FUN_00484100) with no check, which is the recorded bug Z08-B14 (the money
+  goes to whoever holds the handle now). The other 13 are checked in part 6 (same pattern, same risk).
+- **Error classes seen** (for §1's counts, not added to them): N (our name wrong or misleading) 9: R8, M3, M13, C3,
+  C4, C14, C17, C18, P1; B / R (a "every" or "always" that is two call sites) 2: M14, R6; P (a 2017-PDB rule taken
+  as general) 2: R2, R3; S 0: **no offset in `Z01.md` §4 or `Z03.md` §2 is wrong**; the errors are all in what the
+  member means. This matches §1: an offset read from code is reliable, the label next to it is not.
+- **PDB names of folded functions** (H4): a slot whose PDB name does not fit the use (`so_GetKQTeamType` for the
+  type getter) is an identical-code fold. Read the body, not the name.
+- **Ratings changed by this part** (hand rows in §2.2): `Z01.md` §3 → high, §4 and §6 → medium, `Z03.md` §2 → medium
+  with the corrected rows named.
+
+### 3.3 Part 5: ITEMDB message order, zone ↔ WM hand-over
+
+Open (part 5).
+
+### 3.4 Part 6: low ratings in client-facing zone packets
+
+Open (part 6).
+
+### 3.5 Part 7: low ratings in client-facing Login / WM packets; remaining class B, R, O hits
+
+Open (part 7).
 
 ## 4. Coverage gaps of items without a review part
 
