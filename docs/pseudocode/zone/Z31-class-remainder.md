@@ -24,7 +24,7 @@ and the bucket rules are in `docs/plan/status/Z31.md` and `docs/plan/status/Z31-
 | 3 | inventory lock list, cell stacks, inventories and item boxes, item attribute classes | 137 / 2 862 |
 | 4 | the other `ShinePlayer` members | 127 / 1 954 |
 | 5 | `ShineObject`, `ShineMobileObject` and the other object classes | 138 / 1 731 |
-| 6 | abstate containers, character classes, mob AI, rules of engagement, use effects | ≈ 1 800 |
+| 6 | abstate containers, character classes, mob AI, rules of engagement, use effects | 109 / 1 774 |
 | 7 | table templates (`BinaryDataBox<…>`, `ITableBase<…>`, `IIDTableBase<…>`, `SHND::CommonData<…>`, `Table`) | ≈ 4 100 |
 | 8 | the other data loaders and SHN / text parsers | ≈ 2 200 |
 | 9 | NPC roles, merchants, booths, guild, events, kingdom quest, Lua glue | 111 / 2 822 |
@@ -819,15 +819,14 @@ They fill one part of the save packets of `ws_save2DB` FUN_00455a10, `ws_save2wo
 
 ```pseudo
 ShinePlayer::smo_ply_NormalAttackFactor(p) → per-mille          @ FUN_0042f910   (vt 0xf3c)
-    p.smo_CharClass (+0xfbc).cc_ClassType (class vt 0x48) == 21 (Joker line):
+    p.smo_CharClass (+0xfbc).cc_BaseClass (class vt 0x48) == 21 (Joker line):
         sp_MultiHitNotIndex == 3 ? 400 : 300
     else 1000
 ```
 `smo_SwingDamage` FUN_00432f30 multiplies the swing damage by this rate (Z03 §3.2 "attacker's total damage rate").
 Trickster-line normal hits are multi-hits, and each part carries 30 % (the last one 40 %) *(inferred from the counter
-name)*. CharClass vt 0x48 returns the **first class of the line**: 1 Fighter … Knight, 6 Cleric … Guardian, 11 Archer
-… Ranger, 16 Mage … Wizard, 21 Joker … Assassin, 26 Sentinel / Savior (see `docs/knowledge/Z31.md` §0 for Z12's name of
-it).
+name)*. CharClass vt 0x48 `cc_BaseClass` returns the **first class of the line**: 1 Fighter … Knight, 6 Cleric … Guardian, 11 Archer
+… Ranger, 16 Mage … Wizard, 21 Joker … Assassin, 26 Sentinel / Savior (all class slots: §6.2).
 
 ```pseudo
 ShinePlayer::so_ply_JobChangeDamageUp(p, ShineObject* target, int dmg) → dmg   @ FUN_00560e80   (vt 0xd2c)
@@ -1319,6 +1318,270 @@ slots that a class does not implement. Read them by body, not by name:
 | FUN_00408d30 | `ShineObject::so_smo_CanEnchant` | false | non-mobile 0xa6c |
 | FUN_005af8d0 / FUN_00556ff0 | `so_Gamble_IsGambleHouse` / `so_MoverSystem_GetMoverSlot` | 1 / 10 | drop item 0x4d0 (type 1) / servant 0x4d0 (type 10) |
 
+## 6. Abstate containers, character classes, attack rhythm, rules of engagement, mob AI objects, use effects
+
+The 109 functions of this part. Most are small virtual members, folded stubs and destructors; this section gives
+each one its slot, its callers and its body. The subsystems they belong to are documented elsewhere: abnormal states
+in Z03 §6 and Z22, character classes and stats in Z12, rules of engagement in Z03 §4, mob AI in Z09 §5-§8, use
+effects in Z04 §6.3.
+
+### 6.1 Abnormal-state containers
+
+```pseudo
+AbnormalStateContainer::AbstateListInObject::asl_CanEnchant(list, ABSTATEINDEX idx, int strength) → bool   @ FUN_0040bf50
+    e = asl_Abstate_IsSet(list, idx)
+    if e ≠ null: return strength >= e.aeo_Strength          # the same state is on: only an equal or stronger grade may replace it
+    as = dic_abstate.as_StateIndexList[idx]                 # idx ≥ 792 (0x318): assert "AbState::as_FromIndex : Invalid skill idx", as = null (then crashes)
+    sub = as.subabstate[strength].assa_info                 # the SubAbState.shn row of (idx, strength)
+    if sub.Type == SUBAB_DEFAULT: return true
+    x = first element of the list whose ident (abstateidentarray[x.aeo_Index], 12 bytes: +8 u16 Type, +10 u16 SubType)
+        has the same Type and SubType;  none: return true
+    r = SubAbstatePriority::PriorityBase::bp_AbStateChange(&subabpriority.pc_Base,
+            x's row (abstateidentarray[x.aeo_Index].strength[x.aeo_Strength]), &as.subabstate[strength])
+    return r ∈ { SAP_NORELATION 0, SAP_SUBSCRIPT 1 }          # SAP_VANISH 2 (the new state would be wiped by the old one): refuse
+```
+
+Callers: `ShineMobileObject::so_smo_CanEnchant` FUN_0040dba0 (vt 0xa6c, §5.4), which `ShinePlayer::sp_AbstateCheck`
+FUN_00408be0 calls before a buff skill; a `false` there is error 0xFD4 "upper level effect are used already"
+(Z03 §5.2, 0x2440). This is the dry-run twin of the priority test inside `asl_AbstateSet` (Z03 §6).
+
+| Function | Body | Callers |
+|---|---|---|
+| `AbnormalStateDictionary::SubAbState::SubAbState` FUN_00416b50 | `BinaryDataBox<SubAbStateInfo>`; default row `sas_DefAbstate` = the box's `bdb_defaultblock` zeroed (0x4f bytes), `ID` 0xFFFF, `Type` SUBAB_DEFAULT, every action SAA_NONE 0 and argument 0 (`ActionIndexA` is set twice and `B` stays from the memset, also 0) | the `dic_abstate` start-up constructor |
+| `AbnormalStateDictionary::AbState::~AbState` FUN_00416de0 | `delete as_AbstateArray` | `dic_abstate` atexit |
+| `AbstateElementInObject::ase_Terminate` FUN_00401200 | `aeo_Tick.terminate = clockwatch.cw_CurrTick`: the element expires at the next tick of `asl_Routine` | `DispelAttrTypeEffect::_execute` FUN_005d05f0 (Z17 §2.6, dispel by `DispelIndex`) |
+| `AbnormalStateElement::~AbnormalStateElement` FUN_00401490, `AbnormalStateTickRoutine::~…` FUN_004014b0, `ASE_Tick::~ASE_Tick` FUN_00401b10, `ListIteratorAbstateEquip::~…` FUN_004027f0 | reset the vftable (the tick routine also runs the empty `astr_Tick` destructor, the folded FUN_00417480) | compiler-generated: the element / actor destructors and the unwind funclets (1 863 and 377 references are the folded bodies being shared) |
+| `sasa_IndexString` of `SubAbnormalStateMaxHP` FUN_004015f0, `…Fear` FUN_00401600 (shared by two actor classes), `…Captivate` FUN_00401610, `…ActerTimeAttack` FUN_004016f0, `…DamageMinus` FUN_004017b0, `…RangeDamageMinusAtk` FUN_00401810 | return "MaxHP", "Fear", "Captivate", "TimeAttack", "DamageMinusRate", "DamageMinusAtk" | actor vt 0x00 (Z22 §1.2 table: the other classes' strings), for the abstate log only |
+
+### 6.2 Character classes (`CharClass`, 29 classes)
+
+Each player and mob holds a pointer to one static class object (`smo_CharClass` +0xfbc, `so_CharacterClass` vt
+0x49c). `CharClassManager` owns the 29 objects (`ccm_classdefault`, `ccm_classfighter` … `ccm_classsavior`,
+`ccm_classmob`); its destructor FUN_0044a130 runs `CharClass::~CharClass` FUN_004497b0 (vftable reset +
+`OptionReader::~OptionReader`, the `ChrCommon` parser base) on each, in reverse order. Slots 0x20-0x34 are Z12 §3.1.
+The PDB's folded stubs carry several names each; the slot meaning below follows the classes that override a slot
+with a unique body (e.g. `CharClassHighCleric` +0x38 = `HighCleric::cc_ClassType`, +0x44 = `HighCleric::cc_PromoteClass`).
+
+| Slot | Member | Body |
+|---|---|---|
+| 0x38 | `cc_ClassType` | own class id (table below); base `CharClass` 0 |
+| 0x3c | `cc_AttackRhythm` | `&attrhythm_melee` (FUN_004496b0); archer line `&attrhythm_range` (FUN_00449840); mob `&attrhythm_mob` (FUN_004496e0); §6.3 |
+| 0x40 | `cc_JustAfterSkill(mo)` | no-op FUN_00549070; mage line FUN_00449900: `mo.smo_BashStop()` (vt 0xed8): a mage's auto-attack stops after a skill |
+| 0x44 | `cc_PromoteClass` | the next class of the line; the two last classes and Warrior / Paladin / Scout / Enchanter / Cruel return their own id (they branch) |
+| 0x48 | `cc_BaseClass` | first class of the line: 1, 6, 11, 16, 21, 26; base and mob 0 |
+| 0x4c | `cc_NormalHitDelay_AfterSkill` | 3 (FUN_00556e40); archer line 0 (FUN_00570b00) |
+| 0x50 | `cc_CanNormalAttack(o)` | FUN_004496c0: `not o.so_mobile_DuringFlying()` (vt 0x7c0); archer line FUN_00500380 `true` |
+| 0x54 | `cc_IsDescendantsOf(id)` | true when `id` is a strict ancestor (table); base `false` (FUN_00615e70) |
+
+| id | Class | Promote | Base | `cc_IsDescendantsOf` true for | Function |
+|---|---|---|---|---|---|
+| 0 | `CharClass` (default) | 0 | 0 | – | |
+| 1 / 2 / 3 | Fighter / CleverFighter / Warrior | 2 / 3 / 3 | 1 | – / 1 / 1, 2 | FUN_00449710, FUN_00449720 |
+| 4 / 5 | Gladiator / Knight | own | 1 | 1, 2, 3 | FUN_00449750 (shared) |
+| 6 / 7 / 8 | Cleric / HighCleric / Paladin | 7 / 8 / 8 | 6 | – / 6 / 6, 7 | FUN_004497a0, FUN_004497c0 |
+| 9 / 10 | HolyKnight / Guardian | own | 6 | 6, 7, 8 | FUN_004497f0 |
+| 11 / 12 / 13 | Archer / HawkArcher / Scout | 12 / 13 / 13 | 11 | – / 11 / 11, 12 | FUN_00449850, FUN_00449870 |
+| 14 / 15 | SharpShooter / Ranger | own | 11 | 11, 12, 13 | FUN_004498b0 |
+| 16 / 17 / 18 | Mage / WizMage / Enchanter | 17 / 18 / 18 | 16 | – / 16 / 16, 17 | FUN_00449920, FUN_00449930 |
+| 19 / 20 | Warrock / Wizard | own | 16 | 16, 17, 18 | FUN_00449960 |
+| 21 / 22 / 23 | Joker / Chaser / Cruel | 22 / 23 / 23 | 21 | – / 21 / 21, 22 | FUN_004499b0, FUN_004499d0 |
+| 24 / 25 | Closer / Assassin | own | 21 | 21, 22, 23 | FUN_00449a00 |
+| 26 / 27 | Sentinel / Savior | 27 / 27 | 26 | – / 26 | FUN_00449a40 |
+| 28 | `CharClassMob` | 0 | 0 | – | |
+
+The `mov eax, n; ret` stubs of slots 0x38 / 0x44 / 0x48 (FUN_00557bb0 1, FUN_00647230 2, FUN_00556e40 3, FUN_00449740 4,
+FUN_0063e3a0 5, FUN_00449780 6, FUN_00449790 7, FUN_0063e3d0 8, FUN_0063e3f0 9, FUN_004497e0 10, FUN_00449820 11,
+FUN_00449830 12, FUN_00449860 13, FUN_00449890 14, FUN_004498a0 15, FUN_004498e0 16, FUN_004498f0 17, FUN_0063e420 18,
+FUN_00449950 19, FUN_00449990 20, FUN_0063e440 21, FUN_004499a0 22, FUN_004499c0 23, FUN_004499f0 24, FUN_0063e430 25,
+FUN_0063e470 26, FUN_00449a30 27, FUN_0063e4a0 28; FUN_00570b00 0) are shared with unrelated slots of the same value
+(e.g. the attribute classes' `iac_ItemClass` vt 0x28, §3.5): `n` is all they do.
+
+Slot callers (scan of every function that reads `+0xfbc` / vt 0x49c): vt 0x40 `ShinePlayer::so_Routine` FUN_0056c790
+and `smo_SkillResultPacket` FUN_0057a630; vt 0x44 `so_ply_FirstJobChange` FUN_0049fa70 (Z15); vt 0x48 twelve
+(`smo_SwingStart`, `smo_ply_NormalAttackFactor` §4.4, `sp_Schedule_SwingStart`, `so_AttackRange` §4.4, the reinforce
+removes, `so_ply_CheckCharType`, `sp_GetItemWhoEquip_ClassGroup`, `sp_ThirdPromote`, `CharClassValidator::check`, the
+Lua `cGetBaseClass`, `AxialListFindNearPlayer::ali_Work`); vt 0x50 `sp_Schedule_SwingStart` FUN_00430bc0 (Z03 §3.2);
+vt 0x54 `NPCAction::ClassCondition::check` FUN_005c26e0 (Z09 §16.4). vt 0x4c: no call through it was found.
+
+### 6.3 Attack rhythm: the swing animation number (`AttackRhythm`)
+
+`smo_AttackRhythm` (`ShineMobileObject` +0x1d70) is an `AttackRhythm::CharArgument` `{ AttackRhythmBase*
+ca_attrhythm, u8 ca_group (+4), u8 ca_point (+5) }`. `so_mob_RegenComplete` FUN_004424f0, `sp_NC_MAP_LOGINCOMPLETE_CMD`
+FUN_00443390 and `so_smv_SummonMover` FUN_0055fdf0 set `ca_attrhythm = class.cc_AttackRhythm()` (vt 0x3c) and
+group = point = 0. Three static rhythm objects with three slots each:
+
+```pseudo
+slot 0 arb_Next(arg, int baseClass)     # smo_SwingStart FUN_0042f3f0 after each 0x2447, with class.cc_BaseClass() (0 without class)
+slot 4 arb_ActionNumber(arg) → int      # smo_SwingStart: byte actioncode of 0x2447 NC_BAT_SWING_START_CMD (Z03 §3.2)
+slot 8 arb_NextBash(arg, int interval)  # ShinePlayer::smo_ply_NextBashTime FUN_0055ac90 with sp_BashControl.bashinterval (§2.7)
+
+AttackRhythm_Melee (attrhythm_melee, 0x74d680: vftable + arm_table[12][3] preset in .data)
+    arb_Next  @ FUN_00427c70:  ++ca_point; if ca_point > 2:
+                                   ca_point = 0
+                                   ca_group = baseClass == 21 (Joker line) ? rand 0..5 : rand 0..11     # rndbox.rb_box[6] / [12]
+    arb_ActionNumber @ FUN_00427cd0:  arm_table[ca_group > 11 ? 0 : ca_group][ca_point]
+    arb_NextBash     @ FUN_00427d00:  ca_group ≥ 6 and ca_point ≠ 0 ? interval × 1180 >> 17 (≈ interval × 0.9 / 100)
+                                                                    : interval × 10 / 1000
+    arm_table rows: 0 {0,1,2}  1 {0,2,1}  2 {1,0,2}  3 {1,2,0}  4 {2,1,0}  5 {2,0,1}  6-11 {3,4,5}
+AttackRhythm_Range (attrhythm_range; archer line)
+    arb_Next  @ FUN_00427d50:  ca_point = (ca_point + 1) & 2            # from 0 this stays 0 (original bug) Z31-B8
+    arb_ActionNumber @ FUN_00427d70:  ca_point
+    arb_NextBash = AttackRhythmBase::arb_NextBash @ FUN_00427c10:  interval × 10 / 1000
+AttackRhythm_Mob (attrhythm_mob; CharClassMob)
+    arb_Next = empty fold FUN_00509900; arb_ActionNumber = `return 0` fold FUN_004a9c90; arb_NextBash = FUN_00427c10
+```
+
+So melee classes swing in cycles of three animations: a random permutation of 0, 1, 2, or (in half of the cycles,
+never for the Joker line) the combo 3, 4, 5, whose second and third swings come 10 % sooner. Ranged swings always
+send animation 0, and mobs always 0. `AttackRhythmBase` itself has no instance (its slots 0 / 4 are the pure-call
+stub FUN_006583ea).
+
+### 6.4 Rules of engagement: base slots, damage immunity, `EngNormAtt` / `EngSklAtt`
+
+The rule-set objects (`roe_normalPY`, `roe_normalMA`, `roe_physical`, `roe_magical`, `roe_cure`, `roe_always`,
+`roe_alwaysCritical`, `roe_alwaysHealAttack`) and their slots are Z03 §4.2. The base `RulesOfEngagement` has no
+instance; its bodies are reached only through the classes that keep them:
+
+```pseudo
+RulesOfEngagement::roe_HitRate(ctx) → ‰   (vt 0x18; only RuleOfEngagementHealAttack keeps it)        @ FUN_004ffb50
+    if this.vt[0x14](ctx) (shield block rate; 0 for HealAttack) > rand(1000): ctx.isshieldblock = 1; return 0
+    f = def.so_parameter().MissPercentFix (+0xcd0)
+    f == 0: return 1000           (log " Shield Fail")
+    f ≤ 1000: return 1000 − f;    else return 0
+    # roe_alwaysHealAttack is used only for vt 0x20 / 0x1c inside smo_SkillBlast (Z25 §2.5), so this body is never run
+
+RulesOfEngagementNormalPY::roe_IsDamageImmune(ctx) → bool  (vt 0x38; NormalPY, PhisycalSkill, AlwaysCritical)  @ FUN_005043e0
+    ctx.def == null: return true
+    return rand(1000) < def.so_parameter().PhysicalImmuneRate (+0xda4)       # SAA_ACSHIELDRATE (Z12 §2.5)
+RulesOfEngagementNormalMA::roe_IsDamageImmune(ctx)  (vt 0x38; NormalMA, MagicalSkill)                 @ FUN_005044e0
+    same with MagicalImmuneRate (+0xda6)                                    # SAA_MRSHIELDRATE
+RulesOfEngagement::roe_IsDamageImmune(ctx) = false  (vt 0x38; base, CureSkill, AlwaysHit, HealAttack) @ FUN_00504390
+    # caller: roe_CalcDamage (Z03 §4.5: immune → ctx.isImmune = 1, damage 0)
+```
+
+Other base bodies: `roe_ShieldBlock` FUN_004ffd90 `return 0.0` (fills 38 slots of the base, NormalMA, MagicalSkill,
+CureSkill, AlwaysHit, HealAttack vftables: every "rate" those classes do not define is 0), `roe_CriticalStunRate`
+FUN_00500170 = 200 (vt 0x00 of all but AlwaysCritical), `roe_IsDamageSkill` FUN_004ff840 = `ctx.sklinfo ?
+sdi_ServInf.UsualAttack : 0` (vt 0x20), `roe_Damage(ctx, a, b)` FUN_00500510 (vt 0x10 of the base family: `max(1, nBMPDamageRate × a / 1000) ×
+(att.so_GetLevel() + 1) / b`, with BalanceLog output; *(inferred: a = attack, b = defence)*), and FUN_004ffda0 `return 1000.0` (AlwaysHit /
+CureSkill hit rate and evasion slots, AlwaysCritical critical slots; Z11 §6.4 `&allcritical`).
+
+`EngNormAtt` (`engnormatt`) and `EngSklAtt` (`engsklatt`) are an older damage model with fixed results:
+
+```pseudo
+EngNormAtt::ena_physichitrate(a, d, flag) = 500 + ena_LH(|Δ|) × (a.so_GetLevel() − d.so_GetLevel())   @ FUN_004fc440   (slots 0 / 4)
+EngNormAtt::ena_LH(n) = 30                                                                                @ FUN_004fc430   (slot 0x10)
+EngNormAtt::ena_physicdamage = 1                                                                           @ FUN_004fc490   (slots 8 / 0xc)
+EngNormAtt::ena_attack(a, d, flag, u8* crit)   (slot 0x14)                                                 @ FUN_004fc4a0
+    if slot0(a, d, flag) < rand(1000): return 0
+    dmg = slot8(a, d, flag)                                   # 1
+    rand 0..9 == 0: *crit = 1; return 2 × dmg;  else *crit = 0; return dmg
+EngSklAtt::ena_attack(a, d, flag, crit)   (slot 0x14)                                                      @ FUN_00500450
+    flag.efm_sklinfo == null: assert "EngSklAtt::ena_attack : Null skill info"; return 0
+    if not sdi_ServInf.UsualAttack: return 0
+    dmg = (esa_physicaldamage + esa_masicaldamage) × DmgIncRate / 1000 + DmgIncValue;  1 in 10: ×2, *crit = 1
+EngSklAtt::esa_physicaldamage(a, d, flag)                                                                   @ FUN_004fc530
+    PsySucRate ≠ 0: hit = rand(1000) ≤ PsySucRate
+    else SkilPyHitRate == 0: return 0;  else hit = slot0(a, d, flag) ≥ rand(1000) and rand(1000) ≤ SkilPyHitRate
+    hit: return MinWC + (MaxWC − MinWC < 100 ? rand 0..(MaxWC − MinWC) : 0) + slot8(…)
+EngSklAtt::esa_masicaldamage(a, d, flag)                                                                    @ FUN_004fc630
+    same rolls with MagSucRate / SkilMaHitRate, then advances the random box of MaxMA − MinMA and returns only slot 0xc (1):
+    MinMA and the spread are dropped (original bug) Z31-B9
+```
+
+`EngNormAtt::ena_attack` is called only by the dead `ShineMobileObject::so_attack` FUN_0042cab0 (Z09 §7.8).
+`engsklatt` is referenced only by its initializer and atexit destructor: `EngSklAtt` is dead.
+
+### 6.5 Mob AI objects
+
+**The kill-credit list 0x244C** (`MobTargetBout::mts_SlayerList` FUN_004bd630, selector vt 0x30; the builder Z03 §11
+left open). `ShineMob::so_KilledBy` FUN_00432760, when the mob's `MobInfoServer.BroadAtDead` is set:
+
+```pseudo
+    Send to WM 0x244C NC_BAT_MOBSLAYER_CMD (pdb2017) {               # length 5 + 4·number (2-byte opcode included)
+        u16 killedmob = MobInfoServer.ID
+        u8  number
+        u32 slayers[number]
+    } = sm_ArtificalIntelligence.maa_TargetSelect.selector.vt[0x30](&payload, ID)
+MobTargetBout::mts_SlayerList(pkt, killedmob):        number = 0; killedmob = killedmob
+    l_4AllInList(mtb_targetlist (the mob's MobAggroManager, Z09 §6.1), SlayerCollect { sc_Packet = pkt })
+SlayerCollect::lid_Call(MobTargetStruct s, h) → continue                                         @ FUN_004bd440
+    o = s.mts_Object
+    if o ≠ null and o.so_ObjectType() == 2 (player) and not o.IsClosing() (vt 0x300)
+       and o.so_GetCharRegistNumber() (vt 0x344) == s.mts_CharRegnum:        # the handle was not reused by another character
+        pkt.slayers[pkt.number++] = s.mts_CharRegnum
+```
+
+Every player still on the aggro list (at most its 10 entries) counts, whatever their damage. All seven `MobTarget*`
+selector classes share this slot; the base `MobTargetSelector` has the empty fold FUN_00509900, which would leave
+`number` unwritten in the shared send buffer *(no mob without a Bout-derived selector was checked)*. In 2016 six
+`MobInfoServer` rows set `BroadAtDead`: Helga, B_CrackerHumar, BH_Helga, BH_Humar, Chimera, Anvil. The WM registers
+no handler for 0x244C (`re-data/exports/wm/handlers.json`), so the list goes nowhere.
+
+| Function | Body | Callers |
+|---|---|---|
+| `ListMaximumSearch<HitMeList::Enemy>::lid_Call` FUN_00481660 | `v = lms_compfunc(lms_lst, h)`; first entry or `v > lms_maxval` → remember `{lms_hnd = h, lms_maxval = v, lms_max = entry}` | `HitMeList::EnemyList::el_Store` FUN_00482070 (Z09 §6.9: the entry with the least damage is replaced) |
+| `HitMeList::EnemyList::~EnemyList` FUN_00482b50 / scalar deleting FUN_00482e10 | free `el_vecEnemyPlayer`, then the `List<Enemy>` array | `~ShineMob` FUN_00556340 |
+| `MobAggroManager` scalar deleting FUN_004bd6a0 | destroy the 10 inline `MobTargetStruct` (0x20 each), free the list array | vt 0 (mob destruction) |
+| `MobTargetSelector` FUN_004a9df0, `MobTargetBout` FUN_004bd570 (also `MobTargetNoBrain`), `MobTargetAggresive` FUN_004bd5a0 (also `…Aggresive2`), `MobTargetAggresiveALL` FUN_00548dd0 / `~` FUN_00548dc0, `MobTargetAggresiveNoLevel` FUN_00549d60, `MobTargetPlayerCaptivate` FUN_0054df00 / `~` FUN_0054dea0 (scalar deleting = selector vt 4) | each destroys its `IntelligenceOffice4Mob` analysers (`mta_InstanceTarget`, `PlayerTarget`) and its base, then the `AxialListIterator` base | mob destruction |
+| `MobCondition` scalar deleting FUN_004b00e0 (also `MobHPcondition`) | vftable reset, delete | `sm_pMobConditionList` cleanup |
+| `MobRegenClass::MobBreederGroup` scalar deleting FUN_004b2fd0 | destroy the 100 inline `MobBreeder` (0x40 each, empty destructor), free the list array | vt 0 (`MobHatchery` teardown, Z09 §10.2) |
+| `ListEraser<MobAttackSequence::SkillChange>` FUN_004a8690, `ListEraser<MobRegenClass::MobBreeder>` FUN_004b1530, `ListEraser<…MobBreederGroup>` FUN_004b2ce0 | vftable reset to `ListIteratorDefault<T>` | the stack iterators of their `l_4AllInList` callers |
+| `MobTacticElement::MobActionArgument::~MobActionArgument` FUN_00554190 | `Actor::~Actor(maa_MobActionStruct)`, `Selector::~Selector(maa_TargetSelect)` | `~ShineMob` |
+| `MobDeadCount::~MobDeadCount` FUN_004b07a0 | `delete[] mdc_Counter` | field teardown (the counters: Z09 §5.1) |
+| `MobDataBox::<mdb_BinData>::~…` FUN_00641d00 | `BinaryData::~BinaryData` on the 11 boxes `groupAbstate`, `mobRegenAni`, `mobKillablePermission`, `moblifetime`, `mobkilllog`, `mobkillannounce`, `questspec`, `mobspec`, `mobweapon`, `mobinfserv`, `mobinf` (reverse of Z09 §5.1's load order) | `mobdatabox` atexit |
+
+### 6.6 Use effects
+
+```pseudo
+UseEffect::UseItemCapsule::uib_CanUseItem(actor, p, info) → code   (vt 4)                       @ FUN_005969f0
+    p null: 0x701;  info null: 0x702
+    t = itmattcontainer[info.itemid].vt[0xac](&info.iti_itemstruct)    # FUN_0063e410: itemattr + 8 = ShineItemAttr_Capsule.useabletime
+    if t ≠ null and t.year ≠ 0 and now (chargeditemcheck.ct_Current) ≤ t (year, month, date, hour, minute compared in turn):
+        return 0x700                                                  # inside the capsule's period
+    return 0x726                                                      # no date or the period is over (no text in client-error-codes.json)
+```
+
+`useabletime` = creation time + `ChargedItemEffect.KeepTime_Hour` (`sp_MakeCapsuleItem` FUN_0049cce0 through attribute
+vt 0xb0, §3.5). The check runs in `ItemUse_Inventory` (Z04 §6.1) before `UseItemCapsule::uib_DirectUse` FUN_0059bf00
+(`sp_CapsuleItemOpen`, Z05 §6.3), so a capsule can be opened only until its period ends.
+
+```pseudo
+UseEffect::UseItemSkillDummy2Real::uib_Effect(actor, p, info, f)  (vt 0x10)                      @ FUN_00596640
+    p.so_ply_ItemMakeItem(info)   (player vt 0x32c, its only caller)
+ShinePlayer::so_ply_ItemMakeItem(p, info)                                                          @ FUN_0049c680
+    info null: return
+    to = bsearch(itemconvmap, info.itemid).icm_To, 0xFFFF if absent     # the dummy card → container map, Z09 §10.10
+    item = new ItemTotalInformation; iti_mkregnum(&item, to, 6, zone no, world no)
+    if itemdatabox[to] has a row:
+        itmattcontainer[to].vt[0x14](to, &item, "-o")                   # iac_itemcreate with the empty GM option string (§3.5)
+        sp_MakeItem(p, p.handle, &item)                                 # into the inventory (Z04)
+```
+
+The check before it is `UseItemSkillDummy2Real::uib_CanUseItem` (§2.2: one free cell). The effect runs when the
+Character DB has confirmed the dummy's consumption (Z04 §6.3).
+
+Constructors and destructors: `UseItemNormal::UseItemNormal` FUN_00596420 / `~UseItemNormal` FUN_00596430 (vftable
+only), `UseItemJustReviveAtDead::UseItemJustReviveAtDead` FUN_00417490 and its scalar deleting destructor FUN_00417820
+(the revive effect is Z21), `UseItemMysteryBolt` scalar deleting FUN_0059aa80 is the folded vt 0 of 35 `UseItem*`
+classes (reset to `UseItemBase::vftable`, delete). The actors are static (`ui_Capsule` etc.), built at start-up.
+
+### 6.7 Target analyser, looting, brief-info buffers, skill list
+
+- `TargetAnalyser` (`ta_body` +4): ctor FUN_00591d50, dtor FUN_00591d70, `ta_me(o)` FUN_00591d80 = `o.handle == ta_body.handle`
+  (slot 0); `TargetAnalyser_Player::ta_enemy(o)` FUN_00591da0 = `o.vt[0x89c]()` (slot 4), `ta_friend(o)` FUN_00591dc0 =
+  `o.so_ObjectType() == 2` (slot 8); base slots 4 / 8 = `return false` fold FUN_00615e70. The mob (`sm_TargetAnalyser`
+  +0x1eb0) and the player (`sp_TargetAnalyser` +0x5e14) construct one, set its body, and store it in
+  `smo_TargetAnalyser.analyser` (+0x188; `ShineMobileObject` default: the static `TA::tmp`). Nothing reads +0x188 or
+  calls the slots: dead in 2016.
+- `CLooting::CLooting` FUN_00645370: the four `m_ItemLootingType` = LOOTING_TYPE_FREE, `m_Looter` = 0xFFFFFFFF; called by
+  `Raid::Raid` FUN_0063d180 (the zone's raid copy; the WM twin is W05 / W02 §1.4).
+- `BriefInfoExchangeAbstate::BriefInfoExchangeAbstate` FUN_0043ddc0: 28 `bixaPacketbuffer` (0x164 bytes) each prepared
+  as `0x1C19 NC_BRIEFINFO_ABSTATE_CHANGE_LIST_CMD { handle 0xFFFF, count 0 }` with buffer size 341; `bixa_count` = 0,
+  `bixa_Pointer` = the first payload. The batching is Z18 §2.2 (`bixa_Init` FUN_0043c6b0).
+- `CharaterSkillList::~CharaterSkillList` FUN_00447f40: frees the `csl_ToggleSkill` and `csl_Skill` vectors; called by
+  `~ShinePlayer` (§2.9). The list itself is Z23.
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1330,6 +1593,8 @@ slots that a class does not implement. Read them by body, not by name:
 | Z31-B5 | `so_ply_ChangeBriefInfo` (vt 0x608) §4.2 | passes the addresses of two uninitialised locals as the weapon-title out values; only the weapon class writes them, but `SetCurrentTitle(10, …)` runs for every item whenever the weapon title is current | after an equip / unequip of a non-weapon item the current weapon title gets stack garbage as level / mob (same as Z18-B9 in the twin `so_ply_EquipmentChange`) | update the title only when the item is a weapon, or initialise the locals |
 | Z31-B6 | `sp_SendSellItemInfo_World` §4.2 | builds 0x4037 without writing `nWorldHandle` / `nCharNo`; the bytes come from the 0x4036 packet that `sp_SaveUseItemMinimonInfo_World` left in the shared send buffer | none in 2016 (the 0x4036 builder always runs just before and writes the same two fields); breaks if the save order changes | write the 6-byte header in the 0x4037 builder |
 | Z31-B7 | `ShineMobileObject::so_Getabstatebit` FUN_005556a0 (vt 0x4a0, kept by `ShineDoor`) §5.4 | returns one static bit array (`AS::tempbit`) for every door | an abstate bit set on one door (`so_AbnormalState_BitSet`, `asl_Store`) would show in every door's bits; no 2016 path that puts an abstate on a door was found *(inferred)* | a per-object bit array, as the other classes have (the pet's twin is Z13-B43) |
+| Z31-B8 | `AttackRhythm_Range::arb_Next` FUN_00427d50 §6.3 | `ca_point = (ca_point + 1) & 2`: from 0 the point stays 0 | every archer-line swing broadcasts animation 0 in 0x2447 | alternate the animations (`& 1` or `% 2`) *(inferred)* |
+| Z31-B9 | `EngSklAtt::esa_masicaldamage` FUN_004fc630 §6.4 | advances the random box of `MaxMA − MinMA` but returns only `ena_physicdamage` (1): `MinMA` and the spread are never added | none in 2016 (`EngSklAtt` has no caller) | `MinMA + spread + slot 0xc`, as the physical twin |
 
 ## Not reconstructed / uncertain
 
@@ -1356,6 +1621,19 @@ slots that a class does not implement. Read them by body, not by name:
   their caller counts include non-object calls.
 - §4.10: callers of the low slots 0x18 (`so_ply_HideMyIdentity`) and 0x30 (`so_ply_TreasureChestLocationManager`)
   were not separated from the other object types' calls of the same slots.
+
+- §6.2: slot meanings of the class vftable follow the classes whose override has a unique body; the PDB's folded stubs
+  carry up to four names. No call through class vt 0x4c (`cc_NormalHitDelay_AfterSkill`) was found (slot scan of the
+  functions that read `+0xfbc` / vt 0x49c only).
+- §6.3: `smo_ply_NextBashTime` scales `arb_NextBash(bashinterval)` (= interval / 100) by `× speed / 1000 × 10 / 1000`
+  again, which gives 0 ticks for the 1 000-1 800 ms `AtkSpeed` values of `ItemInfo.shn` unless the speed field
+  (`Parameter +0xa18`) is far above 1 000; the units of that field were not traced (Z03 §3.2 / Z17 own the cadence).
+- §6.5: a mob whose selector is the base `MobTargetSelector` would send 0x244C with an unwritten `number`; which
+  selector the six `BroadAtDead` mobs get was not checked. That the WM drops 0x244C rests on its handler table only.
+- §6.6: whether the capsule period (`KeepTime_Hour`) is meant as "openable until" or "openable after" is read from the
+  comparison; the client's reaction to 0x726 (no text in `client-error-codes.json`) was not checked.
+- §6.7: `CharaterSkillList::~CharaterSkillList`'s export ends after the first `operator delete`; that it frees both
+  vectors is the standard `std::vector` destructor pair *(inferred)*.
 
 ## Coverage boundary
 
