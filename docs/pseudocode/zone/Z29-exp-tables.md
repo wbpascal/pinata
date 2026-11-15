@@ -131,6 +131,9 @@ HitMeList::Enemy (0x18)                     # one per attacker unit in the mob's
     +0x14 e_Attacker      a player of the unit: the one whose el_vecEnemyPlayer entry comes last (see below)
 
 # How the unit list is built (Z09 §6.9 documents the functions; restated here because e_Attacker depends on it):
+#   so_KilledBy skips the whole experience block when the killer is NULL, and el_StoreLastDamage does nothing unless
+#   killer != NULL, killing damage > 0 and mob != NULL; el_Store has no other caller, so then the EnemyList stays empty
+#   and nobody gets experience.
 #   every hit: ShineMob::so_DamagedBy FUN_00431750 → el_StoreDamage FUN_00482f00 adds to the per-player vector
 #     el_vecEnemyPlayer {ei_nCharRegNo, ei_Attacker, ei_LastHitTime, ei_TotalDamage} (≤ 100 entries, in order of
 #     first hit; when full the entry with the oldest ei_LastHitTime is overwritten in place). A servant (vt 0x4d0 == 10)
@@ -176,7 +179,7 @@ HitMeList::EnemyList::el_ExpDistribute(list, mob, mobInf, mobHandle)          @ 
 
 ExperienceDistribute::lid_Call(ed, Enemy e) → 1                                @ FUN_00483360
     base = ed_MobInf.serv.MonEXP (u32)
-    if ed_Mob.vt[0xb9c]() != 0: base = ed_Mob.vt[0xb9c]()   # script override (Z03 §8.2); 0 means "no override"
+    if ed_Mob.vt[0xb9c]() != 0: base = ed_Mob.vt[0xb9c]()   # so_mob_GetMonEXP FUN_004aa2f0: script override at mob +0x2508 (Z09 §5.8); 0 = none
     share = TRUNC(base * (e.e_TotalDamage / ed_TotalDamage))  # u32 operands; see TRUNC below
     # ed_TotalDamage is not reduced by el_EnemyExpDistCheck, so removed damage is experience nobody gets (Z09 §28.8)
     if e.e_Attacker == NULL: AssertFail "ExperienceDistribute::lid_Call : Free fail"; return 1
@@ -222,7 +225,10 @@ ExperienceDistribute::ed_FindPartyInfo(ed, u16 party, summary) → n            
         obj = PartyManufacture::pm_FindMember(&partymanufacture, party, i)    @ FUN_004cc390
             # returns PARTY_SLOT.Members[i].memberobj (NULL when that member is not in this zone:
             # WorldManagerSession::wms_PartyMemberRefresh FUN_004cd1a0 sets it to som_FindPlayer(charNo) or NULL);
-            # asserts "Too large party regnum" / "Invalid party member number" / "sub is too big" and returns NULL
+            # party > 3999: assert "Too large party regnum", NULL. PARTY_SLOT.isRaidTypeParty set: Members[i].memberobj
+            # if i < NumOfMember else NULL (no 2 … 5 check, no assert). Otherwise NumOfMember not 2 … 5: assert "Invalid
+            # party member number"; i ≥ NumOfMember: assert "sub is too big"; both return NULL. (ed_FindPartyInfo has
+            # checked the count already, so the raid-type branch changes nothing here.)
         if obj != NULL and so_DistanceSquar(obj, ed_Mob) ≤ EXPRange²:
             nfis_FriendInfo.push({ obj, level = obj.vt[0x4d8]() (u8), CanBonus = false, ExpGain = 0 })
     return nfis_FriendInfo.size()
@@ -285,16 +291,26 @@ For one attacker unit with share `S` (from §2.2) and `n` members near the mob (
 
 - **n = 0**: nobody gets anything ("friendnumber zero").
 - **n = 1** (and every `E_PLAYER` unit): `e_Attacker` gets `trunc(S · lh4ed(level − mobLevel))` (Z28 §3.8), then the
-  abstate and rest-exp modifiers of `so_GetExperienceFromMob` (Z03 §8.2).
+  abstate and rest-exp modifiers of `so_GetExperienceFromMob` (Z03 §8.2), whose result is floored to 1 (below).
 - **n ≥ 2**: with levels `Lᵢ`, `M = max Lᵢ`, valid set `V = { i : M − Lᵢ ≤ 20 }`, `v = |V|`,
   `A = Σᵢ (Lᵢ+5)²`, `W = Σ_{i∈V} Lᵢ²`, `f = pebd_Bonus[v]` (2016: v = 1 → 1.0, 2 → 1.2, 3 → 1.4, 4 → 1.6, ≥ 5 → 1.8),
   `B = trunc(S · (f − 1))`:
-  1. `gᵢ = trunc(S · (Lᵢ+5)² / A)` for every member;
-  2. `gᵢ += trunc(B · Lᵢ² / W)` for i ∈ V;
+  1. `gᵢ = trunc(((Lᵢ+5)² / A) · S)` for every member;
+  2. `gᵢ += trunc(B · (Lᵢ² / W))` for i ∈ V;
   3. `C = Σ max(0, gᵢ − cap(Lᵢ))`, `gᵢ = min(gᵢ, cap(Lᵢ))` with `cap(L) = megag_ExpLimit[L]` (2016: 2L² − 4L + 20);
-  4. `gᵢ += trunc(C · Lᵢ² / W)` for i ∈ V (no second cap);
+  4. `gᵢ += trunc(C · (Lᵢ² / W))` for i ∈ V (no second cap);
   5. each member gets `gᵢ` through `so_GetExperienceFromMob` (abstate modifiers, then `sp_GainExp`). No level
      handicap is applied (original bug) Z29-B7.
+
+The quotient is computed before the multiplication in steps 1, 2 and 4 (and in the share, `S = trunc(MonEXP ·
+(damage / totalDamage))`, §2.2). The order changes results: MonEXP 100, damage 29 of 50 → `100 · 0.58 =
+57.99999999999999` → 57, where `100 · 29 / 50` would give 58.
+
+**Minimum 1.** `ShinePlayer::so_GetExperienceFromMob` FUN_004302a0 (Z03 §8.2) takes the gain as a signed `int`,
+applies the abstate multipliers, converts with `_ftol2_sse` and then sets `exp = 1` when `(int)exp < 1`, before
+`mhl_Logging` and `sp_GainExp`. So every receiver gets at least 1 EXP (before `sp_GainExp`'s own dead / max-level
+checks, Z03 §8.3), including a member whose computed `gᵢ` is 0 (a non-valid member with a tiny base, a level with
+limit 0) and a solo player whose handicap factor is 0.
 
 So the group total before modifiers is `S · f` minus the truncation losses (at most 1 per member per step): the cap moves experience between members but never
 removes it (Z29-B5). Non-valid members (more than 20 levels below the top) get only their base part and do not raise
@@ -311,8 +327,9 @@ Cap example: levels 5 and 20, `S = 1000`. `A = 100 + 625 = 725`: base 137 / 862.
 **TRUNC.** Ghidra shows these conversions as `ROUND`, but each `fistp` (0x4825fd `nfis_ExpBase`, 0x482683
 `nfis_ExpBonus`, 0x483429 / 0x483587 `lid_Call`) runs under a control word `fnstcw | 0x0C00` (RC = 11, round toward
 zero), restored afterwards: the MSVC inline `(__int64)double` cast, i.e. truncation, the same as `_ftol2_sse` in
-`ed_GiveExperience`. Every `u32` operand (`MonEXP`, damages, `share`, sums) is converted as unsigned (`+ 2³²` when the
-sign bit is set). `pebd_Bonus[v] = PB_BonusRatio / 1000.0` (fdiv by the double 1000.0 at 0x481cf5), so `f − 1.0` is
+`ed_GiveExperience`. The `u32` operands (`MonEXP`, `share`, the `nfis` sums and bonus amounts) are converted as unsigned (`+ 2³²` when
+the sign bit is set); the damages (`Enemy.e_TotalDamage`, `ExperienceDistribute.ed_TotalDamage`, `int` (pdb2016)) are
+converted as signed. `pebd_Bonus[v] = PB_BonusRatio / 1000.0` (fdiv by the double 1000.0 at 0x481cf5), so `f − 1.0` is
 slightly below the decimal value for 1200 and 1400 (1.2 − 1.0 = 0.19999999999999996, 1.4 − 1.0 = 0.3999999999999999) and
 slightly above it for 1600 and 1800 (0.6000000000000001, 0.8000000000000000444): with 2 or 3 valid members `B` is one less
 than `S · (ratio − 1000) / 1000` whenever that product is an integer. A rebuild must use IEEE double arithmetic in this
@@ -341,10 +358,10 @@ Z03 is done, so the corrections are recorded here (and in `docs/knowledge/Z29.md
 | Z29-B1 | `megag_Load` FUN_00481980 | a level 1 … 150 without a `PartyBonusLimit` row logs "PartyExperienceBonusDouble::pebd_Load : Data error" | the log names the wrong file/loader | its own text ("MaxExpGainAtGroup::megag_Load : Data error") |
 | Z29-B2 | `megag_Load` FUN_00481980 | `megag_ExpLimit[PSE_ChrLv]` written with no bound check (u8 index, 151 entries) | a row with level 151 … 255 overwrites memory after `g_MaxExpGainAtGroup`; latent (2016 max 150) | reject or ignore levels > 150 |
 | Z29-B3 | `nfis_ExpLimitCut` FUN_00482560 | `megag_ExpLimit[level]` read with no bound check | a member above level 150 reads a random cap; latent (2016 `levellimit` 125, Z12 §5.1) | clamp the level or size the table to 256 |
-| Z29-B4 | `pebd_Load` FUN_00481bf0 / `lid_Call` FUN_00483360 | a missing `PB_PartyMember` 0 … 20 leaves −1.0 and only logs "Data error"; any factor below 1.0 gives a negative bonus that is cast to u32 and read as unsigned by `nfis_ExpBonus` | each valid member adds (2³²·w − \|B\|·w) mod 2³² (w = its `level²` share): huge gains when more than one member is valid, then capped and re-inflated by B5; latent (2016 file complete, all ratios ≥ 1000) | refuse to start on a missing row, and treat the bonus as signed |
-| Z29-B5 | `lid_Call` FUN_00483360 (`nfis_ExpLimitCut` + second `nfis_ExpBonus`) | the amount cut above `PartyBonusLimit` is redistributed by `level²` to all bonus-valid members, the capped ones included, with no second cut | the cap is not a cap: members end above it (example §2.5: 74 for cap 50); with equal levels the cap has no effect at all | give the excess only to members below their cap (or drop it) *(inferred)* |
+| Z29-B4 | `pebd_Load` FUN_00481bf0 / `lid_Call` FUN_00483360 | a missing `PB_PartyMember` 0 … 20 leaves −1.0 and only logs "Data error"; any factor below 1.0 gives a negative bonus that is cast to u32 and read as unsigned by `nfis_ExpBonus` | each valid member adds (2³²·w − \|B\|·w) mod 2³² (w = its `level²` share): huge gains when more than one member is valid, then capped and re-inflated by B5 (a final gain ≥ 2³¹ arrives in `so_GetExperienceFromMob` as a negative `int` and is floored to 1; only one below 2³¹ is huge, e.g. two equal valid members, S = 1000, f = −1 → 2,147,483,148 each); latent (2016 file complete, all ratios ≥ 1000) | refuse to start on a missing row, and treat the bonus as signed |
+| Z29-B5 | `lid_Call` FUN_00483360 (`nfis_ExpLimitCut` + second `nfis_ExpBonus`) | the amount cut above `PartyBonusLimit` is redistributed by `level²` to all bonus-valid members, the capped ones included, with no second cut | the cap is not a cap: members end above it (example §2.5: 73 for cap 50); with equal levels the cap has no effect at all | give the excess only to members below their cap (or drop it) *(inferred)* |
 | Z29-B6 | `lid_Call` FUN_00483360 | a party/raid unit with exactly one member near the mob gives the share to `e_Attacker` (the unit's member whose `el_vecEnemyPlayer` entry is last, §2.1) | if that member has run out of EXP range (or is dead) and another member is near, the far member gets the experience and the near one nothing | give it to the single member found (`nfis_FriendInfo[0]`) |
-| Z29-B7 | `lid_Call` FUN_00483360 / `nfis_ExpDistribute` FUN_004826b0 | units with ≥ 2 members near the mob skip the level handicap (`lh4ed`, `PartyBonusByLvDiff.shn`) | a group gets full experience from mobs far above (solo: 0 from 30 levels above, Z28 §3.8) or below its level | apply `lh4ed_Handicap` per member *(inferred: the file is named "PartyBonus…")* |
+| Z29-B7 | `lid_Call` FUN_00483360 / `nfis_ExpDistribute` FUN_004826b0 | units with ≥ 2 members near the mob skip the level handicap (`lh4ed`, `PartyBonusByLvDiff.shn`) | a group gets full experience from mobs far above (solo: handicap factor 0 from 30 levels above, Z28 §3.8, then floored to 1 EXP, §2.5) or below its level | apply `lh4ed_Handicap` per member *(inferred: the file is named "PartyBonus…")* |
 | Z29-B8 | `ed_FindPartyInfo` FUN_00483260 / `ed_FindReidInfo` FUN_00483190 | members near the mob are collected without an alive check | dead members raise the bonus count and take a share that `sp_GainExp` discards | skip dead members |
 
 ## 4. Not reconstructed / uncertain
@@ -353,8 +370,6 @@ Z03 is done, so the corrections are recorded here (and in `docs/knowledge/Z29.md
   control; no `_controlfp` / `fldcw` with a precision change was looked for outside the conversion sites). With 64-bit
   precision the intermediate quotients `(L+5)² / A`, `L² / W` and products could differ in the last bits, which can
   move a truncated result by 1 when the exact value is an integer *(inferred: not checked at the process start-up)*.
-- **`ed_Mob.vt[0xb9c]` (script EXP override).** Only its use here is read: a non-zero return replaces `MonEXP`. What
-  sets it is Z03 §8.2 (done); not re-read.
 - **"Free fail" in `lid_Call`** (`e_Attacker == NULL`) is unreachable from the 2016 kill path: `el_StoreLastDamage`
   FUN_00483030 skips entries whose player is gone, and `el_Store` stores only non-NULL objects *(inferred from the
   code of both)*.
@@ -384,7 +399,8 @@ classes: the tables exist only on the zone, and no packet carries them.
 | `HitMeList::EnemyList::el_EnemyExpDistCheck` FUN_00482720 | Z09 §28.8 (done) | removes far players' damage before the split; cited in §2.2 |
 | `HitMeList::EnemyList::el_FindLooter` FUN_004822f0 | Z09 §11.4 (done) | same class, loot rights, not experience |
 | `ShineMob::so_KilledBy` FUN_00432760, `ShineMob::so_DamagedBy` FUN_00431750 | Z03 §8.1 (done) | callers of the death / damage paths |
-| `so_GetExperienceFromMob` FUN_004302a0 (vt 0x5c4), mob script EXP override vt 0xb9c, `sp_GainExp` / 0x240B `NC_BAT_EXPGAIN_CMD` | Z03 §8.2 / §8.3 (done) | what happens to a member's gain after `nfis_ExpDistribute` / `ed_GiveExperience`; the client side of the experience packet |
+| `so_GetExperienceFromMob` FUN_004302a0 (vt 0x5c4), `sp_GainExp` / 0x240B `NC_BAT_EXPGAIN_CMD` | Z03 §8.2 / §8.3 (done) | what happens to a member's gain after `nfis_ExpDistribute` / `ed_GiveExperience`; the client side of the experience packet |
+| `so_mob_GetMonEXP` FUN_004aa2f0 (vt 0xb9c) | Z09 §5.8 (done) | returns the script EXP override at mob +0x2508; its use is in §2.2 |
 | `LevelHandicap4ExperienceDouble` ctor FUN_00481260, `lh4ed_Load` FUN_00481a80, `lh4ed_Handicap` FUN_00481810, `PartyBonusByLvDiff.shn` | Z28 §3.8 (done) | third table loaded by `hml_Load`; used only by `ed_GiveExperience` |
 | `RaidTask::rt_GetRaid` FUN_005cdf80, `rt_GetNearRaidPlayer` FUN_005ce6d0, `_GetRaidPlayer` FUN_005ce000 | Z14 §5.2 (done) | raid container; §2.3 cites the result used here |
 | `PartyManufacture::pm_FindMember` FUN_004cc390 | this item §2.3 (and Z22 FUN_004cc390 note) | documented here |
