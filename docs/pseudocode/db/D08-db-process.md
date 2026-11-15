@@ -30,7 +30,7 @@ to all four builds.
 DataServer gServer   (Account DAT_0044b308, AccountLog DAT_004461a8, GameLog DAT_0044d188; size 0x209a68)   (pdb2016)
   +0x0000   CServerInfo m_ServerInfo          config rows (Z19 §5.3)
   +0x04f8   MY_SERVER   m_MyServer            pServiceName, pDisplayName, nServerID (+0x500), nWorldNo, nZoneNo
-  +0x050c   char[16]    m_ConnectSocket_BindIP   zeroed by the ctor, never read in Account (inferred: used by servers that connect out)
+  +0x050c   char[16]    m_ConnectSocket_BindIP   zeroed by the ctor, filled by `ReadDefineScriptor`, never read in Account; the Character server binds its GameLog connect to it (§4.3)
   +0x051c   CIOCP       m_IOCP_For_Socket     S02 §1.3
   +0x054c   CSession_Manager m_SocketSessionManager      §1.4 (contains the acceptor at +0x558)
   +0x9838   CSessionWorkerManager m_SessionWorkerManager §1.5 (2 MB job queue)
@@ -355,7 +355,7 @@ A stopping worker finishes the job in hand; records still queued at stop are dro
 ### 1.6 Address table of the process layer
 
 Same function in all four builds, matched by identical body (§ intro). "–" = the body differs in that build (an
-AccountLog / Character / GameLog variant; parts 3, 4 and 7 of D08 read those). Several addresses = identical-code
+AccountLog / Character / GameLog variant; §3.6, §4.7 and part 7 of D08 give those). Several addresses = identical-code
 folds in that build.
 
 | Function *(pdb2016)* | Account | AccountLog | Character | GameLog | Documented at |
@@ -571,12 +571,12 @@ is in address order)*) and destroys them at exit (`dynamic_atexit_destructor_for
 | `rndbox` (`RandomBox`, 0x348398 = 3.3 MB) | FUN_00431b90 → `RandomBox::RandomBox` FUN_004182e0 | **runs**: `srand(time)`, 101 + 4 shuffled 16 384-entry rings and a WELL512 state (§2.4) | no (read only by the item-create code) |
 | `ShnDataFile` (`CShnDataFileCheckSum`) | FUN_00431c20 → FUN_0042f3c0 | the 49-name client-file list, same as W05 §3.4 | only through `CDataReader::Read` (Character: MapInfo) |
 
-So the Account and AccountLog servers read **no SHN file** at all; the Character server reads one, `MapInfo.shn`
-(§2.2); this replaces the D01 §1 statement "also loads MapInfo.shn, ItemInfo.shn (framework)" (knowledge §0). The
-whole item library is dead weight in Account: a rebuild of Account / AccountLog needs none of it. (The Character
-server does use the attribute-class container for its reward items, D07 §1.3; part 4 checks the other users.)
+So the Account and AccountLog servers read **no SHN file** at all; this replaces the D01 §1 statement "also loads
+MapInfo.shn, ItemInfo.shn (framework)" (knowledge §0). The whole item library is dead weight in Account: a rebuild of
+Account / AccountLog needs none of it. The Character server loads ItemInfo, MapInfo and seven more tables in its own
+`GameData_Load` and uses `itemdatabox`, `mapdatabox` and `itmattcontainer` (§4.5).
 
-### 2.2 `MapDataBox` (the only table a DB server loads, Character only)
+### 2.2 `MapDataBox` (MapInfo.shn, loaded by the Character server only)
 
 ```pseudo
 MapDataBox::CheckReadData(this, path) → bool                                     @ FUN_0040fd60
@@ -603,7 +603,7 @@ MapDataBox::mdb_Load(this, path)                                                
 `u32 Sight` @0x48. The zone's `mdb_Load` FUN_0064ebf0 is the same code with the path built in (Z01 §2.3 table); in
 Account the path is a parameter. `BTree` (256-way trie, node 0x404 = `bt_id` + 256 children; `bt_Insert` FUN_00413f60
 overwrites an existing key, `operator[]` FUN_00413ff0 returns 0xffffffff when absent, case-sensitive; ctor / dtor
-FUN_00413f10 / FUN_00413f30) is the zone's (Z09 §28.11). Who reads `mapdatabox` in the Character server: part 4 (§4).
+FUN_00413f10 / FUN_00413f30) is the zone's (Z09 §28.11). In the Character server only `GetCharBaseData` reads it (§4.5).
 
 ### 2.3 `CItemAuthorityBase`: the box-to-box move matrices
 
@@ -830,7 +830,7 @@ CStatistics::Process(stat, sessions):   (main thread, every second)            @
         if !s.pLinkDown: break
     unlock; return 0
 
-CSession_Manager::FindSession(serverId, from):            @ FUN_00405480   (AccountLog only)
+CSession_Manager::FindSession(serverId, from):            @ FUN_00405480   (AccountLog; Character copy FUN_0043dc20, §4.3)
     under the session-list lock: first node at or after `from` (null = list head) whose session has
     m_Connection == 1 and m_Connected_Server_ID == serverId; null if none
 ```
@@ -1005,6 +1005,250 @@ logoff time (`dUserLogoff`, written by 0x0C28 with the current time and the rema
 with 0x4E and does not use `nMinute` (login-server.md §5.1). A logoff time in the future (clock change) gives a negative
 `elapsed` and a `nMinute` above 299.
 
+## 4. Character: differences against the Account build
+
+Source `Files/Server/2016/w00_Character/Character Release.exe` (no PDB). A Character function carries the Account
+(or AccountLog / WM / zone) PDB name when its decompiled body is identical (`D08-match.py`), or identical after masking
+labels, addresses and types (a masked line diff; "near-identical" below, every one checked by reading the diff). Those
+names are in `tools/protocol-re/names/character/D08.json` (214 added in this part, 372 in all). D02 §1 already describes
+what the server loads and its handler tables; this section adds the process layer under them.
+
+### 4.1 Objects
+
+```
+DataServer g_Server   (DAT_004e2a68, 0x20a47c bytes; ctor FUN_00401f20, dtor FUN_00401000)
+  +0x000000 CServerInfo m_ServerInfo          DataServerInfo_Character.txt (ReadDefineScriptor FUN_004013b0, Z19 §5.3)
+  +0x0004f8 MY_SERVER   m_MyServer            nServerID +0x500 (= 2), nWorldNo +0x504, nZoneNo +0x508
+  +0x00050c char[16]    m_ConnectSocket_BindIP   this server's own ServerInfo row IP (copied by ReadDefineScriptor, as in
+                                              Account); used here as the local address of the GameLog connect (§4.3)
+  +0x00051c CIOCP / +0x00054c CSession_Manager (acceptor +0x558) / +0x009838 CSessionWorkerManager   same as Account (§1.1)
+  --- from here the Character members (names ours, inferred from use) ---
+  +0x209890 CServerInfo DefaultCharacterData.txt (a CCsl script, D02 §1)   [Account: m_bOnStopService …, indun list]
+  +0x209d88 / +0x209dc8 / +0x209e08 CDataReader FaceInfo / HairColorInfo / HairInfo.shn (0x40 each, W05 §3.1)
+  +0x209e48 u16[6] hair-shop coupon ids HairShop01 … 05, the sixth read as HairShop05 again (D02 §10); +0x209e54 u16 UniChange01
+  +0x209e58 CDataReader HolyPromiseReward.shn (D04 §8)
+  +0x209e98 CDataReader promotion reward table: built and destroyed, never loaded (D02 §13)
+  +0x209ed8 CDataReader AttendReward.shn (D02 §12)
+  +0x209f18 cUKItemShop (0x34; ctor FUN_0043f5b0, dtor FUN_0043f5c0; §5)
+  +0x209f4c CServerInfo TutorialCharacterData.txt (D02 §8; its dtor is reached through the thunk to CCsl::~CCsl FUN_00446640)
+  +0x20a444 m_bOnStopService   +0x20a448 / +0x20a458 SYSTEMTIME start / stop   +0x20a468 m_bStopMainThread (0x2803 writes
+  DAT_006eced0 = this) +0x20a46c m_bActiveMainThread   +0x20a470 / +0x20a474 m_hMainThread / m_MainThreadID
+  +0x20a478 CSession* g_GameLogLink (DAT_006ecee0, D02 §1)
+```
+
+There are three `CServerInfo` objects (the server's config and two game-data scripts read with the same `CCsl` parser)
+and no `SHINE_INDUN_INFO` list. The destructor runs in reverse order (Tutorial script, item-shop vector, the six
+`CDataReader`s via FUN_004402a0, the DefaultCharacterData script, workers, sessions, `CIOCP::Close`, the config).
+
+The session pool, `CSession` (0x154), `CSession_Manager` and the acceptor have the Account layout (§1.4). The session
+worker is larger:
+
+```
+CSessionWorker (0x12a8; ctor FUN_0043e4d0, dtor FUN_0043e420, deleting dtor FUN_0043e550)
+  +0x000 … +0x134  as Account (§1.5)
+  +0x138  CParserCharacter m_Parser (ctor FUN_0043b040 = CParser::CParser FUN_0043d2f0 + the D02 / D03 / D04 registrations)
+  +0x124c DB object (0x5c, ctor FUN_0046e0d0): DBRecord (0x14, §2.5) + procedure-class bases (one RTTI name visible:
+          `CSQLPPrison`, vftable at +0x1268) and pointer tables into itself; the handlers' "*this + 0x124c" (D02 §1.1)
+```
+
+### 4.2 Start-up, main thread, stop
+
+```pseudo
+DataServer::Start(this, cmdLine):                                             @ FUN_00402570   (Account FUN_00401d20, §1.2)
+    chdir(exe directory); banner "Launching the server....."; ViewStartInfo FUN_00401130
+    !ReadDefineScriptor(this) → return −1          # FUN_004013b0: "DataServerInfo_Character.txt", "<I AM THE %s, …>"
+    !GameData_Load(this)      → return −4          # FUN_00401550, below; replaces Account's MapInfo-only step
+    !ParseCmd(this, cmdLine)  → return −2          # FUN_00402040, same as Account
+    WinService singleton; startDispatcher(m_MyServer.pServiceName, ::OnStart_Service, ::OnStop_Service); return 0
+
+GameData_Load(this) → 1 ok / 0 failed:                                        @ FUN_00401550   (D02 §1; return value read in the asm)
+    every file: "../../9Data/Shine/<f>", then "../9Data/Shine/<f>"; neither → "*FAILED GLOBAL GAME DATA READ - <f>", return 0
+    ItemInfo.shn            → g_ItemInfo (itemdatabox): FUN_0044a320 (fopen probe, then ItemDataBox::ReadData FUN_0044a060,
+                              Z24 §7.3: ItemInfo only, name trie for idb_2itemid FUN_00402cf0)
+    DefaultCharacterData.txt → +0x209890 (CServerInfo::ReadServerInfo, CCsl)
+    FaceInfo.shn, HairColorInfo.shn, HairInfo.shn → CDataReader::Read(path, key, rowSize) FUN_00441c80 with
+                              (0x45f, 0x3a), (0xc5, 0x3e), (0x3a4d, 0x1e8)   # the file's first u32 must equal key and its
+                              u32 at +0x2c (record length) − 2 must equal rowSize (W05 §3.1 Shn_LoadChecked)
+    HairShop01 … HairShop05 by idb_2itemid; any missing → "*Not found HAIRSHOP_ITEMGRADE_<n>, ItemIndex = HairShop0<n>"
+                              for each, return 0;  UniChange01 missing → "*Not found HAIRSHOP_ITEM_GENDER …", return 0
+    HolyPromiseReward.shn (0x2a1, 0x46); every row's item index must exist, else log
+                              "ERROR - HOLY_PROMISE_REWARD Unknowned Level=%3d, Class=%2d, item = '%s'" per row, return 0
+    AttendReward.shn (0x98, 0x26); the first row with an unknown item → "ERROR - AttendReward Invalid Item : RewardID(%d),
+                              Index(%s)", return 0
+    TutorialCharacterData.txt → +0x209f4c
+    nServerID == 2: MapInfo.shn → g_MapInfo (mapdatabox, MapDataBox::CheckReadData FUN_00449be0 → mdb_Load FUN_004497f0, §2.2)
+    return 1
+```
+
+Every table is checked at start and any gap stops the start (−4): the server never runs with a partial table set. The
+SHN reads go through `CDataReader::Read(path)` FUN_00441a20 (near-identical to the Account / WM copy, W05 §3.1), which
+also registers the file's MD5 in `ShnDataFile` (`CShnDataFileCheckSum::InitDataFileCheckSum` FUN_00442b20,
+`CMD5Checksum::GetMD5` FUN_004440d0 / `Final` FUN_00443f20 *(inferred from the structure; the body differs from Account's
+in the decompiler only)*). `CShnDataFileCheckSum::CShnDataFileCheckSum` FUN_00442cd0 has the Account / WM list of 49
+client file names (identical after masking): of the files read here only ItemInfo.shn and MapInfo.shn are on it, and
+nothing in the Character server reads the stored digests.
+
+```pseudo
+DataServer::OnStart_Service(this):                                            @ FUN_004027a0   (Account FUN_00401f10)
+    !cUKItemShop::Init(&m_ItemShop (+0x209f18), 0) (FUN_0043f690, §5) → log "FAILED - UK ItemShop Init"; return false
+    m_bOnStopService = 1
+    CIOCP::Start(5 × CPU, wait 1), "<NUMBER OF %d IOCP WORKTHREAD STARTED, %d CPU DETECTED>"; n ≠ 5 × CPU → false
+    m_PacketQueSize = 0; CSessionWorkerManager::Start(-1, 1) FUN_0043e9e0 (same as Account: min(10 × CPU + 1, 81)
+        workers, 0x12a8 bytes each, one ODBC link each); Start_Acceptor FUN_00401bb0; Start_MainThread FUN_00402720
+    log "SERVER WORK START ---…"
+    # Character only: one job queued to itself
+    s_SelfSession = static CSession (DAT_004e2908, built on first use, guard bit DAT_004e2a5c & 1, atexit dtor)
+    frame = { u8 2, u16 0xC414 }                    # NC_COLLECT_CHARACTERDB_UP_GET_CARDCOUNT_CMD, no body
+    while CSessionWorkerManager::AddQue(&m_SessionWorkerManager, &s_SelfSession, frame, 3) == 0: Sleep(2)
+    return true
+```
+
+The 0xC414 handler (`LAB_00427cf0`, D03 §12) has no `CheckAlive`, so the first free worker runs it although the session
+was never connected (`m_Connection` 0): the collection-card serial counters are loaded right after start. No zone or WM
+build sends 0xC414 (the open point of Z28 §7), so this self-job is the only load: if it fails ("ERROR -
+fc_NC_COLLECT_CHARACTERDB_UP_GET_CARDCOUNT_CMD, DB Data Get Fail") nothing retries it and every new sealed card is saved
+without serial until the next restart (D03 §12's effect). This corrects D03 §12 / knowledge D03 "loaded only when a zone
+sends 0xC414" (knowledge D08 §0). An item-shop failure stops the start before the IOCP threads, workers and listener exist;
+the other failure paths leave threads running as in Account (D05-B10).
+
+```pseudo
+DataServer::MainThread(this):                                                 @ FUN_004023c0   (Account FUN_00401620, §1.3)
+    log "<MAIN THREAD START>"; m_bActiveMainThread = 1
+    while m_bStopMainThread == 0:
+        Sleep(1000); CSession_Manager::ProcHeartBeat(&m_SocketSessionManager)
+        if g_GameLogLink == null: CSession::ConnectToGameLog(this)            # FUN_00401cd0, §4.3: once a second until connected
+    the Account tear-down (listener, workers, DissconnectSessions, CIOCP::Close, CloseSessions, ViewStopInfo FUN_00401270)
+    m_bActiveMainThread = 0; m_bOnStopService ≠ 0 → "<SERVER MANUAL STOPPED>", return 0; else "<SERVER SELF STOPPED>", exit(0)
+```
+
+`DataServer::OnStop_Service` FUN_00401100, `Start_MainThread` FUN_00402720 ("*FAILED CREATE MAIN THREAD*"),
+`ViewStartInfo` / `ViewStopInfo` FUN_00401130 / FUN_00401270 are the Account code with the members moved (§4.1). The
+0x2803 handler FUN_0043d000 writes `m_bStopMainThread`, so D08-B2 holds here too. A blocking connect to a silent
+GameLog host holds the main thread (no heartbeat checks, a stop request waits) for the TCP connect timeout of every
+attempt (S02-B5, *inferred*: the Windows default is about 21 s).
+
+### 4.3 The GameLog link
+
+The Character server is the only DB server that connects out. D02 §1 / §2 describe what is sent on the link and the
+0x0802 rule ("links are refused until GameLog is connected"); the link itself:
+
+```pseudo
+CSession::ConnectToGameLog(this)   (name from its log text)                   @ FUN_00401cd0
+    row = CServerInfo::GetServerInfo(&g_Server, type 3 = GameLog, nWorldNo, nZoneNo)   # PG_W00_GLDB, port 9511 (§1.2)
+        none → log "CSession::ConnectToGameLog()에서 서버 연결정보를 찾을수 없음, 스크립터 확인필요"
+               ("… cannot find the server connection info, check the script"); return
+    ip = row.pIP; "" → InetAddress::GetHostAddress() (this host)
+    s = CSocket_IOCP (stack object)
+    if !CSocket_IOCP::Connect(&s, m_ConnectSocket_BindIP, 0, ip, row.port):   # FUN_0044b800 = S02 §1.5 (blocking)
+        if s_bLinkUp (DAT_004d7000, initially 1): s_bLinkUp = 0; log "CONNECT TO GAMELOG SERVER TO %s:%d"
+        # the line is written once per outage, at the first failed attempt (the text reads like an attempt notice)
+    else:
+        e = CSession_Manager::ActiveSession(&m_SocketSessionManager, socket, …)   # a pooled session, registered with the IOCP
+        none (pool full) → close the socket (next try in 1 s)
+        else: g_GameLogLink = e.pSocketSession; .m_Connection = 2; .m_Connected_Server_ID = 3; socket handed over; s_bLinkUp = 1
+    ~CSocket_IOCP(&s)
+
+handshake on that session (handlers of D02 §2, X02 knowledge §0, row D02 §2):
+    GameLog accepts and sends 0x0801  → fc_NC_MISC_S2SCONNECTION_RDY FUN_0043c7a0: send 0x0802 { echo (never written,
+        X02-B12), to 3, from nServerID, world nWorldNo, zone 0, key from + 3 }
+    GameLog answers 0x0803 { u16 err } → fc_NC_MISC_S2SCONNECTION_ACK FUN_0043cd20: err == 0 → m_Connection = 1,
+        log "Connected to   %p (%-25s world=%3d zone=%3d, …)"; err ≠ 0 → nothing (the link stays at 2)
+
+close of any session:   CSession_Manager::InactiveSession(list entry)          @ FUN_0043de40   (Account FUN_00405d60, §1.4)
+    under the manager lock: m_Connection ≠ 0 → log "Closed    from %p (…)";
+        m_Connected_Server_ID == 3 → g_GameLogLink = null; log "GAMELOG SERVER DISSCONNECT, WILL RECONNECT TO GAMELOG"
+    CSocket_Session_Manager::InactiveSession (back to the pool)
+```
+
+`g_GameLogLink` is set as soon as the TCP connect succeeds, before the handshake: 0x0802 requests of WM / zone links are
+accepted from then on, and the log packets that handlers send in that first round trip arrive at GameLog before its
+0x0803 has authenticated the link (GameLog's `CheckAlive` drops them, D05 §7.2) *(inferred: a few milliseconds)*. The
+pointer is cleared on the IOCP thread and read by the workers without a lock; a worker that read it just before the close
+sends into a pooled session, possibly reused by another peer (the D08-B3 pattern) *(inferred)*. The close test looks only at
+`m_Connected_Server_ID == 3`, not at `g_GameLogLink`: an incoming link that announced itself as server type 3 in its
+0x0802 (the 0x0802 handler accepts any `server_id_from`) clears the pointer when it closes, while the real GameLog link
+stays open and unused, and the main thread opens a second one **(original bug) D08-B5**.
+
+`CSession_Manager::FindSession(type, from)` FUN_0043dc20 is the AccountLog function of §3.3 (identical after masking):
+the first list node at or after `from` (null = head) whose session has `m_Connection == 1` and
+`m_Connected_Server_ID == type`. Its only caller is `SendToWorldManager` FUN_00402d80 (D03), with type 5 = the WM and
+`from` = null: the first authenticated WM link (one per world).
+
+### 4.4 Workers, the DB link, the parser
+
+- `CSessionWorker::DB_Init` FUN_0043e040: `CServerInfo::GetODBCInfo(id 10 = w00_Character, nWorldNo)` (Account: id 0);
+  none → "DB_Init FAILED, Scriptor BASE ODBC info. not found."; `CGameDB_Connect::DBConnect` failure → "DB_Init FAILED = "
+  + the reason. One link per worker, as in Account (AccountLog has two, §3.4).
+- `CSessionWorkerManager::Start` FUN_0043e9e0: the Account code (§1.5) with `new CSessionWorker` of 0x12a8 bytes.
+- `~CSessionWorker` FUN_0043e420: Account's plus the reset of the `CSQLPPrison` base (FUN_004659d0) before `~DBRecord`.
+- `CParser::CParser` FUN_0043d2f0: the D01 §2 base table (2/1 RDY, 2/2 REQ, 2/3 ACK, 2/4 heartbeat `LAB_0043cdf0`, 2/5
+  `fc_ReturnTrue`, 10/1, 10/3, 10/5, 10/7 OPTool, 2/0x23 `fc_CheckAliveOnly`; default `CPFs::fc_dummyfunction`
+  FUN_0043c6d0); `CParser::Parser` FUN_0043d420 is the AccountLog dispatcher of §3.4 (identical body).
+- Transactions: `Database::CommitTran` FUN_00451e70 is reached only from `close` / `openDB` / `~Database` and no code
+  sets `m_bTran`: the Character server runs in autocommit like Account (§2.5). `Database::InitEnv` FUN_00451dd0 is the
+  Account copy, so D08-B4 holds.
+- The session layer below (`CSession`, `CSession_Manager`, `CSocket_*`, `CIOCP*`, `CPacket`, `CSendPacket`) is the Account
+  code (§1.6 Character column); `CSession::~CSession` FUN_0043d9c0 / deleting dtor FUN_0043db60, `Accept_Process`
+  FUN_0043dfb0 and `CIOCP::Stop` FUN_004471f0 differ only in labels.
+
+### 4.5 Game data in the Character server (replaces the part-2 guess in §2.1)
+
+| Table / object | Loaded | Read by |
+|---|---|---|
+| ItemInfo.shn → `itemdatabox` (`g_ItemInfo` DAT_006ed408) | `GameData_Load` | `idb_2itemid` and the row getters of the item handlers (D02 §3 create, D03, D04, D07; 20 functions) |
+| DefaultCharacterData.txt, FaceInfo / HairColorInfo / HairInfo.shn, hair-shop ids, HolyPromiseReward.shn, AttendReward.shn, TutorialCharacterData.txt | `GameData_Load` | D02 §3 (create), §10 (beauty shop), §12 (attendance), §8 (tutorial); D04 §8 |
+| MapInfo.shn → `mapdatabox` (`g_MapInfo` DAT_006ecee8) | `GameData_Load` (nServerID 2) | only `GetCharBaseData` FUN_0046e2e0 (D02 §4: the 37th column's map name → `mdb_btree`, then `mdb_index` for RegenX / RegenY) |
+| `itmattcontainer` (`g_ItemAttrClassContainer` DAT_006ef2e8) | static constructor | `ItemAttributeClassContainer_Get` FUN_0044d380 from the item-record builders and readers (D03 / D07 §1.3): vtable slots 1 `iac_fill2buffer`, 2 `iac_fill2struct`, 32 / 33 `iac_SetItemOptionUpgrade` / `iac_ClearItemOptionUpgrade` (slot names from the Account vtables) |
+| `itemoptiondata`, `rewarddata`, `fprewarddata`, `rndbox`, `charinvenman`, `g_ItmBelongAttr`, `ShnDataFile` | static constructors (§2.1) | nothing (`rndbox` is filled at start-up and never read) |
+
+No Character code calls vtable slot 5 (`iac_itemcreate`): the reward-item path writes records itself (D07 §1.3), so the
+`ItemAttrCls_*::iac_itemcreate` bodies and their stubs `RidingInitHungry` FUN_00401e80 (returns 100) and the folded
+"return 0" FUN_00401e90 (`RidingInitHP`, `WeaponCostumInitCharge`; read by `ItemAttrCls_Riding::iac_itemcreate`
+FUN_0044e3b0 and `ItemAttrCls_CostumWeapon::iac_itemcreate` FUN_0044e480) are dead here as in Account.
+
+### 4.6 Library code the Character build links in addition
+
+- MSVC `<sstream>` / locale / `num_put` instantiations (0x43eed0–0x4493b0 below): used by `SQL_BuildCallString`
+  FUN_00460bf0 (D06 §7.2: `std::stringstream` builds `"{CALL name(?,…)}"`) and the item-shop client's `std::string`s (§5).
+  Standard library; nothing project-specific.
+- The crash-dump helpers of `MiniDumper` (`FillInStackFrame`, `EHInternalGetStackTraceString`, `GetFaultReason`, …): the
+  WM bodies (W05 §6.3).
+- `cWell512Random::well512_GetRandom` FUN_004515f0 / FUN_004516a0: W05 §6.4 (only `RandomBox` uses them; dead here).
+
+### 4.7 Address table (Character)
+
+Character addresses for the "–" cells of §1.6:
+
+| Function | Character | Difference |
+|---|---|---|
+| `DataServer::~DataServer` / `DataServer::DataServer` | FUN_00401000 / FUN_00401f20 | §4.1 members |
+| `DataServer::OnStop_Service`, `ViewStartInfo`, `ViewStopInfo`, `Start_MainThread` | FUN_00401100, FUN_00401130, FUN_00401270, FUN_00402720 | member offsets only |
+| `DataServer::ReadDefineScriptor` | FUN_004013b0 | file name only |
+| `DataServer::MainThread`, `Start`, `OnStart_Service` | FUN_004023c0, FUN_00402570, FUN_004027a0 | §4.2 |
+| `CSession_Manager::InactiveSession` | FUN_0043de40 | clears `g_GameLogLink` (§4.3) |
+| `CSocket_Acceptor_Process_Manager_App::Accept_Process` | FUN_0043dfb0 | labels only |
+| `CSessionWorker::DB_Init`, `~CSessionWorker`, `CSessionWorkerManager::Start` | FUN_0043e040, FUN_0043e420, FUN_0043e9e0 | §4.4 |
+| `CIOCP::Stop`, `CGTimer::GetTime` | FUN_004471f0, FUN_004503b0 | labels only |
+
+Character functions identical (or near-identical, marked ~) to the cited Account / WM / zone function and cited by no
+other document (the SOAP classes of 0x43f310–0x43f660 are §5's):
+
+| Class (Character functions) | Same as | n |
+|---|---|---|
+| `ItemAttributeClass` + `ItemAttrCls_*`: 0044d440 0044d460 0044d4b0 0044d4d0 0044d500 0044d520 0044d540 0044d590 0044d5b0 0044d5c0 0044d5e0 0044d600 0044d620 0044d630 0044d640 0044d680 0044d690 0044d6a0 0044d740 0044d750 0044d760 0044d770 0044d790 0044d7a0 0044d7b0 0044d7c0 0044d7d0 0044d7e0 0044d7f0 0044d840 0044d870 0044d960 0044ddd0 0044de80 0044df00 0044df40 0044dfe0 0044e110 0044e1b0 0044e250~ 0044e2a0 0044e2c0 0044e340 0044e360 0044e3b0 0044e400 0044e480 0044e4b0 0044e4d0 0044e510 0044e530 0044e550~ 0044e5e0 0044e620 0044e650 0044e700 0044e720 0044e740 0044e770 0044e790 0044e7b0 0044e7d0 0044e810 0044e8c0 0044e940 0044e960 0044e9a0 0044e9e0 0044ea90 0044ead0 0044eb10 0044eb50 0044eb90 0044ebd0 0044ec60 0044ece0 0044eda0 0044ee00 0044ee20 0044ee50 0044ee80 0044eea0 0044ef20 0044ef40 0044ef90 0044f140 0044f160 0044f170 0044f190 0044f1b0 0044f1d0 0044f1f0 0044f210 0044f230 0044f240 0044f270 0044f290 0044f2b0 0044f2d0 0044f300 0044f670 0044f6a0 0044f7f0 0044f810 0044f830 0044f850 | §2.6 row 1 (Z04 §1); used slots §4.5 | 106 |
+| trivial folded bodies (8 lines: return a constant, the argument or a member address, or empty; shared by many vtable slots of the item, gamble, class and STL classes, so no single name applies), incl. the `RidingInitHP` / `WeaponCostumInitCharge` fold FUN_00401e90: 00401e90 0043ed70 0043f370 0043f410 0043ffa0 0043ffe0 00440380 00440390 004403a0 004403b0 004403c0 004403d0 0044d420 0044d430 0044d450 0044d470 0044d480 0044d490 0044d4a0 0044d4c0 0044d4e0 0044d4f0 0044d510 0044d530 0044d550 0044d560 0044d570 0044d580 0044d5a0 0044d5f0 0044d610 0044d660 0044d670 0044d780 0044ddb0 0044ddc0 0044de00 0044de10 0044de20 0044de30 0044de40 0044de50 0044de60 0044de70 0044e5d0 0044e6f0 0044e9d0 0044eb00 0044ecb0 0044ecd0 0044ed90 0044edf0 0044ee10 0044ee90 0044ef80 0044f180 0044f260 0044ff70 004517d0 004518c0 00451a90 00452780 | – | 62 |
+| `ItemDataBox`, `BinaryDataBox<ItemInfo / ItemInfoServer / GradeItemOption / ItemDropLog / ItemSort / ItemInvenDel / ItemMoney>`, `ItemBelongAttribute`; FUN_0044a320 = the fopen probe before `ItemDataBox::ReadData` (shape of `MapDataBox::CheckReadData`, no official name): 00402cf0 00449c20 00449c40 00449c50 00449c60 00449c70 00449c80 00449c90 00449ca0 00449cd0 00449d00 00449d30 00449d60 00449d90 00449dc0 00449df0 00449f90 0044a060 0044a270 0044a2f0 0044a320~ 0044a360 004517e0 00451820 | §2.6 rows 3, 6 (Z27 §1.1, Z24 §7.3); §4.2, §4.5 | 24 |
+| `MapDataBox`, `BinaryDataBox<MapInfo>` (`bdb_ReadData` differs only in inlined code addresses), `BinaryData`, `BTree`: 00449740~ 004497f0~ 00449a90 00449ad0 00449b60 00449be0 0044ccc0 0044cce0 0044cd10 004503e0 00450400 00450410 | §2.2; §2.6 row 5 | 12 |
+| `CDataReader` (incl. `Read(path)` FUN_00441a20), `CShnDataFileCheckSum` (incl. the ctor FUN_00442cd0), `CMD5Checksum` (`Final` FUN_00443f20, inferred): 0043fd50 0043fd80 004402a0 00440fd0 00441a20~ 00441c80 00442b20 004436d0 004436e0 00443710 00443df0 00443f20~ 004440d0~ | §2.6 (W05 §3.1, §3.4, §6.3); §4.2 | 13 |
+| `ItemOptionsData`, `OptionCardStack`, `BinaryDataBox<ItemOptions / ShineReward / FriendPointReward>`, `EnchantSocketRateData`, `RandomBox`, `RandomSlot`, `cWell512Random`, `CardDeck::CardStack`, `List* / ListEraser<CardDeck::Card>`, `List<AbnormalStateContainer::AbnormalStateNode>`: 00451580 004515c0 004515f0~ 004516a0~ 00451700 004517f0 00451850 004518d0 00451ab0 00451ac0 00451b50 00451ba0 00451c30 004521d0 00452390 00452490 00452680 004526b0 004526e0 00452730 00452790 004527d0 00452840 00452890 00452a10 00452a90 | §2.4; §2.6 rows 8–11 (Z09 §28.10, W05 §6.4) | 26 |
+| `Database`, `DBRecord`, `CGameDB_Connect`: 0043e030 0044fab0 0044fad0 0044fde0 0044fe60 0044fed0 00451db0 00451dd0 00451e70 00451fd0 00452010 00452080 | §2.5; §4.4 | 12 |
+| `CharacterInventoryManager` (`cim_inven` +0xe54; the two accessors FUN_0044ff90 / FUN_0044ffa0 return +0x4f98 / +0x51e0 where Account's `cim_quest` / `cim_minihouse` return +0x6558 / +0x67a0: another `CharacterInventory` layout, inferred; no code calls them): 0044ff80 0044ff90~ 0044ffa0~ | §2.1 | 3 |
+| process layer: `CPFs::fc_dummyfunction`, `CParser::Parser`, `CSession::~CSession`, `inet_ntoa` thunk, `GetCurrentTimeString2`, `_DEBUGMSGVC`, `CSocket_IOCP::Connect`, `CSendPacket::GetSendSize / GetSendPtr`: 0043c6d0 0043d420 0043d9c0~ 0043fbcc~ 00447630 00447940 0044b800 0044f9d0 0044f9f0 | §1.6, §3.4, §4.3, §4.4; S02 §1.5 | 9 |
+| `MiniDumper` crash-dump helpers (`FillInStackFrame`, `CH_ReadProcessMemory`, `EHConvertSimpleException`, `EHInitSymbolEngine`, `EHCleanupSymbolEngine`, `EHInternalGetStackTraceString`, `GetFaultReason`, `GetFirstStackTraceString`, `GetNextStackTraceString`): 00450960~ 004509e0 00450a10 00450c60 00450c90 00450cc0~ 004510c0~ 00451510 00451570 | W05 §6.3 | 9 |
+| MSVC STL / CRT: `std::basic_string`, `basic_stringstream` / `stringbuf` / `streambuf` / `ios_base` / `istream` / `ostream`, `locale` facets (`ctype`, `numpunct`, `num_put`, `codecvt`), `bad_alloc` / `logic_error` / `runtime_error` / `system_error` / `ios_base::failure`, `allocator`, catch funclets: 0043eed0 0043ef00 0043ef20 0043ef80 0043efd0 0043f113~ 0043f13c 0043f19b~ 0043fbe0 0043fc10 0043fc50 0043fc60 0043fcb0~ 0043fce0 0043fd20~ 0043fdf0~ 0043fe00 0043fe10~ 0043fe30 0043fe60 0043fe80 0043fea0~ 0043ff00 0043ff20 0043ff50 0043ff70 0043ffb0 0043fff0 00440020~ 00440080 00440160 00440180 004401b0 00440240 00440270 004402e0 00440300~ 00440410~ 004404e0~ 004405b0 004405e0 00440610 00440660 004406d0 00440890 004409b0~ 004409f0~ 00440a60~ 00440ac0~ 00440af0 00440be0 00440c20 00440c50 00440d78~ 00440d90 00440e40 00440ef0 00441030~ 004410b0 00441140~ 004412f0 00441430 00441440 00441450~ 004414a0~ 004414c0 00441510~ 00441550 0044167c~ 004416f0 00441743~ 00441750 00441770 00441790 004417b0~ 004418a0 00441950 00441cc0 00441d30 00441de0 00442056~ 004420a0 004421e0 00442220 00442270 004422c0 00443ea0~ 00447980 00447a10 00447a80 00447af0 00447b90 00447c50~ 00447d50 00447e90 00448153~ 004481a0~ 00448270~ 004482a7~ 00448320~ 00448890~ 00448b20~ 00448b80~ 00448da0 00448ea0 00448f20 004491b0~ 004493b0 0044c580 | – (§4.6) | 109 |
+
+385 functions; `~` = near-identical (labels, inlined code addresses or decompiler types differ; the diff was read).
+
 ---
 
 ## Original-server bugs
@@ -1015,13 +1259,20 @@ with 0x4E and does not use `nMinute` (login-server.md §5.1). A logoff time in t
 | D08-B2 | 0x2803 `CPFs::fc_NC_OPTOOL_CLOSE_SERVER_REQ` + `DataServer::MainThread` (all four builds) | sets `m_bStopMainThread`; the main thread stops listener, workers, links and IOCP, then returns without reporting to the service manager | the DB server is dead but the service is RUNNING until stopped by hand; Login / WM cannot reconnect | end the service (report STOPPED / exit) after a remote stop |
 | D08-B3 | job queue (`GetJobA` FUN_00406780) (all four builds) | a queued record keeps a raw pooled `CSession*` | after a close and an immediate reconnect the old link's request runs on the new link (reply to the wrong peer; a 0x0802 sets the new link's identity) *(inferred)* | tag records with a session generation / drop records of closed sessions |
 | D08-B4 | `Database::InitEnv` FUN_00417330 (all four builds) | the connection-pooling `SQLSetEnvAttr` is accepted only as `SQL_SUCCESS`; on any other result the function fails without freeing or clearing the environment handle | a driver manager answering `SQL_SUCCESS_WITH_INFO` makes every worker's connect fail (server does not start) and leaks one environment handle per attempt *(inferred: the 2016 hosts answer `SQL_SUCCESS`, the servers start)* | accept 0 / 1 like the other calls; free the handle on failure |
+| D08-B5 | Character `CSession_Manager::InactiveSession` FUN_0043de40 (§4.3) | clears `g_GameLogLink` when any session with `m_Connected_Server_ID == 3` closes, without comparing it with `g_GameLogLink` | an incoming link that announced server type 3 in its 0x0802 (accepted for any `server_id_from`) clears the pointer when it closes; the main thread opens a second GameLog link while the first stays open and unused (needs a misconfigured or hostile peer) | clear only when the closing session is `g_GameLogLink` |
 
-Next free ID: D08-B5.
+Next free ID: D08-B6.
 
 ## Not reconstructed / uncertain
 
 - §1.5: per-link ordering of requests is not guaranteed by the code; whether the peers ever send two dependent
   requests back to back on one link is not checked here (the handlers are D01–D05's).
+- §4.1 / §4.4 (Character): the members after `+0x9838` and the worker's DB object (+0x124c, 0x5c bytes) have no PDB; the
+  member names are ours and the DB object's bases are known only by the one RTTI name `CSQLPPrison`. FUN_00443f20 is
+  named `CMD5Checksum::Final` from its structure (padding, length, 16 hex bytes), not from an identical body;
+  FUN_0044a320 (the ItemInfo fopen probe) has no official name in any PDB.
+- §4.3: the timing claims (log packets dropped before GameLog's 0x0803, the `g_GameLogLink` race) are deduced from the
+  code paths, not observed; no capture covers the Character ↔ GameLog link.
 
 ## Coverage boundary
 
