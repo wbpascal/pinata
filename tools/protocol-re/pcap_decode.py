@@ -533,7 +533,8 @@ def decode_capture(path, ports, show_secrets=False):
                 idx = seeds[si][1] % 499
                 st["decrypt"].append(f"seed {seeds[si][1]} (frame {seeds[si][0]}): index {idx}")
                 si += 1
-            if p["resync"]:
+            # offset 0 of a capture without the SYN: a seed seen before it still applies (P02)
+            if p["resync"] and p["off"]:
                 flush()
                 idx = None
             if idx is None:

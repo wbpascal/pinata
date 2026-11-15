@@ -108,9 +108,9 @@ No payload fields read directly by the handler.
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8[32] | token | must exist in the table filled by WM message 0x0C35 |
+| 0 | char[32] | token | must exist in the table filled by WM message 0x0C35. evidence: capture:login-logout, capture:idle_in_world: the 32 ASCII hex characters of the WM 0x0C34 token, no NUL |
 
-L00 name was 'token login'
+L00 name was 'token login'; P02 retyped u8[32] -> char[32] (captured content is ASCII)
 
 Handler `FUN_00406bb0` · packet length check: != 0x22 (length includes the opcode)
 
@@ -457,6 +457,16 @@ Sent in reply to `0x2818` NC_OPTOOL_LOGON_PROCESS_TIME_VIEW_REQ on CParserOPTool
 Empty payload.
 
 answered with bare 0x0805
+
+### `0x0c18` NC_USER_NORMALLOGOUT_CMD (C→S)
+
+**Verified layout** (basis: pdb2016 PROTO_NC_USER_NORMALLOGOUT_CMD; Login handler LAB_004062e0 ignores it)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | LogoutType | evidence: capture:login-logout: 0 when the client quits from the world-select screen |
+
+P02
 
 ### `0x0803` NC_MISC_S2SCONNECTION_ACK (Login→WM, AccountDB/AccountLogDB→Login)
 
