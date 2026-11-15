@@ -387,7 +387,8 @@ RandomBox::RandomBox(this)                                                      
 
 RandomSlot::rs_Init(this, n)                                                        @ FUN_00467e00
     rs_slot[i] = ⌊i·n / 0x4000⌋ for i in 0..0x3FFF                # each of 0..n−1 equally often
-    for i: j = rand() scaled to 0..0x3FFF (_ftol2); if j < 0x4000: swap(rs_slot[i], rs_slot[j])
+    for i: j = _ftol2(rand() * 16384.0 / 32767.0)   # doubles at 0x48DDB8 / 0x48DDB0; j in 0..0x4000
+           if j < 0x4000: swap(rs_slot[i], rs_slot[j])   # j = 0x4000 only for rand() = 32767: that draw skips the swap
     for i: if rs_slot[i] ≥ n: rs_slot[i] = 0                      # never true
 ```
 
@@ -494,12 +495,31 @@ No server behaviour; a rebuild does not reproduce it.
 - The original names of the folded vftable slots (`CGuild` 0x04–0x10, 0x28; `CGuildMember` 0x00–0x14, 0x24;
   `CGuildAcademyMember` 0x0C): the folded bodies keep one PDB name; the 2017 client folds the same way. 0x24 / 0x0C as
   the LEAVE handlers and 0x28 as MONEY_SUB are *(inferred)* from the opcode order and the callers.
-- The opcodes "not sent by the 2016 WM" (0x741F, 0x742B, 0x742C, 0x742E, 0x743A, 0x743B, 0x743C, 0x743F, 0x7442,
-  0x9864, 0x9865, 0x9867): no send site in the WM or zone layouts; whether another server sends them was not checked.
-- §3.1: the `rand()` → index scaling constant of `RandomSlot::rs_Init` (an `_ftol2` of a float product) was not read;
-  it only shapes the shuffle of rings nothing in the WM reads. §3.2: that `itemoptiondata` / `rewarddata` /
-  `fprewarddata` come from a source file shared with the zone is *(inferred)* from the identical classes there.
+- The opcodes with a client handler but no 2016 send site (0x741F, 0x742B, 0x742C, 0x742E, 0x743A, 0x743B, 0x743C,
+  0x743F, 0x7442, 0x9864, 0x9865, 0x9867; §1.4): the sweep checked all seven 2016 servers (Login, WorldManager, Zone,
+  Account, AccountLog, Character, GameLog): none has the opcode as a hex or decimal constant in its `decomp.c`, none
+  has it in `layouts.json` or a `handlers.json` send list, and in `wm-pdb` their `PROTO_NC_*` structs occur only in the
+  dead `Recv_` members of §1.4 (no PDB server export has them at all). They count as never sent by the 2016 build. Not
+  ruled out: an opcode assembled at run time from dept and cmd (no server does that elsewhere *(inferred)*).
+- §3.2: that `itemoptiondata` / `rewarddata` / `fprewarddata` come from a source file shared with the zone is
+  *(inferred)* from the identical classes there.
 
 ## Coverage boundary
 
-(Filled by the sweep part.)
+The sweep checked every direct caller and callee (and the callees of non-hub callees) of the 196 functions this
+document cites: all are cited by some document except three CRT functions (first row). `python3 -I
+docs/plan/status/X02-cov.py game wm 100` reports 0 uncited class-named WM functions (98 before this item);
+`coverage.py W06` does not apply (no scope table).
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| `operator_new` FUN_00469d3f, `operator_delete[]` FUN_0046b6b7, FUN_004701e3 (called by `type_info::_Type_info_dtor`) | none needed (CRT) | Visual C++ runtime, like the `type_info` members of §3.6: no server behaviour, a rebuild uses its own allocator / RTTI |
+| The WM side of the live guild slots (`NOTIFY_CMD`, `ACADEMY_NOTIFY_CMD`, member / academy JOIN, VANISH, LEAVE, GRADE): the handlers that call them | W03 (done) §2–§6, cited per slot in §1.3 | §1.3 documents only what the slot itself does; the WM handlers, DB round trips and broadcasts are W03's pseudocode |
+| CharDB 0x9828 answer path that ends in slot 0x4C (W06-B1) | W03 (done) §6.2 / §6.3 | the handler is documented there; W06 adds the slot body and the overflow (B1) |
+| Client handlers of the 12 never-sent opcodes (`GuildTask` FUN_006b7e70, `GuildMemberTask` FUN_006b1b10, `GuildAcademyMemberTask` FUN_006f3530 rows) | C01 (done), `docs/knowledge/C01.md` dispatcher tables | client code for packets no 2016 server sends (see "Not reconstructed / uncertain"); C01 lists them, nothing on the server side to rebuild |
+| `CSocket_IOCP::Send` FUN_004666f0 (return value behind E14) | S02 §1.5 | the full send path is documented there; §2.1 states only its 0 / 1 result |
+| Zone `RandomBox` (FUN_0063cdb0) and its readers | Z23 (done) §8.6, Z28 | §3.1 documents the WM copy; the zone rings are read there, and the WM reads only the Well512 member |
+| `RandomBox::rb_1000` FUN_00467bc0 caller `CKQServer::KQTeam_DivideRandom` FUN_00453540 | W04 (done) §6.2, W05 (done) §6.4 | the KQ team draw is documented there; §3.1 only adds that it ignores the rings |
+| Zone loaders of `ItemOptions` / `ShineReward` / `FriendPointReward` (the tables behind §3.2's globals) | Z01 (done) §2.3 (loader table), Z09 (done) §10.10 (`tcm_ItemMake(ShineReward)`), Z08 §6 (FriendPointReward draw) | in the WM these globals are never loaded (§3.2); the zone use is documented there |
+| Client flag +0x148C (seated at a dice table / slot machine) that drops 0x9404 | W04 (done) §12.3 + §2.3 here | E25 verdict recorded here; the dice game itself is W04's |
+| WM SHN tables actually loaded (`UseClassTypeInfo` = `CharClassDataBox` etc.) | W05 (done) §3.2 | §3.2 only cites it to show the reward / option tables are not among them |
