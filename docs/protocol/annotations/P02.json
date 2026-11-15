@@ -3745,7 +3745,7 @@
      "combat"
     ],
     "fields": {
-     "netpacketheader.clienthandle": "echo; last of 44 blocks, 17–19 ms after 0x1004"
+     "netpacketheader.clienthandle": "echo; last of 37 packets (36 blocks + 0x1005), 17–19 ms after 0x1004"
     }
    },
    "0x7019": {
@@ -3867,7 +3867,7 @@
     ],
     "fields": {
      "ref": "echoed",
-     "wldmanhandle": "35000 / 32500; last of 34–36 packets of one WM pass"
+     "wldmanhandle": "35000 / 32500; last of 31–33 packets of one WM pass"
     }
    },
    "0x441d": {
@@ -5393,7 +5393,7 @@
     ],
     "fields": {
      "dead": "mob handle",
-     "attacker": "killer; 42–54 ms after a swing kill, same ms after a skill kill"
+     "attacker": "killer; 41–55 ms after a swing kill, same ms after a skill kill"
     }
    },
    "0x240b": {

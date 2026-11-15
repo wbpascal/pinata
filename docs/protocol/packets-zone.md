@@ -11927,7 +11927,7 @@ only the self-kill send site of Z09 (cMobSuicide / ShineSuicide / servant vanish
 
 2017 PDB alias of 0x244A (the zone→WM direction is NC_BAT_PKINPKFIELD_WMS_CMD, Z03). Sent once to sight when the mob's mode becomes 3.
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `dead`: mob handle; `attacker`: killer; 42–54 ms after a swing kill, same ms after a skill kill
+**Captured** (P02, `capture-validation.md`; shop, combat): `dead`: mob handle; `attacker`: killer; 41–55 ms after a swing kill, same ms after a skill kill
 
 ### `0x245A` NC_BAT_AREADOTDAMAGE_CMD (hand-named) (S→C)
 

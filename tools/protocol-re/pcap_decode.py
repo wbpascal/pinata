@@ -944,10 +944,10 @@ def selftest():
         r = decode_packet("zone", S2C, 0x240C, bytes(docs["pdb"][0x240C]["size"]), docs)
         assert r["source"].endswith("(annotation did not fit)") and not r["issues"], r
         # captured variant layout from an `evidence` entry (P02 sweep: W04 0x7C07 4-byte short form)
-        vk = next(iter(docs["variants"]), None)
-        if vk:
-            r = decode_packet(vk[0], vk[2], vk[1], bytes(decode_ann(b"\0" * 4096, docs["variants"][vk][0], docs["structs"], docs)[2]), docs)
-            assert r["source"] in ("annotation", "annotation (captured variant)") and not r["issues"], r
+        vk = ("wm", 0x7C07, S2C)
+        assert vk in docs["variants"], sorted(docs["variants"])
+        r = decode_packet(vk[0], vk[2], vk[1], bytes(decode_ann(b"\0" * 4096, docs["variants"][vk][0], docs["structs"], docs)[2]), docs)
+        assert r["source"] == "annotation (captured variant)" and not r["issues"], r
         f = decode_ann(b"\x02\x01\x00\x02\x00", [[0, "u8", "a.num", ""], [1, "u16[a.num]", "arr", ""]], {}, docs)
         assert f[0] == [("a.num", 2), ("arr", [1, 2])] and f[2] == 5 and not f[3], f
         # type forms added by P02: [] = rest, bytes = rest, Outer::Inner suffix, inline {u8,u8}, name[i].x overlay, datasize

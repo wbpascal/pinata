@@ -758,7 +758,10 @@ Periodic traffic:
 - AccountLog → WM `0x0809` at the start of each minute: 58.802 s, while the WM's `0x0849` for 12:03:00 goes out at
   58.804 s; then 119.293 s; in `combat` 43.397 and 102.901 s. The sender is `CStatistics::Process` @ AL:FUN_004064b0:
   when the local `tm_min` changes, it sends a raw 4-byte `{03, 0x0809, b}` to every type-5 (WM) session. The WM answers
-  in the same ms with `0xC811`, then `0x080A`, the order of W01 §8 (**confirmed**). D01 §4.2 calls 0x080A "WM every
+  with `0xC811`, then `0x080A`, the order of W01 §8 (**confirmed**): in the same ms at `shop` 119.293 and `combat`
+  102.901, 15 ms later at `shop` 58.802 → 58.817 and 3 ms later at `combat` 43.397 → 43.400 (the next WM pass). Only
+  the first 0x0809 is in step with the WM's `0x0849` (2 ms); in `combat` it leaves 0.6 s / 0.12 s after the 0x0849
+  (42.801 / 102.777), so the two minute clocks are not aligned. D01 §4.2 calls 0x080A "WM every
   interval": **corrected**, the WM sends it only as the answer to 0x0809, once per AccountLog minute.
 
 ### 7.3 Opcodes (Login, Account, AccountLog links)
@@ -800,7 +803,7 @@ out the handle that D02 §4 says every block starts with.
 4.075  WM → CDB  0x0C12 AVATARINFO_REQ {35000, userNo 103}
 4.076  CDB → WM  0x0C5F TUTORIAL_CAN_SKIP {isSkip 0};  4.078 0x0C13 avatar list (2 avatars)    (D02 §3.1 order)
 5.693  client → WM 0x1001 LOGIN_REQ slot 1;  5.696 WM → CDB 0x1004 CHARDATA_REQ               (W01 §4.2, same pass)
-5.698 … 5.715  CDB → WM, 44 packets in D02 §4 step order:
+5.698 … 5.715  CDB → WM, 37 packets (36 blocks + 0x1005) in D02 §4 step order:
        0x1007 base, 0x541C friend points, 0x101A KQ map, 0x1008 shape, 0x100A / 0x100B / 0x10CC / 0x10D5 quests,
        0x100D skills, 0x100E passives, 0x100C abstates, 0x9427 / 0x9429 / 0x9444 holy promise, 0x1012 guild,
        0x1097 academy, 0x1017 ×4 items, 0x1019 titles, 0x101B charged buffs, 0x10D2 single option,
@@ -821,9 +824,9 @@ out the handle that D02 §4 says every block starts with.
   return a row**: a failed call is logged and a call with no row sends nothing. **Corrected** (D02). The WM still sends
   the zone 0x10CB (14 bytes, 6.389 s) without a 0x10CA: its chat-block copy (W01 §6.3, +0x1ECE4) is 8 bytes inside the
   session, not a blob pointer, so it goes out whatever it holds (values checked in part 9, §7.5).
-- **W05 §1.4 confirmed on the wire**: the WM handles at most one packet per session per main-loop pass. The 44 blocks
-  arrive within 17 ms, yet the WM handles 0x1005 (and sends 0x1036 / 0x1003) only 580 ms (`shop`) / 557 ms (`combat`)
-  after it arrived: ≈ 13 ms per pass, which is the `Sleep(5)` that `MainThread` @ FUN_00407340 makes on every pass while
+- **W05 §1.4 confirmed on the wire**: the WM handles at most one packet per session per main-loop pass. The 37 packets
+  (36 blocks + 0x1005) arrive within 17 ms, yet the WM handles 0x1005 (and sends 0x1036 / 0x1003) only 580 ms (`shop`) / 557 ms (`combat`)
+  after it arrived: 580 / 37 ≈ 15.7 ms and 557 / 37 ≈ 15.1 ms per pass, one 15.6-ms Windows timer tick, which is the `Sleep(5)` that `MainThread` @ FUN_00407340 makes on every pass while
   the CharDB link is in state 1 (W05 §1.2, W05-B1: state 1 is normal operation) at Windows timer granularity *(inferred
   for the rounding)*. The three client requests of 6.798 s show the same thing: 0x7019 leaves after 3 ms, 0x7021 one
   pass (16 ms) later.
@@ -919,7 +922,7 @@ t0           client → zone 0x1801 MAP_LOGIN_REQ { wmHandle 35000 / 32500, "Tes
 +2 … 20 ms   zone → WM 0x104B REGISTNUMBER_REQ { ref { zone handle, −1 }, loginreq }               link i
 +2 … 16 ms   WM → zone 0x104C REGISTNUMBER_ACK { ref, usrregnum 103, chrregnum 5, loginreq }       link i
 +5 … 15 ms   zone → WM 0x101C ZONE_CHARDATA_REQ { ref { handle, 5 }, wldmanhandle, "Test2" }       link i+1
-+5 … 19 ms   WM → zone, in one ms, on link i+1 (34–36 packets):
++5 … 19 ms   WM → zone, in one ms, on link i+1 (31 packets with 0x101D, + 0–2 of the bracketed ones: 31–33):
              0x101F 0x1020 0x1021 0x1022 0x10CD 0x10D6 0x1023 0x1024 0x1025 0x1029 0x1098 0x102E ×4
              0x1031 0x1032 0x1030 0x10D3 0x10D0 0x10CB [0xBC01] 0x10DD 0x10E3 0x10E6 0x10E9 [0x1130]
              [0xCC0C] 0x441D 0x1115 0x111F 0xD412 0x1122 0x101D
@@ -941,10 +944,10 @@ t0           client → zone 0x1801 MAP_LOGIN_REQ { wmHandle 35000 / 32500, "Tes
   - 0x1130: only in `shop`'s portal hand-over (2 items sold before it); the WM frees it after the send.
   - 0xCC0C: only in `combat`'s portal hand-over, where the old zone sent 0xCC0B (Test2 on a mount: `nMoverID 160`,
     `nItemSlot 3`). It is a byte-identical copy.
-- **Timing**: 0x1802 leaves 391–455 ms after 0x101D. That is ≈ 12 ms × (34 … 36 packets): the zone handles one packet
+- **Timing**: 0x1802 leaves 391–455 ms after 0x101D. That is ≈ 13 ms × (31 … 33 packets): the zone handles one packet
   per WM link per main-loop pass (`zs_PacketProcess`, Z09 §1.5), and all blobs arrive on one link. The zone sends
-  0x1802 from the 0x101D handler (Z07 §1.4). ≈ 11.5–12.8 ms per pass *(inferred: the sleep manager's `Sleep(1)`, Z09
-  §1.4, at Windows timer granularity)*. This queue is most of the map-login latency.
+  0x1802 from the 0x101D handler (Z07 §1.4). ≈ 12.6–13.8 ms per pass *(inferred: the sleep manager's `Sleep(1)`, Z09
+  §1.4, plus the pass's own work; the split between the two is open)*. This queue is most of the map-login latency.
 - **Handles**: `ref.clienthandle` = the zone's player handle = the 0x1802 `charhandle` (8015, 8004, 8013, 8003,
   8014). `ref.charregistnumber` is −1 in 0x104B (Z01 §5.2) and 5 from 0x101C on. Z01 §5.2 / §5.3 **confirmed**.
 - **Map change**: after a portal or linkto, the 0x101F position is the 0x180D destination: RouCos02 (17418, 13832)
@@ -1307,13 +1310,19 @@ enchant stones 61000…). The client
   deadly, though.") followed by the `MENUITEM` bytes of the 0x3C09 sent at 92.892. `so_ply_SellItemList_Insert` @ FUN_00537a20 writes
   the opcode, `nHandle` and the item through `iti_fill2buffer_union` @ FUN_006406c0 (only as many attribute bytes as the
   class has), then sends a fixed `pp_SetPacketLen(&gpp, 0x6b)` from the shared send buffer `gpp`
-  (original bug) P02-B16. The client reads the item by its class *(inferred)*, so the tail is not shown; it puts
-  earlier packets of the zone (other players' texts included) on the wire.
+  (original bug) P02-B16. Client: `On_NC_ITEM_SELL_ITEM_INSERT_CMD` @ FUN_0049dbe0 passes the payload to
+  `ItemShopWin::AddRepurchaseInv` / `NPCItemWin::AddRepurchaseInv` (whichever shop window is open);
+  `Market::AddRepurchase` @ FUN_006135d0 keeps the u16 at +0 and builds the item with `Item::Create` @ FUN_006684f0
+  from +2. No client code looks at the packet length, so the tail is never read *(the item parser itself not
+  re-read)*. The bug puts earlier packets of the zone (other players' texts included) on the wire.
 - **0x3C08 NC_MENU_OPENSTORAGE_CMD** (Z05 §7.1): one per DB page, 13 bytes with an empty page, the PDB struct is 12 +
   items. `so_accountstoragefill` @ FUN_0044c530 sends `0xe + n` bytes (opcode included), with n =
   `ias_FillBufferItem` @ FUN_00643b10, which returns `end − counter pointer` (`param_1` = the `itemcounter` byte at
   +0xd) and so counts the counter byte a second time: every 0x3C08 ends with one stale byte (0x00 here)
-  (original bug) P02-B17, the same slip as `irs_FillBufferItem` for 0x302D (P02-B3). `pages` = 0x10 constant; the zone
+  (original bug) P02-B17, the same slip as `irs_FillBufferItem` for 0x302D (P02-B3). Client: `On_NC_MENU_OPENSTORAGE_CMD`
+  @ FUN_0049a9a0 keeps byte +10 (frame+0x900) and opens the storage menu with byte +9 after `Bank::SetContents`
+  @ FUN_00610700, which reads `itemcounter` (+0xb) items one by one by their own length: the stray byte is never read,
+  so the bug has no visible effect. `pages` = 0x10 constant; the zone
   sends the pages in the order their 0x3446 arrive on its 4 links (2, 3, 0, 1).
 - **0x300A NC_ITEM_PICK_ACK**: `{itemid, lot 1, 0x341, 0xFFFF}` ×3, matches Z05 §3.2; the client prints
   "[%s] has been obtained." (Z04 §3.3).
@@ -1420,7 +1429,7 @@ Code references are Z03 §3 (swing), §5 (skills), §7 (death), §8 (mob death, 
 - **Order at a swing kill** (all in the ms of the killing hit): link `0x1073 NC_CHAR_EXP_CHANGED_CMD` to the WM and
   `0xC80B NC_SYSLOG_CHAR_VICTORY` to GameLog; client `0x2402` (`targethp 0`), `0x240B NC_BAT_EXPGAIN_CMD`, `0x2448`.
   The exp packet precedes the damage packet because `vt 0xef0` (apply damage → `ShineMob::so_KilledBy` → exp) runs
-  before the 0x2448 send (Z03 §3.2, §8.1). `0x244A NC_BAT_REALLYKILL_CMD {dead, attacker}` (4 bytes) follows 42–54 ms
+  before the 0x2448 send (Z03 §3.2, §8.1). `0x244A NC_BAT_REALLYKILL_CMD {dead, attacker}` (4 bytes) follows 41–55 ms
   later from the mob's own tick (`deathSent`, Z09 §5.4); after the skill kill it leaves in the same ms as 0x2452,
   because the blast runs in the player tick before the mob's. `0x1C0A` drops leave with the 0x240B (§8.1).
 - **`0x240B expgain`** 1 (Slime at level 8), 2 (Slime at level 5) and 4 (Hero Slime at level 8): `MonEXP` 3 / 8 ×
@@ -1463,18 +1472,26 @@ GameLog `0x041E`, the CharDB save burst of `ws_save2DB(p, 1, 8)` (`0x4018 … 0x
 - **Death (94.130).** The Hero Slime's hit is applied in its own tick: GameLog `0x042B NC_LOG_GAME_MKED {chrregnum,
   mappos RouCos02 16351 / 12980, mobid 2000, exp 0}` and `0xC80A NC_SYSLOG_CHAR_DEATH {UserNo, CharNo, ZoneNo 2,
   AttackerType 1, AttackerID 2000, DeathCoord}` (22 bytes, the 2016 form without the 2017 `CharID / CharLevel /
-  LostEXP`) leave at once; the client gets `0x104D`, `0x2402` (order 1, handle 0xFFFF: the mob's target cleared),
-  `0x240E {hp 0, hpchangeorder 20}` and the killing `0x2448 {damage 3, resthp 0, hpchangeorder 18}` 18 ms later in one
-  frame. `exp 0`: level 5 is below `g_ExpLossMinLevel` (Z03 §7.2, "Starting from level 20 …"), so no `0x2411` and no
+  LostEXP`) leave at once; the client gets `0x104D`, the killing `0x2448 {damage 3, resthp 0, hpchangeorder 18}`, `0x2402` (order 1, handle
+  0xFFFF: the mob's target cleared) and `0x240E {hp 0, hpchangeorder 20}`, in this order, 19 ms later in one frame
+  (frame 2086). `exp 0`: level 5 is below `g_ExpLossMinLevel` (Z03 §7.2, "Starting from level 20 …"), so no `0x2411` and no
   `0x1073`. No `0x2428` removals reach the client for the states `so_KilledBy` erases (abstate 728).
 - **`0x104D NC_CHAR_DEADMENU_CMD`** (9 bytes): `{reviveWaitSec 180, 50, 0}` as Z03 §7.2 (`field+0x210`, constant 50,
   `p+0x2aac4 && field flag 2`). The 2017 PDB names the fields `Second`, `u8 priority`, `DeadMenuType eMenuType`
   (`DMT_BASE 0`, `DMT_REBIRTH 1`) *(pdb2017)*: the last one is 1 only with a pending rebirth offer (Z07 §3.2
   `p+0x2aac4`), so Z03's `canReviveHere` is the "rebirth" menu variant *(inferred from the names)*.
-- **Revive (102.372, `0x104E`, empty).** Same ms: WM `0x180B`, the CharDB save burst, GameLog `0x042D` (§9.3) and
-  `0x0410 StoreType 2`, client `0x1C18` / `0x242A` for abstate 728 (`keepTime 510100`, restored from `g_ShelterDie`),
+  Client `On_NC_CHAR_DEADMENU_CMD` @ FUN_004a9940 confirms the 2016 layout `{u32 +0, u8 +4, u32 +5}`: it gives the
+  low byte of +0 to `ReviveMenuWin::SetAutoRevieTimeSec` and +0 / 60 to `RebirthMenuWin::SetAutoRevieTime` (so a wait
+  over 255 s would show wrong in the revive window; 180 fits), +4 to `ReviveMenuWin::SetPriority`, locks inventory and
+  equipment, and opens the rebirth window when +5 == 1, else the revive window; below level 6 it adds the system
+  message 0xd5562a42 ("Starting from level 20, character will lose part of the exp when dying.").
+- **Revive (102.372, `0x104E`, empty).** Same ms: WM `0x180B`, GameLog `0x042D` (§9.3), then the CharDB save burst
+  with `0x0410 StoreType 2` (`so_Unmark` @ FUN_00558900 calls `mhl_SendAll2Log` before its `REMOVE_REVIVE` case runs
+  `ws_save2DB`; captured 0x180B, 0x042D, 0x4018 … 0x4035), client `0x1C18` / `0x242A` for abstate 728 (`keepTime 510100`, restored from `g_ShelterDie`),
   then `0x104F NC_CHAR_REVIVESAME_CMD {mapid 2, location 9647 / 9002}` (10 bytes, pdb2017 `{u16 mapid, SHINE_XY_TYPE}`,
-  no hand annotation): the RouCos02 regen point, a same-zone link (Z07 §3.1 "Revive City", Z01 §7.1 `so_LinkTo(…, 4,
+  no hand annotation; client FUN_0049feb0 copies the 10 bytes whole to frame+0x969, sets +0x968 = 1, closes the
+  map-bound windows (minimap marks, dice game, guild-tournament windows) and calls FUN_008c57c0, the start of the map
+  reload that ends in the `0x1803` *(inferred)*): the RouCos02 regen point, a same-zone link (Z07 §3.1 "Revive City", Z01 §7.1 `so_LinkTo(…, 4,
   0x4F, 0x50)`). 158 ms later the client sends `0x1803` and the zone repeats the full map-login burst (§5.1), with
   `0x240E hp 28` = MaxHP 94 × 0x133 / 1024 (Z07 §3.1, 30 %), `0x180C` to the WM and GameLog `0x040F`. The 8.2-s wait
   is the player's; the auto-revive would have fired after 180 + 2 + 6 s (Z03 §7.2).
@@ -1512,7 +1529,7 @@ GameLog `0x041E`, the CharDB save burst of `ws_save2DB(p, 1, 8)` (`0x4018 … 0x
 | C→S | 0x2408 | NC_BAT_UNTARGET_REQ | 1 | 0 | confirmed | no reply |
 | S→C | 0x2447 | NC_BAT_SWING_START_CMD | 31 | 9 | confirmed | timing = Z03 §3.2 / Z09 §7.4 |
 | S→C | 0x2448 | NC_BAT_SWING_DAMAGE_CMD | 28 | 16 | confirmed; **corrected**; **bug** | flag bit map ≠ Z03; no dead bit (P02-B18) |
-| S→C | 0x244A | NC_BAT_REALLYKILL_CMD | 6 | 4 | confirmed | 42–54 ms after a swing kill |
+| S→C | 0x244A | NC_BAT_REALLYKILL_CMD | 6 | 4 | confirmed | 41–55 ms after a swing kill |
 | S→C | 0x240B | NC_BAT_EXPGAIN_CMD | 6 | 6 | confirmed | before the killing 0x2448 |
 | S→C | 0x240C | NC_BAT_LEVELUP_CMD | 3 | 235 | confirmed; **bug** | pdb2016 layout; `Wizdom` stale (Z07-B7) |
 | S→C | 0x2446 | NC_BAT_FAMEGAIN_CMD | 3 | 4 | confirmed | = new level |
@@ -1527,9 +1544,9 @@ GameLog `0x041E`, the CharDB save burst of `ws_save2DB(p, 1, 8)` (`0x4018 … 0x
 | S→C | 0x2048 | NC_ACT_CANCELCASTBAR | 1 | 0 | confirmed | at the cast end (summon) |
 | S→C | 0x2013 | NC_ACT_SOMEONESTOP_CMD | 2 | 10 | confirmed | mob stops before its first swing |
 | S→C | 0x1C19 | NC_BRIEFINFO_ABSTATE_CHANGE_LIST_CMD | 4 | 15 | confirmed | regen mob: `{291 StaImmortal, 5000, 1}` with its 0x1C08, reset by 0x2428 5.0 s later |
-| S→C | 0x104D | NC_CHAR_DEADMENU_CMD | 1 | 9 | confirmed | `{180, 50, 0}` |
+| S→C | 0x104D | NC_CHAR_DEADMENU_CMD | 1 | 9 | confirmed | `{180, 50, 0}`; client FUN_004a9940: §9.5 |
 | C→S | 0x104E | NC_CHAR_REVIVE_REQ | 1 | 0 | confirmed | |
-| S→C | 0x104F | NC_CHAR_REVIVESAME_CMD | 1 | 10 | confirmed | pdb2017 layout; then a full map login |
+| S→C | 0x104F | NC_CHAR_REVIVESAME_CMD | 1 | 10 | confirmed | pdb2017 layout; client FUN_0049feb0 copies it whole (§9.5); then a full map login |
 | S→C | 0x1033 | NC_CHAR_CENCHANGE_CMD | 3 | 8 | confirmed | 99 440 − 69 (BuyPrice), + 3, + 4 (SellPrice) |
 | S→C | 0x106F | NC_CHAR_FAMECHANGE_CMD | 4 | 4 | confirmed | total fame |
 | C→S | 0x5007 / 0x5009 | NC_SOULSTONE_HP / SP_USE_REQ | 1 / 1 | 0 | confirmed | |
@@ -1768,16 +1785,16 @@ every instance of both batch-2 captures):
 | Heartbeat | `C 0x0804` → `S 0x0805` | `S 0x0804` after 30 s of client silence → `C 0x0805`; unsolicited `C 0x0805` to the WM during map loads | **contradicted** (README §1.5) | §2.4, §4.4, §5.5 |
 | Duplicate login | `login-server.md` §5.1 (Login broadcasts 0x0C16, then 0x0C0A) | WM `0x0C17 {0x683}` to the old client 0.8 ms before Login's `0x0C0A` to the new one | **confirmed** | §4.1 |
 | Login links | `login-server.md` §4 / §5.1 / §5.2 / §6; W01 §3.2 / §3.3 | `0x0C5A` → AccountDB `0x0C5B` → `0x0C5C` → AccountLogDB `0x0C5D` → `0x0C5E` → WM `0x0C16` + AccountLogDB `0xC801` (same ms) → client `0x0C0A`; world select `0x0C0B` → AccountDB `0x0C10`, AccountLogDB `0x0721`, WM `0x0C0D` (same ms, this order) → `0x0C0E` → `0x0C0C`; WM world login: `0x0C16` to every zone, `0x0C60` → `0x0C61`, CharDB `0x0C12` → `0x0C5F` + `0x0C13` → client `0x0C14` | **confirmed**; two zone kicks per login (Login's and the WM's own); P02-B5 in the Login `0x0C16` | §7.2 |
-| Character load (WM ↔ CharDB) | D02 §4 step order; W01 §4.2 (0x1005 handler) | `0x1001` → CharDB `0x1004` (same pass) → 44 blocks within 17 ms in D02 §4 step order → `0x1005`; the WM handles it 557–580 ms later (one packet per session per ≈ 13-ms pass) and sends CharDB `0x1036`, GameLog `0xC806`, client `0x1003` in one ms (CharDB's own GameLog `0x040A` 1 ms later); option push `0x7032`–`0x7034` 47 ms after | **confirmed**; D02 §4 steps 21 / 22 **corrected** (sent only with a row) | §7.4 |
-| Map-login hand-over (zone ↔ WM) | Z01 §5.2 / §5.3; W01 §7.2 (0x101C send order) | `0x1801` → WM `0x104B` (link i) → `0x104C` → `0x101C` (link i + 1) → 34–36 blob packets and `0x101D` in one ms on that link → client `0x1802` 391–455 ms after `0x101D` (the zone reads one packet per link per ≈ 12-ms pass) | **confirmed** (Z01); W01 §7.2 **corrected** in three places (0x1029 / 0x1098, 0xCC0C, 0x441D) | §7.5.2 |
+| Character load (WM ↔ CharDB) | D02 §4 step order; W01 §4.2 (0x1005 handler) | `0x1001` → CharDB `0x1004` (same pass) → 36 blocks within 17 ms in D02 §4 step order → `0x1005`; the WM handles it 557–580 ms later (one packet per session per ≈ 15.6-ms pass) and sends CharDB `0x1036`, GameLog `0xC806`, client `0x1003` in one ms (CharDB's own GameLog `0x040A` 1 ms later); option push `0x7032`–`0x7034` 47 ms after | **confirmed**; D02 §4 steps 21 / 22 **corrected** (sent only with a row) | §7.4 |
+| Map-login hand-over (zone ↔ WM) | Z01 §5.2 / §5.3; W01 §7.2 (0x101C send order) | `0x1801` → WM `0x104B` (link i) → `0x104C` → `0x101C` (link i + 1) → 30–32 blob packets and `0x101D` (31–33 packets) in one ms on that link → client `0x1802` 391–455 ms after `0x101D` (the zone reads one packet per link per ≈ 13-ms pass) | **confirmed** (Z01); W01 §7.2 **corrected** in three places (0x1029 / 0x1098, 0xCC0C, 0x441D) | §7.5.2 |
 | Map-login requests at `0x1803` | Z01 §6 (0x10B3 first, 0x1080); D02 §7.1 / §11 | CharDB `0x10B3` (first link packet of the burst) → CharDB `0x1080` (same ms) → the WM's GameLog `0x040F` 0–6 ms later; answers `0x10B4 iscorrect 1`, `0x1081 Error 0x12E2` (not forwarded to the client) | **confirmed**; corrects this file's batch-1 §5.1 line ("0x10B3 not sent") | §10.2 |
-| Map change on the links | Z01 §7.1 (`so_LinkTo`); Z01 §8.4 (`ws_save2worldmanager`) | WM `0x180B` → `ws_save2DB(p, 0, 2)` (CharDB + GameLog `0x0410 StoreType 2`) → `ws_save2worldmanager` `0x400E` … `0x4037` (round robin over the 4 WM links, one burst in 1–2 ms) → WM `0x180D` → GameLog `0xC809` → WM `0x180E` on the `0x180D` link → client `0x180A` 10–16 ms later → new zone: hand-over as above | **confirmed** (Z01 §7.1); Z01 §8.4 **extended** (list and conditions); P02-B12, P02-B14 | §7.5.4, §10.1, §10.2 |
-| CharDB save burst | D02 §6; Z01 §8.4 | `ws_save2DB`: `0x4018`, `0x4001`, `0x4007`, `0x400B` (if titles are marked), GameLog `0x0410`, `0x401A`, `0x4035` in one ms; ACK `0x4008` before `0x4002` in every burst | **confirmed**; Z01 §8.4 header **corrected** (`bufferlocation` always 0, P02-B21) | §10.1 |
-| Kill | Z03 §3.2 / §8.1; Z09 §5.4 | in the ms of the killing hit: WM `0x1073`, GameLog `0xC80B`, client `0x2402`, `0x240B` (+ `0x1C0A` drops), `0x2448`; `0x244A` 42–54 ms later from the mob tick (same ms after a skill kill); hunt log GameLog `0x042D` only at the next same-zone link or logout | **confirmed**; Z09 §28.12 **corrected** (P02-B20: a link to another zone drops the hunt log) | §9.3 |
+| Map change on the links | Z01 §7.1 (`so_LinkTo`); Z01 §8.4 (`ws_save2worldmanager`) | WM `0x180B` → `ws_save2DB(p, 0, 2)` (CharDB + GameLog `0x0410 StoreType 2`) → `ws_save2worldmanager` `0x400E` … `0x4037` (round robin over the 4 WM links, one burst in 1–2 ms; on one link the tail leaves 5–16 ms late, Nagle, §7.5.4) → WM `0x180D` → GameLog `0xC809` → WM `0x180E` on the `0x180D` link → client `0x180A` 10–16 ms later → new zone: hand-over as above | **confirmed** (Z01 §7.1); Z01 §8.4 **extended** (list and conditions); P02-B12, P02-B14 | §7.5.4, §10.1, §10.2 |
+| CharDB save burst | D02 §6; Z01 §8.4 | `ws_save2DB`: `0x4018`, `0x4001`, `0x4007`, `0x400B` (if titles are marked), GameLog `0x0410`, `0x401A`, `0x4035` in one ms (`0x401A` 16 ms late in `combat` 118.034, §10.1); ACK `0x4008` before `0x4002` in every burst | **confirmed**; Z01 §8.4 header **corrected** (`bufferlocation` always 0, P02-B21) | §10.1 |
+| Kill | Z03 §3.2 / §8.1; Z09 §5.4 | in the ms of the killing hit: WM `0x1073`, GameLog `0xC80B`, client `0x2402`, `0x240B` (+ `0x1C0A` drops), `0x2448`; `0x244A` 41–55 ms later from the mob tick (same ms after a skill kill); hunt log GameLog `0x042D` only at the next same-zone link or logout | **confirmed**; Z09 §28.12 **corrected** (P02-B20: a link to another zone drops the hunt log) | §9.3 |
 | Level-up | Z03 §8.3; Z12 §7 | per level, in one ms: WM `0x400E`, `0x1074`, GameLog `0x041E`, `ws_save2DB(p, 1, 8)`, CharDB `0x1070`; client `0x240C`, `0x4810`, `0x105B`, `0x2446`, `0x106F`, `0xBC05`; HP / SP refill one tick later; client `0x4025` → CharDB `0x4027` → `0x4028` → client `0x4026`; WM GameLog `0xC808` in link-service order (7, 6, 8) | **confirmed**; P02-B12 (WM order) | §9.4, §10.6 |
-| Death and revive | Z03 §7.2; Z07 §3.1; Z01 §7.1 (same-zone branch) | death in the mob tick: GameLog `0x042B` + `0xC80A`, then (18 ms later, one frame) client `0x104D`, `0x2402`, `0x240E hp 0`, `0x2448 resthp 0`; revive `0x104E` → WM `0x180B`, `ws_save2DB(p, 0, 2)`, GameLog `0x042D`, client `0x1C18` / `0x242A`, `0x104F` → client `0x1803` 158 ms later → full map-login burst (§5.1) and WM `0x180C`; no WM saves, no `0xC809` | **confirmed** | §9.5 |
+| Death and revive | Z03 §7.2; Z07 §3.1; Z01 §7.1 (same-zone branch) | death in the mob tick: GameLog `0x042B` + `0xC80A`, then (19 ms later, one frame) client `0x104D`, `0x2448 resthp 0`, `0x2402`, `0x240E hp 0`; revive `0x104E` → WM `0x180B`, GameLog `0x042D` (hunt-log flush in `so_Unmark` before its `REMOVE_REVIVE` case), `ws_save2DB(p, 0, 2)`, client `0x1C18` / `0x242A`, `0x104F` → client `0x1803` 158 ms later → full map-login burst (§5.1) and WM `0x180C`; no WM saves, no `0xC809` | **confirmed** | §9.5 |
 | Item transaction | Z05 §1.1 / §1.2; D03 §2–§5 | client request → CharDB request (lock index 0, 1, 2 … per player) → answer → GameLog log and, in one ms, the client cell changes + ACK (commit style 1); pick-up: `0x3001` with the request, `0x300A` after `0x341D` (style 2) | **confirmed** | §7.6.1 |
-| Periodic link traffic | W01 §2 / §8; D01 §4.2; Z09 §1.2 | WM → Login `0x0808` every 30.0 s; AccountLog `0x0809` on each minute change → WM `0xC811` + `0x080A` (same ms); WM `0x0821` every 60 s (at :42) → each zone's per-minute block; zone `0x7495` per minute, `0x987A` / `0x987B` at :00 | **confirmed**; D01 §4.2 **corrected** (0x080A only as the answer to 0x0809) | §7.2, §7.5.3, §7.5.4 |
+| Periodic link traffic | W01 §2 / §8; D01 §4.2; Z09 §1.2 | WM → Login `0x0808` every 30.0 s; AccountLog `0x0809` on each minute change → WM `0xC811` + `0x080A` (same ms or one WM pass later, 0–15 ms); WM `0x0821` every 60 s (at :42) → each zone's per-minute block; zone `0x7495` per minute, `0x987A` / `0x987B` at :00 | **confirmed**; D01 §4.2 **corrected** (0x080A only as the answer to 0x0809) | §7.2, §7.5.3, §7.5.4 |
 
 Pseudocode orders the captures confirm in full: Z01 §6 (`sp_NC_MAP_LOGINCOMPLETE_CMD` burst), W01 §7.3 and W04 §17.5
 (`fc_NC_MAP_LINKEND_CMD`, incl. the zone round trip `0x1120` that grants abstate 728 one tick after the burst, §5.1),
@@ -1915,7 +1932,7 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
   captures (§4.2, §4.3); a capture with the server's own clock (or NTP on both) would pin the send to the second.
 - **0x7C07 timing** (§4.1): the short form is sent in the 0x7C06 handler, yet leaves 73–74 ms after 0x7C06 together with
   the CharDB-backed 0x700D. Batch 2 explains it *(inferred)*: the passes do sleep in normal operation (W05-B1 sleeps
-  only while the CharDB link is in state 1, which is the normal state; ≈ 13 ms per pass measured in §7.4), the client
+  only while the CharDB link is in state 1, which is the normal state; ≈ 15.6 ms per pass measured in §7.4), the client
   session gets one packet per pass (0x7004, 0x700C, then 0x7C06 in the third pass), and Nagle (S02 §1.4, no
   `TCP_NODELAY`) holds the 0x7C07 segment until the client ACKs 0x7005 (6.833 s), so 0x7C07 and 0x700D leave together
   at 6.885 s. The same 47–52 ms hold appears after 0x1003 (§7.4). The batch-1 reading "the passes do not sleep" was wrong.
@@ -1965,10 +1982,11 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
   "not killed by a mob". `CheckNewTitle` @ FUN_005cb5f0 (Z18 §6.2) gives the rule: type 9 unlocks "reach level V
   without dying" only while its value (the death count) is 0. Test2's value 2 blocks it, and the zone still saves
   the unchanged 2 on every level-up.
-- **Client 0x4025 second sender** FUN_004a59d0 (§10.6): **settled** in the sweep. Its two callers send `{btMysteryType 0}`
-  once the level requirement is met: the item-use path FUN_006a2b30 (`Inventory::FindMysteryVault` finds the used
-  slot and its item's level field `+0x7f` ≤ `User::Lv`), and FUN_00553a10, a window button handler (`param_1 == 1`,
-  level threshold at `this+0x174`, opens the inventory). FUN_00553a10 is probably the 2016
+- **Client 0x4025 second sender** FUN_004a59d0 (§10.6): **settled** in the sweep. Its two callers send `{btMysteryType 0}`: the item-use path FUN_006a2b30, only once the level requirement is met
+  (`Inventory::FindMysteryVault` finds the used slot and its item's level field `+0x7f` ≤ `User::Lv`), and
+  FUN_00553a10, a window button handler, whenever `param_1 == 1` and the frame exists: its level check
+  (`this+0x174` ≤ `User::Lv`) gates only `OpenInventoryWin`, not the `CloseRaidMemberAddWin` + `FUN_004a59d0(frame, 0)`
+  that follow (review fix). FUN_00553a10 is probably the 2016
   `MysteryVaultWin::OnMysteryVaultBtnClick` (2017 @ 0x559560, next to `MysteryVaultWin::Create`) *(inferred)*. So
   `1` = "vault level reached" (level-up) and `0` = "vault opened". Both callers first call the frame method that
   `names/client` labels `CloseRaidMemberAddWin`. That label is doubtful here: the 2017 `CloseMysteryVaultWin` would fit
@@ -2041,7 +2059,7 @@ W04 packets P02 cannot override (W04.json sorts after P02.json): WM `0x7C07` 4-b
 | README §2 / §1.4 / §1.5 rewrite, Unknowns line "whether the zone also sends the seed unprompted" | **P04** (new, added by P02: `docs/plan/items/P04.md`) | README's owners P01 and L00 are done and X01 may write only `docs/pseudocode/README.md`; P04 corrects the README from §2 / §11 and the knowledge Corrections rows |
 | WM → zone blobs never sent for Test2: 0x1026, 0x1028, 0x102A–0x102D, 0x102F, 0x10B8, and the 0x101E fail path (§7.5.3) | X02 (plan: "write targeted capture scenarios"), then P02 again | layouts are Z07 / Z12's; confirming them needs a character with a house, pet, emblem … or a failed map login |
 | which of a zone's 4 WM links receives the WM broadcasts (§7.5.1, last to register *(inferred)*; §7.5.4: index [3] twice, [2] once) | X02 (same line) | no layout or order depends on it; a capture of a zone start would show the 0x0802 order |
-| corrections to done items' pseudocode (§13) | X01 (same line) | P02 must not edit other items' output; X01 collects knowledge-file corrections |
+| corrections to done items' pseudocode (§13) | X01 (plan: "Corrections between items: later items record corrections to earlier ones in their knowledge file … Collect every such section") | P02 must not edit other items' output; X01 collects knowledge-file corrections |
 | opcodes and paths never captured (§14 last bullet) | X02 (plan: "write targeted capture scenarios"), then P02 again | needs new captures; P02 is recurring per batch |
 | per-minute phase, clock offset, 0x7C07 timing, LoadMap heartbeat points (§14) | X02 (plan: "adversarially re-check load-bearing claims … write targeted capture scenarios") | none changes a layout or an order; each needs a targeted capture (zone restart, synced clocks, map loads with markers) |
 | second per-minute 0x1035, 0x3C01 `npcPosition`, NPC sp 100 | resolved here (review): §6.1 (0x1035), §6.3 | the second 0x1035 = the `so_Routine` dirty-flag pass after the per-minute block sets `p+0xe94` (`smo_Abstate.parameterchange`, Z09 §2.4 / §5.5, §6.1) |

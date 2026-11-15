@@ -11766,7 +11766,7 @@ size 4
 | 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
 | 6 | u16 | wldmanhandle | (pdb2017 name) |
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `ref`: echoed; `wldmanhandle`: 35000 / 32500; last of 34–36 packets of one WM pass
+**Captured** (P02, `capture-validation.md`; shop, combat): `ref`: echoed; `wldmanhandle`: 35000 / 32500; last of 31–33 packets of one WM pass
 
 ### `0x101e` NC_CHAR_ZONE_CHARDATAFAIL_ACK (WM→Zone)
 
@@ -12997,7 +12997,7 @@ size 0x12, not checked
 
 ### `0x1005` NC_CHAR_CHARDATA_ACK (CharDB→WM)
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `netpacketheader.clienthandle`: echo; last of 44 blocks, 17–19 ms after 0x1004
+**Captured** (P02, `capture-validation.md`; shop, combat): `netpacketheader.clienthandle`: echo; last of 37 packets (36 blocks + 0x1005), 17–19 ms after 0x1004
 
 ### `0x1007` NC_CHAR_BASE_CMD (CharDB→WM)
 
