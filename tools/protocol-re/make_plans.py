@@ -1291,6 +1291,32 @@ ITEMS = [
              "partner; `docs/knowledge/Z02.md` §1 corrects Z01). Collect every such section (grep `docs/knowledge/*.md` for "
              "`Correction`), apply them in the overview and the bug register (mark superseded entries), and list them in a "
              "\"Superseded statements\" table in `docs/pseudocode/README.md` so readers of the older files are warned."]),
+ dict(id="X03", phase=3, title="Integration update: X02's corrections and the bugs of X02 and its follow-ups into the "
+                               "README register and the superseded-statements list (added by X02)",
+      out="docs/pseudocode/README.md", deps=["X01", "X02", "Z31", "Z32", "W06", "D08 (soft: run without the ones not done)"],
+      scope=[],
+      goal="X01 is done and its plan has no recurring step, but its output `docs/pseudocode/README.md` is the only place "
+           "where readers of the older documents are warned. X02 recorded 68 corrections to other items' statements "
+           "(`docs/knowledge/X02.md` §0) and twelve bugs (`docs/review/confidence.md` §5, X02-B1 … B12) after X01 ran; "
+           "the follow-up items Z31, Z32, W06 and D08 add more. Bring the README up to date with them. This item edits "
+           "X01's sections of the README in place (the one exception to 'never edit another item's output'); it does not "
+           "touch the owners' pseudocode.",
+      steps=["Superseded statements (README §5): one row per row of `docs/knowledge/X02.md` §0 (owner document and §, the "
+             "old statement, the correct one with its `@ FUN_…`, the X02 re-check ID). Rows X01 already lists and X02 "
+             "only confirmed stay as they are; rows X02 marks 'superseded' in `confidence.md` §3 need no new entry. Then "
+             "the same for the `Correction` / §0 sections of `docs/knowledge/Z31.md`, `Z32.md`, `W06.md`, `D08.md` where "
+             "they exist.",
+             "Bug register: add X02-B1 … B12 in the register's row format (`confidence.md` §5 has it; evidence level and "
+             "reachability from `docs/knowledge/X02.md` §3), then every `<item>-B<n>` of Z31, Z32, W06, D08. Where an X02 "
+             "re-check withdrew or changed an existing register entry (`confidence.md` §3, result 'corrected' or "
+             "'refined' on a row that names a bug ID), change that entry and say so.",
+             "README item table and overview: the rows of X02, Z31, Z32, W06, D08 (the X02 row still says 'not started'), "
+             "links to `docs/review/confidence.md` and `docs/plan/capture-scenarios.md`, and the feature → message index "
+             "for anything the four follow-ups add.",
+             "Run `tools/protocol-re/regen.sh`. No code reading is needed beyond checking a row that looks wrong; report "
+             "such rows in `docs/knowledge/X03.md` §0 instead of changing the claim."],
+      done="Every row of `docs/knowledge/X02.md` §0 is in the superseded-statements list, every X02 bug and every bug of the "
+           "finished follow-ups is in the register, and the README item table matches the status files."),
  dict(id="X02", phase=3, title="Confidence review and targeted capture/DB experiments",
       out="docs/review/confidence.md + docs/plan/capture-scenarios.md", deps=["all phase-2 items", "X01 (soft)"], scope=[],
       goal="User review of finished items has corrected several assumptions per item, so the static analysis is only "

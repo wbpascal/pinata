@@ -448,6 +448,14 @@
   "\u2013"
  ],
  [
+  "X03",
+  3,
+  "Integration update: X02's corrections and the bugs of X02 and its follow-ups into the README register and the superseded-statements list (added by X02)",
+  "X01, X02, Z31, Z32, W06, D08 (soft: run without the ones not done)",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "X02",
   3,
   "Confidence review and targeted capture/DB experiments",

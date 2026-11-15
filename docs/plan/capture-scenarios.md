@@ -228,6 +228,8 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   shown by the item arriving). (5) the same three DB requests from the buy-booth side (`StreetBoothBuy::sb_Trade`, Z06 §2.5).
   (6) buyer `0x680E` with the money code of Z06 §2.5 (one of 0xA42…0xA59).
 - **Disproved by:** `0x343B` before `0x4C24`; a `0x680E {0xA41}`; a non-zero `nLotTraded`.
+- **With a DB setup (separate run):** S15 (§8.16), one booth purchase whose money move fails at the DB; its
+  prediction and what disproves it are in that section.
 
 ### 21. Items II: drop, split, storage, use, shop
 
@@ -242,8 +244,11 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   stack. (6) equip the ring, then a second ring. (7) with a full inventory: unequip the ring. (8) storage:
   deposit a stack, change the page, withdraw; deposit and withdraw money. (9) sell an item to an NPC and buy it
   back from the repurchase list. (10) buy HP and SP soul stones; use both; use one at full HP. (11) pick-up
-  over the limit: with X3 (an item whose stack limit is 1 lower than a stack on the ground) or two stacks whose
-  sum exceeds the item's maximum lot.
+  over a kingdom-quest item's `PickupLimit` (`KQItem.shn`, 2016 data: `KQ_InvincibleHammer` and `KQ_Ice01`, both
+  1): hold one, pick up a second. Try `&makeitem KQ_Ice01` twice and drop one (whether `&makeitem` and the drop
+  accept these items was not read; if not, do it inside the kingdom quest that hands them out, scenario 30).
+  (12) separate runs with a changed table or DB: X3's over-full stack (§9.4), one NPC purchase with S16 installed
+  (§8.17), and S13's expired item, two minutes after login (§8.14).
 - **Prediction:** (1) C→Z `0x300D` → D `0x3434` → Z `0x3435` → C cell changes; merge `0x342E` → `0x342F`;
   split-and-merge `0x3431` → `0x3432`; refusals come as `0x300E {0x442…0x44C}` (a split of 0 or of the whole
   lot: `{0x442}`), and whether a success sends `0x300E` too is for the capture to show (Z04 §4.2 lists refusal
@@ -259,10 +264,13 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   storage rows `nStorageType = 6`, `nOwner = userNo` (D03 check 3). (9) `0x305B NC_ITEM_SELL_ITEM_LIST_CMD`
   after the sale; `0x3059` → D `0x34B9` / `0x34BB` → `0x305A`, `0x305D`. (10) `0x5001` / `0x5002` → D `0x3441`
   → `0x3442` → `0x5003` / `0x5004`; use → others `0x500B` / `0x500C`; a refused use → `0x5006` (empty) (Z04 §13).
-  (11) `0x300A {0x34A}` and **no client text** (X02-B8; Q23: the client shows "Inventory is full." for 0x346
-  only).
+  (11) `0x300A {0x34A}` and the client text "Failed to obtain the item." (the generic text: the client has none
+  of its own for 0x34A, X02-B8 / Q23; "Inventory is full." is 0x346 only). The refusal is
+  `KQItemDataBox::kqidb_CanPickUp` @ FUN_0064bc90, called by `so_ply_PickupItem` @ FUN_0052faf0 with the lot
+  already owned + the lot picked: item in `KQItem.shn`, `PickupLimit` ≠ 0, sum > limit. A stack over `MaxLot` is
+  not this path. (12) X3: open, no prediction (§9.4); S16 and S13: the predictions of §8.17 and §8.14.
 - **Disproved by:** a split refusal on another opcode than `0x300E`; the ground object appearing before `0x3417`; `0x3013
-  {0x2C1}`; a text shown for 0x34A.
+  {0x2C1}`; another text than "Failed to obtain the item." for 0x34A; 0x34A for an item that is not in `KQItem.shn`.
 
 ### 22. Upgrade, gems, random options, endurance
 
@@ -645,7 +653,7 @@ login plus one crafted packet is enough). One connection per case: several end i
   I3 (`0x68C` after a move).
 - **Steps and predictions:**
   1. **Stack grows while the drop menu is open (E37).** A holds a full-stack item that asks for a drop
-     confirmation (an item with the drop warning; X7 lists them), lot 5; five more of it lie on the ground
+     confirmation (every accepted `0x3007` drop opens it, no table decides: X7), lot 5; five more of it lie on the ground
      (dropped before from a second stack). Drag the stack out (`0x3007`, lot 5), leave the confirmation open,
      pick up the ground stack (if the client lets you; else B trades or a quest gives one more), then confirm.
      Prediction: `sp_ItemDropOK` sees `req.lot < cell.lot` → Z→D `0x3419 NC_ITEMDB_DROPLOT_REQ` and a ground
@@ -696,7 +704,8 @@ login plus one crafted packet is enough). One connection per case: several end i
 | guild create level 20 (W03 §2.2) | level 19, then 20 | 18 | refusal code of W03 §2.2, then success |
 | booth money (Z06 §2.5) | buyer money = price − 1 (S2) | 20 | `0x680E` money code, no DB request |
 | inventory full | unequip, pick up, quest reward, `&makeitem` with 0 free cells | 21, 23, 32 | `0x3013 {0x2C2}`; `0x300A {0x346}` "Inventory is full."; the DONE request is not sent (Z15 §5.1); silence |
-| pick-up over the stack limit | sum of lots = limit + 1 | 21 | `0x300A {0x34A}`, no text |
+| pick-up over a KQ item's `PickupLimit` (`KQItem.shn`) | owned + picked = limit + 1 | 21 step 11 | `0x300A {0x34A}`, text "Failed to obtain the item." (X02-B8) |
+| pick-up onto a stack over `MaxLot` | X3 | 21 step 12 | open, no prediction (§9.4); not the 0x34A path |
 | mini-house visit distance | 101 units | 28 | refused |
 | notice length (W04-B1) | 131 and 132 bytes | 41 T12 | 131 delivered; 132 corrupts the WM stack |
 | premium list size (D03-B10) | 511 and 512 rows (S8) | 34 | 511 arrive |
@@ -741,13 +750,13 @@ checked against their `{CALL …}` strings (`bak.py cover`); the "Checked agains
 | S10 | 37 | blocked account (`bIsBlock`) | §8.11 |
 | S11 | 37 | account not login-able (`bIsLoginAble` of its `tUserAuth` row) | §8.12 |
 | S12 | 42 | change a stack's lot while the owner is online | §8.13 |
-| S13 | §4 | an item past its end time | §8.14 |
+| S13 | 21 step 12, §4 | an item past its end time | §8.14 |
 | S14 | §4 | a character flagged deleted | §8.15 |
-| S15 | 20 (D03 check 7) | a booth purchase whose money move fails at the DB | §8.16 |
-| S16 | 21 (D03 check 13) | a purchase whose attribute write fails | §8.17 |
+| S15 | 20, last line (D03 check 7) | a booth purchase whose money move fails at the DB | §8.16 |
+| S16 | 21 step 12 (D03 check 13) | a purchase whose attribute write fails | §8.17 |
 | X1 | 39, §5 | drop experiments: limited drop `Num` runs out (V22, Z09-B20); Hunter voucher vs `SNS_DropUp` (V19) | §9.2 |
 | X2 | 15, 31, 39 | party-battle maps, maps without party, instance gates, PK fields | §9.3 (read only) |
-| X3 | 21 | an item whose stack limit can be exceeded by a pick-up | §9.4 |
+| X3 | 21 step 12 | a stack that holds more than the item's `MaxLot`, then a pick-up onto it | §9.4 |
 | X4 | 24 | buffs with a walk / run / attack reset condition | §9.5 (read only) |
 | X5 | 30 | a kingdom quest that starts within minutes with one player | §9.6 |
 | X6 | 37 | a world closed / full | §9.7 |
@@ -875,14 +884,15 @@ the change; if a column is reported missing, stop and report it (that is a findi
   `AccountLog`, `StatisticsData`, `w00_Character`, `w00_GameLog`. The Character DB's own wrappers reach the
   account data as `Account.dbo.…` (`usp_ChargeItem_GetList`), so both sit on one SQL Server instance.
 - **Placeholders:** `TestCharA` / `TestCharB` = character names (`tCharacter.sID`), `testaccount` = login name
-  (`tUser.sUserID`). Every script starts by resolving them and stops when the name is not found.
+  (`tUser.sUserID`). Every script starts by resolving them. Only some of the scripts stop by themselves when the name is not found
+  (S4, S6, S7 and S10–S15 do not): check that the save query returned a row before running the change.
 - **Save / restore:** each setup copies the rows it changes into a table named `dbo.X02_save_<n>` (our name, not
   a server table) with `SELECT … INTO`, and the restore block copies them back and drops that table. Run the
   restore before the next setup that uses the same number. `SELECT … INTO` fails when the save table already
   exists: that protects the first copy.
 - **Two parts per script,** separated by the `-- restore` comment: run the part above it before the test and the
   part below it after. The restore part uses only the save table, so it runs in a new query window. Where a
-  script says "run this line first" or "from the list", run the `SELECT`, fill in the variable, then run the rest.
+  script says "run this line first" or "from the list", run the `SELECT`, fill in the variable, then run the rest. S13 has no restore part: the test consumes the item.
 - **Who must be offline** is stated per setup. "Account at the login screen" = no character of the account in
   the game **and** the client back at the login screen or closed: the WM holds the avatar list from world select
   on (D02 §3.1, W01 §3), the zone holds the whole character from `0x1004` on and writes parts of it back
@@ -994,7 +1004,8 @@ used again:
 USE w00_Character;
 DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
 SELECT nCharNo, nClass INTO dbo.X02_save_4 FROM tCharacterShape WHERE nCharNo = @c;
--- restore (account at the login screen; the quest rows are restored by S3's block, learned skills are not removed)
+-- restore (account at the login screen; the quest rows are restored by S3's block; learned skills are not removed
+-- and the level and experience gained by `&levelup` stay: use a character you do not need at its old level)
 UPDATE t SET nClass = s.nClass FROM tCharacterShape t JOIN dbo.X02_save_4 s ON s.nCharNo = t.nCharNo;
 DROP TABLE dbo.X02_save_4;
 ```
@@ -1204,8 +1215,9 @@ SELECT * INTO dbo.X02_save_13a FROM tItem WHERE nItemKey = @key;
 SELECT * INTO dbo.X02_save_13b FROM tItemOptions WHERE nItemKey = @key;
 UPDATE tItemOptions SET nOptionData = 8468
  WHERE nItemKey = @key AND nOptionType IN (417, 521, 620, 720, 820, 906, 1001, 1601, 1900, 2821);
--- the item is deleted by the test; keep the two save tables as the record of what it was, then
-DROP TABLE dbo.X02_save_13a; DROP TABLE dbo.X02_save_13b;
+-- no restore: the item is deleted by the test. The two save tables are the record of what it was.
+-- Drop them only after the test, in a separate run:
+-- DROP TABLE dbo.X02_save_13a; DROP TABLE dbo.X02_save_13b;
 ```
 
 Prediction: within the first per-minute check after login the zone sends D `0x3459` for the cell and clears it
@@ -1363,8 +1375,8 @@ ModeIDLv EntranceType Guild Individual NeedQuest NeedItem Consume LimitTime MaxU
    the client's `ressystem` (§9.1: hashed table). Start, log in.
 3. The inventory stack now holds 50 with a limit of 49. `&makeitem BestLowHpPotion -l10`, drop it, pick it up.
 
-For the over-full stack the free amount `MaxLot − lot` is negative; what the pick-up does with it is the open
-point of scenario 21 (its prediction applies): note the `0x3001` cells and the `tItemOptions` lot rows after. Disproved for "no check": a refusal
+For the over-full stack the free amount `MaxLot − lot` is negative; what the pick-up does with it is open (scenario 21 step 12; no prediction, and it is not the 0x34A path, which is the
+`KQItem.shn` `PickupLimit` test of step 11 only): note the `0x3001` cells and the `tItemOptions` lot rows after. Disproved for "no check": a refusal
 code at login or at the pick-up. Restore both copies of the file afterwards; a client left with the changed file
 is disconnected (0x68E) by any unchanged server.
 

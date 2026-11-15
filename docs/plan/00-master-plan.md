@@ -143,6 +143,7 @@ The DB items (D01–D05) don't depend on the zone/WM items and can fill gaps in 
 |---|---|---|
 | [X01](items/X01.md) | Integration: architecture overview, feature → message index, glossary, contradictions, original-server bug register, regen | all |
 | [X02](items/X02.md) | Confidence review: rate every section, adversarially re-check load-bearing claims, write targeted capture scenarios (with DB/SHN/GM setups and predictions). **Recurring:** re-run after P02 processes those captures | all phase-2 items, X01 (soft) |
+| [X03](items/X03.md) | Integration update: X02's corrections and the bugs of X02 and its follow-ups into the README register and the superseded-statements list (added by X02) | X01, X02; Z31, Z32, W06, D08 (soft) |
 
 Exact handler counts and line sizes per item: `docs/plan/items/_summary.json` and the scope table at the top
 of each item file.
@@ -165,7 +166,7 @@ follow-up session.
 4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, Z19, Z20, Z21, Z22, Z23, Z24, Z25, Z26, Z27, Z28, Z29, Z30, W05, S02, L01, then D06
 5. P04 (README corrections from the first capture batch), P02 again with fuller captures, then X01
 6. X02 → user records its scenarios → P02 → X02 again (repeat until the low ratings are gone or not worth a capture)
-7. The follow-ups X02 created, any order: Z31, Z32, W06, D08; then X01 again for the register and the corrections
+7. The follow-ups X02 created, any order: Z31, Z32, W06, D08; then X03 for the register and the corrections
 
 Large items (Z04, Z05, Z08, D03, D04) will probably need two or three sessions each. Starting a new session
 with the same plan file resumes from the status file.
