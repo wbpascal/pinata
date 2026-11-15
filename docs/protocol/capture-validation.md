@@ -1098,8 +1098,8 @@ WM → zone 0x180E NC_MAP_LINKRESERVE_ACK on the 0x180D link → client 0x180A 1
     750 / 751), 0x12 (1: item 31000), 0x22 (0); `PacketOrder` 0x80 / 0x80 / 0x81 / 0x81 (P02-B14).
   - 0x4016 `TitleValues` move with the scenario. [9] `ID_NOKILLED_BY_MOB` 1 → 2 in `combat` (one death):
     `CCharacterTitleZone::CT_KilledByMob` @ FUN_005cbdd0 adds 1 to type 9 on every death and to type 8
-    `ID_KILLED_BY_MOB` only when 180 s have passed since the last death and the killer handle differs ([8] stayed 0,
-    §14). So 9 is the death
+    `ID_KILLED_BY_MOB` only when 180 s have passed since the last death and the killer handle differs ([8] stayed 0:
+    the death came 48 s after the zone login, §9.5). So 9 is the death
     counter that Z18 §6.2's "reach level V without dying" checks, and the §14 lead is settled. Others: [11] kills 7 → 11
     (combat), 11 → 12 (shop); [23] NPC sales 0 → 2, [24] NPC buys 2 → 3, [46] 2 → 8 after `&levelup 3` (shop).
   - 0x402A `{resttime 0, autopick 0, mystery_vault 1, nChatBan 0, bFirstJoin 0}`: the zero `resttime` is the code
@@ -1318,7 +1318,7 @@ enchant stones 61000…). The client
   "[%s] has been obtained." (Z04 §3.3).
 - **0x3011 for the unequip**: the 0x3414 answer sends `0x3011 NC_ITEM_EQUIP_ACK 0x281`, never `0x3013`: Z05-B2 captured.
 - **0x3016 NC_ITEM_USE_ACK** (Z04 §6.1): the ride item answers `0x700` with `useditem 38043` at once (direct use, no
-  CharDB request) and the client starts a 3000-ms cast bar (0x2047, part 12). The two forced dismounts send a second
+  CharDB request) and the client starts a 3000-ms cast bar (0x2047, §9.6). The two forced dismounts send a second
   `0x3016 0x700` (Z13 §7.4 `so_MoverSystem_GetOff` → `ItemUseResult`), `useditem 0xFFFF` when the first 0x3016 had
   already reset it (map link) and 38043 when the dismount is the use itself (§7.6.1).
 - **0x1C0A NC_BRIEFINFO_DROPEDITEM_CMD** (Z09 §11.3): `attr 8` (looting bit 3) for the killer, `dropmobhandle` = the
@@ -1354,7 +1354,191 @@ enchant stones 61000…). The client
 | S→C | 0x3C09 / 0x3C0B | NC_MENU_SHOPOPENTABLE_WEAPON_CMD / _ITEM_CMD | 2 / 1 | 190 / 67 | confirmed; **new layout** | P02.json; tabs by slot runs |
 | S→C | 0x1C0A | NC_BRIEFINFO_DROPEDITEM_CMD | 3 | 15 | confirmed | `attr 8` for the killer |
 
-## 9. Zone in-world, batch 2: combat, death, revive, soulstones *(part 12, not yet written)*
+## 9. Zone in-world, batch 2: combat, death, revive, soulstones *(captured)*
+
+Scenario: `shop` kills a Slime (MobInfo 0, level 1) in RouN at 110.852 with one swing, then in RouCos02 fights a
+Hero Slime (2000, level 2, 119 HP) with swings and one Bash [01] (ActiveSkill 1500) until it dies at 138.352, and
+uses an HP and an SP soulstone (139.805, 141.521); `&levelup 3` at 30.491 takes Test2 from level 5 to 8. `combat`
+(level 5) kills four Slimes in RouCos02 (59.025, 61.619, 67.486 by skill, 73.719), is killed by a Hero Slime at
+94.130 after a 14-s duel (13 player and 6 mob swings), revives from the death menu at 102.372, and summons the Wooden Horse mover (16.096 → 19.029).
+Code references are Z03 §3 (swing), §5 (skills), §7 (death), §8 (mob death, exp, level-up); Z07 §3.1 (revive); Z04
+§13.2 (soulstones); Z09 §5.4 / §7.4 (mob death, mob weapons); Z12 §7 (level-up tail); Z13 §7 (mover cast).
+
+### 9.1 The swing cycle
+
+- **Start.** `0x242B NC_BAT_BASHSTART_CMD` (empty) is answered by `0x2447 NC_BAT_SWING_START_CMD` 15–31 ms later (the
+  swing timer `ts_Set(…, delay 0)` fires on the next player tick, Z03 §3.1). Before a bash the client always sends
+  `0x2401` + an `0x2012 STOP_REQ`; every `0x2401` gets `0x2402` and, one tick later, `0x243D NC_BAT_CEASE_FIRE_CMD`
+  (`p.smo_BashStop` from the target change).
+- **Hit times** (`attackspeed 1100`, `p.vt[0x50c]`): the first hit lands 303–413 ms after its 0x2447, every later one
+  475–534 ms after; the next swing starts 889 ms after the first and 1078–1128 ms after every later one. This is Z03
+  §3.2 with the 0.1-s `g_Now` step: hit at `(AttackSpeed / 2 + HitNotRevision) × 10 / 1000` tenths = 4 (first swing,
+  −150 ms) or 5 (550 ms rounded down), next swing after `AttackSpeed + HitNotRevision` = 950 / 1100 ms.
+- **Hero Slime swings** (`attackspeed 1000`): one every 2.46–2.53 s, hit 570–635 ms after the start. MobWeapon row
+  2000 has `AtkSpd 1000, AtkDly 1500, SwingTime 1000, HitTime 633`: Z09 §7.4 gives `next = D + A` = 15 + 10 tenths =
+  2.5 s and the hit at `B` = 6 tenths = 600 ms. Its first swing at a player follows `0x2013 NC_ACT_SOMEONESTOP_CMD
+  {handle, server position}` in the same ms (the mob stops its chase, `so_mobile_StopHere`, Z09 §7).
+- **Counters.** `damageindex` (= `++swingCount`) restarts at 1 with every 0x242B for the player; `attacksequence` (+0x1e80)
+  keeps counting across bashes, skills and kills (1 → 19 in `combat`). For the mob, `attacksequence` is always 0 and
+  `damageindex` counts its swings over its life (3…8 for mob 4, 8…10 for mob 3). `actioncode` cycles through the
+  animations 0…5 and keeps its position across bashes. `hpchangeorder` is per defender and grows by more than one per hit:
+  mob 4 2, 4, 6 … with no other packet about it in between, the player 3, 6, 9, … with `0x240E` taking the values in
+  between (5 after the hit with 3) and 20 / 21 at death and revive. Every read of the counter advances it (`vt 0x7e8`,
+  Z03 §2.3); which other reads take the missing values was not traced.
+- **Stop.** `0x2432 NC_BAT_BASHSTOP_CMD` → 0x243D 20–44 ms later (`bashStopNotify` on the next tick, Z03 §3.4). A
+  `0x2019 MOVERUN` from the chasing client stops the bash too (`combat` 77.943 → 0x243D at 78.119): the queued hit
+  (due at +400 ms) is dropped, no 0x2448 follows. After a kill the next swing tick finds the target dead and stops:
+  0x243D 434–598 ms after the killing blow (the next swing time). `0x2408 NC_BAT_UNTARGET_REQ` (`shop` 72.878, no bash running) has no
+  reply, as in Z03 §2.5 (nobody targeted the player).
+
+### 9.2 Damage packets
+
+- **`0x2448 NC_BAT_SWING_DAMAGE_CMD`** (16 bytes, 28 packets, all to the fighters only): `flag` is 0 in every
+  packet, the five killing blows on mobs (`resthp 0`) and the blow that killed the player included. `smo_SwingDamage` @
+  FUN_00432f30 writes the flag byte (payload + 4) bit by bit from the battle context `ctx` (`ctx` = the local block
+  `{+0 att, +4 def, … +0x10 critical, +0x11 miss, +0x12 ?, +0x13 shield block, +0x14, +0x15, +0x16}`): bit 0 ← +0x10,
+  bit 1 ← +0x14, bit 2 ← +0x11 (miss), bit 3 ← +0x13, bit 4 ← costume-weapon charge, bit 6 ← +0x15, bit 7 ← +0x16, and
+  of byte payload + 5 only bit 0 (costume shield). The pdb2016 bitfield `PROTO_NC_BAT_SWING_DAMAGE_CMD::flag` names these
+  `iscritical, isresist, ismissed, isshieldblock, isCostumCharged, isDead (bit 5), isDamege2Heal, isImmune,
+  isCostumShieldCharged`. **Bit 5 `isDead` and bits 1–7 of the second byte are never written**: they keep whatever
+  the shared send buffer `gpp` held (0 in all 28) (original bug) P02-B18. Z03's annotation (and §7.1 "the death
+  reaches clients as the dead flag of the damage packet, SWING_DAMAGE flag bit1") does not hold: bit 1 is `ctx+0x14`
+  (`isresist`), and nothing sets a dead bit. The client (`FUN_004a2620`) reads bits 0–4, 6, 7 and the second byte's
+  bit 0, and takes death from `resthp == 0` (`*(u32 *)(payload + 8) != 0` → alive), so the missing bit has no effect.
+- **`0x2452 NC_BAT_SKILLBASH_HIT_DAMAGE_CMD`** (19 = 5 + 14 bytes, the pdb2016 layout; the decoder now falls back to
+  it, §15): `SkillDamage.flag` is `0x2801` (hit, mob alive) and `0x2901` (kill: byte 2 bit 0 `isDead`). Byte 2 bits 3
+  and 5 (`0x28`) are set in both. `sds_TemplateStore` @ FUN_005803c0 builds the entry in a stack local and writes
+  that byte as `(old & 0xfa) | isImmune << 1 | IsCostumShield << 2 | (resthp == 0)`: bits 3–7 keep uninitialised stack
+  bits (original bug) P02-B19. `isDead` is set first from `resthp == 0` and cleared again when the damage is less
+  than the target's HP. `hpchange` 70 / 27, `resthp` 16 / 0 match the swing sequence (119 − 33 − 70 = 16).
+- **Bystanders**: no `0x2449` was captured (no third player in sight).
+
+### 9.3 Kills, experience, hunt log
+
+- **Order at a swing kill** (all in the ms of the killing hit): link `0x1073 NC_CHAR_EXP_CHANGED_CMD` to the WM and
+  `0xC80B NC_SYSLOG_CHAR_VICTORY` to GameLog; client `0x2402` (`targethp 0`), `0x240B NC_BAT_EXPGAIN_CMD`, `0x2448`.
+  The exp packet precedes the damage packet because `vt 0xef0` (apply damage → `ShineMob::so_KilledBy` → exp) runs
+  before the 0x2448 send (Z03 §3.2, §8.1). `0x244A NC_BAT_REALLYKILL_CMD {dead, attacker}` (4 bytes) follows 42–54 ms
+  later from the mob's own tick (`deathSent`, Z09 §5.4); after the skill kill it leaves in the same ms as 0x2452,
+  because the blast runs in the player tick before the mob's. `0x1C0A` drops leave with the 0x240B (§8.1).
+- **`0x240B expgain`** 1 (Slime at level 8), 2 (Slime at level 5) and 4 (Hero Slime at level 8): `MonEXP` 3 / 8 ×
+  the level handicap (Z03 §8.2), `mobhandle` = the dead mob. `0x1073 exp` goes 30 → 31 and 22 → 30 in steps of 2.
+- **`0xC80B`** (22 bytes, D05 layout): `ZoneNo` = the zone process number (0 = RouN on 9210, 2 = RouCos02 on 9214;
+  `zs_worlddata().nZoneNo`), `TargetType 1` (mob), `TargetID` = MobInfo id (0 Slime, 2000 Hero Slime: `vt 0x708`, the
+  mob id masked to 16 bits), `KillCoord` = the killer's position (`param_1->so_LocateInfo`, ShineMob::so_KilledBy @
+  FUN_00432760).
+- **Hunt log.** `0x042D NC_LOG_GAME_MK_GETEXPINFIELD {chrregnum 5, mobid 0, number 4, exp 8}` leaves once, at the
+  revive (102.376): the four Slime kills of `combat` with their 4 × 2 exp, Z09 §28.12 `mhe_Send2Log`. Its only flush
+  is `mhl_SendAll2Log` in `ShinePlayer::so_Unmark` @ FUN_00558900, guarded by `smo_GetMode() != 0` (vt 0x484). The
+  revive's same-zone link calls `so_Unmark` while the player is in mode 1 (Z07 §3.1 sets it before `so_LinkTo`), so
+  the log goes out. A link to another zone sets `mode = 0` in `so_LinkTo` (Z01 §7.1) and unmarks only later in
+  `so_banning` (0x180E), so the guard fails and the entries are dropped with the object: the Slime kill of `shop`
+  (110.852, zone A) never reaches GameLog although Test2 left for zone B at 118.993 (original bug) P02-B20. Normal
+  logout (0x0C18, mode 1–6) flushes it (Z01 §8.1).
+
+### 9.4 Level-up (`&levelup 3`, `shop` 30.491)
+
+All three levels go out in one ms (30.500–30.501), each in Z03 §8.3 / Z12 §7 code order: links `0x400E`, `0x1074`,
+GameLog `0x041E`, the CharDB save burst of `ws_save2DB(p, 1, 8)` (`0x4018 … 0x4035`, `StoreType 8`, part 13), CharDB
+`0x1070 NC_CHAR_FAMESAVE_CMD`; client `0x240C NC_BAT_LEVELUP_CMD`, `0x4810 NC_SKILL_EMPOWPOINT_CMD`, `0x105B`,
+`0x2446 NC_BAT_FAMEGAIN_CMD`, `0x106F NC_CHAR_FAMECHANGE_CMD`, `0xBC05` (part 13). No `0x240D` (nobody in sight).
+
+- **`0x240C`** (235 = 3 + `CHAR_PARAMETER_DATA` 0xe8; Z03's annotation type `struct` cannot be decoded, the decoder
+  uses the pdb2016 layout): `level` 6 / 7 / 8, `mobhandle 0` (GM command), `PrevExp` / `NextExp` 350 / 560, 560 / 840,
+  840 / 1200, the base and change stats equal (no gear bonus). `Wizdom` holds stale bytes (`" tho"` = text of an
+  earlier packet, then `FF FF FF 01`): Z07-B7, now also in 0x240C. `exp` stays 30 (`0x041E currentexp 30`, `0x0410
+  CharExp 30`), below `PrevExp`: `&levelup` raises the level without exp (Z11 §7.3).
+- **`0x4810 restempow`** 2, 3, 3 and **`0x105B remain`** 6, 7, 8: free empower and stat points after each level.
+- **Fame**: `famegain` = the new level (6, 7, 8); `0x106F` / CharDB `0x1070` carry the total 20, 27, 35 (start 14).
+  The buy at 19.288 sends `0x106F` and `0x1070` with the unchanged 14 (§7.6.1, the money releasers).
+- The HP / SP refill (`0x1035`, `0x240E hp 140`, `0x240F sp 165`) leaves 15 ms later, on the next player tick.
+- **WM `0xC808 NC_SYSLOG_CHAR_LEVEL_UP`** (9 bytes `{UserNo 103, CharNo 5, CharLev}`): one per `0x1074`, in the order
+  7, 6 (30.507), 8 (30.524). The three `0x1074` came on links #7, #11, #7: the WM handles one packet per session per
+  pass (§7.4), session #11 before #7, and the second packet of #7 one pass (17 ms) later.
+
+### 9.5 Player death and revive (`combat`)
+
+- **Death (94.130).** The Hero Slime's hit is applied in its own tick: GameLog `0x042B NC_LOG_GAME_MKED {chrregnum,
+  mappos RouCos02 16351 / 12980, mobid 2000, exp 0}` and `0xC80A NC_SYSLOG_CHAR_DEATH {UserNo, CharNo, ZoneNo 2,
+  AttackerType 1, AttackerID 2000, DeathCoord}` (22 bytes, the 2016 form without the 2017 `CharID / CharLevel /
+  LostEXP`) leave at once; the client gets `0x104D`, `0x2402` (order 1, handle 0xFFFF: the mob's target cleared),
+  `0x240E {hp 0, hpchangeorder 20}` and the killing `0x2448 {damage 3, resthp 0, hpchangeorder 18}` 18 ms later in one
+  frame. `exp 0`: level 5 is below `g_ExpLossMinLevel` (Z03 §7.2, "Starting from level 20 …"), so no `0x2411` and no
+  `0x1073`. No `0x2428` removals reach the client for the states `so_KilledBy` erases (abstate 728).
+- **`0x104D NC_CHAR_DEADMENU_CMD`** (9 bytes): `{reviveWaitSec 180, 50, 0}` as Z03 §7.2 (`field+0x210`, constant 50,
+  `p+0x2aac4 && field flag 2`). The 2017 PDB names the fields `Second`, `u8 priority`, `DeadMenuType eMenuType`
+  (`DMT_BASE 0`, `DMT_REBIRTH 1`) *(pdb2017)*: the last one is 1 only with a pending rebirth offer (Z07 §3.2
+  `p+0x2aac4`), so Z03's `canReviveHere` is the "rebirth" menu variant *(inferred from the names)*.
+- **Revive (102.372, `0x104E`, empty).** Same ms: WM `0x180B`, the CharDB save burst, GameLog `0x042D` (§9.3) and
+  `0x0410 StoreType 2`, client `0x1C18` / `0x242A` for abstate 728 (`keepTime 510100`, restored from `g_ShelterDie`),
+  then `0x104F NC_CHAR_REVIVESAME_CMD {mapid 2, location 9647 / 9002}` (10 bytes, pdb2017 `{u16 mapid, SHINE_XY_TYPE}`,
+  no hand annotation): the RouCos02 regen point, a same-zone link (Z07 §3.1 "Revive City", Z01 §7.1 `so_LinkTo(…, 4,
+  0x4F, 0x50)`). 158 ms later the client sends `0x1803` and the zone repeats the full map-login burst (§5.1), with
+  `0x240E hp 28` = MaxHP 94 × 0x133 / 1024 (Z07 §3.1, 30 %), `0x180C` to the WM and GameLog `0x040F`. The 8.2-s wait
+  is the player's; the auto-revive would have fired after 180 + 2 + 6 s (Z03 §7.2).
+- **Title counter** (§14, open since part 10): `CT_KilledByMob` @ FUN_005cbdd0 adds to type 8 `ID_KILLED_BY_MOB` only
+  when `m_KilledByMobTimeValue + 180 < now`; `CCharacterTitleZone::InitNewPlayer` @ FUN_005ca620 sets that time to
+  `mysecond()` and the handle to 0xFFFF when the WM's title block arrives (`wms_NC_CHAR_ZONE_CHARTITLE_CMD` @
+  FUN_005a39f0, every zone login). Test2 entered RouCos02 at 45.855 and died at 94.130, 48 s later, so [8] stayed 0
+  and only [9] counted: settled.
+
+### 9.6 Skills, soulstones, mover cast bar
+
+- **Bash [01] (1500) on an object**: `0x2440 {skill, target}` → `0x244E NC_BAT_SKILLBASH_HIT_OBJ_START_CMD {skill,
+  targetobj, index}` + `0x2435 NC_BAT_SKILLBASH_CAST_SUC_ACK` (empty) 1–8 ms later; `0x2457 NC_BAT_SKILLBASH_HIT_BLAST_CMD
+  {index, caster, nSkillID}` and `0x2452` 44–55 ms after that (the links in `combat` 27 ms after), then `0x240F sp`
+  (165 → 156 = SP 9). The row has `CastTime 0` and `IsMovingSkill 1`, so `smo_SkillBash_Blast_Obj` (Z03 §5.4) blasts
+  on the first tick without the 0.3-s arming pass. `index` 3 and 4 (per-zone blast counter). No `0x4821` cooldown packet
+  for this skill (DlyTime 6000 is kept server side).
+- **Soulstones**: `0x5007` → `0x5008` (11 ms), `0x5009` → `0x500A` (1 ms), all empty (Z04 §13.2). The heal itself
+  goes out on the next tick as `0x240E hp 140` / `0x240F sp 165` (+51 / +45 ms) after an order-1 `0x2402` about the
+  player. The player's own client gets no `0x500B` / `0x500C`: `sp_HPStoneUse` @ FUN_00589180 broadcasts it with
+  `so_AllOfRange` before sending 0x5008, and it does not reach the user *(captured; whether the iterator skips the
+  sender was not read)*.
+- **Mover (Wooden Horse 38043)**: `0x3015` → `0x201B MOVEFAIL`, `0x3016 0x700`, `0x2047 NC_ACT_CREATECASTBAR
+  {millisec 3000}` in one ms, `0x243D` one tick later (the four cancels of `sp_MoverSystem_Cast`, Z13 §7.2). After
+  2.93 s (MoverMain row 160 `WoodenHorse01`: `CastingTime 3000`, 0.1-s `g_Now` step): `0x1C1A` (the mover object),
+  `0x4821 NC_SKILL_COOLTIME_CMD {skill 29206 UseRide, sec 5}` (`CoolTime 5000`), `0x2048 NC_ACT_CANCELCASTBAR`,
+  `0xCC02`, `0xCC04`, `0xCC0A`: `sp_MoverSystem_SummonItem` order (Z13 §7.4); the CC0x / 0x1C1A statuses are part 13.
+
+### 9.7 Opcodes
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| C→S | 0x242B | NC_BAT_BASHSTART_CMD | 9 | 0 | confirmed | 0x2447 next tick |
+| C→S | 0x2432 | NC_BAT_BASHSTOP_CMD | 3 | 0 | confirmed | 0x243D one or two ticks later |
+| C→S | 0x2408 | NC_BAT_UNTARGET_REQ | 1 | 0 | confirmed | no reply |
+| S→C | 0x2447 | NC_BAT_SWING_START_CMD | 31 | 9 | confirmed | timing = Z03 §3.2 / Z09 §7.4 |
+| S→C | 0x2448 | NC_BAT_SWING_DAMAGE_CMD | 28 | 16 | confirmed; **corrected**; **bug** | flag bit map ≠ Z03; no dead bit (P02-B18) |
+| S→C | 0x244A | NC_BAT_REALLYKILL_CMD | 6 | 4 | confirmed | 42–54 ms after a swing kill |
+| S→C | 0x240B | NC_BAT_EXPGAIN_CMD | 6 | 6 | confirmed | before the killing 0x2448 |
+| S→C | 0x240C | NC_BAT_LEVELUP_CMD | 3 | 235 | confirmed; **bug** | pdb2016 layout; `Wizdom` stale (Z07-B7) |
+| S→C | 0x2446 | NC_BAT_FAMEGAIN_CMD | 3 | 4 | confirmed | = new level |
+| S→C | 0x4810 | NC_SKILL_EMPOWPOINT_CMD | 3 | 1 | confirmed | |
+| C→S | 0x2440 | NC_BAT_SKILLBASH_OBJ_CAST_REQ | 2 | 4 | confirmed | skill 1500 |
+| S→C | 0x244E | NC_BAT_SKILLBASH_HIT_OBJ_START_CMD | 2 | 6 | confirmed | |
+| S→C | 0x2435 | NC_BAT_SKILLBASH_CAST_SUC_ACK | 2 | 0 | confirmed | |
+| S→C | 0x2457 | NC_BAT_SKILLBASH_HIT_BLAST_CMD | 2 | 6 | confirmed | first tick (IsMovingSkill) |
+| S→C | 0x2452 | NC_BAT_SKILLBASH_HIT_DAMAGE_CMD | 2 | 19 | confirmed; **bug** | 5-byte header (pdb2016); flag bits 11/13 stack garbage (P02-B19) |
+| S→C | 0x4821 | NC_SKILL_COOLTIME_CMD | 1 | 6 | confirmed | ride skill 29206, 5 s |
+| S→C | 0x2047 | NC_ACT_CREATECASTBAR | 1 | 2 | confirmed | 3000 ms = MoverMain.CastingTime |
+| S→C | 0x2048 | NC_ACT_CANCELCASTBAR | 1 | 0 | confirmed | at the cast end (summon) |
+| S→C | 0x2013 | NC_ACT_SOMEONESTOP_CMD | 2 | 10 | confirmed | mob stops before its first swing |
+| S→C | 0x1C19 | NC_BRIEFINFO_ABSTATE_CHANGE_LIST_CMD | 4 | 15 | confirmed | regen mob: `{291 StaImmortal, 5000, 1}` with its 0x1C08, reset by 0x2428 5.0 s later |
+| S→C | 0x104D | NC_CHAR_DEADMENU_CMD | 1 | 9 | confirmed | `{180, 50, 0}` |
+| C→S | 0x104E | NC_CHAR_REVIVE_REQ | 1 | 0 | confirmed | |
+| S→C | 0x104F | NC_CHAR_REVIVESAME_CMD | 1 | 10 | confirmed | pdb2017 layout; then a full map login |
+| S→C | 0x1033 | NC_CHAR_CENCHANGE_CMD | 3 | 8 | confirmed | 99 440 − 69 (BuyPrice), + 3, + 4 (SellPrice) |
+| S→C | 0x106F | NC_CHAR_FAMECHANGE_CMD | 4 | 4 | confirmed | total fame |
+| C→S | 0x5007 / 0x5009 | NC_SOULSTONE_HP / SP_USE_REQ | 1 / 1 | 0 | confirmed | |
+| S→C | 0x5008 / 0x500A | NC_SOULSTONE_HP / SP_USESUC_ACK | 1 / 1 | 0 | confirmed | heal on the next tick; no 0x500B to self |
+| Z→CDB | 0x1070 | NC_CHAR_FAMESAVE_CMD | 4 | 8 | confirmed | `{charregnum, fame}`; buy + each level |
+| Z→GL | 0x041E | NC_LOG_GAME_LEVEL_UP | 3 | 33 | confirmed | `currentexp` = unchanged exp |
+| Z→GL | 0x042B | NC_LOG_GAME_MKED | 1 | 34 | confirmed | `exp` = lost exp (0) |
+| Z→GL | 0x042D | NC_LOG_GAME_MK_GETEXPINFIELD | 1 | 12 | confirmed; **bug** | only when unmarked in mode ≠ 0 (P02-B20) |
+| Z→GL | 0xC80A | NC_SYSLOG_CHAR_DEATH | 1 | 22 | confirmed | 2016 short form |
+| Z→GL | 0xC80B | NC_SYSLOG_CHAR_VICTORY | 6 | 22 | confirmed | `TargetID` = mob id, killer's position |
+| WM→GL | 0xC808 | NC_SYSLOG_CHAR_LEVEL_UP | 3 | 9 | confirmed | one per 0x1074, WM session order |
 
 ## 10. Zone in-world, batch 2: other new zone opcodes *(part 13, not yet written)*
 
@@ -1405,13 +1589,16 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B15 | Character server `fc_NC_ITEMDB_PICKALL_REQ` @ FUN_0040b760 → GameLog 0x0446 | fills `chrregnum`, the map name (`strncpy` "Need", 12 bytes, D03-B11), the key, `itemlot 0` and `itemid`; `mappos.x` / `mappos.y` and `iteminven` (10 bytes) keep the stack (§7.6.1) | every pick-up log has garbage cell values (0x7512, 0x4372, 0x7511 captured) and x = y = 0 | write the request's map position and `location` |
 | P02-B16 | zone `ShinePlayer::so_ply_SellItemList_Insert` @ FUN_00537a20 → client 0x305C | writes `nHandle` and the item with its class-sized attribute, then sends a fixed 105-byte payload from the shared `gpp` buffer (§8.1) | up to 100 stale bytes per sale: text and lists of earlier packets (other players' messages included) | length = 4 + written item bytes, or clear the buffer |
 | P02-B17 | zone `ShinePlayer::so_accountstoragefill` @ FUN_0044c530 → client 0x3C08 | adds the length of `ias_FillBufferItem` @ FUN_00643b10, which already counts the `itemcounter` byte, to the offset after it (§8.1) | every storage page carries one stale trailing byte | use `0xd + n` (same slip as P02-B3) |
+| P02-B18 | zone `ShineMobileObject::smo_SwingDamage` @ FUN_00432f30 → 0x2448 | sets the `flag` bits one by one in the shared buffer `gpp` and never writes bit 5 (`isDead`, pdb2016) or bits 1–7 of the second flag byte (§9.2) | 8 bits of whatever `gpp` last held per damage packet (0 in all 28 captured); the client reads none of them and takes death from `resthp 0` | clear the flag word first; set `isDead` when the hit kills |
+| P02-B19 | zone `SkillDamageSender::sds_TemplateStore` @ FUN_005803c0 → 0x2452 | builds each `SkillDamage` in a stack local and writes the second flag byte from `old & 0xfa` plus the three known bits, keeping bits 3–7 of the stack (§9.2) | uninitialised stack bits on every skill damage entry (`0x28` in both captured) | start from a zeroed entry |
+| P02-B20 | zone `ShinePlayer::so_Unmark` @ FUN_00558900 (hunt log, Z09 §28.12) | flushes `mhl_SendAll2Log` only when `smo_GetMode() != 0`; a link to another zone sets mode 0 in `so_LinkTo` before the unmark in `so_banning` (§9.3) | every zone change drops the hunt-log entries of that zone (`shop`: the RouN Slime kill never reached GameLog 0x042D); only same-zone links and logout log them | flush in the other-zone branch of `so_LinkTo`, or before setting mode 0 |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
 | ID | Captured evidence | § |
 |---|---|---|
 | L00-B5 | `0x0C05 bSuccess = 1` on every XTrap key | §3.2 |
-| Z07-B7 | 0x1802 `Wizdom` stale | §5.3 |
+| Z07-B7 | 0x1802 `Wizdom` stale; also in each 0x240C `newparam` (batch 2) | §5.3, §9.4 |
 | Z18-B10 | 0x1C05 `nSlotNum` = 0x74 in all 7 (stale) | §5.2 |
 | Z18-B19 | 0x10E4 / 0x10E7 / 0x10EA `chrregnum` stale, different per login | §5.2 |
 | Z09-B54 | 0x2011 `unk` never written (values 1 / 2 are buffer leftovers) | §5.2 |
@@ -1470,8 +1657,17 @@ Every owner below is `**State:** done`; nobody reopens them. The full rows (old 
 | D03 | `D03-character-items.md` §3.4 (PICKALL → 0x0446 `{ owner, "Need", key, 0, itemid }`) | x, y and `iteminven` are never written (P02-B15); annotation 0x340A `attr` SHINE_ITEM_ATTRIBUTE (101 fixed) is a variable tail | corrected (P02.json override) → X01 |
 | S01 | `pdb2016-layouts.json` 0x3411 / 0x3414 / 0x3423 / 0x3429 / 0x3428 | the CharDB ↔ zone packets carry the 6-byte `NETPACKETZONEHEADER` before the PDB struct (8 / 34 bytes) | corrected (P02.json `packets.zone`) |
 | P01 | `pcap_decode.py` with the annotations | `ITEM_INVEN` and `MAPPOS` had no struct entry, so every field of these types decoded as 1 byte | fixed by P02 (part 11, P02.json `structs`) |
+| Z03 | `Z03-combat.md` §3.2 (0x2448 flag), §7.1 ("death reaches clients as SWING_DAMAGE flag bit1"); `annotations/Z03.json` 0x2448 | flag bits are 0 ← ctx+0x10, 1 ← ctx+0x14 (`isresist`), 2 ← +0x11 miss, 3 ← +0x13, 4 costume, 6 ← +0x15, 7 ← +0x16, second byte bit 0; no dead bit is written (`isDead` = bit 5, P02-B18); the client takes death from `resthp 0` (batch 2, §9.2) | corrected → X01 |
+| Z03 | `annotations/Z03.json` 0x240C (`struct`), 0x2452 (`struct[targetnum]`) | types the decoder cannot read; the pdb2016 layouts fit (235 bytes, 5 + 14 n) | extended (decoder falls back to pdb2016, §15) |
+| Z03 | `Z03-combat.md` §5.6 (`sds_Finish` SkillDamage flag) | the second flag byte keeps uninitialised stack bits 3–7 (P02-B19, `sds_TemplateStore` @ FUN_005803c0) | corrected → X01 |
+| Z09 | `Z09-world.md` §28.12 (hunt log "flush … on logout") | the flush in `so_Unmark` needs mode ≠ 0, so a link to another zone drops the log (P02-B20); same-zone links (revive) flush it | corrected → X01 |
+| Z04 | `Z04-items.md` §13.2 ("broadcast 0x500B") | the user's own client gets no 0x500B / 0x500C; the heal reaches it as 0x240E / 0x240F on the next tick | extended → X01 |
 
-No discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held. Batch 2 §7.5 also confirms Z01 §5.2–§5.3, Z07 §1.2–§1.4, Z09 §1.2 / §1.5, Z12 / Z13 / Z17 / Z28 blob layouts
+No discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held. Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
+timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
+loss below level 20), §8.1–§8.3 (kill order, exp, level-up), Z07 §3.1 (revive city, 30 % HP), Z09 §5.4 / §7.4 (0x244A
+from the mob tick, MobWeapon timing), Z12 §7 (level-up tail, fame), Z13 §7.2 / §7.4 (mover cast and summon order),
+Z11 §7.3 (`&levelup` without exp), D05 (GameLog layouts) and W01's 0xC808. Batch 2 §7.5 also confirms Z01 §5.2–§5.3, Z07 §1.2–§1.4, Z09 §1.2 / §1.5, Z12 / Z13 / Z17 / Z28 blob layouts
 (the trailing bytes are the WM's P02-B10 / P02-B11) and W05 §2 (0x441D). Part 10 (§7.5.4) confirms Z01 §7.1 (`so_LinkTo`, 0x180B / 0x180D / 0x180E, the same-zone branch), the
 Z03 / Z12 / Z13 / Z15 / Z16 / Z23 / W04 layouts of the saves, Z08 §4 (no 0x580E from a zone without the map, Z08-B8) and
 §8.2 (0x7496), W03 §3.5 / §6.4 and W04 §17.5 (0x1120 after the first 0x180C only), and Z18 §6.2's use of title type 9. Part 11 (§7.6.1, §8) confirms Z02 §6.5 (shop lists), Z04 §2–§7, Z05 §1–§7 (lock
@@ -1500,9 +1696,8 @@ forced dismounts, `so_LinkTo` dismounting before `ws_save2DB`), D03 §2–§5 (a
 - **Title value type 9** (batch 2, §7.4 0x1019): `TitleValues[9]` went 1 → 2 across `combat`, in which Test2 died once,
   but pdb2016 names 8 `ID_KILLED_BY_MOB` and 9 `ID_NOKILLED_BY_MOB`. Either the zone counts deaths under 9 or the
   value changed for another reason. **Settled** in part 10 (§7.5.4): `CT_KilledByMob` @ FUN_005cbdd0 adds 1 to type 9 on
-  every death (the death counter). Open: type 8 should also have gone 0 → 1 on the first death of the session (180 s
-  since `m_KilledByMobTimeValue`, a new killer handle) but stayed 0. The initial value of `m_KilledByMobTimeValue` /
-  `m_KilledByMobHandle` was not traced *(part 12 reads the death path)*.
+  every death (the death counter). Type 8: **settled** in part 12 (§9.5): `InitNewPlayer` @ FUN_005ca620 sets
+  `m_KilledByMobTimeValue` to the zone-login time, and the death came 48 s after the RouCos02 login (< 180 s).
 - **0x10D2 single-option columns** (batch 2, §7.4): `usp_Character_getSingleOption` returns (u8, u8, ts, u32); the
   field names in P02.json are ours. The timestamp equals the 0x101A `dKQDate`: both look like "last save" times
   *(inferred)*.
@@ -1516,7 +1711,15 @@ forced dismounts, `so_LinkTo` dismounting before `ws_save2DB`), D03 §2–§5 (a
   after a CharDB answer by the Nagle reading of §7.5.4 *(both inferred)*.
 - *(inferred)* items carried from parts 1–4: the 0x112C range broadcast excludes the sender (§5.1 #12); 0x2011 `unk` values are buffer leftovers (§5.2); the
   client ignores the 0x302D trailing byte (§5.3); AVATAR KQ fields keep the last saved position (§4.3).
-- **Not captured at all**: combat beyond targeting (batch 1), chat (other than `&adminlevel`), trade, booths, every item failure path
+- **Client sends after a mob-tick event** (batch 2, §9.5, §9.6): at the player's death and the skill kill the GameLog
+  / WM link packets leave 18 / 27 ms before the client packets of the same event (one frame), while swing kills in the
+  player tick send both in one ms. Reading: client packets are queued in the player's game socket stream and flushed
+  at a later point of the pass than the link sends *(inferred; the flush point was not traced)*.
+- **0x500B / 0x500C** (§9.6): the soulstone broadcast does not reach the user; whether `so_AllOfRange` skips the source
+  object or the flag argument excludes it was not read.
+- **`hpchangeorder` steps** (§9.1): the counter advances by 2–3 per hit; the extra reads were not traced.
+- **Not captured at all**: party / PvP / guild-war deaths (0x0429, 0x244A WM, 0x2411 exp loss), skill failure and
+  cast abort, bystander packets (0x2449, 0x240D, 0x244F, 0x500B), chat (other than `&adminlevel`), trade, booths, every item failure path
   (batch 2 has only successful item transactions, §8), party,
   guild, KQ, failure paths (0x0C15, 0x1002, 0x1804, 0x0C66, …; lists in §3.2, §4.2, §5.2). Statuses there stay
   **never seen** until X02's scenarios are recorded.
@@ -1553,6 +1756,11 @@ zone layouts 0x3411 / 0x3414 / 0x3423 / 0x3429 / 0x3428 / 0x341C / 0x341D and th
 `packets.character` 0x340A replaces D03's fixed 101-byte attribute with a variable tail. After that every part-11
 opcode decodes without an issue (issue types left: shop 9, combat 8, all of parts 12–13 or the known 0x7C07 / 0x7037).
 
+Batch 2 (part 12): `decode_packet` falls back to the PDB layout (pdb2016 first) when a client-facing hand annotation
+does not decode the payload exactly and the PDB layout does (`source` = `pdb2016 (annotation did not fit)`; selftest
+case 0x240C). That fixes Z03's 0x240C (`struct`) and 0x2452 (`struct[targetnum]`); every part-12 opcode decodes
+without an issue (zone issue types left: 0x4401, part 13).
+
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
 | 0x7C07 4-byte short form: the decoder warns "sReason needs 16 bytes" | W04 §9.2 (done; documents both forms) | the layout is right; `annotations/W04.json` has one entry for two sizes and sorts after P02.json, so P02 cannot override it; harmless warning |
@@ -1565,3 +1773,5 @@ opcode decodes without an issue (issue types left: shop 9, combat 8, all of part
 | second per-minute 0x1035, 0x3C01 `npcPosition`, NPC sp 100 | resolved here (review): §6.1 (0x1035), §6.3 | the second 0x1035 = the `so_Routine` dirty-flag pass after the per-minute block sets `p+0xe94` (`smo_Abstate.parameterchange`, Z09 §2.4 / §5.5, §6.1) |
 | WM `CWMClientSession::Send_NC_CHAR_SUPPORT_REWARD_CMD` @ FUN_00433ab0 → zone 0x1120 @ FUN_005a5c70 (abstate 728) | W04 §17.5, Z07 §1.2 (both done, both document it) | resolved and confirmed in §5.1; nothing left to document |
 | item transaction failures (0x340C/0x340F, 0x3412, 0x3415, 0x341E, 0x3424, 0x342A, 0x3445 …) and their client codes | X02 (plan: "write targeted capture scenarios"), then P02 again | batch 2 holds only successes (§8.2); the failure layouts are Z05 §2–§7 / D03's |
+| PvP / party / guild-war deaths, exp loss (0x0429, WM 0x244A, 0x244B, 0x2411, 0x7445), skill fail / abort (0x2434, 0x2438, 0x2445), bystander packets (0x2449, 0x240D, 0x244F, 0x500B), revive to another map (0x1050), rebirth (0x1102 / 0x1103) | X02 (plan: "write targeted capture scenarios"), then P02 again | batch 2 has one PvE death, a solo player and successful casts only (§9); the layouts are Z03 / Z07's |
+| the extra `hpchangeorder` reads (§9.1) and the client-send flush point (§14) | X02 (plan: "adversarially re-check load-bearing claims") | no layout depends on them; the order within one socket is right |

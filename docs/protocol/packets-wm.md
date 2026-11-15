@@ -13110,3 +13110,7 @@ size 0x12, not checked
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `NumOfMaster`: 0
 
+### `0xc808` NC_SYSLOG_CHAR_LEVEL_UP (WM→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop): `UserNo`: 103; `CharNo`: 5; `CharLev`: 7, 6, 8: one per zone 0x1074, WM session order
+

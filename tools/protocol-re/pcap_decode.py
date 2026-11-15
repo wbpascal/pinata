@@ -523,6 +523,13 @@ def decode_packet(kind, d, op, payload, docs):
             if not r[3] and r[2] == len(payload):
                 (fields, cov, end, prob), name = r, alt.get("name") or name
                 break
+        # P02 batch 2: a client-facing hand annotation whose types the decoder cannot read (Z03 0x240C `struct`,
+        # 0x2452 `struct[targetnum]`) or that does not fit: use the PDB layout when it decodes the payload exactly
+        if kind != "link" and src == "annotation" and (prob or end != len(payload)) and op in docs.get("pdb", {}):
+            alt = pdb_pick(docs["pdb"][op], len(payload))
+            r = decode_ann(payload, alt["fields"], docs["structs"], docs)
+            if not r[3] and r[2] == len(payload):
+                (fields, cov, end, prob), src = r, docs["pdb"][op].get("src", "pdb2017") + " (annotation did not fit)"
         if prob:
             issues.append(prob)
         elif end != len(payload):
@@ -922,6 +929,9 @@ def selftest():
         r = decode_packet("zone", S2C, p17, bytes(docs["pdb"][p17]["size"]), docs)
         assert r["source"] == "pdb2017" and not r["issues"], r
         assert pdb_pick(docs["pdb"][0x0830], 3)["name"] == "NC_MISC_SERVERPARAMETER_ACK"   # alias layout by size
+        # annotation that does not fit -> exact PDB fallback (P02 part 12: Z03's 0x240C `struct`)
+        r = decode_packet("zone", S2C, 0x240C, bytes(docs["pdb"][0x240C]["size"]), docs)
+        assert r["source"].endswith("(annotation did not fit)") and not r["issues"], r
         f = decode_ann(b"\x02\x01\x00\x02\x00", [[0, "u8", "a.num", ""], [1, "u16[a.num]", "arr", ""]], {}, docs)
         assert f[0] == [("a.num", 2), ("arr", [1, 2])] and f[2] == 5 and not f[3], f
         # type forms added by P02: [] = rest, bytes = rest, Outer::Inner suffix, inline {u8,u8}, name[i].x overlay, datasize

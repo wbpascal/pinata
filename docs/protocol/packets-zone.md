@@ -756,6 +756,8 @@ Handler `FUN_0042b7a0`
 
 no inline reply; failure code is sent on the next tick as 0x2434
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `skill`: 1500 Bash [01]; `target`: mob handle
+
 Handler `FUN_0057fa50`
 
 | Off | Type | Checks in handler | Notes |
@@ -2679,6 +2681,8 @@ Sent from `ShineObjectClass::ShineMiniHouse::smh_SendFurnitureInfo` (`FUN_005469
 |---|---|---|---|
 | 0 | u64 | cen |  |
 
+**Captured** (P02, `capture-validation.md`; shop): `cen`: 99371 = 99440 − BuyPrice 69; +3 / +4 = SellPrice
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeCen` (`FUN_00517f70`) · payload 8 bytes
 
 | Off | Type | Value / source |
@@ -2918,6 +2922,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_CharChargedBuffData` (`FUN_0044e1e0
 | 4 | u8 |  | always 50 |
 | 5 | u32 | canReviveHere | 0/1 |
 
+**Captured** (P02, `capture-validation.md`; combat): `reviveWaitSec`: 180; ``: 50 (pdb2017 priority); `canReviveHere`: 0 (pdb2017 eMenuType DMT_BASE)
+
 Sent from `ShineObjectClass::ShinePlayer::so_KilledBy` (`FUN_00433be0`) · payload 9 bytes
 
 | Off | Type | Value / source |
@@ -3023,6 +3029,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_BroadcastGuildInfo` (`FUN_0056e
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u32 | fame | new total |
+
+**Captured** (P02, `capture-validation.md`; shop): `fame`: total: 14 (buy, unchanged), 20, 27, 35
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_ChangeFame` (`FUN_00518070`) · payload 4 bytes
 
@@ -3714,6 +3722,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_Notice` (`FUN_005977e0`) · pay
 | 2 | u32 | loc.x |  |
 | 6 | u32 | loc.y |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `handle`: mob stopping its chase before its first swing; `loc`: server position
+
 Sent from `ShineObjectClass::ShineMobileObject::so_mobile_StopHere` (`FUN_0045a0c0`) · payload 10 bytes
 
 | Off | Type | Value / source |
@@ -4151,6 +4161,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_SendHorseHungry` (`FUN_0045e510`) �
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | millisec |  |
+
+**Captured** (P02, `capture-validation.md`; combat): `millisec`: 3000 = MoverMain CastingTime
 
 Sent from `FUN_0045d550` (`FUN_0045d550`) · payload 2 bytes
 
@@ -4629,6 +4641,8 @@ Sent from `AxialListTargetInform::ali_Work` (`FUN_0042b0b0`) · payload 30 bytes
 | 0 | u32 | expgain |  |
 | 4 | u16 | mobhandle |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `expgain`: 1 / 2 / 4 = MonEXP × level handicap; `mobhandle`: dead mob; sent before the killing 0x2448
+
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 6 bytes
 
 | Off | Type | Value / source |
@@ -4645,6 +4659,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payloa
 | 0 | u8 | level |  |
 | 1 | u16 | mobhandle |  |
 | 3 | struct | newparam | CHAR_PARAMETER_DATA, 0xe8 bytes |
+
+**Captured** (P02, `capture-validation.md`; shop): `level`: 6 / 7 / 8; `mobhandle`: 0 (&levelup); `newparam`: pdb2016 CHAR_PARAMETER_DATA; PrevExp/NextExp 350/560, 560/840, 840/1200; Wizdom stale (Z07-B7)
 
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 235 bytes
 
@@ -5121,6 +5137,8 @@ Sent from `FUN_005835e0` (`FUN_005835e0`) · payload 12 bytes
 |---|---|---|---|
 | 0 | u32 | famegain | added fame (level on level-up), cap 1,000,000 |
 
+**Captured** (P02, `capture-validation.md`; shop): `famegain`: = the new level (6, 7, 8)
+
 Sent from `ShineObjectClass::ShinePlayer::so_GainFame` (`FUN_0042df00`) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -5139,6 +5157,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_GainFame` (`FUN_0042df00`) · paylo
 | 5 | u16 | attackspeed | ms |
 | 7 | u8 | damageindex | swing counter (low byte) |
 | 8 | u8 | attacksequence |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `attackspeed`: 1100 player (vt 0x50c), 1000 Hero Slime (MobWeapon AtkSpd); `damageindex`: player: restarts at 1 per 0x242B; mob: life-long swing count; `attacksequence`: player: counts across bashes (1–19); mob: 0; `actioncode`: animation 0–5, kept across bashes
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SwingStart` (`FUN_0042f3f0`) · payload 9 bytes
 
@@ -5167,6 +5187,8 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SwingStart` (`FUN_0042f3f0`)
 | 15 | u8 | attacksequence |  |
 
 sent to the attacker's and the defender's client only (owner for pets/servants)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `flag`: 0 in all 28, killing blows included: no dead bit is written (P02-B18); `resthp`: 0 on the killing blow; client takes death from it; `hpchangeorder`: per defender, +2–3 per hit
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SwingDamage` (`FUN_00432f30`) · payload 16 bytes
 
@@ -5262,6 +5284,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_TargetChange` (`FUN_004a4680`) 
 | 0 | u16 | skill |  |
 | 2 | u16 | targetobj |  |
 | 4 | u16 | index | blast index tying START, BLAST and DAMAGE together |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `skill`: 1500; `targetobj`: = 0x2440 target; `index`: 3 / 4 (blast counter), ties 0x2457 / 0x2452
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_Volley` (`FUN_004a44a0`) · payload 6 bytes
 
@@ -5359,6 +5383,8 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 
 flag: bit0 isdamage, 1 iscritical, 2 ismissed, 3 isshieldblock, 4 isheal, 5 isenchant, 6 isresist, 7 IsCostumWeapon, 8 isDead, 9 isImmune, 10 IsCostumShield. 2016 header is 5 bytes; the 2017 struct adds kSkillID and pTarget before the array.
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `(layout)`: pdb2016: 5-byte header + 14 n (Z03 annotation type not decodable); `target.flag`: 0x2801 hit / 0x2901 kill; bits 11 and 13 stack garbage (P02-B19)
+
 Sent from `SkillEffectApply::SkillDamageSender::sds_Finish` (`FUN_00437110`) · payload variable ((byte)
 
 | Off | Type | Value / source |
@@ -5419,6 +5445,8 @@ Sent from `AbnormalStateContainer::AbnormalStateReinforcedMove::ase_PreAttachObj
 | 0 | u16 | index |  |
 | 2 | u16 | caster |  |
 | 4 | u16 | nSkillID |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `index`: = 0x244E index; `nSkillID`: 1500; 44–55 ms after 0x244E (IsMovingSkill: no arming pass)
 
 Sent from `ShineObjectClass::ShineMobileObject::so_Routine` (`FUN_0056a080`) · payload 6 bytes
 
@@ -6796,6 +6824,8 @@ Sent in reply to `0x480d` NC_SKILL_EMPOW_RESET_DB_SUC_ACK on GameDBSession (`FUN
 |---|---|---|---|
 | 0 | u8 | restempow | unspent empower points |
 
+**Captured** (P02, `capture-validation.md`; shop): `restempow`: 2, 3, 3
+
 Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payload 1 bytes
 
 | Off | Type | Value / source |
@@ -6882,6 +6912,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_ReviveNow` (`FUN_0057d290`) · payl
 |---|---|---|---|
 | 0 | u16 | skill |  |
 | 2 | u32 | sec |  |
+
+**Captured** (P02, `capture-validation.md`; combat): `skill`: 29206 UseRide; `sec`: 5 = MoverMain WoodenHorse01 CoolTime 5000
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_NewSkillCoolTime` (`FUN_00569260`) · payload 6 bytes
 
@@ -10602,6 +10634,8 @@ Empty payload.
 
 Empty payload.
 
+**Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty; no reply
+
 ### `0x242b` NC_BAT_BASHSTART_CMD (C→S)
 
 **Verified layout** (basis: zone FUN_00430fa0)
@@ -10610,11 +10644,15 @@ Empty payload.
 
 payload not read; attacks the server-side current target. Mode 2 only.
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `(payload)`: empty; 0x2447 15–31 ms later (next player tick)
+
 ### `0x2432` NC_BAT_BASHSTOP_CMD (C→S)
 
 **Verified layout** (basis: zone FUN_0042e700)
 
 Empty payload.
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `(payload)`: empty; 0x243D 20–44 ms later
 
 ### `0x2444` NC_BAT_SKILLBASH_CASTABORT_REQ (C→S)
 
@@ -10701,11 +10739,15 @@ Empty payload.
 
 Empty payload.
 
+**Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty
+
 ### `0x5009` NC_SOULSTONE_SP_USE_REQ (C→S)
 
 **Verified layout** (basis: zone FUN_00589000)
 
 Empty payload.
+
+**Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty
 
 ### `0x4025` NC_CHARSAVE_UI_STATE_SAVE_REQ (C→Z)
 
@@ -11538,6 +11580,8 @@ full brief-info exchange batch to one player (login complete, regen, teleport, l
 | 2 | u8 | count |  |
 | 3 | ABSTATE_INFORMATION[count] | infoList | ABSTATE_INFORMATION × count |
 
+**Captured** (P02, `capture-validation.md`; combat): `handle`: regen mob (after its 0x1C08); `infoList`: {291 StaImmortal, 5000 ms, 1}; 0x2428 5.0 s later
+
 ### `0x1c1a` NC_BRIEFINFO_REGENMOVER_CMD (S→C)
 
 **Verified layout** (basis: zone BriefInformationMover FUN_0055e830 / FUN_0043c280 / FUN_0055ea10 (0x8b bytes); client FUN_00646e00)
@@ -11782,6 +11826,8 @@ player tick, on change (+0x172dc)
 
 Empty payload.
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `(payload)`: empty, same ms as 0x244E
+
 ### `0x243C` NC_BAT_DOTDAMAGE_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone AxialListMobSuicide::alms_SelfKill FUN_004f1720 (broadcast in sight, length 0xF); client FUN_004b5740)
@@ -11815,6 +11861,8 @@ only the self-kill send site of Z09 (cMobSuicide / ShineSuicide / servant vanish
 | 2 | u16 | attacker | killer handle (mob+0x1fba), 0xFFFF when none |
 
 2017 PDB alias of 0x244A (the zone→WM direction is NC_BAT_PKINPKFIELD_WMS_CMD, Z03). Sent once to sight when the mob's mode becomes 3.
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `dead`: mob handle; `attacker`: killer; 42–54 ms after a swing kill, same ms after a skill kill
 
 ### `0x245A` NC_BAT_AREADOTDAMAGE_CMD (hand-named) (S→C)
 
@@ -12148,6 +12196,8 @@ empty payload
 Empty payload.
 
 empty payload
+
+**Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty, 11 ms after 0x5007; 0x240E heal next tick; no 0x500B to self
 
 ### `0x5812` NC_KQ_COMPLETE_CMD (S→C)
 
@@ -13869,6 +13919,8 @@ sent length is one byte longer than the packet (Z11-B38); answer 0x5816 / 0x5817
 | 0 | u32 | charregnum |  |
 | 4 | u32 | fame |  |
 
+**Captured** (P02, `capture-validation.md`; shop): `charregnum`: 5; `fame`: 14 (buy), 20, 27, 35 (each level)
+
 ### `0x10d1` NC_CHAR_FREESTAT_SET_DB_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_0058ad10 / FUN_0058b3f0)
@@ -15425,6 +15477,18 @@ Z01 name was 'map login done (ours)'
 
 ## Captured packets without a section above
 
+### `0x041e` NC_LOG_GAME_LEVEL_UP (Zone→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop): `level`: 6 / 7 / 8; `currentexp`: 30 (unchanged by &levelup)
+
+### `0x042b` NC_LOG_GAME_MKED (Zone→GameLog)
+
+**Captured** (P02, `capture-validation.md`; combat): `mobid`: 2000 killer; `exp`: 0 lost (level 5 < 20)
+
+### `0x042d` NC_LOG_GAME_MK_GETEXPINFIELD (Zone→GameLog)
+
+**Captured** (P02, `capture-validation.md`; combat): `mobid`: 0 Slime; `number`: 4; `exp`: 8; only at the revive (P02-B20)
+
 ### `0x0446` NC_LOG_GAME_ITEM_TAKE (Character→GameLog)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `mappos.MapName`: 'Need' (D03-B11); `mappos.x/y`: 0 (never written, stale); `itemlot`: 0; `iteminven`: 0x7512 / 0x4372 / 0x7511: never written (P02-B15)
@@ -15445,6 +15509,10 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `LogoutType`: 0, 10.04 s after 0x1071
 
+### `0x104e` NC_CHAR_REVIVE_REQ (C→S)
+
+**Captured** (P02, `capture-validation.md`; combat): `(payload)`: empty; answer 0x104F 4 ms later, then a full map login
+
 ### `0x1099` NC_CHAR_GET_ITEMLIST_BY_TYPE_NUM_REQ (Zone→CharDB)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nInvenType`: 2 (reward inventory, client 0x302C page 0); `from`: 0; `to`: 23
@@ -15464,6 +15532,10 @@ Z01 name was 'map login done (ours)'
 ### `0x1c08` NC_BRIEFINFO_REGENMOB_CMD (S→C)
 
 **Captured** (P02, `capture-validation.md`; walk-run-portals): `mobid`: MobInfo ids (0, 1, 32, 178, 191, 2000, 10004 …); `mode`: 2; `nKQTeamType`: 2; `bRegenAni`: 0 for objects entering sight
+
+### `0x2048` NC_ACT_CANCELCASTBAR (S→C)
+
+**Captured** (P02, `capture-validation.md`; combat): `(payload)`: empty, at the summon 2.93 s later
 
 ### `0x340a` NC_ITEMDB_BUYALL_REQ (Zone→CharDB)
 
@@ -15488,6 +15560,18 @@ Z01 name was 'map login done (ours)'
 ### `0x34cf` NC_ITEMDB_RESET_SCROLL_LINK_MAP_INFO_CMD (Zone→CharDB)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nCharRegNum`: 5, at every 0x1803 login completion (6 times, D06 §…)
+
+### `0x500a` NC_SOULSTONE_SP_USESUC_ACK (S→C)
+
+**Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty, 1 ms after 0x5009; 0x240F next tick
+
+### `0xc80a` NC_SYSLOG_CHAR_DEATH (Zone→GameLog)
+
+**Captured** (P02, `capture-validation.md`; combat): `ZoneNo`: 2; `AttackerType`: 1 mob; `AttackerID`: 2000; `DeathCoord`: player position
+
+### `0xc80b` NC_SYSLOG_CHAR_VICTORY (Zone→GameLog)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `ZoneNo`: zone process number 0 / 2; `TargetType`: 1; `TargetID`: MobInfo id 0 / 2000; `KillCoord`: killer position
 
 ### `0xc80d` NC_SYSLOG_CHAR_ITEM_BUY (Character→GameLog)
 
