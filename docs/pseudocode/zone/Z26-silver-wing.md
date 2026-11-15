@@ -26,7 +26,8 @@ Neighbouring items (not redone here): the item-use framework and 0x3015 (Z04 §6
 | Actor | `UseEffect::UseItemSilverWing` (size 4, base `UseItemBase`), the static `ui_silverwing` (constructed by `dynamic_initializer_for_'ui_silverwing'` FUN_006990e0, reset to the base vftable by the atexit destructor FUN_0069f4f0) | registered for `ItemUseFunction` "UseSilverWings" by `ItemUseFunction::iuf_Load` FUN_0049b770 (Z24 §2) |
 | Actor slots | +4 `uib_CanUseItem` FUN_00598000, +8 `uib_DirectUse` FUN_0059c260, +0xc `uib_AfterCast` FUN_0053ff70, +0x10 `uib_Effect` = base no-op (never reached: nothing is consumed) | §3, §5.3 |
 | Pseudo-skill | `ActiveSkill` 29200 = **0x7210** `UseSilverWings` "Use Silver Wing": **CastTime 0**, DlyTime 3 600 000 ms (only stored, §5.1), DlyTimeGroup 0 | `ActiveSkill.shn` (server and client rows agree) |
-| Cooldown | `so_ply_SilverWingCoolTime()` (vt 0x3d8, FUN_005596b0) = `sp_ChargedItem.ci_Effect.cec_SilverWingCoolTime_Minute · 60 000` ms; default 60 min, premium effects lower it | Z23 §3.6, Z24 §6.7 (EE 0 SILVERWINGCOOLTIME) |
+| Skill special | the row's SpecialIndexA = **19 `SS_SILVERWING`**, SpecialValueA 0 (the only `ActiveSkill` row using index 19): `SkillDataIndex::sdi_SetArgument` FUN_00584800 sets `sdi_SILVERWING = { exist 1, value 0 }` (cleared by `sdi_Clear` FUN_00584500, Z20 §4). **No 2016 zone code reads `sdi_SILVERWING`**: the silver-wing special cases test the item ID (`sii_silverwing`, §5.1) or the skill ID 0x7210 (§5.2) | `ActiveSkill.shn`, Z20 §4 |
+| Cooldown | `so_ply_SilverWingCoolTime()` (vt 0x3d8, FUN_005596b0) = `sp_ChargedItem.ci_Effect.cec_SilverWingCoolTime_Minute · 60 000` ms; template value 60 (`so_Initstaticvar` FUN_00549530), lowered to min(cur, EffectValue) by a charged effect `EE_SILVERWINGCOOLTIME` (0) in `ciee_Activ` FUN_00450550. **No 2016 `ChargedEffect` row carries EE 0**, so with the 2016 data the cooldown is always 60 min | Z23 §3.6, Z24 §6.7 |
 
 ### 1.2 Saved location: the item attribute
 
@@ -126,9 +127,9 @@ ShinePlayer::sp_SilverWingMenu(p, slot, cell)                                  @
 
 Reply indices: with a saved location 0 = fly, 1 = save, 2 = cancel; without, 0 = save, 1 = cancel. Nothing is locked: the
 item can be moved, swapped or used otherwise while the menu is open (see Z26-B5). The cooldown is not checked here, so the
-menu (and "Save location") works during the cooldown. When the menu ends without a reply (the 0x3C02 range or mode check
-fails, or another menu replaces it) `sma_Reset` runs the no-op reset callback and sends 0x3C0F; the item use is never
-answered: (original bug) Z26-B1.
+menu (and "Save location") works during the cooldown. When the menu ends without one of its three callbacks running
+(§4.4: the 0x3C02 range or mode check fails, a reply index without an entry, another menu replaces it, a map change), the
+item use is never answered: (original bug) Z26-B1.
 
 ## 4. Menu replies (0x3C02 → `ServerMenuActor::sma_Reply`, Z02 §6.6)
 
@@ -204,6 +205,51 @@ ServerMenuFuncter::smfm_Silverwing_Cancel(f, p, arg)                           @
     sp_silverwing_Cancel(p, &arg.inven)     @ FUN_00597900: p.so_ply_ItemUseResultPacket(0x700, 9)   # closes the client's item use
     smfm_Cancel(f, p, arg)                  @ FUN_0050ecc0: sp_EndOfTrade(p, 1); sp_MiscFlag.BeSummoned = 0
 ```
+
+### 4.4 Menu end without a silver-wing callback
+
+The generic machinery (Z02 §6.6, which names `sma_Clear` "sma_Reset" and `sma_Reset` "sma_Reset_new") matters here because
+the item use stays unanswered whenever none of §4.1–§4.3 runs:
+
+```pseudo
+ShinePlayer::sp_NC_MENU_SERVERMENU_ACK(p, { u8 reply })                        @ FUN_0050fe60   (Z02 §6.6)
+    if mode ∉ cmc_AllowMode 0x4e = {1,2,3,6}: BeSummoned = 0; sma_Reset(actor); return
+    tooFar = actor.sma_bRangeCheck == 1 and dist²(p.position, actor.x/y) > 1 000 000      # silver wing: check on (sma_Clear default)
+    if BeSummoned == 0 and tooFar: BeSummoned = 0; sma_Reset(actor); return
+    sma_Reply(actor, p, reply)
+
+ServerMenuActor::sma_Reply(actor, p, i)                                         @ FUN_0050fd40
+    if i ≥ 10: assert "ServerMenuActor::sma_Reply : Too many regist"; BeSummoned = 0; sma_Reset(actor); return
+    (cb, arg) = sma_Selected[i]; sma_Clear(actor); cb(p, arg)
+        # i ≥ menunum (e.g. 2 when no location is saved) → the default no-op cb (CGambleObject::go_SMC_WinRank,
+        # FUN_00509900, an empty `return;`; the PDB name is one of several sharing it (identical-code folding, *(inferred)*)): nothing answered (Z26-B1); a 0x3C02 with no menu open does the same
+
+ServerMenuActor::sma_Reset(actor)                                               @ FUN_0050fc00
+    if actor.sma_pPlayer ≠ null and actor.sma_Subst ≠ 0 (entries registered):
+        sma_ResetFuction.smfunction(player, copy of sma_ResetFuction.smargument (0x68 bytes))
+        player ← 0x3C0F NC_MENU_SERVERMENU_CLOSE_CMD (2-byte packet; too long → assert "ServerMenuActor::sma_Reset : Packet Too Long")
+    sma_Clear(actor)                                                            @ FUN_0050f660
+        # 10 slots and sma_ResetFuction ← the no-op, sma_bRangeCheck = 1, sma_Subst = 0
+
+ShinePlayer::sp_ServerMenu_SetReserFunction(p, cb, arg)                        @ FUN_00549b30   (sic, official name)
+    ServerMenuActor::sma_SetResetFuction(actor, cb, arg)                        @ FUN_0050f800
+        if cb ≠ null and arg ≠ null: sma_ResetFuction = { smargument = *arg (0x68 bytes), smfunction = cb }
+```
+
+Ways the silver-wing menu ends without a callback of its own:
+
+| Trigger | Path | Client sees |
+|---|---|---|
+| reply while mode ∉ {1,2,3,6} or > 1000 units from where the menu opened | `sma_Reset` from FUN_0050fe60 → no-op reset callback | 0x3C0F (menu closed) |
+| reply index ≥ 10 | `sma_Reset` from `sma_Reply` | 0x3C0F |
+| reply index from `menunum` (2 or 3) to 9 | default slot no-op | nothing |
+| map change | `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 calls `sma_Reset` (Z01) | 0x3C0F |
+| another server menu opens (its `sp_ServerMenuTitle` → `sma_Clear`) | slots overwritten silently | the new 0x3C01 |
+
+`sp_EndOfTrade` (FUN_004c25b0, Z02 §6.4; also called by `smfm_Cancel`, §4.3) resets the menu only when `sp_NPCProcess.npc`
+≠ null; the silver-wing menu sets it to null (§3.2), so 0x200B and the Cancel path never call `sma_Reset` for it. The only
+caller of `sp_ServerMenu_SetReserFunction` is the item drop/destroy menu `ItemMenu_Open` FUN_0048ced0 (Z04 §1.5, which also
+turns the range check off with `sma_SetRangeCheck(0)`); the silver wing never registers a reset callback.
 
 ## 5. Cast end and blast
 
@@ -302,7 +348,7 @@ uses `useditem` for mount, feed and item-0x7578 extras, so the silver wing is un
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
-| Z26-B1 | `sp_SilverWingMenu` FUN_0059c090 / menu end | refused silently while another menu is open or a trade partner is set, yet `uib_DirectUse` returns "handled"; a menu that ends without a reply (range/mode check of 0x3C02, replaced by another menu) runs the no-op reset callback | the 0x3015 never gets its 0x3016: the client's `ItemUseTask` stays open *(inferred effect)* | answer 0x3016 (e.g. 0x701) when refusing; register `smfm_Silverwing_Cancel` as the reset callback |
+| Z26-B1 | `sp_SilverWingMenu` FUN_0059c090 / menu end (§4.4) | refused silently while another menu is open or a trade partner is set, yet `uib_DirectUse` returns "handled"; a menu that ends without one of its callbacks (0x3C02 range/mode check, reply index without an entry, map change, replaced by another menu) runs only the no-op default | the 0x3015 never gets its 0x3016: the client's `ItemUseTask` stays open *(inferred effect)* | answer 0x3016 (e.g. 0x701) when refusing; register `smfm_Silverwing_Cancel` with `sp_ServerMenu_SetReserFunction` FUN_00549b30 after `sp_ServerMenuOpen`, as the item drop/destroy menu does (Z04 §1.5) |
 | Z26-B2 | `sp_silverwing_Setloc` FUN_0059bc80 | "map cannot be saved" (no field / `LinkIn` == 0) answers only 0x3016 0x70F, which the client ignores | the player gets no message; the save just does not happen | send the "RecallDisableField" notice as `uib_CanUseItem` does, or a code with a text |
 | Z26-B3 | `so_Routine` FUN_0056a080 → `smo_ply_ItemUse` → `sp_SilverWing_PortalBlast` | the 60-min cooldown starts before the re-check, the item check and the link; 0x3016 0x700 is sent before `so_LinkTo`, whose refusals are silent | a failed flight (item moved, map now forbids leaving, invalid saved map, trade/locked inventory/dead) still costs the full cooldown, sometimes after a "success" | start the cooldown and send 0x700 only after the link was accepted |
 | Z26-B4 | `sp_SilverWing_PortalBlast` FUN_00597cf0 | an invalid saved map (`mapid` 0xFFFF from a field missing in `MapInfo`, or ≥ `mdb_maxmapid`) or a wrong item returns without any packet; the wrong-item assert text names `sp_silverwing_Setloc` | no 0x3016 for the use, cooldown spent (B3); misleading log | answer 0x3016 with an error; refuse saving when the map id is unknown |
@@ -320,6 +366,8 @@ Also in this flow: Z23-B5 (the first 0x4821 carries milliseconds).
   field switch)*.
 - Whether a dead player (mode 3, accepted by 0x3C02) can save a location: `sp_silverwing_Setloc` has no mode check, so it
   would *(inferred; mode 3 = dead from so_LinkTo's "Link Fail Player Die" test in Z01 §7.1)*.
+- Whether any client build shows the "Fly" entry differently: the menu is plain server text (`MenuString` / `ETC` script
+  strings), the client has no silver-wing code besides the `UseSilverWings` cooldown exception in FUN_006a2b30.
 - How the client refreshes the item's attribute after 0x344A Apply (cell change packet) is Z05 §5.4 / Z04 §1.4, not traced here.
 
 ## 9. Coverage boundary
@@ -329,7 +377,12 @@ Also in this flow: Z23-B5 (the first 0x4821 carries milliseconds).
 | 0x3015 checks, `ItemUse_Inventory` FUN_0053f5e0, `UseItemNormal` path | Z04 §6.1, §6.3 | generic item use before the actor is called |
 | `ShineMobileObject::so_Routine` FUN_0056a080 (all non-item branches), `smo_ply_ItemUse` FUN_0053fd10 | Z13 §9.4 (cast end; done) | §5.1 / §5.2 summarise only the silver-wing path |
 | `csl_CoolTimeCheck`, `smo_ply_SkillCoolTime`, `so_ply_NewSkillCoolTime`, `so_ply_SilverWingCoolTime` FUN_005596b0 / FUN_00554f50 | Z23 §3.2, §3.6 (done) | cooldown store; bug Z23-B5 recorded there |
-| `sp_ServerMenuTitle` / `Item` / `Open`, `sma_Regist`, `sma_Clear`, `sma_Reset`, 0x3C02 handler FUN_0050fe60 | Z02 §6.6 | generic server-menu machinery |
+| `sp_ServerMenuTitle` / `Item` / `Open`, `sma_Regist`, `sma_IsReady`, 0x3C02 handler FUN_0050fe60, `sma_Reply` FUN_0050fd40 | Z02 §6.6 (done) | generic server-menu machinery; the parts that decide whether the item use is answered (`sma_Reset` FUN_0050fc00, `sma_Clear` FUN_0050f660, the reset-callback hook FUN_00549b30 / FUN_0050f800) are in §4.4 because Z02 does not cite them |
+| `ItemMenu_Open` FUN_0048ced0 (the other user of the reset callback) | Z04 §1.5 (done) | cited only to argue Z26-B1's intent |
+| `sp_EndOfTrade` FUN_004c25b0, `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 | Z02 §6.4, Z01 (done) | only their `sma_Reset` call matters here (§4.4) |
+| `SkillDataIndex::sdi_SetArgument` FUN_00584800 / `sdi_Clear` FUN_00584500 (`sdi_SILVERWING`) | Z20 §4 (done) | loader of the skill special; no 2016 reader exists (§1.1) |
+| `ChargedItemEffectElement::ciee_Activ` FUN_00450550, `so_Initstaticvar` FUN_00549530, template copies in FUN_00443390 / 00554870 / 005645e0 / 005970c0 / 0056c790, `UseItemChargedBuff::uib_CanUseItem` FUN_00598310 (`EE_SILVERWINGCOOLTIME` case) | Z24 §6.7 (done) | the `cec_SilverWingCoolTime_Minute` value; 2016 data never lowers it |
+| profiler / assert / message-table / map-btree helpers (FUN_004682d0, 00468360, 0063c710, 0063c760, 0048ce60, 0063cc30, 004c89c0) | boilerplate (Z01) | no silver-wing logic |
 | `so_LinkTo` FUN_0049ad30, 0x1809, WM 0x180D / 0x180E | Z01 §7.1 | generic link path |
 | `so_ply_IsLink_OutMap_AndSendErrorMsg` FUN_005603d0 | Z16 §2.3 (done) | documented there with 0x181D codes |
 | `so_ply_Notice` FUN_005977e0, 0x2011 | Z09 / Z11 §1.5 | notice packet |

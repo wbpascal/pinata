@@ -10991,6 +10991,14 @@ no payload
 |---|---|---|---|
 | 0 | u16 | code | 0x19C1 ok, 0x19C2 state, 0x19C3 index, 0x19C4 level |
 
+### `0x181d` NC_MAP_LINK_FAIL_CMD (S→C)
+
+**Verified layout** (basis: zone so_ply_IsLink_OutMap_AndSendErrorMsg FUN_005603d0 (so_SendErrorCode 6/0x1d); client GameFrameWork::On_NC_MAP_LINK_FAIL_CMD FUN_004b0e70)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x1E42 map has LinkOut 0, 0x1E41 SystemMap map; client shows TextData2 0x35ac8487 (blank) for both |
+
 ### `0x1820` NC_MAP_MULTY_LINK_SELECT_ACK (S→C)
 
 **Verified layout** (basis: zone FUN_00558e40)
@@ -11501,6 +11509,14 @@ no PDB struct of that name
 
 to the player who clicked, only when the receiver is someone else; the 2016 client has no handler (C01: dropped)
 
+### `0x301a` NC_ITEM_USECOMPLETE_CMD (S→C)
+
+**Verified layout** (basis: zone ShinePlayer::so_SendProtocol(12, 0x1a) FUN_0054ef70 from smo_ply_ItemUse FUN_0053fd10 and sp_SilverWing_PortalBlast FUN_00597cf0; client ItemUseTask::OnProcessNetMsg FUN_006a2750)
+
+Empty payload.
+
+no payload (2-byte packet). Client: the first one while the item-use task is in state 3/4 records the use skill's cooldown (Skill::RecordSkillUse) and, in state 4, ends the cast bar; a flag ignores repeats (the silver wing sends it twice, Z26-B6)
+
 ### `0x3025` NC_ITEM_BREAKFAIL_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone FUN_0048db00 / FUN_0048d990)
@@ -11551,6 +11567,23 @@ to every participant on the roller's map who is still in the party/raid; client 
 | 26 | u16 | PickItemID | drop+0x195 item ID at send time |
 
 to every participant still in the party/raid; client: 0x2008 → '%s acquired the %s item by rolling %d with the dice.' if PickItemID is a known item, else the error text
+
+### `0x3c01` NC_MENU_SERVERMENU_REQ (S→C)
+
+**Verified layout** (basis: zone sp_ServerMenuTitle FUN_0054e8a0, sp_ServerMenuItem FUN_0054e990, sp_ServerMenuOpen FUN_0054eaa0 (pdb2017 PROTO_NC_MENU_SERVERMENU_REQ agrees); client GameFrameWork FUN_0049a950)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[128] | title | strncpy 0x80 |
+| 128 | u8 | priority | silver wing: 0 |
+| 129 | u16 | npcHandle | 0xFFFF when not an NPC menu |
+| 131 | u32 | npcPosition.x | player position when the caller passes no position |
+| 135 | u32 | npcPosition.y |  |
+| 139 | u16 | limitRange | silver wing: 1000 |
+| 141 | u8 | menunum | ≤ 10 |
+| 142 | SERVERMENU[menunum] | menu | each 0x21 bytes: u8 reply (= index), char string[32] |
+
+payload size 0x8e + 0x21·menunum
 
 ### `0x3c07` NC_MENU_OPENSTORAGE_FAIL_CMD (S→C)
 
@@ -12829,6 +12862,21 @@ Z16 §6.4
 | 16 | char[16] | zoneIp |  |
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
+
+### `0x3449` NC_ITEMDB_ITEMCHANGE_REQ (Zone→GameDB)
+
+**Verified layout** (basis: zone ShinePlayer::sp_AttrChange2DB FUN_005979b0 (pdb2016 PROTO_NC_ITEMDB_ITEMCHANGE_REQ agrees))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | objHandle | NETPACKETZONEHEADER |
+| 2 | u32 | charNo |  |
+| 6 | u16 | lockindex | InventoryLocking index, reserved with the changed copy |
+| 8 | u64 | itemkey |  |
+| 16 | u16 | itemid | SHINE_ITEM_STRUCT |
+| 18 | bytes | attribute | attribute class size (vt 0xc); silver wing / bind item 0x65 |
+
+answer 0x344A NC_ITEMDB_ITEMCHANGE_ACK (Z05 §5.4); this sender is one of 12
 
 ### `0x482c` NC_SKILL_ITEMACTIONCOOLTIME_CMD (Z→C)
 
