@@ -22,7 +22,7 @@ and the bucket rules are in `docs/plan/status/Z31.md` and `docs/plan/status/Z31-
 |---|---|---|
 | 2 | the 14 player / mobile-object members named by `docs/review/confidence.md` §4.4 | 14 / 1 115 |
 | 3 | inventory lock list, cell stacks, inventories and item boxes, item attribute classes | 137 / 2 862 |
-| 4 | the other `ShinePlayer` members | 130 / 2 008 |
+| 4 | the other `ShinePlayer` members | 127 / 1 954 |
 | 5 | `ShineObject`, `ShineMobileObject` and the other object classes | ≈ 1 750 |
 | 6 | abstate containers, character classes, mob AI, rules of engagement, use effects | ≈ 1 800 |
 | 7 | table templates (`BinaryDataBox<…>`, `ITableBase<…>`, `IIDTableBase<…>`, `SHND::CommonData<…>`, `Table`) | ≈ 4 100 |
@@ -689,6 +689,356 @@ these classes calls `LinearStep::ls_Set`, reads `pathfindflag` or uses a `Tracer
 the 2016 zone (the mobs use `Navigator`, Z09 §9.5 / §28.7). The two `t_continue` radius tests differ (`r` vs `r²`) *(dead
 code, not tagged)*.
 
+## 4. The other `ShinePlayer` members
+
+The 127 `ShineObjectClass::ShinePlayer` members (with nested types) of the part-3 bucket. Most are one-line accessors
+that other documents call by slot only (`p.vt[0x550]()` and so on); §4.10 lists them with their member and slot, so a
+reader of an older document can resolve the slot. Members with logic get their own blocks. Slots are byte offsets into
+the 986-entry `ShinePlayer` vftable. Callers come from a scan of `re-data/exports/zone-pdb/decomp.c` for
+`+ 0x<slot>))(` and for `code **)(… + 0x<slot>)` (the pointer is loaded first and called later). Low slots (< 0x100)
+are shared with every `ShineObject` class, so their caller counts include calls on other objects.
+
+### 4.1 Unregistered commands: `sp_DummyFunction`
+
+```pseudo
+ShinePlayer::sp_DummyFunction(p, NETCOMMAND* cmd, int len, u16 index)     @ FUN_0054ebf0
+    assert "Invalid protocol" with "%d/%d" (dept / cmd); InvalidProtocolLog: the same numbers and the player
+    p.so_Disconnect(0x0686, deferred 0, silent 0)            (vt 0x5f8, Z01 §8.3)
+```
+
+The only pointer to it in the image is `shineprotofunc.pft_deffunc` (VA 0x851f2c). `` `dynamic_initializer_for_'shineprotofunc'` ``
+FUN_006971d0 copies it into every slot of `pft_defaultdepartment`. Every department of the client parser that
+registers no table (and every command with no `pft_Store`) therefore points to this function. A client that sends an
+opcode the zone does not handle is disconnected. The reason code 0x0686 is the same one that Z01 §8.3 lists for "seed
+request without packet encryption", so the WM cannot tell the two cases apart.
+
+### 4.2 Packets to the client and the WM
+
+```pseudo
+ShinePlayer::so_ply_ChangeBriefInfo(p, ItemInventoryCell* cell, int slot)     @ FUN_0043e330   (vt 0x608)
+    len = cell.iic_AttrProc.iac_equipbriefinfo (attr vt 0x24)(p.handle, gpp, &cell.item, slot, &titleMob, &titleLevel)
+    len ≤ 0: return
+    if p.so_GetCharacterTitle (vt 0x420).m_CurrentTitle == 10 (weapon title):
+        CCharacterTitle::SetCurrentTitle(t, 10, titleLevel, titleMob, null)        @ FUN_0062e2e0
+        # titleMob / titleLevel are written only by the weapon class (original bug) Z31-B5, the same as Z18-B9
+    so_AllOfRange broadcast of gpp (len) around p (AxialListPacketBroadcast, all of range, flag 0)
+```
+This function is a twin of `so_ply_EquipmentChange` (Z18 §4.3) that always broadcasts. It sends one of the
+brief packets of the Z18 §4.3 table (`0x1C02` / `0x1C03` / `0x1C04` / …). Its callers are both calls in
+`InvenCellReleaser_EquipLocation::icr_Apply` FUN_0048ca20 (the equip / unequip DB answer, Z05 §1.3, Z17 / Z21
+cite it as vt 0x608).
+
+```pseudo
+ShinePlayer::so_ply_BroadcastGuildInfo(p)              @ FUN_0056e5f0   (vt 0x824)
+    brief.myguild = p.so_mobile_GetGuildRegnum (vt 0x818); brief.isGuildAcademyMember = p.so_ply_isAcademyGuildMember (vt 0x858)
+    broadcast around p (flag 1): 0x106E NC_CHAR_SOMEONEGUILDCHANGE_CMD { u16 handle = p.handle, u32 guild = vt 0x818 }   (6)
+ShinePlayer::so_ply_BroadcastGuildAcademyInfo(p)       @ FUN_0056e9b0   (vt 0x854)
+    brief.myguild = p.so_ply_GetMyGuildAcademyNo (vt 0x85c); brief.isGuildAcademyMember = vt 0x858
+    broadcast: 0x1096 NC_CHAR_SOMEONEGUILDACADEMYCHANGE_CMD { u16 handle, u32 guild = vt 0x85c }   (6)
+```
+Callers of vt 0x824 are the WM guild membership commands `wms_NC_GUILD_ZONE_MEMBER_JOIN_CMD` FUN_005a4230 and
+`…_LEAVE_CMD` FUN_005a4340, `wms_NC_GUILD_ACADEMY_ZONE_MEMBER_GUILD_JOIN_CMD` FUN_0046ee20, and
+`CGuildZone::Recv_NC_GUILD_ZONE_MAKE_CMD` FUN_005cca80 and `…DELETE_CMD` FUN_005cd1e0. Callers of vt 0x854 are
+`wms_NC_GUILD_ACADEMY_ZONE_MEMBER_JOIN_CMD` FUN_0046eaa0 and `…_LEAVE_CMD` FUN_0046ebb0 (W03 / Z08 guild flows). On
+the client, 0x106E (FUN_0049fe10) looks up the object by handle and stores `guild` at +0x2a8 with the academy flag
++0x2ac = 0. 0x1096 (FUN_0049fe50) stores the same with flag 1, and first sends `0x980B NC_GUILD_ACADEMY_LIST_REQ` when
+a client window check (vt 0x104) is true *(window not identified)*.
+
+```pseudo
+ShinePlayer::so_ply_ChangeCen(p)                       @ FUN_00517f70   (vt 0x448)
+    to p: 0x1033 NC_CHAR_CENCHANGE_CMD { u64 cen = p.sp_CharData…Cen }   (8; "Packet Too Long" assert otherwise)
+```
+Callers are every money change: `InvenCellReleaser_CenChange::icr_Apply` FUN_00487d50 (Z05 §1.4), `so_ply_PickupMoney`
+FUN_0052fe80, `so_SendReceiptIncomeMoney` FUN_00511230, `so_ply_HolyPromiseWithdrawCenReward` FUN_00484100, and the
+academy reward storage pair FUN_0046e430 / FUN_0046e750. On the client, FUN_004997d0 stores the u64. The value is
+*(captured)* in P02 (packets-zone 0x1033).
+
+```pseudo
+ShinePlayer::so_ply_SendFieldAttribute(p)              @ FUN_0054aa20   (vt 0xd3c)
+    if p.field (+0x7a) and field.option (+0xc):
+        to p: 0x1827 NC_MAP_FIELD_ATTRIBUTE_CMD { u32 eFieldMapType = option byte +0x36 }   (annotated; 0 NORMAL … 4 TUTORIAL)
+```
+Its caller is `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 (Z01).
+
+```pseudo
+ShinePlayer::so_ply_SendSellItemInfo_Client(p)         @ FUN_00537970   (vt 0xe68)
+    n = 0; len = CSellItemManager::simg_FillBuffer_Client(&p.sp_SellItemManager, &n, gpp+3)     @ FUN_0050e6b0
+    len > 0: to p: 0x305B NC_ITEM_SELL_ITEM_LIST_CMD { u8 NumOfSellItem = n, PROTO_SELL_ITEM_INFO[n] }  (3 + len)
+    # empty list: nothing is sent
+simg_FillBuffer_Client(mgr, u8* n, PROTO_SELL_ITEM_INFO* out)                                     @ FUN_0050e6b0
+    skip the first *n entries of the sell list (callers pass 0); per entry e:
+        e.handle == 0xFFFF: assert "… : Invalid handle", next
+        cls = itmattcontainer[e.itemid] (none: next)
+        out = { u8 nDataSize = 2 + item bytes, u16 nHandle = e.handle, item = iti_fill2buffer_union(e.info, cls) }
+        n += 1; stop when 8000 bytes are written
+    return bytes written
+ShinePlayer::so_ply_CanItemRepurchase(p) → bool        @ FUN_005379f0   (vt 0xe6c)
+    the open NPC's role (sp_NPCProcess.npc.func) vt 0x38 (repurchase allowed); no NPC: false
+```
+`0x305B` is the repurchase list ("items sold to this merchant") *(inferred from vt 0xe6c and 0x3059 REPURCHASE)*. Its caller is `NPCRole_Merchant::nrm_ShopMenuOpen`
+FUN_004c26b0 (Z02), when a merchant menu opens. The insert / delete updates `0x305C` / `0x305D` come from
+`so_ply_SellItemList_Insert` FUN_00537a20 / `…_Delete` FUN_00537ba0 (Z04 §2.5, Z05), which test vt 0xe6c first. `sp_NC_ITEM_REPURCHASE_REQ`
+FUN_00538580 also tests it. `nDataSize` counts the handle plus the item bytes. The next element starts at
+`&nHandle + nDataSize`, which matches the 2016 PDB layout `{u8 nDataSize, u16 nHandle, SHINE_ITEM_STRUCT}`.
+
+```pseudo
+ShinePlayer::sp_SendSellItemInfo_World(p)              @ FUN_00537c30   (direct, from ws_save2worldmanager FUN_004536f0)
+    gpp: opcode 0x4037 NC_CHARSAVE_SELL_ITEM_INFO_CMD; NumOfSellItem (payload +6) = 0
+    len = CSellItemManager::simg_FillBuffer_Server(&p.sp_SellItemManager, &NumOfSellItem, payload+7)   @ FUN_0050e4d0 (Z18)
+    len > 0: send 7 + len bytes to the WM (sock2wldman)
+    # nWorldHandle (+0) and nCharNo (+2) are not written here: they are what the previous packet in gpp,
+    # 0x4036 from sp_SaveUseItemMinimonInfo_World FUN_00563e70 (called just before, unconditionally), left at the same
+    # offsets (original bug) Z31-B6
+```
+On the WM, 0x4037 is stored as the sell-item blob and echoed back as `0x1130` at the next zone login (W01 table "sell-item
+info").
+
+```pseudo
+ShinePlayer::so_ply_PartyZoneLeaveCmd(p)               @ FUN_004cd9a0   (vt 0xd5c)
+    to WM: 0x3861 NC_PARTY_ZONE_LEAVE_CMD { u32 nCharNo = vt 0x344 }   (assert text "cPartyJoin : Packet Too Long")
+```
+No call through vt 0xd5c exists, and the only pointer to the function is its vftable entry, so this copy is dead. The
+live 0x3861 is built inline by the logout path (Z09 §17.7 "live player in a party").
+
+### 4.3 Character save fillers (WholeSaver)
+
+They fill one part of the save packets of `ws_save2DB` FUN_00455a10, `ws_save2worldmanager` FUN_004536f0 and
+`ws_savelevel2worldmamager` FUN_00453580 (Z01 §8.4). Each returns the number of bytes written.
+
+| Function | Slot | Writes | Size | Callers |
+|---|---|---|---|---|
+| `so_SaveStat(PROTO_NC_CHARSAVE_CHARSTAT_CMD*)` FUN_00454990 | 0x3ac | `chrregnum` (vt 0x344), `CurPwrStone`, `CurGrdStone`, `CurHPStone`, `CurSPStone` (each widened to u32), `CurHP`, `CurSP`, `statdistribute {Strength, Constitute, Dexterity, Intelligence, MentalPower, RedistributePoint}` | 0x22 | ws_savelevel2worldmamager, ws_save2DB |
+| `so_SaveLevel(PROTO_NC_CHARSAVE_LEVEL_CMD*)` FUN_004548b0 | 0x390 | `chrregnum`, `level` (u8), `exp` (u64), `fame` | 0x11 | the same two |
+| `so_ply_SavePKCount(PROTO_NC_CHARSAVE_PKCOUNT_CMD*)` FUN_00454230 | 0x388 | `chrregnum`, `pkcount` | 8 | ws_save2DB |
+| `so_SaveGameData(PROTO_GAMEDATA_CMD*)` FUN_00454a90 | 0x3b0 | the 5-byte `sp_GameData` (`zone` byte, `client {partyno, nRaidNo}`) | 5 | ws_save2worldmanager |
+| `so_SaveItem(PROTO_ITEM_CMD*)` FUN_00454ea0 | 0x3b4 | `numofitem = 0`, then `CharacterInventory::ci_FillBufferTotal` FUN_006444b0 of the whole bag | var. | none: no call through 0x3b4, so the function is dead (Z05's item saves use other builders) |
+| `so_ply_SaveWeaponTitle()` FUN_0055a020 | 0x780 | `ItemInventoryCell::iic_WeaponTitleSave` FUN_0059e8a0 (Z05) on equipment slots 10 (left hand) and 12 (right hand) | – | ws_save2DB |
+| `so_SetAutoSaveTime(now, s)` FUN_005608c0 | 0xac0 | `tAutoSaveTime` (+0x2aa40) = now + s × 10 (ticks of 100 ms *(inferred)*) | – | LOGINCOMPLETE, ws_save2DB (Z01 §8.4 "now + 6000" = 10 min) |
+
+### 4.4 Combat factors
+
+```pseudo
+ShinePlayer::smo_ply_NormalAttackFactor(p) → per-mille          @ FUN_0042f910   (vt 0xf3c)
+    p.smo_CharClass (+0xfbc).cc_ClassType (class vt 0x48) == 21 (Joker line):
+        sp_MultiHitNotIndex == 3 ? 400 : 300
+    else 1000
+```
+`smo_SwingDamage` FUN_00432f30 multiplies the swing damage by this rate (Z03 §3.2 "attacker's total damage rate").
+Trickster-line normal hits are multi-hits, and each part carries 30 % (the last one 40 %) *(inferred from the counter
+name)*. CharClass vt 0x48 returns the **first class of the line**: 1 Fighter … Knight, 6 Cleric … Guardian, 11 Archer
+… Ranger, 16 Mage … Wizard, 21 Joker … Assassin, 26 Sentinel / Savior (see `docs/knowledge/Z31.md` §0 for Z12's name of
+it).
+
+```pseudo
+ShinePlayer::so_ply_JobChangeDamageUp(p, ShineObject* target, int dmg) → dmg   @ FUN_00560e80   (vt 0xd2c)
+    target null or target.so_ObjectType (vt 0x4d0) ≠ 5 (mob): return dmg
+    row = class.cc_array[level < 151 ? level : 0] (PrimaryParameter, class +0x10858; level = vt 0x4d8 & 0xff)
+    row null: return dmg
+    return dmg × (row.JobChangeDmgUp (+0x80, u16) + rndbox[2] (0 or 1)) / 1000     (64-bit product)
+```
+Its callers are `RulesOfEngagement::roe_CalcDamage` FUN_00505c00 and `RuleOfEngagementHealAttack::roe_CalcDamage`
+FUN_005002a0, as `att.vt[0xd2c](def, dmg)` (Z03 §4.5). `JobChangeDmgUp` is 1000 in the Fighter file
+(Z12 §2.1), which gives a factor of 1.000 or 1.001 there.
+
+```pseudo
+ShinePlayer::so_ply_ReinforceRemoveWeapon(p)           @ FUN_004a4bf0   (vt 0x9a0)
+    if class line == 11 (Archer): so_ply_ReinforceRemoveEquip (vt 0x9a8)(12); then (10)    # bow: both hands
+    else: vt 0x9a8(12)
+    smo_CastAbort (vt 0xed4); smo_BashStop (vt 0xed8)
+ShinePlayer::so_ply_ReinforceRemoveShield(p)           @ FUN_004a4cd0   (vt 0x9a4)
+    class line 6 (Cleric) or 1 (Fighter): vt 0x9a8(10)          # other lines: nothing (no shield)
+```
+They are the slot-12 / slot-10 cases of the "neutralization" roll in `MiscDataTable::mdt_PostSkillBlast` FUN_004a3a90
+(Z09 §28.3). `so_ply_ReinforceRemoveEquip` FUN_004a4da0 (Z05, Z21) unequips the slot.
+
+```pseudo
+ShinePlayer::so_AttackRange(p, ShineObject*) → range   @ FUN_00559930   (vt 0x510)
+    class line == 11 (Archer) ? 450 : 100                       # the argument is ignored
+ShinePlayer::smo_ply_NextBashTime_AfterSkill(p, int swingTime)   @ FUN_0055ad60   (vt 0xec4)
+    sp_SkillControl.duringnormalhit = 1
+    if the timer's current work ∉ {TSCW_NORMALATTACK_SWING, TSCW_NORMALATTACK_DAMAGE} and sp_SkillControl.normalattackcontinue:
+        sp_NextSwingTick = sp_LastSwingTick = 0
+        if p+0x1ac == 0: ts_Set(&sp_TimerStr, FUN_00430bc0 (normal-attack swing), TSRT_DEFAULT, TSCW_NORMALATTACK_SWING, swingTime)
+ShinePlayer::smo_CastAbort(p)                          @ FUN_00579e70   (vt 0xed4)  → ShineMobileObject::smo_CastAbort FUN_00579d50 (Z03, Z09)
+ShinePlayer::smo_ply_SkillCastFail(p, u16 err)         @ FUN_00579480   (vt 0xee4)  sp_SkillFinish.scf_ErrorType = err
+ShinePlayer::smo_CeaseFireSend(p)                      @ FUN_005794c0   (vt 0xf48)  CeaseFireSender::cfs_Routine FUN_00566820 (Z03)
+ShinePlayer::so_IsAlliance(p, ShineObject* o) → bool   @ FUN_0054b010   (vt 0xe60)
+    o null: false; else o.vt[0x8cc]() == p.vt[0x8cc]()           # side id; players return 2 (folded FUN_00647230)
+```
+vt 0x510 is read by the mob AI on its target (`so_mob_SelectWeapon` FUN_004ab720, `MobActionAttack::mab_Think`
+FUN_004bba00, `mab_CaptivatePlayerAttack` FUN_004ba0d0, BackStep / AvoidOverlap / Chase `mab_Think`, Z09). vt 0xec4
+is called after a skill (Z23 §3.1, with `sdi_ServInf.SwingTime`; the slot call sits in `ShineMobileObject::so_Routine` FUN_0056a080).
+vt 0xed4 has 20 callers (targeting, equip, abstate set, captivate; Z03 / Z09). vt 0xee4 is called from
+`SkillBlastEffectContainer::sbec_Routine` FUN_00437fc0 and `smo_SkillBash_Casting` FUN_0057bef0. vt 0xf48 is called
+from `so_ply_Volley` FUN_004a44a0, `smo_SkillBash_Casting` and `smo_SkillBash_Blast` FUN_0057cd40. vt 0xe60 is the
+"same side" test of Z03 §3.3 / Z09 §6.2 (`== 1` = friendly; 18 callers: enemy / aggro / heal scans).
+
+Small combat accessors:
+
+| Function | Slot | Body | Callers |
+|---|---|---|---|
+| `sp_IsEthereal` FUN_0042b040 | 0x9e4 | `so_AbnormalState_IsSet(STA_ETHEREAL 326)` (vt 0x3e4) | 17: damage-over-time, `so_mobile_IsImmortal`, item-use handlers |
+| `sp_IsPreventAttack` FUN_004a9ca0 | 0x9e0 | `sp_PreventAttack` (+0x2a7f6) | `MobTargetAggresive2::ali_Work` FUN_004aa020 |
+| `so_IsInWeapon` FUN_004c8eb0 | 0x938 | `sp_WeaponCell` (+0x2a7cc) set and its item ≠ 0xFFFF | `roe_MinWC` FUN_004fdbe0, `roe_MaxWC` FUN_004fea10 |
+| `so_GetTargetInfo(o)` FUN_00568f90 | 0x42c | if p's target (`sp_Target.to_Object`, else `to_MainBody`) is `o`: `TargetObject::to_SendInform` FUN_0042b3f0 | `so_ply_Send2WhoTargetMe` FUN_00568ee0 |
+| `so_CurrentTargetObject` FUN_0055adf0 | 0x75c | `to_Object`, else `to_MainBody` | 16 (GM `&` commands, …) |
+| `so_GetTargetObject` FUN_0042b3e0 / `so_IsTarget` FUN_0042aca0 | 0xa04 / 0xa0c | `to_Object` / `to_Object ≠ null` | `AxialListTargetInform::ali_Work` FUN_0042b0b0, `to_SendInform`, mob tactics |
+| `smo_ZeroHP` FUN_00559c00 | 0xf18 | `CurHP = 0` | `ShineMobileObject::so_KilledBy` FUN_00432240 |
+| `so_ply_IncNGet_PKCount` FUN_0055a4e0 | 0x384 | `++pkcount`, returns it | `ShinePlayer::so_KilledBy` FUN_00433be0 |
+| `so_ply_SetDamageAbsorb(n)` FUN_0055a730 / `…SetRemainingDamageAbsorb(n)` FUN_0055a750 / `…GetRemainingDamageAbsorb` FUN_0055a740 | 0xbdc / 0xbe4 / 0xbe0 | `sp_nDamageAbsorb` (+0x2aa8c) / `sp_nRemainingDamageAbsorb` (+0x2aa90) | `so_ply_CheckDamageAbsorption` FUN_00579860, `NPCAction::DamageAbsorbAction::exe` FUN_005c11a0, LOGINCOMPLETE (Z18, Z25) |
+| `so_ply_IsRebirth` FUN_0055a760 / `so_ply_HealRate` FUN_0055a770 | 0xc44 / 0xc4c | `sp_RebirthState.bIsRebirth` / `.nHealRate` (+0x2aac4 / +0x2aac8) | `sp_NC_ITEM_USE_ACTIVESKILL_REQ` FUN_00540b90, `sp_NC_BAT_SKILLBASH_OBJ_CAST_REQ` FUN_0057fa50 / none (0xc4c dead) |
+| `so_ply_getSwingTime` FUN_00560af0 | 0xc68 | `sp_SwingTime` (+0x2aad0) | `UseItemRide::uib_CanUseItem` FUN_005988b0 |
+
+### 4.5 Connection, socket and location
+
+```pseudo
+ShinePlayer::so_PacketBufferFlush(p) → bool            @ FUN_0055aa70   (vt 0x2e8)
+    a = so_GetDataSocketStream (vt 0x2f8).vt[8](sp_SocketSession); b = so_GetGameSocketStream (vt 0x2fc).vt[8](sp_SocketSession)
+    return a and b                                        # both streams are flushed, even when the first fails
+ShinePlayer::so_SetSocketSession(p, ClientSession* s)  @ FUN_00559d90   (vt 0x2f0)
+    sp_SocketSession = s; sp_SocketContainer.stream.vt[0](s)          # rebinds the packet container
+ShinePlayer::so_ply_RemoveWhen(p) → RemoveWhen         @ FUN_0055a4a0   (vt 0x8ec)
+    mode (vt 0x484) == 0, mode == 3 (dead) or sp_MiscFlag.JustRevive: REMOVE_NOW (0)
+    else: sp_MiscFlag.JustLink ? REMOVE_NOW : REMOVE_LOGOUT (1)
+```
+vt 0x2e8 is called from `so_Routine` FUN_0056c790 (Z09 §2: "Char as write fail") and `ZoneServer::zs_disconnect`
+FUN_005abb60. vt 0x2f0 is called from `zs_connect` FUN_005aa840 (attach) and `som_FreeObject` FUN_00557d70 (detach *(inferred)*).
+`zs_disconnect` (Z09 §1) is the only caller of vt 0x8ec: on a socket cut it calls `so_Unmark(RemoveWhen, 1, 7)`
+(vt 0x33c) and `som_FreeObject(handle, RemoveWhen, 0)`. A player in game who was not linking out gets REMOVE_LOGOUT,
+which keeps the character in the world until the 10 s kick-out schedule (Z16 §4.4 `RemoveWhen`, `sp_Schedule_Kickout`).
+A dead or just-revived player, or one in a link, is removed at once.
+
+```pseudo
+ShinePlayer::so_datasync(p)                            @ FUN_00559790   (vt 0x4c0)
+    sp_CharData.logininfo.currentcoord = { x, y = live position (+0x66), dir = live direction (+0x6a) }
+ShinePlayer::so_ply_reinforce_reloc(p, FieldMap* f, char map[12], x, y)   @ FUN_00559f30   (vt 0x6a8)
+    p.field (+0x7a) = f; logininfo.currentmap = map (strncpy 12, after zeroing); position = (x, y); so_datasync
+ShinePlayer::sp_LinkReplyCheck(p, LinkInformTemplete*) → bool   @ FUN_0050ec40   (direct)
+    the open NPC's role vt 0x34 (link reply allowed); no NPC: false
+```
+vt 0x4c0 is called before a save or link: `so_LinkTo` FUN_0049ad30, `so_ply_LoginTutorialMap` FUN_00561450,
+`wms_NC_CHAR_ZONE_CHARDATA_ACK` FUN_005a3590 and `so_ply_reinforce_reloc`. vt 0x6a8 has no caller and its only image
+pointer is the vftable entry, so it is dead. `sp_LinkReplyCheck` is called from
+`ZoneRingPacketFindInstanceDungeon::zrpb_Request` FUN_005a92e0 (Z14 instance-dungeon link through an NPC).
+
+| Function | Slot | Body | Callers |
+|---|---|---|---|
+| `so_ply_GetClientSession` FUN_004c8df0 | 0xa70 | `sp_SocketSession` (+0x5e10) | `wms_NC_MAP_LINKRESERVE_ACK` FUN_0049b510, `PacketContainer::pcb_Append` FUN_004c8b20 |
+| `so_PacketEncryptClass` FUN_00559700 | 0x4a8 | `&sp_Encryption` (+0x7e30) | `pcb_Append`, `ClientSession::zbs_Parsing` FUN_004fb9f0 |
+| `so_SetPossibleNewConnect(b)` FUN_00549420 / `so_GetPossibleNewConnect` FUN_0055a5c0 | 0x330 / 0x334 | `sp_isPossibleNewConnect` (+0x2a800) | setters: 0x0806 seed, 0x1801 map login, class change / beauty-shop DB answers; reader `so_RefreshWMSSocket` FUN_00552190 (Z01 §8.2) |
+| `so_ply_FromWhere(b)` FUN_0043c9c0 | 0x940 | `sp_ConnectFrom` (+0x2a7d4) = b | `wms_NC_MISC_CONNECTFROMWHERE_ACK` FUN_0043f2f0 (Z01) |
+| `so_SetWaitTradeResFromDB(b)` FUN_005596a0 / `so_GetWaitTradeResFromDB` FUN_00559690 | 0x328 / 0x324 | `sp_tradestr.waitingTradeResFromDB` | `sp_NC_TRADE_DECIDE_REQ` FUN_00594870, `so_TradeBoardreset` FUN_00559eb0 / `so_LinkTo` (Z06 trade) |
+| `so_LoginLocation` FUN_00559a50 | 0x4bc | `&sp_CharData.logininfo` | map marking (`so_MapMarking` FUN_00466470 …) |
+
+### 4.6 Mini-game (dice Tai Sai) state on the player
+
+`sp_MiniGame` (+0x5d00, `SHINE_MINI_GAME`) holds the mini-house game state: `nGameType` (`SMT_DICE_TAISAI` for the dice
+table), `GameInfo.DiceTaiSai` (`BetInfo.nBetSumMoney`, 0x34 `nBetMoney` words, two more dwords at +0xd8 / +0xdc, the
+leave flags `bGameLeaveReserve` / `bRoomLeaveReserve`) and `RoomLeavePos` (map name 12 + `LocateXY`). The callers are
+the mini-house game (`ShineMiniHouse::so_mh_*`, Z06 §3) and its gamble twin (`CGambleDiceTaiSaiObject`,
+Z32). Setters accept only 0 / 1 and only while `nGameType == SMT_DICE_TAISAI`, and return false otherwise.
+
+| Function | Slot | Body |
+|---|---|---|
+| `so_GetDiceTaiSaiInfo` FUN_005110c0 | 0x19c | `&GameInfo` when Tai Sai, else null (11 `so_mh_*` callers) |
+| `so_ClearDiceTaiSaiInfo` FUN_005110e0 | 0x1a0 | Tai Sai only: zero `nBetSumMoney`, the 0x34 bet words and +0xd8 / +0xdc; true (`so_mh_ClearGamerBettingInfo` FUN_00511990, `so_mh_DiceTaiSai_Enter` FUN_00511f30) |
+| `so_GetDiceTaiSaiGameLeaveInfo(u8*)` FUN_00510f60 / `so_SetDiceTaiSaiGameLeaveInfo(b)` FUN_00510f90 | 0x184 / 0x188 | `bGameLeaveReserve` (`so_mh_ExcuteLeaveGame` FUN_00514860, `sp_NC_DICE_TAISAI_GAME_LEAVE_REQ` FUN_005151b0, mini-house login complete FUN_00571f20) |
+| `so_GetDiceTaiSaiRoomLeaveInfo(u8*)` FUN_00510fc0 / `so_SetDiceTaiSaiRoomLeaveInfo(b)` FUN_00510ff0 | 0x18c / 0x190 | `bRoomLeaveReserve` (`so_mh_ExcuteLeaveRoom` FUN_00514660, `so_mh_EffectApply` FUN_00542520, `so_mh_PortalEffectApply` FUN_00542c70) |
+| `so_GetMiniGameRoomLeaveMapInfo(map, xy)` FUN_00511070 / `so_SetMiniGameRoomLeaveMapInfo(map, xy)` FUN_00511020 | 0x198 / 0x194 | copy `RoomLeavePos` out / in; null arguments: false (setters: effect / portal apply, `sp_NC_MINIHOUSE_KICKOUT_REQ` FUN_00575500) |
+| `so_SetCTDiceTaiSaiWin(n)` FUN_005113c0 / `so_SetCTDiceTaiSaiSet` FUN_005113f0 | 0x1b4 / 0x1b8 | `CCharacterTitleZone::CT_WinDiceTaiSaiWin` FUN_005cc490 (n ≠ 0) / `CT_WinDiceTaiSaiSet` FUN_005cc4c0 (title counters, Z06 §3) |
+| `so_Gamble_IsJoinThisGamble(t)` FUN_00615e80 / `so_Gamble_SetGambleType(t)` FUN_00615ec0 | 0xb20 / 0xb28 | `sp_Gamble_JoinType` (+0x2aa78) `== t` / `= t` (`GAMBLE_TYPE` 0 BASE, 1 DICETAISAI, 2 SLOTMACHINE; gamble-house callers, Z32) |
+
+### 4.7 Party, raid and guild state
+
+| Function | Slot | Body | Callers |
+|---|---|---|---|
+| `so_PartyRegistNumber` FUN_00559dd0 | 0x550 | `sp_GameData.client.partyno` (0xFFFF = none) | 106 (party scans, abstates, …) |
+| `so_SetParty(n)` FUN_00559760 | 0x574 | `partyno = n` | `PartyManufacture::pm_Break` FUN_004cc520 / `pm_MemberLeave` FUN_004cc7e0 / `pm_Sendmemberinfo` FUN_004cc9f0, `so_SetRaid` FUN_005604a0, `ac_outraid`, `sp_SendPartyMemberInform` (Z08) |
+| `so_PartyRegistNumber_InAttack` FUN_004811b0 | 0x560 | = vt 0x550 | `HitMeList::EnemyList::el_Store` FUN_00482070, magic-field heal, NPC actions |
+| `so_GetRaidNumber` FUN_00559de0 / `so_SetRaidNumber(n)` FUN_00559df0 | 0x554 / 0x558 | `sp_GameData.client.nRaidNo` | LOGINCOMPLETE, exp distribution, … / `so_SetRaid` |
+| `so_GetRaid` FUN_00560470 | 0xa84 | `sp_RaidSlot` (+0x2926c) | 63 |
+| `so_GetPartyGroup` FUN_00559e10 | 0x55c | raid ≠ 0xFFFF → `PartyGroup_Raid` (2), party ≠ 0xFFFF → `PartyGroup_Party` (1), else `Alone` (0) | none: no call through 0x55c, so the function is dead |
+| `so_ply_Setpartyslot(PARTY_SLOT*)` FUN_005493f0 | 0x774 | `sp_LastPartyParam.pmi_PartySlot` | LOGINCOMPLETE, `pm_HandleSet` FUN_004cc610, `pm_Sendmemberinfo`, `wms_PartyMemberRefresh` FUN_004cd1a0, `so_FirstActionAfterSocketConnect` FUN_00554870 |
+| `so_ply_partymemberlogin(charNo)` FUN_0056e550 | 0x778 | `sp_PartyInformInit` FUN_004cd6d0 (Z08) | LOGINCOMPLETE |
+| `so_ply_PartyInformInit` FUN_004cd720 | 0x8dc | `PartyMemberInform::pmi_Clear(&sp_LastPartyParam)` FUN_0056d980 | `sp_PartyInformInit` |
+| `so_ply_SetMyGuild(GUILD_ZONE*)` FUN_0055a200 / `so_ply_SetMyGuildAcademy(GUILD_ZONE*)` FUN_0055a510 | 0x820 / 0x864 | `m_pMyGuild` (+0x2a320) / `m_pMyGuildAcademy` (+0x2a32c) | the guild / academy membership commands of §4.2, `so_FirstActionAfterSocketConnect` |
+| `so_ply_isIAmGuildAcademyMaster` FUN_0055a550 | 0x868 | not an academy member (vt 0x858) and in a guild (vt 0x818 ≠ 0) | none: dead |
+| `so_ply_GetMyGuildStorageHandle` FUN_0055a210 / `so_ply_SetMyGuildStorageHandle(h)` FUN_0055a220 | 0x830 / 0x834 | `&sp_GuildStorageManager.storagehandle` / `= h` | guild storage (24 / `so_ply_GuildStorageDeactivate` FUN_00477420, Z08) |
+| `so_ply_SetMyGuildAcademyRewardStorageHandle(h)` FUN_0055a250 | 0x840 | `sp_GuildAcademyRewardStorageManager.storagehandle = h` | LOGINCOMPLETE, `so_ply_GuildAcademyRewardStorageDeactivate` FUN_0046f7f0 |
+| `so_ply_GuildStoreGradeFill(g)` FUN_00475b00 / `so_ply_isGuildStoreGrade` FUN_00475b10 | 0x5ec / 0x5f0 | `GuildStoreageGrade` (+0x5e0d) `= g` / `== 0` | `wms_NC_GUILD_STORAGE_WITHDRAW_GRADE_ACK` FUN_005a48f0 / guild-token buy, `sp_ItemReloc`, storage withdraw, split (Z08 §8.2) |
+
+### 4.8 NPC menus, trade, booth, tent
+
+```pseudo
+ShinePlayer::so_TentDistance(p, SHINE_XY_TYPE* xy) → bool   @ FUN_0058cc50   (vt 0x768)
+    mode (vt 0x484) ∉ {4, 5}: true                    # not resting / not in a booth: does not block *(inferred from Z02 §7)*
+    else: dist²(p, xy) > 2025 (45 units)
+ShinePlayer::so_ply_BoothTrade(p, ShinePlayer* buyer, PROTO_NC_BOOTH_ITEMTRADE_REQ* req)   @ FUN_0058cd70   (vt 0x7cc)
+    mode == 5 (booth): sp_Booth.boardpnt vt 0x1c(p, buyer, req)        # Z06 booth trade
+```
+vt 0x768 is asked by `ShineObject::so_TentPoint` FUN_0058d260 for each object in the rest / booth / tent scan (Z02 §7;
+the NPC version is Z09's `ShineNPC::so_TentDistance` FUN_0058cbf0). vt 0x7cc is called from `sp_NC_BOOTH_ITEMTRADE_REQ`
+FUN_0058da30 (Z06).
+
+| Function | Slot | Body | Callers |
+|---|---|---|---|
+| `so_ply_dupmenu_Set(m)` FUN_00559fb0 / `so_ply_dupmenu_close(m)` FUN_00559f80 | 0x6b0 / 0x6b4 | set / clear bit m of `sp_NPCProcess.duplicatemenustate.dmc_Control` | `NPCRole_Merchant` / `StoreManager` / `MenuOpen` `nrb_Role` (set) and `nrb_EndOfTrade` (clear); the upgrade REQs and DB ACKs (Z04, Z05) |
+| `so_ply_dupmenu_canmenuopen(m)` FUN_00559fa0 | 0x6ac | `DuplicatedMenuControl::dmc_CanMenuOpen` FUN_00460d70: false if any open menu bit b has `dmc_Table[b][m] ≠ 0` (7 × 7 table), else true | the same `nrb_Role`s and upgrade REQs |
+| `so_ply_ServerMenuactor_sma_IsReady` FUN_005924b0 | 0x978 | `ServerMenuActor::sma_IsReady` FUN_0050ec90 | `sp_NC_TRADE_PROPOSE_REQ` FUN_005925a0, `sp_NC_TRADE_PROPOSEYES_ACK` FUN_00592cd0 |
+| `so_ply_ReactionNpcHandle` FUN_0055a710 | 0xb40 | `nReactionNpcHandle` (+0x2aa80) = `sp_NPCProcess.npchandle` | buy (`ii_BuyAll` FUN_00523ce0, `ii_BuyLot` FUN_005241f0, guild-storage buys), capsule / magic container make |
+| `so_TradeStructure` FUN_00559670 / `so_TradeBoard` FUN_00559680 | 0x31c / 0x320 | `&sp_tradestr` (+0x17d4c) / `&sp_tradeboard` | trade handlers (Z06) |
+| `so_ply_TreasureChestLocationManager` FUN_0055a280 | 0x30 | `&sp_ChestItemBox` (+0x29326) | slot 0x30 is shared by every object type (77 call sites: chest, GM item commands, …) |
+
+### 4.9 Inventory arrange and storage
+
+```pseudo
+ShinePlayer::sp_ArrangeInven_nClassifyGrade(p, AI_ArrangeInven* e) → rank   @ FUN_00560df0   (direct, from so_ply_ArrangeInven FUN_00563500)
+    e, e.pInvenCell, e.pIAC, e.pITI all set, by e.pItemData.data.ItemGradeType:
+        GT_CHARGE 0, GT_MYTHIC 1, GT_LEGENDARY 2, GT_UNIQUE 3, GT_SET 4, GT_RARE 5, GT_NAMED 6, GT_NORMAL 7
+    anything else / missing pointer: 0xFF
+ShinePlayer::so_ply_ArrangeInvenInit(p)                @ FUN_00560d70   (vt 0xd0c, from LOGINCOMPLETE FUN_00443390)
+    so_ply_SetArrangeInven (vt 0xd18)(0); sp_ArrangeInvenDelayCheckTime (+0x2ab1c) = now
+ShinePlayer::so_ply_StorageSize(p) → cells             @ FUN_0055a2b0   (vt 0x490, from sp_ItemReloc FUN_00536780)
+    m = sp_ChargedItem.ci_Effect.cec_MoreStorage: m > 2 ? 144 : (18 + 9m) × 4   (72 / 108 / 144, §3.4)
+```
+The grade rank is one key of the auto-arrange sort (`AI_ArrangeInven` 0x18 bytes: cell, attribute class, total
+information, item data, `Classify`; Z04 §12.5). The rest of that sort and its scheduling are §11 (part 10).
+`so_ply_ArrangeInvenInit` arms the 5 s delay check of 0x304A (Z04 §12.5) at login.
+
+### 4.10 Plain accessors
+
+| Function | Slot | Returns | Callers (count / examples) |
+|---|---|---|---|
+| `GetRTTI` FUN_00559650 | 0x0 | `&ShinePlayer::m_RTTI` | `ShineDynamicCast<…>` (e.g. FUN_00409840) as `vt[0]`, walking `m_pkBaseRTTI` (§5) |
+| `so_ItemInventory` FUN_00559660 | 0x47c | `&sp_Item.itembag` (`CharacterInventory`) | 23 (item breaker, relocation, item search) |
+| `so_ply_GetItemLotInspector` FUN_00490bd0 | 0x96c | `&sp_ItemLotInspector` (+0x1ea8) | `ItemRelocationManager::irm_Move` FUN_00531860 / `irm_Exchange` / `irm_Merge` / `irm_Split_N_Merge` |
+| `so_ply_CurrentMoney` FUN_00559710 | 0x434 | `Cen` (u64) | 45 |
+| `so_ply_CurrentExp` FUN_00559720 | 0x438 | `Experience` (u64) | LOGINCOMPLETE, ws_save2DB, `CQuestZone::Send_NC_QUEST_DB_DONE_REQ` FUN_005bbe60 |
+| `so_ply_CurrentFame` FUN_00559730 / `so_ply_StoreFame(f)` FUN_0055a080 | 0x43c / 0x444 | `fame` / `fame = f` | buy, quest done / `InvenCellReleaser_FameChange::icr_Apply` FUN_00487e60 |
+| `so_GetSP` FUN_00559b80 | 0x4ec | `CurSP` | 32 |
+| `so_GetClass` FUN_005598c0 | 0x4dc | `shape.chrclass` | 11 (class change, GM event class check, booth search) |
+| `so_ply_GetGender` FUN_0055a1e0 | 0x804 | `shape.gender` | KQ score, `WeddingHall::wh_Reserv` FUN_005a0810, quest gender |
+| `so_GetStatDistStr` FUN_0055a1c0 | 0x424 | `&statdistribute` | the five `so_ply_FreeStat*` (Z12) |
+| `so_GetWMSHandle` FUN_00559a20 | 0x340 | `sp_extra.pecd_worldmanagerhandle` | 41 |
+| `so_GetUserRegistNumber` FUN_00559a40 | 0x348 | `sp_CharData.usrregnum` | 35 |
+| `so_extradata` FUN_00559750 | 0x570 | `&sp_extra` | none: dead |
+| `so_Getabstatebit` FUN_00559dc0 | 0x4a0 | `&brief.abstatebit` | 11 (abstate bit set / reset) |
+| `so_FillBriefInformation(dst)` FUN_0055abf0 | 0x4c4 | copies the brief (`PROTO_NC_BRIEFINFO_LOGINCHARACTER_CMD::operator=`) | the `BriefInfoExchanger` visitors (§6) |
+| `so_ply_HideMyIdentity` FUN_0055a4f0 | 0x18 | `BriefInformationCharacter::bic_HideMyIdentity` FUN_0043c180: brief `charid` = "???" (code zeroed), title {0, 0, 0xFFFF}, `myguild = 0` | slot 0x18 is called on every object type (99 call sites); the sites that reach a player were not separated |
+| `so_ply_SoloingMode` FUN_005597b0 | 0x79c | `sp_MiscFlag.SoloingMode` (p+0x5cb8 bit 3; Z02 "hide-except-me") | packet broadcast visitor, brief senders, KQ top |
+| `so_ply_GetChatFontColorID` FUN_0055a840 / `so_ply_SetChatFontColorID(c)` FUN_0055a860 | 0xe2c / 0xe30 | `sp_nChatFontColor` (+0x2ab5d), read only while `cec_ChatFontColor` or `cec_ChatColor` == 1 (else 0) | `so_Chat` FUN_00458c90 / `wms_NC_CHAR_ZONE_CHAT_COLOR_CMD` FUN_0044d4a0, `so_ply_ChatColorInfoApply` FUN_00563ac0 (§2.8) |
+| `so_ply_GetChatBalloonColorID` FUN_0055a870 / `so_ply_SetChatBalloonColorID(c)` FUN_0055a890 | 0xe34 / 0xe38 | `sp_nChatBalloonColor` (+0x2ab5e), read under `cec_ChatBalloonColor` or `cec_ChatColor` | the same |
+| `sp_CharFreeStat_UnLock` FUN_0055a670 | 0xad0 | `sp_bCharFreeStatLock` (+0x5e0c) = 0 | LOGINCOMPLETE, `gds_NC_CHAR_TUTORIAL_FREESTAT_INIT_ACK` FUN_00468b70, `gds_NC_CHAR_FREESTAT_SET_DB_ACK` FUN_0058be50 (Z12) |
+| `so_ply_GetTutorialInfo` FUN_00561520 | 0xdfc | `&sp_TutorialInfo` (+0x2ab44) | `wms_NC_CHAR_ZONE_CHARDATA_ACK`, tutorial save / get (Z07) |
+
+### 4.11 Nested-type destructors
+
+`NPCProcess::~NPCProcess` FUN_00549960 (its `duplicatemenustate`, `servermenuactor` and `currentmenu` members),
+`BoothSell::~BoothSell` FUN_005499e0 (`StreetBoothBuy` / `StreetBoothSell` destructors), `SocketStream::~SocketStream`
+FUN_00549810 (vftable reset to `PacketContainerBase`) and `LPInfo::~LPInfo` FUN_00549a60 (the `RecoverTick` member).
+They run only from the unwind funclets of the `ShinePlayer` constructor and `~ShinePlayer` (§2.9). Their member
+destructors are the empty fold FUN_00417480.
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -697,6 +1047,8 @@ code, not tagged)*.
 | Z31-B2 | `so_ply_DecreaseDmgPassiveSkill` §2.6 | the BackgroundDefense reduction tests the attacking mob's facing against the mob→player direction | ordinary mob attacks (mob facing its target) are never reduced; hits from a mob facing away are, whatever the player's facing | test the player's facing against the player→mob direction (hits from behind the player) |
 | Z31-B3 | `InvenCellReleaser_CoinChange::icr_Reserv` §3.3 | adds a pending coin reservation to `ReservedQuantity.cen`; no releaser fills `guild_token` or `gbcoin` | while a coin reservation is open the money checks (buy, upgrades, soul stones) see less money; the guild-token buy never subtracts reserved tokens | add coins to `gbcoin`, and reserve guild tokens under their own field |
 | Z31-B4 | `ItemAttrCls_SkillScroll` / `WeaponTitlaLicence` / `GBCoin` `iac_fill2buffer` FUN_0063e970 §3.5 | advances the buffer by the 1-byte attribute without writing it (the reader skips it) | one stale send-buffer byte per such item in every item record (0x1047, 0x3001, DB requests); the client ignores it | write a 0 byte (same as D07-B14 on the Character server) |
+| Z31-B5 | `so_ply_ChangeBriefInfo` (vt 0x608) §4.2 | passes the addresses of two uninitialised locals as the weapon-title out values; only the weapon class writes them, but `SetCurrentTitle(10, …)` runs for every item whenever the weapon title is current | after an equip / unequip of a non-weapon item the current weapon title gets stack garbage as level / mob (same as Z18-B9 in the twin `so_ply_EquipmentChange`) | update the title only when the item is a weapon, or initialise the locals |
+| Z31-B6 | `sp_SendSellItemInfo_World` §4.2 | builds 0x4037 without writing `nWorldHandle` / `nCharNo`; the bytes come from the 0x4036 packet that `sp_SaveUseItemMinimonInfo_World` left in the shared send buffer | none in 2016 (the 0x4036 builder always runs just before and writes the same two fields); breaks if the save order changes | write the 6-byte header in the 0x4037 builder |
 
 ## Not reconstructed / uncertain
 
@@ -709,6 +1061,14 @@ code, not tagged)*.
 - §3.2: callers were found by slot offset on lock-list variables; calls through a copied pointer can be missed (vt 0x00
   `icl_IsLocked(&inv, ownIndex)` has none found).
 - §3.5.3: no call through attribute vt 0x4c / 0x50 / 0x54 was found (slot scan only).
+- §4.1: the zone parser table covers every department, so `sp_DummyFunction` is reached by any command without a
+  `pft_Store`; whether the client ever sends one (dead client code) was not checked.
+- §4.2: the client window tested before the 0x980B request (0x1096 handler FUN_0049fe50, vt 0x104) was not identified.
+- §4.4: the 300 / 400 per-mille split of `smo_ply_NormalAttackFactor` is read from the code; that it splits a
+  Trickster multi-hit is inferred from `sp_MultiHitNotIndex`.
+- §4.5: which `RemoveWhen` path `som_FreeObject` takes for REMOVE_LOGOUT on a socket cut is Z16 §4.4 / Z01 §8.3; not re-read.
+- §4.10: callers of the low slots 0x18 (`so_ply_HideMyIdentity`) and 0x30 (`so_ply_TreasureChestLocationManager`)
+  were not separated from the other object types' calls of the same slots.
 
 ## Coverage boundary
 
@@ -724,3 +1084,7 @@ Filled in by the sweep part; rows found so far:
 | `LinearStep::*`, `Tracer` (dead tracer pair with `CellStack`, §3.8) | this item, part 9 (path finding) | `CellStack` is in the part-2 bucket only by name; part 9 links §3.8 |
 | `TreasureChestMaker::tcm_ItemMake` FUN_00595d00 (caller of attribute vt 0x10) | this item, part 8 (`TreasureChest*`) | §3.5.1 documents the callee side |
 | item wire sizes per attribute class | D07 §1.3 (done) | same library on the Character server; §3.5 maps the zone addresses |
+| `CSellItemManager` (the sell list itself, `simg_FillBuffer_Server` FUN_0050e4d0 and the insert / delete) | Z18, this item part 8 (`CSellItemManager`) | §4.2 documents the two player-side senders and `simg_FillBuffer_Client` |
+| `DuplicatedMenuControl::dmc_Table` contents (7 × 7 menu exclusion table) | this item, part 8 (`DuplicatedMenuControl`) | §4.8 documents the test; the table's initializer is in the part-8 bucket |
+| `ShineMiniHouse::so_mh_*` dice game, `CGambleDiceTaiSaiObject` | Z06 §3 (done), Z32 | §4.6 documents only the player-side state accessors they call |
+| auto-arrange sort and step scheduling (`so_ply_ArrangeInven` FUN_00563500) | this item, part 10 (§11, Z04 open point) | §4.9 documents the grade rank and the login init |
