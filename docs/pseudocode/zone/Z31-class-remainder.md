@@ -27,7 +27,7 @@ and the bucket rules are in `docs/plan/status/Z31.md` and `docs/plan/status/Z31-
 | 6 | abstate containers, character classes, mob AI, rules of engagement, use effects | 109 / 1 774 |
 | 7 | table templates (`BinaryDataBox<…>`, `ITableBase<…>`, `IIDTableBase<…>`, `SHND::CommonData<…>`, `Table`) | 201 / 4 103 |
 | 8 | the other data loaders and SHN / text parsers | 67 / 1 927 |
-| 9 | NPC roles, merchants, booths, guild, events, kingdom quest, Lua glue | 111 / 2 822 |
+| 9 | NPC roles, merchant cities, item authority, booths, repurchase list, guild containers, party table, finders, events | 106 / 2 621 (+ `mcd_Load`, `nm_MarkingNPC`, `dmc_Table`) |
 | 10 | sessions, packet containers, `AxialList*` visitors, map clusters, path finding, library classes | ≈ 3 100 |
 | 11 | open points of Z01-Z04 (`confidence.md` §4.6 rows 5-8) | – |
 
@@ -982,7 +982,7 @@ FUN_0058da30 (Z06).
 | Function | Slot | Body | Callers |
 |---|---|---|---|
 | `so_ply_dupmenu_Set(m)` FUN_00559fb0 / `so_ply_dupmenu_close(m)` FUN_00559f80 | 0x6b0 / 0x6b4 | set / clear bit m of `sp_NPCProcess.duplicatemenustate.dmc_Control` | `NPCRole_Merchant` / `StoreManager` / `MenuOpen` `nrb_Role` (set) and `nrb_EndOfTrade` (clear); the upgrade REQs and DB ACKs (Z04, Z05) |
-| `so_ply_dupmenu_canmenuopen(m)` FUN_00559fa0 | 0x6ac | `DuplicatedMenuControl::dmc_CanMenuOpen` FUN_00460d70: false if any open menu bit b has `dmc_Table[b][m] ≠ 0` (7 × 7 table), else true | the same `nrb_Role`s and upgrade REQs |
+| `so_ply_dupmenu_canmenuopen(m)` FUN_00559fa0 | 0x6ac | `DuplicatedMenuControl::dmc_CanMenuOpen` FUN_00460d70: false if any open menu bit b has `dmc_Table[b][m] == 0` (7 × 7 table of "may be open together" bytes, contents in §9.4), else true | the same `nrb_Role`s and upgrade REQs |
 | `so_ply_ServerMenuactor_sma_IsReady` FUN_005924b0 | 0x978 | `ServerMenuActor::sma_IsReady` FUN_0050ec90 | `sp_NC_TRADE_PROPOSE_REQ` FUN_005925a0, `sp_NC_TRADE_PROPOSEYES_ACK` FUN_00592cd0 |
 | `so_ply_ReactionNpcHandle` FUN_0055a710 | 0xb40 | `nReactionNpcHandle` (+0x2aa80) = `sp_NPCProcess.npchandle` | buy (`ii_BuyAll` FUN_00523ce0, `ii_BuyLot` FUN_005241f0, guild-storage buys), capsule / magic container make |
 | `so_TradeStructure` FUN_00559670 / `so_TradeBoard` FUN_00559680 | 0x31c / 0x320 | `&sp_tradestr` (+0x17d4c) / `&sp_tradeboard` | trade handlers (Z06) |
@@ -2220,6 +2220,353 @@ ctor FUN_0064cd20 = `OptionReader::OptionReader`, dtor FUN_0063e150 = the inline
 | `CDataReader` | dtor FUN_0062a140 | frees the file buffer (`m_pHead`) when `m_nBFSize` != 0 and the row array when `m_nDataArraySize` != 0; zeroes sizes and checksum | 87 callers: every stack reader (`bdb_ReadData` of BMP, `MCC_DataRead`, `CPetData::ReadData`, the `ITableBase` destructors, …) |
 | `ITableBase` constructors of the item tables | `AccUpGradeTable` FUN_005b1020, `ActionRangeFactors` FUN_005b1660, `ItemActionConditions` FUN_005b16a0, `ItemActionEffects` FUN_005b16e0, `ItemActions` FUN_005b1720, `ActionEffectItemTable` FUN_005b1f80, `ActionEffectAbStateTable` FUN_005b1fc0 | the §7.3 `T::T()` template | each table's `ITableBase<…>::Load` (§7.3; `DataProcess` bodies Z17 / Z21) |
 
+## 9. NPC roles, merchant cities, item authority, booths, repurchase list, guild containers, party table, finders, events
+
+Part 8 of the work list (`Z31-parts.py 8`, 106 functions). The NPC role table, `nrb_Role` of every role and the click /
+menu flow are Z02 §6 and Z08 §5.2; the shop handlers that call the price slots are Z04 §2. This section documents the
+role objects themselves and the small containers around them. Names *(pdb2016)* unless marked.
+
+### 9.1 NPC role objects (`NPCRoleBase` and its subclasses)
+
+Layout *(pdb2016)*: `NPCRoleBase` (0x18) = vftable + `ORToken nrb_argument` (+0x4, 20 bytes: the NPC.txt `RoleArg0`).
+`NPCRole_Merchant`, `_StoreManager`, `_MenuOpen`, `_JobManager`, `_ClientMenu`, `_Guard` add nothing. `NPCRole_Portal`
+(0x9c) adds `nrb_BrenchNumber` +0x18, `LinkInformTemplete nrb_BrenchSpot` +0x1c (0x61 bytes), `nrb_levelFrom` +0x7e,
+`nrb_levelTo` +0x80, `nrb_LinkNum` +0x84 and `LinkInformTemplete* nrb_pSaveLinkInfo[5]` +0x88. `NPCRole_ID_Portal` (0xa0)
+adds `InstanceDungeonInfo* nrip_pIndunInfo` +0x9c, `NPCRole_Mode_ID_Portal` (0xa8) `nrmip_pIndunInfo[3]` +0x9c (easy,
+normal, hard), `NPCRole_RandomMulti_Portal` (0x9c) nothing. `NPCManager::nm_Load` FUN_004c58c0 (Z02 §6.1) creates one role
+object per NPC.txt row; `NPCManager::nm_SetNPC` (Z09 §5.9) calls slot 0x2c once the NPC has spawned.
+
+Vtable (byte offsets; one table for all 11 classes, read from the RTTI vftables). Callers = calls through an NPC entry's
+`func` pointer, plus the roles' calls on themselves:
+
+| Slot | Name | Default (`NPCRoleBase`) | Overrides | Callers |
+|---|---|---|---|---|
+| 0x0 | `nrb_Role(p, entry, npcHnd)` | FUN_004c2430 (log only) | Z02 §6.5 table | NPC click / menu ACK (Z02 §6.2-§6.3) |
+| 0x4 | `nrb_EndOfTrade(p)` | FUN_00549070 (empty fold) | Merchant FUN_004c4400, MenuOpen FUN_004c4560: `p.so_ply_dupmenu_close(0)` (vt 0x6b4); StoreManager FUN_004c44b0: `so_ply_dupmenu_close(1)`, `sp_MiscFlag.AccountStorage_opened = 0` | 0x200B END OF TRADE (Z02 §6.4) |
+| 0x8 | `nrb_linkinform(i)` | FUN_004c5400: assert "NPCRoleBase::nrb_linkinform", null | all portals FUN_004c5420 (below) | portal `nrb_BriefInformSet`, 0x2070 auto-way-finding gate (Z02 §11) |
+| 0xc | `nrb_ItemSellPrice(p, itemid)` | FUN_00449600 (`return 0` fold) | Merchant FUN_004c7050 | 0x3006 SELL (Z04 §2.4) |
+| 0x10 | `nrb_ItemBuyPrice(p, itemid)` | FUN_00449600 | Merchant FUN_004c7190 | 0x3003 BUY (Z04 §2.1) |
+| 0x14 | `nrb_ItemBuyFame(p, itemid)` | FUN_00449600 | Merchant FUN_004c7390 | 0x3003 BUY |
+| 0x18 | `nrb_ItemBuyGBCoin(p, itemid)` | FUN_00449600 | Merchant FUN_004c7490 | 0x3003 BUY (Z04 §2.1 calls it `nrb_ItemBuyCoin`) |
+| 0x1c | `nrb_ItemBuyGuildToken(p, itemid)` | FUN_00449600 | Merchant FUN_004c7290 | 0x3003 BUY → `so_ply_ItemBuyGuildToken` (Z04 §2.3) |
+| 0x20 | `nrb_ItemBuyItemMoney(p, itemid, &id, &lot)` | FUN_004c5560: `id = 0xFFFF, lot = 0` | Merchant FUN_004c7590 (Z27 §6.7) | 0x3003 BUY (Z04 §2.1-§2.2) |
+| 0x24 | `nrb_SaveLinkData(i)` | FUN_004a9c90 (`return null` fold) | portals FUN_004c23f0 | portal `nrb_Role`s, 0x181F MULTY_LINK_SELECT (Z01 §7.3) |
+| 0x28 | `nrb_GetSaveLinkSize()` | FUN_00570b00 (`return 0` fold) | portals FUN_004c2410 | the same and the portal level slots below |
+| 0x2c | `nrb_BriefInformSet(npc, arg)` | FUN_00509900 (empty fold) | Portal / RandomMulti FUN_004c2360, ID FUN_004c5680, Mode-ID FUN_004c5730 | `nm_SetNPC` with the row's `RoleArg` (Z09 §5.9) |
+| 0x30 | `nrb_LinkBrench(p, n, link, from, to)` | FUN_004c7a00: notice "Not gate" | portals FUN_004c7ab0 | GM `&templink` (Z11 §4.1) |
+| 0x34 | `nrb_LinkBrenchCheck(link)` | FUN_004c7b40: false | portals FUN_004c7b90 | `smfm_Link`, `sp_LinkReplyCheck` (Z11 §4.1, Z02 §6.5) |
+| 0x38 | `nrb_CanItemRepurchase()` | FUN_004b8d20 (`return 0` fold) | Merchant FUN_004c7690 | `so_ply_CanItemRepurchase` FUN_005379f0 (vt 0xe6c, §4.2), `nrm_ShopMenuOpen` (Z02 §6.5) |
+| 0x3c | `nrb_GetLevelFrom()` | – (portals only) | Portal / RandomMulti FUN_004c5580, ID FUN_004c56b0, Mode-ID FUN_004c5770 | Portal and Mode-ID `nrb_Role` (Z02 §6.5, Z08 §5.2) |
+| 0x40 | `nrb_GetLevelTo()` | – | Portal / RandomMulti FUN_004c5600, ID FUN_004c56f0, Mode-ID FUN_004c57d0 | the same |
+
+```pseudo
+NPCRoleBase::NPCRoleBase(role, row)                                                     @ FUN_004c5370
+    nrb_argument = row ? row.rolearg : ORToken("")              # 20-byte token, compared as 5 dwords
+NPCRole_ID_Portal(row) FUN_004c5460, NPCRole_Mode_ID_Portal(row) FUN_004c54b0, NPCRole_RandomMulti_Portal(row) FUN_004c5510:
+    base ctor, then nrb_BrenchNumber = 0, nrb_LinkNum = 0, the five nrb_pSaveLinkInfo = null, and the dungeon pointers = null
+    # BrenchNumber 0 = the normal LinkTable behaviour (Z11 §4.1); callers: nm_Load only
+
+# Merchant price slots: a plain column of the item's ItemInfo row (Z27 §6)
+nrb_ItemSellPrice(p, id)                                                                @ FUN_004c7050
+    p.so_mapindex() is 0xFF or 0xFFFF: assert "…nrb_ItemSellPrice : Wrong mapindex"; return 0
+    row = itemdatabox[id]; none: assert "…nrb_ItemSellPrice : cannot found item inform"; return 0
+    return row.SellPrice
+nrb_ItemBuyPrice FUN_004c7190 → row.BuyPrice;  nrb_ItemBuyFame FUN_004c7390 → row.BuyFame;
+nrb_ItemBuyGBCoin FUN_004c7490 → row.BuyGBCoin;  nrb_ItemBuyGuildToken FUN_004c7290 → row.BuyGToken
+    # no map test; unknown item → assert + 0. The assert text of BuyPrice / BuyFame / BuyGBCoin is
+    # "NPCRole_Merchant::nrb_ItemSellPrice : cannot found item inform" (copy-paste) (original bug) Z31-B17
+
+NPCRole_Merchant::nrb_CanItemRepurchase(role)                                           @ FUN_004c7690
+    return role.nrb_argument == ORToken("Item") or == ORToken("Weapon")
+    # function-local static tokens built on first use (atexit destructors); only the "Item" and "Weapon" merchants
+    # keep the buy-back list (0x305B, §4.2); Skill / SoulStone / WeaponTitle / Guild merchants do not
+
+# Portal link rows
+NPCRole_Portal::nrb_linkinform(i) → LinkTable row i or null                             @ FUN_004c5420
+    OptionReader::or_SelectFromOrder(&npcmanager.nm_NPCInfo, ORToken("LinkTable"), i)
+NPCRole_Portal::nrb_BriefInformSet(role, npc, arg)                                      @ FUN_004c2360
+    for i = 0, 1, … while (row = role.vt[0x8](i)) != null:
+        row.index == arg: role.nrb_pSaveLinkInfo[role.nrb_LinkNum++] = row
+            # no bound: a sixth matching row writes past the 5-pointer array (original bug) Z31-B16;
+            # latent: the 2016 NPC.txt has at most 4 LinkTable rows per argument (GBHouse01…05)
+    nrb_LinkNum > 0: npc.so_SetGateBriefInform(row0.linktoclient)   # ShineNPC vt 0x4cc FUN_00557bc0: brief flag
+                                                                     # +0xe = 1, 12-char client map name at +0xf
+NPCRole_ID_Portal::nrb_BriefInformSet                                                   @ FUN_004c5680
+    Portal version; nrip_pIndunInfo = fieldlist.fc_GetInstanceDungeonInfo(arg, ILT_NORMAL)
+NPCRole_Mode_ID_Portal::nrb_BriefInformSet                                              @ FUN_004c5730
+    Portal version; nrmip_pIndunInfo[k] = fc_GetInstanceDungeonInfo(arg, ILT_EASY + k) for k = 0, 1, 2
+nrb_SaveLinkData(i) FUN_004c23f0: i > nrb_LinkNum → null, else nrb_pSaveLinkInfo[i]
+    # i == nrb_LinkNum passes the test (off by one; part of Z31-B16): reads the null slot after the last row, or
+    # past the array when 5 rows are stored; every caller loops i < nrb_GetSaveLinkSize, so no 2016 path reaches it
+nrb_GetSaveLinkSize() FUN_004c2410: nrb_LinkNum
+
+# Level range of a gate (FieldLevelDataBox::fldb_GetFieldLv(map, mode), Z14 §1.1: LvFrom / LvTo of the field)
+NPCRole_Portal::nrb_GetLevelFrom                                                        @ FUN_004c5580
+    no link rows: return shineparam.levellimit
+    from = levellimit; for each stored row: lv = fldb_GetFieldLv(row.linktoserver, 0)
+        lv missing: from = 1   else from = min(from, lv.LvFrom)
+    return from                                  # lowest LvFrom over the destinations; a destination without a row opens it from 1
+NPCRole_Portal::nrb_GetLevelTo                                                          @ FUN_004c5600
+    no link rows: return 1
+    to = 1; per row: lv missing: to = levellimit   else to = max(to, lv.LvTo)
+    return to                                    # a missing row sets levellimit, a later row can only raise it
+NPCRole_ID_Portal::nrb_GetLevelFrom / To                                                @ FUN_004c56b0 / FUN_004c56f0
+    no dungeon info: From = levellimit, To = 0 (empty range)
+    lv = fldb_GetFieldLv(info.MapIDClient, info.ModeIDLv): From = lv ? lv.LvFrom : 1;  To = lv ? lv.LvTo : levellimit
+    # the ID gate's own nrb_Role (Z08 §5.2) does not call slots 0x3c / 0x40: these two bodies have no 2016 caller
+NPCRole_Mode_ID_Portal::nrb_GetLevelFrom / To                                           @ FUN_004c5770 / FUN_004c57d0
+    over the three dungeon infos (null skipped): From = min LvFrom (start levellimit; a missing level row → 1),
+    To = max LvTo (start 0; a missing row → levellimit)   # no dungeon at all: [levellimit, 0], every level refused (code 2)
+
+NPCManager::nm_MarkingNPC(nm, Name8 mobIndex)          (log name nm_StandNPC)          @ FUN_004c6870
+    # WM 0x086A NC_MISC_EVENTNPC_STANDSTART_ZONE_CMD (Z01 §9 "nm_StandNPC start"): a scheduled event NPC appears
+    for each static entry whose row.mobname (32 chars) == mobIndex:
+        id = mobdatabox index of the name (unknown: assert "NPCManager::nm_StandNPC : Invalid mob id"; next)
+        npc = som_GetObject(entry.handle); require npc and npc.so_mob_MobID (vt 0x708) == id
+        npc.so_npc_SetLocation(row.map, row.coordx, row.coordy, row.direct_degree) (vt 0xb4c)
+        so_MapMarking(npc, 0) ≠ FM_MARKSUCCESS: som_FreeObject(entry.handle, REMOVE_NOW, 0x22); stop the walk
+        so_AllInMap(npc, so_BroadcastBriefInfo, 0)                   # show it to the players around
+        npc.so_npc_FromTable() (vt 0xa80)                             # sn_FromTable = 1
+    # the NPCs were spawned unmarked by nm_SetNPC (Z09 §5.9); the end command 0x086B is FUN_004c6ad0 (Z01 §9)
+
+NPCManager::~NPCManager(nm)                                                             @ FUN_004c7cc0   (atexit of npcmanager)
+    for the 1024 entries: entry.func → reset to the NPCRoleBase vftable and free (no virtual destructor)
+    ~OptionReader(nm.nm_NPCInfo)                                    # the NPC.txt tables (Z09 §28.6)
+```
+
+### 9.2 Merchant cities (`MerchantCityData`, `ItemMerchantInfo.shn`)
+
+`MerchantCityData` is a `BinaryDataBox<MerchantLocation>` (§7.1 row `MerchantLocation`, key 5, row 5 bytes:
+`{char Map[4]; u8 Sub}`). Loader `MerchantCityData::mcd_Load` FUN_004c77b0 = `bdb_ReadData("../9Data/Shine/ItemMerchantInfo.shn")`
+(start stage `zs_start_wide`, label `merchantcity`, Z10 §7.1). 2016 contents: Rou 0, Eld 1, Urg 2, All 3, Fer 4, Kas 5, Sad 6, Kor 7, Ver 8, Mys 9.
+
+```pseudo
+MerchantCityData::mcd_city(mcd, mapIndex) → city number                                @ FUN_004c7860
+    info = mapdatabox.mdb_index[mapIndex] (index ≥ mdb_maxmapid or null: return 0)
+    for each row: strcmp(row.Map, info.MapName as a 12-char string) == 0: return row.Sub
+    return 0
+    # callers: NPCRole_Merchant::nrm_ShopMenuOpen FUN_004c26b0 and nrm_GuildShopMenuOpen FUN_004c2990 (Z02 §6.5):
+    # the city selects which "sold in this city" flag of ItemInfo the shop list uses
+```
+
+Only maps whose whole name equals a row (`Rou`, `Eld`, …) match. A merchant on any other map gets 0, the value of Roumen
+(see "Not reconstructed").
+
+### 9.3 Item authority: the box-to-box matrices (`CItemAuthorityBase`)
+
+`CItemAuthorityBase` (0x368, base of `ItemBelongAttribute g_ItmBelongAttr`, Z04 §1.3) holds three
+`bool [17][17]` matrices `[from box type][to box type]` (types of Z04 §1.1): `IA_Common` +0x4, `IA_ChrBelong` +0x125,
+`IA_AccBelong` +0x246. `IA_CanInvenReloc` FUN_00632280 (Z04 §1.3 `BelongType_CanMove`, Z30 §8) uses the character-bound matrix
+for character-bound items, the account-bound one for account-bound items, else `IA_CanStorage` and the common one.
+
+```pseudo
+CItemAuthorityBase::CItemAuthorityBase(a)                                               @ FUN_00631e50
+    clear the three matrices; set true (from → to):
+    common:    9→{0, 3, 6, 8, 9, 12, 13, 14, 15, 16}, 8→9, 0→{0, 9}, 2→9, 4→9, 5→9, 6→{6, 9}, 3→3, 12→12, 13→13, 14→14, 15→15, 16→16
+    char-bound: the same without 9→0 and 9→6           # no academy reward storage, no account storage
+    acc-bound:  the same without 9→0                    # account storage allowed
+    # the [16][16] entries are set with one 2-byte write that also sets the next matrix's [0][0] (compiler-merged)
+CItemAuthorityBase::~CItemAuthorityBase FUN_00632000 (vftable reset; from ItemBelongAttribute's deleting dtor FUN_0064b1e0
+    and the atexit of g_ItmBelongAttr); scalar deleting dtor FUN_00632250 (vt 0, no caller: the object is a global)
+```
+
+So an item may enter a box other than its own only from the main inventory (9), and may leave any box only to the main
+inventory. Equipment (8) is reached only from 9. No class allows 9 → 4 (guild storage): `ItemReloc_Do` refuses that
+target earlier with 0x246 anyway (Z04 §4.1).
+
+### 9.4 Duplicate-menu table, booth search categories, street booth objects
+
+`DuplicatedMenuControl::dmc_Table` (static data DAT_00754380, 7 × 7 bytes, `dmc_Table[open][new]`, 1 = may be open together):
+
+| open \ new | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|---|
+| 0, 1, 2, 3, 6 | 0 | 0 | 0 | 0 | 1 | 1 | 0 |
+| 4, 5 | 1 | 1 | 1 | 1 | 0 | 0 | 1 |
+
+Menu numbers set by the 2016 code (`so_ply_dupmenu_Set` / `_close` / `_canmenuopen`, vt 0x6b0 / 0x6b4 / 0x6ac, §4.8):
+0 shop (Merchant / MenuOpen `nrb_Role`), 1 account storage (StoreManager), 2 trade / street booth (`sp_NC_TRADE_PROPOSE_REQ`,
+`so_CloseTradeMenu`, `sp_CloseStreetBooth`), 6 item upgrade (the three upgrade REQs, closed by their Item DB ACKs). 3, 4
+and 5 are never set. Shop, storage, trade and upgrade therefore exclude each other, and none can be opened twice.
+
+`BoothItemTypeMatchingInfo gMarketSearchInfo` (0x8: `bitmi_nSize`, `MarketSearchInfo* bitmi_MatchingArray`):
+
+```pseudo
+BoothItemTypeMatchingInfo::InitInfoArray(m, path) → ok                                 @ FUN_0062de00
+    CDataReader.Read(path, key 0x12, row 8); fail → 0
+    n = row count; 0 rows → 0 (array not built)
+    array[i] = { AuctionSubType, MarketSearchType } of row i (a missing record → { AG_ALL, MS_ALL })
+    # caller zs_start_sleep with "../9Data/Shine/MarketSearchInfo.shn" ("Fail to read 'MarketSearchInfo.shn'"; 34 rows
+    # in 2016); the reader is GetValue FUN_0062df10 (Z06 §2.6: booth search by category, MAX_MARKETSEARCH when absent)
+~BoothItemTypeMatchingInfo FUN_0062dde0: free the array (atexit)
+```
+
+Street booth objects (`StreetBooth` base, `StreetBoothSell`, `StreetBoothBuy`, Z06 §2.1): `sb_Type` (vt 0) returns
+"Base" FUN_00401510, "Sell" FUN_0058f3c0, "Buy" FUN_0058f3d0 (only log texts; FUN_00401510 is also slot 0 of
+`AbnormalStateElement`, an identical-code fold). Destructors `~StreetBooth` FUN_0058cbe0 (vftable reset), `~StreetBoothBuy`
+FUN_0058f3b0 and `~StreetBoothSell` FUN_005905a0 (own vftable, then the base) run from `~BoothSell` FUN_005499e0 and
+`~ShinePlayer` (§2.9). `BoothStoreManager::~BoothStoreManager` FUN_0043b530 (`std::list<BoothStoreInfo>` clear + free; the
+booth search index of Z30 §8 / Z06 §2.1) runs only from the unwind funclets of `BoothManager`'s ctor / dtor.
+
+### 9.5 Repurchase list (`CSellItemManager`, `p.sp_SellItemManager`)
+
+`CSellItemManager` (0x141c) = `List<SellItemInfo>` of 42 over `simg_SellItemNode[42]` (ctor Z18 §4.8). `SellItemInfo`
+(0x7a) = `{u16 nHandle, SHINE_ITEM_REGISTNUMBER nSellItemKey, ItemTotalInformation ItemTotalInfo}`; the list handle is
+the slot index. List slots: vt 8 `l_AllocZ(h)`, 0xc `l_Free(h)`, 0x18 `l_PopA` (oldest).
+
+```pseudo
+CSellItemManager::simg_Insert(m, sellKey, item, &dropped) → handle                      @ FUN_0050e360
+    item == null: return 0xFFFF
+    dropped = 0xFFFF
+    h = the free ring's next slot; h == 0xFFFF or l_AllocZ(h) fails:
+        l_PopA(&old); dropped = old.nHandle                   # list full: the oldest entry leaves
+        retry; still failing: assert "CSellItemManager::simg_Insert : Allocation fail"; return 0xFFFF
+    e = { nHandle = h, nSellItemKey = sellKey, ItemTotalInfo = *item (0x6f bytes) }
+    return h
+    # caller so_ply_SellItemList_Insert FUN_00537a20 (Z05 §1.4: 0x305C INSERT, 0x305D DELETE for `dropped`)
+CSellItemManager::simg_Delete(m, h) → ok                                                @ FUN_0050e170
+    h == 0xFFFF: 0;  l_Free(h) fails: assert "CSellItemManager::simg_Insert : Free fail" (copy-paste text, Z31-B17); 0
+    # caller so_ply_SellItemList_Delete FUN_00537ba0 (0x3059 REPURCHASE, Z04 §2.5 / Z05 §1.4)
+CSellItemManager::simg_Initialize(m, n, PROTO_SELL_ITEM_INFO_SERVER* rec) → ok          @ FUN_0050e1b0
+    n ≥ 43: assert "…simg_Initialize : Size over"; 0
+    n times: e = l_AllocZ(rec.nHandle) (fail: assert "…AllocZ fail", the record is not skipped: the same record is tried again
+             for the next count *(read: rec advances only on success)*)
+             e.nHandle = rec.nHandle; iti_fill2struct_whole(&e.ItemTotalInfo, default class, 0xFFFF, &rec.ItemTotalInfo)
+             rec += rec.nDataSize (counted from &rec.nHandle)
+    return 1
+    # caller so_ply_SetSellItemInfo FUN_00537930 (vt 0xe64) ← WM 0x1130 NC_CHAR_SELL_ITEM_INFO_ZONE_CMD (Z07 §1.2)
+~CSellItemManager FUN_0050e340: free the list array (~ShinePlayer, the player ctor's unwind)
+ListEraser<SellItemInfo>::~ListEraser FUN_0050e4c0: vftable reset (unwind of List<SellItemInfo>::l_ClearAll)
+```
+
+The list crosses a map change as `PROTO_SELL_ITEM_INFO_SERVER {u8 nDataSize, u16 nHandle, u64 nSellItemKey, item}`.
+`simg_FillBuffer_Server` FUN_0050e4d0 (§4.2, to WM with the save) writes `nHandle`, the item and `nDataSize` (which counts the
+8 key bytes) but never `nSellItemKey`. `simg_Initialize` never reads it either. After a map change every entry keeps whatever
+key its list slot held before (−1 from the ctor, or an older entry's key). `sp_NC_ITEM_REPURCHASE_REQ` FUN_00538580 passes
+`nSellItemKey` to `ii_RepurchaseLot` / `ii_RepurchaseAll`, and D03 §2 shows that the key only reaches the repurchase log rows
+(original bug) Z31-B19.
+
+### 9.6 Guild academy buffs, guild and academy storage elements
+
+```pseudo
+ShineGuildAcademyGuildBuff(cmd) FUN_0046e070 (Z08 §10: the 0x987A visitor)
+    sgagb_GuildBuff = cmd; sgagb_dic = dic_abstate[BTree index of cmd.BuffName]   # unknown name: assert "…as_FromID : Invalid skill id", null
+ShineGuildAcademyGuildBuff::lid_Call(v, o) → continue                                  @ FUN_0046e110   (over the player list)
+    g = o.so_ply_isAcademyGuildMember() (vt 0x858) == 0 ? o.so_mobile_GetGuildRegnum() (vt 0x818)
+      : == 1 ? o.so_ply_GetMyGuildAcademyNo() (vt 0x85c) : (the object pointer: never matches)
+    for i < cmd.NumOfGuild: cmd.Guild[i] == g:
+        sgagb_dic == null: stop
+        o has abstate STA_ACAMSBUF10P (298) or STA_ACAMSBUF7P (300) (vt 0x3e4): stop      # the master buff wins
+        sub = sgagb_dic.subabstate[1].assa_info; sub ≠ null and
+        o.so_AbnormalState_Set(o, index, strength 1, dic, now, 0, −1, sub.KeepTime, 1, 0) (vt 0x638):
+            so_AbnormalState_BitSet(o, index); so_AbnormalState_BroadcastSet(o, index, −1, 1); o.so_AbnormalState_Inform(index, −1, 1) (vt 0x3f0)
+        stop
+    return 1
+ShineGuildAcademyMasterBuff::lid_Call(v, o) → continue                                 @ FUN_0046e2d0   (0x987B, Z08 §10)
+    for i < cmd.NumOfMaster: cmd.MasterBuff[i].nMasterCharNo == o.charNo (vt 0x344):     # GUILD_MASTER_BUFF {char BuffName[32]; u32 nMasterCharNo}
+        st = dic_abstate[BuffName] (unknown: assert, nothing); sub = st.subabstate[1].assa_info
+        sub ≠ null: o.so_AbnormalState_Set(o, index, 1, st, now, 0, −1, sub.KeepTime, 0, 0)
+        stop
+    return 1
+    # unlike the guild buff, no BitSet / BroadcastSet / Inform call follows (see "Not reconstructed")
+```
+
+Storage elements (Z14 §4 academy reward storage, Z14 §3 / Z05 §7.2 guild storage):
+
+| Function | Behaviour | Caller |
+|---|---|---|
+| `GuildStorageElement::GuildStorageElement` FUN_00474920, `GuildAcademyRewardStorageElement::GuildAcademyRewardStorageElement` FUN_00470820 | bag ctor (`ItemGuildStorage` 36 cells / `ItemGuildAcademyRewardStorage` 72 cells of 0x74), `gse_Guild` / `garse_Guild` = 0 | the managers' array ctors; the stack search key of `gsm_FindStorage` FUN_004751f0 / `garsm_FindStorage` FUN_0046f710 (Z14) |
+| `GuildStorageElement::operator=` FUN_00474fe0, `GuildAcademyRewardStorageElement::operator=` FUN_00471c30 | copy the 36 / 72 cells, `Cen` (u64), guild storage also `Token` (u64), `Guild`, `Activate` | the lists' `l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` (FUN_004754f0 … FUN_004755c0, FUN_00472dd0 … FUN_00472ea0) |
+| `garse_SetMoney(cen)` FUN_004709a0, `garse_SetActivate()` FUN_00470880 | `garse_Cen = cen`; `garse_Activate = 1` | `so_ply_GuildAcademyRewardStorageWithdrawAck` / `…DepositAck` (Z14 §4); `so_ply_GuildAcademyRewardStoreFill` |
+| `~GuildAcademyRewardStorageElement` FUN_00470860 | destroy the 72 cells, `ItemBag` vftable | the search key's unwind |
+| `GuildAcademyRewardStorageManager` scalar deleting dtor FUN_00471ba0 | destroy the 500 elements (0x20b8), free the list | vt 0 only (the manager is a global) |
+| `ListEraser<GuildStorageElement>` FUN_00474a70, `ListEraser<GuildAcademyRewardStorageElement>` FUN_0046f700 dtors | vftable reset | unwind of `l_MakeList`, the `FindStorage`s and the managers' initializers |
+
+### 9.7 Party table, object finders, map kick
+
+```pseudo
+CParty::CParty → CParty::Init(partycontainer)                                           @ FUN_00645c10 / FUN_00645a80
+    m_Array = malloc(4000 × 0xD0)                 # PARTY_SLOT {u8 NumOfMember; PARTY_MEMBER_SLOT Members[5]; CLooting
+                                                  #  m_Looting; bool IsBelongItemDiceGameIng; bool isRaidTypeParty} (Z08 §1)
+    m_NumOfParty = 0; per slot: NumOfMember = 0, one byte near the end and the five members' object pointers = 0
+    m_EmptyPartySearchPoint = 0
+    CParty::p_def = copy of slot 0                # the slot operator[] FUN_00645340 returns for party numbers ≥ 4000
+    # malloc does not clear: the looting fields, the member records and p_def's copies of them are uninitialised
+    # (original bug) Z31-B18; latent: a 0xCB200-byte block comes from fresh zero pages at start-up
+    # caller: partycontainer's dynamic initializer (start-up)
+```
+
+Finders (visitors of `ShineObjectManager`, Z01 §4.2; each stops the walk at the first hit and stores the object):
+`ShineCharRegnumFinder::lid_Call` FUN_005500b0 (charNo, vt 0x344) for `som_FindPlayer(charNo)` FUN_00550360;
+`ShineCharIDFinder::lid_Call` FUN_00550180 (`Name5` name, vt 0x56c, five-dword compare) for `som_FindPlayer(name)`
+FUN_00550430 and `som_FindNPC(name)` FUN_00550500; `ShineMobIDFinder::lid_Call` FUN_00550290 (mob ID, vt 0x708) for
+`som_FindNPC(mobId)` FUN_005505d0 (Z11 §9.2).
+
+```pseudo
+FieldMap::fm_KickAll(map): so_AllInMap(map's centre object, KickPlayer{_Map = map}, 1)   (Z09 §28.8)
+KickPlayer::ali_Work(k, sender, o) → 1                                                  @ FUN_00484e20
+    o.so_ObjectType (vt 0x4d0) ≠ 2 (not a player): continue
+    link = { linktoserver = linktoclient = fm_RegenCity(map) (12 chars), (x, y) = map.fm_FieldOption.regenloc[r],
+             r = rndbox[regenspot count (+0x9a)] (≥ 4 → regenloc[0]), direct 0 }
+    o.so_LinkToReserv(link, 0) (vt 0x3fc)
+    # callers of fm_KickAll: MapCluster::mc_AllDropFilm FUN_00485290 and mc_DeleteInstanceDungeon FUN_00486710 (Z14 §1.7);
+    # the same rule as wms_KickPlayerFromInstanceDungeon (Z14 §1.8) without its dead-player branch
+~KickPlayer FUN_00484660: AxialListIterator dtor (fm_KickAll's unwind)
+```
+
+### 9.8 Events, random slots, cease fire, announce, item list maker, weapon titles
+
+```pseudo
+EventSaveCheck::EventSaveCheck(e)                                                       @ FUN_00455ff0
+    vftable; esc_savebuffer.location.map / map_kq = ""; esc_abstate.pnt, esc_skill.pnt = their own buffers
+    # members of WholeSaver: ws_savestore[2048] (unused ring, P02-B21) and ws_saveblock (ws_save2DB's buffer)
+EventSaveCheck::erb_happen(e)                                                           @ FUN_00453d90   (vt 0, EventReserveBase)
+    esc_savebuffer.handle.chrregnum ≠ −1:
+        assert "EventSaveCheck::erb_happen : Error in Character save", chrregnum
+        write the first 0x69 bytes of the save buffer to "NotSaved.bin" (fopen "wb", not checked; fclose)
+    # dead: an erb_happen runs only for an event put into zonevent, and the only zonevent users are the KQ gate
+    # keepers (Z16 §2.3), the two recurring start-up events (Z10 §7.1) and the main loop (Z09 §1.1)
+EventReserveContainer::EventReserveContainer(c, n)                                      @ FUN_005b22a0   (zonevent: n = 1000)
+    List<EventReserveListElement>::l_MakeList(n); erc_eventarr = new EventReserveListElement[n] (0x10: erle_happened,
+    erle_event, erle_handle, erle_repeat); slot i → erc_eventarr[i]
+    # scalar deleting dtor FUN_005b04a0 (vt 0, no caller) frees both; ListEraser dtor FUN_005b0490 = vftable reset
+```
+
+- `RandomSlot::rs_Init(n)` FUN_0063cd20 builds the 16 384-entry ring of one `RandomBox` box (Z23 §8.6): `slot[i] = (i·n) >> 14`,
+  then 16 384 swaps of slot i with a random index (an index ≥ 16 384 skips the swap), then values ≥ n are set to 0. That last
+  clamp never fires, because `(i·n) >> 14 < n` (dead check) (original bug) Z31-B20. Caller: `RandomBox::RandomBox` FUN_0063cdb0.
+- `CeaseFireSender::cfs_Send` FUN_00566810 (our earlier name `BashStopNotify_Set`) sets `cfs_Flag = 1`; caller `smo_BashStop`
+  FUN_0042e840 (vt 0xed8). `cfs_Routine` FUN_00566820 sends 0x243D on the next player tick (Z09 §2.3, Z03 §3.4).
+- `CAnnounceSystem gAnnounceSystem`: ctor FUN_005b8d10 (a `CDataReader`; the same body is the ctor of `gBadNameFilterData`,
+  §8.5), `Read(path, key, size)` FUN_0062df50 = `CDataReader::Read` (`zs_start_moon`: `AnnounceData.shn`, Z10 §7.1),
+  `AnnounceSystem_ItemTake(name, itemid)` FUN_005b8f50 = `return 0`. Its caller `so_ply_PickupItem` FUN_0052faf0 gets no
+  item-pickup announcement in 2016 (the roar uses `AnnounceSystem_Roar`, Z04 §6.4).
+- `ItemListMaker` (reward item batches, Z05 §9.2 0x344D): ctor FUN_005956c0 (`ilm_ItemNum = 0`, `ilm_InvenType = type`);
+  `ilm_ItemMake(item)` FUN_00595740: null → 0xFFFF; already 8 items → assert "ItemListMaker::ilm_ItemMake : Too many content",
+  0xFFFF; else copy the 0x6f-byte item into `ilm_List[ilm_ItemNum++]` and return its item ID. Callers: Lua `cRewardItem`
+  FUN_005e17e0 / `cRewardItem_AllInMap` FUN_005e1b30 and `SMS_StopButton` FUN_00625340 (Z32); `ilm_PutInto` is Z18 §4.8.
+- `CWeaponTitle gWeaponTitle`: ctor FUN_006358a0 (reader, `m_ppWTDArray` null, `m_MaxArrayIndex` 0), dtor FUN_00635a50 (free
+  the index array, reader dtor); loader and readers Z12 §2.3 / Z18 §6.6.
+
+### 9.9 Constructors and destructors of the other containers
+
+| Object | Function | Behaviour | Caller |
+|---|---|---|---|
+| `ItemOperateList ShineObject::so_defitemoperate` | ctor FUN_0052eb40, dtor FUN_0052d7b0, scalar dtor FUN_0052e930, `ListEraser<ItemOperateElement>` dtor FUN_0052d7a0 | `List<ItemOperateElement>` of 40 over `iol_array[40]` (0x78) / destroy and free | dynamic initializer / atexit only: no 2016 code uses the list (dead) |
+| `BattleObjectGroup::BattleObjectList btlobjlist` | ctor FUN_00437610, scalar dtor FUN_00435e30, `ListEraser<BattleObject>` dtor FUN_00435e20 | list of 1024 `BattleObject` (0xe0) | initializer / atexit; users `so_Bash` FUN_0042e950, `smo_SkillBlast` FUN_00581160 (Z03, Z25 §1.2) |
+| `JunctionPointContainer junctionpointlist` | ctor FUN_004ced20 | `List<PathFindCellLoc>` of 200 over `jpc_array` | initializer / atexit only: unused (dead; path finding is part 9) |
+| `CGuildZone gGuild` | ctor FUN_005cd410, dtor FUN_005cc880, `ListEraser<GUILD_ZONE_LIST>` dtor FUN_005cccd0 | `m_bInit` 0, `gz_IsSendReq` 0, `List<GUILD_ZONE_LIST>` of 16 384 over `gz_GuildArray` (0x3c) / free | initializer / atexit; the guild-zone handlers are its vtable (Z08 §8) |
+| `KingdomQuestContainer kqcontainer` | scalar dtor FUN_004976f0; `ListEraser<KQElement>` FUN_004953d0, `ListEraser<KQPlayerInform>` FUN_004972b0 dtors; `PROTO_KQ_INFO::~PROTO_KQ_INFO` FUN_0041d3a0 | destroy the 300 `KQElement`s (0x42c), free / vftable resets / the four `MapLink` (0x1a) | vt 0 only / unwind funclets, `~KQElement`, `KQPlayerInfoList` ctor (Z16 §1.1-§1.2) |
+| `CLCReward gLCReward` | dtor FUN_0049d310 | free every reward group's item array, the group array, the item vector, the two boxes (`LCReward`, `LCGroupRate`) | atexit (capsule rewards, Z09 §28.13) |
+| `GMEventManager gGMEventManager` | dtor FUN_0046dc80 | free the event vector | atexit (Z09 §3) |
+| `TreasureChestLocationManager` (player member) | dtor FUN_0052d650 | free its buffer | `~ShinePlayer` and the ctor's unwind (Z09 §28.10) |
+| `CCharacterTitleZone` (player member) | dtor FUN_005ca600 | empty | `~ShinePlayer`, the ctor's unwind, the atexit of a static object (Z12 §7.4) |
+| `Raid`, `LuaScript`, `LuaScriptArgument::LuaArgumentDefault`, `LuaFuncTrigger::TriggerElement` | scalar dtors FUN_0063d1d0, FUN_005f2030 (`lua_close` the state), FUN_005f1ee0, FUN_00490800 | vftable reset (+ free) | vt 0 only: never deleted through the vtable |
+| `LuaArgumentInstanceDungeon` | dtor FUN_005d7770 | resets the `LuaArgumentDefault` vftable: the identical-code fold of every Lua argument destructor | 73 callers (every function with a stack argument object: `so_DamagedBy`, `so_KilledBy`, …; Z09 §14.4) |
+| `PineEventScriptNode::ScriptAtom` | dtor FUN_004d64b0 | vftable reset (fold) | the unwinds of `Express`, `Condition`, `Term`, … (18; map scripts, Z09) |
+| `ListEraser<PineEventScriptNode::Statement>` / `<Block>` | FUN_004d9be0 / FUN_004d9bf0 | vftable reset | `l_MakeList` unwinds |
+| `ListEraser<CardDeck::Card>`, `ListArray<CardDeck::Card>` | FUN_0064ca70, FUN_0064e140 (free `la_Array`) | vftable reset / free | unwinds of `cd_Load`, `iod_Load` (§8.1), `CardStack` |
+| `BroadcastEventPopper` | dtor FUN_005497c0 | `g_BroadcastStackPoint −= 1` while ≥ 0 (the re-entrance counter of the broadcast walks; ctor FUN_005496d0, Z09 §28.1) | the unwinds of `so_AllInMapNomal` / `so_AllOfRangeNomal` |
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -2239,7 +2586,25 @@ ctor FUN_0064cd20 = `OptionReader::OptionReader`, dtor FUN_0063e150 = the inline
 | Z31-B13 | `OptionCardStack::ocs_selectnumber` FUN_0064c4f0 §8.1 | picks index i with `r <= Rate[i]` for r in 0…999 | index 0 is 1 ‰ more likely and the last non-zero rate 1 ‰ less likely than the table says | `r < Rate[i]` |
 | Z31-B14 | `BmpDataInfo::bdi_LoadBmpFile` FUN_004390f0 §8.6 | accepts 1-bit bitmaps but reads pixels only for 8-bit ones | a 1-bit area bitmap would give a skill area of uninitialised heap bytes and a random `AreaSize`; latent (all 52 `BMP.shn` files are 8-bit) | refuse 1-bit files or decode them |
 | Z31-B15 | `ItemLotAnalyser::LotAnalyser::la_Store` FUN_0048a170 §8.7 | a new `LotChanger` gets only `delta`; `item` is never written | every inventory change applied through the lock list (the only caller of vt 0x7f8) is reported to the quest item hooks as item 0 (`so_ply_ItemLotChange(0, delta)`), so the quest item counters are not updated when items enter or leave the bag *(effect on quest completion not traced)*; the same item stored twice takes two entries | `e.item = id` when the entry is allocated |
+| Z31-B16 | `NPCRole_Portal::nrb_BriefInformSet` FUN_004c2360 / `nrb_SaveLinkData` FUN_004c23f0 §9.1 | stores every LinkTable row whose argument matches into `nrb_pSaveLinkInfo[5]` without a bound; `nrb_SaveLinkData(i)` accepts `i == nrb_LinkNum` | a gate with six or more rows would overwrite the heap after the role object; the getter reads one slot past the last row; latent (2016: at most 4 rows per argument, callers loop below the count) | stop at 5 rows; test `i >= nrb_LinkNum` |
+| Z31-B17 | `NPCRole_Merchant::nrb_ItemBuyPrice` / `nrb_ItemBuyFame` / `nrb_ItemBuyGBCoin` §9.1, `CSellItemManager::simg_Delete` §9.5 | the "item not found" / "free fail" asserts carry the text of `nrb_ItemSellPrice` / `simg_Insert` | misleading log lines | each function's own name |
+| Z31-B18 | `CParty::Init` FUN_00645a80 §9.7 | `malloc` (not cleared) for the 4000 party slots; only a few fields are zeroed, then slot 0 is copied into `p_def` | looting, dice flags and the uncleared member fields start as heap contents, also in the default slot returned for invalid party numbers; latent (a fresh 0xCB200-byte block is zero pages) | `calloc` or clear every field |
+| Z31-B19 | `simg_FillBuffer_Server` FUN_0050e4d0 / `simg_Initialize` FUN_0050e1b0 §9.5 | the map-change record has room for `nSellItemKey` (counted in `nDataSize`) but the key is never written nor read | after a map change every buy-back entry carries a stale key (−1 or an older entry's); the repurchase log rows (D03 §2) get it | copy `nSellItemKey` both ways |
+| Z31-B20 | `RandomSlot::rs_Init` FUN_0063cd20 §9.8 | clamps values ≥ n to 0 after the shuffle | dead check (`(i·n) >> 14 < n` always) | drop it |
 ## Not reconstructed / uncertain
+
+- §9.2: `mcd_city` returns 0 both for Roumen (`Rou`) and for any map not in `ItemMerchantInfo.shn` (dungeons, Gamble houses, …),
+  so merchants there use Roumen's "sold in this city" column. Whether the 2016 data places a city-dependent merchant on
+  such a map was not checked.
+- §9.6: the academy master buff sets the abstate without the `so_AbnormalState_BitSet` / `BroadcastSet` / `Inform` calls
+  that the guild buff makes right after. Whether `so_AbnormalState_Set` informs the client itself when its 9th argument is 0
+  (master) and not 1 (guild) was not traced (Z03 §6.2 documents the set path but not that argument, `how`). If it does not, a master sees the
+  buff only on the next brief-info or login refresh *(inferred)*.
+- §9.6: `ShineGuildAcademyGuildBuff::lid_Call` compares the guild list with the object pointer when `so_ply_isAcademyGuildMember`
+  returns neither 0 nor 1. Its body (FUN_0055a540) was not re-read; if it returns a bool, that branch is unreachable.
+- §9.6: `GuildStorageElement::operator=` / `GuildAcademyRewardStorageElement::operator=` are reached only through the lists'
+  Push / Pop slots. No call of those slots on the two storage lists was found (the storage code allocates with `l_AllocZ`
+  and searches with `ListSearchSame`), so the copies are probably unused *(inferred)*.
 
 - §2.1: who sends the item-use DB confirmation that runs `uib_Effect` is Z05's `InvenCellReleaser_ItemUse` path
   (Z04 §6.3); not re-read here.
@@ -2297,12 +2662,11 @@ Filled in by the sweep part; rows found so far:
 | `uib_AfterCast` / item DB consumption | Z04 §6.3, Z05 (done) | common path, documented there |
 | lock-list slots 0x10-0x30, 0x38, 0x48-0x54, 0x60, 0x68 and the releasers' `icr_Apply` | Z05 §1.2-§1.4, Z04 §1.4 (done) | documented there; §3.2 links them |
 | `LinearStep::*`, `Tracer` (dead tracer pair with `CellStack`, §3.8) | this item, part 9 (path finding) | `CellStack` is in the part-2 bucket only by name; part 9 links §3.8 |
-| `TreasureChestMaker::tcm_ItemMake` FUN_00595d00 (caller of attribute vt 0x10) | this item, part 8 (`TreasureChest*`) | §3.5.1 documents the callee side |
+| `TreasureChestMaker::tcm_ItemMake` FUN_00595d00 (caller of attribute vt 0x10) | Z09 §10.10 (done) | documented there (treasure chests); §3.5.1 documents the callee side |
 | item wire sizes per attribute class | D07 §1.3 (done) | same library on the Character server; §3.5 maps the zone addresses |
-| `CSellItemManager` (the sell list itself, `simg_FillBuffer_Server` FUN_0050e4d0 and the insert / delete) | Z18, this item part 8 (`CSellItemManager`) | §4.2 documents the two player-side senders and `simg_FillBuffer_Client` |
-| `DuplicatedMenuControl::dmc_Table` contents (7 × 7 menu exclusion table) | this item, part 8 (`DuplicatedMenuControl`) | §4.8 documents the test; the table's initializer is in the part-8 bucket |
+| `CSellItemManager` (the sell list itself) | this item §9.5 | insert / delete / initialise / server fill documented there (Z31-B19); §4.2 documents the two player-side senders and `simg_FillBuffer_Client` |
 | `ShineMiniHouse::so_mh_*` dice game, `CGambleDiceTaiSaiObject` | Z06 §3 (done), Z32 | §4.6 documents only the player-side state accessors they call |
-| `GuildTournamentSystem::CaptureFlag` FUN_0047eae0 (caller of `ShineDynamicCast<ShineNPC>`) | this item, part 8 (`Guild*`) | §5.2 documents the cast |
+| `GuildTournamentSystem::CaptureFlag` FUN_0047eae0 (caller of `ShineDynamicCast<ShineNPC>`) | Z16 §4.5 (done) | documented there (flag capture); §5.2 documents the cast |
 | `List<ShineObject>::l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` (callers of `ShineObject::operator=`) | this item, part 9 (library templates) | §5.1 documents the copy |
 | per-class overrides of the object slots (mob, NPC, bandit, servant, door, effect, drop item, flag, pet, mover, mini-house) | Z09 §5 / §11-§13, Z13 §1.8 / §6.2 / §8.1 (done) | §5 documents only the base-class bodies and links the overrides |
 | auto-arrange sort and step scheduling (`so_ply_ArrangeInven` FUN_00563500) | this item, part 10 (§11, Z04 open point) | §4.9 documents the grade rank and the login init |
