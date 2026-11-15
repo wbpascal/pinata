@@ -23,7 +23,7 @@ and the bucket rules are in `docs/plan/status/Z31.md` and `docs/plan/status/Z31-
 | 2 | the 14 player / mobile-object members named by `docs/review/confidence.md` §4.4 | 14 / 1 115 |
 | 3 | inventory lock list, cell stacks, inventories and item boxes, item attribute classes | 137 / 2 862 |
 | 4 | the other `ShinePlayer` members | 127 / 1 954 |
-| 5 | `ShineObject`, `ShineMobileObject` and the other object classes | ≈ 1 750 |
+| 5 | `ShineObject`, `ShineMobileObject` and the other object classes | 138 / 1 731 |
 | 6 | abstate containers, character classes, mob AI, rules of engagement, use effects | ≈ 1 800 |
 | 7 | table templates (`BinaryDataBox<…>`, `ITableBase<…>`, `IIDTableBase<…>`, `SHND::CommonData<…>`, `Table`) | ≈ 4 100 |
 | 8 | the other data loaders and SHN / text parsers | ≈ 2 200 |
@@ -1039,6 +1039,286 @@ FUN_00549810 (vftable reset to `PacketContainerBase`) and `LPInfo::~LPInfo` FUN_
 They run only from the unwind funclets of the `ShinePlayer` constructor and `~ShinePlayer` (§2.9). Their member
 destructors are the empty fold FUN_00417480.
 
+## 5. `ShineObject`, `ShineMobileObject` and the other object classes
+
+The class tree and the type numbers are `docs/knowledge/Z01.md` §2. `ShineObject` has 933 vtable slots (up to vt 0xe90),
+`ShineMobileObject` and its subclasses 986 (up to vt 0xf64), `ShineMob` and its subclasses 992. This section covers the base-class bodies:
+the defaults that every class without its own override inherits. The per-class override tables are elsewhere: the mini-house in Z13 §1.8,
+the pet in Z13 §6.2, the mover in Z13 §8.1, the door, effect object and servant in Z09 §13.1-§13.3, the mob, NPC and bandit in Z09 §5. For each slot
+the row gives the default, the classes that keep it (abbreviations: O `ShineObject`, Di drop item, Ef effect object,
+Mf magic field, Mh mini-house, Af axial flag, MO `ShineMobileObject`, P player, Do door, Mv mover, M mob, N NPC,
+B bandit, S servant, Pe pet), the override and the callers of the slot. Callers were found by the slot scan of §1. Where the only
+reference to a body in the image is its vtable entry and no `+ 0x<slot>` call exists, the row says "no caller".
+
+### 5.1 Construction, copy and destruction
+
+```pseudo
+# The object pools are arrays allocated with new[] in ShineObjectManager::som_Initialize FUN_0055c260 (Z01 §4); an
+# object is never deleted individually. The deleting destructors (vt 0x4) are therefore reached only by a pool's delete[],
+# and no such call exists in the zone *(inferred: no `+ 4))(` call on an object, no direct call)*.
+ShineObject::~ShineObject: abstract in the base vftable (vt 0x4 = _purecall FUN_006583ea)
+ShineMobileObject::scalar_deleting_destructor(flags)       @ FUN_00556310 (vt 0x4 of MO)
+    ~ShineMobileObject(this); if flags & 1: delete this
+ShineMobileObject::~ShineMobileObject                       @ FUN_005554c0
+    vftable = ShineMobileObject; ~Parameter::Container(smo_Param); empty fold FUN_00417480 on smo_Spy
+    ~AbstateListInObject(smo_Abstate.abstatelist); empty fold on smo_MoveManager; ~ShineObject
+    # called by ~ShineDoor FUN_00555ad0, ~ShineMob, ~ShinePlayer (§2.9), ~ShineMover FUN_0055e950 and the unwind funclets
+ShineMobileObject::AS::~AS (smo_Abstate)                    @ FUN_005497d0
+    free abstatelist.asl_List.l_Array; destroy the 0x74 AbstateElementInObject slots (0x1c bytes each); only in the
+    constructor's unwind path
+ShineMob::~ShineMob                                         @ FUN_00556340
+    vftable = ShineMob; free sm_WeaponUseRate's buffer and zero its three words; ~EnemyList(sm_HitMeList);
+    ~Actor(sm_ArtificalIntelligence.maa_MobActionStruct); ~Selector(….maa_TargetSelect);
+    free sm_ReadyWeapon.nextblast's buffer and zero it; empty fold on sm_CurrRoamInterval; ~TargetAnalyser(sm_TargetAnalyser);
+    empty fold on sm_WanderChat; ~ShineMobileObject
+    # called by ~ShineBandit FUN_00556e20, ~ShineServant FUN_00556f50, ~ShinePet FUN_005571c0, ~ShineNPC FUN_00557b70,
+    # the deleting destructors below and the som_Initialize unwind
+ShineEffectObject::~ShineEffectObject                       @ FUN_00555370
+    vftable = ShineEffectObject; empty fold on seo_DetachCheck; ~ShineObject
+vector_deleting_destructor(flags) (vt 0x4) of ShineEffectObject FUN_00555f70 (array element 0x1d3 bytes),
+    ShineDoor FUN_00556030 (0x1f14), ShineMob FUN_005579a0, ShineBandit FUN_00557940, ShineServant FUN_00557a00,
+    ShineNPC FUN_00557d10:
+    flags & 2: run the class destructor over the count stored before the array (_eh_vector_destructor_iterator_),
+               flags & 1: delete[] the block; return the block
+    else:      run the class destructor once; flags & 1: delete this
+```
+
+`ShineObject` copy (`operator=` FUN_00558890) copies `so_handle`, the slanted-list block (below), `so_LocateInfo`
+(location pointer and direction), `so_layer` (`templyr` main / sub, `layer`), `so_Field`, `so_AIScript` (`LuaAi::operator=`
+FUN_00557ac0: the `AIScript` flag and the 8 script entry names `Entrance`, `NPCClick`, `NPCMenu`, `MobDamaged`, `ObjectDied`,
+`NPCAction`, `MobAttack`, `RankingValue` as `std::string` copies), `so_bIsMapMarking` and `so_eSightState`. Its only
+callers are `List<ShineObject>::l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` (FUN_00558d20 … FUN_00558df0), a by-value
+list template instance (part 9).
+
+The slanted-list block `so_slantedlist` (+0x06, 0x60 bytes) holds the object's nodes in the map's two
+coordinate-sorted lists (`SlantedCoordList`, layout in Z09 §9): `Xnode` / `Ynode`, the list links `Xlist` / `Ylist` (`cn_node`,
+`cn_prev`, `cn_next`), `eventnumber[4]`, `listcheck.lcs_ListCheck[4]` and `LayerRegistInfo` (layer number, view type,
+layer type / value). The copy is `operator=` FUN_00554660; the destructor FUN_00549660 (empty folds on the two lists, then
+`~ObjectXCoordNode` on both nodes) runs only in the `ShineObject` constructor's unwind.
+
+### 5.2 Run-time type: `GetRTTI` and `ShineDynamicCast<T>`
+
+Every object class has its own `m_RTTI` (`ShineRTTI`: name, `m_pkBaseRTTI` = parent class) returned by vt 0x0
+`GetRTTI`: `ShineObject` FUN_00554ed0 (used by O, Di, Ef, Af, which have no own RTTI object), `ShineMobileObject`
+FUN_00555550, `ShineDoor` FUN_00555ae0, `ShineMagicField` FUN_00555c80, `ShineBandit` FUN_00556e30, `ShineServant`
+FUN_00556f60, `ShineNPC` FUN_00557b80 (player: FUN_00559650, §4.10).
+
+```pseudo
+ShineDynamicCast<T>(ShineObject* o) → T*:                   @ FUN_00479410 (T = ShineNPC; one instance per T)
+    if o == null: return null
+    for r = o.vt[0x0]() (GetRTTI); r ≠ null; r = r.m_pkBaseRTTI:
+        if r == &T::m_RTTI: return (T*)o           # single inheritance, no pointer adjustment
+    return null
+```
+
+So a drop item or axial flag answers to `ShineDynamicCast<ShineObject>` only. The `ShineNPC` instance is called by
+`GuildTournamentSystem::CaptureFlag` FUN_0047eae0 (part 8). The other instances are cited where they are used
+(e.g. `<ShinePlayer>` in Z21, `<ShineMobileObject>` in Z25).
+
+### 5.3 Map removal, handles, start-up
+
+```pseudo
+ShineObject::so_RetrateFromMap()  (vt 0x3f4; O, Mf, Mh, Af)                                @ FUN_00495ae0
+    assert "ShineObjectClass::ShineObject::so_RetrateFromMap"            # nothing else; such objects are never retreated
+    # overrides: MO / P / M / … FUN_00495d20 (sets smo_Flag.Retrate, Z09 §28, Z11), drop item FUN_00495c40 (Z09 §11),
+    # effect FUN_00495cc0 (Z09 §13.2), door FUN_00495e50 (Z09 §13.1). 10 callers: map clear, mob vanish, &releasenpc, …
+
+ShineObject::so_RetreatFromMapByImmeditely()  (vt 0x3f8; O, Di, Ef, Mf, Mh, Af)             @ FUN_00495b90
+    this.vt[0x3f4]()                                                    # so_RetrateFromMap: removal at the next tick
+ShineMobileObject::so_RetreatFromMapByImmeditely()  (vt 0x3f8; P, MO, Do, M, B, S, N, Pe, Mv) @ FUN_00495d80
+    # its profiler string is the copied "…ShineMobileObject::so_RetrateFromMap"
+    this.vt[0x3f4]()                                                    # sets smo_Flag.Retrate
+    this.vt[0x33c](0, 1, 3)                                             # so_Unmark FUN_00553970: leave the sight (0x1805, Z13 §6.4)
+    ShineObjectManager::som_FreeObject(handle, REMOVE_NOW, 100)         # Z01 §4.2
+    # vt 0x3f8 has no caller in 2016 (both bodies referenced only by their vftables): dead
+
+ShineObject::so_FreeFromList()  (vt 0x2c; O, Di, Ef, MO, Do, Mf, Mh, Af, Mv)                @ FUN_00554220
+    unlink so_slantedlist.Xlist if linked (cn_prev ≠ cn_next: cn_RemoveList), the same for Ylist
+    if exactly one was linked: assert "ShineObjectList::som_FreeObject : one of SlantedList is removed"
+    # the mob variant FUN_00554280 also leaves the family ring (Z09 §10.5, §28); the player variant FUN_00554310 releases the
+    # party slot first (§2.3). Caller: som_FreeObject FUN_00557d70
+
+ShineObject::so_RemakeHandle(i) → 0xFFFF  (vt 0x4a4; O, MO)                                 @ FUN_00554ff0
+    assert "ShineObjectClass::ShineObject::so_RemakeHandle" (i)         # abstract classes have no handle range
+    # every concrete class overrides it with its pool's handle range (Z01 §3, Z09 §11-§13, Z13 §1.1 / §6.2 / §8.1)
+
+ShineObject::so_LoginLocation() → null  (vt 0x4bc; O, MO, Mf, Af)                          @ FUN_00554fd0
+    assert "ShineObjectClass::ShineObject::so_LoginLocation"
+    # callers: so_MapMarking, so_MapMarkingAtDefaultCoord (Z09), effect blast, SysFuncShineIsGateUse; they run only on
+    # classes with their own LoginLocation (player, mob family, drop item, effect, door, mini-house, mover)
+
+ShineObject::so_Init()  (vt 0xe78; every class)                                           @ FUN_005551c0
+    this.vt[0xe7c](0, 0); this.vt[0xe80](0, 0)                          # clear the fixed walk / run speed
+    # MO and subclasses: so_smo_SetStaticWalkSpeed FUN_005558f0 / so_smo_SetStaticRunSpeed FUN_00555910 set
+    # (smo_bStaticWalkSpeed, smo_nStaticWalkSpeed) / (smo_bStaticRunSpeed, smo_nStaticRunSpeed); the other classes have
+    # the empty two-argument fold FUN_00509900 there. Caller: som_AllocObject (Z01 §4.1), on every object taken from a pool
+```
+
+### 5.4 `ShineMobileObject` members
+
+```pseudo
+ShineMobileObject::so_mobile_IsEnemy(o) → bool  (vt 0x72c; MO, Do)                         @ FUN_0042f220
+    if o.vt[0x9b0]() ≠ null: o = o.vt[0x9b0]()               # so_serv_FindMaster: a servant counts as its master
+    if o.so_AbnormalState_IsSet(STA_IMMORTAL 291) (vt 0x3e4) or o.…IsSet(STA_ADLFLOUSSIERIMT 499): return false
+    if this.so_IsAlliance(o) (vt 0xe60) == 1: return false
+    if o.so_mobile_BattleCamp() (vt 0x8cc) == BC_NPC 3: return false
+    return o.so_ObjectType() (vt 0x4d0) ∈ {2 player, 8 bandit, 5 mob, 11 mover}
+    # in 2016 only doors keep this body, and for a door so_IsAlliance is the `false` fold (§5.7) and its camp is 0. The mob
+    # override ShineMob::so_mobile_IsEnemy FUN_004304c0 (M, N, B; Z03, Z25) calls it directly. Other overrides: player
+    # FUN_00430570 (Z03 §3.3), pet FUN_0042f3a0 (false, Z13 §6.2), servant FUN_004308b0 (Z09 §13.3), mover FUN_004309a0
+    # (Z13 §8.9). 14 slot callers (target scans, aggro, swing damage)
+
+ShineMobileObject::so_mobile_TargetModeCheck(TargetState s) → bool  (vt 0x7e4; MO family)  @ FUN_00555840
+    TS_LIVE 0:   return not this.so_AmIAlreadyDead() (vt 0x28, FUN_005557a0: smo_BattleObject.alreadydead or HP 0)
+    TS_CORPSE 1: return this.so_AmIAlreadyDead()
+    else:        assert "…so_mobile_TargetModeCheck : Invalid target mode" (s); return false
+    # caller: the cast tick in ShineMobileObject::so_Routine FUN_0056a080: while a skill is cast on a target,
+    # target.vt[0x7e4](ActiveSkill.SkillTargetState) false → caster.smo_CastAbort (vt 0xed4)
+
+ShineMobileObject::so_mobile_MoveHalt()  (vt 0x7c4; MO family; others: empty fold)          @ FUN_005559d0
+    if smo_MoveManager.mm_state ≠ MM_REINFORCEMOVE 3:
+        mm_state = MM_HALT; mm_startTime_ms = mm_fullTime_ms = mm_currTime_ms = mm_lastTime_ms = mm_leftTime_ms = 0
+        mm_charSpeed = 0; mm_goalPos = current location
+    # callers: AbstateListInObject::asl_AbstateSet when a SUBAB_FEAR sub-state is set (Z03 abstates);
+    # MobTacticElement::MobActionTurning::mab_Think after its move reserve (vt 0x660) (Z09 §7)
+
+ShineMobileObject::smo_MoveLocationCheck_From(SHINE_XY_TYPE* from) → bool                @ FUN_004569e0
+    from == null: assert "…smo_MoveLocationCheck_From : pFromLoc null"; return false
+    return dx² + dy² < 40001 between the current location and from      # the claimed start is within 200 units
+ShineMobileObject::smo_MoveLocationCheck_To(SHINE_XY_TYPE* to) → bool                    @ FUN_00456a30
+    to == null: assert "…sp_MoveLocationCheck_To : pToLoc null" (sic); return false
+    return MapBlockInformation::mbi_OccupCellCheck(field's block map, to.x, to.y, 1) ≠ 0   # walkable cell
+    # both are non-virtual; callers ShineMover::so_smv_MoveWalk / MoveRun / MoveStop (Z13 §8.7)
+
+ShineMobileObject::so_mobile_NotifyParameterChange(u8)  (vt 0x34; all MO except P)         @ FUN_00503b60
+    Parameter::Container::c_MakeTotal(smo_Param)                        # recompute the totals (Z12)
+    # player override FUN_00503c10 (Z12). 38 callers (abstate actors, & commands, KilledBy, item effects)
+
+ShineMobileObject::so_batobj_DamageApply(dmg)  (vt 0x658)                                   @ FUN_005556c0
+    smo_BattleObject.damagereserve -= dmg; < 0: assert "…so_batobj_DamageApply"
+    # no caller (referenced only by the 9 vftables): dead; its reader so_batobj_GetDamage FUN_005556f0
+```
+
+Small members (slot; classes that use the body; callers):
+
+| Function | Slot | Body | Callers |
+|---|---|---|---|
+| `so_smo_CanEnchant(idx, strength)` FUN_0040dba0 | 0xa6c (MO family; O… `ShineObject::so_smo_CanEnchant` FUN_00408d30 = false) | `AbstateListInObject::asl_CanEnchant` (§6) | `ShinePlayer::sp_AbstateCheck` |
+| `so_smo_RangeEvation` FUN_004a6380 | 0xa68 (O… FUN_004a6330 = 0) | `smo_Param.RangeEvasion` | `RulesOfEngagement::roe_FreeStatHitRate` (Z12) |
+| `smo_HowMachSoul(skill, out, target)` FUN_004a5ff0 | 0xf38 (all MO but P) | `out = {null, 0, 0}`: only players collect souls | `SkillBlastEffectContainer::sbec_Store` (player body FUN_004a6060, Z25) |
+| `smo_SoulManage(target, skill)` FUN_004a5dd0 | 0xf34 (all MO but P) | empty | `MiscDataTable::mdt_PostSkillBlast` (player FUN_004a5e20, Z25) |
+| `so_BashStop` FUN_00401b80 | 0xadc (MO family; others empty fold) | `this.vt[0xed8]()` | `AbstateElementInObject::aeo_Set` |
+| `smo_BashStop` FUN_0042e800 | 0xed8 (MO, Do, Mv) | empty (mob FUN_0042adf0, player FUN_0042e840, Z03) | 29 (swing / targeting / abstate) |
+| `smo_ply_NormalAttackFactor` FUN_0042f8c0 | 0xf3c (all MO but P) | 1000 | `smo_SwingDamage` (player version §4.4) |
+| `so_mobile_SetNaturalEnemy(a)` FUN_0042b020 / `so_mobile_GetNaturalEnemy` FUN_0042b030 | 0x9d8 / 0x9dc (MO family) | `smo_NaturalEnemy = a` / return it | `asl_AbstateSet` / `asl_AbstateReset`, `smo_SwingDamage` |
+| `so_AbnormalState_Reset(idx)` FUN_00555700 | 0x650 (all MO but P) | `asl_AbstateReset(smo_Abstate.abstatelist, this, idx)` | 37 (player FUN_00559ef0) |
+| `so_RecalcSpeed(v)` FUN_005557e0 | 0x7b8 (MO family) | `MoveManager::mm_RecalcSpeed` | no caller: dead |
+| `so_mobile_GetHPChangeOrder` FUN_00555890 | 0x7e8 (MO family; O… FUN_00555130 = 0xFF) | `++smo_HPChangeOrder` (u16 `hpchangeorder`, the sequence number in every HP-changing packet, Z03) | 15 (DoT, HP heal, target inform) |
+| `so_mobile_DeadCheck(cause)` FUN_005558b0 | 0x8d4 (MO family) | `smo_DeadCheck.dc_Cause = cause` (`DC_LIVE` 0, `DC_DOT` 1, `DC_ATTACK` 2, `DC_ATTACK2` 3, `DC_SELFKILL` 4, `DC_SKILL` 5) | DoT, `so_Bash` (dead), mob suicide |
+| `so_SetMovePacket(h, pkt)` FUN_0055d5d0 | 0xbb8 (MO family) | `smo_SetMovePacket` FUN_00434ae0 | no caller: dead (the walk / run handlers call `smo_SetMovePacket` directly) |
+| `so_smo_SPExhByAbState` FUN_00402070 | 0xa60 (MO family; O… `so_getDetectRange` FUN_005551a0 = 1000) | `smo_Param.SPRate` | `CharaterSkillList::csl_SPCheck` |
+| `so_Getabstatebit` FUN_005556a0 | 0x4a0 (MO, Do) | the static `AS::tempbit`, one array shared by every door (original bug) Z31-B7 | 10 (abstate bit set / reset) |
+| `smo_DuringCast` FUN_00555730 | 0xea0 | `smo_SkillCast.scs_BlastTime ≠ 0` | 13 (item use, flag capture, mob attack) |
+| `so_mobile_MoveSpeed` FUN_005557c0 / `so_mobile_MoveState` FUN_005557d0 | 0x7b0 / 0x7b4 | `mm_charSpeed` / `mm_state` | `so_mobile_SpeedChange`, `MobActionInChase`, `so_ExchageBriefInfo` |
+| `so_mobile_DuringFlying` FUN_00555880 | 0x7c0 | `smo_Flag.DuringFlying` | `CharClass::cc_CanNormalAttack` |
+| `so_mobile_IsInFear` FUN_00566e70 | 0x9e8 | `smo_Flag.InFear` | mob target selectors, `MoveManager::mm_Step`, active-skill item use |
+| `so_smo_GetStaticRunSpeed` FUN_00555960 | 0xe90 | `smo_nStaticRunSpeed` | the three `so_RunSpeed` (mob, player, mover) |
+
+The non-mobile classes have the shared folds of §5.6 in all these slots.
+
+### 5.5 `ShineObject` defaults of player slots
+
+These slots are overridden only by `ShinePlayer` (or by one other class, named in the row). The default either asserts
+(the caller only reaches players) or returns a neutral value. The player bodies are cited in the column "Override".
+
+| Default | Slot | Body | Override | Callers |
+|---|---|---|---|---|
+| `so_SaveMisc2WMS` FUN_00453380, `so_SaveCharTitle` FUN_004533a0, `so_SaveToDB_CharTitle` FUN_004533c0, `so_ply_SavePKCount` FUN_004533e0, `so_SaveLocation` FUN_00453400, `so_SaveChestInfo` FUN_00453420, `so_SaveLevel` FUN_00453440, `so_SaveStat` FUN_00453460, `so_SaveGameData` FUN_00453480, `so_SaveAbstate` FUN_00453500, `so_SaveItem` FUN_00453540, `so_SaveSkill` FUN_00453560 | 0x3c4, 0x3c0, 0x3c8, 0x388, 0x38c, 0x3bc, 0x390, 0x3ac, 0x3b0, 0x3a4, 0x3b4, 0x3a8 | assert with its own name, return 0 (no bytes written) | FUN_00453e70 … FUN_00456520 (Z07, §4.3) | `WholeSaver::ws_save2worldmanager` / `ws_savelevel2worldmamager` / `ws_save2DB` (Z07); 0x3b4 none |
+| `so_SetRegistNumber(ack)` FUN_0044a950 | 0x2ec | assert | FUN_0044e900 (Z07) | `wms_NC_CHAR_REGISTNUMBER_ACK` |
+| `so_ply_RegistNumberVarifyCheck(ack)` FUN_00551b60 | 0x9f0 | false (profiler string "…so_RegistNumberVarifyCheck") | FUN_00551bb0 (Z10) | `gds_NC_CHAR_REGNUM_VARIFICATION_ACK` |
+| `so_PacketBufferFlush` FUN_005551f0 | 0x2e8 | true | FUN_0055aa70 (§4.5) | `ShinePlayer::so_Routine`, `zs_disconnect` |
+| `so_ply_Getchestinform(cmd)` FUN_0044c850 | 0x6c4 | empty | FUN_0044c8a0 | `wms_NC_CHAR_ZONE_CHESTINFO_CMD` |
+| `so_ply_GuildReName` FUN_00473b60 / `so_ply_GuildReType` FUN_00473bb0 | 0x880 / 0x884 | empty | FUN_00474650 / FUN_00473c00 (§2.1) | the WM rename / retype acks (Z08 §8.2) |
+| `so_ply_GetClientSession` FUN_004c8da0 | 0xa70 | null | FUN_004c8df0 | `wms_NC_MAP_LINKRESERVE_ACK`, `PacketContainer::pcb_Append` |
+| `so_ply_InvenWrite(text)` FUN_0051ad40 | 0xa58 | empty | FUN_0051ad90 (Z11) | `AmpersandCommand::ac_InventoryView` |
+| `so_ply_ChangeCharIDUseAck(ack)` FUN_0051b7c0 | 0x9fc | empty | FUN_0051b810 (Z07) | the CHANGE_CHAR_ID item-use DB ack |
+| `so_Disconnect(reason, when, arg)` FUN_00549db0 | 0x5f8 | assert "…so_Disconnect" with the object type | FUN_0054f340 (Z01 §8.3) | 50 |
+| `so_ply_ItemLotChange(slot, lot)` FUN_00578220 | 0x7f8 | empty | FUN_00578270 (Z05) | `icl_Apply_N_Free`, `icl_Apply_N_Free_ItemUseAck` (§3.2) |
+| `so_Prison_Go(min)` FUN_005b9460 / `so_Prison_End(name, xy)` FUN_005b96e0 | 0x8a4 / 0x8a8 | 1 / empty | FUN_005b94b0 / FUN_005b9730 (Z08) | `wms_NC_ZONE_PRISON_GO_REQ` / `…_END_CMD` |
+| `so_GetCharRegistNumber_ItemLooter` FUN_004811f0 | 0x564 | `this.vt[0x344]()` (own char number; also used by players) | servant FUN_00481200 (Z09 §13.3: the master's) | `HitMeList::EnemyList::el_Store` (§6) |
+| `so_NC_ITEMDB_fail(dept, cmd, err)` FUN_00517d20, `so_NC_ITEMDB_ADMINCREATEFAIL_ACK` FUN_00527250, `so_NC_ITEMDB_USE_ACK(slot)` FUN_0053f820 | 0x350 / 0x34c / 0x354 | assert | FUN_00517eb0 / FUN_005275b0 / FUN_0053fb50 (Z05) | the Item-DB fail acks (12), mushroom / admin create fail, `gds_NC_ITEMDB_USE_ACK` |
+| `so_drpitm_CanLooting(o)` FUN_00529a50, `so_drpitm_itemview` FUN_00555070 (string "…so_itemview"), `so_itempicked` FUN_00555090 | 0x53c / 0x548 / 0x54c | assert; false / null / – | drop item FUN_0052a4e0 / FUN_00555310 / FUN_00555340 (Z09 §11) | pick-up, party / raid distribution, `ii_PickAll` / `ii_PickMerge` |
+| `so_ply_KeepFromChat(gm)` FUN_00549f40 | 0x8f0 | `gm.vt[0x784]("Error in KeepFromChat")` (`so_ply_Notice` to the GM) | FUN_00549f60 (Z11) | `AmpersandCommand::ac_KeepFromChat` (target not a player) |
+| `so_ply_GodOfSlotMachine` FUN_0061dde0 | 0xb58 | a static empty buffer `tmp` | FUN_0061ddf0 (Z11) | `ac_GodOfSlotMachine`, `SlotMachineScreen::SMS_StopButton` (Z32) |
+| `so_AbnormalState_Set_CharAllMode(…)` FUN_004165b0 | 0x63c | false | FUN_004165c0 (Z03) | `ShineMobileObject::so_KilledBy` |
+| `so_ply_isGuildStoreGrade` FUN_0046deb0 | 0x5f0 and 0x874 | 99 (nonzero) | FUN_00475b10 / `so_ply_isGuildAcademyRewardStoreGrade` FUN_0046dec0 (§4.7) | guild-token buy, item relocation / split, storage withdraws |
+| `so_ply_GetItemLotInspector` FUN_00490bc0 | 0x96c | `&so_ItemLotInspector` (static) | FUN_00490bd0 (§4.10) | `ItemRelocationManager::irm_*` |
+| `so_GetLastUpgradeInfo` FUN_0053b280 | 0x314 | `&so_deflastupgradeinfo` | FUN_0053b290 (Z04) | the three upgrade DB acks |
+| `so_ply_MakeLayerRegNum(type, no)` FUN_0054ab30 | 0xdb8 | 0 | FUN_0054ab40 (Z14) | `so_ply_MoveNewLayer`, `…_AllInMap`, `cMobRegen_XY_Layer` |
+| `so_TradeStructure` FUN_00554f00 / `so_TradeBoard` FUN_00554f10 | 0x31c / 0x320 | `&so_deftradestr` / `&so_deftradebrd` | FUN_00559670 / FUN_00559680 | `so_CloseTradeMenu`, trade propose / decide (Z06) / 0x320: no caller |
+| `so_PacketEncryptClass` FUN_00554f60 | 0x4a8 | `&so_PacketEncrypt` | FUN_00559700 | `pcb_Append`, `ClientSession::zbs_Parsing` (Z01) |
+| `so_ply_CurrentMoney` FUN_00554f70 | 0x434, 0x438, 0xb04, 0xb10 | 0 (u64; one body for four slots) | `so_ply_CurrentMoney` FUN_00559710, `so_ply_CurrentExp` FUN_00559720, `so_Gamble_CurrentCoin` FUN_0055a6b0, `so_Gamble_CurrentExchangedCoin` FUN_0055a6e0 | 35 / 3 / 7 / 1 |
+| `so_extradata` FUN_00554f80 | 0x570 | `&so_defextdata` | FUN_00559750 | none |
+| `so_CharName` FUN_00554f90 | 0x56c (O, Di, Ef, MO, Do, Mf, Mh, Af, Mv) | `&so_defname` | player FUN_00559780, mob family FUN_00556530, pet FUN_005573a0 | 114 (logs, & commands) |
+| `sp_lastpickuptime` FUN_005550d0 | 0x41c | `clockwatch.cw_CurrTick` | FUN_0055a090 | party / raid item distribution |
+| `so_GetStatDistStr` FUN_005550f0 | 0x424 | `&so_StatDistStr` | FUN_0055a1c0 (§4.10) | the five `so_ply_FreeStat*`, `cFreeStatInit` |
+| `so_ply_GetInventoryLockList` FUN_00555100 | 0x7d4 | `&so_definvlocklist` (a static, empty lock list) | FUN_0055a1d0 (§3) | 258 |
+| `so_ply_FreeStatInt` FUN_00555150 / `…Dex` FUN_00555160 / `…Con` FUN_00555170 | 0x46c / 0x470 / 0x474 | the first row of the `FreeStat*` tables (`shineparam.scp_param`, Z12) | FUN_0055a390 / FUN_0055a3d0 / FUN_0055a410 | rule-of-engagement hit / damage / block, NotifyParameterChange, `sp_MaxHP` |
+| `so_MiscTable` FUN_00555190 | 0x984 | `&so_MiscTableDef` | servant FUN_005572e0 | `ShineMobileObject::so_Dispel` |
+| `so_fullbufferitem_box(buf, inform, n, bag)` FUN_0063fd90 | 0x524 | 0 bytes written | FUN_00559a70 | guild / academy storage `…StoreItem`, `smh_SendFurnitureInfo` (Z13 §2.2) |
+
+### 5.6 `ShineObject` defaults of mobile, mob, NPC and effect slots
+
+| Default | Slot | Body | Override | Callers |
+|---|---|---|---|---|
+| `so_Chat(…)` FUN_00458c40 | 0x530 (O, Di, Ef, Mf, Mh, Af) | empty | `ShineMobileObject::so_Chat` FUN_00458c90 | chat request, `MobChat::*` |
+| `so_Bash(…)` FUN_0042ae90 | 0x598 (non-mobiles) | `*dmg = 0`, return 0 | MO FUN_0042e950, P FUN_0042efb0 | none: the whole slot is dead (Z09 §7.8) |
+| `so_SkillEnchant(…)` FUN_0042adb0 | 0x5a0 (non-mobiles) | false | MO FUN_00431ca0 (Z03) | `smo_SkillBlast`, `smo_old_skill_blast` |
+| `so_smo_RangeEvation` FUN_004a6330 | 0xa68 (non-mobiles) | 0 | §5.4 | §5.4 |
+| `so_CharacterClass` FUN_00554f20 | 0x49c (non-mobiles) | `&charclassmanager.ccm_classdefault` | MO FUN_00555590 | 32 |
+| `so_mobile_AbstateList` FUN_00554f40 | 0x52c (non-mobiles) | `&so_defabstatelist` | MO FUN_005555b0 | 72 |
+| `so_Getabstatebit` FUN_00555060 | 0x4a0 (non-mobiles) | `&so_defabstatebit` | §5.4, player, mob, bandit, pet, mover | 10 |
+| `so_parameter` FUN_005550c0 | 0x430 (non-mobiles) | `&so_defaultparam` | MO FUN_00555720 | 66 |
+| `so_mobile_GetHPChangeOrder` FUN_00555130 | 0x7e8 (non-mobiles) | 0xFF | §5.4 | §5.4 |
+| `so_ObjectType` FUN_00554fb0 | 0x4d0 (O, MO) | 0xFF | every concrete class (Z01 §2): bandit FUN_00556eb0 = 8, NPC FUN_00557c00 = 4 | 202 |
+| `so_DefaultCoord` FUN_0054a0f0 | 0xc (all but Af) | `&so_TempLocation` | axial flag FUN_0054a100 (Z09 §12) | many (slot 0xc is shared with other class families; not separated) |
+| `so_mob_GetMonEXP` FUN_004aa2a0 | 0xb9c (non-mob) | 0 | mob family FUN_004aa2f0 (Z09 §5) | `ExperienceDistribute::lid_Call` |
+| `so_mob_SetMobResist` FUN_004aa350 | 0xba0 | empty | FUN_004a9d00 | `cSetNPCResist` (Lua, part 8) |
+| `so_mob_SetIsPlayerSide(v)` FUN_004aa750 | 0xbac | empty | FUN_004aa7a0 | none: dead |
+| `so_mob_CanGathered(p, &picker)` FUN_0046a490 | 0x720 (non-mob) | 0x0B02 (not a gathering object) | FUN_0046af50 (Z02 §8) | `sp_NC_ACT_GATHERSTART_REQ` → 0x202E err 0x0B02 |
+| `so_mob_SelectWeapon(t, n)` FUN_004a9d40 | 0x73c | −1 | FUN_004ab720 (Z09) | `MobActionTargetting` / `MobActionAttack::mab_Think` |
+| `so_mob_SightCenter(i, xy)` FUN_004abcc0 | 0x8f4 | own location | FUN_004abcd0 (Z09) | `MobTargetSelector` / `MobTargetAggresive::mts_SelectTarget` |
+| `so_mob_FindLooter(&out)` FUN_0055e7f0 | 0xe4c | an empty `ShineMultiTypeHandle` | FUN_0055e810 (Z09) | `cDropItem` (Lua) |
+| `so_mob_Regenerate(…)` FUN_004b0e30 | 0x6e0 | `FM_MAPNOTEXIST` 1 | mob / bandit / pet FUN_004b41b0, servant FUN_004b4780, NPC FUN_004b4bc0 (Z09) | 16 (breeders, NPC manager, summons, scripts) |
+| `so_effect_EffectBlast(…)` FUN_004b0e10 (handle form) | 0x6e4 | `FM_MAPNOTEXIST` | effect FUN_004b1540 (Z09 §13.2) | `cEffectRegen_Object` |
+| `so_effect_EffectBlast(…)` FUN_004b0e20 (coordinate form) | 0x6e8 and 0x6dc | `FM_MAPNOTEXIST` | effect FUN_004b1770 / door `so_door_Build` FUN_0043f7b0 at 0x6dc | `cEffectRegen_XY`, `ShineEffectLocate::sa_Step` / door build (`&doorbuild`, scripts) |
+| `so_npc_FromTable` FUN_004b1970 | 0xa80 | empty | `ShineNPC::so_npc_FromTable` FUN_004b19b0: `sn_FromTable` (+0x2568) = 1 | `NPCManager::nm_SetNPC`, `nm_MarkingNPC`, `nm_DynamicRegenerateNPC` (part 8) |
+| `smo_LightningWaveSkill(…)` FUN_00579690 | 0xbf4 (non-mobiles) and 0xb4c (all but N) | empty | MO FUN_005796a0 (Z25) at 0xbf4; `ShineNPC::so_npc_SetLocation` FUN_00557cc0 at 0xb4c | 0xbf4: `so_Routine`, skill-target scans; 0xb4c: `nm_MarkingNPC` |
+
+`ShineNPC::so_mobile_BattleCamp` FUN_00557b90 (vt 0x8cc): `sm_MobDataBox.data.IsPlayerSide` (MobInfo +0x67) ≠ 0 →
+`BC_CHAR` 2, else `BC_NPC` 3 (`BattleCamp`: `BC_NONE` 0, `BC_MOB` 1, `BC_CHAR` 2, `BC_NPC` 3). The generic enemy test (§5.4)
+therefore never takes an NPC: camp 3 answers false, and type 4 is not in its type set either. Mobs and bandits use FUN_00556460, the servant
+FUN_00556f70 (Z09 §13.3), the mover FUN_0055e9c0 (Z13 §8.1), doors and the non-mobiles the `0` fold FUN_00570b00 (`BC_NONE`), the player and pet the `return 2` fold FUN_00647230.
+
+### 5.7 Folded bodies in the object vtables
+
+These shared bodies carry a PDB name from an unrelated class (identical-code folding, `docs/knowledge/X02.md`). They fill the
+slots that a class does not implement. Read them by body, not by name:
+
+| Body | PDB name | Behaviour | Used in the object vtables at (examples) |
+|---|---|---|---|
+| FUN_00417480 | `ShineObject::so_Gamble_ChangeCoin` | empty | non-mobile 0x7c4, 0xadc, 0x588; also the empty member destructors |
+| FUN_00549070 | `ShineObject::so_ply_CollectCardOpen` | empty, one argument | non-player 0x784; non-mobile 0x34, 0x650, 0x658, 0x7b8, 0x8d4, 0x9d8 |
+| FUN_00615e70 | `CGambleObject::go_Init_MaxPlayer` | false, one argument | non-mobile 0x72c, 0x7e4, 0x3e4; 0xe60 of the non-mobiles, `ShineMobileObject` and the door |
+| FUN_00570b00 | `CGambleObject::GDTSO_GetGameStatus` | 0 | non-mobile 0x7b0, 0x7b4, 0xe90, 0x9dc; 0x8cc of the non-mobiles, `ShineMobileObject` and the door; 0x9b0 everywhere but the servant |
+| FUN_00509900 | `CGambleObject::go_SMC_WinRank` | empty, two arguments | non-mobile 0xe7c, 0xe80, 0xbb8 |
+| FUN_004b8d20 | `SlotMachineScreen::go_IsFullCheck` | false | non-mobile 0x28, 0x7c0, 0x9e8; axial flag 0x4d0 (type 0) |
+| FUN_00647230 | `SlotMachineCluster::go_Get_GambleType` | 2 | player and pet 0x8cc (camp `BC_CHAR`) |
+| FUN_00401a80 | `ShineObject::so_smo_GetRandomTarget_Object` | null | non-mobile 0x584 |
+| FUN_005551a0 | `ShineObject::so_getDetectRange` | 1000 | non-mobile 0xa60 |
+| FUN_00408d30 | `ShineObject::so_smo_CanEnchant` | false | non-mobile 0xa6c |
+| FUN_005af8d0 / FUN_00556ff0 | `so_Gamble_IsGambleHouse` / `so_MoverSystem_GetMoverSlot` | 1 / 10 | drop item 0x4d0 (type 1) / servant 0x4d0 (type 10) |
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1049,6 +1329,7 @@ destructors are the empty fold FUN_00417480.
 | Z31-B4 | `ItemAttrCls_SkillScroll` / `WeaponTitlaLicence` / `GBCoin` `iac_fill2buffer` FUN_0063e970 §3.5 | advances the buffer by the 1-byte attribute without writing it (the reader skips it) | one stale send-buffer byte per such item in every item record (0x1047, 0x3001, DB requests); the client ignores it | write a 0 byte (same as D07-B14 on the Character server) |
 | Z31-B5 | `so_ply_ChangeBriefInfo` (vt 0x608) §4.2 | passes the addresses of two uninitialised locals as the weapon-title out values; only the weapon class writes them, but `SetCurrentTitle(10, …)` runs for every item whenever the weapon title is current | after an equip / unequip of a non-weapon item the current weapon title gets stack garbage as level / mob (same as Z18-B9 in the twin `so_ply_EquipmentChange`) | update the title only when the item is a weapon, or initialise the locals |
 | Z31-B6 | `sp_SendSellItemInfo_World` §4.2 | builds 0x4037 without writing `nWorldHandle` / `nCharNo`; the bytes come from the 0x4036 packet that `sp_SaveUseItemMinimonInfo_World` left in the shared send buffer | none in 2016 (the 0x4036 builder always runs just before and writes the same two fields); breaks if the save order changes | write the 6-byte header in the 0x4037 builder |
+| Z31-B7 | `ShineMobileObject::so_Getabstatebit` FUN_005556a0 (vt 0x4a0, kept by `ShineDoor`) §5.4 | returns one static bit array (`AS::tempbit`) for every door | an abstate bit set on one door (`so_AbnormalState_BitSet`, `asl_Store`) would show in every door's bits; no 2016 path that puts an abstate on a door was found *(inferred)* | a per-object bit array, as the other classes have (the pet's twin is Z13-B43) |
 
 ## Not reconstructed / uncertain
 
@@ -1067,6 +1348,12 @@ destructors are the empty fold FUN_00417480.
 - §4.4: the 300 / 400 per-mille split of `smo_ply_NormalAttackFactor` is read from the code; that it splits a
   Trickster multi-hit is inferred from `sp_MultiHitNotIndex`.
 - §4.5: which `RemoveWhen` path `som_FreeObject` takes for REMOVE_LOGOUT on a socket cut is Z16 §4.4 / Z01 §8.3; not re-read.
+- §5.1: that the object pools are never deleted (so the deleting destructors never run) is inferred from the missing
+  `+ 4))(` calls on objects; a shutdown path freeing them was not searched.
+- §5.4 / §5.7: Z31-B7 (shared door bit array) is reachable only if a door can receive an abstate; the door's
+  `so_AbnormalState_Set` path was not traced.
+- §5.5 / §5.6: slots below 0x100 (0xc `so_DefaultCoord`, 0x2c, 0x34) share their offsets with other class families, so
+  their caller counts include non-object calls.
 - §4.10: callers of the low slots 0x18 (`so_ply_HideMyIdentity`) and 0x30 (`so_ply_TreasureChestLocationManager`)
   were not separated from the other object types' calls of the same slots.
 
@@ -1087,4 +1374,7 @@ Filled in by the sweep part; rows found so far:
 | `CSellItemManager` (the sell list itself, `simg_FillBuffer_Server` FUN_0050e4d0 and the insert / delete) | Z18, this item part 8 (`CSellItemManager`) | §4.2 documents the two player-side senders and `simg_FillBuffer_Client` |
 | `DuplicatedMenuControl::dmc_Table` contents (7 × 7 menu exclusion table) | this item, part 8 (`DuplicatedMenuControl`) | §4.8 documents the test; the table's initializer is in the part-8 bucket |
 | `ShineMiniHouse::so_mh_*` dice game, `CGambleDiceTaiSaiObject` | Z06 §3 (done), Z32 | §4.6 documents only the player-side state accessors they call |
+| `GuildTournamentSystem::CaptureFlag` FUN_0047eae0 (caller of `ShineDynamicCast<ShineNPC>`) | this item, part 8 (`Guild*`) | §5.2 documents the cast |
+| `List<ShineObject>::l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` (callers of `ShineObject::operator=`) | this item, part 9 (library templates) | §5.1 documents the copy |
+| per-class overrides of the object slots (mob, NPC, bandit, servant, door, effect, drop item, flag, pet, mover, mini-house) | Z09 §5 / §11-§13, Z13 §1.8 / §6.2 / §8.1 (done) | §5 documents only the base-class bodies and links the overrides |
 | auto-arrange sort and step scheduling (`so_ply_ArrangeInven` FUN_00563500) | this item, part 10 (§11, Z04 open point) | §4.9 documents the grade rank and the login init |
