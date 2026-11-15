@@ -17,10 +17,11 @@ valid for everything else (procedures, logs, cen codes). Evidence markers: *(pdb
 ### 1.1 Item records of the academy reward storage
 
 ```pseudo
-AcademyStorage_List(nGuildNo, out list, out size) → 1 ok, 0 failed (Ghidra shows it as void)   @ FUN_00403400 (D03 §5.3)
+AcademyStorage_List(nGuildNo, out list, out size) → ≠ 0 ok, 0 failed (Ghidra shows it as void)   @ FUN_00403400 (D03 §5.3)
     ItemList_AcademyStorage(nGuildNo) = ItemList_ByStorage(owner = nGuildNo, storage type 0, max 100)  @ FUN_0046a3f0
         # box 0 = guild-academy reward storage (Z04 knowledge); only the first 100 rows are read
-        ItemList_ByStorage(owner, type ≤ 16 else 0, max, out n, out rows[0x28 each])                  @ FUN_00469f70
+        ItemList_ByStorage(owner, type, max, out n, out rows[0x28 each])                             @ FUN_00469f70
+            type > 16 → return 0 (no query)
             p_Item_GetListType(owner, type)   @ FUN_004615e0   # (db-backup) SELECT nItemKey, nStorage, nItemID, nFlags, dDate
                 FROM tItem WITH(READUNCOMMITTED) WHERE nOwner = @nCharNo AND nStorageType = @nStorageType   (no ORDER BY)
             row = { u64 nItemKey @0, u16 nStorage (slot) @8, u8 storage type @0xA (= the argument), u32 nItemID @0xC,
@@ -31,7 +32,8 @@ AcademyStorage_List(nGuildNo, out list, out size) → 1 ok, 0 failed (Ghidra sho
                    attr @0xD (class-sized wire form, written by the class's Write slot) }
         per row: CGameDB_Item_GetItemOptions(key) (D03 §1.3) fills the full attribute, then ItemStruct_Write  @ FUN_0044d300
         packs {key, itemId, attr} with the class object's vtable slot 1 (+4); a failed option load makes the whole list
-        fail (returns 0, size not set); returns 1 after the last row. A failed row fetch also returns 0
+        fail (returns 0, size not set); after the last row it returns whatever is left in eax (non-zero: a size / pointer
+        difference; the caller only tests ≠ 0) *(inferred from the disassembly)*. A failed row fetch also returns 0
 ```
 
 ```pseudo
@@ -59,7 +61,8 @@ ItemAttr_MakeWithLot(itemId, lot, out attr[0x65]) → 0 when attr is null or the
     by Class:  BYTELOT 0, FEED 22, UPSOURCE 14, UPRED 19, UPBLUE 20, UPGOLD 25, NOEFFECT 33, ENCHANT 34 → u8 attr[0] = lot
                WORDLOT 1, QUESTITEM 3, KQSTEP 21, ACTIVESKILL 35                         → u16 attr[0] = lot
                DWRDLOT 2, AMOUNT 24                                                      → u32 attr[0] = lot
-               RECALLSCROLL 12                                                           → u8 attr[0] = 1 (lot ignored)
+               RECALLSCROLL 12                                                           → u8 attr[0] = 1 (lot ignored,
+                   although ItemLotAfterUse treats class 12 as a u8 lot class: (original bug) D07-B15)
                every other class                                                         → all zero (lot ignored)
 ```
 
@@ -126,7 +129,7 @@ item kind out of the academy reward storage (box 0). The member's item goes into
         u8 NumOfItemOption = number of option rows, GUILD_ACADEMY_REWARD_ITEM_OPTION ItemOption[1] {u32 nOptionType, u64 nOptionData}
         = the first option row }
     u64 nSubAcademyMoney @0x2C             cen paid (taken from the academy)
-    u64 nStorageMoney @0x34                academy money after the payment (0 when no cen is configured, D07-B4)
+    u64 nStorageMoney @0x34                academy money after the payment (0 when no cen is configured: (original bug) D07-B4)
     u8  nModifyItemCnt @0x3C
     EACH_MODIFY_ITEM ModifyItem[n] @0x3D { u8 nStatus (0 whole stack taken, 1 part of the stack taken), u16 nItemID,
         ITEM_INVEN nLocation (the stack's cell in box 0), u32 nLot (amount taken) }
@@ -194,11 +197,14 @@ and at most one cen row. An item reward is therefore "item X with lot N" (RIO_LO
                 3 RIO_LOT:     stackable = ItemLotAfterUse(item, s.attr, out stackLot); match only when stackable
                 4 RIO_UPGRADE: Class WEAPON 5 / ARMOR 6 / SHIELD 7 / BOOT 8 → upgrade = attr[0]; BRACELET 38 → upgrade = attr[8]
                                (ShineItemAttr_Weapon / Armor / Bracelet .upgrade, pdb2017); match when (u64) upgrade == data;
-                               any other class (AMULET included) never matches
+                               any other class never matches; AMULET 4 too, although ShineItemAttr_Amulet has upgrade @8
+                               like Bracelet: the jump table at 0x41eca8 has no case 4 (original bug) D07-B16
                 other:         no match
             no match → next record
             ModifyItem[m] = { nItemID = item, nLocation = r.cell }; keys[m] = s.key
-                # keys[] holds 72 entries; the 73rd overwrites the list's count byte (original bug) D07-B9
+                # keys[] holds 72 entries; the 73rd match (index 72) lands in ebp−0x1ca20…−0x1ca19, which nothing reads;
+                # the 74th (index 73) writes its bytes 5–7 over the list header ebp−0x1ca13…−0x1ca11, byte 7 = the
+                # count byte that bounds the loop (original bug) D07-B9
             if stackable:
                 if wantLot ≥ stackLot: ModifyItem[m] = {nStatus 0, nLot = stackLot}; wantLot −= stackLot
                 else:                  ModifyItem[m] = {nStatus 1, nLot = wantLot};  wantLot = 0
@@ -279,8 +285,13 @@ answer:
         failure → log "… - 미지급 보상 아이템 정보 전송 에러" ("error sending the unpaid reward item info")
 ```
 
-Every error path sends the pre-filled 0x986C with only Error changed (and whatever the earlier steps already wrote), then
-ends without 0x9882. Error codes: 0x18A0 success, 0x188D reward read failed, 0x18A1 reward setup / academy money / storage list /
+Every error path sends the pre-filled 0x986C with Error changed and whatever the earlier steps already wrote, at the
+pre-set size 0x3D (only the success path sets 0x3D + 9·m, 0x41eb26): an error after the match loop (withdraw 0xF98–0xF9E,
+single move 0x18A1, split / create 0x44A / 0x44B / 0x44D) therefore sends nModifyItemCnt = m (written in the loop, 0x41e4db)
+with no ModifyItem entries in the packet (original bug) D07-B18; harmless, since the zone ignores codes other than 0x18A0.
+Error paths end without 0x9882, except D07-B1: after a failed `usp_GuildAcademy_getMoney` the handler goes on, and its final
+answer (still Error 0x18A1) is followed by 0x9882 when that send succeeds and nWantMoney or nWantItemCnt ≠ 0 (the condition
+does not test Error). Error codes: 0x18A0 success, 0x188D reward read failed, 0x18A1 reward setup / academy money / storage list /
 ItemInfo / single move failed, 0xF98–0xF9E cen withdraw failed, 0x44A / 0x44B / 0x44D split or create failed. None of them is in
 the client error table: the zone handler (Z14 §4.3 `so_ply_GuildAcademyRewardStorageRewardZoneRng` @ FUN_0046e750) treats every
 code other than 0x18A0 as "receive error" and does nothing. On 0x18A0 the zone adds nSubAcademyMoney to the member's money,
@@ -324,7 +335,7 @@ from `GuildTournamentReward.shn` rows of the reward rank (W03 §8.5); the record
 | Off | Type | Name *(pdb2017; = GuildTournamentReward.shn column)* | ID_ITEM (0) | ID_GUILD_FAME…ID_GUILD_TOKEN (1–4) | ID_GUILD_MONEY_DIVISION (5) |
 |---|---|---|---|---|---|
 | 0x00 | u8 | RewardType (`GT_REWARD_TYPE`) | 0 | type | 5 |
-| 0x01 | u32 | Value1 | item id: low 16 bits for ItemInfo, MakeItemKeyEx and the attribute; the full u32 goes to `p_Item_Create`'s nItemID (D07-B13) | amount added | share in ‰ (clamped to ≤ 1000 and written back into the request) |
+| 0x01 | u32 | Value1 | item id: low 16 bits for ItemInfo, MakeItemKeyEx and the attribute; the full u32 goes to `p_Item_Create`'s nItemID ((original bug) D07-B13) | amount added | share in ‰ (clamped to ≤ 1000 and written back into the request) |
 | 0x05 | u32 | Value2 | lot for the lot classes (§3.2) | unused | minimum share (0 = none) |
 | 0x09 | u32 | Value3 | WEAPON upgrade level (attr[0], u8) | unused | maximum share (0 = none) |
 | 0x0D | u32 | IO_Str | random option `IOT_STR` 1 | unused | unused |
@@ -352,11 +363,12 @@ GTReward_MakeItemAttr(opt, out attr[0x65]) → 0 when attr is null or ItemInfo r
     WORDLOT 1, ACTIVESKILL 35:                   u16 attr[0] = Value2
     DWRDLOT 2, AMOUNT 24:                        u32 attr[0] = Value2
     QUESTITEM 3, KQSTEP 21:                      u16 attr[0] = 1
-    RECALLSCROLL 12, UPSOURCE 14, UPRED 19, UPBLUE 20, UPGOLD 25: u8 attr[0] = 1   (Value2 ignored, D07-B12)
-    AMULET 4:          RandomOpts(0x25)          (ShineItemAttr_Amulet.option; upgrade @8 stays 0)
+    RECALLSCROLL 12, UPSOURCE 14, UPRED 19, UPBLUE 20, UPGOLD 25: u8 attr[0] = 1   (Value2 ignored: (original bug) D07-B12)
+    AMULET 4:          RandomOpts(0x25)          (ShineItemAttr_Amulet.option; upgrade @8 stays 0: (original bug) D07-B17)
     WEAPON 5:          mob-kill slots: u16 attr[7] = attr[0xD] = attr[0x13] = 0xFFFF (mobkills[3].mob), u16 attr[0x19] = 0xFFFF
                        (CharacterTitleMobID); u8 attr[0] = Value3 (upgrade); RandomOpts(0x40) (ShineItemAttr_Weapon.option)
-    ARMOR 6, SHIELD 7, BOOT 8, BRACELET 38: RandomOpts(0xC)   (ShineItemAttr_Armor / Bracelet .option; no upgrade from Value3)
+    ARMOR 6, SHIELD 7, BOOT 8, BRACELET 38: RandomOpts(0xC)   (ShineItemAttr_Armor / Bracelet .option; Value3 is not applied as
+                       their upgrade although Armor @0 / Bracelet @8 have one: (original bug) D07-B17)
     DECORATION 10, HOUSESKIN 18: u32 attr[0] = 0 (deletetime; already zero)
     RIDING 23:         u16 hungrypoint = 100; deletetime @2 = 0; bitflag @6 &= 0x8000 (already 0); u32 nHP @0xC = 0
     CAPSULE 29:        u32 useabletime @8 = 0
@@ -369,13 +381,13 @@ Class names are `ItemClassEnum` and the struct offsets are `ShineItemAttr_<class
 table (option base of amulet 0x25, weapon 0x40, armor / shield / boot / bracelet 0xC). `ItemAttr_Save` then writes the
 attribute as option rows (D03 §1.3). For the 0x74AA caller, the item goes into the guild storage (box 4) at the next free slot
 of 0…35 (D04 §6.4). The two attribute builders disagree for UPSOURCE / UPRED / UPBLUE / UPGOLD / QUESTITEM / KQSTEP (this one
-forces lot 1, ItemAttr_MakeWithLot uses the lot).
+forces lot 1, ItemAttr_MakeWithLot uses the lot); for RECALLSCROLL both force 1, which on the 0x986B side loses lot (D07-B15).
 
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
-| D07-B1 | 0x986B | when `usp_GuildAcademy_getMoney` fails, the 0x18A1 answer is sent and the handler goes on if that send succeeded, with the academy money unset (stack) | cen may be withdrawn (amount from uninitialised money) and items moved; a second 0x986C, still Error 0x18A1, follows; the zone ignores both | end after the error answer |
+| D07-B1 | 0x986B | when `usp_GuildAcademy_getMoney` fails, the 0x18A1 answer is sent and the handler goes on if that send succeeded, with the academy money unset (stack) | cen may be withdrawn (amount from uninitialised money) and items moved; a second 0x986C, still Error 0x18A1, follows, and then possibly 0x9882 to the WM (its condition does not test Error); the zone ignores both answers | end after the error answer |
 | D07-B2 | 0x986B | the cen is withdrawn before the items move, and no later failure (single move 0x18A1, split 0x44A/0x44B/0x44D, create 0x44B) undoes the withdraw or the stacks already deleted | the DB has moved the cen to the character and lost the stacks, but the zone ignores the error answer: the member's in-memory money lacks the cen *(inferred: lost when the zone next saves the character)* and the storage views are stale | one transaction, or items first and money last |
 | D07-B3 | 0x986B | `Item_DropAll`'s result is ignored in the merge path | a whole stack that is not deleted (other owner, DB error) still counts in the merged new item: its lot exists twice | check it and fail with an item code |
 | D07-B4 | 0x986B | nStorageMoney is only written when a cen reward is configured; item-only rewards answer 0 | the zone sets the academy storage cen to 0 and relays it in 0x9885 to every zone | read the academy money for every reward |
@@ -383,12 +395,17 @@ forces lot 1, ItemAttr_MakeWithLot uses the lot).
 | D07-B6 | 0x986B | WantItem.ItemOption[0] is copied from a local that is only written by an option row | 12 bytes of uninitialised stack in 0x986C when no item is configured (unused by the zone) | zero it |
 | D07-B7 | 0x986B | the option list has room for one entry, rows are appended without a bound, and only option 0 is matched; row order comes from a SELECT without ORDER BY | extra option rows (only possible with hand-made DB rows: 0x983F stores one) overwrite the not yet constructed 0x9882 buffer and are ignored when matching | bound the list and match all options |
 | D07-B8 | 0x986B | RIO_ITEM never sets the stackable flag: the first matching stack is taken whole but reported with nLot 1 | the member receives the whole stack; the zone's apply for nStatus 0 needs cell lot == nLot, so it stops and keeps the stack in its storage view | take one unit (split) or report the stack's lot |
-| D07-B9 | 0x986B | the key list of matched stacks holds 72 entries, the match loop is bounded only by the (≤ 100) records | the 73rd matched stack writes its key's top byte over the storage list's count byte, which bounds the loop | 100 entries |
-| D07-B10 | 0x986B | the merged lot fullLot − wantLot is checked neither against ItemInfo.MaxLot nor against 0 | a RIO_LOT larger than MaxLot creates an over-full stack; RIO_LOT 0 splits 0 off the first stack and creates a lot-0 item | validate the configured lot |
+| D07-B9 | 0x986B | the key list of matched stacks holds 72 entries, the match loop is bounded only by the (≤ 100) records | the 73rd matched stack lands in an unused gap; the 74th writes its key's bytes 5–7 over the storage list header, byte 7 being the count byte that bounds the loop | 100 entries |
+| D07-B10 | 0x986B | the merged lot fullLot − wantLot is checked neither against ItemInfo.MaxLot nor against 0 | a RIO_LOT larger than MaxLot creates an over-full stack; RIO_LOT 0 splits 0 off the first stack and creates a lot-0 item; for the u8 / u16 lot classes (ByteLot, Feed, UpSource …, WordLot …) ItemAttr_MakeWithLot stores only the low byte / word, so a merged lot > 255 (> 65535) is silently cut | validate the configured lot |
 | D07-B11 | 0x986B | the second ItemLot_Set of the split writes the taken lot into the record copy's item-id field (`ebp−0x1cd2c`) instead of an attribute | none (never read again) | dead code, or meant for a new-item attribute |
 | D07-B12 | 0x74AA | GTReward_MakeItemAttr gives lot 1 to RECALLSCROLL, UPSOURCE, UPRED, UPBLUE, UPGOLD, QUESTITEM and KQSTEP whatever Value2 says, although these classes have a lot | a reward row for gems etc. with Value2 > 1 yields one item (the shipped table has none) | use Value2 as for the other lot classes *(inferred; may be deliberate)* |
 | D07-B13 | 0x74AA | the item row gets the full u32 Value1 as nItemID while the key, ItemInfo lookup and attribute use its low 16 bits | an id ≥ 0x10000 would create a row whose item id differs from its attribute's class (the shipped table has none) | u16 throughout |
 | D07-B14 | attribute classes 11 / 16 / 28 (all item lists, 0x986B) | SkillScroll, WeaponTitlaLicence and GBCoin Write (FUN_0044da70) advance the output by one byte without writing it | one uninitialised buffer byte per such item in every item record list (D03 §1.4 lists to the zone, the 0x986B storage list); the matching Read ignores it | write the 1-byte attribute (or advance 0) |
+
+| D07-B15 | 0x986B | ItemLotAfterUse treats RECALLSCROLL (12) as a u8 lot class, so RIO_LOT matches and splits recall-scroll stacks, but ItemAttr_MakeWithLot always gives class 12 lot 1 | a merged recall-scroll reward deletes / reduces stacks worth L and creates one item of lot 1: L − 1 scrolls lost | store the lot as for the other u8 lot classes |
+| D07-B16 | 0x986B | the RIO_UPGRADE jump table (0x41eca8) has no case for AMULET (4), although its attribute has an upgrade @8 like Bracelet | an amulet reward with an upgrade level never matches a stored amulet; the whole amount is reported missing | read attr[8] for class 4 too |
+| D07-B17 | 0x74AA | GTReward_MakeItemAttr applies Value3 as the upgrade level only to WEAPON; ARMOR / SHIELD / BOOT / BRACELET / AMULET ignore it | a tournament reward row for an upgraded armour piece yields +0 (the shipped table has none) | apply Value3 to every upgradable class *(inferred; may be deliberate)* |
+| D07-B18 | 0x986B | error answers after the match loop keep the pre-set size 0x3D but carry nModifyItemCnt = m | packet says m entries, contains none (the zone ignores error answers) | reset nModifyItemCnt, or send the entries |
 
 ## 4. Not reconstructed / uncertain
 
@@ -400,8 +417,10 @@ forces lot 1, ItemAttr_MakeWithLot uses the lot).
   the object names, so neither key order nor slot order is guaranteed *(inferred)*. A rebuild should fix one (e.g. by slot).
 - The 2016 `usp_GuildAcademy_withdrawMoney` result codes 1–6 (0xF99–0xF9E) still have no known meaning (D04 §12, D06).
 - The 0x1FF preset in the first dword of the key list (§2.3) has no visible purpose; the first match overwrites it.
-- How the zone shows a reward-inventory item that the DB put there (box 2, lowest free slot, possibly beyond the zone's box
-  size) is Z04's reward-inventory loading; not traced here.
+- The zone reads the reward inventory (box 2) from the DB page by page: 0x302C NC_ITEM_REWARDINVENOPEN_REQ asks the Character
+  server for slots page·24 … page·24+23 (Z04 §8.3), so an item the DB puts at any slot (lowest free, no upper bound) is shown
+  when the client opens its page. Whether the client offers pages beyond some count (a slot the player can never page to) is
+  not checked here *(inferred: client UI limit unknown)*.
 
 ## 5. Coverage boundary
 
@@ -421,4 +440,5 @@ FUN_0041de10 in `strings.tsv` (0x004b2a08, 0x004b2b60, 0x004b2c38) and its Korea
 | `p_Item_GetStorageListType` FUN_00461660 / `ItemStorage_GetUsedSlots` FUN_0046a500 | D04 §6.4, §11 (done) | 0x74AA's free-slot count, documented there |
 | `SendToWorldManager`, `Session_SendPacket(To)`, `CSendPacket_*`, `DB_*`, `CheckAlive`, `Log` FUN_00447960 | D02 (done) | Character server framework |
 | FUN_0046f750 (empty function, 768 call sites) | none needed | compiled-out stub (returns at once); no behaviour |
+| reward-inventory paging 0x302C NC_ITEM_REWARDINVENOPEN_REQ FUN_004fc060 (how the member sees the moved / new item) | Z04 §8.3 (done) | the zone reloads box 2 by pages of 24 slots from the DB; §4 links it |
 | vtable slots of the attribute classes other than Write / Read / class (lot, bound, …) | Z04 knowledge (`IsLot`, `GetLot`, …), D03 §1.2 | 0x986B uses them only through `ItemLotAfterUse` / `ItemLot_Set` (D03 §1.2) |
