@@ -76,6 +76,17 @@ Basis: MSVC struct tm (9 × i32), used by W04 / D02 0x10EB / 0x10EC (P02 batch 2
 | 28 | i32 | tm_yday |  |
 | 32 | i32 | tm_isdst |  |
 
+### PROTO_SELL_ITEM_INFO_SERVER (122 bytes)
+
+Basis: 2016 Zone.pdb PROTO_SELL_ITEM_INFO_SERVER (size 0x7a, a maximum): first byte nDataSize = bytes that follow (P02 batch 2: capture:shop 0x4037 / 0x1130 elements of 22 bytes with nDataSize 21); named `datasize` so that pcap_decode.py reads it as a variable-length element
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | datasize | nDataSize (pdb2016): length of the rest of the element |
+| 1 | u16 | nHandle |  |
+| 3 | u64 | nSellItemKey | SHINE_ITEM_REGISTNUMBER; −1 in capture:shop |
+| 11 | bytes | ItemTotalInfo | ItemTotalInformation, nDataSize − 10 bytes (item id first: 3000, 3001 in capture:shop) |
+
 ## Client → server
 
 ### `0x080d` NC_MISC_GAMETIME_REQ
@@ -8666,10 +8677,10 @@ P02 batch 2 (§7.4): body = PROTO_NC_CHARSAVE_ITEMACTIONCOOLTIME_ACK (pdb2016); 
 | 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
 | 2 | u32 | nCharNo | evidence: capture:shop, capture:combat: 5 |
 | 6 | i32 | tTime | mktime(row column 3, a timestamp); evidence: capture:shop, capture:combat: 12:01:11 (shop) / 11:54:00 (combat) local, the same time as the 0x101A dKQDate: last save before the capture (inferred) |
-| 10 | u8 | nOption2 | row column 2; evidence: capture:shop, capture:combat: 0 |
-| 11 | u8 | nOption1 | row column 1; evidence: capture:shop, capture:combat: 1 |
-| 12 | u32 | nOption4 | row column 4; evidence: capture:shop, capture:combat: 0 |
-| 16 | u8 | bLoaded | always 1 |
+| 10 | u8 | nOption2 | row column 2; evidence: capture:shop, capture:combat: 0; = Z12's 0x10D3 `autopick` |
+| 11 | u8 | nOption1 | row column 1; evidence: capture:shop, capture:combat: 1; = Z12's `mystery_vault` |
+| 12 | u32 | nOption4 | row column 4; evidence: capture:shop, capture:combat: 0; = Z12's `nChatBan` |
+| 16 | u8 | bLoaded | always 1 from CharDB; = Z12's `bFirstJoin`: the WM also sets it to 1 when storing (fc_NC_CHAR_SINGLE_OPTION_CMD @ FUN_0040aad0) and to 0 after sending 0x10D3 (FUN_00428ba0) |
 
 P02 batch 2 (§7.4): the character load reuses opcode 0x10D2 (D02 annotates the 15-byte CharDB→Zone free-stat ack) for the 17-byte single-option block that the WM caches at +0x658 and sends to zones as 0x10D3. Field names are ours (the procedure's column names are not in the binary); with no row, +6..+15 stay 0 and bLoaded is still 1
 
@@ -11691,6 +11702,8 @@ size 4
 | 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
 | 6 | u16 | wldmanhandle | (pdb2017 name) |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `ref`: echoed; `wldmanhandle`: 35000 / 32500; last of 34–36 packets of one WM pass
+
 ### `0x101e` NC_CHAR_ZONE_CHARDATAFAIL_ACK (WM→Zone)
 
 **Verified layout** (basis: wm FUN_00428ba0)
@@ -11702,6 +11715,169 @@ size 4
 | 6 | u16 | err | 0x141 unknown handle, 0x590 name mismatch (pdb2017 name) |
 
 8 bytes in 2016; the 2017 struct (4 B) is {NETPACKETHEADER clienthandle, err}: 2017 replaced the 6-byte zone header with the 2-byte one
+
+### `0x101f` NC_CHAR_ZONE_BASE_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | Name5 | charid |  |
+| 30 | u8 | slotno |  |
+| 31 | u8 | Level | ≥151 → disconnect 0x689 |
+| 32 | u64 | Experience |  |
+| 40 | u16 | CurPwrStone |  |
+| 42 | u16 | CurGrdStone |  |
+| 44 | u16 | CurHPStone |  |
+| 46 | u16 | CurSPStone |  |
+| 48 | u32 | CurHP |  |
+| 52 | u32 | CurSP |  |
+| 56 | u32 | CurLP |  |
+| 60 | u32 | fame |  |
+| 64 | u64 | Cen |  |
+| 72 | Name3 | logininfo.currentmap |  |
+| 84 | u32 | currentcoord.x |  |
+| 88 | u32 | currentcoord.y |  |
+| 92 | u8 | currentcoord.dir |  |
+| 93 | CHARSTATDISTSTR | statdistribute | Str Con Dex Int Men RedistributePoint |
+| 99 | u8 | pkyellowtime |  |
+| 100 | u32 | pkcount |  |
+| 104 | u16 | prisonmin |  |
+| 106 | u8 | adminlevel |  |
+| 107 | u32 | flags |  |
+| 111 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1020` NC_CHAR_ZONE_SHAPE_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u8 | race:2 chrclass:5 gender:1 |  |
+| 7 | u8 | hairtype |  |
+| 8 | u8 | haircolor |  |
+| 9 | u8 | faceshape |  |
+| 10 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1021` NC_CHAR_ZONE_QUEST_DOING_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u8 | bNeedClear | 1 = empty the quest array first |
+| 11 | u8 | nNumOfDoingQuest |  |
+| 12 | PLAYER_QUEST_INFO[nNumOfDoingQuest] | QuestDoingArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1023` NC_CHAR_ZONE_ABSTATE_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u16 | number | < 792 |
+| 12 | ABSTATEREADBLOCK[number] | abstate | 0x24: u16 abstateid, u8 strength, u32 pasttime ms @3, u32 resttime ms @7, u16 restcount @0xb, SKILL_EMPOWER @0xd, u8 caster nLevel @0xf, i32 caster nAttackPower @0x10, {u16 Index,u16 Value}[4] setitem @0x14 |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1024` NC_CHAR_ZONE_SKILL_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | PARTMARK | PartMark | bIsStart:1 bIsEnd:1 nOrder:6 |
+| 11 | u16 | nMaxNum | total over all chunks |
+| 13 | u16 | number | < 3000 |
+| 15 | PROTO_SKILLREADBLOCK[number] | skill | 0x10: i32 savetime, u16 skillid @4, u32 cooltime s @6, u16 empow @0xa, u32 mastery @0xc |
+| 15 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1025` NC_CHAR_ZONE_PASSIVE_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u16 | number |  |
+| 8 | u16[number] | passive | ids < 1000 stored |
+| 8 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x102e` NC_CHAR_ZONE_ITEM_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u8 | PacketOrder | nPacketOrderNum:7, nIsLastOfInven:1 (bit 7: send the client copy) |
+| 7 | u8 | nPartMark | 4 inventory(9), 8 equipment(8), 0x10 mini-house(12), 0x20 action box(15) |
+| 8 | u8 | numofitem |  |
+| 9 | PROTO_ITEMPACKET_TOTAL[numofitem] | ItemArray | {u8 datasize, u16 location (Pos:10, Type:6), item data}; next at +1+datasize |
+| 9 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = next CharDB packet's first bytes while the blob is the CharDB 0x1017 copy (P02-B10); 4 = the first four bytes of the next zone packet on the same WM link once a zone 0x4013 save replaced it (P02-B11); evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1031` NC_CHAR_ZONE_CHARTITLE_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00428ba0 (ref + cached 0x1019 / 0x4016 blob = CHARACTER_TITLE_READBLOCK, pdb2016); zone reader @ FUN_005a39f0 (Z07 §1.3))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.clienthandle | NETPACKETZONEHEADER: the zone's player handle (echo of the 0x101C ref) |
+| 2 | u32 | ref.charregistnumber | NETPACKETZONEHEADER: charNo |
+| 6 | u8 | nFirstConnection | written 0 (u16 0 at +2, then +3 overwritten) |
+| 7 | u8 | CurrentTitle | row type 0, element 0 |
+| 8 | u8 | CurrentTitleElement | row type 0, element 1 |
+| 9 | u16 | CurrentTitleMobID | row type 0, element 2 |
+| 11 | u64[128] | TitleValues | rows with element 0xFF: value per title type (CHARACTER_TITLE_TYPE) |
+| 1035 | u16 | NumOfTitle | rows with element 0..3, title type < 0x80 |
+| 1037 | {u8,u8}[NumOfTitle] | TitleArray | CT_INFO { u8 type, u8 value << 6 | element } |
+| 1037 | bytes | overread | 2 bytes past the blob while it is the CharDB 0x1019 copy (P02-B10), 0 after a zone 0x4016 save; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.5): no annotation existed (the decoder had no layout). evidence: capture:shop, capture:combat: nFirstConnection 0 (CharDB) / 1 (zone save), NumOfTitle 0
+
+### `0x1032` NC_CHAR_ZONE_CHARGEDBUFF_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u16 | NumOfChargedBuff |  |
+| 8 | PROTO_CHARGEDBUFF_INFO[NumOfChargedBuff] | ChargedBuff | 0xe: u32 ChargedBuffKey, u16 ChargedBuffID, ShineDateTime UseTime, ShineDateTime EndTime (year:8 month:5 date:6 hour:6 minute:7) |
+| 8 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
 
 ### `0x104c` NC_CHAR_REGISTNUMBER_ACK (WM→Zone)
 
@@ -11715,6 +11891,157 @@ size 4
 | 10 | u32 | chrregnum | charNo; -1 = refused (pdb2017 name) |
 | 14 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 16 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `ref`: echoed; `usrregnum`: 103; `chrregnum`: 5; `loginreq`: echoed
+
+### `0x10cb` NC_CHAR_GET_CHAT_BLOCK_SPAMER_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00428ba0: SendCharData(0x10cb, session + 0x1ECE4 (W01 §6.3), 8), sent every time (inline 8 bytes, never null); PROTO_NC_CHAR_GET_CHAT_BLOCK_SPAMER_CMD (pdb2017 = pdb2016) after the ref; zone reader @ FUN_0044c9b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.clienthandle | NETPACKETZONEHEADER: the zone's player handle (echo of the 0x101C ref) |
+| 2 | u32 | ref.charregistnumber | NETPACKETZONEHEADER: charNo |
+| 6 | u32 | BlockTime | evidence: capture:shop, capture:combat: 0 |
+| 10 | u32 | DelayTime | evidence: capture:shop, capture:combat: 0 |
+
+P02 batch 2 (§7.5): the struct lacks the 6-byte ref
+
+### `0x10cd` NC_CHAR_ZONE_QUEST_READ_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u16 | nNumOfReadQuest |  |
+| 12 | u16[nNumOfReadQuest] | QuestReadIDArray |  |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10d0` NC_CHAR_ITEMACTIONCOOLTIME_ZONE_CMD (WM→Zone)
+
+**Verified layout** (basis: Z17.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | zone handle of the player |
+| 2 | u32 | header.charregistnumber | must equal the player's charNo |
+| 6 | u16 | num | records |
+| 8 | struct[num] | group | ActionCooltime, 10 bytes each (pdb2016) |
+| 8 | u16 | group[i].actionID | ItemAction id (key of ItemActions::_actions; cool-time entry +0x14) |
+| 10 | i64 | group[i].expiredTime | absolute _time64 end = now + rest seconds (rounded down) |
+| 10 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z17's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10d3` NC_CHAR_ZONE_SINGLE_OPTION_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER |
+| 2 | u32 | charregistnumber | NETPACKETZONEHEADER |
+| 6 | u32 | chrregnum | not read; lookup uses the header charNo |
+| 10 | i32 | resttime | time_t of the last GameDB save (dRestExpLastExecuteTime); rest-exp buff input |
+| 14 | u8 | autopick | → sp_MiscFlag.IsAutoPickUp + brief IsAutoPick |
+| 15 | u8 | mystery_vault | → sp_MysteryVaultUI (sent as 0x10D4 at login complete) |
+| 16 | u32 | nChatBan | → sp_Spammer_ChatBan (≠ 0: chat/shout/roar blocked) |
+| 20 | u8 | bFirstJoin | ≠ 0 (CharDB copy): apply RestExpAbstateApplication |
+| 21 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10d6` NC_CHAR_ZONE_QUEST_REPEAT_CMD (WM→Zone)
+
+**Verified layout** (basis: Z12.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
+| 2 | u32 | chrregnum | ref charNo |
+| 6 | u32 | chrregnum |  |
+| 10 | u16 | nNumOfRepeatQuest |  |
+| 12 | PLAYER_QUEST_INFO[nNumOfRepeatQuest] | QuestRepeatArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z12's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10dd` NC_CHAR_ZONE_COININFO_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00428ba0 (ref + cached 0x10DC / 0x402C blob, PROTO_NC_CHAR_COININFO_CMD pdb2016 16 bytes); zone reader @ FUN_00617830 (Z07 §1.2))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.clienthandle | NETPACKETZONEHEADER: the zone's player handle (echo of the 0x101C ref) |
+| 2 | u32 | ref.charregistnumber | NETPACKETZONEHEADER: charNo |
+| 6 | u64 | nCoin | evidence: capture:shop, capture:combat: 0 |
+| 14 | u64 | nExchangedCoin | evidence: capture:shop, capture:combat: 0 |
+| 22 | bytes | overread | 2 bytes while the blob is the CharDB 0x10DC copy (P02-B10), 0 after a zone 0x402C save |
+
+P02 batch 2 (§7.5): the pdb2016 struct has no ref; decoded as ref + struct
+
+### `0x10e3` NC_CHAR_ZONE_CARDCOLLECT_CMD (WM→Zone)
+
+**Verified layout** (basis: Z28.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle | player object handle |
+| 2 | u32 | ref.charNo | must equal the player's charNo |
+| 6 | u32 | chrregnum | ignored |
+| 10 | u16 | number | trusted, no length check |
+| 12 | CardInform[number] | CardList | 11 bytes each: {i32 RegistTime, u32 SerialNumber, u16 CardID, u8 StarNumber} |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z28's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10e6` NC_CHAR_ZONE_CARDCOLLECT_BOOKMARK_CMD (WM→Zone)
+
+**Verified layout** (basis: Z28.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u32 | chrregnum | ignored |
+| 10 | u16 | number | trusted |
+| 12 | CardBookmarkInfo[number] | ViewList | 4 bytes each: {u16 Slot, u16 CardID} |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z28's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x10e9` NC_CHAR_ZONE_CARDCOLLECT_REWARD_CMD (WM→Zone)
+
+**Verified layout** (basis: Z28.json layout (zone reader) + the WM tail: wm CParserZone::fc_NC_CHAR_ZONE_CHARDATA_REQ @ FUN_00428ba0 → SendCharData @ FUN_00428ac0 sends ref + the whole cached blob; CharDB-fed blobs are stored by CWMClientSession::CharDataStore @ FUN_00430780 with size = len − 2 (len counts the opcode) from payload + 2)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u32 | chrregnum | ignored |
+| 10 | u16 | number | trusted |
+| 12 | u16[number] | RewardID | CollectCardReward.CC_RewardID values already taken |
+| 12 | bytes | overread | 0 to 4 bytes past the stored blob (original bug): 2 = the first two bytes of the next CharDB packet when the blob is still the CharDB copy (P02-B10), 0 once a zone save replaced it; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (capture-validation §7.5): Z28's layout with a trailing `bytes` field, so that both the over-read and the exact form decode; fields unchanged
+
+### `0x1130` NC_CHAR_SELL_ITEM_INFO_ZONE_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00428ba0: ref + the blob of zone 0x4037 (CParserZone::fc_NC_CHARSAVE_SELL_ITEM_INFO_CMD @ FUN_0042d080 stores payload+6, len − 8 bytes: exact), sent once then freed; zone reader @ FUN_005a5e80 (Z07 §1.2))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.clienthandle | NETPACKETZONEHEADER: the zone's player handle (echo of the 0x101C ref) |
+| 2 | u32 | ref.charregistnumber | NETPACKETZONEHEADER: charNo |
+| 6 | u8 | NumOfSellItem | evidence: capture:shop 2 (the items sold before the map change) |
+| 7 | PROTO_SELL_ITEM_INFO_SERVER[NumOfSellItem] | SellItemList | variable: 1 + nDataSize bytes each; evidence: capture:shop items 3000, 3001 |
+
+P02 batch 2 (§7.5): the struct lacks the 6-byte ref; elements are variable length (P02 struct PROTO_SELL_ITEM_INFO_SERVER)
 
 ### `0x441c` NC_QUEST_RESET_TIME_CMD (WM→Zone)
 
@@ -11742,6 +12069,8 @@ size 4
 | 16 | i32 | tResetDayQuest |  |
 
 20 bytes, per character at map login
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5 (no ref); `tReset*`: 2026-01-01, 2026-11-01, Mon 2026-11-09, 2026-11-15 00:00 local: year / month / week / day start (W05 §2)
 
 ### `0x5833` NC_KQ_LINK_TO_FORCE_BY_BAN_CMD (WM→Zone)
 
@@ -11906,6 +12235,18 @@ broadcast to all zones
 | 6 | u16 | nError |  |
 | 8 | i32 | eLevelType |  |
 | 12 | Name3 | sMapName |  |
+
+### `0xbc01` NC_GAMBLE_ZONE_PREVMAPNAME_CMD (WM→Zone)
+
+**Verified layout** (basis: wm FUN_00428ba0: if prevMap != "": SendCharData(0xbc01, prevMap, 12); prevMap = ""; zone reader @ FUN_00617750 (Z06))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.clienthandle | NETPACKETZONEHEADER: the zone's player handle (echo of the 0x101C ref) |
+| 2 | u32 | ref.charregistnumber | NETPACKETZONEHEADER: charNo |
+| 6 | char[12] | sPrevMapName | Name3; the map of the previous zone (zone 0xBC1D), sent only when not empty, then cleared; evidence: capture:shop RouN, capture:combat RouN, RouCos02 |
+
+P02 batch 2 (§7.5): the struct lacks the 6-byte ref
 
 ### `0xbc09` NC_GAMBLE_EXCHANGEDCOIN_INIT_CMD (WM→Zone)
 
@@ -12308,6 +12649,8 @@ then Pre u32 nPartySeqCharNo[5], Post {u16, u8, u8, u32[5]}; 0x32 bytes; 6 bytes
 | 6 | u16 | wldmanhandle | WM client handle (pdb2017 name) |
 | 8 | char[20] | charid | Name5; must equal the cached name (pdb2017 name) |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `ref`: {zone handle, charNo 5}; `wldmanhandle`: 35000 / 32500; `charid`: Test2
+
 ### `0x104b` NC_CHAR_REGISTNUMBER_REQ (Zone→WM)
 
 **Verified layout** (basis: wm FUN_0042f1e0)
@@ -12318,6 +12661,8 @@ then Pre u32 nPartySeqCharNo[5], Post {u16, u8, u8, u32[5]}; 0x32 bytes; 6 bytes
 | 2 | u32 | netpacketzoneheader.charregistnumber | charNo or -1 (pdb2017 name) |
 | 6 | u16 | loginreq.wldmanhandle | (pdb2017 name) |
 | 8 | char[20] | loginreq.charid | Name5 (pdb2017 name) |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `ref`: {zone handle 8015 / 8004 / 8013 / 8003 / 8014, charregistnumber −1 (not yet known)}; `loginreq`: {WM handle 35000 / 32500, Test2}
 
 ### `0x207d` NC_ACT_SCRIPT_MSG_WORLD_CMD (Zone→WM)
 

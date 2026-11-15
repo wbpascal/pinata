@@ -76,6 +76,17 @@ Basis: MSVC struct tm (9 × i32), used by W04 / D02 0x10EB / 0x10EC (P02 batch 2
 | 28 | i32 | tm_yday |  |
 | 32 | i32 | tm_isdst |  |
 
+### PROTO_SELL_ITEM_INFO_SERVER (122 bytes)
+
+Basis: 2016 Zone.pdb PROTO_SELL_ITEM_INFO_SERVER (size 0x7a, a maximum): first byte nDataSize = bytes that follow (P02 batch 2: capture:shop 0x4037 / 0x1130 elements of 22 bytes with nDataSize 21); named `datasize` so that pcap_decode.py reads it as a variable-length element
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | datasize | nDataSize (pdb2016): length of the rest of the element |
+| 1 | u16 | nHandle |  |
+| 3 | u64 | nSellItemKey | SHINE_ITEM_REGISTNUMBER; −1 in capture:shop |
+| 11 | bytes | ItemTotalInfo | ItemTotalInformation, nDataSize − 10 bytes (item id first: 3000, 3001 in capture:shop) |
+
 ## Client → server
 
 ### `0x0812` NC_MISC_PINGTEST_CLIENT_ZONE_DB
@@ -12644,6 +12655,8 @@ Empty payload.
 | 16 | u16 | nIndex |  |
 | 18 | PLAYER_QUEST_DONE_INFO[n] | QuestDoneArray | {u16 ID, i64 tEndTime} (10 bytes) |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `chrregnum`: 5; `nTotalDoneQuest`: 0; `nTotalDoneQuestSize`: 12 (the 0x100B value); `nDoneQuestCount`: 0; `nIndex`: 0; rebuilt by QuestDoneLIstSendToZone @ FUN_004332f0: 12 bytes, the P02-B8 tail of 0x100B is not forwarded
+
 ### `0x1023` NC_CHAR_ZONE_ABSTATE_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_0044e0e0 / asl_Store FUN_0040afd0)
@@ -12691,6 +12704,8 @@ Empty payload.
 | 2 | u32 | chrregnum | ref charNo |
 | 6 | u32 | guildNo | → m_nMyGuildNo |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `guildNo`: 0
+
 ### `0x102e` NC_CHAR_ZONE_ITEM_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_0044ddf0)
@@ -12727,6 +12742,8 @@ Empty payload.
 | 7 | u16 | client.partyno | replaced by pm_FindParty |
 | 9 | u16 | client.nRaidNo |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `zone.bIsGM`: 0; `client.partyno`: 0xFFFF (no party, re-read from the WM party registry); `client.nRaidNo`: 0xFFFF
+
 ### `0x1032` NC_CHAR_ZONE_CHARGEDBUFF_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_0044bcf0 → FUN_0044e1e0)
@@ -12747,6 +12764,8 @@ Empty payload.
 | 0 | u16 | clienthandle | NETPACKETZONEHEADER ref |
 | 2 | u32 | chrregnum | ref charNo |
 | 6 | u32 | academyNo | → m_nMyGuildAcademyNo |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `academyNo`: 0 (the 0x1097 isGuildAcademyMember byte is not forwarded)
 
 ### `0x10b8` NC_CHAR_ZONE_LINK_FROM_CMD (WM→Z)
 
@@ -12864,6 +12883,8 @@ PROTO_NC_CHAR_CARDCOLLECT_REWARD_CMD after the ref; from Character 0x10E8
 | 0 | u16 | nSessionHandle | zone object handle |
 | 2 | u32 | nCharNo | must match the player |
 | 6 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot; slots failing MinimonAutoUseItem or with lot 0 are dropped |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nSessionHandle`: the zone handle; `nCharNo`: 5; `UseItemMinimonInfo`: all 0xFFFF (the 0x1121 values)
 
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→Z)
 
@@ -13165,6 +13186,8 @@ Z16 §6.4
 | 20 | u8 | nGrade | mover upgrade grade |
 | 21 | u32[10] | nPassenger | charNo per seat, −1 empty; only the linking player's own seat is filled |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `nItemSlot`: 3; `nMoverID`: 160; `nMasterCharNo`: 5; `nPassenger`: {5, −1 ×9}: byte-for-byte the old zone's 0xCC0B (combat 43.720 → 44.358 only)
+
 ### `0x0821` NC_MISC_TIMEFROMWORLD_CMD (WM→zone)
 
 **Verified layout** (basis: zone FUN_004511a0)
@@ -13172,6 +13195,8 @@ Z16 §6.4
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | bytes[36] | tm | struct tm |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `tm`: 36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms
 
 ### `0x0825` NC_MISC_WHSHANDLEREPAIR_CMD (WM→zone)
 
@@ -15193,7 +15218,19 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `LogoutType`: 0, 10.04 s after 0x1071
 
+### `0x1115` NC_CHAR_TUTORIAL_INFO_ZONE_CMD (WM→Z)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nSessionHandle`: zone handle; `nCharNo`: 5; `TutorialInfo`: {state 2, step 0} = 0x1114
+
+### `0x111f` NC_CHAR_ZONE_CHAT_COLOR_CMD (WM→Z)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nChatFontColorID`: 0; `nChatBalloonColorID`: 0
+
 ### `0x1c08` NC_BRIEFINFO_REGENMOB_CMD (S→C)
 
 **Captured** (P02, `capture-validation.md`; walk-run-portals): `mobid`: MobInfo ids (0, 1, 32, 178, 191, 2000, 10004 …); `mode`: 2; `nKQTeamType`: 2; `bRegenAni`: 0 for objects entering sight
+
+### `0xd412` NC_PET_LINK_RESUMMON_CMD (WM→Z)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5 (no ref); `bDoResummon`: 0; `nSummonSlot`: 0xFFFF; `nId / nRegNum`: −1 (= the zone 0x4033 values)
 
