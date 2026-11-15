@@ -296,6 +296,14 @@
   "\u2013"
  ],
  [
+  "Z28",
+  2,
+  "Zone: collection-card data tables and card roll (CollectCard*.shn `SHND::CommonData` loaders, `g_CardCollectMake`, album / bookmark loaders) (added by Z27)",
+  "Z07, Z09, Z27",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "D01",
   2,
   "Account and AccountLog servers",

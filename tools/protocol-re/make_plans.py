@@ -843,6 +843,28 @@ ITEMS = [
              "each, linking the items that read them). Bugs as `Z27-B<n>`; Coverage boundary as usual."],
       done="`idb_Load` and every reader / helper it calls are cited as `FUN_…` with pseudocode, every file it loads has a "
            "column → member map with its 2016 invariants, and every special item ID it sets is listed with its source."),
+ dict(id="Z28", phase=2, title="Zone: collection-card data tables and card roll (CollectCard*.shn `SHND::CommonData` "
+                               "loaders, `g_CardCollectMake`, album / bookmark loaders) (added by Z27)",
+      out="docs/pseudocode/zone/Z28-card-tables.md", deps=["Z07", "Z09", "Z27"], scope=[],
+      goal="Z07 §7 documents the card-collection packets but only names the six card tables; Z27 §2 documents the "
+           "`CollectCardMobGroup` loader only. Nobody documents how the other tables are loaded and indexed, nor the card "
+           "roll `g_CardCollectMake` that turns a dropped unidentified mob card into a card ID and star count. Document "
+           "them so a rebuild loads the original files unchanged and rolls cards with the same odds.",
+      steps=["Read Z07 §7 (card packets, `CollectCard` lookup FUN_00627e30, reward `ccr_Load` FUN_00629160), Z27 §2 "
+             "(`CommonData<CollectCardMobGroup>` ctor / `cd_Load` / `cd_Find` FUN_00629700 / 005b7b10 / 00627ed0), Z20 §2.1 "
+             "(`bdb_ReadData` template, identical-code folding). Do not redo those.",
+             "PDB names (`clean.py re-data/exports/zone-pdb - <addr> …`): the static initialisers FUN_0069ba10 (CollectCard.shn), "
+             "0069bac0 (StarRate), 0069bae0 (Reward), 0069bb00 (Title) and the DropRate one (string CollectCardDropRate.shn), "
+             "the `SHND::CommonData<…>` / `IndexedCommonData<CollectCard>` `cd_Load` bodies (`CollectCard` 00629840 and the "
+             "others reached from `ZoneServer_zs_start_long` FUN_005b8c00), their `cd_Find` variants (`CmpCardCollect`, "
+             "`CmpCollectCard_MobGroup`, `CmpCollectCard_ItemIndex`, `CmpCollectCardStarRate`, …), "
+             "`CardCollection::CardCollectionAlbum::cca_Load` FUN_006298c0, `CardCollectionBookmark::ccb_Load` FUN_00629a50.",
+             "`g_CardCollectMake` FUN_00628880 (mob → MobGroup → cards of the group, cumulative DropRate roll with "
+             "`rb_1000000`, then StarRate roll by card grade) and its caller `ItemAttrCls_CardCollect_Close::iac_DropItemMake` FUN_0063faf0 (the unidentified-card item "
+             "attribute at drop); per file column → member map and 2016 invariants (shn.py), odds as numbers.",
+             "Bugs as `Z28-B<n>`; Coverage boundary as usual."],
+      done="Every loader / finder / initialiser above and `g_CardCollectMake` are cited as `FUN_…` with pseudocode, every "
+           "card table has a column → member map with its 2016 invariants, and the card / star roll is specified."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
