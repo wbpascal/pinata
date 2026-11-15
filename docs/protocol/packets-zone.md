@@ -2502,14 +2502,14 @@ Handler `FUN_0061e400`
 
 ### `0xbccc` NC_GAMBLE_SLOTMACHINE_START_REQ
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_START_REQ`, 4 bytes
+**Verified layout** (basis: zone FUN_00625340 (SMS_StopButton reads the stored bet) / FUN_006228f0; 2016 Zone.pdb SLOTMACHINE_BettingLine)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | betting._789|_456 | bits _789:3@0, _456:3@3 |
-| 1 | u8 | betting._123|_741 | bits _123:3@0, _741:3@3 |
-| 2 | u8 | betting._852|_963 | bits _852:3@0, _963:3@3 |
-| 3 | u8 | betting._753|_951 | bits _753:3@0, _951:3@3 |
+| 0 | u8 | betting[0] | bits 0-2 _789 (top row) units, bits 3-5 _456 (middle row) |
+| 1 | u8 | betting[1] | bits 0-2 _123 (bottom row), bits 3-5 _741 (left column) |
+| 2 | u8 | betting[2] | bits 0-2 _852 (middle column), bits 3-5 _963 (right column) |
+| 3 | u8 | betting[3] | bits 0-2 _753 (diagonal 7-5-3), bits 3-5 _951 (diagonal 9-5-1); units 0-7 per line |
 
 Handler `FUN_0061e870`
 
@@ -10133,12 +10133,12 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_SlotMachineDBResult` (`FUN_0062
 
 ### `0xbccf` NC_GAMBLE_SLOTMACHINE_STOPBUTTON_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_STOPBUTTON_ACK`, 11 bytes
+**Verified layout** (basis: zone FUN_0061e980 / FUN_00625340 (SMS_StopButton); client FUN_0071b010)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
-| 2 | byte[9] | screen.Card | nested array uchar[3][3] |
+| 0 | u16 | nError | 0x28D2 ok (client shows the screen); 0x28CD not a screen, 0x28CE no screen, 0x28D3 not rolling, 0x28D6 no lock list: screen bytes uninitialised (Z32-B19), client ignores |
+| 2 | u8[3][3] | screen.Card | row 0 = keys 7 8 9 (top) … row 2 = keys 1 2 3; GBSMCardType 0-8 |
 
 Sent in reply to `0xbcce` NC_GAMBLE_SLOTMACHINE_STOPBUTTON_REQ on ShineObjectClass::ShinePlayer (`FUN_0061e980`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_STOPBUTTON_REQ) · payload 11 bytes
 
@@ -14584,6 +14584,24 @@ payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block 
 | 6 | i32 | nGameNo | from 0xBC79 |
 | 10 | u16 | nResultLogCnt | split when cnt*0x15+0xc > 7500 |
 | 12 | GDT_DiceRollApplyResultLog[] | DiceRollResultLog | {u32 nPlayerNo, u32 nBetting, u32 nBettingMoney, u16 nBattingRate (DividendRate or 0), u8 bStatus (1 won), u16 nSysRate, u32 nDividendMoney (after the cut)}, 0x15 each, one per gamer and staked kind |
+
+### `0xbcd3` NC_GAMBLE_SLOTMACHINE_DB_RESULT_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_00625340 (SMS_StopButton); character FUN_004251a0; 2016 Zone.pdb struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | player handle |
+| 2 | u32 | header.charregistnumber | charNo |
+| 6 | u16 | lockindex | inventory lock index |
+| 8 | u32 | PlayerRegistNumber | charNo |
+| 12 | char[10] | CardDisplay | 9 symbols '0'+v in key order 1-9 (row 2, row 1, row 0) + NUL |
+| 22 | u8 | IsJackPot | WinState.jackpot |
+| 23 | u32 | JackPotAccumulate | zone pool of the machine type after this spin (0 after a jackpot) |
+| 27 | u16 | BetUnit | coins per unit (GBSMBetCoin) |
+| 29 | u8 | BetLine | sum of the line units |
+| 30 | u16 | nJackpotRate | GBTaxRate row 26 GB_JPSaveRate (per mille) |
+| 32 | u32 | WinMoney | payout incl. jackpot share, after tax |
 
 ### `0xc409` NC_COLLECT_REGIST_REQ (Z→DB)
 

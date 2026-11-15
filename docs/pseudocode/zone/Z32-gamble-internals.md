@@ -845,4 +845,291 @@ the `0xBC7A` rows and the win count would still be written (Z32-B10).
 
 ## 4. Slot machines (`SlotMachine::*`)
 
-*(parts 4 and 5)*
+A slot-machine **cluster** (`SlotMachineCluster`, one per dealer NPC, gamble type `GBT_SLOTMACHINE` 2) holds two **screens**
+(`SlotMachineScreen smc_Screens[2]`, one per seated player); the handlers are Z06 §5. Three zone-wide singletons carry the game
+rules; all screens of the zone share them: `g_SlotMachineScreenManager` DAT_14d71160 (symbol decks, bet coins), `g_SlotMachineAnalyse`
+DAT_14d710a0 (pattern tables) and `g_SlotMachineJackPotRanking` DAT_14d712a8 (jackpot pools, rankings). This part (§4.1…§4.6) covers
+the spin: tables, symbol draw, pattern match, jackpot and payout. The lifecycle (join, start, wheel stop, DB answer, routine,
+rankings) follows in §4.7… *(part 5)*.
+
+### 4.1 Tables and the three singletons
+
+`ZoneServer::zs_start_long` FUN_005b8c00 loads, after `g_TaxRate` (`GBTaxRate`), `g_EventCode` (`GBEventCode`) and `g_GBReward`,
+unconditionally and in this order: `smsm_Load`, `sma_Load`, `smjpr_Load`, then `gom_Init` (§2.4). A missing or unreadable file
+stops the server (`ShineExit`). The 2016 data (`shn.py`):
+
+| Table (row struct, size) | Columns | 2016 rows | Read by |
+|---|---|---|---|
+| `GBSMCardRate` (6) | `GBSMCardType GBSMCard`, u16 `GBSM_CardRate` | symbol weights: 0 HPPotion 210, 1 SPPotion 210, 2 Honeying 120, 3 Boogy 110, 4 Pinky 110, 5 PrinceSlime 50, 6 QueenSlime 50, 7 KingSlime 50, 8 FiestaLogo 50 (Σ 960) | `smsm_Load` |
+| `GBSMNPC` (0x24) | `char GBSM_MobInx[32]`, `GBSMBetType GBSMBet` | `GB_SlotMachine_01_01…_12` → 0, `_02_01…_08` → 1, `_03_01…_04` → 2 | `smsm_Load` |
+| `GBSMBetCoin` (6) | `GBSMBetType GBSMBet`, u16 `GBSMCoin` | 0 → 10, 1 → 100, 2 → 500 coins per bet unit | `smsm_Load` (kept open as `smsm_BetCoin`) |
+| `GBSMGroup` (5) | u8 `GBSM_GroupID`, `GBSMCardType GBSMCard` | groups 1…9 = symbol 0…8 alone; group 10 = the three slimes 5, 6, 7 | `sma_Load` |
+| `GBSMLine` (4) | u8 `GBSM_GroupID`, u8 `GBSM_Num`, u16 `GBSM_RatioLine` | (1,1) 20, (2,1) 20, (3,1) 30, (4,1) 40, (5,1) 50, (6,1) 35, (7,1) 45, (8,1) 55, (9,1) 100, (10,2) 20, (10,3) 25 | `sma_Load` |
+| `GBSMAll` (5) | u8 `GBSM_GroupID`, u8 `GBSM_Num`, u16 `GBSM_RatioAll`, u8 `GBSM_IsJP` | (1…9, 1): 200 200 300 400 500 350 450 550 1000; IsJP only for group 9 | `sma_Load` |
+| `GBSMCenter` (3) | u8 `GBSM_GroupID`, u16 `GBSM_RatioCenter` | (9) 2 | `sma_Load` |
+| `GBSMJPRate` (`GBSMJackpotRate`, 0xc) | u32 `GBSM_MinCount`, `GBSM_MaxCount`, `GBSM_JPRate` | 0…100 000 → 0, 100 001…500 000 → 100, 500 001…1 000 000 → 5 000, 1 000 001…9 999 999 → 10 000 | `smjpr_Load` |
+| `GBTaxRate` (0xc) | `MobType GameType`, u16 `GB_TaxRate`, `GB_JPSaveType GB_JPSave`, u16 `GB_JPSaveRate` | slot machine = row 26 (0x1a): tax 0 ‰, `GB_JP_BET` (1), JP rate 100 ‰ | `smjpr_Load` |
+| `GBReward` (§2.5) | | row 26 = jackpot reward item | `SMS_StopButton` |
+| `GBEventCode` (§2.3) | | GameType 26, ANI 0…2 win / 3…5 loss | `go_PlayerAction` |
+
+Symbols (`GBSMCardType`): 0 HPPotion, 1 SPPotion, 2 Honeying, 3 Boogy, 4 Pinky, 5 PrinceSlime, 6 QueenSlime, 7 KingSlime,
+8 FiestaLogo. Machine types (`GBSMBetType`): `GB_SlotMachine_01` 0, `_02` 1, `_03` 2, `MAX_GBSMBETTYPE` 3 (= "none").
+
+```pseudo
+SlotMachineScreenManager (0x148)                                       ctor @ FUN_00623860, dtor @ FUN_00623900
+    +0x00 vector<u8> smsm_LocateDeck          # permutation deck index → screen cell 0…8
+    +0x10 vector<u8> smsm_CardDeck[9]         # one symbol deck per cell
+    +0xa0 u32 smsm_CardDeckPoint              # common read position of all nine decks
+    +0xa8 double smsm_CardRateArray[9]        # symbol probability (written, never read by the zone)
+    +0xf0 vector<NPCvsBetType {Name8 NPC; GBSMBetType betype}> smsm_NPC
+    +0x100 BinaryDataBox<GBSMBetCoin> smsm_BetCoin
+    # ctor/dtor only construct / free these members
+
+smsm_Load()                                                             @ FUN_00624820
+    clear the nine decks
+    for each GBSMCardRate row, GBSM_CardRate times: append GBSMCard to every one of the nine decks
+        # each deck = the same multiset of Σ rate = 960 symbols
+    for each row: smsm_CardRateArray[GBSMCard] = GBSM_CardRate / |deck 0|
+    smsm_Shuffle(); smsm_CardDeckPoint = 0
+    smsm_NPC = all GBSMNPC rows { MobInx (32 bytes), GBSMBet }
+    read GBSMBetCoin.shn into smsm_BetCoin; 0 rows → "smsm_Load : GBSMBetCoin.shn read fail", ShineExit
+    smsm_LocateDeck = [0, 1, …, 8]
+
+smsm_Shuffle()                                                          @ FUN_0061fa10
+    for each of the nine decks (n = size):
+        for i in 0 … n−1:
+            j = round(n · rand() / 32767.0)          # CRT rand() 0…32767; round to nearest (x87 default)
+            if j < n: swap(deck[i], deck[j])         # j == n (rand() near 32767) → no swap
+    # not a Fisher–Yates shuffle: positions 0 and n get half the weight of the others; the result is close to uniform
+
+smsm_NPCData(char* mobInx) → GBSMBetType                                @ FUN_0061fac0
+    first smsm_NPC entry whose 32-byte name equals mobInx (compared as 8 dwords, after strncpy 32) → its betype
+    none → MAX_GBSMBETTYPE (3)
+
+smsm_BettingAtOnce(GBSMBetType t) → u16                                 @ FUN_0061fc40
+    first GBSMBetCoin row with GBSMBet == t → GBSMCoin; none (also t = 3) → 0
+
+SlotMachineAnalyse (0xc0)                                               dtor @ FUN_00623570 (frees the vectors and sets)
+    +0x00 set<u16> sma_GroupForCard[9]        # symbol → the group ids that contain it
+    +0x90 vector<GBSMLine>   sma_LineMatch
+    +0xa0 vector<GBSMAll>    sma_AllMatch
+    +0xb0 vector<GBSMCenter> sma_PointMatch
+
+sma_Load()                                                              @ FUN_006239b0
+    clear the nine sets; for each GBSMGroup row: sma_GroupForCard[GBSMCard].insert(GBSM_GroupID)
+        # 2016: symbols 0…4 and 8 → {own group}; 5, 6, 7 → {own group, 10}
+    sma_LineMatch = GBSMLine rows, sma_AllMatch = GBSMAll rows, sma_PointMatch = GBSMCenter rows (file order)
+
+SlotMachineJackPotRanking (0x28)
+    +0x00 u8 smjpr_IsReq
+    +0x04 vector<SlotMachineInfo {u32 JackPotPrice; vector<SLOTMACHINE_JackPotRank> JackPotRank}> smjpr_InfoArr   # per GBSMBetType
+    +0x14 vector<GBSMJackpotRate> smjpr_JackPotRate
+    +0x24 GBTaxRate* smjpr_TaxInfo
+
+smjpr_Load()                                                            @ FUN_00624270
+    smjpr_TaxInfo = g_TaxRate.cd_Find(GameType 26)
+    none → "smjpr_Load : TaxInfo Load fail", ShineExit
+    smjpr_JackPotRate = all GBSMJPRate rows
+    # smjpr_InfoArr is filled from the GameDB answer 0xBCD6 (smjpr_RankingSet FUN_00625130, part 5); until then it is empty and
+    # every jackpot function below returns 0 / does nothing
+```
+
+### 4.2 Symbol draw (`smsm_Action`)
+
+The screen is `SLOTMACHINE_ScreenState { u8 Card[3][3] }` (row, column). The client and the line names use keypad numbering:
+row 0 = keys 7 8 9 (top), row 1 = 4 5 6, row 2 = 1 2 3 (bottom); `Card[r][c]` = key (2 − r)·3 + c + 1.
+
+```pseudo
+smsm_Action(out STOPBUTTON_ACK* ack, GBSMBetType type, u16 unit, START_REQ* bet, char* god)      @ FUN_006228f0
+    allLines = all eight 3-bit line counts of bet (§4.3) are non-zero
+    if strlen(god) == 9:                                     # GM screen: player.sp_GodOfSlotMachine (vt 0xb58), Z11 §3.4
+        for k in 0…8: v = god[k] − '0' (god[k] < 'A') or god[k] − 'A' + 10; v > 8 → 0
+                      cell of key k+1 = v                    # chars 0‑2 → row 2, 3‑5 → row 1, 6‑8 → row 0
+        return                                               # no jackpot roll, decks untouched
+    jpRate = g_SlotMachineJackPotRanking.smjpr_JackPotRateCalc(type, unit)     # per million (§4.4)
+    if allLines and RandomBox::rb_1000000() < jpRate:        # Well512 0…999 999 (Z28 FUN_0048dfb0)
+        all nine cells = 8 (FiestaLogo); return              # the jackpot screen
+    a = rndbox[9]; b = rndbox[9]; swap(smsm_LocateDeck[a], smsm_LocateDeck[b])       # rndbox: Z23 §8.6
+    smsm_CardDeckPoint += 1
+    if smsm_CardDeckPoint ≥ |deck 0|: smsm_CardDeckPoint = 0; smsm_Shuffle()
+    all cells = 99
+    for k in 0…8: cell number smsm_LocateDeck[k] (row = n / 3, column = n % 3) = smsm_CardDeck[k][smsm_CardDeckPoint]
+    cells > 8 → 0
+    # ack.nError is not written (the caller overwrites it, §4.5)
+```
+
+So every cell is drawn from its own shuffled 960-symbol deck at a common position that advances by one per spin of **any**
+slot machine in the zone (sampling without replacement within a deck pass: after 960 spins every deck has given every symbol
+exactly its weight). For a rebuild each cell is, to a very good approximation, an independent draw with P(symbol) =
+`GBSM_CardRate / 960`: HPPotion and SPPotion 21.9 %, Honeying 12.5 %, Boogy and Pinky 11.5 %, each slime and the FiestaLogo 5.2 %.
+The first spin after start-up reads position 1 (position 0 is only read after a reshuffle) *(inferred from the increment-then-read
+order; no effect on the odds)*.
+
+### 4.3 Patterns (`SlotMachineAnalyse`, `sms_LineRate`)
+
+The bet (`PROTO_NC_GAMBLE_SLOTMACHINE_START_REQ { SLOTMACHINE_BettingLine betting }`, 4 bytes) holds a 3-bit unit count
+(0…7) per line: byte 0 bits 0‑2 `_789`, bits 3‑5 `_456`; byte 1 `_123`, `_741`; byte 2 `_852`, `_963`; byte 3 `_753`, `_951`
+(bits 6‑7 unused). `sms_LineRate(screen, r0, c0, dr, dc)` checks the three cells `Card[r0 + i·dr][c0 + i·dc]`, i = 0…2:
+
+| Line | Keys | (r0, c0, dr, dc) | Through the centre |
+|---|---|---|---|
+| `_789` | top row | (0, 0, 0, 1) | |
+| `_456` | middle row | (1, 0, 0, 1) | yes |
+| `_123` | bottom row | (2, 0, 0, 1) | |
+| `_741` | left column | (0, 0, 1, 0) | |
+| `_852` | middle column | (0, 1, 1, 0) | yes |
+| `_963` | right column | (0, 2, 1, 0) | |
+| `_753` | diagonal 7‑5‑3 | (0, 0, 1, 1) | yes |
+| `_951` | diagonal 9‑5‑1 | (0, 2, 1, −1) | yes |
+
+```pseudo
+sma_1LineMatch(screen, r0, c0, dr, dc) → GBSMLine*                      @ FUN_00621c10
+    for each row L of sma_LineMatch in file order:
+        if all three cells' symbols have L.GBSM_GroupID in sma_GroupForCard[symbol]
+           and the number of distinct symbols among them == L.GBSM_Num: return L
+    return null
+sms_LineRate(screen, r0, c0, dr, dc) → int = sma_1LineMatch(…)?.GBSM_RatioLine or 0          @ FUN_00622800
+
+sma_ScreenMatch(screen) → GBSMAll*            (profiler string "sma_AllMatch")             @ FUN_00621dd0
+    first row A of sma_AllMatch for which all nine cells are in group A.GBSM_GroupID and the distinct-symbol count == A.GBSM_Num
+    none → null
+sma_CenterMatch(screen) → GBSMCenter*                                                     @ FUN_00621fa0
+    first row C of sma_PointMatch with C.GBSM_GroupID in sma_GroupForCard[Card[1][1]]; none → null
+```
+
+With the 2016 tables: a line pays when its three symbols are equal (rate 20 / 20 / 30 / 40 / 50 / 35 / 45 / 55 / 100 for symbols
+0…8), or all slimes of two kinds (20) or of three kinds (25); three equal slimes match their own group row first (35 / 45 / 55).
+The whole screen pays when all nine symbols are equal (`GBSMAll`); the centre bonus pays when the centre is the FiestaLogo.
+
+### 4.4 Jackpot pools (`SlotMachineJackPotRanking`)
+
+One pool per machine type: `smjpr_InfoArr[type].JackPotPrice` (u32 coins), filled from the DB at start-up (part 5).
+
+```pseudo
+smjpr_JackpotAccumulate(type, bet)          ("…(DWRD machine, DWRD bet)")                  @ FUN_006201c0
+    type < |smjpr_InfoArr|: InfoArr[type].JackPotPrice += bet           # u32, wraps
+smjpr_JackpotAccumulate(type) → u32         ("…(DWRD machine)")                            @ FUN_00620250
+    type < |smjpr_InfoArr| → InfoArr[type].JackPotPrice, else 0
+smjpr_GetJackpotPrice(type, GBTaxRate* tax) → u32                                         @ FUN_006200c0
+    type ≥ |smjpr_InfoArr| → 0
+    pool = InfoArr[type].JackPotPrice; InfoArr[type].JackPotPrice = 0
+    return (tax.GB_JPSaveRate · pool) / 1000                 # u32 product: wraps for pool > 42 949 672 at rate 100 (original bug) Z32-B16
+    # 2016: the winner gets 10 % of the pool, the other 90 % vanish (the DB procedure does the same, §4.5) (inferred: intended)
+smjpr_JackPotRateCalc(type, unit) → u32 (per million)                                     @ FUN_006220e0
+    type ≥ |smjpr_InfoArr| → 0
+    x = InfoArr[type].JackPotPrice / unit                    # pool in bet units (unit 0 cannot come with a valid type, Z32-B18)
+    first GBSMJPRate row with MinCount ≤ x ≤ MaxCount → its GBSM_JPRate
+    none → the largest GBSM_JPRate of all rows               # 2016: x > 9 999 999 → 10 000
+```
+
+2016 jackpot chance per spin with all eight lines bet: 0 while the pool is ≤ 100 000 units, then 0.01 %, 0.5 % (500 001…1 000 000
+units) and 1 % above. With fewer than eight lines the jackpot is never rolled.
+
+### 4.5 Stop button: payout and settlement request (`SMS_StopButton`, vt 0xe4)
+
+Reached from `0xBCCE NC_GAMBLE_SLOTMACHINE_STOPBUTTON_REQ` (`sp_NC_GAMBLE_SLOTMACHINE_STOPBUTTON_REQ` FUN_0061e980, Z06 §5) on the
+player's screen. Screen fields used: `+0x18 sms_BettingType`, `+0x1c u16 sms_BettingAtOnce` (coins per unit), `+0x20 sms_State`
+(`SMS_READY` 0, `SMS_ROLLING` 1, `SMS_STOPPING` 2, `SMS_WAITDB` 3), `+0x30 sms_WinNumber`, `+0x34 sms_BettingInfo` (the START_REQ
+bet), `+0x38 sms_ScreenInfo` (STOPBUTTON_ACK, 11 bytes), `+0x43 sms_WheelStop` (WHEELSTOP_ACK { u16 nError, u16 bet, u32 win,
+SLOTMACHINE_WinState WinLine }, 10 bytes).
+
+```pseudo
+SMS_StopButton(p, out STOPBUTTON_ACK* ack) → code                       @ FUN_00625340
+    if sms_State ≠ SMS_ROLLING: return 0x28D3
+    smsm_Action(&tmp, sms_BettingType, sms_BettingAtOnce, &sms_BettingInfo, p.so_ply_GodOfSlotMachine())   # §4.2; vt 0xb58 FUN_0061ddf0
+    sms_ScreenInfo = tmp                                     # nError: uninitialised stack word (never sent, see below)
+    sms_WheelStop = {0}
+    units = Σ of the eight line counts; lines = number of lines with count > 0
+    stake = sms_BettingAtOnce · units
+    win = 0; any = false
+    if lines == 8 and (A = sma_ScreenMatch(screen)):
+        win = A.GBSM_RatioAll · stake; WinLine.all = 1; any = true
+        if A.GBSM_IsJP: WinLine.jackpot = 1
+        # no line wins in this case
+    else for each line in the order _123, _456, _789, _741, _852, _963, _753, _951 with count > 0:
+        r = sms_LineRate(screen, line geometry §4.3)
+        if r > 0: win += count · sms_BettingAtOnce · r; WinLine.<line> = 1; any = true
+    if any of _456, _852, _753, _951 has count > 0 and (C = sma_CenterMatch(screen)):
+        win += C.GBSM_RatioCenter · stake; WinLine.bonus = 1; sms_WinNumber += 1
+    else if any: sms_WinNumber += 1
+    tax = smjpr_TaxInfo                                      # GBTaxRate row 26
+    if tax.GB_JPSave == GB_JP_BET: smjpr_JackpotAccumulate(sms_BettingType, stake)          # 2016: yes, the full stake
+    if WinLine.jackpot:
+        win += smjpr_GetJackpotPrice(sms_BettingType, tax)  # takes 10 % and empties the pool (§4.4)
+        smjpr_JackPotRankingSet(sms_BettingType, p.name (vt 0x56c), win)                    # FUN_00625000, part 5
+        p.so_ply_IBurstJackPot(u64 win)                      # vt 0xb54 FUN_00620410: map ← 0xBCDD (part 5)
+        R = g_GBReward.cd_Find(26)
+        if R and its item (ItemDataBox idb_2itemid(R.Item_INX)) exists:
+            item = default attributes of that item (ItemAttributeClass vt 0x14), key = iti_mkregnum(id, kind 0xB, zone, world)
+            GameDB ← 0x344D NC_ITEMDB_CREATEITEMLIST_REQ {   # sock2gameDB (the Character server), Z05 §9.2 / D03
+                hdr { u16 clienthandle = p.handle, u32 charregistnumber = p.charNo (vt 0x344) },
+                u32 owner = p.charNo, u16 lockindex = L.index (L = p.so_ply_GetInventoryLockList(), vt 0x7d4),
+                u16 map = map id of p's map, u64 price = 0,
+                PROTO_ITEM_CMD itemlist = ItemListMaker(2) with that one item }
+            L.icl_IncIndex()
+            # the packet-too-long assert text is copied from sp_KQReward
+    win −= (tax.GB_TaxRate · win) / 1000                     # signed; 2016 slot tax 0 ‰; applied after the jackpot was added
+    sms_WheelStop.bet = (u16) stake; sms_WheelStop.win = win
+    if L == null: return 0x28D6                              # dead for players (ShinePlayer FUN_0055a1d0 returns a member) (original bug) Z32-B17
+    GameDB ← 0xBCD3 NC_GAMBLE_SLOTMACHINE_DB_RESULT_REQ {    # 0x24 bytes
+        hdr { u16 clienthandle = p.handle, u32 charregistnumber = p.charNo },
+        u16 lockindex = L.index, u32 PlayerRegistNumber = p.charNo,
+        char CardDisplay[10] = the nine symbols in key order 1…9 (row 2, row 1, row 0), each '0' + v (v > 9 would give 'A' + v,
+                               never reached: v ≤ 8), then NUL,
+        u8 IsJackPot = WinLine.jackpot, u32 JackPotAccumulate = smjpr_JackpotAccumulate(type)   # after a jackpot: 0 (just emptied)
+        u16 BetUnit = sms_BettingAtOnce, u8 BetLine = stake / sms_BettingAtOnce (= units),
+            # sms_BettingAtOnce = 0 when the dealer's MobInx is not in GBSMNPC: SlotMachineScreen::go_Init FUN_00620b00 stores
+            # type 3 and unit 0 without refusing, SMS_Start's coin check then always passes, and this integer division
+            # faults: a zone crash; data-dependent (the 24 MobInfo GB_SlotMachine_* NPCs of 2016 are all in GBSMNPC) (original bug) Z32-B18
+        u16 nJackpotRate = tax.GB_JPSaveRate, u32 WinMoney = win }
+    d = win − stake
+    L.vt[0x70] icl_StoreGBCoin(L.index, |d|, d < 0 ? −1 : +1, 0)      # coin reservation (part 3 working notes; FUN_00489d90)
+    L.icl_IncIndex()
+    if win > stake: go_PlayerAction(p, 26, {0, 1, 2}, 3)     # vt 0x30, §2.3: a win motion (DAT_008711b0)
+    elif win < stake: go_PlayerAction(p, 26, {3, 4, 5}, 3)   # a loss motion (DAT_008711a4); equal: none
+    *ack = sms_ScreenInfo; sms_State = SMS_STOPPING
+    return 0x28D2
+```
+
+The handler (Z06 §5) writes the returned code over `ack.nError` and sends `0xBCCF NC_GAMBLE_SLOTMACHINE_STOPBUTTON_ACK { u16 nError,
+u8 screen[3][3] }` (11 bytes). On 0x28D3 / 0x28D6 / 0x28CD (object not a screen, base stub §2.1) `ack` was never written, so the
+nine screen bytes are uninitialised stack (original bug) Z32-B19. The coins themselves change only when the GameDB answers
+`0xBCD4` (`so_ply_SlotMachineDBResult`, part 5); the win numbers reach the client with `0xBCD1` (`SMS_WheelStop`, part 5).
+
+Client (`MHDiceGameTask`, FUN_0071b010): only for nError 0x28D2 it reads the nine symbols in key order 1…9 (row 2 first) and
+hands them to the slot window (`this+0x15c4`, FUN_0071c0f0); every other code is ignored without a message (none of the
+0x28CD…0x28D6 codes has a client text in `client-error-codes.json`).
+
+GameDB side (D03 §11, `fc_NC_GAMBLE_SLOTMACHINE_DB_RESULT_REQ` FUN_004251a0 → `usp_Gamble_setSlotMachineResult`): coins =
+max(0, coins − BetUnit · BetLine + WinMoney); on IsJackPot it also adds `tGambleJackpot.nJackpotCoin · nJackpotRate / 1000` for
+this BetUnit and empties that pool, else it adds the stake to it *(db-backup)*. The DB pool is a second pool (per bet unit) next
+to the zone's in-memory pool (per machine type), and `WinMoney` already contains the zone's 10 % share: a jackpot is credited
+twice in the DB, once in the zone's reservation (original bug) Z32-B15 *(db-backup: the 2016 procedure body is not available)*.
+
+### 4.6 Payout table (what a rebuild needs)
+
+For a spin with unit coin `u` (`GBSMBetCoin` of the machine type, 10 / 100 / 500), line counts `n_l` (0…7), `U = Σ n_l`, stake
+`S = u · U`:
+
+1. Screen: each cell an independent symbol with weight `GBSM_CardRate` (§4.2); if all eight lines are bet, first a jackpot roll
+   with `smjpr_JackPotRateCalc` per million (§4.4) that forces nine FiestaLogos. A GM's 9-character `&godofslotmachine` string
+   replaces both.
+2. All eight lines bet and nine equal symbols: `win = RatioAll(symbol) · S` (200…1 000×), no line wins; FiestaLogo also sets the jackpot.
+3. Otherwise `win = Σ_l n_l · u · RatioLine(line l)` (§4.3).
+4. Centre bonus: a centre line bet (`_456`, `_852`, `_753`, `_951`) and the centre FiestaLogo: `win += 2 · S`.
+5. Pool: `pool[type] += S` (`GB_JP_BET`); jackpot: `win += pool · 100 / 1000`, `pool = 0`, ranking, `0xBCDD`, `GBReward` row 26 item.
+6. `win −= win · GB_TaxRate / 1000` (0 in 2016). Player net = `win − S`.
+
+Expected return (2016 tables, independent cells, no jackpot): one line pays on average 0.718 × its stake; the centre bonus adds
+2 × 5.21 % = 0.104 × S when a centre line is bet; all eight lines with one unit each → 0.822 × S *(computed from the tables)*.
+
+Worked example: machine `GB_SlotMachine_02_03` (type 1, u = 100), bet `_456` = 2, `_123` = 1 → U = 3, S = 300 (7 lines unbet,
+no jackpot roll). Screen keys 7 8 9 = (Pinky, HPPotion, Boogy), 4 5 6 = (QueenSlime, FiestaLogo, KingSlime), 1 2 3 = (SPPotion,
+SPPotion, SPPotion). `_456` = Queen, Logo, King: Logo is not in group 10 → 0. `_123` = three SPPotion → group 2, rate 20 → 1 · 100 ·
+20 = 2 000. Centre bonus: `_456` is a centre line and the centre is the FiestaLogo → + 2 · 300 = 600. win = 2 600, tax 0, pool[1]
++= 300. `0xBCD3` { CardDisplay "111687403" (keys 1…9: SP SP SP, Queen Logo King, Pinky HP Boogy), IsJackPot 0, BetUnit 100,
+BetLine 3, nJackpotRate 100, WinMoney 2 600 }; reservation +2 300 (`icl_StoreGBCoin(+1)`); a win motion; `sms_WinNumber` + 1;
+`0xBCCF { 0x28D2, screen }`; state STOPPING. Had all eight lines been bet with one unit each (S = 800), `_123` would pay 1 · 100 · 20
+and the centre bonus 2 · 800, the other lines nothing: win 3 600.
+
+§4.7… (lifecycle, wheel stop, DB answer, rankings): part 5.
