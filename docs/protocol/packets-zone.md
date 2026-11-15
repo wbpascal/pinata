@@ -872,6 +872,8 @@ Handler `FUN_00539020`
 | 2 | u32 | lot | must cover the whole stack |
 | 6 | SHINE_XY_TYPE | loc |  |
 
+**Captured** (P02, `capture-validation.md`; s21): `slot`: inventory cells 0x2400…0x2417; `lot`: 9 of a 10-stack (refused 0x303, Z04-B4) and whole stacks / single items; `loc`: client position
+
 Handler `FUN_00529f50`
 
 | Off | Type | Checks in handler | Notes |
@@ -920,6 +922,8 @@ Handler `FUN_00537170`
 | 0 | ITEM_INVEN | from |  |
 | 2 | ITEM_INVEN | to | must be empty |
 | 4 | u32 | lot | amount moved; < stack |
+
+**Captured** (P02, `capture-validation.md`; s21): `from`: 0x2400; `to`: 0x2409 (free) or 0x2401 (occupied → 0x446); `lot`: 4, 9
 
 Handler `FUN_00539a40`
 
@@ -5700,7 +5704,7 @@ Fill: +6: FUN_006406f0 (no direct writes found)
 | 6 | u16 | error | 0x341 ok |
 | 8 | u16 | itemhandle |  |
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `itemid`: picked item (3001, 3005, 3004); `lot`: 1; `error`: 0x341 success; `itemhandle`: 0xFFFF always (Z05 §3.2)
+**Captured** (P02, `capture-validation.md`; shop, combat, s21): `itemid`: picked item (3001, 3005, 3004); `lot`: 1; `error`: 0x341 success; `itemhandle`: 0xFFFF always (Z05 §3.2); `s21`: &getmoney {0, 0, 0x341} (Z11-B32, nothing picked before); 0x346 inventory full; 0x34A KQ pick-up limit
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_itempickresult` (`FUN_005308d0`) · payload 10 bytes
 
@@ -5720,6 +5724,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_itempickresult` (`FUN_005308d0`
 | 0 | char[20] | pickerID | Name5 |
 | 20 | u16 | itemID |  |
 | 22 | u32 | nItemLot |  |
+
+**Captured** (P02, `capture-validation.md`; s21): `pickerID`: 'Test2' / 'X14B' to the other player in sight, sent with the 0x3001 of the pick; `itemID`: 3500, 0, 57001; `nItemLot`: 3 for the stack, 1
 
 Sent from `FUN_0052f0e0` (`FUN_0052f0e0`) · payload 26 bytes
 
@@ -12035,6 +12041,8 @@ player tick, on change; also sent to every object targeting the player (so_ply_S
 |---|---|---|---|
 | 0 | u16 | code | 0x301 = confirmation menu opened |
 
+**Captured** (P02, `capture-validation.md`; s21): `code`: 0x301 twice per drop (menu opened, then after 0x3417); 0x301 once for a destroy (menu); 0x303 for a part stack
+
 ### `0x300c` NC_ITEM_RELOC_ACK (S→C)
 
 **Verified layout** (basis: zone 12/12; client FUN_004ab910)
@@ -12052,6 +12060,8 @@ player tick, on change; also sent to every object targeting the player (so_ply_S
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | code |  |
+
+**Captured** (P02, `capture-validation.md`; s21): `code`: 0x441 success (after 0x3435); 0x446 target cell occupied (zone 0x53a047; Z04 §4.2 says 0x44c)
 
 ### `0x3011` NC_ITEM_EQUIP_ACK (S→C)
 
@@ -12073,6 +12083,8 @@ no PDB struct of that name
 |---|---|---|---|
 | 0 | u16 | code | 0x2c1 ok |
 
+**Captured** (P02, `capture-validation.md`; s21): `code`: 0x2C2: slotinven 48 ≥ inventory size (full inventory; client 'Failed to unequip the item.')
+
 ### `0x301B` NC_ITEM_PICKOTHER_ACK (hand-named) (S→C)
 
 **Verified layout** (basis: zone ShinePlayer::sp_partyitemdistribute FUN_0052f630 / ShinePlayer::sp_RaidItemsidtribute FUN_0052f8a0)
@@ -12091,6 +12103,16 @@ to the player who clicked, only when the receiver is someone else; the 2016 clie
 Empty payload.
 
 no payload (2-byte packet). Client: the first one while the item-use task is in state 3/4 records the use skill's cooldown (Skill::RecordSkillUse) and, in state 4, ends the cast bar; a flag ignores repeats (the silver wing sends it twice, Z26-B6)
+
+**Captured** (P02, `capture-validation.md`; s21): `(empty)`: with the 0x343E / 0x343F request, before the DB answer (Z13 smo_ply_ItemUse)
+
+### `0x3024` NC_ITEM_BREAKSUCCESS_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone so_ply_ItemBreakSuccess FUN_0048d480 (Z05 §6.4); name pdb2017 (PROTOCOL_COMMAND_ITEM 36))
+
+Empty payload.
+
+P02 batch 3 (§19.5): empty, after the 0x3001 of the destroyed cell; no 2016 client handler
 
 ### `0x3025` NC_ITEM_BREAKFAIL_CMD (hand-named) (S→C)
 
@@ -15590,9 +15612,17 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; combat): `mobid`: 0 Slime; `number`: 4; `exp`: 8; only at the revive (P02-B20)
 
+### `0x0445` NC_LOG_GAME_ITEM_BREAK (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s21): `(all)`: {charNo, key, itemid 2530, lot 1}
+
 ### `0x0446` NC_LOG_GAME_ITEM_TAKE (Character→GameLog)
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `mappos.MapName`: 'Need' (D03-B11); `mappos.x/y`: 0 (never written, stale); `itemlot`: 0; `iteminven`: 0x7512 / 0x4372 / 0x7511: never written (P02-B15)
+**Captured** (P02, `capture-validation.md`; shop, combat, s21): `mappos.MapName`: 'Need' (D03-B11); `mappos.x/y`: 0 (never written, stale); `itemlot`: 0; `iteminven`: 0x7512 / 0x4372 / 0x7511: never written (P02-B15); `s21`: &getmoney: 'Need Cen', itemlot = (u16) 200000 = 3392, itemid 0; picks: iteminven 0 / 0x750F (P02-B15)
+
+### `0x0447` NC_LOG_GAME_ITEM_DROP (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s21): `mappos`: 'Need', 0, 0 (D03-B11); `itemlot`: 0; `iteminven`: the dropped cell
 
 ### `0x0448` NC_LOG_GAME_ITEM_BUY (Character→GameLog)
 
@@ -15608,7 +15638,23 @@ Z01 name was 'map login done (ours)'
 
 ### `0x044f` NC_LOG_GAME_ITEM_CREATE (Zone/WM/Character→GameLog)
 
-**Captured** (P02, `capture-validation.md`; s14): `chrregnum / itemmaker`: 8 / 8; `itemkey`: = 0x3467 createitemregnum; `itemid`: 31000; `iteminvento`: 0x3000; sent by the Character server after 0x3468
+**Captured** (P02, `capture-validation.md`; s14, s21): `chrregnum / itemmaker`: 8 / 8; `itemkey`: = 0x3467 createitemregnum; `itemid`: 31000; `iteminvento`: 0x3000; sent by the Character server after 0x3468; `itemmaker`: s21: = owner (5) for &makeitem; 56 rows, one per 0x3402
+
+### `0x0456` NC_LOG_GAME_ITEM_MERGE (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s21): `mappos`: 'Need', 0, 0 (D03-B11); `itemlot`: sub lot (4, 9); `itemlotadd`: result 10; `itemlotsub`: 0
+
+### `0x0457` NC_LOG_GAME_ITEM_SPLIT (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s21): `mappos`: real map and position (RouN 6481, 8752); `itemkeynew`: = 0x3434 new key; `itemlotsplit / itemlotremain`: 4 / 6, 9 / 1
+
+### `0x0459` NC_LOG_GAME_ITEM_USELOT (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s21): `itemlot`: 12 = lot after the use
+
+### `0x045a` NC_LOG_GAME_ITEM_USEALL (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s21): `(all)`: {charNo, key, itemid}
 
 ### `0x0c18` NC_USER_NORMALLOGOUT_CMD (C→S)
 
@@ -15674,13 +15720,61 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; shop): `relocA`: 751 → 0x200C; `relocB.key`: key of 750 (in the slot) or −1 (empty slot); `relocB.newlocation`: 0x2406 / 0x2404; `lockindex`: 1, 6; `unequipnum`: 0
 
+### `0x3416` NC_ITEMDB_DROPALL_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s21): `itemid`: 3500, 0, 57001; `vanishitemregnum`: = item.key; `item.attr`: 101-byte union copy: lot, then unwritten heap bytes (P02-B30)
+
+### `0x3417` NC_ITEMDB_DROPALLSUC_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s21): `item`: echo of 0x3416's item, the stale bytes included
+
 ### `0x3422` NC_ITEMDB_SELLALL_REQ (Zone→CharDB)
 
 **Captured** (P02, `capture-validation.md`; shop): `price`: 3 / 4 (SellPrice × lot); `nLot`: 1; `nDeleteChestItem`: 0
 
+### `0x342e` NC_ITEMDB_MERGE_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s21): `(all)`: 0x300B onto a stack of the same item: lotmain = target key, lotsub = source key, nMainLot / nSubLot before
+
+### `0x342f` NC_ITEMDB_MERGESUC_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s21): `MergeResultLot`: 10 = the target cell's lot after the apply
+
+### `0x3434` NC_ITEMDB_SPLIT_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s21): `lotcreate.attr`: not written (0x6874 / 0x6620 stale, P02-B30); `splitlot`: 4, 9; `MainLot`: 10 = lot before the split
+
+### `0x3435` NC_ITEMDB_SPLITSUC_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s21): `RemainLot`: 6, 1
+
+### `0x3438` NC_ITEMDB_PICKMONEY_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s21): `owner`: 5; `itemonfield`: −1; `cen`: 200000 (&getmoney)
+
+### `0x343f` NC_ITEMDB_USEALL_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s21): `(all)`: single potion (lot 1): key, lock 19, itemid 3500
+
+### `0x3440` NC_ITEMDB_USE_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s21): `error`: 0x700 for both use requests
+
 ### `0x344a` NC_ITEMDB_ITEMCHANGE_ACK (CharDB→Zone)
 
 **Captured** (P02, `capture-validation.md`; combat): `lockindex`: echo; `err`: 0x901 success
+
+### `0x3459` NC_ITEMDB_DESTROY_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s21): `flags`: 3, 48, 2 = key count (bit 7 clear); `itemID/key/attrOffset/inven`: unwritten for bit 7 = 0: stale gpp bytes incl. text ('nus', 'res', 'n b') (P02-B30); `keys`: every unlocked inventory item (&cleariv)
+
+### `0x345a` NC_ITEMDB_DESTROY_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s21): `err`: 0xB81 (apply)
+
+### `0x346b` NC_ITEMDB_ITEMBREAKSUC_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s21): `lockindex`: 17
 
 ### `0x34cf` NC_ITEMDB_RESET_SCROLL_LINK_MAP_INFO_CMD (Zone→CharDB)
 

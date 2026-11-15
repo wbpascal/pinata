@@ -2336,6 +2336,220 @@ Batch 1–2 opcodes recur unchanged (create: §16.4; map login and in-world: §5
 
 The 0x1C08 / 0x1C0E / 0x2018 counts of this capture (3 255 / 2 736 / 2 072) are mostly the P02-B27 storm (§18.6).
 
+## 19. Items I, batch 3: GM items, split, drop, pick-up, destroy, use, full inventory (`s21`) *(captured)*
+
+`s21` steps 1–7 and 11 (the storage, shop and soul-stone steps 8–10 are §20). Streams: client A = zone#1 / wm#1
+(`admin`, **Test2**, `chrregnum` 5, zone handle 8003), client B = zone#2 / wm#2 (`testaccountB`, X14B, `chrregnum` 8,
+handle 8004), both on RouN (zone 0, 9210). The zone's CharDB links are W00_CDB#1 / #2 / #3 / #17 (requests go round
+robin), its GameLog link W00_GLDB#1. Times are capture seconds (the notes have no times). Decoder: 56 `0x3401`, 1
+`0x341F`, 2 `0x343E`, 1 `0x346A`, 1 `0x3439` issue packets before this part; the P02.json layouts of §19.8 fit all
+of them (`s21` now has 18 issue packets, all §20 types).
+
+### 19.1 What happened
+
+| Time | Step | Client request | Wire result |
+|---|---|---|---|
+| 130.6–190.5 | setup (`21-setup.txt`) | `&cleariv`, `&levelup 25`, `&getmoney 200000`, `&fullpoint`, 9 × `&makeitem` | §19.2 |
+| 289.6, 291.5, 454.6, 620.3 | (not in the notes) | 0x3015 HP potion at full HP | 0x3016 `0x713` at once (§19.6) |
+| 299.4 / 301.0 | 1 split / merge | 0x300D 4 → cell 9; 0x300B cell 9 → cell 0 | 0x3434 → 0x3435, 0x300E `0x441`; 0x342E → 0x342F, 0x300C `0x241` (§19.3) |
+| 382.4, 389.5, 451.2 | 1 split onto the x3 stack ("did not work") | 0x300D 4 / 4 / 9 → cell 1 (occupied) | 0x300E `0x446`, no DB request |
+| 447.1 | (not in the notes) | 0x3007 lot 9 of the 10-stack | 0x3008 `0x303` (Z04-B4) |
+| 456.5 / 458.0 | 1 "split the whole lot" | 0x300D 9 → cell 9; 0x300B back | as at 299.4 (client range 1…9: "split 0" never reaches the server) |
+| 477.1 / 479.3 | 2 drop / pick up the x3 stack | 0x3007 lot 3; 0x3C02 OK; 0x3009 | §19.4: DROPALL, then PICKMERGE onto cell 0 (lot 13) |
+| 512.9 / 541.0 | 3 A drops Leather Boots, B picks | 0x3007 cell 5; B's 0x3009 at 541.0 only | §19.4: B's first try (notes) sent nothing |
+| 601.3 / 604.8 | 4 destroy Binding Reset Resin | 0x3007 cell 6, two 0x3C02 OK | §19.5: 0x346A ITEMBREAK |
+| 746.6 / 790.8 | 5 use potions | 0x3015 cell 0 (lot 13), cell 2 (lot 1) | §19.6: USELOT / USEALL |
+| 805.7 / 810.8 | 6 rings | 0x300F cell 3, cell 4 | 0x3410 → equipment slots 15, 16 (§19.7) |
+| 1324.2 / 1339.6 | 11 KQ pick-up limit | drop one Freezing Ice, pick it up | §19.4: free at once; 0x300A `0x34A` |
+| 1356.4–1410.7 | 7 full inventory | 49 × `&makeitem LeatherBoots` | 46 × 0x3401 (cells 1–7, 9–47), 3 without a packet (§19.2) |
+| 1470.5 | 7 unequip a ring, inventory full | 0x3012 `{15, 48}` | 0x3013 `0x2C2` (§19.7) |
+| 1481.6 / 1485.2 / 1486.4 | 7 drop one, `&makeitem` refills the cell, pick | 0x3007, chat, 0x3009 | 0x300A `0x346` "Inventory is full." |
+| 1498.2–1507.4 | 7 clean-up | `&cleariv` (48 keys), 2 × 0x3012, `&cleariv` (2), 2 × 0x3009, `&cleariv` (2) | §19.2, §19.4 |
+
+### 19.2 The GM setup on the links (`&makeitem`, `&getmoney`, `&cleariv`)
+
+- **`&makeitem`** (Z11 §4.3): `0x3401 NC_ITEMDB_ADMINCREATE_REQ` 2–24 ms after the chat line, `0x3402` 8–32 ms later,
+  GameLog `0x044F {itemmaker = owner = 5, key, itemid, cell}` in the same ms as the `0x3402`, then the client's
+  `0x3001` for the cell (style 1: the item appears only after the DB answer, Z05 §9.1). The cell is the first free
+  one in slot order (0x2400…0x2408 in the setup; after the drops of step 7 the refilled cell 23). Layout:
+  `{ref, u16 lockindex, PROTO_ITEM_CREATE create, attribute}` (the pdb2016 struct + the 6-byte ref; `create.attr` =
+  46, the payload offset of the attribute, as for 0x3467 in §18.7). Attributes: 1 byte (lot 10 / 3 / 1 for HP Potion
+  3500 `-l10` / `-l3` / `-l1`, KQ_Ice01 57001, PutOn_ClearKit01 2530 `-l1`), 13 bytes for LeatherBoots (item id 0,
+  `ShineItemAttr_Boot`), 41 bytes for SkullRing 2203 (the two rings differ in the last two bytes: `00 01` / `01 02`,
+  the random option roll of Z11 §4.3 *(inferred)*).
+- `&makeitem` with a full inventory sends nothing and the GM gets no message: 3 of the 49 step-7 commands (1409.695,
+  1410.214, 1410.719) have no `0x3401`. **Z11-B12 captured.** The notes' "cells filled 46, no failure message" agree.
+- **Lock indices** (Z05 §1.2) count every transaction of the character, the GM commands included: `&cleariv` 0,
+  `&makeitem` 1–9, split 10, merge 11, split 12, merge 13, break 17, uses 18 / 19, equips 20 / 21, … `&makeitem`
+  43–88, 90, `&cleariv` 91, unequips 92 / 93, `&cleariv` 94 / 95. Between 13 and 17 lie a drop, a pick-merge, a drop
+  and the destroy menu, which carry no index on the wire; which of them took the three indices was not traced.
+- **`&getmoney 200000`** (Z11 §7.4): `0x3438 {owner 5, itemonfield −1, cen 200000}` and `0x1033 {cen 299378}` in the
+  same ms, `0x3439` 23 ms later, GameLog `0x0446 {"Need Cen", 0, 0, key 0, itemlot 3392 = (u16) 200000, …}`, then
+  the client's `0x300A {itemid 0, lot 0, 0x341, 0xFFFF}`: **Z11-B32 captured**, and its open point settled: with
+  nothing picked since the map login the item id and lot are 0, so the client prints the obtained message for item 0
+  (LeatherBoots) *(the text not seen; the notes do not mention it)*. `0x3439` is 7 bytes: the ref and one byte the
+  Character server never writes (`0x10`): **D03-B6 captured**.
+- **`&cleariv`** (Z11 §4.3, Z18 §4.4): `0x3459 NC_ITEMDB_DESTROY_REQ` with `flags` = key count (3, 48, 2, 2; bit 7
+  clear), the keys at payload 0x17, `0x345A {lockindex, err 0xB81}` 2–60 ms later, then one `0x3001` (6 bytes,
+  `itemid 0xFFFF`) per cell in slot order in the same ms (Z05 §6.4). No GameLog row. Payload bytes 9…22 (`itemID`,
+  `key`, `attrOffset`, `inven`, valid only with bit 7) are not written: they hold earlier `gpp` contents, readable
+  text included (`…n u s`, `…r e s`, `…n   b`) (original bug) P02-B30. Z11 §4.3 says "stale, unread"; the Character
+  server indeed reads them only with bit 7 (Z18 §4.4).
+
+### 19.3 Split and merge
+
+- **Split** (Z04 §4.2): `0x3434` 10–17 ms after the request (68 bytes: D03 layout), `0x3435 {ref, lockindex, lotmain,
+  RemainLot 6 / 1}` 33–53 ms later, GameLog `0x0457 {charNo, RouN 6481 8752, itemid, key, new key, 4 / 9, 6 / 1}` in the same
+  ms (the split log carries the real map, unlike the drop and merge logs), then `0x3001` source (new lot, `exchange`
+  = itself), `0x3001` target (`exchange` = the source cell) and `0x300E {0x441}`: style 1, confirms Z05 §4. Z04
+  §4.2's "+0x42 u32 lot, +0x44 u16 oldLot, 0x46 bytes" is off by two: `splitlot` u16 at payload 64, `MainLot` (the lot before the split, 10) at 66,
+  68 bytes. `lotcreate.attr` (payload 62) is not written (`0x6874` / `0x6620`, text bytes; no attribute follows)
+  (original bug) P02-B30.
+- **Split onto an occupied cell** answers `0x300E {0x446}` without a DB request (3 ×). The code (zone 0x53a03f…0x53a052):
+  `to` cell item ≠ 0xFFFF → `so_SendErrorCode(12, 14, 0x446)`; an out-of-range `from` or `to` cell both answer
+  `0x445` (shared label at 0x539f25). Z04 §4.2 gives these as "to cell not empty: 0x44c" and "Invalid 'to' cell:
+  0x446": **corrected**. The client shows nothing for 0x446 (only `0x447` has a text, Z04 §4.2); the notes'
+  "did not work" is the cell not changing.
+- **Merge = 0x300B onto a stack of the same item** (Z04 §4.1): `0x342E NC_ITEMDB_MERGE_REQ {ownerA, ownerB, lockindex,
+  itemid, lotmain = target key, lotsub = source key, nMainLot 6 / 1, nSubLot 4 / 9}`, `0x342F {ref, lockindex,
+  lotmain, MergeResultLot 10}`, GameLog `0x0456 {"Need", 0, 0, itemid, main key, sub key, itemlot 4 / 9 = sub lot,
+  itemlotadd 10 = result, itemlotsub 0}` (D03 §3.3, D03-B11), then `0x3001` source emptied, `0x3001` target 10,
+  `0x300C {0x241}` (a RELOC_ACK, as Z05 §4 says).
+
+### 19.4 Drop, pick-up and the looting time
+
+- **Drop of a whole stack / item** (Z04 §3.1, Z05 §3.1): `0x3C01` "Do you want to discard the item?" (menu
+  `ItemDropWarn`, 208 bytes, `npcHandle 0xFFFF`, position = A's) and `0x3008 {0x301}` in the same ms; after the OK
+  (`0x3C02 reply 0`, 1.0–5.0 s later) `0x3416 DROPALL_REQ` and `0x3001` (cell emptied) in the same ms (style 2),
+  `0x3417` 11–16 ms later, GameLog `0x0447 {"Need", 0, 0, key, itemlot 0, cell, itemid}` (D03-B11), `0x1C0A` to the
+  others in sight first (`attr 0` for B), then to A (`attr 8`) with the second `0x3008 {0x301}`. Two `0x301` per
+  drop: the menu ACK and the DB answer (Z05 §3.1) both send it. `0x3416` / `0x3417` carry the 101-byte attribute
+  union of the cell: a ByteLot item writes its lot byte, the other 100 bytes are heap contents (pointer-like
+  values, `ffff`, …), echoed unchanged in `0x3417` (original bug) P02-B30.
+- **Part stack**: `0x3007 lot 9` on the 10-stack → `0x3008 {0x303}` at once, no menu: **Z04-B4 captured** (only whole
+  stacks drop; `DropLot` / `0x3419` unreachable). The client shows no text for 0x303.
+- **Pick-up onto a stack** (Z04 §3.3 IsLot): `0x341F NC_ITEMDB_PICKMERGE_REQ` (33 bytes: ref + pdb2016 struct +
+  attribute; `itemonfield` = the drop's key, `nCellItemLot 10`, `itempick` = cell 0's key, `attr` = offset 32,
+  attribute = lot 13), `0x3001 {cell 0, lot 13}` and `0x3014` to B in the same ms, `0x3420 {ref}` 6 ms later, no
+  GameLog row, `0x300A {3500, lot 3, 0x341}` 43 ms after it. No new key: the drop's key disappears (the DB deletes it,
+  D03 §3.4).
+- **`0x3014 NC_ITEM_SOMEONEPICK_CMD`** (26 bytes `{char pickerID[20], u16 itemID, u32 nItemLot}`, first capture): sent to
+  the other players in sight (B for A's three picks, A for B's) together with the picker's `0x3001`, not to the
+  picker. The client (`FUN_004abc20`) prints "%s of the expedition group has received an item." only when the picker
+  is in its expedition (raid) list *(inferred from the lookup FUN_006f7e30)*: here nothing.
+- **Ownership** (Z09 §11.4, §18.5): LeatherBoots (`ItemInfoServer.looting` 20000, `Vanish` 60000) dropped at 514.0,
+  re-broadcast with `attr 8` to both at 533.954 (+19.95 s). B's first try (notes: "You do not have the right to pick up
+  the item.") produced **no 0x3009**: the client refuses by itself while the drop's pick bit is 0 *(inferred: the
+  client's drop object FUN_00610fc0 was not read)*. B's 0x3009 at 541.0 → `0x341C PICKALL` (map / x / y = B's
+  position, `location` = B's first free cell 0x2401), B's `0x3001` + A's `0x3014` in the same ms, `0x341D`, GameLog
+  `0x0446` (`iteminven 0` here, `0x750F` for A's later picks: P02-B15), `0x300A {0, 1, 0x341}`. The notes' "~30 s" is
+  the tester's wait; the server allowed it after 20 s. The step-7 Boots (dropped 1484.2) turned free at 1504.149 (+19.9 s).
+- **Looting time 0**: KQ_Ice01 57001 has `looting 0`, `Vanish 300000`: its drop (1329.244) went to B as `attr 0` and
+  at once again as `attr 8`, and to A twice with `attr 8`, all in the same ms: the owner time is already over at the
+  first `so_Routine` pass, which re-broadcasts (Z09 §11.4) *(the routine call itself not timed)*.
+- **KQ pick-up limit** (X02 §4, Z04 §3.3 `ItemLotInspector`): picking up the second Freezing Ice while holding one →
+  `0x300A {0xFFFF, 0, 0x34A, 0xFFFF}` 11 ms after the request, no DB request, the drop stays; client "Failed to
+  obtain the item." (notes). **Confirms** the X02 reading of 0x34A (KQItem.shn `PickupLimit`).
+- **Full inventory**: `0x3009` → `0x300A {0xFFFF, 0, 0x346, 0xFFFF}` 15 ms later, client "Inventory is full.":
+  **settles** Z04 §3.3's *(inferred)* code: it is 0x346. After `&cleariv` the two picks went to cells 0 / 1 as
+  `0x341C` PICKALL (`0x3014` to B each time).
+
+### 19.5 Destroying an undroppable item (Binding Reset Resin)
+
+`0x3007` on PutOn_ClearKit01 2530 (bound: `BelongType_CanDrop` false, Z04 §3.1) opens `0x3C01` "If you discard this
+item, it will automatically be destroyed." (`ItemBreakWarn0`) with `0x3008 {0x301}`; the OK (1.4 s) opens the
+second `0x3C01` "Do you want to destory the selected item?" (`ItemBreakWarn1`, the client text's spelling) 26 ms
+later; the second OK (2.1 s) sends `0x346A NC_ITEMDB_ITEMBREAK_REQ {packheader, lockindex 17, key, Owner 5, nID 2530,
+nLot 1, nDeleteChestItem 0}` (25 bytes, pdb2016 layout; the decoder read one element of the `[0]` array until
+P02.json restated it), `0x346B {ref, 17}` 13 ms later, GameLog `0x0445 {5, key, 2530, 1}` and, 1 ms after the `0x346B`, the client's
+`0x3001` (cell 6 emptied) and **`0x3024 NC_ITEM_BREAKSUCCESS_CMD`** (empty, *(pdb2017)* name) together. **Confirms**
+Z04 §3.2 (two confirmations, style 1) and Z05 §6.4; the client has no 0x3024 handler and shows nothing.
+
+### 19.6 Using potions
+
+- **Full HP**: four 0x3015 on HP Potion 3500 (`ItemUseSkill` UsePotion, `UseItemByTable` actor) answer `0x3016
+  {0x713, 3500, 9}` 2–9 ms later, no DB request, client "The selected item does not have any effect when used.".
+  Code: `UseEffect::UseItemByTable::uib_CanUseItem` @ FUN_005981e0 returns 0x700 only when one of the row's three
+  effects (`sp_CanUseItemCheck_ByTable` for UseEffectA / B / C) would change something, else 0x713. The notes' step
+  10 "HP stone at full HP → no message" is the soul-stone path (§20).
+- **Stack (lot 13)** at HP 632 (`&staticdamage 1`): `0x343E NC_ITEMDB_USELOT_REQ` and **`0x301A
+  NC_ITEM_USECOMPLETE_CMD`** (empty) in the same ms, 34 ms after the request (the UsePotion cast; Z13 §8
+  `smo_ply_ItemUse` sends 0x301A before `uib_AfterCast`), GameLog `0x0459 {5, key, 3500, itemlot 12 = new lot}` and
+  `0x3440 {ref, 18, 0x700}` 19 ms later, then `0x3016 {0x700, 3500, 9}`, `0x3001 {cell 0, lot 12}` and `0x240E {hp
+  633}` together (the heal runs in the releaser after the DB answer, Z05 §6.1). Layout: ref + pdb2016 `{PROTO_CHANGEATTR
+  {key, itemid, attr}, lockindex}` + the attribute (lot 12); `attr` = 20 = the payload offset of the attribute: Z04
+  §6.3's "+0x12 attrLen" is an offset (as for 0x340A in §7.6.1): **corrected**.
+- **Single potion (lot 1)**: `0x343F NC_ITEMDB_USEALL_REQ {ref, key, lock 19, itemid}` with `0x301A`, GameLog `0x045A
+  {5, key, 3500}`, `0x3440 {19, 0x700}`, then `0x3016`, `0x3001` (cell 2 emptied), `0x240E`. **Confirms** Z04 §6.3
+  (lot 1 → USEALL) and D03 §4.
+
+### 19.7 Rings, unequip with a full inventory
+
+- `0x300F` on SkullRing 2203 (`ItemInfo.Equip` 15) in cell 3 → `0x3410 {relocA = ring → 0x200F, relocB.key −1}`
+  (empty slot), `0x3411`, then `0x3002 {exchange 0x2403, location 15, ring}` (46 bytes), `0x3001 {exchange 0x200F,
+  cell 3 emptied}`, `0x3011 {0x281}`. The second ring went to slot 16 (`0x2010`) although the 1-byte 0x300F names only the
+  inventory cell: the zone chose the free ring slot (`EquipEnumChanger_eec_EquipLocation` with the current equipment, Z04 §5.1). The notes call the
+  first one "right". B (in sight) got **nothing** for the two equips but `0x1C04 NC_BRIEFINFO_UNEQUIP_CMD {8003, 16}` /
+  `{8003, 15}` for the two unequips at 1499.6 / 1500.1: SkullRing is class 4 (amulet), whose `iac_equipbriefinfo`
+  returns 0, while an unequip builds the brief info of the empty item (base class → 0x1C04). **Confirms** Z18 §4.3.
+- **Unequip with a full inventory**: the client sends `0x3012 {slotequip 15, slotinven 48}` (48 = one past the 48-cell
+  inventory, its "no free cell" value *(inferred)*); the zone answers `0x3013 NC_ITEM_UNEQUIP_ACK {0x2C2}` at once
+  (`slotinven ≥ usable size`, Z04 §5.4), client "Failed to unequip the item.". **First 0x3013 on the wire** (§8.2 had it
+  "never seen": a success answers 0x3011, Z05-B2; both unequips at 1499.6 / 1500.1 again got `0x3011 {0x281}`).
+  The two later unequips name the free cells 0 / 1 and go through `0x3413` / `0x3414` (style 1, `0x3002` 5 bytes
+  first).
+
+### 19.8 SQL snapshots
+
+`26_11_15_21_items-snapshot-before.txt` / `-after.txt` (and `-prep.txt`) list **Test1235** (`nCharNo` 2, `nUserNo`
+103), not Test2 (`nCharNo` 5) whom the scenario played; both snapshots are identical except `taken_at` (18:02:25 /
+18:43:42). They cannot check D03 against `s21`. The committed `tools/capture/21/21-snapshot.sql` already selects
+`N'Test2'`, so the run used an older copy of the script *(inferred)*. The account storage rows (`nStorageType` 6,
+owner 103) did not change either: the storage step (§20) moved only potions and cen of Test2 (net zero).
+
+### 19.9 Opcodes
+
+Types new in batch 3 (batch 1–2 types recur unchanged: §8.2, §7.6.1; `0x3001` sizes 6 / 7 / 19 boots / 47 ring):
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| C→S | 0x3007 | NC_ITEM_DROP_REQ | 6 | 14 | confirmed | Z04 §3.1 |
+| S→C | 0x3008 | NC_ITEM_DROP_ACK | 10 | 2 | confirmed | `0x301` ×2 per drop, ×1 per destroy; `0x303` part stack (Z04-B4) |
+| C→S | 0x300D | NC_ITEM_SPLIT_REQ | 7 | 8 | confirmed | Z04 §4.2 |
+| S→C | 0x300E | NC_ITEM_SPLIT_ACK | 7 | 2 | **corrected** | `0x441`; `0x446` = target occupied (Z04 says 0x44c) |
+| S→C | 0x3013 | NC_ITEM_UNEQUIP_ACK | 1 | 2 | confirmed | first capture: `0x2C2` full inventory (§19.7) |
+| S→C | 0x3014 | NC_ITEM_SOMEONEPICK_CMD | 4 | 26 | confirmed | pdb2016 layout; to the others in sight |
+| S→C | 0x301A | NC_ITEM_USECOMPLETE_CMD | 3 | 0 | confirmed | with the use request to the CharDB (Z13 §8) |
+| S→C | 0x3024 | NC_ITEM_BREAKSUCCESS_CMD | 1 | 0 | confirmed; **new layout** | *(pdb2017)* name; P02.json (empty) |
+| Z→CDB | 0x3401 | NC_ITEMDB_ADMINCREATE_REQ | 56 | 47 / 59 / 87 | **corrected** | pdb2016 struct + ref + attribute tail (P02.json) |
+| CDB→Z | 0x3402 | NC_ITEMDB_ADMINCREATESUC_ACK | 56 | 8 | **corrected** | `{ref, lockindex}` (P02.json) |
+| Z→CDB | 0x3416 | NC_ITEMDB_DROPALL_REQ | 4 | 129 | confirmed; **bug** | D03 layout; 100 heap bytes in the attribute (P02-B30) |
+| CDB→Z | 0x3417 | NC_ITEMDB_DROPALLSUC_ACK | 4 | 117 | confirmed | Z05 §3.1; echo of the item |
+| Z→CDB | 0x341F | NC_ITEMDB_PICKMERGE_REQ | 1 | 33 | **corrected** | ref + pdb2016 + attribute (P02.json) |
+| CDB→Z | 0x3420 | NC_ITEMDB_PICKMERGESUC_ACK | 1 | 6 | confirmed; **new layout** | `{ref}` (P02.json) |
+| Z→CDB | 0x342E | NC_ITEMDB_MERGE_REQ | 2 | 42 | confirmed | D03 §3.3 |
+| CDB→Z | 0x342F | NC_ITEMDB_MERGESUC_ACK | 2 | 18 | confirmed | Z05 §4 |
+| Z→CDB | 0x3434 | NC_ITEMDB_SPLIT_REQ | 4 | 68 | confirmed; **bug** | D03 layout; `lotcreate.attr` unwritten (P02-B30); Z04 offsets off by 2 |
+| CDB→Z | 0x3435 | NC_ITEMDB_SPLITSUC_ACK | 4 | 18 | confirmed | Z05 §4 |
+| Z→CDB | 0x3438 | NC_ITEMDB_PICKMONEY_REQ | 1 | 22 | confirmed | Z11 §7.4 |
+| CDB→Z | 0x3439 | NC_ITEMDB_PICKMONEYSUC_ACK | 1 | 7 | **corrected**; **bug** | ref + 1 unwritten byte (D03-B6); pdb2017 empty |
+| Z→CDB | 0x343E | NC_ITEMDB_USELOT_REQ | 2 | 21 | **corrected** | ref + pdb2016 + attribute; `attr` = offset (P02.json) |
+| Z→CDB | 0x343F | NC_ITEMDB_USEALL_REQ | 1 | 18 | confirmed | Z04 §6.3 |
+| CDB→Z | 0x3440 | NC_ITEMDB_USE_ACK | 3 | 10 | confirmed | `0x700` |
+| Z→CDB | 0x3459 | NC_ITEMDB_DESTROY_REQ | 4 | 47 / 407 / 39 / 39 | confirmed; **bug** | Z18 §4.4 layout; 14 unwritten bytes (P02-B30) |
+| CDB→Z | 0x345A | NC_ITEMDB_DESTROY_ACK | 4 | 10 | confirmed | `err 0xB81` |
+| Z→CDB | 0x346A | NC_ITEMDB_ITEMBREAK_REQ | 1 | 25 | confirmed | pdb2016; restated for the decoder (P02.json) |
+| CDB→Z | 0x346B | NC_ITEMDB_ITEMBREAKSUC_ACK | 1 | 8 | confirmed | Z05 §6.4 |
+| CDB→GL | 0x0445 | NC_LOG_GAME_ITEM_BREAK | 1 | 16 | confirmed | D05 / D03 §7.5 |
+| CDB→GL | 0x0447 | NC_LOG_GAME_ITEM_DROP | 4 | 38 | confirmed; **bug** | "Need" (D03-B11), `itemlot 0` |
+| CDB→GL | 0x0456 | NC_LOG_GAME_ITEM_MERGE | 2 | 48 | confirmed; **bug** | "Need" (D03-B11) |
+| CDB→GL | 0x0457 | NC_LOG_GAME_ITEM_SPLIT | 4 | 46 | confirmed | real map and position |
+| CDB→GL | 0x0459 | NC_LOG_GAME_ITEM_USELOT | 2 | 16 | confirmed | `itemlot` = lot after |
+| CDB→GL | 0x045A | NC_LOG_GAME_ITEM_USEALL | 1 | 14 | confirmed | D03 §4 |
+
+`0x0446` (`&getmoney` row) and `0x044F` (56) match their batch-2 rows (§7.6.1, §18.8). `0x0459` has 2 rows: the
+second (lock 31, lot 8) belongs to the step-9 potion use (§20).
+
 ## 11. Message order against README §2 and the pseudocode
 
 README §2 is a sketch of the login → WM → zone chain. Against the seven captures (details in the sections cited;
@@ -2412,6 +2626,7 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B27 | zone `AmpersandCommand::ac_Dimension` @ FUN_0041a5a0 (Z11 §3.1) with the sight workers `AxialListBriefExchangerAtMove::ali_Work` @ FUN_004bdde0 / `AxialListBriefDeleteAtMove::ali_Work` @ FUN_004bdfe0 (Z09 §9.6) | `&dimension n` writes only `so_layer.layer→l_Main`; `so_AllOfRangeNomal` @ FUN_0054c900 still selects the GM by the unchanged `LayerRegistInfo`, while `so_DistanceSquar` @ FUN_004028f0 returns 999 999 999 across `l_Main` values, so both workers fire on every step (§18.6) | while a GM is in another dimension, every server step of a player or mob within sight sends an appear packet (+ last move + abstates) and a 0x1C0E both ways: 374 KB to the GM in 20 s near a mob group, 136 appear / delete pairs to the other player | set the slanted-list layer as well (or test `l_Main` in the range query), and re-enter the map (`so_ExchageBriefInfo`) after the change |
 | P02-B28 | WM `CParserClient::fc_NC_CHAR_LOGIN_REQ` @ FUN_00422be0 → client 0x1110 (W01 §4.2) | `CSendPacket::ID(&p, 0x1110, 1, NULL)` declares a 1-byte payload and writes none (§18.7) | one stale WM byte (0xD5) in every tutorial popup; the client reads no payload | payload size 0 (PROTO struct empty), as P02-B2 |
 | P02-B29 | zone `ShineMobileObject::so_Shout` @ FUN_00459080 → 0x201F (Z02 §3.2); WM whisper 0x200D (W04 §2.1) | `smo_Shout` writes only bits 0 / 1 of `flag`; bits 2–7 keep the shared buffer `gpp` byte (0x78, 0x74 captured). The WM's 0x200D flag has bits 1–7 from the stack (0x54, 0x04; W04 states it without an ID) (§18.4) | stale bits on the wire; both clients test only bits 0 / 1, so no visible effect | write the whole byte (`flag = GMColor + (isMob << 1)`) |
+| P02-B30 | zone ITEMDB requests: `ac_ClearInventory` @ FUN_0041bbd0 and the `sp_DestroyItem` family (Z18 §4.4) → 0x3459; `sp_NC_ITEM_SPLIT_REQ` @ FUN_00539a40 → 0x3434; `ItemInventory_ii_DropAll` @ FUN_00529a70 → 0x3416 | 0x3459 without bit 7 leaves payload +9…+22 (`itemID`, `key`, `attrOffset`, `inven`) unwritten; 0x3434 leaves `lotcreate.attr` (+62) unwritten; 0x3416 copies the cell's whole 101-byte attribute union, of which a lot item uses 1 byte (§19.2–§19.4) | earlier `gpp` contents (text of other packets) and zone heap bytes reach the Character DB on every `&cleariv` / destroy / split / drop and come back in 0x3417; the Character server reads only the valid parts *(inferred from D03 §3.3 / §3.4 and Z18 §4.4)* | zero the fields (or the send buffer) before filling; copy only the class's attribute length |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -2436,6 +2651,11 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | W04-B43 | WM → CharDB 0xA41A once per WM start, no answer | §17.4 |
 | Z02-B3 | `s14` 416.929 / 493.861: after a player's 0x1C01 for the other player, the requester's 0x1C19 goes to the other player; the requester gets none | §18.2 |
 | W04 (0x200D flag, no ID) | bits 1–7 stale (0x54 / 0x04), joined into P02-B29 | §18.4 |
+| D03-B11 | `s21`: 0x0447 and 0x0456 map "Need", x / y 0 (the split log 0x0457 carries the real map) | §19.3, §19.4 |
+| D03-B6 | `s21`: 0x3439 = ref + one unwritten byte (`0x10`) | §19.2 |
+| Z04-B4 | `s21` 447.1: a part-stack drop answers `0x3008 {0x303}` without a menu | §19.4 |
+| Z11-B12 | `s21`: 3 `&makeitem` with a full inventory send nothing and show nothing | §19.2 |
+| Z11-B32 | `s21` 142.9: `&getmoney` → `0x300A {itemid 0, lot 0, 0x341}` (nothing picked since login) | §19.2 |
 
 ## 13. Discrepancies per work item
 
@@ -2516,6 +2736,12 @@ creates for the README register.
 | Z13 | `Z13-objects.md` §1.6 (0x3467 `u16 attrLen`) | the u16 at +0x2C is the constant 0x2E (payload offset of the attribute block), not a length; D03 §7.1 `attr16` is right (§18.7) | corrected → batch-3 follow-up |
 | Z02 | `Z02-actions.md` §3.2 (0x201F `flag = GMColor (bit 0), isMob (bit 1) = 0`) | bits 2–7 are not written (stale `gpp` byte, P02-B29) (§18.4) | extended → batch-3 follow-up |
 | X02 | `capture-scenarios.md` §3.14 steps (2), (4), (6) and the `s14` notes | no walk and no sit on the wire (only runs and `stand`); the "name not online" whisper went to X14B with the text `X14Nobody` (0x200E not reached); the shout was never out of sight; notes "B saw A after B stepped" for `&show` and `&dimension 0` disagree with the wire (A's step for `&show`; no appear for `&dimension 0`) (§18.3, §18.4, §18.6) | reach limited → batch-3 follow-up |
+| Z04 | `Z04-items.md` §4.2 (0x300D: "to cell not empty: 0x44c", "Invalid 'to' cell: 0x446"; 0x3434 "+0x42 u32 lot, +0x44 oldLot, 0x46 bytes") | occupied target → `0x446` (zone 0x53a047), invalid from / to → `0x445`; `splitlot` u16 @64, `MainLot` @66, 68 bytes (§19.3) | corrected → batch-3 follow-up |
+| Z04 | `Z04-items.md` §6.3 (0x343E `+0x12 attrLen`) | payload offset of the attribute (20) (§19.6) | corrected → batch-3 follow-up |
+| Z04 | `Z04-items.md` §3.3 (client 0x300A, inventory full `0x34a`/`0x346` *(inferred)*) | `0x346` "Inventory is full."; `0x34A` = KQ pick-up limit (§19.4) | extended → batch-3 follow-up |
+| Z05 | `Z05-itemdb.md` §3.1 (owner-only time "looting / 100 s", "g_Now is in seconds") | 20000 → 19.95 s: `g_Now` counts 0.1 s, as Z09 §11.4 says (§19.4) | corrected → batch-3 follow-up |
+| Z11 | `Z11-gm-commands.md` §7.4 (`&getmoney`: item id 0 *(inferred)*) | captured `0x300A {0, 0, 0x341}` (§19.2) | confirmed |
+| X02 | `tools/capture/21` outputs of `s21` (snapshot / prep) | they list Test1235 (`nCharNo` 2), not the scenario's Test2: no D03 check (§19.8) | contradicted → batch-3 follow-up |
 
 In batch 1 (§3–§6) no discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held (batch 2's rows for Z03, Z09, Z12, Z13 and W03 are above). Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
 timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
@@ -2622,6 +2848,11 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
   makes `vt 0xef4` (zone GM colour) and the WM's `bIsGM` 0 for an admin-level-100 character (an account flag, not
   `nAdminLevel`, *inferred*) was not traced. The mushroom house's attribute `ffecbb76` (0x3449 at the first
   per-minute block) was not decoded. `g_ShoutLevel` is bounded only (1 ≤ value < 120).
+- Batch 3, items I (§19): B's refused pick-up attempt sent no 0x3009, so the client checks the pick right itself;
+  its drop object (`FUN_00610fc0`, built by the 0x1C0A handler FUN_00499900) was not read. The 0x3014 text condition
+  (picker in the client's expedition list, FUN_006f7e30) is read from the call only. Which of drop, pick-merge, drop
+  and destroy menu took the lock indices 14–16 was not traced (one of the four took none). The SQL snapshots of `s21`
+  are of another character (§19.8): the D03 side of scenario 21 is checked only on the wire.
 
 ## 15. Coverage boundary
 
@@ -2700,3 +2931,4 @@ W04 packets P02 cannot override (W04.json sorts after P02.json): WM `0x7C07` 4-b
 | cause of the first WM stop in `s37` (§17.6) | P02 (next batch, needs the WM log) | not on the wire; the code paths are named in §17.6 |
 | `s14` steps not on the wire: unknown-name whisper 0x200E, emote stop 0x2022 / 0x2023, a player walk (0x2017 / 0x2018), sit, a shout out of sight, 0x1C07 at a map login (§18.8) | P02 (next batch, re-recorded scenario 14 steps (2)–(4) / a map login next to a player) | the layouts are W04 §2.1 / Z02 §2–§5's; only the capture is missing |
 | P02-B27's storm also hits the client side (rendering of 136 appear / delete pairs) | – (client behaviour, out of the server spec) | the server bug and its fix are in §12; what the 2016 client does with each pair is not needed for a rebuild |
+| the 2016 client's own pick-right check on a drop object (`FUN_00610fc0`, §19.4) | – (client behaviour, out of the server spec) | the server's rule (Z09 §11.4 owner time, `so_drpitm_CanLooting`) and its timing are captured; a rebuilt server must answer 0x345 for a client that does ask |
