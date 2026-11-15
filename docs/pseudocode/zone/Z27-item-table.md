@@ -97,11 +97,39 @@ ItemInvenDel.shn (CollectCardMobGroup.shn itself is not read here), and WeaponAt
 reader. The keys and row sizes match `docs/knowledge/S01-shn-structs.tsv` (all "same", columns = members in order).
 The column → member maps and the 2016 data invariants of each file are §6.
 
+**The real CollectCardMobGroup loader** (shares the folded reader FUN_00648d50, not part of `idb_Load`; documented here
+because no other doc covers it; the rest of the card tables is follow-up Z28):
+
+```pseudo
+SHND::CommonData<CollectCardMobGroup, CmpCollectCardMobGroup> g_CollectCardMobGroup_MobGroup
+    ctor(this, shnName)                                                        @ FUN_00629700
+        cd_Data = &cd_MyData; cd_MyData = empty std::vector<CollectCardMobGroup>; cd_ShnName = shnName
+    # static initialiser FUN_0069ba90 constructs it with "CollectCardMobGroup.shn" (atexit dtor FUN_006a11b0)
+
+    cd_Load(this)                                                              @ FUN_005b7b10
+        # called from ZoneServer::zs_start_long FUN_005b8c00 (Z10 §7.1)
+        if cd_ShnName == null: fatal "CommonData<T, C>::cd_Load : Name NULL"; ShineExit("CommonData<T, C>::cd_Load")
+        path = "../9Data/Shine/" + cd_ShnName
+        cd_Data.clear()                                                        # end = begin; a reload would not duplicate
+        reader = BinaryDataBox<CollectCardMobGroup>(default row: CC_MobInx "" , CC_CardMobGroup MG_NONE)
+        reader.bdb_ReadData(path)                                              # FUN_00648d50, key 0x12, row 0x24
+        for r in 0 .. reader.rowcount−1:
+            cd_Data.push_back(copy of row r)                                   # 0x24 bytes: char CC_MobInx[32], u32 CC_CardMobGroup
+        free reader                                                            # the rows live only in the vector
+
+    cd_Find(this, mobInxName)                                                  @ FUN_00627ed0
+        for each row (in file order): if row.CC_MobInx (32 bytes, zero-padded copy) == mobInxName (32 bytes): return &row
+        return null                                                            # linear search, first match
+```
+
+Its only reader is `g_CardCollectMake` FUN_00628880 (mob InxName → card group of an unidentified mob card; Z28).
+
 ## 3. `ItemDataBox::idb_Load` (stage home)
 
 Called once, from `ZoneServer::zs_start_home` FUN_005adce0, after `MapDataBox::mdb_Load` and before
-`ItemBelongAttribute::iba_Load`, `DropIndexCluster::dic_Load`, `RecallPointTable::rpt_Load` and
-`ItemGroupClassifier::igc_Load` (Z24 §7.2), which all look items up in it. Every "fatal" below is
+`ItemBelongAttribute::iba_Load` FUN_0064b210 (reads BelongTypeInfo.shn into its own array; it never touches
+`itemdatabox`), `DropIndexCluster::dic_Load` FUN_0048fa30 (Z09), `RecallPointTable::rpt_Load` FUN_004fbf10 (looks names
+up in `idb_btree`; Z01 §2.3 loader table) and `ItemGroupClassifier::igc_Load` (Z24 §7.2); the last three look items up in it. Every "fatal" below is
 `AssertClass::ac_AssertFail` (log line, FUN_0063c6c0 / FUN_0063c710 / FUN_0063c760) followed by `ShineExit`
 (FUN_0063c7c0, ends the process); "log only" is the assert without the exit. `itemdatabox[name]` is
 `BTree::operator[](idb_btree, name)` FUN_0063cc30 (0xFFFFFFFF when absent).
@@ -405,7 +433,10 @@ Read by `idb_Load`: `ID` (index slot, §3.3/§3.4), `InxName` (trie), `ItemFunc`
   Q_SpiritBottle 9039/9424, Q_FogNepilim 9041/9425, Q_FogLence 9042/9427, Q_SilberkTooth 9044/9429,
   Q_HeartBlack 9151/9421): the trie maps each to the **second** ID (§3.4); none of them is a special ID, a
   GradeItemOption, ItemInvenDel or ItemMoney name, so this loader is not affected (name lookups elsewhere are, Z24 §7.3).
-- `ItemFunc`: 14 964 × 0, and exactly one row with `ITEMFUNC_JUSTREVIVAL` (3): ID 30168 `JustRevival` → `sii_JustReviveItem`.
+- `ItemFunc` (`ItemFuncEnum`): 14 964 × `ITEMFUNC_NONE` (0); 8 × `ENDUREKIT_WC` (1: 30152–30157, 30160 `WeaponEndure*`, 30239
+  `EnchantSocketAdd`); 9 × `ENDUREKIT_F` (2: 30144–30151, 30167 `FurnitureEndure*`); exactly one `ITEMFUNC_JUSTREVIVAL` (3):
+  ID 30168 `JustRevival` → `sii_JustReviveItem`; 1 × `CHANGE_NAME` (4: 30175 `F_ChangeName`); 1 × `CHANGE_RELATION` (5: 30176
+  `F_ChangeRelation`); 5 × `PUTON_CLEAR` (6: 2530–2534 `PutOn_ClearKit0*`). `idb_Load` tests only value 3.
 - `Class` ≤ 38 and `WeaponType` ≤ 21 for every row (no "Invalid item class" log at §3.11).
 - One row's `InxName` differs from its ItemInfoServer row (§6.2): ID 9157 is `A piece of Mimic's box` in ItemInfo
   (also in the client's ItemInfo.shn) and `Q_JokerCard01` in ItemInfoServer. The loader never compares them; only the
@@ -498,7 +529,7 @@ have empty names). Read by `idb_Load`: all (§3.8).
 ### 7.1 Special item IDs: 2016 values and consumers
 
 The 2016 ID of each name (ItemInfo.shn; every name exists once, so the loader passes). "Readers" are all places that
-read the member in the zone (`rg 'sii_<name>'` over the PDB-named export, plus the six `idb_SpecialItems` callers, which
+read the member in the zone (`rg 'sii_<name>'` over the PDB-named export, plus the five `idb_SpecialItems` callers FUN_00417580, 00473550, 00473860, 00473c00, 00474650, which
 read `sii_JustReviveItem`, `sii_GuildReName`, `sii_GuildReType`).
 
 | Member | Name → 2016 ID (item name, class) | Readers (owning item) |
@@ -548,7 +579,8 @@ read `sii_JustReviveItem`, `sii_GuildReName`, `sii_GuildReType`).
   passes n = 5; n is capped at 10) finds the first GoddessWing in the inventory, and if its class is `ITEMCLASS_BINDITEM` (13) and it has
   fewer than n saved locations, appends one location {map 0xFFFF, x 10000, y 10000}, writes the item to the DB
   (`sp_AttrChange2DB`) and sends code 0x700 through vt 0x91c; `UseItemMemoryFeather::uib_CanUseItem` FUN_00598ab0 returns
-  0x701 when vt 0x47c fails, else looks for a GoddessWing (class 13) in the unlocked inventory: none → 0x718, more than
+  0x701 when vt 0x47c fails, else takes only the **first** unlocked GoddessWing in the inventory (one `uii_Home` with an ident iterator, no loop):
+  none, or its class is not 13 → 0x718 (even if a later GoddessWing would qualify), more than
   4 saved locations → 0x719, else 0x700 (OK) (so a Memory Feather raises the GoddessWing to at most 5 locations, the
   two limits agree); `sp_silverwing_Setloc` FUN_0059bc80 acts only when the given inventory
   cell holds item `sii_silverwing` (location-save logic belongs to the silver-wing feature, §10).
@@ -585,12 +617,17 @@ ShinePlayer::sp_ItemInvenDelete(p, cond)                                        
     L = p.vt[0x7d4]()                                     # InventoryCellLockList p+0xfaa8 (Z05 §1)
     it = UnlockedInventoryIterator(L, inventory p.sp_Item.itembag.ci_Inventory, InvenType 9)
     if not it.uii_Home(): return                          # no unlocked inventory cell
-    pkt = 0x3459 NC_ITEMDB_DESTROY_REQ {                  # global packet gpp, 0x19 + 8·count bytes
-        u16 handle  = p.handle (p+4)
-        u32 charNo  = p.vt[0x344]()
-        u16 lockindex = L.lockindex (L+4)
-        u8  count:7 = 0                                    # bit 7 kept
-        @0x19 u64 key[count]                               # the item's 8-byte registration key
+    pkt = 0x3459 NC_ITEMDB_DESTROY_REQ {                  # global packet gpp; offsets: buffer (payload = buffer − 2)
+        +0x00 u16 opcode 0x3459                            # buffer total 0x19 + 8·count bytes
+        +0x02 u16 handle  = p.handle (p+4)                 # payload +0x00
+        +0x04 u32 charNo  = p.vt[0x344]()                  # payload +0x02
+        +0x08 u16 lockindex = L.lockindex (L+4)            # payload +0x06
+        +0x0a u8  count:7, flag:1 = 0                      # payload +0x08; the whole byte is written as 0, so bit 7
+                                                           #   (D03 §7.5 "rewrite one item") is 0
+        +0x0b … +0x18 (14 bytes) never written             # payload +0x09 … +0x16: stale gpp bytes of the previous
+                                                           #   packet where D03 §7.5 places itemId / key / attrOffset;
+                                                           #   ignored by the Character server because bit 7 = 0
+        +0x19 u64 key[count]                               # payload +0x17; the item's 8-byte registration key
     }
     do:
         item = cell under it                               # null = empty cell
@@ -622,7 +659,10 @@ string at `itemoption + 0x20`): those functions do not read the index members.
 at `AttackSpeed × HitTimeArray[i] / 1000` ms while that is ≥ 1; `HitTimeArray[0] == 0` stops the swing instead.
 `sp_Schedule_SwingDamage` cycles `sp_MultiHitNotIndex` back to 0 when the next slot is 0 or the index passes 2. With the
 2016 data: every weapon type with a row hits once at half the swing time (500); dual swords hit three times
-(1, 360, 833 ‰) and claws three times (1, 100, 633 ‰).
+(1, 360, 833 ‰) and claws three times (1, 100, 633 ‰), but only while `AttackSpeed` (vt 0x508) ≥ 1000 ms: slot 0 = 1 ‰
+gives `AttackSpeed × 1 / 1000` = 0 below that, the loop breaks at i = 0 and the swing queues **no** damage tick at all
+(the swing timer is still re-armed, so the attack animates without damage) (original bug) Z27-B7. Base `AtkSpeed` of
+WT 17 / 18 items is 1000–1800, so only attack-speed bonuses that bring it under 1000 ms trigger it *(inferred)*.
 
 The only weapons without a row are the four production tools (§6.8), so Z27-B1 matters only for them: if the heap block
 is zeroed they cannot auto-attack (`HitTimeArray[0] == 0` → swing stops); with garbage they would queue up to three
@@ -637,7 +677,7 @@ FUN_006494f0 is dead (Z24 §7.3). Changing any of the eight files therefore need
 
 A second call would not be safe either *(inferred from §3)*: `idb_index` is allocated again without freeing the old
 array (the old one leaks), the readers re-read their files into new images while the other loaders that ran after
-`idb_Load` (Z24 §7.2: `iba_Load`, `dic_Load`, `rpt_Load`, `igc_Load`) and live objects keep pointers into the old rows,
+`idb_Load` (`dic_Load`, `rpt_Load`, `igc_Load`, §3; `iba_Load` does not use the item table) and live objects keep pointers into the old rows,
 `idb_btree` only gains / overwrites names (a renamed item would keep its old name too), `sii_JustReviveItem` keeps an old
 value if the JustRevival row is gone, and every `ItemSortOrder` / `eDelConditionType` / `pBuyItemData` default is
 reset only on the new array.
@@ -647,11 +687,12 @@ reset only on the new array.
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
 | Z27-B1 | `idb_Load` §3.3 / §3.8 | the index initialisation writes every member except `HitTimeArray[0..2]`; only items whose `WeaponType` has a WeaponAttrib row get it set | the 4 `WT_PRODUCTIONTOOL` weapons (4500, 4503, 4506, 35252) swing with heap contents: zero pages in practice → no auto-attack (§7.3) | initialise to 0 (or to a default one-hit {500, 0, 0}) |
-| Z27-B2 | `idb_Load` §3.4 | ItemSort row count and loop index are truncated to 8 bits | with ≥ 256 ItemSort rows, rows 256+ are never matched and every item using them stops the zone ("cannot find ItemSort"); 2016 has 59 rows, no effect | 32-bit count |
+| Z27-B2 | `idb_Load` §3.4 | ItemSort row count and loop index are truncated to 8 bits (`n = (u8)rowcount`) | with R ≥ 256 ItemSort rows only rows 0 … (R mod 256)−1 are searched (R = 256 → none), and every item whose `ItemSort_Index` lies outside them stops the zone with "ItemDataBox::idb_Load : Invalid ItemSort Index"; 2016 has 59 rows, no effect | 32-bit count |
 | Z27-B3 | `idb_Load` §3.6 | a GradeItemOption name that is no ItemInfo InxName exits through the inlined `idb_MakeSpecialID` with "idb_MakeSpecialID : Wrong Item Id"; the two "(GradeItemOption) : Invalid Item Index" checks after it can never fire | misleading fatal text; dead checks; 2016 data passes | own check with the GradeItemOption text |
 | Z27-B4 | `idb_Load` §3.10 | "Invalid ItemInvenDel ID" (`id ≥ idb_maxItemhandle`) tests a value that came from the name trie, so is always valid | dead check, no effect | — (harmless defensive check) |
 | Z27-B5 | `idb_Load` §3.11 | "Duplicate ItemMoney IM_ItemIDX" logs `IM_MoneyIDX` | the fatal log names the money item instead of the duplicated item; 2016 data passes | log `IM_ItemIDX` |
 | Z27-B6 | `sp_ItemInvenDelete` §7.2 | the "Packet Too Long" assert text names `sp_MakeItem`; after it the lock index is still incremented with reservations recorded but no DB request sent | copy-pasted log text; in the (unreachable with 2016 inventories *(inferred)*) too-long case the reserved cells would stay locked with no answer to free them | own function name; free the reservations when the send is refused |
+| Z27-B7 | `sp_Schedule_SwingStart` (data from §3.8), §7.3 | the first `HitTimeArray` slot of WT_DSWORD / WT_CLAW is 1 ‰; `AttackSpeed × 1 / 1000` is 0 for attack speeds < 1000 ms and the tick loop breaks before queuing anything | a dual-sword or claw swing faster than 1000 ms deals no damage at all *(inferred: reachable only with attack-speed bonuses)* | skip slots that round to 0 instead of breaking, or clamp the delay to ≥ 1 ms |
 
 ## 9. Not reconstructed / uncertain
 
@@ -667,6 +708,9 @@ reset only on the new array.
 - **`sp_ItemInvenDelete` limits** (§7.2): the 7-bit key counter wraps at 128 entries and `pp_SetPacketLen`'s limit was
   not looked up; both need more than 127 deletable event-item stacks in one inventory, which the 2016 inventory size
   does not allow *(inferred)*.
+- **`bt_Insert` failure**: `BTree::bt_Insert` FUN_0063cba0 returns 0 when a trie-node allocation fails; `idb_Load` (§3.4)
+  ignores the result, so the name would silently be missing from `idb_btree` (later name lookups → 0xFFFF / fatal
+  "Wrong Item Id" for special names). Only on out-of-memory at start-up; never observed.
 - `IM_MoneyLot` and `DelCondition` are not range-checked at load (§3.10, §3.11); what other values would do is only
   described from their consumers (Z04 §2.2, §7.2).
 
@@ -678,9 +722,10 @@ reset only on the new array.
 | `BTree::BTree` FUN_0063cb50, `BTree::~BTree` FUN_0063cb70 (from the ctor / `~ItemDataBox` FUN_00649700) | Z20 §5.2 (done; the `BTree` trie) | generic name-trie container; §1.1 / §3.4 only use it |
 | `operator new[]` FUN_00654f0b, `operator delete` FUN_0065677f, `operator delete[]` FUN_00656774 | none needed: MSVC runtime | CRT allocation functions, no game logic |
 | `BinaryDataBox<T>::bdb_ReadData` template, SHN decoding FUN_0062a0f0 / FUN_0062a9e0 | Z20 §2.1 (done; the template) | §2 cites the eight instances; the shared body is documented there |
-| other callers of the readers: FUN_00641580 (`<ItemDropLog>`) also reads `MobKillLog.shn` in `MobDataBox::mdb_Load` FUN_00641e60; FUN_00648d50 (`<CollectCardMobGroup>`) also reads `ActiveSkillGroup.shn` in `SkillDataBox::sdb_Load` FUN_00585f40 and the card table in `SHND::CommonData<CollectCardMobGroup,…>` FUN_005b7b10 | Z09 §5.1 / §28.5 (`mdb_Load`, done), Z20 §2.1 (`sdb_Load`, done; names the folding), Z07 §7 (card collection, done; `CollectCardMobGroup.shn`) | identical-code folding: one body per row size, each loader's own table |
+| other callers of the readers: FUN_00641580 (`<ItemDropLog>`) also reads `MobKillLog.shn` in `MobDataBox::mdb_Load` FUN_00641e60; FUN_00648d50 (`<CollectCardMobGroup>`) also reads `ActiveSkillGroup.shn` in `SkillDataBox::sdb_Load` FUN_00585f40 and the card table in `SHND::CommonData<CollectCardMobGroup,…>` FUN_005b7b10 | Z09 §5.1 / §28.5 (`mdb_Load`, done), Z20 §2.1 (`sdb_Load`, done; names the folding), §2 of this file (`CommonData<CollectCardMobGroup>` ctor / `cd_Load` / `cd_Find`; Z07 §7 only names the file) | identical-code folding: one body per row size, each loader's own table |
+| the other collection-card tables (`CollectCard`, `CollectCardDropRate`, `CollectCardStarRate`, `CollectCardReward`, `CollectCardTitle` `CommonData` loaders and finders, static initialisers FUN_0069ba10 …), the card roll `g_CardCollectMake` FUN_00628880, `CardCollectionAlbum::cca_Load` FUN_006298c0, `CardCollectionBookmark::ccb_Load` FUN_00629a50 | **Z28** (new, added by Z27) | Z07 (done) documents the card packets and names the files only; Z09's boundary also hands `CollectCard` `cd_Load` 00629840 to Z07; no item documents the tables |
 | `zs_start_home` FUN_005adce0 (only caller of `idb_Load`) and the loader order | Z10 §7.1 (done; stage scripts) | start-up stages; §8 only needs "runs once at start-up" |
-| the other loaders keeping pointers into item rows (`iba_Load`, `dic_Load`, `rpt_Load`, `igc_Load`) | Z24 §7.2 (done) | they read the finished index; §8 cites them for reload safety |
+| the other loaders that look items up after `idb_Load` (`dic_Load` FUN_0048fa30, `rpt_Load` FUN_004fbf10, `igc_Load`) and `iba_Load` FUN_0064b210 (BelongTypeInfo.shn, no item lookup) | Z09 (`dic_Load`, drop tables), Z01 §2.3 loader table (`rpt_Load`, `iba_Load`), Z24 §7.2 (`igc_Load`) | they read the finished index; §8 cites them for reload safety |
 | the 33 callers of `idb_2itemid` FUN_00418ff0, the callers of `ItemDataBox::operator[]` FUN_00419020 and of `idb_SpecialItems` FUN_00418fe0 | the item of each caller (§7.1 names the `sii_*` readers with their items; Z04 §1.2 the index use) | accessors over the finished table; the logic of each caller is its feature's |
 | `sp_silverwing_Setloc` FUN_0059bc80 (reads `sii_silverwing`) | Z26 (planned; plan step 1 names its only caller `smfm_Silverwing_LocSet` FUN_0059bff0) | silver-wing location saving; §7.1 records only the item-ID test |
 | `sp_Schedule_SwingStart` FUN_00430bc0 / `sp_Schedule_SwingDamage` FUN_0042f550 (read `HitTimeArray`; SwingStart dereferences the `operator[]` result without a null check) | Z03 §3.2 (done; documents the hitTime loop) | combat timing; §7.3 documents only what the 2016 data makes them do |
