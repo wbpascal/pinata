@@ -1251,6 +1251,218 @@ other document (the SOAP classes of 0x43f310–0x43f660 are §5's):
 
 ---
 
+## 5. Character: the SOAP item-shop client (`cUKItemShop`, gSOAP 2.8)
+
+The Character server answers the WM's 0x0870 (the in-game item-shop button, W01 §5.3) by asking a gamigo web service
+for a per-account shop URL. The client is a gSOAP 2.8 proxy (`gSOAP/2.8` in the User-Agent string FUN_004825e0;
+generated code 0x46ed40–0x47d55f, runtime `stdsoap2` 0x47d560–0x48ce80). Account and AccountLog include the same header
+(their PDBs have the types `cUKItemShop`, `SingleSignOnServiceSoapBindingProxy`, `soap`, `ns1__*` *(pdb2016)*) but
+link none of its code. The gSOAP function names used below are library names, matched by structure, call order
+and strings to the gSOAP 2.8 sources *(inferred)*; the class, member and vtable names come from RTTI and the Account
+PDB types.
+
+### 5.1 Objects
+
+```
+cUKItemShop (0x34, g_Server+0x209f18 = DAT_006ec980; member names (pdb2016) from Account.pdb):
+    +0x00 _RTL_CRITICAL_SECTION m_CS          guards the list
+    +0x18 HANDLE m_hSemaphore                  count = free proxies
+    +0x1c ulong m_dwMaxProcessNum              pool size
+    +0x20 SingleSignOnServiceSoapBindingProxy** m_pSoap      array of the pool (only tested for null after Init)
+    +0x24 std::vector<SingleSignOnServiceSoapBindingProxy*> m_pSoapList   the free list (LIFO)
+    ctor FUN_0043f5b0 zeroes the vector; dtor FUN_0043f5c0 frees the vector's buffer only (the proxies, the array, the
+    semaphore and the critical section are never released; the process is ending anyway)
+SingleSignOnServiceSoapBindingProxy : soap (0x1d6c0): +0x1d6bc char* soap_endpoint; 20 virtual slots (§5.6)
+soap (gSOAP context, layout (pdb2016) from Account.pdb): +0x8 mode, +0xc imode, +0x10 omode, +0x34 recv_timeout,
+    +0x38 send_timeout, +0x3c connect_timeout, +0x40 accept_timeout, +0x6c alist (allocations of soap_malloc),
+    +0x5fec… callback table (fpost … fplugin), +0x60c4 socket, +0x19178 keep_alive, +0x191a8 error
+ns1__getItemShopUrlRequest  (0x24): +0x4 std::string accountId, +0x20 soap* soap   (ctor FUN_0043f310, dtor FUN_0043f380)
+ns1__getShopUrlResponse     (0x24): +0x4 std::string url,       +0x20 soap* soap   (ctor FUN_0043f3b0, dtor FUN_0043f420)
+namespaces table PTR_s_SOAP_ENV_004c97c0: SOAP-ENV http://schemas.xmlsoap.org/soap/envelope/, SOAP-ENC …/soap/encoding/,
+    xsi http://www.w3.org/2001/XMLSchema-instance, xsd http://www.w3.org/2001/XMLSchema,
+    ns1 http://infrastructure.games.gamigo.com/v_1_3          # SOAP 1.1, document/literal
+endpoint (string 004bb5a0, compiled in, no config key): http://bip.srv.gsc.gas.gamigo.com:8080/gameserverconnector-webapp-fiesta-us/sso
+```
+
+### 5.2 Start-up: building the pool
+
+```pseudo
+cUKItemShop::Init(this, nCount) → 1 ok / 0 failed:   (our name; log "FAILED - UK ItemShop Init")   @ FUN_0043f690
+    # called once, first step of DataServer::OnStart_Service FUN_004027a0 with nCount 0 (§4.2); 0 → the start fails
+    m_dwMaxProcessNum = nCount ≠ 0 ? nCount : max(1, (CPU × 10) >> 1)        # 5 per CPU (GetSystemInfo)
+    InitializeCriticalSection(&m_CS)
+    m_hSemaphore = CreateSemaphoreA(null, n, n, null);      null → return 0
+    m_pSoap = new Proxy*[n] (FUN_0048ce81);                 null → return 0
+    for i in 0 … n−1:
+        p = new SingleSignOnServiceSoapBindingProxy(endpoint)  (0x1d6c0 bytes; ctor FUN_0047d520, §5.6)
+        p == null: delete the proxies 0 … i−1 (virtual dtor), delete[] m_pSoap; return 0
+            # m_pSoap keeps the freed pointer and m_pSoapList the freed proxies; harmless, the start stops here
+        m_pSoap[i] = p; m_pSoapList.push_back(p) (FUN_0043f5f0, grow FUN_0043f450)
+    return 1
+```
+
+The proxy constructor runs `soap_init2(this, 0, 0)` FUN_0048c5d0 (via `soap::soap` FUN_0048cdd0): input and output mode
+`SOAP_IO_DEFAULT`, no keep-alive, and **all four timeouts 0** (`+0x34 … +0x40`, FUN_0048c5d0 is the only code in the
+binary that writes them; nothing in the Character code changes them afterwards). It then sets the namespaces table
+(`soap_set_namespaces` FUN_00483230) and `soap_endpoint` = the URL above. Nothing connects at start: the shop host is
+first contacted by the first 0x0870.
+
+### 5.3 0x0870 NC_MISC_ITEMSHOP_URL_DB_REQ
+
+```pseudo
+0x0870 NC_MISC_ITEMSHOP_URL_DB_REQ { u32 nCharNo, u32 nUserNo }   (from the WM; no length check)
+                                                       @ fc_NC_MISC_ITEMSHOP_URL_DB_REQ FUN_00428bb0 (D02 §9)
+    CheckAlive(session) fails → return 0
+    cUKItemShop::Recv_NC_MISC_ITEMSHOP_URL_DB_REQ(&g_Server.m_ItemShop, payload, session); return 1
+
+cUKItemShop::Recv_NC_MISC_ITEMSHOP_URL_DB_REQ(this, req, session):   (name from its log strings)   @ FUN_0043f7f0
+    # runs on the session worker that took the job (§1.5); everything below blocks that worker
+    m_pSoap == null: log "cUKItemShop::Recv_NC_MISC_ITEMSHOP_URL_DB_REQ : Not Init Soap"; return      # no reply
+        # unreachable: Init failing stops the start (§5.2)
+    r = WaitForSingleObject(m_hSemaphore, 0)                                   # no waiting
+    r == WAIT_TIMEOUT (0x102):                                                 # every proxy is in use
+        Send session 0x0871 NC_MISC_ITEMSHOP_URL_DB_ACK { u32 nCharNo = req.nCharNo, u16 nError = 0x3042, u16 nLen = 0 }
+        return
+    r ≠ 0: return                                     # WAIT_FAILED: no reply, no log (unreachable with a valid handle)
+    under m_CS: p = m_pSoapList.back(); pop_back()    # LIFO; the semaphore guarantees the list is not empty
+    request = ns1__getItemShopUrlRequest { accountId = sprintf("%d", req.nUserNo) }   # signed decimal
+    response = ns1__getShopUrlResponse { url = "" }
+    err = p->getItemShopUrl(&request, &response)      # vtable +0x44 FUN_0047cd00 → +0x40 FUN_0047d0b0, §5.4
+    err == SOAP_OK (0):
+        nLen = (u16) response.url.size()
+        strncpy(packet.Data + 8, response.url, nLen)  # no check against the 8187-byte packet buffer (original bug) D08-B7
+        Send session 0x0871 { u32 nCharNo = req.nCharNo, u16 nError = 0x3040, u16 nLen, char sURL[nLen] }   (size nLen + 8)
+    else:
+        Send session 0x0871 { u32 nCharNo, u16 nError = 0x3043, u16 nLen = 0 }
+        p->soap_sprint_fault(buf, 0x800) (vtable +0x34 FUN_0047ce70 → soap_sprint_fault FUN_00484500:
+            "Error <err> fault: <faultcode> [<subcode>]\n\"<faultstring>\"\nDetail: <detail>")
+        log "ERROR - cUKItemShop::Recv_NC_MISC_ITEMSHOP_URL_DB_REQ : soap fail ErrCode : %d\n%s" (err, buf)
+    under m_CS: m_pSoapList.push_back(p)
+    !ReleaseSemaphore(m_hSemaphore, 1) → log "ERROR - cUKItemShop::Recv_NC_MISC_ITEMSHOP_URL_DB_REQ Semaphore Release Error"
+    # no soap_destroy / soap_end on p (original bug) D08-B8
+```
+
+Codes (2017 PDB struct `PROTO_NC_MISC_ITEMSHOP_URL_DB_ACK { ulong nCharNo; ushort nError; ushort nLen; char sURL[0] }`
+*(pdb2017)*, matches the 2016 send): 0x3040 ok, 0x3042 busy, 0x3043 SOAP failure; 0x3041 is the WM's own rate-limit
+code (W01 §5.3, one request per session per 5 s). The WM copies `nError`, `nLen`, `sURL` into the client's 0x086F
+(W01 §5.3, FUN_0040e090). The client (`GameFrameWork::On_NC_MISC_ITEMSHOP_URL_ACK` FUN_004b40f0): 0x3041 / 0x3042 /
+0x3043 → system message "Please try later." (text 0x265a978f); 0x3040 → `ShopWin::SetItemShopUrl(sURL, nLen)` and the
+shop window opens; any other code is ignored. An answer without `<ns1:url>` is accepted (the element is optional
+outside `SOAP_XML_STRICT`, FUN_00479db0): 0x3040 with `nLen` 0, an empty shop window.
+
+### 5.4 The `getItemShopUrl` call on the wire
+
+```pseudo
+SingleSignOnServiceSoapBindingProxy::getItemShopUrl(endpoint, action, req, resp):   @ FUN_0047d0b0
+    soap_endpoint = endpoint ?: soap_endpoint ?: "http://localhost:8080/sso"   # the pool always has the gamigo URL
+    action = action ?: "getItemShopUrl"
+    encodingStyle = null                                           # document/literal
+    soap_begin FUN_00483100; soap_serialize___ns1__getItemShopUrl FUN_0046fc80
+    soap_begin_count FUN_00485400; if mode & SOAP_IO_LENGTH: serialise once to count the length
+        (soap_envelope_begin_out FUN_0048b6a0, soap_putheader FUN_0046f760, soap_body_begin_out FUN_0048b7f0,
+         soap_put___ns1__getItemShopUrl FUN_0046fcb0, soap_body_end_out FUN_0048a4c0, soap_envelope_end_out FUN_0048a1f0);
+    soap_end_count FUN_0047eac0
+    soap_connect FUN_0048cc30 → soap_connect_command(SOAP_POST 2000) FUN_0048b870: tcp_gethost FUN_0047e420 (name lookup
+        every call), tcp_connect FUN_00481d90 (new socket every call), http_post FUN_004825e0 + soap_puthttphdr FUN_00480b90
+    the same serialisation again to the socket; soap_end_send FUN_0048a550
+    any error so far → return soap_closesock FUN_0047e6c0 (= the error)
+    soap_begin_recv FUN_00487d50 (reads and parses the HTTP answer, http_parse FUN_00484d00), soap_envelope_begin_in
+        FUN_0048a340, soap_recv_header FUN_00480710, soap_body_begin_in FUN_0048a500
+    resp->soap_get(soap, "ns1:getItemShopUrlResponse", "ns1:getShopUrlResponse")   # FUN_0047ca60 → FUN_00479db0, child <ns1:url>
+    soap.error ≠ 0 → return soap_recv_fault FUN_004884d0 (parses a SOAP-ENV:Fault, soap_get_SOAP_ENV__Fault FUN_0047c700)
+    soap_body_end_in FUN_00488490, soap_envelope_end_in FUN_00488460, soap_end_recv FUN_00485700
+    return soap_closesock FUN_0047e6c0       # keep_alive 0: the socket is closed after every call
+```
+
+The request (read in `http_post` / `soap_puthttphdr` / the serialisers; not captured, the shop traffic is not in any
+capture):
+
+```
+POST /gameserverconnector-webapp-fiesta-us/sso HTTP/1.1
+Host: bip.srv.gsc.gas.gamigo.com:8080
+User-Agent: gSOAP/2.8
+Content-Type: text/xml; charset=utf-8
+Content-Length: <n>
+Connection: close
+SOAPAction: "getItemShopUrl"
+
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:SOAP-ENC="…/soap/encoding/"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:ns1="http://infrastructure.games.gamigo.com/v_1_3"><SOAP-ENV:Body>
+  <ns1:getItemShopUrl><ns1:accountId>{nUserNo}</ns1:accountId></ns1:getItemShopUrl>
+</SOAP-ENV:Body></SOAP-ENV:Envelope>
+```
+
+The expected answer is `<ns1:getItemShopUrlResponse><ns1:url>…</ns1:url></ns1:getItemShopUrlResponse>` (type
+`ns1:getShopUrlResponse`, also the answer type of `getCashShopUrl`). Error values reaching the 0x3043 log are gSOAP's:
+28 `SOAP_TCP_ERROR` (name lookup ("get host by name failed in tcp_connect()") or connect failed, read in `tcp_connect` FUN_00481d90:
+`0x1c`), an HTTP status
+≥ 300 without a SOAP body, 12 `SOAP_FAULT` / 1 / 2 for a SOAP fault (the service's declared fault details are
+`AccountNotFound`, `InfrastructureServiceError`, `TokenInvalid`, …, parsed by `soap_in_SOAP_ENV__Detail` FUN_0047c000),
+3 / 5 / −1 for a malformed or truncated answer *(gSOAP 2.8 error numbering, inferred except 28)*.
+
+### 5.5 When the shop host does not answer
+
+There are no timeouts (§5.2): `tcp_connect` uses a blocking `connect`, and `frecv` FUN_0048c1e0 / `fsend`
+FUN_0048bf40 wait in `select` only when `recv_timeout` / `send_timeout` ≠ 0, which is never the case. So, per request:
+
+| Shop host state | What the worker does | Reply to the WM / client |
+|---|---|---|
+| name does not resolve | blocks for the DNS lookup, then error 28 | 0x3043 "Please try later." |
+| refuses (RST) | fails at once, error 28 | 0x3043 |
+| drops packets (no route / firewall) | blocks in `connect` for the OS connect timeout *(inferred: about 21 s on Windows)*, then error 28 | 0x3043 after the wait |
+| accepts but never answers (hung web app) | blocks in `recv` **forever**; the proxy and the worker never come back | none; the client never gets a window or a message |
+| answers slowly | blocks until the answer | normal reply, late |
+
+Each blocked request holds one proxy and one session worker. The pool has 5 × CPU proxies, the worker pool
+min(10 × CPU + 1, 81) workers (§4.4), so a hung host takes up to half the workers on up to 8 CPUs (4 CPUs: 20 of 41),
+45 of 81 on 9 CPUs, 80 of 81 on 16; after that every 0x0870 is answered 0x3042 at once, and the remaining workers carry
+every other Character job (logins, saves, items) of the world. From 17 CPUs on the pool (85 …) is larger than the
+worker count: all 81 workers can block, the Character server stops serving every job, and 0x3042 is never sent. The lost workers stay lost until a restart, and a stop
+(`CSessionWorkerManager::Stop` waits for each worker to reach STOPPED, §1.5) never completes while one of them is
+blocked in `recv` (original bug) D08-B6. The WM's 5-s per-session limit (0x3041) keeps one player from filling the
+pool alone, not several players.
+
+### 5.6 The proxy class and the unused operations
+
+`SingleSignOnServiceSoapBindingProxy` vtable (RTTI; slot order of soapcpp2's proxy class, MSVC puts each overload pair
+in reverse order):
+
+| Slot | Function | |
+|---|---|---|
+| 0 | FUN_0047d4f0 `scalar deleting destructor` (→ `soap::~soap` FUN_0048cdf0: frees the class list, `soap_end`, `soap_done` FUN_0048c3d0) | |
+| 1–3 | FUN_0047cd40 `SingleSignOnServiceSoapBindingProxy_init` (modes, namespaces), FUN_0047cd70 `destroy` (`soap_delete` FUN_0047ef30 + `soap_end` FUN_004831d0), FUN_0047cd90 `reset` | never called by the Character code |
+| 4–13 | FUN_0047cdc0 `soap_noheader`, FUN_0047cdd0 `soap_header`, FUN_0047cde0 `soap_fault`, FUN_0047cdf0 `soap_fault_string`, FUN_0047ce00 `soap_fault_detail`, FUN_0047ce10 `soap_close_socket`, FUN_0047ce20 `soap_force_close_socket`, FUN_0047ce30 `soap_print_fault`, FUN_0047ce50 `soap_stream_fault`, FUN_0047ce70 `soap_sprint_fault` | only slot 13 is used (§5.3) |
+| 14 / 15 | FUN_0047ce90 / FUN_0047cce0 `getAccountForToken` (action "getAccountForToken", request `ns1:getAccountForToken` with `ssoToken`, `clientIp`; answer `ns1:getAccountForTokenResponse`) | dead: no caller |
+| 16 / 17 | FUN_0047d0b0 / FUN_0047cd00 `getItemShopUrl` | §5.4 |
+| 18 / 19 | FUN_0047d2d0 / FUN_0047cd20 `getCashShopUrl` (action "getCashShopUrl", request `ns1:getCashShopUrlRequest` with `accountId`; answer type `ns1:getShopUrlResponse`) | dead: no caller |
+
+The generated schema also carries a shopping-cart / item model (`ns1__shoppingCartItem` with `itemId`, `name`, `quantity`,
+`total`; `ns1__itemInformationType` with `itemId`, `description`, `visible`, `purchasable`; `ns1__property` /
+`ns1__propertyList` key–value pairs; `_ns1__IllegalAmount`, `_ns1__InsufficentCash { accountId, requestedAmount,
+currentBalance }`, `_ns1__VoucherCodeInvalid`, …): types of the same WSDL that no operation of this proxy sends or
+expects except as fault details. The server never buys, books cash or checks tokens through this service; it only fetches
+the shop URL. The account identifier sent is the game's `nUserNo`, so the web service maps user numbers to its own
+accounts *(inferred)*.
+
+### 5.7 Address table (Character, gSOAP)
+
+None of these functions has project logic except §5.2–§5.4; the rest is generated (soapcpp2) or library (stdsoap2) code.
+
+| Group | Functions | Where described |
+|---|---|---|
+| `cUKItemShop`, its `std::vector<Proxy*>` / `std::string` helpers, the two `ns1` objects on the stack | 0043f310 0043f380 0043f3b0 0043f420 0043f450 0043f4b0 0043f5b0 0043f5c0 0043f5f0 0043f660 0043f690 0043f7f0 | §5.1–§5.3 |
+| proxy class (vtable, ctor FUN_0047d520) | 0047cce0 0047cd00 0047cd20 0047cd40 0047cd70 0047cd90 0047cdc0 0047cdd0 0047cde0 0047cdf0 0047ce00 0047ce10 0047ce20 0047ce30 0047ce50 0047ce70 0047ce90 0047d0b0 0047d2d0 0047d4f0 0047d520 | §5.6 |
+| `ns1` class virtuals (RTTI vtables of the 22 classes: `soap_type`, `soap_default`, `soap_serialize`, `soap_put`, `soap_out`, `soap_get`, `soap_in`, `scalar deleting destructor`); shared bodies (identical code folded): FUN_0046f1f0 `soap_serialize` of 21 classes (empty), FUN_00471840 `soap_default` of the 12 one-string classes, FUN_00472370 of the 4 two-string classes; the `soap_type` of 10 classes are folded into constant-return functions elsewhere (FUN_0043f370 is also the `fget` callback: returns 15) | 0046ed70 0046f170 0046f190 0046f200 0046f210 0046f850 0046f8e0 00470c80 00470ce0 00470d20 00470d60 00470da0 00470de0 00470e70 00470f60 00470fa0 00471010 00471660 004716d0 00471750 004717c0 00471860 004718d0 00471950 004719c0 00471a40 00471ab0 00471b30 00471b60 00471b80 00471c00 00471c20 00471cc0 00471ce0 00471d80 00471df0 00471e70 00471ee0 00471f60 00471fd0 00472050 00472070 004720f0 00472160 004721e0 00472250 004722d0 004722f0 004723a0 004723c0 00472460 00472480 00472520 00472560 00472580 00472620 00472660 00472680 004729d0 004730a0 00473100 00473160 004731c0 00473220 00473280 004732e0 00473340 004733a0 00473400 00473460 004734c0 00473520 00473580 004735e0 00473640 004736a0 00473700 00473760 00473780 004737e0 00473860 004738c0 00473920 004755d0 00476a00 00479300 0047a7f0 0047ad30 0047bda0 0047bdc0 0047bde0 0047be00 0047be20 0047be40 0047be60 0047be80 0047bea0 0047bec0 0047bee0 0047bf00 0047bf20 0047bf40 0047bf60 0047bf80 0047bfa0 0047bfc0 0047bfe0 0047c760 0047c7a0 0047c7e0 0047c820 0047c860 0047c8a0 0047c8e0 0047c920 0047c960 0047c9a0 0047c9e0 0047ca20 0047ca60 0047caa0 0047cae0 0047cb20 0047cb60 0047cba0 0047cbe0 0047cc20 0047cc60 0047cca0 | names in `names/character/D08.json` |
+| generated free functions with a role in the call (§5.3–§5.4) | `soap_ignore_element` 0046ed80, `soap_putheader` 0046f760, `soap_serialize___ns1__getCashShopUrl` 0046fbf0, `soap_put___ns1__getCashShopUrl` 0046fc20, `soap_serialize___ns1__getItemShopUrl` 0046fc80, `soap_put___ns1__getItemShopUrl` 0046fcb0, `soap_serialize___ns1__getAccountForToken` 0046fd10, `soap_put___ns1__getAccountForToken` 0046fd40, `soap_out_ns1__getShopUrlResponse` 00470720, `soap_putelement` 00471020, `soap_fdelete` 00473980, `soap_in_std__string` 00478400, `soap_in_ns1__getShopUrlResponse` 00479db0, `soap_getelement` 0047ad50, `soap_in_SOAP_ENV__Detail` 0047c000, `soap_getindependent` 0047c380, `soap_in_SOAP_ENV__Fault` 0047c3e0, `soap_get_SOAP_ENV__Fault` 0047c700 | §5.4 |
+| remaining generated serialisers (`soap_default_*` / `soap_serialize_*` / `soap_out_*` / `soap_in_*` / `soap_instantiate_*` / pointer and `std::string` typedef helpers of the types above, SOAP-ENV header / fault / code / detail, xsd built-ins) | 0046ed40 0046eea0 0046eed0 0046ef00 0046ef50 0046ef80 0046eff0 0046f070 0046f270 0046f350 0046f3a0 0046f3f0 0046f440 0046f490 0046f4e0 0046f530 0046f580 0046f5d0 0046f620 0046f670 0046f6c0 0046f6f0 0046f750 0046f7e0 0046f830 0046f8c0 0046f930 0046f950 0046fa70 0046fda0 0046fe60 0046ff20 0046ffb0 00470040 004700d0 00470160 004701f0 00470280 00470310 004703a0 00470430 004704c0 00470550 00470600 00470690 004707a0 00470820 004708b0 00470940 00470a30 00470b10 00470b60 00470b90 00470be0 00470c30 00470c90 00470cf0 00470d30 00470d70 00470db0 00470df0 00470e20 00470e80 00470ed0 00470f00 00470f30 00470f70 00470fb0 00470fe0 00472720 00472760 004727d0 00472800 00472880 00472910 004729a0 004729e0 00472a60 00472ae0 00472b40 00472ba0 00472c00 00472c60 00472cc0 00472d40 00472dc0 00472e30 00472e90 00472ef0 00472f50 00472fb0 00473010 00473b90 00473cc0 00473e30 00473fa0 00474110 00474280 004743f0 00474530 00474680 004747d0 00474920 00474a90 00474c00 00474d70 00474ee0 00475050 004751c0 00475330 00475480 00475640 00475790 004758e0 00475a20 00475ac0 00475b60 00475c00 00475c80 00475d20 00475dc0 00475e60 00475f00 00475fe0 004760c0 004761a0 00476280 00476360 00476440 00476560 00476690 004767b0 004767e0 00476870 004768b0 004768e0 004769c0 00476a40 00476dc0 00476e10 00476e30 00476f70 00476fa0 00477450 004775e0 00477770 00477910 00477aa0 00477c30 00477dc0 00477f50 004780e0 00478270 00478590 00478750 00478790 004787c0 00478800 00478960 004789b0 00478a00 00478b30 00478cc0 00478e50 00478fe0 00479170 00479320 00479540 00479720 00479900 00479a90 00479c20 00479f60 0047a0f0 0047a280 0047a430 0047a610 0047a810 0047aac0 0047c2c0 | not individually named: generated from the WSDL, no project logic |
+| stdsoap2 runtime, identified (call path, callback table of `soap_init2`, strings) | `tcp_gethost` 0047e420, `tcp_accept` 0047e620, `tcp_disconnect` 0047e640, `tcp_closesocket` 0047e690, `tcp_shutdownsocket` 0047e6a0, `soap_closesock` 0047e6c0, `soap_force_closesock` 0047e750, `soap_end_count` 0047eac0, `soap_malloc` 0047ee90, `soap_delete` 0047ef30, `soap_link` 0047efd0, `soap_recv_header` 00480710, `soap_puthttphdr` 00480b90, `fplugin` 00481170, `tcp_connect` 00481d90, `soap_poll` 00482510, `http_post` 004825e0, `http_response` 004829b0, `soap_dealloc` 00482d20, `soap_free_temp` 00482f60, `soap_begin` 00483100, `soap_end` 004831d0, `soap_set_namespaces` 00483230, `soap_print_fault` 00484410, `soap_sprint_fault` 00484500, `http_parse` 00484d00, `soap_begin_count` 00485400, `soap_end_recv` 00485700, `soap_element_end_in` 004858b0, `soap_string_in` 00486ab0, `soap_begin_recv` 00487d50, `soap_envelope_end_in` 00488460, `soap_body_end_in` 00488490, `soap_recv_fault` 004884d0, `http_parse_header` 00488980, `http_post_header` 00489000, `soap_element_end_out` 00489120, `soap_element_begin_in` 00489210, `soap_envelope_end_out` 0048a1f0, `soap_envelope_begin_in` 0048a340, `soap_body_end_out` 0048a4c0, `soap_body_begin_in` 0048a500, `soap_end_send` 0048a550, `http_405` 0048aea0, `soap_element_begin_out` 0048b3f0, `soap_envelope_begin_out` 0048b6a0, `soap_body_begin_out` 0048b7f0, `soap_connect_command` 0048b870, `fsend` 0048bf40, `frecv` 0048c1e0, `soap_done` 0048c3d0, `soap_init2` 0048c5d0, `soap_connect` 0048cc30, `soap_stream_fault` 0048cc50, `soap::soap` 0048cdd0, `soap::~soap` 0048cdf0, `soap::`scalar_deleting_destructor'` 0048ce60 | §5.2–§5.5 |
+| stdsoap2 runtime, rest (XML scanner / writer, entity and base64 coding, MIME / DIME attachments, hash tables, UDP, HTTP server side, `soap_poll`, plugin, …) | 0047d560 0047d5c0 0047d940 0047dbe0 0047dc40 0047dca0 0047dcd0 0047dd50 0047dd90 0047deb0 0047df30 0047df70 0047df90 0047e010 0047e090 0047e0d0 0047e1d0 0047e2b0 0047e480 0047e780 0047e890 0047e8d0 0047e910 0047e960 0047ea20 0047eaf0 0047eb80 0047ec70 0047ece0 0047ed20 0047ed40 0047eda0 0047ee30 0047f010 0047f040 0047f1f0 0047f340 0047f360 0047f420 0047f4a0 0047f4f0 0047f660 0047f710 0047fba0 0047fc10 0047fce0 0047fd10 0047fd80 0047fdf0 0047fe50 0047ffa0 00480130 00480200 00480400 004804f0 00480660 00480760 004808a0 004809e0 00480f60 00480fc0 004810b0 00481110 004811d0 00481300 00481410 00481650 004817b0 00481800 00481a60 00481b60 00481d20 00482c60 00482e20 00483340 00483630 00483aa0 00483b50 00483c20 00483d80 00484600 00484670 00484ad0 00485380 00485540 00485a10 00485b20 004875a0 00487660 004878e0 00488670 004887a0 004887d0 00488860 00488e30 00489060 00489320 00489630 00489760 00489860 004899c0 00489ab0 00489c80 00489f30 0048a040 0048a760 0048a9e0 0048aad0 0048abd0 0048af10 0048b430 0048b4e0 0048b570 0048b600 0048bc80 0048bd3d 0048bd71 0048bdf0 0048beef 0048ca10 0048caa0 0048cb70 | library, not individually named |
+
+`thunk_FUN_0044fad0` FUN_0046ed30 (the last function before the generated block) belongs to the ODBC wrapper (§2.5);
+the CRT starts at FUN_0048ce81 (`operator new[]`).
+
 ## Original-server bugs
 
 | ID | Handler / function | 2016 behaviour | Effect | Likely intent |
@@ -1261,7 +1473,10 @@ other document (the SOAP classes of 0x43f310–0x43f660 are §5's):
 | D08-B4 | `Database::InitEnv` FUN_00417330 (all four builds) | the connection-pooling `SQLSetEnvAttr` is accepted only as `SQL_SUCCESS`; on any other result the function fails without freeing or clearing the environment handle | a driver manager answering `SQL_SUCCESS_WITH_INFO` makes every worker's connect fail (server does not start) and leaks one environment handle per attempt *(inferred: the 2016 hosts answer `SQL_SUCCESS`, the servers start)* | accept 0 / 1 like the other calls; free the handle on failure |
 | D08-B5 | Character `CSession_Manager::InactiveSession` FUN_0043de40 (§4.3) | clears `g_GameLogLink` when any session with `m_Connected_Server_ID == 3` closes, without comparing it with `g_GameLogLink` | an incoming link that announced server type 3 in its 0x0802 (accepted for any `server_id_from`) clears the pointer when it closes; the main thread opens a second GameLog link while the first stays open and unused (needs a misconfigured or hostile peer) | clear only when the closing session is `g_GameLogLink` |
 
-Next free ID: D08-B6.
+| D08-B6 | Character `cUKItemShop::Recv_NC_MISC_ITEMSHOP_URL_DB_REQ` FUN_0043f7f0 / proxy pool `cUKItemShop::Init` FUN_0043f690 (§5.5) | the gSOAP contexts keep `soap_init2`'s timeouts 0: blocking connect, `recv` / `send` without limit, on a session worker | a shop host that accepts and never answers blocks one worker and one proxy per request for good (up to 5 × CPU workers; all 81 from 17 CPUs on, which stops the whole Character server); a stop never completes while a worker is blocked | set `connect_timeout` / `recv_timeout` / `send_timeout` (a few seconds) and run the call off the DB workers |
+| D08-B7 | Character FUN_0043f7f0 (§5.3) | copies `nLen = (u16) url.size()` bytes of the shop's URL into the 8187-byte `CSendPacket` at payload +8 without a bound | a URL over 8179 bytes (0x1ff3) fails `CSendPacket::SetSize` (log, a 3-byte frame with opcode 0 is sent); over 8183 bytes the copy runs past the packet into the stack objects (request / response `std::string`, fault buffer, cookie): crash on return; ≥ 64 KiB is cut to `len mod 0x10000` | clamp `nLen` to the packet's payload room (and to what the client's shop window accepts) |
+| D08-B8 | Character FUN_0043f7f0 (§5.3) | never calls `soap_destroy` / `soap_end` after a call; `soap_begin` FUN_00483100 frees only the temporary lists (`soap_free_temp` FUN_00482f60), not `alist` | every answer's `soap_malloc` blocks (the URL text from `soap_string_in`, fault strings) stay on the proxy until the process ends: the Character server's memory grows with every item-shop request *(effect inferred from the gSOAP 2.8 allocation path, size per call = the answer's strings)* | `soap_destroy(p); soap_end(p)` after each call |
+Next free ID: D08-B9.
 
 ## Not reconstructed / uncertain
 
@@ -1273,6 +1488,11 @@ Next free ID: D08-B6.
   FUN_0044a320 (the ItemInfo fopen probe) has no official name in any PDB.
 - §4.3: the timing claims (log packets dropped before GameLog's 0x0803, the `g_GameLogLink` race) are deduced from the
   code paths, not observed; no capture covers the Character ↔ GameLog link.
+- §5: the shop traffic is in no capture: the HTTP request text is read from `http_post` / `soap_puthttphdr` and the
+  serialisers, the answer format from the response parser; what the gamigo service returned (URL length, faults) and
+  whether the host still existed in 2016 is unknown. The gSOAP function names (§5.7) are matched to the public 2.8
+  sources by structure, call order and strings, not by a symbol file; the ~300 generated / runtime functions listed
+  without a name are library code that was not read one by one.
 
 ## Coverage boundary
 
