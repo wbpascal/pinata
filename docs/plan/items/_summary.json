@@ -272,10 +272,26 @@
   "\u2013"
  ],
  [
+  "Z25",
+  2,
+  "Zone: skill special effects (dispel / cure bodies, SkillSpecial handlers of smo_SkillBlast, reflection damage; added by Z17)",
+  "Z03, Z22",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "Z26",
   2,
   "Zone: silver-wing teleport item (saved location, server menu, portal cast and blast; added by Z23)",
   "Z02, Z04, Z23",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "Z27",
+  2,
+  "Zone: item table loader `ItemDataBox::idb_Load` (ItemInfo, ItemInfoServer, GradeItemOption, ItemDropLog, ItemSort, CollectCardMobGroup, ItemMoney; special item IDs) (added by Z24)",
+  "Z01, Z04, Z24",
   "\u2013",
   "\u2013"
  ],

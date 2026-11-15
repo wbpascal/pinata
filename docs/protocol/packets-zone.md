@@ -188,11 +188,11 @@ Handler `FUN_00576480`
 
 ### `0x1124` NC_CHAR_USEITEM_MINIMON_NORMAL_ITEM_ON_REQ
 
-**Verified layout** (basis: zone FUN_00561d90)
+**Verified layout** (basis: zone FUN_005642e0 → sp_UseItemMinimon_NormalOn FUN_00561d90; client FUN_004a6f70)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16[12] | NormalItemList | -1 = empty |
+| 0 | u16[12] | NormalItemList | item ids, 0xFFFF empty; must be MAUI_BUFFITEM (2) items, no duplicates; no length check |
 
 Handler `FUN_005642e0`
 
@@ -1941,14 +1941,12 @@ Handler `FUN_00572670`
 
 ### `0x8c1f` NC_MINIHOUSE_REARRANGE_REQ
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_REARRANGE_REQ`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_00572d50 → FUN_00546150)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | furniturecount |  |
-| 1 | PROTO_NC_MINIHOUSE_REARRANGE_REQ::<unnamed-type-rearrange>[furniturecount] | rearrange | variable length, element PROTO_NC_MINIHOUSE_REARRANGE_REQ::<unnamed-type-rearrange> |
-
-Element `PROTO_NC_MINIHOUSE_REARRANGE_REQ::<unnamed-type-rearrange>` (18 bytes): +0 u16 furniturehandle, +2 f32 location.x, +6 f32 location.y, +10 f32 location.z, +14 f32 location.angle
+| 0 | u8 | furniturecount | < 393; not checked against the length (Z13-B7) |
+| 1 | {u16 furniturehandle, f32 x, f32 y, f32 z, f32 angle}[n] | rearrange | 18 bytes each |
 
 Handler `FUN_00572d50`
 
@@ -1956,14 +1954,12 @@ No payload fields read directly by the handler.
 
 ### `0x8c22` NC_MINIHOUSE_CREATE_FURNITURE_REQ
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_00572bf0 → FUN_00544f00)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | furniturecount |  |
-| 1 | PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ::<unnamed-type-rearrange>[furniturecount] | rearrange | variable length, element PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ::<unnamed-type-rearrange> |
-
-Element `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_REQ::<unnamed-type-rearrange>` (18 bytes): +0 u16 furniturehandle, +2 f32 location.x, +6 f32 location.y, +10 f32 location.z, +14 f32 location.angle
+| 0 | u8 | furniturecount | < 393; not checked against the length (Z13-B7) |
+| 1 | {u16 furniturehandle, f32 x, f32 y, f32 z, f32 angle}[n] | rearrange | 18 bytes each |
 
 Handler `FUN_00572bf0`
 
@@ -1971,12 +1967,12 @@ No payload fields read directly by the handler.
 
 ### `0x8c25` NC_MINIHOUSE_DELETE_FURNITURE_REQ
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_DELETE_FURNITURE_REQ`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_00572eb0 → FUN_00545a40)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | furniturecount |  |
-| 1 | u16[furniturecount] | furniturehandle | variable length |
+| 0 | u8 | furniturecount | < 393; not checked against the length (Z13-B7) |
+| 1 | u16[n] | furniturehandle |  |
 
 Handler `FUN_00572eb0`
 
@@ -3150,14 +3146,11 @@ Sent from `FUN_005e72f0` (`FUN_005e72f0`) · payload 1 bytes
 
 ### `0x1123` NC_CHAR_USEITEM_MINIMON_INFO_CLIENT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_INFO_CLIENT_CMD`, 50 bytes
+**Verified layout** (basis: zone sp_SendUseItemMinimonInfo_Client FUN_00561990 (at LOGINCOMPLETE); client FUN_0049dae0 → FUN_00429e20)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | UseItemMinimonInfo.bNormalItem |  |
-| 1 | u8 | UseItemMinimonInfo.bChargedItem |  |
-| 2 | u16[12] | UseItemMinimonInfo.NormalItemList |  |
-| 26 | u16[12] | UseItemMinimonInfo.ChargedItemList |  |
+| 0 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot; the client sets its two auto-buff buttons and slot ids |
 
 Sent from `FUN_00561990` (`FUN_00561990`) · payload 50 bytes
 
@@ -3179,12 +3172,12 @@ Sent from `FUN_00561aa0` (`FUN_00561aa0`) · payload 3 bytes
 
 ### `0x112d` NC_CHAR_USEITEM_MINIMON_NOTICE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_USEITEM_MINIMON_NOTICE_CMD`, 4 bytes
+**Verified layout** (basis: zone sp_UseItemMinimon_NormalSlotClear FUN_00563f60 / ChargedSlotClear FUN_00564150; client FUN_0049dbb0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nErr |  |
-| 2 | u16 | nItemID |  |
+| 0 | u16 | nErr | always 0x3648 (item ran out); the client acts only on 0x3648 |
+| 2 | u16 | nItemID | item removed from the list; client: "%s supply has reached zero." |
 
 Sent from `FUN_00563f60` (`FUN_00563f60`) · payload 4 bytes
 
@@ -3985,6 +3978,10 @@ Sent from `ShineObjectClass::ShinePlayer::smo_ply_ReinforceStopHere` (`FUN_00456
 | 4 | u32 | `puVar1[1]` |
 
 ### `0x204e` NC_ACT_WEDDING_PROPOSE_WORD_REQ
+
+**Verified layout** (basis: zone UseItemPropose::uib_DirectUse FUN_00596770 (len 2); client WeddingTask FUN_006dd280 case 0x4E → FUN_006dcbe0 (opens WeddingProposeInputWin))
+
+Empty payload.
 
 Sent from `FUN_00596770` (`FUN_00596770`) · payload 0 bytes
 
@@ -5582,14 +5579,16 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_GuildStorageWithdrawAck` (`FUN_
 
 ### `0x3029` NC_ITEM_SOMEONEUSE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_SOMEONEUSE_CMD`, 12 bytes
+**Verified layout** (basis: zone ShinePlayer::sp_ItemUseBroadcast FUN_0053f840 (Z24 §1.4); client FUN_004af820)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | user |  |
-| 2 | u32 | useloc.x |  |
+| 0 | u16 | user | handle of the using player |
+| 2 | u32 | useloc.x | player position (the client does not read it) |
 | 6 | u32 | useloc.y |  |
-| 10 | u16 | useditem |  |
+| 10 | u16 | useditem | item ID |
+
+12 bytes; sent to the surroundings when the item's useditemeffect entry has broadcast set (Z24 §1.4)
 
 Sent from `FUN_0053f840` (`FUN_0053f840`) · payload 12 bytes
 
@@ -5720,11 +5719,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_WeaponEndureChangeAck` (`FUN_00
 
 ### `0x3037` NC_ITEM_WEAPONENDURESET_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_WEAPONENDURESET_CMD`, 4 bytes
+**Verified layout** (basis: zone ShinePlayer::sp_CostumWeaponChargeDecrease_ToClient FUN_0051a500 (6 bytes incl. opcode, game stream); callers smo_ply_CostumWeaponChargeDecrease FUN_00520840 (every 10th charge on a normal swing, every charge on a damaging skill blast from sbec_Routine FUN_00437fc0) and smo_BashStop FUN_0042e840; not sent for counters >= 100000000 (the not-charged sentinel); PDB 2016 PROTO_NC_ITEM_WEAPONENDURESET_CMD; client ItemRepairTask::On_Recv_NC_ITEM_WEAPONENDURESET_CMD FUN_0066c750)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | ChargedNumber |  |
+| 0 | u32 | ChargedNumber | charges left on the worn weapon skin; the client sets it on the equipped weapon skin (slot 13, else 11) |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CostumWeaponChargeDecrease_ToClient` (`FUN_0051a500`) · payload 4 bytes
 
@@ -5734,11 +5733,11 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CostumWeaponChargeDecrease_ToClient
 
 ### `0x3038` NC_ITEM_ITEMBREAK_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_ITEMBREAK_CMD`, 2 bytes
+**Verified layout** (basis: zone ShinePlayer::sp_NoticeItemBreak FUN_00519370 (4 bytes incl. opcode, data stream); only callers the costume charge decreases FUN_00520840 / FUN_00520aa0 at 0 charges; PDB 2016 PROTO_NC_ITEM_ITEMBREAK_CMD; client GameFrameWork::On_NC_ITEM_ITEMBREAK_CMD FUN_004ab710)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | slot | ITEM_INVEN (union: Inven, str) |
+| 0 | u16 | slot | ITEM_INVEN: box 8 (equipment) << 10 | slot 13 / 11 (weapon skin) or 29 (shield skin); client: 'Weapon Costume has been destroyed.' (TextData2 0x0F3D5672) only when it is the equipped weapon skin |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_NoticeItemBreak` (`FUN_00519370`) · payload 2 bytes
 
@@ -5874,13 +5873,13 @@ Sent in reply to `0x349b` NC_ITEMDB_ENCHANT_ADD_NEW_SOCKET_ACK on GameDBSession 
 
 ### `0x3046` NC_ITEM_ENCHANT_SET_GEM_LOT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_ENCHANT_SET_GEM_LOT_CMD`, 4 bytes
+**Verified layout** (basis: zone ShinePlayer::so_ply_EnchantActionUse FUN_00562cb0 (6 bytes incl. opcode); PDB 2016 PROTO_NC_ITEM_ENCHANT_SET_GEM_LOT_CMD; client On_NC_ITEM_ENCHANT_SET_GEM_LOT_CMD FUN_004b3260)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | equipment | ITEM_INVEN (union: Inven, str) |
-| 2 | u8 | gemSocketIndex |  |
-| 3 | u8 | restCount |  |
+| 0 | u16 | equipment | ITEM_INVEN of the equipped weapon (client accepts store 9 slot < 0xC0 or store 8 slot < 0x1E) |
+| 2 | u8 | gemSocketIndex | 0-2 |
+| 3 | u8 | restCount | charges left after this use; 0 = the gem is removed |
 
 Sent from `FUN_00562cb0` (`FUN_00562cb0`) · payload 4 bytes
 
@@ -6112,11 +6111,11 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ShieldEndureChangeAck` (`FUN_00
 
 ### `0x3066` NC_ITEM_SHIELDENDURESET_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_SHIELDENDURESET_CMD`, 4 bytes
+**Verified layout** (basis: zone ShinePlayer::sp_CostumShieldChargeDecrease_ToClient FUN_0051ab10 (6 bytes incl. opcode, game stream); callers smo_ply_CostumShieldChargeDecrease FUN_00520aa0 (every 10th charge on a normal swing, every charge on a damaging skill blast from sbec_Routine FUN_00437fc0) and smo_BashStop FUN_0042e840; PDB 2016 PROTO_NC_ITEM_SHIELDENDURESET_CMD; client ItemRepairTask::On_Recv_NC_ITEM_SHIELDENDURESET_CMD FUN_0066c780)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | ChargedNumber |  |
+| 0 | u32 | ChargedNumber | charges left on the worn shield skin (slot 29) |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CostumShieldChargeDecrease_ToClient` (`FUN_0051ab10`) · payload 4 bytes
 
@@ -8357,6 +8356,17 @@ Sent in reply to `0x8c12` NC_MINIHOUSE_KICKOUT_REQ on ShineObjectClass::ShinePla
 
 ### `0x8c21` NC_MINIHOUSE_REARRANGE_CMD
 
+**Verified layout** (basis: zone FUN_0048a560; client FUN_0049b400)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | furniturecount | always 1; the client reads only the first entry |
+| 1 | u16 | furniturehandle |  |
+| 3 | f32 | x |  |
+| 7 | f32 | y |  |
+| 11 | f32 | z |  |
+| 15 | f32 | angle |  |
+
 Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_0048a560`) · payload 19 bytes
 
 | Off | Type | Value / source |
@@ -8370,14 +8380,18 @@ Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_
 
 ### `0x8c24` NC_MINIHOUSE_CREATE_FURNITURE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_0048a560 (and the portal of FUN_00573930); client FUN_0049b440)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | furniturecount |  |
-| 1 | PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD::<unnamed-type-rearrange>[furniturecount] | rearrange | variable length, element PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD::<unnamed-type-rearrange> |
-
-Element `PROTO_NC_MINIHOUSE_CREATE_FURNITURE_CMD::<unnamed-type-rearrange>` (21 bytes): +0 u16 furniturehandle, +2 u16 furnitureid, +4 f32 location.x, +8 f32 location.y, +12 f32 location.z, +16 f32 location.angle, +20 u8 nEndureGrade
+| 0 | u8 | furniturecount | 1 |
+| 1 | u16 | furniturehandle | 60000 = the portal |
+| 3 | u16 | furnitureid | item id |
+| 5 | f32 | x |  |
+| 9 | f32 | y |  |
+| 13 | f32 | z |  |
+| 17 | f32 | angle |  |
+| 21 | u8 | nEndureGrade |  |
 
 Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_0048a560`) · payload 22 bytes
 
@@ -8393,6 +8407,13 @@ Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_
 | 21 | u8 | `*(undefined1 *)(*(int *)(param_2 + 0x10) + 0x25)` |
 
 ### `0x8c27` NC_MINIHOUSE_DELETE_FURNITURE_CMD
+
+**Verified layout** (basis: zone FUN_0048a560 / FUN_0048aa60; client FUN_004a3ac0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | furniturecount | 1; the client reads only the first handle |
+| 1 | u16 | furniturehandle | 60000 = the portal |
 
 Sent from `InventoryLocking::InvenCellReleaser_FurnitureReloc::icr_Apply` (`FUN_0048a560`) · payload 3 bytes
 
@@ -8459,16 +8480,16 @@ Sent in reply to `0x8c32` NC_MINIHOUSE_MODIFY_MAXENTERNUM_REQ on ShineObjectClas
 
 ### `0x8c3f` NC_MINIHOUSE_CHAR_ACTION_CMD
 
-**Verified layout** (basis: zone FUN_00574750)
+**Verified layout** (basis: zone FUN_00574750 + mhoadb_GetAniData FUN_004a14c0; client FUN_0049b760)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | PreHandle |  |
-| 2 | u16 | NextHandle |  |
+| 0 | u16 | PreHandle | the requested MiniHouseObjAni Handle |
+| 2 | u16 | NextHandle | follow-up animation: NextAniHandle, or a random member of the group NextAniHandle ≥ 10000; 0xFFFF none |
 | 4 | u16 | nFurnitureHnd |  |
-| 6 | u16 | ActorHnd |  |
-| 8 | u8 | ActorIdx |  |
-| 9 | u8 | ActeeIdx |  |
+| 6 | u16 | ActorHnd | the requesting player |
+| 8 | u8 | ActorIdx | 1…ActorMaxNum random, 0 none; not read by the 2016 client |
+| 9 | u8 | ActeeIdx | 1…ActeeMaxNum random, 0 none; not read by the 2016 client |
 
 Sent in reply to `0x8c3d` NC_MINIHOUSE_CHAR_ACTION_REQ on ShineObjectClass::ShinePlayer (`FUN_00574750`, ShineObjectClass::ShinePlayer::sp_NC_MINIHOUSE_CHAR_ACTION_REQ) · payload 10 bytes
 
@@ -8548,12 +8569,12 @@ Sent from `FUN_0056f660` (`FUN_0056f660`) · payload variable (iVar11)
 
 ### `0x8c4c` NC_MINIHOUSE_PORTAL_ADD_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_PORTAL_ADD_CMD`, 6 bytes · ⚠ 2016 code uses 12 bytes: same build, so an extraction error or the code does not send this struct
+**Verified layout** (basis: zone FUN_0056fa10; client FUN_0049b830)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | NewPortal.nPortalItemID |  |
-| 2 | i32 | NewPortal.dEndTime |  |
+| 0 | u16 | nPortalItemID |  |
+| 2 | i32 | dEndTime | time_t, 0 = permanent; length 0xE leaves 6 stale bytes after it |
 
 Sent from `FUN_0056fa10` (`FUN_0056fa10`) · payload 12 bytes
 
@@ -8564,11 +8585,11 @@ Sent from `FUN_0056fa10` (`FUN_0056fa10`) · payload 12 bytes
 
 ### `0x8c4f` NC_MINIHOUSE_PORTAL_DEL_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_PORTAL_DEL_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_00567400 (so_Routine, owner only); client FUN_0049b870)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nPortalItemID |  |
+| 0 | u16 | nPortalItemID | never sent in practice (Z13-B18) |
 
 Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · payload 2 bytes
 
@@ -8592,14 +8613,12 @@ Sent in reply to `0x8c56` NC_MINIHOUSE_PORTAL_EFFECT_REQ on ShineObjectClass::Sh
 
 ### `0x8c61` NC_MINIHOUSE_FURNITURE_ENDURE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MINIHOUSE_FURNITURE_ENDURE_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_00567400 (so_Routine) / FUN_00570fe0; client FUN_0049b960)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nEndureFurnitureCnt |  |
-| 1 | ENDURE_FURNITURE_INFO[nEndureFurnitureCnt] | EndureFurniture | variable length, element ENDURE_FURNITURE_INFO |
-
-Element `ENDURE_FURNITURE_INFO` (4 bytes): +0 u16 nFurnitureHnd, +2 u8 nEndureGrade, +3 u8 isRePair
+| 0 | u8 | nEndureFurnitureCnt | placed furniture whose grade changed (repair: 1) |
+| 1 | ENDURE_FURNITURE_INFO[n] | EndureFurniture | {u16 nFurnitureHnd, u8 nEndureGrade (MHE_STEP 0–4), u8 isRePair (1 after a repair kit; not read by the client)} |
 
 Sent from `ShineObjectClass::ShineMiniHouse::so_Routine` (`FUN_00567400`) · payload variable (*(byte *)
 
@@ -8638,15 +8657,12 @@ Sent in reply to `0x8c62` NC_MINIHOUSE_FURNITURE_EMOTION_REQ on ShineObjectClass
 
 ### `0x8c64` NC_MINIHOUSE_FURNITURE_EMOTION_CMD
 
-**Verified layout** (basis: zone FUN_00575850)
+**Verified layout** (basis: zone FUN_00575850 (1 entry, broadcast) / FUN_005432d0 (all seated members, to the entering player); client FUN_004a5170)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nEmotionCnt | 1 |
-| 2 | u16 | nPlayerHandle |  |
-| 4 | u16 | nFurnitureHnd |  |
-| 6 | u8 | nPosition |  |
-| 7 | u8 | nEmotionNo |  |
+| 0 | u16 | nEmotionCnt |  |
+| 2 | FURNITURE_EMOTION_INFO[n] | Emotion | {u16 nPlayerHandle, u16 nFurnitureHnd, u8 nPosition, u8 nEmotionNo} |
 
 Sent from `FUN_005432d0` (`FUN_005432d0`) · payload variable (iVar9)
 
@@ -8680,12 +8696,12 @@ Sent in reply to `0x8c65` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_REQ on ShineObje
 
 ### `0x8c67` NC_MINIHOUSE_FURNITURE_EMOTION_CANCEL_CMD
 
-**Verified layout** (basis: zone FUN_00575ae0)
+**Verified layout** (basis: zone FUN_00575ae0 (1 entry) / FUN_005431b0 (everybody on one furniture); client FUN_004a5230)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nCancelEmotionCnt | 1 |
-| 2 | u16 | player |  |
+| 0 | u16 | nCancelEmotionCnt |  |
+| 2 | u16[n] | nCancelEmotion | player handles |
 
 Sent from `FUN_005431b0` (`FUN_005431b0`) · payload variable (local_18 & 0xffff)
 
@@ -8709,11 +8725,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ChargedBuff` (`FUN_005970c0`) �
 
 ### `0x9004` NC_CHARGED_BUFFTERMINATE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHARGED_BUFFTERMINATE_CMD`, 4 bytes
+**Verified layout** (basis: zone ciee_Free FUN_00450a50; client FUN_0049b2c0 (2017 GameFrameWork::On_NC_CHARGED_BUFFTERMINATE_CMD))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | ChargedBuffKey |  |
+| 0 | u32 | ChargedBuffKey | client ChargedItemList::DelUsingItem(key) |
+
+4 bytes
 
 Sent from `ChargedItemEffectList::ChargedItemEffectElement::ciee_Free` (`FUN_00450a50`) · payload 4 bytes
 
@@ -10027,13 +10045,13 @@ Sent in reply to `0xc412` NC_COLLECT_REWARD_DB_ACK on GameDBSession (`FUN_00627a
 
 ### `0xcc02` NC_MOVER_RIDE_ON_CMD
 
-**Verified layout** (basis: zone FUN_0055f380)
+**Verified layout** (basis: zone FUN_0055f380 (size 6); client FUN_004b3aa0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | nMoverHandle |  |
-| 2 | u8 | nSlot |  |
-| 3 | u8 | nGrade |  |
+| 2 | u8 | nSlot | seat; 0 = driver (client opens the feed window) |
+| 3 | u8 | nGrade | mover upgrade grade |
 
 Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 4 bytes
 
@@ -10045,11 +10063,11 @@ Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 4 bytes
 
 ### `0xcc04` NC_MOVER_SOMEONE_RIDE_ON_CMD
 
-**Verified layout** (basis: zone FUN_0055f380)
+**Verified layout** (basis: zone FUN_0055f380 (size 8, mover's range); client FUN_004a5f70)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nHandle |  |
+| 0 | u16 | nHandle | rider |
 | 2 | u16 | nMoverHandle |  |
 | 4 | u8 | nSlot |  |
 | 5 | u8 | nGrade |  |
@@ -10065,11 +10083,11 @@ Sent from `FUN_0055f380` (`FUN_0055f380`) · payload 6 bytes
 
 ### `0xcc08` NC_MOVER_SOMEONE_RIDE_OFF_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MOVER_SOMEONE_RIDE_OFF_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_0055f620 (size 4, rider's range); client FUN_004a6090)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nHandle |  |
+| 0 | u16 | nHandle | rider |
 
 Sent from `FUN_0055f620` (`FUN_0055f620`) · payload 2 bytes
 
@@ -10079,11 +10097,11 @@ Sent from `FUN_0055f620` (`FUN_0055f620`) · payload 2 bytes
 
 ### `0xcc0a` NC_MOVER_HUNGRY_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MOVER_HUNGRY_CMD`, 2 bytes
+**Verified layout** (basis: zone smv_SendHungryInfo FUN_0055f0a0 (size 4); client FUN_004b3da0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nHungry |  |
+| 0 | u16 | nHungry | item hunger gauge; 0 → client forces walking |
 
 Sent from `FUN_0055f0a0` (`FUN_0055f0a0`) · payload 2 bytes
 
@@ -10093,7 +10111,7 @@ Sent from `FUN_0055f0a0` (`FUN_0055f0a0`) · payload 2 bytes
 
 ### `0xcc0d` NC_MOVER_MOVESPEED_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MOVER_MOVESPEED_CMD`, 6 bytes
+**Verified layout** (basis: zone FUN_00456910 / FUN_00456850 (size 8, driver only); client FUN_0049d2b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
@@ -10111,13 +10129,13 @@ Sent from `FUN_00456850` (`FUN_00456850`) · payload 6 bytes
 
 ### `0xd405` NC_PET_ASK_NEW_NAME_REQ
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_PET_ASK_NEW_NAME_REQ`, 7 bytes
+**Verified layout** (basis: zone FUN_004d0c90 (from sp_PetSystem_PlayerRoutine FUN_004d2d20); client FUN_004bb170)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nPetHandle |  |
-| 2 | u32 | nPetID |  |
-| 6 | u8 | nFirstSummon |  |
+| 0 | u16 | nPetHandle | pet object handle (sp_PetInfo.nHandle) |
+| 2 | u32 | nPetID | pet id; the client looks it up in its pet table (missing → answers 0xD406 0x34C1) |
+| 6 | u8 | nFirstSummon | 1 = state 1ST_SUMMONED (new pet: 'You're my new master!…'), 0 = resummoned unnamed pet ('What name should I answer to?') |
 
 Sent from `FUN_004d0c90` (`FUN_004d0c90`) · payload 7 bytes
 
@@ -10161,11 +10179,11 @@ Sent from `FUN_004d0b60` (`FUN_004d0b60`) · payload 6 bytes
 
 ### `0xd411` NC_PET_USE_ITEM_FAIL_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_PET_USE_ITEM_FAIL_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_004d15a0 (callers 4d2640 4d2990 4d2a40 59b2b0) and ib_OK 0048d0d0 via so_SendErrorCode; client FUN_0049d350)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x3442/43/44/45/5b (CanUseItem), 0x3458 already out, 0x345e summon failed, 0x3481/0x3482 unsummon failed, 0x345c item break refused; client shows the text unless 0x3440/0x3480; 0x345b has no text |
 
 Sent from `ShineObjectClass::ShinePlayer::sp_Send_NC_PET_USE_ITEM_FAIL_ACK` (`FUN_004d15a0`) · payload 2 bytes
 
@@ -10269,6 +10287,12 @@ Empty payload.
 | 1 | u16 | emoticon.emoticonframe |  |
 
 PDB struct name not checked; fields = STOPEMOTICON_DESCRIPT as echoed in 0x2023
+
+### `0x205e` NC_ACT_WEDDING_DIVORCE_REFUSE_CMD (C→S)
+
+**Verified layout** (basis: client WeddingTask::DirectMessage FUN_006dcba0 (SendNetMsgZoneMgr(8, 0x5e, null, 0), answer to the 0x205D 0x1384 dialog); zone FUN_005a0440 reads no payload)
+
+Empty payload.
 
 ### `0x2408` NC_BAT_UNTARGET_REQ (C→S)
 
@@ -11113,6 +11137,29 @@ Z09 §13.2
 | 2 | u8 | count |  |
 | 3 | ABSTATE_INFORMATION[count] | infoList | ABSTATE_INFORMATION × count |
 
+### `0x1c1a` NC_BRIEFINFO_REGENMOVER_CMD (S→C)
+
+**Verified layout** (basis: zone BriefInformationMover FUN_0055e830 / FUN_0043c280 / FUN_0055ea10 (0x8b bytes); client FUN_00646e00)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHandle |  |
+| 2 | u32 | nID | MoverMain.MoverID; client ignores 0xFFFF |
+| 6 | u32 | nHP | 0 in 2016 |
+| 10 | SHINE_COORD_TYPE | nCoord | {u32 x, u32 y, u8 dir} |
+| 19 | ABNORMAL_STATE_BIT | AbstateBit | 99 bytes; not read by the client handler |
+| 118 | u8 | nGrade |  |
+| 119 | u16[10] | nSlotHandle | rider per seat, 0xFFFF empty; not read by the client handler |
+
+### `0x1c1b` NC_BRIEFINFO_MOVER_CMD (S→C)
+
+**Verified layout** (basis: zone bixmv_Init / bixmv_Exchange / bixmv_Send FUN_0043c810 / FUN_00440690 / FUN_0043e0d0; client FUN_00646ef0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nMoverNum | ≤ 28 per packet |
+| 1 | PROTO_NC_BRIEFINFO_REGENMOVER_CMD[n] | Movers | 0x8b bytes each (layout 0x1C1A) |
+
 ### `0x201F` NC_ACT_SOMEONESHOUT_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone ShineMob::so_Shout FUN_00459250, ShineMobileObject::so_Shout FUN_00459080; client handler reads offset 1 as u16 for mobs (re-data/client-handlers.json 0x201f); 2017 PDB PROTO_NC_ACT_SOMEONESHOUT_CMD agrees; Lua cSomebodyShout FUN_005e5150; Pine someoneshout ShineSomeoneShout::sa_Step FUN_004eeeb0 (Z09 §26.2))
@@ -11168,6 +11215,14 @@ to the whole map instance (target 0xFFFF) or one object. The mob version sends l
 |---|---|---|---|
 | 0 | u16 | walkspeed |  |
 | 2 | u16 | runspeed |  |
+
+### `0x2041` NC_ACT_RIDE_FAIL_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_0045d3b0 (SendErrorCode(8, 0x41, err)); client FUN_00499ee0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x10C2 cooldown, 0x10C3 wrong mode / abstate 0x4B, 0x10C4 casting, 0x10C8 map forbids riding, 0x10CA ride skill missing; 0 = no message |
 
 ### `0x2045` NC_ACT_RIDE_FEEDING_ACK (hand-named) (S→C)
 
@@ -12008,6 +12063,27 @@ to the live players of the map (AxialListPacketBroadcast, 0x16 bytes with the op
 |---|---|---|---|
 | 0 | u16 | err | 0x1182 status, 0x1185 already, 0x1193, 0x1195 zone, 0x1196 later, 0x1199 near NPC, 0x119A skill |
 
+### `0x8c08` NC_MINIHOUSE_FUNICHERINVEN_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00546930 + FUN_00643d40; client FUN_0049b510)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | numofitem |  |
+| 1 | u8 | box | inventory type 3 / 13 / 14 / 16 |
+| 2 | u8 | flag | never written (Z13-B11) |
+| 3 | PROTO_ITEMPACKET_INFORM[n] | ItemArray | {u8 datasize, u16 location, SHINE_ITEM_STRUCT}; owner only |
+
+### `0x8c09` NC_MINIHOUSE_FUNICHER_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00546930; client FUN_004af160)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | furniturecount | placed items, wraps above 255 (Z13-B10) |
+| 1 | u8 | next | 0xFF: last packet, client then sends 0x8C1D |
+| 2 | {u16 furniturehandle, u16 furnitureid, f32 x, f32 y, f32 z, f32 angle, u8 nEndureGrade}[n] | array | 21 bytes each |
+
 ### `0x8c11` NC_MINIHOUSE_VISIT_ACK (S→C)
 
 **Verified layout** (basis: zone so_SendErrorCode 35/0x11)
@@ -12016,6 +12092,30 @@ to the live players of the map (AxialListPacketBroadcast, 0x16 bytes with the op
 |---|---|---|---|
 | 0 | u16 | err | 0x1181 ok, 0x119B password, 0x11A0 too far |
 
+### `0x8c20` NC_MINIHOUSE_REARRANGE_ACK (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 35/0x20; client FUN_0049b3d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x11C1 ok (from the releaser), 0x11CE DB refused (any furniture change), 0x11C6 / 0x11C7 / 0x11CB / 0x11CD / 0x11E0 / 0x11E1 / 0x11E2 |
+
+### `0x8c23` NC_MINIHOUSE_CREATE_FURNITURE_ACK (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 35/0x23; client FUN_004a3a80)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x11C1 ok (from the releaser), 0x1184 / 0x1187 / 0x1188 / 0x1193, 0x11C6 / 0x11C7 / 0x11CA / 0x11CB / 0x11CD / 0x11E0 / 0x11E1 / 0x11E2, 0x1DC0 / 0x1DC1 |
+
+### `0x8c26` NC_MINIHOUSE_DELETE_FURNITURE_ACK (S→C)
+
+**Verified layout** (basis: zone so_SendErrorCode 35/0x26; client FUN_0049b4b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | err | 0x11C1 ok (from the releaser), 0x11C6 / 0x11C7 / 0x11CB / 0x11E0 / 0x11E1, 0x1DC2 dice removal reserved |
+
 ### `0x8c3e` NC_MINIHOUSE_CHAR_ACTION_ACK (S→C)
 
 **Verified layout** (basis: zone FUN_00574750)
@@ -12023,6 +12123,26 @@ to the live players of the map (AxialListPacketBroadcast, 0x16 bytes with the op
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x14C0 ok |
+
+### `0x8c42` NC_MINIHOUSE_FURNITURE_EFFECT_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_005751f0 + FUN_00542520; client FUN_004b5070)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEffectHandle | MiniHouseFurnitureObjEffect row index (client looks the row up by index) |
+| 2 | u16 | nApplyPlayerCnt | > 0 (not sent otherwise) |
+| 4 | u16[n] | nApplyPlayerHandle | players the effect was applied to (owner last) |
+
+### `0x8c58` NC_MINIHOUSE_PORTAL_EFFECT_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00574450 + FUN_00542c70; client ignores it)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nEffectHandle | Handle of the portal's ObjEffect row (1000+) |
+| 2 | u16 | nApplyPlayerCnt | > 0 |
+| 4 | u16[n] | nApplyPlayerHandle | recalled players |
 
 ### `0x9873` NC_GUILD_ACADEMY_REWARD_STORAGE_WITHDRAW_CMD (S→C)
 
@@ -12090,13 +12210,19 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 |---|---|---|---|
 | 0 | u16 | nError | 0x306A…0x3070 |
 
+### `0xcc06` NC_MOVER_RIDE_OFF_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_0055f620 (so_SendProtocol 51/6, no payload); client FUN_004b3c00)
+
+Empty payload.
+
 ### `0xcc07` NC_MOVER_RIDE_OFF_FAIL_CMD (S→C)
 
-**Verified layout** (basis: zone so_SendErrorCode 51/7)
+**Verified layout** (basis: zone so_SendErrorCode 51/7 from FUN_0055f620 / FUN_0045d910 / FUN_0045f020 / FUN_00563420; client FUN_0049d250)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError | 0x3080 (sent on success), 0x3081, 0x3082 |
+| 0 | u16 | err | 0x3080 success (ignored by the client), 0x3081 / 0x3082 player side, 0x3083 no mover data, 0x3084 seat out of range, 0x3085 not your seat, 0x3086 seat empty |
 
 ### `0x101f` NC_CHAR_ZONE_BASE_CMD (WM→Z)
 
@@ -12301,6 +12427,19 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 10 | u16 | nNumOfReadQuest |  |
 | 12 | u16[n] | QuestReadIDArray |  |
 
+### `0x10d0` NC_CHAR_ITEMACTIONCOOLTIME_ZONE_CMD (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_CHAR_ITEMACTIONCOOLTIME_ZONE_CMD FUN_0044e710 reads (SetCoolTime push order checked at 0x44e843..0x44e865); PDB 2016 NETPACKETZONEHEADER + ActionCooltime; WM replays the 0x4034 cache)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | zone handle of the player |
+| 2 | u32 | header.charregistnumber | must equal the player's charNo |
+| 6 | u16 | num | records |
+| 8 | struct[num] | group | ActionCooltime, 10 bytes each (pdb2016) |
+| 8 | u16 | group[i].actionID | ItemAction id (key of ItemActions::_actions; cool-time entry +0x14) |
+| 10 | i64 | group[i].expiredTime | absolute _time64 end = now + rest seconds (rounded down) |
+
 ### `0x10d3` NC_CHAR_ZONE_SINGLE_OPTION_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_005a6200 (PROTO_NC_CHAR_SINGLE_OPTION_CMD, pdb2016); Z12 §7.1)
@@ -12327,6 +12466,16 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 6 | u32 | chrregnum |  |
 | 10 | u16 | nNumOfRepeatQuest |  |
 | 12 | PLAYER_QUEST_INFO[n] | QuestRepeatArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
+
+### `0x1122` NC_CHAR_USEITEM_MINIMON_INFO_ZONE_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_005a5d80 → so_ply_SetUseItemMinimon FUN_005617c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nSessionHandle | zone object handle |
+| 2 | u32 | nCharNo | must match the player |
+| 6 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot; slots failing MinimonAutoUseItem or with lot 0 are dropped |
 
 ### `0x3801` NC_PARTY_FUNDAMENTAL_CMD (WM→Z)
 
@@ -12600,6 +12749,20 @@ Z16 §6.4
 | 6 | u16 | nPartyNo |  |
 | 8 | u8 | nPartyIndex |  |
 | 9 | u8 | nSlotIndex |  |
+
+### `0xcc0c` NC_MOVER_LINKDATA_ZONE_CMD (WM→Z)
+
+**Verified layout** (basis: zone FUN_005a5ac0 → FUN_0045ddf0 (copy of MOVER_LINKDATA))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | charNo of the sender (Z→WM: so_GetCharNo; WM→Z: the target player) |
+| 4 | i32 | nItemSlot | inventory slot of the mover item; −1 for a passenger |
+| 8 | u32 | nMoverID | MoverMain.MoverID |
+| 12 | u32 | nMoverHP | mover HP at the link |
+| 16 | u32 | nMasterCharNo | owner's charNo |
+| 20 | u8 | nGrade | mover upgrade grade |
+| 21 | u32[10] | nPassenger | charNo per seat, −1 empty; only the linking player's own seat is filled |
 
 ### `0x0821` NC_MISC_TIMEFROMWORLD_CMD (WM→zone)
 
@@ -12919,6 +13082,43 @@ to everyone in range of the caster and the caster. Z16 §6.5
 
 2 + 8·n bytes, to the scanning player. Z16 §4.6
 
+### `0x1082` NC_CHAR_WEDDINGDATA_CMD (Z→CharDB)
+
+**Verified layout** (basis: zone so_ply_WeddingInfoUpdate FUN_0059f390 (copy of PROTO_NC_CHAR_WEDDINGDATA_ACK, 0x2d bytes with opcode); Character FUN_00418c80 (D02))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | from the stored copy |
+| 2 | u32 | header.charregistnumber | from the stored copy |
+| 6 | u16 | Error |  |
+| 8 | u8 | Status | Main | Sub << 4 (Sub after the Checker rewrite) |
+| 9 | ShineDateTime | When |  |
+| 13 | ShineDateTime | SubWhen |  |
+| 17 | Name5 | Partner.Name |  |
+| 37 | u32 | Partner.RegisterNumber |  |
+| 41 | u8 | WeddingCount |  |
+| 42 | u8 | RefusalCount |  |
+
+### `0x1085` NC_CHAR_WEDDING_PROPOSE_CANCEL_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone Checker::ApplicationLimit FUN_0059f1b0 (0xc bytes with opcode); Character FUN_00418fc0 (D02))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | player handle |
+| 2 | u32 | header.charregistnumber | player charNo |
+| 6 | u32 | Partner | Partner.RegisterNumber |
+
+### `0x1087` NC_CHAR_WEDDING_ESCAPE_DIVORCE_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone Checker::DelayLimit FUN_0059f2d0 (0xc bytes with opcode); Character FUN_00419140 (D02))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | player handle |
+| 2 | u32 | header.charregistnumber | player charNo |
+| 6 | u32 | Partner | Partner.RegisterNumber |
+
 ### `0x3438` NC_ITEMDB_PICKMONEY_REQ (Z→CharDB)
 
 **Verified layout** (basis: zone ShinePlayer::so_ply_PickupMoney FUN_0052fe80 (0x18 bytes incl. opcode; &getmoney ac_GetMoney FUN_00421bf0); PDB 2017 PROTO_NC_ITEMDB_PICKMONEY_REQ after the 6-byte ref; D03 §3.5)
@@ -12991,6 +13191,18 @@ sent length is one byte longer than the packet (Z11-B38); answer 0x5816 / 0x5817
 | 2 | u32 | nPetRegNum | sp_PetInfo.nRegNum |
 | 6 | u8 | nPetMind | clamped to gPetData mind min..max |
 | 7 | u8 | nPetStress | clamped to gPetData stress min..max |
+
+### `0xd40d` NC_PET_CREATE_DB_REQ (Z→CharDB)
+
+**Verified layout** (basis: zone ShinePet::spt_CreatePet FUN_0055d290 (length 0x1a incl. opcode))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nMasterHandle | player handle |
+| 2 | u32 | nMasterRegNo | master charNo (spt_nMasterRegNum) |
+| 6 | Name4 | sPetName | always empty |
+| 22 | u8 | nPetMind | random in the PupServer row's [MinMind, MaxMind] |
+| 23 | u8 | nPetStress | random in [MinStress, MaxStress] |
 
 ### `0x1070` NC_CHAR_FAMESAVE_CMD (Z→DB)
 
@@ -13098,6 +13310,23 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 20 | u8 | relocnum |  |
 | 21 | bytes | reloc | relocnum × {u64 key, u16 new location} |
 
+### `0x3457` NC_ITEMDB_PRODUCE_REQ (Z→DB)
+
+**Verified layout** (basis: zone smo_ply_ItemProduce FUN_0046c2d0 + ItemProducer::ip_ProductExecute FUN_0046bf80 (Z24 §7.8); struct pdb2016)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | zone session handle |
+| 2 | u32 | header.charregnum | vt 0x344 |
+| 6 | u16 | lockindex | lock list index (then incremented) |
+| 8 | u16 | product | item ID |
+| 10 | u8 | produce.create | 1 = new item (itemcreate), 0 = stacked (itemchange) |
+| 11 | bytes | produce.iteminfo | 0x26: PROTO_ITEM_CREATE {u32 owner, MAPPOS map, ITEM_INVEN location, regnum, u16 createitemid, u16 attr} or PROTO_ITEM_ATTRCHANGE {regnum, u16 attr, ITEM_INVEN location} |
+| 49 | u8 | rawnumber | n ≤ 64 |
+| 50 | bytes | raw[n] | 0x11 each: u8 vanish, u16 rawid, u16 rawuselot_log, union {PROTO_ITEM_VANISH {regnum, location}, PROTO_ITEM_ATTRCHANGE} |
+
+variable length = 0x32 + 0x11·n + blobs: the iac_fill2buffer attribute blobs follow raw[n]; each attr field = payload offset of its blob; ITEM_INVEN = 0x2400 | slot (inventory type 9)
+
 ### `0x345f` NC_ITEMDB_DEPOSIT_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_00533dc0 (zone→DB))
@@ -13171,6 +13400,42 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 6 | u32 | guildregnum | guild or academy number |
 | 10 | u8 | nOpenType |  |
 
+### `0x348b` NC_ITEMDB_FURNITURE_ENDURE_REQ (Z→DB)
+
+**Verified layout** (basis: zone UseItemFurnitureEndureKit::uivpb_ProtocolMake FUN_00596960 (+ CommonData by uib_AfterCast FUN_0059a530))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nFurnitureHnd |  |
+| 2 | u64 | nItemKey | the furniture item |
+| 10 | ShineDateTime | dNewEndureTime | old end extended by the kit's EffectValue hours, capped at now + Endure[0] |
+| 14 | PROTO_NC_ITEMDB_USE_VARIATION_ITEM_REQ | CommonData | the consumed kit (Z04 §6) |
+
+### `0x348f` NC_ITEMDB_WEAPONENDURESET_CMD (Z→DB)
+
+**Verified layout** (basis: zone ShinePlayer::sp_CostumWeaponChargeDecrease_ToDB FUN_0051a610 (0xE bytes incl. opcode, sock2gameDB); callers the decrease (every 10th charge), smo_BashStop, so_Unmark FUN_00558900; PDB 2016 PROTO_NC_ITEMDB_WEAPONENDURESET_CMD; CharDB FUN_0041ff10 (D03 §6.6), no answer)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | WeaponKey | item key of the weapon skin |
+| 8 | u32 | ChargedNumber | charges left |
+
+### `0x3498` NC_ITEMDB_ENCHANT_REMOVE_GEM_REQ (Z→DB)
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_EnchantActionUse FUN_00562cb0 (0x26 bytes incl. opcode; the manual removal sender is Z04 §10.2); PDB 2016 PROTO_NC_ITEMDB_ENCHANT_REMOVE_GEM_REQ; CharDB FUN_004236e0 (D03))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle | zone handle |
+| 2 | u32 | header.charNo |  |
+| 6 | u16 | itemLockIndex | inventory lock index |
+| 8 | u64 | equipment.key | weapon item key |
+| 16 | u16 | equipment.id | weapon item id |
+| 18 | u16 | equipment.cell | ITEM_INVEN |
+| 20 | u8[12] | remover | from so_ply_EnchantActionUse: never written (stale bytes), unused since needItem = 0 |
+| 32 | u8[3] | gemSlot | 1 = clear this socket (charges used up) |
+| 35 | u8 | needItem | 0 here (no remover item to delete) |
+
 ### `0x349e` NC_ITEMDB_MYSTERY_VAULT_MAKEITEM_REQ (Z→DB)
 
 **Verified layout** (basis: zone sp_MysteryVaultMakeItem FUN_005658f0)
@@ -13234,6 +13499,15 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 16 | bytes[38] | CreateItem | PROTO_ITEM_CREATE {u32 owner, MAPPOS map, u16 location, u64 key, u16 id, u16 attr} |
 | 54 | bytes | attributes | of the created card |
 
+### `0x34c8` NC_ITEMDB_SHIELDENDURESET_CMD (Z→DB)
+
+**Verified layout** (basis: zone ShinePlayer::sp_CostumShieldChargeDecrease_ToDB FUN_0051ac20 (0xE bytes incl. opcode, sock2gameDB); same callers as 0x348F; PDB 2016 PROTO_NC_ITEMDB_SHIELDENDURESET_CMD; CharDB FUN_004201c0 (D03 §6.6), no answer)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u64 | ShieldKey | item key of the shield skin |
+| 8 | u32 | ChargedNumber | charges left |
+
 ### `0x401c` NC_CHARSAVE_AUTO_PICK_SAVE_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_005654d0)
@@ -13242,6 +13516,30 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 |---|---|---|---|
 | 0 | u16 | bEnable |  |
 | 2 | u32 | charNo |  |
+
+### `0x4023` NC_CHARSAVE_ITEMACTIONCOOLTIME_REQ (Z→DB)
+
+**Verified layout** (basis: zone ItemActionObserveManager::SendCoolTimes2DB FUN_005d0e60 (10 + 10*num bytes incl. opcode, to sock2gameDB, only when the list is non-empty); PDB 2016 PROTO_NC_CHARSAVE_ITEMACTIONCOOLTIME_REQ / ActionCooltime; CharDB FUN_00424140 (D02))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | p handle |
+| 2 | u32 | header.charregistnumber | p charNo (vt 0x344) |
+| 6 | u16 | num | cool-time list size |
+| 8 | struct[num] | group | ActionCooltime, 10 bytes each (pdb2016) |
+| 8 | u16 | group[i].actionID | ItemAction id (key of ItemActions::_actions; cool-time entry +0x14) |
+| 10 | i64 | group[i].expiredTime | absolute _time64 end = now + rest seconds (rounded down) |
+
+### `0x4035` NC_CHARSAVE_USEITEM_MINIMON_INFO_DB_CMD (Z→DB)
+
+**Verified layout** (basis: zone sp_SaveUseItemMinimonInfo_DB FUN_00563d80 (from ws_save2DB); Character FUN_0042de30 (D02 §6))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot |
+| 54 | u8[12] | DelSlotList_Normal | 1 = slot empty (every empty slot, Z13-B62) |
+| 66 | u8[12] | DelSlotList_Charged | same for the charged list |
 
 ### `0x4403` NC_QUEST_DB_SET_INFO_REQ (Z→DB)
 
@@ -13331,6 +13629,34 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 48 | u16 | LicenseMobID |  |
 | 50 | u16 | echo.licenseitem |  |
 | 52 | u16 | echo.weaponitem |  |
+
+### `0x8c5d` NC_MINIHOUSE_DB_PORTAL_ADD_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_005354a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle | player handle |
+| 2 | u32 | header.charNo |  |
+| 6 | u16 | nPortalItemID | item id |
+| 8 | u8 | bType | KeepTime_Hour != 0 |
+| 9 | i32 | dEndDate | mktime(now + KeepTime_Hour h) |
+| 13 | u16 | lockindex |  |
+| 15 | SHINE_ITEM_REGISTNUMBER | Item.relocitemregnum |  |
+| 23 | u16 | Item.newlocation | never written (Z13-B16) |
+
+### `0x9002` NC_CHARGED_RESETBUFF_CMD (Z→DB)
+
+**Verified layout** (basis: zone ChargedItemEffectElement::ciee_Free FUN_00450a50 (Z24 §6.7); the same packet goes to the WM (W04 annotation))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | CharRegistNumber | so_GetCharRegistNumber |
+| 4 | u32 | ChargedBuffKey | list slot |
+| 8 | u16 | ChargedBuffID | ChargedEffect Handle |
+| 10 | u32 | nUserNo | the character number again (Z24-B14) |
+
+14 bytes
 
 ### `0x9005` NC_CHARGED_STAT_INITIALIZE_DB_REQ (Z→DB)
 
@@ -13456,6 +13782,17 @@ payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block 
 
 0x1f bytes; one per player on the map at the KQ result
 
+### `0x0554` NC_LOG_GAME_ITEM_PUT_ON_BELONGED (Z→GameLog)
+
+**Verified layout** (basis: zone FUN_0045e810 (sp_HorseItemSave))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | chrregnum |  |
+| 4 | u64 | itemkey | item register number |
+| 12 | u16 | iteminvenfrom | 0x2400 | slot (inventory 9) |
+| 14 | u16 | iteminvento | same value |
+
 ### `0xc80f` NC_SYSLOG_CHAR_QUEST_STARTED (Z→GameLog)
 
 **Verified layout** (basis: zone FUN_005bf280)
@@ -13553,6 +13890,41 @@ payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block 
 | 11 | u8 | mystery_vault | sp_MysteryVaultUI |
 | 12 | u32 | nChatBan | sp_Spammer_ChatBan |
 | 16 | u8 | bFirstJoin | always 0 |
+
+### `0x4033` NC_CHARSAVE_2WLDMAN_PET_LINK_RESUMMON_CMD (Z→WM)
+
+**Verified layout** (basis: zone sp_PetLinkResummonInfo_Save2World FUN_004d1760 (ws_save2worldmanager); PDB2016 struct of the same name)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u8 | bDoResummon | 1 when the pet was out (state 5/6) at so_LinkTo |
+| 5 | u64 | xResummonCode | charNo + 0x1BEC48797BAFC8B0 |
+| 13 | u16 | nSummonSlot | inventory slot of the pet item |
+| 15 | u32 | nId | pet id |
+| 19 | u32 | nRegNum | pet DB key |
+
+### `0x4034` NC_CHARSAVE_2WLDMAN_ITEMACTIONCOOLTIME_CMD (Z→WM)
+
+**Verified layout** (basis: zone ItemActionObserveManager::SendCoolTimes2World FUN_005d0fa0 (8 + 10*num bytes incl. opcode, to sock2wldman, only when the list is non-empty); PDB 2016 PROTO_NC_CHARSAVE_2WLDMAN_ITEMACTIONCOOLTIME_CMD; WM FUN_0042cfc0 (W05 §5.5))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | p charNo |
+| 4 | u16 | ActionCoolTime.num | cool-time list size |
+| 6 | struct[num] | group | ActionCooltime, 10 bytes each (pdb2016) |
+| 6 | u16 | group[i].actionID | ItemAction id (key of ItemActions::_actions; cool-time entry +0x14) |
+| 8 | i64 | group[i].expiredTime | absolute _time64 end = now + rest seconds (rounded down) |
+
+### `0x4036` NC_CHARSAVE_USEITEM_MINIMON_INFO_WORLD_CMD (Z→WM)
+
+**Verified layout** (basis: zone sp_SaveUseItemMinimonInfo_World FUN_00563e70 (from ws_save2worldmanager); WM FUN_0042d020)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nWorldHandle | so_GetWMSHandle (vt 0x340) |
+| 2 | u32 | nCharNo |  |
+| 6 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot |
 
 ### `0x580e` NC_KQ_Z2W_MAKE_ACK (Z→WM)
 
@@ -13755,6 +14127,20 @@ only by the hosting zone. Z16 §6.2
 | 0 | u16 | nMapCount |  |
 | 2 | SHINE_INDUN_INFO[n] | sIndunInfos | 0xd: char MapIDClient[12] + NUL, u8 ModeIDLv |
 
+### `0xcc0b` NC_MOVER_LINKDATA_WORLD_CMD (Z→WM)
+
+**Verified layout** (basis: zone FUN_0045e710 (sp_MoverSystem_ZoneLink_Save2World); 2016 PDB MOVER_LINKDATA (0x3d bytes))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | charNo of the sender (Z→WM: so_GetCharNo; WM→Z: the target player) |
+| 4 | i32 | nItemSlot | inventory slot of the mover item; −1 for a passenger |
+| 8 | u32 | nMoverID | MoverMain.MoverID |
+| 12 | u32 | nMoverHP | mover HP at the link |
+| 16 | u32 | nMasterCharNo | owner's charNo |
+| 20 | u8 | nGrade | mover upgrade grade |
+| 21 | u32[10] | nPassenger | charNo per seat, −1 empty; only the linking player's own seat is filled |
+
 ### `0x0811` NC_MISC_ZONERINGLINKTEST_RNG (Z→Z (ring))
 
 **Verified layout** (basis: zone &zonelink ac_ZoneLinkTest FUN_0041d950 (writes, 10 bytes); zls_NC_MISC_ZONERINGLINKTEST_RNG FUN_0045b4d0 (appends, forwards mechines*16+10 bytes); PDB 2016 PROTO_NC_MISC_ZONERINGLINKTEST_RNG)
@@ -13828,6 +14214,32 @@ only by the hosting zone. Z16 §6.2
 | 1 | u16 | start.handle |  |
 | 3 | u32 | start.regnum |  |
 | 7 | Name5 | charid | kicked character |
+
+### `0x10aa` NC_CHAR_WEDDING_PARTNER_SUMMON_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone ZoneRingPacketSummonPartner::zrpb_Request FUN_005a83b0 (write, 0x25 bytes with opcode), zls_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG FUN_005a0c90 (read/forward), zrpb_Success FUN_005a8680; PDB 2016 PROTO_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG (0x23))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | start.zoneNo | origin zone |
+| 1 | u16 | start.handle | caster handle |
+| 3 | u32 | start.regnum | caster charNo |
+| 7 | u32 | RegisterNumber | partner charNo (Partner.RegisterNumber) |
+| 11 | Name3 | map | caster's map |
+| 23 | SHINE_XY_TYPE | coord | caster's position |
+| 31 | u8 | from | min level (1 or FieldLv.LvFrom) |
+| 32 | u8 | to | max level (levellimit or FieldLv.LvTo) |
+| 33 | u16 | err | 0xFCF; set to 0xFCE by a zone that refuses (level / map) |
+
+### `0x10ab` NC_CHAR_WEDDING_REFRESH_INFO_RNG (Z→Z (ring))
+
+**Verified layout** (basis: zone ZoneRingPacketRefreshWeddingInfo::zrpb_Request FUN_005a91c0 (write, 9 bytes with opcode), zls_NC_CHAR_WEDDING_REFRESH_INFO_RNG FUN_005a0e00; PDB 2016 PROTO_NC_CHAR_WEDDING_REFRESH_INFO_RNG (7))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Start.zoneNo | origin zone |
+| 1 | u16 | Start.handle | 0xFFFF |
+| 3 | u32 | Start.regnum | charNo whose wedding data is reloaded where online |
 
 ### `0x10b1` NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG (Z→Z (ring))
 
