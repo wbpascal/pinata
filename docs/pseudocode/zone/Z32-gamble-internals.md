@@ -622,8 +622,227 @@ GDTSO_SetDiceProbability(DiceTaiSaiInfo* dice, u16 weight)  (vt 0xac)           
 
 ### 3.10 Roll, result and payout
 
-*(part 3)*
+The round runs in four steps, all from `go_Routine` (§3.8) or from the GameDB answer: the timer falls due in BETTING → roll and
+the payout request to GameDB (`0xBC78`) → GameDB answer `0xBC79` books the coins, logs and animates, starts the stand-by timer →
+the stand-by timer falls due → board reset, reserved leaves, `0xBC80` (§3.8). Return codes are `0x26xx` result codes; the callers
+ignore them unless stated.
+
+**Roll** (status BETTING, timer due):
+
+```pseudo
+GDTSO_DiceTaiSai_CanAutoDiceRoll()   (vt 0x78)                                                    @ FUN_00619cd0
+    status ≠ BETTING → 0x2655;  nBetSumMoney = 0 → 0x2656;  else 0x2650
+GDTSO_DiceTaiSai_DiceRoll()          (vt 0x7c)                                                    @ FUN_00619dd0
+    status ≠ BETTING → 0x2655;  nBetSumMoney = 0 → 0x2656
+    bIsAdminDice = 1 (GM fix, §3.9) → bIsAdminDice = 0; CurrentRollingDice is already the fixed throw
+    else:
+        r = ((rand() << 15) | rand()) % nDiceRateSum + 1        # C runtime rand(), 15 bits each; the first call gives the high bits
+            # (original bug) Z32-B8: no check for nDiceRateSum = 0: a GM who sets all 216 weights to 0 (&GB_DiceProbability, §3.9)
+            # makes the next roll divide by zero (zone crash)
+        i = first outcome index 0…215 with r ≤ nDiceRate[0] + … + nDiceRate[i]   (r −= nDiceRate[i] while r > nDiceRate[i])
+            # no such index (weights summing to less than nDiceRateSum, Z32-B6) → i = 216
+        ConvertDice(i → CurrentRollingDice) (§1.2) false (i = 216) → 0x2652
+    status = ROLLING; 0x2650
+```
+
+So the outcome is drawn with probability `nDiceRate[i] / nDiceRateSum` (2016: every `GBDiceRate.Rate` is 100, i.e. 1/216 each, fair
+dice; `% nDiceRateSum` of a 30-bit value adds a negligible modulo bias). go_Routine calls `BroadDiceRoll` and `Result_DiceRoll`
+only when both return 0x2650; otherwise it just clears the timer flag. (original bug) Z32-B9: a failed roll (i = 216) leaves the
+table in BETTING with the timer off, and `BroadSetTimer` starts a timer only from NONE_BETTING (§3.6): the board accepts stakes but
+never rolls until every stake is cancelled (or every gamer with stakes leaves, §3.7) and a new first stake restarts the timer.
+
+```pseudo
+GDTSO_DiceTaiSai_BroadDiceRoll()     (vt 0x80)                                                    @ FUN_00619fc0
+    every gamer p (index order, null slots skipped) ← 0xBC77 NC_GAMBLE_DICE_TAISAI_DICE_ROLL_CMD { u16 nError }:
+        0x2661 p not in this game (vt 0xb20(1));  0x2662 no gamer record (vt 0xb8);
+        0x2663 coins (vt 0xb04) < record.nBetSumMoney;  0x2664 lock list (vt 0x7d4) null or busy (L.vt[0x10], Z05 §1.2);
+        else 0x2660                       # the same four tests decide below whether p's stakes are settled
+    0x2650
+```
+
+Client `0xBC77` (`MHDiceGameTask::Recv_NC_GAMBLE_DICE_TAISAI_DICE_ROLL_CMD` FUN_007064b0): only `0x2660` → task state 2 (rolling);
+any other code is ignored (no text).
+
+**Payout request** (status ROLLING):
+
+```pseudo
+GDTSO_DiceTaiSai_Result_DiceRoll()   (vt 0x88)                                                    @ FUN_0061a350
+    npc = go_Get_NpcObject(); null → 0x2652
+        # (original bug) Z32-B9: also here the status stays ROLLING with the timer off (go_Routine clears it): the table is stuck
+        # for good (Out refuses in ROLLING, §3.7); unreachable in practice (go_Init stores a non-null NPC, §3.2)
+    W = get_PrizeWinningBet(ConvertDice(CurrentRollingDice)) (§1.4)      # both results ignored; the dice are valid here
+    for every gamer p in index order:
+        skip p if: null, not in this game (vt 0xb20(1)), no record (vt 0xb8), coins < record.nBetSumMoney (64-bit compare),
+                   lock list L (vt 0x7d4) null, or L busy (L.vt[0x10] = 1)          # = BroadDiceRoll codes 0x2661…0x2664
+        for k = 0…51 with record.nBetMoney[k] ≠ 0:
+            is_CanBettingMoney(k, MaxBetMoney, nBetMoney[k])    # result ignored: (original bug) Z32-B7, dead check (as Z06-B17)
+        net = 0 (s64)
+        for k = 0…51 with stake b = record.nBetMoney[k] ≠ 0:
+            k ∈ W (entry e with e.nBetting = k):
+                d = get_DividindMoney(k, e.nSingle, b)                 (§1.5: round(b × DividendRate / 100))
+                net += d + (s64)(GetSysRate × d) / −1000               # = d − trunc(GetSysRate × d / 1000): the house cut, ‰
+            else:
+                net −= b                                                # lost stake
+            # a winning stake is neither returned nor taken: stakes were never deducted (§3.1), so the dividend is the gain
+        record i of the request (i = number of gamers settled so far) = { u16 nError = 0, u16 lockindex = L.index,
+                                                                          u32 nPlayerNo = p.charNo (vt 0x344), i64 nTotalDividend = net }
+        net ≥ 0 → L.icl_StoreGBCoin(L.index, net, +1, 0)   else L.icl_StoreGBCoin(L.index, −net, −1, 0)     (L.vt[0x70])
+            # coin reservation with releaser CoinChange (Z05 §1.4, Z06 §4.1); last argument 0 = not an exchange
+        L.icl_IncIndex()                                    # FUN_0043c130: next lock index
+    GameDB (sock2gameDB) ← 0xBC78 NC_GAMBLE_DICE_TAISAI_DB_DICE_ROLL_RESULT_REQ {
+        NETPACKETZONEHEADER header = { u16 npc handle, u32 npc vt 0x344 }, DiceTaiSaiInfo DiceNum = CurrentRollingDice,
+        u16 nResultCnt, GDT_DiceRollApplyResult[nResultCnt] (0x10 each) }          # size 0xb + 0x10 × n
+    bIsActiveTimerCheckTime = 0; 0x2650
+```
+
+GameDB runs `usp_Gamble_setDice` / `usp_Gamble_setDiceResult` and answers `0xBC79` (D03 §11, `FUN_00421a30`: overall `nError` 0x2680 ok,
+0x2681…0x2683 failures, and a game number `nGameNo`).
+
+**GameDB answer** (`0xBC79 NC_GAMBLE_DICE_TAISAI_DB_DICE_ROLL_RESULT_ACK { u16 nError, i32 nGameNo, NETPACKETZONEHEADER header, u16
+nResultCnt, GDT_DiceRollApplyResult[] }`, handler `GameDBSession::gds_NC_GAMBLE_DICE_TAISAI_DB_DICE_ROLL_RESULT_ACK` FUN_0061d930, Z06 §4.4):
+
+```pseudo
+gds_NC_GAMBLE_DICE_TAISAI_DB_DICE_ROLL_RESULT_ACK(ack)                                          @ FUN_0061d930
+    ack.nError ≠ 0x2680 → nothing                      # Z06-B10: coins stay reserved, the table stays in ROLLING without timer
+    npc = som_GetObject(header.clienthandle); npc null, npc.vt 0x344 ≠ header.charregistnumber or npc not on a map → nothing
+    o = gom_GetGambleObject(header.clienthandle) (§2.4); null or o.vt 0x0c (game type) ≠ 1 (GBT_DICETAISAI) → nothing
+    o.MoneyResult_DiceRoll(ack) (vt 0x84); o.ResultLog_DiceRoll(ack.nGameNo) (vt 0x8c); o.BroadResult_DiceRoll() (vt 0x90);
+    o.BroadEmotion_DiceRoll(ack) (vt 0x94); o.PrepareNextGame() (vt 0x98)
+
+GDTSO_DiceTaiSai_MoneyResult_DiceRoll(ack)   (vt 0x84)                                           @ FUN_0061a180
+    for each result r (ack.nResultCnt):
+        p = gamer whose charNo = r.nPlayerNo (go_Get_EnterPlayerIndex by charNo); none, p.charNo ≠ r.nPlayerNo or p not in this
+            game → skip              # its lock reservation is neither applied nor freed
+        r.nError = 0x2680 → L.icl_Apply_N_Free(p, r.lockindex, 0) (L.vt[0x1c], Z05 §1.3): the CoinChange releaser books the
+            coins (net ≥ 0: coins += net; else coins −= |net|, or 0 with an assert when they do not cover it) and sends
+            0xBC04 (Z06 §4.1); false → LockIndexLog "…MoneyResult_DiceRoll : <lock>"
+        else → L.icl_Free(r.lockindex) (L.vt[0x28])               # reservation dropped, coins unchanged
+        record(p).nTotalDividend = r.nTotalDividend if > 0 else 0
+    gom_SetNeedRecalDiceRankInfo() (§2.4); 0x2650
+
+GDTSO_DiceTaiSai_ResultLog_DiceRoll(i32 nGameNo)   (vt 0x8c)                                     @ FUN_0061a7c0
+    npc null → 0x2652
+    packet 0xBC7A NC_GAMBLE_DICE_TAISAI_DB_DICE_ROLL_RESULT_LOG_CMD { header (npc, as 0xBC78), i32 nGameNo, u16 nResultLogCnt,
+        GDT_DiceRollApplyResultLog[] (0x15 each) }
+    W = winning bets of CurrentRollingDice (as above)
+    for every gamer p with a record (vt 0xb8) and a win counter (vt 0xc8): wins[p] = 0
+        # no "in game", coin or lock test: (original bug) Z32-B10: gamers that Result_DiceRoll skipped (0x2662…0x2664) are logged
+        # as if settled and their winning kinds count for nTotalWinCnt and the title below
+        for k = 0…51 with stake b ≠ 0: append { nPlayerNo = p.charNo, nBetting = k, nBettingMoney = b,
+                nBattingRate = 0, bStatus = 0, nSysRate = GetSysRate, nDividendMoney = 0 }
+            k ∈ W: nBattingRate = get_DividendRate(k, nSingle) (§1.5); bStatus = 1;
+                   nDividendMoney = d − (GetSysRate × d) / 1000 (u32 arithmetic; d as above);  wins[p] += 1;  record.nTotalWinCnt += 1
+            count × 0x15 + 0xc > 7500 → send the full packet to GameDB and start a new one (same header and nGameNo)
+    remaining count ≠ 0 → send to GameDB (no answer: D03 FUN_00421d60, usp_Gamble_setDiceLog)
+    every gamer with wins[p] ≠ 0: p.so_SetCTDiceTaiSaiWin(wins[p]) (player vt 0x1b4, FUN_005113c0)
+        → CCharacterTitleZone::CT_WinDiceTaiSaiWin FUN_005cc490: m_TitleValues[58].TitleValue += wins (u64), bTitleSave = 1,
+          CheckNewTitle(58) (title unlocks: Z18 §6.2)
+    gom_SetNeedRecalDiceRankInfo(); 0x2650
+```
+
+`nTotalWinCnt` and the title counter therefore count winning **bet kinds**, not winning rounds (a throw that pays BIG, SUM_10 and a
+domino counts 3).
+
+```pseudo
+GDTSO_DiceTaiSai_BroadResult_DiceRoll()   (vt 0x90)                                              @ FUN_0061abe0
+    every gamer p ← 0xBC7B NC_GAMBLE_DICE_TAISAI_DICE_ROLL_RESULT_CMD { u16 nError = 0x2670 (0x2671 if p not in this game),
+        DiceTaiSaiInfo nDiceInfo = CurrentRollingDice }                       # size 5
+    0x2650
+GDTSO_DiceTaiSai_BroadEmotion_DiceRoll(ack)   (vt 0x94)                                          @ FUN_0061ad40
+    n = 0
+    for each result r at position j:
+        repeat gamer-count times:                          # (original bug) Z32-B11: the inner loop re-tests gamer j (the
+            p = go_Get_EnterPlayer(j)                      # result's position), never the other gamers
+            p non-null, p.charNo = r.nPlayerNo, p in this game and r.nError = 0x2680:
+                r.nTotalDividend > 0 → code = WinCode[rand() % 3];  < 0 → code = LoseCode[rand() % 3];  = 0 → none (try again)
+                entry n = { u16 nGamerHnd = p.handle, u32 nEmotion = code }; n += 1; last = p; stop the repeat
+    n ≠ 0 → 0xBC7C NC_GAMBLE_DICE_TAISAI_DICE_ROLL_RESULT_EMOTION_CMD { u8 nGamerCnt = n, GDT_EmotionInfo[n] (6 each) }
+            to every player in last's map (AxialListPacketBroadcast, so_AllInMap(last, …, 1))
+    0x2650
+GDTSO_DiceTaiSai_PrepareNextGame()   (vt 0x98)                                                   @ FUN_0061af50
+    status ≠ ROLLING → 0x2652
+    timer active, due = now + DelayTime (stand-by, 15 s); status = STAND_BY; 0x1cd0
+```
+
+Result j matches gamer j only while the request order still holds: B11 drops the emotion of every gamer after one that
+`Result_DiceRoll` skipped. WinCode / LoseCode are the `GBEventCode` effects of §3.1 (801100 / 801900 / 802200 and 801100 / 801400 /
+801800).
+
+Clients: `0xBC7B` (FUN_007063f0): only `0x2670` → task state 3, stores the outcome index (client `DiceTaiSai::ConvertDice`) and
+starts the dice animation with the three values. `0xBC7C` (FUN_00706d30): per entry finds the character by handle, looks the code
+up in the client table at `DAT_00a7f034` (record field +0x69 = code) and plays that record's action on the character (char vt 0x1c4);
+an unknown handle aborts the rest of the list.
+
+**Stand-by end** (status STAND_BY, timer due; go_Routine §3.8 calls these in this order before `0xBC80`):
+
+```pseudo
+GDTSO_DiceTaiSai_BroadLargeAmount()   (vt 0xa0)                                                  @ FUN_0061b2c0
+    list = gamers p in this game with a record whose nTotalDividend ≥ MaxBetMoney (64-bit compare): { u16 handle, u32 low dword }
+    list not empty → every gamer in this game ← 0xBC7F NC_GAMBLE_DICE_TAISAI_LARGE_AMOUNT_CMD { u8 nGamerCnt,
+        GDT_LargeAmountInfo { u16 nGamerHnd, u32 nMoney }[] }      # size 1 + 6 × n
+    1
+GDTSO_ExcuteLeaveGame()               (vt 0x9c; after ClearDiceBettingInfo, so the status is NONE_BETTING)   @ FUN_0061b020
+    for every gamer p from the last index down to 0:
+        p in this game, GetGameLeaveInfo(p) ok and bGameLeaveReserve = 1:
+            e = Out(p) (vt 0x48, §3.7)              # 0x2620 here (status NONE_BETTING)
+            e = 0x2627 → SetGameLeaveInfo(p, 1)
+            p ← 0xBC69 NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_ACK { u16 nError = e }
+            e = 0x1c90 → BroadOut(p, …)            # (original bug) Z32-B12: Out never returns 0x1c90 (0x2620 meant):
+                                                    # the other gamers get no 0xBC6A; harmless, their clients drop the
+                                                    # gamer marked by the earlier reserved 0xBC6A at the next 0xBC80 (§3.8)
+    1
+```
+
+Client `0xBC7F` (FUN_00706e50): per entry with a known handle and `nMoney ≠ 0`: the amount as text over that character and the
+announcement "%s has received %s by game result. Congratulation!" (TextData2 0x4746208a). Client `0xBC69` (FUN_00706390): `0x2620`
+→ `ShutDownGambleHouse` (closes the TaiSai window); other codes are ignored.
+
+### 3.11 Unmarking and the logout gate
+
+```pseudo
+ShinePlayer::so_Unmark(…)  (FUN_00558900, Z01): p in any gamble (vt 0xb24) → gom_FindGambleObject(p.charNo, type).go_PlayerUnmarking(p)
+CGambleDiceTaiSaiObject::go_PlayerUnmarking(p)   (vt 0xd8)                                       @ FUN_0061b1d0
+    e = Out(p) (§3.7)
+    0x2620 → BroadOut(p, 0)                        # left at once: stakes removed from the board
+    0x2627 → SetGameLeaveInfo(p, 1); BroadOut(p, 1) # ROLLING / STAND_BY: only reserved
+    other → nothing
+ShinePlayer::so_Gamble_IsCanSessionCloseing()   (player vt 0xb2c)                                @ FUN_00615ee0
+    sp_Gamble_JoinType = GBT_DICETAISAI, o = gom_FindGambleObject(charNo, GBT_DICETAISAI) and o.status (vt 0x38) = ROLLING:
+        sp_Gamble_SessionCloseingTime = 0 → set it to now + 0x32 (5 s); return 0
+        now ≥ sp_Gamble_SessionCloseingTime → 1;  else 0
+    otherwise 1
+```
+
+`sp_Schedule_Logout` (FUN_00558160) and `ZoneServer::zs_disconnect` (FUN_005abb60) free the player only when vt 0x17c (mini-house
+TaiSai, Z06 §3) and vt 0xb2c both return 1 (`confidence.md` L6): a gamer who logs out while the dice roll waits up to 5 s for the
+GameDB answer. The gate does not cover STAND_BY. (original bug) Z32-B13: a gamer unmarked in STAND_BY (or in ROLLING after the 5 s)
+gets only the reservation; `go_pEnterPlayerObj` keeps the raw pointer of the freed player object until `ExcuteLeaveGame` (stand-by
+end) or `MoneyResult` use it. What that touches depends on the pool slot's reuse *(inferred)*: the slot's memory stays a
+`ShinePlayer` (Z01 §4 fixed pools), so the calls go through a valid vtable, but `Out` then writes `sp_Gamble_JoinType = 0` and sends
+`0xBC69` to whatever player holds that slot. (original bug) Z32-B14: `sp_Gamble_SessionCloseingTime` is only zeroed by the
+`ShinePlayer` constructor (FUN_0055bc80), never after a gate: a second logout attempt in the same session during a later roll passes
+at once.
+
+### 3.12 Worked example round
+
+Gamer A stakes 1 000 on BIG, 500 on PAIR_3, 200 on SUM_10 (limits §1.6: 150 000 / 18 750 / 25 000); gamer B stakes 2 000 on SMALL.
+Both have ≥ their stake sums in coins. `GetSysRate` = 10 (‰), `GBDiceRate` uniform.
+
+1. The first stake starts the 30 s timer (`0xBC81`, status BETTING). When it falls due both get `0xBC77` 0x2660, and the
+   roll draws index 87 = (3 − 1) × 36 + (3 − 1) × 6 + (4 − 1), i.e. dice (3, 3, 4): sum 10, no triple.
+2. Winning kinds (§1.4): SMALL (sum 4–10), EVEN (10), PAIR_3, SUM_10, DOMINO_34, SINGLE_3 (k = 2), SINGLE_4 (k = 1).
+3. A: BIG loses −1 000; PAIR_3 d = 500 × 8 = 4 000, cut 40 → +3 960; SUM_10 d = 200 × 6 = 1 200, cut 12 → +1 188. net = 4 148.
+   B: SMALL d = 2 000 × 1 = 2 000, cut 20 → +1 980.
+4. `0xBC78` to GameDB with {0, lockA, A, 4 148} and {0, lockB, B, 1 980}; coin reservations +4 148 / +1 980.
+5. `0xBC79` 0x2680: coins A += 4 148, B += 1 980 (`0xBC04` each); nTotalDividend 4 148 / 1 980. `0xBC7A` logs 4 rows (A: BIG
+   rate 0 status 0 dividend 0, PAIR_3 rate 800 status 1 dividend 3 960, SUM_10 rate 600 status 1 dividend 1 188; B: SMALL rate 100
+   status 1 dividend 1 980); A's nTotalWinCnt += 2, B's += 1 (and title value 58). `0xBC7B` (3, 3, 4) to both; `0xBC7C` with a random
+   WinCode for A and for B; status STAND_BY, 15 s.
+6. Stand-by over: nobody reached 150 000 → no `0xBC7F`; board and stakes cleared; `0xBC80 { 0, (3, 3, 4) }`; status NONE_BETTING.
+
+Had A been short of coins (coins < 1 700) at the roll, A would get `0xBC77` 0x2663, no settlement (neither loss nor win), but
+the `0xBC7A` rows and the win count would still be written (Z32-B10).
 
 ## 4. Slot machines (`SlotMachine::*`)
 
-*(parts 3 and 4)*
+*(parts 4 and 5)*

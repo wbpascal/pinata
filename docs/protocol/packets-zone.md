@@ -9868,11 +9868,11 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_SendTaiSaiBettingInfo` (`FUN_006185f0`
 
 ### `0xbc69` NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_0061b020 (GDTSO_ExcuteLeaveGame; also the 0xBC68 handler, Z06 §4.4); client FUN_00706390)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x2620 left (client closes the TaiSai window); 0x2621-0x2627 refusals |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_ExcuteLeaveGame` (`FUN_0061b020`) · payload 2 bytes
 
@@ -9998,11 +9998,11 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadBettingCancel` (`FUN_0
 
 ### `0xbc77` NC_GAMBLE_DICE_TAISAI_DICE_ROLL_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_DICE_ROLL_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_00619fc0 (BroadDiceRoll); client FUN_007064b0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x2660 rolling (client state 2); 0x2661 not in game, 0x2662 no record, 0x2663 coins < own stakes, 0x2664 inventory lock busy (stakes not settled); client ignores non-0x2660 |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadDiceRoll` (`FUN_00619fc0`) · payload 2 bytes
 
@@ -10012,12 +10012,12 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadDiceRoll` (`FUN_00619f
 
 ### `0xbc7b` NC_GAMBLE_DICE_TAISAI_DICE_ROLL_RESULT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_DICE_ROLL_RESULT_CMD`, 5 bytes
+**Verified layout** (basis: zone FUN_0061abe0 (BroadResult_DiceRoll); client FUN_007063f0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
-| 2 | u8[3] | nDiceInfo.nNumber |  |
+| 0 | u16 | nError | 0x2670 (client: state 3, dice animation); 0x2671 not in game |
+| 2 | u8[3] | nDiceInfo | DiceTaiSaiInfo |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadResult_DiceRoll` (`FUN_0061abe0`) · payload 5 bytes
 
@@ -10029,14 +10029,12 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadResult_DiceRoll` (`FUN
 
 ### `0xbc7c` NC_GAMBLE_DICE_TAISAI_DICE_ROLL_RESULT_EMOTION_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_DICE_ROLL_RESULT_EMOTION_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_0061ad40 (BroadEmotion_DiceRoll, to the whole map); client FUN_00706d30)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | nGamerCnt |  |
-| 1 | GDT_EmotionInfo[nGamerCnt] | Emotion | variable length, element GDT_EmotionInfo |
-
-Element `GDT_EmotionInfo` (6 bytes): +0 u16 nGamerHnd, +2 u32 nEmotion
+| 1 | GDT_EmotionInfo[] | Emotion | {u16 nGamerHnd, u32 nEmotion = GBEventCode WinCode/LoseCode}, 6 each |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadEmotion_DiceRoll` (`FUN_0061ad40`) · payload variable (bVar7 * 6 + 3)
 
@@ -10046,14 +10044,12 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadEmotion_DiceRoll` (`FU
 
 ### `0xbc7f` NC_GAMBLE_DICE_TAISAI_LARGE_AMOUNT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_DICE_TAISAI_LARGE_AMOUNT_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_0061b2c0 (BroadLargeAmount); client FUN_00706e50)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nGamerCnt |  |
-| 1 | GDT_LargeAmountInfo[nGamerCnt] | LargeAmount | variable length, element GDT_LargeAmountInfo |
-
-Element `GDT_LargeAmountInfo` (6 bytes): +0 u16 nGamerHnd, +2 u32 nMoney
+| 0 | u8 | nGamerCnt | gamers with nTotalDividend >= MaxBetMoney |
+| 1 | GDT_LargeAmountInfo[] | LargeAmount | {u16 nGamerHnd, u32 nMoney (low dword of nTotalDividend)}, 6 each; client announces text 0x4746208a |
 
 Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadLargeAmount` (`FUN_0061b2c0`) · payload variable (iVar6)
 
@@ -11285,6 +11281,19 @@ no 0x74DC reply in 2016. Z16 §6.4
 | 2 | u32 | ref.charNo |  |
 | 6 | u16 | nError |  |
 | 8 | u64 | nMoney |  |
+
+### `0xbc79` NC_GAMBLE_DICE_TAISAI_DB_DICE_ROLL_RESULT_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_0061d930, FUN_0061a180, FUN_0061ad40; character FUN_00421a30)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nError | 0x2680 ok, else ignored (Z06-B10) |
+| 2 | i32 | nGameNo | passed to the 0xBC7A log |
+| 6 | u16 | header.clienthandle | dealer NPC handle (NETPACKETZONEHEADER) |
+| 8 | u32 | header.charregistnumber | NPC vt 0x344; the 0xBC79 handler re-checks it |
+| 12 | u16 | nResultCnt |  |
+| 14 | GDT_DiceRollApplyResult[] | DiceRollResult | GDT_DiceRollApplyResult {u16 nError (0 in the request, 0x2680 ok in the answer), u16 lockindex, u32 nPlayerNo, i64 nTotalDividend (net coins)}, 0x10 each; per-result nError 0x2680 -> coins applied, else the lock is freed |
 
 ### `0x0830` NC_MISC_CONNECTFROMWHERE_DB_ACK (S→C)
 
@@ -14551,6 +14560,30 @@ payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block 
 | 6 | u16 | nLockIndex |  |
 | 8 | u64 | nCoin |  |
 | 16 | u64 | nMoney | after tax |
+
+### `0xbc78` NC_GAMBLE_DICE_TAISAI_DB_DICE_ROLL_RESULT_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_0061a350 (Result_DiceRoll); character FUN_00421a30)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | dealer NPC handle (NETPACKETZONEHEADER) |
+| 2 | u32 | header.charregistnumber | NPC vt 0x344; the 0xBC79 handler re-checks it |
+| 6 | u8[3] | DiceNum | DiceTaiSaiInfo, the throw |
+| 9 | u16 | nResultCnt | settled gamers |
+| 11 | GDT_DiceRollApplyResult[] | DiceRollResult | GDT_DiceRollApplyResult {u16 nError (0 in the request, 0x2680 ok in the answer), u16 lockindex, u32 nPlayerNo, i64 nTotalDividend (net coins)}, 0x10 each |
+
+### `0xbc7a` NC_GAMBLE_DICE_TAISAI_DB_DICE_ROLL_RESULT_LOG_CMD (Z→DB)
+
+**Verified layout** (basis: zone FUN_0061a7c0 (ResultLog_DiceRoll); character FUN_00421d60)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | dealer NPC handle (NETPACKETZONEHEADER) |
+| 2 | u32 | header.charregistnumber | NPC vt 0x344; the 0xBC79 handler re-checks it |
+| 6 | i32 | nGameNo | from 0xBC79 |
+| 10 | u16 | nResultLogCnt | split when cnt*0x15+0xc > 7500 |
+| 12 | GDT_DiceRollApplyResultLog[] | DiceRollResultLog | {u32 nPlayerNo, u32 nBetting, u32 nBettingMoney, u16 nBattingRate (DividendRate or 0), u8 bStatus (1 won), u16 nSysRate, u32 nDividendMoney (after the cut)}, 0x15 each, one per gamer and staked kind |
 
 ### `0xc409` NC_COLLECT_REGIST_REQ (Z→DB)
 
