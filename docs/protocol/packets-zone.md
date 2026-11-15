@@ -12596,6 +12596,48 @@ Empty payload.
 | 10 | u16 | nNumOfRepeatQuest |  |
 | 12 | PLAYER_QUEST_INFO[n] | QuestRepeatArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
 
+### `0x10e3` NC_CHAR_ZONE_CARDCOLLECT_CMD (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_CHAR_ZONE_CARDCOLLECT_CMD FUN_0044cef0 → cca_Load FUN_006298c0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle | player object handle |
+| 2 | u32 | ref.charNo | must equal the player's charNo |
+| 6 | u32 | chrregnum | ignored |
+| 10 | u16 | number | trusted, no length check |
+| 12 | CardInform[number] | CardList | 11 bytes each: {i32 RegistTime, u32 SerialNumber, u16 CardID, u8 StarNumber} |
+
+PROTO_NC_CHAR_CARDCOLLECT_CMD after the ref; forwarded by the WM from Character 0x10E2
+
+### `0x10e6` NC_CHAR_ZONE_CARDCOLLECT_BOOKMARK_CMD (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_CHAR_ZONE_CARDCOLLECT_BOOKMARK_CMD FUN_0044d090 → ccb_Load FUN_00629a50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u32 | chrregnum | ignored |
+| 10 | u16 | number | trusted |
+| 12 | CardBookmarkInfo[number] | ViewList | 4 bytes each: {u16 Slot, u16 CardID} |
+
+PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD after the ref; from Character 0x10E5
+
+### `0x10e9` NC_CHAR_ZONE_CARDCOLLECT_REWARD_CMD (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_CHAR_ZONE_CARDCOLLECT_REWARD_CMD FUN_0044d230 → ccr_Load FUN_00629160)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | ref.handle |  |
+| 2 | u32 | ref.charNo |  |
+| 6 | u32 | chrregnum | ignored |
+| 10 | u16 | number | trusted |
+| 12 | u16[number] | RewardID | CollectCardReward.CC_RewardID values already taken |
+
+PROTO_NC_CHAR_CARDCOLLECT_REWARD_CMD after the ref; from Character 0x10E8
+
 ### `0x1122` NC_CHAR_USEITEM_MINIMON_INFO_ZONE_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_005a5d80 → so_ply_SetUseItemMinimon FUN_005617c0)

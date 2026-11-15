@@ -21,7 +21,7 @@ stage `zs_start_long` FUN_005b8c00 (§2.4); the zone never reloads them.
 
 | Global *(pdb2016)* | Address | Class (`SHND::`) | File (`../9Data/Shine/`) | Reader `bdb_ReadData` | key | row | rows 2016 | Lookup | Used by |
 |---|---|---|---|---|---|---|---|---|---|
-| `g_CollectCard_CardID` | DAT_14d7138c | `IndexedCommonData<CollectCard, CmpCardCollect<CollectCard>, u16>` (0x30) | CollectCard.shn | `BinaryDataBox<CollectCard>` FUN_005ae9b0 | 0x7e (126) | 0x2a | 334 | inline index by `CC_CardID` (§2.3) | `g_CardCollectMake` FUN_00628880, `so_ply_CollectCardOpen` FUN_006281b0, `cca_IsRewardCondition` FUN_00628d60 |
+| `g_CollectCard_CardID` | DAT_14d7138c | `IndexedCommonData<CollectCard, CmpCardCollect<CollectCard>, u16>` (0x30) | CollectCard.shn | `BinaryDataBox<CollectCard>` FUN_005ae9b0 | 0x7e (126) | 0x2a | 334 | inline index by `CC_CardID` (§2.3); linear `cd_Find(cardID)` FUN_00627d30 (§2.5) | index: `so_ply_CollectCardOpen` FUN_006281b0, `cca_IsRewardCondition` FUN_00628d60; `cd_Find`: `g_CardCollectMake` FUN_00628880 |
 | `g_CollectCard_MobGroup` | DAT_14d71354 | `CommonData<CollectCard, CmpCollectCard_MobGroup>` (0x1c) | (shares the vector of `g_CollectCard_CardID`) | – | – | – | – | `cd_Find(group, &pos)` FUN_00627db0 | `g_CardCollectMake` |
 | `g_CollectCard_ItemIndex` | DAT_14d7131c | `CommonData<CollectCard, CmpCollectCard_ItemIndex>` (0x1c) | (shares the vector) | – | – | – | – | `cd_Find(itemInx)` FUN_00627e30 | `sp_NC_COLLECT_CARDREGIST_REQ` FUN_00628560 |
 | `g_CollectCardMobGroup_MobGroup` | DAT_14d713bc | `CommonData<CollectCardMobGroup, CmpCollectCardMobGroup>` | CollectCardMobGroup.shn | FUN_00648d50 (folded, Z27 §2) | 0x12 (18) | 0x24 | 1 180 | `cd_Find(mobInx)` FUN_00627ed0 | `g_CardCollectMake` |
@@ -128,7 +128,7 @@ IndexedCommonData<…>::icd_Indexing(this)                        @ FUN_005b3f40
     # icd_IndexedData is never cleared first: a second indexing keeps entries of IDs that left the file
     # (latent; nothing reloads, §2.4). The pointers point into cd_Data, which is not reallocated after the load.
 
-inline lookup by CardID (in FUN_00628880, FUN_006281b0, FUN_00628d60):
+inline lookup by CardID (in FUN_006281b0, FUN_00628d60; `g_CardCollectMake` FUN_00628880 uses the linear `cd_Find` FUN_00627d30 instead, §2.5):
     row = (id < icd_IndexedData.size() && icd_IndexedData[id] != null) ? icd_IndexedData[id] : none
     # 2016: index size 335, slots 1..334 filled, slot 0 null
 
@@ -214,7 +214,8 @@ server files; "code relies on" marks the ones whose violation would change behav
 - The 2016 PDB enum `CardMobGroupIndex` ends at `MG_GOLEM` = 187 (`MAX_CARDMOBGROUPINDEX` 188); the data uses groups up to
   234 (80 cards in 47 groups ≥ 188, e.g. 188 "Devildom", 234 "ValeBattleBeak" in the client's GroupDesc). No code
   compares a group with the enum maximum, so the larger values work: a rebuild must keep the member a plain u32.
-- Code relies on: unique `CC_CardID` (index, §2.3; duplicates: index takes the last row, `cd_Find` the first);
+- Code relies on: unique `CC_CardID` (index, §2.3; duplicates: index takes the last row, `cd_Find` the first, so the
+  star roll of §4.2 would use the grade of the first row while opening, §4.4, makes the item of the last row);
   unique `CC_ItemInx` (`cd_Find(itemInx)` takes the first); `CC_CardGradeType` < 4 (`cca_IsRewardCondition` skips
   ≥ 4; the star roll finds no StarRate row for other values, §4.2).
 - The client ships the same file (`ressystem/CollectCard.shn`, rows identical).
@@ -313,7 +314,14 @@ are exactly the enum range 61 … 112. The client ships the same file (rows iden
 - `CollectCardGroupDesc.shn` (`CC_CardMobGroup` u32, `CC_MobGroupName` char[64]): server copy 187 rows with Korean
   names (groups 1 … 187), client copy 227 rows in English up to group 234. Only the client reads it (`FUN_0045de90`,
   "CollectCardGroupDesc.shn InitError!!"); no zone string names it.
-- `View/CollectCardView.shn`: a `CDataReader` view, loaded and checksummed only (Z10 §7.1); no zone code reads its rows.
+- `View/CollectCardView.shn`: a `CDataReader` view, loaded and checksummed only (Z10 §7.1, generic "the 14 View/*.shn";
+  the file is not named there); no zone code reads its rows. Columns (334 rows, CardID 1…334, server and client copies): `CC_CardID` u16,
+  `CC_CardFileName` char[32] (card image), `CC_CardName` char[64], `CC_CardDesc` char[256], `CC_MobInx` char[32] (the mob
+  shown), `CC_CardSeason` u8. It is the per-card display data.
+- Client side: `FUN_0045de90` loads `CollectCard`, `CollectCardView`, `CollectCardGroupDesc`, `CollectCardReward` and
+  `CollectCardTitle` (each with an "… InitError!!" message; `ITableBase<…, …Tab>` classes in the RTTI). It loads none of
+  `CollectCardMobGroup`, `CollectCardDropRate`, `CollectCardStarRate`: the drop odds are server-only, and a rebuild
+  must ship those three only to the zone.
 
 ### 3.8 The folded DropRate reader also loads `PartyBonusByLvDiff.shn`
 
@@ -355,8 +363,11 @@ ascending rows that is the largest `PB_LvDiff ≤ x`. 2016 file (`PB_LvDiff` i16
 | | | +11 … +150 | 0 |
 
 The file row 150 (ratio 0) only rewrites index 300. The defaults of the ctor differ only below −24 (1.2 down to −150
-instead of 0 below −30 and the −29…−25 ramp). 2016 MobInfo levels are 0…150, so the read stays inside the table as long as player levels stay ≤ 150 *(inferred:
-the player level cap was not checked here)*; a difference outside ±150 reads beyond the 301 doubles (Z28-B6).
+instead of 0 below −30 and the −29…−25 ramp). The caller `ExperienceDistribute::ed_GiveExperience` FUN_00481890 passes `playerLevel = p.vt[0x4d8]() & 0xff` (u8) and
+`mobLevel = MobInfo.Level` (2016: 0…150). The difference can therefore be −150 … +255, and indices 301 … 405 lie beyond
+the 301 doubles (Z28-B6). With the 2016 `levellimit` 125 (Z12 §5.1 `levellimit`, no experience at or above it) normal
+play stays within −150 … +125, inside the table. Only a player level above 150 (only reachable by setting the level
+directly, *(inferred)*) reads out of bounds.
 
 ---
 
@@ -404,10 +415,23 @@ ItemAttrCls_CardCollect::iac_itemcreate(itemID, item, opts)                     
 ```
 
 `RandomBox[n]` = the next value of shuffled ring n (uniform 0…n−1, `rndbox.rb_box[n]`, read inline here; `docs/knowledge/Z23.md`,
-Z09 §8). vt 0x14 runs only for items made outside the drop path: admin `&makeitem` (Z11 §4.3), the Pine
-item nodes (Z09 §23.8 / §24.2) and the reward item (§5.4 below). A GM-made `CC_Closed` therefore opens as card 1 (§4.4), with star 0 when the caller
-zeroed the attribute *(inferred)*. A GM-made opened card gets a random serial and star 0…9, independent of the card's
-grade; the serial is not unique.
+Z09 §8). vt 0x14 is the item-creation hook of every path that makes a new item outside the mob drop. A scan of the
+export for `ItemAttributeClassContainer[id]->vt[0x14](id, &item, "-o")` finds 21 direct callers (a few more reach it
+through other pointer chains, e.g. `CQuestZone::Send_NC_QUEST_DB_DONE_REQ` FUN_005bbe60):
+
+| Source | Callers |
+|---|---|
+| shop / guild storage / item-money buys | `ii_BuyAll` FUN_00523ce0, `igs_BuyAll` FUN_005244e0, `ii_ItemMoneyBuyAll` FUN_005259a0 |
+| crafting, mixing, mover upgrade, capsules, magic containers | `sp_MakeItem` FUN_00528930, `so_ply_ItemMakeItem` FUN_0049c680, `sp_NC_ITEM_MIX_ITEM_REQ` FUN_00521540, `sp_NC_ITEM_MOVER_UPGRADE_REQ` FUN_0051c850, `sp_MakeCapsuleItem` FUN_0049cce0, `sp_MagicContainerMake` FUN_0049c050 |
+| quests, rewards, events | `sp_QuestItemGet` FUN_00528240, `cRewardItem` FUN_005e17e0 / `cRewardItem_AllInMap` FUN_005e1b30, `sp_MysteryVaultMakeItem` FUN_005658f0, `SMS_StopButton` FUN_00625340 (slot machine), `sp_NC_FRIEND_UES_FRIEND_POINT_REQ` FUN_0045a730 |
+| item mall, scripts, mini-house | `sp_NC_ITEM_CHARGED_WITHDRAW_REQ` FUN_00492660, `so_scene_CreateItem` FUN_0050d770 / `so_scene_ItemAttrSet` FUN_0050d8c0 (the Pine item nodes, Z09 §23.8 / §24.2), `so_ply_Script_CostumeCreate` FUN_00518fb0, `sp_MakeMiniHouse` FUN_0043eab0 |
+| admin | `AmpersandCommand::ac_MakeItem` FUN_0041b8a0 (`&makeitem`, Z11 §4.3) |
+
+The card reward item (§5.4 below) is one of these as well. So **every `CC_Closed` that does not come from a mob drop**
+has serial 26 999 999 and opens as card 1 (§4.4). Its star is 0 when the caller zeroed the attribute *(inferred)*.
+Every opened card made this way gets a random serial and a star 0…9 that ignores the card's grade, and the serial is
+not unique. The fixed card 1 looks like a placeholder for "sealed cards come only from mobs" *(inferred)*. Whether any
+2016 shop, quest or reward table hands out `CC_Closed` was not checked (§7).
 
 Mob drops never call vt 0x14: `dilig_Drop` zeroes the 0x67 bytes of item ID + attribute (FUN_0048e260), so a dropped
 sealed card has `SerialNumber` 0. The Character DB numbers it when it stores a class-30 item with serial 0
@@ -429,7 +453,7 @@ g_CardCollectMake(u16 mobID, ShineItemAttr_MobCardCollect_Unident* card) → boo
         r = RandomBox::rb_1000000() (FUN_0048dfb0, well512 0…999 999)
         if (double)W · r / 1 000 000.0 < d.CC_CardGetRate: card.CardID = d.CC_CardID
     if card.CardID == 0xFFFF: return false                        # group without cards, or every weight 0
-    c = g_CollectCard_CardID index[card.CardID]                   # inline index (§2.3); none: return false
+    c = g_CollectCard_CardID.cd_Find(card.CardID)                 # FUN_00627d30 (§2.5), linear, first match; none: return false
     card.Star = 0; S = 0; pos = 0
     while (s = g_CollectCardStarRate.cd_Find(c.CC_CardGradeType, &pos)) != null:      # FUN_00627fd0, file order
         S += s.CC_StarRate
@@ -488,6 +512,16 @@ so_ply_CollectCardOpen(p, PROTO_NC_ITEMDB_ITEMINFO_ACK* a)                      
 
 The card ID and stars are therefore fixed at drop time (§4.2). The serial is the Character DB's number (§4.1).
 
+The use effect that starts the opening is `UseEffect::UseItemCardOpen` *(pdb2016)*, a `UseItemNormal` subclass. Z05 §6.6
+documents its `uib_DirectUse` FUN_00627740 (→ 0x34A8). Its other methods:
+
+```pseudo
+UseItemCardOpen::UseItemCardOpen()                 @ FUN_00627290    UseItemNormal ctor; vftable = UseItemCardOpen
+UseItemCardOpen::~UseItemCardOpen()                @ FUN_006272b0    vftable reset; ~UseItemNormal
+UseItemCardOpen::scalar deleting dtor(flags)       @ FUN_006276c0    the same; operator delete if flags & 1
+UseItemCardOpen::uib_CanUseItem(p, item) → u16     @ FUN_006276f0    return 0x700 (allowed): no check of its own
+```
+
 ---
 
 ## 5. Per-player card state
@@ -541,10 +575,16 @@ sp_NC_COLLECT_CARDREGIST_REQ (Z07 §7)                                     @ FUN
     lock the cell: InventoryCellLockList::icl_CardRegist(lockindex, cell, inven, inven, &req, title)   @ FUN_00488b60
         lock entry: releaser = icll_Releaser_CardRegist, +0x14 CardID, +0x18 Serial, +0x1c Star, +0x20 slot (Inven & 0x3ff),
             +0x24 title ? title.Type (CHARACTER_TITLE_TYPE) : 0x80 MAX_CHARACTER_TITLE_TYPE
-        list full: assert "…icl_CardOpen : List Full" (copy-pasted text), no lock
+        list full: assert "…icl_CardOpen : List Full" (copy-pasted text), no lock; the caller goes on (icl_IncIndex)
+        # 0xC409 has already gone to the DB, so the DB registers the card. Its 0xC40A answer
+        # (gds_NC_COLLECT_REGIST_ACK FUN_00627b60, err 0x2B90 → lock list vt 0x1c icl_Apply_N_Free, Z05 §1.3) finds no
+        # releaser and only logs "No Releaser apply". The card item stays in the inventory, and neither 0xC40B nor the
+        # zone album / title update happens. (original bug) Z28-B8: the request is not refused on a full lock list
+        # (other errors of 0xC40A free the lock: vt 0x28, then 0xC40B with the DB's error)
 InvenCellReleaser_CardRegist::icr_Apply(p, cell, …)                         @ FUN_0048b700
     clear the cell (InvenCellReleaser_CellClear::icr_Apply: the card item leaves the inventory)
     p ← 0xC40B NC_COLLECT_CARDREGIST_ACK { u8 invenslot = slot, u16 CardID, u8 Star, u32 Serial, u16 err = 0x2B90 }  (12 bytes)
+        # length failure asserts "…so_ply_CollectCardOpen : Packet Too Long" (copy-pasted text, harmless)
     p.vt[0xc0c] so_ply_CardRegist(CardID, Serial, Star, title type)
 
 ShinePlayer::so_ply_CardRegist(u16 CardID, u32 Serial, int Star, CHARACTER_TITLE_TYPE t)        @ FUN_00629c10
@@ -565,6 +605,15 @@ ShinePlayer::so_ply_CardBookmarkRegist(PROTO_NC_COLLECT_BOOKMARK_REGIST_ACK* a) 
 Registering the same card again (any star) overwrites the zone's album entry. The 0xC408 handler does not compare stars
 (Z07 §7); the DB does the same (`usp_Collection_setCard` upserts the new serial and star, D03 §12). The zone checks no
 bookmark slot range; the DB stores the slot as u8 (D03 §12).
+
+**Changes do not survive a zone change** *(inferred from the missing update path)*. The zone sends no album, bookmark
+or reward change to the WM: there is no zone→WM card opcode in the zone or WM code, and W01 §6.3 lists "Updated by
+zone: –" for the three card blobs. The Character server sends 0x10E2 / 0x10E5 / 0x10E8 only at character load
+(D02 §4, rows 26–28). Every zone the character enters gets the WM's login-time copy (0x10E3 / 0x10E6 / 0x10E9, §5.2),
+which `sp_CardCollectionSend` (Z18 §6.5) then sends to the client. After a map change to another zone, cards registered
+and bookmarks changed since the login vanish from the client's album. They also vanish from `cca_IsRewardCondition`
+(a reward needing them is refused) and from the bookmark album check, until the next login reloads them from the DB,
+which has them. (original bug) Z28-B7. This also keeps Z28-B1 latent: a zone-made album entry is never sent.
 
 The rewarded list is never changed after login: `sp_NC_COLLECT_REWARD_DB_ACK` FUN_00627a40 does not add the ID (Z07 §7
 "possible original bug"; tagged in Z07's scope, not repeated here).
@@ -592,6 +641,8 @@ in the PDB export), so the reward is always one item with class-default attribut
 | Z28-B4 | `sp_NC_COLLECT_REWARD_REQ` FUN_00628ef0 (§5.4) | `CollectCardReward.CC_RewardLot` (+0x48) is never read | latent: the reward is always one item; every 2016 row has lot 1 | give `CC_RewardLot` items (or a stack of that size) |
 | Z28-B5 | `LevelHandicap4ExperienceDouble::lh4ed_Load` FUN_00481a80 (§3.8) | a row with `PB_LvDiff` < −150 writes before `lh4ed_Table` (only the upper bound 150 is checked) | latent memory corruption; the 2016 minimum is −150 | refuse or clamp differences below −150 |
 | Z28-B6 | `LevelHandicap4ExperienceDouble::lh4ed_Handicap` FUN_00481810 (§3.8) | `table[playerLevel − mobLevel + 150]` with no range check | latent out-of-bounds read for a level difference outside ±150 (2016 mob levels 0…150) | clamp the difference to ±150 |
+| Z28-B7 | card state at a zone change (§5.3; no zone→WM card update) | album, bookmark and reward changes stay in the zone's `ShinePlayer`; the next zone gets the WM's login-time copy | after a map change to another zone, cards registered and bookmarks set in this session vanish from the client's album and from `cca_IsRewardCondition` until the next login (the DB has them) | send the changes to the WM (or update its blobs from 0xC40A / 0xC40E) |
+| Z28-B8 | `sp_NC_COLLECT_CARDREGIST_REQ` FUN_00628560 → `icl_CardRegist` FUN_00488b60 (§5.3) | with a full lock list no lock is made, but 0xC409 was already sent | the DB registers the card; on 0xC40A no releaser applies: the card item is not consumed, no 0xC40B, no album / title update (the player keeps the card and can register it again) | check for a free lock entry before sending 0xC409, else answer an error |
 
 Observations that are not bugs: `icd_Indexing` FUN_005b3f40 never clears its index first (no reload exists, §2.3); the
 MobGroup row `RatmanWarlock` names no MobInfo mob (data, §3.2); `cca_Load` / `ccb_Load` / `ccr_Load` trust the WM's
@@ -606,8 +657,13 @@ MobGroup row `RatmanWarlock` names no MobInfo mob (data, §3.2); `cca_Load` / `c
   client export *(inferred: it can)*.
 - The `CommonData` vftable slots (`cd_Load`, `cd_Find`, …) are never called virtually as far as found: `zs_start_long`
   calls the bodies directly (§2.1, *(inferred)* from the vftable references).
-- §3.8: the player level cap (needed to bound Z28-B6) was not checked; `PartyBonusByMember.shn` / `PartyBonusLimit.shn`
+- §3.8: whether any path sets a player level above 150 (the only way to trigger Z28-B6) was not checked; `PartyBonusByMember.shn` / `PartyBonusLimit.shn`
   (`pebd_Load` FUN_00481bf0, `megag_Load` FUN_00481980) are the follow-up item Z29.
+- Non-drop sources of `CC_Closed` (§4.1): whether any 2016 shop, quest, reward or mall table hands out the sealed card
+  (it would open as card 1) was not checked.
+- Album record order: the zone reads `CardInform` as `{RegistTime, SerialNumber, CardID, StarNumber}` *(pdb2016)*, the
+  2017 PDB agrees, and `docs/protocol/annotations/Z28.json` uses it. D02 §4 row 26 lists the Character server's record as
+  `{serial, card, star, time}`. One of the two orders is wrong, and the Character binary has no PDB to settle it; it is D02's to re-check.
 - Random stream: `rb_1000000` FUN_0048dfb0 is the well512 generator shared by every zone roll (Z09); reproducing the
   exact sequence of drops also needs the order of the other rolls between two card drops, which is Z09's.
 
@@ -623,10 +679,10 @@ MobGroup row `RatmanWarlock` names no MobInfo mob (data, §3.2); `cca_Load` / `c
 | WM side of 0x10E2 / 0x10E5 / 0x10E8 → 0x10E3 / 0x10E6 / 0x10E9 | W01 §6.3, W05 | the WM caches and forwards the blobs; §5.2 starts at the zone handler |
 | Character DB card procedures (`usp_Collection_*`, serial numbering, 0xC40x DB answers) and the Character server's card blob load | D03 §12, D02 | DB server behaviour |
 | Character server `ItemAttrCls_CardCollect(_Close)` attribute write / read | D07 §1.3, §3.2 | other binary; the wire bytes there match §4.1 |
-| `View/CollectCardView.shn` (zone `gSHNView_CollectCardView` FUN_00699970, loaded in `zs_start_sleep` FUN_005b67c0; WM FUN_0045d8c0; Character FUN_00442cd0) | Z10 §7.1 (zone load + checksum list FUN_00631450), W05 (WM), D02 (Character) | a checksummed view table; no card logic reads it |
+| `View/CollectCardView.shn` (zone `gSHNView_CollectCardView` FUN_00699970, loaded in `zs_start_sleep` FUN_005b67c0; WM FUN_0045d8c0; Character FUN_00442cd0) | Z10 §7.1 covers it only as one of "the 14 View/*.shn" (zone load + checksum list FUN_00631450; the file is not named there), W05 (WM), D02 (Character); columns and client use in §3.7 here | a checksummed view table; no server card logic reads its rows |
 | `CollectCardGroupDesc.shn` (client FUN_0045de90) | none needed | client-only display data (group names); no server binary names the file (§3.7), a rebuild ships it unchanged |
 | `HitMeList::hml_Load` FUN_004824d0 → `pebd_Load` FUN_00481bf0, `megag_Load` FUN_00481980, `pebd` initialiser FUN_006960f0, `nfis_ExpLimitCut` FUN_00482560 | new item Z29 (added by Z28) | reached only through §3.8 (the reader folded with ours); party experience tables, not card data; Z03 (done) left them untraced |
 | `SlotMachine::SlotMachineScreenManager` ctor FUN_00623860 calling FUN_00629150 | none needed | identical-code folding of the empty-vector ctor (§5.1); no card behaviour; slot machines are Z06 §5 |
 | ICF of `IndexedCommonData<CollectCard>::cd_Load` FUN_00629840 with the `ShinePlayer` ctor's `invenlocklist` setter | Z01 / Z04 | folding only; the player ctor is Z01's |
 | Registrations `protocolstore` FUN_004d37e0 / 004d4510 / 004d5520 / 004d5670 (the `pft_Store` lists) | Z10 §7.1 (`protocolstore` call in the start stages); Z07 §1.2, §7 (the handlers) | registration boilerplate (`handlers.json`); §5.2 and Z07 give the opcodes |
-| STL helpers (`vector<…>::_Reserve` / `reserve` / `push_back` FUN_005b6280, 005b6380, 005b7710, 005b3a70, 005b3c40, 0047a7b0, 00629410, 00629500; `std::_Xlength_error` FUN_00654e50; `vector<Observer>::reserve` FUN_00442170; `~ItemBoxIterator` FUN_0043bfe0) | none needed | container boilerplate (CLAUDE.md: skip); element sizes are in §2–§5 |
+| STL helpers (`vector<…>::_Reserve` / `reserve` / `push_back` FUN_005b6280, 005b6380, 005b7710, 005b3a70, 005b3c40, 0047a7b0, 00629410, 00629500; `std::_Xlength_error` FUN_00654e50; `vector<Observer>::reserve` FUN_00442170; `~ItemBoxIterator` FUN_0043bfe0; `allocator::allocate` / `_Uninit_move` / `reserve` / `_Reserve` FUN_005b0310, 005b0370, 005b03d0, 005b0e20, 005b0e60, 005b0ea0, 005b3980, 005b3b40, 005b3d40, 005b6300; `~CardCollectionReward` FUN_00437730 (frees the vector buffer); the `BinaryDataBox<…>` dtors / scalar-deleting dtors of the card readers (dtors FUN_005ae9a0, 005aea50, 005aea60, 005aea70, 005aeb20, 005aebe0; scalar-deleting dtors FUN_005aee10, 005aee40, 005aee70, 005aeea0, 005aeed0, 005aef00)) | none needed | container boilerplate (CLAUDE.md: skip); element sizes are in §2–§5 |
