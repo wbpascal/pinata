@@ -1,0 +1,6 @@
+Changed database context to 'World00_Character'.
+nCharNo|nMoney|nFame
+-------|------|-----
+2|99999634524|20609
+
+(1 rows affected)

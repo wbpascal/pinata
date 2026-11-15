@@ -1,0 +1,19 @@
+Changed database context to 'World00_Character'.
+nItemKey|nStorageType|nStorage|nItemID|nOptionType|nOptionData
+--------|------------|--------|-------|-----------|-----------
+120327209734897664|9|27|0|800|0
+120327209734897664|9|27|0|801|0
+120327209734897664|9|27|0|802|0
+120327209734897664|9|27|0|803|1
+120327209734897664|9|27|0|820|0
+120327209734897664|9|27|0|821|0
+120327209734897664|9|27|0|822|0
+
+(7 rows affected)
+
+(1 rows affected)
+
+(7 rows affected)
+
+(1 rows affected)
+S13: end time set; log in now and wait two minutes

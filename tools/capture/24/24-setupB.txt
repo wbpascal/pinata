@@ -1,0 +1,5 @@
+# Scenario 24, client B (X24B, HighCleric 20, GM), typed right after login:
+#   ..\gmtype.ps1 -File 24\24-setupB.txt -Client 2
+&fullpoint
+&learnskill 1620                # Revival01 "Revive [01]" (step 8)
+&learnskill 1800                # DivineShield01 "Invincible [01]", cast time 950 ms: the cast B aborts in step 4

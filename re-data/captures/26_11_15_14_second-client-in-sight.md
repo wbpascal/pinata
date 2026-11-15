@@ -1,0 +1,28 @@
+Scenario 14 (docs/plan/capture-scenarios.md): second client in sight
+- recorded on the server PC, loopback + LAN interface, filter of capture-guide.md (client ports + server links)
+- account A: "admin", character A: "Test1235" (GM, admin level 100 by 14-prep.sql), level __
+- account B: "testaccountB", character B: "X14B" (Mage, created in this capture, level 1)
+- A logs in at RouN 6443,9850 (next to the Slime / MushRoom group); B spawns at RouN 6888,7045 (~2840 apart, sight 1600)
+- client A and client B run on: <one PC, two instances | two PCs>
+- times are wall clock; fill in hh:mm:ss as you go
+
+- __:__:__ capture started, both clients started
+- __:__:__ A in game at the slimes (A's level: 120; &levelup 5 needed? no)
+- __:__:__ B logged in, created "X14B" (Mage), in game at the spawn; A visible to B? no
+- (1) __:__:__ B walked north; A appeared on B's screen at __:__:__, B on A's screen at __:__:__
+- (2) __:__:__ B walked, __:__:__ ran, __:__:__ jumped, __:__:__ sat, __:__:__ stood up
+- (3) __:__:__ B emote "<name>" and moved while it played; A saw it? yes
+- (4) __:__:__ B (level 1) shouted "x14 shout B": A saw it? no
+- (4) __:__:__ A shouted "x14 shout A": B saw it? yes
+- (4) __:__:__ B whispered A "x14 whisper B": A got it? yes
+- (4) __:__:__ A whispered "X14Nobody": message on A's screen: "X14Nobody"
+- (5) __:__:__ B hit a Slime next to A with basic attacks (6 hits); A saw the swings? yes
+- (5) __:__:__ B cast Magic Missile on the Slime; A saw it? yes; Slime died? yes (after 3 casts)
+- (6) __:__:__ A &hide: A vanished for B? yes
+- (6) __:__:__ A &show: A back for B without moving? no; after B stepped (__:__:__)? yes
+- (6) __:__:__ A &dimension 1: A vanished for B? yes
+- (6) __:__:__ A &dimension -1: answer on A's screen: none; A visible to B? no
+- (6) __:__:__ A &dimension 70000: answer on A's screen: none; A visible to B? no
+- (6) __:__:__ A &dimension 0: A visible to B right away? no; after B stepped? yes
+- (6) __:__:__ A &linkto (no argument, same map): A visible to B afterwards? no (too far away)
+- __:__:__ both logged out, capture stopped
