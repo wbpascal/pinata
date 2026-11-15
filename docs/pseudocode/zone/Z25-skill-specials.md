@@ -37,6 +37,37 @@ Z03 §5.1's guesses corrected: +0x168 is `sdi_WARPING_TARGET` (SS_DASH2), +0x170
 `sdi_RANDOMTARGETNUMBER` (not a summon member), +0x208 `sdi_SETABSTATEME`, +0x210 `sdi_NOTTARGET`, +0x240
 `sdi_DISPELABSTATE` (not NOTTARGET).
 
+#### 1.1.1 Who reads each special member (sweep)
+
+Every function of the zone-pdb export that names an `sdi_*` special, outside `sdi_Clear` FUN_00584500 /
+`sdi_SetArgument` FUN_00584800 (Z20 §4, which fill them). Raw-offset readers were checked in the disassembly
+(byte reads `0x<off>(%reg)` of the six members without a named reader): only `sdi_SetArgument` writes them.
+
+| Member (off) | Readers → where documented |
+|---|---|
+| HEALAMOUNT (0x78) | smo_SkillBlast §2.4, roe_CalcDamage FUN_005002a0 §2.5.1, `almfh_ApplyHeal` FUN_0056d2c0 Z09 §12.5 |
+| CURE (0x80) | so_SkillCure FUN_0042c440 Z22 §7.5 / §5 here |
+| DISPEL (0x88), TELEPORT (0x90), WHOLEHEALAMOUNT (0x98), SILVERWING (0x138), AREATYPE (0x1a8), HEALFRIENDRATE (0x1c0) | **no reader**: set from the SHN, never used. Teleport skills go by `EffectType` SE_TELEPORT (§6.1), not by SS_TELEPORT |
+| MANABURN, UNDEADTODMG, THHPUP, DIEHPUP, HPCONVERTSP, HPUPRATE, DMGDOWNRATE, MAXDMGDOWNRATE, TARGETHPDOWNDMGUPRATE, DISPELABSTATE, SUCKHP, FIRETIMEADD, CURSETIMEADD, POSIONTIMEADD | smo_SkillBlast only (§2.3 – §2.9) |
+| DISPELALL / ONE / RANDOM, STEALENCHANT, BOMBDISPELALL | so_Dispel FUN_0042bf70 (Z23 §8); BOMBDISPELALL also smo_Dispel FUN_0057d8e0, smo_SkillBlast |
+| DISPELDEBUFF / CURSE / POISON / DISEASE / DEEPER, DETECT | smo_Dispel (mask, Z17 §3.7), smo_SkillBlast §2.9 |
+| WHOLEAGGRORATE / RANGE (0xc8 / 0xd0) | so_Routine FUN_0056a080 §6.1 |
+| WARPING (0xd8) | smo_SkillBash_Blast Obj / Loc §6.2 / §6.3, smo_WarpTo / smo_WarpForward (Z09 §9.3) |
+| CROSSCOUNTER, WARPING_TARGET, JWALK | smo_SkillBash_Blast(Obj) §6.2 |
+| REVIVAL (0x100) | smo_SkillBlast, `sbec_Routine` FUN_00437fc0 (Z03 §5.6), cast handler 0x2440 FUN_0057fa50 (Z03 §5.2), item skill 0x304E FUN_00540b90 (Z04 §12.7) |
+| HOLDME, SHOOTME | cast handlers 0x2441 FUN_0057f400 / 0x2440 FUN_0057fa50 (Z03 §5.5 / §5.2), 0x304E FUN_00540b90 (Z04 §12.7), mover casts FUN_00580800 / FUN_00580cf0 (Z13, unreachable); HOLDME also §2.7, SHOOTME also §6.3 |
+| MAGICFIELD_TICK / KEEP / PARTY / DELAY_START_TIME, BMP_MAGICFIELD_ROTATIONSPEED_RIGHT | magic-field functions (Z09 §12.2 – §12.5), `sasa_Routine` FUN_00408d80 (Z22 §6) |
+| FLYDURINGCAST (0x130) | `sm_UseWeapon` FUN_004ab9c0 (Z09 §7.4 "+0x130"), `sm_UseSkillSimple` FUN_0057d880 (Z03 §6.6) |
+| DMGCOLLTIMEDOWN (0x1a0) | `csl_DmgCoolTimeDown` FUN_00449080 (Z23 §3.4) |
+| SETABSTATEFRIEND (0x1c8) | `almfh_ApplyHeal` FUN_0056d2c0 (Z09 §12.5) only |
+| RANDOMTARGETNUMBER, RANDOMTARGET, TOPAGGRONO, NEXTTARGETAREA, DMGSHARE, SHOTSPEED | §6.4 – §6.8 (RANDOMTARGET also `sm_UseWeapon`, Z09 §7.4) |
+| RANDOMTARGETSPOT (0x260) | `sm_UseWeapon` only (Z09 §7.4 "+0x260"; the `sdb_Load` hit is the array-end bound) |
+| JUMP, RECALL | smo_SkillBlast §2.5 / §2.6, smo_JumpTo FUN_0057db20 (Z09 §9.3) |
+| SETABSTATEME, NOTTARGET, ABKEEPTIME | smo_SkillBash_Blast(Obj) §6.2, smo_MagicFieldSpread FUN_0057c880 (Z09 §12.2) |
+
+`SS_MOVE_CHR`, `SS_HIDE_CHR_START` / `_END` and the other enum values without a member are dropped by
+`sdi_SetArgument` (Z20 §4).
+
 ### 1.2 Globals and structures
 
 ```pseudo
@@ -897,8 +928,50 @@ sbec_Store(index, s, caster, target, xy, fixedDamage, setEffSlot, from, depth):
 So **`mha_HitStep < 0` means a skill without `HitID`, or a chain wave after the first**: the single-hit tail of §2.9
 (`so_SkillEnchant`) runs, and the `mha_AbState[]` that `sbec_Store` filled from StaName A–D is not read.
 **`mha_HitStep ≥ 0` means a MultiHit step**: §2.10's loop applies the step's single abstate (index 0). The MultiHit
-table (`_MultiHitTable`, `MultiHitType` loader of Z01) has its row layout in `MultiHitData::OneHit` *(pdb2016)*. 2016:
+table (`_MultiHitTable`, `MultiHitType` loader of Z01) has its row layout in `MultiHitData::OneHit` *(pdb2016)*; loader in §6.4.1. 2016:
 182 object skills and 10 location skills have a `HitID`.
+
+#### 6.4.1 The MultiHit table: `MultiHitData::MultiHitTable::mht_Load`  @ FUN_004c0ff0
+
+Global `_MultiHitTable` (`std::vector<MultiHitElement> mht_Array`), loaded once at start by the Lua start
+script's `zs_start_full` (Z01 §2.2 / §2.3, row "MultiHitType"). Row structs *(pdb2016)*: SHN `MultiHitType` (0x2a bytes: `u16 ID; u16 HitTime; char AbIndex[32];
+u8 AS_Step; u8 AbStr; u16 AbRate; u16 DmgRate`), element `MultiHitElement` (0xa8: `u16 mhe_ID; OneHit mhe_Array[10];
+u8 mhe_ArrayCnt` at +0xa4), `OneHit` (0x10: `u16 oh_HitTimeRate; ABSTATEINDEX oh_AbState +4; u8 oh_AbStrength +8;
+u16 oh_AbStateRate +0xa; u16 oh_DamageRate +0xc; u8 oh_AreaStep +0xe`).
+
+```pseudo
+mht_Load():                                                       @ FUN_004c0ff0
+    t = BinaryDataBox<MultiHitType>.bdb_ReadData("../9Data/Shine/MultiHitType.shn")   # FUN_004c09b0: row 0x2a; read fail → assert, ShineExit
+    n = max(row.ID) + 1
+    mht_Array.resize(n, { mhe_ID = 0xFFFF, every OneHit = { 0, MAX_ABSTATEINDEX (792), 0, 0, 0, 0 }, mhe_ArrayCnt = 0 })
+    for row in t (file order):
+        if row.ID >= n: assert "mht_Load : Invalid ID", ShineExit          # cannot happen
+        e = mht_Array[row.ID];  e.mhe_ID = row.ID;  k = e.mhe_ArrayCnt
+        e.mhe_Array[k].oh_HitTimeRate = row.HitTime        # no check k < 10 (original bug) Z25-B20
+        if row.HitTime == 0: continue                      # row ignored; slot k is reused by the next row
+        e.mhe_Array[k].oh_AbStateRate = row.AbRate
+        if row.AbRate != 0:
+            e.mhe_Array[k].oh_AbState = dic_abstate name tree[row.AbIndex]   # unknown name → assert "Abstate not found", ShineExit
+            e.mhe_Array[k].oh_AbStrength = row.AbStr                         # 0 → assert "Strength Zero", ShineExit
+        e.mhe_Array[k].oh_DamageRate = row.DmgRate          # ‰ of the skill damage (§2.10)
+        e.mhe_Array[k].oh_AreaStep   = row.AS_Step          # → mha_AraeStep
+        e.mhe_ArrayCnt += 1
+
+MultiHitTable::operator[](id):                                    @ FUN_004c0a90
+    return id < mht_Array.size and mht_Array[id].mhe_ID == id ? &mht_Array[id] : null     # gaps (mhe_ID 0xFFFF) → null
+```
+
+Steps are numbered in **file order**; `sbec_Store` sorts the queued effects by time, so `mha_HitStep` need not grow
+with time. 2016 data: 182 rows, IDs 1–62 (61 unused), at most 10 rows per ID (ID 62 exactly 10), no row with HitTime 0,
+every `AbRate ≠ 0` row names an abstate and no other row does; only ID 8 is out of time order (step 4 at 2733, step 5
+at 2700 HitTime units).
+
+Other callees of `sbec_Store` (§6.4): `SkillBlastEffect::SkillBlastEffect` FUN_00434c60 (the `MultiHitArgument`
+defaults above), `sbec_ListCheck` FUN_004358a0 (empty), `DamageBySoul::SoulDamageContainer::operator[]` FUN_00434db0
+(index beyond the table → `sdc_Default`). Scanner constructors (`AxialListScanSkillTarget` FUN_0057e0f0 and the four
+`AxialListNearScanSkill{Enemy,Party,Friend,EnemyUser}` FUN_0057e1a0 / FUN_0057e260 / FUN_0057e360 / FUN_0057e420 used by
+§6.8) only set the vtable and an empty `alsst_RandomTargetList`; `alsst_SetAttacker` FUN_005793b0 stores the attacker
+and its position.
 
 ### 6.5 Firing: `SkillBlastEffect::sbe_BlastObject` / `sbe_BlastLocate`
 
@@ -1112,13 +1185,12 @@ It sends no 0x2452. This corrects Z23 §8.5 and Z03 §5.4, which read it as the 
 | Z25-B17 | `sbe_BlastObject` / `sbe_BlastLocate` §6.5 | with `sdi_RANDOMTARGET.exist` and a value outside {1, 2}, neither per-target loop runs | the spread blast of `DT_SFocalor_Skill04_W` / `WarH_SFocalor_Skill04_W` (value 0, area) hits nobody; only field ticks hurt | value 0 (cast-time random spot, Z09 §7.4) → the normal `alsst_SkillBlast` |
 | Z25-B18 | `sbe_BlastLocate` §6.5 | `Last` = TARGET_ME is not a case: assert "Invalid TargetType" after the cost is paid | `Dash01` logs an assert on every cast (no other effect: the dash is done in §6.3) | treat ME like NONE |
 | Z25-B19 | `so_Routine` §6.1 / `sbe_BlastObject` §6.5 | mobs: vt 0xedc and vt 0xee0 are both `smo_SPCheck` FUN_005557f0, which pays SP; players: a WHOLEAGGRORATE skill pays at vt 0xee0 in `so_Routine` and again in the blast | mob skills cost twice their SP (latent for players: no 2016 WHOLEAGGRORATE skill) | test only at cast end, pay once at the blast |
+| Z25-B20 | `mht_Load` §6.4.1 | writes row k of an ID into `mhe_Array[mhe_ArrayCnt]` without checking `mhe_ArrayCnt < 10` | an 11th row of one ID overwrites `mhe_ArrayCnt` (+0xa4) and the next element (2016 data: at most 10 rows, latent) | refuse (assert) more than 10 rows per ID |
 
 ## 7. Not reconstructed / uncertain
 
 - What the 2016 client draws for Volley's lone 0x244E (§6.1) and for a failed cross counter, which sends only a
   caster-side 0x2457 (§6.2, Z25-B15), was not traced in the client.
-- The `MultiHitData::OneHit` row columns (`_MultiHitTable` loader, Z01 `MultiHitType`) are taken from the PDB member
-  names used in `sbec_Store` (§6.4); the loader itself was not read here.
 - `so_dummypacketcontainer`'s send (§2.8, mobs) is taken to send nothing from its name *(inferred)*.
 - Client text 0x0A653383 (0x242A for a curse, §2.8) is in none of the 2016 `TextData*.shn`; what the client shows
   for a missing id was not traced.
@@ -1127,8 +1199,6 @@ It sends no 0x2452. This corrects Z23 §8.5 and Z03 §5.4, which read it as the 
 - Client FUN_0057eeb0 calls in the 0x245B handler (own character hit): which HUD element they refresh is not traced.
 
 ## 8. Coverage boundary
-
-(Completed in the sweep part.)
 
 | Found | Covered by | Argument |
 |---|---|---|
@@ -1154,3 +1224,12 @@ It sends no 0x2452. This corrects Z23 §8.5 and Z03 §5.4, which read it as the 
 | item-action `EventRun` calls in `sbe_BlastObject` / `alsst_*` | Z17 §3.4.3 (done) | cited in §6.5 / §6.7 |
 | toggle switch in the object blast (0x245C / 0x245D) | Z23 §2.5 (done) | cited in §6.2 |
 | `so_AIScriptFuncExec` 0xac MobAttack | Z09 §14.3 (done) | script hook at the end of §6.5 |
+| `sm_UseWeapon` FUN_004ab9c0 (reads FLYDURINGCAST, RANDOMTARGET, RANDOMTARGETSPOT), `sm_UseSkillSimple` FUN_0057d880 | Z09 §7.4, Z03 §6.6 (done) | mob skill choice before the cast; §1.1.1 only names the raw offsets |
+| `csl_DmgCoolTimeDown` FUN_00449080 (SS_DMGCOLLTIMEDOWN) | Z23 §3.4 (done) | cooldown shortening on damage taken |
+| `almfh_ApplyHeal` FUN_0056d2c0 and the magic-field functions reading `sdi_MAGICFIELD_*` / SETABSTATEFRIEND | Z09 §12.2 – §12.5 (done) | magic fields are Z09's, as the plan says |
+| `sbec_Routine` FUN_00437fc0 (REVIVAL, fires queued effects) | Z03 §5.6 (done) | effect queue tick; §6.4 covers the queuing |
+| cast handlers FUN_0057fa50 / FUN_0057f400 / FUN_00540b90 and mover casts FUN_00580800 / FUN_00580cf0 (HOLDME, SHOOTME, REVIVAL, AttackDist) | Z03 §5.2 / §5.5, Z04 §12.7, Z13 (done) | cast-time checks of the specials |
+| `smo_SkillBash_Blast_Trap` FUN_005835e0 / FUN_005838a0 | Z09 §8.8 (done) | servant explosions |
+| `sdi_Clear` / `sdi_SetArgument` FUN_00584500 / FUN_00584800, `sdb_Load` FUN_00585f40 | Z20 §4 (done) | fill the special members from the SHN |
+| player normal-attack combo `sp_MultiHitNotIndex` (`sp_Schedule_SwingDamage` FUN_0042f550, item `HitTimeArray`), `smo_ply_GetMultiHitSequance` FUN_0042b050 | Z03 §3.2 (done) | swing combo, not the skill MultiHit table |
+| container code reached from §6 (`std::deque` / `std::vector` helpers FUN_0057dfb0, FUN_00577990, FUN_00437f30, FUN_00437ec0, FUN_0057e0a0, FUN_0057e060, FUN_00576df0, FUN_0057de20, FUN_00437000, FUN_00437b20, FUN_00447600; `BinaryDataBox<AbnormalStateInfo>::bdb_ReadData` FUN_00416a00; `TargetObject::to_GetTargetObject` FUN_0042abe0; `~AxialListScanSkillTarget` FUN_0057e320) | none needed | STL / reader boilerplate with no game logic |
