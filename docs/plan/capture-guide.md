@@ -12,11 +12,16 @@ They are the strongest evidence level in this project ("confirmed by capture").
     install Npcap with loopback support if it is missing)
   - client and server on **different machines** → the network adapter that carries the game traffic
 - Capture filter (enter it before starting):
-  `tcp port 9010 or tcp port 9110 or tcp portrange 9210-9221 or tcp port 9411`
-  If your server config uses other ports (`9Data/ServerInfo/ServerInfo.txt`, type-20 rows), adjust it.
-  Port 9411 is the Character DB server (`PG_W00_CDB`): Zone/WM ↔ Character traffic (item, storage, trade writes;
-  D03). It runs between servers, so it shows up only on the loopback adapter of the PC that runs the servers. The
-  decoder and `fiesta.lua` do not classify this port yet (they know login/WM/zone only); record it anyway.
+  `tcp portrange 9000-9011 or tcp portrange 9110-9111 or tcp portrange 9210-9221 or tcp port 9311 or tcp port 9411 or tcp port 9511`
+  If your server config uses other ports (`9Data/ServerInfo/ServerInfo.txt`), adjust it. Client ports are the
+  type-20 rows (Login 9010, WM 9110, zones 9210/9212/9214/9216); the others are server links: Login←WM 9011,
+  WM←zone 9111, zone links 9218–9221, AccountDB 9000, AccountLog 9311, Character DB 9411 (`PG_W00_CDB`: item,
+  storage, trade writes; D03), GameLog 9511 (the filter also catches the unused OPTool ports 9015/9115/9211–9217).
+  Server links run between processes on the server PC, so they show up only on its loopback adapter.
+  `fiesta.lua` shows them as plaintext Fiesta packets (server name = the listener, e.g. `W00_CDB`); the decoder
+  (`pcap_decode.py`) does not classify them yet.
+- Save with *File → Save As* (all packets). *Export Specified Packets* with a display filter such as `fiesta` drops
+  the TCP handshakes (the decoder then has to resync) and everything the dissector does not mark.
 - Start the capture **before** launching the client. The decoder needs each connection's first server
   packet (the seed) to decrypt client→server traffic.
 - Save as **pcapng** (Wireshark's default) and copy the file to this repo: `re-data/captures/`.

@@ -6,13 +6,23 @@ usage: python3 -I make_dissector.py              # (re)write tools/wireshark/fie
 Doc loading is shared with the capture decoder (pcap_decode.load_docs), so both decode the same way.
 Install / usage / limits: docs/knowledge/P03.md.
 """
-import os, sys
+import os, re, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcap_decode import ROOT, XOR499, C2S, S2C, load_docs, default_ports, xor  # noqa: E402
 
 OUT = os.path.join(ROOT, "tools/wireshark/fiesta.lua")
 DIRS = {C2S: "c2s", S2C: "s2c"}
+
+
+def link_ports():
+    """ServerInfo.txt server-link listeners (types 0-3 DB servers, 5 Login<-WM, 6 WM<->zone) -> {port: name}"""
+    path, out = os.path.join(ROOT, "Files/Server/2016/9Data/ServerInfo/ServerInfo.txt"), {}
+    for line in open(path, encoding="latin-1") if os.path.exists(path) else []:
+        m = re.match(r'\s*SERVER_INFO\s+"PG_([^"]+)",\s*\d+,\s*\d+,\s*\d+,\s*([0-356]),\s*"[^"]*",\s*(\d+)', line)
+        if m:
+            out[int(m.group(3))] = m.group(1)
+    return out
 
 
 def lua(v):
@@ -42,7 +52,13 @@ def gen_data():
     for (srv, op, d), v in sorted(docs["packets"].items(), key=lambda x: (x[0][0], x[0][1], str(x[0][2]))):
         if srv in ann and d in DIRS:
             ann[srv][DIRS[d]][op] = {"name": v.get("name") or "", "f": [f[:3] for f in v["fields"]]}
-    gen = {k: {"c2s": {}, "s2c": {}} for k in kinds}
+    # server links are plaintext, one table for both directions (under "s2c": decode() is called with c2s=false);
+    # their annotations carry free-form dirs ("WM→CharDB", "Z→WM", ...); the first one per opcode wins
+    ann["link"] = {"c2s": {}, "s2c": {}}
+    for (srv, op, d), v in sorted(docs["packets"].items(), key=lambda x: (x[0][0], x[0][1], str(x[0][2]))):
+        if d not in DIRS:
+            ann["link"]["s2c"].setdefault(op, {"name": v.get("name") or "", "f": [f[:3] for f in v["fields"]]})
+    gen = {k: {"c2s": {}, "s2c": {}} for k in kinds + ("link",)}
     for k in kinds:
         for op, v in sorted(docs["layouts"][k][C2S].items()):
             lc = [int(c[3:], 0) for c in v.get("len_checks", []) if c[:3] in ("== ", "!= ")]
@@ -54,8 +70,10 @@ def gen_data():
                 e.setdefault(s["size"] if s["size"] else "var", fl(s["fields"]))
             gen[k]["s2c"][op] = e
     ports = {k: ",".join(str(p) for p, kk in sorted(default_ports().items()) if kk == k) for k in kinds}
+    ports["link"] = ",".join(str(p) for p in sorted(link_ports()))
     out = [f"F.XOR = {{[0]={XOR499[0]},{','.join(map(str, XOR499[1:]))}}}",
            f"F.PORTS = {lua(ports)}",
+           f"F.LINKNAMES = {lua(link_ports())}",
            f"F.NAMES = {lua(dict(sorted((k, v) for k, v in docs['names'].items() if v)))}",
            f"F.ERRORS = {lua(dict(sorted((k, v) for k, v in docs['errors'].items() if v)))}",
            "F.STRUCTS = " + lua({n: {"size": s["size"], "f": [f[:3] for f in s["fields"]]} for n, s in sorted(docs["structs"].items())}),
@@ -299,13 +317,14 @@ proto.experts = {ex.unknown, ex.size, ex.noseed}
 proto.prefs.login_ports = Pref.string("Login server ports", F.PORTS.login, "Comma-separated TCP ports")
 proto.prefs.wm_ports = Pref.string("World manager ports", F.PORTS.wm, "Comma-separated TCP ports")
 proto.prefs.zone_ports = Pref.string("Zone server ports", F.PORTS.zone, "Comma-separated TCP ports")
+proto.prefs.link_ports = Pref.string("Server-link ports (plaintext)", F.PORTS.link, "Comma-separated TCP ports of the server-to-server listeners")
 proto.prefs.show_password = Pref.bool("Show password", false, "Show the 0x0C5A password instead of ********")
 
 local tcp_port, ports = DissectorTable.get("tcp.port"), {}
 local function register()
   for port in pairs(ports) do tcp_port:remove(port, proto) end
   ports = {}
-  for _, k in ipairs({"login", "wm", "zone"}) do
+  for _, k in ipairs({"login", "wm", "zone", "link"}) do
     for s in proto.prefs[k .. "_ports"]:gmatch("%d+") do
       ports[tonumber(s)] = k
       tcp_port:add(tonumber(s), proto)
@@ -343,6 +362,9 @@ end
 local function dissect_pdu(tvb, pinfo, tree)
   local c2s = ports[pinfo.dst_port] ~= nil
   local kind = c2s and ports[pinfo.dst_port] or ports[pinfo.src_port]
+  local link = kind == "link"
+  local sname = link and (F.LINKNAMES[c2s and pinfo.dst_port or pinfo.src_port] or "link") or kind
+  c2s = c2s and not link      -- server links: no cipher; "C->S" below = towards the listening server
   local total, hl = F.pdu_len(function(i) return tvb(i, 1):uint() end)
   local raw = tvb:raw(hl, total - hl)
   local start
@@ -360,9 +382,9 @@ local function dissect_pdu(tvb, pinfo, tree)
     F.track(convs[ck], false, raw)
   end
 
-  local dir = c2s and "C->S" or "S->C"
+  local dir = (c2s or link and ports[pinfo.dst_port]) and "C->S" or "S->C"
   local t = tree:add(proto, tvb())
-  t:add(pf.server, kind):set_generated()
+  t:add(pf.server, sname):set_generated()
   t:add(pf.dir, dir):set_generated()
   if hl == 1 then t:add(pf.len, tvb(0, 1)) else t:add_le(pf.len, tvb(1, 2)) end
   if #raw < 2 then
@@ -384,7 +406,7 @@ local function dissect_pdu(tvb, pinfo, tree)
     t:add(pf.xor_index, start):set_generated()
   end
   local name = r.name or "?"
-  t:set_text(string.format("Fiesta %s %s 0x%04X %s%s (%d bytes)", kind, dir, op, name,
+  t:set_text(string.format("Fiesta %s %s 0x%04X %s%s (%d bytes)", sname, dir, op, name,
                            r.desc and " [" .. r.desc .. "]" or "", #body - 2))
   t:add_le(pf.opcode, btvb(0, 2))
   t:add(pf.dept, btvb(0, 2), math.floor(op / 1024))
@@ -509,6 +531,10 @@ def selftest():
     gen_size = docs["layouts"]["wm"][S2C][gen_op][0]["size"]
     zone_pre, _ = xor(struct.pack("<H", 0x0806), 0)
     C, S = "10.0.0.2", "10.0.0.1"
+    lk = next((op, v) for (srv, op, d), v in sorted(docs["packets"].items(), key=lambda x: (x[0][0], x[0][1], str(x[0][2])))
+              if d not in DIRS and v["fields"] and all(f[1] in ("u8", "u16", "u32") for f in v["fields"]))
+    lsize = max(f[0] + {"u8": 1, "u16": 2, "u32": 4}[f[1]] for f in lk[1]["fields"])
+    lport = min(p for p, n in link_ports().items() if n.endswith("CDB"))
     frames = [  # (src, sport, dst, dport, tcp payload)
         (S, 9010, C, 50000, frame(struct.pack("<HH", 0x0807, seed))),
         (C, 50000, S, 9010, frame(e1)),
@@ -516,6 +542,7 @@ def selftest():
         (S, 9010, C, 50000, frame(struct.pack("<HB", 0x0C0A, 2) + worlds) + frame(struct.pack("<H", 0xFFF0) + b"xy")),
         (S, 9110, C, 50001, frame(struct.pack("<H", gen_op) + b"\0" * (gen_size + 3))),
         (C, 50002, S, 9210, frame(zone_pre)),               # zone 0x0806 before the seed
+        (S, 50003, S, lport, frame(struct.pack("<H", lk[0]) + bytes(lsize))),   # server link: plaintext
     ]
     for name, rt in (("Lua 5.2", lua52), ("Lua 5.4", lua54)):
         L = rt.LuaRuntime(encoding=None)
@@ -547,7 +574,7 @@ def selftest():
         # glue, through the mock API: first pass in order, then re-dissection in reverse order must match
         L.execute(MOCK)
         L.globals().P = L.execute(src + "\nreturn proto")
-        assert set(L.globals().REG.keys()) == {9010, 9110, 9210, 9212, 9214, 9216}
+        assert set(L.globals().REG.keys()) == {9010, 9110, 9210, 9212, 9214, 9216} | set(link_ports())
         run = L.globals().run_frame
         first = [run(i, *f, False) for i, f in enumerate(frames)]
         again = [run(i, *f, True) for i, f in reversed(list(enumerate(frames)))][::-1]
@@ -557,7 +584,8 @@ def selftest():
                      b"fiesta.xor_index=" + str(i2).encode(), b"fiesta.opcode=2052", b'world_name: "World1"',
                      b"EXPERT fiesta.unknown_opcode unknown opcode 0xFFF0", b"(guess)",
                      b"EXPERT fiesta.size_mismatch payload " + str(gen_size + 3).encode() + b" bytes matches no send site",
-                     b"EXPERT fiesta.no_seed", b"TEXT Fiesta zone C->S (encrypted, 2 bytes)"):
+                     b"EXPERT fiesta.no_seed", b"TEXT Fiesta zone C->S (encrypted, 2 bytes)",
+                     ("TEXT Fiesta %s C->S 0x%04X" % (link_ports()[lport], lk[0])).encode()):
             assert want in out, (name, want)
         assert first[2][1].count(b"C->S") == 2 and first[3][1].startswith(b"Fiesta: S->C 0x0C0A"), first[2][1]
         assert all(pw not in t for t in L.globals().TABS.values()) and pw not in out
