@@ -849,8 +849,8 @@ A slot-machine **cluster** (`SlotMachineCluster`, one per dealer NPC, gamble typ
 (`SlotMachineScreen smc_Screens[2]`, one per seated player); the handlers are Z06 §5. Three zone-wide singletons carry the game
 rules; all screens of the zone share them: `g_SlotMachineScreenManager` DAT_14d71160 (symbol decks, bet coins), `g_SlotMachineAnalyse`
 DAT_14d710a0 (pattern tables) and `g_SlotMachineJackPotRanking` DAT_14d712a8 (jackpot pools, rankings). This part (§4.1…§4.6) covers
-the spin: tables, symbol draw, pattern match, jackpot and payout. The lifecycle (join, start, wheel stop, DB answer, routine,
-rankings) follows in §4.7… *(part 5)*.
+the spin: tables, symbol draw, pattern match, jackpot and payout. The lifecycle (objects, join and leave, start, DB answer, wheel stop,
+routine, rankings) is §4.7…§4.11.
 
 ### 4.1 Tables and the three singletons
 
@@ -1132,4 +1132,288 @@ BetLine 3, nJackpotRate 100, WinMoney 2 600 }; reservation +2 300 (`icl_StoreGBC
 `0xBCCF { 0x28D2, screen }`; state STOPPING. Had all eight lines been bet with one unit each (S = 800), `_123` would pay 1 · 100 · 20
 and the centre bonus 2 · 800, the other lines nothing: win 3 600.
 
-§4.7… (lifecycle, wheel stop, DB answer, rankings): part 5.
+### 4.7 Cluster and screen objects
+
+```pseudo
+SlotMachineCluster : CGambleObject (0xb8)          ctor @ FUN_0061dc90, dtor @ FUN_0061dd00 (base + the two screens, eh vector iterators)
+    +0x00 CGambleObject base (§2.1)            # gamers: max 2; seats: 2
+    +0x18 SlotMachineScreen smc_Screens[2]     # 0x50 each
+SlotMachineScreen : CGambleObject (0x50)           ctor @ FUN_0061dc60 (base; sms_WaitTick = 0), dtor @ FUN_0061dc80
+    +0x00 CGambleObject base                   # gamers: max 1 (the player at this screen); seats: 1
+    +0x18 GBSMBetType sms_BettingType          +0x1c u16 sms_BettingAtOnce (coins per bet unit)
+    +0x20 sms_State (SMS_READY 0, SMS_ROLLING 1, SMS_STOPPING 2; SMS_WAITDB 3 is never assigned)
+    +0x24 u32 sms_WaitTick (idle limit, §4.10)  +0x28 u32 sms_NextJackpotInfo (tick)   +0x2c u32 sms_LastStart (tick)
+    +0x30 u32 sms_WinNumber (winning spins since the join, §4.5)
+    +0x34 START_REQ sms_BettingInfo            +0x38 STOPBUTTON_ACK sms_ScreenInfo   +0x43 WHEELSTOP_ACK sms_WheelStop (§4.5)
+    # the other screen members are not set by the constructor: the clusters come from new[] in gom_Init (§2.4) and the members are
+    # first written by go_Init (type, unit) and by the join (sms_PlayerReady: state, win number, jackpot tick)
+```
+
+Both classes use FUN_00618110 for slot 0x34 `go_Init_MaxPlayer(n)` (= `go_Init_PlayerObject(n)`, §2.2; COMDAT-shared). Slot 0x2c
+("full check", §2.1): the cluster keeps the base [1], so the dealer NPC gets `STA_GBGAMEMEMBERFULL` (0x1A3) when both places are taken;
+the screen returns 0 (FUN_004b8d20), so the screens never touch the NPC's abstate.
+
+```pseudo
+SlotMachineCluster::go_Init(npc)                     (vt 0x08, from gom_Init §2.4)                     @ FUN_0061dd70
+    go_Init_NpcObject(npc) and go_Init_nWhoStandHnd(2) and vt[0x34](2) else 0
+    for both screens: screen.vt[0x08] go_Init(npc) false → 0          # all three objects share the dealer NPC
+    1
+SlotMachineScreen::go_Init(npc)                                                                         @ FUN_00620b00
+    npc null or go_Init_NpcObject(npc) false → 0
+    m = npc.vt[0x70c]() (the NPC's MobInfo record); m null or *m == 0 → 0
+    sms_BettingType   = smsm_NPCData(m.InxName)                    # §4.1: GBSMNPC row of the MobInx; none → 3 (no refusal, Z32-B18)
+    sms_BettingAtOnce = smsm_BettingAtOnce(sms_BettingType)        # GBSMBetCoin: 10 / 100 / 500; type 3 → 0
+    go_Init_nWhoStandHnd(1) and vt[0x34](1) → 1, else 0
+SlotMachineCluster::go_Init_MaxPlayer(n) = SlotMachineScreen's   go_Init_PlayerObject(n) ≠ 0          @ FUN_00618110
+SlotMachineCluster::go_FindSubGambleObject(charNo)   (vt 0x28)                                         @ FUN_0061eec0
+    the first screen whose gamer list holds charNo (go_Find_Player, §2.2) → that screen, else null
+SlotMachineCluster::go_Routine()                     (vt 0x20, from gom_Routine every main-loop pass)  @ FUN_0061f300
+    for both screens: screen.vt[0x20] go_Routine()                 # §4.10
+```
+
+The seat arrays (`go_nWhoStandHnd`, 2 seats on the cluster, 1 per screen) are allocated and never written by any slot-machine code
+either: the join's seat check only tests `seat < 2` (`go_CanWhereStand`, §2.2), and two players may ask for the same seat. This
+confirms Z32-B2 for the slot machines (no writer of the seat array exists in the zone).
+
+### 4.8 Joining, leaving and unmarking
+
+The handlers are Z06 §5 (`sp_NC_GAMBLE_SLOTMACHINE_GAME_JOIN_REQ` FUN_0061e400, `…_GAME_LEAVE_REQ` FUN_0061e660); the object side:
+
+```pseudo
+0xBCC8 NC_GAMBLE_SLOTMACHINE_GAME_JOIN_REQ { u16 npc, u8 seat, u8 direction }           (summary of Z06 §5)  @ FUN_0061e400
+    answer 0xBCC9 { u16 BettingUnit, u16 nError } pre-set to nError 0x28C0
+    p.so_Field (p+0x7a) null → 0x28C2; L.icl_IsAnyLock (lock list vt 0x10) → 0x28C3; p in any gamble (vt 0xb1c) → 0x28C1
+    o = gom_GetGambleObject(npc) (by NPC handle, any gamble type); none or o has no NPC → 0x28C4
+    distance²(p, NPC) > 1 000 000 → 0x28C5;  o.vt[0x10] go_CanEnter false → 0x28C6;  o.vt[0x18] go_CanWhereStand(seat) false → 0x28C7
+    o.vt[0x00] go_Enter_Player(p) true → p.sp_Gamble_JoinType = 2 (vt 0xb28), sp_Gamble_DirectInfoBroadcastSet(direction) (0xBC1C),
+        o.vt[0x24] go_SendGameInfo(p) (sends the JOIN_ACK, below); return
+    else JoinType = 0, 0x28C1
+    # error answers write only nError: BettingUnit (payload +0) is whatever the shared send buffer gpp held from the previous packet
+    # (original bug) Z32-B25 (the client ignores every code except 0x28C0)
+    # o is never checked to be a slot machine (vt 0x0c go_Get_GambleType): with the handle of a TaiSai dealer the player is added to
+    # the TaiSai gamers (base go_Enter_Player, §2.2) with JoinType 2, and the TaiSai's go_SendGameInfo answers (0xBC65, §3.5). The
+    # TaiSai broadcasts skip the player (they test JoinType 1, §3.3), the slot LEAVE finds no slot object (0x28CB), the TaiSai LEAVE
+    # refuses (0x2623); the player holds a TaiSai place until logging out, and so_Unmark looks for a slot object, so the TaiSai keeps
+    # the freed player's pointer as in Z32-B13 (original bug) Z32-B24. The TaiSai JOIN fails safely on a cluster: its vt 0x3c stub answers 0x2619.
+
+SlotMachineCluster::go_Enter_Player(p)               (vt 0x00)                                          @ FUN_0061f0b0
+    s = the first screen with no gamer (go_Get_EnterPlayerCnt == 0); none → 0
+    s.vt[0x00] go_Enter_Player(p) false → 0                      # only this first free screen is tried
+    base CGambleObject::go_Enter_Player(cluster, p) (§2.2: the cluster's own gamer list; "full" abstate on the NPC at 2) → 1
+    else s.vt[0x04] go_Out_Player(p); 0
+SlotMachineScreen::go_Enter_Player(p)                (vt 0x00)                                          @ FUN_00620d00
+    sms_WaitTick == 0 and GBBanTime row GameType 26 exists (SHND::g_BanTime, GBBanGame): sms_WaitTick = GB_BanTime · 10
+        # computed once per screen; the 2016 row: GB_Ban GB_BAN_NO_PLAY (0), GB_BanTime 300 000 → 3 000 000 ticks (§4.10)
+    sms_LastStart = now
+    return base go_Enter_Player(screen, p)                        # max 1 gamer
+SlotMachineCluster::go_SendGameInfo(p)               (vt 0x24)                                          @ FUN_00620b80
+    p null → return 0x28C1 (nothing sent)
+    for both screens: s.sms_PlayerReady(p, &ack) true → stop
+    found → p ← 0xBCC9 NC_GAMBLE_SLOTMACHINE_GAME_JOIN_ACK { u16 BettingUnit = s.sms_BettingAtOnce, u16 nError = 0x28C0 }
+    none  → p ← 0xBCC9 { BettingUnit not written (stale gpp bytes, Z32-B25), nError = 0x28D9 }      # not reached after a successful enter
+    return 0x28C0                                                  # the assert text names "CGambleDiceTaiSaiObject::sp_NC_…_JOIN_REQ"
+SlotMachineScreen::sms_PlayerReady(p, ack)                                                              @ FUN_0061efc0
+    p (by charNo, vt 0x344) not this screen's gamer → 0
+    sms_State = SMS_READY; sms_WinNumber = 0; sms_NextJackpotInfo = now (the first 0xBCD8 goes out on the next routine pass)
+    ack.BettingUnit = sms_BettingAtOnce; 1
+```
+
+Client (`MHDiceGameTask::Recv_NC_GAMBLE_SLOTMACHINE_GAME_JOIN_ACK` FUN_0071b370): any nError other than 0x28C0 is ignored without a
+message. On 0x28C0 it opens the slot window (`this+0x15c4`), stores `BettingUnit` at window +0x31c, `SlotMachineWin::InitMachine`
+(FUN_0071f3d0), shows the coin count, sets its own state, plays `GB_SlotMachine.mp3`. None of 0x28C0…0x28D9 has a client text.
+
+```pseudo
+0xBCCA NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_REQ {}                                                           @ FUN_0061e660
+    answer 0xBCCB NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_ACK { u16 nError }
+    p.so_Field null → 0x28C9;  L.icl_IsAnyLock → 0x28CA (a settlement is pending, §4.9);  p not in a slot machine (vt 0xb20(2)) → 0x28CB
+    o = gom_FindGambleObject(p.charNo, GBT_SLOTMACHINE); none → 0x28CB
+    p.sp_Gamble_JoinType = 0 (vt 0xb28); o.vt[0x04] go_Out_Player(p); answer 0x28C8   # the result of go_Out_Player is not looked at
+    # no state check: leaving in ROLLING drops the spin; nothing was charged yet (coins move only from the stop button on, §4.5)
+SlotMachineCluster::go_Out_Player(p)                 (vt 0x04)                                          @ FUN_0061f1d0
+    base CGambleObject::go_Out_Player(cluster, p) (§2.2; removes the NPC's "full" abstate) false → 0
+    the first screen whose gamer 0 has p's zone handle → s.vt[0x04] (base go_Out_Player) → 1;  none → 0
+    # the screen keeps sms_State, sms_BettingInfo, sms_WheelStop; the next join resets the state (sms_PlayerReady)
+SlotMachineCluster::go_PlayerUnmarking(p)            (vt 0xd8, from ShinePlayer::so_Unmark §3.11)       @ FUN_0061f3b0
+    vt[0x04] go_Out_Player(p); then for both screens: s.vt[0xd8](p)
+SlotMachineScreen::go_PlayerUnmarking(p)             (vt 0xd8)                                          @ FUN_0061f480
+    p (by charNo) is this screen's gamer → vt[0x04] go_Out_Player(p)   # after the cluster's call above: never true (redundant)
+```
+
+A player who logs out at a slot machine is simply removed (no logout gate: `so_Gamble_IsCanSessionCloseing` tests only TaiSai,
+§3.11). A pending settlement is not lost: the GameDB has already booked the coins (§4.5), and the answer finds no player (§4.9).
+
+### 4.9 Spin state machine: start, settlement answer, wheel stop
+
+```
+READY ──0xBCCC START (0x28CF)──▶ ROLLING ──0xBCCE STOPBUTTON (0x28D2, §4.5)──▶ STOPPING ──0xBCD0 WHEELSTOP (0x28D4)──▶ READY
+                                                         GameDB 0xBCD4 (while STOPPING): apply / drop the coin reservation, state kept
+```
+
+```pseudo
+SlotMachineScreen::SMS_Start(p, START_REQ req)       (vt 0xdc; from 0xBCCC FUN_0061e870, Z06 §5)        @ FUN_0061f540
+    sms_State ≠ SMS_READY → 0x28D0
+    coins = p.vt[0xb04]() (u64)
+    coins < 2^32 and (u32) coins < sms_BettingAtOnce · Σ the eight line counts of req → 0x28D1
+    sms_BettingInfo = req.betting; sms_LastStart = now; sms_State = SMS_ROLLING
+    return 0x28CF                                    # the handler answers 0xBCCD NC_GAMBLE_SLOTMACHINE_START_ACK { u16 nError }
+    # no coin is reserved here; the coins are only checked. A start with zero units passes too (stake 0, §4.5)
+```
+
+Client (`Recv_NC_GAMBLE_SLOTMACHINE_START_ACK` FUN_0071afd0 → `SlotMachineWin::Spin` FUN_0071c010): only while the window waits for
+a start answer (window state 2): 0x28CF → spin the reels (state 3, sound 0x3b); any other code → back to state 1. In every other window
+state the packet is ignored, which is why the settlement answer below can reuse this opcode *(inferred)*.
+
+```pseudo
+GameDB 0xBCD4 NC_GAMBLE_SLOTMACHINE_DB_RESULT_ACK { hdr { u16 clienthandle, u32 charregistnumber }, u16 lockindex, u16 nError }
+                                                     (GameDBSession, 10 bytes; D03 §11)                 @ FUN_00620330
+    p = som_GetObject(clienthandle); p null, closing (vt 0x300) or p.charNo ≠ charregistnumber → dropped
+    p.vt[0xb50] so_ply_SlotMachineDBResult(ack)
+ShinePlayer::so_ply_SlotMachineDBResult(ack)                                                             @ FUN_00620560
+    (saves and restores the shared send buffer around the call)
+    o = gom_FindGambleObject(p.charNo, GBT_SLOTMACHINE); s = o.vt[0x28] go_FindSubGambleObject(p.charNo)
+    o or s null → code = 0x28CE
+    else code = s.vt[0xe0](p, ack)                   # below
+    p ← 0xBCCD NC_GAMBLE_SLOTMACHINE_START_ACK { u16 nError = code }
+SlotMachineScreen::SMS_StopButton(p, DB_RESULT_ACK ack, …)   (vt 0xe0; PDB name, the DB-answer overload) @ FUN_0061f6e0
+    sms_State ≠ SMS_STOPPING → 0x28D7
+    sms_State = SMS_STOPPING                          # unchanged
+    ack.nError ∈ {0x28D8, 0x2900} (the Character server sends 0x2900 for success, D03 §11):
+        L.icl_Apply_N_Free(p, ack.lockindex, 0)  (lock list vt 0x1c, Z05 §1.3): the CoinChange releaser books the coin difference
+            and tells the client (part 3 notes: icr_Apply FUN_00489be0, 0xBC04)
+        return 0x28CF
+    else: L.icl_Free(ack.lockindex) (vt 0x28): reservation dropped, coins unchanged; return ack.nError (0x2901…0x2906, D03 §11)
+```
+
+(original bug) Z32-B20: the reservation is released only on this path. When the answer finds the screen in another state (the client
+sent `0xBCD0` before the GameDB answered: the screen is READY, code 0x28D7) or finds no screen (code 0x28CE), the lock index is
+neither applied nor freed. The GameDB has booked the coins, the zone's coin count stays old, and the pending lock makes every later
+`icl_IsAnyLock` true: the player can no longer leave the machine (0x28CA) or join a game (0x28C3) until the next login *(inferred:
+the lock list is per session)*. Normal clients send `0xBCD0` only after the reel animation, long after the answer.
+
+```pseudo
+0xBCD0 NC_GAMBLE_SLOTMACHINE_WHEELSTOP_REQ {}                                                            @ FUN_0061eaf0
+    s = the player's screen (gom_FindGambleObject(charNo, 2), vt 0x28); none → so_SendErrorCode(0x2F, 0xD1, 0x28CE) = 0xBCD1 { 0x28CE }
+    ack = {0}; code = s.vt[0xec](p, &ack)
+    p ← 0xBCD1 NC_GAMBLE_SLOTMACHINE_WHEELSTOP_ACK { u16 nError = code, u16 bet, u32 win, SLOTMACHINE_WinState WinLine }   (10 bytes)
+SlotMachineScreen::SMS_WheelStop(p, ack)             ("SMS_WheelStop3", vt 0xec)                        @ FUN_0061f930
+    sms_State ≠ SMS_STOPPING → 0x28D7 (ack stays zero)
+    ack = sms_WheelStop (bet = stake, win = payout after tax, WinLine bits; §4.5); sms_State = SMS_READY; 0x28D4
+SlotMachineScreen::SMS_WheelStop(p)                  ("SMS_WheelStop2", vt 0xe8)                        @ FUN_0061f8c0
+    sms_State = SMS_READY; 0x28D4                    # no caller found (no call through vt 0xe8 in the zone)
+```
+
+`SLOTMACHINE_WinState` (2 bytes, *pdb2016*): byte 0 bits 0…7 = lines `_789`, `_456`, `_123`, `_741`, `_852`, `_963`, `_753`, `_951`;
+byte 1 bit 0 `all`, bit 1 `bonus` (centre), bit 2 `jackpot`. Client (`Recv_…_WHEELSTOP_ACK` FUN_0071b090): only 0x28D4 →
+`SlotMachineWin::WheelStop` (FUN_0071c480): stores `WinLine` and `win` (as a u64 with high word 0) and counts the coin display up by
+`win`; `bet` is not read.
+
+### 4.10 Screen routine: idle kick and jackpot display
+
+```pseudo
+SlotMachineScreen::go_Routine()                      (vt 0x20, every main-loop pass via the cluster)    @ FUN_00620de0
+    no gamer → return;  p = gamer 0
+    idle = now − sms_LastStart                       # since the join or the last START (ticks of 0.1 s)
+    if idle > sms_WaitTick and p:
+        p.vt[0x304] so_SendProtocol(0x2F, 0xD2) = 0xBCD2 NC_GAMBLE_SLOTMACHINE_STAND_UP_CMD {}   # every pass (Z06-B19)
+        if idle > sms_WaitTick + 600: p.vt[0x5fc] so_banning(0) (Z01 §8.3: disconnected); return
+    if sms_NextJackpotInfo < now:                    # also reached in the 60 s between the stand-up and the kick
+        smjpr_SendJackPotPriceTo(p); sms_NextJackpotInfo = now + 100            # every 10 s
+SlotMachineJackPotRanking::smjpr_SendJackPotPriceTo(p)                                                   @ FUN_0061fe80
+    p ← 0xBCD8 NC_GAMBLE_SLOTMACHINE_JACKPOTINFO_CMD (smjpr_PacketMake_JackPotPrice), size 1 + 6·JackPotNum
+smjpr_PacketMake_JackPotPrice(cmd)                                                                        @ FUN_0061fd70
+    JackPotNum = 0; smjpr_TaxInfo null → done (never: smjpr_Load exits without it)
+    for type 0, 1, 2: JackPotList[n++] = { u16 BettingUnit = smsm_BettingAtOnce(type),
+                                           u32 JackpotPrice = smjpr_TaxInfo.GB_JPSaveRate · InfoArr[type].JackPotPrice / 1000 }
+    # = what a jackpot would pay now (10 % of the pool, §4.4), with the same u32 wrap as Z32-B16
+    # reads InfoArr[0…2] without checking its size: before the GameDB link (smjpr_RankingReq, §4.11) the vector is empty and this
+    # reads through a null pointer (original bug) Z32-B22 (unreachable in practice *(inferred)*: a player reaches a map only after the
+    # DB servers are linked)
+```
+
+The 2016 idle limit: `GBBanTime.shn` row 26 `GB_BanTime` 300 000 ·10 = 3 000 000 ticks = 300 000 s ≈ 83 h, then 60 s of stand-up
+commands, then the disconnect. In practice nobody is ever kicked. The ×10 converts seconds to ticks; read as milliseconds (5 min) the
+value would need ÷100 (original bug) Z32-B26 *(intent inferred: the column is used nowhere else)*.
+
+Client: `STAND_UP_CMD` (FUN_0071b0c0) does nothing; `JACKPOTINFO_CMD` (FUN_0071b0d0 → `SlotMachineWin::SetJackPotCoin` FUN_0071c3c0)
+writes each `JackpotPrice` as `%d` into one of three labels chosen by `BettingUnit` 10, 100 or 500 (hard-coded in the client; other
+units are not shown).
+
+### 4.11 Jackpot pools from the DB, rankings, jackpot broadcast
+
+```pseudo
+GameDBSession::gds_NC_MISC_S2SCONNECTION_ACK (the GameDB link is up)                                   @ FUN_00468880
+    sock2gameDB verification; smjpr_RankingReq()
+SlotMachineJackPotRanking::smjpr_RankingReq()                                                            @ FUN_00626220
+    smjpr_IsReq set → return                          # once per zone process: a GameDB reconnect asks nothing
+    smjpr_IsReq = 1
+    GameDB ← 0xBCD5 NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_REQ { u8 nSlotMachineNum = 3,
+                 { u8 Machine = t, u16 BetUnits = smsm_BettingAtOnce(t) } for t = 0, 1, 2 }      # 10 bytes, no header; D03 §11
+    smjpr_InfoArr.resize(3); every entry: JackPotPrice = 0, JackPotRank cleared
+GameDB 0xBCD6 NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_ACK { u8 Machine, u16 nError, u32 JackPotPrice, u8 RankNumber,
+                 SLOTMACHINE_JackPotRank RankList[RankNumber] }   (GameDBSession FUN_00625d30, no header) → smjpr_RankingSet
+SlotMachineJackPotRanking::smjpr_RankingSet(ack)                                                         @ FUN_00625130
+    nError ≠ 0x2940 → assert "…smjpr_RankingSet : Error occur", ShineExit
+    Machine ≥ |InfoArr| → assert "…Invalid Machine", ShineExit
+    InfoArr[Machine].JackPotPrice = JackPotPrice     # the zone pool starts from the DB pool of that BetUnit
+    append the RankNumber entries to InfoArr[Machine].JackPotRank (no sort, no limit)
+```
+
+(original bug) Z32-B23: the Character server answers 0x2941 (jackpot query failed) or 0x2942 (ranking query failed) per machine (D03
+§11), and either one stops the zone at once (`ShineExit`). D03-B22's trailing bytes are harmless here (only `RankNumber` entries are read).
+
+```pseudo
+smjpr_JackPotRankingSet(type, Name5 name, u32 win)   (from SMS_StopButton on a jackpot, §4.5)          @ FUN_00625000
+    type ≥ |InfoArr| → nothing
+    InfoArr[type].JackPotRank.push_back({ name, money = win })   # win = line / all wins + jackpot share, before the tax
+    sort InfoArr[type].JackPotRank by money, descending (std::sort: introsort, ties in any order;
+        FUN_006230d0 with FUN_00621600 / 006216f0 / 00622280 / 00622720; vector growth FUN_00624460 / FUN_00623690)
+    # the list is never trimmed: it grows by one entry per jackpot for the life of the zone
+
+0xBCD9 NC_GAMBLE_SLOTMACHINE_JACKPOTRANKING_REQ {}   (handler's profiler text says WHEELSTOP_REQ)        @ FUN_0061ec60
+    s = the player's screen; none → ListLen = 0
+    else s.vt[0xf0] go_SMS_PacketMake_JackpotRank(ack) (FUN_00620ef0): ListLen = 0; smjpr_PacketMake(ack, s.sms_BettingType)
+    p ← 0xBCDA NC_GAMBLE_SLOTMACHINE_JACKPOTRANKING_ACK { u8 ListLen, SLOTMACHINE_JackPotRank RankList[ListLen] }   size 1 + 0x18·n
+smjpr_PacketMake(ack, type)                                                                               @ FUN_0061ff80
+    ListLen = 0; type ≥ |InfoArr| → done
+    copy the entries of InfoArr[type].JackPotRank in order; the "at most 50" test reads ack.ListLen, which is only written after the
+    loop (still 0), so it never stops the copy; ListLen = (u8) count
+    # (original bug) Z32-B21: with 51…255 entries the answer carries them all; from 256 on ListLen wraps and the packet length
+    # (1 + 0x18·ListLen) cuts the list to count mod 256 entries; past 341 entries the copy runs beyond the send buffer *(inferred:
+    # gpp is the 0x2000-byte buffer the other senders save and restore)*. Intended: the first 50 (the win ranking below tests its
+    # counter correctly)
+
+0xBCDB NC_GAMBLE_SLOTMACHINE_WINRANKING_REQ {}                                                            @ FUN_0061ed90
+    s = the player's screen; none → no answer
+    s.vt[0xf4] go_SMS_PacketMake_WintRank(ack); p ← 0xBCDC NC_GAMBLE_SLOTMACHINE_WINRANKING_ACK { u8 ListLen, SLOTMACHINE_JackPotRank
+        RankList[ListLen] }  size 1 + 0x18·n
+SlotMachineScreen::go_SMS_PacketMake_WintRank(ack)   (vt 0xf4)                                           @ FUN_00624520
+    ListLen = 0; n = gom_GetGambleObjectMaxCnt(GBT_SLOTMACHINE); n == 0 → done
+    wincollect (function-static vector) = []
+    for every cluster i < n: cluster.vt[0xf8] go_SMC_WinRank(&wincollect, sms_BettingType)
+    sort wincollect by money, descending (std::sort); copy the first min(count, 50); ListLen = that number
+SlotMachineCluster::go_SMC_WinRank(list, type)       (vt 0xf8)                                           @ FUN_00625280
+    for both screens: SMS_WinRank(list, type)
+SlotMachineScreen::SMS_WinRank(list, type)                                                               @ FUN_00624710
+    type == sms_BettingType and the screen has a gamer p: list.push_back({ name = p.vt[0x56c] (Name5), money = sms_WinNumber })
+```
+
+The win ranking is live: only the players seated right now at machines of the requester's type in this zone, ranked by their number of
+winning spins since they sat down. The jackpot ranking is the DB list (per BetUnit) plus this zone's jackpots since start, by amount.
+
+```pseudo
+ShinePlayer::so_ply_IBurstJackPot(u64 win)           (vt 0xb54, from SMS_StopButton; win sign-extended from i32)   @ FUN_00620410
+    every player in p's map (so_AllInMap, including p) ← 0xBCDD NC_GAMBLE_SLOTMACHINE_SOMEONE_GET_JACKPOT_CMD {
+        Name5 charid = p.vt[0x56c], u64 price = win }                 # 0x1C bytes
+ShineObject::so_ply_GodOfSlotMachine() / ShinePlayer:: (vt 0xb58)      @ FUN_0061dde0 (global `tmp`) / FUN_0061ddf0 (sp_GodOfSlotMachine)
+    the GM screen string handed to smsm_Action (§4.2; set by the GM command, Z11 §3.4)
+```
+
+Client: `JACKPOTRANKING_ACK` (FUN_0071b820) and `WINRANKING_ACK` (FUN_0071b790) open or raise the rank window (`GBSlotRankWin`,
+`this+0x15cc`), switch to tab 1 / tab 2 and copy all `ListLen` entries (`UpdateJackpotRankList` FUN_0071bca0, `UpdateWinRankList`
+FUN_0071bd40; no limit on the client side either). `SOMEONE_GET_JACKPOT_CMD` (FUN_0071b5b0) adds the system message text 0x7344739
+"%s has won the Jackpot in the amount of %I64d …" with `charid` and `price`.
+
+Corrections to Z06 §5 (done item; Z32 is the reference for these): `0xBCDD` is `{ Name5 charid, u64 price }` (0x1C, no trailing u32);
+the "house cut" and "accumulation flag" read from "config DAT_14d712cc" are `smjpr_TaxInfo` (GBTaxRate row 26) `GB_TaxRate` and
+`GB_JPSave` (§4.1, §4.5); `GBSMNPC` holds only `{ MobInx, GBSMBet }`; the settlement answer `0xBCD4` keeps the screen in STOPPING
+(it is the wheel stop that returns to READY); the 0xBCD0 handler uses vt 0xec (`SMS_WheelStop3`), vt 0xe8 is not called.

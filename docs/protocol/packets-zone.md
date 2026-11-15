@@ -10094,12 +10094,12 @@ Sent from `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_BroadSetTimer` (`FUN_006195
 
 ### `0xbcc9` NC_GAMBLE_SLOTMACHINE_GAME_JOIN_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_GAME_JOIN_ACK`, 4 bytes
+**Verified layout** (basis: zone FUN_0061e400 / FUN_00620b80 (go_SendGameInfo) / FUN_0061efc0 (sms_PlayerReady); client FUN_0071b370; 2016 Zone.pdb struct)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | BettingUnit |  |
-| 2 | u16 | nError |  |
+| 0 | u16 | BettingUnit | coins per bet unit (GBSMBetCoin) on 0x28C0; error answers leave it unwritten (stale gpp bytes, Z32-B25) |
+| 2 | u16 | nError | 0x28C0 ok; 0x28C1 in a game / enter failed, 0x28C2 no field, 0x28C3 lock pending, 0x28C4 no object, 0x28C5 too far, 0x28C6 full, 0x28C7 seat, 0x28D9 not on a screen; client acts only on 0x28C0 |
 
 Sent in reply to `0xbcc8` NC_GAMBLE_SLOTMACHINE_GAME_JOIN_REQ on ShineObjectClass::ShinePlayer (`FUN_0061e400`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_GAME_JOIN_REQ) · payload 4 bytes
 
@@ -10109,11 +10109,11 @@ Sent in reply to `0xbcc8` NC_GAMBLE_SLOTMACHINE_GAME_JOIN_REQ on ShineObjectClas
 
 ### `0xbccb` NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_0061e660)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | 0x28C8 ok, 0x28C9 no field, 0x28CA lock pending, 0x28CB not at a slot machine |
 
 Sent in reply to `0xbcca` NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_REQ on ShineObjectClass::ShinePlayer (`FUN_0061e660`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_REQ) · payload 2 bytes
 
@@ -10123,11 +10123,11 @@ Sent in reply to `0xbcca` NC_GAMBLE_SLOTMACHINE_GAME_LEAVE_REQ on ShineObjectCla
 
 ### `0xbccd` NC_GAMBLE_SLOTMACHINE_START_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_START_ACK`, 2 bytes
+**Verified layout** (basis: zone FUN_0061e870 / FUN_0061f540 (SMS_Start); also the settlement answer FUN_00620560 / FUN_0061f6e0; client FUN_0071afd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
+| 0 | u16 | nError | start: 0x28CF ok, 0x28D0 not READY, 0x28D1 too few coins, 0x28CE no screen; settlement: 0x28CF booked, 0x28D7 not STOPPING, 0x28CE no screen, 0x2901-0x2906 DB error; client: 0x28CF spins, other codes reset, only while a start is pending |
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_SlotMachineDBResult` (`FUN_00620560`) · payload 2 bytes
 
@@ -10151,15 +10151,14 @@ Sent in reply to `0xbcce` NC_GAMBLE_SLOTMACHINE_STOPBUTTON_REQ on ShineObjectCla
 
 ### `0xbcd1` NC_GAMBLE_SLOTMACHINE_WHEELSTOP_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_WHEELSTOP_ACK`, 10 bytes
+**Verified layout** (basis: zone FUN_0061eaf0 / FUN_0061f930 (SMS_WheelStop3); client FUN_0071b090 / FUN_0071c480; 2016 Zone.pdb struct)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nError |  |
-| 2 | u16 | bet |  |
-| 4 | u32 | win |  |
-| 8 | u8 | WinLine._789|_456|_123|_741|_852|_963|_753|_951 | bits _789:1@0, _456:1@1, _123:1@2, _741:1@3, _852:1@4, _963:1@5, _753:1@6, _951:1@7 |
-| 9 | u8 | WinLine.all|bonus|jackpot | bits all:1@0, bonus:1@1, jackpot:1@2 |
+| 0 | u16 | nError | 0x28D4 ok, 0x28D7 not STOPPING (rest zero), 0x28CE no screen (2-byte answer) |
+| 2 | u16 | bet | stake (unit x line units); client does not read it |
+| 4 | u32 | win | payout after tax incl. jackpot share |
+| 8 | SLOTMACHINE_WinState | WinLine | byte0 bits 0-7 lines _789 _456 _123 _741 _852 _963 _753 _951; byte1 bit0 all, bit1 bonus, bit2 jackpot |
 
 Sent in reply to `0xbcd0` NC_GAMBLE_SLOTMACHINE_WHEELSTOP_REQ on ShineObjectClass::ShinePlayer (`FUN_0061eaf0`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_WHEELSTOP_REQ) · payload 10 bytes
 
@@ -10171,14 +10170,12 @@ Sent in reply to `0xbcd0` NC_GAMBLE_SLOTMACHINE_WHEELSTOP_REQ on ShineObjectClas
 
 ### `0xbcd8` NC_GAMBLE_SLOTMACHINE_JACKPOTINFO_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_JACKPOTINFO_CMD`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_0061fe80 / FUN_0061fd70; client FUN_0071b0d0 / FUN_0071c3c0; 2016 Zone.pdb struct)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | JackPotNum |  |
-| 1 | PROTO_NC_GAMBLE_SLOTMACHINE_JACKPOTINFO_CMD::<unnamed-type-JackPotList>[JackPotNum] | JackPotList | variable length, element PROTO_NC_GAMBLE_SLOTMACHINE_JACKPOTINFO_CMD::<unnamed-type-JackPotList> |
-
-Element `PROTO_NC_GAMBLE_SLOTMACHINE_JACKPOTINFO_CMD::<unnamed-type-JackPotList>` (6 bytes): +0 u16 BettingUnit, +2 u32 JackpotPrice
+| 0 | u8 | JackPotNum | 3 |
+| 1 | {u16 BettingUnit; u32 JackpotPrice}[JackPotNum] | JackPotList | per machine type: unit (client label chosen by 10/100/500) and GB_JPSaveRate x pool / 1000 |
 
 Sent from `SlotMachine::SlotMachineJackPotRanking::smjpr_SendJackPotPriceTo` (`FUN_0061fe80`) · payload variable (iVar2)
 
@@ -10186,27 +10183,23 @@ Fill: +0: FUN_0061fd70 (no direct writes found)
 
 ### `0xbcda` NC_GAMBLE_SLOTMACHINE_JACKPOTRANKING_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_JACKPOTRANKING_ACK`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_0061ec60 / FUN_00620ef0 / FUN_0061ff80; client FUN_0071b820; 2016 Zone.pdb struct)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | ListLen |  |
-| 1 | SLOTMACHINE_JackPotRank[ListLen] | RankList | variable length, element SLOTMACHINE_JackPotRank |
-
-Element `SLOTMACHINE_JackPotRank` (24 bytes): +0 char[20] name, +20 u32 money
+| 0 | u8 | ListLen | no 50 cap in 2016 (Z32-B21); 0 when not at a screen |
+| 1 | SLOTMACHINE_JackPotRank[ListLen] | RankList | {Name5 name; u32 money = jackpot win}, sorted by money descending |
 
 Sent in reply to `0xbcd9` NC_GAMBLE_SLOTMACHINE_JACKPOTRANKING_REQ on ShineObjectClass::ShinePlayer (`FUN_0061ec60`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_WHEELSTOP_REQ) · payload variable (iVar4)
 
 ### `0xbcdc` NC_GAMBLE_SLOTMACHINE_WINRANKING_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_WINRANKING_ACK`, 1 bytes + variable tail
+**Verified layout** (basis: zone FUN_0061ed90 / FUN_00624520 / FUN_00624710; client FUN_0071b790; 2016 Zone.pdb struct)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | ListLen |  |
-| 1 | SLOTMACHINE_JackPotRank[ListLen] | RankList | variable length, element SLOTMACHINE_JackPotRank |
-
-Element `SLOTMACHINE_JackPotRank` (24 bytes): +0 char[20] name, +20 u32 money
+| 0 | u8 | ListLen | at most 50 |
+| 1 | SLOTMACHINE_JackPotRank[ListLen] | RankList | {Name5 name; u32 money = winning spins since the join} of the players seated at machines of the same type, descending |
 
 Sent in reply to `0xbcdb` NC_GAMBLE_SLOTMACHINE_WINRANKING_REQ on ShineObjectClass::ShinePlayer (`FUN_0061ed90`, ShineObjectClass::ShinePlayer::sp_NC_GAMBLE_SLOTMACHINE_WINRANKING_REQ) · payload variable (iVar3)
 
@@ -10214,12 +10207,12 @@ Fill: +0: ShineObjectClass::ShinePlayer::vfunc[0xf4] = FUN_004a9c90 (assumed cla
 
 ### `0xbcdd` NC_GAMBLE_SLOTMACHINE_SOMEONE_GET_JACKPOT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_GAMBLE_SLOTMACHINE_SOMEONE_GET_JACKPOT_CMD`, 28 bytes
+**Verified layout** (basis: zone FUN_00620410 (so_ply_IBurstJackPot, so_AllInMap); client FUN_0071b5b0; 2016 Zone.pdb struct)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | char[20] | charid | Name5 |
-| 20 | u64 | price |  |
+| 0 | Name5 | charid | winner |
+| 20 | u64 | price | the spin's win incl. jackpot share, before tax |
 
 Sent from `GameDBSession::so_ply_IBurstJackPot` (`FUN_00620410`) · payload 28 bytes
 
@@ -11294,6 +11287,29 @@ no 0x74DC reply in 2016. Z16 §6.4
 | 8 | u32 | header.charregistnumber | NPC vt 0x344; the 0xBC79 handler re-checks it |
 | 12 | u16 | nResultCnt |  |
 | 14 | GDT_DiceRollApplyResult[] | DiceRollResult | GDT_DiceRollApplyResult {u16 nError (0 in the request, 0x2680 ok in the answer), u16 lockindex, u32 nPlayerNo, i64 nTotalDividend (net coins)}, 0x10 each; per-result nError 0x2680 -> coins applied, else the lock is freed |
+
+### `0xbcd4` NC_GAMBLE_SLOTMACHINE_DB_RESULT_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00620330 / FUN_00620560 / FUN_0061f6e0; 2016 Zone.pdb struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | player handle |
+| 2 | u32 | header.charregistnumber | charNo (checked) |
+| 6 | u16 | lockindex | lock index of the coin reservation |
+| 8 | u16 | nError | 0x2900 (or 0x28D8) ok: reservation applied; else freed |
+
+### `0xbcd6` NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_ACK (DB→Z)
+
+**Verified layout** (basis: zone FUN_00625d30 / FUN_00625130 (smjpr_RankingSet); 2016 Zone.pdb struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Machine | machine type; >= 3 stops the zone |
+| 1 | u16 | nError | 0x2940 ok; anything else stops the zone (Z32-B23) |
+| 3 | u32 | JackPotPrice | DB jackpot pool of that BetUnit; becomes the zone pool |
+| 7 | u8 | RankNumber |  |
+| 8 | SLOTMACHINE_JackPotRank[RankNumber] | RankList | {Name5 name; u32 money}, 0x18 each |
 
 ### `0x0830` NC_MISC_CONNECTFROMWHERE_DB_ACK (S→C)
 
@@ -12818,6 +12834,12 @@ face-direction broadcast reused outside the gamble house; only the dice-game tas
 | 0 | u8 | bIsStart |  |
 | 1 | u16 | nTimer |  |
 | 3 | u32 | nInterval |  |
+
+### `0xbcd2` NC_GAMBLE_SLOTMACHINE_STAND_UP_CMD (S→C)
+
+**Verified layout** (basis: zone FUN_00620de0 (screen go_Routine); client FUN_0071b0c0 (no-op))
+
+Empty payload.
 
 ### `0xcc03` NC_MOVER_RIDE_ON_FAIL_CMD (S→C)
 
@@ -14602,6 +14624,15 @@ payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block 
 | 29 | u8 | BetLine | sum of the line units |
 | 30 | u16 | nJackpotRate | GBTaxRate row 26 GB_JPSaveRate (per mille) |
 | 32 | u32 | WinMoney | payout incl. jackpot share, after tax |
+
+### `0xbcd5` NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_00626220 (smjpr_RankingReq, once at the GameDB link); 2016 Zone.pdb struct)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | nSlotMachineNum | 3 |
+| 1 | {u8 Machine; u16 BetUnits}[3] | MachineIndex | machine type 0-2 and its GBSMBetCoin unit |
 
 ### `0xc409` NC_COLLECT_REGIST_REQ (Z→DB)
 
