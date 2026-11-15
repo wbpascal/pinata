@@ -5720,7 +5720,7 @@ Fill: +6: FUN_006406f0 (no direct writes found)
 | 6 | u16 | error | 0x341 ok |
 | 8 | u16 | itemhandle |  |
 
-**Captured** (P02, `capture-validation.md`; shop, combat, s21): `itemid`: picked item (3001, 3005, 3004); `lot`: 1; `error`: 0x341 success; `itemhandle`: 0xFFFF always (Z05 §3.2); `s21`: &getmoney {0, 0, 0x341} (Z11-B32, nothing picked before); 0x346 inventory full; 0x34A KQ pick-up limit
+**Captured** (P02, `capture-validation.md`; shop, combat, s21, s21d): `itemid`: picked item (3001, 3005, 3004); `lot`: 1; `error`: 0x341 success; `itemhandle`: 0xFFFF always (Z05 §3.2); `s21`: &getmoney {0, 0, 0x341} (Z11-B32, nothing picked before); 0x346 inventory full; 0x34A KQ pick-up limit; `s21d`: {3500, 10, 0x341, 0xFFFF}: picked into a new cell (0x341C) beside the 50-stack over MaxLot 49
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_itempickresult` (`FUN_005308d0`) · payload 10 bytes
 
@@ -10784,7 +10784,7 @@ Empty payload.
 | 0 | u16 | itemid |  |
 | 2 | u32 | lot | clamped to MaxLot for stackables |
 
-**Captured** (P02, `capture-validation.md`; shop): `itemid`: 751 Long Mace (weapon shop, 0x3C09 tab 1); `lot`: 1
+**Captured** (P02, `capture-validation.md`; shop, s21b): `itemid`: 751 Long Mace (weapon shop, 0x3C09 tab 1); `lot`: 1; `s21b`: itemid 0 (LeatherBoots), lot 1, twice
 
 ### `0x3019` NC_ITEM_USEABORT_CMD (C→S)
 
@@ -11366,7 +11366,7 @@ PROTO_NC_MISC_SERVERPARAMETER_ACK, the alias at this opcode value (C02 §2); 3 b
 | 2 | u8 | flag | bit 0 invenclear (first packet of the box); bits 1-7 stale |
 | 3 | PROTO_ITEMPACKET_INFORM[] | ItemArray | {u8 datasize, u16 location, item data}; ≤ ~8000 bytes per packet |
 
-**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: box 9/8/12/15, flag bit 0 set, bits 1-7 stale
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals, s21c): `_`: box 9/8/12/15, flag bit 0 set, bits 1-7 stale; `s21c`: inventory cell 27: expired LeatherBoots still listed, attribute bytes 7–10 = deletetime 8468 (2020-01-01 00:00, ShineItemAttr_Boot +7, pdb2016)
 
 ### `0x1061` NC_CHAR_STAT_INCPOINTFAIL_ACK (S→C)
 
@@ -12051,7 +12051,7 @@ player tick, on change; also sent to every object targeting the player (so_ply_S
 |---|---|---|---|
 | 0 | u16 | code | 0x201 ok, 0x20a full, 0x20c fame, 0x20d bind item owned, 0x20f item-money short, 0x211 buy level |
 
-**Captured** (P02, `capture-validation.md`; shop): `code`: 0x201 success, after the 0x340B apply (Z05 §2.1)
+**Captured** (P02, `capture-validation.md`; shop, s21b): `code`: 0x201 success, after the 0x340B apply (Z05 §2.1); `s21b`: 0x206 ×2 right after 0x340C (Z05 §2.1); the client shows nothing (default case of On_NC_ITEM_BUY_ACK, Z04-B6)
 
 ### `0x3005` NC_ITEM_SELL_ACK (S→C)
 
@@ -13527,7 +13527,7 @@ Z16 §6.4
 |---|---|---|---|
 | 0 | bytes[36] | tm | struct tm |
 
-**Captured** (P02, `capture-validation.md`; combat, s21d, s37, shop): `tm`: 36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms; batch 3: also once per zone registration to every registered zone's broadcast link (SendWMTimeToZone(force))
+**Captured** (P02, `capture-validation.md`; combat, s21d, s37, shop, s21c): `tm`: 36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms; batch 3: also once per zone registration to every registered zone's broadcast link (SendWMTimeToZone(force)); `s21b / s21c`: tm_sec 35 (new WM process); s21c: the per-minute expiry 0x3459 follows 20 ms after the 66.104 one
 
 ### `0x0825` NC_MISC_WHSHANDLEREPAIR_CMD (WM→zone)
 
@@ -15756,11 +15756,15 @@ Z01 name was 'map login done (ours)'
 
 ### `0x340a` NC_ITEMDB_BUYALL_REQ (Zone→CharDB)
 
-**Captured** (P02, `capture-validation.md`; shop): `map`: RouN 5724, 8768 (player position); `location`: 0x2406; `attr`: 68 = attribute offset; `price_cen`: 69; `UserNo`: 103; `Vendor`: 28 (NPC mob id)
+**Captured** (P02, `capture-validation.md`; shop, s21b): `map`: RouN 5724, 8768 (player position); `location`: 0x2406; `attr`: 68 = attribute offset; `price_cen`: 69; `UserNo`: 103; `Vendor`: 28 (NPC mob id); `s21b`: LeatherBoots (0), lot 1, price_cen 13, fame 0, coin 0, attr 68, 13-byte boot attribute, Vendor 28; new key per try
 
 ### `0x340b` NC_ITEMDB_BUYALLSUC_ACK (CharDB→Zone)
 
 **Captured** (P02, `capture-validation.md`; shop): `lockindex`: 0, 11 ms after the request
+
+### `0x340c` NC_ITEMDB_BUYALLFAIL_ACK (S→C)
+
+**Captured** (P02, `capture-validation.md`; s21b): `error`: 0x206 both times: the S16 trigger fails the first p_Item_SetOption after p_Item_BuyAll committed (D03 §1.2 ItemBuy_Create, err ≠ 1); `lockindex`: 0, 1 (the lock of each 0x340A)
 
 ### `0x3410` NC_ITEMDB_EQUIP_REQ (Zone→CharDB)
 
@@ -15812,11 +15816,11 @@ Z01 name was 'map login done (ours)'
 
 ### `0x3459` NC_ITEMDB_DESTROY_REQ (Zone→CharDB)
 
-**Captured** (P02, `capture-validation.md`; s21): `flags`: 3, 48, 2 = key count (bit 7 clear); `itemID/key/attrOffset/inven`: unwritten for bit 7 = 0: stale gpp bytes incl. text ('nus', 'res', 'n b') (P02-B30); `keys`: every unlocked inventory item (&cleariv)
+**Captured** (P02, `capture-validation.md`; s21, s21c): `flags`: 3, 48, 2 = key count (bit 7 clear); `itemID/key/attrOffset/inven`: unwritten for bit 7 = 0: stale gpp bytes incl. text ('nus', 'res', 'n b') (P02-B30); `keys`: every unlocked inventory item (&cleariv); `s21c`: expiry: flags 1 (one key, sp_ItemDelete → sp_DestroyItem @ FUN_00527870), 20 ms after the minute 0x0821; bytes 9–22 stale again (P02-B30)
 
 ### `0x345a` NC_ITEMDB_DESTROY_ACK (CharDB→Zone)
 
-**Captured** (P02, `capture-validation.md`; s21): `err`: 0xB81 (apply)
+**Captured** (P02, `capture-validation.md`; s21, s21c): `err`: 0xB81 (apply); `s21c`: err 0xB81, +25 ms; then 0x3001 itemid 0xFFFF to the client
 
 ### `0x345f` NC_ITEMDB_DEPOSIT_REQ (Zone→CharDB)
 

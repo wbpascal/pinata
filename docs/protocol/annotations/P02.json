@@ -5444,10 +5444,12 @@
     "dir": "S→C",
     "captures": [
      "idle_in_world",
-     "walk-run-portals"
+     "walk-run-portals",
+     "s21c"
     ],
     "fields": {
-     "_": "box 9/8/12/15, flag bit 0 set, bits 1-7 stale"
+     "_": "box 9/8/12/15, flag bit 0 set, bits 1-7 stale",
+     "s21c": "inventory cell 27: expired LeatherBoots still listed, attribute bytes 7–10 = deletetime 8468 (2020-01-01 00:00, ShineItemAttr_Boot +7, pdb2016)"
     }
    },
    "0x1049": {
@@ -6001,10 +6003,12 @@
      "combat",
      "s21d",
      "s37",
-     "shop"
+     "shop",
+     "s21c"
     ],
     "fields": {
-     "tm": "36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms; batch 3: also once per zone registration to every registered zone's broadcast link (SendWMTimeToZone(force))"
+     "tm": "36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms; batch 3: also once per zone registration to every registered zone's broadcast link (SendWMTimeToZone(force))",
+     "s21b / s21c": "tm_sec 35 (new WM process); s21c: the per-minute expiry 0x3459 follows 20 ms after the 66.104 one"
     }
    },
    "0x180b": {
@@ -6177,20 +6181,24 @@
    "0x3003": {
     "dir": "C→S",
     "captures": [
-     "shop"
+     "shop",
+     "s21b"
     ],
     "fields": {
      "itemid": "751 Long Mace (weapon shop, 0x3C09 tab 1)",
-     "lot": "1"
+     "lot": "1",
+     "s21b": "itemid 0 (LeatherBoots), lot 1, twice"
     }
    },
    "0x3004": {
     "dir": "S→C",
     "captures": [
-     "shop"
+     "shop",
+     "s21b"
     ],
     "fields": {
-     "code": "0x201 success, after the 0x340B apply (Z05 §2.1)"
+     "code": "0x201 success, after the 0x340B apply (Z05 §2.1)",
+     "s21b": "0x206 ×2 right after 0x340C (Z05 §2.1); the client shows nothing (default case of On_NC_ITEM_BUY_ACK, Z04-B6)"
     }
    },
    "0x3006": {
@@ -6229,14 +6237,16 @@
     "captures": [
      "shop",
      "combat",
-     "s21"
+     "s21",
+     "s21d"
     ],
     "fields": {
      "itemid": "picked item (3001, 3005, 3004)",
      "lot": "1",
      "error": "0x341 success",
      "itemhandle": "0xFFFF always (Z05 §3.2)",
-     "s21": "&getmoney {0, 0, 0x341} (Z11-B32, nothing picked before); 0x346 inventory full; 0x34A KQ pick-up limit"
+     "s21": "&getmoney {0, 0, 0x341} (Z11-B32, nothing picked before); 0x346 inventory full; 0x34A KQ pick-up limit",
+     "s21d": "{3500, 10, 0x341, 0xFFFF}: picked into a new cell (0x341C) beside the 50-stack over MaxLot 49"
     }
    },
    "0x300b": {
@@ -6460,7 +6470,8 @@
    "0x340a": {
     "dir": "Zone→CharDB",
     "captures": [
-     "shop"
+     "shop",
+     "s21b"
     ],
     "fields": {
      "map": "RouN 5724, 8768 (player position)",
@@ -6468,7 +6479,8 @@
      "attr": "68 = attribute offset",
      "price_cen": "69",
      "UserNo": "103",
-     "Vendor": "28 (NPC mob id)"
+     "Vendor": "28 (NPC mob id)",
+     "s21b": "LeatherBoots (0), lot 1, price_cen 13, fame 0, coin 0, attr 68, 13-byte boot attribute, Vendor 28; new key per try"
     }
    },
    "0x340b": {
@@ -7517,21 +7529,25 @@
    "0x3459": {
     "dir": "Zone→CharDB",
     "captures": [
-     "s21"
+     "s21",
+     "s21c"
     ],
     "fields": {
      "flags": "3, 48, 2 = key count (bit 7 clear)",
      "itemID/key/attrOffset/inven": "unwritten for bit 7 = 0: stale gpp bytes incl. text ('nus', 'res', 'n b') (P02-B30)",
-     "keys": "every unlocked inventory item (&cleariv)"
+     "keys": "every unlocked inventory item (&cleariv)",
+     "s21c": "expiry: flags 1 (one key, sp_ItemDelete → sp_DestroyItem @ FUN_00527870), 20 ms after the minute 0x0821; bytes 9–22 stale again (P02-B30)"
     }
    },
    "0x345a": {
     "dir": "CharDB→Zone",
     "captures": [
-     "s21"
+     "s21",
+     "s21c"
     ],
     "fields": {
-     "err": "0xB81 (apply)"
+     "err": "0xB81 (apply)",
+     "s21c": "err 0xB81, +25 ms; then 0x3001 itemid 0xFFFF to the client"
     }
    },
    "0x346b": {
@@ -7898,6 +7914,16 @@
     ],
     "fields": {
      "player": "8003 to the other player only"
+    }
+   },
+   "0x340c": {
+    "dir": "S→C",
+    "captures": [
+     "s21b"
+    ],
+    "fields": {
+     "error": "0x206 both times: the S16 trigger fails the first p_Item_SetOption after p_Item_BuyAll committed (D03 §1.2 ItemBuy_Create, err ≠ 1)",
+     "lockindex": "0, 1 (the lock of each 0x340A)"
     }
    }
   },

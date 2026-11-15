@@ -29,9 +29,9 @@ the code; where they disagree, the code was re-read and the finding is listed in
 | `travel portal, attack mob, pick-up item, die, revive, linkto` (**combat**, batch 2) | name only: Test2 travels, fights mobs, picks up drops, dies, revives, takes a link portal | login, wm, zone×3 + 56 server links | 1870 |
 | `14_second-client-in-sight` (**s14**, batch 3) | notes file (times not filled in): Test1235 (GM) at the RouN slimes, a second account creates the Mage `X14B`, walks into sight, emotes, jumps, shouts, whispers, attacks; A `&hide` / `&show` / `&dimension` / `&linkto` | login×2, wm×2, zone×2 (both 9210) + 56 links | 13 468 |
 | `21_items-drop-split-storage-use-shop` (**s21**, batch 3) | notes file + SQL snapshots before / after: Test2 splits, merges, drops, picks up, destroys, uses, equips rings, uses storage, sells and buys back, buys soul stones, KQ pick-up limit, full inventory | login×3, wm×2, zone×2 (9210) + 56 links | 11 569 |
-| `21b_purchase-attr-write-fail` (**s21b**) | name only: S16 (a purchase whose attribute write fails) | login, wm, zone (9210) + 56 links | 397 |
-| `21c_expired-item` (**s21c**) | name only + one pcapng comment ("Boots deleted here", 66.1 s): S13 (an item past its end time) | login, wm, zone (9210) + 56 links | 606 |
-| `21d_stack-over-maxlot` (**s21d**) | name only: X3 (a stack limit lower than an existing stack; zone restarted with the changed table) | login, wm, zone (9210) + 67 links (zone restart) | 853 |
+| `21b_purchase-attr-write-fail` (**s21b**) | name only: S16 (a purchase whose attribute write fails); Test1235 buys Leather Boots twice (§21.1) | login, wm, zone (9210) + 56 links | 397 |
+| `21c_expired-item` (**s21c**) | name only + one pcapng comment ("Boots deleted here", 66.1 s): S13 (an item past its end time); Test1235 logs in and waits (§21.2) | login, wm, zone (9210) + 56 links | 606 |
+| `21d_stack-over-maxlot` (**s21d**) | name only: X3 (a stack limit lower than an existing stack; zone restarted with the changed table); Test1235 makes, drops and picks up 10 potions (§21.3) | login, wm, zone (9210) + 67 links (zone restart) | 853 |
 | `37_login-heartbeat-refusals-delete` (**s37**, batch 3) | notes file: idle on the world list, create / delete / re-create `X37Del`, 4 min on the character list, WM stopped (world closed), WM restarted with capacity 1 (world full), blocked account, not-login-able account | login×6, wm + 124 links (WM restarts) | 3 583 |
 
 Batch 2 (`shop`, `combat`) was recorded on the server host with the LAN and the loopback interface: it adds the
@@ -44,7 +44,7 @@ The pcapngs hold only the game packets (saved as "displayed packets"): no SYN/AC
 
 Batch 3 (commit 26bb95f, the X02 scenarios 14, 21, 37 and the setups S13, S16, X3) was recorded the same way as batch 2.
 `26_11_15_24_skills-abstates-stat-points.md` has no pcapng (blank notes only): scenario 24 is not captured. The 146
-opcode types not seen in batches 1–2 (98 on links, 9 WM, 39 zone) are covered in §16–§20; those sections stand
+opcode types not seen in batches 1–2 (98 on links, 9 WM, 39 zone) are covered in §16–§21; those sections stand
 before §11 so that the sweep sections §11–§15, which other documents cite by number, keep their numbers.
 
 ## 2. Transport
@@ -2722,6 +2722,121 @@ Types new in batch 3 (`0x3001`, `0x3006`, `0x3005`, `0x3422` / `0x3423`, `0x0449
 batches 2–3: `0x3028` (storage page). Not reached: `0x3427` / `0x34BA` / `0x34B9` (buy-back onto an empty cell),
 `0x5005` / `0x3443` (soul-stone refusals).
 
+## 21. Items III, batch 3: the setup runs S16, S13 and X3 (`s21b`, `s21c`, `s21d`) *(captured)*
+
+Scenario 21 step 12 (capture-scenarios §8.17, §8.14, §9.4): three short runs, one login each. The character is
+**Test1235** (`chrregnum` 2, user 103), not Test2 as in `s21`: zone handles 8009 / 8011 / 8000, WM sessions 12500 /
+17500 / 20000. The committed `tools/capture/21/21-s16-on.sql` and `21-s13.sql` select `N'Test2'`; the outputs
+(`26_11_15_21_items-s16-before.txt` `nCharNo 2`, `-s13.txt` key 120327209734897664, which is in Test1235's
+inventory in `s21c`) show that they ran for Test1235, like the snapshots of §19.8 *(inferred: older copies of the
+scripts)*. No notes files, one pcapng comment (`s21c`). Decoder: 0 issue packets in all three. Only one type is new
+against every other capture, `0x340C`; the others recur with the layouts of §7.6.1, §8 and §19.
+
+### 21.1 S16: a purchase whose attribute write fails (`s21b`, D03 check 13)
+
+| Time | Stream | Packet |
+|---|---|---|
+| 14.585 | zone#1 | `0x200A {17084}` (James, mob 28) → `0x201C {28}`; the client's `0x201D {1}` 15.676 → `0x3C09` weapon list (62 items) 15.688 |
+| 17.169 | zone#1 | `0x3003 {itemid 0 (LeatherBoots), lot 1}` |
+| 17.178 | W00_CDB#1 | `0x340A BUYALL {ref 8009 / 2, owner 2, RouN 5701 / 8805, cell 0x241B, key …092480, itemid 0, attr 68, lock 0, price_cen 13, fame 0, coin 0, UserNo 103, Vendor 28, 13-byte boot attribute}` |
+| 17.213 | W00_CDB#1 | `0x340C BUYALLFAIL {ref, error 0x206, lock 0}` (+35 ms) |
+| 17.213 | zone#1 | `0x3004 {0x206}` (same ms) |
+| 22.319 – 22.337 | zone#1, W00_CDB#2 | the same again: new key …898944, lock 1, `0x340C {0x206, 1}` +11 ms, `0x3004 {0x206}` |
+
+Nothing else follows: no `0x3001`, no `0x1033`, no GameLog `0x0448` / `0xC80D`, no holy-promise reward. The capture ends
+at 27 s.
+
+- **Which call failed.** The trigger fires on an insert into `tItemOptions`. `p_Item_BuyAll` writes only `tItem`
+  (`p_Item_Create` inserts one row) and commits; the first `tItemOptions` insert is `ItemAttr_Save`'s
+  `p_Item_SetOption`, whose `UPDATE` finds no row for a new key and then inserts *(db-backup)*. So the run took D03
+  §1.2's attribute branch of `ItemBuy_Create` @ FUN_0046bbf0: `p_Item_Delete`, `p_Char_MoneyAdd(owner, 13)`, an error
+  other than 1, hence `0x206` (D03 §2.1). Confirmed: D03 §1.2 / §2.1 and Z05 §2.1 (`0x340C` → `0x3004 {error}` in the
+  same ms, the reservation is dropped: no cell and no cen change on the client).
+- **The refund.** The CharDB's `0x1007 Cen` is 99 999 634 524 at the logins of `s21b`, `s21c` and `s21d`, the
+  `-s16-before.txt` value. The zone's saves carry no cen (§10.1), so the DB balance after the two failed purchases
+  shows that both 13-cen debits of `p_Item_BuyAll` were refunded *(inferred from the balance; the debit is not on the
+  wire)*. The item rows are gone too: `s21c`'s inventory holds no boots key from `s21b`. **D03-B1 is not tested.**
+  Leather Boots cost cen only (`price_fame 0`, `coin 0`), so the lost fame / coins of D03-B1 cannot show. That needs
+  a fame or token purchase under S16 (§15).
+- **Client.** `GameFrameWork::On_NC_ITEM_BUY_ACK` @ FUN_004ab770 has no case for 0x206: its switch's default label is
+  the 0x206 case (`switchD_004ab79e_caseD_206`), which returns without a text. The player sees nothing at all for a
+  failed purchase. Z04-B6 lists 0x203 / 0x204 / 0x20E / 0x210 as silent; 0x206 (BUYALL DB error, captured) and 0x208
+  (BUYLOT DB error, D03 §2.1, same default) are silent too (§12 row, §13).
+- **The prediction** (capture-scenarios §8.17: "the item is deleted again, cen is refunded, fame or coins are not")
+  holds for the item and the cen; the fame / coin half is untested.
+
+### 21.2 S13: an item past its end time (`s21c`)
+
+- **Setup.** `21-s13.sql` sets option row 820 (boot `deletetime`) of the newest Leather Boots in the inventory to
+  8468 = 2020-01-01 00:00. Its output lists key 120327209734897664, inventory cell 27, with the 7 option rows 800–803 and
+  820–822 (820 = 0 and 803 = 1 before the update): the boot rows of D03 §1.3 *(db query output)*.
+- **Login.** The CharDB's `0x1017` (6.372), the WM's `0x102E` (7.017) and the client's `0x1047` (7.165) carry the
+  boots at `0x241B` with the 13-byte `ShineItemAttr_Boot`. Bytes 7–10 are `14 21 00 00` = `deletetime` 8468 (offset
+  +7 *(pdb2016)*), byte 12 = 1. The expired item is **not** removed in the login burst (`0x1801` 6.980, `0x1803`
+  11.171).
+- **Expiry**, in one 65 ms run:
+
+| Time | Stream | Packet |
+|---|---|---|
+| 66.104 | W00_WM#1–#4 | `0x0821` (`tm_min` 54 → 55, `tm_sec` 35): the WM's minute (first one at 6.103, before the map login) |
+| 66.124 | W00_CDB#6 | `0x3459 DESTROY_REQ {handle 8011, charNo 2, lock 0, flags 1, keys [120327209734897664]}` (+20 ms) |
+| 66.149 | W00_CDB#6 | `0x345A {ref, lock 0, err 0xB81}`; the pcapng comment "Boots deleted here" is on this frame (976) |
+| 66.169 | zone#1 | `0x3001 {0x241B, 0x241B, itemid 0xFFFF}`: cell 27 emptied |
+
+  No client text, no GameLog row, no `0x1C04` (the boots were not worn). This confirms Z09 §1.2 / §2.4: the
+  per-minute block runs when the WM's `0x0821` changes the minute, and `sp_ChargedItemLimitCheck` @ FUN_00451530 checks
+  the inventory. It confirms Z24 §6.7 and Z13 §2.7 too: `end.year ≠ 0` and `end < now` lead to `sp_ItemDelete`
+  @ FUN_00451090 → `sp_DestroyItem` @ FUN_00527870 → `0x3459`, and Z05 §6.4 clears the cell on the ACK. The prediction
+  of capture-scenarios §8.14 holds: the item went at the first per-minute check after the login, 59.1 s after the map
+  login (the WM's minute falls at :35 in this WM process, so the wait is at most 60 s), not in the login burst. Until
+  that check the expired item is in the inventory and usable *(inferred, not tried)*.
+- **`0x3459` from `sp_DestroyItem`.** The code writes `+8 flags` = key count 1 (bit 7 clear) and the key at payload +0x17
+  (buffer +0x19). It does not write payload bytes 9–22 (`00 00 14 00 00 00 00 15 00 00 00 00 16 00`, earlier `gpp`
+  contents), so P02-B30 is on the expiry path as well. Its overflow assert text reads
+  "sp_MakeItem : Packet Too Long" (copied from the creation function).
+
+### 21.3 X3: a stack over `MaxLot` (`s21d`)
+
+- **Setup.** `ItemInfo.shn` with `BestLowHpPotion` (3500) `MaxLot` 49 on the server and the client (`21-x3.ps1`). The
+  zones were restarted inside the capture (0–23 s, §17.4). Login: WM 23.6 s, `0x1801` 26.171. No refusal anywhere:
+  no SHN-checksum kick (both copies changed) and no item check at login.
+- **The stack.** Cell 27 (`0x241B`) = 3500, lot 50 (`0x102E` 26.240; `0x1047` 26.392 `1b24 ac0d 32`). It is loaded
+  over the limit as it is, and no `0x3001` touches cell 27 in the whole capture.
+
+| Time | Packet |
+|---|---|
+| 49.472 | `&makeitem BestLowHpPotion -l10` → `0x3401 ADMINCREATE` into cell 28 (`0x241C`, lot 10) → `0x3402` → GameLog `0x044F` → `0x3001 {0x241C, 3500, lot 10}` (a GM create takes an empty cell, §19.2) |
+| 53.395 | `0x3007 {0x241C, lot 10}` → `0x3C01` drop warning + `0x3008 {0x301}`; OK 54.598 → `0x3416 DROPALL` + `0x3001` emptied → `0x3417` → `0x0447` → `0x1C0A {10500, attr 8}` + second `0x3008 {0x301}` (§19.4) |
+| 55.966 | `0x3009 {10500}` → +9 ms `0x341C PICKALL {cell 0x241C, key …133824}` and `0x3001 {0x241C, 3500, lot 10}` → `0x341D` → `0x0446` → `0x300A {3500, 10, 0x341, 0xFFFF}` + `0x1805 {10500}` |
+
+- **Reading.** `so_ply_PickupItem` @ FUN_0052faf0 walks the unlocked inventory cells that hold the item
+  (`UnlockedInventoryIterator` over an `ItemBoxIterIdent`). It merges (`ii_PickMerge` → `0x341F`) only when
+  `cell.lot + picked ≤ ItemInfo.MaxLot` (an unsigned sum; the code has no "free = `MaxLot` − lot" term that could go
+  negative); otherwise it falls back to `ii_PickAll` into an empty cell. 50 + 10 = 60 > 49, so no merge and a new cell.
+  The X3 question (capture-scenarios §9.4, "open, no prediction") has this answer: an over-full stack is never a
+  pick-up target and stays at 50, and nothing at login or at the pick-up checks it. Z04 §3.3's "first stack with room"
+  means room for the **whole** picked lot (no partial merge) (§13).
+- **Not tried** (read only, Z04): the other `MaxLot` comparisons would treat the 50-stack differently: sell
+  (§2.4, `cell.lot > MaxLot` → `0x3005 {0x385}`), use (§6.1, `lot > MaxLot` → `0x702`), and a move onto it (§4.1,
+  `a + b > MaxLot` → `irm_Split_N_Merge(…, MaxLot − b)` with `MaxLot − b` = −1). §15 lists them for a later run.
+
+### 21.4 Opcodes
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| Z→CDB | 0x340A | NC_ITEMDB_BUYALL_REQ | 2 | 81 | confirmed | §7.6.1 layout; 13-byte boot attribute at `attr` 68 |
+| CDB→Z | 0x340C | NC_ITEMDB_BUYALLFAIL_ACK | 2 | 10 | confirmed | **first capture**: `{ref, error 0x206, lock}` (Z05 §2.1, D03 §2.1) |
+| S→C | 0x3004 | NC_ITEM_BUY_ACK | 2 | 2 | confirmed; **bug** | `0x206`, silent in the client (Z04-B6) |
+| Z→CDB | 0x3459 | NC_ITEMDB_DESTROY_REQ | 1 | 31 | confirmed; **bug** | the expiry path: 1 key, bytes 9–22 stale (P02-B30) |
+| CDB→Z | 0x345A | NC_ITEMDB_DESTROY_ACK | 1 | 10 | confirmed | `err 0xB81` |
+| S→C | 0x3001 | NC_ITEM_CELLCHANGE_CMD | 1 / 3 | 6 / 6, 7 | confirmed | `s21c` / `s21d`; expiry: `itemid 0xFFFF` after `0x345A` |
+| WM→Z | 0x0821 | NC_MISC_TIMEFROMWORLD_CMD | 8 (`s21c`) | 36 | confirmed | the minute change that triggers the expiry |
+| Z→CDB | 0x341C | NC_ITEMDB_PICKALL_REQ | 1 | 45 | confirmed | pick into a new cell beside the over-full stack |
+| S→C | 0x300A | NC_ITEM_PICK_ACK | 1 | 10 | confirmed | `{3500, 10, 0x341, 0xFFFF}` |
+
+The other types of the three runs (the login bursts, the zone start of `s21d`, drop and `&makeitem` in `s21d`) recur
+as in §5, §7, §17.4 and §19 with the same layouts.
+
 ## 11. Message order against README §2 and the pseudocode
 
 README §2 is a sketch of the login → WM → zone chain. Against the seven captures (details in the sections cited;
@@ -2798,7 +2913,7 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B27 | zone `AmpersandCommand::ac_Dimension` @ FUN_0041a5a0 (Z11 §3.1) with the sight workers `AxialListBriefExchangerAtMove::ali_Work` @ FUN_004bdde0 / `AxialListBriefDeleteAtMove::ali_Work` @ FUN_004bdfe0 (Z09 §9.6) | `&dimension n` writes only `so_layer.layer→l_Main`; `so_AllOfRangeNomal` @ FUN_0054c900 still selects the GM by the unchanged `LayerRegistInfo`, while `so_DistanceSquar` @ FUN_004028f0 returns 999 999 999 across `l_Main` values, so both workers fire on every step (§18.6) | while a GM is in another dimension, every server step of a player or mob within sight sends an appear packet (+ last move + abstates) and a 0x1C0E both ways: 374 KB to the GM in 20 s near a mob group, 136 appear / delete pairs to the other player | set the slanted-list layer as well (or test `l_Main` in the range query), and re-enter the map (`so_ExchageBriefInfo`) after the change |
 | P02-B28 | WM `CParserClient::fc_NC_CHAR_LOGIN_REQ` @ FUN_00422be0 → client 0x1110 (W01 §4.2) | `CSendPacket::ID(&p, 0x1110, 1, NULL)` declares a 1-byte payload and writes none (§18.7) | one stale WM byte (0xD5) in every tutorial popup; the client reads no payload | payload size 0 (PROTO struct empty), as P02-B2 |
 | P02-B29 | zone `ShineMobileObject::so_Shout` @ FUN_00459080 → 0x201F (Z02 §3.2); WM whisper 0x200D (W04 §2.1) | `smo_Shout` writes only bits 0 / 1 of `flag`; bits 2–7 keep the shared buffer `gpp` byte (0x78, 0x74 captured). The WM's 0x200D flag has bits 1–7 from the stack (0x54, 0x04; W04 states it without an ID) (§18.4) | stale bits on the wire; both clients test only bits 0 / 1, so no visible effect | write the whole byte (`flag = GMColor + (isMob << 1)`) |
-| P02-B30 | zone ITEMDB requests: `ac_ClearInventory` @ FUN_0041bbd0 and the `sp_DestroyItem` family (Z18 §4.4) → 0x3459; `sp_NC_ITEM_SPLIT_REQ` @ FUN_00539a40 → 0x3434; `ItemInventory_ii_DropAll` @ FUN_00529a70 → 0x3416 | 0x3459 without bit 7 leaves payload +9…+22 (`itemID`, `key`, `attrOffset`, `inven`) unwritten; 0x3434 leaves `lotcreate.attr` (+62) unwritten; 0x3416 copies the cell's whole 101-byte attribute union, of which a lot item uses 1 byte (§19.2–§19.4) | earlier `gpp` contents (text of other packets) and zone heap bytes reach the Character DB on every `&cleariv` / destroy / split / drop and come back in 0x3417; the Character server reads only the valid parts *(inferred from D03 §3.3 / §3.4 and Z18 §4.4)* | zero the fields (or the send buffer) before filling; copy only the class's attribute length |
+| P02-B30 | zone ITEMDB requests: `ac_ClearInventory` @ FUN_0041bbd0 and the `sp_DestroyItem` family (Z18 §4.4; `sp_DestroyItem` @ FUN_00527870 itself on the per-minute expiry, §21.2) → 0x3459; `sp_NC_ITEM_SPLIT_REQ` @ FUN_00539a40 → 0x3434; `ItemInventory_ii_DropAll` @ FUN_00529a70 → 0x3416 | 0x3459 without bit 7 leaves payload +9…+22 (`itemID`, `key`, `attrOffset`, `inven`) unwritten; 0x3434 leaves `lotcreate.attr` (+62) unwritten; 0x3416 copies the cell's whole 101-byte attribute union, of which a lot item uses 1 byte (§19.2–§19.4, §21.2) | earlier `gpp` contents (text of other packets) and zone heap bytes reach the Character DB on every `&cleariv` / destroy / expiry / split / drop and come back in 0x3417; the Character server reads only the valid parts *(inferred from D03 §3.3 / §3.4 and Z18 §4.4)* | zero the fields (or the send buffer) before filling; copy only the class's attribute length |
 | P02-B31 | zone `ShinePlayer::InteractWithNPC` @ FUN_004c4660 (Z02 §6.2) with `sp_NC_ITEM_REPURCHASE_REQ` @ FUN_00538580 / `so_ply_CanItemRepurchase` @ FUN_005379f0 | clicking another NPC while a shop is open replaces `sp_NPCProcess.npc` without `sp_EndOfTrade`; when the new role cannot open (`NPCRole_MenuOpen` with menu bit 0 still set by the shop) nothing is sent, so the client keeps the shop window; every buy-back then fails `so_ply_CanItemRepurchase` and gets `0x305A {0x3671}`, a code the client shows no text for (§20.2) | the player cannot buy back (19 silent refusals in `s21` after an Anvil click next to the Blacksmith) | end the old trade (or refuse the click) before replacing the NPC, and answer a refused buy-back with a code the client shows |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
@@ -2832,6 +2947,7 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | Z11-B30 | `s21` 135.642: `&levelup 25` of a GM passes level 20 and sends the world announcement 0x6401 → 0x6402 to every client | §20.4 |
 | Z09-B72 | `s21` 146.087: the WM relays 0x207D unchanged as 0x2079 to both clients, the 18 stale bytes included | §20.4 |
 | P02-B16 | `s21`: every 0x305C carries the bytes of the 0x3001 and the 0x3425 built just before in `gpp`, then older text | §20.2 |
+| Z04-B6 | `s21b` 17.213 / 22.337: `0x3004 {0x206}` (BUYALL DB error) shows no text: 0x206 is the switch's default case in `On_NC_ITEM_BUY_ACK`; 0x208 (BUYLOT DB error) is silent the same way (not in Z04-B6's list) | §21.1 |
 
 ## 13. Discrepancies per work item
 
@@ -2922,6 +3038,9 @@ creates for the README register.
 | D03 | `D03-character-items.md` §2.4 ("No GameLog entry is written (the zone logs `0x0458 SOULSTONEBUY`)") | nobody logs a soul-stone purchase: no 0x0458 on the wire, and D05 finds no 2016 sender (§20.3) | contradicted → batch-3 follow-up |
 | D03 | `D03-character-items.md` §5.1 (Log 0x045E / 0x045F `{ nUserNo, charNo, money, storageMoney }`) | `{chrregnum u32, money u32, userregnum u32, storage balance u64}` = D05's row (§20.1) | corrected → batch-3 follow-up |
 | X02 | `s21` notes, step 9 ("sold all 4 potions individually", "bought back 1 potion and used it", "could not buy back stack of 3 (bug?)") | 5 sales (one from cell 0) and 2 single buy-backs before the use; the stack failed because of an Anvil click with the shop open (P02-B31), not because it was a stack (§20.2) | contradicted → batch-3 follow-up |
+| Z04 | `Z04-items.md` §2.1 (client `0x3004`: "other codes (0x203, 0x204, 0x20e, 0x210) are silent", Z04-B6) | 0x206 and 0x208, the Character server's DB-error codes of BUYALL / BUYLOT (D03 §2.1), are silent too (the switch's default); captured for 0x206 (§21.1) | extended → batch-3 follow-up |
+| Z04 | `Z04-items.md` §3.3 (`so_ply_PickupItem`: "IsLot → first stack with room") | room = `cell.lot + picked ≤ MaxLot` for the whole picked lot (no partial merge); a stack over `MaxLot` is never a target, and nothing checks it at login (§21.3) | extended → batch-3 follow-up |
+| X02 | `capture-scenarios.md` §8.14 / §8.17 / §9.4 and the `tools/capture/21` S13 / S16 scripts | the runs used Test1235 (`nCharNo` 2) although the scripts name Test2; §8.14 confirmed (expiry at the first minute after login); §8.17 confirmed for item and cen, fame / coins untested (a cen-only item); §9.4's open X3 question answered: no check, no merge, a new cell (§21) | confirmed / extended → batch-3 follow-up |
 
 In batch 1 (§3–§6) no discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held (batch 2's rows for Z03, Z09, Z12, Z13 and W03 are above). Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
 timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
@@ -2938,7 +3057,7 @@ conditions), D02 §6 (12-byte save headers, ACKs only for 0x4001 / 0x4007, 0x401
 §3.1 / §6.2 / §6.3, Z15 §3.3 / §3.4 (SAY with the clicked NPC), Z12 §5.2 (0xBC05 cap), Z13 §8.2 / §8.3 / §8.6 / §8.7 /
 §8.10 (summon order, hunger, speed formula, 0x1C1A), Z09 §5.4 (10-s corpse) and D05's GameLog layouts (0x040A, 0x040F,
 0x0410, 0xC806, 0xC809). The sweep (part 14) confirms Z02 §6.4 (the client's `0x200B` in the tick of `0x304D` runs `sp_EndOfTrade`,
-which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second).
+which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second). Part 21 (§21) confirms D03 §1.2 / §2.1 (`ItemBuy_Create`'s attribute branch: item deleted, cen refunded, `0x340C {0x206}`), Z05 §2.1 (`0x340C` → `0x3004 {error}`) and §6.4 (`0x345A` → `0x3001` emptied), Z09 §1.2 / §2.4 (the per-minute block on the WM's `0x0821`), Z24 §6.7 / Z13 §2.7 (`sp_ChargedItemLimitCheck` → `sp_ItemDelete` → `sp_DestroyItem`, not at login), D03 §1.3 (boot option rows 800–803 / 820–822, `deletetime` at attribute +7) and the capture-scenarios predictions §8.14 (S13) and §8.17 (S16, its cen half).
 
 ## 14. Not reconstructed / uncertain
 
@@ -3040,6 +3159,13 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
   were not checked against the class table row of level 33 (Z02 §6.5 formula with the factor 1000 assumed). Why the
   KQs skipped at each minute were scheduled then (KQ data) was not checked; `nrb_ItemSellPrice` of a non-Merchant role
   (what a sale from the open shop window does after the Anvil click) was not read.
+- Batch 3, items III (§21): the cen refund of S16 is deduced from the next logins' DB balance; the debit and the
+  `p_Char_MoneyAdd` are not on the wire, and neither are the Character server's log lines ("ERROR - …SetItemOptions").
+  The error value `ItemAttr_Save` returned is unknown beyond "not 1" (0x206 maps every other value). Where the
+  stale bytes 9–22 of the expiry `0x3459` come from was not traced. Not tried: using an expired item before the
+  first minute check, an expired item that is worn (equipment, kind 8) or a ridden mount (skipped, Z24 §6.7), and the
+  over-full stack's sell / use / move paths (§21.3). That the S13 / S16 scripts ran for Test1235 is read from their
+  outputs, not from the scripts that ran.
 
 ## 15. Coverage boundary
 
@@ -3121,3 +3247,4 @@ W04 packets P02 cannot override (W04.json sorts after P02.json): WM `0x7C07` 4-b
 | the 2016 client's own pick-right check on a drop object (`FUN_00610fc0`, §19.4) | – (client behaviour, out of the server spec) | the server's rule (Z09 §11.4 owner time, `so_drpitm_CanLooting`) and its timing are captured; a rebuilt server must answer 0x345 for a client that does ask |
 | buy-back onto an empty cell (`0x34B9` / `0x34BA`), sell / buy-back / soul-stone refusals (`0x3427`, `0x366B`–`0x366F`, `0x5005`, `0x3443`), the storage page request `0x3028` (§20.5) | X02 (plan: "write targeted capture scenarios"), then P02 again | the layouts are Z04 §2.5 / §7.2 / §13.1, Z05 §2.2 / §2.4 and D03 §2.2 / §2.4's; `s21` holds only successes and the P02-B31 refusal |
 | the 2016 client's own soul-stone check at full HP (no 0x5007, §20.3) | – (client behaviour, out of the server spec) | the server's 0x5007 handler (Z04 §13.2) answers whatever the client sends; a rebuilt server needs nothing from the client check |
+| S16 with a fame or gamble-coin purchase (D03-B1: lost fame / coins), X3's untried `MaxLot` paths (sell `0x385`, use `0x702`, move-merge `irm_Split_N_Merge(MaxLot − b)` with b > `MaxLot`), an expired item worn or used before the minute check (§21) | batch-3 follow-up (the item part 22 creates; X02, which wrote the scenarios, is done) | the code paths are read (D03 §1.2, Z04 §2.4 / §4.1 / §6.1, Z24 §6.7); only a capture with these setups can confirm them |
