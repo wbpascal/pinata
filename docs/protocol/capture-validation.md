@@ -468,7 +468,7 @@ Documented zone-login opcodes never seen: 0x1804 NC_MAP_LOGINFAIL_ACK (no failur
   8001 on 9212: the player pool (Z01 §4.2, 8000..9499) hands out the next index, freed ones are not reused at once.
 - **0x1802.logincoord can differ from 0x1038.currentcoord**: walk-run-portals zone#3 and #5 (Roumen, arriving from Forest
   of Mist) have base 5874/6530, ACK 5899/6530 (x + 25). `so_MapMarking` (Z01 §5.3) moved the player off the saved cell
-  *(reason inferred: the cell was blocked/occupied)*; the other 5 agree. The client gets the saved position first and the
+  (the cell is occupied by the Roumen Teleport Gate NPC, §6.3); the other 5 agree. The client gets the saved position first and the
   real one in 0x1802.
 - **0x441E** `{tResetYearQuest, tResetMonthQuest, tResetWeekQuest, tResetDayQuest}` (decoder names) are `time_t` of the
   **start of the current period** in server local time (UTC+1): 1767222000 = 2026-01-01 00:00, 1793487600 =
@@ -521,3 +521,133 @@ silence → 0x0804, close after 180 s more; the 300 passed by the client overrid
 client answers within 4–14 ms, except during the first map load of idle_in_world (answered after 4.88 s, at 34.887 s,
 just before 0x1803): the client's loader does not service the zone socket. The 0x0805 arrives in session mode 1
 (before 0x1803) and is accepted (Z18 §1.3 session filter: 0x0805 allowed before LOGINCOMPLETE).
+
+## 6. Zone in-world
+
+Same 7 zone streams as §5, from one tick after the 0x1803 burst to the end of each stream: idle among mobs
+(idle_in_world, 96 s in Roumen), run/walk in Roumen (walk-run-portals zone#1), four town-portal hops Roumen ↔ Forest of
+Mist (zone#1→#2→#3→#4→#5) and one gate link Roumen → Forest of Tides (zone#5→#6). Only one player was on the server, so
+every 0x2018 / 0x201A / 0x1C08 / 0x1C0E is about a mob or NPC. Code: Z02 §2/§5/§6, Z09 §2.4/§5.3/§9.6, Z01 §7.1/§7.3,
+Z03 §2.2–2.3/§3.4. Opcodes of §5 that also occur in-world (0x1035, 0x240E, 0x240F, 0x10BD, 0x200B, 0x0804/0x0805) keep
+their §5.2 status; their in-world instances are described here.
+
+### 6.1 Message order *(captured)*
+
+**Town portal** (4 hops; times relative to the click):
+
+```
+C 0x2401 NC_BAT_TARGETTING_REQ {target = Teleport Gate NPC}   (client clicks the NPC: target first)
+S 0x2402 NC_BAT_TARGETINFO_CMD {order 0, …}                    +4..17 ms   to_SendInform @ FUN_0042b3f0 (Z03 §2.3)
+C 0x200A NC_ACT_NPCCLICK_CMD {npchandle}                       +11..24 ms  (zone#1 also C 0x2012 STOP_REQ in the same tick)
+S 0x243D NC_BAT_CEASE_FIRE_CMD {own handle}                    same or next tick (0..51 ms): smo_BashStop of 0x2401 sets
+                                                               sp_CeaseFireSender, so_Routine sends it (Z03 §3.4)
+S 0x201C NC_ACT_NPCMENUOPEN_REQ {mobid 191}                    InteractWithNPC @ FUN_004c4660: NPC.txt row NPCMenu = 1 (Z02 §6.2)
+  … client town-portal window, 1.4–10 s …                      (no 0x201D: see §6.3)
+C 0x181A NC_MAP_TOWNPORTAL_REQ {index} + C 0x200B ENDOFTRADE   same client tick
+S 0x181B NC_MAP_TOWNPORTAL_ACK {0x19C1}                        +4..18 ms   FUN_0049fe70 (Z01 §7.3): success, so_ply_BriefLink
+  zone → WM 0x180B, 0x180D LINKRESERVE; WM → zone 0x180E      (not on the wire; Z01 §7.1)
+S 0x180A NC_MAP_LINKOTHER_CMD {mapIndex, x, y, zoneIp, zonePort, wmHandle}   +87..91 ms after 0x181B; last packet of the stream
+C (new connection) 0x1801 to zonePort                          +0.41..0.58 s → §5.1
+```
+
+**Gate link** (zone#5, Roumen gate NPC `MapLinkGate` 17311, NPC.txt `Gate GateRou1`, role `NPCRole_Portal`):
+
+```
+C 0x2401 {17311}; C 0x200A {17311} (+11 ms)
+S 0x2402 + S 0x3C01 NC_MENU_SERVERMENU_REQ (same tick, +19 ms)  NPCRole_Portal::nrb_Role @ FUN_004c2ef0: one link → "LinkTitle" menu
+S 0x243D {own handle} (next tick, +65 ms)
+C 0x3C02 NC_MENU_SERVERMENU_ACK {reply 0} (4.5 s later)         FUN_0050fe60 → sma_Reply → slot 0 = smfm_Link → so_LinkTo
+S 0x180A {mapIndex 2, 17418, 13832, port 9214} +94 ms; stream ends   (no 0x181B, no 0x200B on this path)
+```
+
+**Movement.** The client reports its own moves: during a continuous run `C 0x2019 NC_ACT_MOVERUN_CMD` every 0.1–0.4 s
+(walk `0x2017` the same), each `to` about 100 units ahead of `from`, and `C 0x2012 STOP_REQ {loc}` when it stops (also
+before an NPC click and before `0x1071` at logout). The server answers none of them on success (no 0x203E, no 0x2013 to
+the mover; see §6.3). One `S 0x201B NC_ACT_MOVEFAIL_CMD {back = 5862, 6677}` came 7 ms after a `0x2019` whose `from` and
+`to` were both (5862, 6677): **confirms** Z02 §2.2 (`from == to` → `SendMoveFail` with the server position).
+
+**Sight.** Objects enter with `S 0x1C08 NC_BRIEFINFO_REGENMOB_CMD` (44, all `mode 2`, `bRegenAni 0`), followed in the
+same tick by the object's remembered move (0x2018 / 0x201A with `from == to` when it had already arrived: 6 of 6 such
+moves directly follow the 0x1C08 of the same handle: **confirms** `ResendLastMove` FUN_005555e0, Z02 §5), and leave
+with `S 0x1C0E NC_BRIEFINFO_BRIEFINFODELETE_CMD {hnd}` (22). With the client-reported position, objects appear at
+1589–1637 units and are deleted at 1567–1608 units: the `MapInfo.Sight` 1600 of Roumen / Forest of Mist / Forest of
+Tides (± the client/server position lag). **Confirms** Z09 §9.6 (the plain `MapInfo.Sight²` in
+`AxialListBriefExchangerAtMove` / `AxialListBriefDeleteAtMove`, FUN_004bdde0 / FUN_004bdfe0). In-world there is no
+0x1C09 batch (all 12 are in the login bursts, §5.1).
+
+**Per-minute player check.** Once a minute every zone player gets two 10-entry `0x1035` one tick apart (40–56 ms):
+idle 41.97 / 42.01 s past the minute, walk zone#1/#3/#5/#6 the same second (42.02–42.14 s past the minute, on both
+9210 and 9214), so all zone processes share the phase *(the phase is probably the processes' common start second,
+inferred)*. The ten entries are flags 0x12–0x1B (free-stat WC … MaxSP), the ones `smo_NotifyParameterChange` always sends
+(Z12 §4.2) *(which call produces the second packet was not traced; candidates: the minute block's vt 0x34 and the
+charged-buff dirty flag `p+0xe94` on the next tick, Z09 §2.4)*.
+
+**Expiry of time-limited items** (idle_in_world 82.1 s, inside the per-minute check):
+
+```
+S 0x1035 (10)                                  82.103   per-minute (above)
+S 0x1035 (10)                                  82.144   next tick
+S 0x3002 NC_ITEM_EQUIPCHANGE_CMD {exchange 0x2008, location 8,  item 0xFFFF}   "[Critical] Red Elderine Uniform (1 Day)" 35740 gone
+S 0x3002 NC_ITEM_EQUIPCHANGE_CMD {exchange 0x2019, location 25, item 0xFFFF}   "[Pickup] Mini Phino (1 Day)" 30817 gone
+S 0x10BD NC_CHAR_CLIENT_AUTO_PICK_ACK {err 0x1E00, bEnable 0}                  the pick-up mini-mon is no longer worn
+S 0x1035 (25)  MaxHP 3043 → 3033, MaxSP 2851 → 2841, every stat −2
+S 0x240E {hp 3033, hpchangeorder 2}, S 0x240F {sp 2841}
+```
+
+Code path: `sp_ChargedItemLimitCheck` @ FUN_00451530 (Z09 §2.4) → `sp_ItemDelete` @ FUN_00451090 → `sp_DestroyItem` →
+GameDB `0x3459 DESTROY_REQ` → `gds_NC_ITEMDB_DESTROY_ACK` @ FUN_005287b0 (Z05 §6.4): the cell is emptied (0x3002, Z05
+§1.5) and `sp_SetAutoPick(0)` @ FUN_005654d0 sends 0x10BD. This answers the part-3 question why the auto-pick flag
+flips at 82.1 s. In walk-run-portals (later that day) neither item was worn any more (§5.2 0x1C02 / 0x1C03 rows).
+
+### 6.2 Opcodes
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| C→S | 0x2019 | NC_ACT_MOVERUN_CMD | 154 | 16 | confirmed | `{from, to}` (Z02 §2.2); no server answer on success |
+| C→S | 0x2017 | NC_ACT_MOVEWALK_CMD | 7 | 16 | confirmed | as 0x2019 |
+| C→S | 0x2012 | NC_ACT_STOP_REQ | 12 | 8 | confirmed | `{loc}`; the 0x2013 broadcast of `so_mobile_StopHere` never reaches the mover (sight broadcast without the sender) |
+| S→C | 0x201B | NC_ACT_MOVEFAIL_CMD | 1 | 8 | confirmed | `{back}` = the position the client sent with `from == to` (§6.1) |
+| S→C | 0x2018 | NC_ACT_SOMEONEMOVEWALK_CMD | 119 | 22 | confirmed | mobs only; `speed` = MobInfo.WalkSpeed of the mob (30 / 40), `from` = previous `to` of the same handle; `moveattr` stale (§6.3) |
+| S→C | 0x201A | NC_ACT_SOMEONEMOVERUN_CMD | 35 | 22 | confirmed | `speed` = MobInfo.RunSpeed (105 / 110); 154 of 154 mob moves match MobInfo.shn |
+| S→C | 0x1C08 | NC_BRIEFINFO_REGENMOB_CMD | 44 | 149 | confirmed (pdb2016 layout) | objects entering sight: `mobid` = MobInfo ids (Slime 0, Mushroom 1, Hero Slime 2000, Snowbank 10004, Teleport Gate 191, Gate 32, Christmas tree 178, signs/merchants …), `coord` = NPC.txt position for NPCs, `nKQTeamType` 2, `bRegenAni` 0 (no respawn captured); Z09 §5.3 offsets +0x72…+0x94 confirmed |
+| S→C | 0x1C0E | NC_BRIEFINFO_BRIEFINFODELETE_CMD | 22 | 2 | confirmed | `{hnd}`; **confirms Z09 §9.6** (sender `AxialListBriefDeleteAtMove::ali_Work` @ FUN_004bdfe0) and **contradicts Z02 §5.2** "no zone code sends 0x1C0E"; no NPC (kind 4) handle is ever deleted; mob-kind Christmas trees are |
+| C→S | 0x2401 | NC_BAT_TARGETTING_REQ | 5 | 2 | confirmed | `{target}`: the client targets an NPC before clicking it |
+| S→C | 0x2402 | NC_BAT_TARGETINFO_CMD | 5 | 30 | confirmed | order 0 only; NPC values hp 0 / maxhp 0 / sp 100 / maxsp 100 / lp 0 / level 0; `hpchangeorder` 1 on the first, 2 on the second targeting of the same NPC after a re-login to that zone process: **confirms** Z03 §2.3 (the target's own counter, incremented by the read) |
+| S→C | 0x243D | NC_BAT_CEASE_FIRE_CMD | 5 | 2 | confirmed | `{own handle}` 0–65 ms after 0x2401: Z03 §3.4 (deferred `sp_CeaseFireSender`, to sight including the player) |
+| C→S | 0x200A | NC_ACT_NPCCLICK_CMD | 5 | 2 | confirmed | `{npchandle}` (Z02 §6.2) |
+| S→C | 0x201C | NC_ACT_NPCMENUOPEN_REQ | 4 | 2 | confirmed | `{mobid 191}` for the Teleport Gate (NPC.txt `Gate_Town … 1 QuestNpc`: NPCMenu 1) |
+| C→S | 0x181A | NC_MAP_TOWNPORTAL_REQ | 4 | 1 | confirmed | `{index}` = TownPortal.shn row: 1 → RouVal01 (13658, 7812), 0 → RouN (5874, 6530) |
+| S→C | 0x181B | NC_MAP_TOWNPORTAL_ACK | 4 | 2 | confirmed | `{0x19C1}` success (Z01 §7.3); the code has no row in `client-error-codes.json` |
+| S→C | 0x180A | NC_MAP_LINKOTHER_CMD | 5 | 30 | confirmed | Z01 §7.1 layout; `{150 RouN, 5874, 6530}`, `{5 RouVal01, 13658, 7812}` (= TownPortal rows), `{2 RouCos02, 17418, 13832}` (= NPC.txt `LinkTable GateRou1`); zoneIp "172.16.42.214" + NUL padding, ports 9210 / 9212 / 9214, `wmHandle` 17500 = the WM handle (§4.3); `zoneIp` NUL-padded, no stale bytes |
+| S→C | 0x3C01 | NC_MENU_SERVERMENU_REQ | 1 | 208 | confirmed | title "Do you want to move to Forest of Tides field?" (script string `LinkTitle` + MapInfo.Name), priority 0, npcHandle 17311, npcPosition (6457, 10501), limitRange 1000, menunum 2: `{0 "Yes"}`, `{1 "No"}` (`SERVERMENU {u8 reply, char string[32]}`); 128 + 1 + 2 + 8 + 2 + 1 + 2 × 33 = 208 |
+| C→S | 0x3C02 | NC_MENU_SERVERMENU_ACK | 1 | 1 | confirmed | `{reply 0}` = "Yes" → `smfm_Link` |
+| S→C | 0x3002 | NC_ITEM_EQUIPCHANGE_CMD | 2 | 5 | confirmed | `{u16 exchange = box 8 << 10 \| slot, u8 location = slot, SHINE_ITEM_VAR item = 0xFFFF (empty)}` (Z05 §1.5); the decoder's "attributes: needs 1 byte" is its fixed tail on an empty item |
+
+In-world instances of §5 opcodes: 0x1035 (per-minute pairs, expiry, §6.1), 0x240E / 0x240F (after the expiry), 0x10BD
+(expiry), 0x200B (with every 0x181A), 0x0804 / 0x0805 (§5.5). No 0x2011 notice, 0x2001 chat or 0x1C09 in-world.
+
+### 6.3 Field findings
+
+- **0x203E is not sent after moves.** Z02 §2.2 (and Z09 `so_MoveByServer`) read `p.vt[0xd4c](1)` as "send 0x203E,
+  forced". `ShinePlayer::so_SendSpeedInformation` @ FUN_00459540 sends when the run or walk speed differs from
+  `sp_SpeedNotice` **or the argument is 0**; with 1 it sends only when a speed changed. 161 client moves, no 0x203E
+  after the login burst *(captured)*: the argument means "only if changed". (Its assert text says
+  `sp_NC_ACT_MOVERUN_CMD : Packet Too Long`, copied from the run handler.)
+- **`moveattr` of mob moves**: the low byte is even in all 154 mob 0x2018 / 0x201A and both bytes are ASCII text
+  (`ll`, `, `, `t `, `ne`, `er`, `th` …): stale `gpp` content with bit 0 cleared. **Confirms** Z02-B2 (and Z09 §9 /
+  Z13 for the mob and mover paths).
+- **Town portal arrival is occupied**: TownPortal.shn row 0 (RouN 5874, 6530) is exactly the NPC.txt position of the
+  Roumen `Gate_Town` NPC (handle 17252, 0x1C08 coord 5874/6530). That is why `so_MapMarking` moved the arriving player to
+  x + 25 in zone#3 and #5 (§5.3, reason now captured, not inferred). Forest of Mist's gate NPC stands at 13660, 7862, 50
+  units from its TownPortal row (13658, 7812): no shift there.
+- **Client side of 0x201C**: `GameFrameWork` handler FUN_004b5560 looks the mob id up in MobViewInfo; for
+  `MiniMapIcon` (+0xAA) = 23 (Gate_Town) it opens its town-portal window (FUN_0048c460, window at GameFrameWork +0x4dc)
+  instead of `NpcDialogWin::OpenNpcNormalDialog`, and never sends 0x201D; the window sends 0x181A and then 0x200B.
+  (Z02 §6.2 says "the client shows the NPC's dialog and answers 0x201D", which holds for other NPCMenu NPCs.)
+- **0x3C01 `npcPosition`** (6457, 10501) is neither the gate's NPC.txt position (6477, 10579) nor the client's last
+  stop (6456, 10525) *(probably the server-side player position, as Z02 §6.6 says the actor stores; not traced)*.
+- **0x2402 for NPCs**: hp / maxhp 0, sp / maxsp 100, level 0 (the NPC's vt 0x4e8 / 0x4f0 / 0x4ec / 0x4f4 / 0x4d8;
+  Gate_Town has MobInfo Level 0, MaxHP 0) *(why SP is 100 not traced)*.
+- **0x1C0E delivery**: the player received the deletes caused by its own moves (o = player, second send of
+  `ali_Work`), so Z09-B13 (wrong first argument of `pcb_Append`) has no visible effect while the buffer is not full
+  *(captured, consistent with Z09's inferred effect)*.

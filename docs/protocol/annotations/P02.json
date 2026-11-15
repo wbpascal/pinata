@@ -1226,6 +1226,219 @@
     "fields": {
      "LogoutType": "0, 10.04 s after 0x1071"
     }
+   },
+   "0x2019": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "from": "client position",
+     "to": "~100 units ahead; no server answer on success"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x2017": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "from": "client position",
+     "to": "~100 units ahead"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x2012": {
+    "dir": "C→S",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "loc": "client stop position; also sent before NPC click and before 0x1071"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x201B": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "back": "server position (5862, 6677) after a 0x2019 with from == to"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x2018": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "handle": "mob handles only (single player)",
+     "speed": "MobInfo.WalkSpeed of the mob",
+     "moveattr": "low byte always even, ASCII stale bytes (Z02-B2)"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x201A": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "speed": "MobInfo.RunSpeed of the mob (154/154 moves match)",
+     "moveattr": "stale, bit 0 cleared"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x1C08": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "mobid": "MobInfo ids (0, 1, 32, 178, 191, 2000, 10004 …)",
+     "mode": "2",
+     "nKQTeamType": "2",
+     "bRegenAni": "0 for objects entering sight"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x1C0E": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "hnd": "mob leaving sight at ~1600 units (MapInfo.Sight); never an NPC"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x2401": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "target": "NPC handle before 0x200A"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x2402": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "order": "0",
+     "targethp": "0 for NPCs",
+     "targetsp": "100 for NPCs",
+     "hpchangeorder": "per-target counter: 1, then 2 on the next targeting"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x243D": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "handle": "own handle, 0-65 ms after 0x2401"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x200A": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "npchandle": "Teleport Gate 17252/17289, gate 17311"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x201C": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "mobid": "191 Gate_Town (NPCMenu 1)"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x181A": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "index": "TownPortal.shn row (0 RouN, 1 RouVal01)"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x181B": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "code": "0x19C1 success"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x180A": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "mapIndex": "MapInfo id 150 / 5 / 2",
+     "x": "TownPortal / LinkTable x",
+     "y": "TownPortal / LinkTable y",
+     "zonePort": "9210 / 9212 / 9214",
+     "wmHandle": "17500 = WM handle"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x3C01": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "title": "'Do you want to move to Forest of Tides field?'",
+     "npcHandle": "gate 17311",
+     "limitRange": "1000",
+     "menunum": "2 (Yes 0, No 1)"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x3C02": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "reply": "0 = Yes → smfm_Link"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x3002": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world"
+    ],
+    "fields": {
+     "exchange": "box 8 << 10 | slot",
+     "location": "equip slot 8 / 25",
+     "itemid": "0xFFFF = emptied (1-day items expired)"
+    },
+    "note": "capture-validation §6"
    }
   }
  }
