@@ -7,9 +7,9 @@ claims it tests, the steps, and a **prediction**: the opcodes our documents expe
 values they give. A capture that differs from the prediction is a finding; P02 validates the captures as usual
 (`docs/plan/items/P02.md`), then X02 is re-run to update the ratings.
 
-State of this file: scenarios, GM setups and boundary values (X02 part 8). The SQL of the database setups
-**S1–S14** and the table / config experiments **X1–X7** named below is written in X02 part 9 (§6 lists what each
-must do). Until then a scenario marked "needs S…" cannot be run as written.
+State of this file: scenarios, GM setups and boundary values (X02 part 8); the SQL of the database setups
+**S1–S16** (§8) and the table / config experiments **X1–X7** (§9) (X02 part 9; §6 is the index). The SQL was
+written from stored-procedure source and has not been run against a database: read §8's first paragraph.
 
 ## 1. Conventions
 
@@ -661,7 +661,7 @@ login plus one crafted packet is enough). One connection per case: several end i
      is closed with the connection tool of scenario 38. Prediction: ZA sends `0x180B`, the save, `0x180D`; the
      WM returns nothing; the client stays connected to ZA, unable to act, until it is closed. Disproved by: a
      `0x180E`, or a zone-side timeout that frees the player.
-  4. **Lot mismatch after a move (I3).** Needs S12 (change a stack's `nLot` in `tItem` while the character is
+  4. **Lot mismatch after a move (I3).** Needs S12 (change a stack's lot row in `tItemOptions` while the character is
      online). Move that stack to another cell. Prediction: C `0x300C {0x241}` first, then the disconnect `Z→W
      0x0C1A {…, 0x68C}`, client `0x0C17 {0x68C}`. Disproved by: a refused move, or no disconnect.
 
@@ -721,35 +721,37 @@ login plus one crafted packet is enough). One connection per case: several end i
 - **Not re-checked claims that stay code-only:** W03 §2.5 helpers, W04 §8.3, §12.3, Z04 §13.2, D02 §2
   (`confidence.md` §3.5); the *(db-backup)* rows of D01 / D02 are DB experiments (part 9).
 
-## 6. Database setups and table experiments these scenarios need (written in X02 part 9)
+## 6. Database setups and table experiments these scenarios need
 
-Names in this table are as our documents give them; part 9 verifies each against the backups (`bak.py`) and the
-binaries' `{CALL …}` strings before writing SQL, and adds save / restore statements and which process must be
-stopped.
+Written in X02 part 9: the SQL is in §8, the table and config experiments in §9. Every table, column and procedure
+name was read from the stored-procedure source in the backups and, where the 2016 binaries call the procedure,
+checked against their `{CALL …}` strings (`bak.py cover`); the "Checked against" column of §8.1 says which.
 
-| ID | Used by | State to create | Starting point |
+| ID | Used by | State to create | Where |
 |---|---|---|---|
-| S1 | all GM steps | character admin level 100 | `tCharacter.nAdminLevel` (Z11 §1.4, D02 §4.1) |
-| S2 | 20, 21, 22, §4 | character money to a chosen value (0, fee − 1, cap − 10) | `tCharacter.nMoney`, character logged out (E41) |
-| S3 | 23 | a quest at its last step | quest tables of D04 §1 |
-| S4 | 23 | level 20 with the class-change precondition | D02 §4, D04 §1 |
-| S5 | 28 | mini-house creation fails at the DB | the procedure behind `0x3467` (D03 §8) |
-| S6 | 29 | wedding state: read `tMarriage`; reset the waiting time | D02 §11 |
-| S7 | 33 | prison minutes for a character | D04 §7 |
-| S8 | 34 | charged-item rows for an account (3, 511, 512, 600) | `Account.dbo.tChargeItem` (D03 §5.4) |
-| S9 | 35 | gamble coins | D03 §11 |
-| S10 | 37 | blocked account (`bIsBlock`) | `tUser` (D01 §3) |
-| S11 | 37 | account not login-able (`bIsLoginAble` of its `tUserAuth` row) | D01 §3 |
-| S12 | 42 | change a stack's lot while the owner is online | `tItem` (D03 knowledge) |
-| S13 | §4 | an item past its end time | `tItem` / `tItemOptions` (D03 §1.3) |
-| S14 | §4 | a character flagged deleted | D02 §3 |
-| X1 | 39, §5 | drop experiments: limited drop `Num` runs out (V22, Z09-B20); Hunter voucher 1500 vs `SNS_DropUp` 1100 (V19) | `ChargedEffect.shn`, the drop tables of Z09 §11 |
-| X2 | 15, 31, 39 | list party-release maps, instance gates, PK fields | `MapInfo.shn` / field tables (Z09), read only |
-| X3 | 21 | an item whose stack limit can be exceeded by a pick-up | `ItemInfo.shn` |
-| X4 | 24 | buffs with a walk / run / attack reset condition | the misc-data abstate table (C18), read only |
-| X5 | 30 | a kingdom quest that starts minutes after boot with 1–2 players | `KingdomQuest.shn` (W04 §6.2) |
-| X6 | 37 | a world closed / full | `9Data/ServerInfo` and the Login config (L01) |
-| X7 | 40, 42 | items with an `ItemAction` row; items with a drop warning | `ItemAction*.shn`, `ItemInfo.shn`, read only |
+| S1 | all GM steps | character admin level 100 | §8.2 |
+| S2 | 20, 21, 22, §4 | character money to a chosen value (0, fee − 1, cap − 10) | §8.3 |
+| S3 | 23 | a quest one kill before its end | §8.4 |
+| S4 | 23 | level 20 with the job-change quest one kill before its end | §8.5 |
+| S5 | 28 | mini-house creation fails at the DB | §8.6 |
+| S6 | 29 | wedding state: read `tMarriage`; end a waiting time | §8.7 |
+| S7 | 33 | prison minutes for a character | §8.8 |
+| S8 | 34 | charged-item rows for an account (3, 511, 512, 600) | §8.9 |
+| S9 | 35 | gamble coins | §8.10 |
+| S10 | 37 | blocked account (`bIsBlock`) | §8.11 |
+| S11 | 37 | account not login-able (`bIsLoginAble` of its `tUserAuth` row) | §8.12 |
+| S12 | 42 | change a stack's lot while the owner is online | §8.13 |
+| S13 | §4 | an item past its end time | §8.14 |
+| S14 | §4 | a character flagged deleted | §8.15 |
+| S15 | 20 (D03 check 7) | a booth purchase whose money move fails at the DB | §8.16 |
+| S16 | 21 (D03 check 13) | a purchase whose attribute write fails | §8.17 |
+| X1 | 39, §5 | drop experiments: limited drop `Num` runs out (V22, Z09-B20); Hunter voucher vs `SNS_DropUp` (V19) | §9.2 |
+| X2 | 15, 31, 39 | party-battle maps, maps without party, instance gates, PK fields | §9.3 (read only) |
+| X3 | 21 | an item whose stack limit can be exceeded by a pick-up | §9.4 |
+| X4 | 24 | buffs with a walk / run / attack reset condition | §9.5 (read only) |
+| X5 | 30 | a kingdom quest that starts within minutes with one player | §9.6 |
+| X6 | 37 | a world closed / full | §9.7 |
+| X7 | 40, 42 | items with an `ItemAction` row; the drop confirmation | §9.8 (read only) |
 
 ## 7. Reach per document
 
@@ -859,3 +861,577 @@ uncaptured opcode of at least one scenario; "link records only" = only GameLog /
 | knowledge X03 | 15 | 8 | 3 | 4 | 0 | 0 | 37 (4) |
 | **Total** | 1882 | 678 | 86 | 1103 | 14 | 1 | |
 <!-- COVER:end -->
+
+## 8. Database setups (S1–S16)
+
+**Run these on the test server only.** They change or delete rows, two of them install a trigger that makes the
+server fail on purpose, and none of them was run: no SQL Server holds these backups yet (`db-backups.md`), so
+every statement is written from procedure source, not from a schema. Read the save query's output before running
+the change; if a column is reported missing, stop and report it (that is a finding, not a typo to work around).
+
+### 8.1 Conventions and what was verified
+
+- **Databases** as the shipped `9Data/ServerInfo/ServerInfo.txt` names them (`ODBC_INFO` rows): `Account`,
+  `AccountLog`, `StatisticsData`, `w00_Character`, `w00_GameLog`. The Character DB's own wrappers reach the
+  account data as `Account.dbo.…` (`usp_ChargeItem_GetList`), so both sit on one SQL Server instance.
+- **Placeholders:** `TestCharA` / `TestCharB` = character names (`tCharacter.sID`), `testaccount` = login name
+  (`tUser.sUserID`). Every script starts by resolving them and stops when the name is not found.
+- **Save / restore:** each setup copies the rows it changes into a table named `dbo.X02_save_<n>` (our name, not
+  a server table) with `SELECT … INTO`, and the restore block copies them back and drops that table. Run the
+  restore before the next setup that uses the same number. `SELECT … INTO` fails when the save table already
+  exists: that protects the first copy.
+- **Two parts per script,** separated by the `-- restore` comment: run the part above it before the test and the
+  part below it after. The restore part uses only the save table, so it runs in a new query window. Where a
+  script says "run this line first" or "from the list", run the `SELECT`, fill in the variable, then run the rest.
+- **Who must be offline** is stated per setup. "Account at the login screen" = no character of the account in
+  the game **and** the client back at the login screen or closed: the WM holds the avatar list from world select
+  on (D02 §3.1, W01 §3), the zone holds the whole character from `0x1004` on and writes parts of it back
+  (README §3.13). No setup needs a server process stopped; §9 does.
+- Two facts decide what is safe to edit while the character is offline: the 2016 Character server never calls
+  `p_Char_SetAllData`, `p_Char_SetAdminLevel` or `p_Char_MoneySet` (they exist in both backups but are missing
+  from `bak.py cover character`), so nothing writes `nAdminLevel` or an absolute `nMoney` back; money is kept as
+  deltas only (`confidence.md` E41).
+
+| Name used below | Read from | Checked against |
+|---|---|---|
+| `tCharacter` { `nCharNo`, `nUserNo`, `sID`, `nLevel`, `nMoney`, `nAdminLevel`, `nPrisonMin`, `sLoginZone`, `nLoginZoneX`, `nLoginZoneY`, `nLoginZoneD`, `bDeleted`, `dDeletedDate` } | `p_Char_GetAllData` (both Character backups, same text) | `{CALL p_Char_GetAllData(?)}`: 1 parameter, matches |
+| `tCharacterShape` { `nCharNo`, `nClass` } | `p_Char_ChangeClass`, `p_Char_GetLoginData` | called by the binary (D02 §7.1, §3.2) |
+| `tQuest` { `nCharNo`, `nQuestNo`, `nStatus`, `sData` varbinary(100) } | `p_Quest_Set`, `p_Quest_GetAllDoing` | `{CALL p_Quest_Set(?,?,?,?,?)}` @ FUN_004530e0 binds parameter 4 as 100 bytes from the record's `Data` |
+| `tItem` { `nItemKey`, `nOwner`, `nStorageType`, `nStorage`, `nItemID`, `nFlags` } | `p_Item_Create` | `{CALL p_Item_Create(?,?,?,?,?,?,?)}` @ FUN_00461270 |
+| `tItemOptions` { `nItemKey`, `nOptionType`, `nOptionData` } | `p_Item_SetOption` | 4 parameters, matches; option types from the save switch (D03 §1.3) |
+| `tMarriage` { `nCharNo`, `nPartnerCharNo`, `nStatus`, `nSubStatus`, `dWhen`, `dSubWhen`, `nMarriageCount`, `nDivorceCancel` } | `p_Char_WeddingStatus_Get` / `_Set` | 1 and 8 parameters, match |
+| `p_Prison_Add2`, `p_Prison_Alter2` (6 parameters), `tPrison` { `nCharID`, `nMinute`, `sReason`, `sGmID`, `sRemark`, `dPrisonDate` } | both Character backups | both called with 6 parameters (D04 §7) |
+| `tGambleCoin` { `nCharNo`, `nCoin`, `sys_update_date` } | `usp_Gamble_addCoin`, `usp_Gamble_getCoin` | `w00_Character.bak` only (the 2017 database) *(db-backup)*; `usp_Gamble_getCoin` is called with 2 parameters, matches |
+| `Account.dbo.tChargeItem` { `rowNo`, `userNo`, `orderNo`, `goodsNo`, `amount`, `isDraw`, `registerDate`, `drawDate` }, `usp_Charge_ItemInsert` (5 parameters) | `Account.bak` | not called by a game server (the item shop's procedure); the servers read the table through `usp_ChargeItem_GetList` (1 parameter, matches) |
+| `Account.dbo.tUser` { `nUserNo`, `sUserID`, `bIsBlock`, `bIsDelete`, `nAuthID` }, `tUserAuth` { `nAuthID`, `sAuthName`, `bIsLoginAble` }, `tUserBlock` { `nBlockNo`, `nUserNo`, `nType`, `dEndDate`, `bStatus` } | `usp_User_loginGame`, `usp_User_chkBlock`, `usp_User_getAuthList` | `{CALL usp_User_loginGame(?,?,?,?,?,?)}`: 6 parameters, matches |
+
+Not verified, and said so where it matters: column types beyond what a procedure declares, columns the
+procedures never name (a NOT NULL column without a default would break an `INSERT` written here; only §8.10 has
+one), constraints, and triggers that may already exist on `tItem` (D03 §1.1 suspects one for the option rows).
+
+### 8.2 S1: admin level
+
+Account at the login screen. Seeing `0x10C6 {nAdminLevel 100}` in the next login burst confirms it (§1).
+
+```sql
+USE w00_Character;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+IF @c IS NULL RAISERROR('character not found', 16, 1)
+ELSE BEGIN
+    SELECT nCharNo, sID, nAdminLevel INTO dbo.X02_save_1 FROM tCharacter WHERE nCharNo = @c;
+    UPDATE tCharacter SET nAdminLevel = 100 WHERE nCharNo = @c;
+END
+-- restore
+UPDATE c SET nAdminLevel = s.nAdminLevel FROM tCharacter c JOIN dbo.X02_save_1 s ON s.nCharNo = c.nCharNo;
+DROP TABLE dbo.X02_save_1;
+```
+
+### 8.3 S2: money
+
+Account at the login screen (the zone holds the amount while the character is in the game and the Character
+server applies deltas to the row: an edit made online is neither seen nor kept consistent). `nMoney` is a
+`bigint` (`p_Char_MoneySet @nSetMoney bigint`). Put the value the boundary row of §4 names in `@money`.
+
+```sql
+USE w00_Character;
+DECLARE @money bigint = 0;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+IF @c IS NULL RAISERROR('character not found', 16, 1)
+ELSE BEGIN
+    SELECT nCharNo, nMoney INTO dbo.X02_save_2 FROM tCharacter WHERE nCharNo = @c;
+    UPDATE tCharacter SET nMoney = @money WHERE nCharNo = @c;
+END
+-- restore
+UPDATE c SET nMoney = s.nMoney FROM tCharacter c JOIN dbo.X02_save_2 s ON s.nCharNo = c.nCharNo;
+DROP TABLE dbo.X02_save_2;
+```
+
+`&getmoney <n>` (§1) reaches most values faster; the SQL is for 0 and for values just under the cap, which a GM
+command can only approach from below.
+
+### 8.4 S3: a quest one kill before its end
+
+A quest record is `tQuest.sData` = the 29-byte `PLAYER_QUEST_DATA` *(pdb2016)* followed by 71 bytes of stack
+garbage (D04-B1): `StartTime` i64 @0, `EndTime` i64 @8, `RepeatCount` u32 @0x10, `ProgressStep` u8 @0x14,
+`End_NPCMobCount[5]` u8 @0x15, flags @0x1A, `End_RunningTimeSec` u16 @0x1B. `nStatus` 6 = `PQS_ING`. The kill
+counters are the five bytes at 0x15 (T-SQL position 22, one-based); which counter belongs to which mob follows
+the order of the quest's kill conditions *(inferred)*.
+
+Steps: accept the quest in the game (that writes the row), read the needed count off the quest window, go to
+the login screen, then set the first counter to count − 1:
+
+```sql
+USE w00_Character;
+DECLARE @quest int = 0;          -- nQuestNo, from the SELECT below
+DECLARE @count tinyint = 0;      -- needed kills - 1
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+SELECT nQuestNo, nStatus, sData FROM tQuest WHERE nCharNo = @c AND nStatus = 6;   -- run this line first
+IF @quest <> 0 BEGIN
+    SELECT nCharNo, nQuestNo, nStatus, sData INTO dbo.X02_save_3 FROM tQuest WHERE nCharNo = @c AND nQuestNo = @quest;
+    UPDATE tQuest
+       SET sData = SUBSTRING(sData, 1, 21) + CAST(@count AS binary(1)) + SUBSTRING(sData, 23, DATALENGTH(sData) - 22)
+     WHERE nCharNo = @c AND nQuestNo = @quest AND DATALENGTH(sData) >= 29;
+END
+-- restore
+UPDATE q SET nStatus = s.nStatus, sData = s.sData
+  FROM tQuest q JOIN dbo.X02_save_3 s ON s.nCharNo = q.nCharNo AND s.nQuestNo = q.nQuestNo;
+DROP TABLE dbo.X02_save_3;
+```
+
+Prediction for the next login: `0x1021` carries the record with the edited counter, and one kill produces the
+`0x440D` that completes the condition. Disproved by: the counter back at its old value (then the zone checks it
+against something else), or the quest finishing only after the full count.
+
+### 8.5 S4: level 20 with the job-change quest one kill before its end
+
+The first job change is not a state the DB can grant: the zone sends `0x1056 NC_CHAR_CLASSCHANGE_REQ` from the
+quest script (`so_ply_FirstJobChange` @ FUN_0049fa70, the `SCENARIO` commands of Z15 §5; quests 60006, 60010,
+60011 … in the 2016 data) and `p_Char_ChangeClass` then writes `tCharacterShape.nClass`. So: `&levelup` to 20
+(§1), accept the job quest at its NPC, then S3 on that quest. Save the class first, so the character can be
+used again:
+
+```sql
+USE w00_Character;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+SELECT nCharNo, nClass INTO dbo.X02_save_4 FROM tCharacterShape WHERE nCharNo = @c;
+-- restore (account at the login screen; the quest rows are restored by S3's block, learned skills are not removed)
+UPDATE t SET nClass = s.nClass FROM tCharacterShape t JOIN dbo.X02_save_4 s ON s.nCharNo = t.nCharNo;
+DROP TABLE dbo.X02_save_4;
+```
+
+### 8.6 S5: mini-house creation fails at the DB
+
+`0x3467` creates one item row through `p_Item_Create` (D03 §7.1). A trigger that rolls back every insert for
+the test character makes that call fail. The wrapper @ FUN_00461270 treats any ODBC result other than success
+as failure and logs `ERROR - CSQLPItem::p_Item_Create, ret(%d), nRet(%d)`; that the driver reports a
+trigger rollback as such a result is *(inferred)*: the log line is the check that the setup worked.
+The character may be online: install the trigger just before step 7 of scenario 28 and drop it right after.
+While it exists the character can receive no item at all (pick-up, purchase, `&makeitem` fail too).
+
+```sql
+USE w00_Character;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+DECLARE @sql nvarchar(max) = N'CREATE TRIGGER dbo.X02_tItem_fail ON dbo.tItem AFTER INSERT AS
+IF EXISTS (SELECT 1 FROM inserted WHERE nOwner = ' + CAST(@c AS nvarchar(12)) + N')
+BEGIN
+    ROLLBACK TRANSACTION;
+    RAISERROR(''X02 forced failure (S5)'', 16, 1);
+END';
+IF @c IS NULL RAISERROR('character not found', 16, 1) ELSE EXEC (@sql);
+-- restore
+DROP TRIGGER dbo.X02_tItem_fail;
+```
+
+Prediction: D answers `0x3469 {lock, owner}`; the client gets nothing (V3). Guild storage rows have the guild
+number in `nOwner` and account storage rows the user number (D03 §1.1): a guild or user whose number equals
+`@c` is hit too while the trigger exists.
+
+### 8.7 S6: wedding state
+
+Read at any time; change only with **both** partners at the login screen (the zone loads the row with `0x1080`
+and writes the whole row back with `0x1082`, D02 §11).
+
+```sql
+USE w00_Character;
+SELECT c.sID, m.* FROM tMarriage m JOIN tCharacter c ON c.nCharNo = m.nCharNo
+ WHERE c.sID IN (N'TestCharA', N'TestCharB');
+
+-- end a waiting time (proposal 3 days, divorce 7 days, divorce by agreement 10 minutes: D02 §11) in one minute
+SELECT m.* INTO dbo.X02_save_6 FROM tMarriage m JOIN tCharacter c ON c.nCharNo = m.nCharNo
+ WHERE c.sID IN (N'TestCharA', N'TestCharB');
+UPDATE m SET dSubWhen = DATEADD(minute, 1, GETDATE())
+  FROM tMarriage m JOIN dbo.X02_save_6 s ON s.nCharNo = m.nCharNo;
+-- restore
+UPDATE m SET nPartnerCharNo = s.nPartnerCharNo, nStatus = s.nStatus, nSubStatus = s.nSubStatus, dWhen = s.dWhen,
+             dSubWhen = s.dSubWhen, nMarriageCount = s.nMarriageCount, nDivorceCancel = s.nDivorceCancel
+  FROM tMarriage m JOIN dbo.X02_save_6 s ON s.nCharNo = m.nCharNo;
+DROP TABLE dbo.X02_save_6;
+```
+
+Which of `dWhen` / `dSubWhen` the zone compares for each status is Z07 §5.1's reading (rated low, wedding status
+names not re-checked): the scenario's prediction is that the state moves on within a minute of the next login;
+if it does not, repeat with `dWhen`.
+
+### 8.8 S7: prison
+
+Use the procedures the Character server itself calls for an offline target (`0x7C0B` / `0x7C10` with
+`nImprisonRegNum` 0, D04 §7). Target character at the login screen (the zone counts the minutes down and saves
+them with `0x7C0D`).
+
+```sql
+USE w00_Character;
+DECLARE @err smallint;
+SELECT nCharNo, nPrisonMin, sLoginZone, nLoginZoneX, nLoginZoneY, nLoginZoneD INTO dbo.X02_save_7
+  FROM tCharacter WHERE sID = N'TestCharB' AND bDeleted = 0;
+EXEC p_Prison_Add2 N'X02', N'TestCharB', 5, N'test', N'X02 scenario 33', @err OUTPUT;
+SELECT @err AS err;   -- 0 ok, 1 no such character, 2 already in prison
+-- restore
+UPDATE c SET nPrisonMin = s.nPrisonMin, sLoginZone = s.sLoginZone, nLoginZoneX = s.nLoginZoneX,
+             nLoginZoneY = s.nLoginZoneY, nLoginZoneD = s.nLoginZoneD
+  FROM tCharacter c JOIN dbo.X02_save_7 s ON s.nCharNo = c.nCharNo;
+DELETE p FROM tPrison p JOIN dbo.X02_save_7 s ON s.nCharID = p.nCharID WHERE p.sGmID = N'X02';
+DROP TABLE dbo.X02_save_7;
+```
+
+The procedure moves the login position to `EldPri` (896, 1122). Boundary values for §4: 1 minute, 32767 (the
+parameter is a `smallint`), and `p_Prison_Alter2 … 0 …` on a prisoner (release to `Rou` 5963 / 9793).
+
+### 8.9 S8: charged-item rows
+
+`usp_Charge_ItemInsert(@userNo, @orderNo, @goodsNo, @amount, @RET OUTPUT)` is the shop's own insert; `@orderNo`
+0 skips its duplicate test. `goodsNo` must be a number the zone can turn into items: `ItemShop.shn` has
+`{goodsNo, InxName, Lot}` rows (10002 = `HPIncrease1` × 20); that this table is the zone's goods table
+`DAT_0d5745e8` of Z04 §8 is *(inferred)* from the column name. The list is read each time the premium storage
+is opened (`0x3463`), so the account may stay online; close the storage window first.
+
+```sql
+USE Account;
+DECLARE @n int = 600;            -- 3, 511, 512 or 600
+DECLARE @u int = (SELECT nUserNo FROM tUser WHERE sUserID = N'testaccount' AND bIsDelete = 0);
+DECLARE @ret int, @i int = 0;
+IF @u IS NULL RAISERROR('account not found', 16, 1)
+ELSE BEGIN
+    SELECT @u AS userNo, ISNULL(MAX(rowNo), 0) AS lastRow INTO dbo.X02_save_8 FROM tChargeItem;
+    WHILE @i < @n BEGIN
+        EXEC usp_Charge_ItemInsert @u, 0, 10002, 1, @ret OUTPUT;
+        SET @i = @i + 1;
+    END
+    SELECT COUNT(*) AS undrawn FROM tChargeItem WHERE userNo = @u AND isDraw = 0;
+END
+-- restore (also removes rows of this account that were withdrawn in the test)
+DELETE t FROM tChargeItem t JOIN dbo.X02_save_8 s ON t.userNo = s.userNo AND t.rowNo > s.lastRow;
+DROP TABLE dbo.X02_save_8;
+```
+
+Prediction (D03-B10): with 512 or 600 rows the `0x3464` parts carry 511 rows in all; with 3 or 511 every row.
+
+### 8.10 S9: gamble coins
+
+Character at the login screen. The table exists only in the 2017 backup *(db-backup)*; if the `SELECT` fails,
+the 2016 database keeps coins elsewhere and this setup does not apply (use the coin exchange NPC instead).
+
+```sql
+USE w00_Character;
+DECLARE @coin bigint = 1000;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+SELECT @c AS nCharNo, (SELECT nCoin FROM tGambleCoin WHERE nCharNo = @c) AS nCoin INTO dbo.X02_save_9;
+IF EXISTS (SELECT 1 FROM tGambleCoin WHERE nCharNo = @c)
+    UPDATE tGambleCoin SET nCoin = @coin WHERE nCharNo = @c;
+ELSE
+    INSERT INTO tGambleCoin (nCharNo, nCoin) VALUES (@c, @coin);   -- the column list usp_Gamble_addCoin uses
+-- restore
+UPDATE g SET nCoin = s.nCoin FROM tGambleCoin g JOIN dbo.X02_save_9 s ON s.nCharNo = g.nCharNo WHERE s.nCoin IS NOT NULL;
+DELETE g FROM tGambleCoin g JOIN dbo.X02_save_9 s ON s.nCharNo = g.nCharNo WHERE s.nCoin IS NULL;
+DROP TABLE dbo.X02_save_9;
+```
+
+### 8.11 S10: blocked account
+
+Read at every login (`usp_User_loginGame`), nothing caches it: the account only has to be at the login screen
+for the test itself. With no active `tUserBlock` row the flag stays set (`usp_User_chkBlock` clears it only for
+an expired timed row).
+
+```sql
+USE Account;
+SELECT nUserNo, bIsBlock INTO dbo.X02_save_10 FROM tUser WHERE sUserID = N'testaccount' AND bIsDelete = 0;
+SELECT * FROM tUserBlock WHERE nUserNo = (SELECT nUserNo FROM dbo.X02_save_10) AND bStatus = 1;   -- expect no row
+UPDATE u SET bIsBlock = 1 FROM tUser u JOIN dbo.X02_save_10 s ON s.nUserNo = u.nUserNo;
+-- restore
+UPDATE u SET bIsBlock = s.bIsBlock FROM tUser u JOIN dbo.X02_save_10 s ON s.nUserNo = u.nUserNo;
+DROP TABLE dbo.X02_save_10;
+```
+
+### 8.12 S11: account not login-able
+
+`bIsLoginAble` belongs to the authority group (`tUserAuth`), not to the account: clearing it locks out **every
+account of that `nAuthID`** until the restore. Do it when no one else uses the test server, or first look for a
+group that is already not login-able and move only the test account into it (second block).
+
+```sql
+USE Account;
+SELECT nAuthID, sAuthName, bIsLoginAble FROM tUserAuth;                       -- look first
+SELECT u.nUserNo, u.nAuthID AS userAuth, a.nAuthID, a.bIsLoginAble INTO dbo.X02_save_11
+  FROM tUser u JOIN tUserAuth a ON a.nAuthID = u.nAuthID WHERE u.sUserID = N'testaccount' AND u.bIsDelete = 0;
+UPDATE a SET bIsLoginAble = 0 FROM tUserAuth a JOIN dbo.X02_save_11 s ON s.nAuthID = a.nAuthID;
+-- or, when a group <g> with bIsLoginAble = 0 exists:  UPDATE u SET nAuthID = <g> FROM tUser u JOIN dbo.X02_save_11 s ON s.nUserNo = u.nUserNo;
+-- restore (covers both variants)
+UPDATE a SET bIsLoginAble = s.bIsLoginAble FROM tUserAuth a JOIN dbo.X02_save_11 s ON s.nAuthID = a.nAuthID;
+UPDATE u SET nAuthID = s.userAuth FROM tUser u JOIN dbo.X02_save_11 s ON s.nUserNo = u.nUserNo;
+DROP TABLE dbo.X02_save_11;
+```
+
+### 8.13 S12: a stack's lot changed under an online owner
+
+A stack's lot is **not** a `tItem` column: it is the item's `tItemOptions` row of type 1 (u8 lot classes), 2
+(u16), 3 (u32), 300 (quest items) or 4 (amount), D03 §1.2 – §1.3. The owner stays in the game: the point is
+that the zone's copy and the DB disagree.
+
+```sql
+USE w00_Character;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+SELECT i.nItemKey, i.nStorageType, i.nStorage, i.nItemID, o.nOptionType, o.nOptionData        -- pick a stack
+  FROM tItem i JOIN tItemOptions o ON o.nItemKey = i.nItemKey
+ WHERE i.nOwner = @c AND i.nStorageType = 9 AND o.nOptionType IN (1, 2, 3) AND o.nOptionData > 1;
+DECLARE @key bigint = 0;         -- nItemKey from the list
+SELECT nItemKey, nOptionType, nOptionData INTO dbo.X02_save_12 FROM tItemOptions
+ WHERE nItemKey = @key AND nOptionType IN (1, 2, 3);
+UPDATE tItemOptions SET nOptionData = nOptionData - 1 WHERE nItemKey = @key AND nOptionType IN (1, 2, 3);
+-- restore (after the disconnect the scenario predicts; the stack may have been changed by the game since)
+UPDATE o SET nOptionData = s.nOptionData FROM tItemOptions o JOIN dbo.X02_save_12 s
+    ON s.nItemKey = o.nItemKey AND s.nOptionType = o.nOptionType;
+DROP TABLE dbo.X02_save_12;
+```
+
+Storage type 9 = inventory (D03 knowledge, check 4); `nStorage` is the cell.
+
+### 8.14 S13: an item past its end time
+
+The end time is the class's `deletetime` option row: type 417 (amulet), 521 (weapon), 620 / 720 / 820 (armor,
+shield, boot), 906 (furniture), 1001 (decoration), 1601 (mount), 1900 (action item), 2821 (bracelet), D03 §1.3.
+The value is a raw `ShineDateTime` *(pdb2016)*: `(year − 2000) | month << 8 | day << 13 | hour << 19 |
+minute << 25`, month 1 – 12 (Z24 §6: `mktime(year + 100, month − 1, …)`). 2020-01-01 00:00 = 20 + 256 + 8192 =
+**8468**. A year field of 0 means "no end" (Z24 `sp_ChargedItemLimitCheck`), so never write 0. Account at the
+login screen.
+
+```sql
+USE w00_Character;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+SELECT i.nItemKey, i.nStorageType, i.nStorage, i.nItemID, o.nOptionType, o.nOptionData        -- timed items
+  FROM tItem i JOIN tItemOptions o ON o.nItemKey = i.nItemKey
+ WHERE i.nOwner = @c AND o.nOptionType IN (417, 521, 620, 720, 820, 906, 1001, 1601, 1900, 2821) AND o.nOptionData <> 0;
+DECLARE @key bigint = 0;         -- nItemKey from the list
+SELECT * INTO dbo.X02_save_13a FROM tItem WHERE nItemKey = @key;
+SELECT * INTO dbo.X02_save_13b FROM tItemOptions WHERE nItemKey = @key;
+UPDATE tItemOptions SET nOptionData = 8468
+ WHERE nItemKey = @key AND nOptionType IN (417, 521, 620, 720, 820, 906, 1001, 1601, 1900, 2821);
+-- the item is deleted by the test; keep the two save tables as the record of what it was, then
+DROP TABLE dbo.X02_save_13a; DROP TABLE dbo.X02_save_13b;
+```
+
+Prediction: within the first per-minute check after login the zone sends D `0x3459` for the cell and clears it
+(`sp_ChargedItemLimitCheck` @ FUN_00451530 → `sp_ItemDelete` → `sp_DestroyItem`, Z24 §6; inventory and equipment,
+a mount being ridden is skipped); the client sees the cell emptied. Disproved by:
+the item surviving two minutes, or being removed already in the login burst. The item is gone afterwards: use
+one made with `&makeitem`. Re-inserting it from the save tables is possible but re-creates a deleted key; do not.
+
+### 8.15 S14: a deleted character
+
+`p_Char_Delete` is what the Character server calls for a client delete (D02 §3.4): it sets `bDeleted`,
+`dDeletedDate` and renames the character to `<name>~<year><month><day>#<n>`. Account at the login screen.
+
+```sql
+USE w00_Character;
+DECLARE @ret int;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharB' AND bDeleted = 0);
+SELECT nCharNo, sID, bDeleted, dDeletedDate INTO dbo.X02_save_14 FROM tCharacter WHERE nCharNo = @c;
+EXEC p_Char_Delete @c, @ret OUTPUT;
+SELECT @ret AS ret, sID, bDeleted FROM tCharacter WHERE nCharNo = @c;   -- ret 0 = deleted now
+-- restore
+UPDATE c SET sID = s.sID, bDeleted = s.bDeleted, dDeletedDate = s.dDeletedDate
+  FROM tCharacter c JOIN dbo.X02_save_14 s ON s.nCharNo = c.nCharNo;
+DROP TABLE dbo.X02_save_14;
+```
+
+What to try against it (§4): a friend request, a whisper, a party invite and a guild invite by the old name from
+A; the avatar list of B's account (prediction: the slot is free, `p_Char_GetListOfUserChar` filters `bDeleted =
+0`). Guild membership, friend rows and the marriage row are not touched by the procedure: a deleted guild member
+still listed is the kind of result to note.
+
+### 8.16 S15: a booth purchase whose money move fails (D03 check 7, D03-B25)
+
+`usp_SafeTrade_setAll` moves the money with `p_Char_MoneyMove`, which fails when the buyer's **row** holds less
+than the price; the zone has already checked its own copy. So lower the buyer's row while the buyer is online,
+just before the purchase: buyer B in the game with enough money, seller A's booth open with a capsule that has
+content.
+
+```sql
+USE w00_Character;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharB' AND bDeleted = 0);
+SELECT nCharNo, nMoney INTO dbo.X02_save_15 FROM tCharacter WHERE nCharNo = @c;
+UPDATE tCharacter SET nMoney = 0 WHERE nCharNo = @c;
+-- restore: only with B at the login screen. The zone still believes in the old amount and keeps sending deltas;
+-- log B out first, then
+UPDATE c SET nMoney = s.nMoney FROM tCharacter c JOIN dbo.X02_save_15 s ON s.nCharNo = c.nCharNo;
+DROP TABLE dbo.X02_save_15;
+```
+
+Prediction: the purchase fails with the procedure's −2623 path, the capsule stays with A, and its type-10
+content rows have `nOwner` = B (`SELECT nItemKey, nOwner, nStorageType FROM tItem WHERE nOwner IN (<A>, <B>) AND
+nStorageType = 10`). Disproved by: the content still owned by A. `usp_SafeTrade_setAll` exists only in the 2017
+backup *(db-backup)*; the binary calls it with the same 7 parameters.
+
+### 8.17 S16: a purchase whose attribute write fails (D03 check 13, D03-B1)
+
+Same pattern as S5, on `tItemOptions`: the item row is created and paid by `p_Item_BuyAll`, then the first
+`p_Item_SetOption` insert is rolled back. Install just before the purchase, drop right after. Buy an item whose
+class writes an option row (anything stackable, a weapon, armor), paying with fame or gamble coins.
+
+```sql
+USE w00_Character;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+DECLARE @sql nvarchar(max) = N'CREATE TRIGGER dbo.X02_tItemOptions_fail ON dbo.tItemOptions AFTER INSERT AS
+IF EXISTS (SELECT 1 FROM inserted o JOIN dbo.tItem i ON i.nItemKey = o.nItemKey WHERE i.nOwner = ' + CAST(@c AS nvarchar(12)) + N')
+BEGIN
+    ROLLBACK TRANSACTION;
+    RAISERROR(''X02 forced failure (S16)'', 16, 1);
+END';
+IF @c IS NULL RAISERROR('character not found', 16, 1) ELSE EXEC (@sql);
+-- restore
+DROP TRIGGER dbo.X02_tItemOptions_fail;
+```
+
+Prediction: the item is deleted again, cen is refunded, fame or coins are not (compare `tCharacter.nFame` /
+`tGambleCoin.nCoin` before and after). While the trigger exists every new item of the character loses its
+attributes or fails; existing option rows are updated normally (the trigger fires on inserts only).
+
+## 9. Table and config experiments (X1–X7)
+
+### 9.1 Conventions
+
+- The servers read `9Data` at start: **stop the named process, change the file, start it, test, put the original
+  back and restart.** Keep a copy of every file you change next to it (`<name>.orig`). The repository's `Files/`
+  tree is the reference: never edit it, edit the test installation.
+- Text tables (`9Data/Shine/World/*.txt`, `9Data/ServerInfo/*.txt`) are CP949 text: use an editor that keeps the
+  bytes it does not understand (the comments are Korean) and change only the digits named below. Columns are
+  separated by tabs or spaces; `#` inside a value stands for a space.
+- `.shn` tables: `python3 -I docs/plan/status/X02-shnset.py <in.shn> <out.shn> <KeyColumn>=<value>
+  <Column>=<number> …` rewrites integer cells in place (same size, same cipher; self-tested by decoding the result
+  with `shn.py`). Example: `… KingdomQuest.shn /tmp/KingdomQuest.shn ID=0 StartWaitTime=2`.
+- **49 tables are hashed and compared with the client's copy at every map login** (`CShnDataFileCheckSum`, enum
+  `SHN_DATA_FILE_INDEX` *(pdb2016)*; mismatch → `0x1804 {0x147, idx}` and disconnect 0x68E, Z01 §5.2). Among the
+  tables used here that is `ItemInfo.shn`, `ChargedEffect.shn` and `MapInfo.shn`: a changed copy must also replace
+  the client's `ressystem/<name>.shn` (the shipped server and client files are byte-identical). Not in the list
+  and free to change on the server alone: `KingdomQuest.shn`, `ItemShop.shn`, `ItemAction*.shn`, every `World/*.txt`.
+  The full list is the enum (`pdb.py Files/Server/NA2016/Zone00/Zone.pdb types '^SHN_DATA_FILE_INDEX$'`).
+
+### 9.2 X1: drops
+
+File `9Data/Shine/World/ItemDropTable.txt`, table `ItemGroup`, one `#RECORD` per mob: `MapArea MobId MinLevel
+MaxLevel AbStateCnt MinCen MaxCen CenRate TradeBoxA RateA … DrItem1 DrItem1R UpGradeMin01 UpGradeMax01 Rule1 Num1
+DrItem2 …` (25 drop entries). `DrItem<n>R` is a rate out of 1 000 000, `Num<n>` the count limit (−1 = no limit).
+Stop and restart the zone that hosts the map (all four when unsure: they share the file).
+
+1. **Limited drop runs out for the whole server (Z09-B20, V22).** In the `Slime` record (first record:
+   `- Slime 1 11 0 0 0 0 - 0 - 0 - 0 Potion01 50000 0 0 r -1 …`) change entry 1 from `Potion01 50000 0 0 r -1`
+   to `Potion01 1000000 0 0 r 3`. Kill slimes with A, then with B. Prediction: the entry passes its rate roll
+   every time but is still subject to the per-entry gate roll (Z09 §11.2); exactly three drops in total come
+   from entry 1, none after that for either player until the zone restarts. Disproved by: a fourth
+   drop from entry 1, or a count per player or per mob. Entry 2 is also `Potion01` (rate 40000): set its rate to
+   0 for the test so every `Potion01` drop is entry 1's.
+2. **Drop-rate items (V19).** No file change. 2016 `ChargedEffect.shn` has 13 rows with `EffectEnum` 16: seven
+   at `EffectValue` 1500 (`Huntervoucher`, `Huntervoucher01`, `02`, `02_1`, `02_2`, `02_3`, `11`), five at 2000
+   (`Huntervoucher00_TD`, `01_TD`, `03_1`, `03_7`, `03_30`) and `SNS_DropUp` at 1100. With entry 1 of experiment
+   1 set to `Potion01 1000000 0 0 r -1`, count drops over 100 slime kills three times: no item, `&makeitem
+   SNS_DropUp` used, `&makeitem Huntervoucher02_1` used (1 h). Prediction (Z09 §11.2): the share of kills that
+   drop rises by the gate bonus, +100 ‰ and +500 ‰. Disproved by: equal shares (then enum 16 does not feed the
+   gate). This is a statistical test: 100 kills separate +500 ‰ from nothing, not +100 ‰ from nothing.
+
+### 9.3 X2: maps with special rules (read only)
+
+`9Data/Shine/World/Field.txt`, table `FieldList` (columns `MapIDClient … KQ … Pker EnemyGuild Party Monster
+Summoned IsPKKQ IsFreePK IsPartyBattle … CanParty …`; a map can have several rows, one per `Serial`):
+
+| Need | Rows in the 2016 data |
+|---|---|
+| party battle (`IsPartyBattle` 1) | `ValDn02`, `CemDn02`, `GblDn02`, `ElfDn02`, `PriDn02`, `ForDn02`, `FireDn02`, `SwaDn02`, `AlDn02`, `PsyInDn02`, `ArkDn02`, `Fbattle01` – `Fbattle04` |
+| free PK (`IsFreePK` 1) | `KDHBat1` only |
+| PK kingdom quest (`IsPKKQ` 1) | `KDHero`, `KDHBat1`, `OX_field` |
+| no party (`CanParty` 0) = party-release map | `KDHero`, `KDHBat1`, `OX_field`, `Wedding`, `Job1_Dn01`, `Job2_Dn01`, `Job2_Dn02`, `KDSpring`, `KDSoccer_W`, `RouT`, and the kingdom-quest copies of `Rou` (`Serial` 98, 101; the town row, `Serial` 0, has 1) |
+| `Pker` column | 1 on 122 rows, 2 on 25 (the `Fbattle` and `KDHero` rows among them), 0 on 6 |
+
+The zone derives the flag the WM tests: `FieldMap::fm_Regist2WMS` @ FUN_00461cf0 *(pdb2016)* writes each
+`0x180F` entry as `{ canparty = fm_FieldOption->canparty, mapname, IsPartyReleaseMap = (canparty == 0) }`. So a
+map is a party-release map exactly when its `CanParty` is 0, and "cannot form a party there" and "leaves the
+party on entering" are one flag. `Wedding` (`KQ` 0) is the one row that is not a kingdom-quest or job-quest
+map: use it for scenario 15 step 8.
+
+Instance gates: table `InstanceDungeon` of the same file (`Argument IDNo ZoneNumber MapIDClient ScriptName
+ModeIDLv EntranceType Guild Individual NeedQuest NeedItem Consume LimitTime MaxUseChr`), 17 rows. Gates with two
+`ModeIDLv` rows (the level-select menu of scenario 31): `UrgFire017` (`UrgDragon`, needs item `DragonRelicNeck`),
+`IDGate011` (`Leviathan`, `lighthouseKey`), `LabGate00` (`Tower03`, zone 1, no item), `BerFrz013` (`Siren`, zone
+2, no item). Single-mode gates without an item: `GateRouVal016` (`Tower01`), `Urg12` (`Tower02`), `AdlFGate00`,
+`WarN01`, `WarBL01` (all `ZoneNumber` 3; `UrgFire017` and `IDGate011` too).
+
+### 9.4 X3: a stack limit lower than an existing stack
+
+`ItemInfo.shn` column `MaxLot` (2016 data: 976 items at 50, 319 at 99, 132 at 10). Test item: `BestLowHpPotion`
+(ID 3500, `MaxLot` 50).
+
+1. With the original files: `&makeitem BestLowHpPotion -l50` twice, drop one stack (whole stacks only), keep 50.
+2. Stop all four zones and the client. `python3 -I docs/plan/status/X02-shnset.py ItemInfo.shn out.shn
+   InxName=BestLowHpPotion MaxLot=49`; put `out.shn` as `ItemInfo.shn` into the server's `9Data/Shine` **and**
+   the client's `ressystem` (§9.1: hashed table). Start, log in.
+3. The inventory stack now holds 50 with a limit of 49. `&makeitem BestLowHpPotion -l10`, drop it, pick it up.
+
+For the over-full stack the free amount `MaxLot − lot` is negative; what the pick-up does with it is the open
+point of scenario 21 (its prediction applies): note the `0x3001` cells and the `tItemOptions` lot rows after. Disproved for "no check": a refusal
+code at login or at the pick-up. Restore both copies of the file afterwards; a client left with the changed file
+is disconnected (0x68E) by any unchanged server.
+
+### 9.5 X4: abstates removed by an action (read only)
+
+`9Data/Shine/World/MiscDataTable.txt`, table `AbStateReset` (`Serial AbState Run Walk Attack Attacked EquipWhere
+EquipClass CheckSum`), all 7 rows of the 2016 data:
+
+| AbState | Run | Walk | Attack | Attacked | Equipment |
+|---|---|---|---|---|---|
+| `StaBuckler` | 0 | 0 | 0 | 0 | `LeftHand` `Shield` |
+| `StaNeglect` | 1 | 1 | 1 | 0 | – |
+| `StaHide` | 0 | 0 | 1 | 1 | – |
+| `StaMesmerize` | 0 | 0 | 0 | 1 | – |
+| `StaEntrapHide` | 0 | 0 | 1 | 1 | – |
+| `StaGTIConfusion` | 0 | 0 | 0 | 1 | – |
+| `StaGTIHide` | 0 | 0 | 1 | 1 | – |
+
+So scenario 24's "buff with a movement reset condition" has one candidate, `StaNeglect` (removed by run, walk
+and attack, not by being hit); `StaHide` tests attack / attacked; `StaBuckler` tests the equipment condition
+(take the shield off). Prediction per `confidence.md` C18: the state ends (the abstate removal packets of Z03, as scenario 24 lists them)
+on the first action whose column is 1 and survives the others.
+
+### 9.6 X5: a kingdom quest within minutes
+
+`KingdomQuest.shn` is read by the WM (W04 §6.2) and is not a hashed table. Row `ID` 0 ("King Slime's
+Counterattack": `ST_Day` 1, `ST_Hour` 0, `ST_Minute` 0, `StartWaitTime` 30, `NextStartDeleyMin` 120, levels 5 –
+16, `MinPlayers` 1, `MaxPlayers` 15) already runs with one player. Stop the WM (and the zones, which reconnect
+to it), then:
+
+```bash
+python3 -I docs/plan/status/X02-shnset.py KingdomQuest.shn out.shn ID=0 NextStartDeleyMin=10 StartWaitTime=2
+```
+
+Prediction (W04 §6.2): the schedule steps from the 1st of the month 00:00 in 10-minute steps, so a start falls
+on every full ten minutes of the clock; at that minute the WM broadcasts `0x580D NC_KQ_W2Z_MAKE_REQ` to all
+zones, a level 5 – 16 character can join, and two minutes later the quest starts with the one joiner. Disproved
+by: starts at other minutes (then `ST_Year` / `ST_Month` / `ST_Second` are used after all), or no start with
+one joiner. Do not set `NextStartDeleyMin` to 0: the schedule loop then never ends (W04-B57). The client has its
+own, different `KingdomQuest.shn`; what its quest list shows comes from the server's packets (W04 §6), a
+difference in the displayed time is worth a note.
+
+### 9.7 X6: a world closed or full
+
+No file needs to change for "closed", one number for "full":
+
+1. **Closed (status 0).** Stop the WM process and wait for the Login server to release the link. Prediction: the
+   world list (`0x0C0A` / `0x0C1C`) shows `worldstatus` 0, a world select gets `0x0C0C {worldstatus 0}` and the
+   client text "Server is closed. Please try login later." (L01 §3).
+2. **Full (status 5).** The WM reports `{NumOfUser, MaxOfUser}` in `0x0808` every 30 s and Login computes the band
+   as `NumOfUser ≥ 95 × MaxOfUser / 100` (integer division). `MaxOfUser` is the WM's client-session capacity
+   (`Login_WorldStatus` @ FUN_00438d10 in W01: `g_Clients.capacity`, or the OPTool limit of `0x280E`); that it comes from the last number of the WM's client row in
+   `9Data/ServerInfo/ServerInfo.txt` (`SERVER_INFO "PG_W00_WM", 5, 0, 0, 20, "0.0.0.0", 9110, 100, 2500`) is
+   *(inferred)*. Change that 2500 to 1 and restart the WM: `95 × 1 / 100` = 0, so the world is full with nobody
+   online. Prediction: status 5 in the list, and on world select `0x0C0C {5}` **with** the WM address, after
+   Login has already sent AccountDB `0x0C10`, AccountLog `0x0721` and WM `0x0C0D` (L00-B3); the client shows
+   "Server is full. Please try again later." and does not connect. Disproved by: no `0x0C0D` on the WM link. If
+   the status stays 6, the capacity comes from somewhere else: note the `0x0808` payload from the capture.
+
+### 9.8 X7: item actions and the drop confirmation (read only)
+
+- **Drop confirmation.** No table decides it: every accepted `0x3007` drop opens the server menu
+  (`ItemDropper_id_Drop` @ FUN_0048dc90, Z04 §3.1), and a bound item goes to the two break confirmations
+  instead. Scenario 42 step 1 can use any droppable stack.
+- **Item actions.** `ItemAction.shn` (1114 rows: `ItemActionID`, `ConditionID`, `EffectID`, `CoolTime`,
+  `CoolGroupActionID`) is referenced by `ActionEffectItem.shn` (372 rows) and `SetEffect.shn` (1043 rows) through
+  their `ItemActionID` column; `ActionEffectAbState.shn` has the column and no rows. List the items of the first
+  with `python3 -I tools/protocol-re/shn.py Files/Server/2016/9Data/Shine/ActionEffectItem.shn | head -20` and
+  take one that `&makeitem` can create; a set item with a `SetEffect.shn` row tests the same path through the
+  set bonus (Z17 §1, Z21).

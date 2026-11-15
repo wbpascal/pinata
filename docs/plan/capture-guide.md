@@ -92,6 +92,8 @@ Values you know (level, money, item names, coordinates shown in the UI) are what
 | 12 | Accept, progress and finish a quest | quests |
 | 13 | Level up; spend stat points | progression |
 
+Scenarios 14–44, with the database setups (SQL) and table experiments they need: `docs/plan/capture-scenarios.md` (X02).
+
 Two accounts on two clients (or two machines) are needed for 6, 10 and 11.
 
 For scenarios 8–10, keep port 9411 in the filter and, if possible, note the `tItem` / `tItemOptions` rows of the items you use
