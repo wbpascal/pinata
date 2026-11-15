@@ -11,7 +11,10 @@ finds go to `docs/knowledge/X02.md` §0; the capture scenarios that follow from 
 | 1 | Error classes: what went wrong so far, with counts | done (part 1) |
 | 2 | Rating of every pseudocode section and knowledge struct table | done (parts 2–3) |
 | 3 | Adversarial re-check of the load-bearing claims | §3.2 done (part 4), §3.3 done (part 5), §3.4 done (parts 6, 6b), §3.5 done (part 7) |
-| 4 | Coverage gaps of items finished without a review part | done (part 10) |
+| 4 | Coverage gaps of items finished without a review part | done (part 10); §4.7 points closed in the sweep (part 11) |
+| 5 | Original-server bugs found by the re-check (X02-B1 … B12) | done (part 11) |
+| 6 | Not reconstructed / uncertain | done (part 11) |
+| 7 | Coverage boundary, follow-up items Z31, Z32, W06, D08 | done (part 11) |
 
 ## 1. Error classes
 
@@ -3943,15 +3946,104 @@ For a follow-up session of the item named, smallest first:
 
 | # | Item | What | Size |
 |---|---|---|---|
-| 1 | D01, D02 | read the two 0x0804 labels (`LAB_00404db0` account, `LAB_0043cdf0` character) with `objdump` | minutes |
-| 2 | W02 | PDB names of PARTY +0xcc and PARTY_MEMBER +0x20 | minutes |
-| 3 | L00 | readers of `builtinKey` | minutes |
-| 4 | D01 | TEENAGER `nType` 1 arithmetic | small |
-| 5 | Z02 | source of the handlers' third argument `hnd`; setter of `p+0x5cb9` bit 2; roar delivery | small each |
-| 6 | Z01 | table of all player modes | small |
-| 7 | Z04 | BELONGED_CANCEL codes 0x2885–0x288f branch by branch; auto-arrange scheduling | small each |
-| 8 | Z03 | 0x244C payload builder | small |
-| 9 | D02 | `nStatusDone` filters of 0x1004; 0x1017 item record sender FUN_004056a0; 0x0812–0x0815 field names | medium |
-| 10 | D02 | SOAP item-shop client (FUN_0043f690 and below) | large |
-| 11 | zone | the class-named functions no document cites (§4.4: 1 158 functions, 25 865 lines; the 15 named functions first) | large: follow-up item (part 11) |
-| 12 | Account, AccountLog, Character, GameLog | process layer and shared-class copies (§4.4; S02 §6) | large: follow-up item (part 11) |
+| 1 | D01, D02 | read the two 0x0804 labels (`LAB_00404db0` account, `LAB_0043cdf0` character) with `objdump` | **closed, §4.7 G3** |
+| 2 | W02 | PDB names of PARTY +0xcc and PARTY_MEMBER +0x20 | **closed, §4.7 G4** |
+| 3 | L00 | readers of `builtinKey` | **closed, §4.7 G5** |
+| 4 | D01 | TEENAGER `nType` 1 arithmetic | small: item D08 |
+| 5 | Z02 | source of the handlers' third argument `hnd`; setter of `p+0x5cb9` bit 2; roar delivery | small each: item Z31 |
+| 6 | Z01 | table of all player modes | small: item Z31 |
+| 7 | Z04 | BELONGED_CANCEL codes 0x2885–0x288f branch by branch; auto-arrange scheduling | small each: item Z31 |
+| 8 | Z03 | 0x244C payload builder | small: item Z31 |
+| 9 | D02 | `nStatusDone` filters of 0x1004; 0x1017 item record sender FUN_004056a0; 0x0812–0x0815 field names | medium: item D08 |
+| 10 | D02 | SOAP item-shop client (FUN_0043f690 and below) | large: item D08 |
+| 11 | zone | the class-named functions no document cites (§4.4: 1 158 functions, 25 865 lines; the 15 named functions first) | large: items Z31 (all but the gamble classes) and Z32 (TaiSai, slot machine) |
+| 12 | Account, AccountLog, Character, GameLog | process layer and shared-class copies (§4.4; S02 §6) | large: item D08 |
+| 13 | wm | the 98 class-named functions no document cites (§4.4), E14 / E15 / E25 of §3.5.3 | medium: item W06 |
+
+### 4.7 Points closed in the sweep (part 11)
+
+The three "minutes" rows of §4.6 and three rows §3 had left as "not re-checked", read now. G1 and G2 are in §4.5.
+
+| # | Claim (owner) | Verdict | Evidence |
+|---|---|---|---|
+| G3 | 0x0804 `NC_MISC_HEARTBEAT_REQ` in Account `LAB_00404db0` and Character `LAB_0043cdf0`: "not decompiled; reply 0x0805 as in Login *(inferred)*" (D01 §2, D02 §2) | **confirmed** (inferred → read) | Both are five instructions (`objdump`): `ecx = this->session (+4); push 3; push <const>; call Send; ret 8`. The constants at 0x4480fc (Account) and 0x4df0d8 (Character) are the bytes `02 05 08` = length 2, opcode 0x0805, no body. The callee is `CSession::Send` @ FUN_004055d0 *(pdb2016, Account)* / `Session_SendRaw` @ FUN_0043d620 (Character; name ours). The handler returns the send result, so a failed send returns 0 to the parser, on the link the request came in on |
+| G4 | PARTY +0xcc "u8 (not used here)", PARTY_MEMBER +0x20 "u32 (unused)" (W02 §1.1) | **confirmed**, names added | 2016 `WorldManager.pdb`: `CParty::PARTY_SLOT` (0xd0) = `{u8 NumOfMember; PARTY_MEMBER_SLOT Members[5] @4; CLooting m_Looting @0xb8; bool IsBelongItemDiceGameIng @0xcc; bool isRaidTypeParty @0xcd}`; `PARTY_MEMBER_SLOT` (0x24) = `{PROTO_PARTY_MEMBER_AND_ZONEMERCHINE MemberInform; ShineObject* memberobj @0x20}`. The class is shared source with the zone: `memberobj` is the zone's object pointer and `IsBelongItemDiceGameIng` the zone's dice-looting flag; the WM has no use for either. `PROTO_PARTY_MEMBER_AND_ZONEMERCHINE` is a 2016 PDB type: W02's *(pdb2017)* marker on it can go |
+| G5 | `builtinKey`: "33-byte constant at 0x428508 `037C4103B543CA6E…`; no reader found" (L00 §1, L00-B5) | **confirmed**, text refined | `LoginServer::ReadGlobalGameData` @ FUN_00401680 copies 33 bytes into `gServer.m_strHashValue` (`char[128]` at +0x5d0; the constructor zeroes it). The constant is `"E5DB037C4103B543CA6E6513075FED1D"`: 32 hex digits (the size of an MD5 value) and the terminator; L00 quotes it from its fifth character (the strings export lists the tail at 0x42850c because the copy loop references it). Readers: none. No typed access in `login-pdb/decomp.c` besides the two writers, no `+ 0x5d0` access besides the copy in `login/decomp.c`, and the absolute address 0x432f20 (`gServer` 0x432950 + 0x5d0) occurs nowhere in the exe. L00-B5 stands; the member's official name says "hash value", not "key": the link to the client's 0x0C04 XTrap key is L00's guess *(inferred)* |
+| G6 | D02 §2: "0x0801 `NC_MISC_S2SCONNECTION_RDY`, 0x0805: return 1 (no-op) @ FUN_0043c7a0, FUN_004503c0" (E38 of §3.5.4) | **refined**, X02-B12 | FUN_004503c0 is `return 1` (0x0805; also registered for dept 2 cmd 5 only). FUN_0043c7a0 (0x0801) is not a no-op: it answers the sender with 0x0802 `NC_MISC_S2SCONNECTION_REQ {u8 echo_data; u8 server_to_id = 3; u8 server_from_id = DAT_004e2f68; u8 server_from_world_num = DAT_004e2f6c; u8 server_from_zone_num = 0; u16 key = server_from_id + 3}` (7 bytes; field names *(pdb2017)*, values read). `echo_data` is never written: one stack byte goes out (original bug), the same defect as the zone's Z01-B2. D02's comment line under the row says the handler "is registered with a sender of 0x0802"; the row itself misleads. The Account handler for 0x0801 (FUN_00404820) is a real `return 1` |
+| G7 | W04 §8.3: "`n ≥ 0x60` … unreachable: the DB caps n at 95" (E25 of §3.5.3, first half) | **confirmed** | Character `fc_NC_CHAR_OPTION_IMPROVE_DB_INIT_KEYMAP_REQ` @ FUN_00422890: the fetch loop tests `0x5e < n` before it stores a row, logs "too many key map data 1" and stops, so n ≤ 95 in every 0x7058 it sends. The WM test is dead with this Character server |
+| G8 | Z04 §13.2: `sp_HPStoneUse` sets "`p+0x173bc` = no-op" (E36 of §3.5.4, second half) | **confirmed**, addition | `ShinePlayer::sp_HPStoneUse` @ FUN_00589180: `sp_HPStoneManager.PointStoneCheck` (the member function pointer at that offset) is set to an empty function; the PDB shows it under the name `ShineObject::so_Gamble_ChangeCoin`, an identical-code fold (§3.2 H-rows: read the body). `StoneTick = now + 0x46`, the queue window `now + 0x32`, as Z04 says. Before the 0x5008 answer the function broadcasts `0x500B {u16 handle}` to the players in sight (`so_AllOfRange`) |
+
+Still not read after the sweep, with an owner: E14, E15 and the second half of E25 (W03 §2.5, W03 §3.5, W04 §12.3) → item W06.
+
+## 5. Original-server bugs
+
+Found by the re-check (§3) and the sweep (§4.7). Each is tagged `(original bug)` in the row named. "Latent" = the
+code is wrong but the 2016 client or the normal message order does not reach it. None was observed in a capture; the
+scenario that would show it is named where one exists (`docs/plan/capture-scenarios.md`).
+
+| ID | Handler | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| X02-B1 | WM 0x180B `fc_NC_MAP_LINKSTART_CMD` @ FUN_00429c90 (§3.3.2 W5) | reads `m_pCharDataBase->chrregnum` without the null test its neighbours make | a 0x180B for a session that is back at character select is a null read in the WM (process crash). Latent: needs a zone that still holds the player after the WM freed the character | test the pointer, log and return |
+| X02-B2 | zone 0x101D `wms_NC_CHAR_ZONE_CHARDATA_ACK` @ FUN_005a3590 (§3.3.3 L3) | when the tutorial-info getter (vt 0xdfc) returns null it logs "TutorialInfo Is Null" and reads through the pointer on the next line | null read in the zone. Latent: the getter returns a member every login sets | return after the log |
+| X02-B3 | WM 0x180D (link request from a zone) for a handle with no session (§3.3.2 W4) | returns 1 without any answer | the zone has saved the character, set mode 0 and `JustLink` and waits for 0x180E: the player stays connected and stranded *(inferred: no timer re-sends 0x180D)* | answer with a failure so the zone can disconnect or restore the player |
+| X02-B4 | zone 0x10B4 `gds_NC_CHAR_REGNUM_VARIFICATION_ACK` @ FUN_00551a80 / FUN_00551bb0 (§3.4.1 T5) | a `charregnum` that does not match the holder of `zonehandle` is treated like `iscorrect == 0`: `so_Disconnect(0x689)` | an answer that arrives after the handle was reused disconnects the new holder. Latent: logout and new login on the same handle within one DB round trip | drop the answer when the character number differs |
+| X02-B5 | zone 0x1115 `wms_NC_CHAR_TUTORIAL_INFO_ZONE_CMD` @ FUN_0044d3d0 (§3.4.1 T9) | `nCharNo` is never read; vt 0xdf8 writes `sp_TutorialInfo` of whoever holds the handle | tutorial state of the wrong character after a handle reuse. Latent | compare `nCharNo` first |
+| X02-B6 | zone 0x74DA `wms_NC_GUILD_TOURNAMENT_ZONE_OBSERVER_ENTER_ACK` @ FUN_00478be0 (§3.4.1 T10) | the packet has no character number; `err == 0x1B60` moves the holder of `nPlayerHnd` into the tournament map | a reused handle moves the wrong player. Latent; a defect of the packet design | carry and test the character number |
+| X02-B7 | zone 0x1816 `sp_NC_MAP_WING_FLY_REQ` @ FUN_00589f00, `so_ply_SparrowWingFly` @ FUN_0058a1a0 (§3.4.2 Q4) | the ring `queue_sparrowfly` entry can be overwritten by other players' requests before the cast ends; every failure of the second half only logs to `ChargedItemLog` | wing stone used, no teleport, no message to the client. Latent: needs 0x80 other requests within one cast time | key the pending teleport by player, answer a failure code |
+| X02-B8 | zone 0x3009 pick-up → client 0x300A, code 0x34a (§3.4.5 Q23) | the lot-inspector refusal ("max owned") is sent as 0x34a, which client FUN_004aba00 does not know | the player reads the generic "Failed to obtain the item." instead of a reason (scenario 21) | send a code the client has a text for |
+| X02-B9 | zone `ItemInventory::ii_DropLot` @ FUN_00529c20 (§3.4.7 V2, §3.5.4 E37) | a partial drop creates its ground object before it sends 0x3419; the failure answer (0x3008, disconnect 0x684) does not remove it | a failed partial drop leaves an item on the ground and the full stack in the DB (duplication). Latent: the request refuses partial stacks, the path runs only when the stack grew while the drop menu was open (scenario 42) | create the object in the success answer, as `ii_DropAll` does |
+| X02-B10 | WM 0x7001 `NC_CHAR_OPTION_GET_ALL_REQ` @ FUN_00413fd0, 0x7002 @ FUN_00413fe0 (§3.5.3 E23) | both handlers are `return 0` | a client that sends either is disconnected. Latent: the 2016 client export holds neither opcode constant (scenario 41) | `return 1` (ignore) |
+| X02-B11 | WM handlers that return the result of a send to a third party: Login link 0x0C36 @ FUN_00424a70, CharDB 0x1113 @ FUN_0040e2c0, client 0x5401 @ FUN_0041ca90, 0x9401 @ FUN_00421990; same shape by text census, bodies not opened: client 0x9405, 0x7C01, 0x0813 / 0x0815 / 0x0816, 0x2014, CharDB 0x9888 (§3.5.3 E30) | `Send` returns 0 when the target's socket is already closed; the handler passes that 0 to its parser | the link or client the packet came in on is closed for another party's dead socket, up to the CharDB link (`CLOSE_CHAR_DB`). The window is *(inferred)* | return 1 after sending |
+| X02-B12 | Character 0x0801 `NC_MISC_S2SCONNECTION_RDY` @ FUN_0043c7a0 (§4.7 G6) | the `echo_data` byte of the 0x0802 it sends is never written | one uninitialised stack byte to the peer (GameLog link); no known reader | zero it |
+
+## 6. Not reconstructed / uncertain
+
+- **§2 ratings are computed, not read.** The generator (`docs/plan/status/X02-rate.py`) rates a section from its
+  recorded evidence (capture rows, markers, error-class keywords, PDB member matches). A "medium" row was not re-read;
+  a keyword can make a sound section low and miss a wrong one that is written without hedging (only 30 of the 207
+  superseded statements were hedged, §1). 56 hand rows correct the cases that were looked at.
+- **§3 re-read 193 claims of several thousand.** The choice followed the error classes and the citation
+  count; a document nobody cites and that uses no weak marker was not attacked. Rows marked "not re-checked" with a
+  reason and no later reading: Q9, Q22 (their statements are replaced by README §5 rows), V7, V13, V22, V23, V25
+  (scenario or table experiment named in §3.4.13), E42 (the *(db-backup)* rows of D01 / D02: DB experiments). E14, E15
+  and half of E25 are item W06.
+- **"Superseded" verdicts were not re-verified.** 32 rows of §3 and the 20 "taken up" rows of §4.5 rest on the later
+  item's text (found by § reference, address or name), not on a second reading of the code behind it.
+- **Latent bugs are argued, not shown.** B1–B7, B9–B11 need a message order no capture holds; the reuse window of a
+  handle (B4–B6) and the closed-socket window of B11 are *(inferred)*. Whether anything can add to a stack while the
+  drop menu is open (B9) is not established.
+- **No prediction of `capture-scenarios.md` was run.** The opcode orders come from the documents under test, so a
+  shared misreading shows only in the capture. 14 predictions were checked against their sections; the others are
+  as the sequence index (README §3) gives them. Scenario 33 step 4 assumes the 2016 client has a prison UI; scenario
+  43 needs an OPTool-side script (no OPTool binary in the repository).
+- **No SQL of `capture-scenarios.md` §8 was executed** (no SQL Server holds the backups). Names are verified against
+  procedure source and the binaries' `{CALL}` strings; column types, NOT NULL columns no procedure names, and
+  whether the 2016 schema equals the backups' are unknown. S5 and S16 assume the ODBC driver reports a trigger
+  rollback as an error result *(inferred)*. `tGambleCoin` and `usp_SafeTrade_setAll` exist only in the 2017 backup.
+- **Table experiments:** `ItemShop.shn` as the zone's goods table and "WM capacity = last number of its client
+  `SERVER_INFO` row" (X6) are *(inferred)*. `X02-shnset.py` was tested on copies only; the client hashes 49 tables,
+  so a changed one of those needs the matching client file (§9.1 there).
+- **Coverage numbers** (§4.4) count addresses that appear in a document, not understanding; the attribution of
+  uncited zone functions to items is by name, and for Character / GameLog (no PDB) library and game code are not
+  separated.
+- **Ratings after captures:** nothing in §2 was raised by the scenarios yet. After P02 processes new captures,
+  re-run X02 (`X02-rate.py write`, then the §3 rows whose "Raise by" names the scenario).
+
+## 7. Coverage boundary
+
+X02 has no scope table (`coverage.py X02`: "no scope table; coverage does not apply"). The rows are what the review
+found and did not close itself.
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| 1 158 class-named zone functions no document cites (§4.4), without the gamble classes | new item **Z31** (added by X02) | about 22 000 lines, several sessions; they hang off virtual calls and tables, which no existing item's scope table (all built from packet handlers) can contain; Z30 covers only handler-reachable gaps and is done |
+| `CGambleDiceTaiSaiObject`, `CGambleObject`, `DiceTaiSai`, `SlotMachine::*` (about 3 900 lines) | new item **Z32** (added by X02) | Z06 is done and its §7 lists exactly these as open (win tables, draw, line patterns, jackpot): not documented there, too large to do here |
+| 98 uncited class-named WM functions, five `Recv_NC_GUILD_*` members without a caller; E14, E15, E25 (second half) | new item **W06** (added by X02) | W03 / W04 / W05 are done and do not cite them; about 2 000 lines |
+| Process layer and shared-class copies of Account / AccountLog / Character / GameLog; SOAP item-shop client (§4.6 rows 10, 12); D01 / D02 open points (rows 4, 9) | new item **D08** (added by X02) | S02 §6 leaves the comparison open, D01 / D02 / D05 are done; several thousand lines |
+| Open points of Z01–Z04 (§4.6 rows 5–8) | **Z31**, step 4 | each is a question about zone functions Z31 reads anyway (player modes, handler arguments, payload builders); the owners are done |
+| The corrections of `docs/knowledge/X02.md` §0 (68 rows) applied to the owners' text | X01 (recurring; plan line "contradictions") | X02 may not edit other items' files; X01 keeps the list of superseded statements (README §5) and takes §0 as input on its next run |
+| Bugs X02-B1 … B12 in the bug register | X01 (README bug register) | same: the register is X01's output; §5 above has X01's row format |
+| Capture validation of scenarios 14–44 | P02 (recurring: "run once per batch of captures") | needs the user's recordings; then X02 is re-run for the ratings (plan, last guidance line) |
+| The *(db-backup)* statements of D01 / D02 (E42) | `capture-scenarios.md` §8 (S1–S16), then P02 | what a procedure body does on the 2016 server is a DB experiment, not a static question; D06 (done) lists the 27 procedures that differ between backups in its §8.5 |
+| Lua VM, CRT, STL code below depth 3 (§4.2) | nobody | library code: a rebuild links its own |
+| Dead regional opcodes 0x0C1D / 0x0C1E / 0x0C20, 0x0820, 0x0823–0x0825, 0x0832, 0x0837–0x083A | L00 §3, Z01 (handlers documented); no scenario | no first sender in the 2016 client or servers (§3.5.2 E4): nothing can trigger them in a capture |

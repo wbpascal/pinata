@@ -718,8 +718,8 @@ login plus one crafted packet is enough). One connection per case: several end i
   only these.
 - **Guild tournament** (W03 §8, Z16 §6): reachable only through its schedule or the OPTool controls
   (scenario 43 step 6, or `&startGT` of Z11 §6.3 on one zone).
-- **Not re-checked claims that stay code-only:** W03 §2.5 helpers, W04 §8.3, §12.3, Z04 §13.2, D02 §2
-  (`confidence.md` §3.5); the *(db-backup)* rows of D01 / D02 are DB experiments (part 9).
+- **Not re-checked claims that stay code-only:** W03 §2.5 helpers, W03 §3.5 client codes, W04 §12.3 (item W06;
+  W04 §8.3, Z04 §13.2 and D02 §2 were read in the sweep, `confidence.md` §4.7); the *(db-backup)* rows of D01 / D02 are DB experiments (part 9).
 
 ## 6. Database setups and table experiments these scenarios need
 

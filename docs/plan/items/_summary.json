@@ -72,6 +72,14 @@
   "\u2013"
  ],
  [
+  "W06",
+  2,
+  "World manager: class-named functions no document cites and three unread guild / option points (added by X02)",
+  "W03, W04, W05",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "S02",
   2,
   "Shared server library: IOCP sockets, acceptor, packet buffers, CCsl script and GDP file readers (added by W05)",
@@ -320,6 +328,22 @@
   "162"
  ],
  [
+  "Z31",
+  2,
+  "Zone: class-named functions no document cites (player / object members without a direct caller, inventory lock list, item attribute classes, table loaders) and open points of Z01-Z04 (added by X02)",
+  "Z01, Z04, Z30, S01",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "Z32",
+  2,
+  "Zone: gamble internals (TaiSai dice table object, slot machine classes; added by X02)",
+  "Z06",
+  "\u2013",
+  "\u2013"
+ ],
+ [
   "D01",
   2,
   "Account and AccountLog servers",
@@ -372,6 +396,14 @@
   2,
   "Character server: D04 residue (academy reward storage, tournament reward items) (added by D04)",
   "D04, D03",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "D08",
+  2,
+  "DB servers: process layer and shared-class copies of Account / AccountLog / Character / GameLog, SOAP item-shop client, open points of D01 / D02 (added by X02)",
+  "D01, D02, D05, S02, L01",
   "\u2013",
   "\u2013"
  ],

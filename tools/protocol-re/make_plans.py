@@ -217,6 +217,25 @@ ITEMS = [
              "FUN_00432ce0, …) belong here; gaps inside W02–W04 subsystems go to those items' coverage boundary instead."],
       done="Main loop, data loader, 0x0849 broadcast and the session teardown/reset chain written as pseudocode; every core "
            "gap from `coverage.py W01` either documented here or assigned to another item with a reason."),
+ dict(id="W06", phase=2, title="World manager: class-named functions no document cites and three unread guild / option "
+                               "points (added by X02)",
+      out="docs/pseudocode/wm/W06-leftovers.md", deps=["W03", "W04", "W05"], scope=[],
+      goal="98 functions the 2016 `WorldManager.pdb` names `Class::Method` are cited by no document (2 019 lines; "
+           "`CGuildMember` 15, `CGuild` 13, `CGuildAcademyMember` 12; `docs/review/confidence.md` §4.4), among them five "
+           "`CGuild*::Recv_NC_GUILD_*` members without a direct caller. X02 also left three WM statements unread "
+           "(`confidence.md` §3.5.3 E14, E15, E25).",
+      steps=["List them: `python3 -I docs/plan/status/X02-cov.py game wm 100`. `rg` each name in `docs/pseudocode/wm` first; "
+             "cite the § where one is already described under its name.",
+             "The `Recv_NC_GUILD_*` members (`CGuild::Recv_NC_GUILD_WAR_TARGET_CMD` FUN_0045bdb0 and four more): find how they "
+             "are reached (member-pointer table, virtual, or dead) and whether W03 documents the same opcode through another "
+             "function.",
+             "E14: W03 §2.5, the two helpers of 0x740C @ FUN_00419db0 that produce the result its three error exits return "
+             "(0xCDE, 0xCD8, 0xCDB): is the trailing 0x0CDB dead? E15: W03 §3.5, client `GuildTask::"
+             "Recv_NC_GUILD_WAR_ABLE_LIST_ACK` FUN_006b3e00: what it does with 0x0D1A / 0x0D1B. E25: W04 §12.3, the "
+             "dice-game test that drops the answer of 0x9405 (the `n` cap of W04 §8.3 is confirmed: `confidence.md` §4.7).",
+             "Bugs as `W06-B<n>`; corrections to W03 / W04 in `docs/knowledge/W06.md` §0."],
+      done="Every function of the list is cited with pseudocode or a link, the five `Recv_` members have a stated caller or "
+           "are shown dead, and E14 / E15 / E25 have a verdict."),
  dict(id="S02", phase=2, title="Shared server library: IOCP sockets, acceptor, packet buffers, CCsl script and GDP file "
                                "readers (added by W05)",
       out="docs/pseudocode/shared/S02-library.md", deps=["W05"], scope=[],
@@ -928,6 +947,60 @@ ITEMS = [
              "`Z30-B<n>`."],
       done="Every function and handler above is cited as `FUN_…` with pseudocode (or a link to the doc section that already "
            "describes it), and `coverage.py --overview` shows no unexplained zone gap."),
+ dict(id="Z31", phase=2, title="Zone: class-named functions no document cites (player / object members without a direct "
+                               "caller, inventory lock list, item attribute classes, table loaders) and open points of "
+                               "Z01-Z04 (added by X02)",
+      out="docs/pseudocode/zone/Z31-class-remainder.md", deps=["Z01", "Z04", "Z30", "S01"], scope=[],
+      goal="`coverage.py` starts at packet handlers and follows direct calls, so it never sees functions reached only "
+           "through virtual calls, member-pointer tables, timers or start-up code. X02 counted them "
+           "(`docs/review/confidence.md` §4.4): 1 158 functions the 2016 `Zone.pdb` names `Class::Method` are cited by no "
+           "document (25 865 decompiled lines; 789 have no direct caller). Document them, except the gamble classes (Z32).",
+      steps=["List the work: `python3 -I docs/plan/status/X02-cov.py game zone 1200` (class, function, lines; largest "
+             "first). Drop `CGambleDiceTaiSaiObject`, `CGambleObject`, `DiceTaiSai`, `SlotMachine::*` (Z32). In the first "
+             "session group the rest by class into parts of about 2 500 lines and write the list into the status file. For "
+             "each function first `rg` its name in `docs/pseudocode` and `docs/knowledge`: where a document already describes "
+             "it under its name (an identical-code fold or an uncited address), cite the § and the address and go on.",
+             "Start with the 15 named functions of `confidence.md` §4.4: `so_ply_GuildReNameItemUseSuccess` FUN_00473ea0, "
+             "`so_ply_GuildReTypeItemUseSuccess` FUN_00474250, `sp_CanUseItemCheck_ByTable` FUN_0056eae0, `sp_CanItemMakeItem` "
+             "FUN_0049b6c0, `sp_LogoutDuringParty` FUN_004cd340, `so_ply_BanByServerDisconnect` FUN_00566930, "
+             "`so_SpamSendDataToCharDB` FUN_00562990, `sp_SpamSendDataToWM` FUN_00562bc0, `so_ply_DecreaseDmgPassiveSkill` "
+             "FUN_005651e0, `so_ply_WeaponSpeedSet` FUN_0043d3c0, `so_ply_WeaponRangeSet` FUN_0043f520, "
+             "`sp_ChatColor_Save2World` FUN_00563c70; then `ShinePlayer::~ShinePlayer` FUN_00559300, "
+             "`ShineMobileObject::so_smo_AbnormalStateAttribute` FUN_004a8010, the 17 `InventoryLocking::"
+             "InventoryCellLockList` members (`icl_IsLocked` FUN_0048b0f0 / FUN_0048af30, `icl_StoreItem` FUN_00488db0, "
+             "`icl_ItemInfoZoneRng` FUN_00489aa0, `icl_UseItem` FUN_004895d0, `icl_ItemSell` FUN_00489ec0, ...) and the four "
+             "`Table::Load<...>` instances of the level-gap and belong-dice tables.",
+             "For a virtual member, find its vtable slot (`rtti.py`, `docs/knowledge/Z01.md` §3) and its callers by slot "
+             "offset (`rg '\\+ 0x<slot>\\)\\)\\(' re-data/exports/zone-pdb/decomp.c`), so each block says who calls it and when. "
+             "A PDB name on a tiny function may be an identical-code fold: read the body (`docs/knowledge/X02.md`).",
+             "Open points of finished first-wave items (`confidence.md` §4.6 rows 5-8): Z02: where the handlers' third "
+             "argument `hnd` comes from, the setter of `p+0x5cb9` bit 2, how a roar is delivered; Z01: a table of all "
+             "player modes (`*(p+0xe9c)`) with who sets and who tests each; Z04: the BELONGED_CANCEL codes 0x2885-0x288f "
+             "branch by branch, and what schedules the auto-arrange; Z03: the builder of the 0x244C payload.",
+             "Bugs as `Z31-B<n>`; corrections to older documents in `docs/knowledge/Z31.md` §0 (format of "
+             "`docs/knowledge/Z07.md` §0). Finish with `X02-cov.py game zone`: every remaining function argued in the "
+             "Coverage boundary."],
+      done="Every class-named zone function of `X02-cov.py game zone` outside the gamble classes is cited with pseudocode "
+           "or a link to the section that already describes it, and the four open points of rows 5-8 are answered."),
+ dict(id="Z32", phase=2, title="Zone: gamble internals (TaiSai dice table object, slot machine classes; added by X02)",
+      out="docs/pseudocode/zone/Z32-gamble-internals.md", deps=["Z06"], scope=[],
+      goal="Z06 (done) documents the gamble handlers and lists as open in its §7 the TaiSai win tables and the slot "
+           "machine's draw, line patterns and jackpot. The classes behind them are cited by no document "
+           "(`docs/review/confidence.md` §4.4): `CGambleDiceTaiSaiObject` 36 functions / 2 408 lines, `CGambleObject` 22 / "
+           "302, `DiceTaiSai` 1 / 166, the `SlotMachine::*` classes about 1 000 lines.",
+      steps=["Read `docs/pseudocode/zone/Z06-economy.md` §7 and its gamble sections (`sect.py`), `docs/knowledge/Z06.md`, "
+             "and `confidence.md` §3.4.8 (re-check of Z06) and row L6 of §3.3.3 (the two logout gates are TaiSai tests).",
+             "List the functions: `python3 -I docs/plan/status/X02-cov.py game zone 1200 | rg -e Gamble -e TaiSai -e "
+             "SlotMachine`. TaiSai: `GDTSO_DiceTaiSai_Result_DiceRoll` FUN_0061a350, `GDTSO_DiceTaiSai_Out` FUN_0061c330 "
+             "and the other `GDTSO_*` members: table states and timers, bet kinds and limits, the roll (which RNG), the win "
+             "table per bet kind with its multipliers, payout and money messages, what leaving or logging out mid-game "
+             "does, manual mode. Slot machine: `SlotMachineAnalyse::sma_ScreenMatch` FUN_00621dd0, `SlotMachineScreen*`, "
+             "`SlotMachineCluster`, `SlotMachineJackPotRanking`: reel draw, line patterns, payout table, jackpot pool and "
+             "ranking, the data tables each reads (`shn.py`).",
+             "Client side for every packet these send (C01, `client-handlers.json`); DB procedures via D03. Bugs as "
+             "`Z32-B<n>`."],
+      done="Every function of the listed classes is cited with pseudocode; a rebuild can compute the outcome and payout of "
+           "a TaiSai round and of a slot-machine spin from the document and the data tables alone."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
@@ -1078,6 +1151,34 @@ ITEMS = [
       done="The 0x986C / 0x9882 contents are fully derived from the code for every storage situation (no stack, partial "
            "stack, full storage, item failure); every ITEM_OPT byte and every class branch of FUN_00467c60 is named or marked "
            "unused."),
+ dict(id="D08", phase=2, title="DB servers: process layer and shared-class copies of Account / AccountLog / Character / "
+                               "GameLog, SOAP item-shop client, open points of D01 / D02 (added by X02)",
+      out="docs/pseudocode/db/D08-db-process.md", deps=["D01", "D02", "D05", "S02", "L01"], scope=[],
+      goal="D01-D05 document the packet handlers of the four database servers. Their process layer was never compared with "
+           "the shared library (S02 §6 leaves it open): 389 (Account) and 382 (AccountLog) class-named functions are cited "
+           "by no document (`WinService`, `MiniDumper`, `CSocket_*`, `CSession*`, `DataServer`, `cLogSystem`, and the data "
+           "loaders `ItemAttrCls_*`, `ItemDataBox`, `MapDataBox`, `CShnDataFileCheckSum`); Character and GameLog have no PDB "
+           "and 2 171 / 990 uncited functions (`docs/review/confidence.md` §4.4). D02 also leaves its SOAP item-shop client "
+           "undescribed.",
+      steps=["Account and AccountLog (PDB exports `account-pdb`, `accountlog-pdb`): `python3 -I docs/plan/status/X02-cov.py "
+             "game account 400` and `game accountlog 400`. For each class compare with the document that describes the same "
+             "class in another server (S02, L01, W05, Z01, Z27) and write only the differences; where the code is the "
+             "same, one table row (class, functions, 'same as <doc> §'). Document start-up (`DataServer`: config keys via "
+             "Z19, listeners, ODBC connections and worker threads), shutdown and the timers in full.",
+             "Character and GameLog (no PDB): match their functions to the Account ones by strings and shape (same "
+             "compiler, same library), name what matches in `tools/protocol-re/names/<bin>/D08.json`, and state per "
+             "server what is different (ODBC pool sizes, queues, which tables the Character server loads and why).",
+             "SOAP item-shop client of the Character server: FUN_0043f690 and below (`confidence.md` §4.6 row 10; D02's "
+             "open point): the HTTP / SOAP requests built (URL and action strings from `strings.tsv`), when each is sent, "
+             "the answers parsed, timeouts, and what the zone-facing handlers do when the shop host does not answer.",
+             "Open points of D01 / D02 (`confidence.md` §4.6 rows 4 and 9): D01 the TEENAGER `nType` 1 arithmetic; D02 the "
+             "`nStatusDone` filters of 0x1004, the 0x1017 item-record sender FUN_004056a0, the field names of 0x0812-0x0815 "
+             "(2016 WM / Zone PDB structs first). Already closed by X02, do not repeat: the 0x0804 handlers and the "
+             "Character 0x0801 handler (`confidence.md` §4.7).",
+             "Bugs as `D08-B<n>`; corrections to D01-D05 in `docs/knowledge/D08.md` §0."],
+      done="Every class-named function of Account / AccountLog is cited or covered by a 'same as' row, the Character and "
+           "GameLog process layers are matched and their differences stated, the SOAP client has pseudocode for every "
+           "request, and rows 4 and 9 are answered."),
  dict(id="P01", phase=1, title="Packet capture decoder", out="tools/protocol-re/pcap_decode.py + docs/knowledge/P01.md",
       scope=[], deps=[],
       goal="A pure-Python (stdlib only: no scapy/dpkt/tshark on this machine) tool that turns a capture of real "

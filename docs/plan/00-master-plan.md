@@ -121,6 +121,9 @@ continue the open phase-2 items with the PDB exports as their main reading sourc
 | [Z28](items/Z28.md) | Zone: collection-card data tables and card roll (CollectCard*.shn `SHND::CommonData` loaders, `g_CardCollectMake`, album / bookmark loaders) (added by Z27) | Z07, Z09, Z27 |
 | [Z29](items/Z29.md) | Zone: party experience tables (`PartyBonusByMember.shn` / `PartyBonusLimit.shn` loaders of `HitMeList::hml_Load` and their readers) (added by Z28) | Z03, Z28 |
 | [Z30](items/Z30.md) | Zone: handler-reachable leftovers (`coverage.py` gaps: change-character-ID handlers, item dismantling, SP / HP stones, title set, spam rules, party / guild helpers) | Z01, Z04, Z08, Z14 |
+| [Z31](items/Z31.md) | Zone: class-named functions no document cites (player / object members without a direct caller, inventory lock list, item attribute classes, table loaders) and open points of Z01–Z04 (added by X02) | Z01, Z04, Z30, S01 |
+| [Z32](items/Z32.md) | Zone: gamble internals (TaiSai dice table object, slot machine classes) (added by X02) | Z06 |
+| [W06](items/W06.md) | World manager: class-named functions no document cites and three unread guild / option points (added by X02) | W03, W04, W05 |
 | [D01](items/D01.md) | Account + AccountLog servers (resolves open Login error conditions) | – |
 | [D02](items/D02.md) | Character server: characters, avatars, save/load | – |
 | [D03](items/D03.md) | Character server: items, economy, pets, house | D02 |
@@ -128,6 +131,7 @@ continue the open phase-2 items with the PDB exports as their main reading sourc
 | [D05](items/D05.md) | GameLog server | – |
 | [D06](items/D06.md) | Database behaviour the backups do not give us: missing procedures, schema, inferred DB statements of D01–D05 (added by D02; run last, before X01) | D01–D05 |
 | [D07](items/D07.md) | Character server: D04 residue — academy reward storage merge (0x986B) and tournament reward item attributes (0x74AA) (added by D04) | D04, D03 |
+| [D08](items/D08.md) | DB servers: process layer and shared-class copies of Account / AccountLog / Character / GameLog, SOAP item-shop client, open points of D01 / D02 (added by X02) | D01, D02, D05, S02, L01 |
 | [P02](items/P02.md) | Capture validation: confirm/correct layouts and message order with real traffic. **Recurring:** run after each batch of captures and after each phase | P01, captures |
 | [P04](items/P04.md) | Protocol README: zone seed on accept, server-initiated heartbeat, §2 flows as captured (added by P02) | P02 |
 
@@ -161,6 +165,7 @@ follow-up session.
 4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, Z19, Z20, Z21, Z22, Z23, Z24, Z25, Z26, Z27, Z28, Z29, Z30, W05, S02, L01, then D06
 5. P04 (README corrections from the first capture batch), P02 again with fuller captures, then X01
 6. X02 → user records its scenarios → P02 → X02 again (repeat until the low ratings are gone or not worth a capture)
+7. The follow-ups X02 created, any order: Z31, Z32, W06, D08; then X01 again for the register and the corrections
 
 Large items (Z04, Z05, Z08, D03, D04) will probably need two or three sessions each. Starting a new session
 with the same plan file resumes from the status file.
