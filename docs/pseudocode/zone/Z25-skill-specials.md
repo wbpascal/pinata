@@ -87,10 +87,67 @@ Set-item multipliers read here (`setitemskilleffect.se_Argument[i]`, Z21 §3; ba
 | 0xb90 | `so_mob_SkillParameterSet` FUN_005d2e40 (returns 0) | FUN_005d2e90 (Z09: sets the mob weapon for this skill) | |
 | 0xf04 / 0xf08 | `smo_ply_IsCostumCharged` / `smo_ply_IsCostumShieldCharged` | 0 | result flags (Z06) |
 | 0xf5c | `smo_ReflectionDamage` FUN_0055dbc0 (§4) | same | reflection |
+| 0x2fc | `so_GetGameSocketStream` FUN_00559870 | `so_GetDataSocketStream` FUN_00554fa0 → `so_dummypacketcontainer` | 0x242A of §2.8 (mobs: nothing sent) |
+| 0x3f0 | `so_AbnormalState_Inform` FUN_00405900 (0x2429 / 0x242A, Z03 §6.3) | no-op (folded FUN_004c2450) | §2.7, §2.10 |
+| 0x52c | `so_mobile_AbstateList` FUN_005555b0 (`smo_Abstate.abstatelist`) | same | |
+| 0x5a0 | `so_SkillEnchant` FUN_00431ca0 (Z22 §10.7) | same | §2.9 |
+| 0x5a4 / 0x5a8 | `so_SkillCure` FUN_0042c440 / `so_Dispel` FUN_0042bf70 (Z23 §8.2, §8.3) | same | §2.9 inline dispel |
+| 0x5d4 | `so_ItemActonAbstateApp` FUN_0055dea0 (Z22 §10.7) | same | §2.10 |
+| 0x634 | `so_AbnormalState_Resist` FUN_00416730 | FUN_00416660 | §2.10 (Z03 §6.2) |
+| 0x638 | `so_AbnormalState_Set` FUN_004162d0 | FUN_004161c0 | §2.7, §2.10 (Z03 §6.2) |
+| 0x654 | empty `ret 4` FUN_00549070 (PDB fold name `so_ply_CollectCardOpen`; every `ShineObjectClass` vftable) | same | §2.9: nothing |
+| 0x72c | `so_mobile_IsEnemy` FUN_00430570 | FUN_004304c0 | dispel mask (Z23 §8.1) |
+| 0xa5c | `so_smo_AbStateKeepTimeAdd` FUN_0040bd20 (§2.8; every mobile class, objects without HP: `ret 8` FUN_00509900) | same | §2.8 |
 
 Rule-set slots (`sdi_DamageRule`, Z03 §4.2): 0x18 `roe_HitRate` (physical FUN_00502d30, magical FUN_00503360),
 0x1c `roe_CalcDamage` FUN_00505c00 (Z03 §4.5), 0x20 `roe_IsDamageSkill` FUN_004ff840 (= `sdi_ServInf.UsualAttack`;
 false without a skill), 0x2c `roe_HitRateByGlobalAction` (physical FUN_005055a0, magical FUN_005058d0).
+
+### 1.4 Sub-state rows by strength, and how a keep time is chosen
+
+Every `so_AbnormalState_Set` in this item passes a strength and a keep time; which `SubAbState` row and which
+duration the state gets is decided here.
+
+```pseudo
+AbnormalStateDictionary::AbState::as_Load()                               @ FUN_00416e80   (zone start)
+    read ../9Data/Shine/AbState.shn and AbStateSaveTypeInfo.shn
+    as_AbstateArray = new AbStateStr[max ID + 1] (0x5ac each);  as_StateIndexList[0x318] = null
+    for each AbState row:
+        BTree as_BTreeID: InxName → ID;  as_BTreeIndex: InxName → AbStataIndex
+        arr[ID].index = row;  arr[ID].pSaveTypeInfo = save-type row with the same AbStateSaveType
+        arr[ID].debuffresist = resist slot by DispelIndex: DA_DISEASE 0xb4, DA_POISON 0xb0, DA_CURSE 0xb8;
+                               SubDispelIndex SDA_MOVESPEED 0xbc / SDA_GTIRESIST 0xc0 override it
+                               (the member offset so_AbnormalState_Resist reads, Z03 §6.2)
+        as_StateIndexList[AbStataIndex] = &arr[ID]
+        for k in 0..39: arr[ID].subabstate[k] = { assa_info = sas_Find(row.SubAbState, k),
+                                                  assa_Effect[4] = its ActionIndexA…D / ActionArgA…D }
+    for idx in 0..0x317 with an entry: null index → assert "as_Load : Null Index" + ShineExit;
+                                        null save type → "Null SaveTypeInfo" + ShineExit
+
+AbnormalStateDictionary::SubAbState::sas_Find(name, strength) → SubAbStateInfo*       @ FUN_00416c10
+    if name[0] == '-': return sas_DefAbstate
+    for each SubAbState.shn row in file order:
+        if row.Strength != 999 and row.Strength > 40: assert "sas_Find : Wrong MaxStrength"; return sas_DefAbstate
+        if row.InxName == name and (row.Strength == 999 or row.Strength == strength): return row
+    name never seen: assert "sas_Find : Not found" (name);  return sas_DefAbstate
+(sas_Load @ FUN_00416bd0 reads SubAbState.shn and truncates ../9Data/SubAbStateClass.txt, S01)
+```
+
+So a `SubAbState` row with **Strength 999 matches every strength** 0…39 (e.g. `SubStaKeepTime_7Sec` of
+StaCannotChangeTarget, §2.7; `SubStaE_UserComeback_Main01…05`, the open question of Z22 §13): the state behaves the same
+whatever strength the setter passes. A missing strength falls back to `sas_DefAbstate`.
+
+Keep time, from `aeo_Set` FUN_0040a340 (Z03 §6.2): `so_AbnormalState_Set(setter, idx, strength, entry, setTime,
+extra, restCount, keepMs, how, origin)` passes `extra` and `keepMs` through `asl_AbstateSet` unchanged.
+
+```pseudo
+    if keepMs == 0: ms = SubAbState.KeepTime + 999 + extra      # row time, rounded up, plus the extra
+    else:           ms = keepMs                                 # explicit time: extra is ignored
+    ticks = ms <= 60000 ? ms·10/1000 : (ms/1000)·10;  terminate = setTime + ticks · SET_ABSTATEKEEPTIMERATE / 1000
+```
+
+`so_SkillEnchant` (Z22 §10.7) folds every bonus into `keepMs`; the multi-hit loop (§2.10) passes the empower bonus as
+`extra` next to a non-zero `keepMs`, which drops it (Z25-B9).
 
 ## 2. `smo_SkillBlast`: one target, in code order  @ FUN_00581160
 
@@ -302,8 +359,174 @@ These run on every hit target, whether or not it took damage.
 
 The skills' own HP cost (VitalConversion's "HP → SP") is the normal skill cost (Z03 §5.3); the special only adds SP.
 
-*(Continued in part 2: SS_HOLDME, the abstate keep-time specials, `so_SkillEnchant` / dispel run, SS_SUCKHP and the
-multi-hit abstates from 0x582122 to the end.)*
+### 2.7 SS_HOLDME: the caster holds still  (0x582122 – 0x58221c)
+
+Runs on every hit target, whatever the damage part did (also on each multi-hit step).
+
+```pseudo
+    if s.sdi_HOLDME.exist:                                     # FatalShadow01…05 (value 500 on all five)
+        r.target = d                                           # the slot goes out even when nothing else happened
+        for idx in (STA_CANNOTCHANGETARGET 392 = StaCannotChangeTarget, STA_SHADOWBINDING 393 = StaShadowBinding):
+            if dic_abstate.as_StateIndexList[idx] == null: continue          # AbState row present (2016: both)
+            a.so_AbnormalState_Set (vt 0x638)(a, idx, strength 1, entry, now, extra 0, restCount 0,
+                                              keepMs = sdi_HOLDME.value, EF_JUSTENCHANTBATTLEOBJECT 5, null)
+            so_AbnormalState_BitSet(a, idx)                    # FUN_00401a00: brief bit (obj vt 0x4a0 bit array)
+            so_AbnormalState_BroadcastSet(a, idx, sdi_HOLDME.value, 1)       # FUN_004056a0: 0x2427 + 0x1C18 to a's sight (Z03 §6.3)
+            a.so_AbnormalState_Inform (vt 0x3f0)(idx, sdi_HOLDME.value, 0)   # player FUN_00405900: 0x242A
+                                                                             #   NC_BAT_ABSTATEINFORM_NOEFFECT_CMD to a; mobs: no-op
+            # the result of so_AbnormalState_Set is not tested: bit, broadcast and inform also go out when the set
+            # fails (map refusal fm_IsRefuseAbstate, Z22 §7.5; a stronger state of the same group, Z03 §6.2)
+            # (original bug) Z25-B8
+```
+
+The states go on the **caster** (`a` in ECX and as setter, checked at 0x58216d / 0x582170), not on the target:
+FatalShadow's own abstates (`StaFatalKnockBack` 1, `StaFitMoveDown` 8, both rate 1000) go to the target through
+`so_SkillEnchant` (§2.9), and the caster is pinned for 500 ms. 2016 rows: 392 `StaCannotChangeTarget`
+(SubAbState `SubStaKeepTime_7Sec`, Strength 999 = any strength (§1.4), Type 38 DEFAULT, no action) and 393
+`StaShadowBinding` (`SubStaShadowBinding` strength 1, Type 23 ENTANGLE, action 19 NOMOVE: `cannotmove_entangle`,
+Z12 §2.5). The keep time is HOLDME's value, not the rows' KeepTime (7000 / 500), because a non-zero `keepMs` wins in
+`aeo_Set` (§1.4). 392 is read by `sp_NC_BAT_TARGETTING_REQ` FUN_0042ffe0 (Z03 §2.2: a player with it cannot change
+target); nothing else tests 392 or 393 by index.
+
+### 2.8 Keep-time specials: SS_FIRETIMEADD, SS_CURSETIMEADD, SS_POSIONTIMEADD  (0x58221c – 0x5824ad)
+
+Also on every hit target and every multi-hit step, in this order:
+
+```pseudo
+    for (special, types) in ((sdi_FIRETIMEADD,   [SUBAB_BURN 83]),
+                             (sdi_CURSETIMEADD,  [SUBAB_CURSE 35, SUBAB_CURSEMR 50, CURSETH 51, CURSEAC 52,
+                                                  CURSETB 53, CURSEDEX 54, CURSEWC 55, CURSECRITICAL 57]),
+                             (sdi_POSIONTIMEADD, [SUBAB_POISON 33])):
+        if not special.exist: continue
+        v = special.value                                      # ms; signed (CURSETIMEADD rows are negative)
+        if a.so_GetItemActionObserves() (vt 0x5d0) and s.sdi_ActiveSkillGroups not empty:
+            if EventRunBySkillGroupIndex(results, s, SEIT_KEEPTIME_RATE_INCREASE, a, d): v = results.GetRateAppliValue(v)   # Z17 §3.4.3
+        for type in types: d.so_smo_AbStateKeepTimeAdd (vt 0xa5c)(type, v)
+```
+
+```pseudo
+ShineMobileObject::so_smo_AbStateKeepTimeAdd(o, SubState type, int ms)          @ FUN_0040bd20 (every mobile class; vt 0xa5c)
+    list = o.so_mobile_AbstateList() (vt 0x52c)
+    for each element e of list (index-linked list +0xcb0, in list order):
+        sub = abstateidentarray[e.aeo_Index].entry.subabstate[e.aeo_Strength].assa_info      # the element's SubAbState row
+        if sub.Type != type: continue
+        rest = e.aeo_Tick.terminate − now                       # ticks of 100 ms
+        e.aeo_Tick.terminate += ms · 10 / 1000                  # signed: a negative ms shortens; no clamp at now
+        send o (vt 0x2fc: player game socket; others so_dummypacketcontainer = nothing):
+            0x242A NC_BAT_ABSTATEINFORM_NOEFFECT_CMD { u32 abstate = e.aeo_Index, u32 keeptime_millisec = rest·100 + ms }
+            # 10 bytes with the opcode; the "Packet Too Long" assert text is copied from so_AbnormalState_Inform
+```
+
+No 0x2427 / 0x1C18 goes to the others in sight: only the bearer's own icon timer is refreshed. A state that ends
+earlier than `now` through a negative `ms` is removed by the normal expiry on its next routine (Z03 §6.4).
+With `|ms| > rest·100` the sent `keeptime_millisec` is negative; the client's handler
+`GameFrameWork::On_NC_BAT_ABSTATEINFORM_NOEFFECT_CMD` FUN_004b55d0 converts it as unsigned (`< 0` → `+ 2^32`), so
+the icon shows about 49.7 days until the reset arrives (original bug) Z25-B13. The client handler also prints a
+system message by the state's client `DispelIndex`: 3 "An illness spell is casted on you." (0x4EFACDCB), 4 "A poison
+spell is casted on you." (0x6808C3CC), 5 text 0x0A653383 (not in the 2016 TextData tables); state 0x151 adds "You
+have temporarily lost hearing.". So DeepFire / FragranceOfPoison re-announce the state to the victim.
+
+2016 data (all `TargetNumber` 1, EffectType 0, `UsualAttack` 0, skill hit type 2):
+
+| Special | Skills (value, ms) | Effect |
+|---|---|---|
+| SS_FIRETIMEADD 41 | DeepFire01…05 (5000, 10000, 20000, 50000, 60000) | burns (Type 83) on the target last longer |
+| SS_CURSETIMEADD 40 | ResistCurse01…05 (−20000, −25000, −30000, −40000, −50000; stored as u32 4294947296 …) | the friend's curses end sooner |
+| SS_POSIONTIMEADD 44 | FragranceOfPoison01…04 (5000, 10000, 20000, 50000) | poisons of Type 33 last longer; the other poison-actor types (22 BLOODING, 27 DOTDAMAGE, 67, 84 FITBLOODING, 94; Z22 §3.2) are not touched |
+
+### 2.9 Single-hit tail: abstates, dispel, item actions, SS_SUCKHP  (`hit.mha_HitStep < 0`: `cmp -1` at 0x5824ad → 0x5828c8 – 0x582d5b)
+
+```pseudo
+    if hit.mha_HitStep < 0:
+        if not ctx.isImmune:
+            smash = SmashArgument { flags 0, sklidx = s, empower = *empower }
+            ok = a.so_SkillEnchant (vt 0x5a0, FUN_00431ca0)(d, &smash, &bos, &resisted, canDamage)   # Z22 §10.7
+                                                       # (the 5th argument, canDamage, is unused there)
+            if ok: r.isenchant = 1
+            r.target = d;  r.isresist |= resisted
+        smo_Dispel(a, s, empower, d, &bos)             # FUN_0057d8e0 (Z23 §8.1)
+        inline copy of smo_Dispel's body (same mask, vt 0x5a4 so_SkillCure, vt 0x5a8 so_Dispel, r.target = d,
+            r.isenchant = 1, r.isresist = 0)           # Z23 §8.4: everything runs twice (Z23-B13 / Z22-B16, Z22-B22)
+        bol_Store(&bos, now + SwingTime·…)             # no-op (§1.2)
+        if d.so_GetItemActionObserves() (vt 0x5d0):    # target-side item actions (Z17 §3.4.3)
+            EventRun(d's manager, { cond {AAT_AttackType, AT_SKILL}, me = object = d, subject = a })
+            EventRun(… AT_PHYSIC if sdi_ServInf.SkillHitType == SHT_FROM_PY_NORMAL_HITRATE else AT_MAGIC …)
+        healOnHit = (the HPUPRATE result of §2.5, else 0)
+        if s.sdi_SUCKHP.exist == 1:                    # KDFargels_Skill06_N (value 999; mob skill, UsualAttack 1)
+            mx = d.so_MaxHP() (vt 0x4f0)
+            n = (value == 999) ? mx − 1 : mx · value / 1000
+            if n >= d.so_GetHP(): n = d.so_GetHP() − 1          # leave the target 1 HP …
+            if n < 1: n = 1                                     # … except at 1 HP, where the 1-point drain kills
+            r.hpchange = n;  r.resthp = d.so_GetHP() − n       # replaces the damage part's values
+            bos.bos_MyHealHit += n;  healOnHit = bos.bos_MyHealHit   # = HPUPRATE heal + n
+            bos.bos_MyHealKill += n; healOnKill = bos.bos_MyHealKill
+                # bos_MyHealKill held DIEHPUP·dmg/1000 (§2.5), so the rolled healOnKill is replaced by it (latent:
+                # no 2016 skill has both)
+            # r.isdamage / r.isheal / r.isImmune are left as the damage part set them: n is dealt as damage
+            # through sds_TemplateStore (§3) and the caster heals n on the hit (a.so_Heal(healOnHit))
+            # (original bug) Z25-B10: the drain ignores immunity (an immune target keeps isdamage = 1 and loses n)
+            # and the AC / MR-mode conversion (r.isheal = 1: the target is *healed* by n)
+        d.vt[0x654](n or the damage of §2.5)           # empty for every class (shared `ret 4` FUN_00549070; the PDB
+                                                       #   folds the name so_ply_CollectCardOpen onto it): nothing
+        if r.target == null: return                     # nothing to report: no slot, no aggro (bufferpoint unchanged)
+```
+
+### 2.10 Multi-hit tail: the step's abstates  (`hit.mha_HitStep ≥ 0`: 0x5824b6 – 0x5828c8; common end 0x582d5b – 0x582d8b)
+
+`hit.mha_AbState[4]` = `{ int mha_AbStateRate; ABSTATEINDEX mha_AbStateIndex; int mha_AbStateStrength }` *(pdb2016)*,
+filled by the multi-hit caller (Z03 §5.6 E; part 3).
+
+```pseudo
+    else:
+        if not d.so_AbnormalState_IsSet(STA_ADLFLOUSSIERIMT 499) and not d.so_AbnormalState_IsSet(STA_IMMORTAL 291):
+                                                       # already refused at entry (§2.1): always true here (original bug) Z25-B12
+            for k in 0..3: (rate, idx, str) = hit.mha_AbState[k]
+                if rand(1000) >= rate: continue
+                entry = as_FromIndex(&dic_abstate, idx)
+                if entry == null or entry.index == null:
+                    assert "BattleObjectGroup::BattleObject::bo_Routine : Invalid abstateidx" (idx); continue
+                if d.so_AbnormalState_Resist (vt 0x634)(entry): r.isresist = 1; continue       # Z03 §6.2
+                bonus = empower.keeptime ? s.sdi_Activ.nT1[keeptime + 4] : 0      # = nT2[keeptime − 1], as Z22 §10.7
+                keep  = entry.subabstate[str].assa_info ? .KeepTime : 0
+                if a.so_GetItemActionObserves() and s.sdi_ActiveSkillGroups not empty:
+                    keep = item-action SEIT_KEEPTIME_RATE_INCREASE rate applied to keep        # Z17 §3.4.3
+                # unlike so_SkillEnchant: no BiffTimeIncrease passive bonus (Z22 §10.7)
+                if d.so_AbnormalState_Set (vt 0x638)(a, idx, str, entry, now, extra = bonus, restCount −1,
+                                                     keepMs = keep, EF_JUSTENCHANTBATTLEOBJECT 5, null):
+                    x = asl_Abstate_IsSet(d's list, idx)                     # FUN_00409b10
+                    if x: a.so_ItemActonAbstateApp (vt 0x5d4, FUN_0055dea0)(x, s, d)     # Z22 §10.7
+                    if entry.index.PartyRange == 0 or entry.index.PartyEnchantNumber == 0:  # not a party state
+                        so_AbnormalState_BitSet(d, idx)
+                        shown = keep + bonus
+                        d.so_AbnormalState_Inform (vt 0x3f0)(idx, shown, 1)  # 0x2429 NC_BAT_ABSTATEINFORM_CMD to d (player)
+                        so_AbnormalState_BroadcastSet(d, idx, shown, str)   # 0x2427 + 0x1C18 to d's sight
+                    r.isenchant = 1
+                # (original bug) Z25-B9: aeo_Set uses `extra` only when keepMs == 0 (§1.4); with a row KeepTime the
+                # empower bonus is shown (0x2429 / 0x1C18) but never applied. `shown` is also not scaled by
+                # SET_ABSTATEKEEPTIMERATE as aeo_Set scales the real time (latent: 1000 in 2016), and BroadcastSet
+                # sends the requested strength, not the stacked one (g_NewAbstateStrength, Z22 §10.7)
+        smo_Dispel(a, s, empower, d, &bos)             # once (Z23 §8.4)
+        if not rule.roe_IsDamageSkill(ctx) (vt 0x20; rule as chosen in §2.5):
+            d.vt[0x700](a, bos.bos_AbsoluteAggro)      # mobs: so_mob_AppendAggro. bos_AbsoluteAggro = AbsoluteAggro,
+                                                       #   +1 when a is a player and the skill has AggroPerDamage or AbsoluteAggro
+            # sds_TemplateStore adds AbsoluteAggro once more for the same slot (§3): (original bug) Z25-B11
+        if hit.mha_HitStep == 0 and d.so_GetItemActionObserves():
+            the two target-side EventRun calls of §2.9 (first step only)
+        healOnHit = (the HPUPRATE result of §2.5, else 0);  healOnKill = (the DIEHPUP result, else 0)
+    sds_TemplateStore(a, r, absAggro = sdi_ServInf.AbsoluteAggro, rateAggro (§2.3), healOnHit, healOnKill)   # §3
+    bufferpoint += 1
+```
+
+The multi-hit path calls `sds_TemplateStore` even when `r.target` is null (it returns at once, §3) and still
+advances `bufferpoint`, so an empty step uses one of the 64 result slots of the blast (§2.1 refuses targets at
+`bufferpoint > 63`). Single-hit skills never reach this branch with an empty slot: `r.target` is set by §2.9's
+enchant call whenever the target is not immune.
+
+Summary of what one blast target receives, by path: hit roll (§2.2) → DISPELABSTATE (§2.3) → heal or damage
+(§2.4, §2.5) → RECALL / HPCONVERTSP / MANABURN (§2.6) → HOLDME (§2.7) → keep-time specials (§2.8) → either the
+skill's own abstates + double dispel + SUCKHP (§2.9) or the step's abstates + one dispel (§2.10) → result record
+(§3). All packets of the hit itself go out later in the one 0x2452 of `sds_Finish` (Z03 §5.6); the abstate packets
+(0x2427 / 0x1C18 / 0x2429 / 0x242A) and 0x2428 go out at once.
 
 ## 3. Committing a result: `SkillDamageSender::sds_TemplateStore`  @ FUN_005803c0
 
@@ -479,12 +702,21 @@ EffectType.
 | Z25-B5 | `RuleOfEngagementHealAttack::roe_CalcDamage` §2.5.1 | `roe_LevelGapDamageRevision`'s return value is discarded | heal damage on devil mobs ignores the level gap | use the revised value |
 | Z25-B6 | `sds_TemplateStore` §3 (0x2452) | `SkillDamage.flag` bits 11–15 are never written (stack garbage) | random high flag bits on the wire (the client reads bits 0–10) | zero them |
 | Z25-B7 | `smo_ReflectionDamage` §4.2 (0x245B) | `damage` is the requested amount, cast to u16 | the number shown differs from the HP lost when hooks reduce it, and wraps above 65535 (boss reflections up to 5000 ‰) | the applied damage, u32 |
+| Z25-B8 | `smo_SkillBlast` §2.7 SS_HOLDME | the result of `so_AbnormalState_Set` on the caster is ignored; bit, 0x2427 / 0x1C18 and 0x242A go out anyway | when the set fails (map refuses the state, stronger state of the group) clients show a hold the server does not apply, and the brief bit stays set with no element to clear it *(inferred)* | bit / broadcast / inform only on success, as in §2.10 |
+| Z25-B9 | `smo_SkillBlast` §2.10 multi-hit abstates | the empower keep-time bonus is passed as `extra`, which `aeo_Set` ignores when `keepMs ≠ 0`; the shown time is `keep + bonus`, unscaled by SET_ABSTATEKEEPTIMERATE; BroadcastSet sends the requested strength | empowered multi-hit states last their row time while the client shows the longer time | `keepMs = keep + bonus` (as `so_SkillEnchant`) |
+| Z25-B10 | `smo_SkillBlast` §2.9 SS_SUCKHP | the drain overwrites `hpchange` / `resthp` without looking at `isImmune` or the AC / MR-mode conversion; `healOnKill` becomes `bos_MyHealKill + n` | an immune target still loses the drain; a target in StaACMode / StaMRMode is healed by up to MaxHP − 1; a 1 HP target dies; a DIEHPUP roll is replaced (latent) | skip the drain on immune / converted hits, keep the rolled kill heal |
+| Z25-B11 | `smo_SkillBlast` §2.10 | for non-damage multi-hit steps `vt 0x700` adds `bos_AbsoluteAggro`, then `sds_TemplateStore` adds `AbsoluteAggro` again | mobs get about twice the absolute aggro (+1 for player casters) per non-damage step | one aggro add per step |
+| Z25-B12 | `smo_SkillBlast` §2.10 | re-tests StaAdlFloussierImt / StaImmortal on the target, already refused at entry (§2.1) | dead check | none needed |
+| Z25-B13 | `so_smo_AbStateKeepTimeAdd` §2.8 (0x242A) | `keeptime_millisec = rest·100 + ms` with a negative `ms` (CURSETIMEADD) is not clamped | ResistCurse on a curse with less time left than the cut: the client icon shows ~49.7 days until 0x2428 arrives | clamp at 0 (or end the state at once) |
 
 ## 6. Not reconstructed / uncertain
 
-- Part 2 (not yet written): `smo_SkillBlast` from 0x582122 (SS_HOLDME, SS_FIRETIMEADD / CURSETIMEADD /
-  POSIONTIMEADD, `so_SkillEnchant`, the dispel runs, SS_SUCKHP, multi-hit abstates, item actions of d, the final
-  `sds_TemplateStore`).
+- Part 3 (not yet written): the blast callers' own special branches (`sbe_BlastObject`, `alsst_SkillBlast`,
+  `alsst_SkillBlast_RandomTarget`, `smo_SkillBash_Blast_Obj` / `_Loc`), including when `mha_HitStep` is negative
+  and how `mha_AbState[]` is filled (§2.10).
+- `so_dummypacketcontainer`'s send (§2.8, mobs) is taken to send nothing from its name *(inferred)*.
+- Client text 0x0A653383 (0x242A for a curse, §2.8) is in none of the 2016 `TextData*.shn`; what the client shows
+  for a missing id was not traced.
 - `ShineObject::so_AllOfRange_Simple`'s receiver set for 0x245B (players in sight of the attacker) is *(inferred)*
   from the broadcaster's name.
 - Client FUN_0057eeb0 calls in the 0x245B handler (own character hit): which HUD element they refresh is not traced.
@@ -498,6 +730,10 @@ EffectType.
 | `smo_JumpTo` FUN_0057db20, 0x482D | Z09 §9.3 (done) | movement helper with packet already documented |
 | `so_SkillCure` / `so_Dispel` / `smo_Dispel` bodies | Z22 §7.5, Z23 §8 (done) | documented there; §5 adds only the data tables |
 | `so_ply_Revival` FUN_0057ab90 | Z03 §7.3 (done) | revive by skill |
+| `so_SkillEnchant` FUN_00431ca0, `so_ItemActonAbstateApp` FUN_0055dea0 | Z22 §10.7 (done) | called from §2.9 / §2.10; bodies documented there |
+| target-side `EventRun` / `EventRunBySkillGroupIndex` (SEIT_KEEPTIME_RATE_INCREASE) | Z17 §3.4.3 (done) | item-action engine; §2.8–§2.10 only cite the call sites |
+| `so_AbnormalState_Set` / `asl_AbstateSet` / `aeo_Set` FUN_004162d0 / FUN_0040d020 / FUN_0040a340, 0x2427 / 0x1C18 / 0x2429 | Z03 §6.2, §6.3 (done) | abstate container; §1.4 adds only the keep-time rule |
+| `sp_NC_BAT_TARGETTING_REQ` FUN_0042ffe0 (reads state 392) | Z03 §2.2 (done) | targeting handler |
 | `mdb_CanIKill` FUN_006424c0, `mdt_ArgumentLoad` FUN_004a6110, `so_mob_SkillParameterSet` FUN_005d2e90 | Z09 §5.1, §28.3 (done) | mob data and ExpandSkill checks |
 | `so_ply_CheckDamageAbsorption` FUN_00579860, SpyAgent reports | Z09 (done) | damage absorb and aggro reports |
 | `so_smo_LastDamageOperation` FUN_0040cbe0, HideDamage actor | Z22 §9.4, §9.7 (done) | abstate damage hooks |
