@@ -187,6 +187,8 @@ Raid_MoveMember(raid, charNo, dstPartyIndex, dstSlot, &err):  (into a free slot)
     dstSlot < dst party memberCount (slot taken) → 0x1F4B
     remove from own party, Party_AddMember(dst party) (appended at its end) ; failure → 0x1F46
 Raid_SwapMembers(raid, charA, charB): both in raid → Parties_SwapMembers(...)    @ FUN_00463720
+    slots are copied with PARTY_MEMBER_SLOT::operator= @ FUN_00465150 (charNo, zone / WM handle, name, level, flag,
+    class, zoneNo, memberobj)
 Raid_Dismiss(raid, &err):                                                   @ FUN_004631c0
     remove every member from its party (errors → 0x1F41 or the remove error), release the 4 party slots,
     reset raidNo/partyNo/leader/subLeaders/loot
@@ -245,6 +247,8 @@ Linked list `{ int count; ENTRY *head; ...; CRITICAL_SECTION @+0xc; int locked @
 ```pseudo
 PartyFinder_AddOrUpdate(name, msg) → 0 added, 1 updated                    @ FUN_00457750 (return read in the assembly)
     entry for name exists: dRegistTime = now, msg replaced (127 chars + NUL) → 1 ; else append a new entry → 0
+    append = CPartyFinder::Add @ FUN_0045d5d0: Find(sCharID) again (update in place if found), else new 0xA4 node
+        at the bottom (no null check after new), count + 1; always returns 1 (the caller ignores it)
 PartyFinder_Delete(name) → 1 deleted, 0 not found                           @ FUN_00457540 / FUN_0045d670
 PartyFinder_ExpireTick():  (called from the WM main tick)                    @ FUN_004575c0
     every 11 s: entries with now - dRegistTime >= 1800 s are removed; the owner, if in game,
@@ -327,6 +331,7 @@ Client_PartyJoinProposeAllow(s):                                            @ FU
       0 (was pending → now confirmed, master confirmed too):
         if Party_CountConfirmed(pn) == 2:                                   # the party is born
             all zones ← 0x3801 NC_PARTY_FUNDAMENTAL_CMD { u16 partyregnum, master, member }
+                (send struct ctor PROTO_NC_PARTY_FUNDAMENTAL_CMD_SEND @ FUN_0041b320 zeroes only the two names)
                 (PROTO_PARTY_MEMBER_AND_ZONEMERCHINE each: charNo, zoneHandle, wmHandle, name, level, flag 0, class, zoneNo)
             Friends_SendPartyState(m); Friends_SendPartyState(s)
             Party_SendLooterInfo(pn, m)
@@ -472,6 +477,7 @@ The two error replies are built with opcode bytes `5B B0` (0xB05B, dept 44 cmd 9
             u16 nMaxPages = ceil(count / nCountOfOnePage), u16 nNumOfList,
             InfoList[nNumOfList] (PROTO_NC_PARTY_FINDER_INFO, 0x9A each) }
         entries start at index nPageNo × nCountOfOnePage; at most nCountOfOnePage, and the payload stays < 8000 bytes
+        (start entry = CPartyFinderServer::Seek(i) @ FUN_00457580: i-th node from the head, null if i ≥ count)
 ```
 
 ---
@@ -612,6 +618,8 @@ The first party keeps its partyNo and becomes `partyNo[0]`; its master becomes l
 Client_RaidLootingTypeReq(s, p):                                            @ FUN_00417420
     raid = Raids_Get(s.raidNo); none → log "… Not Find RaidNo : ", s ← 0xB009 NC_RAID_LOOTING_TYPE_ACK { 0x1EC3 }
     !PartyLoot_SetType(raid.loot, p.nItemGrade, p.nLootingType) → log "… Error LootingType  : ", 0xB009 { 0x1EC4 }
+    # both logs: ac_AssertFail(msg, a, b) @ FUN_00467390 (2-value overload): when ac_Write2File, appends
+    #   "%s : AssertClass::ac_AssertFail : %s[%d/%d]" to ac_FileName; does not exit
     s ← 0xB009 { 0x1E80 }
     online members ← 0xB00A NC_RAID_LOOTING_TYPE_BROAD_CMD { u8 nItemGrade, u8 nLootingType } (request echoed)
     all zones ← 0xB00B NC_RAID_ZONE_LOOTING_TYPE_CMD { u16 nRaidNo, u8 nItemGrade, u8 nLootingType }
@@ -632,6 +640,7 @@ Client_RaidInvitationReq(s, p):                                             @ FU
     guild-only map on either side and not the same guild → 0x1ED0
     !Client_SameKQTeam(s, t) → 0x1ED4
     if t.pendingRaidInvite != 0xFFFF → reply 0x1EC7 ; else t.pendingRaidInvite = raid.raidNo
+        (CWMClientSession::RaidInviteReserve @ FUN_00431610 returns that 0x1EC7 / 0x1E80)
     reply 0x1E80
     t ← 0xB00E NC_RAID_INVITATION_CMD { sMasterCharID = s name }   "%s has invited you to the expedition group. Do you wish to join?"
 ```
@@ -653,6 +662,7 @@ Client_RaidInvitationAnswerReq(s, p):                                       @ FU
     guild-only map and not same guild → reply 0x1ED0 ; !Client_SameKQTeam → reply 0x1ED4
     raid = Raids_Get(inv.raidNo) or else Raids_Get(s.pendingRaidInvite); none → reply 0x1ECE "This expedition group doesn't exist."
     s.pendingRaidInvite != raid.raidNo → reply 0x1ECE
+        (reads: GetRaidInviteReserve @ FUN_00431670, IsRaidInviteMe(raidNo) @ FUN_00431640 = pending == raidNo)
     rec = { s charNo, zoneHandle, wmHandle, name, level, flag 0, class, zoneNo }
     !Raid_AddMember(raid, rec, &err) → reply err (0x1F45 full, 0x1F46, …)
     clear pendingRaidInvite; pos = Raid_Find(raid, s.charNo); End → reply 0x1ECF
@@ -689,6 +699,7 @@ Client_RaidVanishReq(s, p):                                                 @ FU
     raid none → 0x1EE0 ; s not leader → 0x1EE4
     pos = first position whose member name == p.name; none / charNo -1 → 0x1EE1 ; target == s → 0x1EE5
     bc = 0xB01B NC_RAID_VANISH_BROAD_CMD { u16 nPartyNo, u8 nPartyIndex, u8 nSlotIndex, sCommandCharID = s name, sVanishCharID }
+        (PROTO_NC_DATA_SEND1<…VANISH_BROAD_CMD> ctor @ FUN_0041a2f0 zeroes both names, bytes +7…+0x2e)
     zc = 0xB01C NC_RAID_ZONE_VANISH_CMD { u16 nRaidNo, u16 nPartyNo, u8 nPartyIndex, u8 nSlotIndex, u32 nVanishCharNo }
     Raid_HandOverRoles(raid, target); !Raid_RemoveMember(raid, target, &err) → reply err
     reply 0x1E80
@@ -715,6 +726,8 @@ Client_RaidSlotMoveReq(s, p):                                               @ FU
     online members ← 0xB029 NC_RAID_SLOT_MOVE_BROAD_CMD { sCommandCharID = s name,
         PrePosition = request's, PostPosition = a's new position (request's if not found),
         sPreCharID[5] = names in the Pre party (in-game members only, else ""), sPostCharID[5] = same for the Post party }
+        (PROTO_NC_DATA_SEND1<…SLOT_MOVE_BROAD_CMD> ctor @ FUN_0041a320: zeroes +3…+0x16 (sCommandCharID) and
+         constructs both 5 × 0x14 MEMBER_INFO name arrays (+0x1f, +0x83))
     all zones ← 0xB02A NC_RAID_ZONE_SLOT_MOVE_CMD { u16 nRaidNo,
         PrePosition { u16 nPartyNo (request), u8 idx, u8 slot, u32 nPartySeqCharNo[5] },
         PostPosition { u16 nPartyNo (request), u8 idx, u8 slot, u32 nPartySeqCharNo[5] } }
