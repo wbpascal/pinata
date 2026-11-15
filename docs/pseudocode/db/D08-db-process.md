@@ -16,7 +16,7 @@ variable names, addresses and string labels normalised, everything else must be 
 Evidence markers as in `AGENTS.md`. "Same as" means the decompiled body is identical to the cited build's function
 (checked with the same script against `wm-pdb`, `login-pdb`, `zone-pdb`); only the addresses are new.
 
-Corrections to D01 / D05 (done items, not edited): `docs/knowledge/D08.md` §0.
+Corrections to D01 / D02 / D05 (done items, not edited): `docs/knowledge/D08.md` §0.
 
 ## 1. The DataServer process (Account build as reference)
 
@@ -1463,6 +1463,134 @@ None of these functions has project logic except §5.2–§5.4; the rest is gene
 `thunk_FUN_0044fad0` FUN_0046ed30 (the last function before the generated block) belongs to the ODBC wrapper (§2.5);
 the CRT starts at FUN_0048ce81 (`operator new[]`).
 
+## 6. D02 open points (confidence.md §4.6 row 9)
+
+Three questions D02 §16 left open about the Character build: which quest status each 0x1004 quest block reads, how the
+0x1017 item packets are cut and what their sender returns, and the 2016 names of the ping-test fields. Read in
+`re-data/exports/character` with `names/character/D08.json`; the arguments the decompiler drops are read with
+`objdump` on `Files/Server/2016/w00_Character/Character Release.exe`.
+
+### 6.1 The four quest blocks of 0x1004 and their `nStatusDone` filters
+
+`SQL_p_Quest_GetAllDoing` FUN_00453240 binds `{CALL p_Quest_GetAllDoing(?,?)}` with `nCharNo` (`SQL_C_ULONG`) and
+`nStatusDone` (`SQL_C_TINYINT`). Each caller pushes the status as a constant; the decompiler loses it, the code has it
+(push at the address given). The values are `PLAYER_QUEST_STATUS` *(pdb2016, Zone PDB)*. D06 already recorded the four values in
+its knowledge file (`docs/knowledge/D06.md`, "D02 §4 step 5–8 quest filters"); this section adds the record copies and
+the limits.
+
+```pseudo
+QuestList_Doing(charNo, out cmd PROTO_NC_CHAR_QUEST_DOING_CMD)  → 0x100A   @ FUN_0046cb00
+    n = 0
+    for status in [6 PQS_ING (push @ 0x46cb1b), 7 PQS_FAILED (@ 0x46cc14), 8 PQS_REWARD (@ 0x46cd02)]:
+        p_Quest_GetAllDoing(charNo, status) else: log, return (cmd unset → caller sends 0x1006 code 0x587)
+        per row: cmd.array[n] = PLAYER_QUEST_INFO { u16 ID = nQuestNo, u8 Status = nStatus,
+                                                  Data = first 0x1d bytes of sData (read into a zeroed 0x400 buffer) }
+                 n += 1
+    qsort(cmd.array, n, 0x20, QuestInfo_CompareID FUN_0046cae0)        # u16 ID ascending
+    cmd.chrregnum = charNo; cmd.bNeedClear = 1; cmd.nNumOfDoingQuest = (u8) n
+QuestList_DoneQuery(charNo) = p_Quest_GetAllDoing(charNo, 2 PQS_DONE (push @ 0x46ce36))   @ FUN_0046ce30
+    rows read by SendQuestDone FUN_004288d0 (D02 §4 step 6): per row PLAYER_QUEST_DONE_INFO { u16 ID = nQuestNo,
+    i64 tEndTime = sData bytes 8..15 (= PLAYER_QUEST_DATA.EndTime) }; the status column is read and dropped; rows go
+    into a 30 000-byte buffer (3 000 records), then parts of at most 8000 bytes: 0x100B { u32 chrregnum,
+    u16 nTotalDoneQuest = n, u16 nTotalDoneQuestSize = 10n + 12, u16 nDoneQuestCount, u16 nIndex (first record of
+    the part), records } (length 0x12 + 10·count: P02-B8)
+QuestList_Read(charNo, out cmd)  → 0x10CC                                     @ FUN_0046ce50
+    p_Quest_GetAllDoing(charNo, 20 PQS_READ_ABLE (push @ 0x46ce58)) else return 0
+    per row: QuestReadIDArray[n++] = (u16) nQuestNo          # status and sData are not read
+    cmd.nNumOfReadQuest = n; cmd.chrregnum = charNo; return 1
+QuestList_Repeat(charNo, out cmd)  → 0x10D5                                   @ FUN_0046ced0
+    p_Quest_GetAllDoing(charNo, 4 PQS_REPEAT (push @ 0x46ceeb)) else: log, return (caller: 0x1006 0x587)
+    per row: QuestRepeatArray[n++] = { ID, Status, Data = sData bytes 0..31 }   # 32 bytes into a 29-byte slot
+    cmd.nNumOfRepeatQuest = (u16) n; cmd.chrregnum = charNo
+```
+
+- The procedure must select `nStatus = @nStatusDone`, as `w00_Character.bak`'s version does *(db-backup)*. The older
+  `Character.bak` version (`nStatus <> @nStatusDone`) would put every quest three times into the doing list.
+- The repeat copy moves 8 dwords from `sData` into `Data` (0x1d bytes). The 3 extra bytes land on the next record's `ID` /
+  `Status`, which the next row overwrites before its own copy. After the last record they land past the length that is
+  sent. No effect on the wire (original bug) D08-B10.
+- No loop checks the row count against its buffer: doing list u8 count and 0x2000-byte packet, read and repeat lists the
+  same packet, done list 3 000 records. 2016 data stays well inside these limits: at most 40 quests in progress
+  (Z15, error 0xC0F), 2 306 quests in QuestData, 157 of them repeatable (Z15 §1.2). The largest case is the repeat list,
+  8 + 157 · 32 = 5 032 bytes *(inferred: the DB holds no status-4 row for a quest that is not repeatable)*.
+
+### 6.2 The item blocks: 0x1017 NC_CHAR_ITEM_CMD
+
+Step 15 of 0x1004 (D02 §4). Record layout = D03 §1.4 (`ItemRecords_Build` FUN_00402e50: `PROTO_ITEMPACKET_TOTAL`
+records `{ u8 datasize, ITEM_INVEN cell, u64 key, u16 itemId, attribute bytes }`). The four list builders are
+`ItemList_* + ItemRecords_Build`. Each returns 1, or 0 when the list query or any item's option read fails
+(`ItemRecords_Build` returns 0 at the first `CGameDB_Item_GetItemOptions` failure).
+
+```pseudo
+step 15 of 0x1004                                                              @ FUN_00438dc0 (0x439e1f…0x43a0cc)
+    okInv = ItemPart_Inventory(charNo, inv)     # ItemList_Inventory FUN_0046a290 (storage 9, max 144)   @ FUN_00402f80
+    okEqu = ItemPart_Equipped(charNo, equ)      # ItemList_Equipped FUN_0046a2c0 (storage 8, max 30)     @ FUN_00403000
+    okS12 = ItemPart_Storage12(charNo, s12)     # ItemList_Storage12 FUN_0046a410 (35)                  @ FUN_00403480
+    okS15 = ItemPart_Storage15(charNo, s15)     # ItemList_Storage15 FUN_0046a4b0 (42)                  @ FUN_00403700
+    headers PROTO_NC_CHAR_ITEM_CMD { PacketOrder, nPartMark, ItemCmd { u8 numofitem, records } } *(pdb2016)*:
+        inv { 0x80, 5 }, equ { 0x80, 8 }, s12 { 0x80, 0x10 }, s15 { 0x80, 0x22 }
+    if any of the four failed: goto fail591            # nothing of the item step has been sent yet
+    # the inventory is cut into parts; the other three go out as one packet each
+    part = { PacketOrder 0, nPartMark 5, numofitem 0 }; size = 3
+    for each inventory record r (len = r.datasize + 1):
+        if size + r.datasize < 0x1C13: append r; size += len; numofitem += 1     # i.e. size + len ≤ 0x1C13
+        else:
+            rc = Send_NC_CHAR_ITEM_CMD(handle, part, size); rc 0 → stop; rc 2 → goto fail591
+            nPacketOrderNum += 1 (low 7 bits); part = { that order, 5, numofitem 1, r }; size = 3 + len
+    part.nIsLastOfInven (bit 7) = 1; send it                               # an empty inventory: one 3-byte part
+    send equ, then s12, then s15 (each: rc 0 → stop, rc 2 → fail591)
+    continue with step 16 (0x1019 titles)
+fail591: SendRaw { u8 6, u16 0x1006, u16 handle, u16 0x591 }   (7 bytes; NC_CHAR_CHARDATAFAIL_ACK "There is an error in
+    the Item Information.")   # no 0x1005 follows
+
+Send_NC_CHAR_ITEM_CMD(handle, body, len, charNo) → 0 / 1 / 2                   @ FUN_004056a0
+    CSendPacket: opcode 0x1017, u16 handle, then the body (CSendPacket_Append)
+    append fails (frame over the 8 KB packet): log "* FATAL ERROR - CPFsCharacter::Send_NC_CHAR_ITEM_CMD - OVER MAX
+        PACKET SIZE=%d, nPart=%d, nCharNo=%d" (len + 2, body[1] = nPartMark); return 2
+    CSession::Send fails: log "… SEND FAILED, nPart=%d, nCharNo=%d"; return 0
+    return 1
+```
+
+- This corrects D02 §4 step 15 "a send that fails: raw 0x1006 0x591". The 0x591 packet comes from a failed list or
+  option read and from an over-size packet (return 2). A failed send (return 0) ends the 0x1004 handler without any
+  answer, like every other failed send in that handler.
+- How the WM files the parts (W05 §5.4, `CWMClientSession::CharDataStore` FUN_00430870): `nPartMark` bit 2 → inventory
+  chunk `nPacketOrderNum` (only orders 0–2 are kept; order 0 frees all three first), bit 3 → equipment, bit 4 → mini-house
+  skin, bit 5 → action box. So storage 8 = equipment, 9 = inventory, 12 = mini-house skin box, 15 = action box, which
+  matches the zone's own save (Z13 §2.8, `so_SaveItem_Part`: marks 5 / 8 / 0x12 / 0x22). The Character server sends
+  0x10 for box 12 where the zone sends 0x12. The WM ignores bits 0 and 1, so the difference has no effect.
+- An inventory needs more than three parts (orders ≥ 3, which the WM drops) only above about 3 × 0x1C10 bytes, about
+  150 bytes per item for 144 items. That is more than any item record *(inferred: not checked against the largest
+  attribute class)*.
+- `PROTO_NC_CHAR_ITEM_CMD` *(pdb2016)*: `PacketOrder { nPacketOrderNum:7, nIsLastOfInven:1 }`, `u8 nPartMark`,
+  `PROTO_ITEM_CMD ItemCmd`. The annotation is in `annotations/P02.json` (0x1017) and matches.
+
+### 6.3 0x0812–0x0815 ping tests: field names (2016 PDBs)
+
+The 2016 Zone and WM PDBs *(pdb2016)* have the structs with exactly the lengths the Character server echoes:
+`PROTO_NC_MISC_PINGTEST_CLIENT_ZONE_DB` 0x5a, `…_TOOL_WM_CLIENT_ZONE_DB` 0x82, `…_TOOL_WM_DB` 0x26,
+`…_TOOL_WM_ZONE_DB` 0x3a. The 2017 structs (0x7c / 0xa4) are longer because their embedded
+`PROTO_NC_ITEMDB_BUYLOT_REQ buylot` (2016: 0x26 bytes, `NETPACKETZONEHEADER header` before it) grew. That is the whole
+difference D02 §9 saw. Layouts: `docs/protocol/annotations/D08.json` (Character side) and `annotations/W05.json` (WM side).
+
+```pseudo
+handler(pkt) (CParserCharacter; each: CheckAlive FUN_0043c640, else return)
+    t1 = timeGetTime(); t2 = timeGetTime()
+    0x0812 NC_MISC_PINGTEST_CLIENT_ZONE_DB          @ FUN_004167e0: DBSendToODBC @0x26 = t1, DBRecvFromODBC @0x2a = t2
+    0x0813 NC_MISC_PINGTEST_TOOL_WM_CLIENT_ZONE_DB  @ FUN_004168a0: DBSendToODBC @0x4e = t1, DBRecvFromODBC @0x52 = t2
+    0x0814 NC_MISC_PINGTEST_TOOL_WM_DB              @ FUN_00416960: DBSendToODBC @0x1e = t1, DBRecvFromODBC @0x22 = t2
+    0x0815 NC_MISC_PINGTEST_TOOL_WM_ZONE_DB         @ FUN_00416a20: DBSendToODBC @0x32 = t1, DBRecvFromODBC @0x36 = t2
+    send the same opcode back with the same length (0x5a / 0x82 / 0x26 / 0x3a bytes from payload +0)
+```
+
+- The two stamps are taken back to back with no ODBC call between them, so DB time is always about 0. The DB server's own
+  receive / send slots (`DBRecvFromZone` / `DBSendToZone`, for 0x0814 `DBRecvFromWM` / `DBSendToWM`) are never
+  written. The tool gets whatever the zone or WM left in them (original bug) D08-B9.
+- The `header` and `buylot` the zone puts into 0x0812 / 0x0813 (Z01 §9: only with item 0x9C9 in cell 0) are echoed
+  unread. The Character server buys nothing. The zone's lot + 1 on return is Z01-B6.
+- Callers and the return path: zone FUN_005509a0 / FUN_00550b90 / FUN_00550e90 → Character → zone FUN_00550fc0 /
+  FUN_00551130 / FUN_00551250 (Z01 §9); WM FUN_00426060 → Character 0x0814 → WM FUN_0040c460 (W05).
+
 ## Original-server bugs
 
 | ID | Handler / function | 2016 behaviour | Effect | Likely intent |
@@ -1476,7 +1604,9 @@ the CRT starts at FUN_0048ce81 (`operator new[]`).
 | D08-B6 | Character `cUKItemShop::Recv_NC_MISC_ITEMSHOP_URL_DB_REQ` FUN_0043f7f0 / proxy pool `cUKItemShop::Init` FUN_0043f690 (§5.5) | the gSOAP contexts keep `soap_init2`'s timeouts 0: blocking connect, `recv` / `send` without limit, on a session worker | a shop host that accepts and never answers blocks one worker and one proxy per request for good (up to 5 × CPU workers; all 81 from 17 CPUs on, which stops the whole Character server); a stop never completes while a worker is blocked | set `connect_timeout` / `recv_timeout` / `send_timeout` (a few seconds) and run the call off the DB workers |
 | D08-B7 | Character FUN_0043f7f0 (§5.3) | copies `nLen = (u16) url.size()` bytes of the shop's URL into the 8187-byte `CSendPacket` at payload +8 without a bound | a URL over 8179 bytes (0x1ff3) fails `CSendPacket::SetSize` (log, a 3-byte frame with opcode 0 is sent); over 8183 bytes the copy runs past the packet into the stack objects (request / response `std::string`, fault buffer, cookie): crash on return; ≥ 64 KiB is cut to `len mod 0x10000` | clamp `nLen` to the packet's payload room (and to what the client's shop window accepts) |
 | D08-B8 | Character FUN_0043f7f0 (§5.3) | never calls `soap_destroy` / `soap_end` after a call; `soap_begin` FUN_00483100 frees only the temporary lists (`soap_free_temp` FUN_00482f60), not `alist` | every answer's `soap_malloc` blocks (the URL text from `soap_string_in`, fault strings) stay on the proxy until the process ends: the Character server's memory grows with every item-shop request *(effect inferred from the gSOAP 2.8 allocation path, size per call = the answer's strings)* | `soap_destroy(p); soap_end(p)` after each call |
-Next free ID: D08-B9.
+| D08-B9 | Character 0x0812–0x0815 `fc_NC_MISC_PINGTEST_*` FUN_004167e0 / FUN_004168a0 / FUN_00416960 / FUN_00416a20 (§6.3) | stamps `DBSendToODBC` and `DBRecvFromODBC` with two back-to-back `timeGetTime()` calls and no ODBC call between; never writes `DBRecvFromZone` / `DBSendToZone` (`DBRecvFromWM` / `DBSendToWM`) | the ping tool reports a DB time of ~0 and stale or zero values for the DB server's receive / send slots | run a test query between the ODBC stamps and stamp the receive / send slots on arrival and before the send |
+| D08-B10 | Character `QuestList_Repeat` FUN_0046ced0 (§6.1) | copies 32 bytes of `sData` into the 29-byte `PLAYER_QUEST_DATA` of each 0x10D5 record | 3 bytes spill into the next record (overwritten by the next row) or past the sent length; nothing visible on the wire | copy `sizeof(PLAYER_QUEST_DATA)` (0x1d) as the doing list does |
+Next free ID: D08-B11.
 
 ## Not reconstructed / uncertain
 
@@ -1493,6 +1623,9 @@ Next free ID: D08-B9.
   whether the host still existed in 2016 is unknown. The gSOAP function names (§5.7) are matched to the public 2.8
   sources by structure, call order and strings, not by a symbol file; the ~300 generated / runtime functions listed
   without a name are library code that was not read one by one.
+- §6.2: whether a full inventory can need a fourth 0x1017 part (dropped by the WM) depends on the largest item
+  record; the attribute-class sizes were not tabulated (container FUN_0044d380, D03 §1.4). §6.1: the claim that no
+  status-4 row exists for a non-repeatable quest is inferred from the zone's quest code, not checked in a DB.
 
 ## Coverage boundary
 
