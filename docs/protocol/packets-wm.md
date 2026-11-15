@@ -2444,6 +2444,12 @@ Handler `FUN_00417c90`
 
 Sent from `FUN_00446340` (`FUN_00446340`) · payload 3 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `5` |
+| 1 | u8 | `5` |
+| 2 | u8 | `5` |
+
 ### `0x0807` NC_MISC_SEED_ACK
 
 **Verified layout** (basis: FUN_00430550)
@@ -2474,6 +2480,7 @@ Sent in reply to `0x080d` NC_MISC_GAMETIME_REQ on CParserClient (`FUN_00413050`)
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `(undefined1)local_18.wHour` |
 | 1 | u8 | `(undefined1)local_18.wMinute` |
 | 2 | u8 | `(undefined1)local_18.wSecond` |
 
@@ -2487,6 +2494,12 @@ Sent in reply to `0x080d` NC_MISC_GAMETIME_REQ on CParserClient (`FUN_00413050`)
 | 1 | u16 | second |  |
 
 Sent in reply to `0xa403` NC_INSTANCE_DUNGEON_RESET_COUNTDOWN_CMD on CParserZone (`FUN_0042bc40`) · payload 3 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `1` |
+| 1 | u8 | `0` |
+| 2 | u8 | `0` |
 
 ### `0x081c` NC_MISC_WEB_KEY_ACK
 
@@ -2516,6 +2529,7 @@ Sent in reply to `0x082d` NC_MISC_EVENT_L20_DB_ACK on CParserAccountLogDB (`FUN_
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `0` |
 | 1 | u16 | `in(0x082d)+11` |
 
 ### `0x083a` NC_MISC_EVENT_DONE_MUNSANG_WM2Z
@@ -2709,6 +2723,11 @@ W01 name was 'world login refused (ours)'
 
 Sent in reply to `0x0c0f` NC_USER_LOGINWORLD_REQ on CParserClient (`FUN_00419860`) · payload 2 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `68` (0x44) |
+| 1 | u8 | `0` |
+
 ### `0x0c17` NC_USER_CONNECTCUT_CMD
 
 **Verified layout** (basis: wm FUN_004305a0)
@@ -2803,6 +2822,11 @@ Sent in reply to `0x107b` NC_CHAR_SET_STYLE_DB_ACK on CParserCharDB (`FUN_0040c5
 
 Sent in reply to `0x1078` NC_CHAR_SET_STYLE_REQ on CParserClient (`FUN_004158a0`) · payload 2 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `132` (0x84) |
+| 1 | u8 | `18` (0x12) |
+
 ### `0x107d` NC_CHAR_SET_STYLE_GET_INFO_ACK
 
 **Verified layout** (basis: client FUN_00629600)
@@ -2825,6 +2849,11 @@ Sent in reply to `0x107f` NC_CHAR_SET_STYLE_GET_INFO_DB_ACK on CParserCharDB (`F
 | 22 | u32 | `in(0x107f)+13` |
 
 Sent in reply to `0x107c` NC_CHAR_SET_STYLE_GET_INFO_REQ on CParserClient (`FUN_00415960`) · payload 26 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `132` (0x84) |
+| 1 | u8 | `18` (0x12) |
 
 ### `0x10d9` NC_CHAR_CLIENT_NEWBIE_GUIDE_VIEW_LIST_CMD
 
@@ -3020,6 +3049,7 @@ Sent in reply to `0x1405` NC_AVATAR_CREATEDATASUC_ACK on CParserCharDB (`FUN_004
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `1` |
 | 5 | u32 | `0` |
 | 9 | u32 | `0` |
 | 13 | u32 | `0` |
@@ -3048,6 +3078,11 @@ Sent in reply to `0x1409` NC_AVATAR_ERASEDATAFAIL_ACK on CParserCharDB (`FUN_004
 
 Sent in reply to `0x1414` NC_AVATAR_GUILD_DATA_ACK on CParserCharDB (`FUN_0040c6e0`) · payload 2 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `199` (0xc7) |
+| 1 | u8 | `0` |
+
 ### `0x140c` NC_AVATAR_ERASESUCC_ACK
 
 **Verified layout** (basis: client FUN_004768c0)
@@ -3057,6 +3092,10 @@ Sent in reply to `0x1414` NC_AVATAR_GUILD_DATA_ACK on CParserCharDB (`FUN_0040c6
 | 0 | u8 | slot |  |
 
 Sent in reply to `0x140b` NC_AVATAR_ERASEDATASUC_ACK on CParserCharDB (`FUN_0040a010`) · payload 1 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `in(0x140b)+10` |
 
 ### `0x1410` NC_AVATAR_RENAME_ACK
 
@@ -3072,6 +3111,7 @@ Sent in reply to `0x1412` NC_AVATAR_RENAME_DB_ACK on CParserCharDB (`FUN_0040ff0
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `in(0x1412)+6` |
 | 1 | u32 | `in(0x1412)+7` |
 | 5 | u32 | `in(0x1412)+11` |
 | 9 | u32 | `in(0x1412)+15` |
@@ -3214,6 +3254,11 @@ Sent in reply to `0x2014` NC_ACT_PARTYCHAT_REQ on CParserClient (`FUN_00413510`)
 | 0 | u16 | error |  |
 
 Sent in reply to `0x2014` NC_ACT_PARTYCHAT_REQ on CParserClient (`FUN_00413510`) · payload 2 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `192` (0xc0) |
+| 1 | u8 | `7` |
 
 ### `0x2079` NC_ACT_SCRIPT_MSG_CMD
 
@@ -3764,6 +3809,7 @@ Sent in reply to `0x384b` NC_PARTY_ITEM_LOOTING_SET on CParserClient (`FUN_00413
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `in(0x384b)+0` |
 | 1 | u8 | `in(0x384b)+1` |
 
 ### `0x3855` NC_PARTY_FINDER_LIST_ACK
@@ -3879,6 +3925,8 @@ Sent from `FUN_0041b200` (`FUN_0041b200`) · payload 22 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `0`; `(char)uVar4` |
+| 1 | u8 | `0`; `cVar1` |
 | 2 | u32 | `0`; `*(undefined4 *)(pbVar6 + uVar4 * 0x24 + 0xc)` |
 | 6 | u32 | `0`; `*(undefined4 *)(pbVar6 + iVar3 + 0x10)` |
 | 10 | u32 | `0`; `*(undefined4 *)(pbVar6 + iVar3 + 0x14)` |
@@ -4981,6 +5029,8 @@ Sent in reply to `0x7405` NC_GUILD_MAKE_REQ on CParserClient (`FUN_0041d380`) ·
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `199` (0xc7) |
+| 1 | u8 | `12` (0xc) |
 | 6 | u32 | `in(0x7405)+-1` |
 | 10 | u32 | `in(0x7405)+1` |
 | 14 | u32 | `in(0x7405)+3` |
@@ -5001,6 +5051,8 @@ Sent from `FUN_0044cf10` (`FUN_0044cf10`) · payload 27 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `133` (0x85) |
+| 1 | u8 | `49` (0x31) |
 | 6 | u32 | `local_118` |
 | 10 | u32 | `local_114` |
 | 14 | u32 | `local_110` |
@@ -5015,6 +5067,11 @@ Sent from `FUN_0044cf10` (`FUN_0044cf10`) · payload 27 bytes · raw header
 | 0 | u16 | Error |  |
 
 Sent in reply to `0x7403` NC_GUILD_LIST_REQ on CParserClient (`FUN_00414cc0`) · payload 2 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `8` |
+| 1 | u8 | `13` (0xd) |
 
 Sent from `FUN_0043e240` (`FUN_0043e240`) · payload 2 bytes · raw header
 
@@ -5114,6 +5171,11 @@ Sent in reply to `0x740e` NC_GUILD_MEMBER_VANISH_REQ on CParserClient (`FUN_0041
 
 Sent in reply to `0x7410` NC_GUILD_NOTIFY_REQ on CParserClient (`FUN_00414dc0`) · payload 2 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `20` (0x14) |
+| 1 | u8 | `13` (0xd) |
+
 ### `0x7417` NC_GUILD_MEMBER_GRADE_ACK
 
 **2016 PDB layout** *(pdb2016)*: `PROTO_NC_GUILD_MEMBER_GRADE_ACK`, 23 bytes
@@ -5149,6 +5211,11 @@ Element `GUILD_CLIENT` (1067 bytes): +0 u32 nNo, +4 char[16] sName, +20 u64 nMon
 
 Sent in reply to `0x7418` NC_GUILD_MY_GUILD_INFO_REQ on CParserClient (`FUN_004217b0`) · payload 2 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `203` (0xcb) |
+| 1 | u8 | `12` (0xc) |
+
 Sent in reply to `0x2824` NC_OPTOOL_GUILD_DATA_CHANGE_REQ on CParserOPTool (`FUN_00427980`) · payload 1069 bytes
 
 Fill: +2: FUN_00426770
@@ -5171,6 +5238,15 @@ Fill: +2: FUN_00426770
 Element `GUILD_MEMBER_CLIENT` (110 bytes): +0 char[20] sName, +20 u8 nGrade, +21 u32 nFlags, +25 u16 nExpRatio, +27 char[64] sIntro, +91 u32 dLogonInfo.login|year|month|day|hour, +95 u8 nClassID, +96 u8 nLevel, +97 u8 bIsParty, +98 char[12] sMap
 
 Sent in reply to `0x741a` NC_GUILD_MEMBER_LIST_REQ on CParserClient (`FUN_004218c0`) · payload 6 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `0` |
+| 1 | u8 | `0` |
+| 2 | u8 | `0` |
+| 3 | u8 | `0` |
+| 4 | u8 | `0` |
+| 5 | u8 | `0` |
 
 Sent from `FUN_00443e80` (`FUN_00443e80`) · payload variable (uVar1)
 
@@ -5196,6 +5272,11 @@ Sent from `FUN_00443e80` (`FUN_00443e80`) · payload variable (iVar2 * 0x6e + 6)
 
 Sent in reply to `0x741c` NC_GUILD_MEMBER_LEAVE_REQ on CParserClient (`FUN_00415070`) · payload 2 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `228` (0xe4) |
+| 1 | u8 | `12` (0xc) |
+
 Sent from `FUN_0043f310` (`FUN_0043f310`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
@@ -5211,6 +5292,11 @@ Sent from `FUN_0043f310` (`FUN_0043f310`) · payload 2 bytes · raw header
 | 0 | u16 | Error |  |
 
 Sent in reply to `0x7422` NC_GUILD_WAR_REQ on CParserClient (`FUN_00414e50`) · payload 2 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `40` (0x28) |
+| 1 | u8 | `13` (0xd) |
 
 Sent from `FUN_0043e9d0` (`FUN_0043e9d0`) · payload 2 bytes · raw header
 
@@ -5688,6 +5774,11 @@ Sent from `FUN_004447b0` (`FUN_004447b0`) · payload variable (local_201c)
 
 Sent in reply to `0x7473` NC_GUILD_CHAT_REQ on CParserClient (`FUN_00415230`) · payload 2 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `46` (0x2e) |
+| 1 | u8 | `13` (0xd) |
+
 Sent from `FUN_0043f6b0` (`FUN_0043f6b0`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
@@ -5768,6 +5859,7 @@ Sent from `FUN_0043f8e0` (`FUN_0043f8e0`) · payload 12 bytes · raw header
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `*param_2` |
 | 1 | u16 | `*(undefined2 *)(param_2 + 1)` |
 | 3 | u8 | `param_2[3]` |
 | 4 | u32 | `*(undefined4 *)(param_2 + 4)` |
@@ -5819,6 +5911,11 @@ Sent from `FUN_00444930` (`FUN_00444930`) · payload 5 bytes · raw header
 
 Sent in reply to `0x74be` NC_GUILD_MY_GUILD_TOKEN_INFO_REQ on CParserClient (`FUN_00414ec0`) · payload 10 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `202` (0xca); `203` (0xcb) |
+| 1 | u8 | `12` (0xc) |
+
 Sent from `FUN_0043cdd0` (`FUN_0043cdd0`) · payload 10 bytes
 
 | Off | Type | Value / source |
@@ -5864,6 +5961,11 @@ Sent from `FUN_00443060` (`FUN_00443060`) · payload 16 bytes
 | 44 | u8 | GTCondInfo.bIsJoin |  |
 
 Sent in reply to `0x74c3` NC_GUILD_MY_GUILD_TOURNAMENT_MATCH_TIME_REQ on CParserClient (`FUN_00414fa0`) · payload 45 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `105` (0x69); `106` (0x6a) |
+| 1 | u8 | `27` (0x1b) |
 
 Sent from `FUN_0043cea0` (`FUN_0043cea0`) · payload 45 bytes
 
@@ -6128,6 +6230,8 @@ Sent in reply to `0x7c04` NC_PRISON_END_REQ on CParserClient (`FUN_004155f0`) ·
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `169` (0xa9); `170` (0xaa) |
+| 1 | u8 | `13` (0xd) |
 | 2 | u32 | `(undefined4)lVar2` |
 
 ### `0x7c07` NC_PRISON_GET_ACK
@@ -6153,6 +6257,13 @@ Sent in reply to `0x7c0f` NC_DATA_PRISON_GET_ACK on CParserCharDB (`FUN_0040c350
 | 16 | u32 | `in(0x7c0f)+7` |
 
 Sent in reply to `0x7c06` NC_PRISON_GET_REQ on CParserClient (`FUN_00415530`) · payload 4 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `177` (0xb1) |
+| 1 | u8 | `13` (0xd) |
+| 2 | u8 | `0` |
+| 3 | u8 | `0` |
 
 ### `0x7c0a` NC_PRISON_ALTER_GM_ACK
 
@@ -6270,6 +6381,31 @@ Sent in reply to `0x9401` NC_HOLY_PROMISE_SET_UP_REQ on CParserClient (`FUN_0042
 
 Sent in reply to `0x9405` NC_HOLY_PROMISE_SET_UP_CONFIRM_ACK on CParserClient (`FUN_00421d10`) · payload 68 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `72` (0x48); `78` (0x4e) |
+| 1 | u8 | `23` (0x17) |
+| 2 | u8 | `0` |
+| 3 | u8 | `0` |
+| 4 | u8 | `0` |
+| 5 | u8 | `0` |
+| 6 | u8 | `0` |
+| 7 | u8 | `0` |
+| 8 | u8 | `0` |
+| 9 | u8 | `0` |
+| 10 | u8 | `0` |
+| 11 | u8 | `0` |
+| 12 | u8 | `0` |
+| 13 | u8 | `0` |
+| 14 | u8 | `0` |
+| 15 | u8 | `0` |
+| 16 | u8 | `0` |
+| 17 | u8 | `0` |
+| 18 | u8 | `0` |
+| 19 | u8 | `0` |
+| 20 | u8 | `0` |
+| 21 | u8 | `0` |
+
 ### `0x9404` NC_HOLY_PROMISE_SET_UP_CONFIRM_REQ
 
 **2016 PDB layout** *(pdb2016)*: `PROTO_NC_HOLY_PROMISE_SET_UP_CONFIRM_REQ`, 40 bytes
@@ -6299,6 +6435,31 @@ Sent in reply to `0x9406` NC_HOLY_PROMISE_DEL_UP_REQ on CParserClient (`FUN_0041
 | 1 | u16 | `5976` (0x1758) |
 
 Sent in reply to `0x940a` NC_HOLY_PROMISE_DEL_DOWN_REQ on CParserClient (`FUN_0041e570`) · payload 22 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `0` |
+| 1 | u8 | `0` |
+| 2 | u8 | `0` |
+| 3 | u8 | `0` |
+| 4 | u8 | `0` |
+| 5 | u8 | `0` |
+| 6 | u8 | `0` |
+| 7 | u8 | `0` |
+| 8 | u8 | `0` |
+| 9 | u8 | `0` |
+| 10 | u8 | `0` |
+| 11 | u8 | `0` |
+| 12 | u8 | `0` |
+| 13 | u8 | `0` |
+| 14 | u8 | `0` |
+| 15 | u8 | `0` |
+| 16 | u8 | `0` |
+| 17 | u8 | `0` |
+| 18 | u8 | `0` |
+| 19 | u8 | `0` |
+| 20 | u8 | `96` (0x60) |
+| 21 | u8 | `23` (0x17) |
 
 ### `0x9414` NC_HOLY_PROMISE_LIST_CMD
 
@@ -6485,6 +6646,11 @@ Element `GUILD_ACADEMY_CLIENT` (736 bytes): +0 char[20] sAcademyMasterName, +20 
 
 Sent in reply to `0x9807` NC_GUILD_ACADEMY_MY_GUILD_ACADEMY_INFO_REQ on CParserClient (`FUN_00421f40`) · payload 2 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `186` (0xba) |
+| 1 | u8 | `25` (0x19) |
+
 Sent from `FUN_0043cf90` (`FUN_0043cf90`) · payload 14 bytes
 
 | Off | Type | Value / source |
@@ -6516,6 +6682,11 @@ Fill: +2: FUN_00430d50
 
 Sent in reply to `0x9809` NC_GUILD_ACADEMY_MY_ACADEMY_RANK_INFO_REQ on CParserClient (`FUN_00415ce0`) · payload 14 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `153` (0x99); `154` (0x9a) |
+| 1 | u8 | `24` (0x18) |
+
 ### `0x980c` NC_GUILD_ACADEMY_LIST_ACK
 
 **2016 PDB layout** *(pdb2016)*: `PROTO_NC_GUILD_ACADEMY_LIST_ACK`, 11 bytes + variable tail
@@ -6531,6 +6702,11 @@ Sent in reply to `0x9809` NC_GUILD_ACADEMY_MY_ACADEMY_RANK_INFO_REQ on CParserCl
 Element `SHINE_GUILD_ACADEMY_LIST` (42 bytes): +0 char[16] GuildName, +16 char[20] GuildMasterName, +36 u16 NumOfGuildMembers, +38 u16 NumOfAcademyMembers, +40 u16 NumOfGraduate
 
 Sent in reply to `0x980b` NC_GUILD_ACADEMY_LIST_REQ on CParserClient (`FUN_00422060`) · payload 11 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `169` (0xa9) |
+| 1 | u8 | `24` (0x18) |
 
 Sent from `FUN_00447ed0` (`FUN_00447ed0`) · payload variable (local_200c * 0x2a + 0xb)
 
@@ -6662,6 +6838,11 @@ Sent from `FUN_00440610` (`FUN_00440610`) · payload 20 bytes
 
 Sent in reply to `0x981b` NC_GUILD_ACADEMY_MEMBER_LEAVE_REQ on CParserClient (`FUN_00415f30`) · payload 2 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `163` (0xa3) |
+| 1 | u8 | `23` (0x17) |
+
 Sent from `FUN_00441fa0` (`FUN_00441fa0`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
@@ -6678,6 +6859,11 @@ Sent from `FUN_00441fa0` (`FUN_00441fa0`) · payload 2 bytes · raw header
 
 Sent in reply to `0x981f` NC_GUILD_ACADEMY_MASTER_TELEPORT_REQ on CParserClient (`FUN_00416010`) · payload 2 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `168` (0xa8); `169` (0xa9) |
+| 1 | u8 | `23` (0x17) |
+
 Sent from `FUN_00441fd0` (`FUN_00441fd0`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
@@ -6693,6 +6879,11 @@ Sent from `FUN_00441fd0` (`FUN_00441fd0`) · payload 2 bytes · raw header
 | 0 | u16 | Error |  |
 
 Sent in reply to `0x9821` NC_GUILD_ACADEMY_MEMBER_CHAT_BAN_REQ on CParserClient (`FUN_004161b0`) · payload 2 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `181` (0xb5) |
+| 1 | u8 | `23` (0x17) |
 
 Sent from `FUN_00442030` (`FUN_00442030`) · payload 2 bytes · raw header
 
@@ -6733,6 +6924,11 @@ Sent from `FUN_00447a00` (`FUN_00447a00`) · payload 40 bytes · raw header
 | 0 | u16 | Error |  |
 
 Sent in reply to `0x9824` NC_GUILD_ACADEMY_NOTIFY_REQ on CParserClient (`FUN_004163a0`) · payload 2 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `20` (0x14) |
+| 1 | u8 | `13` (0xd) |
 
 Sent from `FUN_00442060` (`FUN_00442060`) · payload 2 bytes · raw header
 
@@ -6887,6 +7083,11 @@ Sent from `FUN_00448840` (`FUN_00448840`) · payload variable ((uVar6 & 0xff) * 
 | 8191 | u8 | `*(byte *)(param_2 + 2)` |
 
 Sent from `FUN_00448840` (`FUN_00448840`) · payload 3 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `(byte)sVar2` |
+| 1 | u8 | `(byte)((ushort)sVar2 >> 8)` |
 
 ### `0x9836` NC_GUILD_ACADEMY_GET_REWARD_ITEM_ACK
 
@@ -7303,6 +7504,11 @@ Sent from `FUN_00440770` (`FUN_00440770`) · payload variable (local_201c)
 | 0 | u16 | error |  |
 
 Sent in reply to `0x9868` NC_GUILD_ACADEMY_CHAT_REQ on CParserClient (`FUN_00416f70`) · payload 2 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `46` (0x2e) |
+| 1 | u8 | `13` (0xd) |
 
 Sent from `FUN_00442000` (`FUN_00442000`) · payload 2 bytes · raw header
 
@@ -7758,6 +7964,11 @@ Sent in reply to `0xa805` NC_CHAT_RESTRICT_DB_ADD_ACK on CParserCharDB (`FUN_004
 
 Sent in reply to `0xa803` NC_CHAT_RESTRICT_ADD_REQ on CParserClient (`FUN_00422240`) · payload 24 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `4` |
+| 1 | u8 | `28` (0x1c) |
+
 ### `0xa80a` NC_CHAT_RESTRICT_DEL_ACK
 
 **2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAT_RESTRICT_DEL_ACK`, 22 bytes
@@ -7782,6 +7993,8 @@ Sent in reply to `0xa807` NC_CHAT_RESTRICT_DEL_REQ on CParserClient (`FUN_0041ec
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `17` (0x11) |
+| 1 | u8 | `28` (0x1c) |
 | 2 | u32 | `in(0xa807)+-1` |
 | 6 | u32 | `in(0xa807)+1` |
 | 10 | u32 | `in(0xa807)+3` |

@@ -247,6 +247,11 @@ L00 name was 'kicked / disconnect reason'
 
 Sent from `FUN_00409810` (`FUN_00409810`) · payload 2 bytes · raw header
 
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `131` (0x83) |
+| 1 | u8 | `6` |
+
 ### `0x0c1c` NC_USER_WORLD_STATUS_ACK
 
 **Verified layout**
@@ -393,6 +398,7 @@ Sent in reply to `0x2812` NC_OPTOOL_LOGIN_USER_RATABLE_GET_REQ on CParserOPTool 
 
 | Off | Type | Value / source |
 |---|---|---|
+| 0 | u8 | `in(0x2812)+0` |
 | 1 | u16 | `*(undefined2 *)(&DAT_00432fa0 + uVar2 * 3)` |
 | 3 | u16 | `*(undefined2 *)(&DAT_00432fa0 + uVar2 * 0xc + 2)` |
 | 5 | u16 | `*(undefined2 *)(&DAT_00432fa4 + uVar2 * 3)` |
@@ -414,6 +420,33 @@ Sent in reply to `0x2812` NC_OPTOOL_LOGIN_USER_RATABLE_GET_REQ on CParserOPTool 
 | 20 | u32 | IPBlock_Time |  |
 
 Sent in reply to `0x2818` NC_OPTOOL_LOGON_PROCESS_TIME_VIEW_REQ on CParserOPTool (`FUN_00407df0`) · payload 24 bytes · raw header
+
+| Off | Type | Value / source |
+|---|---|---|
+| 0 | u8 | `0` |
+| 1 | u8 | `0` |
+| 2 | u8 | `0` |
+| 3 | u8 | `0` |
+| 4 | u8 | `0` |
+| 5 | u8 | `0` |
+| 6 | u8 | `0` |
+| 7 | u8 | `0` |
+| 8 | u8 | `0` |
+| 9 | u8 | `0` |
+| 10 | u8 | `0` |
+| 11 | u8 | `0` |
+| 12 | u8 | `0` |
+| 13 | u8 | `0` |
+| 14 | u8 | `0` |
+| 15 | u8 | `0` |
+| 16 | u8 | `0` |
+| 17 | u8 | `0` |
+| 18 | u8 | `0` |
+| 19 | u8 | `0` |
+| 20 | u8 | `0` |
+| 21 | u8 | `0` |
+| 22 | u8 | `0` |
+| 23 | u8 | `0` |
 
 ## Hand-verified packets without a generated section
 

@@ -259,8 +259,9 @@ def stack_sites(fname, body):
             return p if 0 <= p < lim else None
         for ln in lines[lo:hi]:
             for name, idx, e in re.findall(r"^\s*(local_[0-9a-f]+)(?:\[(" + NUM + r")\])? = ([^;]+);", ln):
-                if name == base: continue
                 t, es, cnt = dl.get(name, ("undefined4", 4, 1))
+                # base[i], i >= hdr, of a byte buffer is a payload byte (header indices give o = None)
+                if name == base and (not idx or es != 1): continue
                 o = off_of(name, ival(idx) * es if idx else 0)
                 if o is not None:
                     add_field(fields, o, es if idx or cnt > 1 else es, tname(t, es), e)

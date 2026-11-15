@@ -340,6 +340,15 @@
       ],
       "kind": "write"
      },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_00432e50"
+      ],
+      "kind": "write"
+     },
      "4": {
       "size": 1,
       "type": "u8",
@@ -356,6 +365,24 @@
       "exprs": [
        "(ushort)DAT_00432e50"
       ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
       "kind": "write"
      }
     },
@@ -377,6 +404,15 @@
       ],
       "kind": "write"
      },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_00432e50"
+      ],
+      "kind": "write"
+     },
      "5": {
       "size": 2,
       "type": "i16",
@@ -393,6 +429,24 @@
       "exprs": [
        "DAT_00432e58"
       ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       1
+      ],
+      "exprs": [],
       "kind": "write"
      }
     },
@@ -1164,7 +1218,26 @@
     "func": "FUN_00405180",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       81
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -1230,7 +1303,26 @@
     "func": "FUN_00405c80",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       81
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -1239,7 +1331,26 @@
     "func": "FUN_00406280",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       74
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -1248,7 +1359,26 @@
     "func": "FUN_004063d0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       76
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -1776,7 +1906,26 @@
     "func": "FUN_00409810",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       131
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       6
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -2414,6 +2563,15 @@
     "size": 13,
     "size_expr": null,
     "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(byte)param_2[1]"
+      ],
+      "kind": "write"
+     },
      "1": {
       "size": 2,
       "type": "u16",
@@ -2479,7 +2637,224 @@
     "func": "FUN_00407df0",
     "size": 24,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "5": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "6": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "7": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "8": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "9": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "10": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "11": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "12": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "13": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "14": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "15": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "16": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "17": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "18": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "19": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "20": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "21": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "22": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "23": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }

@@ -159,7 +159,35 @@
     "func": "FUN_00446340",
     "size": 3,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       5
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       5
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       5
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -228,6 +256,15 @@
       ],
       "kind": "write"
      },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0049a528"
+      ],
+      "kind": "write"
+     },
      "4": {
       "size": 1,
       "type": "u8",
@@ -244,6 +281,24 @@
       "exprs": [
        "(ushort)DAT_0049a528"
       ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
       "kind": "write"
      }
     },
@@ -265,6 +320,15 @@
       ],
       "kind": "write"
      },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0049a528"
+      ],
+      "kind": "write"
+     },
      "5": {
       "size": 2,
       "type": "i16",
@@ -282,6 +346,24 @@
        "DAT_0049a530"
       ],
       "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       1
+      ],
+      "exprs": [],
+      "kind": "write"
      }
     },
     "fills": [],
@@ -293,6 +375,15 @@
     "size": 7,
     "size_expr": null,
     "fields": {
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "*(undefined1 *)((int)param_1 + 8)"
+      ],
+      "kind": "write"
+     },
      "4": {
       "size": 1,
       "type": "u8",
@@ -310,6 +401,33 @@
       ],
       "exprs": [],
       "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       5
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       2
+      ],
+      "exprs": [],
+      "kind": "write"
      }
     },
     "fills": [],
@@ -321,6 +439,15 @@
     "size": 7,
     "size_expr": null,
     "fields": {
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "*(undefined1 *)((int)param_1 + 8)"
+      ],
+      "kind": "write"
+     },
      "4": {
       "size": 1,
       "type": "u8",
@@ -335,6 +462,33 @@
       "type": "u16",
       "values": [
        8
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       5
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       3
       ],
       "exprs": [],
       "kind": "write"
@@ -358,6 +512,15 @@
       ],
       "kind": "write"
      },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0049a528"
+      ],
+      "kind": "write"
+     },
      "5": {
       "size": 2,
       "type": "i16",
@@ -374,6 +537,24 @@
       "exprs": [
        "DAT_0049a530"
       ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       4
+      ],
+      "exprs": [],
       "kind": "write"
      }
     },
@@ -501,6 +682,15 @@
     "size": 3,
     "size_expr": null,
     "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(undefined1)local_18.wHour"
+      ],
+      "kind": "write"
+     },
      "1": {
       "size": 1,
       "type": "u8",
@@ -530,7 +720,35 @@
     "func": "FUN_0042bc40",
     "size": 3,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       1
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -819,6 +1037,15 @@
       ],
       "kind": "write"
      },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "DAT_0049a52c"
+      ],
+      "kind": "write"
+     },
      "5": {
       "size": 4,
       "type": "u32",
@@ -979,6 +1206,15 @@
       "exprs": [
        "*(undefined2 *)((int)param_2 + 0xd)"
       ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
       "kind": "write"
      }
     },
@@ -2519,7 +2755,26 @@
     "func": "FUN_00419860",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       68
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -2538,6 +2793,60 @@
       "exprs": [
        "param_1"
       ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "5": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
       "kind": "write"
      }
     },
@@ -2581,6 +2890,60 @@
        "param_1[0x49]"
       ],
       "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "5": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
      }
     },
     "fills": [],
@@ -2599,6 +2962,60 @@
       "exprs": [
        "*(undefined4 *)(param_1 + 0x124)"
       ],
+      "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "5": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       255
+      ],
+      "exprs": [],
       "kind": "write"
      }
     },
@@ -3580,7 +3997,26 @@
     "func": "FUN_004158a0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       132
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       18
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -3703,7 +4139,26 @@
     "func": "FUN_00415960",
     "size": 26,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       132
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       18
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -4859,6 +5314,15 @@
       ],
       "exprs": [],
       "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       1
+      ],
+      "exprs": [],
+      "kind": "write"
      }
     },
     "fills": [],
@@ -5002,7 +5466,26 @@
     "func": "FUN_0040c6e0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       199
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -5011,7 +5494,26 @@
     "func": "FUN_00412fa0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       198
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -5022,7 +5524,17 @@
     "func": "FUN_0040a010",
     "size": 1,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(byte)param_2[6]"
+      ],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -5184,6 +5696,15 @@
       ],
       "kind": "write"
      },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(byte)param_2[4]"
+      ],
+      "kind": "write"
+     },
      "1": {
       "size": 4,
       "type": "u32",
@@ -5239,6 +5760,15 @@
     "size": 23,
     "size_expr": null,
     "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(byte)param_2[1]"
+      ],
+      "kind": "write"
+     },
      "1": {
       "size": 4,
       "type": "u32",
@@ -6041,7 +6571,26 @@
     "func": "FUN_00413510",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       192
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       7
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -6050,7 +6599,26 @@
     "func": "FUN_00413510",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       194
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       7
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -8444,6 +9012,15 @@
        "*(undefined1 *)((int)param_2 + 3)"
       ],
       "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(byte)param_2[1]"
+      ],
+      "kind": "write"
      }
     },
     "fills": [],
@@ -8999,6 +9576,28 @@
       ],
       "exprs": [
        "*(undefined4 *)(pbVar6 + uVar4 * 0x24 + 0xc)"
+      ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [
+       "(char)uVar4"
+      ],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [
+       "cVar1"
       ],
       "kind": "write"
      }
@@ -12725,6 +13324,24 @@
        "(undefined1)param_2[0xf]"
       ],
       "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       199
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       12
+      ],
+      "exprs": [],
+      "kind": "write"
      }
     },
     "fills": [],
@@ -12791,6 +13408,24 @@
     "size": 27,
     "size_expr": null,
     "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       133
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       49
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
      "14": {
       "size": 4,
       "type": "u32",
@@ -12838,7 +13473,26 @@
     "func": "FUN_00414cc0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       8
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       13
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -12847,7 +13501,26 @@
     "func": "FUN_00414d40",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       8
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       13
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -13342,7 +14015,26 @@
     "func": "FUN_00414dc0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       20
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       13
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -13351,7 +14043,29 @@
     "func": "FUN_00445b90",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       16,
+       17,
+       18,
+       19
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       13
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -13360,7 +14074,26 @@
     "func": "FUN_00445ca0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       65
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       12
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -13599,7 +14332,26 @@
     "func": "FUN_004217b0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       203
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       12
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -13608,7 +14360,26 @@
     "func": "FUN_004217b0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       202
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       12
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -13661,7 +14432,62 @@
     "func": "FUN_004218c0",
     "size": 6,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "5": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -13730,7 +14556,26 @@
     "func": "FUN_00415070",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       228
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       12
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -13760,7 +14605,26 @@
     "func": "FUN_00414e50",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       40
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       13
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -13788,7 +14652,29 @@
     "func": "FUN_0044dba0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       32,
+       33,
+       34,
+       35
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       13
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -15763,7 +16649,26 @@
     "func": "FUN_00415230",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       46
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       13
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -16085,6 +16990,15 @@
     "size": 17,
     "size_expr": null,
     "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(byte)param_1"
+      ],
+      "kind": "write"
+     },
      "1": {
       "size": 2,
       "type": "u16",
@@ -16230,6 +17144,15 @@
     "size": 12,
     "size_expr": null,
     "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "*param_2"
+      ],
+      "kind": "write"
+     },
      "1": {
       "size": 2,
       "type": "u16",
@@ -16823,7 +17746,27 @@
     "func": "FUN_00414ec0",
     "size": 10,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       202,
+       203
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       12
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -16949,7 +17892,27 @@
     "func": "FUN_00414fa0",
     "size": 45,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       105,
+       106
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       27
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -18743,6 +19706,25 @@
        "(undefined4)lVar2"
       ],
       "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       169,
+       170
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       13
+      ],
+      "exprs": [],
+      "kind": "write"
      }
     },
     "fills": [],
@@ -18821,7 +19803,44 @@
     "func": "FUN_00415530",
     "size": 4,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       177
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       13
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -20028,7 +21047,207 @@
     "func": "FUN_00421d10",
     "size": 68,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "18": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "19": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "20": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "21": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "14": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "15": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "16": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "17": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "10": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "11": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "12": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "13": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "6": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "7": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "8": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "9": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "5": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       72,
+       78
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       23
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -20071,7 +21290,206 @@
     "func": "FUN_0041e570",
     "size": 22,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "16": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "17": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "18": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "19": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "12": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "13": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "14": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "15": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "8": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "9": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "10": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "11": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "4": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "5": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "6": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "7": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "2": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "3": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       0
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "20": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       96
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "21": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       23
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -21210,7 +22628,26 @@
     "func": "FUN_00421f40",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       186
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       25
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -21219,7 +22656,26 @@
     "func": "FUN_00421f40",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       185
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       25
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -21310,7 +22766,27 @@
     "func": "FUN_00415ce0",
     "size": 14,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       153,
+       154
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       24
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -21321,7 +22797,26 @@
     "func": "FUN_00422060",
     "size": 11,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       169
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       24
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -22119,7 +23614,26 @@
     "func": "FUN_00415f30",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       163
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       23
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -22147,7 +23661,26 @@
     "func": "FUN_00448220",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       128
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       23
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -22242,7 +23775,27 @@
     "func": "FUN_00416010",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       168,
+       169
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       23
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -22272,7 +23825,26 @@
     "func": "FUN_004161b0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       181
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       23
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -22504,7 +24076,26 @@
     "func": "FUN_004163a0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       20
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       13
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -22532,7 +24123,29 @@
     "func": "FUN_004483e0",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       184,
+       185,
+       186,
+       187
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       23
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -23182,7 +24795,26 @@
     "func": "FUN_00448840",
     "size": 3,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(byte)sVar2"
+      ],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(byte)((ushort)sVar2 >> 8)"
+      ],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -25544,7 +27176,26 @@
     "func": "FUN_00416f70",
     "size": 2,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       46
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       13
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    },
@@ -26718,6 +28369,15 @@
       "values": [],
       "exprs": [
        "*(undefined4 *)((int)param_2 + 3)"
+      ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [],
+      "exprs": [
+       "(byte)param_2[1]"
       ],
       "kind": "write"
      },
@@ -28603,7 +30263,26 @@
     "func": "FUN_00422240",
     "size": 24,
     "size_expr": null,
-    "fields": {},
+    "fields": {
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       4
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       28
+      ],
+      "exprs": [],
+      "kind": "write"
+     }
+    },
     "fills": [],
     "raw": true
    }
@@ -28773,6 +30452,24 @@
       "exprs": [
        "*(undefined4 *)(param_2 + 9)"
       ],
+      "kind": "write"
+     },
+     "0": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       17
+      ],
+      "exprs": [],
+      "kind": "write"
+     },
+     "1": {
+      "size": 1,
+      "type": "u8",
+      "values": [
+       28
+      ],
+      "exprs": [],
       "kind": "write"
      }
     },
