@@ -1,0 +1,63 @@
+{
+  "_about": "Z31: zone class-named functions no document cited (guild rename / retype commit, chat-spam block save, chat colour save). Offsets are payload offsets (after the 2-byte opcode). Layouts read in the 2016 zone code (zone-pdb export); names from the 2016 zone PDB. See docs/pseudocode/zone/Z31-class-remainder.md.",
+  "packets": {
+    "zone": {
+      "0x74b1": {
+        "dir": "Z→WM",
+        "name": "NC_GUILD_WORLD_RENAME_CMD",
+        "basis": "zone ShinePlayer::so_ply_GuildReNameItemUseSuccess FUN_00473ea0 (vt 0x888, after the Item DB confirmed the rename item); receiver wm FUN_0042e520 (W03 §9.3)",
+        "fields": [
+          [0, "u16", "zoneHandle", "player's zone object handle (6-byte ref)"],
+          [2, "u32", "charNo", "so_GetCharRegistNumber (6-byte ref)"],
+          [6, "Name4", "sGuildName", "new guild name from queue_GuildReName"]
+        ],
+        "notes": "0x16 bytes payload (0x18 with opcode); sent only when the ring entry still belongs to the player; followed by 0x74AD {0x1A40} to the client"
+      },
+      "0x74b9": {
+        "dir": "Z→WM",
+        "name": "NC_GUILD_WORLD_RETYPE_CMD",
+        "basis": "zone ShinePlayer::so_ply_GuildReTypeItemUseSuccess FUN_00474250 (vt 0x88c); receiver wm FUN_0042bf60 (W03 §9.4)",
+        "fields": [
+          [0, "u16", "zoneHandle", "6-byte ref"],
+          [2, "u32", "charNo", "6-byte ref"],
+          [6, "u8", "nType", "new guild type from queue_GuildReType"]
+        ],
+        "notes": "7 bytes payload (9 with opcode); followed by 0x74B5 {0x1A58} to the client"
+      },
+      "0x4022": {
+        "dir": "Z→CharDB",
+        "name": "NC_CHARSAVE_SET_CHAT_BLOCK_SPAMER_DB_CMD",
+        "basis": "zone ShinePlayer::so_SpamSendDataToCharDB FUN_00562990 (vt 0xab8, full save ws_save2DB); receiver character FUN_00423420 (D02)",
+        "fields": [
+          [0, "u32", "CharNo", ""],
+          [4, "u32", "BlockTime", "seconds of chat block left (min 1 while blocked), 0 = not blocked"],
+          [8, "u32", "DelayTime", "BlockTime != 0: probation seconds after the block; BlockTime == 0: unix time the probation ends, 0 = none"]
+        ],
+        "notes": "0xC bytes payload, no header; a zero state is sent once after a non-zero one (sp_SpamerInfoSaveChack), otherwise skipped"
+      },
+      "0x4021": {
+        "dir": "Z→WM",
+        "name": "NC_CHARSAVE_SET_CHAT_BLOCK_SPAMER_WM_CMD",
+        "basis": "zone ShinePlayer::sp_SpamSendDataToWM FUN_00562bc0 (from ws_save2worldmanager); receiver wm FUN_0042c2a0 (W05)",
+        "fields": [
+          [0, "u16", "WmHandle", "so_GetWMSHandle"],
+          [2, "u32", "CharNo", ""],
+          [6, "u32", "BlockTime", "as 0x4022"],
+          [10, "u32", "DelayTime", "as 0x4022"]
+        ],
+        "notes": "0xE bytes payload; always sent; the WM returns the values in 0x10CB at the next map login"
+      },
+      "0x4032": {
+        "dir": "Z→WM",
+        "name": "NC_CHARSAVE_2WLDMAN_CHAT_COLOR_CMD",
+        "basis": "zone ShinePlayer::sp_ChatColor_Save2World FUN_00563c70 (from ws_save2worldmanager); receiver wm FUN_0042ccc0 (W05)",
+        "fields": [
+          [0, "u32", "nCharNo", ""],
+          [4, "u8", "nChatFontColorID", "sp_nChatFontColor"],
+          [5, "u8", "nChatBalloonColorID", "sp_nChatBalloonColor"]
+        ],
+        "notes": "6 bytes payload"
+      }
+    }
+  }
+}

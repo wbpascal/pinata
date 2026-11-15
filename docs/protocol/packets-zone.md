@@ -13904,6 +13904,18 @@ to everyone in range of the caster and the caster. Z16 §6.5
 | 10 | u64 | itemonfield | 0xFFFFFFFF_FFFFFFFF (no drop object) |
 | 18 | u32 | cen | amount added |
 
+### `0x4022` NC_CHARSAVE_SET_CHAT_BLOCK_SPAMER_DB_CMD (Z→CharDB)
+
+**Verified layout** (basis: zone ShinePlayer::so_SpamSendDataToCharDB FUN_00562990 (vt 0xab8, full save ws_save2DB); receiver character FUN_00423420 (D02))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | CharNo |  |
+| 4 | u32 | BlockTime | seconds of chat block left (min 1 while blocked), 0 = not blocked |
+| 8 | u32 | DelayTime | BlockTime != 0: probation seconds after the block; BlockTime == 0: unix time the probation ends, 0 = none |
+
+0xC bytes payload, no header; a zero state is sent once after a non-zero one (sp_SpamerInfoSaveChack), otherwise skipped
+
 ### `0x4801` NC_SKILL_SKILLTEACH_REQ (Z→CharDB)
 
 **Verified layout** (basis: zone ac_learnskill FUN_0041c290 (0x11 bytes incl. opcode); D04 §2)
@@ -14749,6 +14761,19 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 18 | u32 | linkfrom.coord.x | current position |
 | 22 | u32 | linkfrom.coord.y |  |
 
+### `0x4021` NC_CHARSAVE_SET_CHAT_BLOCK_SPAMER_WM_CMD (Z→WM)
+
+**Verified layout** (basis: zone ShinePlayer::sp_SpamSendDataToWM FUN_00562bc0 (from ws_save2worldmanager); receiver wm FUN_0042c2a0 (W05))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | WmHandle | so_GetWMSHandle |
+| 2 | u32 | CharNo |  |
+| 6 | u32 | BlockTime | as 0x4022 |
+| 10 | u32 | DelayTime | as 0x4022 |
+
+0xE bytes payload; always sent; the WM returns the values in 0x10CB at the next map login
+
 ### `0x402a` NC_CHARSAVE_2WLDMAN_SINGLE_OPTION_CMD (Z→WM)
 
 **Verified layout** (basis: zone FUN_00563050 (pdb2016 struct); Z12 §7.2)
@@ -14764,6 +14789,18 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 16 | u8 | bFirstJoin | always 0 |
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `resttime`: 0 (written as 0); `autopick`: 0; `mystery_vault`: 1; `bFirstJoin`: 0 (written as 0)
+
+### `0x4032` NC_CHARSAVE_2WLDMAN_CHAT_COLOR_CMD (Z→WM)
+
+**Verified layout** (basis: zone ShinePlayer::sp_ChatColor_Save2World FUN_00563c70 (from ws_save2worldmanager); receiver wm FUN_0042ccc0 (W05))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo |  |
+| 4 | u8 | nChatFontColorID | sp_nChatFontColor |
+| 5 | u8 | nChatBalloonColorID | sp_nChatBalloonColor |
+
+6 bytes payload
 
 ### `0x4033` NC_CHARSAVE_2WLDMAN_PET_LINK_RESUMMON_CMD (Z→WM)
 
@@ -14879,6 +14916,30 @@ sent once per process (gz_IsSendReq); the byte is never written (original bug Z3
 | 2 | u32 | ref.charNo |  |
 | 6 | u8 | nItemSlot |  |
 | 7 | Name4 | sGuildName |  |
+
+### `0x74b1` NC_GUILD_WORLD_RENAME_CMD (Z→WM)
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_GuildReNameItemUseSuccess FUN_00473ea0 (vt 0x888, after the Item DB confirmed the rename item); receiver wm FUN_0042e520 (W03 §9.3))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | zoneHandle | player's zone object handle (6-byte ref) |
+| 2 | u32 | charNo | so_GetCharRegistNumber (6-byte ref) |
+| 6 | Name4 | sGuildName | new guild name from queue_GuildReName |
+
+0x16 bytes payload (0x18 with opcode); sent only when the ring entry still belongs to the player; followed by 0x74AD {0x1A40} to the client
+
+### `0x74b9` NC_GUILD_WORLD_RETYPE_CMD (Z→WM)
+
+**Verified layout** (basis: zone ShinePlayer::so_ply_GuildReTypeItemUseSuccess FUN_00474250 (vt 0x88c); receiver wm FUN_0042bf60 (W03 §9.4))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | zoneHandle | 6-byte ref |
+| 2 | u32 | charNo | 6-byte ref |
+| 6 | u8 | nType | new guild type from queue_GuildReType |
+
+7 bytes payload (9 with opcode); followed by 0x74B5 {0x1A58} to the client
 
 ### `0x74c0` NC_GUILD_ZONE_USE_GUILD_TOKEN_CMD (Z→WM)
 
