@@ -1,0 +1,339 @@
+{
+ "_about": "Z30: zone leftovers (rename by item, dismantle DB request, holy-promise ring transfer, academy-member ring search, title broadcasts, guild list request, SP stone broadcast). Offsets are payload offsets (after the 2-byte opcode). Layouts read in the 2016 zone code; names and structs from the 2016 zone PDB (pdb2016). See docs/pseudocode/zone/Z30-leftovers.md.",
+ "packets": {
+  "zone": {
+   "0xb40f": {
+    "dir": "WM→Z",
+    "name": "NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD",
+    "basis": "zone wms_NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD FUN_0044caa0; sender wm CWMClientSession::CharIDChange FUN_00431dd0 (broadcast to all zones)",
+    "fields": [
+     [
+      0,
+      "u32",
+      "nCharNo",
+      "renamed character"
+     ],
+     [
+      4,
+      "u8",
+      "bInit",
+      "1 = relations reset: the zone drops the member from its party / raid copy"
+     ],
+     [
+      5,
+      "Name5",
+      "sOldID",
+      "not read by the zone"
+     ],
+     [
+      25,
+      "Name5",
+      "sNewID",
+      "new party / raid member name"
+     ]
+    ],
+    "notes": "0x2d bytes, PROTO_NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD; no reply"
+   },
+   "0x3476": {
+    "dir": "Z→GameDB",
+    "name": "NC_ITEMDB_DISMANTLE_REQ",
+    "basis": "zone sp_NC_ITEM_DISMANTLE_REQ FUN_005293c0 → idp_DismantleProductExecute FUN_00529110",
+    "fields": [
+     [
+      0,
+      "u16",
+      "header.clienthandle",
+      "player handle"
+     ],
+     [
+      2,
+      "u32",
+      "header.charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "inventory lock index (incremented after)"
+     ],
+     [
+      8,
+      "u8",
+      "raw.vanish",
+      "always 1"
+     ],
+     [
+      9,
+      "u16",
+      "raw.rawid",
+      "dismantled item id"
+     ],
+     [
+      11,
+      "u16",
+      "raw.rawuselot_log",
+      "always 1"
+     ],
+     [
+      13,
+      "u64",
+      "raw.iteminfo.itemchange.attritemregnum",
+      "dismantled item key"
+     ],
+     [
+      21,
+      "u16",
+      "raw.iteminfo.itemchange.attr",
+      "ITEM_INVEN 0x2400 | slot (location word)"
+     ],
+     [
+      23,
+      "u16",
+      "raw.iteminfo.itemchange.location",
+      "not written"
+     ],
+     [
+      25,
+      "u8",
+      "producenumber",
+      "number of produce entries (≤ 64)"
+     ],
+     [
+      26,
+      "produce[producenumber]",
+      "produce",
+      "0x2b each: u8 create, u16 product, u16 productuselot_log, union { PROTO_ITEM_ATTRCHANGE { u64 regnum, u16 attr = attribute-data offset, ITEM_INVEN location } (create 0) | PROTO_ITEM_CREATE { u32 owner, MAPPOS map, ITEM_INVEN location, u64 regnum, u16 itemid, u16 attr = attribute-data offset } (create 1) }"
+     ]
+    ],
+    "notes": "variable length: after produce[] the attribute data of each produce entry is appended (ItemAttributeClass vt 4); the attr words point at it, relative to the payload start"
+   },
+   "0x9436": {
+    "dir": "Z↔Z ring",
+    "name": "NC_HOLY_PROMISE_CENTRANSFER_RNG",
+    "basis": "zone zls_NC_HOLY_PROMISE_CENTRANSFER_RNG FUN_004839b0, hpctm_Process FUN_00483860 (forward)",
+    "fields": [
+     [
+      0,
+      "ZONERINGLINKAGESTART",
+      "start",
+      "{u8 machine, u16 handle, u32 regnum}"
+     ],
+     [
+      7,
+      "u32",
+      "upper",
+      "receiver (master) charNo"
+     ],
+     [
+      11,
+      "u32",
+      "cen",
+      "money"
+     ],
+     [
+      15,
+      "Name5",
+      "lower",
+      "trainee name"
+     ]
+    ],
+    "notes": "0x23 bytes; no 2016 originator (the spending hook is empty)"
+   },
+   "0x941b": {
+    "dir": "Z→C",
+    "name": "NC_HOLY_PROMISE_REWARD_MONEY_CMD",
+    "basis": "zone sp_HolyPromiseCenFrom FUN_00483aa0; client FUN_004b0040",
+    "fields": [
+     [
+      0,
+      "Name5",
+      "MemberCharID",
+      "trainee name"
+     ],
+     [
+      20,
+      "u64",
+      "nMoney",
+      "low half = cen, high half 0"
+     ]
+    ],
+    "notes": "0x1c bytes"
+   },
+   "0x10ad": {
+    "dir": "Z↔Z ring",
+    "name": "NC_CHAR_PLAYERSEARCH_BY_NORMAL_USER_RNG",
+    "basis": "zone zrpb_Request FUN_005a7430 (origin), zls_NC_CHAR_PLAYERSEARCH_BY_NORMAL_USER_RNG FUN_0045c0b0",
+    "fields": [
+     [
+      0,
+      "ZONERINGLINKAGESTART",
+      "start",
+      "{u8 machine = origin zone, u16 handle = master handle, u32 regnum = master charNo}"
+     ],
+     [
+      7,
+      "Name5",
+      "charid",
+      "searched academy member"
+     ]
+    ],
+    "notes": "0x1b bytes"
+   },
+   "0x10ae": {
+    "dir": "Z↔Z ring",
+    "name": "NC_CHAR_PLAYERFOUND_BY_NORMAL_USER_RNG",
+    "basis": "zone FUN_0045c0b0 (builder), zls_NC_CHAR_PLAYERFOUND_BY_NORMAL_USER_RNG FUN_0045c340, zrpb_Success FUN_005a7cf0",
+    "fields": [
+     [
+      0,
+      "ZONERINGLINKAGESTART",
+      "start",
+      "copied from 0x10AD"
+     ],
+     [
+      7,
+      "Name3",
+      "map",
+      "target's map"
+     ],
+     [
+      19,
+      "SHINE_XY_TYPE",
+      "coord",
+      "target's x, y"
+     ],
+     [
+      27,
+      "Name5",
+      "charid",
+      "target name"
+     ],
+     [
+      47,
+      "u8",
+      "canRecall",
+      "target vt 0xa78 so_ply_IsLink_In_MapAndSendErrorMsg == 1"
+     ],
+     [
+      48,
+      "u8",
+      "modeIDLv",
+      "target map fm_eLevelType (ILT_MAX → 1)"
+     ]
+    ],
+    "notes": "0x31 bytes (the 2016 PDB also has a 0x30-byte definition without modeIDLv; the zone writes and reads 0x31)"
+   },
+   "0x6003": {
+    "dir": "Z→C",
+    "name": "NC_CT_SET_SOMEONECHANGE_CMD",
+    "basis": "zone CCharacterTitleZone::Send_NC_CT_SET_CURRENT_ACK FUN_005ca9e0 (only after Error 0xA01, not on NameHide maps); client FUN_00499700",
+    "fields": [
+     [
+      0,
+      "u16",
+      "hnd",
+      "player handle"
+     ],
+     [
+      2,
+      "u8",
+      "Type",
+      "title type"
+     ],
+     [
+      3,
+      "u8",
+      "ElementNo",
+      "title level"
+     ],
+     [
+      4,
+      "u16",
+      "MobID",
+      "weapon-title mob"
+     ]
+    ],
+    "notes": "6 bytes, broadcast to the players in sight"
+   },
+   "0x6008": {
+    "dir": "Z→GameDB",
+    "name": "NC_CT_SET_CURRENT_DB_CMD",
+    "basis": "zone CCharacterTitleZone::Send_NC_CT_SET_CURRENT_DB_CMD FUN_005cadd0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "header.clienthandle",
+      ""
+     ],
+     [
+      2,
+      "u32",
+      "header.charregistnumber",
+      "not sent when −1 or 0"
+     ],
+     [
+      6,
+      "u8",
+      "CurrentTitle",
+      "req.Type"
+     ],
+     [
+      7,
+      "u8",
+      "CurrentTitleElement",
+      "req.ElementNo"
+     ],
+     [
+      8,
+      "u16",
+      "CurrentTitleMobID",
+      "req.MobID"
+     ],
+     [
+      10,
+      "CT_INFO",
+      "UseTitle",
+      "{u8 Type, u8 ElementNo:6 | ElementValue:2}"
+     ],
+     [
+      12,
+      "CT_INFO",
+      "UseAbleTitle",
+      ""
+     ]
+    ],
+    "notes": "0xe bytes; no answer"
+   },
+   "0x7446": {
+    "dir": "Z→WM",
+    "name": "NC_GUILD_ZONE_LIST_REQ",
+    "basis": "zone CGuildZone::Send_NC_GUILD_ZONE_LIST_REQ FUN_005cc980",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "pp_SetPacketLen(3): one byte after the opcode, never written"
+     ]
+    ],
+    "notes": "sent once per process (gz_IsSendReq); the byte is never written (original bug Z30-B8); answer 0x7447 (Z08 §8)"
+   },
+   "0x500c": {
+    "dir": "Z→C",
+    "name": "NC_SOULSTONE_SP_SOMEONEUSE_CMD",
+    "basis": "zone sp_SPStoneUse FUN_00588a40; client FUN_004ad900",
+    "fields": [
+     [
+      0,
+      "u16",
+      "player",
+      "handle of the player who used the SP stone"
+     ]
+    ],
+    "notes": "broadcast to the players in sight"
+   }
+  }
+ }
+}
