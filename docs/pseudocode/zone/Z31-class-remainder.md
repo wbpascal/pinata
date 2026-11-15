@@ -775,7 +775,7 @@ simg_FillBuffer_Client(mgr, u8* n, PROTO_SELL_ITEM_INFO* out)                   
 ShinePlayer::so_ply_CanItemRepurchase(p) → bool        @ FUN_005379f0   (vt 0xe6c)
     the open NPC's role (sp_NPCProcess.npc.func) vt 0x38 (repurchase allowed); no NPC: false
 ```
-`0x305B` is the repurchase list ("items sold to this merchant") *(inferred from vt 0xe6c and 0x3059 REPURCHASE)*. Its caller is `NPCRole_Merchant::nrm_ShopMenuOpen`
+`0x305B` is the repurchase list ("items sold to this merchant"): official name `NC_ITEM_SELL_ITEM_LIST_CMD` (cmd 91) *(pdb2017)*, and the 2017 client passes it to `Market::SetRepurchaseItem(PROTO_NC_ITEM_SELL_ITEM_LIST_CMD*, …)` *(pdb2017)*; the 2016 client handler is FUN_004a7200 (reads the count byte and the rows). Consistent with vt 0xe6c and 0x3059 REPURCHASE in the 2016 code. Its caller is `NPCRole_Merchant::nrm_ShopMenuOpen`
 FUN_004c26b0 (Z02), when a merchant menu opens. The insert / delete updates `0x305C` / `0x305D` come from
 `so_ply_SellItemList_Insert` FUN_00537a20 / `…_Delete` FUN_00537ba0 (Z04 §2.5, Z05), which test vt 0xe6c first. `sp_NC_ITEM_REPURCHASE_REQ`
 FUN_00538580 also tests it. `nDataSize` counts the handle plus the item bytes. The next element starts at
@@ -1749,11 +1749,11 @@ CommonData<GBBanGame, CmpGameType<GBBanGame>>::cd_Find(this, CmpGameType key) �
     for each row in *cd_Data (file order): if row.GameType == key.cgt_GameType: return row
     return null
     # also used on g_TaxRate (same 12-byte rows, GameType at +0: identical-code folding). Callers:
-    #   CGambleDiceTaiSaiObject::go_Init FUN_00614f10 (g_TaxRate, game 0x17), SlotMachineScreen::go_Enter_Player
+    #   CGambleDiceTaiSaiObject::go_Init (Z32; g_TaxRate, game 0x17), SlotMachineScreen::go_Enter_Player
     #   FUN_00620d00, SlotMachineJackPotRanking::smjpr_Load FUN_00624270
 CommonData<GBEventCode, CmpEventCode>::cd_Find(this, {cec_GameType, cec_AnyType})                 @ FUN_00614e90
     first row with row.GameType == cec_GameType and row.GB_ANI == cec_AnyType, else null
-    # callers: go_Init FUN_00614f10 (game 0x17 with GB_ANI 0, 1, 2, …), CGambleObject::go_PlayerAction FUN_00615180
+    # callers: CGambleDiceTaiSaiObject::go_Init (Z32; game 0x17 with GB_ANI 0, 1, 2, …), CGambleObject::go_PlayerAction FUN_00615180
 CommonData<GBReward, CmpGambleItemReward>::cd_Find(this, {cgir_GameType, cgir_Status})            @ FUN_00620970
     first row with row.GameType == cgir_GameType and row.RewardType == cgir_Status, else null
     # caller: SlotMachine::SlotMachineScreen::SMS_StopButton FUN_00625340
@@ -2939,7 +2939,11 @@ before anything moves the player:
 ShinePlayer::so_ply_ReinforceFoldtent(p)                        @ FUN_0055ae50
     if mode ≠ 4: return
     p.so_SendProtocol(8, 0x3d) (vt 0x304, FUN_0054ef70: header-only packet)
-        → p ← 0x203D NC_ACT_REINFORCE_FOLDTENT_CMD {}  (pdb2017 name; client FUN_004c4bc0 reads no payload)
+        → p ← 0x203D NC_ACT_REINFORCE_FOLDTENT_CMD {}  (pdb2017 name)
+          # client: dispatcher FUN_004be490 routes 0x203D to FUN_004c4bc0, which reads no payload; its body matches the
+          # 2017 `GameFrameWork::ChangeCampMode(bool, …)` (pdb2017): local character vt 0x28 with its two arguments
+          # and, when the first is true, the mini-house sounds (FUN_006671f0 / FUN_0069ae50). The argument values the
+          # dispatcher passes were not traced
     mode = 1
     if sp_MiniHouse.mhs_Backup.bib_Backuped (+0x292d7): copy the 0x2b saved shape bytes (+0x292ac) back to
         brief.shapedata (brief +0x25); bib_Backuped = 0
@@ -2947,7 +2951,9 @@ ShinePlayer::so_ply_ReinforceFoldtent(p)                        @ FUN_0055ae50
     broadcast to sight (so_AllOfRange) 0x202C NC_ACT_SOMEONEFOLDTENT_CMD, 0x2f bytes:
         writes only the opcode and u16 handle = p+4; bytes 4..0x2e (the shapedata) are left as they are in g_buf
         # (original bug) Z31-B26: 0x202A copies brief.shapedata there (Z02 §7); here the 43 bytes are whatever the
-        # previous packet left, so the onlookers' client draws the player with a stale look
+        # previous packet left, so the onlookers' client draws the player with a stale look: the client 0x202C
+        # handler FUN_00499db0 (`On_NC_ACT_SOMEONEFOLDTENT_CMD` pdb2017) finds the character by the u16 handle and
+        # passes payload+2 (the 43 shape bytes) to char vt 0x40, then vt 0x28(0, 4)
 ```
 
 Callers of vt 0x488, each `if mode == 4` first: the link / teleport visitors `AxialListLinkTo` FUN_00428950,
@@ -3052,6 +3058,8 @@ not 0x288b; 0x288c, 0x288e and 0x288f are read in the code, not inferred.
     so_ply_ArrangeInvenDelayCheck (vt 0xd10)                        @ FUN_00560d90
         sp_ArrangeInvenDelayCheckTime (+0x2ab1c) + 50 < now: stamp = now; passes
         else:                                                      0x30a9
+        # (original bug) Z31-B29: the client has no text for 0x30a9; its 0x304B handler FUN_004b3f90 shows every
+        # code through FUN_00416430, so a second request within 5 s prints "An unidentified error code has occurred.: 12457"
         # the stamp is set before the next two checks, so a request refused by them still starts a new 5 s wait
     sp_GetMoverUpgradeWaitState FUN_00561600 (sp_MiscFlag.bMoverUpgradeWait) or
     sp_GetItemBuyWaitState FUN_00561760 (sp_MiscFlag.bItemBuyWait): 0x30aa
@@ -3128,9 +3136,10 @@ the usable size, Z04 §4.1 shows no such refusal)*.
 | Z31-B23 | `OPToolSession::opts_DummyFunction` FUN_004c7fb0, `LinearStep::ls_Set` FUN_004cdd60 §10.1 / §10.5 | assert texts name the wrong function (`ZoneListenSession::opts_DummyFunction`, `LinearStep::ls_step`) | misleading logs only | the own names |
 | Z31-B24 | `AxialListPacketBroadcast::~AxialListPacketBroadcast` FUN_00428d00 §10.8 | writes its name into `fca_stack[fca_stackpoint]` without incrementing the pointer | the name stays above the stack top until overwritten; the hang dump (Z10 §6.4 prints every non-null entry) can list it although the function has returned | push and pop like the other profiled functions |
 | Z31-B25 | `ZoneConnectSession::ZoneConnectSession` FUN_005a6cd0 §10.1 | `m_Connected_Server_ID = 3`, the `GameLogSession` value | none found: nothing reads the field for the ring link | 6 (zone) |
-| Z31-B26 | `so_ply_ReinforceFoldtent` FUN_0055ae50 (vt 0x488) §11.3 | the forced tent fold broadcasts 0x202C NC_ACT_SOMEONEFOLDTENT_CMD with 0x2f bytes but writes only the opcode and the handle; the 43 shapedata bytes are whatever an earlier packet left in `g_buf` | onlookers draw the player who was folded out of the tent (link, teleport, KQ, wedding, abstate) with a stale look until the next brief refresh | copy `brief.shapedata` like 0x202A FUN_00457a90 |
+| Z31-B26 | `so_ply_ReinforceFoldtent` FUN_0055ae50 (vt 0x488) §11.3 | the forced tent fold broadcasts 0x202C NC_ACT_SOMEONEFOLDTENT_CMD with 0x2f bytes but writes only the opcode and the handle; the 43 shapedata bytes are whatever an earlier packet left in `g_buf` (the client 0x202C handler FUN_00499db0 applies them as the shape, char vt 0x40) | onlookers draw the player who was folded out of the tent (link, teleport, KQ, wedding, abstate) with a stale look until the next brief refresh | copy `brief.shapedata` like 0x202A FUN_00457a90 |
 | Z31-B27 | 0x3048 `sp_NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ` FUN_0051b9a0 §11.4 | an open NPC menu / storage is answered with 0x2887, which the client shows as "The item level is different"; 0x2883 (no field), 0x2886 (captivated), 0x2888 / 0x2889 (missing cell) have no client text | misleading or "An unidentified error code has occurred.: N" messages | codes the client knows (e.g. the 0x30aa-style "close the other windows" text) |
 | Z31-B28 | `ShinePet::spt_FindMaster` FUN_00419a80, `so_ply_Summon2GuildTournament` FUN_00478750, `sp_Guild_Tournamnet_Observer_Enter` FUN_004788c0 §11.3 | test `mode ≠ 7`; nothing in the 2016 zone sets mode 7 | dead checks | drop them (or a removed mode) |
+| Z31-B29 | 0x304A `sp_NC_ITEM_AUTO_ARRANGE_INVEN_REQ` FUN_0051c360 §11.5 | a request within 50 ticks (5 s) of the last is answered with 0x304B code 0x30a9, which `client-error-codes.json` / the client text table do not have (0x30a8, 0x30aa-0x30ac do) | the client handler FUN_004b3f90 prints "An unidentified error code has occurred.: 12457" | a code with a text (0x30a8 already says "can not be used again for 5 sec.") or no answer |
 
 ## Not reconstructed / uncertain
 
@@ -3210,8 +3219,8 @@ the usable size, Z04 §4.1 shows no such refusal)*.
 
 ## Coverage boundary
 
-Sweep (part 11, 2026-11-15): `X02-cov.py game zone` leaves 86 class-named functions (3 973 lines), all of them gamble
-classes; `Z31-parts.py` lists only its part G. A reach scan from the 1 759 zone functions this document cites (3 calls deep,
+Sweep (part 11, 2026-11-15; recounted after the review, part 12): `X02-cov.py game zone` leaves 87 class-named functions, all of them gamble
+classes (Z32); `Z31-parts.py` lists only its part G. A reach scan from the 1 759 zone functions this document cites (3 calls deep,
 the `coverage.py` rules: hubs, tiny and library functions skipped) finds 12 uncited functions: the gamble ones of the
 first row, the four Lua 5.2 internals of the second row; `operator==(String&, String&)` FUN_00653820 and the
 `_Type_info_dtor` funclet FUN_0066355d are now in §10.7. The 11 `FUN_` addresses of this text without a zone name are
@@ -3234,10 +3243,10 @@ client functions (0x1C06 handler FUN_004a02f0, 0x1096 handler FUN_0049fe50, erro
 | `List<ShineObject>::l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` (callers of `ShineObject::operator=`) | Z09 §28.11 (done) | the `List<T>` template is documented there; §5.1 documents the copy, §10.4 the `MapCluster` copy of the same four |
 | per-class overrides of the object slots (mob, NPC, bandit, servant, door, effect, drop item, flag, pet, mover, mini-house) | Z09 §5 / §11-§13, Z13 §1.8 / §6.2 / §8.1 (done) | §5 documents only the base-class bodies and links the overrides |
 | the owners of the `BinaryDataBox<T>` instances (`mdb_Load`, `idb_Load`, `mvdb_Load`, `sma_Load`, … in the §7.1 table) | the item named in each row (Z09, Z13, Z27, Z06, …; done) or this item §8 / §9 | §7.1 documents only the box template, the readers' keys and the destructors |
-| the gamble rules that read `g_BanTime`, `g_TaxRate`, `g_EventCode`, `g_GBReward` (`go_Init` FUN_00614f10, `go_PlayerAction` FUN_00615180, `go_Enter_Player` FUN_00620d00, `SMS_StopButton` FUN_00625340) | Z06 §4-§5 (done), Z32 | §7.2 documents the tables and the finders |
+| the gamble rules that read `g_BanTime`, `g_TaxRate`, `g_EventCode`, `g_GBReward` (`go_PlayerAction` FUN_00615180, `go_Enter_Player` FUN_00620d00, `SMS_StopButton` FUN_00625340; `CGambleDiceTaiSaiObject::go_Init`) | Z06 §4-§5 (done) for the first three; Z32 (open) for `go_Init`, which Z06 does not cite | §7.2 documents the tables and the finders; `go_Init` is named here without its address so that `X02-cov.py` keeps it in Z32's list |
 | the guild tournament, GTI, item action and action effect `ITableBase` tables (their `Load` / `DataProcess`) | Z16, Z11, Z17, Z21 (done) | §7.4 lists only their destructors and `GetTotal` |
 | the users of the §8 tables: `rot_FillOption` (random options), `iac_DropItemMake` (sockets), `augdb_*` getters, `Item_Upgrade_Table_mode`, `GetMixItemIndex`, `CSingleDataMap::GetValue`, `GetIsBadName`, the area-skill readers of `AreaBMP` | Z18 §4.5, Z11 §9.3, Z04 §9.4, Z30 §9, W05 §3.3 / Z12 §3.1, Z07, Z20 §3.1 (done) | §8 documents only the loaders and their data structures |
 | `so_ply_ItemLotChange` and the quest item hooks it calls | Z15 §4.5 (done) | §8.7 documents the list that feeds it (Z31-B15) |
 | the loaders of `MapDataBox`, `KQItemDataBox`, `cStateItemDataBox`, `BRAccUpgradeDataBox`, `MapBlockInformationBox`, `FieldContainer::fc_Load` | Z09, Z16, Z24 / Z20, Z18, Z09 §9.2 (done) | §8.9 documents only their constructors and destructors |
-| the 86 gamble functions left by `X02-cov.py game zone`: `CGambleDiceTaiSaiObject` (35, e.g. `GDTSO_DiceTaiSai_Result_DiceRoll` FUN_0061a350, `GDTSO_DiceTaiSai_Out` FUN_0061c330), `CGambleObject` (22, `go_MaxPlayerInObject` FUN_00614dc0), `DiceTaiSai::Init` FUN_00634330, `DiceTaiSaiDividind` (3), `CGambleObjectManager` (3), `SlotMachine::*` (22: `sma_1LineMatch` FUN_00621c10, `sma_ScreenMatch` FUN_00621dd0, `sma_CenterMatch` FUN_00621fa0, `smjpr_JackPotRateCalc` FUN_006220e0, `smsm_Shuffle` FUN_0061fa10, …) | Z32 (open; plan: "`CGambleDiceTaiSaiObject` 36 functions … the `SlotMachine::*` classes", list command `X02-cov.py game zone 1200 \| rg -e Gamble -e TaiSai -e SlotMachine`) | excluded from Z31 by its plan; the `rg` of Z32's list command matches all 86 (`DiceTaiSaiDividind`, `CGambleObjectManager` included) |
+| the gamble-class functions left by `X02-cov.py game zone` (87, 4 065 lines): `CGambleDiceTaiSaiObject` (36, among them `go_Init`, `GDTSO_DiceTaiSai_Result_DiceRoll`, `GDTSO_DiceTaiSai_Out`), `CGambleObject` (22, among them `go_MaxPlayerInObject`), `DiceTaiSai::Init`, `DiceTaiSaiDividind` (3), `CGambleObjectManager` (3), `SlotMachine::*` (22, among them `sma_1LineMatch`, `sma_ScreenMatch`, `sma_CenterMatch`, `smjpr_JackPotRateCalc`, `smsm_Shuffle`) | Z32 (open; plan: "`CGambleDiceTaiSaiObject` 36 functions … the `SlotMachine::*` classes", list command `X02-cov.py game zone 1200 \| rg -e Gamble -e TaiSai -e SlotMachine`) | excluded from Z31 by its plan. The review found that citing 10 of them here by address (`go_Init`, `GDTSO_DiceTaiSai_Result_DiceRoll`, `GDTSO_DiceTaiSai_Out`, `go_MaxPlayerInObject`, `DiceTaiSai::Init` and the five `SlotMachine` ones named above) had removed them from `X02-cov.py`, so from Z32's list; they are now named without addresses and `X02-cov.py game zone` lists all 87 (Z32's `rg` matches every one, `DiceTaiSaiDividind` and `CGambleObjectManager` included) |
 | Lua 5.2 VM internals `close_state` FUN_0060c330, `luaC_freeallobjects` FUN_00602920, `luaF_close` FUN_006014c0, `luaE_freeCI` FUN_0060c1c0 (below `lua_close` FUN_0060c690, reached from the `LuaScript` dtor of §9.9) | no item (upstream code), as argued in Z11's boundary (`lua_close` row); host side Z09 §14.1 | unmodified third-party library: its behaviour is the published Lua 5.2 source; the host side (`LuaScript`) is Z09 |
