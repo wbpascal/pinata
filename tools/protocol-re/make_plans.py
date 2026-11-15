@@ -772,9 +772,9 @@ ITEMS = [
              "Bugs as `Z24-B<n>`; Coverage boundary as usual."],
       done="Every function listed above is cited as `FUN_…` with pseudocode, every file it loads has a column → member map, "
            "and the reload behaviour (which tables `&reloaddata` can rebuild, Z11 §8.6) is stated for each."),
- dict(id="Z25", phase=2, title="Zone: item table loader `ItemDataBox::idb_Load` (ItemInfo, ItemInfoServer, GradeItemOption, "
+ dict(id="Z27", phase=2, title="Zone: item table loader `ItemDataBox::idb_Load` (ItemInfo, ItemInfoServer, GradeItemOption, "
                                "ItemDropLog, ItemSort, CollectCardMobGroup, ItemMoney; special item IDs) (added by Z24)",
-      out="docs/pseudocode/zone/Z25-item-table.md", deps=["Z01", "Z04", "Z24"], scope=[],
+      out="docs/pseudocode/zone/Z27-item-table.md", deps=["Z01", "Z04", "Z24"], scope=[],
       goal="`ItemDataBox::idb_Load` FUN_00649780 (stage home, about 1036 decompiled lines) builds the zone's whole item "
            "index (`itemdatabox` 0x14d4fb90: `idb_index`, `idb_btree`, `idb_maxItemhandle`, the special item IDs) from seven "
            "SHN files, but no item documents it: Z04 §1.2 only uses the index, Z01 §2.3 lists it in one row, Z24 §7.3 covers "
@@ -794,7 +794,7 @@ ITEMS = [
              "how rows join ItemInfo (by ID or InxName), fatal checks, and the 2016 data invariants (id ranges, duplicate IDs / "
              "names, rows dropped, ItemInfoServer rows without ItemInfo and vice versa).",
              "Reload behaviour (Z11 §8.6: `&reloaddata` cannot rebuild it) and the consumers of each derived member (one line "
-             "each, linking the items that read them). Bugs as `Z25-B<n>`; Coverage boundary as usual."],
+             "each, linking the items that read them). Bugs as `Z27-B<n>`; Coverage boundary as usual."],
       done="`idb_Load` and every reader / helper it calls are cited as `FUN_…` with pseudocode, every file it loads has a "
            "column → member map with its 2016 invariants, and every special item ID it sets is listed with its source."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],

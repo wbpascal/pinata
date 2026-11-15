@@ -272,7 +272,7 @@
   "\u2013"
  ],
  [
-  "Z25",
+  "Z27",
   2,
   "Zone: item table loader `ItemDataBox::idb_Load` (ItemInfo, ItemInfoServer, GradeItemOption, ItemDropLog, ItemSort, CollectCardMobGroup, ItemMoney; special item IDs) (added by Z24)",
   "Z01, Z04, Z24",
