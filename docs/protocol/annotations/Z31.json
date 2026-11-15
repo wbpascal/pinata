@@ -57,6 +57,17 @@
           [5, "u8", "nChatBalloonColorID", "sp_nChatBalloonColor"]
         ],
         "notes": "6 bytes payload"
+      },
+      "0x3014": {
+        "dir": "Z→C",
+        "name": "NC_ITEM_SOMEONEPICK_CMD",
+        "basis": "zone ShinePlayer::sp_Send_NC_ITEM_SOMEONEPICK_CMD FUN_0052f0e0 (from so_ply_PickupItem FUN_0052faf0) via AxialListPacketBroadcast4ItemPickUp FUN_00428f40; client FUN_004abc20",
+        "fields": [
+          [0, "Name5", "pickerID", "p.so_CharName (vt 0x56c)"],
+          [20, "u16", "itemID", "sp_pickitem.itemid"],
+          [22, "u32", "nItemLot", "sp_pickitem.itemlot (not read by the client)"]
+        ],
+        "notes": "0x1A bytes payload (0x1C with opcode); to every player in sight in a game mode, the picker excluded; the client prints 'expedition group has received an item' only for a member of its party"
       }
     }
   }

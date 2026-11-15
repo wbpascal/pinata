@@ -28,7 +28,7 @@ and the bucket rules are in `docs/plan/status/Z31.md` and `docs/plan/status/Z31-
 | 7 | table templates (`BinaryDataBox<…>`, `ITableBase<…>`, `IIDTableBase<…>`, `SHND::CommonData<…>`, `Table`) | 201 / 4 103 |
 | 8 | the other data loaders and SHN / text parsers | 67 / 1 927 |
 | 9 | NPC roles, merchant cities, item authority, booths, repurchase list, guild containers, party table, finders, events | 106 / 2 621 (+ `mcd_Load`, `nm_MarkingNPC`, `dmc_Table`) |
-| 10 | sessions, packet containers, `AxialList*` visitors, map clusters, path finding, library classes | ≈ 3 100 |
+| 10 | sessions, packet containers, `AxialList*` visitors, map clusters, path finding, library classes | 154 / 3 096 (+ `sb_HeartBeatCheck`, `sb_DisconnectCheck`, `sp_Send_NC_ITEM_SOMEONEPICK_CMD`) |
 | 11 | open points of Z01-Z04 (`confidence.md` §4.6 rows 5-8) | – |
 
 ## 2. Player and mobile-object members named by `confidence.md` §4.4
@@ -2567,6 +2567,288 @@ EventReserveContainer::EventReserveContainer(c, n)                              
 | `ListEraser<CardDeck::Card>`, `ListArray<CardDeck::Card>` | FUN_0064ca70, FUN_0064e140 (free `la_Array`) | vftable reset / free | unwinds of `cd_Load`, `iod_Load` (§8.1), `CardStack` |
 | `BroadcastEventPopper` | dtor FUN_005497c0 | `g_BroadcastStackPoint −= 1` while ≥ 0 (the re-entrance counter of the broadcast walks; ctor FUN_005496d0, Z09 §28.1) | the unwinds of `so_AllInMapNomal` / `so_AllOfRangeNomal` |
 
+## 10. Sessions, the player send buffer, broadcast visitors, path finding, library classes
+
+The 154 functions of the part-9 bucket: the server-to-server session classes and their session manager, the player's
+`PacketContainer`, the `AxialList*` visitors whose `ali_Work` no document cited, the map-cluster copies, the rest of the
+dead path tracers, the start-up geometry tables, and the library / diagnostic classes. The rest are vftable resets
+(§10.8).
+
+### 10.1 Server-to-server sessions
+
+Every session class is a `ZoneBaseSession` (0x100 bytes: +4 `m_Status`, +8 `m_Connected_Server_ID`, +0xc / +0x10
+world / zone, +0x24 / +0x28 last receive / send tick, +0x2c `CSocket_IOCP`, +0xe0 `CPacket m_Packet`, +0xf8
+`IOCPProcessSession`, +0xfc `m_LastHeartBeatSendTime`). Vtable: slot 0 `CheckHeartBeat` (`ZoneBaseSession::CheckHeartBeat`
+FUN_005a67c0, Z18 §1.4; `ClientSession`'s FUN_0045b110 form passes 300, S02 §4.4), slot 1 `zbs_Parsing` (one per class),
+slot 2 the folded empty destructor FUN_00417480; `ClientSession` adds slot 3 (FUN_005af8d0 `return 1`; in
+`ClientSessionNull` FUN_004b8d20 `return 0`).
+
+| Class | Constructor | `m_Connected_Server_ID` default | Owner |
+|---|---|---|---|
+| `GameDBSession` | FUN_00468510 | 2 | `SocketBundle<GameDBSession> sock2gameDB` (element ctor FUN_005ae730) |
+| `GameLogSession` | FUN_00469f60 | 3 | `sock2gamelog` (element ctor FUN_005ae750) |
+| `WorldManagerSession` | FUN_005a2ce0 | 5 | `sock2wldman` (element ctor FUN_005ae770) |
+| `ZoneConnectSession` | FUN_005a6cd0 | 3 (the GameLog value; nothing rewrites or reads it for the ring link) (original bug) Z31-B25 | `zoneconnect` (`g_ZoneRingNext`, Z01 knowledge), dynamic initializer FUN_0069afa0 |
+| `ClientSession` | FUN_0045b0a0: `cs_sessionMode = INACTIVE`, `cs_bClosingSession = 0` | 0 (`zs_connect` sets 20) | `ClientSessionManager` array (Z10 §6.5 `InitSessions`) |
+| `ClientSessionNull` | FUN_0045b0d0: +0x104 = −1, +0x10c = 0 | 0 | `ShinePlayer::sp_defaultsocket` (initializer FUN_00698790): the null session of a player without a socket |
+
+The `SocketBundle<T>::<sb_SocketStr>` element constructors (FUN_005ae730 / FUN_005ae750 / FUN_005ae770) only run the
+session constructor; the bundle builds its four elements with `_eh_vector_constructor_iterator_`. Each element is
+0x108 bytes: the session, then the reconnect tick (+0x100) and a state byte (+0x104).
+
+```pseudo
+GameDBSession::gds_DummyFunction(s, cmd, len)          @ FUN_00468690
+GameLogSession::gls_DummyFunction(s, cmd, len)         @ FUN_00469fa0
+WorldManagerSession::wms_DummyFunction(s, cmd, len)    @ FUN_005a2d20
+    assert "<Class>::<name>" with "%d/%d:%d" (dept / cmd : len)         # the packet is dropped; the link stays up
+OPToolSession::opts_DummyFunction(s, cmd)              @ FUN_004c7fb0
+    assert "ZoneListenSession::opts_DummyFunction", dept, cmd           # wrong class in the text (original bug) Z31-B23
+    # the default slot of each PROTOCOLFUNCTIONTEMPLETE parser (pft_deffunc), like sp_DummyFunction for the client (§4.1);
+    # none of them is called directly
+ZoneConnectSession::zbs_Parsing(s, sp, idx)            @ FUN_004fb5a0   (vt 4; the seventh zbs_Parsing, Z10 §6.4 lists six)
+    sp ≠ null: assert "ZoneConnectSession::zbs_Parsing : sp entry!!!"
+    m_Packet.GetIDPtr (CPacket slot 0x18), GetDataSize (0x14): read and ignored
+    reply 0x0805 NC_MISC_HEARTBEAT_ACK (2 bytes, header only); too long → assert "…zbs_Parsing : Packet Too Long"
+    # the outgoing ring link to the next zone (zcs_Send, Z01) has no handler table: whatever the next zone sends on
+    # it (its 0x0804 keep-alive, Z18 §1.4) is answered with 0x0805
+```
+
+Session manager (`ZoneBaseSessionManager`, 0x18: +4 `m_pSessionListArray`, +8 `m_MaxSessions`, +0xc `m_NumSessions`, +0x10
+active list, +0x14 empty list; nodes `LOGIN_SESSION_LIST {pLinkUp, pLinkDown, pSession}`). Its vtable is
+`[ActiveSession, InactiveSession]`; `ClientSessionManager` keeps both. The bodies are the Login / WM ones (L01 §2.1,
+W05 §4.1):
+
+```pseudo
+ZoneBaseSessionManager::ActiveSession(m, socket, addr) → node     @ FUN_005a6be0   (vt 0; zs_connect UserData 0x14, Z18 §1.3)
+    m_NumSessions < m_MaxSessions and an empty node:
+        node.session.m_Packet.Clear (CPacket slot 0x2c); m_Socket = socket; copy the 16-byte sockaddr
+        m_Status = CONNECTING; EmptyToActive(node); return node
+    else: debug message, return null
+ZoneBaseSessionManager::EmptyToActive(m, node)                    @ FUN_005a6b60
+    node == null: debug message; m_NumSessions += 1; return       # the count grows without a session (original bug) Z31-B21
+    unlink node from the empty list; push it at the head of the active list; m_NumSessions += 1
+ZoneBaseSessionManager::InactiveSession(m, node)                  @ FUN_005a6c80   (vt 4)
+    unlink node from the active list (null: skipped, then the null node is dereferenced); push it on the empty list;
+    m_NumSessions −= 1
+    # caller: ZoneServer::zs_disconnect FUN_005abb60, after ZoneBaseSession::Close of a cut client session (Z09 §1.5)
+ZoneBaseSessionManager::FreeSessions(m)                           @ FUN_005a6a10   delete m_pSessionListArray
+    # caller ClientSessionManager::InitSessions FUN_0045c4c0 (Z10 §6.5)
+```
+
+Keep-alive of the three outgoing bundles (Z09 §1.5 left them unopened; called by `zs_disconnect` with "DB", "Log", "WMS"):
+
+```pseudo
+SocketBundle<T>::sb_HeartBeatCheck(b, name)            @ FUN_005aae80   (one body for the three T)
+    for the 4 elements: session.CheckHeartBeat(30) (vt 0) == 0:
+        ZoneBaseSession::Close; m_Status = EMPTY; reconnectAt = now + sb_ReconnectInterval × 10; state = 0
+        SocketMultiplicateLog: name, " Cut by heartbeat ", index
+SocketBundle<T>::sb_DisconnectCheck(b, name)           @ FUN_005ab2c0
+    for the 4 elements: m_Status == 3 (CLOSEING): the same reset, log " Close during SESSION_STATUS_CLOSEING "
+    # sb_Routine (Z09 §1.5) reconnects the elements whose reconnectAt has passed
+```
+
+`zs_disconnect` checks the ring link the same way inline: `zoneconnect` with a socket and `CheckHeartBeat(30) == 0` →
+`CloseUseIOCP`, `Close`, status EMPTY.
+
+Other session pieces:
+
+- `PROTOCOLFUNCTIONTEMPLETE<…>` scalar deleting destructors, one per parser class: `ShinePlayer` FUN_004d44c0, `GameDBSession`
+  FUN_004d3790, `GameLogSession` FUN_004d54d0, `OPToolSession` FUN_004d5570, `WorldManagerSession` FUN_004d5620,
+  `ZoneListenSession` FUN_004d5e90. Each frees every one of the 0x400 outer slots `pft_funcpnt[i]` that is not the shared
+  `pft_defaultdepartment` array (layout Z18 §1.8 `pft_IsRegisteredProtocol`), then the object when asked. vt 0 only:
+  the parser globals are destroyed by their atexit functions, not through the vtable.
+- `OPToolList optoollist` (0x1a8): ctor FUN_004c86d0 = `List<OPToolObject>::l_MakeList(50)`, 50 `OPToolObject` (8 bytes; the
+  element ctor is the fold `TradeBoard::TradeBoard`), list slot i → `optl_Array[i]`; scalar deleting dtor FUN_004c84c0
+  (destroy the 50 elements, free the list array); `ListEraser<OPToolObject>` dtor FUN_004c84b0 (vftable reset). Users:
+  `zs_connect` (take one per OPTool connection, Z18 §1.4), `zs_mainthreadfunction`, `opts_NC_OPTOOL_CONNECT_BRIF_REQ`.
+- `IOCPProcessSession::~IOCPProcessSession` FUN_0064f3f0 (resets to the `CIOCP_Process_Interfece` vftable; unwinds of the
+  `ZoneBaseSession` / `CSocket_IOCP` ctors and `~CSocket_IOCP`) and `CIOCP_Process_Interfece` scalar deleting dtor
+  FUN_0064f660 (vt 0 only). The IOCP callbacks are S02 §1.3.
+
+### 10.2 The player's send buffer: `PacketContainer`
+
+`ShinePlayer.sp_SocketContainer.stream` is a `PacketContainer` (0x200c: +4 `pc_Session`, +8 `pc_Buffer[0x2000]`, +0x2008
+`pc_Pointer`), set up in the `ShinePlayer` ctor FUN_0055bc80 (session null, pointer 0). Vtables: `PacketContainer`
+`[FUN_00653a60 set pc_Session (fold of uir_SetSkill), pcb_Clear, pcb_Flush, pcb_Append]`, `PacketContainerBase`
+`[FUN_00549070 empty, FUN_00417480 empty, pcb_Flush FUN_0054b330 → 1, pcb_Append FUN_004c8ad0 empty]` (the do-nothing
+stream).
+
+```pseudo
+PacketContainer::pcb_Clear(c)                          @ FUN_00549080   (vt 4)   pc_Pointer = 0
+PacketContainer::pcb_Flush(c, session) → bool          @ FUN_0054b380   (vt 8)   = pcb_Flush_Try_Catch inside an SEH frame
+PacketContainer::pcb_Flush_Try_Catch(c, session)       @ FUN_004c8800
+    pc_Pointer == 0: return 1
+    pc_Pointer ≥ 0x2000: assert "Too long packet"; pcb_Clear; disconnect   ┐
+    session ≠ pc_Session: assert "Session wrong"; pcb_Clear; disconnect    ┘ disconnect = som_GetObject(session.cs_clienthandle)
+                                                                              .so_Disconnect(0x0686, 0, 0) (vt 0x5f8); return 0
+                                                                              (session null: return 0 without it)
+    pc_Session == null: return 1                         # the buffer is kept, not cleared (original bug) Z31-B22
+    r = ZoneBaseSession::Send(pc_Session, pc_Buffer, pc_Pointer); pcb_Clear; return r
+    # callers: so_PacketBufferFlush (vt 0x2e8, §4.5) once per player tick and from zs_disconnect; pcb_Append FUN_004c8b20
+    # flushes through vt 8 when the next packet would pass 0x17ff bytes (Z09 §9.6)
+PacketContainerBase::pcb_Flush FUN_0054b330 → 1; PacketContainerBase::pcb_Append FUN_004c8ad0: nothing
+```
+
+`AssertClass::operator()(cond, text, a)` FUN_004010e0 (the three-argument twin of Z18 §1.6's FUN_00401110: `cond == 0` →
+`ac_AssertFail(text, a)`, returns `cond == 0`) has `pcb_Flush_Try_Catch` as its only caller.
+
+### 10.3 Broadcast visitors (`AxialList*`)
+
+`so_AllOfRange` / `so_AllInMap` (Z09 §9.6) call the visitor's slot 0 `ali_Work(visitor, centre, o, distance)` for every
+object; returning 1 continues the walk. The bodies not yet cited:
+
+```pseudo
+AxialListPacketBroadcast4ItemPickUp(v, packet, len)    @ FUN_00428dd0
+    alpb_packet = packet; pp_SetPacketLen(len) ok → alpb_packetlength = len, else assert "…Too long packet", length 0
+AxialListPacketBroadcast4ItemPickUp::ali_Work(v, centre, o)   @ FUN_00428f40
+    length 0: return 0 (stop)
+    o is a player (vt 0x4d0 == 2), in a game mode (vt 0x484 ≠ 0), same main layer as centre (or either −1),
+    so_SubLayer_CanSee(centre, o) and not closing (vt 0x300): o.so_GetGameSocketStream (vt 0x2fc).pcb_Append(o, packet)
+    return 1
+    # the plain AxialListPacketBroadcast plus the mode test; ~ FUN_00428eb0
+    # users: ShinePlayer::sp_Send_NC_ITEM_SOMEONEPICK_CMD FUN_0052f0e0 (below), ShineDropItem::so_LogoutPacketBroadcast
+    # FUN_00553b30 (Z09 §11.4)
+ShinePlayer::sp_Send_NC_ITEM_SOMEONEPICK_CMD(p)        @ FUN_0052f0e0   (from so_ply_PickupItem FUN_0052faf0, Z04 §3.3)
+    0x3014 NC_ITEM_SOMEONEPICK_CMD { Name5 pickerID = p.so_CharName (vt 0x56c), u16 itemID = sp_pickitem.itemid,
+                                     u32 nItemLot = sp_pickitem.itemlot }  (26 bytes)
+    so_AllOfRange(p, sight (radius 0), AxialListPacketBroadcast4ItemPickUp(gpp, 0x1c), include self 0)
+    # client FUN_004abc20: only when pickerID is a member of the client's party list and the item id is valid, chat
+    # line "%s of the expedition group has received an item. %s" (text 0x397e6f6b); nItemLot is not read
+AxialListPacketBroadcastByGuild::ali_Work(v, centre, o) @ FUN_00428d90
+    o.so_mobile_GetGuildRegnum (vt 0x818) == m_GuildRegNum: AxialListPacketBroadcast::ali_Work(v, centre, o); else 1
+    # ctor FUN_00428cd0 (Z11 §9.2); users GuildGroup::CheckManagerUser FUN_004798f0, GuildTournamentSystem::DeadPlayer
+    # FUN_0047e640 (Z16 §4.3 / §4.6)
+AxialListCount::ali_Work(v, centre, o)                 @ FUN_00428210
+    centre is a player (vt 0x4d0 == 2): alc_Cnt += 1; return 1
+    # tests the centre, not o: around a player every object counts (mobs, NPCs, drops, the player itself), around
+    # anything else the count stays 0. Only user: cbd_DistanceSquar FUN_0043e740 (§10.6)
+AxialListMobInAreaCounter::ali_Work(v, centre, o)      @ FUN_00428240
+    return v.almc_Search(centre, o)        # the member pointer chosen by the ctor FUN_004e2d00 (ala_SearchMob / All / Ply /
+                                           # Gld, Z09 §22.2); dtor FUN_004e2dd0
+AxialListMobKillLog::ali_Work                          @ FUN_00429590   = D05 0x078E / 0x078F (MK2_START / MK2_SUCCESS GameLog
+                                                                          records per player of the map; documented there)
+AxialListNearScan::alns_GetBMPDamageRate(i) → 1000     @ FUN_004c1b00   base slot; the area-bitmap override FUN_004c1b10 is Z25 §6.6 / Z09 §12.5
+```
+
+### 10.4 Map clusters: copy and teardown
+
+```pseudo
+MapClusterManager::MapCluster::operator=(dst, src)     @ FUN_0049f1d0
+    mc_MapIndex (Name3); the 0x200 InstanceMap records (0x50 bytes each) word by word; mc_MapNumber; mc_Pointer
+    # callers: List<MapCluster>::l_PushA / l_PushZ / l_PopA / l_PopZ FUN_004a01f0 … FUN_004a02c0 (by-value list copies)
+MapClusterManager::ClusterManager::~ClusterManager(m)  @ FUN_004a0310   (atexit of mapclustermanager)
+    for the 10 Clusters[] pointers: destroy the 0x200 InstanceMaps, free the cluster
+    cm_EmptyCheck (folded empty dtor); the 0x200 InstanceMaps of cm_ClassChangeElfForest, cm_ClassChangeGamble,
+    cm_ClassChangeRou, cm_ClassChange; free the List<MapCluster> array
+    # scalar deleting dtor FUN_004a05b0 (vt 0 only); ListEraser<MapCluster> dtor FUN_00486280 (vftable reset, the
+    # unwinds of cm_DeleteInstanceDungeon / cm_FindEmpty / l_MakeList). Layout: Z14 §1.2
+```
+
+### 10.5 Path finding: the rest of the dead tracers and `CFindWay`
+
+Completes §3.8 (`CellStack`) and Z09 §28.7 (`CFindWay`); nothing here is reached in 2016.
+
+```pseudo
+LinearStep::ls_Set(ls, fx, fy, tx, ty) → Tracer*        @ FUN_004cdd60   (caller CellStack::t_trace FUN_004ce470)
+    each coordinate outside ±1200: assert "LinearStep::ls_step : Out of range" (the text names ls_step) (original bug) Z31-B23
+    ls_from = ls_to = (fx, fy)  (ls_to is set to the start, not to (tx, ty))
+    ls_linelength = max(|tx − fx|, |ty − fy|); ls_delta1024 = (dx·1024 / len, dy·1024 / len) (0 when len 0)
+    ls_count = 0; ls_Prev = ls_from; return ls
+LinearStep::ls_step(ls, n, &x, &y)                      @ FUN_004cdcd0   (caller LinearStep::t_trace FUN_004ce880)
+    x = ls_from.x + (delta.x · n) / 1024; y likewise (rounded toward 0); outside ±1200 → the same assert
+LinearStep::t_continue(ls, arg, out, r)                 @ FUN_004ce060   (vt 8)
+    ls_Prev.x² + ls_Prev.y² < r²: out = ls_Prev; return 0; else 1
+PathFindTable::operator()(t, x, y) → cell               @ FUN_004cdc60   |x|, |y| ≤ 1200 → pft_table[x + 1200][y + 1200];
+    else assert "PathFindTable::operator () : Out of range", &pft_def      (callers cs_push, both t_trace)
+PathFindCell::pfc_Getdistance(c, stamp)                 @ FUN_004cdc40   pfc_flag == stamp ? pfc_distance : 34 463 (0x869f)
+MinWeightSearching::lid_Call(s, e, h)                   @ FUN_004ce400   e.weight < mws_minweight → remember weight and h; 1
+    # the visitor CellStack::t_trace uses to pop the minimum-weight element
+Tracer::~Tracer FUN_004cde60 (unwind of the CellStack ctor), Tracer scalar deleting dtor FUN_004ce030 (vt 0 of Tracer and
+LinearStep); ListEraser<PathFindCellLoc> dtor FUN_004ce020 (l_MakeList unwind; the dead junctionpointlist, §9.9)
+
+CFindWay::CFindWay(f)                                   @ FUN_00633630   (global findway, initializer FUN_006967e0)
+    m_bLoaded = 0; m_pBlockInfoByte = null; Init(f)
+CFindWay::Init(f)                                       @ FUN_00633540
+    NoJunc = NumOfJunc = 0; LenMap = null; LenMapInit(256, 256)
+    DirTbl[13] = {0, 3, 4, 6, 8, 0, 12, 0, 1, 2, 0, 0, 9}; XTbl[13] = {0, 0, 1, 2, −1, 0, 0, 0, −1, 1, 0, 0, −2};
+    YTbl[13] = {0, −1, 1, 0, 1, 0, 2, 0, −1, −2, 0, 0, 0}          # direction tables of FindWay (not decoded: dead)
+CFindWay::LenMapInit(f, sx, sy)                         @ FUN_00632620
+    a LenMap of another size is freed; none → new u16[sx·sy], LenMapSx = sx, LenMapSy = sy
+CFindWay::~CFindWay(f)                                  @ FUN_006324b0   (atexit FUN_0069d880)
+    free m_pBlockInfoByte when m_bLoaded == 1; free LenMap
+```
+
+### 10.6 Start-up geometry tables
+
+```pseudo
+ShineRadian::ShineRadian(r)                             @ FUN_00579070   (global shineradian, initializer FUN_00698a50)
+    for i in 0…179: a = i·π / 90 (2° steps); sr_sin[i] = trunc(sin a · 1024); sr_cos[i] = trunc(cos a · 1024)
+    # the 1024-scaled tables of UnitVector::Rotation (Z09 §28.11); one "shine radian" = 2°
+CalculateBroadcastDistance::CalculateBroadcastDistance(c)   @ FUN_0043c910   (global broadcastdistance, initializer FUN_00695240)
+    cbd_DistSquar[0] = 1600² (0x271000); cbd_MinDist starts 0 (static storage)
+    for i = 1 while i − cbd_MinDist < 500:
+        d = trunc(√(75 000 000 / i))
+        d > 1600: cbd_MinDist = i                     # the first 29 values exceed 1600: cbd_MinDist ends at 29
+        else: cbd_DistSquar[i − cbd_MinDist] = d²
+    # result: cbd_MinDist = 29, cbd_DistSquar[k] = trunc(√(75e6 / (k + 29)))² for k = 1…499 (k = 1: 1581², k = 499: 376²),
+    # [0] = 1600². cbd_DistanceSquar (Z02 §5.2) uses it as: n = AxialListCount around o within 500 (§10.3, players only);
+    # n < 29 → the map's Sight² (−1 for wide sight / a moving camera); else cbd_DistSquar[min(n − 29, 499)]: the sight
+    # area shrinks as 75 000 000 / n
+VectorClass::UnitVector::UnitVector(u, x, y)            @ FUN_00579ad0   the (x, y) overload of Z09 §28.11's FUN_0054b430:
+    length = ddt_Distance(x, y); 0 → (1, 0); (x, y) ← (x·32 / len, y·32 / len); length ← ddt_Distance
+    # used by the FanFormSectorArgument ctor FUN_0057bda0 (Z18 §3.5) and the ffsa initializer FUN_00698ec0
+FanFormSectorArgument::~FanFormSectorArgument FUN_005792e0: resets ffsa_chardirect's vftable (unwind of sbe_BlastObject)
+Navigator::NaviPoint::NaviPoint FUN_005c87d0: np_RealX = np_RealY = 0, np_IsDeleted = false (vector fill of the mob path,
+    Z09 §9.5); Navigator::PathFindBuffer::~PathFindBuffer FUN_00439790 = `delete first member`, the fold also used by
+    ~TreasureChestLocationManager, ~ShinePlayer, ~BoothManager and other unwinds
+SlantedCoordList::ObjectYCoordNode::ocn_type FUN_00587d20 → 'Y' (0x59) (X node FUN_00587cf0 → 'X'): slot 0 of the
+    coordinate nodes; cn_AppendList / cn_MakeLink / cn_MakeLink2 compare the two nodes' types and assert when a node is
+    linked into the other axis' list (Z09 §9.6)
+```
+
+### 10.7 Library and diagnostic classes
+
+| Function | Address | What it does | Callers |
+|---|---|---|---|
+| `CMD5Checksum::GetMD5(data, len)` | FUN_0063adf0 | standard MD5 (RFC 1321 initial state 0x67452301 …, `Transform` FUN_0063a450 with the RFC constants, `Update` FUN_0063ab30, `Final` FUN_0063abe0 = padding, length, 32 lower-case hex digits via `"0%x"` / `"%x"`) into a `std::string` | `CDataReader::Read` FUN_0062a780: `m_sFileMD5` of every SHN file, then `CShnDataFileCheckSum::InitDataFileCheckSum` (S01 knowledge; the WM form W05 §3.4) |
+| `~CMD5Checksum` / scalar dtor | FUN_0063a410 / FUN_0063a420 | vftable reset (+ free) | `GetMD5`'s unwind / vt 0 only |
+| `String::String()` / `String(char*)` | FUN_00653740 / FUN_006537d0 | own string class `{vptr, chData, stringLength, allocSize}`: 48-byte zeroed buffer / assign | `ZoneServer::ParseCmd` FUN_005aab10, `zs_start`, `WinService` (Z10 §1.1) |
+| `String::operator=(char*)` / `(String&)` | FUN_006536a0 / FUN_00653800 | grows `allocSize` in 48-byte steps (old buffer freed, new one zeroed), copies, recounts the length | same |
+| `String::makeUpper`, `~String`, scalar dtor | FUN_00653690 (`_mbsupr`), FUN_00653670, FUN_00653790 | | `ParseCmd` (command-line verbs are compared upper-case), `WinService` |
+| `WinService` scalar dtor | FUN_00653360 | vftable, `~String(serviceName)`, free | vt 0 |
+| `cWell512Random::cWell512Random` / `well512_InitState(seed[16])` | FUN_0063c990 / FUN_0063c9d0 | zero index, z0-z2 and the 16 state words / index and z cleared, state = seed | `RandomBox::RandomBox` FUN_0063cdb0: seed = 16 × `rand()` after `srand(_time32())` (Z23 §8.6) |
+| `type_info::~type_info`, scalar dtor, `operator==`, `_Type_info_dtor` | FUN_0065628a, FUN_0065629a, FUN_006562bb, FUN_006634f6 | MSVC run-time (RTTI name list under lock 0xe, `strcmp` of the decorated names) | CRT only *(inferred: library code)* |
+| `FunctionProfiler::PerformanceRecorder::PerformanceRecorder` | FUN_00468460 | `pr_Array` = empty `std::map` (head node 0x38), `QueryPerformanceFrequency` (0 → 1), `pr_CheckLoopCount_Command = pr_CheckLoopCount_Real = −1` | initializer of `_PerformanceRecorder` (report: Z11 §4.5) |
+| `FunctionEntarance::~FunctionEntarance` | FUN_004028d0 | `fca_stackpoint −= 1`; `pr_Exit(fe_FunctionCode)`: the exit half of Z18 §1.6's ctor | 616 scope exits |
+| `DebugLogging::operator<<(char*)` / `(int)` / `(DebugLineFeed&)` | FUN_00419210 / FUN_0043be30 / FUN_00419290 | when `dl_ActivAll` and the log's `dl_Activ`: `"%.255s"` / `"%d"` to the log file (`dl_FilePoint` opens it); the line feed writes `'\n'`, flushes and closes the file | 129 / 78 / 127 log lines (`TooLongPacket`, `InvalidSessionCutLog`, …) |
+| `NameString::operator[](Name5*)` | FUN_00401140 | next `namestring` ring buffer, 20-byte name + NUL (the Name5 twin of Z18 §1.7) | log lines of `sp_NC_MAP_LOGIN_REQ`, `sp_NC_MAP_LOGINCOMPLETE_CMD`, GT, `&` commands (28) |
+| `Name5::operator!=` | FUN_0044a8f0 | 5-dword compare, 0 only when all equal | guild / academy storage `lid_Call`s FUN_00472140 … FUN_004752d0 (Z14 §3, §4.1) |
+| `StringMaker::Maker::operator<<(ItemInventoryCell*)` | FUN_0058def0 | `<< (int) item id` (Z18 §1.6 forms) | `so_SendInform2Admin` FUN_0058e310 (Z11 §5.7) |
+| `TickTimer::TickTimer(delay)` | FUN_00591fa0 | `m_DelayTime = delay`, `m_CurDelayTime = 0`, disabled, `m_PrevCheckTime = now` | `GuildGroup::SetTournamentType` FUN_0047db00 (Z16 §5.3) |
+| `HTTPString::~HTTPString` | FUN_006136a0 | MSVC `std::string` destructor (free when capacity > 15, reset to empty): the fold every `std::string` local uses | 91 (Pine `sa_Step`s and others) |
+| `GppPacketSaver::~GppPacketSaver` | FUN_0061dc40 | copies the saved 0x2000 bytes back into the global send buffer `gpp`; the (inlined) ctor saved them, so a nested send cannot clobber a packet being built | unwinds of the slot machine (`SMS_StopButton`, `so_ply_IBurstJackPot`, `so_ply_SlotMachineDBResult`; Z32) |
+| `Parameter::Container::~Container` | FUN_004c99e0 | frees the `cbcp_pValue` arrays of the seven `ChangeByConditionParam`s (Z12 §1.1) | `~ShineMobileObject` FUN_005554c0, ctor unwind |
+| `Parameter::ChangeByConditionParam::cbcp_GetValue_Index(i)` | FUN_004c9010 | `i < cbcp_nMaxValueNum` → `cbcp_pValue[i]`, else 0 | the four `roe_HitRate` FUN_005011f0 / FUN_005020b0 / FUN_00502d30 / FUN_00503360 (Z03 §4.3) |
+| `ZoneServer::<zs_serverinfo>` dtor | FUN_005aa6e0 | `CCsl::Close`, `~CToken` of the `ServerInfo` reader (S02 §2) | `~ZoneServer` / ctor unwinds |
+| `BlockDistribute::BlockingDistribute::~BlockingDistribute` | FUN_00438a90 | clears `bd_Act` of its four `bd_Brench` children | unwinds of `bdl_New`, `bdm_Find` (Z09 §9.2 `BlockDistribute` quadtree) |
+| `cShineLogSystem::SLS_SetLogName(name)` | FUN_00648500 | a non-empty name shorter than 256 chars is copied into `SLS_sLogName`; null, empty or longer → `"ShineLog"` | dynamic initializers of `gSocket_IOCP_Write` FUN_0069bf60 and `gZoneLinktoErrorLog` FUN_0069bfc0 (the two `SLS_AddLog` daily logs, W05 §5.7: socket write failures, `CSocket_IOCP::Send` / `WriteCallback`; zone link errors, `sp_NC_MAP_LOGIN_REQ`, `wms_NC_CHAR_REGISTNUMBER_ACK`, …) |
+| `ListIter_AmpCmdLevel::~ListIter_AmpCmdLevel` | FUN_00419dd0 | profiler scope, vftable reset | `AmpCmdInit` unwind (Z11 §1.4) |
+
+### 10.8 The remaining destructors
+
+Every function below only resets the vftable to its base (and frees when the scalar flag is set); none has logic.
+
+| Group | Functions |
+|---|---|
+| `AxialListIterator` base | ctor FUN_00427f00, dtor FUN_00428480 (151 callers: every visitor's dtor) |
+| visitors → `AxialListIterator` | `AxialListNearScan` FUN_004c19e0, `…NearScanEnemyorAll` FUN_00401bc0, `…TargetChange` FUN_00434ca0, `…MobFind` FUN_00452a20, `…MobDistribute` FUN_004567d0, `…NumberCount` FUN_00461dd0, `…FlagCaptureCancel` FUN_00478da0, `IsAnybody` FUN_00484670, `…AggroAdjust` FUN_004a3100, `…NearFriend` FUN_004abd60, `…NPCTargetFind` FUN_004abd70, `…BriefExchangerAtMove` FUN_004bdca0, `…BriefDeleteAtMove` FUN_004bdcb0, `…ObjectList` FUN_004e2de0, `…MobVanish` FUN_004e7d00, `…LinkToByObserver` FUN_004e7d10, `…PlayerStateSet` FUN_004e7d20, `…Teleport` FUN_004e7d30, `…TeleportAnywhere` FUN_004e7d40, `…Count2` FUN_004e7d70, `…TeleportSplit` FUN_004e7dc0, `…FindItemOwner` FUN_004eb9d0, `…BriefDeleteAllOfRange` FUN_0054aaa0, `…DeathAura` FUN_0055e120, `…MobIndexVanish` FUN_005d6ca0 |
+| visitors → `AxialListNearScan` | `…NearScanParty` FUN_00401870, `…NearScanGuildAcademy` FUN_00401910, `…NearScanFriend` FUN_004020b0, `…NearScanCenterFriendCasterEnemy` FUN_00402130, `…MagicFieldDamage` FUN_005668d0, `…MagicFieldHeal` FUN_005668e0, `…MagicFieldAggro` FUN_00579470, `…NearExecution_Enemy` FUN_005cf8f0 |
+| visitors with members | `AxialListPacketBroadcast` FUN_00428d00 (287 callers; its profiler line writes `fca_stack[fca_stackpoint]` without the `++`, so the entry stays behind as a stale name for the hang dump, Z10 §6.4) (original bug) Z31-B24; `AxialListCameraMove` FUN_004412a0 (frees `alcm_PlayerList`, a `std::vector`); `AxialListKQResult` FUN_004e5320 (destroys the 128 entries of `alkqr_Array`, 0x34 each) |
+| `ListEraser<T>` / `ListSearchSame<T>` | `ShineObject` FUN_0046df30, `HitMeList::Enemy` FUN_004816a0, `ShineObjectEachList` FUN_005538f0, `HuntLog::MobHuntElement` (`ListSearchSame`) FUN_004b6c10 (`l_MakeList` / search unwinds; template Z09 §28.11) |
+| `ShineObjectEachList::~ShineObjectEachList` | FUN_0054f6f0: frees the `List<ShineObject>` array (unwinds of `~ShineObjectManager`) |
+| scalar deleting dtors, vt 0 only | `Observer` FUN_0043f670 (`tick_` fold + `~IObserver`), `CallBackEvent` FUN_00444940 (+ dtor FUN_00444930, Z12 §7.3), `RoutionInterface` FUN_00478d20 (+ dtor FUN_00478d10, the GT base, Z16 §4.1), `ShineObjectManager` FUN_005541f0 (→ `~ShineObjectManager` FUN_0054f8b0), `SpyNet::IntelligenceOffice` FUN_0058a6a0 (Z09 §28.2), `IObjectTypeValidator` FUN_005cec00 (Z17 §1.4) |
+
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -2591,6 +2873,11 @@ EventReserveContainer::EventReserveContainer(c, n)                              
 | Z31-B18 | `CParty::Init` FUN_00645a80 §9.7 | `malloc` (not cleared) for the 4000 party slots; only a few fields are zeroed, then slot 0 is copied into `p_def` | looting, dice flags and the uncleared member fields start as heap contents, also in the default slot returned for invalid party numbers; latent (a fresh 0xCB200-byte block is zero pages) | `calloc` or clear every field |
 | Z31-B19 | `simg_FillBuffer_Server` FUN_0050e4d0 / `simg_Initialize` FUN_0050e1b0 §9.5 | the map-change record has room for `nSellItemKey` (counted in `nDataSize`) but the key is never written nor read | after a map change every buy-back entry carries a stale key (−1 or an older entry's); the repurchase log rows (D03 §2) get it | copy `nSellItemKey` both ways |
 | Z31-B20 | `RandomSlot::rs_Init` FUN_0063cd20 §9.8 | clamps values ≥ n to 0 after the shuffle | dead check (`(i·n) >> 14 < n` always) | drop it |
+| Z31-B21 | `ZoneBaseSessionManager::EmptyToActive` FUN_005a6b60 §10.1 | a null node is logged and still counted (`m_NumSessions += 1`) | latent: the only caller `ActiveSession` passes a node; a null would make the pool look fuller than it is | return without counting |
+| Z31-B22 | `PacketContainer::pcb_Flush_Try_Catch` FUN_004c8800 §10.2 | with no session (`pc_Session` null) it reports success and keeps the buffer | latent *(inferred)*: packets queued while unbound would go out to the next session bound by `so_SetSocketSession` (vt 0 sets only the pointer) | clear the buffer |
+| Z31-B23 | `OPToolSession::opts_DummyFunction` FUN_004c7fb0, `LinearStep::ls_Set` FUN_004cdd60 §10.1 / §10.5 | assert texts name the wrong function (`ZoneListenSession::opts_DummyFunction`, `LinearStep::ls_step`) | misleading logs only | the own names |
+| Z31-B24 | `AxialListPacketBroadcast::~AxialListPacketBroadcast` FUN_00428d00 §10.8 | writes its name into `fca_stack[fca_stackpoint]` without incrementing the pointer | the name stays above the stack top until overwritten; the hang dump (Z10 §6.4 prints every non-null entry) can list it although the function has returned | push and pop like the other profiled functions |
+| Z31-B25 | `ZoneConnectSession::ZoneConnectSession` FUN_005a6cd0 §10.1 | `m_Connected_Server_ID = 3`, the `GameLogSession` value | none found: nothing reads the field for the ring link | 6 (zone) |
 ## Not reconstructed / uncertain
 
 - §9.2: `mcd_city` returns 0 both for Roumen (`Rou`) and for any map not in `ItemMerchantInfo.shn` (dungeons, Gamble houses, …),
@@ -2650,6 +2937,16 @@ EventReserveContainer::EventReserveContainer(c, n)                              
   forms, so the lot list is the only feed of `QuestPlayer_TakeItem` / `DestroyItem` (Z15 §4.5); whether the quest end
   check re-counts the inventory (`GetQuestPlayerItemLot`), so that item quests still complete, was not traced (Z15).
 
+- §10.3: `AxialListCount::ali_Work` tests the centre object's type, not the visited one, so `cbd_DistanceSquar` counts
+  every object around a player (mobs and drop items included) and nothing around a mob, pet or door (always the map's
+  sight). Whether "count players" was meant (the test on `o` would be the usual pattern) or the type test is a
+  deliberate "only players get the crowd-scaled sight" was not decided; not tagged.
+- §10.1: `ZoneConnectSession::zbs_Parsing` reads the packet's id and size and drops them. Whether the next zone ever sends
+  anything but its keep-alive on the ring link (all ring traffic travels the other way, `zcs_Send` → the next zone's
+  `ZoneListenSession`, Z01) was inferred from the parser having no table, not from a capture.
+- §10.5: `CFindWay::Init`'s `DirTbl` / `XTbl` / `YTbl` are listed raw; their meaning was not decoded because nothing
+  reaches `FindWay` (Z09 §28.7).
+
 ## Coverage boundary
 
 Filled in by the sweep part; rows found so far:
@@ -2661,13 +2958,13 @@ Filled in by the sweep part; rows found so far:
 | `0x4022` on the Character server | D02 (done) | `usp_SpamBlock_setTime` documented in D02 |
 | `uib_AfterCast` / item DB consumption | Z04 §6.3, Z05 (done) | common path, documented there |
 | lock-list slots 0x10-0x30, 0x38, 0x48-0x54, 0x60, 0x68 and the releasers' `icr_Apply` | Z05 §1.2-§1.4, Z04 §1.4 (done) | documented there; §3.2 links them |
-| `LinearStep::*`, `Tracer` (dead tracer pair with `CellStack`, §3.8) | this item, part 9 (path finding) | `CellStack` is in the part-2 bucket only by name; part 9 links §3.8 |
+| `LinearStep::*`, `Tracer`, `PathFindTable`, `MinWeightSearching` (dead tracer pair with `CellStack`, §3.8) | this item §10.5 | documented there; `CFindWay` ctor / `Init` / `LenMapInit` / dtor too (Z09 §28.7 has `FindWay`) |
 | `TreasureChestMaker::tcm_ItemMake` FUN_00595d00 (caller of attribute vt 0x10) | Z09 §10.10 (done) | documented there (treasure chests); §3.5.1 documents the callee side |
 | item wire sizes per attribute class | D07 §1.3 (done) | same library on the Character server; §3.5 maps the zone addresses |
 | `CSellItemManager` (the sell list itself) | this item §9.5 | insert / delete / initialise / server fill documented there (Z31-B19); §4.2 documents the two player-side senders and `simg_FillBuffer_Client` |
 | `ShineMiniHouse::so_mh_*` dice game, `CGambleDiceTaiSaiObject` | Z06 §3 (done), Z32 | §4.6 documents only the player-side state accessors they call |
 | `GuildTournamentSystem::CaptureFlag` FUN_0047eae0 (caller of `ShineDynamicCast<ShineNPC>`) | Z16 §4.5 (done) | documented there (flag capture); §5.2 documents the cast |
-| `List<ShineObject>::l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` (callers of `ShineObject::operator=`) | this item, part 9 (library templates) | §5.1 documents the copy |
+| `List<ShineObject>::l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` (callers of `ShineObject::operator=`) | Z09 §28.11 (done) | the `List<T>` template is documented there; §5.1 documents the copy, §10.4 the `MapCluster` copy of the same four |
 | per-class overrides of the object slots (mob, NPC, bandit, servant, door, effect, drop item, flag, pet, mover, mini-house) | Z09 §5 / §11-§13, Z13 §1.8 / §6.2 / §8.1 (done) | §5 documents only the base-class bodies and links the overrides |
 | auto-arrange sort and step scheduling (`so_ply_ArrangeInven` FUN_00563500) | this item, part 10 (§11, Z04 open point) | §4.9 documents the grade rank and the login init |
 | the owners of the `BinaryDataBox<T>` instances (`mdb_Load`, `idb_Load`, `mvdb_Load`, `sma_Load`, … in the §7.1 table) | the item named in each row (Z09, Z13, Z27, Z06, …; done) or this item §8 / §9 | §7.1 documents only the box template, the readers' keys and the destructors |
