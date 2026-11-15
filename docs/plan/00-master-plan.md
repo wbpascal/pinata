@@ -115,7 +115,7 @@ continue the open phase-2 items with the PDB exports as their main reading sourc
 | [Z22](items/Z22.md) | Zone: abnormal-state actor classes (`SubAbnormalStateActor*` bodies: DoT/HoT, area damage, bomb, detach, rate buffs) (added by Z12) | Z03, Z18 |
 | [Z23](items/Z23.md) | Zone: per-player active skill list (`CharaterSkillList` / `MoverSkillList`: toggle skills, cooldowns, delay groups, empower, mastery) (added by Z20) | Z03, Z20 |
 | [Z24](items/Z24.md) | Zone: item-side data loaders (`UsedItemEffect`, `ItemUseFunction`, `ChargedItemEffectDataBox`, `MoverDataBox`, `cStateItemDataBox`, `MysteryVaultTable`, `RidePetDataBox`) and `CharClassDataBox` (added by Z20) | Z01, Z04, Z20 |
-| [Z25](items/Z25.md) | Zone: silver-wing teleport item (saved location, server menu, portal cast and blast) (added by Z23) | Z02, Z04, Z23 |
+| [Z26](items/Z26.md) | Zone: silver-wing teleport item (saved location, server menu, portal cast and blast) (added by Z23) | Z02, Z04, Z23 |
 | [D01](items/D01.md) | Account + AccountLog servers (resolves open Login error conditions) | – |
 | [D02](items/D02.md) | Character server: characters, avatars, save/load | – |
 | [D03](items/D03.md) | Character server: items, economy, pets, house | D02 |
@@ -152,7 +152,7 @@ follow-up session.
 1c. S01, then its follow-ups (`docs/knowledge/S01.md`) for finished items
 2. Z02, Z03, Z04, W02 (core gameplay)
 3. Z07, Z08, Z05, Z06, W03, W04
-4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, Z19, Z20, Z21, Z22, Z25, W05, S02, L01, then D06
+4. D02, D01, D03, D04, D05, Z09, Z10, Z11, Z12, Z13, Z14, Z15, Z16, Z17, Z18, Z19, Z20, Z21, Z22, Z26, W05, S02, L01, then D06
 5. P02 again with fuller captures, then X01
 6. X02 → user records its scenarios → P02 → X02 again (repeat until the low ratings are gone or not worth a capture)
 

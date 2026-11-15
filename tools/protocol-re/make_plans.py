@@ -772,8 +772,8 @@ ITEMS = [
              "Bugs as `Z24-B<n>`; Coverage boundary as usual."],
       done="Every function listed above is cited as `FUN_…` with pseudocode, every file it loads has a column → member map, "
            "and the reload behaviour (which tables `&reloaddata` can rebuild, Z11 §8.6) is stated for each."),
- dict(id="Z25", phase=2, title="Zone: silver-wing teleport item (saved location, server menu, portal cast and blast; added by Z23)",
-      out="docs/pseudocode/zone/Z25-silver-wing.md", deps=["Z02", "Z04", "Z23"], scope=[],
+ dict(id="Z26", phase=2, title="Zone: silver-wing teleport item (saved location, server menu, portal cast and blast; added by Z23)",
+      out="docs/pseudocode/zone/Z26-silver-wing.md", deps=["Z02", "Z04", "Z23"], scope=[],
       goal="Z04 lists `UseItemSilverWing` only by address in its item-use table and Z23 §3.6 only its cooldown check; the "
            "flow in between is cited by no doc: the server menu the item opens, saving a location in the item, the "
            "portal cast and the blast that links the player. Document it so a rebuild keeps the same menu, checks, "
@@ -792,7 +792,7 @@ ITEMS = [
              "Z23 §3.6); `itemdatabox.idb_specialid.sii_silverwing`; the item attribute layout that stores the location "
              "and its DB update.",
              "Client: the menu packets and the portal effect (C01 handlers); error codes via `client-error-codes.json`.",
-             "Bugs as `Z25-B<n>`; Coverage boundary as usual."],
+             "Bugs as `Z26-B<n>`; Coverage boundary as usual."],
       done="Every function listed above is cited as `FUN_…` with pseudocode, the saved-location format and the "
            "menu → cast → blast → link flow are specified, and every packet has a layout and client handler."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
