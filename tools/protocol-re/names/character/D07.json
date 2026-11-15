@@ -1,0 +1,8 @@
+{
+  "FUN_0044d340": "ItemStruct_Read",
+  "FUN_0044ff60": "ItemAttrClassContainer_Self",
+  "FUN_0044dce0": "ItemAttrCls_ByteLot_Read",
+  "FUN_0044dae0": "ItemAttrCls_ByteLot_Write",
+  "FUN_0044f790": "ItemAttrCls_Weapon_Read",
+  "FUN_0044dbb0": "ItemAttributeClass_ReadWriteNone"
+}
