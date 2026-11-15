@@ -12892,6 +12892,8 @@ forwarded as 0x380A (W04-B19)
 
 size 0x12, not checked
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `sPrevMapName`: the map being left (RouN, RouN, RouCos02) = next 0xBC01
+
 ### `0x384e` NC_PARTY_MEMBERINFORM_REQ (zone→WM)
 
 **Verified layout** (basis: wm FUN_0042d5a0 (zone), FUN_004274e0 (OPTool))
@@ -12957,9 +12959,65 @@ size 0x12, not checked
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nChatFontColorID|nChatBalloonColorID`: 0 / 0
 
+### `0x1120` NC_CHAR_SUPPORT_REWARD_CMD (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `eUserType`: 2; after the first 0x180C of a session only, on the main link
+
 ### `0x1121` NC_CHAR_USEITEM_MINIMON_INFO_CMD (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nWorldHandle`: WM client handle (own field, no extra prefix); `UseItemMinimonInfo`: bNormalItem 0, bChargedItem 0, both lists 0xFFFF ×12
+
+### `0x400e` NC_CHARSAVE_2WLDMAN_ALL_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `all.handle.bufferlocation`: 0 (ws_savestorepoint); `all.level.level`: 5 / 6–8 (per &levelup step); `all.location.map`: map being left, with its position; `all.location.kqhandle`: −1
+
+### `0x400f` NC_CHARSAVE_2WLDMAN_QUEST_DOING_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `questdoing.bNeedClear`: 1; `questdoing.nNumOfDoingQuest`: 0
+
+### `0x4011` NC_CHARSAVE_2WLDMAN_ABSTATE_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `abstate.abstatenum`: 1 (9266)
+
+### `0x4013` NC_CHARSAVE_2WLDMAN_ITEM_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nPartMark`: 5, 8, 0x12, 0x22 per burst; `PacketOrder`: 0x80, 0x80, 0x81, 0x81 (P02-B14)
+
+### `0x4014` NC_CHARSAVE_2WLDMAN_CHESTINFO_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `chest.number`: 0
+
+### `0x4015` NC_CHARSAVE_2WLDMAN_GAME_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `game.zone.bIsGM`: 0; `game.client.partyno`: 0xFFFF; `game.client.nRaidNo`: 0xFFFF
+
+### `0x4016` NC_CHARSAVE_2WLDMAN_TITLE_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `CTData.TitleValues`: [9] death counter 1→2 (combat), [11] kills, [23]/[24] NPC sell/buy
+
+### `0x4017` NC_CHARSAVE_2WLDMAN_MISC_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `cen`: 99440 / 99378; `fame`: 14 / 35
+
+### `0x4021` NC_CHARSAVE_SET_CHAT_BLOCK_SPAMER_WM_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `BlockTime`: 0; `DelayTime`: 0
+
+### `0x4029` NC_CHARSAVE_2WLDMAN_QUEST_READ_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `questread.nNumOfReadQuest`: 0
+
+### `0x402b` NC_CHARSAVE_2WLDMAN_QUEST_REPEAT_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `questrepeat.nNumOfRepeatQuest`: 0
+
+### `0x402c` NC_CHARSAVE_2WLDMAN_COININFO_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCoin`: 0; `nExchangedCoin`: 0
+
+### `0x4032` NC_CHARSAVE_2WLDMAN_CHAT_COLOR_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nChatFontColorID`: 0; `nChatBalloonColorID`: 0
 
 ### `0x7019` NC_CHAR_OPTION_DB_GET_SHORTCUTSIZE_REQ (WM→CharDB)
 
@@ -12997,6 +13055,14 @@ size 0x12, not checked
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nError`: 0x2100 ok; `nCharNo`: 5
 
+### `0x7495` NC_GUILD_GUILDWARSTATUS_REQ (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `(empty)`: per minute, 3–20 ms after 0x0821, on sb_SocketStr[0]
+
+### `0x7496` NC_GUILD_GUILDWARSTATUS_ACK (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `warnumber`: 0
+
 ### `0x9427` NC_HOLY_PROMISE_DB_GET_UP_ACK (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `DBError`: 0x1740 ok; `UpMemberInfo.PromiseCharNo`: −1 (no master)
@@ -13008,4 +13074,12 @@ size 0x12, not checked
 ### `0x9444` NC_HOLY_PROMISE_DB_GET_REMAIN_MONEY_CMD (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `nMoney`: 0
+
+### `0x987a` NC_GUILD_ACADEMY_ZONE_GUILD_BUFF_CMD (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `BuffName`: StaAcaGenalBuf + 17 stale bytes (P02-B13); `NumOfGuild`: 0
+
+### `0x987b` NC_GUILD_ACADEMY_ZONE_GUILD_ACADEMY_MASTER_BUFF_CMD (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `NumOfMaster`: 0
 

@@ -12994,6 +12994,8 @@ PROTO_NC_CHAR_CARDCOLLECT_REWARD_CMD after the ref; from Character 0x10E8
 
 0x179 bytes; only the fields the zone reads are listed, full struct PROTO_KQ_INFO in Z16 §1.2
 
+**Captured** (P02, `capture-validation.md`; shop): `Handle`: 21; `ID`: 14; `Title`: Mean Giant Honeying[A]; `MapLink`: KDHoneying
+
 ### `0x580f` NC_KQ_W2Z_START_CMD (WM→Z)
 
 **Verified layout** (basis: zone wms_NC_KQ_W2Z_START_CMD FUN_00499240)
@@ -13255,6 +13257,8 @@ Z16 §6.4
 | 16 | char[16] | zoneIp |  |
 | 32 | u16 | zonePort |  |
 | 34 | u16 | wmHandle |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `objHandle`: echoed; `mapIndex`: copied from 0x180D; `x`: copied; `zonePort`: copied; on the 0x180D link, 90–110 ms later; client 0x180A 10–16 ms later
 
 ### `0x3449` NC_ITEMDB_ITEMCHANGE_REQ (Zone→GameDB)
 
@@ -14371,6 +14375,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 2 | u32 | charNo |  |
 | 6 | u64 | exp |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `exp`: new total per gain: 22→24→26→28→30 (combat), 30→31→35 (shop)
+
 ### `0x1074` NC_CHAR_LEVEL_CHANGED_CMD (Z→WM)
 
 **Verified layout** (basis: zone FUN_0042d830)
@@ -14380,6 +14386,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 0 | u16 | wmHandle |  |
 | 2 | u32 | charNo |  |
 | 6 | u8 | level |  |
+
+**Captured** (P02, `capture-validation.md`; shop): `level`: 6, 7, 8 after `&levelup 3` (shop 30.500)
 
 ### `0x244a` NC_BAT_PKINPKFIELD_WMS_CMD (Z→WM)
 
@@ -14405,6 +14413,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 12 | u16 | nIndex | records sent in earlier packets |
 | 14 | PLAYER_QUEST_DONE_INFO[n] | QuestDoneArray | 10 each: u16 ID, i64 tEndTime |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `nTotalDoneQuest`: 0; `nTotalDoneQuestSize`: 12; `nDoneQuestCount`: 0; `nIndex`: 0
+
 ### `0x4012` NC_CHARSAVE_2WLDMAN_SKILL_CMD (Z→WM)
 
 **Verified layout** (basis: zone ShinePlayer::so_Send_NC_CHARSAVE_2WLDMAN_SKILL_CMD FUN_00455780 + CharaterSkillList::csl_FillSendBuffer_Server FUN_00445260; WM FUN_0042a0b0 (W05); PROTO_NC_CHARSAVE_2WLDMAN_SKILL_CMD (pdb2016))
@@ -14420,6 +14430,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 13 | PROTO_SKILLREADBLOCK[number] | skill.skill | 16 bytes each: i32 savetime, u16 skillid, u32 cooltime (s left), u16 empow, u32 mastery |
 
 13 + 16*number bytes; sent by ws_save2worldmanager (so_LinkTo) with every skill (mode 0), one chunk per 500 skills. Z23 §7.3.
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `PartMark`: 3 (first | last); `nMaxNum`: 26; `skill.number`: 26; `savetime`: current time_t
 
 ### `0x4019` NC_CHARSAVE_2WLDMAN_LINK_FROM_CMD (Z→WM)
 
@@ -14447,6 +14459,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 12 | u32 | nChatBan | sp_Spammer_ChatBan |
 | 16 | u8 | bFirstJoin | always 0 |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `resttime`: 0 (written as 0); `autopick`: 0; `mystery_vault`: 1; `bFirstJoin`: 0 (written as 0)
+
 ### `0x4033` NC_CHARSAVE_2WLDMAN_PET_LINK_RESUMMON_CMD (Z→WM)
 
 **Verified layout** (basis: zone sp_PetLinkResummonInfo_Save2World FUN_004d1760 (ws_save2worldmanager); PDB2016 struct of the same name)
@@ -14459,6 +14473,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 13 | u16 | nSummonSlot | inventory slot of the pet item |
 | 15 | u32 | nId | pet id |
 | 19 | u32 | nRegNum | pet DB key |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `bDoResummon`: 0; `nSummonSlot`: 0xFFFF; `nId`: −1; `nRegNum`: −1
 
 ### `0x4034` NC_CHARSAVE_2WLDMAN_ITEMACTIONCOOLTIME_CMD (Z→WM)
 
@@ -14482,6 +14498,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 | 2 | u32 | nCharNo |  |
 | 6 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `UseItemMinimonInfo`: empty (0xFFFF lists)
+
 ### `0x580e` NC_KQ_Z2W_MAKE_ACK (Z→WM)
 
 **Verified layout** (basis: zone FUN_00497790)
@@ -14490,6 +14508,8 @@ variable length: after produce[] the attribute data of each produce entry is app
 |---|---|---|---|
 | 0 | u32 | hquest |  |
 | 4 | u16 | err | 0x981 ok, 0x982 dup, 0x983 full, 0x984+i map i missing, 0x988+i map i busy, 0x98C script |
+
+**Captured** (P02, `capture-validation.md`; shop): `hquest`: 21 (= 0x580D Handle); `err`: 0x0981 ERR_KINGDOMQUEST_MAKE_NOERR, only from the zone hosting KDHoneying
 
 ### `0x5810` NC_KQ_Z2W_END_CMD (Z→WM)
 
@@ -14718,6 +14738,8 @@ only by the hosting zone. Z16 §6.2
 | 16 | u32 | nMasterCharNo | owner's charNo |
 | 20 | u8 | nGrade | mover upgrade grade |
 | 21 | u32[10] | nPassenger | charNo per seat, −1 empty; only the linking player's own seat is filled |
+
+**Captured** (P02, `capture-validation.md`; combat): `nItemSlot`: 3; `nMoverID`: 160; `nMasterCharNo`: 5; `nPassenger`: {5, −1 ×9}
 
 ### `0x0811` NC_MISC_ZONERINGLINKTEST_RNG (Z→Z (ring))
 
@@ -15157,6 +15179,8 @@ Z01 name was 'player disconnected (ours)'
 
 Z01 name was 'leaving for a link (ours)'
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `wmHandle`: 35000 / 32500; `charNo`: 5; first packet of every so_LinkTo, also on the same-zone revive (combat 102.376)
+
 ### `0x180c` NC_MAP_LINKEND_CMD (zone→WM)
 
 **Verified layout** (basis: zone FUN_00443390)
@@ -15176,6 +15200,8 @@ Z01 name was 'leaving for a link (ours)'
 | 46 | u8 | inGuildTournament |  |
 
 Z01 name was 'map login done (ours)'
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `objHandle`: zone player handle; `zoneNo`: 0 (9210) / 2 (9214); `always99`: 99 = GameLog 0x040F StoreType (map link); `exp`: total exp; `money`: cen
 
 ### `0x180d` NC_MAP_LINKRESERVE_REQ (zone→WM)
 
@@ -15198,6 +15224,8 @@ Z01 name was 'map login done (ours)'
 | 57 | u16 | wmHandle2 |  |
 
 0x3b bytes; Z01 name was 'link reserve (ours)'
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `destMap`: RouCos02 / RouN = next 0x101F position; `mapIndex`: 2 (RouCos02), 150 (RouN); `zoneIp`: 172.16.42.214; `zonePort`: 9214 / 9210; `wmHandle2`: = wmHandle
 
 ### `0x0802` NC_MISC_S2SCONNECTION_REQ (zone→peer)
 

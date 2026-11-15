@@ -3104,6 +3104,209 @@
      "nCharNo": "5 (no ref)",
      "tReset*": "2026-01-01, 2026-11-01, Mon 2026-11-09, 2026-11-15 00:00 local: year / month / week / day start (W05 §2)"
     }
+   },
+   "0xbc1d": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "sPrevMapName": "the map being left (RouN, RouN, RouCos02) = next 0xBC01"
+    }
+   },
+   "0x400e": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "all.handle.bufferlocation": "0 (ws_savestorepoint)",
+     "all.level.level": "5 / 6–8 (per &levelup step)",
+     "all.location.map": "map being left, with its position",
+     "all.location.kqhandle": "−1"
+    }
+   },
+   "0x400f": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "questdoing.bNeedClear": "1",
+     "questdoing.nNumOfDoingQuest": "0"
+    }
+   },
+   "0x4011": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "abstate.abstatenum": "1 (9266)"
+    }
+   },
+   "0x4013": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "nPartMark": "5, 8, 0x12, 0x22 per burst",
+     "PacketOrder": "0x80, 0x80, 0x81, 0x81 (P02-B14)"
+    }
+   },
+   "0x4014": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "chest.number": "0"
+    }
+   },
+   "0x4015": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "game.zone.bIsGM": "0",
+     "game.client.partyno": "0xFFFF",
+     "game.client.nRaidNo": "0xFFFF"
+    }
+   },
+   "0x4016": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "CTData.TitleValues": "[9] death counter 1→2 (combat), [11] kills, [23]/[24] NPC sell/buy"
+    }
+   },
+   "0x4017": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "cen": "99440 / 99378",
+     "fame": "14 / 35"
+    }
+   },
+   "0x4021": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "BlockTime": "0",
+     "DelayTime": "0"
+    }
+   },
+   "0x4029": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "questread.nNumOfReadQuest": "0"
+    }
+   },
+   "0x402b": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "questrepeat.nNumOfRepeatQuest": "0"
+    }
+   },
+   "0x402c": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "nCoin": "0",
+     "nExchangedCoin": "0"
+    }
+   },
+   "0x4032": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "nChatFontColorID": "0",
+     "nChatBalloonColorID": "0"
+    }
+   },
+   "0x7495": {
+    "dir": "Zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "(empty)": "per minute, 3–20 ms after 0x0821, on sb_SocketStr[0]"
+    }
+   },
+   "0x7496": {
+    "dir": "WM→Zone",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "warnumber": "0"
+    }
+   },
+   "0x987a": {
+    "dir": "WM→Zone",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "BuffName": "StaAcaGenalBuf + 17 stale bytes (P02-B13)",
+     "NumOfGuild": "0"
+    }
+   },
+   "0x987b": {
+    "dir": "WM→Zone",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "NumOfMaster": "0"
+    }
+   },
+   "0x1120": {
+    "dir": "WM→Zone",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "nCharNo": "5",
+     "eUserType": "2; after the first 0x180C of a session only, on the main link"
+    }
    }
   },
   "zone": {
@@ -3776,6 +3979,173 @@
     ],
     "fields": {
      "tm": "36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms"
+    }
+   },
+   "0x180b": {
+    "dir": "zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "wmHandle": "35000 / 32500",
+     "charNo": "5; first packet of every so_LinkTo, also on the same-zone revive (combat 102.376)"
+    }
+   },
+   "0x180c": {
+    "dir": "zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "objHandle": "zone player handle",
+     "zoneNo": "0 (9210) / 2 (9214)",
+     "always99": "99 = GameLog 0x040F StoreType (map link)",
+     "exp": "total exp",
+     "money": "cen"
+    }
+   },
+   "0x180d": {
+    "dir": "zone→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "destMap": "RouCos02 / RouN = next 0x101F position",
+     "mapIndex": "2 (RouCos02), 150 (RouN)",
+     "zoneIp": "172.16.42.214",
+     "zonePort": "9214 / 9210",
+     "wmHandle2": "= wmHandle"
+    }
+   },
+   "0x180e": {
+    "dir": "WM→zone",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "objHandle": "echoed",
+     "mapIndex": "copied from 0x180D",
+     "x": "copied",
+     "zonePort": "copied; on the 0x180D link, 90–110 ms later; client 0x180A 10–16 ms later"
+    }
+   },
+   "0x1073": {
+    "dir": "Z→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "exp": "new total per gain: 22→24→26→28→30 (combat), 30→31→35 (shop)"
+    }
+   },
+   "0x1074": {
+    "dir": "Z→WM",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "level": "6, 7, 8 after `&levelup 3` (shop 30.500)"
+    }
+   },
+   "0x580e": {
+    "dir": "Z→WM",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "hquest": "21 (= 0x580D Handle)",
+     "err": "0x0981 ERR_KINGDOMQUEST_MAKE_NOERR, only from the zone hosting KDHoneying"
+    }
+   },
+   "0x580d": {
+    "dir": "WM→Z",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "Handle": "21",
+     "ID": "14",
+     "Title": "Mean Giant Honeying[A]",
+     "MapLink": "KDHoneying"
+    }
+   },
+   "0x402a": {
+    "dir": "Z→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "resttime": "0 (written as 0)",
+     "autopick": "0",
+     "mystery_vault": "1",
+     "bFirstJoin": "0 (written as 0)"
+    }
+   },
+   "0x4033": {
+    "dir": "Z→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "bDoResummon": "0",
+     "nSummonSlot": "0xFFFF",
+     "nId": "−1",
+     "nRegNum": "−1"
+    }
+   },
+   "0xcc0b": {
+    "dir": "Z→WM",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "nItemSlot": "3",
+     "nMoverID": "160",
+     "nMasterCharNo": "5",
+     "nPassenger": "{5, −1 ×9}"
+    }
+   },
+   "0x4036": {
+    "dir": "Z→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "UseItemMinimonInfo": "empty (0xFFFF lists)"
+    }
+   },
+   "0x4010": {
+    "dir": "Z→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "nTotalDoneQuest": "0",
+     "nTotalDoneQuestSize": "12",
+     "nDoneQuestCount": "0",
+     "nIndex": "0"
+    }
+   },
+   "0x4012": {
+    "dir": "Z→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "PartMark": "3 (first | last)",
+     "nMaxNum": "26",
+     "skill.number": "26",
+     "savetime": "current time_t"
     }
    }
   },
