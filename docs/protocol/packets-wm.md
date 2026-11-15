@@ -3038,12 +3038,14 @@ Sent in reply to `0x1403` NC_AVATAR_CREATEDATAFAIL_ACK on CParserCharDB (`FUN_00
 
 ### `0x1406` NC_AVATAR_CREATESUCC_ACK
 
-**Verified layout** (basis: client FUN_0040b530 / FUN_00662b50)
+**Verified layout** (basis: pdb2016 opcode name; wm FUN_004113c0 (CharDB 0x1405 → client); client FUN_0040b530 / FUN_00662b50 (C01))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | ? (not read) |  |
-| 1 | AVATAR | avatar | appended to the account's list (max 6) |
+| 0 | u8 | flag | always 1 (W01 §4.1); the client does not read it (C01). evidence: capture:create-char = 1 |
+| 1 | AVATAR | avatar | the new character, appended to the list. evidence: capture:create-char: chrregnum 3, CharCreateTest, level 1, slot 1, RouN, delinfo 0, shape 19 01 01 05, TutorialInfo {0,0} |
+
+P02: official name replaces C01's 'character created (ours)'; layout unchanged
 
 Sent in reply to `0x1405` NC_AVATAR_CREATEDATASUC_ACK on CParserCharDB (`FUN_004113c0`) · payload 131 bytes · raw header
 
@@ -3085,11 +3087,13 @@ Sent in reply to `0x1414` NC_AVATAR_GUILD_DATA_ACK on CParserCharDB (`FUN_0040c6
 
 ### `0x140c` NC_AVATAR_ERASESUCC_ACK
 
-**Verified layout** (basis: client FUN_004768c0)
+**Verified layout** (basis: pdb2016 opcode name; wm FUN_0040a010 (CharDB 0x140B → client); client FUN_004768c0 (C01))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | slot |  |
+| 0 | u8 | slot | evidence: capture:create-char = 1 (the slot of the 0x1407) |
+
+P02: official name replaces C01's 'character deleted (ours)'
 
 Sent in reply to `0x140b` NC_AVATAR_ERASEDATASUC_ACK on CParserCharDB (`FUN_0040a010`) · payload 1 bytes · raw header
 
@@ -3121,11 +3125,13 @@ Sent in reply to `0x1412` NC_AVATAR_RENAME_DB_ACK on CParserCharDB (`FUN_0040ff0
 
 ### `0x182a` NC_MAP_LINKEND_CLIENT_CMD
 
-**2017 PDB layout** *(pdb2017, unverified for 2016)*: `PROTO_NC_MAP_LINKEND_CLIENT_CMD`, 0 bytes
+**Verified layout** (basis: wm CParserZone::fc_NC_MAP_LINKEND_CMD @ FUN_0042d8d0: CSendPacket::ID(&p, 0x182a, 1, NULL))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| | | (empty) | |
+| 0 | u8 | uninit | never written: stale send-buffer byte (P02-B2). evidence: capture:idle_in_world 0xDA, capture:walk-run-portals 0x00 (6x) |
+
+P02: pdb2017 struct is empty; the 2016 WM sends 1 byte
 
 Sent in reply to `0x180c` NC_MAP_LINKEND_CMD on CParserZone (`FUN_0042d8d0`) · payload 1 bytes
 

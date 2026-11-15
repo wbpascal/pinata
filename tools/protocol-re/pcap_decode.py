@@ -249,6 +249,19 @@ def deframe(chunks, gaps, fmap, synced_start, enc, known):
 
 
 # ---------------------------------------------------------------- documentation
+def client_dir(d):
+    """annotation 'dir' -> C2S / S2C for client-facing packets. Items label the client side 'C' and the server by
+    name ('C→WM', 'WM→C', 'Z→C', 'C→Z'); 'C→S' / 'S→C' pass through. Server-to-server labels are kept as they are."""
+    if d in (C2S, S2C):
+        return d
+    parts = [x.strip() for x in (d or "").split("→")]
+    if len(parts) == 2 and parts[0] == "C" and parts[1] != "C":
+        return C2S
+    if len(parts) == 2 and parts[1] == "C" and parts[0] != "C":
+        return S2C
+    return d
+
+
 def load_docs():
     ann = json.load(open(os.path.join(DOCS, "annotations.json")))
     structs, packets = dict(ann.get("structs", {})), {}
@@ -257,7 +270,7 @@ def load_docs():
         structs.update(a.get("structs", {}))
         for srv, d in a.get("packets", {}).items():
             for op, v in d.items():
-                packets[(srv, int(op, 16), v.get("dir"))] = v
+                packets[(srv, int(op, 16), client_dir(v.get("dir")))] = v
     names = {}
     known = {k: {C2S: set(), S2C: set()} for k in CLIENT_CLASS}
     for e in json.load(open(os.path.join(DOCS, "opcodes.json"))):
