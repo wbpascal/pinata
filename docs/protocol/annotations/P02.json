@@ -1,5 +1,5 @@
 {
- "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it; an entry may carry a captured variant 'layout' that pcap_decode.py tries when the hand annotation does not fit (W04 0x7C07 short form, 0x7037 tail) (`packets.py` renders each entry as a **Captured** line in packets-<server>.md; capture-validation.md has the full reasoning). Capture names are re-data/captures/26_11_15_<name>.pcapng. Batch-2 aliases: 'shop' = 26_11_15_buy item, equip item, use storage, unequip, sell item, travel portal, attack, use soulstones; 'combat' = 26_11_15_travel portal, attack mob, pick-up item, die, revive, linkto.",
+ "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it; an entry may carry a captured variant 'layout' that pcap_decode.py tries when the hand annotation does not fit (W04 0x7C07 short form, 0x7037 tail) (`packets.py` renders each entry as a **Captured** line in packets-<server>.md; capture-validation.md has the full reasoning). Capture names are re-data/captures/26_11_15_<name>.pcapng. Batch-2 aliases: 'shop' = 26_11_15_buy item, equip item, use storage, unequip, sell item, travel portal, attack, use soulstones; 'combat' = 26_11_15_travel portal, attack mob, pick-up item, die, revive, linkto. Batch-3 aliases: 's14', 's21', 's21b', 's21c', 's21d', 's37' = 26_11_15_14_second-client-in-sight, 26_11_15_21_items-drop-split-storage-use-shop, 26_11_15_21b_purchase-attr-write-fail, 26_11_15_21c_expired-item, 26_11_15_21d_stack-over-maxlot, 26_11_15_37_login-heartbeat-refusals-delete.",
  "packets": {
   "login": {
    "0x0c37": {
@@ -3062,10 +3062,11 @@
    "0x0c09": {
     "dir": "S→C",
     "captures": [
-     "login-errors"
+     "login-errors",
+     "s37"
     ],
     "fields": {
-     "error": "0x45 after a wrong password"
+     "error": "0x45 after a wrong password; s37: 0x47 for nBlock 1, 0x48 for bLoginAble 0"
     }
    },
    "0x0c0a": {
@@ -3107,24 +3108,27 @@
    "0x0c0c": {
     "dir": "S→C",
     "captures": [
-     "all five"
+     "all five",
+     "s37"
     ],
     "fields": {
-     "world_status": "6",
-     "wm_ip": "'172.16.42.214'",
+     "world_status": "6; s37: 0 (WM down) and 5 (full) too",
+     "wm_ip": "'172.16.42.214'; s37: filled from ServerInfo.txt also on a refusal",
      "wm_port": "9110",
-     "validate": "31 rand() words (< 0x8000) + check word; XOR of all 32 = per-world counter 1,3,4,5,6,8 in time order (GetClientValidation)"
+     "validate": "31 rand() words (< 0x8000) + check word; XOR of all 32 = per-world counter 1,3,4,5,6,8 in time order (GetClientValidation); s37: on a status-0 refusal 64 stale stack bytes (P02-B23)"
     }
    },
    "0x0c16": {
     "dir": "Login→WM",
     "captures": [
      "shop",
-     "combat"
+     "combat",
+     "s37"
     ],
     "fields": {
      "bytes 0..5": "never written (P02-B5): 76 27 d3 ef 76 00",
-     "usrregnum": "103 at +6; payload 10 bytes, not 4"
+     "usrregnum": "103 at +6; payload 10 bytes, not 4",
+     "(header)": "s37: stale bytes 76 27 d3 ef 76 00 (password path), 07 f3 23 fc 00 50 (OTP path)"
     }
    }
   },
@@ -3461,11 +3465,12 @@
     "dir": "WM→Login",
     "captures": [
      "shop",
-     "combat"
+     "combat",
+     "s37"
     ],
     "fields": {
-     "currentUsers": "1",
-     "maxUsers": "2500 (WM client listener nMaxAccept), every 30 s"
+     "currentUsers": "1; s37: 0 / 1",
+     "maxUsers": "2500 (WM client listener nMaxAccept), every 30 s; s37: 0 in the handshake ms after each WM start (P02-B22), 1 after ServerInfo capacity 1"
     }
    },
    "0x10da": {
@@ -4093,6 +4098,126 @@
      "UserNo": "103",
      "CharNo": "5",
      "CharLev": "7, 6, 8: one per zone 0x1074, WM session order"
+    }
+   },
+   "0x1402": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "adminlevel": "0 for a GM account (constant)",
+     "slotnum": "2",
+     "shape": "0x85 Fighter, 0xD5 Trickster"
+    }
+   },
+   "0x1408": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "usrregnum": "103",
+     "avatar": "charNo 6",
+     "slot": "2",
+     "nNo": "guild number 0 (W03 §4.5)"
+    }
+   },
+   "0x1413": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "clienthandle": "WM handle 37500",
+     "chrregnum": "6",
+     "slot": "2"
+    }
+   },
+   "0x1414": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "nGuildNo": "0",
+     "chrregnum": "6",
+     "slot": "2"
+    }
+   },
+   "0x1405": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "numofavatar": "1",
+     "avatar": "level 1, RouN, delinfo zero, equipment 0xFFFF"
+    }
+   },
+   "0x140b": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "(body)": "the 0x1408 body echoed (15 bytes)"
+    }
+   },
+   "0x0411": {
+    "dir": "Zone/WM/Character→GameLog",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "chrregnum": "6 / 7 (WM, after 0x1405)"
+    }
+   },
+   "0x0412": {
+    "dir": "Zone/WM/Character→GameLog",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "chrregnum": "6, sent twice: Character server, then WM 10 ms later"
+    }
+   },
+   "0xc804": {
+    "dir": "WM/Zone/Character→GameLog",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "CharClass": "1 / 21 = (shape >> 2) & 0x1F"
+    }
+   },
+   "0xc805": {
+    "dir": "WM/Zone/Character→GameLog",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "CharClass": "1"
+    }
+   },
+   "0x0c35": {
+    "dir": "WM→Login",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "ip": "172.16.42.231 in network order",
+     "userId": "'admin'"
+    }
+   },
+   "0x0c19": {
+    "dir": "WM→Zone",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "netpacketzoneheader": "all 0xFF",
+     "usrregnum": "103, one per zone process"
     }
    }
   },
@@ -5987,14 +6112,15 @@
     "dir": "AccountDB→Login",
     "captures": [
      "shop",
-     "combat"
+     "combat",
+     "s37"
     ],
     "fields": {
      "nError": "0x41 ok",
      "nUserNo": "103",
      "nAuthID": "9",
-     "nBlock": "0",
-     "bLoginAble": "1"
+     "nBlock": "0; s37: 1 for the blocked account",
+     "bLoginAble": "1; s37: 0 for the not-login-able group (nAuthID 1)"
     }
    },
    "0x0c60": {
@@ -6098,6 +6224,45 @@
     "fields": {
      "connectercount": "1",
      "nEachClass": "[6] = 1 (class from the SHAPE byte 0x19 of the character in game)"
+    }
+   },
+   "0x0720": {
+    "dir": "Login→AccountLogDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "userpassword": "first 16 of the 32 MD5 hex characters of 0x0C5C sPassword",
+     "error": "0x47 / 0x48"
+    }
+   },
+   "0xc802": {
+    "dir": "Login→AccountLogDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "UserIP": "'172.16.42.231'",
+     "spawnapps": "'Original'"
+    }
+   },
+   "0xc803": {
+    "dir": "WM→AccountLogDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "LoginKeepTime": "7 (minutes)"
+    }
+   },
+   "0x0722": {
+    "dir": "→AccountLogDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "playmin": "7",
+     "error": "0x780"
     }
    }
   }

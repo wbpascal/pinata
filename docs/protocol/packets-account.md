@@ -873,7 +873,7 @@ Sent in reply to `0x2807` NC_OPTOOL_CONNECT_BRIF_REQ on CPFs (`FUN_00405140`) ·
 
 ### `0x0c5c` NC_USER_US_PASSWORD_CHECK_ACK (AccountDB→Login)
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `nError`: 0x41 ok; `nUserNo`: 103; `nAuthID`: 9; `nBlock`: 0; `bLoginAble`: 1
+**Captured** (P02, `capture-validation.md`; shop, combat, s37): `nError`: 0x41 ok; `nUserNo`: 103; `nAuthID`: 9; `nBlock`: 0; s37: 1 for the blocked account; `bLoginAble`: 1; s37: 0 for the not-login-able group (nAuthID 1)
 
 ### `0x0c61` NC_USER_RETURN_CHECK_ACK (AccountDB→WM)
 

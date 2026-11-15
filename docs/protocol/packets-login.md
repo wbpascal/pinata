@@ -196,7 +196,7 @@ Sent from `FUN_00409610` (`FUN_00409610`) · payload 2 bytes · raw header
 
 session is closed afterwards; L00 name was 'login failed'
 
-**Captured** (P02, `capture-validation.md`; login-errors): `error`: 0x45 after a wrong password
+**Captured** (P02, `capture-validation.md`; login-errors, s37): `error`: 0x45 after a wrong password; s37: 0x47 for nBlock 1, 0x48 for bLoginAble 0
 
 Sent in reply to `0x0c3f` NC_USER_TW_PASSWORD_CHECK_ACK on CParserAccountDB (`FUN_00403b50`) · payload 2 bytes · raw header
 
@@ -242,7 +242,7 @@ Sent in reply to `0x0c27` NC_USER_TEENAGER_ACK on CParserAccountDB (`FUN_0040405
 
 L00 name was 'world select result'
 
-**Captured** (P02, `capture-validation.md`; all five): `world_status`: 6; `wm_ip`: '172.16.42.214'; `wm_port`: 9110; `validate`: 31 rand() words (< 0x8000) + check word; XOR of all 32 = per-world counter 1,3,4,5,6,8 in time order (GetClientValidation)
+**Captured** (P02, `capture-validation.md`; all five, s37): `world_status`: 6; s37: 0 (WM down) and 5 (full) too; `wm_ip`: '172.16.42.214'; s37: filled from ServerInfo.txt also on a refusal; `wm_port`: 9110; `validate`: 31 rand() words (< 0x8000) + check word; XOR of all 32 = per-world counter 1,3,4,5,6,8 in time order (GetClientValidation); s37: on a status-0 refusal 64 stale stack bytes (P02-B23)
 
 Sent in reply to `0x0c0b` NC_USER_WORLDSELECT_REQ on CParserClient (`FUN_00406970`) · payload 83 bytes · raw header
 
@@ -581,5 +581,5 @@ world = the session's m_Connected_World; the first 0x0808 after a WM connects br
 
 ### `0x0c16` NC_USER_KICKOFFFROMWORLD_CMD (Login→WM)
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `bytes 0..5`: never written (P02-B5): 76 27 d3 ef 76 00; `usrregnum`: 103 at +6; payload 10 bytes, not 4
+**Captured** (P02, `capture-validation.md`; shop, combat, s37): `bytes 0..5`: never written (P02-B5): 76 27 d3 ef 76 00; `usrregnum`: 103 at +6; payload 10 bytes, not 4; `(header)`: s37: stale bytes 76 27 d3 ef 76 00 (password path), 07 f3 23 fc 00 50 (OTP path)
 

@@ -34,6 +34,8 @@ Heuristic extraction: verify a layout against the cited function before relying 
 
 pdb2017 field names; offsets checked in the 2016 code
 
+**Captured** (P02, `capture-validation.md`; s37): `userpassword`: first 16 of the 32 MD5 hex characters of 0x0C5C sPassword; `error`: 0x47 / 0x48
+
 Handler `FUN_00402470` (CParserAccountLog)
 
 | Off | Type | Checks in handler | Notes |
@@ -82,6 +84,8 @@ Handler `FUN_00402580` (CParserAccountLog)
 | 4 | u8 | worldnum |  |
 | 5 | u16 | playmin |  |
 | 7 | u16 | error |  |
+
+**Captured** (P02, `capture-validation.md`; s37): `playmin`: 7; `error`: 0x780
 
 Handler `FUN_00402640` (CParserAccountLog)
 
@@ -530,6 +534,8 @@ Handler `FUN_00403310` (CParserAccountLog)
 | 260 | char[16] | UserIP |  |
 | 276 | Name5 | spawnapps |  |
 
+**Captured** (P02, `capture-validation.md`; s37): `UserIP`: '172.16.42.231'; `spawnapps`: 'Original'
+
 Handler `FUN_004033d0` (CParserAccountLog)
 
 | Off | Type | Checks in handler | Notes |
@@ -553,6 +559,8 @@ Handler `FUN_004033d0` (CParserAccountLog)
 |---|---|---|---|
 | 0 | u32 | UserNo |  |
 | 4 | u32 | LoginKeepTime | minutes |
+
+**Captured** (P02, `capture-validation.md`; s37): `LoginKeepTime`: 7 (minutes)
 
 Handler `FUN_004034e0` (CParserAccountLog)
 

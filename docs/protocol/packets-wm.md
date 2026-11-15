@@ -11236,6 +11236,8 @@ size 0x48 + 6·n
 
 W01 name was 'character create request (ours)'
 
+**Captured** (P02, `capture-validation.md`; s37): `adminlevel`: 0 for a GM account (constant); `slotnum`: 2; `shape`: 0x85 Fighter, 0xD5 Trickster
+
 ### `0x1408` NC_AVATAR_ERASEDATA_REQ (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_00412fa0)
@@ -11245,6 +11247,8 @@ W01 name was 'character create request (ours)'
 | 0 | u16 | handle |  |
 | 2 | u32 | charNo |  |
 | 6 | u8 | slot |  |
+
+**Captured** (P02, `capture-validation.md`; s37): `usrregnum`: 103; `avatar`: charNo 6; `slot`: 2; `nNo`: guild number 0 (W03 §4.5)
 
 ### `0x1411` NC_AVATAR_RENAME_DB_REQ (WM→CharDB)
 
@@ -11434,7 +11438,7 @@ size 6
 
 W01 name was 'world user count (ours)'
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `currentUsers`: 1; `maxUsers`: 2500 (WM client listener nMaxAccept), every 30 s
+**Captured** (P02, `capture-validation.md`; shop, combat, s37): `currentUsers`: 1; s37: 0 / 1; `maxUsers`: 2500 (WM client listener nMaxAccept), every 30 s; s37: 0 in the handshake ms after each WM start (P02-B22), 1 after ServerInfo capacity 1
 
 ### `0x0c0e` NC_USER_WILLLOGIN_ACK (WM→Login)
 
@@ -11461,6 +11465,8 @@ W01 name was 'world login accepted (ours)'
 | 262 | u32 | ip |  |
 
 W01 name was 'token request (ours)'
+
+**Captured** (P02, `capture-validation.md`; s37): `ip`: 172.16.42.231 in network order; `userId`: 'admin'
 
 ### `0x2802` NC_OPTOOL_S2SCONNECT_LIST_ACK (WM→OPTool)
 
@@ -11755,6 +11761,8 @@ size 4
 | 0 | u16 | netpacketzoneheader.clienthandle | 0xFFFF: not about one zone player (pdb2017 name) |
 | 2 | u32 | netpacketzoneheader.charregistnumber | 0xFFFFFFFF (pdb2017 name) |
 | 6 | u32 | usrregnum | userNo (pdb2017 name) |
+
+**Captured** (P02, `capture-validation.md`; s37): `netpacketzoneheader`: all 0xFF; `usrregnum`: 103, one per zone process
 
 ### `0x101d` NC_CHAR_ZONE_CHARDATA_ACK (WM→Zone)
 
@@ -12991,6 +12999,14 @@ size 0x12, not checked
 
 ## Captured packets without a section above
 
+### `0x0411` NC_LOG_GAME_CREATE_AVATAR (Zone/WM/Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s37): `chrregnum`: 6 / 7 (WM, after 0x1405)
+
+### `0x0412` NC_LOG_GAME_DELETE_AVATAR (Zone/WM/Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s37): `chrregnum`: 6, sent twice: Character server, then WM 10 ms later
+
 ### `0x0c5f` NC_USER_TUTORIAL_CAN_SKIP_CMD (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `clienthandle`: echo; `isSkip`: 0; sent 1–3 ms before 0x0C13 (D02 §3.1 order)
@@ -13030,6 +13046,22 @@ size 0x12, not checked
 ### `0x1121` NC_CHAR_USEITEM_MINIMON_INFO_CMD (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nWorldHandle`: WM client handle (own field, no extra prefix); `UseItemMinimonInfo`: bNormalItem 0, bChargedItem 0, both lists 0xFFFF ×12
+
+### `0x1405` NC_AVATAR_CREATEDATASUC_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37): `numofavatar`: 1; `avatar`: level 1, RouN, delinfo zero, equipment 0xFFFF
+
+### `0x140b` NC_AVATAR_ERASEDATASUC_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37): `(body)`: the 0x1408 body echoed (15 bytes)
+
+### `0x1413` NC_AVATAR_GUILD_DATA_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s37): `clienthandle`: WM handle 37500; `chrregnum`: 6; `slot`: 2
+
+### `0x1414` NC_AVATAR_GUILD_DATA_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37): `nGuildNo`: 0; `chrregnum`: 6; `slot`: 2
 
 ### `0x400e` NC_CHARSAVE_2WLDMAN_ALL_CMD (Zone→WM)
 
@@ -13146,6 +13178,14 @@ size 0x12, not checked
 ### `0x987b` NC_GUILD_ACADEMY_ZONE_GUILD_ACADEMY_MASTER_BUFF_CMD (WM→Zone)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `NumOfMaster`: 0
+
+### `0xc804` NC_SYSLOG_CHAR_CREATED (WM/Zone/Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s37): `CharClass`: 1 / 21 = (shape >> 2) & 0x1F
+
+### `0xc805` NC_SYSLOG_CHAR_DELETED (WM/Zone/Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s37): `CharClass`: 1
 
 ### `0xc808` NC_SYSLOG_CHAR_LEVEL_UP (WM→GameLog)
 

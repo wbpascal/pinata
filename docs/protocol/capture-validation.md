@@ -27,6 +27,12 @@ the code; where they disagree, the code was re-read and the finding is listed in
 | `walk-run-portals` | run, walk, town portal Roumen↔Forest of Mist several times, link portal Roumen→Forest of Tides | login, wm, zone×6 | 1057 |
 | `buy item, equip item, use storage, unequip, sell item, travel portal, attack, use soulstones` (**shop**, batch 2) | name only, no notes file, no pcapng comments: Test2 (lvl 5) buys, equips, opens storage, unequips, sells, uses a portal, attacks, uses HP / SP stones | login, wm, zone×2 + 56 server links | 1570 |
 | `travel portal, attack mob, pick-up item, die, revive, linkto` (**combat**, batch 2) | name only: Test2 travels, fights mobs, picks up drops, dies, revives, takes a link portal | login, wm, zone×3 + 56 server links | 1870 |
+| `14_second-client-in-sight` (**s14**, batch 3) | notes file (times not filled in): Test1235 (GM) at the RouN slimes, a second account creates the Mage `X14B`, walks into sight, emotes, jumps, shouts, whispers, attacks; A `&hide` / `&show` / `&dimension` / `&linkto` | login×2, wm×2, zone×2 (both 9210) + 56 links | 13 468 |
+| `21_items-drop-split-storage-use-shop` (**s21**, batch 3) | notes file + SQL snapshots before / after: Test2 splits, merges, drops, picks up, destroys, uses, equips rings, uses storage, sells and buys back, buys soul stones, KQ pick-up limit, full inventory | login×3, wm×2, zone×2 (9210) + 56 links | 11 569 |
+| `21b_purchase-attr-write-fail` (**s21b**) | name only: S16 (a purchase whose attribute write fails) | login, wm, zone (9210) + 56 links | 397 |
+| `21c_expired-item` (**s21c**) | name only + one pcapng comment ("Boots deleted here", 66.1 s): S13 (an item past its end time) | login, wm, zone (9210) + 56 links | 606 |
+| `21d_stack-over-maxlot` (**s21d**) | name only: X3 (a stack limit lower than an existing stack; zone restarted with the changed table) | login, wm, zone (9210) + 67 links (zone restart) | 853 |
+| `37_login-heartbeat-refusals-delete` (**s37**, batch 3) | notes file: idle on the world list, create / delete / re-create `X37Del`, 4 min on the character list, WM stopped (world closed), WM restarted with capacity 1 (world full), blocked account, not-login-able account | login×6, wm + 124 links (WM restarts) | 3 583 |
 
 Batch 2 (`shop`, `combat`) was recorded on the server host with the LAN and the loopback interface: it adds the
 server↔server links (§7). The character is Test2 (`chrregnum` 5, slot 1, level 5, shape 0x19), not Test1235.
@@ -35,6 +41,11 @@ batch-1 types recur with the same layouts unless a row says otherwise.
 
 The pcapngs hold only the game packets (saved as "displayed packets"): no SYN/ACK frames. Several game packets often share one frame (one TCP segment, §2.1): idle_in_world holds 208 packets in
 114 frames, walk-run-portals 1 057 in 566, up to 67 packets in one frame.
+
+Batch 3 (commit 26bb95f, the X02 scenarios 14, 21, 37 and the setups S13, S16, X3) was recorded the same way as batch 2.
+`26_11_15_24_skills-abstates-stat-points.md` has no pcapng (blank notes only): scenario 24 is not captured. The 146
+opcode types not seen in batches 1–2 (98 on links, 9 WM, 39 zone) are covered in §16–§20; those sections stand
+before §11 so that the sweep sections §11–§15, which other documents cite by number, keep their numbers.
 
 ## 2. Transport
 
@@ -1764,6 +1775,145 @@ burst, at the end of `so_LinkTo`'s other-zone branch (Z01 §7.1). It is not sent
 | WM→GL | 0xC806 | NC_SYSLOG_CHAR_ENTER_GAME | 2 | 8 | confirmed | |
 | Z→GL | 0xC809 | NC_SYSLOG_CHAR_ZONE_TRANSITION | 3 | 11 | confirmed | other-zone links only |
 
+## 16. Login side, batch 3: refusals, character create / delete, idle (`s37`) *(captured)*
+
+Scenario 37 (`docs/plan/capture-scenarios.md` §3.37, setups S10, S11, X6). Account `admin` (`nUserNo` 103, `nAuthID` 9)
+and `testaccountB` (104, `nAuthID` 1). Login connections: `login#1` (129.8 s, world select, character list until
+631.4 s), `#2` (631.6 s, the OTP return), `#3` (677.6 s, world closed), `#4` (803.5 s, world full), `#5` (846.0 s,
+blocked), `#6` (879.0 s, not login-able). Link streams: Login's AccountDB / AccountLogDB links are `AccDB#1` /
+`ALDB#1`; the WM's are `AccDB#2` / `ALDB#2` (until the WM stops), its CharDB link `W00_CDB#2`, its GameLog link
+`W00_GLDB#1`; the Character server's GameLog link is `W00_GLDB#18`. The WM stop and the two WM starts (729.4 s,
+783.8 s) with the link handshakes and the start-up queries are §17.
+
+### 16.1 Message order
+
+```text
+create (250.412, again at 347.053 with class 21):
+  C→WM 0x1401 {slot 2, "X37Del", shape 0x85}  → 14 ms → WM→CDB 0x1402 → 100 ms (85 ms the second time) → CDB→WM 0x1405
+  → 8 ms, one WM pass → WM→AccDB 0x140D, WM→GL 0x0411, WM→GL 0xC804, WM→C 0x1406   (same ms)
+delete (319.801; the client's name check refuses a wrong confirmation without a packet):
+  C→WM 0x1407 {slot 2} → 14 ms → WM→CDB 0x1413 → 3 ms → CDB→WM 0x1414 {nGuildNo 0}
+  → 12 ms → WM→CDB 0x1408 → 22 ms → CDB→WM 0x140B + CDB→GL 0x0412 (same ms)
+  → 10 ms → WM→AccDB 0x140E, WM→GL 0x0412, WM→GL 0xC805, WM→C 0x140C, WM→CDB 0x9424, WM→zones 0x10B2 ×4   (same ms)
+  → 3 ms → CDB→WM 0x9425 {DBError 0x1740}
+back to the world list (631.405):
+  C→WM 0x0C33 → 11 ms → WM→Login 0x0C35 → 1 ms → Login→WM 0x0C36 {0x1E58} → 16 ms → WM→C 0x0C34
+  → client closes the WM connection → 15 ms → WM→AccDB 0x0C11, WM→ALDB 0x0722, WM→ALDB 0xC803, WM→zones 0x0C19 ×4
+  → 143 ms → new Login connection: seed, 0x0C65, 0x0C37 token → Login→WM 0x0C16, C 0x0C0A → WM→zones 0x0C16 ×4
+  → 632.981 C 0x0C18 {0}: the user leaves the world list for the login screen
+world closed (WM stopped after 655.5 s): 0x0C0A / 0x0C1C {worldstatus 0}; world select 696.113 → 17 ms → 0x0C0C {0}
+world full (WM up since 783.8 s): 0x0C0A {5}; world select 805.915 → 13 ms → Login→AccDB 0x0C10, Login→ALDB 0x0721,
+  Login→WM 0x0C0D → 18 ms → WM→Login 0x0C0E {ok 1} → 14 ms → C 0x0C0C {5, WM address, validate}; no WM connection
+blocked (846.0): 0x0C5A … AccDB 0x0C5C {nBlock 1, bLoginAble 1} → 10 ms → C 0x0C09 {0x47}, ALDB 0x0720, ALDB 0xC802
+not login-able (879.0): AccDB 0x0C5C {nBlock 0, bLoginAble 0} → 5 ms → ALDB 0x0720, 0xC802 → 15 ms → C 0x0C09 {0x48}
+```
+
+- **Create** (W01 §4.1, D02 §3) **confirmed**: the WM sends its four packets in code order (`fc_NC_AVATAR_CREATEDATASUC_ACK`
+  @ FUN_004113c0); `0x1402 adminlevel` is 0 for the GM account (the WM writes a constant 0). Shape 0x85 = Fighter
+  (class `(0x85 >> 2) & 0x1F` = 1), 0xD5 = Trickster (21); `0x140D.nClass` and `0xC804.CharClass` carry the same
+  value. The CharDB answer takes 85–100 ms (`p_Char_Create`). Slot 2 is the notes' "slot 3" (the client counts from 1).
+- **Delete** **confirmed** against W03 §4.5 (guild check 0x1413 → 0x1414 → 0x1408, `nNo` = the guild number 0) and
+  W04 §4.3 (`CWMClientSessionManager::AvatarErase` @ FUN_004382d0: 0x9424 to CharDB, 0x10B2 to every zone process; no
+  friend or guild member, so no 0x540C / 0x7438). W01 §4.1's "0x1407 sends 0x1408" is the statement W03 §4.5 already
+  corrects; the capture sides with W03 (`CParserClient::fc_NC_AVATAR_ERASE_REQ` @ FUN_00412fa0 sends `09 13 14`).
+  GameLog 0x0412 arrives twice, 10 ms apart: first from the Character server (D02 §3.4, its own GameLog link), then from
+  the WM (D05 §2.3, "two senders"). 0x9425 is also asked by every character delete, not only by the OPTool 0x281F path
+  that W04 §12.4's 0x9425 block names.
+- **Return to the world list** (W01 §5.1, `login-server.md` §5.3) **confirmed**: `0x0C36 {nError 0x1E58, hWM 37500,
+  sOTP}` in W01's field order; the session closes when the client drops the WM connection (`Client_OnClosed` @
+  FUN_00437030: `playmin 7` = 421.7 s since 209.7 s, `closeReason 0x780`, `LoginKeepTime 7`). No handler on this path
+  sets `closeReason`; 0x780 (normal logout) is the session's value from before *(inferred)*. The token login is the
+  batch-1 flow (§3.1); the Login → WM 0x0C16 of the OTP handler carries other stale header bytes (`07 f3 23 fc 00
+  50`) than the password path (`76 27 d3 ef 76 00`, again at 129.9 s and 803.5 s): P02-B5, one stack slot per caller.
+- **World closed**: the world stays in the list with status 0 (L01 status table, "WM link released") and the client
+  shows "Server is closed. Please try login later." (notes). The refusal is **not** "status and zeros"
+  (`login-server.md` §4): see §16.3 and P02-B23.
+- **World full**: the X6 prediction **confirmed** to the byte: Login sends AccountDB 0x0C10, AccountLog 0x0721 and WM
+  0x0C0D before it answers `0x0C0C {5}` with the WM address and a valid `validate` set (L00-B3); the WM accepts the
+  pending login (`0x0C0E ok 1`); the client shows "Server is full. Please try again later." and does not connect. The
+  status 5 at 803–806 s does not yet come from the capacity 1: the only `0x0808` the WM had sent since its start was
+  `{0, 0}` (P02-B22). From 816.2 s the WM reports `{0, 1}`, which also gives 5 (`95 × 1 / 100 = 0`); before the change
+  it reported `{0 or 1, 2500}`. So `MaxOfUser` is the last number of the WM's client row in `ServerInfo.txt` (X6's
+  inference **confirmed**).
+- **Blocked / not login-able**: `AccountCheckResult` (`login-server.md` §5.1) **confirmed** for 0x47 (`nBlock 1`) and
+  0x48 (`bLoginAble 0`); the client texts are the notes' "The ID has been blocked." and "The World Servers are down for
+  maintenance". Neither path asks AccountLog 0x0C5D. The S11 variant used clears the whole group: `nAuthID` stays 1 and
+  `bLoginAble` is 0 *(captured)*.
+
+### 16.2 Heartbeats and idle
+
+- **Login ↔ client**: the 2016 client opens the Login connection only when the user submits the login form: in all
+  six connections the seed comes 2–9 ms before `0x0C65`, and nothing reached port 9010 during the 70 s on the login
+  screen before 129.8 s. On the world list the client polls `0x0C1B` every 10.0 s (also after a refused world
+  select), and it closes the connection after 0x0C09. A 2016 client is therefore never 30 s silent on a Login
+  connection: Login sent no `0x0804` in any capture, and L01-B11 (heartbeat before the login request) is not reachable
+  with this client *(captured)*. Scenario 37 step 1 tests nothing as written (no connection exists).
+- **WM ↔ client** (7 min on the character list, 209.8–631.4 s): `0x0804` exactly 30.0 s after the last client packet,
+  12 times, answered in 1–10 ms; no close (W05 §1.5 / §4.5, §4.4 **confirmed**; scenario 37 prediction 6).
+
+### 16.3 Field findings
+
+- **0x0C0C refusal** (`CParserClient::fc_NC_USER_WORLDSELECT_REQ` @ FUN_00406970): on a refusal Login sends its stack
+  `PROTO_NC_USER_WORLDSELECT_ACK` (0x55 bytes) as filled by `GetWorldManagerConnectInfo` @ FUN_0040a020 (L01): status,
+  and `wm_ip` / `wm_port` from the `ServerInfo.txt` row (`"172.16.42.214"`, 9110) even though the WM is down. The 64
+  bytes of `validate_new[32]` are never written: captured `01 76 00 00 00 32 36 32 30 30 7c f2 ff 00 e0 d1 42 02 b5 e8
+  db 84 d8 f9 d3 07 …` (pointer-like words, the text `"26200"`, near the end `"172.01"` of an earlier `%03d` IP string).
+  (original bug) P02-B23. The client reads only the status for values below 6 (`login-server.md` §8).
+- **0x0720 `userpassword`** (the 16 bytes Login copies from `0x0C5C` +0x10C): the first 16 of the 32 lowercase hex
+  characters of `sPassword`, i.e. half of the MD5 the client sent, not the typed password (D01 §4.1 says "the typed
+  password"). Logged for both refusals with `userip ac 10 2a e7` and the refusal code.
+- **0x140D** (WM → AccountDB, `PROTO_NC_USP_USER_CHARACTER_INSERT`, 0x32 bytes, `sCharName` `char[40]` *(pdb2016)*):
+  the WM writes 20 name bytes and one zero byte; bytes +0x1E..+0x30 are stack residue (`9c 64 00 7f 61 52 00 e0 9e 64 00
+  5c e1 62 00 8e 00 00 00`, the same in both creates). (original bug) P02-B24. The Account server drops 0x140D unread
+  (D01 §3.1), so nothing is stored.
+- **0x0808 after a WM start**: `{NumOfUser 0, MaxOfUser 0}` in the same ms as the Login-link handshake (729.448,
+  783.818), then `{0, 1}` 30 s later. `CWMLoginSession::SendUserCount` @ FUN_00438d10 (W01 `Login_WorldStatus`) is
+  forced on the handshake (W01 §2.1) and sends the client capacity `DAT_00556bb8`, which is still 0 then: the client
+  listener opens only after the four DB links are validated (W01 §2 `BootstrapTick`) *(inferred cause)*. Login turns
+  `MaxOfUser 0` into status 5 (L01 §3: every threshold 0) and, since it is the first 0x0808 after a connect, pushes
+  the list to every client. (original bug) P02-B22: for up to 30 s after every WM start the world reports "full".
+- **0x0C35** `ip` 3 878 293 676 = `ac 10 2a e7` (172.16.42.231, network order); **0x0C11 / 0x0722** `{usrregnum 103,
+  worldnum 0, playmin 7, error 0x780}`; **0xC803** `{103, LoginKeepTime 7}` (minutes, not seconds).
+- **0x1405** = `{clienthandle, numofavatar 1, AVATAR}` (W01's "u8 ?" is `numofavatar`): level 1, `loginmap "RouN"`,
+  `delinfo` all zero (5 bytes; P02-B1 concerns only `GetAvatarInfo`), every equipment slot 0xFFFF.
+
+### 16.4 Opcodes
+
+Batch-1 client opcodes of these flows recur unchanged (0x0807, 0x0C65, 0x0C67, 0x0C5A, 0x0C04, 0x0C05, 0x0C0A, 0x0C1B,
+0x0C1C, 0x0C0B, 0x0C37, 0x0C18; WM 0x0C0F, 0x0C14, 0x080D, 0x080E, 0x1401, 0x1406, 0x1407, 0x140C, 0x0C33, 0x0C34,
+0x0804, 0x0805: §3.2, §4.2). New values and the 22 new link types:
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| S→C | 0x0C09 | NC_USER_LOGINFAIL_ACK | 2 | 2 | confirmed | 0x47 blocked, 0x48 not login-able (§16.1) |
+| S→C | 0x0C0C | NC_USER_WORLDSELECT_ACK | 3 | 83 | **corrected** (refusal) | status 0 carries the WM address + 64 stale bytes (P02-B23); status 5 = full answer with `validate` (L00-B3) |
+| S→C | 0x0C0A / 0x0C1C | NC_USER_LOGIN_ACK / NC_USER_WORLD_STATUS_ACK | 4 / 17 | 19 | confirmed | `worldstatus` 6, 0 (WM down), 5 (after the WM start) |
+| WM→CharDB | 0x1402 | NC_AVATAR_CREATEDATA_REQ | 2 | 33 | confirmed | `adminlevel 0`, `createworld 0`, shape + hair from 0x1401 |
+| CharDB→WM | 0x1405 | NC_AVATAR_CREATEDATASUC_ACK | 2 | 133 | confirmed | §16.3 |
+| WM→AccountDB | 0x140D | NC_USP_USER_CHARACTER_INSERT | 2 | 50 | **corrected** (stale bytes) | P02-B24; `nClass` 1 / 21 |
+| WM→GameLog | 0x0411 | NC_LOG_GAME_CREATE_AVATAR | 2 | 4 | confirmed | `chrregnum` 6 / 7 |
+| WM→GameLog | 0xC804 | NC_SYSLOG_CHAR_CREATED | 2 | 9 | confirmed | `UserNo, CharNo, CharClass` |
+| WM→CharDB | 0x1413 | NC_AVATAR_GUILD_DATA_REQ | 1 | 7 | confirmed | W03 §4.5 (not W01 §4.1) |
+| CharDB→WM | 0x1414 | NC_AVATAR_GUILD_DATA_ACK | 1 | 11 | confirmed | `nGuildNo 0` → straight to 0x1408 |
+| WM→CharDB | 0x1408 | NC_AVATAR_ERASEDATA_REQ | 1 | 15 | confirmed | `{handle, usrregnum, avatar, slot, nNo = guild 0}` (W03 §4.5) |
+| CharDB→WM | 0x140B | NC_AVATAR_ERASEDATASUC_ACK | 1 | 15 | confirmed | the 0x1408 body echoed |
+| CharDB→GameLog, WM→GameLog | 0x0412 | NC_LOG_GAME_DELETE_AVATAR | 2 | 4 | confirmed | two senders (D05), Character server first |
+| WM→AccountDB | 0x140E | NC_USP_USER_CHARACTER_DELETE | 1 | 9 | confirmed | dropped by the Account server (D01 §3.1) |
+| WM→GameLog | 0xC805 | NC_SYSLOG_CHAR_DELETED | 1 | 9 | confirmed | class 1 |
+| WM→CharDB | 0x9424 | NC_HOLY_PROMISE_DB_DEL_CHAR_REQ | 1 | 4 | confirmed | from `AvatarErase` (W04 §4.3) |
+| CharDB→WM | 0x9425 | NC_HOLY_PROMISE_DB_DEL_CHAR_ACK | 1 | 6 | confirmed | `DBError 0x1740` ok (D04) |
+| WM→Zone | 0x10B2 | NC_CHAR_WEDDING_CANCEL_WEDDING | 4 | 4 | confirmed | one per zone process, `RegisterNumber` = charNo |
+| WM→Login | 0x0C35 | NC_USER_CREATE_OTP_REQ | 1 | 266 | confirmed | `{handle, userNo, userId[256], ip}` (W01 §5.1) |
+| Login→WM | 0x0C36 | NC_USER_CREATE_OTP_ACK | 1 | 36 | confirmed | `{nError 0x1E58, hWM, sOTP[32]}` (W01's order) |
+| WM→AccountDB | 0x0C11 | NC_USER_LOGOUT_DB | 1 | 9 | confirmed | dropped by the Account server |
+| WM→AccountLogDB | 0x0722 | NC_LOG_USER_LOGOUT | 1 | 9 | confirmed | same body as 0x0C11 |
+| WM→AccountLogDB | 0xC803 | NC_SYSLOG_ACCOUNT_LOGOUT | 1 | 8 | confirmed | `LoginKeepTime` in minutes |
+| WM→Zone | 0x0C19 | NC_USER_CONNECTCUT2ZONE_CMD | 4 | 10 | confirmed | header all 0xFF, `usrregnum 103` |
+| Login→AccountLogDB | 0x0720 | NC_LOG_USER_LOGINFAIL | 2 | 278 | **corrected** (D01 note) | `userpassword` = half the MD5 (§16.3) |
+| Login→AccountLogDB | 0xC802 | NC_SYSLOG_ACCOUNT_LOGIN_FAILURE | 2 | 296 | confirmed | `UserName`, `UserIP "172.16.42.231"`, `spawnapps` |
+| Login→WM | 0x0C16 | NC_USER_KICKOFFFROMWORLD_CMD | 3 | 10 | confirmed (P02-B5) | stale header differs per caller (§16.1) |
+| WM→Login | 0x0808 | NC_MISC_USER_COUNT_CMD | 27 | 4 | **corrected** (first after a start) | `{0, 0}` on the handshake (P02-B22), then `{0, 1}` |
+
 ## 11. Message order against README §2 and the pseudocode
 
 README §2 is a sketch of the login → WM → zone chain. Against the seven captures (details in the sections cited;
@@ -1832,6 +1982,9 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B19 | zone `SkillDamageSender::sds_TemplateStore` @ FUN_005803c0 → 0x2452 | builds each `SkillDamage` in a stack local and writes the second flag byte from `old & 0xfa` plus the three known bits, keeping bits 3–7 of the stack (§9.2) | uninitialised stack bits on every skill damage entry (`0x28` in both captured) | start from a zeroed entry |
 | P02-B20 | zone `ShinePlayer::so_Unmark` @ FUN_00558900 (hunt log, Z09 §28.12) | flushes `mhl_SendAll2Log` only when `smo_GetMode() != 0`; a link to another zone sets mode 0 in `so_LinkTo` before the unmark in `so_banning` (§9.3) | every zone change drops the hunt-log entries of that zone (`shop`: the RouN Slime kill never reached GameLog 0x042D); only same-zone links and logout log them | flush in the other-zone branch of `so_LinkTo`, or before setting mode 0 |
 | P02-B21 | zone `WholeSaver::ws_save2DB` @ FUN_00455a10, `ws_save2worldmanager` @ FUN_004536f0, `ws_savelevel2worldmamager` @ FUN_00453580 (§10.1) | every save's `handle.bufferlocation` is `ws_savestorepoint.value`, which only the constructor @ FUN_004565f0 sets (0); the 2048-slot `ws_savestore` ring (0x148A8 bytes per slot) is never used and `ws_saveassure` @ FUN_00453d40 is empty | `bufferlocation` is 0 in every 0x4001 / 0x4007 / 0x401A and every ACK, so an ACK cannot be matched to a pending save and a lost save is never re-sent; 172 MB of unused memory per zone process | advance the index per save, keep the save in `ws_savestore[index]` until its ACK, re-send unanswered ones in `ws_saveassure` |
+| P02-B22 | WM `CWMLoginSession::SendUserCount` @ FUN_00438d10, forced by the Login-link handshake (W01 §2.1) | the first `0x0808` after a WM start carries `MaxOfUser` = the client capacity `DAT_00556bb8`, still 0 because the client listener opens only after the four DB links (cause *inferred*; `{0, 0}` captured at both starts, §16.3) | Login sets the world to `WMSUS_FULL` and pushes the list: for up to 30 s after every WM start world selects get "Server is full" (after L00-B3's AccountDB / AccountLog / WM side effects) | send the first count once the client listener is open, or skip a count with `MaxOfUser 0` |
+| P02-B23 | Login `fc_NC_USER_WORLDSELECT_REQ` @ FUN_00406970 (refusal branch) | sends the 0x55-byte stack `PROTO_NC_USER_WORLDSELECT_ACK` with only status, `wm_ip` and `wm_port` written; `validate_new[32]` is never initialised (§16.3) | 64 bytes of Login stack (pointers, string pieces) reach the client with every refused world select; the client ignores them | zero the struct before `GetWorldManagerConnectInfo` |
+| P02-B24 | WM `fc_NC_AVATAR_CREATEDATASUC_ACK` @ FUN_004113c0 → AccountDB 0x140D | `sCharName` is `char[40]` *(pdb2016)*; the WM writes 20 name bytes and one zero byte, bytes +0x1E..+0x30 are stack residue (§16.3) | 19 stale WM bytes per character creation on the AccountDB link; the Account server drops 0x140D unread, so no effect | copy the name into a zeroed 40-byte field |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -1848,11 +2001,15 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | D03-B8 | 0x3446 = 17 bytes + 3 stale (zero) bytes | §7.6.1 |
 | D03-B11 | 0x0446 map name "Need" | §7.6.1 |
 | D02-B13 | 0x109A `Error 0x1200` in both captures (never written) | §7.6.1 |
+| L00-B3 | `s37` 805.9 s: 0x0C10, 0x0721, 0x0C0D and the WM's `0x0C0E ok 1` before `0x0C0C {5}`; the client does not connect | §16.1 |
+| P02-B5 | `s37`: the OTP path (0x0C37) leaves other stale header bytes than the password path | §16.1 |
 
 ## 13. Discrepancies per work item
 
 Every owner below is `**State:** done`; nobody reopens them. The full rows (old statement, correction, evidence) are in
 `docs/knowledge/P02.md` "Corrections"; X01 (contradictions register, plan "Corrections between items") collects them.
+X01 is done since batch 2: rows marked "batch-3 follow-up" wait for the follow-up item the batch-3 sweep (part 22)
+creates for the README register.
 
 | Owner | Where | Discrepancy | Status |
 |---|---|---|---|
@@ -1908,6 +2065,13 @@ Every owner below is `**State:** done`; nobody reopens them. The full rows (old 
 | Z02 | `Z02-actions.md` §3.1 (`FUN_005cc2a0` "event 0x29, inferred: achievement/stat hook") | resets title 41 `ID_NOCHATTING_COUNT` (captured: 76 → 0 after a chat, §10.3); 0x2a of the shout = 42 `ID_BROADCAST_COUNT` *(inferred)* | corrected (inferred → captured) → X01 |
 | Z12 | `Z12-stats.md` N ("who sends 0x4025 in the client was not traced") | the 2016 client's `On_NC_BAT_LEVELUP_CMD` @ FUN_004aa3d0 sends `{1}` when the inventory holds a Mystery Vault (§10.6) | open item answered → X01 |
 | P01 | `pcap_decode.py` with the annotations | `SHINE_COORD_TYPE`, `ABNORMAL_STATE_BIT`, `STRUCT_QSC` had no struct entry (Z09 / Z13 / Z08 annotations decoded them as 1 byte or fell back to pdb2016) | fixed by P02 (part 13, P02.json `structs`) |
+| L00 | `login-server.md` §4 (0x0C0B: "Send 0x0C0C { status, zeros… }, only status filled") | the refusal also carries `wm_ip` / `wm_port` from `ServerInfo.txt` and 64 uninitialised bytes (P02-B23, batch 3, §16.3); L01's `GetWorldManagerConnectInfo` block is right | contradicted → batch-3 follow-up (part 22) |
+| L01 | `L01-process.md` world-status table (6 = "WM connected") | the WM's first 0x0808 in the handshake ms is `{0, 0}`: the world turns 5 (full) at once and stays so until the next 0x0808 30 s later (P02-B22, §16.3) | extended → batch-3 follow-up |
+| L01 | `L01-B11` (Login heartbeat before the login request) | not reachable with the 2016 client: it opens the Login connection only on submit and polls 0x0C1B every 10 s (§16.2) | reach limited (captured) → batch-3 follow-up |
+| D01 | `D01-account.md` §4.1 (0x0720: "failed logins store the typed password") | the stored 16 characters are the first half of the client's MD5 hex string (`0x0C5C sPassword`), not the typed password (§16.3) | corrected → batch-3 follow-up |
+| W01 | `W01-core.md` §4.1 (0x1407 → 0x1408; 0x1405's "u8 ?") | 0x1407 sends 0x1413 (W03 §4.5 already says so; captured); the byte is `numofavatar` (1) | confirmed W03 → batch-3 follow-up |
+| W04 | `W04-social-misc.md` §12.4 (0x9425 "asked by OPTool 0x281F") | every character delete asks it too (`AvatarErase` from CharDB 0x140B, §16.1) | extended → batch-3 follow-up |
+| X02 | `capture-scenarios.md` §3.37 step 1 / prediction (1) | the login screen holds no connection, so a 70 s idle there tests nothing (§16.2) | reach limited → batch-3 follow-up |
 
 In batch 1 (§3–§6) no discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held (batch 2's rows for Z03, Z09, Z12, Z13 and W03 are above). Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
 timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
@@ -1999,6 +2163,9 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
   (batch 2 has only successful item transactions, §8), party,
   guild, KQ, failure paths (0x0C15, 0x1002, 0x1804, 0x0C66, …; lists in §3.2, §4.2, §5.2). Statuses there stay
   **never seen** until X02's scenarios are recorded.
+- Batch 3, login side (§16): the cause of P02-B22 (client capacity 0 until the client listener opens) is inferred
+  from `BootstrapTick`'s order, not from a writer of `DAT_00556bb8`; `closeReason 0x780` on the 0x0C33 path (no
+  handler on it sets the field) is taken to be the value left from before *(inferred)*.
 
 ## 15. Coverage boundary
 
