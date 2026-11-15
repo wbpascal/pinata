@@ -12945,6 +12945,19 @@ Z16 §6.4
 | 8 | u8 | nPartyIndex |  |
 | 9 | u8 | nSlotIndex |  |
 
+### `0xb40f` NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD (WM→Z)
+
+**Verified layout** (basis: zone wms_NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD FUN_0044caa0; sender wm CWMClientSession::CharIDChange FUN_00431dd0 (broadcast to all zones))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | nCharNo | renamed character |
+| 4 | u8 | bInit | 1 = relations reset: the zone drops the member from its party / raid copy |
+| 5 | Name5 | sOldID | not read by the zone |
+| 25 | Name5 | sNewID | new party / raid member name |
+
+0x2d bytes, PROTO_NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD; no reply
+
 ### `0xcc0c` NC_MOVER_LINKDATA_ZONE_CMD (WM→Z)
 
 **Verified layout** (basis: zone FUN_005a5ac0 → FUN_0045ddf0 (copy of MOVER_LINKDATA))
@@ -13052,6 +13065,16 @@ answer 0x344A NC_ITEMDB_ITEMCHANGE_ACK (Z05 §5.4); this sender is one of 12
 | 4 | u16 | group[i].ItemActionGroupID | cool-time entry +0x10 |
 | 6 | u32 | group[i].SecondCoolTime | remaining ms (client divides by 1000); 0 from ResetCoolTime |
 
+### `0x500c` NC_SOULSTONE_SP_SOMEONEUSE_CMD (Z→C)
+
+**Verified layout** (basis: zone sp_SPStoneUse FUN_00588a40; client FUN_004ad900)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | player | handle of the player who used the SP stone |
+
+broadcast to the players in sight
+
 ### `0x5836` NC_KQ_SCORE_INFO_CMD (Z→C)
 
 **Verified layout** (basis: zone Lua cScoreInfo FUN_005e3790 / cScoreInfo_AllInMap FUN_005e3970; PROTO_NC_KQ_SCORE_INFO_CMD (pdb2016); client On_NC_KQ_SCORE_INFO_CMD FUN_0049d8b0)
@@ -13089,6 +13112,19 @@ answer 0x344A NC_ITEMDB_ITEMCHANGE_ACK (Z05 §5.4); this sender is one of 12
 | 3 | u8 | Blue.nScore | arg 3 (no limit) |
 
 4 bytes; broadcast to the map; KDSoccer_W. Z09 §28.12
+
+### `0x6003` NC_CT_SET_SOMEONECHANGE_CMD (Z→C)
+
+**Verified layout** (basis: zone CCharacterTitleZone::Send_NC_CT_SET_CURRENT_ACK FUN_005ca9e0 (only after Error 0xA01, not on NameHide maps); client FUN_00499700)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | hnd | player handle |
+| 2 | u8 | Type | title type |
+| 3 | u8 | ElementNo | title level |
+| 4 | u16 | MobID | weapon-title mob |
+
+6 bytes, broadcast to the players in sight
 
 ### `0x7483` NC_GUILD_TOURNAMENTSTART_CMD (Z→C)
 
@@ -13291,6 +13327,17 @@ to everyone in range of the caster and the caster. Z16 §6.5
 | 2 | SHINE_XY_TYPE[nNum] | Members | {u32 x, u32 y} of each visible enemy fighter |
 
 2 + 8·n bytes, to the scanning player. Z16 §4.6
+
+### `0x941b` NC_HOLY_PROMISE_REWARD_MONEY_CMD (Z→C)
+
+**Verified layout** (basis: zone sp_HolyPromiseCenFrom FUN_00483aa0; client FUN_004b0040)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | Name5 | MemberCharID | trainee name |
+| 20 | u64 | nMoney | low half = cen, high half 0 |
+
+0x1c bytes
 
 ### `0x1082` NC_CHAR_WEDDINGDATA_CMD (Z→CharDB)
 
@@ -14008,6 +14055,42 @@ payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block 
 | 2 | u32 | nPetRegNum |  |
 | 6 | char[16] | sPetName |  |
 
+### `0x3476` NC_ITEMDB_DISMANTLE_REQ (Z→GameDB)
+
+**Verified layout** (basis: zone sp_NC_ITEM_DISMANTLE_REQ FUN_005293c0 → idp_DismantleProductExecute FUN_00529110)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | player handle |
+| 2 | u32 | header.charregistnumber | charNo |
+| 6 | u16 | lockindex | inventory lock index (incremented after) |
+| 8 | u8 | raw.vanish | always 1 |
+| 9 | u16 | raw.rawid | dismantled item id |
+| 11 | u16 | raw.rawuselot_log | always 1 |
+| 13 | u64 | raw.iteminfo.itemchange.attritemregnum | dismantled item key |
+| 21 | u16 | raw.iteminfo.itemchange.attr | ITEM_INVEN 0x2400 | slot (location word) |
+| 23 | u16 | raw.iteminfo.itemchange.location | not written |
+| 25 | u8 | producenumber | number of produce entries (≤ 64) |
+| 26 | produce[producenumber] | produce | 0x2b each: u8 create, u16 product, u16 productuselot_log, union { PROTO_ITEM_ATTRCHANGE { u64 regnum, u16 attr = attribute-data offset, ITEM_INVEN location } (create 0) | PROTO_ITEM_CREATE { u32 owner, MAPPOS map, ITEM_INVEN location, u64 regnum, u16 itemid, u16 attr = attribute-data offset } (create 1) } |
+
+variable length: after produce[] the attribute data of each produce entry is appended (ItemAttributeClass vt 4); the attr words point at it, relative to the payload start
+
+### `0x6008` NC_CT_SET_CURRENT_DB_CMD (Z→GameDB)
+
+**Verified layout** (basis: zone CCharacterTitleZone::Send_NC_CT_SET_CURRENT_DB_CMD FUN_005cadd0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle |  |
+| 2 | u32 | header.charregistnumber | not sent when −1 or 0 |
+| 6 | u8 | CurrentTitle | req.Type |
+| 7 | u8 | CurrentTitleElement | req.ElementNo |
+| 8 | u16 | CurrentTitleMobID | req.MobID |
+| 10 | CT_INFO | UseTitle | {u8 Type, u8 ElementNo:6 | ElementValue:2} |
+| 12 | CT_INFO | UseAbleTitle |  |
+
+0xe bytes; no answer
+
 ### `0x0441` NC_LOG_GAME_KQ_ENTER (Z→GameLog)
 
 **Verified layout** (basis: zone FUN_00496280)
@@ -14219,6 +14302,16 @@ Lua title grant for a player not on this zone; WM relay W04 §7 (W04-B19)
 | 0 | ANNOUNCE_MESSAGE | AnnounceMessage | type 11 = roar, text from AnnounceData row 11 "%s:%s" |
 
 (pdb2017 struct; zone writes a type byte and a length-prefixed text, details not decoded)
+
+### `0x7446` NC_GUILD_ZONE_LIST_REQ (Z→WM)
+
+**Verified layout** (basis: zone CGuildZone::Send_NC_GUILD_ZONE_LIST_REQ FUN_005cc980)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | (unset) | pp_SetPacketLen(3): one byte after the opcode, never written |
+
+sent once per process (gz_IsSendReq); the byte is never written (original bug Z30-B8); answer 0x7447 (Z08 §8)
 
 ### `0x7482` NC_GUILD_TOURNAMENT_END_CMD (Z→WM)
 
@@ -14673,6 +14766,45 @@ only by the hosting zone. Z16 §6.2
 | 15 | ORToken | Argument | InstanceDungeon row key (20 B) |
 | 35 | char[33] | ServerMapName | instance map, set by the hosting zone |
 | 68 | u16 | Error | 0 found, 1 no free instance, 2 not handled (initial), 3 full |
+
+### `0x10ad` NC_CHAR_PLAYERSEARCH_BY_NORMAL_USER_RNG (Z↔Z ring)
+
+**Verified layout** (basis: zone zrpb_Request FUN_005a7430 (origin), zls_NC_CHAR_PLAYERSEARCH_BY_NORMAL_USER_RNG FUN_0045c0b0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | ZONERINGLINKAGESTART | start | {u8 machine = origin zone, u16 handle = master handle, u32 regnum = master charNo} |
+| 7 | Name5 | charid | searched academy member |
+
+0x1b bytes
+
+### `0x10ae` NC_CHAR_PLAYERFOUND_BY_NORMAL_USER_RNG (Z↔Z ring)
+
+**Verified layout** (basis: zone FUN_0045c0b0 (builder), zls_NC_CHAR_PLAYERFOUND_BY_NORMAL_USER_RNG FUN_0045c340, zrpb_Success FUN_005a7cf0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | ZONERINGLINKAGESTART | start | copied from 0x10AD |
+| 7 | Name3 | map | target's map |
+| 19 | SHINE_XY_TYPE | coord | target's x, y |
+| 27 | Name5 | charid | target name |
+| 47 | u8 | canRecall | target vt 0xa78 so_ply_IsLink_In_MapAndSendErrorMsg == 1 |
+| 48 | u8 | modeIDLv | target map fm_eLevelType (ILT_MAX → 1) |
+
+0x31 bytes (the 2016 PDB also has a 0x30-byte definition without modeIDLv; the zone writes and reads 0x31)
+
+### `0x9436` NC_HOLY_PROMISE_CENTRANSFER_RNG (Z↔Z ring)
+
+**Verified layout** (basis: zone zls_NC_HOLY_PROMISE_CENTRANSFER_RNG FUN_004839b0, hpctm_Process FUN_00483860 (forward))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | ZONERINGLINKAGESTART | start | {u8 machine, u16 handle, u32 regnum} |
+| 7 | u32 | upper | receiver (master) charNo |
+| 11 | u32 | cen | money |
+| 15 | Name5 | lower | trainee name |
+
+0x23 bytes; no 2016 originator (the spending hook is empty)
 
 ### `0x1095` NC_CHAR_WEDDING_PARTNER_INFO_RNG (ring)
 
