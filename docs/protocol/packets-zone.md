@@ -5196,11 +5196,11 @@ Sent in reply to `0x2454` NC_BAT_ABSTATE_ERASE_REQ on ShineObjectClass::ShinePla
 
 ### `0x2456` NC_BAT_SUMEONESKILLCUT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_BAT_SUMEONESKILLCUT_CMD`, 2 bytes
+**Verified layout** (basis: zone FUN_004083a0 (AbnormalStateReinforcedMove::ase_PreAttachObject), to the bearer's sight incl. the bearer; client GameFrameWork::On_NC_BAT_SUMEONESKILLCUT_CMD FUN_0049bcd0)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | caster |  |
+| 0 | u16 | caster | handle of the object whose skill is cut (the knocked-back bearer); client: if that character is in a skill action, Char::CancelSkillAction + ApplicateSkillSeqImmediately |
 
 Sent from `AbnormalStateContainer::AbnormalStateReinforcedMove::ase_PreAttachObject` (`FUN_004083a0`) · payload 2 bytes
 
@@ -11338,6 +11338,17 @@ only the self-kill send site of Z09 (cMobSuicide / ShineSuicide / servant vanish
 | 2 | u16 | attacker | killer handle (mob+0x1fba), 0xFFFF when none |
 
 2017 PDB alias of 0x244A (the zone→WM direction is NC_BAT_PKINPKFIELD_WMS_CMD, Z03). Sent once to sight when the mob's mode becomes 3.
+
+### `0x245A` NC_BAT_AREADOTDAMAGE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_0040d640 (SubAbnormalStateActorAreaDamage::sasa_Routine); dead twin FUN_0040dc60; client FUN_004b62f0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | abstate | AbStataIndex of the area state |
+| 2 | u16 | Centerobject | handle of the caster (scan centre) |
+| 4 | u8 | num | records that follow; AreaDamage: scanned targets (max 30), untouched ones are all-zero records (Z22-B2) |
+| 5 | targetinfo[num] | target | {u16 object, u32 resthp, u32 damage, u16 hpchangeorder} (12 bytes); client: object 0 / unknown skipped, damage number if > 0, resthp 0 = death |
 
 ### `0x245F` NC_BAT_LPCHANGE_CMD (hand-named) (S→C)
 
