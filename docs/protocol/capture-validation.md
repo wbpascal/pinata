@@ -2,14 +2,15 @@
 
 Real client↔server traffic compared with the documented protocol (`README.md`, annotations, generated layouts,
 pseudocode). Captures are the strongest evidence level: a statement here marked *(captured)* overrides a reading of
-the code; where they disagree, the code was re-read and the finding is listed in §9 for the owning item.
+the code; where they disagree, the code was re-read and the finding is listed in §13 for the owning item.
 
 - Decoder: `python3 -I tools/protocol-re/pcap_decode.py re-data/captures/<file>.pcapng --out <dir>` (P01,
   `docs/knowledge/P01.md`). Field names below are the decoder's (annotations first).
 - Captured fields confirmed or corrected by P02: `annotations/P02.json` (`packets` = corrected/new layouts,
   `evidence` = confirmed existing layouts).
 - Server set: `Files/Server/2016`, client `Files/Client/2016` (version key `20151116141627`), one world
-  (`world_no` 0, `INITIO`), zones on ports 9210/9212/9214, all on 172.16.42.214; client on another LAN host.
+  (`world_no` 0, `INITIO`), zones on ports 9210/9212/9214 (Zone03 on 9216 was never used), all on 172.16.42.214; client on another LAN host.
+  The server links (batch 2, §7) run over loopback on the same host.
 - Status words per opcode: **confirmed** (size and every field value consistent with the documented layout and
   behaviour), **corrected** (layout or behaviour differs; correction recorded), **contradicted** (a documented
   statement is wrong, owner must fix), **partial** (size confirmed, some fields not exercised or not documented),
@@ -24,6 +25,13 @@ the code; where they disagree, the code was re-read and the finding is listed in
 | `create-char` | create Cleric/female/face 3/"Feather" hair/"Deep Blue" `CharCreateTest`, then delete it | login, wm | 30 |
 | `idle_in_world` | log Test1235 into Roumen, idle among mobs, log out to character select, back to world select | login×2, wm, zone | 208 |
 | `walk-run-portals` | run, walk, town portal Roumen↔Forest of Mist several times, link portal Roumen→Forest of Tides | login, wm, zone×6 | 1057 |
+| `buy item, equip item, use storage, unequip, sell item, travel portal, attack, use soulstones` (**shop**, batch 2) | name only, no notes file, no pcapng comments: Test2 (lvl 5) buys, equips, opens storage, unequips, sells, uses a portal, attacks, uses HP / SP stones | login, wm, zone×2 + 56 server links | 1570 |
+| `travel portal, attack mob, pick-up item, die, revive, linkto` (**combat**, batch 2) | name only: Test2 travels, fights mobs, picks up drops, dies, revives, takes a link portal | login, wm, zone×3 + 56 server links | 1870 |
+
+Batch 2 (`shop`, `combat`) was recorded on the server host with the LAN and the loopback interface: it adds the
+server↔server links (§7). The character is Test2 (`chrregnum` 5, slot 1, level 5, shape 0x19), not Test1235.
+Its 257 opcode types not seen in batch 1 (190 on links, 64 zone, 3 WM) are covered in §7–§10 (parts 7–13); the
+batch-1 types recur with the same layouts unless a row says otherwise.
 
 The pcapngs hold only the game packets (saved as "displayed packets"): no SYN/ACK frames. Several game packets often share one frame (one TCP segment, §2.1): idle_in_world holds 208 packets in
 114 frames, walk-run-portals 1 057 in 566, up to 67 packets in one frame.
@@ -107,7 +115,7 @@ Differences from the documented order:
 | C→S | 0x0C04 | NC_USER_XTRAP_REQ | 9 | 30 | confirmed | order: after the login request (§3.1) |
 | S→C | 0x0C05 | NC_USER_XTRAP_ACK | 9 | 1 | confirmed | `bSuccess = 1` always (the key is not checked, L00-B5) |
 | S→C | 0x0C09 | NC_USER_LOGINFAIL_ACK | 1 | 2 | confirmed | `0x45` for a wrong password (`login-server.md` §5.1) |
-| S→C | 0x0C0A | NC_USER_LOGIN_ACK | 8 | 19 | confirmed | 1 world: `{0, "INITIO", 6}`. The name is ServerInfo.txt `WORLD_NAME 0, "INITIO"`. The scenario notes say the tester saw "Enid", but neither `Fiesta.bin` (2016) nor its `TextData*.shn` contains that string, so the 2016 client cannot have shown it: unexplained (probably another client install or a slip in the notes); §10 |
+| S→C | 0x0C0A | NC_USER_LOGIN_ACK | 8 | 19 | confirmed | 1 world: `{0, "INITIO", 6}`. The name is ServerInfo.txt `WORLD_NAME 0, "INITIO"`. The scenario notes say the tester saw "Enid", but neither `Fiesta.bin` (2016) nor its `TextData*.shn` contains that string, so the 2016 client cannot have shown it: unexplained (probably another client install or a slip in the notes); §14 |
 | C→S | 0x0C1B | NC_USER_WORLD_STATUS_REQ | 10 | 0 | confirmed | every 10 s on the world list |
 | S→C | 0x0C1C | NC_USER_WORLD_STATUS_ACK | 10 | 19 | confirmed | same body as 0x0C0A |
 | C→S | 0x0C0B | NC_USER_WORLDSELECT_REQ | 6 | 1 | confirmed | `world_no = 0` |
@@ -164,7 +172,7 @@ S 0x7032, 0x7033, 0x7034            +53 ms after 0x1003, before the zone has ans
 C 0x7004, 0x700C, 0x7C06            same client tick, 7 ms after 0x1802 (the client asks on NC_MAP_LOGIN_ACK, C01)
 S 0x7005, 0x700D (CharDB round trip, 20–75 ms), 0x7C07 (4-byte form; the WM sends it in the 0x7C06 handler
                                     without a DB round trip, W04, yet it left 73–74 ms after 0x7C06, in the same TCP
-                                    segment as 0x700D, before it in idle and after it in walk; cause open, §10)
+                                    segment as 0x700D, before it in idle and after it in walk; cause open, §14)
   zone: C 0x1803 NC_MAP_LOGINCOMPLETE_CMD, and in the same client tick:
 C 0x581B NC_KQ_LIST_REFRESH_REQ
 S 0x581C, 0x581D ×3                 answer to 0x581B (first refresh of the session only, §4.3)
@@ -265,6 +273,9 @@ found no old session.
 | S→C | 0x0C34 | NC_USER_WILL_WORLD_SELECT_ACK | 2 | 34 | confirmed | `result 0x1E58`, 32 ASCII hex chars (= the later Login 0x0C37, §3.2) |
 | C→S | 0x0C18 | NC_USER_NORMALLOGOUT_CMD | 1 | 1 | confirmed + extended | `LogoutType 0` when going from the game to the world list (W01 §5.1 calls mode 0 "quit"; it covers leaving the WM either way). Mode 1 not captured |
 | S→C | 0x0C17 | NC_USER_CONNECTCUT_CMD | 1 | 2 | confirmed | `0x683` (Login-initiated kick, §4.1) |
+| C→S | 0x10DA | NC_CHAR_NEWBIE_GUIDE_VIEW_SET_CMD | 2 (batch 2) | 1 | confirmed | `nGuideView` 131, 142 (`shop`). The WM forwards CharDB `0x10DB {nCharNo 5, nGuideView}` 5–11 ms later (W01 §5 @ FUN_004182f0; D02 0x10DB) |
+| C→S | 0x7037 | NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_REQ | 2 (batch 2) | 11 | partial | `n 1`, `SHORT_CUT_DATA {nSlotNo 9, nCodeNo 0, nValue 0}`, then `{9, 1, 38043}` (`combat`). The client sends **3 zero bytes more** than `1 + 7n`. The WM forwards CharDB `0x704B` with `5 + 7n` = 12 bytes (tail dropped); CharDB `0x704C {nError 0x2100 ok, nCharNo 5}` comes back 1–2 ms later (W04 §8.2 / §8.3 **confirmed**). Client sender not located: the 2017 `ShortCutMgr::SaveToNet` / `SendOptToChange` are empty stubs (§14) |
+| S→C | 0x7038 | NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_ACK | 2 (batch 2) | 2 | confirmed | `nError 0x2100` 23–29 ms after the request; the 2016 client has no handler (W04 §8.3) |
 
 Never seen on the WM (documented client-facing paths not exercised): `0x0C15` (bad validate / DB error), `0x1002`
 (char login errors), `0x1404` / `0x140A` (create / delete errors), `0x1110` / `0x111D` (tutorial), `0x140F` / `0x1410`
@@ -445,7 +456,7 @@ a 10-entry 0x1035 *(captured)*; 4.93–5.02 s in all 7 streams.
 | S→C | 0x1C03 | NC_BRIEFINFO_CHANGEUPGRADE_CMD | 1 | 6 | confirmed | item 30817, upgrade 0, slot 25 |
 | S→C | 0x1C05 | NC_BRIEFINFO_CHANGEWEAPON_CMD | 7 | 9 | confirmed | item 1250 (equipment slot 10 in 0x1047), `nSlotNum` = 0x74 in all 7 (stale): **confirms** Z18-B10; currentmobid 0xFFFF, killlevel 0xFF |
 | S→C | 0x583A | NC_KQ_TEAM_TYPE_CMD | 7 | 1 | confirmed | 2 |
-| S→C | 0x1C09 | NC_BRIEFINFO_MOB_CMD | 12 | 299–4173 | confirmed | 1 + 149 × n, n ≤ 28; since the part-5 decoder fix (§11) every record decodes (`mobnum` = record count in all 12; handle, mode 2, mobid, coord); in-world 0x1C09 is §6 |
+| S→C | 0x1C09 | NC_BRIEFINFO_MOB_CMD | 12 | 299–4173 | confirmed | 1 + 149 × n, n ≤ 28; since the part-5 decoder fix (§15) every record decodes (`mobnum` = record count in all 12; handle, mode 2, mobid, coord); in-world 0x1C09 is §6 |
 | S→C | 0x242A | NC_BAT_ABSTATEINFORM_NOEFFECT_CMD | 19 | 8 | confirmed | `asl_SendAfterLogin`, §5.1 #5 |
 | S→C | 0x2429 | NC_BAT_ABSTATEINFORM_CMD | 30 | 8 | confirmed | title abstates (§5.1 #13), abstate 728; keepTime −1 = permanent |
 | S→C | 0x1C18 | NC_BRIEFINFO_ABSTATE_CHANGE_CMD | 49 | 14 | confirmed | one per 0x2429 / 0x242A, handle = own |
@@ -455,9 +466,9 @@ a 10-entry 0x1035 *(captured)*; 4.93–5.02 s in all 7 streams.
 | S→C | 0x182B | NC_MAP_CAN_USE_REVIVEITEM_CMD | 7 | 1 | confirmed | 1 |
 | S→C | 0x2011 | NC_ACT_NOTICE_CMD | 14 | 20 | confirmed | 2 per login: "From 172.16.42.231" (`unk` 1) and "Admin level is 100" (`unk` 2): `unk` is never written (Z09-B54); the values are whatever the send buffer held *(inferred)* |
 | S→C | 0x10BD | NC_CHAR_CLIENT_AUTO_PICK_ACK | 2 | 3 | confirmed (pdb2016 layout) | login {err 0x1E00, bEnable 1}; at 82.1 s {0x1E00, 0} (in-world, §6); layout added to P02.json |
-| S→C | 0x1123 | NC_CHAR_USEITEM_MINIMON_INFO_CLIENT_CMD | 7 | 50 | confirmed | Z13 layout right (0x32); the struct `USEITEM_MINIMON_INFO` (pdb2016, 0x32) is now in `annotations/P02.json` `structs`, so all 7 decode in full (part 5, §11) |
+| S→C | 0x1123 | NC_CHAR_USEITEM_MINIMON_INFO_CLIENT_CMD | 7 | 50 | confirmed | Z13 layout right (0x32); the struct `USEITEM_MINIMON_INFO` (pdb2016, 0x32) is now in `annotations/P02.json` `structs`, so all 7 decode in full (part 5, §15) |
 | S→C | 0x10C6 | NC_CHAR_ADMIN_LEVEL_INFORM_CMD | 7 | 1 | confirmed | `nAdminLevel` 100 (pdb2016 name; layout added to P02.json) |
-| S→C | 0x482C | NC_SKILL_ITEMACTIONCOOLTIME_CMD | 7 | 2 | confirmed | num 0 (Z17 §3.5: 2 + 8n, sent also when empty); Z11.json overlays the array header and its element fields (`group[i].…`) at offset 2; the decoder now reads that as the element layout (part 5, §11) |
+| S→C | 0x482C | NC_SKILL_ITEMACTIONCOOLTIME_CMD | 7 | 2 | confirmed | num 0 (Z17 §3.5: 2 + 8n, sent also when empty); Z11.json overlays the array header and its element fields (`group[i].…`) at offset 2; the decoder now reads that as the element layout (part 5, §15) |
 | S→C | 0x10D4 | NC_CHAR_MYSTERYVAULT_UI_STATE_CMD | 7 | 1 | confirmed | 0 |
 | S→C | 0x1827 | NC_MAP_FIELD_ATTRIBUTE_CMD | 7 | 4 | confirmed (pdb2016 layout) | `eFieldMapType` 0 = FMT_NORMAL; layout added to P02.json |
 | S→C | 0x1035 | NC_CHAR_CHANGEPARAMCHANGE_CMD | 25 | 51–131 | confirmed | 1 + 5n; full refresh (26) after login, 10 after the immortal reset (in-world refresh is §6) |
@@ -680,7 +691,113 @@ In-world instances of §5 opcodes: 0x1035 (per-minute pairs, expiry, §6.1), 0x2
   `ali_Work`), so Z09-B13 (wrong first argument of `pcb_Append`) has no visible effect while the buffer is not full
   *(captured, consistent with Z09's inferred effect)*.
 
-## 7. Message order against README §2 and the pseudocode
+## 7. Server links (batch 2)
+
+The batch-2 captures (`shop`, `combat`, §1) also hold the loopback traffic between the server processes on
+172.16.42.214. The decoder names a link stream after its listener (ServerInfo.txt): `AccDB` 9000 (Account), `ALDB` 9311
+(AccountLog), `W00_CDB` 9411 (Character), `W00_GLDB` 9511 (GameLog), `Login` 9011 (Login's WM listener), `W00_WM` 9111
+(the WM's zone listener). On a link, "C→S" means connecting server → listener. Every link was up before recording
+started, so no `0x0801`–`0x0803` handshake was captured.
+
+### 7.1 Transport on the links *(captured)*
+
+- **Framing and cipher**: README §1.1 framing; no `0x0807` seed and no XOR on any link (plaintext both ways, as
+  `pcap_decode.py` assumes). The short and long length forms are the same as on client streams. All 3 440 batch-2
+  packets parse without a resync.
+- **Connections per capture** (the same in both): AccDB 2, ALDB 2, Login 1, W00_WM 16, W00_CDB 17, W00_GLDB 18.
+  All servers share one IP, so the connecting process is identified by content:
+  - AccDB: one link from Login (`0x0C5B`, `0x0C10`) and one from the WM (`0x0C60`).
+  - ALDB: one link from Login (`0x0C5D`, `0x0721`, `0xC801`) and one from the WM (`0x0809` / `0x080A` / `0xC811`).
+  - Login: the WM's link to Login.
+  - W00_WM: 4 of the 16 links get every WM→zone broadcast (`0x0C16`, `0x0821`, `0x580D`, `0x987A` / `0x987B`), so
+    they are one per zone process (Zone00–03). The other 12 carry per-character traffic (`0x101C`, `0x104B`, `0x40xx`).
+  - W00_CDB: one WM link (`0x0C12`, `0x1004` …) and 16 zone links.
+  - 16 = 4 zones × 4 links per DB / WM listener *(inferred; checked against the code in part 9)*.
+- **Heartbeat**: either end sends `0x0804` (empty) when it has received nothing on that link for 30 s, and the other
+  end answers `0x0805` (empty) within 1 ms. Every idle link shows requests exactly 30.0 s apart. Most come from the
+  connecting side, but on the W00_WM main links and some CharDB links the listener sends them. Longer gaps (42–81 s)
+  occur only on links that carried other traffic in between. This is the Login rule (`login-server.md` §2; L01 §1.6
+  `ProcHeartBeat` on every link) running on both ends of every link.
+- **Timestamps**: the pcapng holds a LAN and a loopback interface, and the file does not keep their frames in time
+  order (e.g. the first AccDB frame, 2.877 s, comes before LAN frames stamped 2.845 s). Sorted by timestamp, every
+  request/answer chain is causal with 1–15 ms steps, so both interfaces share one clock. All orders below are by
+  timestamp.
+
+### 7.2 Login, Account and AccountLog links: message order *(captured)*
+
+`shop` capture, times in s (`combat` gives the same order, each step within ±20 ms):
+
+```
+2.866  client → Login     0x0C5A US_LOGIN_REQ + 0x0C04 XTRAP_REQ (same tick)
+2.877  Login → AccountDB  0x0C5B PASSWORD_CHECK_REQ               (Login → client 0x0C05 in the same ms)
+2.880  AccountDB → Login  0x0C5C nError 0x41 (ok)
+2.892  Login → AcctLogDB  0x0C5D IS_IP_BLOCK_REQ
+2.908  AcctLogDB → Login  0x0C5E bUserIPBlock 0
+2.910  Login → WM         0x0C16 KICKOFFFROMWORLD {userNo 103}  + Login → AcctLogDB 0xC801 (same ms)
+2.918  Login → client     0x0C0A world list
+2.923  WM → zone ×4       0x0C16 {FF×6, 103}                       (first kick, W01 §5.2)
+3.954  client → Login     0x0C0B world 0
+3.960  Login → AccountDB 0x0C10, → AcctLogDB 0x0721, → WM 0x0C0D   (same ms, this order)
+3.977  WM → Login         0x0C0E ok 1
+3.993  Login → client     0x0C0C (WM address, validate[32])
+4.042  WM → client 0x0807 seed;  4.050 client → WM 0x0C0F
+4.059  WM → zone ×4       0x0C16 {FF×6, 103}                       (second kick, W01 §3.2)
+4.059  WM → AccountDB     0x0C60 RETURN_CHECK_REQ;  4.060 AccountDB → WM 0x0C61
+4.075  WM → CharDB        0x0C12 AVATARINFO_REQ;  4.076 0x0C5F, 4.078 0x0C13   (§7.4)
+4.104  WM → client        0x0C14 avatar list
+```
+
+**Confirms** the `login-server.md` §4 / §5.1 / §5.2 handler order and its §6 summary (`0x0C5A → 0x0C5B → 0x0C5C →
+0x0C5D → 0x0C5E → 0x0C16 + 0x0C0A + 0xC801`; `0x0C0B → 0x0C10, 0x0721, 0x0C0D → 0x0C0E → 0x0C0C`). It also confirms W01
+§3.2 / §3.3: on world login the WM kicks on every zone, then runs `0x0C60` → `0x0C61` → the avatar request → `0x0C14`.
+Each login therefore sends 2 × 4 zone kicks (one from Login's `0x0C16`, one from the WM's own `0x0C0F`).
+
+Periodic traffic:
+- WM → Login `0x0808` every 30.0 s (25.7, 55.8, 85.7, 115.8, 145.7 s): W01 §2 `Login_WorldStatus` **confirmed**.
+- AccountLog → WM `0x0809` at the start of each minute: 58.802 s, while the WM's `0x0849` for 12:03:00 goes out at
+  58.804 s; then 119.293 s; in `combat` 43.397 and 102.901 s. The sender is `CStatistics::Process` @ AL:FUN_004064b0:
+  when the local `tm_min` changes, it sends a raw 4-byte `{03, 0x0809, b}` to every type-5 (WM) session. The WM answers
+  in the same ms with `0xC811`, then `0x080A`, the order of W01 §8 (**confirmed**). D01 §4.2 calls 0x080A "WM every
+  interval": **corrected**, the WM sends it only as the answer to 0x0809, once per AccountLog minute.
+
+### 7.3 Opcodes (Login, Account, AccountLog links)
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| Login→AccountDB | 0x0C5B | NC_USER_US_PASSWORD_CHECK_REQ | 2 | 338 | confirmed | `clienthandle` = Login client handle (5600 / 5200), `sUserName "admin"`, `sPassword` = 32 lowercase hex chars = MD5("admin") `21232f29…` (the client hashes; Login forwards it unchanged), `sUserIP "172.016.042.231"` (`%03d` format, `login-server.md` §4), `spawnapps "Original"` |
+| AccountDB→Login | 0x0C5C | NC_USER_US_PASSWORD_CHECK_ACK | 2 | 353 | confirmed | `nError 0x41` (ok), `nUserNo 103`, request strings echoed, `nAuthID 9`, `nBlock 0`, `bLoginAble 1` (D01 §3.2) |
+| Login→AccountLogDB | 0x0C5D | NC_USER_US_IS_IP_BLOCK_REQ | 2 | 379 | confirmed | `LoginData` = the 0x0C5C body (0x161), `nUserNo 103`, `nClientHandle`, `sUserIP` |
+| AccountLogDB→Login | 0x0C5E | NC_USER_US_IS_IP_BLOCK_ACK | 2 | 356 | confirmed | `LoginData` copy, `nClientHandle` at +0x161, `bUserIPBlock 0` at +0x163: the offsets of `login-server.md` §5.2 |
+| Login→AccountLogDB | 0xC801 | NC_SYSLOG_ACCOUNT_LOGIN_SUCCESS | 2 | 40 | **contradicted** (L00-B6) | `UserNo 103`, `UserIP "172.16.42.231"` (`%d` format, NUL-padded), `spawnapps "Original"` at +0x14 (2016 40-byte layout, D01 §4.5). `fc_NC_USER_US_IS_IP_BLOCK_ACK` @ FUN_004058c0 zeroes `Data[4..0x13]`, then copies `sprintf("%d.%d.%d.%d", ip)` into it with `strncpy(Data + 4, …, 0x10)`: the IP is filled, so L00-B6 ("UserIP zeroed") is not a bug |
+| Login→WM | 0x0C16 | NC_USER_KICKOFFFROMWORLD_CMD | 2 | 10 | **corrected** | 10 bytes, not `{u32 userNo}` (`login-server.md` §4, §5.1, §5.2; the pdb2017 struct is 4 bytes). The handler builds the raw header `{0x0C, 0x0C16}` on the stack, writes `usrregnum` at +6 and `BroadCast`s 0xD bytes, so the 6 bytes before `usrregnum` (the `NETPACKETZONEHEADER` slot) are never written: `76 27 d3 ef 76 00` in both captures. (original bug) P02-B5. The WM reads `userNo` at +6 (W01 §5.2 **confirmed**) |
+| WM→Zone | 0x0C16 | NC_USER_KICKOFFFROMWORLD_CMD | 16 | 10 | confirmed | header all `0xFF`, `usrregnum 103` (W01 §3.2 / §5.2); 4 per event (one per zone process), 2 events per login (§7.2) |
+| Login→AccountDB | 0x0C10 | NC_USER_LOGIN_DB | 2 | 9 | confirmed | `usrregnum 103`, `worldnum 0`, `ip` bytes `ac 10 2a e7` = 172.16.42.231 in network order |
+| Login→AccountLogDB | 0x0721 | NC_LOG_USER_LOGIN | 2 | 9 | confirmed | same body as 0x0C10 |
+| Login→WM | 0x0C0D | NC_USER_WILLLOGIN_REQ | 2 | 347 | confirmed | 0x15B bytes: `clienthandle` = Login client handle, world 0, `usrregnum 103`, `userid "admin"`, `validate_new[32]` = the words the client then sends in WM 0x0C0F (§4.2), `spawnapps "Original"` at +0x147 (W05 §5.3 names) |
+| WM→Login | 0x0C0E | NC_USER_WILLLOGIN_ACK | 2 | 348 | confirmed | the 0x15B request verbatim + `ok 1` (W01 §3.1) |
+| WM→Login | 0x0808 | NC_MISC_USER_COUNT_CMD | 9 | 4 | confirmed | `{NumOfUser 1, MaxOfUser 2500}` every 30 s; 2500 = the `nMaxAccept` of the WM client listener (ServerInfo.txt `PG_W00_WM` type 20), no OPTool limit set (W01 §2) |
+| WM→AccountDB | 0x0C60 | NC_USER_RETURN_CHECK_REQ | 2 | 6 | confirmed | `nHandle` = WM client handle (35000 / 32500, the `worldmanager` of the following 0x0C14), `nUserNo 103` |
+| AccountDB→WM | 0x0C61 | NC_USER_RETURN_CHECK_ACK | 2 | 11 | confirmed | `bReturnUser 0`, `tLastSec` 174 618 (`combat`) and 174 902 s (`shop`, 284 s later): with no comeback row, D01 §3.3 falls back to `usp_User_GetDatediffCreated`, i.e. seconds since the account was created (≈ 2.02 days). The WM takes the `hasHistory = 0` branch (W01 §3.3) |
+| AccountLogDB→WM | 0x0809 | NC_MISC_CONNECTER_REQ | 4 | 1 | **corrected** (size) | 1 payload byte. `CStatistics::Process` @ AL:FUN_004064b0 reuses its `CSession_Manager *` parameter as the 4-byte packet buffer (`CONCAT13(ptr >> 24, 0x080903)`), so the byte is the high byte of that pointer (0x00 here). The 2016 / 2017 PDB struct is empty. (original bug) P02-B6. Layout in `annotations/P02.json` |
+| WM→AccountLogDB | 0xC811 | NC_SYSLOG_SERVER_CCU | 4 | 5 | confirmed | `UserCount 1, WorldNo 0` |
+| WM→AccountLogDB | 0x080A | NC_MISC_CONNECTER_ACK | 4 | 131 | confirmed | `worldno 0`, `connectercount 1`, `nEachClass[6] = 1`: the character in game is Test2 (0x0C14 shape byte 0x19 → class `(0x19 >> 2) & 0x1F` = 6), counted from the SHAPE byte as W01 §8 says |
+| both | 0x0804 / 0x0805 | NC_MISC_HEARTBEAT_REQ / _ACK | 457 / 458 | 0 | confirmed | §7.1 |
+
+### 7.4 WM ↔ Character DB *(part 8, not yet written)*
+
+The client→WM→CharDB forwards `0x10DA → 0x10DB` and `0x7037 → 0x704B → 0x704C → 0x7038` are in §4.2 (batch-2 rows).
+
+### 7.5 Zone ↔ WM *(parts 9–10, not yet written)*
+
+### 7.6 Zone ↔ Character DB and GameLog DB *(parts 11–13, not yet written)*
+
+## 8. Zone in-world, batch 2: items, shops, storage *(part 11, not yet written)*
+
+## 9. Zone in-world, batch 2: combat, death, revive, soulstones *(part 12, not yet written)*
+
+## 10. Zone in-world, batch 2: other new zone opcodes *(part 13, not yet written)*
+
+## 11. Message order against README §2 and the pseudocode
 
 README §2 is a sketch of the login → WM → zone chain. Against the five captures (details in the sections cited):
 
@@ -704,7 +821,7 @@ Pseudocode orders the captures confirm in full: Z01 §6 (`sp_NC_MAP_LOGINCOMPLET
 W05 §2.2 (0x0849 once per character, on the full minute), Z09 §2.4 (per-minute check, item expiry), Z09 §9.6 (sight
 enter / leave at `MapInfo.Sight`), Z02 §5 (`ResendLastMove` after 0x1C08).
 
-## 8. Original-server bugs
+## 12. Original-server bugs
 
 Found by P02 (tagged `(original bug)` where described):
 
@@ -714,6 +831,8 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B2 | WM `fc_NC_MAP_LINKEND_CMD` @ FUN_0042d8d0 → client 0x182A | `CSendPacket::ID(&p, 0x182a, 1, NULL)` declares a 1-byte payload and writes none (§4.2) | one stale WM byte per map login (0xDA / 0x00 captured); the client ignores it | payload size 0 (the 2017 PDB struct is empty) |
 | P02-B3 | zone `so_ply_FillRewardInven` @ FUN_004fc310 → 0x302D | adds the counter byte to the length `irs_FillBufferItem` @ FUN_00644c80 already counts (§5.3) | every 0x302D carries one uninitialised trailing byte | use the returned length as is |
 | P02-B4 | zone `sp_NC_MAP_LOGINCOMPLETE_CMD` @ FUN_00443390 (tail) | a missing title state entry or abstate jumps to the epilogue (§5.3) | latent: with a bad `CurrentTitleElement` the client gets no 0x10C6 / 0x482C / 0x10D4 / 0x1827 / 0x182C, no map Lua `MapLogin`, no GameDB 0x34CF | skip only the title abstates and continue |
+| P02-B5 | Login `fc_NC_USER_US_IS_IP_BLOCK_ACK` @ FUN_004058c0 (and the other 0x0C16 broadcasts of `login-server.md` §4 / §5.1) → WM 0x0C16 | builds the raw packet on the stack, writes only the header and `usrregnum` at +6, and sends 0xD bytes (§7.3) | 6 bytes of Login stack (`76 27 d3 ef 76 00`) reach the WM in the `NETPACKETZONEHEADER` slot on every login; the WM ignores them | zero the header (the WM fills it with 0xFF when it forwards) |
+| P02-B6 | AccountLog `CStatistics::Process` @ AL:FUN_004064b0 → WM 0x0809 | the payload byte is the high byte of the `CSession_Manager *` parameter, which is reused as the packet buffer (§7.3) | one meaningless byte per minute to each WM; the WM ignores it | empty payload (the struct is empty) |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -727,7 +846,7 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | Z02-B2 | mob `moveattr` = stale `gpp` bytes with bit 0 cleared | §6.3 |
 | Z09-B13 | no visible effect while the broadcast buffer is not full (0x1C0E reaches the mover) | §6.3 |
 
-## 9. Discrepancies per work item
+## 13. Discrepancies per work item
 
 Every owner below is `**State:** done`; nobody reopens them. The full rows (old statement, correction, evidence) are in
 `docs/knowledge/P02.md` "Corrections"; X01 (contradictions register, plan "Corrections between items") collects them.
@@ -736,7 +855,11 @@ Every owner below is `**State:** done`; nobody reopens them. The full rows (old 
 |---|---|---|---|
 | P01 / L00 (README) | `README.md` §1.4, §2 | zone seed is sent on accept; no client `0x0806` | contradicted → X01 |
 | P01 / L00 (README) | `README.md` §1.5 | heartbeat runs server → client (`0x0804`), client answers `0x0805` | contradicted → X01 |
-| P01 / L00 (README) | `README.md` §2 | missing: 0x0C04/0x0C05, token-login order, 0x0C1B poll, 0x080D game time, WM option pushes, zone blob copies, map change, logout (§7) | corrected → X01 |
+| L00 | `login-server.md` §4 (0x0C37), §5.1, §5.2 (0x0C16 broadcasts) | Login → WM 0x0C16 is 10 bytes (6 unwritten bytes + `usrregnum`), not `{u32 userNo}` (P02-B5, batch 2) | corrected → X01 |
+| L00 | `login-server.md` §5.2 (0xC801) and its bugs table L00-B6 | 0xC801 `UserIP` is filled (`"172.16.42.231"`); L00-B6 is not a bug | contradicted → X01 (drop L00-B6 from the register) |
+| D01 | `D01-account.md` §4.2 (0x080A "WM every interval") | the WM sends `0xC811` + `0x080A` only as the answer to AccountLog's `0x0809`, which `CStatistics::Process` @ AL:FUN_004064b0 sends on each minute change (P02-B6 for its byte) | corrected → X01 |
+| W04 | `W04-social-misc.md` §8.2 (0x7037) | the client sends 3 bytes more than `1 + 7n`; the WM forwards only `5 + 7n` | extended → X01 |
+| P01 / L00 (README) | `README.md` §2 | missing: 0x0C04/0x0C05, token-login order, 0x0C1B poll, 0x080D game time, WM option pushes, zone blob copies, map change, logout (§11) | corrected → X01 |
 | L00 | `login-server.md` §8 | client sends its login request before 0x0C04 | corrected → X01 |
 | L00 | `annotations/L00.json` 0x0C37 | token is `char[32]` | corrected (P02.json overrides) |
 | D02 | `D02-character.md` §3.2 | `delinfo` +0x28..+0x2B uninitialised (P02-B1) | contradicted → X01 |
@@ -745,7 +868,7 @@ Every owner below is `**State:** done`; nobody reopens them. The full rows (old 
 | W01 | `W01-core.md` §5.1 | 0x0C18 mode 0 also = back to the world list | corrected → X01 |
 | W04 | `W04-social-misc.md` §9 | 0x7C07 arrives in the game scene | open item answered |
 | W05 | `W05-process.md` §2.2 | 0x0849 has `tm_sec = 0`; no drift | contradicted (inferred claim) → X01 |
-| P01 | `pcap_decode.py` | annotation dirs `X→C` / `C→X`; struct-array, `bytes`, nested and inline struct types | fixed by P02 (parts 2 and 5, §11) |
+| P01 | `pcap_decode.py` | annotation dirs `X→C` / `C→X`; struct-array, `bytes`, nested and inline struct types | fixed by P02 (parts 2 and 5, §15) |
 | P01 | `annotations.json` zone 0x1802 | pdb2016 layout replaces the `?` blocks | corrected (P02.json overrides) |
 | Z01 | `Z01-core.md` §6 | `sp_ConnectFromWhere` sends a notice, not WM 0x082A | contradicted → X01 |
 | Z01 | `Z01-core.md` §6 | tail of 0x1803 is conditional (P02-B4) | corrected → X01 |
@@ -758,7 +881,7 @@ Every owner below is `**State:** done`; nobody reopens them. The full rows (old 
 
 No discrepancy for Z03, Z05, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held.
 
-## 10. Not reconstructed / uncertain
+## 14. Not reconstructed / uncertain
 
 - **0x0849 / 0x080E clock offset**: the capture PC and server clocks differ by a few tens of ms, sign varying between
   captures (§4.2, §4.3); a capture with the server's own clock (or NTP on both) would pin the send to the second.
@@ -769,13 +892,18 @@ No discrepancy for Z03, Z05, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: e
   *(inferred; a capture after restarting one zone would settle it)*.
 - **Client `World::LoadMap` heartbeats** (§4.4): which of the 8 call points fire per map load *(not traced)*.
 - **World name "Enid"** in the scenario notes (§3.2): not in the 2016 client or its texts; unexplained.
+- **0x7037 trailing 3 bytes** (batch 2, §4.2): the client sends `1 + 7n + 3` bytes for `n = 1`. The 2016 client sender
+  was not located (the 2017 `ShortCutMgr` send functions are empty stubs), so it is open whether the tail is
+  `+3` or `+3n` *(a capture with n ≥ 2 settles it)*. The WM drops it either way.
+- **Link-to-process mapping** (batch 2, §7.1): "4 links per zone process to each of WM, CharDB and GameLog" is
+  inferred from counts and content; the zone code that opens them is read in part 9.
 - *(inferred)* items carried from parts 1–4: the 0x112C range broadcast excludes the sender (§5.1 #12); 0x2011 `unk` values are buffer leftovers (§5.2); the
   client ignores the 0x302D trailing byte (§5.3); AVATAR KQ fields keep the last saved position (§4.3).
 - **Not captured at all**: combat beyond targeting, chat (other than `&adminlevel`), item use / trade / shops, party,
   guild, KQ, failure paths (0x0C15, 0x1002, 0x1804, 0x0C66, …; lists in §3.2, §4.2, §5.2). Statuses there stay
   **never seen** until X02's scenarios are recorded.
 
-## 11. Coverage boundary
+## 15. Coverage boundary
 
 P02 has no scope table (`coverage.py P02`: "no scope table; coverage does not apply"); its scope is every packet of
 the processed captures, and every observed (server, dir, opcode) type has a status in §3.2, §4.2, §5.2 or §6.2.
@@ -794,9 +922,9 @@ lists the four without a generated section (WM 0x1012, 0x1097; zone 0x0C18, 0x1C
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
 | 0x7C07 4-byte short form: the decoder warns "sReason needs 16 bytes" | W04 §9.2 (done; documents both forms) | the layout is right; `annotations/W04.json` has one entry for two sizes and sorts after P02.json, so P02 cannot override it; harmless warning |
-| README §2 / §1.4 / §1.5 rewrite, Unknowns line "whether the zone also sends the seed unprompted" | **P04** (new, added by P02: `docs/plan/items/P04.md`) | README's owners P01 and L00 are done and X01 may write only `docs/pseudocode/README.md`; P04 corrects the README from §2 / §7 and the knowledge Corrections rows |
-| corrections to done items' pseudocode (§9) | X01 (same line) | P02 must not edit other items' output; X01 collects knowledge-file corrections |
-| opcodes and paths never captured (§10 last bullet) | X02 (plan: "write targeted capture scenarios"), then P02 again | needs new captures; P02 is recurring per batch |
-| per-minute phase, clock offset, 0x7C07 timing, LoadMap heartbeat points (§10) | X02 (plan: "adversarially re-check load-bearing claims … write targeted capture scenarios") | none changes a layout or an order; each needs a targeted capture (zone restart, synced clocks, map loads with markers) |
+| README §2 / §1.4 / §1.5 rewrite, Unknowns line "whether the zone also sends the seed unprompted" | **P04** (new, added by P02: `docs/plan/items/P04.md`) | README's owners P01 and L00 are done and X01 may write only `docs/pseudocode/README.md`; P04 corrects the README from §2 / §11 and the knowledge Corrections rows |
+| corrections to done items' pseudocode (§13) | X01 (same line) | P02 must not edit other items' output; X01 collects knowledge-file corrections |
+| opcodes and paths never captured (§14 last bullet) | X02 (plan: "write targeted capture scenarios"), then P02 again | needs new captures; P02 is recurring per batch |
+| per-minute phase, clock offset, 0x7C07 timing, LoadMap heartbeat points (§14) | X02 (plan: "adversarially re-check load-bearing claims … write targeted capture scenarios") | none changes a layout or an order; each needs a targeted capture (zone restart, synced clocks, map loads with markers) |
 | second per-minute 0x1035, 0x3C01 `npcPosition`, NPC sp 100 | resolved here (review): §6.1 (0x1035), §6.3 | the second 0x1035 = the `so_Routine` dirty-flag pass after the per-minute block sets `p+0xe94` (`smo_Abstate.parameterchange`, Z09 §2.4 / §5.5, §6.1) |
 | WM `CWMClientSession::Send_NC_CHAR_SUPPORT_REWARD_CMD` @ FUN_00433ab0 → zone 0x1120 @ FUN_005a5c70 (abstate 728) | W04 §17.5, Z07 §1.2 (both done, both document it) | resolved and confirmed in §5.1; nothing left to document |

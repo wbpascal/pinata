@@ -456,6 +456,8 @@ No payload fields read directly by the handler.
 |---|---|---|---|
 | 0 | u8 | nGuideView |  |
 
+**Captured** (P02, `capture-validation.md`; shop): `nGuideView`: 131, 142; forwarded as CharDB 0x10DB {nCharNo, nGuideView}
+
 Handler `FUN_004182f0`
 
 | Off | Type | Checks in handler | Notes |
@@ -8669,6 +8671,8 @@ size 0x28
 
 → CharDB 0x704B {u32 nCharNo, u8 n, data}
 
+**Captured** (P02, `capture-validation.md`; combat): `ShortCutData`: {9, 0, 0}, {9, 1, 38043}; `size`: 1 + 7n + 3 (3 trailing zero bytes; the WM forwards 5 + 7n)
+
 ### `0x7039` NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_REQ (C→WM)
 
 **Verified layout** (basis: wm FUN_004148f0)
@@ -8893,6 +8897,8 @@ no payload read
 | 327 | char[20] | spawnapps | Name5; W01's extra[5]; forwarded to CharDB in 0x1036 |
 
 0x15B bytes (pdb2016). Names from the 2016 WM PDB
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `clienthandle`: Login client handle; `validate_new`: = the 32 words of the later client 0x0C0F; `spawnapps`: 'Original' at +0x147
 
 ### `0xd001` NC_EVENT_GET_ALL_EVENT_INFO_REQ (OPTool→WM)
 
@@ -10151,6 +10157,8 @@ session cache blob, sent once after CharDB 0x1005
 
 client: no handler for 0x7038/0x703A, 0x703C accepted and ignored
 
+**Captured** (P02, `capture-validation.md`; combat): `nError`: 0x2100 ok
+
 ### `0x703a` NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_ACK (WM→C)
 
 **Verified layout** (basis: wm FUN_0040af00)
@@ -11036,6 +11044,8 @@ size 6
 
 W01 name was 'world user count (ours)'
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `currentUsers`: 1; `maxUsers`: 2500 (WM client listener nMaxAccept), every 30 s
+
 ### `0x0c0e` NC_USER_WILLLOGIN_ACK (WM→Login)
 
 **Verified layout** (basis: wm FUN_00424950)
@@ -11046,6 +11056,8 @@ W01 name was 'world user count (ours)'
 | 347 | u8 | ok | always 1 |
 
 W01 name was 'world login accepted (ours)'
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `request`: 0x15B request verbatim; `ok`: 1
 
 ### `0x0c35` NC_USER_CREATE_OTP_REQ (WM→Login)
 
@@ -11341,6 +11353,8 @@ size 4
 | 0 | u16 | netpacketzoneheader.clienthandle | 0xFFFF: not about one zone player (pdb2017 name) |
 | 2 | u32 | netpacketzoneheader.charregistnumber | 0xFFFFFFFF (pdb2017 name) |
 | 6 | u32 | usrregnum | userNo (pdb2017 name) |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `netpacketzoneheader`: all 0xFF; `usrregnum`: 103; 4 copies (one per zone process) per event, 2 events per login
 
 ### `0x0c19` NC_USER_CONNECTCUT2ZONE_CMD (WM→Zone)
 

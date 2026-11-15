@@ -1,5 +1,5 @@
 {
- "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it (`packets.py` renders each entry as a **Captured** line in packets-<server>.md; capture-validation.md has the full reasoning). Capture names are re-data/captures/26_11_15_<name>.pcapng.",
+ "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it (`packets.py` renders each entry as a **Captured** line in packets-<server>.md; capture-validation.md has the full reasoning). Capture names are re-data/captures/26_11_15_<name>.pcapng. Batch-2 aliases: 'shop' = 26_11_15_buy item, equip item, use storage, unequip, sell item, travel portal, attack, use soulstones; 'combat' = 26_11_15_travel portal, attack mob, pick-up item, die, revive, linkto.",
  "packets": {
   "login": {
    "0x0c37": {
@@ -487,6 +487,22 @@
     "fields": [],
     "notes": "P02: empty body. evidence: capture size 0"
    }
+  },
+  "accountlog": {
+   "0x0809": {
+    "dir": "AccountLogDB→WM",
+    "name": "NC_MISC_CONNECTER_REQ",
+    "basis": "CStatistics::Process @ AL:FUN_004064b0: raw {03, 0x0809, b} to every type-5 (WM) session when the local tm_min changes",
+    "fields": [
+     [
+      0,
+      "u8",
+      "unused",
+      "high byte of the CSession_Manager* parameter reused as the packet buffer (P02-B6, original bug); PROTO struct empty. evidence: capture:shop, capture:combat: 0x00, 4 times, once per minute"
+     ]
+    ],
+    "notes": "P02 batch 2: first hand layout (pdb2016/2017 struct is empty, the decoder warned 'size 1 != documented 0')"
+   }
   }
  },
  "evidence": {
@@ -604,6 +620,17 @@
      "wm_ip": "'172.16.42.214'",
      "wm_port": "9110",
      "validate": "31 rand() words (< 0x8000) + check word; XOR of all 32 = per-world counter 1,3,4,5,6,8 in time order (GetClientValidation)"
+    }
+   },
+   "0x0c16": {
+    "dir": "Login→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "bytes 0..5": "never written (P02-B5): 76 27 d3 ef 76 00",
+     "usrregnum": "103 at +6; payload 10 bytes, not 4"
     }
    }
   },
@@ -883,6 +910,79 @@
     ],
     "fields": {
      "reason": "0x683 (Login-initiated duplicate-login kick)"
+    }
+   },
+   "0x0c0d": {
+    "dir": "Login→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "clienthandle": "Login client handle",
+     "validate_new": "= the 32 words of the later client 0x0C0F",
+     "spawnapps": "'Original' at +0x147"
+    }
+   },
+   "0x0c0e": {
+    "dir": "WM→Login",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "request": "0x15B request verbatim",
+     "ok": "1"
+    }
+   },
+   "0x0c16": {
+    "dir": "WM→Zone",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "netpacketzoneheader": "all 0xFF",
+     "usrregnum": "103; 4 copies (one per zone process) per event, 2 events per login"
+    }
+   },
+   "0x0808": {
+    "dir": "WM→Login",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "currentUsers": "1",
+     "maxUsers": "2500 (WM client listener nMaxAccept), every 30 s"
+    }
+   },
+   "0x10da": {
+    "dir": "C→S",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "nGuideView": "131, 142; forwarded as CharDB 0x10DB {nCharNo, nGuideView}"
+    }
+   },
+   "0x7037": {
+    "dir": "C→WM",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "ShortCutData": "{9, 0, 0}, {9, 1, 38043}",
+     "size": "1 + 7n + 3 (3 trailing zero bytes; the WM forwards 5 + 7n)"
+    }
+   },
+   "0x7038": {
+    "dir": "WM→C",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "nError": "0x2100 ok"
     }
    }
   },
@@ -1439,6 +1539,138 @@
      "itemid": "0xFFFF = emptied (1-day items expired)"
     },
     "note": "capture-validation §6"
+   }
+  },
+  "account": {
+   "0x0c5b": {
+    "dir": "Login→AccountDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "clienthandle": "Login client handle (5600, 5200)",
+     "sPassword": "32 lowercase hex chars = MD5 of the password (client-side hash, forwarded unchanged)",
+     "sUserIP": "'172.016.042.231' (%03d)",
+     "spawnapps": "'Original'"
+    }
+   },
+   "0x0c5c": {
+    "dir": "AccountDB→Login",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "nError": "0x41 ok",
+     "nUserNo": "103",
+     "nAuthID": "9",
+     "nBlock": "0",
+     "bLoginAble": "1"
+    }
+   },
+   "0x0c60": {
+    "dir": "WM→AccountDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "nHandle": "WM client handle 35000 / 32500 (= the following 0x0C14 worldmanager)",
+     "nUserNo": "103"
+    }
+   },
+   "0x0c61": {
+    "dir": "AccountDB→WM",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "bReturnUser": "0",
+     "tLastSec": "174618 / 174902 s = seconds since account creation (usp_User_GetDatediffCreated fallback)"
+    }
+   },
+   "0x0c10": {
+    "dir": "Login→AccountDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "usrregnum": "103",
+     "worldnum": "0",
+     "ip": "ac 10 2a e7"
+    }
+   }
+  },
+  "accountlog": {
+   "0x0721": {
+    "dir": "Login→AccountLogDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "usrregnum": "103",
+     "worldnum": "0",
+     "ip": "ac 10 2a e7 (network order)"
+    }
+   },
+   "0x0c5d": {
+    "dir": "Login→AccountLogDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "LoginData": "the 0x0C5C body",
+     "nUserNo": "103"
+    }
+   },
+   "0x0c5e": {
+    "dir": "AccountLogDB→Login",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "nClientHandle": "+0x161",
+     "bUserIPBlock": "0 at +0x163"
+    }
+   },
+   "0xc801": {
+    "dir": "Login→AccountLogDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "UserIP": "'172.16.42.231' (filled: L00-B6 refuted)",
+     "spawnapps": "'Original' at +0x14"
+    }
+   },
+   "0xc811": {
+    "dir": "WM→AccountLogDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "UserCount": "1",
+     "WorldNo": "0"
+    }
+   },
+   "0x080a": {
+    "dir": "WM→AccountLogDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "connectercount": "1",
+     "nEachClass": "[6] = 1 (class from the SHAPE byte 0x19 of the character in game)"
+    }
    }
   }
  },
