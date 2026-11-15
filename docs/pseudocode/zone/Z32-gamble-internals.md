@@ -91,7 +91,7 @@ DiceTaiSai::get_PrizeWinningBet(index, out DiceTaiSaiPrizeWinning)          @ FU
         isSum > 0    → DTB_SUM_4 + isSum − 4
         for each domino (a, b), a < b, in enum order: both a and b among the three dice → DTB_DOMINO_ab
         for each value n = 1 … 6: k = number of dice showing n; k > 0 → { nSingle = k, DTB_SINGLE_n }
-    out.nPrizeWinningBetCnt = number appended (at most 10: even/odd, big/small, pair, sum, 3 dominoes, 3 singles)
+    out.nPrizeWinningBetCnt = number appended (at most 9: three different dice give even/odd, big/small, sum, 3 dominoes, 3 singles; a pair gives 7, a triple 4)
 ```
 
 ### 1.5 Bet groups, dividends and the bet limit (`DiceTaiSaiDividind`)
@@ -944,8 +944,15 @@ row 0 = keys 7 8 9 (top), row 1 = 4 5 6, row 2 = 1 2 3 (bottom); `Card[r][c]` = 
 smsm_Action(out STOPBUTTON_ACK* ack, GBSMBetType type, u16 unit, START_REQ* bet, char* god)      @ FUN_006228f0
     allLines = all eight 3-bit line counts of bet (§4.3) are non-zero
     if strlen(god) == 9:                                     # GM screen: player.sp_GodOfSlotMachine (vt 0xb58), Z11 §3.4
-        for k in 0…8: v = god[k] − '0' (god[k] < 'A') or god[k] − 'A' + 10; v > 8 → 0
+        for k in 0…8: v = god[k] − '0' (god[k] < 'A') or god[k] − 'A' + 10   # int, signed char (signed compare)
+                      v > 8 → 0; v < 0 is stored as is (u8 0xD0…0xFF)   (original bug) Z32-B28
                       cell of key k+1 = v                    # chars 0‑2 → row 2, 3‑5 → row 1, 6‑8 → row 0
+        # Z32-B28: only the high side is clamped. A character below '0' (e.g. '!' '-' '/') or a byte ≥ 0x80 gives a cell
+        # 0xD0…0xFF; ac_GodOfSlotMachine FUN_00419790 copies args[0] unchecked (Z11 §3.4 states only "values > 8 → 0").
+        # SMS_StopButton (§4.5) then indexes sma_GroupForCard[cell] (9 sets × 0x10 inside the 0xc0-byte g_SlotMachineAnalyse)
+        # far out of bounds in sma_1LineMatch / ScreenMatch / CenterMatch: a garbage std::set header, likely zone crash
+        # (inferred); the raw byte goes to the client in 0xBCCF, and CardDisplay in 0xBCD3 gets (0x41 + v) & 0xff.
+        # (The deck path's final "cell > 8 → 0" loop is a u8 compare, but it does not run on the GM path.)
         return                                               # no jackpot roll, decks untouched
     jpRate = g_SlotMachineJackPotRanking.smjpr_JackPotRateCalc(type, unit)     # per million (§4.4)
     if allLines and RandomBox::rb_1000000() < jpRate:        # Well512 0…999 999 (Z28 FUN_0048dfb0)
@@ -1076,7 +1083,7 @@ SMS_StopButton(p, out STOPBUTTON_ACK* ack) → code                       @ FUN_
         hdr { u16 clienthandle = p.handle, u32 charregistnumber = p.charNo },
         u16 lockindex = L.index, u32 PlayerRegistNumber = p.charNo,
         char CardDisplay[10] = the nine symbols in key order 1…9 (row 2, row 1, row 0), each '0' + v (v > 9 would give 'A' + v,
-                               never reached: v ≤ 8), then NUL,
+                               reached only by a GM screen with a negative v, Z32-B28, §4.2), then NUL,
         u8 IsJackPot = WinLine.jackpot, u32 JackPotAccumulate = smjpr_JackpotAccumulate(type)   # after a jackpot: 0 (just emptied)
         u16 BetUnit = sms_BettingAtOnce, u8 BetLine = stake / sms_BettingAtOnce (= units),
             # sms_BettingAtOnce = 0 when the dealer's MobInx is not in GBSMNPC: SlotMachineScreen::go_Init FUN_00620b00 stores
@@ -1257,7 +1264,9 @@ SlotMachineScreen::SMS_Start(p, START_REQ req)       (vt 0xdc; from 0xBCCC FUN_0
     coins < 2^32 and (u32) coins < sms_BettingAtOnce · Σ the eight line counts of req → 0x28D1
     sms_BettingInfo = req.betting; sms_LastStart = now; sms_State = SMS_ROLLING
     return 0x28CF                                    # the handler answers 0xBCCD NC_GAMBLE_SLOTMACHINE_START_ACK { u16 nError }
-    # no coin is reserved here; the coins are only checked. A start with zero units passes too (stake 0, §4.5)
+    # no coin is reserved here; the coins are only checked. A start with zero units passes too (stake 0, §4.5); the payout is 0 (no line bet, no centre bonus), and the
+    # settlement then fails in the DB: usp_Gamble_setSlotMachineResult rejects @nBatting = 0 with −3315 *(db-backup)*, so the
+    # answer takes the error path (lock freed, no coin change, §4.9)
 ```
 
 Client (`Recv_NC_GAMBLE_SLOTMACHINE_START_ACK` FUN_0071afd0 → `SlotMachineWin::Spin` FUN_0071c010): only while the window waits for
@@ -1483,7 +1492,7 @@ so_SetDiceTaiSaiRoomLeaveInfo(v)     (vt 0x190)  v ∈ {0, 1}: bRoomLeaveReserve
 so_GetDiceTaiSaiInfo()               (vt 0x19c)  → &GameInfo (GI_DiceTaiSai*)                                 @ FUN_005110c0
 so_ClearDiceTaiSaiInfo()             (vt 0x1a0)  nBetSumMoney = 0, nBetMoney[0…51] = 0, nTotalDividend (i64 +0xd8) = 0, 1;
                                                  the two leave reserves are kept                              @ FUN_005110e0
-so_SetCTDiceTaiSaiSet()              (vt 0x1b8)  sp_CharacterTitle.CT_WinDiceTaiSaiSet() (FUN_005cc4c0, Z07), 1  @ FUN_005113f0
+so_SetCTDiceTaiSaiSet()              (vt 0x1b8)  sp_CharacterTitle.CT_WinDiceTaiSaiSet() (FUN_005cc4c0: m_TitleValues[59].TitleValue += 1 (u64), bTitleSave = 1, CheckNewTitle(59) Z18 §6.2), 1  @ FUN_005113f0
 ```
 
 ### 5.4 Coin items and the merchant's coin price
@@ -1576,6 +1585,7 @@ The same helper serves the script item grants (`cRewardItem` FUN_005e17e0, `cRew
 | Z32-B25 | `0xBCC9` (§4.8) | error answers leave `BettingUnit` stale | stale buffer byte (client ignores it) | write 0 |
 | Z32-B26 | slot idle kick (§4.10) | `GB_BanTime · 10` ticks | 83 h idle limit instead of 5 min *(intent inferred)* | ÷100 |
 | Z32-B27 | `InvenCellReleaser_CoinChange::icr_Reserv` (§5.5) | pending coin changes summed into reserved `cen` | pending coins count as pending money in money checks | add to `gbcoin` |
+| Z32-B28 | `smsm_Action` GM screen (§4.2) | `&godofslotmachine` symbols clamped only above 8; a character below `'0'` or ≥ 0x80 gives a cell 0xD0…0xFF | `sma_GroupForCard[cell]` read far out of bounds in the pattern matches: likely zone crash *(inferred)*; garbage symbol in 0xBCCF / 0xBCD3 (GM-only) | clamp `v < 0` too / validate the argument |
 
 Bugs of the gamble handlers themselves are Z06's (`Z06-B…`, Z06 §6); §3.10 cites Z06-B10 (the 0xBC79 failure path) and Z06-B17.
 
@@ -1607,7 +1617,7 @@ Bugs of the gamble handlers themselves are Z06's (`Z06-B…`, Z06 §6); §3.10 c
 | merchant purchase with coins (`0x3003`) | Z04 §2.1 (done) | uses `nrb_ItemBuyGBCoin` (§5.4) as its coin price |
 | inventory lock list (`icl_StoreGBCoin` FUN_00489d90, `icr_Apply` FUN_00489be0, lock kinds `L.vt[0x30]`, `0x40`) | Z05 §1.3, §1.4 releaser table (done), Z04 §1.4 (done) | generic reservation machinery; the coin releaser's reserve is §5.5 |
 | GM commands `&GB_DiceFix`, `&GB_DiceProbability`, slot-machine GM string | Z11 §6.7, §3.4 (done) | command parsing; the object methods they call are §3.9, §4.2 |
-| character-title counters `CT_WinDiceTaiSaiWin` / `…Set` | Z07 (done) | title system; the calls are §3.10, §5.3 |
+| character-title counters `CT_WinDiceTaiSaiWin` / `…Set` | Z32 §3.10 (`CT_WinDiceTaiSaiWin` FUN_005cc490), Z32 §5.3 (`CT_WinDiceTaiSaiSet` FUN_005cc4c0), Z18 §6.2 (`CheckNewTitle`) | title system; the calls are §3.10, §5.3 |
 | `zs_start_long` order, the other GB tables (`GBHouse`, `GBExchangeMaxCoin`, `GBJoinGameMember`, `GBDiceDividind`, `GBDiceGame`, `GBDiceRate`) loaded inline in `zs_start_sleep` | Z01 §2.3 data-table loaders (done), Z10 (done) | start-up sequence; the row contents are §1.1, §3.1 |
 | logout gate callers `sp_Schedule_Logout`, `zs_disconnect`, `so_Unmark` | Z01 (done) | session core; the gate itself is §3.11 |
 | WM `CGambleSystemServer` daily exchanged-coin reset | W04 §15.1 (done) | world-manager side |
