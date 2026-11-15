@@ -772,6 +772,29 @@ ITEMS = [
              "Bugs as `Z24-B<n>`; Coverage boundary as usual."],
       done="Every function listed above is cited as `FUN_…` with pseudocode, every file it loads has a column → member map, "
            "and the reload behaviour (which tables `&reloaddata` can rebuild, Z11 §8.6) is stated for each."),
+ dict(id="Z25", phase=2, title="Zone: skill special effects (dispel / cure bodies, SkillSpecial handlers of smo_SkillBlast, reflection damage; added by Z17)",
+      out="docs/pseudocode/zone/Z25-skill-specials.md", deps=["Z03", "Z22"], scope=[],
+      goal="Z03 §5 summarises `smo_SkillBlast` (FUN_00581160, ~1000 decompiled lines) but lists its `SkillSpecial` handlers "
+           "(mana burn, dispel variants, HP→SP, jump / dash, chain targets, steal enchant, summon, metamorphosis), "
+           "`smo_Dispel` and `smo_ReflectionDamage` (0x245B) as only named (`docs/pseudocode/zone/Z03-combat.md` 'Not "
+           "reconstructed', `smo_SkillBlast` bullet). Z17 §3.7 documents `smo_Dispel` FUN_0057d8e0 (the dispel mask) but "
+           "not what the mask removes. No item covers these bodies. Reconstruct them so a rebuild reproduces every "
+           "special skill effect.",
+      steps=["Read `docs/pseudocode/zone/Z03-combat.md` §5 (skill cast and blast, `SkillEntry` layout §5.1, the special table "
+             "+0xa0…+0x260) and its 'Not reconstructed' bullets, Z17 §3.7 (`smo_Dispel` mask bits), Z09's magic-field sections "
+             "(already documented there, do not redo) and Z22's output for the abstate actors once it exists.",
+             "Dispel / cure: `ShineMobileObject::so_Dispel` 0042bf70 (vt 0x5a8) and `so_SkillCure` 0042c440 (vt 0x5a4): which "
+             "states each mask bit (2, 0x4 DEBUFF, 0x8 DISEASE, 0x10 POISON, 0x20 CURSE, 0x18 cure, 0x100 DEEPER, 0x200 DETECT, "
+             "0x400 BOMBDISPELALL) removes (`DispelIndex` / `SubDispelIndex` of `AbState.shn`), the `so_MiscTable` vt 0x984 "
+             "servant kill (Z09 §13.3 `mds_Dead.ByDebuff` row), and the packets / result flags.",
+             "`smo_SkillBlast` 00581160: walk every `SkillSpecial` / `sdi_*` flag branch in order (read with `clean.py "
+             "re-data/exports/zone-pdb - 581160`, PDB names), one pseudocode block per special with its SHN columns "
+             "(`ActiveSkill.shn` / `ActiveSkillInfoServer.shn`), state changes, packets (layouts, client handlers via "
+             "`re-data/client-handlers.json`, codes via `docs/protocol/client-error-codes.json`).",
+             "`smo_ReflectionDamage` 0055dbc0 and packet 0x245B; any other function these reach that no doc cites.",
+             "Bugs as `Z25-B<n>`; Coverage boundary as usual (no scope table: do the caller / callee check by hand)."],
+      done="`so_Dispel`, `so_SkillCure`, `smo_ReflectionDamage` and every special-effect branch of `smo_SkillBlast` are "
+           "described with their SHN columns, state changes and packets, each sent packet has a layout and client handler."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "
