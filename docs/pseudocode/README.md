@@ -209,7 +209,7 @@ DataServers rely on the database for consistency *(inferred from the thread layo
 |---|---|---|---|---|
 | accounts, passwords, block and auth flags | Account DB | `Account` (`tUser`, `tUserAuth`) | by procedures on request; Login and WM only read | D01 §3 |
 | login / logout history, IP blocks, statistics | AccountLog DB | `AccountLog` (`tAccountLog`, `tIPBlock`), `StatisticsData` | Login at login and world select, WM at logout and for user counts | D01 §4 |
-| character rows, shape, options, tutorial | Character DB; between zones the **WM cache** | `w00_Character` (`tCharacter`, …) | read by the WM at character select (0x1004 → 0x1005 + one blob per DB packet, kept in the WM session); the zone saves to the Character server (`ws_save2DB`: 0x4001 … every 600 s and on other triggers) and to the WM cache (`ws_save2worldmanager`, dept 16 `2WLDMAN` blobs, at map change and logout); the WM sends the cache to the next zone (0x101C …) and 0x1037 at logout | W01 §6.3, Z01 §8.4, Z09 §2, Z12 §6, D02 §4–§6 |
+| character rows, shape, options, tutorial | Character DB; between zones the **WM cache** | `w00_Character` (`tCharacter`, …) | read by the WM at character select (0x1004 → 0x1005 + one blob per DB packet, kept in the WM session); the zone saves to the Character server (`ws_save2DB`: 0x4001 … every 600 s and on other triggers) and to the WM cache (`ws_save2worldmanager`, dept 16 `2WLDMAN` blobs, only when the player links to another zone; §3.13); the WM sends the cache to the next zone (0x101C …) and 0x1037 at logout | W01 §6.3, Z01 §8.4, Z09 §2, Z12 §6, D02 §4–§6 |
 | items, money, storage | the zone (in memory) with the Character server as the store | `tItem`, `tItemOptions` and side tables | per change through ITEMDB: reserve → DB → apply, or apply → DB with disconnect on failure (Z05 §1); the Character server trusts the zone's keys, lots and prices (D03 knowledge) | Z04, Z05, D03 |
 | quests, skills, abstates, titles | the zone | `tQuest`, skill / state tables | CHARSAVE and the dept 17 / 18 / 24 requests | Z15 §5, Z23 §7, D04 §1–§4 |
 | guilds, academies, guild storage | the WM (loaded from the Character DB at start, W03 §9.1); zones keep mirrors | guild tables in `w00_Character` | WM ↔ Character round trips on every change (W03 §2) | W03, Z08 §8, §10, D04 §6, §9 |
@@ -230,7 +230,7 @@ DataServers rely on the database for consistency *(inferred from the thread layo
    zone goes through the WM (0x180D / 0x180E) and a new client connection; a change inside the zone stays local
    (Z01 §7). Returning to the world list uses a one-time token Login issued through the WM (L01 §4.3).
 
-The message-level sequences are §3 (parts 5–6).
+The message-level sequences are §3 (session and persistence §3.2–§3.15; cross-server gameplay from §3.16, part 6).
 
 ### 2.7 Deployment limits (from X03)
 
@@ -243,7 +243,240 @@ The message-level sequences are §3 (parts 5–6).
 
 ## 3. Cross-server sequence index
 
-*(parts 5–6)* Feature → messages → handler in each server.
+Feature → messages → handler in each process. §3.2–§3.15 cover a player's session and the persistence paths (part 5);
+the cross-server gameplay features follow from §3.16 (part 6). Every row names the handler that **receives** the
+message; the behaviour inside it is in the cited §, which this index does not repeat. Statements of §5 are already
+applied here (for example the seed at accept, the Login 0x0C36 field order, the 600-s save).
+
+### 3.1 Notation
+
+- Processes: **C** client, **L** Login, **A** Account, **AL** AccountLog, **W** WM, **Z** zone (**ZA** / **ZB** the
+  old and the new zone of a map change), **D** Character server, **G** GameLog. `X→Y` = X sends, Y receives.
+- Handler column: `<receiver> FUN_…` = address in that process's 2016 binary (`re-data/exports/<bin>`); `client
+  FUN_…` = the 2016 client.
+- Names: official opcode names from the 2016 server PDBs and the 2017 `PROTOCOL_COMMAND_*` enums (one name source
+  per value, §1.1); the 2017 name of a value the 2016 code uses differently is not given. *(captured)* marks an order
+  or timing seen in `re-data/captures` (`docs/protocol/capture-validation.md` §3–§5).
+- Log records (AccountLog, GameLog, NC_SYSLOG) are listed once, in §3.15, not in every flow.
+
+### 3.2 Connection set-up
+
+| Link | Sequence | Handlers | Docs |
+|---|---|---|---|
+| C → L, W, Z | the server sends `0x0807 NC_MISC_SEED_ACK {u16 seed}` right after accept; from then on client → server bytes are XOR-499 encrypted from that index. The zone takes the seed from a global counter (+1 per connection); the client never sends `0x0806` *(captured)* | L L01 §1.4; W `Client_SendSeed` FUN_00430550; Z `Send_NC_MISC_SEED_ACK` FUN_0045b120 (accept, Z18 §1.3); Z `0x0806` handler FUN_00451a30 (unused) | §2.3, §5.1, Z01 §5.1 |
+| server → server | listener `0x0801` → connector `0x0802 {echo, to, from, world, zone, key}` → listener `0x0803 {echo, result}`; then `0x0804` / `0x0805` heartbeats (30 s / +180 s) | per parser: L01 §4.2, W01 §2.1, W05 §5.2, Z01 §3.3, D01 §2, D05 §5 | §2.3 |
+| C → W, C → Z | the first client packet must be `0x0C0F` (WM) or `0x1801` (zone); before `0x1803` the zone dispatches only `0x1803` and `0x0805` | W parser FUN_00419690; Z `ClientSession::zbs_Parsing` FUN_004fb9f0 | W01 §3.2, Z18 §1.3 |
+
+### 3.3 Account login with password *(captured)*
+
+| # | Hop | Message | Handler | What happens | Docs |
+|---|---|---|---|---|---|
+| 1 | C→L | `0x0C65 NC_USER_CLIENT_VERSION_CHECK_REQ {sVersionKey[64]}` | L FUN_004060d0 | key compared with the configured keys → `0x0C67 …RIGHTVERSION_CHECK_ACK` or `0x0C66 …WRONGVERSION_CHECK_ACK` (client quits; L00-B1) | login §4 |
+| 2 | C→L | `0x0C5A NC_USER_US_LOGIN_REQ {sUserName[260], sPassword[36], spawnapps}`, sent by the client on 0x0C67 (client FUN_0046f470) | L FUN_00406450 | exact length 0x13E, else dropped; forwarded with the client IP | login §4 |
+| 3 | C→L | `0x0C04 NC_USER_XTRAP_REQ`, same client tick | L FUN_00406230 | key not checked (L00-B5); `0x0C05 NC_USER_XTRAP_ACK {1}` at once | login §4 |
+| 4 | L→A | `0x0C5B NC_USER_US_PASSWORD_CHECK_REQ` (0x152) | A FUN_00402fe0 | `usp_User_USLoginGame` → `0x0C5C {nError 0x41 ok / 0x43 DB error, nUserNo, nAuthID, nBlock, bLoginAble, …}` | D01 §3.2 |
+| 5 | A→L | `0x0C5C NC_USER_US_PASSWORD_CHECK_ACK` | L FUN_00404590 | userNo −1 → 0x45 "Please check ID or Password.", −2 → 0x4B agreement, login closed → 0x45 (L00-B2), blocked → 0x47, not authorised → 0x48 maintenance: `0x0C09 NC_USER_LOGINFAIL_ACK {err}` and disconnect; OK → next step | login §5.1, D01 §3.2 |
+| 6 | L→AL | `0x0C5D NC_USER_US_IS_IP_BLOCK_REQ` (0x17B) | AL FUN_004038d0 | `p_IPBlock_IsBlock`: blocked = IP in `tIPBlock` **and** the account never selected a world; DB error = not blocked | D01 §4.3 |
+| 7 | AL→L | `0x0C5E NC_USER_US_IS_IP_BLOCK_ACK` | L FUN_004058c0 | blocked → `0x0C09 {0x51}` "You are not in our service area."; else register the session, `0x0C16 NC_USER_KICKOFFFROMWORLD_CMD {userNo}` to **every** WM (§3.12 f), `0x0C0A NC_USER_LOGIN_ACK` world list (70–170 ms after 0x0C5A *(captured)*) | login §5.2 |
+| 8 | C→L | `0x0C1B NC_USER_WORLD_STATUS_REQ`, 10 ms after 0x0C0A, then every 10.0 s while the list is shown *(captured)* | L FUN_004062f0 | `0x0C1C NC_USER_WORLD_STATUS_ACK` (same body as 0x0C0A) | login §4 |
+
+A wrong password ends at step 5 (`0x0C09 {0x45}` ~50 ms after 0x0C5A *(captured)*); the next attempt is a new TCP
+connection with a new seed. Only this path is reachable from the 2016 client; the other login variants of Login and
+Account (0x0C08, 0x0C3A, 0x0C3F, 0x0C4C, 0x0C27 …) serve older clients (login §5.1, D01 §3.2–§3.4).
+
+### 3.4 One-time-token login (back from the WM to the world list) *(captured)*
+
+| # | Hop | Message | Handler | What happens | Docs |
+|---|---|---|---|---|---|
+| 1 | C→W | `0x0C33 NC_USER_WILL_WORLD_SELECT_REQ` (character list or in game) | W FUN_00417330 | forwards to Login | W01 §5.1 |
+| 2 | W→L | `0x0C35 NC_USER_CREATE_OTP_REQ {u16 handle, u32 userNo, userId[256], u32 ip}` | L FUN_00408a20 | 32-char token (FUN_0040a8a0), valid 10 s; result 0x1E58 ok, 0x1E59 / 0x1E5A failure, 0x1E5B a token is pending | login §5.3, L01 §4.3 |
+| 3 | L→W | `0x0C36 NC_USER_CREATE_OTP_ACK {u16 result, u16 wmHandle, char token[32]}` | W FUN_00424a70 | `0x0C34 NC_USER_WILL_WORLD_SELECT_ACK {result, token}` to the client (+20…44 ms *(captured)*) | W01 §5.1 (field order: §5.2 of this file) |
+| 4 | C | client CharSelect FUN_004766a0 | | 0x1E58: keeps the token, leaves the game (§3.12 a) or the character list (§3.12 d), connects to Login | C01 |
+| 5 | C→L | `0x0807` seed, `0x0C65` / `0x0C67`, then `0x0C37 NC_USER_LOGIN_WITH_OTP_REQ {sOTP[32]}` and `0x0C04` | L FUN_00406bb0 | exact length 0x22; unknown or expired token → `0x0C09 {0x52}` (no client text, L00-B4); login closed → 0x45 (L00-B2); success: `0x0C16` to every WM, `0x0C0A` **before** the `0x0C05` *(captured)* (no DB round trip), token removed | login §4, L01 §4.3 |
+
+### 3.5 World select *(captured)*
+
+| # | Hop | Message | Handler | What happens | Docs |
+|---|---|---|---|---|---|
+| 1 | C→L | `0x0C0B NC_USER_WORLDSELECT_REQ {u8 worldno}` | L FUN_00406970 | unregistered world or status < 5 → `0x0C0C {status}` only (status 5 = full passes, L00-B3); else A `0x0C10 NC_USER_LOGIN_DB` (dropped by Account, D01 §3.1), AL `0x0721`, validate key = 31 random words + a check word whose XOR is the world's counter (`GetClientValidation` FUN_0040a200, +1 per select, §5.3), W `0x0C0D` | login §4, L01 §2.5 |
+| 2 | L→W | `0x0C0D NC_USER_WILLLOGIN_REQ {loginHandle, worldNo, userNo, userId[256], validate[32], spawnapps}` | W FUN_00424950 | stored in `pending[XOR of validate]` (0x800 slots, newer overwrites); never refused | W01 §3.1, W05 §5.3 |
+| 3 | W→L | `0x0C0E NC_USER_WILLLOGIN_ACK {copy, u8 ok = 1}` | L FUN_00408870 | `0x0C0C NC_USER_WORLDSELECT_ACK {status, WM ip and port, validate[32]}` to the client, 20–30 ms after 0x0C0B *(captured)* | login §5.3 |
+| 4 | C | client login scene | | closes the Login link, connects to the WM | login §8 |
+
+### 3.6 World login at the WM *(captured)*
+
+| # | Hop | Message | Handler | What happens | Docs |
+|---|---|---|---|---|---|
+| 1 | C→W | `0x0C0F NC_USER_LOGINWORLD_REQ {userId[256], validate[32]}` (2–9 ms after the seed) | W FUN_00419860 | `LoginLink_TakePendingLogin` FUN_00438ba0 (one use); no entry → `0x0C15 NC_USER_LOGINWORLDFAIL_ACK {0x44}`, close 0x788. userId taken from the client unchecked (W01-B1). Old sessions of the account: `0x0C17 NC_USER_CONNECTCUT_CMD {0x683}`, close 0x785 (FUN_00437dc0); zones `0x0C16` | W01 §3.2, W05 §4.5 |
+| 2 | W→A | `0x0C60 NC_USER_RETURN_CHECK_REQ {u16 handle, u32 userNo}` | A FUN_00403220 | `usp_ReturnUser_GetDatediffLastlog`, else `usp_User_GetDatediffCreated` → `0x0C61 {bReturnUser, tLastSec}` | D01 §3.3 |
+| 3 | A→W | `0x0C61 NC_USER_RETURN_CHECK_ACK` | W FUN_00408740 | newbie / comeback class from the `UserNewbie_*` / `UserComeback_*` server parameters; some cases ask AL `0x0C62 NC_USER_LOGOUT_LAST_DAY_REQ` (AL FUN_004035e0) → `0x0C63` (W FUN_004093b0), which may send A `0x0C64 NC_USER_SET_RETURN_CMD` (A FUN_00403480, `usp_ReturnUser_SetUserItem`) | W01 §3.3, D01 §3.3, §4.4 |
+| 4 | W→D | `0x0C12 NC_USER_AVATARINFO_REQ {u16 handle, u32 userNo}` (also on the client's `0x0C1F`, W FUN_00412ee0) | D FUN_004050b0 | `p_Char_GetListOfUserChar`, `usp_Tutorial_getIsSkip` → `0x0C5F NC_USER_TUTORIAL_CAN_SKIP_CMD` (W FUN_0040e260), one AVATAR per character (`GetAvatarInfo` FUN_0046bff0) → `0x0C13`; DB error → count 0xFF | D02 §3.1, §3.2 |
+| 5 | D→W | `0x0C13 NC_USER_AVATARINFO_ACK {u16 handle, u8 n, AVATAR[n]}` | W FUN_0040ede0 | 0xFF → `0x0C15 {0x46}` and an immediate close (twice, W05-B10); else slots stored (unfinished tutorial → login map "RouT"), client `0x0C14 NC_USER_LOGINWORLD_ACK {worldmanager, n, AVATAR[n]}` 50–76 ms after 0x0C0F *(captured)* (client LoginWorldNet FUN_00471720 → character select) | W01 §3.3, §6.1 |
+| 6 | C→W | `0x080D NC_MISC_GAMETIME_REQ` (4–8 ms after 0x0C14 *(captured)*) | W FUN_00413050 | `0x080E NC_MISC_GAMETIME_ACK {hour, minute, second}` | W01 §5.3 |
+
+### 3.7 Character create, delete, rename (character select)
+
+| Feature | Sequence (receiver handler) | Docs |
+|---|---|---|
+| create | C→W `0x1401 NC_AVATAR_CREATE_REQ {slot, name[20], shape[4]}` (W FUN_004229f0: slot, name, class-26 level gate `ChrLevel_CanCreateSen`; any failure → `0x1404 {0x84}`, W01-B2) → D `0x1402 NC_AVATAR_CREATEDATA_REQ` (D FUN_00404b30) → W `0x1403 NC_AVATAR_CREATEDATAFAIL_ACK` (W FUN_00409f00 → C `0x1404 NC_AVATAR_CREATEFAIL_ACK {error}`) or `0x1405 NC_AVATAR_CREATEDATASUC_ACK {AVATAR}` (W FUN_004113c0: slot stored, A `0x140D NC_USP_USER_CHARACTER_INSERT` (Account: no-op), G `0x0411`, `0xC804`; C `0x1406 NC_AVATAR_CREATESUCC_ACK`) | W01 §4.1, D02 §3.3 |
+| delete | C→W `0x1407 NC_AVATAR_ERASE_REQ {slot}` (W FUN_00412fa0; empty slot → `0x140A {0xC6}`, W01-B3) → D `0x1408 NC_AVATAR_ERASEDATA_REQ` (D FUN_00404cd0; logs G `0x0412` itself) → W `0x1409 NC_AVATAR_ERASEDATAFAIL_ACK` (W FUN_00409fa0 → C `0x140A NC_AVATAR_ERASEFAIL_ACK`, 199 = guild master) or `0x140B NC_AVATAR_ERASEDATASUC_ACK` (W FUN_0040a010: A `0x140E` (no-op), G `0x0412` again, `0xC805`; slot cleared; C `0x140C NC_AVATAR_ERASESUCC_ACK {slot}`) | W01 §4.1, D02 §3.4 |
+| rename (free) | C→W `0x140F NC_AVATAR_RENAME_REQ` (W FUN_0041a640; bad input → `0x1410 {…, 0xD1}`) → D `0x1411 NC_AVATAR_RENAME_DB_REQ` (D FUN_00436030) → W `0x1412 NC_AVATAR_RENAME_DB_ACK` (W FUN_0040ff00: 0xD0 → name stored) → C `0x1410 NC_AVATAR_RENAME_ACK` | W01 §4.1, D02 §3.5 |
+| rename with a rename item | in game: C→Z `0xB410` (Z FUN_0051b090) → D `0xB411` → Z `0xB412` (grants the right); at character select: C→W `0xB409` (W FUN_00417c90) → D `0xB40A` → W `0xB40B` → C `0xB40C` | Z01 §9, W01 §4.1, §6.2, D02 §14 |
+
+### 3.8 Character select: load and zone address *(captured)*
+
+| # | Hop | Message | Handler | What happens | Docs |
+|---|---|---|---|---|---|
+| 1 | C→W | `0x1001 NC_CHAR_LOGIN_REQ {u8 slot}` | W FUN_00422be0 | slot ≥ 6 → `0x1002 NC_CHAR_LOGINFAIL_ACK {0x143}`, empty → 0x144; unfinished tutorial: step 0 → `0x1110 NC_CHAR_TUTORIAL_POPUP_REQ` and stop (step 1b), else map "RouT00" + `0x111D`; instance-map redirect FUN_00452580; no zone has the map, or the previous character's logout is not yet confirmed (`playingCharNo`, cleared only by the zone's 0x0C31, §3.12) → 0x145 "The Map is under maintenance"; else D `0x1004` | W01 §4.2, §5.4 |
+| 1b | C→W | `0x1111 NC_CHAR_TUTORIAL_POPUP_ACK {u8 skip}` | W FUN_00418cb0 | `0x111D` unless skipped; D `0x1112 NC_CHAR_TUTORIAL_MAKE_ITEM_REQ` (D FUN_00429160) → W `0x1113` (W FUN_0040e2c0), which then asks `0x1004` | W01 §4.2, §6.2, D02 §8 |
+| 2 | W→D | `0x1004 NC_CHAR_CHARDATA_REQ {u16 handle, u32 charNo, u32 userNo, i32 tExchangedCoinSumDate}` | D FUN_00438dc0 | 32 steps, one packet per data block (base 0x1007, friend points 0x541C, KQ map 0x101A, shape 0x1008, quests 0x100A / 0x100B / 0x10CC / 0x10D5, skills 0x100D / 0x100E, abstates 0x100C, holy promise 0x9427 / 0x9429 / 0x9444, friends 0x1010, guild 0x1012, academy 0x1097, items 0x1017, titles 0x1019, charged buffs 0x101B, chat restrictions 0xA801, single option 0x10D2, options 0x702C… or 0x7018…, spam filter 0x0844, chat block 0x10CA, item cool times 0x10CF, guide 0x10D8, coins 0x10DC, cards 0x10E2 / 0x10E5 / 0x10E8, tutorial 0x1114, chat colour 0x111E, minimon 0x1121), then `0x1005`; a failed step → `0x1006 NC_CHAR_CHARDATAFAIL_ACK` and no 0x1005 (D02-B6: most codes at the wrong offset) | D02 §4 |
+| 3 | D→W | each block | W `Session_StoreBlob` FUN_00430780 and the per-block handlers | stored in the client session (W01 §6.3 table); the guild, friend, holy-promise and chat blocks also feed W02–W04 | W01 §6.3, W05 §5.4 |
+| 3b | D→W | `0x1006 {u16 handle, u16 error}` | W FUN_00409e70 | C `0x1002 {u16 at +2}` (client CharSelect FUN_004769d0: "There is an error in the … Information." texts) | W01 §6.2, D02 §4 |
+| 4 | D→W | `0x1005 NC_CHAR_CHARDATA_ACK {u16 handle}` | W FUN_00410040 | position fix-ups (instance return map, prison "EldPri" 0x2C0 / 0x3C2, tutorial "RouT00"); zone address FUN_004393e0 (none → 0x145; no selected avatar → 0x31EB, W01-B6); in game, map-login ticket = 1; D `0x1036`, G `0xC806`; C `0x1003 NC_CHAR_LOGIN_ACK {zoneIp[16], zonePort}` (~615 ms after 0x1001 *(captured)*; client CharSelect FUN_00476190 connects to the zone); then `SendToClient_CharOptionData` FUN_00431680 → `0x7032` / `0x7033` / `0x7034` (53 ms later, before the zone answers *(captured)*) | W01 §4.2, W04 §8, capture-validation §4.1 |
+| 5 | W→D | `0x1036 NC_CHAR_LOGIN_DB {charNo, map, x, y, Cen, userNo, spawnapps}` | D FUN_00405810 | `p_Char_Login` (login count, date); G `0x040A`; on the first login of a day every friend gets +1 friend point → W `0x541C NC_FRIEND_DB_POINT_CMD` (D02-B8). Map, position and money are only logged | D02 §5 |
+
+### 3.9 Map login at the zone *(captured)*
+
+| # | Hop | Message | Handler | What happens | Docs |
+|---|---|---|---|---|---|
+| 1 | C→Z | `0x1801 NC_MAP_LOGIN_REQ {u16 wmHandle, charName[20], shnChecksum[49][32]}` (client FUN_004779d0); in the same tick C→W `0x080D` | Z FUN_00452590 | an SHN checksum differs → `0x1804 NC_MAP_LOGINFAIL_ACK {0x147, idx}` ("The client has been illegally manipulated…", client ZoneLoginNet FUN_004778c0) and disconnect 0x68E; else W `0x104B` | Z01 §5.2 |
+| 2 | Z→W | `0x104B NC_CHAR_REGISTNUMBER_REQ {ref {handle, −1}, wmHandle, charName}` | W FUN_0042f1e0 | the ticket of step 3.8-4 (or of a link reserve, §3.11) must be set and the name must match: ticket cleared, userNo / charNo returned; else −1 and the **WM session is closed** | W01 §7.2 |
+| 3 | W→Z | `0x104C NC_CHAR_REGISTNUMBER_ACK {ref, userNo, charNo, wmHandle, charName}` | Z FUN_0044aa60 → `so_SetRegistNumber` FUN_0044e900 | name mismatch or −1 → `so_Disconnect(0x689)`; else userNo / charNo / wmHandle stored, W `0x101C` | Z01 §5.3 |
+| 4 | Z→W | `0x101C NC_CHAR_ZONE_CHARDATA_REQ {ref, wldmanhandle, charid[20]}` | W FUN_00428ba0 | no character → `0x101E {0x141}`; name mismatch → `0x101E {0x590}`; a reserved link destination replaces the base blob's map and position; every cached block as its zone opcode (FUN_00428ac0, `0x101F` base … `0x1130`, W01 §6.3), `0x1029` guild, `0x1098` academy, then `0x101D` | W01 §7.2 |
+| 5 | W→Z | the blocks | Z per-block handlers | the character is built (Z07 §1.1–§1.3, Z12 §6); the zone passes 15 of them on to the client (`0x1038` … `0x441E`) before 0x1802 *(captured)* | Z07 §1, capture-validation §5.1 |
+| 5b | W→Z | `0x101E NC_CHAR_ZONE_CHARDATAFAIL_ACK {ref, err}` | Z FUN_005a3440 | `0x1804 {own handle, 0xFF}` (Z01-B1); the client leaves the scene without a message | Z01 §5.3, Z07 §1.4 |
+| 6 | W→Z | `0x101D NC_CHAR_ZONE_CHARDATA_ACK {ref, wldmanhandle}` | Z FUN_005a3590 | build (FUN_0055ab60), tutorial map (none free → `0x1804 {0x31EC}`), place on the field (fails twice → `0x1804 {0x142}`), stats FUN_0054f190, `0x1802 NC_MAP_LOGIN_ACK` (FUN_005a3140, 442–560 ms after 0x1801 *(captured)*) | Z01 §5.3, Z07 §1.4, §1.5 |
+| 7 | C→W | `0x7004`, `0x700C`, `0x7C06` on 0x1802 (same tick) | W04 §8 / §9 handlers | option data from the Character server (`0x7005`, `0x700D`) and `0x7C07` | W04 §8, capture-validation §4.1 |
+
+### 3.10 Login complete and link end *(captured)*
+
+| # | Hop | Message | Handler | What happens | Docs |
+|---|---|---|---|---|---|
+| 1 | C→Z | `0x1803 NC_MAP_LOGINCOMPLETE_CMD` (with `0x581B` to the WM in the same tick) | Z FUN_00443390 | player mode 1 (in game); the login burst to the client (Z01 §6, captured order in capture-validation §5.1); D `0x10B3 NC_CHAR_REGNUM_VARIFICATION_REQ` (D FUN_00414170), `0x1080 NC_CHAR_WEDDINGDATA_REQ` (D FUN_00418a40), `0x34CF NC_ITEMDB_MAPLINK_ITEM_COMPARE_MAP_REQ` (D03 §6.5); W `0x180C`, `0x384E` (party member, W02), `0x082A` | Z01 §6 |
+| 2 | Z→W | `0x180C NC_MAP_LINKEND_CMD {wmHandle, objHandle, charNo, map, zoneNo, x, y, 99, exp, money, inGT}` | W FUN_0042d8d0 | zone number, map, `linking = 0`; party, raid, friend, guild, holy-promise, KQ, guide and time refreshes (the once-per-character pushes `0x1097`, `0x1012`, `0x9414`, `0x10D9`, the first `0x0849` only on the first map), attendance, instance enter FUN_00456b20, C `0x182A` (P02-B2), `0x5425` friend points if any, G `0x040F` | W01 §7.3, W04 §17, capture-validation §4.1 |
+| 3 | Z→W→A | `0x082A NC_MISC_CONNECTFROMWHERE_REQ` → `0x082F NC_MISC_CONNECTFROMWHERE_DB_REQ` | W FUN_0042b740; A FUN_00402ba0 | the Account server answers `0x0830` (W FUN_00407fd0) → Z `0x082B NC_MISC_CONNECTFROMWHERE_ACK` (Z FUN_0043f2f0: `p.connectFrom`) | W01 §7.6, D01 §3.4, Z01 §9 |
+
+### 3.11 Map change
+
+**Inside one zone** (destination map on the same zone, or `_ServerGroup` 99): `so_LinkTo` FUN_0049ad30 sends W
+`0x180B NC_MAP_LINKSTART_CMD` (W FUN_00429c90: `linking = 1`), unmarks the player (`so_Unmark` FUN_00558900,
+`REMOVE_NOW` → character save, §3.13), moves it and sends C `0x1809 NC_MAP_LINKSAME_CMD {mapIndex, x, y}` (client
+FUN_0049feb0; the revive-at-another-map path sends `0x104F` instead). The client reloads the map and sends `0x1803`
+again → §3.10 (another `0x180C`). Z01 §7.1.
+
+**To another zone** *(captured: gate, town portal)*:
+
+| # | Hop | Message | Handler | What happens | Docs |
+|---|---|---|---|---|---|
+| 1 | ZA | `so_LinkTo` FUN_0049ad30 | | an open trade is cancelled first (or the link dropped), locked items refuse it ("Link during item operation"); W `0x180B`; full DB save `ws_save2DB(p, 0, 2)` and WM cache save `ws_save2worldmanager` FUN_004536f0 (§3.13); player mode 0; W `0x180D`; G `0xC809` | Z01 §7.1 |
+| 2 | ZA→W | `0x180D NC_MAP_LINKRESERVE_REQ {objHandle, charNo, wmHandle, destZone, destMap, x, y, mapIndex, x, y, zoneIp[16], zonePort, wmHandle}` | W FUN_0042f420 | map-login ticket = 1, pending link with the destination; `0x180E` back to ZA | W01 §7.3 |
+| 3 | W→ZA | `0x180E NC_MAP_LINKRESERVE_ACK {ref, mapIndex, x, y, zoneIp, zonePort, wmHandle}` | Z FUN_0049b510 | HP 0 or mode 3 → only the log "Link Fail Player Die" (the player stays in ZA in mode 0 and the WM keeps the reservation; what follows is not traced, §7); else C `0x180A NC_MAP_LINKOTHER_CMD {mapIndex, x, y, zoneIp, zonePort, wmHandle}` and `so_banning(p, 0)` (removed; its save is skipped because the mode is 0) | Z01 §7.1, §8.3 |
+| 4 | C→ZB | client GameFrameWork FUN_004b4ab0 connects to ZB; `0x080D` to the WM in the same tick *(captured)* | | §3.9 with the reserved destination in the base blob (step 4), then §3.10; the WM repeats only `0x5826` and `0x182A` *(captured)* | capture-validation §4.1 |
+
+Wing, town portal and multi-link NPCs (Z01 §7.2–§7.3), revive (Z07 §3) and silver wing (Z26) end in `so_LinkTo`.
+
+### 3.12 Leaving the game, kicks and duplicate logins
+
+**a) In game → world list** *(captured, idle_in_world)*:
+
+| # | Hop | Message | Handler | What happens | Docs |
+|---|---|---|---|---|---|
+| 1 | C→Z | `0x2012 NC_ACT_STOP_REQ`, `0x1071 NC_CHAR_LOGOUTREADY_CMD` | Z FUN_00558450 | logout allowed after 8 s; action timer +13 s → `sp_Schedule_Logout` | Z07 §3.3 |
+| 1b | C→W | `0x7011`, `0x7015`, `0x7016`, `0x703B` (same tick) | W04 §8.2 | client options saved through the WM to the Character server, no answers | W04 §8.2 |
+| 2 | C→W→L | after the client's 10-s countdown: `0x0C33` → token | | §3.4 steps 1–3 | |
+| 3 | C→W, C→Z | `0x0C18 NC_USER_NORMALLOGOUT_CMD {0}` to both, same tick | | | |
+| 4 | Z | `0x0C18` | Z FUN_00558690 → `sp_Schedule_Logout` FUN_00558160 | unsummon, `so_Unmark(REMOVE_NOW, …, 9)` → full save to D (dept 16) + G `0x0410`; W `0x0C31`; object freed, client link closed | Z01 §8.1 |
+| 5 | W | `0x0C18 {0}` | W FUN_00412df0 | zones `0x0C19`; close reason 0x780; `CharacterLogout` FUN_00436d50 (party / raid / guild / friends / instance / chat leave → W02–W04, D `0x1037`, AL `0x081F`, G `0xC807`, AL `0x0843` after ≥ 60 min); state 3 → `Client_OnClosed` FUN_00437030: A `0x0C11 NC_USER_LOGOUT_DB` (no-op), AL `0x0722`, `0xC803`, zones `0x0C19` again (W05-B25) | W01 §5.1, §5.4, W05 §4.5 |
+| 6 | W→D | `0x1037 NC_CHAR_LOGOUT_DB {charNo, map, x, y, playmin, state, Cen}` | D FUN_00405b30 | `p_Char_Logout` adds the play minutes; G `0x040B`. Map, position and money come from the WM cache and are only logged | D02 §5 |
+| 7 | Z→W | `0x0C31 NC_USER_POSSIBLE_NEW_CONNECT_CMD {…, wmHandle, charNo}` | W FUN_0042c1c0 | `playingCharNo = −1` (a later `0x1001` is allowed); logs an error if the session is gone | W01 §7.3 |
+| 8 | W→Z | `0x0C19 NC_USER_CONNECTCUT2ZONE_CMD {ref = 0xFF…, userNo}` | Z FUN_005a6040 → `wms_kickoff` FUN_005a3860 | the player is already gone: nothing *(inferred)* | Z01 §8.3 |
+| 9 | C→L | token login | | §3.4 step 5 | |
+
+**b) Quit**: as (a) without the token steps. **c) Back to character select** (`0x0C18 {1}`, W01 §5.1): the WM runs
+`CharacterLogout` but keeps the session (`linking = 1`, zone handle 0xFFFF); the zone side is (a) step 4 *(inferred: the client sends the zone the same `0x0C18`)*. **d) Character
+list → world list** *(captured)*: `0x0C33` → `0x0C34`, then the client closes the WM link without `0x0C18`; the WM's
+`ProcessDisconnect` runs `Client_OnClosed` (no character logout, A `0x0C11`, AL `0x0722` / `0xC803`, zones `0x0C19`).
+
+**e) Lost connections**: WM: socket error, or 30 + 180 s silence → state 3 → `Client_OnClosed` as (a) step 5 (W05 §4.5;
+reason stale, W05-B9). Zone: `zs_disconnect` FUN_005abb60 on state 3 ("Socket cut"): `sp_RefreshWMSSocket` (Z01 §8.2,
+W `0x0C31`), `so_Unmark(vt 0x8ec(), 1, 7)` (saves unless that returns `REMOVE_WARP`) and free (Z09 §1.5). The two sides do not tell each other except through
+`0x0C19` (WM → zones) and `0x0C31` (zone → WM).
+
+**f) Kicks and duplicate logins**:
+
+| Trigger | Sequence (receiver handler) | Docs |
+|---|---|---|
+| the account logs in to Login again (§3.3 step 7, §3.4 step 5) *(captured)* | L→every W `0x0C16 NC_USER_KICKOFFFROMWORLD_CMD {userNo}` (W FUN_00424880 → `Kickoff` FUN_00437d50: C `0x0C17 {0x683}` "multiple logins", close 0x785) → every Z `0x0C16` (Z FUN_005a5f90 → `wms_kickoff` → `so_banning(p, 1)`: `REMOVE_LOGOUT`, save, `sp_Schedule_Kickout` FUN_00558080 after 10 s). The WM's 0x0C17 left 0.8 ms before Login's 0x0C0A *(captured)* | W01 §5.2, Z01 §8.3, capture-validation §4.1 |
+| a second `0x0C0F` of the account at the WM | `Clients_KickDoubleLogin` FUN_00437dc0 (`0x0C17 {0x683}`) and zones `0x0C16`, as §3.6 step 1 | W01 §3.2 |
+| the zone throws a player out (`so_Disconnect` FUN_0054f340: SHN checksum, bad ticket, item DB failure 0x684, lot check 0x68C, GM kick …) | Z→W `0x0C1A NC_USER_CONNECTCUT2WORLDMANAGER_CMD {userNo, wmHandle, reason}` (W FUN_00428a40: C `0x0C17 {reason}`); `so_banning` FUN_00558b70 (save, free) | Z01 §8.3, W01 §5.2 |
+| GM / OPTool kicks, prison | part 6 (§3.16 ff.); W04 §4, Z11, Z01 §10 | |
+
+### 3.13 Character persistence
+
+Load: always from the Character server at character select (§3.8: `0x1004` → blocks → `0x1005`). The WM keeps the
+blocks as its cache and replays them to every zone the character enters (§3.9 step 4); the zone never reads the
+character from the Character server. The cache is dropped when the WM session closes; returning to character select
+keeps it until the next `0x1001` reloads.
+
+Saves (`WholeSaver` at DAT_00aa46b0; `ws_save2DB` FUN_00455a10 returns at once when the player's mode is 0;
+`RemoveWhen` *(pdb2016)*: `REMOVE_NOW` 0, `REMOVE_LOGOUT` 1, `REMOVE_WARP` 2, `REMOVE_REVIVE` 3; `ShinePlayer::so_Unmark`
+FUN_00558900 saves for every value except `REMOVE_WARP`):
+
+| Trigger | Zone path | To the Character server | To the WM cache | Docs |
+|---|---|---|---|---|
+| every 600 s in game (`tAutoSaveTime` +0x2aa40, reset by every save) | `so_Routine` FUN_0056c790 → `ws_save2DB(p, 1, 10)` | `0x4018` PK count, `0x4001 NC_CHARSAVE_ALL_REQ` (level / exp / fame, position, stones / HP / SP), `0x4007` abstates, `0x4009` skills if changed, `0x400B` titles, `0x401A` rest-exp time, item cool times `0x4023`, pet / minimon saves; **no** `0x4005` quests (second argument 1) | – | Z09 §2, Z01 §8.4, D02 §6 |
+| level up, `&levelup` | `sp_GainExp` FUN_0042d830, FUN_0042fa00 → `ws_save2DB(p, 1, 8)` | as above | `0x1073 NC_CHAR_EXP_CHANGED_CMD` on every exp gain, `0x1074 NC_CHAR_LEVEL_CHANGED_CMD` (W FUN_0042e160 → G `0xC808`) | Z03 §8.3, Z12, W01 §7.5 |
+| link to another zone | `so_LinkTo` FUN_0049ad30 → `ws_save2DB(p, 0, 2)` + `ws_save2worldmanager` FUN_004536f0 | as above **plus** `0x4005` quests | the full dept-16 set: `0x400E NC_CHARSAVE_2WLDMAN_ALL_CMD`, `0x400F`, `0x4029`, `0x402B`, `0x4011`, `0x4013` items, `0x4015`, `0x4014`, `0x4016`, `0x4017`, `0x402A`, gamble / coin / chat colour / pet / mover / minimon / cool-time blocks (W FUN_00429d40 … FUN_0042d080, W05 §5.5) | Z01 §7.1, §8.4, W01 §7.4 |
+| link inside the zone, revive at another map | `so_Unmark` `REMOVE_NOW` / `REMOVE_REVIVE` → `ws_save2DB(p, 0, …)` | full | – | Z01 §7.1 |
+| logout | `sp_Schedule_Logout` → `so_Unmark(REMOVE_NOW, …, 9)` | full | – (the cache is dropped) | Z01 §8.1 |
+| WM kick (`0x0C16` / `0x0C19`) | `so_banning(p, 1)` → `so_Unmark(REMOVE_LOGOUT, …, 4)` | full, then `sp_Schedule_Kickout` after 10 s | – | Z01 §8.3 |
+| zone disconnect, link out | `so_banning(p, 0)` → `so_Unmark(REMOVE_NOW, …, 4)` | full (skipped after a link: mode 0) | – | Z01 §8.3 |
+| socket lost | `zs_disconnect` FUN_005abb60 → `so_Unmark(vt 0x8ec(), 1, 7)` | full | – | Z09 §1.5 |
+| single values | the owning features | their own requests (quests dept 17, skills 18, options, free stats 0x10D1, …) | `0x1058` class, `0x10C1` option byte, `0x083D` (W01 §7.4) | D02 §6–§7, D04 |
+
+`ws_save2worldmanager` has exactly one caller (`so_LinkTo`, other zone), so the WM cache holds the state of the last
+zone change plus the single updates; `0x1037` at logout carries those values, which the Character server only logs
+(§5.5). Of these requests only `0x4001`, `0x4005`, `0x4007`, `0x4009` and `0x4027` are answered, each only on success
+(D02 §6); the zone ignores the answers except `0x4002` (level ≥ 60 → W `0x750C`, academy) and `0x4028` (Z01 §8.4).
+
+Ordering: the zone's logout save goes to the Character server on the zone's link, and the next `0x1004` on the WM's
+link once the zone's `0x0C31` arrived. The Character server's workers do not order requests of different links
+(§2.4), so a re-select that overtakes the save would load the pre-logout rows (X01-B3, *inferred*; the window is the
+time a player needs to re-select, so it is rarely open). After a duplicate login (f) the new WM session has
+`playingCharNo = −1`, so nothing waits for the old zone's kick save.
+
+### 3.14 Item persistence
+
+Every item change is its own round trip zone → Character server (ITEMDB, dept 13); the zone never sends an item
+state to the WM except the item block of a zone change (`0x4013` → `0x102E` to the next zone).
+
+| Step | What happens | Docs |
+|---|---|---|
+| request | the zone handler checks the request, mints any new item key itself (`ItemKey_Make` FUN_00640710) and sends `NC_ITEMDB_*_REQ {ref, lockindex, …}` | Z04 §1.4, Z05 §1.7 (request → answer table) |
+| style 1: reserve → DB → apply | the cells are locked under a lock index, memory unchanged; success → `icl_Apply_N_Free` applies and sends the client its `NC_ITEM_CELLCHANGE_CMD` / … packets, failure → `icl_Free` | Z05 §1.1, §1.3 |
+| style 2: apply → DB | drop, pick-up, pick money, `INC_DEC_MONEY`: memory and client change at once, DB-pending flag blocks other item requests; failure → `so_Disconnect(0x684)` (the next login reloads the DB state) | Z05 §1.1 |
+| Character server | one handler per request, most multi-step requests not transactional; trusts the zone's keys, lots and prices | D03 §1, D03 knowledge |
+| consistency | stack operations compare the zone's lots with the DB's result lots (mismatch → disconnect 0x68C) | Z05 §1.1, §4 |
+| zone change | `so_LinkTo` refuses while items are locked; the WM's item block is refreshed by `0x4013` and replayed as `0x102E` ×6 | Z01 §7.1, W01 §6.3 |
+| map login | `0x34CF` compares the map-link items with the map (D03 §6.5) | Z01 §6 |
+
+### 3.15 Log records along the session
+
+| Event | Record (sender → receiver handler) | Docs |
+|---|---|---|
+| failed account login | L→AL `0x0720 NC_LOG_USER_LOGINFAIL` (AL FUN_00402470, `tAccountLog` type 0 with the typed password), `0xC802 NC_SYSLOG_ACCOUNT_LOGIN_FAILURE` (AL FUN_004033d0) | D01 §4.1, §4.5 |
+| successful account login | L→AL `0xC801 NC_SYSLOG_ACCOUNT_LOGIN_SUCCESS` (AL FUN_00403310; IP zeroed, L00-B6) | D01 §4.5 |
+| world select | L→AL `0x0721 NC_LOG_USER_LOGIN` (AL FUN_00402580, type 1; also ends the IP-block exemption of §3.3 step 6) | D01 §4.1 |
+| character created | W→G `0x0411 NC_LOG_GAME_CREATE_AVATAR` (G FUN_00403560), `0xC804` (G FUN_00406e60) | D05 §2.3, §6.2 |
+| character deleted | W→G and D→G `0x0412 NC_LOG_GAME_DELETE_AVATAR` (G FUN_00403560, two rows), W→G `0xC805` (G FUN_00406ee0) | D05 §2.3 |
+| character enters the game | W→G `0xC806` (G FUN_00406f60); D→G `0x040A NC_LOG_GAME_LOGIN` (G FUN_004032b0, also `usp_Login_setChannel`) | D05 §2.2, §6.2 |
+| map login done | W→G `0x040F NC_LOG_GAME_LINK` (G FUN_00403490) | D05 §2.3 |
+| zone change | Z→G `0xC809 NC_SYSLOG_CHAR_ZONE_TRANSITION` (G FUN_004070e0) | D05 §6.2 |
+| every character save | Z→G `0x0410 NC_LOG_GMAE_LOGOUT_ZONEINFO` (G FUN_00403490; StoreType = save reason) | D05 §2.3 |
+| level up | W→G `0xC808` (G FUN_00407060) | D05 §6.2 |
+| unmark (logout, link, …) | Z→G `0x042D` hunt log (`mhl_SendAll2Log`, Z09 §28.12) | Z03 §8.2 |
+| character logout | D→G `0x040B NC_LOG_GAME_LOGOUT` (G FUN_004033d0); W→G `0xC807` (G FUN_00406fe0); W→AL `0x081F NC_MISC_CHAR_LOGOFF_STATISTICS` (AL FUN_00402990), `0x0843 NC_MISC_EVENT_LONG_TIME_PLAY_CMD` after ≥ 60 min (AL FUN_004030d0) | D02 §5, D01 §4.2 |
+| WM session closed | W→AL `0x0722 NC_LOG_USER_LOGOUT` (AL FUN_00402640, type 2), `0xC803` (AL FUN_004034e0); W→A `0x0C11` (no-op) | D01 §3.1, §4.1, §4.5 |
 
 ## 4. Glossary
 
@@ -349,6 +582,7 @@ one: W01-B5 (§5.3).
 | Z01 §6 burst | "expired items (`sp_ItemInvenDelete`)" | `sp_ItemInvenDelete(1)` FUN_0051c590 deletes every unlocked inventory item whose `ItemInvenDel.shn` `DelCondition` is `DCT_LINKIN_ALL` (19 event items) at every map login; not expiry | Z18 §4.4 |
 | Z01 §6 tail of 0x1803 | everything after the minimon info is unconditional | runs only if the title block (vt 0x420) and `GetStateData(CurrentTitle, Element)` FUN_005ca9b0 are non-null and every state entry has an abstate, else the handler returns (P02-B4, latent); captured send order of the burst in capture-validation §5.1 | P02 |
 | Z01 §8.4 | "tutorial save" FUN_005d0e60 | `ItemActionObserveManager::SendCoolTimes2DB` (0x4023) | Z17 §3.5 |
+| Z01 §7.1 `so_LinkTo` | `ws_save2DB(p, full = 0, reason = 2)` | the second argument is the *partial* flag of §8.4: 0 = full save, the only kind that includes `0x4005` quests; the 600-s save passes 1 (`WholeSaver::ws_save2DB` FUN_00455a10: `if (param_2 == 0)` → 0x4005, re-read) | X01 §3.13 |
 | knowledge Z01 §4 (player members) | +0x29638 class / shape block; +0x5cb8 bit 3 "hide-except-me"; vt 0x300 IsClosing; +0x7f57 exp / +0x7f77 money *(inferred)* | +0x29638 = `sp_CharacterTitle` (`CCharacterTitleZone`); +0x5cb8 = `sp_MiscFlag` (bit 3 `SoloingMode`); vt 0x300 = `so_IsEmpty`; +0x7f3d is a copy of `PROTO_NC_CHAR_BASE_CMD` (+0x7f57 `Experience`, +0x7f77 `Cen` confirmed); more members: Z08 knowledge §0 | S01 §3.3; Z07 §1.1 |
 | knowledge Z01 §8 | `CHAR_PARAMETER_DATA` in 0x1802 open | answered | Z07 §1.5 |
 | Z01 annotation 0x0810 `NC_MISC_RESTMINUTE_CMD` | u16 = minutes (limit / 10) | seconds (`second`, pdb2016): `Movie::TimeLimit::tl_LeftTick` writes left ticks / 10 (Z09's annotation overrides) | Z09 §26.5, §27.4 |
@@ -405,6 +639,7 @@ one: W01-B5 (§5.3).
 | Z12 §2.5 | the set-item buffer of an abstate is filled from the caster's set-item effects | `aeo_SetItemEffectStore` FUN_00510670 stores nothing in 2016; the writer is `ShineMobileObject::so_ItemActonAbstateApp` (vt 0x5d4, FUN_0055dea0): item actions of `SkillEffectIncreaseType` 4/6/8/9/10/12/13/14 stored as codes 1004…1014 | Z21 §5.3 |
 | Z12 §6.4 | element vt 0x0c "party" | "is a party main" (ours) | Z22 §12.1 |
 | Z12 §6.8 | `el = ci_List.vt[8](ChargedBuffKey)` | vt 8 is `List::l_AllocZ`; the list slot number is the buff's `ChargedBuffKey` (0x9002 / 0x9004 carry the slot) | Z24 §6.7 |
+| Z12 §7.2 | `ws_save2worldmanager` runs on "every WM save, i.e. map change and logout" | its only caller is `so_LinkTo` FUN_0049ad30 (link to another zone); logout, kicks and socket loss save only to the Character server (`so_Unmark` FUN_00558900 → `ws_save2DB`), and the WM drops its cache (callers re-read; no pointer to FUN_004536f0 in the image) | X01 §3.13 |
 
 ### 5.6 Zone items, character, content and world (Z04, Z05, Z07, Z08, Z09, Z14, Z15)
 
@@ -1617,6 +1852,7 @@ for are recorded per handler by the owning items (their rows say "no client text
 | C02-B2 | zone 0x1022, 0x3055 and one CHARSAVE handler ([C02 § 2](../knowledge/C02.md#2-opcode-names)) | profiler strings `NC_CHAR_ZONE__DONE_CMD`, `NC_ITEM_CHATC_OLOR_CHANGE_REQ` (typos) and `NC_MISC_DB_UI_STATE_SAVE_REQ` (wrong dept) | logs only | `NC_CHAR_ZONE_QUEST_DONE_CMD`, `NC_ITEM_CHAT_COLOR_CHANGE_REQ`, the CHARSAVE name | code | C02 |
 | X01-B1 | zone `ShineMobileObject::so_RecalcAbstateParam` @ FUN_004cbe50 (vt 0x360; [Z12 § 2.5](zone/Z12-stats.md), noted there as "(sic: the Item layer)") | while resetting the abnormal-state layer (`AbnormalState.Rate.CriticalTB = 0`, `AbnormalState.Rate.CriDamRate = 0`) it zeroes `smo_Param.Item.Rate.MagCriDamRate`, a field of the **item** layer (re-read in `zone-pdb`) | every abstate recalculation clears the item layer's magic critical-damage rate until the next item recalculation; the abstate layer's own `MagCriDamRate` keeps the eraser value *(inferred: which items set the field not checked)* | `AbnormalState.Rate.MagCriDamRate = 0` | code; effect *(inferred)* | X01 |
 | X01-B2 | zone GM command `&outraid` ([Z11 § 7.1](zone/Z11-gm-commands.md)) | the success wall text is "레이트 탈퇴 성공" | the GM reads a misspelt text (레이트 for 레이드, "raid") | "레이드 탈퇴 성공" | code | X01 |
+| X01-B3 | zone `sp_Schedule_Logout` FUN_00558160 + WM `fc_NC_USER_POSSIBLE_NEW_CONNECT_CMD` FUN_0042c1c0 + Character `0x1004` FUN_00438dc0 ([§3.13](#313-character-persistence)) | the zone sends the logout save (dept 16) to the Character server and then `0x0C31` to the WM, which allows the next `0x1001` → `0x1004` on its own link; the Character server's workers do not order requests of different links, and nothing waits for the save's answers | a quick re-select can load the rows from before the logout save (position, level / exp, abstates, skills, quests) | the WM waits for a save-done signal, or the Character server serialises per character | code; effect *(inferred)* | X01 |
 
 #### 6.2.2 Opcodes the server sends and the 2016 client drops
 
