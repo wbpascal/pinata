@@ -1298,7 +1298,7 @@ clear) run at login complete (Z01 §6).
 | `InventoryLocking::InventoryCellLockList::InventoryCellLockList` | FUN_0048c740 | `icll_List.l_MakeList(0xc0)` (FUN_0048bb90, the §3.10 `List<T>` build for `LockedCell`), then the 192 `icll_Array` cells get `lc_Releaser = &icll_Releaser_None` and are put into the list's free slots; the player's lock list (`so_ply_GetInventoryLockList`, vt 0x7d4, Z04 §1.4). All six are built by the `<unnamed-type-sp_Item>` ctor FUN_00549820 (§1.1) |
 | `BinaryDataBox<ItemServerEquipTypeInfo>::bdb_ReadData(path)` | FUN_00492230 | `CDataReader::Read(path, 0x3e9, 0x1d)` (§1.7 pattern); the 0x1d-byte row is the column map of §4.2; called by `ItemEquipTable::iet_Load` |
 | `List<SellItemInfo>::l_MakeList(n)` | FUN_0050e990 | same build for the buy-back list of `CSellItemManager` FUN_0050eb60 (§4.1) |
-| `ShinePlayer::sp_CalcTotalLot(bag, itemid)` | FUN_00490b00 | sum over every cell of `bag` holding `itemid` (`ItemBoxIterIdent`) of the class's lot getter (`ItemAttributeClass` vt 0x1c); called by `so_ply_CalcTotalLot` (item counts for quest and NPC checks *(inferred from the callers)*) |
+| `ShinePlayer::sp_CalcTotalLot(bag, itemid)` | FUN_00490b00 | sum over every cell of `bag` holding `itemid` (`ItemBoxIterIdent`) of the class's lot getter (`ItemAttributeClass` vt 0x1c = `iac_GetLot`: ByteLot / WordLot / DwrdLot FUN_0063e340 / FUN_0063e450 / FUN_0063e5b0 *(pdb2016)*; the non-lot classes share a `return 1` body (ICF-folded, export header FUN_0063ec90), so a non-lot item counts 1); called by `so_ply_CalcTotalLot` (item counts for quest and NPC checks *(inferred from the callers)*) |
 | `BRAccUpgradeDataBox::LoadBRAccUpgradeData` | FUN_0043bb00 | reads `BRAccUpGrade.shn` through `BinaryDataBox<BRAccUpgrade>::bdb_ReadData` FUN_0043b8c0 (key 0x51, row 0xe, §1.7 pattern; rows `{u32 ID = grade, u16 CriFail, DownFail, NormalFail, nCon, LuckySuc}`; 2016 data: 10 rows grade 1, 15 grade 2, 20 grade 3) and counts rows per grade into `m_upgradeStepList[grade]` (grade 0 skipped), then prefix-sums `[1] += [0]`, `[2] += [1]`, so `[g−1]` = rows of lower grades; `m_upgradeList[i]` = row i. The array has 3 entries but is indexed by the grade itself: the 20 grade-3 rows increment `m_upgradeStepList[3]`, which is the first dword (vftable pointer) of the next member `m_binDataBRAccUpgradeInfo` (original bug) Z18-B21. Then `BRAccUpgradeInfo.shn` (key 0x1acc, row 0x50): `m_upgradeInfoNumber` = highest ID, `m_upgradeInfoList[0 … max]` by ID |
 | `BRAccUpgradeDataBox::GetBRAccUpgrade(grade, demandLv, lv)` | FUN_0043b850 | `grade > 0` and `m_upgradeStepList[grade−1] + lv ≥ 0` → `m_upgradeList[that]`, else null: the `lv`-th row of that grade (rows sorted by grade in the file). `demandLv` is not read (Z04 §9.4 says the row is chosen "by (Grade, DemandLv, lv)": correction in knowledge Z18). Neither `grade ≤ 3` nor `lv` < the grade's row count is checked: `lv` past the grade's rows takes the next grade's rows; grade ≥ 4 would index with the corrupted dword of B21. Caller: `Item_Upgrade_Table_mode` FUN_0053ca10 (Z04 §9.4) for bracelets (class 0x26) |
 | `BRAccUpgradeDataBox::GetBRAccUpgradeInfo(i)` | FUN_0043b880 | `i > m_upgradeInfoNumber` → null, else `m_upgradeInfoList[i]`; the list has max-ID + 1 entries, so the bound is right (a negative `i` is not checked); read by `so_RecalcEquipParam` FUN_004cab70 (Z12 §2.2: `BRAccUpgradeDataBox[d.BasicUpInx]`) |
@@ -1310,7 +1310,7 @@ clear) run at login complete (Z01 §6).
 sp_MakeItem(p, handle, keyKind, id, lot):             @ FUN_00528930
     info.key = ItemTotalInformation::iti_mkregnum(id, keyKind, zoneNo, worldNo); info.itemid = id
     no ItemDataBox row (or row.data null): return false
-    cls = itmattcontainer[id]; cls.iac_itemcreate(id, &info, "-o") (vt 0x14); cls.vt[0x20](&info.item, lot)   # lot setter (inferred)
+    cls = itmattcontainer[id]; cls.iac_itemcreate(id, &info, "-o") (vt 0x14); cls.iac_SetLot(&info.item, lot) (vt 0x20: ItemAttrCls_ByteLot / WordLot / DwrdLot::iac_SetLot FUN_0063e350 / FUN_0063e360 / FUN_0063e5c0; no-op for the non-lot classes)
     sp_MakeItem(p, handle, &info) (FUN_00528690); return true
 ```
 
@@ -1577,10 +1577,13 @@ The caller is `sp_GainExp` FUN_0042d830 (Z03 §8.3: `so_weapontitle(&mobId) == 1
 
 Level semantics. With the 2016 data (mob 2: Killer 3, Executioner 6, Eliminator 9 kills), `GetLevel` gives 0 below 3
 kills, 1 from 3, 2 from 6 and still 2 from 9 on, because the loop stops at the null fourth row and returns `i − 1`. The
-0x5C03 "Weapon title has been upgraded." (client `GameFrameWork` FUN_00479fa0, C01 summary) therefore fires at 3 and
-6 kills but never at the last threshold, and a full table of 10 rows ends at 9 as well: if 0 means "no title" (as the
-first 0x5C03 at the first threshold suggests), the highest title of every mob cannot be reached (original bug) Z18-B22
-*(inferred: the client's reading of the level value was not traced)*.
+0x5C03 therefore fires at 3 and 6 kills but never at the last threshold, and a full table of 10 rows ends at 9 as
+well (original bug) Z18-B22. Client: dept 0x17 is handled inline in the `GameFrameWork` dispatcher FUN_004be490
+(`case 0x17`, cmd 3 → text id 0x85f9c1cf "Weapon title has been upgraded.", printed through the generic system-text
+helper FUN_00479fa0; FUN_004ae470 prints the same text): the client reads neither `ItemInven` nor `Grade`, so the
+payload has no client effect. The level itself reaches the client only as the 0x1C05 `currentkilllevel` byte (§4.3)
+and through the saved title (§6.4); whether the missing top level hides the highest title depends on how that byte
+is mapped to a `WeaponTitleData` row *(inferred: 0 = no title, since the first 0x5C03 comes at the first threshold)*.
 
 | Function | Address | What it does |
 |---|---|---|
@@ -1619,8 +1622,8 @@ roll.
 | Z18-B18 | Z07 Lua `cAddCharacterTitle` FUN_005eb310, §6.3 | `IsKnownedTitle` is "status > 0", so the grant always runs; the trailing 0x6005 is unconditional | a granted title that is worn (USE) is set back to USABLE while still current; a fresh grant is saved twice, an unchanged one once | test `status < USABLE`; send 0x6005 only from `SetTitleStatus` |
 | Z18-B19 | Z07 `ShinePlayer::sp_CardCollectionSend` FUN_0044cc30, §6.5 | the `chrregnum` header (payload +0..3) of 0x10E4 / 0x10E7 / 0x10EA is not written | 4 stale bytes of the shared send buffer go to the client (it ignores them) | write the character number or 0 |
 | Z18-B20 | Z07 `CCharacterTitleDataStateServer::Read` FUN_005ca790, §6.1 | `nStateNum > 6` is refused but 6 is accepted, and Type / TitleLV are not range-checked | a 7th state row for one title (or a type ≥ 128 / level ≥ 4) writes past `StateData[6]` / the 512 entries; latent, the 2016 table has at most 6 rows per title | refuse `nStateNum ≥ 6`; check the indices |
-| Z18-B21 | Z04 `BRAccUpgradeDataBox::LoadBRAccUpgradeData` FUN_0043bb00 / `GetBRAccUpgrade` FUN_0043b850, §4.9 | rows are counted into `m_upgradeStepList[grade]` of a 3-entry array; grade-3 rows write index 3 = the vftable pointer of `m_binDataBRAccUpgradeInfo` (+20 with the 2016 data); the getter checks neither `grade ≤ 3` nor `lv` against the grade's row count | a corrupted vftable pointer (harmless while nothing calls it virtually); a level past a grade's rows silently uses the next grade's rates | count into `[grade−1]`; bound-check grade and level |
-| Z18-B22 | Z07 `CWeaponTitle::GetLevel` FUN_006359c0 (with `so_weapontitle` FUN_0059e190), §6.6 | after passing every threshold it returns `rows − 1`, the same value as one threshold less | the last weapon-title level of every mob is never reached and no 0x5C03 is sent for it *(inferred: if 0 = no title)* | return the number of thresholds reached |
+| Z18-B21 | Z04 `BRAccUpgradeDataBox::LoadBRAccUpgradeData` FUN_0043bb00 / `GetBRAccUpgrade` FUN_0043b850, §4.9 | rows are counted into `m_upgradeStepList[grade]` of a 3-entry array; grade-3 rows write index 3 = the vftable pointer of `m_binDataBRAccUpgradeInfo` (+20 with the 2016 data); the getter checks neither `grade ≤ 3` nor `lv` against the grade's row count | a corrupted vftable pointer (harmless while nothing calls it virtually); a level past a grade's rows silently uses the next grade's rates | a 4-entry array (or skip counting the last grade; the prefix sums and the getter's `[grade−1]` start offset are right as they are); bound-check grade and level |
+| Z18-B22 | Z07 `CWeaponTitle::GetLevel` FUN_006359c0 (with `so_weapontitle` FUN_0059e190), §6.6 | after passing every threshold it returns `rows − 1`, the same value as one threshold less | the server-side level (0x1C05 `currentkilllevel`, saved title) never reaches the last row and the client's "Weapon title has been upgraded." (0x5C03, payload ignored by the client) is not shown at the last threshold; whether the client then hides the top title is open (§8) | return the number of thresholds reached |
 
 ## 8. Not reconstructed / uncertain
 
@@ -1655,9 +1658,9 @@ roll.
   searched beyond the Lua grant (§6.3); `CT_*` counters other than those named in §6.2 are documented by their callers.
 - §6.2: after the type-15 take-back the worn title (`m_CurrentTitle`) is not cleared; whether its abstates stay until
   the next 0x6001 / login was not followed *(inferred: they stay)*.
-- §6.6: how the client reads the weapon-title level byte (0x5C03 `Grade`, 0x1C05 `currentkilllevel`): whether 0 means
-  "no title" or the first row decides whether Z18-B22 is a bug or an off-by-one in the data's favour; read the client's
-  `On_NC_WT_GRADE_CMD` (FUN_00479fa0) and the 0x1C05 handler against `WeaponTitleData.shn`.
+- §6.6: how the client maps the weapon-title level byte of 0x1C05 (`currentkilllevel`) to a `WeaponTitleData.shn`
+  row (0x5C03 `Grade` is ignored by the client): whether 0 means "no title" or the first row decides whether Z18-B22
+  also hides the top title or only drops the last "upgraded" message; read the 0x1C05 handler.
 - §4.9: the Silver Wing result 0x70f and the "RecallDisableField" line have no `client-error-codes.json` entry; the text
   the client shows for 0x70f was not looked up. When the stored map no longer exists `sp_SilverWing_PortalBlast` sends
   nothing, so the client's cast bar is not closed by an item-use result *(inferred from the code; not tested)*.
@@ -1678,15 +1681,15 @@ zone pseudocode doc or `S02-library.md`. Before part 5: **124 functions / 5.3 k 
 plus what their citations exposed one level further (the Silver Wing chain, the bracelet table reader,
 `so_weapontitle` / `sp_saveweapontitle`, `CH_ReadProcessMemory`, `sp_RecoverPoint_House`, `so_SetRaid` +
 `fm_GetRegenCityLinkData`); re-runs until no new Z01–Z07 function appeared. After: **79 functions / 3.9 k lines**, all in the
-table below: 48 with an open item whose plan line names them or their class, 31 already listed in Z09 §31.2 for an open
-item. None belongs to Z01–Z07 or to a finished item. Addresses are written without `FUN_` so that the owners' own gap
+table below: 23 with an open item whose plan line names them or their class, 31 already listed in Z09 §31.2 for an open
+item, 25 STL instances ("none needed", no owner). None belongs to Z01–Z07 or to a finished item. Addresses are written without `FUN_` so that the owners' own gap
 lists keep showing them.
 
 ### 9.2 Functions of other items
 
 | Found (functions) | Covered by | Argument |
 |---|---|---|
-| `CQuestZone::Send_NC_QUEST_DB_DONE_REQ` 005bbe60, `CQuestZone::QuestCheckReward` 005bcde0, `CQuestZone::QuestCheckSelectReward` 005ba0e0, `CQuest::GetNewQuestStatus` 006304a0, `CQuestZone::Send_NC_QUEST_DB_SET_INFO_REQ` 005baa80, `CQuestZone::Send_NC_QUEST_DB_CLEAR_REQ` 005babd0, `CQuestZone::QuestStart` 005bca30, `CQuestZone::Send_NC_QUEST_SCRIPT_CMD_REQ` 005ba960, `CQuestZone::Send_NC_QUEST_REWARD_NEED_SELECT_ITEM_CMD` 005bb570, `CQuestZone::QuestEnd` 005bccb0, `CQuestZone::QuestDoing` 005bcb80 | Z15 (plan lines 13–15: "The interpreter: every `QUEST_SCRIPT_COMMAND` …", "Conditions and diary updates: … FUN_006304a0 (status)", "Rewards: `QuestCheckReward`, `QuestCheckSelectReward`, … `QuestTakeReward` FUN_005bbe60 and the 0x441A NC_QUEST_DB_DONE_REQ body") | callees of `CQuestZone::QuestNext` FUN_005bdef0 (cited in §1.6 as a `FunctionEntarance` user): the quest step machine (start / doing / end phases, reward checks, DB done / set-info / clear requests, script-command and select-item packets) is the quest engine |
+| `CQuestZone::Send_NC_QUEST_DB_DONE_REQ` 005bbe60, `CQuestZone::QuestCheckReward` 005bcde0, `CQuestZone::QuestCheckSelectReward` 005ba0e0, `CQuest::GetNewQuestStatus` 006304a0, `CQuestZone::Send_NC_QUEST_DB_SET_INFO_REQ` 005baa80, `CQuestZone::Send_NC_QUEST_DB_CLEAR_REQ` 005babd0, `CQuestZone::QuestStart` 005bca30, `CQuestZone::Send_NC_QUEST_SCRIPT_CMD_REQ` 005ba960, `CQuestZone::Send_NC_QUEST_REWARD_NEED_SELECT_ITEM_CMD` 005bb570, `CQuestZone::QuestEnd` 005bccb0, `CQuestZone::QuestDoing` 005bcb80 | Z15 (plan lines 13–15: "The interpreter: every `QUEST_SCRIPT_COMMAND` …", "Conditions and diary updates: … 006304a0 (status)", "Rewards: `QuestCheckReward`, `QuestCheckSelectReward`, … `QuestTakeReward` 005bbe60 and the 0x441A NC_QUEST_DB_DONE_REQ body") | callees of `CQuestZone::QuestNext` FUN_005bdef0 (cited in §1.6 as a `FunctionEntarance` user): the quest step machine (start / doing / end phases, reward checks, DB done / set-info / clear requests, script-command and select-item packets) is the quest engine |
 | `SubAbnormalStateActor::sasa_SetAbstateToArea_T` 0040b670, `SubAbnormalStateActor::sasa_SetAbstateToArea` 00401bd0, `SubAbnormalStateActorPoison::sasa_Routine` 0040d4c0, `AxialListNearScanEnemyorAll::AxialListNearScanEnemyorAll` 004c1830 | Z22 (plan line 12: "List every `AbnormalStateContainer::SubAbnormalStateActor*` function …", naming `sasa_SetAbstateToArea_TargetNum` 0040b670 and `AxialListNearScanEnemyorAll`) | abstate actor bodies (area-apply helpers of the actor base, Poison `sasa_Routine`) reached from the §3.1 actor table; Z22 depends on Z18 and takes every actor class |
 | `ShineMobileObject::smo_ClearSkillResultBuffer_Miss` 0057a550, `AbstateElementInObject::aeo_IsMine` 00408880 | Z23 (plan line 12: "the Z03 leftovers reached from `smo_SkillBlast` / `smo_SkillBash_Blast`: … `smo_ClearSkillResultBuffer_Miss` 0057a550, `AbstateElementInObject::aeo_IsMine` 00408880") | named in Z23's plan |
 | `ShinePlayer::sp_RideInitialize` 0043d140, `ShinePlayer::sp_MakeRideBriefInfo` 0056e800, `CPetData::GetPetTendencyModifyData` 004cf440, `CPetData::GetPetMindType` 004cf250 | Z13 (plan line 16 "Mounts: mover creation …" for the ride functions; line 15 "Pets: … 0xD401 SET_TENDENCY (mind/stress)" for the `CPetData` getters) | mount brief / ride init from `sp_LoginInit` and the horse code; pet tendency data read by `sp_PetSystem_ChangeTendency` FUN_004d2470 (cited in §2.6 as the rest-mode pet hook) |

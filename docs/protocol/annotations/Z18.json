@@ -214,10 +214,10 @@
       "0x5c03": {
         "dir": "S→C",
         "name": "NC_WT_GRADE_CMD",
-        "basis": "zone FUN_0059e190 (ShinePlayer::so_weapontitle); client FUN_00479fa0 (GameFrameWork, 'Weapon title has been upgraded.')",
+        "basis": "zone FUN_0059e190 (ShinePlayer::so_weapontitle); client GameFrameWork dispatcher FUN_004be490 case 0x17 cmd 3 (inline: text 0x85f9c1cf 'Weapon title has been upgraded.' through the system-text helper FUN_00479fa0; payload not read)",
         "fields": [
-          [0, "u16", "ItemInven", "ITEM_INVEN: 0x200A (equipment slot 10) when equipment slot 12 is empty, else 0x200C"],
-          [2, "u8", "Grade", "CWeaponTitle::GetLevel after the kill (Z18 §6.6, Z18-B22)"]
+          [0, "u16", "ItemInven", "ITEM_INVEN: 0x200A (equipment slot 10) when equipment slot 12 is empty, else 0x200C; not read by the client"],
+          [2, "u8", "Grade", "CWeaponTitle::GetLevel after the kill (Z18 §6.6, Z18-B22); not read by the client"]
         ],
         "notes": "3 bytes; sent only when the level changes (Z18 §6.6)"
       },

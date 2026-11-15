@@ -7129,12 +7129,12 @@ Sent in reply to `0x5c06` NC_WT_LICENSE_SET_ACK on GameDBSession (`FUN_0059dab0`
 
 ### `0x5c03` NC_WT_GRADE_CMD
 
-**Verified layout** (basis: zone FUN_0059e190 (ShinePlayer::so_weapontitle); client FUN_00479fa0 (GameFrameWork, 'Weapon title has been upgraded.'))
+**Verified layout** (basis: zone FUN_0059e190 (ShinePlayer::so_weapontitle); client GameFrameWork dispatcher FUN_004be490 case 0x17 cmd 3 (inline: text 0x85f9c1cf 'Weapon title has been upgraded.' through the system-text helper FUN_00479fa0; payload not read))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | ItemInven | ITEM_INVEN: 0x200A (equipment slot 10) when equipment slot 12 is empty, else 0x200C |
-| 2 | u8 | Grade | CWeaponTitle::GetLevel after the kill (Z18 §6.6, Z18-B22) |
+| 0 | u16 | ItemInven | ITEM_INVEN: 0x200A (equipment slot 10) when equipment slot 12 is empty, else 0x200C; not read by the client |
+| 2 | u8 | Grade | CWeaponTitle::GetLevel after the kill (Z18 §6.6, Z18-B22); not read by the client |
 
 3 bytes; sent only when the level changes (Z18 §6.6)
 
