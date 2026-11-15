@@ -355,7 +355,7 @@ A stopping worker finishes the job in hand; records still queued at stop are dro
 ### 1.6 Address table of the process layer
 
 Same function in all four builds, matched by identical body (§ intro). "–" = the body differs in that build (an
-AccountLog / Character / GameLog variant; §3.6, §4.7 and part 7 of D08 give those). Several addresses = identical-code
+AccountLog / Character / GameLog variant; §3.6, §4.7 and §7.5 give those). Several addresses = identical-code
 folds in that build.
 
 | Function *(pdb2016)* | Account | AccountLog | Character | GameLog | Documented at |
@@ -1591,6 +1591,152 @@ handler(pkt) (CParserCharacter; each: CheckAlive FUN_0043c640, else return)
 - Callers and the return path: zone FUN_005509a0 / FUN_00550b90 / FUN_00550e90 → Character → zone FUN_00550fc0 /
   FUN_00551130 / FUN_00551250 (Z01 §9); WM FUN_00426060 → Character 0x0814 → WM FUN_0040c460 (W05).
 
+## 7. GameLog: differences against the Account build
+
+D05 §1.1 and §7 already describe the GameLog copy of the framework, using our own names. This section lists only what
+differs from the Account reference (§1–§2) and gives the official names, all in `tools/protocol-re/names/gamelog/D08.json`
+(853 functions; the clean.py output now shows them instead of D05's names, see knowledge §7 for the old-to-new list).
+Method as in §4: every uncited GameLog function was compared with the Account / AccountLog / Character / WM / Login /
+zone exports by identical normalised body. A function with no identical body was compared with a masked line diff
+against its most similar Account function.
+
+The GameLog exe is older than the others. Its PE link time is **2015-11-05 02:48 UTC**, the same build as the stamp
+`"US - 2015년 11월 05일 - 11시 42분 26초"` that it writes to `ExecUpdateInfo.txt` (D05 §7.1). Character was linked on
+2015-11-16; Account, AccountLog, Login and WM on 2016-05-31; the zones on 2016-06-02 *(read: `TimeDateStamp` of the
+file headers)*. This explains the layout differences in §7.4.
+
+### 7.1 Objects
+
+```
+DataServer gServer (DAT_0044d188; 0x209df8 bytes, from the ctor's last member) (inferred names = Account's, pdb2016)
+    +0x0000 … +0x2098c0    as Account (§1.1): m_ServerInfo, m_MyServer, m_IOCP_For_Socket, m_SocketSessionManager,
+                           m_SessionWorkerManager, m_bOnStopService +0x209890, start / stop time, m_bStopMainThread
+                           +0x2098b4, m_bActiveMainThread +0x2098b8, m_hMainThread, m_MainThreadID
+    +0x2098c4 cLogSystem   (0x390) new: the syslog text file (D05 §6.1; class and member names §3.5)
+    +0x209c54 m_NumOfIndunMap, +0x209c58 SHINE_INDUN_INFO[32] m_IndunMapList   (Account: +0x2098c4 / +0x2098c8)
+CSessionWorker (0x1268, as Account): +0x138 CParserGameLog m_Parser (D05 §1.3), +0x124c the DB object (one ODBC link)
+```
+
+There is no `CStatistics` (AccountLog §3.3) and only one DB link per worker. The stop flag of 0x2803 is at the Account
+offset, +0x2098b4 (knowledge §1).
+
+### 7.2 Start-up, main thread, stop
+
+```pseudo
+DataServer::DataServer:                                   @ FUN_00401900
+    as Account (§1.2), plus cLogSystem::cLogSystem(+0x2098c4) (two empty std::string, §3.2); zeroes the indun list at +0x209c54
+DataServer::~DataServer:                                  @ FUN_00401020
+    as Account, plus ~cLogSystem (strings only; the writer thread is never stopped, as in AccountLog §3.2)
+DataServer::ReadDefineScriptor:                           @ FUN_00401370
+    as Account, file "DataServerInfo_GameLog.txt" (D05 §1.1)
+
+DataServer::Start(this, cmdLine):                         @ FUN_00401de0
+    as Account (§1.2), with two differences:
+    _ExecUpdateInfoMsg(build stamp DAT_00434898)          # Account passes "-"; D05 §7.1
+    the MapInfo step is replaced by
+    if !DataServer_ReadGameData(this): return −4          # FUN_00401510, name ours (D05); Account has no such function
+DataServer_ReadGameData(this):                            @ FUN_00401510
+    ItemInfo.shn ("../../9Data/Shine/", then "../9Data/Shine/"): fopen probe FUN_00410d00 (= Character FUN_0044a320)
+        → ItemDataBox::ReadData FUN_00410a40 into itemdatabox DAT_006574a0; both missing → "*FAILED GLOBAL GAME DATA READ - ItemInfo.shn", 0
+    nServerID == 2 only: MapDataBox::CheckReadData FUN_004105c0 (§2.2) on MapInfo.shn       # never for GameLog (id 3)
+    return 1
+    # Character's GameData_Load (§4.2) opens with the same ItemInfo step. GameLog reads the table and never uses it (D05 §7.5)
+
+DataServer::OnStart_Service(this):                        @ FUN_00401f90
+    name = sprintf("_fiesta_Gamelog_World%d.log", m_MyServer.nWorldNo)          # +0x504; AccountLog: fixed "_fiesta_Accountlog.log"
+    if !cLogSystem::ls_LogSystemInit(+0x2098c4, "C:/data/gamigo-dwh/current/", 4 = LCT_HOUR, name): return false   # silent, as §3.2
+    then exactly the Account sequence (§1.2): m_bOnStopService = 1, CIOCP::Start(5 × CPU), CSessionWorkerManager::Start(-1, wait),
+    Start_Acceptor FUN_004015b0, Start_MainThread FUN_00401d60, "SERVER WORK START"
+```
+
+`DataServer::MainThread` FUN_004016d0, `Start_Acceptor`, `Start_MainThread`, `OnStop_Service`, `ParseCmd`, `ViewStartInfo` /
+`ViewStopInfo`, `WinMain` FUN_004020b0 and the service shell have the same body as in Account (§1.6). The main thread does
+only the heartbeat once a second; there is no CStatistics poll. B2 (0x2803 stop) and the 5 × CPU IOCP / min(10 × CPU + 1, 81)
+worker counts are the same as in Account.
+
+### 7.3 Workers, the DB link, transactions
+
+- `CSessionWorker::DB_Init` FUN_0040a290 is the Account code with ODBC row id **11** (`w00_GameLog`) instead of 0. There is
+  one `Database` per worker and no second link. Everything else in the worker / job-queue path is the Account code (§1.5).
+- **Autocommit**, as in Account / AccountLog / Character: nothing turns autocommit off. The only `SQLSetConnectAttr`
+  call (ordinal 39) is the `AUTOCOMMIT = ON` in `Database::CommitTran` FUN_00417b70, which runs only from `Database::close`
+  FUN_00417bc0, `~Database` FUN_00417c00 and `openDB` FUN_00417c70, and does nothing while `m_bTran` is false. Nothing sets
+  `m_bTran`. Each `{CALL p_GameLog_Add…}` therefore commits on its own.
+- `DBRecord` (§2.5) in GameLog: ctor FUN_00413f20, `close` FUN_00413f40 (folded with `CGameDB_Connect::DBClose`; thunk
+  FUN_0041b780), `query` FUN_00413f70, `getStatement` FUN_00414000, dtor FUN_00414010, `openDB` FUN_00414090, deleting dtor
+  FUN_00414100. **`fetch`, `endFetch` and the two `operator>>` are not linked**. GameLog imports neither `SQLFetch`
+  (ordinal 13) nor `SQLGetData` (43) from ODBC32. The only call to ordinal 13 is the Winsock `listen` in
+  `CSocket_Acceptor::Initialize` FUN_00411020. No GameLog procedure reads a result set; the one 0x0402 answer
+  takes its value from an output parameter (D05 §2.1). This settles the open `DBRecord::fetch…` cell of §1.6.
+- ODBC and Winsock are imported **by ordinal** (Account: by name). The import thunks are 0x42f6a0–0x42f6fa (§7.6) plus
+  `gethostname` FUN_0040b226 / `inet_ntoa` FUN_0040b22c (ws2_32 ordinals 57 / 12). `gethostname` is called by the syslog
+  line writer FUN_00406cc0 (D05 §6.1) and `InetAddress::GetHostAddress` FUN_00416900, `inet_ntoa` by the session / worker log messages (peer IP).
+
+### 7.4 Linked library: what differs (dead code)
+
+D05 §7.5 shows that GameLog uses none of the linked game-data library except the ItemInfo load. Its copy is the
+Account code (§2.6), apart from two classes compiled with older layouts:
+
+| Function (GameLog) | Account | Difference |
+|---|---|---|
+| `ItemAttrCls_Weapon` vtable slots 1 `iac_fill2buffer` FUN_00416710, 3 `iac_GetAttrSize` FUN_00416820, 11 `iac_DropItemMake` FUN_00415c10, 13 `iac_GetDeteleDateTime` FUN_00414410, 28 `iac_GetItemOptionStruct` FUN_00414790, 29 / 30 `iac_Get/SetRandomOptionChangeCount` FUN_004147e0 / FUN_004147f0 | FUN_00417190 FUN_004172a0 FUN_00416690 FUN_00414e90 FUN_00415210 FUN_00415260 FUN_00415270 | every member from `gemSockets` (attribute +0x30) on sits 3 bytes later. `iac_DropItemMake` writes the three sockets as 4-byte `{0xffff, 0}` entries (Account: 3 bytes, `{u16 gemID = 0xffff, u8 0}`). That puts `maxSocketCount` / `createdSocketCount` at attribute +0x3c / +0x3d (Account +0x39 / +0x3a), `deletetime` at +0x3e, `randomOptionChangedCount` at +0x42 and `option` at +0x43. `iac_fill2buffer` copies 0x5c bytes, `iac_GetAttrSize` = 0x44 + 3 × options (Account: 0x59 / 0x41 + 3n). The 2016 Account and Zone PDBs and the 2017 client have `ShineItemAttr_Weapon` = 0x59. *(inferred: built from an older header)* |
+| `CharacterInventoryManager::cim_quest` / `cim_minihouse` FUN_00414330 / FUN_00414340 | FUN_00414dc0 / FUN_00414dd0 | return inventory +0x4f98 / +0x51e0 (Account +0x6558 / +0x67a0). These are the offsets of "definition 1 of 2" of `CharacterInventory` in the Account PDB itself *(pdb2016)*: `ItemInventory` with `ItemInventoryCell[144]` (0x4144 bytes; cell 0x74) instead of definition 2's `[192]` (0x5704), which the Account code uses. The Account PDB therefore still has translation units built with the 144-slot header |
+
+The ItemInfo row layout is the same: `ItemDataBox::ReadData` FUN_00410a40 is identical to Account's. Neither difference
+can show, because GameLog never builds or reads an item attribute (D05 §7.5). Do not take GameLog's `ItemAttrCls_*`
+offsets as the 2016 layout.
+
+### 7.5 Address table (GameLog functions no other document cites)
+
+The "–" cells of the GameLog column in §1.6:
+
+| Function *(pdb2016)* | GameLog | Account | Difference |
+|---|---|---|---|
+| `DataServer::~DataServer` / `DataServer::DataServer` | FUN_00401020 / FUN_00401900 | FUN_00401020 / FUN_00401850 | + `cLogSystem` member (§7.1) |
+| `DataServer::ReadDefineScriptor` | FUN_00401370 | FUN_00401360 | file name |
+| `DataServer::Start` | FUN_00401de0 | FUN_00401d20 | build stamp, `ReadGameData` (§7.2) |
+| `DataServer::OnStart_Service` | FUN_00401f90 | FUN_00401f10 | syslog init first (§7.2) |
+| `CSessionWorker::DB_Init` | FUN_0040a290 | FUN_00405f20 | ODBC id 11 |
+| `CSocket_Acceptor_Process_Manager_App::Accept_Process`, `CIOCP::Stop`, `CGTimer::GetTime` | FUN_0040a210, FUN_0040ea60, FUN_00413f00 | FUN_00405ea0, FUN_0040ec30, FUN_00413ef0 | none: the bodies are the same, and only label names and `_DAT_` operands escaped the §1.6 normaliser |
+| `DBRecord::fetch` / `endFetch` / `operator>>` | not linked | FUN_004124a0 FUN_004124d0 FUN_004124e0 FUN_00412510 | §7.3 |
+
+GameLog functions in 0x401000–0x41b77f that no document cited before this part. All are the Account code (identical
+body unless noted), so they are documented where the Account copy is:
+
+| Class / group (GameLog functions) | Same as |
+|---|---|
+| MSVC STL: `std::bad_alloc` 0040ad80, `std::allocator<char>::allocate` 0040ada0, `std::basic_string` 0040adf0 0040ae80 0040b010 0040eef0 0040fcf0, its catch funclets 0040af33 0040af5c 0040afbb, `std::locale` 0040f7e0 0040f820, `operator==` 00412350 | standard library (§4.6); used by `cLogSystem` (§3.5) |
+| `gethostname` 0040b226, `inet_ntoa` 0040b22c (import thunks) | §7.3 |
+| `BinaryDataBox<ItemInfo / ItemInfoServer / GradeItemOption / ItemDropLog / ItemSort / ItemInvenDel / MapInfo / ItemOptions / ShineReward / FriendPointReward>` dtors and deleting dtors 00410480 00410620 00410630 00410640 00410650 00410660 00410680 004106b0 00410710 00410740 00410770 00418000 00418010 00418040 00418370; `MapDataBox::~MapDataBox` 00410540; `ItemDataBox::<unnamed-type-idb_BinData>` ctor / dtor 004107d0 00410970; `ItemBelongAttribute` 00410600 00410cd0 | §2.6 (Z27 §1, §2.2) |
+| `DBRecord` 00413f20 00413f40 00414010; `Database` 00417b70 00417bc0 | §2.5, §7.3 |
+| `BTree` 00414190 004141b0 00414270; `BinaryData` 004142b0 004142d0 004142e0 | §2.6 (W05 §6.2, Z27 §1.1) |
+| `CharacterInventoryManager` 00414310 00414320 (and 00414330 00414340, §7.4) | §2.6 |
+| `ItemAttributeClass` + `ItemAttrCls_*` (121 functions; the seven `ItemAttrCls_Weapon` variants are in §7.4): 00414360 00414380 004143b0 004143c0 004143e0 00414430 00414440 00414450 00414460 00414480 004144a0 004144b0 004144c0 004144e0 004144f0 00414500 00414510 00414520 00414530 00414540 00414550 00414570 00414580 004145a0 004145b0 004145c0 004145d0 004145f0 00414600 00414610 00414620 00414630 00414640 00414660 00414670 00414690 004146b0 004146c0 004146d0 00414770 00414780 004147a0 004147b0 004147c0 004147d0 00414800 00414810 00414830 00414880 004148b0 004149a0 004149f0 00414a10 00414a50 00414a80 00414ab0 00414b10 00414b40 00414b70 00414b90 00414bb0 00414bf0 00414c10 00414c30 00414c50 00414c80 00414cb0 00414cf0 00414d10 00414d30 00414d40 00414d70 004151d0 00415310 00415380 00415400 00415420 00415470 00415570 00415590 004155b0 00415690 00415730 00415750 00415770 004157b0 004157d0 00415960 00415980 004159a0 004159e0 00415a20 00415b10 00415b50 00415b90 00415bd0 00415c90 00415d10 00415dd0 00415eb0 00415ed0 00415f60 00415f80 00416170 00416180 004161a0 00416220 00416240 00416280 004162a0 004162c0 004162e0 00416310 00416340 00416680 004166b0 004166e0 00416740 004167d0 00416800 00416840 | §2.6 (Z04 §1, Z18, Z30 §9) |
+| `ItemAttributeClassContainer::ItemAttributeClassContainer` 00416340 | §2.6 (Z04 §1; D07 §1.3) |
+| `cWell512Random` 00417de0 00417e10 00417ec0 (the last two differ from Account only in `_DAT_` constants); `ItemOptionsData::OptionCardStack::ocs_selectnumber` 00417f20; `EnchantSocketRateData::GetSocketRateData` 00417ff0; `RandomSlot::rs_Init` 004183d0; `RandomBox::RandomBox` 00418460 | §2.4 |
+| `List<CardDeck::Card>` 00418070 004185e0 00418600 004188c0 004189c0 00418ab0 00418ae0 00418b10 00418bc0 00418cc0; `ListEraser<CardDeck::Card>` 004182b0 004182d0; `ListArray<CardDeck::Card>` dtor 00418bb0; `CardDeck::CardStack` 00418c00 00418c70 | §2.6 (Z09 §28.10, Z05 §8.5) |
+| `MiniDumper` helpers `FillInStackFrame` 00416970 (only `_DAT_` operands differ), `EHCleanupSymbolEngine` 00416ca0 | W05 §6.3 |
+| identical-code folds that stand for several Account functions (one-line getters, `return 0`, `g_CardCollectMake`, `ListIteratorDefault::lid_Call`), so they get no name: 00409630 00414350 00414370 00414390 004143d0 004143f0 00414400 00414420 00414470 00414490 004144d0 00414560 004146a0 00414820 00415b40 00415ce0 00415d00 00415dc0 00415e20 00415e40 00415ea0 004180e0 | §2.6 (the Account functions they fold) |
+
+### 7.6 Runtime boundary
+
+Layout of GameLog's `.text` (read from the function list of the export and the matches above):
+
+| Range | Contents |
+|---|---|
+| 0x401000–0x41b77f | program: `DataServer`, handlers (D05 §2–§6), framework (D05 §7, this §), linked library (§7.4), SQL wrappers `SQL_p_GameLog_Add*` FUN_00419080–FUN_0041b4c0, `SQL_usp_Login_setChannel` FUN_0041b680, `CGameDB_Connect::DBConnect` FUN_0041b720 |
+| 0x41b780–0x42f69f, 0x42f700–0x431bbf | MSVC C runtime (+ the `type_info` / EH support). It starts at the `DBRecord::close` thunk FUN_0041b780 and `operator new[]` FUN_0041b785, and ends with the math helpers `_ceil_default` / `_floor_default` / `_frnd` |
+| 0x42f6a0–0x42f6fa | import thunks by ordinal: ODBC32 `SQLFreeHandle` (31), `SQLExecDirect` (11), `SQLFreeStmt` (16), `SQLCloseCursor` (26), `SQLAllocHandle` (24), `SQLSetEnvAttr` (75), `SQLSetConnectAttr` (39), `SQLEndTran` (29), `SQLDisconnect` (9), `SQLDriverConnect` (41), `SQLBindParameter` (72); ws2_32 `__WSAFDIsSet` (151), `WSACleanup` (116), `WSAStartup` (115), `gethostbyname` (52); `RtlUnwind`: 0042f6a0 0042f6a6 0042f6ac 0042f6b2 0042f6b8 0042f6be 0042f6c4 0042f6ca 0042f6d0 0042f6d6 0042f6dc 0042f6e2 0042f6e8 0042f6ee 0042f6f4 0042f6fa |
+| 0x431bc0–0x4328ff | 99 compiler-generated EH unwind funclets (`Unwind@…`): 00431bc0 00431bc8 00431bd6 00431be4 00431bf2 00431c58 00431c66 00431c74 00431c82 00431cb0 00431cbb 00431cc6 00431cdc 00431cea 00431cf5 00431d30 00431d3b 00431d80 00431dc0 00431e30 00431e70 00431eb0 00431f20 00431f28 00431f60 00431fa0 00431fa8 00431fe0 00431fe8 00432020 00432050 004320a0 004320d0 00432100 0043210b 00432116 00432150 0043215b 00432190 004321c0 004321f0 00432220 00432228 00432260 00432268 00432276 00432284 00432292 004322a0 004322d0 004322d8 004322e6 004322f4 00432302 00432310 00432340 00432370 0043237b 004323b0 004323e0 00432410 0043241b 00432429 00432460 00432468 00432470 004324a0 004324d0 004324db 00432510 00432540 0043254b 00432556 00432580 0043258b 004325c0 004325cb 004325d6 00432600 0043260b 00432616 00432621 00432650 00432680 004326b0 004326e0 004326f6 00432711 00432750 00432767 004327a0 004327d0 00432800 00432808 0043282e 00432870 004328a0 004328b9 004328f0 |
+| 0x432900– | static initializers / atexit destructors (the others are cited elsewhere). Not cited before: `dynamic_initializer_for_'itemoptiondata'` 00432bd0, `std::dynamic_initializer_for_'initlocks'` 00432ce6, `dynamic_atexit_destructor_for_'itemoptiondata'` 00432eb0, `dynamic_atexit_destructor_for_'rndbox'` 00432f50 (§2.1) |
+
+CRT functions no document cited before this part (529). 432 have a body identical to an Account
+CRT function, 27 are nearly identical (similarity ≥ 0.9, only data operands differ) and 70 have no close Account match
+(CRT code that Account does not link, or folds). They carry the Account PDB name in `names/gamelog/D08.json` where the
+match is unique. They are the standard MSVC runtime (EH4 handlers and the `_s` / `_l` functions mean Visual C++ 2005 or later), with no project
+behaviour, and are treated as S02's coverage boundary treats the CRT ("standard MSVC CRT semantics"):
+0041b780 0041b785 0041b795 0041b7b2 0041b7e2 0041b7ff 0041b82f 0041b84c 0041b86d 0041b8c7 0041b8ef 0041b906 0041b969 0041b98a 0041b9ab 0041b9ce 0041b9d2 0041b9e6 0041ba08 0041ba2b 0041ba5b 0041baae 0041babe 0041bace 0041bade 0041bb19 0041bb3a 0041bb51 0041bbaf 0041bbfa 0041bc12 0041bc44 0041bc4b 0041bc9f 0041bcd5 0041bd08 0041bddf 0041be7e 0041bef1 0041bf1d 0041bf44 0041bf96 0041bff6 0041c005 0041c090 0041c1b4 0041c1df 0041c1f7 0041c200 0041c209 0041c23c 0041c260 0041c2f7 0041c422 0041c437 0041c44d 0041c463 0041c481 0041c49f 0041c4aa 0041c52a 0041c577 0041c590 0041c60a 0041c733 0041c81a 0041c850 0041c856 0041c86d 0041c8f4 0041c9c7 0041c9f0 0041ca1b 0041ca26 0041ca36 0041ca57 0041ca80 0041ce00 0041d161 0041d17e 0041d18b 0041d1cb 0041d1e9 0041d210 0041d245 0041d277 0041d29c 0041d2e8 0041d311 0041d47e 0041d488 0041d54d 0041d564 0041d75b 0041d772 0041d7ac 0041d840 0041d8f0 0041d907 0041da06 0041da1d 0041dbd9 0041dc5d 0041dc67 0041dc84 0041dddb 0041de4b 0041de55 0041dfe9 0041e044 0041e04e 0041e0d8 0041e14a 0041e154 0041e1c1 0041e22d 0041e235 0041e2e7 0041e2f1 0041e308 0041e454 0041e46e 0041e484 0041e48f 0041e4fd 0041e51f 0041e5ca 0041e5dd 0041e63d 0041e656 0041e84e 0041e89a 0041e9a0 0041e9d4 0041ea3c 0041ea84 0041eb26 0041eb55 0041eb5e 0041eba7 0041ebb1 0041ebba 0041ecbc 0041ecc6 0041ed72 0041ed8f 0041ee7d 0041ef60 0041f037 0041f078 0041f0aa 0041f0e6 0041f115 0041f190 0041f1d6 0041f200 0041f306 0041f32b 0041f3af 0041f3c9 0041f473 0041f490 0041f61f 0041f825 0041f84c 0041f89a 0041f8eb 0041f919 0041f96f 0041f99f 0041f9f0 0041fa1e 0041fc65 0041fc77 0041fcc9 0041fd30 0041fd5d 0041fd6f 0041fd90 0041fe50 0041ff96 004200d6 0042010d 00420338 00420363 00420423 00420585 00420640 0042066d 00420693 004207e8 00420805 0042091b 00420935 00421032 004210fe 00421106 004216bd 004217ab 004217b3 0042199a 004219e0 00421a25 00421a71 00421abf 00421b11 00421b53 00421b66 00421b79 00421b9c 00421bcf 00421c05 00421c19 00421cc6 00421cd2 00421ce0 00421d6b 00421d93 00421e08 00421e2f 00421e8e 00421edd 00421f9f 00421ffe 00422053 0042207c 004220f7 00422128 00422140 00422266 004222dc 0042245b 004224ed 0042255b 00422662 004229d7 004229f4 00422ada 00422b0d 00422b2e 00422ce4 00422cf6 00422d2a 00422d67 00422e09 00422e12 00422e1b 00422e94 00422fc8 00422fd4 00422fe0 0042315b 00423194 004231a7 004231df 004231f0 00423235 00423250 0042329c 004233a2 00423506 00423539 004235ad 00424159 00424168 00424291 004242b6 004242e3 004242f3 0042433d 00424394 004243ab 00424464 0042446d 004244a0 004244be 004244f5 00424502 00424669 004246a5 004246b4 004246c3 004246d2 004246fa 00424746 00424770 004247b0 00424800 004248bc 004248e2 00424a91 00424aca 00424b94 00424c3a 00424c4d 00424c80 00424caf 00424d13 00424ea3 00424f3e 00424f47 00424fc3 004251ac 0042530d 00425346 00425364 004253f3 0042548c 004255d7 00425624 00425691 0042569d 00425704 00425710 00425798 0042589b 00425b1e 00425bae 00425da5 00425f7c 00425fc2 00425fcb 00426003 0042600c 00426039 00426066 00426093 00426099 0042609f 004260a5 00426220 00426288 004262d8 00426422 00426481 0042655d 004266f7 004267b2 00426849 00426a8e 00426aac 00426b50 00426b90 00426bc9 00426c89 00426dab 00426dd1 00426e46 00426f12 00426f1a 00426fb6 00427072 0042707a 004270ab 00427342 0042746c 00427480 00427556 00427572 00427589 004275a2 004275bb 004275d2 00427629 00427649 0042765f 00427689 0042868d 00428734 004287ec 00428ec8 00428f3c 00428fbe 00428fda 0042901c 00429036 00429055 00429068 0042907b 004291dc 004292a3 004292c3 00429639 0042973c 004297fd 004298ea 00429972 00429995 004299bd 00429a10 00429a29 00429a41 00429a5e 00429ab8 00429bdc 00429c1c 00429c25 00429c65 00429d36 00429d3e 00429dda 00429e0e 00429e57 00429eea 00429ef3 00429f78 0042a058 0042a062 0042a07f 0042a0ac 0042a112 0042a1d5 0042a4b1 0042a695 0042a6c2 0042a6f6 0042a796 0042a7eb 0042a8b5 0042a8c5 0042a8d6 0042a901 0042a959 0042a9d0 0042aa08 0042aa20 0042aa36 0042aa4c 0042aacd 0042ab53 0042abbc 0042ac52 0042ac5b 0042ac82 0042ad54 0042ae12 0042ae1b 0042af02 0042af42 0042af84 0042afda 0042b05c 0042b109 0042b177 0042b4ee 0042b557 0042b655 0042b70a 0042b710 0042b716 0042b730 0042b7c5 0042b8b0 0042b915 0042b9bc 0042b9c5 0042b9e4 0042b9e7 0042b9ef 0042ba0e 0042bb7a 0042bbef 0042bcbc 0042bcd7 0042bd3a 0042bd79 0042be00 0042bf15 0042bf41 0042c675 0042c70b 0042c739 0042c759 0042c95d 0042c977 0042cec8 0042d419 0042d5fd 0042d6a5 0042d74d 0042d800 0042d8b3 0042d950 0042da30 0042da4f 0042daae 0042dc96 0042dd64 0042dd67 0042dd86 0042dd9d 0042de7f 0042ded2 0042dfb0 0042dfca 0042e061 0042e217 0042eb0f 0042eb9d 0042ec3d 0042f011 0042f27f 0042f2c1 0042f3ab 0042f3fd 0042f45d 0042f700 0042f730 0042f770 0042f7a0 0042f7e0 0042f840 0042fae0 0042fc90 0042fd40 0042fef0 004308f0 00430900 00430930 00431010 004310c0 00431270 00431561 0043164f 00431657 00431714 004319f0 00431ac8 00431ba0
+
 ## Original-server bugs
 
 | ID | Handler / function | 2016 behaviour | Effect | Likely intent |
@@ -1626,6 +1772,10 @@ Next free ID: D08-B11.
 - §6.2: whether a full inventory can need a fourth 0x1017 part (dropped by the WM) depends on the largest item
   record; the attribute-class sizes were not tabulated (container FUN_0044d380, D03 §1.4). §6.1: the claim that no
   status-4 row exists for a non-repeatable quest is inferred from the zone's quest code, not checked in a DB.
+- §7.4 (GameLog): that the weapon attribute layout (4-byte socket records, perhaps a `u16 restCount`) comes from the
+  2015 sources is inferred from the link dates. No PDB has that layout (the inventory one is the Account PDB's
+  definition 1 of 2), and no 2015 Account / Zone export was compared.
+  The 70 CRT functions with no Account match (§7.6) were not read one by one.
 
 ## Coverage boundary
 
