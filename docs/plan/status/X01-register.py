@@ -144,6 +144,7 @@ SUPERSEDED = {
     'D02-B18': ('Extended', 'D06: no 2016 component sends 0xA001 / 0xA004, so the whole promotion path is dead'),
     'D02-B19': ('Superseded', 'D06 §6.2: column 37 is the link-scroll destination map (`sLinkScrollDestMap`, ours) the backups lack: a backup mismatch, not a 2016 bug *(inferred, strong)*'),
     'D03-B21': ('Narrowed', 'D06: 0xBC06 has no 2016 sender (no zone send, no zone 0xBC07 handler), so it has no effect in 2016; the handler also ignores `@nRet`'),
+    'D04-B6': ('Narrowed', 'W04 §5.3: the 2016 client shows its literal "DB Error" for 0x949, not "Already have a friend request." (§5.7)'),
     'D04-B9': ('Extended', 'S01 §2.4: a header mismatch: the 2016 Zone PDB has two definitions of the 0x5C05 struct; the zone sends the 54-byte one, the Character server reads 58'),
     'D05-B2': ('Extended', 'S01 §2.4: a header mismatch: the 2016 Zone PDB has two definitions of the 0x0452 struct; the zone sends the newer one'),
 }

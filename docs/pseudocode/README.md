@@ -641,7 +641,7 @@ zone)*; the zone reserves the cells and money (lock list) and the Character serv
 
 | Path | Sequence (receiver handler) | Docs |
 |---|---|---|
-| imprison an online player | GM C→W `0x7C01 NC_PRISON_ADD_GM_REQ` (W FUN_0041de70; any admin level) → target's Z `0x7C13 NC_ZONE_PRISON_GO_REQ` (Z FUN_005a4470: link to `EldPri`) → W `0x7C14` (W FUN_0042dea0: timer `CPrisonServer_Add`) → D `0x7C0B` (D FUN_00436df0) → W `0x7C0C` (W FUN_00410a50: `prisonmin`, leaves the KQ list) → GM `0x7C02` | W04 §9.2, §9.3, Z08 §12, D04 §7 |
+| imprison an online player | GM C→W `0x7C01 NC_PRISON_ADD_GM_REQ` (W FUN_0041de70; any admin level) → target's Z `0x7C13 NC_ZONE_PRISON_GO_REQ` (Z FUN_005a4470: link to `EldPri`; err 0xDC0 ok, 0xDC1 other charNo at the handle, 0xDC2 failed; no answer when the handle is unknown or empty, X01-B4) → W `0x7C14` (W FUN_0042dea0: timer `CPrisonServer_Add`) → D `0x7C0B` (D FUN_00436df0) → W `0x7C0C` (W FUN_00410a50: `prisonmin`, leaves the KQ list) → GM `0x7C02` | W04 §9.2, §9.3, Z08 §12, D04 §7 |
 | imprison an offline player | W → D `0x7C0B` directly (by name) → W `0x7C0C` → GM `0x7C02` | W04 §9.2 |
 | map login in prison | Z → C `0x7C05` (minutes·60) at the `EldPri` map login; C→W `0x7C06 NC_PRISON_GET_REQ` (W FUN_00415530) → D `0x7C0E` (D FUN_004166d0) → W `0x7C0F` (W FUN_0040c350: timer starts) → C `0x7C07` | W04 §9.2, §9.3, Z01 |
 | serving time | W `CPrisonServer_Tick` FUN_00458360 (2 s) → D `0x7C0D` (D FUN_00416650) every 3 minutes; at 0: C `0x7C05 {0x0DA8}`, Z `0x7C12 NC_ZONE_PRISON_END_CMD` (Z FUN_005a60f0), D `0x7C0D {0}`; C→W `0x7C04` (W FUN_004155f0) asks early (milliseconds as seconds, W04-B24); logout saves the minutes (`CPrisonServer_SaveOnLogout` FUN_00458790) | W04 §9.1, §9.2 |
@@ -689,7 +689,231 @@ Prison is §3.27. The other `&` commands act inside one zone (Z11 §2) or reach 
 
 ## 4. Glossary
 
-*(part 7)*
+The vocabulary the documents share, then where function and variable names come from and how the older (pre-PDB)
+names map to the official ones. Each term names the place that defines it; read that place for details.
+
+### 4.1 Processes, links and sessions
+
+| Term | Meaning | Docs |
+|---|---|---|
+| world | one WM with its zones, Character and GameLog server; Login, Account and AccountLog serve every world | §2.1, X03 §1 |
+| DataServer | Account, AccountLog, Character and GameLog: one server framework with a different parser class and SQL wrappers each | D01 §1, D05 §7 |
+| GameDB | the zone's (and WM's) name for the Character server link (`sock2gameDB`, our `g_GameDBSessions`) | Z01 §1, Z05 §1 |
+| ServerInfo, server type | `ServerInfo.txt`: every process with its type (0 Account … 8 OPTool), world, zone number, address and ports, read by `ReadDefineScriptor` (our `LoadServerInfo`) | §2.1, §2.2, X03 |
+| OPTool | operator tool (ServerInfo type 8, not shipped) that connects to Login, WM, zones and DataServers | §2.1, W04 §4, Z11 |
+| session, handle | one connection object; its `u16` handle is the slot index plus k × pool size and changes on every reuse (Login) | L01 §2.3, W05 §4 |
+| handshake | 0x0801 `S2SCONNECTION_RDY` / 0x0802 / 0x0803 between servers; `CheckConnectionValidation` (our `*_CheckAlive`) guards every other handler | §2.3 |
+| heartbeat | 0x0804 / 0x0805 after 30 s of silence, close after 180 s more | §2.3 |
+| seed, XOR-499 | 0x0807 seed after accept; client → server bytes are XORed with a 499-byte table from that position | §2.3, `docs/protocol/README.md` §1 |
+| `NETPACKETZONEHEADER`, ref | the 6-byte `{u16 clienthandle, u32 charregistnumber}` a zone puts before a request about a player and the answer echoes; called *ref* in older docs | §2.3, Z01 knowledge, W01 knowledge |
+| zone ring, RNG | each zone of a world connects to the next one (`ZoneConnectSession`) and accepts the previous one (listen type 6); `*_RNG` packets travel round it to find a player or map in any zone; `ZoneRingPacket*` classes build them (`zrpb_Request`, answers `zrpb_Success` / `zrpb_Failure`) | Z01 §10, Z14 §2 |
+| validate key, pending login | Login's 32-word world-select key; the WM stores the 0x0C0D in a 0x800-slot table keyed by the key's XOR and takes it once on 0x0C0F | §3.5, §3.6, L01 §2.5 |
+| one-time token (OTP) | the MD5 token (`COTPLogin`) with which a client returns from the WM to the world list without the password | §3.4, L01 knowledge |
+| link (map change) | moving a player to another map: *link same* (same zone, 0x1809) or *link other* (other zone, reserve 0x180D / 0x180E, then 0x180A to the client); not to be confused with a server link | §3.11, Z01 §7 |
+| map-login ticket, pending link | the WM's record of a reserved map change that the next 0x1801 map login at the destination zone consumes | §3.9, §3.11, W01 §7 |
+| link end | the WM's `0x180C` / `LinkEndProcessing` after the client's 0x1803: features re-attach the player (KQ, party, guild) | §3.10 |
+| start script, certification | the Lua script a zone downloads at start (127.0.0.1:58492, then `cert1.fo.gamigo:80`) that runs the data-load and service stages; the certification thread answers its periodic challenge | Z10 §1–§7 |
+
+### 4.2 Messages and records
+
+| Term | Meaning | Docs |
+|---|---|---|
+| opcode, dept, cmd | `opcode = dept << 10 \| cmd`; official names `NC_<DEPT>_<NAME>` from the `PROTOCOL_COMMAND_<DEPT>` enums | `docs/protocol/README.md`, §1.1 |
+| `REQ` / `ACK` / `CMD` | request / its answer / one-way notification (naming convention of the official names) *(inferred)* | `opcodes-*.md` |
+| `PROTO_NC_*` | the packet body struct of an opcode in the PDBs (without the session or ref prefix) | C02 knowledge §3, S01 §2 |
+| CHARSAVE, 2WLDMAN | dept 16: the zone's character saves to the Character server (`ws_save2DB`, 0x4001 …) and the `NC_CHARSAVE_2WLDMAN_*` blobs to the WM's cache (`ws_save2worldmanager`) | §2.5, §3.13 |
+| blob, WM cache | the character data packets the WM keeps per session from character select on and forwards to each zone at map login | §2.5, §3.8, §3.13, W01 §6 |
+| ITEMDB | dept of the zone ↔ Character item transactions; *style 1* reserves cells under a lock index and applies on the answer, *style 2* applies first and disconnects on failure | §3.14, Z05 §1, Z05 knowledge §1 |
+| lock index | the per-player 16-bit index of an `InventoryCellLockList` reservation, carried by the DB request and its answer | Z05 §1 |
+| NC_LOG, NC_SYSLOG | GameLog records (write-only; only 0x0402 is answered) and the hourly text log | §3.15, D05 |
+| error code, result code | the `u16` codes in ACKs; texts and client behaviour in `docs/protocol/client-error-codes.json` | C01 knowledge |
+| disconnect code | the reason a server passes when it closes a session (`so_Disconnect(0x684)` …), listed per process | Z01 §8, W05 |
+
+### 4.3 Game objects and data
+
+| Term | Meaning | Docs |
+|---|---|---|
+| `ShineObject` classes | zone object hierarchy `ShineObject` → `ShineMobileObject` → `ShinePlayer`, `ShineMob`, `ShineNPC`, …; behaviour through vtable slots (`vt 0x664` = byte offset 0x664) | Z01 §4, `rtti.py` |
+| object type | `so_ObjectType` (vt 0x4d0): player 2, mini-house 3, NPC 4, mob 5, magic field 6, bandit 8, servant 10, mover 11, pet 12 | Z09 knowledge, Z13 §1, Z10 §6 |
+| object handle | the zone's `u16` handle of a map object | Z01 §4 |
+| charNo, chrregnum, charregistnumber | the `u32` character number (`tCharacter.nCharNo`); userNo = the account number | D02, §2.3 |
+| item key, regnum | the `u64` `SHINE_ITEM_REGISTNUMBER` of an item (`iti_mkregnum`, our `ItemKey_Make`) | Z04 §1.2, D03 |
+| inven, cell | `u16 inven = type << 10 \| slot` (`ITEM_INVEN`): box type (9 inventory, 8 equipment, 6 account storage, 4 guild storage, …) and slot | Z04 §1.1 |
+| lot | the stack count of a stackable item | Z04 §1.2, Z05 |
+| belong | item binding (`ItemBelongAttribute`, `CItemAuthorityBase`): whether an item may be traded, moved, dropped | Z04 §1, Z06 |
+| charged item | premium (item-mall) item; charged buffs; the item-shop rows in `Account.dbo.tChargeItem` | §3.26, Z04 §8, W04 §11, Z24 §6 |
+| abstate | abnormal state (buff, debuff, status): `AbnormalState*` classes, `AbState.shn`, `AbStateSaveTypeInfo.shn`; the *shelters* `g_AbstateNeverShelter` (Z03's `g_ShelterDie`: states kept while dead) and `g_AbstateShelter` (Z03's `g_ShelterItem`) are restored on revive | Z03 §7.2, Z12, Z21 §5, Z22 |
+| stat matrix | `Parameter::Container`, the layered stat table recomputed by `so_allparametercalculate` | Z12 §1–§4 |
+| SHN, 9Data | the encrypted data tables in `9Data/Shine/*.shn` (server) and `ressystem/*.shn` (client) | `shn.py`, S01 §6 |
+| field, map index, server group | a map and its index; `g_ServerGroup` gives the zone number that hosts a map (99 = this zone, −1 unknown) | Z01 §7, Z01 knowledge |
+| sub-layer | a visibility layer of a map; `g_SubLayerCanSee` (6 × 6) says who sees whom | Z02 knowledge, Z18 knowledge |
+| instance dungeon, ID, indun, map cluster | per-party / per-raid copies of a map (`MapClusterManager`, categories party / raid); *indun* (Korean 인던) in official names | §3.24, Z08 §4–§5, Z14 §1 |
+| server menu | a server-side choice dialog (`ServerMenuActor`, 10 slots) with an NPC-range check (`CurrentMenu::cm_MenuAction`) | Z02 §6.5–§6.6 |
+| `RemoveWhen` | why a player leaves a map: `REMOVE_NOW` 0, `REMOVE_LOGOUT` 1, `REMOVE_WARP` 2, `REMOVE_REVIVE` 3; every case except `REMOVE_WARP` saves | §3.12, §3.13, Z16 knowledge |
+| mover, minimon, pet | mount (`ShineMover`, object type 11), mini-monster accessory, pet (`ShinePet`) | Z13 §5–§9 |
+| Pine, scenario Lua | the map-script language (films, scenario books) and the AI / scenario Lua; separate from the start-script Lua | Z09 §14–§27, Z10 |
+| `lsf_Factor` | `g_LUA_SCRIPT_SECURITYFactor`, the hit / damage factor that grows × 1.01 per world minute and that the start script resets to 1.0 (Z03's `g_HitRateScale`) | §5.5, Z10 §6 |
+
+### 4.4 Features
+
+| Term | Meaning | Docs |
+|---|---|---|
+| raid | expedition: up to 20 members as 4 parties × 5 under one leader | §3.18, W02 §1 |
+| guild, academy | guild (WM-owned, zone mirrors) and its guild academy: a second member list of a guild with its own chat, ranks and reward storage | §3.19, §3.20, W03, Z14 §4 |
+| guild war, guild tournament (GT) | declared war between guilds; the scheduled tournament with its own map and phases | §3.19, §3.21, W03, Z16 §4–§6 |
+| KQ | kingdom quest: a scheduled world event with a join list and its own map | §3.23, W04 §6, Z16 §1–§3 |
+| holy promise | the master / apprentice relation (official `CHolyPromise*`, our `HP_*`) | §3.29, W04 §12 |
+| mini-house (MH) | the player's private house map object with furniture | §3.29, Z13 §1–§3 |
+| wedding | proposal, ceremony in the wedding hall, married state, partner summon | §3.29, Z13 §4 |
+| booth | a player's street stall | §3.25, Z06 |
+| gamble house | the casino map: coins, dice and slot machines | Z06, W04 §15 |
+| prison | a timed jail map for punished players, timer kept by the WM | §3.27, W04 §9 |
+| titles | character titles (`CCharacterTitleZone`, dept 24 CT) | W04 §7, Z12 §7 |
+
+### 4.5 Reading the code references
+
+- `@ FUN_xxxxxxxx` / `DAT_…` / `LAB_…`: an address in that process's **2016** binary (`re-data/exports/<bin>`, the same
+  addresses in `<bin>-pdb`); `client FUN_…` = the 2016 client. `p+0x…` = a `ShinePlayer` member offset
+  (`docs/knowledge/S01-player-offsets.tsv` names them); `vt 0x…` = a vtable slot as a byte offset.
+- **Folded functions.** The linker merged identical bodies, so one address can carry several official names: an empty
+  `ret 0xc` at FUN_004c2450 is `CQuest::Occure_LevelChange` and what Z01 called `ShinePlayer_HeartbeatNoOp`; the empty
+  destructor FUN_0040a550 (Login) is `COTPData::~COTPData` and `~CSendPacket` (our `Pkt_Free`). A name at such an
+  address says nothing about the caller's intent.
+- **Profiler strings** (`"Class::Method"` labels passed to the profiler) gave most pre-PDB names. Some were
+  copy-pasted in the original source (C02-B1, Z10-B20), so a handler can carry another handler's label; §4.7 lists
+  the names this misled.
+- `_DebugMessageNew` (our `Log`) and `_DMVC` (our `LogLevel`, a line with a level byte and prefix) write the debug log;
+  the documents skip them unless the text tells something.
+
+### 4.6 Name sources and the names files
+
+- Order of preference (AGENTS.md): the 2016 server PDBs (*pdb2016*), strings in the binaries, the 2017 client PDB
+  (*pdb2017*), the client texts; names marked *(ours)* were made up by an item.
+- `tools/protocol-re/names/<bin>/*.json` are merged in file-name order and the later file wins. `S01.json` holds the
+  official names only for addresses that no item had named, so where an item named an address before S01, the
+  generated docs (`re-data/exports/<bin>` + names) and that item's text keep the item's name. The official name of
+  every such address is in `docs/knowledge/S01-renames.tsv` (4253 rows: login 40, account 57, accountlog 54, WM 851,
+  zone 3251) and in the `<bin>-pdb` exports.
+- Items started after S01 (Z09–Z17, W05 and the later ones) use the official names; L00, W01–W04, Z01–Z08, D01–D05
+  and C01 use their own. §4.7 maps the older names that occur at least five times in the documents; for any other one, look the
+  address up in `S01-renames.tsv`.
+- Names that two items gave the same address (merge conflicts) are cosmetic except the ones in §4.7. In the zone the
+  set is mostly Z01's pre-PDB names that Z09–Z15 replaced (219 addresses); Login has 9 (`00-base` vs L01), GameLog 9
+  (D05 vs Z19), WM 1.
+
+### 4.7 Older names → official names (used five times or more)
+
+Our names that occur at least five times in the pseudocode and knowledge files (README excluded), with the 2016 PDB
+name of the same address. Generated from `docs/knowledge/S01-renames.tsv`; rows whose official name only adds the class
+or differs in case are left out. *Uses* = occurrences of the name, *Where* = the items whose files use it.
+
+| Binary | Our name | Address | Official name *(pdb2016)* | Uses | Where |
+|---|---|---|---|---|---|
+| login + wm | `SendRaw` | FUN_00408e20, FUN_0042fca0 | `CLoginBaseSession::Send` / `CWMBaseSession::Send` | 158 | C01, D01, D02, L00, W01, W03, W04 |
+| login + account + accountlog + wm | `Log` | 4 addresses | `_DebugMessageNew` | 118 | D03, D04, D05, D07, W04, W05, Z09, Z11, Z15, Z19 |
+| login + wm | `SendPacket` | FUN_00408df0, FUN_0042fc50 | `CLoginBaseSession::Send` / `CWMBaseSession::Send` | 14 | C01, D01, W04 |
+| login + wm | `Client_CheckAlive` | FUN_00405f60, FUN_00412b20 | `CParserClient::CheckConnectionValidation` | 12 | W02, W03, W04, W05 |
+| account + accountlog | `Session_SendPacket` | FUN_00404e80, FUN_004055a0 | `CSession::Send` | 6 | D02, D03, D05, D07 |
+| wm + zone | `Raid_SwapMembers` | FUN_00463720, FUN_0063ded0 | `Raid::SwapMember` | 5 | W02, Z08, Z14 |
+| account | `SessionWorker_Run` | FUN_00406010 | `CSessionWorker::SessionWorkThread` | 5 | D05 |
+| wm | `Clients_GetByHandle` | FUN_00437860 | `CWMClientSessionManager::GetSession` | 55 | C01, W01, W02, W03, W04, W05 |
+| wm | `Clients_FindByCharNo` | FUN_00437910 | `CWMClientSessionManager::GetSession` | 33 | W01, W02, W03, W04, W05 |
+| wm | `Members_Broadcast` | FUN_0043cc50 | `CGuildMemberServer::BroadCastToMember` | 26 | W03, W04 |
+| wm | `Guilds_FindByNo` | FUN_0043dca0 | `CGuildManager::Find` | 22 | W03, W04 |
+| wm | `Clients_FindByCharName` | FUN_004378a0, FUN_00437990 | `CWMClientSessionManager::GetSession` / `CWMClientSessionManager::GetSessionByLowerCase` | 18 | W02, W03, W04, W05 |
+| wm | `Client_OnClosed` | FUN_00437030 | `CWMClientSession::Close` | 13 | W01, W05 |
+| wm | `Clients_BroadcastInGame` | FUN_00437b40 | `CWMClientSessionManager::BroadCastToPlayer` | 12 | W01, W03, W04, W05 |
+| wm | `Party_RemoveMember` | FUN_004652c0 | `CParty::MemberLeave` | 11 | W02, Z08, Z30 |
+| wm | `g_WM` | DAT_0049a028 | `gServer` | 11 | W01, W02, W03, W04, W05 |
+| wm | `Raids_Get` | FUN_00462f90 | `RaidSystem::GetRaid` | 9 | W02, W04, Z14 |
+| wm | `AcademyMembers_Broadcast` | FUN_00441170 | `CGuildAcademyMemberServer::BroadCastToAcademyMember` | 8 | W03 |
+| wm | `HP_ClearMaster` | FUN_00451090 | `CHolyPromiseServer::DelUp` | 8 | W04 |
+| wm | `HP_FindByCharNo` | FUN_00451170 | `CHolyPromiseServer::Get` | 8 | W04 |
+| wm | `Members_BroadcastRaw` | FUN_0043cbc0 | `CGuildMemberServer::BroadCastToMember` | 8 | W03 |
+| wm | `Tournament_IsFighting` | FUN_0043e170 | `CGuildManager::IsTournamentMarch` | 8 | W03 |
+| wm | `Guild_BroadcastEmblemInfo` | FUN_00443a40 | `CGuildManager::Send_NC_GUILD_EMBLEM_INFO_CMD` | 7 | W03 |
+| wm | `KQ_LeaveJoinList` | FUN_00454510 | `CKQServer::PlayerDisjoin` | 7 | W04 |
+| wm | `LoadServerInfo` | FUN_00403e70 | `WorldManagerServer::ReadDefineScriptor` | 7 | L00, L01, W01, X03, Z19 |
+| wm | `Party_AddMember` | FUN_00464fa0 | `CParty::MemberJoin` | 7 | W02, Z08, Z11 |
+| wm | `ServerParam_GetInt` | FUN_00459f10 | `CSingleDataMap::GetValue` | 7 | W01, W03, W04, W05 |
+| wm | `Zones_BroadcastRaw` | FUN_004394b0 | `CWMZoneSessionManager::BroadCast` | 7 | W01, W02, W03, W04 |
+| wm | `Client_SameKQTeam` | FUN_00433740 | `CWMClientSession::KQTeam_IsCanParty` | 6 | W02 |
+| wm | `Guild_IsAtWar` | FUN_0043dd40 | `CGuildManager::IsWar` | 6 | W03 |
+| wm | `OPTool_CheckAlive` | FUN_00424c70 | `CParserOPTool::CheckConnectionValidation` | 6 | W02, W04 |
+| wm | `Zones_Get` | FUN_004391b0 | `CWMZoneSessionManager::GetZoneSession` | 6 | W03, W04, W05 |
+| wm | `Client_CharLogin_1001` | FUN_00422be0 | `CParserClient::fc_NC_CHAR_LOGIN_REQ` | 5 | W04 |
+| wm | `Client_GetPrison` | FUN_00409a10 | `CWMClientSession::GetPrisonMin` | 5 | W02, W04 |
+| wm | `Clients_BroadcastRaw` | FUN_00437b00 | `CWMClientSessionManager::BroadCast` | 5 | W03, W04 |
+| wm | `Clients_FindInGameByCharName` | FUN_00437720 | `CWMClientSessionManager::GetSessionChar` | 5 | W02, W04 |
+| wm | `Clients_FindInGameByCharNo` | FUN_004377c0 | `CWMClientSessionManager::GetSessionChar` | 5 | W01, W02, W03, W04 |
+| wm | `Guild_SendEmblemToSession` | FUN_00430bc0 | `CWMClientSession::GuildEmblemRefresh` | 5 | W03 |
+| wm | `HP_HasMaster` | FUN_0045d0b0 | `CHolyPromise::IsExistUp` | 5 | W04 |
+| wm | `LogLevel` | FUN_00407ae0 | `_DMVC` | 5 | W04 |
+| wm | `Members_FindByCharNo` | FUN_0043c850 | `CGuildMemberServer::Get` | 5 | W03, W04 |
+| wm | `Members_OnLoaded` | FUN_0044c5f0 | `CGuildMemberServer::SendMemberDataToRequestor` | 5 | W03 |
+| wm | `Party_EnsureLooter` | FUN_0041b4d0 | `CParserClient::PartyLooterChange` | 5 | W02 |
+| wm | `Party_IsPending` | FUN_00464ce0 | `CParty::IsMemberPreParty` | 5 | W02, W04 |
+| wm | `Party_Leave` | FUN_0041b7d0 | `CParserClient::LeaveParty` | 5 | W02, W04 |
+| wm | `Party_SendMasterChanged` | FUN_0041b630 | `CParserClient::SendPartyNewMaster` | 5 | W02 |
+| wm | `Raid_DismissIfEmpty` | FUN_004312b0 | `CWMClientSession::RaidResetCheckAndRelease` | 5 | W02 |
+| wm | `Raid_RemoveMember` | FUN_00463650 | `Raid::DeleteMember` | 5 | W02, Z14 |
+| wm | `Tournament_IsEntered` | FUN_0043e180 | `CGuildManager::IsTournamentEntry` | 5 | W03 |
+| wm | `Zone_CheckAlive` | FUN_00428230 | `CParserZone::CheckConnectionValidation` | 5 | W04, W05 |
+| zone | `g_SetEffect` | DAT_1325edb0 | `setitemskilleffect` | 15 | Z03, Z09, Z12, Z21 |
+| zone | `ItemKey_Make` | FUN_00640710 | `ItemTotalInformation::iti_mkregnum` | 13 | Z04, Z05, Z06, Z07, Z08 |
+| zone | `SessionPool_Pick` | FUN_004199b0 | `SocketBundle<GameLogSession>::sb_GetSocket` | 12 | D05, Z01, Z04, Z05, Z06, Z07 |
+| zone | `g_ItemData` | DAT_14d4fb90 | `itemdatabox` | 12 | Z01, Z04, Z07, Z27 |
+| zone | `ItemUse_Inventory` | FUN_0053f5e0 | `ShineObjectClass::ShinePlayer::sp_ItemUseReq_Inven` | 10 | Z04, Z13, Z18, Z26 |
+| zone | `g_ShelterDie` | DAT_0087c4c8 | `g_AbstateNeverShelter` | 10 | Z03, Z07, Z18, Z21 |
+| zone | `IDInfo_Find` | FUN_00484470 | `FieldContainer::fc_GetInstanceDungeonInfo` | 9 | Z08, Z14 |
+| zone | `g_SkillData` | DAT_13286828 | `skilldatabox` | 9 | Z03, Z04, Z20 |
+| zone | `InstanceEjectAfterLeave` | FUN_00486c00 | `WorldManagerSession::wms_KickPlayerFromInstanceDungeon` | 8 | Z08, Z14 |
+| zone | `g_GameDBSessions` | DAT_14d454b8 | `sock2gameDB` | 8 | Z01, Z04, Z05, Z06, Z07 |
+| zone | `g_HitRateScale` | DAT_00870dd8 | `g_LUA_SCRIPT_SECURITYFactor` | 8 | Z03, Z10 |
+| zone | `g_Objects` | DAT_132826b8 | `shineobjmanager` | 8 | Z01, Z03, Z05 |
+| zone | `g_ShelterItem` | DAT_0087c4d8 | `g_AbstateShelter` | 8 | Z03, Z07, Z18, Z21, Z22 |
+| zone | `IDCondition` | FUN_004624d0 | `FieldContainer::fc_CanEnterIndun` | 7 | Z08, Z14 |
+| zone | `ItemMenu_Open` | FUN_0048ced0 | `itembreakmenu` | 7 | Z04, Z26 |
+| zone | `g_AbActiveInfo` | DAT_00875228 | `abstateidentarray` | 7 | Z03, Z09, Z18, Z22 |
+| zone | `g_BlastEffects` | DAT_0087efd4 | `skilleffectapplyer` | 7 | Z03, Z09, Z18 |
+| zone | `ItemLotInspector_CheckAndReset` | FUN_00491f90 | `ShineObjectClass::ShinePlayer::so_ply_ItemLotInspecting` | 6 | Z05, Z18 |
+| zone | `BelongType_CanTrade` | FUN_00632090 | `CItemAuthorityBase::IA_CanPlayerTrade` | 5 | Z04, Z06 |
+| zone | `Item_Upgrade_Table_mode` | FUN_0053ca10 | `Item_Upgrade` | 5 | Z04, Z18 |
+| zone | `g_NoBooth` | DAT_13282670 | `ShineObjectClass::ShinePlayer::BoothSell::board` | 5 | Z06 |
+
+### 4.8 Older names that mislead
+
+Names whose wording suggests another function than the one at the address. Most came from a copied profiler label or
+from a folded body (§4.5). The later documents named in the last column already use the official name; read the older
+ones with this table.
+
+| Binary | Older name (item) | Address | Official name *(pdb2016)* and what it is | Where it matters |
+|---|---|---|---|---|
+| zone | `g_HitRateScale` (Z03) | DAT_00870dd8 | `g_LUA_SCRIPT_SECURITYFactor.lsf_Factor`: the start-script security factor, × 1.01 per world minute and reset to 1.0 by the script in the same tick; not a hit-rate or balance setting | Z03 §3.2, §4.3, §4.5 (§5.5 row); Z10 §6 |
+| zone | `ZoneServer_zs_start` (Z01) | FUN_005a9d90 | `ZoneServer::zs_ServiceThreadFunction`; `zs_start` is FUN_005ab520 | Z01 §2.1 (§5.4 row); Z10 §1 |
+| zone | vt 0x300 "IsClosing" (Z01), `ShinePlayer_IsClosing` | FUN_00559880 | `so_IsEmpty` | knowledge Z01 §4 (§5.4 row) |
+| zone | `ShinePlayer_HeartbeatNoOp` (Z01) | FUN_004c2450 | `CQuest::Occure_LevelChange`: a folded empty `ret 0xc` | Z15, Z11, Z17 |
+| zone | `ShinePlayer_so_StoreQuestRead_0044b770` (Z01) | FUN_0044b770 | `so_StoreQuestRepeat` (vt 0x688; the body carries `so_StoreQuestRead`'s profiler label): the sender of 0x10D7 | C01 knowledge 0x10D7 row; Z12 §6 |
+| zone | `CharaterSkillList_csl_FillSaveBuffer_00445460` (Z01) | FUN_00445460 | `csl_FillSendBuffer_Client`: builds the client's 0x103D, not the DB save (that is `csl_FillSaveBuffer` FUN_00454f60) | Z12 §6, Z23 §7 |
+| zone | `MobTargetBout_mts_AppendAggroPoint_004ad7b0` (Z01) | FUN_004ad7b0 | `mts_ViewAggroList` (GM aggro list; carries the `mts_AppendAggroPoint` label) | Z09 §6 |
+| zone | `ZoneRingPacketExpBonus_zrpb_Success_005a79a0` (Z01) | FUN_005a79a0 | `ZoneRingPacketExpBonus::zrpb_Request` | Z11 |
+| zone | `ShineObject_so_AllOfRange_Class0` / `_Class1` (Z01) | FUN_0054baf0 / FUN_0054bc80 | two overloads of `ShineObject::so_AllOfRange` | Z02, Z06 |
+| zone | GM command handlers `AmpersandCommand_ac_PartyInform_0041e6d0`, `ac_ObserverLinkTo_0041fcb0`, `ac_IgnoreSkillCoolTime_0041fe20`, `ac_IgnoreSkillCoolTime_004228c0`, `ac_wall_00425290`, `ListIter_AmpCmdLevel_…_00419f50` (Z01) | FUN_0041e6d0, FUN_0041fcb0, FUN_0041fe20, FUN_004228c0, FUN_00425290, FUN_00419f50 | `ac_LuaSec`, `ac_ObserverOut`, `ac_RunTo`, `ac_WalkTo`, `ac_FieldMobCount`, `AmpCmdInit` (copied profiler labels) | Z11 §1, §5–§8 |
+| zone | `CQuestZone_QuestTakeReward` (Z01) | FUN_005bbe60 | `CQuestZone::Send_NC_QUEST_DB_DONE_REQ` (0x441A; the label says `QuestTakeReward`) | Z15 |
+| zone | `ShinePlayer_MoveStart` (Z02) | FUN_00555970 | `ShineMobileObject::so_mobile_MoveReserve` (vt 0x660, every mobile class) | Z09 §9 |
+| zone | `NPCRangeCheck_Check` (Z02, Z04, Z06) | FUN_004c4610 | `CurrentMenu::cm_MenuAction`: returns the menu's NPC, and ends the trade (`sp_EndOfTrade`) when there is none or the player is more than 1000 units from the menu point | Z02 §6, Z04 §2 |
+| zone | `sma_Reset` (Z02) | FUN_0050f660 | `ServerMenuActor::sma_Clear` (also re-enables the range check) | Z18 knowledge, Z26 (§5.4 row) |
+| zone | `ItemMenu_Open` (Z04) | FUN_0048ced0 | `itembreakmenu` (drop / destroy confirmation menu) | Z04 §3, Z26 |
+| zone | `AbstateListInObject_Find`, `BriefAbstateBit_Clear` (Z03) | FUN_00409b10, FUN_00401a40 | `asl_Abstate_IsSet`, `so_AbnormalState_BitReset` | Z11, Z21, Z25 |
+| zone | `g_NoBooth` (Z06) | DAT_13282670 | `ShinePlayer::BoothSell::board`: the static "no booth" object every player points at | Z06 §2 |
+| zone | `IDGate_OpenMenu` (Z08) | FUN_005a6d10 | `ZoneRingPacketFindInstanceDungeon::zrpb_Query` | Z14 §2 |
+| zone | `MapClusterManager_ChangeOwner` (Z08) | FUN_00485210 | `MapClusterManager::ClusterManager::cm_ChangeCategory` | Z11, Z14 §1 |
+| wm | `Party_GetRole` (W02) | FUN_00464b70 | `CParty::MemberLeaveCheck` (returns the member's role: master, member, none) | W02 §1 |
+| wm | `KQ_CanReturnToMap` (W04) | FUN_00452580 | `CKQServer::IsExisted` | W04 §6 |
+| wm | `BootstrapTick`, `AcceptTick`, `SessionCleanupTick` (W01) | FUN_00404bf0, FUN_00405860, FUN_00404e70 | `WorldManagerServer::ProcessLink`, `ProcessConnect`, `ProcessDisconnect` | W05 §1 |
+| login | `Pkt_Free` (00-base) | FUN_0040a550 | folded empty destructor (`COTPData::~COTPData`, `~CSendPacket`): frees nothing | L01 knowledge (§5.2 row) |
+| login | `TokenTable_*` (00-base) | FUN_0040a610 … FUN_0040a830 | `COTPLogin::Find`, `DelByDueTime`, `DelByIP` (deletes every pending token of the IP), `DelByOTP` | L01 knowledge (§5.2 row) |
+| gamelog | `ServerInfo_*`, `Scriptor_*` (D05) | FUN_0040feb0 … FUN_004100e0, FUN_0040cb40 … FUN_0040e7c0 | `CServerInfo::GetServerInfo` / `GetServerIndex` / `GetODBCInfo`, `CCsl::ReadScript` / `ReadScriptDone` / `ProcRemark` / `AddResultMsg` (the names Z19 gave) | Z19 |
 
 ## 5. Superseded statements
 
@@ -703,10 +927,12 @@ statement* = what the 2016 code (or a capture) shows; *Source* = the item and §
 entry are also marked in the register (§6.1) and listed in §5.9.
 
 Sources collected: knowledge `L01`, `W01`, `W03`, `W05`, `Z02`, `Z07`, `Z08`, `Z09`, `Z10`, `Z12`, `Z13`, `Z15`, `Z16`,
-`Z17`, `Z18`, `Z21`, `Z22`, `Z24`, `Z25`, `Z29`, `D02`, `D06`, `S01` §3.3, `S02`, `C01` §3, `P02` (with
+`Z17`, `Z18`, `Z21`, `Z22`, `Z24`, `Z25`, `Z29`, `D02`, `D06`, `S01` §3.3, `S02`, `C01` §3, `W04` ("Answers to other
+items' open questions", part 7), `Z10` (combat factor, part 7), `P02` (with
 `docs/protocol/capture-validation.md` §7 / §9), and the correcting passages in `W05-process.md` §5.1 / §5.3,
 `Z29-exp-tables.md` §2.6, `Z12-stats.md` §1.3, `Z25-skill-specials.md`, `Z09-world.md`, `D06-db-inferred.md`. X01 adds
-one: W01-B5 (§5.3).
+W01-B5 (§5.3), the Z01 §7.1 and Z12 §7.2 rows (§5.4, §5.5, from re-reading the save paths) and the
+Z03 `g_HitRateScale` row (§5.5; Z10 recorded it outside a Corrections section).
 
 ### 5.1 Protocol README and tools (P01)
 
@@ -756,7 +982,10 @@ one: W01-B5 (§5.3).
 | W01 §3.2 | `loginStep` / `acceptTime` set at accept *(inferred)* | set in `CWMClientSessionManager::ActiveSession` FUN_00438a60 (`m_SessionMode = 0`, `m_dActiveTime = time()`, 2-hour timeout) | W05 §4.3 |
 | W01 §4.1 | FUN_0043a400 bad-name check *(inferred)* | `CDataFileServer::GetIsBadName` over `BadNameFilter.shn` (FT_COMPLETE / FT_PART), names upper-cased at load | W05 §3.2, §3.3 |
 | W01 §4.1 delete, annotation 0x1408 | 0x1407 sends CharDB 0x1408 `{handle, charNo @2, u8 slot @6}` | 0x1407 (FUN_00412fa0) sends **0x1413** `NC_AVATAR_GUILD_DATA_REQ {u16 clienthandle, u32 chrregnum, u8 slot}`; 0x1408 is sent only after the guild check (0x1414 / 0x1416), 15 bytes `{u16 clienthandle, u32 usrregnum, u32 avatar, u8 slot, u32 nNo}`; guild masters get 0x140A {0x00C7}, unknown guild 0x00C9, member missing 0x00C3 | W03 §4.5, S01 §3.3 |
+| W01 §4.2 0x1004 | last field = "stored day-start time − 1 day" | `g_GambleSystemServer.nextReset − 1 day`, i.e. the time of the last gamble-house coin reset | W04 §15.1, knowledge W04 |
+| W01 §4.2 0x1005, §6.1 AVATAR +0x5b | `g_InstanceMaps.Redirect` FUN_00452580: an instance / KQ map that may no longer exist *(inferred)*; +0x5b "instance / return key" | `g_InstanceMaps` (DAT_0055e15c) is the `CKQ` object; FUN_00452580 = `CKQServer::IsExisted` (W04's `KQ_CanReturnToMap`) tests the saved KQ link (`nKQHandle`); FUN_00452e40 / FUN_00454ee0 in 0x1005 = `KQ_RejoinOnCharData` / `KQ_IsJoinerBanned` (banned → session +0x1DF74) | W04 §6.1, knowledge W04 |
 | W01 §5.1 0x0C18 | mode 0 = quit; otherwise "return" | mode 0 is also sent when the client returns from the game to the world list *(captured)*; with `m_pCharDataBase == null` the handler returns 0 and the session is closed (stale `m_LogoutType`, W05-B9); mode 0 broadcasts 0x0C19 and `Client_OnClosed` broadcasts it again (W05-B25); mode 1 keeps the session with `m_LogoutType` 0x780 | W05 §4.5; P02 |
+| W01 §5.4 CharacterLogout | FUN_004589b0 / FUN_00458790 "remove from a name registry" *(inferred)* | `CPrisonServer_SaveOnLogout`: the prison server saves the prisoner's remaining minutes at logout | W04 §9.1, knowledge W04 |
 | W01 close reasons | (addition) | 0x781 unknown client opcode, 0x782 service stop, 0x786 default (set once per slot, W05-B9), 0x787 packet while `m_Status ≠ 1`, 0x789 AccountDB lost, 0x78b CharDB lost; 0x78a / 0x78c unused | W05 §4.5 |
 | W01 §6.1 AVATAR | `shape` race bits / hair / colour / face *(inferred)*; `delinfo` | race = `RaceNameInfo.shn` id (1 Human, 2 Elf), class = `ClassName.shn` id, gender 0 = female, hair / colour / face = `HairInfo` / `HairColorInfo` / `FaceInfo` ids *(captured)*; `delinfo.year` (+0x27) = year − 2000; `CharIDChangeData` defaults to `{0, 0x64, 0}` without a rename right | P02; D02 knowledge |
 | W01 §6.2 0x107F | 12 u16 | 6 pairs `{u16 itemId, u16 totalLot}` (HairShop01–05, UniChange01), `STYLE_ITEM_COUNTS[6]` | D02 knowledge |
@@ -844,6 +1073,7 @@ one: W01-B5 (§5.3).
 | Z03 §8.1 `so_KilledBy` | FUN_005cbe70 = `killer.questDiary.MobKill(mobId)` | `CCharacterTitleZone::CT_KillMob` (title value 11, player level ≤ mob level + 10); the quest credit is the later `pm_QuestCheck` / `rt_QuestCheck` | Z15 §6.2 |
 | Z03 §8.2 `el_ExpDistribute` | members = living members near the mob, each through the level handicap; `share += round(share·(bonus[n] − 1))`, n = members; rounding | `el_EnemyExpDistCheck` FUN_00482720 first drops players farther than `MobInfoServer.EXPRange`; the group path (n ≥ 2) gets no handicap; no alive check (Z29-B8); the bonus index is the number of bonus-valid members (within 20 levels of the top), split by level²; every conversion truncates; `ExpRecalculation.txt` is not read; the attacker is the unit whose `el_vecEnemyPlayer` entry is last | Z09 §28.8; Z29 §2.6 |
 | Z03 §8.2 `mhl_Logging` | (addition) | the hunt log (50 mob kinds per session, flush at 65000 kills or on logout → GameLog 0x042D) | Z09 §28.12 |
+| Z03 §3.2, §4.3, §4.5, §11 `g_HitRateScale` (DAT_00870dd8) | a runtime hit-rate / PvE balance double (default not read) that scales the hit roll and divides (player attacker) or multiplies damage | it is `g_LUA_SCRIPT_SECURITYFactor.lsf_Factor` *(pdb2016)*: start value 1.0, × 1.01 per world minute unless frozen, reset to 1.0 by the start script's `dhsmfskfWk` in the same main-loop tick before any combat, so 1.0 in a running zone; only `&mobdamage` (Z11) freezes or sets it | Z10 §6, knowledge Z10 |
 | Z03 / Z07 `g_LevelExp`; Z07 §1.5 / Z03 §8.3 exp indexing | DAT_0da504a8 = u64 per level; per-stat cap DAT_0da504a9 inside entry 0 | DAT_0da504a8 = `scp_param.LostExpLevel` (u8), DAT_0da504a9 = `MaxFreeStat` (u8); the table is `nextexp` u64[151] at DAT_0da504b0: `PrevExp = nextexp[level − 1]`, `NextExp = nextexp[level]` | Z12 §4.3, §5.1 |
 | Z12 §2.5 | the set-item buffer of an abstate is filled from the caster's set-item effects | `aeo_SetItemEffectStore` FUN_00510670 stores nothing in 2016; the writer is `ShineMobileObject::so_ItemActonAbstateApp` (vt 0x5d4, FUN_0055dea0): item actions of `SkillEffectIncreaseType` 4/6/8/9/10/12/13/14 stored as codes 1004…1014 | Z21 §5.3 |
 | Z12 §6.4 | element vt 0x0c "party" | "is a party main" (ours) | Z22 §12.1 |
@@ -883,10 +1113,12 @@ one: W01-B5 (§5.3).
 | Z07 0x1057 class change | `so_ply_ClassChange` FUN_004521b0 named only | documented (sends 0x1059 / 0x1058 / 0x105A) (addition) | Z09 §28.13 |
 | Z08 §1.2 | the KQ map instance is found by `MapBase` | by `MapName` | Z16 §1.2 |
 | Z08 0x580D | the `local` flag = "all maps local" | the last listed map (Z16-B2) | Z16 §2.1 |
+| Z08 §4–§5 KQ open points | (addition) | the WM waits 1 min for 0x580E (Status 1 → 9); a late 0x580E → Status 0x0B + 0x5811; the 2016 WM never sends 0x5819; start times come from `KingdomQuest.shn` (two upcoming listed); the zone's 0xA401 / 0xA403 come from `mc_Routine` / `mc_AllDropFilm` (Z14 §1) | knowledge W04, W04 §6.2 |
 | Z08 §3.1 helper names | `Diary_Find` / `Diary_Store` / `Diary_Touch` / `Diary_Count` | `CQuest::GetQuestInfo` FUN_0062f210, `AddQuestInfo`, `SetQuestInfoClearRepeat`, `GetNumOfDoingQuest`; FUN_006304d0 = `IsDoingQuest`, FUN_00630570 = `GetQuestStatusWithNPC` | Z15 §4 |
 | Z08 §3.1 `QuestNext` | logs "UN-DRIVED"; END sent to the client | the "UN-DRIVED" log is the 0x4402 handler; `QuestNext` closes on END before its switch, so the client never gets Cmd 1 (Z15-B12) | Z15 §3.2 |
 | Z08 §7.1 0x5C05 | Character reads 58 bytes, the zone sends 54 | cause: the 2016 Zone PDB has two definitions; the zone sends the 54-byte one (D04-B9 = header mismatch) | S01 §2.4 |
 | Z08 §8.1 | a declined recall 0x749C is answered with 0x1441; an open NPC menu / storage → 0x1A42 | 0x1440; the mode codes 0x1A41 / 0x1A59 (read in the assembly) | Z16 §6.3, §6.8 |
+| Z08 §12 0x7C13 `NC_ZONE_PRISON_GO_REQ` | `err = so_Prison_Go ? 0xDC1 : 0xDC2` (0xDC0 the default), always answered with 0x7C14 | 0xDC0 = ok (preset), 0xDC1 = the object at the handle has another charNo, 0xDC2 = `so_Prison_Go` (vt 0x8a4) failed; no 0x7C14 at all when the handle is unknown or the object is empty (`so_IsEmpty`), X01-B4 | W04 §9.3, knowledge W04; FUN_005a4470 re-read (X01) |
 | Z08-B12 | seed bound `< 33` vs `< 32` | Z16-B17 (`seed ≤ 32` against 32-entry tables) | Z16 §6.1 |
 | Z09 §2.4 | charged buffs: rebuild `p+0x2a5a0` | the template DAT_132728f8 is `ShineObject::so_ChargedEffectContainerClear` (filled by `so_Initstaticvar` FUN_00549530); per-slot work `ciee_Routine` → `ciee_Activ` / `ciee_Free` | Z24 §6.7 |
 | Z09 §8.8 / §31.3 | `smo_SkillBash_Blast_Trap` (Loc / Obj), 0x2442 / 0x2443 handed to Z03 | Z18 covers them | Z25 knowledge |
@@ -930,10 +1162,12 @@ D06 compared every 2016 call with both backup versions; for a rebuild its versio
 | D03 §8 OWNERBLOG GET | (answer) | URL bound with 0xff bytes (≤ 254 characters, truncation is success) and an indicator: NULL / missing → success with an empty address; 0x8C39 / 0x8C3B have no 2016 sender | D06 |
 | D03 §11 0xBC06, D03-B21 | 0x2829 = failure answer | the handler ignores `@nRet` (0x2828 whenever the call executes); 0xBC06 has no 2016 sender: D03-B21 has no effect | D06 |
 | D03 §13 pets | (success code) | `@nRet` must be 0; the NA2016 third-party procedures set `@@ROWCOUNT` (1), which fails every rename / tendency save; 0xD40F has no 2016 sender | D06 |
+| D04 §3 friend add / delete client texts | 0x949 "Already have a friend request.", 0x952 "Cannot find %s." | the 2016 client shows its literal "DB Error" for 0x949 and " DB Error" for 0x952 (0x953 is "Cannot find %s."); D04-B6's effect narrowed (§5.9) | W04 §5.3, §5.4 |
 | D04 §5.2 −2721 / −2725 | (distinct) | cosmetic: both make 0x7057 send no answer (D04-B14) | D06 |
 | D04 §6.4 0x74E5, knowledge D04 | the DB does not take the character's money | `usp_GuildTournament_setRegist` charges the fee (`p_Char_MoneySub`, −1423); −1424 (→ 0x1C47) = the guild won the previous tournament; the 2016 procedure is w00 | D06 §5.7 |
 | D04 §6.4 `getRegistList` | `SELECT nNo` | the 2016 procedure returned `nNo, nMoney, bChoice, bIsRefundNotice` (column missing in the backups) | D06 §5.6, §5.7 |
 | D04 §6 / §7 | version choices | `p_Guild_Member_SetGrade` must be w00 (Character.bak returns 1 on success); the prison procedures and `p_Char_GetLoginData` of Character.bak are a 2015 third-party rework: use w00 | D06 |
+| D04 §7 0x7C11 → 0x7C0A | other failures show "Imprisonment request has failed." | the DB failure code is 0x0DA7, which the client's alter handler does not map: no text (W04-B27) | W04 §9.3 |
 | D04 §9.3 withdrawMoney 1–6 | (meaning) | returned by the procedure itself; most likely invalid guild, invalid character, invalid amount, character missing, academy missing, not enough money *(inferred, weak)* | D06 |
 | D04-B9, D05-B2 | (cause) | header mismatch: two 2016 definitions of the 0x5C05 / 0x0452 structs | S01 §2.4 |
 | D05 §1.2 / §9 Type6 version | (open) | for a rebuild follow `w00_GameLog.bak` (the only GameLog backup with every procedure the binary calls) | D06 §4.2 |
@@ -971,6 +1205,7 @@ cause or more effect. Rows that only rename functions are not marked.
 | D02-B18 | Extended | the whole promotion path is dead | D06 |
 | D02-B19 | Superseded | a backup mismatch, not a 2016 bug | D06 §6.2 |
 | D03-B21 | Narrowed | 0xBC06 has no 2016 sender | D06 |
+| D04-B6 | Narrowed | the effect: the 2016 client shows "DB Error" for 0x949 | W04 §5.3 |
 | D04-B9 | Extended | cause: header mismatch | S01 §2.4 |
 | D05-B2 | Extended | cause: header mismatch | S01 §2.4 |
 
@@ -1917,7 +2152,7 @@ in a capture unless marked *(captured)*. *Owner*: the item whose document descri
 | D04-B3 | 0x441A ([D04-character-social § bugs](db/D04-character-social.md#original-server-bugs)) | rollback subtracts nExp / nMoney even when they were not added (exp failure only logged) | exp can be lost on a later failure | track what was applied | code | D04 |
 | D04-B4 | 0x4801 ([D04-character-social § bugs](db/D04-character-social.md#original-server-bugs)) | 0x4803 is 7 bytes, the last never written | one stack byte on the wire | send 6 bytes or zero it | code | D04 |
 | D04-B5 | 0x4812 ([D04-character-social § bugs](db/D04-character-social.md#original-server-bugs)) | redistribution items are destroyed before `p_Skill_SetPowerAll`; no restore on failure | items lost when the DB refuses | one transaction | code | D04 |
-| D04-B6 | 0x5410 ([D04-character-social § bugs](db/D04-character-social.md#original-server-bugs)) | every DB error incl. "already friends" (2627) → 0x949 | client shows "Already have a friend request." | map 2627 to the "already registered" code | code | D04 |
+| D04-B6 | 0x5410 ([D04-character-social § bugs](db/D04-character-social.md#original-server-bugs)) | **Narrowed** (W04 §5.3: the 2016 client shows its literal "DB Error" for 0x949, not "Already have a friend request." (§5.7); [§5.9](#59-bug-register-entries-a-later-item-changed)): every DB error incl. "already friends" (2627) → 0x949 | client shows "Already have a friend request." | map 2627 to the "already registered" code | code | D04 |
 | D04-B7 | 0x5815 ([D04-character-social § bugs](db/D04-character-social.md#original-server-bugs)) | `AddCharFame` always returns 1 | 0x1103 path dead; fame failures not reported or refunded | return the procedure result | code | D04 |
 | D04-B8 | 0x5C05 ([D04-character-social § bugs](db/D04-character-social.md#original-server-bugs)) | GameLog 0x0454 sent on failure too | log shows licences that were never stored | log only on 0x9B9 | code | D04 |
 | D04-B9 | 0x5C05 ([D04-character-social § bugs](db/D04-character-social.md#original-server-bugs)) | **Extended** (S01 §2.4: a header mismatch: the 2016 Zone PDB has two definitions of the 0x5C05 struct; the zone sends the 54-byte one, the Character server reads 58; [§5.9](#59-bug-register-entries-a-later-item-changed)): log fields @0x16/@0x18 read 4 bytes past the 0x36-byte request | stale bytes in the GameLog | real fields / drop them | code | D04 |
@@ -2062,6 +2297,7 @@ for are recorded per handler by the owning items (their rows say "no client text
 | X01-B1 | zone `ShineMobileObject::so_RecalcAbstateParam` @ FUN_004cbe50 (vt 0x360; [Z12 § 2.5](zone/Z12-stats.md), noted there as "(sic: the Item layer)") | while resetting the abnormal-state layer (`AbnormalState.Rate.CriticalTB = 0`, `AbnormalState.Rate.CriDamRate = 0`) it zeroes `smo_Param.Item.Rate.MagCriDamRate`, a field of the **item** layer (re-read in `zone-pdb`) | every abstate recalculation clears the item layer's magic critical-damage rate until the next item recalculation; the abstate layer's own `MagCriDamRate` keeps the eraser value *(inferred: which items set the field not checked)* | `AbnormalState.Rate.MagCriDamRate = 0` | code; effect *(inferred)* | X01 |
 | X01-B2 | zone GM command `&outraid` ([Z11 § 7.1](zone/Z11-gm-commands.md)) | the success wall text is "레이트 탈퇴 성공" | the GM reads a misspelt text (레이트 for 레이드, "raid") | "레이드 탈퇴 성공" | code | X01 |
 | X01-B3 | zone `sp_Schedule_Logout` FUN_00558160 + WM `fc_NC_USER_POSSIBLE_NEW_CONNECT_CMD` FUN_0042c1c0 + Character `0x1004` FUN_00438dc0 ([§3.13](#313-character-persistence)) | the zone sends the logout save (dept 16) to the Character server and then `0x0C31` to the WM, which allows the next `0x1001` → `0x1004` on its own link; the Character server's workers do not order requests of different links, and nothing waits for the save's answers | a quick re-select can load the rows from before the logout save (position, level / exp, abstates, skills, quests) | the WM waits for a save-done signal, or the Character server serialises per character | code; effect *(inferred)* | X01 |
+| X01-B4 | zone `WorldManagerSession::wms_NC_ZONE_PRISON_GO_REQ` @ FUN_005a4470 (0x7C13; Z08 §12, WM side W04 §9.2–§9.3, [§3.27](#327-prison)) | the zone answers 0x7C14 only when the object at `nCharZoneHandle` exists and is not empty (`so_IsEmpty`, vt 0x300); when the target leaves the zone (logout, map change) or is closing between the WM's 0x7C13 and its arrival, no answer comes (unless the handle was already reused: 0xDC1); the WM keeps no pending state for the request | the GM's imprisonment command shows nothing (neither success nor 0x0D88 "Imprisonment request has failed."); retrying works once the target is found again | answer 0x7C14 with an error code (e.g. 0x0DC1) in that case too | code (zone FUN_005a4470 re-read; WM 0x7C14 handler FUN_0042dea0 is the only consumer, W04 §9.3) | X01 |
 
 #### 6.2.2 Opcodes the server sends and the 2016 client drops
 
