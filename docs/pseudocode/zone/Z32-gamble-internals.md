@@ -9,7 +9,8 @@ dept 47.
 This item extends Z06 (`docs/pseudocode/zone/Z06-economy.md`): Z06 documents the gamble-house handlers (§4), the mini-house TaiSai
 (§3) and the slot-machine handlers (§5); this document documents the classes behind them: the TaiSai outcome and dividend
 rules shared by both TaiSai games (§1), the gamble object base class and manager (§2), the gamble-house TaiSai table object
-`CGambleDiceTaiSaiObject` (§3) and the slot-machine classes (§4).
+`CGambleDiceTaiSaiObject` (§3) and the slot-machine classes (§4). §5 adds the table loaders, base stubs, player accessors and the coin-item
+request found by the sweep; §6 lists the original-server bugs, §7 what stays uncertain, §8 the coverage boundary.
 
 ## 1. TaiSai rules shared by both TaiSai games (`DiceTaiSai`, `DiceTaiSaiDividind`)
 
@@ -1417,3 +1418,200 @@ Corrections to Z06 §5 (done item; Z32 is the reference for these): `0xBCDD` is 
 the "house cut" and "accumulation flag" read from "config DAT_14d712cc" are `smjpr_TaxInfo` (GBTaxRate row 26) `GB_TaxRate` and
 `GB_JPSave` (§4.1, §4.5); `GBSMNPC` holds only `{ MobInx, GBSMBet }`; the settlement answer `0xBCD4` keeps the screen in STOPPING
 (it is the wheel stop that returns to READY); the 0xBCD0 handler uses vt 0xec (`SMS_WheelStop3`), vt 0xe8 is not called.
+
+## 5. Sweep additions: table loaders, base stubs, player accessors, coin items
+
+The sweep found these functions of the subsystem that no document cited yet. They are small; they complete §1–§4.
+
+### 5.1 Loaders of the shared GB tables
+
+`ZoneServer::zs_start_long` (FUN_005b8c00, Z10) loads, right after the card-collection tables, `SHND::g_BanTime.cd_Load()`
+(`GBBanTime.shn`), `g_TaxRate.cd_Load()` (`GBTaxRate.shn`), `g_EventCode.cd_Load()` (`GBEventCode.shn`) and `g_GBReward.cd_Load()`
+(`GBReward.shn`, §2.5). The file name is part of each global (`SHND::dynamic_initializer_for_'g_BanTime'` FUN_0069b7e0, `…g_TaxRate`
+FUN_0069b7f0, `…g_GBReward` FUN_0069b800, `…g_EventCode` FUN_0069b820 only register the exit destructors FUN_006a0e80 / FUN_006a0ec0 /
+FUN_006a0f00 / FUN_006a0f40, which free the row vector).
+
+```pseudo
+SHND::CommonData<T, Cmp>::cd_Load()          GBBanGame @ FUN_005b85c0, GBTaxRate @ FUN_005b8720, GBEventCode @ FUN_005b8aa0, GBReward @ FUN_005b8880
+    cd_ShnName null → assert "CommonData<T, C>::cd_Load : Name NULL"; ShineExit("CommonData<T, C>::cd_Load")
+    path = "../9Data/Shine/" + cd_ShnName; empty the row vector
+    BinaryDataBox<T>::bdb_ReadData(path)     # CDataReader::Read(path, column code, row size); a missing file or a header whose
+                                             # column code / row size differs → asserts "BinaryDataBox<T>::bdb_ReadData : readfail",
+                                             # "Code:%X:%d\tSHN:%X:%d"; ShineExit("BinaryDataBox<T>::bdb_ReadData")
+    append every row in file order (no sort, no duplicate check); the BinaryDataBox is destroyed afterwards
+SHND::CommonData<T, Cmp>::cd_Find(key) → first row whose key column equals key, else null (linear)
+    GBBanGame / GBTaxRate (GameType at +0) @ FUN_00614e20; GBEventCode ({GameType, GB_ANI}) @ FUN_00614e90; GBReward @ FUN_00620970 (§2.5)
+```
+
+| Table | Row struct (size) | Column code (expected header) | Reader | Default row |
+|---|---|---|---|---|
+| `GBBanTime.shn` | `GBBanGame` (0xc): `MobType GameType`, `GBBanType GB_Ban`, u32 `GB_BanTime` | 0x23 | `BinaryDataBox<GBBanGame>::bdb_ReadData` FUN_005aec00 | `{MT_HUMAN, GB_BAN_NO_PLAY, 0}` |
+| `GBEventCode.shn` | `GBEventCode` (0xc) | 0x23 (same three u32 columns) | the same FUN_005aec00 (COMDAT-folded: the GBEventCode instance is the GBBanGame code) | the GBBanGame default |
+| `GBTaxRate.shn` | `GBTaxRate` (0xc) | 0x38 | `BinaryDataBox<GBTaxRate>::bdb_ReadData` FUN_005aecb0 | zeros |
+| `GBReward.shn` | `GBReward` (0x28) | 0x67 | `BinaryDataBox<GBReward>::bdb_ReadData` FUN_005aed60 | |
+| `GBSMCardRate.shn` | 6 | 7 | FUN_0061dea0 (from `smsm_Load`, §4.1) | |
+| `GBSMGroup.shn` | 5 | 0x12 | FUN_0061df60 (from `sma_Load`; folded with `SpamerPenaltyDataBox::spdb_Load`'s reader) | |
+| `GBSMJPRate.shn` | `GBSMJackpotRate` (0xc) | 0x1b | FUN_0061e040 (from `smjpr_Load`) | |
+
+The remaining `BinaryDataBox<GB…>` functions are compiler-generated: destructors FUN_005aebf0 / FUN_005aeca0 / FUN_005aed50 /
+FUN_005aee00, FUN_0061de90, FUN_0061df40, FUN_0061df50, FUN_0061e000, FUN_0061e010, FUN_0061e020, FUN_0061e030 and the scalar deleting
+destructors FUN_005aef30, FUN_005aef60, FUN_005aef90, FUN_005aefc0, FUN_0061e0e0, FUN_0061e110, FUN_0061e140, FUN_0061e170, FUN_0061e1a0,
+FUN_0061e1d0, FUN_0061e200, FUN_0061e230 (vtable entries; free the reader). `GBBanGame.GB_Ban` is read by nobody: the only code that
+touches the name is `CGambleDiceTaiSaiObject::go_Init`, which uses the folded GBBanGame finder on `g_TaxRate` and so reads
+`GBTaxRate`'s bytes +4…+7 as "GB_Ban" (§3.2). 2016 `GBBanTime.shn` has one row `{26, 0, 300000}` (§4.10).
+
+### 5.2 Base `GDTSO_*` stubs
+
+The base entries of the TaiSai slots (§2.1 row 0x3c…0xd4) that answer a non-TaiSai object: `GDTSO_SendTaiSaiBettingInfo`
+FUN_00618140 → 0x2619, `GDTSO_DiceTaiSai_Enter` FUN_00511f20 → 0x1C88, `GDTSO_DiceTaiSai_Out` FUN_00618160 and `…_BroadOut`
+FUN_00618170 → 0x2625, `…_CanBetting` FUN_00618180 → 0x2635, `…_CanBettingCancel` FUN_00618190 → 0x2643, `…_CanAutoDiceRoll`
+FUN_006181a0 and `…_MoneyResult_DiceRoll` FUN_006181b0 → 0x2652, `…_PrepareNextGame` FUN_00513fe0 → 0x1CD4. Enter's 0x1C88 and
+PrepareNextGame's 0x1CD4 lie in the mini-house block (0x1C80…0x1D2F, Z06 §3): the stubs are folded with mini-house code of the same
+bytes. With a slot object the TaiSai JOIN already stops at the vt 0x3c stub (0x2619, §4.8 note to Z32-B24).
+
+### 5.3 Player-side mini-house TaiSai accessors (`sp_MiniGame`)
+
+Z06 §3.1 lists these player slots without addresses (its names are ours; these are the *pdb2016* ones). All test
+`sp_MiniGame.nGameType == SMT_DICE_TAISAI` (1) first and fail (0 / null) otherwise; the record is `GI_DiceTaiSai` at
+`sp_MiniGame.GameInfo` (Z06 §3.1 layout).
+
+```pseudo
+so_GetDiceTaiSaiGameLeaveInfo(out)   (vt 0x184)  out non-null: *out = bGameLeaveReserve, 1                  @ FUN_00510f60
+so_SetDiceTaiSaiGameLeaveInfo(v)     (vt 0x188)  v ∈ {0, 1}: bGameLeaveReserve = v, 1                       @ FUN_00510f90
+so_GetDiceTaiSaiRoomLeaveInfo(out)   (vt 0x18c)  out non-null: *out = bRoomLeaveReserve, 1                  @ FUN_00510fc0
+so_SetDiceTaiSaiRoomLeaveInfo(v)     (vt 0x190)  v ∈ {0, 1}: bRoomLeaveReserve = v, 1 (Z13's house leave)   @ FUN_00510ff0
+so_GetDiceTaiSaiInfo()               (vt 0x19c)  → &GameInfo (GI_DiceTaiSai*)                                 @ FUN_005110c0
+so_ClearDiceTaiSaiInfo()             (vt 0x1a0)  nBetSumMoney = 0, nBetMoney[0…51] = 0, nTotalDividend (i64 +0xd8) = 0, 1;
+                                                 the two leave reserves are kept                              @ FUN_005110e0
+so_SetCTDiceTaiSaiSet()              (vt 0x1b8)  sp_CharacterTitle.CT_WinDiceTaiSaiSet() (FUN_005cc4c0, Z07), 1  @ FUN_005113f0
+```
+
+### 5.4 Coin items and the merchant's coin price
+
+The coin gift cards are used through the normal item use (`0x3015`, Z04 §6.1, which already refuses a player in a gamble game
+with 0x701); their actor is `UseEffect::UseItemGBCoin` (Z04 §6.3, "direct" use). Z06 §4.2 documents the DB answer `0xBC1A`; the
+request side:
+
+```pseudo
+UseEffect::UseItemGBCoin::uib_DirectUse(p, slot, item)       (profiler string "UseEffect::UseItemCoin::uib_AfterCast")   @ FUN_0059aab0
+    p null → calls vt 0x91c through a null object (crash; the caller always passes p)
+    p.sp_Gamble_UseCoinItem(slot, item); return 1
+
+ShinePlayer::sp_Gamble_UseCoinItem(slot, item)                                                                   @ FUN_006174e0
+    item null:                                         p.so_ply_ItemUseResultPacket(0x702, 9)   (vt 0x91c → 0x3016, Z04 §6.1)
+    p.so_Gamble_IsJoinAnyGamble(0) (vt 0xb24):         p.so_ply_ItemUseResultPacket(0x701, 9)
+    walk the ChargedEffect.shn box (chargedbuffdatabox, Z24) from its first row; at the first row with ItemID == item.itemid:
+        row.EffectEnum ≠ EE_GBCOIN (32):               stop; result 0x702
+        coins = row.EffectValue (u16)                  # 2016: GB_Coin01 1 000, GB_Coin02 10 000, GB_Coin03 50 000
+        cell = inventory cell slot (box 9); empty:     stop; result 0x702
+        GameDB ← 0xBC19 NC_GAMBLE_COIN_DB_USE_COINITEM_REQ {      # 0x18 bytes, layout = PROTO struct (pdb2017, confirmed)
+            hdr { u16 clienthandle = p.handle, u32 charregistnumber = p.charNo (vt 0x344) },
+            u64 nItemReg = item.registnum, u64 nCoin = coins, u16 nLockIndex = L.index }   (L = vt 0x7d4)
+        L.vt[0x70] icl_StoreGBCoin(L.index, coins, +1, 0)          # coin reservation (FUN_00489d90; §5.5)
+        L.vt[0x30](L.index, cell, key, key), key = (slot & 0x3ff) | 9 << 10          # "clear cell": the whole stack goes
+        L.icl_IncIndex(); return                        # the answer 0xBC1A applies or frees the lock (Z06 §4.2)
+    no row for the item:                               result 0x702
+    0x701 "Cannot use the item due to an Abnormal State."; 0x702 "You cannot use this" (client-error-codes.json)
+```
+
+The whole cell is cleared whatever its lot: correct for 2016 because the three coin cards have `ItemInfo.MaxLot` 1 (a stackable coin
+item would lose the rest of its stack for one card's coins).
+
+`NPCRole_Merchant::nrb_ItemBuyGBCoin(p, itemid)` (merchant vt 0x18; Z04 §2.1 calls it `nrb_ItemBuyCoin` after its profiler string)
+@ FUN_004c7490: `ItemInfo[itemid].BuyGBCoin`, or 0 with the copied assert "NPCRole_Merchant::nrb_ItemSellPrice : cannot found item
+inform" when the item is unknown.
+
+### 5.5 Coin reservations in the lock list's reserved quantities
+
+`InventoryCellLockList::icl_ReservedQuantity(out)` (FUN_0048b5d0) sums the pending changes of all locks: it zeroes `out`
+(`ReservedQuantity { int cen, fame, hpstone, spstone, guild_token, gbcoin }`, `InventoryCellLock::icl_ReservedQuantity` FUN_00489930)
+and calls each lock's releaser `icr_Reserv(out, cell)` (releaser vt 4). The money checks that add this to the player's money (Z04 §2.1
+shop buy, Z16 proposal money) read `out.cen`.
+
+```pseudo
+InvenCellReleaser_CoinChange::icr_Reserv(out, cell)                                                  @ FUN_00489d20
+    out.cen += cell.plusminus · cell.amount        # the same instructions as InvenCellReleaser_CenChange::icr_Reserv FUN_004885d0
+```
+
+(original bug) Z32-B27: the coin releaser adds the pending coin change to `cen` (money), not to `gbcoin`; no releaser ever writes
+`gbcoin`. While a TaiSai settlement (§3.10), a slot spin (§4.5), a coin card (§5.4) or a coin purchase (Z06 §4.2) waits for the GameDB,
+the pending coins count as pending money: a win makes money checks pass for up to that many coppers the player does not have, a stake
+makes them fail early *(inferred: what the later money debit then does depends on the DB side, Z05 / D03)*.
+
+### 5.6 The jackpot reward's item list
+
+`SMS_StopButton` (§4.5) builds the `0x344D` item list with `ItemListMaker::ItemListMaker(invenType)` FUN_005956c0 (`ilm_ItemNum = 0`,
+`ilm_InvenType = 2`) and `ilm_ItemMake(item)` FUN_00595740: null item → 0xFFFF; more than 8 items → assert "ItemListMaker::ilm_ItemMake :
+Too many content", 0xFFFF; else copies the 0x6f-byte `ItemTotalInformation` into `ilm_List[ilm_ItemNum++]` and returns its item id.
+The same helper serves the script item grants (`cRewardItem` FUN_005e17e0, `cRewardItem_AllInMap` FUN_005e1b30, Z05 §9.2 table).
+
+## 6. Original-server bugs
+
+| ID | Handler | 2016 behaviour | Effect | Likely intent |
+|---|---|---|---|---|
+| Z32-B1 | TaiSai `go_Init` (§3.2) | `GBTaxRate` row 23 lookup not null-checked | a `GBTaxRate.shn` without row 23 crashes the zone at start-up | refuse / default the cut |
+| Z32-B2 | TaiSai join / seats (§3.5) | no code writes `go_nWhoStandHnd` (TaiSai and slot machines) | every seat stays free: several gamers on one seat, `0x2616` only for seat ≥ 13, `0xBC17` never answers `0x2606` | mark the seat on join, free it on leave |
+| Z32-B3 | `0xBC65` (§3.5) | `nUseMinLv` never written | two stale buffer bytes on the wire (client ignores them) | `GambleActiveDice.UseMinLv` |
+| Z32-B4 | `GDTSO_DiceTaiSai_Enter` (§3.5) | calls `SetGameLeaveInfo(p, 0)` which refuses 0 for a non-gamer | dead call | reset the leave flag |
+| Z32-B5 | `CanBetting` (§3.6) | stake sums are 32-bit and wrap | a stake close to 2^32 passes the limit checks; the payout reads the wrapped record | 64-bit sums / reject |
+| Z32-B6 | `SetDiceProbability` (§3.9) | weight stored as u16, summed as u32 | a Rate > 65 535 skews the outcome distribution | clamp or widen |
+| Z32-B7 | `Result_DiceRoll` (§3.10) | `is_CanBettingMoney` result ignored | dead check | refuse over-limit stakes |
+| Z32-B8 | `DiceRoll` (§3.10) | `% nDiceRateSum` without a zero test | all weights 0 (GM) → division by zero, zone crash | refuse a zero sum |
+| Z32-B9 | `go_Routine` / `DiceRoll` (§3.10) | a failed roll leaves BETTING without a timer | table accepts stakes but never rolls until all stakes are cancelled (ROLLING: for good) | restart the timer / reset |
+| Z32-B10 | `ResultLog` (§3.10) | logs and counts wins of gamers `Result_DiceRoll` skipped | wrong log rows, title counter for unsettled wins | skip the same gamers |
+| Z32-B11 | `BroadEmotion` (§3.10) | inner loop re-tests gamer j for result j | animations only when result order = gamer order | search all gamers |
+| Z32-B12 | `ExcuteLeaveGame` (§3.10) | compares `Out`'s result with 0x1c90 (never returned) | `BroadOut` dead: others get no `0xBC6A` | compare with 0x2620 |
+| Z32-B13 | `go_PlayerUnmarking` (§3.11) | unmark in STAND_BY keeps the raw pointer of the freed player | later `Out` / `MoneyResult` act on the pool slot's next player | remove the gamer at unmark |
+| Z32-B14 | logout gate (§3.11) | `sp_Gamble_SessionCloseingTime` never reset | a second logout during a later roll passes the 5 s gate at once | reset after the gate |
+| Z32-B15 | `SMS_StopButton` + DB (§4.5) | jackpot share in `WinMoney` and again from the DB pool *(db-backup)* | jackpot credited twice | one pool |
+| Z32-B16 | `smjpr_GetJackpotPrice` (§4.4) | u32 product `rate · pool` | wraps for pools > 42 949 672 at rate 100 | 64-bit product |
+| Z32-B17 | `SMS_StopButton` (§4.5) | null lock-list test after the jackpot side effects | dead for players; the jackpot is already paid if it could fire | test first |
+| Z32-B18 | `SMS_StopButton` (§4.5) | division by `sms_BettingAtOnce` 0 when the dealer is not in `GBSMNPC` | zone crash (data-dependent) | refuse at `go_Init` |
+| Z32-B19 | `0xBCCF` (§4.5) | error answers carry nine uninitialised screen bytes | stack bytes on the wire | zero them |
+| Z32-B20 | `so_ply_SlotMachineDBResult` (§4.9) | lock index neither applied nor freed when the screen is not STOPPING or gone | coins stale, player cannot leave / join until relogin | always release |
+| Z32-B21 | `smjpr_PacketMake` `0xBCDA` (§4.11) | 50-entry cap tests `ListLen` before it is written | unbounded list, u8 wrap, buffer overrun past 341 entries | cap at 50 |
+| Z32-B22 | `PacketMake_JackPotPrice` `0xBCD8` (§4.10) | reads `InfoArr[0…2]` unchecked | null read before the DB link (unreachable in practice) | check the size |
+| Z32-B23 | `smjpr_RankingSet` `0xBCD6` (§4.11) | DB error 0x2941 / 0x2942 → `ShineExit` | a DB query failure stops the zone | log and retry |
+| Z32-B24 | slot JOIN (§4.8) | no `go_Get_GambleType` check | a TaiSai dealer handle seats the player at the TaiSai as JoinType 2; stuck until logout, freed-pointer case of B13 | refuse non-slot objects |
+| Z32-B25 | `0xBCC9` (§4.8) | error answers leave `BettingUnit` stale | stale buffer byte (client ignores it) | write 0 |
+| Z32-B26 | slot idle kick (§4.10) | `GB_BanTime · 10` ticks | 83 h idle limit instead of 5 min *(intent inferred)* | ÷100 |
+| Z32-B27 | `InvenCellReleaser_CoinChange::icr_Reserv` (§5.5) | pending coin changes summed into reserved `cen` | pending coins count as pending money in money checks | add to `gbcoin` |
+
+Bugs of the gamble handlers themselves are Z06's (`Z06-B…`, Z06 §6); §3.10 cites Z06-B10 (the 0xBC79 failure path) and Z06-B17.
+
+## 7. Not reconstructed / uncertain
+
+- Base slot names (§2.1): COMDAT folding hides the base names of most `CGambleObject` slots; the table uses the overriding classes'
+  names. The PDB name of a folded stub belongs to whatever function shares its bytes.
+- Pair bets lose on a triple of their value (§1.6): intended or not is unknown (the client's bet board does not tell); not tagged.
+- Z32-B2 (seats never marked) rests on "no writer found" in the export; a writer through an unrecognised pointer would change it.
+- Z32-B15 and the DB jackpot pools (§4.5, §4.11) come from the private-server procedure sources *(db-backup)*; the 2016 procedure
+  bodies are not available.
+- Z32-B13 / B24: what the freed-pointer calls touch depends on the player pool's reuse (Z01 §4) *(inferred)*.
+- Z32-B27: the effect on the later money debit depends on how D03 / Z05 treat a debit larger than the money; not followed.
+- `SMS_WheelStop2` (vt 0xe8, FUN_0061f8c0) has no caller; documented in §4.9 as dead code.
+- No capture covers dept 47: every gamble layout here is read in the code (and the client), none is *(captured)*.
+- RNGs: the TaiSai roll (§3.10), `BroadEmotion` and the slot deck shuffle (§4.1) use the C runtime `rand()` (MSVC LCG, 15 bits);
+  `go_PlayerAction` (§2.3) and the slot draw's swaps (§4.2) use `rndbox` (Z23 §8.6). The TaiSai roll's modulo bias is negligible.
+
+## 8. Coverage boundary
+
+| Found (function / packet / table / behaviour) | Covered by | Argument |
+|---|---|---|
+| gamble-house handlers (coin buy / sell / exchange `0xBC0x…0xBC14`, exit `0xBC17`, TaiSai JOIN / LEAVE / BET / CANCEL, slot JOIN / LEAVE / START / STOP / RANKING `0xBCC8…0xBCDB`) | Z06 §4.2–§4.4, §5 (done) | Z06's scope table lists them; §3 / §4 here summarise only what the objects do (corrections to Z06 §5 in §4.11) |
+| mini-house TaiSai `ShineMiniHouse::so_mh_*`, dept 43 | Z06 §3 (done) | separate game; only the shared rules (§1) and the player accessors (§5.3) are here |
+| `0xBC1A` coin-card DB answer FUN_00617c90 | Z06 §4.2 (done) | documented there; the request side is §5.4 |
+| Character-server procedures of `0xBC19`, `0xBC78`, `0xBC7A`, `0xBCD3`, `0xBCD5`, `0xBCDB` (usp_Gamble_*) | D03 §11 (done) | DB side of every packet sent here; cited in §3.10, §4.5, §4.11 |
+| `0x344D` jackpot reward item creation, `0x344E/F` answers | Z05 §9.2 (done) | generic item-list creation |
+| item use `0x3015` and the `UseEffect` actor table | Z04 §6.1, §6.3 (done) | §5.4 documents only the coin actor |
+| merchant purchase with coins (`0x3003`) | Z04 §2.1 (done) | uses `nrb_ItemBuyGBCoin` (§5.4) as its coin price |
+| inventory lock list (`icl_StoreGBCoin` FUN_00489d90, `icr_Apply` FUN_00489be0, lock kinds `L.vt[0x30]`, `0x40`) | Z05 §1.3, §1.4 releaser table (done), Z04 §1.4 (done) | generic reservation machinery; the coin releaser's reserve is §5.5 |
+| GM commands `&GB_DiceFix`, `&GB_DiceProbability`, slot-machine GM string | Z11 §6.7, §3.4 (done) | command parsing; the object methods they call are §3.9, §4.2 |
+| character-title counters `CT_WinDiceTaiSaiWin` / `…Set` | Z07 (done) | title system; the calls are §3.10, §5.3 |
+| `zs_start_long` order, the other GB tables (`GBHouse`, `GBExchangeMaxCoin`, `GBJoinGameMember`, `GBDiceDividind`, `GBDiceGame`, `GBDiceRate`) loaded inline in `zs_start_sleep` | Z01 §2.3 data-table loaders (done), Z10 (done) | start-up sequence; the row contents are §1.1, §3.1 |
+| logout gate callers `sp_Schedule_Logout`, `zs_disconnect`, `so_Unmark` | Z01 (done) | session core; the gate itself is §3.11 |
+| WM `CGambleSystemServer` daily exchanged-coin reset | W04 §15.1 (done) | world-manager side |
+| `rndbox` | Z23 §8.6 (done) | shared RNG |
+| `ChargedEffect.shn` box | Z24 (done) | item data; §5.4 reads only `EffectEnum` / `EffectValue` |
+| `BelongDice.shn` (`Table::Load<BelongDiceTable>` FUN_005b5440) | Z09 (done, loot dice table) | not gambling: the party loot dice timer |
+| client windows (`SlotMachineWin`, `GBSlotRankWin`, TaiSai board) | C01 (done) handler inventory; behaviour in §3 / §4 | each packet's client handler is cited where the packet is described |

@@ -14583,6 +14583,18 @@ payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block 
 | 8 | u64 | nCoin |  |
 | 16 | u64 | nMoney | after tax |
 
+### `0xbc19` NC_GAMBLE_COIN_DB_USE_COINITEM_REQ (Z→DB)
+
+**Verified layout** (basis: zone FUN_006174e0 (sp_Gamble_UseCoinItem); character FUN_00424fc0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nHeader.clienthandle | player handle |
+| 2 | u32 | nHeader.charregistnumber | player vt 0x344 |
+| 6 | u64 | nItemReg | SHINE_ITEM_REGISTNUMBER of the coin item |
+| 14 | u64 | nCoin | ChargedItemEffect.EffectValue (u16, high bytes 0) |
+| 22 | u16 | nLockIndex | lock-list index; one coin reservation (+nCoin) and one item reservation on it |
+
 ### `0xbc78` NC_GAMBLE_DICE_TAISAI_DB_DICE_ROLL_RESULT_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_0061a350 (Result_DiceRoll); character FUN_00421a30)
