@@ -5578,14 +5578,16 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_GuildStorageWithdrawAck` (`FUN_
 
 ### `0x3029` NC_ITEM_SOMEONEUSE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_SOMEONEUSE_CMD`, 12 bytes
+**Verified layout** (basis: zone ShinePlayer::sp_ItemUseBroadcast FUN_0053f840 (Z24 §1.4); client FUN_004af820)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | user |  |
-| 2 | u32 | useloc.x |  |
+| 0 | u16 | user | handle of the using player |
+| 2 | u32 | useloc.x | player position (the client does not read it) |
 | 6 | u32 | useloc.y |  |
-| 10 | u16 | useditem |  |
+| 10 | u16 | useditem | item ID |
+
+12 bytes; sent to the surroundings when the item's useditemeffect entry has broadcast set (Z24 §1.4)
 
 Sent from `FUN_0053f840` (`FUN_0053f840`) · payload 12 bytes
 
@@ -8703,11 +8705,13 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ChargedBuff` (`FUN_005970c0`) �
 
 ### `0x9004` NC_CHARGED_BUFFTERMINATE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHARGED_BUFFTERMINATE_CMD`, 4 bytes
+**Verified layout** (basis: zone ciee_Free FUN_00450a50; client FUN_0049b2c0 (2017 GameFrameWork::On_NC_CHARGED_BUFFTERMINATE_CMD))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u32 | ChargedBuffKey |  |
+| 0 | u32 | ChargedBuffKey | client ChargedItemList::DelUsingItem(key) |
+
+4 bytes
 
 Sent from `ChargedItemEffectList::ChargedItemEffectElement::ciee_Free` (`FUN_00450a50`) · payload 4 bytes
 
@@ -13071,6 +13075,23 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 20 | u8 | relocnum |  |
 | 21 | bytes | reloc | relocnum × {u64 key, u16 new location} |
 
+### `0x3457` NC_ITEMDB_PRODUCE_REQ (Z→DB)
+
+**Verified layout** (basis: zone smo_ply_ItemProduce FUN_0046c2d0 + ItemProducer::ip_ProductExecute FUN_0046bf80 (Z24 §7.8); struct pdb2016)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.clienthandle | zone session handle |
+| 2 | u32 | header.charregnum | vt 0x344 |
+| 6 | u16 | lockindex | lock list index (then incremented) |
+| 8 | u16 | product | item ID |
+| 10 | u8 | produce.create | 1 = new item (itemcreate), 0 = stacked (itemchange) |
+| 11 | bytes | produce.iteminfo | 0x26: PROTO_ITEM_CREATE {u32 owner, MAPPOS map, ITEM_INVEN location, regnum, u16 createitemid, u16 attr} or PROTO_ITEM_ATTRCHANGE {regnum, u16 attr, ITEM_INVEN location} |
+| 49 | u8 | rawnumber | n ≤ 64 |
+| 50 | bytes | raw[n] | 0x11 each: u8 vanish, u16 rawid, u16 rawuselot_log, union {PROTO_ITEM_VANISH {regnum, location}, PROTO_ITEM_ATTRCHANGE} |
+
+variable length = 0x32 + 0x11·n + blobs: the iac_fill2buffer attribute blobs follow raw[n]; each attr field = payload offset of its blob; ITEM_INVEN = 0x2400 | slot (inventory type 9)
+
 ### `0x345f` NC_ITEMDB_DEPOSIT_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_00533dc0 (zone→DB))
@@ -13304,6 +13325,19 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 48 | u16 | LicenseMobID |  |
 | 50 | u16 | echo.licenseitem |  |
 | 52 | u16 | echo.weaponitem |  |
+
+### `0x9002` NC_CHARGED_RESETBUFF_CMD (Z→DB)
+
+**Verified layout** (basis: zone ChargedItemEffectElement::ciee_Free FUN_00450a50 (Z24 §6.7); the same packet goes to the WM (W04 annotation))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | CharRegistNumber | so_GetCharRegistNumber |
+| 4 | u32 | ChargedBuffKey | list slot |
+| 8 | u16 | ChargedBuffID | ChargedEffect Handle |
+| 10 | u32 | nUserNo | the character number again (Z24-B14) |
+
+14 bytes
 
 ### `0xac23` NC_DICE_TAISAI_DB_DICE_ROLL_RESULT_REQ (Z→DB)
 
