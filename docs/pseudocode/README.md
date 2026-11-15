@@ -12,11 +12,234 @@ Evidence levels as in `AGENTS.md`: plain = read in the 2016 code (2016 server PD
 
 ## 1. Reading guide
 
-*(part 4)* Map of the documents per server process and subsystem.
+Where each behaviour is documented. Read this section and §2 first, then the document of the subsystem; check §5 for
+the place you read before you rely on an older file. Every pseudocode document has the skeleton of `FORMAT.md`
+(numbered §, `@ FUN_…` per block, an "Original-server bugs" table, "Not reconstructed", "Coverage boundary"); a
+reference `<doc> §n` in this file and in the item files means that numbered section. Outline of a big file:
+`python3 -I tools/protocol-re/sect.py <file>`; one section: `sect.py <file> <§>`.
+
+### 1.1 Protocol and shared material
+
+| Document | Contents |
+|---|---|
+| `docs/protocol/README.md` (P01) | framing, opcode = `dept << 10 \| cmd`, the client → server XOR-499 cipher, a first connection sketch. Its seed and heartbeat statements are superseded (§5.1) |
+| `docs/protocol/opcodes-{login,wm,zone}.md`, `opcodes.json` | every registered handler per parser and server, with official names (generated) |
+| `docs/protocol/packets-{login,wm,zone,account,accountlog}.md` | packet layouts (generated from send sites, handler reads, `annotations/<ID>.json`, `pdb2016-layouts.json`, `pdb-layouts.json`); the Character and GameLog layouts are only in `annotations/D02.json` … `D05.json` |
+| `docs/protocol/capture-validation.md` (P02) | what the captures confirm or contradict; source of every *(captured)* mark |
+| `docs/protocol/client-error-codes.json` | error code → client text |
+| `docs/pseudocode/shared/S02-library.md` | the network library all three game servers link (IOCP, acceptor, send/receive buffers, frame parser), the `CCsl` config-script reader, the dead `CGdp` packed-file layer |
+| `docs/pseudocode/zone/Z19-config-script.md` | the CSL config-file format and the reader copies in every server binary |
+| `docs/knowledge/X03.md` | deployment: process roles, `ServerInfo.txt` rows, worlds, map → zone assignment, `MHBasic` / zone 99, adding a world or zone (summarised in §2.7) |
+| `docs/knowledge/S01.md` + `S01-*.tsv` | the 2016 server PDBs: renames (our name → official), `ShinePlayer` offsets, SHN row structs |
+| `docs/knowledge/C01.md`, `C02.md` | client packet-handler inventory (2016 client), 2017 client PDB facts and name verdicts |
+| `docs/knowledge/<ID>.md` | per item: offsets, helper names, open questions and the "Corrections" sections collected in §5 |
+
+### 1.2 Per server process
+
+| Process | Document | Contents |
+|---|---|---|
+| Login | `login-server.md` (L00) | handlers (client, WM, AccountDB, AccountLogDB, OPTool), login flow, client cross-check |
+| | `login/L01-process.md` | process object, main thread, session pools, world status and load table, parser copies |
+| Account, AccountLog | `db/D01-account.md` | both DataServer processes: framework, server-link handlers, every handler and its procedure |
+| WM | `wm/W01-core.md` | sessions, world login, character select, zone hand-off, the character blob cache, links to Login and the DB servers |
+| | `wm/W02-party-raid.md` | party and raid (expedition) |
+| | `wm/W03-guild.md` | guild, guild war, guild academy, guild manager tick |
+| | `wm/W04-social-misc.md` | chat routing, friends, kingdom quest, titles, options, prison, reports, charged buffs, OPTool, instances, misc |
+| | `wm/W05-process.md` | process lifecycle, timed services, data tables, session pools, close reasons, Windows service |
+| Zone | `zone/Z01-core.md` | process, start, network sessions, objects and handles, map login, login burst, map change, logout, zone ring |
+| | `zone/Z10-certification.md` | process entry, the downloaded Lua start script, certification threads, start stage order |
+| | `zone/Z09-world.md` | main loop and timers, player tick, GM events, mobs and NPC AI, spawns, drops, map scripts (the largest file, 0.9 MB: always use `sect.py`) |
+| | `zone/Z02-actions.md` | movement, chat, emotes, sight / brief info, NPC menus, tents, gathering and production, mounts, wedding requests, scenarios |
+| | `zone/Z03-combat.md` | targeting, basic attack, hit / damage rules, skills, abnormal states, death, experience |
+| | `zone/Z12-stats.md` | stat matrix, HP / SP maxima, level and experience, parsing of the WM's character blobs |
+| | `zone/Z20-skill-data.md`, `Z23-skill-list.md`, `Z25-skill-specials.md`, `Z22-abstate-actors.md`, `Z29-exp-tables.md` | skill tables, per-player skill list, skill special effects, abnormal-state actors, party experience split |
+| | `zone/Z04-items.md`, `Z05-itemdb.md` | items, inventory, equipment, upgrades; the ITEMDB commit protocol with the Character server |
+| | `zone/Z17-item-actions.md`, `Z21-set-items.md`, `Z24-item-data.md`, `Z26-silver-wing.md`, `Z27-item-table.md`, `Z28-card-tables.md` | item actions, set items, item data loaders, the silver-wing teleport, the item table, collection-card tables |
+| | `zone/Z06-economy.md` | trade, street booths, gamble house, dice, slot machines |
+| | `zone/Z07-character.md`, `Z13-objects.md` | character data at login, free stats, wedding, mini-house, cards, mounts, pets (zone side); mini-house / wedding hall / pet / mount internals |
+| | `zone/Z08-content.md`, `Z14-instances.md`, `Z15-quest-engine.md`, `Z16-events.md` | party / raid / guild / academy mirrors, quests, KQ, instances, holy promise; instance cluster and zone-ring storage; quest script engine; KQ element and guild tournament |
+| | `zone/Z11-gm-commands.md` | the GM `&` commands |
+| | `zone/Z18-leftovers.md`, `Z30-leftovers.md` | functions left over by Z01–Z07 (Z18) and reachable from handlers (Z30); each § names the item it completes |
+| Character | `db/D02-character.md` | framework, avatars (character select), character load, login / logout, CHARSAVE, class / stats, tutorial, misc |
+| | `db/D03-character-items.md` | item persistence model and every ITEMDB / economy / pet / mini-house handler |
+| | `db/D04-character-social.md` | quests, skills, friends, titles, options, guild, prison, holy promise, academy, requests from the WM |
+| | `db/D07-character-reward-items.md` | academy reward storage, tournament reward items |
+| GameLog | `db/D05-gamelog.md` | every NC_LOG / NC_SYSLOG handler and the `tGameLog` column it fills; the DataServer framework (§7) |
+| Databases | `db/D06-db-inferred.md`, `docs/plan/db-backups.md` | procedures the backups lack, reconstructed from the binaries; what the backups contain |
+
+### 1.3 By feature
+
+The full message paths are the sequence index (§3); this table only says which documents a feature touches.
+
+| Feature | Client-facing | Other processes |
+|---|---|---|
+| account login, world list, world select | `login-server.md` §4–§6, L01 §3 | D01 §3–§4, W01 §3.1 |
+| world login, character list / create / delete | W01 §3–§4 | D02 §3, D01 |
+| entering a map, map change, logout | Z01 §5–§8, W01 §5–§7 | D02 §4–§6, Z07 §1, Z12 §6 |
+| chat | Z02 §3 | W04 §2 |
+| party, raid | W02 | Z08 §1–§2, Z14 §5, Z29 |
+| guild, guild war, academy, tournament | W03 | Z08 §8, §10, Z14 §3–§4, Z16 §4–§6, D04 §6, D07 |
+| friends, titles, options, prison, reports | W04 §5–§10 | Z08 §6–§7, D04 §3–§7 |
+| kingdom quest, instances | W04 §6, Z08 §4–§5 | Z14, Z16 §1–§3 |
+| items, shop, storage, upgrades | Z04 | Z05, D03, Z17, Z24, Z27 |
+| trade, booths, gambling | Z06 | D03 §10, §11, §14 |
+| quests | Z08 §3, Z15 | D04 §1 |
+| combat, skills, stats | Z03, Z12 | Z20, Z22, Z23, Z25, D04 §2 |
+| mini-house, wedding, pets, mounts | Z07, Z13 | D02, D03 §8 |
+| GM commands, OPTool | Z11; W04 §4 | L00 §5.4, D01 §2, D05 §5 |
+| logging | – | D05 (senders: zones, WM, Character server) |
 
 ## 2. Architecture overview
 
-*(part 4)* Processes, links between them, data flow, persistence.
+Sources: `docs/knowledge/X03.md` (topology, config), W01 §1–§2, W05 §1, §4, L01 §1–§3, `login-server.md` §1–§2,
+Z01 §1, §3.3, §10, Z10 §1, S02 §1, D01 §1, D02 §1, D05 §1, §7, and the shipped `Files/Server/2016` config.
+
+### 2.1 Processes
+
+| Process | 2016 binary | ServerInfo type | Instances | Role | Database |
+|---|---|---|---|---|---|
+| Login | `Login/3LoginServer2.exe` | 4 | one for the service | version check, account login, world list, world select ticket, one-time tokens | none (through Account / AccountLog) |
+| Account | `Account/Account Release.exe` | 0 | one | account check, block / auth flags, PC-bang check, web key, reports | `Account` (ODBC type 0) |
+| AccountLog | `AccountLog/AccountLog Release.exe` | 1 | one | login / world-select / logout records, IP block, statistics | `AccountLog` + `StatisticsData` (types 1, 2) |
+| WorldManager (WM) | `w00_WorldManager/4WorldManagerServer2.exe` | 5 | **one per world** | world login, character select, zone routing, character cache, party, raid, guild, academy, friends, chat routing, KQ, OPTool | none (through Character) |
+| Zone | `w00_Zone0n/5ZoneServer2.exe` (4 identical copies) | 6 | up to 12 per world | one process per zone number; simulates the maps assigned to it | none (through Character, GameLog) |
+| Character | `w00_Character/Character Release.exe` | 2 | one per world | characters, items, quests, skills, guild, friends, mini-house, pets: every game-data read and write | `w00_Character` (type 10) |
+| GameLog | `w00_GameLog/GameLog Release.exe` | 3 | one per world | write-only game log; hourly text log for the data warehouse | `w00_GameLog` (type 11) |
+| OPTool | not shipped | 8 | optional | operator tool; connects to Login, WM, zones and the DataServers | – |
+
+A world is exactly one WM with its zones, Character and GameLog server; a second world duplicates those and shares
+Login, Account and AccountLog (X03 §1, §3). The four DataServers (Account, AccountLog, Character, GameLog) are one
+framework with different parser classes and SQL wrappers (D01 §1, D05 §7). Login, WM and Zone link the shared network
+library (S02).
+
+Start-up dependencies (X03 §7 for the order an operator uses):
+
+- **DataServers** listen at once. The Character server opens its link to the GameLog server first and refuses
+  incoming server links until it is up (D02 knowledge, D02 §1).
+- **Login** opens the OPTool listener, connects to Account and AccountLog, and opens the WM and client listeners
+  once both links are connected (L01 §1.3).
+- **WM** opens the OPTool listener, connects to Account, AccountLog, Character, GameLog and Login, and opens the zone
+  and client listeners only after the Character link has loaded the guild and academy data (link states 5 … 0x18,
+  then 1 on 0x9806; W05 §1.3–§1.4, W03 §9.1). The Login link is not required for that.
+- **Zone**: `WinMain` → service thread → the Lua start script downloaded from a certification server
+  (127.0.0.1:58492, fallback `cert1.fo.gamigo:80`); the script runs every data-load stage, then every network
+  service stage (Z10 §1, §7). The zone then connects to the WM, the Character server ("GameDB") and GameLog, and to
+  the next zone of the ring (Z01 §1, §10). On the WM's 0x0803 it registers its maps (0x180F) and instance maps
+  (0xA419) (Z01 §3.3).
+- **World status**: Login shows a world as unselectable until its WM has registered with 0x0802; the WM's 0x0808
+  user counts (at once and every 30 s) then update the status byte against the load table (L01 §3).
+
+### 2.2 Links
+
+```text
+game client ──1──► Login ──────► Account (9000), AccountLog (9311)
+     │  ◄── WM address + validate key (0x0C0C)
+     ├─────2──► WM ─────────► Login (9011), Account, AccountLog, Character (9411), GameLog (9511)
+     │  ◄── zone address (0x1003)
+     └─────3──► Zone n ─────► WM (9111), Character "GameDB" (9411), GameLog (9511),
+                              Zone n+1 ring listener (the last zone → Zone 0)
+                Character ──► GameLog (9511)
+OPTool ───────► Login, WM, zones, DataServers
+
+arrow = connecting side → listener; ports = shipped world-0 config; client links 1 → 2 → 3 in that order
+```
+
+| Connects (TCP client) | Listener (ServerInfo row, shipped port) | Carries | Docs |
+|---|---|---|---|
+| game client | Login (type 4, peer 20: 9010) | version check, login, world list / select, OTP login (dept 3 USER, dept 2 MISC) | `login-server.md` §4 |
+| game client | WM (type 5, peer 20: 9110), address from Login's 0x0C0C | world login, character list / create / delete / select; in game: chat, party, raid, guild, friends, KQ, options, … | W01 §3–§5, W02–W04 |
+| game client | zone (type 6, peer 20: 9210 / 9212 / 9214 / 9216), address from the WM's 0x1003 | everything on the map: movement, combat, items, NPCs, quests, trade, … | Z01–Z30 |
+| Login | Account (type 0: 9000) | password check 0x0C5B / 0x0C5C and the other AccountDB requests | `login-server.md` §5.1, D01 §3 |
+| Login | AccountLog (type 1: 9311) | IP block 0x0C5D / 0x0C5E, login records 0x0720 / 0x0721, NC_SYSLOG 0xC801 / 0xC802 | `login-server.md` §5.2, D01 §4 |
+| WM | Login (type 4, peer 5: 9011) | 0x0808 user counts; world select 0x0C0D → WM, 0x0C0E back; one-time tokens 0x0C35 / 0x0C36 | `login-server.md` §5.3, W01 §3.1, §8 |
+| WM | Account (9000) | world-login check 0x0C60 / 0x0C61, logout 0x0C11 (a no-op in the Account server, D01 knowledge), PC-bang check 0x082F / 0x0830, web key, reports | W01 §3, §8, D01 §3 |
+| WM | AccountLog (9311) | last-logout day 0x0C62 / 0x0C63, logout 0x0722, NC_SYSLOG 0xC803 / 0xC811 | W01 §2, §3.3, D01 §4 |
+| WM | Character (type 2, world: 9411) | avatars 0x0C12 / 0x0C13, create / delete / rename, character load 0x1004 → 0x1005 + blobs, login 0x1036, logout 0x1037; guild, academy, friends, options, prison data | W01 §6, W03, W04; D02 §3–§5, D04 §3–§9 |
+| WM | GameLog (type 3, world: 9511) | log records | W01 §8, D05 |
+| zone | WM (type 5, peer 6: 9111) | map registration 0x180F; character hand-off 0x101C → blobs → 0x101D, ticket 0x104B, map change 0x180B … 0x180E, 0x0C31; kicks 0x0C16 / 0x0C19; time 0x0821; dept 16 saves into the WM cache; mirrors of party / raid / guild / academy, chat relay, KQ | W01 §7, Z01 §5–§9, Z08 |
+| zone | Character "GameDB" (9411) | ITEMDB (dept 13), CHARSAVE (dept 16), quests (17), skills (18), and the zone-side DB requests of every other subsystem | Z05, Z01 §8.4, D02–D04, D07 |
+| zone | GameLog (9511) | NC_LOG_GAME / NC_LOG (dept 1), NC_SYSLOG (dept 50) | D05 |
+| zone n | zone n + 1, ring listener (type 6, peer 6: 9218 … 9221); the last zone connects to zone 0 | requests that need "any zone": player search / summon / kick, EXP / item bonus events, wedding partner, instance and job dungeons, guild and academy storage, holy-promise cen transfer | Z01 §10, Z14 §2–§4, Z30 §6 |
+| Character | GameLog (9511) | log records of DB-side changes (items, wedding, class change, login / logout) | D02 knowledge, D03 knowledge, D05 |
+| OPTool | Login 9015, WM 9115, zone 9211 / 9213 / 9215 / 9217 (all bound to 127.0.0.1); DataServers through their single listener | dept 10 OPTOOL: status, user limits, kicks, notices | `login-server.md` §5.4, W04 §4, Z01 §3.3, D01 §2, D05 §5 |
+
+The zones never talk to Login, Account or AccountLog; the WM does that for them (for example the PC-bang check
+0x082F carries the zone's handle, D01 knowledge). The client is connected to the WM and to one zone at the same time
+in game (it sends WM requests from the map, W01 §5); to Login only before the world login.
+
+### 2.3 Common link behaviour
+
+- **Framing and cipher**: every link uses the same frames (`[u8 len]` or `[0][u16 len]`, then `u16 opcode`, data;
+  S02 §1, `docs/protocol/README.md` §1.1). Only client → server traffic is XOR-encrypted, with the 499-byte table from
+  the seed 0x0807 that Login, WM and zone send right after accept (§5.1). Server links are not encrypted.
+- **Server handshake**: the listener sends 0x0801 `S2SCONNECTION_RDY`; the connecting side answers 0x0802
+  `{u8 echo, u8 server_id_to, u8 server_id_from, u8 world, u8 zone, u16 key = to + from}`; the listener checks
+  `server_id_to` (its own type) and the key and answers 0x0803 `{u8 echo, u16 result}` (W01 §2.1, Z01 §3.3, D01 §2).
+  The WM also compares a zone's IP with its ServerInfo row and does not check the world byte (W05 §5.2, W05-B13).
+  Account and AccountLog do not check the world either, which is what lets them serve every world (X03 §3).
+- **Handler guard**: every handler except the handshake and heartbeat first checks that its session completed the
+  handshake (`CheckConnectionValidation` / `CheckAlive`). Failing it closes the link in Login and WM (L01 §4.4,
+  W05 §4.5) and drops the packet in the DataServers (D01 §1.1). What an unregistered opcode does differs per parser
+  (W05 §5.1, L01 §4.1).
+- **Heartbeat**: a side that has received nothing for 30 s sends 0x0804; the peer answers 0x0805; 180 s more without
+  traffic closes the link (same constants in every process: W05 §1.5, L01 §2.6, S02 §4.4, D05 knowledge). The game servers also heartbeat clients (§5.1); Login does
+  it even to pre-login clients, which it then closes for answering (L01-B11).
+- **Link loss in the WM**: Account lost → the WM shuts down; Character lost → one immediate reconnect, then shutdown;
+  AccountLog / GameLog / Login → reconnect (W05 §1.5).
+- **Handles in messages**: a server request about a client carries the requester's handle so the answer can be routed:
+  Login and WM put the session handle (`u16`) first; zone requests start with the 6-byte `NETPACKETZONEHEADER
+  {u16 objHandle, u32 charNo}` that the answer echoes (Z01 knowledge §6, W01 knowledge). The 2017 PDB structs omit
+  these prefixes (C02 knowledge §3).
+
+### 2.4 Processing model
+
+| Process | Threads | Order guarantees |
+|---|---|---|
+| Login | IOCP workers (2 × CPU), acceptor, one main thread that pumps **every** buffered frame of each session per pass (5 ms sleep) | per session in order |
+| WM | IOCP workers (2 × CPU), acceptor, main thread: **one** frame per session per pass; `ProcessContents` runs the timed services (W05 §2) | per session in order |
+| Zone | IOCP workers (2 × CPU + 1), acceptor, main thread `zs_mainthreadfunction` (handlers, timers, player tick, mob AI; Z09 §1), certification threads (Z10 §6) | per session in order; `g_Now` in tenths of a second (Z09 knowledge) |
+| DataServers | a listener / IOCP layer and N session workers, each with its own ODBC connection, taking packets from one global queue (D01 §1, D05 knowledge) | **none across workers**: two requests of one sender can run concurrently and finish out of order (D05 knowledge; D03 knowledge: most multi-step requests are not transactional) |
+
+All handlers of the three game servers run on their main thread, so in-memory state needs no locks there; the
+DataServers rely on the database for consistency *(inferred from the thread layout)*.
+
+### 2.5 State ownership and persistence
+
+| State | Owner while running | Stored in | Written | Docs |
+|---|---|---|---|---|
+| accounts, passwords, block and auth flags | Account DB | `Account` (`tUser`, `tUserAuth`) | by procedures on request; Login and WM only read | D01 §3 |
+| login / logout history, IP blocks, statistics | AccountLog DB | `AccountLog` (`tAccountLog`, `tIPBlock`), `StatisticsData` | Login at login and world select, WM at logout and for user counts | D01 §4 |
+| character rows, shape, options, tutorial | Character DB; between zones the **WM cache** | `w00_Character` (`tCharacter`, …) | read by the WM at character select (0x1004 → 0x1005 + one blob per DB packet, kept in the WM session); the zone saves to the Character server (`ws_save2DB`: 0x4001 … every 600 s and on other triggers) and to the WM cache (`ws_save2worldmanager`, dept 16 `2WLDMAN` blobs, at map change and logout); the WM sends the cache to the next zone (0x101C …) and 0x1037 at logout | W01 §6.3, Z01 §8.4, Z09 §2, Z12 §6, D02 §4–§6 |
+| items, money, storage | the zone (in memory) with the Character server as the store | `tItem`, `tItemOptions` and side tables | per change through ITEMDB: reserve → DB → apply, or apply → DB with disconnect on failure (Z05 §1); the Character server trusts the zone's keys, lots and prices (D03 knowledge) | Z04, Z05, D03 |
+| quests, skills, abstates, titles | the zone | `tQuest`, skill / state tables | CHARSAVE and the dept 17 / 18 / 24 requests | Z15 §5, Z23 §7, D04 §1–§4 |
+| guilds, academies, guild storage | the WM (loaded from the Character DB at start, W03 §9.1); zones keep mirrors | guild tables in `w00_Character` | WM ↔ Character round trips on every change (W03 §2) | W03, Z08 §8, §10, D04 §6, §9 |
+| friends, prison, options, holy promise | WM / zone per feature | `tFriend` and feature tables | WM or zone requests | W04, Z08 §6, §9, D04 |
+| party, raid | the WM; zones keep mirrors | not stored *(inferred: no W02 handler sends a Character-server request)* | – | W02 §1, Z08 §1–§2 |
+| map objects, mobs, drops, booths, trades in progress | the zone | not stored | – | Z09, Z06 |
+| game log | GameLog DB (write-only) | `w00_GameLog.tGameLog`; NC_SYSLOG hourly text files | zones, WM and Character server send records; only 0x0402 is answered | D05 |
+
+### 2.6 Where a player's session lives
+
+1. **Login** (client link 1): version check, account check through Account and AccountLog, world list, world select
+   (Login asks the WM with 0x0C0D and gives the client the WM address and a 32-word validate key).
+2. **WM** (client link 2, kept until the client quits or returns to the world list): world login with the key
+   (0x0C0F), the character list from the Character server, character select (0x1001): the WM loads the character,
+   finds the zone that registered the login map and gives the client that zone's address (0x1003).
+3. **Zone** (client link 3, replaced on every zone change): map login 0x1801; the zone takes the ticket from the WM
+   (0x104B) and receives the cached character (0x101C … 0x101D) before it answers 0x1802. A map change to another
+   zone goes through the WM (0x180D / 0x180E) and a new client connection; a change inside the zone stays local
+   (Z01 §7). Returning to the world list uses a one-time token Login issued through the WM (L01 §4.3).
+
+The message-level sequences are §3 (parts 5–6).
+
+### 2.7 Deployment limits (from X03)
+
+- One `WORLD_NAME` row and one WM per world; Login indexes worlds by number (L01-B1, L01-B2 for out-of-range numbers).
+- Zone numbers 0 … 11, contiguous (the ring follows `zone + 1` and wraps to 0 at the first gap); a map belongs to one
+  zone by the `_ServerGroup.txt` column of `World/Field.txt` (or `World/<worldName>/Field.txt`); value 99 = "every zone
+  its own copy" (the mini-house `MHBasic0` … `MHBasic3`, single-digit suffix) (X03 §5–§6).
+- The shipped rows bind every listener to `0.0.0.0` but the WM compares a zone's address with its row exactly
+  (W05 knowledge §3, open question; X02).
 
 ## 3. Cross-server sequence index
 
