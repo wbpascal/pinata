@@ -9,11 +9,13 @@ offsets with `re-data/exports/zone`. Client: `Files/Client/2016/Fiesta.bin` (`re
 The Silver Wing is a reusable premium teleport item: using it opens a server menu with "Save location" and, once a
 location is saved in the item, "Fly to the saved location". Saving writes the current map and position into the item's
 attribute (DB 0x3449); flying starts an item cast of the pseudo-skill `UseSilverWings` whose end links the player to the
-saved place. The item is never consumed; a 60-minute cooldown (shortened by premium effects) limits it.
+saved place. The item is never consumed; a 60-minute cooldown limits it (a premium effect `EE_SILVERWINGCOOLTIME` could
+shorten it, but no 2016 `ChargedEffect` row carries it, §1.1). A second, unintended entry (0x304E, §5.5) skips menu and cast.
 
 Neighbouring items (not redone here): the item-use framework and 0x3015 (Z04 §6), the cast routine and `smo_ply_ItemUse`
-(Z13 §9.4, cast end), cooldowns and Z23-B5 (Z23 §3.2 / §3.6), server menus and 0x3C02 (Z02 §6.6), the link
-`so_LinkTo` (Z01 §7.1), the DB attribute change answer 0x344A (Z05 §5.4), the loaders of the tables in §1.1 (Z24 §2, Z27).
+(summarised in Z13 §9.4, the Minimon auto-use section), cooldowns and Z23-B5 (Z23 §3.2 / §3.6), server menus and 0x3C02 (Z02 §6.6), the link
+`so_LinkTo` (Z01 §7.1), the DB attribute change answer 0x344A (Z05 §5.4) and its Character-server side (D03 §4: 0x3449
+`FUN_0040e630` → `ItemAttr_Save`, BindItem storage table in D03 §1.3), the loaders of the tables in §1.1 (Z24 §2, Z27).
 
 ## 1. Data
 
@@ -32,7 +34,9 @@ Neighbouring items (not redone here): the item-use framework and 0x3015 (Z04 §6
 ### 1.2 Saved location: the item attribute
 
 The attribute is `ShineItemAttr_BindItem { u8 portalnum; Bind portal[10] }` with `Bind { u16 mapid; u32 x; u32 y }`
-*(pdb2016)*. The silver wing uses only the first entry and `portalnum` as the "location saved" flag. Offsets in the item
+*(pdb2016)*. In the Character DB (D03 §1.3, class 13 row) it is stored as option rows: 1100 = portalnum, then per portal n
+(0…9) 1110+10n = u16 map, +1 = u32 x, +2 = u32 y; `ItemAttr_Save` writes them on 0x3449 (D03 §4, FUN_0040e630). The silver
+wing uses only the first entry and `portalnum` as the "location saved" flag. Offsets in the item
 cell / `ItemTotalInformation` (key +0, `itemid` +8, attribute from +0xa):
 
 | Cell offset | Field | Meaning |
@@ -68,7 +72,8 @@ and never read). The callbacks read only `inven & 0x3ff`.
 
 ```pseudo
 client 0x3015 NC_ITEM_USE_REQ { invenslot, invenType 9 }        (Z04 §6.1: mode, field CanItem, level, class, lot … checks)
-  └ ItemUse_Inventory FUN_0053f5e0: sp_LastUsedItem = 2504
+  sp_NC_ITEM_USE_REQ FUN_005416b0: sp_LastUsedItem = 2504
+  └ sp_ItemUseReq_Inven FUN_0053f5e0 (Z04's "ItemUse_Inventory")
       ├ uib_CanUseItem (§3.1)       ≠ 0x700 → 0x3016 {0x70F} (+ 0x181D, 0x2011 notice)
       └ uib_DirectUse (§3.2) → sp_SilverWingMenu → 0x3C01 menu; returns "handled": no 0x3016 now, no cooldown check
 client 0x3C02 NC_MENU_SERVERMENU_ACK { reply }                    (Z02 §6.6: mode ∈ {1,2,3,6}, ≤ 1000 units from the opening point)
@@ -76,8 +81,9 @@ client 0x3C02 NC_MENU_SERVERMENU_ACK { reply }                    (Z02 §6.6: mo
   ├ "Fly …"           → sp_SilverWing_PortalCast (§4.2) → item cast (no packet) or 0x3016 {0x70D}
   └ "Cancel"          → sp_silverwing_Cancel + smfm_Cancel (§4.3) → 0x3016 {0x700}
 next so_Routine tick (§5.1): cooldown 0x7210 started, 0x4821 (ms, Z23-B5)
-  └ smo_ply_ItemUse (§5.2): uib_CanUseItem again; 0x301A; item-use broadcast; 0x4821 (s)
+  └ smo_ply_ItemUse (§5.2): uib_CanUseItem again; 0x301A; no 0x3029 broadcast (BroadCast 0); 0x4821 (s)
       └ uib_AfterCast (§5.3) → sp_SilverWing_PortalBlast (§5.4): 0x301A, 0x3016 {0x700}, so_LinkTo(saved map, x, y) → 0x1809 or WM 0x180D
+crafted 0x304E NC_ITEM_USE_ACTIVESKILL_REQ on the slot (§5.5): uib_AfterCast at once → blast and link, then a skill cast
 ```
 
 ## 3. Using the item (0x3015 → actor)
@@ -280,7 +286,8 @@ costs the full cooldown: (original bug) Z26-B3.
     actor = useditemeffect[cell.itemid].useitemclass        # the actor of the item in the slot NOW
     code = actor.uib_CanUseItem(p, cell); ≠ 0x700 → 0x3016 { code }; return     # silver wing: §3.1 again
     if bAutoUse == 0: p ← 0x301A NC_ITEM_USECOMPLETE_CMD (so_SendProtocol 12/0x1a, no payload)
-    sp_ItemUseBroadcast(p, entry, itemid)  (FUN_0053f840, Z24 §1.4)
+    sp_ItemUseBroadcast(p, entry, itemid)  (FUN_0053f840, Z24 §1.4): returns at once when entry.broadcast == 0, and the
+        `World/ItemUseFunction.txt` row `SilverWings` has BroadCast 0 → no 0x3029 NC_ITEM_SOMEONEUSE_CMD for the silver wing
     if scs_Skill == 0x7210: p.so_ply_NewSkillCoolTime(0x7210, so_ply_SilverWingCoolTime() / 1000) → 0x4821 { 0x7210, sec }
     actor.uib_AfterCast(p, inventory, itemdata, invenslot)          (§5.3)
     field Lua script: event 0x20 ItemUse (field, p, itemid)          # runs after the link of §5.4 (see §8)
@@ -323,10 +330,39 @@ ShinePlayer::sp_SilverWing_PortalBlast(p, inven)                              @ 
         # its refusals (mode ∉ {1,2,6}, trade partner, locked inventory, unknown zone) are silent: (original bug) Z26-B3
 ```
 
-The destination is not checked: neither `LinkIn` of the saved map now (only at the save), nor level limits, kingdom-quest or
-instance maps. `sp_LastUsedItem` at the blast is 2504 only if no other 0x3016 was sent since the 0x3015 (a Cancel/LocSet
+The destination is not checked: neither `LinkIn` of the saved map now (only at the save), nor `portalnum` (a fresh item
+links to `MapInfo` index 0 when reached through §5.5), nor the field level window of `FieldLvCondition.shn` (`LvFrom`–`LvTo`,
+Z14), nor kingdom-quest or instance state. The save-time `LinkIn` test keeps most instance / KQ maps out; a map with
+`LinkIn` ≠ 0 and an `LvTo` upper bound would let a player who saved there below `LvTo` return after out-levelling it:
+(original bug) Z26-B9 *(inferred: no 2016 map was checked for that combination)*. `sp_LastUsedItem` at the blast is 2504 only if no other 0x3016 was sent since the 0x3015 (a Cancel/LocSet
 reply or another item use in between leaves 0xFFFF or another item's ID; the client's `On_NC_ITEM_USE_ACK` 0x700 branch only
 uses `useditem` for mount, feed and item-0x7578 extras, so the silver wing is unaffected).
+
+### 5.5 Unintended entry: 0x304E NC_ITEM_USE_ACTIVESKILL_REQ @ FUN_00540b90
+
+`sp_NC_ITEM_USE_ACTIVESKILL_REQ` (Z04 §12.7, which describes it as a generic skill-item cast) is the second caller of the
+actor slot +0xc (`uib_AfterCast`); the first is `smo_ply_ItemUse` (§5.2). It never calls `uib_CanUseItem` or
+`uib_DirectUse` and does not check the item class (Z04's "class 35" is what the client sends, not a server test):
+
+```pseudo
+    checks of Z04 §12.7: mode, field CanItem (+0x9e), exclusive states, inventory locks, SB_SILENCE, slot, DemandLv,
+        1 ≤ lot ≤ MaxLot, KQ map + PK_KQ_USE, useditemeffect[itemid].useskill present (0x7210 for the silver wing),
+        move state 3 with CastTime ≠ 0 (not the case here), csl_CoolTimeCheck(0x7210) → 0x304F { 0x3129 } while cooling down
+    sp_LastUsedItem = itemid
+    target 0xFFFF (ground): TargetLoc reachable (so_FindBlockLocate) and within AttackDist + body size; the player's own
+        position passes both
+    actor.uib_AfterCast(p, inventory, itemdata, slot)      # silver wing: §5.3 → sp_SilverWing_PortalBlast → so_LinkTo NOW
+    vt 0xef8 smo_ply_SetItemEffect(0x7210); vt 0x8d0
+    smo_SkillBash_Casting(p, skill 0x7210, null, &TargetLoc, −1)   # Z03 §5.4: 0x2450 to p, 0x2451 to sight, CastTime 0
+    p ← 0x304F NC_ITEM_USE_ACTIVESKILL_ACK { 0x3128 }
+```
+
+So a crafted 0x304E on the silver-wing slot teleports at once: no menu, no item cast, **no `so_ply_IsLink_OutMap…` test**
+(only `uib_CanUseItem` does it, §3.1), so `LinkOut` / SystemMap maps can be left; with nothing saved (`portalnum` 0) the
+blast uses map 0 (`Rou`) at the stored x/y (0/0 for a fresh attribute *(inferred)*). The 0x301A / 0x3016 0x700 of the
+blast are sent, then a skill cast of 0x7210 starts on the already-linked player; its cooldown is set by the generic skill
+path (DlyTime 3 600 000 ms) rather than `so_ply_SilverWingCoolTime` *(inferred, cast end not traced for this case)*:
+(original bug) Z26-B7. The official client only sends 0x304E for its skill-cast items, so this needs a modified client.
 
 ## 6. Packets and client handlers
 
@@ -341,7 +377,9 @@ uses `useditem` for mount, feed and item-0x7578 extras, so the silver wing is un
 | 0x181D NC_MAP_LINK_FAIL_CMD | Z→C | `{ u16 err }` 0x1E41 / 0x1E42 | FUN_004b0e70: TextData2 0x35ac8487 (blank) |
 | 0x2011 NC_ACT_NOTICE_CMD | Z→C | `{ u8 unk (not written, Z09-B54), u8 len, char text[len] }` | FUN_004b5420 "[Notice] %s" |
 | 0x4821 NC_SKILL_COOLTIME_CMD | Z→C | `{ u16 skill, u32 sec }` (Z03; ms first, Z23-B5) | FUN_0049a9e0 |
-| 0x3449 NC_ITEMDB_ITEMCHANGE_REQ | Z→GameDB | §4.1 (`PROTO_NC_ITEMDB_ITEMCHANGE_REQ` *(pdb2016)*) | – (answer 0x344A, Z05 §5.4) |
+| 0x3449 NC_ITEMDB_ITEMCHANGE_REQ | Z→GameDB | §4.1 (`PROTO_NC_ITEMDB_ITEMCHANGE_REQ` *(pdb2016)*) | – (Character server FUN_0040e630 → `ItemAttr_Save`, answer 0x344A err 0x901 ok / 0x902 failed, D03 §4; zone side Z05 §5.4) |
+| 0x304E / 0x304F NC_ITEM_USE_ACTIVESKILL_REQ / ACK | C→Z / Z→C | Z04 §12.7 | only reached by a crafted request (§5.5); 0x304F codes in Z04 §12.7 |
+| 0x3029 NC_ITEM_SOMEONEUSE_CMD | Z→sight | Z24 §1.4 | **never sent** for the silver wing (BroadCast 0, §5.2) |
 | 0x1809 / 0x180D | Z→C / Z→WM | Z01 §7.1 | Z01 |
 
 ## 7. Original-server bugs
@@ -354,6 +392,9 @@ uses `useditem` for mount, feed and item-0x7578 extras, so the silver wing is un
 | Z26-B4 | `sp_SilverWing_PortalBlast` FUN_00597cf0 | an invalid saved map (`mapid` 0xFFFF from a field missing in `MapInfo`, or ≥ `mdb_maxmapid`) or a wrong item returns without any packet; the wrong-item assert text names `sp_silverwing_Setloc` | no 0x3016 for the use, cooldown spent (B3); misleading log | answer 0x3016 with an error; refuse saving when the map id is unknown |
 | Z26-B5 | `sp_SilverWing_PortalCast` FUN_00597b30 | uses whatever item is in the slot at the reply: its use skill, cooldown and actor; no Type/level/class/field `CanItem`/fear/"already casting" checks | an item swapped into the slot while the menu is open is cast and used through `smo_ply_ItemUse` without the 0x3015 checks *(inferred: needs a 0x300B move while the menu is open)*; a running skill cast is overwritten | check `itemid == sii_silverwing` and the 0x3015 state checks before casting |
 | Z26-B6 | `sp_SilverWing_PortalBlast` FUN_00597cf0 | sends 0x301A although `smo_ply_ItemUse` just sent it | harmless: the client's `ItemUseTask` ignores the second | drop one |
+| Z26-B7 | `sp_NC_ITEM_USE_ACTIVESKILL_REQ` FUN_00540b90 → `uib_AfterCast` FUN_0053ff70 | 0x304E calls the item actor's `uib_AfterCast` directly, without `uib_CanUseItem` / `uib_DirectUse` and without an item-class check; for the silver wing it runs `sp_SilverWing_PortalBlast` at once, then starts a skill cast of 0x7210 on the linked player | a crafted 0x304E teleports without menu or cast, out of `LinkOut` / SystemMap maps, and with nothing saved to map 0 (Rou); cooldown from the generic skill path | refuse 0x304E for items whose actor is not the skill-item actor (check the item class / `ItemUseFunction` entry), or call `uib_CanUseItem` first |
+| Z26-B8 | `sp_silverwing_Setloc` FUN_0059bc80 | answers 0x3016 0x700 right after sending 0x3449, before the Character server confirms; a 0x344A 0x902 (`ItemAttr_Save` failed, D03 §4) makes the zone Free the reserved copy (Z05 §5.4) | the player is told the save succeeded while the old location (or none) stays in the item | answer after the 0x344A, or send an error on 0x902 |
+| Z26-B9 | `sp_SilverWing_PortalBlast` FUN_00597cf0 | no field level check (`FieldLvCondition` LvFrom–LvTo) at save or blast | *(inferred)* a player can return to a level-windowed map with `LinkIn` ≠ 0 after passing its `LvTo` | check the destination's level window at the blast |
 
 Also in this flow: Z23-B5 (the first 0x4821 carries milliseconds).
 
@@ -368,14 +409,22 @@ Also in this flow: Z23-B5 (the first 0x4821 carries milliseconds).
   would *(inferred; mode 3 = dead from so_LinkTo's "Link Fail Player Die" test in Z01 §7.1)*.
 - Whether any client build shows the "Fly" entry differently: the menu is plain server text (`MenuString` / `ETC` script
   strings), the client has no silver-wing code besides the `UseSilverWings` cooldown exception in FUN_006a2b30.
+- 0x304E path (§5.5, Z26-B7): the end of the skill cast of 0x7210 started after the link (which cooldown store, whether
+  the cast survives a cross-zone link) was not traced; the attribute bytes of a newly created silver wing (assumed 0) neither.
+- Z26-B9: no 2016 map was checked for `LinkIn` ≠ 0 together with a `FieldLvCondition` row.
 - How the client refreshes the item's attribute after 0x344A Apply (cell change packet) is Z05 §5.4 / Z04 §1.4, not traced here.
 
 ## 9. Coverage boundary
 
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
-| 0x3015 checks, `ItemUse_Inventory` FUN_0053f5e0, `UseItemNormal` path | Z04 §6.1, §6.3 | generic item use before the actor is called |
-| `ShineMobileObject::so_Routine` FUN_0056a080 (all non-item branches), `smo_ply_ItemUse` FUN_0053fd10 | Z13 §9.4 (cast end; done) | §5.1 / §5.2 summarise only the silver-wing path |
+| 0x3015 checks, `sp_NC_ITEM_USE_REQ` FUN_005416b0, `sp_ItemUseReq_Inven` FUN_0053f5e0 (Z04: "ItemUse_Inventory"), `UseItemNormal` path | Z04 §6.1, §6.3 (done) | generic item use before the actor is called |
+| 0x304E `sp_NC_ITEM_USE_ACTIVESKILL_REQ` FUN_00540b90 (all non-silver-wing behaviour) | Z04 §12.7 (done) | generic skill-item use; its silver-wing consequence is §5.5 / Z26-B7 here, because Z04 does not describe the direct `uib_AfterCast` call |
+| `smo_SkillBash_Casting` FUN_0057bef0 and the skill cast end | Z03 §5.4 (done) | generic cast after §5.5 |
+| Minimon auto-use `sp_UseItemMonimon_UseItem` FUN_00561b80 (another caller of `uib_CanUseItem` / `uib_DirectUse`) | Z13 §9.4 (done) | cannot reach the silver wing: auto-use items are validated against `MinimonAutoUseItem.shn`, which has no `SilverWings` row (checked) |
+| Character-server 0x3449 FUN_0040e630 / `ItemAttr_Save`, BindItem option rows 1100 / 1110+10n | D03 §1.3, §4 (done) | DB side of the location save, cited in §1.2 |
+| `FieldLvCondition.shn` loader `fldb_Load` FUN_0046a350 | Z14 (table loader, done) | cited only for Z26-B9 |
+| `ShineMobileObject::so_Routine` FUN_0056a080 (all non-item branches), `smo_ply_ItemUse` FUN_0053fd10 | Z13 §9.4 (Minimon auto-use section, which also summarises `smo_ply_ItemUse`; done) | §5.1 / §5.2 summarise only the silver-wing path |
 | `csl_CoolTimeCheck`, `smo_ply_SkillCoolTime`, `so_ply_NewSkillCoolTime`, `so_ply_SilverWingCoolTime` FUN_005596b0 / FUN_00554f50 | Z23 §3.2, §3.6 (done) | cooldown store; bug Z23-B5 recorded there |
 | `sp_ServerMenuTitle` / `Item` / `Open`, `sma_Regist`, `sma_IsReady`, 0x3C02 handler FUN_0050fe60, `sma_Reply` FUN_0050fd40 | Z02 §6.6 (done) | generic server-menu machinery; the parts that decide whether the item use is answered (`sma_Reset` FUN_0050fc00, `sma_Clear` FUN_0050f660, the reset-callback hook FUN_00549b30 / FUN_0050f800) are in §4.4 because Z02 does not cite them |
 | `ItemMenu_Open` FUN_0048ced0 (the other user of the reset callback) | Z04 §1.5 (done) | cited only to argue Z26-B1's intent |
