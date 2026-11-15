@@ -1203,9 +1203,156 @@ So it is not a fixed index. "The last link to register" still fits if the 4 hand
 | WM→Z | 0x1120 | NC_CHAR_SUPPORT_REWARD_CMD | 2 | 8 | confirmed | `{5, eUserType 2}` after the first 0x180C only, on the main link |
 | Z→WM | 0x4034 | NC_CHARSAVE_2WLDMAN_ITEMACTIONCOOLTIME_CMD | 0 | | never seen | no cool time running at a zone change |
 
-### 7.6 Zone ↔ Character DB and GameLog DB *(parts 11–13, not yet written)*
+### 7.6 Zone ↔ Character DB and GameLog DB *(captured)*
 
-## 8. Zone in-world, batch 2: items, shops, storage *(part 11, not yet written)*
+The zone's 4 CharDB links and 4 GameLog links follow the round robin of §7.5.1: consecutive requests of one player
+leave on different `W00_CDB#n` links (the 4 `0x3444` of one storage open go out on 4 links in the same ms). Every
+CharDB answer comes back on the link of its request. The Character server's item logs (`0x0446`, `0x0448`, `0x0449`,
+`0x044C`, `0xC80D`, `0xC80E`) all use one link (`W00_GLDB#2` in both captures, which otherwise carries only `0x040A`, part 13), so that link is
+the Character server's GameLog link *(inferred from the content: only D03 sends these logs)*. Each log leaves 0–1 ms after the
+CharDB answer it belongs to, so the Character server sends the log after the reply (D03 §2.1 / §2.2 / §3.2 order).
+
+#### 7.6.1 Item transactions (part 11)
+
+Request → answer → client, by timestamp (`shop` unless noted; `Δ` from the client request):
+
+| Client request | Zone → CharDB | CharDB → zone | CharDB → GameLog | Zone → client (same ms) |
+|---|---|---|---|---|
+| 0x3003 buy 751 (19.253) | 0x340A BUYALL +1 ms, lock 0 | 0x340B +12 ms | 0x0448, 0xC80D +13 ms | +35 ms: CharDB 0x1070 FAMESAVE, 0x1033 cen, 0x106F fame, 0xBC04 coin, 0x3001, 0x3004 `0x201` |
+| 0x300F equip (34.931, 61.540) | 0x3410 EQUIP +4 / +17 ms, lock 1 / 6 | 0x3411 +13 / +19 ms | – | 0x3002 (equip slot), 0x3001 (inventory cell), 0x3011 `0x281` |
+| 0x300B move ×3 (51.508 …) | 0x3428 RELOC +4…12 ms, locks 2–4 | 0x3429 +8…23 ms | 0x044C (inventory → storage) | 0x3001 source emptied, 0x3001 target, 0x300C `0x241` |
+| 0x3012 unequip (59.029) | 0x3413 UNEQUIP +8 ms, lock 5 | 0x3414 +12 ms | – | 0x3002 slot 12 emptied (5 bytes), 0x3001, **0x3011** `0x281` (Z05-B2 captured) |
+| 0x3006 sell ×2 (94.949, 95.646) | 0x3422 SELLALL +0…5 ms, locks 7, 8 | 0x3423 +4…10 ms | 0x0449, 0xC80E | 0x1033, 0x3001 emptied, 0x305C repurchase slot 0 / 1, 0x3005 `0x381` |
+| 0x3009 pick (144.964; `combat` 69.422, 75.179) | 0x341C PICKALL **and** 0x3001 in the same ms (+3…6 ms) | 0x341D +7…10 ms | 0x0446 | 0x300A `0x341` 34–52 ms after 0x341D |
+| storage NPC (0x201D at 49.946) | 4 × 0x3444 pages 0–3, 15 ms after 0x201D | 4 × 0x3446, 16 ms later | – | 4 × 0x3C08 16 ms later, in the order 2, 3, 0, 1 |
+| 0x3015 ride item (`combat` 16.096) | none (direct use) | – | – | 0x3016 `0x700` + 0x2047 cast bar 3000 ms (+1 ms) |
+| ride item while riding (`combat` 56.122), map link while riding (43.715) | 0x3449 ITEMCHANGE (`sp_HorseItemSave`) | 0x344A `err 0x901` +7 ms | – | 0x203E, 0xCC06, 0x3016 `0x700`, 0x1805; 0x3001 with the new attribute 48 ms after 0x344A |
+| zone login (every 0x1803) | 0x34CF; with the client's 0x3020 / 0x302C: 0x3463, 0x1099 | 0x3464 `0x1041`, 0x109A (+1–2 ms) | – | (§5.1) |
+
+- **Lock indices** run 0, 1, 2 … per player across all transaction types (buy 0, equip 1, moves 2–4, unequip 5, equip
+  6, sells 7, 8), as Z05 §1.2 describes; every answer echoes its request's index.
+- **Commit styles (Z05 §1.1) captured**: style 1 (buy, equip, move, unequip, sell): the client sees nothing until the
+  CharDB answer, then all cell changes and the ACK in one ms. Style 2 (pick-up): the `0x3001` leaves with the request,
+  and only the `0x300A` waits for `0x341D`.
+- **Money releasers**: a purchase that costs only cen still runs all three releasers (`CenChange`, `FameChange`,
+  `CoinChange`, Z05 §1.4): `0x1033`, `0x106F` `fame 14` (unchanged), `0xBC04` `nCoin 0` and a `0x1070 FAMESAVE` to
+  the CharDB, before the `0x3001` of the new item. A sale sends only `0x1033`.
+- **The 34–52 ms gaps** (`0x341D` → `0x300A`, `0x344A` → `0x3001`) are the Nagle delay of §7.5.4: a small client
+  send right after another one in the same ms waits for the client's ACK *(inferred)*.
+- **Mover (Wooden Horse 38043, `MoverItem.shn` → mover 160)**: Z13 §7.2 / §7.4 confirmed. The use answers at once
+  (`uib_DirectUse` → `sp_MoverSystem_Cast`, no DB request). On the portal link at 43.715 `so_LinkTo` dismounts with
+  `GetOff(1)` right after `0x180B` and before the `ws_save2DB` packets (§7.5.4): `0x3449` with `hungrypoint 760`,
+  `bitflag 0` (DuringRide cleared before the save), then client `0x203E`, `0xCC06`, `0x3016 {0x700, 0xFFFF, 9}` (the
+  useditem was reset by the first 0x3016) and `0x1805` for the mover object; WM `0xCC0B` carries the link data
+  (§7.5.4). In zone B the mover is back (re-summoned from the link data, Z13 §7.7), and using the item at 56.122
+  dismounts with `GetOff(0)`: `hungrypoint 750`, the same client packets with `useditem 38043`.
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| Z→CDB | 0x340A | NC_ITEMDB_BUYALL_REQ | 1 | 133 | **corrected** | D03 layout right; `attr` (u16 @42) = byte offset of the attribute (68), not a length (Z04 §2.1 "attrLen"); attribute = variable tail (65 B weapon); P02.json override |
+| CDB→Z | 0x340B | NC_ITEMDB_BUYALLSUC_ACK | 1 | 8 | confirmed | `{ref, lockindex}` |
+| Z→CDB | 0x3410 | NC_ITEMDB_EQUIP_REQ | 2 | 35 | confirmed | D03 layout; `relocA_IsPutOnBelonged` is 4 bytes (Z04 §5.1 says u8, its offsets are right); `relocB.key −1` for an empty slot |
+| CDB→Z | 0x3411 / 0x3414 / 0x3423 / 0x3429 | EQUIPSUC / UNEQUIPSUC / SELLALLSUC / RELOCSUC_ACK | 2 / 1 / 2 / 3 | 8 | **corrected** | `{ref, lockindex}`; pdb2016 struct lacks the 6-byte ref (P02.json) |
+| Z→CDB | 0x3413 | NC_ITEMDB_UNEQUIP_REQ | 1 | 20 | confirmed | Z04 layout |
+| Z→CDB | 0x341C | NC_ITEMDB_PICKALL_REQ | 3 | 45 | confirmed; **new layout** | no annotation before; `{ref, PROTO_ITEM_CREATE, attribute}`; map / x / y = the picker's position; `attr` = offset 44 (P02.json) |
+| CDB→Z | 0x341D | NC_ITEMDB_PICKALLSUC_ACK | 3 | 6 | confirmed; **new layout** | `{ref}` only (D03 §3.4) |
+| Z→CDB | 0x3422 | NC_ITEMDB_SELLALL_REQ | 2 | 39 | confirmed | D03 layout; `price` = unit price × lot |
+| Z→CDB | 0x3428 | NC_ITEMDB_RELOC_REQ | 3 | 34 | **corrected** | pdb2016 struct + ref prefix; `ownerA 5` (charNo), `ownerB 103` (userNo: account storage) |
+| Z→CDB | 0x3444 | NC_ITEMDB_OPENSTORAGE_REQ | 4 | 12 | confirmed | Z04 §7.2; pages 0–3 from the NPC role (Z02 §6.5), `fromAccountStorageCmd 0` |
+| CDB→Z | 0x3446 | NC_ITEMDB_OPENSTORAGE_ACK | 4 | 20 | confirmed; **bug** | 17 bytes + 3 stale bytes (D03-B8 captured, zeros here) |
+| Z→CDB | 0x3449 | NC_ITEMDB_ITEMCHANGE_REQ | 2 | 37 | confirmed | Z26 layout; riding attribute 0x13 bytes (Z13 §7.1) |
+| CDB→Z | 0x344A | NC_ITEMDB_ITEMCHANGE_ACK | 2 | 10 | confirmed | pdb2016 layout; `err 0x901` |
+| Z→CDB | 0x3463 / CDB→Z 0x3464 | NC_ITEMDB_CHARGED_LIST_REQ / _ACK | 2 / 2 | 14 / 11 | confirmed | Z04 §8.1 page 0 (0..23); `ErrorCode 0x1041`, 0 items |
+| Z→CDB | 0x34CF | NC_ITEMDB_RESET_SCROLL_LINK_MAP_INFO_CMD | 6 | 4 | confirmed | once per zone login completion, also after the same-zone revive (D06 §5.2) |
+| Z→CDB | 0x1099 / CDB→Z 0x109A | NC_CHAR_GET_ITEMLIST_BY_TYPE_NUM_REQ / _ACK | 2 / 2 | 16 / 16 | confirmed; **bug** | Z04 §8.3 box 2 page 0; `Error 0x1200` in both = never written (D02-B13 captured) |
+| CDB→GL | 0x0446 | NC_LOG_GAME_ITEM_TAKE | 3 | 38 | confirmed; **bug** | map "Need" (D03-B11); x / y and `iteminven` never written (P02-B15); `itemlot 0` |
+| CDB→GL | 0x0448 / 0x0449 | NC_LOG_GAME_ITEM_BUY / _SELL | 1 / 2 | 23 | confirmed | D03 §2.1 / §2.2; `itemlot 0`, seller / buyer 0 |
+| CDB→GL | 0x044C | NC_LOG_GAME_ITEM_INVEN_MOVE | 3 | 20 | confirmed | only for a move that leaves the inventory (D03 §3.2) |
+| CDB→GL | 0xC80D / 0xC80E | NC_SYSLOG_CHAR_ITEM_BUY / _SELL | 1 / 2 | 20 | confirmed | `Vendor 28` = the NPC's mob id |
+
+Parts 12–13 add the combat / death and the save / other zone ↔ CharDB and GameLog rows (0x4001 … 0x4035, 0x1070,
+0x041E, 0x0410, 0xC808, 0xC809 …).
+
+## 8. Zone in-world, batch 2: items, shops, storage *(captured)*
+
+Scenario (`shop`, zone A = RouN, character Test2, 99 371 cen): weapon NPC (0x3C09 at 13.076), buy Long Mace 751
+(19.253), equip it in place of Short Mace 750 (34.931), storage NPC (49.946), move 750, Bone 3004 and Leather 3005
+into account storage (51.5–53.0), close (57.055), unequip 751 (59.029) and equip it again (61.540), item NPC (0x3C0B
+at 86.732), weapon NPC (92.892), sell Spirit Dust 3000 and Meat 3001 (94.949, 95.646), then in zone B (RouCos02) pick
+up a Meat drop (144.964). `combat`: ride item Wooden Horse 38043 used twice (16.096 zone A, 56.122 zone B), three
+pick-ups of mob drops (69.422, 75.179). The CharDB / GameLog side of every transaction and its timing: §7.6.1.
+
+### 8.1 Field findings
+
+- **0x3001 NC_ITEM_CELLCHANGE_CMD** (Z05 §1.5 layout): sizes 6 (empty cell, `itemid 0xFFFF`, nothing follows),
+  7 (stackable: 1-byte lot), 25 (riding item: 0x13-byte `ShineItemAttr_Riding`), 71 (weapon: 65 attribute bytes).
+  `exchange` = the other cell of the change: the target cell when the source is emptied, the source when the target
+  is filled (a move sends the emptied source first), the equipment cell (`0x200C`) for the inventory side of an
+  (un)equip, and `location` itself for buy, sell, pick-up and attribute changes.
+- **0x3002 NC_ITEM_EQUIPCHANGE_CMD** (batch 1 §6.2): `exchange` = the inventory cell, `location` u8 = equipment slot
+  12 (right hand); 70 bytes with a weapon, 5 when the slot is emptied. On an equip the 0x3002 precedes the 0x3001 of
+  the inventory cell, then the ACK.
+- **0x3C09 / 0x3C0B NC_MENU_SHOPOPENTABLE_WEAPON / _ITEM_CMD** (no layout before; P02.json from Z02 §6.5
+  `nrm_ShopMenuOpen` and the pdb2017 struct): `{u16 itemnum, u16 npc, MENUITEM {u8 slot, u16 item}[itemnum]}`,
+  190 = 4 + 62 × 3 and 67 = 4 + 21 × 3. The weapon list holds three runs of rising slots (0…26 weapons 250…57365,
+  0…69 armour from LeatherBoots 0 to 57396, 0…8 rings 2000…2302) and the item list two (weapon licences 10000…10005,
+enchant stones 61000…). The client
+  (`Market::SetWeapon` FUN_006137c0) starts a run whenever `slot` is 0, takes the tab from the first item's
+  `ItemInfo.Class` (5 weapon, 6–8 armour, else the third tab), fills skipped slots with empty cells, and stops at 200
+  per tab. Both NPC visits to the weapon NPC sent byte-identical lists (`npc 17084`).
+- **0x305C NC_ITEM_SELL_ITEM_INSERT_CMD** (pdb2016 `{u16 nHandle, SHINE_ITEM_STRUCT ItemInfo}`, 105 bytes):
+  `nHandle` 0 / 1 = repurchase slot, `itemid` 3000 / 3001, then the 1-byte lot. The other 100 bytes are stale:
+  readable text of earlier text packets ("…nly death can cleanse the light.…", "…oes anyone want to play? My game is
+  deadly, though.") followed by the `MENUITEM` bytes of the 0x3C09 sent at 92.892. `so_ply_SellItemList_Insert` @ FUN_00537a20 writes
+  the opcode, `nHandle` and the item through `iti_fill2buffer_union` @ FUN_006406c0 (only as many attribute bytes as the
+  class has), then sends a fixed `pp_SetPacketLen(&gpp, 0x6b)` from the shared send buffer `gpp`
+  (original bug) P02-B16. The client reads the item by its class *(inferred)*, so the tail is not shown; it puts
+  earlier packets of the zone (other players' texts included) on the wire.
+- **0x3C08 NC_MENU_OPENSTORAGE_CMD** (Z05 §7.1): one per DB page, 13 bytes with an empty page, the PDB struct is 12 +
+  items. `so_accountstoragefill` @ FUN_0044c530 sends `0xe + n` bytes (opcode included), with n =
+  `ias_FillBufferItem` @ FUN_00643b10, which returns `end − counter pointer` (`param_1` = the `itemcounter` byte at
+  +0xd) and so counts the counter byte a second time: every 0x3C08 ends with one stale byte (0x00 here)
+  (original bug) P02-B17, the same slip as `irs_FillBufferItem` for 0x302D (P02-B3). `pages` = 0x10 constant; the zone
+  sends the pages in the order their 0x3446 arrive on its 4 links (2, 3, 0, 1).
+- **0x300A NC_ITEM_PICK_ACK**: `{itemid, lot 1, 0x341, 0xFFFF}` ×3, matches Z05 §3.2; the client prints
+  "[%s] has been obtained." (Z04 §3.3).
+- **0x3011 for the unequip**: the 0x3414 answer sends `0x3011 NC_ITEM_EQUIP_ACK 0x281`, never `0x3013`: Z05-B2 captured.
+- **0x3016 NC_ITEM_USE_ACK** (Z04 §6.1): the ride item answers `0x700` with `useditem 38043` at once (direct use, no
+  CharDB request) and the client starts a 3000-ms cast bar (0x2047, part 12). The two forced dismounts send a second
+  `0x3016 0x700` (Z13 §7.4 `so_MoverSystem_GetOff` → `ItemUseResult`), `useditem 0xFFFF` when the first 0x3016 had
+  already reset it (map link) and 38043 when the dismount is the use itself (§7.6.1).
+- **0x1C0A NC_BRIEFINFO_DROPEDITEM_CMD** (Z09 §11.3): `attr 8` (looting bit 3) for the killer, `dropmobhandle` = the
+  mob that dropped it; sent 1.5–6.6 s before the pick-up, 15 bytes.
+- **0x304D NC_ITEM_ACCOUNT_STORAGE_CLOSE_CMD**: the client sends it when the NPC storage window closes, although the
+  storage was opened through the NPC (`fromAccountStorageCmd 0`, `nOpenType 0`); no reply (Z04 §7.3).
+- **0x3003 / 0x3006 payloads** match Z04 §2.1 / §2.4 (`{itemid 751, lot 1}`, `{slot, lot 1}`); `0x300B` = `{0x2406 →
+  0x1800}` etc. (the decoder read every `ITEM_INVEN` as 1 byte until P02.json defined the struct, part 11).
+
+### 8.2 Opcodes
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| C→S | 0x3003 | NC_ITEM_BUY_REQ | 1 | 6 | confirmed | Z04 §2.1 |
+| S→C | 0x3004 | NC_ITEM_BUY_ACK | 1 | 2 | confirmed | `0x201` after 0x340B (Z05 §2.1) |
+| C→S | 0x3006 | NC_ITEM_SELL_REQ | 2 | 5 | confirmed | Z04 §2.4 |
+| S→C | 0x3005 | NC_ITEM_SELL_ACK | 2 | 2 | confirmed | `0x381` after 0x3423 |
+| C→S | 0x3009 | NC_ITEM_PICK_REQ | 3 | 2 | confirmed | Z04 §3.3 |
+| S→C | 0x300A | NC_ITEM_PICK_ACK | 3 | 10 | confirmed | `0x341`, `itemhandle 0xFFFF` |
+| C→S | 0x300B | NC_ITEM_RELOC_REQ | 3 | 4 | confirmed | inventory → account storage; decoder fixed (`ITEM_INVEN`) |
+| S→C | 0x300C | NC_ITEM_RELOC_ACK | 3 | 2 | confirmed | `0x241` |
+| C→S | 0x300F | NC_ITEM_EQUIP_REQ | 2 | 1 | confirmed | Z04 §5.1 |
+| S→C | 0x3011 | NC_ITEM_EQUIP_ACK | 3 | 2 | confirmed; **bug** | `0x281` also for the unequip (Z05-B2) |
+| C→S | 0x3012 | NC_ITEM_UNEQUIP_REQ | 1 | 2 | confirmed | `{12, 4}` |
+| S→C | 0x3013 | NC_ITEM_UNEQUIP_ACK | 0 | | never seen | on success the zone sends 0x3011 (Z05-B2) |
+| C→S | 0x3015 | NC_ITEM_USE_REQ | 2 | 2 | confirmed | ride item |
+| S→C | 0x3016 | NC_ITEM_USE_ACK | 3 | 5 | confirmed | `0x700`; 2 from forced dismounts |
+| C→S | 0x304D | NC_ITEM_ACCOUNT_STORAGE_CLOSE_CMD | 1 | 0 | confirmed | also after an NPC open |
+| S→C | 0x305C | NC_ITEM_SELL_ITEM_INSERT_CMD | 2 | 105 | confirmed; **bug** | 100 stale `gpp` bytes (P02-B16) |
+| S→C | 0x3001 | NC_ITEM_CELLCHANGE_CMD | 17 | 6 / 7 / 25 / 71 | confirmed | `exchange` rule above |
+| S→C | 0x3002 | NC_ITEM_EQUIPCHANGE_CMD | 3 | 5 / 70 | confirmed | before the 0x3001 of the inventory cell |
+| S→C | 0x3C08 | NC_MENU_OPENSTORAGE_CMD | 4 | 13 | confirmed; **bug** | one stray trailing byte (P02-B17) |
+| S→C | 0x3C09 / 0x3C0B | NC_MENU_SHOPOPENTABLE_WEAPON_CMD / _ITEM_CMD | 2 / 1 | 190 / 67 | confirmed; **new layout** | P02.json; tabs by slot runs |
+| S→C | 0x1C0A | NC_BRIEFINFO_DROPEDITEM_CMD | 3 | 15 | confirmed | `attr 8` for the killer |
 
 ## 9. Zone in-world, batch 2: combat, death, revive, soulstones *(part 12, not yet written)*
 
@@ -1255,6 +1402,9 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B12 | zone `SocketBundle<WorldManagerSession>::sb_GetSocket` @ FUN_004199b0 used for every per-character update (`sp_GainExp` @ FUN_0042d830, `ws_save2worldmanager` @ FUN_004536f0, …), with the WM serving each link once per pass in session-list order | consecutive updates of one character go out on 4 different links, and the WM applies them in link-service order, not in send order (§7.5.4) | `&levelup 3`: the WM logged GameLog 0xC808 for levels 7, 6, 8; two updates of one field in one WM pass (two 0x1073 / 0x1074 / 0x400E) can leave the WM cache (party, guild, academy level, exp) one step old until the next update | keep one character's updates on one link (pick the link by character) |
 | P02-B13 | WM `CGuildManager::ProcessGuildAcademy` @ FUN_00441200 → all zones 0x987A | copies the 15-byte buff name with a `strcpy` loop into the uncleared `CSendPacket` buffer and sends all 32 bytes of `BuffName` (§7.5.4) | 17 stale WM stack bytes per zone per minute (in `shop` 58.755 the tail of the KQ title of the 0x580D built in the same ms); the zone reads up to the NUL | zero the buffer or use a bounded copy that pads |
 | P02-B14 | zone `ShinePlayer::so_SaveItem_Part` @ FUN_00456030 → WM 0x4013 | the mini-house (`nPartMark 0x12`) and action-box (0x22) loops increment `nPacketOrderNum` before the send, the inventory (5) and equipment (8) loops after it; an action-box failure logs the mini-house message (§7.5.4) | first packet of boxes 0x12 / 0x22 carries order 1 (`0x81` captured), of boxes 5 / 8 order 0 (`0x80`); harmless, the WM uses the order only for the inventory (`CharDataStore` @ FUN_00430870, `nPartMark & 4`); Z13 §2.8 describes the order without a tag | count from 0 in all four loops; own log text for the action box |
+| P02-B15 | Character server `fc_NC_ITEMDB_PICKALL_REQ` @ FUN_0040b760 → GameLog 0x0446 | fills `chrregnum`, the map name (`strncpy` "Need", 12 bytes, D03-B11), the key, `itemlot 0` and `itemid`; `mappos.x` / `mappos.y` and `iteminven` (10 bytes) keep the stack (§7.6.1) | every pick-up log has garbage cell values (0x7512, 0x4372, 0x7511 captured) and x = y = 0 | write the request's map position and `location` |
+| P02-B16 | zone `ShinePlayer::so_ply_SellItemList_Insert` @ FUN_00537a20 → client 0x305C | writes `nHandle` and the item with its class-sized attribute, then sends a fixed 105-byte payload from the shared `gpp` buffer (§8.1) | up to 100 stale bytes per sale: text and lists of earlier packets (other players' messages included) | length = 4 + written item bytes, or clear the buffer |
+| P02-B17 | zone `ShinePlayer::so_accountstoragefill` @ FUN_0044c530 → client 0x3C08 | adds the length of `ias_FillBufferItem` @ FUN_00643b10, which already counts the `itemcounter` byte, to the offset after it (§8.1) | every storage page carries one stale trailing byte | use `0xd + n` (same slip as P02-B3) |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -1267,6 +1417,10 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | Z09-B54 | 0x2011 `unk` never written (values 1 / 2 are buffer leftovers) | §5.2 |
 | Z02-B2 | mob `moveattr` = stale `gpp` bytes with bit 0 cleared | §6.3 |
 | Z09-B13 | no visible effect while the broadcast buffer is not full (0x1C0E reaches the mover) | §6.3 |
+| Z05-B2 | unequip answered with `0x3011 0x281`, no `0x3013` | §8.1 |
+| D03-B8 | 0x3446 = 17 bytes + 3 stale (zero) bytes | §7.6.1 |
+| D03-B11 | 0x0446 map name "Need" | §7.6.1 |
+| D02-B13 | 0x109A `Error 0x1200` in both captures (never written) | §7.6.1 |
 
 ## 13. Discrepancies per work item
 
@@ -1311,11 +1465,18 @@ Every owner below is `**State:** done`; nobody reopens them. The full rows (old 
 | Z02 | `Z02-actions.md` §6.2 | Gate_Town NPCs (MiniMapIcon 23): no 0x201D, town-portal window | corrected → X01 |
 | Z04 | `Z04-items.md` §8.3 | 0x302D trailing byte (P02-B3) | corrected → X01 |
 | Z15 | `Z15-quest-engine.md` §5.6 | 0x441E values are `time_t` period starts | corrected → X01 |
+| Z04 | `Z04-items.md` §2.1 (0x340A `+0x2c attrLen`), §5.1 (0x3410 `+0x14 u8 bind`) | the u16 is the byte offset of the attribute in the payload (68; 44 in 0x341C), not a length; `bind` is 4 bytes (offsets right) | corrected → X01 |
+| Z05 | `Z05-itemdb.md` §1.4 (ItemSell → 0x305C), §7.1 (0x3C08) | fixed-length 0x305C with 100 stale bytes (P02-B16); 0x3C08 one stray byte (P02-B17) | corrected → X01 |
+| D03 | `D03-character-items.md` §3.4 (PICKALL → 0x0446 `{ owner, "Need", key, 0, itemid }`) | x, y and `iteminven` are never written (P02-B15); annotation 0x340A `attr` SHINE_ITEM_ATTRIBUTE (101 fixed) is a variable tail | corrected (P02.json override) → X01 |
+| S01 | `pdb2016-layouts.json` 0x3411 / 0x3414 / 0x3423 / 0x3429 / 0x3428 | the CharDB ↔ zone packets carry the 6-byte `NETPACKETZONEHEADER` before the PDB struct (8 / 34 bytes) | corrected (P02.json `packets.zone`) |
+| P01 | `pcap_decode.py` with the annotations | `ITEM_INVEN` and `MAPPOS` had no struct entry, so every field of these types decoded as 1 byte | fixed by P02 (part 11, P02.json `structs`) |
 
-No discrepancy for Z03, Z05, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held. Batch 2 §7.5 also confirms Z01 §5.2–§5.3, Z07 §1.2–§1.4, Z09 §1.2 / §1.5, Z12 / Z13 / Z17 / Z28 blob layouts
+No discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held. Batch 2 §7.5 also confirms Z01 §5.2–§5.3, Z07 §1.2–§1.4, Z09 §1.2 / §1.5, Z12 / Z13 / Z17 / Z28 blob layouts
 (the trailing bytes are the WM's P02-B10 / P02-B11) and W05 §2 (0x441D). Part 10 (§7.5.4) confirms Z01 §7.1 (`so_LinkTo`, 0x180B / 0x180D / 0x180E, the same-zone branch), the
 Z03 / Z12 / Z13 / Z15 / Z16 / Z23 / W04 layouts of the saves, Z08 §4 (no 0x580E from a zone without the map, Z08-B8) and
-§8.2 (0x7496), W03 §3.5 / §6.4 and W04 §17.5 (0x1120 after the first 0x180C only), and Z18 §6.2's use of title type 9.
+§8.2 (0x7496), W03 §3.5 / §6.4 and W04 §17.5 (0x1120 after the first 0x180C only), and Z18 §6.2's use of title type 9. Part 11 (§7.6.1, §8) confirms Z02 §6.5 (shop lists), Z04 §2–§7, Z05 §1–§7 (lock
+indices, both commit styles, the money releasers), Z09 §11.3 (0x1C0A looting bit), Z13 §7.2 / §7.4 (mover use and both
+forced dismounts, `so_LinkTo` dismounting before `ws_save2DB`), D03 §2–§5 (answers before logs) and D06 §5.2 (0x34CF).
 
 ## 14. Not reconstructed / uncertain
 
@@ -1348,9 +1509,15 @@ Z03 / Z12 / Z13 / Z15 / Z16 / Z23 / W04 layouts of the saves, Z08 §4 (no 0x580E
 - **Link-to-process mapping** (batch 2, §7.1): settled in part 9 (§7.5.1): `SocketBundle<…>` `sb_SocketStr[4]`, one
   round-robin pick per send. Which of the 4 WM links carries a zone's broadcasts (the last to register) is *(inferred)*; part 10 (§7.5.4) shows
   it is not a fixed `sb_SocketStr` index.
+- **Account-storage flags after 0x304D** (§8.1): the NPC open sets `p+0x5cb8` bit 4 (`nOpenType 0`, Z05 §7.1) and
+  the close command clears only bit 5 (Z04 §7.3). Whether bit 4 stays set (and storage moves remain possible after the
+  window is closed) was not exercised: no move followed the close. Look for the clear in the NPC menu close path (Z02).
+- **Character server's GameLog link** (§7.6): identified by content (D03 logs only), and the 34–52 ms client delays
+  after a CharDB answer by the Nagle reading of §7.5.4 *(both inferred)*.
 - *(inferred)* items carried from parts 1–4: the 0x112C range broadcast excludes the sender (§5.1 #12); 0x2011 `unk` values are buffer leftovers (§5.2); the
   client ignores the 0x302D trailing byte (§5.3); AVATAR KQ fields keep the last saved position (§4.3).
-- **Not captured at all**: combat beyond targeting, chat (other than `&adminlevel`), item use / trade / shops, party,
+- **Not captured at all**: combat beyond targeting (batch 1), chat (other than `&adminlevel`), trade, booths, every item failure path
+  (batch 2 has only successful item transactions, §8), party,
   guild, KQ, failure paths (0x0C15, 0x1002, 0x1804, 0x0C66, …; lists in §3.2, §4.2, §5.2). Statuses there stay
   **never seen** until X02's scenarios are recorded.
 
@@ -1380,6 +1547,12 @@ Batch 2 (part 9): no decoder change. `annotations/P02.json` `packets.wm` annotat
 `PROTO_SELL_ITEM_INFO_SERVER` (pdb2016) is redefined there with `datasize` first (variable elements), which also
 decodes 0x4037. After that every packet on the 32 WM links decodes without an issue.
 
+Batch 2 (part 11): no decoder change. `annotations/P02.json` `structs` adds `ITEM_INVEN` (u16) and `MAPPOS` (20 bytes),
+which no file defined (the decoder read both as 1 byte), and `MENUITEM`; `packets.zone` adds the ref-prefixed CharDB ↔
+zone layouts 0x3411 / 0x3414 / 0x3423 / 0x3429 / 0x3428 / 0x341C / 0x341D and the shop lists 0x3C09 / 0x3C0B;
+`packets.character` 0x340A replaces D03's fixed 101-byte attribute with a variable tail. After that every part-11
+opcode decodes without an issue (issue types left: shop 9, combat 8, all of parts 12–13 or the known 0x7C07 / 0x7037).
+
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
 | 0x7C07 4-byte short form: the decoder warns "sReason needs 16 bytes" | W04 §9.2 (done; documents both forms) | the layout is right; `annotations/W04.json` has one entry for two sizes and sorts after P02.json, so P02 cannot override it; harmless warning |
@@ -1391,3 +1564,4 @@ decodes 0x4037. After that every packet on the 32 WM links decodes without an is
 | per-minute phase, clock offset, 0x7C07 timing, LoadMap heartbeat points (§14) | X02 (plan: "adversarially re-check load-bearing claims … write targeted capture scenarios") | none changes a layout or an order; each needs a targeted capture (zone restart, synced clocks, map loads with markers) |
 | second per-minute 0x1035, 0x3C01 `npcPosition`, NPC sp 100 | resolved here (review): §6.1 (0x1035), §6.3 | the second 0x1035 = the `so_Routine` dirty-flag pass after the per-minute block sets `p+0xe94` (`smo_Abstate.parameterchange`, Z09 §2.4 / §5.5, §6.1) |
 | WM `CWMClientSession::Send_NC_CHAR_SUPPORT_REWARD_CMD` @ FUN_00433ab0 → zone 0x1120 @ FUN_005a5c70 (abstate 728) | W04 §17.5, Z07 §1.2 (both done, both document it) | resolved and confirmed in §5.1; nothing left to document |
+| item transaction failures (0x340C/0x340F, 0x3412, 0x3415, 0x341E, 0x3424, 0x342A, 0x3445 …) and their client codes | X02 (plan: "write targeted capture scenarios"), then P02 again | batch 2 holds only successes (§8.2); the failure layouts are Z05 §2–§7 / D03's |

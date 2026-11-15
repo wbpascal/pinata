@@ -87,6 +87,33 @@ Basis: 2016 Zone.pdb PROTO_SELL_ITEM_INFO_SERVER (size 0x7a, a maximum): first b
 | 3 | u64 | nSellItemKey | SHINE_ITEM_REGISTNUMBER; −1 in capture:shop |
 | 11 | bytes | ItemTotalInfo | ItemTotalInformation, nDataSize − 10 bytes (item id first: 3000, 3001 in capture:shop) |
 
+### ITEM_INVEN (2 bytes)
+
+Basis: pdb2017 union ITEM_INVEN { Pos:10, Type:6 } (2 bytes); Z04 §1.1. P02 batch 2 part 11: no file defined it, so the decoder read every ITEM_INVEN field (D03 / D05 / Z04 annotations) as 1 byte
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | inven | type << 10 | slot (pdb2017 union Pos:10 / Type:6; Z04 §1.1). P02 part 11: without this entry the decoder read every ITEM_INVEN as 1 byte |
+
+### MAPPOS (20 bytes)
+
+Basis: pdb2016 PROTO_ITEM_CREATE.map (MapName u8[12], MapXY.x u32, MapXY.y u32; 20 bytes), used by D03's 0x340A annotation; captured 0x340A / 0x341C
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | char[12] | MapName |  |
+| 12 | u32 | x |  |
+| 16 | u32 | y |  |
+
+### MENUITEM (3 bytes)
+
+Basis: pdb2016 / pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD::MENUITEM (3 bytes); zone nrm_ShopMenuOpen FUN_004c26b0; client Market::SetWeapon FUN_006137c0; captured 0x3C09 / 0x3C0B
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | slot | grid cell of the shop tab; a slot not above the previous one starts the next tab (client Market::SetWeapon FUN_006137c0) |
+| 1 | u16 | item | ItemInfo ID |
+
 ## Client → server
 
 ### `0x080d` NC_MISC_GAMETIME_REQ

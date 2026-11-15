@@ -2242,6 +2242,308 @@
     "basis": "pdb2016 enum NC_CHAR_LOGOUTREADY_CMD = 113; zone FUN_00558450 (Z07 §3.3)",
     "fields": [],
     "notes": "P02: empty body. evidence: capture size 0"
+   },
+   "0x3411": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_EQUIPSUC_ACK",
+    "basis": "zone FUN_0052cba0 (Z05); pdb2016 struct without the 6-byte ref prefix",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone object handle of the player (NETPACKETZONEHEADER)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "the request's lock index. evidence: capture:shop"
+     ]
+    ],
+    "notes": "P02 part 11: 8 bytes on the wire = ref + PROTO struct (pdb2016 gives only the 2-byte struct)"
+   },
+   "0x3414": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_UNEQUIPSUC_ACK",
+    "basis": "zone FUN_0053b0a0 (Z05); pdb2016 struct without the 6-byte ref prefix",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone object handle of the player (NETPACKETZONEHEADER)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "the request's lock index. evidence: capture:shop"
+     ]
+    ],
+    "notes": "P02 part 11: 8 bytes on the wire = ref + PROTO struct (pdb2016 gives only the 2-byte struct)"
+   },
+   "0x3423": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_SELLALLSUC_ACK",
+    "basis": "zone FUN_005393e0 (Z05); pdb2016 struct without the 6-byte ref prefix",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone object handle of the player (NETPACKETZONEHEADER)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "the request's lock index. evidence: capture:shop"
+     ]
+    ],
+    "notes": "P02 part 11: 8 bytes on the wire = ref + PROTO struct (pdb2016 gives only the 2-byte struct)"
+   },
+   "0x3429": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_RELOCSUC_ACK",
+    "basis": "zone FUN_00533070 (Z05); pdb2016 struct without the 6-byte ref prefix",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone object handle of the player (NETPACKETZONEHEADER)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "the request's lock index. evidence: capture:shop"
+     ]
+    ],
+    "notes": "P02 part 11: 8 bytes on the wire = ref + PROTO struct (pdb2016 gives only the 2-byte struct)"
+   },
+   "0x341C": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_PICKALL_REQ",
+    "basis": "zone ItemInventory_ii_PickAll FUN_0052f1b0 (Z04 §3.3); character FUN_0040b760 (D03 §3.4); pdb2016 PROTO_ITEM_CREATE",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone object handle of the player (NETPACKETZONEHEADER)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u32",
+      "owner",
+      "charNo"
+     ],
+     [
+      10,
+      "MAPPOS",
+      "map",
+      "the picker's map and position (not the drop's: shop 144.969 x 16337 vs drop 16295)"
+     ],
+     [
+      30,
+      "ITEM_INVEN",
+      "location",
+      "target cell (inventory 9)"
+     ],
+     [
+      32,
+      "u64",
+      "createitemregnum",
+      "item key (kept from the drop)"
+     ],
+     [
+      40,
+      "u16",
+      "createitemid",
+      ""
+     ],
+     [
+      42,
+      "u16",
+      "attr",
+      "byte offset of the attribute in this payload (= 44), not a length"
+     ],
+     [
+      44,
+      "bytes",
+      "attribute",
+      "class-specific, 1 byte (lot) for stackables"
+     ]
+    ]
+   },
+   "0x341D": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_PICKALLSUC_ACK",
+    "basis": "character FUN_0040b760; zone FUN_00530110 (Z05 §3.2)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone object handle of the player (NETPACKETZONEHEADER)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ]
+    ]
+   },
+   "0x3428": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_RELOC_REQ",
+    "basis": "zone irm_Move FUN_00531860 (Z04 §4.1); pdb2016 PROTO_NC_ITEMDB_RELOC_REQ + ref prefix",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone object handle of the player (NETPACKETZONEHEADER)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u32",
+      "ownerA",
+      "owner of the source box (charNo 5)"
+     ],
+     [
+      10,
+      "u32",
+      "ownerB",
+      "owner of the target box (userNo 103 for account storage)"
+     ],
+     [
+      14,
+      "u16",
+      "lockindex",
+      ""
+     ],
+     [
+      16,
+      "u64",
+      "item.relocitemregnum",
+      "key of the moved item"
+     ],
+     [
+      24,
+      "ITEM_INVEN",
+      "item.newlocation",
+      "target cell"
+     ],
+     [
+      26,
+      "ITEM_INVEN",
+      "inven_from",
+      "source cell"
+     ],
+     [
+      28,
+      "u16",
+      "nFromItemID",
+      ""
+     ],
+     [
+      30,
+      "u32",
+      "nFromItemLot",
+      "1 also for a non-stackable item"
+     ]
+    ],
+    "notes": "P02 part 11: 34 bytes on the wire; the pdb2016 struct (28) lacks the ref prefix"
+   },
+   "0x3C09": {
+    "dir": "S→C",
+    "name": "NC_MENU_SHOPOPENTABLE_WEAPON_CMD",
+    "basis": "zone NPCRole_Merchant::nrm_ShopMenuOpen FUN_004c26b0 (Z02); pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD; client Market::SetWeapon FUN_006137c0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "itemnum",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "npc",
+      "NPC object handle"
+     ],
+     [
+      4,
+      "MENUITEM[itemnum]",
+      "itemlist",
+      "3 bytes each; the client opens a new tab at every slot that does not grow, chosen by the first item's class (5 weapon, 6-8 armour, else other)"
+     ]
+    ]
+   },
+   "0x3C0B": {
+    "dir": "S→C",
+    "name": "NC_MENU_SHOPOPENTABLE_ITEM_CMD",
+    "basis": "zone NPCRole_Merchant::nrm_ShopMenuOpen FUN_004c26b0 (Z02); pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD; client Market::SetWeapon FUN_006137c0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "itemnum",
+      ""
+     ],
+     [
+      2,
+      "u16",
+      "npc",
+      "NPC object handle"
+     ],
+     [
+      4,
+      "MENUITEM[itemnum]",
+      "itemlist",
+      "3 bytes each; the client opens a new tab at every slot that does not grow, chosen by the first item's class (5 weapon, 6-8 armour, else other)"
+     ]
+    ]
    }
   },
   "accountlog": {
@@ -2258,6 +2560,106 @@
      ]
     ],
     "notes": "P02 batch 2: first hand layout (pdb2016/2017 struct is empty, the decoder warned 'size 1 != documented 0')"
+   }
+  },
+  "character": {
+   "0x340a": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_BUYALL_REQ",
+    "basis": "character FUN_00409300",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "owner",
+      ""
+     ],
+     [
+      10,
+      "MAPPOS",
+      "map",
+      "20 bytes"
+     ],
+     [
+      30,
+      "ITEM_INVEN",
+      "location",
+      "type<<10|slot"
+     ],
+     [
+      32,
+      "u64",
+      "createitemregnum",
+      ""
+     ],
+     [
+      40,
+      "u16",
+      "createitemid",
+      ""
+     ],
+     [
+      42,
+      "u16",
+      "attr",
+      "byte offset of the attribute in this payload (= 68; the zone writes attrptr − payload), not a length (Z04 §2.1 says attrLen)"
+     ],
+     [
+      44,
+      "u16",
+      "lockindex",
+      ""
+     ],
+     [
+      46,
+      "u64",
+      "price_cen",
+      ""
+     ],
+     [
+      54,
+      "u32",
+      "price_fame",
+      ""
+     ],
+     [
+      58,
+      "u32",
+      "price_gamblecoin",
+      ""
+     ],
+     [
+      62,
+      "u32",
+      "UserNo",
+      ""
+     ],
+     [
+      66,
+      "u16",
+      "Vendor",
+      ""
+     ],
+     [
+      68,
+      "bytes",
+      "attr",
+      "class-specific attribute bytes (65 for a weapon); D03's SHINE_ITEM_ATTRIBUTE (101 fixed) overran the payload"
+     ]
+    ],
+    "notes": "P02 part 11: copy of D03's layout with the attribute as a variable tail (decoder fit)"
    }
   }
  },
@@ -4147,6 +4549,398 @@
      "skill.number": "26",
      "savetime": "current time_t"
     }
+   },
+   "0x3003": {
+    "dir": "C→S",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "itemid": "751 Long Mace (weapon shop, 0x3C09 tab 1)",
+     "lot": "1"
+    }
+   },
+   "0x3004": {
+    "dir": "S→C",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "code": "0x201 success, after the 0x340B apply (Z05 §2.1)"
+    }
+   },
+   "0x3006": {
+    "dir": "C→S",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "slot": "1, 2 (inventory 9)",
+     "lot": "1"
+    }
+   },
+   "0x3005": {
+    "dir": "S→C",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "code": "0x381 success ×2"
+    }
+   },
+   "0x3009": {
+    "dir": "C→S",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "itemhandle": "drop handles 10500–10502 from 0x1C0A"
+    }
+   },
+   "0x300a": {
+    "dir": "S→C",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "itemid": "picked item (3001, 3005, 3004)",
+     "lot": "1",
+     "error": "0x341 success",
+     "itemhandle": "0xFFFF always (Z05 §3.2)"
+    }
+   },
+   "0x300b": {
+    "dir": "C→S",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "from": "0x2406 / 0x2405 / 0x2404 (inventory)",
+     "to": "0x1800 / 0x1801 / 0x1802 (account storage page 0)"
+    }
+   },
+   "0x300c": {
+    "dir": "S→C",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "code": "0x241 success ×3"
+    }
+   },
+   "0x300f": {
+    "dir": "C→S",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "slot": "6, 4 (inventory slot of 751)"
+    }
+   },
+   "0x3011": {
+    "dir": "S→C",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "code": "0x281 ×3: two equips and the unequip (Z05-B2: unequip answers with EQUIP_ACK)"
+    }
+   },
+   "0x3012": {
+    "dir": "C→S",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "slotequip": "12 (right hand)",
+     "slotinven": "4"
+    }
+   },
+   "0x3015": {
+    "dir": "C→S",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "invenslot": "3 (38043 Wooden Horse, a mover)",
+     "invenType": "9"
+    }
+   },
+   "0x3016": {
+    "dir": "S→C",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "error": "0x700 ×3",
+     "useditem": "38043 on the two uses; 0xFFFF on the forced dismount at the map link (Z13 §7.4 GetOff(1))",
+     "invenType": "9"
+    }
+   },
+   "0x304d": {
+    "dir": "C→S",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "(empty)": "sent by the client when the NPC storage window closes; no reply"
+    }
+   },
+   "0x3c08": {
+    "dir": "S→C",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "cen": "0",
+     "pages": "16 (constant 0x10)",
+     "curpage": "2, 3, 0, 1 (one per 0x3446, in link arrival order)",
+     "openType": "0 (NPC)",
+     "count": "0",
+     "items": "13 bytes with 0 items: one stray trailing byte (00), P02-B17"
+    }
+   },
+   "0x1c0a": {
+    "dir": "S→C",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "handle": "10500–10502",
+     "itemid": "3001 / 3005 / 3004 (mob drops)",
+     "dropmobhandle": "killer mob handle",
+     "attr": "8 = looting bit 3 set for the killer (Z09 §11.3)"
+    }
+   },
+   "0x305c": {
+    "dir": "S→C",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "nHandle": "0, 1 (repurchase slots)",
+     "ItemInfo.itemid": "3000 / 3001",
+     "ItemInfo.itemattr": "1 byte lot, then 100 stale bytes of the global send buffer (P02-B16)"
+    }
+   },
+   "0x3413": {
+    "dir": "Z→DB",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "key": "751's key",
+     "inven": "0x2404",
+     "lock": "5",
+     "equip": "0x200C"
+    }
+   },
+   "0x3444": {
+    "dir": "Z→DB",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "page": "0, 1, 2, 3 on four links in the same ms",
+     "userNo": "103",
+     "fromAccountStorageCmd": "0 (NPC menu)"
+    }
+   },
+   "0x3446": {
+    "dir": "DB→Z",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "curpage": "0–3",
+     "nOpenType": "0",
+     "cen": "0",
+     "itemcounter": "0 (empty storage), 3 unused zero bytes after it"
+    }
+   },
+   "0x3449": {
+    "dir": "Zone→GameDB",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "lockindex": "2 / 1",
+     "itemid": "38043",
+     "attribute": "ShineItemAttr_Riding 0x13 bytes: hungrypoint 760 → 750, deletetime 0x76bbecff (never), bitflag 0 (DuringRide cleared before the save)"
+    }
+   },
+   "0x3463": {
+    "dir": "Z→DB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "userNo": "103",
+     "first": "0",
+     "last": "23 (client 0x3020 page 0 at login)"
+    }
+   },
+   "0x344a": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "lockindex": "echo",
+     "err": "0x901 success"
+    }
+   },
+   "0x34cf": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "nCharRegNum": "5, at every 0x1803 login completion (6 times, D06 §…)"
+    }
+   },
+   "0x1099": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "nInvenType": "2 (reward inventory, client 0x302C page 0)",
+     "from": "0",
+     "to": "23"
+    }
+   },
+   "0x109a": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "Error": "0x1200 in both captures: never written (D02-B13 captured)",
+     "ItemCmd.nPartMark": "3",
+     "numofitem": "0"
+    }
+   },
+   "0x340a": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "map": "RouN 5724, 8768 (player position)",
+     "location": "0x2406",
+     "attr": "68 = attribute offset",
+     "price_cen": "69",
+     "UserNo": "103",
+     "Vendor": "28 (NPC mob id)"
+    }
+   },
+   "0x340b": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "lockindex": "0, 11 ms after the request"
+    }
+   },
+   "0x3410": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "relocA": "751 → 0x200C",
+     "relocB.key": "key of 750 (in the slot) or −1 (empty slot)",
+     "relocB.newlocation": "0x2406 / 0x2404",
+     "lockindex": "1, 6",
+     "unequipnum": "0"
+    }
+   },
+   "0x3422": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "price": "3 / 4 (SellPrice × lot)",
+     "nLot": "1",
+     "nDeleteChestItem": "0"
+    }
+   },
+   "0x0446": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "mappos.MapName": "'Need' (D03-B11)",
+     "mappos.x/y": "0 (never written, stale)",
+     "itemlot": "0",
+     "iteminven": "0x7512 / 0x4372 / 0x7511: never written (P02-B15)"
+    }
+   },
+   "0x0448": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "itemseller": "0",
+     "itemlot": "0 (non-stackable)",
+     "iteminven": "0x2406",
+     "itemmoney": "69"
+    }
+   },
+   "0x0449": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "itembuyer": "0",
+     "itemlot": "0",
+     "itemmoney": "3 / 4"
+    }
+   },
+   "0x044c": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "iteminvenfrom": "inventory",
+     "iteminvento": "account storage 0x1800–0x1802",
+     "guildregnum": "0"
+    }
+   },
+   "0xc80d": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "BuyMoney": "69",
+     "Vendor": "28"
+    }
+   },
+   "0xc80e": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "SellMoney": "3 / 4",
+     "Vendor": "28"
+    }
    }
   },
   "account": {
@@ -4402,6 +5196,60 @@
      "ItemTotalInformation, nDataSize − 10 bytes (item id first: 3000, 3001 in capture:shop)"
     ]
    ]
+  },
+  "ITEM_INVEN": {
+   "size": 2,
+   "fields": [
+    [
+     0,
+     "u16",
+     "inven",
+     "type << 10 | slot (pdb2017 union Pos:10 / Type:6; Z04 §1.1). P02 part 11: without this entry the decoder read every ITEM_INVEN as 1 byte"
+    ]
+   ],
+   "basis": "pdb2017 union ITEM_INVEN { Pos:10, Type:6 } (2 bytes); Z04 §1.1. P02 batch 2 part 11: no file defined it, so the decoder read every ITEM_INVEN field (D03 / D05 / Z04 annotations) as 1 byte"
+  },
+  "MAPPOS": {
+   "size": 20,
+   "fields": [
+    [
+     0,
+     "char[12]",
+     "MapName",
+     ""
+    ],
+    [
+     12,
+     "u32",
+     "x",
+     ""
+    ],
+    [
+     16,
+     "u32",
+     "y",
+     ""
+    ]
+   ],
+   "basis": "pdb2016 PROTO_ITEM_CREATE.map (MapName u8[12], MapXY.x u32, MapXY.y u32; 20 bytes), used by D03's 0x340A annotation; captured 0x340A / 0x341C"
+  },
+  "MENUITEM": {
+   "size": 3,
+   "fields": [
+    [
+     0,
+     "u8",
+     "slot",
+     "grid cell of the shop tab; a slot not above the previous one starts the next tab (client Market::SetWeapon FUN_006137c0)"
+    ],
+    [
+     1,
+     "u16",
+     "item",
+     "ItemInfo ID"
+    ]
+   ],
+   "basis": "pdb2016 / pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD::MENUITEM (3 bytes); zone nrm_ShopMenuOpen FUN_004c26b0; client Market::SetWeapon FUN_006137c0; captured 0x3C09 / 0x3C0B"
   }
  }
 }
