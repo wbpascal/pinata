@@ -539,6 +539,212 @@ bodies are above and in D01 §1. `DataServer::Start` differs from the WM and Log
 missing `ReadGlobalGameData`; `CIOCP::Stop` FUN_0040ec30 and `CGTimer::GetTime` FUN_00413ef0 differ from the WM copies
 only in decompiler output (same calls and constants, read).
 
+## 2. Linked game-data and database classes (Account build)
+
+The DB servers link the shared game-data library of the zone (item table, item attribute classes, map table, random
+boxes, SHN reader) and an ODBC wrapper of their own. Compared by PDB name and normalised body with `zone-pdb` and
+`wm-pdb` (same normaliser as §1.6; scratch compare, not kept): of 426 functions in 0x40f800–0x419000, 175 are identical
+to the zone's, 113 to the WM's, 115 exist in neither (session layer §1.4, ODBC wrapper §2.5, the `iac_ItemClass`
+one-liners the zone folds), and the 23 that differ differ only in a folded callee name or a decompiler type
+(§2.6 lists the three real differences). What matters for a rebuild is **which of these objects the DB servers
+actually use**: almost none.
+
+### 2.1 Static objects and who uses them
+
+The CRT builds these globals before `WinMain` (`dynamic_initializer_for_…`, in this order *(inferred: the `__xc` table
+is in address order)*) and destroys them at exit (`dynamic_atexit_destructor_for_…`):
+
+| Global (pdb2016) | Initializer → constructor | What it does at start-up | Used in Account at run time |
+|---|---|---|---|
+| `gServer` | FUN_004317e0 | §1.1 | yes |
+| `itemdatabox` (`ItemDataBox`, 0x94c) | FUN_00431800 → `ItemDataBox::ItemDataBox(&itemdatabox, (char*)-1, false)` FUN_00411f30 | builds the empty trie and the seven `BinaryDataBox` members (`<unnamed-type-idb_BinData>` ctor FUN_00411a00); path −1 = **no file is read** (a null path would read `../9Data/Shine/ItemInfo.shn` through `ItemDataBox::ReadData` FUN_00411c70, Z24 §7.3) | no: only `ItemAttrCls_Amount::iac_itemcreate` FUN_00415f10 reads it, and that is never called (below) |
+| `namestring` (`NameString`, 256 × 128-byte ring) | FUN_00431820 (atexit only) | – | only by `MapDataBox::mdb_Load` (§2.2) |
+| `mapdatabox` (`MapDataBox`, 0x51c) | FUN_00431830 → `MapDataBox::MapDataBox` FUN_0040fc50 | empty | loaded by `DataServer::Start` only when `nServerID == 2` (Character, §1.2, §2.2); never in Account / AccountLog |
+| `g_ItmBelongAttr` (`ItemBelongAttribute` : `CItemAuthorityBase`, 0x3d8) | FUN_00431850 → `CItemAuthorityBase::CItemAuthorityBase` FUN_0042efb0, then the `ItemBelongAttribute` vftable | fills the three box-to-box matrices (§2.3); `BelongTypeInfo.shn` is not loaded (`iba_Load` is not linked) | no |
+| `shineassert` | FUN_00431870 | `AssertClass` (W05 §6.4) | yes (assert log) |
+| `charinvenman` (`CharacterInventoryManager`, 17 member-function pointers) | FUN_00431880 | `cim_Array[7]` = `cim_quest` FUN_00414dc0 (inventory + 0x6558), `[8]` = `cim_equip` FUN_00414da0 (+0), `[9]` = `cim_inven` FUN_00414db0 (+0xe54), `[12]` = `cim_minihouse` FUN_00414dd0 (+0x67a0), every other slot `cim_null` FUN_00414d90 (returns its argument); same offsets as the zone's FUN_00642e00 … | no |
+| `ItemBag::ib_staticcell`, `ItemActionItemBox::iaib_Default` | FUN_00431910, FUN_00431920 (atexit only) | – | no |
+| `itmattcontainer` (`ItemAttributeClassContainer`) | FUN_00431930 → FUN_00416dc0 | one object per attribute class, `iacc_Array[0…0x26]` by `ItemClassEnum`, same table as the zone (Z04 §1) and the Character copy (D07 §1.3) | **no**: no function of Account reads `itmattcontainer`, so none of the 202 `ItemAttributeClass` / `ItemAttrCls_*` functions (vtables only) can run |
+| `IOBufferList`, `g_slotBuffer`, `gSocket_IOCP_Write`, `gZoneLinktoErrorLog` | FUN_00431950 … FUN_00431a00 | library (S02 §1.2, §1.4 here) | yes |
+| `rewarddata` (`RewardData` : `BinaryDataBox<ShineReward>`), `fprewarddata` (`FPRewardData` : `BinaryDataBox<FriendPointReward>`) | FUN_00431a60, FUN_00431b30 | zeroed `BinaryData` (`BinaryData::BinaryData` FUN_00414030 = a `CDataReader`) | no (never loaded) |
+| `itemoptiondata` (`ItemOptionsData` : `BinaryDataBox<ItemOptions>`, 0x46ac) | FUN_00431a90 | 500 empty `OptionCardStack` (§2.4) | no (never loaded; read only by `ocs_make`) |
+| `rndbox` (`RandomBox`, 0x348398 = 3.3 MB) | FUN_00431b90 → `RandomBox::RandomBox` FUN_004182e0 | **runs**: `srand(time)`, 101 + 4 shuffled 16 384-entry rings and a WELL512 state (§2.4) | no (read only by the item-create code) |
+| `ShnDataFile` (`CShnDataFileCheckSum`) | FUN_00431c20 → FUN_0042f3c0 | the 49-name client-file list, same as W05 §3.4 | only through `CDataReader::Read` (Character: MapInfo) |
+
+So the Account and AccountLog servers read **no SHN file** at all; the Character server reads one, `MapInfo.shn`
+(§2.2); this replaces the D01 §1 statement "also loads MapInfo.shn, ItemInfo.shn (framework)" (knowledge §0). The
+whole item library is dead weight in Account: a rebuild of Account / AccountLog needs none of it. (The Character
+server does use the attribute-class container for its reward items, D07 §1.3; part 4 checks the other users.)
+
+### 2.2 `MapDataBox` (the only table a DB server loads, Character only)
+
+```pseudo
+MapDataBox::CheckReadData(this, path) → bool                                     @ FUN_0040fd60
+    f = fopen(path, "rb"); none → return false; fclose(f)
+    mdb_Load(this, path); return true          # DataServer::Start tries "../../9Data/Shine/MapInfo.shn", then "../9Data/…" (§1.2)
+
+MapDataBox::mdb_Load(this, path)                                                 @ FUN_0040f970
+    BinaryDataBox<MapInfo>::bdb_ReadData(&mdb_BinData, path)                     @ FUN_0040f8c0
+        CDataReader::Read(path, key 0x1f8, row size 0x4c) (W05 §3.1) fails →
+        assert "BinaryDataBox<T>::bdb_ReadData : readfail", "Code:%X:%d\tSHN:%X:%d"; ShineExit   (process ends)
+    mdb_maxmapid = max(row.ID) + 1; mdb_index = new MapInfo*[mdb_maxmapid], all null
+    for each row r:
+        mdb_index[r.ID] = r
+        key = r.MapName (Name3, 12 bytes) copied into the next `namestring` slot with a NUL at 12
+        BTree::bt_Insert(&mdb_btree, key, r.ID) == 0 → assert "MobDataBox::ReadData : memory leak for BTree"  (sic);
+            ShineExit("MapDataBox::mdb_Load")          # only on out-of-memory: bt_Insert fails only when new fails
+    mdb_wmlink[0…32] = null; for each row: mdb_wmlink[r.IsWMLink] = r (last row wins); mdb_wmlink[0] = null
+        # IsWMLink is not range-checked (33 slots); 2016 MapInfo.shn: 138 rows, IDs 0…1001, IsWMLink 0…32, no
+        # duplicate link or name, so the data is safe
+```
+
+`MapInfo` row *(pdb2016)*, 0x4c: `u16 ID`, `Name3 MapName` @2, `char Name[32]` @0xe, `WM_Link IsWMLink` (u32) @0x2e,
+`u32 RegenX` @0x32, `RegenY` @0x36, `u8 KingdomMap` @0x3a, `Name3 MapFolderName` @0x3b, `u8 InSide` @0x47,
+`u32 Sight` @0x48. The zone's `mdb_Load` FUN_0064ebf0 is the same code with the path built in (Z01 §2.3 table); in
+Account the path is a parameter. `BTree` (256-way trie, node 0x404 = `bt_id` + 256 children; `bt_Insert` FUN_00413f60
+overwrites an existing key, `operator[]` FUN_00413ff0 returns 0xffffffff when absent, case-sensitive; ctor / dtor
+FUN_00413f10 / FUN_00413f30) is the zone's (Z09 §28.11). Who reads `mapdatabox` in the Character server: part 4 (§4).
+
+### 2.3 `CItemAuthorityBase`: the box-to-box move matrices
+
+Not documented for the zone either (its copy FUN_00631e50 is identical); the only reader is the zone's
+`CItemAuthorityBase::IA_CanInvenReloc` FUN_00632280 (Z04 §1.3 `BelongType_CanMove`, Z30 §9 `IA_IsWork*Belonged`):
+`from`, `to` = inventory types of Z04 §1.1 (both < 17, else refused); the item's belong state picks the matrix —
+character-bound (`IA_IsWorkChrBelonged`) → `IA_ChrBelong`, else account-bound → `IA_AccBelong`, else
+`IA_CanStorage` must pass and `IA_Common` decides.
+
+```pseudo
+CItemAuthorityBase::CItemAuthorityBase(this)                                     @ FUN_0042efb0
+    all three bool[17][17] matrices = false, then true for (from → to):
+    IA_Common:   9→{0, 3, 6, 8, 9, 12, 13, 14, 15, 16}, 8→9, {0, 2, 4, 5, 6}→9, and t→t for t ∈ {0, 3, 6, 12, 13, 14, 15, 16}
+    IA_ChrBelong: as IA_Common without 9→0 and 9→6           (no account storage, no academy storage)
+    IA_AccBelong: as IA_Common without 9→0                   (account storage allowed)
+    # IA_ChrBelong[0][0] and IA_AccBelong[0][0] are set only by 2-byte stores (`= 0x101`) at the previous matrix's
+    # [16][16]: the compiler merged "[16][16] = true" with the next matrix's "[0][0] = true" (inferred: written per
+    # matrix in the source like IA_Common[0][0]); so 0→0 is allowed in all three
+```
+
+Type 9 = main inventory, 8 = equipment, 6 = account storage, 4 = guild storage, 0 = guild-academy storage,
+3 / 12–16 = mini-house and small-item boxes (Z04 §1.1). No matrix allows 9→4 or any move into type 2 (reward box) or
+type 4 (guild storage); whether the zone's guild-storage deposit takes another path belongs to Z04's RELOC handler.
+
+### 2.4 Random boxes and the reward-item option roll (zone code, dead in the DB servers)
+
+```pseudo
+RandomBox::RandomBox(this)                                                       @ FUN_004182e0
+    srand(_time32()); rb_box[n] for n = 0…100: RandomSlot of 16 384 u16 = i·n >> 14 (uniform 0…n−1), shuffled with rand(),
+        values ≥ n → 0; rb_thausend[0…3] = RandomSlot::rs_Init(1000) FUN_00418250 (same for n = 1000)
+    WELL512 state = 16 × rand() (cWell512Random::well512_InitState FUN_00417c70; ctor FUN_00417c30)
+    # same as the zone (Z23 knowledge: box n = 1…100 is a shuffled ring of 16 384 values uniform over 0…n−1) and the WM
+cWell512Random::well512_GetRandom() FUN_00417ca0 → [0, 1);  (n) FUN_00417d50 → 0…n−1   (zone Z09 §28.10, W05 §6.4)
+```
+
+The item-create overloads that take a `ShineReward` row (vt 0x10; vt 0x14 is the `"-o"` text parser of Z11 §4.3)
+are reachable only in the zone (reward items); their Account copies are identical to the zone's (`ItemAttrCls_Weapon`
+FUN_004162b0 = zone FUN_0063f650, Armor FUN_00416360 = FUN_0063f700, Amulet FUN_00416270 = FUN_0063f610, Bracelet
+FUN_00416420 = FUN_0063f7a0) and no zone document describes them, so here once:
+
+```pseudo
+ItemAttrCls_Weapon::iac_itemcreate(itemID, ShineReward rw, item)                 @ FUN_004162b0
+    vt 0x14(itemID, item, "-o")                        # class defaults (Z11 table)
+    r = well512(1000); upgrade = first i < 10 with r < rw.Upgrade[i] (subtracting each weight); none → 0
+    ocs_make(&itemoptiondata.iod_optionlist[rw.OptionDegree], &item.weapon.option)
+    s = EnchantSocketRateData::GetSocketRateData() FUN_00417e80 (static sm_pSocketRateData; never set in Account → null)
+    s: maxSocketCount = min(s.vt0(itemID), 2)
+Armor FUN_00416360: the same without the socket part (options into the armor option block)
+Amulet FUN_00416270, Bracelet FUN_00416420: "-o" defaults, then ocs_make only (no upgrade roll)
+
+ItemOptionsData::OptionCardStack::ocs_make(stack, ItemOptionStorage* o) → bool   @ FUN_00417f80
+    keep o.identified bit (bit 0 of optionnumber); stack.ocs_Number (ItemOptions row) null → false
+    n = ocs_selectnumber(stack.ocs_Number)            # how many options
+    while option count < n:
+        take the top card (CardDeck::CardStack, the List<Card> of W05 / Z05 §8.5) else assert "…ocs_make : Error in selecting"; false
+        put it back at the bottom (cs_InsertBottom FUN_00418af0; failure → assert "…Error in card recycle")
+        row = itemoptiondata[card] (ItemOptions); row id 0xffff → assert "…Option not found"; false
+        row.Type ∉ 1…11 → assert "…Invalid Option"; false
+        o.optionlist[count] = { type = row.Type, value = ocs_selectnumber(stack.ocs_Number) }; count++
+    true
+ItemOptionsData::OptionCardStack::ocs_selectnumber(ItemOptions r) → int         @ FUN_00417db0
+    x = well512(1000); i = first of 9 with x < r.Rate[i] (subtracting); none → assert "…Error in random select", i = 0
+    r.Interval == 1 → i + 1
+    v = r.Interval · i + rndbox[r.Interval] (0…Interval−1; 0 when Interval ∉ 1…100); v > 255 → assert "…Too large value", 255
+```
+
+`ItemOptions` row *(pdb2016)*: `u16 OptionDegree`, `ITEM_OPTION_TYPE Type` @2 (u32), `u8 Interval` @6, `u16 Rate[9]` @7.
+`ShineReward`: `u16 RewardHandle`, `u8 RewardType`, `char Argument[33]`, `u32 Quantity` @0x24, `u16 Upgrade[10]` @0x28,
+`u16 OptionDegree` @0x3c, `u32 TitleDegree` @0x3e. The card decks are filled by the zone's `ItemOptions.shn` loader
+(Z01 §2.3 table, FUN_0064cbc0), which the DB servers do not link.
+
+### 2.5 The ODBC wrapper (`Database`, `DBRecord`, `CGameDB_Connect`)
+
+DB-server only (neither the zone nor the WM has it). Layout *(pdb2016)*: `Database` 0xc { vftable, `bool m_bTran` @4,
+`void* handleDBC` @8 }; `DBRecord : Database` 0x14 { `handleStatement` @0xc, `int columnNo` @0x10 };
+`CGameDB_Connect` { `DBRecord m_DB` @0 }; `CGameDB_Account : CGameDB_Connect` 0x18 (+ the empty procedure classes
+`CSQLPAccount` / `CSQLPIPChecker`, D01). One per session worker (`CSessionWorker.m_DBF`, §1.5). Statics shared by all
+objects: `handleEnv`, `handleEnvRef` (open connections), `bInit`.
+
+```pseudo
+Database::Database: vftable, handleDBC = 0, m_bTran = false                      @ FUN_00417310
+Database::InitEnv() → bool                                                       @ FUN_00417330
+    bInit → true
+    handleEnvRef = 0; SQLAllocHandle(ENV) fails → handleEnv = 0; false
+    SQLSetEnvAttr(SQL_ATTR_ODBC_VERSION 200, 2 = SQL_OV_ODBC2) fails → free; handleEnv = 0; false
+    SQLSetEnvAttr(201 = SQL_ATTR_CONNECTION_POOLING, 1 = SQL_CP_ONE_PER_DRIVER) ≠ SQL_SUCCESS → false
+        # (original bug) D08-B4: here SQL_SUCCESS_WITH_INFO also counts as failure and the environment handle is
+        # neither freed nor cleared, so the next openDB allocates another one
+    bInit = true; true
+Database::openDB(connStr) → bool                                                 @ FUN_004175e0
+    InitEnv() fails → false
+    an open connection: (m_bTran → CommitTran) SQLDisconnect, free, handleEnvRef−−
+    SQLAllocHandle(DBC); SQLDriverConnect(hdbc, 0, connStr, SQL_NTS, out[0x400], …, SQL_DRIVER_NOPROMPT)
+    ok → handleEnvRef++, true; else free, handleDBC = 0, false
+Database::CommitTran() → bool                                                    @ FUN_004173d0
+    !m_bTran → false; SQLEndTran(DBC, hdbc, SQL_COMMIT); SQLSetConnectAttr(SQL_ATTR_AUTOCOMMIT, ON); m_bTran = false
+    # nothing in Account / AccountLog sets m_bTran = true (no BeginTran is linked; Character / GameLog: §4 / §7): autocommit
+Database::close FUN_00417530: open → (CommitTran) SQLDisconnect, free DBC, handleEnvRef−−
+Database::~Database FUN_00417570: close; handleEnvRef < 1 → free the environment, bInit = false
+DBRecord::DBRecord FUN_004123b0 (handleStatement = 0); ~DBRecord FUN_00412550 / close FUN_004123e0: free the statement, Database::close
+DBRecord::openDB(connStr) (vt 1) → bool                                          @ FUN_004125d0
+    free the statement; Database::close; Database::openDB(connStr) and SQLAllocHandle(STMT) → true
+DBRecord::query(fmt, …) FUN_00412410: vsprintf into 8 KB, SQLCloseCursor, SQLFreeStmt(SQL_CLOSE), SQLExecDirect (D06 §7.3)
+DBRecord::fetch FUN_004124a0: columnNo = 0; SQLFetch ∈ {0, 1};  endFetch FUN_004124d0: SQLCloseCursor
+DBRecord::operator>>(int&) FUN_004124e0 / (ulong&) FUN_00412510: SQLGetData(++columnNo, SQL_C_SLONG / SQL_C_ULONG, 4 bytes)
+DBRecord::getStatement FUN_00412540 → handleStatement (the CSQLP* procedures bind and execute on it, D01–D06)
+CGameDB_Connect::DBConnect(connStr, startupCmd) → 0 ok / 1 connect failed / 2 start-up command failed   @ FUN_00419bb0
+    m_DB.vt 1 (DBRecord::openDB)(connStr); startupCmd non-empty → DBRecord::query(startupCmd)   (D06 §7.3)
+CGameDB_Connect::DBClose FUN_00419c10: free the statement, Database::close   (worker exit, §1.5)
+ViewDBError(where, hstmt)                                                        @ FUN_00417420
+    SQLError(0, 0, hstmt, state, &native, text[0x400]); a message → log "ERROR - %s, state = %s error_num = %d error_str = %s"
+    rc −1 → "ERROR - %s, SQLError = %d = SQL_ERROR"; rc not 0 → "… = unknown return value"   (log only; callers D01–D06)
+```
+
+The statics are not locked. The workers connect one after another (`CSessionWorkerManager::Start(-1, wait = 1)` from
+`DataServer::Start`, §1.5), so `InitEnv` does not race at start-up; at stop the workers decrement `handleEnvRef` in
+parallel, which is harmless because the environment is freed only by the destructors after all threads have ended.
+
+### 2.6 Address table of the data classes (Account; same as the cited zone / WM documentation)
+
+| Class (Account functions) | Same as | Note |
+|---|---|---|
+| `ItemAttributeClass` + 38 `ItemAttrCls_*` (202 functions 00414de0–004172e0: 00414de0 00414df0 00414e00 00414e10 00414e20 00414e30 00414e40 00414e60 00414e70 00414e80 00414e90 00414ea0 00414eb0 00414ec0 00414ed0 00414ee0 00414ef0 00414f00 00414f10 00414f20 00414f30 00414f40 00414f50 00414f60 00414f70 00414f80 00414f90 00414fa0 00414fb0 00414fc0 00414fd0 00414fe0 00414ff0 00415000 00415010 00415020 00415030 00415040 00415050 00415060 00415070 00415080 00415090 004150a0 004150b0 004150c0 004150d0 004150e0 004150f0 00415100 00415110 00415120 00415130 00415140 004151e0 004151f0 00415200 00415210 00415220 00415230 00415240 00415250 00415260 00415270 00415280 00415290 004152a0 004152f0 00415320 00415410 00415460 00415480 004154a0 004154c0 004154e0 00415510 00415540 00415580 004155a0 004155d0 00415600 00415620 00415650 00415660 00415680 004156a0 004156d0 00415700 00415740 00415760 00415780 00415790 004157c0 004157f0 00415810 00415830 00415860 00415870 00415880 00415890 004158b0 004158c0 004158d0 004158e0 004158f0 00415900 00415910 00415920 00415930 004159b0 004159f0 00415a30 00415ad0 00415c00 00415ca0 00415d40 00415d90 00415db0 00415e30 00415e50 00415e70 00415ec0 00415f10 00415f90 00415fc0 00416000 00416010 00416030 00416050 004160d0 004160e0 00416110 004161b0 004161c0 004161d0 004161e0 00416200 00416230 00416250 00416270 004162b0 00416360 004163e0 00416400 00416420 00416460 00416490 004164a0 00416550 00416590 004165c0 004165d0 00416610 00416650 00416690 00416720 00416770 00416790 004167a0 00416850 00416860 004168b0 004168c0 004168d0 004168e0 00416900 00416930 00416940 00416950 004169d0 004169f0 00416a00 00416a40 00416a50 00416bf0 00416c00 00416c10 00416c20 00416c30 00416c50 00416c70 00416c90 00416cb0 00416cd0 00416ce0 00416d00 00416d20 00416d40 00416d60 00416d90 00417100 00417130 00417160 00417190 004171c0 004171f0 00417220 00417250 00417280 004172a0 004172c0 004172e0) | zone: Z04 §1 (classes), Z11 (`iac_itemcreate` "-…" options), Z18 knowledge (slots), Z13 / Z17 / Z28 (per class); Character copy D07 §1.3 | dead in Account (§2.1). 154 bodies identical to the zone's, 47 are one-liners the zone folds under other names; 3 differ: `ItemAttrCls_Riding::iac_itemcreate` FUN_00415ec0 and `ItemAttrCls_CostumWeapon::iac_itemcreate` FUN_00415f90 call a folded "return 0" (FUN_004036d0, named `TiXmlNode::ToElement`) where the zone calls `RidingInitHP` / `WeaponCostumInitCharge`, and `RidingInitHungry` FUN_004017c0 returns the constant 100 (zone: from `MoverHG` / `Riding.shn`, Z24 §5): the DB builds stub the helpers that need zone tables |
+| `ItemAttributeClassContainer` 00416dc0 00417070 | Z04 §1; D07 §1.3 | never read in Account |
+| `ItemDataBox`, `<unnamed-type-idb_BinData>`, `BinaryDataBox<ItemInfo / ItemInfoServer / GradeItemOption / ItemDropLog / ItemSort / ItemInvenDel / ItemMoney>` 00411850 00411860 00411870 00411880 00411890 004118a0 004118b0 004118e0 00411910 00411940 00411970 004119a0 004119d0 00411a00 00411ba0 00411c70 00411e80 00411f30 | Z27 §1.1, Z24 §7.3 (`ReadData`, ctor) | built empty, nothing read (§2.1) |
+| `MapDataBox`, `BinaryDataBox<MapInfo>` 0040f8c0 0040f970 0040fc10 0040fc20 0040fc50 0040fce0 0040fd60 | §2.2 | Character only |
+| `BinaryData` 00414030 00414050 00414060; `BTree` 00413f10 00413f30 00413f60 00413ff0 | W05 §6.2, Z27 §1.1; Z09 §28.11 | |
+| `CItemAuthorityBase`, `ItemBelongAttribute` 00411830 00411f00 0042efb0 0042f160 0042f170 | §2.3; zone Z30 §9 (`IA_IsWork*Belonged`), Z04 §1.3 | `IA_GetBelongTypeInfo` FUN_00411830: index > 10 → null, else `iba_Array[i]` (never filled in Account) |
+| `CharacterInventoryManager` 00414d90 00414da0 00414db0 00414dc0 00414dd0 | §2.1 | unused |
+| `ItemOptionsData`, `OptionCardStack`, `BinaryDataBox<ItemOptions>`, `EnchantSocketRateData` 00417d90 00417da0 00417db0 00417e80 00417e90 00417ed0 00417f80 00418170 | §2.4 | identical to WM / zone |
+| `BinaryDataBox<ShineReward / FriendPointReward>` 00417ea0 00418200 | §2.1 | never loaded |
+| `CardDeck::CardStack`, `ListEraser / ListIteratorDefault<CardDeck::Card>` 00417f70 00418140 00418160 00418a80 00418af0 00418d40 (and the `List<CardDeck::Card>` methods of §1.6) | Z09 §28.10, Z05 §8.5, W05 | |
+| `RandomBox`, `RandomSlot`, `cWell512Random` 00417c30 00417c70 00417ca0 00417d50 00418230 00418250 004182e0 | §2.4; Z23 / Z09 knowledge, W05 §6.4 | the ctor runs at start-up |
+| `CDataReader` 0042ebd0 0042ec00 0042ec40 0042ec70 0042ecb0 0042ed10 0042ef70 | W05 §3.1 (identical bodies) | reached only via §2.2 |
+| `CShnDataFileCheckSum` 0042f1f0 0042f210 0042f3c0 | W05 §3.4 (identical) | 49 names; in Character only `MapInfo.shn` (entry 9) gets an MD5, nothing reads it |
+| `CWeaponTitle::GetLevel` 0042f1a0 | Z18 §6.6 | dead (caller is an `iac_wptitle_*`) |
+| `CMD5Checksum` 0040afe0 0040aff0 0040b020 0040b700 0040b8e0 0040baf0 | W05 §6.3 (RFC 1321), L01 | used by `CDataReader::Read` and D01 (MD5 hex) |
+| `Database`, `DBRecord`, `CGameDB_Connect`, `ViewDBError` 004123b0 004123e0 00412410 004124a0 004124d0 004124e0 00412510 00412540 00412550 004125d0 00412640 00417310 00417330 004173d0 00417420 00417530 00417570 004175e0 004176e0 00419bb0 00419c10 | §2.5 | DB servers only |
+| `SHINE_INDUN_INFO` ctor / dtor 00401010 00413b20; `type_info` 0041b8fc 0041b90c 0041b92d 004264a3; `g_CardCollectMake` 004123d0 | – | empty folded ctor / dtor (31 callers: every empty destructor); CRT RTTI; `g_CardCollectMake` is a one-line stub here (zone Z28 §4.2) |
+| static initializers / atexit destructors 00431800 00431820 00431830 00431850 00431880 00431910 00431920 00431930 00431a60 00431a90 00431b30 00431b90 00431c20 00431c50 00431c70 00431c80 00431ce0 00431d50 00431d70 00431df0 00431e10 00431ef0 | §2.1 | |
+
 ## Original-server bugs
 
 | ID | Handler / function | 2016 behaviour | Effect | Likely intent |
@@ -546,8 +752,9 @@ only in decompiler output (same calls and constants, read).
 | D08-B1 | `CSessionWorkerManager::AddQue` FUN_004066a0 / `CSession::PacketStroe` FUN_00405630 (all four builds) | returns the space left (0 when the record fills the 2 MB queue exactly), which the caller reads as "full" and appends the frame again | that packet is handled twice (double DB call, double reply) when the backlog reaches exactly 2 MB | return a success flag separate from the space left |
 | D08-B2 | 0x2803 `CPFs::fc_NC_OPTOOL_CLOSE_SERVER_REQ` + `DataServer::MainThread` (all four builds) | sets `m_bStopMainThread`; the main thread stops listener, workers, links and IOCP, then returns without reporting to the service manager | the DB server is dead but the service is RUNNING until stopped by hand; Login / WM cannot reconnect | end the service (report STOPPED / exit) after a remote stop |
 | D08-B3 | job queue (`GetJobA` FUN_00406780) (all four builds) | a queued record keeps a raw pooled `CSession*` | after a close and an immediate reconnect the old link's request runs on the new link (reply to the wrong peer; a 0x0802 sets the new link's identity) *(inferred)* | tag records with a session generation / drop records of closed sessions |
+| D08-B4 | `Database::InitEnv` FUN_00417330 (all four builds) | the connection-pooling `SQLSetEnvAttr` is accepted only as `SQL_SUCCESS`; on any other result the function fails without freeing or clearing the environment handle | a driver manager answering `SQL_SUCCESS_WITH_INFO` makes every worker's connect fail (server does not start) and leaks one environment handle per attempt *(inferred: the 2016 hosts answer `SQL_SUCCESS`, the servers start)* | accept 0 / 1 like the other calls; free the handle on failure |
 
-Next free ID: D08-B4.
+Next free ID: D08-B5.
 
 ## Not reconstructed / uncertain
 
