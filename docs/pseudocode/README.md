@@ -409,7 +409,7 @@ W `0x0C31`), `so_Unmark(vt 0x8ec(), 1, 7)` (saves unless that returns `REMOVE_WA
 | the account logs in to Login again (§3.3 step 7, §3.4 step 5) *(captured)* | L→every W `0x0C16 NC_USER_KICKOFFFROMWORLD_CMD {userNo}` (W FUN_00424880 → `Kickoff` FUN_00437d50: C `0x0C17 {0x683}` "multiple logins", close 0x785) → every Z `0x0C16` (Z FUN_005a5f90 → `wms_kickoff` → `so_banning(p, 1)`: `REMOVE_LOGOUT`, save, `sp_Schedule_Kickout` FUN_00558080 after 10 s). The WM's 0x0C17 left 0.8 ms before Login's 0x0C0A *(captured)* | W01 §5.2, Z01 §8.3, capture-validation §4.1 |
 | a second `0x0C0F` of the account at the WM | `Clients_KickDoubleLogin` FUN_00437dc0 (`0x0C17 {0x683}`) and zones `0x0C16`, as §3.6 step 1 | W01 §3.2 |
 | the zone throws a player out (`so_Disconnect` FUN_0054f340: SHN checksum, bad ticket, item DB failure 0x684, lot check 0x68C, GM kick …) | Z→W `0x0C1A NC_USER_CONNECTCUT2WORLDMANAGER_CMD {userNo, wmHandle, reason}` (W FUN_00428a40: C `0x0C17 {reason}`); `so_banning` FUN_00558b70 (save, free) | Z01 §8.3, W01 §5.2 |
-| GM / OPTool kicks, prison | part 6 (§3.16 ff.); W04 §4, Z11, Z01 §10 | |
+| GM / OPTool kicks, prison | OPTool kick at the WM and through the ring: §3.28; prison: §3.27 | W04 §4.3, §9, Z01 §10 |
 
 ### 3.13 Character persistence
 
@@ -477,6 +477,215 @@ state to the WM except the item block of a zone change (`0x4013` → `0x102E` to
 | unmark (logout, link, …) | Z→G `0x042D` hunt log (`mhl_SendAll2Log`, Z09 §28.12) | Z03 §8.2 |
 | character logout | D→G `0x040B NC_LOG_GAME_LOGOUT` (G FUN_004033d0); W→G `0xC807` (G FUN_00406fe0); W→AL `0x081F NC_MISC_CHAR_LOGOFF_STATISTICS` (AL FUN_00402990), `0x0843 NC_MISC_EVENT_LONG_TIME_PLAY_CMD` after ≥ 60 min (AL FUN_004030d0) | D02 §5, D01 §4.2 |
 | WM session closed | W→AL `0x0722 NC_LOG_USER_LOGOUT` (AL FUN_00402640, type 2), `0xC803` (AL FUN_004034e0); W→A `0x0C11` (no-op) | D01 §3.1, §4.1, §4.5 |
+
+### 3.16 Chat routing
+
+Map chat stays in the zone; everything addressed to a person or a group goes through the WM, which has every
+in-game session (W04 §2). No chat message reaches the Character server or GameLog.
+
+| Kind | Sequence (receiver handler) | Docs |
+|---|---|---|
+| say | C→Z `0x2001 NC_ACT_CHAT_REQ` (Z FUN_0045a400) → clients in sight | Z02 §3.1 |
+| shout | C→Z `0x201E NC_ACT_SHOUT_CMD` (Z FUN_00458e80; level > `shoutlevel` of the WM's `0x0830`, delay) → `0x201F` to the whole map instance (`so_AllInMap1`), not to other maps or zones | Z02 §3.2 |
+| whisper | C→W `0x200C NC_ACT_WHISPER_REQ` (W FUN_0041c610; prison, arena, length checks) → target C `0x200D NC_ACT_SOMEONEWHISPER_CMD` (client FUN_004a9c80, drops it when the talker is on the client's block list), sender C `0x200F` / `0x200E` (client FUN_004a9ea0); W→sender's Z `0x6006 NC_CT_CHARTTING_CMD` (Z FUN_005a3ce0, chat-title counter) | W04 §2.1, Z08 §7.2 |
+| party chat | C→W `0x2014 NC_ACT_PARTYCHAT_REQ` (W FUN_00413510) → every confirmed online member (sender too) `0x2015` (client FUN_004a1890), sender `0x2016` (client FUN_004a9f00); W→Z `0x6006` | W04 §2.3 |
+| raid chat, raid warning | C→W `0xB03F` / `0xB042` (W FUN_00417630) → raid members | W02 §5.12 |
+| guild chat | C→W `0x7473 NC_GUILD_CHAT_REQ` (W FUN_00415230) → online guild members | W03 §3.6 |
+| notice | C (admin level 100 only) / Z / OPTool →W `0x2010 NC_ACT_NOTICE_REQ` (W FUN_00413450 / FUN_0042a920 / FUN_00425c90) → every client session `0x2011 NC_ACT_NOTICE_CMD` (client FUN_004b5420, game scene only); stack overflow above 131 bytes, W04-B1 | W04 §2.2 |
+| world script message | Z (script engine) →W `0x207D NC_ACT_SCRIPT_MSG_WORLD_CMD` (W FUN_0042cea0) → every in-game client `0x2079 NC_ACT_SCRIPT_MSG_CMD` (client FUN_004bc020) | W04 §2.4, Z15 |
+| chat ban, spam | the WM's `singleOption.nChatBan` turns whisper and party chat into a silent echo for the sender; the zone's own spam filter (Z02 §3.4) and the WM's gold-spammer report and GM chat ban (`0x085F` … `0x0869`) | W04 §2.1, §2.5, §17.2, §17.4 |
+| block list | C→W dept 42 `NC_CHAT_RESTRICT_*` → D (D04 §10) → W → C; the list is applied by the client | W04 §14 |
+
+### 3.17 Party
+
+The WM owns the party registry (W02 §1.2); every zone keeps a mirror fed by **broadcasts to all zones** (W02 §8), and
+each zone sends the party status packets of its own players (Z08 §1.2).
+
+**a) Invite and accept:**
+
+| # | Hop | Message | Handler | What happens | Docs |
+|---|---|---|---|---|---|
+| 1 | C→W | `0x3802 NC_PARTY_JOIN_REQ {target}` | W FUN_0041a940 | checks (size, prison, map `canparty`, guild-only map, KQ team); both records pending; refusals `0x3807 {err}` | W02 §2.1 |
+| 2 | W→C | `0x3803 NC_PARTY_JOINPROPOSE_REQ {mastername}` | client FUN_004a29d0 | invitation dialog | W02 §2.1 |
+| 3 | C→W | `0x3804 NC_PARTY_JOINPROPOSE_ALLOW_ACK` (or `0x3805` reject) | W FUN_004211e0 | confirm the member | W02 §2.2, §2.3 |
+| 4 | W→every Z | `0x3801 NC_PARTY_FUNDAMENTAL_CMD` (party born) or `0x3808 NC_PARTY_JOIN_CMD` | Z FUN_004cd5c0 / FUN_004cd730 | zone mirror created / member added (`partyregnum < 4000`) | Z08 §1.3 |
+| 5 | W→C | members `0x3807 {name, class, 0x4C1}` (client FUN_004ac300); joiner member list `0x3809`, looter info | | friends get `0x540E` (§3.22) | W02 §2.2 |
+| 6 | C→Z | `0x3848 NC_PARTY_MEMBERINFOREQ_CMD` | Z FUN_004cd820 | resets the members' send cache: the player tick (`sp_SendMyInform2PartyMember` FUN_0056df80) resends `0x3832` / `0x3833` / `0x3849` to the members on **this** zone | Z08 §1.2, §1.3 |
+
+**b) Other changes**: zone-driven join without invitation Z→W `0x3860 NC_PARTY_ZONE_JOIN_CMD` (W FUN_0042e8c0; refusals
+only logged, guild-map check ignored W02-B11) then steps 4–5; leave C→W `0x380A` (W FUN_0041b990) or zone-driven
+`0x3861` (W FUN_0042cbf0) → all Z `0x380C NC_PARTY_LEAVE_CMD` (Z FUN_004cda00), C `0x380B`; kick `0x3814` → all Z
+`0x3816` (Z FUN_004cdb20); a 2-member party dissolves: all Z `0x381F NC_PARTY_DISMISS_CMD` (Z FUN_004cc060: the party's
+instances are deleted, §3.24), members `0x381E`; master, loot rule and looter: `0x382A`, `0x384D`, `0x385E` (Z08 §1.3).
+
+**c) Session hooks**: map login (W `0x180C`, §3.9) → `Client_PartyRefreshOnMapLogin` FUN_00430a30 refreshes the
+record's handles, leaves on a party-release map, sends the member list, all Z `0x383C` (empty handler in the zone) and
+members `0x383D`. Logout (`CharacterLogout`, §3.12) → `Client_PartyOnLogout` FUN_00436670: all Z `0x3846` (empty
+handler), members `0x3847`; with ≤ 1 member online the party is released (`0x381F`); otherwise the member stays in the
+party while offline. Zone resync: Z→W `0x384E NC_PARTY_MEMBERINFORM_REQ` (W FUN_0042d5a0; also from the OPTool, W
+FUN_004274e0) → that zone `0x384F` (Z FUN_004cd4b0, rebuilds the mirror when the list differs). Party experience and
+loot are zone-local (Z29, Z09).
+
+### 3.18 Raid (expedition)
+
+| Step | Sequence (receiver handler) | Docs |
+|---|---|---|
+| make | C→W `0xB001 NC_RAID_MAKE_REQ` (W FUN_0041ed50; party master) → C `0xB002`, members `0xB003`; all Z `0xB004 NC_RAID_ZONE_MAKE_CMD` (Z FUN_005a6320); the zones move the party's instance to the raid (`cm_ChangeCategory`) | W02 §5.1, Z08 §2, Z14 §1.5 |
+| invite, answer | C→W `0xB00C` (W FUN_0041f1c0) → invitee; C→W `0xB00F NC_RAID_INVITATION_ANSWER_REQ` (W FUN_00422400) → inviter `0xB011`, members `0xB012`; all Z `0xB013 NC_RAID_ZONE_MEMBER_JOIN_CMD` (Z FUN_005a4e90) | W02 §5.3, §5.4 |
+| leave, ban, slots, leaders, looter | C→W `0xB014` … `0xB03A` (W02 §5.5–§5.11) → all Z `0xB017`, `0xB01C`, `0xB02A`, `0xB02F`, `0xB034`, `0xB039`, `0xB03E` | W02 §5, §8 |
+| dismiss | all Z `0xB007` (Z FUN_005a4cf0; the raid's instances are deleted) | W02 §8, Z08 §2 |
+| map login, logout | W `0x180C` → `Client_RaidOnMapLogin`, all Z `0xB01D`; logout → all Z `0xB01F` | W02 §6 |
+| status to the clients | zone → raid members on that zone (`RaidTask`, raid variants of the party status packets) | Z14 §5.2, §5.3 |
+
+### 3.19 Guild
+
+The guild data lives in the Character DB and is loaded by the WM at start-up (W03 §9.1); the WM answers the clients
+and broadcasts a reduced mirror (`GUILD_ZONE`) to every zone (W03 §10). Guild storage is a zone ↔ Character server
+path with only the member grade asked from the WM.
+
+| Step | Sequence (receiver handler) | Docs |
+|---|---|---|
+| create | C→W `0x7405 NC_GUILD_MAKE_REQ` (W FUN_0041d380 → `Guild_MakeReq` FUN_0044cf10: level 20, name) → D `0x7458 NC_GUILD_DB_MAKE_REQ` (D FUN_00438440; item and money refusals come from here) → W `0x7459` (W FUN_0040b9d0) → C `0x7406` (client FUN_006b7aa0), members `0x7436`; all Z `0x7448 NC_GUILD_ZONE_MAKE_CMD` (Z FUN_005a40d0) | W03 §2.2, D04 §6.2, Z08 §8.2 |
+| invite, join | C→W `0x7409 NC_GUILD_MEMBER_INVITE_REQ` (W FUN_0041d450) → invitee; answer C→W `0x740C NC_GUILD_MEMBER_JOIN_ACK` (W FUN_00419db0) → D `0x7469` (D FUN_00415270; academy member: `0x982F`, §3.20) → W `0x746A` (W FUN_0040bbd0) → members `0x7436`, all Z `0x744A` (Z FUN_005a4230); refusals `0x740D` (client FUN_006b11a0); a refused invitation is not reported to the inviter | W03 §2.4, §2.5 |
+| leave, kick, grade, notice | C→W `0x741C` (W FUN_00415070) → D `0x746B` → W `0x746C` (W FUN_0040bc20); kick `0x740E` (W FUN_0041d6f0) → D `0x7471` → W `0x7472` (W FUN_0040bcc0); grade `0x7416`, notice `0x7410` (W03 §2.8, §2.9); members told, leave / kick: all Z `0x744B` (Z FUN_005a4340) | W03 §2.6–§2.9, D04 §6.3 |
+| map login, logout, level, rename / delete of a character | W `0x180C` → `Client_RefreshGuildState` FUN_004360f0; `Guild_OnLogout` FUN_0044ccf0; Z→W `0x1074` (W FUN_0042e160); `CharIDChange` FUN_00431dd0 | W03 §4 |
+| war | C→W `0x7422 NC_GUILD_WAR_REQ` (W FUN_00414e50 → FUN_0044dba0); WM tick `Guilds_WarTick` FUN_0044ce00 → all Z `0x7443` / `0x7444` (Z FUN_005a3ea0 / FUN_005a3f60); kills Z→W `0x7445 NC_GUILD_ZONE_WAR_KILL_CMD` (W FUN_0042ac50) → both guilds' members `0x742A` (no 2016 client handler) | W03 §3.2–§3.4 |
+| storage open | C→Z `0x7491 NC_GUILD_STORAGEOPEN_REQ` (Z FUN_004762d0) → D `0x3471 NC_ITEMDB_OPEN_GUILD_STORAGE_REQ` (D FUN_0040dd30) → Z `0x3473` (Z FUN_00475b20) → C `0x7492`; in parallel Z→W `0x749E NC_GUILD_STORAGE_WITHDRAW_GRADE_REQ` (W FUN_0042b0c0) → Z `0x749F` (Z FUN_005a48f0; error replies have no routing header, W03-B17) | Z08 §8.1, Z05 §7.2, W03 §9.5, D03 §5.2 |
+| storage withdraw | C→Z `0x3026 NC_ITEM_GUILD_STORAGE_WITHDRAW_REQ` (Z FUN_00537330) → D `0x3474` (D FUN_00411460) → Z `0x3475` (Z FUN_005347a0) → C `0x3027`; Z→next Z (ring) `0x7493 NC_GUILD_STORAGEWITHDRAW_RNG` (Z FUN_00474f10, not forwarded further: Z14-B10) → guild members on that zone and on the origin zone `0x7494` (client FUN_006b4880) | Z05 §7.2, Z14 §3 |
+| rename, retype (items) | C→Z `0x74AC NC_GUILD_RENAME_REQ` (Z FUN_00473550, item in a slot) → W (master, war, tournament and name checks) → D `0x74B2 NC_GUILD_DB_RENAME_REQ` → W `0x74B3` (W FUN_00410890); W→asking Z `0x74B0` (retype `0x74B8`), every in-game client `0x74AE NC_GUILD_RENAME_CMD` | W03 §9.3, §9.4, Z08 §8.1 |
+| dismiss, delete | C→W `0x7407` → D; deletion executed by the DB → W → all Z `0x7449`; zones delete the guild's instances | W03 §2.3, §9.2, Z14 §1.9 |
+| emblem, tokens, history | W ↔ D; token spent → all Z `0x74C1` | W03 §3.8, §3.10, §3.11 |
+
+### 3.20 Guild academy
+
+| Step | Sequence (receiver handler) | Docs |
+|---|---|---|
+| start-up | D → W academy lists (CharDB link states 0x11–0x18) | W03 §6.1, D04 §9.1 |
+| join, leave, rank, notice | C→W dept 38 (W03 §5) → D (D04 §9.2) → W (W03 §6.2, §6.3) → members; all Z `0x9876` / `0x9877` (Z FUN_0046eaa0 / FUN_0046ebb0) | W03 §5, §6.2, Z08 §10 |
+| academy member joins its guild | C→W `0x740C` → D `0x982F` (D FUN_004377c0) → W `0x9830` (W FUN_0040cf40) → all Z `0x9879`, members `0x982E` (ignored by the 2016 client) | W03 §2.5, §6.2 |
+| points, level-up, buffs | W ↔ D academy points and level-up (`0x9855` W FUN_0040d250, weekly balance `0x9857` / `0x9858`) → all Z `0x987A` / `0x987B` (guild and master buffs, also every minute) | W03 §6.4 |
+| reward storage | C→Z → D (`0x3483` … `0x3488`, Z05 §7.3); grade Z→W `0x9870` → Z `0x9871`; other zones by ring `0x9872`, `0x9874`, `0x9884`, `0x9885` (Z FUN_00473050, FUN_00473160, FUN_00473270, FUN_00473370) | Z14 §4, W03 §9.5, D07 |
+| academy rewards | Z→D `0x986B` (D FUN_0041de10) → Z `0x986C` (Z FUN_0046f380) | Z14 §4.3, D04 §9.3 |
+
+### 3.21 Guild tournament
+
+| Step | Sequence (receiver handler) | Docs |
+|---|---|---|
+| load | D→W `0x7486 NC_GUILD_TOURNAMENT_DB_GET_ACK` (W FUN_0040eff0), entry list `0x74F7` | W03 §8.4 |
+| schedule, phases | WM minute tick `Tournament_Tick` FUN_00445fe0 → D `0x7499` (D FUN_00415e70, match times), `0x748B` (D FUN_004164f0, phase) → W `0x748C` (W FUN_0040bda0 → `Tournament_EnterPhase` FUN_0044c900): `0x74E7` final selection to D (D FUN_00408630); `0x7480 NC_GUILD_TOURNAMENT_TYPE_CMD` to the bracket guilds' members | W03 §8.4, D04 §6.4 |
+| entry | C→W (W03 §8.2) → all Z `0x74E3 NC_GUILD_TOURNAMENT_ZONE_JOIN_NEW_REQ` (Z FUN_004766f0, the zone holding the applicant checks guild and money) → D `0x74E5` (D FUN_00408180) → Z `0x74E6` (Z FUN_00476a10); a zone refusal goes Z→W `0x74E4` (W FUN_0042b080) | Z16 §6.7, W03 §8.2 |
+| match start | W→all Z `0x7481 NC_GUILD_TOURNAMENT_START_CMD` (Z FUN_00477a10); recall prompt `0x749B` / answer `0x749C`, observers | Z16 §6.2–§6.4 |
+| match end | map script → Z→W `0x7482 NC_GUILD_TOURNAMENT_END_CMD` (W FUN_0042ad10 → `Tournament_OnEnd` FUN_00446340: bracket advance, results, rewards); no result after the film → the zone's minute check sends a draw | Z16 §6.6, W03 §8.5 |
+| refunds, rewards | W→all Z `0x74F4 NC_GUILD_TOURNAMENT_GOLD_REFUND_ZONE_CMD` (Z LAB_00476c00: empty body, the zone refunds nothing); reward items D07 | W03 §8.5, D07 |
+
+### 3.22 Friends
+
+| Step | Sequence (receiver handler) | Docs |
+|---|---|---|
+| list at character login | D→W `0x1010 NC_CHAR_FRIEND_CMD` (W FUN_0040a570) into the session | W04 §5.2 |
+| presence | W `0x180C` → `Friends_OnMapLogin` FUN_00436900: friends `0x5409 NC_FRIEND_LOGIN_CMD`, own `0x5407 NC_FRIEND_LIST_CMD`, details W→D `0x5414` (D FUN_00437cd0); later map logins `0x540D` (`Friends_SendMap` FUN_00435cd0), level `0x540F` (from Z→W `0x1074`), party state `0x540E`, logout `0x540A` | W04 §5.2 |
+| request | C→W `0x5401 NC_FRIEND_SET_REQ` (W FUN_0041ca90) → C `0x5402`, target `0x5403`; C→W `0x5404 NC_FRIEND_SET_CONFIRM_ACK` (W FUN_0041cd70) → D `0x5410` (D FUN_004126a0) → W `0x5411` (W FUN_00411600) → both `0x5408 NC_FRIEND_ADD_CMD`, both zones `0x6007 NC_CT_ADD_FRIEND_CMD` (Z FUN_005a3dc0, title counter), `0x5402`; refusal `0x540B` | W04 §5.3, D04 §3 |
+| delete, points, find | W04 §5.4–§5.6 (W ↔ D), friend points on the zone (Z08 §6); character deleted by the OPTool → `0x540C` to its friends (§3.28) | W04 §5.4–§5.6, Z08 §6 |
+
+### 3.23 Kingdom quest
+
+The WM keeps the schedule and the joiner lists (`CKQ`, W04 §6.1); the zone that hosts the KQ maps runs them (Z16).
+
+| # | Hop | Message | Handler | What happens | Docs |
+|---|---|---|---|---|---|
+| 1 | W | `KQ_Tick` FUN_00456190 (1 s) | | `KingdomQuest.shn` rows → next two start times; at start time free map slots are taken | W04 §6.2 |
+| 2 | W→every Z | `0x580D NC_KQ_W2Z_MAKE_REQ {PROTO_KQ_INFO}` | Z FUN_00497790 | every zone builds the element and marks the map instances it hosts | Z16 §2.1 |
+| 3 | Z→W | `0x580E NC_KQ_Z2W_MAKE_ACK {hquest, err 0x981}` | W FUN_0042a9c0 | sent only by a zone that hosts the **last** listed map (Z16-B2); other errors → Status 8; Status 2 and a joining alarm to every client session; no answer → 1-min timeout, Status 9 | W04 §6.3, Z16 §2.1 |
+| 4 | C→W | `0x581B NC_KQ_LIST_REFRESH_REQ`, `0x5805 NC_KQ_JOIN_REQ`, `0x5807` cancel | W FUN_00413f80 / FUN_00413cc0 / FUN_00413d70 | list diffs `0x581C` … `0x581F` (client FUN_0049add0 …); join `0x5806`; cancel → all Z `0x583B` (Z FUN_00499100) | W04 §6.4 |
+| 5 | W | start wait over, enough joiners, teams | | 10-s countdown (notice `0x580B` to the joiners, `0x5825` each second); then the joiners leave their parties / raids (§3.17) | W04 §6.2 |
+| 6 | W→every Z | `0x580F NC_KQ_W2Z_START_CMD {info, joiners}` | Z FUN_00499240 | the zone that hosts map 0 starts the map script and inserts the joiners; every zone runs gate-keeper events at 0, 2, 5, 7, 10 s that link the listed joiners it holds (`so_LinkTo` → §3.11) and log `0x0441 NC_LOG_GAME_KQ_ENTER` to G. How joiners who stand on a zone without map 0 are pulled in is not settled (Z16 §2.2 says the events link local players; the joiner list there is empty) | Z16 §2.2, §2.3 |
+| 7 | C→Z | `0x581A NC_KQ_ENTRYRESPONCE_ACK` | Z FUN_00496990 | links to map 0 without a joiner check (Z16-B4) | Z16 §2.3 |
+| 8 | W→Z | `0x5833 NC_KQ_LINK_TO_FORCE_BY_BAN_CMD` (vote ban) | Z FUN_00497120 | the banned player is linked to Roumen | W04 §6.5, Z16 §2.5 |
+| 9 | Z→W | `0x5810 NC_KQ_Z2W_END_CMD` (script `cEndOfKingdomQuest`) | W FUN_0042aac0 | Status 5 → all Z `0x5811 NC_KQ_W2Z_DESTROY_CMD` (Z FUN_004972c0: maps cleared; players left on them go to Roumen at their next map login or revive). `0x5811` also when the WM cancels (too few joiners, `SetDoneSkip` FUN_004548c0) | W04 §6.3, Z16 §2.5 |
+| 10 | Z→D | `0x5815 NC_KQ_REWARD_REQ {fame, cen, item list}` | D FUN_004321d0 | → Z `0x5816` / `0x5817` (Z FUN_0052e570 / FUN_0052e680) | Z16 §3.4, D04 §3 |
+
+### 3.24 Instance dungeons
+
+| Path | Sequence (receiver handler) | Docs |
+|---|---|---|
+| gate on the hosting zone | C→Z NPC menu (IDGate) → `cm_PlayerinToInstanceDungeon` → `so_LinkTo` (§3.11) | Z08 §5.2, Z14 §1.4 |
+| gate on another zone | Z→ring `0xA404 NC_INSTANCE_DUNGEON_FIND_RNG` (each Z FUN_00487510; the hosting zone takes an instance, the answer travels on to the origin) → origin `so_LinkTo` (no `sp_LinkReplyCheck`, Z14-B8) | Z14 §2.1 |
+| level select (ModeIDGate) | Z→W `0xA408` (W FUN_0042c630) → destination Z `0xA40A` (Z FUN_00486ff0) → W `0xA40B` (W FUN_0042c7d0) → origin Z `0xA409` (Z FUN_00485540); then Z→W `0xA40E` (W FUN_0042c8e0) → destination Z `0xA410` (Z FUN_004871a0) → W `0xA411` (W FUN_0042cac0) → origin Z `0xA40F` (Z FUN_00485b90) → `so_LinkTo` | W04 §13.2, Z08 §5.3 |
+| empty countdown | Z (`mc_Routine` FUN_004868d0, 20 s empty) →W `0xA401` (W FUN_0042ba20) → party / raid members `0x0810 NC_MISC_RESTMINUTE_CMD {1, 300}` (client FUN_004997a0), all Z `0xA402` (Z FUN_00484590: the leader's zone opens the "delete now" menu); players back or instance deleted → Z→W `0xA403` (W FUN_0042bc40) → members `0x0810 {1, 0}` | W04 §13.1, Z14 §1.6 |
+| delete everywhere | leader's "delete now" → ring `0x10B1 NC_CHAR_EMPTY_INSTANCE_DUNGEON_RNG` (Z FUN_00485120); party / raid dismissal (`0x381F`, `0xB007`) and guild deletion delete the group's instances on every zone | Z14 §1.7, §2.2 |
+| job-change dungeon | ring `0x441F NC_QUEST_JOBDUNGEON_FIND_RNG` (Z FUN_005bfde0) | Z14 §2.3 |
+| ranking | W `g_IndunRank` | W04 §13.3 |
+
+### 3.25 Trade and booths
+
+Both partners of a trade and a booth's seller and buyer are on the same map *(inferred: they are map objects of one
+zone)*; the zone reserves the cells and money (lock list) and the Character server moves the rows in one request.
+
+| Step | Sequence (receiver handler) | Docs |
+|---|---|---|
+| trade proposal, board, lock | C→Z dept 19 `NC_TRADE_*` (zone only) | Z06 §1.2, §1.3 |
+| trade commit | C→Z `0x4C1F NC_TRADE_DECIDE_REQ` (Z FUN_00594870), both decided → both C `0x4C24 NC_TRADE_TRADECOMPLETE_CMD` **before** the DB answer (Z06-B15) → D `0x343B NC_ITEMDB_ITEMTRADE_REQ` (D FUN_0040ca80: money, then items; undo on failure) → Z `0x343D` / `0x343C` per partner (Z FUN_00593ed0 / FUN_00593dd0: apply or free, `0x4C23` on failure); D→G `0x0460` / `0x0461` / `0x044A` | Z06 §1.4, D03 §14, Z05 §9.10 |
+| booth open, visit | C→Z dept 26 (zone only) | Z06 §2.2–§2.4 |
+| booth purchase / sale | C→Z `0x680D NC_BOOTH_ITEMTRADE_REQ` (Z FUN_0058da30) → D `0x3453` / `0x3454` / `0x3455` (D FUN_0040f510 / FUN_0040f950 / FUN_0040feb0, whole stack / merge / split) → Z `0x3456 NC_ITEMDB_BOOTHTRADE_ACK` (Z FUN_005914a0: both locks; buyer `0x680E` on failure), owner `0x680F`; D→G `0x045B` / `0x045C` | Z06 §2.5, D03 §14, Z05 §9.11 |
+| market search | zone only | Z06 §2.6 |
+
+### 3.26 Premium items and buffs
+
+| Feature | Sequence (receiver handler) | Docs |
+|---|---|---|
+| item-shop purchases | C→Z `0x3020 NC_ITEM_CHARGEDINVENOPEN_REQ` (Z FUN_004923c0) → D `0x3463 NC_ITEMDB_CHARGED_LIST_REQ` (D FUN_004116e0; the procedure reads `Account.dbo.tChargeItem` by a cross-database call, not by a server link) → Z `0x3464` (Z FUN_00492570) → C `0x3021` | D03 §5.4, Z05 §7.4 |
+| withdraw one purchase | C→Z `0x3022 NC_ITEM_CHARGED_WITHDRAW_REQ` (Z FUN_00492660; goods → items in the zone) → D `0x3465` (D FUN_004118a0: create, then `usp_ChargeItem_Draw`) → Z `0x3466` (Z FUN_00492ca0) → C `0x3023`; D→G `0x04BE` | D03 §5.4, Z04 §8 |
+| charged buffs | Z→D and Z→W `0x9001 NC_CHARGED_SETBUFF_CMD` / `0x9002 NC_CHARGED_RESETBUFF_CMD` (D FUN_00416ae0 / FUN_00416d30, W FUN_0042a5b0 / FUN_0042a6d0: the WM's copy in the session blob); W→Z `0x1032 NC_CHAR_ZONE_CHARGEDBUFF_CMD` (Z FUN_0044bcf0) at every zone entry | W04 §11, D03 §9, W01 §6.3 |
+
+### 3.27 Prison
+
+| Path | Sequence (receiver handler) | Docs |
+|---|---|---|
+| imprison an online player | GM C→W `0x7C01 NC_PRISON_ADD_GM_REQ` (W FUN_0041de70; any admin level) → target's Z `0x7C13 NC_ZONE_PRISON_GO_REQ` (Z FUN_005a4470: link to `EldPri`) → W `0x7C14` (W FUN_0042dea0: timer `CPrisonServer_Add`) → D `0x7C0B` (D FUN_00436df0) → W `0x7C0C` (W FUN_00410a50: `prisonmin`, leaves the KQ list) → GM `0x7C02` | W04 §9.2, §9.3, Z08 §12, D04 §7 |
+| imprison an offline player | W → D `0x7C0B` directly (by name) → W `0x7C0C` → GM `0x7C02` | W04 §9.2 |
+| map login in prison | Z → C `0x7C05` (minutes·60) at the `EldPri` map login; C→W `0x7C06 NC_PRISON_GET_REQ` (W FUN_00415530) → D `0x7C0E` (D FUN_004166d0) → W `0x7C0F` (W FUN_0040c350: timer starts) → C `0x7C07` | W04 §9.2, §9.3, Z01 |
+| serving time | W `CPrisonServer_Tick` FUN_00458360 (2 s) → D `0x7C0D` (D FUN_00416650) every 3 minutes; at 0: C `0x7C05 {0x0DA8}`, Z `0x7C12 NC_ZONE_PRISON_END_CMD` (Z FUN_005a60f0), D `0x7C0D {0}`; C→W `0x7C04` (W FUN_004155f0) asks early (milliseconds as seconds, W04-B24); logout saves the minutes (`CPrisonServer_SaveOnLogout` FUN_00458790) | W04 §9.1, §9.2 |
+| change, release | GM C→W `0x7C09` (W FUN_0041e290; minutes and reason never copied, W04-B25) → D `0x7C10` (D FUN_00437010) → W `0x7C11` (W FUN_00410b90) → prisoner `0x7C03` or release, GM `0x7C0A` | W04 §9.2, §9.3 |
+
+### 3.28 GM commands and OPTool across processes
+
+| Action | Sequence (receiver handler) | Docs |
+|---|---|---|
+| OPTool kick by user number | OPTool→W `0x2829 NC_OPTOOL_KICK_USER_REQ` (W FUN_00426e20) → every Z `0x0C16` (Z FUN_005a5f90 → `so_banning`, save, §3.12 f), C `0x0C17 {0x068F}`, close reason 0x790; OPTool `0x282A`; find only: `0x2827` (W FUN_00426c50) | W04 §4.3 |
+| OPTool character delete | OPTool→W `0x281D` (playing?) and `0x281F` (W FUN_00426730 → `Clients_OnCharacterDeleted` FUN_004382d0) → friends `0x540C`, guild members `0x7438`, D `0x9424` (D FUN_0041a4f0, holy promise), all Z `0x10B2 NC_CHAR_WEDDING_CANCEL_WEDDING` (Z FUN_005a07d0), academy `0x9860`; the WM deletes no DB row | W04 §4.3 |
+| OPTool at Login, zones, DataServers | dept 10 status, user limits, kicks, notices on each process's OPTool listener | `login-server.md` §5.4, Z01 §3.3, D01 §2, D05 §5 |
+| OPTool kingdom quest, guild, tournament | OPTool→W `0x2811` … (W04 §4.2, §4.4) | W04 §4.2, §4.4 |
+| GM events | OPTool→W `0xD001` … `0xD009` (`GMEventManager`) → all Z `0xD00B NC_EVENT_ADD_UPDATE_EVENT_CMD` / `0xD00C NC_EVENT_DEL_EVENT_CMD` (Z FUN_0046ddf0 / FUN_0046dae0); a deleted active event is not withdrawn (W04-B50) | W04 §16, Z08 §13 |
+| `&pfind`, `&psummon` | GM chat line → Z (`ac_FindPlayer` FUN_0041d050 / `ac_SummonPlayer` FUN_0041d140) → local, else ring `0x1068 NC_CHAR_PLAYERSEARCH_RNG` (Z FUN_0045b870) → `0x1069` (Z FUN_0045ba60) back to the origin (the GM links to the player) / `0x106A NC_CHAR_PLAYERSUMMON_RNG` (Z FUN_0045b700: the target links to the GM); every move is a map change (§3.11) | Z11 §5.1, Z01 §10 |
+| kick through the ring | ring `0x106B NC_CHAR_KICKPLAYEROUT_RNG` (Z FUN_0045bc30: `so_Disconnect(0x68B)` → W `0x0C1A`, §3.12 f) → `0x106C` (Z FUN_0045bdf0) to the origin | Z01 §10 |
+| `&expbonus A`, `&itembonus A` | ring `0x1810` / `0x1811` (Z FUN_0045bf30 / FUN_0045bff0) → every map of every zone; the EXP value has no reader (Z11-B15) | Z11 §5.4 |
+| ring test | `&` command → ring `0x0811 NC_MISC_ZONERINGLINKTEST_RNG` (Z FUN_0045b4d0) round the ring | Z01 §10 |
+| notices | §3.16 | W04 §2.2 |
+
+Prison is §3.27. The other `&` commands act inside one zone (Z11 §2) or reach another zone only through a map change.
+
+### 3.29 Wedding, holy promise, mini-house
+
+| Feature | Sequence (receiver handler) | Docs |
+|---|---|---|
+| wedding requests | C→Z dept 4 wedding requests (Z02 §10) → D `0x1083` … `0x1091` (D FUN_00418e40 … FUN_00419920, `tMarriage`) → Z answers `0x1084` … `0x1092` (Z07 §5.2); after a change the zone reloads its player (`0x1080 NC_CHAR_WEDDINGDATA_REQ`, D FUN_00418a40) and asks the other zones to reload the partner (ring `0x10AB`); summon and couple entrance by ring `0x10AA`, `0x2055` | Z02 §10, Z07 §5, D02 §11, D06, Z01 §10 |
+| partner info | C→Z `0x1093` (Z FUN_005a0570) → partner here, else ring `0x1095` (Z FUN_005a0a40) → offline: D `0x1093` (D FUN_00419af0) → Z `0x1094` (Z FUN_005a1b60); the 2016 client has no `0x1094` handler | Z07 §5.3 |
+| wedding cancel on character delete | W→all Z `0x10B2` (§3.28) | Z07 §5.4 |
+| holy promise | relations, invites and presence: C→W dept 37 ↔ D (W04 §12, D04 §8); cen reward: C→Z `0x943C` → D `0x943E` (D FUN_0041aff0) → Z `0x943F` (Z FUN_00483d10) → C `0x943D`; withdraw `0x9440` → D `0x9442` (D FUN_0041b190) → Z `0x9443` (Z FUN_00484040) → C `0x9441` (handle not checked, Z08-B14); ring `0x9436` cen transfer is dead in 2016 | W04 §12, Z08 §9, D04 §8, Z30 §6.1 |
+| mini-house | C→Z `0x8C01 NC_MINIHOUSE_ACTIV_REQ` (Z FUN_00536310), `0x8C03` building (Z FUN_005769d0), furniture and portals → D dept 35 (D03 §8) → Z answers (Z07 §6.12, `0x8C5A` Z FUN_0056ed60); a visit is zone-local: the visitor must stand within 100 units of the house object (`0x8C10` Z FUN_00571c50) and is linked into the house map (Z07 §6.5) | Z07 §6, Z13, D03 §8 |
+| TaiSai dice table, gamble house | zone only, persistence through D dept 43 / 47; the WM resets the daily coin counter (`CGambleSystemServer`) and keeps the return map | Z06 §3, §4, D03 §10, §11, W04 §15 |
+
+### 3.30 Other WM relays
+
+| Feature | Sequence (receiver handler) | Docs |
+|---|---|---|
+| level change | Z→W `0x1074 NC_CHAR_LEVEL_CHANGED_CMD` (W FUN_0042e160) → friends `0x540F`, guild member record, holy promise, academy points | W01 §7.5, W03 §4.7, W04 §5.2, §12.2 |
+| character titles | W→Z `0x6006` (chat count), `0x6007` (friend count); Z→W `0x6009 NC_CT_LUASCRIPT_SET_WORLD_CMD` (W FUN_0042cda0) → that zone `0x380A` (wrong opcode, no zone handler: W04-B19) | W04 §7, Z08 §7.2 |
+| client options | C→W `0x7011`, `0x7015`, `0x7016`, `0x703B` (W FUN_004143a0, FUN_004145e0, FUN_00414680, FUN_00414af0) → D (D04 §5), no answers; sent in the logout tick too (§3.12 a, step 1b); the login push from the WM cache | W04 §8 |
+| player reports | C→W `0x8001` / `0x8003` / `0x8005` (W FUN_0041db50 / FUN_004153e0 / FUN_004154c0) → AL `0x8007` / `0x8009` / `0x800B` (AL FUN_00403a00 / FUN_004027b0 / FUN_004028a0) → W `0x8008` / `0x800A` / `0x800C` (W FUN_004092e0 / FUN_004090c0 / FUN_00409130) → C `0x8002` / `0x8004` / `0x8006` | W04 §10, D01 §4 |
+| zone announcements | Z→W `0x244A` (PK in a PK field), `0x2458` (world mob-kill announcement), `0x4820` (passive skill learned) | W04 §3 |
+| attendance event, NPC schedule | WM-side timers and their client / zone messages | W04 §17.5, §17.6 |
+| loading-failure report | C→W `0x0840` → D `0x0841` | W04 §17.3 |
 
 ## 4. Glossary
 
