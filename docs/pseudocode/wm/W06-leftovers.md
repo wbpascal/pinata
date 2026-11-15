@@ -338,9 +338,147 @@ The WM's error replies are the initial packet with only `Error` replaced: `PartM
 (`FUN_0043e270` starts every packet as `41 0C 01 00 00`). So every error reply also **empties the client's war-able
 list**, including the 5-second throttle reply (original bug) W06-B4.
 
-### 2.3 E25 (second half): W04 §12.3, the dice-game test that drops the answer of 0x9405
+### 2.3 E25 (second half): W04 §12.3, the dice-game test that drops the answer of 0x9405: **confirmed**
 
-Part 2 of this item (see `docs/plan/status/W06.md`).
+```pseudo
+client GameFrameWork::On_NC_HOLY_PROMISE_SET_UP_CONFIRM_REQ(p { Name5 CharID; Name5 UpCharID })   @ client FUN_004afc30
+    playing = MHDiceGameTask::IsDicegamePlaying(MHDiceGameTask::GetDiceGameTask())   # FUN_006a4600 / FUN_0048b2d0
+                                                    # = byte task+0x148C of the singleton DAT_00b50d60
+    if playing: return                              # no window, no text, nothing sent
+    HolyPromiseWin::SetID(this+0x360, CharID, UpCharID)
+    yes/no box TextData 0x37490F2E "%s is requesting you as a master. Do you wish to accept?" (CharID)
+        → the answer is sent as 0x9405 NC_HOLY_PROMISE_SET_UP_CONFIRM_ACK (W04 §12.3)
+```
+
+The flag `+0x148C` is set to 1 by `MHDiceGameTask::Recv_NC_DICE_TAISAI_GAME_JOIN_ACK` FUN_006a7f10,
+`Recv_NC_GAMBLE_DICE_TAISAI_GAME_JOIN_ACK` FUN_00707e10 and `Recv_NC_GAMBLE_SLOTMACHINE_GAME_JOIN_ACK` FUN_0071b370,
+and cleared by `Recv_NC_DICE_TAISAI_GAME_LEAVE_ACK` FUN_006a7580, `ShutDownGambleHouse` FUN_006a7d70 and
+`ShutDownSlotMachine` FUN_0071b660 (names: C02's client names). So "dice game playing" means **seated at a gamble-house
+dice table or slot machine**. W04 §12.3's statement holds as written: while the would-be master sits at one, the
+request is silently dropped. The apprentice has already received 0x9403 "You've asked %s to be your master." and gets
+nothing more; the WM keeps no pending request (W04 §12.3), so nothing times out or needs cleaning up. The apprentice
+can ask again once the master has left the table. This is a deliberate client rule *(inferred)*, not a bug; the only
+effect worth noting for a rebuild is that the requester is never told (no refusal code exists for it).
+
+## 3. The other leftover functions (shared code, destructors, CRT)
+
+The 48 functions of the list that are not guild classes. None of them reads or writes protocol state. Reachability
+from `W06-refs.py` (callers listed are the functions containing the `E8` call; "vftable" = only an absolute
+reference from a vftable in `.rdata`).
+
+### 3.1 `RandomBox rndbox` and `cWell512Random` (the global random source, shared with the zone)
+
+```pseudo
+`dynamic initializer for 'rndbox'` FUN_00482880 (CRT static init, before WinMain):
+    RandomBox::RandomBox(&rndbox); atexit(`dynamic atexit destructor for 'rndbox'` FUN_00482b60)
+
+RandomBox (0x348398, pdb2016) { RandomSlot rb_box[101] +0; RandomSlot rb_thausend[4] +0x328328;
+                               cWell512Random rb_well512random +0x348348 }
+RandomSlot (0x8008)          { u16 rs_slot[0x4000]; BitANDInt rs_point +0x8000 }      # ring of 16384 values
+
+RandomBox::RandomBox(this)                                                          @ FUN_00467e90
+    construct 101 + 4 RandomSlot (RandomSlot::RandomSlot FUN_00467de0), cWell512Random::cWell512Random   @ FUN_00468f60
+        # the Well512 ctor zeroes m_nIndex, m_nZ0..m_nZ2 and the 16-word m_nState
+    srand(_time32())
+    for n in 0..100: rb_box[n] filled inline exactly as RandomSlot::rs_Init(n) below
+    for k in 0..3:   RandomSlot::rs_Init(&rb_thausend[k], 1000)                    @ FUN_00467e00
+    seed[0..15] = 16 × rand();  cWell512Random::well512_InitState(&rb_well512random, seed)   @ FUN_00468fa0
+        # m_nIndex = m_nZ0 = m_nZ1 = m_nZ2 = 0; m_nState[0..15] = seed[0..15]
+
+RandomSlot::rs_Init(this, n)                                                        @ FUN_00467e00
+    rs_slot[i] = ⌊i·n / 0x4000⌋ for i in 0..0x3FFF                # each of 0..n−1 equally often
+    for i: j = rand() scaled to 0..0x3FFF (_ftol2); if j < 0x4000: swap(rs_slot[i], rs_slot[j])
+    for i: if rs_slot[i] ≥ n: rs_slot[i] = 0                      # never true
+```
+
+This is the zone's `RandomBox` (Z23 §8.6, zone ctor FUN_0063cdb0) compiled into the WM, plus the four 1000-boxes
+`rb_thausend` that Z23 §8.6 does not mention. In the WM the only reader of `rndbox` is `RandomBox::rb_1000`
+FUN_00467bc0 from `CKQServer::KQTeam_DivideRandom` FUN_00453540 (W04 §6.2 `KQ_AssignRandomTeams`), and `rb_1000` uses
+only the Well512 member (W05 §6.4 table: `well512_GetRandom(1000)`). So the WM builds 105 shuffled 32 KB rings at start
+(1.7 M `rand()` calls, 3.3 MB) that nothing reads; only the 16 `rand()` words of the Well512 seed matter, and they come
+from `srand(_time32())`.
+
+### 3.2 `ItemOptionsData itemoptiondata`, `rewarddata`, `fprewarddata` and the `CardDeck` lists: built, never loaded
+
+```pseudo
+`dynamic initializer for 'itemoptiondata'` FUN_00482780:
+    BinaryData::BinaryData (FUN_00468cb0); vftable = ItemOptionsData::vftable
+    iod_optionlist[500] = ItemOptionsData::OptionCardStack::OptionCardStack ×500       @ FUN_00467be0
+        → CardDeck::CardStack::CardStack(&ocs_cardstack)                             @ FUN_00469790
+            cs_deck = List<CardDeck::Card> (List::l_MakeList(1)); cs_Array = { la_Size 5, la_Array = new 0x14 }
+            List::l_SetListArray(&cs_deck, &cs_Array)
+    atexit(FUN_00482ac0)
+`dynamic initializer for 'rewarddata'` FUN_00482750 (BinaryDataBox<ShineReward>), `'fprewarddata'` FUN_00482820
+    (BinaryDataBox<FriendPointReward>): BinaryData ctor only
+```
+
+No WM function other than these initialisers, their atexit destructors and the unwind funclets references
+`itemoptiondata`, `rewarddata` or `fprewarddata` (full scan of `wm-pdb/decomp.c`): no `ItemOptions.shn`,
+`ShineReward.shn` or `FriendPointReward.shn` is read by the WM (W05 §3.2 lists every SHN it loads). They are the
+zone's item-option / reward tables linked into the WM by a shared source file *(inferred)*; the zone side is Z24 / Z09.
+Their destructors, all shutdown-only:
+
+| Function | Body | Reached from |
+|---|---|---|
+| `ItemOptionsData::scalar_deleting_destructor` FUN_00467d50 | 500 × `OptionCardStack::~OptionCardStack` FUN_00467bf0, base vftable, `BinaryData::~BinaryData`, delete if flag 1 | vftable |
+| `BinaryDataBox<ItemOptions>::~BinaryDataBox` FUN_00467c00 / `scalar_deleting_destructor` FUN_00467c10 | vftable, `BinaryData::~BinaryData` (+ delete) | unwind funclets FUN_00482400 / FUN_00482430; vftable |
+| `BinaryDataBox<UseClassTypeInfo>` FUN_00465a10, `<FriendPointReward>` FUN_00467c40, `<ShineReward>` FUN_00467d20 `scalar_deleting_destructor` | same | vftable (`UseClassTypeInfo` is the live `CharClassDataBox`, W05 §3.2) |
+| `BinaryData::scalar_deleting_destructor` FUN_00468ce0 | vftable, `CDataReader::~CDataReader`, delete if flag 1 | vftable |
+| `CardDeck::CardStack::~CardStack` FUN_00469520 | delete `cs_Array.la_Array`, then `cs_deck.l_Array` | `OptionCardStack` dtor FUN_00467bf0 |
+| `ListArray<CardDeck::Card>::~ListArray` FUN_004694d0 | delete `la_Array` | unwind funclet FUN_00482588 (`CardStack` ctor) |
+| `ListEraser<CardDeck::Card>::~ListEraser` FUN_00467d10 | resets the base vftable | unwind funclet FUN_00482550 (`l_MakeList`) |
+| `ListEraser<CardDeck::Card>::lid_Call` FUN_00467cf0 | calls slot 0x0C of `le_list` (the list's erase) with the index; returns 1 | vftable |
+| `ListIteratorDefault<CardDeck::Card>::lid_Call` FUN_00467ce0 | returns 1 (visit everything) | vftable |
+
+### 3.3 Destructors of live WM objects
+
+| Function | What it does | Reached from |
+|---|---|---|
+| `CDataFileServer::~CDataFileServer` FUN_00403890 | `CDataReader::~CDataReader` of `m_AttendRewardData`, `m_AttendScheduleData`, `m_BadNameFilterData`, `m_GBHouseData`, `m_SpamerReportData` (W05 §3.2 rows; W04 §2.5 / §15 / §17.5) | `~WorldManagerServer` / ctor unwind funclets FUN_0047f4a4, FUN_0047f792 (W05 §1.6 shutdown) |
+| `CDataReader::scalar_deleting_destructor` FUN_00458b50 | vftable; frees `m_pHead` (file buffer) if `m_nBFSize`, zeroes `m_pHead`, `m_pData`, `m_nBFSize`, `m_nFileCheckSum`; `delete[] m_pDataArray` if `m_nDataArraySize`; delete if flag 1 (W05 §3.1 `CDataReader`) | vftable |
+| `CNpcScheduleServer::~CNpcScheduleServer` FUN_00456c20 | the same `CDataReader` teardown inlined for `enss_NpcScheduleData` (W04 §17.6) | `WorldManagerServer::~WorldManagerServer` FUN_00403920 and its ctor / dtor unwind funclets FUN_0047f488, FUN_0047f718 |
+| `CNpcScheduleServer::NpcScheduleInfo::~NpcScheduleInfo` FUN_0043c190 | empty. COMDAT-folded: every empty destructor in the WM (`RandomSlot`, `Name5`, `cWell512Random`, packet rows …) is this one address, hence its 511 callers; the PDB name is that of one of the folded bodies | `_eh_vector_destructor_iterator_` everywhere |
+| `PROTOCOLFUNCTIONTEMPLETE<T>::scalar_deleting_destructor`, T = `CParserAccountDB` FUN_00408210, `CParserAccountLogDB` FUN_00409260, `CParserCharDB` FUN_0040ed90, `CParserClient` FUN_00419610, `CParserGameLogDB` FUN_004242f0, `CParserLogin` FUN_004248d0, `CParserOPTool` FUN_00427330, `CParserZone` FUN_0042d440 | eight identical bodies: vftable; for each of the 1024 `pft_funcpnt[i]`, `delete[]` it unless it is `&pft_defaultdepartment`; delete `this` if flag 1. = the destructor of W05 §6.1 | vftable only (the parsers are `gServer` members, destroyed at exit) |
+| `RaidSystem::~RaidSystem` FUN_004037e0 | 500 × `Raid::~Raid` (0x38 each; W02 §1.4 `g_Raids`) | `~WorldManagerServer` / ctor unwind funclets FUN_0047f46c, FUN_0047f6fc |
+| `Raid::scalar_deleting_destructor` FUN_00462bf0 | vftable; delete if flag 1 | vftable |
+| `CIOCP_Process_Interfece::scalar_deleting_destructor` FUN_0042ff80 | vftable (`Interfece` sic, PDB spelling); delete if flag 1 | vftable |
+| `CIOCP_Process_LSession::~CIOCP_Process_LSession` FUN_0042fbb0 | resets the base vftable | unwind funclets of `CWMBaseSession::CWMBaseSession` FUN_00480919 and `CSocket_IOCP::CSocket_IOCP` FUN_00482290 (W05 §6.2) |
+| `CMD5Checksum::~CMD5Checksum` FUN_0045e2c0 / `scalar_deleting_destructor` FUN_0045e2d0 | vftable (+ delete) | unwind funclet FUN_004821a0 of `CMD5Checksum::GetMD5` (the MD5 of W05 §3.1 / §6.3); vftable |
+| `WinService::scalar_deleting_destructor` FUN_00466d80 | vftable; `String::~String(&serviceName)`; delete if flag 1 (the service wrapper of W05 §1.1 / §6.3) | vftable |
+| `String::scalar_deleting_destructor` FUN_004671c0 | vftable; delete `chData` if set; delete if flag 1 | vftable |
+
+### 3.4 Packet-builder destructors (stack objects of send functions)
+
+Each is the unwind cleanup of one sender's stack packet: it runs the folded empty destructor over the packet's arrays,
+so it does nothing; none changes the bytes sent.
+
+| Function | Arrays destroyed | Owner (unwind funclet) and where the packet is documented |
+|---|---|---|
+| `PROTO_NC_DATA_SEND1<PROTO_NC_RAID_SLOT_MOVE_BROAD_CMD>::~…` FUN_0041a3b0 | 5 × 0x14 at +0x1F and at +0x83 | `CParserClient::fc_NC_RAID_SLOT_MOVE_REQ` (funclet FUN_004802a0); W02 §5.7 |
+| `PROTO_NC_DATA_SEND1<PROTO_NC_RAID_MAKE_BROAD_CMD>::~…` FUN_0041a270 | 5 × 0x14 at +0x0D | `CParserClient::fc_NC_RAID_MAKE_REQ` (funclet FUN_0048026b); W02 §5.1 |
+| `PROTO_NC_DATA_SEND2<PROTO_NC_RAID_MEMBER_LIST_CMD>::~…` FUN_00435a60 | 4 × 0x14 at +0x19, 20 × 0x15 at +0x7F | `CWMClientSession::SendRaidMember` (funclet FUN_00480d50); W02 §1.4 `Client_SendRaidMemberList` |
+| `PROTO_NC_PARTY_MEMBER_LIST_CMD_SEND::~…` FUN_00419b90 | `memberarray` 5 × 0x16 | `CParserClient::SendPartyMemberList` (funclet FUN_00480150); W02 §1.3 (0x3809) |
+| `PROTO_NC_DATA_SEND2<PROTO_NC_GUILD_TOURNAMENT_LIST_ACK>::~…` FUN_00445560 | 31 × 0x15 at +0x170 | `CGuildTournamentServer::Send_NC_GUILD_TOURNAMENT_LIST_ACK` (funclet FUN_004815e0); W03 §8.2 (0x747F) |
+
+### 3.5 `Raid::iterator::operator!=` FUN_00462e60
+
+```pseudo
+Raid::iterator::operator!=(a, b)                                                    @ FUN_00462e60
+    return not (a.m_pRaid != null and a.m_pRaid == b.m_pRaid
+                and a.m_nPartyIndex == b.m_nPartyIndex and a.m_nSlot == b.m_nSlot)
+```
+
+The loop test of W02 §1.4's iterator (`Raid::Begin` {0,0} … `Raid::End` {4,0}); its six call sites are the member
+loops of `WorldManagerServer::RaidLeaveLeader` FUN_00407430, `RaidLeaveSubLeader` FUN_00407620 and `RaidLeaveLooter`
+FUN_00407800 (W02 §1.4, the 0xB02E broadcast to every raid member). Two iterators on a null raid compare unequal, so a
+loop over a null raid would not end; the three callers check `GetRaid` ≠ null first.
+
+### 3.6 MSVC runtime `type_info`
+
+`type_info::_Type_info_dtor` FUN_0047017c (unlinks and frees the cached undecorated name under CRT lock 0xE),
+`type_info::~type_info` FUN_00469ce3, `scalar_deleting_destructor` FUN_00469cf3, `type_info::operator==` FUN_00469d14
+(`strcmp` of the decorated names): Visual C++ CRT code for RTTI, called only by the CRT and `dynamic_cast`/`typeid`.
+No server behaviour; a rebuild does not reproduce it.
 
 ## Original-server bugs
 
@@ -358,6 +496,9 @@ Part 2 of this item (see `docs/plan/status/W06.md`).
   the LEAVE handlers and 0x28 as MONEY_SUB are *(inferred)* from the opcode order and the callers.
 - The opcodes "not sent by the 2016 WM" (0x741F, 0x742B, 0x742C, 0x742E, 0x743A, 0x743B, 0x743C, 0x743F, 0x7442,
   0x9864, 0x9865, 0x9867): no send site in the WM or zone layouts; whether another server sends them was not checked.
+- §3.1: the `rand()` → index scaling constant of `RandomSlot::rs_Init` (an `_ftol2` of a float product) was not read;
+  it only shapes the shuffle of rings nothing in the WM reads. §3.2: that `itemoptiondata` / `rewarddata` /
+  `fprewarddata` come from a source file shared with the zone is *(inferred)* from the identical classes there.
 
 ## Coverage boundary
 
