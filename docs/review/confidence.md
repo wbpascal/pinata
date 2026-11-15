@@ -10,8 +10,8 @@ finds go to `docs/knowledge/X02.md` §0; the capture scenarios that follow from 
 |---|---|---|
 | 1 | Error classes: what went wrong so far, with counts | done (part 1) |
 | 2 | Rating of every pseudocode section and knowledge struct table | done (parts 2–3) |
-| 3 | Adversarial re-check of the load-bearing claims | §3.2 done (part 4), §3.3 done (part 5), §3.4 done (parts 6, 6b); §3.5 open (part 7) |
-| 4 | Coverage gaps of items finished without a review part | open (part 10) |
+| 3 | Adversarial re-check of the load-bearing claims | §3.2 done (part 4), §3.3 done (part 5), §3.4 done (parts 6, 6b), §3.5 done (part 7) |
+| 4 | Coverage gaps of items finished without a review part | done (part 10) |
 
 ## 1. Error classes
 
@@ -3688,5 +3688,270 @@ A zone handler returns `void` (E31): this error class does not exist there.
 
 ## 4. Coverage gaps of items without a review part
 
-Open (part 10). Status files without a "Review" section: C01, C02, D01, D02, L00, P01, P03, W01, W02, Z01, Z02,
-Z03, Z04, Z05, Z07, Z08.
+Sixteen status files have no "Review" section: C01, C02, D01, D02, L00, P01, P03, W01, W02, Z01, Z02, Z03, Z04, Z05,
+Z07, Z08. They were closed before the plan had the "Coverage boundary" and review steps, and none of their outputs has
+a "Coverage boundary" section. This section says what `coverage.py` reports for them (§4.1), what that tool cannot see
+(§4.2–§4.4), and which of their own open points nobody took up (§4.5). §4.6 is the work list. No other item's file
+was edited; two small gaps are closed in §4.5 itself.
+
+The numbers come from `docs/plan/status/X02-cov.py` (commands `items`, `weak`, `rest`, `game <bin>`, `who <ID>`); it
+imports `coverage.py` and keeps its rules. Run it again after documents change.
+
+### 4.1 What `coverage.py <ID>` reports
+
+"Gap" = a function reachable from the item's scope handlers that no document of that server cites.
+
+| Item | Handlers cited by the item | Reachable, depth 3 | Gaps | Reachable, depth 6 | Gaps | Reachable, no limit | Gaps |
+|---|---|---|---|---|---|---|---|
+| C01 | no scope table | – | – | – | – | – | – |
+| C02 | no scope table | – | – | – | – | – | – |
+| D01 | 52/52 | 120 | 0 | 132 | 10 | 132 | 10 |
+| D02 | 75/75 | 279 | 0 | 307 | 27 | 309 | 29 |
+| L00 | no scope table | – | – | – | – | – | – |
+| P01 | no scope table | – | – | – | – | – | – |
+| P03 | no scope table | – | – | – | – | – | – |
+| W01 | 102/197 | 321 | 0 | 338 | 0 | 338 | 0 |
+| W02 | 28/28 | 106 | 0 | 106 | 0 | 106 | 0 |
+| Z01 | 74/74 | 368 | 0 | 493 | 23 | 611 | 128 |
+| Z02 | 38/38 | 131 | 0 | 172 | 0 | 173 | 0 |
+| Z03 | 19/19 | 86 | 0 | 115 | 0 | 124 | 0 |
+| Z04 | 52/52 | 244 | 0 | 306 | 8 | 436 | 128 |
+| Z05 | 102/102 | 98 | 0 | 172 | 1 | 193 | 1 |
+| Z07 | 117/117 | 169 | 0 | 223 | 22 | 329 | 127 |
+| Z08 | 111/111 | 373 | 0 | 497 | 24 | 617 | 129 |
+
+- **Depth 3 (the tool's setting): no gap in any of the eleven items with a scope table.** The follow-up items
+  (W03–W05, Z09–Z30, D03–D07) and X01 closed what the first documents left.
+- **W01, 102 of 197 handlers.** The other 95 are not cited by W01's own documents; every one is cited by W05
+  (`X02-cov.py who W01`: 44 by W05 alone, 30 by W04 and W05, the rest by W05 with W03, S02, P02, L01 or zone items).
+  W01's scope table was split after it was written; nothing is missing.
+- **No scope table (C01, C02, L00, P01, P03):** the tool does not apply. L00 is the Login server: the overview
+  (`docs/plan/progress.md`) counts 43 of 43 Login handlers and 53 of 53 functions cited, with L01. C01's status file
+  has its own measure (629 of 671 server → client opcodes have a client handler; the 42 others are classified in
+  `docs/knowledge/C01.md` §5). C02, P01 and P03 are tools; their open points are in README §7.3 and §4.5 below.
+
+### 4.2 Below depth 3
+
+With the depth limit raised (other rules unchanged) the gaps are library code, with three exceptions:
+
+| Item | Uncited below depth 3 | What they are |
+|---|---|---|
+| D01 | 10 | `cShineLogSystem::SLS_AddLog` (FUN_004179d0 account, FUN_00413530 accountlog; 94 lines each), `CIOBuffer::Alloc` / `Free`, `CIOSpinLock::Wait`, `cLS_Queue::lsq_QueueAllocate`, `operator new`. Shared network and log classes: S02's subject, and S02 §6 says the DB-server copies were not compared (§4.4) |
+| D02 | 29 | all under FUN_00460bf0 (holds the `{CALL ` string) and FUN_004412f0 (holds `bad cast`): C++ stream and locale code *(inferred from the two strings; the Character server has no PDB)* |
+| Z01, Z04, Z07, Z08 | 127–129 each | the same Lua 5.2 VM functions (`luaV_execute` FUN_006120c0 817 lines, garbage collector, tables, strings) reached through a script call. Library code. Not library: `CLooting::CLooting` FUN_00645370 (13 lines) and `TickTimer::TickTimer` FUN_00591fa0 (12 lines), two constructors |
+| Z05 | 1 | `BoothItemInfo::GetAttrSize` FUN_0062dca0 (66 lines): documented in §4.5 (G1) |
+| W01, W02, Z02, Z03 | 0 | – |
+
+### 4.3 Cited is not the same as documented
+
+The tool counts an address as covered when any document mentions it. The table splits the depth-3 functions of each
+item by the strongest kind of mention: `@ FUN_…` on a pseudocode line or in a heading; a sentence or table cell; only
+lines that list five or more addresses; only under a heading named "Not reconstructed", "Open questions" or similar.
+
+| Item | Reachable (depth 3) | Cited with `@` or in a heading | Text only | List lines only | Only under an open-points heading |
+|---|---|---|---|---|---|
+| D01 | 120 | 44 | 62 | 14 | 0 |
+| D02 | 279 | 121 | 106 | 52 | 0 |
+| W01 | 321 | 173 | 132 | 16 | 0 |
+| W02 | 106 | 72 | 24 | 9 | 1 |
+| Z01 | 368 | 251 | 94 | 17 | 6 |
+| Z02 | 131 | 76 | 51 | 1 | 3 |
+| Z03 | 86 | 55 | 31 | 0 | 0 |
+| Z04 | 244 | 124 | 109 | 5 | 6 |
+| Z05 | 98 | 52 | 40 | 4 | 2 |
+| Z07 | 169 | 101 | 64 | 3 | 1 |
+| Z08 | 373 | 246 | 104 | 14 | 9 |
+
+- The **list-only** functions are mostly library copies named in one line (`Name256Byte` constructors and
+  assignments, `TiXmlNode::Identify`, `CSocket_IOCP::Send` in D01 §1.2 and S02 §1.9) and, for D02, the 52 SQL wrappers
+  of its §15 table (one row per procedure). No handler logic was found among them.
+- The **open-points-only** functions (28) are the ones their own document says it did not read. They count as covered
+  but are not documented by the document that cites them; `X02-cov.py weak` lists each with its heading. Whether a
+  later item documents them is §4.5.
+- "Text only" is not a defect by itself: many documents describe a helper in a sentence. It is the reason a 100 % in
+  `progress.md` must not be read as "every function has pseudocode".
+
+### 4.4 Functions no document cites
+
+The tool starts at packet handlers and follows direct calls. It does not see virtual calls, tables of member
+pointers, timers or start-up code. Counted over whole binaries (functions of 6 lines or more, library code by PDB name
+excluded):
+
+| Binary | Functions (≥ 6 lines, not library) | Cited by some doc | Not cited | Lines not cited / all |
+|---|---|---|---|---|
+| login | 505 | 366 | 139 | 5465 / 19555 |
+| wm | 1907 | 1666 | 241 | 7896 / 83475 |
+| zone | 8797 | 6619 | 2178 | 63692 / 413175 |
+| account | 850 | 254 | 596 | 16458 / 26286 |
+| accountlog | 780 | 240 | 540 | 15265 / 23030 |
+| character | 3216 | 1045 | 2171 | 72263 / 134283 |
+| gamelog | 1408 | 418 | 990 | 31905 / 48038 |
+
+Most uncited lines are CRT, Lua and STL code that the library filter does not match (the largest are `memcmp`,
+`$I10_OUTPUT`, `memcpy`, `luaV_execute`, `llex`). Character and GameLog have no PDB, so library and game code cannot
+be told apart there by name. The Account and AccountLog remainder is the process layer (`WinService`, `MiniDumper`,
+`CSocket_*`, `CSession*`, `DataServer`, `cLogSystem`) and data loaders they share with the other servers
+(`ItemAttrCls_*`, `ItemDataBox`, `MapDataBox`, `CShnDataFileCheckSum`): 389 and 382 class-named functions.
+
+For the zone, restricted to functions the 2016 PDB names `Class::Method`:
+
+Zone: 7438 class-named functions, 1158 not cited (25865 of 350966 lines); 789 of them have no direct caller (virtual / table-dispatched).
+
+| Class | Functions not cited | Lines |
+|---|---|---|
+| `ShineObjectClass::ShinePlayer` | 139 | 2944 |
+| `CGambleDiceTaiSaiObject` | 36 | 2408 |
+| `ShineObjectClass::ShineObject` | 87 | 895 |
+| `InventoryLocking::InventoryCellLockList` | 17 | 887 |
+| `ShineObjectClass::ShineMobileObject` | 34 | 615 |
+| `CMD5Checksum` | 6 | 408 |
+| `Table` | 5 | 340 |
+| `SlotMachine::SlotMachineAnalyse` | 4 | 317 |
+| `CGambleObject` | 22 | 302 |
+| `CellStack` | 6 | 280 |
+| `NPCRole_Merchant` | 7 | 269 |
+| `ItemAttrCls_Weapon` | 15 | 241 |
+| `ItemMixData` | 3 | 232 |
+| `AccUpGradeDataBox` | 3 | 222 |
+| `CSellItemManager` | 5 | 216 |
+| `SlotMachine::SlotMachineScreenManager` | 4 | 209 |
+| `ItemAttrCls_Amulet` | 13 | 205 |
+| `SlotMachine::SlotMachineScreen` | 5 | 176 |
+| `LinearStep` | 4 | 173 |
+| `DiceTaiSai` | 1 | 166 |
+| `SlotMachine::SlotMachineCluster` | 6 | 160 |
+| `BmpDataInfo` | 1 | 158 |
+| `SlotMachine::SlotMachineJackPotRanking` | 3 | 150 |
+| `CharacterInventory` | 2 | 147 |
+| `ItemOptionsData::OptionCardStack` | 3 | 139 |
+| (472 more classes) | 727 | 13606 |
+
+The WM has 98 such functions (2 019 lines; `CGuildMember` 15, `CGuild` 13, `CGuildAcademyMember` 12, among them
+`CGuild::Recv_NC_GUILD_WAR_TARGET_CMD` FUN_0045bdb0 and four more `Recv_NC_GUILD_*` members with no direct caller),
+Login 5 (`type_info`, `String`).
+
+An address that is not cited can still be described under its name, or be an identical-code fold of a cited
+function. Of 23 large zone functions checked by name, 8 are mentioned somewhere and 15 are not mentioned at
+all. The 15, with the item of this section whose subject they belong to *(attribution by name, ours; bodies not read)*:
+
+| Function | Lines | Belongs to |
+|---|---|---|
+| `ShinePlayer::so_ply_GuildReNameItemUseSuccess` FUN_00473ea0, `so_ply_GuildReTypeItemUseSuccess` FUN_00474250 | 136, 133 | Z08 (guild content) |
+| `ShinePlayer::sp_CanUseItemCheck_ByTable` FUN_0056eae0 | 88 | Z04 (item use) |
+| `ShinePlayer::sp_CanItemMakeItem` FUN_0049b6c0 | 45 | Z04 (production) |
+| `ShinePlayer::sp_LogoutDuringParty` FUN_004cd340 | 67 | Z01 (logout) / Z08 (party) |
+| `ShinePlayer::so_ply_BanByServerDisconnect` FUN_00566930 | 54 | Z01 (kicks) |
+| `ShinePlayer::so_SpamSendDataToCharDB` FUN_00562990, `sp_SpamSendDataToWM` FUN_00562bc0 | 68, 56 | Z02 (chat) |
+| `ShinePlayer::so_ply_DecreaseDmgPassiveSkill` FUN_005651e0 | 67 | Z03 (damage) |
+| `ShinePlayer::so_ply_WeaponSpeedSet` FUN_0043d3c0 (and `so_ply_WeaponRangeSet` FUN_0043f520) | 56, 56 | Z04 (equipment) / Z07 |
+| `ShinePlayer::sp_ChatColor_Save2World` FUN_00563c70 | 44 | Z07 (character options) |
+| `CGambleDiceTaiSaiObject::GDTSO_DiceTaiSai_Result_DiceRoll` FUN_0061a350, `GDTSO_DiceTaiSai_Out` FUN_0061c330 and 34 more `GDTSO_*` | 2 408 together | Z06 (reviewed item; its §7 lists the TaiSai win tables as open) |
+| `SlotMachine::SlotMachineAnalyse::sma_ScreenMatch` FUN_00621dd0 and the other slot-machine classes | about 1 000 together | Z06 (§7: draw, line patterns, jackpot open) |
+
+Also uncited and inside the 16 items' subjects: 17 members of `InventoryLocking::InventoryCellLockList`
+(887 lines: `icl_IsLocked` FUN_0048b0f0 / FUN_0048af30, `icl_StoreItem` FUN_00488db0, `icl_ItemInfoZoneRng`
+FUN_00489aa0, `icl_UseItem` FUN_004895d0, `icl_ItemSell` FUN_00489ec0, …; Z04 / Z05 describe the lock list from its
+callers), `ShineMobileObject::so_smo_AbnormalStateAttribute` FUN_004a8010 (119 lines, Z03; named once in Z09),
+`ShinePlayer::~ShinePlayer` FUN_00559300 (126 lines, Z01), four `Table::Load<…>` instances for the level-gap and
+belong-dice tables (83 lines each, Z03 / Z09). Full list: `X02-cov.py game zone 200`.
+
+This remainder is larger than a gap one session closes: part 11 (coverage boundary) decides the follow-up item.
+
+### 4.5 Open points of the sixteen items, one by one
+
+Every bullet of each "Not reconstructed / uncertain" section was searched in the later documents by its function
+addresses, opcodes and names. README §7.3 gives the same sections in one line each and warns that a point "may
+already be answered"; this table answers that per point. **taken up** = a later document has an `@` block for the
+function or several mentions of the name (document named; its text was not re-read here, except where a § is given).
+**open, owned** = still open and a document says whose it is. **open, unargued** = still open and nothing says who
+closes it: the follow-up list. Bullets that only state a finding (a code without client text, "nothing is captured")
+are left out.
+
+| Item | Point | State | Where / what remains |
+|---|---|---|---|
+| L00 | DB conditions behind the AccountDB result flags | taken up | D01, D06 §2–§3 |
+| L00 | reader of `builtinKey` | open, unargued | only X01 repeats it. Small: search the readers of the server-object member |
+| L00 | OPTool status queries 0x2812 / 0x2814 / 0x2818; service install FUN_00402ba0; log plumbing FUN_00411bb0, FUN_00412bc0 | taken up | L01 (`@` FUN_00402ba0), S02 (FUN_00412bc0) |
+| D01 | procedures without source | open, owned | D06 §2–§3 give contracts; README §7.2 "Lost DB sources" |
+| D01 | `nUserNo == −2`; private edits of `usp_User_USloginGame` | open, owned | D06 §11 |
+| D01 | TEENAGER `nType` 1: the value divided by 60 comes from an untraced FPU expression | open, unargued | read the x87 code of the handler in `account-pdb` (the PDB types the operands) |
+| D01 | 0x0804 handler `LAB_00404db0` "not decompiled" (and D02: `LAB_0043cdf0`) | open, unargued | both are labels, not functions, in the exports; a few instructions with `objdump`. Until then "answers 0x0805" is *(inferred)* for Account and Character |
+| D01 | syslog writer object `DAT_0064fa90` | open, unargued | where the log lines go is unknown for the Account server |
+| D01 | session list, accept, service install, crash dumps, MapInfo / ItemInfo loading | open, owned | S02 §6: the DB-server copies of the shared classes are not compared (§4.4: 389 / 382 uncited class-named functions) |
+| D02 | wedding sub-status 6 / +4 against the zone's reading | taken up | Z13 §4 (`@` FUN_0059f2d0) |
+| D02 | 0x1004 steps 5–8: which `nStatusDone` filter is doing / done / read / repeat | open, unargued | D06 names `nStatusDone` once; D04 owns the blobs but not the filter order |
+| D02 | holy-promise blocks and option packets of 0x1004 | taken up | W04, D04 |
+| D02 | 0x1017 item record `Send_NC_CHAR_ITEM_CMD` FUN_004056a0 "is D03's" | open, unargued | no DB document other than D02 cites FUN_004056a0 or names 0x1017; D03 describes item rows for the ITEMDB answers, not this sender. Check D03 before reading |
+| D02 | `p_Char_GetAllData` column 37; `usp_CharacterLoading`, promotion procedures; `setStatPoint` codes | open, owned | D06 §6, §11 |
+| D02 | 0x0812–0x0815 field names (2017 structs are larger) | open, unargued | Z01 and W05 describe the opcodes from their side; the Character side keeps 2017 names |
+| D02 | SOAP item-shop client (`cUKItemShop`, FUN_0043f690), unchecked URL length | open, unargued | cited by no other document; S01 names the class only. Not small (gSOAP, no PDB) |
+| D02 | sender of 0x0841 | taken up | W04 (0x0840 → 0x0841) |
+| W01 | feature callees, `g_InstanceMaps`, FUN_004382d0, FUN_00437d50, handlers 0x0840 … 0x10F1, OPTool | taken up | W04 (`@` FUN_00452580, §4.3), W05 §4.5 |
+| W01 | AVATAR fields *(inferred)*, CHARDATA beyond the WM's offsets | open, owned | D02; the 2016 `WorldManager.pdb` has the struct (S01) |
+| W02 | PARTY +0xcc, PARTY_MEMBER +0x20 never read | open, unargued | harmless as stated; the 2016 PDB names both members (one `pdb.py` call) |
+| W02 | zone side of the notifications; `nChatBan`; FUN_0042cda0 | taken up | Z08, W04 (`@` FUN_0042cda0) |
+| Z01 | start order | open, owned | Z10 §10, README §7.2 |
+| Z01 | certification protocol, main thread, tick | taken up | Z10 (`@` FUN_00613440, FUN_00613750, FUN_005ab9c0), Z09 |
+| Z01 | player modes other than 0 and 1 | open, unargued | later documents use single modes (mode 3 in X01-B5); no table of all values |
+| Z01 | 0x0830 values, `p+0x2a800`, the 49-table list | taken up | Z10; S01 §3.3 and §3.2.3 here (`sp_isPossibleNewConnect`); `capture-scenarios.md` §9 names the 49 tables |
+| Z01 | fields of 0x4001 | taken up | Z12, P02 (captured) |
+| Z02 | source of `hnd` (third handler argument) | open, unargued | the dispatcher's second argument was never traced; every zone handler description rests on it |
+| Z02 | setter of `+0x1e78` bit 5 | taken up | `docs/knowledge/Z03.md` §1 (Captivate) |
+| Z02 | which client action sends 0x2003 / 0x2005 | open, owned | client question; the second-client scenario of `capture-scenarios.md` §3 that expects `0x2003` → `0x2004` shows whether the client still sends it |
+| Z02 | sight removal, `&` commands, portal roles, wedding hall, AI events | taken up | Z09, Z11, Z14, Z13 |
+| Z02 | roar delivery after the item cast (`p+0x2a79c`, ring `DAT_008598c0`) | open, unargued | only Z04 mentions the member (the cast side) |
+| Z02 | setter of `p+0x5cb9` bit 2; FUN_005cc2a0 / FUN_005cc2d0 events | open, unargued | Z09 and Z18 mention the byte; no setter recorded |
+| Z03 | formulas | open, owned | Z12, Z22 §13, README §7.2 "Floating-point formulas" |
+| Z03 | stun chance FUN_00500170 | closed here | G2 below |
+| Z03 | `smo_SkillBlast` specials, cooldowns, abstate actors, mob side, experience split, weapon charges | taken up | Z25, Z23, Z22, Z09, Z29 (`@` FUN_00482500, FUN_004826b0), Z17 (`@` FUN_00562160) |
+| Z03 | SkillEntry layout beyond §5.1 | taken up | Z20 (by subject; the name "SkillEntry" is not used there) |
+| Z03 | StaACMode / StaMRMode actors (FUN_0042aeb0) | taken up | Z25, Z22 (few mentions: check before relying on it) |
+| Z03 | 0x244C payload builder (`mob+0x2234 .vt[0x30]`) | open, unargued | Z09 mentions the member; the builder is not read |
+| Z04 | DB answers, lock commit, `UseEffect` actors, upgrade stat delta, dismantle, loot rules | taken up | Z05, Z17, Z24, Z26, Z13, Z11 (`@` FUN_005c5c60), Z30 (`@` FUN_005290f0), Z09 (`@` FUN_00644f60) |
+| Z04 | merged branches whose code is *(inferred)* (SPLIT, PICK, BELONGED_CANCEL 0x2885–0x288f, MAPLINK, soul stone) | open, unargued | §3.4.5 and §3.4.7 here re-read SPLIT and PICK; 0x2885–0x288f are named by no other document |
+| Z04 | inventory types 2 / 3 / 13 / 14 / 16; item attribute layout | taken up | Z13, Z05, D03; sizes per class also in G1 |
+| Z04 | `ItemKey_Make` kinds | open, owned | Z24 §9 (`iti_mkregnum` kind 8 still open) |
+| Z04 | auto-arrange scheduling (`p+0x2ab18`) and sort key | open, unargued | Z05 mentions the member only |
+| Z04 | mover-upgrade rare roll | taken up | Z30, Z13 (few mentions: check) |
+| Z05 | which DB check gives each code | open, owned | D03 |
+| Z05 | `LC_Machine` as a vending machine | open, unargued | a name guess; no effect on behaviour |
+| Z07 | stat layers, blob bodies, wedding, mini-house, minimon, mover, pet, `cca_IsRewardCondition` | taken up | Z12 (`@` FUN_0058bd10), Z13 (`@` FUN_005b92a0), Z28 |
+| Z07 | `NC_CHAR_ZONE_SINGLE_OPTION_CMD` field meanings; LINK_FROM record use | open, unargued | Z12 names the packet twice; meanings stay *(inferred)* |
+| Z08 | quest engine, KQ, instances, tournament, raid status, academy storage, GM events | taken up | Z15 (`@` FUN_006387f0), Z16 (`@` FUN_00476860), Z14 (`@` FUN_005cd9c0 … FUN_005cdc00), D07, Z09 (`@` FUN_0046d5c0) |
+| Z08 | prison release timer, 0xDC1 vs 0xDC2 | open, owned | W04 §19; scenario 33 and setup S7 in `capture-scenarios.md` |
+| Z08 | client source of `EncHandle` for 0x581A | open, owned | Z16, README §7.2 |
+| C01 | `0x7c07`, `0x9010`, `0x103c`, `0x1047`, `0x1049`, `0x10de` by shape only; which send carries `0x083a`; live ITasks | open, owned | README §7.3 (C01 row) |
+| C02 | 2017 names not confirmed in 2016 code; 70 size differences; `struct_alias` layouts | open, owned | S01 (`pdb2016-layouts.json`) settles the opcodes the five PDB servers handle; the rest is README §7.2 "2017-only facts" |
+| P01, P03 | no "Not reconstructed" section | – | P02 validated the decoder on the captures (`capture-validation.md`); the dissector is generated from the same tables |
+
+**Closed here** (small gaps, read in `zone-pdb`):
+
+- **G1. `BoothItemInfo::GetAttrSize(ItemClassEnum)` @ FUN_0062dca0** *(pdb2016)*: the attribute size in bytes of an
+  item of that class, a constant per class. 2: `ITEMCLASS_WORDLOT`, `QUESTITEM`, `KQSTEP`, `ACTIVESKILL`. 4: `DWRDLOT`,
+  `HOUSESKIN`, `AMOUNT`, `COSWEAPON`, `ACTIONITEM`, `COSSHIELD`. 62: `AMULET`. 89: `WEAPON`. 37: `ARMOR`, `SHIELD`,
+  `BOOT`, `BRACELET`. 36: `FURNITURE`. 8: `DECORATION`. 1: `SKILLSCROLL`, `RECALLSCROLL`, `UPSOURCE`, `WTLICENCE`,
+  `KQ`, `UPRED`, `UPBLUE`, `FEED`, `UPGOLD`, `GBCOIN`, `NOEFFECT`, `ENCHANT`. 101: `BINDITEM`. 65: `ITEMCHEST`.
+  19: `RIDING`. 12: `CAPSULE`. 9: `CLOSEDCARD`. 5: `OPENCARD`. 26: `PUP`. Any other class: 0. The values 19 (riding),
+  26 (pet), 9 and 5 (cards) are the sizes Z13 and Z28 give for the per-class `iac_GetAttrSize` members.
+- **G2. `RulesOfEngagement::roe_CriticalStunRate(EngageArgument*)` @ FUN_00500170** *(pdb2016)*: returns the constant
+  200.0 and reads nothing from its argument. Z03 §4.5 compares it with `rand1000()` after a critical hit, so the stun
+  (abstate 307) follows 20 % of critical hits *(the comparison is Z03's reading, not re-read)*.
+
+### 4.6 Work list
+
+For a follow-up session of the item named, smallest first:
+
+| # | Item | What | Size |
+|---|---|---|---|
+| 1 | D01, D02 | read the two 0x0804 labels (`LAB_00404db0` account, `LAB_0043cdf0` character) with `objdump` | minutes |
+| 2 | W02 | PDB names of PARTY +0xcc and PARTY_MEMBER +0x20 | minutes |
+| 3 | L00 | readers of `builtinKey` | minutes |
+| 4 | D01 | TEENAGER `nType` 1 arithmetic | small |
+| 5 | Z02 | source of the handlers' third argument `hnd`; setter of `p+0x5cb9` bit 2; roar delivery | small each |
+| 6 | Z01 | table of all player modes | small |
+| 7 | Z04 | BELONGED_CANCEL codes 0x2885–0x288f branch by branch; auto-arrange scheduling | small each |
+| 8 | Z03 | 0x244C payload builder | small |
+| 9 | D02 | `nStatusDone` filters of 0x1004; 0x1017 item record sender FUN_004056a0; 0x0812–0x0815 field names | medium |
+| 10 | D02 | SOAP item-shop client (FUN_0043f690 and below) | large |
+| 11 | zone | the class-named functions no document cites (§4.4: 1 158 functions, 25 865 lines; the 15 named functions first) | large: follow-up item (part 11) |
+| 12 | Account, AccountLog, Character, GameLog | process layer and shared-class copies (§4.4; S02 §6) | large: follow-up item (part 11) |
