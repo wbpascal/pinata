@@ -43,7 +43,7 @@ Z03 §5.1's guesses corrected: +0x168 is `sdi_WARPING_TARGET` (SS_DASH2), +0x170
 skillresultbuffer[64] (SkillResultBuffer, 0x18 bytes each)  @ 0x13283d18;  SkillResultBuffer::bufferpoint @ 0x13283d10
     { +0 ShineObject* target, +4 u32 resthp, +8 u8 isdamage, +9 IsCostumWeapon, +a IsCostumShield, +b iscritical,
       +c ismissed, +d isshieldblock, +e isheal, +f isenchant, +10 isresist, +11 isImmune, +14 u32 hpchange }
-    # one slot per target of the current blast; bufferpoint is reset by sds_Initialize and read by sds_Finish (Z03 §5.6)
+    # one slot per target of the current blast; bufferpoint is reset by sds_Initialize, the blasts and each chain wave (§6); sds_Finish sends sds_List, not this buffer
 skilldamagesender (SkillEffectApply::SkillDamageSender)   .sds_List = vector<SkillDamage> sent as 0x2452 by sds_Finish
 EngageArgument (0x2c) { att, def, sklinfo, SKILL_EMPOWER empower, u8 actionnumber, attackcode, iscritical, ismiss,
     isdead, isshieldblock, isresist, isDamege2Heal, isImmune, SHINE_XY_TYPE* attackloc, int damagerate, crirateadd,
@@ -474,7 +474,8 @@ have temporarily lost hearing.". So DeepFire / FragranceOfPoison re-announce the
 ### 2.10 Multi-hit tail: the step's abstates  (`hit.mha_HitStep ≥ 0`: 0x5824b6 – 0x5828c8; common end 0x582d5b – 0x582d8b)
 
 `hit.mha_AbState[4]` = `{ int mha_AbStateRate; ABSTATEINDEX mha_AbStateIndex; int mha_AbStateStrength }` *(pdb2016)*,
-filled by the multi-hit caller (Z03 §5.6 E; part 3).
+filled by `sbec_Store` (§6.4): for a MultiHit step only entry 0 (the step's `oh_AbState`); a negative `mha_HitStep` (no
+`HitID`, or a chain wave) takes the single-hit tail of §2.9 instead.
 
 ```pseudo
     else:
@@ -691,6 +692,403 @@ BOMBDISPELALL / STEALENCHANT, Z22 §7.5. With the double run of Z23-B13, the DIS
 remove a second state and StealEnchant rolls twice.) The SS_DISPELABSTATE path (§2.3) is separate and needs no
 EffectType.
 
+## 6. Blast entry points, target scans and chained blasts (outside `smo_SkillBlast`)
+
+This section covers what happens between the end of a cast and the per-target `smo_SkillBlast` (§2). Z03 §5.4 / §5.6
+give a summary of it. Z23 §2.5 (toggle switch) and Z17 §3.4.3 (the item-action `EventRun` calls in these functions)
+already document parts of it; this section cites them and does not repeat them.
+
+### 6.1 Which blast runs: `ShineMobileObject::so_Routine`  @ FUN_0056a080
+
+The cast part of `so_Routine` (after the abstate, fear and move steps of Z09 §5.5) runs these checks, then picks
+one blast:
+
+```pseudo
+    if cast.scs_BlastTime == 0: return;  s = cast.scs_ProduceSkill.sklidx;  if s == null: cast.scs_BlastTime = 0; return
+    if g_Now < cast.scs_BlastTime:                                # still casting
+        if o.so_parameter().IsNoAttack() or smo_SkillBlastOption(o) == SB_SILENCE: o.smo_CastAbort (vt 0xed4)
+        return
+    o.vt[0xef8](s.ID)                                             # set-item skill effect of this cast (Z21 l. 200)
+    produce branch (prdidx) / item branch (scs_UseItem): Z23 §3.6, Z13 — return
+    if cast.target and not cast.target.vt[0x7e4](s.SkillTargetState):         # target state (live / corpse) changed
+        o.smo_CastAbort();  o.smo_ply_NextBashTime (vt 0xec0);  return
+    if not o.smo_SPCheck (vt 0xedc)(skill, s, &empower): CastAbort; NextBashTime; return
+        # player FUN_0055bc20 = csl_SPCheck test only (Z23 §4); mob FUN_005557f0 tests **and pays** SP unless InSkillShift
+    if o.so_parameter().IsNoAttack() or smo_SkillBlastOption(o) == SB_SILENCE: o.smo_CastAbort(); return   # Z22 §10.2
+    so_AllOfRange(o, sight, member function so_ply_Send2WhoTargetMe)            # 0x2402 refresh for whoever targets o (Z22 §10.6)
+    o.smo_ply_WeaponTitleSet (vt 0xec8)(cast.target ? cast.target.so_mob_MobID() : 0xFFFF)   # Z12 l. 310
+    if s.sdi_WHOLEAGGRORATE.exist:                                # no 2016 skill
+        o.vt[0xee0](skill, s, &empower)                           # player smo_SPCheckConsume: cost paid here …
+        o.smo_ply_AggroAdjust (vt 0xebc)(WHOLEAGGRORATE.value, WHOLEAGGRORANGE.value)   # Z09 §6.2 (its "+200 / +0xcc / +0xd4")
+    if s.EffectType == SE_TELEPORT (6):  o.vt[0xee0](…);  o.so_mobile_Teleport (vt 0x6d8)()      # Z09 §9.3; no blast; no 2016 skill
+    else if s.EffectType == SE_VOLLEY (12):  o.vt[0xee0](…);  o.so_ply_Volley (vt 0x994)()       # below; no blast
+    else if s.sdi_MAGICFIELD_KEEP.exist or s.sdi_MAGICFIELD_PARTY.exist:
+        smo_MagicFieldSpread(o, s)                                # Z09 §12 (its SETABSTATEME / NOTTARGET: Z09 l. 3689)
+    else if cast.scs_Skill == sdb_SpecSkillStruct().ss_SummonMate: partner summon   # Z13 §4.6 (0x2457 to sight, sbec_Store with target = o)
+    else if s.sdi_RANDOMTARGETNUMBER.exist:                                      # chain skills (§6.8)
+        if s.sdi_Activ.TargetNumber == 1:
+            if s.IsMovingSkill: smo_Flag.InSkillShift = 1
+            if not InSkillShift: cast.scs_BlastTime += 3; InSkillShift = 1; return     # arming pass, as in §6.2
+            InSkillShift = 0
+            o.smo_LightningWaveSkill (vt 0xbf4)(s, o.smo_SkillIndexLastCasting, from = o, to = cast.target,
+                                                 o.smo_SetEffectForJustSkill() (vt 0xefc), depth = 1)
+            # depth 1 is the `push 1` at 0x56a7e2, left on the stack across the vt 0xefc call
+        else:
+            smo_SkillBash_Blast(Loc)(o, cast.target ? cast.target.pos : &cast.locate, &cast.empower)   # §6.3
+    else if cast.target == null: smo_SkillBash_Blast(Loc)(o, &cast.locate, &cast.empower)
+    else:                        smo_SkillBash_Blast(Obj)(o, cast.target, &cast.empower)
+```
+
+The cost is paid twice for mobs on every skill: `smo_SPCheck` above pays, and `sbe_BlastObject` / `sbe_BlastLocate`
+pay again through vt 0xee0, which is the same function for mobs (§6.5) (original bug) Z25-B19. A WHOLEAGGRORATE skill
+would also pay twice for a player, here and in §6.5 (latent).
+
+`ShinePlayer::so_ply_Volley(p)` @ FUN_004a44a0 (Volley01: First ME, Last PARTY; mobs: no-op):
+
+```pseudo
+    require p on a map, in a party (vt 0x550 ≠ 0xFFFF, sp_LastPartyParam.pmi_PartySlot) and with a target t
+    for each party member m (memberobj ≠ null) with so_DistanceSquar(p, m) < 1 000 000 (1000 units):
+        m.so_ply_TargetChange (vt 0x998)(t)                       # Z03 §2.4: 0x244D, m's attack and cast stop
+    smo_SkillResultPacket(p, s, t.pos)                            # §6.9
+    p.smo_CeaseFireSend (vt 0xf48)
+    send p only: 0x244E NC_BAT_SKILLBASH_HIT_OBJ_START_CMD { u16 skill = s.ID, u16 targetobj = t.handle, u16 index = sbec_GetIndex() }
+        # the "Packet Too Long" log text is copied from smo_SkillBash_Blast
+```
+
+Volley sends no 0x2457 and queues no blast. The client of the caster gets a cast-start (0x244E, Z03 §5.4) as the
+skill's only visible result *(inferred: what the client draws for it was not traced)*.
+
+This corrects Z03 §5.4 ("servant/summon skills and self-target single skills take a variant path through vt 0xbf4")
+and Z03 §5.6 ("summon skills: caster.vt[0xbf4](…)"). vt 0xbf4 is `ShineMobileObject::smo_LightningWaveSkill`
+FUN_005796a0 for every class. It starts a **chain** blast. A chain skill never reaches `smo_SkillBash_Blast(Obj)`, so
+CROSSCOUNTER, SETABSTATEME, WARPING, JWALK, WARPING_TARGET and the toggle switch (§6.2) are not run for it. An area
+chain skill blasts at the target's **position** (the location blast), not at the target object.
+
+### 6.2 `ShineMobileObject::smo_SkillBash_Blast(Obj)(o, t, empower)`  @ FUN_0057cd40
+
+```pseudo
+    s = cast.scs_ProduceSkill.sklidx;  fixedDamage = −1
+    if s.sdi_CROSSCOUNTER.exist:                                  # CrossCounter01…: First = Last = 7 ENEMYUSER, IsMovingSkill 1
+        if t == null or not o.so_mobile_ICanDamageTo (vt 0x980)(t)
+                or (dmg = t.so_smo_CrossCounterDamage (vt 0x9ac)(o)) == −1:          # Z09 §8.3
+            o.smo_CeaseFireSend (vt 0xf48)                        # player: CeaseFireSender::cfs_Routine FUN_00566820: if a
+                                                                  #   cease-fire is pending, 0x243D NC_BAT_CEASE_FIRE_CMD { u16 handle }
+                                                                  #   to sight now; mobs: no-op
+            send o (vt 0x2fc → stream vt 0xc): 0x2457 NC_BAT_SKILLBASH_HIT_BLAST_CMD
+                { u16 index = o.smo_SkillIndexLastCasting, u16 caster = o.handle, u16 skill = s.ID }   # caster only
+            smo_ClearSkillResultBuffer_Miss(o, t)                 # Z23 §8.5
+            smo_SkillResultPacket(o, s, t.pos)                    # §6.9: sends nothing
+            return                                                # (original bug) Z25-B15: the miss result is never sent
+        InSkillShift = 1;  fixedDamage = dmg * 2                  # no arming pass; fixed damage skips the hit roll (§2.2)
+    if s.IsMovingSkill: InSkillShift = 1
+    if not InSkillShift:                                          # first ("arming") pass: blast 0.3 s later
+        cast.scs_BlastTime += 3;  smo_Flag |= 0x10 (InSkillShift);  return
+    smo_Flag &= ~0x10
+    (name copy into namestring ring: log only)
+    SkillResultBuffer::bufferpoint = 0
+    if s.sdi_SETABSTATEME.exist: o.so_AbnormalState_Set_SS_SETABSTATEME (vt 0x648)(&s.sdi_SETABSTATEME, &s.sdi_ABKEEPTIME)
+    if s.sdi_NOTTARGET.exist:
+        o.vt[0x648](&s.sdi_NOTTARGET, &s.sdi_ABKEEPTIME)
+        o.so_EscapeFromTarget (vt 0x64c)()
+    if s.sdi_WARPING.exist:                                       # SS_WARPING (25) / SS_DASH (36)
+        smo_WarpForward(o, s)                                     # FUN_004a83e0, Z09 §9.3: sdi_WARPING.value units forward
+        smo_SkillResultPacket(o, s, t.pos)
+        o.smo_ChineCastCut (vt 0xf60)()                           # player FUN_005794d0: smo_Flag |= 0x40, sp_ChineCastCut (Z23 §3.3),
+                                                                  #   smo_Flag &= ~0x40; mobs: no-op
+    if s.sdi_JWALK.exist and not o.so_parameter().flag.cannotmove_entangle (Container+0xcce bit 1):
+        smo_ShadowStep(o, t)                                      # FUN_0045ad10, Z09 §9.3 (0x206A); sdi_JWALK.value is not read
+    if s.sdi_WARPING_TARGET.exist:                                # SS_DASH2 (38): dash to the target's edge
+        v = t.pos − o.pos;  v.length = t.so_BodySize() + o.so_BodySize()          # vt 0x6cc; vwl_Scale
+        smo_WarpTo(o, t.pos − v, s)                               # FUN_004a7de0, Z09 §9.3: free-cell radius = sdi_WARPING.value
+        smo_SkillResultPacket(o, s, t.pos)
+    if s.sdi_ToggleData not empty: on / off switch                # Z23 §2.5 (0x245C / 0x245D)
+    origin = s.First == TARGET_ME ? o.pos : t.pos
+    broadcast to o's sight (incl. o): 0x2457 { u16 index = o.smo_SkillIndexLastCasting, u16 caster, u16 skill = cast.scs_Skill }
+    sbec_Store(index, s, o, t, origin, fixedDamage, o.smo_SetEffectForJustSkill (vt 0xefc)(), from = null, depth = 1)   # §6.4
+```
+
+`ShineObject::so_AbnormalState_Set_SS_SETABSTATEME(o, special, keep)` @ FUN_00416880 (one body for every class):
+
+```pseudo
+    row = dic_abstate.as_FromID((u16)special.value)               # the special's value is an AbState.shn ID
+    if out of range: assert "AbnormalStateDictionary::AbState::as_FromID : Invalid skill id"; return 0
+    if row == null or row.index == null: return 0
+    keepMs = keep.exist ? keep.value : −1                         # SS_ABKEEPTIME; −1 = the row's own keep time (§1.4)
+    if o.so_AbnormalState_Set (vt 0x638)(o, row.AbStataIndex, strength 1, row, g_Now, 0, 0, keepMs, 0xd, null):
+        so_AbnormalState_BitSet(o, idx);  so_AbnormalState_BroadcastSet(o, idx, 0, 1)      # 0x2427 / 0x1C18 (Z03 §6.3)
+        o.so_AbnormalState_Inform (vt 0x3f0)(idx, 0, 0)                                    # player: 0x242A
+        return 1
+    return 0
+```
+
+Unlike SS_HOLDME (§2.7, Z25-B8), it tests the result of the set. The states go on the **caster**.
+
+`ShineObject::so_EscapeFromTarget(o)` @ FUN_00435ba0 runs `AxialListTargetChange { altc_From = o.handle, altc_To =
+null }` over o's sight. Its `ali_Work` FUN_00435ac0 calls, for each player (`so_ObjectType` vt 0x4d0 == 2) whose
+target (`so_GetTargetObject` vt 0xa04) has handle `altc_From`, `so_ply_TargetChange(null)` (vt 0x998, Z03 §2.4:
+0x244D with 0xFFFF, the player's attack and cast stop). Mobs keep their target.
+
+2016 data: the only object-blast skill with SETABSTATEME / NOTTARGET / ABKEEPTIME is `DNepilim_Skill_W` (StaMobImmortal
+4306 and StaNotTarget 8987 for 8566 ms on the caster). It is a magic-field skill, so `smo_MagicFieldSpread` runs the
+same three steps (Z09 l. 3689) and this branch is not reached. `SD_DragonSkill07_W` (First 4 SPOT,
+SETABSTATEME 9335 StaSDVale01_WCMAUp) blasts at a location (§6.3), and only the object blast and
+`smo_MagicFieldSpread` read `sdi_SETABSTATEME`. Its self-buff is never applied (original bug) Z25-B16. WARPING: 26
+skills (Blink01, TeleportCharm01, PsyAtkSkill03 by object, the rest by location), DASH2: SilberkDash, ECrabDash,
+Lab_19_Dash_Atk, Lab_23_Dash_Atk (value 0: no free-cell search), JWALK: ShockEnemy01…05, CROSSCOUNTER: CrossCounter01.
+
+### 6.3 `ShineMobileObject::smo_SkillBash_Blast(Loc)(o, xy, empower)`  @ FUN_0057cb10
+
+```pseudo
+    s = cast.scs_ProduceSkill.sklidx
+    if s.IsMovingSkill: InSkillShift = 1
+    if not InSkillShift: cast.scs_BlastTime += 3; smo_Flag |= 0x10; return               # arming pass
+    smo_Flag &= ~0x10
+    if s.sdi_SHOOTME.exist:                                       # BodyForce01… (9 skills, value 1)
+        if o.smo_Param.flag.cannotmove_entangle or o.smo_MoveManager.mm_state == MM_REINFORCEMOVE:
+            o.smo_CastAbort (vt 0xed4)();  return                 # Z03 §5.4 sp_castabort: 0x2438 to sight; no blast, no cost
+        smo_ShootMeTo(o, xy)                                      # FUN_00459940, Z09 §9.3 (states 391 / 350, 0x2069)
+    SkillResultBuffer::bufferpoint = 0
+    if s.sdi_WARPING.exist:  smo_WarpTo(o, xy, s);  smo_SkillResultPacket(o, s, xy)       # Dash01, Advent01, LightJump01 …
+    broadcast to sight (incl. o): 0x2457 { index = o.smo_SkillIndexLastCasting, caster, skill = cast.scs_Skill }
+    sbec_Store(index, s, o, target = null, xy, −1, o.vt[0xefc](), from = null, depth = 1)
+```
+
+The location blast reads no CROSSCOUNTER / SETABSTATEME / NOTTARGET / JWALK / WARPING_TARGET / toggle data. For the
+toggle part, Z23 §2.5 (Z23-B20) already says so.
+
+### 6.4 Queuing: `SkillBlastEffectContainer::sbec_Store`  @ FUN_00438380
+
+This answers the open question of §2.10: who makes `mha_HitStep` negative and who fills `mha_AbState[]`.
+
+```pseudo
+sbec_Store(index, s, caster, target, xy, fixedDamage, setEffSlot, from, depth):
+    require caster, s, s.sdi_Activ, s.sdi_ServInf
+    e = SkillBlastEffect();  e.sbe_nLightningWaveCnt = depth;  e.sbe_nSetEffectForJustSkill = setEffSlot
+    caster.so_ply_setSwingTime (vt 0xc64)(g_Now + ServInf.SwingTime·10/1000)   # player FUN_00560ae0; mobs: no-op
+    soulRate = s.DemandSoul ? SoulDamageContainer[DemandSoul].sde_DamageRateBySoul[caster.smo_HowMachSoul (vt 0xf38)(s, …, target)]
+                            : 1000                                              # Z03 §5.6 souls
+    e.sbe_Empow = caster.cast.scs_Empower;  e.sbe_Index = index;  e.sbe_LastDamage = fixedDamage
+    e.sbe_SkillIndex = s;  e.sbe_CasterObject = caster;  e.sbe_CasterRegistNumber = caster.so_GetCharRegistNumber (vt 0x344)
+    e.sbe_TargetObject = target;  e.sbe_TargetRegistNumber = target ? target.vt[0x344]() : 0xFFFFFFFF
+    e.sbe_TargetLocate = xy ?? caster.pos
+    if s.HitID == 0 or depth > 1:                                 # one hit
+        e.hit = { mha_HitStep = −1, mha_DamageRate = soulRate, mha_AraeStep = 0,
+                  mha_AbState[0..3] = mha_SetAbState(i, StaName A–D, StaSucRate A–D, StaStrength A–D) }
+        tick = caster.smo_SkillBlastTick (vt 0xf14)(s)            # Z09 §8.5 (player: HitTime)
+        if s.sdi_SHOTSPEED.exist and from != null:                # chain waves (§6.8)
+            tick = max(1, ddt_Distance(target.pos − from) · 1000 / SHOTSPEED.value · 10 / 1000)
+            if depth == 1: tick += smo_SkillBlastTick(s)
+        e.sbe_BlastTick = g_Now + tick − (s.sdi_RANDOMTARGETNUMBER.exist ? 0 : 2)
+        insert e before the first queued effect with a later sbe_BlastTick (else at the end); sbec_ListCheck (empty)
+    else:                                                         # multi-hit: one effect per MultiHit row step
+        m = _MultiHitTable[s.HitID]; require m and m.mhe_ID == s.HitID      # else nothing is queued (no blast at all)
+        for step k in 0 … m.mhe_ArrayCnt − 1, stop at the first oh_HitTimeRate == 0:
+            e.sbe_BlastTick = g_Now + oh_HitTimeRate·10/1000 − 2
+            e.hit = { mha_HitStep = k, mha_AraeStep = oh_AreaStep, mha_DamageRate = oh_DamageRate · soulRate / 1000,
+                      mha_AbState[0] = { oh_AbStateRate, oh_AbState, oh_AbStrength } }   # [1..3] keep the defaults
+            insert e (sorted as above)
+```
+
+`MultiHitArgument::MultiHitArgument` FUN_00434b30: `{ HitStep −1, DamageRate 1000, AraeStep 0, AbState[i] =
+{ rate 0, MAX_ABSTATEINDEX, strength 0 } }`. `mha_SetAbState(i, name, rate, strength)` FUN_00434de0 resolves
+`name` in the abstate name tree. `-` or an unknown name leaves the entry empty. `sbec_GetIndex` FUN_00434c40 returns
+`sbec_Index = (sbec_Index + 1) & 0x7fff`.
+
+So **`mha_HitStep < 0` means a skill without `HitID`, or a chain wave after the first**: the single-hit tail of §2.9
+(`so_SkillEnchant`) runs, and the `mha_AbState[]` that `sbec_Store` filled from StaName A–D is not read.
+**`mha_HitStep ≥ 0` means a MultiHit step**: §2.10's loop applies the step's single abstate (index 0). The MultiHit
+table (`_MultiHitTable`, `MultiHitType` loader of Z01) has its row layout in `MultiHitData::OneHit` *(pdb2016)*. 2016:
+182 object skills and 10 location skills have a `HitID`.
+
+### 6.5 Firing: `SkillBlastEffect::sbe_BlastObject` / `sbe_BlastLocate`
+
+`sbec_Routine` (Z03 §5.6) calls these between `sds_Initialize` and `sds_Finish` (0x2452). "First step" below means
+`hit.mha_HitStep ∈ {−1, 0}`.
+
+```pseudo
+sbe_BlastObject(e):                                                                    @ FUN_00583bc0
+    if e.caster == null: assert "… : Caster Null Ptr"; return
+    if first step and e.depth == 1:
+        caster.vt[0xee0](s.ID, s, &e.empower)                     # player smo_SPCheckConsume FUN_0055bc50 (cost paid, Z03 §5.6);
+                                                                  #   mobs smo_SPCheck FUN_005557f0
+        caster.vt[0xbf8](1, caster, 0, 0)                         # player so_ply_PassiveSetAbstate (Z20 l. 732); mobs: no-op
+    if s.ServInf.AggroPerDamage or AbsoluteAggro: e.target.vt[0x700](caster, 1)          # mobs: so_mob_AppendAggro(+1)
+    if s.TargetNumber == 1 or e.depth > 1:                        # single target (also every chain wave)
+        smo_SkillBlast(caster, s, e.target, &e.empower, e.sbe_LastDamage, &e.hit, depth = e.depth, rate 1000)   # §2
+        item actions "after skill" on the caster                  # Z17 §3.4.3
+        if s.sdi_RANDOMTARGETNUMBER.exist:                        # next chain wave (§6.8)
+            caster.smo_LightningWaveSkill (vt 0xbf4)(s, sbec_GetIndex(), from = e.target, to = null,
+                                                     e.sbe_nSetEffectForJustSkill, depth = e.depth + 1)
+    else:                                                         # area
+        scan = by s.Last:  0 ENEMY → alnse,  1 ME / 3 FRIEND → alnsf,  2 PARTY / 6 GROUP → alnsp,  5 ALL → alnsst,
+                           7 ENEMYUSER → alnseu;  other → assert "… : Invalid TargetType" (ID, First); return
+        scan.alsst_attacker = caster;  scan.alsst_nEffectForJustSkill = e.sbe_nSetEffectForJustSkill;  count = 0
+        area = sdb_GetAreaSkillInfo(s, e.hit.mha_AraeStep)        # Z20 §5 (AreaSkill.shn bitmap of this step)
+        if area == null:
+            allas_Init(scan)                                      # no bitmap (Z09 §12.5)
+            if s.SkillDegree == 360: so_AllOfRange(caster, centre = e.sbe_TargetLocate, radius = s.Area / 2, scan)
+            else: fan = FanFormSectorArgument(caster, e.target) (FUN_0057bda0) with half-angle SkillDegree / 2,
+                      direction rotated by sr_degree2sr(DirectionRotate) when ≠ 0
+                  so_AllOfRange(caster, centre = e.target.pos, radius = s.Area / 2, fan, scan)
+        else:
+            allas_Init(scan, area, from = caster.pos, to = e.sbe_TargetLocate, dir = caster direction)
+            so_AllOfRange(caster, centre = allas_GetEffectCoord(scan), radius = area.AreaSize, scan)
+        qsort(scan entries, alns_Compare)                         # nearest first; see §6.6 (Z25-B14)
+        scan.alsst_attackPos = e.target.pos
+        if s.sdi_RANDOMTARGET.exist:
+            if value ∈ {1, 2}: alsst_SkillBlast_RandomTarget(scan, s, &e.empower, s.TargetNumber, &e.hit)   # §6.7
+            # value 0 (or other): nobody is hit
+        else: alsst_SkillBlast(scan, s, &e.empower, s.TargetNumber, &e.hit)                                # §6.7
+    if first step:
+        if e.target == null or s == null or s.sdi_Activ == null: return            # skips the script hook below too
+        mdt_PostSkillBlast(caster, e.target, s.ID, e.target.pos)                   # Z09 §28.3
+        mdt_SkillBlast_Summon(caster, e.target, s.ID, e.target.pos, MST_NONE)      # Z09 §13.3
+    if caster has a MobAttack script name: caster.so_AIScriptFuncExec (vt 0xb68)(0xac, LuaArgumentMobAttack(map, caster))   # Z09 §14.3
+
+sbe_BlastLocate(e):                                                                    @ FUN_00584160
+    SkillResultBuffer::bufferpoint = 0
+    if first step: caster.vt[0xee0](…);  caster.vt[0xbf8](1, caster, 0, 0)            # cost, as above (depth is not tested)
+    scan = by s.Last as above but: 1 ME → assert "… : Invalid TargetType"; 18 NONE → return (silently); both after the cost
+    alsst_attackPos = e.sbe_TargetLocate;  same bitmap / circle scan around e.sbe_TargetLocate (never a fan)
+    qsort;  RANDOMTARGET 1/2 → alsst_SkillBlast_RandomTarget, value 0 → nobody, absent → alsst_SkillBlast
+    smo_SkillResultPacket(caster, s, xy)                                           # §6.9
+    mdt_PostSkillBlast(caster, null, s.ID, xy);  mdt_SkillBlast_Summon(caster, null, s.ID, xy, MST_NONE)
+        # on every step, not only the first (latent: no MiscDataTable row names one of the 10 multi-hit location skills)
+    script hook 0xac as above
+```
+
+`Dash01` (First 4 SPOT, Last 1 ME, TargetNumber 1, SS_DASH 850) is the only 2016 location skill with Last = ME: every
+cast logs the "Invalid TargetType" assert after the warp (original bug) Z25-B18. `LightJump01` (Last 18 NONE) returns
+without the log. `RANDOMTARGET` 0 is used by `Eglack_Skill04_N` / `EglackMad_Skill04_N`: single target, so they do
+not reach the area branch, and the mob AI picks their target at cast time (Z09 §7.4, `sm_UseWeapon`: values {0, 2}). It
+is also used by `DT_SFocalor_Skill04_W` and `WarH_SFocalor_Skill04_W`: magic fields, whose spread blast
+(`sbe_BlastLocate`) therefore hits nobody (original bug) Z25-B17. RANDOMTARGET 1: 12 mob skills (`Salare_Skill03_N`, the
+Focalor `…Skill02_N`), all with TOPAGGRONO.
+
+### 6.6 The skill target scanners
+
+Five global scanners *(pdb2016)*, all `AxialListScanSkillTarget` (an `AxialListLimitAreaScan`: up to 200
+`{ object, d² }` entries, `allas_MemberBMPDamageRate[200]`, `alsst_attacker`, `alsst_attackPos`,
+`alsst_nEffectForJustSkill`, `deque alsst_RandomTargetList`). vftable slots: +0 `AxialListLimitAreaScan::ali_Work`
+FUN_004c1e20 (Z09 §12.5: mode ∉ {0, 3}, the class filter, the bitmap cell; no bitmap → `AxialListNearScan::ali_Work`
+FUN_004c1cf0, which also refuses STA_IMMORTAL / STA_ADLFLOUSSIERIMT, Z17 §2.6), +4 the filter below, +8
+`alns_GetBMPDamageRate(i)` FUN_004c1b10 (`allas_MemberBMPDamageRate[i] · 10`, 1000 without a bitmap).
+
+| Scanner (global) | `alns_ValidObject(o)` | keeps |
+|---|---|---|
+| `alnsst` `AxialListScanSkillTarget` (ALL) | FUN_00579320: `o.vt[0x5ac]()` (skill-targetable: mobs `so_CanSkillTarget`) and not an NPC (`so_mob_IsNPC` vt 0xd48) and o ≠ attacker and not (kind 11 and `so_MoverSystem_NoDamage` vt 0xc70) and mode ≠ 3 and not `so_AmIAlreadyDead` (vt 0x28) | everyone but the caster |
+| `alnse` `AxialListNearScanSkillEnemy` | FUN_0057a250: `mdb_CanIKill(o.so_mob_MobID, attacker is a mob ? MKID_MOB : MKID_USER)` and `attacker.so_mobile_IsEnemy(o)` (vt 0x72c) and `attacker.so_mobile_ICanDamageTo(o)` (vt 0x980) | enemies the caster may damage |
+| `alnsf` `AxialListNearScanSkillFriend` | FUN_0057a490: not `attacker.so_mobile_IsEnemy(o)` | everyone not hostile, **the caster included** |
+| `alnsp` `AxialListNearScanSkillParty` | FUN_0057a3b0: attacker without party (`so_PartyRegistNumber` vt 0x550 = 0xFFFF): o == attacker; else o's party == attacker's | the party in range |
+| `alnseu` `AxialListNearScanSkillEnemyUser` | FUN_0057a130: `o.vt[0xbbc]()` ≠ 0 (players: self; others 0) and `attacker.so_mobile_ICanDamageTo(o)` | players the caster may damage |
+
+The subclass filters do not call the ALL filter, so for them the "not dead / not the caster" tests are only those of
+`ali_Work` (mode 3) and of `smo_SkillBlast` (§2.1). The heal check for SE_HEALING skills is made per target in §6.7.
+
+The distance `qsort` (8-byte entries) does not move `allas_MemberBMPDamageRate[]`, and §6.7 reads the rate by
+**position after sorting** (`vt[8](i)`). With an AreaSkill bitmap whose cells differ, a target gets the cell rate of
+whichever object was inserted i-th (original bug) Z25-B14. The random path of §6.7 makes it worse: it reads the rate
+by its own list index.
+
+### 6.7 Per-target loops: `alsst_SkillBlast` / `alsst_SkillBlast_RandomTarget`
+
+```pseudo
+AxialListScanSkillTarget::alsst_SkillBlast(scan, s, empower, n = s.TargetNumber, hit)                  @ FUN_00582de0
+    n = min(n, scan.count)
+    if s == null: assert "… : idx null" (continues)
+    else if s.sdi_DMGSHARE.exist and hit and n > 0:               # B_Albireo_Skill05_W / BH_…: the damage is shared
+        hit.mha_DamageRate = (int)(hit.mha_DamageRate / n)        # fild / fidiv at 0x582e96; n counts blocked targets too
+    item actions "on skill use" per scanned target                # Z17 §3.4.3
+    for i in 0 … n − 1:                                           # the n nearest; a blocked one still uses its slot
+        t = scan.entry[i].object; if t == null: continue
+        if so_FindBlockLocateFrom(attacker, from = scan.alsst_attackPos, to = t.pos, 10000, mbi_IsAttackBlock) != t.pos:
+            continue                                              # wall between the impact point and t (not the caster)
+        if s.sdi_Activ == null: assert "… : idx->Activ null"; break
+        if s.EffectType == SE_HEALING and not attacker.smo_ICanHealTo (vt 0xe94)(t): continue    # Z09 §8.4
+        h = hit ?? MultiHitArgument()                             # sbe always passes its own
+        smo_SkillBlast(attacker, s, t, empower, fixedDamage −1, h, depth −1, rate = scan.vt[8](i))   # §2; rate: §6.6
+        if hit and first step: mdt_SkillBlast_Summon(attacker, t, s.ID, t.pos, MST_MULTI)        # Z09 §13.3
+        if s.sdi_RANDOMTARGETNUMBER.exist:                        # area chain skill: a chain from every hit target
+            attacker.smo_LightningWaveSkill (vt 0xbf4)(s, sbec_GetIndex(), from = t, to = null, scan.alsst_nEffectForJustSkill, depth 2)
+
+AxialListScanSkillTarget::alsst_SkillBlast_RandomTarget(scan, s, empower, n, hit)                      @ FUN_00583180
+    if s == null: return
+    exclude = 0xFFFF
+    if s.sdi_TOPAGGRONO.exist and n < scan.count and (top = attacker.so_mob_GetTopAggroTarget (vt 0xc18)()):   # Z09 §6.4
+        exclude = top.handle                                      # spare the tank when there are more candidates than hits
+    alsst_MakeRandomTargetList(scan, n, exclude)
+    item actions per listed target                                # Z17 §3.4.3
+    for i, t in alsst_RandomTargetList:                           # same per-target body as alsst_SkillBlast (block test
+        …                                                         #   again, heal check, smo_SkillBlast with rate vt[8](i),
+                                                                  #   MST_MULTI summon, chain start); no DMGSHARE here
+
+AxialListScanSkillTarget::alsst_MakeRandomTargetList(scan, n, exclude)                                 @ FUN_0057e4e0
+    clear alsst_RandomTargetList;  n = min(n, scan.count)
+    while list.size < n and scan.count ≥ 1:
+        k = scan.count ≤ 100 ? rndbox[scan.count] : 0             # uniform 0 … count−1 (Z23 §8.6); above 100: always slot 0
+        t = scan.entry[k].object
+        if t != null and t.handle != exclude and so_FindBlockLocateFrom(attacker, attackPos → t.pos, attack block) reaches t:
+            list.push_back(t)
+        scan.count −= 1;  entry[k].object = entry[count].object;  entry[count].object = null      # drawn without replacement
+```
+
+### 6.8 Chain blasts ("lightning wave"): `smo_LightningWaveSkill`  @ FUN_005796a0
+
+```pseudo
+ShineMobileObject::smo_LightningWaveSkill(o, s, index, from, to, setEffSlot, depth):     (vt 0xbf4, every class)
+    require s, s.sdi_RANDOMTARGETNUMBER.exist, depth ≤ RANDOMTARGETNUMBER.value, from, s.sdi_Activ
+    SkillResultBuffer::bufferpoint = 0                            # restarts the 64-slot count (results already queued stay)
+    if to == null: to = from.so_smo_GetRandomTarget_Object (vt 0xc1c)(s, s.sdi_NEXTTARGETAREA.value, o)
+    if to == null: return                                         # chain ends
+    sbec_Store(index, s, o, to, to.pos, −1, setEffSlot, from = from.pos, depth)          # §6.4: travel time by SHOTSPEED
+    broadcast to o's sight (incl. o): 0x245E NC_BAT_SKILLBLAST_LIGHTNINGWAVE_CMD
+        { u16 nBIndex = index, u16 nSkillID = s.ID, u16 nShotHnd = from.handle, u16 nTargetHnd = to.handle }   # 8 bytes
+    if depth == 1: broadcast 0x2457 { index, caster = o.handle, skill = s.ID }            # the cast's blast animation
+```
+
+The chain: wave 1 (from `so_Routine`, §6.1) goes caster → cast target. When it fires, `sbe_BlastObject` (§6.5,
+`depth > 1` or TargetNumber 1) hits that target and calls wave `depth + 1` from it. Each wave gets a new blast index,
+so each one's damage goes out in its own 0x2452. The chain stops at `depth > RANDOMTARGETNUMBER.value` or when no
+next target is found. `smo_SkillBlast` lowers the damage per step with SS_DMGDOWNRATE / SS_MAXDMGDOWNRATE (§2.5).
+Cost is paid on wave 1 only (§6.5: `depth == 1`). Area chain skills start one depth-2 chain per hit target (§6.7). 2016:
+`LightningWave01…` (10 waves, area 300, speed 400, −100 ‰ per step down to 900 ‰), `DT_TFocalor_Skill04_W` (5,
+area, multi-hit), `FRangerH_Skill_N_PSN` (2).
+
+```pseudo
+ShineMobileObject::so_smo_GetRandomTarget_Object(c, s, range, caster):                  @ FUN_0057e660   (vt 0xc1c)
+    # c = the centre object: the previous target in a chain; the mob itself in sm_UseWeapon (Z09 §7.4)
+    if s == null or s.sdi_Activ == null or c has no position: return null
+    scan = a local scanner by s.Last (0 → Enemy, 2 / 6 → Party, 3 → Friend, 5 → ALL, 7 → EnemyUser; 1 ME and others → null)
+    alsst_SetAttacker(scan, caster.vt[0xb8c]())                   # so_ShineMobileObject: the caster itself
+    so_AllOfRange(caster, centre = c.pos, radius = range, scan);  alns_Sort(scan)
+    exclude = c.handle
+    if s.sdi_TOPAGGRONO.exist and scan.count > 1 and (top = c.so_mob_GetTopAggroTarget()): exclude = top.handle
+    alsst_MakeRandomTargetList(scan, 1, exclude);  return the first entry or null
+```
+
+Only the previous target is excluded, so a chain can come back (A → B → A). With TOPAGGRONO the exclusion moves to
+the previous target's top-aggro object, so the previous target itself can be picked again. No 2016 skill has both
+RANDOMTARGETNUMBER and TOPAGGRONO.
+
+`ShineMobileObject::so_smo_GetRandomTarget_Locate(o, s, &xy)` @ FUN_00579910 (vt 0xc20; used only by `sm_UseWeapon`,
+Z09 §7.4): `r = rb_largerandom(s.Range)`, `a = rndbox[64] · 180 / 64` (Shine-radian 2° units: the whole circle), point =
+o.pos + r·(sin a, cos a) / 1024. It snaps that point to the nearest non-attack-block cell, then to the nearest
+non-move-block cell, each within 2r (`so_FindBlockLocate`). It returns false when either snap fails.
+
+Client (`GameFrameWork::On_NC_BAT_SKILLBLAST_LIGHTNINGWAVE_CMD` FUN_004a5bf0): if the attack-sequence manager already
+holds damage info for `nBIndex`, it does nothing. Otherwise it looks up `nSkillID` in the active-skill table and the
+two characters, then plays `EffectMgr::CreateLightningShootEff` from `nShotHnd` to `nTargetHnd` with the skill's
+effect names and speed. It sets a "lightning pending" flag (`this+0x1334 = 1`, `+0x1336 = nSkillID`).
+
+### 6.9 `smo_SkillResultPacket` sends nothing
+
+`ShineMobileObject::smo_SkillResultPacket(o, s, xy)` @ FUN_0057a630 copies o's name to the name ring and sets the
+dept bits of the global packet buffer's opcode word (`(op & 0x3ff) | 0x2400`; nothing is sent with it). Then it calls
+`o.smo_CharClass.vt[0x40](o)`. That slot is `CharClassMage::cc_JustAfterSkill` FUN_00449900 = `o.smo_BashStop()` (vt
+0xed8, Z03 §3.4) for Mage, WizMage, Enchanter, Warrock and Wizard, and the empty `ret 4` FUN_00549070 for every other
+class (mobs too). The `s` and `xy` arguments are not used. So the function stops a mage's auto-attack after a skill.
+It sends no 0x2452. This corrects Z23 §8.5 and Z03 §5.4, which read it as the result send.
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -708,12 +1106,19 @@ EffectType.
 | Z25-B11 | `smo_SkillBlast` §2.10 | for non-damage multi-hit steps `vt 0x700` adds `bos_AbsoluteAggro`, then `sds_TemplateStore` adds `AbsoluteAggro` again | mobs get about twice the absolute aggro (+1 for player casters) per non-damage step | one aggro add per step |
 | Z25-B12 | `smo_SkillBlast` §2.10 | re-tests StaAdlFloussierImt / StaImmortal on the target, already refused at entry (§2.1) | dead check | none needed |
 | Z25-B13 | `so_smo_AbStateKeepTimeAdd` §2.8 (0x242A) | `keeptime_millisec = rest·100 + ms` with a negative `ms` (CURSETIMEADD) is not clamped | ResistCurse on a curse with less time left than the cut: the client icon shows ~49.7 days until 0x2428 arrives | clamp at 0 (or end the state at once) |
+| Z25-B14 | area scans §6.6 / §6.7 | `qsort` sorts the `{object, d²}` entries but not `allas_MemberBMPDamageRate[]`; the per-target rate is read by sorted (or random-list) position | with an AreaSkill bitmap whose cells differ, targets get another object's cell rate (more or less damage than their cell) | sort the rates with the entries, or store the rate in the entry |
+| Z25-B15 | `smo_SkillBash_Blast(Obj)` §6.2 CROSSCOUNTER | on failure the miss result is built (`smo_ClearSkillResultBuffer_Miss`) but never sent: `smo_SkillResultPacket` sends nothing (§6.9), no `sbec_Store` | the caster's client gets only 0x2457, others nothing; nobody sees the "miss" | send 0x2452 with the miss entry |
+| Z25-B16 | location blast §6.3 | `sdi_SETABSTATEME` / `NOTTARGET` are read only by the object blast and `smo_MagicFieldSpread` | `SD_DragonSkill07_W` (SPOT, SETABSTATEME StaSDVale01_WCMAUp) never buffs its caster | apply them in the location blast too |
+| Z25-B17 | `sbe_BlastObject` / `sbe_BlastLocate` §6.5 | with `sdi_RANDOMTARGET.exist` and a value outside {1, 2}, neither per-target loop runs | the spread blast of `DT_SFocalor_Skill04_W` / `WarH_SFocalor_Skill04_W` (value 0, area) hits nobody; only field ticks hurt | value 0 (cast-time random spot, Z09 §7.4) → the normal `alsst_SkillBlast` |
+| Z25-B18 | `sbe_BlastLocate` §6.5 | `Last` = TARGET_ME is not a case: assert "Invalid TargetType" after the cost is paid | `Dash01` logs an assert on every cast (no other effect: the dash is done in §6.3) | treat ME like NONE |
+| Z25-B19 | `so_Routine` §6.1 / `sbe_BlastObject` §6.5 | mobs: vt 0xedc and vt 0xee0 are both `smo_SPCheck` FUN_005557f0, which pays SP; players: a WHOLEAGGRORATE skill pays at vt 0xee0 in `so_Routine` and again in the blast | mob skills cost twice their SP (latent for players: no 2016 WHOLEAGGRORATE skill) | test only at cast end, pay once at the blast |
 
-## 6. Not reconstructed / uncertain
+## 7. Not reconstructed / uncertain
 
-- Part 3 (not yet written): the blast callers' own special branches (`sbe_BlastObject`, `alsst_SkillBlast`,
-  `alsst_SkillBlast_RandomTarget`, `smo_SkillBash_Blast_Obj` / `_Loc`), including when `mha_HitStep` is negative
-  and how `mha_AbState[]` is filled (§2.10).
+- What the 2016 client draws for Volley's lone 0x244E (§6.1) and for a failed cross counter, which sends only a
+  caster-side 0x2457 (§6.2, Z25-B15), was not traced in the client.
+- The `MultiHitData::OneHit` row columns (`_MultiHitTable` loader, Z01 `MultiHitType`) are taken from the PDB member
+  names used in `sbec_Store` (§6.4); the loader itself was not read here.
 - `so_dummypacketcontainer`'s send (§2.8, mobs) is taken to send nothing from its name *(inferred)*.
 - Client text 0x0A653383 (0x242A for a curse, §2.8) is in none of the 2016 `TextData*.shn`; what the client shows
   for a missing id was not traced.
@@ -721,7 +1126,7 @@ EffectType.
   from the broadcaster's name.
 - Client FUN_0057eeb0 calls in the 0x245B handler (own character hit): which HUD element they refresh is not traced.
 
-## 7. Coverage boundary
+## 8. Coverage boundary
 
 (Completed in the sweep part.)
 
@@ -737,3 +1142,15 @@ EffectType.
 | `mdb_CanIKill` FUN_006424c0, `mdt_ArgumentLoad` FUN_004a6110, `so_mob_SkillParameterSet` FUN_005d2e90 | Z09 §5.1, §28.3 (done) | mob data and ExpandSkill checks |
 | `so_ply_CheckDamageAbsorption` FUN_00579860, SpyAgent reports | Z09 (done) | damage absorb and aggro reports |
 | `so_smo_LastDamageOperation` FUN_0040cbe0, HideDamage actor | Z22 §9.4, §9.7 (done) | abstate damage hooks |
+| `smo_WarpForward` / `smo_WarpTo` / `smo_ShadowStep` / `smo_ShootMeTo` / `so_mobile_Teleport` (FUN_004a83e0 / FUN_004a7de0 / FUN_0045ad10 / FUN_00459940 / FUN_0057a8b0), 0x4828 / 0x206A / 0x2069 | Z09 §9.3 (done) | movement bodies reached from §6.1–§6.3 |
+| `so_smo_CrossCounterDamage` FUN_004a5360 / FUN_004a54b0 / FUN_004a56a0 | Z09 §8.3 (done) | counter damage value used by §6.2 |
+| `smo_ICanHealTo` FUN_00435390 / FUN_004357c0 / FUN_004356b0, `so_mobile_ICanDamageTo` | Z09 §8.4 (done), Z03 §5.2 | per-target tests of §6.6 / §6.7 |
+| `AxialListLimitAreaScan::ali_Work` FUN_004c1e20, `allas_Init` FUN_004c19f0 / FUN_004c1a00, `allas_GetEffectCoord` FUN_004c1ae0, `AxialListNearScan::ali_Work` FUN_004c1cf0 | Z09 §12.5, Z17 §2.6 (done) | scan walkers; §6.6 adds the skill filters and the rate mismatch |
+| `smo_MagicFieldSpread` FUN_0057c880 | Z09 §12.2 / §12.3 (done) | magic-field branch of §6.1 |
+| `ZoneRingPacketSummonPartner::zrpb_Request` FUN_005a83b0 (SummonMate) | Z13 §4.6 (done) | partner summon branch of §6.1 |
+| `smo_ply_AggroAdjust` FUN_004a4a40 | Z09 §6.2 (done) | WHOLEAGGRORATE branch of §6.1 |
+| `mdt_PostSkillBlast` FUN_004a3a90, `mdt_SkillBlast_Summon` | Z09 §28.3, §13.3 (done) | MiscDataTable hooks after a blast |
+| `so_ply_TargetChange` FUN_004a4680 (0x244D), `so_ply_Send2WhoTargetMe` FUN_00568ee0 (0x2402) | Z03 §2.4, Z22 §10.6 (done) | target packets sent by §6.1 / §6.2 |
+| item-action `EventRun` calls in `sbe_BlastObject` / `alsst_*` | Z17 §3.4.3 (done) | cited in §6.5 / §6.7 |
+| toggle switch in the object blast (0x245C / 0x245D) | Z23 §2.5 (done) | cited in §6.2 |
+| `so_AIScriptFuncExec` 0xac MobAttack | Z09 §14.3 (done) | script hook at the end of §6.5 |
