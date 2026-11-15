@@ -11515,6 +11515,30 @@ only the self-kill send site of Z09 (cMobSuicide / ShineSuicide / servant vanish
 | 4 | u8 | num | records that follow; AreaDamage: scanned targets (max 30), untouched ones are all-zero records (Z22-B2) |
 | 5 | targetinfo[num] | target | {u16 object, u32 resthp, u32 damage, u16 hpchangeorder} (12 bytes); client: object 0 / unknown skipped, damage number if > 0, resthp 0 = death |
 
+### `0x245B` NC_BAT_REFLECTIONDAMAGE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_0055dbc0 (ShineMobileObject::smo_ReflectionDamage), broadcast to the attacker's sight; client GameFrameWork FUN_004b6980)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | abstate | ABSTATEINDEX of the reflector's first state with SAA_REFLECTDAMAGE; client: picks the effect played on the reflector; 14 / 339 / 0x318 suppress the damage number |
+| 2 | u16 | ReflectionObject | handle of the reflecting defender |
+| 4 | u16 | TargetObject | handle of the attacker who takes the reflected damage |
+| 6 | u32 | resthp | attacker HP after the damage; client: 0 = death animation |
+| 10 | u16 | damage | requested reflected damage (DamageReflection ‰ of the hit), truncated to 16 bits (Z25-B7); client: damage number when > 0 |
+| 12 | u16 | hpchangeorder | attacker's ++smo_HPChangeOrder; client orders HP updates with it |
+
+### `0x245E` NC_BAT_SKILLBLAST_LIGHTNINGWAVE_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone FUN_005796a0 (ShineMobileObject::smo_LightningWaveSkill), broadcast to the caster's sight (incl. caster); client GameFrameWork::On_NC_BAT_SKILLBLAST_LIGHTNINGWAVE_CMD FUN_004a5bf0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | nBIndex | blast index of this wave (sbec_GetIndex, a new one per wave); client: ignores the packet when it already holds damage info for this index |
+| 2 | u16 | nSkillID | ActiveSkill ID; client: looks up the skill's effect names for the lightning effect |
+| 4 | u16 | nShotHnd | handle the wave starts from (caster for wave 1, else the previous target) |
+| 6 | u16 | nTargetHnd | handle the wave goes to; client: CreateLightningShootEff from nShotHnd to nTargetHnd |
+
 ### `0x245F` NC_BAT_LPCHANGE_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone ShinePlayer::sp_SendLPinform FUN_0056dc20; client FUN_0049d840)
