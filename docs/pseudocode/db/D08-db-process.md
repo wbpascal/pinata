@@ -745,6 +745,268 @@ parallel, which is harmless because the environment is freed only by the destruc
 | `SHINE_INDUN_INFO` ctor / dtor 00401010 00413b20; `type_info` 0041b8fc 0041b90c 0041b92d 004264a3; `g_CardCollectMake` 004123d0 | – | empty folded ctor / dtor (31 callers: every empty destructor); CRT RTTI; `g_CardCollectMake` is a one-line stub here (zone Z28 §4.2) |
 | static initializers / atexit destructors 00431800 00431820 00431830 00431850 00431880 00431910 00431920 00431930 00431a60 00431a90 00431b30 00431b90 00431c20 00431c50 00431c70 00431c80 00431ce0 00431d50 00431d70 00431df0 00431e10 00431ef0 | §2.1 | |
 
+## 3. AccountLog: differences against the Account build
+
+`python3 -I docs/plan/status/D08-match.py accountlog account` over the whole AccountLog export: 1 056 of 1 327 functions
+have an identical body in Account. Of the 230 class-named AccountLog functions that no document cited before this part
+(`X02-cov.py game accountlog`), 203 are such copies (address table §3.6) and 27 differ. Read side by side
+(`clean.py` on both PDB exports, labels and addresses masked), the 27 and the AccountLog "–" cells of §1.6 fall in three
+groups:
+
+- **only labels, member offsets or a folded empty destructor differ** (same code): `DataServer::OnStop_Service`
+  FUN_004010d0, `ViewStartInfo` FUN_00401100, `ViewStopInfo` FUN_00401240, `Start_MainThread` FUN_00401ce0,
+  `CSocket_Acceptor_Process_Manager_App::Accept_Process` FUN_004057e0, `CIOCP::Stop` FUN_0040a290, `CGTimer::GetTime`
+  FUN_0040fa40, `BinaryDataBox<MapInfo>::bdb_ReadData` FUN_0040b950, `MapDataBox::mdb_Load` FUN_0040ba00, both
+  `cWell512Random::well512_GetRandom` FUN_00413800 / FUN_004138b0, the `CGdp` file functions FUN_00407630 / FUN_00407670 /
+  FUN_00407700 / FUN_004077f0 / FUN_00407830, `CPFs::fc_NC_MISC_S2SCONNECTION_REQ` FUN_004040f0 and
+  `CPFs::fc_NC_OPTOOL_CLOSE_SERVER_REQ` FUN_00404880 (they end in the folded empty destructor, which the PDB names
+  `CStatistics::~CStatistics` here and `SHINE_INDUN_INFO::~SHINE_INDUN_INFO` in Account). Their Account description holds:
+  §1.2–§1.5, §2.2, §2.4, S02 §1.3, D01 §2.
+- **AccountLog variants** of the process layer: the `DataServer` object, start-up, main thread, DB_Init and the
+  session worker (§3.1–§3.4).
+- **AccountLog-only classes**: `CStatistics` (§3.3), `cLogSystem` / `cLS_Queue` (§3.5), `CSession_Manager::FindSession`
+  (§3.3), `CGameDB_AccountLog` / `CSQLPReport` (§3.4), `CParserAccountLog` (§3.4).
+
+### 3.1 Objects
+
+```
+DataServer gServer (0x209e20, DAT_004461a8) *(pdb2016)*: as Account (§1.1) up to +0x9838 m_SessionWorkerManager, then
+    +0x209890 CStatistics m_Statistics (0x24: tm m_Timer)        # new
+    +0x2098b4 m_bOnStopService  +0x2098b8 m_ServerStartTime  +0x2098c8 m_ServerStopTime
+    +0x2098d8 m_bStopMainThread  +0x2098dc m_bActiveMainThread  +0x2098e0 m_hMainThread  +0x2098e4 m_MainThreadID
+    +0x2098e8 cLogSystem m_UK_SysLog (0x390)                     # new: the syslog text file (§3.5); DAT_0064fa90 in D01 §4.5
+    +0x209c78 m_NumOfIndunMap  +0x209c7c SHINE_INDUN_INFO m_IndunMapList[32]
+CSessionWorker (0x1288): as Account up to +0x138, then +0x138 CParserAccountLog m_Parser, +0x124c CGameDB_AccountLog m_DBF
+    (0x20: CGameDB_Connect + CSQLPReport m_SQLPReport @0x14 + empty CSQLP* method holders), +0x126c CGameDB_StatisticsData
+    m_DBFStatistics (the second ODBC link)
+```
+
+So the stop flag of 0x2803 is `gServer + 0x2098d8` in AccountLog (Account / GameLog: +0x2098b4, knowledge §1).
+
+### 3.2 Start-up, main thread, stop
+
+```pseudo
+DataServer::DataServer:                                   @ FUN_00401870
+    as Account (§1.2), plus CStatistics::CStatistics(&m_Statistics) and cLogSystem::cLogSystem(&m_UK_SysLog)
+        CStatistics ctor FUN_00406470: m_Timer = localtime(_time64())            # the minute of start-up
+        cLogSystem ctor FUN_0040a800: two empty std::string (directory, file name)
+DataServer::~DataServer:                                  @ FUN_00401020
+    as Account, plus ~cLogSystem FUN_0040a820 (frees the two strings; the writer thread is not stopped) and ~CStatistics (empty)
+DataServer::ReadDefineScriptor:                           @ FUN_00401380
+    as Account, file "DataServerInfo_AccountLog.txt"
+
+DataServer::OnStart_Service:                              @ FUN_00401f50
+    name = "_fiesta_Accountlog.log"
+    if !cLogSystem::ls_LogSystemInit(&m_UK_SysLog, "C:/data/gamigo-dwh/current/", LCT_HOUR, name):   (§3.5)
+        return false                                       # no message: the service start fails silently
+    then exactly the Account sequence (§1.2): m_bOnStopService = 1, IOCP 5 × CPU, CSessionWorkerManager::Start(-1, wait),
+    Start_Acceptor, Start_MainThread
+
+DataServer::MainThread:                                   @ FUN_00401640
+    m_bActiveMainThread = 1
+    while !m_bStopMainThread:
+        Sleep(1000)
+        CSession_Manager::ProcHeartBeat(&m_SocketSessionManager)        # §1.4
+        CStatistics::Process(&m_Statistics, &m_SocketSessionManager)    # new: §3.3
+    then the Account stop sequence (§1.3), testing m_bOnStopService at its AccountLog offset
+```
+
+The writer thread of `m_UK_SysLog` has no stop path: `ls_bLogThreadStopOrder` is only ever written by
+`ls_LogSystemInit` (false), so the thread runs until the process ends, and lines still queued at `exit(0)` or service
+stop are lost *(read: no other writer of the flag in the export)*.
+
+### 3.3 The once-a-minute user-count poll (`CStatistics`)
+
+```pseudo
+CStatistics::Process(stat, sessions):   (main thread, every second)            @ FUN_004064b0
+    now = localtime(_time64())
+    minuteChanged = stat.m_Timer.tm_min != now.tm_min
+    copy now.tm_min / tm_hour / tm_mday / tm_mon into m_Timer where they changed        # only tm_min is ever tested
+    lock the session list (CSM_Enter_CS)
+    for s = FindSession(5, null); s; s = FindSession(5, s.pLinkDown):   # every authenticated WorldManager link
+        if minuteChanged:
+            CSession::Send(s, raw {0x03, 0x0809, b}, 4)     # NC_MISC_CONNECTER_REQ; b = high byte of the `sessions`
+                                                            # pointer reused as the buffer = 0x00 (P02-B6; layout P02)
+        if !s.pLinkDown: break
+    unlock; return 0
+
+CSession_Manager::FindSession(serverId, from):            @ FUN_00405480   (AccountLog only)
+    under the session-list lock: first node at or after `from` (null = list head) whose session has
+    m_Connection == 1 and m_Connected_Server_ID == serverId; null if none
+```
+
+The WM answers each 0x0809 with 0xC811 `NC_SYSLOG_SERVER_CCU` and 0x080A `NC_MISC_CONNECTER_ACK` (W01 §8), which AccountLog
+stores as one `p_SameTimeChar_Add` row per world (D01 §4.2) and one syslog line (D01 §4.5). So the concurrent-user
+statistics are sampled once per wall-clock minute (at the first second tick of the minute), not at a WM interval
+*(captured: P02, 0x0809 once per minute)*. The first poll comes at the first minute change after start-up.
+
+### 3.4 Session workers, the two DB links, the dispatcher
+
+```pseudo
+CSessionWorker::CSessionWorker:                           @ FUN_00405de0
+    as Account (§1.5), with CParserAccountLog m_Parser (registrations below), CSQLPReport, a second DBRecord (statistics)
+CSessionWorker::~CSessionWorker:                          @ FUN_00405d20
+    as Account, plus ~DBRecord(m_DBFStatistics), ~CSQLPReport
+CGameDB_AccountLog::~CGameDB_AccountLog:                  @ FUN_00405bd0   ~CSQLPReport, ~DBRecord
+CSQLPReport::`scalar_deleting_destructor':                @ FUN_00415330   (empty class with a vtable; the report procedures, D01 §4.4)
+CSessionWorkerManager::Start:                             @ FUN_00406310
+    as Account (§1.5) with workers of 0x1288 bytes
+
+CSessionWorker::DB_Init(w):                               @ FUN_00405870
+    base = CServerInfo::GetODBCInfo(id 1 "AccountLog", my world)        # Account: id 0
+    stat = CServerInfo::GetODBCInfo(id 2 "Statistics", my world)        # both rows must exist, else log and fail
+    if DBConnect(w.m_DBF, base) ok:
+        if DBConnect(w.m_DBFStatistics, stat) ok: return 1
+        DBClose(w.m_DBF)
+    log "DB_Init FAILED …"; return 0
+CSessionWorker::SessionWorkThread(w):                     @ FUN_004059c0
+    as Account (§1.5); at the end it also closes m_DBFStatistics (offset +0x126c)
+```
+
+So every AccountLog worker holds two ODBC connections: up to 2 × 81 connections at once, half of them to
+StatisticsData (D01 §1).
+
+```pseudo
+CParser::Parser(parser, packet):   (the worker's m_Parser.vtbl[0]; identical in Account FUN_004053c0)   @ FUN_00404ca0
+    while (r = packet.IsValidPacket()) == 1:                # one frame of the job (normally exactly one)
+        op = frame opcode; session.m_Last_PacketCommand = op; session.m_Last_PacketLength = payload length
+        session.m_Last_PacketWorkType = PACKET_PARSING_WORKING
+        ok = pft_funcpnt[op & 0x3ff][op >> 10](payload, length)      # handler table (W05 §6.1); empty slot = fc_dummyfunction
+        if !ok: m_Last_PacketWorkType = PACKET_PARSING_FAILED; return 0     # the worker logs "*Work failed …" (§1.5)
+        m_Last_PacketWorkType = PACKET_PARSING_DONE; packet.next()
+    if r == 2: log "… From (%25s world=… )" with the peer IP / port and server name; return 0     # malformed frame
+    packet.reset(); return 1
+```
+
+`CParserAccountLog::CParserAccountLog` FUN_00403dc0 registers 21 handlers on the `CParser` base table (D01 §2's
+server-link handlers come from the base constructor FUN_00404b70):
+
+| Opcode (dept, cmd) | Handler | D01 § |
+|---|---|---|
+| 0x0720 / 0x0721 / 0x0722 (1, 800–802) | FUN_00402470 / FUN_00402580 / FUN_00402640 | §4.1 |
+| 0x080A (2, 10) | FUN_004026f0 | §4.2 |
+| 0x081F (2, 31), 0x082C (2, 44), 0x0835 (2, 53), 0x0843 (2, 67) | FUN_00402990, FUN_00402aa0, FUN_00402d40, FUN_004030d0 | §4.2 |
+| 0x0C2A, 0x0C3B, 0x0C40, 0x0C4D, 0x0C5D (3, 42 / 59 / 64 / 77 / 93) | FUN_00403bb0, FUN_00403cc0, FUN_00402e00, FUN_00402ec0, FUN_004038d0 | §4.3 |
+| 0x0C62 (3, 98) | FUN_004035e0 | §4.4 |
+| 0x8007 / 0x8009 / 0x800B (32, 7 / 9 / 11) | FUN_00403a00 / FUN_004027b0 / FUN_004028a0 | §4.4 |
+| 0xC801 / 0xC802 / 0xC803 / 0xC811 (50, 1 / 2 / 3 / 17) | FUN_00403310 / FUN_004033d0 / FUN_004034e0 / FUN_00403560 | §4.5 |
+
+### 3.5 The syslog text file (`cLogSystem`, `cLS_Queue<std::string>`)
+
+The same class as the GameLog's hourly log file (D05 §6.1, our names there); AccountLog's PDB gives the official names,
+and the GameLog copies match by body (names added to `names/gamelog/D08.json`). Account and Character do not have it.
+
+| D05 §6.1 (GameLog, ours) | Official *(pdb2016)* | AccountLog | GameLog |
+|---|---|---|---|
+| `RotatingLog_Open` | `cLogSystem::ls_LogSystemInit` | FUN_0040aee0 | FUN_0040f6b0 |
+| `CreateDirectoryPath` | `cLogSystem::ls_CreateDirectory` | FUN_0040a5a0 | FUN_0040ed70 |
+| `RotatingLog_IsBeforeRollover` | `cLogSystem::ls_ValidTimeCheck` | FUN_0040a620 | FUN_0040edf0 |
+| `RotatingLog_Write` | `cLogSystem::ls_LogReservation` | FUN_0040aa20 | FUN_0040f1f0 |
+| `RotatingLog_WriterThread` | `cLogSystem::ls_LogSystemProcess` | FUN_0040aa80 | FUN_0040f250 |
+| `LineQueue_Push` | `cLS_Queue::lsq_Push` | FUN_0040a870 | FUN_0040f040 |
+| – | `cLS_Queue::lsq_Front` / `lsq_QueueAllocate` | FUN_0040a990 / FUN_0040a730 | FUN_0040f160 / FUN_0040ef00 |
+| – | `cLogSystem` ctor / dtor | FUN_0040a800 / FUN_0040a820 | FUN_0040efd0 / FUN_0040eff0 |
+
+```
+cLogSystem (0x390) *(pdb2016)*: +0x0 std::string ls_LogFileDirectory, +0x1c LOG_CYCLE_TYPE ls_LogCycleType
+    (LCT_NULL 0, YEAR 1, MONTH 2, DAY 3, HOUR 4, MINUTE 5, SECOND 6), +0x20 std::string ls_LogFileName,
+    +0x3c char ls_FileNameBuf[256], +0x13c char ls_FileLineBuf[512], +0x33c cLS_Queue ls_LogQueue,
+    +0x364 bool ls_LogFlush (set, never read), +0x368 ulong ls_LogInsertCount, +0x36c CRITICAL_SECTION ls_SendCS,
+    +0x384 ls_hLogThread, +0x388 ls_dwLogThread, +0x38c bool ls_bActiveLogThread, +0x38d bool ls_bLogThreadStopOrder
+cLS_Queue (+0x33c): lsq_dwFront_X / _Y, lsq_dwBack_X / _Y (slot in block, block number), lsq_dwAllocatePoint = 0x400
+    (slots per block), list head / tail of CLS_QNODE {std::string* pDataArray; …; pNext}, current front / back block,
+    lsq_pMemoryHead (free list of emptied blocks)
+```
+
+```pseudo
+ls_LogSystemInit(dir, cycle, name):                       @ FUN_0040aee0
+    store dir, cycle, name; active = stop = false; flush = true; count = 0
+    ls_CreateDirectory(dir)                               @ FUN_0040a5a0  (CreateDirectoryA per '/' or '\' prefix, then all; results ignored)
+    queue = one block of 1024 std::string (lsq_QueueAllocate @ FUN_0040a730: from the free list, else new)
+    CreateThread(ls_LogSystemProcess); fails → false
+    InitializeCriticalSection(ls_SendCS); return true
+
+ls_LogReservation(line):                                  @ FUN_0040aa20
+    if line and ls_bActiveLogThread and !ls_bLogThreadStopOrder:
+        under ls_SendCS: lsq_Push(std::string(line)); ls_LogInsertCount++
+lsq_Push(s):                                              @ FUN_0040a870
+    back slot = s; Back_X++
+    block full → next block (lsq_QueueAllocate; chained at the tail), Back_Y++
+        # the "overwrite the last slot" branch needs Back_Y to wrap onto Front_Y (2³² blocks) or a failed `new`:
+        # in practice the queue is unbounded and grows by 1024-line blocks; emptied blocks are recycled
+
+ls_LogSystemProcess:   (the writer thread)                @ FUN_0040aa80
+    ls_bActiveLogThread = 1
+    while !stop or queue not empty:
+        Sleep(1)
+        queue empty and a file is open and !ls_ValidTimeCheck(now, rollover): fclose     # close at the hour even when idle
+        while queue not empty:
+            now = GetLocalTime()
+            no file, or !ls_ValidTimeCheck(now, rollover) (after fclose):
+                stamp by cycle: YEAR "%04d", MONTH "%04d%02d", DAY "%04d%02d%02d", HOUR "%04d%02d%02d%02d",
+                    MINUTE "…%02d", SECOND "…%02d", other ""
+                rollover = now + 1 unit, lower fields zeroed (hour: yyyy-mm-dd (hh+1):00:00)
+                ls_FileNameBuf = dir + stamp + name; fopen("a+"); fails → thread ends with −1   (D05-B11)
+            else:
+                under ls_SendCS: lsq_Front → sprintf(ls_FileLineBuf, "%s", line); pop (an emptied block goes to the free list)
+                fprintf(file, "%s\n", ls_FileLineBuf); fflush
+    fclose; ls_bActiveLogThread = 0
+ls_ValidTimeCheck(now, rollover, cycle):                  @ FUN_0040a620
+    cycle == LCT_NULL → true
+    true when Y·10¹⁰ + M·10⁸ + D·10⁶ + h·10⁴ + m·10² + s of now < the same number of rollover   (64-bit)
+        # hour 24 / day 32 / month 13 compare correctly as numbers, so month and year ends roll over too
+```
+
+AccountLog file: `C:/data/gamigo-dwh/current/<yyyymmddhh>_fiesta_Accountlog.log`, one per hour. Lines come only from
+`CPFsAccountLog::SaveSysLog` FUN_00403150 (the four 0xC8xx handlers, D01 §4.5); their buffer is 0x500 bytes, the writer
+copies into 512 with an unbounded `sprintf`, and the longest line (0xC802 with a 256-byte user name) is 434 bytes plus the
+host name, so it overflows only with a host name of 78 characters or more *(computed from the formats)*.
+
+### 3.6 Address table (AccountLog functions identical to the Account copy)
+
+All AccountLog class-named functions not cited elsewhere whose body equals the Account function documented in the cited
+section (addresses are AccountLog's; the Account addresses: `D08-match.py accountlog account`).
+
+| Class (AccountLog functions, identical body to the Account copy) | Same as | n |
+|---|---|---|
+| `ItemAttributeClass` + `ItemAttrCls_*`: 00410920 00410940 00410950 00410960 00410980 004109a0 004109b0 004109c0 004109d0 004109e0 004109f0 00410a00 00410a20 00410a30 00410a40 00410a60 00410a90 00410aa0 00410ab0 00410ad0 00410ae0 00410b00 00410b10 00410b20 00410b30 00410b40 00410b50 00410b60 00410b70 00410ba0 00410bb0 00410bc0 00410bd0 00410be0 00410c00 00410c10 00410c20 00410c30 00410c40 00410c50 00410c60 00410c70 00410c80 00410c90 00410d40 00410d50 00410d70 00410d80 00410d90 00410da0 00410db0 00410dc0 00410dd0 00410e50 00410e80 00410f70 00410fc0 00410fd0 00410ff0 00411010 00411090 004110d0 004110f0 00411110 00411170 00411190 004111c0 004111e0 00411240 00411280 004112b0 00411310 00411340 004113d0 004113e0 00411400 00411410 00411420 00411430 00411450 00411480 00411490 00411550 00411590 004117a0 00411840 00411930 00411950 00411a40 00411b10 00411c30 00411c40 00411d10 00411d30 00411d60 00411d90 00411e10 00411f40 00411f60 00411f80 00411fc0 00411ff0 004120a0 00412110 00412120 00412130 00412170 00412240 00412290 00412420 00412430 00412440 004124b0 004124c0 00412560 00412740 004127e0 00412820 00412830 00412850 00412860 004128c0 004128f0 00412cc0 00412d80 00412db0 00412de0 00412e40 | §2.6 row 1 (Z04 §1, D07 §1.3) | 128 |
+| `ItemDataBox`, `BinaryDataBox<Item… / GradeItemOption>`, `ItemBelongAttribute`: 0040d8f0 0040d990 0040d8b0 0040d8d0 0040d8e0 0040d900 0040d910 0040d920 0040d930 0040d960 0040d9f0 0040da20 0040da50 0040dc20 0040dcf0 0040df00 0040df80 0040dfb0 | §2.6 rows 3, 6 | 18 |
+| `MapDataBox`, `BinaryDataBox<MapInfo>`, `BinaryData`, `BTree`: 0040bcb0 0040bd70 0040fa60 0040fab0 0040fb40 0040fb80 0040fba0 0040fbb0 | §2.2; §2.6 rows 4–5 | 8 |
+| `CItemAuthorityBase`: 00429ff0 0042a1a0 0042a1b0 | §2.3 | 3 |
+| `CharacterInventoryManager`: 004108e0 00410900 00410910 00412490 | §2.1 | 4 |
+| `ItemOptionsData`, `OptionCardStack`, `BinaryDataBox<ItemOptions / ShineReward / FriendPointReward>`, `EnchantSocketRateData`, `RandomSlot`, `cWell512Random`: 004137d0 00413910 004139e0 004139f0 00413a00 00413a60 00413d00 00413db0 | §2.4; §2.6 rows 8–9, 11 | 8 |
+| `CardDeck::CardStack`, `List*<CardDeck::Card>`: 00413b00 00413cd0 00414590 00414650 004148a0 | §2.6 row 10 (Z09 §28.10) | 5 |
+| `CDataReader`: 00429c10 00429c40 00429cb0 00429cf0 00429d50 | §2.6 (W05 §3.1) | 5 |
+| `CShnDataFileCheckSum`: 0042a250 0042a400 | §2.6 (W05 §3.4) | 2 |
+| `CMD5Checksum`: 0042ae00 0042ae10 0042ae40 0042b520 0042b5d0 0042b7e0 | §2.6 (W05 §6.3) | 6 |
+| `Database`, `DBRecord`, `CGameDB_Connect`: 0040e440 0040e470 0040e6c0 0040e730 00412e70 00412e90 00413090 00413140 004156e0 | §2.5 | 9 |
+| `type_info`: 00416986 00416996 004169b7 0041f94d | §2.6 (CRT RTTI) | 4 |
+| `CParser::CParser`, `CPFs::fc_dummyfunction`: 00404010 00404b70 | D01 §2 (Account FUN_00405290 / FUN_00404750) | 2 |
+| `CParser::Parser`: 00404ca0 | §3.4 | 1 |
+
+### 3.7 D01 open point: TEENAGER `nType` 1 (confidence.md §4.6 row 4)
+
+`CPFsAccount::fc_NC_USER_TEENAGER_REQ` FUN_00402610, x87 code at 0x402972–0x4029e9 (objdump):
+
+```pseudo
+elapsed = _difftime32(now, mktime(lastLogoff))            # double, seconds since the stored logoff time
+fld 17940.0 (DAT_00432960); fcom elapsed                  # elapsed ≥ 17940 → nType 0, nMinute 180 (as D01 says)
+elapsed < 17940:
+    remain = r.nUserPlayRemainTime (signed compare with 0)
+    remain ≥ 1:  nType 0, nMinute = remain
+    remain ≤ 0:  fsubrp (DE E1) → 17940.0 − elapsed; _ftol2_sse → int seconds
+                 nMinute = seconds / 60 (signed, truncated: magic 0x88888889, sar 5)
+                 nType 1
+```
+
+So `nType 1` carries **the whole minutes left until 4 h 59 min have passed since the last logoff**, i.e. when the
+teen's play time will be reset to 180 minutes; D01's guess is right. The 17940 s window is measured from the stored
+logoff time (`dUserLogoff`, written by 0x0C28 with the current time and the remaining minutes). Login refuses nType 1
+with 0x4E and does not use `nMinute` (login-server.md §5.1). A logoff time in the future (clock change) gives a negative
+`elapsed` and a `nMinute` above 299.
+
+---
+
 ## Original-server bugs
 
 | ID | Handler / function | 2016 behaviour | Effect | Likely intent |
