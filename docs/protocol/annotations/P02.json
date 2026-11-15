@@ -2996,6 +2996,76 @@
      ]
     ],
     "notes": "P02 part 13: pdb2016 PROTO_NC_CHARSAVE_PKCOUNT_CMD after the ref"
+   },
+   "0x7456": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_DB_ALL_REQ",
+    "basis": "wm WorldManagerServer::ProcessPacket @ FUN_00405aa0 (CharDB start-up states 5 / 7 / 9 / 0x11 / 0x17, W03 §9.1): raw 4-byte packet {len 3, opcode, 1 byte}; the PROTO struct is empty (sizeof 1, pdb2016)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "byte 3 of the stack word local_10c, never written for this packet; it is 0 when the AccountDB or AccountLogDB pump of the same pass stored local_10c = 1 (normal case); evidence: capture:s37: 0 in both WM starts"
+     ]
+    ],
+    "notes": "P02 batch 3 (§17.3): the 1-byte payload of an empty request; W03 §11 lists the 0x7456 byte as an observation without a bug ID"
+   },
+   "0x7503": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_EMBLEM_INFO_DB_REQ",
+    "basis": "wm WorldManagerServer::ProcessPacket @ FUN_00405aa0 (CharDB start-up states 5 / 7 / 9 / 0x11 / 0x17, W03 §9.1): raw 4-byte packet {len 3, opcode, 1 byte}; the PROTO struct is empty (sizeof 1, pdb2016)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "byte 3 of the stack word local_10c, never written for this packet; it is 0 when the AccountDB or AccountLogDB pump of the same pass stored local_10c = 1 (normal case); evidence: capture:s37: 0 in both WM starts"
+     ]
+    ],
+    "notes": "P02 batch 3 (§17.3): the 1-byte payload of an empty request; W03 §11 lists the 0x7456 byte as an observation without a bug ID"
+   },
+   "0x74bc": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_DB_TOKEN_ALL_REQ",
+    "basis": "wm WorldManagerServer::ProcessPacket @ FUN_00405aa0 (CharDB start-up states 5 / 7 / 9 / 0x11 / 0x17, W03 §9.1): raw 4-byte packet {len 3, opcode, 1 byte}; the PROTO struct is empty (sizeof 1, pdb2016)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "byte 3 of the stack word local_10c, never written for this packet; it is 0 when the AccountDB or AccountLogDB pump of the same pass stored local_10c = 1 (normal case); evidence: capture:s37: 0 in both WM starts"
+     ]
+    ],
+    "notes": "P02 batch 3 (§17.3): the 1-byte payload of an empty request; W03 §11 lists the 0x7456 byte as an observation without a bug ID"
+   },
+   "0x9801": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_ACADEMY_START_DB_ALL_REQ",
+    "basis": "wm WorldManagerServer::ProcessPacket @ FUN_00405aa0 (CharDB start-up states 5 / 7 / 9 / 0x11 / 0x17, W03 §9.1): raw 4-byte packet {len 3, opcode, 1 byte}; the PROTO struct is empty (sizeof 1, pdb2016)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "byte 3 of the stack word local_10c, never written for this packet; it is 0 when the AccountDB or AccountLogDB pump of the same pass stored local_10c = 1 (normal case); evidence: capture:s37: 0 in both WM starts"
+     ]
+    ],
+    "notes": "P02 batch 3 (§17.3): the 1-byte payload of an empty request; W03 §11 lists the 0x7456 byte as an observation without a bug ID"
+   },
+   "0x9805": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_ACADEMY_START_DB_RANK_BALANCE_REQ",
+    "basis": "wm WorldManagerServer::ProcessPacket @ FUN_00405aa0 (CharDB start-up states 5 / 7 / 9 / 0x11 / 0x17, W03 §9.1): raw 4-byte packet {len 3, opcode, 1 byte}; the PROTO struct is empty (sizeof 1, pdb2016)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "byte 3 of the stack word local_10c, never written for this packet; it is 0 when the AccountDB or AccountLogDB pump of the same pass stored local_10c = 1 (normal case); evidence: capture:s37: 0 in both WM starts"
+     ]
+    ],
+    "notes": "P02 batch 3 (§17.3): the 1-byte payload of an empty request; W03 §11 lists the 0x7456 byte as an observation without a bug ID; not captured: the 0x9804 answer sets the link to state 1 when dAggregationDate is 0"
    }
   }
  },
@@ -4040,11 +4110,13 @@
    "0x7495": {
     "dir": "Zone→WM",
     "captures": [
-     "shop",
-     "combat"
+     "combat",
+     "s21d",
+     "s37",
+     "shop"
     ],
     "fields": {
-     "(empty)": "per minute, 3–20 ms after 0x0821, on sb_SocketStr[0]"
+     "(empty)": "per minute, 3–20 ms after 0x0821, on sb_SocketStr[0]; batch 3: also once per zone start, 9–23 ms after the first 0x0821 on the new link"
     }
    },
    "0x7496": {
@@ -4218,6 +4290,202 @@
     "fields": {
      "netpacketzoneheader": "all 0xFF",
      "usrregnum": "103, one per zone process"
+    }
+   },
+   "0x0802": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "echo_data": "zone: never written (Z01-B2): 126, 155, 222, 17, 63, 3, 125, 112, 67, 4, 12, 45, 255, 38, 104, 33, 2; WM → DB / Login links: 0",
+     "server_to_id": "0 Account, 1 AccountLog, 2 Character, 3 GameLog, 4 Login, 5 WM",
+     "server_from_id": "5 WM, 6 zone",
+     "server_from_world_num": "0",
+     "server_from_zone_num": "0–3",
+     "key": "server_to_id + server_from_id (5…11) on all 106"
+    }
+   },
+   "0x0803": {
+    "dir": "WM→Zone",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "echo_data": "the request's echo_data copied back by every peer (106/106)",
+     "error": "0"
+    }
+   },
+   "0x180f": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "numofmap": "107 / 88 / 255 / 196 (zones 0 / 1 / 3 / 2)",
+     "maparray": "14-byte {canparty, mapname[12], IsPartyReleaseMap}; IsPartyReleaseMap = (canparty == 0) (fm_Regist2WMS @ FUN_00461cf0); sent on every link at its 0x0803"
+    }
+   },
+   "0xa419": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "nMapCount": "17 from every zone",
+     "sIndunInfos": "13-byte {MapIDClient[12], ModeIDLv}; sent on every link at its 0x0803; the WM forwards only the first (0xA41A once per WM start)"
+    }
+   },
+   "0xa41a": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "nMapCount": "17, the first zone's 0xA419 bytes; no answer (W04-B43)"
+    }
+   },
+   "0x7446": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "(unset)": "0x11 = the low byte of the preceding 0xA419 nMapCount (17) left in the shared gpp buffer (Z30-B8); once per zone process"
+    }
+   },
+   "0x7447": {
+    "dir": "WM→Zone",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "PartMask": "3",
+     "NumOfList": "0"
+    }
+   },
+   "0x207d": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "nHandle": "0xFFFF",
+     "sScriptMsgIndex": "\"E_Olympic_A04\" + 18 heap bytes that differ per start (Z09-B72: 32-byte copy)",
+     "nlen": "0 0 0 0 0"
+    }
+   },
+   "0x7457": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x0C41",
+     "PartMask": "3",
+     "NumOfGuild": "0"
+    }
+   },
+   "0x7504": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "PartMask": "2",
+     "nNumOfEmblem": "0"
+    }
+   },
+   "0x74bd": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x0C41",
+     "PartMask": "3",
+     "NumOfGuild": "0"
+    }
+   },
+   "0x7485": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "nGTNo": "0"
+    }
+   },
+   "0x7486": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x0D40",
+     "nGTNo": "1794258000 (a time_t)",
+     "nMatchType": "6",
+     "MatchTime": "9 time_t",
+     "size": "204 = 43 + 31 × 5 + 6"
+    }
+   },
+   "0x74f6": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "nGTNo": "the 0x7486 nGTNo"
+    }
+   },
+   "0x74f7": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x0D50",
+     "PartMask": "3",
+     "nEnterGuildNum": "0"
+    }
+   },
+   "0x9802": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x1780",
+     "PartMask": "3",
+     "NumOfGuildAcademy": "0"
+    }
+   },
+   "0x9803": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "nRoundTime": "1"
+    }
+   },
+   "0x9804": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x18B8",
+     "PartMask": "3",
+     "RankData.dAggregationDate": "0 → m_bAcademyRankInit = 1, link state 1, no 0x9805",
+     "RankData.NumOfEachRankingData": "0"
     }
    }
   },
@@ -4890,11 +5158,13 @@
    "0x0821": {
     "dir": "WM→zone",
     "captures": [
-     "shop",
-     "combat"
+     "combat",
+     "s21d",
+     "s37",
+     "shop"
     ],
     "fields": {
-     "tm": "36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms"
+     "tm": "36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms; batch 3: also once per zone registration to every registered zone's broadcast link (SendWMTimeToZone(force))"
     }
    },
    "0x180b": {
@@ -6091,6 +6361,30 @@
     "fields": {
      "DestZoneNo / SrcZoneNo": "2 / 0 (RouN → RouCos02), 0 / 2 (&linkto RouN); not on a same-zone link",
      "CharLev": "8 / 5"
+    }
+   },
+   "0xbcd5": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "nSlotMachineNum": "3",
+     "MachineIndex": "{Machine 0, BetUnits 10}, {1, 100}, {2, 500} (smsm_BettingAtOnce); once per zone process, on the first GameDB link's 0x0803"
+    }
+   },
+   "0xbcd6": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "Machine": "0, 1, 2",
+     "nError": "0x2940",
+     "JackPotPrice": "0",
+     "RankNumber": "0 (so D03-B22's trailing rank bytes do not show)"
     }
    }
   },

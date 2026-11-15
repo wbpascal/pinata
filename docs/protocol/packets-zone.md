@@ -13455,7 +13455,7 @@ Z16 §6.4
 |---|---|---|---|
 | 0 | bytes[36] | tm | struct tm |
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `tm`: 36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms
+**Captured** (P02, `capture-validation.md`; combat, s21d, s37, shop): `tm`: 36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms; batch 3: also once per zone registration to every registered zone's broadcast link (SendWMTimeToZone(force))
 
 ### `0x0825` NC_MISC_WHSHANDLEREPAIR_CMD (WM→zone)
 
@@ -15673,6 +15673,14 @@ Z01 name was 'map login done (ours)'
 ### `0x500a` NC_SOULSTONE_SP_USESUC_ACK (S→C)
 
 **Captured** (P02, `capture-validation.md`; shop): `(payload)`: empty, 1 ms after 0x5009; 0x240F next tick
+
+### `0xbcd5` NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s37, s21d): `nSlotMachineNum`: 3; `MachineIndex`: {Machine 0, BetUnits 10}, {1, 100}, {2, 500} (smsm_BettingAtOnce); once per zone process, on the first GameDB link's 0x0803
+
+### `0xbcd6` NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s37, s21d): `Machine`: 0, 1, 2; `nError`: 0x2940; `JackPotPrice`: 0; `RankNumber`: 0 (so D03-B22's trailing rank bytes do not show)
 
 ### `0xc806` NC_SYSLOG_CHAR_ENTER_GAME (WM/Zone/Character→GameLog)
 

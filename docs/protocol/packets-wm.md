@@ -11392,6 +11392,8 @@ no 2016 Character handler (W04-B23)
 
 no 2016 Character-server handler
 
+**Captured** (P02, `capture-validation.md`; s37): `nMapCount`: 17, the first zone's 0xA419 bytes; no answer (W04-B43)
+
 ### `0xa804` NC_CHAT_RESTRICT_DB_ADD_REQ (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_00422240)
@@ -12749,6 +12751,8 @@ then Pre u32 nPartySeqCharNo[5], Post {u16, u8, u8, u32[5]}; 0x32 bytes; 6 bytes
 
 re-broadcast as 0x2079 with the same layout
 
+**Captured** (P02, `capture-validation.md`; s37, s21d): `nHandle`: 0xFFFF; `sScriptMsgIndex`: "E_Olympic_A04" + 18 heap bytes that differ per start (Z09-B72: 32-byte copy); `nlen`: 0 0 0 0 0
+
 ### `0x244a` NC_BAT_PKINPKFIELD_WMS_CMD (Zone→WM)
 
 **Verified layout** (basis: wm FUN_0042b3b0)
@@ -12952,6 +12956,8 @@ forwarded as 0x380A (W04-B19)
 | 0 | u16 | nMapCount | ≤ 32 |
 | 2 | SHINE_INDUN_INFO[n] | sIndunInfos | 0xD each |
 
+**Captured** (P02, `capture-validation.md`; s37, s21d): `nMapCount`: 17 from every zone; `sIndunInfos`: 13-byte {MapIDClient[12], ModeIDLv}; sent on every link at its 0x0803; the WM forwards only the first (0xA41A once per WM start)
+
 ### `0xbc1d` NC_GAMBLE_WORLD_PREVMAPNAME_CMD (Zone→WM)
 
 **Verified layout** (basis: wm FUN_0042c570)
@@ -13006,6 +13012,14 @@ size 0x12, not checked
 ### `0x0412` NC_LOG_GAME_DELETE_AVATAR (Zone/WM/Character→GameLog)
 
 **Captured** (P02, `capture-validation.md`; s37): `chrregnum`: 6, sent twice: Character server, then WM 10 ms later
+
+### `0x0802` NC_MISC_S2SCONNECTION_REQ (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; s37, s21d): `echo_data`: zone: never written (Z01-B2): 126, 155, 222, 17, 63, 3, 125, 112, 67, 4, 12, 45, 255, 38, 104, 33, 2; WM → DB / Login links: 0; `server_to_id`: 0 Account, 1 AccountLog, 2 Character, 3 GameLog, 4 Login, 5 WM; `server_from_id`: 5 WM, 6 zone; `server_from_world_num`: 0; `server_from_zone_num`: 0–3; `key`: server_to_id + server_from_id (5…11) on all 106
+
+### `0x0803` NC_MISC_S2SCONNECTION_ACK (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; s37, s21d): `echo_data`: the request's echo_data copied back by every peer (106/106); `error`: 0
 
 ### `0x0c5f` NC_USER_TUTORIAL_CAN_SKIP_CMD (CharDB→WM)
 
@@ -13062,6 +13076,10 @@ size 0x12, not checked
 ### `0x1414` NC_AVATAR_GUILD_DATA_ACK (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; s37): `nGuildNo`: 0; `chrregnum`: 6; `slot`: 2
+
+### `0x180f` NC_MAP_REGIST_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; s37, s21d): `numofmap`: 107 / 88 / 255 / 196 (zones 0 / 1 / 3 / 2); `maparray`: 14-byte {canparty, mapname[12], IsPartyReleaseMap}; IsPartyReleaseMap = (canparty == 0) (fm_Regist2WMS @ FUN_00461cf0); sent on every link at its 0x0803
 
 ### `0x400e` NC_CHARSAVE_2WLDMAN_ALL_CMD (Zone→WM)
 
@@ -13151,13 +13169,49 @@ size 0x12, not checked
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nError`: 0x2100 ok; `nCharNo`: 5
 
+### `0x7446` NC_GUILD_ZONE_LIST_REQ (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; s37, s21d): `(unset)`: 0x11 = the low byte of the preceding 0xA419 nMapCount (17) left in the shared gpp buffer (Z30-B8); once per zone process
+
+### `0x7447` NC_GUILD_ZONE_LIST_ACK (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; s37, s21d): `PartMask`: 3; `NumOfList`: 0
+
+### `0x7457` NC_GUILD_DB_ALL_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37): `Error`: 0x0C41; `PartMask`: 3; `NumOfGuild`: 0
+
+### `0x7485` NC_GUILD_TOURNAMENT_DB_GET_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s37): `nGTNo`: 0
+
+### `0x7486` NC_GUILD_TOURNAMENT_DB_GET_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37): `Error`: 0x0D40; `nGTNo`: 1794258000 (a time_t); `nMatchType`: 6; `MatchTime`: 9 time_t; `size`: 204 = 43 + 31 × 5 + 6
+
 ### `0x7495` NC_GUILD_GUILDWARSTATUS_REQ (Zone→WM)
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `(empty)`: per minute, 3–20 ms after 0x0821, on sb_SocketStr[0]
+**Captured** (P02, `capture-validation.md`; combat, s21d, s37, shop): `(empty)`: per minute, 3–20 ms after 0x0821, on sb_SocketStr[0]; batch 3: also once per zone start, 9–23 ms after the first 0x0821 on the new link
 
 ### `0x7496` NC_GUILD_GUILDWARSTATUS_ACK (WM→Zone)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `warnumber`: 0
+
+### `0x74bd` NC_GUILD_DB_TOKEN_ALL_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37): `Error`: 0x0C41; `PartMask`: 3; `NumOfGuild`: 0
+
+### `0x74f6` NC_GUILD_TOURNAMENT_ENTER_LIST_DB_GET_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s37): `nGTNo`: the 0x7486 nGTNo
+
+### `0x74f7` NC_GUILD_TOURNAMENT_ENTER_LIST_DB_GET_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37): `Error`: 0x0D50; `PartMask`: 3; `nEnterGuildNum`: 0
+
+### `0x7504` NC_GUILD_EMBLEM_INFO_DB_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37): `PartMask`: 2; `nNumOfEmblem`: 0
 
 ### `0x9427` NC_HOLY_PROMISE_DB_GET_UP_ACK (CharDB→WM)
 
@@ -13170,6 +13224,18 @@ size 0x12, not checked
 ### `0x9444` NC_HOLY_PROMISE_DB_GET_REMAIN_MONEY_CMD (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `nMoney`: 0
+
+### `0x9802` NC_GUILD_ACADEMY_START_DB_ALL_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37): `Error`: 0x1780; `PartMask`: 3; `NumOfGuildAcademy`: 0
+
+### `0x9803` NC_GUILD_ACADEMY_START_DB_GET_RANKING_LIST_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s37): `nRoundTime`: 1
+
+### `0x9804` NC_GUILD_ACADEMY_START_DB_GET_RANKING_LIST_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37): `Error`: 0x18B8; `PartMask`: 3; `RankData.dAggregationDate`: 0 → m_bAcademyRankInit = 1, link state 1, no 0x9805; `RankData.NumOfEachRankingData`: 0
 
 ### `0x987a` NC_GUILD_ACADEMY_ZONE_GUILD_BUFF_CMD (WM→Zone)
 

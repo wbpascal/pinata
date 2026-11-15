@@ -915,7 +915,8 @@ zone → WM saves, level / exp updates, map links and the per-minute link traffi
 - **Broadcasts** (0x0821, 0x0C16, 0x580D, 0x987A / 0x987B) reach one link per zone: `g_Zones[zone]`. The 0x0802
   handler (W01 §7.1) overwrites it for each of the 4 links, so the last link to register gets them *(inferred:
   which link registers last)*. Part 10 (§7.5.4): that link is `sb_SocketStr[3]` for two zones and `[2]` for one, so it
-  is not a fixed index.
+  is not a fixed index. Batch 3 **confirms** the rule on two zone starts (§17.4: 186 of 188 broadcasts on the
+  last-registered link; the WM refuses 2 of every zone's 4 first connects, P02-B25).
 - **Ordering** *(inferred)*: one zone's save burst is spread over 4 links, and the WM handles one packet per session
   per pass (§7.4). The WM therefore applies the parts interleaved by link, not in send order. In `combat` 43.715–43.720
   s, 0x180D (sent last) is the 6th packet on link #1 while the 0x4013 saves sit on the other links. Only time
@@ -1914,6 +1915,229 @@ Batch-1 client opcodes of these flows recur unchanged (0x0807, 0x0C65, 0x0C67, 0
 | Login→WM | 0x0C16 | NC_USER_KICKOFFFROMWORLD_CMD | 3 | 10 | confirmed (P02-B5) | stale header differs per caller (§16.1) |
 | WM→Login | 0x0808 | NC_MISC_USER_COUNT_CMD | 27 | 4 | **corrected** (first after a start) | `{0, 0}` on the handshake (P02-B22), then `{0, 1}` |
 
+## 17. Server stop and start on the links, batch 3 (`s37`, `s21d`) *(captured)*
+
+`s37` holds a full stop and two starts: the four zone processes and the WM stop (653–659 s), a first WM start that
+ends after 1.25 s (729.4 s), a second WM start (783.8 s) and a zone start (794.6 s). `s21d` starts with the four zone
+processes starting against a running WM (0.0 s; X3 setup). The pcapngs of batch 3 keep the TCP SYN / FIN frames,
+so link opens and closes are timed with `tcpdump -r … 'tcp[tcpflags] & (tcp-syn|tcp-fin|tcp-rst) != 0'`; the decoder
+streams are mapped by their ports. 106 S2S handshakes (58 + 48), all three packets each.
+
+### 17.1 What happened (TCP opens / closes)
+
+```text
+s37
+653.266 … 657.329  the 4 zone processes stop one by one (653.27, 654.62, 655.72, 657.33): each closes its 12 links
+                   (4 WM, 4 CharDB, 4 GameLog) within 2 ms, FIN from the zone; no packet before (operator stop)
+655.466            WM → Login 0x0808 {0, 2500} (the 30-s count, last one)
+658.674 … 658.676  WM stops: FIN from the WM on Login, AccountDB, AccountLogDB, CharDB, GameLog, in that order
+                   = WorldManagerServer::ProcessStop @ FUN_004067f0 (W05 §1.2)
+729.400 … 729.403  first WM start: connects AccountLog, Account, CharDB, GameLog, Login (W05 §1.3 order)
+729.415 … 729.561  handshakes, 0x0808 {0, 0} (P02-B22), the CharDB start-up load (§17.3)
+730.649 … 730.653  FIN from the WM on the same 5 links, same order: ProcessStop again, 1.09 s after 0x9804 (§17.6)
+783.801 … 783.945  second WM start: same connects, handshakes, 0x0808 {0, 0}, the same load, then 0xA41A later
+794.639 … 797.121  zone start, order 0, 1, 3, 2 (0.6–1 s apart): per zone 4 CharDB, 4 GameLog, 4 WM connects in 8 ms;
+                   the WM closes the 2nd and 4th WM link of every zone 5–22 ms after the SYN, without a packet (§17.4)
+822.998 … 845.887  each zone reconnects the closed links (two at a time); again one of a pair is closed when both
+                   land in one WM pass; after 843.8 / 845.9 every zone holds 4 WM links
+s21d
+0.000 … 2.267      zone start against the running WM, order 0, 1, 3, 2: the same 12 connects per zone, the same
+                   refusals of WM links 2 and 4 (0.012 / 0.028, 0.991 / 0.997, 1.590 / 1.606, 2.272 / 2.288)
+27.201 … 29.872    first retry per zone (25–28 s after the refusal); 47.175 / 47.429 / 48.171 second retry, 20.0 s
+                   (±0.03) after the first for the three zones whose first retry was refused again
+```
+
+The Character and GameLog servers accept all 4 links of a zone within 1 ms: the refusal is the WM's (§17.4). Zone
+and WM never close a link because of the other side going down: the zones were stopped before the WM, and the
+Character server's GameLog link (`W00_GLDB#18`) runs on with heartbeats through both WM starts.
+
+### 17.2 The S2S handshake (0x0801 / 0x0802 / 0x0803)
+
+```text
+listener → connector  0x0801 NC_MISC_S2SCONNECTION_RDY {}                      on accept (W05 §1.4, Z01 §3.3)
+connector → listener  0x0802 NC_MISC_S2SCONNECTION_REQ { echo_data, server_to_id, server_from_id,
+                                                          server_from_world_num, server_from_zone_num, key }
+                      0–56 ms after the 0x0801 (zones: up to 56 ms, WM: same ms)
+listener → connector  0x0803 NC_MISC_S2SCONNECTION_ACK { echo_data = the request's, error = 0 }
+```
+
+- **Server ids confirmed** on all 106: 0 Account, 1 AccountLog, 2 Character, 3 GameLog, 4 Login, 5 WM, 6 zone;
+  `key = server_to_id + server_from_id` (5 … 11) every time; world 0; zone 0–3 (W01 §7.1, W05 §5.2, Z01 §3.3,
+  D01 / D02).
+- **echo_data**: the WM writes 0 on its 5 links; the zones' byte is never written (Z01-B2 **confirmed**): 126, 155,
+  222, 17, 63, 3, 125, 112, 67, 4, 12, 45, 255, 38, 104, 33, 2. The two links a zone opens in the same ms usually
+  carry the same value (same stack). Every peer copies it back in 0x0803 (106 / 106), `error` 0 every time.
+- **After 0x0803** the zone, per WM link, sends `0x180F` and `0xA419` on that link (`wms_NC_MISC_S2SCONNECTION_ACK`
+  @ FUN_005a3320, Z01 §3.3: confirmed, on every link that registers, 2–4 times per zone start), and **once per process**
+  `0x7446` on the round-robin link (`gz_IsSendReq`, set by the first call, reset only in the constructor). The first
+  GameDB link's 0x0803 sends `0xBCD5` once (`smjpr_RankingReq` @ FUN_00626220, guard `smjpr_IsReq`). §17.4 has the
+  order.
+
+### 17.3 WM start-up: links and the CharDB load (W05 §1.3, W03 §9.1)
+
+```text
+729.400 SYN ALDB, AccDB, CDB, GLDB, Login (1 ms apart; ProcessLink order: AccountLog, Account, Char, GameLog, Login)
+729.415 0x0801 from AccountDB / CharDB / GameLog → WM 0x0802 at once; AccountLog's 0x0801 at 729.415, Login's 729.432
+        Login 0x0803 → WM 0x0808 {0, 0} in the same ms (P02-B22)
+CharDB load, one request per WM pass after each answer (state machine of ProcessPacket @ FUN_00405aa0):
+  0x7456 {1 byte}             → 0x7457 {Error 0x0C41, PartMask 3, NumOfGuild 0}                   18 ms
+  0x7503 {1 byte}             → 0x7504 {PartMask 2, nNumOfEmblem 0}                               17 ms
+  0x74BC {1 byte}             → 0x74BD {Error 0x0C41, PartMask 3, 0}                              40 ms
+  (states 0xB / 0xC: 0x7454 per guild; no guild, so nothing on the wire)
+  0x7485 {nGTNo 0}            → 0x7486 {Error 0x0D40, nGTNo 1794258000, nMatchType 6, MatchTime[9], 31 brackets, …} (204 B)
+  0x74F6 {nGTNo 1794258000}   → 0x74F7 {Error 0x0D50, PartMask 3, 0}
+  0x9801 {1 byte}             → 0x9802 {Error 0x1780, PartMask 3, 0}
+  (states 0x13 / 0x14: 0x980F per guild; nothing)
+  0x9803 {nRoundTime 1}       → 0x9804 {Error 0x18B8, PartMask 3, dAggregationDate 0, 0 rows}       144 ms in all
+  no 0x9805: CharDB link state 1 directly (below)
+second start (783.801): the same requests and answers byte for byte; then 794.763 WM → CharDB 0xA41A (§17.4)
+```
+
+- **Order and codes confirmed** against W03 §9.1, §6.1, §8.4 (all ok codes as documented: 0x0C41, 0x0D40, 0x0D50,
+  0x1780, 0x18B8; 0x7504 has no `Error`). 0x7486 = 43 + 31 × 5 + 6 = 204 bytes as W03 §8.4 lays it out.
+- **No 0x9805** (state 0x17) in either start: `CGuildManager::Recv_NC_GUILD_ACADEMY_START_DB_GET_RANKING_LIST_ACK`
+  @ FUN_00441aa0 sets `m_bAcademyRankInit = 1` when `RankData.dAggregationDate` is 0 (never aggregated; the next
+  balance time is this week's from `GuildAcademy` data row 0, + 7 days if already past); state 0x17 (→ 0x9805 → 0x9806)
+  is taken only when a stored date is more than 600 s older than the balance time that has passed. The 0x9804 handler
+  `fc_…_GET_RANKING_LIST_ACK` @ FUN_0040ccc0 then sets the CharDB link to state 1. W05 §1.3 names 0x9806 as "the last
+  answer" that sets state 1: that holds only on the balance path (§13).
+- **The 1-byte requests** (0x7456, 0x7503, 0x74BC, 0x9801; 0x9805 too) are raw 4-byte packets built in the stack word
+  `local_10c` (`{3, op lo, op hi, byte 3}`); byte 3 is never written for the packet (W03 §11 "observation" for
+  0x7456). It is **0** in both starts because the AccountDB / AccountLogDB pump of the same `ProcessPacket` call stores
+  `local_10c = 1` first whenever that link is in state 1 or 2, i.e. always after the handshakes; only a pass with
+  both links down would send a stack byte. Annotated in P02.json `packets.character` (`(unset)`) so the decoder no
+  longer reports "size 1 vs 0".
+
+### 17.4 Zone start: registration, the WM's accept refusals, reconnects
+
+```text
+zone 0, s37 (the other zones and s21d alike, offsets ±10 ms):
+794.639–.644 SYN 4 × CharDB, 4 × GameLog            all accepted, 0x0801 → 0x0802 → 0x0803
+794.645–.647 SYN 4 × WM (#17 #18 #19 #20)            #18 closed by the WM at .654, #20 at .669: no 0x0801, FIN at once
+794.702      0x0802 on #17 and #19 (echo 126)
+794.717      0x0803 + 0x0821 on #19, then on #17   (each registration: 0x0803, SendWMTimeToZone(force) → 0x0821 to every
+             registered zone's broadcast link, enss_NPCStandState (nothing: no standing event NPC), GMEM_SendAllEventInfo
+             (nothing))
+794.731      #17: 0x180F {107 maps}, 0xA419 {17}, 0x7446 {0x11};  #19: 0x180F, 0xA419;  CharDB#20: 0xBCD5
+794.737      CharDB → 0xBCD6 × 3 {Machine 0/1/2, 0x2940, JackPot 0, 0 ranks}
+794.740      #17 0x7495 (the per-minute guild-war query, first run) → .794 0x7496 {0}
+794.763      WM → CharDB 0xA41A {the first 0xA419's 17 entries}: once per WM start, no answer (W04-B43)
+794.779      WM → zone 0x7447 {PartMask 3, 0 guilds}
+795.408      zone 1 only: 0x207D NC_ACT_SCRIPT_MSG_WORLD_CMD {0xFFFF, "E_Olympic_A04" + 18 heap bytes, nlen 0×5}
+823.834      zone 0 retries #18 / #20 as #37 (accepted) and #38 (closed at once); 843.842 #41 accepted
+```
+
+- **Accept refusal** (S02 §1.4 per-IP admission rule, **confirmed**): `CSocket_Acceptor::SetAccepted` @ FUN_00463c40
+  refuses a socket while another one from the same IPv4 address waits in the accepted ring, and the accept thread
+  (`AcceptThreadRing` @ FUN_00463ee0) then calls `shutdown` + `closesocket` (the FIN 5–22 ms after the SYN, no packet).
+  `WorldManagerServer::ProcessConnect` @ FUN_00405860 drains the ring once per main pass (≈ 15.6 ms), so of 4 links
+  opened within 2 ms the 1st and 3rd survive. Every zone therefore runs its first 25–30 s on 2 of its 4 WM links
+  (round robin over the verified entries only, §7.5.1, so traffic is not lost) and gets the full 4 after 45–50 s when
+  a retry pair is split again (`s21d` zones 0, 1, 3; `s37` zones 0, 2). Two connects 2 ms apart can both pass when
+  a pass falls between them (`s37` 822.998 / 823.000, `s21d` 29.870 / 29.872). (original bug) P02-B25: S02 calls the
+  rule a flood guard *(inferred)*, but it also refuses the zones' own server links on every start, and any two
+  clients behind one NAT address that connect in the same pass (§12).
+- **Retry timing**: `SocketBundle::sb_DisconnectCheck` @ FUN_005ab2c0 / `sb_Packet` @ FUN_005ab030 close a dead entry
+  and set `reconnectAt = cw_CurrTick + sb_ReconnectInterval × 10`; `sock2wldman.sb_ReconnectInterval = 0x14` (20 s in
+  0.1-s ticks), `sock2gameDB` 20 s, `sock2gamelog` 600 (= 600 s) (set by the static initialisers, `dynamic_initializer_for_'sock2gameDB'` @ FUN_0069afc0 and its two
+  neighbours). The second retry comes 20.0 s after the first: **confirmed**. The first retry
+  comes 26–29 s after the refusal: the zone notices the closed socket only when its main loop runs, 6–9 s after its
+  links connected *(inferred: map / data loading between the link handshakes and the first main-loop pass)*.
+  `sb_Routine` @ FUN_005aa340 returns at the first entry not yet due, so a later entry waits for an earlier one (the
+  first retries of a zone come as a pair).
+- **Broadcast link = the zone's last-registered link** (§7.5.1 inference, now **confirmed**): `SetZoneSession` @
+  FUN_00439190 overwrites `m_ppZoneMappingTable[zone]` on every 0x0802. Over all WM → zone broadcasts after a
+  registration in both captures (0x0821, 0x0C16, 0x987A / 0x987B, 0x580D), 186 of 188 go to the link whose 0x0803 came
+  last; the 2 others are 0x0821 sent in the same ms as a registration of that zone. So the broadcast link changes
+  with every retry (`s37` 0x987A at 844.9 s on #34 / #35 / #39 / #41, the retried links, and at 899.9 s on #42 instead of #39: zone 2's #42 registered at 845.887).
+- **0x180F**: `{numofmap, maparray[n] {canparty, mapname[12], IsPartyReleaseMap}}` (pdb2016): 107 / 88 / 255 / 196
+  maps for zones 0 / 1 / 3 / 2, the same in both captures; `IsPartyReleaseMap = (canparty == 0)` (`fm_Regist2WMS` @
+  FUN_00461cf0; `fc_MapRegist` @ FUN_00463a70 has no cap, the count is the zone's `FieldMap` list). canparty 0 / 1 / 2
+  all occur (zone 0: 40 / 41 / 26; GuildT* maps 2 = guild-only, W02 §1.6). Every registering link sends the full list:
+  `CWMZoneSessionManager::SetServiceMapZoneNo` @ FUN_004391d0 (W01's `Zones_AddMap`) updates an existing entry with all
+  three values, but a **new** entry gets only `Vaild`, the name, `ZoneNo` and `CanParty`: `IsReleaseMap` stays 0 until
+  the same map is registered a second time (original bug) P02-B26. The zone's second link repairs it in the same ms,
+  so it shows only for a zone that registers through a single link (3 refused connects).
+- **0xA419** on every registering link (17 entries, the instance-dungeon table, the same from every zone); the WM keeps
+  the first only and forwards it once as 0xA41A (W04 §13.3 "Zone 0xA419" block, **confirmed**; no 0xA41F back, W04-B43).
+- **0x7446** once per zone process, on the round-robin link: its one payload byte is 0x11 in all 8, the low byte of the
+  preceding 0xA419's `nMapCount` (17) left at `gpp + 2` (Z30-B8 **confirmed**, its value explained). A WM restart while a
+  zone runs gets no new 0x7446 from that zone (the guard is never reset) *(inferred from the code: not captured, the
+  zones restarted with the WM in `s37`)*.
+- **0xBCD5 / 0xBCD6** (Z06 §5 `smjpr_RankingReq`; D03 §11 0xBCD5 block): `{3, {0, 10}, {1, 100}, {2, 500}}` = `BetUnits` from
+  `smsm_BettingAtOnce`; three answers `{Machine, 0x2940, 0, 0}` (8 bytes each, **confirmed**; with no ranks D03-B22's
+  trailing bytes cannot show). The decoder now reads PDB element types named `Outer::<unnamed-type-…>` (0x180F, 0xBCD5).
+- **0x207D** from zone 1 at both starts (`cScriptMsg_World` @ FUN_005eb970 from a map / NPC script at load; the
+  string `E_Olympic_A04` is in `9Data/Shine/LuaScript/AIScript/E_Ski_CongressNPC.lua`): `sScriptMsgIndex` is a 32-byte
+  copy from the Lua string, so 18 heap bytes follow the terminator, different per start (`ee 1b c7 e7 7a 04 …` /
+  `e0 03 77 c3 00 a1 …`): Z09-B72 **confirmed**.
+- **0x0821** carries the WM's local time (`tm` 2026-11-15 17:16:16, wday 0, yday 318); the zone's handler sets the
+  machine clock from it (Z01 §9). One zone start sends 20 (8 registrations × the zones registered so far: 1, 1, 2, 2,
+  3, 3, 4, 4); zone 0's broadcast link gets 7 of them, in both captures.
+
+### 17.5 Message order against the documents
+
+| Flow | Documents | Captured | Status |
+|---|---|---|---|
+| WM link connect order | W05 §1.3 (`ProcessLink`) | AccountLog, Account, Char, GameLog, Login within 3 ms | confirmed |
+| WM stop | W05 §1.2 `ProcessStop` | Login, AccountDB, AccountLogDB, CharDB, GameLog FINs in 2 ms; zones had stopped first | confirmed |
+| CharDB start-up load | W03 §9.1, §6.1, §8.4 | states 5 → 0x15 in order, one request per answer | confirmed |
+| end of the load | W05 §1.3 ("the last answer 0x9806 sets state 1") | 0x9804 with `dAggregationDate 0` ends it | **corrected** (§13) |
+| zone link set | Z01 §3.3, Z09 §1.5, §7.5.1 | 4 CharDB, 4 GameLog, 4 WM per zone; 2 WM links refused per start (P02-B25) | confirmed + **extended** |
+| per-link registration | Z01 §3.3 (0x0803 → 0x180F, 0xA419, 0x7446) | 0x180F + 0xA419 on every link; 0x7446 once per process | **extended** (the call is per 0x0803, the guard `gz_IsSendReq` is Z30's) |
+| WM on 0x0802 | W05 §5.2 | 0x0803, then 0x0821 to every registered zone; no 0x086A (no standing NPC) | confirmed |
+| 0xA419 → 0xA41A | W04 (0xA419 block) | once per WM start, after the first zone's 0xA419, 32 ms later | confirmed |
+| broadcast link | §7.5.1 *(inferred)* | the last-registered link, 186 / 188 | confirmed (settles the §15 row) |
+| reconnect delay | Z09 §1.5 (`pool.reconnectSeconds`) | 20.0 s on the WM pool | confirmed (value added) |
+
+### 17.6 Why the first WM start ended
+
+Both WM ends are `ProcessStop` (§17.1: the FIN order is its close order). The first start ran its whole CharDB load
+and stopped 1.09 s after 0x9804, before any zone or client connected; the second start sent the same bytes up to
+0x9804 and ran on. In the code two things end the WM right after the load: a failed `Listen_Zone` / `Listen_Client`
+(`ProcessLink` @ FUN_00404bf0 sets `m_bStopMainThread`, W05 §1.3; `CSocket_Acceptor::Listen_Add` @ FUN_00463a50
+fails when the accept thread cannot `bind` / `listen`) and a stop of the service or console by the operator (the notes
+step "ServerInfo capacity set to 1, WM started" suggests a restart). `InitSessions` cannot fail (FUN_00437fd0 returns
+1). The wire does not tell which; the WM log of 729–731 s ("*FAILED LISTEN ADD, IP=%s:%d, From=%s*" or the
+`ViewStopInfo` stop time) would (§14).
+
+### 17.7 Opcodes
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| listener → connector | 0x0801 | NC_MISC_S2SCONNECTION_RDY | 106 | 0 | confirmed | on accept; never on a refused WM link |
+| connector → listener | 0x0802 | NC_MISC_S2SCONNECTION_REQ | 106 | 7 | confirmed (Z01-B2) | ids and key §17.2; zone `echo_data` unwritten |
+| listener → connector | 0x0803 | NC_MISC_S2SCONNECTION_ACK | 106 | 3 | confirmed | echo copied, `error` 0 |
+| WM→CharDB | 0x7456 | NC_GUILD_DB_ALL_REQ | 2 | 1 | **corrected** (size) | 1 unwritten byte, 0 in practice (§17.3); P02.json |
+| CharDB→WM | 0x7457 | NC_GUILD_DB_ALL_ACK | 2 | 5 | confirmed | `0x0C41`, PartMask 3, 0 guilds |
+| WM→CharDB | 0x7503 | NC_GUILD_EMBLEM_INFO_DB_REQ | 2 | 1 | **corrected** (size) | as 0x7456 |
+| CharDB→WM | 0x7504 | NC_GUILD_EMBLEM_INFO_DB_ACK | 2 | 3 | confirmed | PartMask 2, no Error field |
+| WM→CharDB | 0x74BC | NC_GUILD_DB_TOKEN_ALL_REQ | 2 | 1 | **corrected** (size) | as 0x7456 |
+| CharDB→WM | 0x74BD | NC_GUILD_DB_TOKEN_ALL_ACK | 2 | 5 | confirmed | `0x0C41`, 3, 0 |
+| WM→CharDB | 0x7485 | NC_GUILD_TOURNAMENT_DB_GET_REQ | 2 | 4 | confirmed | `nGTNo 0` |
+| CharDB→WM | 0x7486 | NC_GUILD_TOURNAMENT_DB_GET_ACK | 2 | 204 | confirmed | `0x0D40`, nGTNo = a `time_t`, nMatchType 6 |
+| WM→CharDB | 0x74F6 | NC_GUILD_TOURNAMENT_ENTER_LIST_DB_GET_REQ | 2 | 4 | confirmed | nGTNo of 0x7486 |
+| CharDB→WM | 0x74F7 | NC_GUILD_TOURNAMENT_ENTER_LIST_DB_GET_ACK | 2 | 5 | confirmed | `0x0D50`, 3, 0 |
+| WM→CharDB | 0x9801 | NC_GUILD_ACADEMY_START_DB_ALL_REQ | 2 | 1 | **corrected** (size) | as 0x7456 |
+| CharDB→WM | 0x9802 | NC_GUILD_ACADEMY_START_DB_ALL_ACK | 2 | 5 | confirmed | `0x1780`, 3, 0 |
+| WM→CharDB | 0x9803 | NC_GUILD_ACADEMY_START_DB_GET_RANKING_LIST_REQ | 2 | 4 | confirmed | `nRoundTime 1` |
+| CharDB→WM | 0x9804 | NC_GUILD_ACADEMY_START_DB_GET_RANKING_LIST_ACK | 2 | 11 | confirmed | `0x18B8`; date 0 ends the load (no 0x9805) |
+| WM→CharDB | 0xA41A | NC_INSTANCE_DUNGEON_RANK_REQ | 1 | 223 | confirmed (W04-B43) | once per WM start, never answered |
+| Zone→WM | 0x180F | NC_MAP_REGIST_CMD | 32 | 1234–3572 | confirmed | every registering link; decoder fixed (§17.4) |
+| Zone→WM | 0xA419 | NC_INSTANCE_DUNGEON_MAP_REGIST_CMD | 32 | 223 | confirmed | every registering link; WM keeps the first |
+| Zone→WM | 0x7446 | NC_GUILD_ZONE_LIST_REQ | 8 | 1 | confirmed (Z30-B8) | once per process; byte 0x11 = stale 0xA419 count |
+| WM→Zone | 0x7447 | NC_GUILD_ZONE_LIST_ACK | 8 | 3 | confirmed | PartMask 3, 0 guilds |
+| Zone→WM / WM→Zone | 0x7495 / 0x7496 | NC_GUILD_GUILDWARSTATUS_REQ / _ACK | 8 / 8 at start | 0 / 2 | confirmed | first run of the per-minute query (§7.5.4) |
+| Zone→WM | 0x207D | NC_ACT_SCRIPT_MSG_WORLD_CMD | 2 | 39 | confirmed (Z09-B72) | zone 1 at load; 18 heap bytes in the index |
+| Zone→CharDB | 0xBCD5 | NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_REQ | 8 | 10 | confirmed | once per process; decoder fixed |
+| CharDB→Zone | 0xBCD6 | NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_ACK | 24 | 8 | confirmed | `0x2940`, no jackpot, no ranks |
+| WM→Zone | 0x0821 | NC_MISC_TIMEFROMWORLD_CMD | 40 at starts | 36 | confirmed | 20 per zone start: to every registered zone at each registration |
+| WM→Zone | 0x0C16 | NC_USER_KICKOFFFROMWORLD_CMD | 12 after a start | 10 | confirmed | header all 0xFF; only on each zone's broadcast link |
+
+The 0x0804 / 0x0805 heartbeats of the new links run as in §7.1. After this part `s37` decodes with **0 issue
+packets** (was 28) and `s21d` with 2 (0x3401 / 0x3402, part 19); `pcap_decode.py --selftest` has a case for the nested
+element type.
+
 ## 11. Message order against README §2 and the pseudocode
 
 README §2 is a sketch of the login → WM → zone chain. Against the seven captures (details in the sections cited;
@@ -1985,6 +2209,8 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B22 | WM `CWMLoginSession::SendUserCount` @ FUN_00438d10, forced by the Login-link handshake (W01 §2.1) | the first `0x0808` after a WM start carries `MaxOfUser` = the client capacity `DAT_00556bb8`, still 0 because the client listener opens only after the four DB links (cause *inferred*; `{0, 0}` captured at both starts, §16.3) | Login sets the world to `WMSUS_FULL` and pushes the list: for up to 30 s after every WM start world selects get "Server is full" (after L00-B3's AccountDB / AccountLog / WM side effects) | send the first count once the client listener is open, or skip a count with `MaxOfUser 0` |
 | P02-B23 | Login `fc_NC_USER_WORLDSELECT_REQ` @ FUN_00406970 (refusal branch) | sends the 0x55-byte stack `PROTO_NC_USER_WORLDSELECT_ACK` with only status, `wm_ip` and `wm_port` written; `validate_new[32]` is never initialised (§16.3) | 64 bytes of Login stack (pointers, string pieces) reach the client with every refused world select; the client ignores them | zero the struct before `GetWorldManagerConnectInfo` |
 | P02-B24 | WM `fc_NC_AVATAR_CREATEDATASUC_ACK` @ FUN_004113c0 → AccountDB 0x140D | `sCharName` is `char[40]` *(pdb2016)*; the WM writes 20 name bytes and one zero byte, bytes +0x1E..+0x30 are stack residue (§16.3) | 19 stale WM bytes per character creation on the AccountDB link; the Account server drops 0x140D unread, so no effect | copy the name into a zeroed 40-byte field |
+| P02-B25 | shared `CSocket_Acceptor::SetAccepted` @ FUN_00463c40 (S02 §1.4), WM zone listener; the same class serves the WM client listener and Login / Zone (S02 §1.9) | refuses and closes a socket while another one from the same IPv4 address waits in the accepted ring; the ring is drained once per main pass (§17.4) | every zone start loses its 2nd and 4th WM link (8 of 16 in both captures) and reconnects them 26–29 s later, half again refused, 20 s more; a zone runs ≈ 30 s on 2 links and ≈ 50 s until it has 4; two clients behind one NAT address that connect within one pass lose the second connection | exempt server listeners, or compare address and port, or drain the ring in the accept thread |
+| P02-B26 | WM `CWMZoneSessionManager::SetServiceMapZoneNo` @ FUN_004391d0 (zone 0x180F, W01 §7.1 `Zones_AddMap`) | a new map entry stores `Vaild`, name, `ZoneNo` and `CanParty` but not `IsReleaseMap`; only the update path (a second registration of the same map) stores all three (§17.4) | masked: every zone registers its maps on each link that registers (2–4 times), so the flag is set one 0x180F later; a zone left with a single WM link would keep `IsPartyReleaseMap` 0 for all its maps (no leave-party on entering `Job*_Dn*`, `Wedding`, `Rou00`… after a fresh WM start) | store `IsReleaseMap` in the new-entry path too |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -2003,6 +2229,10 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | D02-B13 | 0x109A `Error 0x1200` in both captures (never written) | §7.6.1 |
 | L00-B3 | `s37` 805.9 s: 0x0C10, 0x0721, 0x0C0D and the WM's `0x0C0E ok 1` before `0x0C0C {5}`; the client does not connect | §16.1 |
 | P02-B5 | `s37`: the OTP path (0x0C37) leaves other stale header bytes than the password path | §16.1 |
+| Z01-B2 | 0x0802 `echo_data` of the zones: 17 different values over 48 links, the WM's own 0x0802 carry 0 | §17.2 |
+| Z30-B8 | 0x7446 payload byte 0x11 in all 8 = the preceding 0xA419 `nMapCount` (17) left in `gpp` | §17.4 |
+| Z09-B72 | 0x207D `sScriptMsgIndex` "E_Olympic_A04" + 18 heap bytes, different per start | §17.4 |
+| W04-B43 | WM → CharDB 0xA41A once per WM start, no answer | §17.4 |
 
 ## 13. Discrepancies per work item
 
@@ -2072,6 +2302,11 @@ creates for the README register.
 | W01 | `W01-core.md` §4.1 (0x1407 → 0x1408; 0x1405's "u8 ?") | 0x1407 sends 0x1413 (W03 §4.5 already says so; captured); the byte is `numofavatar` (1) | confirmed W03 → batch-3 follow-up |
 | W04 | `W04-social-misc.md` §12.4 (0x9425 "asked by OPTool 0x281F") | every character delete asks it too (`AvatarErase` from CharDB 0x140B, §16.1) | extended → batch-3 follow-up |
 | X02 | `capture-scenarios.md` §3.37 step 1 / prediction (1) | the login screen holds no connection, so a 70 s idle there tests nothing (§16.2) | reach limited → batch-3 follow-up |
+| W05 | `W05-process.md` §1.3 ("the last answer 0x9806 sets state 1") | 0x9805 / 0x9806 run only on the rank-balance path; with `dAggregationDate` 0 (or a balance not due) the 0x9804 handler sets the CharDB link to state 1 (FUN_0040ccc0 / FUN_00441aa0, §17.3) | extended → batch-3 follow-up |
+| W01 / W02 | `W01-core.md` §7.1 (0x180F `g_Zones.AddMap(map, zone, a, b)`), `W02-party-raid.md` §1.6 | a new map entry does not get `IsPartyReleaseMap`; only a re-registration stores it (P02-B26, §17.4) | corrected → batch-3 follow-up |
+| Z01 | `Z01-core.md` §3.3 (0x0803 → 0x180F, 0xA419, 0x7446) | 0x180F / 0xA419 go out on every registering link; 0x7446 once per process (guard `gz_IsSendReq`, Z30's annotation) (§17.4) | extended → batch-3 follow-up |
+| Z09 | `Z09-world.md` §1.5 (`reconnectAt = g_Now + pool.reconnectSeconds · 10`) | the values: WM 20 s, GameDB 20 s, GameLog 600 s (`dynamic_initializer_for_'sock2gameDB'` @ FUN_0069afc0 and neighbours); captured 20.0 s; `sb_Routine` returns at the first entry not yet due (§17.4) | extended → batch-3 follow-up |
+| S02 | `S02-library.md` §1.4 per-IP admission rule ("several zones started together … lose all but the first", *inferred*) | confirmed per zone: of 4 links opened within 2 ms the 1st and 3rd survive; tagged P02-B25 (§17.4) | confirmed + bug ID → batch-3 follow-up |
 
 In batch 1 (§3–§6) no discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held (batch 2's rows for Z03, Z09, Z12, Z13 and W03 are above). Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
 timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
@@ -2166,6 +2401,11 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
 - Batch 3, login side (§16): the cause of P02-B22 (client capacity 0 until the client listener opens) is inferred
   from `BootstrapTick`'s order, not from a writer of `DAT_00556bb8`; `closeReason 0x780` on the 0x0C33 path (no
   handler on it sets the field) is taken to be the value left from before *(inferred)*.
+- Batch 3, server start (§17): why the first WM start of `s37` stopped 1.09 s after its CharDB load (listener failure
+  or an operator stop, §17.6) needs the WM's `Msg` log of 729–731 s; the 6–9 s between a zone's link handshakes and its
+  first main-loop pass (from the first-retry delay) is *inferred* (data loading), not read; that a WM restart under
+  running zones brings no new 0x7446 is read from the guard, not captured; zone 3's 255 maps were not checked against
+  `World/Field.txt` (the count is the zone's `FieldMap` list, `fc_MapRegist` has no cap).
 
 ## 15. Coverage boundary
 
@@ -2225,7 +2465,7 @@ W04 packets P02 cannot override (W04.json sorts after P02.json): WM `0x7C07` 4-b
 | 0x7C07 4-byte short form: the decoder warned "sReason needs 16 bytes" | resolved here (sweep) | W04 §9.2 (done) documents both forms; the decoder now reads the short form as a captured variant (`annotations/P02.json` `evidence.wm` 0x7c07 `layout`, paragraph above) |
 | README §2 / §1.4 / §1.5 rewrite, Unknowns line "whether the zone also sends the seed unprompted" | **P04** (new, added by P02: `docs/plan/items/P04.md`) | README's owners P01 and L00 are done and X01 may write only `docs/pseudocode/README.md`; P04 corrects the README from §2 / §11 and the knowledge Corrections rows |
 | WM → zone blobs never sent for Test2: 0x1026, 0x1028, 0x102A–0x102D, 0x102F, 0x10B8, and the 0x101E fail path (§7.5.3) | X02 (plan: "write targeted capture scenarios"), then P02 again | layouts are Z07 / Z12's; confirming them needs a character with a house, pet, emblem … or a failed map login |
-| which of a zone's 4 WM links receives the WM broadcasts (§7.5.1, last to register *(inferred)*; §7.5.4: index [3] twice, [2] once) | X02 (same line) | no layout or order depends on it; a capture of a zone start would show the 0x0802 order |
+| which of a zone's 4 WM links receives the WM broadcasts (§7.5.1, last to register *(inferred)*; §7.5.4: index [3] twice, [2] once) | resolved here (batch 3, §17.4) | the zone starts of `s37` / `s21d`: 186 of 188 broadcasts on the last-registered link (`SetZoneSession` @ FUN_00439190 overwrites the mapping) |
 | corrections to done items' pseudocode (§13) | X01 (plan: "Corrections between items: later items record corrections to earlier ones in their knowledge file … Collect every such section") | P02 must not edit other items' output; X01 collects knowledge-file corrections |
 | opcodes and paths never captured (§14 last bullet) | X02 (plan: "write targeted capture scenarios"), then P02 again | needs new captures; P02 is recurring per batch |
 | per-minute phase, clock offset, 0x7C07 timing, LoadMap heartbeat points (§14) | X02 (plan: "adversarially re-check load-bearing claims … write targeted capture scenarios") | none changes a layout or an order; each needs a targeted capture (zone restart, synced clocks, map loads with markers) |
@@ -2240,3 +2480,5 @@ W04 packets P02 cannot override (W04.json sorts after P02.json): WM `0x7C07` 4-b
 | `fm_fp_AllOfRange2` (§10.4) and the account-storage open flag after 0x304D (§8.1, §14) | resolved here (sweep): `so_AllOfRangeNomal` @ FUN_0054c900; `sp_NC_ACT_ENDOFTRADE_CMD` @ FUN_004c4a60 → `sp_EndOfTrade` @ FUN_004c25b0 (Z02 §6.4, done) | – |
 | client 0x4025 second sender FUN_004a59d0 and its callers FUN_00553a10 / FUN_006a2b30 (§14) | resolved here (sweep) | official name of FUN_00553a10 *(inferred)* only; Z12's open item is answered (§13) |
 | 0x10D2 single-option column names (ours), Character server's GameLog link, link carrying the WM broadcasts (§14 *(inferred)*) | X02 (plan: "adversarially re-check load-bearing claims") | the layouts and orders hold whatever the names; a zone-start capture shows the 0x0802 registration order |
+| Character / GameLog servers' acceptors (they take 4 links of one address within 1 ms, no per-IP refusal, §17.1) | D08 (plan: "the Character and GameLog process layers are matched and their differences stated") | the difference is in the DB servers' own process layer, not documented by S02 (Login / WM / Zone only) |
+| cause of the first WM stop in `s37` (§17.6) | P02 (next batch, needs the WM log) | not on the wire; the code paths are named in §17.6 |
