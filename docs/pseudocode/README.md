@@ -8,7 +8,7 @@ items corrected, and every behaviour of the 2016 servers that looks unintended.
 Evidence levels as in `AGENTS.md`: plain = read in the 2016 code (2016 server PDB names count as code),
 *(captured)*, *(pdb2017)*, *(fh-doc)*, *(db-backup)*, *(inferred)*.
 
-> Status: X01 is written in parts (`docs/plan/status/X01.md`). Sections marked *(part n)* are not written yet.
+> Status: all sections written (X01 parts 1–8, `docs/plan/status/X01.md`); the fresh-context review (part 9) is pending.
 
 ## 1. Reading guide
 
@@ -370,7 +370,7 @@ again → §3.10 (another `0x180C`). Z01 §7.1.
 |---|---|---|---|---|---|
 | 1 | ZA | `so_LinkTo` FUN_0049ad30 | | an open trade is cancelled first (or the link dropped), locked items refuse it ("Link during item operation"); W `0x180B`; full DB save `ws_save2DB(p, 0, 2)` and WM cache save `ws_save2worldmanager` FUN_004536f0 (§3.13); player mode 0; W `0x180D`; G `0xC809` | Z01 §7.1 |
 | 2 | ZA→W | `0x180D NC_MAP_LINKRESERVE_REQ {objHandle, charNo, wmHandle, destZone, destMap, x, y, mapIndex, x, y, zoneIp[16], zonePort, wmHandle}` | W FUN_0042f420 | map-login ticket = 1, pending link with the destination; `0x180E` back to ZA | W01 §7.3 |
-| 3 | W→ZA | `0x180E NC_MAP_LINKRESERVE_ACK {ref, mapIndex, x, y, zoneIp, zonePort, wmHandle}` | Z FUN_0049b510 | HP 0 or mode 3 → only the log "Link Fail Player Die" (the player stays in ZA in mode 0 and the WM keeps the reservation; what follows is not traced, §7); else C `0x180A NC_MAP_LINKOTHER_CMD {mapIndex, x, y, zoneIp, zonePort, wmHandle}` and `so_banning(p, 0)` (removed; its save is skipped because the mode is 0) | Z01 §7.1, §8.3 |
+| 3 | W→ZA | `0x180E NC_MAP_LINKRESERVE_ACK {ref, mapIndex, x, y, zoneIp, zonePort, wmHandle}` | Z FUN_0049b510 | HP 0 or mode 3 → only the log "Link Fail Player Die": no packet to the client, nothing undone (the player stays in ZA in mode 0 with the "linking out" flag, the WM keeps ticket and pending link; (original bug) X01-B5, §6.2.1); else C `0x180A NC_MAP_LINKOTHER_CMD {mapIndex, x, y, zoneIp, zonePort, wmHandle}` and `so_banning(p, 0)` (removed; its save is skipped because the mode is 0) | Z01 §7.1, §8.3 |
 | 4 | C→ZB | client GameFrameWork FUN_004b4ab0 connects to ZB; `0x080D` to the WM in the same tick *(captured)* | | §3.9 with the reserved destination in the base blob (step 4), then §3.10; the WM repeats only `0x5826` and `0x182A` *(captured)* | capture-validation §4.1 |
 
 Wing, town portal and multi-link NPCs (Z01 §7.2–§7.3), revive (Z07 §3) and silver wing (Z26) end in `so_LinkTo`.
@@ -598,7 +598,7 @@ The WM keeps the schedule and the joiner lists (`CKQ`, W04 §6.1); the zone that
 | 3 | Z→W | `0x580E NC_KQ_Z2W_MAKE_ACK {hquest, err 0x981}` | W FUN_0042a9c0 | sent only by a zone that hosts the **last** listed map (Z16-B2); other errors → Status 8; Status 2 and a joining alarm to every client session; no answer → 1-min timeout, Status 9 | W04 §6.3, Z16 §2.1 |
 | 4 | C→W | `0x581B NC_KQ_LIST_REFRESH_REQ`, `0x5805 NC_KQ_JOIN_REQ`, `0x5807` cancel | W FUN_00413f80 / FUN_00413cc0 / FUN_00413d70 | list diffs `0x581C` … `0x581F` (client FUN_0049add0 …); join `0x5806`; cancel → all Z `0x583B` (Z FUN_00499100) | W04 §6.4 |
 | 5 | W | start wait over, enough joiners, teams | | 10-s countdown (notice `0x580B` to the joiners, `0x5825` each second); then the joiners leave their parties / raids (§3.17) | W04 §6.2 |
-| 6 | W→every Z | `0x580F NC_KQ_W2Z_START_CMD {info, joiners}` | Z FUN_00499240 | the zone that hosts map 0 starts the map script and inserts the joiners; every zone runs gate-keeper events at 0, 2, 5, 7, 10 s that link the listed joiners it holds (`so_LinkTo` → §3.11) and log `0x0441 NC_LOG_GAME_KQ_ENTER` to G. How joiners who stand on a zone without map 0 are pulled in is not settled (Z16 §2.2 says the events link local players; the joiner list there is empty) | Z16 §2.2, §2.3 |
+| 6 | W→every Z | `0x580F NC_KQ_W2Z_START_CMD {info, joiners}` | Z FUN_00499240 | the zone that hosts map 0 starts the map script and inserts the joiners into the KQ's player list (`kqe_PlayerList`); **every** zone also copies the joiners into an entrance slot (`KingdomQuestEntrance::operator[]` FUN_00496150, outside the map-0 test; re-read in part 8) and runs gate-keeper events at 0, 2, 5, 7, 10 s (`erb_happen` FUN_00496280) that look its own players up in that slot (`kqe_search`, not the player list) and link them to map 0 (`so_LinkTo` → §3.11: another zone when map 0 is not local), logging `0x0441 NC_LOG_GAME_KQ_ENTER` to G. So joiners on any zone are pulled in by their own zone | Z16 §2.2, §2.3 |
 | 7 | C→Z | `0x581A NC_KQ_ENTRYRESPONCE_ACK` | Z FUN_00496990 | links to map 0 without a joiner check (Z16-B4) | Z16 §2.3 |
 | 8 | W→Z | `0x5833 NC_KQ_LINK_TO_FORCE_BY_BAN_CMD` (vote ban) | Z FUN_00497120 | the banned player is linked to Roumen | W04 §6.5, Z16 §2.5 |
 | 9 | Z→W | `0x5810 NC_KQ_Z2W_END_CMD` (script `cEndOfKingdomQuest`) | W FUN_0042aac0 | Status 5 → all Z `0x5811 NC_KQ_W2Z_DESTROY_CMD` (Z FUN_004972c0: maps cleared; players left on them go to Roumen at their next map login or revive). `0x5811` also when the WM cancels (too few joiners, `SetDoneSkip` FUN_004548c0) | W04 §6.3, Z16 §2.5 |
@@ -928,11 +928,11 @@ entry are also marked in the register (§6.1) and listed in §5.9.
 
 Sources collected: knowledge `L01`, `W01`, `W03`, `W05`, `Z02`, `Z07`, `Z08`, `Z09`, `Z10`, `Z12`, `Z13`, `Z15`, `Z16`,
 `Z17`, `Z18`, `Z21`, `Z22`, `Z24`, `Z25`, `Z29`, `D02`, `D06`, `S01` §3.3, `S02`, `C01` §3, `W04` ("Answers to other
-items' open questions", part 7), `Z10` (combat factor, part 7), `P02` (with
+items' open questions", part 7), `Z10` (combat factor, part 7), `D05` ("For D01", part 8), `P02` (with
 `docs/protocol/capture-validation.md` §7 / §9), and the correcting passages in `W05-process.md` §5.1 / §5.3,
 `Z29-exp-tables.md` §2.6, `Z12-stats.md` §1.3, `Z25-skill-specials.md`, `Z09-world.md`, `D06-db-inferred.md`. X01 adds
 W01-B5 (§5.3), the Z01 §7.1 and Z12 §7.2 rows (§5.4, §5.5, from re-reading the save paths) and the
-Z03 `g_HitRateScale` row (§5.5; Z10 recorded it outside a Corrections section).
+Z03 `g_HitRateScale` row (§5.5; Z10 recorded it outside a Corrections section). The part-8 sweep re-read every knowledge heading named "Answers to …" / "For <item>" (D02, D03, D04, D05, Z03, Z07, Z10): they answer open points and add facts; the only contradiction among them not yet listed was D05's 0x2802 entry order (§5.7).
 
 ### 5.1 Protocol README and tools (P01)
 
@@ -1006,6 +1006,7 @@ Z03 `g_HitRateScale` row (§5.5; Z10 recorded it outside a Corrections section).
 | W05 §2.2 0x0849 | the send second drifts by the loop latency *(inferred)* | `tm_sec` is always 0: `m_NextSendWMTime` comes from the 1-s `_time32()` *(captured)* | P02; capture-validation §4.3 |
 | W05 §3.2 class mask | bit 0 = Fig | `ccdb_UseClassTypeToBit` FUN_00465a90 (same code as the zone's): bit n = class ID n, Fig = bit 1 … Sav = bit 27 | Z24 §7.1 |
 | W05 §5.2 | strings are stored as pointers | true for `SERVER_INFO`; the CSL row stores them inline | S02 knowledge |
+| W04 §12.3 0x940A NC_HOLY_PROMISE_DEL_DOWN_REQ (unknown apprentice) | replies `0x940B {Name5 DownCharID zeroed, u16 Error 0x1760}` | the raw header carries opcode **0x9407** NC_HOLY_PROMISE_DEL_UP_ACK (`local_43 = 0x9407`, length byte 0x18, 0x16 payload bytes: zeros, the u16 0x1760 at +0x14 where DEL_DOWN_ACK has its `Error`); the client reads it as DEL_UP_ACK `{nDelCmdType 0, Error 0}` (original bug) X01-B6 (re-read in `wm-pdb` FUN_0041e570 by X01, part 8) | X01 |
 
 ### 5.4 Zone core and actions (Z01, Z02)
 
@@ -1142,6 +1143,7 @@ D06 compared every 2016 call with both backup versions; for a rebuild its versio
 | D01 §4.2 L20 codes; D01-B10 | `nRet` uninitialised; codes guessed | both wrappers preset `nRet = −1`; Get > 0 already rewarded (0x1289), −1 error (0x128a), 0 → Set; Set 0 granted (0x1288), 1 / 3 / other → 0x128b *(inferred)*; the log condition is intended | D06 §3.2, §3.3 |
 | D01 §4.4, §3.3 | `usp_AccountLog_GetDateDiffLastlogout` body unknown | inferred body (D06 §3.4); the wrapper's `nRet == 0` test is a dead check (D06-B1), the same for `usp_ReturnUser_GetDatediffLastlog` / `usp_User_GetDatediffCreated` | D06 §3.4, §6.3 |
 | D01 §4.5, knowledge D01 "client-version", D05 §2.2 | `spawnapps` = client version | a launcher / partner-portal tag: the client sets `"Original"` or the first `Fiesta.ini` entry (FUN_0045b1b0); GameLog stores it as the login channel | D06 §4.1 |
+| D01 §2 0x2801 → 0x2802 NC_OPTOOL_S2SCONNECT_LIST_ACK (also AccountLog) | entries `{u8 type, u8 world, u8 zone, u32 connectTime}` | entries `{u8 world (session m_Connected_World +0xe4), u8 zone (+0xe8), u8 server id (m_Connected_Server_ID +0xe0), u32 connect time}`, the 2017 `SERVER_CONN_INFO` order; the time bit fields are as D01 gives them (re-read in `account-pdb` FUN_00404dd0 by X01, part 8) | knowledge D05 "For D01" |
 | D01-B4 | every TW login fails | holds only against the NA DB: the TW service had its own Account DB with `usp_UserTWLoginGame` (pdb2016) | D06 §2.4 |
 | D01-B2 | (cause) | the 2016 structs are 275 / 290 bytes, so the intended lengths are 0x115 / 0x124: confirmed | S01 §3.3 |
 | D02 §3 / §15 `p_Char_Create` | Character.bak used | **w00** ("2010.10.7 By kodong", calls `usp_Character_initKeyMap`, −4 → 0x1403 err 0x181) | D06 §8.5 |
@@ -2298,6 +2300,8 @@ for are recorded per handler by the owning items (their rows say "no client text
 | X01-B2 | zone GM command `&outraid` ([Z11 § 7.1](zone/Z11-gm-commands.md)) | the success wall text is "레이트 탈퇴 성공" | the GM reads a misspelt text (레이트 for 레이드, "raid") | "레이드 탈퇴 성공" | code | X01 |
 | X01-B3 | zone `sp_Schedule_Logout` FUN_00558160 + WM `fc_NC_USER_POSSIBLE_NEW_CONNECT_CMD` FUN_0042c1c0 + Character `0x1004` FUN_00438dc0 ([§3.13](#313-character-persistence)) | the zone sends the logout save (dept 16) to the Character server and then `0x0C31` to the WM, which allows the next `0x1001` → `0x1004` on its own link; the Character server's workers do not order requests of different links, and nothing waits for the save's answers | a quick re-select can load the rows from before the logout save (position, level / exp, abstates, skills, quests) | the WM waits for a save-done signal, or the Character server serialises per character | code; effect *(inferred)* | X01 |
 | X01-B4 | zone `WorldManagerSession::wms_NC_ZONE_PRISON_GO_REQ` @ FUN_005a4470 (0x7C13; Z08 §12, WM side W04 §9.2–§9.3, [§3.27](#327-prison)) | the zone answers 0x7C14 only when the object at `nCharZoneHandle` exists and is not empty (`so_IsEmpty`, vt 0x300); when the target leaves the zone (logout, map change) or is closing between the WM's 0x7C13 and its arrival, no answer comes (unless the handle was already reused: 0xDC1); the WM keeps no pending state for the request | the GM's imprisonment command shows nothing (neither success nor 0x0D88 "Imprisonment request has failed."); retrying works once the target is found again | answer 0x7C14 with an error code (e.g. 0x0DC1) in that case too | code (zone FUN_005a4470 re-read; WM 0x7C14 handler FUN_0042dea0 is the only consumer, W04 §9.3) | X01 |
+| X01-B5 | zone `WorldManagerSession::wms_NC_MAP_LINKRESERVE_ACK` @ FUN_0049b510 (0x180E; [Z01 § 7.1](zone/Z01-core.md), W side W01 §7.3, [§3.11](#311-map-change)) | when the player's HP is 0 (vt 0x4e8) or its mode is 3 when the WM's answer arrives, the handler only logs "Link Fail Player Die" and returns (re-read in `zone-pdb`); `so_LinkTo` FUN_0049ad30 has already saved the character, set mode 0 and the "linking out" flag (`+0x5cb8 |= 2`) and sent 0x180B / 0x180D, and nothing resets them | the client gets neither 0x180A nor an error, so it waits on the map it is leaving while the zone treats the player as not in a map (mode 0: the handlers that need mode 1/2/6 refuse) and the WM keeps the map-login ticket and the pending link; only a logout or a lost link ends it *(inferred)*. The window is the WM round trip after `so_LinkTo` (a hit or DoT landing then); the death-menu revive sets HP and mode 1 before its `so_LinkTo` (Z07 §3.1), so it is not affected | on failure: tell the client (0x181D or a revive), restore mode 1 and the flag, cancel the WM reservation | code; effect *(inferred)* | X01 |
+| X01-B6 | WM `CParserClient::fc_NC_HOLY_PROMISE_DEL_DOWN_REQ` @ FUN_0041e570 (0x940A; [W04 § 12.3](wm/W04-social-misc.md), which writes 0x940B here, superseded in §5.3) | when the named apprentice is not in the master's holy-promise list (or is the master's own master), the reply is built as a 0x940B DEL_DOWN_ACK body (22 bytes: zeroed `DownCharID`, `Error` 0x1760 at +0x14) but sent with opcode 0x9407 NC_HOLY_PROMISE_DEL_UP_ACK (3-byte struct `{u8 nDelCmdType, u16 Error}`) | client 0x9407 FUN_004afb60 reads `Error` = bytes 1–2 = 0, which is not 0x1740, so it shows the error text of code 0 (none in the client table: "An unidentified error code has occurred.: 0") instead of 0x1760 "Apprentice's User ID cannot be found." | opcode 0x940B (client FUN_004afaa0 reads `Error` at +0x14) | code; client read | X01 |
 
 #### 6.2.2 Opcodes the server sends and the 2016 client drops
 
@@ -2348,12 +2352,162 @@ client handler. Cosmetic; a rebuild that ships its own client texts can fix them
 
 ## 7. Remaining gaps
 
-*(part 8)*
+What the specification does not settle yet, as of the X01 sweep. `docs/plan/progress.md` (generated by
+`coverage.py --overview`) shows every registered handler of the seven servers cited by some document (1581 / 1581)
+and every function up to three calls below them (2508 / 2508; calls through vtables are not counted, so this is a lower
+bound of the code read). The gaps are therefore not unread handlers but unsettled details: evidence that only a capture,
+a lost source or the client can give, and the open points each item listed. §7.1 names the open work items, §7.2 the
+gaps that cut across items, §7.3 each document's own list, §7.4 what the X01 sweep settled or added.
+
+### 7.1 Open work items
+
+| Item | State | What it will change |
+|---|---|---|
+| [P04](../plan/items/P04.md) | not started | brings `docs/protocol/README.md` §1.4 (zone seed on accept), §1.5 (server-initiated heartbeat) and §2 (flows) in line with `capture-validation.md`. Until then read README §5.1 here before trusting the protocol README |
+| [X02](../plan/items/X02.md) | not started | confidence rating of every pseudocode section, adversarial re-check of load-bearing claims, capture scenarios with predictions and DB / SHN setups for everything still medium or low. Uses §5 (superseded statements) as its list of past error classes. Recurring after each capture batch |
+| X01 part 9 | open | fresh-context review of this file (`docs/plan/review-prompt.md`) |
+
+### 7.2 Gaps that cut across items
+
+- **Captures.** Only the session flows are *(captured)*: login, token login, world list and select, world login,
+  character select and load, map login, login complete, map change through a gate and a town portal, logout to the
+  world list, the duplicate-login kick and the heartbeats (`docs/protocol/capture-validation.md`; §3.3–§3.12 here mark
+  them). Every gameplay feature (combat, items and ITEMDB, trade and booths, party, raid, guild, academy, tournament,
+  quests, KQ, instances, mini-house, wedding, GM commands, the DB answers) is read in code only, and so are the effects
+  of almost all bugs in §6 (`code; effect *(inferred)*`). X02 turns them into scenarios.
+- **Lost DB sources.** The procedures listed in D01 §7, D02 §16, D03 §16 and D05 §9 have no body in any backup; D06 §2–§6 gives the
+  narrowest contract the binds force, with tables and columns *(ours)* (D06 §11, §9.6). The schema is the 2019 restore
+  (D06 §9); the w00 bodies carry 2017–2019 private fixes, and D06 §8 records which version a rebuild should follow.
+  Error codes that only these procedures produce (D01 §7, D02 §16, D04 §12, D07 §4) stay *(inferred)* or unknown.
+- **No PDB for Character and GameLog.** Their names and offsets are ours or matched by code shape (S01 §8: the
+  `CSQLP*` parameter structs come from the Account build; D02–D05 *(inferred)* marks). The D02 / Z28 disagreement on the
+  `CardInform` record order (Z28 §7) is one consequence and stays open.
+- **Zone start-up script.** The order of the `zs_start_*` / `zs_service_*` stages comes from the certification
+  server; only the private-server replacement exists (Z10 §10). Z10 §7.2 lists the data dependencies any order must keep.
+- **Floating-point formulas.** Hit rate, damage, critical, experience and the stat layers are read from x87 code
+  (Z03 §11, Z12 N., Z22 §13, Z29 §4): operand order is certain, the CRT precision and rounding were not run.
+- **Client-side behaviour.** Each client-facing packet names its client handler, but several UI consequences were not
+  followed: how the client obtains `EncHandle` for `0x581A` (Z08 §15, Z16 N.), what it does with `0x7C07` after leaving
+  character select (W04 §19), client-side scenarios (Z15 §9), the cast bar after a silent silver-wing failure (Z18 §8,
+  Z26 §8), Volley's lone `0x244E` (Z25 §7), the dialog after the last SAY (Z15-B12). Codes without a client text are
+  recorded per handler (§6.2 intro).
+- **2017-only facts.** Field and opcode names marked *(pdb2017)* that no 2016 binary confirms (about 10 % of the 2017
+  names conflict with 2016 readings, AGENTS.md); C02 and S01 list the known conflicts.
+- **Latent paths of the 2016 data.** Many condition, effect and quest kinds have no row in the shipped SHN tables, so
+  their code was read but never exercised (Z15 §9, Z17 §5, Z20 §8, Z21 §6, Z24 §9, Z28 §7). A data set from another
+  region could reach them, and with them the latent bugs those items list.
+
+### 7.3 Open points per document
+
+Each document's "Not reconstructed / uncertain" section, shortened. The lists of the earlier items (L00, W01–W04,
+Z01–Z08, D01–D04) were written before the follow-up items that took most of them up; the last column names those, so
+a point there may already be answered (search the later document before treating it as open). Points about another
+item's code are counted where they are owned.
+
+| Document (§) | Still open (short) | Later documents that took points up |
+|---|---|---|
+| `login-server.md` §7 | DB conditions behind the AccountDB result flags; reader of `builtinKey`; codes 0x4C / 0x4E / 0x52 without client text; OPTool status queries summarised | D01, D06 (flags); L01 (process, OPTool) |
+| L01 §5 | Windows SCM behaviour on a `STOP_PENDING` exit; two banner strings lost; whether the client answers Login's `0x0804` (only the timing is open); world-list icon images | – |
+| S02 §6 (§1.10, §2.8, §3.7) | `m_LoginUserRatable` meaning; Account / AccountLog / Character / GameLog copies of the network classes not compared instruction by instruction | Z19 (`CCsl` in every build) |
+| D01 §7 | missing procedures (Netmarble / JP / TW logins, PC-bang, play time, L20 event); `nUserNo == −2`; private edits of `usp_User_USloginGame`; teen-protection window; codes without client text; syslog target | D06 §2–§3 (contracts), §5.7 here (0x2802) |
+| D02 §16 | wedding sub-status 6 / +4 marker against the zone's reading; `p_Char_GetAllData` column 37; `usp_CharacterLoading` and promotion procedures without source; `setStatPoint` −1091…−1094; SOAP item-shop client; sender of `0x0841` | D06 §6, Z13 §4 (wedding), W01 / W04 (`0x0840` → `0x0841`) |
+| D03 §16 | option-type field names from the 2017 PDB; hidden return values (`TradeMoveContents`); `usp_Pet_*` and other sourceless procedures; storage types 6 / 10; `usp_Gamble_addCoin` for D03-B21; `0x3437` does nothing | D06 §5, §8, D07 |
+| D04 §12 | academy reward stack merge not traced line by line; `usp_GuildAcademy_withdrawMoney` codes 1–6; `GTReward_MakeItemAttr` ITEM_OPT tail; codes without client text; `getRegistList` columns | D06 §5.7, D07 §4 |
+| D05 §9 | `usp_Login_setChannel` body; `tGameLog` column types; Type6 version; 0x0454 extra fields (stale, D04-B9); senders of §2.4 / §3.3 commands; several field meanings from the 2017 PDB or format strings only | D06 §4 |
+| D06 §11 | everything marked *(ours)* (tables, columns, bodies); `nUserNo == −2`; L20 codes; D06-B1 / B3 need a capture; storage type 10; schema types from 2019; `p_Quest_Set` / `usp_Dice_setDiceResult` versions | – |
+| D07 §4 | order of `p_Item_GetListType` rows (no ORDER BY: which stacks a lot reward takes, which rows fall past 100); withdraw codes 1–6; client page limit of the reward inventory | – |
+| W01 §11 | feature callees of login / logout only listed (W02–W04 own them); `FUN_004382d0`, `FUN_00437d50` not opened; OPTool queries summarised | W04 (most feature handlers, `g_InstanceMaps` = `CKQ`, §5.3 here), W05 (process) |
+| W02 §10 | PARTY +0xcc and PARTY_MEMBER +0x20 never read; `nChatBan` set by W04 | Z08 (zone side), W04 (`0x380A`, chat ban) |
+| W03 §12 | `nGTNo` = start time vs the DB's number; exact field copies of some guild packets; grades 4–6 unnamed; academy-excluded class; GuildAcademy.shn columns; GuildTask client listener texts | D04 §6 (tournament procedures), Z16 (tournament zone side) |
+| W04 §19 | partial `so_Prison_Go` not undone; `0x7C07` use on the client; KQ map allocation `Clear` flags; KQ rules the WM does not enforce; OPTool reactions (tool not available); holy-promise texts and the 20-member list cap; guild / individual instances; chat-block list timing; attendance with an empty schedule | Z16 (KQ zone side), Z08 §12 (prison), X01-B4 / X01-B6 |
+| W05 §8 | `"0.0.0.0"` zone rows against the exact IP check of 0x0802; W05-B8 / B10 / B15 effects need a capture; dump file name separator | – |
+| Z01 §12 | start order (certification script); player modes beyond 0 / 1; `0x0830` values; `p+0x2a800`; 49-table client checksum list order | Z10 (start-up, certification), Z09 (main loop, tick), S01 §3.3 (`p+0x2a800` = `sp_isPossibleNewConnect`), Z12 (save fields) |
+| Z02 §15 | `hnd` source; setter of `+0x1e78` bit 5; which client action sends 0x2003 / 0x2005; how objects leave the client's sight; `&` commands; portal roles; wedding hall | Z03 knowledge §1 (bit 5 = Captivate), Z09 (sight, portals, AI events), Z11 (`&` commands), Z13 (wedding hall), Z18 |
+| Z03 §11 | skill hit-rate and damage formulas in detail; stat matrix labels; `smo_SkillBlast` specials; cooldown setting; abstate actors; mob side; experience split; `0x244C` payload | Z12 (stats), Z20 (skill data), Z22 (abstate actors), Z23 (skill list, cooldowns), Z25 (skill specials), Z29 (experience), Z09 (mobs) |
+| Z04 §14 | DB answers and lock commit; merged branches whose code is *(inferred)*; inventory types 2 / 3 / 13 / 14 / 16; `ItemKey_Make` kinds; `UseEffect` actors; upgrade stat delta; mover rare roll | Z05 (ITEMDB), Z17 (item actions), Z24 / Z27 (item data), Z26 (silver wing), Z13 (mini-house boxes) |
+| Z05 §12 | ids whose client text is empty; which DB check gives each code (D03); `LC_Machine` | D03 |
+| Z06 §7 | slot-machine draw, line patterns and jackpot; TaiSai win tables; booth-size summand writers; open-menu kinds 3–6 | Z13 (charged items), Z24 |
+| Z07 §12 | stat layer formula; blob bodies; single-option meanings; wedding (`FUN_005b92a0`, hall); mini-house internals; minimon kinds; mover / pet flows | Z12 (stats, login blobs), Z13 (mini-house, wedding hall, pets, mounts), Z18 |
+| Z08 §15 | quest script engine; quest codes without client text; KQ internals and `EncHandle`; instance cluster internals; tournament per-map system; raid status packets; academy reward storage; prison timer; GM events | Z15 (quest engine), Z16 (KQ, tournament), Z14 (instances, raid internals), Z09 §24 (GM events, scripts) |
+| Z09 §30 | still-open sub-points of §6–§28: per-tick cache readers, breeder fields, drop lot / upgrade weights (Z04 model), unidentified movement bytes, far boss briefs, Lua stream split, Pine interrupt re-entry, keep times above 2³¹, `chatwin` buffer size | Z16, Z15, Z07, Z13 (named in §30.6) |
+| Z10 §10 | Gamigo's own start and run-time answers; crash claims Z10-B4 / B6 from the Lua and CRT sources only; registry values; `Size.txt`; `.exe_Reserve` stager | – |
+| Z11 (Not reconstructed) | who sets `nAdminLevel` in production; several client refreshes after GM edits (HP / SP, position, pet tendency, reward chest); negative radius of `&deathaura`; single-zone ring for `&weddingreset` | – |
+| Z12 N. | arguments of `so_AbnormalState_Set` for timed states; `roe_MR` / `roe_TB` / `roe_MaxWC` cells only; `sp_NextSaveExp` without reader; four item-layer clusters without writer; `SAA_ALLSTATEPLUS` vs `SAA_ALLSTATPLUS` | – |
+| Z13 (Not reconstructed) | owner leaving with visitors pending; `mhs_Activ` write-only; duplicate furniture handles; pet `FieldAttr.KingdomQuestMap == 2`; pet item byte +0x19 on the client; mover modes; minimon range | – |
+| Z14 §8 | `ItemBag` slot 0; deposit types 0 / 1 of 0x9872 / 0x9874; `so_LinkTo` extra arguments | – |
+| Z15 §9 | zero-filled pool memory (Z15-B2); client-side scenarios; dialog end; inventory type 7 writer; latent paths in other regions' data | – |
+| Z16 N. | `LinkInformTemplete` stack bytes after `GetLinkData`; MOBBREED argument; `rb_1000 % 6` bias; mover enemy rule; `0x580C` unused; broadcast radius; observer GM path; `EncHandle`; unlimited-revive display | – |
+| Z17 §5 | `normalattackcontinue` effect; client charge-counter display; costume hit bits; effect order (Z17-B6); pool exhaustion (Z17-B13) | – |
+| Z18 §8 | `sp_GhostBan` self-skip; the three skip-only opcodes; Silencetoone consumption; "Old" conflict scans; batch buffer opcodes; title unlocks without `CheckNewTitle` case; weapon-title level mapping (Z18-B22); rest-mode `HPRecover` neutral value | – |
+| Z19 §7 | Character `CServerInfo` placement; `~CServerInfo` folding; `msgId 0x401` / `hWnd` unused | – |
+| Z20 §8 | `bsearch` on the duplicate ID 9034; `Rate.CastingTime = 0` effect on casting; passive list order from the DB; `ActiveSkillGroupInx` reader | Z12 (casting cluster) |
+| Z21 §6 | legacy set tables without loader; lock-list order; HP gauge after a set heal; `so_batobj_GetDamage`; WM keeps `0x4011` rows byte-exact | – |
+| Z22 §13 | `roe_DefendPower`; `so_KilledBy` order for SubStaSacrifice; `SB_SILENCE` value; servant kill by dispel; party-main abstates aimed at others (dangling caster) | – |
+| Z23 §11 | toggle states across a same-zone link; client cooldown display of `SS_DMGCOLLTIMEDOWN`; step IDs the client sends; mastery kept when the DB refuses a produce | – |
+| Z24 §9 | timed buffs above 2³¹ ms; `rb_largerandom`; `iti_mkregnum` kind 8; chat-colour reset not told to the client; "no reader found" lists | – |
+| Z25 §7 | client drawing of Volley's `0x244E` and a failed cross counter; `so_dummypacketcontainer`; curse text 0x0A653383 missing | – |
+| Z26 §8 | client item-use block until `0x3016`; `ItemUse` Lua event after a same-zone link; dead player saving a location | – |
+| Z27 §9 | heap contents of `HitTimeArray` (Z27-B1); offset-only reads; potion slot rotation; ID 9157 names | – |
+| Z28 §7 | sender of `0xC414`; sealed card display; D02 / Z28 `CardInform` order; non-drop sources of the sealed card | – |
+| Z29 §4 | x87 precision control; raid radius 1000 vs `EXPRange` (not tagged as a bug) | – |
+| Z30 §11 | `CGuildZone` offsets past the struct; WM side of a `bInit` rename; `FieldAttr` +0x6b name; client 0x500A widgets | – |
+
+### 7.4 Settled or added by the X01 sweep
+
+- **KQ joiners on a zone without map 0** (part 6 gap): settled. `0x580F` FUN_00499240 fills an entrance slot
+  (`KingdomQuestEntrance::operator[]` FUN_00496150) with the joiners on **every** zone, outside the map-0 test; the gate
+  keeper `erb_happen` FUN_00496280 searches that slot, not the KQ player list, so each zone links its own joiners to
+  map 0 (§3.23 step 6, rewritten). Z16 §2.2 is right; part 6 had read the player list for the search.
+- **Failed link reserve** (part 5 gap): `0x180E` FUN_0049b510 with HP 0 or mode 3 undoes nothing and tells nobody:
+  X01-B5 (§6.2.1, effect *(inferred)*; a capture would need a death in the WM round trip).
+- **S01 size flags** (S01 §2.3, §8): all settled now. Zone 0x3034 (4 of 6 bytes, `Error` off the wire) and 0x8C4C
+  (12 bytes, 6 stale) are Z13 §3.3 / §3.1; 0x3065 is Z05-B11; AccountLog 0x0C2B / 0x0C3C are D01-B2; 0x380A is the
+  `ref` alone and 0x7C07 the documented short form (W04); 0x9868 is an extractor artefact (S01). WM **0x9407** with 22
+  bytes is `fc_NC_HOLY_PROMISE_DEL_DOWN_REQ` sending a DEL_DOWN_ACK body under the DEL_UP_ACK opcode: X01-B6, and W04
+  §12.3's "0x940B" is superseded (§5.3). WM **0x1110** with 14 bytes is a layout-extractor false positive: FUN_0040eff0
+  (`fc_NC_GUILD_TOURNAMENT_DB_GET_ACK`, W03) and `CGuildTournament::ApplyResult` FUN_0045afd0 fill byte tables whose bytes 1–2 read as 0x1110; the tutorial
+  question is sent empty (W01 §4.2). Zone 0x340D's attribute tail past the 2017 struct is read as such in D03 §2.1.
+- **OPTool connection list** `0x2802`: D01 §2's entry order is superseded (§5.7; `packets-account.md` already shows the 2016 PDB layout, which agrees).
+- **Still open from X01's own reading:** X01-B3 (logout save against a quick re-select) rests on the Character server
+  not ordering requests of different links (D02's worker model; not proven); X01-B4 / X01-B5 effects are *(inferred)*.
 
 ## 8. Not reconstructed / uncertain
 
-*(part 8)*
+About this file itself (the open points of the specification are §7):
+
+- **An index, not a re-reading.** §2–§4 summarise the items' documents; X01 re-read the 2016 code only where it says so:
+  W01-B5 (`GetClientValidation` FUN_0040a200), the save paths (`ws_save2worldmanager` FUN_004536f0, `ws_save2DB`
+  FUN_00455a10, `so_Unmark` FUN_00558900, `zs_disconnect` FUN_005abb60), X01-B1…B6, `0x2802` (FUN_00404dd0) and the KQ
+  entrance slot (FUN_00499240). Everything else carries the owning item's evidence, and a step that item marked
+  *(inferred)* stays inferred here even where the marker is not repeated in a sequence table.
+- **Message order in §3.** Hops on one link keep their order; the order between different links (for example the
+  Character server's answer against the WM's next packet) is what the code sends first, not a guarantee, unless the step
+  is *(captured)*. X01-B3 is the one place where this matters and is itself *(inferred)*.
+- **Superseded statements (§5).** Collected from the headings named in §5 and the passages found by grep (`Correction`,
+  "Answers to", "For <item>", corrections inside pseudocode text). A correction written in running text under another
+  heading can still be missing; X02's `git log` pass over the docs is the cross-check.
+- **Register (§6.1).** Generated from table rows; the *Evidence* column is a heuristic over the row's words (§6
+  intro), so an inferred effect described without the word "inferred" shows as `code`. The owning document's text wins.
+  Rows the owners did not tag in place (83 IDs) are still listed.
+- **Older open-point lists (§7.3)** were shortened, not re-checked point by point against the later items; the third
+  column says where to look first.
+- **Glossary (§4.7)** maps only the older names used at least five times; `docs/knowledge/S01-renames.tsv` has the rest.
 
 ## 9. Coverage boundary
 
-*(part 8)*
+X01 has no handler scope (`coverage.py X01`: "X01 has no scope table; coverage does not apply"); `coverage.py --overview`
+shows no uncovered handler or function in any server (§7). What X01 found and did not settle itself:
+
+| Found | Covered by | Argument |
+|---|---|---|
+| Protocol README statements contradicted by the captures (seed on accept, server heartbeat, captured flows) | P04 (open; plan "README §1.4, §1.5, §2 and the Unknowns list agree with capture-validation §2 / §7") | P04 owns `docs/protocol/README.md`, which X01 may not edit; §5.1 here warns readers until then |
+| Every claim read in code only (gameplay features, bug effects marked *(inferred)*, the client-side points of §7.2) | X02 (open; plan: "for every claim still medium or low after the re-check, write a scenario … the prediction") | settling them needs captures, DB setups or targeted re-reads with an adversarial reviewer, which is X02's method; X01 indexes them (§7.2, §7.3) |
+| The per-document open points of §7.3 | the owning items' documents (each row's §) and X02 (same plan line) | the owners recorded them as open on purpose; none is an unread handler or function (progress 100 %); points that need evidence go to X02's scenarios |
+| Procedures without source, schema of 2016 (§7.2) | D06 §11 (done; documents the contracts and says what stays open) | no further source exists in the repository; only a 2016 database dump would settle them |
+| Zone start-up stage order from the certification server | Z10 §7, §10 (done; documents the dependencies any order must keep) | the 2016 answer is not in the repository |
+| D02 / Z28 `CardInform` record order | Z28 §7 (done; documents both readings) | the Character binary has no PDB; one capture of a card album (X02 scenario) settles it |
+| `CGuildTournament::ApplyResult` FUN_0045afd0, FUN_0040eff0 (cited here only for the 0x1110 extractor artefact) | W03 (done; FUN_0040eff0 = `fc_NC_GUILD_TOURNAMENT_DB_GET_ACK` and the result path are documented there) | X01 only checked that they do not send 0x1110 |
+| 2015 binaries | none (AGENTS.md: "Only for diffing; do not document them") | out of scope for the whole reconstruction |
+
+No follow-up item was created: everything X01 found either fits P04 or X02 (both open) or is documented as open by a
+done item whose document already describes it.
