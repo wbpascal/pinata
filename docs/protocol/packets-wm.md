@@ -114,6 +114,43 @@ Basis: pdb2016 / pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD::MENUITEM (3 bytes); zo
 | 0 | u8 | slot | grid cell of the shop tab; a slot not above the previous one starts the next tab (client Market::SetWeapon FUN_006137c0) |
 | 1 | u16 | item | ItemInfo ID |
 
+### SHINE_COORD_TYPE (9 bytes)
+
+Basis: pdb2016 SHINE_COORD_TYPE { SHINE_XY_TYPE xy; u8 dir } (9 bytes). P02 batch 2 part 13: no file defined it, so the decoder read every SHINE_COORD_TYPE field (Z09 / Z13 annotations, e.g. 0x1C1A nCoord) as 1 byte
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | x |  |
+| 4 | u32 | y |  |
+| 8 | u8 | dir |  |
+
+### ABNORMAL_STATE_BIT (99 bytes)
+
+Basis: pdb2016 ABNORMAL_STATE_BIT { u8 statebit[99] }. P02 part 13: Z13's 0x1C1A annotation uses it; without a size the decoder read 1 byte
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | bytes[99] | statebit |  |
+
+### STRUCT_QSC (101 bytes)
+
+Basis: pdb2016 STRUCT_QSC (0x65 bytes). P02 part 13: Z08's 0x4401 annotation uses it; without a size it did not fit and the decoder fell back to pdb2016
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u32 | Cmd | QUEST_SCRIPT_COMMAND (pdb2016 enum: 0 ERROR, 1 END, 2 SAY, …) |
+| 4 | u8 | IsPigeonStartType |  |
+| 5 | bytes[96] | Data | union by Cmd; SAY = {u32 nID, u32 TalkerType, u16 NPCNo} (pdb2016), the rest is Z15-B11 leftovers |
+
+### CHARACTER_TITLE_DB_SAVE_VALUE (9 bytes)
+
+Basis: pdb2016 CHARACTER_TITLE_DB_SAVE::<unnamed-type-TitleValues> { u8 Type; u64 TitleValue } (9 bytes); the key is ours (the PDB type is unnamed)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | Type | CHARACTER_TITLE_TYPE (pdb2016 enum) |
+| 1 | u64 | TitleValue |  |
+
 ## Client → server
 
 ### `0x080d` NC_MISC_GAMETIME_REQ

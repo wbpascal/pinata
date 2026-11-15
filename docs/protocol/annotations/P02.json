@@ -2660,6 +2660,342 @@
      ]
     ],
     "notes": "P02 part 11: copy of D03's layout with the attribute as a variable tail (decoder fit)"
+   },
+   "0x4001": {
+    "dir": "Zone→CharDB",
+    "name": "NC_CHARSAVE_ALL_REQ",
+    "basis": "zone WholeSaver::ws_save2DB FUN_00455a10 (len 0x71 − 2); character FUN_004064c0 (D02 §6); pdb2016 PROTO_NC_CHARSAVE_ALL_REQ (0x69) after the 6-byte ref",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref, D02 §6); evidence: capture:shop, capture:combat"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      6,
+      "u16",
+      "handle.bufferlocation",
+      "WholeSaver::ws_savestorepoint.value: 0 in every capture; the ring index is never advanced (only the ctor FUN_004565f0 writes it), so always 0 (§10.3); evidence: capture:shop, capture:combat"
+     ],
+     [
+      8,
+      "u32",
+      "handle.chrregnum",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      12,
+      "u32",
+      "level.chrregnum",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      16,
+      "u8",
+      "level.level",
+      "new level on a level-up save (6, 7, 8 at shop 30.500); evidence: capture:shop, capture:combat"
+     ],
+     [
+      17,
+      "u64",
+      "level.exp",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      25,
+      "u32",
+      "level.fame",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      29,
+      "u32",
+      "location.chrregnum",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      33,
+      "char[12]",
+      "location.map",
+      "so_SaveLocation FUN_004542f0: current map; after a revive (JustRevive) the map's regen point; evidence: capture:shop, capture:combat"
+     ],
+     [
+      45,
+      "u32",
+      "location.coord.x",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      49,
+      "u32",
+      "location.coord.y",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      53,
+      "u32",
+      "location.kqhandle",
+      "0xFFFFFFFF (no KQ); evidence: capture:shop, capture:combat"
+     ],
+     [
+      57,
+      "char[12]",
+      "location.map_kq",
+      "always the current map"
+     ],
+     [
+      69,
+      "u32",
+      "location.coord_kq.x",
+      "always the current position (the death position in the revive save, combat 102.376)"
+     ],
+     [
+      73,
+      "u32",
+      "location.coord_kq.y",
+      ""
+     ],
+     [
+      77,
+      "u32",
+      "stat.chrregnum",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      81,
+      "u32",
+      "stat.PwrStone",
+      ""
+     ],
+     [
+      85,
+      "u32",
+      "stat.GrdStone",
+      ""
+     ],
+     [
+      89,
+      "u32",
+      "stat.HPStone",
+      "13 (shop)"
+     ],
+     [
+      93,
+      "u32",
+      "stat.SPStone",
+      "10 (shop)"
+     ],
+     [
+      97,
+      "u32",
+      "stat.HP",
+      "current HP (28 after the revive)"
+     ],
+     [
+      101,
+      "u32",
+      "stat.SP",
+      ""
+     ],
+     [
+      105,
+      "u8[6]",
+      "stat.statdistribute",
+      "not saved by the CharDB (D02 §6)"
+     ]
+    ],
+    "notes": "P02 part 13: the pdb2016 struct lacks the ref prefix (decoder: 'size 111 != documented 105')"
+   },
+   "0x4002": {
+    "dir": "CharDB→Zone",
+    "name": "NC_CHARSAVE_ALL_ACK",
+    "basis": "character FUN_004064c0 echoes the 12-byte header (D02 §6); zone FUN_00455260 reads chrregnum at +8",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref, D02 §6); evidence: capture:shop, capture:combat"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      6,
+      "u16",
+      "bufferlocation",
+      "echo (0)"
+     ],
+     [
+      8,
+      "u32",
+      "chrregnum",
+      "evidence: capture:shop, capture:combat"
+     ]
+    ],
+    "notes": "P02 part 13: ref + PROTO_NC_CHARSAVE_ALL_ACK; 6–17 ms after 0x4001"
+   },
+   "0x4008": {
+    "dir": "CharDB→Zone",
+    "name": "NC_CHARSAVE_ABSTATE_ACK",
+    "basis": "character FUN_00406850 echoes the 12-byte header (D02 §6); no pdb2016 struct",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref, D02 §6); evidence: capture:shop, capture:combat"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      6,
+      "u16",
+      "bufferlocation",
+      "echo (0)"
+     ],
+     [
+      8,
+      "u32",
+      "chrregnum",
+      "evidence: capture:shop, capture:combat"
+     ]
+    ],
+    "notes": "P02 part 13: the decoder had no layout (raw bytes)"
+   },
+   "0x4007": {
+    "dir": "Zone→CharDB",
+    "name": "NC_CHARSAVE_ABSTATE_REQ",
+    "basis": "zone ws_save2DB FUN_00455a10 (len n × 0x24 + 0x10 − 2); character FUN_00406850; pdb2016 PROTO_NC_CHARSAVE_ABSTATE_REQ after the ref",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref, D02 §6); evidence: capture:shop, capture:combat"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      6,
+      "u16",
+      "handle.bufferlocation",
+      "WholeSaver::ws_savestorepoint.value: 0 in every capture; the ring index is never advanced (only the ctor FUN_004565f0 writes it), so always 0 (§10.3); evidence: capture:shop, capture:combat"
+     ],
+     [
+      8,
+      "u32",
+      "handle.chrregnum",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      12,
+      "u16",
+      "abstatenum",
+      "0 in every capture (abstate 728 is not saved: vt 0x3a4 fills only savable states, inferred); evidence: capture:shop, capture:combat"
+     ],
+     [
+      14,
+      "ABSTATEREADBLOCK[abstatenum]",
+      "abstate",
+      "36 bytes each"
+     ]
+    ],
+    "notes": "P02 part 13: ref prefix missing in the pdb2016 struct"
+   },
+   "0x400b": {
+    "dir": "Zone→CharDB",
+    "name": "NC_CHARSAVE_TITLE_REQ",
+    "basis": "zone ws_save2DB FUN_00455a10 (len vt 0x3c8 result + 0xE; sent only when it is > 0); character FUN_00406970; pdb2016 PROTO_NC_CHARSAVE_TITLE_REQ after the ref",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref, D02 §6); evidence: capture:shop, capture:combat"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      6,
+      "u16",
+      "handle.bufferlocation",
+      "WholeSaver::ws_savestorepoint.value: 0 in every capture; the ring index is never advanced (only the ctor FUN_004565f0 writes it), so always 0 (§10.3); evidence: capture:shop, capture:combat"
+     ],
+     [
+      8,
+      "u32",
+      "handle.chrregnum",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      12,
+      "u16",
+      "NumOfValues",
+      "2, 4 or 5 in the captures: only the titles marked for saving; evidence: capture:shop, capture:combat"
+     ],
+     [
+      14,
+      "CHARACTER_TITLE_DB_SAVE_VALUE[NumOfValues]",
+      "TitleValues",
+      "9 bytes each {u8 Type, u64 TitleValue}"
+     ]
+    ],
+    "notes": "P02 part 13: D02 §6 reads the value as two u32; pdb2016 says one u64 (same bytes)"
+   },
+   "0x4018": {
+    "dir": "Zone→CharDB",
+    "name": "NC_CHARSAVE_PKCOUNT_CMD",
+    "basis": "zone ws_save2DB FUN_00455a10 (len 0x10 − 2, so_ply_SavePKCount vt 0x388 writes at +6); character FUN_004069a0",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref, D02 §6); evidence: capture:shop, capture:combat"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      6,
+      "u32",
+      "chrregnum",
+      "evidence: capture:shop, capture:combat"
+     ],
+     [
+      10,
+      "u32",
+      "pkcount",
+      "0; evidence: capture:shop, capture:combat"
+     ]
+    ],
+    "notes": "P02 part 13: pdb2016 PROTO_NC_CHARSAVE_PKCOUNT_CMD after the ref"
    }
   }
  },
@@ -3956,21 +4292,25 @@
    "0x105b": {
     "dir": "S→C",
     "captures": [
+     "combat",
      "idle_in_world",
+     "shop",
      "walk-run-portals"
     ],
     "fields": {
-     "_": "73"
+     "_": "73 (batch 1); batch 2: 5 at level 5, then 6 / 7 / 8 with each level-up (one point per level)"
     }
    },
    "0x203e": {
     "dir": "S→C",
     "captures": [
+     "combat",
      "idle_in_world",
+     "shop",
      "walk-run-portals"
     ],
     "fields": {
-     "_": "33 / 127"
+     "_": "33 / 127; batch 2 also at a dismount, before 0xCC06"
     }
    },
    "0x9010": {
@@ -5301,6 +5641,294 @@
      "TargetID": "MobInfo id 0 / 2000",
      "KillCoord": "killer position"
     }
+   },
+   "0x2002": {
+    "dir": "S→C",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "handle": "8003 = the sender: so_Chat's broadcast includes the sender (so_AllOfRange u8 1)",
+     "flag.GMColor|chatwin": "2 (chatwin 1, no GM colour)",
+     "nChatFontColorID / nChatBalloonColorID": "0",
+     "content": "'test'"
+    }
+   },
+   "0x2008": {
+    "dir": "C→S",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "mode": "2 (combat stance) before attacking; no 0x2009 reaches the sender (so_AllOfRange u8 0)"
+    }
+   },
+   "0x201d": {
+    "dir": "C→S",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "ack": "1: after 0x201C (storage NPC 108, item merchant 88) and after a quest SAY 0x4401 (Blacksmith James 28): opens the NPC's role (0x3C08 / 0x3C09 / 0x3C0B) 4–47 ms later"
+    }
+   },
+   "0x1805": {
+    "dir": "S→C",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "objHandle": "the mover at a dismount (with 0xCC06), a dead mob 10.0 s after its kill, a dropped item in the frame of its 0x300A"
+    }
+   },
+   "0x1c1a": {
+    "dir": "S→C",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "nID": "160 (MoverMain WoodenHorse01)",
+     "nHP": "0",
+     "nCoord": "summon position {x, y, dir}",
+     "nGrade": "0",
+     "nSlotHandle": "10 × 0xFFFF: sent before the rider boards (0xCC02 follows)"
+    }
+   },
+   "0x4025": {
+    "dir": "C→Z",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "btMysteryType": "1, once per 0x240C: the client's On_NC_BAT_LEVELUP_CMD sends it when a Mystery Vault is in the inventory"
+    }
+   },
+   "0x4026": {
+    "dir": "S→C",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "result": "8536 = 0x2158 (CharDB ok); the 2016 client has no handler (Z01-B5)"
+    }
+   },
+   "0x4401": {
+    "dir": "S→C",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "nQuestID": "10 / 947",
+     "Command.Cmd": "2 SAY",
+     "Command.Data": "nID 230 / 18702, TalkerType 0 NPC, NPCNo 28 = m_nClickNPCNo (the clicked NPC); bytes 07 / 01 at Data+0xC / +0x10 unused"
+    }
+   },
+   "0xbc04": {
+    "dir": "S→C",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "nCoin": "0 (CoinChange releaser of a cen-only purchase)"
+    }
+   },
+   "0xbc05": {
+    "dir": "S→C",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "nExchangeCoin": "10000 = GBExchangeMaxCoin row of levels 6, 7, 8 (nothing exchanged)"
+    }
+   },
+   "0xcc02": {
+    "dir": "S→C",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "nMoverHandle": "22139 / 22138",
+     "nSlot": "0",
+     "nGrade": "0"
+    }
+   },
+   "0xcc04": {
+    "dir": "S→C",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "nHandle": "the rider itself (the broadcast includes it)",
+     "nSlot": "0",
+     "nGrade": "0"
+    }
+   },
+   "0xcc06": {
+    "dir": "S→C",
+    "captures": [
+     "combat"
+    ],
+    "fields": {}
+   },
+   "0xcc0a": {
+    "dir": "S→C",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "nHungry": "780 → 770 → 760 (zone A), 760 → 750 (zone B): MoverHG WoodenHorse01 ConsumeHG 10 every Tick 10000 ms after the summon"
+    }
+   },
+   "0xcc0d": {
+    "dir": "S→C",
+    "captures": [
+     "combat"
+    ],
+    "fields": {
+     "nWalk / nRun": "36 / 165 = MoverMain 1100 / 1300 × the rider's 33 / 127 / 1000 (Z13 §8.7); 0.39 / 0.47 s after 0xCC02"
+    }
+   },
+   "0x4027": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "btMysteryType": "1 (copy of 0x4025)"
+    }
+   },
+   "0x4028": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "shop"
+    ],
+    "fields": {
+     "err": "0x2158 (8536) ok, 1–7 ms after 0x4027"
+    }
+   },
+   "0x4035": {
+    "dir": "Z→DB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "nCharNo": "5",
+     "UseItemMinimonInfo": "bNormalItem / bChargedItem 0, all lists 0xFFFF",
+     "DelSlotList_*": "12 × 1: last packet of every ws_save2DB"
+    }
+   },
+   "0x401a": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "handle.bufferlocation": "0 (ws_savestorepoint, P02-B21)",
+     "handle.chrregnum": "5: no zone ref, as D02 §6 says"
+    }
+   },
+   "0x1080": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "header": "{zone handle, charNo}: every 0x1803 (Z01 §6)"
+    }
+   },
+   "0x1081": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "Error": "4834 = 0x12E2 (single: partner name lookup finds no row, D02 §7); the zone ignores it, no client 0x1081",
+     "When / SubWhen": "1582426906"
+    }
+   },
+   "0x10b3": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "zonehandle": "player handle",
+     "zone_charid": "Test2",
+     "charregnum": "5: every 0x1803, first link packet of the burst"
+    }
+   },
+   "0x10b4": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "iscorrect": "1, 0–11 ms later"
+    }
+   },
+   "0x040a": {
+    "dir": "Zone/WM/Character→GameLog",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "mappos": "login map / position",
+     "Cen": "99440",
+     "usrregnum": "103",
+     "spawnapps": "'Original'"
+    }
+   },
+   "0x040f": {
+    "dir": "Zone/WM/Character→GameLog",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "StoreType": "99 (the WM's copy of 0x180C at every map login)",
+     "CharExp / CharMoney": "current values"
+    }
+   },
+   "0x0410": {
+    "dir": "Zone/WM/Character→GameLog",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "StoreType": "ws_save2DB reason: 2 zone link and revive, 8 level-up",
+     "mappos": "position before the link"
+    }
+   },
+   "0xc806": {
+    "dir": "WM/Zone/Character→GameLog",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "UserNo / CharNo": "103 / 5"
+    }
+   },
+   "0xc809": {
+    "dir": "WM/Zone/Character→GameLog",
+    "captures": [
+     "shop",
+     "combat"
+    ],
+    "fields": {
+     "DestZoneNo / SrcZoneNo": "2 / 0 (RouN → RouCos02), 0 / 2 (&linkto RouN); not on a same-zone link",
+     "CharLev": "8 / 5"
+    }
    }
   },
   "account": {
@@ -5610,6 +6238,84 @@
     ]
    ],
    "basis": "pdb2016 / pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD::MENUITEM (3 bytes); zone nrm_ShopMenuOpen FUN_004c26b0; client Market::SetWeapon FUN_006137c0; captured 0x3C09 / 0x3C0B"
+  },
+  "SHINE_COORD_TYPE": {
+   "size": 9,
+   "fields": [
+    [
+     0,
+     "u32",
+     "x",
+     ""
+    ],
+    [
+     4,
+     "u32",
+     "y",
+     ""
+    ],
+    [
+     8,
+     "u8",
+     "dir",
+     ""
+    ]
+   ],
+   "basis": "pdb2016 SHINE_COORD_TYPE { SHINE_XY_TYPE xy; u8 dir } (9 bytes). P02 batch 2 part 13: no file defined it, so the decoder read every SHINE_COORD_TYPE field (Z09 / Z13 annotations, e.g. 0x1C1A nCoord) as 1 byte"
+  },
+  "ABNORMAL_STATE_BIT": {
+   "size": 99,
+   "fields": [
+    [
+     0,
+     "bytes[99]",
+     "statebit",
+     ""
+    ]
+   ],
+   "basis": "pdb2016 ABNORMAL_STATE_BIT { u8 statebit[99] }. P02 part 13: Z13's 0x1C1A annotation uses it; without a size the decoder read 1 byte"
+  },
+  "STRUCT_QSC": {
+   "size": 101,
+   "fields": [
+    [
+     0,
+     "u32",
+     "Cmd",
+     "QUEST_SCRIPT_COMMAND (pdb2016 enum: 0 ERROR, 1 END, 2 SAY, …)"
+    ],
+    [
+     4,
+     "u8",
+     "IsPigeonStartType",
+     ""
+    ],
+    [
+     5,
+     "bytes[96]",
+     "Data",
+     "union by Cmd; SAY = {u32 nID, u32 TalkerType, u16 NPCNo} (pdb2016), the rest is Z15-B11 leftovers"
+    ]
+   ],
+   "basis": "pdb2016 STRUCT_QSC (0x65 bytes). P02 part 13: Z08's 0x4401 annotation uses it; without a size it did not fit and the decoder fell back to pdb2016"
+  },
+  "CHARACTER_TITLE_DB_SAVE_VALUE": {
+   "size": 9,
+   "fields": [
+    [
+     0,
+     "u8",
+     "Type",
+     "CHARACTER_TITLE_TYPE (pdb2016 enum)"
+    ],
+    [
+     1,
+     "u64",
+     "TitleValue",
+     ""
+    ]
+   ],
+   "basis": "pdb2016 CHARACTER_TITLE_DB_SAVE::<unnamed-type-TitleValues> { u8 Type; u64 TitleValue } (9 bytes); the key is ours (the PDB type is unnamed)"
   }
  }
 }
