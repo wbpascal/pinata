@@ -1,0 +1,18 @@
+{
+  "FUN_0069ba10": "SHND::dynamic_initializer_for_g_CollectCard_CardID",
+  "FUN_0069ba50": "SHND::dynamic_initializer_for_g_CollectCard_MobGroup",
+  "FUN_0069ba70": "SHND::dynamic_initializer_for_g_CollectCard_ItemIndex",
+  "FUN_0069ba90": "SHND::dynamic_initializer_for_g_CollectCardMobGroup_MobGroup",
+  "FUN_0069bab0": "SHND::dynamic_initializer_for_g_CollectCardDropRate_CardID",
+  "FUN_0069bac0": "SHND::dynamic_initializer_for_g_CollectCardStarRate",
+  "FUN_0069bae0": "SHND::dynamic_initializer_for_g_CollectCardReward",
+  "FUN_0069bb00": "SHND::dynamic_initializer_for_g_CollectCardTitle",
+  "FUN_006a1120": "SHND::dynamic_atexit_destructor_for_g_CollectCard_CardID",
+  "FUN_006a1130": "SHND::dynamic_atexit_destructor_for_g_CollectCard_MobGroup",
+  "FUN_006a1170": "SHND::dynamic_atexit_destructor_for_g_CollectCard_ItemIndex",
+  "FUN_006a11b0": "SHND::dynamic_atexit_destructor_for_g_CollectCardMobGroup_MobGroup",
+  "FUN_006a11f0": "SHND::dynamic_atexit_destructor_for_g_CollectCardDropRate_CardID",
+  "FUN_006a1230": "SHND::dynamic_atexit_destructor_for_g_CollectCardStarRate",
+  "FUN_006a1270": "SHND::dynamic_atexit_destructor_for_g_CollectCardReward",
+  "FUN_006a12b0": "SHND::dynamic_atexit_destructor_for_g_CollectCardTitle"
+}
