@@ -112,7 +112,7 @@ cleared.
 ```
 0x381F NC_PARTY_DISMISS_CMD {u16 partyregnum} @ FUN_004cc060
     MapClusterManager visit DeleteDungeon{kind 0, partyregnum, 0}     // §8: the party's instances are deleted
-    pm_Break: every member found by its stored zonecharhandle gets partyNo 0xFFFF
+    pm_Break: every member found by its stored zonecharhandle gets partyNo 0xFFFF (vt 0x574)   @ FUN_004cc520
     Party_Delete(partyregnum)
 
 0x382A NC_PARTY_CHANGEMASTER_CMD {u16 partyregnum, u32 newmaster_chrregnum} @ FUN_004cc150
@@ -743,6 +743,7 @@ FUN_004749f0). The tournament state is per map (`FieldMap_fm_GetGuildTournamentS
 ```
 0x7491 NC_GUILD_STORAGEOPEN_REQ (no body) @ FUN_004762d0
     if p.guildNo == 0: sp_GuildStorageError(0x1242)       // 0x7492 NC_GUILD_STORAGEOPEN_ACK, "not registered in any guild"
+                       // sp_GuildStorageError @ FUN_00474bf0: 0x7492 {u16 err, rest 0}, 0x15 B (byte +0x14 = 0), via vt 0x2f8
     else: → DB 0x3471 NC_ITEMDB_OPEN_GUILD_STORAGE_REQ {ref, u32 guildregnum}
           → WM 0x749E NC_GUILD_STORAGE_WITHDRAW_GRADE_REQ {ref}
     // no mode check, no NPC/range check

@@ -7,8 +7,9 @@ usage: coverage.py <ID> [--all]     summary + uncovered functions (the review st
 Reachable = functions referenced (FUN_ tokens in decomp.c) up to DEPTH calls deep from the item's scope handlers, same
 binary. Deeper code is mostly shared infrastructure (map iteration, Lua VM) that belongs to the core items.
 Not expanded: functions referenced by more than HUB others (shared utilities, containers, logging) and handlers
-registered for other items. Covered = cited as FUN_xxxxxxxx in any doc of an item whose scope includes that binary.
-Functions shorter than TINY lines are traversed but not counted (accessors, thunks).
+registered for other items. Covered = cited as FUN_xxxxxxxx (or the bare 8-digit address) in any doc of an item whose scope includes that binary.
+Functions shorter than TINY lines are traversed but not counted (accessors, thunks). Library code (LIB, matched on the
+PDB name where a <bin>-pdb export exists) is neither expanded nor counted.
 """
 import glob, json, os, re, sys
 from collections import deque
@@ -17,6 +18,9 @@ R = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 E, ITEMS, HUB, TINY, DEPTH = f"{R}/re-data/exports", f"{R}/docs/plan/items", 25, 6, 3
 SERVER_BINS = ["login", "wm", "zone", "account", "accountlog", "character", "gamelog"]
 FUN = re.compile(r"FUN_([0-9a-f]{8})")
+ADDR = re.compile(r"(?<![0-9A-Za-z_])(?:FUN_)?([0-9a-f]{8})(?![0-9A-Za-z])")  # docs also cite "0063d070" in address lists
+# library code by its PDB name (<bin>-pdb export): STL / container templates, CRT, compiler-generated, packet struct copies
+LIB = re.compile(r"^(std::|stdext::|List<|ListFunctionCall<|_|`|PROTO_\w*::operator=$)")
 
 
 def items():
@@ -59,6 +63,10 @@ class Bin:
             for c in cs: self.indeg[c] = self.indeg.get(c, 0) + 1
         H = json.load(open(f"{E}/{name}/handlers.json"))
         self.registered = {e["handler"][-8:] for t in H["tables"] for e in t["entries"]}
+        pdb = f"{E}/{name}-pdb/decomp.c"
+        self.lib = set() if not os.path.exists(pdb) else {
+            m.group(1) for m in re.finditer(r"^//==== FUNC ([0-9a-f]{8}) (\S+)", open(pdb, errors="replace").read(), re.M)
+            if LIB.match(m.group(2))}
         self.names = {}
         for f in sorted(glob.glob(f"{R}/tools/protocol-re/names/{name}/*.json")):
             self.names.update({k[4:]: v for k, v in json.load(open(f)).items() if k.startswith("FUN_")})
@@ -68,7 +76,7 @@ class Bin:
         seen, q = {r: None for r in roots if r in self.calls}, deque((r, 0) for r in roots)
         while q:
             a, d = q.popleft()
-            if d == DEPTH or a not in roots and (self.indeg.get(a, 0) > HUB or a in self.registered): continue
+            if d == DEPTH or a not in roots and (self.indeg.get(a, 0) > HUB or a in self.registered or a in self.lib): continue
             for c in sorted(self.calls.get(a, ())):
                 if c in self.calls and c not in seen:
                     seen[c] = a; q.append((c, d + 1))
@@ -79,7 +87,7 @@ def cited(its):
     """bin -> item -> set(addr) cited in that item's docs (only for the bins in the item's scope)."""
     out = {}
     for iid, p in docs():
-        addrs = set(FUN.findall(open(p, encoding="utf-8", errors="replace").read()))
+        addrs = set(ADDR.findall(open(p, encoding="utf-8", errors="replace").read()))
         for b in its.get(iid, {}).get("bins", SERVER_BINS):
             out.setdefault(b, {}).setdefault(iid, set()).update(addrs)
     return out
@@ -94,7 +102,8 @@ def measure(iid, it, bins, cit):
         anyone = set().union(*cit.get(b, {}).values()) if cit.get(b) else set()
         r["h"] += len(hs); r["hdoc"] += len(hs & own)
         for a, parent in B.reach(hs).items():
-            if parent is None or B.size.get(a, 0) < TINY or B.indeg.get(a, 0) > HUB or a in B.registered: continue
+            if parent is None or B.size.get(a, 0) < TINY or B.indeg.get(a, 0) > HUB or a in B.registered or a in B.lib:
+                continue
             r["n"] += 1
             if a in own: r["own"] += 1
             elif a in anyone: r["other"] += 1
@@ -142,7 +151,8 @@ def overview(its):
         hs = B.registered & set(B.calls)
         n = cov = 0
         for a, parent in B.reach(hs).items():
-            if parent is None or B.size.get(a, 0) < TINY or B.indeg.get(a, 0) > HUB or a in B.registered: continue
+            if parent is None or B.size.get(a, 0) < TINY or B.indeg.get(a, 0) > HUB or a in B.registered or a in B.lib:
+                continue
             n += 1; cov += a in anyone
         hd = len(hs & anyone)
         for i, v in enumerate((hd, len(hs), cov, n)): T[i] += v
@@ -162,7 +172,7 @@ def overview(its):
         "Items: ✓ done · ◐ started · `·` not started (from `docs/plan/status/<ID>.md`).\n\n"
         "- **Handlers documented**: registered packet handlers of that server whose `FUN_` some doc cites.\n"
         f"- **Functions covered**: functions up to {DEPTH} calls below those handlers that some doc cites (not counted: "
-        f"shared helpers with more than {HUB} callers, functions under {TINY} lines). Calls through vtables are not "
+        f"shared helpers with more than {HUB} callers, functions under {TINY} lines, STL / CRT / compiler-generated code by its PDB name). Calls through vtables are not "
         "seen, so these counts are a lower bound of the real code size.\n"
         "- **Progress bar**: handlers + functions together. Per work item: `coverage.py <ID>` lists its gaps.\n")
     print(f"progress.md: handlers {T[0]}/{T[1]}, functions {T[2]}/{T[3]}")

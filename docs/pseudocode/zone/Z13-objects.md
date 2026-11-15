@@ -1526,7 +1526,7 @@ zrpb_Success(_, buf)                                                            
 zrpb_Failure(caster, buf): caster ← 0x2434 { buf.err }                                                    @ FUN_005a8890
 
 0x10AA on the ring   ZoneListenSession::zls_NC_CHAR_WEDDING_PARTNER_SUMMON_RNG                             @ FUN_005a0c90
-    zls_TravelComplete (back at the origin): caster = zls_FindPlayer(start); if online: zrpb_Failure(caster, buf)   # 0xFCF or 0xFCE
+    zls_TravelComplete (back at the origin): caster = zls_FindPlayer(start) (@ FUN_0045b220: som_GetObject(handle), kept only if its regnum (vt 0x344) matches); if online: zrpb_Failure(caster, buf)   # 0xFCF or 0xFCE
     q = som_FindPlayer(RegisterNumber) with a field:
         level in [from, to] and vt 0xa74 true: zrpb_Success(_, buf); stop (the origin is not told)
         else: forward with err = 0xFCE

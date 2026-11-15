@@ -458,10 +458,10 @@ Shared guild storage record (`gldstoramanager` = Z08's `g_GuildStorage`, class `
 0x134358 B): a `List` of 300 cells over `gsm_StorageArray[300]` of `GuildStorageElement` (0x1070 B: `ItemGuildStorage
 gse_Storage` (ItemBag) @0, `u64 gse_Cen` @0x1058, `u64 gse_Token` @0x1060, `u32 gse_Guild` @0x1068, `u8 gse_Activate`
 @0x106c). Ctor @ FUN_00475610. Each player keeps the list handle of the storage it has open (`so_ply_GetMyGuildStorageHandle`
-vt 0x830 / `Set…` vt 0x834, 0xFFFF = none).
+vt 0x830 / `Set…` vt 0x834, 0xFFFF = none). Bag ctor `ItemGuildStorage` @ FUN_006449e0: vftable + 0x24 `ItemInventoryCell` (0x74 B each).
 
 ```pseudo
-gsm_FindStorage(guildNo, &handle) @ FUN_004751f0: ListSearchSame with gse_GuildCompare (gse_Guild) → element, handle
+gsm_FindStorage(guildNo, &handle) @ FUN_004751f0: ListSearchSame with gse_GuildCompare @ FUN_00474990 (gse_Guild difference) → element, handle
 gse_StoreItem(pkt 0x3473, p) @ FUN_00474a80 (Z05 §7.2): clear the bag, ib_Initializetotal(items), cen, token;
     p ← 0x7492 NC_GUILD_STORAGEOPEN_ACK {u16 0x1240 ok, u64 cen, u64 token, u8 count, items…} (so_fullbufferitem_box);
     count mismatch → assert "ItemNumber not match"
@@ -518,7 +518,7 @@ academy member (== 1) `academyNo` (vt 0x85c). In ITEM_INVEN the storage is box 0
 
 ```pseudo
 garsm_FindStorage(guildNo, &handle) @ FUN_0046f710: ListSearchSame with garse_GuildCompare @ FUN_00470890 (garse_Guild
-    difference) over a temporary element (ctor @ FUN_00470840, bag dtor ItemGuildAcademyRewardStorage @ FUN_006432f0)
+    difference) over a temporary element (ctor @ FUN_00470840, bag ctor ItemGuildAcademyRewardStorage @ FUN_00644a40: vftable + 0x48 `ItemInventoryCell`, bag dtor @ FUN_006432f0)
 # helpers: packet copy operators PROTO_…_WITHDRAW_RNG::operator= @ FUN_004709c0 (0x35 B, also used for DEPOSIT),
 #  PROTO_…_ITEM_INFO_ZONE_RNG::operator= @ FUN_00470ab0 (0xb0 B), PROTO_NC_INSTANCE_DUNGEON_FIND_RNG::operator= @ FUN_004846c0
 #  (0x46 B); ItemInventoryCell::iic_Clear @ FUN_00470d20 = "clear the cell" in §4.2

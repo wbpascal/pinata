@@ -888,6 +888,46 @@ ITEMS = [
       done="`hml_Load`, `pebd_Load`, the `pebd` initialiser, `megag_Load` and `nfis_ExpLimitCut` are cited as `FUN_…` with "
            "pseudocode, both files have a column → member map with their 2016 invariants, and the party experience formula "
            "with these tables is specified."),
+ dict(id="Z30", phase=2, title="Zone: handler-reachable leftovers (`coverage.py` gaps: change-character-ID handlers, item "
+                               "dismantling, SP / HP stones, title set, spam rules, party / guild helpers)",
+      out="docs/pseudocode/zone/Z30-leftovers.md", deps=["Z01", "Z04", "Z08", "Z14"],
+      scope=[("zone", "WorldManagerSession", [45]), ("zone", "GameDBSession", [45]), ("zone", "ShinePlayer", [16])],
+      goal="After the done zone items, `coverage.py --overview` still lists 48 zone functions reachable from packet handlers "
+           "that no doc cites, plus two registered handlers in no item's scope. The docs name some of them, but none "
+           "describes what they do. Document each one so the zone handler code is fully covered.",
+      steps=["Read with PDB names (`clean.py re-data/exports/zone-pdb - <addr> …`). Where an existing doc already calls the "
+             "function by name (Z01 §… `0xB410`, Z04 §12.1 dismantle, Z04 HP stone, Z08 titles / guild zone, Z11 ring "
+             "search, Z14 raid table), link that section instead of repeating it.",
+             "Scope handlers: `wms_NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD` FUN_0044caa0 (with `RaidSystem::GetInRaidNumber` "
+             "0063d8b0, `Raid::iterator::UpdateMemberName` 0063d620, `CParty::MemberGetNo` 00645280) and "
+             "`gds_NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ITEM_USE_ACK` FUN_0051b6d0: the rest of the rename-by-item flow after "
+             "Z01's `0xB410`. Client side via C01. `sp_NC_MISC_DB_UI_STATE_SAVE_REQ` FUN_00562f40 is in scope so it has an "
+             "owner; Z01 already cites it, check it is complete.",
+             "Item dismantling internals (Z04 §12.1 'not read'): `ItemDismantleProducer::idp_WhereDismantleProductStore` "
+             "00528be0, `idp_DismantleProductExecute` 00529110, dtor 00528ba0, and the `FUN_005290f0` codes. Soul stones: "
+             "`sp_SPStoneUse` 00588a40, `sp_SPStoneReserv` 00588c50, `sp_HPStoneReserv` 00589410 (the HP side is in Z04 by name).",
+             "Character title: `CCharacterTitleZone::Send_NC_CT_SET_CURRENT_ACK` 005ca9e0, `Send_NC_CT_SET_CURRENT_DB_CMD` "
+             "005cadd0, `CT_SellNPC` 005cbff0, `CCharacterTitle::Clear` 0062e370, `sp_CharTitleChangeAvailable` 005608e0. "
+             "Spam rules: `SpamerPenaltyDataBox::spdb_SpamePenaltyGet{SecondRule,RepeatRule,ChatBlockTime,ProbateTime}` "
+             "00589820 / 00589850 / 00589870 / 00589900 (which table / config, units).",
+             "Zone ring and sight: `HolyPromiseCenTransferManager::hpctm_Process` 00483860, "
+             "`ZoneRingPacketFindPlayerByNormalUser::zrpb_Success` 005a7cf0 / `zrpb_Failure` 005a8170, "
+             "`so_HideExceptMeOff_BriefInfo` 00441700, `so_BroadcastEndOfTrade` 00552e10.",
+             "Party / raid / guild helpers: `CParty::SwapPartyMember` 006459e0, `GetEmptyParty` 00645070, "
+             "`PARTY_MEMBER_SLOT::operator=` 006455a0, `Raid::iterator::operator==` 0063d0a0, `CGuildZone::Add` 005cc900, "
+             "`GUILD_ZONE::operator=` 005cc790, `Send_NC_GUILD_ZONE_LIST_REQ` 005cc980, `GuildWarManager::gwm_IsEnemyGuild` "
+             "00481070 / `gwm_EnemyCheck` 00481190, `garse_GuildCheck` 00470800, `~ItemGuildStorage` 00643280.",
+             "Remaining helpers: `ItemMixData::GetMixItemIndex` 00635820, `ShineDateTime::operator+=` 00517a80 (term "
+             "extension arithmetic), `TownPortalData::operator[]` 0049fd60, `BoothStoreManager::RemoveItem` 0043a420, "
+             "`CItemAuthorityBase::IA_IsWork{Chr,Acc}Belonged` 00632180 / 006321e0, `CShnDataFileCheckSum::GetDataFile"
+             "{CheckSum,Name}` 006313d0 / 00631430 (login data-file check), `NameString::operator[]` 004519d0, `WELLRNG512a` "
+             "0063c8c0 (the RNG: seed, state, who else uses it), `AxialListCount` ctor 00428200, `sp_SetNormalLogoutTick` "
+             "005620f0, `fc_GetFieldOption` 00419390, `ShineCommonParameter::operator->` 004192f0, `sp_GetServerMenuactor` "
+             "0048cec0, `sp_IsInTrade` 004c2420.",
+             "Finish with `coverage.py --overview`: zone gaps 0 or each remaining one argued in the Coverage boundary. Bugs as "
+             "`Z30-B<n>`."],
+      done="Every function and handler above is cited as `FUN_…` with pseudocode (or a link to the doc section that already "
+           "describes it), and `coverage.py --overview` shows no unexplained zone gap."),
  dict(id="D01", phase=2, title="Account and AccountLog servers", out="docs/pseudocode/db/D01-account.md", deps=[],
       scope=[("account", "", ALL), ("accountlog", "", ALL)],
       goal="Every request, the SQL/stored procedure it calls (strings like `{CALL usp_…(?,?)}`), parameters/columns, "

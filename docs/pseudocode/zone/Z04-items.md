@@ -135,6 +135,7 @@ sp_NC_ITEM_BUY_REQ(p, pkt, len, hnd):
     if !info.ItemInfo or !info.ItemInfoServer or no open NPC role (p+0x17d80): ack 0x203
     if p.level < ItemInfo.BuyDemandLv:                       ack 0x211
     list = NPCItemList.nilt_MenuPacket(role.row)             # the shop's item list (NPCItemList tables)
+                                                             # @ FUN_004c5050: nilt_Index2Handle[name] < 100 → nilt_Packet[i], else null
     if itemid not in list:                                   ack 0x203
     # alternative currencies (NPCRole_Merchant vtable)
     (needItem, n) = npc.nrb_ItemBuyItemMoney(p, itemid)     # vt 0x20, ItemMoney.shn
@@ -310,8 +311,9 @@ ItemBreaker_ib_Break(p, cell, inven, &err):                @ FUN_0048de20
     err = 0x30d; if not BelongType_CanDelete(cell): fail
     if the server menu is busy: err = 0x13c1; fail
     lock the cell; ItemMenu_Open(smfm_ItemBreakCancel, "ItemBreakWarn0", smfm_ItemBreakWarn0, p, {inven, lock})
+smfm_ItemBreakCancel:  unlock sma_ItemBreak.lockindex (vt 0x7d4 → +0x28); p.vt0x308(0xc, 0x25, 0x1829) (0x3025 with 0x1829)  @ FUN_0048d990
 smfm_ItemBreakWarn0:  ItemMenu_Open(…, "ItemBreakWarn1", smfm_ItemBreakWarn1, …)   # second confirmation  @ FUN_0048dbd0
-smfm_ItemBreakWarn1 → ItemBreaker_ib_OK(p, {inven, lock}):  @ FUN_0048d0d0
+smfm_ItemBreakWarn1 (@ FUN_0048d8e0, only forwards) → ItemBreaker_ib_OK(p, {inven, lock}):  @ FUN_0048d0d0
     box = inventory (9) or mini-house box (3/13/14/16); cell = box[slot]; class = cell.class
     if class == 36 PUP (minimon) and p+0xaad8*4 in 1..8 (a minimon is summoned, inferred):
         release lock; send 0xD411 NC_PET_USE_ITEM_FAIL_ACK { 0x345c }; return

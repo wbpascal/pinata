@@ -511,6 +511,7 @@ sp_EndOfTrade(p, resetMenu):                             @ FUN_004c25b0
 ```pseudo
 NPCRole_Merchant.nrb_Role(p, entry, npcHnd):             @ FUN_004c3c00
     mapIdx = so_mapindex(p); if invalid: log "…Wrong mapindex"; return
+        # so_mapindex @ FUN_0054dd80: no field → 0xFFFF; else mapdatabox BTree lookup of the field's mapidclient name (0xFFFF if absent)
     if !p.dmc_CanMenuOpen(0): return; set menu bit 0
     switch RoleArg0:
       "SoulStone": nrm_PortionStone(p)                   @ FUN_004c2d60
@@ -890,7 +891,7 @@ Sent by the client's auto-path (`MapNavigator`) when it reaches a gate.
 ```pseudo
 @ FUN_00562340     reply 0x2071 NC_ACT_AUTO_WAY_FINDING_USE_GATE_ACK { u16 nError } (sent through vt 0x2f8)
     if mode ∉ {1,2,6}: → 0x2401;  if no field: → 0x2402
-    gate = nearest NPC in sight whose NPC.txt Role is "Gate" (AxialListNearGateFind.ali_Work @ FUN_00429680)
+    gate = nearest NPC in sight whose NPC.txt Role is "Gate" (AxialListNearGateFind.ali_Work @ FUN_00429680; ctor @ FUN_00428370: handle 0xFFFF, object null)
     none, no role entry, or no LinkTable row whose argument == the NPC's RoleArg0: → 0x2403
     if p rides no mover:
         if the destination map has a level range (FUN_0046a370(DAT_0d026c30, destMap): +0x22 min, +0x24 max)

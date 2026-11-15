@@ -312,6 +312,14 @@
   "\u2013"
  ],
  [
+  "Z30",
+  2,
+  "Zone: handler-reachable leftovers (`coverage.py` gaps: change-character-ID handlers, item dismantling, SP / HP stones, title set, spam rules, party / guild helpers)",
+  "Z01, Z04, Z08, Z14",
+  "3",
+  "162"
+ ],
+ [
   "D01",
   2,
   "Account and AccountLog servers",
