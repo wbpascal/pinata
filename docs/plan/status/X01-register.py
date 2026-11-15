@@ -126,7 +126,27 @@ def key(i):
     return (m.group(1), int(m.group(2)), int(m.group(3)), m.group(4))
 
 EXTRA = []        # (group name, row dict with id, handler, beh, eff, intent, ev, owner)
-SUPERSEDED = {}   # ID -> short note
+# ID -> (mark, note): mark = Superseded (the bug as stated does not exist), Narrowed (part of it, or its effect, is
+# wrong), Extended (a later item adds the cause or more effect). README §5.9 lists the same entries with sources.
+SUPERSEDED = {
+    'W01-B5': ('Superseded', 'X01: the XOR key is Login\'s per-world counter, +1 per world select (`GetClientValidation` FUN_0040a200, L01 §2.5), so pending logins take consecutive slots; a slot is reused only after 2048 selects'),
+    'Z02-B5': ('Narrowed', 'Z07 §11: the 0x2035 / 0x2039 produce path is live (client `ProductTask` sends both); only the result packets are unused'),
+    'Z02-B12': ('Narrowed', 'Z09 §15.8: the report only arms the interrupt, which fires when the server\'s own `.aid` geometry agrees; a false report can only choose which inside player counts'),
+    'Z04-B13': ('Superseded', 'Z13 §3.3: every failing check returns a code that the handler sends as 0x3034; only the 0x702 error loses its code, see Z13-B17'),
+    'Z07-B10': ('Narrowed', 'the 2016 client does handle 0x1094 (`WeddingInfoWin::SetWeddingInfo` FUN_006da330, Z13 §4.7), so the stale LastConnect is shown'),
+    'Z07-B13': ('Narrowed', 'Z13 §1.4: the house method refuses `nNotifyLen > 100`, so the over-read is at most 100 bytes past a short packet'),
+    'Z08-B6': ('Extended', 'Z15 §4.7: the silent case is `IsDoingQuest` = 0, i.e. client and zone diaries disagree'),
+    'Z08-B12': ('Superseded', 'Z16-B17: `seed <= 32` against 32-entry tables; the start bound is the bug'),
+    'D01-B4': ('Narrowed', 'D06 §2.4: `usp_UserTWLoginGame` (pdb2016) belonged to a separate Taiwan Account DB; fails only against the NA database, and the NA client never starts the TW path'),
+    'D01-B10': ('Superseded', 'D06 §3.3: both L20 wrappers preset `nRet = -1`, so the error branch is deterministic (0x128a); the `nRet` not in {1,3} log condition is intended'),
+    'D02-B3': ('Narrowed', 'W03 §4.5: the WM refuses guild masters itself with 0x140A {0x00C7} before 0x1408 reaches the Character server'),
+    'D02-B8': ('Narrowed', 'D06 §6.3: harmless with the w00 body (`@nRet int = 0 output` default); only the codes -1111 / 1 are lost'),
+    'D02-B18': ('Extended', 'D06: no 2016 component sends 0xA001 / 0xA004, so the whole promotion path is dead'),
+    'D02-B19': ('Superseded', 'D06 §6.2: column 37 is the link-scroll destination map (`sLinkScrollDestMap`, ours) the backups lack: a backup mismatch, not a 2016 bug *(inferred, strong)*'),
+    'D03-B21': ('Narrowed', 'D06: 0xBC06 has no 2016 sender (no zone send, no zone 0xBC07 handler), so it has no effect in 2016; the handler also ignores `@nRet`'),
+    'D04-B9': ('Extended', 'S01 §2.4: a header mismatch: the 2016 Zone PDB has two definitions of the 0x5C05 struct; the zone sends the 54-byte one, the Character server reads 58'),
+    'D05-B2': ('Extended', 'S01 §2.4: a header mismatch: the 2016 Zone PDB has two definitions of the 0x0452 struct; the zone sends the newer one'),
+}
 
 if sys.argv[1] in ('md', 'write'):
     by = collections.OrderedDict()
@@ -159,7 +179,8 @@ if sys.argv[1] in ('md', 'write'):
             also = ('; also ' + ', '.join(sorted({x['file'].split('/')[-1] for x in others}))) if others else ''
             c = list(r['cells'])
             if i in SUPERSEDED:
-                c[1] = f"**Superseded** ({SUPERSEDED[i]}): " + c[1]
+                mark, note = SUPERSEDED[i]
+                c[1] = f"**{mark}** ({note}; [§5.9](#59-bug-register-entries-a-later-item-changed)): " + c[1]
             out.append(f"| {i} | {c[0]} ({link}{also}) | {c[1]} | {c[2]} | {c[3]} | {evidence(c, i)} | {item} |")
         out.append('')
     text = '\n'.join(out)
