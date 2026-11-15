@@ -195,7 +195,7 @@ sp_SPStoneUse(p)                                                                
     PointStoneCheck = no-op;  StoneTick = g_Now + 70 (7 s);  StoneReservationTick = g_Now + 50 (5 s)
     CurSPStone −= 1
     row = class data (vt 0x49c) +0x10858 + level × 4  (level = so_GetLevel & 0xff; ≥ 151 → entry 0)
-    CurSP += cec_MaxSPRate (sp_ChargedItem.ci_Effect, ‰) × row+0x28 / 1000;  CurSP = min(CurSP, MaxSP (p+0xeac))
+    CurSP += cec_MaxSPRate (sp_ChargedItem.ci_Effect, ‰) × row.spsoulstone.soul (+0x28, Z12 §2.1) / 1000;  CurSP = min(CurSP, MaxSP (p+0xeac))
     so_AllOfRange(p, all, so_ply_Send2WhoTargetMe)           # SP bar to everyone who has p targeted
 
 sp_SPStoneReserv(p)   (the queued action, called from the player tick)                       @ FUN_00588c50
@@ -209,7 +209,11 @@ sp_HPStoneReserv(p)                                                             
     else sp_HPStoneUse(p) (Z04 §13.2, FUN_00589180)           # no "HP already full" re-check (Z30-B2)
 ```
 
-Client 0x500C: FUN_004ad900 (reads the handle, plays the `SPSoulStone` effect).
+Client 0x500C: FUN_004ad900 (reads the handle, plays the `SPSoulStone` effect). Client 0x500A
+`NC_SOULSTONE_SP_USESUC_ACK` FUN_004ad7b0 (scene GameFrameWork): local SP-stone count − 1 (if > 0), a sound (id 0x1a),
+the `SPSoulStone` effect on the own character, then refreshes the stone slot widgets (cooldown display *(inferred)*).
+The row is `PrimaryParameter` (`cc_array[level]`, Z12 §2.1): `hpsoulstone` +0x1c / `spsoulstone` +0x28 =
+`PointSoulStone { soul, maxsoul, buysoul }`, so the heal base is `spsoulstone.soul`.
 
 ## 4. Character title helpers (answers Z08 §7.2)
 
@@ -310,6 +314,7 @@ zrpb_Request(master, pkt { start, Name5 charid })                               
     t without a map: zrpb_Failure(master, pkt)
     else: found = { map = t's map, coord = t's x, y, charid = t.vt 0x56c name,
                     modeIDLv = map.fm_eLevelType (ILT_MAX → 1), canRecall = t.so_ply_IsLink_In_MapAndSendErrorMsg() (vt 0xa78) == 1 }
+                                                           # may send t a 0x181D (Z30-B3)
           if t is in a mini house (so_ply_MH_GetActiveMH, vt 0x130): house = som_GetObject(so_ply_MH_GetMyHandle (vt 0x138));
                 map / coord = house.vt 0x14c (5 dwords: the house's map and outside position)
                 house missing → return            # (original bug) Z30-B4: the master gets no answer
@@ -323,12 +328,18 @@ zrpb_Request(master, pkt { start, Name5 charid })                               
     t missing or without a map → forward the packet unchanged (0x1d)
     else: 0x10AE NC_CHAR_PLAYERFOUND_BY_NORMAL_USER_RNG { start, Name3 map, SHINE_XY_TYPE coord, Name5 charid,
                                                            u8 canRecall, u8 modeIDLv }   (0x31 bytes, 0x33 with the opcode)
-          m = zls_FindPlayer(start) (only found if the master is on this zone too)
+          m = zls_FindPlayer(start) FUN_0045b220 (som_GetObject(start.handle) with charNo == start.regnum on THIS zone)
+              # effectively never found: this branch runs only when start.machine ≠ own zoneNo, so the level check
+              # below is dead in practice (the master's zone does it again in zrpb_Success)
           if m: e = fc_CanEnterField(m, t)                    # player / player overload
                 e == ENTER_MAP_ERR_DATA_NULL → return (nothing sent)
                 e == ENTER_MAP_ERR_LEVEL_LIMIT → m.so_SendErrorCode(38, 32, 0x3E00) (0x9820 "Unable to Travel to Academy
                      Member due Level Restriction on Map"); return
-          canRecall = t.vt 0xa78 == 1;  ZoneConnect ← 0x10AE
+          canRecall = t.so_ply_IsLink_In_MapAndSendErrorMsg() (vt 0xa78) == 1   # may send t a 0x181D (Z30-B3)
+          ZoneConnect ← 0x10AE
+          # (original bug) Z30-B9: unlike zrpb_Request, no mini-house redirect (vt 0x130 / 0x138 / 0x14c): a target
+          # inside a mini house is reported with the house interior's map and coordinates, and the master is linked
+          # into the house map
 
 0x10AE NC_CHAR_PLAYERFOUND_BY_NORMAL_USER_RNG                                                @ FUN_0045c340
     start.machine < 10 and ≠ own zoneNo → forward (PROTO operator=, 0x33)
@@ -367,8 +378,23 @@ FieldContainer::fc_CanEnterField(p, ShinePlayer* t) → ENTER_MAP_ERR           
     # also the "local summon" call of Z08 §10 0x9878 (Z08 reads FUN_004621f0 as the summon itself; it is this check)
 ```
 
-`canRecall` is the target's own "can a link start here" test (vt 0xa78 also sends the target an error text
-when it fails *(inferred from the PDB name)*).
+`canRecall` is the target's "can a link come into this map" test:
+
+```pseudo
+ShinePlayer::so_ply_IsLink_In_MapAndSendErrorMsg(p) → 0/1                                    @ FUN_00560420
+    no field (p+0x7a) → 0 (silent)
+    attr = field's FieldAttr (+0xc)
+    attr.LinkIn (+0x6b) == 0 → p ← 0x181D NC_MAP_LINK_FAIL_CMD { 0x1E43 } (so_SendErrorCode(6, 0x1D), vt 0x308); 0
+    attr.SystemMap (+0x6d) == 1 → p ← 0x181D { 0x1E41 }; 0
+    → 1
+```
+
+The field name LinkIn is ours by analogy with Z26's LinkOut (+0x6c) *(inferred)*. Here it is called on the **target**
+(zrpb_Request and 0x10AD) and on the master (zrpb_Success). (original bug) Z30-B3: the academy member gets an
+unexplained 0x181D when the master looks them up, and the master gets no feedback when `canRecall` is 0 (zrpb_Success
+silently does nothing). Client `On_NC_MAP_LINK_FAIL_CMD` FUN_004b0e70 shows TextData2 0x35ac8487 (a blank line) only for
+0x1E41 / 0x1E42 and ignores 0x1E43 (no entry in `client-error-codes.json`), so the visible effect is a blank chat line for a
+target on a system map.
 
 ## 7. Sight and NPC callbacks
 
@@ -394,10 +420,13 @@ the receiver's own mover.
 
 ```pseudo
 ShineObject::so_BroadcastEndOfTrade(obj, npc, _) → 1                                         @ FUN_00552e10
-    obj.so_ply_EndofTrade(npc.handle, 1) (vt 0xb3c)     # close obj's dialog with that NPC
-    # map iterator callback of NPCManager::nm_UnmarkNPC FUN_004c6ad0 (Z01 §9 NpcSchedule "end"; so_ply_EndofTrade
-    # FUN_004c4b50 = sp_EndOfTrade of Z02 §6.2): before a scheduled
-    # event NPC is removed (vt 0x33c(0, 1, 3)), every object on its map is told; non-players have an empty slot
+    obj.so_ply_EndofTrade(npc.handle, 1) (vt 0xb3c)
+    # map iterator callback of NPCManager::nm_UnmarkNPC FUN_004c6ad0 (Z01 §9 NpcSchedule "end"): before a scheduled
+    # event NPC is removed (vt 0x33c(0, 1, 3)), every object on its map is visited; non-players have an empty slot
+
+ShinePlayer::so_ply_EndofTrade(p, npcHandle, arg)                                            @ FUN_004c4b50
+    if p.sp_NPCProcess.npchandle == npcHandle: sp_EndOfTrade(p, arg) (FUN_004c25b0, Z02 §6.2)
+    # only players whose open NPC dialog is with that NPC get it closed
 ```
 
 ## 8. Party, raid and guild helpers
@@ -449,8 +478,10 @@ GuildAcademyRewardStorageElement::garse_GuildCheck(e, guildNo) = e.garse_Guild =
 ItemGuildStorage::~ItemGuildStorage(s)                                                       @ FUN_00643280
     vfptr = ItemGuildStorage; destroy igs_Array (0x24 cells × 0x74 bytes; the cell destructor is the empty folded function);
     vfptr = ItemBag
-    # callers: GuildStorageManager functions (gsm_FindStorage FUN_004751f0, FUN_00474e80, FUN_00475610, Z14 §3):
-    # the destructor of temporary / removed storage elements (inferred from the call sites)
+    # call sites (Z14 §3): the stack search key `local_1084` in gsm_FindStorage FUN_004751f0; through the thunk
+    # FUN_00474940 (GuildStorageElement), the 300 × 0x1070 array teardown in the GuildStorageManager dtor FUN_00474e80
+    # and the static teardown FUN_0069cfc0, and the EH cleanup of the ctor FUN_00475610 (vector constructor iterator).
+    # Elements are never destroyed one by one (no removal path)
 ```
 
 ## 9. Remaining helpers
@@ -469,7 +500,9 @@ InitWELLRNG512a(seed[16]) : STATE = seed; state_i = 0                           
 
 The decompiled form writes the last term as `((… << 13 ^ (z1 ^ z2) & 0xFED22169) * 8 ^ z0) * 4` (the compiler factored
 the `<< 5`; `0xFED22169 << 5` = `0xDA442D20`). A Python port of the decompiled expression and of the reference gave the
-same output for 200 random seeds × 50 draws, so it is the unmodified reference algorithm. Callers: only the mover upgrade's rare roll:
+same output for 200 random seeds × 50 draws, so it is the unmodified reference algorithm (`(x << 5) & 0xDA442D24` =
+`(x & 0xFED22169) << 5`, the low 5 bits being zero). The seed is 16 × `rand()` (15-bit values), so the upper 17 bits of
+every state word start at zero: a weak seeding, the generator mixes them in after a few draws *(inferred)*. Callers: only the mover upgrade's rare roll:
 
 ```pseudo
 CMoverUpgradeData::GetIsRareMover(d, value, sub) → 0/1                                      @ FUN_004c03b0
@@ -491,9 +524,14 @@ ShineDateTime::operator+=(t, seconds) (long64)                                  
     # only caller: 0x3057 NC_ITEM_TERMEXTEND_REQ FUN_0051eb40 (Z04 §12.9):
     #   cap    = now (chargeditemcheck.ct_Current) + 2160 h (90 days), via _mktime32 on tm_hour + 0x870
     #   newEnd = term item's end date (attribute, must have year ≠ 0) + extend item's ChargedItemEffect.KeepTime_Hour × 3600
-    #   end = newEnd > cap ? cap : newEnd           # written into the item attribute in memory at once
+    #   end = newEnd > cap ? cap : newEnd
+    #   written into a stack copy of the term item's cell (0x6f bytes, local_a8; the attribute call vt 0x34 at 51f150
+    #   gets `lea eax,[ebp-0x9c]`, inside the copy), not into the inventory: the copy goes into the DB packet (+0x22)
+    #   and into the inventory lock reservation (invenlocklist vt 0x40(index, cell, &copy, …)); 0x34B8 FUN_0051f440
+    #   applies the reservation (vt 0x1c) on 0x3618, else frees it (vt 0x28). Z04's "nothing changes before the DB
+    #   answer" holds
     #   DB 0x34B7 carries the old end @+0x87 and (new − old) seconds @+0x8b
-    # (WeddingHall::wh_Reserv uses the other overload operator+=(ShineDateTimeSpan) FUN_0059ead0, Z07)
+    # (WeddingHall::wh_Reserv FUN_005a0810 uses the other overload operator+=(ShineDateTimeSpan) FUN_0059ead0, Z13 §4.2)
 
 TownPortalData::operator[](index) → TownPortal* or null                                      @ FUN_0049fd60
     linear search of TownPortal.shn rows { u8 Index, u8 MinLevel, u8 TP_GroupNo, char MapName[32], u32 X, u32 Y } for Index
@@ -503,7 +541,10 @@ BoothStoreManager::RemoveItem(ownerHandle, itemKey) → value or 0xFFFFFFFF     
     ownerHandle == 0xFFFF → assert "…The booth owner handle value is Invalid."; −1
     find the booth (bsm_StoreList node with that owner handle) else assert "…Cannot find the booth…"; −1
     find the item node with that 8-byte key else assert "…Cannot find the item…"; −1
-    unlink and delete the node;  return node[4]      # (original bug) Z30-B3: read after operator delete
+    v = node[4] (the value, read first: `43a54c mov edi,[eax+0x10]`);  unlink and delete the node;  list size (+0x18) −= 1
+    return v
+    # the decompiled form returns node[4] after operator delete only because Ghidra treats operator_delete as no-return;
+    # the assembly reads the value before the call (no use after free)
     # caller: BoothManager_RemoveItem FUN_0043ad30 ← 0x3456 booth trade ACK (Z05 §9.11, Z06 §2.1)
 
 CItemAuthorityBase::IA_IsWorkChrBelonged(belongType, putOn) → 0/1                            @ FUN_00632180
@@ -547,28 +588,28 @@ ShinePlayer::sp_IsInTrade() → sp_tradeboard.tb_opposit ≠ null               
 |---|---|---|---|---|
 | Z30-B1 | 0x9436 `so_ply_HolyPromiseCenFrom` FUN_00484240 | the receiver has any open inventory lock → return; the packet is not forwarded or retried; at the origin (`zls_TravelComplete`) an unfound receiver is dropped too | transferred holy-promise money vanishes (path dead in 2016: no sender) | queue / retry or return the money |
 | Z30-B2 | queued soul stones `sp_SPStoneReserv` FUN_00588c50, `sp_HPStoneReserv` FUN_00589410 | the queued use re-checks only the stock (SP) or stock + HP ≠ 0 + not dead (HP); SP does not re-check death; neither re-checks "already full" | an SP stone is used on a dead player; stones are spent when HP / SP filled up meanwhile | repeat the request's checks |
-| Z30-B3 | 0x3456 booth trade → `BoothStoreManager::RemoveItem` FUN_0043a420 | returns `node[4]` after `operator delete(node)` | use after free (heap reuse can return garbage) | read the value before deleting |
+| Z30-B3 | 0x9878 `zrpb_Request` FUN_005a7430, 0x10AD FUN_0045c0b0 → `so_ply_IsLink_In_MapAndSendErrorMsg` FUN_00560420 on the target | the "can link in" test is the error-sending variant, called on the academy member | the member gets a 0x181D link-fail (blank line for 0x1E41, ignored 0x1E43); the master gets no message when the recall is refused | use a silent check on the target and tell the master |
 | Z30-B4 | 0x9878 → `zrpb_Request` FUN_005a7430 | target inside a mini house whose house object is not found → return | the academy master gets no answer at all | send the failure notice |
 | Z30-B5 | 0x302A dismantle `idp_WhereDismantleProductStore` FUN_00528be0 | stops after 64 product stacks with the rest unplaced but still returns 0x1680 | products beyond 64 stacks are lost (unreachable with the 2016 tables: Karis MaxLot ≫ counts) | refuse with 0x168C |
 | Z30-B6 | 0x7448 `CGuildZone::Add` FUN_005cc900 | full guild list asserts "CGuildZone::ClearWar : Guild Buffer Full." and the MAKE_CMD is dropped | wrong function name in the log; the master's guild is not set on this zone | correct text; log the guild |
 | Z30-B7 | `CGuildZone::IsGuildEnemy` → `gwm_EnemyCheck` FUN_00481190 | scans the 4096-entry guild-war array on every call and discards the result | wasted work on every PvP target check (dead debug check) | remove, or compare and log |
 | Z30-B8 | `CGuildZone::Send_NC_GUILD_ZONE_LIST_REQ` FUN_005cc980 | packet length 3 = opcode + one byte nobody writes | one stale byte of `gpp` goes to the WM | length 2 (empty body) |
+| Z30-B9 | 0x10AD `zls_NC_CHAR_PLAYERSEARCH_BY_NORMAL_USER_RNG` FUN_0045c0b0 | the remote answer 0x10AE carries the target's own map and position; the mini-house redirect of the local path (zrpb_Request) is missing | a master whose member sits in a mini house on another zone is linked into the house interior map | redirect to the house's map and outside position as zrpb_Request does |
 
 ## 11. Not reconstructed / uncertain
 
-- §9 WELL512a: the tempering expression was copied as decompiled; whether it is the reference algorithm with a changed
-  constant or a decompiler artefact was not checked against the assembly (`objdump` FUN_0063c8c0 is 33 lines).
-- §9 TERMEXTEND: the zone writes the extended end date into the item attribute before the DB answer (an exception to
-  Z04 knowledge §2 "nothing changes before the DB answer"). Whether `0x34B8`'s Free path (Z05 §8.5) restores the old date
-  was not traced.
-- §6.2 `canRecall` = the target's `so_ply_IsLink_In_MapAndSendErrorMsg` (vt 0xa78): whether it sends the error text to
-  the target (not the master) was taken from the PDB name, not read.
 - §8 `CGuildZone::Add`: the element offsets +0x34 / +0x38 are past the 0x31-byte `GUILD_ZONE`; named by Z08 as "enemy of"
   and list index *(inferred)*.
 - §1.2: whether the WM sends its own party / raid packets to the zones and clients for a `bInit` rename (so that the zone
   copy and the WM agree) is W01's / W02's side; not followed.
-- §8 `~ItemGuildStorage`: which object `gsm_FindStorage` destroys (temporary search key vs. removed element) is inferred
-  from the call shape.
+- §6.2: `FieldAttr` +0x6b is called LinkIn by analogy with LinkOut +0x6c *(inferred)*; the client's handling of 0x1E43 is
+  read (ignored), its intended text is unknown.
+- §3: the widgets the client 0x500A handler refreshes (this+0x27c…0x2f4) are taken as the stone slots / cooldown
+  display *(inferred)*.
+
+Resolved in the review (part 2): WELL512a is the reference algorithm (§9); TERMEXTEND changes only a stack copy before
+the DB answer (§9); vt 0xa78 read (§6.2); `~ItemGuildStorage` call sites read (§8); `BoothStoreManager::RemoveItem` has
+no use after free (§9).
 
 ## 12. Coverage boundary
 
@@ -583,14 +624,14 @@ cited above with its `FUN_` address; the two handlers (FUN_0044caa0, FUN_0051b6d
 | `sp_NC_ITEM_DISMANTLE_REQ` FUN_005293c0, DB 0x3477 FUN_005298f0 | Z04 §12.1, Z05 §8.6 (done) | the handlers around §2 |
 | `sp_HPStoneUse` FUN_00589180, SOULSTONE USE / BUY handlers | Z04 §13 (done) | §3 adds only the SP use and the queue |
 | `sp_NC_CT_SET_CURRENT_REQ` FUN_005cb100, `CheckNewTitle` FUN_005cb5f0, `InitNewPlayer` FUN_005ca620 | Z08 §7.2, Z18 §6.2, Z07 §4 (done) | title logic around §4 |
-| `sp_SpamCheck` FUN_005649d0, `sp_SpamSetBlock` FUN_00562ab0, `spdb_Load` FUN_005897f0 | Z02 §3.4, Z01 §3 (done) | spam filter use and load |
+| `sp_SpamCheck` FUN_005649d0, `sp_SpamSetBlock` FUN_00562ab0, `spdb_Load` FUN_005897f0 | Z02 §3.4, Z01 §2.3 (done) | spam filter use and load |
 | `zls_TravelComplete` FUN_0045b1f0, `ZoneConnectSession::zcs_Send` (ring transport) | Z01 §10, Z13 §4.6 (done) | shared ring plumbing |
 | the other `fc_CanEnterField` overloads FUN_00461ee0 / FUN_00462040, `fldb_GetFieldLv` FUN_0046a370 | Z02 §6.5 (FUN_00461ee0 / FUN_00462040 cited), Z14 (fldb_GetFieldLv) (done) | instance / NPC-gate entry checks, not reached from §6.2 |
 | `BriefInfoExchanger::*_Exchange` | Z18 §2.1 (done) | brief-info batch |
-| `so_ply_EndofTrade` FUN_004c4b50 body, `NPCManager::nm_UnmarkNPC` FUN_004c6ad0 | Z02 §6.2 (`sp_EndOfTrade`) / Z01 §9 (done) | NPC dialog close and schedule |
+| `sp_EndOfTrade` FUN_004c25b0 (body of the dialog close), `NPCManager::nm_UnmarkNPC` FUN_004c6ad0 | Z02 §6.2 / Z01 §9 (done) | NPC dialog close and schedule; the `so_ply_EndofTrade` wrapper FUN_004c4b50 is §7 |
 | `Raid::*`, `RaidSystem::*`, `RaidTask::rt_*` | Z14 §5 (done) | raid library |
 | `CParty::MemberJoin` / `CreateRaidParty` / `MemberLeave` | Z08 §1, Z14 §5 (done) | party library |
 | `GuildStorageManager::gsm_FindStorage` and friends | Z14 §3 (done) | guild storage |
 | TERMEXTEND `0x34B7` / `0x34B8` | Z04 §12.9, Z05 §8.5 (done) | handler and DB answer |
 | `CMoverUpgradeData` tables (RareMoverRate / SubRate / Info) | Z13 §7.1 (done) | table loading |
-| `WeddingHall::wh_Reserv`, `ShineDateTime::operator+=(ShineDateTimeSpan)` FUN_0059ead0 | Z07 §12 open point (done item; "wh_Reserv internals: not reconstructed") | not reached from Z30's functions; a wedding-hall question, not a leftover of the coverage list. Small; noted here: `wh_Reserv` sets EnteringStart = now + span 0x14000000, EnteringEnd = +0x5000000, WeddingEnd = +0xa000000 (ShineDateTimeSpan {u16 date, u8 hour, u8 minute}: +20 min, +5 min, +10 min) |
+| `WeddingHall::wh_Reserv` FUN_005a0810, `ShineDateTime::operator+=(ShineDateTimeSpan)` FUN_0059ead0 | Z13 §4.2 (done; cites both) | not reached from Z30's functions; the reservation times (+20 / +5 / +10 min) are documented there |
