@@ -349,39 +349,82 @@ def cstr(b):
     return b.split(b"\0", 1)[0].decode("cp1252", "replace")
 
 
+def struct_of(base, structs):
+    """struct definition by name; "Inner" also finds a nested "Outer::Inner" when the suffix is unique (P02)"""
+    if base in structs:
+        return structs[base]
+    hits = [k for k in structs if k.endswith("::" + base)]
+    return structs[hits[0]] if len(hits) == 1 else None
+
+
+def inline_struct(typ):
+    """'{u8,u8}[n]' -> ('{u8,u8}', struct dict, '[n]') or None (anonymous element types of hand annotations)"""
+    m = re.fullmatch(r"\{([\w, ]+)\}((?:\[[\w.]*\])*)", typ)
+    if not m or not all(t.strip() in INT for t in m.group(1).split(",")):
+        return None
+    fs, off = [], 0
+    for i, t in enumerate(x.strip() for x in m.group(1).split(",")):
+        fs.append([off, t, f"f{i}", ""])
+        off += struct.calcsize(INT[t])
+    return "{" + m.group(1) + "}", dict(size=off, fields=fs), m.group(2)
+
+
 def decode_ann(payload, fields, structs, docs):
-    """annotation fields [[off, type, name, note]] -> (list of (name, value), covered bytes, end, problem)"""
+    """annotation fields [[off, type, name, note]] -> (list of (name, value), covered bytes, end, problem)
+
+    Type forms: INT names, char[n], u8/byte[n], `bytes` (rest of the payload), struct names (also the suffix of a
+    nested `Outer::Inner`), inline `{u8,u16}` elements, dims `[n]` / `[countField]` / `[]` (rest of the payload),
+    `struct[count]` followed by `name[i].member` fields at the element offsets. A struct whose first field is
+    `datasize` is variable-length: each element takes 1 + datasize bytes (PROTO_ITEMPACKET_INFORM)."""
     out, cov, pos, vals, variable = [], set(), 0, {}, False
-    for off, typ, name, _ in fields:
+    fields, k = list(fields), 0
+    while k < len(fields):
+        off, typ, name, _ = fields[k][:4]
+        k += 1
         if not variable:
             pos = off
-        m = re.fullmatch(r"(\w+)((?:\[[\w.]+\])*)", typ)      # a dim may name a count field (pdb2017: dotted)
-        if not m:
-            return out, cov, pos, f"unparsed type {typ}"
-        base, dims = m.group(1), re.findall(r"\[([\w.]+)\]", m.group(2))
+        sub = []                                               # `struct[num]` + `name[i].x` overlay (Z11, Z17)
+        while k < len(fields) and str(fields[k][2]).startswith(name + "[i]."):
+            sub.append([fields[k][0] - off, fields[k][1], fields[k][2][len(name) + 4:], ""])
+            k += 1
+        inl = inline_struct(typ)
+        if inl:
+            base, sdef, dimtxt = inl
+        else:
+            m = re.fullmatch(r"(\w+(?:::\w+)*)((?:\[[\w.]*\])*)", typ)   # a dim may name a count field (pdb2017: dotted)
+            if not m:
+                return out, cov, pos, f"unparsed type {typ}"
+            base, dimtxt = m.group(1), m.group(2)
+            sdef = struct_of(base, structs)
+            if sub:
+                sdef = dict(size=max(o + elem_size(t, structs) for o, t, _, _ in sub), fields=sub)
+        dims = re.findall(r"\[([\w.]*)\]", dimtxt)
         dims_n = []
-        esz = structs[base]["size"] if base in structs else struct.calcsize(INT[base]) if base in INT else 1
+        dsz = bool(sdef) and sdef["fields"] and sdef["fields"][0][2] == "datasize"
+        esz = sdef["size"] if sdef else struct.calcsize(INT[base]) if base in INT else 1
         for d in dims:
             if d.isdigit():
                 dims_n.append(int(d))
             else:
                 variable = True
-                dims_n.append(vals.get(d) if isinstance(vals.get(d), int) else max(0, len(payload) - pos) // max(esz, 1))
-        if base in structs:
-            ssz, n = structs[base]["size"], (dims_n[0] if dims_n else 1)
-            if pos + ssz * n > len(payload):
-                return out, cov, pos + ssz * n, f"{name}: needs {ssz * n} bytes at {pos}, payload has {len(payload)}"
-            items = []
-            for i in range(n):
-                rec = payload[pos + i * ssz:pos + (i + 1) * ssz]
-                items.append(dict(decode_ann(rec, structs[base]["fields"], structs, docs)[0]))
-            val, size = items if dims_n else items[0], ssz * n
+                c = vals.get(d)
+                dims_n.append(c if isinstance(c, int) else None if dsz else max(0, len(payload) - pos) // max(esz, 1))
+        if sdef:
+            n = dims_n[0] if dims_n else 1
+            items, q = [], pos
+            while (n is None and q < len(payload)) or (n is not None and len(items) < n):
+                ssz = 1 + payload[q] if dsz and q < len(payload) else sdef["size"]
+                if q + ssz > len(payload):
+                    return out, cov, q + ssz, f"{name}[{len(items)}]: needs {ssz} bytes at {q}, payload has {len(payload)}"
+                items.append(dict(decode_ann(payload[q:q + ssz], sdef["fields"], structs, docs)[0]))
+                q += ssz
+            val, size = items if dims_n else items[0], q - pos
         else:
             esz = 1 if base not in INT else struct.calcsize(INT[base])
             count = 1
             for d in dims_n:
                 count *= d
-            size = esz * count
+            size = esz * count if dims_n or base != "bytes" else max(0, len(payload) - pos)
             if pos + size > len(payload):
                 return out, cov, pos + size, f"{name}: needs {size} bytes at {pos}, payload has {len(payload)}"
             raw = payload[pos:pos + size]
@@ -394,6 +437,8 @@ def decode_ann(payload, fields, structs, docs):
                 val = vs[0] if not dims_n else vs
             else:
                 val = raw
+            if base == "bytes":
+                variable = True
         vals[name] = val
         if isinstance(val, int) and re.search(r"error|reason", name) and val in docs["errors"]:
             val = f"{val:#06x} ({docs['errors'][val]})"
@@ -401,6 +446,18 @@ def decode_ann(payload, fields, structs, docs):
         cov.update(range(pos, pos + size))
         pos += size
     return out, cov, pos, None
+
+
+def elem_size(typ, structs):
+    """byte size of one annotation field type with fixed dims (used for `name[i].x` overlays)"""
+    m = re.fullmatch(r"(\w+(?:::\w+)*)((?:\[\d+\])*)", typ)
+    if not m:
+        return 1
+    sdef = struct_of(m.group(1), structs)
+    n = sdef["size"] if sdef else struct.calcsize(INT[m.group(1)]) if m.group(1) in INT else 1
+    for d in re.findall(r"\[(\d+)\]", m.group(2)):
+        n *= int(d)
+    return n
 
 
 def decode_gen(payload, fields):
@@ -709,7 +766,9 @@ def to_json(res, rows):
 def run(path, ports, show_secrets=False, out_dir=None):
     res = decode_capture(path, ports, show_secrets)
     rows = build_report(res)
-    stem = os.path.join(out_dir or os.path.dirname(os.path.abspath(path)), os.path.basename(path))
+    out_dir = out_dir or os.path.dirname(os.path.abspath(path))
+    os.makedirs(out_dir, exist_ok=True)
+    stem = os.path.join(out_dir, os.path.basename(path))
     with open(stem + ".decoded.txt", "w") as f:
         write_decoded(res, f)
     with open(stem + ".report.md", "w") as f:
@@ -790,6 +849,10 @@ def selftest():
     pkts.append((tcp(S, C, 9210, 50001, 9000, frame(struct.pack("<HH", 0x0807, zseed))), None))
     e1, _ = xor(zb[1], zseed % 499)
     pkts.append((tcp(C, S, 50001, 9210, 7000 + 3, frame(e1)), None))
+    # second zone stream without SYN ("displayed packets" save, P02): the seed comes before the first client packet
+    z2seed = 5
+    pkts.append((tcp(S, C, 9212, 50003, 11000, frame(struct.pack("<HH", 0x0807, z2seed))), None))
+    pkts.append((tcp(C, S, 50003, 9212, 12000, frame(xor(struct.pack("<H", 0x1803), z2seed % 499)[0])), None))
     # server link (plaintext, no seed), e.g. WM <-> Character DB
     lop, lv = next((op, v) for op, v in sorted(docs["link_ann"].items())
                    if v["fields"] and all(f[1] in ("u8", "u16", "u32") for f in v["fields"]))
@@ -827,7 +890,8 @@ def selftest():
                 ("login#1", S2C, 0x0C09), ("login#1", S2C, 0x0C05), ("login#1", S2C, unknown_op),
                 ("wm#1", C2S, 0x1001), ("wm#1", C2S, 0x0C0F), ("wm#1", C2S, 0x1001), ("wm#1", S2C, gen_op),
                 ("zone#1", C2S, 0x0806), ("zone#1", S2C, 0x0807), ("zone#1", C2S, 0x1803),
-                (f"{link_ports()[lport]}#1", C2S, lop), (f"{link_ports()[lport]}#1", S2C, lop)]
+                ("zone#2", S2C, 0x0807), ("zone#2", C2S, 0x1803),
+                 (f"{link_ports()[lport]}#1", C2S, lop), (f"{link_ports()[lport]}#1", S2C, lop)]
         assert got == want, got
         login = dict(ps[3]["fields"])
         assert login["sUserName"] == "tester" and set(login["sPassword"]) == {"*"}, login   # L00 names (pdb2017)
@@ -851,6 +915,22 @@ def selftest():
         assert pdb_pick(docs["pdb"][0x0830], 3)["name"] == "NC_MISC_SERVERPARAMETER_ACK"   # alias layout by size
         f = decode_ann(b"\x02\x01\x00\x02\x00", [[0, "u8", "a.num", ""], [1, "u16[a.num]", "arr", ""]], {}, docs)
         assert f[0] == [("a.num", 2), ("arr", [1, 2])] and f[2] == 5 and not f[3], f
+        # type forms added by P02: [] = rest, bytes = rest, Outer::Inner suffix, inline {u8,u8}, name[i].x overlay, datasize
+        f = decode_ann(b"\x07\x01\x00\x02\x00", [[0, "u8", "k", ""], [1, "u16[]", "rest", ""]], {}, docs)
+        assert f[0] == [("k", 7), ("rest", [1, 2])] and not f[3], f
+        f = decode_ann(b"\x07abc", [[0, "u8", "k", ""], [1, "bytes", "tail", ""]], {}, docs)
+        assert f[0] == [("k", 7), ("tail", b"abc")] and not f[3], f
+        st = {"Outer::Inner": dict(size=2, fields=[[0, "u8", "x", ""], [1, "u8", "y", ""]])}
+        f = decode_ann(b"\x01\x02\x03\x04", [[0, "Inner[2]", "e", ""]], st, docs)
+        assert f[0] == [("e", [{"x": 1, "y": 2}, {"x": 3, "y": 4}])] and not f[3], f
+        f = decode_ann(b"\x02\x01\x02\x03\x04", [[0, "u8", "n", ""], [1, "{u8,u8}[n]", "p", ""]], {}, docs)
+        assert f[0] == [("n", 2), ("p", [{"f0": 1, "f1": 2}, {"f0": 3, "f1": 4}])] and not f[3], f
+        f = decode_ann(b"\x01\x00\x09\x02\x00\x08", [[0, "S[2]", "s", ""], [0, "u16", "s[i].a", ""], [2, "u8", "s[i].b", ""]], {}, docs)
+        assert f[0] == [("s", [{"a": 1, "b": 9}, {"a": 2, "b": 8}])] and not f[3], f
+        st = {"V": dict(size=3, fields=[[0, "u8", "datasize", ""], [1, "u8", "id", ""]])}
+        f = decode_ann(b"\x01\x05\x02\x06\xff", [[0, "V[]", "v", ""]], st, docs)
+        assert f[0] == [("v", [{"datasize": 1, "id": 5}, {"datasize": 2, "id": 6}])] and not f[3], f
+        assert [client_dir(d) for d in ("C→WM", "Z→C", C2S, "WM→Z")] == [C2S, S2C, C2S, "WM→Z"]
         f10 = dict(ps[10]["fields"])                         # C01 names it user_id, W01 (merged later) userId
         assert f10.get("userId", f10.get("user_id")) == "tester" and dict(ps[11]["fields"])["slot"] == 1
         assert any("not among the constants" in s for s in ps[12]["issues"]), ps[12]
@@ -860,6 +940,8 @@ def selftest():
         assert res["streams"][0]["seeds"][0]["seed"] == seed
         assert any("1 retransmitted" in s for s in res["streams"][0]["problems"]), res["streams"][0]["problems"]
         assert any("brute-forced start index" in s for s in res["streams"][2]["decrypt"])
+        z2 = res["streams"][3]                               # seed before the first client packet, no SYN (P02)
+        assert z2["seeds"][0]["seed"] == z2seed and not any("brute-forced" in s for s in z2["decrypt"]), z2
         for lp in ps[-2:]:                                   # link packets: plaintext, decoded from the link annotation
             f0 = lv["fields"][0]
             want0 = int.from_bytes(lpay[f0[0]:f0[0] + {"u8": 1, "u16": 2, "u32": 4}[f0[1]]], "little")

@@ -49,6 +49,17 @@ Basis: Character server FUN_0046bff0 (reads SQL columns in this order with SQLGe
 | 125 | u32 | TutorialInfo.nTutorialState | default 3 when no tutorial row; L00 name 'tutorial_state (inferred)' |
 | 129 | u8 | TutorialInfo.nTutorialStep | L00 name 'tutorial_step (inferred)' |
 
+### USEITEM_MINIMON_INFO (50 bytes)
+
+Basis: 2016 Zone.pdb (pdb2016) struct USEITEM_MINIMON_INFO, size 0x32; referenced by Z13's 0x1123 annotation; 7 captured 0x1123 (50 bytes) decode in full
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bNormalItem |  |
+| 1 | u8 | bChargedItem |  |
+| 2 | u16[12] | NormalItemList | item ids, 0xFFFF = empty |
+| 26 | u16[12] | ChargedItemList | item ids, 0xFFFF = empty |
+
 ## Client → server
 
 ### `0x080d` NC_MISC_GAMETIME_REQ
@@ -312,6 +323,8 @@ No payload fields read directly by the handler.
 
 0x140 bytes; W01 name was 'world login (ours)'
 
+**Captured** (P02, `capture-validation.md`; all five): `userId`: 'admin' + NUL padding (256); `validate`: the 32 words of the preceding Login 0x0C0C, unchanged (7/7)
+
 Handler `FUN_00419860`
 
 | Off | Type | Checks in handler | Notes |
@@ -358,6 +371,8 @@ Handler `FUN_00419860`
 |---|---|---|---|
 | 0 | u8 | LogoutType |  |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world): `LogoutType`: 0 (game → world list)
+
 Handler `FUN_00412df0`
 
 | Off | Type | Checks in handler | Notes |
@@ -395,6 +410,8 @@ No payload fields read directly by the handler.
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | slot | 0..5 |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `slot`: 0
 
 Handler `FUN_00422be0`
 
@@ -487,6 +504,8 @@ Handler `FUN_00418cb0`
 
 W01 name was 'character create (ours)'
 
+**Captured** (P02, `capture-validation.md`; create-char): `slot`: 1; `name`: 'CharCreateTest'; `shape[0]`: 0x19 = race 1 Human, class 6 Cleric, gender 0 (female); `shape[1..3]`: HairInfo 1 'Feather', HairColorInfo 1 'Deep Blue', FaceInfo 5 'Face 3'
+
 Handler `FUN_004229f0`
 
 | Off | Type | Checks in handler | Notes |
@@ -508,6 +527,8 @@ Handler `FUN_004229f0`
 | 0 | u8 | slot |  |
 
 W01 name was 'character delete (ours)'
+
+**Captured** (P02, `capture-validation.md`; create-char): `slot`: 1
 
 Handler `FUN_00412fa0`
 
@@ -1206,6 +1227,8 @@ Handler `FUN_004148f0`
 | 2 | GAME_OPTION_DATA[nGameOptionDataCnt] | GameOptionData | variable length, element GAME_OPTION_DATA |
 
 Element `GAME_OPTION_DATA` (3 bytes): +0 u16 nOptionNo, +2 u8 nValue
+
+**Captured** (P02, `capture-validation.md`; idle_in_world): `nGameOptionDataCnt`: 28
 
 Handler `FUN_00414af0`
 
@@ -2476,6 +2499,8 @@ Sent from `FUN_00430550` (`FUN_00430550`) · payload 2 bytes · raw header
 | 1 | u8 | minute |  |
 | 2 | u8 | second |  |
 
+**Captured** (P02, `capture-validation.md`; all five): `hour/minute/second`: server local time (UTC+1), equal to the capture clock to the second (11/11)
+
 Sent in reply to `0x080d` NC_MISC_GAMETIME_REQ on CParserClient (`FUN_00413050`) · payload 3 bytes · raw header
 
 | Off | Type | Value / source |
@@ -2588,6 +2613,8 @@ Sent from `FUN_00431cd0` (`FUN_00431cd0`) · payload 3 bytes
 | 28 | i32 | dCurrentTM.tm_yday |  |
 | 32 | i32 | dCurrentTM.tm_isdst |  |
 | 36 | i8 | nTimeZone |  |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `dCurrentTM`: local time; periodic copies tm_sec 0; `nTimeZone`: 1
 
 Sent from `FUN_00432e10` (`FUN_00432e10`) · payload 37 bytes
 
@@ -2703,6 +2730,8 @@ Sent in reply to `0x086e` NC_MISC_ITEMSHOP_URL_REQ on CParserClient (`FUN_004184
 
 W01 name was 'avatar list (ours)'
 
+**Captured** (P02, `capture-validation.md`; all five): `worldmanager`: session handle 0, 5000, 7500, 10000, 12500, 17500: +2500 (nMaxAccept) per reuse of the slot; `numofavatar`: 1; `avatar`: Test1235, see capture-validation §4.3 (delinfo bytes 1..4 uninitialised, P02-B1)
+
 Sent in reply to `0x0c13` NC_USER_AVATARINFO_ACK on CParserCharDB (`FUN_0040ede0`) · payload variable (uVar2 * 0x82 + 3)
 
 | Off | Type | Value / source |
@@ -2738,6 +2767,8 @@ Sent in reply to `0x0c0f` NC_USER_LOGINWORLD_REQ on CParserClient (`FUN_00419860
 
 W01 name was 'kick reason (ours)'
 
+**Captured** (P02, `capture-validation.md`; login-errors): `reason`: 0x683 (Login-initiated duplicate-login kick)
+
 Sent from `FUN_004305a0` (`FUN_004305a0`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
@@ -2754,6 +2785,8 @@ Sent from `FUN_004305a0` (`FUN_004305a0`) · payload 2 bytes · raw header
 | 2 | char[32] | token |  |
 
 W01 name was 'return-to-world-select token (ours)'
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, login-logout): `result`: 0x1E58; `token`: 32 ASCII hex characters
 
 Sent in reply to `0x0c36` NC_USER_CREATE_OTP_ACK on CParserLogin (`FUN_00424a70`) · payload 34 bytes · raw header
 
@@ -2795,6 +2828,8 @@ Sent in reply to `0x1006` NC_CHAR_CHARDATAFAIL_ACK on CParserCharDB (`FUN_00409e
 | 16 | u16 | zonePort |  |
 
 W01 name was 'character login ok (ours)'
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `zoneIp`: '172.16.42.214'; `zonePort`: 9210 (Zone00, map RouN)
 
 Sent in reply to `0x1005` NC_CHAR_CHARDATA_ACK on CParserCharDB (`FUN_00410040`) · payload 18 bytes · raw header
 
@@ -2863,6 +2898,8 @@ Sent in reply to `0x107c` NC_CHAR_SET_STYLE_GET_INFO_REQ on CParserClient (`FUN_
 |---|---|---|---|
 | 0 | u8 | nGuideViewNum |  |
 | 1 | u8[nGuideViewNum] | nGuideViewList | variable length |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `nGuideViewNum`: 34 (ids < 0xC5)
 
 Sent from `FUN_00432ce0` (`FUN_00432ce0`) · payload variable (_Size)
 
@@ -4396,6 +4433,8 @@ Sent from `FUN_00452750` (`FUN_00452750`) · payload variable ((uint)(pcVar2 + (
 | 32 | i32 | tm_ServerTime.tm_yday |  |
 | 36 | i32 | tm_ServerTime.tm_isdst |  |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `ServerTime`: = capture time (s); `tm_ServerTime`: local
+
 Sent from `FUN_004559e0` (`FUN_004559e0`) · payload 40 bytes · raw header
 
 | Off | Type | Value / source |
@@ -4412,6 +4451,8 @@ Sent from `FUN_004559e0` (`FUN_004559e0`) · payload 40 bytes · raw header
 | 2 | PROTO_KQ_INFO_CLIENT[NumOfAdd] | AddQuestArray | variable length, element PROTO_KQ_INFO_CLIENT |
 
 Element `PROTO_KQ_INFO_CLIENT` (141 bytes): +0 u32 Handle, +4 u8 Status, +5 u16 NumOfJoiner, +7 u16 ID, +9 char[64] Title, +73 u16 LimitTime, +75 i32 StartTime, +79 i32 tm_StartTime.tm_sec, +83 i32 tm_StartTime.tm_min, +87 i32 tm_StartTime.tm_hour, +91 i32 tm_StartTime.tm_mday, +95 i32 tm_StartTime.tm_mon, +99 i32 tm_StartTime.tm_year, +103 i32 tm_StartTime.tm_wday, +107 i32 tm_StartTime.tm_yday, +111 i32 tm_StartTime.tm_isdst, +115 u16 StartWaitTime, +117 u8 MinLevel, +118 u8 MaxLevel, +119 u16 MinPlayers, +121 u16 MaxPlayers, +123 u8 PlayerRepeatMode, +124 u16 PlayerRepeatCount, +126 u8 PlayerRevivalMode, +127 u8 PlayerRevivalCount, +128 u16 DemandQuest, +130 u16 DemandItem, +132 i64 DemandClass, +140 u8 DemandGender
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `NumOfAdd`: 53, 53, 30 / 32 (split after passing 0x1D25)
 
 Sent from `FUN_004559e0` (`FUN_004559e0`) · payload variable (uVar4)
 
@@ -4452,6 +4493,8 @@ Fill: +8191: FUN_0042fc50
 
 Element `KQ_UPDATE_ITEMS` (7 bytes): +0 u32 Handle, +4 u8 Status, +5 u16 NumOfJoiner
 
+**Captured** (P02, `capture-validation.md`; idle_in_world): `UpdateQuestArray`: {14, Status 1, 0}, then {14, Status 2, 0}
+
 Sent from `FUN_004559e0` (`FUN_004559e0`) · payload variable ((uint)local_203f * 7 + 2)
 
 | Off | Type | Value / source |
@@ -4470,6 +4513,8 @@ Sent from `FUN_004559e0` (`FUN_004559e0`) · payload variable ((uint)local_203f 
 | 7 | u8 | KQInfo.nMaxLev |  |
 | 8 | u8 | MsgLength |  |
 | 9 | u8[MsgLength] | Msg | variable length |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world): `KQInfo`: {14, 16, 46, 60}; `Msg`: MsgWorldManager row 0 with the KQ title, MsgLength 75
 
 Sent from `FUN_00452930` (`FUN_00452930`) · payload variable ((uint)(pcVar2 + (9 - (int)(param_1 + 1))))
 
@@ -4508,6 +4553,8 @@ Sent from `FUN_00452a70` (`FUN_00452a70`) · payload 6 bytes
 | 2 | KQ_JOINING_ALARM_INFO[nNumOfKQ] | KQList | variable length, element KQ_JOINING_ALARM_INFO |
 
 Element `KQ_JOINING_ALARM_INFO` (8 bytes): +0 u32 nHandle, +4 u16 nID, +6 u8 nMinLev, +7 u8 nMaxLev
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `nNumOfKQ`: 22 / 24 (Status-2 KQs)
 
 Sent from `FUN_00452b60` (`FUN_00452b60`) · payload variable (uVar3)
 
@@ -4791,6 +4838,8 @@ Sent from `FUN_00431680` (`FUN_00431680`) · payload 1025 bytes
 | 0 | u8 | bSuccess |  |
 | 1 | u8[24] | Data.Data |  |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `bSuccess`: 1; `Data`: 24 bytes, = the client's later 0x7011
+
 Sent from `FUN_00431680` (`FUN_00431680`) · payload 25 bytes
 
 ### `0x7007` NC_CHAR_OPTION_GET_VIDEO_ACK
@@ -4835,6 +4884,8 @@ Sent from `FUN_00431680` (`FUN_00431680`) · payload 65 bytes
 | 0 | u8 | bSuccess |  |
 | 1 | u8[392] | Data.Data |  |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `bSuccess`: 1; `Data`: 392 bytes, = the client's later 0x7015
+
 Sent from `FUN_00431680` (`FUN_00431680`) · payload 393 bytes
 
 ### `0x700f` NC_CHAR_OPTION_GET_KEYMAPPING_ACK
@@ -4859,6 +4910,8 @@ Sent from `FUN_00431680` (`FUN_00431680`) · payload 309 bytes
 
 Element `SHORT_CUT_DATA` (7 bytes): +0 u8 nSlotNo, +1 u16 nCodeNo, +3 i32 nValue
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `count`: 5; `data`: 5 x SHORT_CUT_DATA (7 bytes)
+
 Sent from `FUN_00431680` (`FUN_00431680`) · payload variable ((uint)local_2213[0] * 7 + 2)
 
 ### `0x7033` NC_CHAR_OPTION_IMPROVE_GET_KEYMAP_CMD
@@ -4872,6 +4925,8 @@ Sent from `FUN_00431680` (`FUN_00431680`) · payload variable ((uint)local_2213[
 
 Element `KEY_MAP_DATA` (4 bytes): +0 u16 nFunctionNo, +2 u8 nExtendKey, +3 u8 nASCIICode
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `nKeyMapDataCnt`: 95
+
 Sent from `FUN_00431680` (`FUN_00431680`) · payload variable ((uint)local_2213[0] * 4 + 2)
 
 ### `0x7034` NC_CHAR_OPTION_IMPROVE_GET_GAMEOPTION_CMD
@@ -4884,6 +4939,8 @@ Sent from `FUN_00431680` (`FUN_00431680`) · payload variable ((uint)local_2213[
 | 2 | GAME_OPTION_DATA[nGameOptionDataCnt] | GameOptionData | variable length, element GAME_OPTION_DATA |
 
 Element `GAME_OPTION_DATA` (3 bytes): +0 u16 nOptionNo, +2 u8 nValue
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `nGameOptionDataCnt`: 28
 
 Sent from `FUN_00431680` (`FUN_00431680`) · payload variable ((uint)local_2213[0] * 3 + 2)
 
@@ -6251,6 +6308,8 @@ Sent in reply to `0x7c04` NC_PRISON_END_REQ on CParserClient (`FUN_004155f0`) ·
 | 4 | char[16] | sReason |  |
 | 20 | char[64] | sRemark |  |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `err`: 0x0DB1 (not in prison); `nMinute`: 0; 4-byte short form, no sReason/sRemark
+
 Sent in reply to `0x7c0f` NC_DATA_PRISON_GET_ACK on CParserCharDB (`FUN_0040c350`) · payload 84 bytes · raw header
 
 | Off | Type | Value / source |
@@ -6482,6 +6541,8 @@ Sent in reply to `0x940a` NC_HOLY_PROMISE_DEL_DOWN_REQ on CParserClient (`FUN_00
 | 29 | PROTO_HOLY_PROMISE_INFO[MemberCount] | MemberInfo | variable length, element PROTO_HOLY_PROMISE_INFO |
 
 Element `PROTO_HOLY_PROMISE_INFO` (26 bytes): +0 char[20] PromiseCharID, +20 u32 LogonInfo.login|year|month|day|hour, +24 u8 Level, +25 u8 Flags
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `nPart`: 3; `MemberCount`: 0
 
 Sent from `FUN_00434c20` (`FUN_00434c20`) · payload variable (uVar2)
 
@@ -12187,4 +12248,14 @@ size 0x12, not checked
 | 0 | u32 | nCharNo |  |
 
 4 bytes; field names pdb2017, offsets read in the 2016 WM
+
+## Captured packets without a section above
+
+### `0x1012` NC_CHAR_GUILD_CMD (S→C)
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `nGuildNo`: 0 (4-byte form)
+
+### `0x1097` NC_CHAR_GUILD_ACADEMY_CMD (S→C)
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `nGuildAcademyNo`: 0; `isGuildAcademyMember`: 0 (5-byte form)
 

@@ -9,12 +9,17 @@ root, docs = sys.argv[1], sys.argv[2]
 cat = {c["op"]: c for c in json.load(open(f"{docs}/opcodes.json"))}
 import glob
 ANN = json.load(open(f"{docs}/annotations.json"))
+EVID, SHOWN = {}, set()
 # per-work-item annotation files (docs/protocol/annotations/*.json) are merged on top, same schema
 for f in sorted(glob.glob(f"{docs}/annotations/*.json")):
     extra = json.load(open(f))
     ANN["structs"].update(extra.get("structs", {}))
     for srv, pk in extra.get("packets", {}).items():
         ANN["packets"].setdefault(srv, {}).update(pk)
+    # capture confirmations (P02 `evidence`: {server: {op: {dir, captures, fields{name: note}}}}), shown under the layout
+    for srv, pk in extra.get("evidence", {}).items():
+        for op, e in pk.items():
+            EVID.setdefault((srv, op.lower(), e.get("dir")), []).append((os.path.basename(f)[:-5], e))
 # 2017 client PDB layouts (work item C02): shown when no hand annotation exists, above the generated guess
 _pp = f"{docs}/pdb-layouts.json"
 PDB = json.load(open(_pp)) if os.path.exists(_pp) else {"opcodes": {}, "structs": {}}
@@ -88,6 +93,17 @@ def verified(server, op, direction):
         rows.append("Empty payload.")
     if a.get("notes"): rows.append(f"\n{a['notes']}")
     return rows + [""]
+
+
+def captured(server, op, direction):
+    """capture confirmations of this packet (annotations/<ID>.json `evidence`, work item P02)"""
+    rows, key = [], (server, op.lower(), direction)
+    if key in SHOWN: return rows                     # once per page (annotation keys differ in case: 0x182b / 0x182B)
+    SHOWN.add(key)
+    for item, e in EVID.get((server, op.lower(), direction), []):
+        fs = "; ".join(f"`{k}`: {v}" for k, v in e.get("fields", {}).items())
+        rows.append(f"**Captured** ({item}, `capture-validation.md`; {', '.join(e.get('captures', []))})" + (f": {fs}" if fs else "") + "\n")
+    return rows
 
 
 def pdb_layout(op, sizes):
@@ -176,6 +192,7 @@ def render(server):
         v = verified(server, op, None if link else "C→S"); done.add((d, op))
         lc = [int(c[3:], 0) - 2 for c in r["len_checks"] if c[:3] in ("== ", "!= ")]
         out += v or pdb_layout(op, lc)
+        out += captured(server, op, d)
         out.append(f"Handler `{r['handler']}`" + (f" ({pname})" if link else "") +
                    (f" · packet length check: {', '.join(r['len_checks'])} (length includes the opcode)" if r["len_checks"] else ""))
         if not r["fields"]:
@@ -197,6 +214,7 @@ def render(server):
         out.append(f"### `{op}` {name(op, server)}\n")
         v = verified(server, op, None if link else "S→C"); done.add((adir(op) if link else "S→C", op))
         out += v or pdb_layout(op, [x["size"] for x in sites if x["size"] is not None])
+        out += captured(server, op, "S→C")
         seen_layouts = set()
         for s in sites[:4]:
             key = json.dumps(sorted((o, f["size"]) for o, f in s["fields"].items()))
@@ -226,6 +244,13 @@ def render(server):
         for d, op in sorted(rest):
             out.append(f"### `{op}` {name(op, server)} ({d})\n")
             out += verified(server, op, d)
+            out += captured(server, op, d)
+    left = sorted(k for k in EVID if k[0] == server and k not in SHOWN)
+    if left:
+        out.append("## Captured packets without a section above\n")
+        for _, op, d in left:
+            out.append(f"### `{op}` {name(op, server)} ({d})\n")
+            out += captured(server, op, d)
     open(f"{docs}/packets-{server}.md", "w").write("\n".join(out) + "\n")
     if link:
         print(f"{server}: {len(L['c2s'])} received, {len(L['s2c'])} sent, {len(rest)} hand-verified only")

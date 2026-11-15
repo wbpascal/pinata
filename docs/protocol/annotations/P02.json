@@ -1,5 +1,5 @@
 {
- "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it (tools ignore this key; capture-validation.md is the readable form). Capture names are re-data/captures/26_11_15_<name>.pcapng.",
+ "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it (`packets.py` renders each entry as a **Captured** line in packets-<server>.md; capture-validation.md has the full reasoning). Capture names are re-data/captures/26_11_15_<name>.pcapng.",
  "packets": {
   "login": {
    "0x0c37": {
@@ -79,6 +79,413 @@
      ]
     ],
     "notes": "P02: pdb2017 struct is empty; the 2016 WM sends 1 byte"
+   }
+  },
+  "zone": {
+   "0x1802": {
+    "dir": "S→C",
+    "name": "NC_MAP_LOGIN_ACK",
+    "basis": "pdb2016 PROTO_NC_CHAR_MAPLOGIN_ACK (0xF2) = {u16 charhandle, CHAR_PARAMETER_DATA param (0xE8), SHINE_XY_TYPE logincoord}; zone so_fill_PROTO_NC_CHAR_MAPLOGIN_ACK FUN_005a3140 / so_fill_CHAR_PARAMETER_DATA FUN_005a2e00 (Z07 §1.5)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "charhandle",
+      "player object handle: 8000 + pool index (8000, 8002, 8003, 8004 on zone 9210; 8000, 8001 on 9212). capture:idle_in_world, capture:walk-run-portals (7 map logins)"
+     ],
+     [
+      2,
+      "u64",
+      "param.PrevExp",
+      "g_LevelExp[level] (72987672292 at level 120)"
+     ],
+     [
+      10,
+      "u64",
+      "param.NextExp",
+      "g_LevelExp[level+1] (83037947834)"
+     ],
+     [
+      18,
+      "u32",
+      "param.Strength.base",
+      "layer 0 (pure)"
+     ],
+     [
+      22,
+      "u32",
+      "param.Strength.change",
+      "layer 15 (total)"
+     ],
+     [
+      26,
+      "u32",
+      "param.Constitute.base",
+      "layer 0 (pure)"
+     ],
+     [
+      30,
+      "u32",
+      "param.Constitute.change",
+      "layer 15 (total)"
+     ],
+     [
+      34,
+      "u32",
+      "param.Dexterity.base",
+      "layer 0 (pure)"
+     ],
+     [
+      38,
+      "u32",
+      "param.Dexterity.change",
+      "layer 15 (total)"
+     ],
+     [
+      42,
+      "u32",
+      "param.Intelligence.base",
+      "layer 0 (pure)"
+     ],
+     [
+      46,
+      "u32",
+      "param.Intelligence.change",
+      "layer 15 (total)"
+     ],
+     [
+      50,
+      "u32",
+      "param.Wizdom.base",
+      "never written: stale send-buffer bytes (Z07-B7). evidence: ', though', 'ful.', 00x6 FF FF"
+     ],
+     [
+      54,
+      "u32",
+      "param.Wizdom.change",
+      "stale, see base"
+     ],
+     [
+      58,
+      "u32",
+      "param.MentalPower.base",
+      "layer 0 (pure)"
+     ],
+     [
+      62,
+      "u32",
+      "param.MentalPower.change",
+      "layer 15 (total)"
+     ],
+     [
+      66,
+      "u32",
+      "param.WClow.base",
+      "layer 0 (pure)"
+     ],
+     [
+      70,
+      "u32",
+      "param.WClow.change",
+      "layer 15 (total)"
+     ],
+     [
+      74,
+      "u32",
+      "param.WChigh.base",
+      "layer 0 (pure)"
+     ],
+     [
+      78,
+      "u32",
+      "param.WChigh.change",
+      "layer 15 (total)"
+     ],
+     [
+      82,
+      "u32",
+      "param.AC.base",
+      "layer 0 (pure)"
+     ],
+     [
+      86,
+      "u32",
+      "param.AC.change",
+      "layer 15 (total)"
+     ],
+     [
+      90,
+      "u32",
+      "param.TH.base",
+      "layer 0 (pure)"
+     ],
+     [
+      94,
+      "u32",
+      "param.TH.change",
+      "layer 15 (total)"
+     ],
+     [
+      98,
+      "u32",
+      "param.TB.base",
+      "layer 0 (pure)"
+     ],
+     [
+      102,
+      "u32",
+      "param.TB.change",
+      "layer 15 (total)"
+     ],
+     [
+      106,
+      "u32",
+      "param.MAlow.base",
+      "layer 0 (pure)"
+     ],
+     [
+      110,
+      "u32",
+      "param.MAlow.change",
+      "layer 15 (total)"
+     ],
+     [
+      114,
+      "u32",
+      "param.MAhigh.base",
+      "layer 0 (pure)"
+     ],
+     [
+      118,
+      "u32",
+      "param.MAhigh.change",
+      "layer 15 (total)"
+     ],
+     [
+      122,
+      "u32",
+      "param.MR.base",
+      "layer 0 (pure)"
+     ],
+     [
+      126,
+      "u32",
+      "param.MR.change",
+      "layer 15 (total)"
+     ],
+     [
+      130,
+      "u32",
+      "param.MH.base",
+      "layer 0 (pure)"
+     ],
+     [
+      134,
+      "u32",
+      "param.MH.change",
+      "layer 15 (total)"
+     ],
+     [
+      138,
+      "u32",
+      "param.MB.base",
+      "layer 0 (pure)"
+     ],
+     [
+      142,
+      "u32",
+      "param.MB.change",
+      "layer 15 (total)"
+     ],
+     [
+      146,
+      "u32",
+      "param.MaxHp",
+      "3043 / 3033 = 0x1038.CurHP"
+     ],
+     [
+      150,
+      "u32",
+      "param.MaxSp",
+      "2851 / 2841"
+     ],
+     [
+      154,
+      "u32",
+      "param.MaxLp",
+      "0"
+     ],
+     [
+      158,
+      "u32",
+      "param.MaxAp",
+      "always 0"
+     ],
+     [
+      162,
+      "u32",
+      "param.MaxHPStone",
+      "441"
+     ],
+     [
+      166,
+      "u32",
+      "param.MaxSPStone",
+      "416"
+     ],
+     [
+      170,
+      "u32[4]",
+      "param.PwrStone",
+      "always 0 (16 bytes)"
+     ],
+     [
+      186,
+      "u32[4]",
+      "param.GrdStone",
+      "always 0"
+     ],
+     [
+      202,
+      "u32",
+      "param.PainRes.base",
+      "0"
+     ],
+     [
+      206,
+      "u32",
+      "param.PainRes.change",
+      "0"
+     ],
+     [
+      210,
+      "u32",
+      "param.RestraintRes.base",
+      "0"
+     ],
+     [
+      214,
+      "u32",
+      "param.RestraintRes.change",
+      "0"
+     ],
+     [
+      218,
+      "u32",
+      "param.CurseRes.base",
+      "0"
+     ],
+     [
+      222,
+      "u32",
+      "param.CurseRes.change",
+      "0"
+     ],
+     [
+      226,
+      "u32",
+      "param.ShockRes.base",
+      "0"
+     ],
+     [
+      230,
+      "u32",
+      "param.ShockRes.change",
+      "0"
+     ],
+     [
+      234,
+      "u32",
+      "logincoord.x",
+      "position after so_MapMarking; can differ from 0x1038 currentcoord (5874 -> 5899)"
+     ],
+     [
+      238,
+      "u32",
+      "logincoord.y",
+      ""
+     ]
+    ],
+    "notes": "P02: replaces the '?' blocks of annotations.json; capture-validation §5.3"
+   },
+   "0x302d": {
+    "dir": "S→C",
+    "name": "NC_ITEM_REWARDINVENOPEN_ACK",
+    "basis": "pdb2016 PROTO_NC_ITEM_REWARDINVENOPEN_ACK; zone so_ply_FillRewardInven FUN_004fc310 + irs_FillBufferItem FUN_00644c80",
+    "fields": [
+     [
+      0,
+      "u8",
+      "itemcounter",
+      "records that follow. evidence: capture:idle_in_world, capture:walk-run-portals = 0"
+     ],
+     [
+      1,
+      "bytes",
+      "itemarray",
+      "itemcounter × PROTO_ITEMPACKET_INFORM {u8 datasize, u16 location (Type 2), item}, then ONE stale byte (length = records + 2): P02-B3. evidence: 0x12, 0x10"
+     ]
+    ],
+    "notes": "P02: capture-validation §5.3"
+   },
+   "0x10bd": {
+    "dir": "S→C",
+    "name": "NC_CHAR_CLIENT_AUTO_PICK_ACK",
+    "basis": "pdb2016 PROTO_NC_CHAR_CLIENT_AUTO_PICK_ACK; zone sp_SetAutoPick FUN_005654d0 → sp_SendAutoPickToClient (error path _ErrorSendPlayer 0x1E01)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "err",
+      "0x1E00 ok, 0x1E01 no pick-up mini-mon. evidence: capture:idle_in_world 0x1E00 (2)"
+     ],
+     [
+      2,
+      "u8",
+      "bEnable",
+      "1 at login, 0 later"
+     ]
+    ]
+   },
+   "0x10c6": {
+    "dir": "S→C",
+    "name": "NC_CHAR_ADMIN_LEVEL_INFORM_CMD",
+    "basis": "pdb2016 PROTO_NC_CHAR_ADMIN_LEVEL_INFORM_CMD; zone sp_NC_MAP_LOGINCOMPLETE_CMD FUN_00443390 (only when adminlevel != 0)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "nAdminLevel",
+      "basedata.adminlevel. evidence: capture 100 (7)"
+     ]
+    ]
+   },
+   "0x1827": {
+    "dir": "S→C",
+    "name": "NC_MAP_FIELD_ATTRIBUTE_CMD",
+    "basis": "pdb2016 PROTO_NC_MAP_FIELD_ATTRIBUTE_CMD; zone so_ply_SendFieldAttribute FUN_0054aa20 (vt 0xd3c, from LOGINCOMPLETE)",
+    "fields": [
+     [
+      0,
+      "u32",
+      "eFieldMapType",
+      "FIELD_MAP_TYPE (pdb2016): 0 NORMAL, 1 KINGDOMQUEST, 2 MINIHOUSE, 3 INSTANCEDUNGEON, 4 TUTORIAL = FieldOption byte +0x36. evidence: capture 0 on RouN, RouVal01, RouCos02"
+     ]
+    ]
+   },
+   "0x200b": {
+    "dir": "C→S",
+    "name": "NC_ACT_ENDOFTRADE_CMD",
+    "basis": "zone sp_NC_ACT_ENDOFTRADE_CMD FUN_004c4a60 (no payload read, Z02 §6.4)",
+    "fields": [],
+    "notes": "P02: empty body. evidence: capture size 0"
+   },
+   "0x1071": {
+    "dir": "C→S",
+    "name": "NC_CHAR_LOGOUTREADY_CMD",
+    "basis": "pdb2016 enum NC_CHAR_LOGOUTREADY_CMD = 113; zone FUN_00558450 (Z07 §3.3)",
+    "fields": [],
+    "notes": "P02: empty body. evidence: capture size 0"
    }
   }
  },
@@ -478,6 +885,593 @@
      "reason": "0x683 (Login-initiated duplicate-login kick)"
     }
    }
+  },
+  "zone": {
+   "0x0807": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "seed": "consecutive per zone process: 1,3,4,5 (9210), 1,2 (9212), 1 (9214)"
+    }
+   },
+   "0x1801": {
+    "dir": "C→S",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "wm_handle": "WM session handle 12500 / 17500",
+     "char_name": "Test1235",
+     "shn_checksums": "49 × 32 hex digits, same in all 7"
+    }
+   },
+   "0x1803": {
+    "dir": "C→S",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {}
+   },
+   "0x1038": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "chrregnum 2, Level 120, map of the new zone, adminlevel 100"
+    }
+   },
+   "0x1039": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "AE 04 00 00"
+    }
+   },
+   "0x103a": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "bNeedClear 1, 0 quests"
+    }
+   },
+   "0x103b": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "0 records"
+    }
+   },
+   "0x10ce": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "1 id (3109)"
+    }
+   },
+   "0x10d7": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "0 records"
+    }
+   },
+   "0x103d": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "24 skills, nMaxNum 24, PartMark 3"
+    }
+   },
+   "0x103e": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "3 passives"
+    }
+   },
+   "0x1047": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "box 9/8/12/15, flag bit 0 set, bits 1-7 stale"
+    }
+   },
+   "0x1049": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "8 titles"
+    }
+   },
+   "0x104a": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "1 buff"
+    }
+   },
+   "0x1048": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "0xFFFF, 0xFFFF"
+    }
+   },
+   "0x10de": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "0, 1000000"
+    }
+   },
+   "0x441e": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "start of current year/month/week/day, server local time"
+    }
+   },
+   "0x10e4": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "chrregnum stale (Z18-B19)"
+    }
+   },
+   "0x10e7": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "as 0x10e4"
+    }
+   },
+   "0x10ea": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "as 0x10e4"
+    }
+   },
+   "0x1c04": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "29 per login, own handle"
+    }
+   },
+   "0x1c05": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "nSlotNum stale 0x74 (Z18-B10)"
+    }
+   },
+   "0x583a": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "2"
+    }
+   },
+   "0x105b": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "73"
+    }
+   },
+   "0x203e": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "33 / 127"
+    }
+   },
+   "0x9010": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "5"
+    }
+   },
+   "0x182b": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "1"
+    }
+   },
+   "0x2011": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "login notices 'From <ip>' and 'Admin level is 100'"
+    }
+   },
+   "0x1123": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "50 bytes, Z13 layout"
+    }
+   },
+   "0x482c": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "num 0 (2 bytes)"
+    }
+   },
+   "0x10d4": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "0"
+    }
+   },
+   "0x3021": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "_": "0x1041, partmark 3, count 0"
+    }
+   },
+   "0x2001": {
+    "dir": "C→S",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "content": "'&adminlevel' after every 0x1803"
+    }
+   },
+   "0x0c18": {
+    "dir": "C→S",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "LogoutType": "0, 10.04 s after 0x1071"
+    }
+   },
+   "0x2019": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "from": "client position",
+     "to": "~100 units ahead; no server answer on success"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x2017": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "from": "client position",
+     "to": "~100 units ahead"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x2012": {
+    "dir": "C→S",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "loc": "client stop position; also sent before NPC click and before 0x1071"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x201B": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "back": "server position (5862, 6677) after a 0x2019 with from == to"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x2018": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "handle": "mob handles only (single player)",
+     "speed": "MobInfo.WalkSpeed of the mob",
+     "moveattr": "low byte always even, ASCII stale bytes (Z02-B2)"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x201A": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world",
+     "walk-run-portals"
+    ],
+    "fields": {
+     "speed": "MobInfo.RunSpeed of the mob (154/154 moves match)",
+     "moveattr": "stale, bit 0 cleared"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x1C08": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "mobid": "MobInfo ids (0, 1, 32, 178, 191, 2000, 10004 …)",
+     "mode": "2",
+     "nKQTeamType": "2",
+     "bRegenAni": "0 for objects entering sight"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x1C0E": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "hnd": "mob leaving sight at ~1600 units (MapInfo.Sight); never an NPC"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x2401": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "target": "NPC handle before 0x200A"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x2402": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "order": "0",
+     "targethp": "0 for NPCs",
+     "targetsp": "100 for NPCs",
+     "hpchangeorder": "per-target counter: 1, then 2 on the next targeting"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x243D": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "handle": "own handle, 0-65 ms after 0x2401"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x200A": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "npchandle": "Teleport Gate 17252/17289, gate 17311"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x201C": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "mobid": "191 Gate_Town (NPCMenu 1)"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x181A": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "index": "TownPortal.shn row (0 RouN, 1 RouVal01)"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x181B": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "code": "0x19C1 success"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x180A": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "mapIndex": "MapInfo id 150 / 5 / 2",
+     "x": "TownPortal / LinkTable x",
+     "y": "TownPortal / LinkTable y",
+     "zonePort": "9210 / 9212 / 9214",
+     "wmHandle": "17500 = WM handle"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x3C01": {
+    "dir": "S→C",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "title": "'Do you want to move to Forest of Tides field?'",
+     "npcHandle": "gate 17311",
+     "limitRange": "1000",
+     "menunum": "2 (Yes 0, No 1)"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x3C02": {
+    "dir": "C→S",
+    "captures": [
+     "walk-run-portals"
+    ],
+    "fields": {
+     "reply": "0 = Yes → smfm_Link"
+    },
+    "note": "capture-validation §6"
+   },
+   "0x3002": {
+    "dir": "S→C",
+    "captures": [
+     "idle_in_world"
+    ],
+    "fields": {
+     "exchange": "box 8 << 10 | slot",
+     "location": "equip slot 8 / 25",
+     "itemid": "0xFFFF = emptied (1-day items expired)"
+    },
+    "note": "capture-validation §6"
+   }
+  }
+ },
+ "structs": {
+  "USEITEM_MINIMON_INFO": {
+   "size": 50,
+   "basis": "2016 Zone.pdb (pdb2016) struct USEITEM_MINIMON_INFO, size 0x32; referenced by Z13's 0x1123 annotation; 7 captured 0x1123 (50 bytes) decode in full",
+   "fields": [
+    [
+     0,
+     "u8",
+     "bNormalItem",
+     ""
+    ],
+    [
+     1,
+     "u8",
+     "bChargedItem",
+     ""
+    ],
+    [
+     2,
+     "u16[12]",
+     "NormalItemList",
+     "item ids, 0xFFFF = empty"
+    ],
+    [
+     26,
+     "u16[12]",
+     "ChargedItemList",
+     "item ids, 0xFFFF = empty"
+    ]
+   ]
   }
  }
 }

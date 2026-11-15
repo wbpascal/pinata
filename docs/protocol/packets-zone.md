@@ -49,6 +49,17 @@ Basis: Character server FUN_0046bff0 (reads SQL columns in this order with SQLGe
 | 125 | u32 | TutorialInfo.nTutorialState | default 3 when no tutorial row; L00 name 'tutorial_state (inferred)' |
 | 129 | u8 | TutorialInfo.nTutorialStep | L00 name 'tutorial_step (inferred)' |
 
+### USEITEM_MINIMON_INFO (50 bytes)
+
+Basis: 2016 Zone.pdb (pdb2016) struct USEITEM_MINIMON_INFO, size 0x32; referenced by Z13's 0x1123 annotation; 7 captured 0x1123 (50 bytes) decode in full
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u8 | bNormalItem |  |
+| 1 | u8 | bChargedItem |  |
+| 2 | u16[12] | NormalItemList | item ids, 0xFFFF = empty |
+| 26 | u16[12] | ChargedItemList | item ids, 0xFFFF = empty |
+
 ## Client → server
 
 ### `0x0812` NC_MISC_PINGTEST_CLIENT_ZONE_DB
@@ -236,6 +247,8 @@ Handler `FUN_005645e0`
 
 0x636 bytes
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `wm_handle`: WM session handle 12500 / 17500; `char_name`: Test1235; `shn_checksums`: 49 × 32 hex digits, same in all 7
+
 Handler `FUN_00452590`
 
 | Off | Type | Checks in handler | Notes |
@@ -282,6 +295,8 @@ Handler `FUN_00589f00`
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | index | TownPortal.shn row |
+
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `index`: TownPortal.shn row (0 RouN, 1 RouVal01)
 
 Handler `FUN_0049fe70`
 
@@ -334,6 +349,8 @@ Handler `FUN_0043e460`
 | 2 | char[len] | content | (pdb2017 name) |
 
 Z01 override of the annotations.json entry with the PROTO_NC_ACT_CHAT_REQ field names (C02 §9)
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `content`: '&adminlevel' after every 0x1803
 
 Handler `FUN_0045a400`
 
@@ -405,6 +422,8 @@ Handler `FUN_00457560`
 |---|---|---|---|
 | 0 | u16 | npchandle |  |
 
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `npchandle`: Teleport Gate 17252/17289, gate 17311
+
 Handler `FUN_004c4b70`
 
 | Off | Type | Checks in handler | Notes |
@@ -421,6 +440,8 @@ Handler `FUN_004c4b70`
 | 4 | u32 | loc.y |  |
 
 position is not taken from the client; only checked (200 units, free cell)
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `loc`: client stop position; also sent before NPC click and before 0x1071
 
 Handler `FUN_00456ff0`
 
@@ -441,6 +462,8 @@ Handler `FUN_00456ff0`
 
 from: only a 200-unit sanity check (MOVE*); WALK/RUN_REQ set the position to `to` unchecked
 
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `from`: client position; `to`: ~100 units ahead
+
 Handler `FUN_00457c60`
 
 | Off | Type | Checks in handler | Notes |
@@ -460,6 +483,8 @@ Handler `FUN_00457c60`
 | 12 | u32 | to.y |  |
 
 from: only a 200-unit sanity check (MOVE*); WALK/RUN_REQ set the position to `to` unchecked
+
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `from`: client position; `to`: ~100 units ahead; no server answer on success
 
 Handler `FUN_00457fd0`
 
@@ -643,6 +668,8 @@ Handler `FUN_004c2460`
 | 0 | u16 | target | object handle |
 
 ignored while captivated or under StaCannotChangeTarget (392); untargetable mob types 12,13,24,27,29
+
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `target`: NPC handle before 0x200A
 
 Handler `FUN_0042ffe0`
 
@@ -1321,6 +1348,8 @@ Handler `FUN_0053ec40`
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | reply | menu item index (< 10) |
+
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `reply`: 0 = Yes → smfm_Link
 
 Handler `FUN_0050fe60`
 
@@ -2516,6 +2545,8 @@ Handler `FUN_004d0e10`
 |---|---|---|---|
 | 0 | u16 | seed | global counter, wraps at 499 |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `seed`: consecutive per zone process: 1,3,4,5 (9210), 1,2 (9212), 1 (9214)
+
 Sent in reply to `0x0806` NC_MISC_SEED_REQ on ShineObjectClass::ShinePlayer (`FUN_00451a30`, ShineObjectClass::ShinePlayer::sp_NC_MISC_SEED_REQ) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -2637,6 +2668,8 @@ Fill: +0: FUN_004c9660; +0: FUN_004c9660; +0: FUN_004c9660
 | 100 | u8 | adminlevel |  |
 | 101 | u32 | flags |  |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: chrregnum 2, Level 120, map of the new zone, adminlevel 100
+
 Sent from `ShineObjectClass::ShinePlayer::so_charbasedata` (`FUN_0044d890`) · payload 105 bytes
 
 Fill: +0: FUN_0044ac80 (no direct writes found); +66: FUN_004662e0 (no direct writes found)
@@ -2658,6 +2691,8 @@ Fill: +0: FUN_0044ac80 (no direct writes found); +66: FUN_004662e0 (no direct wr
 | 2 | u8 | haircolor |  |
 | 3 | u8 | faceshape |  |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: AE 04 00 00
+
 Sent from `ShineObjectClass::ShinePlayer::so_charsharpdata` (`FUN_0044ae80`) · payload 4 bytes
 
 | Off | Type | Value / source |
@@ -2674,6 +2709,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_charsharpdata` (`FUN_0044ae80`) · 
 | 4 | u8 | bNeedClear | 1 = empty the quest array first |
 | 5 | u8 | nNumOfDoingQuest |  |
 | 6 | PLAYER_QUEST_INFO[n] | QuestDoingArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: bNeedClear 1, 0 quests
 
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDoing` (`FUN_0044b3c0`) · payload variable (iVar8)
 
@@ -2693,6 +2730,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDoing` (`FUN_0044b3c0`) �
 | 8 | u16 | nDoneQuestCount |  |
 | 10 | u16 | nIndex |  |
 | 12 | PLAYER_QUEST_DONE_INFO[n] | QuestDoneArray | {u16 ID, i64 tEndTime} (10 bytes) |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 0 records
 
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDone` (`FUN_0044b500`) · payload variable (iVar7)
 
@@ -2714,6 +2753,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestDone` (`FUN_0044b500`) ·
 | 8 | u16 | number | ≤ 500 |
 | 10 | PROTO_SKILLREADBLOCKCLIENT[number] | skill | 0xc: u16 skillid, u32 cooltime (remaining s), u16 empow, u32 mastery |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 24 skills, nMaxNum 24, PartMark 3
+
 Sent from `ShineObjectClass::ShinePlayer::so_charskilldata` (`FUN_0044bf20`) · payload variable (iVar5)
 
 Fill: +4: FUN_00445460 (no direct writes found)
@@ -2734,6 +2775,8 @@ Fill: +4: FUN_00445460 (no direct writes found)
 | 0 | u16 | number |  |
 | 2 | u16[number] | passive | ids < 1000 stored |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 3 passives
+
 Sent from `ShineObjectClass::ShinePlayer::so_charpassivedata` (`FUN_0044e5a0`) · payload variable (iVar1)
 
 | Off | Type | Value / source |
@@ -2749,6 +2792,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_charpassivedata` (`FUN_0044e5a0`) �
 |---|---|---|---|
 | 0 | u16 | partyno |  |
 | 2 | u16 | nRaidNo |  |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 0xFFFF, 0xFFFF
 
 Sent from `ShineObjectClass::ShinePlayer::so_Storegamedata` (`FUN_0044c220`) · payload 4 bytes
 
@@ -2768,6 +2813,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_Storegamedata` (`FUN_0044c220`) · 
 | 4 | u16 | NumOfTitle |  |
 | 6 | {u8,u8}[n] | titles | type, element |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 8 titles
+
 Sent in reply to `0x1031` NC_CHAR_ZONE_CHARTITLE_CMD on WorldManagerSession (`FUN_005a39f0`, WorldManagerSession::wms_NC_CHAR_ZONE_CHARTITLE_CMD) · payload variable (iVar9)
 
 | Off | Type | Value / source |
@@ -2786,6 +2833,8 @@ Sent in reply to `0x1031` NC_CHAR_ZONE_CHARTITLE_CMD on WorldManagerSession (`FU
 |---|---|---|---|
 | 0 | u16 | NumOfChargedBuff |  |
 | 2 | PROTO_CHARGEDBUFF_INFO[n] | ChargedBuff | 0xe: u32 ChargedBuffKey, u16 ChargedBuffID, ShineDateTime UseTime, ShineDateTime EndTime (year:8 month:5 date:6 hour:6 minute:7) |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 1 buff
 
 Sent from `ShineObjectClass::ShinePlayer::so_CharChargedBuffData` (`FUN_0044e1e0`) · payload variable (iVar5)
 
@@ -2848,6 +2897,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_ClassChange` (`FUN_004521b0`) �
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | remain | StatTable stat[class] − spent points |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 73
 
 Sent from `GameDBSession::gds_NC_CHAR_STAT_DECPOINTFAIL_DB_ACK` (`FUN_0058bd10`) · payload 1 bytes
 
@@ -2949,12 +3000,12 @@ Sent from `FUN_004a3120` (`FUN_004a3120`) · payload 8 bytes
 
 ### `0x10bd` NC_CHAR_CLIENT_AUTO_PICK_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_CLIENT_AUTO_PICK_ACK`, 3 bytes
+**Verified layout** (basis: pdb2016 PROTO_NC_CHAR_CLIENT_AUTO_PICK_ACK; zone sp_SetAutoPick FUN_005654d0 → sp_SendAutoPickToClient (error path _ErrorSendPlayer 0x1E01))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | err |  |
-| 2 | u8 | bEnable |  |
+| 0 | u16 | err | 0x1E00 ok, 0x1E01 no pick-up mini-mon. evidence: capture:idle_in_world 0x1E00 (2) |
+| 2 | u8 | bEnable | 1 at login, 0 later |
 
 Sent from `FUN_00560250` (`FUN_00560250`) · payload 3 bytes
 
@@ -2981,11 +3032,11 @@ Sent from `FUN_00560250` (`FUN_00560250`) · payload 3 bytes
 
 ### `0x10c6` NC_CHAR_ADMIN_LEVEL_INFORM_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_CHAR_ADMIN_LEVEL_INFORM_CMD`, 1 bytes
+**Verified layout** (basis: pdb2016 PROTO_NC_CHAR_ADMIN_LEVEL_INFORM_CMD; zone sp_NC_MAP_LOGINCOMPLETE_CMD FUN_00443390 (only when adminlevel != 0))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | nAdminLevel |  |
+| 0 | u8 | nAdminLevel | basedata.adminlevel. evidence: capture 100 (7) |
 
 Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePlayer (`FUN_00443390`, ShineObjectClass::ShinePlayer::sp_NC_MAP_LOGINCOMPLETE_CMD) · payload 1 bytes
 
@@ -3003,6 +3054,8 @@ Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePla
 | 4 | u16 | nNumOfReadQuest |  |
 | 6 | u16[n] | QuestReadIDArray |  |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 1 id (3109)
+
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b640`) · payload variable (iVar6)
 
 | Off | Type | Value / source |
@@ -3017,6 +3070,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b640`) ·
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | mystery_vault | 1 and a mystery-vault item in the inventory: client opens MysteryVaultWin; else ignored |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 0
 
 Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePlayer (`FUN_00443390`, ShineObjectClass::ShinePlayer::sp_NC_MAP_LOGINCOMPLETE_CMD) · payload 1 bytes
 
@@ -3034,6 +3089,8 @@ Sent in reply to `0x1803` NC_MAP_LOGINCOMPLETE_CMD on ShineObjectClass::ShinePla
 | 4 | u16 | nNumOfRepeatQuest |  |
 | 6 | PLAYER_QUEST_INFO[n] | QuestRepeatArray | PLAYER_QUEST_INFO (0x20) {u16 ID, u8 Status, PLAYER_QUEST_DATA Data} |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 0 records
+
 Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b770`) · payload variable (iVar8)
 
 | Off | Type | Value / source |
@@ -3049,6 +3106,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_StoreQuestRead` (`FUN_0044b770`) ·
 |---|---|---|---|
 | 0 | u64 | coin |  |
 | 8 | u64 | remaining exchangeable |  |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 0, 1000000
 
 Sent from `FUN_00615d10` (`FUN_00615d10`) · payload 16 bytes
 
@@ -3090,6 +3149,8 @@ Sent from `FUN_004cbb30` (`FUN_004cbb30`) · payload variable (iVar4)
 
 length 6 + number × 11 (Z18 §6.5)
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: chrregnum stale (Z18-B19)
+
 Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`) · payload variable (iVar3)
 
 | Off | Type | Value / source |
@@ -3108,6 +3169,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`
 
 length 6 + number × 4 (Z18 §6.5)
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: as 0x10e4
+
 Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`) · payload variable (iVar3)
 
 | Off | Type | Value / source |
@@ -3125,6 +3188,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`
 | 6 | u16[] | RewardID |  |
 
 length 6 + number × 2 (Z18 §6.5)
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: as 0x10e4
 
 Sent from `ShineObjectClass::ShinePlayer::sp_CardCollectionSend` (`FUN_0044cc30`) · payload variable (iVar3)
 
@@ -3153,6 +3218,8 @@ Sent from `FUN_005e72f0` (`FUN_005e72f0`) · payload 1 bytes
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | USEITEM_MINIMON_INFO | UseItemMinimonInfo | USEITEM_MINIMON_INFO {u8 bNormalItem, u8 bChargedItem, u16 NormalItemList[12] (MAUI_BUFFITEM items), u16 ChargedItemList[12] (MAUI_CHARGED items)}, 0xFFFF = empty slot; the client sets its two auto-buff buttons and slot ids |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 50 bytes, Z13 layout
 
 Sent from `FUN_00561990` (`FUN_00561990`) · payload 50 bytes
 
@@ -3190,17 +3257,65 @@ Sent from `FUN_00563f60` (`FUN_00563f60`) · payload 4 bytes
 
 ### `0x1802` NC_MAP_LOGIN_ACK
 
-**Verified layout** (basis: FUN_005a3590 -> ShinePlayer vfunc 0x664 = FUN_005a3140 (so_fill_PROTO_NC_CHAR_MAPLOGIN_ACK))
+**Verified layout** (basis: pdb2016 PROTO_NC_CHAR_MAPLOGIN_ACK (0xF2) = {u16 charhandle, CHAR_PARAMETER_DATA param (0xE8), SHINE_XY_TYPE logincoord}; zone so_fill_PROTO_NC_CHAR_MAPLOGIN_ACK FUN_005a3140 / so_fill_CHAR_PARAMETER_DATA FUN_005a2e00 (Z07 §1.5))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | object_handle | this+4, the player's map object id |
-| 2 | u32[4] | ? | global table indexed by a byte |
-| 18 | u32[32] | stat pairs (inferred) | bytes 18-145, alternating this+0xfc0+4k / this+0x1bb4+4k: base and current value of each stat; bytes 50-57 are not written |
-| 146 | u32[6] | ? | computed values (146-169), e.g. products of this+0x2a5a2 by a table value |
-| 170 | u32[16] | ? | always 0 |
-| 234 | u32 | pos_x | player position (same source as move packets) |
-| 238 | u32 | pos_y |  |
+| 0 | u16 | charhandle | player object handle: 8000 + pool index (8000, 8002, 8003, 8004 on zone 9210; 8000, 8001 on 9212). capture:idle_in_world, capture:walk-run-portals (7 map logins) |
+| 2 | u64 | param.PrevExp | g_LevelExp[level] (72987672292 at level 120) |
+| 10 | u64 | param.NextExp | g_LevelExp[level+1] (83037947834) |
+| 18 | u32 | param.Strength.base | layer 0 (pure) |
+| 22 | u32 | param.Strength.change | layer 15 (total) |
+| 26 | u32 | param.Constitute.base | layer 0 (pure) |
+| 30 | u32 | param.Constitute.change | layer 15 (total) |
+| 34 | u32 | param.Dexterity.base | layer 0 (pure) |
+| 38 | u32 | param.Dexterity.change | layer 15 (total) |
+| 42 | u32 | param.Intelligence.base | layer 0 (pure) |
+| 46 | u32 | param.Intelligence.change | layer 15 (total) |
+| 50 | u32 | param.Wizdom.base | never written: stale send-buffer bytes (Z07-B7). evidence: ', though', 'ful.', 00x6 FF FF |
+| 54 | u32 | param.Wizdom.change | stale, see base |
+| 58 | u32 | param.MentalPower.base | layer 0 (pure) |
+| 62 | u32 | param.MentalPower.change | layer 15 (total) |
+| 66 | u32 | param.WClow.base | layer 0 (pure) |
+| 70 | u32 | param.WClow.change | layer 15 (total) |
+| 74 | u32 | param.WChigh.base | layer 0 (pure) |
+| 78 | u32 | param.WChigh.change | layer 15 (total) |
+| 82 | u32 | param.AC.base | layer 0 (pure) |
+| 86 | u32 | param.AC.change | layer 15 (total) |
+| 90 | u32 | param.TH.base | layer 0 (pure) |
+| 94 | u32 | param.TH.change | layer 15 (total) |
+| 98 | u32 | param.TB.base | layer 0 (pure) |
+| 102 | u32 | param.TB.change | layer 15 (total) |
+| 106 | u32 | param.MAlow.base | layer 0 (pure) |
+| 110 | u32 | param.MAlow.change | layer 15 (total) |
+| 114 | u32 | param.MAhigh.base | layer 0 (pure) |
+| 118 | u32 | param.MAhigh.change | layer 15 (total) |
+| 122 | u32 | param.MR.base | layer 0 (pure) |
+| 126 | u32 | param.MR.change | layer 15 (total) |
+| 130 | u32 | param.MH.base | layer 0 (pure) |
+| 134 | u32 | param.MH.change | layer 15 (total) |
+| 138 | u32 | param.MB.base | layer 0 (pure) |
+| 142 | u32 | param.MB.change | layer 15 (total) |
+| 146 | u32 | param.MaxHp | 3043 / 3033 = 0x1038.CurHP |
+| 150 | u32 | param.MaxSp | 2851 / 2841 |
+| 154 | u32 | param.MaxLp | 0 |
+| 158 | u32 | param.MaxAp | always 0 |
+| 162 | u32 | param.MaxHPStone | 441 |
+| 166 | u32 | param.MaxSPStone | 416 |
+| 170 | u32[4] | param.PwrStone | always 0 (16 bytes) |
+| 186 | u32[4] | param.GrdStone | always 0 |
+| 202 | u32 | param.PainRes.base | 0 |
+| 206 | u32 | param.PainRes.change | 0 |
+| 210 | u32 | param.RestraintRes.base | 0 |
+| 214 | u32 | param.RestraintRes.change | 0 |
+| 218 | u32 | param.CurseRes.base | 0 |
+| 222 | u32 | param.CurseRes.change | 0 |
+| 226 | u32 | param.ShockRes.base | 0 |
+| 230 | u32 | param.ShockRes.change | 0 |
+| 234 | u32 | logincoord.x | position after so_MapMarking; can differ from 0x1038 currentcoord (5874 -> 5899) |
+| 238 | u32 | logincoord.y |  |
+
+P02: replaces the '?' blocks of annotations.json; capture-validation §5.3
 
 Sent in reply to `0x101d` NC_CHAR_ZONE_CHARDATA_ACK on WorldManagerSession (`FUN_005a3590`, WorldManagerSession::wms_NC_CHAR_ZONE_CHARDATA_ACK) · payload 242 bytes
 
@@ -3317,17 +3432,19 @@ Sent from `ShineObjectClass::ShineObject::so_LogoutPacketBroadcast` (`FUN_00553a
 
 Z01 name was 'link to another zone (ours)'
 
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `mapIndex`: MapInfo id 150 / 5 / 2; `x`: TownPortal / LinkTable x; `y`: TownPortal / LinkTable y; `zonePort`: 9210 / 9212 / 9214; `wmHandle`: 17500 = WM handle
+
 Sent in reply to `0x180e` NC_MAP_LINKRESERVE_ACK on WorldManagerSession (`FUN_0049b510`, WorldManagerSession::wms_NC_MAP_LINKRESERVE_ACK) · payload 30 bytes
 
 Fill: +0: FUN_0049b4c0 (no direct writes found)
 
 ### `0x1827` NC_MAP_FIELD_ATTRIBUTE_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_MAP_FIELD_ATTRIBUTE_CMD`, 4 bytes
+**Verified layout** (basis: pdb2016 PROTO_NC_MAP_FIELD_ATTRIBUTE_CMD; zone so_ply_SendFieldAttribute FUN_0054aa20 (vt 0xd3c, from LOGINCOMPLETE))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | i32 | eFieldMapType |  |
+| 0 | u32 | eFieldMapType | FIELD_MAP_TYPE (pdb2016): 0 NORMAL, 1 KINGDOMQUEST, 2 MINIHOUSE, 3 INSTANCEDUNGEON, 4 TUTORIAL = FieldOption byte +0x36. evidence: capture 0 on RouN, RouVal01, RouCos02 |
 
 Sent from `FUN_0054aa20` (`FUN_0054aa20`) · payload 4 bytes
 
@@ -3342,6 +3459,8 @@ Sent from `FUN_0054aa20` (`FUN_0054aa20`) · payload 4 bytes
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | bCanUseReviveItem |  |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 1
 
 Sent from `FUN_005616f0` (`FUN_005616f0`) · payload 1 bytes
 
@@ -3511,6 +3630,8 @@ Sent in reply to `0x2008` NC_ACT_CHANGEMODE_REQ on ShineObjectClass::ShinePlayer
 
 sent by Lua cNotice / cNoticeString / cNotice_Obj (§19.3), NPCAction NoticeAction (§16.5) and the Lua observer (§14.7); client copies len bytes into a 128-byte buffer (len > 127 overruns it); no struct in either PDB
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: login notices 'From <ip>' and 'Admin level is 100'
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_Notice` (`FUN_005977e0`) · payload variable (iVar7)
 
 | Off | Type | Value / source |
@@ -3549,6 +3670,8 @@ Sent from `ShineObjectClass::ShineMobileObject::so_mobile_StopHere` (`FUN_0045a0
 | 18 | u16 | speed | GetWalkSpeed / GetRunSpeed |
 | 20 | u16 | moveattr.direct | bit 0 cleared, rest stale |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `handle`: mob handles only (single player); `speed`: MobInfo.WalkSpeed of the mob; `moveattr`: low byte always even, ASCII stale bytes (Z02-B2)
+
 Sent from `ShineObjectClass::ShineMobileObject::so_mobile_SpeedChange` (`FUN_00435ec0`) · payload 22 bytes
 
 | Off | Type | Value / source |
@@ -3577,6 +3700,8 @@ Sent from `ShineObjectClass::ShineMobileObject::so_mobile_SpeedChange` (`FUN_004
 | 18 | u16 | speed | GetWalkSpeed / GetRunSpeed |
 | 20 | u16 | moveattr.direct | bit 0 cleared, rest stale |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `speed`: MobInfo.RunSpeed of the mob (154/154 moves match); `moveattr`: stale, bit 0 cleared
+
 Sent from `ShineObjectClass::ShineMobileObject::so_mobile_SpeedChange` (`FUN_00435ec0`) · payload 22 bytes
 
 Fill: +0: FUN_00434ae0 (no direct writes found)
@@ -3604,6 +3729,8 @@ Fill: +0: FUN_00434ae0 (no direct writes found)
 
 server position
 
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `back`: server position (5862, 6677) after a 0x2019 with from == to
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_SendMoveFail` (`FUN_00458340`) · payload 8 bytes
 
 | Off | Type | Value / source |
@@ -3618,6 +3745,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_SendMoveFail` (`FUN_00458340`) 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | mobid | NPC mob id (vt 0x708) |
+
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `mobid`: 191 Gate_Town (NPCMenu 1)
 
 Sent from `ShineObjectClass::ShinePlayer::InteractWithNPC` (`FUN_004c4660`) · payload 2 bytes
 
@@ -4408,6 +4537,8 @@ Sent from `FUN_00561030` (`FUN_00561030`) · payload 0 bytes
 | 27 | u8 | targetlevel |  |
 | 28 | u16 | hpchangeorder | the target's HP sequence counter |
 
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `order`: 0; `targethp`: 0 for NPCs; `targetsp`: 100 for NPCs; `hpchangeorder`: per-target counter: 1, then 2 on the next targeting
+
 Sent from `AxialListTargetInform::ali_Work` (`FUN_0042b0b0`) · payload 30 bytes
 
 | Off | Type | Value / source |
@@ -4855,6 +4986,8 @@ Sent from `ShineObjectClass::ShineMobileObject::so_mobile_DamageOverTime` (`FUN_
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | handle | object that stopped attacking |
+
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `handle`: own handle, 0-65 ms after 0x2401
 
 Sent from `AbnormalStateContainer::AbstateElementInObject::aeo_Set` (`FUN_0040a340`) · payload 2 bytes
 
@@ -5534,6 +5667,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_WithdrawAck` (`FUN_005345e0`) �
 | 3 | u16 | count |  |
 | 5 | bytes | items | count × PROTO_CHARGED_ITEM_INFO (16 B) |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 0x1041, partmark 3, count 0
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_FillChargedInven` (`FUN_00492f30`) · payload variable (iVar4)
 
 | Off | Type | Value / source |
@@ -5607,14 +5742,14 @@ Sent from `FUN_0053f840` (`FUN_0053f840`) · payload 12 bytes
 
 ### `0x302d` NC_ITEM_REWARDINVENOPEN_ACK
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_ITEM_REWARDINVENOPEN_ACK`, 1 bytes + variable tail
+**Verified layout** (basis: pdb2016 PROTO_NC_ITEM_REWARDINVENOPEN_ACK; zone so_ply_FillRewardInven FUN_004fc310 + irs_FillBufferItem FUN_00644c80)
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u8 | itemcounter |  |
-| 1 | PROTO_ITEMPACKET_INFORM[itemcounter] | itemarray | variable length, element PROTO_ITEMPACKET_INFORM |
+| 0 | u8 | itemcounter | records that follow. evidence: capture:idle_in_world, capture:walk-run-portals = 0 |
+| 1 | bytes | itemarray | itemcounter × PROTO_ITEMPACKET_INFORM {u8 datasize, u16 location (Type 2), item}, then ONE stale byte (length = records + 2): P02-B3. evidence: 0x12, 0x10 |
 
-Element `PROTO_ITEMPACKET_INFORM` (106 bytes): +0 u8 datasize, +1 u16 location, +3 u16 info.itemid, +5 byte[101] info.itemattr
+P02: capture-validation §5.3
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_FillRewardInven` (`FUN_004fc310`) · payload variable (iVar2 + 3)
 
@@ -6538,6 +6673,8 @@ Sent from `CQuestZone::Recv_NC_QUEST_DB_READ_ACK` (`FUN_005c06c0`) · payload 4 
 | 8 | i32 | tResetWeekQuest |  |
 | 12 | i32 | tResetDayQuest | client stores all four at its CQuest+0xA4 |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: start of current year/month/week/day, server local time
+
 Sent from `CQuestZone::Send_NC_QUEST_RESET_TIME_ZONE_CMD` (`FUN_005bc570`) · payload 16 bytes
 
 | Off | Type | Value / source |
@@ -6736,6 +6873,8 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_WarpTo` (`FUN_004a7de0`) · 
 | 18 | u16 | `**(undefined2 **)(param_2 + 4)` |
 
 ### `0x482c` NC_SKILL_ITEMACTIONCOOLTIME_CMD
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: num 0 (2 bytes)
 
 Sent from `FUN_005d0d30` (`FUN_005d0d30`) · payload variable (iVar7)
 
@@ -7065,6 +7204,8 @@ Sent from `FUN_005e3790` (`FUN_005e3790`) · payload 8 bytes
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | nTeamType | 0 red, 1 blue, 2 none; sent at every map login |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 2
 
 Sent from `FUN_00561560` (`FUN_00561560`) · payload 1 bytes
 
@@ -8799,6 +8940,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_InitSkillEmpow` (`FUN_00518c00`
 |---|---|---|---|
 | 0 | u8 | size | ≤ 20 |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 5
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_SendBoothSize` (`FUN_00535390`) · payload 1 bytes
 
 | Off | Type | Value / source |
@@ -10269,6 +10412,14 @@ Sent from `FUN_004d0bd0` (`FUN_004d0bd0`) · payload 18 bytes
 
 Empty payload.
 
+### `0x1071` NC_CHAR_LOGOUTREADY_CMD (C→S)
+
+**Verified layout** (basis: pdb2016 enum NC_CHAR_LOGOUTREADY_CMD = 113; zone FUN_00558450 (Z07 §3.3))
+
+Empty payload.
+
+P02: empty body. evidence: capture size 0
+
 ### `0x1093` NC_CHAR_WEDDING_PARTNER_INFO_REQ (C→S)
 
 **Verified layout** (basis: zone FUN_005a0570)
@@ -10286,6 +10437,16 @@ Empty payload.
 **Verified layout**
 
 Empty payload.
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals)
+
+### `0x200b` NC_ACT_ENDOFTRADE_CMD (C→S)
+
+**Verified layout** (basis: zone sp_NC_ACT_ENDOFTRADE_CMD FUN_004c4a60 (no payload read, Z02 §6.4))
+
+Empty payload.
+
+P02: empty body. evidence: capture size 0
 
 ### `0x2022` NC_ACT_EMOTICONSTOP_CMD (C→S)
 
@@ -10909,6 +11070,8 @@ PROTO_NC_MISC_SERVERPARAMETER_ACK, the alias at this opcode value (C02 §2); 3 b
 | 2 | u8 | flag | bit 0 invenclear (first packet of the box); bits 1-7 stale |
 | 3 | PROTO_ITEMPACKET_INFORM[] | ItemArray | {u8 datasize, u16 location, item data}; ≤ ~8000 bytes per packet |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: box 9/8/12/15, flag bit 0 set, bits 1-7 stale
+
 ### `0x1061` NC_CHAR_STAT_INCPOINTFAIL_ACK (S→C)
 
 **Verified layout** (basis: zone so_SendErrorCode 4/0x61)
@@ -11000,6 +11163,8 @@ no payload
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | code | 0x19C1 ok, 0x19C2 state, 0x19C3 index, 0x19C4 level |
+
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `code`: 0x19C1 success
 
 ### `0x181d` NC_MAP_LINK_FAIL_CMD (S→C)
 
@@ -11093,6 +11258,8 @@ never sent by the 2016 zone: the batch counter is never incremented (original bu
 
 corrects Z02 §5 ('no zone code sends 0x1C0E'); client queues the handle in CharMgr.m_kmapDeletedChar (pdb2017) unless char+0x9be, removes minimap/decal/KQ marks
 
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `hnd`: mob leaving sight at ~1600 units (MapInfo.Sight); never an NPC
+
 ### `0x1C0F` NC_BRIEFINFO_BUILDDOOR_CMD (hand-named) (S→C)
 
 **Verified layout** (basis: zone BriefInformationDoor ctor FUN_00549260 (length 0x32), ShineDoor::so_door_Build FUN_0043f7b0 / so_door_DoorAction FUN_00550770 fill it, sent by ShineDoor::so_SendMyBriefInfo FUN_00555b60; client On_NC_BRIEFINFO_BUILDDOOR_CMD FUN_004a0a60)
@@ -11181,6 +11348,8 @@ Armor / Boot / Shield; client: CharShape::Equip(item, upgrade) + Char::Equip
 
 also sent for items of the 29 classes without own builder; client: Char::UnEquip(slot), weapon-title reset on slot 12
 
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 29 per login, own handle
+
 ### `0x1c05` NC_BRIEFINFO_CHANGEWEAPON_CMD (S→C)
 
 **Verified layout** (basis: zone FUN_0063f820 (ItemAttrCls_Weapon::iac_equipbriefinfo); client FUN_004a07e0)
@@ -11195,6 +11364,8 @@ also sent for items of the 29 classes without own builder; client: Char::UnEquip
 | 8 | u8 | currentkilllevel | CWeaponTitle::GetLevel(mob, kills), else 0 |
 
 client: Char::Equip(item, upgrade); title type 10 shown and item class 5 → weapon title by (mob, level) or off for 0xFFFF
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: nSlotNum stale 0x74 (Z18-B10)
 
 ### `0x1c0b` NC_BRIEFINFO_ITEMONFIELD_CMD (S→C)
 
@@ -11319,6 +11490,8 @@ to the whole map instance (target 0xFFFF) or one object. The mob version sends l
 |---|---|---|---|
 | 0 | u16 | walkspeed |  |
 | 2 | u16 | runspeed |  |
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `_`: 33 / 127
 
 ### `0x2041` NC_ACT_RIDE_FAIL_CMD (S→C)
 
@@ -11560,6 +11733,8 @@ player tick, on change; also sent to every object targeting the player (so_ply_S
 | 3 | u16 | itemid | 0xFFFF = empty |
 | 5 | bytes | attributes | class-specific |
 
+**Captured** (P02, `capture-validation.md`; idle_in_world): `exchange`: box 8 << 10 | slot; `location`: equip slot 8 / 25; `itemid`: 0xFFFF = emptied (1-day items expired)
+
 ### `0x3004` NC_ITEM_BUY_ACK (S→C)
 
 **Verified layout** (basis: zone so_SendErrorCode 12/4; client FUN_004ab770)
@@ -11704,6 +11879,8 @@ to every participant still in the party/raid; client: 0x2008 → '%s acquired th
 | 142 | SERVERMENU[menunum] | menu | each 0x21 bytes: u8 reply (= index), char string[32] |
 
 payload size 0x8e + 0x21·menunum
+
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `title`: 'Do you want to move to Forest of Tides field?'; `npcHandle`: gate 17311; `limitRange`: 1000; `menunum`: 2 (Yes 0, No 1)
 
 ### `0x3c07` NC_MENU_OPENSTORAGE_FAIL_CMD (S→C)
 
@@ -14993,4 +15170,14 @@ Z01 name was 'map login done (ours)'
 | 3 | u8 | worldNo |  |
 | 4 | u8 | zoneNo |  |
 | 5 | u16 | key | to + from |
+
+## Captured packets without a section above
+
+### `0x0c18` NC_USER_NORMALLOGOUT_CMD (C→S)
+
+**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `LogoutType`: 0, 10.04 s after 0x1071
+
+### `0x1c08` NC_BRIEFINFO_REGENMOB_CMD (S→C)
+
+**Captured** (P02, `capture-validation.md`; walk-run-portals): `mobid`: MobInfo ids (0, 1, 32, 178, 191, 2000, 10004 …); `mode`: 2; `nKQTeamType`: 2; `bRegenAni`: 0 for objects entering sight
 
