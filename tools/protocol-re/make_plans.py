@@ -1368,7 +1368,7 @@ ITEMS = [
       done="Every pseudocode section has a rating; all high-traffic claims re-checked with results in §3 and corrections in "
            "`docs/knowledge/X02.md`; every remaining medium/low client-facing claim has a scenario with a prediction; DB "
            "setups use only verified names and come with restore statements."),
- dict(id="X04", phase=3, title="Integration update: P02's capture batches 2 and 3 (corrections, bugs P02-B5 … B31, "
+ dict(id="X04", phase=3, title="Integration update: P02's capture batches 2 and 3 (corrections, bugs P02-B5 … B32, "
                                "captured evidence) into the README register and the superseded-statements list "
                                "(added by P02)",
       out="docs/pseudocode/README.md + docs/knowledge/X04.md", scope=[],
@@ -1376,7 +1376,7 @@ ITEMS = [
       goal="X01 ran after the second capture batch was added but integrated only P02's batch 1: README §5 (Superseded "
            "statements) holds P02's batch-1 rows, the register (README §6) lists P02-B1 … B4, and its four links "
            "`capture-validation.md#8-original-server-bugs` point at a section batch 2 renumbered (§8 → §12). Batches 2 and "
-           "3 (capture-validation §7–§10, §16–§21) added P02-B5 … B31, about 70 correction rows for done items "
+           "3 (capture-validation §7–§10, §16–§21) added P02-B5 … B32, about 70 correction rows for done items "
            "(capture-validation §13, statuses \"→ X01\" from batch 2 and \"→ X04\"), captured evidence for other items' "
            "bugs (§12, second table) and 40 confirmed or corrected flows (§11). X03 covers only X02 and its follow-ups. "
            "Bring the README up to date with P02. Like X03, this item edits X01's README sections in place; it does not "
@@ -1405,7 +1405,7 @@ ITEMS = [
              "Run `tools/protocol-re/regen.sh`. Record per README table how many rows were added or changed, and every §13 "
              "row left out with the reason, in `docs/knowledge/X04.md`."],
       done="Every capture-validation §13 row of batches 2–3 that names X01 or X04 has a README §5 row or a stated reason in "
-           "`docs/knowledge/X04.md`; P02-B5 … B31 are in the register; the §12 second-table entries carry *(captured)*; "
+           "`docs/knowledge/X04.md`; P02-B5 … B32 are in the register; the §12 second-table entries carry *(captured)*; "
            "every README citation of capture-validation points at the current section."),
  dict(id="X05", phase=3, title="Capture scenarios and ratings after capture batch 3: X02's recurring re-run (added by P02)",
       out="docs/plan/capture-scenarios.md + docs/review/confidence.md (both updated in place) + docs/knowledge/X05.md",
@@ -1429,7 +1429,7 @@ ITEMS = [
              "scripts (they ran for Test1235, not the scenario's Test2: name the character in one variable and print it).",
              "Open after batch 3, one scenario (or a step added to an existing one) each, with setup, steps, prediction "
              "and what disproves it: scenario 14 steps (2)–(4) (walk `0x2017` / `0x2018`, sit, whisper to an unknown name "
-             "`0x200E`, emote stop `0x2022` / `0x2023`, shout out of sight) and a map login next to a player (`0x1C07`); "
+             "`0x200E`, emote stop `0x2022` / `0x2023`, shout out of sight); "
              "scenario 21 for the character the SQL snapshots name; buy back onto an empty cell (`0x34B9` / `0x34BA`); "
              "sell, buy-back and soul-stone refusals (`0x3427`, `0x366B`–`0x366F`, `0x5005`, `0x3443`); the storage page "
              "request `0x3028`; S16 with a fame or gamble-coin item (D03-B1); X3's untried paths of the over-full stack "
