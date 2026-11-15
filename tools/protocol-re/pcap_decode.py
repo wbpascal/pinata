@@ -272,7 +272,7 @@ def load_docs():
             for op, v in d.items():
                 packets[(srv, int(op, 16), client_dir(v.get("dir")))] = v
     names = {}
-    known = {k: {C2S: set(), S2C: set()} for k in CLIENT_CLASS}
+    known = {k: {C2S: set(), S2C: set()} for k in list(CLIENT_CLASS) + ["link"]}
     for e in json.load(open(os.path.join(DOCS, "opcodes.json"))):
         op = int(e["op"], 16)
         names[op] = e["name"]
@@ -291,6 +291,13 @@ def load_docs():
     for (srv, op, d) in packets:
         if srv in known and d in known[srv]:
             known[srv][d].add(op)
+    # server links (plaintext): one table for both directions; the annotations carry free-form dirs ("WM→CharDB",
+    # "Z→WM", ...), the first one per opcode wins (same rule as make_dissector.py)
+    link_ann = {}
+    for (srv, op, d), v in sorted(packets.items(), key=lambda x: (x[0][0], x[0][1], str(x[0][2]))):
+        if d not in (C2S, S2C):
+            link_ann.setdefault(op, v)
+    known["link"][C2S] = known["link"][S2C] = set(names) | set(link_ann)
     # PDB layouts, fallback below hand annotations and above layouts.json: the 2016 server PDBs (work item S01, same
     # build, "pdb2016") first, then the 2017 client PDB (work item C02, "pdb2017"). A pdb2016 struct that is only a
     # name-alias guess yields to pdb2017's own struct (0x182a). Each entry carries its label in "src".
@@ -306,11 +313,12 @@ def load_docs():
                 pdb[op] = dict(v, src=lab)
     errs = {int(k, 16): v.get("text") or v.get("literal") for k, v in
             json.load(open(os.path.join(DOCS, "client-error-codes.json"))).items()}
-    return dict(structs=structs, packets=packets, names=names, known=known, layouts=layouts, errors=errs, pdb=pdb)
+    return dict(structs=structs, packets=packets, names=names, known=known, layouts=layouts, errors=errs, pdb=pdb,
+                link_ann=link_ann)
 
 
 def default_ports():
-    """ServerInfo.txt type-20 rows -> {port: kind}"""
+    """ServerInfo.txt type-20 rows -> {port: kind}, plus the server-link listeners as link"""
     ports = {}
     path = os.path.join(ROOT, "Files/Server/2016/9Data/ServerInfo/ServerInfo.txt")
     for line in open(path, encoding="latin-1") if os.path.exists(path) else []:
@@ -318,7 +326,18 @@ def default_ports():
         if m:
             n = m.group(1).upper()
             ports[int(m.group(2))] = "login" if "LOGIN" in n else "wm" if n.endswith("_WM") else "zone"
-    return ports or {9010: "login", 9110: "wm", 9210: "zone", 9212: "zone", 9214: "zone", 9216: "zone"}
+    ports = ports or {9010: "login", 9110: "wm", 9210: "zone", 9212: "zone", 9214: "zone", 9216: "zone"}
+    return {**{p: "link" for p in link_ports()}, **ports}
+
+
+def link_ports():
+    """ServerInfo.txt server-link listeners (types 0-3 DB servers, 5 Login<-WM, 6 WM<->zone) -> {port: name}"""
+    path, out = os.path.join(ROOT, "Files/Server/2016/9Data/ServerInfo/ServerInfo.txt"), {}
+    for line in open(path, encoding="latin-1") if os.path.exists(path) else []:
+        m = re.match(r'\s*SERVER_INFO\s+"PG_([^"]+)",\s*\d+,\s*\d+,\s*\d+,\s*([0-356]),\s*"[^"]*",\s*(\d+)', line)
+        if m:
+            out[int(m.group(3))] = m.group(1)
+    return out
 
 
 # ---------------------------------------------------------------- field decoding
@@ -425,7 +444,8 @@ def pdb_pick(e, n):
 
 def decode_packet(kind, d, op, payload, docs):
     """-> dict(name, source, fields, covered, doc_size, issues)"""
-    issues, ann = [], docs["packets"].get((kind, op, d))
+    issues = []
+    ann = docs["link_ann"].get(op) if kind == "link" else docs["packets"].get((kind, op, d))
     src = "annotation"
     if ann is None and op in docs.get("pdb", {}):
         ann, src = pdb_pick(docs["pdb"][op], len(payload)), docs["pdb"][op].get("src", "pdb2017")
@@ -503,11 +523,12 @@ def decode_capture(path, ports, show_secrets=False):
         elif data:
             dr.segs.append((seq, i, data))
     streams, packets = [], []
-    count = collections.Counter()
+    count, lnames = collections.Counter(), link_ports()
     for key in order:
         kind = ports[key[3]]
-        count[kind] += 1
-        sid = f"{kind}#{count[kind]}"
+        label = lnames.get(key[3], f"link{key[3]}") if kind == "link" else kind   # link streams: listener name
+        count[label] += 1
+        sid = f"{label}#{count[label]}"
         st = dict(id=sid, kind=kind, client=f"{key[0]}:{key[1]}", server=f"{key[2]}:{key[3]}",
                   first_frame=conns[key]["first"], gaps={}, problems=[], seeds=[], decrypt=[])
         streams.append(st)
@@ -518,7 +539,7 @@ def decode_capture(path, ports, show_secrets=False):
             st["gaps"][d] = gaps
             if dup:
                 st["problems"].append(f"{d}: {dup} retransmitted/duplicate segments ignored")
-            pk, probs = deframe(chunks, gaps, fmap, dr.isn is not None, d == C2S, docs["known"][kind][d])
+            pk, probs = deframe(chunks, gaps, fmap, dr.isn is not None, d == C2S and kind != "link", docs["known"][kind][d])
             st["problems"] += [f"{d}: {p}" for p in probs]
             plist[d] = pk
         # seeds from the server side, then decrypt the client side
@@ -541,6 +562,9 @@ def decode_capture(path, ports, show_secrets=False):
                     g["dec"], i0 = xor(g["body"], i0)
                 group.clear()
         for p in plist[C2S]:
+            if kind == "link":                               # server links: no cipher
+                p["dec"] = p["body"]
+                continue
             while si < len(seeds) and seeds[si][0] <= p["frame"]:
                 flush()
                 idx = seeds[si][1] % 499
@@ -766,6 +790,13 @@ def selftest():
     pkts.append((tcp(S, C, 9210, 50001, 9000, frame(struct.pack("<HH", 0x0807, zseed))), None))
     e1, _ = xor(zb[1], zseed % 499)
     pkts.append((tcp(C, S, 50001, 9210, 7000 + 3, frame(e1)), None))
+    # server link (plaintext, no seed), e.g. WM <-> Character DB
+    lop, lv = next((op, v) for op, v in sorted(docs["link_ann"].items())
+                   if v["fields"] and all(f[1] in ("u8", "u16", "u32") for f in v["fields"]))
+    lpay = bytes(range(1, 1 + max(f[0] + {"u8": 1, "u16": 2, "u32": 4}[f[1]] for f in lv["fields"])))
+    lport = min(p for p, n in link_ports().items() if n.endswith("CDB"))
+    pkts.append((tcp(S, S, 50010, lport, 100, frame(struct.pack("<H", lop) + lpay)), None))
+    pkts.append((tcp(S, S, lport, 50010, 200, frame(struct.pack("<H", lop) + lpay)), None))
 
     tmp = tempfile.mkdtemp()
     for fmt in ("pcapng", "pcap"):
@@ -795,7 +826,8 @@ def selftest():
                 ("login#1", C2S, 0x0C5A), ("login#1", C2S, 0x0C37), ("login#1", S2C, 0x0C0A),
                 ("login#1", S2C, 0x0C09), ("login#1", S2C, 0x0C05), ("login#1", S2C, unknown_op),
                 ("wm#1", C2S, 0x1001), ("wm#1", C2S, 0x0C0F), ("wm#1", C2S, 0x1001), ("wm#1", S2C, gen_op),
-                ("zone#1", C2S, 0x0806), ("zone#1", S2C, 0x0807), ("zone#1", C2S, 0x1803)]
+                ("zone#1", C2S, 0x0806), ("zone#1", S2C, 0x0807), ("zone#1", C2S, 0x1803),
+                (f"{link_ports()[lport]}#1", C2S, lop), (f"{link_ports()[lport]}#1", S2C, lop)]
         assert got == want, got
         login = dict(ps[3]["fields"])
         assert login["sUserName"] == "tester" and set(login["sPassword"]) == {"*"}, login   # L00 names (pdb2017)
@@ -828,6 +860,11 @@ def selftest():
         assert res["streams"][0]["seeds"][0]["seed"] == seed
         assert any("1 retransmitted" in s for s in res["streams"][0]["problems"]), res["streams"][0]["problems"]
         assert any("brute-forced start index" in s for s in res["streams"][2]["decrypt"])
+        for lp in ps[-2:]:                                   # link packets: plaintext, decoded from the link annotation
+            f0 = lv["fields"][0]
+            want0 = int.from_bytes(lpay[f0[0]:f0[0] + {"u8": 1, "u16": 2, "u32": 4}[f0[1]]], "little")
+            assert lp["payload"] == lpay and lp["source"] == "annotation" and dict(lp["fields"])[f0[2]] == want0, lp
+            assert not lp["issues"] and lp["server"] == "link", lp["issues"]
         rep = open(stem + ".report.md").read()
         assert "| login | C→S | 0x0C5A |" in rep and "secret" not in open(stem + ".decoded.txt").read()
         if fmt == "pcapng":
@@ -859,7 +896,7 @@ def main(argv):
         a = argv[i]
         if a == "--port":
             p, k = argv[i + 1].split("=")
-            assert k in CLIENT_CLASS, f"--port PORT=login|wm|zone, got {k}"
+            assert k in CLIENT_CLASS or k == "link", f"--port PORT=login|wm|zone|link, got {k}"
             ports[int(p)] = k
             i += 1
         elif a == "--show-secrets":

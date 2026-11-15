@@ -6,23 +6,13 @@ usage: python3 -I make_dissector.py              # (re)write tools/wireshark/fie
 Doc loading is shared with the capture decoder (pcap_decode.load_docs), so both decode the same way.
 Install / usage / limits: docs/knowledge/P03.md.
 """
-import os, re, sys
+import os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pcap_decode import ROOT, XOR499, C2S, S2C, load_docs, default_ports, xor  # noqa: E402
+from pcap_decode import ROOT, XOR499, C2S, S2C, load_docs, default_ports, link_ports, xor  # noqa: E402
 
 OUT = os.path.join(ROOT, "tools/wireshark/fiesta.lua")
 DIRS = {C2S: "c2s", S2C: "s2c"}
-
-
-def link_ports():
-    """ServerInfo.txt server-link listeners (types 0-3 DB servers, 5 Login<-WM, 6 WM<->zone) -> {port: name}"""
-    path, out = os.path.join(ROOT, "Files/Server/2016/9Data/ServerInfo/ServerInfo.txt"), {}
-    for line in open(path, encoding="latin-1") if os.path.exists(path) else []:
-        m = re.match(r'\s*SERVER_INFO\s+"PG_([^"]+)",\s*\d+,\s*\d+,\s*\d+,\s*([0-356]),\s*"[^"]*",\s*(\d+)', line)
-        if m:
-            out[int(m.group(3))] = m.group(1)
-    return out
 
 
 def lua(v):
@@ -53,11 +43,9 @@ def gen_data():
         if srv in ann and d in DIRS:
             ann[srv][DIRS[d]][op] = {"name": v.get("name") or "", "f": [f[:3] for f in v["fields"]]}
     # server links are plaintext, one table for both directions (under "s2c": decode() is called with c2s=false);
-    # their annotations carry free-form dirs ("WM→CharDB", "Z→WM", ...); the first one per opcode wins
-    ann["link"] = {"c2s": {}, "s2c": {}}
-    for (srv, op, d), v in sorted(docs["packets"].items(), key=lambda x: (x[0][0], x[0][1], str(x[0][2]))):
-        if d not in DIRS:
-            ann["link"]["s2c"].setdefault(op, {"name": v.get("name") or "", "f": [f[:3] for f in v["fields"]]})
+    # their annotations: pcap_decode.load_docs()['link_ann'] (first one per opcode)
+    ann["link"] = {"c2s": {}, "s2c": {op: {"name": v.get("name") or "", "f": [f[:3] for f in v["fields"]]}
+                                     for op, v in sorted(docs["link_ann"].items())}}
     gen = {k: {"c2s": {}, "s2c": {}} for k in kinds + ("link",)}
     for k in kinds:
         for op, v in sorted(docs["layouts"][k][C2S].items()):
@@ -531,8 +519,8 @@ def selftest():
     gen_size = docs["layouts"]["wm"][S2C][gen_op][0]["size"]
     zone_pre, _ = xor(struct.pack("<H", 0x0806), 0)
     C, S = "10.0.0.2", "10.0.0.1"
-    lk = next((op, v) for (srv, op, d), v in sorted(docs["packets"].items(), key=lambda x: (x[0][0], x[0][1], str(x[0][2])))
-              if d not in DIRS and v["fields"] and all(f[1] in ("u8", "u16", "u32") for f in v["fields"]))
+    lk = next((op, v) for op, v in sorted(docs["link_ann"].items())
+              if v["fields"] and all(f[1] in ("u8", "u16", "u32") for f in v["fields"]))
     lsize = max(f[0] + {"u8": 1, "u16": 2, "u32": 4}[f[1]] for f in lk[1]["fields"])
     lport = min(p for p, n in link_ports().items() if n.endswith("CDB"))
     frames = [  # (src, sport, dst, dport, tcp payload)

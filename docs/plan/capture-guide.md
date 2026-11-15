@@ -18,8 +18,8 @@ They are the strongest evidence level in this project ("confirmed by capture").
   WM←zone 9111, zone links 9218–9221, AccountDB 9000, AccountLog 9311, Character DB 9411 (`PG_W00_CDB`: item,
   storage, trade writes; D03), GameLog 9511 (the filter also catches the unused OPTool ports 9015/9115/9211–9217).
   Server links run between processes on the server PC, so they show up only on its loopback adapter.
-  `fiesta.lua` shows them as plaintext Fiesta packets (server name = the listener, e.g. `W00_CDB`); the decoder
-  (`pcap_decode.py`) does not classify them yet.
+  `fiesta.lua` and the decoder (`pcap_decode.py`) show them as plaintext Fiesta packets named after the listener
+  (e.g. `W00_CDB`).
 - Save with *File → Save As* (all packets). *Export Specified Packets* with a display filter such as `fiesta` drops
   the TCP handshakes (the decoder then has to resync) and everything the dissector does not mark.
 - Start the capture **before** launching the client. The decoder needs each connection's first server
