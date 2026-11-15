@@ -115,7 +115,7 @@ through the slot in the 2016 WM; **dead** = no virtual call through that slot of
 | 0x24 | `Recv_NC_GUILD_ACADEMY_MEMBER_MAP_CMD` FUN_0045bbf0 | 0x9863 | dead | W03 §4.2 |
 | 0x28 | `Recv_NC_GUILD_ACADEMY_MEMBER_CLASS_CMD` FUN_0045bc40 | 0x9867 | dead | not sent by the 2016 WM |
 | 0x2C | `Recv_NC_GUILD_ACADEMY_MEMBER_GUILD_JOIN_CMD` FUN_0045b350 | 0x982E | dead | W03 §6.2 (`FUN_00447cc0`; ignored by the 2016 client) |
-| 0x30 | `CGuildAcademyMemberServer::GetIndex` FUN_00440fd0 (derived class only) | – | 12 callers (§1.3) | – |
+| 0x30 | `CGuildAcademyMemberServer::GetIndex` FUN_00440fd0 (derived class only) | – | 13 callers (§1.3) | – |
 
 "Not sent by the 2016 WM" = no WM send site in `re-data/exports/wm/layouts.json` (`.s2c`) and none in the zone's either;
 these opcodes have no 2016 sender found *(inferred from the generated layouts; Character / zone hand-built buffers not
@@ -178,11 +178,51 @@ CGuild::Recv_NC_GUILD_ACADEMY_NOTIFY_CMD(g, p PROTO_NC_GUILD_ACADEMY_NOTIFY_CMD)
     return 1
     # (original bug) W06-B1: the caller FUN_004484d0 (0x9828 answer, W03 §6.3) first strcpy's the DB text into
     # a stack PROTO_NC_GUILD_ACADEMY_NOTIFY_CMD (local_248, text at +0x3E) and then passes it here; neither copy is
-    # bounded, so a notice longer than 511 bytes overruns the stack frame and then g+0x760.. (reward money fields)
+    # bounded. A notice of 512 or more bytes writes past sNotify into g+0x760.. (graduate count, reward money fields);
+    # 514 or more also overwrite the /GS cookie of the caller's frame (text at ebp−0x20A, cookie at ebp−8), so the
+    # WM process is terminated by __security_check_cookie when FUN_004484d0 returns (after the broadcasts)
+
+CGuild::Recv_NC_GUILD_NOTIFY_CMD(g, p PROTO_NC_GUILD_NOTIFY_CMD)                    @ FUN_0045acd0   (slot 0x2C)
+    # p = { i32 dNotifyDate; tm tm_dNotifyDate; Name5 sNotifyCharID; u16 nNotifyLength; char sNotify[] } (0x3E + text)
+    if g.m_bIsGuild == 0: return 0
+    g.m_Guild.dNotifyDate, .tm_dNotifyDate, .sNotifyCharID = p's
+    strcpy(g.m_Guild.sNotify /* [512] at g+0x237: m_Guild at g+0xC, sNotify at GUILD_CLIENT+0x22B */, p.sNotify)
+    return 1
+    # (original bug) W06-B6, the guild twin of B1: the caller Recv_NC_GUILD_DB_NOTIFY_ACK FUN_00445ca0 (CharDB 0x7463,
+    # W03 §2.8) strcpy's the DB text into its stack PROTO_NC_GUILD_NOTIFY_CMD local_248 (text at +0x3E, same frame
+    # layout as FUN_004484d0) and this slot copies it again, both unbounded. sNotify ends at g+0x436 (g+0x437 is
+    # padding); 513 bytes reach `CGuildWar m_GuildWar` at g+0x438 (§1.5: count, top, bottom; freed by CGuildWar::Clear),
+    # 514 or more also hit the /GS cookie → the WM is terminated when FUN_00445ca0 returns
 ```
 
-The 0x2C slot (`CGuild::Recv_NC_GUILD_NOTIFY_CMD` FUN_0045acd0) and 0x28 slot (`CGuildMember::Recv_NC_GUILD_MEMBER_GRADE_CMD`
-FUN_0045b560) are documented by W03 (§2.8, §2.9).
+Reachability of B1 / B6 *(inferred)*: the Character server echoes the requested text into its answer (`_mbsnbcpy` of
+`nNotifyLength` bytes, D04 §6.3 / 0x9827) and answers ok only if the procedure succeeded; its own 512-byte bind
+overflow (D04-B16) comes first. So the WM overrun needs a client notice of 512 or more bytes (W03-B3: the WM does not
+bound the request) that the Character server survives and stores.
+
+The 0x9828 answer path itself (W03 §6.3 only covers its error branch's log):
+
+```pseudo
+CGuildManager::Recv_NC_GUILD_ACADEMY_DB_NOTIFY_ACK(p { u16 Error; u16 hWMChar; u32 nNo; i32 dNotifyDate;
+                                                    u16 nNotifyLength; char sNotify[] })      @ FUN_004484d0
+    s = GetSession(p.hWMChar)                          # the requester; may be null (logged off meanwhile)
+    if p.Error != 0x1780:
+        s ? s ← raw { u16 0x9825 NC_GUILD_ACADEMY_NOTIFY_ACK; u16 Error } (5 bytes) : log "DEBUG - … Cannot Find Client
+            Session After Changing …"; return
+    if p.nNo == 0 or guild nNo not in the list: return 0
+    if s: Send_NC_GUILD_ACADEMY_NOTIFY_ACK(s, 0x1780)
+    cmd.dNotifyDate = p.dNotifyDate; cmd.tm_dNotifyDate = *_localtime32(&p.dNotifyDate)
+    cmd.sNotifyCharID = s.m_pCharDataBase ? s.m_pCharDataBase.charid (Name5 at +4) : zero / ""
+        # s is not checked here: a null requester session is dereferenced (s+0x560) → access violation, WM crash
+        # (original bug) W06-B5; the 0x9828 answer carries no sNotifyCharID (unlike 0x7463), so the name must come
+        # from the live session
+    cmd.nNotifyLength = p.nNotifyLength; strcpy(cmd.sNotify, p.sNotify)                       # W06-B1
+    g.vtbl[0x4C/4](cmd)                                # CGuild::Recv_NC_GUILD_ACADEMY_NOTIFY_CMD above, result ignored
+    CGuildMemberServer::Send_NC_GUILD_ACADEMY_NOTIFY_CMD(cmd); CGuildAcademyMemberServer::Send_NC_GUILD_ACADEMY_NOTIFY_CMD(cmd)
+    return 1
+```
+
+The 0x28 slot (`CGuildMember::Recv_NC_GUILD_MEMBER_GRADE_CMD` FUN_0045b560) is documented by W03 (§2.9).
 
 ### 1.4 Dead slots (client-side handlers compiled into the WM)
 
@@ -231,6 +271,9 @@ CGuild::Recv_NC_GUILD_DELETE_CMD → m_bIsGuild = m_bIsGuildAcademy = m_bisGuild
 CGuild::Recv_NC_GUILD_MONEY_ADD_CMD (and the folded SUB) { Name5 CharID; u64 GuildMoneyAdd; u64 GuildTotalMoney }
     → m_Guild.nMoney = GuildTotalMoney                                                         @ FUN_0045aca0
 CGuild::Recv_NC_GUILD_GRADE_CMD { u8 Grade } → m_Guild.nGrade                                  @ FUN_0045ad50
+CGuild::Recv_NC_GUILD_WAR_LIST_ACK { u16 Error; u8 PartMask; u16 NumOfWarInfo; SHINE_GUILD_WAR_INFO rows[] }  @ FUN_0045c190
+    Error != 0x0C41 → return 0; PartMask & 1 → CGuildWar::Clear(m_GuildWar)
+    for each of the NumOfWarInfo 0xEA-byte rows: CGuildWar::Add(m_GuildWar, row) (§1.5); return 1
 CGuild::Recv_NC_GUILD_WAR_TARGET_CMD { SHINE_GUILD_WAR_INFO WarInfo }                          @ FUN_0045bdb0
     if WarInfo.nRequestNo == m_Guild.nNo:            # my own declaration
         m_Guild.nWarEnemy/sWarEnemyName/nWarEnemyGrade/nWarStatus/3 dates/3 tm/MyScore/EnemyScore = WarInfo's
@@ -249,7 +292,8 @@ CGuild::Recv_NC_GUILD_WAR_COOLDOWN_DONE_CMD → m_Guild.nWarEnemy = 0, nWarStatu
 Correction of W03 §1.2 (its row +0x438 calls this a "member-info list"; `docs/knowledge/W06.md` §0): CGuild+0x438 is
 `CGuildWar` *(pdb2016)* { +0 i32 `m_NumOfWarList`, +4 `m_pGuildWarListTop`, +8 `m_pGuildWarListBottom` }, a doubly linked
 list of `CGuildWar::GUILD_WAR_LIST` nodes (0xF4 bytes: `SHINE_GUILD_WAR_INFO WarInfo` 0xEA, then `pLinkUp`, `pLinkDn`).
-Only the dead slots 0x38 / 0x3C / 0x40 / 0x44 add to it, so in the WM it stays empty; `CGuildWar::Clear` FUN_0045bf20 also
+Only the dead slots 0x38 (WAR_LIST_ACK) and 0x3C (WAR_TARGET_CMD) add to it (0x40 WAR_START calls `CGuildWar::Update`,
+0x44 WAR_END `Update` or `Del`), so in the WM it stays empty; `CGuildWar::Clear` FUN_0045bf20 also
 runs from `CGuild::Make` FUN_0045bf60 (guild creation, W03 §2.2) and `CGuild::~CGuild` FUN_0045c300.
 
 `SHINE_GUILD_WAR_INFO` (0xEA) *(pdb2016)*: +0x00 nNo, +0x04 Name4 sName, +0x14 nGrade, +0x15 nWarStatus, +0x16
@@ -303,8 +347,10 @@ CParserClient::fc_NC_GUILD_MEMBER_JOIN_ACK(s, p { Name4 GuildName; u8 JoinAck })
 Both helpers return 0 when `s` or `s.m_pCharDataBase` is null (already excluded by the handler's first check) and
 otherwise **the result of `CWMBaseSession::Send(&gServer.m_CharDB, buf, len)`** (FUN_0042fca0 →
 `CSocket_IOCP::Send` FUN_004666f0), not the opcode. `CSocket_IOCP::Send` returns 0 when the CharDB link's socket is
-`INVALID_SOCKET` (link down: "CSocket_IOCP::Write, INVALID m_Socket=%d"), when `WriteFile` fails with an error other
-than `ERROR_IO_PENDING` (0x3E5) (the buffer is freed, `gSocket_IOCP_Write` log), or for a zero-size buffer; else 1.
+`INVALID_SOCKET` (link down: "CSocket_IOCP::Write, INVALID m_Socket=%d") or when `WriteFile` fails with an error other
+than `ERROR_IO_PENDING` (0x3E5) (the buffers are freed, `gSocket_IOCP_Write` log); else 1. A size-0 call returns 1
+(the chunk loop is skipped; its inner `dwSize == 0` exit cannot fire), and while a write is pending the data is only
+appended to the queue (merged into the last buffer when it fits in 0x2000) and the call returns 1 without `WriteFile`.
 So 0x0CDB ("Failed to join % guild.", W03 §2.5 client texts) is sent **when the Character DB link is down or the
 write fails**. W03 §2.5's last comment ("both send helpers return the opcode … dead code") is wrong.
 
@@ -334,9 +380,11 @@ Client texts (`ErrMsgTable::GetErrMsg`, `docs/protocol/client-error-codes.json`)
 | 0x0D1B | requester's guild not found | "You have no joined guild" (TextData3 0x9C090D3F) |
 | 0x0D1C | asked again within 5 s | the default line "An unidentified error code has occurred.: 3356" **and then** "Please try later." (original bug) W06-B2 |
 
-The WM's error replies are the initial packet with only `Error` replaced: `PartMask = 1`, `NumOfWarInfo = 0`
-(`FUN_0043e270` starts every packet as `41 0C 01 00 00`). So every error reply also **empties the client's war-able
-list**, including the 5-second throttle reply (original bug) W06-B4.
+The WM's error replies are the initial packet with only `Error` replaced: `FUN_0043e270` starts every packet as
+`41 0C 01 00 00` (Error 0x0C41, PartMask 1, NumOfWarInfo 0), middle chunks reset PartMask to 0, and the final send
+(`LAB_0043e4fa`) sets `PartMask |= 2`. An error reply therefore carries `PartMask = 3`, `NumOfWarInfo = 0`; the client
+tests `PartMask & 1`, so every error reply also **empties the client's war-able list**, including the 5-second throttle
+reply (original bug) W06-B4.
 
 ### 2.3 E25 (second half): W04 §12.3, the dice-game test that drops the answer of 0x9405: **confirmed**
 
@@ -469,10 +517,19 @@ Raid::iterator::operator!=(a, b)                                                
                 and a.m_nPartyIndex == b.m_nPartyIndex and a.m_nSlot == b.m_nSlot)
 ```
 
-The loop test of W02 §1.4's iterator (`Raid::Begin` {0,0} … `Raid::End` {4,0}); its six call sites are the member
-loops of `WorldManagerServer::RaidLeaveLeader` FUN_00407430, `RaidLeaveSubLeader` FUN_00407620 and `RaidLeaveLooter`
-FUN_00407800 (W02 §1.4, the 0xB02E broadcast to every raid member). Two iterators on a null raid compare unequal, so a
-loop over a null raid would not end; the three callers check `GetRaid` ≠ null first.
+The test of W02 §1.4's iterator (`Raid::Begin` {0,0} … `Raid::End` {4,0}), used both as the member-loop condition
+(`it != End`) and as the membership test after `Raid::Find` (`Find(charNo) != End`). 65 E8 call sites in 26 functions,
+all raid code of W02: `WorldManagerServer::RaidLeaveLeader` FUN_00407430 / `RaidLeaveSubLeader` FUN_00407620 /
+`RaidLeaveLooter` FUN_00407800 (0xB02E broadcasts); `CParserClient::fc_NC_RAID_LOOTING_TYPE_REQ` FUN_00417420,
+`_CHAT_REQ` FUN_00417630, `_WARNING_REQ` FUN_004178a0, `_MAKE_REQ` FUN_0041ed50, `_LEAVE_REQ` FUN_0041f4d0,
+`_VANISH_REQ` FUN_0041f7b0, `_SLOT_MOVE_REQ` FUN_0041fc70, `_SET_LEADER_REQ` FUN_004202c0, `_SET_SUB_LEADER_REQ`
+FUN_00420660, `_DEL_SUB_LEADER_REQ` FUN_00420a00, `_SET_LOOTER_REQ` FUN_00420e40, `_INVITATION_ANSWER_REQ` FUN_00422400;
+`CParserZone::fc_NC_INSTANCE_DUNGEON_EMPTY_DUNGEON_CMD` FUN_0042ba20, `_RESET_COUNTDOWN_CMD` FUN_0042bc40,
+`fc_NC_MAP_LINKEND_CMD` FUN_0042d8d0; `CWMClientSession::IsInRaid` FUN_00431240, `RaidResetCheckAndRelease`
+FUN_004312b0, `RaidLostAuthorityByLeave` FUN_004313f0, `CharIDChange` FUN_00431dd0, `RaidLogOff` FUN_004357d0,
+`RaidLeave` FUN_00435ad0, `SendRaidMember` FUN_00436170, `RaidRefresh` FUN_00436b90. Two iterators on a null raid
+compare unequal, so a loop over a null raid would not end; all 26 test the `Raid *` (from `RaidSystem::GetRaid`, or
+the argument in `RaidLostAuthorityByLeave`) against null before `Begin` / `End` / `Find`, so this cannot happen.
 
 ### 3.6 MSVC runtime `type_info`
 
@@ -485,10 +542,12 @@ No server behaviour; a rebuild does not reproduce it.
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
 |---|---|---|---|---|
-| W06-B1 | CharDB 0x9828 → slot 0x4C (FUN_004484d0 → FUN_0045add0) | the academy notice from the DB answer is strcpy'd into a stack `PROTO_NC_GUILD_ACADEMY_NOTIFY_CMD` and then into `GUILD_ACADEMY_CLIENT.sNotify[512]`; `nNotifyLength` is not used, no bound (the request side is W03-B3) | a notice ≥ 512 bytes overruns the WM stack frame and the guild entry from +0x760 (academy reward money, graduate count, emblem fields) | copy at most `min(nNotifyLength, 511)` bytes and terminate |
-| W06-B2 | client 0x7425 (FUN_006b3e00) | for 0x0D1C the generic `GetErrMsg` line is shown before "Please try later."; 0x0D1C has no `ErrMsgTable` entry | two lines, the first "An unidentified error code has occurred.: 3356" | exclude 0x0D1C from the generic message |
+| W06-B1 | CharDB 0x9828 → slot 0x4C (FUN_004484d0 → FUN_0045add0) | the academy notice from the DB answer is strcpy'd into a stack `PROTO_NC_GUILD_ACADEMY_NOTIFY_CMD` and then into `GUILD_ACADEMY_CLIENT.sNotify[512]`; `nNotifyLength` is not used, no bound (the request side is W03-B3) | a notice ≥ 512 bytes overruns the guild entry from +0x760 (graduate count, academy reward money); ≥ 514 also the /GS cookie of the handler frame → WM terminated on return (§1.3; reachability *(inferred)*: needs a long client notice the Character server survives, D04-B16) | copy at most `min(nNotifyLength, 511)` bytes and terminate |
+| W06-B2 | client 0x7425 (FUN_006b3e00), **client-side** | for 0x0D1C the generic `GetErrMsg` line is shown before "Please try later."; 0x0D1C has no `ErrMsgTable` entry | two lines, the first "An unidentified error code has occurred.: 3356" | client fix: exclude 0x0D1C from the generic message; a server rebuild can only avoid it by its choice of code (or by sending no reply to the throttled request) |
 | W06-B3 | 0x7424 (FUN_0043e270) | a guild-less requester gets 0x0D1A, which the client has no text for; the client's "You have no joined guild" text is under 0x0D1B, which the WM sends when the guild entry is missing | generic "unidentified error: 3354" | send 0x0D1B for "no guild" (codes look swapped) *(inferred)* |
-| W06-B4 | 0x7424 (FUN_0043e270) | error replies keep `PartMask = 1` from the packet template | the client clears its war-able list on every error, also on the 5 s throttle reply | send `PartMask = 0` on errors |
+| W06-B4 | 0x7424 (FUN_0043e270) | error replies keep bit 0 of `PartMask` from the packet template; the final send adds bit 1 → `PartMask = 3` | the client (tests `& 1`) clears its war-able list on every error, also on the 5 s throttle reply | send `PartMask = 2` (last part only) on errors |
+| W06-B5 | CharDB 0x9828 success path (FUN_004484d0) | the requester session `GetSession(hWMChar)` is null-checked for the 0x9825 ACK but then dereferenced unchecked (`s.m_pCharDataBase` at s+0x560) to fill `sNotifyCharID` | requester logs off between 0x9827 and the DB answer → access violation, WM crash | skip the name (or take it from the DB answer) when the session is gone |
+| W06-B6 | CharDB 0x7463 (FUN_00445ca0 → slot 0x2C FUN_0045acd0) | as B1 for the guild notice: strcpy into the stack `PROTO_NC_GUILD_NOTIFY_CMD` and into `GUILD_CLIENT.sNotify[512]` (CGuild+0x237), both unbounded (the request side is W03-B3) | 513 bytes reach `CGuildWar m_GuildWar` (CGuild+0x438); ≥ 514 hit the /GS cookie → WM terminated on return (§1.3) | as B1 |
 
 ## Not reconstructed / uncertain
 
@@ -515,7 +574,7 @@ docs/plan/status/X02-cov.py game wm 100` reports 0 uncited class-named WM functi
 |---|---|---|
 | `operator_new` FUN_00469d3f, `operator_delete[]` FUN_0046b6b7, FUN_004701e3 (called by `type_info::_Type_info_dtor`) | none needed (CRT) | Visual C++ runtime, like the `type_info` members of §3.6: no server behaviour, a rebuild uses its own allocator / RTTI |
 | The WM side of the live guild slots (`NOTIFY_CMD`, `ACADEMY_NOTIFY_CMD`, member / academy JOIN, VANISH, LEAVE, GRADE): the handlers that call them | W03 (done) §2–§6, cited per slot in §1.3 | §1.3 documents only what the slot itself does; the WM handlers, DB round trips and broadcasts are W03's pseudocode |
-| CharDB 0x9828 answer path that ends in slot 0x4C (W06-B1) | W03 (done) §6.2 / §6.3 | the handler is documented there; W06 adds the slot body and the overflow (B1) |
+| CharDB 0x9828 / 0x7463 answer paths that end in slots 0x4C / 0x2C (W06-B1, B5, B6) | documented here (§1.3); W03 (done) §6.3 / §2.8 for the request side and the broadcasts | W03 §6.3 records only the error branch's log, so the success path (notifier name from the session, the null dereference B5) and both overflows are written in §1.3 |
 | Client handlers of the 12 never-sent opcodes (`GuildTask` FUN_006b7e70, `GuildMemberTask` FUN_006b1b10, `GuildAcademyMemberTask` FUN_006f3530 rows) | C01 (done), `docs/knowledge/C01.md` dispatcher tables | client code for packets no 2016 server sends (see "Not reconstructed / uncertain"); C01 lists them, nothing on the server side to rebuild |
 | `CSocket_IOCP::Send` FUN_004666f0 (return value behind E14) | S02 §1.5 | the full send path is documented there; §2.1 states only its 0 / 1 result |
 | Zone `RandomBox` (FUN_0063cdb0) and its readers | Z23 (done) §8.6, Z28 | §3.1 documents the WM copy; the zone rings are read there, and the WM reads only the Well512 member |

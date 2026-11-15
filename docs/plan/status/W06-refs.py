@@ -16,4 +16,4 @@ for j in range(rp, rp + rs - 5):
         t = pe.va(j) + 5 + d
         if t in tg: rel[t].append(hex(pe.va(j)))
 for t in sorted(tg):
-    print(hex(t), "abs", absr[t][:6], "rel", rel[t][:6])
+    print(hex(t), "abs", len(absr[t]), absr[t], "rel", len(rel[t]), rel[t])   # full lists (an earlier [:6] cut hid callers)
