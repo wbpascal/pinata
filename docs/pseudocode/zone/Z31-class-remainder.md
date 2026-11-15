@@ -25,7 +25,7 @@ and the bucket rules are in `docs/plan/status/Z31.md` and `docs/plan/status/Z31-
 | 4 | the other `ShinePlayer` members | 127 / 1 954 |
 | 5 | `ShineObject`, `ShineMobileObject` and the other object classes | 138 / 1 731 |
 | 6 | abstate containers, character classes, mob AI, rules of engagement, use effects | 109 / 1 774 |
-| 7 | table templates (`BinaryDataBox<…>`, `ITableBase<…>`, `IIDTableBase<…>`, `SHND::CommonData<…>`, `Table`) | ≈ 4 100 |
+| 7 | table templates (`BinaryDataBox<…>`, `ITableBase<…>`, `IIDTableBase<…>`, `SHND::CommonData<…>`, `Table`) | 201 / 4 103 |
 | 8 | the other data loaders and SHN / text parsers | ≈ 2 200 |
 | 9 | NPC roles, merchants, booths, guild, events, kingdom quest, Lua glue | 111 / 2 822 |
 | 10 | sessions, packet containers, `AxialList*` visitors, map clusters, path finding, library classes | ≈ 3 100 |
@@ -1582,6 +1582,333 @@ classes (reset to `UseItemBase::vftable`, delete). The actors are static (`ui_Ca
 - `CharaterSkillList::~CharaterSkillList` FUN_00447f40: frees the `csl_ToggleSkill` and `csl_Skill` vectors; called by
   `~ShinePlayer` (§2.9). The list itself is Z23.
 
+## 7. Table templates: `BinaryDataBox<T>`, `SHND::CommonData<T, Cmp>`, `ITableBase<Row, Table>`, `Table::Load<T>`
+
+The zone reads its SHN files through three template families. Their bodies were documented by earlier items:
+`BinaryDataBox<T>::bdb_ReadData` (the checked `CDataReader::Read(path, key, rowSize)`) in Z20 §2.1,
+`SHND::CommonData<T, Cmp>` (layout, construction, `cd_Load`, `cd_Find`) in Z28 §2, and `Table::Load<T>` →
+`ITableBase<Row, Table>::Load` → `DataProcess` in Z21 §4.1. The stage that loads each file is Z01 §2.3. This section
+adds the instances no document cited: about 200 functions, most of them 10-40 line copies of one template body.
+Each subsection gives the template once and then lists the instances.
+
+### 7.1 `CDataReader`, `BinaryData`, `BinaryDataBox<T>`: layout and destructors
+
+```
+CDataReader   (size 0x40)                                   *(pdb2016)*
+    +0x00  vftable (1 slot: scalar deleting dtor FUN_0062a260)
+    +0x04  m_nFileSize   +0x08 m_nBFSize   +0x0c m_nDataArraySize   +0x10 m_nFileCheckSum
+    +0x14  Name8 m_sFileMD5
+    +0x34  HEAD* m_pHead      HEAD (0x34): +0 nVersionKey, +4 sVersion[20], +0x18 nReserved, +0x1c nDataMode,
+                              +0x20 nFileSize, +0x24 nDataSize, +0x28 nNumOfRecord, +0x2c nFieldSize, +0x30 nNumOfField, +0x34 FIELD[]
+    +0x38  uchar* m_pData     +0x3c uchar** m_pDataArray   (row pointers: GetRecord(i) = m_pDataArray[i])
+BinaryData : CDataReader                (0x40, no members; own vftable, 1 slot FUN_0063cf60)
+BinaryDataBox<T> : BinaryData           (0x40 + sizeof T)
+    +0x40  T bdb_defaultblock            the row returned for an index past the end (Z28 §2.3: that branch is dead in every user)
+```
+
+The "rowcount at reader data +0x28" of Z28 §2.3 is `m_pHead->nNumOfRecord`.
+
+```pseudo
+BinaryDataBox<T>::~BinaryDataBox(this)                         @ the "~BinaryDataBox<T>" column below
+    this.vftable = BinaryDataBox<T>::vftable
+    BinaryData::~BinaryData(this)                              # → CDataReader::~CDataReader: frees the file buffer and the row array
+
+BinaryDataBox<T>::`scalar deleting destructor'(this, flags)    @ the "scalar deleting dtor" column below
+    same as ~BinaryDataBox; if flags & 1: operator delete(this)
+
+BinaryData::`scalar deleting destructor'(this, flags)          @ FUN_0063cf60
+    this.vftable = BinaryData::vftable; CDataReader::~CDataReader(this); if flags & 1: operator delete(this)
+```
+
+Callers. The normal path never calls the named `~BinaryDataBox<T>` bodies. The owners inline
+`BinaryData::~BinaryData` (for example every `cd_Load` destroys its stack reader that way, Z28 §2.3). The only direct
+callers are the compiler's exception-unwind funclets of the owner's constructor, destructor or loader (for example
+`__unwindfunclet$?mht_Load@MultiHitTable…`, `…??0<unnamed-type-mdb_BinData>@MobDataBox…`). Each scalar deleting
+destructor is slot 0 of its `BinaryDataBox<T>` vftable, and in 74 of the 77 instances the vftable is its only
+reference in the image. No `delete` through a `BinaryData` pointer was found, so these destructors never run
+*(inferred: the boxes are globals, members or stack objects)*. The other three bodies are each referenced by a second
+vftable: `BinaryDataBox<MerchantLocation>` FUN_004c7d10 by `MerchantCityData`, `BinaryDataBox<ShineReward>` FUN_0064ca80
+by `RewardData`, and `BinaryDataBox<FriendPointReward>` FUN_0064cb40 by `FPRewardData`. These derived boxes add no
+code to the destructor, so identical-code folding gives them the same body.
+
+All instances follow. Every function in the table is the template above with the row type's key, size and vftable;
+the readers check `HEAD.nVersionKey == key` and `nFieldSize − 2 == row size` (Z20 §2.1). Every key and size equals
+the `DataVersionKey` / `row_bytes` of `docs/knowledge/S01-shn-structs.tsv`. Where a row type has no reader under its
+own name, another instance with the same key and row size reads it (identical-code folding: the PDB keeps one name).
+"Owner" is the loader that holds the box and the item that documents it.
+
+| Row type `T` | `bdb_ReadData` (key / row size) | `~BinaryDataBox<T>` | scalar deleting dtor (vftable slot 0) | Owner and loader |
+|---|---|---|---|---|
+| `SubAbStateInfo` | FUN_00416940 (0x42c / 0x4f) | – | FUN_00416ac0 | `SubAbState::sas_Load` FUN_00416bd0 (Z25) |
+| `AbnormalStateInfo` | FUN_00416a00 (0xfca / 0x121) | FUN_004169f0 | FUN_00416af0 | `AbState::as_Load` FUN_00416e80 (Z25) |
+| `AbStateSaveTypeInfo` | FUN_006416e0 (0x16 / 7) | FUN_00416ab0 | FUN_00416b20 | `AbState::as_Load` FUN_00416e80 (Z25) |
+| `BRAccUpgrade` | FUN_0043b8c0 (0x51 / 0xe) | FUN_0043b8b0 | FUN_0043b960 | `BRAccUpgradeDataBox::LoadBRAccUpgradeData` FUN_0043bb00 (Z18) |
+| `BRAccUpgradeInfo` | no reader under its own name (a key / size twin or inline in the owner) | – | FUN_0043b990 | `BRAccUpgradeDataBox::LoadBRAccUpgradeData` FUN_0043bb00 (Z18) |
+| `ChargedItemEffect` | FUN_005ae790 (0x8d / 0x2b) | – | FUN_0044fb80 | `ChargedItemEffectDataBox<ChargedItemEffect>::cideb_Load` FUN_005af300 (Z24) |
+| `MiniHouseFurniture` | FUN_005ae8f0 (0x3f9 / 0x94) | – | FUN_0044fc70 | `ChargedItemEffectDataBox<MiniHouseFurniture>::cideb_Load` FUN_005af6d0 (Z13) |
+| `StateField` | FUN_004628e0 (0x39 / 0x30) | FUN_004639f0 | FUN_00463a10 | `FieldContainer::fc_AbstateInFieldLoad` FUN_00464950 (Z22 §7.5) |
+| `MapBuff` | FUN_00462980 (0x67 / 0x30) | FUN_00463a00 | FUN_00463a40 | `MapBuffDataBox::mbdb_Load` FUN_004670b0 (Z01 §2.3) |
+| `FieldLvCondition` | FUN_0046a280 (0x20 / 0x26) | – | FUN_0046a320 | `FieldLevelDataBox::fldb_Load` FUN_0046a350 (Z14) |
+| `PartyBonusByLvDiff` | folded: CollectCardDropRate FUN_00481440 (7 / 4, Z28 knowledge) | FUN_00481430 | FUN_00481600 | `LevelHandicap4ExperienceDouble::lh4ed_Load` FUN_00481a80 (Z28 §3.8) |
+| `ItemShop` | FUN_00492180 (0x3d / 0x28) | FUN_00492170 | FUN_004922e0 | `ItemMall::im_Load` FUN_00493250 (§3.6) |
+| `ItemServerEquipTypeInfo` | FUN_00492230 (0x3e9 / 0x1d) | FUN_00492220 | FUN_00492310 | `ItemEquipTable::iet_Load` FUN_00493140 (Z18) |
+| `RandomOptionCount` | FUN_00493380 (0x12 / 0x25) | FUN_00493370 | FUN_00493430 | `RandomOptionTable::rot_Load` FUN_00494570 (Z01 §2.3; §8) |
+| `RandomOption` | no reader under its own name (a key / size twin or inline in the owner) | FUN_00493420 | FUN_00493460 | `RandomOptionTable::rot_Load` FUN_00494570 (Z01 §2.3; §8) |
+| `KINGDOM_QUEST_REW` | FUN_0049a860 (0x32a9 / 0x80) | – | FUN_0049a910 | `KQRewardDataBox::kqrdb_Load` FUN_0049a940 (Z01 §2.3) |
+| `LCGroupRate` | FUN_0049beb0 (0x16 / 9) | FUN_0049bea0 | FUN_0049bff0 | `CLCReward::clcr_Load` FUN_0049d420 (Z01 §2.3) |
+| `LCReward` | FUN_0049bf50 (0x33 / 0x22) | – | FUN_0049c020 | `CLCReward::clcr_Load` FUN_0049d420 (Z01 §2.3) |
+| `TownPortal` | FUN_0049f0e0 (0xd5 / 0x2b) | – | FUN_0049f240 | `TownPortalData::tpd_Load` FUN_0049fbc0 (Z30) |
+| `MiniHouseEndure` | FUN_004a1100 (0xfb / 10) | – | FUN_004a11b0 | `MiniHouseEndureDataBox::mhe_Load` FUN_004a11e0 (Z13) |
+| `MiniHouseObjAni` | FUN_004a1580 (0x271 / 0x27) | – | FUN_004a1630 | `MiniHouseObjAniDataBox::mhoadb_Load` FUN_004a1970 (Z13) |
+| `MinimonInfo` | FUN_004a1ae0 (0x33 / 0x28) | FUN_004a1ad0 | FUN_004a1c30 | `CMinimonDataBox::mmdb_Load` FUN_004a27f0 (Z13) |
+| `MinimonAutoUseItem` | no reader under its own name (a key / size twin or inline in the owner) | FUN_004a1b80 | FUN_004a1c60 | `CMinimonAutoUseItemDataBox::mauidb_Load` FUN_004a2b80 (Z13) |
+| `MoverMain` | FUN_004bf320 (0xba / 0x33) | FUN_004bf310 | FUN_004bf600 | `MoverDataBox::mvdb_Load` FUN_004bf960 (Z13) |
+| `MoverAbility` | FUN_004bf3e0 (0x388 / 0x61) | FUN_004bf3d0 | FUN_004bf630 | `MoverDataBox::mvdb_Load` FUN_004bf960 (Z13) |
+| `MoverHG` | FUN_004bf4a0 (0x95 / 0x4a) | FUN_004bf490 | FUN_004bf660 | `MoverDataBox::mvdb_Load` FUN_004bf960 (Z13) |
+| `MoverItem` | FUN_004bf560 (0x2c / 0x40) | FUN_004bf550 | FUN_004bf690 | `MoverDataBox::mvdb_Load` FUN_004bf960 (Z13) |
+| `MoverUseSkill` | folded: MoverItem FUN_004bf560 (0x2c / 0x40) | – | FUN_004bf6c0 | `MoverDataBox::mvdb_Load` FUN_004bf960 (Z13) |
+| `MultiHitType` | FUN_004c09b0 (0xac / 0x2a) | FUN_004c09a0 | FUN_004c0a60 | `MultiHitTable::mht_Load` FUN_004c0ff0 (Z25) |
+| `MerchantLocation` | FUN_004c5820 (5 / 5) | – | FUN_004c7d10 | `MerchantCityData::mcd_Load` FUN_004c77b0 (§9) |
+| `SpamerPenaltyRule` | FUN_005896f0 (5 / 3) | FUN_005896e0 | FUN_00589790 | `SpamerPenaltyDataBox::spdb_Load` FUN_005897f0 (Z02) |
+| `SpamerPenalty` | folded: GBSMGroup FUN_0061df60 (0x12 / 5) | – | FUN_005897c0 | `SpamerPenaltyDataBox::spdb_Load` FUN_005897f0 (Z02) |
+| `StateItem` | FUN_0058bfe0 (0x4d / 0x46) | FUN_0058bfd0 | FUN_0058c080 | `cStateItemDataBox::sidb_Load` FUN_0058c920 (Z24) |
+| `UpGradeInfo` | FUN_00596160 (0xa2b / 0x3e) | – | FUN_00596210 | `UpgradeDataBox::udb_Load` FUN_00596240 (Z12) |
+| `ItemUseEffect` | FUN_00596b20 (0x23b / 0x56) | – | FUN_00596bd0 | `UsedItemEffect::uie_Load` FUN_0059cc30 (Z24) |
+| `GBBanGame` | FUN_005aec00 (0x23 / 0xc) | FUN_005aebf0 | FUN_005aef30 | `CommonData<GBBanGame, CmpGameType>::cd_Load` FUN_005b85c0 (§7.3) |
+| `GBTaxRate` | FUN_005aecb0 (0x38 / 0xc) | FUN_005aeca0 | FUN_005aef60 | `CommonData<GBTaxRate, CmpGameType>::cd_Load` FUN_005b8720 (§7.3) |
+| `GBReward` | FUN_005aed60 (0x67 / 0x28) | FUN_005aed50 | FUN_005aef90 | `CommonData<GBReward, CmpGambleItemReward>::cd_Load` FUN_005b8880 (§7.3) |
+| `GBEventCode` | folded: GBBanGame FUN_005aec00 (same key 0x23 / 0xc) | FUN_005aee00 | FUN_005aefc0 | `CommonData<GBEventCode, CmpEventCode>::cd_Load` FUN_005b8aa0 (§7.3) |
+| `AccUpGradeInfo` | FUN_005c5160 (3999 / 0x70) | FUN_005c5150 | FUN_005c5210 | `AccUpGradeDataBox::augdb_Load` FUN_005c69b0 (§8) |
+| `StateMob` | FUN_005d21b0 (0x9a / 100) | FUN_005d21a0 | FUN_005d23d0 | `ServentBuffBossTable::sbbt_Load` FUN_005d4580 (Z09) |
+| `MobAbStateDropSetting` | FUN_005d2270 (0x58 / 0x47) | FUN_005d2260 | FUN_005d2400 | `ListOfMobStateCheckAtDead::lomscad_Load` FUN_005d5970 (Z09 §8.9) |
+| `MobAutoAction` | FUN_005d2320 (0x160 / 0x51) | FUN_005d2310 | FUN_005d2430 | `MobAutomaticActionList::maal_Load` FUN_005d49f0 (Z09) |
+| `GBSMCardRate` | FUN_0061dea0 (7 / 6) | FUN_0061de90 | FUN_0061e110 | `SlotMachineScreenManager::smsm_Load` FUN_00624820 (Z06) |
+| `GBSMNPC` | no reader under its own name (a key / size twin or inline in the owner) | FUN_0061df40 | FUN_0061e140 | `SlotMachineScreenManager::smsm_Load` FUN_00624820 (Z06) |
+| `GBSMGroup` | FUN_0061df60 (0x12 / 5) | FUN_0061df50 | FUN_0061e170 | `SlotMachineAnalyse::sma_Load` FUN_006239b0 (Z06) |
+| `GBSMLine` | no reader under its own name (a key / size twin or inline in the owner) | FUN_0061e000 | FUN_0061e1a0 | `SlotMachineAnalyse::sma_Load` FUN_006239b0 (Z06) |
+| `GBSMAll` | no reader under its own name (a key / size twin or inline in the owner) | FUN_0061e010 | FUN_0061e1d0 | `SlotMachineAnalyse::sma_Load` FUN_006239b0 (Z06) |
+| `GBSMCenter` | no reader under its own name (a key / size twin or inline in the owner) | FUN_0061e020 | FUN_0061e200 | `SlotMachineAnalyse::sma_Load` FUN_006239b0 (Z06) |
+| `GBSMJackpotRate` | FUN_0061e040 (0x1b / 0xc) | FUN_0061e030 | FUN_0061e230 | `SlotMachineJackPotRanking::smjpr_Load` FUN_00624270 (Z06) |
+| `GBSMBetCoin` | folded: GBSMCardRate FUN_0061dea0 (7 / 6) *(inferred)* | – | FUN_0061e0e0 | `SlotMachineScreenManager::smsm_Load` FUN_00624820 (Z06) |
+| `MobInfo` | FUN_00641110 (0x4a9 / 0x6c) | FUN_00641100 | FUN_006418d0 | `MobDataBox::mdb_Load` FUN_00641e60 (Z09 §5.1) |
+| `MobInfoServer` | FUN_006411d0 (0x1cf1 / 0xa7) | FUN_006411c0 | FUN_00641900 | `MobDataBox::mdb_Load` FUN_00641e60 (Z09 §5.1) |
+| `MobWeapon` | FUN_00641290 (0x9fc / 0x98) | FUN_00641280 | FUN_00641930 | `MobDataBox::mdb_Load` FUN_00641e60 (Z09 §5.1) |
+| `MobSpecies` | FUN_00641350 (0x24f / 0x86) | FUN_00641340 | FUN_00641960 | `MobDataBox::mdb_Load` FUN_00641e60 (Z09 §5.1) |
+| `MobKillAnnounce` | FUN_006414d0 (0x25 / 8) | FUN_006414c0 | FUN_006419c0 | `MobDataBox::mdb_Load` FUN_00641e60 (Z09 §5.1) |
+| `MobKillLog` | folded: ItemDropLog FUN_00641580 (0xb / 4) | FUN_00641570 | FUN_006419f0 | `MobDataBox::mdb_Load` FUN_00641e60 (Z09 §5.1) |
+| `ItemDropLog` | FUN_00641580 (0xb / 4) | FUN_00648c80 | FUN_006490a0 | `ItemDataBox::idb_Load` FUN_00649780 (Z27) |
+| `MobLifeTime` | FUN_00641630 (7 / 0x22) | FUN_00641620 | FUN_00641a20 | `MobDataBox::mdb_Load` FUN_00641e60 (Z09 §5.1) |
+| `MobKillAble` | folded: AbStateSaveTypeInfo FUN_006416e0 (0x16 / 7) | FUN_006416d0 | FUN_00641a50 | `MobDataBox::mdb_Load` FUN_00641e60 (Z09 §5.1) |
+| `MobRegenAni` | FUN_00641790 (0x66 / 0x43) | FUN_00641780 | FUN_00641a80 | `MobDataBox::mdb_Load` FUN_00641e60 (Z09 §5.1) |
+| `GroupAbState` | FUN_00641830 (0x33 / 0x41) | – | FUN_00641ab0 | `MobDataBox::mdb_Load` FUN_00641e60 (Z09 §5.1) |
+| `MobResist` | FUN_00644da0 (0x11e / 0x34) | – | FUN_00644e50 | `MobResistTable::mrt_Load` FUN_00644e80 (Z09) |
+| `ItemInfo` | FUN_00648a50 (0x4b67 / 0x17a) | FUN_00648a40 | FUN_00649010 | `ItemDataBox::idb_Load` FUN_00649780 (Z27) |
+| `ItemInfoServer` | FUN_00648b10 (0x12a2 / 0xde) | FUN_00648b00 | FUN_00649040 | `ItemDataBox::idb_Load` FUN_00649780 (Z27) |
+| `GradeItemOption` | FUN_00648bd0 (0x268 / 0x3e) | FUN_00648bc0 | FUN_00649070 | `ItemDataBox::idb_Load` FUN_00649780 (Z27) |
+| `ItemSort` | FUN_00648ca0 (1 / 0x20) | FUN_00648c90 | FUN_006490d0 | `ItemDataBox::idb_Load` FUN_00649780 (Z27) |
+| `ItemInvenDel` | no reader under its own name (a key / size twin or inline in the owner) | FUN_00648d40 | FUN_00649100 | `ItemDataBox::idb_Load` FUN_00649780 (Z27) |
+| `ItemMoney` | FUN_00648df0 (0x37 / 0x42) | – | FUN_00649130 | `ItemDataBox::idb_Load` FUN_00649780 (Z27) |
+| `WeaponAttrib` | no reader under its own name (a key / size twin or inline in the owner) | FUN_00648e90 | FUN_00649160 | `ItemDataBox::idb_Load` FUN_00649780 (Z27) |
+| `BelongTypeInfo` | FUN_00648eb0 (0x46 / 10) | FUN_00648ea0 | FUN_00649190 | `ItemBelongAttribute::iba_Load` FUN_0064b210 (Z27) |
+| `TermExtendMatch` | folded: MoverItem FUN_004bf560 (0x2c / 0x40) | FUN_00648f50 | FUN_006491c0 | `CTermExtendMatchDataBox::teib_Load` FUN_0064c090 (Z24 §7.6) |
+| `KQItem` | FUN_00648f70 (0x22 / 0x26) | FUN_00648f60 | FUN_006491f0 | `KQItemDataBox::kqidb_Load` FUN_0064bd80 (Z16) |
+| `ShineReward` | FUN_0064c5e0 (0x96f / 0x42) | – | FUN_0064ca80 | `RewardData::rd_Load` FUN_0064c830 (Z01 §2.3) |
+| `ItemOptions` | FUN_0064c6a0 (0x62e / 0x19) | FUN_0064c690 | FUN_0064c7f0 | `ItemOptionsData::iod_Load` FUN_0064cbc0 (Z01 §2.3; §8) |
+| `FriendPointReward` | FUN_0064c750 (0x1b / 0x28) | – | FUN_0064cb40 | `FPRewardData::fprd_Load` FUN_0064ca60 (Z08) |
+| `MapInfo` | FUN_0064eb40 (0x1f8 / 0x4c) | FUN_0064ee90 | FUN_0064eea0 | `MapDataBox::mdb_Load` FUN_0064ebf0 (Z09) |
+
+Folded readers, in short: `BinaryDataBox<GBBanGame>` FUN_005aec00 also reads GBEventCode.shn; `<GBSMGroup>`
+FUN_0061df60 also reads SpamerPenalty.shn (called by `spdb_Load`); `<MoverItem>` FUN_004bf560 also reads MoverUseSkill.shn
+and TermExtendMatch.shn (called by `teib_Load`); `<AbStateSaveTypeInfo>` FUN_006416e0 also reads MobKillAble.shn and
+`<ItemDropLog>` FUN_00641580 also reads MobKillLog.shn (both called by `mdb_Load`). A wrong row size on any of them
+stops the zone (`ShineExit`), so the folding is safe only while the twin files keep equal keys and sizes. In 2016 they do.
+
+### 7.2 `SHND::CommonData<…>` of the gamble tables
+
+Four more instances of the Z28 §2 template hold the gamble configuration. Their users are the gamble classes
+(Z06 §4-§5, Z32); here only the tables are described.
+
+| Global *(pdb2016)* | Address | File (`../9Data/Shine/`) | Construction | key / row | rows 2016 | `cd_Load` | Default row |
+|---|---|---|---|---|---|---|---|
+| `SHND::g_BanTime` | 0x870f5c | GBBanTime.shn | constant-initialised in `.data` (vftable 0x704884, `cd_ShnName` 0x7048b0, `cd_Data` = own vector) | 0x23 / 0xc `GBBanGame {GameType, GB_Ban, GB_BanTime}` | 1 | FUN_005b85c0 | {MT_HUMAN, GB_BAN_NO_PLAY, 0} |
+| `SHND::g_TaxRate` | 0x870f78 | GBTaxRate.shn | constant-initialised (vftable 0x704890, name 0x7048c0) | 0x38 / 0xc `GBTaxRate {GameType, u16 GB_TaxRate, GB_JPSave, u16 GB_JPSaveRate}` | 2 | FUN_005b8720 | {MT_HUMAN, 0, 0, 0} |
+| `SHND::g_EventCode` | 0x870f94 | GBEventCode.shn | constant-initialised (vftable 0x7048a8, name 0x7048e0) | 0x23 / 0xc `GBEventCode {GameType, GB_ANI, GB_ECode}` (read by the GBBanGame reader) | 14 | FUN_005b8aa0 | the GBBanGame default (same 12 bytes) |
+| `SHND::g_GBReward` | – | GBReward.shn | `dynamic_initializer_for 'g_GBReward'` FUN_0069b800: ctor FUN_006153a0(this, "GBReward.shn") (vftable, `cd_Data` = &`cd_MyData`, empty vector, name), atexit FUN_006a0f00 | 0x67 / 0x28 `GBReward {GameType, RewardType, char Item_INX[32]}` | 1 | FUN_005b8880 | {MT_HUMAN, GBSM_JACKPOT, ""} |
+
+```pseudo
+zs_start_long():                                               @ FUN_005b8c00 (Z28 §2.4), after the card tables
+    g_BanTime.cd_Load(); g_TaxRate.cd_Load(); g_EventCode.cd_Load(); g_GBReward.cd_Load()   # direct calls, not through the vftable
+
+CommonData<GB…>::cd_Load(this)                                 @ FUN_005b85c0, FUN_005b8720, FUN_005b8aa0, FUN_005b8880
+    = the Z28 §2.3 body: name null → assert "CommonData<T, C>::cd_Load : Name NULL" + ShineExit;
+      path = "../9Data/Shine/" + name; cd_Data.clear(); stack BinaryDataBox<T> with the default row;
+      bdb_ReadData (exits on a bad file); push_back a copy of every row; destroy the reader
+    # FUN_005b8880 inlines push_back (the "is the source inside the vector" test of std::vector before _Reserve)
+
+CommonData<GBBanGame, CmpGameType<GBBanGame>>::cd_Find(this, CmpGameType key) → row | null       @ FUN_00614e20
+    for each row in *cd_Data (file order): if row.GameType == key.cgt_GameType: return row
+    return null
+    # also used on g_TaxRate (same 12-byte rows, GameType at +0: identical-code folding). Callers:
+    #   CGambleDiceTaiSaiObject::go_Init FUN_00614f10 (g_TaxRate, game 0x17), SlotMachineScreen::go_Enter_Player
+    #   FUN_00620d00, SlotMachineJackPotRanking::smjpr_Load FUN_00624270
+CommonData<GBEventCode, CmpEventCode>::cd_Find(this, {cec_GameType, cec_AnyType})                 @ FUN_00614e90
+    first row with row.GameType == cec_GameType and row.GB_ANI == cec_AnyType, else null
+    # callers: go_Init FUN_00614f10 (game 0x17 with GB_ANI 0, 1, 2, …), CGambleObject::go_PlayerAction FUN_00615180
+CommonData<GBReward, CmpGambleItemReward>::cd_Find(this, {cgir_GameType, cgir_Status})            @ FUN_00620970
+    first row with row.GameType == cgir_GameType and row.RewardType == cgir_Status, else null
+    # caller: SlotMachine::SlotMachineScreen::SMS_StopButton FUN_00625340
+```
+
+The second vftable slot of every instance is the shared external-vector `cd_Load` FUN_00629840 (Z28 §2.3). It is
+not called for these four.
+
+### 7.3 `ITableBase<Row, Table>` singletons and `Table::Load<T>`
+
+```
+ITableBase<Row, Table>   (size 0xc4)                         *(pdb2016)*
+    +0x00  vftable   slot 0 (0x0): empty FUN_00417480 (shared fold); slot 1 (0x4): DataProcess, default FUN_005af8d0 `return 1`;
+                     slot 2 (0x8): scalar deleting destructor
+    +0x04  CDataReader m_kDataReader
+    +0x44  char m_acFilename[128]
+    static Table* ms_pkTable                                   (one global per instance)
+IIDTableBase<Row, Table, K> : ITableBase                      (size 0xcc)
+    +0xc4  Row** m_pkRecordIDMap      id → row, sized m_tMostLargeID + 1
+    +0xc8  K m_tMostLargeID
+    vftable slots 3 (0xc) GetID(row) → K (pure in the base: `_purecall` 0x6583ea), 4 (0x10) IsValidID(K)
+```
+
+The template (Z21 §4.1 shows the SetEffect instance):
+
+```pseudo
+Table::Load<T>(char* name)                                     @ FUN_005b5080 (PVE), FUN_005b51c0 (EVP), FUN_005b5300 (PVP), FUN_005b5440 (BelongDice)
+    path = Table::GetTableDir() + name                         # FUN_005c6ed0 returns &strDirPath, set once by Table::SetTableDir
+                                                               #   FUN_005c74d0 from zs_start_earth FUN_005ad970 ("../9Data/Shine/", Z01 §2.3)
+    msg  = "Fail to read  : " + name
+    if not ITableBase<Row, T>::Load(path, true):
+        AssertFail(msg); ShineExit(msg)                        # the zone does not start
+    # GetTableDir has 24 callers, one per Table::Load<…> instance (FUN_005b42b0 … FUN_005b6140)
+
+ITableBase<Row, T>::Load(char* path, bool _unused) → bool      @ FUN_005b2f90 (PVE), FUN_005b3070 (EVP), FUN_005b4090 (PVP),
+                                                                 FUN_005b3150 (BelongDice), FUN_005b3850 (EnchantSocketRate)
+    if ms_pkTable == null: ms_pkTable = new T                  # 0xc4 bytes (PVP: 0xcc); allocation failure leaves it null
+    ms_pkTable.m_kDataReader.ClearBF()
+    if not m_kDataReader.Read(path) or m_pHead == null or m_pHead.nVersionKey != KEY: return false
+        # only the version key is checked, not the row size (S01 knowledge: all 24 ITableBase loaders)
+    strcpy(m_acFilename, path)                                 # no length check; the paths are fixed and short
+    return ms_pkTable.vt[1]()                                  # DataProcess
+
+T::T()  (LevelGap_Player_to_Monster FUN_005b1520, LevelGap_Monster_to_Player FUN_005b1560, LevelGap_Player_to_Player FUN_005b3930,
+         BelongDiceTable FUN_005b1620, EnchantSocketRateTable FUN_005b2000)
+    vftable = ITableBase<Row, T>::vftable; CDataReader::CDataReader(&m_kDataReader)
+    once (function-local static guard): atexit(ITableBase<Row, T>'s "dynamic atexit destructor for __instance__")
+    m_acFilename[0] = 0
+    PVP only: m_pkRecordIDMap = null, m_tMostLargeID = 0
+    vftable = T::vftable
+
+atexit destructor  @ FUN_006a0410 (PVE), FUN_006a03e0 (EVP), FUN_006a0680 (PVP), FUN_006a03b0 (BelongDice), FUN_006a0230 (EnchantSocketRate)
+    if ms_pkTable: ms_pkTable.vt[0](); if ms_pkTable: ms_pkTable.vt[2](1)    # empty slot 0, then the scalar deleting destructor
+    ms_pkTable = null
+
+ITableBase<Row, T>::`scalar deleting destructor'(this, flags)   (vt slot 2; list in §7.4)
+    vftable = ITableBase vftable; m_kDataReader.ClearBF(); ~CDataReader(&m_kDataReader); if flags & 1: delete this
+IIDTableBase<DamageLvGapPVP, LevelGap_Player_to_Player, u8>::`scalar deleting destructor'   @ FUN_005aff00
+    vftable = IIDTableBase vftable; delete[] m_pkRecordIDMap; then the ITableBase body above
+
+ITableBase<Row, T>::GetTotal() = m_pHead ? m_pHead.nNumOfRecord : 0        (static, on ms_pkTable; list in §7.4)
+```
+
+| Table class *(pdb2016)* | `ms_pkTable` | File | key (2016 file) | Row *(pdb2016)* | rows 2016 | DataProcess (vt 0x4) | Loaded in |
+|---|---|---|---|---|---|---|---|
+| `LevelGap_Player_to_Monster` | DAT_133888cc | DamageLvGapPVE.shn | 7 | `DamageLvGapPVE {u16 LvGap, u16 DamageRate}` (4) | 24 | `return 1` FUN_005af8d0 | `zs_start_full` LAB_005b6580 (Z01 §2.3), strings at 0x5b65d0 … 0x5b65ee |
+| `LevelGap_Monster_to_Player` | DAT_133888d0 | DamageLvGapEVP.shn | 7 | `DamageLvGapEVP` (same 4 bytes) | 24 | `return 1` | same |
+| `LevelGap_Player_to_Player` (an `IIDTableBase<…, u8>`) | DAT_133888f4 | DamageLvGapPVP.shn | 0xddc8 (56776) | `DamageLvGapPVP {u8 MyLv; u16 TargetLv1 … TargetLv150}` (0x12d) | 151 | `IIDTableBase::DataProcess` FUN_005af8f0 | same |
+| `BelongDiceTable` | DAT_132723c4 | BelongDice.shn | 1 | `BelongDice {u8 DiceTimeLimit}` | 1 (15) | `return 1` | same; use: Z09 §11.1 |
+| `EnchantSocketRateTable` | DAT_133888f0 | EnchantSocketRate.shn | 0x22 (34) | `EnchantSocketRate {GradeType ItemGradeType; u16 Socket0, Socket1, Socket2}` (0xa) | 5 | `EnchantSocketRateTable::DataProcess` FUN_005c8070 (§8) | `zs_start_open` via `Table::Load<EnchantSocketRateTable>` FUN_005b56c0 (Z10) |
+
+The four `Table::Load` instances of the plan run in `zs_start_full` in the order PVE, EVP, PVP, BelongDice, between
+AccUpGrade and MysteryVaultServer (Z01 §2.3). No function calls them: `zs_start_full` is a label inside the staged
+start-up (LAB_005b6580), which is why X02 counted 0 callers.
+
+```pseudo
+IIDTableBase<DamageLvGapPVP, LevelGap_Player_to_Player, u8>::DataProcess(this) → bool   @ FUN_005af8f0 (vt 0x4)
+    maxId = −1
+    for i in 0 .. nNumOfRecord − 1: maxId = max(maxId, vt[3](GetRecord(i)) & 0xff)        # GetID = row.MyLv
+    if maxId < 0: return false                                 # empty file → Load fails → "Fail to read  : DamageLvGapPVP.shn", ShineExit
+    delete[] m_pkRecordIDMap; m_pkRecordIDMap = new Row*[maxId + 1], all null
+    for i in 0 .. nNumOfRecord − 1:
+        id = GetID(GetRecord(i)) & 0xff
+        if m_pkRecordIDMap[id] != null: delete[] m_pkRecordIDMap; m_pkRecordIDMap = null; return false   # duplicate MyLv: the zone exits
+        m_pkRecordIDMap[id] = GetRecord(i)
+    m_tMostLargeID = maxId; return true
+LevelGap_Player_to_Player::GetID(row) = row.MyLv                                @ FUN_005c8170 (vt 0xc; only caller: DataProcess)
+IIDTableBase<…>::IsValidID(u8 id) = id != 0xFF                                  @ FUN_005af8e0 (vt 0x10; caller: GetLevelCapRate)
+```
+
+The level-gap lookups. `RulesOfEngagement::roe_LevelGapDamageRevision` FUN_00500180 (Z03 §4.5) and the abstate
+strength rule of Z22 call them as `GetLevelCapRate(attackerLevel, defenderLevel)` and scale by the per-mille result:
+
+```pseudo
+LevelGap_Player_to_Monster::GetLevelCapRate(att, def) → per mille            @ FUN_005c8220 (PVE)
+LevelGap_Monster_to_Player::GetLevelCapRate(att, def) → per mille            @ FUN_005c8280 (EVP, same body)
+    for i in 0 .. GetTotal() − 1:                              # GetTotal FUN_005c8180 / FUN_005c81a0
+        row = GetRecord(i)
+        if def − att <= (s16)row.LvGap: return row.DamageRate  # first match in file order; LvGap is read signed
+    return 1000
+    # the rows must be sorted by LvGap ascending. 2016 PVE: −150 → 1500, −10 … −5 → 1500, −4 → 1400, −3 → 1300,
+    #   −2 → 1200, −1 → 1100, 0 … 11 and 150 → 1000: a player hitting a mob 1-4+ levels below deals 110-150 %.
+    #   2016 EVP: every row 1000 (no level effect on mob damage). A gap above 150 finds no row → 1000.
+
+LevelGap_Player_to_Player::GetLevelCapRate(att, def) → per mille             @ FUN_005c81c0 (PVP)
+    t = ms_pkTable
+    if t.vt[0x10](att & 0xff)                                  # IsValidID: att & 0xff != 0xFF
+       and (att & 0xff) <= t.m_tMostLargeID and (row = t.m_pkRecordIDMap[att & 0xff]) != null
+       and def < 150:
+        return *(u16*)((byte*)row + DefLv[def])               # DefLv @ 0x870148: u32[150], DefLv[i] = 1 + 2·i = offset of TargetLv(i+1)
+        # (original bug) Z31-B10: a defender of level L reads column TargetLv(L+1). Row 0 of the file is a header
+        # row (MyLv 0, TargetLvN = N) that labels column N as level N. A level-150 defender fails `def < 150` and
+        # always gets 1000.
+    return 1000
+    # 2016 DamageLvGapPVP.shn: rows MyLv 0 … 150, every cell of rows 1-150 is 1000, so neither the shift nor the cap
+    #   changes any damage in 2016
+```
+
+### 7.4 The other `ITableBase` instances: destructors and `GetTotal`
+
+Every `ITableBase<Row, Table>` vftable has the three slots of §7.3. Its scalar deleting destructor (slot 2) is called
+only by that table's atexit destructor at process exit. These are the instances not cited before (the `Load` /
+`DataProcess` bodies are in the item named):
+
+| Table class | Scalar deleting dtor | `Table::Load<…>` | Documented in |
+|---|---|---|---|
+| `GuildTournamentScoreTable` / `…LvGapTable` / `…OccupyTable` / `…SkillTable` / `…MasterBuffTable` | FUN_005b1120 / FUN_005afa00 / FUN_005afa80 / FUN_005b1260 / FUN_005afb00 | FUN_005b42b0 / FUN_005b43f0 / FUN_005b4530 / FUN_005b4670 / FUN_005b47b0 | Z16 (guild tournament) |
+| `GTIGetRateTable` / `GTIGetRateGapTable` / `GTIServerTable` / `GTIBreedSubjectTable` / `GTWinScoreTable` | FUN_005afb80 / FUN_005afc00 / FUN_005afc80 / FUN_005afd00 / FUN_005b1460 | FUN_005b48f0 / FUN_005b4a30 / FUN_005b4b70 / FUN_005b4cb0 / FUN_005b4df0 | Z16, Z11 |
+| `MysteryVaultTable` | FUN_005afd80 | FUN_005b5580 | Z24, Z05 |
+| `AccUpGradeTable` | FUN_005b1060 | FUN_005b4f40 | Z01 §2.3 (stage full); §8 |
+| `LevelGap_Player_to_Monster` / `LevelGap_Monster_to_Player` | FUN_005afe00 / FUN_005b15a0 | FUN_005b5080 / FUN_005b51c0 | §7.3 |
+| `LevelGap_Player_to_Player` | `IIDTableBase` body FUN_005aff00 (slot 2 of its vftable) | FUN_005b5300 | §7.3 |
+| `BelongDiceTable` | FUN_005aff90 | FUN_005b5440 | §7.3 |
+| `EnchantSocketRateTable` | FUN_005b2040 | FUN_005b56c0 | §7.3, §8 |
+| `ActionRangeFactors` / `ItemActionConditions` / `ItemActionEffects` / `ItemActions` | FUN_005b0010 / FUN_005b0090 / FUN_005b0110 / FUN_005b0190 | FUN_005b59c0 / FUN_005b5b00 / FUN_005b5c40 / FUN_005b5d80 | Z17 |
+| `ActionEffectItemTable` / `ActionEffectAbStateTable` | FUN_005b0210 / FUN_005b0290 | FUN_005b6000 / FUN_005b6140 | Z17, Z21 |
+
+`ITableBase<DamageLvGapPVP, LevelGap_Player_to_Player>::`scalar deleting destructor'` FUN_005afe80 is dead. Its only
+image reference is the `ITableBase<DamageLvGapPVP, …>` vftable. The `LevelGap_Player_to_Player` constructor replaces
+that vftable twice before the object is used (by the `IIDTableBase` one and then its own), so the destructor that
+runs is FUN_005aff00.
+
+`ITableBase<…>::GetTotal()` (body in §7.3) instances not cited before, with their only caller:
+
+| Instance | Address | Caller |
+|---|---|---|
+| `ITableBase<ItemAction, ItemActions>` | FUN_005b1800 | `ItemActions::DataProcess` FUN_005b78e0 (Z17) |
+| `ITableBase<ActionEffectItem, ActionEffectItemTable>` | FUN_005c7e50 | `ActionEffectItemTable::DataProcess` FUN_005c80d0 (Z17) |
+| `ITableBase<EnchantSocketRate, EnchantSocketRateTable>` | FUN_005c7e90 | `EnchantSocketRateDataChild::iod_GetSocketCount` FUN_005c7fd0 (§8) |
+| `ITableBase<DamageLvGapPVE, LevelGap_Player_to_Monster>` | FUN_005c8180 | `LevelGap_Player_to_Monster::GetLevelCapRate` FUN_005c8220 (§7.3) |
+| `ITableBase<DamageLvGapEVP, LevelGap_Monster_to_Player>` | FUN_005c81a0 | `LevelGap_Monster_to_Player::GetLevelCapRate` FUN_005c8280 (§7.3) |
+| `ITableBase<ActionRangeFactor, ActionRangeFactors>` | FUN_005cf030 | `ActionRangeFactors::DataProcess` FUN_005cf5a0 (Z17) |
+| `ITableBase<ItemActionCondition, ItemActionConditions>` | FUN_005cf050 | `ItemActionConditions::DataProcess` FUN_005cf820 (Z17) |
+| `ITableBase<ItemActionEffect, ItemActionEffects>` | FUN_005d01c0 | `ItemActionEffects::DataProcess` FUN_005d0790 (Z17) |
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -1595,6 +1922,7 @@ classes (reset to `UseItemBase::vftable`, delete). The actors are static (`ui_Ca
 | Z31-B7 | `ShineMobileObject::so_Getabstatebit` FUN_005556a0 (vt 0x4a0, kept by `ShineDoor`) §5.4 | returns one static bit array (`AS::tempbit`) for every door | an abstate bit set on one door (`so_AbnormalState_BitSet`, `asl_Store`) would show in every door's bits; no 2016 path that puts an abstate on a door was found *(inferred)* | a per-object bit array, as the other classes have (the pet's twin is Z13-B43) |
 | Z31-B8 | `AttackRhythm_Range::arb_Next` FUN_00427d50 §6.3 | `ca_point = (ca_point + 1) & 2`: from 0 the point stays 0 | every archer-line swing broadcasts animation 0 in 0x2447 | alternate the animations (`& 1` or `% 2`) *(inferred)* |
 | Z31-B9 | `EngSklAtt::esa_masicaldamage` FUN_004fc630 §6.4 | advances the random box of `MaxMA − MinMA` but returns only `ena_physicdamage` (1): `MinMA` and the spread are never added | none in 2016 (`EngSklAtt` has no caller) | `MinMA + spread + slot 0xc`, as the physical twin |
+| Z31-B10 | `LevelGap_Player_to_Player::GetLevelCapRate` FUN_005c81c0 §7.3 | reads the cell at `DefLv[def]` = column `TargetLv(def+1)`; `def < 150` sends a level-150 defender to the default | PvP level-gap rates shifted one target level; level-150 defenders always 1000 ‰; none in 2016 (every cell 1000) | `DefLv[def − 1]` with `def <= 150` *(inferred: the file's header row labels column N as level N)* |
 
 ## Not reconstructed / uncertain
 
@@ -1656,3 +1984,7 @@ Filled in by the sweep part; rows found so far:
 | `List<ShineObject>::l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` (callers of `ShineObject::operator=`) | this item, part 9 (library templates) | §5.1 documents the copy |
 | per-class overrides of the object slots (mob, NPC, bandit, servant, door, effect, drop item, flag, pet, mover, mini-house) | Z09 §5 / §11-§13, Z13 §1.8 / §6.2 / §8.1 (done) | §5 documents only the base-class bodies and links the overrides |
 | auto-arrange sort and step scheduling (`so_ply_ArrangeInven` FUN_00563500) | this item, part 10 (§11, Z04 open point) | §4.9 documents the grade rank and the login init |
+| the owners of the `BinaryDataBox<T>` instances (`mdb_Load`, `idb_Load`, `mvdb_Load`, `sma_Load`, … in the §7.1 table) | the item named in each row (Z09, Z13, Z27, Z06, …; done) or this item §8 / §9 | §7.1 documents only the box template, the readers' keys and the destructors |
+| the gamble rules that read `g_BanTime`, `g_TaxRate`, `g_EventCode`, `g_GBReward` (`go_Init` FUN_00614f10, `go_PlayerAction` FUN_00615180, `go_Enter_Player` FUN_00620d00, `SMS_StopButton` FUN_00625340) | Z06 §4-§5 (done), Z32 | §7.2 documents the tables and the finders |
+| `EnchantSocketRateTable::DataProcess` FUN_005c8070, `iod_GetSocketCount` FUN_005c7fd0 | this item, part 7 (§8, `EnchantSocketRate*`) | §7.3 documents the load template and the singleton |
+| the guild tournament, GTI, item action and action effect `ITableBase` tables (their `Load` / `DataProcess`) | Z16, Z11, Z17, Z21 (done) | §7.4 lists only their destructors and `GetTotal` |
