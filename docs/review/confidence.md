@@ -10,7 +10,7 @@ finds go to `docs/knowledge/X02.md` §0; the capture scenarios that follow from 
 |---|---|---|
 | 1 | Error classes: what went wrong so far, with counts | done (part 1) |
 | 2 | Rating of every pseudocode section and knowledge struct table | done (parts 2–3) |
-| 3 | Adversarial re-check of the load-bearing claims | §3.2 done (part 4), §3.3 done (part 5), §3.4 Z01–Z04 done (part 6); §3.4 Z05–Z13 and §3.5 open (parts 6b, 7) |
+| 3 | Adversarial re-check of the load-bearing claims | §3.2 done (part 4), §3.3 done (part 5), §3.4 done (parts 6, 6b); §3.5 open (part 7) |
 | 4 | Coverage gaps of items finished without a review part | open (part 10) |
 
 ## 1. Error classes
@@ -3187,8 +3187,8 @@ Knowledge files (`docs/knowledge/`):
 
 ## 3. Adversarial re-check
 
-State: §3.1–§3.2 (part 4), §3.3 (part 5: ITEMDB order, zone ↔ WM hand-over) and §3.4 for Z01–Z04 (part 6) done. Part 6b
-adds Z05–Z13 to §3.4, part 7 adds §3.5 (low client-facing Login / WM packets, remaining class B / R / O hits).
+State: §3.1–§3.2 (part 4), §3.3 (part 5: ITEMDB order, zone ↔ WM hand-over) and §3.4 (parts 6 and 6b: low zone rows
+Z01–Z13) done. Part 7 adds §3.5 (low client-facing Login / WM packets, remaining class B / R / O hits).
 
 ### 3.1 Method
 
@@ -3399,7 +3399,8 @@ handlers Z05 read one by one.
 
 ### 3.4 Part 6: low ratings in client-facing zone packets
 
-State: Z01–Z04 and the handle-trusting handlers of §3.2.6 done (part 6). Z05–Z13 (60 low rows) are part 6b.
+State: done. Z01–Z04 and the handle-trusting handlers of §3.2.6 in part 6 (§3.4.1–§3.4.6), Z05–Z13 (60 low rows)
+in part 6b (§3.4.7–§3.4.13).
 
 §2 rates 110 zone pseudocode sections low (Z01 11, Z02 9, Z03 17, Z04 13, Z05 10, Z06 6, Z07 16, Z08 8, Z09 10,
 Z10 3, Z11 2, Z12 3, Z13 1). For each one the reason was split into its parts with one script: the README §5 rows
@@ -3411,7 +3412,8 @@ read, it was (marked "re-read"). The remaining weak lines were re-read in `zone-
 (process structure, loaders, the stat matrix, formulas) are listed in one row per document and not re-read here:
 their `sup` rows already say what is wrong.
 
-Result: 38 rows: 10 confirmed, 8 refined, 2 corrected, 15 superseded, 3 not re-checked.
+Result, part 6: 38 rows: 10 confirmed, 8 refined, 2 corrected, 15 superseded, 3 not re-checked. Part 6b: 27 rows:
+10 confirmed, 3 refined, 1 corrected, 8 superseded, 5 not re-checked (§3.4.7).
 
 #### 3.4.1 Handlers that trust the handle alone (the list of §3.2.6)
 
@@ -3504,6 +3506,85 @@ order of an FPU sum), which is a formula and not a packet.
 - **For part 6b:** the same script (`weak.py` in the notes) prints the `sup` rows and weak lines for Z05–Z13;
   Z07 (16), Z05 (10), Z09 (10), Z08 (8) are the large ones. Z05 §10 (client handling of 64 answers) and Z06 §2
   (booth, 4 rows with the `g_NoBooth` name) have weak lines of their own.
+
+#### 3.4.7 Z05 (10 low rows; part 6b)
+
+Part 6b result (§3.4.7–§3.4.12): 27 rows over the 60 low rows of Z05–Z13: 10 confirmed, 3 refined, 1 corrected,
+8 superseded, 5 not re-checked. 28 of the 60 rows are low only through README §5 rows (no weak line of their own).
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| V1 | 0x3491 / 0x3494: the WM message 0x74C0 is sent "first, unconditionally (even when the player is gone)" (Z05 §2.3) | confirmed | `gds_NC_ITEMDB_GUILD_TOKEN_BUYALLSUC_ACK` @ FUN_00525400 writes `0x74C0 {u32 nGuildNo, u32 nPriceGuildToken, u32 0}` (0xe bytes) to `sock2wldman` before `som_GetObject`; then object, vt 0x300, charNo (vt 0x344), lock apply (`L` vt 0x1c, log on failure), `p ← 0x3004 {0x201}`, vt 0xb44(1). Not a bug: the DB has already sold the item. Its profiler string is "gds_NC_ITEMDB_BUYALLSUC_ACK" (copied code) |
+| V2 | 0x341A: "no drop object is created for a partial drop (unreachable, Z04-B4)" (Z05 §3.1) | **corrected**, X02-B9 | The handler `gds_NC_ITEMDB_DROPALLLOT_ACK` @ FUN_0052ad70 is as written (object, vt 0x300, no charNo test, `0x3008 {0x301}`, pending 0). But a partial drop does get its object, earlier: `ItemInventory::ii_DropLot` @ FUN_00529c20 (only caller `ShinePlayer::sp_ItemDropOK` FUN_0052b060) makes a new key (`iti_mkregnum` type 4), allocates the drop object and calls `so_ItemDrop` (vt 0x544) with it **before** it sends 0x3419; on 0x301 it lowers the cell's lot, calls vt 0x604, sends `0x3419` and sets pending 1; on another code it frees the object and answers 0x3008 with that code; a full object table → `0x3008 {0x304}` with the `ii_DropAll` assert text. So unlike DROPALL (object made in the success answer) the ground item exists before the DB commit, and Z05's DROPLOTFAIL path (0x3008, disconnect 0x684) does not take it back (original bug, latent while Z04-B4 keeps the branch dead; the reachability from `sp_ItemDropOK` was not re-read) |
+| V3 | 0x3469: "vt 0x34c (no-op); Free" (Z05 §9.5) | confirmed | `gds_NC_ITEMDB_CREATEMUSHROOMFAIL_ACK` @ FUN_0043ef10: object, vt 0x300, charNo, vt 0x34c(payload), `L` vt 0x28(lockindex). Player slot 0x34c = FUN_005275b0 `ShinePlayer::so_NC_ITEMDB_ADMINCREATEFAIL_ACK` *(pdb2016)*: only the profiler frame and an unused charNo read. The client gets nothing on a failed mini-house creation |
+| V4 | client 0x3013: "`0x2c1` (never sent, Z05-B2), others 'Failed to unequip the item.'" (Z05 §10) | confirmed | Client `On_NC_ITEM_UNEQUIP_ACK` FUN_004abd80: every code ≠ 0x2c1 → `TextData` 0x92ad77c0. Zone: the only 0x3013 sends are four vt 0x308 calls in `sp_NC_ITEM_UNEQUIP_REQ` FUN_0053a990 (0x2c2 three times, 0x2c4 once); no function writes opcode 0x3013 into the send buffer directly |
+| V5 | reward inventory "not reachable by SPLIT" (Z04 §1.1; Q27 of §3.4.5) | confirmed | `sp_NC_ITEM_SPLIT_REQ` @ FUN_00539a40 switches on the box (`Inven >> 10`) of the source and of the destination: 0 guild-academy reward storage, 4 guild storage, 6 account storage (when `sp_MiscFlag.AccountStorage_opened` or `AStorageAnywhere_opened`), 9 inventory; 5 and every other box (2 = reward inventory included) → assert "Invalid Item from box" / "Invalid Item to box". Box 4 as destination is refused at once (vt 0x308). Same cell on both sides is refused first |
+| V6 | Z05 §1.4 (`g_ItemUsage` class 2), §5.1 (three names of ours), §9.6 (mini-house effect request), the bug table | superseded | README §5.6: `gMinimonDataBox` role `MRT_USEITEM`; `so_ply_ViewSlot_EquipInfoSend`, `so_ply_DecoActList_Cehck`, `so_ply_ItemLotInspecting`; D06-B2. Not re-read |
+| V7 | Z05 §7.1 (account storage), §11 (invariants, prose) | not re-checked | §7.1 is low through a capture correction (P02, `capture-validation.md`): the capture wins. §11 has no statement of its own; its content is rows I1–I12 of §3.3.1 |
+
+#### 3.4.8 Z06 (6 low rows; part 6b)
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| V8 | `g_NoBooth` (Z06 §2.1, §2.3, §2.4); `NPCRangeCheck_Check` (§4.2) | superseded | README §4.8: `ShinePlayer::BoothSell::board` and `CurrentMenu::cm_MenuAction`. Checked on the way: player slot 0x3e0 = `so_ply_SendBoothSize` FUN_00535390 (RTTI table); the client stores the byte of 0x9010 when it is < 0x15 (`client-handlers.json`). The "no-op" slots 0x08 / 0x0c of the base object were not re-read |
+| V9 | client 0x680E: "0xA41 'Item has been successfully sold.' (never sent on this opcode)" (Z06 §2.5) | confirmed | Every 0x680E send of the zone (vt 0x308(0x1a, 0xe, code), 21 sites in `sp_NC_BOOTH_ITEMTRADE_REQ`, `StreetBoothBuy::sb_Trade`, `StreetBoothSell::sb_Trade` / `sbs_SellAll` / `sbs_SellMerge` / `sbs_SellSplitCreate`): 0xa42, 0xa44, 0xa45, 0xa47, 0xa48, 0xa49, 0xa4c, 0xa54, 0xa59. The DB code is forwarded only in the else branch of `gds_NC_ITEMDB_BOOTHTRADE_ACK` @ FUN_005914a0 (`err` ≠ 0xa41), to the object its log calls "Buyer". Client `On_NC_BOOTH_ITEMTRADE_ACK` FUN_004a8620: 0xa41 → text 0x82a9e4e5 and a booth refresh request when a booth window is open; 0xa42–0xa55, 0xa59, 0xa5a one text each; any other code text 0x4db07b7f |
+| V10 | Z06-B11: the manual-mode check vt 0x260 FUN_00513670 "has no caller and 0xAC20 is not registered" (Z06 §3.4) | confirmed | No call through slot 0x260 anywhere in the decompiled image; `handlers.json` has no entry for 0xAC20 (0xAC24 is the DB answer FUN_005171c0). FUN_00513670 = `ShineMiniHouse::so_mh_DiceTaiSai_CanDiceRoll` *(pdb2016)*: 0x1cd4 no player, 0x1cd5 / 0x1cd6 (player vt 0x174 / vt 0x170(1) false), 0x1cd9 (house vt 0x214 false), 0x1cdb not the owner, 0x1cda mode ≠ `DTGM_MANUAL`, 0x1cd7 status ≠ `DTGS_BETTING`, 0x1cd8 no bets, 0x1cd0 ok. The nine codes exist for a request the 2016 zone cannot receive |
+
+#### 3.4.9 Z07 (16 low rows; part 6b)
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| V11 | Z07 §1.2 (0x10D3 "key-map / shortcut options", auto-pick *(inferred)*), §1.1 / §2.1 ("legacy" DEC path, `DAT_0da504a9` "inside the level-0 entry"), §1.5 (exp indexing) | superseded | README §5.6 (`resttime`, autopick, mystery_vault, `nChatBan`, `bFirstJoin`; ActionID) and §5.5 (`scp_param.LostExpLevel` / `MaxFreeStat`, `nextexp` u64[151]). The weak lines are exactly the corrected ones. Whether the DEC request path is dead was not re-read |
+| V12 | Z07 §11: "the client ignores 0x2036, 0x2038, 0x203A and 0x203B (no handler)"; 0x481D is handled | confirmed (client side) | `re-data/client-handlers.json` has no entry for the four; 0x481D → client FUN_0069edd0. The server path (`smo_ply_ItemProduce` FUN_0046c2d0) was not re-read |
+| V13 | wedding status values, names *(inferred)* (Z07 §5.1) | not re-checked | Names of ours for the `Main` / `Sub` values; the `Sub` 5–8 values are in README §5.6. Needs the wedding scenario (propose → hall → divorce) |
+| V14 | Z07 §4.1, §5.3, §5.4, §5.5, §6.1, §6.7, §6.9, §6.10, §7, the bug table | superseded | README §5.6, one row each (`mauidb_CanUseItem` kinds reversed; the 2016 client does handle 0x1094; `AnnounceSystem_ProposeAccept`; `isAlreadyEnterPlayer`; the dead 0x8C1D branch; `UseRange` / `ApplyRange`; `cca_IsRewardCondition`; D06-B2). Not re-read. §6.1's `MiniHouseFurnitureObjEffect.shn` column names stay *(pdb2017)* |
+
+#### 3.4.10 Z08 (8 low rows; part 6b)
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| V15 | quest record "0x20 bytes: `u16 ID, u8 Status, PLAYER_QUEST_DATA Data` *(pdb2017)*"; `QUEST_SCRIPT_COMMAND` *(pdb2017)* (Z08 §3.1) | refined | Both are in the 2016 `Zone.pdb`, so not *(pdb2017)*: `PLAYER_QUEST_INFO` (0x20) `{+0 ID, +2 Status, +3 PLAYER_QUEST_DATA Data}`; `PLAYER_QUEST_DATA` (0x1d) `{+0 i64 StartTime, +8 i64 EndTime, +0x10 u32 RepeatCount, +0x14 u8 ProgressStep, +0x15 u8 End_NPCMobCount[5], +0x1a bit 0 End_Location, bit 1 End_Scenario, +0x1b u16 End_RunningTimeSec}`; `QUEST_SCRIPT_COMMAND` 0 `QSC_ERROR`, 1 `QSC_END` … 33 `QSC_GET_ITEM_LOT`, 34 `QSC_MAX`, 35 `QSC_EOF`. The 0x65-byte struct of the same line was not looked up |
+| V16 | `PROTO_KQ_INFO` "0x179 bytes *(pdb2017)*" (Z08 §4) | confirmed | 2016 `Zone.pdb`: `PROTO_KQ_INFO : PROTO_KQ_INFO_CLIENT`, size 0x179; own members from +0x8d (`NextStartMode`, `NextStartDelayMin`, `RepeatMode`, `RepeatCount`, +0x93 `RewardIndex`, `DemandMobKill`, +0x97 `ScheduleTime`, +0x9b `tm_ScheduleTime`, +0xbf `RunCounter`, +0xc0 `MapLink[4]`, +0x128 `ScriptLanguage[32]`, +0x148 `ScriptInitValue[32]`, +0x168 `IsTeamPVP`, +0x169 `TeamRegenXY[2]`) |
+| V17 | 0x7C13 prison: the README §5.6 row that replaced Z08 §12 | superseded, re-read | `wms_NC_ZONE_PRISON_GO_REQ` @ FUN_005a4470 agrees with README §5.6: `err` preset 0xDC0; unknown handle (payload +0x11c) or vt 0x300 true → no answer at all; charNo (payload +0x11e) differs → 0xDC1; `so_Prison_Go` (vt 0x8a4, argument = the u16 at payload +0x122) returns 0 → 0xDC2. Answer 0x7C14 to the WM = the request's first 0x174 payload bytes copied, `u16 err` at +0x174 (packet length 0x178) |
+| V18 | Z08 §1.2, §5, §7.1, §8.1, §8.2 | superseded | README §5.6 (`MapName`; KQ open points; 0x5C05 two PDB definitions, D04-B9; 0x1440 and the mode codes 0x1A41 / 0x1A59) and §5.3 (no 2016 component pays the tournament refund, D06-B3). Not re-read |
+
+#### 3.4.11 Z09 (10 low rows; part 6b)
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| V19 | drop gate bonus: "`ChargedEffect.shn` EffectEnum 16 'SNS_DropUp' 1100 *(inferred)*"; PC-room +200 *(inferred)* (Z09 §11.2) | refined | 2016 `ChargedEffect.shn` has eight EffectEnum 16 rows: seven `Huntervoucher*` with EffectValue **1500** (KeepTime 1 h to 720 h) and `SNS_DropUp` 1100: the gate bonus is +500 ‰ or +100 ‰. That enum 16 is what fills `cec_ItemDropRate` was not re-read (Z09 §2.4's `ciee_Activ`). "PC room" as the meaning of `sp_ConnectFrom` = 1 stays *(inferred)* |
+| V20 | 0x6C1D `EFFECT_TIMER_FUNC` *(pdb2017)*; `EFFECT_MSG_TYPE` *(fh-doc)*, "15 slots *(pdb2017)*" (Z09 §19.5) | refined | `EFFECT_TIMER_FUNC {ETF_TIMER 0, ETF_REMOVE 1, ETF_MAX 2}` is in the 2016 `Zone.pdb`: not *(pdb2017)*. `EFFECT_MSG_TYPE` is not in it: the 15 value names stay *(fh-doc)*. Client handler of 0x6C1D: FUN_0049d8f0 |
+| V21 | Z09 §2.4, §8.8, §24.1, §28.2, §31.2, §31.3; the group-row line of §11.2 | superseded | README §5.6 (`so_ChargedEffectContainerClear`; Z18 covers the trap blasts; no `iac_DropItemMake` reads `ig_itemid`; the requested heal is reported; `sp_RemoveField`; `iac_DropItemMake` and Z18-B8). Not re-read |
+| V22 | Z09 §28.12 (`cIndunRankResult` not called by a 2016 script *(fh-doc)*; a ring branch "unreachable"), §29.1 (bug effects *(inferred)* of Z09-B2, B13, B20, B25) | not re-checked | Server-internal; the four effects are deductions from code that was read (class X). Z09-B20 (a limited drop runs out for the whole server) is the one a test can show: scenario input below |
+
+#### 3.4.12 Z10–Z13 (9 low rows; part 6b)
+
+| # | Claim (where) | Verdict | Evidence / correct statement |
+|---|---|---|---|
+| V23 | Z10 §1 (`zs_start`), §7.2 (load-order dependencies, five effects *(inferred)*), the bug table (Z10-B21) | superseded (§1) / not re-checked | README §5.4 for §1. §7.2 and Z10-B21 are start-up behaviour with no packet; the effects are what a missing table would cause, testable only by removing a data file (part 9, SHN / config experiments) |
+| V24 | `&show`: "no appear broadcast here"; `&dimension`: main layer set, "0 returns to the normal layer" (Z11 §3.1) | confirmed (code) | `AmpersandCommand::ac_Show` @ FUN_0041a4d0: in a mini-house (vt 0x130) only the wall text; else `so_AbnormalState_Reset(0x120)` (vt 0x650) and `l_Sub` = 0; it sends nothing itself. `ac_Dimension` @ FUN_0041a5a0: `so_Logout(gm)`, then `l_Main` = the scanned number, nothing else (no re-login to the map, no range test on the number). What other clients then see stays *(inferred)*: needs a second client |
+| V25 | `&killallmob` "EXP, drops and quest credit as for a kill *(inferred)*"; `&suicidemob` / `&mfind` against *(fh-doc)* (Z11 §5.2) | not re-checked | The doc already states where the code differs from the FiestaHeroes text. Scenario input below |
+| V26 | Z12 §2.5, §6.4, §7.2 | superseded | README §5.5 (`so_ItemActonAbstateApp` is the writer; "is a party main"; `ws_save2worldmanager` runs only from `so_LinkTo`, re-checked as L-rows of §3.3.3) |
+| V27 | `so_MH_SendFunitureInfoStart` FUN_00544de0 (player vt 0xd4): "No caller in the 2016 zone" (Z13 §2.8) | confirmed | No direct call by name; the four calls through a slot 0xd4 are all on a `CGambleDiceTaiSaiObject` (`GDTSO_DiceTaiSai_Enter`, `GDTSO_ExcuteLeaveGame`, `go_PlayerUnmarking`, `sp_NC_GAMBLE_DICE_TAISAI_GAME_LEAVE_REQ`) |
+
+#### 3.4.13 What part 6b adds for later parts
+
+- **Original-server bug found:** X02-B9 a partial drop puts its ground object down before the DB commit and the
+  failure answer does not remove it (V2; latent, the branch is dead by Z04-B4).
+- **Error classes seen:** P reversed, 3 times (V15, V16, V20: facts marked *(pdb2017)* that the 2016 `Zone.pdb`
+  holds: the marker was right when Z08 / Z09 were written, before S01); T 1 (V2: when the object is created);
+  F 1 (V19: one table row taken for the whole enum value). No offset, opcode or code value was wrong.
+- **28 of 60 rows are `sup`-only**, as in Z01–Z04: the documents from Z05 on carry few weak lines of their own
+  (Z07 16 rows: 13 with a `sup` row, 9 of them with nothing else). The re-read claims held more often than in part 6 (10 of 14 confirmed).
+- **Scenario inputs** (part 8): a failed mini-house creation (V3: expect no packet at all); unequip with a full
+  inventory (V4: 0x3013 `{0x2c2}` or `{0x2c4}`, never 0x2c1); a split from the reward inventory with a test
+  client (V5: expect the assert in the zone log); booth buy from a second client (V9: the buyer never gets 0x680E
+  `{0xa41}`); TaiSai table in manual mode (V10: bets stay); a Hunter voucher against `SNS_DropUp` on a mob 5
+  levels below (V19); `&show` / `&dimension 1` / `&dimension 0` with a second client in sight (V24);
+  `&killallmob` with a quest mob (V25); a mob with a limited drop `Num`, killed until it runs out (V22, Z09-B20);
+  the wedding sequence (V13); prison send to a handle of another character (V17: 0x7C14 `{0xDC1}`).
+- **For part 7:** nothing open from Z05–Z13 except the reachability of `ii_DropLot` from `sp_ItemDropOK`
+  FUN_0052b060 (V2), which decides whether X02-B9 is latent.
 
 ### 3.5 Part 7: low ratings in client-facing Login / WM packets; remaining class B, R, O hits
 
