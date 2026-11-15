@@ -5283,11 +5283,13 @@ Sent from `ShineMobileObject::smo_ReflectionDamage` (`FUN_0055dbc0`) · payload 
 
 ### `0x245c` NC_BAT_TOGGLESKILL_ON_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_BAT_TOGGLESKILL_ON_CMD`, 2 bytes
+**Verified layout** (basis: zone ShinePlayer::so_ply_ToggleSkill_On FUN_00579500; client GameFrameWork::On_NC_BAT_TOGGLESKILL_ON_CMD FUN_0049ce60; PROTO_NC_BAT_TOGGLESKILL_ON_CMD (pdb2016, pdb2017))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nSkillID |  |
+| 0 | u16 | nSkillID | toggle skill step switched on (SkillDataIndex.sdi_Activ.ID) |
+
+2 bytes, to the player only; sent from the second blast pass of a toggle-skill cast (Z23 §2.5). Client: ShortCutWin::OnToggleKey on all shortcut bars.
 
 Sent from `FUN_00579500` (`FUN_00579500`) · payload 2 bytes
 
@@ -5297,11 +5299,13 @@ Sent from `FUN_00579500` (`FUN_00579500`) · payload 2 bytes
 
 ### `0x245d` NC_BAT_TOGGLESKILL_OFF_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_BAT_TOGGLESKILL_OFF_CMD`, 2 bytes
+**Verified layout** (basis: zone ShinePlayer::so_ply_ToggleSkill_Off FUN_005795d0; client GameFrameWork::On_NC_BAT_TOGGLESKILL_OFF_CMD FUN_004a5b70; PROTO_NC_BAT_TOGGLESKILL_OFF_CMD (pdb2016, pdb2017))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | nSkillID |  |
+| 0 | u16 | nSkillID | toggle skill step switched off |
+
+2 bytes, to the player only; sent by the off-cast, csl_Toggle_CheckOnOff, csl_Toggle_AllOff (map link) and csl_Toggle_AllOffAndReset (tent, mount; also for steps that were off, Z23-B2). Client: ShortCutWin::OffToggleKey, then Skill::RecordSkillUse (starts the client cooldown display).
 
 Sent from `FUN_005795d0` (`FUN_005795d0`) · payload 2 bytes
 
@@ -6600,12 +6604,14 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_SkillEmpowerSetResult` (`FUN_00
 
 ### `0x481d` NC_SKILL_SKILLEXP_CLIENT_CMD
 
-**2016 PDB layout** *(pdb2016)*: `PROTO_NC_SKILL_SKILLEXP_CLIENT_CMD`, 6 bytes
+**Verified layout** (basis: zone CharaterSkillList::csl_AddMastery FUN_00446730; client ProductTask::OnProcessNetMsg FUN_00487400 (Skill::GetLearnProductSkill FUN_0069edd0); PROTO_NC_SKILL_SKILLEXP_CLIENT_CMD (pdb2016))
 
 | Off | Type | Field | Notes |
 |---|---|---|---|
-| 0 | u16 | skill |  |
-| 2 | u32 | mastery |  |
+| 0 | u16 | skill | produce recipe skill whose mastery grew |
+| 2 | u32 | mastery | new total CharSkill.cs_Mastery |
+
+6 bytes, to the player only; sent after each finished produce (smo_ply_ItemProduce, gain = cec_ProductMasteryRate * MasteryGain / 1000). Client stores mastery in its learned production list; no text. Z23 §5.
 
 Sent from `CharaterSkillList::csl_AddMastery` (`FUN_00446730`) · payload 6 bytes
 
@@ -13326,6 +13332,40 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 50 | u16 | echo.licenseitem |  |
 | 52 | u16 | echo.weaponitem |  |
 
+### `0x9005` NC_CHARGED_STAT_INITIALIZE_DB_REQ (Z→DB)
+
+**Verified layout** (basis: zone UseEffect::UseItemStatClear::uib_DirectUse FUN_00599990 (ui_StatClearStat.uisc_DBReqCommand = 5) → ShinePlayer::sp_StatEmpowInitialize FUN_005183f0; PROTO_NC_CHARGED_STAT_INITIALIZE_DB_REQ (pdb2017, header = 6-byte ref))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle | player's zone handle (obj+4) |
+| 2 | u32 | header.charno | charNo (vt 0x344) |
+| 6 | u16 | lockindex | inventory lock-list counter (incremented after the send) |
+| 8 | u64 | restatitemkey | the reset item's registration key |
+| 16 | u16 | restatitemid | the reset item's ItemInfo ID |
+| 18 | u8 | isdelete | 1 when the item has 1 left (delete), else 0 |
+| 19 | u16 | attr | 0 when deleting, else 0x15 = (attribute start − buffer) − 2, the payload offset of the attribute block |
+| 21 | bytes | attribute | only when isdelete = 0: the item's attribute block with lot − 1 (item class vt 4) |
+
+payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block at payload offset attr = 0x15 (computed in the code); to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4.
+
+### `0x9006` NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ (Z→DB)
+
+**Verified layout** (basis: zone UseEffect::UseItemStatClear::uib_DirectUse FUN_00599990 (ui_StatClearEmpow.uisc_DBReqCommand = 6) → ShinePlayer::sp_StatEmpowInitialize FUN_005183f0; PROTO_NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ (pdb2016 size 0x15, pdb2017; header = 6-byte ref))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | header.handle | player's zone handle (obj+4) |
+| 2 | u32 | header.charno | charNo (vt 0x344) |
+| 6 | u16 | lockindex | inventory lock-list counter (incremented after the send) |
+| 8 | u64 | restatitemkey | the reset item's registration key |
+| 16 | u16 | restatitemid | the reset item's ItemInfo ID |
+| 18 | u8 | isdelete | 1 when the item has 1 left (delete), else 0 |
+| 19 | u16 | attr | 0 when deleting, else 0x15 = (attribute start − buffer) − 2, the payload offset of the attribute block |
+| 21 | bytes | attribute | only when isdelete = 0: the item's attribute block with lot − 1 (item class vt 4) |
+
+payload 0x15 bytes (0x17 with the opcode) when deleting, else + attribute block at payload offset attr = 0x15 (computed in the code); to the GameDB socket. Answers 0x9007-0x900A (Z08 §11); DB side D03. Z23 §4.
+
 ### `0xac23` NC_DICE_TAISAI_DB_DICE_ROLL_RESULT_REQ (Z→DB)
 
 **Verified layout** (basis: zone FUN_005161d0; = PDB)
@@ -13471,6 +13511,22 @@ answer 0x111B (Z07 §2); the zone locks sp_bCharFreeStatLock meanwhile
 | 10 | u16 | nDoneQuestCount | records in this packet |
 | 12 | u16 | nIndex | records sent in earlier packets |
 | 14 | PLAYER_QUEST_DONE_INFO[n] | QuestDoneArray | 10 each: u16 ID, i64 tEndTime |
+
+### `0x4012` NC_CHARSAVE_2WLDMAN_SKILL_CMD (Z→WM)
+
+**Verified layout** (basis: zone ShinePlayer::so_Send_NC_CHARSAVE_2WLDMAN_SKILL_CMD FUN_00455780 + CharaterSkillList::csl_FillSendBuffer_Server FUN_00445260; WM FUN_0042a0b0 (W05); PROTO_NC_CHARSAVE_2WLDMAN_SKILL_CMD (pdb2016))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | wldmanhandle | player's WM handle (vt 0x340) |
+| 2 | u8 | PartMark | bit0 bIsStart, bit1 bIsEnd, bits 2-7 nOrder |
+| 3 | u16 | nMaxNum | csl_SkillNumber (total over all chunks) |
+| 5 | u16 | skill.handle.bufferlocation | never written: leftover gpp bytes (Z23-B7) |
+| 7 | u32 | skill.handle.chrregnum | charNo (vt 0x344) |
+| 11 | u16 | skill.number | records in this chunk, at most 500 |
+| 13 | PROTO_SKILLREADBLOCK[number] | skill.skill | 16 bytes each: i32 savetime, u16 skillid, u32 cooltime (s left), u16 empow, u32 mastery |
+
+13 + 16*number bytes; sent by ws_save2worldmanager (so_LinkTo) with every skill (mode 0), one chunk per 500 skills. Z23 §7.3.
 
 ### `0x4019` NC_CHARSAVE_2WLDMAN_LINK_FROM_CMD (Z→WM)
 
