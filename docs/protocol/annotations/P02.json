@@ -1,5 +1,5 @@
 {
- "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it (`packets.py` renders each entry as a **Captured** line in packets-<server>.md; capture-validation.md has the full reasoning). Capture names are re-data/captures/26_11_15_<name>.pcapng. Batch-2 aliases: 'shop' = 26_11_15_buy item, equip item, use storage, unequip, sell item, travel portal, attack, use soulstones; 'combat' = 26_11_15_travel portal, attack mob, pick-up item, die, revive, linkto.",
+ "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it; an entry may carry a captured variant 'layout' that pcap_decode.py tries when the hand annotation does not fit (W04 0x7C07 short form, 0x7037 tail) (`packets.py` renders each entry as a **Captured** line in packets-<server>.md; capture-validation.md has the full reasoning). Capture names are re-data/captures/26_11_15_<name>.pcapng. Batch-2 aliases: 'shop' = 26_11_15_buy item, equip item, use storage, unequip, sell item, travel portal, attack, use soulstones; 'combat' = 26_11_15_travel portal, attack mob, pick-up item, die, revive, linkto.",
  "packets": {
   "login": {
    "0x0c37": {
@@ -3257,13 +3257,30 @@
    "0x7c07": {
     "dir": "S→C",
     "captures": [
+     "combat",
      "idle_in_world",
+     "shop",
      "walk-run-portals"
     ],
     "fields": {
      "err": "0x0DB1 (not in prison)",
-     "nMinute": "0; 4-byte short form, no sReason/sRemark"
-    }
+     "nMinute": "0; 4-byte short form, no sReason/sRemark",
+     "layout": "captured 4-byte variant {err, nMinute} (W04 §9.2 short form); the decoder uses it when the 84-byte annotation does not fit"
+    },
+    "layout": [
+     [
+      0,
+      "u16",
+      "err",
+      "0x0DB1 not in prison"
+     ],
+     [
+      2,
+      "u16",
+      "nMinute",
+      "0"
+     ]
+    ]
    },
    "0x0849": {
     "dir": "S→C",
@@ -3467,8 +3484,29 @@
     ],
     "fields": {
      "ShortCutData": "{9, 0, 0}, {9, 1, 38043}",
-     "size": "1 + 7n + 3 (3 trailing zero bytes; the WM forwards 5 + 7n)"
-    }
+     "size": "1 + 7n + 3 (3 trailing zero bytes; the WM forwards 5 + 7n)",
+     "layout": "captured 11-byte variant (n = 1 + 3-byte tail); the decoder uses it when the W04 layout does not fit"
+    },
+    "layout": [
+     [
+      0,
+      "u8",
+      "nShortCutDataCnt",
+      ""
+     ],
+     [
+      1,
+      "SHORT_CUT_DATA[nShortCutDataCnt]",
+      "ShortCutData",
+      "7 each"
+     ],
+     [
+      8,
+      "u8[3]",
+      "tail",
+      "3 zero bytes the client sends for n = 1; the WM does not read them (+3 or +3n open, capture-validation §14)"
+     ]
+    ]
    },
    "0x7038": {
     "dir": "WM→C",

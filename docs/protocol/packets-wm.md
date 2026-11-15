@@ -6401,7 +6401,7 @@ Sent in reply to `0x7c04` NC_PRISON_END_REQ on CParserClient (`FUN_004155f0`) ·
 | 4 | char[16] | sReason |  |
 | 20 | char[64] | sRemark |  |
 
-**Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `err`: 0x0DB1 (not in prison); `nMinute`: 0; 4-byte short form, no sReason/sRemark
+**Captured** (P02, `capture-validation.md`; combat, idle_in_world, shop, walk-run-portals): `err`: 0x0DB1 (not in prison); `nMinute`: 0; 4-byte short form, no sReason/sRemark; `layout`: captured 4-byte variant {err, nMinute} (W04 §9.2 short form); the decoder uses it when the 84-byte annotation does not fit
 
 Sent in reply to `0x7c0f` NC_DATA_PRISON_GET_ACK on CParserCharDB (`FUN_0040c350`) · payload 84 bytes · raw header
 
@@ -9053,7 +9053,7 @@ size 0x28
 
 → CharDB 0x704B {u32 nCharNo, u8 n, data}
 
-**Captured** (P02, `capture-validation.md`; combat): `ShortCutData`: {9, 0, 0}, {9, 1, 38043}; `size`: 1 + 7n + 3 (3 trailing zero bytes; the WM forwards 5 + 7n)
+**Captured** (P02, `capture-validation.md`; combat): `ShortCutData`: {9, 0, 0}, {9, 1, 38043}; `size`: 1 + 7n + 3 (3 trailing zero bytes; the WM forwards 5 + 7n); `layout`: captured 11-byte variant (n = 1 + 3-byte tail); the decoder uses it when the W04 layout does not fit
 
 ### `0x7039` NC_CHAR_OPTION_IMPROVE_SET_KEYMAP_REQ (C→WM)
 

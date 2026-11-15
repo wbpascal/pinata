@@ -264,13 +264,19 @@ def client_dir(d):
 
 def load_docs():
     ann = json.load(open(os.path.join(DOCS, "annotations.json")))
-    structs, packets = dict(ann.get("structs", {})), {}
+    structs, packets, variants = dict(ann.get("structs", {})), {}, {}
     for f in [None] + sorted(glob.glob(os.path.join(DOCS, "annotations/*.json"))):
         a = ann if f is None else json.load(open(f))
         structs.update(a.get("structs", {}))
         for srv, d in a.get("packets", {}).items():
             for op, v in d.items():
                 packets[(srv, int(op, 16), client_dir(v.get("dir")))] = v
+        # P02 sweep (batch 2): an `evidence` entry may carry a captured variant `layout` of a packet whose hand
+        # annotation belongs to a file sorting after P02.json (W04 0x7C07 short form, 0x7037 trailing bytes)
+        for srv, d in a.get("evidence", {}).items():
+            for op, v in d.items():
+                if "layout" in v:
+                    variants.setdefault((srv, int(op, 16), client_dir(v.get("dir"))), []).append(v["layout"])
     names = {}
     known = {k: {C2S: set(), S2C: set()} for k in list(CLIENT_CLASS) + ["link"]}
     for e in json.load(open(os.path.join(DOCS, "opcodes.json"))):
@@ -317,7 +323,7 @@ def load_docs():
     errs = {int(k, 16): v.get("text") or v.get("literal") for k, v in
             json.load(open(os.path.join(DOCS, "client-error-codes.json"))).items()}
     return dict(structs=structs, packets=packets, names=names, known=known, layouts=layouts, errors=errs, pdb=pdb,
-                link_ann=link_ann, link_alts=link_alts)
+                link_ann=link_ann, link_alts=link_alts, variants=variants)
 
 
 def default_ports():
@@ -522,6 +528,11 @@ def decode_packet(kind, d, op, payload, docs):
             r = decode_ann(payload, alt["fields"], docs["structs"], docs)
             if not r[3] and r[2] == len(payload):
                 (fields, cov, end, prob), name = r, alt.get("name") or name
+                break
+        for alt in docs.get("variants", {}).get((kind, op, d), []) if kind != "link" and (prob or end != len(payload)) else []:
+            r = decode_ann(payload, alt, docs["structs"], docs)
+            if not r[3] and r[2] == len(payload):
+                (fields, cov, end, prob), src = r, "annotation (captured variant)"
                 break
         # P02 batch 2: a client-facing hand annotation whose types the decoder cannot read (Z03 0x240C `struct`,
         # 0x2452 `struct[targetnum]`) or that does not fit: use the PDB layout when it decodes the payload exactly
@@ -932,6 +943,11 @@ def selftest():
         # annotation that does not fit -> exact PDB fallback (P02 part 12: Z03's 0x240C `struct`)
         r = decode_packet("zone", S2C, 0x240C, bytes(docs["pdb"][0x240C]["size"]), docs)
         assert r["source"].endswith("(annotation did not fit)") and not r["issues"], r
+        # captured variant layout from an `evidence` entry (P02 sweep: W04 0x7C07 4-byte short form)
+        vk = next(iter(docs["variants"]), None)
+        if vk:
+            r = decode_packet(vk[0], vk[2], vk[1], bytes(decode_ann(b"\0" * 4096, docs["variants"][vk][0], docs["structs"], docs)[2]), docs)
+            assert r["source"] in ("annotation", "annotation (captured variant)") and not r["issues"], r
         f = decode_ann(b"\x02\x01\x00\x02\x00", [[0, "u8", "a.num", ""], [1, "u16[a.num]", "arr", ""]], {}, docs)
         assert f[0] == [("a.num", 2), ("arr", [1, 2])] and f[2] == 5 and not f[3], f
         # type forms added by P02: [] = rest, bytes = rest, Outer::Inner suffix, inline {u8,u8}, name[i].x overlay, datasize
