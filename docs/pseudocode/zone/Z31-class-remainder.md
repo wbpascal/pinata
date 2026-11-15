@@ -2849,6 +2849,254 @@ Every function below only resets the vftable to its base (and frees when the sca
 | scalar deleting dtors, vt 0 only | `Observer` FUN_0043f670 (`tick_` fold + `~IObserver`), `CallBackEvent` FUN_00444940 (+ dtor FUN_00444930, Z12 §7.3), `RoutionInterface` FUN_00478d20 (+ dtor FUN_00478d10, the GT base, Z16 §4.1), `ShineObjectManager` FUN_005541f0 (→ `~ShineObjectManager` FUN_0054f8b0), `SpyNet::IntelligenceOffice` FUN_0058a6a0 (Z09 §28.2), `IObjectTypeValidator` FUN_005cec00 (Z17 §1.4) |
 
 
+## 11. Open points of Z01-Z04 (`confidence.md` §4.6 rows 5-8)
+
+The four first-wave items left these open (Z02 §15, Z01 §4.3, Z04 §12.5 / §12.6 and §14, Z03 §11). Each is answered
+here or linked to the section that already answers it.
+
+| Row | Open point | Answer |
+|---|---|---|
+| 5 | Z02: source of the handlers' third argument `hnd` | §11.1 |
+| 5 | Z02: setter of `p+0x5cb9` bit 2 | `sp_MiscFlag.BeSummoned`, set only by the wedding partner summon: Z18 §2.4 (§11.2 lists every writer) |
+| 5 | Z02: how a roar is delivered | Z04 §6.4 (`so_ply_RoarItemUseSuccess` vt 0x8e4, ring `g_RoarQueue`) |
+| 6 | Z01: table of all player modes | §11.3 |
+| 7 | Z04: BELONGED_CANCEL codes 0x2885-0x288f | §11.4 |
+| 7 | Z04: what schedules the auto-arrange | §11.5 |
+| 8 | Z03: builder of the 0x244C payload | §6.5 (`MobTargetBout::mts_SlayerList` FUN_004bd630 + `SlayerCollect::lid_Call` FUN_004bd440) |
+
+### 11.1 The handlers' `hnd` argument
+
+`hnd` is computed again on every tick from the player's slot in the object walk. It is not read from the session:
+
+```pseudo
+List<ShineObject>::l_4AllInList(list, pmf)                      @ FUN_0054b160   (the object walk, Z09 §1.3)
+    for each active cell i (list.l_Array[i], 12 bytes: object, next, active):
+        r = pmf(object, list, i)          # pmf = thunk LAB_0054b320: jmp [obj.vt + 0x4ac] (so_Routine)
+        r == 0: return 0                  # stop the walk
+ShinePlayer::so_Routine(p, list, index)                         @ FUN_0056c790   (vt 0x4ac, Z09 §2.1)
+    …
+    hnd = p.so_RemakeHandle(index) (vt 0x4a4)                   @ FUN_00559d40
+        index > 1499 (0x5db): 0xFFFF; else index + 8000
+    …
+    receive loop (Z09 §2.5): one packet → p.sp_SocketSession.vt[4](p, hnd)
+ClientSession::zbs_Parsing(s, p, hnd)                           @ FUN_004fb9f0   (session vt 4; Z18 §1.3)
+    … shineprotofunc.pft_funcpnt[cmd][dept](p, pkt, len, hnd)   # the third handler argument
+```
+
+The other `zbs_Parsing` callers pass something else: `ZoneServer::zs_PacketProcess` FUN_005a9f70 gives the server
+sessions `(0, 0xFFFF)`, and `OPToolObject::opto_Routine` FUN_004c7e60 gives its session `(0, its own list index)`.
+For a player, `hnd` is therefore 8000 + its index in the player list. That is the player's own handle, the value in
+`p+4` (Z09 §2.1: "handle = 8000 + poolIndex") *(inferred: the list index is the pool index the handle was made from)*.
+Some handlers read `p+4` directly and others use `hnd`. Both give the same number (e.g. §11.4 writes `p+4` into 0x34A6,
+and §11.5 passes `p+4` to `sp_ItemReloc`).
+
+### 11.2 `p+0x5cb9` bit 2 (`sp_MiscFlag.BeSummoned`)
+
+Z18 §2.4 already documents the flag (*(pdb2016)* name, only setter `ZoneRingPacketSummonPartner::zrpb_Success`
+FUN_005a8680, which opens the "Summons" menu on the summoned spouse). A scan of every write in the zone confirms
+there is exactly one setter. These are all the functions that touch it:
+
+| Function | Access |
+|---|---|
+| `ZoneRingPacketSummonPartner::zrpb_Success` FUN_005a8680 | `= 1` (the only setter) |
+| `ServerMenuFuncter::smfm_LinkWithoutNPC` FUN_0050f1d0 | links only while set, then `= 0` |
+| `sp_NC_MENU_SERVERMENU_ACK` FUN_0050fe60 | skips the 1000-unit range check while set (Z02 §6.6); clears it on its error paths |
+| `ServerMenuActor::sma_Reply` FUN_0050fd40, `ServerMenuFuncter::smfm_Cancel` FUN_0050ecc0, `sp_ServerMenuTitle` FUN_0054e8a0, `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 | `= 0` |
+
+### 11.3 Player modes
+
+**Storage.** Every mobile object has `smo_Mode { u8 tempmode; u8* mode }` at +0xe98 *(pdb2016)*, so `*(p+0xe9c)` is
+the pointer and `**(p+0xe9c)` the mode. The `ShineMobileObject` constructor FUN_005591c0 points `mode` at `tempmode`.
+`ShinePlayer::ShinePlayer` FUN_0055bc80 points it at `sp_CharBriefInfo.bic_BriefInfo->mode` (offset 0x1f of
+`PROTO_NC_BRIEFINFO_LOGINCHARACTER_CMD`), and `ShineMob::ShineMob` FUN_0055b140 points it at its mob brief's `mode`.
+So the mode a client sees in 0x1C06 is the live byte, copied whole by `so_FillBriefInformation` FUN_0055abf0. It is
+read through `ShineMobileObject::smo_GetMode` FUN_00549800 (vt 0x484, the same function in all nine mobile classes)
+or directly. It is written directly, except for one call of `smo_SetMode` FUN_005497e0. Neither PDB has an enum for
+the values, so the meanings below are ours, taken from the setters. Client: `Char::SetMode` (client FUN_0042f440, Z02 §1)
+only treats 2 (`STAND_MODE_COMBAT`) and 3 (`OnDead`) specially. The brief's `shapedata` union
+(`CHARBRIEFINFO_NOTCAMP` / `_CAMP` / `_BOOTH` / `_RIDE` *(pdb2017)*) carries the tent, booth or mount look of modes
+4 / 5 / 6 *(inferred from the member names and the tent / booth / ride shape copies of the setters)*.
+
+**Every writer** (scan of `zone-pdb/decomp.c` for stores through `+0xe9c` / `smo_Mode.mode`, plus `smo_SetMode`):
+
+| Mode | Meaning | Set by |
+|---|---|---|
+| 0 | not on a map (connecting, logging in, linking out) | `ShineMobileObject::so_FirstActionAfterSocketConnect` FUN_0054b6d0 (new connection); `so_ply_RegistNumberVarifyCheck` FUN_00551bb0 (both failure paths); `so_LinkTo` FUN_0049ad30 (both link-out paths, after `ws_save2DB` / before the map unmark); `so_ply_ToNormalLoc` FUN_00552350 (Z01 §7.4); mobs: `ShineMob::so_mob_Regenerate` FUN_004b41b0 |
+| 1 | standing (normal) | 0x1803 `sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390 (only from mode 0, mask 0x01); 0x2008 `sp_NC_ACT_CHANGEMODE_REQ` FUN_00457560 (client value 1 or 2); 0x202A `sp_NC_ACT_FOLDTENT_REQ` FUN_00457a90; `so_ply_ReinforceFoldtent` FUN_0055ae50 (vt 0x488, below); revive `sp_ReviveReqProcess` FUN_00451bd0, `sp_ReviveNow` FUN_0057d290; `sp_HorseOff` FUN_0045f7c0, `so_MoverSystem_GetOff` FUN_0045f020; `sp_CloseStreetBooth` FUN_005932b0; `so_Prison_Go` FUN_005b94b0 (a dead player is set to 1 before the link); the mover object itself: `ShineMover::so_smv_SummonMover` FUN_0055fdf0 |
+| 2 | combat stance | 0x2008 CHANGEMODE (client value 2); `MobActionAttack::mab_CaptivatePlayerAttack` FUN_004ba0d0 via `smo_SetMode(2)` on the captivated player it makes attack (Z09 §7.7) |
+| 3 | dead | `ShineMobileObject::so_KilledBy` FUN_00432240 (every mobile object); `ShineMob::so_mobile_Teleport` FUN_005793e0 when the re-marking fails (with HP 0) |
+| 4 | resting in a tent | 0x2027 `sp_NC_ACT_PITCHTENT_REQ` FUN_00457760 |
+| 5 | street booth open | 0x6801 `sp_NC_BOOTH_OPEN_REQ` FUN_0058e900 (mask 0x26: from 1, 2 or 5) |
+| 6 | riding (horse or mover seat) | `sp_HorseOn` FUN_0045f270, `sp_MoverSystem_GetOn` FUN_0045d7a0 (Z13 §7) |
+| 7 | never set | no writer. Tested only by `ShinePet::spt_FindMaster` FUN_00419a80, `so_ply_Summon2GuildTournament` FUN_00478750, `sp_Guild_Tournamnet_Observer_Enter` FUN_004788c0 (each `mode ≠ 7`) (original bug) Z31-B28 |
+
+`so_ply_ReinforceFoldtent` (vt 0x488; every other class has the empty FUN_00417480) is the forced tent fold that runs
+before anything moves the player:
+
+```pseudo
+ShinePlayer::so_ply_ReinforceFoldtent(p)                        @ FUN_0055ae50
+    if mode ≠ 4: return
+    p.so_SendProtocol(8, 0x3d) (vt 0x304, FUN_0054ef70: header-only packet)
+        → p ← 0x203D NC_ACT_REINFORCE_FOLDTENT_CMD {}  (pdb2017 name; client FUN_004c4bc0 reads no payload)
+    mode = 1
+    if sp_MiniHouse.mhs_Backup.bib_Backuped (+0x292d7): copy the 0x2b saved shape bytes (+0x292ac) back to
+        brief.shapedata (brief +0x25); bib_Backuped = 0
+    sp_RecoverPoint (+0x29628) = FUN_00417480 (normal regeneration, as 0x202A)
+    broadcast to sight (so_AllOfRange) 0x202C NC_ACT_SOMEONEFOLDTENT_CMD, 0x2f bytes:
+        writes only the opcode and u16 handle = p+4; bytes 4..0x2e (the shapedata) are left as they are in g_buf
+        # (original bug) Z31-B26: 0x202A copies brief.shapedata there (Z02 §7); here the 43 bytes are whatever the
+        # previous packet left, so the onlookers' client draws the player with a stale look
+```
+
+Callers of vt 0x488, each `if mode == 4` first: the link / teleport visitors `AxialListLinkTo` FUN_00428950,
+`AxialListLinkToByObserver` FUN_00428530, `AxialListTeleport` FUN_004286e0, `…TeleportAnywhere` FUN_00428730,
+`…TeleportSplit` FUN_004287b0; `so_LinkTo` FUN_0049ad30; Pine `ShineLinkTo::sa_Step` FUN_004efb10; Lua `cLinkTo`
+FUN_005dde20; KQ gate `erb_happen` FUN_00496280 and `sp_NC_KQ_ENTRYRESPONCE_ACK` FUN_00496990; guild tournament
+FUN_00478750 / FUN_004788c0; wedding hall `sp_NC_ACT_WEDDING_HALL_GUEST_ENTER_REQ` FUN_0059fcb0, `wh_RecallCouple`
+FUN_005a27f0, `&` `ac_WeddingGuestEnter` FUN_0041ef10; `sp_StateChangeToNormal` FUN_005606e0 (also gets off a mount in
+mode 6, Z22 / Z13 §7); the `ReinforcedMove` abstate FUN_00401db0 / FUN_004083a0; `ShineMobileObject::so_Routine`
+FUN_0056a080.
+
+**Testers: the handler masks.** A handler with a static `cmc_AllowMode` mask returns (usually silently, or with its
+own error code) when bit `mode` is clear (Z01 §4.3). All statics in the zone:
+
+| Mask | Modes | Users |
+|---|---|---|
+| 0x01 | 0 | 0x0806 SEED, 0x1801 MAP_LOGIN, 0x1803 LOGINCOMPLETE |
+| 0x04 | 2 | 0x242B BASHSTART, 0x2432 BASHSTOP, SKILLBASH_FLD_CAST / OBJ_CAST, SKILLBASH_CASTABORT_CMD / _REQ (attacks and skills need the combat stance) |
+| 0x06 | 1, 2 | 27: ACT_CHANGEMODE, PITCHTENT, GATHERSTART / GATHERCANCEL / `sp_GatherComplete`, PRODUCE_CAST / CASTABORT, WEAPONENDURE / SHIELDENDURE_CHARGE, EQUIP_BELONGED_CANCEL_USE, MOVER_UPGRADE, ITEM_USE_ACTIVESKILL, MOVER_RIDE_ON, MH_FURNITURE_ENDURE_KIT_USE, MINIHOUSE ACTIV / VISITREADY / VISIT / EXIT / BUILDING, `ShineMover::so_smv_SkillBash_Object` / `_Location`, BOOTH_REFRESH, WEDDING_HALL_GUEST_ENTER_READY, WEDDING AGREEMENT / COMPULSORY_DIVORCE, CT_SET_CURRENT, FRIEND_UES_FRIEND_POINT |
+| 0x07 | 0, 1, 2 | MINIHOUSE_LOGINCOMPLETE |
+| 0x08 | 3 | `sp_ReviveReqProcess` |
+| 0x10 | 4 | FOLDTENT |
+| 0x16 | 1, 2, 4 | SKILL_PRODUCTFIELD |
+| 0x20 | 5 | BOOTH_CLOSE, BOOTH_INTERIORSTART |
+| 0x26 | 1, 2, 5 | BOOTH_OPEN |
+| 0x38 / 0x40 | 3, 4, 5 / 6 | `so_ply_FlagCaptureCast` (two statics, Z16 §4.5); 0x40 also ACT_RIDE_FEEDING |
+| 0x46 | 1, 2, 6 | 68: ACT STOP / WALK / RUN / MOVEWALK / MOVERUN / JUMP / ACTIONBYITEM / EMOTICONSTOP, `sp_DoEmotion`; NPC: NPC_MENU, NPCMENUOPEN_ACK, NPCCLICK, ENDOFTRADE, `InteractWithNPC`; items: BUY, SELL, REPURCHASE, DROP, PICK, EQUIP, UNEQUIP, RINGEQUIP, MINIMON_EQUIP, USE, USEABORT, DEPOSIT, WITHDRAW, OPENSTORAGEPAGE, GUILD_STORAGE_WITHDRAW, guild academy reward storage withdraw / deposit, UPGRADE, NEW_UPGRADE, BRACELET_UPGRADE, DISMANTLE, MIX_ITEM, RANDOMOPTION_CHANGE / RECOVER_COUNT_LIMIT, CLASS_CHANGE + `sp_OpenClassChangeMenu`, TERMEXTEND, CHAT_COLOR_CHANGE, MAPLINK_SCROLL, AUTO_ARRANGE_INVEN, CONNECTION_CHANGE_CHAR_ID_ITEM_USE; map: TOWNPORTAL, MULTY_LINK_SELECT, WING_SAVE, WING_FLY, AUTO_WAY_FINDING_USE_GATE, INSTANCE_DUNGEON_LEVEL_SELECT_MENU_ACK, SCENARIO AREAENTRY / AREALEAVE, job dungeon `zrpb_Request` / `zls_NC_QUEST_JOBDUNGEON_FI…`; CLIENT_AUTO_PICK, SKILL_UNLEARN, `sp_PointStoneBuy`, SOULSTONE HP / SP_BUY, BOOTH_ENTRY, BOOTH_ITEMTRADE, TRADE_PROPOSE, WT_LICENSE, GAMBLE house exit / COIN_BUY / COIN_SELL / VIPCARD_UI_OPEN |
+| 0x4e | 1, 2, 3, 6 | MENU_SERVERMENU_ACK (a dead player can answer a server menu, e.g. a revive offer) |
+| 0x56 | 1, 2, 4, 6 | 14: GUILD_RENAME / RETYPE + `so_ply_GuildReName` / `ReType`, KQ_ENTRYRESPONCE, REWARDINVENOPEN, RELOC, SPLIT, ACT_ROAR, SOULSTONE HP / SP_USE, STAT_INCPOINT / DECPOINT, `smo_IsActiveMode` (Z11) |
+| 0x5e | 1-4, 6 | CHARGEDINVENOPEN, CHARGED_WITHDRAW |
+| 0x76 | 1, 2, 4, 5, 6 | SKILL_EMPOWALLOC |
+| 0x78 | 3-6 | `sp_Schedule_CastingBar`, `sp_CreateCastingBar` (a set bit **refuses** here: no casting bar while dead, in a tent, booth or riding *(inferred from the callers)*) |
+| 0x7e | 1-6 | 23: BAT UNTARGET / ASSIST / ABSTATE_ERASE / TARGETTING, BRIEFINFO_INFORM, HIDE_EXCEPT_ME ON / OFF, ACT SHOUT / CHAT, PARTY_MEMBERINFOREQ, LOGOUTREADY / LOGOUTCANCEL, NORMALLOGOUT, CHARGEDBUFF_ERASE, TRADE PROPOSE_CANCEL / ASKNO / PROPOSEYES / CANCEL / CENBOARDING / BOARDLOCK / DECIDE / DOWNBOARD / UPBOARD |
+
+**Testers: direct comparisons** (vt 0x484 or the byte; scan of every `== / ≠ N` on the value):
+
+| Mode | Tests |
+|---|---|
+| 0 | `≠ 0` = "on a map", 30 sites: the brief-info exchangers and `so_ExchageBriefInfo` FUN_00441460 / `so_HideExceptMeOff_BriefInfo` FUN_00441700 / `so_SendMyBriefInfo` FUN_005597c0, item-pickup broadcast FUN_00428f40, mob counters FUN_00427f30 / FUN_00429370 / FUN_004293f0, `AxialListSetAbstateInArea` FUN_004c21a0, `ws_save2worldmanager` FUN_004536f0, `so_Unmark` FUN_00558900, `so_banning` FUN_00558b70, `so_ply_RemoveWhen` FUN_0055a4a0, `so_SetRaid` FUN_005604a0, `so_LogoutLog` FUN_00549f90, `zs_disconnect` FUN_005abb60, `so_Prison_Go`, `zrpb_Request` FUN_005a83b0 (`== 0` → spouse offline), the pet / servant / mob routines, KQ top list FUN_004e6760, max-HP abstate FUN_00401990, `SkillBlastEffectContainer` FUN_00437fc0, mob explosion FUN_0057b830; `ShinePlayer::so_Routine` (`≠ 0` → `GameModeWork`, Z09 §2.1); 0x1803 LOGINCOMPLETE (`≠ 0` → error); pet item `uib_CanUseItem` FUN_0059b2b0 (`≠ 0` and `< 3`) |
+| 1, 2 | `AxialListMobCounter::ala_SearchPly` FUN_00428020 / `ala_SearchGld` FUN_004280a0 and `AxialListMobInAreaCounter` FUN_00429470 / FUN_004294f0 count a player only in mode 1, 2, 4 or 6; `SkillBlastEffectContainer::sbec_Routine` FUN_00437fc0; `ShineServant::so_serv_FindMaster` FUN_00557090 (master in 1, 2, 4 or 6) |
+| 3 | `≠ 3` = "alive", 45 sites: party / couple / academy buff visitors FUN_0040e250 / FUN_0040e380 / FUN_0040e4b0, `AxialListPlayerStateSet` FUN_004285f0, boss / near-player / near-object scans FUN_00429080 / FUN_0042a8f0 / FUN_004c21a0, `so_skillsmash` FUN_0042ba90, `so_SkillCure` FUN_0042c440, `CharClassSentinel::LPRecoveryRoutine` FUN_00449a50, `wms_NC_MAP_LINKRESERVE_ACK` FUN_0049b510 ("Link Fail Player Die", with HP 0), instance-dungeon kick FUN_00486c00, guild tournament FUN_00478750 / FUN_004788c0, `so_LogoutLog`, `so_ply_RemoveWhen`, overlap factors FUN_00556540 / FUN_00557240, all object routines, skill-target scan FUN_00579320, NPC actions FUN_005c10c0 / FUN_005c11a0 / FUN_005c1390, `IAxialListNearExecution::apply` FUN_005cf9c0, Lua `cPlayerExist` / `cGetPlayerName` / `cIsObjectDead` / `cRunToUntilBlock` / `cTargetHandle` / `cGetWhoKillMe` (FUN_005d8aa0 … FUN_005ef430); `== 3`: `so_attack` FUN_0042cb80, `so_SaveLocation` FUN_004542f0, `so_Prison_Go`, `so_IsEmpty` of mob / mover FUN_00556610 / FUN_0055eaa0, `sm_DuringRecover` FUN_0056b710, the captivate target selector FUN_004add20 |
+| 4 | the vt 0x488 callers above; `≠ 4`: `so_TentDistance` FUN_0058cc50 (4 or 5 = resting, §4.8), `sp_RecoverPoint_House` FUN_0056b3b0; `so_SendInform2Admin` FUN_0058e310 (admin view, also 5 / 6) |
+| 5 | `so_ply_ShowBoothItem` FUN_0058cd50, `so_ply_BoothTrade` FUN_0058cd70 (§4.8), `sp_CloseStreetBooth` FUN_005932b0; player `so_KilledBy` FUN_00433be0 closes the booth (Z03 knowledge); `ShinePlayer::so_Routine`; KQ gate FUN_00496280 |
+| 6 | `== 6`: `sp_StateChangeToNormal`, `sp_HorseOff`, 0xCC05 `sp_NC_MOVER_RIDE_OFF_REQ` FUN_00563420, `so_WalkSpeed` / `so_RunSpeed` FUN_00559960 / FUN_005599c0, the four layer moves FUN_0054ab90 / FUN_0054ac70 / FUN_0054ad30 / FUN_0054ae10, `so_Unmark`, ITEM_DROP FUN_00529f50, AUTO_ARRANGE (0x30ab, §11.5), SKILLBASH_CASTABORT_REQ FUN_0057c480, `so_ply_HorseFeed` FUN_0045eaa0, `sp_MoverUpgradeEffect_ON` FUN_0056b5f0, `&hide` FUN_0041a3a0, player `so_KilledBy`, `ShinePlayer::so_Routine`; `≠ 6`: MOVERUN FUN_00457fd0, `sp_MoverSystem_GetOff` FUN_0045d910 / `so_MoverSystem_GetOff` / `so_MoverSystem_Feeding` FUN_0045f1d0, horse food `uib_CanUseItem` FUN_00596500, `sp_ChargedItemLimitCheck` FUN_00451530 |
+| 7 | see the writer table (dead value) |
+
+### 11.4 0x3048 NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ: every code
+
+Payload `{ u8 nCancelItemInvenSlot, u8 nBelongedItemInvenSlot }` *(pdb2017, confirmed: `pkt+2` / `pkt+3`)*. The
+length is not checked. Every refusal sends `0x3049 NC_ITEM_EQUIP_BELONGED_CANCEL_USE_ACK { u16 nError }`. Client
+FUN_004b3940 shows `FUN_00416430(nError)` for any code other than 0x2880. A code it has no text for is shown as "An
+unidentified error code has occurred.: <code>" (text 0xb4d3f216, Z13 §9.8).
+
+```pseudo
+sp_NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ(p, pkt, len, hnd)                     @ FUN_0051b9a0
+    mode ∉ {1, 2} (mask 0x06):                         0x2882  "Is unavailable"
+    p.field_0x1e78 & 0x04 (Fear, Z09 §2.1):            0x2885  "Unable to use this item when status on fear"
+    smo_IsCaptivate (vt 0xf20, FUN_0055d5a0: smo_Flag.InCaptivate):
+                                                       0x2886  (no client text)
+    no field (p+0x7a == 0):                            0x2883  (no client text)
+    lock list busy (L.vt[0x10], Z05 §1.2):             0x2884  "Inventory information is incorrect"
+    sp_NPCProcess.duplicatemenustate.dmc_Control & 0x0C (NPC menu or storage open, §9.4):
+                                                       0x2887  "The item level is different"   (original bug) Z31-B27
+    B = inventory cell nBelongedItemInvenSlot (ci_Inventory.vt[0]); none:
+                                                       0x2888  (no client text)
+    B.id == 0xFFFF, no ItemDataBox row, row.data null or B's attribute object (cell+0x70) null:
+                                                       0x288a  "Inventory information is incorrect"
+    !CItemAuthorityBase::IA_IsDataPutOnBelonged(g_ItmBelongAttr, row.BT_Inx) (§9.3):
+                                                       0x288c  "Unable to reset binding with this item"
+    B.attr.iac_GetIsPutOnBelonged (vt 0xa4) == 0 (not bound):
+                                                       0x288d  "Unable to reset binding with this item"
+    C = inventory cell nCancelItemInvenSlot; none:     0x2889  (no client text)
+    C.id == 0xFFFF, no row, row.data null, no attribute object, or lot n = C.attr.iac_GetLot (vt 0x1c) < 1:
+                                                       0x288b  "Inventory information is incorrect"
+    C.row.ItemFunc ≠ ITEMFUNC_PUTON_CLEAR:             0x288e  "Unable to reset binding with this item"
+    C.row.Grade ≠ B.row.Grade:                         0x288f  "The item level is different"
+    ok:
+        lock = L.icll_Index (lock list +4)
+        Item DB ← 0x34A6 NC_ITEMDB_EQUIP_BELONGED_CANCEL_USE_REQ (0x22 bytes; DB side D03 §6.6):
+            { u16 handle = p+4, u32 charNo (vt 0x344), u16 nLockIndex = lock,
+              u64 nBelongedItem_ItemKey = B.key, u16 nBelongedItem_ItemID = B.id,
+              u64 nCancelItem_ItemKey = C.key, u16 nCancelItem_ItemID = C.id, u32 nCancelItem_LotCnt = n }
+        reserve under `lock` (lock-list slots §3.2), both cells at inventory location 0x2400 | slot:
+            n < 2:  L.vt[0x30] icl_ClearItem(lock, C, loc, loc)                   # the cancel item goes
+            else:   copy of C with iac_SetLot (vt 0x20) n − 1; L.vt[0x40] icl_StoreItem(lock, C, copy, loc, loc)
+            copy of B with iac_SetIsPutOnBelonged (vt 0xa8) 0; L.vt[0x40] icl_StoreItem(lock, B, copy, loc, loc)
+        L.icll_Index += 1
+        # no reply now: 0x3049 { 0x2880 } comes with the DB answer 0x34A7 (Z05 §5.3)
+```
+
+Corrections to Z04 §12.6 (knowledge §0): 0x2885 / 0x2886 are not inferred; a missing cancel-item cell is 0x2889,
+not 0x288b; 0x288c, 0x288e and 0x288f are read in the code, not inferred.
+
+### 11.5 Auto-arrange: start, steps and end
+
+```pseudo
+0x304A sp_NC_ITEM_AUTO_ARRANGE_INVEN_REQ(p)                                     @ FUN_0051c360
+    mode ∉ {1, 2, 6} (mask 0x46):                                  0x30aa
+    mode == 6 or L.vt[0x18]() == 1 (lock list busy, Z05 §1.2):       0x30ab
+    trading (sp_tradeboard.tb_opposit) or !sma_IsReady (server menu open): 0x30aa
+    dmc_Control & 0x40 (open menu bit 6 = upgrade, §9.4):           0x30ac
+    so_ply_ArrangeInvenDelayCheck (vt 0xd10)                        @ FUN_00560d90
+        sp_ArrangeInvenDelayCheckTime (+0x2ab1c) + 50 < now: stamp = now; passes
+        else:                                                      0x30a9
+        # the stamp is set before the next two checks, so a request refused by them still starts a new 5 s wait
+    sp_GetMoverUpgradeWaitState FUN_00561600 (sp_MiscFlag.bMoverUpgradeWait) or
+    sp_GetItemBuyWaitState FUN_00561760 (sp_MiscFlag.bItemBuyWait): 0x30aa
+    p ← 0x304B { 0x30a8 } "Inventory has been organized. …"         # sent before any move
+    so_ply_SetArrangeInven (vt 0xd18)(1)                            @ FUN_00560dc0: sp_ArrangeInvenCnt (+0x2ab18) = 0xC0
+    so_ply_ArrangeInven (vt 0xd1c)                                  # first step
+& command ac_ArrangeInven FUN_004197e0 (Z11 §3.4): the same last two lines, without any check or 0x30a8.
+
+ShinePlayer::so_ply_ArrangeInven(p)                                             @ FUN_00563500
+    if !so_ply_IsArrangeInven (vt 0xd14, FUN_00560db0: sp_ArrangeInvenCnt ≠ 0): return
+    sp_ArrangeInvenCnt −= 1                                         # a budget of 192 steps per run
+    n = ci_Inventory.vt[4](&sp_ChargedItem.ci_Effect)               # usable inventory cells
+    for i < n: e[i] = AI_ArrangeInven { pInvenCell = cell i, pIAC, pITI, pItemData, Classify }   (§4.9)
+        Classify (u64, AI_nClassify pdb2016) = all ones (empty / unknown cell sorts last), else
+            { u16 nItemID = item id, u16 nClassifyGroupB = 0xFFFF, u16 nClassifyGroupA = ~ItemInfo.DemandLv,
+              u8 nItemGrade = sp_ArrangeInven_nClassifyGrade (§4.9: 0 charge … 7 normal),
+              u8 nItemSortOrder = ItemDataBoxIndex.ItemSortOrder (Z27 §6.5) }
+        # compared as one unsigned 64-bit number: sort order, then grade, then higher DemandLv, then item id
+    for i in 0 … n−2:                                               # one selection-sort pass, stops at the first move
+        best = i
+        for j in i+1 … n−1:
+            if e[j].Classify < e[best].Classify: best = j
+            if e[j].Classify == e[best].Classify (the same item)
+               and e[i].pIAC.vt[0x18]() == 1 (stackable) and e[i].pItemData
+               and e[i].pIAC.iac_GetLot(e[i].pITI + 8) < e[i].pItemData.data.MaxLot:
+                best = j                                            # merge: the last equal stack moves onto i
+        if best ≠ i:
+            req = PROTO_NC_ITEM_RELOC_REQ { from = 0x2400 | best, to = 0x2400 | i }
+            if neither cell is locked (L.vt[0x08] icl_IsLocked(ITEM_INVEN*), §3.2):
+                sp_ItemReloc(p, p+4, &req)  (FUN_00536780, Z04 §4.1: move / merge / split-and-merge / exchange → Item DB)
+                return                                              # one move per step
+            p ← 0x304B { 0x30ab } "Auto stack is stopped since there is non movable item existed."; break
+    so_ply_SetArrangeInven(0)                                       # sorted (no move left), stopped, or locked
+```
+
+**Scheduling.** There is no timer. Each step issues one ordinary relocation and stops. The next step runs from the
+Item DB answer: the success handlers `gds_NC_ITEMDB_RELOCSUC_ACK` FUN_00533070, `EXCHANGESUC` FUN_00533350,
+`MERGESUC` FUN_00533630 and `SPLIT_N_MERGESUC` FUN_00533a40 call vt 0xd1c after they apply the move (Z05 §4). The
+four matching failure handlers (FUN_00533220 / FUN_00533500 / FUN_00533910 / FUN_00533ca0) and a failed
+`Apply_N_Free` call vt 0xd18(0) and end the run. A run therefore ends after the inventory is sorted, after 192 steps
+(silently; the inventory may be only partly sorted), at the first DB failure, or at a locked cell. A manual move's DB
+answer during a run also triggers a step. `so_ply_ArrangeInvenInit` FUN_00560d70 (vt 0xd0c, at 0x1803) clears the
+counter at login.
+If `sp_ItemReloc` refuses the move locally (0x300C error, no DB request), no answer comes back. The counter stays
+non-zero until the next relocation answer or the next 0x304A *(inferred: for an inventory-to-inventory move inside
+the usable size, Z04 §4.1 shows no such refusal)*.
+
 ## Original-server bugs
 
 | ID | Handler | 2016 behaviour | Effect | Likely intent |
@@ -2878,8 +3126,19 @@ Every function below only resets the vftable to its base (and frees when the sca
 | Z31-B23 | `OPToolSession::opts_DummyFunction` FUN_004c7fb0, `LinearStep::ls_Set` FUN_004cdd60 §10.1 / §10.5 | assert texts name the wrong function (`ZoneListenSession::opts_DummyFunction`, `LinearStep::ls_step`) | misleading logs only | the own names |
 | Z31-B24 | `AxialListPacketBroadcast::~AxialListPacketBroadcast` FUN_00428d00 §10.8 | writes its name into `fca_stack[fca_stackpoint]` without incrementing the pointer | the name stays above the stack top until overwritten; the hang dump (Z10 §6.4 prints every non-null entry) can list it although the function has returned | push and pop like the other profiled functions |
 | Z31-B25 | `ZoneConnectSession::ZoneConnectSession` FUN_005a6cd0 §10.1 | `m_Connected_Server_ID = 3`, the `GameLogSession` value | none found: nothing reads the field for the ring link | 6 (zone) |
+| Z31-B26 | `so_ply_ReinforceFoldtent` FUN_0055ae50 (vt 0x488) §11.3 | the forced tent fold broadcasts 0x202C NC_ACT_SOMEONEFOLDTENT_CMD with 0x2f bytes but writes only the opcode and the handle; the 43 shapedata bytes are whatever an earlier packet left in `g_buf` | onlookers draw the player who was folded out of the tent (link, teleport, KQ, wedding, abstate) with a stale look until the next brief refresh | copy `brief.shapedata` like 0x202A FUN_00457a90 |
+| Z31-B27 | 0x3048 `sp_NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ` FUN_0051b9a0 §11.4 | an open NPC menu / storage is answered with 0x2887, which the client shows as "The item level is different"; 0x2883 (no field), 0x2886 (captivated), 0x2888 / 0x2889 (missing cell) have no client text | misleading or "An unidentified error code has occurred.: N" messages | codes the client knows (e.g. the 0x30aa-style "close the other windows" text) |
+| Z31-B28 | `ShinePet::spt_FindMaster` FUN_00419a80, `so_ply_Summon2GuildTournament` FUN_00478750, `sp_Guild_Tournamnet_Observer_Enter` FUN_004788c0 §11.3 | test `mode ≠ 7`; nothing in the 2016 zone sets mode 7 | dead checks | drop them (or a removed mode) |
+
 ## Not reconstructed / uncertain
 
+- §11.1: that the player list index handed to `so_Routine` is the pool index the handle `p+4` was made from is
+  inferred from Z09 §2.1 and the equal ranges (8000 + 0 … 1499); no handler compares `hnd` with `p+4`.
+- §11.3: the meaning of mode 7 (tested, never set) is unknown. The shapedata member that each mode selects on the
+  client was not traced in the 2016 client's 0x1C06 handler FUN_004a02f0. `mab_CaptivatePlayerAttack` sets mode 2
+  without restoring the previous mode afterwards (as read; Z09 §7.7 owns the captivation flow).
+- §11.5: whether `sp_ItemReloc` can refuse an inventory-to-inventory step locally (leaving the arrange counter armed
+  without a pending DB answer) was argued from Z04 §4.1, not traced branch by branch.
 - §9.2: `mcd_city` returns 0 both for Roumen (`Rou`) and for any map not in `ItemMerchantInfo.shn` (dungeons, Gamble houses, …),
   so merchants there use Roumen's "sold in this city" column. Whether the 2016 data places a city-dependent merchant on
   such a map was not checked.
@@ -2966,7 +3225,6 @@ Filled in by the sweep part; rows found so far:
 | `GuildTournamentSystem::CaptureFlag` FUN_0047eae0 (caller of `ShineDynamicCast<ShineNPC>`) | Z16 §4.5 (done) | documented there (flag capture); §5.2 documents the cast |
 | `List<ShineObject>::l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` (callers of `ShineObject::operator=`) | Z09 §28.11 (done) | the `List<T>` template is documented there; §5.1 documents the copy, §10.4 the `MapCluster` copy of the same four |
 | per-class overrides of the object slots (mob, NPC, bandit, servant, door, effect, drop item, flag, pet, mover, mini-house) | Z09 §5 / §11-§13, Z13 §1.8 / §6.2 / §8.1 (done) | §5 documents only the base-class bodies and links the overrides |
-| auto-arrange sort and step scheduling (`so_ply_ArrangeInven` FUN_00563500) | this item, part 10 (§11, Z04 open point) | §4.9 documents the grade rank and the login init |
 | the owners of the `BinaryDataBox<T>` instances (`mdb_Load`, `idb_Load`, `mvdb_Load`, `sma_Load`, … in the §7.1 table) | the item named in each row (Z09, Z13, Z27, Z06, …; done) or this item §8 / §9 | §7.1 documents only the box template, the readers' keys and the destructors |
 | the gamble rules that read `g_BanTime`, `g_TaxRate`, `g_EventCode`, `g_GBReward` (`go_Init` FUN_00614f10, `go_PlayerAction` FUN_00615180, `go_Enter_Player` FUN_00620d00, `SMS_StopButton` FUN_00625340) | Z06 §4-§5 (done), Z32 | §7.2 documents the tables and the finders |
 | the guild tournament, GTI, item action and action effect `ITableBase` tables (their `Load` / `DataProcess`) | Z16, Z11, Z17, Z21 (done) | §7.4 lists only their destructors and `GetTotal` |
