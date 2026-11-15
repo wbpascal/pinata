@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """X01 bug register: collects every `<item>-B<n>` table row of docs/pseudocode/**/*.md and docs/knowledge/*.md
-into docs/pseudocode/README.md §6 (between the register markers).
+(plus P02's table in docs/protocol/capture-validation.md §8) into docs/pseudocode/README.md §6 (between the
+register markers). IDs listed in capture-validation's "captured evidence" table get *(captured)*.
 
 usage (repo root):  python3 -I docs/plan/status/X01-register.py write   # rewrite the register in README.md
                     python3 -I docs/plan/status/X01-register.py stats   # rows per file, duplicates, headers
@@ -38,21 +39,29 @@ def split_cells(s):
 
 files = sorted(glob.glob('docs/pseudocode/**/*.md', recursive=True) + glob.glob('docs/knowledge/*.md'))
 files = [f for f in files if not f.endswith(('FORMAT.md', 'README.md'))]
+files.append('docs/protocol/capture-validation.md')   # P02's bug table (§8) and its "captured evidence" table
 rows = []
+CAPTURED = {}     # ID -> § of capture-validation.md where the capture shows the bug on the wire
 for f in files:
-    head = None; header = None
+    head = None; header = None; capmode = False
     for i, line in enumerate(open(f, encoding='utf-8'), 1):
         m = H.match(line)
         if m:
-            head = m.group(2); header = None
+            head = m.group(2); header = None; capmode = False
             continue
         if line.startswith('| ') and ('2016 behaviour' in line or 'Behaviour' in line):
-            header = split_cells(line.strip()[1:-1])
+            header = split_cells(line.strip()[1:-1]); capmode = False
+            continue
+        if line.startswith('| ID') and 'Captured evidence' in line:
+            header = None; capmode = True
             continue
         m = ROW.match(line.rstrip('\n'))
         if not m:
             continue
         cells = split_cells(m.group(2))
+        if capmode:
+            CAPTURED[m.group(1)] = cells[-1]
+            continue
         rows.append(dict(id=m.group(1), file=f, line=i, head=head, header=header, cells=cells,
                          paren=line.lstrip('| ').startswith('(')))
 
@@ -83,21 +92,25 @@ SERVER = {'L00': 'Login', 'L01': 'Login', 'D01': 'Account / AccountLog', 'D02': 
 GROUPS = [('Login', ['L00', 'L01']), ('Account / AccountLog', ['D01']), ('WorldManager', ['W']),
           ('Zone', ['Z']), ('Character', ['D02', 'D03', 'D04', 'D07']), ('GameLog', ['D05']),
           ('Database (inferred procedures)', ['D06']), ('Shared library (Login / WM / Zone)', ['S02']),
-          ('Found while reading the 2016 server PDBs', ['S01'])]
+          ('Found while reading the 2016 server PDBs', ['S01']),
+          ('Found in packet captures (P02; Character, WM, Zone)', ['P02'])]
 
 def owner_file(item, f):
     b = f.split('/')[-1]
     if item == 'L00': return b == 'login-server.md'
     if item == 'S01': return f == 'docs/knowledge/S01.md'
+    if item == 'P02': return b == 'capture-validation.md'
     return b.startswith(item + '-') or b == item + '.md'
 
 def server(item):
     return SERVER.get(item) or {'W': 'WM', 'Z': 'Zone'}.get(item[0], item)
 
-def evidence(cells):
+def evidence(cells, i=''):
     t = ' '.join(cells)
     ev = []
-    if '(captured)' in t or 'captured' in t.lower() and 'capture' in cells[1].lower(): ev.append('*(captured)*')
+    if i in ('P02-B1', 'P02-B2', 'P02-B3') or i in CAPTURED:     # P02-B4 is latent: read in the disassembly only
+        ev.append('*(captured)*' + (f" ([capture-validation {CAPTURED[i]}](../protocol/capture-validation.md))" if i in CAPTURED else ''))
+    elif '(captured)' in t or 'captured' in t.lower() and 'capture' in cells[1].lower(): ev.append('*(captured)*')
     beh = cells[1]; eff = cells[2] if len(cells) > 2 else ''
     if 'inferred' in beh: ev.append('*(inferred)*')
     elif 'inferred' in eff or 'inferred' in (cells[3] if len(cells) > 3 else ''): ev.append('code; effect *(inferred)*')
@@ -140,14 +153,14 @@ if sys.argv[1] in ('md', 'write'):
             r = own[0]
             if len(r['cells']) != 4:
                 bad.append((i, r['file'], r['line'], len(r['cells']))); continue
-            rel = r['file'].replace('docs/pseudocode/', '').replace('docs/knowledge/', '../knowledge/')
+            rel = r['file'].replace('docs/pseudocode/', '').replace('docs/knowledge/', '../knowledge/').replace('docs/protocol/', '../protocol/')
             link = f"[{r['file'].split('/')[-1].replace('.md','')} § {r['head'].split(' ')[0].rstrip('.') if re.match(r'[0-9]', r['head']) else 'bugs'}]({rel}#{anchor(r['head'])})"
             others = [x for x in rs if x is not r and x['file'] != r['file']]
             also = ('; also ' + ', '.join(sorted({x['file'].split('/')[-1] for x in others}))) if others else ''
             c = list(r['cells'])
             if i in SUPERSEDED:
                 c[1] = f"**Superseded** ({SUPERSEDED[i]}): " + c[1]
-            out.append(f"| {i} | {c[0]} ({link}{also}) | {c[1]} | {c[2]} | {c[3]} | {evidence(c)} | {item} |")
+            out.append(f"| {i} | {c[0]} ({link}{also}) | {c[1]} | {c[2]} | {c[3]} | {evidence(c, i)} | {item} |")
         out.append('')
     text = '\n'.join(out)
     if sys.argv[1] == 'md':
