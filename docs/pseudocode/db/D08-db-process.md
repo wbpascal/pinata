@@ -34,7 +34,7 @@ DataServer gServer   (Account DAT_0044b308, AccountLog DAT_004461a8, GameLog DAT
   +0x051c   CIOCP       m_IOCP_For_Socket     S02 §1.3
   +0x054c   CSession_Manager m_SocketSessionManager      §1.4 (contains the acceptor at +0x558)
   +0x9838   CSessionWorkerManager m_SessionWorkerManager §1.5 (2 MB job queue)
-  +0x209890 int m_bOnStopService              set to 1 by OnStart_Service, never cleared
+  +0x209890 int m_bOnStopService              0 from the ctor, set to 1 by OnStart_Service, never cleared after that
   +0x209894 / +0x2098a4  SYSTEMTIME m_ServerStartTime / m_ServerStopTime
   +0x2098b4 int m_bStopMainThread             the stop request; the main thread polls it every second
   +0x2098b8 int m_bActiveMainThread
@@ -69,8 +69,30 @@ DataServer::Start(this, cmdLine):                                             @ 
     return 0                                       # also when the dispatcher failed (not started by the SCM)
 ```
 
-Unlike GameLog (D05 §7.1, which loads ItemInfo here) the Account build loads no game table in `Start`; its ItemInfo copy
-is loaded by a static constructor (§2, part 2).
+Unlike GameLog (D05 §7.1, which loads ItemInfo here) the Account build loads no game table in `Start`. Its `itemdatabox`
+is built by a static constructor with path −1, which skips `ReadData`: Account reads no file (§2.1).
+
+The config file (row formats and getters: Z19 §5.3; tokenizer Z19 §2):
+
+```pseudo
+DataServer::ReadDefineScriptor(this) → 1 ok / 0 fail                                   @ FUN_00401360
+    if !CServerInfo::ReadServerInfo(&m_ServerInfo, "DataServerInfo_Account.txt"):      # FUN_0040f590
+        log "*FAILED SCRIPTOR READ* "; CToken::Close; return 0
+    log "<SUCCESSED SCRIPTOR READ> "; CToken::Close                                    # the parsed rows stay in m_ServerInfo
+    if !GetMyServerInfo(&m_MyServer):                  # MY_SERVER row: service name, display name, nServerID, nWorldNo, nZoneNo
+        log "*FAILED GetMyServerInfo*"; return 0
+    log "<I AM THE %s, %s, WorldNo=%d, ZoneNo=%d>" (GetShineServerIDName(nServerID), …)
+    if !GetServerInfo(&row, nServerID, nWorldNo, nZoneNo):      # this server's own SERVER_INFO row
+        log "FATAL ERROR - Can't found ServerInfo on funcition 'DataServer::ReadDefineScriptor()', need check scriptor data."
+        return 0
+    m_ConnectSocket_BindIP = strncpy(row.pIP, 16), byte 15 = 0                         # §1.1
+    return 1
+```
+
+Keys therefore read by every DB server: the `MY_SERVER` row (5 columns) and its own `SERVER_INFO` row (IP, port,
+backlog, max accept: the listener opened by `Start_Acceptor`, below); `ODBC_INFO` rows are read later by each worker's `DB_Init` (§1.5, D01 §1), the
+peers' `SERVER_INFO` rows by the connect code (Character: §4.3). AccountLog / Character / GameLog differ only in the
+file name (§3.2, §4.2, §7.2).
 
 `DataServer::ParseCmd` FUN_00401920 is the WM / Login `ParseCmd` (W05 §1.1, L01 §1.8) with other texts: up to 5 tokens of
 the command line; none and `queryServiceStatus` succeeds → code 0; none and the service is not installed → "UPLOAD";
@@ -729,13 +751,13 @@ parallel, which is harmless because the environment is freed only by the destruc
 | `ItemAttributeClass` + 38 `ItemAttrCls_*` (202 functions 00414de0–004172e0: 00414de0 00414df0 00414e00 00414e10 00414e20 00414e30 00414e40 00414e60 00414e70 00414e80 00414e90 00414ea0 00414eb0 00414ec0 00414ed0 00414ee0 00414ef0 00414f00 00414f10 00414f20 00414f30 00414f40 00414f50 00414f60 00414f70 00414f80 00414f90 00414fa0 00414fb0 00414fc0 00414fd0 00414fe0 00414ff0 00415000 00415010 00415020 00415030 00415040 00415050 00415060 00415070 00415080 00415090 004150a0 004150b0 004150c0 004150d0 004150e0 004150f0 00415100 00415110 00415120 00415130 00415140 004151e0 004151f0 00415200 00415210 00415220 00415230 00415240 00415250 00415260 00415270 00415280 00415290 004152a0 004152f0 00415320 00415410 00415460 00415480 004154a0 004154c0 004154e0 00415510 00415540 00415580 004155a0 004155d0 00415600 00415620 00415650 00415660 00415680 004156a0 004156d0 00415700 00415740 00415760 00415780 00415790 004157c0 004157f0 00415810 00415830 00415860 00415870 00415880 00415890 004158b0 004158c0 004158d0 004158e0 004158f0 00415900 00415910 00415920 00415930 004159b0 004159f0 00415a30 00415ad0 00415c00 00415ca0 00415d40 00415d90 00415db0 00415e30 00415e50 00415e70 00415ec0 00415f10 00415f90 00415fc0 00416000 00416010 00416030 00416050 004160d0 004160e0 00416110 004161b0 004161c0 004161d0 004161e0 00416200 00416230 00416250 00416270 004162b0 00416360 004163e0 00416400 00416420 00416460 00416490 004164a0 00416550 00416590 004165c0 004165d0 00416610 00416650 00416690 00416720 00416770 00416790 004167a0 00416850 00416860 004168b0 004168c0 004168d0 004168e0 00416900 00416930 00416940 00416950 004169d0 004169f0 00416a00 00416a40 00416a50 00416bf0 00416c00 00416c10 00416c20 00416c30 00416c50 00416c70 00416c90 00416cb0 00416cd0 00416ce0 00416d00 00416d20 00416d40 00416d60 00416d90 00417100 00417130 00417160 00417190 004171c0 004171f0 00417220 00417250 00417280 004172a0 004172c0 004172e0) | zone: Z04 §1 (classes), Z11 (`iac_itemcreate` "-…" options), Z18 knowledge (slots), Z13 / Z17 / Z28 (per class); Character copy D07 §1.3 | dead in Account (§2.1). 154 bodies identical to the zone's, 47 are one-liners the zone folds under other names; 3 differ: `ItemAttrCls_Riding::iac_itemcreate` FUN_00415ec0 and `ItemAttrCls_CostumWeapon::iac_itemcreate` FUN_00415f90 call a folded "return 0" (FUN_004036d0, named `TiXmlNode::ToElement`) where the zone calls `RidingInitHP` / `WeaponCostumInitCharge`, and `RidingInitHungry` FUN_004017c0 returns the constant 100 (zone: from `MoverHG` / `Riding.shn`, Z24 §5): the DB builds stub the helpers that need zone tables |
 | `ItemAttributeClassContainer` 00416dc0 00417070 | Z04 §1; D07 §1.3 | never read in Account |
 | `ItemDataBox`, `<unnamed-type-idb_BinData>`, `BinaryDataBox<ItemInfo / ItemInfoServer / GradeItemOption / ItemDropLog / ItemSort / ItemInvenDel / ItemMoney>` 00411850 00411860 00411870 00411880 00411890 004118a0 004118b0 004118e0 00411910 00411940 00411970 004119a0 004119d0 00411a00 00411ba0 00411c70 00411e80 00411f30 | Z27 §1.1, Z24 §7.3 (`ReadData`, ctor) | built empty, nothing read (§2.1) |
-| `MapDataBox`, `BinaryDataBox<MapInfo>` 0040f8c0 0040f970 0040fc10 0040fc20 0040fc50 0040fce0 0040fd60 | §2.2 | Character only |
+| `MapDataBox`, `BinaryDataBox<MapInfo>` 0040f8c0 0040f970 0040fc10 0040fc20 0040fc50 0040fce0 0040fd60 (ctor unwind funclet 00431160) | §2.2 | Character only |
 | `BinaryData` 00414030 00414050 00414060; `BTree` 00413f10 00413f30 00413f60 00413ff0 | W05 §6.2, Z27 §1.1; Z09 §28.11 | |
 | `CItemAuthorityBase`, `ItemBelongAttribute` 00411830 00411f00 0042efb0 0042f160 0042f170 | §2.3; zone Z30 §9 (`IA_IsWork*Belonged`), Z04 §1.3 | `IA_GetBelongTypeInfo` FUN_00411830: index > 10 → null, else `iba_Array[i]` (never filled in Account) |
 | `CharacterInventoryManager` 00414d90 00414da0 00414db0 00414dc0 00414dd0 | §2.1 | unused |
 | `ItemOptionsData`, `OptionCardStack`, `BinaryDataBox<ItemOptions>`, `EnchantSocketRateData` 00417d90 00417da0 00417db0 00417e80 00417e90 00417ed0 00417f80 00418170 | §2.4 | identical to WM / zone |
 | `BinaryDataBox<ShineReward / FriendPointReward>` 00417ea0 00418200 | §2.1 | never loaded |
-| `CardDeck::CardStack`, `ListEraser / ListIteratorDefault<CardDeck::Card>` 00417f70 00418140 00418160 00418a80 00418af0 00418d40 (and the `List<CardDeck::Card>` methods of §1.6) | Z09 §28.10, Z05 §8.5, W05 | |
+| `CardDeck::CardStack`, `ListEraser / ListIteratorDefault<CardDeck::Card>` 00417f70 00418140 00418160 00418a80 00418af0 00418d40; `List<CardDeck::Card>` `l_4AllInList` 00417f00, `~List` 00418460, `l_Enlargement` 00418480, `l_AllocA` / `l_AllocZ` 00418640 / 00418740, `l_Free` 00418840, `l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` 00418930 00418960 00418990 004189e0, `ListArray` dtor 00418a30, deleting dtor 00418a40, `l_MakeList` 00418b40, `l_SetListArray` 00418cc0 (all but `l_Enlargement` and `cs_InsertBottom` have a body identical to the WM copy, `D08-match.py account wm`) | Z09 §28.10, Z05 §8.5, W05 | |
 | `RandomBox`, `RandomSlot`, `cWell512Random` 00417c30 00417c70 00417ca0 00417d50 00418230 00418250 004182e0 | §2.4; Z23 / Z09 knowledge, W05 §6.4 | the ctor runs at start-up |
 | `CDataReader` 0042ebd0 0042ec00 0042ec40 0042ec70 0042ecb0 0042ed10 0042ef70 | W05 §3.1 (identical bodies) | reached only via §2.2 |
 | `CShnDataFileCheckSum` 0042f1f0 0042f210 0042f3c0 | W05 §3.4 (identical) | 49 names; in Character only `MapInfo.shn` (entry 9) gets an MD5, nothing reads it |
@@ -759,7 +781,7 @@ Non-STL build (`TiXmlString`), visitor interface (`Accept`) and `TiXmlAttributeS
 
 | Group (Account functions) | Reached how |
 |---|---|
-| parse path: `TiXmlComment::Parse` 00409850, `TiXmlDeclaration::Parse` 0040ac10, `TiXmlAttribute::Parse` 0040a8b0, `TiXmlElement::ReadValue` 00409dd0, `TiXmlBase::ReadName` 00409590 / `GetEntity` 00409960 / `GetChar` 00409fe0 / `ReadText` 0040a060 / `IsWhiteSpace` 004091a0 / `ConvertUTF32ToUTF8` 004091d0, `TiXmlAttributeSet::Add` 00407be0 / `Find` 00407c00 / `FindOrCreate` 00408800, `TiXmlNode::GetDocument` 004079a0, `TiXmlString` ctor / dtor / `operator=` 00408890 00403680 00407840 | from `TiXmlDocument::Parse` through the `TiXmlNode::Parse` vtable slot (the node type comes from `TiXmlNode::Identify`, D01) |
+| parse path: `TiXmlComment::Parse` 00409850, `TiXmlDeclaration::Parse` 0040ac10, `TiXmlText::Parse` 0040aa40, `TiXmlAttribute::Parse` 0040a8b0, `TiXmlElement::ReadValue` 00409dd0, `TiXmlBase::ReadName` 00409590 / `GetEntity` 00409960 / `GetChar` 00409fe0 / `ReadText` 0040a060 / `IsWhiteSpace` 004091a0 / `ConvertUTF32ToUTF8` 004091d0, `TiXmlAttributeSet::Add` 00407be0 / `Find` 00407c00 / `FindOrCreate` 00408800, `TiXmlNode::GetDocument` 004079a0, `TiXmlString` ctor / dtor / `operator=` 00408890 00403680 00407840 | from `TiXmlDocument::Parse` through the `TiXmlNode::Parse` vtable slot (the node type comes from `TiXmlNode::Identify`, D01) |
 | destructors: `TiXmlBase::~TiXmlBase` 00407870, `TiXmlAttribute::~TiXmlAttribute` 00408790, `TiXmlDeclaration::~TiXmlDeclaration` 00408b00, scalar deleting destructors of `TiXmlDocument` / `TiXmlBase` / `TiXmlAttribute` / `TiXmlComment` / `TiXmlDeclaration` / `TiXmlUnknown` / `TiXmlNode` 004036e0 00407880 00408930 004089c0 00408ba0 00408be0 00408c10 | when the parsed document is destroyed (end of the JP check) |
 | output / copy / visitor (vtable slots no server code calls): `Accept` of `TiXmlDocument` / `TiXmlComment` / `TiXmlText` / `TiXmlDeclaration` / `TiXmlUnknown` 00407a90 00407b20 00407b40 00407b60 00407bc0, `Print` of `TiXmlUnknown` / `TiXmlAttribute` (2) / `TiXmlText` / `TiXmlDeclaration` (2) 00407b80 00408320 00408910 004084c0 004085a0 004085c0, `TiXmlBase::EncodeString` 00407c80, `CopyTo` of `TiXmlDocument` / `TiXmlDeclaration` / `TiXmlElement` 004081f0 00408710 00408da0, `Clone` of `TiXmlDocument` / `TiXmlComment` / `TiXmlText` / `TiXmlDeclaration` 00408290 00408f00 00408fa0 00409060, `TiXmlDocument::ToDocument` 00408bd0 | dead in the Account server (no `Print`, `Clone` or visitor use) |
 
@@ -1023,8 +1045,16 @@ section (addresses are AccountLog's; the Account addresses: `D08-match.py accoun
 | `type_info`: 00416986 00416996 004169b7 0041f94d | §2.6 (CRT RTTI) | 4 |
 | `CParser::CParser`, `CPFs::fc_dummyfunction`: 00404010 00404b70 | D01 §2 (Account FUN_00405290 / FUN_00404750) | 2 |
 | `CParser::Parser`: 00404ca0 | §3.4 | 1 |
+| added by the review (cited before only through same-address cells of §1.6): `ItemAttrCls_Armor::iac_GetDeteleDateTime` 00410a10, `ItemAttrCls_ItemChest::iac_Getitemchest` 00410af0, `ItemAttrCls_Enchant::iac_ItemClass` 00410bf0, `ItemAttrCls_Armor::iac_GetRandomOptionChangeCount` 00410de0, `ItemAttrCls_Amulet::iac_GetItemOptionUpgrade` 00410e00, `iac_fill2buffer` of `ItemAttrCls_ItemChest` / `ItemAttrCls_CardCollect_Close` 00411060 / 00411140, `iac_fill2struct` of `ItemAttrCls_Decoration` / `ItemAttrCls_Pet` 00411220 / 00411390, `iac_GetAttrSize` of `ItemAttrCls_Capsule` / `ItemAttrCls_WordLot` 00411440 / 00411470 (each an identical-code fold of two Account functions), `ItemAttrCls_Weapon::iac_wptitle_Setlicense` 00412300, `ItemAttrCls_Weapon::iac_fill2buffer` 00412cf0 | §2.6 row 1 (Account 00414ec0 004150c0 00415090 00415280 004152a0 00415510 004155d0 00415680 00415830 00414f50 / 004158e0 00414e30 / 00415910 004167a0 00417190) | 13 |
+| added by the review: `Database::CommitTran` 00412f30, `Database::~Database` 004130d0 | §2.5 (Account 004173d0 / 00417570) | 2 |
+| added by the review: `ItemOptionsData::OptionCardStack::ocs_make` 00413b10, `RandomBox::RandomBox` 00413e40 | §2.4 (Account 00417f80 / 004182e0) | 2 |
+| added by the review: `List<CardDeck::Card>` `l_PushA` / `l_PushZ` / `l_PopA` / `l_PopZ` 00414490 004144c0 004144f0 00414540, deleting dtor 004145a0, `l_MakeList` 004146a0 | §2.6 row 10 (Account 00418930 00418960 00418990 004189e0 00418a40 00418b40) | 6 |
+| added by the review: `std::locale::facet::_Decref` 0040b010, `std::allocator<char>::allocate` 004065e0 | MSVC STL (Account 0040ef40, §4.6) | 2 |
 
 ### 3.7 D01 open point: TEENAGER `nType` 1 (confidence.md §4.6 row 4)
+
+An Account handler, answered here because part 3 took the D01 open point (the section number is kept for the
+references to it).
 
 `CPFsAccount::fc_NC_USER_TEENAGER_REQ` FUN_00402610, x87 code at 0x402972–0x4029e9 (objdump):
 
@@ -1043,7 +1073,7 @@ So `nType 1` carries **the whole minutes left until 4 h 59 min have passed since
 teen's play time will be reset to 180 minutes; D01's guess is right. The 17940 s window is measured from the stored
 logoff time (`dUserLogoff`, written by 0x0C28 with the current time and the remaining minutes). Login refuses nType 1
 with 0x4E and does not use `nMinute` (login-server.md §5.1). A logoff time in the future (clock change) gives a negative
-`elapsed` and a `nMinute` above 299.
+`elapsed` and a `nMinute` above 299: no check bounds it (original bug) D08-B12.
 
 ## 4. Character: differences against the Account build
 
@@ -1581,8 +1611,8 @@ QuestList_Repeat(charNo, out cmd)  → 0x10D5                                   
 - The repeat copy moves 8 dwords from `sData` into `Data` (0x1d bytes). The 3 extra bytes land on the next record's `ID` /
   `Status`, which the next row overwrites before its own copy. After the last record they land past the length that is
   sent. No effect on the wire (original bug) D08-B10.
-- No loop checks the row count against its buffer: doing list u8 count and 0x2000-byte packet, read and repeat lists the
-  same packet, done list 3 000 records. 2016 data stays well inside these limits: at most 40 quests in progress
+- No loop checks the row count against its buffer (original bug) D08-B11: doing list u8 count and 0x2000-byte packet,
+  read and repeat lists the same packet, done list 3 000 records. 2016 data stays well inside these limits: at most 40 quests in progress
   (Z15, error 0xC0F), 2 306 quests in QuestData, 157 of them repeatable (Z15 §1.2). The largest case is the repeat list,
   8 + 157 · 32 = 5 032 bytes *(inferred: the DB holds no status-4 row for a quest that is not repeatable)*.
 
@@ -1631,9 +1661,11 @@ Send_NC_CHAR_ITEM_CMD(handle, body, len, charNo) → 0 / 1 / 2                  
   skin, bit 5 → action box. So storage 8 = equipment, 9 = inventory, 12 = mini-house skin box, 15 = action box, which
   matches the zone's own save (Z13 §2.8, `so_SaveItem_Part`: marks 5 / 8 / 0x12 / 0x22). The Character server sends
   0x10 for box 12 where the zone sends 0x12. The WM ignores bits 0 and 1, so the difference has no effect.
-- An inventory needs more than three parts (orders ≥ 3, which the WM drops) only above about 3 × 0x1C10 bytes, about
-  150 bytes per item for 144 items. That is more than any item record *(inferred: not checked against the largest
-  attribute class)*.
+- An inventory never needs a fourth part (orders ≥ 3, which the WM drops). The 2016 Zone PDB gives
+  `SHINE_ITEM_ATTRIBUTE` 0x65 bytes (the union of all attribute classes) and `SHINE_ITEM_STRUCT` 0x67 *(pdb2016)*, so the
+  largest record is 1 + 2 + 8 + 0x67 = 114 bytes. A part is closed only when the next record does not fit, so each
+  part carries at least 0x1C13 − 3 − 114 = 7 078 record bytes. 144 items need at most 144 × 114 = 16 416 bytes, less
+  than 3 × 7 078 = 21 234. Three parts are always enough (finding of the review).
 - `PROTO_NC_CHAR_ITEM_CMD` *(pdb2016)*: `PacketOrder { nPacketOrderNum:7, nIsLastOfInven:1 }`, `u8 nPartMark`,
   `PROTO_ITEM_CMD ItemCmd`. The annotation is in `annotations/P02.json` (0x1017) and matches.
 
@@ -1751,7 +1783,7 @@ Account code (§2.6), apart from two classes compiled with older layouts:
 
 | Function (GameLog) | Account | Difference |
 |---|---|---|
-| `ItemAttrCls_Weapon` vtable slots 1 `iac_fill2buffer` FUN_00416710, 3 `iac_GetAttrSize` FUN_00416820, 11 `iac_DropItemMake` FUN_00415c10, 13 `iac_GetDeteleDateTime` FUN_00414410, 28 `iac_GetItemOptionStruct` FUN_00414790, 29 / 30 `iac_Get/SetRandomOptionChangeCount` FUN_004147e0 / FUN_004147f0 | FUN_00417190 FUN_004172a0 FUN_00416690 FUN_00414e90 FUN_00415210 FUN_00415260 FUN_00415270 | every member from `gemSockets` (attribute +0x30) on sits 3 bytes later. `iac_DropItemMake` writes the three sockets as 4-byte `{0xffff, 0}` entries (Account: 3 bytes, `{u16 gemID = 0xffff, u8 0}`). That puts `maxSocketCount` / `createdSocketCount` at attribute +0x3c / +0x3d (Account +0x39 / +0x3a), `deletetime` at +0x3e, `randomOptionChangedCount` at +0x42 and `option` at +0x43. `iac_fill2buffer` copies 0x5c bytes, `iac_GetAttrSize` = 0x44 + 3 × options (Account: 0x59 / 0x41 + 3n). The 2016 Account and Zone PDBs and the 2017 client have `ShineItemAttr_Weapon` = 0x59. *(inferred: built from an older header)* |
+| `ItemAttrCls_Weapon` vtable slots 1 `iac_fill2buffer` FUN_00416710, 3 `iac_GetAttrSize` FUN_00416820, 11 `iac_DropItemMake` FUN_00415c10, 13 `iac_GetDeteleDateTime` FUN_00414410, 28 `iac_GetItemOptionStruct` FUN_00414790, 29 / 30 `iac_Get/SetRandomOptionChangeCount` FUN_004147e0 / FUN_004147f0; slot 4 `iac_itemcreate(ShineReward*)` FUN_00415830 and slot 5 `iac_itemcreate(char* cmd)` FUN_004150a0 (added by the review) | FUN_00417190 FUN_004172a0 FUN_00416690 FUN_00414e90 FUN_00415210 FUN_00415260 FUN_00415270; FUN_004162b0 / FUN_00415ad0 | every member from `gemSockets` (attribute +0x30) on sits 3 bytes later. `iac_DropItemMake` writes the three sockets as 4-byte `{0xffff, 0}` entries (Account: 3 bytes, `{u16 gemID = 0xffff, u8 0}`). That puts `maxSocketCount` / `createdSocketCount` at attribute +0x3c / +0x3d (Account +0x39 / +0x3a), `deletetime` at +0x3e, `randomOptionChangedCount` at +0x42 and `option` at +0x43. `iac_fill2buffer` copies 0x5c bytes, `iac_GetAttrSize` = 0x44 + 3 × options (Account: 0x59 / 0x41 + 3n). The two `iac_itemcreate` overloads write the same fields 3 bytes later (option list at +0x4d instead of +0x4a, `maxSocketCount` +0x46 instead of +0x43) and the GM-command one (`-o` reset) fills the three sockets with 4-byte `0x00ffffff` words at +0x3a / +0x3e / +0x42 (Account: `u16 0xffff, u8 0xff` pairs at +0x3a…+0x3f). The 2016 Account and Zone PDBs and the 2017 client have `ShineItemAttr_Weapon` = 0x59. *(inferred: built from an older header)* |
 | `CharacterInventoryManager::cim_quest` / `cim_minihouse` FUN_00414330 / FUN_00414340 | FUN_00414dc0 / FUN_00414dd0 | return inventory +0x4f98 / +0x51e0 (Account +0x6558 / +0x67a0). These are the offsets of "definition 1 of 2" of `CharacterInventory` in the Account PDB itself *(pdb2016)*: `ItemInventory` with `ItemInventoryCell[144]` (0x4144 bytes; cell 0x74) instead of definition 2's `[192]` (0x5704), which the Account code uses. The Account PDB therefore still has translation units built with the 144-slot header |
 
 The ItemInfo row layout is the same: `ItemDataBox::ReadData` FUN_00410a40 is identical to Account's. Neither difference
@@ -1783,11 +1815,12 @@ body unless noted), so they are documented where the Account copy is:
 | `DBRecord` 00413f20 00413f40 00414010; `Database` 00417b70 00417bc0 | §2.5, §7.3 |
 | `BTree` 00414190 004141b0 00414270; `BinaryData` 004142b0 004142d0 004142e0 | §2.6 (W05 §6.2, Z27 §1.1) |
 | `CharacterInventoryManager` 00414310 00414320 (and 00414330 00414340, §7.4) | §2.6 |
-| `ItemAttributeClass` + `ItemAttrCls_*` (121 functions; the seven `ItemAttrCls_Weapon` variants are in §7.4): 00414360 00414380 004143b0 004143c0 004143e0 00414430 00414440 00414450 00414460 00414480 004144a0 004144b0 004144c0 004144e0 004144f0 00414500 00414510 00414520 00414530 00414540 00414550 00414570 00414580 004145a0 004145b0 004145c0 004145d0 004145f0 00414600 00414610 00414620 00414630 00414640 00414660 00414670 00414690 004146b0 004146c0 004146d0 00414770 00414780 004147a0 004147b0 004147c0 004147d0 00414800 00414810 00414830 00414880 004148b0 004149a0 004149f0 00414a10 00414a50 00414a80 00414ab0 00414b10 00414b40 00414b70 00414b90 00414bb0 00414bf0 00414c10 00414c30 00414c50 00414c80 00414cb0 00414cf0 00414d10 00414d30 00414d40 00414d70 004151d0 00415310 00415380 00415400 00415420 00415470 00415570 00415590 004155b0 00415690 00415730 00415750 00415770 004157b0 004157d0 00415960 00415980 004159a0 004159e0 00415a20 00415b10 00415b50 00415b90 00415bd0 00415c90 00415d10 00415dd0 00415eb0 00415ed0 00415f60 00415f80 00416170 00416180 004161a0 00416220 00416240 00416280 004162a0 004162c0 004162e0 00416310 00416340 00416680 004166b0 004166e0 00416740 004167d0 00416800 00416840 | §2.6 (Z04 §1, Z18, Z30 §9) |
+| `ItemAttributeClass` + `ItemAttrCls_*` (121 functions; the nine `ItemAttrCls_Weapon` variants are in §7.4): 00414360 00414380 004143b0 004143c0 004143e0 00414430 00414440 00414450 00414460 00414480 004144a0 004144b0 004144c0 004144e0 004144f0 00414500 00414510 00414520 00414530 00414540 00414550 00414570 00414580 004145a0 004145b0 004145c0 004145d0 004145f0 00414600 00414610 00414620 00414630 00414640 00414660 00414670 00414690 004146b0 004146c0 004146d0 00414770 00414780 004147a0 004147b0 004147c0 004147d0 00414800 00414810 00414830 00414880 004148b0 004149a0 004149f0 00414a10 00414a50 00414a80 00414ab0 00414b10 00414b40 00414b70 00414b90 00414bb0 00414bf0 00414c10 00414c30 00414c50 00414c80 00414cb0 00414cf0 00414d10 00414d30 00414d40 00414d70 004151d0 00415310 00415380 00415400 00415420 00415470 00415570 00415590 004155b0 00415690 00415730 00415750 00415770 004157b0 004157d0 00415960 00415980 004159a0 004159e0 00415a20 00415b10 00415b50 00415b90 00415bd0 00415c90 00415d10 00415dd0 00415eb0 00415ed0 00415f60 00415f80 00416170 00416180 004161a0 00416220 00416240 00416280 004162a0 004162c0 004162e0 00416310 00416340 00416680 004166b0 004166e0 00416740 004167d0 00416800 00416840 | §2.6 (Z04 §1, Z18, Z30 §9) |
 | `ItemAttributeClassContainer::ItemAttributeClassContainer` 00416340 | §2.6 (Z04 §1; D07 §1.3) |
 | `cWell512Random` 00417de0 00417e10 00417ec0 (the last two differ from Account only in `_DAT_` constants); `ItemOptionsData::OptionCardStack::ocs_selectnumber` 00417f20; `EnchantSocketRateData::GetSocketRateData` 00417ff0; `RandomSlot::rs_Init` 004183d0; `RandomBox::RandomBox` 00418460 | §2.4 |
 | `List<CardDeck::Card>` 00418070 004185e0 00418600 004188c0 004189c0 00418ab0 00418ae0 00418b10 00418bc0 00418cc0; `ListEraser<CardDeck::Card>` 004182b0 004182d0; `ListArray<CardDeck::Card>` dtor 00418bb0; `CardDeck::CardStack` 00418c00 00418c70 | §2.6 (Z09 §28.10, Z05 §8.5) |
 | `MiniDumper` helpers `FillInStackFrame` 00416970 (only `_DAT_` operands differ), `EHCleanupSymbolEngine` 00416ca0 | W05 §6.3 |
+| added by the review (counted as cited before only because Account / AccountLog functions at the same address are listed in §2–§3): `RidingInitHungry` 00401870 (§2.7, returns 0); `cLogSystem::cLogSystem` 0040efd0 (§3.5); `ItemDataBox::~ItemDataBox` / `ItemDataBox::ItemDataBox` 00410c50 / 00410d40 (§2.1); `MapDataBox::mdb_Load` 004101d0 (§2.2; only `_DAT_` operands differ; its caller `CheckReadData` FUN_004105c0 runs only for `nServerID == 2`, so never in GameLog, §7.2); `BinaryDataBox<GradeItemOption>` deleting dtor 004106e0; `ItemAttrCls_KQStep::iac_ItemClass` 00414590, `ItemAttrCls_CardCollect_Close::iac_ItemClass` 00414650, `ItemAttrCls_CardCollect::iac_fill2struct` 00414da0, `iac_itemcreate` of `ItemAttrCls_ByteLot` / `WordLot` / `DwrdLot` / `Amulet` (both overloads) / `CardCollect` / `Pet` / `Armor` 00414f40 00414f80 00414fc0 00415000 004157f0 004155d0 00415660 004158e0, `ItemAttributeClass::iac_itemcreate` 00416860, `ItemAttrCls_CostumWeapon::iac_SetChargedNumber` 00415740, `ItemAttrCls_Weapon::iac_wptitle_Gettitle` / `iac_wptitle_Settitle` 00415e30 / 00415e50, `ItemAttributeClass::iac_wptitle_Getlicencemob` 00415ec0, `ItemAttrCls_Furniture::iac_SetEndureEndTime` 00415fc0, `ItemAttrCls_Riding::iac_SetIsPutOnBelonged` / `iac_SetHP` / `iac_SetGrade` 004161e0 00416200 00416250, `ItemAttrCls_Amulet::iac_fill2struct` 00416770; one-line `iac_ItemClass` / `iac_GetAttrSize` folds (each stands for two or three Account functions) 00414df0 00414e00 00414e10 00414e20 00414e30 00414e40 00414e60 00414e70 00414e80 00414e90 00414ea0 00414eb0, and the `g_CardCollectMake` / `iac_DropItemMake` / `iac_GetDuringRide` fold 00415650 00416270; `CH_ReadProcessMemory` 004169f0, `EHInitSymbolEngine` 00416c70 (W05 §6.3); `cWell512Random::cWell512Random` 00417da0, `ItemOptionsData` deleting dtor 004182e0 (§2.4); unwind funclets 00431c20 00431c50 00431df0 00431ef0 (`operator delete`, the `CSendPacket` dtor, the `PROTOCOLFUNCTIONTEMPLETE<CPFs>` dtor) | §2.1–§2.7, §3.5 (the Account copies; identical bodies with `_DAT_` masked) |
 | identical-code folds that stand for several Account functions (one-line getters, `return 0`, `g_CardCollectMake`, `ListIteratorDefault::lid_Call`), so they get no name: 00409630 00414350 00414370 00414390 004143d0 004143f0 00414400 00414420 00414470 00414490 004144d0 00414560 004146a0 00414820 00415b40 00415ce0 00415d00 00415dc0 00415e20 00415e40 00415ea0 004180e0 | §2.6 (the Account functions they fold) |
 
 ### 7.6 Runtime boundary
@@ -1823,7 +1856,10 @@ behaviour, and are treated as S02's coverage boundary treats the CRT ("standard 
 | D08-B8 | Character FUN_0043f7f0 (§5.3) | never calls `soap_destroy` / `soap_end` after a call; `soap_begin` FUN_00483100 frees only the temporary lists (`soap_free_temp` FUN_00482f60), not `alist` | every answer's `soap_malloc` blocks (the URL text from `soap_string_in`, fault strings) stay on the proxy until the process ends: the Character server's memory grows with every item-shop request *(effect inferred from the gSOAP 2.8 allocation path, size per call = the answer's strings)* | `soap_destroy(p); soap_end(p)` after each call |
 | D08-B9 | Character 0x0812–0x0815 `fc_NC_MISC_PINGTEST_*` FUN_004167e0 / FUN_004168a0 / FUN_00416960 / FUN_00416a20 (§6.3) | stamps `DBSendToODBC` and `DBRecvFromODBC` with two back-to-back `timeGetTime()` calls and no ODBC call between; never writes `DBRecvFromZone` / `DBSendToZone` (`DBRecvFromWM` / `DBSendToWM`) | the ping tool reports a DB time of ~0 and stale or zero values for the DB server's receive / send slots | run a test query between the ODBC stamps and stamp the receive / send slots on arrival and before the send |
 | D08-B10 | Character `QuestList_Repeat` FUN_0046ced0 (§6.1) | copies 32 bytes of `sData` into the 29-byte `PLAYER_QUEST_DATA` of each 0x10D5 record | 3 bytes spill into the next record (overwritten by the next row) or past the sent length; nothing visible on the wire | copy `sizeof(PLAYER_QUEST_DATA)` (0x1d) as the doing list does |
-Next free ID: D08-B11.
+| D08-B11 | Character quest lists `QuestList_Doing` FUN_0046cb00, `QuestList_Read` FUN_0046ce50, `QuestList_Repeat` FUN_0046ced0, done list `SendQuestDone` FUN_004288d0 (§6.1) | append every row the procedure returns without comparing the count with the buffer (u8 doing count, the 0x2000-byte packet, the 3 000-record done buffer) | a character with more rows than fit wraps the u8 count or writes past the packet / buffer; 2016 data stays well inside (at most 5 032 bytes, §6.1) | stop at the buffer's capacity (or split the packet) |
+| D08-B12 | Account `CPFsAccount::fc_NC_USER_TEENAGER_REQ` FUN_00402610 (§3.7) | for `nType` 1, `nMinute = (17940 − elapsed) / 60` with `elapsed` taken from the stored logoff time, never clamped | a logoff time in the future (server clock set back) gives a negative `elapsed` and `nMinute` > 299; Login only refuses nType 1 with 0x4E and does not show `nMinute` (login-server.md §5.1), so nothing visible in 2016 | clamp `elapsed` to ≥ 0 (or `nMinute` to 299) |
+
+Next free ID: D08-B13.
 
 ## Not reconstructed / uncertain
 
@@ -1840,8 +1876,7 @@ Next free ID: D08-B11.
   whether the host still existed in 2016 is unknown. The gSOAP function names (§5.7) are matched to the public 2.8
   sources by structure, call order and strings, not by a symbol file; the ~300 generated / runtime functions listed
   without a name are library code that was not read one by one.
-- §6.2: whether a full inventory can need a fourth 0x1017 part (dropped by the WM) depends on the largest item
-  record; the attribute-class sizes were not tabulated (container FUN_0044d380, D03 §1.4). §6.1: the claim that no
+- §6.1: the claim that no
   status-4 row exists for a non-repeatable quest is inferred from the zone's quest code, not checked in a DB.
 - §7.4 (GameLog): that the weapon attribute layout (4-byte socket records, perhaps a `u16 restCount`) comes from the
   2015 sources is inferred from the link dates. No PDB has that layout (the inventory one is the Account PDB's
@@ -1859,7 +1894,9 @@ Next free ID: D08-B11.
 
 After the sweep `X02-cov.py rest` reports 0 uncited functions for Account (850), AccountLog (780), Character (3 216)
 and GameLog (1 408) (before D08: 389 / 382 class-named Account / AccountLog functions, 2 171 / 990 Character /
-GameLog functions uncited, `confidence.md` §4.4). What this document found and leaves to others:
+GameLog functions uncited, `confidence.md` §4.4). The review found 13 Account, 25 AccountLog and 49 GameLog functions
+that the tools counted only because a function of another build at the same address is listed here (bare-address rule);
+they are now in §2.6, §2.7, §3.6, §7.4 and §7.5 under their own build. What this document found and leaves to others:
 
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
