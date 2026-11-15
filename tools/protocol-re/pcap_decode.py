@@ -293,10 +293,13 @@ def load_docs():
             known[srv][d].add(op)
     # server links (plaintext): one table for both directions; the annotations carry free-form dirs ("WM→CharDB",
     # "Z→WM", ...), the first one per opcode wins (same rule as make_dissector.py)
-    link_ann = {}
+    # P02 batch 2: one opcode can have several link layouts (0x10D2 CharDB→Zone free-stat ack vs CharDB→WM single-option
+    # block); decode_packet tries them all in this order (link_alts) and keeps the first that fits the payload
+    link_ann, link_alts = {}, {}
     for (srv, op, d), v in sorted(packets.items(), key=lambda x: (x[0][0], x[0][1], str(x[0][2]))):
         if d not in (C2S, S2C):
             link_ann.setdefault(op, v)
+            link_alts.setdefault(op, []).append(v)
     known["link"][C2S] = known["link"][S2C] = set(names) | set(link_ann)
     # PDB layouts, fallback below hand annotations and above layouts.json: the 2016 server PDBs (work item S01, same
     # build, "pdb2016") first, then the 2017 client PDB (work item C02, "pdb2017"). A pdb2016 struct that is only a
@@ -314,7 +317,7 @@ def load_docs():
     errs = {int(k, 16): v.get("text") or v.get("literal") for k, v in
             json.load(open(os.path.join(DOCS, "client-error-codes.json"))).items()}
     return dict(structs=structs, packets=packets, names=names, known=known, layouts=layouts, errors=errs, pdb=pdb,
-                link_ann=link_ann)
+                link_ann=link_ann, link_alts=link_alts)
 
 
 def default_ports():
@@ -380,6 +383,7 @@ def decode_ann(payload, fields, structs, docs):
     fields, k = list(fields), 0
     while k < len(fields):
         off, typ, name, _ = fields[k][:4]
+        typ = re.sub(r"\s*\([^)]*\)", "", typ)                 # "tm (9×i32)[28]" -> "tm[28]" (comment in the type)
         k += 1
         if not variable:
             pos = off
@@ -514,6 +518,11 @@ def decode_packet(kind, d, op, payload, docs):
             issues.append(f"length check violated: handler requires body length {int(m.group(1), 0)}, got {len(payload) + 2}")
     if ann is not None:
         fields, cov, end, prob = decode_ann(payload, ann["fields"], docs["structs"], docs)
+        for alt in docs.get("link_alts", {}).get(op, [])[1:] if kind == "link" and (prob or end != len(payload)) else []:
+            r = decode_ann(payload, alt["fields"], docs["structs"], docs)
+            if not r[3] and r[2] == len(payload):
+                (fields, cov, end, prob), name = r, alt.get("name") or name
+                break
         if prob:
             issues.append(prob)
         elif end != len(payload):

@@ -60,6 +60,22 @@ Basis: 2016 Zone.pdb (pdb2016) struct USEITEM_MINIMON_INFO, size 0x32; reference
 | 2 | u16[12] | NormalItemList | item ids, 0xFFFF = empty |
 | 26 | u16[12] | ChargedItemList | item ids, 0xFFFF = empty |
 
+### tm (36 bytes)
+
+Basis: MSVC struct tm (9 × i32), used by W04 / D02 0x10EB / 0x10EC (P02 batch 2: the decoder could not parse 'tm (9×i32)')
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | tm_sec |  |
+| 4 | i32 | tm_min |  |
+| 8 | i32 | tm_hour |  |
+| 12 | i32 | tm_mday |  |
+| 16 | i32 | tm_mon |  |
+| 20 | i32 | tm_year |  |
+| 24 | i32 | tm_wday |  |
+| 28 | i32 | tm_yday |  |
+| 32 | i32 | tm_isdst |  |
+
 ## Client → server
 
 ### `0x080d` NC_MISC_GAMETIME_REQ
@@ -8438,6 +8454,93 @@ stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
 | 2 | u8 | numofavatar | 0xFF = DB error (pdb2017 name) |
 | 3 | AVATAR[numofavatar] | avatar | 0x82 bytes each = PROTO_AVATARINFORMATION, W01 §6.1 (pdb2017 name) |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `netpacketheader.clienthandle`: echo; `numofavatar`: 2 (Test1235 slot 0, Test2 slot 1); `avatar`: dKQDate bits 30–31 differ between lists while bits 0–29 match the 0x101A date: uninitialised (P02-B7); delinfo +0x28..+0x2B again pointer-like (P02-B1)
+
+### `0x1008` NC_CHAR_SHAPE_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; p_Char_GetShape @ FUN_0046c5d0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u8 | shape.race|chrclass|gender | bits race:2@0, chrclass:5@2, gender:1@7 (PROTO_AVATAR_SHAPE_INFO, pdb2016); evidence: capture:shop, capture:combat: 0x19 = race 1, class 6, gender 0 |
+| 3 | u8 | shape.hairtype | evidence: capture:shop, capture:combat: 2 |
+| 4 | u8 | shape.haircolor | evidence: capture:shop, capture:combat: 1 |
+| 5 | u8 | shape.faceshape | evidence: capture:shop, capture:combat: 4 (= the 0x0C13 AVATAR shape of Test2) |
+
+P02 batch 2 (§7.4): no PROTO_NC_CHAR_SHAPE_CMD in either PDB; body = PROTO_AVATAR_SHAPE_INFO
+
+### `0x100a` NC_CHAR_QUEST_DOING_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046cb00 (bNeedClear always 1))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u8 | bNeedClear | evidence: capture:shop, capture:combat |
+| 7 | u8 | nNumOfDoingQuest | evidence: capture:shop, capture:combat |
+| 8 | PLAYER_QUEST_INFO[nNumOfDoingQuest] | QuestDoingArray | variable length, element PLAYER_QUEST_INFO; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_QUEST_DOING_CMD at +2; without the handle the decoder misread every field
+
+### `0x100b` NC_CHAR_QUEST_DONE_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; SendQuestDone @ FUN_004288d0 (size 0x12 + 10n: 4 bytes past the array, P02-B8))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | nTotalDoneQuest | evidence: capture:shop, capture:combat |
+| 8 | u16 | nTotalDoneQuestSize | evidence: capture:shop, capture:combat |
+| 10 | u16 | nDoneQuestCount | evidence: capture:shop, capture:combat |
+| 12 | u16 | nIndex | evidence: capture:shop, capture:combat |
+| 14 | PLAYER_QUEST_DONE_INFO[nDoneQuestCount] | QuestDoneArray | variable length, element PLAYER_QUEST_DONE_INFO; evidence: capture:shop, capture:combat |
+| 14 | u8[4] | unwritten | (original bug) P02-B8: SendQuestDone sizes the part 0x12 + 10n, 4 bytes more than the header + records; evidence: capture:shop, capture:combat: 00 00 00 00 (n = 0) |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_QUEST_DONE_CMD at +2; without the handle the decoder misread every field
+
+### `0x100c` NC_CHAR_ABSTATE_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046c6e0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | number | evidence: capture:shop, capture:combat |
+| 8 | ABSTATEREADBLOCK[number] | abstate | variable length, element ABSTATEREADBLOCK; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_ABSTATE_CMD at +2; without the handle the decoder misread every field
+
+### `0x100d` NC_CHAR_SKILL_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046c900)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u8 | PartMark.bIsStart|bIsEnd|nOrder | bits bIsStart:1@0, bIsEnd:1@1, nOrder:6@2; evidence: capture:shop, capture:combat |
+| 7 | u16 | nMaxNum | evidence: capture:shop, capture:combat |
+| 9 | u16 | number | evidence: capture:shop, capture:combat |
+| 11 | PROTO_SKILLREADBLOCK[number] | skill | variable length, element PROTO_SKILLREADBLOCK; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_SKILL_CMD at +2; without the handle the decoder misread every field
+
+### `0x100e` NC_CHAR_SKILL_PASSIVE_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046c900 (passive list))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u16 | number | evidence: capture:shop, capture:combat |
+| 4 | u16[number] | passive | variable length; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_SKILL_PASSIVE_CMD at +2; without the handle the decoder misread every field
+
 ### `0x1010` NC_CHAR_FRIEND_CMD (CharDB→WM)
 
 **Verified layout** (basis: wm FUN_0040a570)
@@ -8447,6 +8550,204 @@ stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
 | 0 | u16 | wmHandle |  |
 | 2 | u16 | count | > 100 clamped |
 | 4 | {u32 charNo, Name5 name, u8 flag}[n] | friends | 25 bytes each |
+
+### `0x1012` NC_CHAR_GUILD_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 13 (p_Guild_GetMyNo); the client-side GUILD_CLIENT tail is not sent)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | nGuildNo | evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_GUILD_CMD at +2; without the handle the decoder misread every field
+
+### `0x1017` NC_CHAR_ITEM_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; Send_NC_CHAR_ITEM_CMD @ FUN_004056a0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u8 | PacketOrder.nPacketOrderNum|nIsLastOfInven | bits nPacketOrderNum:7@0, nIsLastOfInven:1@7; evidence: capture:shop, capture:combat |
+| 3 | u8 | nPartMark | evidence: capture:shop, capture:combat |
+| 4 | u8 | ItemCmd.numofitem | evidence: capture:shop, capture:combat |
+| 5 | PROTO_ITEMPACKET_TOTAL[ItemCmd.numofitem] | ItemCmd.ItemArray | variable length, element PROTO_ITEMPACKET_TOTAL; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_ITEM_CMD at +2; without the handle the decoder misread every field
+
+### `0x1019` NC_CHAR_CHARTITLE_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046d2c0 (p_Char_GetTitleAll))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u8 | nFirstConnection | written 0 (u16 0 at +2, then +3 overwritten); evidence: capture:shop, capture:combat: 0 |
+| 3 | u8 | CurrentTitle | row type 0, element 0 |
+| 4 | u8 | CurrentTitleElement | row type 0, element 1 |
+| 5 | u16 | CurrentTitleMobID | row type 0, element 2 |
+| 7 | u64[128] | TitleValues | rows with element 0xFF: value per title type (CHARACTER_TITLE_TYPE); evidence: capture:shop, capture:combat: all 0 |
+| 1031 | u16 | NumOfTitle | rows with element 0..3, title type < 0x80; evidence: capture:shop, capture:combat: 0 |
+| 1033 | {u8,u8}[NumOfTitle] | TitleArray | CT_INFO { u8 type, u8 value << 6 | element } |
+
+P02 batch 2 (§7.4): body = CHARACTER_TITLE_READBLOCK (0x407, Zone/WM pdb2016); 0x409 + 2n bytes
+
+### `0x101a` NC_CHAR_KQMAP_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; SQL_p_Char_GetKQMap @ FUN_0045a130)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | nKQHandle | evidence: capture:shop, capture:combat |
+| 6 | char[12] | sKQMapName | Name3; evidence: capture:shop, capture:combat |
+| 18 | u32 | nKQCoord.x | evidence: capture:shop, capture:combat |
+| 22 | u32 | nKQCoord.y | evidence: capture:shop, capture:combat |
+| 26 | u32 | dKQDate.year|month|day|hour|min|sec | bits year:4@0, month:4@4, day:5@8, hour:5@13, min:6@18, sec:6@24; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_KQMAP_CMD at +2; without the handle the decoder misread every field
+
+### `0x101b` NC_CHAR_CHARGEDBUFF_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046d680)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u16 | NumOfChargedBuff | evidence: capture:shop, capture:combat |
+| 4 | PROTO_CHARGEDBUFF_INFO[NumOfChargedBuff] | ChargedBuff | variable length, element PROTO_CHARGEDBUFF_INFO; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_CHARGEDBUFF_CMD at +2; without the handle the decoder misread every field
+
+### `0x1097` NC_CHAR_GUILD_ACADEMY_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 14; the client-side GUILD_ACADEMY_CLIENT tail is not sent)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | nGuildAcademyNo | evidence: capture:shop, capture:combat |
+| 6 | u8 | isGuildAcademyMember | evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_GUILD_ACADEMY_CMD at +2; without the handle the decoder misread every field
+
+### `0x10cc` NC_CHAR_QUEST_READ_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046ce50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | nNumOfReadQuest | evidence: capture:shop, capture:combat |
+| 8 | u16[nNumOfReadQuest] | QuestReadIDArray | variable length; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_QUEST_READ_CMD at +2; without the handle the decoder misread every field
+
+### `0x10cf` NC_CHAR_ITEMACTIONCOOLTIME_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046dd40 (usp_Character_getItemActionCoolTime))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u16 | num | row count; evidence: capture:shop, capture:combat: 0 |
+| 4 | ActionCooltime[num] | group | { u16 actionID, i64 expiredTime = mktime64(row ts) } (pdb2016 ActionCooltime, 10 bytes) |
+
+P02 batch 2 (§7.4): body = PROTO_NC_CHARSAVE_ITEMACTIONCOOLTIME_ACK (pdb2016); 4 + 10n bytes
+
+### `0x10d2` NC_CHAR_FREESTAT_SET_DB_ACK (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; step 19, FUN_0046dc00 (usp_Character_getSingleOption), SetOpcode size 0x11)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | nCharNo | evidence: capture:shop, capture:combat: 5 |
+| 6 | i32 | tTime | mktime(row column 3, a timestamp); evidence: capture:shop, capture:combat: 12:01:11 (shop) / 11:54:00 (combat) local, the same time as the 0x101A dKQDate: last save before the capture (inferred) |
+| 10 | u8 | nOption2 | row column 2; evidence: capture:shop, capture:combat: 0 |
+| 11 | u8 | nOption1 | row column 1; evidence: capture:shop, capture:combat: 1 |
+| 12 | u32 | nOption4 | row column 4; evidence: capture:shop, capture:combat: 0 |
+| 16 | u8 | bLoaded | always 1 |
+
+P02 batch 2 (§7.4): the character load reuses opcode 0x10D2 (D02 annotates the 15-byte CharDB→Zone free-stat ack) for the 17-byte single-option block that the WM caches at +0x658 and sends to zones as 0x10D3. Field names are ours (the procedure's column names are not in the binary); with no row, +6..+15 stay 0 and bLoaded is still 1
+
+### `0x10d5` NC_CHAR_QUEST_REPEAT_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_0046ced0)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | nNumOfRepeatQuest | evidence: capture:shop, capture:combat |
+| 8 | PLAYER_QUEST_INFO[nNumOfRepeatQuest] | QuestRepeatArray | variable length, element PLAYER_QUEST_INFO; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_QUEST_REPEAT_CMD at +2; without the handle the decoder misread every field
+
+### `0x10d8` NC_CHAR_NEWBIE_GUIDE_VIEW_LIST_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 24 (usp_InGameGuide_getViewList))
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u8 | nGuideViewNum | evidence: capture:shop, capture:combat |
+| 3 | u8[nGuideViewNum] | nGuideViewList | variable length; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_NEWBIE_GUIDE_VIEW_LIST_CMD at +2; without the handle the decoder misread every field
+
+### `0x10dc` NC_CHAR_COININFO_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 25)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u64 | nCoin | evidence: capture:shop, capture:combat |
+| 10 | u64 | nExchangedCoin | evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_COININFO_CMD at +2; without the handle the decoder misread every field
+
+### `0x10e2` NC_CHAR_CARDCOLLECT_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 26)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | number | evidence: capture:shop, capture:combat |
+| 8 | PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform[number] | CardList | variable length, element PROTO_NC_CHAR_CARDCOLLECT_CMD::CardInform; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_CARDCOLLECT_CMD at +2; without the handle the decoder misread every field
+
+### `0x10e5` NC_CHAR_CARDCOLLECT_BOOKMARK_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 27)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | number | evidence: capture:shop, capture:combat |
+| 8 | PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo[number] | ViewList | variable length, element PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD::CardBookmarkInfo; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_CARDCOLLECT_BOOKMARK_CMD at +2; without the handle the decoder misread every field
+
+### `0x10e8` NC_CHAR_CARDCOLLECT_REWARD_CMD (CharDB→WM)
+
+**Verified layout** (basis: Character FUN_00438dc0 (0x1004 handler, D02 §4): every block starts with the WM clienthandle; the PROTO struct (pdb2016) follows at +2; FUN_00438dc0 step 28)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | clienthandle | WM client handle (the 0x1004 clienthandle echoed) |
+| 2 | u32 | chrregnum | evidence: capture:shop, capture:combat |
+| 6 | u16 | number | evidence: capture:shop, capture:combat |
+| 8 | u16[number] | RewardID | variable length; evidence: capture:shop, capture:combat |
+
+P02 batch 2 (§7.4): PROTO_NC_CHAR_CARDCOLLECT_REWARD_CMD at +2; without the handle the decoder misread every field
 
 ### `0x10ec` NC_CHAR_EVENT_ATTENDANCE_LIST_DB_ACK (CharDB→WM)
 
@@ -8461,6 +8762,8 @@ stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
 | 11 | tm (9×i32)[28] | AttendanceArray |  |
 | 1019 | u8 | RewardNum |  |
 | 1020 | u8[RewardNum] | RewardList | AR_IDs already claimed |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nError`: 0x2C00 ok; `tConnect`: echo; `AttendanceNum`: 0; `AttendanceArray`: stack garbage except the first 7 ints of element 0 (P02-B9); `RewardNum`: 0; the WM sends no 0x10ED (event over, nothing to claim)
 
 ### `0x10ef` NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_ACK (CharDB→WM)
 
@@ -8491,6 +8794,8 @@ stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
 | 0 | u16 | numoffriend |  |
 | 2 | {u32 charregnum,u16 friendpoint,u16 diffpoint}[n] | pointinfo | 8 each |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `numoffriend`: 1 (the character itself: D02 §4 step 2); `pointinfo`: {charregnum 5, friendpoint 0, diffpoint 0}; no second 0x541C after 0x1036 (no friends / same day)
+
 ### `0x702c` NC_CHAR_OPTION_IMPROVE_DB_GET_DATA_TYPE_CMD (CharDB→WM)
 
 **Verified layout** (basis: wm FUN_0040acb0)
@@ -8499,6 +8804,8 @@ stored in session +0x1ECE0..+0x1ECE2, +0x1ECE3 = 1
 |---|---|---|---|
 | 0 | u32 | nCharNo |  |
 | 4 | u32 | DataType | CHAR_OPTION_DATA_TYPE 0/1/2 → session +0x1ECD8 |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `DataType`: 2 = improved (usp_Character_chkKeyMap 1): 0x702D–0x702F follow, then the WM pushes 0x7032–0x7034 (§4.1)
 
 ### `0xa801` NC_CHAT_RESTRICT_DB_LIST_CMD (CharDB→WM)
 
@@ -10758,6 +11065,8 @@ size 0x48 + 6·n
 | 0 | u16 | handle |  |
 | 2 | u32 | userNo |  |
 
+**Captured** (P02, `capture-validation.md`; shop, combat): `clienthandle`: WM client handle 35000 / 32500; `usrregnum`: 103
+
 ### `0x1004` NC_CHAR_CHARDATA_REQ (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_00422be0)
@@ -10768,6 +11077,8 @@ size 0x48 + 6·n
 | 2 | u32 | charNo |  |
 | 6 | u32 | userNo |  |
 | 10 | u32 | time | day start - 1 day (inferred) |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `handle`: 35000 / 32500; `charNo`: 5; `userNo`: 103; `time`: 1794718800 = 15 Nov 06:00 local = CGambleSystemServer::GetSendExchangeCoinInitTime (next GBHouse GB_ResetTime 06:00:00) − 1 day
 
 ### `0x1036` NC_CHAR_LOGIN_DB (WM→CharDB)
 
@@ -10782,6 +11093,8 @@ size 0x48 + 6·n
 | 24 | u64 | money |  |
 | 32 | u32 | userNo |  |
 | 36 | u32[5] | extra |  |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `charNo|map|x|y|money`: = the 0x1007 CHARDATA values; `userNo`: 103; `extra`: u32[5] = char spawnapps[20] 'Original' (D02 name)
 
 ### `0x1037` NC_CHAR_LOGOUT_DB (WM→CharDB)
 
@@ -10807,6 +11120,8 @@ size 0x48 + 6·n
 | 4 | tm (9×i32) | tmEventStartDate | localtime(eventStart) |
 | 40 | tm (9×i32) | tmEventEndDate | localtime(eventEnd) |
 | 76 | i32 | tConnect | time(NULL) at first map login |
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `tmEventStartDate`: 2015-11-09 00:00; `tmEventEndDate`: 2015-12-07 00:00 (28 days, ended); `tConnect`: time of the request (first map login, ≈ 4.4 s after 0x1003)
 
 ### `0x10ee` NC_CHAR_EVENT_ATTENDANCE_CHECK_DB_REQ (WM→CharDB)
 
@@ -12265,6 +12580,18 @@ size 0x12, not checked
 
 ## Captured packets without a section above
 
+### `0x0c5f` NC_USER_TUTORIAL_CAN_SKIP_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `clienthandle`: echo; `isSkip`: 0; sent 1–3 ms before 0x0C13 (D02 §3.1 order)
+
+### `0x1005` NC_CHAR_CHARDATA_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `netpacketheader.clienthandle`: echo; last of 44 blocks, 17–19 ms after 0x1004
+
+### `0x1007` NC_CHAR_BASE_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `chrregnum`: 5; `charid`: 'Test2'; `Level`: 5; `Experience`: 22 (combat) → 30 (shop); `CurHPStone|CurSPStone`: 13 / 10; `Cen`: 99440; `currentmap|x|y`: RouN (5904, 6793) / (5724, 8768) = the 0x101A KQ position and the following 0x1036; `adminlevel`: 100
+
 ### `0x1012` NC_CHAR_GUILD_CMD (S→C)
 
 **Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `nGuildNo`: 0 (4-byte form)
@@ -12272,4 +12599,68 @@ size 0x12, not checked
 ### `0x1097` NC_CHAR_GUILD_ACADEMY_CMD (S→C)
 
 **Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `nGuildAcademyNo`: 0; `isGuildAcademyMember`: 0 (5-byte form)
+
+### `0x10db` NC_CHAR_DB_NEWBIE_GUIDE_VIEW_SET_CMD (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `nGuideView`: 131, 142 (shop) = the client 0x10DA values
+
+### `0x1114` NC_CHAR_TUTORIAL_INFO_WORLD_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `TutorialInfo.nTutorialState|nTutorialStep`: 2 / 0 = the 0x0C13 TutorialInfo
+
+### `0x111e` NC_CHAR_CHAT_COLOR_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nChatFontColorID|nChatBalloonColorID`: 0 / 0
+
+### `0x1121` NC_CHAR_USEITEM_MINIMON_INFO_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nWorldHandle`: WM client handle (own field, no extra prefix); `UseItemMinimonInfo`: bNormalItem 0, bChargedItem 0, both lists 0xFFFF ×12
+
+### `0x7019` NC_CHAR_OPTION_DB_GET_SHORTCUTSIZE_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `WorldManagerHandle|nCharNo`: 35000 / 32500, 5; forwarded 3 ms after client 0x7004
+
+### `0x701a` NC_CHAR_OPTION_DB_GET_SHORTCUTSIZE_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `bSuccess`: 1; `Data.Data`: 24 bytes, forwarded to the client as 0x7005 (§4.1)
+
+### `0x7021` NC_CHAR_OPTION_DB_GET_WINDOWPOS_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `WorldManagerHandle|nCharNo`: forwarded after client 0x700C
+
+### `0x7022` NC_CHAR_OPTION_DB_GET_WINDOWPOS_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `bSuccess`: 1; `Data.Data`: 392 bytes → client 0x700D
+
+### `0x702d` NC_CHAR_OPTION_IMPROVE_DB_GET_SHORTCUTDATA_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `DBShortCutData.nShortCutDataCnt`: 6; `DBShortCutData.ShortCutData`: slots 0, 1 (code 4), 4 (code 3, skill 1500), 9 (code 1, item 38043 Wooden Horse), 10 / 11 (code 1, items 3500 / 3505 HP / SP Potion Tier 1)
+
+### `0x702e` NC_CHAR_OPTION_IMPROVE_DB_GET_KEYMAP_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `DBKeyMapData.nKeyMapDataCnt`: 95 (0x5F, the W04 §8.2 limit is < 0x60)
+
+### `0x702f` NC_CHAR_OPTION_IMPROVE_DB_GET_GAMEOPTION_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `DBGameOptionData.nGameOptionDataCnt`: 28
+
+### `0x704b` NC_CHAR_OPTION_IMPROVE_DB_SET_SHORTCUTDATA_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `DBShortCutData`: n 1: {9, 0, 0} then {9, 1, 38043} (combat), the 0x7037 entries (§4.2)
+
+### `0x704c` NC_CHAR_OPTION_IMPROVE_DB_SET_SHORTCUTDATA_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nError`: 0x2100 ok; `nCharNo`: 5
+
+### `0x9427` NC_HOLY_PROMISE_DB_GET_UP_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `DBError`: 0x1740 ok; `UpMemberInfo.PromiseCharNo`: −1 (no master)
+
+### `0x9429` NC_HOLY_PROMISE_DB_GET_MEMBER_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `DBError`: 0x1740; `nPart`: 3 (first | last); `nMemberCount`: 0
+
+### `0x9444` NC_HOLY_PROMISE_DB_GET_REMAIN_MONEY_CMD (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; shop, combat): `nCharNo`: 5; `nMoney`: 0
 

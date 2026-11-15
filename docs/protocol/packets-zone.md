@@ -60,6 +60,22 @@ Basis: 2016 Zone.pdb (pdb2016) struct USEITEM_MINIMON_INFO, size 0x32; reference
 | 2 | u16[12] | NormalItemList | item ids, 0xFFFF = empty |
 | 26 | u16[12] | ChargedItemList | item ids, 0xFFFF = empty |
 
+### tm (36 bytes)
+
+Basis: MSVC struct tm (9 × i32), used by W04 / D02 0x10EB / 0x10EC (P02 batch 2: the decoder could not parse 'tm (9×i32)')
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | i32 | tm_sec |  |
+| 4 | i32 | tm_min |  |
+| 8 | i32 | tm_hour |  |
+| 12 | i32 | tm_mday |  |
+| 16 | i32 | tm_mon |  |
+| 20 | i32 | tm_year |  |
+| 24 | i32 | tm_wday |  |
+| 28 | i32 | tm_yday |  |
+| 32 | i32 | tm_isdst |  |
+
 ## Client → server
 
 ### `0x0812` NC_MISC_PINGTEST_CLIENT_ZONE_DB
