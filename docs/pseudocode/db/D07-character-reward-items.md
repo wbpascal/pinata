@@ -20,6 +20,11 @@ valid for everything else (procedures, logs, cen codes). Evidence markers: *(pdb
 AcademyStorage_List(nGuildNo, out list, out size) → 1 ok, 0 failed (Ghidra shows it as void)   @ FUN_00403400 (D03 §5.3)
     ItemList_AcademyStorage(nGuildNo) = ItemList_ByStorage(owner = nGuildNo, storage type 0, max 100)  @ FUN_0046a3f0
         # box 0 = guild-academy reward storage (Z04 knowledge); only the first 100 rows are read
+        ItemList_ByStorage(owner, type ≤ 16 else 0, max, out n, out rows[0x28 each])                  @ FUN_00469f70
+            p_Item_GetListType(owner, type)   @ FUN_004615e0   # (db-backup) SELECT nItemKey, nStorage, nItemID, nFlags, dDate
+                FROM tItem WITH(READUNCOMMITTED) WHERE nOwner = @nCharNo AND nStorageType = @nStorageType   (no ORDER BY)
+            row = { u64 nItemKey @0, u16 nStorage (slot) @8, u8 storage type @0xA (= the argument), u32 nItemID @0xC,
+                    u32 nFlags @0x10, dDate @0x14 }; stops after max rows
     ItemRecords_Build(rows → list)                                       @ FUN_00402e50
         list = { u16 ?, u8 count @2, records @3 }  # the 0x986B caller's buffer starts at ebp−0x1ca13, count at ebp−0x1ca11
         record = { u8 len (bytes after this one), ITEM_INVEN cell @1 (type << 10 | slot), u64 key @3, u16 itemId @0xB,
@@ -36,12 +41,11 @@ ItemStruct_Read(dst {u64 key, u16 itemId @8, attr[0x65] @0xA}, container, unused
         # ItemInfo row's Class (+0x66) indexes the table at container+0x9C; class > 0x26 → log "ItemAttributeClassContainer::
         # operator [] : Invalid item class" and returns the container itself
     cls.vt[2](&dst.itemId, src + 0xA)     # slot 2 = Read: copies the class-sized wire attribute to dst.attr, returns the end
-        # examples: ItemAttrCls_ByteLot Read @ FUN_0044dce0 (1 byte), Write @ FUN_0044dae0; ItemAttrCls_Weapon Read @ FUN_0044f790
-        # (0x59 bytes + 3 per random option); base ItemAttributeClass Read/Write @ FUN_0044dbb0 (copies nothing)
+        # per-class sizes in §1.3 (e.g. ByteLot 1 byte, Weapon 0x41 + 3 per random option; unknown item → base class, nothing)
 ItemAttrClassContainer_Self(container) → container                        @ FUN_0044ff60   (identity getter, our name)
 ```
 
-The class objects are the 38 `ItemAttrCls_*` RTTI classes plus the base `ItemAttributeClass` (51 vtable slots each, `rtti.py`).
+The class objects are the 38 `ItemAttrCls_*` RTTI classes plus the base `ItemAttributeClass` (51 vtable slots each, `rtti.py`); §1.3.
 
 ### 1.2 Lot helpers
 
@@ -58,6 +62,48 @@ ItemAttr_MakeWithLot(itemId, lot, out attr[0x65]) → 0 when attr is null or the
                RECALLSCROLL 12                                                           → u8 attr[0] = 1 (lot ignored)
                every other class                                                         → all zero (lot ignored)
 ```
+
+### 1.3 Item attribute classes (`g_ItemAttrClassContainer`)
+
+```pseudo
+ItemAttributeClassContainer_Init(c)   @ FUN_0044f330   (our name; constructor of the global at DAT_006ef2e8)
+    c[0] = base ItemAttributeClass object; c[1 … 0x26] = one object per ItemAttrCls_* class
+    table[class] at c + 0x9C (39 entries, class 0 … 0x26): first all = c (the base object), then each class's object
+    # class 32 (0x20, MONEY in ItemClassEnum, §3.2) keeps the base object: no ItemAttrCls for it (no 2016 ItemInfo row has it)
+    # ItemAttributeClassContainer_Get (§1.1) also falls back to c, i.e. the base class, for a missing item or class > 0x26
+```
+
+Vtable slot 1 (+4) Write copies the attribute (`attr` = item struct + 2) to the wire and returns the end; slot 2 (+8) Read is
+the mirror. Slot 10 (+0x28) returns the class number (read from each class's getter; they agree with the table). Both slots
+copy the full struct size (= the 2017 PDB `ShineItemAttr_*` size, *(pdb2017)* names), but the wire length can be shorter.
+The `ItemAttrCls_<class>_Write/_Read` function names are ours (`names/character/D07.json`), the class names are RTTI:
+
+| Class | ItemAttrCls_* | Write / Read | Wire bytes |
+|---|---|---|---|
+| 0, 12, 14, 19, 20, 22, 25, 33, 34 | ByteLot, RecallScroll, UpSource, UpgradeRedGem, UpgradeBlueGem, Feed, UpgradeGoldGem, NoEffect, Enchant | FUN_0044dae0 / FUN_0044dce0 | 1 (u8 lot) |
+| 1, 3, 21, 35 | WordLot, QuestLot, KQStep, ActiveSkill | FUN_0044d9b0 / FUN_0044dbc0 | 2 (u16) |
+| 2, 18, 24, 26, 27, 37 | DwrdLot, MiniHouseSkin, Amount, CostumWeapon, ActionItem, CostumShield | FUN_0044dac0 / FUN_0044dc80 | 4 (u32) |
+| 4 | Amulet | FUN_0044f6d0 / FUN_0044f760 | 0x26 + 3·n, n = attr[0x25] >> 1 (copies 0x3E) |
+| 5 | Weapon | FUN_0044f700 / FUN_0044f790 | 0x41 + 3·n, n = attr[0x40] >> 1 (copies 0x59) |
+| 6, 7, 8, 38 | Armor, Shield, Boot, Bracelet | FUN_0044f730 / FUN_0044f7c0 | 0xD + 3·n, n = attr[0xC] >> 1 (copies 0x25) |
+| 9 | Furniture | FUN_0044d9d0 / FUN_0044dbe0 | 0x24 |
+| 10 | Decoration | FUN_0044d9f0 / FUN_0044dc00 | 8 |
+| 11, 16, 28 | SkillScroll, WeaponTitlaLicence, GBCoin | FUN_0044da70 for both | 1, never written or read: the pointer only advances (original bug) D07-B14 |
+| 13 | BindItem | FUN_0044da10 / FUN_0044dc20 | 1 + 10·attr[0] (copies 0x65) |
+| 15 | ItemChest | FUN_0044da40 / FUN_0044dc50 | 1 + 8·(attr[0] & 0xF) (copies 0x41) |
+| 17 | KingdomQuestItem | FUN_0044dbb0 (ItemAttributeClass_ReadWriteNone) | 0 (the 2017 struct `ShineItemAttr_KingdomQuest` is 1 byte) |
+| 23 | Riding | FUN_0044da80 / FUN_0044dca0 | 0x13 |
+| 29 | Capsule | FUN_0044db00 / FUN_0044dd00 | 0xC |
+| 30 | CardCollect_Close | FUN_0044db30 / FUN_0044dd30 | 9 |
+| 31 | CardCollect | FUN_0044db60 / FUN_0044dd60 | 5 |
+| 36 | Pet | FUN_0044db80 / FUN_0044dd80 | 0x1A |
+| 32, unknown | base ItemAttributeClass | FUN_0044dbb0 | 0 |
+
+The option count byte is `ItemOptionStorage.fixed.optionnumber` *(pdb2017)*: `ItemOptionStorage` = { u8 fixed, Element[8]
+{u8 itemoption_type, u16 itemoption_value} }; its bits 1–7 are the count (the code uses `>> 1`; bit 0 is not read here). In
+the Amulet it is `option` at 0x25 (an `UpgradeOption` storage sits at 0x0B), in the Weapon `option` at 0x40, in the Armor
+family `option` at 0xC. Because Read copies the full struct while the wire record is shorter, Read also copies the bytes of the
+next record (or stale buffer bytes) into the unused option slots; nothing reads them in 0x986B *(inferred: harmless)*.
 
 ## 2. 0x986B NC_GUILD_ACADEMY_DB_ACADEMY_REWARD_REQ (from the zone) @ FUN_0041de10
 
@@ -342,11 +388,16 @@ forces lot 1, ItemAttr_MakeWithLot uses the lot).
 | D07-B11 | 0x986B | the second ItemLot_Set of the split writes the taken lot into the record copy's item-id field (`ebp−0x1cd2c`) instead of an attribute | none (never read again) | dead code, or meant for a new-item attribute |
 | D07-B12 | 0x74AA | GTReward_MakeItemAttr gives lot 1 to RECALLSCROLL, UPSOURCE, UPRED, UPBLUE, UPGOLD, QUESTITEM and KQSTEP whatever Value2 says, although these classes have a lot | a reward row for gems etc. with Value2 > 1 yields one item (the shipped table has none) | use Value2 as for the other lot classes *(inferred; may be deliberate)* |
 | D07-B13 | 0x74AA | the item row gets the full u32 Value1 as nItemID while the key, ItemInfo lookup and attribute use its low 16 bits | an id ≥ 0x10000 would create a row whose item id differs from its attribute's class (the shipped table has none) | u16 throughout |
+| D07-B14 | attribute classes 11 / 16 / 28 (all item lists, 0x986B) | SkillScroll, WeaponTitlaLicence and GBCoin Write (FUN_0044da70) advance the output by one byte without writing it | one uninitialised buffer byte per such item in every item record list (D03 §1.4 lists to the zone, the 0x986B storage list); the matching Read ignores it | write the 1-byte attribute (or advance 0) |
 
 ## 4. Not reconstructed / uncertain
 
-- The order of the storage records (and so which stacks a lot reward takes first) is the order of `p_Item_GetStorageListType`'s
-  result set (D04 §11); whether that procedure sorts is not checked here.
+- The order of the storage records (and so which stacks a lot reward takes first, and which records fall beyond the 100-row
+  limit) is the order of `p_Item_GetListType`'s result set (§1.1; not `p_Item_GetStorageListType` @ FUN_00461660, the slot-only
+  variant that `ItemStorage_GetUsedSlots` FUN_0046a500 uses for 0x74AA, D04 §6.4). The procedure has no ORDER BY and reads with READUNCOMMITTED
+  *(db-backup)*, so the order is SQL Server's access path: unspecified. The w00 backup has a non-clustered primary key
+  `PK_tItem_nItemKey_NC`; the clustered index (if any) and the index serving `nOwner, nStorageType` are not recoverable from
+  the object names, so neither key order nor slot order is guaranteed *(inferred)*. A rebuild should fix one (e.g. by slot).
 - The 2016 `usp_GuildAcademy_withdrawMoney` result codes 1–6 (0xF99–0xF9E) still have no known meaning (D04 §12, D06).
 - The 0x1FF preset in the first dword of the key list (§2.3) has no visible purpose; the first match overwrites it.
 - How the zone shows a reward-inventory item that the DB put there (box 2, lowest free slot, possibly beyond the zone's box
@@ -354,12 +405,20 @@ forces lot 1, ItemAttr_MakeWithLot uses the lot).
 
 ## 5. Coverage boundary
 
-(Preliminary; the sweep part completes it.)
+Sweep (part 2): every callee of FUN_0041de10, FUN_00467c60, FUN_00468000 and FUN_004076a0 and every caller of FUN_00467c60,
+FUN_00468000, FUN_0044d340, FUN_0044ff60, FUN_0044d300 and FUN_0044d380 was checked against the docs. FUN_00467c60 is called
+only by 0x74AA (FUN_004076a0); FUN_00468000, FUN_0044d340 and FUN_0044ff60 only by 0x986B. The three log strings of
+FUN_0041de10 in `strings.tsv` (0x004b2a08, 0x004b2b60, 0x004b2c38) and its Korean ones are quoted in §2.
 
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
 | 0x986B procedures, cen codes, logging | D04 §9.3, §11 (done) | already documented there; this doc only adds the item internals |
 | 0x74AA handler FUN_004076a0 (fame / money / exp / token / division, logs) | D04 §6.4 (done) | documented there; §3 here adds the ITEM_OPT / attribute mapping |
 | zone side of 0x986C / 0x9885 | Z14 §4.3 (done) | the zone handler is documented there; §2.6 links to it |
-| WM side of 0x9882 → 0x9883 and of 0x74AA's sender / 0x74AB | W03 §6.3, §8.5 | WM handlers documented there |
-| `ItemAttr_Save`, `CGameDB_Item_GetItemOptions`, `Item_Insert`, `ItemLotAfterUse`, `ItemLot_Set`, `ItemRecords_Build` internals | D03 §1.2–1.3, §5.3 (done) | generic item helpers, documented there |
+| WM side of 0x9882 → 0x9883 and of 0x74AA's sender / 0x74AB | W03 §6.3, §8.5 (done) | WM handlers documented there |
+| `ItemAttr_Save`, `CGameDB_Item_GetItemOptions`, `Item_Insert`, `ItemLotAfterUse`, `ItemLot_Set`, `ItemRecords_Build` FUN_00402e50, `ItemInfo_Get` FUN_00402d20 internals | D03 §1.2–1.4, §5.3 (done) | generic item helpers, documented there; §1.1 / §1.3 here add the list procedure and the per-class wire sizes |
+| other users of `ItemAttributeClassContainer_Get` FUN_0044d380 / `ItemStruct_Write` FUN_0044d300: 0x3447 NC_ITEMDB_UPGRADE_REQ FUN_0040e0d0, 0x346D NC_ITEMDB_CHESTITEM_REQ FUN_0040f030, 0x34D1 NC_ITEMDB_NEW_UPGRADE_REQ FUN_00430a10 | D03 (done; its handler blocks cite these functions) | Character item handlers; they use the same container (§1.3) |
+| `p_Item_GetStorageListType` FUN_00461660 / `ItemStorage_GetUsedSlots` FUN_0046a500 | D04 §6.4, §11 (done) | 0x74AA's free-slot count, documented there |
+| `SendToWorldManager`, `Session_SendPacket(To)`, `CSendPacket_*`, `DB_*`, `CheckAlive`, `Log` FUN_00447960 | D02 (done) | Character server framework |
+| FUN_0046f750 (empty function, 768 call sites) | none needed | compiled-out stub (returns at once); no behaviour |
+| vtable slots of the attribute classes other than Write / Read / class (lot, bound, …) | Z04 knowledge (`IsLot`, `GetLot`, …), D03 §1.2 | 0x986B uses them only through `ItemLotAfterUse` / `ItemLot_Set` (D03 §1.2) |
