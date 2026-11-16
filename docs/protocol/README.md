@@ -23,7 +23,8 @@ Generated per-server opcode tables (every handler, with the packets it sends):
 - [opcodes-login.md](opcodes-login.md): 12 client handlers
 - [opcodes-wm.md](opcodes-wm.md): 167 client handlers
 - [opcodes-zone.md](opcodes-zone.md): 245 client handlers
-- [opcodes.json](opcodes.json): all 2,056 opcodes seen in the 7 binaries (names, receivers)
+- [opcodes.json](opcodes.json): all 2,572 opcodes sent or received in the 7 binaries or handled by the client
+  (official names from the 2016 server PDBs, receivers)
 
 Per-packet field layouts (what each packet contains, with values or where each value comes from):
 
@@ -34,8 +35,11 @@ Per-packet field layouts (what each packet contains, with values or where each v
 - [client-error-codes.json](client-error-codes.json): all 479 error codes the client knows, with the
   message it shows. Extracted from the 2016 client `Fiesta.bin` (`FUN_00416430`) and its
   `TextData*.shn` tables (`tools/protocol-re/errcodes.py`, `shn.py`).
-- [annotations.json](annotations.json): the hand-verified layouts (36 packets plus the `WORLD` and
-  130-byte `AVATAR` structs). Edit this file to add names as you confirm fields, then regenerate.
+- [annotations.json](annotations.json): the first hand-verified layouts (38 packets plus the `WORLD` and
+  130-byte `AVATAR` structs); each work item adds its own in `annotations/<ID>.json` (about 1,700 more). Add a layout
+  there as you confirm its fields, then regenerate (`tools/protocol-re/regen.sh`).
+- [pdb2016-layouts.json](pdb2016-layouts.json): every packet struct of the 2016 server PDBs (S01), ranked below the
+  annotations.
 
 ---
 
@@ -100,7 +104,10 @@ def decrypt(body: bytearray, state):         # state.idx starts at seed % 499
 
 *(captured)* On all three servers every client body decrypts with this rule from the stream's `0x0807` seed, across
 packets; server → client traffic is plaintext (capture-validation §2.2). Server ↔ server links carry no seed and no
-cipher (capture-validation §7.1).
+cipher (capture-validation §7.1); they open with a handshake instead: the listener sends `0x0801
+NC_MISC_S2SCONNECTION_RDY` on accept, the connector `0x0802 NC_MISC_S2SCONNECTION_REQ {echo_data, server_to_id,
+server_from_id, world, zone, key}`, the listener `0x0803 NC_MISC_S2SCONNECTION_ACK {echo_data, error 0}`
+(capture-validation §17.2; W05 §1.4, Z01 §3.3).
 
 ### 1.4 Seed: `0x0807` NC_MISC_SEED_ACK (observed, *captured*)
 
@@ -261,6 +268,24 @@ capture the WM's `0x0C17` left 0.8 ms before Login's `0x0C0A` to the new client.
 at the WM kicks the old session the same way (not captured). Detail: capture-validation §4.1; X01 §3.12 f;
 `login-server.md` §5.1; W01 §3.2, §5.2; Z01 §8.3.
 
+### 2.6 Character create and delete (character list)
+
+*(captured)* Create: `C 0x1401 {slotnum, name, char_shape}` → D `0x1402` (14 ms) → D `0x1405` (85–100 ms,
+`p_Char_Create`) → in one WM pass AccountDB `0x140D`, GameLog `0x0411` + `0xC804` and client `0x1406` (`numofavatar 1`,
+the new `AVATAR`). Delete (the client checks the typed confirmation itself and sends nothing on a mismatch): `C 0x1407
+{slot}` → D `0x1413` / `0x1414 {nGuildNo}` (guild check) → D `0x1408` → `0x140B` → in one ms AccountDB `0x140E`,
+GameLog `0x0412` + `0xC805`, client `0x140C`, D `0x9424`, every zone `0x10B2`. Refusals: `0x1404` / `0x140A` (§3.2).
+Detail: capture-validation §16.1; X01 §3.7; W01 §4.1; W03 §4.5; W04 §4.3; D02 §3.3, §3.4.
+
+### 2.7 Login refusals
+
+*(captured)* Blocked account / login disabled: AccountDB `0x0C5C {nBlock 1}` / `{bLoginAble 0}` → `0x0C09 {0x47}` /
+`{0x48}` (AccountLog `0x0720` + `0xC802`, no `0x0C5D`). World closed (WM down): the world stays in the list with
+status 0 and a select answers `0x0C0C {0}` at once. World full: Login still runs the AccountDB / AccountLog / WM round
+trip and answers `0x0C0C {5}` with a valid address and key; the client shows "Server is full." and does not connect
+(L00-B3). For up to 30 s after a WM start the world reports full, because the WM's first `0x0808` carries capacity 0
+(P02-B22). Detail: capture-validation §16.1, §16.3; X01 §3.5; `login-server.md` §4, §5.1; L01 §3.
+
 ---
 
 ## 3. Packet layouts
@@ -278,14 +303,14 @@ NUL-padded unless stated otherwise.
 | `0x0C66` | S→C | `u8` (value not set by the code) | version rejected |
 | `0x0C5A` | C→S | `char user[256]` @0, 4 unread bytes @256, `char password[36]` @260, `u32 extra[5]` @296 | total packet length must equal `0x13E`. `extra` is forwarded to AccountDB without being interpreted |
 | `0x0C37` | C→S | `u8 token[32]` | `NC_USER_LOGIN_WITH_OTP_REQ`; total packet length must equal `0x22`. Token login: looked up in a table filled by WM message `0x0C35` (token valid 10 s, L01 §4.3). Unknown token → `0x0C09 {0x52}`; login disabled flag (`DAT_004425f8 == 0`) → `{0x45}`; else world list `0x0C0A`, sent before the `0x0C05` of the client's following `0x0C04` *(captured, §2.2)* |
-| `0x0C09` | S→C | `u16 error` | login failure, then disconnect. Codes seen: `0x45` (server closed or account error -1), `0x47`, `0x48`, `0x4A` (after `0x0C1D`), `0x4B` (account error -2), `0x4C` (after `0x0C20`), `0x51` (AccountLog block), `0x52` (bad token) |
-| `0x0C0A` | S→C | `u8 count; WORLD[count]` | `WORLD` (18 bytes) = `u8 world_no; char name[16]; u8 status`. Status is set to 2 at load. Worlds with status `< 5` cannot be selected |
+| `0x0C09` | S→C | `u16 error` | login failure, then disconnect. Codes seen: `0x45` (server closed or account error -1; client "Please check ID or Password.", 50 ms after a wrong password *(captured)*), `0x47` (AccountDB `nBlock`: "The ID has been blocked." *(captured)*), `0x48` (AccountDB `bLoginAble 0`: "The World Servers are down for maintenance." *(captured)*), `0x4A` (after `0x0C1D`), `0x4B` (account error -2), `0x4C` (after `0x0C20`), `0x51` (AccountLog block), `0x52` (bad token) |
+| `0x0C0A` | S→C | `u8 count; WORLD[count]` | `WORLD` (18 bytes) = `u8 world_no; char name[16]; u8 status`. Status is set to 2 at load, 6–10 while the WM is connected (load band from its `0x0808` user count, L01 §3), 0 once its link is released ("Server is closed."), 5 = full. Login refuses a select of a world with status `< 5`; 5 passes (L00-B3) and the client then shows "Server is full." without connecting; the client connects for 6–10 (`login-server.md` §8). *(captured: 6 normal, 0 after a WM stop, 5 full, capture-validation §16.1)* |
 | `0x0C1B` | C→S | – | `NC_USER_WORLD_STATUS_REQ`, world list refresh → `0x0C1C` (same layout as `0x0C0A`). The client polls it 10 ms after `0x0C0A`, then every 10.0 s while the world list is shown *(captured, §2.2)* |
 | `0x0C0B` | C→S | `u8 world_no` | world select |
 | `0x0C0C` | S→C | `u8 status; char wm_ip[16]; u16 wm_port; u16 validate[32]` (83 bytes) | `NC_USER_WORLDSELECT_ACK`. `wm_ip` / `wm_port` are the WM's client listener from `ServerInfo.txt` (`GetWorldManagerConnectInfo` FUN_0040a020, L01 §2.5; 9110 *(captured)*). On success, `validate` is the 64-byte key that came back from WM `0x0C0E`. On an unknown, closed or refused world only `status` is meaningful: `wm_ip` / `wm_port` are filled anyway and `validate` is uninitialised stack (P02-B23, *captured*) |
 | `0x0C04` | C→S | `u8 XTrapClientKeyLength` (29); `char XTrapClientKey[29]` | `NC_USER_XTRAP_REQ`, sent by the client right **after** `0x0C5A` / `0x0C37`, in the same tick *(captured)*. The key is not compared (L00-B5); answered at once with `0x0C05 NC_USER_XTRAP_ACK {u8 bSuccess 1}` |
 | `0x0C1D` / `0x0C20` | C→S | – | answered with `0x0C09 {0x4A}` / `{0x4C}`, then disconnect |
-| `0x0C06`, `0x0C18` | C→S | – | no-op handlers |
+| `0x0C06`, `0x0C18` | C→S | –, `u8 LogoutType` | no-op handlers. The client sends `0x0C18 {0}` to Login when the user leaves the world list for the login screen *(captured, capture-validation §16.1)* |
 
 Login → WM `0x0C0D` (internal): carries the login handle, world number, user name and user number, plus
 31 random `u16` values and a 32nd `u16` that is the XOR of a world key with all 31. WM keeps this record
@@ -307,8 +332,10 @@ until the client presents the same 32 values in `0x0C0F`.
 | `0x0C33` → `0x0C34` | C→S, S→C | – → `u16 nError; char sOTP[32]` | `NC_USER_WILL_WORLD_SELECT_REQ` / `_ACK`: back to the world list; the WM gets a one-time token from Login (`0x0C35` / `0x0C36`), `0x1E58` = OK (§2.4, W01 §5.1) |
 | `0x0C18` | C→S | `u8 LogoutType` | `NC_USER_NORMALLOGOUT_CMD`; sent to the WM and the zone together. 0 = quit or back to the world list *(captured)*, 1 = back to character select (W01 §5.1) |
 | `0x0C17` | S→C | `u16 reason` | `NC_USER_CONNECTCUT_CMD`, then the WM closes the session; `0x683` = duplicate login (§2.5), zone kick reasons are passed on from `0x0C1A` (W01 §5.2) |
-| `0x1401` | C→S | `u8 slot; char name[20]; u8 …` | avatar create (inferred from reads), forwarded to CharDB as `0x1402` |
-| `0x1407` | C→S | `u8 slot` | avatar delete (inferred), see table |
+| `0x1401` | C→S | `u8 slotnum; char name[20]; u8 char_shape[4]` (25 bytes; shape byte 0 = `race:2, chrclass:5, gender:1`, then hairtype, haircolor, faceshape) | `NC_AVATAR_CREATE_REQ` *(pdb2016)*: checked by the WM (slot, name, class level rule), then CharDB `0x1402` → `0x1405` (§2.6; W01 §4.1, D02 §3.3) *(captured: `{2, "X37Del", 0x85}` = Fighter)* |
+| `0x1406` / `0x1404` | S→C | `u8 numofavatar; AVATAR` (131 bytes) / `u16 err` | `NC_AVATAR_CREATESUCC_ACK` / `NC_AVATAR_CREATEFAIL_ACK`. Every refusal the WM finds itself answers `0x84` "name already taken" (W01-B2); CharDB failures pass on its code |
+| `0x1407` | C→S | `u8 slot` | `NC_AVATAR_ERASE_REQ` *(pdb2016)*: the WM asks the CharDB for the guild first (`0x1413` → `0x1414`), then `0x1408` (§2.6; W01 §4.1, W03 §4.5) *(captured)* |
+| `0x140C` / `0x140A` | S→C | `u8 slot` / `u16 err` | `NC_AVATAR_ERASESUCC_ACK` / `NC_AVATAR_ERASEFAIL_ACK`; `0xC7` (199) = guild master; an empty slot answers `0xC6`, which the client also shows as the guild-master text (W01-B3) |
 
 The other 160 WM handlers (party, friends, guild, raid, chat channels, …) are listed in
 [opcodes-wm.md](opcodes-wm.md) with their replies and payload-read hints.
@@ -404,8 +431,9 @@ reads the cipher table from Appendix A below, so keep that heading and hex block
   zone: Z18 §1.3 session filter), not summarised here.
 - Which of the client's 8 `0x0805` points in `World::LoadMap` fire for which map (two first loads sent none;
   capture-validation §4.4).
-- Names for most WM- and Login-only opcodes. These binaries carry no name strings for them; the names
-  would have to come from the client.
+- ~~Names for most WM- and Login-only opcodes. These binaries carry no name strings for them~~: the official
+  names come from the opcode enums of the 2016 server PDBs (`Files/Server/NA2016`, work item S01); `opcodes.json`
+  names 2,529 of its 2,572 opcodes from them (`name_source: pdb2016`).
 - Server → client messages sent from timers or other non-handler code (combat ticks, mob AI, broadcasts)
   are not listed per trigger. They do appear in `opcodes.json` when a handler sends them.
 
