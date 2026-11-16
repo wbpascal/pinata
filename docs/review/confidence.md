@@ -147,13 +147,14 @@ absence means "not re-read by anyone", not "confirmed": P02 lists what the captu
 
 ## 2. Ratings per document
 
-State: re-run after capture batch 3 (X05 part 4). 49 pseudocode documents (2 249 headings: 130 high, 1 570 medium,
-223 low, 326 not rated) and 61 knowledge files (318 headings: 13 high, 237 medium, 28 low, 40 not rated; 5 of them the sections X05's sweep added to its own knowledge file); 102 hand
-rows. Hand passes: Login, WM, the shared library and the DB servers (X02 part 2), the zone documents and the
-knowledge files (part 3), 4 rows set by the re-check of §3.2 (part 4: `Z01.md` §3 → high, §4 and §6 low → medium,
-`Z03.md` §2 stays medium), and the pass after batch 3 (X05: end of §2.2). The state before the re-run was 45
-documents, 2 031 headings: 78 high, 1 427 medium, 227 low, 299 not rated; the four documents added since are W06,
-Z31, Z32 and D08. The ratings are the input of §3; §3 and new captures change them (re-run the generator).
+State: re-run after capture batch 4 (X07 part 3). 49 pseudocode documents (2 249 headings: 152 high, 1 559 medium,
+212 low, 326 not rated) and 62 knowledge files (321 headings: 13 high, 240 medium, 28 low, 40 not rated; the 3 new
+ones are `X07.md` §1–§3); 123 hand rows. Hand passes: Login, WM, the shared library and the DB servers (X02 part 2),
+the zone documents and the knowledge files (part 3), 4 rows set by the re-check of §3.2 (part 4: `Z01.md` §3 → high,
+§4 and §6 low → medium, `Z03.md` §2 stays medium), the pass after batch 3 (X05) and the pass after batch 4 (X07),
+both at the end of §2.2. Before the batch-4 re-run: 130 high, 1 570 medium, 223 low, 326 not rated over the same 49
+documents; knowledge 13 / 237 / 28 / 40 over 61 files; 102 hand rows. The ratings are the input of §3; §3 and new
+captures change them (re-run the generator).
 
 ### 2.1 Method
 
@@ -168,7 +169,7 @@ What the generator reads:
 
 | Signal | Source | Use |
 |---|---|---|
-| `cap n/m` | the opcodes written in the section (`0x…`, known to `opcodes.json`) that have an evidence entry in `annotations/P02.json` or a row with "Seen" > 0 in an "Opcodes" table of `capture-validation.md` (`n`), of all its opcodes (`m`). The second source was added by X05: 102 captured opcodes have a table row and no evidence entry (73 of batches 1–2, 29 of batch 3, e.g. `0x0804`, `0x1802`, `0x240E`, `0x3441` / `0x3442`) | capture evidence |
+| `cap n/m` | the opcodes written in the section (`0x…`, known to `opcodes.json`) that have an evidence entry in `annotations/P02.json` or a row with "Seen" > 0 in an "Opcodes" table of `capture-validation.md` (`n`), of all its opcodes (`m`). The second source was added by X05: 102 captured opcodes have a table row and no evidence entry (73 of batches 1–2, 29 of batch 3, e.g. `0x0804`, `0x1802`, `0x240E`, `0x3441` / `0x3442`); the batch-4 tables (§22.6, §23.8, §24.9, §25.10) are read the same way. X07 widened the row form to cells with several opcodes (`0x9007 / 0x9008`, "Seen" `1 / 2`, `2 + 2`, `5 each`): 78 more opcodes, most of them the WM / zone login lists of batch 2 | capture evidence |
 | `cv ok` | the § is named in a **confirmed** row of `capture-validation.md` (§11) or in its list of orders confirmed in full (end of §11) | capture evidence |
 | `cv corr` | the § is named in `capture-validation.md` §13 (corrected / contradicted / extended by a capture); the correct statement is in `docs/knowledge/P02.md` "Corrections" | class applies |
 | `sup×n (README §5.x)` | `n` rows of README §5 name this item and § as "Older place" (a § that is no heading counts for its nearest parent) | class applies |
@@ -340,6 +341,60 @@ the refusals and `0x34BA`, of Z05 §3.2 the three fail answers, of W05 §5.4 the
 lists and the capture-validation text; no code and no section body was re-read in this pass, so a "kept high" row
 means "its own packets are in a capture", not "re-verified".
 
+**Hand pass after capture batch 4 (X07 part 3).** The batch-3 block above is kept as written. The re-run reads the
+batch-4 evidence (captures `s24`, `s37b`, `s38`: the "Opcodes" tables §22.6, §23.8, §24.9, §25.10 of
+`capture-validation.md` and the batch-4 entries of `annotations/P02.json`) and the batch-4 rows of §11 (from
+"Character create refused" on) and §13. Batch 4 adds to the capture set: the create refusal, both renames (free
+rename, rename right `0xB40F`), a tutorial skip refused (P02-B33), a zone down at character login, back to character
+select and quit on all links, the zone connection lost and the 10-s Kickout save, zone kills after `&getmoney`, the
+10-min auto-save; the skill master and a skill book, empower, stat points up and down, both reset capsules, skill
+saves `0x4009` / `0x400A`, auto-arrange, a Damaged Mystery Vault; cast abort, Dash (ground target), the toggle Heat of
+Fury with its area drain, abstate reset conditions, `&resetabstate`, poison damage over time, death by a mob, revive
+by skill and town revive. Still in no capture: party, raid, guild, pet, silver wing, quest step, KQ play, scripted
+map, booth, mini-house, mob skills, `0x243E` (the client's assist sends `0x2401`), the server refusals the client
+pre-empts (capture-scenarios 51, T23, T24).
+
+Of the sections that existed before, 37 changed their rating (`X07.md` §1–§3 are rated for the first time):
+
+| Change | Rows | Why |
+|---|---|---|
+| medium → high | 23 | a batch-4 capture shows the section's own packets or confirms it in §11: W01 §10 and Z03 §10 (client cross-check summaries, now 14 of 21 / 31 of 43 opcodes captured), Z03 §5.5 / §9.3, Z05 §9.8 (Mystery Vault, §24.8), Z07 §2.2 / §2.3 / §2.4, Z08 §11, Z09 §9.3 (Dash), Z22 §3.3 (DoT) / §4.2 (the area part of the toggle, only its `num 0` path: no enemy in range, §25.4), Z23 §2.3 / §2.5 / §3.1 / §4 / §6.2 / §7.1 / §7.2 (skill-save wire; the DB columns against a snapshot with the cool-time column are open, capture-scenarios 51), Z25 §6.3, Z30 §1.2; by hand Z09 §8.5 (no opcode: the blast-to-effect delay rule matches all four batch-4 skills within one tick, §25.4) and Z31 §11.5 (the X05 hand row is removed: `0x304A` → `0x304B` → exchange captured, §24.8) |
+| low → medium | 12 | a section with a class (README §5 row, `cv corr`, D, weak markers) that batch 4 now covers: "a captured section in which a class applies". D01 §4.2, D02 §3.3 / §3.5 / §7.2 / §14, D04 §2 (DB sections whose link packets are captured), W01 §5.4 / §6.1 / §6.2, Z01 §8.1, Z03 §5.4, Z04 §12.5 |
+| high → medium | 1 | W01 §3.3: batch 4 corrects it (the list's map is patched to "RouT", §13 → X06) |
+| medium → low | 1 | Z03 §2.6 `0x243E`: the client's assist sent a plain `0x2401` (§25.5), and the 2016 client has no path that sends `0x243E` (`X07.md` §2); hand row with that reason, raise by test-client case T25 |
+
+Generator change (`X02-rate.py` `load_inputs`): an "Opcodes" table row may name several opcodes in one cell (`0x9007 /
+0x9008`, `0x1021 / 0x10CD / 0x10D6`); the old pattern read only rows with one opcode and an `NC_…` name, so 78
+captured opcodes (the batch-2 login lists `0x1021` – `0x10E9`, `0x400F` / `0x4029` / `0x402B`, soul-stone and shop
+pairs, the toggle pair `0x245C` / `0x245D`, `0x9008`) counted as uncaptured. Read now, they raised 7 sections, all
+set back to medium by hand (the lists were captured empty, below).
+
+Hand rows of this pass (`X02-rate-hand.py`, the two blocks "X07": 22 new rows, 1 removed, 11 reworded):
+
+| Row(s) | Hand rating | Reason |
+|---|---|---|
+| Z03 §9.4, Z09 §2.3 / §12.6 / §17.3 / §26.4 / §29.2, Z13 §4.6, Z20 §5.2, Z23 §1.3, Z25 §1.1.1, Z26 §5.5 | medium | baseline limit 1: the captured opcodes are the skill-book learn (`0x4801` / `0x4802` / `0x4804`), the DoT damage `0x243C`, Dash `0x2450` / `0x2451`, the invalid-command answer `0x2011`, the potion use; the section's subject (`0x4822` production field, game-mode tick work, magic fields, Lua and Pine functions, the Z09 bug table, the partner summon, the skill-name trie, vtable slots, special-member readers, `0x304E`) is in no capture or not on the wire |
+| Z11 §3.4, §5.2 | low (kept) | a class applies and the batch-4 opcodes are mentions only: `0x304A` came from the client's own auto-arrange, not a debug wrapper; `0x2011` / `0x243C` are the invalid `&resetabstated` and the poison, no mob tool was used |
+| W04 §3.3 / §11, Z09 §14.5, Z15 §4.2 / §5.7, Z17 §3.5, Z28 §5.2 | medium | raised by the widened table read only: the login lists (quest diary, passives, charged buffs, item-action cool-downs, card collection) were captured empty (`n 0`, capture-validation §5.2, §7.4, §7.5), like the guild list of W03 §1.1; Z09 §14.5's jump / emote are mentions |
+| Z03 §2.6 | low | see the table above |
+| Z09 §8.5 | high | see the table above |
+| Z22 §10.7, Z23 §2.4 (reworded, stay medium) | medium | now captured (the toggle's keep-time path; its automatic switch-off by unequip, low HP, map change, §25.4) but extended by batch 4 (P02-B39, P02-B38; §13 → X06): a captured section in which a class applies |
+| Z25 §1.3, Z18 §3.8 (reworded, stay medium) | medium | the reasons name the batch-4 skills (Dash, Heat of Fury, Divine Shield, Revival) and skill teach / empower; the mob-side slots, polymorph and the other helper rows are still code only |
+| Z22 §7.2 / §7.5 / §9.5 / §12.4, Z25 §2.7 / §2.8 / §2.10 (reworded, stay medium) | medium | the list of captured abstates names batch 4 too; the bomb, dispel / cure, time-attack and party-enchant actors and the skill specials are still in no capture |
+
+Kept as the baseline rates them after the check: Z03 §5.2, W01 §5.2, Z05 §6.1, Z12 §7.1 (high, unchanged); the other
+sections batch 4 names stay medium because a class applies (W01 §3.2 / §4.1 / §4.2 / §5.1 / §7.2, Z01 §5.3 / §6 /
+§8.3 / §8.4, Z03 §7.3 / §9.1, Z11 §4.4 / §7.4, D02 §6, D03 §9: README §5 rows or §13 corrections) or only part of
+the section is captured (Z03 §9.5 skill unlearn `0x4824`: in no capture; its `cv ok` is a false match of the §11 row "Death by mob, revive by
+skill", whose `§9.5` is capture-validation's own §9.5; Z09 §28.3: only the
+`AbStateReset` part of `MiscDataTable` is confirmed, `0x10AF` is not captured; Z25 §6.4: the one-hit queuing path,
+not the multi-hit one). D02 §5 stays low (class D: `p_Char_Login` / `p_Char_Logout` differ between the backups; the
+capture shows `0x1037` with the WM's copy, P02-B36). As in the batch-3 pass, the check used the section titles, their
+opcode lists and the capture-validation text; "high" is the path the captures took (of Z07 §2.2 – §2.4 the refusal
+codes 0xAC2 – 0xAC7 of `0x1061` / `0x1067`: test-client cases T10, T24; of Z08 §11 the failures `0x9009` / `0x900A` / `0x900E` / `0x900F`:
+capture-scenarios 51; of Z23 §4 / Z03 §9.1 the refusals of `0x4814` 0x882 – 0x889: T23; of Z03 §9.3 the teach failures `0x4803`
+/ `0x4805` are open).
+
 <!-- X02-RATINGS:BEGIN (generated by docs/plan/status/X02-rate.py write; do not edit) -->
 
 ### 2.3 Summary per file (generated)
@@ -350,54 +405,54 @@ Pseudocode documents (`docs/pseudocode/`):
 |---|---|---|---|---|---|---|---|
 | `login-server.md` | L00 | 16 | 1 | 8 | 4 | 3 | 0 |
 | `login/L01-process.md` | L01 | 27 | 8 | 13 | 1 | 5 | 2 |
-| `wm/W01-core.md` | W01 | 33 | 4 | 19 | 5 | 5 | 0 |
+| `wm/W01-core.md` | W01 | 33 | 4 | 22 | 2 | 5 | 0 |
 | `wm/W02-party-raid.md` | W02 | 45 | 1 | 29 | 8 | 7 | 0 |
 | `wm/W03-guild.md` | W03 | 63 | 1 | 42 | 12 | 8 | 1 |
-| `wm/W04-social-misc.md` | W04 | 70 | 11 | 38 | 9 | 12 | 1 |
+| `wm/W04-social-misc.md` | W04 | 70 | 11 | 38 | 9 | 12 | 3 |
 | `wm/W05-process.md` | W05 | 42 | 11 | 22 | 1 | 8 | 0 |
 | `wm/W06-leftovers.md` | W06 | 21 | 0 | 16 | 0 | 5 | 0 |
-| `zone/Z01-core.md` | Z01 | 33 | 1 | 16 | 13 | 3 | 0 |
+| `zone/Z01-core.md` | Z01 | 33 | 1 | 17 | 12 | 3 | 0 |
 | `zone/Z02-actions.md` | Z02 | 36 | 5 | 19 | 8 | 4 | 3 |
-| `zone/Z03-combat.md` | Z03 | 52 | 7 | 20 | 19 | 6 | 0 |
-| `zone/Z04-items.md` | Z04 | 72 | 6 | 42 | 11 | 13 | 5 |
-| `zone/Z05-itemdb.md` | Z05 | 61 | 7 | 39 | 7 | 8 | 3 |
+| `zone/Z03-combat.md` | Z03 | 52 | 10 | 17 | 19 | 6 | 2 |
+| `zone/Z04-items.md` | Z04 | 72 | 6 | 43 | 10 | 13 | 5 |
+| `zone/Z05-itemdb.md` | Z05 | 61 | 8 | 38 | 7 | 8 | 3 |
 | `zone/Z06-economy.md` | Z06 | 29 | 1 | 16 | 7 | 5 | 0 |
-| `zone/Z07-character.md` | Z07 | 52 | 3 | 28 | 14 | 7 | 1 |
-| `zone/Z08-content.md` | Z08 | 30 | 1 | 15 | 9 | 5 | 0 |
-| `zone/Z09-world.md` | Z09 | 268 | 9 | 209 | 10 | 40 | 16 |
+| `zone/Z07-character.md` | Z07 | 52 | 6 | 25 | 14 | 7 | 1 |
+| `zone/Z08-content.md` | Z08 | 30 | 2 | 14 | 9 | 5 | 0 |
+| `zone/Z09-world.md` | Z09 | 268 | 11 | 207 | 10 | 40 | 23 |
 | `zone/Z10-certification.md` | Z10 | 38 | 0 | 28 | 3 | 7 | 1 |
-| `zone/Z11-gm-commands.md` | Z11 | 62 | 3 | 52 | 3 | 4 | 2 |
+| `zone/Z11-gm-commands.md` | Z11 | 62 | 3 | 52 | 3 | 4 | 4 |
 | `zone/Z12-stats.md` | Z12 | 46 | 7 | 28 | 4 | 7 | 2 |
-| `zone/Z13-objects.md` | Z13 | 87 | 10 | 67 | 1 | 9 | 4 |
+| `zone/Z13-objects.md` | Z13 | 87 | 10 | 67 | 1 | 9 | 5 |
 | `zone/Z14-instances.md` | Z14 | 28 | 0 | 24 | 0 | 4 | 0 |
-| `zone/Z15-quest-engine.md` | Z15 | 51 | 0 | 45 | 1 | 5 | 5 |
+| `zone/Z15-quest-engine.md` | Z15 | 51 | 0 | 45 | 1 | 5 | 7 |
 | `zone/Z16-events.md` | Z16 | 47 | 1 | 42 | 1 | 3 | 1 |
-| `zone/Z17-item-actions.md` | Z17 | 38 | 2 | 31 | 0 | 5 | 3 |
+| `zone/Z17-item-actions.md` | Z17 | 38 | 2 | 31 | 0 | 5 | 4 |
 | `zone/Z18-leftovers.md` | Z18 | 50 | 12 | 33 | 0 | 5 | 6 |
 | `zone/Z19-config-script.md` | Z19 | 22 | 0 | 17 | 0 | 5 | 0 |
-| `zone/Z20-skill-data.md` | Z20 | 26 | 0 | 20 | 0 | 6 | 0 |
+| `zone/Z20-skill-data.md` | Z20 | 26 | 0 | 20 | 0 | 6 | 1 |
 | `zone/Z21-set-items.md` | Z21 | 32 | 0 | 27 | 0 | 5 | 3 |
-| `zone/Z22-abstate-actors.md` | Z22 | 61 | 1 | 49 | 0 | 11 | 5 |
-| `zone/Z23-skill-list.md` | Z23 | 43 | 1 | 34 | 0 | 8 | 1 |
+| `zone/Z22-abstate-actors.md` | Z22 | 61 | 3 | 47 | 0 | 11 | 5 |
+| `zone/Z23-skill-list.md` | Z23 | 43 | 8 | 27 | 0 | 8 | 2 |
 | `zone/Z24-item-data.md` | Z24 | 37 | 0 | 32 | 0 | 5 | 0 |
-| `zone/Z25-skill-specials.md` | Z25 | 37 | 2 | 29 | 0 | 6 | 5 |
-| `zone/Z26-silver-wing.md` | Z26 | 24 | 1 | 19 | 0 | 4 | 12 |
+| `zone/Z25-skill-specials.md` | Z25 | 37 | 3 | 28 | 0 | 6 | 6 |
+| `zone/Z26-silver-wing.md` | Z26 | 24 | 1 | 19 | 0 | 4 | 13 |
 | `zone/Z27-item-table.md` | Z27 | 36 | 0 | 31 | 0 | 5 | 1 |
-| `zone/Z28-card-tables.md` | Z28 | 29 | 0 | 24 | 0 | 5 | 0 |
+| `zone/Z28-card-tables.md` | Z28 | 29 | 0 | 24 | 0 | 5 | 1 |
 | `zone/Z29-exp-tables.md` | Z29 | 15 | 0 | 11 | 0 | 4 | 0 |
-| `zone/Z30-leftovers.md` | Z30 | 17 | 2 | 12 | 0 | 3 | 1 |
-| `zone/Z31-class-remainder.md` | Z31 | 95 | 4 | 78 | 1 | 12 | 4 |
+| `zone/Z30-leftovers.md` | Z30 | 17 | 3 | 11 | 0 | 3 | 1 |
+| `zone/Z31-class-remainder.md` | Z31 | 95 | 5 | 77 | 1 | 12 | 3 |
 | `zone/Z32-gamble-internals.md` | Z32 | 48 | 1 | 40 | 0 | 7 | 1 |
-| `db/D01-account.md` | D01 | 18 | 0 | 7 | 10 | 1 | 0 |
-| `db/D02-character.md` | D02 | 27 | 1 | 7 | 17 | 2 | 0 |
+| `db/D01-account.md` | D01 | 18 | 0 | 8 | 9 | 1 | 0 |
+| `db/D02-character.md` | D02 | 27 | 1 | 11 | 13 | 2 | 0 |
 | `db/D03-character-items.md` | D03 | 50 | 3 | 29 | 14 | 4 | 0 |
-| `db/D04-character-social.md` | D04 | 29 | 0 | 10 | 15 | 4 | 0 |
+| `db/D04-character-social.md` | D04 | 29 | 0 | 11 | 14 | 4 | 0 |
 | `db/D05-gamelog.md` | D05 | 31 | 0 | 12 | 13 | 6 | 0 |
 | `db/D06-db-inferred.md` | D06 | 59 | 0 | 47 | 2 | 10 | 0 |
 | `db/D07-character-reward-items.md` | D07 | 18 | 0 | 15 | 0 | 3 | 0 |
 | `db/D08-db-process.md` | D08 | 54 | 0 | 47 | 0 | 7 | 0 |
 | `shared/S02-library.md` | S02 | 44 | 2 | 32 | 0 | 10 | 3 |
-| **total** | | 2249 | 130 | 1570 | 223 | 326 | 92 |
+| **total** | | 2249 | 152 | 1559 | 212 | 326 | 113 |
 
 Knowledge files (`docs/knowledge/`):
 
@@ -463,8 +518,9 @@ Knowledge files (`docs/knowledge/`):
 | `X03.md` | X03 | 2 | 0 | 2 | 0 | 0 | 0 |
 | `X04.md` | X04 | 6 | 0 | 4 | 0 | 2 | 0 |
 | `X05.md` | X05 | 7 | 0 | 7 | 0 | 0 | 0 |
+| `X07.md` | X07 | 3 | 0 | 3 | 0 | 0 | 0 |
 | `K01.md` | K01 | 19 | 0 | 15 | 0 | 4 | 0 |
-| **total** | | 318 | 13 | 237 | 28 | 40 | 10 |
+| **total** | | 321 | 13 | 240 | 28 | 40 | 10 |
 
 ### 2.4 L00: `login-server.md`
 
@@ -529,32 +585,32 @@ Knowledge files (`docs/knowledge/`):
 | · 2.1 Server-to-server handshake (all outgoing links) | **high** | cap 4/4; cv ok |  |
 | 3. World login (client → WM) | – | container (see its subsections) |  |
 | · 3.1 Pending world logins (Login → WM) | medium | cap 3/3; sup×2 (README §5.3) | re-read the rest (§3) |
-| · 3.2 Client connects to the WM | medium | cap 8/9; cv ok; sup×1 (README §5.3); N: `AcceptTick` | re-read the rest (§3); README §4.8; capture 0x0C15 |
-| · 3.3 Newbie / comeback classification, then the avatar list | **high** | cap 5/10; cv ok; client×1; weak inf1 p171 |  |
+| · 3.2 Client connects to the WM | medium | cap 8/9; cv ok; sup×1 (README §5.3); cv corr; N: `AcceptTick` | re-read the rest (§3); read with P02 "Corrections"; README §4.8; capture 0x0C15 |
+| · 3.3 Newbie / comeback classification, then the avatar list | medium | cap 6/10; cv ok; client×1; cv corr; weak inf1 p171 | read with P02 "Corrections"; capture 0x0C15 |
 | 4. Character select (client → WM) | – | container (see its subsections) |  |
-| · 4.1 Create / delete / rename | medium | cap 12/26; cv ok; sup×2 (README §5.3); cv corr; weak inf4 | re-read the rest (§3); read with P02 "Corrections"; code or capture for the marked statements; capture 0x1404, 0x1406, 0x140A, 0x140C … |
-| · 4.2 Character login (enter the game) | medium | cap 15/17; cv ok; client×1; sup×4 (README §5.3); cv corr; weak inf1 | re-read the rest (§3); read with P02 "Corrections"; capture 0x1002, 0x111D |
+| · 4.1 Create / delete / rename | medium | cap 24/26; cv ok; sup×2 (README §5.3); cv corr; weak inf4 | re-read the rest (§3); read with P02 "Corrections"; code or capture for the marked statements; capture 0x140A |
+| · 4.2 Character login (enter the game) | medium | cap 16/17; cv ok; client×1; sup×4 (README §5.3); cv corr; weak inf1 | re-read the rest (§3); read with P02 "Corrections"; capture 0x111D |
 | · 4.3 Beauty shop at character select (CHairShopFrameWork) | medium | cap 0/8 | capture 0x1079, 0x107D |
 | 5. In-game client requests (core) | – | container (see its subsections) |  |
 | · 5.1 Logout and return to character select | medium | cap 7/7; cv ok; client×1; sup×2 (README §5.3); cv corr | re-read the rest (§3); read with P02 "Corrections" |
-| · 5.2 Kicks | **high** | cap 2/3 |  |
+| · 5.2 Kicks | **high** | cap 3/3; cv ok |  |
 | · 5.3 Small client requests | medium | cap 4/20 | capture 0x0813, 0x0819, 0x086F, 0x3041 |
-| · 5.4 CharacterLogout (shared by logout, disconnect, return to se… | **low** | cap 2/7; sup×1 (README §5.3) | re-read the rest (§3) |
+| · 5.4 CharacterLogout (shared by logout, disconnect, return to se… | medium | cap 6/7; cv ok; sup×1 (README §5.3); cv corr | re-read the rest (§3); read with P02 "Corrections" |
 | 6. Character DB link (CParserCharDB) | medium | read in code | second reading / client check |
-| · 6.1 AVATAR (0x82 bytes; char-select list entry) | **low** | cap 1/5; sup×2 (README §5.3); cv corr; weak inf6 p172; ours×1 | re-read the rest (§3); read with P02 "Corrections"; code or capture for the marked statements |
-| · 6.2 Avatar and character replies | **low** | cap 3/17; sup×2 (README §5.3) | re-read the rest (§3); capture 0x086F, 0x1002, 0x1079, 0x107D … |
-| · 6.3 Character blob cache (CharDB → WM → zone) | medium | cap 59/96; sup×2 (README §5.3); cv corr | re-read the rest (§3); read with P02 "Corrections"; capture 0x1010, 0x1011, 0x102A |
+| · 6.1 AVATAR (0x82 bytes; char-select list entry) | medium | cap 5/5; sup×2 (README §5.3); cv corr; weak inf6 p172; ours×1 | re-read the rest (§3); read with P02 "Corrections"; code or capture for the marked statements |
+| · 6.2 Avatar and character replies | medium | cap 6/17; cv ok; sup×2 (README §5.3); cv corr | re-read the rest (§3); read with P02 "Corrections"; capture 0x086F, 0x1079, 0x107D |
+| · 6.3 Character blob cache (CharDB → WM → zone) | medium | cap 73/96; sup×2 (README §5.3); cv corr | re-read the rest (§3); read with P02 "Corrections"; capture 0x1010, 0x1011, 0x102A |
 | 7. Zone links (CParserZone) | – | container (see its subsections) |  |
 | · 7.1 Zone registration and map table | medium | cap 4/5; sup×2 (README §5.3); cv corr | re-read the rest (§3); read with P02 "Corrections" |
-| · 7.2 Character data for a zone (map login and map change) | medium | cap 11/13; cv ok; sup×1 (README §5.3); cv corr; weak p172 | re-read the rest (§3); read with P02 "Corrections" |
-| · 7.3 Map login done, map change, logout notices | medium | cap 23/27; cv ok; sup×4 (README §5.3); cv corr | re-read the rest (§3); read with P02 "Corrections"; capture 0x5425, 0xB016 |
+| · 7.2 Character data for a zone (map login and map change) | medium | cap 12/13; cv ok; sup×1 (README §5.3); cv corr; weak p172 | re-read the rest (§3); read with P02 "Corrections" |
+| · 7.3 Map login done, map change, logout notices | medium | cap 24/27; cv ok; sup×4 (README §5.3); cv corr | re-read the rest (§3); read with P02 "Corrections"; capture 0x5425, 0xB016 |
 | · 7.4 Character state saves (dept 16 and others; zone → WM cache) | medium | cap 4/7; sup×3 (README §5.3, §5.4); cv corr | re-read the rest (§3); read with P02 "Corrections" |
 | · 7.5 Level change | medium | cap 2/4; sup×1 (README §5.4); cv corr; weak inf1 | re-read the rest (§3); read with P02 "Corrections" |
 | · 7.6 Other zone messages in scope | medium | cap 2/19; cv ok; client×1; weak inf1 | capture 0x7C02 |
 | 8. AccountDB / AccountLogDB / GameLogDB links (rest) | medium | cap 3/12; cv ok; client×1 | capture 0x8002, 0x8004, 0x8006 |
 | 9. OPTool (CParserOPTool) | medium | cap 6/55 | capture 0x0813, 0x7419, 0x7477, 0x9418 |
-| 10. Client cross-check (summary) | medium | cap 10/21 | capture 0x0C15, 0x1002, 0x1079, 0x107D … |
-| Original-server bugs | **low** | cap 7/11; sup×3 (README §5.3); weak inf1; bug table (class X: effects are deductions) | re-read the rest (§3); capture 0x1002 |
+| 10. Client cross-check (summary) | **high** | cap 16/21 |  |
+| Original-server bugs | **low** | cap 10/11; sup×3 (README §5.3); weak inf1; bug table (class X: effects are deductions) | re-read the rest (§3) |
 | 11. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 
 ### 2.7 W02: `wm/W02-party-raid.md`
@@ -680,7 +736,7 @@ Knowledge files (`docs/knowledge/`):
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
 | 1. Shared data and helpers | – | container (see its subsections) |  |
-| · 1.1 Client-session fields used by this item (see W01-core §1.1 … | medium | cap 1/7; weak p171 | capture (class U) |
+| · 1.1 Client-session fields used by this item (see W01-core §1.1 … | medium | cap 2/7; weak p171 | capture (class U) |
 | · 1.2 Helpers (named here) | medium | cap 0/1; ours×1 | capture 0x2004 |
 | 2. Chat routing (dept 8 ACT) | – | container (see its subsections) |  |
 | · 2.1 Whisper: client 0x200C NC_ACT_WHISPER_REQ (CParserClient) | **high** | cap 4/5; cv ok; client×2 |  |
@@ -691,12 +747,12 @@ Knowledge files (`docs/knowledge/`):
 | 3. Zone notifications (dept 9 BAT, 18 SKILL) | – | container (see its subsections) |  |
 | · 3.1 0x244A NC_BAT_PKINPKFIELD_WMS_CMD | **high** | cap 2/3 |  |
 | · 3.2 0x2458 NC_BAT_WORLD_MOB_KILL_ANNOUNCE_CMD | medium | cap 0/2; client×1; weak p171 | capture 0x2459 |
-| · 3.3 0x4820 NC_SKILL_PASSIVESKILL_LEARN_CMD | medium | cap 0/2 | capture (class U) |
+| · 3.3 0x4820 NC_SKILL_PASSIVESKILL_LEARN_CMD | medium | the captured opcode is only the passive list 0x1025, empty (`n 0`, capture-validation §7.5); the subject of the section (0x4820 passive skill learned) is in no capture (hand; baseline: high) | capture: learn a passive skill |
 | 4. Operator tool (dept 10 OPTOOL and the other CParserOPTool ha… | medium | cap 0/1 | capture (class U) |
 | · 4.1 Server status | **low** | cap 1/15; B×1 | follow the return value to the parser |
 | · 4.2 Kingdom-quest schedule (OPTool side) | medium | cap 0/7 | capture (class U) |
 | · 4.3 Users and characters | medium | cap 3/14; cv ok; weak inf1 | capture 0x540C, 0x7438, 0x9860 |
-| · 4.4 Guild and guild tournament (OPTool side; W03 owns the guild… | medium | cap 4/22 | capture 0x1404, 0x7419, 0x7439, 0x7477 |
+| · 4.4 Guild and guild tournament (OPTool side; W03 owns the guild… | medium | cap 6/22 | capture 0x7419, 0x7439, 0x7477 |
 | 5. Friends (dept 21 FRIEND) | – | container (see its subsections) |  |
 | · 5.1 Friend list in the client session | **high** | cap 1/2; cv ok |  |
 | · 5.2 Loading and presence (not handlers; reached from W01's logi… | medium | cap 2/12 | capture 0x1010, 0x5407, 0x5408, 0x5409 … |
@@ -713,14 +769,14 @@ Knowledge files (`docs/knowledge/`):
 | 7. Character title relay (dept 24 CT) | medium | cap 1/4 | capture (class U) |
 | 8. Character options (dept 28 CHAR_OPTION) | – | container (see its subsections) |  |
 | · 8.1 Session cache and the login push | **high** | cap 10/17 |  |
-| · 8.2 Client requests | **low** | cap 10/41; sup×2 (README §5.3); cv corr; B×3 | re-read the rest (§3); read with P02 "Corrections"; follow the return value to the parser |
-| · 8.3 CharDB answers | **low** | cap 6/26; client×2; B×1; R×1 | follow the return value to the parser; callers incl. vtable slots; senders in every `handlers.json`; capture 0x7003, 0x7007, 0x7009, 0x700B … |
+| · 8.2 Client requests | **low** | cap 14/41; sup×2 (README §5.3); cv corr; B×3 | re-read the rest (§3); read with P02 "Corrections"; follow the return value to the parser |
+| · 8.3 CharDB answers | **low** | cap 7/26; client×2; B×1; R×1 | follow the return value to the parser; callers incl. vtable slots; senders in every `handlers.json`; capture 0x7003, 0x7007, 0x7009, 0x700B … |
 | 9. Prison (dept 31) | **low** | no function cited; sup×1 (README §5.3); cv corr | re-read the rest (§3); read with P02 "Corrections" |
 | · 9.1 `CPrisonServer` (the WM's release timer) | medium | cap 1/4; weak inf1 | capture 0x7C05 |
 | · 9.2 Client requests (CParserClient) | medium | cap 2/16; client×3; weak inf1 | capture 0x7C02, 0x7C03, 0x7C05, 0x7C0A |
 | · 9.3 Zone and CharDB answers | medium | cap 2/18; client×2; weak p171 | capture 0x5808, 0x7C02, 0x7C03, 0x7C05 … |
 | 10. Player reports (dept 32 REPORT) | **low** | cap 0/12; client×1; R×1 | callers incl. vtable slots; senders in every `handlers.json`; capture 0x8002, 0x8004, 0x8006 |
-| 11. Charged (premium) buffs (dept 36, CParserZone) | medium | cap 1/4 | capture (class U) |
+| 11. Charged (premium) buffs (dept 36, CParserZone) | medium | captured only as empty lists: CharDB 0x101B `{handle, 0}` and WM→Z 0x1032 `n 0` at every login (capture-validation §7.4, §7.5); no charged buff in a capture, 0x9001 / 0x9002 not captured (hand; baseline: high) | capture with an active charged buff (premium item), then a map login |
 | 12. Holy promise (master / apprentice, dept 37) | medium | cap 0/2 | capture (class U) |
 | · 12.1 The relation object in the session (`HP` = session +0x1DFB… | **high** | cap 2/2 |  |
 | · 12.2 Loading, presence, level change (not handlers) | medium | cap 6/13; client×3 | capture 0x9416, 0x9417, 0x9419, 0x9445 |
@@ -760,7 +816,7 @@ Knowledge files (`docs/knowledge/`):
 | · 1.3 ProcessLink (start-up links) | medium | cap 1/2; cv ok; sup×1 (README §5.3); cv corr | re-read the rest (§3); read with P02 "Corrections" |
 | · 1.4 ProcessConnect and ProcessPacket (accept and packet pump) | medium | cap 2/2; sup×1 (README §5.3) | re-read the rest (§3) |
 | · 1.5 ProcessDisconnect (heartbeats and closing links) | **high** | cap 2/2 |  |
-| · 1.6 Shutdown | **high** | cap 4/5 |  |
+| · 1.6 Shutdown | **high** | cap 5/5 |  |
 | 2. Timed services (`ProcessContents`) | – | container (see its subsections) |  |
 | · 2.1 Order and period | medium | cap 1/1 | capture (class U) |
 | · 2.2 Server time for the clients (0x0849) | medium | cap 4/4; cv ok; client×1; sup×1 (README §5.3); cv corr; weak inf1 | re-read the rest (§3); read with P02 "Corrections" |
@@ -773,27 +829,27 @@ Knowledge files (`docs/knowledge/`):
 | 4. Session pools and the client session lifecycle | – | container (see its subsections) |  |
 | · 4.1 Pool structure (`CWMBaseSessionManager`) | medium | weak inf1 | second reading / client check |
 | · 4.2 Handles | medium | cap 1/1; weak inf1 | capture (class U) |
-| · 4.3 Client session: construct, take, reset | **high** | cap 9/10 |  |
+| · 4.3 Client session: construct, take, reset | **high** | cap 10/10 |  |
 | · 4.4 Pending-login groups per IP | medium | cap 1/1 | capture (class U) |
-| · 4.5 Release: which event closes a client session | **high** | cap 9/11 |  |
+| · 4.5 Release: which event closes a client session | **high** | cap 10/11 |  |
 | · 4.6 Destroy (process stop and exit) | medium | read in code | second reading / client check |
 | · 4.7 Newbie-guide list on the first map login (0x10D9) | **high** | cap 4/4; client×1; weak p171 |  |
 | 5. W01 core gaps | – | container (see its subsections) |  |
 | · 5.1 Handler return value and `fc_dummyfunction` (corrects W01 §… | medium | read in code | second reading / client check |
 | · 5.2 Zone registration 0x0802 (completes W01 §7.1) | medium | cap 3/4; cv ok; sup×1 (README §5.3) | re-read the rest (§3) |
 | · 5.3 World-login entry (0x0C0D / 0x0C0F helpers; corrects W01 §3… | **high** | cap 8/8 |  |
-| · 5.4 Character blob cache: CharDB pushes (W01 §6.3 per handler) | **high** | cap 25/45 |  |
+| · 5.4 Character blob cache: CharDB pushes (W01 §6.3 per handler) | **high** | cap 30/45 |  |
 | · 5.5 Zone state saves (W01 §7.4 per handler) | **high** | cap 17/21 |  |
 | · 5.6 Ping-test relay (OPTool ↔ WM ↔ client / CharDB / zone) | medium | cap 0/8; client×2 | capture 0x0813 |
 | · 5.7 Small helpers and the log systems | **high** | cap 7/9 |  |
-| · 5.8 Triage of the W01 handlers `coverage.py` lists as undocumen… | medium | cap 18/63; client×1 | capture 0x0813, 0x1002, 0x1010 |
+| · 5.8 Triage of the W01 handlers `coverage.py` lists as undocumen… | medium | cap 24/63; client×1 | capture 0x0813, 0x1010 |
 | · 5.9 Uncertain (part 4) | – | open points / boundary list, no claim to rate |  |
 | 6. Construction, service shell and small helpers (sweep) | – | container (see its subsections) |  |
 | · 6.1 Parser handler tables (`PROTOCOLFUNCTIONTEMPLETE<T>`) | medium | cap 1/1 | capture (class U) |
 | · 6.2 Member and session constructors | medium | cap 0/1 | capture (class U) |
 | · 6.3 Windows-service shell, crash dump, checksums | medium | read in code | second reading / client check |
 | · 6.4 Small helpers | medium | cap 0/2 | capture 0x7433, 0x7434 |
-| 7. Original-server bugs | medium | cap 9/13; weak inf2; bug table (class X: effects are deductions) | capture 0x5830 |
+| 7. Original-server bugs | medium | cap 10/13; weak inf2; bug table (class X: effects are deductions) | capture 0x5830 |
 | 8. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 | 9. Coverage boundary | – | open points / boundary list, no claim to rate |  |
 
@@ -849,12 +905,12 @@ Knowledge files (`docs/knowledge/`):
 | · 7.1 so_LinkTo (gate, NPC, script, skill teleport) | medium | cap 9/10; cv ok; client×2; sup×1 (README §5.4); weak inf2 | re-read the rest (§3) |
 | · 7.2 Wing (saved locations) | **low** | cap 0/4; sup×1 (README §5.4); R×1; weak inf1 | re-read the rest (§3); callers incl. vtable slots; senders in every `handlers.json`; capture 0x1815, 0x1817 |
 | · 7.3 Town portal and multi-link NPC | medium | cap 2/9; client×1 | capture 0x181F, 0x1820, 0x2028, 0x2029 … |
-| · 7.4 0x181C NC_MAP_TONORMALCOORD_CMD and so_ply_ToNormalLoc | medium | cap 0/4; weak inf1 | capture (class U) |
+| · 7.4 0x181C NC_MAP_TONORMALCOORD_CMD and so_ply_ToNormalLoc | medium | cap 1/4; weak inf1 | capture (class U) |
 | 8. Logout, kick and character save | **low** | no function cited; sup×1 (README §5.4) | re-read the rest (§3) |
-| · 8.1 Normal logout | **low** | cap 1/2; sup×2 (README §5.4); weak inf1 | re-read the rest (§3) |
-| · 8.2 sp_RefreshWMSSocket | **low** | cap 0/1; sup×1 (README §5.4) | re-read the rest (§3) |
-| · 8.3 Disconnect and kick | medium | cap 4/5; sup×1 (README §5.4) | re-read the rest (§3) |
-| · 8.4 Character save (WholeSaver) | medium | cap 21/27; cv ok; sup×3 (README §5.4); cv corr; B×2; weak inf1 | re-read the rest (§3); read with P02 "Corrections"; follow the return value to the parser |
+| · 8.1 Normal logout | medium | cap 2/2; cv ok; sup×2 (README §5.4); cv corr; weak inf1 | re-read the rest (§3); read with P02 "Corrections" |
+| · 8.2 sp_RefreshWMSSocket | **low** | cap 1/1; sup×1 (README §5.4) | re-read the rest (§3) |
+| · 8.3 Disconnect and kick | medium | cap 5/5; sup×1 (README §5.4); cv corr | re-read the rest (§3); read with P02 "Corrections" |
+| · 8.4 Character save (WholeSaver) | medium | cap 23/27; cv ok; sup×3 (README §5.4); cv corr; B×2; weak inf1 | re-read the rest (§3); read with P02 "Corrections"; follow the return value to the parser |
 | 9. Other client and WM messages in scope | **low** | cap 1/22; sup×3 (README §5.4); B×1; weak p171 | re-read the rest (§3); follow the return value to the parser; capture 0x0812, 0x0813, 0xB413 |
 | 10. Zone ring (ZoneListenSession / ZoneConnectSession) | medium | cap 2/25 | capture (class U) |
 | 11. Client cross-check (summary) | medium | cap 8/18 | capture 0x0810, 0x1804, 0x1815, 0x1817 … |
@@ -870,7 +926,7 @@ Knowledge files (`docs/knowledge/`):
 | · 2.1 0x2003 NC_ACT_WALK_REQ / 0x2005 NC_ACT_RUN_REQ `{ u32 from.… | medium | cap 2/6; weak inf1 | capture 0x2004, 0x2006 |
 | · 2.2 0x2017 NC_ACT_MOVEWALK_CMD / 0x2019 NC_ACT_MOVERUN_CMD `{ u… | medium | cap 6/6; client×1; sup×1 (README §5.4); cv corr | re-read the rest (§3); read with P02 "Corrections" |
 | · 2.3 0x2012 NC_ACT_STOP_REQ `{ u32 loc.x, loc.y }` | **high** | cap 3/3 |  |
-| · 2.4 0x2024 NC_ACT_JUMP_CMD (no payload) | **high** | cap 1/2 |  |
+| · 2.4 0x2024 NC_ACT_JUMP_CMD (no payload) | **high** | cap 2/2 |  |
 | · 2.5 0x2008 NC_ACT_CHANGEMODE_REQ `{ u8 mode }` | **high** | cap 2/2; client×1; weak inf1 |  |
 | 3. Chat | – | container (see its subsections) |  |
 | · 3.1 0x2001 NC_ACT_CHAT_REQ `{ u8 itemLinkDataCount, u8 len, u8 … | medium | cap 2/3; sup×2 (README §5.4); cv corr | re-read the rest (§3); read with P02 "Corrections" |
@@ -886,7 +942,7 @@ Knowledge files (`docs/knowledge/`):
 | · 6.2 0x200A NC_ACT_NPCCLICK_CMD `{ u16 npchandle }` | medium | cap 3/3; sup×1 (README §5.4); cv corr; weak inf1 | re-read the rest (§3); read with P02 "Corrections" |
 | · 6.3 0x201D NC_ACT_NPCMENUOPEN_ACK `{ u8 ack }` | **high** | cap 1/1 |  |
 | · 6.4 0x200B NC_ACT_ENDOFTRADE_CMD, 0x2073 NC_ACT_NPC_MENU_CMD | medium | cap 1/3 | capture 0x3C0F |
-| · 6.5 Role actions | **low** | cap 1/12; sup×1 (README §5.4) | re-read the rest (§3); capture 0x181F, 0x3C03, 0x3C04, 0x3C06 … |
+| · 6.5 Role actions | **low** | cap 4/12; sup×1 (README §5.4) | re-read the rest (§3); capture 0x181F, 0x3C03, 0x3C04, 0x3C06 … |
 | · 6.6 Server menus (generic yes/no dialogs) and 0x3C02 NC_MENU_SE… | medium | cap 2/3; sup×1 (README §5.4); N: `sma_Reset` | re-read the rest (§3); README §4.8; capture 0x3C0F |
 | 7. Tents (mini-house rest mode) | medium | cap 0/6; client×1; weak inf1 | capture 0x2028, 0x2029, 0x202B, 0x202C |
 | 8. Gathering and production | **low** | cap 0/15; sup×4 (README §5.4); weak inf2 p171; R×1 | re-read the rest (§3); code or capture for the marked statements; callers incl. vtable slots; senders in every `handlers.json`; capture 0x202E, 0x202F, 0x2031, 0x2033 … |
@@ -898,7 +954,7 @@ Knowledge files (`docs/knowledge/`):
 | 11. 0x2070 NC_ACT_AUTO_WAY_FINDING_USE_GATE_REQ (no payload) | medium | the captured opcodes are only mentioned here (0x2401 / 0x2402 targeting); the subject of the section (0x2070 / 0x2071 auto way-finding gate use) is in no capture (hand; baseline: high) | capture 0x2070, 0x2071 |
 | 12. Scenario areas and script interrupts | **low** | cap 0/4; client×1; sup×1 (README §5.4) | re-read the rest (§3); capture 0x6C05, 0x6C07 |
 | 13. Field (map) permissions used here | medium | cap 2/5 | capture (class U) |
-| 14. Client cross-check (summary) | medium | cap 15/44 | capture 0x0848, 0x1C07, 0x2004, 0x2006 … |
+| 14. Client cross-check (summary) | medium | cap 17/44 | capture 0x0848, 0x1C07, 0x2004, 0x2006 … |
 | Original-server bugs | **low** | cap 7/30; R×1; bug table (class X: effects are deductions) | callers incl. vtable slots; senders in every `handlers.json`; capture 0x202E, 0x204C, 0x2052, 0x2054 … |
 | 15. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 
@@ -913,12 +969,12 @@ Knowledge files (`docs/knowledge/`):
 | · 2.3 Target information | medium | cap 1/1; client×1 | capture (class U) |
 | · 2.4 Server-side target change | medium | cap 0/1 | capture 0x244D |
 | · 2.5 NC_BAT_UNTARGET_REQ `0x2408` (C→Z) @ FUN_0042b6a0 | **high** | cap 1/1 |  |
-| · 2.6 NC_BAT_ASSIST_REQ `0x243E` (C→Z) @ FUN_0042b7a0 | medium | cap 0/2; client×1 | capture 0x243F |
+| · 2.6 NC_BAT_ASSIST_REQ `0x243E` (C→Z) @ FUN_0042b7a0 | **low** | 0x243E is in no capture: the 2016 client's assist sent a plain 0x2401 to the target's target (capture-validation §25.5, §13 "unconfirmed"), and the 2016 client export has no 0x243e literal (docs/knowledge/X07.md §2) (hand; baseline: low) | test-client case T25 (capture-scenarios §3.41) |
 | 3. Basic attack ("bash" / swing) | – | container (see its subsections) |  |
 | · 3.1 NC_BAT_BASHSTART_CMD `0x242B` (C→Z) @ FUN_00430fa0 | medium | cap 1/1; sup×1 (README §5.5) | re-read the rest (§3) |
 | · 3.2 The swing cycle | medium | cap 3/3; cv ok; sup×3 (README §5.5); cv corr; N: `g_HitRateScale` | re-read the rest (§3); read with P02 "Corrections"; README §4.8 |
 | · 3.3 Who may be hit | **low** | sup×1 (README §5.5) | re-read the rest (§3) |
-| · 3.4 Stopping | **high** | cap 2/3 |  |
+| · 3.4 Stopping | **high** | cap 3/3 |  |
 | · 3.5 The older "bash" packets | **low** | cap 0/1; sup×1 (README §5.5) | re-read the rest (§3); capture 0x242E |
 | 4. Rules of engagement (hit, critical, damage) | – | container (see its subsections) |  |
 | · 4.1 The stat matrix | **low** | sup×3 (README §5.5) | re-read the rest (§3) |
@@ -929,13 +985,13 @@ Knowledge files (`docs/knowledge/`):
 | · 4.6 Attack power, defence, damage | **low** | sup×1 (README §5.5); weak inf1 | re-read the rest (§3) |
 | 5. Skills | **low** | no function cited; sup×1 (README §5.5) | re-read the rest (§3) |
 | · 5.1 Data | **low** | sup×1 (README §5.5) | re-read the rest (§3) |
-| · 5.2 NC_BAT_SKILLBASH_OBJ_CAST_REQ `0x2440` (C→Z) @ FUN_0057fa50 | **high** | cap 1/2; client×1 |  |
+| · 5.2 NC_BAT_SKILLBASH_OBJ_CAST_REQ `0x2440` (C→Z) @ FUN_0057fa50 | **high** | cap 2/2; cv ok; client×1 |  |
 | · 5.3 Cost | medium | read in code | second reading / client check |
-| · 5.4 Casting, abort, blast | **low** | cap 4/9; client×1; sup×2 (README §5.5) | re-read the rest (§3); capture 0x2438, 0x2445, 0x2450, 0x2451 |
-| · 5.5 NC_BAT_SKILLBASH_FLD_CAST_REQ `0x2441` (C→Z) @ FUN_0057f400 | medium | cap 0/1 | capture (class U) |
+| · 5.4 Casting, abort, blast | medium | cap 9/9; cv ok; client×1; sup×2 (README §5.5) | re-read the rest (§3) |
+| · 5.5 NC_BAT_SKILLBASH_FLD_CAST_REQ `0x2441` (C→Z) @ FUN_0057f400 | **high** | cap 1/1; cv ok |  |
 | · 5.6 Effect application | **low** | cap 1/2; sup×5 (README §5.5); cv corr | re-read the rest (§3); read with P02 "Corrections"; capture 0x2453 |
 | 6. Abnormal states | – | container (see its subsections) |  |
-| · 6.1 Tables and structures | **low** | cap 0/1; sup×4 (README §5.5) | re-read the rest (§3); capture 0x243C |
+| · 6.1 Tables and structures | **low** | cap 1/1; sup×4 (README §5.5) | re-read the rest (§3) |
 | · 6.2 Setting a state | **low** | cap 1/1; sup×1 (README §5.5) | re-read the rest (§3) |
 | · 6.3 Packets | **high** | cap 5/5 |  |
 | · 6.4 Expiry and removal | medium | read in code | second reading / client check |
@@ -944,19 +1000,19 @@ Knowledge files (`docs/knowledge/`):
 | 7. Damage, death | **high** | cap 2/2 |  |
 | · 7.1 Common part | **low** | sup×2 (README §5.5); cv corr | re-read the rest (§3); read with P02 "Corrections" |
 | · 7.2 Player death | **high** | cap 6/10; cv ok; weak inf1 |  |
-| · 7.3 Revive by skill: NC_SKILL_REPLYREVIVE_CMD `0x482A` (C→Z) @ … | medium | cap 1/6 | capture 0x481E, 0x481F, 0x4829, 0x482B |
+| · 7.3 Revive by skill: NC_SKILL_REPLYREVIVE_CMD `0x482A` (C→Z) @ … | medium | cap 5/6; cv ok; cv corr | read with P02 "Corrections"; capture 0x482B |
 | 8. Mob death, experience, level-up | – | container (see its subsections) |  |
 | · 8.1 Mob death | medium | cap 1/3; cv ok; sup×1 (README §5.5) | re-read the rest (§3) |
 | · 8.2 Experience | **low** | sup×2 (README §5.5) | re-read the rest (§3) |
 | · 8.3 `ShinePlayer::sp_GainExp` @ FUN_0042d830 | medium | cap 8/10; cv ok; client×1; sup×1 (README §5.5) | re-read the rest (§3); capture 0x5C0D |
 | 9. Skill learning, empowering, unlearning | – | container (see its subsections) |  |
-| · 9.1 NC_SKILL_EMPOWALLOC_REQ `0x4811` (C→Z) @ FUN_0044f150 | medium | cap 0/4; client×1 | capture 0x4814 |
+| · 9.1 NC_SKILL_EMPOWALLOC_REQ `0x4811` (C→Z) @ FUN_0044f150 | medium | cap 4/4; cv ok; client×1; cv corr | read with P02 "Corrections" |
 | · 9.2 Empower reset answers (DB→Z) | medium | cap 0/5 | capture 0x480E, 0x480F |
-| · 9.3 Skill teach answers (DB→Z) | medium | cap 0/6 | capture 0x4804, 0x4805 |
-| · 9.4 NC_SKILL_PRODUCTFIELD_REQ `0x4822` (C→Z) @ FUN_0046c820 | medium | cap 0/5; client×1 | capture 0x4804, 0x4823 |
-| · 9.5 NC_SKILL_UNLEARN_REQ `0x4824` (C→Z) @ FUN_0057ad80 | medium | cap 0/4; client×1 | capture 0x4827 |
-| 10. Client cross-check (packets sent by this subsystem) | medium | cap 20/43; client×1 | capture 0x2411, 0x2434, 0x2438, 0x243F … |
-| Original-server bugs | **low** | cap 1/5; sup×2 (README §5.5); bug table (class X: effects are deductions) | re-read the rest (§3); capture 0x482B |
+| · 9.3 Skill teach answers (DB→Z) | **high** | cap 3/6; cv ok |  |
+| · 9.4 NC_SKILL_PRODUCTFIELD_REQ `0x4822` (C→Z) @ FUN_0046c820 | medium | the captured opcodes are only mentioned here (0x4801 / 0x4802 / 0x4804 of the skill-book learn, capture-validation §24.2); the subject of the section (0x4822 production field) is in no capture (hand; baseline: high) | capture 0x4822 |
+| · 9.5 NC_SKILL_UNLEARN_REQ `0x4824` (C→Z) @ FUN_0057ad80 | medium | cap 0/4; cv ok; client×1 | capture 0x4827 |
+| 10. Client cross-check (packets sent by this subsystem) | **high** | cap 31/43; client×1 |  |
+| Original-server bugs | **low** | cap 3/5; sup×2 (README §5.5); bug table (class X: effects are deductions) | re-read the rest (§3); capture 0x482B |
 | 11. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 
 ### 2.15 Z04: `zone/Z04-items.md`
@@ -1022,7 +1078,7 @@ Knowledge files (`docs/knowledge/`):
 | · 12.2 NC_ITEM_WEAPONENDURE_CHARGE_REQ `0x3035` / NC_ITEM_SHIELDE… | **low** | cap 0/8; client×1; sup×1 (README §5.6) | re-read the rest (§3); capture 0x3036, 0x3037, 0x3065, 0x3066 |
 | · 12.3 NC_ITEM_REVIVEITEMUSE_CMD `0x3039` (C→Z) @ FUN_00417580 | medium | cap 0/3 | capture 0x303A, 0x482B |
 | · 12.4 NC_ITEM_DICE_GAME_START_REQ `0x303C` (C→Z) @ FUN_00517d70 | medium | cap 0/6 | capture 0x2004, 0x303B, 0x303D, 0x303E … |
-| · 12.5 NC_ITEM_AUTO_ARRANGE_INVEN_REQ `0x304A` (C→Z) @ FUN_0051c3… | **low** | cap 0/2; sup×1 (README §5.6) | re-read the rest (§3); capture 0x304B |
+| · 12.5 NC_ITEM_AUTO_ARRANGE_INVEN_REQ `0x304A` (C→Z) @ FUN_0051c3… | medium | cap 2/2; sup×1 (README §5.6) | re-read the rest (§3) |
 | · 12.6 NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ `0x3048` (C→Z) @ FUN… | **low** | cap 0/3; sup×1 (README §5.6); weak inf2 | re-read the rest (§3); capture 0x3049 |
 | · 12.7 NC_ITEM_USE_ACTIVESKILL_REQ `0x304E` (C→Z) @ FUN_00540b90 | **low** | cap 0/2; sup×1 (README §5.6) | re-read the rest (§3); capture 0x304F |
 | · 12.8 NC_ITEM_CHAT_COLOR_CHANGE_REQ `0x3055` (C→Z) @ FUN_0051e580 | medium | cap 0/4; client×1 | capture 0x3056 |
@@ -1047,10 +1103,10 @@ Knowledge files (`docs/knowledge/`):
 | · 1.4 Releasers (what "apply" does), `InventoryLocking::InvenCell… | **low** | cap 5/13; sup×3 (README §5.6); cv corr | re-read the rest (§3); read with P02 "Corrections"; capture 0x8C20, 0x8C21, 0x8C24, 0x8C27 … |
 | · 1.5 Client packets produced by an apply | **high** | cap 2/2; client×1 |  |
 | · 1.6 Handler skeleton and the error helpers | medium | read in code | second reading / client check |
-| · 1.7 Requests and answers | medium | cap 43/181 | capture (class U) |
+| · 1.7 Requests and answers | medium | cap 50/181 | capture (class U) |
 | 2. Shop | – | container (see its subsections) |  |
 | · 2.1 Buy: `0x340B`/`0x340E` BUYALLSUC/BUYLOTSUC, `0x340C`/`0x340… | **high** | cap 5/10; cv ok; client×1; ours×1 |  |
-| · 2.2 Sell and repurchase | **high** | cap 6/10; cv ok |  |
+| · 2.2 Sell and repurchase | **high** | cap 7/10; cv ok |  |
 | · 2.3 Guild-token buy: `0x3491`/`0x3494` and fails | **low** | cap 1/6; B×1 | follow the return value to the parser |
 | · 2.4 Soul stones: `0x3442` / `0x3443` | medium | captured (two purchases, capture-validation §20.3), and the 0x3441 / 0x3442 layouts were corrected by that capture (§20.5: `{ref, lock}`); 0x3443 / 0x5005 are in no capture (hand; baseline: high) | capture-scenarios 46 / 47 (0x5005, 0x3443) |
 | · 2.5 Capsule buy: `0x34A1` | medium | the captured opcodes are only mentioned here (the shared buy answer 0x3004); the subject of the section (0x34A1 capsule buy) is in no capture (hand; baseline: high) | capture 0x34A1 |
@@ -1059,9 +1115,9 @@ Knowledge files (`docs/knowledge/`):
 | · 3.1 Drop: `0x3417`, `0x3418`, `0x341A`, `0x341B` | medium | cap 3/6; cv ok; sup×2 (README §5.6); cv corr; R×1 | re-read the rest (§3); read with P02 "Corrections"; callers incl. vtable slots; senders in every `handlers.json` |
 | · 3.2 Pick-up: `0x341D`…`0x3421`, `0x3439`, `0x343A` | **high** | cap 4/7; client×1 |  |
 | · 3.3 Money: `0x347B` / `0x347C` | medium | cap 0/3 | capture (class U) |
-| 4. Moving and stacking | medium | cap 4/12; cv ok; sup×1 (README §5.6) | re-read the rest (§3) |
+| 4. Moving and stacking | medium | cap 6/12; cv ok; sup×1 (README §5.6) | re-read the rest (§3) |
 | 5. Equipment | – | container (see its subsections) |  |
-| · 5.1 Equip / unequip: `0x3411`, `0x3412`, `0x3414`, `0x3415` | medium | cap 4/8; sup×1 (README §5.6) | re-read the rest (§3) |
+| · 5.1 Equip / unequip: `0x3411`, `0x3412`, `0x3414`, `0x3415` | medium | cap 6/8; sup×1 (README §5.6) | re-read the rest (§3) |
 | · 5.2 Reinforce unequip: `0x3480` / `0x3481` | medium | cap 0/4 | capture (class U) |
 | · 5.3 Bound-item cancel: `0x34A7` | medium | cap 0/2; client×1 | capture 0x3049 |
 | · 5.4 Item attribute change: `0x344A` | medium | cap 2/2; sup×1 (README §5.6) | re-read the rest (§3) |
@@ -1078,7 +1134,7 @@ Knowledge files (`docs/knowledge/`):
 | · 7.3 Guild-academy reward storage: `0x3484`, `0x3483`, `0x3486`,… | medium | cap 0/8 | capture 0x3030 |
 | · 7.4 Premium ("charged") inventory: `0x3464`, `0x3466` | medium | cap 1/4 | capture 0x3023 |
 | 8. Upgrades, enchanting and item services | – | container (see its subsections) |  |
-| · 8.1 Upgrade: `0x3448`, `0x34D2`, `0x34D4` | medium | cap 4/22 | capture 0x3018, 0x306E, 0x3070, 0x3803 … |
+| · 8.1 Upgrade: `0x3448`, `0x34D2`, `0x34D4` | medium | cap 7/22 | capture 0x3018, 0x306E, 0x3070, 0x3803 … |
 | · 8.2 Enchanting: `0x3497`, `0x3499`, `0x349B`, `0x349D` | medium | cap 0/8; client×1 | capture 0x3041, 0x3043, 0x3045 |
 | · 8.3 Mounts: `0x34AD`, `0x34AF` | medium | cap 0/3; client×1 | capture 0x3052 |
 | · 8.4 Random options: `0x34B4`, `0x34C2`, `0x34CE` | medium | cap 0/7 | capture 0x3054, 0x3062, 0x306C |
@@ -1093,13 +1149,13 @@ Knowledge files (`docs/knowledge/`):
 | · 9.5 Mushroom (mini-house creation): `0x3468` / `0x3469` | medium | cap 1/2; sup×1 (README §5.6); B×1 | re-read the rest (§3); follow the return value to the parser |
 | · 9.6 Mini-house furniture effect: `0x347E` (answers Z07 §6.10) | **low** | cap 0/4; sup×1 (README §5.6) | re-read the rest (§3); capture 0x8C41, 0x8C57 |
 | · 9.7 Furniture endurance: `0x348C` | medium | cap 0/3 | capture 0x3034, 0x8C61 |
-| · 9.8 Mystery vault: `0x349F` | medium | cap 1/3 | capture (class U) |
+| · 9.8 Mystery vault: `0x349F` | **high** | cap 3/3 |  |
 | · 9.9 Friend points: `0x34C0` (answers Z08 knowledge) | medium | cap 0/3; client×1 | capture 0x5422 |
 | · 9.10 Trade: `0x343C` / `0x343D` (Z06 owns the trade window) | medium | cap 0/4 | capture 0x4C23 |
 | · 9.11 Booth trade: `0x3456` | medium | cap 0/2 | capture 0x680E |
-| 10. Client handling of the answers (2016 client) | **low** | cap 20/64; client×1; R×1 | callers incl. vtable slots; senders in every `handlers.json`; capture 0x3018, 0x3027, 0x302B, 0x3030 … |
+| 10. Client handling of the answers (2016 client) | **low** | cap 23/64; client×1; R×1 | callers incl. vtable slots; senders in every `handlers.json`; capture 0x3018, 0x3027, 0x302B, 0x3030 … |
 | 11. Invariants and state | **low** | no function cited; sup×1 (README §5.6) | re-read the rest (§3) |
-| Original-server bugs | **low** | cap 5/34; sup×1 (README §5.6); bug table (class X: effects are deductions) | re-read the rest (§3); capture 0x3027, 0x3030, 0x3036, 0x3065 … |
+| Original-server bugs | **low** | cap 6/34; sup×1 (README §5.6); bug table (class X: effects are deductions) | re-read the rest (§3); capture 0x3027, 0x3030, 0x3036, 0x3065 … |
 | 12. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 
 ### 2.17 Z06: `zone/Z06-economy.md`
@@ -1142,16 +1198,16 @@ Knowledge files (`docs/knowledge/`):
 |---|---|---|---|
 | 1. Character data at login (WM → zone) | – | container (see its subsections) |  |
 | · 1.1 The character block inside ShinePlayer | **low** | no function cited; R×1 | callers incl. vtable slots; senders in every `handlers.json` |
-| · 1.2 Blob handlers | medium | cap 19/30; sup×3 (README §5.6); weak inf2 | re-read the rest (§3) |
+| · 1.2 Blob handlers | medium | cap 28/30; sup×3 (README §5.6); weak inf2 | re-read the rest (§3) |
 | · 1.3 NC_CHAR_ZONE_CHARTITLE_CMD `0x1031` (WM → zone) @ FUN_005a3… | medium | cap 2/2; sup×1 (README §5.6) | re-read the rest (§3) |
 | · 1.4 NC_CHAR_ZONE_CHARDATA_ACK `0x101D` / CHARDATAFAIL_ACK `0x10… | **high** | cap 2/4 |  |
 | · 1.5 CHAR_PARAMETER_DATA (in 0x1802 and the parameter refresh) @… | medium | cap 1/1; sup×1 (README §5.5) | re-read the rest (§3) |
 | 2. Stat points (free stats) | – | container (see its subsections) |  |
 | · 2.1 Data | **low** | R×1; ours×2 | callers incl. vtable slots; senders in every `handlers.json` |
-| · 2.2 NC_CHAR_STAT_INCPOINT_REQ `0x105C` (C→Z) `{u8 stat}` @ FUN_… | medium | cap 0/3 | capture (class U) |
-| · 2.3 NC_CHAR_STAT_DECPOINT_REQ `0x1062` (C→Z) `{u8 stat}` @ FUN_… | medium | cap 0/2 | capture (class U) |
-| · 2.4 NC_CHAR_FREESTAT_SET_DB_ACK `0x10D2` (DB→Z) @ FUN_0058be50 | medium | cap 1/3 | capture 0x105F, 0x1065 |
-| · 2.5 Legacy answers `0x105E` / `0x1060` / `0x1064` / `0x1066` (D… | medium | cap 0/6; weak inf1 | capture 0x105F, 0x1065 |
+| · 2.2 NC_CHAR_STAT_INCPOINT_REQ `0x105C` (C→Z) `{u8 stat}` @ FUN_… | **high** | cap 2/3; cv ok |  |
+| · 2.3 NC_CHAR_STAT_DECPOINT_REQ `0x1062` (C→Z) `{u8 stat}` @ FUN_… | **high** | cap 2/2; cv ok |  |
+| · 2.4 NC_CHAR_FREESTAT_SET_DB_ACK `0x10D2` (DB→Z) @ FUN_0058be50 | **high** | cap 3/3 |  |
+| · 2.5 Legacy answers `0x105E` / `0x1060` / `0x1064` / `0x1066` (D… | medium | cap 2/6; weak inf1 | capture (class U) |
 | · 2.6 Related DB answers | medium | cap 0/3 | capture (class U) |
 | 3. Revive, logout, polymorph and other CHAR requests | – | container (see its subsections) |  |
 | · 3.1 NC_CHAR_REVIVE_REQ `0x104E` (C→Z, no payload) @ FUN_0045298… | **high** | cap 2/3; cv ok |  |
@@ -1166,7 +1222,7 @@ Knowledge files (`docs/knowledge/`):
 | · 4.2 NC_CHAR_CHARGEDBUFF_ERASE_REQ `0x112E` (C→Z) @ FUN_005645e0 | medium | cap 0/2 | capture 0x112F |
 | 5. Wedding (zone side; client requests are in Z02 §10) | – | container (see its subsections) |  |
 | · 5.1 Data and status maintenance | **low** | cap 1/7; sup×1 (README §5.6); weak inf1 | re-read the rest (§3); capture 0x205D |
-| · 5.2 DB answers | medium | cap 1/14 | capture 0x2052, 0x205D |
+| · 5.2 DB answers | medium | cap 2/14 | capture 0x2052, 0x205D |
 | · 5.3 Partner info | **low** | cap 0/3; sup×1 (README §5.6) | re-read the rest (§3) |
 | · 5.4 NC_CHAR_WEDDING_CANCEL_WEDDING `0x10B2` (WM→Z) `{u32 Regist… | medium | cap 1/1; sup×1 (README §5.6) | re-read the rest (§3) |
 | · 5.5 `FUN_005b92a0` after an accepted proposal (Z02 question) | **low** | sup×1 (README §5.6) | re-read the rest (§3) |
@@ -1183,14 +1239,14 @@ Knowledge files (`docs/knowledge/`):
 | · 6.10 NC_MINIHOUSE_FURNITURE_EFFECT_REQ `0x8C40` / PORTAL_EFFECT… | **low** | cap 0/6; sup×2 (README §5.6) | re-read the rest (§3); capture 0x8C41, 0x8C57 |
 | · 6.11 Furniture emotions | medium | cap 0/6 | capture 0x8C63, 0x8C64, 0x8C66, 0x8C67 |
 | · 6.12 Mini-house DB answers | medium | cap 0/5 | capture 0x8C4B |
-| 7. Card collection (COLLECT, dept 49) | **low** | cap 0/21; sup×1 (README §5.6) | re-read the rest (§3); capture 0xC405, 0xC406, 0xC40B, 0xC40F … |
+| 7. Card collection (COLLECT, dept 49) | **low** | cap 3/21; sup×1 (README §5.6) | re-read the rest (§3); capture 0xC405, 0xC406, 0xC40B, 0xC40F … |
 | 8. Mounts (MOVER, dept 51) | medium | cap 3/13 | capture 0x306A, 0x306C, 0x3070, 0xCC03 … |
 | 9. Pets (PET, dept 53) | medium | cap 3/17 | capture 0xD408, 0xD40A, 0xD413 |
 | 10. Other DB answers | – | container (see its subsections) |  |
 | · 10.1 NC_CHAR_GET_ITEMLIST_BY_TYPE_ACK `0x1077` / _NUM_ACK `0x10… | medium | cap 1/3 | capture 0x302E |
 | · 10.2 NC_CHAR_REGNUM_VARIFICATION_ACK `0x10B4` (DB→Z) @ FUN_0055… | medium | cap 1/1; sup×1 (README §5.6) | re-read the rest (§3) |
 | 11. Production (answers Z02 §8) | **low** | cap 0/7; client×1; R×1 | callers incl. vtable slots; senders in every `handlers.json`; capture 0x481D |
-| Original-server bugs | **low** | cap 4/25; sup×1 (README §5.6); B×1; bug table (class X: effects are deductions) | re-read the rest (§3); follow the return value to the parser; capture 0x1125, 0x1804, 0xCC07 |
+| Original-server bugs | **low** | cap 7/25; sup×1 (README §5.6); B×1; bug table (class X: effects are deductions) | re-read the rest (§3); follow the return value to the parser; capture 0x1125, 0x1804, 0xCC07 |
 | 12. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 
 ### 2.19 Z08: `zone/Z08-content.md`
@@ -1203,7 +1259,7 @@ Knowledge files (`docs/knowledge/`):
 | · 1.3 Handlers | medium | cap 0/13; weak inf1 | capture (class U) |
 | 2. Raid mirror (WM → zone, dept 44) | medium | cap 0/18; weak p171 | capture 0xB020, 0xB021, 0xB022, 0xB023 … |
 | 3. Quests (dept 17) | – | container (see its subsections) |  |
-| · 3.1 Model | **low** | cap 2/11; client×1; sup×3 (README §5.6); weak p172 | re-read the rest (§3); capture 0x4412 |
+| · 3.1 Model | **low** | cap 5/11; client×1; sup×3 (README §5.6); weak p172 | re-read the rest (§3); capture 0x4412 |
 | · 3.2 Client requests | medium | cap 0/15 | capture 0x4408, 0x440C, 0x4410, 0x4415 … |
 | · 3.3 DB answers | medium | cap 1/9 | capture 0x4408, 0x4417 |
 | · 3.4 Reset times (WM → zone) | **high** | cap 2/3 |  |
@@ -1222,7 +1278,7 @@ Knowledge files (`docs/knowledge/`):
 | · 8.2 WM / DB messages | **low** | cap 2/24; sup×2 (README §5.3, §5.6) | re-read the rest (§3); capture 0x74D8 |
 | 9. Holy promise (master / trainee, dept 37) | medium | cap 0/11 | capture 0x943D, 0x9441 |
 | 10. Guild academy (dept 38) | **low** | cap 2/14; sup×1 (README §5.6) | re-read the rest (§3); capture 0x9820 |
-| 11. Charged stat / skill-empower reset (dept 36, DB answers) | medium | cap 0/10 | capture 0x900C, 0x900D, 0x900E, 0x900F |
+| 11. Charged stat / skill-empower reset (dept 36, DB answers) | **high** | cap 6/10; cv ok |  |
 | 12. Prison (dept 31, WM → zone) | **low** | cap 0/3; sup×2 (README §5.6) | re-read the rest (§3) |
 | 13. GM events (dept 52, WM → zone) | medium | cap 0/2; ours×1 | capture (class U) |
 | 14. Original-server bugs | medium | cap 3/30; weak inf1; bug table (class X: effects are deductions) | capture 0x3832, 0x4408, 0x5C02 |
@@ -1241,7 +1297,7 @@ Knowledge files (`docs/knowledge/`):
 | 2. Player tick (`ShinePlayer::so_Routine`) | – | container (see its subsections) |  |
 | · 2.1 Order of work | medium | cap 0/1; weak inf1 | capture 0x2453 |
 | · 2.2 Region check on Elderine | medium | read in code | second reading / client check |
-| · 2.3 Work done for a player in a game mode | medium | cap 1/2 | capture 0x2434 |
+| · 2.3 Work done for a player in a game mode | medium | the captured opcodes are only mentioned here (0x2434, 0x243D); the subject of the section (the per-tick game-mode work: ride timer, mount hunger, pet reactions, title minute counters) is in no capture (hand; baseline: high) | a ride, a pet or a title counter in a capture |
 | · 2.4 Status packets and per-minute player checks | medium | cap 3/3; cv ok; client×1; sup×1 (README §5.6) | re-read the rest (§3) |
 | · 2.5 Client packets are handled inside the player tick | medium | read in code | second reading / client check |
 | · 2.6 Script triggers held by the player | medium | read in code | second reading / client check |
@@ -1285,7 +1341,7 @@ Knowledge files (`docs/knowledge/`):
 | · 8.2 Weapon rates set by scripts | medium | read in code | second reading / client check |
 | · 8.3 Cross-counter (`so_smo_CrossCounterDamage`, vt 0x9ac) | medium | cap 1/1 | capture (class U) |
 | · 8.4 Who may hit or heal whom (non-player classes) | medium | read in code | second reading / client check |
-| · 8.5 `smo_SkillBlastTick` (vt 0xf14): delay between a skill's bl… | medium | read in code | second reading / client check |
+| · 8.5 `smo_SkillBlastTick` (vt 0xf14): delay between a skill's bl… | **high** | no opcode; the blast-to-effect delay `HitTime × 10 / 1000 − 2` tenths matches all four skills of batch 4 within one tick (Heat of Fury 1.32–1.39 s, Dash 0.36–0.41 s, Divine Shield 0.217 s, Revival 0.80 s; capture-validation §25.4) (hand; baseline: medium) |  |
 | · 8.6 Mob chat (`MobChat::MobChatManager` `mobchatman`, DAT_0084c… | medium | cap 1/1; R×1 | capture (class U) |
 | · 8.7 Mob shout and scripted mob chat | medium | the captured opcodes are only mentioned here (0x2002 / 0x201F of player chat and shout); the subject of the section (a mob shout or scripted mob chat) is in no capture (hand; baseline: high) | a shouting mob in a capture |
 | · 8.8 Servant explosions (`MobExplosionElement`) | **low** | sup×1 (README §5.6) | re-read the rest (§3) |
@@ -1295,7 +1351,7 @@ Knowledge files (`docs/knowledge/`):
 | 9. Movement, map blocks, path finding and sight | – | container (see its subsections) |  |
 | · 9.1 `MoveManager` (obj+0x18c) | **high** | cap 2/3 |  |
 | · 9.2 Block bitmaps and the per-class block checks | medium | the captured opcodes are only mentioned here (0x2013, 0x2021, 0x2025 of a free player); the subject of the section (a blocked stop, emote or jump) is in no capture (hand; baseline: high) | capture a jump / emote on a blocked cell |
-| · 9.3 Server-driven moves | medium | cap 3/9; client×2 | capture 0x2049, 0x2069, 0x206A, 0x2450 … |
+| · 9.3 Server-driven moves | **high** | cap 5/9; cv ok; client×2 |  |
 | · 9.4 `BlockDistribute`: random free spots | medium | read in code | second reading / client check |
 | · 9.5 Mob paths: Navigator and MobRoam | **high** | cap 2/2 |  |
 | · 9.6 Sight: how objects appear and disappear (answers Z02 §5) | medium | cap 3/3; cv ok; client×1; sup×1 (README §5.6); cv corr; weak p171 | re-read the rest (§3); read with P02 "Corrections" |
@@ -1328,8 +1384,8 @@ Knowledge files (`docs/knowledge/`):
 | · 12.2 Who creates a field | medium | cap 1/1; weak fh1 | capture (class U) |
 | · 12.3 Spreading: `so_mgcfld_MagicFieldSpread` (damage) and `…_Fr… | medium | cap 0/1 | capture 0x1C0C |
 | · 12.4 The field tick: `ShineMagicField::so_Routine` (vt 0x4ac) | medium | cap 1/1 | capture (class U) |
-| · 12.5 Damage, heal and aggro | medium | cap 0/1; weak inf1 | capture 0x243C |
-| · 12.6 Packets and the client | medium | cap 1/4; client×2; weak p171; R×1 | capture 0x1C0C, 0x1C0D, 0x243C |
+| · 12.5 Damage, heal and aggro | medium | cap 1/1; weak inf1 | capture (class U) |
+| · 12.6 Packets and the client | medium | the captured opcodes are only mentioned here (0x1805, the DoT damage 0x243C of batch 4); the subject of the section (magic fields and axial flags) is in no capture (hand; baseline: high) | a magic field on a map in a capture |
 | · 12.7 `ShineAxialFlag`: the map anchors (0x188 bytes) | medium | read in code | second reading / client check |
 | · 12.8 Open points of this section | – | open points / boundary list, no claim to rate |  |
 | 13. Other world objects 2: doors, effect objects, servants | – | container (see its subsections) |  |
@@ -1342,7 +1398,7 @@ Knowledge files (`docs/knowledge/`):
 | · 14.2 Where the script objects come from | medium | read in code | second reading / client check |
 | · 14.3 Script events: object events (`LuaAi`) and map events (`Lu… | medium | the captured opcodes are only mentioned here (0x1803, 0x200A); the subject of the section (Lua object and map events) is in no capture (hand; baseline: high) | a scripted map (KQ or instance) in a capture |
 | · 14.4 Argument objects (`LuaScriptArgument::*`) *(pdb2016)* | medium | read in code | second reading / client check |
-| · 14.5 Lua triggers (`LuaFuncTrigger`): chat, jump and item use n… | medium | cap 1/2 | capture (class U) |
+| · 14.5 Lua triggers (`LuaFuncTrigger`): chat, jump and item use n… | medium | the captured opcodes are only mentioned here (jump 0x2024 / 0x2025, emote 0x2020 / 0x2021 of batch 3); the subject of the section (Lua triggers on chat, jump, item use) is in no capture (hand; baseline: high) | a scripted map with a trigger in a capture |
 | · 14.6 Lua functions of the script infrastructure | medium | cap 3/8; client×2 | capture 0x2074, 0x2075, 0x6C16, 0x6C21 … |
 | · 14.7 The Lua observer (`g_LuaScriptObserver`, DAT_0087ef88) | medium | read in code | second reading / client check |
 | · 14.8 Player observers (`Observer`, `IObserver`) *(pdb2016)* | medium | read in code | second reading / client check |
@@ -1371,7 +1427,7 @@ Knowledge files (`docs/knowledge/`):
 | 17. Scripts 4: Lua functions that control objects | medium | weak fh1 | second reading / client check |
 | · 17.1 Moving objects | medium | the captured opcodes are only mentioned here (0x2018 / 0x201A mob moves); the subject of the section (Lua move functions) is in no capture (hand; baseline: high) | a scripted map in a capture |
 | · 17.2 Animations, actions, visibility | medium | cap 0/8; client×1 | capture 0x0810, 0x2074, 0x2075, 0x207C … |
-| · 17.3 Damage, healing, killing, revival | medium | cap 1/2; client×1 | capture 0x243C |
+| · 17.3 Damage, healing, killing, revival | medium | the captured opcodes are only mentioned here (0x243C / 0x244A of batch 4); the subject of the section (the Lua damage, heal, kill and revive functions) is in no capture (hand; baseline: high) | a scripted map in a capture |
 | · 17.4 Abnormal states | medium | cap 0/2 | capture 0x10AF |
 | · 17.5 Mob and NPC settings | medium | cap 1/1; weak fh1 | capture (class U) |
 | · 17.6 Map rules | medium | cap 2/6; client×1 | capture 0x1812, 0x1813, 0x1828, 0x1829 |
@@ -1449,11 +1505,11 @@ Knowledge files (`docs/knowledge/`):
 | · 25.6 KQ results and rewards: `questresult`, `reward`, `questmob… | medium | cap 0/4; client×2 | capture 0x5812, 0x5813, 0x5823 |
 | · 25.7 Guild-tournament flags and gates: `RegisteFlag`, `RegisteG… | medium | read in code | second reading / client check |
 | · 25.8 2016 use, answers and open points | – | open points / boundary list, no claim to rate |  |
-| 26. Scripts 13: Pine action nodes S–W and `endofkq` (KQ end, sc… | medium | cap 2/8 | capture 0x0810, 0x243C, 0x5812, 0x5813 |
+| 26. Scripts 13: Pine action nodes S–W and `endofkq` (KQ end, sc… | medium | cap 3/8 | capture 0x0810, 0x5812, 0x5813 |
 | · 26.1 KQ end and results: `endofkq`, `sendquestresult`, `scinari… | medium | cap 1/5 | capture 0x5812, 0x5813 |
 | · 26.2 Dialog files and shouts: `scriptfile`, `someoneshout` | medium | cap 1/1 | capture (class U) |
 | · 26.3 Summoning mobs and starting films: `summonmob`, `spawn` | medium | read in code | second reading / client check |
-| · 26.4 Killing and moving objects: `suicide`, `teleport`, `telepo… | medium | cap 1/2 | capture 0x243C |
+| · 26.4 Killing and moving objects: `suicide`, `teleport`, `telepo… | medium | the captured opcodes are only mentioned here (0x1805, 0x243C); the subject of the section (the Pine nodes suicide / teleport) is in no capture (hand; baseline: high) | a KQ played in a capture (scenario 31) |
 | · 26.5 Time limits and waits: `timelimit`, `waitlogin`, `waitidle` | medium | cap 0/1; weak p171 | capture 0x0810 |
 | · 26.6 Who clicked, who killed: `whoclickme`, `whokillme` | medium | read in code | second reading / client check |
 | · 26.7 Wedding: `weddingcomplete` | medium | cap 0/2 | capture (class U) |
@@ -1469,7 +1525,7 @@ Knowledge files (`docs/knowledge/`):
 | 28. Sweep additions: map query functions, heal reports, the res… | – | container (see its subsections) |  |
 | · 28.1 Map initialisation and the query functions per map kind | medium | read in code | second reading / client check |
 | · 28.2 Heal reports: how mobs learn who healed their enemy (`SpyN… | **low** | sup×1 (README §5.6) | re-read the rest (§3) |
-| · 28.3 The rest of `World/MiscDataTable.txt`: Polymorph, Neutrali… | medium | cap 0/1 | capture 0x10AF |
+| · 28.3 The rest of `World/MiscDataTable.txt`: Polymorph, Neutrali… | medium | cap 0/1; cv ok | capture 0x10AF |
 | · 28.4 Answers to the leftovers marked "sweep" | medium | cap 0/2 | capture (class U) |
 | · 28.5 Small helpers reached from documented code | medium | read in code | second reading / client check |
 | · 28.6 `OptionReader`: the `#`-command text tables | medium | read in code | second reading / client check |
@@ -1482,7 +1538,7 @@ Knowledge files (`docs/knowledge/`):
 | · 28.13 Small leftovers of finished items: capsule creation, clas… | medium | cap 3/14; client×2 | capture 0x1059, 0x105A, 0x1116 |
 | 29. Original-server bugs (decide for a rebuild) | – | container (see its subsections) |  |
 | · 29.1 Objects, mob core, AI, movement, spawns, drops (parts 1–7,… | **low** | cap 0/1; weak inf4 | code or capture for the marked statements; capture 0x2049 |
-| · 29.2 World objects and script infrastructure (parts 8a–9c) | medium | cap 3/8; client×1; weak inf2; R×1 | capture 0x1C0D, 0x2075, 0x243C, 0x6C09 |
+| · 29.2 World objects and script infrastructure (parts 8a–9c) | medium | bug table (class X); the captured opcodes are only mentioned here (0x1805, 0x2011, 0x243C, 0x2449); the world objects and the script infrastructure are in no capture (hand; baseline: high) | a scripted map / KQ in a capture |
 | · 29.3 Lua C functions (parts 10–12) | medium | cap 0/4 | capture 0x207A, 0x6C11, 0x6C12, 0x6C15 |
 | · 29.4 Pine engine (parts 14a–14c) | medium | weak inf1 | second reading / client check |
 | · 29.5 Pine action nodes, films, sweep (parts 15a–17d) | medium | cap 0/6; weak inf2 | capture 0x0810, 0x202E, 0x7483, 0x74E2 |
@@ -1555,24 +1611,24 @@ Knowledge files (`docs/knowledge/`):
 | · 1.4 Admin levels | medium | cap 2/2; sup×1 (README §5.7); weak fh1 | re-read the rest (§3) |
 | · 1.5 Replies and the command log | medium | cap 1/1 | capture (class U) |
 | · 1.6 Helpers | medium | read in code | second reading / client check |
-| 2. All commands | medium | cap 26/81; B×3 | capture 0x0810, 0x0867, 0x1812, 0x1813 … |
+| 2. All commands | medium | cap 31/81; B×3 | capture 0x0810, 0x0867, 0x1812, 0x1813 … |
 | 3. Commands, part 1 (handlers FUN_004194f0 … FUN_0041b030) | medium | read in code | second reading / client check |
 | · 3.1 Visibility, layers and teleports | **low** | cap 1/1; sup×3 (README §5.6); cv corr; weak inf2 fh1 | re-read the rest (§3); read with P02 "Corrections"; code or capture for the marked statements |
 | · 3.2 Information | medium | read in code | second reading / client check |
 | · 3.3 Map, script and instance tools | medium | cap 1/2; weak fh1 | capture 0x0810 |
-| · 3.4 Debug wrappers around other handlers | **low** | cap 1/4; sup×1 (README §5.6) | re-read the rest (§3) |
+| · 3.4 Debug wrappers around other handlers | **low** | README §5.6 row; 0x304A is captured from the client's own auto-arrange (capture-validation §24.8), not from a debug wrapper; `&queststart` / `&questread` / `&viewaggrolist` are in no capture (hand; baseline: medium) | the wrapper commands in a capture |
 | · 3.5 GM chat colour | medium | the captured opcodes are only mentioned here (0x1030 / 0x2002 of a normal chat); the subject of the section (the GM colour request 0x083D) is in no capture (hand; baseline: high) | capture 0x083D (GM command, part 8) |
 | · 3.6 Words that do nothing | medium | weak inf1 fh1 | second reading / client check |
 | 4. Commands, part 2 (handlers FUN_0041b1f0 … FUN_0041cec0) | medium | read in code | second reading / client check |
 | · 4.1 Gates and doors: `&oxblock`, `&templink` | medium | cap 0/1; weak inf1 fh1 | capture 0x6C09 |
 | · 4.2 Mobs: `&mobbreed`, `&mb` | medium | read in code | second reading / client check |
 | · 4.3 Items: `&makeitem`, `&cleariv` | **high** | cap 4/4; weak inf3 |  |
-| · 4.4 Character state: `&fullpoint`, `&sethp`, `&setsp`, `&learns… | medium | cap 3/8; weak inf2 | capture 0x4804, 0x4805 |
+| · 4.4 Character state: `&fullpoint`, `&sethp`, `&setsp`, `&learns… | medium | cap 6/8; cv corr; weak inf2 | read with P02 "Corrections"; capture 0x4805 |
 | · 4.5 Players and information | medium | cap 0/3; weak inf1 | capture (class U) |
 | · 4.6 Empty quest and cool-time words | medium | read in code | second reading / client check |
 | 5. Commands, part 3 (handlers FUN_0041cf90 … FUN_0041e880) | medium | read in code | second reading / client check |
 | · 5.1 Finding and summoning: `&mfind`, `&pfind`, `&psummon` | medium | cap 0/3; weak fh1 | capture (class U) |
-| · 5.2 Mob tools: `&mobdist`, `&killallmob`, `&suicideallmob`, `&s… | **low** | cap 1/2; weak inf1 fh2 | code or capture for the marked statements; capture 0x243C |
+| · 5.2 Mob tools: `&mobdist`, `&killallmob`, `&suicideallmob`, `&s… | **low** | weak markers (inferred 1, fh-doc 2); 0x2011 is the answer to the invalid `&resetabstated` and 0x243C the poison damage of batch 4 (capture-validation §25.6, §25.7); no mob tool was used (hand; baseline: medium) | capture `&mobdist`, `&killallmob`, `&suicideallmob` |
 | · 5.3 Combat debug: `&deathaura`, `&immortal`, `&staticdamage`, `… | medium | read in code | second reading / client check |
 | · 5.4 Bonus events: `&expbonus`, `&itembonus`, `&fieldbonus` | medium | cap 0/2 | capture (class U) |
 | · 5.5 Server and map tools | medium | cap 0/2 | capture (class U) |
@@ -1580,7 +1636,7 @@ Knowledge files (`docs/knowledge/`):
 | · 5.7 Information: `&charinform`, `&partyinfo`, `&루아인수`, `&parame… | medium | cap 1/1 | capture (class U) |
 | 6. Commands, part 4 (handlers FUN_0041e9d0 … FUN_00420d30) | medium | read in code | second reading / client check |
 | · 6.1 Wedding: `&propose`, `&proposeres`, `&weddingreset`, `&rese… | medium | cap 0/14; weak inf1 dbb1 | capture 0x2050, 0x2052, 0x2057 |
-| · 6.2 Skills: `&unlearn`, `&unlearnpassive`, `&learnpassive` | medium | cap 0/8 | capture 0x4804, 0x4827 |
+| · 6.2 Skills: `&unlearn`, `&unlearnpassive`, `&learnpassive` | medium | cap 3/8 | capture 0x4827 |
 | · 6.3 Guild tournament: `&startGT`, `&flagcapture`, `&useguildski… | medium | cap 1/11; weak inf1 | capture 0x74CB, 0x74D0, 0x74D1, 0x74D8 |
 | · 6.4 Character and combat: `&speed`, `&runto`, `&allcritical`, `… | medium | cap 1/1; weak inf1 | capture (class U) |
 | · 6.5 Map tools: `&showid`, `&pvp`, `&ghostremove`, `&partblock`,… | medium | cap 0/2; weak inf1 | capture 0x1812, 0x1813 |
@@ -1589,8 +1645,8 @@ Knowledge files (`docs/knowledge/`):
 | 7. Commands, part 5 (handlers FUN_00420ef0 … FUN_00422a90) | medium | read in code | second reading / client check |
 | · 7.1 Raid tests: `&makeraid`, `&outraid` | medium | cap 0/1 | capture (class U) |
 | · 7.2 Instance, link and tournament tests: `&PlayIns`, `&testlink… | medium | cap 1/10 | capture 0x181F, 0x1820, 0x2028, 0x2029 … |
-| · 7.3 Skills and level: `&alllearnskill`, `&levelup` | **high** | cap 9/14; cv ok; weak inf2 |  |
-| · 7.4 Items and money: `&getmoney`, `&iareset`, `&ebcu`, `&vanish… | medium | cap 6/11; client×1; cv corr; weak inf1 | read with P02 "Corrections"; capture 0x3049 |
+| · 7.3 Skills and level: `&alllearnskill`, `&levelup` | **high** | cap 11/14; cv ok; weak inf2 |  |
+| · 7.4 Items and money: `&getmoney`, `&iareset`, `&ebcu`, `&vanish… | medium | cap 6/11; cv ok; client×1; cv corr; weak inf1 | read with P02 "Corrections"; capture 0x3049 |
 | · 7.5 NPC tools: `&fnpc`, `&RegenNPC`, `&ReleaseNPC` | medium | weak inf1 | second reading / client check |
 | · 7.6 Character and movement: `&godmode`, `&setlp`, `&walkto`, `&… | medium | cap 0/2 | capture 0x6C14, 0xBC1C |
 | · 7.7 Chat ban and pets: `&releasechatban`, `&getpetinfo`, `&setp… | medium | cap 0/7; weak inf1 | capture 0x0867 |
@@ -1643,14 +1699,14 @@ Knowledge files (`docs/knowledge/`):
 | · 5.3 `sp_NextSaveExperience` @ FUN_0042d6f0 | medium | cap 1/1 | capture (class U) |
 | · 5.4 Rest-exp buff: `RestExpCalculate::RestExpAbstateApplication… | medium | read in code | second reading / client check |
 | 6. Login data parsing (WM → zone character blobs) | medium | cap 1/1 | capture (class U) |
-| · 6.1 Summary | **high** | cap 24/34; R×1 |  |
+| · 6.1 Summary | **high** | cap 30/34; R×1 |  |
 | · 6.2 Base and shape | **high** | cap 2/2; client×1 |  |
 | · 6.3 Quests | **high** | cap 4/4; client×1; R×1 |  |
 | · 6.4 Abnormal states | **low** | cap 1/2; client×1; sup×1 (README §5.5) | re-read the rest (§3); capture 0x103C |
 | · 6.5 Skills | medium | cap 1/1; client×1; R×1 | capture (class U) |
 | · 6.6 Passives | medium | cap 1/1; client×1 | capture (class U) |
 | · 6.7 Inventory | medium | cap 1/1; client×1 | capture (class U) |
-| · 6.8 Chest locations, game data, charged buffs | medium | cap 3/4; client×1; sup×1 (README §5.5) | re-read the rest (§3) |
+| · 6.8 Chest locations, game data, charged buffs | medium | cap 4/4; client×1; sup×1 (README §5.5) | re-read the rest (§3) |
 | · 6.9 End of data: `so_StoreCharData` (vt 0x4b4) and `sp_LoginIni… | medium | cap 1/1; weak inf1 | capture (class U) |
 | 7. Single options, link-from position, title refresh (Z07 §12 o… | – | open points / boundary list, no claim to rate |  |
 | · 7.1 NC_CHAR_ZONE_SINGLE_OPTION_CMD `0x10D3` (WM → zone) @ FUN_0… | **high** | cap 9/10; client×1 |  |
@@ -1697,7 +1753,7 @@ Knowledge files (`docs/knowledge/`):
 | · 4.3 Ceremony | medium | cap 1/5 | capture (class U) |
 | · 4.4 Married-state checks (`Checker`, per minute and on every 0x… | medium | cap 1/11 | capture 0x205D |
 | · 4.5 Ring refresh of a partner's wedding data | medium | cap 1/4 | capture (class U) |
-| · 4.6 Partner summon (`SummonMate01`, Z09 §28.4 hand-over) | medium | cap 1/3; weak inf1 | capture 0x2434 |
+| · 4.6 Partner summon (`SummonMate01`, Z09 §28.4 hand-over) | medium | the captured opcodes are only mentioned here (0x2434, 0x3C02); the subject of the section (the partner summon SummonMate01) is in no capture (hand; baseline: high) | SummonMate01 in a capture |
 | · 4.7 Client side | medium | cap 1/6 | capture 0x205D |
 | · 4.8 The annulment item (`UseItemImmediateDivorce`, instant divo… | medium | cap 1/3 | capture (class U) |
 | · 4.9 The proposal item (`UseItemPropose`): where the partner is … | medium | cap 0/5; client×1; weak p171; R×1 | capture 0x204E, 0x2050, 0x2052 |
@@ -1738,7 +1794,7 @@ Knowledge files (`docs/knowledge/`):
 | · 8.6 Hunger and feeding (mover side) | medium | cap 1/2; R×1 | capture 0xCC09 |
 | · 8.7 Movement and speed | **high** | cap 6/6 |  |
 | · 8.8 Abnormal states shared with the riders | medium | read in code | second reading / client check |
-| · 8.9 Combat overrides (no effect with the 2016 data) | medium | cap 0/3; R×1 | capture 0x2434 |
+| · 8.9 Combat overrides (no effect with the 2016 data) | medium | cap 1/3; R×1 | capture (class U) |
 | · 8.10 Brief info: `0x1C1A NC_BRIEFINFO_REGENMOVER_CMD`, `0x1C1B … | **high** | cap 1/2 |  |
 | · 8.11 Client side (2016 client, `GameFrameWork` / `CharMgr`) | **high** | cap 7/12 |  |
 | 9. Minimon auto-use, the card reward condition, client handling… | – | container (see its subsections) |  |
@@ -1749,7 +1805,7 @@ Knowledge files (`docs/knowledge/`):
 | · 9.5 Item changes and equipment hooks | medium | cap 0/2 | capture (class U) |
 | · 9.6 Client side (2016 client, `GameFrameWork`) | medium | cap 2/11; client×1 | capture 0x1125, 0x1127, 0x1129, 0x112B … |
 | · 9.7 `cca_IsRewardCondition` (Z07 §7, return values from the ass… | medium | cap 0/1; R×1 | capture (class U) |
-| · 9.8 Client handling of result codes without text (Z07 §12) | medium | cap 0/14; client×2; weak inf1 | capture 0x105F, 0x1061, 0x1065, 0x1067 … |
+| · 9.8 Client handling of result codes without text (Z07 §12) | medium | cap 2/14; client×2; weak inf1 | capture 0x1061, 0x1067, 0x1125, 0x1129 … |
 | Original-server bugs | medium | cap 14/48; client×1; weak inf1; R×5; bug table (class X: effects are deductions) | capture 0x2041, 0x2050, 0x3034, 0x306A … |
 | Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 | Coverage boundary | – | open points / boundary list, no claim to rate |  |
@@ -1816,7 +1872,7 @@ Knowledge files (`docs/knowledge/`):
 | · 3.10 Script error codes (0x4401 `Cmd 0`, `Data.ErrCode`) | medium | cap 1/5 | capture (class U) |
 | 4. The diary (`CQuest`), quest conditions and repeat resets | medium | the only client citation says the client shares the `CQuest` / `CQuestData` library code; nothing on the wire and no capture of a quest step (hand; baseline: high) | capture: accept, progress and finish one quest |
 | · 4.1 Members and the diary array | medium | the only client citation says the client shares the `CQuest` / `CQuestData` library code; nothing on the wire and no capture of a quest step (hand; baseline: high) | capture: accept, progress and finish one quest |
-| · 4.2 Loading the diary at login (WM 0x1021 / 0x1022 / 0x10CD / 0… | medium | cap 1/5 | capture (class U) |
+| · 4.2 Loading the diary at login (WM 0x1021 / 0x1022 / 0x10CD / 0… | medium | captured only as empty lists: 0x1021 / 0x10CD / 0x10D6 `n 0` at every map login (capture-validation §7.5; P02-B10); no quest in the diary of any captured character (hand; baseline: high) | capture-scenarios 19 (a quest accepted, then a map login) |
 | · 4.3 Status changes after a DB answer | medium | R×1 | second reading / client check |
 | · 4.4 Quest conditions and the computed status | medium | cap 1/7; client×1 | capture (class U) |
 | · 4.5 Event functions (`CQuest` vftable 0x04…0x24) | medium | the only client citation says the client shares the `CQuest` / `CQuestData` library code; nothing on the wire and no capture of a quest step (hand; baseline: high) | capture: accept, progress and finish one quest |
@@ -1829,7 +1885,7 @@ Knowledge files (`docs/knowledge/`):
 | · 5.4 The reward-request flag | medium | cap 0/1 | capture (class U) |
 | · 5.5 The older two-step path: `0x345C NC_ITEMDB_QUESTREWARD_ACK` | medium | cap 0/4; R×2 | capture (class U) |
 | · 5.6 Reset times: 0x441C / 0x441D → 0x441E | medium | cap 2/3; client×1; sup×1 (README §5.6); cv corr; weak inf1 | re-read the rest (§3); read with P02 "Corrections" |
-| · 5.7 The diary in the character save and at map login | medium | cap 9/20; client×2; weak inf1 | capture (class U) |
+| · 5.7 The diary in the character save and at map login | medium | captured only as empty lists: the saves 0x400F / 0x4029 / 0x402B `n 0` and the login lists `n 0` (capture-validation §7.5); no quest in the diary of any captured character (hand; baseline: high) | capture-scenarios 19 (a quest accepted, then a save and a map login) |
 | · 5.8 Worked trace: a quest with an item reward | medium | cap 3/7 | capture (class U) |
 | 6. Other entry points: NPC click, start request, kills, quest d… | medium | cap 0/1 | capture (class U) |
 | · 6.1 NPC click and the start request 0x4414 | medium | cap 2/7; client×2 | capture 0x4415 |
@@ -1913,19 +1969,19 @@ Knowledge files (`docs/knowledge/`):
 | · 2.2 Adding and removing actions | medium | read in code | second reading / client check |
 | · 2.3 Running a hook point | medium | read in code | second reading / client check |
 | · 2.4 `Action::raise`: conditions, then effects | medium | weak inf1; R×1 | second reading / client check |
-| · 2.5 Cool-down groups and `0x482C` | **high** | cap 1/2 |  |
+| · 2.5 Cool-down groups and `0x482C` | **high** | cap 2/2 |  |
 | · 2.6 Effects: target selection and bodies | medium | cap 0/1; weak inf1 | capture 0x206F |
 | · 2.7 Packets sent by the effects | medium | cap 0/4; client×2 | capture 0x206F, 0x3046 |
 | · 2.8 `so_ItemActonAbstateApp`: skill-group rates on a state just… | medium | read in code | second reading / client check |
 | 3. Item-action lifecycle and hook points | – | container (see its subsections) |  |
-| · 3.1 Login: cool-time restore, then the action setup | **high** | cap 4/5; weak inf1 |  |
-| · 3.2 Equip, unequip, drop | medium | cap 0/3 | capture (class U) |
+| · 3.1 Login: cool-time restore, then the action setup | **high** | cap 5/5; weak inf1 |  |
+| · 3.2 Equip, unequip, drop | medium | cap 1/3 | capture (class U) |
 | · 3.3 Gems and abnormal states | medium | cap 0/4 | capture 0x3046 |
 | · 3.4 Hook points: the events that run the actions | – | container (see its subsections) |  |
 | · · 3.4.1 Periodic, item use, kill | medium | capture credit comes from the shared 0x3016 / 0x482C; no capture is known to contain an item with an action set (hand; baseline: high) | capture: equip an item with an `ItemAction` row and kill a mob |
 | · · 3.4.2 Normal attacks (swing) and the rule-set rates | medium | capture credit comes from the swings 0x2448 / 0x2449; no capture is known to contain an item with an action set (hand; baseline: high) | capture: equip an item with an `ItemAction` row and kill a mob |
 | · · 3.4.3 Skills | medium | read in code | second reading / client check |
-| · 3.5 Cool-down persistence: `0x482C` (full list), `0x4023`, `0x4… | medium | cap 1/4; client×1; R×1 | capture (class U) |
+| · 3.5 Cool-down persistence: `0x482C` (full list), `0x4023`, `0x4… | medium | captured only as empty lists: WM→Z 0x10D0 `n 0` and client 0x482C `num 0` (capture-validation §5.2, §7.5); 0x4023 / 0x4034 not captured; no item-action cool-down was persisted (hand; baseline: high) | capture: use an item with an item-action cool-down, then a map login |
 | · 3.6 Teardown | medium | read in code | second reading / client check |
 | · 3.7 Helpers of finished items reached from the hooks | medium | cap 1/1 | capture (class U) |
 | 4. Costume weapon / shield charges and the action-item box | medium | read in code | second reading / client check |
@@ -1934,7 +1990,7 @@ Knowledge files (`docs/knowledge/`):
 | · 4.3 Flushing the counter: packets | medium | cap 2/7; client×1 | capture 0x3037, 0x3038, 0x3066 |
 | · 4.4 `sp_CheckBashAndEquipment`: skin without its base item | medium | read in code | second reading / client check |
 | · 4.5 The action-item box (premium emote items) | medium | the captured opcodes are only mentioned here (login and item-move packets); the subject of the section (the action-item box (premium emotes)) is in no capture (hand; baseline: high) | capture 0x2067, 0x3428 ff. |
-| Original-server bugs | medium | cap 1/6; bug table (class X: effects are deductions) | capture 0x206F, 0x3046 |
+| Original-server bugs | medium | cap 2/6; bug table (class X: effects are deductions) | capture 0x206F, 0x3046 |
 | 5. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 | 6. Coverage boundary | – | open points / boundary list, no claim to rate |  |
 
@@ -1961,18 +2017,18 @@ Knowledge files (`docs/knowledge/`):
 | 3. Z03: combat, skills, abnormal states | medium | cap 0/2 | capture 0x2442, 0x2443 |
 | · 3.1 The SubState → actor table: `ActorCluster` | medium | read in code | second reading / client check |
 | · 3.2 Abstate elements and lists | **high** | cap 4/6 |  |
-| · 3.3 Death shelters: `AbstateShelter` | medium | cap 0/2 | capture (class U) |
+| · 3.3 Death shelters: `AbstateShelter` | medium | cap 1/2 | capture (class U) |
 | · 3.4 Dispel, cure and the caster-side abstate | medium | read in code | second reading / client check |
 | · 3.5 Skill target scans and random targets | medium | read in code | second reading / client check |
 | · 3.6 0x2442 / 0x2443: trap blasts `smo_SkillBash_Blast_Trap` | medium | cap 1/3; client×2 | capture 0x2442, 0x2443 |
 | · 3.7 Blast queue, multi-hit and damage tables | **high** | cap 4/4 |  |
-| · 3.8 Player attack timing and the rest | medium | table of 22 helpers; the captures touch the attack-timing rows only (0x242B, 0x2440, moves), not polymorph, skill teach, empower (hand; baseline: high) | per row: Z03 §3 for the timing, scenarios for the rest |
+| · 3.8 Player attack timing and the rest | medium | table of 22 helpers; the captures touch the attack-timing rows (0x242B, 0x2440, moves) and, since batch 4, skill teach and empower (capture-validation §24.2, §24.3), not polymorph and the rest (hand; baseline: high) | per row: Z03 §3 for the timing, scenarios for the rest |
 | · 3.9 Open point: B31's player-rule twin | medium | read in code | second reading / client check |
 | · 3.10 Sweep additions: element constructor, sub-state lookup, ac… | medium | read in code | second reading / client check |
 | 4. Z04: items, equipment, set items, random options | – | container (see its subsections) |  |
-| · 4.1 Item tables and `ItemDataBox` accessors | medium | cap 0/1 | capture (class U) |
+| · 4.1 Item tables and `ItemDataBox` accessors | medium | cap 1/1 | capture (class U) |
 | · 4.2 Equipment slot rules: `EquipEnumChanger` and `ItemServerEqu… | medium | read in code | second reading / client check |
-| · 4.3 View slots and `so_ply_EquipmentChange` | **high** | cap 4/6; client×1; weak p171 |  |
+| · 4.3 View slots and `so_ply_EquipmentChange` | **high** | cap 6/6; client×1; weak p171 |  |
 | · 4.4 Destroying items: the `sp_DestroyItem` family and `0x3459` | **high** | cap 2/2 |  |
 | · 4.5 Drop attributes (`ItemAttr` vt 0x2c), random options and ca… | medium | read in code | second reading / client check |
 | · 4.6 Upgrade helpers | medium | read in code | second reading / client check |
@@ -2038,7 +2094,7 @@ Knowledge files (`docs/knowledge/`):
 | 4. `sdi_Clear` and `sdi_SetArgument`: the special-effect members | medium | read in code | second reading / client check |
 | 5. Lookups | – | container (see its subsections) |  |
 | · 5.1 By ID and name | medium | read in code | second reading / client check |
-| · 5.2 `skillnametree` (`BTree`) | medium | cap 0/2; weak inf1 | capture (class U) |
+| · 5.2 `skillnametree` (`BTree`) | medium | the captured opcodes are only mentioned here (0x4801 / 0x4802 of the skill-book learn); the subject of the section (the name trie built at start-up) is not on the wire (hand; baseline: high) | none on the wire |
 | 6. PassiveDataBox | medium | read in code | second reading / client check |
 | · 6.1 Data structures | medium | read in code | second reading / client check |
 | · 6.2 Tables and column → member map | medium | read in code | second reading / client check |
@@ -2083,7 +2139,7 @@ Knowledge files (`docs/knowledge/`):
 | · 5.5 Saving: `ABSTATEREADBLOCK.setitem[4]` | medium | the captured opcodes are only mentioned here (the abstate blob and its saves 0x1023 / 0x4007 / 0x4011); the subject of the section (the set-item part of the block) is in no capture (hand; baseline: high) | capture: log out wearing a full set |
 | · 5.6 Restoring | medium | the captured opcodes are only mentioned here (0x100C / 0x1023 abstate blobs, 0x104E); the subject of the section (restoring a set-item state) is in no capture (hand; baseline: high) | capture: log in wearing a full set |
 | · 5.7 The enchant path: `ShineMobileObject::so_SkillEnchant` (vt … | medium | weak inf1; R×1 | second reading / client check |
-| · 5.8 Heal over time: `so_mobile_HPHealOverTime` / `so_mobile_SPH… | medium | cap 0/1; client×1 | capture 0x243C |
+| · 5.8 Heal over time: `so_mobile_HPHealOverTime` / `so_mobile_SPH… | medium | cap 1/1; client×1 | capture (class U) |
 | Original-server bugs | medium | weak inf1; R×2; bug table (class X: effects are deductions) | second reading / client check |
 | 6. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 | 7. Coverage boundary | – | open points / boundary list, no claim to rate |  |
@@ -2105,30 +2161,30 @@ Knowledge files (`docs/knowledge/`):
 | 3. Damage over time | – | container (see its subsections) |  |
 | · 3.1 Data | medium | no function cited | cite and re-read the function |
 | · 3.2 Poison actor  @ FUN_0040d4c0 (types 22, 27, 33, 67, 83, 84,… | medium | read in code | second reading / client check |
-| · 3.3 `sasa_GetDamage`  @ FUN_0040b360 | medium | read in code | second reading / client check |
+| · 3.3 `sasa_GetDamage`  @ FUN_0040b360 | **high** | cv ok |  |
 | · 3.4 Disease actor  @ FUN_0040b8a0 (type 34) | medium | read in code | second reading / client check |
-| · 3.5 Applying the damage: `so_mobile_DamageOverTime`  (vt 0x730)… | medium | cap 0/1; client×1 | capture 0x243C |
+| · 3.5 Applying the damage: `so_mobile_DamageOverTime`  (vt 0x730)… | medium | cap 1/1; client×1 | capture (class U) |
 | 4. Area damage | – | container (see its subsections) |  |
 | · 4.1 Data | medium | no function cited | cite and re-read the function |
-| · 4.2 AreaDamage actor  @ FUN_0040d640 (types 82, 95, 101) | medium | cap 0/2; client×2; R×1 | capture 0x243C, 0x245A |
-| · 4.3 DmgState actor (dead code)  @ FUN_0040dc60 | medium | cap 0/1 | capture 0x245A |
+| · 4.2 AreaDamage actor  @ FUN_0040d640 (types 82, 95, 101) | **high** | cap 2/2; client×2; R×1 |  |
+| · 4.3 DmgState actor (dead code)  @ FUN_0040dc60 | medium | cap 1/1 | capture (class U) |
 | 5. Heal over time | – | container (see its subsections) |  |
 | · 5.1 Data | medium | no function cited | cite and re-read the function |
-| · 5.2 Actors | medium | cap 0/1 | capture 0x243C |
+| · 5.2 Actors | medium | cap 1/1 | capture (class U) |
 | 6. Other routine actors (documented elsewhere) | medium | read in code | second reading / client check |
 | 7. Detach actions: bomb, detach process, exp / drop chains, dis… | – | container (see its subsections) |  |
 | · 7.1 Removal flags and the friend scans | medium | read in code | second reading / client check |
-| · 7.2 Bomb actor (type 97)  @ FUN_0040c520 / FUN_0040c640 | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (the bomb actor) is in no capture (hand; baseline: high) | capture a skill with this abstate type |
-| · 7.3 Detach process, exp-up and drop-up detach  @ FUN_0040c1c0 /… | medium | cap 0/1 | capture 0x243C |
+| · 7.2 Bomb actor (type 97)  @ FUN_0040c520 / FUN_0040c640 | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion; batch 4: the skills and states of `s24`, capture-validation §24–§25)); the subject of the section (the bomb actor) is in no capture (hand; baseline: high) | capture a skill with this abstate type |
+| · 7.3 Detach process, exp-up and drop-up detach  @ FUN_0040c1c0 /… | medium | cap 1/1 | capture (class U) |
 | · 7.4 Dispel actor (type 113)  @ FUN_0040ca20 | medium | cap 1/1 | capture (class U) |
-| · 7.5 The removers: dispel, cure, steal and map refusal  @ FUN_00… | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (dispel, cure, steal) is in no capture (hand; baseline: high) | capture a dispel or cure skill |
+| · 7.5 The removers: dispel, cure, steal and map refusal  @ FUN_00… | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion; batch 4: the skills and states of `s24`, capture-validation §24–§25)); the subject of the section (dispel, cure, steal) is in no capture (hand; baseline: high) | capture a dispel or cure skill |
 | 8. Exp and drop rate actors (types 109, 110) | medium | read in code | second reading / client check |
 | 9. Damage hooks | – | container (see its subsections) |  |
 | · 9.1 Where they run | medium | read in code | second reading / client check |
 | · 9.2 Shields  @ FUN_00407370, FUN_00407400, FUN_00402390 | medium | read in code | second reading / client check |
 | · 9.3 Range intercept (type 59)  @ FUN_004074f0 | medium | read in code | second reading / client check |
-| · 9.4 Damage ratios and hide damage  @ FUN_00407570, FUN_00407650… | medium | cap 0/1 | capture 0x243C |
-| · 9.5 Time attack (type 77)  @ FUN_0040ba30 | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (the time-attack actor) is in no capture (hand; baseline: high) | capture a skill with this abstate type |
+| · 9.4 Damage ratios and hide damage  @ FUN_00407570, FUN_00407650… | medium | cap 1/1 | capture (class U) |
+| · 9.5 Time attack (type 77)  @ FUN_0040ba30 | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion; batch 4: the skills and states of `s24`, capture-validation §24–§25)); the subject of the section (the time-attack actor) is in no capture (hand; baseline: high) | capture a skill with this abstate type |
 | · 9.6 Damage reductions  @ FUN_004023d0, FUN_00402450, FUN_004094… | medium | R×2 | second reading / client check |
 | · 9.7 `so_smo_LastDamageOperation` (vt 0xdb4) and min HP  @ FUN_0… | medium | read in code | second reading / client check |
 | 10. Skill, targeting and parameter hooks | – | container (see its subsections) |  |
@@ -2138,19 +2194,19 @@ Knowledge files (`docs/knowledge/`):
 | · 10.4 SP cost  @ FUN_004021d0 | medium | read in code | second reading / client check |
 | · 10.5 Cannot target (type 105)  @ FUN_004b8d20 | medium | read in code | second reading / client check |
 | · 10.6 Max HP / SP actor (types 24, 25, 39, 40)  @ FUN_00401990 | medium | cap 1/1 | capture (class U) |
-| · 10.7 Skill enchant (vt 0x5a0)  @ FUN_00431ca0 | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (skill enchant) is in no capture (hand; baseline: high) | capture a skill with this abstate type |
+| · 10.7 Skill enchant (vt 0x5a0)  @ FUN_00431ca0 | medium | captured: the toggle Heat of Fury goes through the skill-enchant keep-time path (capture-validation §25.4), and the capture extends the section (keep times above 2^31 − 1: 1 385 447 ms sent, 1 345 294 tenths set, P02-B39, §13): a captured section in which a class applies (hand; baseline: medium) | capture-scenarios 51 (toggle kept past its 23-min icon timer); X06 folds P02-B39 into the section |
 | 11. Death hooks (slot 0x14)  @ FUN_00407730, FUN_00407910 | medium | cap 0/2 | capture (class U) |
 | 12. Element classes (`AbnormalStateElement` subclasses) | – | container (see its subsections) |  |
 | · 12.1 Slots and callers | medium | read in code | second reading / client check |
 | · 12.2 Which abstate uses which class  (`AbnormalStateList::Abnor… | medium | read in code | second reading / client check |
 | · 12.3 Rest counts  @ FUN_00401a90, FUN_00401ab0 | medium | read in code | second reading / client check |
-| · 12.4 Party enchant  @ FUN_00408680, FUN_00405280, FUN_0040ebc0 | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (party enchant) is in no capture (hand; baseline: high) | capture-scenarios 15 (party) with a party buff |
+| · 12.4 Party enchant  @ FUN_00408680, FUN_00405280, FUN_0040ebc0 | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion; batch 4: the skills and states of `s24`, capture-validation §24–§25)); the subject of the section (party enchant) is in no capture (hand; baseline: high) | capture-scenarios 15 (party) with a party buff |
 | · 12.5 Couple party enchant (wedding)  @ FUN_0040e5e0 | medium | cap 1/1; weak inf1 | capture (class U) |
 | · 12.6 Guild academy master enchant  @ FUN_004053c0, FUN_004087b0… | medium | weak inf1 | second reading / client check |
 | · 12.7 Forced movement and recover  @ FUN_004083a0, FUN_004085b0,… | medium | cap 1/2 | capture 0x2456 |
 | · 12.8 Polymorph and GM hide  @ FUN_00406c80, FUN_00409c10 | medium | R×1 | second reading / client check |
 | · 12.9 Element side effects elsewhere | medium | cap 1/1 | capture (class U) |
-| Original-server bugs | medium | cap 0/2; weak inf1; R×3; bug table (class X: effects are deductions) | capture 0x243C, 0x245A |
+| Original-server bugs | medium | cap 2/2; weak inf1; R×3; bug table (class X: effects are deductions) | capture (class U) |
 | 13. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 | 14. Coverage boundary | – | open points / boundary list, no claim to rate |  |
 
@@ -2161,30 +2217,30 @@ Knowledge files (`docs/knowledge/`):
 | 1. Data structures | – | container (see its subsections) |  |
 | · 1.1 `CharaterSkillList` (player + 0x17d08, `ShinePlayer::sp_Ski… | medium | read in code | second reading / client check |
 | · 1.2 `MoverSkillList` (mount + 0x1f54, `ShineMover::smv_MoverSki… | medium | no function cited | cite and re-read the function |
-| · 1.3 Vtable slots used here | medium | cap 1/2; B×5 | capture 0x900D |
+| · 1.3 Vtable slots used here | medium | the captured opcodes are only mentioned here (0x4821, 0x900D); the subject of the section (the vtable slots used by the skill list) is not on the wire (hand; baseline: high) | none on the wire |
 | 2. Toggle skills | – | container (see its subsections) |  |
 | · 2.1 Condition: `csl_Toggle_CanUseSkill` and the weapon check | medium | read in code | second reading / client check |
 | · 2.2 The toggle list | medium | read in code | second reading / client check |
-| · 2.3 Player wrappers and packets | medium | cap 0/2; R×1 | capture 0x245C, 0x245D |
-| · 2.4 Automatic switch-off | medium | the captured opcodes are only mentioned here (0x2047, 0xC809); the subject of the section (automatic switch-off of a toggle skill) is in no capture (hand; baseline: high) | capture 0x245D, 0x4007 (toggle skill, then map link) |
-| · 2.5 Switching by cast | medium | cap 2/5 | capture 0x245C, 0x245D |
+| · 2.3 Player wrappers and packets | **high** | cap 2/2; R×1 |  |
+| · 2.4 Automatic switch-off | medium | captured: the automatic switch-off of the toggle by unequip, low HP and map change (capture-validation §25.4, §11 row "Toggle skill"), and the capture extends the section (each removed state is broadcast twice, a switch-off cast costs HPRate HP; P02-B38, §13): a captured section in which a class applies (hand; baseline: medium) | X06 folds P02-B38 into the section |
+| · 2.5 Switching by cast | **high** | cap 5/5; cv ok |  |
 | 3. Cooldowns and delay groups | – | container (see its subsections) |  |
-| · 3.1 When a cast sets the cooldown | medium | read in code | second reading / client check |
+| · 3.1 When a cast sets the cooldown | **high** | cv ok |  |
 | · 3.2 Setting: `smo_ply_SkillCoolTime` and `csl_SetCoolTime` | medium | cap 1/1; client×1; weak inf1 | capture (class U) |
 | · 3.3 IgnoreCoolTime abstates ("chain cast") | medium | cap 1/1 | capture (class U) |
 | · 3.4 Shortening: damage taken, item-set rates, charged buffs | medium | cap 1/1 | capture (class U) |
 | · 3.5 Mount skills: `MoverSkillList` | medium | cap 1/1; R×2 | capture (class U) |
 | · 3.6 Other callers that set or check skill cooldowns | medium | cap 1/2 | capture (class U) |
-| 4. Empower points | medium | cap 1/11; client×1 | capture 0x480F, 0x900D, 0x900E, 0x900F |
+| 4. Empower points | **high** | cap 7/11; cv ok; client×1 |  |
 | 5. Mastery (production skills) | medium | cap 1/3; client×2; R×1 | capture 0x481D |
 | 6. Learn, unlearn, load | – | container (see its subsections) |  |
 | · 6.1 Membership tests | medium | read in code | second reading / client check |
-| · 6.2 Skill scroll: `UseItemSkillScroll::uib_CanUseItem` | medium | cap 0/1 | capture (class U) |
-| · 6.3 Learning and the default skills | medium | cap 0/1 | capture (class U) |
+| · 6.2 Skill scroll: `UseItemSkillScroll::uib_CanUseItem` | **high** | cap 1/1; cv ok |  |
+| · 6.3 Learning and the default skills | medium | cap 1/1 | capture (class U) |
 | · 6.4 Unlearning one step: `csl_UnLearn` | medium | weak inf1 | second reading / client check |
 | 7. Buffers: save to the DB and the WM, list to the client | – | container (see its subsections) |  |
-| · 7.1 Which entries are written (`cs_bSave`) | medium | cap 0/3 | capture (class U) |
-| · 7.2 Character DB: `so_SaveSkill` / `csl_FillSaveBuffer` | medium | cap 0/2 | capture (class U) |
+| · 7.1 Which entries are written (`cs_bSave`) | **high** | cap 2/3; cv ok |  |
+| · 7.2 Character DB: `so_SaveSkill` / `csl_FillSaveBuffer` | **high** | cap 2/2 |  |
 | · 7.3 World manager cache: `so_Send_NC_CHARSAVE_2WLDMAN_SKILL_CMD… | **high** | cap 4/4 |  |
 | · 7.4 Client list: `csl_FillSendBuffer_Client` | medium | cap 1/1 | capture (class U) |
 | 8. Dispel, cure and the miss result (Z03 leftovers) | medium | read in code | second reading / client check |
@@ -2196,9 +2252,9 @@ Knowledge files (`docs/knowledge/`):
 | · 8.6 `RandomBox` (the dispel / steal pick of §8.3) | medium | read in code | second reading / client check |
 | 9. Mount skills (`ShineMover`) | – | container (see its subsections) |  |
 | · 9.1 Who fills `MoverSkillList` | medium | read in code | second reading / client check |
-| · 9.2 Casting: `so_smv_SkillBash_Object` / `so_smv_SkillBash_Loca… | medium | cap 0/1 | capture 0x2434 |
+| · 9.2 Casting: `so_smv_SkillBash_Object` / `so_smv_SkillBash_Loca… | medium | cap 1/1 | capture (class U) |
 | · 9.3 Mob weapons against a mount: `ShineMover::so_ply_CanMyTarge… | medium | read in code | second reading / client check |
-| 10. Original-server bugs | medium | cap 2/4; bug table (class X: effects are deductions) | capture 0x245D |
+| 10. Original-server bugs | medium | cap 4/4; bug table (class X: effects are deductions) | capture (class U) |
 | 11. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 | 12. Coverage boundary | – | open points / boundary list, no claim to rate |  |
 
@@ -2250,9 +2306,9 @@ Knowledge files (`docs/knowledge/`):
 |---|---|---|---|
 | 1. Data used by the special effects | – | container (see its subsections) |  |
 | · 1.1 Special members of `SkillDataIndex` | – | container (see its subsections) |  |
-| · · 1.1.1 Who reads each special member (sweep) | medium | cap 1/3; R×1 | capture (class U) |
+| · · 1.1.1 Who reads each special member (sweep) | medium | the captured opcodes are only mentioned here (0x2440 / 0x2441 of the casts); the subject of the section (which code reads each SS_* special member) is in no capture beyond the specials of the `s24` skills (hand; baseline: high) | capture a skill per special |
 | · 1.2 Globals and structures | medium | cap 1/1 | capture (class U) |
-| · 1.3 Virtual slots called by `smo_SkillBlast` (players / mobs) | medium | the captures run these slots only for Bash [01] of a Fighter against a mob; the mob-side slots and the other branches are code only (hand; baseline: high) | skills of other classes; a mob skill |
+| · 1.3 Virtual slots called by `smo_SkillBlast` (players / mobs) | medium | the captures run these slots for player skills only: Bash [01] against a mob (batches 2–3) and, in batch 4, the casts of `s24` (Dash ground target, Heat of Fury toggle, Divine Shield abort, Revival; capture-validation §25.2–§25.4, §25.8); the mob-side slots and the other branches are code only (hand; baseline: high) | a mob skill; skills of other classes |
 | · 1.4 Sub-state rows by strength, and how a keep time is chosen | medium | read in code | second reading / client check |
 | 2. `smo_SkillBlast`: one target, in code order  @ FUN_00581160 | medium | read in code | second reading / client check |
 | · 2.1 Entry filters  (0x581160 – 0x5812f0) | medium | read in code | second reading / client check |
@@ -2262,10 +2318,10 @@ Knowledge files (`docs/knowledge/`):
 | · 2.5 Damage part  (0x5818f0 – 0x582080) | medium | cap 0/1 | capture 0x482D |
 | · · 2.5.1 `RuleOfEngagementHealAttack::roe_CalcDamage`  @ FUN_00500… | medium | read in code | second reading / client check |
 | · 2.6 After the damage part: RECALL, HPCONVERTSP, MANABURN  (0x58… | medium | cap 0/1 | capture 0x482D |
-| · 2.7 SS_HOLDME: the caster holds still  (0x582122 – 0x58221c) | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (SS_HOLDME) is in no capture (hand; baseline: high) | capture a skill with this special |
-| · 2.8 Keep-time specials: SS_FIRETIMEADD, SS_CURSETIMEADD, SS_POS… | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (the keep-time specials) is in no capture (hand; baseline: high) | capture a skill with this special |
+| · 2.7 SS_HOLDME: the caster holds still  (0x582122 – 0x58221c) | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion; batch 4: the skills and states of `s24`, capture-validation §24–§25)); the subject of the section (SS_HOLDME) is in no capture (hand; baseline: high) | capture a skill with this special |
+| · 2.8 Keep-time specials: SS_FIRETIMEADD, SS_CURSETIMEADD, SS_POS… | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion; batch 4: the skills and states of `s24`, capture-validation §24–§25)); the subject of the section (the keep-time specials) is in no capture (hand; baseline: high) | capture a skill with this special |
 | · 2.9 Single-hit tail: abstates, dispel, item actions, SS_SUCKHP … | medium | read in code | second reading / client check |
-| · 2.10 Multi-hit tail: the step's abstates  (`hit.mha_HitStep ≥ 0… | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion), 0x2452); the subject of the section (the multi-hit tail) is in no capture (hand; baseline: high) | capture a multi-hit skill |
+| · 2.10 Multi-hit tail: the step's abstates  (`hit.mha_HitStep ≥ 0… | medium | the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion; batch 4: the skills and states of `s24`, capture-validation §24–§25), 0x2452); the subject of the section (the multi-hit tail) is in no capture (hand; baseline: high) | capture a multi-hit skill |
 | 3. Committing a result: `SkillDamageSender::sds_TemplateStore` … | medium | cap 1/1 | capture (class U) |
 | 4. Damage reflection | – | container (see its subsections) |  |
 | · 4.1 Trigger (in `smo_SwingDamage` FUN_00432f30 and `smo_SkillBl… | medium | read in code | second reading / client check |
@@ -2273,8 +2329,8 @@ Knowledge files (`docs/knowledge/`):
 | 5. Dispel and cure: what the masks remove | medium | cap 1/1 | capture (class U) |
 | 6. Blast entry points, target scans and chained blasts (outside… | – | container (see its subsections) |  |
 | · 6.1 Which blast runs: `ShineMobileObject::so_Routine`  @ FUN_00… | **high** | cap 3/4 |  |
-| · 6.2 `ShineMobileObject::smo_SkillBash_Blast(Obj)(o, t, empower)… | **high** | cap 5/9; R×1 |  |
-| · 6.3 `ShineMobileObject::smo_SkillBash_Blast(Loc)(o, xy, empower… | medium | cap 1/3 | capture 0x2069, 0x2438 |
+| · 6.2 `ShineMobileObject::smo_SkillBash_Blast(Obj)(o, t, empower)… | **high** | cap 7/9; R×1 |  |
+| · 6.3 `ShineMobileObject::smo_SkillBash_Blast(Loc)(o, xy, empower… | **high** | cap 2/3; cv ok |  |
 | · 6.4 Queuing: `SkillBlastEffectContainer::sbec_Store`  @ FUN_004… | medium | read in code | second reading / client check |
 | · · 6.4.1 The MultiHit table: `MultiHitData::MultiHitTable::mht_Loa… | medium | read in code | second reading / client check |
 | · 6.5 Firing: `SkillBlastEffect::sbe_BlastObject` / `sbe_BlastLoc… | medium | cap 1/1 | capture (class U) |
@@ -2309,7 +2365,7 @@ Knowledge files (`docs/knowledge/`):
 | · 5.2 smo_ply_ItemUse (shared, Z13 §9.4) @ FUN_0053fd10 | medium | silver wing used in no capture: the captured opcodes are the NPC server menu (0x3C01 / 0x3C02), the ride item (0x3015 / 0x3016 / 0x3449) and `&linkto` (0x180D) (hand; baseline: high) | scenario: save a location and fly with a silver wing (part 8) |
 | · 5.3 uib_AfterCast | **high** | cap 2/2 |  |
 | · 5.4 sp_SilverWing_PortalBlast: the link | medium | silver wing used in no capture: the captured opcodes are the NPC server menu (0x3C01 / 0x3C02), the ride item (0x3015 / 0x3016 / 0x3449) and `&linkto` (0x180D) (hand; baseline: high) | scenario: save a location and fly with a silver wing (part 8) |
-| · 5.5 Unintended entry: 0x304E NC_ITEM_USE_ACTIVESKILL_REQ @ FUN_… | medium | cap 2/6; weak inf1 | capture 0x2450, 0x2451, 0x304F |
+| · 5.5 Unintended entry: 0x304E NC_ITEM_USE_ACTIVESKILL_REQ @ FUN_… | medium | the captured opcodes are only mentioned here (Dash 0x2450 / 0x2451, the potion use 0x3016 / 0x301A); the subject of the section (0x304E NC_ITEM_USE_ACTIVESKILL_REQ) is in no capture (hand; baseline: high) | test client: send 0x304E |
 | 6. Packets and client handlers | medium | silver wing used in no capture: the captured opcodes are the NPC server menu (0x3C01 / 0x3C02), the ride item (0x3015 / 0x3016 / 0x3449) and `&linkto` (0x180D) (hand; baseline: high) | scenario: save a location and fly with a silver wing (part 8) |
 | 7. Original-server bugs | medium | cap 8/9; weak inf1; bug table (class X: effects are deductions) | capture (class U) |
 | 8. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
@@ -2383,10 +2439,10 @@ Knowledge files (`docs/knowledge/`):
 | · 4.4 Opening: sealed attribute → opened card | medium | cap 1/5 | capture 0xC407 |
 | 5. Per-player card state | – | container (see its subsections) |  |
 | · 5.1 Containers | medium | read in code | second reading / client check |
-| · 5.2 Loading from the WorldManager (0x10E3 / 0x10E6 / 0x10E9) | medium | cap 0/3 | capture (class U) |
-| · 5.3 Changes during the session | medium | cap 0/13; R×1 | capture 0xC40B |
+| · 5.2 Loading from the WorldManager (0x10E3 / 0x10E6 / 0x10E9) | medium | captured only as empty lists: 0x10E3 / 0x10E6 / 0x10E9 `{5, n 0}` at every map login (capture-validation §7.5; P02-B10); no card collection in a capture (hand; baseline: high) | capture with a collected card, then a map login |
+| · 5.3 Changes during the session | medium | cap 6/13; R×1 | capture 0xC40B |
 | · 5.4 Reward request: which table columns are used | medium | cap 0/1 | capture (class U) |
-| 6. Original-server bugs | medium | cap 0/5; bug table (class X: effects are deductions) | capture 0xC40B |
+| 6. Original-server bugs | medium | cap 1/5; bug table (class X: effects are deductions) | capture 0xC40B |
 | 7. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 | 8. Coverage boundary | – | open points / boundary list, no claim to rate |  |
 
@@ -2414,9 +2470,9 @@ Knowledge files (`docs/knowledge/`):
 
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
-| 1. Character rename by item: the zone side (dept 45 USER2) | medium | cap 0/7 | capture 0xB413 |
+| 1. Character rename by item: the zone side (dept 45 USER2) | medium | cap 3/7 | capture 0xB413 |
 | · 1.1 GameDB 0xB412 NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ITEM_USE… | medium | cap 0/3; client×1 | capture 0xB413 |
-| · 1.2 WM 0xB40F NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD (World… | medium | cap 0/2 | capture (class U) |
+| · 1.2 WM 0xB40F NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD (World… | **high** | cap 2/2; cv ok |  |
 | · 1.3 Client 0x4025 NC_CHARSAVE_UI_STATE_SAVE_REQ | **high** | cap 4/4 |  |
 | 2. Item dismantling internals (answers Z04 §12.1) | medium | cap 0/3 | capture 0x302B |
 | 3. Soul stones: SP use and the queued use (answers Z04 §13.2) | **high** | cap 2/2; client×1; weak inf1; B×4 |  |
@@ -2469,7 +2525,7 @@ Knowledge files (`docs/knowledge/`):
 | · 4.6 Mini-game (dice Tai Sai) state on the player | medium | read in code | second reading / client check |
 | · 4.7 Party, raid and guild state | medium | read in code | second reading / client check |
 | · 4.8 NPC menus, trade, booth, tent | **low** | sup×1 (README §5.6) | re-read the rest (§3) |
-| · 4.9 Inventory arrange and storage | medium | cap 0/1 | capture (class U) |
+| · 4.9 Inventory arrange and storage | medium | cap 1/1 | capture (class U) |
 | · 4.10 Plain accessors | medium | read in code | second reading / client check |
 | · 4.11 Nested-type destructors | medium | read in code | second reading / client check |
 | 5. `ShineObject`, `ShineMobileObject` and the other object clas… | – | container (see its subsections) |  |
@@ -2527,8 +2583,8 @@ Knowledge files (`docs/knowledge/`):
 | · 11.2 `p+0x5cb9` bit 2 (`sp_MiscFlag.BeSummoned`) | medium | read in code | second reading / client check |
 | · 11.3 Player modes | medium | cap 6/13; client×3; weak p172 | capture 0x202C, 0x203D |
 | · 11.4 0x3048 NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ: every code | medium | cap 0/4 | capture 0x3049 |
-| · 11.5 Auto-arrange: start, steps and end | medium | the captured opcodes are only mentioned here (0x1803, 0x300C); the subject of the section (auto-arrange 0x304A / 0x304B) is in no capture (hand; baseline: high) | capture 0x304A, 0x304B (sort the inventory) |
-| Original-server bugs | medium | cap 5/10; client×2; weak inf4; R×1; bug table (class X: effects are deductions) | capture 0x202C, 0x304B |
+| · 11.5 Auto-arrange: start, steps and end | **high** | cap 4/4; client×1 |  |
+| Original-server bugs | medium | cap 7/10; client×2; weak inf4; R×1; bug table (class X: effects are deductions) | capture 0x202C |
 | Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 | Coverage boundary | – | open points / boundary list, no claim to rate |  |
 
@@ -2600,7 +2656,7 @@ Knowledge files (`docs/knowledge/`):
 | · 3.4 Web key, PC-bang, events, teen protection | **low** | cap 2/13; sup×2 (README §5.7); weak inf1 dbb1 | re-read the rest (§3) |
 | 4. AccountLog server (CParserAccountLog) | medium | read in code | second reading / client check |
 | · 4.1 Account log (`p_AccountLog_Add` → `tAccountLog`) | **low** | cap 4/4; sup×1 (README §5.7); cv corr; weak dbb1; capture shows the link packets, not the SQL | re-read the rest (§3); read with P02 "Corrections" |
-| · 4.2 Statistics, events | **low** | cap 1/6; cv ok; sup×2 (README §5.7); cv corr; weak inf1 dbb3 | re-read the rest (§3); read with P02 "Corrections"; code or capture for the marked statements |
+| · 4.2 Statistics, events | medium | cap 2/6; cv ok; sup×2 (README §5.7); cv corr; weak inf1 dbb3 | re-read the rest (§3); read with P02 "Corrections"; code or capture for the marked statements |
 | · 4.3 IP block checks (the source of Login's 0x51) | medium | cap 3/11; weak dbb1 | capture (class U) |
 | · 4.4 Logout day, user reports | **low** | cap 0/11; sup×1 (README §5.7); weak inf1 dbb3 | re-read the rest (§3); code or capture for the marked statements; capture 0x8002, 0x8004, 0x8006 |
 | · 4.5 Syslog lines (NC_SYSLOG_*) | **low** | cap 4/4; sup×2 (README §5.7); weak inf1 p171; capture shows the link packets, not the SQL | re-read the rest (§3) |
@@ -2618,26 +2674,26 @@ Knowledge files (`docs/knowledge/`):
 | 3. Avatars (char select): list, create, delete, rename, guild | medium | cv ok; no function cited; sup×1 (README §5.7); no PDB | re-read the rest (§3) |
 | · 3.1 Avatar list | **low** | cap 3/3; weak inf1 dbb3; capture shows the link packets, not the SQL | code or capture for the marked statements |
 | · 3.2 GetAvatarInfo (the 130-byte AVATAR record) | **low** | cap 1/1; sup×2 (README §5.7); cv corr; D: `p_Char_GetLoginData` differ between the backups; weak inf1 | re-read the rest (§3); read with P02 "Corrections"; D06 §8.5 version |
-| · 3.3 Create | **low** | cap 4/6; client×1; D: `p_Char_Create`, `p_Quest_Set` differ between the backups; weak dbb2; capture shows the link packets, not the SQL | D06 §8.5 version; capture 0x1404 |
+| · 3.3 Create | medium | cap 6/6; cv ok; client×1; D: `p_Char_Create`, `p_Quest_Set` differ between the backups; weak dbb2 | D06 §8.5 version |
 | · 3.4 Delete | **high** | cap 3/4; cv ok; client×1; weak dbb2 |  |
-| · 3.5 Rename (char select) and guild data | **low** | cap 2/7; D: `p_Char_Rename` differ between the backups | D06 §8.5 version; capture 0x1410 |
+| · 3.5 Rename (char select) and guild data | medium | cap 5/7; cv ok; D: `p_Char_Rename` differ between the backups | D06 §8.5 version |
 | · 3.6 Item list helper (shared with D03) | medium | no PDB | second reading / client check |
-| 4. Character load: 0x1004 NC_CHAR_CHARDATA_REQ (CParserCharacte… | medium | cap 32/54; cv ok; client×2; sup×7 (README §5.7); cv corr; D: `p_Char_GetStateAllWithSetItemAndRestTime`, `p_Quest_GetAllDoing`, `usp_Character_getSingleOption` differ between the backups | re-read the rest (§3); read with P02 "Corrections"; D06 §8.5 version; capture 0x1002, 0x1010, 0x1011, 0x1C13 |
+| 4. Character load: 0x1004 NC_CHAR_CHARDATA_REQ (CParserCharacte… | medium | cap 38/54; cv ok; client×2; sup×7 (README §5.7); cv corr; D: `p_Char_GetStateAllWithSetItemAndRestTime`, `p_Quest_GetAllDoing`, `usp_Character_getSingleOption` differ between the backups | re-read the rest (§3); read with P02 "Corrections"; D06 §8.5 version; capture 0x1010, 0x1011, 0x1C13 |
 | · 4.1 GetCharBaseData: `p_Char_GetAllData` → `PROTO_NC_CHAR_BASE_… | **low** | cap 1/1; sup×2 (README §5.7); weak dbb1; capture shows the link packets, not the SQL | re-read the rest (§3) |
-| 5. Login, logout, loading report | **low** | cap 3/6; sup×1 (README §5.7); weak inf1 dbb2; D: `p_Char_Login`, `p_Char_Logout` differ between the backups; capture shows the link packets, not the SQL | re-read the rest (§3); code or capture for the marked statements; D06 §8.5 version |
-| 6. Character saves from the zone (dept 16 CHARSAVE) | medium | cap 10/24; cv ok; sup×2 (README §5.7); cv corr; D: `p_Quest_Set` differ between the backups; weak dbb1 | re-read the rest (§3); read with P02 "Corrections"; D06 §8.5 version |
+| 5. Login, logout, loading report | **low** | cap 5/6; sup×1 (README §5.7); cv corr; weak inf1 dbb2; D: `p_Char_Login`, `p_Char_Logout` differ between the backups; capture shows the link packets, not the SQL | re-read the rest (§3); read with P02 "Corrections"; code or capture for the marked statements; D06 §8.5 version |
+| 6. Character saves from the zone (dept 16 CHARSAVE) | medium | cap 13/24; cv ok; sup×2 (README §5.7); cv corr; D: `p_Quest_Set` differ between the backups; weak dbb1 | re-read the rest (§3); read with P02 "Corrections"; D06 §8.5 version |
 | 7. Class, stats, fame, name check | – | container (see its subsections) |  |
-| · 7.1 Class change, legacy stat points, fame, registration check | medium | cap 9/23; cv ok; R×1 | callers incl. vtable slots; senders in every `handlers.json`; capture 0x1096 |
-| · 7.2 Free-stat save: 0x10D1 NC_CHAR_FREESTAT_SET_DB_REQ (answers… | **low** | cap 4/9; sup×1 (README §5.7); weak inf2 dbb1 | re-read the rest (§3); code or capture for the marked statements; capture 0x1096 |
+| · 7.1 Class change, legacy stat points, fame, registration check | medium | cap 10/23; cv ok; R×1 | callers incl. vtable slots; senders in every `handlers.json`; capture 0x1096 |
+| · 7.2 Free-stat save: 0x10D1 NC_CHAR_FREESTAT_SET_DB_REQ (answers… | medium | cap 5/9; cv ok; sup×1 (README §5.7); weak inf2 dbb1 | re-read the rest (§3); code or capture for the marked statements; capture 0x1096 |
 | 8. Tutorial | medium | cap 2/4; capture shows the link packets, not the SQL | capture (class U) |
 | 9. Misc (chat bans, spam filter, guide, item shop URL, ping tes… | **low** | cap 1/15; sup×2 (README §5.7); D: `usp_Character_setChatBan` differ between the backups | re-read the rest (§3); D06 §8.5 version; capture 0x0812, 0x0813, 0x3043 |
 | 10. Item lists by storage type, beauty shop | medium | cap 4/11; weak inf1 | capture 0x1079 |
 | 11. Wedding (tMarriage) — answers the Z07 §5 questions | **low** | cap 2/27; cv ok; sup×1 (README §5.7); weak dbb4; D: `p_Char_Wedding_Divorce_by_Agree`, `p_Char_Wedding_Divorce_by_Force`, `p_Char_Wedding_Do` differ between the backups | re-read the rest (§3); code or capture for the marked statements; D06 §8.5 version |
 | 12. Attendance event | **low** | cap 3/7; sup×2 (README §5.7); cv corr | re-read the rest (§3); read with P02 "Corrections" |
 | 13. Promotion (event) user and reward | **low** | cap 1/6; sup×1 (README §5.7) | re-read the rest (§3) |
-| 14. Character rename with a rename item (dept 45) | **low** | cap 1/7; D: `usp_Character_setChangeID` differ between the backups; weak dbb1 | D06 §8.5 version; capture 0xB40C |
-| 15. Procedures called by these handlers | **low** | cap 13/37; sup×2 (README §5.7); D: `p_Char_Create`, `p_Char_GetLoginData`, `p_Char_GetStateAllWithSetItemAndRestTime` … differ between the backups | re-read the rest (§3); D06 §8.5 version |
-| Original-server bugs | **low** | cap 8/23; sup×2 (README §5.7); weak inf2 dbb1; D: `p_Char_Create`, `usp_Character_setChatBan` differ between the backups; R×1; bug table (class X: effects are deductions) | re-read the rest (§3); code or capture for the marked statements; D06 §8.5 version; callers incl. vtable slots; senders in every `handlers.json` |
+| 14. Character rename with a rename item (dept 45) | medium | cap 5/7; cv ok; D: `usp_Character_setChangeID` differ between the backups; weak dbb1 | D06 §8.5 version |
+| 15. Procedures called by these handlers | **low** | cap 17/37; sup×2 (README §5.7); D: `p_Char_Create`, `p_Char_GetLoginData`, `p_Char_GetStateAllWithSetItemAndRestTime` … differ between the backups | re-read the rest (§3); D06 §8.5 version |
+| Original-server bugs | **low** | cap 9/23; sup×2 (README §5.7); weak inf2 dbb1; D: `p_Char_Create`, `usp_Character_setChatBan` differ between the backups; R×1; bug table (class X: effects are deductions) | re-read the rest (§3); code or capture for the marked statements; D06 §8.5 version; callers incl. vtable slots; senders in every `handlers.json` |
 | 16. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 
 ### 2.46 D03: `db/D03-character-items.md`
@@ -2652,14 +2708,14 @@ Knowledge files (`docs/knowledge/`):
 | · 1.5 Holy-promise cen reward | medium | no PDB | second reading / client check |
 | 2. Shop (CParserCharacter, registered @ FUN_0043b040) | **high** | cap 2/2; cv ok |  |
 | · 2.1 NPC purchase | medium | cap 5/8; cv ok; D: `p_Item_BuyLot` differ between the backups; weak dbb1 | D06 §8.5 version |
-| · 2.2 Sell and repurchase | medium | cap 9/14; cv ok; D: `p_Item_BuyLot` differ between the backups; weak dbb2 | D06 §8.5 version |
+| · 2.2 Sell and repurchase | medium | cap 10/14; cv ok; D: `p_Item_BuyLot` differ between the backups; weak dbb2 | D06 §8.5 version |
 | · 2.3 Guild-token purchase (into guild storage) | medium | cap 1/8; weak dbb1 | capture (class U) |
 | · 2.4 Soul stones | medium | cap 2/4; cv ok; sup×1 (README §5.7); cv corr | re-read the rest (§3); read with P02 "Corrections" |
 | · 2.5 Capsule purchase | medium | cap 2/4; capture shows the link packets, not the SQL | capture (class U) |
 | · 2.6 Item-money purchase (paying with an item, e.g. tokens / med… | medium | cap 4/9 | capture (class U) |
 | 3. Inventory: equip, move, stack, drop, pick, money | medium | weak dbb1; no PDB | second reading / client check |
-| · 3.1 Equip / unequip | **low** | cap 3/8; weak dbb3 | code or capture for the marked statements |
-| · 3.2 Relocation and exchange (inventory ↔ storage ↔ other owner) | medium | cap 2/7; weak dbb2 | capture (class U) |
+| · 3.1 Equip / unequip | **low** | cap 5/8; weak dbb3; capture shows the link packets, not the SQL | code or capture for the marked statements |
+| · 3.2 Relocation and exchange (inventory ↔ storage ↔ other owner) | medium | cap 5/7; weak dbb2; capture shows the link packets, not the SQL | capture (class U) |
 | · 3.3 Merge and split | **high** | cap 6/11; cv ok; weak dbb1 |  |
 | · 3.4 Drop and pick-up | **low** | cap 9/18; sup×1 (README §5.7); cv corr; capture shows the link packets, not the SQL | re-read the rest (§3); read with P02 "Corrections" |
 | · 3.5 Money | medium | cap 3/8; weak dbb1 | capture (class U) |
@@ -2670,7 +2726,7 @@ Knowledge files (`docs/knowledge/`):
 | · 5.3 Guild-academy reward storage | **low** | cap 0/8; D: `usp_GuildAcademy_withdrawMoney` differ between the backups; weak dbb1 | D06 §8.5 version |
 | · 5.4 Premium ("charged") items from the item shop | medium | cap 5/9; weak dbb1; capture shows the link packets, not the SQL | capture (class U) |
 | 6. Upgrades, enchanting and item services | medium | cap 2/2; capture shows the link packets, not the SQL | capture (class U) |
-| · 6.1 Upgrade (`p_Item_Upgrade_CelllInAll`) | **low** | cap 1/17; R×1 | callers incl. vtable slots; senders in every `handlers.json`; capture 0x3803, 0x3809, 0x3C04, 0x3C06 … |
+| · 6.1 Upgrade (`p_Item_Upgrade_CelllInAll`) | **low** | cap 4/17; R×1 | callers incl. vtable slots; senders in every `handlers.json`; capture 0x3803, 0x3809, 0x3C04, 0x3C06 … |
 | · 6.2 Enchanting (gem sockets, `tItemEnchant`) | medium | cap 0/9; weak dbb1; no PDB | capture 0x2082 |
 | · 6.3 Mounts (movers) | medium | cap 0/6; no PDB | capture (class U) |
 | · 6.4 Random options | medium | cap 2/11 | capture (class U) |
@@ -2680,18 +2736,18 @@ Knowledge files (`docs/knowledge/`):
 | · 7.1 Direct creation | medium | cap 5/15 | capture (class U) |
 | · 7.2 Item lists (scripts, quests, events) @ FUN_00432090 | **low** | cap 1/5; sup×1 (README §5.7) | re-read the rest (§3) |
 | · 7.3 Chests and capsules | medium | cap 2/11 | capture (class U) |
-| · 7.4 Mystery vault, card rebuild, item info | medium | cap 2/10 | capture (class U) |
+| · 7.4 Mystery vault, card rebuild, item info | medium | cap 4/10 | capture (class U) |
 | · 7.5 Breaking, destroying, producing, quest rewards | medium | cap 5/15; weak inf1 | capture (class U) |
 | · 7.6 Mini-house resources | medium | cap 0/3; no PDB | capture (class U) |
 | 8. Mini-house (dept 35, CParserCharacter) | **low** | cap 0/12; sup×1 (README §5.7); weak inf1 dbb4 | re-read the rest (§3); code or capture for the marked statements |
-| 9. Premium buffs and re-initialise items (dept 36) | medium | cap 2/28; weak dbb1 | capture (class U) |
+| 9. Premium buffs and re-initialise items (dept 36) | medium | cap 6/28; cv ok; weak dbb1 | capture (class U) |
 | 10. Dice "TaiSai" game machine (dept 43) | **low** | cap 0/11; weak dbb3; D: `usp_Dice_setDicePay`, `usp_Dice_setDiceResult` differ between the backups | code or capture for the marked statements; D06 §8.5 version; capture 0xAC2C |
 | 11. Gamble coins, house dice and slot machines (dept 47) | **low** | cap 2/34; sup×1 (README §5.7); weak dbb3 | re-read the rest (§3); code or capture for the marked statements; capture 0x1C12 |
 | 12. Card collection (dept 49) | **low** | cap 1/11; sup×1 (README §5.7); weak dbb2 | re-read the rest (§3) |
-| 13. Pets (dept 53) | **low** | cap 2/17; sup×1 (README §5.7) | re-read the rest (§3) |
+| 13. Pets (dept 53) | **low** | cap 3/17; sup×1 (README §5.7) | re-read the rest (§3) |
 | 14. Trade and booths (Z06 owns the windows) | medium | cap 0/12; weak dbb2; no PDB | capture (class U) |
-| 15. Procedures called by these handlers | **low** | cap 0/2; sup×1 (README §5.7); D: `p_Item_BuyAll`, `p_Item_BuyLot`, `usp_Dice_setDicePay` … differ between the backups | re-read the rest (§3); D06 §8.5 version |
-| Original-server bugs | **low** | cap 14/55; D: `p_Item_BuyAll` differ between the backups; bug table (class X: effects are deductions) | D06 §8.5 version |
+| 15. Procedures called by these handlers | **low** | cap 1/2; sup×1 (README §5.7); D: `p_Item_BuyAll`, `p_Item_BuyLot`, `usp_Dice_setDicePay` … differ between the backups | re-read the rest (§3); D06 §8.5 version |
+| Original-server bugs | **low** | cap 16/55; D: `p_Item_BuyAll` differ between the backups; bug table (class X: effects are deductions) | D06 §8.5 version |
 | 16. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 | 17. Coverage boundary | – | open points / boundary list, no claim to rate |  |
 
@@ -2702,14 +2758,14 @@ Knowledge files (`docs/knowledge/`):
 | 1. Quests (dept 17, CParserCharacter) | – | container (see its subsections) |  |
 | · 1.1 Store one record | **low** | sup×1 (README §5.7); D: `p_Quest_Set` differ between the backups; weak dbb1 | re-read the rest (§3); D06 §8.5 version |
 | · 1.2 Handlers | **low** | cap 0/19; R×1; weak inf1 dbb1 | callers incl. vtable slots; senders in every `handlers.json`; capture 0x4408 |
-| 2. Skills (dept 18, CParserCharacter) | **low** | cap 1/13; weak dbb6 | code or capture for the marked statements |
+| 2. Skills (dept 18, CParserCharacter) | medium | cap 6/13; cv ok; weak dbb6 | code or capture for the marked statements |
 | 3. Friends (dept 21) and the kingdom-quest reward (dept 22) | **low** | cap 0/17; sup×1 (README §5.7); weak dbb3 | re-read the rest (§3); code or capture for the marked statements; capture 0x1010, 0x5402, 0x5406 |
 | 4. Weapon licences (dept 23 WEAPONTITLE) and character titles (… | medium | cap 0/4; weak dbb1; no PDB | capture (class U) |
 | · 4.1 Weapon licences | medium | cap 2/12; weak dbb2 | capture 0x5C02 |
 | · 4.2 Character titles | medium | cap 3/6; capture shows the link packets, not the SQL | capture (class U) |
 | 5. Character options (dept 28 CHAR_OPTION), requests from the WM | – | container (see its subsections) |  |
-| · 5.1 Old options (`p_Char_GetOpt*` / `p_Char_SetOpt*`) | medium | cap 4/21; weak dbb2 | capture (class U) |
-| · 5.2 Improved options | **low** | cap 2/11; sup×1 (README §5.7); weak dbb7 | re-read the rest (§3); code or capture for the marked statements |
+| · 5.1 Old options (`p_Char_GetOpt*` / `p_Char_SetOpt*`) | medium | cap 7/21; weak dbb2 | capture (class U) |
+| · 5.2 Improved options | **low** | cap 4/11; sup×1 (README §5.7); weak dbb7 | re-read the rest (§3); code or capture for the marked statements |
 | 6. Guilds (dept 29 GUILD), requests from the WM | **low** | cap 0/7; sup×1 (README §5.7); weak dbb1 | re-read the rest (§3) |
 | · 6.1 Loading guilds | **low** | cap 2/7; weak inf1 dbb2 | code or capture for the marked statements |
 | · 6.2 Creating, deleting, dismissing | medium | cap 0/10; weak dbb2; no PDB | capture (class U) |
@@ -2725,7 +2781,7 @@ Knowledge files (`docs/knowledge/`):
 | · 9.3 Graduates and rewards | **low** | cap 0/19; sup×1 (README §5.7); D: `usp_GuildAcademy_withdrawMoney` differ between the backups; weak dbb1 | re-read the rest (§3); D06 §8.5 version |
 | 10. Chat block list (dept 42 CHAT_RESTRICT), requests from the … | medium | cap 5/16; weak dbb1 | capture 0x1C07, 0x1C10, 0x1C13, 0x1C14 |
 | 11. Procedures and helpers reached by these handlers | **low** | cap 0/1; D: `p_Guild_Member_SetGrade`, `p_Prison_Add`, `p_Prison_Add2` … differ between the backups | D06 §8.5 version |
-| Original-server bugs | medium | cap 1/33; bug table (class X: effects are deductions) | capture (class U) |
+| Original-server bugs | medium | cap 4/33; bug table (class X: effects are deductions) | capture (class U) |
 | 12. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 | 13. Coverage boundary | – | open points / boundary list, no claim to rate |  |
 
@@ -2740,7 +2796,7 @@ Knowledge files (`docs/knowledge/`):
 | 2. NC_LOG_GAME handlers, commands 1–84 (CParserGameLog, part 1) | – | container (see its subsections) |  |
 | · 2.1 Generic add with and without answer | **low** | cap 2/5; B×1 | follow the return value to the parser |
 | · 2.2 Login: two procedures | **low** | cap 1/1; sup×1 (README §5.7); weak inf1 | re-read the rest (§3) |
-| · 2.3 All handlers of this part | **low** | cap 15/52; cv ok; weak inf1 p1711; D: `p_GameLog_Add_Type6` differ between the backups; B×1 | code or capture for the marked statements; D06 §8.5 version; follow the return value to the parser |
+| · 2.3 All handlers of this part | **low** | cap 17/52; cv ok; weak inf1 p1711; D: `p_GameLog_Add_Type6` differ between the backups; B×1 | code or capture for the marked statements; D06 §8.5 version; follow the return value to the parser |
 | · 2.4 Commands no 2016 server sends | **low** | cap 0/23; R×2 | callers incl. vtable slots; senders in every `handlers.json` |
 | 3. NC_LOG_GAME handlers, commands 85–857 (CParserGameLog, part … | – | container (see its subsections) |  |
 | · 3.1 All logging handlers of this part | medium | cap 6/61; weak p171 | capture (class U) |
@@ -2754,7 +2810,7 @@ Knowledge files (`docs/knowledge/`):
 | 5. Server-link handlers (CPFs, registered @ FUN_00409640 CPFs_c… | **low** | cap 5/14; sup×1 (README §5.7); B×1; weak p171 | re-read the rest (§3); follow the return value to the parser |
 | 6. NC_SYSLOG handlers: text log for the data warehouse (dept 50… | – | container (see its subsections) |  |
 | · 6.1 The log file | medium | weak inf1; no PDB | second reading / client check |
-| · 6.2 The fourteen messages | medium | cap 10/14; capture shows the link packets, not the SQL | capture (class U) |
+| · 6.2 The fourteen messages | medium | cap 11/14; capture shows the link packets, not the SQL | capture (class U) |
 | 7. Process framework (part 4 sweep) | medium | cap 0/1; no PDB | capture (class U) |
 | · 7.1 Start, Windows service, shutdown | **low** | sup×1 (README §5.7); R×1 | re-read the rest (§3); callers incl. vtable slots; senders in every `handlers.json` |
 | · 7.2 Sessions: accept, receive, framing, heartbeat, close | **low** | cap 4/5; sup×1 (README §5.7); B×1; capture shows the link packets, not the SQL | re-read the rest (§3); follow the return value to the parser |
@@ -2788,7 +2844,7 @@ Knowledge files (`docs/knowledge/`):
 | · 4.1 `usp_Login_setChannel` — the client channel tag of each cha… | medium | cap 3/3; weak inf1; capture shows the link packets, not the SQL | capture (class U) |
 | · 4.2 `p_GameLog_Add_Type6` version (D05 §1.2 open point) | medium | no function cited; weak dbb1 | cite and re-read the function |
 | 5. Character DB (`w00_Character`), Character server: pets, link… | – | container (see its subsections) |  |
-| · 5.1 Pets: `usp_Pet_setCreate`, `usp_Pet_getInfo`, `usp_Pet_setN… | medium | cap 2/16; weak inf1 dbb1 | capture (class U) |
+| · 5.1 Pets: `usp_Pet_setCreate`, `usp_Pet_getInfo`, `usp_Pet_setN… | medium | cap 3/16; weak inf1 dbb1 | capture (class U) |
 | · 5.2 `usp_LinkScroll_SetDestMap` — remember where a map-link scr… | medium | cap 1/2 | capture (class U) |
 | · 5.3 `p_Item_MiniHouse_Effect_Resource_Del` — pay a mini-house f… | medium | cap 0/2; weak inf1 | capture 0x8C41 |
 | · 5.4 `p_MiniHouseURL_Get`, `p_MiniHouseURL_Set` — the house owne… | medium | cap 0/6 | capture 0x8C36, 0x8C38 |
@@ -2810,7 +2866,7 @@ Knowledge files (`docs/knowledge/`):
 | · 8.2 `usp_Character_setChatBan`: follow w00 | medium | cap 0/2 | capture (class U) |
 | · 8.3 `usp_Gamble_addCoin` and D03-B21 | medium | cap 0/10; weak inf1; R×1 | capture (class U) |
 | · 8.4 Enchant procedures (`usp_Item_*Enchant*`): follow w00 | medium | read in code | second reading / client check |
-| · 8.5 Version sweep: every called procedure that exists in two ba… | medium | cap 2/7 | capture (class U) |
+| · 8.5 Version sweep: every called procedure that exists in two ba… | medium | cap 4/7; capture shows the link packets, not the SQL | capture (class U) |
 | · 8.6 Other open DB statements of D01–D05 settled in the sweep | **low** | cap 0/9; client×1; weak inf2 dbb2 | code or capture for the marked statements; capture 0x205D |
 | 9. Table schema of the 2016 servers | – | container (see its subsections) |  |
 | · 9.1 Source and method | medium | no function cited; weak dbb1 | cite and re-read the function |
@@ -2875,7 +2931,7 @@ Knowledge files (`docs/knowledge/`):
 | · 3.1 Objects | medium | cap 0/2 | capture (class U) |
 | · 3.2 Start-up, main thread, stop | medium | read in code | second reading / client check |
 | · 3.3 The once-a-minute user-count poll (`CStatistics`) | medium | cap 3/3; capture shows the link packets, not the SQL | capture (class U) |
-| · 3.4 Session workers, the two DB links, the dispatcher | medium | cap 9/21 | capture (class U) |
+| · 3.4 Session workers, the two DB links, the dispatcher | medium | cap 10/21 | capture (class U) |
 | · 3.5 The syslog text file (`cLogSystem`, `cLS_Queue<std::string>… | medium | cap 1/1 | capture (class U) |
 | · 3.6 Address table (AccountLog functions identical to the Accoun… | medium | read in code | second reading / client check |
 | · 3.7 D01 open point: TEENAGER `nType` 1 (confidence.md §4.6 row … | medium | cap 0/1 | capture (class U) |
@@ -2897,7 +2953,7 @@ Knowledge files (`docs/knowledge/`):
 | · 5.6 The proxy class and the unused operations | medium | weak inf1; R×3 | second reading / client check |
 | · 5.7 Address table (Character, gSOAP) | medium | read in code | second reading / client check |
 | 6. D02 open points (confidence.md §4.6 row 9) | – | open points / boundary list, no claim to rate |  |
-| · 6.1 The four quest blocks of 0x1004 and their `nStatusDone` fil… | medium | cap 3/6; weak dbb1; capture shows the link packets, not the SQL | capture (class U) |
+| · 6.1 The four quest blocks of 0x1004 and their `nStatusDone` fil… | medium | cap 5/6; weak dbb1; capture shows the link packets, not the SQL | capture (class U) |
 | · 6.2 The item blocks: 0x1017 NC_CHAR_ITEM_CMD | medium | cap 4/6; capture shows the link packets, not the SQL | capture 0x1C13 |
 | · 6.3 0x0812–0x0815 ping tests: field names (2016 PDBs) | medium | cap 0/4 | capture 0x0812, 0x0813 |
 | 7. GameLog: differences against the Account build | – | container (see its subsections) |  |
@@ -2907,7 +2963,7 @@ Knowledge files (`docs/knowledge/`):
 | · 7.4 Linked library: what differs (dead code) | medium | read in code | second reading / client check |
 | · 7.5 Address table (GameLog functions no other document cites) | medium | read in code | second reading / client check |
 | · 7.6 Runtime boundary | medium | read in code | second reading / client check |
-| Original-server bugs | medium | cap 1/5; weak inf1; bug table (class X: effects are deductions) | capture 0x0812 |
+| Original-server bugs | medium | cap 2/5; weak inf1; bug table (class X: effects are deductions) | capture 0x0812 |
 | Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 | Coverage boundary | – | open points / boundary list, no claim to rate |  |
 
@@ -2972,7 +3028,7 @@ Knowledge files (`docs/knowledge/`):
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
 | Globals (wm) | **low** | cap 2/3; S: 3 offset lines, no 2016 PDB member named (pre-S01 names are ours); ours×1 | find the struct in the 2016 PDB (`pdb.py … types`), S01-renames.tsv |
-| Facts other items need | medium | cap 26/31; pdb 2/2; weak inf1 p171 | capture (class U) |
+| Facts other items need | medium | cap 28/31; pdb 2/2; weak inf1 p171 | capture (class U) |
 | Open questions | – | open points / boundary list, no claim to rate |  |
 
 ### 2.55 W02 knowledge: `docs/knowledge/W02.md`
@@ -3034,7 +3090,7 @@ Knowledge files (`docs/knowledge/`):
 |---|---|---|---|
 | 1. Corrections and additions to Z01 | medium | cap 1/4; pdb 0/3; 3 PDB member(s) at another offset (nested or wrong: `X02-rate.py pdbmiss`) | check the offsets with `pdb.py` |
 | 2. Player offsets found here | **low** | cap 1/1; S: 22 offset lines, no 2016 PDB member named (pre-S01 names are ours) | find the struct in the 2016 PDB (`pdb.py … types`), S01-renames.tsv |
-| 3. Shared mechanisms | medium | cap 4/9; pdb 0/1; 1 PDB member(s) at another offset (nested or wrong: `X02-rate.py pdbmiss`) | check the offsets with `pdb.py`; capture 0x0848, 0x1C07, 0x3C03, 0x3C09 … |
+| 3. Shared mechanisms | medium | cap 5/9; pdb 0/1; 1 PDB member(s) at another offset (nested or wrong: `X02-rate.py pdbmiss`) | check the offsets with `pdb.py`; capture 0x0848, 0x1C07, 0x3C03, 0x3C0F |
 | 4. Open questions for other items | – | open points / boundary list, no claim to rate |  |
 
 ### 2.62 Z03 knowledge: `docs/knowledge/Z03.md`
@@ -3061,8 +3117,8 @@ Knowledge files (`docs/knowledge/`):
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
 | 1. Commit model (for D03, Z06, Z07, Z13, X01) | medium | cap 3/3 | capture (class U) |
-| 2. Answer layouts (for D03) | medium | cap 0/4 | capture 0x3803, 0x3C07, 0x3C0B |
-| 3. Facts for other items | **low** | cap 15/36; R×1 | callers incl. vtable slots; senders in every `handlers.json`; capture 0x2072, 0x4C23, 0x5422, 0x680E … |
+| 2. Answer layouts (for D03) | medium | cap 1/4 | capture 0x3803, 0x3C07 |
+| 3. Facts for other items | **low** | cap 16/36; R×1 | callers incl. vtable slots; senders in every `handlers.json`; capture 0x2072, 0x4C23, 0x5422, 0x680E … |
 | 4. Open questions | – | open points / boundary list, no claim to rate |  |
 
 ### 2.65 Z06 knowledge: `docs/knowledge/Z06.md`
@@ -3116,7 +3172,7 @@ Knowledge files (`docs/knowledge/`):
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
 | 1. Command system | medium | cap 1/1; pdb 0/1; 1 PDB member(s) at another offset (nested or wrong: `X02-rate.py pdbmiss`) | check the offsets with `pdb.py` |
-| 2. Commands that change persistent state or reach other servers | medium | cap 7/20 | capture (class U) |
+| 2. Commands that change persistent state or reach other servers | medium | cap 8/20 | capture (class U) |
 | 3. Shared facts found on the way | medium | cap 1/1 | capture (class U) |
 | 4. vtable slot method (used throughout Z11) | medium | no function cited | cite and re-read the function |
 
@@ -3135,7 +3191,7 @@ Knowledge files (`docs/knowledge/`):
 |---|---|---|---|
 | 1. Wedding sub-status 5–8 (answers D02 §11 end / §16) | medium | cap 1/5; client×1 | capture 0x205D |
 | 2. Corrections to earlier items (wedding) | medium | cap 1/5 | capture (class U) |
-| 3. Wedding hall facts | medium | cap 0/5 | capture 0x2434 |
+| 3. Wedding hall facts | medium | cap 1/5 | capture (class U) |
 | 4. Minimon auto-use and card rewards (part 9, output §9) | medium | cap 1/3; R×1 | capture (class U) |
 | 5. Mini house (output §1–§3) | medium | cap 0/10; pdb 1/2; R×1 | capture 0x3034, 0x8C08, 0x8C3F, 0x8C51 … |
 | 6. Pets (output §5–§6) | medium | cap 3/3 | capture (class U) |
@@ -3176,8 +3232,8 @@ Knowledge files (`docs/knowledge/`):
 | Item actions in one paragraph | medium | cap 1/1 | capture (class U) |
 | Player members and slots (zone) | medium | pdb 1/2 | second reading / client check |
 | Costume charges in one paragraph | medium | cap 1/7 | capture 0x3037, 0x3038, 0x3066 |
-| Packets (layouts in `docs/protocol/annotations/Z17.json`) | medium | cap 1/12 | capture 0x206F, 0x3037, 0x3038, 0x3046 … |
-| Corrections to other items' docs | medium | cap 0/2; pdb 2/2 | capture (class U) |
+| Packets (layouts in `docs/protocol/annotations/Z17.json`) | medium | cap 2/12 | capture 0x206F, 0x3037, 0x3038, 0x3046 … |
+| Corrections to other items' docs | medium | cap 1/2; pdb 2/2 | capture (class U) |
 | Open questions | – | open points / boundary list, no claim to rate |  |
 
 ### 2.77 Z18 knowledge: `docs/knowledge/Z18.md`
@@ -3208,7 +3264,7 @@ Knowledge files (`docs/knowledge/`):
 |---|---|---|---|
 | Three mechanisms (§1) | medium | pdb 1/1; no function cited | cite and re-read the function |
 | Corrections to done items | medium | read in code | second reading / client check |
-| Shared functions documented here (cite Z21 instead of redoing) | medium | cap 0/2 | capture 0x206F, 0x243C |
+| Shared functions documented here (cite Z21 instead of redoing) | medium | cap 1/2 | capture 0x206F |
 | Player vtable slots (ShinePlayer; most shared by all mobile obj… | medium | R×1 | second reading / client check |
 | Bugs for other registers | medium | bug table (class X: effects are deductions) | second reading / client check |
 
@@ -3227,9 +3283,9 @@ Knowledge files (`docs/knowledge/`):
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
 | Structures (pdb2016) | medium | pdb 3/4; no function cited | cite and re-read the function |
-| Rules | medium | cap 2/6 | capture 0x245C, 0x245D, 0x481D |
-| Vtable slots (ShinePlayer) | medium | cap 1/2 | capture 0x900D |
-| Utilities | medium | cap 0/2 | capture (class U) |
+| Rules | medium | cap 5/6 | capture 0x481D |
+| Vtable slots (ShinePlayer) | medium | cap 2/2 | capture (class U) |
+| Utilities | medium | cap 2/2 | capture (class U) |
 | Follow-up created | medium | no function cited | cite and re-read the function |
 
 ### 2.83 Z24 knowledge: `docs/knowledge/Z24.md`
@@ -3273,7 +3329,7 @@ Knowledge files (`docs/knowledge/`):
 | Globals *(pdb2016)* | medium | pdb 1/1 | second reading / client check |
 | Rows (member offsets) | medium | no function cited | cite and re-read the function |
 | Card roll | medium | read in code | second reading / client check |
-| Per-player state (`ShinePlayer`, *(pdb2016)*) | medium | cap 0/3; pdb 2/2 | capture (class U) |
+| Per-player state (`ShinePlayer`, *(pdb2016)*) | medium | cap 3/3; pdb 2/2 | capture (class U) |
 | Shared code (identical-code folding) | medium | read in code | second reading / client check |
 | Bugs | medium | no function cited; bug table (class X: effects are deductions) | cite and re-read the function |
 
@@ -3292,7 +3348,7 @@ Knowledge files (`docs/knowledge/`):
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
 | ShinePlayer vtable slots resolved here (rtti.py over the 2016 z… | medium | cap 0/3 | capture 0x181D, 0xB413 |
-| Other facts | medium | cap 0/5 | capture 0x941B |
+| Other facts | medium | cap 1/5 | capture 0x941B |
 
 ### 2.90 Z31 knowledge: `docs/knowledge/Z31.md`
 
@@ -3325,10 +3381,10 @@ Knowledge files (`docs/knowledge/`):
 
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
-| Framework (for D03 / D04) | medium | cap 5/10; capture shows the link packets, not the SQL | capture (class U) |
+| Framework (for D03 / D04) | medium | cap 6/10; capture shows the link packets, not the SQL | capture (class U) |
 | Tables and columns (as the procedures use them; *(db-backup)*) | **low** | no function cited; D: `p_Char_Login`, `usp_Character_setChangeID` differ between the backups | D06 §8.5 version |
 | Answers to open questions | – | open points / boundary list, no claim to rate |  |
-| Corrections / additions for other items | **low** | cap 0/3; pdb 1/1; D: `p_Guild_Member_SetGrade`, `usp_GuildAcademy_withdrawMoney` differ between the backups | D06 §8.5 version |
+| Corrections / additions for other items | **low** | cap 1/3; pdb 1/1; D: `p_Guild_Member_SetGrade`, `usp_GuildAcademy_withdrawMoney` differ between the backups | D06 §8.5 version |
 
 ### 2.94 D03 knowledge: `docs/knowledge/D03.md`
 
@@ -3344,8 +3400,8 @@ Knowledge files (`docs/knowledge/`):
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
 | Answers to Z08's open questions (Z08 knowledge §2) | – | open points / boundary list, no claim to rate |  |
-| For W03 / W04 (WM side of the answers) | medium | cap 3/15; weak p171 | capture (class U) |
-| For D05 (GameLog) | medium | cap 3/19 | capture (class U) |
+| For W03 / W04 (WM side of the answers) | medium | cap 4/15; weak p171 | capture (class U) |
+| For D05 (GameLog) | medium | cap 4/19 | capture (class U) |
 | For D06 (missing DB behaviour) | **low** | cap 0/1; D: `usp_GuildAcademy_withdrawMoney`, `usp_GuildTournament_setRegist` differ between the backups | D06 §8.5 version |
 | Tables (db-backup) | **low** | no function cited; pre-S01 prose without a function | cite and re-read the function |
 
@@ -3362,7 +3418,7 @@ Knowledge files (`docs/knowledge/`):
 
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
-| Corrections | medium | cap 3/30; weak dbb1 | capture 0x205D, 0x74F8 |
+| Corrections | medium | cap 4/30; weak dbb1 | capture 0x205D, 0x74F8 |
 | For a rebuild (Account DB) | medium | cap 0/1 | capture (class U) |
 | For a rebuild (AccountLog / Statistics / GameLog) | medium | cap 1/4 | capture (class U) |
 | For a rebuild (Character DB, D06 §5) | medium | no function cited | cite and re-read the function |
@@ -3398,7 +3454,7 @@ Knowledge files (`docs/knowledge/`):
 |---|---|---|---|
 | 1. NA2016 executables: private-server patches | – | container (see its subsections) |  |
 | · 1.1 What differs from the 2016 exes | medium | cap 1/1 | capture (class U) |
-| · 1.2 WorldManager hooks | medium | cap 0/3; pdb 2/4 | capture (class U) |
+| · 1.2 WorldManager hooks | medium | cap 1/3; pdb 2/4 | capture (class U) |
 | · 1.3 Zone hooks and byte edits | medium | cap 2/2; pdb 0/1; weak inf1; 1 PDB member(s) at another offset (nested or wrong: `X02-rate.py pdbmiss`) | check the offsets with `pdb.py` |
 | · 1.4 Bug hints for the owning items (for X01) | medium | cap 6/12; weak inf1 | capture (class U) |
 | · 1.5 Other NA2016 files | medium | read in code | second reading / client check |
@@ -3440,18 +3496,18 @@ Knowledge files (`docs/knowledge/`):
 |---|---|---|---|
 | 1. Receive path | medium | cap 5/6 | capture 0x0819 |
 | 2. Dispatchers (found via RTTI: PgFrameWork subclasses, vtable … | medium | cap 1/4; weak inf1 p171 | capture 0x749D, 0x74D4, 0x74FE |
-| 3. Names the client itself proves | medium | cap 2/10; client×2 | capture 0x1002, 0x204A, 0x242E, 0x2434 … |
+| 3. Names the client itself proves | medium | cap 6/10; client×2 | capture 0x204A, 0x242E, 0x6C11, 0x6C12 |
 | 4. Per-scene handlers (pre-game scenes checked by hand) | medium | client×1 | second reading / client check |
 | · · Net(pre-dispatch) | medium | cap 3/4 | capture 0x0819 |
 | · · AccountFrameWork | **high** | dispatch table of the login scene: 11 of 12 opcodes captured and handled as listed (hand; baseline: medium) |  |
 | · · LoginWorldNetFrameWork | **high** | dispatch table: 5 of 6 opcodes captured (hand; baseline: medium) |  |
-| · · CharSelectFrameWork | medium | cap 17/29; client×6 | capture 0x1002, 0x111D, 0x140A, 0x140C … |
-| · · CharCreateFrameWork | medium | cap 2/4 | capture 0x1404, 0x1406 |
+| · · CharSelectFrameWork | medium | cap 21/29; client×6 | capture 0x111D, 0x140A, 0x580B, 0x7003 … |
+| · · CharCreateFrameWork | medium | cap 4/4 | capture (class U) |
 | · · CHairShopFrameWork | medium | cap 2/4 | capture 0x1079, 0x107D |
 | · · ZoneLoginNetFrameWork | **high** | dispatch table: 18 of 24 opcodes captured (the character-load burst) (hand; baseline: medium) |  |
 | · · LinkFrameWork | **high** | dispatch table: 15 of 22 opcodes captured (map links) (hand; baseline: medium) |  |
 | · · GameFrameWork opcodes per dept | medium | no function cited | cite and re-read the function |
-| · · ITask handlers | medium | cap 9/230 | capture 0x105F, 0x1061, 0x1065, 0x1067 … |
+| · · ITask handlers | medium | cap 11/230 | capture 0x1061, 0x1067, 0x202E, 0x202F … |
 | 5. Coverage of server → client packets | medium | cap 3/32; client×1 | capture 0x242E |
 | 6. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 
@@ -3461,15 +3517,15 @@ Knowledge files (`docs/knowledge/`):
 |---|---|---|---|
 | 1. Tools and generated files | medium | cap 0/1 | capture 0x1804 |
 | 2. Opcode names | medium | cap 3/10; pdb 0/1; weak p171; 1 PDB member(s) at another offset (nested or wrong: `X02-rate.py pdbmiss`) | check the offsets with `pdb.py`; capture 0x181F, 0xAC2C |
-| · Handler-name conflicts (51), verdicts in `pdb-name-verdicts.jso… | medium | cap 19/82 | capture 0xBCDA |
-| · Weak 2016 names replaced by the PDB name (59, by rank) | medium | cap 12/59 | capture 0x1002, 0x10ED, 0x10F0, 0x2004 … |
+| · Handler-name conflicts (51), verdicts in `pdb-name-verdicts.jso… | medium | cap 21/82 | capture 0xBCDA |
+| · Weak 2016 names replaced by the PDB name (59, by rank) | medium | cap 14/59 | capture 0x10ED, 0x10F0, 0x2004, 0x2006 … |
 | 3. Packet layouts (`pdb-layouts.json`) | medium | cap 1/1; weak inf1 p171 | capture (class U) |
-| 4. Struct sizes vs the 2016 code | medium | cap 16/47 | capture 0x0812, 0x0813, 0x3034, 0x3036 … |
+| 4. Struct sizes vs the 2016 code | medium | cap 17/47 | capture 0x0812, 0x0813, 0x3034, 0x3036 … |
 | 5. Hand annotations vs the PDB (per owner) | medium | no function cited | cite and re-read the function |
 | 6. Types catalogue (which PDB types matter to whom) | medium | no function cited | cite and re-read the function |
 | 7. Ghidra project `client2017` | medium | no function cited | cite and re-read the function |
 | 8. 2016 client function names ported from 2017 | medium | weak p171 | second reading / client check |
-| 9. Follow-ups per item | medium | cap 12/24 | capture 0x0C66 |
+| 9. Follow-ups per item | medium | cap 14/24 | capture 0x0C66 |
 | 10. Not reconstructed / uncertain | – | open points / boundary list, no claim to rate |  |
 
 ### 2.104 P01 knowledge: `docs/knowledge/P01.md`
@@ -3487,7 +3543,7 @@ Knowledge files (`docs/knowledge/`):
 
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
-| Corrections | **high** | every row is a capture finding with its packet count and the code place (hand; baseline: low) |  |
+| Corrections | **high** | every row is a capture finding with its packet count and the code place (hand; baseline: medium) |  |
 | Facts | **high** | capture facts (orders, timings, field values) with the code place; *(inferred)* marks the 8 deductions (hand; baseline: medium) |  |
 
 ### 2.106 P03 knowledge: `docs/knowledge/P03.md`
@@ -3504,7 +3560,7 @@ Knowledge files (`docs/knowledge/`):
 
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
-| Changed statements | medium | cap 72/79; client×4; pdb 0/1; weak inf3; 1 PDB member(s) at another offset (nested or wrong: `X02-rate.py pdbmiss`); R×1 | check the offsets with `pdb.py`; capture 0x1002, 0x1404, 0x1406, 0x140A … |
+| Changed statements | medium | cap 76/79; client×4; pdb 0/1; weak inf3; 1 PDB member(s) at another offset (nested or wrong: `X02-rate.py pdbmiss`); R×1 | check the offsets with `pdb.py`; capture 0x140A |
 | Uncertain / not reconstructed | – | open points / boundary list, no claim to rate |  |
 | Original-server bugs | medium | no function cited; bug table (class X: effects are deductions) | cite and re-read the function |
 | Coverage boundary | – | open points / boundary list, no claim to rate |  |
@@ -3522,7 +3578,7 @@ Knowledge files (`docs/knowledge/`):
 
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
-| 0. Corrections to earlier items (read these before trusting the… | **low** | cap 39/104; client×3; pdb 12/15; weak inf10 p176 fh1; B×5; R×7 | code or capture for the marked statements; capture 0x0812, 0x1804, 0x1815, 0x1817 … |
+| 0. Corrections to earlier items (read these before trusting the… | **low** | cap 47/104; client×3; pdb 12/15; weak inf10 p176 fh1; B×5; R×7 | code or capture for the marked statements; capture 0x0812, 0x1804, 0x1815, 0x1817 … |
 | 1. How to use the review (for X01, P02 and the owners) | medium | no function cited; weak inf1 p171 | cite and re-read the function |
 | 2. Facts found on the way that no other file holds | medium | read in code | second reading / client check |
 | 3. Original-server bugs | medium | no function cited; bug table (class X: effects are deductions) | cite and re-read the function |
@@ -3542,7 +3598,7 @@ Knowledge files (`docs/knowledge/`):
 |---|---|---|---|
 | 0. Facts for other items | medium | cap 7/8 | capture (class U) |
 | 1. Rows per README table | medium | cap 14/14 | capture (class U) |
-| 2. capture-validation §13 rows left out of README §5, with the … | medium | cap 15/19 | capture (class U) |
+| 2. capture-validation §13 rows left out of README §5, with the … | medium | cap 19/19 | capture (class U) |
 | 3. Original-server bugs | medium | no function cited; bug table (class X: effects are deductions) | cite and re-read the function |
 | 4. Uncertain / not reconstructed | – | open points / boundary list, no claim to rate |  |
 | 5. Coverage boundary | – | open points / boundary list, no claim to rate |  |
@@ -3551,15 +3607,23 @@ Knowledge files (`docs/knowledge/`):
 
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
-| 1. Batch-2 leftovers (capture-validation §15 rows naming X05, §… | medium | cap 11/44; R×1 | capture 0x0C15, 0x0C66, 0x1002, 0x1011 … |
+| 1. Batch-2 leftovers (capture-validation §15 rows naming X05, §… | medium | cap 15/44; R×1 | capture 0x0C15, 0x0C66, 0x1011, 0x102A … |
 | 2. Facts found on the way | medium | cap 2/3; weak dbb1 | capture 0x1050 |
-| 3. Batch 3: what the recorded scenarios confirmed (one line eac… | medium | cap 33/47 | capture 0x200E, 0x2023, 0x242E, 0x2438 … |
-| 4. Open after batch 3: where each thing went | medium | cap 4/20 | capture 0x200E, 0x2023, 0x242E, 0x2438 … |
+| 3. Batch 3: what the recorded scenarios confirmed (one line eac… | medium | cap 34/47 | capture 0x200E, 0x2023, 0x242E, 0x301B … |
+| 4. Open after batch 3: where each thing went | medium | cap 6/20 | capture 0x200E, 0x2023, 0x242E, 0x5005 … |
 | 5. Predictions of X02 that were wrong as written (for the owner… | medium | cap 14/22 | capture 0x2006, 0x301B, 0x3029, 0x305B |
 | 6. Left open on purpose | medium | cap 5/9; weak inf1 | capture 0x106E, 0x203D, 0x242E |
 | 7. Ratings and the generator scripts | medium | no function cited | cite and re-read the function |
 
-### 2.113 K01 knowledge: `docs/knowledge/K01.md`
+### 2.113 X07 knowledge: `docs/knowledge/X07.md`
+
+| § | Rating | Reason | Raise by |
+|---|---|---|---|
+| 1. Batch 4: result lines, corrected notes, run kits | medium | cap 10/13; R×1 | capture 0x1061, 0x482B |
+| 2. Open after batch 4: where each thing went | medium | cap 20/31; client×1; weak p171 | capture 0x1061, 0x1067, 0x900E, 0x900F |
+| 3. Ratings after batch 4 (`docs/review/confidence.md` §2) | medium | cap 2/3; R×1 | capture (class U) |
+
+### 2.114 K01 knowledge: `docs/knowledge/K01.md`
 
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
@@ -3572,7 +3636,7 @@ Knowledge files (`docs/knowledge/`):
 | 5. Zone configuration: identity, listeners, peers, maps | – | container (see its subsections) |  |
 | · 5.1 Identity | medium | read in code | second reading / client check |
 | · 5.2 Listeners and peers | medium | cap 2/2 | capture (class U) |
-| · 5.3 Map assignment: `World/Field.txt` | medium | cap 3/4 | capture 0x1002 |
+| · 5.3 Map assignment: `World/Field.txt` | medium | cap 4/4 | capture (class U) |
 | · 5.4 Zone ring limits | medium | R×1 | second reading / client check |
 | 6. `MHBasic` and `Fiesta = 99` | – | container (see its subsections) |  |
 | · 6.1 What the map is | medium | read in code | second reading / client check |
