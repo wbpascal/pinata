@@ -9,6 +9,8 @@ Runs X03's wrapper in `md` mode and post-processes its rows:
   3. the Evidence column of P02's own rows (P02-B1 ... B32): *(captured)* with the § of the capture, except the
      entries P02 read in the code only (P02-B4 latent, P02-B26 masked, P02-B32 found in the batch-3 review);
   4. cross notes between P02 rows and the owner entries they extend or duplicate (Handler column, "linked: ...").
+  3b. Evidence qualified after the review (part 6): L00-B6 (superseded by the capture), Z04-B4 (only the refusal is
+     captured, not the latent path its Superseded mark names).
 
 usage (repo root):  python3 -I docs/plan/status/X04-register.py write   # rewrite README §6.1
                     python3 -I docs/plan/status/X04-register.py md      # print the register
@@ -97,6 +99,12 @@ P02_EV = {
     'P02-B32': 'code; effect *(inferred)* (found in the batch-3 review of ' + caplink(['§20.2']) + ', not captured)',
 }
 
+# --- 3b. Evidence qualifications (review, part 6) ---------------------------------------------------------------
+EV_FIX = {
+    'L00-B6': lambda: 'superseded: *(captured)* (' + caplink(['§7.3']) + ', `UserIP` filled); the zeroing read in the code',
+    'Z04-B4': lambda: '*(captured)* (' + caplink(['§19.4']) + ': the `0x303` refusal before the menu); the latent `ii_DropLot` path (Superseded mark) not captured, code',
+}
+
 # --- 4. cross notes (appended to the Handler cell) ---------------------------------------------------------------
 NOTES = {
     'P02-B10': 'W05-B15 (same defect, CharDB blob side)',
@@ -145,13 +153,16 @@ for line in text.split('\n'):
     elif i == 'W05-B15':
         c[5] = '*(captured)* (' + caplink(['§7.5.3']) + ', as P02-B10 / B11), ' + c[5]
         changed['captured-link'] += 1
+    if i in EV_FIX:
+        c[5] = EV_FIX[i]()
+        changed['ev-fix'] += 1
     if i in NOTES:
         c[1] = c[1] + '; linked: ' + NOTES[i]
         changed['note'] += 1
     out.append('| ' + ' | '.join(c) + ' |')
 text = '\n'.join(out)
 
-missing = [i for i in list(MARKS) + list(NOTES) + list(P02_EV) if not re.search(r'^\| ' + re.escape(i) + r' \|', text, re.M)]
+missing = [i for i in list(MARKS) + list(NOTES) + list(P02_EV) + list(EV_FIX) if not re.search(r'^\| ' + re.escape(i) + r' \|', text, re.M)]
 for i in missing:
     print('MISSING', i, file=sys.stderr)
 print('x04 changes', dict(changed), file=sys.stderr)
