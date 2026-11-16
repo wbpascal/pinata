@@ -5766,10 +5766,11 @@
    "0x1002": {
     "dir": "S→C",
     "captures": [
-     "s37b"
+     "s37b",
+     "s38"
     ],
     "fields": {
-     "error": "0x145 after a tutorial skip of a listed character (P02-B33) and with all zones stopped"
+     "error": "0x145 after a tutorial skip of a listed character (P02-B33) and with all zones stopped (s38: six, §23.6)"
     }
    },
    "0x1403": {
@@ -5857,7 +5858,9 @@
    "0x0c31": {
     "dir": "Zone→WM",
     "captures": [
-     "s37b"
+     "s37b",
+     "s38",
+     "s24"
     ],
     "fields": {
      "netpacketzoneheader": "all 0xFF",
@@ -5868,13 +5871,15 @@
    "0x1037": {
     "dir": "WM→CharDB",
     "captures": [
-     "s37b"
+     "s37b",
+     "s38",
+     "s24"
     ],
     "fields": {
-     "MapName / x / y": "the WM copy (older than the zone position)",
-     "playmin": "0",
+     "MapName / x / y": "the WM copy: the character login's 0x1007 blob, updated by a link to another map / zone (s24 A 1276.175), not by same-map links (s24 B 1295.027, 1914.536); older than the zone position (P02-B36)",
+     "playmin": "minutes of this session (0 in s37b after 22 s; s24 32 / 31)",
      "state": "0 (closeReason 0x780 − 0x80, low byte)",
-     "Cen": "money"
+     "Cen": "money of the same WM copy (stale after a committed &getmoney, s38 1894.409; P02-B36)"
     }
    },
    "0x7026": {

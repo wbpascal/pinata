@@ -2913,7 +2913,7 @@ Sent in reply to `0x0c36` NC_USER_CREATE_OTP_ACK on CParserLogin (`FUN_00424a70`
 
 W01 name was 'character login failed (ours)'
 
-**Captured** (P02, `capture-validation.md`; s37b): `error`: 0x145 after a tutorial skip of a listed character (P02-B33) and with all zones stopped
+**Captured** (P02, `capture-validation.md`; s37b, s38): `error`: 0x145 after a tutorial skip of a listed character (P02-B33) and with all zones stopped (s38: six, §23.6)
 
 Sent in reply to `0x1006` NC_CHAR_CHARDATAFAIL_ACK on CParserCharDB (`FUN_00409e70`) · payload 2 bytes · raw header
 
@@ -11213,7 +11213,7 @@ size 0x48 + 6·n
 | 26 | u8 | closeReason-0x80 |  |
 | 27 | u64 | money |  |
 
-**Captured** (P02, `capture-validation.md`; s37b): `MapName / x / y`: the WM copy (older than the zone position); `playmin`: 0; `state`: 0 (closeReason 0x780 − 0x80, low byte); `Cen`: money
+**Captured** (P02, `capture-validation.md`; s37b, s38, s24): `MapName / x / y`: the WM copy: the character login's 0x1007 blob, updated by a link to another map / zone (s24 A 1276.175), not by same-map links (s24 B 1295.027, 1914.536); older than the zone position (P02-B36); `playmin`: minutes of this session (0 in s37b after 22 s; s24 32 / 31); `state`: 0 (closeReason 0x780 − 0x80, low byte); `Cen`: money of the same WM copy (stale after a committed &getmoney, s38 1894.409; P02-B36)
 
 ### `0x10eb` NC_CHAR_EVENT_ATTENDANCE_LIST_DB_REQ (WM→CharDB)
 
@@ -13073,7 +13073,7 @@ size 0x12, not checked
 
 ### `0x0c31` NC_USER_POSSIBLE_NEW_CONNECT_CMD (Zone→WM)
 
-**Captured** (P02, `capture-validation.md`; s37b): `netpacketzoneheader`: all 0xFF; `nWorldManagerHandle`: the WM session handle; `nCharNo`: the character leaving
+**Captured** (P02, `capture-validation.md`; s37b, s38, s24): `netpacketzoneheader`: all 0xFF; `nWorldManagerHandle`: the WM session handle; `nCharNo`: the character leaving
 
 ### `0x0c5f` NC_USER_TUTORIAL_CAN_SKIP_CMD (CharDB→WM)
 

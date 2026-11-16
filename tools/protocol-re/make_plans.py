@@ -1271,6 +1271,33 @@ ITEMS = [
              "`docs/knowledge/P04.md` so X01's \"Superseded statements\" table can cite it."],
       done="README §1.4, §1.5, §2 and the Unknowns list agree with capture-validation §2 / §7; every changed statement is listed "
            "in `docs/knowledge/P04.md`."),
+ dict(id="P05", phase=2, title="Protocol README: the flows of capture batch 4 (added by P02)",
+      out="docs/protocol/README.md (corrected in place) + docs/knowledge/P05.md", scope=[], deps=["P04", "P02 (batch 4)"],
+      goal="P04 brought `docs/protocol/README.md` §1–§2 in line with capture batches 1–3; its sweep (part 3, commit e20c6b3) "
+           "ran before P02 checked batch 4 (captures `s37b`, `s38`, `s24`; capture-validation §22–§25), and only its review "
+           "is left. X06 writes only `docs/pseudocode/README.md`. Batch 4 captured flows README §2 omits or states "
+           "differently: back to character select from in game (`0x0C18 {1}`), the quit to the desktop (`0x0C18 {0}`, two "
+           "`0x0C19`, P02-B35's four saves or one), the client's own logout after losing the zone socket, the zone's 10-s "
+           "Kickout and 13-s Logout timers, the WM's `0x1002 {0x145}` with the zones down or after a tutorial skip, the "
+           "create refusal and both renames. Bring README §2 up to date with batch 4.",
+      steps=["Read capture-validation §11 (rows from \"Character create refused\" on), §22.2–§22.5, §23.2–§23.4, §23.6 and "
+             "§25.9, and the \"(batch 4)\" rows of the Corrections table in `docs/knowledge/P02.md` (outline with `sect.py`, "
+             "then the sections); do not re-read code: P02's rows give the `@ FUN_…` and the evidence.",
+             "README §2.4 (leaving the game): add back to character select from in game (`0x0C18 {1}`: one save `StoreType` 9 "
+             "+ `0x0C31`, WM `0x1037` / `0x081F` / `0xC807`, list reload `0x0C12` → `0x0C13` → `0x0C14`, the client's 1-byte "
+             "`0x0C1F`; §22.5) and the quit (`0x0C18 {0}` to WM and zone, `0x0C19` from the 0x0C18 handler and from "
+             "`Client_OnClosed`, four saves 4 / 7 / 4 / 9 or one, P02-B35; §22.5, §25.9); the two logout timers (§23.3); "
+             "the client's own logout when the zone connection is lost (`0x0C18 {0}` to every open socket, \"Disconnected "
+             "from the server.\", §23.4). Check the existing sentence \"From the character list the client sends only "
+             "`0x0C33` → `0x0C34`\" against §22.5.",
+             "README §2.6 / §2.2 / §2.7: the create refusal (`0x1403` → `0x1404`, §22.1), the free rename and the rename right "
+             "(dept 45, §22.3 / §22.4), the WM's `0x1002 {0x145}` (\"The Map is under maintenance\") with all zones down "
+             "(§23.6) or after a tutorial skip of a listed character (P02-B33, §22.2); mark each *(captured)* with the "
+             "capture-validation §.",
+             "Keep the README a sketch: link to the pseudocode for detail. Record every change (old → new, with source) in "
+             "`docs/knowledge/P05.md` so X06 / X01 can cite it; run `tools/protocol-re/regen.sh`."],
+      done="README §2 agrees with capture-validation §11's batch-4 rows and §22.5 / §23.3 / §23.4 / §25.9; every changed "
+           "statement is listed in `docs/knowledge/P05.md`."),
  dict(id="X01", phase=3, title="Integration and review", out="docs/pseudocode/README.md", deps=["all"], scope=[],
       goal="Read all item outputs, fix contradictions, write the architecture overview (processes, links, data flow), "
            "a cross-server sequence index (feature → messages → handlers in each server), a glossary, a register of "
@@ -1477,7 +1504,8 @@ ITEMS = [
              "confirm (create refusal, both renames, tutorial skip, zone down, back to select, quit, zone connection "
              "lost, zone kill, skill book, empower, stat points, reset capsules, skill saves, cast abort, ground target, "
              "toggle, abstate reset, damage over time, death and revive by skill), and apply the corrected ones (W01 §5.1 "
-             "/ Z01 §8.1 quit with four saves, Z01 §8.3 the 10-s Kickout timer and StoreType 3, Z01 §8.4 10-min "
+             "/ Z01 §8.1 quit with four saves when the zone handles the WM's kick first and one when it handles the client's "
+             "own `0x0C18 {0}` first (§25.9), Z01 §8.3 the 10-s Kickout timer and StoreType 3, Z01 §8.4 10-min "
              "auto-save).",
              "Check every README citation of capture-validation still points at the right section (batch 4 put §22–§25 "
              "before §11; §11–§15 kept their numbers).",
