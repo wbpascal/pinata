@@ -249,16 +249,57 @@ Town portal: `C 0x2401` → `0x2402`, `C 0x200A` → `0x243D`, `0x201C`; the cli
 repeats only `0x5826` and `0x182A`. A destination on the same zone gets `0x1809 NC_MAP_LINKSAME_CMD` instead (no new
 connection; not captured). Detail: capture-validation §6.1, §4.1, §7.5.4; X01 §3.11; Z01 §7.
 
-### 2.4 Leaving the game, back to the world list
+### 2.4 Leaving the game: world list, character select, quit
 
-*(captured)* In game → world list: zone `C 0x2012 NC_ACT_STOP_REQ`, `C 0x1071 NC_CHAR_LOGOUTREADY_CMD`; in the same
-tick the client saves its options at the WM (`0x7011`, `0x7015`, `0x7016`, `0x703B`, no answers). After its own 10-s
-countdown: WM `C 0x0C33 NC_USER_WILL_WORLD_SELECT_REQ` → (Login `0x0C35` / `0x0C36`) → `0x0C34
-NC_USER_WILL_WORLD_SELECT_ACK {nError 0x1E58, sOTP[32]}`, then `0x0C18 NC_USER_NORMALLOGOUT_CMD {LogoutType 0}` to the
-WM **and** the zone in one tick (`LogoutType` 0 also means "back to the world list"); the zone saves and frees the
-player without a reply, and the client logs in again with the token (§2.2). From the character list the client sends
-only `0x0C33` → `0x0C34` and closes the WM connection without `0x0C18`. Detail: capture-validation §4.1, §5.4, §16.1;
-X01 §3.12 a / d; W01 §5.1; Z01 §8.1; Z07 §3.3.
+All three ways out start the same *(captured)*: zone `C 0x2012 NC_ACT_STOP_REQ`, `C 0x1071 NC_CHAR_LOGOUTREADY_CMD`
+(the zone arms its 13-s logout timer and allows `0x0C18` after 8 s, Z07 §3.3); in the same tick the client saves its
+options at the WM (`0x7011`, `0x7015`, `0x7016`, `0x703B`, no answers to the client; the WM writes them to CharDB as
+`0x7026` / `0x702A` / `0x702B` / `0x704F` 20–70 ms later, D04 §5.1, W04 §8.2). The client then counts down 10 s
+itself and sends `0x0C18 NC_USER_NORMALLOGOUT_CMD {LogoutType}` to the WM **and** the zone in one tick. The zone's
+handler reads no `LogoutType`: once the 8 s have passed it runs `sp_Schedule_Logout` at once: one save
+(`0x0410 StoreType 9`), `0x0C31 NC_USER_POSSIBLE_NEW_CONNECT_CMD` to the WM, the object freed, nothing to the client
+(Z01 §8.1). What the WM does depends on `LogoutType` (W01 §5.1):
+
+- **Back to the world list** (`LogoutType 0` after `0x0C33`): before the `0x0C18`, WM `C 0x0C33
+  NC_USER_WILL_WORLD_SELECT_REQ` → (Login `0x0C35` / `0x0C36`) → `0x0C34 NC_USER_WILL_WORLD_SELECT_ACK {nError 0x1E58,
+  sOTP[32]}`; then `0x0C18 {0}` closes the WM session as a quit does (below), and the client logs in again with the
+  token (§2.2). From the character list the client sends only `0x0C33` → `0x0C34` and closes the WM connection
+  without `0x0C18`; the WM's `Client_OnClosed` then sends AccountDB `0x0C11 {playmin 0, 0x780}` and `0x0C19` to every
+  zone (capture-validation §23.2).
+- **Back to character select** (`LogoutType 1`) *(captured, capture-validation §22.5, §23.2)*: the zone saves once
+  (StoreType 9) and sends `0x0C31` 3–10 ms after the `0x0C18`. The WM keeps the session (no `0x0C11`, no `0x0C19`); its
+  `CharacterLogout` sends CharDB `0x1037 NC_CHAR_LOGOUT_DB`, AccountLogDB `0x081F` and GameLogDB `0xC807` in one ms
+  (W01 §5.4; `0x1037` carries the WM's copy of the position from the character login or the last link to another
+  map, not the zone's, P02-B36), and the Character server logs `0x040B` 4 ms later. The client sends `0x0C1F` with one
+  unset byte (a client quirk; the WM ignores the payload), and the WM reloads the list from CharDB (`0x0C12` →
+  `0x0C5F`, `0x0C13`) and sends `0x0C14` (§2.2). The client closes its zone socket 1 s later.
+- **Quit to the desktop** (`LogoutType 0`, no `0x0C33`) *(captured, capture-validation §22.5, §25.9)*: the WM
+  broadcasts `0x0C19 NC_USER_CONNECTCUT2ZONE_CMD` to every zone from its 0x0C18 handler (with `0x1037` / `0x081F` /
+  `0xC807`) and again from `Client_OnClosed` (with AccountDB `0x0C11 {playmin, 0x780}`, AccountLogDB `0x0722` /
+  `0xC803`), W01 §5.1 / §3.2. Each `0x0C19` makes the zone run `so_banning` (Z01 §8.3). If the zone handles the
+  client's own `0x0C18 {0}` first, it saves once (StoreType 9 + `0x0C31`) and the later `0x0C19` find no player
+  (`s24` A). If it handles the WM's kick first, it saves four times **(original bug) P02-B35**: StoreType 4
+  (`so_banning`), 7 (`zs_disconnect` closing the client socket), 4 (the second `0x0C19`), then 9 + `0x0C31` 13 s after
+  the `0x1071` (the `0x1071` timer, about 3 s after the quit), each a full `ws_save2DB` burst. Both orders were
+  captured, and the client's `0x0C18` was on the wire first in all three quits.
+
+**The two logout timers** *(captured, capture-validation §23.3)*. `so_banning` saves (`so_Unmark(REMOVE_LOGOUT, 1, 4)`,
+FUN_00558900) and arms `sp_Schedule_Kickout` @ FUN_00558080 at +10 s unless the player's timer already holds the
+`0x1071` work (`TSCW_LOGOUT`). So the work queued first decides how the zone object ends: after a cut **without**
+`0x1071` (lost socket, kick), Kickout at +10 s saves with StoreType 3 and frees the object, **without** `0x0C31`; after a
+`0x1071` (quit, exit countdown, also a client killed during it), `sp_Schedule_Logout` at +13 s saves with StoreType 9
+and sends `0x0C31` (a late `0x0C31` is harmless: the WM compares the `charNo`, W01 §7.3). Every further kick of the same
+user inside that window (`0x0C19`, the next login's `0x0C16`, §2.5) runs `so_banning` and a full save again. Z01
+§8.3 does not have the Kickout timer yet (capture-validation §11, "Zone connection lost").
+
+**Zone connection lost** *(captured, capture-validation §23.4)*. When the zone socket closes (server reset, zone
+crash), the client does not stay on the WM: 14–27 ms later it sends `0x0C18 {0}` to every open socket
+(`NetMgr::SendUserLogOutMsg2AllServer` @ client FUN_006d34e0, name *(pdb2017)*, called from the in-game scene tick
+FUN_004cbf30), waits 1 s, closes them all and shows "Disconnected from the server." ("Multiple logins detected, you
+have been logged out." when a duplicate-login flag is set; a closed WM socket gives "Disconnected from the world
+server."). The WM closes the session as for a quit (`CharacterLogout`, `0x0C11 {0x780}`, `0x0C19` twice); the zone
+object ends by the Kickout timer (StoreType 3, no `0x0C31`). Detail: capture-validation §4.1, §5.4, §16.1, §22.5,
+§23.2–§23.4, §25.9; X01 §3.12 a / d; W01 §5.1, §5.4; Z01 §8.1, §8.3; Z07 §3.3.
 
 ### 2.5 Duplicate login
 
@@ -334,7 +375,7 @@ until the client presents the same 32 values in `0x0C0F`.
 | `0x080D` | C→S | – | `NC_MISC_GAMETIME_REQ`: after `0x0C14` and in the tick of every zone `0x1801` *(captured)* → `0x080E NC_MISC_GAMETIME_ACK {u8 hour, u8 minute, u8 second}` (W01 §5.3) |
 | `0x7032` / `0x7033` / `0x7034` | S→C | option blobs | `NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD` / `…_GET_KEYMAP_CMD` / `…_GET_GAMEOPTION_CMD`, pushed after `0x1003` (`SendToClient_CharOptionData` FUN_00431680, W04 §8) |
 | `0x0C33` → `0x0C34` | C→S, S→C | – → `u16 nError; char sOTP[32]` | `NC_USER_WILL_WORLD_SELECT_REQ` / `_ACK`: back to the world list; the WM gets a one-time token from Login (`0x0C35` / `0x0C36`), `0x1E58` = OK (§2.4, W01 §5.1) |
-| `0x0C18` | C→S | `u8 LogoutType` | `NC_USER_NORMALLOGOUT_CMD`; sent to the WM and the zone together. 0 = quit or back to the world list *(captured)*, 1 = back to character select (W01 §5.1) |
+| `0x0C18` | C→S | `u8 LogoutType` | `NC_USER_NORMALLOGOUT_CMD`; sent to the WM and the zone together. 0 = quit or back to the world list, 1 = back to character select, both *(captured)* (W01 §5.1); the zone reads no `LogoutType` (§2.4) |
 | `0x0C17` | S→C | `u16 reason` | `NC_USER_CONNECTCUT_CMD`, then the WM closes the session; `0x683` = duplicate login (§2.5), zone kick reasons are passed on from `0x0C1A` (W01 §5.2) |
 | `0x1401` | C→S | `u8 slotnum; char name[20]; u8 char_shape[4]` (25 bytes; shape byte 0 = `race:2, chrclass:5, gender:1`, then hairtype, haircolor, faceshape) | `NC_AVATAR_CREATE_REQ` *(pdb2016)*: checked by the WM (slot, name, class level rule), then CharDB `0x1402` → `0x1405` (§2.6; W01 §4.1, D02 §3.3) *(captured: `{2, "X37Del", 0x85}` = Fighter)* |
 | `0x1406` / `0x1404` | S→C | `u8 numofavatar; AVATAR` (131 bytes) / `u16 err` | `NC_AVATAR_CREATESUCC_ACK` / `NC_AVATAR_CREATEFAIL_ACK`. Every refusal the WM finds itself answers `0x84` "name already taken" (W01-B2); CharDB failures pass on its code |
@@ -355,7 +396,7 @@ The other 160 WM handlers (party, friends, guild, raid, chat channels, …) are 
 | `0x1802` | S→C | `u16 charhandle; CHAR_PARAMETER_DATA param` (0xE8); `SHINE_XY_TYPE logincoord` (242 bytes) | `NC_MAP_LOGIN_ACK` (struct `PROTO_NC_CHAR_MAPLOGIN_ACK` *(pdb2016)*), sent in `wms_NC_CHAR_ZONE_CHARDATA_ACK` (FUN_005a3590 → FUN_005a3140) once WM delivers the character, after the 15 client blob copies `0x1038` … `0x441E` *(captured, §2.2)*. Field layout: packets-zone.md (Z07 §1.5) |
 | `0x1803` | C→S | – | `NC_MAP_LOGINCOMPLETE_CMD`. Zone then pushes the login burst in one server tick (`sp_NC_MAP_LOGINCOMPLETE_CMD` FUN_00443390, Z01 §6; captured order in capture-validation §5.1) and tells the WM `0x180C` |
 | `0x180A` | S→C | `u16 mapIndex; u32 x; u32 y; char zoneIp[16]; u16 zonePort; u16 wmHandle` | `NC_MAP_LINKOTHER_CMD`, last packet of a zone stream on a map change to another zone; the client connects to `zoneIp:zonePort` (§2.3, Z01 §7.1) |
-| `0x1071`, `0x0C18` | C→S | –, `u8 LogoutType` | `NC_CHAR_LOGOUTREADY_CMD` starts the logout countdown; `0x0C18` 10 s later ends the session: the zone saves and frees the player and sends nothing (§2.4, Z01 §8.1, Z07 §3.3) |
+| `0x1071`, `0x0C18` | C→S | –, `u8 LogoutType` | `NC_CHAR_LOGOUTREADY_CMD` starts the logout countdown; `0x0C18` 10 s later (accepted after 8 s, any `LogoutType`) ends the session: the zone saves once (StoreType 9), sends the WM `0x0C31`, frees the player and sends the client nothing; a WM kick handled first adds saves (P02-B35, §2.4, Z01 §8.1, Z07 §3.3) |
 
 Zone → WM `0x104B NC_CHAR_REGISTNUMBER_REQ` (internal): `u16 zone_handle, u32 0xFFFFFFFF, u16 wm_handle,
 char char_id[20]`.
