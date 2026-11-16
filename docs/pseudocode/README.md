@@ -2643,7 +2643,7 @@ State from `docs/plan/status/<ID>.md` when X03 part 5 ran (2026-11-16); every ot
 | Item | State | What it will change |
 |---|---|---|
 | [P04](../plan/items/P04.md) | not started | brings `docs/protocol/README.md` §1.4 (zone seed on accept), §1.5 (server-initiated heartbeat) and §2 (flows) in line with `capture-validation.md`. Until then read README §5.1 here before trusting the protocol README |
-| [X03](../plan/items/X03.md) | in progress | this update: X02's corrections (§5), the bugs of X02, Z31, Z32, W06, D08 (§6.1), the item tables (§1, §3, §7); sweep and review remain |
+| [X03](../plan/items/X03.md) | in progress (parts 1–6 done) | this update: X02's corrections (§5), the bugs of X02, Z31, Z32, W06, D08 (§6.1), the item tables (§1, §3, §7); the fresh-context review remains |
 | [X04](../plan/items/X04.md) | not started | P02's capture batches 2 and 3 into §5 and §6: their corrections, the bugs P02-B5 … B32 (already in §6.1.11 through the generator) and the new *(captured)* evidence |
 | [X05](../plan/items/X05.md) | not started | X02's recurring re-run after capture batch 3: updates `docs/plan/capture-scenarios.md` and the ratings in `docs/review/confidence.md` |
 
@@ -2787,6 +2787,18 @@ About this file itself (the open points of the specification are §7):
 - **Older open-point lists (§7.3)** were shortened, not re-checked point by point against the later items; the third
   column says where to look first.
 - **Glossary (§4.7)** maps only the older names used at least five times; `docs/knowledge/S01-renames.tsv` has the rest.
+- **The X03 update (2026-11-16) copies, it does not re-read.** The rows X03 added to §5 restate `docs/knowledge/X02.md`
+  §0, Z31 §0, Z32 "Corrections to done items", W06 §0 and D08 §0 in this file's row format; the evidence is the source
+  row's (its re-check ID in `docs/review/confidence.md` §3). A script matched each of the 69 X02 §0 rows one-to-one to
+  a §5 row by its `FUN_` addresses, opcodes, backticked names and re-check IDs (sweep, part 6). Where an older X01 row
+  and an X02 row disagree, the X02 row (later, re-checked) wins; X03 did not delete the X01 rows.
+- **Register sources since X01.** §6.1 is now written by `docs/plan/status/X03-register.py` (wraps X01's generator):
+  X02-B1 … B12 come from `confidence.md` §5 with the reachability of `knowledge/X02.md` §3 as *Evidence*; D08-B1 … B12
+  have their own group (§6.1.8). The §5.9 marks are X03's reading of which X02 / follow-up rows change an entry;
+  L00-B5 is not marked (X02 G5 renames the constant, the register row states no size).
+- **`docs/plan/progress.md` item marks.** `coverage.py --overview` counts an item as done when any of its status
+  file's first eight lines contains the word "done", so an item in progress whose State line reads
+  `part <n> of <m> done` shows ✓ (X03 itself while parts 6–7 ran). §7.1 reads the State line instead.
 
 ## 9. Coverage boundary
 
@@ -2806,3 +2818,16 @@ shows no uncovered handler or function in any server (§7). What X01 found and d
 
 No follow-up item was created: everything X01 found either fits P04 or X02 (both open) or is documented as open by a
 done item whose document already describes it.
+
+X03 (the update of 2026-11-16, no handler scope either) found and did not settle:
+
+| Found | Covered by | Argument |
+|---|---|---|
+| P02's capture batches 2 and 3: about 70 correction rows (capture-validation §13 "→ X04"), P02-B5 … B32 marks, the stale `capture-validation.md#8-…` links | X04 (open; plan goal: "Batches 2 and 3 … added P02-B5 … B32, about 70 correction rows for done items … captured evidence") | X03's plan is X02 and its four follow-ups; the P02-B5 … B32 rows are already in §6.1.11 through the generator, their corrections and links are X04's |
+| Ratings of `docs/review/confidence.md` after capture batch 3, scenario texts that did not match the recordings | X05 (open; plan goal: "re-run X02 to update the ratings") | `confidence.md` is X02's output; X03 copies its §3 / §5 results only |
+| Protocol README statements contradicted by the captures (§5.1) | P04 (open; X01 row above) | unchanged since X01 |
+| `AGENTS.md` / `CLAUDE.md` "Facts already established": "the 6-byte `ref` prefix …, which the PROTO struct does not include" | none (project instructions, kept by the maintainer outside the item system) | contradicted by X02 §0 row 1 (the header is a member of 211 2016 `PROTO_NC_*` structs; §5.4 here); reported in `docs/knowledge/X03.md` §0 for the maintainer |
+| `coverage.py` `state()` marks a multi-part item in progress as done (§8) | none needed beyond the note | the tool is shared (not X03's to edit); `docs/knowledge/X03.md` §0 gives the one-line fix; the mark is right again for X03 once its review part closes |
+
+No follow-up item was created: the open work fits X04, X05 and P04 (all open), the two remaining points are outside
+the item system and are reported in `docs/knowledge/X03.md` §0.
