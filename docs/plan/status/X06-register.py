@@ -47,6 +47,14 @@ P02_EV = {
 EV_FIX = {
     'D04-B13': lambda: '*(captured)* (' + caplink(['§22.5', '§25.9']) + ')',
     'Z07-B2': lambda: '*(captured)* (' + caplink(['§24.4']) + ': `nLockIndex` unwritten; the stale word happened to be 0), code',
+    'W05-B25': lambda: 'code; the extension *(captured)* (' + caplink(['§22.5', '§25.9']) + ')',
+}
+
+# --- 2b. Effect column of an extended entry (review finding 5) -------------------------------------------------
+EFF_FIX = {
+    'W05-B25': ('(zones handle an absent user, W01 §5.1 / Z01)',
+                '(zones handle an absent user, W01 §5.1 / Z01; but the zone that still holds the user in its logout window '
+                'saves again on each: two of the four saves of P02-B35, captured)'),
 }
 
 # --- 4. marks (README §5.9 rows "added by X06") ----------------------------------------------------------------
@@ -81,6 +89,12 @@ for line in text.split('\n'):
     if i in EV_FIX:
         c[5] = EV_FIX[i]()
         changed['ev-fix'] += 1
+    if i in EFF_FIX:
+        old, new = EFF_FIX[i]
+        if old not in c[3]:
+            print('EFF_FIX miss', i, file=sys.stderr)
+        c[3] = c[3].replace(old, new)
+        changed['eff-fix'] += 1
     if i in MARKS:
         mk, note = MARKS[i]
         c[2] = f"**{mk}** ({note}; [§5.9](#59-bug-register-entries-a-later-item-changed)): " + c[2]
