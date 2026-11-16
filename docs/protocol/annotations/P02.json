@@ -1,5 +1,5 @@
 {
- "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it; an entry may carry a captured variant 'layout' that pcap_decode.py tries when the hand annotation does not fit (W04 0x7C07 short form, 0x7037 tail) (`packets.py` renders each entry as a **Captured** line in packets-<server>.md; capture-validation.md has the full reasoning). Capture names are re-data/captures/26_11_15_<name>.pcapng. Batch-2 aliases: 'shop' = 26_11_15_buy item, equip item, use storage, unequip, sell item, travel portal, attack, use soulstones; 'combat' = 26_11_15_travel portal, attack mob, pick-up item, die, revive, linkto. Batch-3 aliases: 's14', 's21', 's21b', 's21c', 's21d', 's37' = 26_11_15_14_second-client-in-sight, 26_11_15_21_items-drop-split-storage-use-shop, 26_11_15_21b_purchase-attr-write-fail, 26_11_15_21c_expired-item, 26_11_15_21d_stack-over-maxlot, 26_11_15_37_login-heartbeat-refusals-delete.",
+ "_about": "P02 capture validation. 'packets': layouts corrected or first annotated from captures (they override earlier annotation files that sort before P02.json). 'evidence': opcodes whose existing annotation a capture confirmed field by field, without changing it; an entry may carry a captured variant 'layout' that pcap_decode.py tries when the hand annotation does not fit (W04 0x7C07 short form, 0x7037 tail) (`packets.py` renders each entry as a **Captured** line in packets-<server>.md; capture-validation.md has the full reasoning). Capture names are re-data/captures/26_11_15_<name>.pcapng. Batch-2 aliases: 'shop' = 26_11_15_buy item, equip item, use storage, unequip, sell item, travel portal, attack, use soulstones; 'combat' = 26_11_15_travel portal, attack mob, pick-up item, die, revive, linkto. Batch-3 aliases: 's14', 's21', 's21b', 's21c', 's21d', 's37' = 26_11_15_14_second-client-in-sight, 26_11_15_21_items-drop-split-storage-use-shop, 26_11_15_21b_purchase-attr-write-fail, 26_11_15_21c_expired-item, 26_11_15_21d_stack-over-maxlot, 26_11_15_37_login-heartbeat-refusals-delete. Batch-4 aliases (prefix 26_11_16_): 's37b', 's38', 's24' = 26_11_16_37b_char-select-rename-refusals, 26_11_16_38_session-loss-kicks-char-select, 26_11_16_24_skills-abstates-stat-points.",
  "packets": {
   "login": {
    "0x0c37": {
@@ -5227,10 +5227,11 @@
    "0x1110": {
     "dir": "S→C",
     "captures": [
-     "s14"
+     "s14",
+     "s37b"
     ],
     "fields": {
-     "(unset)": "one uninitialised byte (0xD5): CSendPacket::ID(…, 0x1110, 1, NULL) (P02-B28)",
+     "(unset)": "one uninitialised byte (0xD5 in s14, 0x91 in s37b): CSendPacket::ID(…, 0x1110, 1, NULL) (P02-B28)",
      "layout": "captured 1-byte variant; the PDB struct is empty"
     },
     "layout": [
@@ -5326,6 +5327,239 @@
     ],
     "fields": {
      "DeleteQuestArray": "the KQs skipped this minute; one client per second"
+    }
+   },
+   "0x0c1f": {
+    "dir": "C→S",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "(unset)": "one byte of an unset client local (00 both times; client FUN_00497140 case 0x36), the WM ignores it",
+     "layout": "captured 1-byte variant; the PDB struct is empty"
+    },
+    "layout": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "client stack byte, never written"
+     ]
+    ]
+   },
+   "0x140f": {
+    "dir": "C→S",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "slot": "2",
+     "name": "\"Test1235\", \"X37Ren\""
+    }
+   },
+   "0x1410": {
+    "dir": "S→C",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "slot": "2",
+     "new_name": "the requested name",
+     "result": "0xD0 (stored in the WM avatar copy)"
+    }
+   },
+   "0xb409": {
+    "dir": "C→S",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "nSlotNo": "1",
+     "sNewID": "\"Test1235\", \"X37Id\""
+    }
+   },
+   "0xb40c": {
+    "dir": "S→C",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "result": "0x20D1 (name in use), 0x20C0 (ok)",
+     "slot": "1 on 0x20C0; 7 = stack garbage on 0x20D1 (P02-B34)",
+     "new_name": "the requested name"
+    }
+   },
+   "0x1404": {
+    "dir": "S→C",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "error": "0x181 \"The name is already in use.\""
+    }
+   },
+   "0x1002": {
+    "dir": "S→C",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "error": "0x145 after a tutorial skip of a listed character (P02-B33) and with all zones stopped"
+    }
+   },
+   "0x1403": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "clienthandle": "30000",
+     "charid": "\"Test1235\"",
+     "err": "0x181"
+    }
+   },
+   "0x1411": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "clienthandle": "WM session handle",
+     "nCharNo": "7",
+     "SlotNo": "2",
+     "NewName": "the requested name"
+    }
+   },
+   "0x1412": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "Error": "0xD0 (the test DB runs the 2018 p_Char_Rename: ok without renaming, capture-validation §22.3)"
+    }
+   },
+   "0xb40a": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "hWMChar": "35000",
+     "nRowNo": "1 (avatar +0x79)",
+     "nUserNo": "103",
+     "nCharNo": "5",
+     "sNewID": "requested name",
+     "bInit": "0 (avatar +0x78)"
+    }
+   },
+   "0xb40b": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "nError": "0x20D1, 0x20C0",
+     "nUserNo": "103",
+     "nCharNo": "5",
+     "sNewID": "echo"
+    }
+   },
+   "0xb40f": {
+    "dir": "WM→Zone",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "nCharNo": "5",
+     "bInit": "0",
+     "sOldID": "\"Test2\" (the WM copy)",
+     "sNewID": "\"X37Id\"; one per zone link of the broadcast set"
+    }
+   },
+   "0x0c1a": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "netpacketzoneheader": "all 0xFF",
+     "usrregnum": "0 (not set: so_SetRegistNumber failed)",
+     "wldmanhandle": "0",
+     "reason": "0x689"
+    }
+   },
+   "0x0c31": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "netpacketzoneheader": "all 0xFF",
+     "nWorldManagerHandle": "the WM session handle",
+     "nCharNo": "the character leaving"
+    }
+   },
+   "0x1037": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "MapName / x / y": "the WM copy (older than the zone position)",
+     "playmin": "0",
+     "state": "0 (closeReason 0x780 − 0x80, low byte)",
+     "Cen": "money"
+    }
+   },
+   "0x7026": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "nCharNo": "character",
+     "Data": "the client 0x7011 bytes"
+    }
+   },
+   "0x702a": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "nCharNo": "character",
+     "Data": "the client 0x7015 bytes"
+    }
+   },
+   "0x702b": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "nCharNo": "character",
+     "Data": "the client 0x7016 bytes"
+    }
+   },
+   "0x704f": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "nCharNo": "character",
+     "DBGameOptionData": "the 28 options of 0x703B"
+    }
+   },
+   "0x7050": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "nError": "0x2118",
+     "nCharNo": "270, 2791060741, 2791060740: never written (D04-B13)"
     }
    }
   },
@@ -7925,6 +8159,30 @@
      "error": "0x206 both times: the S16 trigger fails the first p_Item_SetOption after p_Item_BuyAll committed (D03 §1.2 ItemBuy_Create, err ≠ 1)",
      "lockindex": "0, 1 (the lock of each 0x340A)"
     }
+   },
+   "0xc807": {
+    "dir": "WM→GameLog",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "UserNo": "103",
+     "CharNo": "character",
+     "PlayTime": "0"
+    }
+   },
+   "0x040b": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "chrregnum": "character",
+     "mappos": "copy of 0x1037",
+     "playmin": "0",
+     "state": "0",
+     "Cen": "money"
+    }
    }
   },
   "account": {
@@ -8096,6 +8354,21 @@
     "fields": {
      "playmin": "7",
      "error": "0x780"
+    }
+   },
+   "0x081f": {
+    "dir": "WM→AccountLogDB",
+    "captures": [
+     "s37b"
+    ],
+    "fields": {
+     "WorldNo": "0",
+     "UserNo": "103",
+     "CharNo": "character",
+     "CharClass": "11, 21",
+     "CharLevel": "120, 1",
+     "CharGetExp": "0",
+     "CharPlayMin": "0"
     }
    }
   }

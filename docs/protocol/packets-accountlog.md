@@ -168,6 +168,8 @@ Handler `FUN_004026f0` (CParserAccountLog)
 | 11 | u64 | CharGetExp |  |
 | 19 | u16 | CharPlayMin |  |
 
+**Captured** (P02, `capture-validation.md`; s37b): `WorldNo`: 0; `UserNo`: 103; `CharNo`: character; `CharClass`: 11, 21; `CharLevel`: 120, 1; `CharGetExp`: 0; `CharPlayMin`: 0
+
 Handler `FUN_00402990` (CParserAccountLog)
 
 | Off | Type | Checks in handler | Notes |

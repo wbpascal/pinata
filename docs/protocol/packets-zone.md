@@ -15795,6 +15795,10 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `mappos`: login map / position; `Cen`: 99440; `usrregnum`: 103; `spawnapps`: 'Original'
 
+### `0x040b` NC_LOG_GAME_LOGOUT (Character→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s37b): `chrregnum`: character; `mappos`: copy of 0x1037; `playmin`: 0; `state`: 0; `Cen`: money
+
 ### `0x040f` NC_LOG_GAME_LINK (Zone/WM/Character→GameLog)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `StoreType`: 99 (the WM's copy of 0x180C at every map login); `CharExp / CharMoney`: current values
@@ -16062,6 +16066,10 @@ Z01 name was 'map login done (ours)'
 ### `0xc806` NC_SYSLOG_CHAR_ENTER_GAME (WM/Zone/Character→GameLog)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `UserNo / CharNo`: 103 / 5
+
+### `0xc807` NC_SYSLOG_CHAR_LEAVE_GAME (WM→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s37b): `UserNo`: 103; `CharNo`: character; `PlayTime`: 0
 
 ### `0xc809` NC_SYSLOG_CHAR_ZONE_TRANSITION (WM/Zone/Character→GameLog)
 

@@ -367,14 +367,18 @@ def struct_of(base, structs):
 
 
 def inline_struct(typ):
-    """'{u8,u8}[n]' -> ('{u8,u8}', struct dict, '[n]') or None (anonymous element types of hand annotations)"""
-    m = re.fullmatch(r"\{([\w, ]+)\}((?:\[[\w.]*\])*)", typ)
-    if not m or not all(t.strip() in INT for t in m.group(1).split(",")):
+    """'{u8,u8}[n]' or '{u8 a; u16 b}[n]' -> (base, struct dict, '[n]') or None (anonymous element types of hand
+    annotations; named members since P02 batch 4: Z32's 0xBCD5 `{u8 Machine; u16 BetUnits}[3]`)"""
+    m = re.fullmatch(r"\{([\w,; ]+)\}((?:\[[\w.]*\])*)", typ)
+    if not m:
+        return None
+    parts = [x.split() for x in re.split(r"[,;]", m.group(1)) if x.strip()]
+    if not parts or not all(len(t) in (1, 2) and t[0] in INT for t in parts):
         return None
     fs, off = [], 0
-    for i, t in enumerate(x.strip() for x in m.group(1).split(",")):
-        fs.append([off, t, f"f{i}", ""])
-        off += struct.calcsize(INT[t])
+    for i, t in enumerate(parts):
+        fs.append([off, t[0], t[1] if len(t) == 2 else f"f{i}", ""])
+        off += struct.calcsize(INT[t[0]])
     return "{" + m.group(1) + "}", dict(size=off, fields=fs), m.group(2)
 
 

@@ -478,6 +478,8 @@ Handler `FUN_00412df0`
 |---|---|---|---|
 | | | (empty) | |
 
+**Captured** (P02, `capture-validation.md`; s37b): `(unset)`: one byte of an unset client local (00 both times; client FUN_00497140 case 0x36), the WM ignores it; `layout`: captured 1-byte variant; the PDB struct is empty
+
 Handler `FUN_00412ee0`
 
 No payload fields read directly by the handler.
@@ -641,6 +643,8 @@ Handler `FUN_00412fa0`
 | 1 | char[20] | name | 1..16 chars |
 
 W01 name was 'character rename (ours)'
+
+**Captured** (P02, `capture-validation.md`; s37b): `slot`: 2; `name`: "Test1235", "X37Ren"
 
 Handler `FUN_0041a640`
 
@@ -2545,6 +2549,8 @@ Handler `FUN_004178a0`
 | 0 | u8 | nSlotNo |  |
 | 1 | char[20] | sNewID | Name5 |
 
+**Captured** (P02, `capture-validation.md`; s37b): `nSlotNo`: 1; `sNewID`: "Test1235", "X37Id"
+
 Handler `FUN_00417c90`
 
 | Off | Type | Checks in handler | Notes |
@@ -2907,6 +2913,8 @@ Sent in reply to `0x0c36` NC_USER_CREATE_OTP_ACK on CParserLogin (`FUN_00424a70`
 
 W01 name was 'character login failed (ours)'
 
+**Captured** (P02, `capture-validation.md`; s37b): `error`: 0x145 after a tutorial skip of a listed character (P02-B33) and with all zones stopped
+
 Sent in reply to `0x1006` NC_CHAR_CHARDATAFAIL_ACK on CParserCharDB (`FUN_00409e70`) · payload 2 bytes · raw header
 
 | Off | Type | Value / source |
@@ -3142,7 +3150,7 @@ Sent from `FUN_0044fae0` (`FUN_0044fae0`) · payload 9 bytes
 |---|---|---|---|
 | | | (empty) | |
 
-**Captured** (P02, `capture-validation.md`; s14): `(unset)`: one uninitialised byte (0xD5): CSendPacket::ID(…, 0x1110, 1, NULL) (P02-B28); `layout`: captured 1-byte variant; the PDB struct is empty
+**Captured** (P02, `capture-validation.md`; s14, s37b): `(unset)`: one uninitialised byte (0xD5 in s14, 0x91 in s37b): CSendPacket::ID(…, 0x1110, 1, NULL) (P02-B28); `layout`: captured 1-byte variant; the PDB struct is empty
 
 Sent in reply to `0x7486` NC_GUILD_TOURNAMENT_DB_GET_ACK on CParserCharDB (`FUN_0040eff0`) · payload 14 bytes · raw header
 
@@ -3163,6 +3171,8 @@ Sent in reply to `0x1111` NC_CHAR_TUTORIAL_POPUP_ACK on CParserClient (`FUN_0041
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | error | 0x82 failed, 0x83 wrong class, 0x84 name taken, 0x85 max slot, 0x181 name in use |
+
+**Captured** (P02, `capture-validation.md`; s37b): `error`: 0x181 "The name is already in use."
 
 Sent in reply to `0x1403` NC_AVATAR_CREATEDATAFAIL_ACK on CParserCharDB (`FUN_00409f00`) · payload 2 bytes · raw header
 
@@ -3244,6 +3254,8 @@ Sent in reply to `0x140b` NC_AVATAR_ERASEDATASUC_ACK on CParserCharDB (`FUN_0040
 | 0 | u8 | slot |  |
 | 1 | char[20] | new_name |  |
 | 21 | u16 | result | 0xD0 ok, 0xD1 'The name cannot be used.' |
+
+**Captured** (P02, `capture-validation.md`; s37b): `slot`: 2; `new_name`: the requested name; `result`: 0xD0 (stored in the WM avatar copy)
 
 Sent in reply to `0x1412` NC_AVATAR_RENAME_DB_ACK on CParserCharDB (`FUN_0040ff00`) · payload 23 bytes · raw header
 
@@ -8289,6 +8301,8 @@ Fill: +1: FUN_00402140
 | 2 | u8 | slot |  |
 | 3 | char[20] | new_name |  |
 
+**Captured** (P02, `capture-validation.md`; s37b): `result`: 0x20D1 (name in use), 0x20C0 (ok); `slot`: 1 on 0x20C0; 7 = stack garbage on 0x20D1 (P02-B34); `new_name`: the requested name
+
 Sent in reply to `0xb40b` NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK on CParserCharDB (`FUN_0040d740`) · payload 23 bytes
 
 | Off | Type | Value / source |
@@ -11199,6 +11213,8 @@ size 0x48 + 6·n
 | 26 | u8 | closeReason-0x80 |  |
 | 27 | u64 | money |  |
 
+**Captured** (P02, `capture-validation.md`; s37b): `MapName / x / y`: the WM copy (older than the zone position); `playmin`: 0; `state`: 0 (closeReason 0x780 − 0x80, low byte); `Cen`: money
+
 ### `0x10eb` NC_CHAR_EVENT_ATTENDANCE_LIST_DB_REQ (WM→CharDB)
 
 **Verified layout** (basis: wm FUN_0043a7f0)
@@ -11276,6 +11292,8 @@ W01 name was 'character create request (ours)'
 | 7 | char[20] | name |  |
 
 W01 name was 'character rename request (ours)'
+
+**Captured** (P02, `capture-validation.md`; s37b): `clienthandle`: WM session handle; `nCharNo`: 7; `SlotNo`: 2; `NewName`: the requested name
 
 ### `0x5410` NC_FRIEND_DB_SET_REQ (WM→CharDB)
 
@@ -13049,6 +13067,14 @@ size 0x12, not checked
 
 **Captured** (P02, `capture-validation.md`; s37, s21d): `echo_data`: the request's echo_data copied back by every peer (106/106); `error`: 0
 
+### `0x0c1a` NC_USER_CONNECTCUT2WORLDMANAGER_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; s37b): `netpacketzoneheader`: all 0xFF; `usrregnum`: 0 (not set: so_SetRegistNumber failed); `wldmanhandle`: 0; `reason`: 0x689
+
+### `0x0c31` NC_USER_POSSIBLE_NEW_CONNECT_CMD (Zone→WM)
+
+**Captured** (P02, `capture-validation.md`; s37b): `netpacketzoneheader`: all 0xFF; `nWorldManagerHandle`: the WM session handle; `nCharNo`: the character leaving
+
 ### `0x0c5f` NC_USER_TUTORIAL_CAN_SKIP_CMD (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `clienthandle`: echo; `isSkip`: 0; sent 1–3 ms before 0x0C13 (D02 §3.1 order)
@@ -13097,6 +13123,10 @@ size 0x12, not checked
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nWorldHandle`: WM client handle (own field, no extra prefix); `UseItemMinimonInfo`: bNormalItem 0, bChargedItem 0, both lists 0xFFFF ×12
 
+### `0x1403` NC_AVATAR_CREATEDATAFAIL_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37b): `clienthandle`: 30000; `charid`: "Test1235"; `err`: 0x181
+
 ### `0x1405` NC_AVATAR_CREATEDATASUC_ACK (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; s37): `numofavatar`: 1; `avatar`: level 1, RouN, delinfo zero, equipment 0xFFFF
@@ -13104,6 +13134,10 @@ size 0x12, not checked
 ### `0x140b` NC_AVATAR_ERASEDATASUC_ACK (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; s37): `(body)`: the 0x1408 body echoed (15 bytes)
+
+### `0x1412` NC_AVATAR_RENAME_DB_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37b): `Error`: 0xD0 (the test DB runs the 2018 p_Char_Rename: ok without renaming, capture-validation §22.3)
 
 ### `0x1413` NC_AVATAR_GUILD_DATA_REQ (WM→CharDB)
 
@@ -13197,6 +13231,18 @@ size 0x12, not checked
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `bSuccess`: 1; `Data.Data`: 392 bytes → client 0x700D
 
+### `0x7026` NC_CHAR_OPTION_DB_SET_SHORTCUTSIZE_CMD (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s37b): `nCharNo`: character; `Data`: the client 0x7011 bytes
+
+### `0x702a` NC_CHAR_OPTION_DB_SET_WINDOWPOS_CMD (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s37b): `nCharNo`: character; `Data`: the client 0x7015 bytes
+
+### `0x702b` NC_CHAR_OPTION_DB_SET_KEYMAPPING_CMD (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s37b): `nCharNo`: character; `Data`: the client 0x7016 bytes
+
 ### `0x702d` NC_CHAR_OPTION_IMPROVE_DB_GET_SHORTCUTDATA_CMD (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `DBShortCutData.nShortCutDataCnt`: 6; `DBShortCutData.ShortCutData`: slots 0, 1 (code 4), 4 (code 3, skill 1500), 9 (code 1, item 38043 Wooden Horse), 10 / 11 (code 1, items 3500 / 3505 HP / SP Potion Tier 1)
@@ -13216,6 +13262,14 @@ size 0x12, not checked
 ### `0x704c` NC_CHAR_OPTION_IMPROVE_DB_SET_SHORTCUTDATA_ACK (CharDB→WM)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nError`: 0x2100 ok; `nCharNo`: 5
+
+### `0x704f` NC_CHAR_OPTION_IMPROVE_DB_SET_GAMEOPTION_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s37b): `nCharNo`: character; `DBGameOptionData`: the 28 options of 0x703B
+
+### `0x7050` NC_CHAR_OPTION_IMPROVE_DB_SET_GAMEOPTION_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37b): `nError`: 0x2118; `nCharNo`: 270, 2791060741, 2791060740: never written (D04-B13)
 
 ### `0x7446` NC_GUILD_ZONE_LIST_REQ (Zone→WM)
 
@@ -13296,6 +13350,18 @@ size 0x12, not checked
 ### `0x987b` NC_GUILD_ACADEMY_ZONE_GUILD_ACADEMY_MASTER_BUFF_CMD (WM→Zone)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `NumOfMaster`: 0
+
+### `0xb40a` NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_REQ (WM→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s37b): `hWMChar`: 35000; `nRowNo`: 1 (avatar +0x79); `nUserNo`: 103; `nCharNo`: 5; `sNewID`: requested name; `bInit`: 0 (avatar +0x78)
+
+### `0xb40b` NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK (CharDB→WM)
+
+**Captured** (P02, `capture-validation.md`; s37b): `nError`: 0x20D1, 0x20C0; `nUserNo`: 103; `nCharNo`: 5; `sNewID`: echo
+
+### `0xb40f` NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD (WM→Zone)
+
+**Captured** (P02, `capture-validation.md`; s37b): `nCharNo`: 5; `bInit`: 0; `sOldID`: "Test2" (the WM copy); `sNewID`: "X37Id"; one per zone link of the broadcast set
 
 ### `0xc804` NC_SYSLOG_CHAR_CREATED (WM/Zone/Character→GameLog)
 

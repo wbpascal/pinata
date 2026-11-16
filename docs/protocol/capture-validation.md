@@ -33,6 +33,9 @@ the code; where they disagree, the code was re-read and the finding is listed in
 | `21c_expired-item` (**s21c**) | name only + one pcapng comment ("Boots deleted here", 66.1 s): S13 (an item past its end time); Test1235 logs in and waits (§21.2) | login, wm, zone (9210) + 56 links | 606 |
 | `21d_stack-over-maxlot` (**s21d**) | name only: X3 (a stack limit lower than an existing stack; zone restarted with the changed table); Test1235 makes, drops and picks up 10 potions (§21.3) | login, wm, zone (9210) + 67 links (zone restart) | 853 |
 | `37_login-heartbeat-refusals-delete` (**s37**, batch 3) | notes file: idle on the world list, create / delete / re-create `X37Del`, 4 min on the character list, WM stopped (world closed), WM restarted with capacity 1 (world full), blocked account, not-login-able account | login×6, wm + 124 links (WM restarts) | 3 583 |
+| `26_11_16_37b_char-select-rename-refusals` (**s37b**, batch 4) | notes file + prep / DB readings: create refused (name taken), free rename of `X37-Ren` twice (with the 2018 `p_Char_Rename` of the test DB), rename right of Test2 (refused, then `X37Id`), character login with all zones stopped (§22) | login×3, wm×3, zone×5 (9210) + 123 links (zone restart) | 3 886 |
+| `26_11_16_38_session-loss-kicks-char-select` (**s38**, batch 4) | notes file: back to character select, quit, zone connection closed by the server, client killed, zone killed after `&getmoney` (twice) (§23, part 25) | login×15, wm×12, zone×10 (9210) + 115 links (zone kills) | 11 976 |
+| `26_11_16_24_skills-abstates-stat-points` (**s24**, batch 4) | notes file + prep / DB readings: X24A (Gladiator 100) and X24B (HighCleric 20): learn, empower, stat points, reset items, cast abort, ground target, toggle skill, abstate reset conditions, damage over time, death and revive by skill (§24–§25, parts 26–27) | login×2, wm×2, zone×4 (9210 ×3, 9212) + 56 links | 14 722 |
 
 Batch 2 (`shop`, `combat`) was recorded on the server host with the LAN and the loopback interface: it adds the
 server↔server links (§7). The character is Test2 (`chrregnum` 5, slot 1, level 5, shape 0x19), not Test1235.
@@ -46,6 +49,10 @@ Batch 3 (commit 26bb95f, the X02 scenarios 14, 21, 37 and the setups S13, S16, X
 `26_11_15_24_skills-abstates-stat-points.md` has no pcapng (blank notes only): scenario 24 is not captured. The 146
 opcode types not seen in batches 1–2 (98 on links, 9 WM, 39 zone) are covered in §16–§21; those sections stand
 before §11 so that the sweep sections §11–§15, which other documents cite by number, keep their numbers.
+
+Batch 4 (commits a8e2527, 40b338d and the scenario-38 capture added after them: X02 scenarios 37 (second run "37b"), 38 and
+24) was recorded the same way. Against batches 1–3 (534 types) it adds 69 opcode types (33 on links, 7 WM, 29 zone),
+all in `s37b` and `s24`; `s38` adds none. They are covered in §22 onwards, again placed before §11.
 
 ## 2. Transport
 
@@ -2842,6 +2849,155 @@ at 27 s.
 The other types of the three runs (the login bursts, the zone start of `s21d`, drop and `&makeitem` in `s21d`) recur
 as in §5, §7, §17.4 and §19 with the same layouts.
 
+## 22. Character select, batch 4: create and rename refusals, rename right, map under maintenance (`s37b`) *(captured)*
+
+Scenario 37, second run (`26_11_16_37b_char-select-rename-refusals.md`, prep and DB readings `-prep.txt` / `-db.txt`;
+no pcapng comments). Account `admin` (`nUserNo` 103): Test1235 (`nCharNo` 2, slot 0), Test2 (5, slot 1, with an open
+rename right: `tCharacterChangeID` row 1, `bFlag` 0, `bInit` 0), `X37-Ren` (7, slot 2: `X37Del` of `s37`, renamed in the
+DB by the prep; tutorial never started). The test DB runs the private 2018 `Fixes` copy of `p_Char_Rename` (prep output:
+"renames only with an open tCharacterChangeID row, else reports ok and renames nothing"); the 2016 `Character.bak`
+version is a plain `UPDATE` (D02 §3.5). Client connections: `login#1` / `wm#1` (18.2 s), `login#2` / `wm#2` (371.6 s)
+and `login#3` / `wm#3` (461.9 s), each after a "Disconnected"; `zone#1`–`#5`. Links: the WM's CharDB link `W00_CDB#9`,
+its GameLog link `W00_GLDB#5` (the Character server's is `#6`), `ALDB#1`, `AccDB#2`. The zones were stopped at about
+595 s and came back at 655.9–656.5 s with the §17.4 registration pattern (no new type).
+
+### 22.1 What happened
+
+```text
+step 1, create refused (33.053):
+  C→WM 0x1401 {slot 3, "Test1235", 0x85} → 15 ms → WM→CDB 0x1402 → 29 ms → CDB→WM 0x1403 {30000, "Test1235", err 0x181}
+  → 14 ms → WM→C 0x1404 {0x181}                     client: "The name is already in use. Please choose another"
+  ("X37 Sp" with a space: refused by the client, no packet)
+step 2, free rename of X37-Ren (the client opens the rename window itself on selecting a name with '-'):
+  the old name: refused by the client, no packet ("Please enter a correct name.")
+  188.811 C→WM 0x140F {2, "Test1235"} → 10 ms → WM→CDB 0x1411 {30000, nCharNo 7, 2, "Test1235"} → 8 ms
+          → CDB→WM 0x1412 {…, Error 0xD0} → 4 ms → WM→C 0x1410 {2, "Test1235", 0xD0}   no message; the list shows "Test1235" twice
+  212.378 C→WM 0x1001 {2} → 15 ms → WM→C 0x1110 {0x91}            tutorial popup; the byte is stale (P02-B28)
+  214.152 C→WM 0x1111 {bIsSkip 1} → 5 ms → WM→CDB 0x1112 {30000, 0, 7, 103, 1} → 22 ms → CDB→WM 0x1113 {…, 0x31E8, 1}
+          → 10 ms → WM→C 0x1002 {0x145}, no 0x1004       client: "The Map is under maintenance" (P02-B33, §22.2)
+  226.359 0x1001 {0}: Test1235 in game (zone#1); 249.066 back to character select (0x0C18 {1}, §22.5); 250.076 0x0C1F
+          → 0x0C12 → CDB 0x0C5F, 0x0C13 → WM→C 0x0C14: X37-Ren under its DB name again, tutorial state 2, map RouN
+  319.256 0x140F {2, "X37Ren"} → 0x1411 → 0x1412 {0xD0} → 0x1410 {2, "X37Ren", 0xD0} (16 ms)   the list shows X37Ren
+  331.470 0x1001 {2} → CDB 0x1004 … 0x1005 (the blob's 0x1007 says charid "X37-Ren") → CDB 0x1036, GL 0xC806, C 0x1003 (596 ms)
+  332.112 C→Z 0x1801 {30000, "X37Ren"} → 13 ms → Z→WM 0x104B {8002, "X37Ren"} → 17 ms → WM→Z 0x104C {usr −1, chr −1}
+          → 16 ms → Z→WM 0x0C1A {usrregnum 0, wldmanhandle 0, reason 0x689}
+  332.161 WM: CDB 0x1037, ALDB 0x081F, GL 0xC807, AccDB 0x0C11 {error 0x780}, ALDB 0x0722 / 0xC803, zones 0x0C19 ×4 (same ms)
+          client: "Disconnected" (§22.3)
+  371.6 new login; 377.830 the same rename again (0xD0); 381.712 0x1001 {2} → the same 0x104C refusal (382.360) and the same end
+step 3, rename right of Test2 (avatar bNeedChangeID 1, nRowNo 1):
+  508.159 C→WM 0xB409 {1, "Test1235"} → 15 ms → WM→CDB 0xB40A {35000, nRowNo 1, 103, 5, "Test1235", bInit 0} → 28 ms
+          → CDB→WM 0xB40B {35000, 0x20D1, 103, 5, "Test1235"} → 5 ms → WM→C 0xB40C {0x20D1, slot 7, "Test1235"}
+          client: no message, Test2 unchanged (P02-B34, §22.4)
+  550.298 0xB409 {1, "X37Id"} → 17 ms → 0xB40A → 3 ms → 0xB40B {0x20C0} → 10 ms → WM→zones 0xB40F {5, bInit 0, "Test2",
+          "X37Id"} ×4 and WM→C 0xB40C {0x20C0, slot 1, "X37Id"} (1 ms apart)   client: "Character name successfully changed."
+  572.354 0x1001 {1}: X37Id in game (zone#4); 591.872 back to character select; the list has X37Id, bNeedChangeID 0
+step 4, zones stopped (the last zone-link 0x0821 at 593.9):
+  622.447 C→WM 0x1001 {0} → 7 ms → WM→C 0x1002 {0x145}, no CharDB round trip   client: "The Map is under maintenance", stays on the list
+  665.417 0x1001 {0} (zones back) → 0x1003 after 671 ms, in game; 689.147 quit (0x0C18 {0}, §22.5)
+```
+
+The DB readings agree: before the cleanup Test2 is `X37Id` with the `tCharacterChangeID` row at `bFlag` 1, `sOldID`
+Test2, `sNewID` X37Id (updated 11:52:25.370, the 550.3 s request); `X37-Ren` was never renamed.
+
+### 22.2 Skipping the tutorial with a listed tutorial character (P02-B33)
+
+The CharDB list (`0x0C13`, 19.336) carries `X37-Ren` with `loginmap` RouN and `nTutorialState` 0. The WM's
+`fc_NC_USER_AVATARINFO_ACK` @ FUN_0040ede0 sets the map of every state-0 avatar to "RouT" (W01 §3.3), and the client's
+`0x0C14` (19.362) carries that patched copy: `loginmap` RouT (also `s14` 8.944, `X37Del`). W01 §3.3 says the list is
+a "verbatim copy of the DB records (map not patched)": **corrected**. On the skip, `fc_NC_CHAR_TUTORIAL_MAKE_ITEM_ACK`
+@ FUN_0040e2c0 sets the avatar to `TS_SKIP` (2) and calls `CWMClientSession::TutorialLoginProcess` @ FUN_004371a0,
+which rewrites the map only for `TS_PROGRESS` ("RouT00"). It looks up "RouT"; `GetServiceMapZoneNo` finds no zone
+for it, the function logs "TutorialMap Search Fail" and sends `0x1002 {0x145}` (captured 10 ms after `0x1113`, no
+`0x1004`). The other two 0x145 branches need an existing zone session with a free `playingCharNo`, and this was the
+session's first character login *(inferred: so the map lookup failed)*. **(original bug) P02-B33**: a character created
+in an earlier session (listed by `0x0C13`, not appended by `0x1406`) cannot enter the game by skipping the tutorial: the
+client says "The Map is under maintenance". The skip itself is saved (`0x1112` → `0x1113 0x31E8`; the next lists show
+state 2 and RouN). Until the list is reloaded, the WM's copy keeps "RouT" with state 2, so a second `0x1001` would also
+end in 0x145 through the normal path *(inferred)*. In `s14` (§18.7) the skipping character had just been created:
+its `0x1406` copy carries RouN, so the same path worked. The scenario notes blame the rename to "Test1235" for this
+message; the rename played no part in it.
+
+### 22.3 The free rename with the 2018 procedure: name mismatch at the map login
+
+`0x1412 {Error 0xD0}` came back for both names although the DB renamed nothing (the 2018 procedure; with the 2016
+`UPDATE` the duplicate "Test1235" would have failed on the unique name, D02 §3.5 *(inferred)*, not testable here).
+`fc_NC_AVATAR_RENAME_DB_ACK` @ FUN_0040ff00 stored the new name in the WM's avatar copy (W01 §4.1, confirmed), and the
+client's list showed it. The CharDB blob of `0x1004` still said "X37-Ren", so the WM's character data had the DB
+name. The client sent the list name in `0x1801`. The WM's `0x104B` check (`charName == CHARDATA.name`, W01 §7.2)
+failed: it set its session to state 3 and answered `{−1, −1}`. The zone ran `so_SetRegistNumber` → `so_Disconnect(0x689)`
+(Z01 §5.3). Its `0x0C1A` carries `usrregnum 0` and `wldmanhandle 0` (not set yet), so the WM's 0x0C1A handler found no
+session and sent no `0x0C17` (W01 §5.2). The WM then closed the session (`CharacterLogout` + `Client_OnClosed`,
+0x0C11 `0x780`), and the client showed "Disconnected". **Confirms** W01 §4.1, §7.2, §5.2, Z01 §5.3. With the 2016
+procedure the names cannot diverge this way. This is the test DB's procedure, not a server bug.
+
+### 22.4 The rename right (dept 45)
+
+`0xB40A` / `0xB40B` / `0xB40F` match D02 §14 and Z30 §1.2 field by field. `-3039` → `0x20D1` (name in use) comes back
+for "Test1235", and `0x20C0` goes with the `0xB40F` broadcast to the four zone links, 1 ms before the client's answer
+(W01 §6.2). `fc_NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK` @ FUN_0040d740 fills the `0xB40C` slot byte from a local that only
+`CWMClientSession::CharIDChange` writes (on 0x20C0). For every other code the byte is stack garbage: 7 captured.
+The client's `CharSelectFrameWork::On_NC_USER_CONNECTION_CHANGE_CHAR_ID_ACK` @ FUN_00476de0 first calls
+`User::GetAvatarInfoBySlot(slot)` and returns without a message when it finds none, so the "The name is already taken
+by another user." text of 0x20D1 (and 0x20C7, and the generic text) is not shown **(original bug) P02-B34**. The tester saw
+no message. On 0x20C0 the client copies the name and clears avatar +0x77..+0x78 (`bNeedChangeID`, `bInit`). The next
+list has X37Id with `bNeedChangeID` 0 (row used). The avatar list's `CharIDChangeData` reads `{0, 0x64, 0}` for
+characters without a row (D02 §3.2 default) and `{1, 0, 1}` for Test2, as D02 says.
+
+### 22.5 Back to character select and quit, on the links
+
+- **Back to character select** (`0x0C18 {1}`, 249.066 and 591.872): the zone saves once with `0x0410 StoreType 9`
+  (`sp_Schedule_Logout` → `so_Unmark(0, 1, 9)`, Z01 §8.1). It sends `0x0C31` in the same ms (3 ms / 10 ms after
+  0x0C18), and the WM's `CharacterLogout` sends CDB `0x1037`, ALDB `0x081F` and GL `0xC807` in one ms (W01 §5.4, in that
+  order). The Character server logs `0x040B` 4 ms later. No `0x0C11`: the WM session stays. `0x1037` and `0x081F` carry the
+  WM's copies of the map position and level (`x/y 5771/8796` against the zone's last `5756/8745` in `0x0410`), and
+  `playmin` / `CharPlayMin` / `PlayTime` 0 after 22 s. The client then sends `0x0C1F` with one byte (`00`): its
+  sender (client FUN_00497140 case 0x36) writes the opcode and one byte of an unset local. The PDB struct is empty, and
+  the WM ignores the payload. This is a client quirk, recorded as a captured layout variant. The WM answers by reloading
+  the list from CharDB (`0x0C12` → `0x0C5F`, `0x0C13`) and sends `0x0C14`. The client's option saves `0x7011` / `0x7015` /
+  `0x7016` / `0x703B` become CDB `0x7026` / `0x702A` / `0x702B` / `0x704F` 20–70 ms later (D04 §5.1, W04 §8.2). `0x7050
+  {nError 0x2118, nCharNo 270}` comes back with a stale `nCharNo` (2791060741 / 2791060740 at the later two), **D04-B13
+  captured**.
+- **Quit** (`0x0C18 {0}`, 689.147; the same in `s24` at 2020.8 and 2022.8): the WM broadcasts `0x0C19` from the 0x0C18
+  handler (689.148, with `0x1037` / `0x081F` / `0xC807`) and again from `Client_OnClosed` (689.165, with AccDB `0x0C11
+  {playmin 3, 0x780}`, ALDB `0x0722` / `0xC803`), as W01 §5.1 / §3.2 describe. The zone runs `so_banning` on each
+  `0x0C19` and its own socket cut (`zs_disconnect` → `so_Unmark(…, 1, 7)`, Z31 §4.5, Z09 §1), and later the logout
+  schedule. The result is four full `ws_save2DB` bursts with `StoreType` 4 (689.164), 7 (.179), 4 (.180) and 9 (692.126,
+  2.98 s later, with `0x0C31`), and three `0x750C` (level 120, Z01 §8.4) **(original bug) P02-B35**.
+  Each burst is complete (0x4018 … 0x4035, both ACKs).
+
+### 22.6 Opcodes
+
+Batch-1 to batch-3 types of these flows recur unchanged (login, `0x0C14`, `0x1001` / `0x1003`, the CharDB blob of §7.4,
+`0x1801` / `0x104B` / `0x104C`, the save bursts of §10.1, the zone start of §17.4). New in batch 4:
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| C→WM | 0x0C1F | NC_USER_AVATAR_LIST_REQ | 2 | 1 | confirmed; **client quirk** | one unset byte (`00`), PDB struct empty; WM reloads the list (§22.5) |
+| C→WM | 0x140F | NC_AVATAR_RENAME_REQ | 3 | 21 | confirmed | `{slot, name[20]}` |
+| WM→C | 0x1410 | NC_AVATAR_RENAME_ACK | 3 | 23 | confirmed | `{slot, name, 0xD0}`; the WM stores the name on 0xD0 |
+| C→WM | 0xB409 | NC_USER_CONNECTION_CHANGE_CHAR_ID_REQ | 2 | 21 | confirmed | `{nSlotNo, sNewID}` |
+| WM→C | 0xB40C | NC_USER_CONNECTION_CHANGE_CHAR_ID_ACK | 2 | 23 | confirmed; **bug** | `0x20C0` with the slot; `0x20D1` with slot 7 (stale, P02-B34) |
+| WM→C | 0x1404 | NC_AVATAR_CREATEFAIL_ACK | 1 | 2 | confirmed | `0x181` "The name is already in use." |
+| WM→C | 0x1002 | NC_CHAR_LOGINFAIL_ACK | 2 | 2 | confirmed; **bug** | `0x145` after a tutorial skip (P02-B33) and with the zones down |
+| WM→CDB | 0x1411 | NC_AVATAR_RENAME_DB_REQ | 3 | 27 | confirmed | `{clienthandle, nCharNo, SlotNo, NewName}` |
+| CDB→WM | 0x1412 | NC_AVATAR_RENAME_DB_ACK | 3 | 29 | confirmed | `Error 0xD0` (2018 procedure, §22.3) |
+| CDB→WM | 0x1403 | NC_AVATAR_CREATEDATAFAIL_ACK | 1 | 24 | confirmed | `{clienthandle, charid, err 0x181}` |
+| WM→CDB | 0xB40A | NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_REQ | 2 | 35 | confirmed | `{hWMChar, nRowNo 1, nUserNo, nCharNo, sNewID, bInit 0}` |
+| CDB→WM | 0xB40B | NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK | 2 | 32 | confirmed | `0x20D1`, `0x20C0` |
+| WM→Z | 0xB40F | NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD | 4 | 45 | confirmed | one per zone link of the broadcast set; `{5, 0, "Test2", "X37Id"}` |
+| Z→WM | 0x0C1A | NC_USER_CONNECTCUT2WORLDMANAGER_CMD | 2 | 14 | confirmed | `{ref all 0xFF, usrregnum 0, wldmanhandle 0, reason 0x689}` (§22.3) |
+| Z→WM | 0x0C31 | NC_USER_POSSIBLE_NEW_CONNECT_CMD | 3 | 12 | confirmed | `{ref all 0xFF, nWorldManagerHandle, nCharNo}` with the reason-9 save |
+| WM→CDB | 0x1037 | NC_CHAR_LOGOUT_DB | 5 | 35 | confirmed | WM copy of map / x / y, `playmin`, `state 0`, `Cen` |
+| WM→ALDB | 0x081F | NC_MISC_CHAR_LOGOFF_STATISTICS | 5 | 21 | confirmed | `{0, 103, charNo, class, level, exp gained, minutes}` |
+| WM→GL | 0xC807 | NC_SYSLOG_CHAR_LEAVE_GAME | 5 | 12 | confirmed | `{UserNo, CharNo, PlayTime}` |
+| Char→GL | 0x040B | NC_LOG_GAME_LOGOUT | 5 | 35 | confirmed | copy of `0x1037` |
+| WM→CDB | 0x7026 / 0x702A / 0x702B | NC_CHAR_OPTION_DB_SET_SHORTCUTSIZE / WINDOWPOS / KEYMAPPING_CMD | 3 each | 28 / 396 / 312 | confirmed | `nCharNo` + the client's 24 / 392 / 308 bytes |
+| WM→CDB | 0x704F | NC_CHAR_OPTION_IMPROVE_DB_SET_GAMEOPTION_REQ | 3 | 90 | confirmed | `nCharNo` + the 28 options of `0x703B` |
+| CDB→WM | 0x7050 | NC_CHAR_OPTION_IMPROVE_DB_SET_GAMEOPTION_ACK | 3 | 6 | confirmed; **bug** | `0x2118`, `nCharNo` stale (D04-B13) |
+
+`s24` and `s38` contain these logout and option types too; they are counted in this table with the `s37b` values.
+`0x0C1A` with a real `usrregnum` and the s38 kicks are §23 (part 25).
+
 ## 11. Message order against README §2 and the pseudocode
 
 README §2 is a sketch of the login → WM → zone chain. Against the thirteen captures (details in the sections cited;
@@ -2944,6 +3100,9 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B30 | zone ITEMDB requests: `ac_ClearInventory` @ FUN_0041bbd0 and the `sp_DestroyItem` family (Z18 §4.4; `sp_DestroyItem` @ FUN_00527870 itself on the per-minute expiry, §21.2) → 0x3459; `sp_NC_ITEM_SPLIT_REQ` @ FUN_00539a40 → 0x3434; `ItemInventory_ii_DropAll` @ FUN_00529a70 → 0x3416 | 0x3459 without bit 7 leaves payload +9…+22 (`itemID`, `key`, `attrOffset`, `inven`) unwritten; 0x3434 leaves `lotcreate.attr` (+62) unwritten; 0x3416 copies the cell's whole 101-byte attribute union, of which a lot item uses 1 byte (§19.2–§19.4, §21.2) | earlier `gpp` contents (text of other packets) and zone heap bytes reach the Character DB on every `&cleariv` / destroy / expiry / split / drop and come back in 0x3417; the Character server reads only the valid parts *(inferred from D03 §3.3 / §3.4 and Z18 §4.4)* | zero the fields (or the send buffer) before filling; copy only the class's attribute length |
 | P02-B31 | zone `ShinePlayer::InteractWithNPC` @ FUN_004c4660 (Z02 §6.2) with `sp_NC_ITEM_REPURCHASE_REQ` @ FUN_00538580 / `so_ply_CanItemRepurchase` @ FUN_005379f0 | clicking another NPC while a shop is open replaces `sp_NPCProcess.npc` without `sp_EndOfTrade`; when the new role cannot open (`NPCRole_MenuOpen` with menu bit 0 still set by the shop) nothing is sent, so the client keeps the shop window; every buy-back then fails `so_ply_CanItemRepurchase` and gets `0x305A {0x3671}`, a code the client shows no text for (§20.2) | the player cannot buy back (19 silent refusals in `s21` after an Anvil click next to the Blacksmith) | end the old trade (or refuse the click) before replacing the NPC, and answer a refused buy-back with a code the client shows |
 | P02-B32 | zone `ShinePlayer::so_ply_SellItemList_Insert` @ FUN_00537a20 with `CSellItemManager::simg_Insert` @ FUN_0050e360 (found in the batch-3 review) | the sold item enters the buy-back list first; `0x305D` (the entry `simg_Insert` evicted from a full list, handle in its out-parameter) and `0x305C` (the new entry) both go only when `so_ply_CanItemRepurchase` (vt 0xe6c) holds, so a sale at a merchant without buy-back (SoulStone / Skill / WeaponTitle / Guild) changes the server's list silently (§20.2; read, not captured) | the client keeps a buy-back entry whose handle the server has reused or dropped; a later buy-back of it at a Weapon / Item merchant names the wrong item or none *(inferred)* | send `0x305D` whenever an entry is evicted, or insert into the list only where buy-back is allowed |
+| P02-B33 | WM `fc_NC_USER_AVATARINFO_ACK` @ FUN_0040ede0 (map "RouT" for every listed avatar with tutorial state 0) with `fc_NC_CHAR_TUTORIAL_MAKE_ITEM_ACK` @ FUN_0040e2c0 → `CWMClientSession::TutorialLoginProcess` @ FUN_004371a0 (found in batch 4) | on a tutorial skip the avatar becomes `TS_SKIP`, but only `TS_PROGRESS` rewrites the map ("RouT00"); the lookup of "RouT" finds no service zone ("TutorialMap Search Fail") and the WM sends `0x1002 {0x145}` (`s37b` 214.189, §22.2) | a character created in an earlier session cannot enter the game by skipping the tutorial: "The Map is under maintenance"; it works after the list is reloaded (the skip is saved) | restore the DB map (or keep it in the list) when the tutorial is skipped |
+| P02-B34 | WM `fc_NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK` @ FUN_0040d740 → client 0xB40C (found in batch 4) | the slot byte comes from a local that only `CWMClientSession::CharIDChange` writes (code 0x20C0); for every other code it is stack garbage (7 captured, `s37b` 508.207, §22.4) | the client's `On_NC_USER_CONNECTION_CHANGE_CHAR_ID_ACK` @ FUN_00476de0 finds no avatar for the slot and returns: "The name is already taken by another user." (0x20D1), the guild-master text (0x20C7) and the generic error never show | send the slot of the request (look it up by `nCharNo`) |
+| P02-B35 | WM `0x0C18` mode 0 @ FUN_00412df0 and `Client_OnClosed` @ FUN_00437030 (each broadcasts `0x0C19`), zone `so_banning` @ FUN_00558b70, `zs_disconnect` and `sp_Schedule_Logout` @ FUN_00558160 (found in batch 4) | a quit runs `ws_save2DB` four times: `StoreType` 4 (first `0x0C19`), 7 (socket cut), 4 (second `0x0C19`) within 35 ms and 9 with `0x0C31` 3 s later (`s37b` 689.1, `s24` 2020.8 / 2022.8; §22.5) | four full CharDB save bursts, four GameLog `0x0410` and three `0x750C` for one quit; the data is the same each time *(inferred: no lost state)* | one save per logout |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -2977,6 +3136,8 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | Z09-B72 | `s21` 146.087: the WM relays 0x207D unchanged as 0x2079 to both clients, the 18 stale bytes included | §20.4 |
 | P02-B16 | `s21`: every 0x305C carries the bytes of the 0x3001 and the 0x3425 built just before in `gpp`, then older text | §20.2 |
 | Z04-B6 | `s21b` 17.213 / 22.337: `0x3004 {0x206}` (BUYALL DB error) shows no text: 0x206 is the switch's default case in `On_NC_ITEM_BUY_ACK`; 0x208 (BUYLOT DB error) is silent the same way (not in Z04-B6's list) | §21.1 |
+| D04-B13 | `s37b` 250.211 / 593.052 / 679.228: `0x7050 {0x2118, nCharNo 270 / 2791060741 / 2791060740}` (never written) | §22.5 |
+| P02-B28 | `s37b` 212.393: `0x1110` carries a stale `0x91` | §22.1 |
 
 ## 13. Discrepancies per work item
 
@@ -3072,6 +3233,11 @@ sweep, `docs/plan/items/X04.md`) carries every row marked "→ X01" that README 
 | Z04 | `Z04-items.md` §2.1 (client `0x3004`: "other codes (0x203, 0x204, 0x20e, 0x210) are silent", Z04-B6) | 0x206 and 0x208, the Character server's DB-error codes of BUYALL / BUYLOT (D03 §2.1), are silent too (the switch's default); captured for 0x206 (§21.1) | extended → X04 |
 | Z04 | `Z04-items.md` §3.3 (`so_ply_PickupItem`: "IsLot → first stack with room") | room = `cell.lot + picked ≤ MaxLot` for the whole picked lot (no partial merge); a stack over `MaxLot` is never a target, and nothing checks it at login (§21.3) | extended → X04 |
 | X02 | `capture-scenarios.md` §8.14 / §8.17 / §9.4 and the `tools/capture/21` S13 / S16 scripts | the runs used Test1235 (`nCharNo` 2) although the scripts name Test2; §8.14 confirmed (expiry at the first minute after login); §8.17 confirmed for item and cen, fame / coins untested (a cen-only item); §9.4's open X3 question answered: no check, no merge, a new cell (§21) | confirmed / extended → X05 |
+| W01 | `W01-core.md` §3.3 (0x0C13 → 0x0C14 "verbatim copy of the DB records (map not patched)") | the client's list carries the patched map "RouT" for tutorial-state-0 avatars (CharDB sent RouN; `s37b` 19.336 / 19.362, `s14` 8.939 / 8.944, §22.2) | corrected → batch-4 follow-up |
+| W01 | `W01-core.md` §6.2 (`TutorialLoginProcess`), bugs table | a skip by a listed tutorial character looks up "RouT" and answers `0x1002 {0x145}` (P02-B33, §22.2) | extended → batch-4 follow-up |
+| W01 | `W01-core.md` §6.2 (CharDB 0xB40B → client 0xB40C) | the slot byte is unwritten for every code but 0x20C0; the client then shows nothing (P02-B34, §22.4) | extended → batch-4 follow-up |
+| W01 / Z01 | `W01-core.md` §5.1 / §3.2, `Z01-core.md` §8.1 / §8.3 | a quit sends `0x0C19` twice and the zone saves four times (reasons 4, 7, 4, 9; P02-B35, §22.5) | extended → batch-4 follow-up |
+| X02 | `s37b` notes step 2 ("entered Test1235 … Map under Maintenance", "maybe an issue because we renamed …") | the maintenance message comes from the tutorial skip (P02-B33); the disconnects come from the test DB's 2018 `p_Char_Rename`, which reports 0xD0 without renaming (§22.3); step 3's silent refusal is P02-B34 | corrected → batch-4 follow-up |
 
 In batch 1 (§3–§6) no discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held (batch 2's rows for Z03, Z09, Z12, Z13 and W03 are above). Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
 timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
@@ -3088,7 +3254,7 @@ conditions), D02 §6 (12-byte save headers, ACKs only for 0x4001 / 0x4007, 0x401
 §3.1 / §6.2 / §6.3, Z15 §3.3 / §3.4 (SAY with the clicked NPC), Z12 §5.2 (0xBC05 cap), Z13 §8.2 / §8.3 / §8.6 / §8.7 /
 §8.10 (summon order, hunger, speed formula, 0x1C1A), Z09 §5.4 (10-s corpse) and D05's GameLog layouts (0x040A, 0x040F,
 0x0410, 0xC806, 0xC809). The sweep (part 14) confirms Z02 §6.4 (the client's `0x200B` in the tick of `0x304D` runs `sp_EndOfTrade`,
-which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second). Part 21 (§21) confirms D03 §1.2 / §2.1 (`ItemBuy_Create`'s attribute branch: item deleted, cen refunded, `0x340C {0x206}`), Z05 §2.1 (`0x340C` → `0x3004 {error}`) and §6.4 (`0x345A` → `0x3001` emptied), Z09 §1.2 / §2.4 (the per-minute block on the WM's `0x0821`), Z24 §6.7 / Z13 §2.7 (`sp_ChargedItemLimitCheck` → `sp_ItemDelete` → `sp_DestroyItem`, not at login), D03 §1.3 (boot option rows 800–803 / 820–822, `deletetime` at attribute +7) and the capture-scenarios predictions §8.14 (S13) and §8.17 (S16, its cen half).
+which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second). Part 21 (§21) confirms D03 §1.2 / §2.1 (`ItemBuy_Create`'s attribute branch: item deleted, cen refunded, `0x340C {0x206}`), Z05 §2.1 (`0x340C` → `0x3004 {error}`) and §6.4 (`0x345A` → `0x3001` emptied), Z09 §1.2 / §2.4 (the per-minute block on the WM's `0x0821`), Z24 §6.7 / Z13 §2.7 (`sp_ChargedItemLimitCheck` → `sp_ItemDelete` → `sp_DestroyItem`, not at login), D03 §1.3 (boot option rows 800–803 / 820–822, `deletetime` at attribute +7) and the capture-scenarios predictions §8.14 (S13) and §8.17 (S16, its cen half). Part 24 (§22) confirms W01 §4.1 (0x1401 → 0x1403 → 0x1404 `0x181`, 0x140F → 0x1411 → 0x1412 → 0x1410 with the name stored on 0xD0, 0xB409 → 0xB40A), §4.2 (0x145 without a CharDB round trip when no zone serves the map), §5.4 (`CharacterLogout` order 0x1037, 0x081F, 0xC807), §6.2 (0xB40B 0x20C0 → `CharIDChange`), §7.2 (0x104B name check, state 3, `{−1, −1}`), Z01 §5.3 (`so_SetRegistNumber` → 0x689) and §8.1 (reason-9 save with 0x0C31), D02 §3.2 (`CharIDChangeData` default `{0, 0x64, 0}`), §3.5 and §14 (layouts; −3039 → 0x20D1), Z30 §1.2 (0xB40F) and D04 §5.1 (option saves).
 
 ## 14. Not reconstructed / uncertain
 
@@ -3199,6 +3365,12 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
   first minute check, an expired item that is worn (equipment, kind 8) or a ridden mount (skipped, Z24 §6.7), and the
   over-full stack's sell / use / move paths (§21.3). That the S13 / S16 scripts ran for Test1235 is read from their
   outputs, not from the scripts that ran.
+- Batch 4, character select (§22): that "RouT" has no service zone is inferred from the captured `0x145` (the WM log
+  line "TutorialMap Search Fail" is not on the wire). The second `0x1001` with the stale "RouT" copy was not tried. The
+  2016 `p_Char_Rename` (a duplicate name should fail with 0xD1) could not be tested: the test DB runs the 2018 copy.
+  The `0x0C1F` byte of the client is an unset local (00 both times); other values were not seen. P02-B35's claim that
+  the four saves write the same data is read from the four bursts of `s37b` 689.1 (same position, money, level), not
+  compared field by field.
 
 ## 15. Coverage boundary
 
