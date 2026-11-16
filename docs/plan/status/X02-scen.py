@@ -79,7 +79,7 @@ SCEN = {
          R(0x1082, 0x1095) + R(0x10aa, 0x10ab) + O(0x10b2) + R(0x204e, 0x205e) + R(0x065b, 0x065f)),
     30: ('Kingdom quest', 20, '2 clients, GM, SHN / schedule setup',
          D(22, 27) + R(0x1828, 0x1829) + R(0x1812, 0x1813) + R(0x2072, 0x2073) + R(0x2077, 0x207d)
-         + R(0x2082, 0x2083) + O(0x101a) + R(0x0441, 0x0442)),
+         + R(0x2082, 0x2083) + O(0x101a) + R(0x0441, 0x0442) + O(0x1050)),
     31: ('Instance dungeon', 10, '2 clients (party), GM',
          D(41) + O(0x0810, 0x10b1, 0x182c)),
     32: ('GM command session', 12, 'GM, 2 clients',
@@ -93,7 +93,7 @@ SCEN = {
          D(43, 47, 49) + R(0x303b, 0x303f) + R(0x10dc, 0x10dd) + R(0x10e2, 0x10e9)),
     36: ('Block list, reports, options, megaphone', 5, '2 clients',
          D(42, 32, 28) + R(0x0844, 0x0848) + R(0x085f, 0x0869) + R(0x204b, 0x204c) + R(0x10ca, 0x10cb)
-         + O(0x10d3)),
+         + O(0x10d3, 0x7037)),
     37: ('Login side: idle heartbeat, refusals, character delete', 6, 'DB / config setup',
          R(0x0c06, 0x0c08) + O(0x0c15) + R(0x0c23, 0x0c2b) + O(0x0c33) + R(0x0c35, 0x0c66) + D(5, 45, 40)
          + R(0x0801, 0x080d) + R(0x081b, 0x081e) + O(0x1002, 0x1006) + R(0x1008, 0x101a) + R(0x101e, 0x1032)
@@ -103,19 +103,43 @@ SCEN = {
          + R(0x1078, 0x107f) + O(0x081f, 0x0843)),
     39: ('Combat extras: death penalty, PK, revive item, knock-back', 8, '2 clients, GM',
          O(0x2411, 0x242e, 0x2449, 0x244b, 0x104f, 0x1102, 0x1103, 0x10af, 0x10b0) + R(0x2049, 0x204a)
-         + O(0x204d) + R(0x2069, 0x206a) + R(0x3039, 0x303a) + D(23) + R(0x0791, 0x0791)),
+         + O(0x204d) + R(0x2069, 0x206a) + R(0x3039, 0x303a) + D(23) + R(0x0791, 0x0791)
+         + O(0x2434, 0x2438, 0x2444, 0x2445, 0x244a, 0x0429, 0x1073, 0x3832)),
     40: ('Gathering, production, item emotes, way-finding gate, tutorial, attendance', 8, 'GM',
          R(0x202d, 0x203c) + R(0x2067, 0x2068) + R(0x206f, 0x2071) + R(0x3457, 0x3458) + R(0x1110, 0x111d)
          + R(0x10ed, 0x10f6) + R(0x086a, 0x086d) + O(0x10bc, 0x10c1, 0x10cf, 0x10d0, 0x10d8) + O(0x482c)),
     41: ('Test client: crafted client packets', 15, 'test client',
          O(0x7001, 0x7002, 0x980d, 0x3802, 0x0812, 0x300d, 0x304e, 0x5401, 0x581a, 0x1814, 0x0840, 0x0841,
-           0x080f, 0x0819, 0x081a, 0x0827, 0x0836) + R(0x0813, 0x0816)),
+           0x080f, 0x0819, 0x081a, 0x0827, 0x0836) + R(0x0813, 0x0816)
+         # T15-T22 (X05)
+         + O(0x0804, 0x0805, 0x3028, 0x3007, 0x3c07, 0x300e, 0x5001, 0x5005, 0x5006, 0x5007, 0x2022, 0x2023,
+             0x101e, 0x1804, 0x104c, 0x2434, 0x2440, 0x0c66, 0x0c15)),
     42: ('Races: drop menu, two money pick-ups, link with a dead WM session', 10, '2 clients',
          R(0x3416, 0x341b) + R(0x3438, 0x343a) + O(0x180d, 0x180e)),
     43: ('OPTool listener (test tool)', 15, 'test tool',
          D(10, 52) + R(0x0828, 0x0828) + R(0x0834, 0x0835)),
     44: ('Holy promise (mentor and pupil)', 8, '2 clients, GM', D(37)),
+    # 45-50: added by X05 after capture batch 3 (what s14 / s21 / s37 and batch 2 left open)
+    45: ('Second client in sight II', 8, '2 clients',
+         R(0x2017, 0x2018) + R(0x201f, 0x2023) + O(0x200e, 0x242d, 0x242e, 0x2438, 0x2444, 0x2445, 0x1805)),
+    46: ('Items III: no DB change', 12, 'GM',
+         R(0x300b, 0x300c) + R(0x3431, 0x3433) + R(0x3059, 0x305a) + O(0x305d, 0x3004, 0x5001, 0x5005)
+         + R(0x34b9, 0x34bc) + O(0x4014)),
+    47: ('Items IV: the zone and the DB disagree', 25, 'GM, DB / table setup per step, 2 clients for step 6',
+         R(0x3422, 0x3427) + O(0x3005, 0x3004, 0x305a, 0x340c, 0x34a0, 0x3016, 0x300c) + R(0x3441, 0x3443)
+         + R(0x34b9, 0x34bc) + R(0x3431, 0x3433) + R(0x3459, 0x345a)),
+    48: ('WM stop and start with its log', 10, 'server PC only',
+         O(0x9804, 0x0821, 0x0802)),
+    49: ('Items V: refusals by the Character server', 25, 'DB setup per step, a second client or drops',
+         R(0x340a, 0x340f) + R(0x3410, 0x3415) + R(0x3416, 0x3418) + R(0x341c, 0x3421) + R(0x3428, 0x342a)
+         + O(0x3004, 0x300c, 0x3011, 0x3013, 0x3008, 0x300a) + R(0x3444, 0x3445) + R(0x3c07, 0x3c08)
+         + R(0x34b9, 0x34ba) + O(0x3059, 0x305a)),
+    50: ('Timing with one clock and without delayed ACKs', 15, 'capture on the server PC, a registry change',
+         O(0x7004, 0x700c, 0x700d, 0x7c06, 0x7c07, 0x1003, 0x0849, 0x080e)),
 }
+
+# Recorded scenarios (capture batch): their row counts what the opcode set still leaves uncaptured.
+RECORDED = {14: 3, 21: 3, 37: 3}
 
 # Not a scenario of its own: records that every scenario produces on the server links (README §3.13, §3.15).
 LINKS = D(1, 50, 16)
@@ -183,6 +207,8 @@ def order_table(reach):
     rows = sorted(SCEN, key=lambda n: -reach[n][0] / SCEN[n][1])
     for n in rows:
         title, mins, needs, _ = SCEN[n]
+        if n in RECORDED:
+            title += ' *(recorded, batch %d)*' % RECORDED[n]
         out.append('| %d | %s | %s | %d | %d | %d | %.1f |' % (
             n, title, needs, mins, reach[n][0], len(reach[n][1]), reach[n][0] / mins))
     return '\n'.join(out)

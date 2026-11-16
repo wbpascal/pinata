@@ -148,7 +148,7 @@ absence means "not re-read by anyone", not "confirmed": P02 lists what the captu
 ## 2. Ratings per document
 
 State: re-run after capture batch 3 (X05 part 4). 49 pseudocode documents (2 249 headings: 130 high, 1 570 medium,
-223 low, 326 not rated) and 61 knowledge files (313 headings: 13 high, 232 medium, 28 low, 40 not rated); 102 hand
+223 low, 326 not rated) and 61 knowledge files (318 headings: 13 high, 237 medium, 28 low, 40 not rated; 5 of them the sections X05's sweep added to its own knowledge file); 102 hand
 rows. Hand passes: Login, WM, the shared library and the DB servers (X02 part 2), the zone documents and the
 knowledge files (part 3), 4 rows set by the re-check of §3.2 (part 4: `Z01.md` §3 → high, §4 and §6 low → medium,
 `Z03.md` §2 stays medium), and the pass after batch 3 (X05: end of §2.2). The state before the re-run was 45
@@ -462,9 +462,9 @@ Knowledge files (`docs/knowledge/`):
 | `X02.md` | X02 | 6 | 0 | 3 | 1 | 2 | 0 |
 | `X03.md` | X03 | 2 | 0 | 2 | 0 | 0 | 0 |
 | `X04.md` | X04 | 6 | 0 | 4 | 0 | 2 | 0 |
-| `X05.md` | X05 | 2 | 0 | 2 | 0 | 0 | 0 |
+| `X05.md` | X05 | 7 | 0 | 7 | 0 | 0 | 0 |
 | `K01.md` | K01 | 19 | 0 | 15 | 0 | 4 | 0 |
-| **total** | | 313 | 13 | 232 | 28 | 40 | 10 |
+| **total** | | 318 | 13 | 237 | 28 | 40 | 10 |
 
 ### 2.4 L00: `login-server.md`
 
@@ -3553,6 +3553,11 @@ Knowledge files (`docs/knowledge/`):
 |---|---|---|---|
 | 1. Batch-2 leftovers (capture-validation §15 rows naming X05, §… | medium | cap 11/44; R×1 | capture 0x0C15, 0x0C66, 0x1002, 0x1011 … |
 | 2. Facts found on the way | medium | cap 2/3; weak dbb1 | capture 0x1050 |
+| 3. Batch 3: what the recorded scenarios confirmed (one line eac… | medium | cap 33/47 | capture 0x200E, 0x2023, 0x242E, 0x2438 … |
+| 4. Open after batch 3: where each thing went | medium | cap 2/17 | capture 0x200E, 0x2023, 0x242E, 0x2438 … |
+| 5. Predictions of X02 that were wrong as written (for the owner… | medium | cap 14/22 | capture 0x2006, 0x301B, 0x3029, 0x305B |
+| 6. Left open on purpose | medium | cap 3/6; weak inf1 | capture 0x106E, 0x203D |
+| 7. Ratings and the generator scripts | medium | no function cited | cite and re-read the function |
 
 ### 2.113 K01 knowledge: `docs/knowledge/K01.md`
 
