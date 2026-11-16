@@ -1,8 +1,11 @@
 # Client ⇄ Server Protocol Specification (recovered from binaries)
 
-Recovered by static analysis of the shipped server binaries in `Files/Server/2016/`. Nothing here was observed on a
-live connection; every statement is either read from decompiled code (**observed**) or deduced from it
-(**inferred**). Open questions are listed in [Unknowns](#unknowns).
+Recovered by static analysis of the shipped server binaries in `Files/Server/2016/`, then checked against packet
+captures of a 2016 client on these servers ([capture-validation.md](capture-validation.md), work item P02). In this
+file **observed** means read in the decompiled code, **inferred** means deduced from it, and *(captured)* means seen
+on a real connection (the strongest evidence; where a capture and the code disagreed, the text below follows the
+capture and cites the code that explains it). Open questions are listed in [Unknowns](#unknowns). Statements changed
+after the captures are listed with their old wording in [`docs/knowledge/P04.md`](../knowledge/P04.md).
 
 | Binary | SHA-256 (prefix) | Role | Client port |
 |---|---|---|---|
@@ -41,7 +44,7 @@ Per-packet field layouts (what each packet contains, with values or where each v
 All three client-facing servers share one network library (`CSocket_IOCP`, `CSendPacket`), with the same
 framing and the same cipher table.
 
-### 1.1 Framing (observed)
+### 1.1 Framing (observed, *captured*)
 
 ```
 short packet  (body < 256 bytes):  [len:u8]               [body: len bytes]
@@ -57,6 +60,9 @@ len  = 2 + payload length       (the length prefix is not counted)
 - Writes are queued in 0x2000-byte IO buffers. Several packets can share one TCP write.
 - Hand-built packets in the code show the same layout, for example `{04, 07 08, seed_lo, seed_hi}` is
   `len=4, opcode=0x0807, u16 seed`.
+- *(captured)* Every captured packet parses with this rule; the long form appears exactly for bodies ≥ 256 bytes
+  (`0x0C5A`, `0x0C0F`, zone `0x1801`, large `0x1C09` / `0x581D`), and the servers put several packets in one TCP
+  segment (capture-validation §2.1).
 
 ### 1.2 Opcode (observed)
 
@@ -76,7 +82,7 @@ Department prefixes from the handler names: 2 `NC_MISC`, 3 `NC_USER`, 4 `NC_CHAR
 37 `NC_HOLY`, 38 `NC_GUILD`(academy), 41 `NC_INSTANCE`, 43 `NC_DICE`, 44 `NC_RAID`, 47 `NC_GAMBLE`,
 49 `NC_COLLECT`, 51 `NC_MOVER`, 53 `NC_PET`. See `opcodes.json` for the rest.
 
-### 1.3 Encryption (observed)
+### 1.3 Encryption (observed, *captured*)
 
 - **Client → server only.** Each received body (opcode + payload, not the length prefix) is XORed in
   place before dispatch (Login `FUN_0040b170`, WM `FUN_0045d4b0`, Zone `FUN_00631120`). Server → client traffic is plaintext: the send path (`CSocket_IOCP::Send`) has no cipher.
@@ -92,19 +98,48 @@ def decrypt(body: bytearray, state):         # state.idx starts at seed % 499
         state.idx = 0 if state.idx >= 498 else state.idx + 1
 ```
 
-### 1.4 Seed: `0x0807` NC_MISC_SEED_ACK (observed)
+*(captured)* On all three servers every client body decrypts with this rule from the stream's `0x0807` seed, across
+packets; server → client traffic is plaintext (capture-validation §2.2). Server ↔ server links carry no seed and no
+cipher (capture-validation §7.1).
 
-| Server | When it is sent | Payload |
+### 1.4 Seed: `0x0807` NC_MISC_SEED_ACK (observed, *captured*)
+
+Every client-facing server sends the seed **unasked, right after accept**, as the raw 5 bytes `{04, 07 08, u16 seed}`;
+the server's decrypt index for that session starts at `seed % 499` (§1.3). The client never asks for it.
+
+| Server | Sent by (on accept) | Seed value |
 |---|---|---|
-| Login | right after accept (`FUN_00409610`) | `u16 seed` |
-| WM | right after accept (`FUN_00430550`) | `u16 seed` |
-| Zone | as the reply to client `0x0806 NC_MISC_SEED_REQ` (`sp_NC_MISC_SEED_REQ`, `FUN_00451a30`). No direct call from the accept path was found. | `u16 seed`, a rolling counter `< 499` |
+| Login | `LoginServer::ProcessConnect` (FUN_004022a0) → `CLoginClientSession::Send_NC_MISC_SEED_ACK` (FUN_00409610) | per-process counter `m_ClientSeed`: `rand()` after `srand(time)` at start (ctor FUN_00409680), then `(m_ClientSeed + 1) % 499` in `CLoginClientSessionManager::ActiveSession` (FUN_00409700) per accepted client (L01 §2) |
+| WM | `WorldManagerServer::ProcessConnect` (FUN_00405860) → `Send_NC_MISC_SEED_ACK` (FUN_00430550) | same scheme in `CWMClientSessionManager::ActiveSession` (FUN_00438a60; W05 §1.4, §4.3) |
+| Zone | `ZoneServer::zs_connect` (FUN_005aa840) → `ClientSession::Send_NC_MISC_SEED_ACK` (FUN_0045b120) | `ShinePlayer::so_EncSeedSet` (FUN_0054f660, vtable slot `0x2f4`): global `seed = seed + 1`, `0` once it reaches 499; also sets the player's decrypt index. So the first client of a zone process gets 1, then consecutive values (Z18 §1.3) |
 
-### 1.5 Heartbeat (observed)
+*(captured)* Login seeds 355–368 and WM seeds 264–271 rise by one per connection; zone seeds per process are 1, 2, 3 …
+(capture-validation §2.3).
 
-Client `0x0804 NC_MISC_HEARTBEAT_REQ` is answered with the bare `0x0805` (Login sends the raw bytes
-`02 05 08`). A `0x0805` received from the client is accepted and ignored. Whether the servers also start
-heartbeats themselves was not checked.
+The zone also registers client `0x0806 NC_MISC_SEED_REQ` (`sp_NC_MISC_SEED_REQ`, FUN_00451a30), which answers
+`0x0807` from a second counter `newseed` without moving the decrypt index (Z01 §5.1). The 2016 client never sends
+`0x0806` *(captured)*, and the zone's session filter lets it through only in a state normal play never reaches, so the
+path is dead (Z18 §1.3, original bug Z18-B2).
+
+### 1.5 Heartbeat (observed, *captured*)
+
+`0x0804 NC_MISC_HEARTBEAT_REQ` and `0x0805 NC_MISC_HEARTBEAT_ACK` are both empty. **The server starts them**: every
+server session (client and server links alike) runs a check per main-loop pass: no packet received for 30 s → send one
+`0x0804` (raw `02 04 08`); nothing at all received in the next 180 s → close the session. Any received packet resets
+the timer. A failed `0x0804` send closes the session at once.
+
+| Server | Check | Client-session notes |
+|---|---|---|
+| Login | `CheckHeartBeat` (FUN_00408f30; L01 §2) | a client before its login request (session mode 0 / 1) is closed for any `0x0804` / `0x0805` it sends, so a pre-login heartbeat cannot be answered (original bug L01-B11). Not reachable with the 2016 client: it opens the Login connection only when the login form is submitted and then polls `0x0C1B` every 10 s, so Login never sends it a heartbeat *(captured, capture-validation §16.2)* |
+| WM | `CWMBaseSession::CheckHeartBeat` (FUN_0042fda0), via `ProcHeartBeat` (FUN_00430160; W05 §1.5) | `0x0804` exactly 30.0 s after the last client packet, repeated 30 s after each answer; the client answers within ~1–12 ms; 7 min on the character list without a close *(captured, capture-validation §4.4, §16.2)* |
+| Zone | `ClientSession::CheckHeartBeat` (FUN_0045b110) → `ZoneBaseSession::CheckHeartBeat` (FUN_005a67c0; S02 §4.4, Z18 §1.4) | same 30 s / 180 s rule (the 300 the client override passes is ignored). The answer is accepted before `0x1803` too; during the first map load the client answers late (4.9 s), because its loader does not service the zone socket *(captured, capture-validation §5.5)* |
+
+A received `0x0804` is answered with a bare `0x0805` (Login: raw bytes `02 05 08`); a received `0x0805` is accepted and
+ignored. The 2016 client answers the server's `0x0804` with `0x0805` (`Net::ProcessNetMsg` FUN_006d2fa0, when its
+heartbeat flag is on) and was never seen sending `0x0804` itself *(captured)*. It also sends **unsolicited `0x0805` to
+the WM while it loads a map** (`World::LoadMap` FUN_006768c0 → FUN_006d2ef0, name *(pdb2017)*
+`NetMgr::SendHeartBeat2WorldMgrServer`), which keeps the WM session alive during long loads (capture-validation §4.4).
+Server ↔ server links use the same rule in both directions (capture-validation §7.1; `docs/pseudocode/README.md` §2.3).
 
 ---
 
@@ -207,8 +242,8 @@ The other 160 WM handlers (party, friends, guild, raid, chat channels, …) are 
 
 | Opcode | Dir | Layout | Notes |
 |---|---|---|---|
-| `0x0806` | C→S | – | `NC_MISC_SEED_REQ` |
-| `0x0807` | S→C | `u16 seed` | |
+| `0x0807` | S→C | `u16 seed` | sent on accept (§1.4) *(captured)* |
+| `0x0806` | C→S | – | `NC_MISC_SEED_REQ`: registered, never sent by the 2016 client; dead path (§1.4) |
 | `0x1801` | C→S | `u16 wm_handle` @0, `char char_id[20]` @2, `u8 shn_md5[49][32]` @22 | `NC_MAP_LOGIN_REQ`. Each 32-byte entry is compared with the server's checksum of one SHN data file |
 | `0x1804` | S→C | `u16 error; u8 index` | map login failed. `0x0147` = SHN checksum mismatch, `index` names the file. Also sent on `0x101E NC_CHAR_ZONE_CHARDATAFAIL_ACK` |
 | `0x1802` | S→C | 242 bytes | `NC_MAP_LOGIN_ACK`, sent in `wms_NC_CHAR_ZONE_CHARDATA_ACK` once WM delivers the character. Layout not yet decoded |
@@ -256,7 +291,7 @@ OUT=$OUT $T/fn.sh login 406680              # print one decompiled function
 
 | Item | Basis |
 |---|---|
-| Framing, opcode split, XOR table and index rule, seed packets | observed, cross-checked in 3 binaries |
+| Framing, opcode split, XOR table and index rule, seed packets, heartbeats | observed, cross-checked in 3 binaries, *captured* on all three servers (capture-validation §2) |
 | Handler ↔ opcode tables | observed (registration calls). 597/597 zone and 220/223 `sp_` handler names matched |
 | Names marked "handler" | the opcode's own handler string in some binary |
 | Names marked † | inferred: REQ+1 = ACK, or a log string. Can be wrong (e.g. `0x0C65` is the version check, not `RETURN_CHECK_ACK`) |
@@ -285,8 +320,11 @@ reads the cipher table from Appendix A below, so keep that heading and hex block
 - `0x1802` (map-login ACK, 242 B): handle, stat pairs and position are known. Bytes 2–17 and 146–169 are
   unnamed. The initial-state burst after `0x1803` has generated layouts but no names.
 - `0x0C0C` offset 17–18 (probably the WM port) is not written in the observed path.
-- Whether the zone also sends the seed unprompted on accept. Only the `0x0806` path was found.
-- Any session-state gating in WM and Zone (only Login's was traced).
+- ~~Whether the zone also sends the seed unprompted on accept~~: it does (§1.4, *captured*).
+- Session-state gating in WM and Zone is documented in the pseudocode (WM: W01 §2 / §3.2 and W05 §4.3 `m_SessionMode`;
+  zone: Z18 §1.3 session filter), not summarised here.
+- Which of the client's 8 `0x0805` points in `World::LoadMap` fire for which map (two first loads sent none;
+  capture-validation §4.4).
 - Names for most WM- and Login-only opcodes. These binaries carry no name strings for them; the names
   would have to come from the client.
 - Server → client messages sent from timers or other non-handler code (combat ticks, mob AI, broadcasts)
