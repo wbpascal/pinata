@@ -154,6 +154,9 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   layers differ (P02-B27) and the values −1 / 70000 being accepted.
   (7) not recorded (the capture ends before it). None of the "Disproved by" events occurred; the first and the last
   of them were not reached.
+- **Open after batch 3 (X05):** every "not reached" above is a step of **scenario 45** (walk, sit, emote stop, shout
+  out of sight, unknown receiver, `0x242E`, `0x2438`, leaving sight); `0x2022` by a crafted packet is T19 of
+  scenario 41. Scenario 14 itself needs no second recording.
 
 ### 15. Party across two zones
 
@@ -336,6 +339,12 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   (11) **confirmed**: `0x300A {0x34A}` without a DB request and "Failed to obtain the item."; a full inventory gives
   `0x300A {0x346}` "Inventory is full." (§19.4). `&makeitem` and the drop accept `KQ_Ice01`.
   (12) see the result lines of §8.17, §8.14 and §9.4 (run with Test1235). None of the "Disproved by" events occurred.
+- **Open after batch 3 (X05):** **scenario 46** (no DB change: `0x3431` / `0x3432` by a drag onto a fuller stack,
+  buy-back onto an empty cell `0x34B9` / `0x34BA`, the refusals `0x366B`–`0x366D` and `0x5005`, and the SQL
+  snapshots for the character that plays); **scenario 47** (DB and table setups: `0x3424` / `0x3427`, `0x3443`,
+  `0x366E`, S16 with fame or coins, X3's sell / use / move, S13 worn, ridden, used); test-client cases **T16–T18**
+  of scenario 41 for what the 2016 client never sends (`0x3028`, a split of 0 or of the whole lot `{0x442}`,
+  `0x5007` at full HP → `0x5006`, soul-stone numbers over the limit).
 
 ### 22. Upgrade, gems, random options, endurance
 
@@ -401,6 +410,11 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   makes the zone send `0x482B`, which the client ignores (Z03 §7.3, Z03-B3).
 - **Disproved by:** `0x105D` on the wire; a DB request for the refused fourth point; a buff that survives its
   reset action or falls to another one; a toggle skill still on after the link.
+- **State after batch 3 (X05):** not captured. `re-data/captures/26_11_15_24_skills-abstates-stat-points.md` holds
+  the blank notes form only, no pcapng (capture-validation §1). The scenario stands as written and is the next one to
+  record; its typed setups exist (`tools/capture/24`: `24-prep.sql`, `24-setupA.txt`, `24-setupB.txt`,
+  `24-items.txt`, `24-cleanup.sql`; A is X24A, a level-100 Gladiator GM, with the toggle skill 7300 and the
+  ground-target skill 452). No step or prediction changed: nothing recorded since touches them.
 
 ### 25. Pet
 
@@ -628,6 +642,8 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   a packet. Not predicted: AccountDB `0x140D` / `0x140E`, `0x9424` → `0x9425`, `0x10B2` to every zone (§16.1).
   (6) **confirmed**: `0x0804` 30.0 s after the last client packet, 12 times in 7 minutes, no close (§16.2).
   None of the "Disproved by" events occurred.
+- **Open after batch 3 (X05):** T15 of scenario 41 (the silent Login connection) and **scenario 48** (why the first
+  WM start of `s37` ended, capture-validation §17.6: the WM's `Msg` log next to a stop / start).
 
 ### 38. Session loss, kicks, back to character select
 
@@ -706,6 +722,141 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   the new request is refused by the rejoin date (W04 §12.1: the dates are kept, W04-B34).
 - **Disproved by:** a credit other than price / 10; a second promise accepted inside the rejoin time.
 
+### 45. Second client in sight II: what `s14` left open (added by X05)
+
+- **Claims:** Z02 §2.2 (walk relay `0x2017` → `0x2018` from a player), §3.2 (shout to the whole map instance), §4
+  (sit as an emote, emote stop `0x2022` / `0x2023`), W04 §2.1 (`0x200E`), Z03 §3.5 (`0x242E`), Z03 §5 cast abort
+  (`0x2438`). Every one is a "not reached" of §3.14's result line (capture-validation §18.8, §15).
+- **Setup:** as 14: A (GM, above the shout level) and B on one map, in sight (RouN, `MapInfo.Sight` 1600). B owns a
+  skill with a cast bar; a mob that attacks stands near. No `&hide` / `&dimension` in this run (their appear /
+  delete storm, P02-B27, hides the packets looked for).
+- **Steps:** (1) B switches to walking, walks five steps, switches back, runs two steps. (2) B uses the action
+  "Sit", 5 s later "Stand". (3) B plays a dance emote and ends it three ways, 10 s apart, the notes saying which:
+  the same emote again, Esc, a step. (4) B runs out of A's sight on the same map (more than 1600 units; A no longer
+  sees B); A shouts; B runs back. (5) A whispers with `X45Nobody` (no such character) as the **receiver**.
+  (6) B lets a mob hit it three times next to A without hitting back, then kills it. (7) B starts the cast and steps
+  before the bar is full; then casts once to the end. (8) B walks out of A's sight and stops (step 7 of 14).
+- **Prediction:** (1) B `0x2017 {from, to}` → A `0x2018 NC_ACT_SOMEONEMOVEWALK_CMD` for B's handle, nothing to B;
+  the run steps `0x2019` → `0x201A` as captured. (2) B `0x2020 {6}` → `0x2021 {B, 6}` to A **and** B, then `{7}`
+  *(inferred from the captured stand)*; no `0x2009`. (3) for at least one of the three ways B sends `0x2022
+  {emoticonid, emoticonframe}` → A `0x2023 {B, emoticonid, emoticonframe}` (Z02 §4); if none of them sends it, the
+  2016 client has no stop and the packet is test-client case T19. (4) `0x201F` reaches B out of sight (the whole map
+  instance, `so_AllInMap1`). (5) WM → A `0x200E {ErrorType 0x0F69, receiver "X45Nobody"}` (25 bytes raw); no
+  `0x200D`, no `0x200F`, no `0x6006` to A's zone. (6) A gets `0x242E NC_BAT_SOMEONEBASH_HIT_CMD {attacker = mob,
+  defender = B, …}` per hit that lands (the mob's `so_Bash`), B gets `0x242D`. (7) B `0x2444` → `0x2438 {caster B}`
+  to A and B, then B `0x2445 {0x20E8}`; the full cast gives A `0x244F` as captured. (8) A gets `0x1805` for B's
+  handle when B leaves the sight range *(inferred: the removal packet `&hide` produced in `s14`)*.
+- **Disproved by:** `0x2018` also to B; a `0x2009` for the sit; a shout that stops at sight range; `0x200F` or
+  `0x6006` for the unknown receiver, or another `ErrorType`; `0x2449` instead of `0x242E` for a mob's hit; a cast
+  abort without `0x2438` to A.
+
+### 46. Items III: what `s21` left open, no DB change (added by X05)
+
+- **Claims:** Z04 §2.4, §2.5 (buy-back onto an empty cell, the three request-side refusals), §4.1
+  (`irm_Split_N_Merge` @ FUN_00532a20), §13.1 (`0x5005`); Z05 §2.2, §4; D03 §2.2 (`0x34B9` @ FUN_0042e060), §3.3
+  (`0x3431` @ FUN_0040c000) and its SQL checks for **the character that plays** (capture-validation §19.8: the
+  `s21` snapshots listed another one).
+- **Setup:** one client, GM character `<Char>`; `tools/capture/21/21-server.ps1 snapshot-before -Char <Char>` before
+  the login and `snapshot-after` after the logout (the script prints the name first: compare it with the notes).
+  `&makeitem BestLowHpPotion -l40` and `-l30` (`MaxLot` 50), `&makeitem LeatherBoots` (not stackable), one item whose
+  `ItemInfo.BuyDemandLv` is above the character's level and whose `SellPrice` is not 0 (2016 data: `NormalEar117`,
+  117; if `&makeitem` refuses it, any row of
+  `python3 -I tools/protocol-re/shn.py …/ItemInfo.shn` with a higher `BuyDemandLv` than the level), one weapon that
+  sells for more than the merchant's cheapest item costs.
+- **Steps:** (1) drag the lot-30 stack onto the lot-40 stack; then the rest (20) onto the full stack. (2) at the
+  storage keeper deposit a stack (for D03 check 3) and **all** cen. (3) at one item merchant, without clicking any
+  other NPC until step 7 (P02-B31): sell the boots, buy them back. (4) sell the `BuyDemandLv` item, try to buy it
+  back. (5) sell the weapon, buy the merchant's cheapest item, try to buy the weapon back. (6) `&makeitem` until the
+  inventory is full (no `0x3402` any more), sell the boots, `&makeitem` once more, try to buy the boots back.
+  (7) deposit the cen the sales brought (storage keeper), then at the healer with 0 cen: buy one HP soul stone; withdraw the cen
+  (storage keeper), back at the healer buy HP stones up to the number the window allows, then ask for more if the
+  client lets the number be typed.
+- **Prediction:** (1) `0x300B` → D `0x3431 {MoveLot 10, nFromItemLot 30, nToItemLot 40}` → `0x3432 {…, 10, 20, 50}`
+  → `0x300C {0x241}`, the two cells at 20 and 50; G `0x0456`. The second drag: `0x3431 {MoveLot 0}` (the zone has
+  no check for a full target, FUN_00532a20 computes `MaxLot − b`) → `0x3433 {0x412}` → `0x300C {0x412}` "Failed to
+  move the item.". (2) as captured (§3.21 result 8); the after-snapshot holds the stack with `nStorageType = 6`,
+  `nOwner = userNo` (D03 check 3). (3) sale `0x3422` → `0x3423` → `0x305C`, `0x3005 {0x381}`; buy-back `0x3059` → D
+  `0x34B9 NC_ITEMDB_REPURCHASE_ALL_REQ` (a **new** item key made by the zone, `nSellItemKey` = the sold one) →
+  `0x34BA {0x3668}` → `0x305D`, `0x305A {0x3668}`, the cell by `0x3001`; G `0x07FD {0x7F8}`, `0xC815`; the
+  after-snapshot has the boots under the new key only. (4) `0x3059` → **`0x3004 {0x366B}`** (a BUY_ACK, Z04-B2), no
+  `0x305A`, no DB request, no text *(inferred: the buy handler has texts for its own codes only, Z05 §2.4)*. (5)
+  `0x305A {0x366C}` "Not enough money to buy the item.", no DB request. (6) `0x305A {0x366D}` "Inventory is full.",
+  no DB request. (7) with 0 cen `0x5005 NC_SOULSTONE_BUYFAIL_ACK {0x743}`; over the stock limit `{0x742}`; no D
+  `0x3441` for either *(the order of the two checks is inferred, Z04 §13.1)*. If the client refuses both itself, the
+  packets are test-client case T18.
+- **Disproved by:** a refusal of the second drag by the zone (no `0x3431`); `0x34BB` for the boots; the sold key
+  coming back; `0x305A {0x366B}`; a DB request in (4)–(7); a refusal in (4)–(6) that removes the entry from the
+  repurchase list (`0x305D`).
+
+### 47. Items IV: the zone and the DB disagree (added by X05)
+
+- **Claims:** D03 §2.2 (`0x3424` / `0x3427`, `0x366E`), §2.4 (`0x3443 {0x744}`), §1.2 `ItemBuy_Create` (D03-B1);
+  Z05 §2.2 (Z05-B1), §2.4; Z04 §2.4 (`0x385`), §6.1 (`0x702`), §4.1 with an over-full stack; Z24 §6.7
+  (`sp_ChargedItemLimitCheck` @ FUN_00451530 for a worn item and a ridden mount). All are DB or table setups: one
+  short capture per step, each named in the notes, the scripts of `tools/capture/21` run with `-Char <Char>`.
+- **Setup:** S12, S17, S16, X3, S13 as named per step. The character stays in the game for S12 and S17 (that is the
+  point) and logs out right after each, before the restore.
+- **Steps and predictions:**
+  (1) **S12, whole stack.** A lot-10 stack; S12 as written (DB lot 9); sell the whole stack. Z → D `0x3422 {nLot
+  10}` → `0x3424 NC_ITEMDB_SELLALLFAIL_ACK {0x389}` (stored lot < `nLot`) → C **`0x3005 {the player's object
+  handle}`** (Z05-B1), text "Failed to sell the item."; no money, no `0x305C`, the cell keeps 10.
+  (2) **S12, part of a stack.** Run S12's `UPDATE` with `- 3` (DB lot 7, the zone shows 10); sell 1. Z → D `0x3425`
+  (remaining lot 9) → `0x3427 NC_ITEMDB_SELLLOTFAIL_ACK {0x38D}` (stored lot < remaining lot) → C `0x3005 {object
+  handle}` as in (1). A DB lot only 1 lower passes (9 is not < 9): the sale succeeds and the DB keeps 9.
+  (3) **S17, money.** With the DB money at 0 and cen in the client: buy one HP soul stone → D `0x3441` → `0x3443
+  {0x744}` → C `0x3004 {0x744}`, no `0x5003`, no text; sell the boots and buy them back → D `0x34B9` → `0x34BA
+  {0x366E}` → C `0x305A {0x366E}`, no text (D03-B2), no `0x305D` *(inferred: the list entry is removed by the lock's
+  apply only)*; with a stack of the item in the inventory the same through `0x34BB` → `0x34BC {0x366E}`. The sale
+  itself succeeds (`p_Char_MoneyAdd`).
+  (4) **S16 with fame.** A character with fame (each `&levelup` level adds its number, Z11 §7.3) buys, with the
+  trigger installed, an item with `BuyFame` > 0 (2016 data: 106 rows, e.g. `MightySoul01`, 1200) whose class writes
+  an option row; note `tCharacter.nFame` before and after. Wire as §8.17's result (`0x340C {0x206}` → `0x3004
+  {0x206}`); DB: **`nFame` lower by `BuyFame`**, cen unchanged, no item row (D03-B1). If the purchase succeeds, the
+  class writes no option row: take another item. The gamble-coin form is the same with a `LuckyCapsule*` item
+  (`BuyGBCoin` 1000 / 5000, the 4 coin rows; coins by S9) through the capsule purchase `0x34A0`: `tGambleCoin.nCoin`
+  lower.
+  (5) **X3, the over-full stack** (§9.4 steps 1–3 done: 50 in the cell, `MaxLot` 49, a second stack of 10): sell
+  one of the 50 → C `0x3005 {0x385}`, no DB request; use one → C `0x3016 {0x702, itemid, 9}`, no DB request; drag
+  the 10 onto the 50 → D `0x3431` with **`MoveLot 0xFFFF`** (`MaxLot − b` = −1 as a u16) → `0x3433 {0x40D}` → C
+  `0x300C {0x40D}` "Failed to move the item."; drag the 50 onto the 10 → `0x3431 {MoveLot 39}` → with the Character
+  server still on the old table (X3 restarts the zones only) `0x3432 {…, 39, 11, 49}`, with it restarted on the new
+  one `0x3433 {0x40D}` (stored 50 > `MaxLot`): the notes say whether the Character server was restarted.
+  (6) **S13, worn.** S13 on an item in the equipment (`nStorageType` 8; pick it from S13's list), login, stand in
+  B's sight for two minutes. At the first minute check D `0x3459` for the key and the equipment cell emptied on
+  `0x345A`; what B sees of it (an unequip packet or nothing until the next brief info) and whether A's stats are
+  sent again was not read: note both.
+  (7) **S13, ridden mount.** S13 on a mount (option row 1601); login and mount within the first minute; ride for
+  three minutes; dismount. No `0x3459` while riding (class 23 and mode 6 are skipped); `0x3459` at the first minute
+  check after the dismount. That the expired mount can be mounted at all is *(inferred: Z04 §6.1 names no end-time
+  check)*.
+  (8) **S13, used before the check.** S13 on a timed item that can be used (action item, option row 1900); use it
+  within the first minute. `0x3016 {0x700}` *(inferred as in 7)*, and the item still goes at the minute check.
+- **Disproved by:** (1), (2) a `0x3005` with the DB code (0x389 / 0x38D) instead of the handle, or a `0x305C`; (3) a
+  `0x5003`, a `0x305D`, or any client text; (4) `nFame` unchanged (D03-B1 is wrong) or the item kept; (5) a DB
+  request for the sale or the use, a zone-side refusal of the first drag, or a disconnect `0x68C`; (6)–(8) a
+  refusal at the mount or the use that names the end time, a `0x3459` while riding, or the worn item surviving two
+  minutes.
+
+### 48. WM stop and start with its log (added by X05)
+
+- **Claims:** W05 §1.3 (`ProcessLink` @ FUN_00404bf0 stops the WM when `Listen_Zone` / `Listen_Client` fails), §1.6
+  (`ViewStopInfo` @ FUN_00403d40); capture-validation §17.6: the first WM start of `s37` ended 1.09 s after its
+  CharDB load and the wire cannot tell why.
+- **Setup:** server PC only, no client; the link capture running; note the wall-clock time of every step. Keep the
+  WM's `.\DebugMessage\Msg_<date>.txt`, `Assert<date><hh>.txt` and `ExitLog<date><hh>.txt` of the hour (W05 §3)
+  next to the capture.
+- **Steps:** (1) stop the WM the way it was stopped in `s37` (service stop or console close: note which). (2) start
+  it; wait for the zones to register. (3) stop it; occupy the WM's client port with another listener
+  (`[System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, <port of the WM's client row in
+  ServerInfo>).Start()` in a PowerShell that stays open); start the WM. (4) close that PowerShell, start the WM again.
+- **Prediction:** (1) the `ProcessStop` close order of §17.1 and a stop time in the `Msg` log (`ViewStopInfo`); no
+  "FAILED LISTEN" line. (2) the start of §17 up to `0x9804`, then the zone registrations. (3) the same bytes up to
+  `0x9804`, then the WM closes all its links about 1 s later without any zone or client connection (the `s37`
+  pattern), and the `Msg` log has "*FAILED LISTEN ADD, IP=…:<port>, From=…*". (4) as (2).
+- **Disproved by:** a WM that runs on in step 3 (the listen failure does not stop it, so `s37`'s first stop was the
+  operator's); no "FAILED LISTEN" text in any log file of step 3; a stop in step 3 at another point than after
+  `0x9804`.
+
 ### 41. Test client: crafted client packets
 
 These need a scripted client (framing and XOR-499 cipher of `docs/protocol/README.md`; a replay of a captured
@@ -728,6 +879,10 @@ login plus one crafted packet is enough). One connection per case: several end i
 | T13 | W04 §17.3 | `0x0840` loading-failure report | W→D `0x0841`, no answer | an answer |
 | T14 | X02-B6 (T10 of §3.4.1) | none (server-internal); listed for completeness: needs a tournament observer, scenario 43 | – | – |
 | T15 | L01 §1.6, L01-B11 (added by X05: scenario 37 step 1 cannot reach it, capture-validation §16.2) | to Login: connect, read the seed `0x0807`, send nothing, answer `0x0804` with `0x0805`; second connection: the same without answering; third: a replayed login (`0x0C65` … world list), then silence (no `0x0C1B`), answering `0x0804` | first: `0x0804` 30 s after the connect, and the `0x0805` answer closes the connection at once (the parser rejects it before the login request, L01-B11); second: `0x0804` at 30 s, close 180 s later; third: `0x0804` every 30 s, no close | no `0x0804`; the first connection staying open after its `0x0805`; a close in the third |
+| T16 | Z04 §7.2, Z04-B9 (added by X05: the 2016 client never sends `0x3028`, the four pages come at the open, capture-validation §20.1) | in game: `0x3028 {page 1}` with the storage closed; with the storage window open (after the keeper's menu) `{1}`, then `{16}` | closed: **`0x3007 {0x803}`** (the DROP_REQ number, Z04-B9), no DB request; open: Z → D `0x3444 {ref, page 1, userNo, 0}` and the page answer as at the open; `{16}`: `0x3C07 {0x804}` | a DB request with the storage closed; a refusal on another opcode than `0x3007` / `0x3C07` |
+| T17 | Z04 §4.2 (added by X05: the client offers 1 … lot − 1 only, capture-validation §19.3) | `0x300D` on a lot-10 stack into a free cell with lot 0; with lot 10 | `0x300E {0x442}` both times, no DB request | a `0x3434`; another code |
+| T18 | Z04 §13.1, §13.2 (added by X05: at full HP the client sends no `0x5007`, capture-validation §20.3; use only if scenario 46 step 7 was refused by the client) | at the healer: `0x5001 {number = limit + 1}`; with 0 cen `0x5001 {1}`; away from every NPC `0x5001 {1}`; in the field at full HP `0x5007` | `0x5005 {0x742}`; `{0x743}`; `{0x741}`; `0x5006` (empty); no DB request in any | a `0x3441`; a `0x5008` at full HP |
+| T19 | Z02 §4 (added by X05; use only if scenario 45 step 3 put no `0x2022` on the wire) | B in A's sight: `0x2022 {emoticonid of a dance, emoticonframe 5}`; `0x2022 {emoticonid 255, 0}` (no such `ActionViewInfo` row); then a third character walks into sight | A gets `0x2023 {B, emoticonid, 5}`, nothing to B; nothing for id 255; the newcomer's brief info of B (`0x1C06`) carries the emote id and frame 5 | a `0x2023` to the sender or for the unknown id |
 
 ### 42. Races: drop menu, two money pick-ups, link with a dead WM session
 
@@ -1277,6 +1432,10 @@ DROP TABLE dbo.X02_save_12;
 
 Storage type 9 = inventory (D03 knowledge, check 4); `nStorage` is the cell.
 
+*(X05)* Scenario 47 uses it twice: as written (`- 1`) before the sale of the **whole** stack (`0x3424`), and with
+`- 3` in the `UPDATE` before the sale of **one** item (`0x3427`: the Character server refuses only when the stored
+lot is below the lot the zone says remains, D03 §2.2, so `- 1` passes a sale of one). Log out before the restore.
+
 ### 8.14 S13: an item past its end time
 
 The end time is the class's `deletetime` option row: type 417 (amulet), 521 (weapon), 620 / 720 / 820 (armor,
@@ -1313,6 +1472,12 @@ Result (P02 batch 3, `s21c`, capture-validation §21.2; run for Test1235 with `t
 unchanged; at the WM's first minute change `0x0821` after the map login (59.1 s later) the zone sent `0x3459` with
 the one key, and the client's `0x3001` emptied the cell on the `0x345A`. No text, no GameLog row. Neither "Disproved
 by" event occurred. Not tried: wearing or using the item before that check.
+
+Open after batch 3 *(X05)*: three more runs of this setup, scenario 47 steps 6–8: the item **worn** (pick a row
+with `nStorageType = 8` from the list above), a **mount** (option row 1601) ridden across the minute check, and a
+timed item **used** inside the first minute. `tools/capture/21/21-s13.sql` serves none of them (it takes a Leather
+Boots in the inventory, `nStorageType = 9`, row 820): run the SQL above by hand with the key picked from its list,
+after a logout that saved the item where the run needs it (worn: equip it first).
 
 ### 8.15 S14: a deleted character
 
@@ -1389,6 +1554,35 @@ cen): **confirmed for the item and the cen**: `0x340A` → `0x340C {0x206}` → 
 `0x1033`, no GameLog row; the DB balance of the next logins is unchanged *(the refund itself is not on the wire)* and
 no boots row is left. The client shows nothing for 0x206. **Fame / coins not reached** (a cen-only item): D03-B1
 is untested.
+
+Open after batch 3 *(X05)*: the fame and the gamble-coin purchase, scenario 47 step 4. Items: `ItemInfo.shn` rows
+with `BuyFame` > 0 (106 in the 2016 data, e.g. `MightySoul01`, 1200 fame) or `BuyGBCoin` > 0 (4: the `LuckyCapsule*`
+rows); the trigger fires only if the item's class writes an option row.
+
+### 8.18 S17: the DB money lowered under an online owner (added by X05)
+
+The reverse of S2's rule: the character **stays in the game**, so the zone still holds the old amount and lets a
+purchase through, and `p_Char_MoneySub` refuses it (*(db-backup)*: `@nRet = 0` when the balance would go below 0).
+Used by scenario 47 step 3.
+
+```sql
+USE w00_Character;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+IF @c IS NULL RAISERROR('character not found', 16, 1)
+ELSE BEGIN
+    SELECT nCharNo, nMoney INTO dbo.X05_save_17 FROM tCharacter WHERE nCharNo = @c;
+    UPDATE tCharacter SET nMoney = 0 WHERE nCharNo = @c;
+END
+-- restore: with the account at the login screen (the sales of the test have added to the row since; this
+-- puts back the amount saved before it)
+UPDATE c SET nMoney = s.nMoney FROM tCharacter c JOIN dbo.X05_save_17 s ON s.nCharNo = c.nCharNo;
+DROP TABLE dbo.X05_save_17;
+```
+
+Prediction: every DB-side debit fails while the zone-side check passes: `0x3443 {0x744}` for a soul stone, `0x34BA`
+/ `0x34BC {0x366E}` for a buy-back, `0x340C` / `0x340F` for an NPC purchase (D03 §2.1's "not enough" code; not
+predicted further). Credits succeed (`p_Char_MoneyAdd`). Disproved by: a purchase that goes through. Not verified
+here: no SQL Server on the analysis machine (as §8.1).
 
 ## 9. Table and config experiments (X1–X7)
 
@@ -1479,6 +1673,14 @@ refusal at login or at the pick-up ("no check" holds): the stack loads with 50 a
 10 did **not** merge: `so_ply_PickupItem` merges only when `cell.lot + picked ≤ MaxLot` (no negative free amount is
 computed), so the 10 went into an empty cell with `0x341C` → `0x341D` → `0x300A {0x341}`. Not tried: selling, using
 and moving a stack onto the over-full one.
+
+Open after batch 3 *(X05)*: steps 4–7 on the same changed table, predictions in scenario 47 step 5.
+
+4. Sell one item of the over-full stack to an item merchant.
+5. Use one item of it.
+6. Drag the lot-10 stack onto the over-full one.
+7. Drag the over-full stack onto the lot-10 one. Note whether the Character server was restarted with the changed
+   `ItemInfo.shn` (it checks `MaxLot` itself, D03 §3.3).
 
 ### 9.5 X4: abstates removed by an action (read only)
 
