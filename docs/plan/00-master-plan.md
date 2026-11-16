@@ -146,6 +146,8 @@ The DB items (D01–D05) don't depend on the zone/WM items and can fill gaps in 
 | [X03](items/X03.md) | Integration update: X02's corrections and the bugs of X02 and its follow-ups into the README register and the superseded-statements list (added by X02) | X01, X02; Z31, Z32, W06, D08 (soft) |
 | [X04](items/X04.md) | Integration update: P02's capture batches 2 and 3 (corrections, bugs P02-B5 … B32, captured evidence) into the README register and the superseded-statements list (added by P02) | X01, P02; X03 (soft: not at the same time) |
 | [X05](items/X05.md) | Capture scenarios and ratings after capture batch 3: result lines, fixed scenario texts, scenarios for what is still open, confidence re-rating (X02's recurring re-run, added by P02) | P02 (batch 3), X02 |
+| [X06](items/X06.md) | Integration update: P02's capture batch 4 (corrections, bugs P02-B33 … B40, captured evidence) into the README register, the superseded-statements list and the sequence index (added by P02) | X04, P02 (batch 4) |
+| [X07](items/X07.md) | Capture scenarios and ratings after capture batch 4: result lines for scenarios 24 / 37 / 38, fixed scenario texts, scenarios for what is still open, confidence re-rating (X02's recurring re-run, added by P02) | P02 (batch 4), X05 |
 
 Exact handler counts and line sizes per item: `docs/plan/items/_summary.json` and the scope table at the top
 of each item file.
@@ -170,6 +172,7 @@ follow-up session.
 6. X02 → user records its scenarios → P02 → X02 again (repeat until the low ratings are gone or not worth a capture)
 7. The follow-ups X02 created, any order: Z31, Z32, W06, D08; then X03 for the register and the corrections
 8. X04 (P02's batches 2–3 into the README; after X03 or at least not alongside it) and X05 (X02's re-run after batch 3) → user records the new scenarios → P02 again
+9. X06 (P02's batch 4 into the README; after X04) and X07 (X02's re-run after batch 4) → user records the new scenarios → P02 again
 
 Large items (Z04, Z05, Z08, D03, D04) will probably need two or three sessions each. Starting a new session
 with the same plan file resumes from the status file.

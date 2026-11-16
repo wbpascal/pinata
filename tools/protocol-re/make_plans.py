@@ -1450,6 +1450,79 @@ ITEMS = [
       done="Every recorded batch-3 scenario has a result line; every §15 row naming X05 maps to a scenario number or a stated "
            "reason in `docs/knowledge/X05.md`; the §13 scenario-text rows are fixed; confidence ratings re-run after "
            "batch 3."),
+ dict(id="X06", phase=3, title="Integration update: P02's capture batch 4 (corrections, bugs P02-B33 … B40, captured "
+                               "evidence) into the README register and the superseded-statements list (added by P02)",
+      out="docs/pseudocode/README.md + docs/knowledge/X06.md", scope=[],
+      deps=["X04", "P02 (batch 4)"],
+      goal="X04 brought P02's batches 2 and 3 into `docs/pseudocode/README.md` (superseded statements §5, bug register §6, "
+           "sequence index §3) and is done. Batch 4 (captures `s37b`, `s38`, `s24`; capture-validation §22–§25) added "
+           "P02-B33 … B40, 13 correction rows for done items (capture-validation §13, status \"batch-4 follow-up\" with "
+           "an owner other than X02: W01 §3.3 / §6.2 ×2, W01 / Z01 quit, Z01 §8.3 Kickout timer, Z01 §8.4 auto-save, "
+           "W01 / D02 `0x1037`, Z03 §9.1 `0x4812`, Z11 §4.4 ×2, Z23 §2.4, Z09 §23.9 / Z22 §10.7, Z03 §7.3), captured "
+           "evidence for other items' bugs (§12 second table, rows citing §22–§25) and 21 confirmed or corrected flows "
+           "(§11 rows from \"Character create refused\" on). Bring the README up to date with batch 4, as X04 did for "
+           "batches 2–3. This item edits X01's README sections in place; it does not touch the owners' pseudocode.",
+      steps=["Read capture-validation §11 (batch-4 rows), §12, §13 (rows with status \"batch-4 follow-up\") and the "
+             "\"(batch 4)\" rows of the Corrections table in `docs/knowledge/P02.md` (outline with `sect.py`, then the "
+             "sections); do not re-read code: P02's rows give the `@ FUN_…` and the evidence.",
+             "Superseded statements (README §5): one row per §13 batch-4 row whose owner is not X02, in §5's row format "
+             "(owner document and §, old statement, correct statement with `@ FUN_…`, source `P02; capture-validation "
+             "§n`). The row \"P02 own (batch 4)\" of the knowledge table corrects P02's own §22.5 / §23.3 (already fixed "
+             "there): no README row unless the README cites the old wording.",
+             "Bug register (README §6): add P02-B33 … P02-B40 from capture-validation §12 (first table) in the register's "
+             "row format; P02-B35 includes its extensions (§23.3 kicks inside the logout window, §25.9 quit variants). For "
+             "each §12 second-table row citing §22–§25 (D04-B13, P02-B28, D03-B6, Z11-B32, D03-B11, Z07-B2, P02-B36 / "
+             "D04-B13) set that entry's evidence to *(captured)* with the §.",
+             "Sequence index (README §3): add *(captured)* and the capture-validation § to the steps §11's batch-4 rows "
+             "confirm (create refusal, both renames, tutorial skip, zone down, back to select, quit, zone connection "
+             "lost, zone kill, skill book, empower, stat points, reset capsules, skill saves, cast abort, ground target, "
+             "toggle, abstate reset, damage over time, death and revive by skill), and apply the corrected ones (W01 §5.1 "
+             "/ Z01 §8.1 quit with four saves, Z01 §8.3 the 10-s Kickout timer and StoreType 3, Z01 §8.4 10-min "
+             "auto-save).",
+             "Check every README citation of capture-validation still points at the right section (batch 4 put §22–§25 "
+             "before §11; §11–§15 kept their numbers).",
+             "Run `tools/protocol-re/regen.sh`. Record per README table how many rows were added or changed, and every "
+             "§13 row left out with the reason, in `docs/knowledge/X06.md`."],
+      done="Every capture-validation §13 batch-4 row not owned by X02 has a README §5 row or a stated reason in "
+           "`docs/knowledge/X06.md`; P02-B33 … B40 are in the register; the batch-4 §12 second-table entries carry "
+           "*(captured)*; the batch-4 §11 flows are marked in README §3."),
+ dict(id="X07", phase=3, title="Capture scenarios and ratings after capture batch 4: X02's recurring re-run (added by P02)",
+      out="docs/plan/capture-scenarios.md + docs/review/confidence.md (both updated in place) + docs/knowledge/X07.md",
+      scope=[], deps=["P02 (batch 4)", "X05"],
+      goal="X05 re-ran X02 after capture batch 3 and is done. The fourth batch recorded scenario 24 (skills, abstates, stat "
+           "points), the character-select steps of scenario 37 (`s37b`: create and rename refusals, rename right, zones "
+           "down) and scenario 38 (session loss, kicks, zone kills). P02 checked them (capture-validation §22–§25), found "
+           "scenario notes that did not match what was recorded (§13 rows owned by X02, \"batch-4 follow-up\") and "
+           "listed what is still open (§14 bullets starting \"Batch 4\", §15 rows naming X07). Do X02's re-run for "
+           "batch 4: result lines, fixed scenario texts, scenarios for what is still open, ratings. This item edits "
+           "X02's two output files in place; it does not touch the owners' pseudocode.",
+      steps=["Read capture-validation §1 (batch-4 rows), the §13 rows owned by X02 with status \"batch-4 follow-up\" "
+             "(4 rows: `s37b` step 2, `s38` steps 1–6, `s24` start / steps 1–3, `s24` steps 4–8), the §14 bullets "
+             "starting \"Batch 4\" and the §15 rows naming X07 (outline with `sect.py`); do not re-derive them.",
+             "Results: under scenarios 24, 37 and 38 (`capture-scenarios.md` §3.24, §3.37, §3.38) add a line \"Result "
+             "(P02 batch 4)\": each prediction confirmed / disproved / not reached, with the capture-validation §; "
+             "replace scenario 24's \"notes but no capture\" state line.",
+             "Fix the scenario texts §13 names: the maintenance message of `s37b` step 2 comes from the tutorial skip "
+             "(P02-B33), not the rename; `s38` step 2's in-game quit is missing and step 1 ran twice; the `s24` notes' "
+             "STR values (DB 63, no STR total for free points), `&resetabstated` (invalid command), `&sethp 1` (no "
+             "death; the poison stops at 1 HP), one Revive cast, assist without `0x243E`. Make the scripts copy their "
+             "`-db.txt` next to the capture (`s38` lost it).",
+             "Open after batch 4, one scenario (or a step added to an existing one) each, with setup, steps, prediction "
+             "and what disproves it: a second `0x1001` with the stale \"RouT\" copy (P02-B33); the 2016 "
+             "`p_Char_Rename` on a DB with the 2016 procedure (duplicate → 0xD1); a zone-initiated disconnect of a "
+             "logged-in player (`&kickout` or an SHN mismatch: `0x0C1A` with a real `usrregnum`); an empower request "
+             "with two learned steps of one line (Z23-B8: which `skill` the client names); the server refusals the "
+             "client pre-empted (`0x4814` 0x882–0x889, `0x105F` / `0x1065` 0xAC2–0xAC7, `0x9009` / `0x900A`); a toggle "
+             "kept on past its 23-min icon timer (P02-B39) and a toggle with a lower learned step (Z23-B1); the skill-save "
+             "columns against a DB snapshot with the cool-time column; `0x243E NC_BAT_ASSIST_REQ` (never sent by the "
+             "2016 client: state it if no client path sends it).",
+             "Ratings (`docs/review/confidence.md` §2): re-run `docs/plan/status/X02-rate.py`, then check by hand the "
+             "sections batch 4 confirms or corrects (§11 rows from \"Character create refused\" on, §13 batch-4 rows) and "
+             "update the hand ratings (`X02-rate-hand.py`).",
+             "Record the changes in `docs/knowledge/X07.md`."],
+      done="Scenarios 24, 37 and 38 have result lines for batch 4; the four §13 X02 rows of batch 4 are fixed in the "
+           "scenario texts; every §15 row naming X07 maps to a scenario number or a stated reason in "
+           "`docs/knowledge/X07.md`; confidence ratings re-run after batch 4."),
 ]
 
 

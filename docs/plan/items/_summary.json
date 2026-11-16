@@ -478,5 +478,21 @@
   "P02 (batch 3), X02",
   "\u2013",
   "\u2013"
+ ],
+ [
+  "X06",
+  3,
+  "Integration update: P02's capture batch 4 (corrections, bugs P02-B33 \u2026 B40, captured evidence) into the README register and the superseded-statements list (added by P02)",
+  "X04, P02 (batch 4)",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "X07",
+  3,
+  "Capture scenarios and ratings after capture batch 4: X02's recurring re-run (added by P02)",
+  "P02 (batch 4), X05",
+  "\u2013",
+  "\u2013"
  ]
 ]
