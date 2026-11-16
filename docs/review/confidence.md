@@ -148,8 +148,8 @@ absence means "not re-read by anyone", not "confirmed": P02 lists what the captu
 ## 2. Ratings per document
 
 State: re-run after capture batch 4 (X07 part 3). 49 pseudocode documents (2 249 headings: 152 high, 1 559 medium,
-212 low, 326 not rated) and 62 knowledge files (321 headings: 13 high, 240 medium, 28 low, 40 not rated; the 3 new
-ones are `X07.md` §1–§3); 123 hand rows. Hand passes: Login, WM, the shared library and the DB servers (X02 part 2),
+212 low, 326 not rated) and 62 knowledge files (324 headings: 13 high, 241 medium, 28 low, 42 not rated; the 6 new
+ones are `X07.md` §1–§6); 123 hand rows. Hand passes: Login, WM, the shared library and the DB servers (X02 part 2),
 the zone documents and the knowledge files (part 3), 4 rows set by the re-check of §3.2 (part 4: `Z01.md` §3 → high,
 §4 and §6 low → medium, `Z03.md` §2 stays medium), the pass after batch 3 (X05) and the pass after batch 4 (X07),
 both at the end of §2.2. Before the batch-4 re-run: 130 high, 1 570 medium, 223 low, 326 not rated over the same 49
@@ -518,9 +518,9 @@ Knowledge files (`docs/knowledge/`):
 | `X03.md` | X03 | 2 | 0 | 2 | 0 | 0 | 0 |
 | `X04.md` | X04 | 6 | 0 | 4 | 0 | 2 | 0 |
 | `X05.md` | X05 | 7 | 0 | 7 | 0 | 0 | 0 |
-| `X07.md` | X07 | 3 | 0 | 3 | 0 | 0 | 0 |
+| `X07.md` | X07 | 6 | 0 | 4 | 0 | 2 | 0 |
 | `K01.md` | K01 | 19 | 0 | 15 | 0 | 4 | 0 |
-| **total** | | 321 | 13 | 240 | 28 | 40 | 10 |
+| **total** | | 324 | 13 | 241 | 28 | 42 | 10 |
 
 ### 2.4 L00: `login-server.md`
 
@@ -3622,6 +3622,9 @@ Knowledge files (`docs/knowledge/`):
 | 1. Batch 4: result lines, corrected notes, run kits | medium | cap 10/13; R×1 | capture 0x1061, 0x482B |
 | 2. Open after batch 4: where each thing went | medium | cap 20/31; client×1; weak p171 | capture 0x1061, 0x1067, 0x900E, 0x900F |
 | 3. Ratings after batch 4 (`docs/review/confidence.md` §2) | medium | cap 2/3; R×1 | capture (class U) |
+| 4. Order of work and reach after batch 4 (`capture-scenarios.md… | medium | cap 27/33 | capture 0x1067, 0x1804, 0x243F, 0x900F |
+| 5. Left open, uncertain | – | open points / boundary list, no claim to rate |  |
+| 6. Coverage boundary | – | open points / boundary list, no claim to rate |  |
 
 ### 2.114 K01 knowledge: `docs/knowledge/K01.md`
 
