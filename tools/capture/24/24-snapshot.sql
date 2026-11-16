@@ -10,7 +10,10 @@ SELECT c.nCharNo, c.sID, c.bDeleted, c.nLevel, s.nClass, c.nAdminLevel, c.nMoney
        c.nHP, c.nSP, c.sLoginZone, c.nLoginZoneX, c.nLoginZoneY
   FROM tCharacter c JOIN tCharacterShape s ON s.nCharNo = c.nCharNo
  WHERE c.sID IN (N'$(CharA)', N'$(CharB)') AND c.bDeleted = 0;
-SELECT c.sID, k.nSkillNo, k.nSkillLevel, k.nSkillPowerDemage, k.nSkillPowerSP, k.nSkillPowerKeepTime, k.nSkillPowerCoolTime
+-- nSkillExp / nSkillWriteTime / nSkillCoolTime: the 0x4009 skill save (p_Skill_Set: mastery, save time in s since 1970,
+-- cooldown seconds left; D02 §6, Z23 §7), added by X07 for scenario 51 step 4.
+SELECT c.sID, k.nSkillNo, k.nSkillLevel, k.nSkillPowerDemage, k.nSkillPowerSP, k.nSkillPowerKeepTime, k.nSkillPowerCoolTime,
+       k.nSkillExp, k.nSkillWriteTime, k.nSkillCoolTime
   FROM tSkill k JOIN tCharacter c ON c.nCharNo = k.nCharNo
  WHERE c.sID IN (N'$(CharA)', N'$(CharB)') AND c.bDeleted = 0
  ORDER BY c.sID, k.nSkillNo;
