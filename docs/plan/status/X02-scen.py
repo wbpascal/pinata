@@ -113,7 +113,10 @@ SCEN = {
            0x080f, 0x0819, 0x081a, 0x0827, 0x0836) + R(0x0813, 0x0816)
          # T15-T22 (X05)
          + O(0x0804, 0x0805, 0x3028, 0x3007, 0x3c07, 0x300e, 0x5001, 0x5005, 0x5006, 0x5007, 0x2022, 0x2023,
-             0x101e, 0x1804, 0x104c, 0x2434, 0x2440, 0x0c66, 0x0c15)),
+             0x101e, 0x1804, 0x104c, 0x2434, 0x2440, 0x0c66, 0x0c15)
+         # T23-T25 (X07)
+         + R(0x4811, 0x4814) + O(0x0c1a, 0x0c17, 0x105c, 0x105f, 0x1061, 0x1062, 0x1067, 0x10d1, 0x10d2)
+         + R(0x243e, 0x243f)),
     42: ('Races: drop menu, two money pick-ups, link with a dead WM session', 10, '2 clients',
          R(0x3416, 0x341b) + R(0x3438, 0x343a) + O(0x180d, 0x180e)),
     43: ('OPTool listener (test tool)', 15, 'test tool',
@@ -136,10 +139,18 @@ SCEN = {
          + R(0x34b9, 0x34ba) + O(0x3059, 0x305a)),
     50: ('Timing with one clock and without delayed ACKs', 15, 'capture on the server PC, a registry change',
          O(0x7004, 0x700c, 0x700d, 0x7c06, 0x7c07, 0x1003, 0x0849, 0x080e)),
+    # 51-52: added by X07 after capture batch 4 (what s24 / s37b / s38 left open)
+    51: ('Skills II: what `s24` left open', 80, 'GM, 2 clients for steps 2 (heals) and 4, DB setup S21 for steps 6–7',
+         R(0x4801, 0x4804) + R(0x4811, 0x4814) + O(0x0c1a, 0x0c17) + R(0x245c, 0x245d) + O(0x2428, 0x2429, 0x1c18)
+         + R(0x4009, 0x400a) + O(0x103d) + R(0x9005, 0x900f)),
+    52: ('Character select and session II: what `s37b` / `s38` left open', 15,
+         'GM, 2 clients, DB setup S20, a zone restart',
+         R(0x1001, 0x1004) + R(0x1110, 0x1113) + R(0x1410, 0x1412) + O(0x0c1a, 0x0c17, 0x0c18, 0x2011, 0x1068)
+         + O(0x1801, 0x1804)),
 }
 
 # Recorded scenarios (capture batch): their row counts what the opcode set still leaves uncaptured.
-RECORDED = {14: 3, 21: 3, 37: 3}
+RECORDED = {14: 'batch 3', 21: 'batch 3', 37: 'batches 3 and 4', 24: 'batch 4', 38: 'batch 4'}
 
 # Not a scenario of its own: records that every scenario produces on the server links (README §3.13, §3.15).
 LINKS = D(1, 50, 16)
@@ -205,9 +216,9 @@ def analyse():
 # for the rebuild, then how early the feature comes, then capture cost. (when, [(scenario, why)]).
 PRIORITY = [
     ('before the rebuild starts', [
-        (38, 'the client-visible session state machine every server part sits on; W01 and L00 had the most errors here'),
-        (37, 'its refusal steps 3–6 not yet run (S10, S11, X6) finish the login side'),
-        (24, 'core zone data model (stats, abstates); Z03 is the worst-rated document and 24 has no capture'),
+        (37, 'its refusal steps 3–6 not yet run (S10, S11, X6) finish the login side; `s37b` ran only the character-select refusals'),
+        (52, 'closes the session paths `s37b` / `s38` left open: the stale tutorial copy, the zone-initiated kick with a real user number'),
+        (51, 'the skill paths the client reached only with one learned step: empower wrap, toggle steps, skill-save columns'),
     ]),
     ('early: core gameplay', [
         (46, 'closes what 21 left open on stack moves and buy-back'),
@@ -252,6 +263,8 @@ PRIORITY = [
     ('recorded', [
         (14, 'continued by 45'),
         (21, 'continued by 46, 47, 49'),
+        (24, 'continued by 51 (refusals the client pre-empted: T23, T24, T25 in 41)'),
+        (38, 'continued by 52'),
     ]),
 ]
 
@@ -266,7 +279,7 @@ def order_table(reach):
         for n, why in rows:
             title, mins, needs, _ = SCEN[n]
             if n in RECORDED:
-                title += ' *(recorded, batch %d)*' % RECORDED[n]
+                title += ' *(recorded, %s)*' % RECORDED[n]
             numbered = when not in ('recorded', 'dropped (original processes only)')
             rank += numbered
             out.append('| %s | %d | %s | %s | %s | %d | %d | %d | %s |' % (

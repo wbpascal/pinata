@@ -138,9 +138,19 @@ def load_inputs():
     I['conf'] = conf; I['corr'] = corr
     # X05: opcodes counted in an "Opcodes" table of capture-validation (| dir | 0x…. | NC_… | n > 0 | …) are captured
     # too; 29 batch-3 link opcodes (0x3441 / 0x3442, 0x343E, 0x3401 …) have no evidence entry in P02.json
-    for m in re.finditer(r'^\| [^|\n]+ \| (0x[0-9A-Fa-f]{4}) \| NC_\w+ \| (\d+) \|', cv, re.M):
-        if int(m.group(2)) > 0:
-            I['cap'].add(m.group(1).lower())
+    # X07: a row may name several opcodes ("0x9007 / 0x9008", any name cell); its "Seen" cell then holds one count per
+    # opcode ("1 / 2", "2 + 2") or one count for all ("1 each", "5"). 78 opcodes were missed by the one-opcode form.
+    for m in re.finditer(r'^\| [^|\n]+ \| (0x[0-9A-Fa-f]{4}(?:\s*/\s*0x[0-9A-Fa-f]{4})*) \| [^|\n]* \| (\d[^|\n]*) \|',
+                         cv, re.M):
+        ops = re.findall(r'0x[0-9A-Fa-f]{4}', m.group(1))
+        seen = [int(n) for n in re.findall(r'(\d+)(?:\s*(?:/|\+|each|$))', m.group(2).split('(')[0])]
+        if not seen:
+            continue
+        if len(seen) != len(ops):
+            seen = [seen[0]] * len(ops)
+        for o, n in zip(ops, seen):
+            if n > 0:
+                I['cap'].add(o.lower())
     return I
 
 
