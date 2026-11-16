@@ -517,6 +517,18 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
 - **Disproved by:** a `0x580E` from a zone that does not host the last map; a joiner on another zone who is not
   linked; a reward before `0x5816`.
 
+
+- **Added by X05 (batch-2 leftover: revive to another map, capture-validation §9.5 / §15):** step (6) inside the
+  running KQ, A dies to a mob and takes the death menu's revive. Claim: Z07 §3.1 `sp_ReviveReqProcess` @ FUN_00451bd0.
+  On a normal field the revive target is the map's own regen point (`0x104F NC_CHAR_REVIVESAME_CMD`, captured in
+  `combat`); only a KQ with a revive count (`kqe_ReviveNumber`) or a guild-tournament map
+  (`fm_IsGuildTournametnMap` @ FUN_00475770) takes the other branch, whose target is the map's regen city or the
+  KQ team point. Prediction: `0x104E` → `so_LinkTo(target, 4, 0x4F, 0x50)`: `0x104F` when the target is served by
+  the same zone process, **`0x1050 NC_CHAR_REVIVEOTHER_CMD`** with the other zone's address when it is not *(inferred
+  from the two opcode arguments, as `0x1809` / `0x180A` for a link)*; HP ≈ 30 % (`MaxHP × 307 / 1024`) after the
+  map login; no `0x2411` *(inferred: Z03 §7.2 `sp_LostExperienceByKilled` returns 0 for a protected player and names the KQ
+  as an example)*. Disproved by: a revive that stays on the KQ map after the revive count is used up.
+
 ### 31. Instance dungeon
 
 - **Claims:** Z14 §1–§2, Z08 §5, W04 §13, Z09 instance scripts; bugs Z14-B8.
@@ -610,6 +622,19 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   values. (4) `0x204B` → `0x204C`, item use, the roar to the map (Z02 §9). (5) `0x085F` → `0x0860` (W04 §17.4).
 - **Disproved by:** the WM dropping the blocked whisper; an answer to an option save.
 
+
+- **Added by X05 (batch-2 leftover: the `0x7037` tail, capture-validation §4.2 / §14):** step (6) in one session
+  drag **three** different skills or items onto empty quick-slot cells, then log out; in a second session change
+  two cells and log out. Prediction: one `0x7037 NC_CHAR_OPTION_IMPROVE_SET_SHORTCUTDATA_REQ` per logout with
+  `n` = the number of changed cells (the captured one had `n = 1` and 11 bytes = `1 + 7n + 3`). **Open, no
+  prediction for the tail:** `n = 3` gives 25 bytes if the tail is a fixed 3 bytes and 31 if it is 3 per entry
+  (`n = 2`: 18 or 21). Either way the WM drops the packet without an answer (W04 §8.2) and the next login's
+  shortcut block is the Character server's (so the changed cells come back only if another packet saved them: note
+  what the quick slots show after the relog). Disproved by: a size that is neither `1 + 7n + 3` nor `1 + 10n`; an
+  answer from the WM. How the 2016 client builds the opcodes of its option saves (no `0x7037` / `0x7011` /
+  `0x7015` / `0x703B` immediate in the client) is not a capture question: it stays a client-reading note in
+  capture-validation §14.
+
 ### 37. Login side: idle heartbeat, refusals, character delete
 
 - **Claims:** L01 §1.6 (hand-rated: the Login heartbeat never fired in a capture), L00 / L01 refusal codes,
@@ -685,6 +710,43 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   the moved player (Z09 §9.3, Z25). (6) Z→W `0x2458` → clients
   `0x2459`.
 - **Disproved by:** an exp loss below the level Z03 §8 gives; a client reaction to `0x742A`.
+
+
+- **Added by X05 (batch-2 leftovers: capture-validation §9 / §15 "PvP / party / guild-war deaths, exp loss, skill
+  fail / abort, rebirth"; batch 2 holds one PvE death of a level-5 character and successful casts only):**
+  - **Correction to step 2 as written:** the death captured in `combat` was answered with `0x104F` (same zone);
+    `0x1050` was never captured, and a normal field always revives onto its own map (Z07 §3.1). The other-map
+    revive is scenario 30 step 6.
+  - **Setup addition:** A's exp well above the start of its level (kill a few mobs after `&levelup`), noted from
+    the character window before each death; A and B in one party for step 8 (scenario 15 step 2).
+  - **Steps:** (7) A casts a skill at a mob from beyond its range; twice in a row inside its cool-time; with less
+    SP than its cost (spend the SP first); then starts a cast with a cast time and presses Esc (the abort of
+    scenario 24 step 4, here with B in sight). (8) in the party, A dies to a mob; then on the PK field B kills A
+    (step 3 with the party kept, if the field allows attacking a party member: note it). (9) A takes the buff
+    whose abstate is `StaRebirth` (`AbState.shn` row 48; the skill or item that sets it is found with X4's table
+    read), dies to a mob, and accepts the resurrection offered in the death menu; the same again, refused, then
+    the town revive. (10) each death of steps 1–4 and 8 with the exp before and after noted.
+  - **Prediction:** (7) no `0x244E` / `0x2435`; `0x2434 NC_BAT_SKILLBASH_CAST_FAIL_ACK {u16 err}`: `0xFCA` out of
+    range, `0xFC8` in the cool-time, `0xFC9` not enough SP (Z03 §5.2); if the client refuses any of them itself
+    (no `0x2440` on the wire) the case moves to T21. Abort: C → Z `0x2444` → sight including A `0x2438
+    NC_BAT_SOMEONESKILLBASH_CASTCUT_CMD {caster}` and then A `0x2445 {0x20E8}`; no `0x2457` follows (Z03 §5.4).
+    (8) to A the packets of the captured PvE death (`0x104D`, GameLog `0x042B`, `0xC80A`); B gets the bystander
+    packets of capture-validation §18.5 and, at the next party status tick, `0x3832 NC_PARTY_MEMBERINFORM_CMD` with
+    `hp 0` for A (Z08 §1.2–§1.3) and nothing party-specific at the death itself; the party stays. Killed by B on
+    the PK field: Z → W `0x244A {killerWmHandle, killerCharNo, pkCount}`, A and B `0x244B {killer, victim,
+    pkCount}`, GameLog **`0x0429 NC_LOG_GAME_PKED`** instead of `0x042B`, `0xC80B` for B and `0xC80A` with kind 0
+    (Z03 §7.2). (9) the `0x104D` of that death has its last field (`canReviveHere`) = 1 when the map allows it
+    (`field.flags & 2`), 0 in the captured death; accept: C → Z **`0x1102 NC_CHAR_REBIRTH_CMD`** (empty) → revive
+    on the spot (`sp_ReviveNow`), no map login; refuse: C → Z **`0x1103 NC_CHAR_REBIRTH_REJECT_CMD`** (empty), no
+    answer, and the later `0x104E` runs the town revive (Z07 §3.2; that the `StaRebirth` buff is what sets the
+    offer is *(inferred)* from the `SelfRevive` sub-actor of Z03 §7.2). (10) `0x2411 NC_BAT_EXPLOST_CMD {u32
+    lost}` and Z → W `0x1073` only from the level `g_ExpLossMinLevel` on (the client text says 20): by a mob `lost
+    = (exp of next level − exp of this level) / 100 × FieldList ExpLostAtDeadByMob / 1000`, by a player on the
+    PK field the level table's value × `ExpLostAtDeadByPly / 1000`, never below the start of the level, and 0 (no
+    `0x2411`) where the map's rate is 0; the GameLog `0x042B.exp` carries the same number (0 in `combat`).
+  - **Disproved by:** a `0x2434` code other than the three; a `0x2445` before the `0x2438`; a party packet at the
+    moment of the death; `0x042B` for the PK death; a `0x2411` whose number differs from the formula with the
+    map's `FieldList` row (read it with `shn.py`), or one below the minimum level; a map login after `0x1102`.
 
 ### 40. Gathering, production, item emotes, way-finding gate, tutorial, attendance
 
@@ -857,6 +919,89 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   operator's); no "FAILED LISTEN" text in any log file of step 3; a stop in step 3 at another point than after
   `0x9804`.
 
+
+- **Added by X05 (batch-2 leftover: the phase of the per-minute `0x0821`, capture-validation §14):** the capture of
+  steps 2 and 4 already holds the answer, nothing more to do than keep recording for three minutes after each WM
+  start. The zones' per-minute block runs on the WM's `0x0821` (Z09 §1.2), the WM sends it on a 60-s timer (W01 §2)
+  and it left at :42 in both batch-2 captures; what sets the phase was *(inferred)*. Read from the capture: the
+  time of the first `0x0821` on each zone link after the WM start, against (a) the WM's `0x9804` (end of its start)
+  and (b) that zone's `0x0802` registration. **Open between two readings**, the capture decides: the timer runs from the WM's start (first `0x0821` 60 s
+  after it, a zone registering later gets none of its own), or a zone's registration forces a send and re-arms the
+  timer (a `0x0821` within one pass of the last zone's `0x0802` answer, the next 60.0 s later). In both, one send
+  goes to all registered zones in the same ms and every later one follows 60.0 s after the one before, whatever
+  second the wall clock shows. Disproved by: sends aligned to the wall-clock minute; an interval other than 60 s.
+
+### 49. Items V: refusals by the Character server (added by X05)
+
+Batch-2 leftover (capture-validation §8.2 / §15): the captures hold only successful item transactions; batch 3 added
+`0x340C {0x206}` (S16) and scenarios 46 / 47 the sell, buy-back and soul-stone refusals. This one takes the rest of
+the `*FAIL_ACK` family. Every step is a DB setup under an **online** owner; several end in a disconnect, so one
+short capture per step, links recorded, the setup named in the notes.
+
+- **Claims:** D03 §2.1 (`0x340C` / `0x340F`), §3.1 (`0x3412`, `0x3415`, D03-B5), §3.2 (`0x342A`), §3.4 (`0x3418`,
+  `0x341E`, `0x3421`), §5.1 (`0x3445`, D03-B6); Z05 §2.1, §3.1, §3.2, §4, §5.1 (Z05-B1: the object handle in the
+  code field; Z05-B5: the wrong lock freed), §7.1.
+- **Setup:** S17, S12, S18, S19 as named per step; A next to a merchant and the storage keeper; a weapon and a
+  stack of 10 potions in the inventory, a ring worn; a mob that drops (X1) or B dropping items for A.
+- **Steps and predictions:**
+  (1) **S17, purchase.** DB money 0, cen in the client: buy an item that takes a new cell → Z → D `0x340A` →
+  `0x340C NC_ITEMDB_BUYALLFAIL_ACK {0x205}` → C `0x3004 {0x205}`; buy one more of the potions onto the stack → D
+  `0x340D` → **`0x340F NC_ITEMDB_BUYLOTFAIL_ACK {0x207}`** → C `0x3004 {0x207}`. No `0x3001`, no `0x1033`; note
+  the client text for each (S16's `0x206` showed none).
+  (2) **S18 on the weapon** (row removed, the zone still shows it): move it to another inventory cell → D `0x3428`
+  → `0x342A NC_ITEMDB_RELOCFAIL_ACK {0x247}` (`p_Item_IsValidOwner` 1 = no such item) → C `0x300C {0x247}`, the
+  weapon stays in its cell; then equip it into an empty equipment slot → D `0x3410` → `0x3412 NC_ITEMDB_EQUIPFAIL_ACK {0x28A}` (`0x28B`–`0x28D` or
+  `0x28A` when it replaces a worn item, D03 §3.1) → C **`0x3011 {A's object handle}`** (Z05-B1), nothing worn; then drop it → the cell empties at once (`0x3001`), D `0x3416` →
+  `0x3418 NC_ITEMDB_DROPALLFAIL_ACK {0x306}` → C `0x3008 {object handle}` and the zone disconnects A with reason
+  `0x684`; no drop object appears.
+  (3) **S18 on the worn ring:** unequip it → D `0x3413` → `0x3415 NC_ITEMDB_UNEQUIPFAIL_ACK {0x28A, lock}` → C
+  **`0x3013 {object handle}`**, the ring stays worn; the zone frees lock index `0x28A` instead of the request's
+  (Z05-B5), so the ring's cell and the target cell stay locked: a second unequip or a move onto that inventory
+  cell is refused by the zone itself without a DB request (note the code), until the relog.
+  (4) **S12 on the potion stack** (DB lot 9, zone 10): drop the whole stack → D `0x3416` → `0x3418 {0x348}` (a
+  PICK code; the stored lot differs) → C `0x3008 {object handle}` + disconnect `0x684`. Second run, same setup:
+  pick up one more potion onto the stack → D `0x341F` → **`0x3421 NC_ITEMDB_PICKMERGEFAIL_ACK {0x348}`** → C
+  `0x300A {itemid 0xFFFF, lot 0, error = object handle, 0xFFFF}` + disconnect `0x684`.
+  (5) **S19 on `tItem`:** pick up an item that takes a new cell → D `0x341C` → **`0x341E
+  NC_ITEMDB_PICKALLFAIL_ACK {0x347}`** → C `0x300A {0xFFFF, 0, object handle, 0xFFFF}` + disconnect `0x684`. The
+  pick-up was applied before the answer (Z05 §3: style 2), so until the disconnect the client shows the item;
+  after the relog it is gone (no row) and the drop object no longer exists either: the item is lost.
+  (6) **S19 on `tUserMoney`** (the account's storage-money row removed first): talk to the storage keeper → D
+  `0x3444` → **`0x3445 NC_ITEMDB_OPENSTORAGE_FAIL_ACK`** whose 2 code bytes are never written (D03-B6) → C `0x3C07
+  NC_MENU_OPENSTORAGE_FAIL_CMD {those bytes}`, text "An error has occurred while using the Storage.", no `0x3C08`.
+- **Disproved by:** a DB code (0x28A, 0x306, 0x347, 0x348) in the client packet where the handle is predicted, or
+  the handle where the code is predicted (`0x3004`, `0x300C`); no disconnect after a drop or pick refusal; a
+  second unequip in step 3 that reaches the DB; a `0x3C08` in step 6; any `0x1033` in step 1.
+- **After each step:** A at the login screen, then the setup's restore; compare `tItem` / `tItemOptions` of A with
+  `21-server.ps1 snapshot-*` before and after (rows the refusal left behind are findings: the equip path does not
+  undo its `unequip[]` moves, D03 §3.1).
+
+### 50. Timing with one clock and without delayed ACKs (added by X05)
+
+Batch-2 leftovers that are about **when**, not what (capture-validation §14: "0x0849 / 0x080E clock offset", "0x7C07
+timing", "client sends after a mob-tick event"). No layout and no order within one connection depends on them; they
+are worth one run because a rebuild that answers in the same order but in other segments would look different to a
+reader of the old captures.
+
+- **Claims:** W05-B1 and S02 §1.4 (the passes sleep ≈ 15.6 ms; no `TCP_NODELAY`: Nagle holds a second small
+  segment until the first is ACKed); capture-validation §4.1, §7.4, §7.5.4 (the 47–74 ms holds read as Nagle +
+  the client's delayed ACK), §9.5 / §9.6 (client packets of a mob-tick event leave 18–27 ms after the link
+  packets).
+- **Setup:** capture **on the server PC** (client and links in one file, one clock: this alone removes the
+  0x0849 / 0x080E offset question, the stamps are then the server's). Run A as recorded so far. Run B with delayed
+  ACK switched off on the client PC (`TcpAckFrequency` = 1 on its network interface, reboot; restore after).
+- **Steps (both runs):** (1) log in to the character list, select a character (`0x7004`, `0x700C`, `0x7C06` and
+  their answers). (2) walk through a gate (`0x1003` after the link). (3) let a mob kill A; kill a mob with a
+  skill; kill one with swings.
+- **Prediction:** run A repeats the captured holds (`0x7C07` leaving with `0x700D` 73–74 ms after `0x7C06`; 47–52
+  ms after `0x1003`). Run B: every held segment leaves within one WM pass of its cause (`0x7C07` ≤ 20 ms after
+  `0x7C06`, before `0x700D`), the order of packets unchanged. Step 3 in both runs: at A's death and at the skill
+  kill the GameLog / WM link packets precede the client packets of the same event by one to two zone passes
+  (the mob tick queues client data that a later point of the pass flushes), a swing kill sends both in one ms;
+  run B must not change that (it is not an ACK effect).
+- **Disproved by:** the 73 ms hold surviving run B (then it is not Nagle: re-read W05 §1 for a per-session send
+  timer); a changed packet order in run B; the 18–27 ms gap vanishing in run B.
+
 ### 41. Test client: crafted client packets
 
 These need a scripted client (framing and XOR-499 cipher of `docs/protocol/README.md`; a replay of a captured
@@ -883,6 +1028,9 @@ login plus one crafted packet is enough). One connection per case: several end i
 | T17 | Z04 §4.2 (added by X05: the client offers 1 … lot − 1 only, capture-validation §19.3) | `0x300D` on a lot-10 stack into a free cell with lot 0; with lot 10 | `0x300E {0x442}` both times, no DB request | a `0x3434`; another code |
 | T18 | Z04 §13.1, §13.2 (added by X05: at full HP the client sends no `0x5007`, capture-validation §20.3; use only if scenario 46 step 7 was refused by the client) | at the healer: `0x5001 {number = limit + 1}`; with 0 cen `0x5001 {1}`; away from every NPC `0x5001 {1}`; in the field at full HP `0x5007` | `0x5005 {0x742}`; `{0x743}`; `{0x741}`; `0x5006` (empty); no DB request in any | a `0x3441`; a `0x5008` at full HP |
 | T19 | Z02 §4 (added by X05; use only if scenario 45 step 3 put no `0x2022` on the wire) | B in A's sight: `0x2022 {emoticonid of a dance, emoticonframe 5}`; `0x2022 {emoticonid 255, 0}` (no such `ActionViewInfo` row); then a third character walks into sight | A gets `0x2023 {B, emoticonid, 5}`, nothing to B; nothing for id 255; the newcomer's brief info of B (`0x1C06`) carries the emote id and frame 5 | a `0x2023` to the sender or for the unknown id |
+| T20 | W01 §7.2, Z07 §1.4 (added by X05: the `0x101E` fail path, capture-validation §7.5.3; a race, as T7) | a replayed login up to the zone's seed; send the zone `0x1801` and close the **WM** connection in the same instant (script both; vary the gap 0–30 ms over 20 tries) | three outcomes by timing: WM session gone before `0x104B`: `0x104C {usrregnum −1, chrregnum −1}` and the zone drops the client (`0x689`, Z01 §8); gone between `0x104B` and `0x101C`: WM → Z **`0x101E NC_CHAR_ZONE_CHARDATAFAIL_ACK {ref, 0x141}`** (8 bytes) → C `0x1804 {u16 = the client's object handle, 0xFF}` (the handle in the code field, Z07 §1.4 original bug); gone later: a normal `0x1802`, then the WM's logout notices | a `0x101E` of another size; a `0x1804` carrying `0x141`; never in 20 tries: the window is below one WM pass and the row stays code-only |
+| T21 | Z03 §5.2 (added by X05; use only for the codes scenario 39 step 7 could not put on the wire because the client refused first) | in game: `0x2440 {skill, target}` with a target handle that does not exist; with a skill the character has not learned; in a town map (`FieldList.CanSkill` 0, X2) | `0x2434 {0xFC4}` "Casting another skill now." for the unknown handle (Z03-B2); `{0xFC6}`; `{0xFC3}` | a silent drop; `0x244E` for the unlearned skill |
+| T22 | `login-server.md` §3 (`0x0C65`), L00-B1; W01 §3 (added by X05: failure paths capture-validation §14 lists as never seen) | to Login: `0x0C65` with a version key one digit off; to the WM: a replayed login whose `0x0C0F` carries a changed validate key | `0x0C66` with **one payload byte** that is never written (L00-B1), no close by the server (the client quits); WM: `0x0C15 NC_USER_LOGINWORLDFAIL_ACK {0x44}` | an empty `0x0C66`; a `0x0C15` with another code; a WM close without `0x0C15` |
 
 ### 42. Races: drop menu, two money pick-ups, link with a dead WM session
 
@@ -966,6 +1114,47 @@ login plus one crafted packet is enough). One connection per case: several end i
   (scenario 43 step 6, or `&startGT` of Z11 §6.3 on one zone).
 - **Not re-checked claims that stay code-only:** W03 §2.5 helpers, W03 §3.5 client codes, W04 §12.3 (item W06;
   W04 §8.3, Z04 §13.2 and D02 §2 were read in the sweep, `confidence.md` §4.7); the *(db-backup)* rows of D01 / D02 are DB experiments (part 9).
+
+
+**Batch-2 leftovers no capture is worth (X05; capture-validation §15 rows that named X05):**
+
+- **WM → zone `0x1026` (house), `0x1028` ("maspup"), `0x102A` (emblem), `0x102B` (pet), `0x102C` (arena), `0x102D`
+  (sea war):** unreachable in the 2016 set. The WM sends a blob only when its session slot is filled, the only
+  writers of these six slots are the CharDB blocks `0x100F`, `0x1011`, `0x1013`–`0x1016` (W01 §6.3), and the 2016
+  Character server never sends those (D02 §4: no `SetOpcode` with these values in the binary). A character with a
+  house, a pet or an emblem gets the same hand-over as Test2; house, pet and guild data travel in their own
+  departments (scenarios 28, 25, 18).
+- **WM → zone `0x102F NC_CHAR_ZONE_CHESTINFO_CMD`:** the zone has the handler (Z07 §1.2) but the WM's hand-over
+  table has no row for the slot (+0x630 is filled by `0x1018`, which the Character server never sends, and by the
+  zone's `0x4014`; W01 §6.3 "not in 0x101C"). Only the save direction can be captured: Z → W `0x4014` *(inferred to follow a
+  chest change)*; open one present box in scenario 46 with the links recorded and note whether it appears.
+- **WM → zone `0x10B8 NC_CHAR_ZONE_LINK_FROM_CMD`:** only after the zone's `0x4019`, whose one sender is the
+  guild-tournament observer entry onto another zone (`sp_Guild_Tournamnet_Observer_Enter` @ FUN_004788c0, Z12
+  §7.3). It needs a tournament in `guildtournamentinfo`: scenario 43 step 6 (the OPTool controls), then `0x74D7`
+  from a client or `&observerlinkto <seed>` from a GM on a zone that does not host the tournament map. Prediction:
+  Z → W `0x4019 {wmHandle, charNo, map, x, y}` (0x1a bytes) before the link, W → new Z `0x10B8` (0x1e bytes with the
+  ref) once after the character blobs, and `0x74DB` brings the observer back to that position. No own scenario: it
+  rides on 43.
+- **`0x101E`:** a race only (the WM session must vanish between `0x104B` and `0x101C` of one map login): test-client
+  case T20.
+- **`World::LoadMap` heartbeat call points:** which of the client's 8 call points fire in one map load is a client
+  trace (a debugger on `Fiesta.bin`), not a capture: the wire shows only how many heartbeats left (already in
+  capture-validation §4.4), and the servers accept a heartbeat answer at any time. Nothing in the server spec
+  depends on it.
+- **The extra `hpchangeorder` reads (capture-validation §9.1):** every read of the counter advances it (`vt 0x7e8`,
+  Z03 §2.3; 21 candidate call sites `(… + 0x7e8)` in the zone export), and the reads that send nothing leave no packet, so a capture can only show
+  the gaps it already shows (2 per hit on a mob, 3 on the player). It is a code-reading question (the callers on the
+  damage path), and the client uses the value only to order HP updates *(inferred)*: a rebuild needs "strictly
+  increasing per defender", which the captures confirm.
+- **The client-send flush point:** read from the timing only (18–27 ms after the link packets of the same
+  mob-tick event); scenario 50 separates it from the ACK effect, the exact point in the zone's pass is S02's
+  process layer and changes no order within a connection.
+- **The `0x10D2` single-option column names:** not a capture question, and answered from the DB backup:
+  `usp_Character_getSingleOption` *(db-backup, `w00_Character.bak`)* selects `bMysteryBolt`, `bAutoPick`,
+  `dRestExpLastExecuteTime`, `nChatBan` from `tCharacterSingleOption` (it inserts the row when missing; error
+  −3192). So P02's `nOption1` / `nOption2` / `tTime` / `nOption4` are these four, and the timestamp is the last
+  rest-exp run, not a "last save" time (it equalled the `0x101A` `dKQDate` in both captures because both were
+  written at the same logout *(inferred)*).
 
 ## 6. Database setups and table experiments these scenarios need
 
@@ -1580,9 +1769,75 @@ DROP TABLE dbo.X05_save_17;
 ```
 
 Prediction: every DB-side debit fails while the zone-side check passes: `0x3443 {0x744}` for a soul stone, `0x34BA`
-/ `0x34BC {0x366E}` for a buy-back, `0x340C` / `0x340F` for an NPC purchase (D03 §2.1's "not enough" code; not
-predicted further). Credits succeed (`p_Char_MoneyAdd`). Disproved by: a purchase that goes through. Not verified
+/ `0x34BC {0x366E}` for a buy-back, `0x340C {0x205}` / `0x340F {0x207}` for an NPC purchase (D03 §2.1; scenario 49
+step 1). Credits succeed (`p_Char_MoneyAdd`). Disproved by: a purchase that goes through. Not verified
 here: no SQL Server on the analysis machine (as §8.1).
+
+
+### 8.19 S18: an item row removed under an online owner (added by X05)
+
+The owner **stays in the game**: the zone keeps the item in its cell while the Character server no longer finds
+the key. `p_Item_SetStorage` returns `@@ROWCOUNT` (0 = "not found or error", *(db-backup)*: both Character
+backups) and `p_Item_IsValidOwner` returns 1 for a missing item (D03 §2.2), so every request on that key is
+refused. Used by scenario 49 steps 2 and 3.
+
+```sql
+USE w00_Character;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+SELECT nItemKey, nStorageType, nStorage, nItemID FROM tItem WHERE nOwner = @c AND nStorageType IN (8, 9);  -- pick: 9 inventory, 8 worn
+DECLARE @key bigint = 0;         -- nItemKey from the list
+SELECT * INTO dbo.X05_save_18  FROM tItem        WHERE nItemKey = @key;
+SELECT * INTO dbo.X05_save_18o FROM tItemOptions WHERE nItemKey = @key;
+DELETE FROM tItem WHERE nItemKey = @key;
+SELECT COUNT(*) AS option_rows_left FROM tItemOptions WHERE nItemKey = @key;   -- note it: 0 = a trigger removed them (D03 §1.1)
+-- restore (A at the login screen; skip the row if the test dropped the item for good)
+INSERT INTO tItem SELECT * FROM dbo.X05_save_18 s WHERE NOT EXISTS (SELECT 1 FROM tItem i WHERE i.nItemKey = s.nItemKey);
+INSERT INTO tItemOptions SELECT * FROM dbo.X05_save_18o s
+ WHERE NOT EXISTS (SELECT 1 FROM tItemOptions o WHERE o.nItemKey = s.nItemKey AND o.nOptionType = s.nOptionType);
+DROP TABLE dbo.X05_save_18; DROP TABLE dbo.X05_save_18o;
+```
+
+Prediction: `0x342A {0x247}` for a move, `0x3412 {0x28A}` for an equip, `0x3415 {0x28A}` for an unequip, `0x3418
+{0x306}` for a drop (scenario 49). The zone's save at logout writes no item rows *(inferred: items are written per
+transaction, D03 §1; the logout sends the item blob to the WM only, `0x4013`)*, so the restore brings the item back as it was. Disproved by: any of the four requests succeeding.
+Not verified: `INSERT … SELECT *` fails if `tItem` has an identity or computed column (then name the columns of
+§8.1's table); no SQL Server on the analysis machine (as §8.1).
+
+### 8.20 S19: a forced insert failure on one table for one owner (added by X05)
+
+S16's trigger pattern on another table. Two uses in scenario 49: on `tItem` for the character (step 5: every new
+item row of A fails, so a pick-up into a free cell and a purchase into a free cell are refused), and on
+`tUserMoney` for the account (step 6: `p_User_MoneyGet` inserts the row at the first storage access and reports an
+error when that fails, *(db-backup)*). Install just before the step, drop right after.
+
+```sql
+USE w00_Character;
+DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = N'TestCharA' AND bDeleted = 0);
+DECLARE @u int = (SELECT nUserNo FROM tCharacter WHERE nCharNo = @c);
+-- (a) tItem, for the character
+DECLARE @sql nvarchar(max) = N'CREATE TRIGGER dbo.X05_tItem_fail ON dbo.tItem AFTER INSERT AS
+IF EXISTS (SELECT 1 FROM inserted WHERE nOwner = ' + CAST(@c AS nvarchar(12)) + N')
+BEGIN ROLLBACK TRANSACTION; RAISERROR(''X05 forced failure (S19 a)'', 16, 1); END';
+IF @c IS NULL RAISERROR('character not found', 16, 1) ELSE EXEC (@sql);
+-- (b) tUserMoney, for the account: A must never have opened the storage in this session
+SELECT * INTO dbo.X05_save_19 FROM tUserMoney WHERE nUserNo = @u;
+DELETE FROM tUserMoney WHERE nUserNo = @u;
+SET @sql = N'CREATE TRIGGER dbo.X05_tUserMoney_fail ON dbo.tUserMoney AFTER INSERT AS
+IF EXISTS (SELECT 1 FROM inserted WHERE nUserNo = ' + CAST(@u AS nvarchar(12)) + N')
+BEGIN ROLLBACK TRANSACTION; RAISERROR(''X05 forced failure (S19 b)'', 16, 1); END';
+IF @u IS NULL RAISERROR('account not found', 16, 1) ELSE EXEC (@sql);
+-- restore (a)
+DROP TRIGGER dbo.X05_tItem_fail;
+-- restore (b)
+DROP TRIGGER dbo.X05_tUserMoney_fail;
+INSERT INTO tUserMoney SELECT * FROM dbo.X05_save_19; DROP TABLE dbo.X05_save_19;
+```
+
+Run (a) and (b) in separate steps, not together. Prediction: (a) `0x341E {0x347}` for the pick-up (`Item_Insert`
+returns the error of `p_Item_Create`), `0x340C {0x206}` for a purchase into a free cell; (b) `0x3445`. Disproved
+by: the item or the storage arriving. While (a) exists, every other source of a new row for A fails too (quest
+rewards, `&makeitem`, chests): do nothing else in that capture. Not verified: `tUserMoney` has exactly the two
+columns the procedure inserts (`nUserNo`, `nUserMoney`); no SQL Server on the analysis machine.
 
 ## 9. Table and config experiments (X1–X7)
 
