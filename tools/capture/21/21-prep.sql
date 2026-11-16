@@ -5,7 +5,7 @@
 -- The account database is assumed to be named "Account" (Account.dbo.… below): change it if yours differs.
 SET NOCOUNT ON;
 USE World00_Character;
-DECLARE @char nvarchar(32) = N'$(Char)';          -- the GM character of account "admin" that plays the scenario
+DECLARE @char nvarchar(32) = N'$(Char)';          -- the GM character that plays the scenario (21-server.ps1 -Char)
 DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = @char AND bDeleted = 0);
 IF @c IS NULL BEGIN RAISERROR('character $(Char) not found', 16, 1); RETURN; END
 SELECT 'character' AS scenario_21, sID, nCharNo, nUserNo FROM tCharacter WHERE nCharNo = @c;   -- who this run is for

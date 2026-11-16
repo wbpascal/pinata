@@ -86,7 +86,7 @@ their value is the prediction, not the reach; run them in the session of their p
 | 40 | Gathering, production, item emotes, way-finding gate, tutorial, attendance | GM | 8 | 72 | 46 | 9.0 |
 | 35 | Dice table, gamble house, card collection | GM, mini-house | 10 | 89 | 146 | 8.9 |
 | 28 | Mini-house | 2 clients, GM | 10 | 81 | 92 | 8.1 |
-| 39 | Combat extras: death penalty, PK, revive item, knock-back | 2 clients, GM | 8 | 59 | 33 | 7.4 |
+| 39 | Combat extras: death penalty, PK, revive item, knock-back | 2 clients, GM | 8 | 60 | 33 | 7.5 |
 | 15 | Party across two zones | 2 clients | 8 | 53 | 52 | 6.6 |
 | 22 | Upgrade, gems, random options, endurance | GM | 8 | 53 | 58 | 6.6 |
 | 16 | Raid | 2 clients (3 better) | 6 | 37 | 66 | 6.2 |
@@ -102,11 +102,11 @@ their value is the prediction, not the reach; run them in the session of their p
 | 38 | Session loss, kicks, back to character select | GM, 2 clients, process kill | 10 | 31 | 17 | 3.1 |
 | 20 | Trade and booth | 2 clients | 10 | 28 | 65 | 2.8 |
 | 33 | Prison | GM, 2 clients | 8 | 16 | 17 | 2.0 |
-| 45 | Second client in sight II | 2 clients | 8 | 15 | 7 | 1.9 |
 | 49 | Items V: refusals by the Character server | DB setup per step, a second client or drops | 25 | 41 | 16 | 1.6 |
+| 45 | Second client in sight II | 2 clients | 8 | 13 | 6 | 1.6 |
 | 42 | Races: drop menu, two money pick-ups, link with a dead WM session | 2 clients | 10 | 15 | 5 | 1.5 |
-| 47 | Items IV: the zone and the DB disagree | GM, DB / table setup per step, 2 clients for step 6 | 25 | 23 | 10 | 0.9 |
-| 46 | Items III: no DB change | GM | 12 | 10 | 6 | 0.8 |
+| 47 | Items IV: the zone and the DB disagree | GM, DB / table setup per step, 2 clients for step 6 | 25 | 26 | 14 | 1.0 |
+| 46 | Items III: no DB change | GM | 12 | 12 | 7 | 1.0 |
 | 48 | WM stop and start with its log | server PC only | 10 | 0 | 0 | 0.0 |
 | 50 | Timing with one clock and without delayed ACKs | capture on the server PC, a registry change | 15 | 0 | 0 | 0.0 |
 <!-- ORDER:end -->
@@ -825,12 +825,15 @@ online owner, one short capture per step, the SQL window open next to the client
   {emoticonid, emoticonframe}` → A `0x2023 {B, emoticonid, emoticonframe}` (Z02 §4); if none of them sends it, the
   2016 client has no stop and the packet is test-client case T19. (4) `0x201F` reaches B out of sight (the whole map
   instance, `so_AllInMap1`). (5) WM → A `0x200E {ErrorType 0x0F69, receiver "X45Nobody"}` (25 bytes raw); no
-  `0x200D`, no `0x200F`, no `0x6006` to A's zone. (6) A gets `0x242E NC_BAT_SOMEONEBASH_HIT_CMD {attacker = mob,
-  defender = B, …}` per hit that lands (the mob's `so_Bash`), B gets `0x242D`. (7) B `0x2444` → `0x2438 {caster B}`
+  `0x200D`, no `0x200F`, no `0x6006` to A's zone. (6) as captured before (capture-validation §9.2, §18.5): B gets
+  `0x2447` / `0x2448` per swing of the mob, A the bystander forms `0x2447` / `0x2449`; **no `0x242E`, no `0x242D`**.
+  Z03 §3.5 names the mob's normal attack as a caller of `so_Bash`, but every mob hit of batches 2–3 (28 `0x2448`,
+  the killing blow included) came as a swing, so `0x242E` is left to the `&` test commands (which one was not looked up: knowledge X05 §6); the
+  step stays as the check with a bystander and a player who does not hit back. (7) B `0x2444` → `0x2438 {caster B}`
   to A and B, then B `0x2445 {0x20E8}`; the full cast gives A `0x244F` as captured. (8) A gets `0x1805` for B's
   handle when B leaves the sight range *(inferred: the removal packet `&hide` produced in `s14`)*.
 - **Disproved by:** `0x2018` also to B; a `0x2009` for the sit; a shout that stops at sight range; `0x200F` or
-  `0x6006` for the unknown receiver, or another `ErrorType`; `0x2449` instead of `0x242E` for a mob's hit; a cast
+  `0x6006` for the unknown receiver, or another `ErrorType`; a `0x242E` / `0x242D` for a mob's hit (then Z03 §3.5 holds for that mob: note its `MobInfo` row); a cast
   abort without `0x2438` to A.
 
 ### 46. Items III: what `s21` left open, no DB change (added by X05)
@@ -843,31 +846,36 @@ online owner, one short capture per step, the SQL window open next to the client
   the login and `snapshot-after` after the logout (the script prints the name first: compare it with the notes).
   `&makeitem BestLowHpPotion -l40` and `-l30` (`MaxLot` 50), `&makeitem LeatherBoots` (not stackable), one item whose
   `ItemInfo.BuyDemandLv` is above the character's level and whose `SellPrice` is not 0 (2016 data: `NormalEar117`,
-  117; if `&makeitem` refuses it, any row of
+  117: **the character must be below that level**, the level-120 GM of the earlier batches gets no `0x366B`; if
+  `&makeitem` refuses it, any row of
   `python3 -I tools/protocol-re/shn.py …/ItemInfo.shn` with a higher `BuyDemandLv` than the level), one weapon that
   sells for more than the merchant's cheapest item costs.
 - **Steps:** (1) drag the lot-30 stack onto the lot-40 stack; then the rest (20) onto the full stack. (2) at the
   storage keeper deposit a stack (for D03 check 3) and **all** cen. (3) at one item merchant, without clicking any
-  other NPC until step 7 (P02-B31): sell the boots, buy them back. (4) sell the `BuyDemandLv` item, try to buy it
-  back. (5) sell the weapon, buy the merchant's cheapest item, try to buy the weapon back. (6) `&makeitem` until the
+  other NPC until step 7 (P02-B31): sell the boots, buy them back. (4) sell the weapon, buy the merchant's cheapest item, try to buy the weapon back (the cen are 0 since
+  step 2 and step 3 nets 0, so the purse now holds less than the weapon's price; this step must come before the
+  next one, whose sale leaves cen in the purse). (5) sell the `BuyDemandLv` item, try to buy it back. (6) `&makeitem` until the
   inventory is full (no `0x3402` any more), sell the boots, `&makeitem` once more, try to buy the boots back.
   (7) deposit the cen the sales brought (storage keeper), then at the healer with 0 cen: buy one HP soul stone; withdraw the cen
   (storage keeper), back at the healer buy HP stones up to the number the window allows, then ask for more if the
   client lets the number be typed.
 - **Prediction:** (1) `0x300B` → D `0x3431 {MoveLot 10, nFromItemLot 30, nToItemLot 40}` → `0x3432 {…, 10, 20, 50}`
-  → `0x300C {0x241}`, the two cells at 20 and 50; G `0x0456`. The second drag: `0x3431 {MoveLot 0}` (the zone has
-  no check for a full target, FUN_00532a20 computes `MaxLot − b`) → `0x3433 {0x412}` → `0x300C {0x412}` "Failed to
-  move the item.". (2) as captured (§3.21 result 8); the after-snapshot holds the stack with `nStorageType = 6`,
+  → `0x300C {0x241}`, the two cells at 20 and 50; G `0x0456`. The second drag (target full): no `0x3431`. `sp_ItemReloc` @ FUN_00536780 tests
+  `MaxLot <= lot of the target` before it calls `irm_Split_N_Merge` and takes `irm_Exchange` instead (Z04 §4.1
+  does not show this branch; X05 review): D `0x342B NC_ITEMDB_EXCHANGE_REQ` → `0x342C` → `0x300C {0x241}`, the two
+  stacks swap cells (20 where the 50 was). Only an item that may not be relocated back (`iba_CanInvenReloc` 0) is
+  refused by the zone, `0x300C {0x24A}`. (2) as captured (§3.21 result 8); the after-snapshot holds the stack with `nStorageType = 6`,
   `nOwner = userNo` (D03 check 3). (3) sale `0x3422` → `0x3423` → `0x305C`, `0x3005 {0x381}`; buy-back `0x3059` → D
   `0x34B9 NC_ITEMDB_REPURCHASE_ALL_REQ` (a **new** item key made by the zone, `nSellItemKey` = the sold one) →
   `0x34BA {0x3668}` → `0x305D`, `0x305A {0x3668}`, the cell by `0x3001`; G `0x07FD {0x7F8}`, `0xC815`; the
-  after-snapshot has the boots under the new key only. (4) `0x3059` → **`0x3004 {0x366B}`** (a BUY_ACK, Z04-B2), no
-  `0x305A`, no DB request, no text *(inferred: the buy handler has texts for its own codes only, Z05 §2.4)*. (5)
-  `0x305A {0x366C}` "Not enough money to buy the item.", no DB request. (6) `0x305A {0x366D}` "Inventory is full.",
+  after-snapshot has the boots under the new key only. (4) `0x305A {0x366C}` "Not enough money to buy the item.", no DB request
+  (the handler refuses only when the purse is below the price). (5) `0x3059` → **`0x3004 {0x366B}`** (a BUY_ACK,
+  Z04-B2), no `0x305A`, no DB request, no text *(inferred: the buy handler has texts for its own codes only, Z05
+  §2.4)*. (6) `0x305A {0x366D}` "Inventory is full.",
   no DB request. (7) with 0 cen `0x5005 NC_SOULSTONE_BUYFAIL_ACK {0x743}`; over the stock limit `{0x742}`; no D
   `0x3441` for either *(the order of the two checks is inferred, Z04 §13.1)*. If the client refuses both itself, the
   packets are test-client case T18.
-- **Disproved by:** a refusal of the second drag by the zone (no `0x3431`); `0x34BB` for the boots; the sold key
+- **Disproved by:** a `0x3431` or a refusal for the second drag (predicted: an exchange `0x342B`); `0x34BB` for the boots; the sold key
   coming back; `0x305A {0x366B}`; a DB request in (4)–(7); a refusal in (4)–(6) that removes the entry from the
   repurchase list (`0x305D`).
 
@@ -887,21 +895,31 @@ online owner, one short capture per step, the SQL window open next to the client
   (remaining lot 9) → `0x3427 NC_ITEMDB_SELLLOTFAIL_ACK {0x38D}` (stored lot < remaining lot) → C `0x3005 {object
   handle}` as in (1). A DB lot only 1 lower passes (9 is not < 9): the sale succeeds and the DB keeps 9.
   (3) **S17, money.** With the DB money at 0 and cen in the client: buy one HP soul stone → D `0x3441` → `0x3443
-  {0x744}` → C `0x3004 {0x744}`, no `0x5003`, no text; sell the boots and buy them back → D `0x34B9` → `0x34BA
-  {0x366E}` → C `0x305A {0x366E}`, no text (D03-B2), no `0x305D` *(inferred: the list entry is removed by the lock's
-  apply only)*; with a stack of the item in the inventory the same through `0x34BB` → `0x34BC {0x366E}`. The sale
-  itself succeeds (`p_Char_MoneyAdd`).
+  {0x744}` → C `0x3004 {0x744}`, no `0x5003`, no text; sell the boots (the sale succeeds and
+  **credits the DB row** with the price, `p_Char_MoneyAdd`), then **run S17's `UPDATE` again** (the buy-back price
+  is that same `SellPrice × lot`, so without it `p_Char_MoneySub` ends at exactly 0 and the buy-back succeeds; X05
+  review), then buy them back → D `0x34B9` → `0x34BA {0x366E}` → C `0x305A {0x366E}`, no text (D03-B2), no `0x305D`
+  *(inferred: the list entry is removed by the lock's apply only)*; with a stack of the item in the inventory the
+  same order (sell, `UPDATE`, buy back) through `0x34BB` → `0x34BC {0x366E}`.
   (4) **S16 with fame.** A character with fame (each `&levelup` level adds its number, Z11 §7.3) buys, with the
   trigger installed, an item with `BuyFame` > 0 (2016 data: 106 rows, e.g. `MightySoul01`, 1200) whose class writes
   an option row; note `tCharacter.nFame` before and after. Wire as §8.17's result (`0x340C {0x206}` → `0x3004
   {0x206}`); DB: **`nFame` lower by `BuyFame`**, cen unchanged, no item row (D03-B1). If the purchase succeeds, the
-  class writes no option row: take another item. The gamble-coin form is the same with a `LuckyCapsule*` item
-  (`BuyGBCoin` 1000 / 5000, the 4 coin rows; coins by S9) through the capsule purchase `0x34A0`: `tGambleCoin.nCoin`
-  lower.
+  class writes no option row: take another item. The gamble-coin form goes through the capsule purchase `0x34A0` (a `LuckyCapsule*` item, `BuyGBCoin` 1000 /
+  5000, the 4 coin rows; coins by S9) and has **two outcomes, the content decides** (D03 §2.5 inserts the content
+  first, `Item_Insert` with its attribute write, and calls `ItemBuy_Create` for the capsule only after it): (a) the
+  content item writes an option row → the trigger fails step 1, `0x34A1 NC_ITEMDB_BUYCAPSULE_ACK {0x206}` **before
+  any debit**, `nCoin` unchanged, D03-B1 not reached; (b) the content writes none and the capsule does → `0x34A1
+  {0x206}` from step 2 with `tGambleCoin.nCoin` lower by `BuyGBCoin` (D03-B1), the content row deleted. Note
+  `nCoin` before and after and the content's item id (`0x34A0` @0x95); which of the two a given capsule gives was
+  not looked up, and whether an NPC sells `MightySoul01` or the capsules was not checked (X05 review): if none
+  does, this step has no client path and stays open.
   (5) **X3, the over-full stack** (§9.4 steps 1–3 done: 50 in the cell, `MaxLot` 49, a second stack of 10): sell
   one of the 50 → C `0x3005 {0x385}`, no DB request; use one → C `0x3016 {0x702, itemid, 9}`, no DB request; drag
-  the 10 onto the 50 → D `0x3431` with **`MoveLot 0xFFFF`** (`MaxLot − b` = −1 as a u16) → `0x3433 {0x40D}` → C
-  `0x300C {0x40D}` "Failed to move the item."; drag the 50 onto the 10 → `0x3431 {MoveLot 39}` → with the Character
+  the 10 onto the 50 → no `0x3431` (`MaxLot <= lot of the target` in `sp_ItemReloc` @ FUN_00536780, as scenario 46
+  step 1) but an exchange D `0x342B` → with the Character server still on the old table `0x342C`, the cells swap;
+  with it restarted on the new one `0x342D NC_ITEMDB_EXCHANGEFAIL_ACK {0x84F}` (D03 §3.2: a lot above `MaxLot`) → C
+  `0x300C {0x84F}`; drag the 50 onto the 10 → `0x3431 {MoveLot 39}` → with the Character
   server still on the old table (X3 restarts the zones only) `0x3432 {…, 39, 11, 49}`, with it restarted on the new
   one `0x3433 {0x40D}` (stored 50 > `MaxLot`): the notes say whether the Character server was restarted.
   (6) **S13, worn.** S13 on an item in the equipment (`nStorageType` 8; pick it from S13's list), login, stand in
@@ -915,8 +933,8 @@ online owner, one short capture per step, the SQL window open next to the client
   (8) **S13, used before the check.** S13 on a timed item that can be used (action item, option row 1900); use it
   within the first minute. `0x3016 {0x700}` *(inferred as in 7)*, and the item still goes at the minute check.
 - **Disproved by:** (1), (2) a `0x3005` with the DB code (0x389 / 0x38D) instead of the handle, or a `0x305C`; (3) a
-  `0x5003`, a `0x305D`, or any client text; (4) `nFame` unchanged (D03-B1 is wrong) or the item kept; (5) a DB
-  request for the sale or the use, a zone-side refusal of the first drag, or a disconnect `0x68C`; (6)–(8) a
+  `0x5003`, a `0x305D`, or any client text; (4) `nFame` unchanged (D03-B1 is wrong) or the item kept; for the capsule a `0x34A1` code other than `0x206`, or `nCoin` lower in outcome (a); (5) a DB
+  request for the sale or the use, a `0x3431` or a zone-side refusal for the first drag, or a disconnect `0x68C`; (6)–(8) a
   refusal at the mount or the use that names the end time, a `0x3459` while riding, or the worn item surviving two
   minutes.
 
@@ -990,17 +1008,23 @@ short capture per step, links recorded, the setup named in the notes.
   (6) **S19 on `tUserMoney`** (the account's storage-money row removed first): talk to the storage keeper → D
   `0x3444` → **`0x3445 NC_ITEMDB_OPENSTORAGE_FAIL_ACK`** whose 2 code bytes are never written (D03-B6) → C `0x3C07
   NC_MENU_OPENSTORAGE_FAIL_CMD {those bytes}`, text "An error has occurred while using the Storage.", no `0x3C08`.
+  The 2016 zone asks for four pages at the open (four `0x3444`, capture-validation §20.1) and each one runs
+  `p_User_MoneyGet`: expect **up to four** `0x3445` / `0x3C07`; note how many arrive.
   (7) **S19 on `tItem`, buy-back** (added in the X05 sweep: the one repurchase code 46 and 47 do not reach): sell
   the Leather Boots (the sale deletes the row and succeeds), install S19 (a), buy them back → D `0x34B9` →
-  **`0x34BA {0x366F}`** (D03 §2.2: `ItemBuy_Create` returns neither 0 nor 1; that an insert failure is such a return
-  is *(inferred)* from S16's result, where the same function gave the purchase's "other" code `0x206`) → C `0x305A
-  {0x366F}`, no text (D03-B2), no `0x305D`, no `0x1033`; the entry stays in the repurchase list *(inferred as in 47
+  **`0x34BA {0x366F}` or `{0x366E}`, open between the two** (X05 review). D03 §2.2 gives `0x366F` when
+  `ItemBuy_Create` returns neither 0 nor 1. S16's result does not carry over: there the trigger fired in a separate
+  call (`ItemAttr_Save`); here it fires inside `p_Item_BuyAll` *(db-backup)*, after `p_Char_MoneySub` has set `@nRet
+  = 1`, and its rollback aborts the batch before `SET @nRet = @CreateItemRet`. If no output parameter comes back,
+  the wrapper FUN_00462380 keeps its initial −1 → `0x366F`; if the stale 1 comes back → `0x366E`, the money code,
+  although the money was not the cause. → C `0x305A {that code}`, no text (D03-B2), no `0x305D`, no `0x1033`; the entry stays in the repurchase list *(inferred as in 47
   step 3)*: drop the trigger and buy back again in the same capture, which must succeed (`0x34BA {0x3668}`). No
   disconnect in this step.
 - **Disproved by:** a DB code (0x28A, 0x306, 0x347, 0x348) in the client packet where the handle is predicted, or
   the handle where the code is predicted (`0x3004`, `0x300C`); no disconnect after a drop or pick refusal; a
-  second unequip in step 3 that reaches the DB; a `0x3C08` in step 6; any `0x1033` in step 1; `0x366E` in step 7
-  (then the money path, not the insert, failed) or a second buy-back that finds the list entry gone.
+  second unequip in step 3 that reaches the DB; a `0x3C08` in step 6; any `0x1033` in step 1; in step 7 a
+  successful buy-back, a code other than `0x366E` / `0x366F`, a lower `tCharacter.nMoney` after the refusal (the
+  rollback must undo the debit), or a second buy-back that finds the list entry gone.
 - **After each step:** A at the login screen, then the setup's restore; compare `tItem` / `tItemOptions` of A with
   `21-server.ps1 snapshot-*` before and after (rows the refusal left behind are findings: the equip path does not
   undo its `unequip[]` moves, D03 §3.1).
@@ -1120,8 +1144,8 @@ login plus one crafted packet is enough). One connection per case: several end i
 | inventory full | unequip, pick up, quest reward, `&makeitem` with 0 free cells | 21, 23, 32 | `0x3013 {0x2C2}`; `0x300A {0x346}` "Inventory is full."; the DONE request is not sent (Z15 §5.1); silence |
 | pick-up over a KQ item's `PickupLimit` (`KQItem.shn`) | owned + picked = limit + 1 | 21 step 11 | `0x300A {0x34A}`, text "Failed to obtain the item." (X02-B8) |
 | pick-up onto a stack over `MaxLot` | X3 | 21 step 12 (recorded, `s21d`) | see the result line of §9.4 (capture-validation §21.3); the paths not tried are the next row |
-| sell / use / merge with a stack over `MaxLot` (added by X05) | X3: 50 in the cell, `MaxLot` 49 | 47 step 5 | `0x3005 {0x385}`; `0x3016 {0x702}`; `0x3431 {MoveLot 0xFFFF}` → `0x300C {0x40D}` |
-| merge onto a full stack (added by X05; Z04 §4.1 has no check for it) | 20 onto 50 of `MaxLot` 50 | 46 step 1 | `0x3431 {MoveLot 0}` → `0x300C {0x412}` |
+| sell / use / merge with a stack over `MaxLot` (added by X05) | X3: 50 in the cell, `MaxLot` 49 | 47 step 5 | `0x3005 {0x385}`; `0x3016 {0x702}`; the 10 onto the 50: exchange `0x342B` (→ `0x342D {0x84F}` on the new table), no `0x3431` |
+| merge onto a full stack (added by X05; the check is in `sp_ItemReloc` @ FUN_00536780, not in Z04 §4.1) | 20 onto 50 of `MaxLot` 50 | 46 step 1 | exchange `0x342B` → `0x342C`, no `0x3431` |
 | split lot (added by X05; the client offers 1 … lot − 1) | 0 and the whole lot | 41 T17 | `0x300E {0x442}`, no DB request |
 | stored lot against the zone's (added by X05) | DB lot 1 lower, then 3 lower, sell 1 (S12) | 47 step 2 | 1 lower: the sale succeeds; 3 lower: `0x3427 {0x38D}` → `0x3005 {object handle}` |
 | soul-stone number and money (added by X05) | limit + 1; 0 cen | 46 step 7, 41 T18 | `0x5005 {0x742}`; `{0x743}`; no DB request |
@@ -1250,7 +1274,7 @@ reached).
 | W06 | 16 | 5 | 0 | 11 | 0 | 0 | 18 (7), 19 (3), 37 (2), 44 (1), 36 (1) |
 | Z01 | 29 | 8 | 2 | 19 | 0 | 0 | 37 (9), 41 (7), 27 (6), 38 (6), 28 (3) |
 | Z02 | 27 | 3 | 2 | 22 | 0 | 0 | 40 (7), 14 (6), 36 (6), 21 (4), 30 (4) |
-| Z03 | 39 | 17 | 4 | 18 | 0 | 0 | 24 (15), 39 (5), 45 (3), 32 (1), 19 (1) |
+| Z03 | 39 | 17 | 4 | 18 | 0 | 0 | 24 (15), 39 (5), 45 (2), 32 (1), 19 (1) |
 | Z04 | 53 | 5 | 6 | 42 | 0 | 0 | 21 (17), 22 (12), 30 (4), 49 (4), 41 (4) |
 | Z05 | 46 | 6 | 1 | 39 | 0 | 0 | 21 (21), 49 (9), 22 (8), 28 (7), 18 (6) |
 | Z06 | 23 | 2 | 0 | 21 | 0 | 0 | 20 (11), 35 (11), 43 (3), 21 (1) |
@@ -1282,7 +1306,7 @@ reached).
 | Z32 | 40 | 18 | 1 | 21 | 0 | 0 | 35 (20), 21 (2) |
 | D01 | 17 | 4 | 4 | 9 | 0 | 0 | 37 (8), 43 (2), 38 (1), 36 (1) |
 | D02 | 24 | 4 | 3 | 17 | 0 | 0 | 37 (7), 23 (5), 24 (5), 29 (5), 28 (4) |
-| D03 | 43 | 7 | 1 | 35 | 0 | 0 | 21 (18), 49 (9), 22 (6), 34 (5), 23 (5) |
+| D03 | 43 | 7 | 1 | 35 | 0 | 0 | 21 (18), 49 (9), 22 (6), 47 (5), 34 (5) |
 | D04 | 25 | 1 | 0 | 24 | 0 | 0 | 18 (9), 19 (6), 17 (5), 39 (4), 36 (4) |
 | D05 | 25 | 6 | 1 | 10 | 8 | 0 | 39 (3), 29 (2), 43 (2), 30 (1), 40 (1) |
 | D06 | 49 | 19 | 4 | 25 | 0 | 1 | 37 (11), 18 (4), 21 (3), 28 (3), 36 (3) |
@@ -1347,7 +1371,7 @@ reached).
 | knowledge X02 | 4 | 3 | 0 | 1 | 0 | 0 | 14 (1), 15 (1), 17 (1), 18 (1), 19 (1) |
 | knowledge X03 | 2 | 2 | 0 | 0 | 0 | 0 |  |
 | knowledge X04 | 4 | 1 | 1 | 2 | 0 | 0 | 37 (1), 21 (1), 47 (1), 49 (1) |
-| knowledge X05 | 7 | 1 | 0 | 6 | 0 | 0 | 21 (4), 41 (4), 45 (4), 47 (4), 14 (4) |
+| knowledge X05 | 7 | 1 | 0 | 6 | 0 | 0 | 21 (4), 39 (4), 41 (4), 45 (4), 47 (4) |
 | knowledge K01 | 15 | 8 | 6 | 1 | 0 | 0 | 37 (1) |
 | **Total** | 2058 | 796 | 183 | 1061 | 16 | 2 | |
 <!-- COVER:end -->
@@ -1364,6 +1388,9 @@ the change; if a column is reported missing, stop and report it (that is a findi
 - **Databases** as the shipped `9Data/ServerInfo/ServerInfo.txt` names them (`ODBC_INFO` rows): `Account`,
   `AccountLog`, `StatisticsData`, `w00_Character`, `w00_GameLog`. The Character DB's own wrappers reach the
   account data as `Account.dbo.…` (`usp_ChargeItem_GetList`), so both sit on one SQL Server instance.
+  The recording install of batch 3 names the Character DB **`World00_Character`** (the `tools/capture/21` scripts
+  say `USE World00_Character`): replace `w00_Character` in every script of this chapter, S17–S19 included, by the
+  name the install's `ServerInfo.txt` gives (X05 review).
 - **Placeholders:** `TestCharA` / `TestCharB` = character names (`tCharacter.sID`), `testaccount` = login name
   (`tUser.sUserID`). Every script starts by resolving them. Only some of the scripts stop by themselves when the name is not found
   (S4, S6, S7 and S10–S15 do not): check that the save query returned a row before running the change.
@@ -1824,7 +1851,8 @@ DROP TABLE dbo.X05_save_17;
 ```
 
 Prediction: every DB-side debit fails while the zone-side check passes: `0x3443 {0x744}` for a soul stone, `0x34BA`
-/ `0x34BC {0x366E}` for a buy-back, `0x340C {0x205}` / `0x340F {0x207}` for an NPC purchase (D03 §2.1; scenario 49
+/ `0x34BC {0x366E}` for a buy-back **when the `UPDATE` is run again after the sale** (the sale credits the row with
+exactly the buy-back price), `0x340C {0x205}` / `0x340F {0x207}` for an NPC purchase (D03 §2.1; scenario 49
 step 1). Credits succeed (`p_Char_MoneyAdd`). Disproved by: a purchase that goes through. Not verified
 here: no SQL Server on the analysis machine (as §8.1).
 
@@ -1889,7 +1917,9 @@ INSERT INTO tUserMoney SELECT * FROM dbo.X05_save_19; DROP TABLE dbo.X05_save_19
 ```
 
 Run (a) and (b) in separate steps, not together. Prediction: (a) `0x341E {0x347}` for the pick-up (`Item_Insert`
-returns the error of `p_Item_Create`), `0x340C {0x206}` for a purchase into a free cell; (b) `0x3445`. Disproved
+returns the error of `p_Item_Create`), `0x340C {0x206}` or `{0x205}` for a purchase into a free cell and `0x34BA {0x366F}` or `{0x366E}` for a buy-back
+(open between the two: the trigger rolls back inside `p_Item_BuyAll` after the money step set `@nRet = 1`, see
+scenario 49 step 7); (b) `0x3445`. Disproved
 by: the item or the storage arriving. While (a) exists, every other source of a new row for A fails too (quest
 rewards, `&makeitem`, chests): do nothing else in that capture. Not verified: `tUserMoney` has exactly the two
 columns the procedure inserts (`nUserNo`, `nUserMoney`); no SQL Server on the analysis machine.

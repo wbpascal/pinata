@@ -3554,9 +3554,9 @@ Knowledge files (`docs/knowledge/`):
 | 1. Batch-2 leftovers (capture-validation §15 rows naming X05, §… | medium | cap 11/44; R×1 | capture 0x0C15, 0x0C66, 0x1002, 0x1011 … |
 | 2. Facts found on the way | medium | cap 2/3; weak dbb1 | capture 0x1050 |
 | 3. Batch 3: what the recorded scenarios confirmed (one line eac… | medium | cap 33/47 | capture 0x200E, 0x2023, 0x242E, 0x2438 … |
-| 4. Open after batch 3: where each thing went | medium | cap 2/17 | capture 0x200E, 0x2023, 0x242E, 0x2438 … |
+| 4. Open after batch 3: where each thing went | medium | cap 4/20 | capture 0x200E, 0x2023, 0x242E, 0x2438 … |
 | 5. Predictions of X02 that were wrong as written (for the owner… | medium | cap 14/22 | capture 0x2006, 0x301B, 0x3029, 0x305B |
-| 6. Left open on purpose | medium | cap 3/6; weak inf1 | capture 0x106E, 0x203D |
+| 6. Left open on purpose | medium | cap 5/9; weak inf1 | capture 0x106E, 0x203D, 0x242E |
 | 7. Ratings and the generator scripts | medium | no function cited | cite and re-read the function |
 
 ### 2.113 K01 knowledge: `docs/knowledge/K01.md`
