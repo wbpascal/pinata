@@ -436,11 +436,16 @@ online owner, one short capture per step, the SQL window open next to the client
   makes the zone send `0x482B`, which the client ignores (Z03 §7.3, Z03-B3).
 - **Disproved by:** `0x105D` on the wire; a DB request for the refused fourth point; a buff that survives its
   reset action or falls to another one; a toggle skill still on after the link.
-- **State after batch 3 (X05):** not captured. `re-data/captures/26_11_15_24_skills-abstates-stat-points.md` holds
-  the blank notes form only, no pcapng (capture-validation §1). The scenario stands as written and is the next one to
-  record; its typed setups exist (`tools/capture/24`: `24-prep.sql`, `24-setupA.txt`, `24-setupB.txt`,
-  `24-items.txt`, `24-cleanup.sql`; A is X24A, a level-100 Gladiator GM, with the toggle skill 7300 and the
-  ground-target skill 452). No step or prediction changed: nothing recorded since touches them.
+- **State after batch 3 (X05):** not captured. The scenario stands as written and is the next one to record. No
+  step or prediction changed: nothing recorded since touches them.
+- **Run kit (2026-11-16):** notes form `re-data/captures/26_11_16_24_skills-abstates-stat-points.md` (the capture
+  name; was `26_11_15_…`, blank). `tools/capture/24/24-server.ps1` runs on the server: `prep` (`24-prep.sql`: X24A
+  → Gladiator 100 GM with 3 free stat points, money, skills 7300 toggle / 452 ground target; X24B → HighCleric 20
+  GM with 1620 revive / 1800 cast; skills written to `tSkill` with `p_Skill_Set`, so no `&learnskill` on the wire;
+  tutorial marked done; both at Skill Master Ruby), `capture-start` (dumpcap), `snapshot` (stats / skill rows),
+  `cleanup` (`p_Char_Delete` on both). The typing files `24-setupA/B.txt`, `24-items.txt`, `24-moveA/B.txt`,
+  `24-step7.txt` go through `gmtype.ps1`. The two characters are still created in the client: the Character
+  server's create writes items, skills, quests, shortcuts and the tutorial row (D02 §3), which SQL would only copy.
 
 ### 25. Pet
 

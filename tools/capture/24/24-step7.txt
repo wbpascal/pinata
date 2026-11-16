@@ -1,0 +1,5 @@
+# Scenario 24, client A at the slimes (RouN 6443 9850), start of step 7: a Diamond Trumpy next to A, damage 1 so it lives.
+#   .\gmtype.ps1 -File .\24\24-step7.txt -Client 1
+&fullpoint
+&staticdamage 1
+&mobbreed DiaTrumpy 1 60 n 1
