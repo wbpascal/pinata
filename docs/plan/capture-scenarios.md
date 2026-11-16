@@ -57,58 +57,63 @@ Common GM setups (Z11 §2; all persistent unless noted):
 
 ## 2. Order of work
 
+The order is the order for the **rebuild** (decided 2026-11-16: the rebuild must match the 2016 client only, it
+does not replace the original processes one by one). Rank = what a wrong assumption would cost the rebuild, then
+how early the feature comes, then the capture cost; the ranking and its reasons are the `PRIORITY` list of
+`docs/plan/status/X02-scen.py`, which also holds each scenario's opcode set. Only ranks 1–3 belong before the
+rebuild starts; the rest is recorded shortly before its feature is implemented, and the ranks under "with its
+feature" follow the rebuild's own feature order. 48 and 50 are dropped: they test the original processes among
+themselves (a stop cause, timing). 47 and 49 are optional for the same reason: their refusals need a DB or table
+changed under an online player (49's steps were not re-read for a refusal a normal client can reach).
+
 "Sections reached" = sections rated medium or low that name at least one opcode the scenario should put on the
-wire and no capture holds yet (`docs/plan/status/X02-scen.py`, which also holds each scenario's opcode set). It is
-a reach count, not a proof; the last column orders the work. The table was rebuilt after capture batch 3 (X05:
-ratings of `confidence.md` §2 as re-run, 45–50 and the added steps in the opcode sets). A row marked *(recorded)*
-counts what its opcode set still leaves uncaptured, not what a second run of its steps would bring: 37 still leads
-because its set holds the character-load blocks (`0x1008`–`0x1032`) and the whole Login / WM departments, of which
-one login of Test2 delivers only the blocks that character has; the uncaptured rest needs another character
-(guild, pet, house: scenarios 18, 25, 28) or the refusals of its steps 3–6 not yet run. 14 and 21 are continued
-by 45 and by 46, 47, 49. Scenarios 45–50 rank low by construction: each targets a few named packets that one
-recorded scenario left open (48 and 50 name no uncaptured opcode at all: they test a stop cause and timing), so
-their value is the prediction, not the reach; run them in the session of their parent scenario.
+wire and no capture holds yet. It is a reach count, not a proof, and no longer the sort key (until X05 the table
+was sorted by sections per minute). A row marked *(recorded)* counts what its opcode set still leaves uncaptured,
+not what a second run of its steps would bring: 37's set holds the character-load blocks (`0x1008`–`0x1032`) and
+the whole Login / WM departments, of which one login of Test2 delivers only the blocks that character has; the
+uncaptured rest needs another character (guild, pet, house: log in again after scenarios 18, 25, 28) or the
+refusals of its steps 3–6 not yet run. 14 and 21 are continued by 45 and by 46, 47, 49.
 
 <!-- ORDER:begin -->
-| # | Scenario | Needs | Minutes | Sections reached | Opcodes not yet captured | Sections per minute |
-|---|---|---|---|---|---|---|
-| 37 | Login side: idle heartbeat, refusals, character delete *(recorded, batch 3)* | DB / config setup | 6 | 150 | 88 | 25.0 |
-| 19 | Guild academy | 2 clients, GM | 6 | 97 | 147 | 16.2 |
-| 21 | Items II: drop, split, storage, use, shop *(recorded, batch 3)* | GM | 10 | 139 | 103 | 13.9 |
-| 36 | Block list, reports, options, megaphone | 2 clients | 5 | 66 | 94 | 13.2 |
-| 18 | Guild life cycle and guild storage | 2 clients, GM | 12 | 158 | 242 | 13.2 |
-| 24 | Skills, abstates, stat points | GM, 2 clients for revive | 10 | 119 | 69 | 11.9 |
-| 23 | Quest: accept, kill, finish, give up; class change | GM | 8 | 91 | 54 | 11.4 |
-| 17 | Friends and character titles | 2 clients | 4 | 40 | 38 | 10.0 |
-| 14 | Second client in sight *(recorded, batch 3)* | 2 clients | 5 | 48 | 26 | 9.6 |
-| 27 | Wing stone and silver wing | GM | 5 | 47 | 13 | 9.4 |
-| 34 | Premium inventory, charged buffs | DB setup | 5 | 45 | 30 | 9.0 |
-| 40 | Gathering, production, item emotes, way-finding gate, tutorial, attendance | GM | 8 | 72 | 46 | 9.0 |
-| 35 | Dice table, gamble house, card collection | GM, mini-house | 10 | 89 | 146 | 8.9 |
-| 28 | Mini-house | 2 clients, GM | 10 | 81 | 92 | 8.1 |
-| 39 | Combat extras: death penalty, PK, revive item, knock-back | 2 clients, GM | 8 | 60 | 33 | 7.5 |
-| 15 | Party across two zones | 2 clients | 8 | 53 | 52 | 6.6 |
-| 22 | Upgrade, gems, random options, endurance | GM | 8 | 53 | 58 | 6.6 |
-| 16 | Raid | 2 clients (3 better) | 6 | 37 | 66 | 6.2 |
-| 41 | Test client: crafted client packets | test client | 15 | 86 | 31 | 5.7 |
-| 26 | Mounts and minimon | GM | 5 | 27 | 23 | 5.4 |
-| 30 | Kingdom quest | 2 clients, GM, SHN / schedule setup | 20 | 94 | 93 | 4.7 |
-| 43 | OPTool listener (test tool) | test tool | 15 | 60 | 59 | 4.0 |
-| 25 | Pet | GM | 8 | 29 | 19 | 3.6 |
-| 32 | GM command session | GM, 2 clients | 12 | 41 | 18 | 3.4 |
-| 31 | Instance dungeon | 2 clients (party), GM | 10 | 34 | 34 | 3.4 |
-| 29 | Wedding | 2 clients, GM | 15 | 49 | 44 | 3.3 |
-| 44 | Holy promise (mentor and pupil) | 2 clients, GM | 8 | 25 | 41 | 3.1 |
-| 38 | Session loss, kicks, back to character select | GM, 2 clients, process kill | 10 | 31 | 17 | 3.1 |
-| 20 | Trade and booth | 2 clients | 10 | 28 | 65 | 2.8 |
-| 33 | Prison | GM, 2 clients | 8 | 16 | 17 | 2.0 |
-| 49 | Items V: refusals by the Character server | DB setup per step, a second client or drops | 25 | 41 | 16 | 1.6 |
-| 45 | Second client in sight II | 2 clients | 8 | 13 | 6 | 1.6 |
-| 42 | Races: drop menu, two money pick-ups, link with a dead WM session | 2 clients | 10 | 15 | 5 | 1.5 |
-| 47 | Items IV: the zone and the DB disagree | GM, DB / table setup per step, 2 clients for step 6 | 25 | 26 | 14 | 1.0 |
-| 46 | Items III: no DB change | GM | 12 | 12 | 7 | 1.0 |
-| 48 | WM stop and start with its log | server PC only | 10 | 0 | 0 | 0.0 |
-| 50 | Timing with one clock and without delayed ACKs | capture on the server PC, a registry change | 15 | 0 | 0 | 0.0 |
+| Rank | # | Scenario | When | Needs | Minutes | Sections reached | Opcodes not yet captured | Why at this rank |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 38 | Session loss, kicks, back to character select | before the rebuild starts | GM, 2 clients, process kill | 10 | 31 | 17 | the client-visible session state machine every server part sits on; W01 and L00 had the most errors here |
+| 2 | 37 | Login side: idle heartbeat, refusals, character delete *(recorded, batch 3)* | before the rebuild starts | DB / config setup | 6 | 150 | 88 | its refusal steps 3–6 not yet run (S10, S11, X6) finish the login side |
+| 3 | 24 | Skills, abstates, stat points | before the rebuild starts | GM, 2 clients for revive | 10 | 119 | 69 | core zone data model (stats, abstates); Z03 is the worst-rated document and 24 has no capture |
+| 4 | 46 | Items III: no DB change | early: core gameplay | GM | 12 | 12 | 7 | closes what 21 left open on stack moves and buy-back |
+| 5 | 39 | Combat extras: death penalty, PK, revive item, knock-back | early: core gameplay | 2 clients, GM | 8 | 60 | 33 | party / PK death and exp loss are not captured at all |
+| 6 | 45 | Second client in sight II | early: core gameplay | 2 clients | 8 | 13 | 6 | walk, sit, emote stop: the remaining movement relays |
+| 7 | 36 | Block list, reports, options, megaphone | early: core gameplay | 2 clients | 5 | 66 | 94 | cheap, high reach; settles the option-save tail of `0x7037` |
+| 8 | 23 | Quest: accept, kill, finish, give up; class change | early: core gameplay | GM | 8 | 91 | 54 | the quest engine has no capture-confirmed section |
+| 9 | 22 | Upgrade, gems, random options, endurance | early: core gameplay | GM | 8 | 53 | 58 | item attribute changes the client displays directly |
+| 10 | 15 | Party across two zones | early: core gameplay | 2 clients | 8 | 53 | 52 | party is the first social feature; the zone change itself is captured |
+| 11 | 17 | Friends and character titles | early: core gameplay | 2 clients | 4 | 40 | 38 | cheap; fills the WM social packets |
+| 12 | 20 | Trade and booth | early: core gameplay | 2 clients | 10 | 28 | 65 | not captured at all; item duplication if wrong |
+| 13 | 18 | Guild life cycle and guild storage | with its feature | 2 clients, GM | 12 | 158 | 242 | largest uncaptured area; log in again afterwards for the guild load blocks |
+| 14 | 19 | Guild academy | with its feature | 2 clients, GM | 6 | 97 | 147 | same session as 18 |
+| 15 | 16 | Raid | with its feature | 2 clients (3 better) | 6 | 37 | 66 | builds on party |
+| 16 | 25 | Pet | with its feature | GM | 8 | 29 | 19 | log in again afterwards for the pet load blocks |
+| 17 | 26 | Mounts and minimon | with its feature | GM | 5 | 27 | 23 | small, self-contained |
+| 18 | 27 | Wing stone and silver wing | with its feature | GM | 5 | 47 | 13 | small, self-contained |
+| 19 | 34 | Premium inventory, charged buffs | with its feature | DB setup | 5 | 45 | 30 | needed once charged items are sold |
+| 20 | 40 | Gathering, production, item emotes, way-finding gate, tutorial, attendance | with its feature | GM | 8 | 72 | 46 | several small systems in one run |
+| 21 | 32 | GM command session | with its feature | GM, 2 clients | 12 | 41 | 18 | only for the commands the rebuild keeps |
+| 22 | 28 | Mini-house | with its feature | 2 clients, GM | 10 | 81 | 92 | log in again afterwards for the house load blocks; 35 needs it |
+| 23 | 35 | Dice table, gamble house, card collection | with its feature | GM, mini-house | 10 | 89 | 146 | many uncaptured opcodes, but late content |
+| 24 | 31 | Instance dungeon | with its feature | 2 clients (party), GM | 10 | 34 | 34 | needs party first |
+| 25 | 30 | Kingdom quest | with its feature | 2 clients, GM, SHN / schedule setup | 20 | 94 | 93 | longest setup; only the WM minute skips are captured |
+| 26 | 29 | Wedding | with its feature | 2 clients, GM | 15 | 49 | 44 | late content |
+| 27 | 44 | Holy promise (mentor and pupil) | with its feature | 2 clients, GM | 8 | 25 | 41 | late content |
+| 28 | 33 | Prison | with its feature | GM, 2 clients | 8 | 16 | 17 | late content, small |
+| 29 | 41 | Test client: crafted client packets | optional | test client | 15 | 86 | 31 | how the original reacts to bad input: validation rules, not features |
+| 30 | 42 | Races: drop menu, two money pick-ups, link with a dead WM session | optional | 2 clients | 10 | 15 | 5 | original race behaviour; the rebuild designs its own locking |
+| 31 | 43 | OPTool listener (test tool) | optional | test tool | 15 | 60 | 59 | only if the original OPTool must work |
+| 32 | 49 | Items V: refusals by the Character server | optional | DB setup per step, a second client or drops | 25 | 41 | 16 | DB faults the rebuild's own persistence does not have |
+| 33 | 47 | Items IV: the zone and the DB disagree | optional | GM, DB / table setup per step, 2 clients for step 6 | 25 | 26 | 14 | every step tampers with the DB or tables under an online player |
+| – | 48 | WM stop and start with its log | dropped (original processes only) | server PC only | 10 | 0 | 0 | the WM's own stop cause and log |
+| – | 50 | Timing with one clock and without delayed ACKs | dropped (original processes only) | capture on the server PC, a registry change | 15 | 0 | 0 | timing between the original processes |
+| – | 14 | Second client in sight *(recorded, batch 3)* | recorded | 2 clients | 5 | 48 | 26 | continued by 45 |
+| – | 21 | Items II: drop, split, storage, use, shop *(recorded, batch 3)* | recorded | GM | 10 | 139 | 103 | continued by 46, 47, 49 |
 <!-- ORDER:end -->
 
 Sessions that fit together (same setup): **I** one client, GM: 24, 46, 22, 23, 27, 40, 26, 25, 34, 32 (37 and 21

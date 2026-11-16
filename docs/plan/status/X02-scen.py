@@ -201,16 +201,76 @@ def analyse():
     return reach, docs
 
 
+# Order for the rebuild (decided 2026-11-16: client-facing compatibility only). Rank = cost of a wrong assumption
+# for the rebuild, then how early the feature comes, then capture cost. (when, [(scenario, why)]).
+PRIORITY = [
+    ('before the rebuild starts', [
+        (38, 'the client-visible session state machine every server part sits on; W01 and L00 had the most errors here'),
+        (37, 'its refusal steps 3–6 not yet run (S10, S11, X6) finish the login side'),
+        (24, 'core zone data model (stats, abstates); Z03 is the worst-rated document and 24 has no capture'),
+    ]),
+    ('early: core gameplay', [
+        (46, 'closes what 21 left open on stack moves and buy-back'),
+        (39, 'party / PK death and exp loss are not captured at all'),
+        (45, 'walk, sit, emote stop: the remaining movement relays'),
+        (36, 'cheap, high reach; settles the option-save tail of `0x7037`'),
+        (23, 'the quest engine has no capture-confirmed section'),
+        (22, 'item attribute changes the client displays directly'),
+        (15, 'party is the first social feature; the zone change itself is captured'),
+        (17, 'cheap; fills the WM social packets'),
+        (20, 'not captured at all; item duplication if wrong'),
+    ]),
+    ('with its feature', [
+        (18, 'largest uncaptured area; log in again afterwards for the guild load blocks'),
+        (19, 'same session as 18'),
+        (16, 'builds on party'),
+        (25, 'log in again afterwards for the pet load blocks'),
+        (26, 'small, self-contained'),
+        (27, 'small, self-contained'),
+        (34, 'needed once charged items are sold'),
+        (40, 'several small systems in one run'),
+        (32, 'only for the commands the rebuild keeps'),
+        (28, 'log in again afterwards for the house load blocks; 35 needs it'),
+        (35, 'many uncaptured opcodes, but late content'),
+        (31, 'needs party first'),
+        (30, 'longest setup; only the WM minute skips are captured'),
+        (29, 'late content'),
+        (44, 'late content'),
+        (33, 'late content, small'),
+    ]),
+    ('optional', [
+        (41, 'how the original reacts to bad input: validation rules, not features'),
+        (42, 'original race behaviour; the rebuild designs its own locking'),
+        (43, 'only if the original OPTool must work'),
+        (49, 'DB faults the rebuild\'s own persistence does not have'),
+        (47, 'every step tampers with the DB or tables under an online player'),
+    ]),
+    ('dropped (original processes only)', [
+        (48, 'the WM\'s own stop cause and log'),
+        (50, 'timing between the original processes'),
+    ]),
+    ('recorded', [
+        (14, 'continued by 45'),
+        (21, 'continued by 46, 47, 49'),
+    ]),
+]
+
+
 def order_table(reach):
-    out = ['| # | Scenario | Needs | Minutes | Sections reached | Opcodes not yet captured | Sections per minute |',
-           '|---|---|---|---|---|---|---|']
-    rows = sorted(SCEN, key=lambda n: -reach[n][0] / SCEN[n][1])
-    for n in rows:
-        title, mins, needs, _ = SCEN[n]
-        if n in RECORDED:
-            title += ' *(recorded, batch %d)*' % RECORDED[n]
-        out.append('| %d | %s | %s | %d | %d | %d | %.1f |' % (
-            n, title, needs, mins, reach[n][0], len(reach[n][1]), reach[n][0] / mins))
+    out = ['| Rank | # | Scenario | When | Needs | Minutes | Sections reached | Opcodes not yet captured | Why at this rank |',
+           '|---|---|---|---|---|---|---|---|---|']
+    ranked = [n for _, rows in PRIORITY for n, _ in rows]
+    assert sorted(ranked) == sorted(SCEN), 'PRIORITY must name every scenario once'
+    rank = 0
+    for when, rows in PRIORITY:
+        for n, why in rows:
+            title, mins, needs, _ = SCEN[n]
+            if n in RECORDED:
+                title += ' *(recorded, batch %d)*' % RECORDED[n]
+            numbered = when not in ('recorded', 'dropped (original processes only)')
+            rank += numbered
+            out.append('| %s | %d | %s | %s | %s | %d | %d | %d | %s |' % (
+                rank if numbered else '–', n, title, when, needs, mins, reach[n][0], len(reach[n][1]), why))
     return '\n'.join(out)
 
 
