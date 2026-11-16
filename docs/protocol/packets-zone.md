@@ -242,6 +242,8 @@ Handler `FUN_00550b90`
 |---|---|---|---|
 | 0 | u8 | stat | 0 STR, 1 END, 2 DEX, 3 INT, 4 SPR |
 
+**Captured** (P02, `capture-validation.md`; s24): `stat`: 0 (STR) ×3; a fourth + press sends nothing (client check)
+
 Handler `FUN_0058ad10`
 
 | Off | Type | Checks in handler | Notes |
@@ -255,6 +257,8 @@ Handler `FUN_0058ad10`
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | stat | consumes one restat item |
+
+**Captured** (P02, `capture-validation.md`; s24): `stat`: 0 (with one Stat Reset Scroll in the inventory; no − button without it)
 
 Handler `FUN_0058b3f0`
 
@@ -1599,6 +1603,8 @@ Handler `FUN_00578f90`
 | 0 | u16 | skill |  |
 | 2 | u16 | plus | SKILL_EMPOWER: damage:4, sp:4, keeptime:4, cooltime:4 |
 | 4 | u16 | minus | SKILL_EMPOWER |
+
+**Captured** (P02, `capture-validation.md`; s24): `skill`: 0 ×3 (the only learned step); `plus/minus`: {1,0}, {0,1} (with the scroll), {1,0}
 
 Handler `FUN_0044f150`
 
@@ -3047,6 +3053,8 @@ Sent from `GameDBSession::gds_NC_CHAR_STAT_DECPOINTFAIL_DB_ACK` (`FUN_0058bd10`)
 |---|---|---|---|
 | 0 | u8 | stat | first stat that rose |
 
+**Captured** (P02, `capture-validation.md`; s24): `stat`: 0 ×3, each followed by 0x1035 (flags 0x12…0x1b + WCmin / WCmax +1)
+
 Sent from `FUN_0058a7e0` (`FUN_0058a7e0`) · payload 1 bytes
 
 | Off | Type | Value / source |
@@ -3060,6 +3068,8 @@ Sent from `FUN_0058a7e0` (`FUN_0058a7e0`) · payload 1 bytes
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | stat | first stat that fell |
+
+**Captured** (P02, `capture-validation.md`; s24): `stat`: 0, after 0x3001 (scroll lot 2 → 1)
 
 Sent from `FUN_0058a9d0` (`FUN_0058a9d0`) · payload 1 bytes
 
@@ -6241,6 +6251,8 @@ Sent in reply to `0x3048` NC_ITEM_EQUIP_BELONGED_CANCEL_USE_REQ on ShineObjectCl
 |---|---|---|---|
 | 0 | u16 | err | 0x30a8 ok (sent before the work) |
 
+**Captured** (P02, `capture-validation.md`; s24): `err`: 0x30A8 before the DB exchange ("Inventory has been organized…")
+
 Sent in reply to `0x304a` NC_ITEM_AUTO_ARRANGE_INVEN_REQ on ShineObjectClass::ShinePlayer (`FUN_0051c360`, ShineObjectClass::ShinePlayer::sp_NC_ITEM_AUTO_ARRANGE_INVEN_REQ) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -6894,6 +6906,8 @@ Sent from `CQuestZone::Send_NC_QUEST_RESET_TIME_ZONE_CMD` (`FUN_005bc570`) · pa
 | 0 | u16 | skillid |  |
 | 2 | u8 | ispassive |  |
 
+**Captured** (P02, `capture-validation.md`; s24): `skillid`: 0; `ispassive`: 0; client: "You learned Slice and Dice [1] skill"
+
 Sent in reply to `0x4802` NC_SKILL_SKILLTEACHSUC_ACK on GameDBSession (`FUN_0044ec80`, GameDBSession::gds_NC_SKILL_SKILLTEACHSUC_ACK) · payload 3 bytes
 
 | Off | Type | Value / source |
@@ -6939,6 +6953,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_GainExp` (`FUN_0042d830`) · payloa
 |---|---|---|---|
 | 0 | u16 | skill |  |
 | 2 | u16 | err | 0x881 ok, 0x882 mode, 0x883 too many points, 0x884 refused, 0x886 no reset item, 0x889 plus and minus on one line |
+
+**Captured** (P02, `capture-validation.md`; s24): `skill`: 0; `err`: 0x881 ×3: "Skill empower succeeded"
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_SkillEmpowerSetResult` (`FUN_00518d20`) · payload 4 bytes
 
@@ -9123,6 +9139,8 @@ Sent from `UseEffect::UseItemLicenseClear::uib_DirectUse` (`FUN_00599880`) · pa
 |---|---|---|---|
 | 0 | u8 | freePoints |  |
 
+**Captured** (P02, `capture-validation.md`; s24): `freePoints`: 130 (level 100: all points free after the reset)
+
 Sent from `ShineObjectClass::ShinePlayer::so_ply_InitFreeStat` (`FUN_00518ab0`) · payload 1 bytes
 
 | Off | Type | Value / source |
@@ -9136,6 +9154,8 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_InitFreeStat` (`FUN_00518ab0`) 
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u8 | freePoints |  |
+
+**Captured** (P02, `capture-validation.md`; s24): `freePoints`: 49 (all empower points of level 100)
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_InitSkillEmpow` (`FUN_00518c00`) · payload 1 bytes
 
@@ -10771,7 +10791,7 @@ Empty payload.
 | 0 | u16 | itemid |  |
 | 2 | u32 | lot | clamped to MaxLot for stackables |
 
-**Captured** (P02, `capture-validation.md`; shop, s21b): `itemid`: 751 Long Mace (weapon shop, 0x3C09 tab 1); `lot`: 1; `s21b`: itemid 0 (LeatherBoots), lot 1, twice
+**Captured** (P02, `capture-validation.md`; shop, s21b, s24): `itemid`: 751 Long Mace (weapon shop, 0x3C09 tab 1); `lot`: 1; `s21b`: itemid 0 (LeatherBoots), lot 1, twice; `s24`: itemid 4700 (skill book Slice and Dice [01]), lot 1
 
 ### `0x3019` NC_ITEM_USEABORT_CMD (C→S)
 
@@ -10790,6 +10810,8 @@ Empty payload.
 **Verified layout** (basis: zone FUN_0051c360)
 
 Empty payload.
+
+**Captured** (P02, `capture-validation.md`; s24): `(empty)`: one press
 
 ### `0x304c` NC_ITEM_ACCOUNT_STORAGE_OPEN_CMD (C→S)
 
@@ -10859,7 +10881,7 @@ Empty payload.
 |---|---|---|---|
 | 0 | u8 | btMysteryType | stored unchecked in sp_MysteryVaultUI and sent to GameDB 0x4027 |
 
-**Captured** (P02, `capture-validation.md`; shop): `btMysteryType`: 1, once per 0x240C: the client's On_NC_BAT_LEVELUP_CMD sends it when a Mystery Vault is in the inventory
+**Captured** (P02, `capture-validation.md`; shop, s24): `btMysteryType`: 1, once per 0x240C: the client's On_NC_BAT_LEVELUP_CMD sends it when a Mystery Vault is in the inventory; `s24`: btMysteryType 0 with the vault use (1707.775)
 
 ### `0x749c` NC_GUILD_TOURNAMENT_RECALL_ENTER_REQ (C→Z)
 
@@ -11377,6 +11399,16 @@ no 0x74DC reply in 2016. Z16 §6.4
 | 1 | u16 | shoutdelay | DAT_0da50480 (pdb2017 name) |
 
 PROTO_NC_MISC_SERVERPARAMETER_ACK, the alias at this opcode value (C02 §2); 3 bytes as in the 2016 send
+
+### `0x0842` NC_MISC_MISCERROR_CMD (S→C)
+
+**Verified layout** (basis: zone SendErrorCode(2, 0x42, err) (Z03 §6: asl_AbstateSet / aeo_Set weaker refresh); client GameFrameWork::On_NC_MISC_MISCERROR_CMD FUN_004b0e40)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | error | 0xFD4: the client shows "The effect cannot be used because upper level effect are used already"; any other value is ignored |
+
+P02 batch 4 (s24): 2 bytes; the decoder had no layout
 
 ### `0x1047` NC_CHAR_CLIENT_ITEM_CMD (S→C)
 
@@ -12235,6 +12267,18 @@ to every participant still in the party/raid; client: 0x2008 → '%s acquired th
 | 0 | u16 | itemnum |  |
 | 2 | u16 | npc | NPC object handle |
 | 4 | MENUITEM[itemnum] | itemlist | 3 bytes each; the client opens a new tab at every slot that does not grow, chosen by the first item's class (5 weapon, 6-8 armour, else other) |
+
+### `0x3C0A` NC_MENU_SHOPOPENTABLE_SKILL_CMD (hand-named) (S→C)
+
+**Verified layout** (basis: zone NPCRole_Merchant::nrm_ShopMenuOpen FUN_004c26b0 (Z02 §6.5, role "Skill"); pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD; client Market::SetSkill FUN_00613c50)
+
+| Off | Type | Field | Notes |
+|---|---|---|---|
+| 0 | u16 | itemnum | 123 for Skill Master Ruby (books of every class) |
+| 2 | u16 | npc | NPC object handle |
+| 4 | MENUITEM[itemnum] | itemlist | {u8 slot, u16 item}; the client keeps only skill books (ItemInfo class 11), slot 0 starts a tab chosen by the book's skill (production / active or passive per base class) |
+
+P02 batch 4 (s24, §24.2): 373 bytes; the decoder had no layout
 
 ### `0x3C0B` NC_MENU_SHOPOPENTABLE_ITEM_CMD (hand-named) (S→C)
 
@@ -15819,6 +15863,10 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; combat): `mobid`: 0 Slime; `number`: 4; `exp`: 8; only at the revive (P02-B20)
 
+### `0x0432` NC_LOG_GAME_SKILL_LEARN (Zone→GameLog)
+
+**Captured** (P02, `capture-validation.md`; s24): `chrregnum`: 9; `mappos`: "Need", 0, 0 (D03-B11); `skillid`: 0; `skilllevel`: 1
+
 ### `0x0445` NC_LOG_GAME_ITEM_BREAK (Character→GameLog)
 
 **Captured** (P02, `capture-validation.md`; s21): `(all)`: {charNo, key, itemid 2530, lot 1}
@@ -15907,6 +15955,14 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `iscorrect`: 1, 0–11 ms later
 
+### `0x10d1` NC_CHAR_FREESTAT_SET_DB_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s24): `nMaxStat`: 130; `nFreeStat`: [61|62|63, 67, 0, 0, 0] (INC), [62, 67, …] (DEC); `nLockIndex`: 0 ×3 on INC (unwritten, Z07-B2), 14 on DEC; `nItemNum`: 0 / 1; `DecItemInfo`: {isDelete 0, key, 30022 Stat Reset Scroll, count 1} (27 bytes)
+
+### `0x10d2` NC_CHAR_FREESTAT_SET_DB_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s24): `nFreeStat`: echo; `nLockIndex`: echo; `nErrorType`: 0xAC1 ×4
+
 ### `0x1115` NC_CHAR_TUTORIAL_INFO_ZONE_CMD (WM→Z)
 
 **Captured** (P02, `capture-validation.md`; shop, combat): `nSessionHandle`: zone handle; `nCharNo`: 5; `TutorialInfo`: {state 2, step 0} = 0x1114
@@ -15933,7 +15989,7 @@ Z01 name was 'map login done (ours)'
 
 ### `0x340a` NC_ITEMDB_BUYALL_REQ (Zone→CharDB)
 
-**Captured** (P02, `capture-validation.md`; shop, s21b): `map`: RouN 5724, 8768 (player position); `location`: 0x2406; `attr`: 68 = attribute offset; `price_cen`: 69; `UserNo`: 103; `Vendor`: 28 (NPC mob id); `s21b`: LeatherBoots (0), lot 1, price_cen 13, fame 0, coin 0, attr 68, 13-byte boot attribute, Vendor 28; new key per try
+**Captured** (P02, `capture-validation.md`; shop, s21b, s24): `map`: RouN 5724, 8768 (player position); `location`: 0x2406; `attr`: 68 = attribute offset; `price_cen`: 69; `UserNo`: 103; `Vendor`: 28 (NPC mob id); `s21b`: LeatherBoots (0), lot 1, price_cen 13, fame 0, coin 0, attr 68, 13-byte boot attribute, Vendor 28; new key per try; `s24 (skill book)`: createitemid 4700, price_cen 41, Vendor 31, location 0x2404
 
 ### `0x340b` NC_ITEMDB_BUYALLSUC_ACK (CharDB→Zone)
 
@@ -15981,11 +16037,11 @@ Z01 name was 'map login done (ours)'
 
 ### `0x343f` NC_ITEMDB_USEALL_REQ (Zone→CharDB)
 
-**Captured** (P02, `capture-validation.md`; s21): `(all)`: single potion (lot 1): key, lock 19, itemid 3500
+**Captured** (P02, `capture-validation.md`; s21, s24): `(all)`: single potion (lot 1): key, lock 19, itemid 3500; `s24`: skill book 4700 used whole
 
 ### `0x3440` NC_ITEMDB_USE_ACK (CharDB→Zone)
 
-**Captured** (P02, `capture-validation.md`; s21): `error`: 0x700 for both use requests
+**Captured** (P02, `capture-validation.md`; s21, s24): `error`: 0x700 for both use requests; `s24`: error 0x700, then 0x4801
 
 ### `0x344a` NC_ITEMDB_ITEMCHANGE_ACK (CharDB→Zone)
 
@@ -16019,6 +16075,14 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; s21): `lockindex`: 17
 
+### `0x349e` NC_ITEMDB_MYSTERY_VAULT_MAKEITEM_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s24): `box`: 46003 Damaged Mystery Vault, lot 1; `count`: 3: 46004, 32413, 11504 (MysteryVaultServer rows of class 0 / 6 at rate 1000)
+
+### `0x349f` NC_ITEMDB_MYSTERY_VAULT_MAKEITEM_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s24): `itemLockIndex`: 3; `err`: 0x2140
+
 ### `0x34bc` NC_ITEMDB_REPURCHASE_LOT_ACK (CharDB→Zone)
 
 **Captured** (P02, `capture-validation.md`; s21): `nError`: 0x3668
@@ -16039,6 +16103,18 @@ Z01 name was 'map login done (ours)'
 
 **Captured** (P02, `capture-validation.md`; shop): `err`: 0x2158 (8536) ok, 1–7 ms after 0x4027
 
+### `0x4801` NC_SKILL_SKILLTEACH_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s24): `charregistnumber/chrregnum`: 9 twice; `skillid`: 0 (Slice and Dice [01]); `ispassive`: 0; `removeid`: 0xFFFF
+
+### `0x4802` NC_SKILL_SKILLTEACHSUC_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s24): `ref`: 8001 / 9; `skillid`: 0; `ispassive`: 0
+
+### `0x4813` NC_SKILL_EMPOWALLOC_DB_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s24): `lockindex`: echo of 0x4812 +6 (stale 8049 / 6654 without an item, 12 with); `skill`: 0; `err`: 0x881 ×3; `bUseItem`: echo
+
 ### `0x5003` NC_SOULSTONE_HP_BUY_ACK (S→C)
 
 **Captured** (P02, `capture-validation.md`; s21): `totalnumber`: 15 = 12 held + 3
@@ -16054,6 +16130,18 @@ Z01 name was 'map login done (ours)'
 ### `0x6005` NC_CT_DB_SET_CMD (Zone→CharDB)
 
 **Captured** (P02, `capture-validation.md`; s21): `Info.Type`: 46 (Cleric level titles); `Info.ElementNo / ElementValue`: 0x80 / 0x81 = element 0 / 1, value 2
+
+### `0x9005` NC_CHARGED_STAT_INITIALIZE_DB_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s24): `lockindex`: 15; `restatitemid`: 30023 Full Stat Reset Capsule; `isdelete`: 1 (lot 1); `attr`: 0
+
+### `0x9006` NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_REQ (Zone→CharDB)
+
+**Captured** (P02, `capture-validation.md`; s24): `lockindex`: 13; `restatitemid`: 30017 Full Skill Reset Capsule; `isdelete`: 1; `attr`: 0
+
+### `0x9007` NC_CHARGED_STAT_INITIALIZE_DB_SUC_ACK (CharDB→Zone)
+
+**Captured** (P02, `capture-validation.md`; s24): `lockindex`: 15
 
 ### `0xbcd5` NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_REQ (Zone→CharDB)
 

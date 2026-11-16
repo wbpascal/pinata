@@ -3157,6 +3157,216 @@ No new type: all of them are in §3–§10, §17 and §22.6, and the decoder rep
 the WM (`0x0C19` / `0x0C16`), and no zone called `so_Disconnect` (Z01 §8.3), so a `0x0C1A` with a real `usrregnum`
 is still uncaptured (§14). `0x1002` is captured with `0x145` only (§23.6).
 
+## 24. Skills, stat points and reset items, batch 4 (`s24` part I) *(captured)*
+
+`s24` (notes file + `-prep.txt` + `-db.txt`): A = `admin` / X24A (Gladiator 100, GM, charNo 9, zone handle 8001, later
+8000 / 8003 after the map changes of part 27), B = `testaccountB` / X24B (HighCleric 20, charNo 10, handle 8002), both
+at Skill Master Ruby in RouN. Streams: A = login#1 / wm#1 / zone#1 (9210), then zone#3 (9212, Forest of Mist) and
+zone#4 (9210 again); B = login#2 / wm#2 / zone#2. The zone's CharDB links are `W00_CDB#1`–`#4` (round robin), the
+Character server's GameLog link is `W00_GLDB#1`, the WM's CharDB link `W00_CDB#5`. This section covers the notes'
+start and steps 1–3 (and the inventory events between them); steps 4–8 (casts, toggles, abstates, damage over time,
+revive) are part 27. Item ids: 4700 Slice and Dice [01] (book), 30016 Skill Reset Scroll, 30017 Full Skill Reset
+Capsule, 30022 Stat Reset Scroll, 30023 Full Stat Reset Capsule, 260 Vulcan Sword, 357 Titanic Axe; skill 0 =
+`TripleHit01` "Slice and Dice [01]" (ActiveSkill.shn row 0).
+
+### 24.1 What happened
+
+```text
+73.9 / 79.9    A map login (0x1801 / 0x1803); 151.2 / 157.6 B
+step 1, learn (Skill Master Ruby, NPC handle 17089):
+  356.357 C 0x200A → Z 0x4401 (quest 585 dialog) → C 0x201D {1} → 357.344 Z 0x3C0A {123 books, npc 17089}
+  364.425 C 0x3003 {4700, lot 1} → CDB 0x340A {price_cen 41, Vendor 31} → 0x340B (21 ms) → GL 0x0448 / 0xC80D,
+          C 0x1033 {99959}, 0x106F, 0xBC04, 0x3001 (book in cell 4), 0x3004 {0x201}
+  370.746 C 0x3015 {slot 4} → CDB 0x343F (book used whole) + C 0x301A → CDB 0x3440 {0x700} (14 ms)
+          → CDB 0x4801 {9, 9, skill 0, passive 0, 0xFFFF} → 0x4802 (11 ms) → GL 0x0432 {9, "Need", 0, 0, skill 0, level 1}
+          → C 0x3016 {0x700, 4700}, 0x3001 (cell 4 emptied), 0x4804 {0, 0}, 0x1035     client: "You learned Slice and Dice [1] skill"
+step 2 part 1, empower:
+  398.086 C 0x4811 {skill 0, plus {damage 1}, minus 0} → CDB 0x4812 (40 bytes, bUseItem 0) → 0x4813 {0x881} → C 0x4814 {0, 0x881} (52 ms)
+          client: "Skill empower succeeded"; taking it back: refused by the client, no packet (no reset item yet)
+step 3 part 1, stat points (3 free):
+  496.739 / 497.410 / 498.046 C 0x105C {0} → CDB 0x10D1 {max 130, [61|62|63, 67, 0, 0, 0], lock 0, 0 items} → 0x10D2 {0xAC1}
+          → C 0x105F {0} + 0x1035 (DB 35–88 ms, request to answer 51–105 ms); a fourth +: no packet; no − button
+551.3          DB snapshot "after steps 2-3 part 1" (12:23:56.303)
+667.042 C 0x304A (auto-arrange; not in the notes) → C 0x304B {0x30A8} at once → CDB 0x342B (swap cells 1 / 2) → 0x342C (40 ms)
+          → C 0x3001 ×2, 0x300C {0x241}
+676.0   Item Merchant Pey (17090): 0x201C / 0x3C0B, closed (0x200B)
+679.911 A auto-save, StoreType 10, 599.99 s after 0x1803 (§23.5's 10-min period again; B's at 757.614, 599.97 s)
+707.979–719.615 &makeitem FreeStatusReloadOne -l2, SkillReloadbundleOne -l2, SkillReloadbundleAll, FreeStatusReloadAll
+          (0x3401 → 0x3402, GL 0x044F, C 0x3001: cells 4–7, locks 8–11)
+step 2 part 2:
+  744.088 C 0x4811 {0, plus 0, minus {damage 1}} → CDB 0x4812 (41 bytes, bUseItem 1, lock 12, scroll cell 5 lot 2 → 1)
+          → 0x4813 {0x881, bUseItem 1} → C 0x4814 {0x881}, 0x3001 {cell 5, lot 1} (17 ms)    "Skill empower succeeded"
+  770.911 C 0x4811 {0, plus {damage 1}, 0} → 0x4812 (40 bytes) → 0x4813 → 0x4814 {0x881} (15 ms)
+  781.977 C 0x3015 {slot 6} (Full Skill Reset Capsule) → CDB 0x9006 {lock 13, 30017, isdelete 1} + C 0x3016 {0x700} at once
+          → 0x9008 (20 ms) → GL 0x045A → C 0x3001 (cell 6 emptied), 0x900D {49}               client: nothing
+step 3 part 2:
+  811.944 C 0x1062 {0} → CDB 0x10D1 (27 bytes: [62, 67, …], lock 14, 1 item {isDelete 0, Stat Reset Scroll, count 1})
+          → 0x10D2 {0xAC1} (30 ms) → GL 0x0459 {lot 1} → C 0x3001 {cell 4, lot 1}, 0x1065 {0}, 0x1035     client: nothing
+  831.528 C 0x3015 {slot 7} (Full Stat Reset Capsule) → CDB 0x9005 {lock 15, 30023, isdelete 1} + C 0x3016 {0x700}
+          → 0x9007 (28 ms) → GL 0x045A → C 0x3001 (cell 7 emptied), 0x900C {130}, 0x1035 (MaxHP 3836, all free-stat
+          values 0), 0x240E {hp 3836}                                                          client: nothing
+858.7          DB snapshot "after steps 2-3 part 2" (12:29:03.727)
+```
+
+The step times in the notes have no clock; the order above is the capture's and matches the notes' order. The DB
+snapshot times convert with the capture start 12:14:45.040 (the WM's `0x0821` at 14.970 carries 12:15:00).
+
+### 24.2 The skill master and learning from a book
+
+- `0x3C0A NC_MENU_SHOPOPENTABLE_SKILL_CMD` is `nrm_ShopMenuOpen` @ FUN_004c26b0's table form (Z02 §6.5, role
+  "Skill"): `{u16 itemnum 123, u16 npc 17089, MENUITEM {u8 slot, u16 item}[123]}` = 373 bytes, the same struct as
+  `0x3C0B` (pdb2017 `PROTO_NC_MENU_SHOPOPENTABLE_CMD`). The list holds the books of every class (4700 Slice and Dice [01],
+  5440 Heal [01], 6200 Aimed Shot [01], 19400 Claws Swipe [01], recipes 20000…, 29001 Mining, …): the NPC list is not
+  filtered by the player's class. The client
+  (`Market::SetSkill` @ FUN_00613c50) keeps only skill books (ItemInfo class 11) and starts a new tab at every
+  slot 0, chosen by the book's skill (production, else active / passive of the base class). Layout added to `P02.json`.
+- The purchase is the ordinary buy path (§8, §20.2: `0x3003` → `0x340A` → `0x340B` → logs → `0x1033` … `0x3004
+  {0x201}`), price 41 = the notes' price; DB money 100 000 → 99 959 (snapshot 1).
+- Using the book: the zone deletes it first (`0x343F` USEALL, `0x301A` at once) and runs the effect on the DB's
+  `0x3440 {0x700}` (Z05 §6.1: the releaser runs `uib_Effect`): `UseItemSkillScroll` sends `0x4801` (Z23 §6.2, Z03 §9.3).
+  `0x4801` / `0x4802` / `0x4804` and GameLog `0x0432` have the documented layouts (D04 §2, Z03 §9.3): `removeid
+  0xFFFF`, `skill 0`, `skilllevel 1`, and the GameLog map is the constant "Need" with x / y 0 (D03-B11). The client
+  packets of the `0x3440` and `0x4802` handlers leave in one burst (370.833) after the DB link packets: client packets
+  are flushed once per zone loop *(inferred)*. `0x4804` is followed by a `0x1035` (vt 0x528 recalculation, Z03 §9.3).
+  DB: a new `tSkill` row `nSkillNo 0`, `nSkillLevel 1` (snapshot 1). **Confirmed**.
+
+### 24.3 Empower (`0x4811` → `0x4812` → `0x4813` → `0x4814`)
+
+- `0x4811 {u16 skill, SKILL_EMPOWER plus, SKILL_EMPOWER minus}` (Z03 §9.1): `skill` is 0 in all three, the only learned
+  step of the line. Whether the client names the highest learned step when several are learned (Z23 §4, Z23-B8) stays
+  open (§14).
+- `0x4812` is 40 bytes without an item and 41 with one partly used scroll: `PROTO_NC_SKILL_EMPOWALLOC_DB_REQ` (pdb2016,
+  0x28 bytes, ref included) + 8 per deleted cell + the attribute of a partly used cell. The decoder's annotations
+  (D04 / Z03) ended after 18 bytes; `P02.json` now has the full layout (verified field by field against
+  `sp_NC_SKILL_EMPOWALLOC_REQ` @ FUN_0044f150 and D04 §2): `+6 lockindex`, `+8 skill`, `+10 bUseItem`,
+  `+11 empower {skill, plus, minus}` with **plus = minus = the new totals** (`{damage 1}`, then 0, then `{damage 1}`),
+  `+17 redistitem` (`PROTO_ITEMDELETEREQUEST`: 6-byte header, `+23 lockindex`, `+25 count` (bit 7 = partly used),
+  `+26 changeinfo {itemid, key, attroffset, location}`), `+40` deleted keys, then the attribute (`01`: the scroll's new lot).
+- **Stale bytes (original bug) P02-B37**: the request is built in the global `gpp` and three parts are written only
+  conditionally. `+6 lockindex` only when an item is used (398.094: 8049, 770.912: 6654; the DB echoes it in
+  `0x4813`, the zone ignores it then); `redistitem.header` never (`00 32 00 6e 65 62`, `00 28 00 6e 20 65`, …);
+  `changeinfo` only for a partly used cell (398.094 carries the text "g darkness to " of an older packet).
+  `redistitem.lockindex` is always the player's current lock counter (7, 12, 13) but is consumed only with
+  `bUseItem 1` (13 is used again by `0x9006` at 781.979). The DB reads `count` (0) and so does no item work: no
+  functional effect.
+- With the scroll (744.088): `bUseItem 1`, `count 0x80`, `changeitemid 30016`, `attroffset 40`, location `0x2405`,
+  attribute lot 1; `0x4813 {lock 12, 0x881, bUseItem 1}`; the zone answers `0x4814` and commits the cell (`0x3001`
+  lot 1) in the same ms, as Z03 §9.1 says (release only with `bUseItem 1`).
+- `0x4814 {skill, 0x881}` → "Skill empower succeeded" each time (client FUN_004acf60). DB `nSkillPowerDemage` 1 after
+  step 2 part 1, 0 after part 2 (snapshots). No packet carries the free empower points except `0x900D`; the client
+  counts them itself (49 → 48 → 49 in the notes). The refused take-back without an item (notes) is a client check:
+  no `0x4811`, so the server's 0x886 is untested. **Confirmed**: Z03 §9.1, Z23 §4, D04 §2.
+
+### 24.4 Stat points (`0x105C` / `0x1062` → `0x10D1` → `0x10D2` → `0x105F` / `0x1065`)
+
+- INC (Z07 §2.2): `0x10D1` = 15 bytes `{ref, nMaxStat 130, nFreeStat [STR, END, DEX, INT, SPR], nLockIndex, nItemNum 0}`
+  with the **whole target array** (61, 62, 63 for STR; END 67 unchanged). `nLockIndex` is 0 in all three: never
+  written (Z07-B2), the stale `gpp` word happened to be 0. `0x10D2 {nFreeStat echo, nLockIndex echo, 0xAC1}` →
+  `0x105F {stat 0}` → `0x1035`. **Confirmed**.
+- DEC with the Stat Reset Scroll (Z07 §2.3): `0x10D1` = 27 bytes: `nLockIndex 14`, `nItemNum 1`, `DecItemInfo {isDelete 0,
+  key, 30022, count 1}` (the 2-stack becomes 1); the Character server logs `0x0459 {lot 1}` after `0x10D2` (D02 §7.2,
+  logged before the zone acts); the zone then commits the cell (`0x3001` lot 1) before `0x1065 {0}`. **Confirmed**.
+- Client side: the fourth + press and the − button without a scroll send nothing (notes): the client counts the free
+  points (130 − 127 = 3 at login) and shows − only with the scroll.
+- `0x1035` after each change: flags `0x12`…`0x1b` (the free-stat bonuses, always sent, Z12 §4.2), with `0x12` (free WC)
+  72 → 73 → 74 → 75, and `6` / `7` (WCmin / WCmax) +1 per point; **no flag 0** (total STR): free points do not enter
+  the STR total the server sends (Z12 §4.2: they act through the `0x12…0x1b` bonuses). The notes' "STR 594 (+60)" →
+  "593 (+63)" and "other values … none" do not match the wire: the client's STR total had nothing to change it, and
+  WC rose by 3 *(the 593 is most likely a misreading)*.
+- DB (snapshot 1): STR 63, END 67, `spent` 130 (notes' "53" is a typo; the file says 63).
+
+### 24.5 Reset items: `0x9005` / `0x9006` → `0x9007` / `0x9008` → `0x900C` / `0x900D`
+
+- Request (Z08 §11 / Z23 §4 `sp_StatEmpowInitialize` @ FUN_005183f0): 21 bytes `{ref, lock, key, itemid, isdelete 1,
+  attr 0}` for a lot-1 capsule, no attribute tail; `0x3016 {0x700}` goes to the client in the same ms, **before** the
+  DB answer (the 0x700 is `uib_DirectUse`'s, not the DB's). The DB answer `{ref, lock}` (8 bytes; `0x9008` had no
+  layout, added) is followed by GameLog `0x045A` (deleted) and then the zone's `0x3001` (cell emptied).
+- `0x900D {49}` = every empower point of level 100 (`csl_EmpowerClear` then `vt 0x6b8() − summary`); `0x900C {130}` =
+  every stat point (the class-table points of level 100 − spent 0). The client handlers clear their state and take the
+  byte (`On_NC_CHARGED_*_INITIALIZE_SUC_CMD` @ FUN_004a37f0 / FUN_0049b330); they show no text, as the notes say.
+- The stat reset also re-sends MaxHP: `0x1035 {0x10: 3836, 0x12…0x1b: 0, 6 / 7: 59, 8: 405}` and `0x240E {hp 3836}`:
+  MaxHP falls by the free MaxHP bonus 335 (4171 → 3836) and the current HP is clamped. DB: STR / END 0, `spent` 0
+  (snapshot 2; `usp_ChargeItem_UseStatPointInitDel`, D03 §9), `nSkillPowerDemage` 0. **Confirmed**: Z08 §11, D03 §9.
+
+### 24.6 DB snapshots against the wire
+
+| Snapshot (capture time) | X24A in the DB | Wire before it |
+|---|---|---|
+| after_prep (before the capture) | money 100 000, STR 60, END 67, spent 127, HP 52, RouN 6450 / 7150 | blob `0x1007` at login: the same |
+| after steps 2-3 part 1 (551.3) | money 99 959, STR 63, spent 130, skill 0 {level 1, damage 1} | `0x340A` 41, `0x10D1` [63, 67], `0x4812 plus {1}` |
+| after steps 2-3 part 2 (858.7) | STR 0, END 0, spent 0, skill 0 damage 0; HP 4171, SP 2029, RouN 6971 / 6683 | `0x9005` / `0x9006`; HP and position are the 679.911 auto-save's (`0x4001`), taken before the reset lowered MaxHP |
+| before_cleanup (2040.2) | HP 3836, RouN 6536 / 9825; skills unchanged | the quit saves (part 27) |
+
+Every value the wire wrote is in the DB; nothing else changed. The skill rows of the prep (452, 7300 for A; 1620, 1800
+for B) have `nSkillLevel 0` (written by the prep script); the snapshot has no cool-time column, so the `0x4009` rows
+(§24.7) cannot be compared.
+
+### 24.7 Skill saves: `0x4009` / `0x400A`
+
+Two saves carry skills, both at a map change of part 27 (1236.110 StoreType-2 burst before the Forest-of-Mist
+link, 1274.440 before the link back): `0x4009` = 30 bytes `{ref, handle {bufferlocation 0, chrregnum 9}, number 1,
+PROTO_SKILLREADBLOCK {savetime, skillid 452, cooltime, empow 0, mastery 0}}`, answered by `0x400A` = the 12-byte
+header (8 ms). The first record is Dash, cast 47.2 s earlier with a 60-s cool-down: `cooltime 12` (seconds left,
+rounded down); the second, 38 s later, writes it once more with `cooltime 0` (cool-down over), then Dash is no longer
+saved. `savetime` = the wall clock of the send (1794828921 = capture time 1236.1). This is Z23 §7.1's incremental
+rule exactly; skill 0 (learned, never cast) is never in a `0x4009`. The pdb2016 struct lacks the ref and `0x400A` had
+no layout: both added to `P02.json`. **Confirmed**: Z23 §7.1 / §7.2, D02 §6.
+
+### 24.8 Other events in this part of the capture
+
+- **Auto-arrange** (667.042, not in the notes): `0x304B {0x30A8}` is sent at once, before any DB request (Z04 §12.5);
+  the client plays the arrange effect and shows "Inventory has been organized. The organizing function can not be used
+  again for 5 sec." (`On_NC_ITEM_AUTO_ARRANGE_INVEN_ACK` @ FUN_004b3f90). `so_ply_ArrangeInven` @ FUN_00563500 moves
+  through `sp_ItemReloc`, which for an occupied target cell issues an exchange: `0x342B` (48 bytes = ref + pdb2016
+  `PROTO_NC_ITEMDB_EXCHANGE_REQ`; Vulcan Sword to cell 1, Titanic Axe to cell 2, lots 1) → `0x342C {ref, lock 7}` →
+  `0x3001` ×2, `0x300C {0x241}` (Z05 §4). One swap sorted the inventory; no further step followed. Both layouts added.
+- **Damaged Mystery Vault** (1707.775, part 27's step-6 window; the tester re-equipping the axe, not in the notes):
+  client `0x4025 {0}` and `0x3015 {slot 0}` in one ms (the knowledge note "0x4025 `{0}` comes when a Mystery Vault is
+  used" again); `sp_MysteryVaultMakeItem` (Z05 §9.8) sends `0x349E` (217 bytes, box 46003, count 3: 46004 Chipped
+  Mystery Vault, 32413 Angel Wings (7 Days), 11504 Lightning Long Sword = the MysteryVaultServer.shn rows of
+  `MVault_01` for class groups 6 / 6 / 0 at rate 1000) and `0x3016 {0x700}` at once; the DB answers `0x349F {lock 3,
+  0x2140}` in 54 ms, logs `0x044F` ×3 and `0x0445 {box, lot 1}` (D03 §7.4), and the zone commits the four cells
+  (`0x3001` ×4) with no other client packet (Z05 §9.8). The zone's `0x4027` → CharDB `0x4028 {0x2158}` → client `0x4026`
+  (no client handler) runs in parallel (Z12 §7.1). **Confirmed**.
+- **`0x0842 NC_MISC_MISCERROR_CMD`** (1699.861, 21 ms after `&resetabstate`): `{u16 error 0xFD4}` =
+  `SendErrorCode(2, 0x42, 0xFD4)` of `asl_AbstateSet` / `aeo_Set` (Z03 §6: a weaker abstate refresh). The client
+  (`On_NC_MISC_MISCERROR_CMD` @ FUN_004b0e40) shows "The effect cannot be used because upper level effect are used
+  already" for 0xFD4 and ignores every other value. Layout added; why the reset produced it is part 27.
+
+### 24.9 Opcodes
+
+All 29 `s24`-only types of steps 1–3 (of the 45 `s24` adds besides the 10 it shares with `s37b`; the other 16 are
+part 27's) now decode with no issue:
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| Z→C | 0x3C0A | NC_MENU_SHOPOPENTABLE_SKILL_CMD | 1 | 373 | confirmed; layout added | `{123, npc, MENUITEM[123]}` (§24.2) |
+| Z→CDB | 0x4801 | NC_SKILL_SKILLTEACH_REQ | 1 | 15 | confirmed | `{ref, 9, skill 0, 0, 0xFFFF}` |
+| CDB→Z | 0x4802 | NC_SKILL_SKILLTEACHSUC_ACK | 1 | 9 | confirmed | |
+| CDB→GL | 0x0432 | NC_LOG_GAME_SKILL_LEARN | 1 | 27 | confirmed; **bug** | "Need", 0, 0 (D03-B11) |
+| Z→C | 0x4804 | NC_SKILL_SKILL_LEARNSUC_CMD | 1 | 3 | confirmed | "You learned Slice and Dice [1] skill" |
+| C→Z | 0x4811 | NC_SKILL_EMPOWALLOC_REQ | 3 | 6 | confirmed | skill 0 |
+| Z→CDB | 0x4812 | NC_SKILL_EMPOWALLOC_DB_REQ | 3 | 40 / 41 | corrected (layout); **bug** | P02-B37 (§24.3) |
+| CDB→Z | 0x4813 | NC_SKILL_EMPOWALLOC_DB_ACK | 3 | 13 | confirmed | `0x881`, lockindex echo |
+| Z→C | 0x4814 | NC_SKILL_EMPOWALLOC_ACK | 3 | 4 | confirmed | `0x881` |
+| C→Z | 0x105C | NC_CHAR_STAT_INCPOINT_REQ | 3 | 1 | confirmed | `{0}` |
+| C→Z | 0x1062 | NC_CHAR_STAT_DECPOINT_REQ | 1 | 1 | confirmed | `{0}` |
+| Z→CDB | 0x10D1 | NC_CHAR_FREESTAT_SET_DB_REQ | 4 | 15 / 27 | confirmed; **bug** | INC `nLockIndex` unwritten (Z07-B2) |
+| Z→C | 0x105F | NC_CHAR_STAT_INCPOINTSUC_ACK | 3 | 1 | confirmed | |
+| Z→C | 0x1065 | NC_CHAR_STAT_DECPOINTSUC_ACK | 1 | 1 | confirmed | |
+| Z→CDB | 0x9005 / 0x9006 | NC_CHARGED_STAT / SKILLEMPOW_INITIALIZE_DB_REQ | 1 each | 21 | confirmed | lot-1 capsules, no attribute |
+| CDB→Z | 0x9007 / 0x9008 | …_INITIALIZE_DB_SUC_ACK | 1 each | 8 | confirmed; 0x9008 layout added | `{ref, lock}` |
+| Z→C | 0x900C / 0x900D | NC_CHARGED_STAT / SKILLEMPOW_INITIALIZE_SUC_CMD | 1 each | 1 | confirmed | 130 / 49 |
+| C→Z | 0x304A | NC_ITEM_AUTO_ARRANGE_INVEN_REQ | 1 | 0 | confirmed | |
+| Z→C | 0x304B | NC_ITEM_AUTO_ARRANGE_INVEN_ACK | 1 | 2 | confirmed | `0x30A8` before the DB work |
+| Z→CDB | 0x342B | NC_ITEMDB_EXCHANGE_REQ | 1 | 48 | corrected (layout: + ref) | §24.8 |
+| CDB→Z | 0x342C | NC_ITEMDB_EXCHANGESUC_ACK | 1 | 8 | corrected (layout: + ref) | |
+| Z→CDB | 0x349E | NC_ITEMDB_MYSTERY_VAULT_MAKEITEM_REQ | 1 | 217 | confirmed | 3 items |
+| CDB→Z | 0x349F | NC_ITEMDB_MYSTERY_VAULT_MAKEITEM_ACK | 1 | 10 | confirmed | `0x2140` |
+| Z→CDB | 0x4009 | NC_CHARSAVE_SKILL_REQ | 2 | 30 | corrected (layout: + ref) | §24.7 |
+| CDB→Z | 0x400A | NC_CHARSAVE_SKILL_ACK | 2 | 12 | confirmed; layout added | 12-byte header |
+| Z→C | 0x0842 | NC_MISC_MISCERROR_CMD | 1 | 2 | confirmed; layout added | `0xFD4` (§24.8) |
+
 ## 11. Message order against README §2 and the pseudocode
 
 README §2 is a sketch of the login → WM → zone chain. Against the thirteen captures (details in the sections cited;
@@ -3263,6 +3473,7 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B34 | WM `fc_NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK` @ FUN_0040d740 → client 0xB40C (found in batch 4) | the slot byte comes from a local that only `CWMClientSession::CharIDChange` writes (code 0x20C0); for every other code it is stack garbage (7 captured, `s37b` 508.207, §22.4) | the client's `On_NC_USER_CONNECTION_CHANGE_CHAR_ID_ACK` @ FUN_00476de0 finds no avatar for the slot and returns: "The name is already taken by another user." (0x20D1), the guild-master text (0x20C7) and the generic error never show | send the slot of the request (look it up by `nCharNo`) |
 | P02-B35 | WM `0x0C18` mode 0 @ FUN_00412df0 and `Client_OnClosed` @ FUN_00437030 (each broadcasts `0x0C19`), zone `so_banning` @ FUN_00558b70, `zs_disconnect` and `sp_Schedule_Logout` @ FUN_00558160 (found in batch 4) | a quit runs `ws_save2DB` four times: `StoreType` 4 (first `0x0C19`), 7 (socket cut), 4 (second `0x0C19`) within 35 ms and 9 with `0x0C31` 3 s later (`s37b` 689.1, `s24` 2020.8 / 2022.8; §22.5). The last one is the `0x1071` timer (13 s after it, §23.3). `so_banning` has no guard for a player already in its logout window, so every further `0x0C16` / `0x0C19` for the user inside the 10-s / 13-s window saves again (`s38` 428.104, 518.799, 520.345: the next login's kicks) | four to six full CharDB save bursts, GameLog `0x0410` rows and `0x750C` for one logout; the data is the same each time *(inferred: no lost state)* | one save per logout; skip `so_banning` for a closing player |
 | P02-B36 | WM `CharacterLogout` → CharDB `0x1037` (W01 §5.4) → Character `fc_NC_CHAR_LOGOUT_DB` @ FUN_00405b30 → GameLog `0x040B` (found in batch 4) | `0x1037` carries the WM's copy of map, x / y and `Cen` from the last map login (CharDB blob), not the logout values; `p_Char_Logout` ignores them, but the Character server copies them into `0x040B NC_LOG_GAME_LOGOUT` (`s38` 1894.409: `Cen` …4824 after a committed `&getmoney 500`, DB …5324; §23.5; position 5771 / 8796 vs the zone's 5756 / 8745 in `s37b`, §22.5) | the GameLog logout row records stale money and position; the client and the character row are not affected | send the zone's last saved values (or drop the fields from the log) |
+| P02-B37 | zone `sp_NC_SKILL_EMPOWALLOC_REQ` @ FUN_0044f150 → CharDB `0x4812` (found in batch 4) | the request is built in the global `gpp`: `+6 lockindex` is written only when a redistribution item is used, `redistitem.header` (6 bytes) never, `redistitem.changeinfo` (14 bytes) only for a partly used cell; the rest are bytes of older packets (`s24` 398.094 lockindex 8049 and the text "g darkness to ", 770.912 lockindex 6654; §24.3) | none seen: the DB echoes the stale lockindex in `0x4813`, which the zone ignores without `bUseItem`, and `count` 0 stops the item work; stale bytes on a server link | zero the request (or write lockindex 0xFFFF) |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -3298,6 +3509,8 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | Z04-B6 | `s21b` 17.213 / 22.337: `0x3004 {0x206}` (BUYALL DB error) shows no text: 0x206 is the switch's default case in `On_NC_ITEM_BUY_ACK`; 0x208 (BUYLOT DB error) is silent the same way (not in Z04-B6's list) | §21.1 |
 | D04-B13 | `s37b` 250.211 / 593.052 / 679.228: `0x7050 {0x2118, nCharNo 270 / 2791060741 / 2791060740}` (never written) | §22.5 |
 | P02-B28 | `s37b` 212.393: `0x1110` carries a stale `0x91` | §22.1 |
+| D03-B11 | `s24` 370.824: `0x0432 NC_LOG_GAME_SKILL_LEARN` map "Need", x / y 0 | §24.2 |
+| Z07-B2 | `s24` 496.751 / 497.415 / 498.047: `0x10D1` INC `nLockIndex` 0 (unwritten; the stale word was 0) | §24.4 |
 
 ## 13. Discrepancies per work item
 
@@ -3402,6 +3615,8 @@ sweep, `docs/plan/items/X04.md`) carries every row marked "→ X01" that README 
 | Z01 | `Z01-core.md` §8.4 ("periodic timer every 6000 ms"; "Reason values seen: 2") | the auto-save (`so_Routine` @ FUN_0056c790, `tAutoSaveTime`, reason 10, partial) runs every 6000 ticks of 0.1 s = 10 min (captured 599.98 s after `0x1803`); reasons: 2 link / revive, 3 kickout, 4 `so_banning`, 7 `zs_disconnect`, 8 level-up, 9 logout, 10 auto-save (§23.3, §23.5) | corrected → batch-4 follow-up |
 | W01 / D02 | `W01-core.md` §5.4 `CharacterLogout`, `D02` §5 `0x1037` | `0x1037` carries the WM's map-login copy of money and position; `p_Char_Logout` ignores them, `0x040B` logs them (P02-B36, §23.5) | extended → batch-4 follow-up |
 | X02 | `s38` notes (steps 1–6) | step 2's in-game quit is not in the capture (292.5 is a server reset, no `0x1071`); step 1 was done twice (the first try went on to the world list); step 5 has a first `&getmoney` without a kill (547.2) and two kills before the one the notes record; the DB readings file was not copied (§23.1) | corrected → batch-4 follow-up |
+| Z03 | `Z03-combat.md` §9.1 (`0x4812` layout) | the buffer is `gpp`: `+6 lockindex` only with an item, `redistitem.header` never and `changeinfo` only for a partly used cell are written (P02-B37); the partly used cell's `changeinfo` sits before the deleted keys and the attribute follows them (§24.3; D04 §2 has the offsets) | extended → batch-4 follow-up |
+| X02 | `s24` notes (start, steps 1–3) | "STR in the DB 53" is 63 in the `-db.txt`; "STR 593 (+63)": the server sends no STR total for free points, WCmin / WCmax rose by 3 (§24.4); the auto-arrange at 667.0 and the Damaged Mystery Vault opened at 1707.8 are not in the notes (§24.8) | corrected → batch-4 follow-up |
 
 In batch 1 (§3–§6) no discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held (batch 2's rows for Z03, Z09, Z12, Z13 and W03 are above). Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
 timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
@@ -3418,7 +3633,7 @@ conditions), D02 §6 (12-byte save headers, ACKs only for 0x4001 / 0x4007, 0x401
 §3.1 / §6.2 / §6.3, Z15 §3.3 / §3.4 (SAY with the clicked NPC), Z12 §5.2 (0xBC05 cap), Z13 §8.2 / §8.3 / §8.6 / §8.7 /
 §8.10 (summon order, hunger, speed formula, 0x1C1A), Z09 §5.4 (10-s corpse) and D05's GameLog layouts (0x040A, 0x040F,
 0x0410, 0xC806, 0xC809). The sweep (part 14) confirms Z02 §6.4 (the client's `0x200B` in the tick of `0x304D` runs `sp_EndOfTrade`,
-which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second). Part 21 (§21) confirms D03 §1.2 / §2.1 (`ItemBuy_Create`'s attribute branch: item deleted, cen refunded, `0x340C {0x206}`), Z05 §2.1 (`0x340C` → `0x3004 {error}`) and §6.4 (`0x345A` → `0x3001` emptied), Z09 §1.2 / §2.4 (the per-minute block on the WM's `0x0821`), Z24 §6.7 / Z13 §2.7 (`sp_ChargedItemLimitCheck` → `sp_ItemDelete` → `sp_DestroyItem`, not at login), D03 §1.3 (boot option rows 800–803 / 820–822, `deletetime` at attribute +7) and the capture-scenarios predictions §8.14 (S13) and §8.17 (S16, its cen half). Part 24 (§22) confirms W01 §4.1 (0x1401 → 0x1403 → 0x1404 `0x181`, 0x140F → 0x1411 → 0x1412 → 0x1410 with the name stored on 0xD0, 0xB409 → 0xB40A), §4.2 (0x145 without a CharDB round trip when no zone serves the map), §5.4 (`CharacterLogout` order 0x1037, 0x081F, 0xC807), §6.2 (0xB40B 0x20C0 → `CharIDChange`), §7.2 (0x104B name check, state 3, `{−1, −1}`), Z01 §5.3 (`so_SetRegistNumber` → 0x689) and §8.1 (reason-9 save with 0x0C31), D02 §3.2 (`CharIDChangeData` default `{0, 0x64, 0}`), §3.5 and §14 (layouts; −3039 → 0x20D1), Z30 §1.2 (0xB40F) and D04 §5.1 (option saves). Part 25 (§23) confirms W01 §4.2 (`0x145` while the map's zone is down, six times), §5.4 and §7.3 (`0x0C31` checked by `charNo`), Z01 §8.1 (`0x0C18 {1}` ≥ 8 s after `0x1071` → logout at once), Z07 §3.3 (the 13-s `0x1071` timer: 12.97 / 12.99 s), Z11 §7.4 and Z05 (money committed in 15–22 ms, kept through zone kills), D02 §5 (`p_Char_Logout` takes only `charNo`, `playmin`), §17.4 at four zone restarts (P02-B25) and §19.2 (Z11-B32: the tester saw "[Leather Boots] has been obtained").
+which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second). Part 21 (§21) confirms D03 §1.2 / §2.1 (`ItemBuy_Create`'s attribute branch: item deleted, cen refunded, `0x340C {0x206}`), Z05 §2.1 (`0x340C` → `0x3004 {error}`) and §6.4 (`0x345A` → `0x3001` emptied), Z09 §1.2 / §2.4 (the per-minute block on the WM's `0x0821`), Z24 §6.7 / Z13 §2.7 (`sp_ChargedItemLimitCheck` → `sp_ItemDelete` → `sp_DestroyItem`, not at login), D03 §1.3 (boot option rows 800–803 / 820–822, `deletetime` at attribute +7) and the capture-scenarios predictions §8.14 (S13) and §8.17 (S16, its cen half). Part 24 (§22) confirms W01 §4.1 (0x1401 → 0x1403 → 0x1404 `0x181`, 0x140F → 0x1411 → 0x1412 → 0x1410 with the name stored on 0xD0, 0xB409 → 0xB40A), §4.2 (0x145 without a CharDB round trip when no zone serves the map), §5.4 (`CharacterLogout` order 0x1037, 0x081F, 0xC807), §6.2 (0xB40B 0x20C0 → `CharIDChange`), §7.2 (0x104B name check, state 3, `{−1, −1}`), Z01 §5.3 (`so_SetRegistNumber` → 0x689) and §8.1 (reason-9 save with 0x0C31), D02 §3.2 (`CharIDChangeData` default `{0, 0x64, 0}`), §3.5 and §14 (layouts; −3039 → 0x20D1), Z30 §1.2 (0xB40F) and D04 §5.1 (option saves). Part 25 (§23) confirms W01 §4.2 (`0x145` while the map's zone is down, six times), §5.4 and §7.3 (`0x0C31` checked by `charNo`), Z01 §8.1 (`0x0C18 {1}` ≥ 8 s after `0x1071` → logout at once), Z07 §3.3 (the 13-s `0x1071` timer: 12.97 / 12.99 s), Z11 §7.4 and Z05 (money committed in 15–22 ms, kept through zone kills), D02 §5 (`p_Char_Logout` takes only `charNo`, `playmin`), §17.4 at four zone restarts (P02-B25) and §19.2 (Z11-B32: the tester saw "[Leather Boots] has been obtained"). Part 26 (§24) confirms Z02 §6.5 (`0x3C0A` table form), Z03 §9.1 / §9.3 (`0x4811` → `0x4812` → `0x4814`, item release only with `bUseItem`; `0x4802` → `0x4804` + `0x1035`), Z04 §12.5 (`0x304B {0x30A8}` before the work, moves through `sp_ItemReloc`, a swap as `0x342B`), Z05 §4 / §6.1 / §9.8 (`0x342C` → `0x3001` + `0x300C`; book effect on `0x3440`; vault `0x349E` → `0x349F` → `0x3001` only), Z07 §2.2–§2.4 (INC / DEC sizes 15 / 27, full target array), Z08 §11 / Z23 §4 (`0x9005` / `0x9006` 21 bytes, `0x3016 {0x700}` first, `0x900C {130}`, `0x900D {49}`), Z12 §4.2 (`0x1035` free-stat flags, no STR total) and §7.1 (`0x4027` with the vault), Z23 §7.1 / §7.2 (incremental skill save: cooling skill, then once with 0), D02 §6 / §7.2, D03 §3 / §7.4 / §9 and D04 §2 (Character-server answers and logs) and Z01 §8.4 as corrected in §23.5 (auto-saves 599.99 / 599.97 s after `0x1803`).
 
 ## 14. Not reconstructed / uncertain
 
@@ -3541,6 +3756,12 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
   client socket by itself before the WM's `0x0C19` is not visible (its first save follows the `0x0C19`). That
   `tAutoSaveTime` starts at `0x1803` is read from one interval (599.98 s). Why the first two zone restarts took 120 s
   and 64 s instead of 12 s is not recorded. Client FUN_004cbf30 (the in-game scene tick) has no official name.
+- Batch 4, skills and stats (§24): only step 01 of one skill line was learned, so whether the client names the highest
+  learned step in `0x4811` / `0x4812 skill` (Z23 §4, Z23-B8) is still open; the server's refusals (0x882–0x889, the
+  stat codes 0xAC2–0xAC7, the 0x9009 / 0x900A reset failures) were not provoked, the client refused first. `0x4009`
+  writes `nSkillLevel` 0 per D02 §6; the prep rows already had 0 and the snapshot has no cool-time column, so the
+  skill-save columns are unchecked against the DB. The order "DB link packets before the client burst" (§24.2) is
+  read from timestamps of different sockets; that the zone flushes client packets once per loop is *(inferred)*.
 
 ## 15. Coverage boundary
 

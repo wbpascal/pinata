@@ -2577,6 +2577,46 @@
     "basis": "zone so_ply_ItemBreakSuccess FUN_0048d480 (Z05 §6.4); name pdb2017 (PROTOCOL_COMMAND_ITEM 36)",
     "fields": [],
     "notes": "P02 batch 3 (§19.5): empty, after the 0x3001 of the destroyed cell; no 2016 client handler"
+   },
+   "0x3C0A": {
+    "dir": "S→C",
+    "name": "NC_MENU_SHOPOPENTABLE_SKILL_CMD",
+    "basis": "zone NPCRole_Merchant::nrm_ShopMenuOpen FUN_004c26b0 (Z02 §6.5, role \"Skill\"); pdb2017 PROTO_NC_MENU_SHOPOPENTABLE_CMD; client Market::SetSkill FUN_00613c50",
+    "fields": [
+     [
+      0,
+      "u16",
+      "itemnum",
+      "123 for Skill Master Ruby (books of every class)"
+     ],
+     [
+      2,
+      "u16",
+      "npc",
+      "NPC object handle"
+     ],
+     [
+      4,
+      "MENUITEM[itemnum]",
+      "itemlist",
+      "{u8 slot, u16 item}; the client keeps only skill books (ItemInfo class 11), slot 0 starts a tab chosen by the book's skill (production / active or passive per base class)"
+     ]
+    ],
+    "notes": "P02 batch 4 (s24, §24.2): 373 bytes; the decoder had no layout"
+   },
+   "0x0842": {
+    "dir": "S→C",
+    "name": "NC_MISC_MISCERROR_CMD",
+    "basis": "zone SendErrorCode(2, 0x42, err) (Z03 §6: asl_AbstateSet / aeo_Set weaker refresh); client GameFrameWork::On_NC_MISC_MISCERROR_CMD FUN_004b0e40",
+    "fields": [
+     [
+      0,
+      "u16",
+      "error",
+      "0xFD4: the client shows \"The effect cannot be used because upper level effect are used already\"; any other value is ignored"
+     ]
+    ],
+    "notes": "P02 batch 4 (s24): 2 bytes; the decoder had no layout"
    }
   },
   "accountlog": {
@@ -3763,6 +3803,324 @@
      ]
     ],
     "notes": "P02 batch 3 (§20.3): {ref, lockindex}; the pdb2016 struct lacks the ref"
+   },
+   "0x4812": {
+    "dir": "Zone→CharDB",
+    "name": "NC_SKILL_EMPOWALLOC_DB_REQ",
+    "basis": "zone sp_NC_SKILL_EMPOWALLOC_REQ FUN_0044f150 (built in the global gpp; length 40 + 8·vanishcount + attribute bytes); pdb2016 PROTO_NC_SKILL_EMPOWALLOC_DB_REQ (0x28, ref included) and PROTO_ITEMDELETEREQUEST (0x17); character FUN_004124c0 (D04 §2)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "written only when a redistribution item is used (bUseItem 1); otherwise stale gpp bytes (s24: 8049, 6654), echoed in 0x4813 (P02-B37)"
+     ],
+     [
+      8,
+      "u16",
+      "skill",
+      "the step in the request (s24: 0, Slice and Dice [01])"
+     ],
+     [
+      10,
+      "u8",
+      "bUseItem",
+      "1 when minus > 0 consumed items"
+     ],
+     [
+      11,
+      "u16",
+      "empower.skill",
+      ""
+     ],
+     [
+      13,
+      "u16",
+      "empower.plus",
+      "SKILL_EMPOWER new totals (damage:4 sp:4 keeptime:4 cooltime:4); the DB writes these"
+     ],
+     [
+      15,
+      "u16",
+      "empower.minus",
+      "same value as plus; not read by the DB"
+     ],
+     [
+      17,
+      "u8[6]",
+      "redistitem.header",
+      "NETPACKETZONEHEADER never written: stale gpp bytes (P02-B37)"
+     ],
+     [
+      23,
+      "u16",
+      "redistitem.lockindex",
+      "the player's lock counter (sp_Item.invenlocklist); consumed only with bUseItem 1"
+     ],
+     [
+      25,
+      "u8",
+      "redistitem.count",
+      "bits 0-6 vanishcount (cells deleted), bit 7 changecount (last cell only partly used)"
+     ],
+     [
+      26,
+      "u16",
+      "redistitem.changeinfo.changeitemid",
+      "with bit 7: item id of the partly used cell (30016 Skill Reset Scroll); else stale gpp bytes"
+     ],
+     [
+      28,
+      "u64",
+      "redistitem.changeinfo.key",
+      ""
+     ],
+     [
+      36,
+      "u16",
+      "redistitem.changeinfo.attroffset",
+      "payload offset of the attribute block = 40 + 8·vanishcount"
+     ],
+     [
+      38,
+      "u16",
+      "redistitem.changeinfo.location",
+      "ITEM_INVEN 0x2400 | slot"
+     ],
+     [
+      40,
+      "bytes",
+      "vanishkeys_attribute",
+      "vanishcount × u64 item keys, then the partly used cell's attribute (1 byte lot for the scroll)"
+     ]
+    ],
+    "notes": "P02 batch 4 (s24, capture-validation §24.3): sizes 40 (no item) and 41 (one scroll of a 2-stack); the D04 / Z03 annotations stop at redistitem (18 bytes), 3 issue packets"
+   },
+   "0x4009": {
+    "dir": "Zone→CharDB",
+    "name": "NC_CHARSAVE_SKILL_REQ",
+    "basis": "zone ws_save2DB FUN_00455a10 + so_SaveSkill FUN_00456520 (Z23 §7.2); pdb2016 PROTO_NC_CHARSAVE_SKILL_REQ after the 6-byte ref; character FUN_00406760 (D02 §6)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u16",
+      "handle.bufferlocation",
+      "ws_savestorepoint, always 0 (§10.1)"
+     ],
+     [
+      8,
+      "u32",
+      "handle.chrregnum",
+      ""
+     ],
+     [
+      12,
+      "u16",
+      "number",
+      "records; the zone skips the packet when 0"
+     ],
+     [
+      14,
+      "PROTO_SKILLREADBLOCK[number]",
+      "skill",
+      "16 bytes: i32 savetime (mysecond, wall clock), u16 skillid, u32 cooltime (s left), u16 empow, u32 mastery"
+     ]
+    ],
+    "notes": "P02 batch 4 (s24, §24.7): 30 bytes = one record (Dash 452 cooling down, then once more with cooltime 0); the pdb2016 struct lacks the ref (2 issue packets)"
+   },
+   "0x400a": {
+    "dir": "CharDB→Zone",
+    "name": "NC_CHARSAVE_SKILL_ACK",
+    "basis": "character FUN_00406760 echoes the 12-byte header when every p_Skill_Set succeeded (D02 §6); zone gds_NC_CHARSAVE_SKILL_ACK FUN_00455570 ignores it; no pdb2016 struct",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u16",
+      "bufferlocation",
+      "echo (0)"
+     ],
+     [
+      8,
+      "u32",
+      "chrregnum",
+      ""
+     ]
+    ],
+    "notes": "P02 batch 4 (s24): the decoder had no layout"
+   },
+   "0x342b": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_EXCHANGE_REQ",
+    "basis": "zone auto-arrange / exchange (Z04 §12.5, Z05 §4); character FUN_0040a4b0 (D03 §3); pdb2016 PROTO_NC_ITEMDB_EXCHANGE_REQ (0x2a) after the ref",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u32",
+      "ownerA",
+      ""
+     ],
+     [
+      10,
+      "u32",
+      "ownerB",
+      ""
+     ],
+     [
+      14,
+      "u16",
+      "lockindex",
+      ""
+     ],
+     [
+      16,
+      "u64",
+      "relocA.relocitemregnum",
+      ""
+     ],
+     [
+      24,
+      "u16",
+      "relocA.newlocation",
+      "ITEM_INVEN"
+     ],
+     [
+      26,
+      "u64",
+      "relocB.relocitemregnum",
+      ""
+     ],
+     [
+      34,
+      "u16",
+      "relocB.newlocation",
+      ""
+     ],
+     [
+      36,
+      "u16",
+      "relocA_ID",
+      ""
+     ],
+     [
+      38,
+      "u16",
+      "relocB_ID",
+      ""
+     ],
+     [
+      40,
+      "u32",
+      "relocA_Lot",
+      ""
+     ],
+     [
+      44,
+      "u32",
+      "relocB_Lot",
+      ""
+     ]
+    ],
+    "notes": "P02 batch 4 (s24, §24.8): 48 bytes; the decoder read the pdb2016 struct without the ref"
+   },
+   "0x342c": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_EXCHANGESUC_ACK",
+    "basis": "character FUN_0040a4b0 raw {hdr, lock}; zone FUN_00533350 (Z05 §4)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      ""
+     ]
+    ],
+    "notes": "P02 batch 4 (s24): 8 bytes = ref + pdb2016 struct"
+   },
+   "0x9008": {
+    "dir": "CharDB→Zone",
+    "name": "NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_SUC_ACK",
+    "basis": "character FUN_00417160 (D03 §9); zone FUN_00518780 (Z08 §11)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "clienthandle",
+      "zone player handle (NETPACKETZONEHEADER ref)"
+     ],
+     [
+      2,
+      "u32",
+      "charregistnumber",
+      "charNo"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      ""
+     ]
+    ],
+    "notes": "P02 batch 4 (s24): the decoder had no layout"
    }
   }
  },
@@ -6416,12 +6774,14 @@
     "dir": "C→S",
     "captures": [
      "shop",
-     "s21b"
+     "s21b",
+     "s24"
     ],
     "fields": {
      "itemid": "751 Long Mace (weapon shop, 0x3C09 tab 1)",
      "lot": "1",
-     "s21b": "itemid 0 (LeatherBoots), lot 1, twice"
+     "s21b": "itemid 0 (LeatherBoots), lot 1, twice",
+     "s24": "itemid 4700 (skill book Slice and Dice [01]), lot 1"
     }
    },
    "0x3004": {
@@ -6705,7 +7065,8 @@
     "dir": "Zone→CharDB",
     "captures": [
      "shop",
-     "s21b"
+     "s21b",
+     "s24"
     ],
     "fields": {
      "map": "RouN 5724, 8768 (player position)",
@@ -6714,7 +7075,8 @@
      "price_cen": "69",
      "UserNo": "103",
      "Vendor": "28 (NPC mob id)",
-     "s21b": "LeatherBoots (0), lot 1, price_cen 13, fame 0, coin 0, attr 68, 13-byte boot attribute, Vendor 28; new key per try"
+     "s21b": "LeatherBoots (0), lot 1, price_cen 13, fame 0, coin 0, attr 68, 13-byte boot attribute, Vendor 28; new key per try",
+     "s24 (skill book)": "createitemid 4700, price_cen 41, Vendor 31, location 0x2404"
     }
    },
    "0x340b": {
@@ -7227,10 +7589,12 @@
    "0x4025": {
     "dir": "C→Z",
     "captures": [
-     "shop"
+     "shop",
+     "s24"
     ],
     "fields": {
-     "btMysteryType": "1, once per 0x240C: the client's On_NC_BAT_LEVELUP_CMD sends it when a Mystery Vault is in the inventory"
+     "btMysteryType": "1, once per 0x240C: the client's On_NC_BAT_LEVELUP_CMD sends it when a Mystery Vault is in the inventory",
+     "s24": "btMysteryType 0 with the vault use (1707.775)"
     }
    },
    "0x4026": {
@@ -7747,19 +8111,23 @@
    "0x343f": {
     "dir": "Zone→CharDB",
     "captures": [
-     "s21"
+     "s21",
+     "s24"
     ],
     "fields": {
-     "(all)": "single potion (lot 1): key, lock 19, itemid 3500"
+     "(all)": "single potion (lot 1): key, lock 19, itemid 3500",
+     "s24": "skill book 4700 used whole"
     }
    },
    "0x3440": {
     "dir": "CharDB→Zone",
     "captures": [
-     "s21"
+     "s21",
+     "s24"
     ],
     "fields": {
-     "error": "0x700 for both use requests"
+     "error": "0x700 for both use requests",
+     "s24": "error 0x700, then 0x4801"
     }
    },
    "0x3459": {
@@ -8184,6 +8552,232 @@
      "playmin": "0",
      "state": "0",
      "Cen": "money"
+    }
+   },
+   "0x4801": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "charregistnumber/chrregnum": "9 twice",
+     "skillid": "0 (Slice and Dice [01])",
+     "ispassive": "0",
+     "removeid": "0xFFFF"
+    }
+   },
+   "0x4802": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "ref": "8001 / 9",
+     "skillid": "0",
+     "ispassive": "0"
+    }
+   },
+   "0x0432": {
+    "dir": "Zone→GameLog",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "chrregnum": "9",
+     "mappos": "\"Need\", 0, 0 (D03-B11)",
+     "skillid": "0",
+     "skilllevel": "1"
+    }
+   },
+   "0x4804": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "skillid": "0",
+     "ispassive": "0; client: \"You learned Slice and Dice [1] skill\""
+    }
+   },
+   "0x4811": {
+    "dir": "C→S",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "skill": "0 ×3 (the only learned step)",
+     "plus/minus": "{1,0}, {0,1} (with the scroll), {1,0}"
+    }
+   },
+   "0x4813": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "lockindex": "echo of 0x4812 +6 (stale 8049 / 6654 without an item, 12 with)",
+     "skill": "0",
+     "err": "0x881 ×3",
+     "bUseItem": "echo"
+    }
+   },
+   "0x4814": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "skill": "0",
+     "err": "0x881 ×3: \"Skill empower succeeded\""
+    }
+   },
+   "0x105c": {
+    "dir": "C→S",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "stat": "0 (STR) ×3; a fourth + press sends nothing (client check)"
+    }
+   },
+   "0x10d1": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "nMaxStat": "130",
+     "nFreeStat": "[61|62|63, 67, 0, 0, 0] (INC), [62, 67, …] (DEC)",
+     "nLockIndex": "0 ×3 on INC (unwritten, Z07-B2), 14 on DEC",
+     "nItemNum": "0 / 1",
+     "DecItemInfo": "{isDelete 0, key, 30022 Stat Reset Scroll, count 1} (27 bytes)"
+    }
+   },
+   "0x10d2": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "nFreeStat": "echo",
+     "nLockIndex": "echo",
+     "nErrorType": "0xAC1 ×4"
+    }
+   },
+   "0x105f": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "stat": "0 ×3, each followed by 0x1035 (flags 0x12…0x1b + WCmin / WCmax +1)"
+    }
+   },
+   "0x1062": {
+    "dir": "C→S",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "stat": "0 (with one Stat Reset Scroll in the inventory; no − button without it)"
+    }
+   },
+   "0x1065": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "stat": "0, after 0x3001 (scroll lot 2 → 1)"
+    }
+   },
+   "0x9005": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "lockindex": "15",
+     "restatitemid": "30023 Full Stat Reset Capsule",
+     "isdelete": "1 (lot 1)",
+     "attr": "0"
+    }
+   },
+   "0x9006": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "lockindex": "13",
+     "restatitemid": "30017 Full Skill Reset Capsule",
+     "isdelete": "1",
+     "attr": "0"
+    }
+   },
+   "0x9007": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "lockindex": "15"
+    }
+   },
+   "0x900c": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "freePoints": "130 (level 100: all points free after the reset)"
+    }
+   },
+   "0x900d": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "freePoints": "49 (all empower points of level 100)"
+    }
+   },
+   "0x304a": {
+    "dir": "C→S",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "(empty)": "one press"
+    }
+   },
+   "0x304b": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "err": "0x30A8 before the DB exchange (\"Inventory has been organized…\")"
+    }
+   },
+   "0x349e": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "box": "46003 Damaged Mystery Vault, lot 1",
+     "count": "3: 46004, 32413, 11504 (MysteryVaultServer rows of class 0 / 6 at rate 1000)"
+    }
+   },
+   "0x349f": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "itemLockIndex": "3",
+     "err": "0x2140"
     }
    }
   },
