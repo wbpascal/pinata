@@ -196,7 +196,8 @@ Client                Login                AccountDB  AccountLog   WM           
   |-- 0x1801 NC_MAP_LOGIN_REQ (wm handle, char name, 49 SHN checksums) ------------------------------------->|
   |-- 0x080D game time (same client tick) ------------------------------------>|
   |<-- 0x1804 fail (bad checksum)                                         WM <-- 0x104B ------------------------|
-  |                                                                        WM --> 0x104C, 0x101C ------------->|
+  |                                                                        WM --> 0x104C ---------------------->|
+  |                                                                        WM <-- 0x101C -----------------------|
   |                                                                        WM --> blocks …, 0x101D ---------->|
   |<-- 15 blob copies 0x1038 … 0x441E ----------------------------------------------------------------------|
   |<-- 0x1802 NC_MAP_LOGIN_ACK (or 0x1804) -------------------------------------------------------------------|
@@ -226,12 +227,12 @@ Anything else closes the session.
 | Login: version, password | `0x0807`, `C 0x0C65` → `0x0C67`, `C 0x0C5A`, `C 0x0C04 NC_USER_XTRAP_REQ` → `0x0C05 NC_USER_XTRAP_ACK {1}`, A `0x0C5B` / `0x0C5C`, AL `0x0C5D` / `0x0C5E`, W `0x0C16`, `0x0C0A` | *(captured)* The client sends `0x0C04` right **after** its login request, in the same tick (client `On_NC_USER_CLIENT_RIGHTVERSION_CHECK_ACK` FUN_0046f470 calls the login request first); Login answers it at once, so `0x0C05` comes before `0x0C0A` (70–170 ms after `0x0C5A`). The XTrap key is not checked (L00-B5). The TCP connection is opened only when the login form is submitted. Wrong password: `0x0C09 {0x45}` ~50 ms after `0x0C5A`, the next try is a new connection | capture-validation §3.1, §16.1; X01 §3.3; `login-server.md` §4 |
 | Login: token login | `0x0807`, `0x0C65` → `0x0C67`, `C 0x0C37 NC_USER_LOGIN_WITH_OTP_REQ {sOTP[32]}`, `C 0x0C04`, `0x0C0A`, `0x0C05` | *(captured)* Used when the client comes back from the WM to the world list (§2.4); the token comes from `0x0C34` (WM ← Login `0x0C36`). No DB round trip, so `0x0C0A` leaves **before** `0x0C05` | capture-validation §3.1; X01 §3.4; `login-server.md` §4, §5.3; L01 §4.3 |
 | Login: world list poll | `C 0x0C1B NC_USER_WORLD_STATUS_REQ` → `0x0C1C NC_USER_WORLD_STATUS_ACK` | *(captured)* 10 ms after `0x0C0A`, then every 10.0 s while the world list is shown; keeps the Login session busy, so Login never needs a heartbeat (§1.5) | capture-validation §3.1, §16.2; X01 §3.3 step 8 |
-| Login: world select | `C 0x0C0B` → W `0x0C0D` / `0x0C0E` → `0x0C0C` | *(captured)* 20–30 ms; the XOR of the 32 validate words is the per-world counter (L01 §2.5); a refused select still carries the WM ip / port, its validate words are stack residue (P02-B23) | capture-validation §3.3, §16.1, §16.3; X01 §3.5 |
-| WM: world login | `0x0807`, `C 0x0C0F` → A `0x0C60` / `0x0C61`, D `0x0C12` / `0x0C13` → `0x0C14` | *(captured)* `0x0C14` 50–76 ms after `0x0C0F` | capture-validation §4.1; X01 §3.6; W01 §3.2, §3.3 |
+| Login: world select | `C 0x0C0B` → A `0x0C10`, AL `0x0721`, W `0x0C0D` (same ms, this order) / `0x0C0E` → `0x0C0C` | *(captured)* 20–30 ms; the XOR of the 32 validate words is the per-world counter (L01 §2.5); a refused select still carries the WM ip / port, its validate words are stack residue (P02-B23) | capture-validation §3.3, §16.1, §16.3; X01 §3.5 |
+| WM: world login | `0x0807`, `C 0x0C0F` → `0x0C16` to every zone, A `0x0C60` / `0x0C61`, D `0x0C12` → `0x0C5F` + `0x0C13` → `0x0C14` | *(captured)* `0x0C14` 50–76 ms after `0x0C0F`; the WM kicks the user from every zone on every world login (§2.5) | capture-validation §4.1; X01 §3.6; W01 §3.2, §3.3 |
 | WM: game time | `C 0x080D NC_MISC_GAMETIME_REQ` → `0x080E NC_MISC_GAMETIME_ACK {hour, minute, second}` | *(captured)* 4–8 ms after `0x0C14`, and again in the tick of every zone `0x1801` (map login and map change) | capture-validation §4.1; X01 §3.6 step 6; W01 §5.3 |
 | WM: character login | `C 0x1001` → D `0x1004` → blocks → `0x1005` → `0x1003` + D `0x1036` + GameLog `0xC806`, then `0x7032` / `0x7033` / `0x7034` (`NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD`, `…_GET_KEYMAP_CMD`, `…_GET_GAMEOPTION_CMD`) | *(captured)* `0x1003` ~615 ms after `0x1001`; the option pushes come from `SendToClient_CharOptionData` FUN_00431680 after `0x1003`, 53 ms later, before the zone has answered `0x1801`. `0x1036 NC_CHAR_LOGIN_DB` goes to the CharDB (not to the zone) | capture-validation §4.1, §7.4; X01 §3.8; W01 §4.2; W04 §8 |
 | Zone: seed | `0x0807` on accept | *(captured)* The client never sends `0x0806` (§1.4) | capture-validation §2.3; Z18 §1.3 |
-| Zone: map login | `C 0x1801` (+ `C 0x080D` to the WM, same tick) → W `0x104B` / `0x104C` / `0x101C` → blocks → `0x101D` → 15 client copies of the blocks (`0x1038` BASE … `0x441E` QUEST_RESET_TIME) → `0x1802` | *(captured)* `0x1802` 442–560 ms after `0x1801`; the blob copies come in W01 §6.3 table order, all before `0x1802`. On `0x1802` the client asks the WM for its options in one tick: `0x7004`, `0x700C` (answered from the CharDB, `0x7005`, `0x700D`) and `0x7C06 NC_PRISON_GET_REQ` (`0x7C07`) | capture-validation §5.1, §4.1, §7.5.2; X01 §3.9; Z01 §5.2, §5.3; W01 §7.2 |
+| Zone: map login | `C 0x1801` (+ `C 0x080D` to the WM, same tick) → zone → W `0x104B`, W → zone `0x104C`, zone → W `0x101C NC_CHAR_ZONE_CHARDATA_REQ`, W → zone blocks → `0x101D` → 15 client copies of the blocks (`0x1038` BASE … `0x441E` QUEST_RESET_TIME) → `0x1802` | *(captured)* `0x1802` 442–560 ms after `0x1801`; the blob copies come in W01 §6.3 table order, all before `0x1802`. On `0x1802` the client asks the WM for its options in one tick: `0x7004`, `0x700C` (answered from the CharDB, `0x7005`, `0x700D`) and `0x7C06 NC_PRISON_GET_REQ` (`0x7C07`) | capture-validation §5.1, §4.1, §7.5.2; X01 §3.9; Z01 §5.2, §5.3; W01 §7.2 |
 | Zone: login complete | `C 0x1803` and, in the same client tick, `0x2001 NC_ACT_CHAT_REQ "&adminlevel"`, `0x200B NC_ACT_ENDOFTRADE_CMD` ×3, on the first map login also `0x302C` / `0x3020`; to the WM `0x581B NC_KQ_LIST_REFRESH_REQ` | *(captured)* The zone answers with the 17-step login burst of Z01 §6 in one server tick (6–18 ms), then the parameter refresh (`0x1035`, `0x240E`, `0x240F`, `0x245F`) one tick later; the zone's `0x180C` makes the WM send `0x1097`, `0x1012`, `0x9414`, `0x5826`, `0x10D9`, `0x0849`, `0x182A` (W01 §7.3 call order; the once-per-character ones only on the first map login) | capture-validation §5.1, §4.1; X01 §3.10; Z01 §6; W01 §7.3; W04 §17 |
 
 The login request, the world list and the world select also run over the server links (Login ↔ AccountDB /
@@ -261,9 +262,12 @@ X01 §3.12 a / d; W01 §5.1; Z01 §8.1; Z07 §3.3.
 
 ### 2.5 Duplicate login
 
-*(captured)* When an account logs in to Login while it still has a WM session, Login sends `0x0C16
-NC_USER_KICKOFFFROMWORLD_CMD {userNo}` to every WM before its `0x0C0A`; the WM sends the old client `0x0C17
-NC_USER_CONNECTCUT_CMD {reason 0x683}` ("multiple logins") and closes it, and passes `0x0C16` on to every zone. In the
+*(captured)* Login sends `0x0C16 NC_USER_KICKOFFFROMWORLD_CMD` to every WM before its `0x0C0A` on **every** successful
+login (password and token login, `fc_NC_USER_LOGIN_WITH_OTP_REQ` FUN_00406bb0 too), without checking for an old session;
+the body is 10 bytes, `usrregnum` after 6 unwritten header bytes (capture-validation §7.2, P02-B5). Only when the account
+still has a WM session does it have an effect: the WM sends the old client `0x0C17 NC_USER_CONNECTCUT_CMD {reason
+0x683}` ("multiple logins") and closes it, and passes `0x0C16` on to every zone (the WM also sends its own `0x0C16` to
+every zone on every `0x0C0F`, §2.2: two zone kicks per login). In the
 capture the WM's `0x0C17` left 0.8 ms before Login's `0x0C0A` to the new client. A second `0x0C0F` of the same account
 at the WM kicks the old session the same way (not captured). Detail: capture-validation §4.1; X01 §3.12 f;
 `login-server.md` §5.1; W01 §3.2, §5.2; Z01 §8.3.
@@ -302,7 +306,7 @@ NUL-padded unless stated otherwise.
 | `0x0C67` | S→C | `u8 n; char s[n]` | version OK. In this build always `n=1, s=""` (the source field is cleared before the copy) |
 | `0x0C66` | S→C | `u8` (value not set by the code) | version rejected |
 | `0x0C5A` | C→S | `char user[256]` @0, 4 unread bytes @256, `char password[36]` @260, `u32 extra[5]` @296 | total packet length must equal `0x13E`. `extra` is forwarded to AccountDB without being interpreted |
-| `0x0C37` | C→S | `u8 token[32]` | `NC_USER_LOGIN_WITH_OTP_REQ`; total packet length must equal `0x22`. Token login: looked up in a table filled by WM message `0x0C35` (token valid 10 s, L01 §4.3). Unknown token → `0x0C09 {0x52}`; login disabled flag (`DAT_004425f8 == 0`) → `{0x45}`; else world list `0x0C0A`, sent before the `0x0C05` of the client's following `0x0C04` *(captured, §2.2)* |
+| `0x0C37` | C→S | `u8 token[32]` | `NC_USER_LOGIN_WITH_OTP_REQ`; total packet length must equal `0x22`. Token login: looked up in a table filled by WM message `0x0C35` (token valid 10 s, L01 §4.3). Unknown token → `0x0C09 {0x52}`; login disabled flag (`gServer.m_isPermitServer` *(pdb2016)*, `DAT_004425f8`, `== 0`) → `{0x45}`; else world list `0x0C0A`, sent before the `0x0C05` of the client's following `0x0C04` *(captured, §2.2)* |
 | `0x0C09` | S→C | `u16 error` | login failure, then disconnect. Codes seen: `0x45` (server closed or account error -1; client "Please check ID or Password.", 50 ms after a wrong password *(captured)*), `0x47` (AccountDB `nBlock`: "The ID has been blocked." *(captured)*), `0x48` (AccountDB `bLoginAble 0`: "The World Servers are down for maintenance." *(captured)*), `0x4A` (after `0x0C1D`), `0x4B` (account error -2), `0x4C` (after `0x0C20`), `0x51` (AccountLog block), `0x52` (bad token) |
 | `0x0C0A` | S→C | `u8 count; WORLD[count]` | `WORLD` (18 bytes) = `u8 world_no; char name[16]; u8 status`. Status is set to 2 at load, 6–10 while the WM is connected (load band from its `0x0808` user count, L01 §3), 0 once its link is released ("Server is closed."), 5 = full. Login refuses a select of a world with status `< 5`; 5 passes (L00-B3) and the client then shows "Server is full." without connecting; the client connects for 6–10 (`login-server.md` §8). *(captured: 6 normal, 0 after a WM stop, 5 full, capture-validation §16.1)* |
 | `0x0C1B` | C→S | – | `NC_USER_WORLD_STATUS_REQ`, world list refresh → `0x0C1C` (same layout as `0x0C0A`). The client polls it 10 ms after `0x0C0A`, then every 10.0 s while the world list is shown *(captured, §2.2)* |
@@ -363,7 +367,7 @@ in [opcodes-zone.md](opcodes-zone.md).
 
 ## 4. How the tables were produced
 
-1. Ghidra headless (tables were generated with 12.2) with `Decompiler Parameter ID` enabled (`tools/protocol-re/EnableParamId.java`).
+1. Ghidra headless (the exports were generated with 12.1.4) with `Decompiler Parameter ID` enabled (`tools/protocol-re/EnableParamId.java`).
    `tools/protocol-re/ExportAll.java` dumps every function's C and every string with its references.
    REA (Hopper backend) was used for spot checks. REA's Ghidra provider requires Ghidra 12.1.x
    (now installed as `ghidra@12.1.4`).
