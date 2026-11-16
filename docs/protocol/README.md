@@ -233,7 +233,7 @@ Anything else closes the session.
 | WM: character login | `C 0x1001` → D `0x1004` → blocks → `0x1005` → `0x1003` + D `0x1036` + GameLog `0xC806`, then `0x7032` / `0x7033` / `0x7034` (`NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD`, `…_GET_KEYMAP_CMD`, `…_GET_GAMEOPTION_CMD`) | *(captured)* `0x1003` ~615 ms after `0x1001`; the option pushes come from `SendToClient_CharOptionData` FUN_00431680 after `0x1003`, 53 ms later, before the zone has answered `0x1801`. `0x1036 NC_CHAR_LOGIN_DB` goes to the CharDB (not to the zone). A tutorial-state-0 character first gets the `0x1110` popup (`C 0x1111 {bIsSkip}` → D `0x1112` → `0x1113`, then the same chain). Refusal: `0x1002` (zone down, P02-B33 tutorial skip; §2.7) | capture-validation §4.1, §7.4, §18.7, §22.1, §23.6; X01 §3.8; W01 §4.2, §6.2; W04 §8 |
 | Zone: seed | `0x0807` on accept | *(captured)* The client never sends `0x0806` (§1.4) | capture-validation §2.3; Z18 §1.3 |
 | Zone: map login | `C 0x1801` (+ `C 0x080D` to the WM, same tick) → zone → W `0x104B`, W → zone `0x104C`, zone → W `0x101C NC_CHAR_ZONE_CHARDATA_REQ`, W → zone blocks → `0x101D` → 15 client copies of the blocks (`0x1038` BASE … `0x441E` QUEST_RESET_TIME) → `0x1802` | *(captured)* `0x1802` 442–560 ms after `0x1801`; the blob copies come in W01 §6.3 table order, all before `0x1802`. On `0x1802` the client asks the WM for its options in one tick: `0x7004`, `0x700C` (answered from the CharDB, `0x7005`, `0x700D`) and `0x7C06 NC_PRISON_GET_REQ` (`0x7C07`) | capture-validation §5.1, §4.1, §7.5.2; X01 §3.9; Z01 §5.2, §5.3; W01 §7.2 |
-| Zone: login complete | `C 0x1803` and, in the same client tick, `0x2001 NC_ACT_CHAT_REQ "&adminlevel"`, `0x200B NC_ACT_ENDOFTRADE_CMD` ×3, on the first map login also `0x302C` / `0x3020`; to the WM `0x581B NC_KQ_LIST_REFRESH_REQ` | *(captured)* The zone answers with the 17-step login burst of Z01 §6 in one server tick (6–18 ms), then the parameter refresh (`0x1035`, `0x240E`, `0x240F`, `0x245F`) one tick later; the zone's `0x180C` makes the WM send `0x1097`, `0x1012`, `0x9414`, `0x5826`, `0x10D9`, `0x0849`, `0x182A` (W01 §7.3 call order; the once-per-character ones only on the first map login) | capture-validation §5.1, §4.1; X01 §3.10; Z01 §6; W01 §7.3; W04 §17 |
+| Zone: login complete | `C 0x1803` and, in the same client tick, `0x2001 NC_ACT_CHAT_REQ "&adminlevel"`, `0x200B NC_ACT_ENDOFTRADE_CMD` ×3, on the first map login also `0x302C` / `0x3020`; to the WM `0x581B NC_KQ_LIST_REFRESH_REQ` | *(captured)* The zone answers with the 17-step login burst of Z01 §6 in one server tick (6–18 ms), then the parameter refresh (`0x1035`, `0x240E`, `0x240F`, `0x245F`) one tick later; the zone's `0x180C` makes the WM send `0x1097`, `0x1012`, `0x9414`, `0x5826`, `0x10D9`, `0x0849`, `0x182A` (W01 §7.3 call order; the once-per-character ones only on the first map login). `0x1803` also arms the zone's 10-min auto-save (StoreType 10, §2.4 "Zone process killed") | capture-validation §5.1, §4.1, §23.5; X01 §3.10; Z01 §6, §8.4; W01 §7.3; W04 §17 |
 
 The login request, the world list and the world select also run over the server links (Login ↔ AccountDB /
 AccountLogDB / WM, WM ↔ CharDB, zone ↔ WM); their captured order is in capture-validation §7.2, §7.4 and §7.5.2.
@@ -297,9 +297,21 @@ crash), the client does not stay on the WM: 14–27 ms later it sends `0x0C18 {0
 (`NetMgr::SendUserLogOutMsg2AllServer` @ client FUN_006d34e0, name *(pdb2017)*, called from the in-game scene tick
 FUN_004cbf30), waits 1 s, closes them all and shows "Disconnected from the server." ("Multiple logins detected, you
 have been logged out." when a duplicate-login flag is set; a closed WM socket gives "Disconnected from the world
-server."). The WM closes the session as for a quit (`CharacterLogout`, `0x0C11 {0x780}`, `0x0C19` twice); the zone
-object ends by the Kickout timer (StoreType 3, no `0x0C31`). Detail: capture-validation §4.1, §5.4, §16.1, §22.5,
-§23.2–§23.4, §25.9; X01 §3.12 a / d; W01 §5.1, §5.4; Z01 §8.1, §8.3; Z07 §3.3.
+server."). The WM closes the session as for a quit (`CharacterLogout`, `0x0C11 {0x780}`, `0x0C19` twice). After a
+reset of the socket (zone still running) the zone object saves 4 / 7 / 4 and ends by the Kickout timer (StoreType 3,
+no `0x0C31`); after a zone process kill there is no object left and nothing is saved (below).
+
+**Zone process killed** *(captured, capture-validation §23.5, §23.6)*. The zone dies without a save. What was committed
+through a CharDB transaction survives: `&getmoney` (`so_ply_PickupMoney`) has its `0x3438` → `0x3439` back in 15–22 ms,
+before any kill, and the next login has that money. Position (and whatever else only `ws_save2DB` writes) is the
+last save's: the last logout or link save, or the **auto-save**, a full `ws_save2DB` burst with StoreType 10 that
+`ShinePlayer::so_Routine` @ FUN_0056c790 runs 600 s after the map login's `0x1803` (deadline from `so_SetAutoSaveTime`
+@ FUN_005608c0) and then every 600 s (6000 ticks of 0.1 s; captured 599.94–599.99 s after `0x1803`; Z01 §8.4's "every
+6000 ms" is wrong). The WM's `0x1037` still carries its own copy of money and position (P02-B36; the CharDB row is not
+written from it). The WM tells nobody that the zone died: its broadcasts go to the remaining zone links, and a
+`0x1001` for that zone's maps gets `0x1002 {0x145}` until the restarted zone has registered (§2.7; restarts as
+capture-validation §17.4, P02-B25). Detail: capture-validation §4.1, §5.4, §16.1, §22.5, §23.2–§23.6, §25.9; X01
+§3.12 a / d; W01 §4.2, §5.1, §5.4; Z01 §8.1, §8.3, §8.4; Z07 §3.3; Z11 §7.4.
 
 ### 2.5 Duplicate login
 
