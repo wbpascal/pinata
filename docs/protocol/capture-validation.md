@@ -2957,7 +2957,8 @@ characters without a row (D02 §3.2 default) and `{1, 0, 1}` for Test2, as D02 s
   `0x7016` / `0x703B` become CDB `0x7026` / `0x702A` / `0x702B` / `0x704F` 20–70 ms later (D04 §5.1, W04 §8.2). `0x7050
   {nError 0x2118, nCharNo 270}` comes back with a stale `nCharNo` (2791060741 / 2791060740 at the later two), **D04-B13
   captured**.
-- **Quit** (`0x0C18 {0}`, 689.147; the same in `s24` at 2020.8 and 2022.8): the WM broadcasts `0x0C19` from the 0x0C18
+- **Quit** (`0x0C18 {0}`, 689.147; the same for B in `s24` at 2022.8, not for A at 2020.8, whose own `0x0C18` reached
+  the zone first: one save, §25.9): the WM broadcasts `0x0C19` from the 0x0C18
   handler (689.148, with `0x1037` / `0x081F` / `0xC807`) and again from `Client_OnClosed` (689.165, with AccDB `0x0C11
   {playmin 3, 0x780}`, ALDB `0x0722` / `0xC803`), as W01 §5.1 / §3.2 describe. The zone runs `so_banning` on each
   `0x0C19` and its own socket cut (`zs_disconnect` → `so_Unmark(…, 1, 7)`, Z31 §4.5, Z09 §1), and later the logout
@@ -3069,7 +3070,9 @@ So the work queued first decides how the object ends:
 | back to character select (89.1, 778.8) | – | **9** + `0x0C31` at once (`0x0C18 {1}` ≥ 8 s after `0x1071`) |
 
 So the "9 with `0x0C31` 3 s later" of a quit (§22.5, P02-B35) is the `0x1071` timer: 13 s minus the client's 10-s
-countdown. The zone ignores the quit's own `0x0C18 {0}` (mode 0, Z01 §8.1). StoreType 7 is `zs_disconnect` @
+countdown. The zone does act on the quit's own `0x0C18 {0}` (Z01 §8.1 reads no `LogoutType`; part 27 correction): when
+it is handled before the WM's `0x0C19`, the player logs out at once with one save (`s24` A, §25.9); in `s37b` 689.1 and
+for `s24` B the kick came first. StoreType 7 is `zs_disconnect` @
 FUN_005abb60 closing a client session that `so_banning` has put in state 3. In its closing branch it calls
 `so_Unmark(vt[0x8ec](), 1, 7)` and `som_FreeObject`. Its earlier conditional `sp_RefreshWMSSocket` call (vt 0x338, Z01 §8.2) sent no `0x0C31` in any capture; which of its conditions failed is *(not traced)*.
 The zone's first save after a reset follows the WM's `0x0C19`, 37–42 ms after the RST; that the zone itself had not
@@ -3367,6 +3370,277 @@ part 27's) now decode with no issue:
 | CDB→Z | 0x400A | NC_CHARSAVE_SKILL_ACK | 2 | 12 | confirmed; layout added | 12-byte header |
 | Z→C | 0x0842 | NC_MISC_MISCERROR_CMD | 1 | 2 | confirmed; layout added | `0xFD4` (§24.8) |
 
+## 25. Skills II: cast abort, ground target, toggle, abnormal states, damage over time, death and revive, batch 4 (`s24` part II) *(captured)*
+
+Steps 4–8 and the end of the `s24` notes (part 27). Handles: A = 8001 on zone#1 until the town portal at 1236.1, 8000
+on zone#3 (9212, Forest of Mist), 8003 on zone#4 (9210) from 1276.2; B = 8002 on zone#2 throughout (§24). Skills
+(`ActiveSkill.shn`): 1800 `DivineShield01` "Invincible [01]" (`CastTime` 950, `DlyTime` 120 s, StaDivineShield =
+abstate 28 for 10 s), 452 `Dash01` (`Range` 800, `Area` 50, SP 140, `DlyTime` 60 s, `IsMovingSkill`, WARPING), 7300
+`BurnPain01` "Heat of Fury [01]" (`HPRate` 60, `DemandType` 1 two-hand, `DlyTime` 5 s, StaBurnPainMe 461 +
+StaBurnPainFoe 462), 1620 `Revival01` "Revive [01]" (`Range` 350, `DlyTime` 30 s, `IsMovingSkill`). Mob 82 `DiaTrumpy`
+"Diamond Trumpy" (level 76, HP 3810); its skill 9051 sets StaDiaTrumpyPoison (179: `SAA_TICK` 3000, 200 damage,
+`KeepTime` 301 000).
+
+### 25.1 What happened
+
+| Time | Who | Event (notes step) |
+|---|---|---|
+| 915.603 / 915.909 | B | Invincible on itself, `0x2444` 306 ms into the cast (4) |
+| 928.046 | B | Invincible again, completes: `0x2457` 929.213, StaDivineShield 929.430 → 939.418 (4) |
+| 939.467 | A | equips the Titanic Axe |
+| 957.010 / 1048.799 | A | Dash to a near spot / to a spot 804 units away after running closer (4) |
+| 1074.608–1092.831 | A | Heat of Fury on and off by cast (5) |
+| 1114.547–1121.172 | A | on, axe off (`0x3012`) → off by itself; 1127.491 axe on again (5) |
+| 1136.791 / 1140.568 | A | `&sethp 100`, cast refused `0x2434 {0xFD5}`; 1154.245 `&fullpoint` (5) |
+| 1161.750–1165.087 | A | on, `&sethp 100` → off by itself; 1171.667 `&fullpoint` (5) |
+| 1188.920 | A | a third Dash, cast while running (not in the notes) → `0x201B` |
+| 1232.455–1236.201 | A | on, town portal `0x181A` → off with the link → Forest of Mist (5) |
+| 1252.007 / 1260.512 | A | on / off on the new map (5) |
+| 1274.436 / 1294.901 | A / B | `&linkto RouN …` (24-moveA / 24-moveB); A on zone#4 |
+| 1308.300–1410.223 | A, B | assist test (6) |
+| 1457.283–1575.407 | A | StaNeglect: nine `&setabstate` (6) |
+| 1584.502–1644.554 | A | StaHide: seven `&setabstate` (6) |
+| 1660.043–1695.432 | A | sword and shield, StaBuckler, shield off (6) |
+| 1699.840 | A | `&resetabstate` → `0x0842 {0xFD4}`; 1708.107 axe again (6) |
+| 1736.139 | A | `&mobbreed DiaTrumpy 1 60 n 1` → mob 6426 (7) |
+| 1741.161 | B | killed by the Trumpy (one swing of 391; not in the notes) |
+| 1760.711–1839.314 | A | poisoned: 29 `0x243C` of 200 (7) |
+| 1840.784 | A | `&sethp 1` (8) |
+| 1878.770 | A | killed by the Trumpy (8) |
+| 1914.392 | B | `0x104E`: revive in town (not in the notes) |
+| 1949.668 / 1991.421 | B / A | Revive [01] on A / A accepts (8) |
+| 2010.817 / 2012.832 | A / B | `0x1071`, then the quits (End) |
+
+The notes against the wire:
+
+- Step 6 "`&resetabstated`" is a typo: 1574.099 `0x2011 "Invalid command : &resetabstated"`. The StaNeglect set at
+  1572.272 ended with A's next run (1575.378 → 1575.407).
+- Step 8 "A typed `&sethp 1` … A died, killed by none; death menu shown? no": nothing died. The zone sent `0x240E {1}`
+  and no `0x104D`. The poison stopped sending (§25.7). A died 38 s later from a Trumpy swing of `damage 1` (1878.770).
+- Step 8 "B cast Revive again after the cooldown (30 s) → A accepted": the capture has one Revive cast (1949.668). A
+  accepted 41 s after the offer. An earlier attempt never reached the server *(inferred: refused by B's client)*.
+- B's death (1741.161) and town revive (1914.392) are not in the notes. B had 391 of 393 HP (`0x2402` 1434.204).
+- Step 6 assist: no `0x243E` was sent (§25.5).
+
+### 25.2 Cast abort (`0x2444` → `0x2438` / `0x2445`)
+
+B's first Invincible: `0x2440 {1800, 8002}` → `0x244E {1800, 8002, index 1}` and `0x2435` 11 ms later. The client sent
+`0x2444` (empty) 306 ms into the 950-ms cast. 24 ms later B got `0x2438 NC_BAT_SOMEONESKILLBASH_CASTCUT_CMD {caster
+8002}`, and A got it 15 ms after B. B then got `0x2445 {err 0x20E8}`, and both got `0x243D CEASE_FIRE {8002}` 44–60 ms
+later. This is Z03 §5.4's order: `sp_NC_BAT_SKILLBASH_CASTABORT_CMD` broadcasts to the sight including the caster,
+then the success code goes out, then `smo_BashStop`. There was no `0x2457`, no SP change and no cooldown: the second
+cast 12 s later (928.046) was accepted despite `DlyTime` 120 s, as Z23 §3.1 says (the cooldown is set at the blast).
+No message (the client `FUN_0049a540` ignores the code).
+
+The second cast blasted 1.167 s after `0x244E`. That is `CastTime` 950 ms (9 tenths) plus the 0.3-s arming pass of a
+non-moving skill (Z03 §5.4). `0x2452` (flag `isenchant`) followed 0.217 s later, then StaDivineShield (28):
+`0x2429` / `0x1C18 {keepTime 10000}` to B and `0x2427` to A. B got `0x240F {417}` (SP 41). The reset came 9.99 s
+later.
+
+### 25.3 Ground target: Dash (`0x2441` → `0x2450` / `0x2451` → `0x4828`)
+
+| | 957.010 | 1048.799 | 1188.920 |
+|---|---|---|---|
+| A at | 6464 / 7134 | 6428 / 6883 (after running closer) | 6495 / 8415 (running) |
+| `0x2441` point | 6446 / 7225 | 6379 / 6080 (804 units) | 6493 / 9130 |
+| `0x2450` of the cast (+ `0x2435`, B `0x2451`) | index 3, +6 ms | index 5, +11 ms | index 11, +7 ms |
+| `0x2450` + `0x4828` of the warp | index 4, x + 5, +48 ms | index 6, x + 5, +24 ms | index 12, x + 5, +49 ms |
+| `0x2457` / `0x2452` | index 3; `targetnum 0` +0.37 s | index 5; +0.41 s | index 11; +0.36 s |
+| SP (`0x240F`) | 2029 → 1889 | 1889 → 1749 | 2029 → 1889 |
+
+`sp_NC_BAT_SKILLBASH_FLD_CAST_REQ` (Z03 §5.5) answers A with `0x2450 {skill, point, index}` and `0x2435`, and sends
+`0x2451 {caster, …}` to B. An `IsMovingSkill` skill blasts on the next tick without an arming pass.
+`smo_SkillBash_Blast(Loc)` (Z25 §6.3) calls `smo_WarpTo` (Z09 §9.3). It adds 5 to x and sends a second `0x2450` with a
+new blast index to A only. It also sends `0x4828 NC_SKILL_WARP_CMD {object, from, to, skill}` to A and B. The `0x2457`
+then carries the cast's index (3), not the warp's (4). `Area` 50 found no target: `0x2452 targetnum 0`. The 804-unit
+cast passed the range test (800 + body size + tolerance). The client had run A closer first (1046.796–1048.741) and
+sent no request out of range (the notes: "A tries to go closer before casting"), so no `0xFCA` was sent. At 1188.9 A was running.
+The client's `0x2019` sent 5 ms after the warp got `0x201B NC_ACT_MOVEFAIL_CMD {back 6498 / 9130}`, the warp point.
+B got no `0x4828` / `0x2457` for the third Dash (out of sight). The 91 s between the first two casts cover the 60-s
+cooldown.
+
+### 25.4 Toggle skill: Heat of Fury (`0x245C` / `0x245D`)
+
+- **On** (1074.608): `0x2440 {7300, target 8001 = self}` → `0x244E` + `0x2435` 3 ms later. On the next tick (41 ms),
+  A alone got `0x245C NC_BAT_TOGGLESKILL_ON_CMD {7300}`, then A and B got `0x2457` (Z23 §2.5 order). The effect came
+  1.39 s later: StaBurnPainMe (461) and StaBurnPainFoe (462) on A (`0x2429` + `0x1C18` to A, `0x2427` + `0x1C18` to
+  B), `0x2452` (self, `isenchant`) and `0x240E {3606}`. The cast costs **230 HP** = `HPRate` 60 ‰ × MaxHP 3836 (the
+  cost check of Z03 §5.2 / §5.3). All five on-casts show the same 1.32–1.39 s effect delay.
+- **Drain** (notes: "HP drains, 76 per instance"): every 1.00 s, A and B get `0x243C NC_BAT_DOTDAMAGE_CMD {8001,
+  resthp, damage 76, abstate 461, hpchangeorder, IsMissDamage 0}`, then `0x245A NC_BAT_AREADOTDAMAGE_CMD {abstate 462,
+  Centerobject 8001, num 0}`. A also gets `0x240E`. 76 = MaxHP × `MAXHPRATEDAMAGE` 20 ‰ (SubStaBurnPainMe, tick 1000
+  ms; Z22 §3.3). StaBurnPainFoe is the area part (AreaDamage actor, type 95, Z22 §4.2). It found no enemy (B is not
+  one), so `num` is 0 and the client only plays the centre effect. `hpchangeorder` advances by 3 per tick.
+- **Off by cast** (1091.466): A gets `0x245D {7300}` and A and B get `0x2457`, both in the blast tick. At the effect
+  (1092.831) 461 / 462 are removed, `0x2452` has flag 0, and the cast costs 230 HP again (`0x240E {2084}`).
+  Switching off is not free.
+- **Off by itself**: each case below happens in the tick of its cause. Each sends the `0x2428` pair before `0x245D`
+  (`csl_Toggle_CheckOnOff`, Z23 §2.4):
+  - Axe unequipped: 1121.117 `0x3012 {12, 2}`, then at 1121.172 `0x3002` / `0x3001` / `0x3011 {0x281}`, the resets
+    and `0x245D` (`DemandType` 1: `csl_Toggle_CanUseSkill_WeaponType`).
+  - `&sethp 100` while on: 1165.073, then at 1165.087 `0x240E {100}`, the resets and `0x245D`. 100 ≤ 3836 × 50 / 1000
+    (`TS_HPRATEOFF` 50).
+  - The town portal: 1236.104 `0x181A {1}` → `0x181B {0x19C1}` and `0x245D` in the same ms (1236.111). This path is
+    `so_LinkTo` → `csl_Toggle_AllOff`: it sends `0x245D` and **removes nothing** (no `0x2428` on zone#1 before the
+    link). On Forest of Mist neither the toggle nor 461 / 462 came back (`AbStateSaveType 0`, Z23 §2.4). This matches
+    the notes ("slot still active? no; icon? no").
+- **Refused**: at HP 100 the cast was answered with `0x2434 NC_BAT_SKILLBASH_CAST_FAIL_ACK {0xFD5}` in 19 ms, without
+  `0x244E`. The client showed "Failed to cast the skill." (Z03 §5.2 table, the notes' message).
+- **New map**: the on / off casts at 1252.0 / 1260.5 behave as in RouN.
+
+**Two `0x2428` per removed state.** Each removal sends `0x2428 {8001, 461}` and `{8001, 462}` twice to A and B. At a
+cast-off all four come in the effect tick (1092.831, with the `0x2452` between the pairs). At an automatic off the
+second pair comes one tick later (1121.222, 1165.136: +50 / +49 ms). The cause: `RemoveSkillAbstates` (Z23 §2.4) calls
+`so_AbnormalState_Reset` (vt 0x650: detach hook and `terminate = now`, Z03 §6.4) **and**
+`so_AbnormalState_BroadcastReset`. The element routine `AbnormalStateElement::ase_Routine` @ FUN_00406910 (Z22 §1.3)
+then finds `terminate ≤ now`, calls vt 0x650 again and broadcasts a second `0x2428` before it frees the slot. Z11 §8.3
+predicted the same double for `&resetabstatetarget` *(inferred there)*; here it is captured. (original bug) P02-B38.
+
+**`keepTime 1385447`.** At all five on-casts, the toggle states' `0x2429` / `0x1C18 keepTime` is 1 385 447 ms
+(23 min 5 s), although `SubStaBurnPainMe` / `Foe` have `KeepTime` 4 000 000 000. `ShineObject::so_SkillEnchant` @
+FUN_00431ca0 (Z22 §10.7) holds the keep time in an `int`, where 4 000 000 000 = −294 967 296. So the `< 3 600 000`
+test takes the short branch `(int)(SET_ABSTATEKEEPTIMERATE × ms) / 1000`. Its u32 product 1000 × 4 000 000 000
+mod 2³² = 1 385 447 424 gives 1 385 447 for the inform and the broadcast. The element itself is set by
+`AbstateElementInObject::aeo_Set` @ FUN_0040a340, which reads the keep time unsigned: (4 000 000 000 / 1000) × 10 =
+40 000 000 tenths. Multiplied by the rate 1000 in 32 bits this gives 1 385 447 424, and / 1000 gives
+`terminate = start + 1 385 447` tenths (38.5 h). The client's icon timer therefore runs out after 23 min, while the
+server keeps the state for 38.5 h. A toggle normally ends earlier. This answers Z09 §23.9's open point for skill
+states. Script keep times reach the same `aeo_Set` through vt 0x638 *(inferred: 38.5 h, not 48 days)*.
+(original bug) P02-B39.
+
+### 25.5 Abnormal-state reset conditions (step 6) and assist
+
+`&setabstate <name> 60000` (Z11 §4.4) answers `0x2429 {idx, 60000}` + `0x1C18` (B: `0x2427` + `0x1C18`) in 3–27 ms.
+The reset conditions are the `AbStateReset` table of `9Data/Shine/World/MiscDataTable.txt` (Z09 §28.3: `aeo_Run` /
+`aeo_Walk` / `aeo_Attack` / `aeo_Attacked`, `aeo_ItemChange`). Every reset is one `0x2428 {8003, idx}` in the tick of
+the cause; StaNeglect's also brings a `0x1035`.
+
+| State (index) | `AbStateReset` row: Run / Walk / Attack / Attacked, equip | Captured |
+|---|---|---|
+| StaNeglect (16) | 1 / 1 / 1 / 0 | ended by a run (1463.845 → 1463.862, 1476.640 → .662, 1498.010 → .030, 1539.821 → .841, 1546.012 → .066, 1575.378 → .407), a walk (1487.849 → .867), an attack start (`0x242B` 1502.966 → 1503.046); kept through 8 mob swings 1522.3–1539.8 (all misses) and through A's own running auto-attack (set at 1544.263 during it: the swing 1545.306 / 1546.016 did not end it) |
+| StaHide (75) | 0 / 0 / 1 / 1 | kept through the runs 1584.5–1595.9; ended by an attack start (1596.018 → .042, 1633.974 → .998) and by the first mob swing after each set (1606.678, 1613.856, 1639.942, 1642.239, 1644.554), all of them **misses** (`flag 4, damage 0`) |
+| StaBuckler (15) | 0 / 0 / 0 / 0, `LeftHand` `Shield` | kept through the attack 1683.1; ended when the shield came off (`0x3012 {10, 2}` 1695.398 → 1695.432, with `0x3011 {0x281}`) |
+
+So "attack" means starting an attack (`0x242B`, a skill cast: Z03 §3.1 / §5.2 call `aeo_Attack` there), not each
+swing. "Attacked" includes a missed swing *(captured; that the miss path reaches `aeo_Attacked` is inferred: Z03 §7.1 shows the call in the damage path only)*.
+
+**Assist.** The notes say "A's target became the slime? no; only after B started attacking the slime …". The whole
+capture has no `0x243E NC_BAT_ASSIST_REQ`. The 2016 client's assist sent a plain `0x2401 {5375}` (1410.223), the slime
+B had targeted since 1406.916. When A targets B, the zone sends A the order-1 `0x2402` of B's own target (1312.320
+`{5377}`, 1356.921 `{5376}`, 1406.940 `{5375}`; Z03 §2.3). The client therefore knows B's target without `0x243E`.
+Why it waited for B's attack (B's `0x242B` 1407.919) is client logic *(not traced)*. The 2017 PDB names
+`GameFrameWork::NcBatAssistReq` / `Assist` / `CurTargetAssist`, but the 2016 client export has no `0x243e` literal.
+Z03 §2.6 (`0x243E` → `0x243F`) stays unconfirmed: never seen.
+
+### 25.6 `&resetabstate` and the newbie exp chain (`0x0842 {0xFD4}`)
+
+`ac_resetabstate` @ FUN_0041c620 calls vt 0x650 (`so_AbnormalState_Reset`) for every index 0…0x317. It sends nothing
+itself (Z11 §4.4 says "0x2428 per state": they come from the routine). A held only StaE_UserNewbie02 (729), which the
+chain had set at 679.911 when 728 ended. On the wire at 1699.861, 21 ms after the command: `0x2429` 730 {1 800 000},
+731 {3 600 000}, 732 {7 200 000}, then `0x0842 {0xFD4}`. In the next tick (1699.909): `0x2429` 730, `0x2428` 729,
+`0x2429` 732, `0x2428` 731 (B gets both `0x2428`). Two detach runs of the `SETABSTATEME` chain explain this (Z22 §7.3:
+Newbie01 → 02 → 03 → 04 → 05 → 01; 01–04 share `Type` 109 / `SubType` 6, 05 has `SubType` 7):
+
+1. In the command's loop, resetting 729 runs the detach hook in `asl_AbstateReset`, which sets 730 (`Set_Simple`,
+   inform). The loop then reaches 730 and its detach sets 731; 731 sets 732; 732 sets 728. 728 is weaker than 729–731,
+   which are still in the list in the same group, so `asl_AbstateSet` refuses it with `SendErrorCode(2, 0x42, 0xFD4)`
+   to the setter, which is A: `0x0842`. The client shows "The effect cannot be used because upper level effect are
+   used already" (§24.8).
+2. In the next tick, `ase_Routine` finds 729–732 at `terminate = now`. 729: vt 0x650 runs the detach again and re-sets
+   730 (a refresh, `0x2429`), then `0x2428` 729. 730 is alive again. 731: re-sets 732, then `0x2428` 731. 732 is alive.
+
+So `&resetabstate` leaves A with **730 and 732** instead of no state, and shows the GM an error. The revive at 1991.425
+re-informs the two (730 {1 508 400}, 732 {6 908 400}). (original bug) P02-B40: the detach hook runs both at the reset
+and at the removal, and `ac_resetabstate` walks into the states its own resets create. B's 729 ended normally at
+1957.607, with one detach: `0x2429` 730 and `0x2428` 729 in one tick.
+
+### 25.7 Damage over time: StaDiaTrumpyPoison (step 7)
+
+The `&mobbreed` mob came with StaImmortal (291, 5000 ms, `0x1C19`), which was reset at 1741.237. Its skill 9051
+(`0x244F` / `0x2457` to both) hit A three times (1760.647, 1763.948, 1767.242): `0x2429` + `0x1C18 {179, keepTime
+301000}` to A, and `0x2427` + `0x1C18` to B. Each set is followed by a tick 64–85 ms later, then a tick every
+3.00 s: `0x243C {8003, resthp, damage 200, abstate 179, hpchangeorder, 0}` to A and B. There were 29 ticks
+(1760.711 … 1839.314); A refilled HP three times with HP stones (`0x5007` / `0x5008`, `0x500B` to B). After
+`&sethp 1` (1840.784 → `0x240E {1}` 24 ms later) no `0x243C` followed. `sasa_GetDamage` caps the flat DoT at
+`HP − 1` = 0 (Z22 §3.3, "the flat part never kills"), and a damage of 0 sends nothing. The state stayed: no
+`0x2428 {179}` came until A's death, and none at it (`so_KilledBy` erases states silently, §9.5). A's HP stayed at 1
+for 37 s (`0x2402 targethp 1` at 1878.081). The notes say "more than 10 ticks … duration 4–5 minutes": that is the
+301-s icon; the ticks stop at 1 HP.
+
+### 25.8 Deaths and revive by skill (step 8)
+
+- **B (1741.161).** One Trumpy swing of 391 at HP 391. B got `0x104D {180, 50, 0}`, `0x2448 {resthp 0}` and
+  `0x240E {0}` in that order (§9.5). GameLog `0x042B {mobid 82, exp 0}` and `0xC80A {AttackerType 1, AttackerID 82}`
+  had left 6 ms earlier.
+- **A (1878.770).** The Trumpy's `damage 1` swing at HP 1, with the same order plus `0x2402 {order 1, 0xFFFF}`. The
+  GameLog row has `exp 0` and there is no `0x2411`. RouN's `ExpLostAtDeadByMob` (`World/Field.txt`, `FieldAttr
+  +0xa7 explost_atdead_bymob`) is 0, so `sp_LostExpWhenKilledByMob` @ FUN_0042e030 returns 0 and
+  `sp_LostExperienceByKilled` @ FUN_0042e210 sends nothing (the notes: "EXP lost message: none"). Both deaths also
+  produced newbie-guide sets through the WM (`0x10DA` / `0x10DB {42}`, and B 14).
+- **B's town revive (1914.392).** `0x104E` (empty) → `0x1C18` / `0x242A` 729 {43300} (from `g_ShelterDie`) →
+  `0x104F NC_CHAR_REVIVESAME_CMD {150, 4700, 5748}` = RouN's `RegenCity` point (`Field.txt` `RegenXA` / `RegenYA`).
+  Then WM `0x180B`, GameLog `0x042D`, the CharDB burst with `0x0410 StoreType 2`, the client's `0x1803` 140 ms later
+  and the map-login burst, as §9.5. This was 173 s after the dead menu (the auto-revive would fire at 180 + 2 + 6 s).
+- **Revive [01] (1949.668).** `0x2440 {1620, 8003}` → `0x244E` / `0x2435` / `0x244F` → `0x2457` 46 ms later
+  (`IsMovingSkill`). At the effect (1950.518), A got `0x4829 NC_SKILL_SOMEONEREVAVALTOME_CMD` (empty), both got
+  `0x2452 {index 17, targetnum 0}`, and B got `0x240F {376}` (SP 41). `ShinePlayer::so_ply_Revival` @ FUN_0057ab90
+  sends `0x4829` (vt 0x304 with (0x12, 0x29)), sets `sp_MiscFlag.SomeClericReviveMe` and adds an `isheal` slot to
+  `skillresultbuffer` (bufferpoint + 1). Yet the packet carries no target: the slot does not reach the client
+  *(not traced why)*. A's client then showed "Revival" in the dead menu (notes).
+- **Accept (1991.421, 41 s later).** `0x482A` (empty) → 4 ms later `0x481E NC_SKILL_REVIVE_CMD {3836, 2029, 0}` (full
+  HP: rate 1000; SP and LP unchanged). Then StaImmortal (291) `0x242A {5000}` (RouN `immortalsec` 5000), `0x203E {33,
+  127}`, `0x9010 {5}` and the saved states 730 / 732 (`asl_SendAfterLogin`). B got `0x481F
+  NC_SKILL_SOMEONEREVIVE_CMD {8003, 3836, 2029, 0}`, A got `0x1035` and `0x240E {3836}`. 291 was reset after 5.00 s.
+  This is Z03 §7.3's order. `0x481F`'s first field (2017 PDB name `reviver`) holds the **revived** player (8003), not
+  the caster (8002). The client `On_NC_SKILL_SOMEONEREVIVE_CMD` @ FUN_004a2ed0 looks that object up, sets it to mode
+  1, sets its HP / SP and plays "RevivalTarget" on it, so only the 2017 name is misleading.
+
+### 25.9 The two quits
+
+| | A (zone#4, wm#1) | B (zone#2, wm#2) |
+|---|---|---|
+| `0x1071` | 2010.817 (option saves → CDB `0x7026` … `0x7050 {0x2118, nCharNo 270}`) | 2012.832 (… `0x7050 {0x2118, nCharNo 0}`) |
+| `0x0C18 {0}` to zone and WM | 2020.827 (+10.010 s) | 2022.841 (+10.009 s) |
+| zone saves | **9 + `0x0C31`** at 2020.834, nothing else | 4 (2022.847), 7 (.869), 4 (.870), **9 + `0x0C31`** at 2025.829 (13.00 s after `0x1071`) |
+| WM `0x0C19` ×4 | 2020.836, 2020.852 | 2022.844, 2022.862 |
+
+A's quit took the zone's own `0x0C18` path. `NC_USER_NORMALLOGOUT_CMD` @ FUN_00558690 (Z01 §8.1) reads no `LogoutType`.
+With the player in mode 1–6 and `p+0x2a798` (the `0x1071` time + 8 s, Z07 §3.3) passed, it runs `sp_Schedule_Logout`
+at once: StoreType 9, `0x0C31`, object freed. That save came 7 ms after the request and before the WM's first `0x0C19`
+(2020.836), which then found no object. B's `0x0C18` reached the zone 3 ms before the WM's `0x0C19`, yet the zone's
+first save is `so_banning`'s 4 (2022.847). Either the kick was handled first, or `sp_Schedule_Logout` re-armed itself
+(its vt 0x17c / 0xb2c tests) *(not traced)*. The 13-s `0x1071` timer then did the 9. So P02-B35's four saves happen
+only when the WM's kick wins; §22.5 and §23.3 are corrected accordingly. `0x1037` again carries the WM's stale copies
+(P02-B36): for A `6443 / 9850`, the `&linkto` point, against the zone's `6536 / 9825`; for B `6550 / 7150` and Cen 0.
+`0x7050` carries a stale `nCharNo` (D04-B13).
+
+### 25.10 Opcodes
+
+The 16 part-27 types (all `s24` only) decode with no issue. `0x104E` had no layout: an empty one is added.
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| C→Z | 0x2441 | NC_BAT_SKILLBASH_FLD_CAST_REQ | 3 | 10 | confirmed | Dash (§25.3) |
+| C→Z | 0x2444 | NC_BAT_SKILLBASH_CASTABORT_REQ | 1 | 0 | confirmed | 306 ms into the cast |
+| Z→C | 0x2445 | NC_BAT_SKILLBASH_CASTABORT_ACK | 1 | 2 | confirmed | `0x20E8` (success) |
+| Z→C | 0x2438 | NC_BAT_SOMEONESKILLBASH_CASTCUT_CMD | 2 | 2 | confirmed | to the caster too |
+| Z→C | 0x2434 | NC_BAT_SKILLBASH_CAST_FAIL_ACK | 1 | 2 | confirmed | `0xFD5` (toggle HP condition) |
+| Z→C | 0x2450 | NC_BAT_SKILLBASH_HIT_FLD_START_CMD | 6 | 12 | confirmed | two per Dash (cast, warp) |
+| Z→C | 0x2451 | NC_BAT_SOMEONESKILLBASH_HIT_FLD_START_CMD | 3 | 14 | confirmed | for the cast only |
+| Z→C | 0x4828 | NC_SKILL_WARP_CMD | 5 | 20 | confirmed | `to` = point x + 5 |
+| Z→C | 0x245C / 0x245D | NC_BAT_TOGGLESKILL_ON_CMD / _OFF_CMD | 5 / 5 | 2 | confirmed | 7300 |
+| Z→C | 0x243C | NC_BAT_DOTDAMAGE_CMD | 123 | 13 | confirmed | 76 (461), 200 (179) |
+| Z→C | 0x245A | NC_BAT_AREADOTDAMAGE_CMD | 65 | 5 | confirmed | `num 0` |
+| Z→C | 0x4829 | NC_SKILL_SOMEONEREVAVALTOME_CMD | 1 | 0 | confirmed | |
+| C→Z | 0x482A | NC_SKILL_REPLYREVIVE_CMD | 1 | 0 | confirmed | |
+| Z→C | 0x481E | NC_SKILL_REVIVE_CMD | 1 | 12 | confirmed | full HP |
+| Z→C | 0x481F | NC_SKILL_SOMEONEREVIVE_CMD | 1 | 14 | confirmed | field 1 = the revived player |
+| C→Z | 0x104E | NC_CHAR_REVIVE_REQ | 1 | 0 | confirmed; layout added (empty) | also batch 2 (§9.5) |
+
+Old types with new values: `0x104D` (twice `{180, 50, 0}`), `0x104F {150, 4700, 5748}` (pdb2016 layout), `0x2434`
+(first `0xFD5`), `0x0842` (cause in §25.6). With part 26's 29 types (§24.9), part 24's shared 10 and these 16, all
+55 `s24` types have a status.
+
 ## 11. Message order against README §2 and the pseudocode
 
 README §2 is a sketch of the login → WM → zone chain. Against the thirteen captures (details in the sections cited;
@@ -3471,9 +3745,12 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B32 | zone `ShinePlayer::so_ply_SellItemList_Insert` @ FUN_00537a20 with `CSellItemManager::simg_Insert` @ FUN_0050e360 (found in the batch-3 review) | the sold item enters the buy-back list first; `0x305D` (the entry `simg_Insert` evicted from a full list, handle in its out-parameter) and `0x305C` (the new entry) both go only when `so_ply_CanItemRepurchase` (vt 0xe6c) holds, so a sale at a merchant without buy-back (SoulStone / Skill / WeaponTitle / Guild) changes the server's list silently (§20.2; read, not captured) | the client keeps a buy-back entry whose handle the server has reused or dropped; a later buy-back of it at a Weapon / Item merchant names the wrong item or none *(inferred)* | send `0x305D` whenever an entry is evicted, or insert into the list only where buy-back is allowed |
 | P02-B33 | WM `fc_NC_USER_AVATARINFO_ACK` @ FUN_0040ede0 (map "RouT" for every listed avatar with tutorial state 0) with `fc_NC_CHAR_TUTORIAL_MAKE_ITEM_ACK` @ FUN_0040e2c0 → `CWMClientSession::TutorialLoginProcess` @ FUN_004371a0 (found in batch 4) | on a tutorial skip the avatar becomes `TS_SKIP`, but only `TS_PROGRESS` rewrites the map ("RouT00"); the lookup of "RouT" finds no service zone ("TutorialMap Search Fail") and the WM sends `0x1002 {0x145}` (`s37b` 214.189, §22.2) | a character created in an earlier session cannot enter the game by skipping the tutorial: "The Map is under maintenance"; it works after the list is reloaded (the skip is saved) | restore the DB map (or keep it in the list) when the tutorial is skipped |
 | P02-B34 | WM `fc_NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK` @ FUN_0040d740 → client 0xB40C (found in batch 4) | the slot byte comes from a local that only `CWMClientSession::CharIDChange` writes (code 0x20C0); for every other code it is stack garbage (7 captured, `s37b` 508.207, §22.4) | the client's `On_NC_USER_CONNECTION_CHANGE_CHAR_ID_ACK` @ FUN_00476de0 finds no avatar for the slot and returns: "The name is already taken by another user." (0x20D1), the guild-master text (0x20C7) and the generic error never show | send the slot of the request (look it up by `nCharNo`) |
-| P02-B35 | WM `0x0C18` mode 0 @ FUN_00412df0 and `Client_OnClosed` @ FUN_00437030 (each broadcasts `0x0C19`), zone `so_banning` @ FUN_00558b70, `zs_disconnect` and `sp_Schedule_Logout` @ FUN_00558160 (found in batch 4) | a quit runs `ws_save2DB` four times: `StoreType` 4 (first `0x0C19`), 7 (socket cut), 4 (second `0x0C19`) within 35 ms and 9 with `0x0C31` 3 s later (`s37b` 689.1, `s24` 2020.8 / 2022.8; §22.5). The last one is the `0x1071` timer (13 s after it, §23.3). `so_banning` has no guard for a player already in its logout window, so every further `0x0C16` / `0x0C19` for the user inside the 10-s / 13-s window saves again (`s38` 428.104, 518.799, 520.345: the next login's kicks) | four to six full CharDB save bursts, GameLog `0x0410` rows and `0x750C` for one logout; the data is the same each time *(inferred: no lost state)* | one save per logout; skip `so_banning` for a closing player |
+| P02-B35 | WM `0x0C18` mode 0 @ FUN_00412df0 and `Client_OnClosed` @ FUN_00437030 (each broadcasts `0x0C19`), zone `so_banning` @ FUN_00558b70, `zs_disconnect` and `sp_Schedule_Logout` @ FUN_00558160 (found in batch 4) | a quit runs `ws_save2DB` four times: `StoreType` 4 (first `0x0C19`), 7 (socket cut), 4 (second `0x0C19`) within 35 ms and 9 with `0x0C31` 3 s later (`s37b` 689.1, `s24` B 2022.8; §22.5). The last one is the `0x1071` timer (13 s after it, §23.3). Only when the WM's `0x0C19` reaches the zone before the client's own `0x0C18`: `s24` A (2020.8) saved once (§25.9). `so_banning` has no guard for a player already in its logout window, so every further `0x0C16` / `0x0C19` for the user inside the 10-s / 13-s window saves again (`s38` 428.104, 518.799, 520.345: the next login's kicks) | four to six full CharDB save bursts, GameLog `0x0410` rows and `0x750C` for one logout; the data is the same each time *(inferred: no lost state)* | one save per logout; skip `so_banning` for a closing player |
 | P02-B36 | WM `CharacterLogout` → CharDB `0x1037` (W01 §5.4) → Character `fc_NC_CHAR_LOGOUT_DB` @ FUN_00405b30 → GameLog `0x040B` (found in batch 4) | `0x1037` carries the WM's copy of map, x / y and `Cen` from the last map login (CharDB blob), not the logout values; `p_Char_Logout` ignores them, but the Character server copies them into `0x040B NC_LOG_GAME_LOGOUT` (`s38` 1894.409: `Cen` …4824 after a committed `&getmoney 500`, DB …5324; §23.5; position 5771 / 8796 vs the zone's 5756 / 8745 in `s37b`, §22.5) | the GameLog logout row records stale money and position; the client and the character row are not affected | send the zone's last saved values (or drop the fields from the log) |
 | P02-B37 | zone `sp_NC_SKILL_EMPOWALLOC_REQ` @ FUN_0044f150 → CharDB `0x4812` (found in batch 4) | the request is built in the global `gpp`: `+6 lockindex` is written only when a redistribution item is used, `redistitem.header` (6 bytes) never, `redistitem.changeinfo` (14 bytes) only for a partly used cell; the rest are bytes of older packets (`s24` 398.094 lockindex 8049 and the text "g darkness to ", 770.912 lockindex 6654; §24.3) | none seen: the DB echoes the stale lockindex in `0x4813`, which the zone ignores without `bUseItem`, and `count` 0 stops the item work; stale bytes on a server link | zero the request (or write lockindex 0xFFFF) |
+| P02-B38 | zone `RemoveSkillAbstates` (inlined in `csl_Toggle_CheckOnOff` @ FUN_00448e20, `csl_Toggle_AllOffAndReset` @ FUN_00448fa0, `so_SkillEnchant` @ FUN_00431ca0; Z23 §2.4) with `AbnormalStateElement::ase_Routine` @ FUN_00406910 (found in batch 4) | removes a state with `so_AbnormalState_Reset` (vt 0x650: `terminate = now`) **and** broadcasts `0x2428` itself; the element routine then broadcasts `0x2428` again when it frees the expired slot (`s24` 1092.831 ×2, 1121.172 / 1121.222, 1165.087 / 1165.136; §25.4) | every toggle switch-off sends each `0x2428` twice to the whole sight; the client ignores the second *(inferred)* | broadcast once (leave it to the routine, or free the slot at once) |
+| P02-B39 | zone `ShineObject::so_SkillEnchant` @ FUN_00431ca0 → `0x2429` / `0x1C18`, and `AbstateElementInObject::aeo_Set` @ FUN_0040a340 (found in batch 4) | a `KeepTime` above 2³¹ − 1 (StaBurnPainMe / Foe 4 000 000 000) is held in an `int` (negative), so the short branch `(int)(1000 × ms) / 1000` overflows: the packets say 1 385 447 ms; `aeo_Set` reads it unsigned but `rate × 40 000 000` tenths overflows too: the state ends after 1 385 447 tenths (38.5 h) (`s24` 1076.046 …, §25.4) | the client's icon timer runs out after 23 min while the state stays; scripts with such keep times get 38.5 h instead of the meant "forever" *(inferred for the script path)* | 64-bit or unsigned keep-time arithmetic, or a "permanent" flag |
+| P02-B40 | zone `AmpersandCommand::ac_resetabstate` @ FUN_0041c620 with `asl_AbstateReset` @ FUN_0040a930 (detach hook) and `ase_Routine` @ FUN_00406910 (vt 0x650 again) (found in batch 4) | the detach hook runs at the reset and again when the routine removes the expired element; for the `SETABSTATEME` exp chain (StaE_UserNewbie01–05) the command's loop walks into the states its resets create (729 → 730 → 731 → 732 → 728 refused), and the next tick re-sets 730 / 732 (`s24` 1699.861 / 1699.909, §25.6) | `&resetabstate` leaves the GM with two newbie states instead of none and shows "The effect cannot be used because upper level effect are used already" (`0x0842 {0xFD4}`); any reset of a chained state advances its chain twice | run the detach hook once (at removal), mark resets as `f_SystemRemove`, or iterate over a snapshot |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -3511,6 +3788,7 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | P02-B28 | `s37b` 212.393: `0x1110` carries a stale `0x91` | §22.1 |
 | D03-B11 | `s24` 370.824: `0x0432 NC_LOG_GAME_SKILL_LEARN` map "Need", x / y 0 | §24.2 |
 | Z07-B2 | `s24` 496.751 / 497.415 / 498.047: `0x10D1` INC `nLockIndex` 0 (unwritten; the stale word was 0) | §24.4 |
+| P02-B36 / D04-B13 | `s24` 2020.836 / 2022.844: `0x1037` with the WM's map-login position (A 6443 / 9850, B 6550 / 7150, Cen 0); `0x7050 {0x2118, nCharNo 270 / 0}` | §25.9 |
 
 ## 13. Discrepancies per work item
 
@@ -3617,6 +3895,13 @@ sweep, `docs/plan/items/X04.md`) carries every row marked "→ X01" that README 
 | X02 | `s38` notes (steps 1–6) | step 2's in-game quit is not in the capture (292.5 is a server reset, no `0x1071`); step 1 was done twice (the first try went on to the world list); step 5 has a first `&getmoney` without a kill (547.2) and two kills before the one the notes record; the DB readings file was not copied (§23.1) | corrected → batch-4 follow-up |
 | Z03 | `Z03-combat.md` §9.1 (`0x4812` layout) | the buffer is `gpp`: `+6 lockindex` only with an item, `redistitem.header` never and `changeinfo` only for a partly used cell are written (P02-B37); the partly used cell's `changeinfo` sits before the deleted keys and the attribute follows them (§24.3; D04 §2 has the offsets) | extended → batch-4 follow-up |
 | X02 | `s24` notes (start, steps 1–3) | "STR in the DB 53" is 63 in the `-db.txt`; "STR 593 (+63)": the server sends no STR total for free points, WCmin / WCmax rose by 3 (§24.4); the auto-arrange at 667.0 and the Damaged Mystery Vault opened at 1707.8 are not in the notes (§24.8) | corrected → batch-4 follow-up |
+| X02 | `s24` notes (steps 4–8, end) | step 6 "`&resetabstated`" was an invalid command (`0x2011`); step 8 "`&sethp 1` … A died": HP 1, no death, the poison only stops (§25.7); step 8's second Revive cast is not on the wire (one cast, accepted 41 s later); B's death by the Trumpy and town revive are missing; assist sent no `0x243E` (§25.1, §25.5) | corrected → batch-4 follow-up |
+| Z11 | `Z11-gm-commands.md` §4.4 (`&sethp`: "none of the three sends a packet: the GM's client keeps the old bars" *(inferred)*) | the client gets `0x240E {new HP}` 14–24 ms later (`s24` 1136.810, 1165.087, 1840.808; `s21` §20.3); the sender (the next tick's HP report) is not traced | corrected → batch-4 follow-up |
+| Z11 | `Z11-gm-commands.md` §4.4 / table row 58 (`&resetabstate`: "0x2428 per state") | the command sends nothing; the routine removes the states next tick; with the newbie exp chain it sets 730 / 732 and draws `0x0842 {0xFD4}` (P02-B40, §25.6) | extended → batch-4 follow-up |
+| Z23 | `Z23-skill-list.md` §2.4 (`RemoveSkillAbstates`) | each removed state is broadcast twice: `BroadcastReset` here and again by the element routine (P02-B38, §25.4); a toggle cast costs `HPRate` HP also when it switches off (230 HP, §25.4) | extended → batch-4 follow-up |
+| Z09 / Z22 | `Z09-world.md` §23.9 (keep times above 2³¹ − 1 "not traced"), `Z22-abstate-actors.md` §10.7 (`so_SkillEnchant`) | answered: the skill path sends 1 385 447 ms and sets 1 385 447 tenths (P02-B39, §25.4) | extended → batch-4 follow-up |
+| Z03 | `Z03-combat.md` §7.3 (`so_ply_Revival` "adds an `isheal` result slot to the skill result packet") | the slot is added (FUN_0057ab90), yet Revive [01]'s `0x2452` has `targetnum 0` (`s24` 1950.518, §25.8); why is not traced | contradicted → batch-4 follow-up |
+| Z03 | `Z03-combat.md` §2.6 (`0x243E NC_BAT_ASSIST_REQ`) | the 2016 client's assist sent a plain `0x2401` to the target's target known from the order-1 `0x2402`; `0x243E` never seen (§25.5) | unconfirmed |
 
 In batch 1 (§3–§6) no discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held (batch 2's rows for Z03, Z09, Z12, Z13 and W03 are above). Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
 timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
@@ -3633,7 +3918,7 @@ conditions), D02 §6 (12-byte save headers, ACKs only for 0x4001 / 0x4007, 0x401
 §3.1 / §6.2 / §6.3, Z15 §3.3 / §3.4 (SAY with the clicked NPC), Z12 §5.2 (0xBC05 cap), Z13 §8.2 / §8.3 / §8.6 / §8.7 /
 §8.10 (summon order, hunger, speed formula, 0x1C1A), Z09 §5.4 (10-s corpse) and D05's GameLog layouts (0x040A, 0x040F,
 0x0410, 0xC806, 0xC809). The sweep (part 14) confirms Z02 §6.4 (the client's `0x200B` in the tick of `0x304D` runs `sp_EndOfTrade`,
-which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second). Part 21 (§21) confirms D03 §1.2 / §2.1 (`ItemBuy_Create`'s attribute branch: item deleted, cen refunded, `0x340C {0x206}`), Z05 §2.1 (`0x340C` → `0x3004 {error}`) and §6.4 (`0x345A` → `0x3001` emptied), Z09 §1.2 / §2.4 (the per-minute block on the WM's `0x0821`), Z24 §6.7 / Z13 §2.7 (`sp_ChargedItemLimitCheck` → `sp_ItemDelete` → `sp_DestroyItem`, not at login), D03 §1.3 (boot option rows 800–803 / 820–822, `deletetime` at attribute +7) and the capture-scenarios predictions §8.14 (S13) and §8.17 (S16, its cen half). Part 24 (§22) confirms W01 §4.1 (0x1401 → 0x1403 → 0x1404 `0x181`, 0x140F → 0x1411 → 0x1412 → 0x1410 with the name stored on 0xD0, 0xB409 → 0xB40A), §4.2 (0x145 without a CharDB round trip when no zone serves the map), §5.4 (`CharacterLogout` order 0x1037, 0x081F, 0xC807), §6.2 (0xB40B 0x20C0 → `CharIDChange`), §7.2 (0x104B name check, state 3, `{−1, −1}`), Z01 §5.3 (`so_SetRegistNumber` → 0x689) and §8.1 (reason-9 save with 0x0C31), D02 §3.2 (`CharIDChangeData` default `{0, 0x64, 0}`), §3.5 and §14 (layouts; −3039 → 0x20D1), Z30 §1.2 (0xB40F) and D04 §5.1 (option saves). Part 25 (§23) confirms W01 §4.2 (`0x145` while the map's zone is down, six times), §5.4 and §7.3 (`0x0C31` checked by `charNo`), Z01 §8.1 (`0x0C18 {1}` ≥ 8 s after `0x1071` → logout at once), Z07 §3.3 (the 13-s `0x1071` timer: 12.97 / 12.99 s), Z11 §7.4 and Z05 (money committed in 15–22 ms, kept through zone kills), D02 §5 (`p_Char_Logout` takes only `charNo`, `playmin`), §17.4 at four zone restarts (P02-B25) and §19.2 (Z11-B32: the tester saw "[Leather Boots] has been obtained"). Part 26 (§24) confirms Z02 §6.5 (`0x3C0A` table form), Z03 §9.1 / §9.3 (`0x4811` → `0x4812` → `0x4814`, item release only with `bUseItem`; `0x4802` → `0x4804` + `0x1035`), Z04 §12.5 (`0x304B {0x30A8}` before the work, moves through `sp_ItemReloc`, a swap as `0x342B`), Z05 §4 / §6.1 / §9.8 (`0x342C` → `0x3001` + `0x300C`; book effect on `0x3440`; vault `0x349E` → `0x349F` → `0x3001` only), Z07 §2.2–§2.4 (INC / DEC sizes 15 / 27, full target array), Z08 §11 / Z23 §4 (`0x9005` / `0x9006` 21 bytes, `0x3016 {0x700}` first, `0x900C {130}`, `0x900D {49}`), Z12 §4.2 (`0x1035` free-stat flags, no STR total) and §7.1 (`0x4027` with the vault), Z23 §7.1 / §7.2 (incremental skill save: cooling skill, then once with 0), D02 §6 / §7.2, D03 §3 / §7.4 / §9 and D04 §2 (Character-server answers and logs) and Z01 §8.4 as corrected in §23.5 (auto-saves 599.99 / 599.97 s after `0x1803`).
+which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second). Part 21 (§21) confirms D03 §1.2 / §2.1 (`ItemBuy_Create`'s attribute branch: item deleted, cen refunded, `0x340C {0x206}`), Z05 §2.1 (`0x340C` → `0x3004 {error}`) and §6.4 (`0x345A` → `0x3001` emptied), Z09 §1.2 / §2.4 (the per-minute block on the WM's `0x0821`), Z24 §6.7 / Z13 §2.7 (`sp_ChargedItemLimitCheck` → `sp_ItemDelete` → `sp_DestroyItem`, not at login), D03 §1.3 (boot option rows 800–803 / 820–822, `deletetime` at attribute +7) and the capture-scenarios predictions §8.14 (S13) and §8.17 (S16, its cen half). Part 24 (§22) confirms W01 §4.1 (0x1401 → 0x1403 → 0x1404 `0x181`, 0x140F → 0x1411 → 0x1412 → 0x1410 with the name stored on 0xD0, 0xB409 → 0xB40A), §4.2 (0x145 without a CharDB round trip when no zone serves the map), §5.4 (`CharacterLogout` order 0x1037, 0x081F, 0xC807), §6.2 (0xB40B 0x20C0 → `CharIDChange`), §7.2 (0x104B name check, state 3, `{−1, −1}`), Z01 §5.3 (`so_SetRegistNumber` → 0x689) and §8.1 (reason-9 save with 0x0C31), D02 §3.2 (`CharIDChangeData` default `{0, 0x64, 0}`), §3.5 and §14 (layouts; −3039 → 0x20D1), Z30 §1.2 (0xB40F) and D04 §5.1 (option saves). Part 25 (§23) confirms W01 §4.2 (`0x145` while the map's zone is down, six times), §5.4 and §7.3 (`0x0C31` checked by `charNo`), Z01 §8.1 (`0x0C18 {1}` ≥ 8 s after `0x1071` → logout at once), Z07 §3.3 (the 13-s `0x1071` timer: 12.97 / 12.99 s), Z11 §7.4 and Z05 (money committed in 15–22 ms, kept through zone kills), D02 §5 (`p_Char_Logout` takes only `charNo`, `playmin`), §17.4 at four zone restarts (P02-B25) and §19.2 (Z11-B32: the tester saw "[Leather Boots] has been obtained"). Part 26 (§24) confirms Z02 §6.5 (`0x3C0A` table form), Z03 §9.1 / §9.3 (`0x4811` → `0x4812` → `0x4814`, item release only with `bUseItem`; `0x4802` → `0x4804` + `0x1035`), Z04 §12.5 (`0x304B {0x30A8}` before the work, moves through `sp_ItemReloc`, a swap as `0x342B`), Z05 §4 / §6.1 / §9.8 (`0x342C` → `0x3001` + `0x300C`; book effect on `0x3440`; vault `0x349E` → `0x349F` → `0x3001` only), Z07 §2.2–§2.4 (INC / DEC sizes 15 / 27, full target array), Z08 §11 / Z23 §4 (`0x9005` / `0x9006` 21 bytes, `0x3016 {0x700}` first, `0x900C {130}`, `0x900D {49}`), Z12 §4.2 (`0x1035` free-stat flags, no STR total) and §7.1 (`0x4027` with the vault), Z23 §7.1 / §7.2 (incremental skill save: cooling skill, then once with 0), D02 §6 / §7.2, D03 §3 / §7.4 / §9 and D04 §2 (Character-server answers and logs) and Z01 §8.4 as corrected in §23.5 (auto-saves 599.99 / 599.97 s after `0x1803`). Part 27 (§25) confirms Z03 §5.4 (cast abort: `0x2438` to the sight including the caster, `0x2445 {0x20E8}`, `0x243D`, no cooldown; 0.3-s arming of a non-moving skill), §5.5 (`0x2441` → `0x2450` / `0x2451`), §6.2 / §6.3 (inform and broadcast order), §7.2 (death order; no exp loss on a map with `ExpLostAtDeadByMob` 0) and §7.3 (`0x4829` → `0x482A` → `0x481E` / `0x481F`, full HP, StaImmortal for `immortalsec`), Z09 §9.3 (`smo_WarpTo`: x + 5, a second `0x2450` with its own index, `0x4828`) and §28.3 (the `AbStateReset` rows of StaNeglect / StaHide / StaBuckler), Z22 §1.3 (`ase_Routine` → vt 0x650 + `0x2428`), §3.3 (BurnPainMe 20 ‰ of MaxHP; the flat DoT never kills: no tick at 1 HP), §4.2 (`0x245A` with `num 0`) and §7.3 (the newbie chain), Z23 §2.1–§2.5 (toggle on / off by cast, the three automatic switch-offs, `csl_Toggle_AllOff` on a link without removing the states, no state after the link), Z25 §6.3, Z01 §8.1 (`0x0C18` acts whatever its `LogoutType`, ≥ 8 s after `0x1071`) and Z07 §3.1 / §9.5's town revive (`0x104F` = the map's `RegenCity` point).
 
 ## 14. Not reconstructed / uncertain
 
@@ -3762,6 +4047,13 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
   writes `nSkillLevel` 0 per D02 §6; the prep rows already had 0 and the snapshot has no cool-time column, so the
   skill-save columns are unchecked against the DB. The order "DB link packets before the client burst" (§24.2) is
   read from timestamps of different sockets; that the zone flushes client packets once per loop is *(inferred)*.
+- Batch 4, skills II (§25): why Revive [01]'s `0x2452` has no target although `so_ply_Revival` adds an `isheal` slot;
+  why B's quit took the kick path although its `0x0C18` reached the zone 3 ms before the WM's `0x0C19` (packet-loop
+  order or a re-armed `sp_Schedule_Logout`); the 2016 client's assist logic (it sent no `0x243E` and waited for B's
+  attack); the sender of the `0x240E` after `&sethp`; that missed swings reach `aeo_Attacked` through the damage path
+  (only the effect is captured); the 1.32–1.39 s effect delay of BurnPain01 against 0.2–0.8 s for the other skills
+  (the blast-effect queue `sbec_Store`, Z25 §6.4, was not re-read). The toggle's 23-min icon timer (P02-B39) was not
+  waited out, and the toggle with a lower learned step (Z23-B1) was not tested.
 
 ## 15. Coverage boundary
 

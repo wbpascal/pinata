@@ -807,7 +807,7 @@ Handler `FUN_0042b7a0`
 
 no inline reply; failure code is sent on the next tick as 0x2434
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `skill`: 1500 Bash [01]; `target`: mob handle
+**Captured** (P02, `capture-validation.md`; shop, combat, s24): `skill`: 1500 Bash [01]; `target`: mob handle
 
 Handler `FUN_0057fa50`
 
@@ -825,6 +825,8 @@ Handler `FUN_0057fa50`
 | 0 | u16 | skill |  |
 | 2 | u32 | locate.x |  |
 | 6 | u32 | locate.y |  |
+
+**Captured** (P02, `capture-validation.md`; s24): `skill`: 452 (Dash01) ×3; `locate.x`: ground point; 804 units from the caster at 1048.799 (Range 800 + body + tolerance); `locate.y`: ground point
 
 Handler `FUN_0057f400`
 
@@ -2989,7 +2991,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_CharChargedBuffData` (`FUN_0044e1e0
 | 4 | u8 |  | always 50 |
 | 5 | u32 | canReviveHere | 0/1 |
 
-**Captured** (P02, `capture-validation.md`; combat): `reviveWaitSec`: 180; ``: 50 (pdb2017 priority); `canReviveHere`: 0 (pdb2017 eMenuType DMT_BASE)
+**Captured** (P02, `capture-validation.md`; combat, s24): `reviveWaitSec`: 180; ``: 50 (pdb2017 priority); `canReviveHere`: 0 (pdb2017 eMenuType DMT_BASE)
 
 Sent from `ShineObjectClass::ShinePlayer::so_KilledBy` (`FUN_00433be0`) · payload 9 bytes
 
@@ -5118,6 +5120,8 @@ Sent from `ShineObjectClass::ShineMobileObject::so_Bash` (`FUN_0042e950`) · pay
 |---|---|---|---|
 | 0 | u16 | caster |  |
 
+**Captured** (P02, `capture-validation.md`; s24): `caster`: 8002, sent to the caster and to the other client
+
 Sent from `ShineObjectClass::ShineMobileObject::sp_castabort` (`FUN_00579d50`) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -5136,6 +5140,8 @@ Sent from `ShineObjectClass::ShineMobileObject::sp_castabort` (`FUN_00579d50`) �
 | 8 | u16 | abstate |  |
 | 10 | u16 | hpchangeorder |  |
 | 12 | u8 | IsMissDamage |  |
+
+**Captured** (P02, `capture-validation.md`; s24): `object`: 8001 / 8003; `resthp`: HP after the tick; `damage`: 76 (StaBurnPainMe: 20 ‰ of MaxHP 3836), 200 (StaDiaTrumpyPoison); `abstate`: 461 / 179; `hpchangeorder`: +3 per BurnPain tick; `IsMissDamage`: 0
 
 Sent from `ShineObjectClass::ShineMobileObject::so_mobile_DamageOverTime` (`FUN_00409cd0`) · payload 13 bytes
 
@@ -5376,7 +5382,7 @@ Sent from `ShineObjectClass::ShinePlayer::so_ply_TargetChange` (`FUN_004a4680`) 
 | 2 | u16 | targetobj |  |
 | 4 | u16 | index | blast index tying START, BLAST and DAMAGE together |
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `skill`: 1500; `targetobj`: = 0x2440 target; `index`: 3 / 4 (blast counter), ties 0x2457 / 0x2452
+**Captured** (P02, `capture-validation.md`; shop, combat, s24): `skill`: 1500; `targetobj`: = 0x2440 target; `index`: 3 / 4 (blast counter), ties 0x2457 / 0x2452
 
 Sent from `ShineObjectClass::ShinePlayer::so_ply_Volley` (`FUN_004a44a0`) · payload 6 bytes
 
@@ -5425,6 +5431,8 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 | 6 | u32 | targetloc.y |  |
 | 10 | u16 | index |  |
 
+**Captured** (P02, `capture-validation.md`; s24): `skill`: 452; `targetloc.x`: cast: the requested x; warp (smo_WarpTo): x + 5; `targetloc.y`: the requested y; `index`: cast n, warp n + 1 (a second 0x2450 to the caster only)
+
 Sent from `ShineObjectClass::ShineMobileObject::smo_WarpTo` (`FUN_004a7de0`) · payload 12 bytes
 
 | Off | Type | Value / source |
@@ -5453,6 +5461,8 @@ Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_005
 | 4 | u32 | targetloc.x |  |
 | 8 | u32 | targetloc.y |  |
 | 12 | u16 | index |  |
+
+**Captured** (P02, `capture-validation.md`; s24): `caster`: 8001; `skill`: 452; `targetloc.x`: requested point; `targetloc.y`: requested point; `index`: the cast's index; no 0x2451 for the warp
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_SkillBash_Casting` (`FUN_0057bef0`) · payload 14 bytes
 
@@ -5572,6 +5582,8 @@ Sent from `FUN_005796a0` (`FUN_005796a0`) · payload 6 bytes
 
 Element `PROTO_NC_BAT_AREADOTDAMAGE_CMD::targetinfo` (12 bytes): +0 u16 object, +2 u32 resthp, +6 u32 damage, +10 u16 hpchangeorder
 
+**Captured** (P02, `capture-validation.md`; s24): `abstate`: 462 (StaBurnPainFoe); `Centerobject`: 8001 (the caster); `num`: 0 (no enemy in range)
+
 Sent from `AbnormalStateContainer::SubAbnormalStateActorAreaDamage::sasa_Routine` (`FUN_0040d640`) · payload variable ((byte)
 
 | Off | Type | Value / source |
@@ -5614,6 +5626,8 @@ Sent from `ShineMobileObject::smo_ReflectionDamage` (`FUN_0055dbc0`) · payload 
 
 2 bytes, to the player only; sent from the second blast pass of a toggle-skill cast (Z23 §2.5). Client: ShortCutWin::OnToggleKey on all shortcut bars.
 
+**Captured** (P02, `capture-validation.md`; s24): `nSkillID`: 7300 (BurnPain01), caster only, in the blast tick before 0x2457
+
 Sent from `FUN_00579500` (`FUN_00579500`) · payload 2 bytes
 
 | Off | Type | Value / source |
@@ -5629,6 +5643,8 @@ Sent from `FUN_00579500` (`FUN_00579500`) · payload 2 bytes
 | 0 | u16 | nSkillID | toggle skill step switched off |
 
 2 bytes, to the player only; sent by the off-cast, csl_Toggle_CheckOnOff, csl_Toggle_AllOff (map link) and csl_Toggle_AllOffAndReset (tent, mount; also for steps that were off, Z23-B2). Client: ShortCutWin::OffToggleKey, then Skill::RecordSkillUse (starts the client cooldown display).
+
+**Captured** (P02, `capture-validation.md`; s24): `nSkillID`: 7300: by cast, unequip, HP ≤ 5 %, link (town portal)
 
 Sent from `FUN_005795d0` (`FUN_005795d0`) · payload 2 bytes
 
@@ -6991,6 +7007,8 @@ Sent from `CharaterSkillList::csl_AddMastery` (`FUN_00446730`) · payload 6 byte
 | 4 | u32 | sp |  |
 | 8 | u32 | lp |  |
 
+**Captured** (P02, `capture-validation.md`; s24): `hp`: 3836 = MaxHP (rate 1000); `sp`: 2029 (unchanged); `lp`: 0
+
 Sent from `ShineObjectClass::ShinePlayer::sp_ReviveNow` (`FUN_0057d290`) · payload 12 bytes
 
 | Off | Type | Value / source |
@@ -7009,6 +7027,8 @@ Sent from `ShineObjectClass::ShinePlayer::sp_ReviveNow` (`FUN_0057d290`) · payl
 | 2 | u32 | hp |  |
 | 6 | u32 | sp |  |
 | 10 | u32 | lp |  |
+
+**Captured** (P02, `capture-validation.md`; s24): `reviver`: 8003 = the revived player (the caster was 8002); the client treats it as the revived object; `hp`: 3836; `sp`: 2029; `lp`: 0
 
 Sent from `ShineObjectClass::ShinePlayer::sp_ReviveNow` (`FUN_0057d290`) · payload 14 bytes
 
@@ -7081,6 +7101,8 @@ Sent in reply to `0x4824` NC_SKILL_UNLEARN_REQ on ShineObjectClass::ShinePlayer 
 | 10 | u32 | to.x | position after the block search |
 | 14 | u32 | to.y |  |
 | 18 | u16 | skill | skill ID |
+
+**Captured** (P02, `capture-validation.md`; s24): `object`: 8001; `from.x`: position before the warp; `from.y`: position before the warp; `to.x`: requested x + 5; `to.y`: requested y; `skill`: 452
 
 Sent from `ShineObjectClass::ShineMobileObject::smo_WarpTo` (`FUN_004a7de0`) · payload 20 bytes
 
@@ -10697,6 +10719,16 @@ P02 part 11: 8 bytes on the wire = ref + PROTO struct (pdb2016 gives only the 2-
 
 Empty payload.
 
+### `0x104E` NC_CHAR_REVIVE_REQ (hand-named) (C→S)
+
+**Verified layout** (basis: zone handler FUN_00452980 reads no payload (Z07 §3.1); no PROTO struct in the 2017 PDB)
+
+Empty payload.
+
+P02 batch 4: empty body. evidence: capture size 0 (combat 102.372, s24 1914.392)
+
+**Captured** (P02, `capture-validation.md`; combat, s24): `(payload)`: empty; answer 0x104F 4 ms later, then a full map login
+
 ### `0x1071` NC_CHAR_LOGOUTREADY_CMD (C→S)
 
 **Verified layout** (basis: pdb2016 enum NC_CHAR_LOGOUTREADY_CMD = 113; zone FUN_00558450 (Z07 §3.3))
@@ -10782,6 +10814,8 @@ Empty payload.
 
 Empty payload.
 
+**Captured** (P02, `capture-validation.md`; s24): `(payload)`: empty; 306 ms into a 950-ms cast (§25.2)
+
 ### `0x3003` NC_ITEM_BUY_REQ (C→S)
 
 **Verified layout** (basis: zone FUN_00524a60)
@@ -10856,6 +10890,8 @@ Empty payload.
 **Verified layout** (basis: zone FUN_00418a30)
 
 Empty payload.
+
+**Captured** (P02, `capture-validation.md`; s24): `(payload)`: empty; 41 s after 0x4829
 
 ### `0x5007` NC_SOULSTONE_HP_USE_REQ (C→S)
 
@@ -12004,6 +12040,8 @@ player tick, on change (+0x172dc)
 |---|---|---|---|
 | 0 | u16 | err | 0xFC0..0xFDC, see Z03-combat §5.2 |
 
+**Captured** (P02, `capture-validation.md`; s24): `err`: 0xFD5: toggle skill at HP 100 of 3836 (TS_HPRATEOFF 50); client 'Failed to cast the skill.'
+
 ### `0x2435` NC_BAT_SKILLBASH_CAST_SUC_ACK (S→C)
 
 **Verified layout** (basis: zone FUN_005792f0)
@@ -12034,6 +12072,8 @@ only the self-kill send site of Z09 (cMobSuicide / ShineSuicide / servant vanish
 | Off | Type | Field | Notes |
 |---|---|---|---|
 | 0 | u16 | err | 0x20E8 ok, 0x20E9 riding, 0x20EA wrong mode |
+
+**Captured** (P02, `capture-validation.md`; s24): `err`: 0x20E8 (success), after the 0x2438
 
 ### `0x244A` NC_BAT_REALLYKILL_CMD (hand-named) (S→C)
 
@@ -12338,6 +12378,8 @@ payload size 0x8e + 0x21·menunum
 **Verified layout** (basis: zone FUN_0057ab90; client FUN_00575f30)
 
 Empty payload.
+
+**Captured** (P02, `capture-validation.md`; s24): `(payload)`: empty; at the Revive [01] effect, before 0x2452
 
 ### `0x482D` NC_SKILL_JUMP_CMD (hand-named) (S→C)
 
@@ -15926,10 +15968,6 @@ Z01 name was 'map login done (ours)'
 ### `0x0c18` NC_USER_NORMALLOGOUT_CMD (C→S)
 
 **Captured** (P02, `capture-validation.md`; idle_in_world, walk-run-portals): `LogoutType`: 0, 10.04 s after 0x1071
-
-### `0x104e` NC_CHAR_REVIVE_REQ (C→S)
-
-**Captured** (P02, `capture-validation.md`; combat): `(payload)`: empty; answer 0x104F 4 ms later, then a full map login
 
 ### `0x1080` NC_CHAR_WEDDINGDATA_REQ (Zone→CharDB)
 

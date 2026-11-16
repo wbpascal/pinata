@@ -2617,6 +2617,13 @@
      ]
     ],
     "notes": "P02 batch 4 (s24): 2 bytes; the decoder had no layout"
+   },
+   "0x104E": {
+    "dir": "C→S",
+    "name": "NC_CHAR_REVIVE_REQ",
+    "basis": "zone handler FUN_00452980 reads no payload (Z07 §3.1); no PROTO struct in the 2017 PDB",
+    "fields": [],
+    "notes": "P02 batch 4: empty body. evidence: capture size 0 (combat 102.372, s24 1914.392)"
    }
   },
   "accountlog": {
@@ -7292,7 +7299,8 @@
     "dir": "C→S",
     "captures": [
      "shop",
-     "combat"
+     "combat",
+     "s24"
     ],
     "fields": {
      "skill": "1500 Bash [01]",
@@ -7303,7 +7311,8 @@
     "dir": "S→C",
     "captures": [
      "shop",
-     "combat"
+     "combat",
+     "s24"
     ],
     "fields": {
      "skill": "1500",
@@ -7395,7 +7404,8 @@
    "0x104d": {
     "dir": "S→C",
     "captures": [
-     "combat"
+     "combat",
+     "s24"
     ],
     "fields": {
      "reviveWaitSec": "180",
@@ -7406,7 +7416,8 @@
    "0x104e": {
     "dir": "C→S",
     "captures": [
-     "combat"
+     "combat",
+     "s24"
     ],
     "fields": {
      "(payload)": "empty; answer 0x104F 4 ms later, then a full map login"
@@ -8778,6 +8789,176 @@
     "fields": {
      "itemLockIndex": "3",
      "err": "0x2140"
+    }
+   },
+   "0x2441": {
+    "dir": "C→S",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "skill": "452 (Dash01) ×3",
+     "locate.x": "ground point; 804 units from the caster at 1048.799 (Range 800 + body + tolerance)",
+     "locate.y": "ground point"
+    }
+   },
+   "0x2444": {
+    "dir": "C→S",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "(payload)": "empty; 306 ms into a 950-ms cast (§25.2)"
+    }
+   },
+   "0x2445": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "err": "0x20E8 (success), after the 0x2438"
+    }
+   },
+   "0x2438": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "caster": "8002, sent to the caster and to the other client"
+    }
+   },
+   "0x2434": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "err": "0xFD5: toggle skill at HP 100 of 3836 (TS_HPRATEOFF 50); client 'Failed to cast the skill.'"
+    }
+   },
+   "0x2450": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "skill": "452",
+     "targetloc.x": "cast: the requested x; warp (smo_WarpTo): x + 5",
+     "targetloc.y": "the requested y",
+     "index": "cast n, warp n + 1 (a second 0x2450 to the caster only)"
+    }
+   },
+   "0x2451": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "caster": "8001",
+     "skill": "452",
+     "targetloc.x": "requested point",
+     "targetloc.y": "requested point",
+     "index": "the cast's index; no 0x2451 for the warp"
+    }
+   },
+   "0x4828": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "object": "8001",
+     "from.x": "position before the warp",
+     "from.y": "position before the warp",
+     "to.x": "requested x + 5",
+     "to.y": "requested y",
+     "skill": "452"
+    }
+   },
+   "0x245c": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "nSkillID": "7300 (BurnPain01), caster only, in the blast tick before 0x2457"
+    }
+   },
+   "0x245d": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "nSkillID": "7300: by cast, unequip, HP ≤ 5 %, link (town portal)"
+    }
+   },
+   "0x243c": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "object": "8001 / 8003",
+     "resthp": "HP after the tick",
+     "damage": "76 (StaBurnPainMe: 20 ‰ of MaxHP 3836), 200 (StaDiaTrumpyPoison)",
+     "abstate": "461 / 179",
+     "hpchangeorder": "+3 per BurnPain tick",
+     "IsMissDamage": "0"
+    }
+   },
+   "0x245a": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "abstate": "462 (StaBurnPainFoe)",
+     "Centerobject": "8001 (the caster)",
+     "num": "0 (no enemy in range)"
+    }
+   },
+   "0x4829": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "(payload)": "empty; at the Revive [01] effect, before 0x2452"
+    }
+   },
+   "0x482a": {
+    "dir": "C→S",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "(payload)": "empty; 41 s after 0x4829"
+    }
+   },
+   "0x481e": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "hp": "3836 = MaxHP (rate 1000)",
+     "sp": "2029 (unchanged)",
+     "lp": "0"
+    }
+   },
+   "0x481f": {
+    "dir": "S→C",
+    "captures": [
+     "s24"
+    ],
+    "fields": {
+     "reviver": "8003 = the revived player (the caster was 8002); the client treats it as the revived object",
+     "hp": "3836",
+     "sp": "2029",
+     "lp": "0"
     }
    }
   },
