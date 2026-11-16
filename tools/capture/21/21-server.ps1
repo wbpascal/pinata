@@ -3,6 +3,10 @@
   server (e.g. C:\FiestaServer\capture\21) and run it there in PowerShell. Needs sqlcmd (comes with SQL Server)
   and Windows authentication to the instance (-Instance, default "." = the local default instance).
 
+  -Char <name> is required for every SQL action that concerns the character (prep, snapshot-*, s16-on, s13): the
+  character that PLAYS the run. It is the only place the name is set; every output starts with it. (Batch 3: the
+  scenario was played with Test2, the scripts ran for Test1235, so the snapshots checked nothing.)
+
   .\21-server.ps1 prep              S1 (admin level 100) + check that account B can log in   [admin at login screen]
   .\21-server.ps1 snapshot-before   items / money of the GM character -> out\..._items-snapshot-before.txt
   .\21-server.ps1 snapshot-after    the same -> out\..._items-snapshot-after.txt               [admin at login screen]
@@ -16,6 +20,7 @@ param(
     [Parameter(Mandatory, Position = 0)]
     [ValidateSet('prep', 'snapshot-before', 'snapshot-after', 's16-on', 's16-off', 's13', 's13-done',
                  'x3-apply', 'x3-restore', 'status')][string]$Action,
+    [string]$Char,
     [string]$Instance = '.',
     [string]$Name = '26_11_15_21_items'
 )
@@ -26,10 +31,16 @@ New-Item -ItemType Directory -Force $out | Out-Null
 
 function Sql([string]$file, [string]$log) {
     $sqlArgs = @('-S', $Instance, '-E', '-b', '-W', '-s', '|', '-i', (Join-Path $here $file))
+    if ($Char) { $sqlArgs += @('-v', "Char=$Char") }
     if ($log) { & sqlcmd @sqlArgs -o $log; Get-Content $log } else { & sqlcmd @sqlArgs }
     if ($LASTEXITCODE) { throw "$file failed (sqlcmd exit $LASTEXITCODE)" }
 }
 function SqlQ([string]$q) { & sqlcmd -S $Instance -E -b -W -Q $q; if ($LASTEXITCODE) { throw "query failed" } }
+
+if ($Action -in 'prep', 'snapshot-before', 'snapshot-after', 's16-on', 's13') {
+    if ($Char -notmatch '^[A-Za-z0-9_]{1,20}$') { throw "-Char <character name> is required for '$Action' (the character that plays this run)" }
+    Write-Host "scenario 21, action $Action, character: $Char"
+}
 
 switch ($Action) {
     'prep'            { Sql '21-prep.sql' (Join-Path $out "$Name-prep.txt") }

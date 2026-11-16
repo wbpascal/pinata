@@ -1,4 +1,5 @@
-# Scenario 21 setup, typed by ..\gmtype.ps1 -File 21-setup.txt (character of account "admin", GM level 100)
+# Scenario 21 setup, typed by ..\gmtype.ps1 -File 21-setup.txt (character of account "admin", GM level 100:
+# the same character you pass as -Char to 21-server.ps1)
 # Inventory cells after this file, in order (first free cell each time):
 #   0 HP Potion (Tier 1) x10   1 HP Potion x3   2 HP Potion x1   3 Jeweled Skeleton Ring   4 Jeweled Skeleton Ring
 #   5 Leather Boots            6 Binding Reset Resin (Grade 1) x1 (no-drop, deletable: the destroy item)

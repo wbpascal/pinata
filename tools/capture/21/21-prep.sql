@@ -1,12 +1,14 @@
 -- Scenario 21 preparation (capture-scenarios.md §8.2 S1, made idempotent) + account B check.
 -- Run with account "admin" at the login screen (no character in the game).
--- On the server: .\21-server.ps1 prep   (or open in SSMS and press F5)
+-- On the server: .\21-server.ps1 prep -Char <name>
+-- The character comes from 21-server.ps1 -Char <name> (sqlcmd variable Char). In SSMS: SQLCMD mode, first line ":setvar Char <name>".
 -- The account database is assumed to be named "Account" (Account.dbo.… below): change it if yours differs.
 SET NOCOUNT ON;
 USE World00_Character;
-DECLARE @char nvarchar(32) = N'Test2';            -- the GM character of account "admin"
+DECLARE @char nvarchar(32) = N'$(Char)';          -- the GM character of account "admin" that plays the scenario
 DECLARE @c int = (SELECT nCharNo FROM tCharacter WHERE sID = @char AND bDeleted = 0);
-IF @c IS NULL BEGIN RAISERROR('character not found', 16, 1); RETURN; END
+IF @c IS NULL BEGIN RAISERROR('character $(Char) not found', 16, 1); RETURN; END
+SELECT 'character' AS scenario_21, sID, nCharNo, nUserNo FROM tCharacter WHERE nCharNo = @c;   -- who this run is for
 
 -- S1: admin level 100
 IF (SELECT nAdminLevel FROM tCharacter WHERE nCharNo = @c) = 100

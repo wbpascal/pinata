@@ -105,10 +105,18 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   capture), §3.2 shout, W04 §2.1 whisper, Z03 §3 `SOMEONE…` attack packets; Z11 §3.1 `&hide` / `&show` /
   `&dimension` (re-check V24).
 - **Setup:** A (GM) and B stand out of sight of each other on one map, then B walks to A.
-- **Steps:** (1) B walks into A's sight. (2) B walks, runs, jumps, sits, stands. (3) B plays an emote, then moves
-  while it plays. (4) A shouts; B whispers A; A whispers a name that is not online. (5) B attacks a mob next to A
-  with a swing and one skill. (6) A types `&hide`, `&show`, `&dimension 1`, `&dimension 0`. (7) B walks out of
-  sight.
+- **Steps:** (1) B walks into A's sight. (2) B switches the client to walking (its walk / run toggle), walks a
+  few steps, switches back and runs, jumps, uses the action "Sit" (`ActionViewInfo` 6), then "Stand" (7), then
+  changes the combat stance. (3) B plays an emote, then moves while it plays. (4) A shouts with B in sight; B runs
+  out of A's sight on the same map (more than `MapInfo.Sight`, 1600 in RouN) and A shouts again; B whispers A; A
+  whispers with a name no character has (`X14Nobody`) as the **receiver** of the whisper, any text. (5) B attacks a
+  mob next to A with a swing and one skill. (6) A types `&hide`, `&show`, `&dimension 1`, `&dimension 0`; after
+  each command both stand still for 10 s, then **B alone** takes a step, 10 s later **A alone** takes a step, and
+  the notes say after whose step the other one reappeared. (7) B walks out of sight.
+  *(Steps 2, 4 and 6 reworded by X05: in `s14` B only ran and never sat, the shout was never out of sight, the
+  unknown name went into the whisper's text, and the notes could not tell whose step brought A back,
+  capture-validation §13.)* The shouter must have the shout level (a level-1 character is refused without a packet,
+  capture-validation §18.4): A shouts, not a new B.
 - **Prediction:** (1) Z→A `0x1C06 NC_BRIEFINFO_LOGINCHARACTER_CMD` for B's handle (and Z→B for A); if a client
   meets an unknown handle first it asks with `0x1C01 {nMyHnd, …}` and gets the brief info packet of that object
   (Z02 §5.1). (2) B's `0x2003` → A `0x2004`; `0x2005` → `0x2006`; `0x2024` → `0x2025`; sit / stand → A `0x2009
@@ -123,6 +131,29 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   again until A changes map (the command does not re-enter the map, V24).
 - **Disproved by:** a shout that stops at sight range; a `0x1C07` where we expect `0x1C06`; B seeing A right
   after `&dimension 0`; a `0x200F` for the unknown name.
+- **Result (P02 batch 3, `s14`, capture-validation §18):**
+  (1) **confirmed**: `0x1C06` both ways when B came within 1600 units, each followed by the other's abstate list
+  `0x1C19`; 18 × `0x1C01` each answered by the appear packet and the last move (§18.2). `0x1C07` is not in `s14`
+  (nobody in sight at a map login); `s21` has it at B's map login, `0x1C06` for the one already there (§18.2).
+  (2) **run, jump, stance confirmed; the move opcodes of the prediction are wrong**: the client sends `0x2019` →
+  others `0x201A`, stop `0x2012` → `0x2013` (Z02 §2.2); no `0x2003` … `0x2006` is in the capture. `0x2024` → A
+  `0x2025` (only in sight), `0x2008 {2}` → A `0x2009` (§18.3). **Stand disproved as predicted**: it is the emote
+  `0x2020 {7}` → `0x2021`, not `0x2009`. **Not reached**: a walk (`0x2017` → `0x2018` from a player) and the sit
+  (`0x2020 {6}` *(inferred from the stand)*).
+  (3) **confirmed** for `0x2020` → `0x2021` (7 emotes; also echoed to B itself); `0x2022` / `0x2023` **not reached**
+  (the client never sent a stop) (§18.3).
+  (4) **shout confirmed in sight only**: A's `0x201E` → `0x201F` to A and B; B (level 1) got nothing for its own
+  shout; out of sight **not reached**. **Whisper confirmed**: WM `0x200D` to the target, `0x200F` to the sender,
+  `0x6006` to the sender's zone, one WM pass. `0x200E` **not reached** (the whisper went to X14B with the text
+  "X14Nobody") (§18.4).
+  (5) **confirmed** for `0x2449` and `0x244F` (A only; B got its own forms); `0x242E` / `0x2438` **not reached** (no
+  other skill path was used) (§18.5).
+  (6) **confirmed** on all four counts: `&hide` → A `0x242A` (STA_GMHIDEMODE), B `0x1805`; `&show` → `0x2428` to
+  both and no appear packet (B got A back through `0x1C01` after **A's** step); `&dimension 1` → B `0x1805`;
+  `&dimension 0` → nothing for B, also after B's step (§18.6). Not predicted: the appear + delete storm while the
+  layers differ (P02-B27) and the values −1 / 70000 being accepted.
+  (7) not recorded (the capture ends before it). None of the "Disproved by" events occurred; the first and the last
+  of them were not reached.
 
 ### 15. Party across two zones
 
@@ -238,6 +269,10 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   §10 (V4); D03 §1–§7. The shop capture covered buy, sell, equip and the storage open only.
 - **Setup:** `&makeitem` a stackable consumable (lot 10), a second stack of the same item (lot 3), a ring, a
   non-stackable item; a filled inventory for step 7 (`&makeitem` until `0x3402` stops coming; silent when full).
+  The server-side scripts are `tools/capture/21` (`21-server.ps1 <action> -Char <name>`): `-Char` is the character
+  that plays the run, named once and printed at the top of every output *(X05: in batch 3 the snapshots and the
+  S13 / S16 runs were made for another character than the one played, capture-validation §19.8, §21)*. Step 12's
+  three runs must name the character that logs in for them.
 - **Steps:** (1) split 4 off the stack into a free cell; merge them back; split onto the lot-3 stack. (2) drop
   the lot-3 stack; pick it up. (3) drop the non-stackable item; pick it up with B if a second client runs
   (else skip). (4) destroy an item (drag out + confirm destroy). (5) use one consumable; use the last one of a
@@ -271,6 +306,36 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
   not this path. (12) X3: open, no prediction (§9.4); S16 and S13: the predictions of §8.17 and §8.14.
 - **Disproved by:** a split refusal on another opcode than `0x300E`; the ground object appearing before `0x3417`; `0x3013
   {0x2C1}`; another text than "Failed to obtain the item." for 0x34A; 0x34A for an item that is not in `KQItem.shn`.
+- **Result (P02 batch 3, `s21`, capture-validation §19–§20; the character was Test2):**
+  (1) **confirmed**, and the open question answered: a successful split ends with `0x300E {0x441}` after the two
+  `0x3001`; the merge (a `0x300B` move onto the stack) is `0x342E` → `0x342F` → `0x300C {0x241}`. Split onto the
+  lot-3 stack: **refused** `0x300E {0x446}` without a DB request (3 ×), so `0x3431` / `0x3432` were **not reached**;
+  `{0x442}` not reached either (the client offers 1 … lot − 1 only) (§19.3).
+  (2) **confirmed**: `0x3416` → `0x3417` → ground object `0x1C0A` and `0x3008 {0x301}` (V2: the object comes after
+  the answer). Not predicted: the confirmation menu `0x3C01` with a first `0x3008 {0x301}` before the DB request,
+  and the cell emptied with the request. Pick-up onto the stack: `0x341F` → `0x3420` → `0x300A {0x341}`. A drop of
+  part of a stack: `0x3008 {0x303}` (Z04-B4) (§19.4).
+  (3) **confirmed** on B's links (`0x341C` → `0x341D` → `0x300A`), allowed 20 s after the drop (`looting`); no
+  `0x301B`; the others in sight get `0x3014 NC_ITEM_SOMEONEPICK_CMD` (§19.4).
+  (4) **confirmed** (`0x346A` → `0x346B`, two menus before it, `0x3024` after it) (§19.5).
+  (5) **confirmed** for `0x343E` / `0x343F` → `0x3440` → `0x3016 {0x700}`, with `0x301A` before the DB answer. No
+  `0x3029` reached B. A potion at full HP: `0x3016 {0x713}` without a DB request (§19.6).
+  (6) **confirmed except the opcode**: the client sent `0x300F` for both rings, not `0x3010`; `0x3410` → `0x3411` →
+  `0x3011 {0x281}`, the second ring in slot 16 (§19.7).
+  (7) **confirmed**: `0x3013 {0x2C2}` and "Failed to unequip the item." (first `0x3013` on the wire) (§19.7).
+  (8) **money confirmed** (`0x301C` → `0x345F` → `0x3460` → `0x301D`; `0x301E` → `0x3461` → `0x3462` → `0x301F`); the
+  stack went in and out as a `0x300B` move (`0x3428` → `0x3429`). `0x3028` **not reached**: changing the page sends
+  nothing, the four pages come at the open (§20.1). D03 check 3 not checked: the SQL snapshots list another character
+  (§19.8).
+  (9) **confirmed with another opcode**: every sale is followed by `0x305C` (one entry), never `0x305B`; buy-back
+  `0x3059` → `0x34BB` → `0x34BC` → `0x305D`, `0x305A {0x3668}`, always onto the stack in cell 0. `0x34B9` (onto an
+  empty cell) **not reached**. The stack of 3 the notes could not buy back was refused `0x305A {0x3671}` because
+  another NPC had been clicked (P02-B31), not because it was a stack (§20.2).
+  (10) **confirmed**: `0x5001` / `0x5002` → `0x3441` → `0x3442` → `0x5003` / `0x5004` (and `0x3004 {0x201}`); a use
+  → B `0x500B` / `0x500C`. `0x5006` **not reached**: at full HP the client sends no `0x5007` (§20.3).
+  (11) **confirmed**: `0x300A {0x34A}` without a DB request and "Failed to obtain the item."; a full inventory gives
+  `0x300A {0x346}` "Inventory is full." (§19.4). `&makeitem` and the drop accept `KQ_Ice01`.
+  (12) see the result lines of §8.17, §8.14 and §9.4 (run with Test1235). None of the "Disproved by" events occurred.
 
 ### 22. Upgrade, gems, random options, endurance
 
@@ -536,17 +601,33 @@ Sessions that fit together (same setup): **I** one client, GM: 37, 21, 22, 23, 2
 - **Claims:** L01 §1.6 (hand-rated: the Login heartbeat never fired in a capture), L00 / L01 refusal codes,
   D01 §3–§4, W01 §4 (delete, rename), W05 §4.5; D02 §3.
 - **Setup:** S10 (blocked account), S11 (account not login-able), X6 (world closed / full in the server config).
-- **Steps:** (1) start the client, stay on the login screen 70 s without typing. (2) log in, stay on the world
+- **Steps:** (1) *(dropped by X05: the client opens the Login connection only when the login form is submitted,
+  so an idle login screen holds no connection and tests nothing, capture-validation §16.2. The idle tests are steps
+  2 and 6; a Login connection that stays silent needs the test client: scenario 41, T15.)* (2) log in, stay on the world
   list 70 s. (3) log in with the blocked account; with the not-login-able account. (4) select the closed world.
   (5) delete a character (wrong confirmation first if the client asks one), create one with the same name.
   (6) stay 4 minutes on the character list.
-- **Prediction:** (1) Login → C `0x0804` after 30 s without a received packet, C → `0x0805`; no close
-  (L01 §1.6). (2) the client's own `0x0C1B` poll keeps the link alive: no `0x0804`. (3) `0x0C09 {0x47}` "The ID
+- **Prediction:** (1) *(needs a silent Login connection, which this client never has)* Login → C `0x0804` after 30 s
+  without a received packet, C → `0x0805`; no close (L01 §1.6). (2) the client's own `0x0C1B` poll keeps the link alive: no `0x0804`. (3) `0x0C09 {0x47}` "The ID
   has been blocked."; `{0x48}` "The World Servers are down for maintenance."; AL `0x0720` / `0xC802` for both
   (README §3.15). (4) the world-select refusal of L01 with the world's status byte. (5) W ↔ D delete, G
   `0x0412` twice (W and D), `0xC805`; create: `0x0411`, `0xC804`. (6) WM heartbeat every 30 s; no close at
   30 + 180 s as long as the client answers (W05 §4.5).
 - **Disproved by:** a close in step 1 or 6 while `0x0805` is answered; another code than 0x47 / 0x48.
+- **Result (P02 batch 3, `s37`, capture-validation §16):**
+  (1) **not reached**: nothing was sent to the Login port during the 70 s; in no capture did Login send `0x0804`
+  (§16.2). L01 §1.6 stays hand-rated; the test is now T15 of scenario 41.
+  (2) **confirmed**: `0x0C1B` every 10.0 s, no `0x0804` (§16.2).
+  (3) **confirmed**: `0x0C09 {0x47}` and `{0x48}` with the two texts, AccountLog `0x0720` + `0xC802` for both
+  (§16.1).
+  (4) **closed world confirmed with a correction**: `0x0C0C {0}` and "Server is closed. Please try login later.",
+  but the refusal also carries the WM address and unwritten `validate_new` bytes, not zeros (P02-B23, §16.3).
+  **Full world (X6) confirmed to the byte**: `0x0C10`, `0x0721`, `0x0C0D` before `0x0C0C {5}` (§16.1).
+  (5) **confirmed**: delete W → D `0x1413` → `0x1414` → `0x1408` → `0x140B`, GameLog `0x0412` twice (Character
+  server first, WM 10 ms later), `0xC805`; create `0x0411`, `0xC804`. The client refuses a wrong confirmation without
+  a packet. Not predicted: AccountDB `0x140D` / `0x140E`, `0x9424` → `0x9425`, `0x10B2` to every zone (§16.1).
+  (6) **confirmed**: `0x0804` 30.0 s after the last client packet, 12 times in 7 minutes, no close (§16.2).
+  None of the "Disproved by" events occurred.
 
 ### 38. Session loss, kicks, back to character select
 
@@ -646,6 +727,7 @@ login plus one crafted packet is enough). One connection per case: several end i
 | T12 | W04-B1 | `0x2010` notice from a level-100 GM with a 140-byte text (**crashes the WM**: last test of a session) | WM stack overflow above 131 bytes | a clean `0x2011` |
 | T13 | W04 §17.3 | `0x0840` loading-failure report | W→D `0x0841`, no answer | an answer |
 | T14 | X02-B6 (T10 of §3.4.1) | none (server-internal); listed for completeness: needs a tournament observer, scenario 43 | – | – |
+| T15 | L01 §1.6, L01-B11 (added by X05: scenario 37 step 1 cannot reach it, capture-validation §16.2) | to Login: connect, read the seed `0x0807`, send nothing, answer `0x0804` with `0x0805`; second connection: the same without answering; third: a replayed login (`0x0C65` … world list), then silence (no `0x0C1B`), answering `0x0804` | first: `0x0804` 30 s after the connect, and the `0x0805` answer closes the connection at once (the parser rejects it before the login request, L01-B11); second: `0x0804` at 30 s, close 180 s later; third: `0x0804` every 30 s, no close | no `0x0804`; the first connection staying open after its `0x0805`; a close in the third |
 
 ### 42. Races: drop menu, two money pick-ups, link with a dead WM session
 
@@ -1226,6 +1308,12 @@ a mount being ridden is skipped); the client sees the cell emptied. Disproved by
 the item surviving two minutes, or being removed already in the login burst. The item is gone afterwards: use
 one made with `&makeitem`. Re-inserting it from the save tables is possible but re-creates a deleted key; do not.
 
+Result (P02 batch 3, `s21c`, capture-validation §21.2; run for Test1235 with `tools/capture/21/21-s13.sql`: a
+`&makeitem` Leather Boots whose row 820 was set to 8468): **confirmed**. The boots came in the login burst
+unchanged; at the WM's first minute change `0x0821` after the map login (59.1 s later) the zone sent `0x3459` with
+the one key, and the client's `0x3001` emptied the cell on the `0x345A`. No text, no GameLog row. Neither "Disproved
+by" event occurred. Not tried: wearing or using the item before that check.
+
 ### 8.15 S14: a deleted character
 
 `p_Char_Delete` is what the Character server calls for a client delete (D02 §3.4): it sets `bDeleted`,
@@ -1295,6 +1383,12 @@ DROP TRIGGER dbo.X02_tItemOptions_fail;
 Prediction: the item is deleted again, cen is refunded, fame or coins are not (compare `tCharacter.nFame` /
 `tGambleCoin.nCoin` before and after). While the trigger exists every new item of the character loses its
 attributes or fails; existing option rows are updated normally (the trigger fires on inserts only).
+
+Result (P02 batch 3, `s21b`, capture-validation §21.1; run for Test1235, two purchases of Leather Boots for 13
+cen): **confirmed for the item and the cen**: `0x340A` → `0x340C {0x206}` → `0x3004 {0x206}`, no `0x3001`, no
+`0x1033`, no GameLog row; the DB balance of the next logins is unchanged *(the refund itself is not on the wire)* and
+no boots row is left. The client shows nothing for 0x206. **Fame / coins not reached** (a cen-only item): D03-B1
+is untested.
 
 ## 9. Table and config experiments (X1–X7)
 
@@ -1379,6 +1473,12 @@ For the over-full stack the free amount `MaxLot − lot` is negative; what the p
 `KQItem.shn` `PickupLimit` test of step 11 only): note the `0x3001` cells and the `tItemOptions` lot rows after. Disproved for "no check": a refusal
 code at login or at the pick-up. Restore both copies of the file afterwards; a client left with the changed file
 is disconnected (0x68E) by any unchanged server.
+
+Result (P02 batch 3, `s21d`, capture-validation §21.3; run for Test1235): the open question is **answered**. No
+refusal at login or at the pick-up ("no check" holds): the stack loads with 50 and is never touched. The pick-up of
+10 did **not** merge: `so_ply_PickupItem` merges only when `cell.lot + picked ≤ MaxLot` (no negative free amount is
+computed), so the 10 went into an empty cell with `0x341C` → `0x341D` → `0x300A {0x341}`. Not tried: selling, using
+and moving a stack onto the over-full one.
 
 ### 9.5 X4: abstates removed by an action (read only)
 
