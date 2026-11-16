@@ -29,9 +29,9 @@ the code; where they disagree, the code was re-read and the finding is listed in
 | `travel portal, attack mob, pick-up item, die, revive, linkto` (**combat**, batch 2) | name only: Test2 travels, fights mobs, picks up drops, dies, revives, takes a link portal | login, wm, zone×3 + 56 server links | 1870 |
 | `14_second-client-in-sight` (**s14**, batch 3) | notes file (times not filled in): Test1235 (GM) at the RouN slimes, a second account creates the Mage `X14B`, walks into sight, emotes, jumps, shouts, whispers, attacks; A `&hide` / `&show` / `&dimension` / `&linkto` | login×2, wm×2, zone×2 (both 9210) + 56 links | 13 468 |
 | `21_items-drop-split-storage-use-shop` (**s21**, batch 3) | notes file + SQL snapshots before / after: Test2 splits, merges, drops, picks up, destroys, uses, equips rings, uses storage, sells and buys back, buys soul stones, KQ pick-up limit, full inventory | login×3, wm×2, zone×2 (9210) + 56 links | 11 569 |
-| `21b_purchase-attr-write-fail` (**s21b**) | name only: S16 (a purchase whose attribute write fails) | login, wm, zone (9210) + 56 links | 397 |
-| `21c_expired-item` (**s21c**) | name only + one pcapng comment ("Boots deleted here", 66.1 s): S13 (an item past its end time) | login, wm, zone (9210) + 56 links | 606 |
-| `21d_stack-over-maxlot` (**s21d**) | name only: X3 (a stack limit lower than an existing stack; zone restarted with the changed table) | login, wm, zone (9210) + 67 links (zone restart) | 853 |
+| `21b_purchase-attr-write-fail` (**s21b**) | name only: S16 (a purchase whose attribute write fails); Test1235 buys Leather Boots twice (§21.1) | login, wm, zone (9210) + 56 links | 397 |
+| `21c_expired-item` (**s21c**) | name only + one pcapng comment ("Boots deleted here", 66.1 s): S13 (an item past its end time); Test1235 logs in and waits (§21.2) | login, wm, zone (9210) + 56 links | 606 |
+| `21d_stack-over-maxlot` (**s21d**) | name only: X3 (a stack limit lower than an existing stack; zone restarted with the changed table); Test1235 makes, drops and picks up 10 potions (§21.3) | login, wm, zone (9210) + 67 links (zone restart) | 853 |
 | `37_login-heartbeat-refusals-delete` (**s37**, batch 3) | notes file: idle on the world list, create / delete / re-create `X37Del`, 4 min on the character list, WM stopped (world closed), WM restarted with capacity 1 (world full), blocked account, not-login-able account | login×6, wm + 124 links (WM restarts) | 3 583 |
 
 Batch 2 (`shop`, `combat`) was recorded on the server host with the LAN and the loopback interface: it adds the
@@ -44,7 +44,7 @@ The pcapngs hold only the game packets (saved as "displayed packets"): no SYN/AC
 
 Batch 3 (commit 26bb95f, the X02 scenarios 14, 21, 37 and the setups S13, S16, X3) was recorded the same way as batch 2.
 `26_11_15_24_skills-abstates-stat-points.md` has no pcapng (blank notes only): scenario 24 is not captured. The 146
-opcode types not seen in batches 1–2 (98 on links, 9 WM, 39 zone) are covered in §16–§20; those sections stand
+opcode types not seen in batches 1–2 (98 on links, 9 WM, 39 zone) are covered in §16–§21; those sections stand
 before §11 so that the sweep sections §11–§15, which other documents cite by number, keep their numbers.
 
 ## 2. Transport
@@ -915,7 +915,8 @@ zone → WM saves, level / exp updates, map links and the per-minute link traffi
 - **Broadcasts** (0x0821, 0x0C16, 0x580D, 0x987A / 0x987B) reach one link per zone: `g_Zones[zone]`. The 0x0802
   handler (W01 §7.1) overwrites it for each of the 4 links, so the last link to register gets them *(inferred:
   which link registers last)*. Part 10 (§7.5.4): that link is `sb_SocketStr[3]` for two zones and `[2]` for one, so it
-  is not a fixed index.
+  is not a fixed index. Batch 3 **confirms** the rule on two zone starts (§17.4: 186 of 188 broadcasts on the
+  last-registered link; the WM refuses 2 of every zone's 4 first connects, P02-B25).
 - **Ordering** *(inferred)*: one zone's save burst is spread over 4 links, and the WM handles one packet per session
   per pass (§7.4). The WM therefore applies the parts interleaved by link, not in send order. In `combat` 43.715–43.720
   s, 0x180D (sent last) is the 6th packet on link #1 while the 0x4013 saves sit on the other links. Only time
@@ -1914,11 +1915,939 @@ Batch-1 client opcodes of these flows recur unchanged (0x0807, 0x0C65, 0x0C67, 0
 | Login→WM | 0x0C16 | NC_USER_KICKOFFFROMWORLD_CMD | 3 | 10 | confirmed (P02-B5) | stale header differs per caller (§16.1) |
 | WM→Login | 0x0808 | NC_MISC_USER_COUNT_CMD | 27 | 4 | **corrected** (first after a start) | `{0, 0}` on the handshake (P02-B22), then `{0, 1}` |
 
+## 17. Server stop and start on the links, batch 3 (`s37`, `s21d`) *(captured)*
+
+`s37` holds a full stop and two starts: the four zone processes and the WM stop (653–659 s), a first WM start that
+ends after 1.25 s (729.4 s), a second WM start (783.8 s) and a zone start (794.6 s). `s21d` starts with the four zone
+processes starting against a running WM (0.0 s; X3 setup). The pcapngs of batch 3 keep the TCP SYN / FIN frames,
+so link opens and closes are timed with `tcpdump -r … 'tcp[tcpflags] & (tcp-syn|tcp-fin|tcp-rst) != 0'`; the decoder
+streams are mapped by their ports. 106 S2S handshakes (58 + 48), all three packets each.
+
+### 17.1 What happened (TCP opens / closes)
+
+```text
+s37
+653.266 … 657.329  the 4 zone processes stop one by one (653.27, 654.62, 655.72, 657.33): each closes its 12 links
+                   (4 WM, 4 CharDB, 4 GameLog) within 2 ms, FIN from the zone; no packet before (operator stop)
+655.466            WM → Login 0x0808 {0, 2500} (the 30-s count, last one)
+658.674 … 658.676  WM stops: FIN from the WM on Login, AccountDB, AccountLogDB, CharDB, GameLog, in that order
+                   = WorldManagerServer::ProcessStop @ FUN_004067f0 (W05 §1.2)
+729.400 … 729.403  first WM start: connects AccountLog, Account, CharDB, GameLog, Login (W05 §1.3 order)
+729.415 … 729.561  handshakes, 0x0808 {0, 0} (P02-B22), the CharDB start-up load (§17.3)
+730.649 … 730.653  FIN from the WM on the same 5 links, same order: ProcessStop again, 1.09 s after 0x9804 (§17.6)
+783.801 … 783.945  second WM start: same connects, handshakes, 0x0808 {0, 0}, the same load, then 0xA41A later
+794.639 … 797.121  zone start, order 0, 1, 3, 2 (0.6–1 s apart): per zone 4 CharDB, 4 GameLog, 4 WM connects in 8 ms;
+                   the WM closes the 2nd and 4th WM link of every zone 5–22 ms after the SYN, without a packet (§17.4)
+822.998 … 845.887  each zone reconnects the closed links (two at a time); again one of a pair is closed when both
+                   land in one WM pass; after 843.8 / 845.9 every zone holds 4 WM links
+s21d
+0.000 … 2.267      zone start against the running WM, order 0, 1, 3, 2: the same 12 connects per zone, the same
+                   refusals of WM links 2 and 4 (0.012 / 0.028, 0.991 / 0.997, 1.590 / 1.606, 2.272 / 2.288)
+27.201 … 29.872    first retry per zone (25–28 s after the refusal); 47.175 / 47.429 / 48.171 second retry, 20.0 s
+                   (±0.03) after the first for the three zones whose first retry was refused again
+```
+
+The Character and GameLog servers accept all 4 links of a zone within 1 ms: the refusal is the WM's (§17.4). Zone
+and WM never close a link because of the other side going down: the zones were stopped before the WM, and the
+Character server's GameLog link (`W00_GLDB#18`) runs on with heartbeats through both WM starts.
+
+### 17.2 The S2S handshake (0x0801 / 0x0802 / 0x0803)
+
+```text
+listener → connector  0x0801 NC_MISC_S2SCONNECTION_RDY {}                      on accept (W05 §1.4, Z01 §3.3)
+connector → listener  0x0802 NC_MISC_S2SCONNECTION_REQ { echo_data, server_to_id, server_from_id,
+                                                          server_from_world_num, server_from_zone_num, key }
+                      0–56 ms after the 0x0801 (zones: up to 56 ms, WM: same ms)
+listener → connector  0x0803 NC_MISC_S2SCONNECTION_ACK { echo_data = the request's, error = 0 }
+```
+
+- **Server ids confirmed** on all 106: 0 Account, 1 AccountLog, 2 Character, 3 GameLog, 4 Login, 5 WM, 6 zone;
+  `key = server_to_id + server_from_id` (5 … 11) every time; world 0; zone 0–3 (W01 §7.1, W05 §5.2, Z01 §3.3,
+  D01 / D02).
+- **echo_data**: the WM writes 0 on its 5 links; the zones' byte is never written (Z01-B2 **confirmed**): 126, 155,
+  222, 17, 63, 3, 125, 112, 67, 4, 12, 45, 255, 38, 104, 33, 2. The two links a zone opens in the same ms usually
+  carry the same value (same stack). Every peer copies it back in 0x0803 (106 / 106), `error` 0 every time.
+- **After 0x0803** the zone, per WM link, sends `0x180F` and `0xA419` on that link (`wms_NC_MISC_S2SCONNECTION_ACK`
+  @ FUN_005a3320, Z01 §3.3: confirmed, on every link that registers, 2–4 times per zone start), and **once per process**
+  `0x7446` on the round-robin link (`gz_IsSendReq`, set by the first call, reset only in the constructor). The first
+  GameDB link's 0x0803 sends `0xBCD5` once (`smjpr_RankingReq` @ FUN_00626220, guard `smjpr_IsReq`). §17.4 has the
+  order.
+
+### 17.3 WM start-up: links and the CharDB load (W05 §1.3, W03 §9.1)
+
+```text
+729.400 SYN ALDB, AccDB, CDB, GLDB, Login (1 ms apart; ProcessLink order: AccountLog, Account, Char, GameLog, Login)
+729.415 0x0801 from AccountDB / CharDB / GameLog → WM 0x0802 at once; AccountLog's 0x0801 at 729.415, Login's 729.432
+        Login 0x0803 → WM 0x0808 {0, 0} in the same ms (P02-B22)
+CharDB load, one request per WM pass after each answer (state machine of ProcessPacket @ FUN_00405aa0):
+  0x7456 {1 byte}             → 0x7457 {Error 0x0C41, PartMask 3, NumOfGuild 0}                   18 ms
+  0x7503 {1 byte}             → 0x7504 {PartMask 2, nNumOfEmblem 0}                               17 ms
+  0x74BC {1 byte}             → 0x74BD {Error 0x0C41, PartMask 3, 0}                              40 ms
+  (states 0xB / 0xC: 0x7454 per guild; no guild, so nothing on the wire)
+  0x7485 {nGTNo 0}            → 0x7486 {Error 0x0D40, nGTNo 1794258000, nMatchType 6, MatchTime[9], 31 brackets, …} (204 B)
+  0x74F6 {nGTNo 1794258000}   → 0x74F7 {Error 0x0D50, PartMask 3, 0}
+  0x9801 {1 byte}             → 0x9802 {Error 0x1780, PartMask 3, 0}
+  (states 0x13 / 0x14: 0x980F per guild; nothing)
+  0x9803 {nRoundTime 1}       → 0x9804 {Error 0x18B8, PartMask 3, dAggregationDate 0, 0 rows}       144 ms in all
+  no 0x9805: CharDB link state 1 directly (below)
+second start (783.801): the same requests and answers byte for byte; then 794.763 WM → CharDB 0xA41A (§17.4)
+```
+
+- **Order and codes confirmed** against W03 §9.1, §6.1, §8.4 (all ok codes as documented: 0x0C41, 0x0D40, 0x0D50,
+  0x1780, 0x18B8; 0x7504 has no `Error`). 0x7486 = 43 + 31 × 5 + 6 = 204 bytes as W03 §8.4 lays it out.
+- **No 0x9805** (state 0x17) in either start: `CGuildManager::Recv_NC_GUILD_ACADEMY_START_DB_GET_RANKING_LIST_ACK`
+  @ FUN_00441aa0 sets `m_bAcademyRankInit = 1` when `RankData.dAggregationDate` is 0 (never aggregated; the next
+  balance time is this week's from `GuildAcademy` data row 0, + 7 days if already past); state 0x17 (→ 0x9805 → 0x9806)
+  is taken only when a stored date is more than 600 s older than the balance time that has passed. The 0x9804 handler
+  `fc_…_GET_RANKING_LIST_ACK` @ FUN_0040ccc0 then sets the CharDB link to state 1. W05 §1.3 names 0x9806 as "the last
+  answer" that sets state 1: that holds only on the balance path (§13).
+- **The 1-byte requests** (0x7456, 0x7503, 0x74BC, 0x9801; 0x9805 too) are raw 4-byte packets built in the stack word
+  `local_10c` (`{3, op lo, op hi, byte 3}`); byte 3 is never written for the packet (W03 §11 "observation" for
+  0x7456). It is **0** in both starts because the AccountDB / AccountLogDB pump of the same `ProcessPacket` call stores
+  `local_10c = 1` first whenever that link is in state 1 or 2, i.e. always after the handshakes; only a pass with
+  both links down would send a stack byte. Annotated in P02.json `packets.character` (`(unset)`) so the decoder no
+  longer reports "size 1 vs 0".
+
+### 17.4 Zone start: registration, the WM's accept refusals, reconnects
+
+```text
+zone 0, s37 (the other zones and s21d alike, offsets ±10 ms):
+794.639–.644 SYN 4 × CharDB, 4 × GameLog            all accepted, 0x0801 → 0x0802 → 0x0803
+794.645–.647 SYN 4 × WM (#17 #18 #19 #20)            #18 closed by the WM at .654, #20 at .669: no 0x0801, FIN at once
+794.702      0x0802 on #17 and #19 (echo 126)
+794.717      0x0803 + 0x0821 on #19, then on #17   (each registration: 0x0803, SendWMTimeToZone(force) → 0x0821 to every
+             registered zone's broadcast link, enss_NPCStandState (nothing: no standing event NPC), GMEM_SendAllEventInfo
+             (nothing))
+794.731      #17: 0x180F {107 maps}, 0xA419 {17}, 0x7446 {0x11};  #19: 0x180F, 0xA419;  CharDB#20: 0xBCD5
+794.737      CharDB → 0xBCD6 × 3 {Machine 0/1/2, 0x2940, JackPot 0, 0 ranks}
+794.740      #17 0x7495 (the per-minute guild-war query, first run) → .794 0x7496 {0}
+794.763      WM → CharDB 0xA41A {the first 0xA419's 17 entries}: once per WM start, no answer (W04-B43)
+794.779      WM → zone 0x7447 {PartMask 3, 0 guilds}
+795.408      zone 1 only: 0x207D NC_ACT_SCRIPT_MSG_WORLD_CMD {0xFFFF, "E_Olympic_A04" + 18 heap bytes, nlen 0×5}
+823.834      zone 0 retries #18 / #20 as #37 (accepted) and #38 (closed at once); 843.842 #41 accepted
+```
+
+- **Accept refusal** (S02 §1.4 per-IP admission rule, **confirmed**): `CSocket_Acceptor::SetAccepted` @ FUN_00463c40
+  refuses a socket while another one from the same IPv4 address waits in the accepted ring, and the accept thread
+  (`AcceptThreadRing` @ FUN_00463ee0) then calls `shutdown` + `closesocket` (the FIN 5–22 ms after the SYN, no packet).
+  `WorldManagerServer::ProcessConnect` @ FUN_00405860 drains the ring once per main pass (≈ 15.6 ms), so of 4 links
+  opened within 2 ms the 1st and 3rd survive. Every zone therefore runs its first 25–30 s on 2 of its 4 WM links
+  (round robin over the verified entries only, §7.5.1, so traffic is not lost) and gets the full 4 after 45–50 s when
+  a retry pair is split again (`s21d` zones 0, 1, 3; `s37` zones 0, 2). Two connects 2 ms apart can both pass when
+  a pass falls between them (`s37` 822.998 / 823.000, `s21d` 29.870 / 29.872). (original bug) P02-B25: S02 calls the
+  rule a flood guard *(inferred)*, but it also refuses the zones' own server links on every start, and any two
+  clients behind one NAT address that connect in the same pass (§12).
+- **Retry timing**: `SocketBundle::sb_DisconnectCheck` @ FUN_005ab2c0 / `sb_Packet` @ FUN_005ab030 close a dead entry
+  and set `reconnectAt = cw_CurrTick + sb_ReconnectInterval × 10`; `sock2wldman.sb_ReconnectInterval = 0x14` (20 s in
+  0.1-s ticks), `sock2gameDB` 20 s, `sock2gamelog` 600 (= 600 s) (set by the static initialisers, `dynamic_initializer_for_'sock2gameDB'` @ FUN_0069afc0 and its two
+  neighbours). The second retry comes 20.0 s after the first: **confirmed**. The first retry
+  comes 26–29 s after the refusal: the zone notices the closed socket only when its main loop runs, 6–9 s after its
+  links connected *(inferred: map / data loading between the link handshakes and the first main-loop pass)*.
+  `sb_Routine` @ FUN_005aa340 returns at the first entry not yet due, so a later entry waits for an earlier one (the
+  first retries of a zone come as a pair).
+- **Broadcast link = the zone's last-registered link** (§7.5.1 inference, now **confirmed**): `SetZoneSession` @
+  FUN_00439190 overwrites `m_ppZoneMappingTable[zone]` on every 0x0802. Over all WM → zone broadcasts after a
+  registration in both captures (0x0821, 0x0C16, 0x987A / 0x987B, 0x580D), 186 of 188 go to the link whose 0x0803 came
+  last; the 2 others are 0x0821 sent in the same ms as a registration of that zone. So the broadcast link changes
+  with every retry (`s37` 0x987A at 844.9 s on #34 / #35 / #39 / #41, the retried links, and at 899.9 s on #42 instead of #39: zone 2's #42 registered at 845.887).
+- **0x180F**: `{numofmap, maparray[n] {canparty, mapname[12], IsPartyReleaseMap}}` (pdb2016): 107 / 88 / 255 / 196
+  maps for zones 0 / 1 / 3 / 2, the same in both captures; `IsPartyReleaseMap = (canparty == 0)` (`fm_Regist2WMS` @
+  FUN_00461cf0; `fc_MapRegist` @ FUN_00463a70 has no cap, the count is the zone's `FieldMap` list). canparty 0 / 1 / 2
+  all occur (zone 0: 40 / 41 / 26; GuildT* maps 2 = guild-only, W02 §1.6). Every registering link sends the full list:
+  `CWMZoneSessionManager::SetServiceMapZoneNo` @ FUN_004391d0 (W01's `Zones_AddMap`) updates an existing entry with all
+  three values, but a **new** entry gets only `Vaild`, the name, `ZoneNo` and `CanParty`: `IsReleaseMap` stays 0 until
+  the same map is registered a second time (original bug) P02-B26. The zone's second link repairs it in the same ms,
+  so it shows only for a zone that registers through a single link (3 refused connects).
+- **0xA419** on every registering link (17 entries, the instance-dungeon table, the same from every zone); the WM keeps
+  the first only and forwards it once as 0xA41A (W04 §13.3 "Zone 0xA419" block, **confirmed**; no 0xA41F back, W04-B43).
+- **0x7446** once per zone process, on the round-robin link: its one payload byte is 0x11 in all 8, the low byte of the
+  preceding 0xA419's `nMapCount` (17) left at `gpp + 2` (Z30-B8 **confirmed**, its value explained). A WM restart while a
+  zone runs gets no new 0x7446 from that zone (the guard is never reset) *(inferred from the code: not captured, the
+  zones restarted with the WM in `s37`)*.
+- **0xBCD5 / 0xBCD6** (Z06 §5 `smjpr_RankingReq`; D03 §11 0xBCD5 block): `{3, {0, 10}, {1, 100}, {2, 500}}` = `BetUnits` from
+  `smsm_BettingAtOnce`; three answers `{Machine, 0x2940, 0, 0}` (8 bytes each, **confirmed**; with no ranks D03-B22's
+  trailing bytes cannot show). The decoder now reads PDB element types named `Outer::<unnamed-type-…>` (0x180F, 0xBCD5).
+- **0x207D** from zone 1 at both starts (`cScriptMsg_World` @ FUN_005eb970 from a map / NPC script at load; the
+  string `E_Olympic_A04` is in `9Data/Shine/LuaScript/AIScript/E_Ski_CongressNPC.lua`): `sScriptMsgIndex` is a 32-byte
+  copy from the Lua string, so 18 heap bytes follow the terminator, different per start (`ee 1b c7 e7 7a 04 …` /
+  `e0 03 77 c3 00 a1 …`): Z09-B72 **confirmed**.
+- **0x0821** carries the WM's local time (`tm` 2026-11-15 17:16:16, wday 0, yday 318); the zone's handler sets the
+  machine clock from it (Z01 §9). One zone start sends 20 (8 registrations × the zones registered so far: 1, 1, 2, 2,
+  3, 3, 4, 4); zone 0's broadcast link gets 7 of them, in both captures.
+
+### 17.5 Message order against the documents
+
+| Flow | Documents | Captured | Status |
+|---|---|---|---|
+| WM link connect order | W05 §1.3 (`ProcessLink`) | AccountLog, Account, Char, GameLog, Login within 3 ms | confirmed |
+| WM stop | W05 §1.2 `ProcessStop` | Login, AccountDB, AccountLogDB, CharDB, GameLog FINs in 2 ms; zones had stopped first | confirmed |
+| CharDB start-up load | W03 §9.1, §6.1, §8.4 | states 5 → 0x15 in order, one request per answer | confirmed |
+| end of the load | W05 §1.3 ("the last answer 0x9806 sets state 1") | 0x9804 with `dAggregationDate 0` ends it | **corrected** (§13) |
+| zone link set | Z01 §3.3, Z09 §1.5, §7.5.1 | 4 CharDB, 4 GameLog, 4 WM per zone; 2 WM links refused per start (P02-B25) | confirmed + **extended** |
+| per-link registration | Z01 §3.3 (0x0803 → 0x180F, 0xA419, 0x7446) | 0x180F + 0xA419 on every link; 0x7446 once per process | **extended** (the call is per 0x0803, the guard `gz_IsSendReq` is Z30's) |
+| WM on 0x0802 | W05 §5.2 | 0x0803, then 0x0821 to every registered zone; no 0x086A (no standing NPC) | confirmed |
+| 0xA419 → 0xA41A | W04 (0xA419 block) | once per WM start, after the first zone's 0xA419, 32 ms later | confirmed |
+| broadcast link | §7.5.1 *(inferred)* | the last-registered link, 186 / 188 | confirmed (settles the §15 row) |
+| reconnect delay | Z09 §1.5 (`pool.reconnectSeconds`) | 20.0 s on the WM pool | confirmed (value added) |
+
+### 17.6 Why the first WM start ended
+
+Both WM ends are `ProcessStop` (§17.1: the FIN order is its close order). The first start ran its whole CharDB load
+and stopped 1.09 s after 0x9804, before any zone or client connected; the second start sent the same bytes up to
+0x9804 and ran on. In the code two things end the WM right after the load: a failed `Listen_Zone` / `Listen_Client`
+(`ProcessLink` @ FUN_00404bf0 sets `m_bStopMainThread`, W05 §1.3; `CSocket_Acceptor::Listen_Add` @ FUN_00463a50
+fails when the accept thread cannot `bind` / `listen`) and a stop of the service or console by the operator (the notes
+step "ServerInfo capacity set to 1, WM started" suggests a restart). `InitSessions` cannot fail (FUN_00437fd0 returns
+1). The wire does not tell which; the WM log of 729–731 s ("*FAILED LISTEN ADD, IP=%s:%d, From=%s*" or the
+`ViewStopInfo` stop time) would (§14).
+
+### 17.7 Opcodes
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| listener → connector | 0x0801 | NC_MISC_S2SCONNECTION_RDY | 106 | 0 | confirmed | on accept; never on a refused WM link |
+| connector → listener | 0x0802 | NC_MISC_S2SCONNECTION_REQ | 106 | 7 | confirmed (Z01-B2) | ids and key §17.2; zone `echo_data` unwritten |
+| listener → connector | 0x0803 | NC_MISC_S2SCONNECTION_ACK | 106 | 3 | confirmed | echo copied, `error` 0 |
+| WM→CharDB | 0x7456 | NC_GUILD_DB_ALL_REQ | 2 | 1 | **corrected** (size) | 1 unwritten byte, 0 in practice (§17.3); P02.json |
+| CharDB→WM | 0x7457 | NC_GUILD_DB_ALL_ACK | 2 | 5 | confirmed | `0x0C41`, PartMask 3, 0 guilds |
+| WM→CharDB | 0x7503 | NC_GUILD_EMBLEM_INFO_DB_REQ | 2 | 1 | **corrected** (size) | as 0x7456 |
+| CharDB→WM | 0x7504 | NC_GUILD_EMBLEM_INFO_DB_ACK | 2 | 3 | confirmed | PartMask 2, no Error field |
+| WM→CharDB | 0x74BC | NC_GUILD_DB_TOKEN_ALL_REQ | 2 | 1 | **corrected** (size) | as 0x7456 |
+| CharDB→WM | 0x74BD | NC_GUILD_DB_TOKEN_ALL_ACK | 2 | 5 | confirmed | `0x0C41`, 3, 0 |
+| WM→CharDB | 0x7485 | NC_GUILD_TOURNAMENT_DB_GET_REQ | 2 | 4 | confirmed | `nGTNo 0` |
+| CharDB→WM | 0x7486 | NC_GUILD_TOURNAMENT_DB_GET_ACK | 2 | 204 | confirmed | `0x0D40`, nGTNo = a `time_t`, nMatchType 6 |
+| WM→CharDB | 0x74F6 | NC_GUILD_TOURNAMENT_ENTER_LIST_DB_GET_REQ | 2 | 4 | confirmed | nGTNo of 0x7486 |
+| CharDB→WM | 0x74F7 | NC_GUILD_TOURNAMENT_ENTER_LIST_DB_GET_ACK | 2 | 5 | confirmed | `0x0D50`, 3, 0 |
+| WM→CharDB | 0x9801 | NC_GUILD_ACADEMY_START_DB_ALL_REQ | 2 | 1 | **corrected** (size) | as 0x7456 |
+| CharDB→WM | 0x9802 | NC_GUILD_ACADEMY_START_DB_ALL_ACK | 2 | 5 | confirmed | `0x1780`, 3, 0 |
+| WM→CharDB | 0x9803 | NC_GUILD_ACADEMY_START_DB_GET_RANKING_LIST_REQ | 2 | 4 | confirmed | `nRoundTime 1` |
+| CharDB→WM | 0x9804 | NC_GUILD_ACADEMY_START_DB_GET_RANKING_LIST_ACK | 2 | 11 | confirmed | `0x18B8`; date 0 ends the load (no 0x9805) |
+| WM→CharDB | 0xA41A | NC_INSTANCE_DUNGEON_RANK_REQ | 1 | 223 | confirmed (W04-B43) | once per WM start, never answered |
+| Zone→WM | 0x180F | NC_MAP_REGIST_CMD | 32 | 1234–3572 | confirmed | every registering link; decoder fixed (§17.4) |
+| Zone→WM | 0xA419 | NC_INSTANCE_DUNGEON_MAP_REGIST_CMD | 32 | 223 | confirmed | every registering link; WM keeps the first |
+| Zone→WM | 0x7446 | NC_GUILD_ZONE_LIST_REQ | 8 | 1 | confirmed (Z30-B8) | once per process; byte 0x11 = stale 0xA419 count |
+| WM→Zone | 0x7447 | NC_GUILD_ZONE_LIST_ACK | 8 | 3 | confirmed | PartMask 3, 0 guilds |
+| Zone→WM / WM→Zone | 0x7495 / 0x7496 | NC_GUILD_GUILDWARSTATUS_REQ / _ACK | 8 / 8 at start | 0 / 2 | confirmed | first run of the per-minute query (§7.5.4) |
+| Zone→WM | 0x207D | NC_ACT_SCRIPT_MSG_WORLD_CMD | 2 | 39 | confirmed (Z09-B72) | zone 1 at load; 18 heap bytes in the index |
+| Zone→CharDB | 0xBCD5 | NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_REQ | 8 | 10 | confirmed | once per process; decoder fixed |
+| CharDB→Zone | 0xBCD6 | NC_GAMBLE_SLOTMACHINE_DB_GAMEINFO_ACK | 24 | 8 | confirmed | `0x2940`, no jackpot, no ranks |
+| WM→Zone | 0x0821 | NC_MISC_TIMEFROMWORLD_CMD | 40 at starts | 36 | confirmed | 20 per zone start: to every registered zone at each registration |
+| WM→Zone | 0x0C16 | NC_USER_KICKOFFFROMWORLD_CMD | 12 after a start | 10 | confirmed | header all 0xFF; only on each zone's broadcast link |
+
+The 0x0804 / 0x0805 heartbeats of the new links run as in §7.1. After this part `s37` decodes with **0 issue
+packets** (was 28) and `s21d` with 2 (0x3401 / 0x3402, part 19); `pcap_decode.py --selftest` has a case for the nested
+element type.
+
+## 18. Second client in sight, batch 3 (`s14`) *(captured)*
+
+Scenario 14 (`capture-scenarios.md` §3.14). Client A = `admin` / Test1235 (level 120 archer, admin level 100, zone
+handle 8000, WM session 0), client B = `testaccountB`, which creates the mage `X14B` (`chrregnum` 8, handle 8001, WM
+session 1). Both clients run on 172.16.42.231 and use zone 9210. The notes give no times, so the times below are
+capture seconds. Code: Z02 §2–§5, Z09 §9.6 / §11.4, Z11 §3.1, Z01 §3.2 / §8.4, W01 §4.2, W04 §2.1, Z13 §1.6, D03 §7.1.
+`s14` decodes with **0 issue packets** after this part (the 0x1110 byte was the only one, §18.7).
+
+### 18.1 What happened
+
+| t (s) | Event | On the wire |
+|---|---|---|
+| 8.9–52.4 | A logs in, map login at RouN 6443, 9850 | batch-1 burst (§5.1) |
+| 82.0–92.2 | B logs in, creates X14B | 0x1401 → CharDB 0x1402 / 0x1405, AccDB 0x140D, GameLog 0x0411 / 0xC804, client 0x1406 (as in §16, `s37`) |
+| 105.1–107.1 | B selects the character, tutorial popup, skip | §18.7 |
+| 107.1–113.4 | B's map login at RouN 6888, 7045 | §5.1 burst, plus the mushroom house (§18.7) |
+| 151.4–154.5 | B jumps 6 × out of A's sight | 6 × C 0x2024, no 0x2025 to anyone |
+| 156.75 | B runs north into A's sight | 0x1C06 both ways (§18.2) |
+| 183.1–209.0 | B emotes 7 ×, jumps once | §18.3 |
+| 237.9–325.2 | shouts and whispers | §18.4 |
+| 305.3–381.6 | A targets B; B fights Slime 5375, 3 × Magic Missile, the slime dies | §18.5 |
+| 392.5–506.3 | A: `&hide`, `&show`, `&dimensio 1` (typo), `&dimension 1`, `&dimension -1` × 2, `&dimension 70000`, `&dimension 0`, `&linkto` | §18.6 |
+| 549.1 | capture ends (no logout in the file) | – |
+
+### 18.2 Entering sight, 0x1C06 and 0x1C01
+
+- **B walks in.** At 156.753 the zone sends B `0x1C06 NC_BRIEFINFO_LOGINCHARACTER_CMD` for A, then `0x1C19` with A's
+  6 abstates. A gets B's `0x1C06`, B's last move `0x201A` and B's `0x1C19` 33 ms later (156.786), from the same exchanger call (B's last `0x2019` put
+  B ≈ 1 534 units from A; `MapInfo.Sight` of RouN is 1600). After that, B's moves reach A as `0x201A` (95 ×) and
+  `0x2013` (16 ×). **Confirms** Z09 §9.6 (`AxialListBriefExchangerAtMove::ali_Work` @ FUN_004bdde0: appear packet
+  plus abstate list, both directions) and the 1600 radius of §6.1.
+- **0x1C07 not in `s14`.** No map login of this capture (B at 113.4, A at 506.4) had another player in sight, so
+  `bixc_Send` (Z02 §5.2) had nothing to batch. It is in `s21` (review, part 23): at B's map login there (89.893) B gets
+  `0x1C07 NC_BRIEFINFO_CHARACTER_CMD` (236 bytes, `charnum 1`, `chars[0]` = A: handle 8003, `Test2`, 6484 / 8683) and
+  A's `0x1C19`, and A gets B's `0x1C06` + `0x1C19` 14 ms later (89.907, §20.4). **Confirms** Z02 §5.2 (`bixc_Send`
+  batches the players already in sight of the one logging in; the others get the single `0x1C06`).
+- **0x1C06 layout** (pdb2016, 0xEB = 235 bytes in all 544): `charid`, `coord` (server position), `mode` (1 / 2),
+  `chrclass` 11 / 16 (= bits 2–6 of the shape byte), `Level` 120 / 1, `chartitle` {9, 3, 0} = A's `0x1049`,
+  `nKQTeamType` 2 = `0x583A`, `abstatebit` with the bits of A's abstates. **Confirmed** field by field (Z02 §1).
+- **0x1C01 NC_BRIEFINFO_INFORM_CMD** (18 ×, `{nMyHnd, ReceiveNetCommand, hnd}`): the client sends it when a
+  `0x201A` / `0x2018` names a handle it does not know (`ReceiveNetCommand` = 0x201A or 0x2018). Every request got the
+  object's appear packet (0x1C06 for players, 0x1C08 for mobs) followed by its last move, within 3–20 ms.
+  **Confirms** Z02 §5.1 and C01's `GetCharByHandle` path. In both player cases (416.915 B asks for A; 493.847 A asks
+  for B), the requester's `0x1C19` goes to the **other** player (A gets B's list at 416.929; B gets A's 6 abstates at
+  493.861), and the requester gets no abstate list. **Confirms Z02-B3 on the wire.**
+
+### 18.3 Moves, emotes, jumps, stance
+
+- B only **ran** (`0x2019` 216 ×, no `0x2017`). A got B's runs as `0x201A {handle, from, to, speed 127,
+  moveattr}` and B's stops as `0x2013`, so walking (`0x2018` from a player) is not in this capture. The notes'
+  "sat" has no packet: B sent `0x2020 {7}` (ActionViewInfo `stand`), and no `0x2020 {6}` (sit) appears.
+- **Emotes** `0x2020 {emoticonid}` 7, 9, 10, 25, 26, 23, 24 (stand, laugh, cry, Dance 2–5): every one comes back to B
+  itself 6–20 ms before it reaches A, because `sp_DoEmotion` @ FUN_00458860 broadcasts with `includeSelf` 1. B never
+  sent `0x2022`, so `0x2022` / `0x2023` (stop emote) are **never seen**.
+- **Jump** `0x2024` (no payload): only the jump in sight (193.435) produced `0x2025 {handle 8001}`, to A only
+  (`includeSelf` 0, FUN_0045a250). **Stance** `0x2008 {2}` → A `0x2009 {8001, 2}` (351.361), not echoed to B
+  (FUN_00457560). **Confirms** Z02 §2.4, §2.5, §4.
+
+### 18.4 Chat: shout and whisper
+
+- **Shout.** B (level 1) sent `0x201E "test"` (237.918), and nobody got a `0x201F`. A (level 120) shouted twice, 36 s
+  apart, and both lines went to A **and** B as `0x201F {speaker "Test1235", flag, len, content}`. **Confirms** Z02 §3.2:
+  the level check fails silently (so `g_ShoutLevel` is between 1 and 119 *(inferred)*; 0x0830 is not in the capture),
+  and `so_AllInMap(…, includeSelf 1)` echoes the line to the shouter. B was in A's sight both times, so the "whole map,
+  also out of sight" part is not tested. The `flag` byte was 0x78, then 0x74: `smo_Shout` @ FUN_00459080 clears bit 1
+  and writes bit 0 (`vt 0xef4` GM colour, 0 for A), and leaves bits 2–7 as the shared buffer `gpp` held them
+  (original bug) P02-B29. The client (`On_NC_ACT_SOMEONESHOUT_CMD` @ FUN_004a0ec0) tests only bits 0 and 1.
+- **Whisper.** B → WM `0x200C {receiver "Test1235", "x14 whisper B"}` (298.517). 11 ms later the WM sent A
+  `0x200D {talker "X14B", flag 0x54, …}`, B `0x200F` (echo), and the sender's zone `0x6006 NC_CT_CHARTTING_CMD
+  {zoneHandle 8001, charNo 8}`, all in the same ms; `0x6006` went on the zone's broadcast link W00_WM#2. A → `0x200C {receiver
+  "X14B", content "X14Nobody"}` (325.162) is an ordinary whisper to B: `0x200D {talker "Test1235", flag 0x04}`,
+  `0x200F`, `0x6006 {8000, 2}`. The notes' "A whispered X14Nobody" put the name in the text. So `0x200E
+  NC_ACT_WHISPERFAIL_ACK` (unknown name) is **never seen**. **Confirms** W04 §2.1 (order, fields, `0x6006`). The flag's bit 0
+  (`bIsGM`) is 0 for both, even for A with admin level 100: the WM's GM bit is not the zone admin level. Bits 1–7
+  (0x54, 0x04) are stale stack bits as W04 §2.1 says, with no bug ID there; they are added to P02-B29.
+
+### 18.5 Combat seen by a third player
+
+B hit Slime 5375 next to A (351.3–358.8), then cast skill 6000 three times (366.6, 368.8, 371.1); the slime died at
+381.576.
+
+- A (bystander) got `0x2447 SWING_START` for both directions, **`0x2449 NC_BAT_SOMEONESWING_DAMAGE_CMD`** (13 bytes:
+  `{attacker, defender, flag, resthp, hpchangeorder, damageindex, attacksequence}`, 14 ×, the same `damageindex` as
+  the `0x2447`), **`0x244F NC_BAT_SOMEONESKILLBASH_HIT_OBJ_START_CMD {caster 8001, skill 6000, targetobj 5375, index
+  1..3}`** 14–35 ms after B's own `0x244E` / `0x2435`, and the same `0x2457` blast / `0x2452` damage as B. B got none
+  of the `SOMEONE` forms. **Confirms** Z03 §3 / §5 ("to sight, not o"). `0x242E` and `0x2438` (named in the scenario's
+  prediction) did not occur: no other skill path was used.
+- A had B targeted (305.262), so A got `0x2402` twice per change: `order 0` for B and `order 1` for B's target (A
+  itself at first, then 5375, then `65535` at 348.546 when B dropped its target). This is the batch-2 pattern (§9.7)
+  seen from a third player.
+- The slime's drop `0x1C0A {handle 10500, itemid 3001 LowMeat}` reached B with `attr 8` and A with `attr 0` (371.582).
+  At 391.549 (+20.0 s) both got it again with `attr 8`, and at 431.656 (+60.07 s) B got `0x1805 {10500}`. A, in another
+  layer by then (§18.6), got no `0x1805`. **Confirms** Z09 §11.4 (owner-only time, then a re-broadcast with fresh
+  pickable bits, `so_Routine` vanish, the first handle of the 10500 pool), with the times 20 s / 60 s.
+- Mob chat `0x2002` from handle 5375 reached both players (sight broadcast, Z09 §8.6).
+
+### 18.6 GM visibility: `&hide`, `&show`, `&dimension`, `&linkto`
+
+| t (s) | A's command | A got | B got | Matches |
+|---|---|---|---|---|
+| 392.450 | `&hide` | `0x242A {288 STA_GMHIDEMODE, keepTime 4 200 000 000}` | `0x1805 {8000}` (16 ms) | Z11 §3.1: `so_Logout` + abstate inform (the NOEFFECT form `0x242A`) |
+| 405.082 | `&show` | `0x2428 {8000, 288}` | `0x2428 {8000, 288}`, nothing else | V24: no appear broadcast. B gets the reset for a handle its client no longer knows |
+| 409.232 | (B steps) | B's `0x201A` | nothing | the exchanger skips A: A is within sight of B's old position |
+| 416.894 | (A steps) | – | A's `0x201A` → B `0x1C01 {8000, 0x201A}` → `0x1C06` + `0x201A` | B sees A again only after **A** moves. The notes say "after B stepped": B's own step did nothing |
+| 428.574 | `&dimensio 1` | `0x2011 "Invalid command : &dimensio"` (10 ms) | nothing | Z02 §3.3 (no element took the word, admin level ≠ 0) |
+| 431.166 | `&dimension 1` | – | `0x1805 {8000}` | `so_Logout` while A's `l_Main` was still 0 |
+| 431.2–451.4 | (both move) | **appear + delete storm** (below) | **storm** | (original bug) P02-B27 |
+| 451.474 | `&dimension -1` | nothing | **no** `0x1805` | logout broadcast filtered: A's `l_Main` 1 ≠ B's 0 |
+| 456.960 | `&dimension -1` | – | `0x1805 {8000}` | `l_Main` −1 passes the "either is −1" rule of `AxialListPacketBroadcast` (Z01 §3.2) |
+| 457–473 | (both move) | storm, **plus** B's ordinary `0x201A` / `0x2013` broadcasts (16 + 2) | storm | −1 = receives every layer's broadcasts |
+| 473.194 | `&dimension 70000` | – | `0x1805 {8000}` | sent while A was at −1; no range check (V24) |
+| 492.149 | `&dimension 0` | nothing | **no** `0x1805`, no `0x1C06` | logout filtered (70000 ≠ 0); the command does not re-enter the map (V24) |
+| 493.821 | (B steps) | B's `0x201A` → A `0x1C01` → `0x1C06` + `0x201A` | only A's `0x1C19` (Z02-B3) | A sees B again; B gets **no** appear packet for A (the notes say B saw A after stepping; the wire disagrees) |
+| 506.256 | `&linkto` (no argument) | `0x1809 NC_MAP_LINKSAME_CMD {mapIndex 150, x 4975, y 5825}`, then the A-side burst of §10.2 | `0x1805 {8000}` | Z11 §3.1 (`bd_FindEmptyCoord`), Z01 §7.1. 150 = MapInfo `RouN` |
+
+**The storm (P02-B27).** `ac_Dimension` @ FUN_0041a5a0 runs `so_Logout(gm)`, then
+`**(int **)(gm+0x76) = ac_Scanf(arg)`: it writes `so_layer.layer→l_Main` (`SubLayer::Layer`, pdb2016) and nothing else.
+The two sight workers compare that layer in different ways:
+
+- `so_AllOfRangeNomal` @ FUN_0054c900 picks the objects by `so_slantedlist.LayerRegistInfo.LayerRegNumberUnion`
+  (the tutorial / char-number layer, which `&dimension` leaves unchanged) or `nViewType`. So the GM stays in every
+  range query of its map.
+- `so_DistanceSquar(obj)` @ FUN_004028f0 returns 999 999 999 when the two `l_Main` differ.
+
+So for every server step of any mobile object within the sight range of the GM (`mm_Step` → `smo_NewObjBriefInfoChange` /
+`smo_OldObjectDelete`), both workers see "out of sight": `AxialListBriefExchangerAtMove::ali_Work` @ FUN_004bdde0
+sends the appear packet (`0x1C06` / `0x1C08` + the last move + `0x1C19`) both ways, and `AxialListBriefDeleteAtMove::ali_Work`
+@ FUN_004bdfe0 sends `0x1C0E` both ways right after it. Captured: 136 such pairs to each player in 431–451 s, 93 in
+457–473 s, 40 in 473–492 s, each pair 3 per server step. For the mobs around A: 1 995 `0x1C08`, 1 292 `0x1C0E` and
+940 `0x2018` in 20 s, **374 KB to A in 20 s** against about 7 KB in the 236 s before. When A asks with `0x1C01` for such a
+mob, the mob's appear packet is followed by the next delete in the same tick. The visible result is right (B never
+keeps A; A never keeps B), but every object that moves near the GM costs both clients an appear + delete per step.
+Plain broadcasts (`0x201A`, `0x2013`, logout `0x1805`) use `AxialListPacketBroadcast`'s `l_Main` test and are
+filtered correctly: in the dimension-1 and 70000 windows no ordinary `0x201A` crossed between A and B, only the resent
+last move inside each appear. With `&dimension 0` the storm stops (`l_Main` equal again).
+
+**Corrections / extensions.** Z11 §3.1 "objects of another main layer do not see each other" *(inferred)* holds for
+broadcasts only. Brief info is exchanged and deleted again on every step (P02-B27). `-1` is a wildcard for
+broadcasts (the GM hears all layers) but not for `so_DistanceSquar`. The V24 predictions hold: no appear broadcast on `&show`, no range test (−1,
+70000 accepted), no re-entry on `&dimension 0`.
+
+### 18.7 New character: tutorial popup and the mushroom house
+
+- **Tutorial popup.** `0x1001 {slot 0}` (105.099) → WM `0x1110 NC_CHAR_TUTORIAL_POPUP_REQ` 6 ms later, with **one
+  byte** (0xD5): `CParserClient::fc_NC_CHAR_LOGIN_REQ` @ FUN_00422be0 calls `CSendPacket::ID(&p, 0x1110, 1, NULL)`
+  (the same pattern as P02-B2) (original bug) P02-B28. W01 §4.2 says "(empty)". The client reads no payload (C01). B
+  answered `0x1111 {bIsSkip 1}` after 1.34 s. The WM sent CharDB `0x1112 {nSessionHandle 1, nCreateWorldNo 0, nCharNo 8,
+  nUserNo 104, bIsSkip 1}` (4 ms), and CharDB answered `0x1113 {1, 8, rErrorType 0x31E8, bIsSkip 1}` (25 ms). 6 ms
+  later the WM sent `0x1004`, so `TutorialLoginProcess` follows the normal 0x1001 path (W01 §6.2). No `0x111D` was sent (skip = 1). The
+  character blob then carried `0x1114 {nTutorialState 2, nTutorialStep 0}`, and the zone got `0x1115` with the same
+  values. **Confirms** W01 §4.2 / §6.2 and D02 §8 (0x1112 / 0x1113 layout). `0x1003` reached the client at 107.092,
+  1.99 s after `0x1001` (most of it the popup wait).
+- **Mushroom house.** On B's first `0x1803` (113.352), the zone sent CharDB `0x3467 NC_ITEMDB_CREATEMUSHROOM_REQ` on
+  W00_CDB#5 in the same ms as the §10.2 requests. Layout (first annotation, `annotations/P02.json`): `{ref, lockindex 0,
+  owner 8, MAPPOS {RouN, 6888, 7045}, location 0x3000, key, itemid 31000 House_MushRoom, attr 0x002E, attributes[4] = 0}`.
+  The u16 before the attributes is the constant 46, the payload offset of the attribute block
+  (`sp_MakeMiniHouse` @ FUN_0043eab0 writes `end − start − 2`), not a length (Z13 §1.6 calls it `attrLen`). Then
+  `0x3468 {ref, lockindex}` came back (34 ms), the Character server logged GameLog `0x044F {8, 8, key, 31000, 0x3000}`
+  on W00_GLDB#1, and the client got `0x3001 NC_ITEM_CELLCHANGE_CMD {0x3000, 0x3000, 31000, attributes 0}` (13 ms).
+  At the next per-minute block (WM `0x0821`, 121.398), the zone wrote the house's attribute with ItemDB `0x3449
+  {lockindex 1, key, 31000, attribute ffecbb76}` → `0x344A {err 0x0901}`. At the same time the client got
+  `0x9010 NC_CHARGED_BOOTHSLOTSIZE_CMD {size 5}` (it was 0 at the map login) and a second `0x3001` with the new
+  attribute. **Confirms** Z13 §1.6, Z05 §9.5, D03 §7.1. A, who already owns 31000, got `0x9010 {5}` in its login burst.
+- **0x750C NC_GUILD_EMBLEM_LEVELUP_CMD {nCharNo 2}**, zone → WM W00_WM#10, 5 ms after CharDB's `0x4002` of A's
+  `&linkto` save (506.357 → 506.362). **Confirms** Z01 §8.4 (level ≥ 60 → `0x750C`) and W03 §3.11 (the WM handler).
+
+### 18.8 Opcodes
+
+Batch 1–2 opcodes recur unchanged (create: §16.4; map login and in-world: §5.2, §6.2, §8.2, §9.7, §10.8). New types:
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| C→S | 0x1C01 | NC_BRIEFINFO_INFORM_CMD | 18 | 6 | confirmed | §18.2; Z02-B3 captured |
+| S→C | 0x1C06 | NC_BRIEFINFO_LOGINCHARACTER_CMD | 544 | 235 | confirmed | 2 by sight, 2 on request, 540 in the P02-B27 storm |
+| S→C | 0x1C07 | NC_BRIEFINFO_CHARACTER_CMD | 0 (`s21` 1) | 236 | confirmed (`s21`) | none in `s14` (no player in sight at a map login); `s21` 89.893 at B's map login, `charnum 1` = A (§18.2, §20.4) |
+| C→S / S→C | 0x2024 / 0x2025 | NC_ACT_JUMP_CMD / NC_ACT_SOMEEONEJUMP_CMD | 7 / 1 | 0 / 2 | confirmed | not to the jumper |
+| C→S / S→C | 0x2020 / 0x2021 | NC_ACT_EMOTICON_CMD / NC_ACT_SOMEONEEMOTICON_CMD | 7 / 14 | 1 / 3 | confirmed | also to the sender |
+| C→S / S→C | 0x2022 / 0x2023 | NC_ACT_EMOTICONSTOP_CMD / …SOMEONEEMOTICONSTOP_CMD | 0 | – | never seen | no emote stop |
+| S→C | 0x2009 | NC_ACT_SOMEONECHANGEMODE_CMD | 1 | 3 | confirmed | `{8001, 2}`, not to the sender |
+| C→S | 0x201E | NC_ACT_SHOUT_CMD | 3 | 6–13 | confirmed | level-1 shout dropped silently |
+| S→C | 0x201F | NC_ACT_SOMEONESHOUT_CMD | 4 | 28 / 34 | **corrected** (flag) | bits 2–7 stale (P02-B29); also to the shouter |
+| C→WM | 0x200C | NC_ACT_WHISPER_REQ | 2 | 31 / 35 | confirmed | §18.4 |
+| WM→C | 0x200D | NC_ACT_SOMEONEWHISPER_CMD | 2 | 32 / 36 | confirmed | flag bit 0 = 0 for the admin too |
+| WM→C | 0x200F | NC_ACT_WHISPERSUCCESS_ACK | 2 | 31 / 35 | confirmed | same ms as 0x200D |
+| WM→C | 0x200E | NC_ACT_WHISPERFAIL_ACK | 0 | – | never seen | the "unknown name" step named an online player |
+| WM→Zone | 0x6006 | NC_CT_CHARTTING_CMD | 2 | 6 | confirmed | sender's zone handle / charNo, broadcast link |
+| S→C | 0x2449 | NC_BAT_SOMEONESWING_DAMAGE_CMD | 14 | 13 | confirmed | bystander form, both directions |
+| S→C | 0x244F | NC_BAT_SOMEONESKILLBASH_HIT_OBJ_START_CMD | 3 | 8 | confirmed | bystander form of 0x244E |
+| S→C | 0x1809 | NC_MAP_LINKSAME_CMD | 1 | 10 | confirmed | `{150, 4975, 5825}` |
+| WM→C | 0x1110 | NC_CHAR_TUTORIAL_POPUP_REQ | 1 | 1 | **corrected** (size) | 1 unwritten byte (P02-B28); was the capture's only decoder issue |
+| C→WM | 0x1111 | NC_CHAR_TUTORIAL_POPUP_ACK | 1 | 1 | confirmed | `bIsSkip 1` |
+| WM→CharDB | 0x1112 | NC_CHAR_TUTORIAL_MAKE_ITEM_REQ | 1 | 12 | confirmed | D02 §8 |
+| CharDB→WM | 0x1113 | NC_CHAR_TUTORIAL_MAKE_ITEM_ACK | 1 | 9 | confirmed | `0x31E8` ok |
+| Zone→CharDB | 0x3467 | NC_ITEMDB_CREATEMUSHROOM_REQ | 1 | 50 | confirmed, **first layout** | `attr` = constant offset 46 (§18.7) |
+| CharDB→Zone | 0x3468 | NC_ITEMDB_CREATEMUSHROOMSUC_ACK | 1 | 8 | confirmed, **first layout** | `{ref, lockindex}` |
+| Character→GameLog | 0x044F | NC_LOG_GAME_ITEM_CREATE | 1 | 20 | confirmed | D03 §7.1 |
+| Zone→WM | 0x750C | NC_GUILD_EMBLEM_LEVELUP_CMD | 1 | 4 | confirmed | after 0x4002, level 120 |
+| WM→CharDB, CharDB→WM, WM→AccountDB, WM→GameLog | 0x1402, 0x1405, 0x140D, 0x0411, 0xC804 | (character create) | 1 each | 33, 133, 50, 4, 9 | confirmed | as in §16.4 (`s37`); 0x140D +0x1E..+0x30 again stale (P02-B24), partly other values (`… 00 70 9e … 00 72 00 …`) |
+
+The 0x1C08 / 0x1C0E / 0x2018 counts of this capture (3 255 / 2 736 / 2 072) are mostly the P02-B27 storm (§18.6).
+
+## 19. Items I, batch 3: GM items, split, drop, pick-up, destroy, use, full inventory (`s21`) *(captured)*
+
+`s21` steps 1–7 and 11 (the storage, shop and soul-stone steps 8–10 are §20). Streams: client A = zone#1 / wm#1
+(`admin`, **Test2**, `chrregnum` 5, zone handle 8003), client B = zone#2 / wm#2 (`testaccountB`, X14B, `chrregnum` 8,
+handle 8004), both on RouN (zone 0, 9210). The zone's CharDB links are W00_CDB#1 / #2 / #3 / #17 (requests go round
+robin), its GameLog link W00_GLDB#1. Times are capture seconds (the notes have no times). Decoder: 56 `0x3401`, 1
+`0x341F`, 2 `0x343E`, 1 `0x346A`, 1 `0x3439` issue packets before this part; the P02.json layouts of §19.8 fit all
+of them (`s21` now has 18 issue packets, all §20 types).
+
+### 19.1 What happened
+
+| Time | Step | Client request | Wire result |
+|---|---|---|---|
+| 130.6–190.5 | setup (`21-setup.txt`) | `&cleariv`, `&levelup 25`, `&getmoney 200000`, `&fullpoint`, 9 × `&makeitem` | §19.2 |
+| 289.6, 291.5, 454.6, 620.3 | (not in the notes) | 0x3015 HP potion at full HP | 0x3016 `0x713` at once (§19.6) |
+| 299.4 / 301.0 | 1 split / merge | 0x300D 4 → cell 9; 0x300B cell 9 → cell 0 | 0x3434 → 0x3435, 0x300E `0x441`; 0x342E → 0x342F, 0x300C `0x241` (§19.3) |
+| 382.4, 389.5, 451.2 | 1 split onto the x3 stack ("did not work") | 0x300D 4 / 4 / 9 → cell 1 (occupied) | 0x300E `0x446`, no DB request |
+| 447.1 | (not in the notes) | 0x3007 lot 9 of the 10-stack | 0x3008 `0x303` (Z04-B4) |
+| 456.5 / 458.0 | 1 "split the whole lot" | 0x300D 9 → cell 9; 0x300B back | as at 299.4 (client range 1…9: "split 0" never reaches the server) |
+| 477.1 / 479.3 | 2 drop / pick up the x3 stack | 0x3007 lot 3; 0x3C02 OK; 0x3009 | §19.4: DROPALL, then PICKMERGE onto cell 0 (lot 13) |
+| 512.9 / 541.0 | 3 A drops Leather Boots, B picks | 0x3007 cell 5; B's 0x3009 at 541.0 only | §19.4: B's first try (notes) sent nothing |
+| 601.3 / 604.8 | 4 destroy Binding Reset Resin | 0x3007 cell 6, two 0x3C02 OK | §19.5: 0x346A ITEMBREAK |
+| 746.6 / 790.8 | 5 use potions | 0x3015 cell 0 (lot 13), cell 2 (lot 1) | §19.6: USELOT / USEALL |
+| 805.7 / 810.8 | 6 rings | 0x300F cell 3, cell 4 | 0x3410 → equipment slots 15, 16 (§19.7) |
+| 1324.2 / 1339.6 | 11 KQ pick-up limit | drop one Freezing Ice, pick it up | §19.4: free at once; 0x300A `0x34A` |
+| 1356.4–1410.7 | 7 full inventory | 49 × `&makeitem LeatherBoots` | 46 × 0x3401 (cells 1–7, 9–47), 3 without a packet (§19.2) |
+| 1470.5 | 7 unequip a ring, inventory full | 0x3012 `{15, 48}` | 0x3013 `0x2C2` (§19.7) |
+| 1481.6 / 1485.2 / 1486.4 | 7 drop one, `&makeitem` refills the cell, pick | 0x3007, chat, 0x3009 | 0x300A `0x346` "Inventory is full." |
+| 1498.2–1507.4 | 7 clean-up | `&cleariv` (48 keys), 2 × 0x3012, `&cleariv` (2), 2 × 0x3009, `&cleariv` (2) | §19.2, §19.4 |
+
+### 19.2 The GM setup on the links (`&makeitem`, `&getmoney`, `&cleariv`)
+
+- **`&makeitem`** (Z11 §4.3): `0x3401 NC_ITEMDB_ADMINCREATE_REQ` 2–24 ms after the chat line, `0x3402` 8–32 ms later,
+  GameLog `0x044F {itemmaker = owner = 5, key, itemid, cell}` in the same ms as the `0x3402`, then the client's
+  `0x3001` for the cell (style 1: the item appears only after the DB answer, Z05 §9.1). The cell is the first free
+  one in slot order (0x2400…0x2408 in the setup; after the drops of step 7 the refilled cell 23). Layout:
+  `{ref, u16 lockindex, PROTO_ITEM_CREATE create, attribute}` (the pdb2016 struct + the 6-byte ref; `create.attr` =
+  46, the payload offset of the attribute, as for 0x3467 in §18.7). Attributes: 1 byte (lot 10 / 3 / 1 for HP Potion
+  3500 `-l10` / `-l3` / `-l1`, KQ_Ice01 57001, PutOn_ClearKit01 2530 `-l1`), 13 bytes for LeatherBoots (item id 0,
+  `ShineItemAttr_Boot`), 41 bytes for SkullRing 2203 (the two rings differ in the last two bytes: `00 01` / `01 02`,
+  the random option roll of Z11 §4.3 *(inferred)*).
+- `&makeitem` with a full inventory sends nothing and the GM gets no message: 3 of the 49 step-7 commands (1409.695,
+  1410.214, 1410.719) have no `0x3401`. **Z11-B12 captured.** The notes' "cells filled 46, no failure message" agree.
+- **Lock indices** (Z05 §1.2) count every transaction of the character, the GM commands included: `&cleariv` 0,
+  `&makeitem` 1–9, split 10, merge 11, split 12, merge 13, break 17, uses 18 / 19, equips 20 / 21, … `&makeitem`
+  43–88, 90, `&cleariv` 91, unequips 92 / 93, `&cleariv` 94 / 95. Between 13 and 17 lie a drop, a pick-merge, a drop
+  and the destroy menu, which carry no index on the wire; which of them took the three indices was not traced.
+- **`&getmoney 200000`** (Z11 §7.4): `0x3438 {owner 5, itemonfield −1, cen 200000}` and `0x1033 {cen 299378}` in the
+  same ms, `0x3439` 23 ms later, GameLog `0x0446 {"Need Cen", 0, 0, key 0, itemlot 3392 = (u16) 200000, …}`, then
+  the client's `0x300A {itemid 0, lot 0, 0x341, 0xFFFF}`: **Z11-B32 captured**, and its open point settled: with
+  nothing picked since the map login the item id and lot are 0, so the client prints the obtained message for item 0
+  (LeatherBoots) *(the text not seen; the notes do not mention it)*. `0x3439` is 7 bytes: the ref and one byte the
+  Character server never writes (`0x10`): **D03-B6 captured**.
+- **`&cleariv`** (Z11 §4.3, Z18 §4.4): `0x3459 NC_ITEMDB_DESTROY_REQ` with `flags` = key count (3, 48, 2, 2; bit 7
+  clear), the keys at payload 0x17, `0x345A {lockindex, err 0xB81}` 2–60 ms later, then one `0x3001` (6 bytes,
+  `itemid 0xFFFF`) per cell in slot order in the same ms (Z05 §6.4). No GameLog row. Payload bytes 9…22 (`itemID`,
+  `key`, `attrOffset`, `inven`, valid only with bit 7) are not written: they hold earlier `gpp` contents, readable
+  text included (`…n u s`, `…r e s`, `…n   b`) (original bug) P02-B30. Z11 §4.3 says "stale, unread"; the Character
+  server indeed reads them only with bit 7 (Z18 §4.4).
+
+### 19.3 Split and merge
+
+- **Split** (Z04 §4.2): `0x3434` 10–17 ms after the request (68 bytes: D03 layout), `0x3435 {ref, lockindex, lotmain,
+  RemainLot 6 / 1}` 33–53 ms later, GameLog `0x0457 {charNo, RouN 6481 8752, itemid, key, new key, 4 / 9, 6 / 1}` in the same
+  ms (the split log carries the real map, unlike the drop and merge logs), then `0x3001` source (new lot, `exchange`
+  = itself), `0x3001` target (`exchange` = the source cell) and `0x300E {0x441}`: style 1, confirms Z05 §4. Z04
+  §4.2's "+0x42 u32 lot, +0x44 u16 oldLot, 0x46 bytes" is off by two: `splitlot` u16 at payload 64, `MainLot` (the lot before the split, 10) at 66,
+  68 bytes. `lotcreate.attr` (payload 62) is not written (`0x6874` / `0x6620`, text bytes; no attribute follows)
+  (original bug) P02-B30.
+- **Split onto an occupied cell** answers `0x300E {0x446}` without a DB request (3 ×). The code (zone 0x53a03f…0x53a052):
+  `to` cell item ≠ 0xFFFF → `so_SendErrorCode(12, 14, 0x446)`; an out-of-range `from` or `to` cell both answer
+  `0x445` (shared label at 0x539f25). Z04 §4.2 gives these as "to cell not empty: 0x44c" and "Invalid 'to' cell:
+  0x446": **corrected**. The client shows nothing for 0x446 (only `0x447` has a text, Z04 §4.2); the notes'
+  "did not work" is the cell not changing.
+- **Merge = 0x300B onto a stack of the same item** (Z04 §4.1): `0x342E NC_ITEMDB_MERGE_REQ {ownerA, ownerB, lockindex,
+  itemid, lotmain = target key, lotsub = source key, nMainLot 6 / 1, nSubLot 4 / 9}`, `0x342F {ref, lockindex,
+  lotmain, MergeResultLot 10}`, GameLog `0x0456 {"Need", 0, 0, itemid, main key, sub key, itemlot 4 / 9 = sub lot,
+  itemlotadd 10 = result, itemlotsub 0}` (D03 §3.3, D03-B11), then `0x3001` source emptied, `0x3001` target 10,
+  `0x300C {0x241}` (a RELOC_ACK, as Z05 §4 says).
+
+### 19.4 Drop, pick-up and the looting time
+
+- **Drop of a whole stack / item** (Z04 §3.1, Z05 §3.1): `0x3C01` "Do you want to discard the item?" (menu
+  `ItemDropWarn`, 208 bytes, `npcHandle 0xFFFF`, position = A's) and `0x3008 {0x301}` in the same ms; after the OK
+  (`0x3C02 reply 0`, 1.0–5.0 s later) `0x3416 DROPALL_REQ` and `0x3001` (cell emptied) in the same ms (style 2),
+  `0x3417` 11–16 ms later, GameLog `0x0447 {"Need", 0, 0, key, itemlot 0, cell, itemid}` (D03-B11), `0x1C0A` to the
+  others in sight first (`attr 0` for B), then to A (`attr 8`) with the second `0x3008 {0x301}`. Two `0x301` per
+  drop: the menu ACK and the DB answer (Z05 §3.1) both send it. `0x3416` / `0x3417` carry the 101-byte attribute
+  union of the cell: a ByteLot item writes its lot byte, the other 100 bytes are heap contents (pointer-like
+  values, `ffff`, …), echoed unchanged in `0x3417` (original bug) P02-B30.
+- **Part stack**: `0x3007 lot 9` on the 10-stack → `0x3008 {0x303}` at once, no menu: **Z04-B4 captured** (only whole
+  stacks drop; `DropLot` / `0x3419` unreachable). The client shows no text for 0x303.
+- **Pick-up onto a stack** (Z04 §3.3 IsLot): `0x341F NC_ITEMDB_PICKMERGE_REQ` (33 bytes: ref + pdb2016 struct +
+  attribute; `itemonfield` = the drop's key, `nCellItemLot 10`, `itempick` = cell 0's key, `attr` = offset 32,
+  attribute = lot 13), `0x3001 {cell 0, lot 13}` and `0x3014` to B in the same ms, `0x3420 {ref}` 6 ms later, no
+  GameLog row, `0x300A {3500, lot 3, 0x341}` 43 ms after it. No new key: the drop's key disappears (the DB deletes it,
+  D03 §3.4).
+- **`0x3014 NC_ITEM_SOMEONEPICK_CMD`** (26 bytes `{char pickerID[20], u16 itemID, u32 nItemLot}`, first capture): sent to
+  the other players in sight (B for A's three picks, A for B's) together with the picker's `0x3001`, not to the
+  picker. The client (`FUN_004abc20`) prints "%s of the expedition group has received an item." only when the picker
+  is in its expedition (raid) list *(inferred from the lookup FUN_006f7e30)*: here nothing.
+- **Ownership** (Z09 §11.4, §18.5): LeatherBoots (`ItemInfoServer.looting` 20000, `Vanish` 60000) dropped at 514.0,
+  re-broadcast with `attr 8` to both at 533.954 (+19.95 s). B's first try (notes: "You do not have the right to pick up
+  the item.") produced **no 0x3009**: the client refuses by itself while the drop's pick bit is 0 *(inferred: the
+  client's drop object FUN_00610fc0 was not read)*. B's 0x3009 at 541.0 → `0x341C PICKALL` (map / x / y = B's
+  position, `location` = B's first free cell 0x2401), B's `0x3001` + A's `0x3014` in the same ms, `0x341D`, GameLog
+  `0x0446` (`iteminven 0` here, `0x750F` for A's later picks: P02-B15), `0x300A {0, 1, 0x341}`. The notes' "~30 s" is
+  the tester's wait; the server allowed it after 20 s. The step-7 Boots (dropped 1484.2) turned free at 1504.149 (+19.9 s).
+- **Looting time 0**: KQ_Ice01 57001 has `looting 0`, `Vanish 300000`: its drop (1329.244) went to B as `attr 0` and
+  at once again as `attr 8`, and to A twice with `attr 8`, all in the same ms: the owner time is already over at the
+  first `so_Routine` pass, which re-broadcasts (Z09 §11.4) *(the routine call itself not timed)*.
+- **KQ pick-up limit** (X02 §4, Z04 §3.3 `ItemLotInspector`): picking up the second Freezing Ice while holding one →
+  `0x300A {0xFFFF, 0, 0x34A, 0xFFFF}` 11 ms after the request, no DB request, the drop stays; client "Failed to
+  obtain the item." (notes). **Confirms** the X02 reading of 0x34A (KQItem.shn `PickupLimit`).
+- **Full inventory**: `0x3009` → `0x300A {0xFFFF, 0, 0x346, 0xFFFF}` 15 ms later, client "Inventory is full.":
+  **settles** Z04 §3.3's *(inferred)* code: it is 0x346. After `&cleariv` the two picks went to cells 0 / 1 as
+  `0x341C` PICKALL (`0x3014` to B each time).
+
+### 19.5 Destroying an undroppable item (Binding Reset Resin)
+
+`0x3007` on PutOn_ClearKit01 2530 (bound: `BelongType_CanDrop` false, Z04 §3.1) opens `0x3C01` "If you discard this
+item, it will automatically be destroyed." (`ItemBreakWarn0`) with `0x3008 {0x301}`; the OK (1.4 s) opens the
+second `0x3C01` "Do you want to destory the selected item?" (`ItemBreakWarn1`, the client text's spelling) 26 ms
+later; the second OK (2.1 s) sends `0x346A NC_ITEMDB_ITEMBREAK_REQ {packheader, lockindex 17, key, Owner 5, nID 2530,
+nLot 1, nDeleteChestItem 0}` (25 bytes, pdb2016 layout; the decoder read one element of the `[0]` array until
+P02.json restated it), `0x346B {ref, 17}` 13 ms later, GameLog `0x0445 {5, key, 2530, 1}` and, 1 ms after the `0x346B`, the client's
+`0x3001` (cell 6 emptied) and **`0x3024 NC_ITEM_BREAKSUCCESS_CMD`** (empty, *(pdb2017)* name) together. **Confirms**
+Z04 §3.2 (two confirmations, style 1) and Z05 §6.4; the client has no 0x3024 handler and shows nothing.
+
+### 19.6 Using potions
+
+- **Full HP**: four 0x3015 on HP Potion 3500 (`ItemUseSkill` UsePotion, `UseItemByTable` actor) answer `0x3016
+  {0x713, 3500, 9}` 2–9 ms later, no DB request, client "The selected item does not have any effect when used.".
+  Code: `UseEffect::UseItemByTable::uib_CanUseItem` @ FUN_005981e0 returns 0x700 only when one of the row's three
+  effects (`sp_CanUseItemCheck_ByTable` for UseEffectA / B / C) would change something, else 0x713. The notes' step
+  10 "HP stone at full HP → no message" is the soul-stone path (§20).
+- **Stack (lot 13)** at HP 632 (`&staticdamage 1`): `0x343E NC_ITEMDB_USELOT_REQ` and **`0x301A
+  NC_ITEM_USECOMPLETE_CMD`** (empty) in the same ms, 34 ms after the request (the UsePotion cast; Z13 §8
+  `smo_ply_ItemUse` sends 0x301A before `uib_AfterCast`), GameLog `0x0459 {5, key, 3500, itemlot 12 = new lot}` and
+  `0x3440 {ref, 18, 0x700}` 19 ms later, then `0x3016 {0x700, 3500, 9}`, `0x3001 {cell 0, lot 12}` and `0x240E {hp
+  633}` together (the heal runs in the releaser after the DB answer, Z05 §6.1). Layout: ref + pdb2016 `{PROTO_CHANGEATTR
+  {key, itemid, attr}, lockindex}` + the attribute (lot 12); `attr` = 20 = the payload offset of the attribute: Z04
+  §6.3's "+0x12 attrLen" is an offset (as for 0x340A in §7.6.1): **corrected**.
+- **Single potion (lot 1)**: `0x343F NC_ITEMDB_USEALL_REQ {ref, key, lock 19, itemid}` with `0x301A`, GameLog `0x045A
+  {5, key, 3500}`, `0x3440 {19, 0x700}`, then `0x3016`, `0x3001` (cell 2 emptied), `0x240E`. **Confirms** Z04 §6.3
+  (lot 1 → USEALL) and D03 §4.
+
+### 19.7 Rings, unequip with a full inventory
+
+- `0x300F` on SkullRing 2203 (`ItemInfo.Equip` 15) in cell 3 → `0x3410 {relocA = ring → 0x200F, relocB.key −1}`
+  (empty slot), `0x3411`, then `0x3002 {exchange 0x2403, location 15, ring}` (46 bytes), `0x3001 {exchange 0x200F,
+  cell 3 emptied}`, `0x3011 {0x281}`. The second ring went to slot 16 (`0x2010`) although the 1-byte 0x300F names only the
+  inventory cell: the zone chose the free ring slot (`EquipEnumChanger_eec_EquipLocation` with the current equipment, Z04 §5.1). The notes call the
+  first one "right". B (in sight) got **nothing** for the two equips but `0x1C04 NC_BRIEFINFO_UNEQUIP_CMD {8003, 16}` /
+  `{8003, 15}` for the two unequips at 1499.6 / 1500.1: SkullRing is class 4 (amulet), whose `iac_equipbriefinfo`
+  returns 0, while an unequip builds the brief info of the empty item (base class → 0x1C04). **Confirms** Z18 §4.3.
+- **Unequip with a full inventory**: the client sends `0x3012 {slotequip 15, slotinven 48}` (48 = one past the 48-cell
+  inventory, its "no free cell" value *(inferred)*); the zone answers `0x3013 NC_ITEM_UNEQUIP_ACK {0x2C2}` at once
+  (`slotinven ≥ usable size`, Z04 §5.4), client "Failed to unequip the item.". **First 0x3013 on the wire** (§8.2 had it
+  "never seen": a success answers 0x3011, Z05-B2; both unequips at 1499.6 / 1500.1 again got `0x3011 {0x281}`).
+  The two later unequips name the free cells 0 / 1 and go through `0x3413` / `0x3414` (style 1, `0x3002` 5 bytes
+  first).
+
+### 19.8 SQL snapshots
+
+`26_11_15_21_items-snapshot-before.txt` / `-after.txt` (and `-prep.txt`) list **Test1235** (`nCharNo` 2, `nUserNo`
+103), not Test2 (`nCharNo` 5) whom the scenario played; both snapshots are identical except `taken_at` (18:02:25 /
+18:43:42). They cannot check D03 against `s21`. The committed `tools/capture/21/21-snapshot.sql` already selects
+`N'Test2'`, so the run used an older copy of the script *(inferred)*. The account storage rows (`nStorageType` 6,
+owner 103) did not change either: the storage step (§20) moved only potions and cen of Test2 (net zero).
+
+### 19.9 Opcodes
+
+Types new in batch 3 (batch 1–2 types recur unchanged: §8.2, §7.6.1; `0x3001` sizes 6 / 7 / 19 boots / 47 ring):
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| C→S | 0x3007 | NC_ITEM_DROP_REQ | 6 | 14 | confirmed | Z04 §3.1 |
+| S→C | 0x3008 | NC_ITEM_DROP_ACK | 10 | 2 | confirmed | `0x301` ×2 per drop, ×1 per destroy; `0x303` part stack (Z04-B4) |
+| C→S | 0x300D | NC_ITEM_SPLIT_REQ | 7 | 8 | confirmed | Z04 §4.2 |
+| S→C | 0x300E | NC_ITEM_SPLIT_ACK | 7 | 2 | **corrected** | `0x441`; `0x446` = target occupied (Z04 says 0x44c) |
+| S→C | 0x3013 | NC_ITEM_UNEQUIP_ACK | 1 | 2 | confirmed | first capture: `0x2C2` full inventory (§19.7) |
+| S→C | 0x3014 | NC_ITEM_SOMEONEPICK_CMD | 4 | 26 | confirmed | pdb2016 layout; to the others in sight |
+| S→C | 0x301A | NC_ITEM_USECOMPLETE_CMD | 3 | 0 | confirmed | with the use request to the CharDB (Z13 §8) |
+| S→C | 0x3024 | NC_ITEM_BREAKSUCCESS_CMD | 1 | 0 | confirmed; **new layout** | *(pdb2017)* name; P02.json (empty) |
+| Z→CDB | 0x3401 | NC_ITEMDB_ADMINCREATE_REQ | 56 | 47 / 59 / 87 | **corrected** | pdb2016 struct + ref + attribute tail (P02.json) |
+| CDB→Z | 0x3402 | NC_ITEMDB_ADMINCREATESUC_ACK | 56 | 8 | **corrected** | `{ref, lockindex}` (P02.json) |
+| Z→CDB | 0x3416 | NC_ITEMDB_DROPALL_REQ | 4 | 129 | confirmed; **bug** | D03 layout; 100 heap bytes in the attribute (P02-B30) |
+| CDB→Z | 0x3417 | NC_ITEMDB_DROPALLSUC_ACK | 4 | 117 | confirmed | Z05 §3.1; echo of the item |
+| Z→CDB | 0x341F | NC_ITEMDB_PICKMERGE_REQ | 1 | 33 | **corrected** | ref + pdb2016 + attribute (P02.json) |
+| CDB→Z | 0x3420 | NC_ITEMDB_PICKMERGESUC_ACK | 1 | 6 | confirmed; **new layout** | `{ref}` (P02.json) |
+| Z→CDB | 0x342E | NC_ITEMDB_MERGE_REQ | 2 | 42 | confirmed | D03 §3.3 |
+| CDB→Z | 0x342F | NC_ITEMDB_MERGESUC_ACK | 2 | 18 | confirmed | Z05 §4 |
+| Z→CDB | 0x3434 | NC_ITEMDB_SPLIT_REQ | 4 | 68 | confirmed; **bug** | D03 layout; `lotcreate.attr` unwritten (P02-B30); Z04 offsets off by 2 |
+| CDB→Z | 0x3435 | NC_ITEMDB_SPLITSUC_ACK | 4 | 18 | confirmed | Z05 §4 |
+| Z→CDB | 0x3438 | NC_ITEMDB_PICKMONEY_REQ | 1 | 22 | confirmed | Z11 §7.4 |
+| CDB→Z | 0x3439 | NC_ITEMDB_PICKMONEYSUC_ACK | 1 | 7 | **corrected**; **bug** | ref + 1 unwritten byte (D03-B6); pdb2017 empty |
+| Z→CDB | 0x343E | NC_ITEMDB_USELOT_REQ | 2 | 21 | **corrected** | ref + pdb2016 + attribute; `attr` = offset (P02.json) |
+| Z→CDB | 0x343F | NC_ITEMDB_USEALL_REQ | 1 | 18 | confirmed | Z04 §6.3 |
+| CDB→Z | 0x3440 | NC_ITEMDB_USE_ACK | 3 | 10 | confirmed | `0x700` |
+| Z→CDB | 0x3459 | NC_ITEMDB_DESTROY_REQ | 4 | 47 / 407 / 39 / 39 | confirmed; **bug** | Z18 §4.4 layout; 14 unwritten bytes (P02-B30) |
+| CDB→Z | 0x345A | NC_ITEMDB_DESTROY_ACK | 4 | 10 | confirmed | `err 0xB81` |
+| Z→CDB | 0x346A | NC_ITEMDB_ITEMBREAK_REQ | 1 | 25 | confirmed | pdb2016; restated for the decoder (P02.json) |
+| CDB→Z | 0x346B | NC_ITEMDB_ITEMBREAKSUC_ACK | 1 | 8 | confirmed | Z05 §6.4 |
+| CDB→GL | 0x0445 | NC_LOG_GAME_ITEM_BREAK | 1 | 16 | confirmed | D05 / D03 §7.5 |
+| CDB→GL | 0x0447 | NC_LOG_GAME_ITEM_DROP | 4 | 38 | confirmed; **bug** | "Need" (D03-B11), `itemlot 0` |
+| CDB→GL | 0x0456 | NC_LOG_GAME_ITEM_MERGE | 2 | 48 | confirmed; **bug** | "Need" (D03-B11) |
+| CDB→GL | 0x0457 | NC_LOG_GAME_ITEM_SPLIT | 4 | 46 | confirmed | real map and position |
+| CDB→GL | 0x0459 | NC_LOG_GAME_ITEM_USELOT | 2 | 16 | confirmed | `itemlot` = lot after |
+| CDB→GL | 0x045A | NC_LOG_GAME_ITEM_USEALL | 1 | 14 | confirmed | D03 §4 |
+
+`0x0446` (`&getmoney` row) and `0x044F` (56) match their batch-2 rows (§7.6.1, §18.8). `0x0459` has 2 rows: the
+second (lock 31, lot 8) belongs to the step-9 potion use (§20).
+
+## 20. Items II, batch 3: storage money, selling and buying back, soul stones; world traffic (`s21`) *(captured)*
+
+`s21` steps 8–10 (storage, sell / buy back, soul stones) and the world traffic of the capture that the scenario did not
+ask for (level-up announcement and titles, KQ minute ticks, a script message, B's map login seen by A). Streams as in
+§19 (A = Test2, zone#1 / wm#1, handle 8003; B = X14B, zone#2 / wm#2, handle 8004; CharDB W00_CDB#1 / #2 / #3 / #17,
+GameLog W00_GLDB#1). Times are capture seconds. Decoder: the 18 issue packets left by part 19 (0x34BB ×5, 0x3425 /
+0x3426 ×4, 0x3441 / 0x3442 ×2, 0x6401) fit the P02.json layouts of this section; all six batch-3 captures now decode
+with 0 issue packets.
+
+### 20.1 Storage (step 8, Storage Keeper Raina)
+
+- **Open** (as §8.1): `0x200A {17092}` (mob 108 RouStoreRaina) 843.695 → `0x201C {108}` → the client's `0x201D {1}`
+  844.693 → 3 ms later 4 × `0x3444` pages 0–3, all at 844.696 on 4 links → `0x3446` pages 2 / 3 / 1 (20 bytes, empty) at 844.707 and page 0
+  (126 bytes, 3 items) at 844.717 → `0x3C08` pages 1, 2, 3 at 844.713 and page 0 at 844.757: each page goes to the client
+  when its DB answer arrives (batch 2: 2, 3, 0, 1).
+- **Item in / out**: the HP-potion stack (cell 0, lot 12) to account-storage cell 3 (`0x300B 0x2400 → 0x1803`): `0x3428`
+  `ownerA 5, ownerB 103`, lock 22, GameLog `0x044C`, `0x3429`, two `0x3001`, `0x300C {0x241}`; back at 854.766 with
+  `ownerA 103, ownerB 5`, lock 23. The notes' "changed to page 2, back to page 1" sent **nothing**: the four pages are
+  loaded at open, and the 2016 client never sent `0x3028 NC_ITEM_OPENSTORAGEPAGE_REQ` (Z04 §7.2) in either batch.
+- **Money** (Z04 §7.1, D03 §5.1): deposit `0x301C {cen 1333}` 865.110 → `0x345F {ref, lock 24, userNo 103, cen 1333}`
+  +7 ms → GameLog `0x045E {chrregnum 5, deposit_money 1333, userregnum 103, user_result_money 1333}` and `0x3460 {ref,
+  lock 24, storagemoney 1333, error 0xF80}` in the same ms (+25 ms) → `0x1033 {298045}` and `0x301D {cen 1333, err
+  0xF80}` +26 ms. Withdraw `0x301E {1333}` 877.854 → `0x3461` lock 25 → `0x045F {5, 1333, 103, 0}` + `0x3462 {…, cen 0,
+  err 0xF80}` +87 ms → `0x1033 {299378}`, `0x301F {0, 0xF80}`. The ACK's `cen` is the **storage balance after**, the
+  10-byte success ACK is the PDB `{u64 cen, u16 err}` (the Z04-B8 error path was not reached); money before / after
+  299378 as in the notes. The GameLog field order is D05's `{chrregnum u32, money u32, userregnum u32, result u64}`; D03
+  §5.1 lists it as `{nUserNo, charNo, money, storageMoney}` (§13).
+- **Close**: `0x200B` and `0x304D` in the same ms (893.855), as §8.1.
+
+### 20.2 Selling and buying back (step 9, Blacksmith James)
+
+James (17084, mob 28 RouSmithJames, `Merchant Weapon`) answers the click with the quest dialog `0x4401` (quest 2524,
+§10.5); the client's `0x201D {1}` opens `0x3C09` (62 items). HP Potion 3500: `SellPrice` 6, `MaxLot` 50.
+
+| Time | Request | Cells 0 / 1 (lots) | DB | Client |
+|---|---|---|---|---|
+| 966.6 | `0x300D` 4 → cell 1 | 12 → 8 / 4 | (§19.3) | `0x300E {0x441}` |
+| 987.3 | `0x3006 {slot 1, lot 1}` | 8 / 3 | `0x3425` SELLLOT, lock 27 | `0x305C {h 0}` |
+| 991.6 | `0x3059 {0}` | **9** / 3 | `0x34BB` onto cell 0, lock 28 | `0x305D {0}`, `0x305A {0x3668}` |
+| 997.1 | `0x3006 {slot 0, lot 1}` | 8 / 3 | SELLLOT, lock 29 | `0x305C {h 1}` |
+| 999.5 | `0x3059 {1}` | 9 / 3 | `0x34BB`, lock 30 | `0x305D {1}`, `0x305A {0x3668}` |
+| 1001.3 | `0x3015` cell 0 | 8 / 3 | `0x343E` (§19.6) | `0x3016 {0x700}` |
+| 1015.6, 1025.1 | `0x3006 {slot 1, lot 1}` ×2 | 8 / 2, 8 / 1 | SELLLOT, locks 32 / 33 | `0x305C {h 2}`, `{h 3}` |
+| 1025.4 | `0x3006 {slot 1, lot 1}` | 8 / – | `0x3422` SELLALL, lock 34 | `0x305C {h 4}` |
+| 1068.3–1069.3 | `0x3059 {4}`, `{3}`, `{2}` | 9, 10, 11 / – | `0x34BB` ×3, locks 35–37 | `0x305D` + `0x305A {0x3668}` each |
+| 1075.7 | `0x300D` 3 → cell 1 | 8 / 3 | `0x3434` lock 38 | `0x300E {0x441}` |
+| 1092.3 | `0x3006 {slot 1, lot 3}` | 8 / – | SELLALL `price 18`, lock 39 | `0x305C {h 5}` |
+| 1095.0 | `0x200A {17164}` (the Anvil) | | | nothing |
+| 1117.7–1130.2 | `0x3059 {5}` ×19 | | none | `0x305A {0x3671}` each, no text |
+
+- **Sell** (Z04 §2.4, Z05 §2.2, D03 §2.2): `0x3006` → `0x3425` / `0x3422` 1–20 ms later → `0x3426` / `0x3423` 6–26 ms
+  later with GameLog `0x0449` + `0xC80E` in the same ms → `0x1033` (+cen), `0x3001` (lot left, or the cell emptied),
+  `0x305C`, `0x3005 {0x381}`. `req.lot < cell.lot` → SELLLOT, else SELLALL (the last single of cell 1 at 1025.4 went
+  as SELLALL). **0x3425** = D03's layout (ref + pdb2016 struct + attribute, P02.json): `iteminfo.attr` = 32 = payload
+  offset of the attribute (as 0x343E, §19.6), the attribute = the lot **left**, `price` = sold lot × 6, `Vendor` 28 =
+  James's mob id; `0x3426` = `{ref, lock}`. `0x0449 itemlot` = lot left (3 / 8 / 2 / 1, 0 after SELLALL).
+- **0x305C**: `nHandle` 0…5 in sale order; freed handles 0 and 1 were not reused by the next sale *(the allocator
+  `CSellItemManager` vt 0x18 / +8 was not read)*. `itemattr` = the sold lot (1, then 3) + 100 stale `gpp` bytes
+  (P02-B16, batch 2): bytes 1–2 are the `0x3001` sent just before (high byte of item id 3500, its lot), bytes 18–27 the
+  `0x3425` built in the same buffer (`price 6`, `UserNo 103`, `Vendor 28`), then text of earlier packets
+  ("…ess to Isya…"): client and link packets share `gpp`.
+- **Buy back** (Z04 §2.5, Z05 §2.2, D03 §2.2): `0x3059` → `0x34BB` 2–20 ms → GameLog `0x07FD` + `0x34BC {0x3668}` +
+  `0xC815` in the same ms → `0x1033` (−6), `0x3001` (cell 0 lot + 1), `0x305D {h}`, `0x305A {0x3668}`. Every buy-back
+  went onto **cell 0**, the potion sold from cell 1 too: `ii_RepurchaseLot` stacks onto the first unlocked cell of the
+  item with room and the sold key only reaches the logs (D03 §2.2 confirmed). `0x34BB` = pdb2016 struct + 1 attribute
+  byte (the target's lot after), `nItemAttrChange.attr` 40 = offset, `nItemAttrChange.attritemregnum` = cell 0's key,
+  `nSellItemKey` = the sold item's key. `0x07FD {nType 0x7F8, charNo 5, 0, 3500, target key, nInt1 lot after, nInt2
+  cell, nInt3 price 6, nBigint1 nSellItemKey}`; `0xC815 {103, 5, 3500, u64 6, Vendor 28}`. Buy-back price = `SellPrice`
+  × lot.
+- **The stack of 3 that could not be bought back** (notes "bug?"): settled. After the sale at 1092.3 the tester
+  clicked the Anvil next to James (17164, mob 9361; `World/NPC.txt` RouN 5645 / 8924, `NPCMenu 0`, role `NPCMenu
+  RandomOption` = `NPCRole_MenuOpen`) while James's shop window was open. `InteractWithNPC` @ FUN_004c4660 (Z02 §6.2)
+  stores the Anvil's role entry in `sp_NPCProcess.npc` and calls `NPCRole_MenuOpen::nrb_Role` @ FUN_004c4140 at once,
+  which returns without a packet because `dmc_CanMenuOpen(0)` fails (James's shop still holds menu bit 0): no reply on
+  the wire. `sp_NC_ITEM_REPURCHASE_REQ` @ FUN_00538580 then asks `so_ply_CanItemRepurchase` @ FUN_005379f0 (vt 0xe6c)
+  *(pdb2016)*: true only when the current role's slot 14 says so, i.e. `NPCRole_Merchant::nrb_CanItemRepurchase` @
+  FUN_004c7690 with `RoleArg0` "Item" or "Weapon"; every other role class has the shared "return 0" FUN_004b8d20 there.
+  So all 19 tries got `0x305A {0x3671}` without a DB request, and the client handler FUN_004b46a0 shows text only for
+  `0x366B` / `0x366C` / `0x366D`: silent, with James's window still open (original bug) P02-B31. The stack stays in the
+  list as handle 5. The two ends of the session (1165.8 `0x200B`, 1167.1 James again, no `0x201D`) retried nothing.
+- `so_ply_SellItemList_Insert` @ FUN_00537a20 inserts the sold item first and sends `0x305C` only when
+  `so_ply_CanItemRepurchase` holds: a sale at a SoulStone / Skill / WeaponTitle / Guild merchant (whose
+  `nrb_ItemSellPrice` is the same Merchant function) enters the server's list without telling the client *(read, not
+  captured)*. The same test also drops the `0x305D` for the entry `simg_Insert` pushed out of a full list, so the
+  client keeps a handle the server no longer holds (original bug) P02-B32.
+
+### 20.3 Soul stones (step 10, Healer Julia)
+
+- `0x200A {17085}` (mob 29 RouSoulMctJulia, `Merchant SoulStone`) 1206.546 → `0x201C {29}` (no quest dialog) →
+  `0x201D {1}` 1212.279 → `0x3C05 NC_MENU_SHOPOPENSOULSTONE_CMD {hp.recover 443, hp.maxnum 100, hp.price 55, sp.recover
+  590, sp.maxnum 114, sp.price 37}` 4 ms later (Z02 §6.5 `nrm_PortionStone`; first capture).
+- **Buy** (Z04 §13.1, Z05 §2.4, D03 §2.4): `0x5001 {3}` 1219.196 → `0x3441 {ref, chrregnum 5, flag 0, number 3, price
+  165, lock 40}` +7 ms (D03's layout = ref + pdb2016 struct, P02.json) → `0x3442 {ref, lock}` +11 ms → `0x1033 {299231}`,
+  `0x5003 {15}`, `0x3004 {0x201}` in the same ms. SP: `0x5002 {42}` → `flag 1`, `price 1554`, lock 41 → `0x5004 {51}`,
+  money 297677 (notes). Totals = held (12 / 9) + bought, under `maxnum`: `0x742` not reached. **No GameLog row**: no
+  `0x0458` from any server, as D05 says ("no 2016 sender"); D03 §2.4's "the zone logs 0x0458" is wrong (§13).
+- **HP stone at full HP**: no `0x5007` on the wire; the client refuses by itself, without a message.
+- **Use at 1 HP / 1 SP** (`&sethp 1` → `0x240E {1}`, `&setsp 1` → `0x240F {1}`): `0x5007` → `0x5008` +11 ms and B's
+  `0x500B {8003}` in the same ms → `0x240E {444}` +48 ms (1 + `hp.recover` 443); `0x5009` → `0x500A` +14 ms, B's
+  `0x500C {8003}` → `0x240F {591}` +45 ms. Confirms §9.6 / §10.4 from the bystander side: the other player gets
+  0x500B / 0x500C, the user does not.
+
+### 20.4 World traffic in the capture
+
+- **`&levelup 25`** (135.630, level 8 → 33): A gets 25 × `0x240C` in one ms, B 25 × `0x240D {8003, 0}` 14 ms later
+  (one per level; first bystander `0x240D`). Titles (`CT_LevelUp`, Z11 §7.3, Z18 §6.2): Test2 is class 6 → type 0x2E =
+  46 (`CharacterTitleData` "Apprentice Cleric" `Value0 10`, "High Cleric" `Value1 20`): CharDB `0x6005 {ref, 46,
+  0x80}` at 135.637 and `{46, 0x81}` at 135.642 (no answer, D04 §4.2), client `0x6004 {0x2E80}` /
+  `{0x2E81}` (`ElementNo` 0 / 1, `ElementValue` 2), each **before** the `0x240C` of level 10 / 20 in the stream.
+- **Level announcement**: level 20 passed → zone `0x6401 {AnnounceType 4, SizeOfMessage 51, "\"Test2\" has just become
+  level 20. Congratulations!"}` on W00_WM#13 at 135.642 → WM `0x6402` with the same 53 bytes to both clients 88 ms
+  later (W01 §7.6). **Z11-B30 captured**: a GM's `&levelup` announces world-wide. `0x6401` layout in P02.json (Z04.json
+  types it as one 2-byte `ANNOUNCE_MESSAGE`).
+- **Script message**: zone `0x207D` on W00_WM#11 at 146.087 → WM `0x2079` to both clients 6 ms later, the 39 bytes
+  unchanged: `"E_Olympic_A04"` + 18 stale bytes (Z09-B72, §17.4); confirms W04 §2.4's relay. A map script, not a step.
+- **B's map login seen by A** (89.9): B gets `0x1C07 {charnum 1, A}` + A's `0x1C19` at 89.893 (§18.2); A gets B's
+  `0x1C06` + `0x1C19` at 89.907, then `0x2427 {8004, 291 StaImmortal}`, `0x112C {8004, bUse 0}`, `0x2427 {8004, 728
+  StaE_UserNewbie01}`. `0x112C` reached A only: confirms §5.1 #12's *(inferred)* "the minimon broadcast excludes the
+  sender"; `0x2427` goes to the others in sight (Z03 §6.3).
+- **KQ minute ticks** (W04 §6.2 `SetDoneSkip` @ FUN_004548c0): from 756.8 on, every 60 s at hh:mm:00 (no skip at
+  1356) the WM skips the KQs whose start wait passed without joiners: per KQ `0x5811 {hquest}` to the four zones'
+  broadcast links (W00_WM#1 / #7 / #4 / #3, §17.4) and `0x5825 {nHandle, nID}` to both clients, then `0x581E
+  NC_KQ_LIST_DELETE_ACK` through `KQ_RefreshOneClient` (one client per second: wm#2 in the same second, wm#1 ≈ 0.9 s
+  later). 120 / 60 / 24 packets, 11 KQs at the first tick, 1–3 later; no `0x580B` (no joiners). Confirms W04 §6.2 /
+  §6.4.
+
+### 20.5 Opcodes
+
+Types new in batch 3 (`0x3001`, `0x3006`, `0x3005`, `0x3422` / `0x3423`, `0x0449`, `0xC80E`, `0x3444` / `0x3446`,
+`0x3C08`, `0x3428` / `0x3429`, `0x044C`, `0x5007`–`0x500A` recur as in §8.2 / §9.7):
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| C→S | 0x301C | NC_ITEM_DEPOSIT_REQ | 1 | 8 | confirmed | Z04 §7.1 |
+| S→C | 0x301D | NC_ITEM_DEPOSIT_ACK | 1 | 10 | confirmed | `{storage balance, 0xF80}`, after `0x1033` |
+| C→S | 0x301E | NC_ITEM_WITHDRAW_REQ | 1 | 8 | confirmed | Z04 §7.1 |
+| S→C | 0x301F | NC_ITEM_WITHDRAW_ACK | 1 | 10 | confirmed | `{0, 0xF80}` |
+| Z→CDB | 0x345F | NC_ITEMDB_DEPOSIT_REQ | 1 | 20 | confirmed | D03 §5.1 |
+| CDB→Z | 0x3460 | NC_ITEMDB_DEPOSIT_ACK | 1 | 18 | confirmed | balance after |
+| Z→CDB | 0x3461 | NC_ITEMDB_WITHDRAW_REQ | 1 | 20 | confirmed | D03 §5.1 |
+| CDB→Z | 0x3462 | NC_ITEMDB_WITHDRAW_ACK | 1 | 18 | confirmed | balance after |
+| CDB→GL | 0x045E | NC_LOG_GAME_MONEY_DEPOSIT | 1 | 20 | confirmed | D05 order; D03 §5.1's order **corrected** |
+| CDB→GL | 0x045F | NC_LOG_GAME_MONEY_WITHDRAW | 1 | 20 | confirmed | as 0x045E |
+| Z→CDB | 0x3425 | NC_ITEMDB_SELLLOT_REQ | 4 | 33 | **corrected** | ref + pdb2016 + attribute; `attr` = offset (P02.json) |
+| CDB→Z | 0x3426 | NC_ITEMDB_SELLLOTSUC_ACK | 4 | 8 | **corrected** | `{ref, lock}` (P02.json) |
+| C→S | 0x3059 | NC_ITEM_REPURCHASE_REQ | 24 | 2 | confirmed | 5 accepted, 19 refused |
+| S→C | 0x305A | NC_ITEM_REPURCHASE_ACK | 24 | 2 | confirmed; **bug** | `0x3668` ×5; `0x3671` ×19 silent (P02-B31) |
+| S→C | 0x305D | NC_ITEM_SELL_ITEM_DELETE_CMD | 5 | 2 | confirmed | before 0x305A |
+| Z→CDB | 0x34BB | NC_ITEMDB_REPURCHASE_LOT_REQ | 5 | 41 | **corrected** | pdb2016 + 1 attribute byte (P02.json) |
+| CDB→Z | 0x34BC | NC_ITEMDB_REPURCHASE_LOT_ACK | 5 | 10 | confirmed | `0x3668` |
+| CDB→GL | 0x07FD | NC_LOG_GAME_DATA_TYPE_L | 5 | 44 | confirmed | `nType 0x7F8`; `nInt3` = price |
+| CDB→GL | 0xC815 | NC_SYSLOG_CHAR_ITEM_REBUY | 5 | 20 | confirmed | D03 §2.2 |
+| S→C | 0x3C05 | NC_MENU_SHOPOPENSOULSTONE_CMD | 1 | 24 | confirmed | Z02 §6.5 |
+| C→S | 0x5001 / 0x5002 | NC_SOULSTONE_HP / SP_BUY_REQ | 1 / 1 | 2 | confirmed | Z04 §13.1 |
+| Z→CDB | 0x3441 | NC_ITEMDB_SOULSTONEBUY_REQ | 2 | 23 | **corrected** | ref + pdb2016 (P02.json); `flag` 0 HP / 1 SP |
+| CDB→Z | 0x3442 | NC_ITEMDB_SOULSTONEBUYSUC_ACK | 2 | 8 | **corrected** | `{ref, lock}` (P02.json) |
+| S→C | 0x5003 / 0x5004 | NC_SOULSTONE_HP / SP_BUY_ACK | 1 / 1 | 2 | confirmed | new total; with `0x3004 {0x201}` |
+| S→C | 0x500B / 0x500C | NC_SOULSTONE_HP / SP_SOMEONEUSE_CMD | 1 / 1 | 2 | confirmed | first capture: to the other player only |
+| S→C | 0x240D | NC_BAT_SUMEONELEVELUP_CMD | 25 | 4 | confirmed | first capture: one per level, to the others |
+| S→C | 0x2427 | NC_BAT_ABSTATESET_CMD | 4 | 6 | confirmed | first capture: the other player's abstates |
+| S→C | 0x112C | NC_CHAR_USEITEM_MINIMON_USE_BROAD_CMD | 1 | 3 | confirmed | first capture: to the others, not the sender |
+| Z→CDB | 0x6005 | NC_CT_DB_SET_CMD | 2 | 8 | confirmed | D04; no answer |
+| S→C | 0x6004 | NC_CT_SET_CMD | 2 | 2 | confirmed | Z18 §6.2 |
+| Z→WM | 0x6401 | NC_ANNOUNCE_Z2W_CMD | 1 | 53 | **corrected** | `{type, len, text[len]}` (P02.json) |
+| WM→C | 0x6402 | NC_ANNOUNCE_W2C_CMD | 2 | 53 | confirmed; **bug** | type 4 level announcement for a GM (Z11-B30) |
+| WM→C | 0x2079 | NC_ACT_SCRIPT_MSG_CMD | 2 | 39 | confirmed; **bug** | relay of 0x207D (Z09-B72) |
+| WM→Zone | 0x5811 | NC_KQ_W2Z_DESTROY_CMD | 120 | 4 | confirmed | per skipped KQ, 4 zones |
+| WM→C | 0x5825 | NC_KQ_JOINING_ALARM_END_CMD | 60 | 6 | confirmed | per skipped KQ, every client |
+| WM→C | 0x581E | NC_KQ_LIST_DELETE_ACK | 24 | 2 + 4n | confirmed | one client per second |
+
+`0x6006` (part-20 scope in the status file) does not occur in `s21`; its row is §18.8. Never sent by the 2016 client in
+batches 2–3: `0x3028` (storage page). Not reached: `0x3427` / `0x34BA` / `0x34B9` (buy-back onto an empty cell),
+`0x5005` / `0x3443` (soul-stone refusals).
+
+## 21. Items III, batch 3: the setup runs S16, S13 and X3 (`s21b`, `s21c`, `s21d`) *(captured)*
+
+Scenario 21 step 12 (capture-scenarios §8.17, §8.14, §9.4): three short runs, one login each. The character is
+**Test1235** (`chrregnum` 2, user 103), not Test2 as in `s21`: zone handles 8009 / 8011 / 8000, WM sessions 12500 /
+17500 / 20000. The committed `tools/capture/21/21-s16-on.sql` and `21-s13.sql` select `N'Test2'`; the outputs
+(`26_11_15_21_items-s16-before.txt` `nCharNo 2`, `-s13.txt` key 120327209734897664, which is in Test1235's
+inventory in `s21c`) show that they ran for Test1235, like the snapshots of §19.8 *(inferred: older copies of the
+scripts)*. No notes files, one pcapng comment (`s21c`). Decoder: 0 issue packets in all three. Only one type is new
+against every other capture, `0x340C`; the others recur with the layouts of §7.6.1, §8 and §19.
+
+### 21.1 S16: a purchase whose attribute write fails (`s21b`, D03 check 13)
+
+| Time | Stream | Packet |
+|---|---|---|
+| 14.585 | zone#1 | `0x200A {17084}` (James, mob 28) → `0x201C {28}`; the client's `0x201D {1}` 15.676 → `0x3C09` weapon list (62 items) 15.688 |
+| 17.169 | zone#1 | `0x3003 {itemid 0 (LeatherBoots), lot 1}` |
+| 17.178 | W00_CDB#1 | `0x340A BUYALL {ref 8009 / 2, owner 2, RouN 5701 / 8805, cell 0x241B, key …092480, itemid 0, attr 68, lock 0, price_cen 13, fame 0, coin 0, UserNo 103, Vendor 28, 13-byte boot attribute}` |
+| 17.213 | W00_CDB#1 | `0x340C BUYALLFAIL {ref, error 0x206, lock 0}` (+35 ms) |
+| 17.213 | zone#1 | `0x3004 {0x206}` (same ms) |
+| 22.319 – 22.337 | zone#1, W00_CDB#2 | the same again: new key …898944, lock 1, `0x340C {0x206, 1}` +11 ms, `0x3004 {0x206}` |
+
+Nothing else follows: no `0x3001`, no `0x1033`, no GameLog `0x0448` / `0xC80D`, no holy-promise reward. The capture ends
+at 27 s.
+
+- **Which call failed.** The trigger fires on an insert into `tItemOptions`. `p_Item_BuyAll` writes only `tItem`
+  (`p_Item_Create` inserts one row) and commits; the first `tItemOptions` insert is `ItemAttr_Save`'s
+  `p_Item_SetOption`, whose `UPDATE` finds no row for a new key and then inserts *(db-backup)*. So the run took D03
+  §1.2's attribute branch of `ItemBuy_Create` @ FUN_0046bbf0: `p_Item_Delete`, `p_Char_MoneyAdd(owner, 13)`, an error
+  other than 1, hence `0x206` (D03 §2.1). Confirmed: D03 §1.2 / §2.1 and Z05 §2.1 (`0x340C` → `0x3004 {error}` in the
+  same ms, the reservation is dropped: no cell and no cen change on the client).
+- **The refund.** The CharDB's `0x1007 Cen` is 99 999 634 524 at the logins of `s21b`, `s21c` and `s21d`, the
+  `-s16-before.txt` value. The zone's saves carry no cen (§10.1), so the DB balance after the two failed purchases
+  shows that both 13-cen debits of `p_Item_BuyAll` were refunded *(inferred from the balance; the debit is not on the
+  wire)*. The item rows are gone too: `s21c`'s inventory holds no boots key from `s21b`. **D03-B1 is not tested.**
+  Leather Boots cost cen only (`price_fame 0`, `coin 0`), so the lost fame / coins of D03-B1 cannot show. That needs
+  a fame or token purchase under S16 (§15).
+- **Client.** `GameFrameWork::On_NC_ITEM_BUY_ACK` @ FUN_004ab770 has no case for 0x206: its switch's default label is
+  the 0x206 case (`switchD_004ab79e_caseD_206`), which returns without a text. The player sees nothing at all for a
+  failed purchase. Z04-B6 lists 0x203 / 0x204 / 0x20E / 0x210 as silent; 0x206 (BUYALL DB error, captured) and 0x208
+  (BUYLOT DB error, D03 §2.1, same default) are silent too (§12 row, §13).
+- **The prediction** (capture-scenarios §8.17: "the item is deleted again, cen is refunded, fame or coins are not")
+  holds for the item and the cen; the fame / coin half is untested.
+
+### 21.2 S13: an item past its end time (`s21c`)
+
+- **Setup.** `21-s13.sql` sets option row 820 (boot `deletetime`) of the newest Leather Boots in the inventory to
+  8468 = 2020-01-01 00:00. Its output lists key 120327209734897664, inventory cell 27, with the 7 option rows 800–803 and
+  820–822 (820 = 0 and 803 = 1 before the update): the boot rows of D03 §1.3 *(db query output)*.
+- **Login.** The CharDB's `0x1017` (6.372), the WM's `0x102E` (7.017) and the client's `0x1047` (7.165) carry the
+  boots at `0x241B` with the 13-byte `ShineItemAttr_Boot`. Bytes 7–10 are `14 21 00 00` = `deletetime` 8468 (offset
+  +7 *(pdb2016)*), byte 12 = 1. The expired item is **not** removed in the login burst (`0x1801` 6.980, `0x1803`
+  11.171).
+- **Expiry**, in one 65 ms run:
+
+| Time | Stream | Packet |
+|---|---|---|
+| 66.104 | W00_WM#1–#4 | `0x0821` (`tm_min` 54 → 55, `tm_sec` 35): the WM's minute (first one at 6.103, before the map login) |
+| 66.124 | W00_CDB#6 | `0x3459 DESTROY_REQ {handle 8011, charNo 2, lock 0, flags 1, keys [120327209734897664]}` (+20 ms) |
+| 66.149 | W00_CDB#6 | `0x345A {ref, lock 0, err 0xB81}`; the pcapng comment "Boots deleted here" is on this frame (976) |
+| 66.169 | zone#1 | `0x3001 {0x241B, 0x241B, itemid 0xFFFF}`: cell 27 emptied |
+
+  No client text, no GameLog row, no `0x1C04` (the boots were not worn). This confirms Z09 §1.2 / §2.4: the
+  per-minute block runs when the WM's `0x0821` changes the minute, and `sp_ChargedItemLimitCheck` @ FUN_00451530 checks
+  the inventory. It confirms Z24 §6.7 and Z13 §2.7 too: `end.year ≠ 0` and `end < now` lead to `sp_ItemDelete`
+  @ FUN_00451090 → `sp_DestroyItem` @ FUN_00527870 → `0x3459`, and Z05 §6.4 clears the cell on the ACK. The prediction
+  of capture-scenarios §8.14 holds: the item went at the first per-minute check after the login, 59.1 s after the map
+  login (the WM's minute falls at :35 in this WM process, so the wait is at most 60 s), not in the login burst. Until
+  that check the expired item is in the inventory and usable *(inferred, not tried)*.
+- **`0x3459` from `sp_DestroyItem`.** The code writes `+8 flags` = key count 1 (bit 7 clear) and the key at payload +0x17
+  (buffer +0x19). It does not write payload bytes 9–22 (`00 00 14 00 00 00 00 15 00 00 00 00 16 00`, earlier `gpp`
+  contents), so P02-B30 is on the expiry path as well. Its overflow assert text reads
+  "sp_MakeItem : Packet Too Long" (copied from the creation function).
+
+### 21.3 X3: a stack over `MaxLot` (`s21d`)
+
+- **Setup.** `ItemInfo.shn` with `BestLowHpPotion` (3500) `MaxLot` 49 on the server and the client (`21-x3.ps1`). The
+  zones were restarted inside the capture (0–23 s, §17.4). Login: WM 23.6 s, `0x1801` 26.171. No refusal anywhere:
+  no SHN-checksum kick (both copies changed) and no item check at login.
+- **The stack.** Cell 27 (`0x241B`) = 3500, lot 50 (`0x102E` 26.240; `0x1047` 26.392 `1b24 ac0d 32`). It is loaded
+  over the limit as it is, and no `0x3001` touches cell 27 in the whole capture.
+
+| Time | Packet |
+|---|---|
+| 49.472 | `&makeitem BestLowHpPotion -l10` → `0x3401 ADMINCREATE` into cell 28 (`0x241C`, lot 10) → `0x3402` → GameLog `0x044F` → `0x3001 {0x241C, 3500, lot 10}` (a GM create takes an empty cell, §19.2) |
+| 53.395 | `0x3007 {0x241C, lot 10}` → `0x3C01` drop warning + `0x3008 {0x301}`; OK 54.598 → `0x3416 DROPALL` + `0x3001` emptied → `0x3417` → `0x0447` → `0x1C0A {10500, attr 8}` + second `0x3008 {0x301}` (§19.4) |
+| 55.966 | `0x3009 {10500}` → +9 ms `0x341C PICKALL {cell 0x241C, key …133824}` and `0x3001 {0x241C, 3500, lot 10}` → `0x341D` → `0x0446` → `0x300A {3500, 10, 0x341, 0xFFFF}` + `0x1805 {10500}` |
+
+- **Reading.** `so_ply_PickupItem` @ FUN_0052faf0 walks the unlocked inventory cells that hold the item
+  (`UnlockedInventoryIterator` over an `ItemBoxIterIdent`). It merges (`ii_PickMerge` → `0x341F`) only when
+  `cell.lot + picked ≤ ItemInfo.MaxLot` (an unsigned sum; the code has no "free = `MaxLot` − lot" term that could go
+  negative); otherwise it falls back to `ii_PickAll` into an empty cell. 50 + 10 = 60 > 49, so no merge and a new cell.
+  The X3 question (capture-scenarios §9.4, "open, no prediction") has this answer: an over-full stack is never a
+  pick-up target and stays at 50, and nothing at login or at the pick-up checks it. Z04 §3.3's "first stack with room"
+  means room for the **whole** picked lot (no partial merge) (§13).
+- **Not tried** (read only, Z04): the other `MaxLot` comparisons would treat the 50-stack differently: sell
+  (§2.4, `cell.lot > MaxLot` → `0x3005 {0x385}`), use (§6.1, `lot > MaxLot` → `0x702`), and a move onto it (§4.1,
+  `a + b > MaxLot` → `irm_Split_N_Merge(…, MaxLot − b)` with `MaxLot − b` = −1). §15 lists them for a later run.
+
+### 21.4 Opcodes
+
+| Dir | Opcode | Name | Seen | Size | Status | Notes |
+|---|---|---|---|---|---|---|
+| Z→CDB | 0x340A | NC_ITEMDB_BUYALL_REQ | 2 | 81 | confirmed | §7.6.1 layout; 13-byte boot attribute at `attr` 68 |
+| CDB→Z | 0x340C | NC_ITEMDB_BUYALLFAIL_ACK | 2 | 10 | confirmed | **first capture**: `{ref, error 0x206, lock}` (Z05 §2.1, D03 §2.1) |
+| S→C | 0x3004 | NC_ITEM_BUY_ACK | 2 | 2 | confirmed; **bug** | `0x206`, silent in the client (Z04-B6) |
+| Z→CDB | 0x3459 | NC_ITEMDB_DESTROY_REQ | 1 | 31 | confirmed; **bug** | the expiry path: 1 key, bytes 9–22 stale (P02-B30) |
+| CDB→Z | 0x345A | NC_ITEMDB_DESTROY_ACK | 1 | 10 | confirmed | `err 0xB81` |
+| S→C | 0x3001 | NC_ITEM_CELLCHANGE_CMD | 1 / 3 | 6 / 6, 7 | confirmed | `s21c` / `s21d`; expiry: `itemid 0xFFFF` after `0x345A` |
+| WM→Z | 0x0821 | NC_MISC_TIMEFROMWORLD_CMD | 8 (`s21c`) | 36 | confirmed | the minute change that triggers the expiry |
+| Z→CDB | 0x341C | NC_ITEMDB_PICKALL_REQ | 1 | 45 | confirmed | pick into a new cell beside the over-full stack |
+| S→C | 0x300A | NC_ITEM_PICK_ACK | 1 | 10 | confirmed | `{3500, 10, 0x341, 0xFFFF}` |
+
+The other types of the three runs (the login bursts, the zone start of `s21d`, drop and `&makeitem` in `s21d`) recur
+as in §5, §7, §17.4 and §19 with the same layouts.
+
 ## 11. Message order against README §2 and the pseudocode
 
-README §2 is a sketch of the login → WM → zone chain. Against the seven captures (details in the sections cited;
+README §2 is a sketch of the login → WM → zone chain. Against the thirteen captures (details in the sections cited;
 the rows from "Login links" on come from batch 2, the first capture of the server links; each row's order holds in
-every instance of both batch-2 captures):
+every instance of both batch-2 captures; the rows from "Character create" on come from batch 3, §16–§21, and hold in
+every instance of the six batch-3 captures):
 
 | Phase | README §2 / pseudocode | Captured | Status | Detail |
 |---|---|---|---|---|
@@ -1945,6 +2874,24 @@ every instance of both batch-2 captures):
 | Death and revive | Z03 §7.2; Z07 §3.1; Z01 §7.1 (same-zone branch) | death in the mob tick: GameLog `0x042B` + `0xC80A`, then (19 ms later, one frame) client `0x104D`, `0x2448 resthp 0`, `0x2402`, `0x240E hp 0`; revive `0x104E` → WM `0x180B`, GameLog `0x042D` (hunt-log flush in `so_Unmark` before its `REMOVE_REVIVE` case), `ws_save2DB(p, 0, 2)`, client `0x1C18` / `0x242A`, `0x104F` → client `0x1803` 158 ms later → full map-login burst (§5.1) and WM `0x180C`; no WM saves, no `0xC809` | **confirmed** | §9.5 |
 | Item transaction | Z05 §1.1 / §1.2; D03 §2–§5 | client request → CharDB request (lock index 0, 1, 2 … per player) → answer → GameLog log and, in one ms, the client cell changes + ACK (commit style 1); pick-up: `0x3001` with the request, `0x300A` after `0x341D` (style 2) | **confirmed** | §7.6.1 |
 | Periodic link traffic | W01 §2 / §8; D01 §4.2; Z09 §1.2 | WM → Login `0x0808` every 30.0 s; AccountLog `0x0809` on each minute change → WM `0xC811` + `0x080A` (same ms or one WM pass later, 0–15 ms); WM `0x0821` every 60 s (at :42) → each zone's per-minute block; zone `0x7495` per minute, `0x987A` / `0x987B` at :00 | **confirmed**; D01 §4.2 **corrected** (0x080A only as the answer to 0x0809) | §7.2, §7.5.3, §7.5.4 |
+| Character create | W01 §4.1; D02 §3 | `0x1401` → CharDB `0x1402` (14 ms) → `0x1405` (85–100 ms, `p_Char_Create`) → one WM pass → AccountDB `0x140D`, GameLog `0x0411` + `0xC804`, client `0x1406` in one ms (`fc_NC_AVATAR_CREATEDATASUC_ACK` @ FUN_004113c0 code order) | **confirmed**; P02-B24 (`sCharName` tail) | §16.1, §16.3, §18.1 |
+| Character delete | W01 §4.1; W03 §4.5; W04 §4.3 / §12.4; D02 §3.4; D05 §2.3 | `0x1407` → CharDB `0x1413` → `0x1414 {nGuildNo 0}` → `0x1408` → `0x140B` + the Character server's GameLog `0x0412` (same ms) → AccountDB `0x140E`, GameLog `0x0412` + `0xC805`, client `0x140C`, CharDB `0x9424`, every zone `0x10B2` (same ms) → `0x9425` 3 ms later | **confirmed** (W03 §4.5, W04 §4.3: `AvatarErase` @ FUN_004382d0); W01 §4.1 (0x1407 → 0x1408) **corrected**, W04 §12.4 **extended** (0x9425 on every delete) | §16.1 |
+| Back to the world list on the links | W01 §5.1; `login-server.md` §5.3 | `0x0C33` → Login `0x0C35` → `0x0C36 {0x1E58, hWM, sOTP}` → client `0x0C34` → client closes the WM connection → AccountDB `0x0C11`, AccountLog `0x0722` + `0xC803`, every zone `0x0C19` (same ms) → token login (batch-1 row above) with Login → WM `0x0C16` → every zone `0x0C16` | **confirmed**; P02-B5 also on the OTP path (other stale bytes) | §16.1 |
+| Login refusals | `login-server.md` §4 / §5.1; L00-B3; L01 world-status table | world closed: `0x0C0A` / `0x0C1C {0}`, select → `0x0C0C {0}` 17 ms; world full: select → AccountDB `0x0C10`, AccountLog `0x0721`, WM `0x0C0D` → `0x0C0E {ok 1}` → `0x0C0C {5, WM address, validate}`, no WM connection; blocked / not login-able: AccountDB `0x0C5C {nBlock 1}` / `{bLoginAble 0}` → client `0x0C09 {0x47}` / `{0x48}`, AccountLog `0x0720` + `0xC802`, no `0x0C5D` | **confirmed**; `login-server.md` §4 refusal body **contradicted** (P02-B23); L00-B3 captured; P02-B22 (first `0x0808 {0, 0}`) | §16.1, §16.3 |
+| WM start | W05 §1.2 / §1.3; W03 §9.1; W01 §2.1 | links to AccountLog, Account, Char, GameLog, Login within 3 ms, each `0x0801` → `0x0802` → `0x0803`; Login `0x0808 {0, 0}` in the handshake ms (P02-B22); CharDB start-up load in W03 §9.1 order, one request per answer, ended by the `0x9804` answer when `dAggregationDate` is 0 (no `0x9805` / `0x9806`); stop: the five FINs within 2 ms | **confirmed**; W05 §1.3 (end of the load) **corrected** | §17.2, §17.3, §17.5 |
+| Zone start | Z01 §3.3; Z09 §1.5; W05 §5.2; S02 §1.4 | per process 4 CharDB, 4 GameLog, 4 WM links; the WM refuses the 2nd and 4th WM link (P02-B25), the zone retries after 20.0 s; per accepted WM link `0x0801` → `0x0802` → `0x0803` → zone `0x180F` + `0xA419` (`0x7446`, `0xBCD5` once per process) → WM `0x0821`; WM → CharDB `0xA41A` once per WM start (32 ms after the first `0xA419`); later broadcasts on the last-registered link (186 / 188) | **confirmed** + Z01 §3.3 **extended**; W01 §7.1 / W02 §1.6 **corrected** (P02-B26); §7.5.1's broadcast-link inference settled | §17.4, §17.5 |
+| Entering sight | Z09 §9.6; Z02 §5.1 / §5.2 | inside `MapInfo.Sight` (1600 on RouN) the mover gets `0x1C06` + `0x1C19` for the other player, the other `0x1C06` + the mover's last `0x201A` + `0x1C19` 33 ms later from the same exchanger call; at a map login next to a player the one logging in gets `0x1C07` + `0x1C19`, the other `0x1C06` + `0x1C19` 14 ms later (`s21`); then the mover's `0x201A` / `0x2013` reach the other; a move naming an unknown handle → client `0x1C01` → appear packet + last move 3–20 ms later, the requester's `0x1C19` to the **other** player (Z02-B3) | **confirmed** | §18.2, §20.4 |
+| Chat: shout, whisper | Z02 §3.2; W04 §2.1 | shout `0x201E` → `0x201F` to the map including the shouter (a level-1 shout dropped silently); whisper `0x200C` → 11 ms → WM: receiver `0x200D`, sender `0x200F`, sender's zone `0x6006` on its broadcast link, one ms | **confirmed**; P02-B29 (stale flag bits) | §18.4 |
+| GM visibility | Z11 §3.1; Z01 §3.2 (`AxialListPacketBroadcast`) | `&hide`: GM `0x242A {288}`, the others `0x1805` (16 ms); `&show`: `0x2428` to both, the appear only after the **GM's** next move (`0x201A` → `0x1C01` → `0x1C06`); `&dimension n`: `0x1805` only where `l_Main` matches or is −1; an appear + delete pair per server step of every object near the GM (P02-B27) | **extended** (Z11 §3.1 holds for broadcasts only) | §18.6 |
+| Split, merge | Z04 §4.1 / §4.2; Z05 §4; D03 §3.3 | split `0x300D` → `0x3434` (10–17 ms) → `0x3435` + GameLog `0x0457` (same ms) → `0x3001` ×2 + `0x300E {0x441}` (style 1); merge `0x300B` → `0x342E` → `0x342F` + `0x0456` → `0x3001` ×2 + `0x300C {0x241}`; occupied target → `0x300E {0x446}` without a DB request | **confirmed**; Z04 §4.2 codes and 0x3434 offsets **corrected** | §19.3 |
+| Drop, pick-up | Z04 §3.1 / §3.3; Z05 §3.1; Z09 §11.4 | drop `0x3007` → menu `0x3C01` + `0x3008 {0x301}` → `0x3C02` → `0x3416` + `0x3001` (same ms, style 2) → `0x3417` → GameLog `0x0447`, `0x1C0A` to the others, then to the dropper with the second `0x3008 {0x301}`; part stack → `0x3008 {0x303}` (Z04-B4); pick onto a stack `0x341F` + `0x3001` + `0x3014` to the others (same ms) → `0x3420` → `0x300A`; pick into a new cell `0x341C` (as §7.6.1); owner-only time 19.9–19.95 s, then `0x1C0A attr 8` again | **confirmed**; Z05 §3.1 time unit **corrected** (0.1 s) | §19.4 |
+| Item use | Z04 §6.3; Z13 §8; Z05 §6.1; D03 §4 | `0x3015` → after the cast (34 ms) `0x343E` USELOT / `0x343F` USEALL + `0x301A` (same ms) → `0x3440` + GameLog `0x0459` / `0x045A` → `0x3016 {0x700}`, `0x3001`, `0x240E` together; full HP → `0x3016 {0x713}` without a DB request | **confirmed** | §19.6 |
+| Storage | Z04 §7.1 / §7.2; Z05 §7; D03 §5.1 | open → 4 × `0x3444` (one per CharDB link, all in one ms, 3 ms after `0x201D`) → each `0x3446` → its `0x3C08` as it arrives (no `0x3028`); deposit `0x301C` → `0x345F` → GameLog `0x045E` + `0x3460` (same ms) → `0x1033`, `0x301D {balance after}`; withdraw `0x301E` → `0x3461` → `0x045F` + `0x3462` → `0x1033`, `0x301F` | **confirmed**; D03 §5.1 (0x045E field order) **corrected** | §20.1 |
+| Sell, buy back | Z04 §2.4 / §2.5; Z05 §2.2; D03 §2.2 | `0x3006` → `0x3425` SELLLOT / `0x3422` SELLALL → `0x3426` / `0x3423` + GameLog `0x0449` + `0xC80E` (same ms) → `0x1033`, `0x3001`, `0x305C`, `0x3005 {0x381}`; buy back `0x3059` → `0x34BB` → GameLog `0x07FD` + `0x34BC` + `0xC815` (same ms) → `0x1033`, `0x3001` (first cell of the item with room), `0x305D`, `0x305A {0x3668}`; with another NPC's role current → `0x305A {0x3671}` without a DB request (P02-B31) | **confirmed**; Z04 §2.5 vt 0xe6c **settled** | §20.2 |
+| Soul stones | Z04 §13.1 / §13.2; Z05 §2.4; D03 §2.4 | `0x5001` / `0x5002` → `0x3441` → `0x3442` → `0x1033`, `0x5003` / `0x5004`, `0x3004 {0x201}` (same ms), no GameLog row; use `0x5007` → `0x5008` + `0x500B` to the others (same ms) → `0x240E` 48 ms later (SP: `0x5009` → `0x500A` + `0x500C` → `0x240F`) | **confirmed**; D03 §2.4 ("the zone logs 0x0458") **contradicted** | §20.3 |
+| World announcements | W01 §7.6; W04 §2.4 / §6.2; Z11 §7.3 | `&levelup` past level 20: zone `0x6401` → WM `0x6402` to every client 88 ms later (Z11-B30); zone `0x207D` → WM `0x2079` unchanged 6 ms later (Z09-B72); title marks CharDB `0x6005` + client `0x6004` before the level's `0x240C`; KQ skip at hh:mm:00: `0x5811` per zone, `0x5825` per client, then `0x581E` one client per second | **confirmed** | §20.4 |
+| Failed purchase (S16) | Z05 §2.1; D03 §1.2 / §2.1 | `0x3003` → `0x340A` → 11–35 ms → `0x340C {0x206}` → client `0x3004 {0x206}` in the same ms; no `0x3001`, `0x1033` or GameLog row; the cen comes back (next login's balance) | **confirmed**; Z04-B6 **extended** (0x206 / 0x208 silent) | §21.1 |
+| Item expiry (S13) | Z09 §1.2 / §2.4; Z24 §6.7; Z13 §2.7; Z05 §6.4 | not in the login burst; WM `0x0821` (the WM's minute falls at :35 in `s21b` / `s21c`, at :42 in batch 2) → 20 ms → CharDB `0x3459 {flags 1, key}` → `0x345A {0xB81}` → client `0x3001` (cell emptied), no text, no GameLog row | **confirmed**; P02-B30 on this path | §21.2 |
 
 Pseudocode orders the captures confirm in full: Z01 §6 (`sp_NC_MAP_LOGINCOMPLETE_CMD` burst), W01 §7.3 and W04 §17.5
 (`fc_NC_MAP_LINKEND_CMD`, incl. the zone round trip `0x1120` that grants abstate 728 one tick after the burst, §5.1),
@@ -1952,8 +2899,12 @@ W05 §2.2 (0x0849 once per character, on the full minute), Z09 §2.4 (per-minute
 enter / leave at `MapInfo.Sight`), Z02 §5 (`ResendLastMove` after 0x1C08). Batch 2 adds `login-server.md` §4 / §5
 (link round trips), D02 §4 (character load), Z01 §5.2 / §5.3 / §7.1 (hand-over, both `so_LinkTo` branches), D02 §6
 (save headers and ACKs), Z03 §3 / §7.2 / §8 (swing, death, kill, level-up), Z05 §1 (both commit styles), Z07 §3.1
-(revive) and Z12 §7 (level-up tail). The corrected orders are W01 §7.2 (hand-over) and Z01 §8.4 (WM save list), both
-in §13.
+(revive) and Z12 §7 (level-up tail). Batch 3 adds W01 §4.1 / W03 §4.5 / W04 §4.3 (character create and delete), W05
+§1.2 / §1.3 and W03 §9.1 (WM start, stop, CharDB load), Z01 §3.3 and Z09 §1.5 (zone link set, registration,
+reconnect), Z09 §9.6 and Z02 §5.1 (sight entry, `0x1C01`), Z02 §3.2 and W04 §2.1 (shout, whisper), Z05 §3 / §4 / §6
+(drop, pick-up, split, merge, use), Z04 §7 / §13 (storage, soul stones), D03 §2.2 (sell, buy back) and Z09 §2.4 /
+Z24 §6.7 (expiry at the first minute). The corrected orders are W01 §7.2 (hand-over), Z01 §8.4 (WM save list), W01
+§4.1 (0x1407 asks the guild first) and W05 §1.3 (end of the CharDB load), all in §13.
 
 ## 12. Original-server bugs
 
@@ -1985,6 +2936,14 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B22 | WM `CWMLoginSession::SendUserCount` @ FUN_00438d10, forced by the Login-link handshake (W01 §2.1) | the first `0x0808` after a WM start carries `MaxOfUser` = the client capacity `DAT_00556bb8`, still 0 because the client listener opens only after the four DB links (cause *inferred*; `{0, 0}` captured at both starts, §16.3) | Login sets the world to `WMSUS_FULL` and pushes the list: for up to 30 s after every WM start world selects get "Server is full" (after L00-B3's AccountDB / AccountLog / WM side effects) | send the first count once the client listener is open, or skip a count with `MaxOfUser 0` |
 | P02-B23 | Login `fc_NC_USER_WORLDSELECT_REQ` @ FUN_00406970 (refusal branch) | sends the 0x55-byte stack `PROTO_NC_USER_WORLDSELECT_ACK` with only status, `wm_ip` and `wm_port` written; `validate_new[32]` is never initialised (§16.3) | 64 bytes of Login stack (pointers, string pieces) reach the client with every refused world select; the client ignores them | zero the struct before `GetWorldManagerConnectInfo` |
 | P02-B24 | WM `fc_NC_AVATAR_CREATEDATASUC_ACK` @ FUN_004113c0 → AccountDB 0x140D | `sCharName` is `char[40]` *(pdb2016)*; the WM writes 20 name bytes and one zero byte, bytes +0x1E..+0x30 are stack residue (§16.3) | 19 stale WM bytes per character creation on the AccountDB link; the Account server drops 0x140D unread, so no effect | copy the name into a zeroed 40-byte field |
+| P02-B25 | shared `CSocket_Acceptor::SetAccepted` @ FUN_00463c40 (S02 §1.4), WM zone listener; the same class serves the WM client listener and Login / Zone (S02 §1.9) | refuses and closes a socket while another one from the same IPv4 address waits in the accepted ring; the ring is drained once per main pass (§17.4) | every zone start loses its 2nd and 4th WM link (8 of 16 in both captures) and reconnects them 26–29 s later, half again refused, 20 s more; a zone runs ≈ 30 s on 2 links and ≈ 50 s until it has 4; two clients behind one NAT address that connect within one pass lose the second connection | exempt server listeners, or compare address and port, or drain the ring in the accept thread |
+| P02-B26 | WM `CWMZoneSessionManager::SetServiceMapZoneNo` @ FUN_004391d0 (zone 0x180F, W01 §7.1 `Zones_AddMap`) | a new map entry stores `Vaild`, name, `ZoneNo` and `CanParty` but not `IsReleaseMap`; only the update path (a second registration of the same map) stores all three (§17.4) | masked: every zone registers its maps on each link that registers (2–4 times), so the flag is set one 0x180F later; a zone left with a single WM link would keep `IsPartyReleaseMap` 0 for all its maps (no leave-party on entering `Job*_Dn*`, `Wedding`, `Rou00`… after a fresh WM start) | store `IsReleaseMap` in the new-entry path too |
+| P02-B27 | zone `AmpersandCommand::ac_Dimension` @ FUN_0041a5a0 (Z11 §3.1) with the sight workers `AxialListBriefExchangerAtMove::ali_Work` @ FUN_004bdde0 / `AxialListBriefDeleteAtMove::ali_Work` @ FUN_004bdfe0 (Z09 §9.6) | `&dimension n` writes only `so_layer.layer→l_Main`; `so_AllOfRangeNomal` @ FUN_0054c900 still selects the GM by the unchanged `LayerRegistInfo`, while `so_DistanceSquar` @ FUN_004028f0 returns 999 999 999 across `l_Main` values, so both workers fire on every step (§18.6) | while a GM is in another dimension, every server step of a player or mob within sight sends an appear packet (+ last move + abstates) and a 0x1C0E both ways: 374 KB to the GM in 20 s near a mob group, 136 appear / delete pairs to the other player | set the slanted-list layer as well (or test `l_Main` in the range query), and re-enter the map (`so_ExchageBriefInfo`) after the change |
+| P02-B28 | WM `CParserClient::fc_NC_CHAR_LOGIN_REQ` @ FUN_00422be0 → client 0x1110 (W01 §4.2) | `CSendPacket::ID(&p, 0x1110, 1, NULL)` declares a 1-byte payload and writes none (§18.7) | one stale WM byte (0xD5) in every tutorial popup; the client reads no payload | payload size 0 (PROTO struct empty), as P02-B2 |
+| P02-B29 | zone `ShineMobileObject::so_Shout` @ FUN_00459080 → 0x201F (Z02 §3.2); WM whisper 0x200D (W04 §2.1) | `smo_Shout` writes only bits 0 / 1 of `flag`; bits 2–7 keep the shared buffer `gpp` byte (0x78, 0x74 captured). The WM's 0x200D flag has bits 1–7 from the stack (0x54, 0x04; W04 states it without an ID) (§18.4) | stale bits on the wire; both clients test only bits 0 / 1, so no visible effect | write the whole byte (`flag = GMColor + (isMob << 1)`) |
+| P02-B30 | zone ITEMDB requests: `ac_ClearInventory` @ FUN_0041bbd0 and the `sp_DestroyItem` family (Z18 §4.4; `sp_DestroyItem` @ FUN_00527870 itself on the per-minute expiry, §21.2) → 0x3459; `sp_NC_ITEM_SPLIT_REQ` @ FUN_00539a40 → 0x3434; `ItemInventory_ii_DropAll` @ FUN_00529a70 → 0x3416 | 0x3459 without bit 7 leaves payload +9…+22 (`itemID`, `key`, `attrOffset`, `inven`) unwritten; 0x3434 leaves `lotcreate.attr` (+62) unwritten; 0x3416 copies the cell's whole 101-byte attribute union, of which a lot item uses 1 byte (§19.2–§19.4, §21.2) | earlier `gpp` contents (text of other packets) and zone heap bytes reach the Character DB on every `&cleariv` / destroy / expiry / split / drop and come back in 0x3417; the Character server reads only the valid parts *(inferred from D03 §3.3 / §3.4 and Z18 §4.4)* | zero the fields (or the send buffer) before filling; copy only the class's attribute length |
+| P02-B31 | zone `ShinePlayer::InteractWithNPC` @ FUN_004c4660 (Z02 §6.2) with `sp_NC_ITEM_REPURCHASE_REQ` @ FUN_00538580 / `so_ply_CanItemRepurchase` @ FUN_005379f0 | clicking another NPC while a shop is open replaces `sp_NPCProcess.npc` without `sp_EndOfTrade`; when the new role cannot open (`NPCRole_MenuOpen` with menu bit 0 still set by the shop) nothing is sent, so the client keeps the shop window; every buy-back then fails `so_ply_CanItemRepurchase` and gets `0x305A {0x3671}`, a code the client shows no text for (§20.2) | the player cannot buy back (19 silent refusals in `s21` after an Anvil click next to the Blacksmith) | end the old trade (or refuse the click) before replacing the NPC, and answer a refused buy-back with a code the client shows |
+| P02-B32 | zone `ShinePlayer::so_ply_SellItemList_Insert` @ FUN_00537a20 with `CSellItemManager::simg_Insert` @ FUN_0050e360 (found in the batch-3 review) | the sold item enters the buy-back list first; `0x305D` (the entry `simg_Insert` evicted from a full list, handle in its out-parameter) and `0x305C` (the new entry) both go only when `so_ply_CanItemRepurchase` (vt 0xe6c) holds, so a sale at a merchant without buy-back (SoulStone / Skill / WeaponTitle / Guild) changes the server's list silently (§20.2; read, not captured) | the client keeps a buy-back entry whose handle the server has reused or dropped; a later buy-back of it at a Weapon / Item merchant names the wrong item or none *(inferred)* | send `0x305D` whenever an entry is evicted, or insert into the list only where buy-back is allowed |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -2003,13 +2962,30 @@ Other items' bugs the captures show on the wire (no new ID; owner's register ent
 | D02-B13 | 0x109A `Error 0x1200` in both captures (never written) | §7.6.1 |
 | L00-B3 | `s37` 805.9 s: 0x0C10, 0x0721, 0x0C0D and the WM's `0x0C0E ok 1` before `0x0C0C {5}`; the client does not connect | §16.1 |
 | P02-B5 | `s37`: the OTP path (0x0C37) leaves other stale header bytes than the password path | §16.1 |
+| Z01-B2 | 0x0802 `echo_data` of the zones: 17 different values over 48 links, the WM's own 0x0802 carry 0 | §17.2 |
+| Z30-B8 | 0x7446 payload byte 0x11 in all 8 = the preceding 0xA419 `nMapCount` (17) left in `gpp` | §17.4 |
+| Z09-B72 | 0x207D `sScriptMsgIndex` "E_Olympic_A04" + 18 heap bytes, different per start | §17.4 |
+| W04-B43 | WM → CharDB 0xA41A once per WM start, no answer | §17.4 |
+| Z02-B3 | `s14` 416.929 / 493.861: after a player's 0x1C01 for the other player, the requester's 0x1C19 goes to the other player; the requester gets none | §18.2 |
+| W04 (0x200D flag, no ID) | bits 1–7 stale (0x54 / 0x04), joined into P02-B29 | §18.4 |
+| D03-B11 | `s21`: 0x0447 and 0x0456 map "Need", x / y 0 (the split log 0x0457 carries the real map) | §19.3, §19.4 |
+| D03-B6 | `s21`: 0x3439 = ref + one unwritten byte (`0x10`) | §19.2 |
+| Z04-B4 | `s21` 447.1: a part-stack drop answers `0x3008 {0x303}` without a menu | §19.4 |
+| Z11-B12 | `s21`: 3 `&makeitem` with a full inventory send nothing and show nothing | §19.2 |
+| Z11-B32 | `s21` 142.9: `&getmoney` → `0x300A {itemid 0, lot 0, 0x341}` (nothing picked since login) | §19.2 |
+| Z11-B30 | `s21` 135.642: `&levelup 25` of a GM passes level 20 and sends the world announcement 0x6401 → 0x6402 to every client | §20.4 |
+| Z09-B72 | `s21` 146.087: the WM relays 0x207D unchanged as 0x2079 to both clients, the 18 stale bytes included | §20.4 |
+| P02-B16 | `s21`: every 0x305C carries the bytes of the 0x3001 and the 0x3425 built just before in `gpp`, then older text | §20.2 |
+| Z04-B6 | `s21b` 17.213 / 22.337: `0x3004 {0x206}` (BUYALL DB error) shows no text: 0x206 is the switch's default case in `On_NC_ITEM_BUY_ACK`; 0x208 (BUYLOT DB error) is silent the same way (not in Z04-B6's list) | §21.1 |
 
 ## 13. Discrepancies per work item
 
 Every owner below is `**State:** done`; nobody reopens them. The full rows (old statement, correction, evidence) are in
-`docs/knowledge/P02.md` "Corrections"; X01 (contradictions register, plan "Corrections between items") collects them.
-X01 is done since batch 2: rows marked "batch-3 follow-up" wait for the follow-up item the batch-3 sweep (part 22)
-creates for the README register.
+`docs/knowledge/P02.md` "Corrections"; X01 (contradictions register, plan "Corrections between items") collected
+them, but X01 (done) integrated only batch 1 into `docs/pseudocode/README.md` §5 / §6. **X04** (added by P02, batch-3
+sweep, `docs/plan/items/X04.md`) carries every row marked "→ X01" that README §5 does not hold yet and every row marked
+"→ X04" into the README. Rows owned by X02 (done) go to **X05** (added by P02, X02's recurring re-run:
+`docs/plan/items/X05.md`).
 
 | Owner | Where | Discrepancy | Status |
 |---|---|---|---|
@@ -2065,13 +3041,37 @@ creates for the README register.
 | Z02 | `Z02-actions.md` §3.1 (`FUN_005cc2a0` "event 0x29, inferred: achievement/stat hook") | resets title 41 `ID_NOCHATTING_COUNT` (captured: 76 → 0 after a chat, §10.3); 0x2a of the shout = 42 `ID_BROADCAST_COUNT` *(inferred)* | corrected (inferred → captured) → X01 |
 | Z12 | `Z12-stats.md` N ("who sends 0x4025 in the client was not traced") | the 2016 client's `On_NC_BAT_LEVELUP_CMD` @ FUN_004aa3d0 sends `{1}` when the inventory holds a Mystery Vault (§10.6) | open item answered → X01 |
 | P01 | `pcap_decode.py` with the annotations | `SHINE_COORD_TYPE`, `ABNORMAL_STATE_BIT`, `STRUCT_QSC` had no struct entry (Z09 / Z13 / Z08 annotations decoded them as 1 byte or fell back to pdb2016) | fixed by P02 (part 13, P02.json `structs`) |
-| L00 | `login-server.md` §4 (0x0C0B: "Send 0x0C0C { status, zeros… }, only status filled") | the refusal also carries `wm_ip` / `wm_port` from `ServerInfo.txt` and 64 uninitialised bytes (P02-B23, batch 3, §16.3); L01's `GetWorldManagerConnectInfo` block is right | contradicted → batch-3 follow-up (part 22) |
-| L01 | `L01-process.md` world-status table (6 = "WM connected") | the WM's first 0x0808 in the handshake ms is `{0, 0}`: the world turns 5 (full) at once and stays so until the next 0x0808 30 s later (P02-B22, §16.3) | extended → batch-3 follow-up |
-| L01 | `L01-B11` (Login heartbeat before the login request) | not reachable with the 2016 client: it opens the Login connection only on submit and polls 0x0C1B every 10 s (§16.2) | reach limited (captured) → batch-3 follow-up |
-| D01 | `D01-account.md` §4.1 (0x0720: "failed logins store the typed password") | the stored 16 characters are the first half of the client's MD5 hex string (`0x0C5C sPassword`), not the typed password (§16.3) | corrected → batch-3 follow-up |
-| W01 | `W01-core.md` §4.1 (0x1407 → 0x1408; 0x1405's "u8 ?") | 0x1407 sends 0x1413 (W03 §4.5 already says so; captured); the byte is `numofavatar` (1) | confirmed W03 → batch-3 follow-up |
-| W04 | `W04-social-misc.md` §12.4 (0x9425 "asked by OPTool 0x281F") | every character delete asks it too (`AvatarErase` from CharDB 0x140B, §16.1) | extended → batch-3 follow-up |
-| X02 | `capture-scenarios.md` §3.37 step 1 / prediction (1) | the login screen holds no connection, so a 70 s idle there tests nothing (§16.2) | reach limited → batch-3 follow-up |
+| L00 | `login-server.md` §4 (0x0C0B: "Send 0x0C0C { status, zeros… }, only status filled") | the refusal also carries `wm_ip` / `wm_port` from `ServerInfo.txt` and 64 uninitialised bytes (P02-B23, batch 3, §16.3); L01's `GetWorldManagerConnectInfo` block is right | contradicted → X04 |
+| L01 | `L01-process.md` world-status table (6 = "WM connected") | the WM's first 0x0808 in the handshake ms is `{0, 0}`: the world turns 5 (full) at once and stays so until the next 0x0808 30 s later (P02-B22, §16.3) | extended → X04 |
+| L01 | `L01-B11` (Login heartbeat before the login request) | not reachable with the 2016 client: it opens the Login connection only on submit and polls 0x0C1B every 10 s (§16.2) | reach limited (captured) → X04 |
+| D01 | `D01-account.md` §4.1 (0x0720: "failed logins store the typed password") | the stored 16 characters are the first half of the client's MD5 hex string (`0x0C5C sPassword`), not the typed password (§16.3) | corrected → X04 |
+| W01 | `W01-core.md` §4.1 (0x1407 → 0x1408; 0x1405's "u8 ?") | 0x1407 sends 0x1413 (W03 §4.5 already says so; captured); the byte is `numofavatar` (1) | confirmed W03 → X04 |
+| W04 | `W04-social-misc.md` §12.4 (0x9425 "asked by OPTool 0x281F") | every character delete asks it too (`AvatarErase` from CharDB 0x140B, §16.1) | extended → X04 |
+| X02 | `capture-scenarios.md` §3.37 step 1 / prediction (1) | the login screen holds no connection, so a 70 s idle there tests nothing (§16.2) | reach limited → X05 |
+| W05 | `W05-process.md` §1.3 ("the last answer 0x9806 sets state 1") | 0x9805 / 0x9806 run only on the rank-balance path; with `dAggregationDate` 0 (or a balance not due) the 0x9804 handler sets the CharDB link to state 1 (FUN_0040ccc0 / FUN_00441aa0, §17.3) | extended → X04 |
+| W01 / W02 | `W01-core.md` §7.1 (0x180F `g_Zones.AddMap(map, zone, a, b)`), `W02-party-raid.md` §1.6 | a new map entry does not get `IsPartyReleaseMap`; only a re-registration stores it (P02-B26, §17.4) | corrected → X04 |
+| Z01 | `Z01-core.md` §3.3 (0x0803 → 0x180F, 0xA419, 0x7446) | 0x180F / 0xA419 go out on every registering link; 0x7446 once per process (guard `gz_IsSendReq`, Z30's annotation) (§17.4) | extended → X04 |
+| Z09 | `Z09-world.md` §1.5 (`reconnectAt = g_Now + pool.reconnectSeconds · 10`) | the values: WM 20 s, GameDB 20 s, GameLog 600 s (`dynamic_initializer_for_'sock2gameDB'` @ FUN_0069afc0 and neighbours); captured 20.0 s; `sb_Routine` returns at the first entry not yet due (§17.4) | extended → X04 |
+| S02 | `S02-library.md` §1.4 per-IP admission rule ("several zones started together … lose all but the first", *inferred*) | confirmed per zone: of 4 links opened within 2 ms the 1st and 3rd survive; tagged P02-B25 (§17.4) | confirmed + bug ID → X04 |
+| Z11 / Z09 | `Z11-gm-commands.md` §3.1 `&dimension` ("objects of another main layer do not see each other" *(inferred)*), `Z09-world.md` §9.6 (the at-move workers' `dist²` test) | true for broadcasts (`AxialListPacketBroadcast`'s `l_Main` test; −1 = hears every layer); the at-move workers use `so_DistanceSquar`, which is 999 999 999 across `l_Main`, while the range query ignores `l_Main`: appear + delete on every step (P02-B27, §18.6) | extended → X04 |
+| Z11 | `Z11-gm-commands.md` §3.1 `&show` ("the others see the GM again on their next sight exchange" *(inferred)*) | they see the GM after the **GM's** next move: its `0x201A` makes their client ask with `0x1C01`; their own steps do nothing (the exchanger skips objects already within range); `&hide`'s inform is the `0x242A` NOEFFECT form (§18.6) | extended → X04 |
+| W01 | `W01-core.md` §4.2 (0x1001: "send 0x1110 (empty)") | 0x1110 carries one unwritten byte (P02-B28, §18.7) | corrected → X04 |
+| Z13 | `Z13-objects.md` §1.6 (0x3467 `u16 attrLen`) | the u16 at +0x2C is the constant 0x2E (payload offset of the attribute block), not a length; D03 §7.1 `attr16` is right (§18.7) | corrected → X04 |
+| Z02 | `Z02-actions.md` §3.2 (0x201F `flag = GMColor (bit 0), isMob (bit 1) = 0`) | bits 2–7 are not written (stale `gpp` byte, P02-B29) (§18.4) | extended → X04 |
+| X02 | `capture-scenarios.md` §3.14 steps (2), (4), (6) and the `s14` notes | no walk and no sit on the wire (only runs and `stand`); the "name not online" whisper went to X14B with the text `X14Nobody` (0x200E not reached); the shout was never out of sight; notes "B saw A after B stepped" for `&show` and `&dimension 0` disagree with the wire (A's step for `&show`; no appear for `&dimension 0`) (§18.3, §18.4, §18.6) | reach limited → X05 |
+| Z04 | `Z04-items.md` §4.2 (0x300D: "to cell not empty: 0x44c", "Invalid 'to' cell: 0x446"; 0x3434 "+0x42 u32 lot, +0x44 oldLot, 0x46 bytes") | occupied target → `0x446` (zone 0x53a047), invalid from / to → `0x445`; `splitlot` u16 @64, `MainLot` @66, 68 bytes (§19.3) | corrected → X04 |
+| Z04 | `Z04-items.md` §6.3 (0x343E `+0x12 attrLen`) | payload offset of the attribute (20) (§19.6) | corrected → X04 |
+| Z04 | `Z04-items.md` §3.3 (client 0x300A, inventory full `0x34a`/`0x346` *(inferred)*) | `0x346` "Inventory is full."; `0x34A` = KQ pick-up limit (§19.4) | extended → X04 |
+| Z05 | `Z05-itemdb.md` §3.1 (owner-only time "looting / 100 s", "g_Now is in seconds") | 20000 → 19.95 s: `g_Now` counts 0.1 s, as Z09 §11.4 says (§19.4) | corrected → X04 |
+| Z11 | `Z11-gm-commands.md` §7.4 (`&getmoney`: item id 0 *(inferred)*) | captured `0x300A {0, 0, 0x341}` (§19.2) | confirmed |
+| X02 | `tools/capture/21` outputs of `s21` (snapshot / prep) | they list Test1235 (`nCharNo` 2), not the scenario's Test2: no D03 check (§19.8) | contradicted → X05 |
+| Z04 | `Z04-items.md` §2.5 (0x3059: "`p.vt[0xe6c]()` (repurchase allowed, inferred) → 0x3671"; client 0x305A "otherwise Inventory is full.") | vt 0xe6c = `so_ply_CanItemRepurchase` @ FUN_005379f0: the current NPC is a Merchant with `RoleArg0` "Item" or "Weapon" (`nrb_CanItemRepurchase` @ FUN_004c7690); the client shows only `0x366B` / `0x366C` / `0x366D` ("Inventory is full."), every other code is silent (Z05 §2.2's table is right) (§20.2) | corrected → X04 |
+| D03 | `D03-character-items.md` §2.4 ("No GameLog entry is written (the zone logs `0x0458 SOULSTONEBUY`)") | nobody logs a soul-stone purchase: no 0x0458 on the wire, and D05 finds no 2016 sender (§20.3) | contradicted → X04 |
+| D03 | `D03-character-items.md` §5.1 (Log 0x045E / 0x045F `{ nUserNo, charNo, money, storageMoney }`) | `{chrregnum u32, money u32, userregnum u32, storage balance u64}` = D05's row (§20.1) | corrected → X04 |
+| X02 | `s21` notes, step 9 ("sold all 4 potions individually", "bought back 1 potion and used it", "could not buy back stack of 3 (bug?)") | 5 sales (one from cell 0) and 2 single buy-backs before the use; the stack failed because of an Anvil click with the shop open (P02-B31), not because it was a stack (§20.2) | contradicted → X05 |
+| Z04 | `Z04-items.md` §2.1 (client `0x3004`: "other codes (0x203, 0x204, 0x20e, 0x210) are silent", Z04-B6) | 0x206 and 0x208, the Character server's DB-error codes of BUYALL / BUYLOT (D03 §2.1), are silent too (the switch's default); captured for 0x206 (§21.1) | extended → X04 |
+| Z04 | `Z04-items.md` §3.3 (`so_ply_PickupItem`: "IsLot → first stack with room") | room = `cell.lot + picked ≤ MaxLot` for the whole picked lot (no partial merge); a stack over `MaxLot` is never a target, and nothing checks it at login (§21.3) | extended → X04 |
+| X02 | `capture-scenarios.md` §8.14 / §8.17 / §9.4 and the `tools/capture/21` S13 / S16 scripts | the runs used Test1235 (`nCharNo` 2) although the scripts name Test2; §8.14 confirmed (expiry at the first minute after login); §8.17 confirmed for item and cen, fame / coins untested (a cen-only item); §9.4's open X3 question answered: no check, no merge, a new cell (§21) | confirmed / extended → X05 |
 
 In batch 1 (§3–§6) no discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held (batch 2's rows for Z03, Z09, Z12, Z13 and W03 are above). Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
 timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
@@ -2088,7 +3088,7 @@ conditions), D02 §6 (12-byte save headers, ACKs only for 0x4001 / 0x4007, 0x401
 §3.1 / §6.2 / §6.3, Z15 §3.3 / §3.4 (SAY with the clicked NPC), Z12 §5.2 (0xBC05 cap), Z13 §8.2 / §8.3 / §8.6 / §8.7 /
 §8.10 (summon order, hunger, speed formula, 0x1C1A), Z09 §5.4 (10-s corpse) and D05's GameLog layouts (0x040A, 0x040F,
 0x0410, 0xC806, 0xC809). The sweep (part 14) confirms Z02 §6.4 (the client's `0x200B` in the tick of `0x304D` runs `sp_EndOfTrade`,
-which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level).
+which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second). Part 21 (§21) confirms D03 §1.2 / §2.1 (`ItemBuy_Create`'s attribute branch: item deleted, cen refunded, `0x340C {0x206}`), Z05 §2.1 (`0x340C` → `0x3004 {error}`) and §6.4 (`0x345A` → `0x3001` emptied), Z09 §1.2 / §2.4 (the per-minute block on the WM's `0x0821`), Z24 §6.7 / Z13 §2.7 (`sp_ChargedItemLimitCheck` → `sp_ItemDelete` → `sp_DestroyItem`, not at login), D03 §1.3 (boot option rows 800–803 / 820–822, `deletetime` at attribute +7) and the capture-scenarios predictions §8.14 (S13) and §8.17 (S16, its cen half).
 
 ## 14. Not reconstructed / uncertain
 
@@ -2158,21 +3158,56 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
 - **Quest SAY bytes** `Data+0xC = 7`, `+0x10 = 1` (§10.5): not identified (Z15-B11 says they are leftovers of earlier
   commands of the script).
 - **`hpchangeorder` steps** (§9.1): the counter advances by 2–3 per hit; the extra reads were not traced.
-- **Not captured at all**: party / PvP / guild-war deaths (0x0429, 0x244A WM, 0x2411 exp loss), skill failure and
-  cast abort, bystander packets (0x2449, 0x240D, 0x244F, 0x500B), chat (other than `&adminlevel`), trade, booths, every item failure path
-  (batch 2 has only successful item transactions, §8), party,
-  guild, KQ, failure paths (0x0C15, 0x1002, 0x1804, 0x0C66, …; lists in §3.2, §4.2, §5.2). Statuses there stay
-  **never seen** until X02's scenarios are recorded.
+- **Not captured at all** (after batch 3): party / PvP / guild-war deaths (0x0429, 0x244A WM, 0x2411 exp loss), skill
+  failure and cast abort, trade, booths, party, guild, KQ joins (batch 3 has only the WM's minute skips 0x5811 / 0x5825 /
+  0x581E, §20.4), most item failure paths (batch 3 has 0x300E {0x446}, 0x3008 {0x303}, 0x3016 {0x713}, 0x3013 {0x2C2},
+  0x305A {0x3671}, 0x340C, §19–§21; the others are in the §15 X05 rows), other failure paths (0x0C15, 0x1002, 0x1804,
+  0x0C66, …; lists in §3.2, §4.2, §5.2). Batch 3 captured the bystander packets (0x2449, 0x244F, 0x240D, 0x500B /
+  0x500C: §18.5, §20.3, §20.4) and chat (shout, whisper: §18.4). The statuses of the rest stay **never seen** until
+  X05's scenarios are recorded.
 - Batch 3, login side (§16): the cause of P02-B22 (client capacity 0 until the client listener opens) is inferred
   from `BootstrapTick`'s order, not from a writer of `DAT_00556bb8`; `closeReason 0x780` on the 0x0C33 path (no
   handler on it sets the field) is taken to be the value left from before *(inferred)*.
+- Batch 3, server start (§17): why the first WM start of `s37` stopped 1.09 s after its CharDB load (listener failure
+  or an operator stop, §17.6) needs the WM's `Msg` log of 729–731 s; the 6–9 s between a zone's link handshakes and its
+  first main-loop pass (from the first-retry delay) is *inferred* (data loading), not read; that a WM restart under
+  running zones brings no new 0x7446 is read from the guard, not captured; zone 3's 255 maps were not checked against
+  `World/Field.txt` (the count is the zone's `FieldMap` list, `fc_MapRegist` has no cap).
+- Batch 3, second client (§18): the notes say B saw A again after B stepped (after `&dimension 0`), but B received
+  no appear packet for A until A's `&linkto`. Either the client builds an object from the stray `0x1C19` (Z02-B3) or
+  the tester saw something else; the client's 0x1C19 handler FUN_004a5560 was not read for unknown handles. Why
+  each step yields exactly three appear / delete pairs (`mm_Step` sub-steps per tick) is *inferred*. Which field
+  makes `vt 0xef4` (zone GM colour) and the WM's `bIsGM` 0 for an admin-level-100 character (an account flag, not
+  `nAdminLevel`, *inferred*) was not traced. The mushroom house's attribute `ffecbb76` (0x3449 at the first
+  per-minute block) was not decoded. `g_ShoutLevel` is bounded only (1 ≤ value < 120).
+- Batch 3, items I (§19): B's refused pick-up attempt sent no 0x3009, so the client checks the pick right itself;
+  its drop object (`FUN_00610fc0`, built by the 0x1C0A handler FUN_00499900) was not read. The 0x3014 text condition
+  (picker in the client's expedition list, FUN_006f7e30) is read from the call only. Which of drop, pick-merge, drop
+  and destroy menu took the lock indices 14–16 was not traced (one of the four took none). The SQL snapshots of `s21`
+  are of another character (§19.8): the D03 side of scenario 21 is checked only on the wire.
+- Batch 3, items II (§20): that freed repurchase handles are not reused at once is read from the wire only (the
+  `CSellItemManager` allocator, vt +8 / +0x18 of its pool, was not read; `simg_Initialize` @ FUN_0050e1b0 caps a stored
+  list at 42). That a sale at a non-Item / Weapon merchant enters the list without 0x305C is read, not captured. The
+  client's refusal of an HP stone at full HP (no 0x5007) was not read in the client. `hp.maxnum 100` / `sp.maxnum 114`
+  were not checked against the class table row of level 33 (Z02 §6.5 formula with the factor 1000 assumed). Why the
+  KQs skipped at each minute were scheduled then (KQ data) was not checked; `nrb_ItemSellPrice` of a non-Merchant role
+  (what a sale from the open shop window does after the Anvil click) was not read.
+- Batch 3, items III (§21): the cen refund of S16 is deduced from the next logins' DB balance; the debit and the
+  `p_Char_MoneyAdd` are not on the wire, and neither are the Character server's log lines ("ERROR - …SetItemOptions").
+  The error value `ItemAttr_Save` returned is unknown beyond "not 1" (0x206 maps every other value). Where the
+  stale bytes 9–22 of the expiry `0x3459` come from was not traced. Not tried: using an expired item before the
+  first minute check, an expired item that is worn (equipment, kind 8) or a ridden mount (skipped, Z24 §6.7), and the
+  over-full stack's sell / use / move paths (§21.3). That the S13 / S16 scripts ran for Test1235 is read from their
+  outputs, not from the scripts that ran.
 
 ## 15. Coverage boundary
 
 P02 has no scope table (`coverage.py P02`: "no scope table; coverage does not apply"); its scope is every packet of
 the processed captures, and every observed (server, dir, opcode) type has a status in §3.2, §4.2, §5.2 or §6.2
 (batch 1) or §4.2, §7.3–§7.6, §8.2, §9.7, §10.8 (batch 2): 388 types over the seven captures, checked in the sweep
-against the decoder output.
+against the decoder output. Batch 3 adds 146 types (466 over its six captures, 534 over all thirteen), each with a
+row in §16.4, §17.7, §18.8, §19.9, §20.5 or §21.4 (checked in the batch-3 sweep, part 22, by matching every new
+(server, dir, opcode) of the decoder output against those tables).
 
 Decoder gaps found in parts 2–4 (knowledge row "pcap_decode.py struct sizes", owner P01 = done) are small and fixed
 here in `tools/protocol-re/pcap_decode.py` (part 5): dims `[]` = rest of the payload; `bytes` = rest of the payload;
@@ -2220,23 +3255,44 @@ W04 packets P02 cannot override (W04.json sorts after P02.json): WM `0x7C07` 4-b
 3 packets have no layout at all: zone `0x500A`, `0x2048`, `0x104E`, all empty and without an annotation or PDB entry; statuses in §9.7).
 `packets.py` shows the variants through the evidence `fields` note (`layout`).
 
+Batch 3 (parts 16–22): before part 17 the batch-3 decodes had issue packets in `s21` (135: the ITEMDB link packets
+with the 6-byte ref or the item-transaction header the pdb2016 structs lack, `0x6401`, `0x3439`), `s21d` (22) and
+`s37` (28: the arrays of `0x180F` / `0xBCD5`, size-1 empty requests) and `s14` (1: `0x1110`). One decoder change
+(part 17): a PDB element type named `Outer::<unnamed-type-…>` is resolved (0x180F, 0xBCD5; selftest case). The rest
+are `annotations/P02.json` entries: `packets.character` (the 1-byte WM → CharDB start-up requests 0x7456 / 7503 /
+74BC / 9801 / 9805, and 0x3401 / 3402 / 341F / 3420 / 3425 / 3426 / 3439 / 343E / 3441 / 3442 / 3467 / 3468 / 346A /
+34BB), `packets.wm` 0x6401,
+`packets.zone` 0x3024 and the captured 1-byte variant of 0x1110. Batch-3 sweep (part 22): all thirteen captures
+decode with **0 issue packets** (35 281 packets, 30 476 of them in batch 3); 11 have no layout, all empty: zone
+`0x2024` ×7 (`s14`, §18.8), `0x500A` ×2 (§9.7, §20.3), `0x2048`, `0x104E` (§9.7); `--selftest` passes.
+
 | Found (function / packet / table / behaviour) | Covered by | Argument |
 |---|---|---|
 | 0x7C07 4-byte short form: the decoder warned "sReason needs 16 bytes" | resolved here (sweep) | W04 §9.2 (done) documents both forms; the decoder now reads the short form as a captured variant (`annotations/P02.json` `evidence.wm` 0x7c07 `layout`, paragraph above) |
 | README §2 / §1.4 / §1.5 rewrite, Unknowns line "whether the zone also sends the seed unprompted" | **P04** (new, added by P02: `docs/plan/items/P04.md`) | README's owners P01 and L00 are done and X01 may write only `docs/pseudocode/README.md`; P04 corrects the README from §2 / §11 and the knowledge Corrections rows |
-| WM → zone blobs never sent for Test2: 0x1026, 0x1028, 0x102A–0x102D, 0x102F, 0x10B8, and the 0x101E fail path (§7.5.3) | X02 (plan: "write targeted capture scenarios"), then P02 again | layouts are Z07 / Z12's; confirming them needs a character with a house, pet, emblem … or a failed map login |
-| which of a zone's 4 WM links receives the WM broadcasts (§7.5.1, last to register *(inferred)*; §7.5.4: index [3] twice, [2] once) | X02 (same line) | no layout or order depends on it; a capture of a zone start would show the 0x0802 order |
-| corrections to done items' pseudocode (§13) | X01 (plan: "Corrections between items: later items record corrections to earlier ones in their knowledge file … Collect every such section") | P02 must not edit other items' output; X01 collects knowledge-file corrections |
-| opcodes and paths never captured (§14 last bullet) | X02 (plan: "write targeted capture scenarios"), then P02 again | needs new captures; P02 is recurring per batch |
-| per-minute phase, clock offset, 0x7C07 timing, LoadMap heartbeat points (§14) | X02 (plan: "adversarially re-check load-bearing claims … write targeted capture scenarios") | none changes a layout or an order; each needs a targeted capture (zone restart, synced clocks, map loads with markers) |
+| WM → zone blobs never sent for Test2: 0x1026, 0x1028, 0x102A–0x102D, 0x102F, 0x10B8, and the 0x101E fail path (§7.5.3) | X05 (added by P02: X02's re-run, `docs/plan/items/X05.md` step "Batch-2 leftovers"; X02 is done), then P02 again | layouts are Z07 / Z12's; confirming them needs a character with a house, pet, emblem … or a failed map login |
+| which of a zone's 4 WM links receives the WM broadcasts (§7.5.1, last to register *(inferred)*; §7.5.4: index [3] twice, [2] once) | resolved here (batch 3, §17.4) | the zone starts of `s37` / `s21d`: 186 of 188 broadcasts on the last-registered link (`SetZoneSession` @ FUN_00439190 overwrites the mapping) |
+| corrections to done items' pseudocode (§13) | X04 (added by P02, `docs/plan/items/X04.md`: "for every §13 row whose status names X01 or X04 … add the missing ones"); X01 (done) took batch 1 only | P02 must not edit other items' output; X01 collects knowledge-file corrections |
+| opcodes and paths never captured (§14 last bullet) | X05 (added by P02: X02's re-run, `docs/plan/items/X05.md` step "Batch-2 leftovers"; X02 is done), then P02 again | needs new captures; P02 is recurring per batch |
+| per-minute phase, clock offset, 0x7C07 timing, LoadMap heartbeat points (§14) | X05 (added by P02: X02's re-run, `docs/plan/items/X05.md` step "Batch-2 leftovers"; X02 is done) | none changes a layout or an order; each needs a targeted capture (zone restart, synced clocks, map loads with markers) |
 | second per-minute 0x1035, 0x3C01 `npcPosition`, NPC sp 100 | resolved here (review): §6.1 (0x1035), §6.3 | the second 0x1035 = the `so_Routine` dirty-flag pass after the per-minute block sets `p+0xe94` (`smo_Abstate.parameterchange`, Z09 §2.4 / §5.5, §6.1) |
 | WM `CWMClientSession::Send_NC_CHAR_SUPPORT_REWARD_CMD` @ FUN_00433ab0 → zone 0x1120 @ FUN_005a5c70 (abstate 728) | W04 §17.5, Z07 §1.2 (both done, both document it) | resolved and confirmed in §5.1; nothing left to document |
-| item transaction failures (0x340C/0x340F, 0x3412, 0x3415, 0x341E, 0x3424, 0x342A, 0x3445 …) and their client codes | X02 (plan: "write targeted capture scenarios"), then P02 again | batch 2 holds only successes (§8.2); the failure layouts are Z05 §2–§7 / D03's |
-| PvP / party / guild-war deaths, exp loss (0x0429, WM 0x244A, 0x244B, 0x2411, 0x7445), skill fail / abort (0x2434, 0x2438, 0x2445), bystander packets (0x2449, 0x240D, 0x244F, 0x500B), revive to another map (0x1050), rebirth (0x1102 / 0x1103) | X02 (plan: "write targeted capture scenarios"), then P02 again | batch 2 has one PvE death, a solo player and successful casts only (§9); the layouts are Z03 / Z07's |
-| the extra `hpchangeorder` reads (§9.1) and the client-send flush point (§14) | X02 (plan: "adversarially re-check load-bearing claims") | no layout depends on them; the order within one socket is right |
-| 0x7037 trailing bytes `+3` or `+3n`, and how the 2016 client builds its option-save opcodes (no 0x7037 / 0x7011 / 0x7015 / 0x703B immediate, §14) | X02 (plan: "write targeted capture scenarios"), then P02 again | a capture with two or more shortcut changes in one request settles the tail; the WM drops it either way (W04 §8.2), so no server layout depends on it |
+| item transaction failures (0x340C/0x340F, 0x3412, 0x3415, 0x341E, 0x3424, 0x342A, 0x3445 …) and their client codes | X05 (added by P02: X02's re-run, `docs/plan/items/X05.md` step "Batch-2 leftovers"; X02 is done), then P02 again | batch 2 holds only successes (§8.2); the failure layouts are Z05 §2–§7 / D03's |
+| PvP / party / guild-war deaths, exp loss (0x0429, WM 0x244A, 0x244B, 0x2411, 0x7445), skill fail / abort (0x2434, 0x2438, 0x2445), revive to another map (0x1050), rebirth (0x1102 / 0x1103) | X05 (added by P02: X02's re-run, `docs/plan/items/X05.md` step "Batch-2 leftovers"; X02 is done), then P02 again | batch 2 has one PvE death, a solo player and successful casts only (§9); the layouts are Z03 / Z07's. The bystander packets (0x2449, 0x240D, 0x244F, 0x500B) are captured in batch 3 (§18.5, §20.3, §20.4) |
+| the extra `hpchangeorder` reads (§9.1) and the client-send flush point (§14) | X05 (added by P02: X02's re-run, `docs/plan/items/X05.md` step "Batch-2 leftovers"; X02 is done) | no layout depends on them; the order within one socket is right |
+| 0x7037 trailing bytes `+3` or `+3n`, and how the 2016 client builds its option-save opcodes (no 0x7037 / 0x7011 / 0x7015 / 0x703B immediate, §14) | X05 (added by P02: X02's re-run, `docs/plan/items/X05.md` step "Batch-2 leftovers"; X02 is done), then P02 again | a capture with two or more shortcut changes in one request settles the tail; the WM drops it either way (W04 §8.2), so no server layout depends on it |
 | quest SAY bytes `Data+0xC = 7`, `+0x10 = 1` (§10.5, §14) | Z15 (done): `Z15-quest-engine.md` Z15-B11 documents the leftover heap pointers / bytes of earlier script commands in the SAY buffer | the bytes are stale data, not fields; nothing to add |
 | title type 9 marking and its unlock rule (§10.3, §14) | resolved here (sweep): `CT_LevelUp` @ FUN_005cc2f0; rule = Z18 §6.2 (done) `CheckNewTitle` @ FUN_005cb5f0 | – |
 | `fm_fp_AllOfRange2` (§10.4) and the account-storage open flag after 0x304D (§8.1, §14) | resolved here (sweep): `so_AllOfRangeNomal` @ FUN_0054c900; `sp_NC_ACT_ENDOFTRADE_CMD` @ FUN_004c4a60 → `sp_EndOfTrade` @ FUN_004c25b0 (Z02 §6.4, done) | – |
 | client 0x4025 second sender FUN_004a59d0 and its callers FUN_00553a10 / FUN_006a2b30 (§14) | resolved here (sweep) | official name of FUN_00553a10 *(inferred)* only; Z12's open item is answered (§13) |
-| 0x10D2 single-option column names (ours), Character server's GameLog link, link carrying the WM broadcasts (§14 *(inferred)*) | X02 (plan: "adversarially re-check load-bearing claims") | the layouts and orders hold whatever the names; a zone-start capture shows the 0x0802 registration order |
+| 0x10D2 single-option column names (ours), Character server's GameLog link, link carrying the WM broadcasts (§14 *(inferred)*) | link carrying the broadcasts: resolved here (batch 3, §17.4); Character server's GameLog link: resolved here (batch 3: `s37` `W00_GLDB#18` keeps its heartbeats through the WM stop and both WM starts, §17.1, so it is not the WM's link); the 0x10D2 names: X05 (added by P02, step "Batch-2 leftovers"; X02 is done) | the layouts and orders hold whatever the names; the zone starts of `s37` / `s21d` showed the 0x0802 registration order |
+| Character / GameLog servers' acceptors (they take 4 links of one address within 1 ms, no per-IP refusal, §17.1) | D08 (plan: "the Character and GameLog process layers are matched and their differences stated") | the difference is in the DB servers' own process layer, not documented by S02 (Login / WM / Zone only) |
+| cause of the first WM stop in `s37` (§17.6) | X05 (added by P02: X02's re-run, `docs/plan/items/X05.md` step "Open after batch 3": the WM's `Msg` log next to a WM restart), then P02 again | not on the wire; the code paths are named in §17.6 |
+| `s14` steps not on the wire: unknown-name whisper 0x200E, emote stop 0x2022 / 0x2023, a player walk (0x2017 / 0x2018), sit, a shout out of sight (§18.8; 0x1C07 is in `s21`, §18.2) | X05 (added by P02: X02's re-run, `docs/plan/items/X05.md` step "Open after batch 3": scenario 14 steps (2)–(4)), then P02 again | the layouts are W04 §2.1 / Z02 §2–§5's; only the capture is missing |
+| P02-B27's storm also hits the client side (rendering of 136 appear / delete pairs) | – (client behaviour, out of the server spec) | the server bug and its fix are in §12; what the 2016 client does with each pair is not needed for a rebuild |
+| the 2016 client's own pick-right check on a drop object (`FUN_00610fc0`, §19.4) | – (client behaviour, out of the server spec) | the server's rule (Z09 §11.4 owner time, `so_drpitm_CanLooting`) and its timing are captured; a rebuilt server must answer 0x345 for a client that does ask |
+| buy-back onto an empty cell (`0x34B9` / `0x34BA`), sell / buy-back / soul-stone refusals (`0x3427`, `0x366B`–`0x366F`, `0x5005`, `0x3443`), the storage page request `0x3028` (§20.5) | X05 (added by P02: X02's re-run, `docs/plan/items/X05.md` step "Open after batch 3"; X02 is done), then P02 again | the layouts are Z04 §2.5 / §7.2 / §13.1, Z05 §2.2 / §2.4 and D03 §2.2 / §2.4's; `s21` holds only successes and the P02-B31 refusal |
+| the 2016 client's own soul-stone check at full HP (no 0x5007, §20.3) | – (client behaviour, out of the server spec) | the server's 0x5007 handler (Z04 §13.2) answers whatever the client sends; a rebuilt server needs nothing from the client check |
+| S16 with a fame or gamble-coin purchase (D03-B1: lost fame / coins), X3's untried `MaxLot` paths (sell `0x385`, use `0x702`, move-merge `irm_Split_N_Merge(MaxLot − b)` with b > `MaxLot`), an expired item worn or used before the minute check (§21) | X05 (added by P02: X02's re-run, `docs/plan/items/X05.md` step "Open after batch 3"; X02 is done), then P02 again | the code paths are read (D03 §1.2, Z04 §2.4 / §4.1 / §6.1, Z24 §6.7); only a capture with these setups can confirm them |
+| P02-B5 … B32 (§12, first table), the *(captured)* evidence for other items' bugs (§12, second table) and the batch-2 / batch-3 rows of §13, none of them in `docs/pseudocode/README.md` §5 / §6 yet (X01 integrated batch 1 only; its README links still cite §8 for the bugs, renumbered §12 in batch 2) | **X04** (new, added by P02 in the batch-3 sweep: `docs/plan/items/X04.md`) | X01 is done and has no recurring step; X03 covers only X02 and its follow-ups; P02 may not write the README |
+| scenario texts that did not match the recordings (§13 rows owned by X02: §3.37 step 1, §3.14 steps, the `tools/capture/21` scripts' character), result lines for the recorded scenarios 14 / 21 / 37 / S13 / S16 / X3, scenario 24 (notes without a capture, §1), and the confidence ratings after batches 2–3 | **X05** (new, added by P02 in the batch-3 sweep: `docs/plan/items/X05.md`, X02's recurring re-run) | X02 is done; its plan's last step ("after the user records them, P02 validates them …; then re-run X02 to update the ratings") has no open item to run it |

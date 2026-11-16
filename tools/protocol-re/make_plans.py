@@ -1368,6 +1368,88 @@ ITEMS = [
       done="Every pseudocode section has a rating; all high-traffic claims re-checked with results in §3 and corrections in "
            "`docs/knowledge/X02.md`; every remaining medium/low client-facing claim has a scenario with a prediction; DB "
            "setups use only verified names and come with restore statements."),
+ dict(id="X04", phase=3, title="Integration update: P02's capture batches 2 and 3 (corrections, bugs P02-B5 … B32, "
+                               "captured evidence) into the README register and the superseded-statements list "
+                               "(added by P02)",
+      out="docs/pseudocode/README.md + docs/knowledge/X04.md", scope=[],
+      deps=["X01", "P02", "X03 (soft: not at the same time, both edit README §5 / §6)"],
+      goal="X01 ran after the second capture batch was added but integrated only P02's batch 1: README §5 (Superseded "
+           "statements) holds P02's batch-1 rows, the register (README §6) lists P02-B1 … B4, and its four links "
+           "`capture-validation.md#8-original-server-bugs` point at a section batch 2 renumbered (§8 → §12). Batches 2 and "
+           "3 (capture-validation §7–§10, §16–§21) added P02-B5 … B32, about 70 correction rows for done items "
+           "(capture-validation §13, statuses \"→ X01\" from batch 2 and \"→ X04\"), captured evidence for other items' "
+           "bugs (§12, second table) and 40 confirmed or corrected flows (§11). X03 covers only X02 and its follow-ups. "
+           "Bring the README up to date with P02. Like X03, this item edits X01's README sections in place; it does not "
+           "touch the owners' pseudocode.",
+      steps=["Read capture-validation §11, §12, §13 and the Corrections table of `docs/knowledge/P02.md` (outline with "
+             "`sect.py`, then the sections); do not re-read code: P02's rows give the `@ FUN_…` and the evidence.",
+             "Superseded statements (README §5): for every §13 row whose status names X01 or X04, `rg` README §5 for its "
+             "owner § and opcode; add the missing ones in §5's row format (owner document and §, old statement, correct "
+             "statement with `@ FUN_…`, source `P02; capture-validation §n`). Rows already fixed by an annotation "
+             "override (\"corrected (P02.json …)\", \"fixed by P02\") get a row only when a reader of the owner's text "
+             "would still be misled. Drop or mark withdrawn the register entries §13 contradicts (L00-B6: `UserIP` is "
+             "filled; also README §3.15's \"IP zeroed, L00-B6\").",
+             "Bug register (README §6): add P02-B5 … P02-B31 from capture-validation §12 (first table) in the register's "
+             "row format (handler `@ FUN_…`, 2016 behaviour, effect, intent, evidence, owner P02). For each row of §12's "
+             "second table (other items' bugs seen on the wire) set that entry's evidence to *(captured)* with the §; "
+             "the P02 rows that only extend another item's bug (P02-B16 on 0x305C, P02-B29 on W04's whisper flag, P02-B30 "
+             "on Z18 / Z05 paths) say so in both entries.",
+             "Links: the README cites capture-validation by § number and by anchor. Batch 2 renumbered old §7–§11 to "
+             "§11–§15 (message order §11, bugs §12, discrepancies §13, uncertain §14, coverage boundary §15) and batch 3 "
+             "put §16–§21 before §11. Fix every link and § citation (`rg -n 'capture-validation' docs/pseudocode/README.md`).",
+             "Sequence index (README §3): add *(captured)* and the capture-validation § to the steps §11's batch-2 and "
+             "batch-3 rows confirm (link round trips, character load, hand-over, saves, kill, level-up, death and revive, "
+             "character create / delete, WM and zone start, sight entry, chat, GM visibility, item operations, storage, "
+             "sell / buy back, soul stones, failed purchase, expiry), and apply the order corrections (W01 §4.1 0x1407 → "
+             "0x1413, W01 §7.2, W05 §1.3, Z01 §8.4).",
+             "Run `tools/protocol-re/regen.sh`. Record per README table how many rows were added or changed, and every §13 "
+             "row left out with the reason, in `docs/knowledge/X04.md`."],
+      done="Every capture-validation §13 row of batches 2–3 that names X01 or X04 has a README §5 row or a stated reason in "
+           "`docs/knowledge/X04.md`; P02-B5 … B32 are in the register; the §12 second-table entries carry *(captured)*; "
+           "every README citation of capture-validation points at the current section."),
+ dict(id="X05", phase=3, title="Capture scenarios and ratings after capture batch 3: X02's recurring re-run (added by P02)",
+      out="docs/plan/capture-scenarios.md + docs/review/confidence.md (both updated in place) + docs/knowledge/X05.md",
+      scope=[], deps=["P02 (batch 3)", "X02"],
+      goal="X02 wrote capture scenarios 14–44, DB setups S1–S16 and table experiments X1–X7; its plan ends \"after the user "
+           "records them, P02 validates them as usual; then re-run X02 to update the ratings\", and X02 is done. The "
+           "third capture batch recorded scenarios 14, 21 (with S13, S16 and X3) and 37 (scenario 24 has notes but no "
+           "capture). P02 checked them against the predictions (capture-validation §16–§21), found scenario texts that "
+           "did not match what was recorded (§13 rows owned by X02), and listed what is still open (§14 batch-3 bullets, "
+           "§15 rows naming X05). Do X02's re-run: update the scenarios and the ratings so the next recording session "
+           "targets what is still open. This item edits X02's two output files in place; it does not touch the "
+           "owners' pseudocode.",
+      steps=["Read capture-validation §1 (batch-3 rows), the §13 rows owned by X02, the §14 bullets starting \"Batch 3\" and "
+             "the §15 rows naming X05 (outline with `sect.py`); do not re-derive them.",
+             "Results: under each recorded scenario (`capture-scenarios.md` §3.14, §3.21, §3.37, §8.14 S13, §8.17 S16, "
+             "§9.4 X3) add a line \"Result (P02 batch 3)\": each prediction confirmed / disproved / not reached, with the "
+             "capture-validation §.",
+             "Fix the scenario texts §13 names: §3.37 step 1 (the login screen holds no connection, so idle there tests "
+             "nothing; idle on the world list or character list instead), §3.14 steps (2), (4), (6) (walk and sit were not "
+             "done; the unknown-name whisper put the name into the text), the `tools/capture/21` S13 / S16 / snapshot "
+             "scripts (they ran for Test1235, not the scenario's Test2: name the character in one variable and print it).",
+             "Open after batch 3, one scenario (or a step added to an existing one) each, with setup, steps, prediction "
+             "and what disproves it: scenario 14 steps (2)–(4) (walk `0x2017` / `0x2018`, sit, whisper to an unknown name "
+             "`0x200E`, emote stop `0x2022` / `0x2023`, shout out of sight); "
+             "scenario 21 for the character the SQL snapshots name; buy back onto an empty cell (`0x34B9` / `0x34BA`); "
+             "sell, buy-back and soul-stone refusals (`0x3427`, `0x366B`–`0x366F`, `0x5005`, `0x3443`); the storage page "
+             "request `0x3028`; S16 with a fame or gamble-coin item (D03-B1); X3's untried paths of the over-full stack "
+             "(sell `0x385`, use `0x702`, move-merge); an expired item worn or used before the minute check; scenario 24 "
+             "(not captured); the WM's `Msg` log next to a WM restart (capture-validation §17.6).",
+             "Batch-2 leftovers (capture-validation §15 rows that named X02): the WM → zone blobs of a character with a "
+             "house, pet, emblem … and a failed map login `0x101E` (§7.5.3); item transaction failures (§8.2); PvP / "
+             "party / guild-war deaths, exp loss, skill fail / abort, revive to another map, rebirth (§9); `0x7037` with "
+             "two or more shortcut changes (§14); synced clocks for the per-minute phase and `0x7C07` timing, the "
+             "`World::LoadMap` heartbeat points (map loads with markers), the extra `hpchangeorder` reads (§9.1) and the "
+             "client-send flush point, the 0x10D2 single-option column names (§14). Map each to an existing scenario "
+             "number, write one, or state why no capture is worth it (no layout or order depends on it).",
+             "Ratings (`docs/review/confidence.md` §2): re-run `docs/plan/status/X02-rate.py` (it reads capture-validation "
+             "§11 / §13), then check by hand the sections batches 2–3 confirm or correct (§11 rows, §13 rows) and update "
+             "the hand ratings (`X02-rate-hand.py`).",
+             "Link the new scenarios from `docs/plan/capture-guide.md` (the scenarios line). Record the changes in "
+             "`docs/knowledge/X05.md`."],
+      done="Every recorded batch-3 scenario has a result line; every §15 row naming X05 maps to a scenario number or a stated "
+           "reason in `docs/knowledge/X05.md`; the §13 scenario-text rows are fixed; confidence ratings re-run after "
+           "batch 3."),
 ]
 
 

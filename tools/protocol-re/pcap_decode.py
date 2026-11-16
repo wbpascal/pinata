@@ -401,7 +401,9 @@ def decode_ann(payload, fields, structs, docs):
         if inl:
             base, sdef, dimtxt = inl
         else:
-            m = re.fullmatch(r"(\w+(?:::\w+)*)((?:\[[\w.]*\])*)", typ)   # a dim may name a count field (pdb2017: dotted)
+            # a dim may name a count field (pdb2017: dotted); PDB nested anonymous element types keep their
+            # "Outer::<unnamed-type-member>" name (P02 batch 3: 0x180F maparray, 0xBCD5 MachineIndex)
+            m = re.fullmatch(r"(\w+(?:::(?:\w+|<unnamed-type-\w+>))*)((?:\[[\w.]*\])*)", typ)
             if not m:
                 return out, cov, pos, f"unparsed type {typ}"
             base, dimtxt = m.group(1), m.group(2)
@@ -1002,6 +1004,11 @@ def selftest():
     st = res["streams"][0]
     assert st["gaps"][S2C] == [(len(s1) + len(s2), 150)], st["gaps"]
     assert [p["op"] for p in res["packets"] if p["stream"] == "login#1" and p["dir"] == S2C][-3:] == [0x0C09, 0x0C05, unknown_op]
+    # PDB nested anonymous element type (P02 batch 3, 0xBCD5): "Outer::<unnamed-type-x>[count]" resolves by exact name
+    st_ = {"O::<unnamed-type-m>": dict(size=3, fields=[[0, "u8", "Machine", ""], [1, "u16", "BetUnits", ""]])}
+    r = decode_ann(bytes.fromhex("03000a0001640002f401"), [[0, "u8", "n", ""], [1, "O::<unnamed-type-m>[n]", "m", ""]],
+                   st_, {})
+    assert r[3] is None and r[2] == 10 and [x["BetUnits"] for x in dict(r[0])["m"]] == [10, 100, 500], r
     print(f"selftest OK ({tmp})")
 
 

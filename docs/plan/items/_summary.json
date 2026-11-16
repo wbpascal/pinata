@@ -462,5 +462,21 @@
   "all phase-2 items, X01 (soft)",
   "\u2013",
   "\u2013"
+ ],
+ [
+  "X04",
+  3,
+  "Integration update: P02's capture batches 2 and 3 (corrections, bugs P02-B5 \u2026 B32, captured evidence) into the README register and the superseded-statements list (added by P02)",
+  "X01, P02, X03 (soft: not at the same time, both edit README \u00a75 / \u00a76)",
+  "\u2013",
+  "\u2013"
+ ],
+ [
+  "X05",
+  3,
+  "Capture scenarios and ratings after capture batch 3: X02's recurring re-run (added by P02)",
+  "P02 (batch 3), X02",
+  "\u2013",
+  "\u2013"
  ]
 ]

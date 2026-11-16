@@ -1835,6 +1835,32 @@
      ]
     ],
     "notes": "P02 batch 2 (§7.5): the struct lacks the 6-byte ref; elements are variable length (P02 struct PROTO_SELL_ITEM_INFO_SERVER)"
+   },
+   "0x6401": {
+    "dir": "Zone→WM",
+    "name": "NC_ANNOUNCE_Z2W_CMD",
+    "basis": "zone Send_PROTO_NC_ANNOUNCE_Z2W_CMD FUN_005b8d30 (Z11 §7.3 AnnounceSystem_LevelMax, Z13 §4); WM FUN_0042ab50 (W01 §7); pdb2016 ANNOUNCE_MESSAGE",
+    "fields": [
+     [
+      0,
+      "u8",
+      "AnnounceMessage.AnnounceType",
+      "4 = level announcement (AnnounceData.shn record 4)"
+     ],
+     [
+      1,
+      "u8",
+      "AnnounceMessage.SizeOfMessage",
+      "strlen + 1 (51)"
+     ],
+     [
+      2,
+      "bytes",
+      "AnnounceMessage.Message",
+      "text with its NUL: \"\\\"Test2\\\" has just become level 20. Congratulations!\""
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.4): 53 bytes in s21; Z04.json types the payload as one ANNOUNCE_MESSAGE struct (2 bytes)"
    }
   },
   "zone": {
@@ -2544,6 +2570,13 @@
       "3 bytes each; the client opens a new tab at every slot that does not grow, chosen by the first item's class (5 weapon, 6-8 armour, else other)"
      ]
     ]
+   },
+   "0x3024": {
+    "dir": "S→C",
+    "name": "NC_ITEM_BREAKSUCCESS_CMD",
+    "basis": "zone so_ply_ItemBreakSuccess FUN_0048d480 (Z05 §6.4); name pdb2017 (PROTOCOL_COMMAND_ITEM 36)",
+    "fields": [],
+    "notes": "P02 batch 3 (§19.5): empty, after the 0x3001 of the destroyed cell; no 2016 client handler"
    }
   },
   "accountlog": {
@@ -2996,6 +3029,740 @@
      ]
     ],
     "notes": "P02 part 13: pdb2016 PROTO_NC_CHARSAVE_PKCOUNT_CMD after the ref"
+   },
+   "0x7456": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_DB_ALL_REQ",
+    "basis": "wm WorldManagerServer::ProcessPacket @ FUN_00405aa0 (CharDB start-up states 5 / 7 / 9 / 0x11 / 0x17, W03 §9.1): raw 4-byte packet {len 3, opcode, 1 byte}; the PROTO struct is empty (sizeof 1, pdb2016)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "byte 3 of the stack word local_10c, never written for this packet; it is 0 when the AccountDB or AccountLogDB pump of the same pass stored local_10c = 1 (normal case); evidence: capture:s37: 0 in both WM starts"
+     ]
+    ],
+    "notes": "P02 batch 3 (§17.3): the 1-byte payload of an empty request; W03 §11 lists the 0x7456 byte as an observation without a bug ID"
+   },
+   "0x7503": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_EMBLEM_INFO_DB_REQ",
+    "basis": "wm WorldManagerServer::ProcessPacket @ FUN_00405aa0 (CharDB start-up states 5 / 7 / 9 / 0x11 / 0x17, W03 §9.1): raw 4-byte packet {len 3, opcode, 1 byte}; the PROTO struct is empty (sizeof 1, pdb2016)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "byte 3 of the stack word local_10c, never written for this packet; it is 0 when the AccountDB or AccountLogDB pump of the same pass stored local_10c = 1 (normal case); evidence: capture:s37: 0 in both WM starts"
+     ]
+    ],
+    "notes": "P02 batch 3 (§17.3): the 1-byte payload of an empty request; W03 §11 lists the 0x7456 byte as an observation without a bug ID"
+   },
+   "0x74bc": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_DB_TOKEN_ALL_REQ",
+    "basis": "wm WorldManagerServer::ProcessPacket @ FUN_00405aa0 (CharDB start-up states 5 / 7 / 9 / 0x11 / 0x17, W03 §9.1): raw 4-byte packet {len 3, opcode, 1 byte}; the PROTO struct is empty (sizeof 1, pdb2016)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "byte 3 of the stack word local_10c, never written for this packet; it is 0 when the AccountDB or AccountLogDB pump of the same pass stored local_10c = 1 (normal case); evidence: capture:s37: 0 in both WM starts"
+     ]
+    ],
+    "notes": "P02 batch 3 (§17.3): the 1-byte payload of an empty request; W03 §11 lists the 0x7456 byte as an observation without a bug ID"
+   },
+   "0x9801": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_ACADEMY_START_DB_ALL_REQ",
+    "basis": "wm WorldManagerServer::ProcessPacket @ FUN_00405aa0 (CharDB start-up states 5 / 7 / 9 / 0x11 / 0x17, W03 §9.1): raw 4-byte packet {len 3, opcode, 1 byte}; the PROTO struct is empty (sizeof 1, pdb2016)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "byte 3 of the stack word local_10c, never written for this packet; it is 0 when the AccountDB or AccountLogDB pump of the same pass stored local_10c = 1 (normal case); evidence: capture:s37: 0 in both WM starts"
+     ]
+    ],
+    "notes": "P02 batch 3 (§17.3): the 1-byte payload of an empty request; W03 §11 lists the 0x7456 byte as an observation without a bug ID"
+   },
+   "0x9805": {
+    "dir": "WM→CharDB",
+    "name": "NC_GUILD_ACADEMY_START_DB_RANK_BALANCE_REQ",
+    "basis": "wm WorldManagerServer::ProcessPacket @ FUN_00405aa0 (CharDB start-up states 5 / 7 / 9 / 0x11 / 0x17, W03 §9.1): raw 4-byte packet {len 3, opcode, 1 byte}; the PROTO struct is empty (sizeof 1, pdb2016)",
+    "fields": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "byte 3 of the stack word local_10c, never written for this packet; it is 0 when the AccountDB or AccountLogDB pump of the same pass stored local_10c = 1 (normal case); evidence: capture:s37: 0 in both WM starts"
+     ]
+    ],
+    "notes": "P02 batch 3 (§17.3): the 1-byte payload of an empty request; W03 §11 lists the 0x7456 byte as an observation without a bug ID; not captured: the 0x9804 answer sets the link to state 1 when dAggregationDate is 0"
+   },
+   "0x3467": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_CREATEMUSHROOM_REQ",
+    "basis": "zone ShinePlayer::sp_MakeMiniHouse @ FUN_0043eab0 (Z13 §1.6; buffer offsets −2 = payload); character FUN_00408ba0 (D03 §7.1); pdb2016 PROTO_ITEM_CREATE (0x26)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8001)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "8 (X14B)"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "sp_Item.invenlocklist counter (0 at the first map login)"
+     ],
+     [
+      8,
+      "u32",
+      "owner",
+      "charNo (vt 0x344)"
+     ],
+     [
+      12,
+      "MAPPOS",
+      "map",
+      "player map and position at the map login (RouN 6888, 7045)"
+     ],
+     [
+      32,
+      "u16",
+      "location",
+      "0x3000 | slot: mini-house box 12, slot 0"
+     ],
+     [
+      34,
+      "u64",
+      "createitemregnum",
+      "iti_mkregnum(id, 5, zone, world); the same key goes to GameLog 0x044F"
+     ],
+     [
+      42,
+      "u16",
+      "createitemid",
+      "itemdatabox.idb_specialid.sii_MiniHouse_MushRoom = 31000 House_MushRoom"
+     ],
+     [
+      44,
+      "u16",
+      "attr",
+      "constant 0x002E = 46 = payload offset of the attribute block (written as `end − start − 2`), not a length"
+     ],
+     [
+      46,
+      "bytes",
+      "attributes",
+      "iti_fill2buffer_atrib of the item class ('-o' default): 4 zero bytes for 31000"
+     ]
+    ],
+    "notes": "P02 batch 3 (§18.7): first annotation; evidence capture:s14 (113.363, sent on the first 0x1803 of a new character)"
+   },
+   "0x3468": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_CREATEMUSHROOMSUC_ACK",
+    "basis": "character FUN_00408ba0 (D03 §7.1); zone FUN_0043ee30 → so_ply_MakeMiniHouse FUN_0043f010 (Z05 §9.5)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "echo of 0x3467"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "echo"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "echo of 0x3467 lockindex"
+     ]
+    ],
+    "notes": "P02 batch 3 (§18.7): evidence capture:s14 (113.397, 34 ms after 0x3467, same link W00_CDB#5)"
+   },
+   "0x3401": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_ADMINCREATE_REQ",
+    "basis": "zone sp_MakeItem FUN_00528690 → sp_CreateItemByAdmin (Z11 §4.3, Z05 §9.1); pdb2016 PROTO_NC_ITEMDB_ADMINCREATE_REQ (0x28) without the ref prefix and the attribute tail",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "sp_Item.invenlocklist counter: &makeitem takes one index like every transaction (1–9 in the s21 setup, 0x56–0x58, 0x5A later)"
+     ],
+     [
+      8,
+      "u32",
+      "create.owner",
+      "charNo"
+     ],
+     [
+      12,
+      "MAPPOS",
+      "create.map",
+      "20 bytes: player map and position (RouN)"
+     ],
+     [
+      32,
+      "u16",
+      "create.location",
+      "ITEM_INVEN 0x2400 | slot: the first free unlocked inventory cell"
+     ],
+     [
+      34,
+      "u64",
+      "create.createitemregnum",
+      "new key; the same key goes to GameLog 0x044F"
+     ],
+     [
+      42,
+      "u16",
+      "create.createitemid",
+      ""
+     ],
+     [
+      44,
+      "u16",
+      "create.attr",
+      "payload offset of the attribute block (46), not a length"
+     ],
+     [
+      46,
+      "bytes",
+      "attribute",
+      "class-specific attribute: 1 byte (lot) for a potion / KQ item, 13 for LeatherBoots, 41 for SkullRing"
+     ]
+    ],
+    "notes": "P02 batch 3 (§19.2): sizes 47 / 59 / 87 in s21 = 46 + attribute; the decoder read the pdb2016 struct without the 6-byte ref (56 issue packets)"
+   },
+   "0x3402": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_ADMINCREATESUC_ACK",
+    "basis": "character D03 §7.1; zone FUN_00527660 (Z05 §9.1)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "echo of 0x3401"
+     ]
+    ],
+    "notes": "P02 batch 3 (§19.2): {ref, lockindex}; the pdb2016 struct lacks the ref"
+   },
+   "0x341f": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_PICKMERGE_REQ",
+    "basis": "zone ItemInventory_ii_PickMerge FUN_0052f440 (Z04 §3.3); pdb2016 PROTO_NC_ITEMDB_PICKMERGE_REQ (0x1a) + ref + attribute tail",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u16",
+      "itemid",
+      "3500"
+     ],
+     [
+      8,
+      "u64",
+      "itemonfield",
+      "key of the picked drop (the stack A dropped)"
+     ],
+     [
+      16,
+      "u32",
+      "nCellItemLot",
+      "lot of the target cell before the merge (10)"
+     ],
+     [
+      20,
+      "u64",
+      "itempick.attritemregnum",
+      "key of the target inventory cell"
+     ],
+     [
+      28,
+      "u16",
+      "itempick.attr",
+      "payload offset of the attribute (32)"
+     ],
+     [
+      30,
+      "ITEM_INVEN",
+      "itempick.location",
+      "0x2400 (cell 0)"
+     ],
+     [
+      32,
+      "bytes",
+      "attribute",
+      "the target cell's new attribute: lot 13 = 10 + 3"
+     ]
+    ],
+    "notes": "P02 batch 3 (§19.4): 33 bytes in s21 (the decoder read the struct without the ref)"
+   },
+   "0x3420": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_PICKMERGESUC_ACK",
+    "basis": "zone FUN_00530310 (Z05 §3.2)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ]
+    ],
+    "notes": "P02 batch 3 (§19.4): {ref} only, as 0x341D; no layout before"
+   },
+   "0x343e": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_USELOT_REQ",
+    "basis": "zone UseEffect::UseItemNormal::uib_AfterCast FUN_00540080 (Z04 §6.3); pdb2016 PROTO_NC_ITEMDB_USELOT_REQ (0xe) = {PROTO_CHANGEATTR attr, u16 lockindex} + ref + attribute tail",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u64",
+      "attr.attritemregnum",
+      "key of the used stack"
+     ],
+     [
+      14,
+      "u16",
+      "attr.itemid",
+      "3500"
+     ],
+     [
+      16,
+      "u16",
+      "attr.attr",
+      "payload offset of the attribute (20), not a length (Z04 §6.3 says attrLen)"
+     ],
+     [
+      18,
+      "u16",
+      "lockindex",
+      "18"
+     ],
+     [
+      20,
+      "bytes",
+      "attribute",
+      "the stack's attribute with lot − 1 (12)"
+     ]
+    ],
+    "notes": "P02 batch 3 (§19.6): 21 bytes in s21 (the decoder read the pdb2016 struct without the ref)"
+   },
+   "0x3439": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_PICKMONEYSUC_ACK",
+    "basis": "character D03 §3.5 (D03-B6); zone FUN_00530510 (Z05 §3.2)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u8",
+      "unwritten",
+      "never written by the Character server (D03-B6): 0x10 captured"
+     ]
+    ],
+    "notes": "P02 batch 3 (§19.2): 7 bytes; the pdb2017 struct is empty"
+   },
+   "0x346a": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_ITEMBREAK_REQ",
+    "basis": "zone ItemBreaker_ib_OK FUN_0048d0d0 (Z04 §3.2); pdb2016 PROTO_NC_ITEMDB_ITEMBREAK_REQ (0x19, packheader included)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "packheader.clienthandle",
+      "8003"
+     ],
+     [
+      2,
+      "u32",
+      "packheader.charregistnumber",
+      "5"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "17"
+     ],
+     [
+      8,
+      "u64",
+      "BreakItemKey",
+      ""
+     ],
+     [
+      16,
+      "u32",
+      "Owner",
+      "charNo"
+     ],
+     [
+      20,
+      "u16",
+      "nID",
+      "2530 PutOn_ClearKit01"
+     ],
+     [
+      22,
+      "u16",
+      "nLot",
+      "1"
+     ],
+     [
+      24,
+      "u8",
+      "nDeleteChestItem",
+      "0 (not a chest / capsule)"
+     ],
+     [
+      25,
+      "PROTO_ITEM_VANISH[nDeleteChestItem]",
+      "DeleteChestItem",
+      "10 bytes each"
+     ]
+    ],
+    "notes": "P02 batch 3 (§19.5): pdb2016 layout; restated so the decoder takes the array length from nDeleteChestItem (it read one element of the [0] array)"
+   },
+   "0x3425": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_SELLLOT_REQ",
+    "basis": "zone ItemInventory_ii_SellLot FUN_00538cb0 (Z04 §2.4); character FUN_00409ec0 (D03 §2.2); pdb2016 PROTO_NC_ITEMDB_SELLLOT_REQ (0x1a) + ref + attribute tail (the pdb2017 CharID / CharLevel are not in 2016)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "27 / 29 / 32 / 33"
+     ],
+     [
+      8,
+      "u64",
+      "iteminfo.attritemregnum",
+      "key of the sold stack"
+     ],
+     [
+      16,
+      "u16",
+      "iteminfo.attr",
+      "payload offset of the attribute (32), as in 0x343E"
+     ],
+     [
+      18,
+      "u16",
+      "iteminfo.location",
+      "the stack's cell (0x2401 / 0x2400)"
+     ],
+     [
+      20,
+      "u16",
+      "itemid",
+      "3500"
+     ],
+     [
+      22,
+      "u32",
+      "price",
+      "lot sold × ItemInfo.SellPrice (6)"
+     ],
+     [
+      26,
+      "u32",
+      "UserNo",
+      "103"
+     ],
+     [
+      30,
+      "u16",
+      "Vendor",
+      "mob id of the NPC (28 RouSmithJames)"
+     ],
+     [
+      32,
+      "bytes",
+      "attribute",
+      "the stack's attribute after the sale (lot 3 / 8 / 2 / 1)"
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.2): 33 bytes in s21 (the decoder read the pdb2016 struct without the ref)"
+   },
+   "0x3426": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_SELLLOTSUC_ACK",
+    "basis": "character FUN_00409ec0 (D03 §2.2); zone FUN_00539510 (Z05 §2.2)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "echo of 0x3425"
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.2): {ref, lockindex}; the pdb2016 struct lacks the ref"
+   },
+   "0x34bb": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_REPURCHASE_LOT_REQ",
+    "basis": "zone ItemInventory::ii_RepurchaseLot FUN_00538010 (Z04 §2.5); character FUN_0042e380 (D03 §2.2); pdb2016 PROTO_NC_ITEMDB_REPURCHASE_LOT_REQ (0x28) + attribute tail",
+    "fields": [
+     [
+      0,
+      "u16",
+      "nHandleNum",
+      "zone handle of the player (8003)"
+     ],
+     [
+      2,
+      "u32",
+      "nCharRegNum",
+      "5"
+     ],
+     [
+      6,
+      "u16",
+      "nLockIndex",
+      "28 / 30 / 35 / 36 / 37"
+     ],
+     [
+      8,
+      "u16",
+      "nItemID",
+      "3500"
+     ],
+     [
+      10,
+      "u64",
+      "nItemAttrChange.attritemregnum",
+      "key of the target stack (cell 0), not of the sold item"
+     ],
+     [
+      18,
+      "u16",
+      "nItemAttrChange.attr",
+      "payload offset of the attribute (40)"
+     ],
+     [
+      20,
+      "u16",
+      "nItemAttrChange.location",
+      "target cell (0x2400)"
+     ],
+     [
+      22,
+      "u32",
+      "nPrice",
+      "ItemInfo.SellPrice × lot (6)"
+     ],
+     [
+      26,
+      "u64",
+      "nSellItemKey",
+      "key the sold item had (only logged, D03 §2.2)"
+     ],
+     [
+      34,
+      "u32",
+      "UserNo",
+      "103"
+     ],
+     [
+      38,
+      "u16",
+      "Vendor",
+      "28 (RouSmithJames)"
+     ],
+     [
+      40,
+      "bytes",
+      "attribute",
+      "the target stack's attribute after the buy-back (lot 9 / 10 / 11)"
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.2): 41 bytes in s21; the pdb2016 struct ends at Vendor (the pdb2017 CharID / CharLevel are not in 2016)"
+   },
+   "0x3441": {
+    "dir": "Zone→CharDB",
+    "name": "NC_ITEMDB_SOULSTONEBUY_REQ",
+    "basis": "zone ShinePlayer_sp_PointStoneBuy FUN_00588510 (Z04 §13.1); character D03 §2.5; pdb2016 PROTO_NC_ITEMDB_SOULSTONEBUY_REQ (0x11) + ref",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u32",
+      "chrregnum",
+      "5"
+     ],
+     [
+      10,
+      "u8",
+      "flag",
+      "0 = HP stones, 1 = SP stones"
+     ],
+     [
+      11,
+      "u16",
+      "number",
+      "stones bought (3 / 42)"
+     ],
+     [
+      13,
+      "u64",
+      "price",
+      "number × price of 0x3C05 (165 / 1554)"
+     ],
+     [
+      21,
+      "u16",
+      "lockindex",
+      "40 / 41"
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.3): 23 bytes in s21 (the decoder read the pdb2016 struct without the ref)"
+   },
+   "0x3442": {
+    "dir": "CharDB→Zone",
+    "name": "NC_ITEMDB_SOULSTONEBUYSUC_ACK",
+    "basis": "character D03 §2.5 (raw frame); zone FUN_00588800 (Z05 §2.4)",
+    "fields": [
+     [
+      0,
+      "u16",
+      "ref.clienthandle",
+      "zone handle of the player (8003 = Test2)"
+     ],
+     [
+      2,
+      "u32",
+      "ref.charNo",
+      "5 (Test2)"
+     ],
+     [
+      6,
+      "u16",
+      "lockindex",
+      "echo of 0x3441"
+     ]
+    ],
+    "notes": "P02 batch 3 (§20.3): {ref, lockindex}; the pdb2016 struct lacks the ref"
    }
   }
  },
@@ -4040,11 +4807,13 @@
    "0x7495": {
     "dir": "Zone→WM",
     "captures": [
-     "shop",
-     "combat"
+     "combat",
+     "s21d",
+     "s37",
+     "shop"
     ],
     "fields": {
-     "(empty)": "per minute, 3–20 ms after 0x0821, on sb_SocketStr[0]"
+     "(empty)": "per minute, 3–20 ms after 0x0821, on sb_SocketStr[0]; batch 3: also once per zone start, 9–23 ms after the first 0x0821 on the new link"
     }
    },
    "0x7496": {
@@ -4219,6 +4988,345 @@
      "netpacketzoneheader": "all 0xFF",
      "usrregnum": "103, one per zone process"
     }
+   },
+   "0x0802": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "echo_data": "zone: never written (Z01-B2): 126, 155, 222, 17, 63, 3, 125, 112, 67, 4, 12, 45, 255, 38, 104, 33, 2; WM → DB / Login links: 0",
+     "server_to_id": "0 Account, 1 AccountLog, 2 Character, 3 GameLog, 4 Login, 5 WM",
+     "server_from_id": "5 WM, 6 zone",
+     "server_from_world_num": "0",
+     "server_from_zone_num": "0–3",
+     "key": "server_to_id + server_from_id (5…11) on all 106"
+    }
+   },
+   "0x0803": {
+    "dir": "WM→Zone",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "echo_data": "the request's echo_data copied back by every peer (106/106)",
+     "error": "0"
+    }
+   },
+   "0x180f": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "numofmap": "107 / 88 / 255 / 196 (zones 0 / 1 / 3 / 2)",
+     "maparray": "14-byte {canparty, mapname[12], IsPartyReleaseMap}; IsPartyReleaseMap = (canparty == 0) (fm_Regist2WMS @ FUN_00461cf0); sent on every link at its 0x0803"
+    }
+   },
+   "0xa419": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "nMapCount": "17 from every zone",
+     "sIndunInfos": "13-byte {MapIDClient[12], ModeIDLv}; sent on every link at its 0x0803; the WM forwards only the first (0xA41A once per WM start)"
+    }
+   },
+   "0xa41a": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "nMapCount": "17, the first zone's 0xA419 bytes; no answer (W04-B43)"
+    }
+   },
+   "0x7446": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "(unset)": "0x11 = the low byte of the preceding 0xA419 nMapCount (17) left in the shared gpp buffer (Z30-B8); once per zone process"
+    }
+   },
+   "0x7447": {
+    "dir": "WM→Zone",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "PartMask": "3",
+     "NumOfList": "0"
+    }
+   },
+   "0x207d": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "nHandle": "0xFFFF",
+     "sScriptMsgIndex": "\"E_Olympic_A04\" + 18 heap bytes that differ per start (Z09-B72: 32-byte copy)",
+     "nlen": "0 0 0 0 0"
+    }
+   },
+   "0x7457": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x0C41",
+     "PartMask": "3",
+     "NumOfGuild": "0"
+    }
+   },
+   "0x7504": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "PartMask": "2",
+     "nNumOfEmblem": "0"
+    }
+   },
+   "0x74bd": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x0C41",
+     "PartMask": "3",
+     "NumOfGuild": "0"
+    }
+   },
+   "0x7485": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "nGTNo": "0"
+    }
+   },
+   "0x7486": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x0D40",
+     "nGTNo": "1794258000 (a time_t)",
+     "nMatchType": "6",
+     "MatchTime": "9 time_t",
+     "size": "204 = 43 + 31 × 5 + 6"
+    }
+   },
+   "0x74f6": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "nGTNo": "the 0x7486 nGTNo"
+    }
+   },
+   "0x74f7": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x0D50",
+     "PartMask": "3",
+     "nEnterGuildNum": "0"
+    }
+   },
+   "0x9802": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x1780",
+     "PartMask": "3",
+     "NumOfGuildAcademy": "0"
+    }
+   },
+   "0x9803": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "nRoundTime": "1"
+    }
+   },
+   "0x9804": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s37"
+    ],
+    "fields": {
+     "Error": "0x18B8",
+     "PartMask": "3",
+     "RankData.dAggregationDate": "0 → m_bAcademyRankInit = 1, link state 1, no 0x9805",
+     "RankData.NumOfEachRankingData": "0"
+    }
+   },
+   "0x200c": {
+    "dir": "C→WM",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "receiver": "Test1235 / X14B",
+     "content": "\"x14 whisper B\", \"X14Nobody\" (the second whisper names an online player: 0x200E not reached)"
+    }
+   },
+   "0x200d": {
+    "dir": "WM→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "talker": "X14B / Test1235",
+     "flag": "0x54 / 0x04: bit 0 (bIsGM) 0 for both, also for the admin-level-100 GM; bits 1–7 stale (P02-B29)"
+    }
+   },
+   "0x200f": {
+    "dir": "WM→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "receiver": "stored spelling",
+     "content": "echo"
+    }
+   },
+   "0x1111": {
+    "dir": "C→S",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "bIsSkip": "1 (tester chose skip, 1.34 s after 0x1110)"
+    }
+   },
+   "0x1110": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "(unset)": "one uninitialised byte (0xD5): CSendPacket::ID(…, 0x1110, 1, NULL) (P02-B28)",
+     "layout": "captured 1-byte variant; the PDB struct is empty"
+    },
+    "layout": [
+     [
+      0,
+      "u8",
+      "(unset)",
+      "never written (P02-B28)"
+     ]
+    ]
+   },
+   "0x1112": {
+    "dir": "WM→CharDB",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "nSessionHandle": "WM session 1",
+     "nCreateWorldNo": "0",
+     "nCharNo": "8",
+     "nUserNo": "104",
+     "bIsSkip": "1 = 0x1111"
+    }
+   },
+   "0x1113": {
+    "dir": "CharDB→WM",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "rErrorType": "0x31E8 ok",
+     "bIsSkip": "echo; WM then runs TutorialLoginProcess (CharDB 0x1004 6 ms later)"
+    }
+   },
+   "0x6006": {
+    "dir": "WM→Zone",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "zoneHandle / charNo": "the whisper sender (8001 / 8 and 8000 / 2), on the sender zone's broadcast link W00_WM#2"
+    }
+   },
+   "0x750c": {
+    "dir": "Zone→WM",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "nCharNo": "2: after 0x4002 of the `&linkto` save, level 120 ≥ 60 (Z01 §8.4)"
+    }
+   },
+   "0x6402": {
+    "dir": "WM→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "AnnounceMessage": "type 4, 51 bytes, relayed unchanged 88 ms after the zone's 0x6401, to both clients"
+    }
+   },
+   "0x2079": {
+    "dir": "WM→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "sScriptMsgIndex": "E_Olympic_A04 + the 0x207D heap bytes, relayed unchanged (Z09-B72)"
+    }
+   },
+   "0x5811": {
+    "dir": "WM→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "hquest": "each KQ skipped at its start time (SetDoneSkip), to all four zones' broadcast links"
+    }
+   },
+   "0x5825": {
+    "dir": "WM→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nHandle / nID": "the skipped KQ, to every client"
+    }
+   },
+   "0x581e": {
+    "dir": "WM→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "DeleteQuestArray": "the KQs skipped this minute; one client per second"
+    }
    }
   },
   "zone": {
@@ -4336,10 +5444,12 @@
     "dir": "S→C",
     "captures": [
      "idle_in_world",
-     "walk-run-portals"
+     "walk-run-portals",
+     "s21c"
     ],
     "fields": {
-     "_": "box 9/8/12/15, flag bit 0 set, bits 1-7 stale"
+     "_": "box 9/8/12/15, flag bit 0 set, bits 1-7 stale",
+     "s21c": "inventory cell 27: expired LeatherBoots still listed, attribute bytes 7–10 = deletetime 8468 (2020-01-01 00:00, ShineItemAttr_Boot +7, pdb2016)"
     }
    },
    "0x1049": {
@@ -4890,11 +6000,15 @@
    "0x0821": {
     "dir": "WM→zone",
     "captures": [
+     "combat",
+     "s21d",
+     "s37",
      "shop",
-     "combat"
+     "s21c"
     ],
     "fields": {
-     "tm": "36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms"
+     "tm": "36-byte struct tm, sec 42 every time: sent every 60 s (±40 ms) to the 4 main links at once; the zones' per-minute work (0x7495, 0x1035) follows within 3–20 ms; batch 3: also once per zone registration to every registered zone's broadcast link (SendWMTimeToZone(force))",
+     "s21b / s21c": "tm_sec 35 (new WM process); s21c: the per-minute expiry 0x3459 follows 20 ms after the 66.104 one"
     }
    },
    "0x180b": {
@@ -5067,39 +6181,45 @@
    "0x3003": {
     "dir": "C→S",
     "captures": [
-     "shop"
+     "shop",
+     "s21b"
     ],
     "fields": {
      "itemid": "751 Long Mace (weapon shop, 0x3C09 tab 1)",
-     "lot": "1"
+     "lot": "1",
+     "s21b": "itemid 0 (LeatherBoots), lot 1, twice"
     }
    },
    "0x3004": {
     "dir": "S→C",
     "captures": [
-     "shop"
+     "shop",
+     "s21b"
     ],
     "fields": {
-     "code": "0x201 success, after the 0x340B apply (Z05 §2.1)"
+     "code": "0x201 success, after the 0x340B apply (Z05 §2.1)",
+     "s21b": "0x206 ×2 right after 0x340C (Z05 §2.1); the client shows nothing (default case of On_NC_ITEM_BUY_ACK, Z04-B6)"
     }
    },
    "0x3006": {
     "dir": "C→S",
     "captures": [
-     "shop"
+     "shop",
+     "s21"
     ],
     "fields": {
-     "slot": "1, 2 (inventory 9)",
+     "slot": "1, 2 (inventory 9); s21: 1 / 0 (lot 1 each), 1 lot 3",
      "lot": "1"
     }
    },
    "0x3005": {
     "dir": "S→C",
     "captures": [
-     "shop"
+     "shop",
+     "s21"
     ],
     "fields": {
-     "code": "0x381 success ×2"
+     "code": "0x381 success ×2; s21: 0x381 ×6"
     }
    },
    "0x3009": {
@@ -5116,13 +6236,17 @@
     "dir": "S→C",
     "captures": [
      "shop",
-     "combat"
+     "combat",
+     "s21",
+     "s21d"
     ],
     "fields": {
      "itemid": "picked item (3001, 3005, 3004)",
      "lot": "1",
      "error": "0x341 success",
-     "itemhandle": "0xFFFF always (Z05 §3.2)"
+     "itemhandle": "0xFFFF always (Z05 §3.2)",
+     "s21": "&getmoney {0, 0, 0x341} (Z11-B32, nothing picked before); 0x346 inventory full; 0x34A KQ pick-up limit",
+     "s21d": "{3500, 10, 0x341, 0xFFFF}: picked into a new cell (0x341C) beside the 50-stack over MaxLot 49"
     }
    },
    "0x300b": {
@@ -5232,12 +6356,13 @@
    "0x305c": {
     "dir": "S→C",
     "captures": [
-     "shop"
+     "shop",
+     "s21"
     ],
     "fields": {
-     "nHandle": "0, 1 (repurchase slots)",
+     "nHandle": "0, 1 (repurchase slots); s21: 0…5 in sale order",
      "ItemInfo.itemid": "3000 / 3001",
-     "ItemInfo.itemattr": "1 byte lot, then 100 stale bytes of the global send buffer (P02-B16)"
+     "ItemInfo.itemattr": "1 byte lot, then 100 stale bytes of the global send buffer (P02-B16); s21: lot sold (1 / 3), then the previous 0x3001 / 0x3425 bytes of gpp (P02-B16)"
     }
    },
    "0x3413": {
@@ -5345,7 +6470,8 @@
    "0x340a": {
     "dir": "Zone→CharDB",
     "captures": [
-     "shop"
+     "shop",
+     "s21b"
     ],
     "fields": {
      "map": "RouN 5724, 8768 (player position)",
@@ -5353,7 +6479,8 @@
      "attr": "68 = attribute offset",
      "price_cen": "69",
      "UserNo": "103",
-     "Vendor": "28 (NPC mob id)"
+     "Vendor": "28 (NPC mob id)",
+     "s21b": "LeatherBoots (0), lot 1, price_cen 13, fame 0, coin 0, attr 68, 13-byte boot attribute, Vendor 28; new key per try"
     }
    },
    "0x340b": {
@@ -5381,11 +6508,12 @@
    "0x3422": {
     "dir": "Zone→CharDB",
     "captures": [
-     "shop"
+     "shop",
+     "s21"
     ],
     "fields": {
-     "price": "3 / 4 (SellPrice × lot)",
-     "nLot": "1",
+     "price": "3 / 4 (SellPrice × lot); s21: 6 / 18",
+     "nLot": "1; s21: 1 / 3",
      "nDeleteChestItem": "0"
     }
    },
@@ -5393,13 +6521,15 @@
     "dir": "Character→GameLog",
     "captures": [
      "shop",
-     "combat"
+     "combat",
+     "s21"
     ],
     "fields": {
      "mappos.MapName": "'Need' (D03-B11)",
      "mappos.x/y": "0 (never written, stale)",
      "itemlot": "0",
-     "iteminven": "0x7512 / 0x4372 / 0x7511: never written (P02-B15)"
+     "iteminven": "0x7512 / 0x4372 / 0x7511: never written (P02-B15)",
+     "s21": "&getmoney: 'Need Cen', itemlot = (u16) 200000 = 3392, itemid 0; picks: iteminven 0 / 0x750F (P02-B15)"
     }
    },
    "0x0448": {
@@ -5417,12 +6547,13 @@
    "0x0449": {
     "dir": "Character→GameLog",
     "captures": [
-     "shop"
+     "shop",
+     "s21"
     ],
     "fields": {
      "itembuyer": "0",
-     "itemlot": "0",
-     "itemmoney": "3 / 4"
+     "itemlot": "0; s21: lot left in the cell (3 / 8 / 2 / 1 after SELLLOT, 0 after SELLALL)",
+     "itemmoney": "3 / 4; s21: 6 / 18"
     }
    },
    "0x044c": {
@@ -6091,6 +7222,708 @@
     "fields": {
      "DestZoneNo / SrcZoneNo": "2 / 0 (RouN → RouCos02), 0 / 2 (&linkto RouN); not on a same-zone link",
      "CharLev": "8 / 5"
+    }
+   },
+   "0xbcd5": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "nSlotMachineNum": "3",
+     "MachineIndex": "{Machine 0, BetUnits 10}, {1, 100}, {2, 500} (smsm_BettingAtOnce); once per zone process, on the first GameDB link's 0x0803"
+    }
+   },
+   "0xbcd6": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s37",
+     "s21d"
+    ],
+    "fields": {
+     "Machine": "0, 1, 2",
+     "nError": "0x2940",
+     "JackPotPrice": "0",
+     "RankNumber": "0 (so D03-B22's trailing rank bytes do not show)"
+    }
+   },
+   "0x1c01": {
+    "dir": "C→S",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "nMyHnd": "own handle (8000 / 8001)",
+     "ReceiveNetCommand": "opcode of the packet that named the unknown handle: 0x201A or 0x2018 (18 requests)",
+     "hnd": "the unknown player / mob handle; answer = its appear packet + last move (+ the requester's 0x1C19 to the object, Z02-B3)"
+    }
+   },
+   "0x1c06": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "handle": "8000 / 8001",
+     "charid": "Test1235 / X14B",
+     "coord": "server position",
+     "mode": "1 normal, 2 combat stance",
+     "chrclass": "11 archer / 16 mage (= shape bits 2–6)",
+     "chartitle": "Type 9, ElementNo 3 = 0x1049 CurrentTitle / Element",
+     "Level": "120 / 1",
+     "nKQTeamType": "2 = 0x583A",
+     "size": "235 bytes (0xEB) in all 544"
+    }
+   },
+   "0x2021": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "handle": "sender (8001)",
+     "emoticonid": "7, 9, 10, 23–26 (ActionViewInfo stand, laugh, cry, dances); also sent to the sender itself (includeSelf 1)"
+    }
+   },
+   "0x2025": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "handle": "jumper (8001); not to the jumper itself (includeSelf 0)"
+    }
+   },
+   "0x2009": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "handle": "8001",
+     "mode": "2 (combat stance); not to the sender"
+    }
+   },
+   "0x201f": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "speaker": "Test1235",
+     "flag": "0x78 / 0x74: bit 0 GMColor 0, bit 1 isMob 0, bits 2–7 stale gpp byte (P02-B29)",
+     "content": "echo of 0x201E, also to the shouter"
+    }
+   },
+   "0x201e": {
+    "dir": "C→S",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "content": "\"shout\", \"x14 shout A\" (level 120: relayed); \"test\" (level 1: dropped silently)"
+    }
+   },
+   "0x2020": {
+    "dir": "C→S",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "emoticonid": "7 stand, 9 laugh, 10 cry, 23–26 dances"
+    }
+   },
+   "0x2449": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "attacker / defender": "B (8001) ↔ Slime 5375, both directions",
+     "resthp": "defender HP after the hit",
+     "damageindex": "= the 0x2447 of the same swing"
+    }
+   },
+   "0x244f": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "caster": "8001",
+     "skill": "6000 (mage basic skill)",
+     "targetobj": "5375",
+     "index": "1, 2, 3 = 0x244E index of the caster"
+    }
+   },
+   "0x1809": {
+    "dir": "S→C",
+    "captures": [
+     "s14"
+    ],
+    "fields": {
+     "mapIndex": "150 = MapInfo RouN",
+     "x / y": "4975, 5825 (BlockingDistribute free spot for `&linkto` without arguments)"
+    }
+   },
+   "0x044f": {
+    "dir": "Zone/WM/Character→GameLog",
+    "captures": [
+     "s14",
+     "s21"
+    ],
+    "fields": {
+     "chrregnum / itemmaker": "8 / 8",
+     "itemkey": "= 0x3467 createitemregnum",
+     "itemid": "31000",
+     "iteminvento": "0x3000; sent by the Character server after 0x3468",
+     "itemmaker": "s21: = owner (5) for &makeitem; 56 rows, one per 0x3402"
+    }
+   },
+   "0x3007": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "slot": "inventory cells 0x2400…0x2417",
+     "lot": "9 of a 10-stack (refused 0x303, Z04-B4) and whole stacks / single items",
+     "loc": "client position"
+    }
+   },
+   "0x3008": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "code": "0x301 twice per drop (menu opened, then after 0x3417); 0x301 once for a destroy (menu); 0x303 for a part stack"
+    }
+   },
+   "0x300d": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "from": "0x2400",
+     "to": "0x2409 (free) or 0x2401 (occupied → 0x446)",
+     "lot": "4, 9"
+    }
+   },
+   "0x300e": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "code": "0x441 success (after 0x3435); 0x446 target cell occupied (zone 0x53a047; Z04 §4.2 says 0x44c)"
+    }
+   },
+   "0x3013": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "code": "0x2C2: slotinven 48 ≥ inventory size (full inventory; client 'Failed to unequip the item.')"
+    }
+   },
+   "0x3014": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "pickerID": "'Test2' / 'X14B' to the other player in sight, sent with the 0x3001 of the pick",
+     "itemID": "3500, 0, 57001",
+     "nItemLot": "3 for the stack, 1"
+    }
+   },
+   "0x301a": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "(empty)": "with the 0x343E / 0x343F request, before the DB answer (Z13 smo_ply_ItemUse)"
+    }
+   },
+   "0x3416": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "itemid": "3500, 0, 57001",
+     "vanishitemregnum": "= item.key",
+     "item.attr": "101-byte union copy: lot, then unwritten heap bytes (P02-B30)"
+    }
+   },
+   "0x3417": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "item": "echo of 0x3416's item, the stale bytes included"
+    }
+   },
+   "0x342e": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "(all)": "0x300B onto a stack of the same item: lotmain = target key, lotsub = source key, nMainLot / nSubLot before"
+    }
+   },
+   "0x342f": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "MergeResultLot": "10 = the target cell's lot after the apply"
+    }
+   },
+   "0x3434": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "lotcreate.attr": "not written (0x6874 / 0x6620 stale, P02-B30)",
+     "splitlot": "4, 9",
+     "MainLot": "10 = lot before the split"
+    }
+   },
+   "0x3435": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "RemainLot": "6, 1"
+    }
+   },
+   "0x343f": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "(all)": "single potion (lot 1): key, lock 19, itemid 3500"
+    }
+   },
+   "0x3440": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "error": "0x700 for both use requests"
+    }
+   },
+   "0x3459": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21",
+     "s21c"
+    ],
+    "fields": {
+     "flags": "3, 48, 2 = key count (bit 7 clear)",
+     "itemID/key/attrOffset/inven": "unwritten for bit 7 = 0: stale gpp bytes incl. text ('nus', 'res', 'n b') (P02-B30)",
+     "keys": "every unlocked inventory item (&cleariv)",
+     "s21c": "expiry: flags 1 (one key, sp_ItemDelete → sp_DestroyItem @ FUN_00527870), 20 ms after the minute 0x0821; bytes 9–22 stale again (P02-B30)"
+    }
+   },
+   "0x345a": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21",
+     "s21c"
+    ],
+    "fields": {
+     "err": "0xB81 (apply)",
+     "s21c": "err 0xB81, +25 ms; then 0x3001 itemid 0xFFFF to the client"
+    }
+   },
+   "0x346b": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "lockindex": "17"
+    }
+   },
+   "0x3438": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "owner": "5",
+     "itemonfield": "−1",
+     "cen": "200000 (&getmoney)"
+    }
+   },
+   "0x0445": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "(all)": "{charNo, key, itemid 2530, lot 1}"
+    }
+   },
+   "0x0447": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "mappos": "'Need', 0, 0 (D03-B11)",
+     "itemlot": "0",
+     "iteminven": "the dropped cell"
+    }
+   },
+   "0x0456": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "mappos": "'Need', 0, 0 (D03-B11)",
+     "itemlot": "sub lot (4, 9)",
+     "itemlotadd": "result 10",
+     "itemlotsub": "0"
+    }
+   },
+   "0x0457": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "mappos": "real map and position (RouN 6481, 8752)",
+     "itemkeynew": "= 0x3434 new key",
+     "itemlotsplit / itemlotremain": "4 / 6, 9 / 1"
+    }
+   },
+   "0x0459": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "itemlot": "12 = lot after the use"
+    }
+   },
+   "0x045a": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "(all)": "{charNo, key, itemid}"
+    }
+   },
+   "0x301c": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "cen": "1333 (deposit)"
+    }
+   },
+   "0x301d": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "cen": "storage money after (1333)",
+     "err": "0xF80 success"
+    },
+    "note": "capture-validation §20.1; sent after 0x1033"
+   },
+   "0x301e": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "cen": "1333 (withdraw)"
+    }
+   },
+   "0x301f": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "cen": "storage money after (0)",
+     "err": "0xF80 success"
+    },
+    "note": "capture-validation §20.1"
+   },
+   "0x345f": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "lock": "24",
+     "userNo": "103",
+     "cen": "1333"
+    }
+   },
+   "0x3461": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "lock": "25",
+     "userNo": "103",
+     "cen": "1333"
+    }
+   },
+   "0x3460": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "storagemoney": "1333 (balance after)",
+     "error": "0xF80"
+    }
+   },
+   "0x3462": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "cen": "0 (balance after)",
+     "err": "0xF80"
+    }
+   },
+   "0x045e": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "chrregnum": "5",
+     "deposit_money": "1333",
+     "userregnum": "103",
+     "user_result_money": "1333 = storage balance after"
+    }
+   },
+   "0x045f": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "chrregnum": "5",
+     "withdraw_money": "1333",
+     "userregnum": "103",
+     "user_result_money": "0 = storage balance after"
+    }
+   },
+   "0x3059": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nHaldle": "repurchase handle of 0x305C"
+    }
+   },
+   "0x305a": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nError": "0x3668 success; 0x3671 = current NPC is no Item / Weapon merchant (so_ply_CanItemRepurchase), silent in the client"
+    }
+   },
+   "0x305d": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nHandle": "the bought-back handle, before 0x305A"
+    }
+   },
+   "0x34bc": {
+    "dir": "CharDB→Zone",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nError": "0x3668"
+    }
+   },
+   "0x07fd": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nType": "0x7F8 (2040) repurchase",
+     "nTargetID": "item id",
+     "nItemKey": "target stack key",
+     "nInt1": "lot after",
+     "nInt2": "cell",
+     "nInt3": "price",
+     "nBigint1": "nSellItemKey"
+    }
+   },
+   "0xc815": {
+    "dir": "Character→GameLog",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "BuyMoney": "6 (u64)",
+     "Vendor": "28"
+    }
+   },
+   "0x3c05": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "hp.recover": "443",
+     "hp.maxnum": "100",
+     "hp.price": "55",
+     "sp.recover": "590",
+     "sp.maxnum": "114",
+     "sp.price": "37"
+    },
+    "note": "capture-validation §20.3 (level 33 Cleric)"
+   },
+   "0x5001": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "number": "3"
+    }
+   },
+   "0x5002": {
+    "dir": "C→S",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "number": "42"
+    }
+   },
+   "0x5003": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "totalnumber": "15 = 12 held + 3"
+    }
+   },
+   "0x5004": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "totalnumber": "51 = 9 held + 42"
+    }
+   },
+   "0x6005": {
+    "dir": "Zone→CharDB",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "Info.Type": "46 (Cleric level titles)",
+     "Info.ElementNo / ElementValue": "0x80 / 0x81 = element 0 / 1, value 2"
+    }
+   },
+   "0x6004": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "Info": "same CT_INFO as the 0x6005 (0x2E80, 0x2E81)"
+    }
+   },
+   "0x2427": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "handle": "8004 (X14B) to Test2 at X14B's map login",
+     "abstateIndex": "291 StaImmortal, 728 StaE_UserNewbie01"
+    }
+   },
+   "0x112c": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "nCharHandle": "8004 to the other player in sight only",
+     "bUse": "0"
+    }
+   },
+   "0x240d": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "handle": "8003, one per level (25 for &levelup 25) to the other player",
+     "mobhandle": "0"
+    }
+   },
+   "0x500b": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "player": "8003 to the other player only"
+    }
+   },
+   "0x500c": {
+    "dir": "S→C",
+    "captures": [
+     "s21"
+    ],
+    "fields": {
+     "player": "8003 to the other player only"
+    }
+   },
+   "0x340c": {
+    "dir": "S→C",
+    "captures": [
+     "s21b"
+    ],
+    "fields": {
+     "error": "0x206 both times: the S16 trigger fails the first p_Item_SetOption after p_Item_BuyAll committed (D03 §1.2 ItemBuy_Create, err ≠ 1)",
+     "lockindex": "0, 1 (the lock of each 0x340A)"
     }
    }
   },
