@@ -195,3 +195,14 @@ OVERRIDE.update({
     ('Z17', '3.5'): ('medium', 'captured only as empty lists: WM→Z 0x10D0 `n 0` and client 0x482C `num 0` (capture-validation §5.2, §7.5); 0x4023 / 0x4034 not captured; no item-action cool-down was persisted', 'capture: use an item with an item-action cool-down, then a map login'),
     ('Z28', '5.2'): ('medium', 'captured only as empty lists: 0x10E3 / 0x10E6 / 0x10E9 `{5, n 0}` at every map login (capture-validation §7.5; P02-B10); no card collection in a capture', 'capture with a collected card, then a map login'),
 })
+
+# ---- X07 review (part 5): two batch-4 highs whose own open point is a capture question ----------------------------
+OVERRIDE.update({
+    ('Z23', '4'): ('medium', 'empower allocation and reset captured with one learned step (capture-validation §24.3, '
+                   '§24.4); the section\'s own inferred point, which step ID the client names in 0x4811 with two learned '
+                   'steps of one line (it decides Z23-B8: the wrap to 15, 0x885 and the 0x68A kick), is not captured',
+                   'capture-scenarios 51 step 1'),
+    ('Z23', '2.5'): ('medium', 'switching on and off by cast captured with one learned step (capture-validation §25.4); '
+                     'two points of the section are not: the lower-step case Z23-B1 and the crafted field cast of a toggle '
+                     'that is on, Z23-B20 (inferred)', 'capture-scenarios 51 step 3; a crafted 0x2440 (test client, 41)'),
+})

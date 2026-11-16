@@ -140,7 +140,7 @@ SCEN = {
     50: ('Timing with one clock and without delayed ACKs', 15, 'capture on the server PC, a registry change',
          O(0x7004, 0x700c, 0x700d, 0x7c06, 0x7c07, 0x1003, 0x0849, 0x080e)),
     # 51-52: added by X07 after capture batch 4 (what s24 / s37b / s38 left open)
-    51: ('Skills II: what `s24` left open', 45, 'GM, 2 clients for step 4, DB setup S21 for step 6',
+    51: ('Skills II: what `s24` left open', 80, 'GM, 2 clients for steps 2 (heals) and 4, DB setup S21 for steps 6–7',
          R(0x4801, 0x4804) + R(0x4811, 0x4814) + O(0x0c1a, 0x0c17) + R(0x245c, 0x245d) + O(0x2428, 0x2429, 0x1c18)
          + R(0x4009, 0x400a) + O(0x103d) + R(0x9005, 0x900f)),
     52: ('Character select and session II: what `s37b` / `s38` left open', 15,

@@ -147,9 +147,9 @@ absence means "not re-read by anyone", not "confirmed": P02 lists what the captu
 
 ## 2. Ratings per document
 
-State: re-run after capture batch 4 (X07 part 3). 49 pseudocode documents (2 249 headings: 152 high, 1 559 medium,
+State: re-run after capture batch 4 (X07 part 3; review fix of part 5: Z23 §2.5 and §4 back to medium). 49 pseudocode documents (2 249 headings: 150 high, 1 561 medium,
 212 low, 326 not rated) and 62 knowledge files (324 headings: 13 high, 241 medium, 28 low, 42 not rated; the 6 new
-ones are `X07.md` §1–§6); 123 hand rows. Hand passes: Login, WM, the shared library and the DB servers (X02 part 2),
+ones are `X07.md` §1–§6); 125 hand rows (123 + the 2 rows of the X07 review). Hand passes: Login, WM, the shared library and the DB servers (X02 part 2),
 the zone documents and the knowledge files (part 3), 4 rows set by the re-check of §3.2 (part 4: `Z01.md` §3 → high,
 §4 and §6 low → medium, `Z03.md` §2 stays medium), the pass after batch 3 (X05) and the pass after batch 4 (X07),
 both at the end of §2.2. Before the batch-4 re-run: 130 high, 1 570 medium, 223 low, 326 not rated over the same 49
@@ -354,7 +354,8 @@ by skill and town revive. Still in no capture: party, raid, guild, pet, silver w
 map, booth, mini-house, mob skills, `0x243E` (the client's assist sends `0x2401`), the server refusals the client
 pre-empts (capture-scenarios 51, T23, T24).
 
-Of the sections that existed before, 37 changed their rating (`X07.md` §1–§3 are rated for the first time):
+Of the sections that existed before, 37 changed their rating (`X07.md` §1–§3 are rated for the first time; the
+review of X07 part 5 set two of the 23 new highs back, last row):
 
 | Change | Rows | Why |
 |---|---|---|
@@ -362,6 +363,7 @@ Of the sections that existed before, 37 changed their rating (`X07.md` §1–§3
 | low → medium | 12 | a section with a class (README §5 row, `cv corr`, D, weak markers) that batch 4 now covers: "a captured section in which a class applies". D01 §4.2, D02 §3.3 / §3.5 / §7.2 / §14, D04 §2 (DB sections whose link packets are captured), W01 §5.4 / §6.1 / §6.2, Z01 §8.1, Z03 §5.4, Z04 §12.5 |
 | high → medium | 1 | W01 §3.3: batch 4 corrects it (the list's map is patched to "RouT", §13 → X06) |
 | medium → low | 1 | Z03 §2.6 `0x243E`: the client's assist sent a plain `0x2401` (§25.5), and the 2016 client has no path that sends `0x243E` (`X07.md` §2); hand row with that reason, raise by test-client case T25 |
+| high → medium (review, part 5) | 2 | Z23 §2.5 and Z23 §4 (hand rows `X07 review`): batch 4 captured them with one learned step only; each keeps an uncaptured point of its own (the lower-step case Z23-B1 and the inferred Z23-B20 field cast; the step ID the client names in `0x4811` with two learned steps, which decides Z23-B8): capture-scenarios 51 steps 1 and 3. Net: 21 medium → high |
 
 Generator change (`X02-rate.py` `load_inputs`): an "Opcodes" table row may name several opcodes in one cell (`0x9007 /
 0x9008`, `0x1021 / 0x10CD / 0x10D6`); the old pattern read only rows with one opcode and an `NC_…` name, so 78
@@ -433,7 +435,7 @@ Pseudocode documents (`docs/pseudocode/`):
 | `zone/Z20-skill-data.md` | Z20 | 26 | 0 | 20 | 0 | 6 | 1 |
 | `zone/Z21-set-items.md` | Z21 | 32 | 0 | 27 | 0 | 5 | 3 |
 | `zone/Z22-abstate-actors.md` | Z22 | 61 | 3 | 47 | 0 | 11 | 5 |
-| `zone/Z23-skill-list.md` | Z23 | 43 | 8 | 27 | 0 | 8 | 2 |
+| `zone/Z23-skill-list.md` | Z23 | 43 | 6 | 29 | 0 | 8 | 4 |
 | `zone/Z24-item-data.md` | Z24 | 37 | 0 | 32 | 0 | 5 | 0 |
 | `zone/Z25-skill-specials.md` | Z25 | 37 | 3 | 28 | 0 | 6 | 6 |
 | `zone/Z26-silver-wing.md` | Z26 | 24 | 1 | 19 | 0 | 4 | 13 |
@@ -452,7 +454,7 @@ Pseudocode documents (`docs/pseudocode/`):
 | `db/D07-character-reward-items.md` | D07 | 18 | 0 | 15 | 0 | 3 | 0 |
 | `db/D08-db-process.md` | D08 | 54 | 0 | 47 | 0 | 7 | 0 |
 | `shared/S02-library.md` | S02 | 44 | 2 | 32 | 0 | 10 | 3 |
-| **total** | | 2249 | 152 | 1559 | 212 | 326 | 113 |
+| **total** | | 2249 | 150 | 1561 | 212 | 326 | 115 |
 
 Knowledge files (`docs/knowledge/`):
 
@@ -2223,7 +2225,7 @@ Knowledge files (`docs/knowledge/`):
 | · 2.2 The toggle list | medium | read in code | second reading / client check |
 | · 2.3 Player wrappers and packets | **high** | cap 2/2; R×1 |  |
 | · 2.4 Automatic switch-off | medium | captured: the automatic switch-off of the toggle by unequip, low HP and map change (capture-validation §25.4, §11 row "Toggle skill"), and the capture extends the section (each removed state is broadcast twice, a switch-off cast costs HPRate HP; P02-B38, §13): a captured section in which a class applies (hand; baseline: medium) | X06 folds P02-B38 into the section |
-| · 2.5 Switching by cast | **high** | cap 5/5; cv ok |  |
+| · 2.5 Switching by cast | medium | switching on and off by cast captured with one learned step (capture-validation §25.4); two points of the section are not: the lower-step case Z23-B1 and the crafted field cast of a toggle that is on, Z23-B20 (inferred) (hand; baseline: high) | capture-scenarios 51 step 3; a crafted 0x2440 (test client, 41) |
 | 3. Cooldowns and delay groups | – | container (see its subsections) |  |
 | · 3.1 When a cast sets the cooldown | **high** | cv ok |  |
 | · 3.2 Setting: `smo_ply_SkillCoolTime` and `csl_SetCoolTime` | medium | cap 1/1; client×1; weak inf1 | capture (class U) |
@@ -2231,7 +2233,7 @@ Knowledge files (`docs/knowledge/`):
 | · 3.4 Shortening: damage taken, item-set rates, charged buffs | medium | cap 1/1 | capture (class U) |
 | · 3.5 Mount skills: `MoverSkillList` | medium | cap 1/1; R×2 | capture (class U) |
 | · 3.6 Other callers that set or check skill cooldowns | medium | cap 1/2 | capture (class U) |
-| 4. Empower points | **high** | cap 7/11; cv ok; client×1 |  |
+| 4. Empower points | medium | empower allocation and reset captured with one learned step (capture-validation §24.3, §24.4); the section's own inferred point, which step ID the client names in 0x4811 with two learned steps of one line (it decides Z23-B8: the wrap to 15, 0x885 and the 0x68A kick), is not captured (hand; baseline: high) | capture-scenarios 51 step 1 |
 | 5. Mastery (production skills) | medium | cap 1/3; client×2; R×1 | capture 0x481D |
 | 6. Learn, unlearn, load | – | container (see its subsections) |  |
 | · 6.1 Membership tests | medium | read in code | second reading / client check |
@@ -3620,7 +3622,7 @@ Knowledge files (`docs/knowledge/`):
 | § | Rating | Reason | Raise by |
 |---|---|---|---|
 | 1. Batch 4: result lines, corrected notes, run kits | medium | cap 10/13; R×1 | capture 0x1061, 0x482B |
-| 2. Open after batch 4: where each thing went | medium | cap 20/31; client×1; weak p171 | capture 0x1061, 0x1067, 0x900E, 0x900F |
+| 2. Open after batch 4: where each thing went | medium | cap 20/31; client×1; pdb 1/1; weak p171 | capture 0x1061, 0x1067, 0x900E, 0x900F |
 | 3. Ratings after batch 4 (`docs/review/confidence.md` §2) | medium | cap 2/3; R×1 | capture (class U) |
 | 4. Order of work and reach after batch 4 (`capture-scenarios.md… | medium | cap 27/33 | capture 0x1067, 0x1804, 0x243F, 0x900F |
 | 5. Left open, uncertain | – | open points / boundary list, no claim to rate |  |

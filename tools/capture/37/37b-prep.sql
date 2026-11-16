@@ -34,6 +34,15 @@ BEGIN TRAN;
 UPDATE tCharacter SET sID = N'$(DashName)' WHERE nCharNo = @dash;
 INSERT INTO tCharacterChangeID (nUserNo, nCharNo, bInit)            -- the columns usp_Character_setChangeIDItemUsed fills
 SELECT nUserNo, nCharNo, 0 FROM tCharacter WHERE nCharNo = @right;   -- bInit 0: no friend / guild / marriage reset
+-- tutorial done (nState 2, as 24-prep.sql) for the '-' character: in state 0 its start in step b2 meets P02-B33 first
+-- ("The Map is under maintenance" from the tutorial skip, capture-validation §22.2). Left at 2 by the cleanup.
+IF OBJECT_ID('dbo.usp_Tutorial_setCharInfo') IS NOT NULL
+BEGIN
+    DECLARE @r int;
+    DECLARE @nd int = (SELECT nUserNo FROM tCharacter WHERE nCharNo = @dash);
+    EXEC usp_Tutorial_setCharInfo @nd, @dash, 2, 0, @r OUTPUT;
+END
+ELSE PRINT 'no usp_Tutorial_setCharInfo in this DB: start $(DashChar) once and answer the tutorial question with "skip" before the run';
 COMMIT;
 PRINT 'prep done: $(DashChar) -> $(DashName); rename right for $(RightChar) (old values in dbo.X37_save)';
 

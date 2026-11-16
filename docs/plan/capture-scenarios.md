@@ -2,7 +2,7 @@
 
 Continues the 13 scenarios of `docs/plan/capture-guide.md`. Those gave seven captures (login, idle, walk and
 portals, shop and storage, combat with `&levelup` / `&linkto`); everything else in the reconstruction is read
-from code only (`docs/review/confidence.md` §2: 2 040 sections rated medium or low after capture batch 4, 2 058 after batch 3). Each scenario here names the
+from code only (`docs/review/confidence.md` §2: 2 042 sections rated medium or low after capture batch 4, 2 058 after batch 3). Each scenario here names the
 claims it tests, the steps, and a **prediction**: the opcodes our documents expect, in order, with the field
 values they give. A capture that differs from the prediction is a finding; P02 validates the captures as usual
 (`docs/plan/items/P02.md`), then X02 is re-run to update the ratings.
@@ -92,7 +92,7 @@ the 2016 client pre-empted.
 |---|---|---|---|---|---|---|---|---|
 | 1 | 37 | Login side: idle heartbeat, refusals, character delete *(recorded, batches 3 and 4)* | before the rebuild starts | DB / config setup | 6 | 134 | 71 | its refusal steps 3–6 not yet run (S10, S11, X6) finish the login side; `s37b` ran only the character-select refusals |
 | 2 | 52 | Character select and session II: what `s37b` / `s38` left open | before the rebuild starts | GM, 2 clients, DB setup S20, a zone restart | 15 | 19 | 2 | closes the session paths `s37b` / `s38` left open: the stale tutorial copy, the zone-initiated kick with a real user number |
-| 3 | 51 | Skills II: what `s24` left open | before the rebuild starts | GM, 2 clients for step 4, DB setup S21 for step 6 | 45 | 7 | 5 | the skill paths the client reached only with one learned step: empower wrap, toggle steps, skill-save columns |
+| 3 | 51 | Skills II: what `s24` left open | before the rebuild starts | GM, 2 clients for steps 2 (heals) and 4, DB setup S21 for steps 6–7 | 80 | 8 | 5 | the skill paths the client reached only with one learned step: empower wrap, toggle steps, skill-save columns |
 | 4 | 46 | Items III: no DB change | early: core gameplay | GM | 12 | 10 | 5 | closes what 21 left open on stack moves and buy-back |
 | 5 | 39 | Combat extras: death penalty, PK, revive item, knock-back | early: core gameplay | 2 clients, GM | 8 | 50 | 27 | party / PK death and exp loss are not captured at all |
 | 6 | 45 | Second client in sight II | early: core gameplay | 2 clients | 8 | 8 | 3 | walk, sit, emote stop: the remaining movement relays |
@@ -108,7 +108,7 @@ the 2016 client pre-empted.
 | 16 | 25 | Pet | with its feature | GM | 8 | 29 | 19 | log in again afterwards for the pet load blocks |
 | 17 | 26 | Mounts and minimon | with its feature | GM | 5 | 27 | 23 | small, self-contained |
 | 18 | 27 | Wing stone and silver wing | with its feature | GM | 5 | 47 | 13 | small, self-contained |
-| 19 | 34 | Premium inventory, charged buffs | with its feature | DB setup | 5 | 38 | 23 | needed once charged items are sold |
+| 19 | 34 | Premium inventory, charged buffs | with its feature | DB setup | 5 | 39 | 23 | needed once charged items are sold |
 | 20 | 40 | Gathering, production, item emotes, way-finding gate, tutorial, attendance | with its feature | GM | 8 | 68 | 45 | several small systems in one run |
 | 21 | 32 | GM command session | with its feature | GM, 2 clients | 12 | 42 | 18 | only for the commands the rebuild keeps |
 | 22 | 28 | Mini-house | with its feature | 2 clients, GM | 10 | 81 | 92 | log in again afterwards for the house load blocks; 35 needs it |
@@ -127,13 +127,13 @@ the 2016 client pre-empted.
 | – | 50 | Timing with one clock and without delayed ACKs | dropped (original processes only) | capture on the server PC, a registry change | 15 | 0 | 0 | timing between the original processes |
 | – | 14 | Second client in sight *(recorded, batch 3)* | recorded | 2 clients | 5 | 47 | 25 | continued by 45 |
 | – | 21 | Items II: drop, split, storage, use, shop *(recorded, batch 3)* | recorded | GM | 10 | 131 | 90 | continued by 46, 47, 49 |
-| – | 24 | Skills, abstates, stat points *(recorded, batch 4)* | recorded | GM, 2 clients for revive | 10 | 60 | 38 | continued by 51 (refusals the client pre-empted: T23, T24, T25 in 41) |
+| – | 24 | Skills, abstates, stat points *(recorded, batch 4)* | recorded | GM, 2 clients for revive | 10 | 61 | 38 | continued by 51 (refusals the client pre-empted: T23, T24, T25 in 41) |
 | – | 38 | Session loss, kicks, back to character select *(recorded, batch 4)* | recorded | GM, 2 clients, process kill | 10 | 20 | 13 | continued by 52 |
 <!-- ORDER:end -->
 
-Sessions that fit together (same setup): **I** one client, GM: 51, 46, 22, 23, 27, 40, 26, 25, 34, 32 (37, 21 and 24
+Sessions that fit together (same setup): **I** one client, GM (51 needs a second one for steps 2 and 4): 51, 46, 22, 23, 27, 40, 26, 25, 34, 32 (37, 21 and 24
 are recorded; 37's steps 3–6 with S10, S11, X6 where `s37` did not reach them, see its result line; 51's step 4
-needs B for a few minutes, step 6 S21).
+needs B for a few minutes, step 2 B or `&sethp` for 25 minutes, steps 6–7 S21; about 80 minutes in all).
 **II** two clients: 45, 17, 15, 16, 36, 44, 18, 19, 20, 39 (14 is recorded). **III** content with a longer setup:
 28, 35, 29, 31, 30, 33, 52 (38 is recorded; 52 needs S20 and a zone restart). **IV** tools: 42, 41 (T15–T25 with
 the others), 43. **V** DB and table setups under an
@@ -779,7 +779,8 @@ online owner, one short capture per step, the SQL window open next to the client
   name; start. (b4) all zones stopped: start a character; zones back: start again; quit. **Fixed for a rerun (X07,
   capture-validation §13):** the `-` character must not be in tutorial state 0, or step b2's start meets P02-B33
   first ("The Map is under maintenance" from the tutorial skip, not from the rename; capture-validation §22.2): give it
-  a tutorial row in state 2 in the prep, or create it in the same session. The test DB runs the private 2018
+  a tutorial row in state 2 in the prep (`37b-prep.sql` does it since the X07 review, `usp_Tutorial_setCharInfo` as
+  in `24-prep.sql`), or create it in the same session. The test DB runs the private 2018
   `p_Char_Rename`, which answers 0xD0 without renaming; the 2016 behaviour needs the 2016 procedure on the test DB.
   Predictions (the form's "expected" lines and W01 §4 / §6.2): (b1) W → D `0x1402` → `0x1403 {0x181}` → C `0x1404
   {0x181}` "The name is already in use."; the space refused by the client. (b2) the old name refused by the client;
@@ -1223,7 +1224,7 @@ The client-side refusals are test-client cases T23 / T24 (scenario 41); `0x243E`
   `24-setupA.txt` (Titanic Axe: Heat of Fury needs a two-hand weapon) and `24-items.txt` (2 Skill Reset Scrolls
   `SkillReloadbundleOne`, the two capsules). Slice and Dice [01] (skill 0) as in `s24` step 1 (book) or
   `&learnskill 0`. `snapshot` before and after each step; the snapshot now lists `nSkillExp`, `nSkillWriteTime` and
-  `nSkillCoolTime` (X07). S21 for step 6 only. One capture; the notes give the time of each step.
+  `nSkillCoolTime` (X07). S21 for steps 6 and 7 only. One capture; the notes give the time of each step.
 - **Steps and predictions:**
   (1) **Empower with two learned steps (Z23-B8).** A puts 1 damage point on Slice and Dice [01] (as `s24` step 2:
   `0x4811 {0, plus {damage 1}}` → `0x4814 {0, 0x881}`); `&learnskill 1` (Slice and Dice [02]: D `0x4801` → `0x4802`
@@ -1233,11 +1234,23 @@ The client-side refusals are test-client cases T23 / T24 (scenario 41); `0x243E`
   {…, skill 1, empower {damage 15}, bUseItem 1}` → `0x4813 {0x885}` (`p_Skill_SetPowerAll` refuses a field above 5)
   → C `0x4814 {1, 0x885}` "Skill Empower failed." → the zone disconnects A: Z → W **`0x0C1A {usrregnum = A's user
   number, wldmanhandle = A's WM handle, 0x68A}`** → W → C `0x0C17 {0x68A}` (the client acts only on 0x683), A's
-  sockets close; the next login shows the point still on [01] (DB unchanged). If it is **0**: `0x4814 {0, 0x881}`,
+  sockets close; the next login shows the point still on [01] (the skill rows unchanged) but the Skill Reset Scroll
+  **gone** (one fewer in the lot, or its row deleted): the Character server destroys it before `p_Skill_SetPowerAll`
+  and does not give it back when the procedure refuses (D04 §2, D04-B5). The refusal needs the procedure's "> 5 →
+  `nRet` 0" check: before the step print `EXEC sp_helptext 'p_Skill_SetPowerAll'` on the test CharDB (as S20 prints
+  `sp_helpindex`); the w00 version and the second version in `Character.bak` have it, the first (2007) version of
+  `Character.bak` only runs the UPDATE, which writes damage 15 and answers `0x881` (`0x4814 {1, 0x881}`, A stays in
+  the game, row 1 damage 15). If it is **0**: `0x4814 {0, 0x881}`,
   the point leaves [01]; Z23-B8 then needs a crafted `0x4811 {1, 0, minus {damage 1}}` (test client, scenario 41
   T23's form).
   (2) **Toggle past its icon timer (P02-B39).** A switches Heat of Fury [01] on next to a mob (as `s24` step 5) and
   keeps it on for 25 minutes: HP above 5 %, weapon unchanged, no link (each of these switches it off, Z23 §2.4).
+  The toggle drains 2 % of MaxHP per second (76 HP/s for A in `s24`, capture-validation §25.4), so it switches itself
+  off after about 48 s from full HP: keep A's HP up with `&sethp <MaxHP>` (76 = 2 % ⇒ MaxHP 3 800 at `s24`'s step 5,
+  *inferred*; read it from the character window; `&sethp 100` there put HP
+  below 5 % and switched the toggle off) every 30–40 s, or with B healing A (Heal, B next to A). Each `&sethp` gives
+  A the HP update `s24` recorded after `&sethp` (`0x240E`, §25), each heal B's cast packets and A's HP change in
+  sight; none of them switches the toggle off.
   At 23 min 5 s (1 385 447 ms after `0x2429`) the client's icon of `StaBurnPainMe` runs out; **no packet** in either
   direction *(inferred: the client asks nothing)*, no `0x2428` / `0x1C18` from the server (it keeps the state 37.4 h).
   At 25 min A switches it off by a cast: `0x245D {7300}` and **two** `0x2428` per state still set (P02-B38), sight
@@ -1249,19 +1262,24 @@ The client-side refusals are test-client cases T23 / T24 (scenario 41); `0x243E`
   {7745}` (one step up is updated). If the client casts only the highest learned step (the shortcut changes to [03]
   or the cast of [01] is refused without a packet), note it: this step then needs a crafted `0x2440 {7300}` (test
   client).
-  (4) **Skill-save columns (D02 §6).** B casts Invincible [01] (1800, `DlyTime` 120 s) and A Dash [01] (452, 60 s);
-  20 s later both quit to the login screen; `snapshot` at once. Prediction per cooling skill: CharDB `0x4009
-  NC_CHARSAVE_SKILL_REQ` record `{savetime, skillid, cooltime ≈ 100 / 40 (seconds left), empow, mastery}` (Z23 §7.1: a
-  skill still cooling is in every save, incremental or full) → `0x400A`; the row: `nSkillLevel 0`, `nSkillExp` =
-  mastery, `nSkillWriteTime` = `savetime` (seconds since 1970), `nSkillCoolTime` = the seconds left, the four
-  `nSkillPower*` = empower. Log in again 30 s later: the `0x103D NC_CHAR_CLIENT_SKILL_CMD` record carries `cooltime =
-  max(0, saved − offline seconds)` (Z23 §7: saved ≈ 100 / 40, sent ≈ 70 / 10). Note the client's cooldown
-  display.
+  (4) **Skill-save columns (D02 §6).** A learns Violence [01] (453, `DlyTime` 120 s, `UseClass` 6 like Heat of Fury) with
+  `&learnskill 453`: the `0x4801` path that gave the book's row `nSkillLevel 1` in `s24` (capture-validation §24.2),
+  so its row starts at **1**, unlike the prep rows (`p_Skill_Set`, level 0, §24.6); `snapshot`. B casts Invincible
+  [01] (1800, 120 s), A casts Violence [01] next to a mob; 20 s later both quit to the login screen; `snapshot` once
+  the quit saves are in (they come 10–13 s after `0x1071`: the 10-s quit countdown, capture-validation §23.2 /
+  §23.3). Prediction per cooling skill: CharDB `0x4009 NC_CHARSAVE_SKILL_REQ` record `{savetime, skillid, cooltime ≈
+  87–90 (seconds left at the save, 120 − 20 − 10…13), empow, mastery}` (Z23 §7.1: a skill still cooling is in every
+  save, incremental or full) → `0x400A`; the row: `nSkillLevel` **0** for Violence too (D02 §6: the save writes 0),
+  `nSkillExp` = mastery, `nSkillWriteTime` = `savetime` (seconds since 1970), `nSkillCoolTime` = the seconds left,
+  the four `nSkillPower*` = empower. Log in again 30 s after the save: the `0x103D NC_CHAR_CLIENT_SKILL_CMD` record
+  carries `cooltime = max(0, saved − offline seconds)` (Z23 §7: sent ≈ 57–60 for both). Note the client's cooldown
+  display. (Dash's 60 s would be about 0 at the relogin and give no data point for the formula.)
   (5) **Two consecutive auto-saves** (capture-validation §23.5, Z01 §8.4): log in and stand still 21 minutes on one
   map (no link, no item move, no level). CharDB save bursts with `StoreType` 10 at map login + 600 s and + 1200 s
-  (± 1 s). Then `&levelup 1` (a save, Z11 §7.3) and stand 11 more minutes: the next `StoreType` 10 comes 600 s after
-  the `&levelup` save if `ws_save2DB`'s `nextSave` (+0x2aa40 = now + 6000) is the auto-save timer, else on the old
-  600-s grid; note which (not read).
+  (± 1 s). Then `&levelup 1` (a save, Z11 §7.3) and stand 11 more minutes: the next `StoreType` 10 comes **600 s
+  after the `&levelup` save**, not on the old 600-s grid: every `ws_save2DB` @ FUN_00455a10 restarts the auto-save
+  timer through vt 0xac0 `so_SetAutoSaveTime(cw_CurrTick, 600)` (`tAutoSaveTime` +0x2aa40, Z31's slot table;
+  capture-validation §23.5).
   (6) **Charged reset failures (S21).** A has 1 empower point on a skill and spent stat points. With S21 (b)
   installed, use the Full Skill Reset Capsule: Z → D `0x9006 {…, isdelete 1}` → **`0x900A
   NC_CHARGED_SKILLEMPOW_INITIALIZE_DB_FAIL_ACK {ref, lockindex, 0x108B}`** (`nRet` 1; `{0x1092}` if the error
@@ -1269,11 +1287,22 @@ The client-side refusals are test-client cases T23 / T24 (scenario 41); `0x243E`
   capsule stays in its cell and usable (lock cancelled), the empower point stays (memory and DB). Drop (b), install
   (a), use the Full Stat Reset Capsule: `0x9005` → **`0x9009 {…, 0x1083}`** (or `{0x108A}`) → C `0x900E`, silent;
   stats and capsule unchanged. Drop (a); use both capsules again: `0x9008` / `0x9007` as in `s24`.
-- **Disproved by:** (1) `0x4814 {1, 0x881}` with skill 1 named, or no disconnect after a refusal, or a `0x0C1A` with
-  usrregnum 0; (2) a `0x2428` for `StaBurnPainMe` between 23 and 25 min, or the switch-off finding no state (no
+  (7) **The scroll's destruction refused (`0x4813` 0x887 / 0x888, S21 (c) / (d)).** A has one empower point placed and
+  Skill Reset Scrolls. With S21 (d) installed and a stack of **two** scrolls (the lot drops by one: `ItemAttr_Save` →
+  `p_Item_SetOption` on `tItemOptions`, *inferred* from D04 §2's count bit 7), take a point back in the skill window:
+  D `0x4812 {…, bUseItem 1}` → **`0x4813 {0x887}`** (`p_Skill_SetPowerAll` not called) → C `0x4814 {1, 0x887}`
+  "Skill Empower failed." → the zone disconnects A (`0x0C1A {A's user number, 0x68A}` → `0x0C17 {0x68A}`, as step
+  1); after the relogin the point is back where it was and both scrolls are there (the trigger rolled the lot back).
+  Drop (d), install (c), keep **one** scroll (the row is deleted: `Item_Delete` → `p_Item_Delete`): the same with
+  **`0x4813 {0x888}`**, `0x4814 {1, 0x888}`, the scroll still there after the relogin. Drop (c).
+- **Disproved by:** (1) `0x4814 {1, 0x881}` with skill 1 named while `sp_helptext` shows the "> 5" check, no
+  disconnect after a refusal, a `0x0C1A` with usrregnum 0, or the scroll still there after a refusal; (2) a
+  `0x2428` for `StaBurnPainMe` between 23 and 25 min, or the switch-off finding no state (no
   `0x2428`); (3) `0x245D {7746}` at the first [03] cast after [01]; (4) a DB `nSkillCoolTime` in another unit than
-  seconds, `nSkillLevel` ≠ 0, or the relogin giving the full cooldown again; (5) no second `StoreType` 10 at + 1200 s;
-  (6) a client text, the capsule gone, or the point removed while the trigger stands.
+  seconds, Violence's `nSkillLevel` still 1 after the save, or the relogin giving the full cooldown again; (5) no second
+  `StoreType` 10 at + 1200 s, or the save after `&levelup` on the old grid;
+  (6) a client text, the capsule gone, or the point removed while the trigger stands; (7) `0x4813 {0x881}` or another
+  code while (c) / (d) stands, A staying in the game, or the scroll or the point changed after the relogin.
 
 ### 52. Character select and session II: what `s37b` / `s38` left open (added by X07)
 
@@ -1291,10 +1320,16 @@ The client-side refusals are test-client cases T23 / T24 (scenario 41); `0x243E`
   and still the map "RouT", W01 §4.2; capture-validation §22.2 *inferred*). Then leave to the server list, enter the
   world again (new `0x0C13`: state 2, RouN) and start: `0x1004` … `0x1003`, in game on RouN. This is the opposite of
   `s37b`'s rerun fix (§3.37: there the `-` character must **not** be in state 0): use another character.
+  Copy the WorldManager's log of both starts next to the notes by hand (`collect` copies only the capture and the
+  SQL outputs): the first logs "TutorialMap Search Fail" (capture-validation
+  §22.2, not on the wire); note whether the second logs it too or another line (not predicted: which check of the
+  second start answers 0x145 is *inferred* from W01 §4.2).
   (2) **The 2016 `p_Char_Rename` (S20).** With S20 installed (note what its `sp_helpindex` printed), select the `-`
-  character (tutorial state 2, §3.37), give the name of another existing character: W → D `0x1411` → `0x1412
-  {0xD1}` → C `0x1410 {slot, name, 0xD1}` "The name cannot be used.", the WM keeps the old name (W01 §4.1), the DB row
-  unchanged; start: in game (no map-login name mismatch). Then a free name: `0x1412 {0xD0}`, `0x1410 {0xD0}`, the DB
+  character (tutorial state 2: `37b-prep.sql` writes it, §3.37), give the name of another existing character: W → D
+  `0x1411` → `0x1412 {0xD1}` → C `0x1410 {slot, name, 0xD1}` "The name cannot be used.", the WM keeps the old name
+  (W01 §4.1), the DB row unchanged; the name still has its `-`, so selecting it opens the forced rename window again
+  *(inferred from capture-validation §22.1: the client opens it itself for a name with `-`)*: start is reached only
+  through a successful rename. Then a free name: `0x1412 {0xD0}`, `0x1410 {0xD0}`, the DB
   row renamed, start works. **If `tCharacter.sID` has no unique index**, the UPDATE succeeds and two characters share
   the name (`0xD0`): note it, it decides D02 §3.5's "a duplicate fails on the unique name" *(inferred there)*.
   Restore S20 at the end.
@@ -1306,7 +1341,8 @@ The client-side refusals are test-client cases T23 / T24 (scenario 41); `0x243E`
   capture-validation §23.4). Then B logs in on a map of **another** zone process and A kicks again: nothing reaches B;
   A gets "… is not in game" with the name read one byte early (Z11-B6); with the zone ↔ zone ports in the filter, the
   ring `0x1068` (0x1E bytes).
-  (4) **SHN mismatch.** On the server, keep a copy of one zone-side `9Data/Shine/View/*.shn` (e.g. `PupView.shn`),
+  (4) **SHN mismatch.** On the server, keep a copy of one zone-side View table the zone hashes (`9Data/Shine/View/MapViewInfo.shn`;
+  only the 14 View tables of the zone's "SHN - ViewData Checksum - …" log strings count, `PupView.shn` is not one),
   append one byte to it and restart that zone only; log in to a map it hosts: C `0x1801` → Z → C **`0x1804 {0x147,
   idx}`** "The client has been illegally manipulated. Please reinstall the client." (first login), the zone log's
   "DataFail" line names the table; Z → W `0x0C1A {usrregnum 0, 0x68E}` (the user number is set only by `0x104C`,
@@ -1425,7 +1461,7 @@ login plus one crafted packet is enough). One connection per case: several end i
 
 ## 5. What the scenarios do not reach
 
-- **Sections with no opcode (793 of the 2 040; counts of §7 as rebuilt by X07 after batch 4; X05: 796 of 2 058):** data tables, formulas, loaders, internal classes (most of Z09,
+- **Sections with no opcode (793 of the 2 042; counts of §7 as rebuilt by X07 after batch 4; X05: 796 of 2 058):** data tables, formulas, loaders, internal classes (most of Z09,
   Z10, Z12, Z19–Z22, Z24, Z27–Z29, S02). A capture raises them only through an effect: a damage or stat number
   (Z12, Z20, Z21: note the character window before and after each equip in 21 and 22), a drop rate (X1), a
   table value (X1–X7). The rest is second reading, as `confidence.md` §2 says per row.
@@ -1511,7 +1547,7 @@ checked against their `{CALL …}` strings (`bak.py cover`); the "Checked agains
 | S18 | 49 steps 2–3 | an item row removed while the owner is online (added by X05) | §8.19 |
 | S19 | 49 steps 5–7 | a forced insert failure on `tItem` / `tUserMoney` for one owner (added by X05) | §8.20 |
 | S20 | 52 step 2 | the 2016 `p_Char_Rename` on the test DB (added by X07) | §8.21 |
-| S21 | 51 step 6 | a forced failure of the charged stat / empower reset for one character (added by X07) | §8.22 |
+| S21 | 51 steps 6–7 | a forced failure of the charged stat / empower reset or of an item's destruction for one character (added by X07) | §8.22 |
 | X1 | 39, §5 | drop experiments: limited drop `Num` runs out (V22, Z09-B20); Hunter voucher vs `SNS_DropUp` (V19) | §9.2 |
 | X2 | 15, 31, 39 | party-battle maps, maps without party, instance gates, PK fields | §9.3 (read only) |
 | X3 | 21 step 12 (recorded); 47 step 5 (sell, use, move-merge: §9.4 steps 4–7) | a stack that holds more than the item's `MaxLot`, then a pick-up onto it | §9.4 |
@@ -1530,7 +1566,7 @@ scenarios 45–50 and the added steps counted (first build: 1 882 sections, 1 10
 reached).
 Rebuilt by X07 after capture batch 4: ratings as re-run in `confidence.md` §2 (50 documents, 61 knowledge files with
 a medium or low section), scenarios 51–52 and T23–T25 counted, 24 and 38 recorded (X05's build: 2 058 sections, 1 061
-reached, 183 all captured, 16 link records only; now 2 040, 1 003, 224, 18; 2 not reached in both).
+reached, 183 all captured, 16 link records only; now 2 042, 1 004, 225, 18; 2 not reached in both).
 
 <!-- COVER:begin -->
 | Document | Medium / low sections | No opcode | Opcodes all captured | Reached by a scenario | Link records only | Not reached | Scenarios (sections) |
@@ -1565,7 +1601,7 @@ reached, 183 all captured, 16 link records only; now 2 040, 1 003, 224, 18; 2 no
 | Z20 | 20 | 19 | 1 | 0 | 0 | 0 |  |
 | Z21 | 27 | 20 | 4 | 3 | 0 | 0 | 21 (2), 40 (1), 39 (1) |
 | Z22 | 47 | 28 | 16 | 3 | 0 | 0 | 39 (2), 24 (1) |
-| Z23 | 27 | 14 | 11 | 2 | 0 | 0 | 27 (1), 41 (1), 24 (1), 40 (1) |
+| Z23 | 29 | 14 | 12 | 3 | 0 | 0 | 24 (2), 27 (1), 41 (1), 34 (1), 51 (1) |
 | Z24 | 32 | 22 | 0 | 10 | 0 | 0 | 21 (6), 34 (4), 27 (3), 40 (1) |
 | Z25 | 28 | 12 | 10 | 6 | 0 | 0 | 24 (5), 27 (1), 41 (1) |
 | Z26 | 19 | 3 | 8 | 8 | 0 | 0 | 27 (6), 21 (5), 41 (4) |
@@ -1645,7 +1681,7 @@ reached, 183 all captured, 16 link records only; now 2 040, 1 003, 224, 18; 2 no
 | knowledge X05 | 7 | 1 | 0 | 6 | 0 | 0 | 21 (4), 39 (4), 41 (4), 47 (4), 14 (4) |
 | knowledge X07 | 4 | 0 | 0 | 4 | 0 | 0 | 24 (4), 41 (4), 34 (2), 51 (2), 29 (1) |
 | knowledge K01 | 15 | 8 | 7 | 0 | 0 | 0 |  |
-| **Total** | 2040 | 793 | 224 | 1003 | 18 | 2 | |
+| **Total** | 2042 | 793 | 225 | 1004 | 18 | 2 | |
 <!-- COVER:end -->
 
 ## 8. Database setups (S1–S21)
@@ -2222,13 +2258,14 @@ DROP TABLE dbo.X07_save_20;
 Check before the restore that `def` holds the 2018 text (`tCharacterChangeID` in it). Prediction and disproof:
 scenario 52 step 2. Not verified: no SQL Server on the analysis machine.
 
-### 8.22 S21: a forced failure of the charged stat / empower reset for one character (added by X07)
+### 8.22 S21: a forced failure of the charged stat / empower reset or of an item's destruction for one character (added by X07)
 
 S19's trigger pattern on an `UPDATE`. `usp_ChargeItem_UseSkillPowerInitDel` / `…UseStatPointInitDel` (*db-backup*)
 first set every `nSkillPower*` / free-stat column of the character to 0, roll back and return `@nRet` 1 when that
 `UPDATE` fails, then delete the capsule. The triggers fire only on that reset (all four powers or all five stats to
 0 from a non-zero row), so the empower and stat saves of the same session pass. Install one just before scenario 51
-step 6, drop it right after.
+step 6, drop it right after. (c) and (d) (review fix) are for step 7: they refuse the delete or the option write of
+any item of A, so nothing else may move A's items while one stands.
 
 ```sql
 USE w00_Character;
@@ -2250,13 +2287,29 @@ IF EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON d.nCharNo = i.nCharNo AND 
              AND d.nSkillPowerDemage + d.nSkillPowerSP + d.nSkillPowerKeepTime + d.nSkillPowerCoolTime > 0)
     RAISERROR(''X07 forced failure (S21 b)'', 16, 1);';
 IF @c IS NULL RAISERROR('character not found', 16, 1) ELSE EXEC (@sql);
+-- (c) deleting one of A's items (step 7, one scroll: Item_Delete → p_Item_Delete), S19's ROLLBACK pattern
+SET @sql = N'CREATE TRIGGER dbo.X07_tItem_delfail ON dbo.tItem AFTER DELETE AS
+IF EXISTS (SELECT 1 FROM deleted WHERE nOwner = ' + CAST(@c AS nvarchar(12)) + N')
+BEGIN ROLLBACK TRANSACTION; RAISERROR(''X07 forced failure (S21 c)'', 16, 1); END';
+IF @c IS NULL RAISERROR('character not found', 16, 1) ELSE EXEC (@sql);
+-- (d) an option write on one of A's items (step 7, a stack of two: ItemAttr_Save → p_Item_SetOption)
+SET @sql = N'CREATE TRIGGER dbo.X07_tItemOptions_fail ON dbo.tItemOptions AFTER INSERT, UPDATE AS
+IF EXISTS (SELECT 1 FROM inserted o JOIN dbo.tItem t ON t.nItemKey = o.nItemKey
+           WHERE t.nOwner = ' + CAST(@c AS nvarchar(12)) + N')
+BEGIN ROLLBACK TRANSACTION; RAISERROR(''X07 forced failure (S21 d)'', 16, 1); END';
+IF @c IS NULL RAISERROR('character not found', 16, 1) ELSE EXEC (@sql);
 -- restore (a)
 DROP TRIGGER dbo.X07_tCharacter_fail;
 -- restore (b)
 DROP TRIGGER dbo.X07_tSkill_fail;
+-- restore (c) / (d)
+DROP TRIGGER dbo.X07_tItem_delfail;
+DROP TRIGGER dbo.X07_tItemOptions_fail;
 ```
 
-Run the part of (a) or of (b) only (the script above installs both when run whole). The trigger raises without a
+Run the part of (a), (b), (c) or (d) only (the script above installs all when run whole). (c) and (d) roll back
+(S19's pattern): the batch ends and the Character server's ODBC call fails, which `Item_Delete` / `ItemAttr_Save`
+report as an error *(inferred)*: `0x4813 {0x888}` / `{0x887}` (D04 §2). The trigger raises without a
 rollback, so the procedure's own `IF @@ERROR <> 0` path should run (`@nRet` 1 → 0x1083 / 0x108B, D03); if the error
 reaches the Character server's ODBC call instead, the code is the "other failure" one (0x108A / 0x1092). Both give
 `0x9009` / `0x900A`. While (b) stands, an empower take-back to 0 on every field fails too (`p_Skill_SetPowerAll`):
