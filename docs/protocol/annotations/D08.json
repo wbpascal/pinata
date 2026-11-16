@@ -1,0 +1,400 @@
+{
+ "_about": "D08: Character server packets of docs/pseudocode/db/D08-db-process.md §6. Offsets after the opcode; names from the 2016 Zone / WM PDBs (NA2016, same build).",
+ "packets": {
+  "character": {
+   "0x0812": {
+    "dir": "Zone↔CharDB",
+    "name": "NC_MISC_PINGTEST_CLIENT_ZONE_DB",
+    "basis": "character FUN_004167e0 (CParserCharacter; D08 §6.3); names and offsets pdb2016 (Zone / WM PDB struct, size 0x5a = the echoed length)",
+    "fields": [
+     [
+      0,
+      "u32",
+      "ID",
+      ""
+     ],
+     [
+      4,
+      "u32",
+      "ClientSendZone",
+      ""
+     ],
+     [
+      8,
+      "u32",
+      "ClientRecvZone",
+      ""
+     ],
+     [
+      12,
+      "u16",
+      "hZoneClient",
+      ""
+     ],
+     [
+      14,
+      "u32",
+      "ZoneSendToDB",
+      ""
+     ],
+     [
+      18,
+      "u32",
+      "ZoneRecvFromDB",
+      ""
+     ],
+     [
+      22,
+      "u32",
+      "ZoneSendToClient",
+      ""
+     ],
+     [
+      26,
+      "u32",
+      "ZoneRecvFromClient",
+      ""
+     ],
+     [
+      30,
+      "u32",
+      "DBRecvFromZone",
+      "never written by the Character server (D08-B9)"
+     ],
+     [
+      34,
+      "u32",
+      "DBSendToZone",
+      "never written by the Character server (D08-B9)"
+     ],
+     [
+      38,
+      "u32",
+      "DBSendToODBC",
+      "Character stamp 1"
+     ],
+     [
+      42,
+      "u32",
+      "DBRecvFromODBC",
+      "Character stamp 2"
+     ],
+     [
+      46,
+      "NETPACKETZONEHEADER",
+      "header",
+      "{u16 clienthandle, u32 charregistnumber}, filled by the zone, echoed"
+     ],
+     [
+      52,
+      "PROTO_NC_ITEMDB_BUYLOT_REQ",
+      "buylot",
+      "0x26 bytes, filled by the zone, echoed; the Character server does not buy"
+     ]
+    ],
+    "notes": "0x5a bytes; answered with the same opcode and length"
+   },
+   "0x0813": {
+    "dir": "Zone↔CharDB",
+    "name": "NC_MISC_PINGTEST_TOOL_WM_CLIENT_ZONE_DB",
+    "basis": "character FUN_004168a0 (CParserCharacter; D08 §6.3); names and offsets pdb2016 (Zone / WM PDB struct, size 0x82 = the echoed length)",
+    "fields": [
+     [
+      0,
+      "u32",
+      "ID",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "hTool",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "ToolSendToWM",
+      ""
+     ],
+     [
+      10,
+      "u32",
+      "ToolRecvFromWM",
+      ""
+     ],
+     [
+      14,
+      "Name5",
+      "TargetCharName",
+      ""
+     ],
+     [
+      34,
+      "u16",
+      "hWMClient",
+      ""
+     ],
+     [
+      36,
+      "u32",
+      "WMSendClient",
+      ""
+     ],
+     [
+      40,
+      "u32",
+      "WMRecvFromClient",
+      ""
+     ],
+     [
+      44,
+      "u32",
+      "ClientSendZone",
+      ""
+     ],
+     [
+      48,
+      "u32",
+      "ClientRecvZone",
+      ""
+     ],
+     [
+      52,
+      "u16",
+      "hZoneClient",
+      ""
+     ],
+     [
+      54,
+      "u32",
+      "ZoneSendToDB",
+      ""
+     ],
+     [
+      58,
+      "u32",
+      "ZoneRecvFromDB",
+      ""
+     ],
+     [
+      62,
+      "u32",
+      "ZoneSendToClient",
+      ""
+     ],
+     [
+      66,
+      "u32",
+      "ZoneRecvFromClient",
+      ""
+     ],
+     [
+      70,
+      "u32",
+      "DBRecvFromZone",
+      "never written by the Character server (D08-B9)"
+     ],
+     [
+      74,
+      "u32",
+      "DBSendToZone",
+      "never written by the Character server (D08-B9)"
+     ],
+     [
+      78,
+      "u32",
+      "DBSendToODBC",
+      "Character stamp 1"
+     ],
+     [
+      82,
+      "u32",
+      "DBRecvFromODBC",
+      "Character stamp 2"
+     ],
+     [
+      86,
+      "NETPACKETZONEHEADER",
+      "header",
+      "echoed"
+     ],
+     [
+      92,
+      "PROTO_NC_ITEMDB_BUYLOT_REQ",
+      "buylot",
+      "echoed"
+     ]
+    ],
+    "notes": "0x82 bytes; answered with the same opcode and length"
+   },
+   "0x0814": {
+    "dir": "WM↔CharDB",
+    "name": "NC_MISC_PINGTEST_TOOL_WM_DB",
+    "basis": "character FUN_00416960 (CParserCharacter; D08 §6.3); names and offsets pdb2016 (Zone / WM PDB struct, size 0x26 = the echoed length)",
+    "fields": [
+     [
+      0,
+      "u32",
+      "ID",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "hTool",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "ToolSendToWM",
+      ""
+     ],
+     [
+      10,
+      "u32",
+      "ToolRecvFromWM",
+      ""
+     ],
+     [
+      14,
+      "u32",
+      "WMSendDB",
+      ""
+     ],
+     [
+      18,
+      "u32",
+      "WMRecvFromDB",
+      ""
+     ],
+     [
+      22,
+      "u32",
+      "DBRecvFromWM",
+      "never written by the Character server (D08-B9)"
+     ],
+     [
+      26,
+      "u32",
+      "DBSendToWM",
+      "never written by the Character server (D08-B9)"
+     ],
+     [
+      30,
+      "u32",
+      "DBSendToODBC",
+      "Character stamp 1"
+     ],
+     [
+      34,
+      "u32",
+      "DBRecvFromODBC",
+      "Character stamp 2"
+     ]
+    ],
+    "notes": "0x26 bytes; answered with the same opcode and length"
+   },
+   "0x0815": {
+    "dir": "Zone↔CharDB",
+    "name": "NC_MISC_PINGTEST_TOOL_WM_ZONE_DB",
+    "basis": "character FUN_00416a20 (CParserCharacter; D08 §6.3); names and offsets pdb2016 (Zone / WM PDB struct, size 0x3a = the echoed length)",
+    "fields": [
+     [
+      0,
+      "u32",
+      "ID",
+      ""
+     ],
+     [
+      4,
+      "u16",
+      "hTool",
+      ""
+     ],
+     [
+      6,
+      "u32",
+      "ToolSendToWM",
+      ""
+     ],
+     [
+      10,
+      "u32",
+      "ToolRecvFromWM",
+      ""
+     ],
+     [
+      14,
+      "u32",
+      "WMTargetZoneNo",
+      ""
+     ],
+     [
+      18,
+      "u32",
+      "WMSendZone",
+      ""
+     ],
+     [
+      22,
+      "u32",
+      "WMRecvFromZone",
+      ""
+     ],
+     [
+      26,
+      "u32",
+      "ZoneSendToDB",
+      ""
+     ],
+     [
+      30,
+      "u32",
+      "ZoneRecvFromDB",
+      ""
+     ],
+     [
+      34,
+      "u32",
+      "ZoneSendToWMS",
+      ""
+     ],
+     [
+      38,
+      "u32",
+      "ZoneRecvFromWMS",
+      ""
+     ],
+     [
+      42,
+      "u32",
+      "DBRecvFromZone",
+      "never written by the Character server (D08-B9)"
+     ],
+     [
+      46,
+      "u32",
+      "DBSendToZone",
+      "never written by the Character server (D08-B9)"
+     ],
+     [
+      50,
+      "u32",
+      "DBSendToODBC",
+      "Character stamp 1"
+     ],
+     [
+      54,
+      "u32",
+      "DBRecvFromODBC",
+      "Character stamp 2"
+     ]
+    ],
+    "notes": "0x3a bytes; answered with the same opcode and length"
+   }
+  }
+ },
+ "structs": {}
+}
