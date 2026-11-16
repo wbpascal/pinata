@@ -10,13 +10,15 @@
                                   stop it with Ctrl+C in THAT window. -NoLan when the clients run on the server PC
   .\24-server.ps1 snapshot -Label <text>   stats, money and skill rows of both characters -> out\<Name>-db.txt
   .\24-server.ps1 status          client links, X02 / X37 leftovers
-  .\24-server.ps1 cleanup         [both accounts logged out]  snapshot, then delete X24A and X24B (p_Char_Delete)
+  .\24-server.ps1 cleanup         [both accounts logged out]  snapshot, then delete X24A and X24B (p_Char_Delete);
+                                   with -Dest <folder> it ends with collect
+  .\24-server.ps1 collect -Dest <folder>   copies out\<Name>.pcapng, -prep.txt and -db.txt into <folder> (the notes' folder)
 
   Defaults: -CharA X24A, -CharB X24B, -CharDb World00_Character, -AccountDb Account (only used for a check).
 #>
 param(
     [Parameter(Mandatory, Position = 0)]
-    [ValidateSet('prep', 'capture-start', 'snapshot', 'status', 'cleanup')]
+    [ValidateSet('prep', 'capture-start', 'snapshot', 'status', 'cleanup', 'collect')]
     [string]$Action,
     [string]$Instance = '.\SQLExpress',
     [string]$CharDb = 'World00_Character',
@@ -27,6 +29,7 @@ param(
     [string]$Name = '26_11_16_24_skills-abstates-stat-points',
     [string]$ServerRoot = 'C:\FiestaServer\2016',
     [string]$Dumpcap = 'C:\Program Files\Wireshark\dumpcap.exe',
+    [string]$Dest,
     [switch]$NoLan
 )
 $ErrorActionPreference = 'Stop'
@@ -60,6 +63,22 @@ function Sql([string]$file, [hashtable]$vars, [string]$log) {
     $o | ForEach-Object { Write-Host $_ }
     if ($log) { "---- $(Stamp) $file" | Add-Content -LiteralPath $log -Encoding UTF8; $o | Add-Content -LiteralPath $log -Encoding UTF8 }
     if ($code) { throw "$file failed (sqlcmd exit $code)" }
+}
+# collect (X07): the run's files next to its notes. s38 lost its -db.txt because only the pcapng was copied by hand.
+function Collect([string]$dest, [string]$pcap) {
+    if (-not $dest) { throw "collect needs -Dest <folder>: the folder of the notes file (re-data\captures of a checkout, a share or a USB stick)" }
+    New-Item -ItemType Directory -Force $dest | Out-Null
+    if (-not $pcap) { $pcap = Join-Path $out "$Name.pcapng" }
+    $missing = @()
+    $files = [ordered]@{ $pcap = "$Name" + [IO.Path]::GetExtension($pcap); (Join-Path $out "$Name-prep.txt") = "$Name-prep.txt"; $dbLog = "$Name-db.txt" }
+    foreach ($src in $files.Keys) {
+        if (Test-Path -LiteralPath $src) {
+            Copy-Item -LiteralPath $src -Destination (Join-Path $dest $files[$src]) -Force
+            Write-Host "copied $src -> $(Join-Path $dest $files[$src])"
+        } else { $missing += $src }
+    }
+    if ($missing) { Write-Warning ("missing, copy by hand if it exists elsewhere: " + ($missing -join ', ')) }
+    else { Write-Host "all files of $Name are in $dest" }
 }
 function Snapshot([string]$label) { Sql '24-snapshot.sql' @{ Label = ($label -replace '[^\w\-]+', '_') } $dbLog }
 function Warn-Online {
@@ -107,6 +126,7 @@ switch ($Action) {
         Warn-Online
         Snapshot 'before cleanup'
         Sql '24-cleanup.sql' @{} $dbLog
-        Write-Host "Copy $out\$Name.pcapng and $dbLog to re-data\captures\ next to $Name.md"
+        if ($Dest) { Collect $Dest '' } else { Write-Host "Next: .\24-server.ps1 collect -Dest <folder of $Name.md> (pcapng, -prep.txt and -db.txt)" }
     }
+    'collect' { Collect $Dest '' }
 }

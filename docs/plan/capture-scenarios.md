@@ -12,10 +12,15 @@ State of this file: scenarios, GM setups and boundary values (X02 part 8); the S
 written from stored-procedure source and has not been run against a database: read §8's first paragraph.
 
 State after capture batch 3 (X05): scenarios 14, 21 (with S13, S16, X3) and 37 are recorded and carry a "Result
-(P02 batch 3)" line; scenario 24 has notes but no capture. What they and batch 2 left open is in scenarios
+(P02 batch 3)" line; scenario 24 was not captured then. What they and batch 2 left open is in scenarios
 **45–50** (they stand after 44, before the tool scenarios 41–43), setups **S17–S19**, test-client cases
 **T15–T22** and the "Added by X05" steps under scenarios 30, 36, 39 and 48. §2, §6 and §7 count all of them;
 the map from each open thing to its scenario is `docs/knowledge/X05.md`.
+
+State after capture batch 4 (X07): scenarios 24 (`s24`), 37 (second run `s37b`) and 38 (`s38`) are recorded and
+carry a "Result (P02 batch 4)" line and a "Notes corrected" line (capture-validation §13); their steps carry the
+fixes. The run kits under `tools/capture/` end with `collect` (§1). The map from each open thing of batch 4 to its
+scenario is `docs/knowledge/X07.md`.
 
 ## 1. Conventions
 
@@ -32,6 +37,10 @@ the map from each open thing to its scenario is `docs/knowledge/X05.md`.
 - **Notes file** as in `capture-guide.md`: character names, levels, money before and after, item names and
   cells, the time of each step. For item scenarios also the `tItem` rows before and after
   (`docs/knowledge/D03.md` "For capture scenarios (X02)", 13 SQL checks that run alongside 20–22, 34, 35).
+- **Run kits** (`tools/capture/<n>/<n>-server.ps1`) write the capture, `-prep.txt` and `-db.txt` into their `out\`
+  folder. End every run with `<n>-server.ps1 collect -Dest <folder of the notes file>` (24 and 37b: or `cleanup -Dest
+  …`; 38: `-Pcap <capture file>` as well), which copies all three and warns about a missing one. `s38` lost its `-db.txt`
+  because only the pcapng was copied by hand (capture-validation §23; X07).
 - **Notation.** `C→Z`, `Z→D` … as in `docs/pseudocode/README.md` §3.1 (C client, L Login, W WM, Z zone, D
   Character server, G GameLog, AL AccountLog). `{…}` = payload fields by our documents' names. "all Z" = the WM
   broadcast to every zone link. A section reference is the place the prediction was taken from.
@@ -419,12 +428,19 @@ online owner, one short capture per step, the SQL window open next to the client
   Z12 recompute; D04 §2.
 - **Setup:** A level 20+ with free stat and empower points (`&levelup 20` on a fresh character), money; a
   toggle skill and a buff with a movement reset condition (X4 lists the candidates from the misc-data table);
-  B in sight for step 6.
+  B in sight for step 6, but out of the DoT mob's reach in steps 7–8 (in `s24` the Trumpy killed B unnoticed).
 - **Steps:** (1) learn a skill at the skill master. (2) put 1 empower point into it; reset empower with the
-  item if at hand. (3) add 3 stat points to one stat; remove one with a restat item (else note the refusal).
+  item if at hand. (3) add 3 stat points to one stat; remove one with a restat item (else note the refusal). Read
+  WCmin / WCmax in the character window, not the STR total: the server sends no STR total for free points (`0x1035`
+  without flag 0, capture-validation §24.4); the DB's STR column holds the free points (63 after three points, not 53).
   (4) start a long cast and move to abort it; cast a ground-target skill. (5) switch a toggle skill on, walk
   through a gate, switch it off. (6) take the buff, then walk / run / attack: one action per buff, noting which
-  removes it. (7) get poisoned or burned by a mob (DOT). (8) die; B revives A with a revive skill; A accepts.
+  removes it. Assist: the 2016 client sends no `0x243E`; it sends `0x2401` with B's target once B attacks (§25.5),
+  so note when A's target changes. Clear with `&resetabstate` (one word; `&resetabstated` is an invalid command,
+  `0x2011`); it leaves the newbie states 730 / 732 behind (P02-B40). (7) get poisoned or burned by a mob (DOT).
+  (8) die by the mob's hit, not by `&sethp 1`: the flat DoT stops at 1 HP and `&sethp 1` kills nothing (§25.7); B
+  casts the revive skill **once**; A takes "Revival" in the death menu (the 2016 client has no decline, so the
+  `0x482B` refusal path is unreachable). Note every death, town revive and extra cast, also B's.
 - **Prediction:** (1) `0x4801` → D → `0x4802` → C `0x4804` (Z03 §9). (2) `0x4811` → D `0x4812` → answer (Z23
   §4). (3) per point C→Z `0x105C {stat}` → D `0x10D1 {nMaxStat, nFreeStat[5] (target), nLockIndex, nItemNum 0}`
   → `0x10D2 {…, 0xAC1}` → C `0x105F {stat}`; the dedicated `0x105D` is never sent; a fourth point with none left
@@ -436,14 +452,55 @@ online owner, one short capture per step, the SQL window open next to the client
   makes the zone send `0x482B`, which the client ignores (Z03 §7.3, Z03-B3).
 - **Disproved by:** `0x105D` on the wire; a DB request for the refused fourth point; a buff that survives its
   reset action or falls to another one; a toggle skill still on after the link.
-- **State after batch 3 (X05):** not captured. The scenario stands as written and is the next one to record. No
-  step or prediction changed: nothing recorded since touches them.
+- **State after batch 4 (X07):** recorded as `s24` (`26_11_16_24_skills-abstates-stat-points`, capture-validation
+  §24–§25); the notes form, the prep and the DB readings are next to it. Result below; what it left open:
+  "Open after batch 4". (After batch 3 the scenario was not captured.)
+- **Notes corrected (capture-validation §13, X07):** start / steps 1–3: "STR in the DB 53" is 63 in the `-db.txt`;
+  "STR 593 (+63)" is no server value (no STR total for free points; WCmin / WCmax rose by 3, §24.4); the auto-arrange
+  at 667.0 and the Damaged Mystery Vault opened at 1707.8 are missing (§24.8). Steps 4–8: step 6's
+  "`&resetabstated`" was an invalid command (`0x2011` at 1574.1); step 8's "`&sethp 1` … A died" did not happen (HP
+  1, no `0x104D`; the poison stopped, §25.7): A died 38 s later from a Trumpy swing; the second Revive cast is not
+  on the wire (one cast at 1949.7, accepted 41 s later); B's death by the Trumpy (1741.2) and town revive (1914.4)
+  are missing; assist sent no `0x243E` (§25.1, §25.5). The steps above carry these fixes.
+- **Result (P02 batch 4, `s24`, capture-validation §24–§25):**
+  (1) **confirmed** with the book use in front: `0x3015` → D `0x343F` → `0x3440 {0x700}` → D `0x4801 {skill 0,
+  removeid 0xFFFF}` → `0x4802` (11 ms) → G `0x0432` → C `0x4804 {0, 0}` + `0x1035`; DB row `nSkillLevel 1` (§24.2).
+  (2) **confirmed**: `0x4811` → D `0x4812` (40 bytes; 41 with a partly used scroll, `bUseItem 1`) → `0x4813 {0x881}` →
+  C `0x4814 {skill, 0x881}` "Skill empower succeeded"; plus and minus carry the new totals; stale bytes in the request
+  (P02-B37, no effect). The take-back without an item was refused by the client (no `0x4811`), so the server's 0x886
+  is untested. The full reset capsule: D `0x9006` → `0x9008` → C `0x900D {49}`, no text (§24.3, §24.5).
+  (3) **confirmed** per point: `0x105C {0}` → D `0x10D1 {130, [61|62|63, 67, 0, 0, 0], lock 0, 0 items}` →
+  `0x10D2 {0xAC1}` → C `0x105F {0}` + `0x1035`; `0x105D` never on the wire. The fourth point's `0x1061 {0xAC2}`:
+  **not reached**: the client counts the free points and sent nothing. Restat item: `0x1062` → `0x10D1` with
+  `DecItemInfo` → `0x10D2` → G `0x0459` → C `0x1065 {0}`; full capsule `0x9005` → `0x9007` → `0x900C {130}`, MaxHP
+  re-sent (§24.4, §24.5).
+  (4) **confirmed with an addition**: `0x2444` → `0x2438 CASTCUT` to the sight including the caster, then
+  `0x2445 {0x20E8}`, then `0x243D`; no cooldown (the second cast 12 s later was accepted). Field skill `0x2441` →
+  `0x2450` + `0x2435`, sight `0x2451`; the warp adds a second `0x2450` (new index, x + 5) and `0x4828` (§25.2, §25.3).
+  (5) **confirmed with a correction**: `0x245C` on the next tick, effect after `HitTime`; the link's CharDB burst
+  carries `0x4007` with `abstatenum 0` (1236.110: the toggle states have `AbStateSaveType 0`, so nothing is saved),
+  `0x245D` goes in the ms of `0x181B` without a `0x2428` (`csl_Toggle_AllOff` removes nothing), and on the new map
+  the toggle and its states are gone. Off by itself on weapon change and HP ≤ 5 %; at HP 100 the cast is refused with
+  `0x2434 {0xFD5}`. Not predicted: two `0x2428` per removed state (P02-B38) and the 23-min icon `keepTime` of a
+  37.4-h server state (P02-B39) (§25.4).
+  (6) **confirmed** for StaNeglect (run / walk / attack), StaHide (attack / attacked) and StaBuckler (shield off):
+  each state went on exactly its `AbStateReset` actions, one `0x2428` in the tick of the cause. "Attack" means an
+  attack start (`0x242B`, a cast), not each swing; "attacked" includes a missed swing (§25.5).
+  (7) **confirmed**: `0x243C {…, damage 200, abstate 179}` every 3.00 s to A and the sight, `0x240E` to A with each;
+  29 ticks. Not predicted: the ticks stop at 1 HP (the flat DoT never kills) while the state stays (§25.7).
+  (8) **confirmed**: A `0x4829` (empty) at the Revive effect; the client offers "Revival" in the death menu; A's
+  `0x482A` → `0x481E {3836, 2029, 0}` to A, `0x481F {8003, …}` to the sight (the field holds the revived player).
+  `0x482B`: **not reached** (no decline in the 2016 client). Not predicted: no experience loss on RouN
+  (`ExpLostAtDeadByMob` 0, no `0x2411`) (§25.8).
+  None of the "Disproved by" events occurred: no `0x105D`, no DB request for the refused fourth point (no request at
+  all), no state outlived its reset action or fell to another one, the toggle was off after the link.
 - **Run kit (2026-11-16):** notes form `re-data/captures/26_11_16_24_skills-abstates-stat-points.md` (the capture
   name; was `26_11_15_…`, blank). `tools/capture/24/24-server.ps1` runs on the server: `prep` (`24-prep.sql`: X24A
   → Gladiator 100 GM with 3 free stat points, money, skills 7300 toggle / 452 ground target; X24B → HighCleric 20
   GM with 1620 revive / 1800 cast; skills written to `tSkill` with `p_Skill_Set`, so no `&learnskill` on the wire;
   tutorial marked done; both at Skill Master Ruby), `capture-start` (dumpcap), `snapshot` (stats / skill rows),
-  `cleanup` (`p_Char_Delete` on both). The typing files `24-setupA/B.txt`, `24-items.txt`, `24-moveA/B.txt`,
+  `cleanup` (`p_Char_Delete` on both; with `-Dest` it ends with `collect`, which copies the capture, `-prep.txt` and
+  `-db.txt` next to the notes). The typing files `24-setupA/B.txt`, `24-items.txt`, `24-moveA/B.txt`,
   `24-step7.txt` go through `gmtype.ps1`. The two characters are still created in the client: the Character
   server's create writes items, skills, quests, shortcuts and the tutorial row (D02 §3), which SQL would only copy.
 
@@ -700,18 +757,59 @@ online owner, one short capture per step, the SQL window open next to the client
   None of the "Disproved by" events occurred.
 - **Open after batch 3 (X05):** T15 of scenario 41 (the silent Login connection) and **scenario 48** (why the first
   WM start of `s37` ended, capture-validation §17.6: the WM's `Msg` log next to a stop / start).
+- **Second run `s37b` (batch 4)**: the character-select paths `s37` did not reach (capture-validation §4.2 "never seen
+  on the WM"). Run kit `tools/capture/37/37b-server.ps1` (`prep`: `X37Del` renamed to `X37-Ren` in the DB, an open
+  `tCharacterChangeID` row for Test2; `stop-zones` / `start-zones`; `snapshot`; `cleanup`; `collect`), notes form
+  `re-data/captures/26_11_16_37b_char-select-rename-refusals.md`. Steps as run: (b1) create a character with a name
+  in use; one with a space. (b2) select the `-` character (the client opens the free rename itself): the old name,
+  then a name in use, then a free name; start each time. (b3) the rename right of Test2: a name in use, then a free
+  name; start. (b4) all zones stopped: start a character; zones back: start again; quit. **Fixed for a rerun (X07,
+  capture-validation §13):** the `-` character must not be in tutorial state 0, or step b2's start meets P02-B33
+  first ("The Map is under maintenance" from the tutorial skip, not from the rename; capture-validation §22.2): give it
+  a tutorial row in state 2 in the prep, or create it in the same session. The test DB runs the private 2018
+  `p_Char_Rename`, which answers 0xD0 without renaming; the 2016 behaviour needs the 2016 procedure on the test DB.
+  Predictions (the form's "expected" lines and W01 §4 / §6.2): (b1) W → D `0x1402` → `0x1403 {0x181}` → C `0x1404
+  {0x181}` "The name is already in use."; the space refused by the client. (b2) the old name refused by the client;
+  W ↔ D `0x1411` / `0x1412`, C `0x1410`; a name in use fails with 0xD1 (2016 procedure). (b3) `0xB409` → D `0xB40A` →
+  `0xB40B` → C `0xB40C`: 0x20D1 "The name is already taken by another user."; 0x20C0 "Character name successfully
+  changed." with `0xB40F` to all Z. (b4) `0x1002 {0x145}` "The Map is under maintenance" without a CharDB round trip.
+- **Result (P02 batch 4, `s37b`, capture-validation §22):**
+  (b1) **confirmed**: `0x1401` → `0x1402` → `0x1403 {err 0x181}` → `0x1404 {0x181}` in 58 ms; the client's text is
+  "The name is already in use. Please choose another"; "X37 Sp" refused by the client without a packet (§22.1).
+  (b2) the old name: **confirmed** (client, no packet). The name in use: **not reached** for the 2016 procedure: the
+  test DB's 2018 copy answered `0x1412 {0xD0}` without renaming, the WM stored the new name in its avatar copy, and the
+  start failed at the map login on the name mismatch (`0x104B` → `0x104C {−1, −1}` → `0x0C1A {usrregnum 0, 0x689}`,
+  "Disconnected"); this confirms W01 §4.1, §7.2, §5.2 and Z01 §5.3 (§22.3). The free name: the same 0xD0 path. The
+  first start ended in "The Map is under maintenance" from the tutorial skip of a listed state-0 character
+  (`0x1111` → `0x1112` / `0x1113` → `0x1002 {0x145}`, P02-B33; §22.2).
+  (b3) the name in use: **disproved for the client**: `0xB40C {0x20D1, slot 7}` came back, but the slot byte is stack
+  garbage and the client returns before the message: no text (P02-B34, §22.4). The free name: **confirmed**:
+  `0xB40B {0x20C0}`, `0xB40F` to the four zone links 1 ms before `0xB40C`, "Character name successfully changed.", the
+  row's `bFlag` 1.
+  (b4) **confirmed**: `0x1002 {0x145}` 7 ms after `0x1001`, no CharDB round trip, the client stays on the list; after
+  the restart `0x1003` in 671 ms (§22.1). Also seen: the WM's list copy patches the map of state-0 characters to "RouT"
+  (W01 §3.3 corrected), and the quit gives four saves (StoreType 4, 7, 4, 9; P02-B35, §22.5).
+- **Notes corrected (`s37b`, capture-validation §13, X07):** step 2's "Map under Maintenance" comes from the tutorial
+  skip (P02-B33), not from the rename to "Test1235"; the disconnects come from the 2018 `p_Char_Rename` (0xD0 without a
+  rename, so the WM's name and the DB's differ at the map login); step 3's silent refusal is P02-B34, not a success.
 
 ### 38. Session loss, kicks, back to character select
 
 - **Claims:** Z01 §8 (logout, kick, socket loss; re-checks L5, L6), W01 §5 and §7.3 (`0x0C31`, W8), W05 §4.5,
   Z09 §1.5, README §3.12 b, c, e; re-check E41 (money is saved only as deltas); bug X01-B3.
 - **Setup:** A in game with a known money value; a tool that closes one TCP connection of the client (TCPView
-  "Close Connection" or a firewall rule on the zone port only).
-- **Steps:** (1) return to character select (not world list), select the same character again. (2) quit the
-  game from inside. (3) close only the **zone** connection of the client; note what the client shows; log in
-  again within 10 s. (4) kill the client process; log in again. (5) pick up 100 money, wait for `0x3439`, then
-  kill the **zone process** (no clean stop); restart, log in, read the money. (6) `&getmoney 500`, then the
-  same kill within a second.
+  "Close Connection" or a firewall rule on the zone port only). Run kit: `tools/capture/38/38-server.ps1` (`prep`,
+  `close-zone-conn`, `kill-client`, `kill-zone`, `getmoney-kill`, `snapshot`; at the end `collect -Dest <folder of
+  the notes> -Pcap <capture>`).
+- **Steps:** (1) return to character select with the menu's "character select" (the world-list button closes the WM
+  session, `0x0C33`, capture-validation §23.2), select the same character again. (2) quit the game from inside and
+  let the 10-s countdown run out; wait until the client has closed before step 3 (in `s38` this step is missing:
+  the event at 292.5 is a `close-zone-conn`, §23.1). (3) close only the **zone** connection of the client; note what
+  the client shows; log in again within 10 s. (4) kill the client process; log in again. (5) pick up 100 money (no
+  mob of the 2016 data drops money: `&getmoney 100`, the same commit), wait for `0x3439`, then kill the **zone
+  process** (no clean stop); restart, log in, read the money. (6) `&getmoney 500`, then the same kill within a second.
+  Do each step once; write every extra try (a second step 1, a `&getmoney` or a kill not followed through) into the
+  notes with its time.
 - **Prediction:** (1) `0x0C18 {1}` to W and Z; the WM runs the character logout but keeps the session; the
   zone saves (dept 16), sends W `0x0C31 {…, wmHandle, charNo}`; the next `0x1001` is accepted only after it
   (W8). (2) as the captured logout without the token steps. (3) the zone's socket-close path sends **no**
@@ -723,6 +821,33 @@ online owner, one short capture per step, the SQL window open next to the client
   else of the last 10 minutes is saved (auto save 600 s).
 - **Disproved by:** a `0x0C31` in step 3; a money value in step 5 or 6 that is neither the committed sum nor
   the old value.
+- **Result (P02 batch 4, `s38`, capture-validation §23):**
+  (1) **confirmed** (778.8): `0x0C18 {1}` to Z and W in one ms, 10.0 s after `0x1071`; the zone saves once
+  (StoreType 9) and sends `0x0C31 {10000, 2}` 3 ms later; the WM's `CharacterLogout` (`0x1037`, `0x081F`, `0xC807`)
+  without `0x0C11`; `0x0C1F` → the list reloaded from CharDB → `0x1001` → in game 4.4 s after the quit (§23.2). The
+  first try went to the world list (`0x0C33`): the WM closed the session and handed the client to the Login by OTP.
+  (2) **not reached in `s38`**; the quits of `s37b` and `s24` show it (§22.5, §25.9): `0x0C18 {0}` to Z and W, `0x0C19`
+  from the WM twice; four saves (StoreType 4, 7, 4, then 9 + `0x0C31` 13 s after `0x1071`) when the zone handles the
+  WM's kick first (P02-B35), one save 9 + `0x0C31` when it handles the client's `0x0C18` first.
+  (3) **confirmed**: no `0x0C31` (saves 4, 7, 4, then 3 by `sp_Schedule_Kickout` 9.9 s later, §23.3). **Disproved**:
+  "the WM session lives on": the client itself sends `0x0C18 {0}` to the WM 14–27 ms after the zone socket's reset,
+  closes everything and shows "Disconnected from the server." (§23.4), so the WM closes the session (`0x0C11 {0x780}`,
+  `0x0C19` ×2). The new login's `0x0C17 {0x683}` kick and the `0x1002 {0x145}` on the same session are **not
+  reachable** with the 2016 client; the new login only sends `0x0C16` kicks, which re-run `so_banning` (one more save 4).
+  (4) **confirmed**: both sockets reset; `Client_OnClosed` 9 ms later (`0x0C11`, AL `0x0722`, `0xC803`, one `0x0C19`
+  broadcast); zone saves 4 and 7; the pending `0x1071` timer then saved 9 with `0x0C31` (§23.7, §23.3).
+  (5) **confirmed** (with `&getmoney 100`, see step 5): `0x3438` → `0x3439` in 15–22 ms, before the kill; the next
+  login's blob and the DB hold the sum (…4824) (§23.5).
+  (6) **confirmed**: all 500 (`0x3439` 17 ms, kill 0.58 s after `0x3438`, DB …5324); the position walked to was lost
+  (relogin at the last save's spot). The auto-save is every **10 min** (StoreType 10, `tAutoSaveTime` from the map
+  login; Z01 §8.4 corrected). Not predicted: the WM's `0x1037` carries its stale login copy of money and position,
+  which reaches the GameLog's `0x040B` but not the character row (P02-B36); `0x1001` for a dead zone's map →
+  `0x1002 {0x145}` without a CharDB round trip (§23.6).
+  None of the "Disproved by" events occurred.
+- **Notes corrected (`s38`, capture-validation §13, X07):** step 2's in-game quit is not in the capture (the 292.5
+  event is a server-side reset without `0x1071`); step 1 was done twice (the first try went on to the world list);
+  step 5 has a first `&getmoney` without a kill (547.2) and two kills (1412.1, 1567.5) before the one the notes
+  record; the DB readings file was not copied (the run kits now have `collect`). The steps above carry these fixes.
 
 ### 39. Combat extras: death penalty, PK, revive item, knock-back
 

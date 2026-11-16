@@ -16,13 +16,15 @@
                                                (client on this PC: typed for you; else a countdown tells you when to press Enter)
   .\38-server.ps1 status                       zone processes and ports, WM links, X02 save tables
   .\38-server.ps1 restore-gm                   undo S1 (only when no later scenario needs the GM character) [admin at the login screen]
+  .\38-server.ps1 collect -Dest <folder> [-Pcap <file>]   at the end: copies -prep.txt, -db.txt and the capture
+                                               (-Pcap, default out\<Name>.pcapng) into <folder> (the notes' folder)
 
   The zone is found from the client's connection (local ports 9210 / 9212 / 9214 / 9216), so the map does not matter.
   -ZonePort <port> picks the zone when no client is connected (kill-zone) or more than one is.
 #>
 param(
     [Parameter(Mandatory, Position = 0)]
-    [ValidateSet('prep', 'snapshot', 'close-zone-conn', 'kill-client', 'kill-zone', 'getmoney-kill', 'status', 'restore-gm')]
+    [ValidateSet('prep', 'snapshot', 'close-zone-conn', 'kill-client', 'kill-zone', 'getmoney-kill', 'status', 'restore-gm', 'collect')]
     [string]$Action,
     [string]$Char,
     [string]$Label = 'snapshot',
@@ -34,7 +36,9 @@ param(
     [int]$Money = 500,
     [switch]$Countdown,
     [string]$ClientLike = 'Fiesta*',
-    [string]$ServerRoot = 'C:\FiestaServer\2016'
+    [string]$ServerRoot = 'C:\FiestaServer\2016',
+    [string]$Dest,
+    [string]$Pcap
 )
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
@@ -74,6 +78,22 @@ function Sql([string]$file, [hashtable]$vars, [string]$log) {
     $o | ForEach-Object { Write-Host $_ }
     if ($log) { $o | Add-Content -LiteralPath $log -Encoding UTF8 }
     if ($code) { throw "$file failed (sqlcmd exit $code)" }
+}
+# collect (X07): the run's files next to its notes. s38 lost its -db.txt because only the pcapng was copied by hand.
+function Collect([string]$dest, [string]$pcap) {
+    if (-not $dest) { throw "collect needs -Dest <folder>: the folder of the notes file (re-data\captures of a checkout, a share or a USB stick)" }
+    New-Item -ItemType Directory -Force $dest | Out-Null
+    if (-not $pcap) { $pcap = Join-Path $out "$Name.pcapng" }
+    $missing = @()
+    $files = [ordered]@{ $pcap = "$Name" + [IO.Path]::GetExtension($pcap); (Join-Path $out "$Name-prep.txt") = "$Name-prep.txt"; $dbLog = "$Name-db.txt" }
+    foreach ($src in $files.Keys) {
+        if (Test-Path -LiteralPath $src) {
+            Copy-Item -LiteralPath $src -Destination (Join-Path $dest $files[$src]) -Force
+            Write-Host "copied $src -> $(Join-Path $dest $files[$src])"
+        } else { $missing += $src }
+    }
+    if ($missing) { Write-Warning ("missing, copy by hand if it exists elsewhere: " + ($missing -join ', ')) }
+    else { Write-Host "all files of $Name are in $dest" }
 }
 function Snapshot([string]$label) {
     Sql '38-snapshot.sql' @{ Char = $Char; Label = ($label -replace '[^\w\-]+', '_') } $dbLog
@@ -239,6 +259,7 @@ switch ($Action) {
         Kill-Zone $z
         Snapshot "step 6: after &getmoney $Money and the zone kill"
         Start-Zone $z
+        Write-Host "Last step done. At the end: .\38-server.ps1 collect -Dest <folder of $Name.md> -Pcap <the capture file>"
     }
     'status' {
         foreach ($port in $ZonePorts) {
@@ -250,6 +271,7 @@ switch ($Action) {
         Write-Host 'client links:'; Show-ClientLinks
         & sqlcmd -S $Instance -E -b -W -Q "USE World00_Character; SELECT name AS x02_object, type_desc FROM sys.objects WHERE name LIKE 'X02[_]%';"
     }
+    'collect' { Collect $Dest $Pcap }
     'restore-gm' {
         & sqlcmd -S $Instance -E -b -W -Q "USE World00_Character; IF OBJECT_ID('dbo.X02_save_1') IS NULL PRINT 'no dbo.X02_save_1: nothing to restore' ELSE BEGIN UPDATE c SET nAdminLevel = s.nAdminLevel FROM tCharacter c JOIN dbo.X02_save_1 s ON s.nCharNo = c.nCharNo; SELECT c.sID, c.nAdminLevel FROM tCharacter c JOIN dbo.X02_save_1 s ON s.nCharNo = c.nCharNo; DROP TABLE dbo.X02_save_1; PRINT 'S1 restored'; END"
     }

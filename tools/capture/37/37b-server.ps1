@@ -11,13 +11,15 @@
   .\37b-server.ps1 start-zones     step 4: start them again, wait until each listens and is linked to the WM
   .\37b-server.ps1 snapshot -Label <text>   characters + rename rows of the account -> out\<Name>-db.txt
   .\37b-server.ps1 status          zone ports, WM links, client links, save table
-  .\37b-server.ps1 cleanup         [admin logged out]  snapshot, then restore names, remove the rename rows
+  .\37b-server.ps1 cleanup         [admin logged out]  snapshot, then restore names, remove the rename rows;
+                                   with -Dest <folder> it ends with collect
+  .\37b-server.ps1 collect -Dest <folder>   copies out\<Name>.pcapng, -prep.txt and -db.txt into <folder> (the notes' folder)
 
   Defaults: -DashChar X37Del (renamed to -DashName X37-Ren), -RightChar Test2.
 #>
 param(
     [Parameter(Mandatory, Position = 0)]
-    [ValidateSet('prep', 'capture-start', 'stop-zones', 'start-zones', 'snapshot', 'status', 'cleanup')]
+    [ValidateSet('prep', 'capture-start', 'stop-zones', 'start-zones', 'snapshot', 'status', 'cleanup', 'collect')]
     [string]$Action,
     [string]$Instance = '.\SQLExpress',
     [string]$CharDb = 'World00_Character',
@@ -28,6 +30,7 @@ param(
     [string]$Name = '26_11_16_37b_char-select-rename-refusals',
     [string]$ServerRoot = 'C:\FiestaServer\2016',
     [string]$Dumpcap = 'C:\Program Files\Wireshark\dumpcap.exe',
+    [string]$Dest,
     [switch]$NoLan
 )
 $ErrorActionPreference = 'Stop'
@@ -65,6 +68,22 @@ function Sql([string]$file, [hashtable]$vars, [string]$log) {
     $o | ForEach-Object { Write-Host $_ }
     if ($log) { "---- $(Stamp) $file" | Add-Content -LiteralPath $log -Encoding UTF8; $o | Add-Content -LiteralPath $log -Encoding UTF8 }
     if ($code) { throw "$file failed (sqlcmd exit $code)" }
+}
+# collect (X07): the run's files next to its notes. s38 lost its -db.txt because only the pcapng was copied by hand.
+function Collect([string]$dest, [string]$pcap) {
+    if (-not $dest) { throw "collect needs -Dest <folder>: the folder of the notes file (re-data\captures of a checkout, a share or a USB stick)" }
+    New-Item -ItemType Directory -Force $dest | Out-Null
+    if (-not $pcap) { $pcap = Join-Path $out "$Name.pcapng" }
+    $missing = @()
+    $files = [ordered]@{ $pcap = "$Name" + [IO.Path]::GetExtension($pcap); (Join-Path $out "$Name-prep.txt") = "$Name-prep.txt"; $dbLog = "$Name-db.txt" }
+    foreach ($src in $files.Keys) {
+        if (Test-Path -LiteralPath $src) {
+            Copy-Item -LiteralPath $src -Destination (Join-Path $dest $files[$src]) -Force
+            Write-Host "copied $src -> $(Join-Path $dest $files[$src])"
+        } else { $missing += $src }
+    }
+    if ($missing) { Write-Warning ("missing, copy by hand if it exists elsewhere: " + ($missing -join ', ')) }
+    else { Write-Host "all files of $Name are in $dest" }
 }
 function Snapshot([string]$label) { Sql '37b-snapshot.sql' @{ RightChar = $RightChar; Label = ($label -replace '[^\w\-]+', '_') } $dbLog }
 
@@ -165,6 +184,7 @@ switch ($Action) {
         Snapshot 'before cleanup'
         Sql '37b-cleanup.sql' @{} $dbLog
         if (Test-Path -LiteralPath $zonesJson) { Write-Warning "$zonesJson still there: start-zones was not completed" }
-        Write-Host "Copy $out\$Name.pcapng and $dbLog to re-data\captures\ next to $Name.md"
+        if ($Dest) { Collect $Dest '' } else { Write-Host "Next: .\37b-server.ps1 collect -Dest <folder of $Name.md> (pcapng, -prep.txt and -db.txt)" }
     }
+    'collect' { Collect $Dest '' }
 }
