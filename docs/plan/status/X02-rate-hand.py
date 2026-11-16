@@ -11,9 +11,10 @@ OVERRIDE.update({
     ('S02', '1.8'): ('high', 'frame builder: short / long header of every captured Login and WM send matches '
                      '(capture-validation §2.1); pool exhaustion paths are code only', ''),
     # capture-validation §2.4: Login sent no heartbeat in any capture (the client polls 0x0C1B every 10 s).
-    ('L01', '1.6'): ('medium', 'the 30 s / close rule is read in code and seen on the WM and the zone only; the Login '
-                     'copy never fired in a capture (capture-validation §2.4)', 'scenario: sit on the login screen '
-                     'before the world list (no 0x0C1B poll) for 60 s'),
+    ('L01', '1.6'): ('medium', 'the 30 s / close rule is read in code and seen on the WM and the zone only; the 2016 client '
+                     'holds no Login connection on the login screen and polls 0x0C1B every 10 s on the world list, so the '
+                     'Login copy cannot fire with it (capture-validation §2.4, §16.2)', 'test-client case T15 '
+                     '(capture-scenarios §3.41): a silent Login connection for 60 s'),
 })
 
 CAPS += [
@@ -28,14 +29,12 @@ CAPS += [
 # idle, walk / portals, shop (buy, equip, storage, sell, soulstones), combat (swing, Bash [01], pick-up, death,
 # revive, &levelup, &linkto, Wooden Horse). No silver wing, pet, party, guild, KQ play, scripted map, second player.
 OVERRIDE.update({
-    ('Z02', '5.1'): ('medium', 'the captured opcodes are only mentioned here (0x1C19 abstate batch); the subject of the section (client 0x1C01 NC_BRIEFINFO_INFORM_CMD) is in no capture', 'capture 0x1C01 (scenario: a second client in sight)'),
     ('Z02', '11'): ('medium', 'the captured opcodes are only mentioned here (0x2401 / 0x2402 targeting); the subject of the section (0x2070 / 0x2071 auto way-finding gate use) is in no capture', 'capture 0x2070, 0x2071'),
-    ('Z04', '5.2'): ('medium', 'the captured opcodes are only mentioned here (0x3011 / 0x3410 of the normal equip, §5.1); the subject of the section (0x3010 ring equip) is in no capture', 'capture 0x3010 (equip a ring)'),
+    ('Z04', '5.2'): ('medium', 'the captured opcodes are only mentioned here (0x3011 / 0x3410 of the normal equip, §5.1); the 2016 client equipped both rings of batch 3 with 0x300F (capture-validation §19.7), so the subject of the section (0x3010 ring equip) is in no capture', 'test client: send 0x3010'),
     ('Z04', '5.3'): ('medium', 'the captured opcodes are only mentioned here (0x3011 / 0x3410 of the normal equip, §5.1); the subject of the section (0x3050 mini-monster equip) is in no capture', 'capture 0x3050'),
     ('Z04', '8.2'): ('medium', 'the captured opcodes are only mentioned here (0x1047 / 0x104B / 0x104C of the login); the subject of the section (0x3022 / 0x3023 / 0x3465 premium withdraw) is in no capture', 'capture 0x3022, 0x3023 (DB setup: a charged item row, part 9)'),
     ('Z05', '2.5'): ('medium', 'the captured opcodes are only mentioned here (the shared buy answer 0x3004); the subject of the section (0x34A1 capsule buy) is in no capture', 'capture 0x34A1'),
     ('Z05', '2.6'): ('medium', 'the captured opcodes are only mentioned here (the shared buy answer 0x3004); the subject of the section (0x34B2 item-money buy) is in no capture', 'capture 0x34B2'),
-    ('Z05', '6.1'): ('medium', 'the captured opcodes are only mentioned here (0x3016 of the ride item, which saves with 0x3449); the subject of the section (0x3440 item use with a DB commit) is in no capture', 'capture 0x3440 (use a stackable consumable)'),
     ('Z07', '6.2'): ('medium', 'the captured opcodes are only mentioned here (WM character-list opcodes); the subject of the section (0x8C01 mini-house activation) is in no capture', 'capture 0x8C01'),
     ('Z09', '5.9'): ('medium', 'the captured opcodes are only mentioned here (0x244A, 0x3004); the subject of the section (NPC object internals and the scheduled NPCs of 0x086A) is in no capture', 'capture 0x086A (event NPC schedule)'),
     ('Z09', '13.3'): ('medium', 'the captured opcodes are only mentioned here (0x1805 object removal); the subject of the section (servants / summoned mobs) is in no capture', 'capture a summoning mob (0x243C)'),
@@ -98,4 +97,66 @@ OVERRIDE.update({
                      'EngageArgument fields and the abstate element +0x70 corrected, stat matrix and battle statistics '
                      'superseded by Z12 §1.1 / Z16 §3.1; read with docs/knowledge/X02.md §0', 'combat capture with an '
                      'abstate set and removed by walking (aeo_MiscData reset condition)'),
+})
+
+# ---- X05 part 4: after capture batch 3 (s14, s21, s21b-d, s37) -----------------------------------------------
+# Lifted: Z02 §5.1 (0x1C01 captured 18 x in s14, capture-validation §18.2) and Z05 §6.1 (0x343E / 0x343F -> 0x3440
+# captured in s21, §19.6): both are high by the baseline now. Reworded above: L01 §1.6, Z04 §5.2.
+# New highs of the re-run checked against what batch 3 contains (second client in sight, whisper / shout / emote /
+# jump, GM items, split / merge, drop / pick, destroy, potions, rings, storage money, sell / buy back, soul stones,
+# login refusals, character create / delete, WM and zone stop / start); the incidental ones are medium by hand:
+OVERRIDE.update({
+    ('W03', '1.1'): ('medium', 'captured only as the start-up load of a world without a guild (0x7457 `NumOfGuild 0`, 0x74BD; capture-validation §17.3): no guild object was ever built', 'capture-scenarios 22 / 23 (guild with members)'),
+    ('W04', '2.5'): ('medium', 'the captured opcodes are only mentioned here (0x200D of a normal whisper, §2.1); the subject of the section (the gold-spammer alert from 0x085F) is in no capture', 'capture 0x085F (report a spammer with a GM online)'),
+    ('Z02', '9.2'): ('medium', 'the captured opcodes are only mentioned here (0x0720, 0x300C); the subject of the section (0x204B / 0x204C roar) is in no capture', 'capture 0x204B, 0x204C (use a megaphone item)'),
+    ('Z04', '7.2'): ('medium', 'the storage open 0x3444 is captured (capture-validation §7.6.1), but the 2016 client never sent 0x3028 in batch 2 or 3: all four pages come with the open (§20.1)', 'test-client case T16 (capture-scenarios §3.41)'),
+    ('Z05', '2.4'): ('medium', 'captured (two purchases, capture-validation §20.3), and the 0x3441 / 0x3442 layouts were corrected by that capture (§20.5: `{ref, lock}`); 0x3443 / 0x5005 are in no capture', 'capture-scenarios 46 / 47 (0x5005, 0x3443)'),
+    ('Z09', '8.7'): ('medium', 'the captured opcodes are only mentioned here (0x2002 / 0x201F of player chat and shout); the subject of the section (a mob shout or scripted mob chat) is in no capture', 'a shouting mob in a capture'),
+    ('Z09', '9.2'): ('medium', 'the captured opcodes are only mentioned here (0x2013, 0x2021, 0x2025 of a free player); the subject of the section (a blocked stop, emote or jump) is in no capture', 'capture a jump / emote on a blocked cell'),
+    ('Z09', '16.6'): ('medium', 'the captured opcodes are only mentioned here (0x2448 / 0x2449 swings); the subject of the section (damage absorption) is in no capture', 'capture a swing against an absorb abstate'),
+    ('Z09', '19.3'): ('medium', 'the captured opcodes are only mentioned here (0x2011, 0x201F, 0x2020 / 0x2021 from players); the subject of the section (the Lua notice, system-message, NPC chat and shout functions) is in no capture', 'a scripted map in a capture'),
+    ('Z09', '25.3'): ('medium', 'the captured opcodes are only mentioned here (0x2002 / 0x201F of player chat and shout); the subject of the section (`npcchat`, `npcshout`, `maplight`, fog) is in no capture', 'a scripted map in a capture'),
+    ('Z09', '28.8'): ('medium', 'the captured opcodes are only mentioned here (0x1C06 / 0x1C08 appear packets); the subject of the section (the vtable-only methods listed) is in no capture', 'second reading'),
+    ('Z13', '6.5'): ('medium', 'the captured opcodes are only mentioned here (0x1805, 0x1C01); the subject of the section (pet brief info 0x1C1C / 0x1C1D) is in no capture', 'capture with a pet summoned'),
+    ('Z16', '2.6'): ('medium', 'the captured opcodes are only mentioned here (0x3459 / 0x345A of the destroy and the expiry in batch 3); the subject of the section (KQ items) is in no capture', 'a KQ played in a capture (scenario 31)'),
+    ('Z17', '3.4.2'): ('medium', 'capture credit comes from the swings 0x2448 / 0x2449; no capture is known to contain an item with an action set', 'capture: equip an item with an `ItemAction` row and kill a mob'),
+    ('Z18', '4.9'): ('medium', 'the captured opcodes are only mentioned here (0x3016 / 0x301A of a potion); the subject of the section (item boxes, locks, lot sums, bracelet upgrade rows) is in no capture', 'per row: the scenario of its feature'),
+    ('Z18', '6.3'): ('medium', 'the captured opcodes are only mentioned here (0x6004 / 0x6005 of the level-20 title marks, §6.2); the subject of the section (Lua `cAddCharacterTitle`) is in no capture', 'a script that gives a title, in a capture'),
+    ('Z18', '6.6'): ('medium', 'the captured opcodes are only mentioned here (0x1C05, 0x200A, 0x200C); the subject of the section (weapon titles, group titles, card table lookups) is in no capture', 'capture 0x5C03, 0x5C0D'),
+    ('Z21', '3.1'): ('medium', 'the captured opcodes are only mentioned here (0x2408, 0x5004); the subject of the section (the set-item structures) is in no capture', 'capture: wear a full set'),
+    ('Z26', '1.4'): ('medium', 'silver wing used in no capture: 0x301A is the potion use of batch 3', 'scenario: save a location and fly with a silver wing'),
+    ('Z27', '7.2'): ('medium', 'the captured opcodes are only mentioned here (0x3459 / 0x345A); the subject of the section (the index consumers listed) is in no capture', 'second reading'),
+    ('Z30', '8'): ('medium', 'captured: only the guild list at zone start (0x7446 / 0x7447, no guild) and 0x1070; the other opcodes are mentions (0x300D); no party, raid or guild in a capture', 'capture-scenarios 15–17 (party / raid), 22 (guild)'),
+    ('Z31', '9.6'): ('medium', '0x987A / 0x987B are captured only as the hourly push to a world without a guild; the storage elements are in no capture', 'capture-scenarios 22 / 23 (guild, academy)'),
+    ('Z31', '10.2'): ('medium', 'the captured opcodes are only mentioned here (0x2008, 0x200C); the subject of the section (the `PacketContainer` send buffer) is in no capture', 'none on the wire (flush point: capture-scenarios §5 leftovers)'),
+    ('Z31', '11.5'): ('medium', 'the captured opcodes are only mentioned here (0x1803, 0x300C); the subject of the section (auto-arrange 0x304A / 0x304B) is in no capture', 'capture 0x304A, 0x304B (sort the inventory)'),
+    ('Z32', '5.4'): ('medium', 'the captured opcodes are only mentioned here (0x3015 / 0x3016 of the ride item); the subject of the section (coin items 0xBC19 / 0xBC1A) is in no capture', 'capture: use a coin item'),
+    ('S02', '1.1'): ('medium', 'the captured opcodes are only mentioned here (0x2008, 0x200C); the subject of the section (the library object model) is in no capture', 'none on the wire'),
+})
+
+# The generator now also counts the "Opcodes" tables of capture-validation as capture evidence (102 captured opcodes had
+# no evidence entry in annotations/P02.json, 73 of them from batches 1-2). New highs from that, incidental ones:
+OVERRIDE.update({
+    ('L01', '4.4'): ('medium', 'the captured opcodes are only mentioned here (the S2S handshake and heartbeat of §4.2, 0x0C18); the subject of the section (the OPTool handlers 0x2818 / 0x2819 and the other small bodies) is in no capture', 'second reading'),
+    ('Z02', '9.1'): ('medium', 'the captured opcodes are only mentioned here (0x10C6, 0x2019); the subject of the section (0x2044 / 0x2046 ride feeding) is in no capture', 'capture 0x2044, 0x2046 (feed a mount)'),
+    ('Z04', '6.4'): ('medium', 'the captured opcodes are only mentioned here (0x6401 / 0x6402 of the level-20 announcement); the subject of the section (the megaphone 0x204B / 0x204C) is in no capture', 'capture 0x204B, 0x204C (use a megaphone item)'),
+    ('Z09', '23.8'): ('medium', 'the captured opcodes are only mentioned here (0x3401 of `&makeitem`, 0x3459 of the destroy); the subject of the section (Lua `costumecreate` / `costumetakeoff`) is in no capture', 'a scripted map in a capture'),
+    ('Z12', '3.3'): ('medium', '0x1035 / 0x245F are captured as parameter pushes of other classes; no capture is known to contain a Sentinel or Savior', 'capture with a Sentinel character'),
+    ('Z12', '7.4'): ('medium', 'the captured opcodes are only mentioned here (0x1031 title blob, 0x4016 title save); the subject of the section (a title progress reset) is in no capture', 'capture across the reset time of a title'),
+    ('Z13', '5.3'): ('medium', 'the captured opcodes are only mentioned here (cast bar, item use, soul-stone and storage link packets); the subject of the section (the pet item, 0xD411) is in no capture', 'capture with a pet item used'),
+    ('Z15', '5.3'): ('medium', 'the captured opcodes are only mentioned here (0x1033, 0x3001, 0x4401); the subject of the section (0x441B quest done) is in no capture', 'capture: accept, progress and finish one quest (scenario 19)'),
+    ('Z18', '1.4'): ('medium', 'the captured opcodes are only mentioned here (the S2S handshake and heartbeat); the subject of the section (OPTool and zone-ring sessions) is in no capture', 'none with one zone PC and no OPTool'),
+    ('Z18', '6.4'): ('medium', 'the captured opcodes are only mentioned here (the title blobs 0x1031 / 0x1049 of the login); the subject of the section (the weapon title after an equipment change) is in no capture', 'capture 0x5C03 (weapon with a title)'),
+    ('Z21', '5.5'): ('medium', 'the captured opcodes are only mentioned here (the abstate blob and its saves 0x1023 / 0x4007 / 0x4011); the subject of the section (the set-item part of the block) is in no capture', 'capture: log out wearing a full set'),
+    ('Z21', '5.6'): ('medium', 'the captured opcodes are only mentioned here (0x100C / 0x1023 abstate blobs, 0x104E); the subject of the section (restoring a set-item state) is in no capture', 'capture: log in wearing a full set'),
+    ('Z22', '7.2'): ('medium', 'the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (the bomb actor) is in no capture', 'capture a skill with this abstate type'),
+    ('Z22', '7.5'): ('medium', 'the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (dispel, cure, steal) is in no capture', 'capture a dispel or cure skill'),
+    ('Z22', '9.5'): ('medium', 'the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (the time-attack actor) is in no capture', 'capture a skill with this abstate type'),
+    ('Z22', '10.7'): ('medium', 'the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (skill enchant) is in no capture', 'capture a skill with this abstate type'),
+    ('Z22', '12.4'): ('medium', 'the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (party enchant) is in no capture', 'capture-scenarios 15 (party) with a party buff'),
+    ('Z25', '1.3'): ('medium', 'the captures run these slots only for Bash [01] of a Fighter against a mob; the mob-side slots and the other branches are code only', 'skills of other classes; a mob skill'),
+    ('Z25', '2.7'): ('medium', 'the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (SS_HOLDME) is in no capture', 'capture a skill with this special'),
+    ('Z25', '2.8'): ('medium', 'the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion)); the subject of the section (the keep-time specials) is in no capture', 'capture a skill with this special'),
+    ('Z25', '2.10'): ('medium', 'the captured opcodes are only mentioned here (0x1C18 / 0x2427 – 0x242A of the abstates the captures set (login list, Bash [01], potion), 0x2452); the subject of the section (the multi-hit tail) is in no capture', 'capture a multi-hit skill'),
+    ('Z31', '3.5'): ('medium', 'the captured opcodes are only mentioned here (0x1047, 0x3001); the subject of the section (the 51 attribute classes) is in no capture', 'per class: the scenario of its item type'),
 })

@@ -13,7 +13,8 @@ usage (repo root):  python3 -I docs/plan/status/X02-rate.py write          # rew
 (`show` / `sig` / `pdbmiss` take 'K:<ID>' for the knowledge file of an item.)
 
 Signals per section (own body, up to the next heading of any level):
-  cap      opcodes of the section with a capture evidence entry (annotations/P02.json `evidence`), of all its opcodes
+  cap      opcodes of the section with a capture evidence entry (annotations/P02.json `evidence`) or a counted row
+           in an "Opcodes" table of capture-validation.md, of all its opcodes
   conf     the § is named in a **confirmed** row of capture-validation.md (§11, §13 tail) -> `cv ok`
   corr     the § is named in a row of capture-validation.md §13 (corrected / contradicted / extended) -> `cv corr`
   sup      rows of README §5 whose "Older place" names this item and § (statements a later item superseded)
@@ -135,6 +136,11 @@ def load_inputs():
     if m:
         conf.update(refs(m.group(1), None))
     I['conf'] = conf; I['corr'] = corr
+    # X05: opcodes counted in an "Opcodes" table of capture-validation (| dir | 0x…. | NC_… | n > 0 | …) are captured
+    # too; 29 batch-3 link opcodes (0x3441 / 0x3442, 0x343E, 0x3401 …) have no evidence entry in P02.json
+    for m in re.finditer(r'^\| [^|\n]+ \| (0x[0-9A-Fa-f]{4}) \| NC_\w+ \| (\d+) \|', cv, re.M):
+        if int(m.group(2)) > 0:
+            I['cap'].add(m.group(1).lower())
     return I
 
 
