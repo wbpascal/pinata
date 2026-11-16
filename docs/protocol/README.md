@@ -230,7 +230,7 @@ Anything else closes the session.
 | Login: world select | `C 0x0C0B` → A `0x0C10`, AL `0x0721`, W `0x0C0D` (same ms, this order) / `0x0C0E` → `0x0C0C` | *(captured)* 20–30 ms; the XOR of the 32 validate words is the per-world counter (L01 §2.5); a refused select still carries the WM ip / port, its validate words are stack residue (P02-B23) | capture-validation §3.3, §16.1, §16.3; X01 §3.5 |
 | WM: world login | `0x0807`, `C 0x0C0F` → `0x0C16` to every zone, A `0x0C60` / `0x0C61`, D `0x0C12` → `0x0C5F` + `0x0C13` → `0x0C14` | *(captured)* `0x0C14` 50–76 ms after `0x0C0F`; the WM kicks the user from every zone on every world login (§2.5) | capture-validation §4.1; X01 §3.6; W01 §3.2, §3.3 |
 | WM: game time | `C 0x080D NC_MISC_GAMETIME_REQ` → `0x080E NC_MISC_GAMETIME_ACK {hour, minute, second}` | *(captured)* 4–8 ms after `0x0C14`, and again in the tick of every zone `0x1801` (map login and map change) | capture-validation §4.1; X01 §3.6 step 6; W01 §5.3 |
-| WM: character login | `C 0x1001` → D `0x1004` → blocks → `0x1005` → `0x1003` + D `0x1036` + GameLog `0xC806`, then `0x7032` / `0x7033` / `0x7034` (`NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD`, `…_GET_KEYMAP_CMD`, `…_GET_GAMEOPTION_CMD`) | *(captured)* `0x1003` ~615 ms after `0x1001`; the option pushes come from `SendToClient_CharOptionData` FUN_00431680 after `0x1003`, 53 ms later, before the zone has answered `0x1801`. `0x1036 NC_CHAR_LOGIN_DB` goes to the CharDB (not to the zone) | capture-validation §4.1, §7.4; X01 §3.8; W01 §4.2; W04 §8 |
+| WM: character login | `C 0x1001` → D `0x1004` → blocks → `0x1005` → `0x1003` + D `0x1036` + GameLog `0xC806`, then `0x7032` / `0x7033` / `0x7034` (`NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD`, `…_GET_KEYMAP_CMD`, `…_GET_GAMEOPTION_CMD`) | *(captured)* `0x1003` ~615 ms after `0x1001`; the option pushes come from `SendToClient_CharOptionData` FUN_00431680 after `0x1003`, 53 ms later, before the zone has answered `0x1801`. `0x1036 NC_CHAR_LOGIN_DB` goes to the CharDB (not to the zone). A tutorial-state-0 character first gets the `0x1110` popup (`C 0x1111 {bIsSkip}` → D `0x1112` → `0x1113`, then the same chain). Refusal: `0x1002` (zone down, P02-B33 tutorial skip; §2.7) | capture-validation §4.1, §7.4, §18.7, §22.1, §23.6; X01 §3.8; W01 §4.2, §6.2; W04 §8 |
 | Zone: seed | `0x0807` on accept | *(captured)* The client never sends `0x0806` (§1.4) | capture-validation §2.3; Z18 §1.3 |
 | Zone: map login | `C 0x1801` (+ `C 0x080D` to the WM, same tick) → zone → W `0x104B`, W → zone `0x104C`, zone → W `0x101C NC_CHAR_ZONE_CHARDATA_REQ`, W → zone blocks → `0x101D` → 15 client copies of the blocks (`0x1038` BASE … `0x441E` QUEST_RESET_TIME) → `0x1802` | *(captured)* `0x1802` 442–560 ms after `0x1801`; the blob copies come in W01 §6.3 table order, all before `0x1802`. On `0x1802` the client asks the WM for its options in one tick: `0x7004`, `0x700C` (answered from the CharDB, `0x7005`, `0x700D`) and `0x7C06 NC_PRISON_GET_REQ` (`0x7C07`) | capture-validation §5.1, §4.1, §7.5.2; X01 §3.9; Z01 §5.2, §5.3; W01 §7.2 |
 | Zone: login complete | `C 0x1803` and, in the same client tick, `0x2001 NC_ACT_CHAT_REQ "&adminlevel"`, `0x200B NC_ACT_ENDOFTRADE_CMD` ×3, on the first map login also `0x302C` / `0x3020`; to the WM `0x581B NC_KQ_LIST_REFRESH_REQ` | *(captured)* The zone answers with the 17-step login burst of Z01 §6 in one server tick (6–18 ms), then the parameter refresh (`0x1035`, `0x240E`, `0x240F`, `0x245F`) one tick later; the zone's `0x180C` makes the WM send `0x1097`, `0x1012`, `0x9414`, `0x5826`, `0x10D9`, `0x0849`, `0x182A` (W01 §7.3 call order; the once-per-character ones only on the first map login) | capture-validation §5.1, §4.1; X01 §3.10; Z01 §6; W01 §7.3; W04 §17 |
@@ -322,6 +322,27 @@ the new `AVATAR`). Delete (the client checks the typed confirmation itself and s
 GameLog `0x0412` + `0xC805`, client `0x140C`, D `0x9424`, every zone `0x10B2`. Refusals: `0x1404` / `0x140A` (§3.2).
 Detail: capture-validation §16.1; X01 §3.7; W01 §4.1; W03 §4.5; W04 §4.3; D02 §3.3, §3.4.
 
+*(captured, capture-validation §22.1)* Create refused by the CharDB: `0x1401` → D `0x1402` (15 ms) → D `0x1403
+NC_AVATAR_CREATEDATAFAIL_ACK {err 0x181}` (29 ms) → client `0x1404 {0x181}` (14 ms) "The name is already in use.
+Please choose another"; a name with a space never leaves the client.
+
+*(captured, capture-validation §22.1, §22.3)* Free rename (the client opens the rename window itself when the selected
+name contains `-`; the unchanged name is refused by the client): `C 0x140F NC_AVATAR_RENAME_REQ {SlotNo, NewName}` → D
+`0x1411 {handle, nCharNo, SlotNo, NewName}` → `0x1412 {…, Error}` → client `0x1410 {SlotNo, NewName, Error}` (16–22 ms in all);
+`0xD0` = renamed (no message, the list shows the new name, the WM stores it in its avatar copy), `0xD1` = refused (the
+WM's own check; from the CharDB on a taken name *(inferred)*, D02 §3.5). The test DB's newer `p_Char_Rename` answered `0xD0` without renaming: the client then
+logged in with a name the CharDB blob did not have, the WM's `0x104B` name check answered `0x104C {−1, −1}`, the zone
+ran `0x0C1A {0, 0, 0x689}` and the WM closed the session ("Disconnected"; no `0x0C17`). This is the test DB's
+procedure, not a 2016 server path. Detail: W01 §4.1, §7.2, §5.2; D02 §3.5; Z01 §5.3.
+
+*(captured, capture-validation §22.1, §22.4)* Rename right (dept 45, avatar `CharIDChangeData.bNeedChangeID` 1): `C
+0xB409 NC_USER_CONNECTION_CHANGE_CHAR_ID_REQ {nSlotNo, sNewID}` → D `0xB40A {hWMChar, nRowNo, nUserNo, nCharNo, sNewID,
+bInit}` → `0xB40B {hWMChar, nError, …}`. On `0x20C0` the WM sends `0xB40F NC_USER_CONNECTION_ZONE_CHANGE_CHAR_ID_CMD
+{nCharNo, bInit, sOldID, sNewID}` to every zone link, then (1 ms later) the client `0xB40C {nError 0x20C0, nSlotNo,
+sNewID}` "Character name successfully changed." (30–48 ms after `0xB409`). Every other CharDB code (`0x20D1` name in
+use captured) carries a stack-garbage slot byte, and the client, finding no avatar in that slot, shows nothing
+**(original bug) P02-B34**. Detail: W01 §4.1, §6.2; D02 §14; Z30 §1.2.
+
 ### 2.7 Login refusals
 
 *(captured)* Blocked account / login disabled: AccountDB `0x0C5C {nBlock 1}` / `{bLoginAble 0}` → `0x0C09 {0x47}` /
@@ -330,6 +351,15 @@ status 0 and a select answers `0x0C0C {0}` at once. World full: Login still runs
 trip and answers `0x0C0C {5}` with a valid address and key; the client shows "Server is full." and does not connect
 (L00-B3). For up to 30 s after a WM start the world reports full, because the WM's first `0x0808` carries capacity 0
 (P02-B22). Detail: capture-validation §16.1, §16.3; X01 §3.5; `login-server.md` §4, §5.1; L01 §3.
+
+*(captured)* Character login refused: `C 0x1001` → `0x1002 {0x145}` "The Map is under maintenance", the client stays on
+the character list. Without a CharDB round trip (2–12 ms) when no zone serves the login map: the zone is stopped or
+killed (capture-validation §22.1 step 4, §23.6). The WM tells nobody else that a zone died; the first `0x1001` after the
+zone's `0x0803` / `0x180F` succeeds. After a CharDB round trip when a character listed by `0x0C13` (not just created)
+skips the tutorial (`0x1110` → `0x1111 {1}` → D `0x1112` → `0x1113 {0x31E8}` → 10 ms → `0x1002 {0x145}`, no `0x1004`):
+the WM's list copy maps every tutorial-state-0 avatar to "RouT", the skip rewrites only the `TS_PROGRESS` map, and no
+zone serves "RouT" **(original bug) P02-B33** (capture-validation §22.2; the skip is saved, the next list shows state 2
+and the DB map). Detail: W01 §4.2, §6.2.
 
 ---
 
@@ -368,9 +398,9 @@ until the client presents the same 32 values in `0x0C0F`.
 | `0x0807` | S→C | `u16 seed` | sent on accept |
 | `0x0C0F` | C→S | `char user[256]` @0, `u16 validate[32]` @256 | must match a pending `0x0C0D` record. No match → `0x0C15 {u16 0x44}` |
 | `0x0C15` | S→C | `u16 error` | world login failed (`0x44` bad key, `0x46` avatar DB error) |
-| `0x0C14` | S→C | `u16 worldmanager; u8 numofavatar; AVATAR[numofavatar]` | `NC_USER_LOGINWORLD_ACK`. `worldmanager` = the client's WM handle (sent back in `0x1801`). `AVATAR` is 130 bytes (`0x82`), copied from CharDB `0x0C13`; its layout is in `annotations.json` (W01 §6.1). The client sends `0x080D` 4–8 ms later *(captured)* |
+| `0x0C14` | S→C | `u16 worldmanager; u8 numofavatar; AVATAR[numofavatar]` | `NC_USER_LOGINWORLD_ACK`. `worldmanager` = the client's WM handle (sent back in `0x1801`). `AVATAR` is 130 bytes (`0x82`), copied from CharDB `0x0C13`, except that the WM sets the login map of every tutorial-state-0 avatar to "RouT" *(captured, capture-validation §22.2)*; its layout is in `annotations.json` (W01 §6.1). The client sends `0x080D` 4–8 ms later *(captured)* |
 | `0x1001` | C→S | `u8 slot` (0–5) | `NC_CHAR_LOGIN_REQ`: select a character |
-| `0x1002` | S→C | `u16 error` | `NC_CHAR_LOGINFAIL_ACK`. Codes: `0x0143` (slot ≥ 6), `0x0144` (empty slot), `0x0145` "The Map is under maintenance" (no zone for the map, or the previous character's logout not yet confirmed), `0x31EB` (no selected avatar, W01-B6). W01 §4.2 |
+| `0x1002` | S→C | `u16 error` | `NC_CHAR_LOGINFAIL_ACK`. Codes: `0x0143` (slot ≥ 6), `0x0144` (empty slot), `0x0145` "The Map is under maintenance" (no zone serves the map: zone down or a tutorial skip of a listed character, both *(captured)*, §2.7, P02-B33; no session for that zone; or the previous character's logout not yet confirmed), `0x31EB` (no selected avatar, W01-B6). W01 §4.2 |
 | `0x1003` | S→C | `char zone_ip[16]; u16 zone_port` | `NC_CHAR_LOGIN_ACK`, zone handoff, sent after CharDB `0x1005 NC_CHAR_CHARDATA_ACK`. In the same ms the WM sends `0x1036 NC_CHAR_LOGIN_DB` to the **CharDB** and `0xC806` to the GameLog, then `0x7032`–`0x7034` to the client *(captured, §2.2)* |
 | `0x080D` | C→S | – | `NC_MISC_GAMETIME_REQ`: after `0x0C14` and in the tick of every zone `0x1801` *(captured)* → `0x080E NC_MISC_GAMETIME_ACK {u8 hour, u8 minute, u8 second}` (W01 §5.3) |
 | `0x7032` / `0x7033` / `0x7034` | S→C | option blobs | `NC_CHAR_OPTION_IMPROVE_GET_SHORTCUTDATA_CMD` / `…_GET_KEYMAP_CMD` / `…_GET_GAMEOPTION_CMD`, pushed after `0x1003` (`SendToClient_CharOptionData` FUN_00431680, W04 §8) |
@@ -378,8 +408,10 @@ until the client presents the same 32 values in `0x0C0F`.
 | `0x0C18` | C→S | `u8 LogoutType` | `NC_USER_NORMALLOGOUT_CMD`; sent to the WM and the zone together. 0 = quit or back to the world list, 1 = back to character select, both *(captured)* (W01 §5.1); the zone reads no `LogoutType` (§2.4) |
 | `0x0C17` | S→C | `u16 reason` | `NC_USER_CONNECTCUT_CMD`, then the WM closes the session; `0x683` = duplicate login (§2.5), zone kick reasons are passed on from `0x0C1A` (W01 §5.2) |
 | `0x1401` | C→S | `u8 slotnum; char name[20]; u8 char_shape[4]` (25 bytes; shape byte 0 = `race:2, chrclass:5, gender:1`, then hairtype, haircolor, faceshape) | `NC_AVATAR_CREATE_REQ` *(pdb2016)*: checked by the WM (slot, name, class level rule), then CharDB `0x1402` → `0x1405` (§2.6; W01 §4.1, D02 §3.3) *(captured: `{2, "X37Del", 0x85}` = Fighter)* |
-| `0x1406` / `0x1404` | S→C | `u8 numofavatar; AVATAR` (131 bytes) / `u16 err` | `NC_AVATAR_CREATESUCC_ACK` / `NC_AVATAR_CREATEFAIL_ACK`. Every refusal the WM finds itself answers `0x84` "name already taken" (W01-B2); CharDB failures pass on its code |
+| `0x1406` / `0x1404` | S→C | `u8 numofavatar; AVATAR` (131 bytes) / `u16 err` | `NC_AVATAR_CREATESUCC_ACK` / `NC_AVATAR_CREATEFAIL_ACK`. Every refusal the WM finds itself answers `0x84` "name already taken" (W01-B2); CharDB failures pass on its code (`0x1403`; `0x181` "The name is already in use." *(captured)*, §2.6) |
 | `0x1407` | C→S | `u8 slot` | `NC_AVATAR_ERASE_REQ` *(pdb2016)*: the WM asks the CharDB for the guild first (`0x1413` → `0x1414`), then `0x1408` (§2.6; W01 §4.1, W03 §4.5) *(captured)* |
+| `0x140F` → `0x1410` | C→S, S→C | `u8 SlotNo; char NewName[20]` → `u8 SlotNo; char NewName[20]; u16 Error` | `NC_AVATAR_RENAME_REQ` / `_ACK`: free rename; `0xD0` renamed, `0xD1` refused (§2.6; W01 §4.1) *(captured)* |
+| `0xB409` → `0xB40C` | C→S, S→C | `u8 nSlotNo; char sNewID[20]` → `u16 nError; u8 nSlotNo; char sNewID[20]` | `NC_USER_CONNECTION_CHANGE_CHAR_ID_REQ` / `_ACK`: rename right; `0x20C0` renamed, `nSlotNo` set only then (P02-B34) (§2.6; W01 §4.1, §6.2) *(captured)* |
 | `0x140C` / `0x140A` | S→C | `u8 slot` / `u16 err` | `NC_AVATAR_ERASESUCC_ACK` / `NC_AVATAR_ERASEFAIL_ACK`; `0xC7` (199) = guild master; an empty slot answers `0xC6`, which the client also shows as the guild-master text (W01-B3) |
 
 The other 160 WM handlers (party, friends, guild, raid, chat channels, …) are listed in
