@@ -34,7 +34,7 @@ the code; where they disagree, the code was re-read and the finding is listed in
 | `21d_stack-over-maxlot` (**s21d**) | name only: X3 (a stack limit lower than an existing stack; zone restarted with the changed table); Test1235 makes, drops and picks up 10 potions (§21.3) | login, wm, zone (9210) + 67 links (zone restart) | 853 |
 | `37_login-heartbeat-refusals-delete` (**s37**, batch 3) | notes file: idle on the world list, create / delete / re-create `X37Del`, 4 min on the character list, WM stopped (world closed), WM restarted with capacity 1 (world full), blocked account, not-login-able account | login×6, wm + 124 links (WM restarts) | 3 583 |
 | `26_11_16_37b_char-select-rename-refusals` (**s37b**, batch 4) | notes file + prep / DB readings: create refused (name taken), free rename of `X37-Ren` twice (with the 2018 `p_Char_Rename` of the test DB), rename right of Test2 (refused, then `X37Id`), character login with all zones stopped (§22) | login×3, wm×3, zone×5 (9210) + 123 links (zone restart) | 3 886 |
-| `26_11_16_38_session-loss-kicks-char-select` (**s38**, batch 4) | notes file: back to character select, quit, zone connection closed by the server, client killed, zone killed after `&getmoney` (twice) (§23, part 25) | login×15, wm×12, zone×10 (9210) + 115 links (zone kills) | 11 976 |
+| `26_11_16_38_session-loss-kicks-char-select` (**s38**, batch 4) | notes file: back to character select, quit, zone connection closed by the server, client killed, zone killed four times, three of them 0.6–7.3 s after `&getmoney` (§23) | login×15, wm×12, zone×10 (9210) + 115 links (zone kills) | 11 976 |
 | `26_11_16_24_skills-abstates-stat-points` (**s24**, batch 4) | notes file + prep / DB readings: X24A (Gladiator 100) and X24B (HighCleric 20): learn, empower, stat points, reset items, cast abort, ground target, toggle skill, abstate reset conditions, damage over time, death and revive by skill (§24–§25, parts 26–27) | login×2, wm×2, zone×4 (9210 ×3, 9212) + 56 links | 14 722 |
 
 Batch 2 (`shop`, `combat`) was recorded on the server host with the LAN and the loopback interface: it adds the
@@ -2996,7 +2996,166 @@ Batch-1 to batch-3 types of these flows recur unchanged (login, `0x0C14`, `0x100
 | CDB→WM | 0x7050 | NC_CHAR_OPTION_IMPROVE_DB_SET_GAMEOPTION_ACK | 3 | 6 | confirmed; **bug** | `0x2118`, `nCharNo` stale (D04-B13) |
 
 `s24` and `s38` contain these logout and option types too; they are counted in this table with the `s37b` values.
-`0x0C1A` with a real `usrregnum` and the s38 kicks are §23 (part 25).
+The s38 kicks and zone kills are §23; `s38` has no `0x0C1A` at all (§23.8).
+
+## 23. Session loss, kicks and zone kills, batch 4 (`s38`) *(captured)*
+
+Scenario 38 (`26_11_16_38_session-loss-kicks-char-select.md`; no pcapng comments; the script's DB readings file was not
+copied, so the DB values below are the notes'). Account `admin` (`usrregnum` 103), Test1235 (`nCharNo` 2, level 120,
+GM), map RouN, zone process 0 (client port 9210). The server actions come from `tools/capture/38/38-server.ps1`:
+`close-zone-conn` deletes the zone connection's TCB (`SetTcpEntry` state 12, so the **server's** stack sends the RST),
+`kill-zone` / `getmoney-kill` run `Stop-Process -Force` on the zone and start it again. TCP flags show them as
+follows: a server-side RST on the client's zone port alone (`close-zone-conn`); client-side RSTs on both client ports
+(the killed client); and a server-side RST on the zone port plus 12 RSTs on the zone's 4 CharDB / 4 GameLog / 4 WM links in the same ms
+(zone kill). Client streams `login#1`–`#15`, `wm#1`–`#12` (WM handles 0, 2500, … 27500), `zone#1`–`#10` (handles
+8000–8005, then 8000 after each restart). The WM's CharDB link is `W00_CDB#17`, its GameLog link `W00_GLDB#10` (the
+Character server's is `#9`), `ALDB#2`, `AccDB#2`; Login ↔ WM `Login#1`. No new opcode type.
+
+### 23.1 What happened
+
+The capture does not follow the notes' step order. The tester tried steps 1 and 5 more than once, and step 2's
+in-game quit is not in it (the 292.5 event is a server-side reset: no `0x1071` before it, the same pattern as 423.4).
+
+```text
+ 79.056 / 89.065   step 1, first try: 0x1071, 10.0 s later 0x0C18 {1} → zone save 9 + 0x0C31 (16 ms), list (0x0C1F → 0x0C14);
+                   92.794 0x0C33 → back to the world list (§4.1 OTP flow), 94.256 Login 0x0C18 {0} → login screen (§16.1)
+110.7–113.9        new login, in game (zone#2, 8001)
+292.532            close-zone-conn #1: server RST on zone#2 → 20 ms → C→WM 0x0C18 {0} → WM FIN 292.573 (§23.3)
+368.3 / 378.9      two logins that went back to the login screen from the world list (Login 0x0C18 {0})
+410.4–414.0        client 1 in game (zone#3, 8002)
+423.409            close-zone-conn #2 (step 3): server RST → 14 ms → C→WM 0x0C18 {0}; client 1 "Disconnected from the server."
+428.050            client 2 presses login 4.6 s after the reset: world list, no message; 470.2 world select, 472.5 in game (zone#4, 8003)
+508.530            client 2: 0x2012 STOP, 0x1071 LOGOUTREADY + the WM option saves (an exit countdown had started)
+510.845            client 2 killed (step 4): client RSTs on wm#4 and zone#4 → 9 ms → WM CharacterLogout (§23.4)
+518.7–525.4        new login, in game (zone#5, 8004); 547.188 &getmoney 100 (no kill follows)
+768.831 / 778.831  step 1: 0x1071, 10.0 s, 0x0C18 {1} → save 9 + 0x0C31 {10000, 2} (3 ms); 779.859 0x0C1F → 0x0C14;
+                   782.087 0x1001 → 0x1003, 783.184 in game with the same character (zone#6, 8005): works, no message
+1386.602           auto-save, StoreType 10 (§23.5)
+1412.076           kill #1 → 20 ms → C→WM 0x0C18 {0}; zone back 1531.974 (119.9 s)
+1513.9–1531.9      relogin; 0x1001 ×4 → 0x1002 {0x145} (§23.6); 1532.478 0x0C33, world list, 1534.438 0x1001 → in game 1535.3
+1563.048           &getmoney 100 → 0x3439 15 ms; 1567.540 kill #2 (4.5 s later) → 22 ms → 0x0C18 {0}; zone back 1631.369 (63.8 s)
+1617.5–1633.0      relogin; 1628.157 and 1631.034 0x1001 → 0x1002 {0x145}; 1632.171 → in game
+1688.475           step 5: &getmoney 100 (…4724 → …4824) → 0x3439 16 ms; 1695.786 kill #3 (7.3 s) → 18 ms → 0x0C18 {0}; back 1707.744
+1788.3–1792.6      relogin, in game with …4824; walks to 5269 / 7419 (Storage Keeper Raina), stops 1824.038
+1893.783           step 6: chat "&getmoney 500" → 0x3438 3 ms → 0x3439 17 ms; 1894.366 kill #4 (580 ms after 0x3438) → 27 ms → 0x0C18 {0}
+1906.488           zone back; 1973.9 relogin, 1977.5 in game at 5771 / 8796 with …5324 (the notes: "next to Blacksmith James")
+```
+
+### 23.2 Back to character select (step 1)
+
+The client sends `0x1071` and, after its 10-s countdown, `0x0C18 {1}` to the zone and the WM in the same ms. That is
+more than 8 s after `0x1071`, so the zone's `0x0C18` handler (Z01 §8.1, FUN_00558690) runs `sp_Schedule_Logout` at
+once: one save with StoreType 9 and `0x0C31`. The WM runs `CharacterLogout` (`0x1037`, `0x081F`, `0xC807`) without
+`0x0C11`, and the client closes its zone socket 1.0 s later. The rest (0x0C1F → the list reloaded from CharDB →
+`0x1001`) is §22.5's flow, and the same character entered the game again 4.4 s after the quit. **Confirms** §22.5,
+W01 §5.4 / §7.3 and Z01 §8.1. The first try went from the character list to the world list (`0x0C33`): the WM then
+closed the session (`0x0C11 {playmin 0, 0x780}`, `0x0C19` ×4) and handed the client to the Login by OTP, as in §4.1.
+
+### 23.3 The two logout timers: StoreType 3 after a cut, 9 after a quit
+
+`so_banning` (Z01 §8.3) calls `so_Unmark(REMOVE_LOGOUT = 1, 1, 4)`. The `REMOVE_LOGOUT` branch of
+`ShinePlayer::so_Unmark` @ FUN_00558900 saves (`ws_save2DB(p, 0, reason)`) and then arms
+`ts_Set(sp_Schedule_Kickout, TSRT_RETURN, TSCW_LOGOUT = 4, 10000)`, but only if the player's `sp_TimerStr` does not
+already hold `TSCW_LOGOUT` work (pdb2016 enums `RemoveWhen`, `TS_CurWork`). `sp_Schedule_Kickout` @ FUN_00558080
+calls `so_Unmark(REMOVE_NOW, 1, 3)` (save with StoreType 3) and `som_FreeObject(handle, REMOVE_NOW, 0x11)`. It sends
+**no** `0x0C31`. `0x1071` (Z07 §3.3) arms the same timer with `TSCW_LOGOUT` (state 4) and `sp_Schedule_Logout` at +13 s.
+So the work queued first decides how the object ends:
+
+| Case | Saves (StoreType, time) | End |
+|---|---|---|
+| server reset of the zone socket, no `0x1071` (292.5, 423.4) | 4 (first `0x0C19`, +42 / +37 ms after the RST), 7 (`zs_disconnect`, +14 / +15 ms), 4 (second `0x0C19`); at 423.4 one more 4 at 428.104 (the next login's `0x0C16`) | **3** at 302.512 / 433.406 = 9.94 / 9.96 s after the first save (`sp_Schedule_Kickout`), no `0x0C31` |
+| client killed during the exit countdown (510.8) | 4 (the one `0x0C19` broadcast of `Client_OnClosed`), 7; then 4 at 518.799 and 4 at 520.345 (the next login's two `0x0C16`) | **9** + `0x0C31 {7500, 2}` at 521.501 = 12.97 s after `0x1071` (`sp_Schedule_Logout`; the old WM handle) |
+| quit, `s37b` 689.1 (§22.5) | 4, 7, 4 | **9** + `0x0C31` at 692.126 = **12.99 s after the `0x1071` at 679.139** |
+| back to character select (89.1, 778.8) | – | **9** + `0x0C31` at once (`0x0C18 {1}` ≥ 8 s after `0x1071`) |
+
+So the "9 with `0x0C31` 3 s later" of a quit (§22.5, P02-B35) is the `0x1071` timer: 13 s minus the client's 10-s
+countdown. The zone ignores the quit's own `0x0C18 {0}` (mode 0, Z01 §8.1). StoreType 7 is `zs_disconnect` @
+FUN_005abb60 closing a client session that `so_banning` has put in state 3. In its closing branch it calls
+`so_Unmark(vt[0x8ec](), 1, 7)` and `som_FreeObject`. Its earlier conditional `sp_RefreshWMSSocket` call (vt 0x338, Z01 §8.2) sent no `0x0C31` in any capture; which of its conditions failed is *(not traced)*.
+The zone's first save after a reset follows the WM's `0x0C19`, 37–42 ms after the RST; that the zone itself had not
+yet noticed the reset is *(inferred)*. Each later kick of the same user inside the 10-s / 13-s window runs
+`so_banning` and a full save again (428.104, 518.799, 520.345); P02-B35 is extended by these. A `0x0C31` that comes
+after the WM session closed is harmless: `fc_NC_USER_POSSIBLE_NEW_CONNECT_CMD` @ FUN_0042c1c0 compares the `charNo`
+(W01 §7.3).
+
+StoreType values on the wire, all captured: 2 link / revive (§10.1), **3** `sp_Schedule_Kickout`, 4 `so_banning`,
+7 `zs_disconnect`, 8 `&levelup`, 9 `sp_Schedule_Logout`, **10** auto-save (§23.5).
+
+### 23.4 The zone connection lost: the client quits the world itself (steps 3, 5, 6)
+
+After each server-side RST on the zone socket (two resets, four kills), the client sends `0x0C18 {LogoutType 0}` to
+the WM 14–27 ms later. The WM closes the session (`CharacterLogout`, `0x0C11 {0x780}`, `0x0C19` twice, FIN 38–54 ms
+after the RST), and the client's FIN follows 1.0 s later. The client code explains it. The in-game scene tick
+(client FUN_004cbf30) checks the closed flag (+9) of its zone socket (`this[0x242]`) and its WM socket (`this[0x243]`).
+For a closed zone socket it calls `NetMgr::SendUserLogOutMsg2AllServer` @ FUN_006d34e0 (C02 name, pdb2017). That
+function writes `0x0C18 {0}` to every open socket, busy-waits 1000 ms and closes them all. The scene then opens
+`MsgBox::Modal` @ FUN_0044d9a0 with "Disconnected from the server." (text 0xCBCED23A; with the flag DAT_00b1b420 set:
+"Multiple logins detected, you have been logged out.", 0x16526A50). A closed WM socket gives "Disconnected from the
+world server." (0xCFCE1341). So the WM link is not kept: the script's check 500 ms after the reset found it gone, as
+the notes say. A client cannot stay on the character list after losing its zone; it always logs out.
+
+### 23.5 Zone kills: money, position, auto-save (steps 5, 6)
+
+| `&getmoney` | `0x3439` after | kill after | WM `0x1037 Cen` at the logout | next login's CharDB `0x1007 Cen` |
+|---|---|---|---|---|
+| 547.188 +100 | 22 ms | (none; 0x0C18 {1} at 778.8) | …4524 (778.837) | …4624 (782.102) |
+| 1563.048 +100 | 15 ms | 4.49 s | …4624 (1567.577) | …4724 (1632.173) |
+| 1688.475 +100 | 16 ms | 7.31 s | …4724 (1695.812) | …4824 (1791.526); notes: DB …4824 |
+| 1893.786 +500 | 17 ms | **0.58 s** | …4824 (1894.405) | …5324 (1976.364); notes: DB …5324 |
+
+- **Money survives every kill**: `so_ply_PickupMoney` commits through CharDB `0x3438` → `0x3439` (Z11 §7.4, Z05) in
+  15–22 ms, before the kill. The zone process dies without a save. **Confirms** Z11 §7.4 and the script's premise
+  (money is written only as deltas). The rest of each flow is §19.2's: `0x1033 {cen}` in the ms of `0x3438`, GameLog
+  `0x0446 {"Need Cen", itemlot = cen}` with `0x3439`, then `0x300A {0, 0, 0x341}`. The tester saw that last one as
+  the notice "[Leather Boots] has been obtained" (not in the chat), which settles §19.2's open point on Z11-B32's text.
+  The unwritten `0x3439` byte (D03-B6) reads 0x77, 0x00, 0x0F, 0x0F.
+- **`0x1037` carries the WM's copy** of money and position from the last map login (blob `0x1007`), never the zone's.
+  The Character server's `fc_NC_CHAR_LOGOUT_DB` @ FUN_00405b30 passes only `charNo` and `playmin` to `p_Char_Logout`
+  (D02 §5), so the stale values do not reach the character row: **confirmed** (each next login has the
+  committed money). They do reach the GameLog: the Character server copies `0x1037` into `0x040B NC_LOG_GAME_LOGOUT`
+  (1894.409: `Cen` …4824 while the DB holds …5324) **(original bug) P02-B36**.
+- **Position**: the zone saves position only in `ws_save2DB`. In step 6 the character walked from 5771 / 8796 to
+  5269 / 7419. No save came between that map login (1792.6) and the kill, so the relogin's blob and the client show
+  5771 / 8796, the spot of the last saves (778.834 StoreType 9, 1386.602 StoreType 10). The notes' expectation is
+  **confirmed**. Experience and position gained since the last save are lost the same way *(inferred)*.
+- **Auto-save** (StoreType 10, 1386.602): `ShinePlayer::so_Routine` @ FUN_0056c790 calls `ws_save2DB(p, partial 1, 10)`
+  once `tAutoSaveTime ≤ cw_CurrTick`, and `ws_save2DB` sets the next one to now + 6000 ticks (Z01 §8.4). The capture
+  shows 599.98 s after zone#6's `0x1803` (786.627), so the ticks are 0.1 s and the period is **10 min**. Z01 §8.4's
+  "periodic timer every 6000 ms" is **corrected**. That the first deadline is set at map-login completion is
+  *(inferred)* from the timing. The burst is the normal one (§10.1), in the same ms as an abstate change of the
+  same routine pass (`0x2428` / `0x2429`).
+
+### 23.6 The dead zone on the WM and the Login; the restarts
+
+- **WM**: nothing goes out when a zone's links die: no packet to the Login, the clients or the other zones. Its
+  broadcasts (`0x0C16`, `0x0C19`, `0x0821`) go to the 3 remaining zone links until the restarted zone registers, then
+  to 4 again (`0x0C16` ×4 at 1789.750). `0x1001` for the dead zone's map gets `0x1002 {0x145}` "The Map is under
+  maintenance" in 2–12 ms without a CharDB round trip (W01 §4.2 "zone not connected", **confirmed**): at 1517.590,
+  1528.509, 1530.216 and 1531.880 (zone back at 1531.974), 1628.160 and 1631.034 (back at 1631.369). These are the
+  notes' "six 0x1002". The first `0x1001` after the restart's `0x0803` / `0x180F` succeeds (1534.438, 1632.171).
+- **Login**: only the periodic `0x0808 NC_MISC_USER_COUNT_CMD` (`NumOfUser 0` at 1427.627). Every login still sends
+  the 2 × `0x0C16` kicks of §7.2, also while the old character's zone object waits in the logout window (§23.3).
+- **Restarts** follow §17.4 at all four: 4 WM links within 35 ms, the 2nd and 4th closed by the WM at once (FIN, no
+  `0x0801`). Retries come 26.6–27.7 s later (1st accepted, 2nd closed) and 20.0 s after that: 1559.676 (cut by kill
+  #2 before the next one), 1657.960 / 1677.955, 1734.342 / 1754.346, 1933.516 / 1953.517. **P02-B25 again.** The
+  downtime was 119.9 / 63.8 / 12.0 / 12.1 s. The script waits 5 s and starts the zone, so the first two restarts were
+  slower; why is not recorded *(not traced)*.
+
+### 23.7 Client killed (step 4)
+
+The client was killed 2.3 s into an exit countdown (`0x1071` at 508.530, together with the client's option saves
+`0x7011` / `0x7015` / `0x7016` / `0x703B` → CDB `0x7026` / `0x702A` / `0x702B` / `0x704F`, `0x7050` stale `nCharNo`,
+D04-B13). Its stack reset both connections at 510.845. The WM ran `Client_OnClosed` 9 ms later: `CharacterLogout`,
+`0x0C11` / `0x0722` / `0xC803`, and **one** `0x0C19` broadcast (no `0x0C18`, so no second one). The zone saved 4 and
+7, then (§23.3) 9 with `0x0C31` from the `0x1071` timer. The relogin 7.9 s after the kill worked without a message,
+as the notes say.
+
+### 23.8 Opcodes
+
+No new type: all of them are in §3–§10, §17 and §22.6, and the decoder reports no issue for `s38`. Status changes:
+`0x0410 StoreType` 3 and 10 are new values (§23.3, §23.5). `0x0C1A` does not occur: every logout here went through
+the WM (`0x0C19` / `0x0C16`), and no zone called `so_Disconnect` (Z01 §8.3), so a `0x0C1A` with a real `usrregnum`
+is still uncaptured (§14). `0x1002` is captured with `0x145` only (§23.6).
 
 ## 11. Message order against README §2 and the pseudocode
 
@@ -3102,7 +3261,8 @@ Found by P02 (tagged `(original bug)` where described):
 | P02-B32 | zone `ShinePlayer::so_ply_SellItemList_Insert` @ FUN_00537a20 with `CSellItemManager::simg_Insert` @ FUN_0050e360 (found in the batch-3 review) | the sold item enters the buy-back list first; `0x305D` (the entry `simg_Insert` evicted from a full list, handle in its out-parameter) and `0x305C` (the new entry) both go only when `so_ply_CanItemRepurchase` (vt 0xe6c) holds, so a sale at a merchant without buy-back (SoulStone / Skill / WeaponTitle / Guild) changes the server's list silently (§20.2; read, not captured) | the client keeps a buy-back entry whose handle the server has reused or dropped; a later buy-back of it at a Weapon / Item merchant names the wrong item or none *(inferred)* | send `0x305D` whenever an entry is evicted, or insert into the list only where buy-back is allowed |
 | P02-B33 | WM `fc_NC_USER_AVATARINFO_ACK` @ FUN_0040ede0 (map "RouT" for every listed avatar with tutorial state 0) with `fc_NC_CHAR_TUTORIAL_MAKE_ITEM_ACK` @ FUN_0040e2c0 → `CWMClientSession::TutorialLoginProcess` @ FUN_004371a0 (found in batch 4) | on a tutorial skip the avatar becomes `TS_SKIP`, but only `TS_PROGRESS` rewrites the map ("RouT00"); the lookup of "RouT" finds no service zone ("TutorialMap Search Fail") and the WM sends `0x1002 {0x145}` (`s37b` 214.189, §22.2) | a character created in an earlier session cannot enter the game by skipping the tutorial: "The Map is under maintenance"; it works after the list is reloaded (the skip is saved) | restore the DB map (or keep it in the list) when the tutorial is skipped |
 | P02-B34 | WM `fc_NC_USER_CONNECTION_DB_CHANGE_CHAR_ID_ACK` @ FUN_0040d740 → client 0xB40C (found in batch 4) | the slot byte comes from a local that only `CWMClientSession::CharIDChange` writes (code 0x20C0); for every other code it is stack garbage (7 captured, `s37b` 508.207, §22.4) | the client's `On_NC_USER_CONNECTION_CHANGE_CHAR_ID_ACK` @ FUN_00476de0 finds no avatar for the slot and returns: "The name is already taken by another user." (0x20D1), the guild-master text (0x20C7) and the generic error never show | send the slot of the request (look it up by `nCharNo`) |
-| P02-B35 | WM `0x0C18` mode 0 @ FUN_00412df0 and `Client_OnClosed` @ FUN_00437030 (each broadcasts `0x0C19`), zone `so_banning` @ FUN_00558b70, `zs_disconnect` and `sp_Schedule_Logout` @ FUN_00558160 (found in batch 4) | a quit runs `ws_save2DB` four times: `StoreType` 4 (first `0x0C19`), 7 (socket cut), 4 (second `0x0C19`) within 35 ms and 9 with `0x0C31` 3 s later (`s37b` 689.1, `s24` 2020.8 / 2022.8; §22.5) | four full CharDB save bursts, four GameLog `0x0410` and three `0x750C` for one quit; the data is the same each time *(inferred: no lost state)* | one save per logout |
+| P02-B35 | WM `0x0C18` mode 0 @ FUN_00412df0 and `Client_OnClosed` @ FUN_00437030 (each broadcasts `0x0C19`), zone `so_banning` @ FUN_00558b70, `zs_disconnect` and `sp_Schedule_Logout` @ FUN_00558160 (found in batch 4) | a quit runs `ws_save2DB` four times: `StoreType` 4 (first `0x0C19`), 7 (socket cut), 4 (second `0x0C19`) within 35 ms and 9 with `0x0C31` 3 s later (`s37b` 689.1, `s24` 2020.8 / 2022.8; §22.5). The last one is the `0x1071` timer (13 s after it, §23.3). `so_banning` has no guard for a player already in its logout window, so every further `0x0C16` / `0x0C19` for the user inside the 10-s / 13-s window saves again (`s38` 428.104, 518.799, 520.345: the next login's kicks) | four to six full CharDB save bursts, GameLog `0x0410` rows and `0x750C` for one logout; the data is the same each time *(inferred: no lost state)* | one save per logout; skip `so_banning` for a closing player |
+| P02-B36 | WM `CharacterLogout` → CharDB `0x1037` (W01 §5.4) → Character `fc_NC_CHAR_LOGOUT_DB` @ FUN_00405b30 → GameLog `0x040B` (found in batch 4) | `0x1037` carries the WM's copy of map, x / y and `Cen` from the last map login (CharDB blob), not the logout values; `p_Char_Logout` ignores them, but the Character server copies them into `0x040B NC_LOG_GAME_LOGOUT` (`s38` 1894.409: `Cen` …4824 after a committed `&getmoney 500`, DB …5324; §23.5; position 5771 / 8796 vs the zone's 5756 / 8745 in `s37b`, §22.5) | the GameLog logout row records stale money and position; the client and the character row are not affected | send the zone's last saved values (or drop the fields from the log) |
 
 Other items' bugs the captures show on the wire (no new ID; owner's register entry stands):
 
@@ -3238,6 +3398,10 @@ sweep, `docs/plan/items/X04.md`) carries every row marked "→ X01" that README 
 | W01 | `W01-core.md` §6.2 (CharDB 0xB40B → client 0xB40C) | the slot byte is unwritten for every code but 0x20C0; the client then shows nothing (P02-B34, §22.4) | extended → batch-4 follow-up |
 | W01 / Z01 | `W01-core.md` §5.1 / §3.2, `Z01-core.md` §8.1 / §8.3 | a quit sends `0x0C19` twice and the zone saves four times (reasons 4, 7, 4, 9; P02-B35, §22.5) | extended → batch-4 follow-up |
 | X02 | `s37b` notes step 2 ("entered Test1235 … Map under Maintenance", "maybe an issue because we renamed …") | the maintenance message comes from the tutorial skip (P02-B33); the disconnects come from the test DB's 2018 `p_Char_Rename`, which reports 0xD0 without renaming (§22.3); step 3's silent refusal is P02-B34 | corrected → batch-4 follow-up |
+| Z01 | `Z01-core.md` §8.3 (`so_banning`) / §8.1 | `so_Unmark(REMOVE_LOGOUT)` arms `sp_Schedule_Kickout` @ FUN_00558080 at +10 s (`TSCW_LOGOUT`, unless `0x1071`'s 13-s `sp_Schedule_Logout` is already queued); Kickout saves with StoreType 3 and frees the object **without** `0x0C31`. The "9 + `0x0C31` 3 s after a quit" is the `0x1071` timer; StoreType 7 is `zs_disconnect` closing the state-3 session (§23.3) | extended → batch-4 follow-up |
+| Z01 | `Z01-core.md` §8.4 ("periodic timer every 6000 ms"; "Reason values seen: 2") | the auto-save (`so_Routine` @ FUN_0056c790, `tAutoSaveTime`, reason 10, partial) runs every 6000 ticks of 0.1 s = 10 min (captured 599.98 s after `0x1803`); reasons: 2 link / revive, 3 kickout, 4 `so_banning`, 7 `zs_disconnect`, 8 level-up, 9 logout, 10 auto-save (§23.3, §23.5) | corrected → batch-4 follow-up |
+| W01 / D02 | `W01-core.md` §5.4 `CharacterLogout`, `D02` §5 `0x1037` | `0x1037` carries the WM's map-login copy of money and position; `p_Char_Logout` ignores them, `0x040B` logs them (P02-B36, §23.5) | extended → batch-4 follow-up |
+| X02 | `s38` notes (steps 1–6) | step 2's in-game quit is not in the capture (292.5 is a server reset, no `0x1071`); step 1 was done twice (the first try went on to the world list); step 5 has a first `&getmoney` without a kill (547.2) and two kills before the one the notes record; the DB readings file was not copied (§23.1) | corrected → batch-4 follow-up |
 
 In batch 1 (§3–§6) no discrepancy for Z03, Z07, Z09, Z11, Z12, Z13, Z16, Z17, Z18, Z22, W03: every statement of theirs that §3–§6 test held (batch 2's rows for Z03, Z09, Z12, Z13 and W03 are above). Part 12 (§9) confirms Z03 §3.1–§3.4 (swing
 timing with the 0.1-s `g_Now` step, stop paths), §5.4 (cast, `IsMovingSkill` blast), §7.2 (death order, 0x104D, no exp
@@ -3254,7 +3418,7 @@ conditions), D02 §6 (12-byte save headers, ACKs only for 0x4001 / 0x4007, 0x401
 §3.1 / §6.2 / §6.3, Z15 §3.3 / §3.4 (SAY with the clicked NPC), Z12 §5.2 (0xBC05 cap), Z13 §8.2 / §8.3 / §8.6 / §8.7 /
 §8.10 (summon order, hunger, speed formula, 0x1C1A), Z09 §5.4 (10-s corpse) and D05's GameLog layouts (0x040A, 0x040F,
 0x0410, 0xC806, 0xC809). The sweep (part 14) confirms Z02 §6.4 (the client's `0x200B` in the tick of `0x304D` runs `sp_EndOfTrade`,
-which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second). Part 21 (§21) confirms D03 §1.2 / §2.1 (`ItemBuy_Create`'s attribute branch: item deleted, cen refunded, `0x340C {0x206}`), Z05 §2.1 (`0x340C` → `0x3004 {error}`) and §6.4 (`0x345A` → `0x3001` emptied), Z09 §1.2 / §2.4 (the per-minute block on the WM's `0x0821`), Z24 §6.7 / Z13 §2.7 (`sp_ChargedItemLimitCheck` → `sp_ItemDelete` → `sp_DestroyItem`, not at login), D03 §1.3 (boot option rows 800–803 / 820–822, `deletetime` at attribute +7) and the capture-scenarios predictions §8.14 (S13) and §8.17 (S16, its cen half). Part 24 (§22) confirms W01 §4.1 (0x1401 → 0x1403 → 0x1404 `0x181`, 0x140F → 0x1411 → 0x1412 → 0x1410 with the name stored on 0xD0, 0xB409 → 0xB40A), §4.2 (0x145 without a CharDB round trip when no zone serves the map), §5.4 (`CharacterLogout` order 0x1037, 0x081F, 0xC807), §6.2 (0xB40B 0x20C0 → `CharIDChange`), §7.2 (0x104B name check, state 3, `{−1, −1}`), Z01 §5.3 (`so_SetRegistNumber` → 0x689) and §8.1 (reason-9 save with 0x0C31), D02 §3.2 (`CharIDChangeData` default `{0, 0x64, 0}`), §3.5 and §14 (layouts; −3039 → 0x20D1), Z30 §1.2 (0xB40F) and D04 §5.1 (option saves).
+which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_LevelUp` re-marks type 9 on every level). Part 20 (§20) confirms Z04 §2.4 / §7.1 / §13.1, Z05 §2.2 / §2.4 (answer orders, `0x305D` before `0x305A`), D03 §2.2 / §2.4 / §5.1 layouts (with the ref), Z02 §6.5 (`0x3C05`), Z11 §7.3 (`CT_LevelUp`, the level-20 announcement), Z18 §6.2 (titles 46 / 0 and 1), W01 §7.6 (0x6401 relay), W04 §2.4 (0x2079 relay) and §6.2 / §6.4 (KQ skip: 0x5811, 0x5825, one 0x581E per client per second). Part 21 (§21) confirms D03 §1.2 / §2.1 (`ItemBuy_Create`'s attribute branch: item deleted, cen refunded, `0x340C {0x206}`), Z05 §2.1 (`0x340C` → `0x3004 {error}`) and §6.4 (`0x345A` → `0x3001` emptied), Z09 §1.2 / §2.4 (the per-minute block on the WM's `0x0821`), Z24 §6.7 / Z13 §2.7 (`sp_ChargedItemLimitCheck` → `sp_ItemDelete` → `sp_DestroyItem`, not at login), D03 §1.3 (boot option rows 800–803 / 820–822, `deletetime` at attribute +7) and the capture-scenarios predictions §8.14 (S13) and §8.17 (S16, its cen half). Part 24 (§22) confirms W01 §4.1 (0x1401 → 0x1403 → 0x1404 `0x181`, 0x140F → 0x1411 → 0x1412 → 0x1410 with the name stored on 0xD0, 0xB409 → 0xB40A), §4.2 (0x145 without a CharDB round trip when no zone serves the map), §5.4 (`CharacterLogout` order 0x1037, 0x081F, 0xC807), §6.2 (0xB40B 0x20C0 → `CharIDChange`), §7.2 (0x104B name check, state 3, `{−1, −1}`), Z01 §5.3 (`so_SetRegistNumber` → 0x689) and §8.1 (reason-9 save with 0x0C31), D02 §3.2 (`CharIDChangeData` default `{0, 0x64, 0}`), §3.5 and §14 (layouts; −3039 → 0x20D1), Z30 §1.2 (0xB40F) and D04 §5.1 (option saves). Part 25 (§23) confirms W01 §4.2 (`0x145` while the map's zone is down, six times), §5.4 and §7.3 (`0x0C31` checked by `charNo`), Z01 §8.1 (`0x0C18 {1}` ≥ 8 s after `0x1071` → logout at once), Z07 §3.3 (the 13-s `0x1071` timer: 12.97 / 12.99 s), Z11 §7.4 and Z05 (money committed in 15–22 ms, kept through zone kills), D02 §5 (`p_Char_Logout` takes only `charNo`, `playmin`), §17.4 at four zone restarts (P02-B25) and §19.2 (Z11-B32: the tester saw "[Leather Boots] has been obtained").
 
 ## 14. Not reconstructed / uncertain
 
@@ -3371,6 +3535,12 @@ which clears `AccountStorage_opened`) and Z18 §6.2 (title type 9 rule; `CT_Leve
   The `0x0C1F` byte of the client is an unset local (00 both times); other values were not seen. P02-B35's claim that
   the four saves write the same data is read from the four bursts of `s37b` 689.1 (same position, money, level), not
   compared field by field.
+- Batch 4, session loss (§23): the DB money and position values are the notes' (the script's `-db.txt` was not
+  copied); the wire agrees with them. A `0x0C1A` with a real `usrregnum` (a zone-initiated disconnect of a logged-in
+  player, e.g. `&kickout` or an SHN mismatch) is still uncaptured. Whether the zone noticed a server-side reset of a
+  client socket by itself before the WM's `0x0C19` is not visible (its first save follows the `0x0C19`). That
+  `tAutoSaveTime` starts at `0x1803` is read from one interval (599.98 s). Why the first two zone restarts took 120 s
+  and 64 s instead of 12 s is not recorded. Client FUN_004cbf30 (the in-game scene tick) has no official name.
 
 ## 15. Coverage boundary
 

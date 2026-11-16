@@ -7430,10 +7430,12 @@
     "dir": "Zone/WM/Character→GameLog",
     "captures": [
      "shop",
-     "combat"
+     "combat",
+     "s37b",
+     "s38"
     ],
     "fields": {
-     "StoreType": "ws_save2DB reason: 2 zone link and revive, 8 level-up",
+     "StoreType": "ws_save2DB reason: 2 zone link and revive, 3 sp_Schedule_Kickout (10 s after so_banning), 4 so_banning (0x0C19 / 0x0C16 kick), 7 zs_disconnect, 8 level-up, 9 sp_Schedule_Logout (with 0x0C31), 10 so_Routine auto-save every 10 min (capture-validation §23.3)",
      "mappos": "position before the link"
     }
    },

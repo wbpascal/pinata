@@ -15805,7 +15805,7 @@ Z01 name was 'map login done (ours)'
 
 ### `0x0410` NC_LOG_GMAE_LOGOUT_ZONEINFO (Zone/WM/Character→GameLog)
 
-**Captured** (P02, `capture-validation.md`; shop, combat): `StoreType`: ws_save2DB reason: 2 zone link and revive, 8 level-up; `mappos`: position before the link
+**Captured** (P02, `capture-validation.md`; shop, combat, s37b, s38): `StoreType`: ws_save2DB reason: 2 zone link and revive, 3 sp_Schedule_Kickout (10 s after so_banning), 4 so_banning (0x0C19 / 0x0C16 kick), 7 zs_disconnect, 8 level-up, 9 sp_Schedule_Logout (with 0x0C31), 10 so_Routine auto-save every 10 min (capture-validation §23.3); `mappos`: position before the link
 
 ### `0x041e` NC_LOG_GAME_LEVEL_UP (Zone→GameLog)
 
