@@ -10,6 +10,10 @@ The language of the new Elixir server that replaces the 2016 Fiesta server binar
 One of the independently startable pieces of the new server: Login, WorldManager or Zone.
 _Avoid_: service, component, server (alone)
 
+**Zone node**:
+A runtime instance that runs the Zone part and hosts a set of maps with the players on them. A world has one or more.
+_Avoid_: zone server, zone (alone), channel
+
 **Single-node mode**:
 All parts running inside one runtime instance on one machine. The only mode that may use SQLite.
 _Avoid_: offline mode (that is a use of single-node mode, not a synonym), standalone
