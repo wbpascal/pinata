@@ -48,6 +48,24 @@ _Avoid_: 9Data, resource folder
 The operational values an administrator sets per node: addresses, ports, worlds, database.
 _Avoid_: config, server info
 
+### Simulation
+
+**Map instance**:
+One running copy of a map with everything on it: players, monsters, NPCs, drops. A field map has one for the life of its Zone node; instance content (Kingdom Quest, instance dungeon, mini-house) gets one per run.
+_Avoid_: map (alone, when the running copy is meant), field, room, channel
+
+**Handle**:
+The 16-bit number by which the client knows an object on its map. Unique within one map instance; its range tells the object type.
+_Avoid_: object id, entity id
+
+**Tick**:
+One step of a map instance's time, in which movement, monster behaviour, combat and expiry advance.
+_Avoid_: frame, pass, loop
+
+**Bot**:
+A player with no connection, driven by the server instead of a client.
+_Avoid_: test client (that one talks over the network), NPC, fake player
+
 ### Delivery
 
 **Milestone**:
