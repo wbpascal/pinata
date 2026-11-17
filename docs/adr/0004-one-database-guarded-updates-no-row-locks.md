@@ -1,0 +1,15 @@
+# One database, direct calls, guarded updates instead of row locks
+
+All persistent state lives in one database: accounts plus the data of every world, with a `world_id` column on every world-scoped table. The original used one Account database and one Character database per world. We chose one because it means a single connection pool, a single migration run and a single SQLite file offline; a world can still be split out later with a dump filtered by `world_id`.
+
+Every node opens its own pool and calls `Persistence` functions directly. There is no persistence part relaying requests, as the original database servers did: with SQLite there is only one node, and with PostgreSQL the database is already the shared point. Behind the boundary sit two thin Repo modules, one per adapter, sharing one migrations directory; configuration picks which one starts, so one release serves both modes. Ecto queries, schemas and the Repo modules are private to `Persistence`.
+
+`Persistence` exposes one function per business operation (create character, subtract money, commit trade), each a single transaction returning a tagged result. Parts map the result to the client error code; `Persistence` knows nothing about packets. Every such transaction has the same form: `Repo.transact` of guarded `UPDATE … WHERE` statements, each checked for an affected-row count of 1, rows touched in key order, inserts without a pre-check and the unique-index error mapped to a result. `FOR UPDATE` is never used. Row locks would be the conventional choice, but they raise on SQLite, and this form is the only one that runs on both adapters. It also closes the check-then-write races of the original stored procedures.
+
+## Consequences
+
+- Schema and queries keep to the portable subset from the [Ecto research](https://github.com/wbpascal/pinata/issues/3). The rules are written down in `server/AGENTS.md` and enforced by CI running the full suite twice: single-node mode on SQLite and multi-node mode on PostgreSQL. There is no lint for them and no separate single-node PostgreSQL run.
+- Local tests default to SQLite and cannot run async against it.
+- The schema is designed fresh per milestone from what that milestone's operations need. The reconstructed original tables are a checklist of fields, not a template. Client-visible limits (32-bit character id, name length, one-byte level) become column constraints. Until the first release the initial migrations are edited in place.
+- Migrations behave differently per adapter: on SQLite the server runs pending migrations itself at start-up; on PostgreSQL it refuses to start while migrations are pending and an operator runs them with a release command, so nodes starting together cannot race. This difference must be documented for operators when it is implemented.
+- `Persistence` supports both a per-operation write and a whole-character save; which one the zone uses when is decided with the zone process model.
