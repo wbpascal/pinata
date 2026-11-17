@@ -66,6 +66,14 @@ _Avoid_: frame, pass, loop
 A player with no connection, driven by the server instead of a client.
 _Avoid_: test client (that one talks over the network), NPC, fake player
 
+**Level ceiling**:
+The highest level the unmodified client can be told about: 255, for players, monsters and every level requirement alike. Fixed; no data can raise it.
+_Avoid_: maximum level, level limit (alone)
+
+**Level cap**:
+The highest level a character can reach on a running server. Set by the server data tables, never above the level ceiling.
+_Avoid_: maximum level, level ceiling
+
 ### Delivery
 
 **Milestone**:
