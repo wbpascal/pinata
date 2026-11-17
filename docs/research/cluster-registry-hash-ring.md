@@ -102,7 +102,7 @@ Source: [README](https://github.com/derekkraan/horde/blob/master/README.md),
   `Horde.UniformDistribution`); `Horde.UniformQuorumDistribution` shuts down the side with less than
   half of the cluster. "You may end up with duplicate processes in your cluster."
 - **Node loss:** `Horde.DynamicSupervisor` "will redistribute processes among the remaining nodes".
-- **One node:** three runtime dependencies (`delta_crdt`, `libring`, `telemetry` + `telemetry_poller`;
+- **One node:** four direct runtime dependencies (`delta_crdt`, `libring`, `telemetry`, `telemetry_poller`;
   `delta_crdt` adds `merkle_map`) and a CRDT process per registry syncing every 300 ms by default
   ([mix.exs](https://github.com/derekkraan/horde/blob/master/mix.exs), `sync_interval` default in
   `registry.ex`). Heaviest option for single-node use.
