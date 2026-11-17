@@ -33,12 +33,16 @@ The 2016 server binaries and the behaviour reconstructed from them in `docs/`.
 _Avoid_: old server, legacy server
 
 **Client data table**:
-A data file the unmodified client also reads (SHN, SHBD, AID and similar), kept byte-identical as the source of truth.
+An SHN table the unmodified client also holds, kept byte-identical as the source of truth.
 _Avoid_: game data, resource file
 
-**Server-only configuration**:
-Settings and data the client never reads, free to be stored in a new format.
-_Avoid_: TXT config
+**Server data table**:
+Game data only the server reads, free to be stored in a new format.
+_Avoid_: server-only configuration, TXT config
+
+**Settings**:
+The operational values an administrator sets per node: addresses, ports, worlds, database.
+_Avoid_: config, server info
 
 ### Delivery
 
