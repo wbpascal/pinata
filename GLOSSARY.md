@@ -40,6 +40,10 @@ _Avoid_: game data, resource file
 Game data only the server reads, free to be stored in a new format.
 _Avoid_: server-only configuration, TXT config
 
+**Data directory**:
+The folder a node reads its client data tables, server data tables, scripts and geometry from, produced by the import task.
+_Avoid_: 9Data, resource folder
+
 **Settings**:
 The operational values an administrator sets per node: addresses, ports, worlds, database.
 _Avoid_: config, server info
