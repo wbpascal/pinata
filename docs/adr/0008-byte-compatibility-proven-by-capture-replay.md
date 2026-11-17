@@ -1,0 +1,32 @@
+# Byte-compatibility is proven by capture replay
+
+Every capture is converted once into a transcript: a committed text file under `server/test/replay/transcripts/`, one line per decrypted packet with capture timestamp, connection, direction, opcode and payload. The `.pcapng` stays the source; the conversion extends `tools/protocol-re/pcap_decode.py`, and the Elixir side never parses pcap. A replay test builds the capture's starting state, sends the transcript's client packets through the test client, and requires every server packet to equal the transcript's byte for byte outside the masks.
+
+We compare bytes, not decoded structs, because comparing structs would run both sides through the codec under test and hide its errors.
+
+**Pacing and strictness.** Client actions (open, send, close) run in the capture's overall order, each after all earlier server packets have arrived. Server packet order is checked per connection only, never across connections and never by timing. A missing, extra or reordered server packet fails the test, except for a short declared list of timer-driven opcodes (heartbeat, `0x080E` game time) accepted at any position. A replay test names a stop point in its transcript, moved forward as later milestones land.
+
+**Values that cannot match.**
+
+- Session values (seed, validation key, login tokens), server addresses (`0x0C0C`, `0x1003`, `0x180A`) and fields the original server fills with uninitialised memory are masked. The rebuild sends zeroes for the last kind.
+- Handles and item keys go through a handle map: the first pairing of an original value with a new one is bound, every later occurrence must agree. This checks consistency without copying the original's allocator.
+- Clock values are compared, not masked. Server code reads time and randomness only through a `Clock` and a `Random` module; a custom Credo check in `mix check` rejects direct calls elsewhere. Before each client packet the harness moves the injected clock to that packet's capture timestamp, so replay never sleeps.
+- Random game values (damage, drops) are decided with the combat milestone.
+
+Masks are named by field and resolved to byte ranges through the packet definition. They live in one global list, each with its reason (and the bug id for uninitialised memory); a test may add its own with a reason.
+
+**Starting state.** One Elixir setup function per capture, written from its scenario notes, using public `Persistence` operations where one exists and a test-only factory for the rest. No database dumps, so the same setup runs on SQLite and PostgreSQL. `Persistence` is validated by replay (reads, write-then-read sequences, and the end state where the capture has a database snapshot) plus a direct test per business operation including every guarded-update refusal.
+
+**Test client.** One library (socket, framing, cipher, codec, expect helpers) serves both replay and hand-written end-to-end tests. It speaks TCP only and connects to whatever address the server sends.
+
+**Where no capture exists.** Every client-facing handler branch is hit by a replay test or by a hand-written end-to-end test whose expected bytes come from the reconstruction in `docs/`. A later capture that disagrees wins and replaces the hand-written test. Behaviour that needs a timeout to elapse is tested by hand with the timeout shortened in the settings.
+
+**Topology.** Tests only speak TCP, so one environment variable picks the mode: single-node starts all parts in the test VM on SQLite; multi-node starts Login, WorldManager and Zone as `:peer` nodes on PostgreSQL. We chose `:peer` over containers for the suite because each replay test needs a fresh database and its own clock start; containers would need a restart per test or a test-only control port in the release. CI adds one Docker Compose smoke test (three part containers, PostgreSQL, one hand-written login-to-character-list run) to prove the real release; its compose file is the multi-node example in the user documentation.
+
+## Consequences
+
+- No server code may call the system clock or `:rand` directly, from the first line written.
+- Every new mask is a claim that a field cannot match; reviewers check the reason.
+- The multi-node suite does not exercise the release artifact; only the smoke test does.
+- A capture is fully replayed only once the last milestone it touches is done.
+- Timer intervals themselves (how often a heartbeat fires) are not proven by replay.

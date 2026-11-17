@@ -60,3 +60,28 @@ _Avoid_: gate
 
 **Original-server bug**:
 Behaviour of the original server judged unintended, listed in the bug register. Fixed silently unless the fix changes packets or gameplay.
+
+### Testing
+
+**Capture**:
+A recording of real traffic between the unmodified client and the original server, with its scenario notes.
+_Avoid_: dump, trace, pcap (that is its file format)
+
+**Transcript**:
+The decrypted packets of one capture in order, per connection and direction, in a form tests read.
+_Avoid_: fixture, decoded capture
+
+**Replay test**:
+A test that sends a transcript's client packets to the new server and requires the server packets it answers with to equal the transcript's.
+_Avoid_: capture test, golden test
+
+**Test client**:
+The stand-in for the game client that tests use to talk to the new server over the network.
+_Avoid_: simulated client, fake client, bot (a bot is a player without a connection)
+
+**Mask**:
+A named packet field that a replay test does not compare because its value cannot match the capture.
+_Avoid_: ignore list, wildcard
+
+**Handle map**:
+The pairing a replay test builds between identifiers the original server handed out and the ones the new server hands out, which must stay consistent for the whole replay.
