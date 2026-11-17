@@ -1,0 +1,5 @@
+/_build/
+/deps/
+# the repo root .gitignore ignores lib/ and *.lock; this prototype needs both
+!/lib/
+!/mix.lock

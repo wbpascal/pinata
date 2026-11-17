@@ -1,0 +1,74 @@
+[
+  {
+    "i": 0,
+    "server": "login",
+    "dir": "S→C",
+    "op": "0x0807",
+    "name": "NC_MISC_SEED_ACK",
+    "payload": "6b01"
+  },
+  {
+    "i": 1,
+    "server": "login",
+    "dir": "C→S",
+    "op": "0x0C65",
+    "name": "NC_USER_CLIENT_VERSION_CHECK_REQ",
+    "payload": "32303135313131363134313632370000000000001cfd1a0060df706e4e2ac420feffffff70fc1a00d46ca276040a00005cfc1a000100000064fc1a0084fc1a00"
+  },
+  {
+    "i": 6,
+    "server": "login",
+    "dir": "S→C",
+    "op": "0x0C0A",
+    "name": "NC_USER_LOGIN_ACK",
+    "payload": "0100494e4954494f0000000000000000000006"
+  },
+  {
+    "i": 10,
+    "server": "login",
+    "dir": "S→C",
+    "op": "0x0C0C",
+    "name": "NC_USER_WORLDSELECT_ACK",
+    "payload": "063137322e31362e34322e3231340000009623563bcb688a2ce6453a317459da305b4eec0e67351e2f75492f37357e3865dd7511457b1ddc25c86c0879ad6d454ed710407c124026443c64346e1004e40fe50a"
+  },
+  {
+    "i": 11,
+    "server": "wm",
+    "dir": "S→C",
+    "op": "0x0807",
+    "name": "NC_MISC_SEED_ACK",
+    "payload": "0c01"
+  },
+  {
+    "i": 13,
+    "server": "wm",
+    "dir": "S→C",
+    "op": "0x0C14",
+    "name": "NC_USER_LOGINWORLD_ACK",
+    "payload": "102701020000005465737431323335000000000000000000000000780000526f754e00000000000000000098d97210ae040000ffffffffffffffffe204ffffffffffffffff9c8bffffffffffffffffffffffffffffffff6178ffff0000f0ffffffff526f754e00000000000000004d19000074260000ba8de50f0064000000000200000000"
+  },
+  {
+    "i": 22,
+    "server": "wm",
+    "dir": "C→S",
+    "op": "0x1401",
+    "name": "NC_AVATAR_CREATE_REQ",
+    "payload": "01436861724372656174655465737400000000000019010105"
+  },
+  {
+    "i": 23,
+    "server": "wm",
+    "dir": "S→C",
+    "op": "0x1406",
+    "name": "NC_AVATAR_CREATESUCC_ACK",
+    "payload": "01030000004368617243726561746554657374000000000000010001526f754e0000000000000000000000000019010105ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000f0ffffffff0000000000000000000000000000000000000000ba4f19680000000000000000000000"
+  },
+  {
+    "i": 28,
+    "server": "wm",
+    "dir": "C→S",
+    "op": "0x1407",
+    "name": "NC_AVATAR_ERASE_REQ",
+    "payload": "01"
+  }
+]

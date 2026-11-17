@@ -1,0 +1,251 @@
+Compiling 10 files (.ex)
+    warning: incompatible types given to Proto.Hand.UserWorldselectAck.encode/1:
+
+        Proto.Hand.UserWorldselectAck.encode(%Proto.Hand.UserWorldselectAck{
+          world_status: 6,
+          wm_ip: "172.16.42.214",
+          wm_port: "9110",
+          validate: List.duplicate(0, 32)
+        })
+
+    given types:
+
+        -dynamic(%Proto.Hand.UserWorldselectAck{
+          world_status: integer(),
+          wm_ip: binary(),
+          wm_port: binary()
+        })-
+
+    but expected one of:
+
+        %Proto.Hand.UserWorldselectAck{world_status: integer(), wm_port: integer()}
+
+    type warning found at:
+    │
+ 13 │     UserWorldselectAck.encode(%UserWorldselectAck{
+    │                        ~
+    │
+    └─ probes/hand_probes.ex:13:24: Proto.Probes.Hand.wrong_field_type/0
+
+    warning: incompatible types given to Proto.Gen.UserWorldselectAck.encode/1:
+
+        Proto.Gen.UserWorldselectAck.encode(%Proto.Gen.UserWorldselectAck{
+          world_status: 6,
+          wm_ip: "172.16.42.214",
+          wm_port: "9110",
+          validate: List.duplicate(0, 32)
+        })
+
+    given types:
+
+        -dynamic(%Proto.Gen.UserWorldselectAck{
+          world_status: integer(),
+          wm_ip: binary(),
+          wm_port: binary()
+        })-
+
+    but expected one of:
+
+        %Proto.Gen.UserWorldselectAck{world_status: integer(), wm_port: integer()}
+
+    type warning found at:
+    │
+ 13 │     UserWorldselectAck.encode(%UserWorldselectAck{
+    │                        ~
+    │
+    └─ probes/gen_probes.ex:13:24: Proto.Probes.Gen.wrong_field_type/0
+
+    warning: incompatible types given to Proto.Macro.UserWorldselectAck.encode/1:
+
+        Proto.Macro.UserWorldselectAck.encode(%Proto.Macro.UserWorldselectAck{
+          world_status: 6,
+          wm_ip: "172.16.42.214",
+          wm_port: "9110",
+          validate: List.duplicate(0, 32)
+        })
+
+    given types:
+
+        -dynamic(%Proto.Macro.UserWorldselectAck{
+          world_status: integer(),
+          wm_ip: binary(),
+          wm_port: binary()
+        })-
+
+    but expected one of:
+
+        %Proto.Macro.UserWorldselectAck{world_status: integer(), wm_port: integer()}
+
+    type warning found at:
+    │
+ 13 │     UserWorldselectAck.encode(%UserWorldselectAck{
+    │                        ~
+    │
+    └─ probes/macro_probes.ex:13:24: Proto.Probes.Macro.wrong_field_type/0
+
+    warning: the following pattern will never match:
+
+        %Proto.Hand.UserWorldselectAck{} = Proto.Hand.UserWorldselectAck.decode(bin)
+
+    because the right-hand side has type:
+
+        dynamic(
+          {:error, :bad_size} or
+            {:ok,
+             %Proto.Hand.UserWorldselectAck{
+               world_status: integer(),
+               wm_port: integer(),
+               validate: list(integer())
+             }}
+        )
+
+    where "bin" was given the type:
+
+        # type: dynamic()
+        # from: probes/hand_probes.ex:23:23
+        bin
+
+    type warning found at:
+    │
+ 24 │     %UserWorldselectAck{} = UserWorldselectAck.decode(bin)
+    │                           ~
+    │
+    └─ probes/hand_probes.ex:24:27: Proto.Probes.Hand.untagged_result/1
+
+    warning: the following pattern will never match:
+
+        %Proto.Gen.UserWorldselectAck{} = Proto.Gen.UserWorldselectAck.decode(bin)
+
+    because the right-hand side has type:
+
+        dynamic(
+          {:error, :bad_size} or
+            {:ok,
+             %Proto.Gen.UserWorldselectAck{
+               world_status: integer(),
+               wm_port: integer(),
+               validate: list(integer())
+             }}
+        )
+
+    where "bin" was given the type:
+
+        # type: dynamic()
+        # from: probes/gen_probes.ex:23:23
+        bin
+
+    type warning found at:
+    │
+ 24 │     %UserWorldselectAck{} = UserWorldselectAck.decode(bin)
+    │                           ~
+    │
+    └─ probes/gen_probes.ex:24:27: Proto.Probes.Gen.untagged_result/1
+
+    warning: the following pattern will never match:
+
+        %Proto.Macro.UserWorldselectAck{} = Proto.Macro.UserWorldselectAck.decode(bin)
+
+    because the right-hand side has type:
+
+        dynamic(
+          {:error, :bad_size} or
+            {:ok,
+             %Proto.Macro.UserWorldselectAck{
+               world_status: integer(),
+               wm_port: integer(),
+               validate: list(integer())
+             }}
+        )
+
+    where "bin" was given the type:
+
+        # type: dynamic()
+        # from: probes/macro_probes.ex:23:23
+        bin
+
+    type warning found at:
+    │
+ 24 │     %UserWorldselectAck{} = UserWorldselectAck.decode(bin)
+    │                           ~
+    │
+    └─ probes/macro_probes.ex:24:27: Proto.Probes.Macro.untagged_result/1
+
+    warning: unknown key .wm_prot in expression:
+
+        p.wm_prot
+
+    the given type does not have the given key:
+
+        dynamic(%Proto.Hand.UserWorldselectAck{
+          world_status: term(),
+          wm_ip: term(),
+          wm_port: term(),
+          validate: term()
+        })
+
+    where "p" was given the type:
+
+        # type: dynamic(%Proto.Hand.UserWorldselectAck{})
+        # from: probes/hand_probes.ex:8:43
+        %Proto.Hand.UserWorldselectAck{} = p
+
+    type warning found at:
+    │
+  8 │   def unknown_field(%UserWorldselectAck{} = p), do: p.wm_prot
+    │                                                       ~~~~~~~
+    │
+    └─ probes/hand_probes.ex:8:55: Proto.Probes.Hand.unknown_field/1
+
+    warning: unknown key .wm_prot in expression:
+
+        p.wm_prot
+
+    the given type does not have the given key:
+
+        dynamic(%Proto.Gen.UserWorldselectAck{
+          world_status: term(),
+          wm_ip: term(),
+          wm_port: term(),
+          validate: term()
+        })
+
+    where "p" was given the type:
+
+        # type: dynamic(%Proto.Gen.UserWorldselectAck{})
+        # from: probes/gen_probes.ex:8:43
+        %Proto.Gen.UserWorldselectAck{} = p
+
+    type warning found at:
+    │
+  8 │   def unknown_field(%UserWorldselectAck{} = p), do: p.wm_prot
+    │                                                       ~~~~~~~
+    │
+    └─ probes/gen_probes.ex:8:55: Proto.Probes.Gen.unknown_field/1
+
+    warning: unknown key .wm_prot in expression:
+
+        p.wm_prot
+
+    the given type does not have the given key:
+
+        dynamic(%Proto.Macro.UserWorldselectAck{
+          world_status: term(),
+          wm_ip: term(),
+          wm_port: term(),
+          validate: term()
+        })
+
+    where "p" was given the type:
+
+        # type: dynamic(%Proto.Macro.UserWorldselectAck{})
+        # from: probes/macro_probes.ex:8:43
+        %Proto.Macro.UserWorldselectAck{} = p
+
+    type warning found at:
+    │
+  8 │   def unknown_field(%UserWorldselectAck{} = p), do: p.wm_prot
+    │                                                       ~~~~~~~
+    │
+    └─ probes/macro_probes.ex:8:55: Proto.Probes.Macro.unknown_field/1
+
+Generated packet_codec_proto app

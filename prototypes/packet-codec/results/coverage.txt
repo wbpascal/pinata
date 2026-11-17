@@ -1,0 +1,18 @@
+docs: /Users/wpascal/Git/fiesta-rea/docs/protocol
+login/wm packets with dir C→S or S→C in the merged annotations: 250
+  generated without override (types in grammar, names unique identifiers, offsets contiguous): 205
+  not generated: 45
+  (6 of all 250 have no official NC_ name; the generator falls back to Op<hex> module names)
+by server: %{"login" => {18, 17}, "wm" => {232, 188}} ({total, generated})
+
+top 10 reasons (packets affected):
+    16  count field `n` is not the preceding integer field
+     7  unsupported type `char[len]`
+     3  offset 12 != running size 8 (gap or overlap)
+     3  offset 4 != running size 0 (gap or overlap)
+     3  offset 8 != running size 4 (gap or overlap)
+     3  struct SHINE_INDUN_RANK_CLIENT_VALUE: offset 24 != running size 21 (gap or overlap)
+     3  unsupported type `DATE`
+     3  unsupported type `PROTO_AVATAR_SHAPE_INFO`
+     3  unsupported type `entries[n]`
+     2  offset 26 != running size 22 (gap or overlap)

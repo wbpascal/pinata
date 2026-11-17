@@ -1,0 +1,25 @@
+# Corrected-layout experiment: AVATAR.level i16 -> u16, AVATAR.delinfo u8[5] -> del_year, del_month, del_day, del_hour, del_min (u8 each)
+
+## Shape A (generated)
+Edit: copy of docs/protocol/annotations/W01.json in /tmp/issue14-docs (AVATAR: 1 type changed, 1 field replaced by 5 fields = 7 JSON entries touched, 0 lines of Elixir edited by hand), then PROTO_DOCS=/tmp/issue14-docs elixir gen.exs
+mix compile: no warning, no error (nothing in lib/ or probes/ reads delinfo)
+mix test: 26/27 pass; failing: Proto.Gen wm 0x0C14 NC_USER_LOGINWORLD_ACK -> KeyError key :delinfo not found (the test's own check of the garbage bytes)
+git diff --stat:
+   prototypes/packet-codec/lib/gen/generated.ex | 46 +++++++++++++++++++---------
+   1 file changed, 32 insertions(+), 14 deletions(-)
+
+## Shape B (hand-written)
+Edit: lib/hand/avatar.ex by hand in 4 places (@enforce_keys, @type, decode head + struct build, encode head + binary): 31 lines added, 15 removed, 0 elsewhere
+mix compile: no warning, no error
+mix test: 26/27 pass; failing: Proto.Hand wm 0x0C14 NC_USER_LOGINWORLD_ACK -> KeyError key :delinfo not found (the test's own check of the garbage bytes)
+git diff --stat:
+   prototypes/packet-codec/lib/hand/avatar.ex | 46 ++++++++++++++++++++----------
+   1 file changed, 31 insertions(+), 15 deletions(-)
+
+## Shape C (macro)
+Edit: lib/macro/packets.ex by hand in 1 place (the Avatar definition: 1 type token changed, 1 line replaced by 5): 6 lines added, 2 removed; the macro itself unchanged
+mix compile: no warning, no error
+mix test: 26/27 pass; failing: Proto.Macro wm 0x0C14 NC_USER_LOGINWORLD_ACK -> KeyError key :delinfo not found (the test's own check of the garbage bytes)
+git diff --stat:
+   prototypes/packet-codec/lib/macro/packets.ex | 8 ++++++--
+   1 file changed, 6 insertions(+), 2 deletions(-)
