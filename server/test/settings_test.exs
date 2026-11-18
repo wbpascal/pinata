@@ -23,6 +23,7 @@ defmodule SettingsTest do
              world: [%{number: 0, name: "INITIO"}],
              database: %{url: "sqlite:./data/pinata.db"},
              cluster: %{nodes: []},
+             connection: %{max_packets_per_second: 100, max_unsent_bytes: 1_048_576},
              data: %{strict_references: true}
            }
   end

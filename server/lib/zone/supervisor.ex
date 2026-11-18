@@ -1,5 +1,5 @@
 defmodule Zone.Supervisor do
-  @moduledoc "Root supervisor of `Zone`. It has no children yet."
+  @moduledoc "Root supervisor of `Zone`. It starts the client listener."
 
   use Supervisor
 
@@ -7,5 +7,6 @@ defmodule Zone.Supervisor do
   def start_link(settings), do: Supervisor.start_link(__MODULE__, settings, name: __MODULE__)
 
   @impl Supervisor
-  def init(_settings), do: Supervisor.init([], strategy: :one_for_one)
+  def init(settings),
+    do: Supervisor.init([{Net.Listener, {Zone.Handler, settings.zone.port, settings}}], strategy: :one_for_one)
 end
