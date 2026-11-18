@@ -103,7 +103,7 @@ defmodule GameData.Loader do
     {_n, keyed, ordered, problems} =
       Enum.reduce(rows, {1, %{}, [], []}, fn row, {n, keyed, ordered, problems} ->
         {keyed, ordered, problems} =
-          add_row(build_row(schema, row, columns, width, n, rel), {schema, spec, n, rel}, {keyed, ordered, problems})
+          add_row(build_row(spec, row, columns, width, n, rel), {schema, spec, n, rel}, {keyed, ordered, problems})
 
         {n + 1, keyed, ordered, problems}
       end)
@@ -133,12 +133,12 @@ defmodule GameData.Loader do
     end
   end
 
-  defp build_row(_schema, row, _columns, width, n, rel) when length(row) != width,
+  defp build_row(_spec, row, _columns, width, n, rel) when length(row) != width,
     do: {:error, ["#{rel} row #{n}: expected #{width} cells, got #{length(row)}"]}
 
-  defp build_row(schema, row, columns, _width, n, rel) do
+  defp build_row(spec, row, columns, _width, n, rel) do
     cells = List.to_tuple(row)
-    names = schema.__schema__().columns
+    names = spec.columns
 
     {fields, problems} =
       Enum.reduce(columns, {%{}, []}, fn {field, pos, type}, {fields, problems} ->

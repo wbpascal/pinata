@@ -98,6 +98,8 @@ defmodule GameData.Import.Txt do
     {:cont, state}
   end
 
+  defp command(state, "table", [], n), do: {:cont, %{error(state, n, "#table needs a name") | current: nil}}
+
   defp command(state, "table", [name | _], n) do
     name = clean(state, name)
 
@@ -219,10 +221,18 @@ defmodule GameData.Import.Txt do
 
   defp open_table(state, name, n) do
     count = Enum.count(state.order, fn existing -> base(existing) == name end)
-    unique = if count == 0, do: name, else: "#{name}.#{count + 1}"
+    unique = unique_name(state, name, count)
     state = if count == 0, do: state, else: warn(state, n, "table #{name} is declared again, named #{unique}")
     table = %{name: unique, line: n, types: nil, header: nil, rows: []}
     {:cont, %{state | tables: Map.put(state.tables, unique, table), order: [unique | state.order], current: unique}}
+  end
+
+  # An explicit `T.2` earlier in the file must not be overwritten by the second `T`.
+  defp unique_name(_state, name, 0), do: name
+
+  defp unique_name(state, name, count) do
+    candidate = "#{name}.#{count + 1}"
+    if Map.has_key?(state.tables, candidate), do: unique_name(state, name, count + 1), else: candidate
   end
 
   # Value clean-up: drop the ignore bytes, then replace bytes through the exchange map.

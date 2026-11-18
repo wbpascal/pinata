@@ -26,10 +26,20 @@ defmodule GameData.Import do
     end
   end
 
+  # Symlinks are not followed: their targets are not part of the folder.
+  defp regular?(file), do: match?({:ok, %File.Stat{type: :regular}}, File.lstat(file))
+
+  defp read(file) do
+    case File.read(file) do
+      {:ok, binary} -> {:ok, binary}
+      {:error, reason} -> {:error, ["cannot read: #{:file.format_error(reason)}"]}
+    end
+  end
+
   defp empty?(target), do: File.ls(target) in [{:ok, []}, {:error, :enoent}]
 
   defp import_files(shine, target) do
-    files = shine |> Path.join("**/*") |> Path.wildcard(match_dot: true) |> Enum.filter(&File.regular?/1) |> Enum.sort()
+    files = shine |> Path.join("**/*") |> Path.wildcard(match_dot: true) |> Enum.filter(&regular?/1) |> Enum.sort()
     items = Enum.map(files, fn file -> {file, Path.relative_to(file, shine)} end)
     results = Enum.map(items, fn {file, rel} -> {rel, convert(file, rel)} end)
 
@@ -92,20 +102,20 @@ defmodule GameData.Import do
   defp script(file, rel) do
     base = Path.rootname(rel)
 
-    with {:ok, tables} <- file |> File.read!() |> Csl.parse() do
+    with {:ok, binary} <- read(file),
+         {:ok, tables} <- Csl.parse(binary) do
       {:ok, Enum.map(tables, &{:csv, "tables/#{base}/#{&1.name}.csv", &1.header, &1.rows}), []}
     end
   end
 
   defp table(file, rel) do
-    binary = File.read!(file)
-    base = Path.rootname(rel)
+    with {:ok, binary} <- read(file), do: table(file, rel, binary, Txt.table_file?(binary))
+  end
 
-    if Txt.table_file?(binary) do
-      with {:ok, tables, warnings} <- Txt.parse(binary), do: {:ok, csv_writes(tables, base), warnings}
-    else
-      {:ok, [{:copy, "tables/" <> rel, file}], ["not a table, copied unchanged"]}
-    end
+  defp table(file, rel, _binary, false), do: {:ok, [{:copy, "tables/" <> rel, file}], ["not a table, copied unchanged"]}
+
+  defp table(_file, rel, binary, true) do
+    with {:ok, tables, warnings} <- Txt.parse(binary), do: {:ok, csv_writes(tables, Path.rootname(rel)), warnings}
   end
 
   defp csv_writes([one], base), do: [{:csv, "tables/#{base}.csv", one.header, one.rows}]

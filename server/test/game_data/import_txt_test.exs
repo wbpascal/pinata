@@ -55,6 +55,19 @@ defmodule GameData.ImportTxtTest do
     assert "line 1: invalid table name \"../x\"" in errors
   end
 
+  test "#table without a name is reported as such" do
+    assert {:error, errors} = Txt.parse("#table\n")
+    assert "line 1: #table needs a name" in errors
+  end
+
+  test "an explicit T.2 is not overwritten by a later second T" do
+    text =
+      "#table\tT\n#columntype\tindex\n#columnname\ta\n#table\tT.2\n#columntype\tindex\n#columnname\ta\n#table\tT\n#columntype\tindex\n#columnname\ta\n"
+
+    assert {:ok, tables, _warnings} = Txt.parse(text)
+    assert Enum.map(tables, & &1.name) == ["T", "T.2", "T.3"]
+  end
+
   test "warnings: a table declared twice and a real extra value" do
     text =
       "#table\tT\n#columntype\tindex\n#columnname\tA\n#record\ta\t  \n#record\tb\textra\n#table\tT\n#columntype\tindex\n#columnname\tA\n"

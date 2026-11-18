@@ -62,4 +62,21 @@ defmodule GameData.ImportTest do
   test "a source without a Shine folder is refused", %{tmp_dir: tmp_dir} do
     assert {:error, _problems} = GameData.Import.run(tmp_dir, Path.join(tmp_dir, "out"))
   end
+
+  test "symlinks and unreadable files in the source", %{tmp_dir: tmp_dir} do
+    shine = Path.join([tmp_dir, "src", "Shine"])
+    File.mkdir_p!(Path.join(shine, "World"))
+    File.write!(Path.join(tmp_dir, "secret.shn"), "secret")
+    File.ln_s!(Path.join(tmp_dir, "secret.shn"), Path.join(shine, "Link.shn"))
+    out = Path.join(tmp_dir, "out")
+
+    assert {:ok, %{copied: 0}} = GameData.Import.run(Path.join(tmp_dir, "src"), out)
+    refute File.exists?(Path.join(out, "shn/Link.shn"))
+
+    File.write!(Path.join(shine, "World/Bad.txt"), "#table\tT\n")
+    File.chmod!(Path.join(shine, "World/Bad.txt"), 0)
+    File.rm_rf!(out)
+    assert {:error, [message]} = GameData.Import.run(Path.join(tmp_dir, "src"), out)
+    assert message =~ "World/Bad.txt: cannot read"
+  end
 end
