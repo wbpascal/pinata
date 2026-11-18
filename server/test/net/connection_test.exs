@@ -192,6 +192,7 @@ defmodule Net.ConnectionTest do
     {data, _cipher} = heartbeats(cipher, 100)
     :ok = :gen_tcp.send(socket, data)
     assert {:ok, _} = :gen_tcp.recv(socket, 300, 2000)
+    Process.sleep(50)
     nothing(socket)
   end
 

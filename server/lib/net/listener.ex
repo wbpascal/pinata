@@ -11,7 +11,10 @@ defmodule Net.Listener do
       # Thousand Island's own idle timeout (60 s by default) would cut in before our heartbeat.
       read_timeout: :infinity,
       # A send blocks only above the high watermark; keep it above the limit so Net.Connection sees the queue first.
-      transport_options: [high_watermark: 2 * settings.connection.max_unsent_bytes]
+      transport_options: [
+        high_watermark: 2 * settings.connection.max_unsent_bytes,
+        low_watermark: settings.connection.max_unsent_bytes
+      ]
     )
   end
 end
