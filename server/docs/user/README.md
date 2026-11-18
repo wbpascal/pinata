@@ -4,6 +4,10 @@ For administrators: how to install, configure, run and manage the Pinata server.
 
 The server cannot be played on yet. `iex -S mix` in `server/` starts all three parts in single-node mode on the default settings; the parts are still empty, so no port is opened yet.
 
+## Development tasks
+
+`mix pinata.packets_doc` (in `server/`) writes `docs/technical/packets.md` from the packet definitions. Run it after changing a packet definition; `mix check` fails on a stale file.
+
 ## Pages
 
 | Page | Content |

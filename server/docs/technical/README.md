@@ -20,7 +20,7 @@ The server is one Mix project, application `:pinata` ([ADR 0001](../../../docs/a
 | `Random` | library | the only caller of `:rand` | nothing |
 | `Pinata.Application` | application | starts the supervision tree | the parts, `Persistence`, `Cluster`, `Settings` |
 
-A part never uses another part. The boundaries are almost empty: the parts have only empty supervisors that the application starts.
+A part never uses another part. `Proto` is built; the parts have only empty supervisors that the application starts, and the other libraries are almost empty.
 
 ADR 0001 calls the protocol library `Protocol`. Elixir already has a core module of that name, so the module is `Proto`.
 
@@ -51,6 +51,10 @@ A new key goes into `Settings.Schema` and the type `Settings.t()`. Then regenera
 ## Cluster registry
 
 `Cluster.Registry` names the Login process `{:global, {:login}}` and each WorldManager `{:global, {:world_manager, world_id}}`, and keeps one `:pg` group `{:zones, world_id}` of Zone processes per world. The `:pg` scope `Cluster.Registry` is started by `Cluster.Root`. libcluster runs only when `cluster.nodes` is not empty, with `Cluster.Strategy.Epmd` and those hosts. `Cluster.Root` has that name because libcluster owns `Cluster.Supervisor`. Facade modules come with the issues that need them. See [ADR 0002](../../../docs/adr/0002-fail-simple-cluster-model.md).
+
+## Protocol
+
+[`protocol.md`](protocol.md) describes framing, cipher and packet definitions; [`packets.md`](packets.md) lists the defined packets (generated).
 
 ## Time and randomness
 

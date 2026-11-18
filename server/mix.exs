@@ -15,7 +15,8 @@ defmodule Pinata.MixProject do
       dialyzer: [
         flags: [:unmatched_returns, :extra_return, :missing_return],
         plt_local_path: "plts",
-        plt_core_path: "plts"
+        plt_core_path: "plts",
+        plt_add_apps: [:mix]
       ]
     ]
   end
@@ -44,6 +45,7 @@ defmodule Pinata.MixProject do
       {:libcluster, "~> 3.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:stream_data, "~> 1.1", only: [:dev, :test]},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
     ]
   end
