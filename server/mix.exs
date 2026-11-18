@@ -39,6 +39,9 @@ defmodule Pinata.MixProject do
   defp deps do
     [
       {:boundary, "~> 0.12.0", runtime: false},
+      {:toml, "~> 0.7"},
+      {:nimble_options, "~> 1.1"},
+      {:libcluster, "~> 3.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
