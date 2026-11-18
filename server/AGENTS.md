@@ -26,6 +26,20 @@ CI also runs `mix deps.audit`. A noisy Credo check is switched off on its own in
 - **ETS:** no named tables.
 - **Packet docs:** after a change to a packet definition run `mix pinata.packets_doc`; `mix check` fails on a stale `docs/technical/packets.md`.
 
+## Persistence: the portable subset
+
+Schema and queries must run on PostgreSQL and SQLite (ADR 0004). No tool checks these rules; CI runs the tests on both.
+
+1. Column types: `:integer`, `:bigint`, `:boolean`, `:string`, `:binary`, `:utc_datetime`, opaque `:map`. No arrays, no decimals.
+2. Unique indexes keep Ecto's default names. Upserts always name the `conflict_target` columns.
+3. No `lock:`, no `mode:` per call, no `ilike`, no array operators, no SQL fragments outside one reviewed module.
+4. The SQLite repo runs with `default_transaction_mode: :immediate` and keeps the WAL and `foreign_keys` defaults.
+5. Every operation is one `Repo.transact` of guarded statements, each checked for its affected-row count, rows touched in key order. Leave the transaction after a failed statement.
+6. No `modify` in migrations. Until the first release, edit the initial migrations in place.
+7. Tests that touch the database are not async and must pass on both adapters; CI runs them once per adapter.
+
+Nothing outside `Persistence` names a Repo, a schema or a query. A text compared without case gets a second, normalised column with a plain unique index (`accounts.name_key`).
+
 ## Where the documentation is
 
 - `GLOSSARY.md`: the project's vocabulary. Use its terms in code, documentation and issues.

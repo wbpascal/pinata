@@ -27,7 +27,7 @@ defmodule Pinata.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :crypto],
       mod: {Pinata.Application, []}
     ]
   end
@@ -45,6 +45,9 @@ defmodule Pinata.MixProject do
       {:libcluster, "~> 3.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:ecto_sql, "~> 3.14"},
+      {:postgrex, "~> 0.22.4"},
+      {:ecto_sqlite3, "~> 0.26.0"},
       {:stream_data, "~> 1.1", only: [:dev, :test]},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
     ]
@@ -52,6 +55,7 @@ defmodule Pinata.MixProject do
 
   defp aliases do
     [
+      test: ["test --no-start"],
       check: [
         "format --check-formatted",
         "deps.unlock --check-unused",

@@ -5,4 +5,7 @@ defmodule Random do
 
   @spec uniform(pos_integer()) :: pos_integer()
   def uniform(n), do: Application.get_env(:pinata, :random_source, Random.Rand).uniform(n)
+
+  @spec bytes(non_neg_integer()) :: binary()
+  def bytes(n), do: Application.get_env(:pinata, :random_source, Random.Rand).bytes(n)
 end
