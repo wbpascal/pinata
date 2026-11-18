@@ -60,6 +60,10 @@ A new key goes into `Settings.Schema` and the type `Settings.t()`. Then regenera
 
 Server code reads time through `Clock` and random numbers through `Random`, never directly ([ADR 0008](../../../docs/adr/0008-byte-compatibility-proven-by-capture-replay.md)). Each forwards to a source module taken from the application environment (`:clock_source`, `:random_source`), so a test can put its own source in place.
 
+## Testing
+
+[`testing.md`](testing.md) describes the transcripts under `server/test/replay/transcripts/` and how a capture is converted into one.
+
 ## The gate
 
 `mix check` and the three custom Credo checks in `server/credo/checks/` are described in [`server/AGENTS.md`](../../AGENTS.md). Each check has a probe file in `server/test/probes/` that breaks its rule, and a test that requires the check to report it.
