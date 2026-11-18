@@ -22,10 +22,14 @@ defmodule Persistence.Repo do
 
   # The URL of a PostgreSQL form holds the password: it is never printed.
   def configure(url) do
-    scheme = url |> String.split(":", parts: 2) |> hd()
+    scheme =
+      case String.split(url, ":", parts: 2) do
+        [scheme, _rest] -> inspect(scheme)
+        [_no_colon] -> "the URL (no scheme)"
+      end
 
     {:error,
-     "database.url: unknown scheme in #{inspect(scheme)}, expected sqlite:<path> or postgres://user:password@host/database"}
+     "database.url: unknown scheme in #{scheme}, expected sqlite:<path> or postgres://user:password@host/database"}
   end
 
   @spec active() :: t()

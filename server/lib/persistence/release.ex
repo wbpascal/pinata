@@ -13,19 +13,19 @@ defmodule Persistence.Release do
 
   @spec create_account(String.t()) :: :ok
   def create_account(name) do
-    # shortcut: the password is echoed while typed, hide it when a terminal library is acceptable
-    typed =
-      case IO.gets("Password: ") do
-        line when is_binary(line) -> line |> String.trim_trailing("\n") |> String.trim_trailing("\r")
-        _eof_or_error -> ""
-      end
-
-    if typed == "", do: raise("No password given.")
-
-    # The 2016 client sends the lower-case hex MD5 of the typed password; that is what is stored hashed.
-    password = Base.encode16(:crypto.hash(:md5, typed), case: :lower)
-
     ready(fn ->
+      # shortcut: the password is echoed while typed, hide it when a terminal library is acceptable
+      typed =
+        case IO.gets("Password: ") do
+          line when is_binary(line) -> line |> String.trim_trailing("\n") |> String.trim_trailing("\r")
+          _eof_or_error -> ""
+        end
+
+      if typed == "", do: raise("No password given.")
+
+      # The 2016 client sends the lower-case hex MD5 of the typed password; that is what is stored hashed.
+      password = Base.encode16(:crypto.hash(:md5, typed), case: :lower)
+
       case Persistence.create_account(name, password) do
         {:ok, id} ->
           IO.puts("Account #{name} created, user number #{id}.")

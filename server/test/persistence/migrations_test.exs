@@ -11,6 +11,9 @@ defmodule Persistence.MigrationsTest do
   setup do
     url = System.get_env("DATABASE_URL")
     :ok = Application.stop(:pinata)
+    # the restarted application compiles this migration again; unload it to avoid the redefinition warning
+    :code.purge(Persistence.Repo.Migrations.CreateAccounts)
+    :code.delete(Persistence.Repo.Migrations.CreateAccounts)
 
     on_exit(fn ->
       System.put_env("DATABASE_URL", url)

@@ -15,7 +15,7 @@ defmodule Persistence.Migrations do
       {:error,
        """
        The database has #{length(pending)} pending migration(s): #{Enum.join(pending, ", ")}
-       The node does not start. Run them with the release command
+       Run them with the release command
          bin/pinata eval "Persistence.Release.migrate()"
        or, from a source checkout, with `mix pinata.migrate`.\
        """}
@@ -35,7 +35,7 @@ defmodule Persistence.Migrations do
         :ignore
 
       {:error, message} ->
-        IO.puts(:stderr, message)
+        IO.puts(:stderr, message <> "\nThe node does not start.")
         {:error, :pending_migrations}
     end
   end
