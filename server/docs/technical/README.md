@@ -11,6 +11,7 @@ The server is one Mix project, application `:pinata` ([ADR 0001](../../../docs/a
 | `Login` | part | the Login part | all libraries |
 | `WorldManager` | part | the WorldManager part | all libraries |
 | `Zone` | part | the Zone part | all libraries |
+| `Net` | library | client listener and connection process | `Proto`, `Settings`, `Clock`, `Random` |
 | `Proto` | library | framing, cipher, packet definitions | `Clock`, `Random` |
 | `Persistence` | library | database access | `Settings`, `Clock`, `Random` |
 | `Cluster` | library | registry and the facades between parts | `Settings`, `Clock`, `Random` |
@@ -20,27 +21,32 @@ The server is one Mix project, application `:pinata` ([ADR 0001](../../../docs/a
 | `Random` | library | the only caller of `:rand` | nothing |
 | `Pinata.Application` | application | starts the supervision tree | the parts, `Persistence`, `Cluster`, `Settings` |
 
-A part never uses another part. `Proto` is built; the parts have only empty supervisors that the application starts, and the other libraries are almost empty.
+A part never uses another part. `Proto` and `Net` are built; each part starts a client listener and has a stub packet handler, and the other libraries are almost empty.
 
 ADR 0001 calls the protocol library `Protocol`. Elixir already has a core module of that name, so the module is `Proto`.
 
 ```mermaid
 flowchart TD
     App[Pinata.Application] --> Login & WorldManager & Zone
-    Login & WorldManager & Zone --> Proto & Persistence & Cluster & GameData
-    Proto & Persistence & Cluster & GameData --> Clock & Random
+    Login & WorldManager & Zone --> Net & Proto & Persistence & Cluster & GameData
+    Net --> Proto
+    Net & Proto & Persistence & Cluster & GameData --> Clock & Random
 ```
 
-The diagram leaves out three sets of arrows that the table has: the parts also use `Clock` and `Random`, and the application uses `Persistence` and `Cluster`. Every part, `Persistence`, `Cluster` and the application also use `Settings`.
+The diagram leaves out three sets of arrows that the table has: the parts also use `Clock` and `Random`, and the application uses `Persistence` and `Cluster`, and `Net` uses `Settings`. Every part, `Persistence`, `Cluster` and the application also use `Settings`.
 
 ## Start-up
 
-`Pinata.Application.start/2` calls `Settings.load(System.get_env())`. On problems it prints them all to standard error and returns `{:error, :invalid_settings}`. Otherwise `Pinata.Supervisor` (`:one_for_one`) starts `Persistence.Supervisor`, `Cluster.Root`, then one supervisor per part in `PINATA_PARTS`, each with the settings as its argument. The part supervisors have no children yet.
+`Pinata.Application.start/2` calls `Settings.load(System.get_env())`. On problems it prints them all to standard error and returns `{:error, :invalid_settings}`. Otherwise `Pinata.Supervisor` (`:one_for_one`) starts `Persistence.Supervisor`, `Cluster.Root`, then one supervisor per part in `PINATA_PARTS`, each with the settings as its argument. Each part supervisor starts its client listener.
 
 ```mermaid
 flowchart TD
     S[Pinata.Supervisor] --> P[Persistence.Supervisor] & C[Cluster.Root] & L[Login.Supervisor] & W[WorldManager.Supervisor] & Z[Zone.Supervisor]
 ```
+
+## Processes
+
+[`processes.md`](processes.md) describes the listener and the connection process.
 
 ## Settings
 

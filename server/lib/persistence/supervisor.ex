@@ -1,5 +1,5 @@
 defmodule Persistence.Supervisor do
-  @moduledoc "Root supervisor of `Persistence`. It has no children yet."
+  @moduledoc "Root supervisor of `Persistence`. It has no child processes yet."
 
   use Supervisor
 
