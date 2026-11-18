@@ -100,11 +100,11 @@ defmodule GameData.Import.Txt do
 
   defp command(state, "table", [name | _], n) do
     name = clean(state, name)
-    count = Enum.count(state.order, fn existing -> base(existing) == name end)
-    unique = if count == 0, do: name, else: "#{name}.#{count + 1}"
-    state = if count == 0, do: state, else: warn(state, n, "table #{name} is declared again, named #{unique}")
-    table = %{name: unique, line: n, types: nil, header: nil, rows: []}
-    {:cont, %{state | tables: Map.put(state.tables, unique, table), order: [unique | state.order], current: unique}}
+
+    # Table names become file names, so a name that could leave the target directory is refused.
+    if Regex.match?(~r/\A[A-Za-z0-9_][A-Za-z0-9_().-]*\z/, name),
+      do: open_table(state, name, n),
+      else: {:cont, %{error(state, n, "invalid table name #{inspect(name)}") | current: nil}}
   end
 
   defp command(state, "columntype", types, n) do
@@ -215,6 +215,14 @@ defmodule GameData.Import.Txt do
       true ->
         {:error, "column #{inspect(name)}: not a number: #{inspect(value)}"}
     end
+  end
+
+  defp open_table(state, name, n) do
+    count = Enum.count(state.order, fn existing -> base(existing) == name end)
+    unique = if count == 0, do: name, else: "#{name}.#{count + 1}"
+    state = if count == 0, do: state, else: warn(state, n, "table #{name} is declared again, named #{unique}")
+    table = %{name: unique, line: n, types: nil, header: nil, rows: []}
+    {:cont, %{state | tables: Map.put(state.tables, unique, table), order: [unique | state.order], current: unique}}
   end
 
   # Value clean-up: drop the ignore bytes, then replace bytes through the exchange map.

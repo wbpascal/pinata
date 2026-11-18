@@ -50,6 +50,11 @@ defmodule GameData.ImportTxtTest do
     assert "line 7: bad column type in #columntype" in errors
   end
 
+  test "a table name that is not a plain file name is refused" do
+    assert {:error, errors} = Txt.parse("#table\t../x\n#columntype\tindex\n")
+    assert "line 1: invalid table name \"../x\"" in errors
+  end
+
   test "warnings: a table declared twice and a real extra value" do
     text =
       "#table\tT\n#columntype\tindex\n#columnname\tA\n#record\ta\t  \n#record\tb\textra\n#table\tT\n#columntype\tindex\n#columnname\tA\n"

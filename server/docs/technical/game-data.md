@@ -31,6 +31,8 @@ The boundary `GameData` reads the data directory when a node starts and keeps ea
 
 The `#`-command format. Lines are split into tokens at bytes below 0x20 and at the bytes a `#delimiter` declared (a space is not one by default). A `;` at the start of a token begins a comment. The first token is the command: `ignore C`, `delimiter C` (from the next line), `exchange FROM TO`, `table NAME`, `columntype T…` (`index`, `string[n]`, `byte`, `word`, `dwrd`, `dword`), `columnname N…`, `record V…`, `recordin TABLE V…`, `end`. A character argument is one byte or `\dNNN`, `\oNNN`, `\xNN`. Values lose the ignore bytes and then go through the exchange map. Number columns are trimmed, must be `-?[0-9]+` or `0x…` (written as decimal). Text values are kept as written (not cut to `n`). Too few values is an error; extra blank values are dropped silently, other extras with a warning. A second table of the same name in one file becomes `NAME.2`, `NAME.3`, …, with a warning.
 
+Table names are limited to `[A-Za-z0-9_][A-Za-z0-9_().-]*` because they become file names; any other name is an error.
+
 Oddities of the 2016 data: `NPCItemList/HednisSkillGrunt.txt` declares `Tab08` twice (so `Tab08.2.csv`); `World/QuestParser.txt` has no `#table` (copied); `World/RecallCoord.txt` line 56 has a blank extra value; the column `TimeLimit(min)` in `World/Quest.txt` has brackets in its name; 8 tables have no rows.
 
 ### Character-default scripts (`GameData.Import.Csl`)
