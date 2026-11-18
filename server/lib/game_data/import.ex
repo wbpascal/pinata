@@ -26,8 +26,14 @@ defmodule GameData.Import do
     end
   end
 
-  # Symlinks are not followed: their targets are not part of the folder.
-  defp regular?(file), do: match?({:ok, %File.Stat{type: :regular}}, File.lstat(file))
+  # Symlinks are not followed, neither files nor directories: their targets are not part of the folder.
+  defp regular?(shine, file) do
+    paths = file |> Path.relative_to(shine) |> Path.split() |> Enum.scan(shine, &Path.join(&2, &1))
+    {last, dirs} = List.pop_at(paths, -1)
+
+    match?({:ok, %File.Stat{type: :regular}}, File.lstat(last)) and
+      Enum.all?(dirs, &match?({:ok, %File.Stat{type: :directory}}, File.lstat(&1)))
+  end
 
   defp read(file) do
     case File.read(file) do
@@ -39,7 +45,9 @@ defmodule GameData.Import do
   defp empty?(target), do: File.ls(target) in [{:ok, []}, {:error, :enoent}]
 
   defp import_files(shine, target) do
-    files = shine |> Path.join("**/*") |> Path.wildcard(match_dot: true) |> Enum.filter(&regular?/1) |> Enum.sort()
+    files =
+      shine |> Path.join("**/*") |> Path.wildcard(match_dot: true) |> Enum.filter(&regular?(shine, &1)) |> Enum.sort()
+
     items = Enum.map(files, fn file -> {file, Path.relative_to(file, shine)} end)
     results = Enum.map(items, fn {file, rel} -> {rel, convert(file, rel)} end)
 

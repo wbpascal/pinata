@@ -68,6 +68,15 @@ defmodule GameData.ImportTxtTest do
     assert Enum.map(tables, & &1.name) == ["T", "T.2", "T.3"]
   end
 
+  test "an explicit T.2 after two T is renamed, nothing is lost" do
+    t = "#columntype\tindex\n#columnname\ta\n"
+    text = "#table\tT\n#{t}#table\tT\n#{t}#table\tT.2\n#{t}"
+
+    assert {:ok, tables, warnings} = Txt.parse(text)
+    assert Enum.map(tables, & &1.name) == ["T", "T.2", "T.2.2"]
+    assert Enum.any?(warnings, &(&1 =~ "line 7" and &1 =~ "T.2.2"))
+  end
+
   test "warnings: a table declared twice and a real extra value" do
     text =
       "#table\tT\n#columntype\tindex\n#columnname\tA\n#record\ta\t  \n#record\tb\textra\n#table\tT\n#columntype\tindex\n#columnname\tA\n"

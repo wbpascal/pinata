@@ -73,6 +73,14 @@ defmodule GameData.ImportTest do
     assert {:ok, %{copied: 0}} = GameData.Import.run(Path.join(tmp_dir, "src"), out)
     refute File.exists?(Path.join(out, "shn/Link.shn"))
 
+    File.mkdir_p!(Path.join(tmp_dir, "outside"))
+    File.write!(Path.join(tmp_dir, "outside/X.shn"), "x")
+    File.ln_s!(Path.join(tmp_dir, "outside"), Path.join(shine, "View"))
+    File.rm_rf!(out)
+    assert {:ok, %{copied: 0}} = GameData.Import.run(Path.join(tmp_dir, "src"), out)
+    refute File.exists?(Path.join(out, "shn/View/X.shn"))
+    File.rm!(Path.join(shine, "View"))
+
     File.write!(Path.join(shine, "World/Bad.txt"), "#table\tT\n")
     File.chmod!(Path.join(shine, "World/Bad.txt"), 0)
     File.rm_rf!(out)

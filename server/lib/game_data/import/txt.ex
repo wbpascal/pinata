@@ -220,7 +220,7 @@ defmodule GameData.Import.Txt do
   end
 
   defp open_table(state, name, n) do
-    count = Enum.count(state.order, fn existing -> base(existing) == name end)
+    count = Enum.count(state.order, fn existing -> existing == name or base(existing) == name end)
     unique = unique_name(state, name, count)
     state = if count == 0, do: state, else: warn(state, n, "table #{name} is declared again, named #{unique}")
     table = %{name: unique, line: n, types: nil, header: nil, rows: []}
