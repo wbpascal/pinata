@@ -1,0 +1,11 @@
+defmodule Pinata.Application do
+  @moduledoc false
+
+  use Boundary, top_level?: true, deps: [Login, WorldManager, Zone, Persistence, Cluster]
+  use Application
+
+  @impl Application
+  def start(_type, _args) do
+    Supervisor.start_link([], strategy: :one_for_one, name: Pinata.Supervisor)
+  end
+end
