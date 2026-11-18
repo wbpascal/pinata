@@ -126,8 +126,13 @@ defmodule Settings.Schema do
     {values, problems} =
       rows
       |> Enum.with_index()
-      |> Enum.map(fn {row, index} -> table(keys, row, "#{path}[#{index}].") end)
+      |> Enum.flat_map(fn
+        {%{} = row, index} -> [table(keys, row, "#{path}[#{index}].")]
+        {row, index} -> [{nil, ["#{path}[#{index}]: expected a table, got: #{inspect(row)}"]}]
+      end)
       |> Enum.unzip()
+
+    values = Enum.reject(values, &is_nil/1)
 
     {{:ok, values}, Enum.concat(problems)}
   end

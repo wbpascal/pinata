@@ -51,6 +51,7 @@ defmodule Settings do
     case Toml.decode(text) do
       {:ok, file} -> {file, []}
       {:error, {:invalid_toml, message}} -> {%{}, ["#{path}: not valid TOML (#{message})"]}
+      {:error, message} when is_binary(message) -> {%{}, ["#{path}: not valid TOML (#{message})"]}
     end
   end
 
