@@ -18,29 +18,16 @@ jobs:
         working-directory: server
     env:
       MIX_ENV: test
-      # Same pins as mise.toml; the first step fails when they drift apart.
-      OTP_VERSION: "29.1.2"
-      ELIXIR_VERSION: "1.20.5"
     steps:
       - uses: actions/checkout@v4
-
-      - name: Pins match mise.toml
-        working-directory: .
-        run: |
-          grep -qx "erlang = \"$OTP_VERSION\"" mise.toml
-          grep -qx "elixir = \"$ELIXIR_VERSION-otp-${OTP_VERSION%%.*}\"" mise.toml
-
-      - uses: erlef/setup-beam@v1
-        with:
-          otp-version: ${{ env.OTP_VERSION }}
-          elixir-version: ${{ env.ELIXIR_VERSION }}
-          version-type: strict
+      
+      - uses: jdx/mise-action@v5
 
       - name: Dialyzer PLT cache
         uses: actions/cache@v4
         with:
           path: server/plts
-          key: plt-${{ runner.os }}-otp-${{ env.OTP_VERSION }}-elixir-${{ env.ELIXIR_VERSION }}-${{ hashFiles('server/mix.lock') }}
+          key: plt-${{ runner.os }}-mise-${{ hashFiles('mise.toml') }}-deps-${{ hashFiles('server/mix.lock') }}
 
       - run: mix deps.get
 
