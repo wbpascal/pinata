@@ -14,6 +14,7 @@ Start-up errors from the database:
 
 | Message | Meaning |
 |---|---|
-| `database.url: unknown scheme in "...", expected sqlite:<path> or postgres://user:password@host/database` | the URL form is not one of the two |
+| `database.url: unknown scheme: "...", expected sqlite:<path> or postgres://user:password@host/database` | the URL form is not one of the two |
+| `database.url: unknown scheme: a URL without scheme, expected ...` | the URL has no `scheme:` part at all (for example a bare file path) |
 | `database.url: cannot create the directory of <path> (...)` | the directory of the SQLite file cannot be created |
 | `The database has N pending migration(s): ...` | PostgreSQL only; run the migrate command named in the message |

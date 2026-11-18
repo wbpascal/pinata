@@ -65,7 +65,7 @@ defmodule Pinata.MixProject do
         "xref graph --label compile-connected --fail-above 0",
         "credo",
         "dialyzer",
-        "test --warnings-as-errors"
+        "test --no-start --warnings-as-errors"
       ]
     ]
   end

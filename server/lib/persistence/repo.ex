@@ -25,11 +25,11 @@ defmodule Persistence.Repo do
     scheme =
       case String.split(url, ":", parts: 2) do
         [scheme, _rest] -> inspect(scheme)
-        [_no_colon] -> "the URL (no scheme)"
+        [_no_colon] -> "a URL without scheme"
       end
 
     {:error,
-     "database.url: unknown scheme in #{scheme}, expected sqlite:<path> or postgres://user:password@host/database"}
+     "database.url: unknown scheme: #{scheme}, expected sqlite:<path> or postgres://user:password@host/database"}
   end
 
   @spec active() :: t()
