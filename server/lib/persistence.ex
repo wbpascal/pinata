@@ -72,9 +72,11 @@ defmodule Persistence do
     {:error, :unknown}
   end
 
+  @doc "Bans or unbans an account. A blocked account gets `:blocked` from `check_login/2` (client: \"The ID has been blocked.\")."
   @spec set_blocked(binary(), boolean()) :: :ok | {:error, :unknown}
   def set_blocked(name, value) when is_boolean(value), do: set(name, blocked: value)
 
+  @doc "Lets an account in or keeps it out without banning it. `false` gives `:not_login_able` from `check_login/2` (client: maintenance message)."
   @spec set_login_able(binary(), boolean()) :: :ok | {:error, :unknown}
   def set_login_able(name, value) when is_boolean(value), do: set(name, login_able: value)
 

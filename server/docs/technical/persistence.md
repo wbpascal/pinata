@@ -40,8 +40,8 @@ flowchart TD
 | `password_hash` | binary | PBKDF2-HMAC-SHA256, 32 bytes |
 | `password_salt` | binary | 16 bytes from `Random.bytes/1` |
 | `password_iterations` | integer | iterations used for this hash |
-| `blocked` | boolean | default false |
-| `login_able` | boolean | default true |
+| `blocked` | boolean | the account is banned; default false |
+| `login_able` | boolean | the account may enter; default true |
 
 The name key models SQL Server's default comparison, case-insensitive and blind to trailing spaces of the original (*inferred*). A valid name has 1 to 255 bytes in `0x21..0x7E`; `check_login` never fails on odd bytes, such a name is `:unknown`.
 
@@ -55,7 +55,24 @@ The default is 600,000 iterations; `Application.get_env(:pinata, :password_itera
 
 `check_login` checks in the original's order (D01 section 3.2): unknown account, wrong password, blocked, not login-able. The Login part will map unknown and wrong password to client code 0x45, blocked to 0x47, not login-able to 0x48.
 
-Fields of D01 section 3.2 not carried over: `bIsDelete`, `nAuthID` / `tUserAuth` (the group flag `bIsLoginAble` became the per-account `login_able`), login by e-mail, timed blocks (`tUserBlock`, `usp_User_chkBlock`), the EGPal and merge additions.
+Fields of D01 section 3.2 not carried over: `bIsDelete`, `nAuthID` / `tUserAuth` (see the next section), login by e-mail, timed blocks (`tUserBlock`, `usp_User_chkBlock`), the EGPal and merge additions.
+
+## Blocked and login-able
+
+The two flags are two separate outputs of the original account check and reach the 2016 client as two different codes. Source: `docs/pseudocode/db/D01-account.md` section 3.2 and `docs/pseudocode/login-server.md` section 5.1; the table and column names are from the database backups (*db-backup*).
+
+| | `blocked` | `login_able` |
+|---|---|---|
+| Original source | `tUser.bIsBlock`, one bit per account | `tUserAuth.bIsLoginAble`, one value per group; the account holds the group in `tUser.nAuthID` |
+| Field of `0x0C5C` | `nBlock != 0` refuses | `bLoginAble != 1` refuses |
+| `check_login` result | `{:error, :blocked}` | `{:error, :not_login_able}` |
+| Client code and text | 0x47 "The ID has been blocked." | 0x48 "The World Servers are down for maintenance." |
+| Purpose | ban one account | let only some groups in, for example staff during maintenance or testers in a closed beta |
+
+Differences from the original:
+
+- There are no groups here. `login_able` is a column of the account, so closing the server to all players means setting it on each account. A later change may add groups or a server-wide switch; the two results of `check_login` stay the same either way.
+- A block here has no end date. The original cleared `bIsBlock` when the last timed block in `tUserBlock` had expired.
 
 ## Tests
 
