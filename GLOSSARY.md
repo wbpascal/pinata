@@ -90,6 +90,14 @@ _Avoid_: gate
 **Original-server bug**:
 Behaviour of the original server judged unintended, listed in the bug register. Fixed silently unless the fix changes packets or gameplay.
 
+**User documentation**:
+What an administrator needs to run and manage the rebuilt server, one page per task.
+_Avoid_: admin guide, manual
+
+**Technical documentation**:
+How the rebuilt server is built and how it talks to the client, at the level of parts, processes and flows. It says how things are; the reasons are in the ADRs.
+_Avoid_: architecture docs, developer docs
+
 ### Testing
 
 **Capture**:
