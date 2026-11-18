@@ -53,7 +53,7 @@ defmodule Settings.Schema do
         url: [
           type: :string,
           doc:
-            "Database URL. Default: the SQLite file `pinata.db` in `data_dir`. The environment variable `DATABASE_URL` overrides it."
+            "Database URL: `sqlite:<path>` or `postgres://user:password@host/database`. Default: the SQLite file `pinata.db` in `data_dir`. The environment variable `DATABASE_URL` overrides it."
         ]
       ]
     ],
@@ -64,6 +64,23 @@ defmodule Settings.Schema do
           type: {:list, :string},
           default: [],
           doc: "Names of the other nodes (`name@host`). Empty means single-node mode."
+        ]
+      ]
+    ],
+    connection: [
+      type: :keyword_list,
+      keys: [
+        max_packets_per_second: [
+          type: :pos_integer,
+          type_doc: "integer, 1 or more",
+          default: 100,
+          doc: "A client that sends more packets than this within one second is disconnected."
+        ],
+        max_unsent_bytes: [
+          type: :pos_integer,
+          type_doc: "integer, 1 or more",
+          default: 1_048_576,
+          doc: "A client with more than this many bytes of unsent outbound data is disconnected."
         ]
       ]
     ],

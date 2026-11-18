@@ -27,7 +27,7 @@ defmodule Pinata.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :crypto],
       mod: {Pinata.Application, []}
     ]
   end
@@ -41,10 +41,14 @@ defmodule Pinata.MixProject do
     [
       {:boundary, "~> 0.12.0", runtime: false},
       {:toml, "~> 0.7"},
+      {:thousand_island, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:libcluster, "~> 3.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:ecto_sql, "~> 3.14"},
+      {:postgrex, "~> 0.22.4"},
+      {:ecto_sqlite3, "~> 0.26.0"},
       {:stream_data, "~> 1.1", only: [:dev, :test]},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
     ]
@@ -61,7 +65,7 @@ defmodule Pinata.MixProject do
         "xref graph --label compile-connected --fail-above 0",
         "credo",
         "dialyzer",
-        "test --warnings-as-errors"
+        "test --no-start --warnings-as-errors"
       ]
     ]
   end

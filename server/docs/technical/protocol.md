@@ -7,7 +7,7 @@ The `Proto` boundary holds the client protocol as pure code: no sockets and no p
 - Receive: `Proto.Framing.split/1`, then `Proto.Cipher.crypt/2` on the body, then `Proto.decode/1`.
 - Send: `Proto.encode/1`, then `Proto.Framing.frame/1`. Server to client is not encrypted.
 
-A later session part chains them. This change adds no client flow across parts, so there is no sequence diagram.
+`Net.Connection` chains them, see [`processes.md`](processes.md).
 
 ## Framing
 

@@ -1,7 +1,7 @@
 defmodule Login do
   @moduledoc "The Login part."
 
-  use Boundary, deps: [Proto, Persistence, Cluster, GameData, Settings, Clock, Random], exports: [Supervisor]
+  use Boundary, deps: [Net, Proto, Persistence, Cluster, GameData, Settings, Clock, Random], exports: [Supervisor]
 
   @doc "The data tables this part reads (ADR 0006)."
   @spec game_data() :: [module()]

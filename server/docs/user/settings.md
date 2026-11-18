@@ -26,8 +26,10 @@ with no file the node starts in single-node mode on the data directory `./data`,
 | `zone.port` | integer 1 to 65535 | `9210` | Client listener of the Zone part, one per Zone node. |
 | `[[world]] number` | integer, 0 or more | `0` | World number. |
 | `[[world]] name` | string | `"INITIO"` | World name. |
-| `database.url` | string | see description | Database URL. Default: the SQLite file `pinata.db` in `data_dir`. The environment variable `DATABASE_URL` overrides it. |
+| `database.url` | string | see description | Database URL: `sqlite:<path>` or `postgres://user:password@host/database`. Default: the SQLite file `pinata.db` in `data_dir`. The environment variable `DATABASE_URL` overrides it. |
 | `cluster.nodes` | list of strings | `[]` | Names of the other nodes (`name@host`). Empty means single-node mode. |
+| `connection.max_packets_per_second` | integer, 1 or more | `100` | A client that sends more packets than this within one second is disconnected. |
+| `connection.max_unsent_bytes` | integer, 1 or more | `1048576` | A client with more than this many bytes of unsent outbound data is disconnected. |
 | `data.strict_references` | boolean | `true` | Refuse to start when a data table refers to a row that does not exist. |
 
 A key with a dot is written inside a table: `login.port` is `port` under `[login]`. Each world is one `[[world]]` table.
