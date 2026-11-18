@@ -10,6 +10,10 @@ The order in which the Elixir server is built. Terms (Milestone, Capture checkpo
   2016 client on its own. Areas that already have captures go first.
 - **Fixed and provisional:** milestones 1 to 4 are fixed. Milestones 5 to 11 are provisional: the order is confirmed
   or changed when the milestone before closes, and each is cut into issues only then.
+- **Milestone map:** every milestone after the first is planned on its own wayfinder map (GitHub issue labelled
+  `wayfinder:map`, attached to the GitHub milestone). The map is opened as soon as the GitHub milestone exists and
+  collects points that come up during earlier work. It is charted when the milestone before closes: that session
+  checks the captures, triages the original-server bugs and cuts the milestone into issues.
 - **Capture checkpoint:** a milestone's captures are recorded and validated before its issues are cut. It closes
   after capture replay passes and the user has confirmed it with the real client. A feature without any capture
   scenario (guild tournament) is built from the pseudocode and closes on the manual check alone.

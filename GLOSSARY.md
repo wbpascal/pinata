@@ -80,6 +80,9 @@ _Avoid_: maximum level, level ceiling
 A slice of the rebuild that is usable with the real client on its own.
 _Avoid_: phase, stage
 
+**Milestone map**:
+The planning issue of one milestone. It is opened early to collect points for that milestone and charted into tickets when the milestone before closes.
+
 **Capture checkpoint**:
 A point where a milestone waits for named packet captures and a manual check with the real client before it may close.
 _Avoid_: gate
