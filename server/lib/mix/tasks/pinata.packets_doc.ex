@@ -11,7 +11,7 @@ defmodule Mix.Tasks.Pinata.PacketsDoc do
   @impl Mix.Task
   @spec run([String.t()]) :: :ok
   def run(_args) do
-    Mix.Task.run("app.start")
+    Mix.Task.run("app.config")
     File.write!("docs/technical/packets.md", Proto.PacketsDoc.render())
   end
 end

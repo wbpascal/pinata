@@ -52,6 +52,7 @@ defmodule Pinata.MixProject do
 
   defp aliases do
     [
+      test: ["test --no-start"],
       check: [
         "format --check-formatted",
         "deps.unlock --check-unused",

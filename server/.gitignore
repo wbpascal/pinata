@@ -8,3 +8,4 @@ erl_crash.dump
 !lib/
 !parts/
 /tmp/
+/data/

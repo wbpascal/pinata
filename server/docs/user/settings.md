@@ -3,7 +3,7 @@
 <!-- Generated from `Settings.Schema` by `Settings.Doc.render/0`. Do not edit by hand: see "Settings" in server/docs/technical/README.md. -->
 
 A node reads its settings once, at start-up, from one TOML file. Every key has a default, so the file is optional:
-with no file the node starts in single-node mode.
+with no file the node starts in single-node mode on the data directory `./data`, which must exist (see [`install.md`](install.md)).
 
 ## Environment variables
 
@@ -17,7 +17,7 @@ with no file the node starts in single-node mode.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `data_dir` | string | `"./data"` | The data directory. |
+| `data_dir` | string | `"./data"` | The data directory, written by `mix pinata.import_data` (see install.md). The node does not start without it. |
 | `public_host` | string | `"127.0.0.1"` | The address the client is told to connect to. |
 | `client_version_key` | string | `"20151116141627"` | The version key a client must send at login. The default is the key of the 2016 client. |
 | `login.port` | integer 1 to 65535 | `9010` | Client listener of the Login part. |
@@ -55,3 +55,6 @@ Invalid settings, the node does not start:
   bogus: unknown key
   login.port: invalid value for :port option: expected one of 1..65535, got: 0
 ```
+
+After the settings the node loads its game data. If `data_dir` does not exist, or a data table is damaged, it prints
+the problems and does not start. Both cases are described in [`install.md`](install.md).
