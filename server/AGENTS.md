@@ -24,6 +24,7 @@ CI also runs `mix deps.audit`. A noisy Credo check is switched off on its own in
 - **Exhaustiveness:** no catch-all clause on a closed set of our own values; a catch-all is mandatory on anything decoded from the client. This is a review rule; no tool checks it.
 - **Time and randomness:** only through `Clock` and `Random`.
 - **ETS:** no named tables.
+- **Packet docs:** after a change to a packet definition run `mix pinata.packets_doc`; `mix check` fails on a stale `docs/technical/packets.md`.
 
 ## Where the documentation is
 

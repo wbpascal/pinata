@@ -19,7 +19,7 @@ The server is one Mix project, application `:pinata` ([ADR 0001](../../../docs/a
 | `Random` | library | the only caller of `:rand` | nothing |
 | `Pinata.Application` | application | starts the supervision tree | the parts, `Persistence`, `Cluster` |
 
-A part never uses another part. All boundaries are empty for now, and the application starts no part.
+A part never uses another part. `Proto` is built; the other boundaries are empty, and the application starts no part.
 
 ADR 0001 calls the protocol library `Protocol`. Elixir already has a core module of that name, so the module is `Proto`.
 
@@ -31,6 +31,10 @@ flowchart TD
 ```
 
 The diagram leaves out three sets of arrows that the table has: the parts also use `Clock` and `Random`, and the application uses `Persistence` and `Cluster`.
+
+## Protocol
+
+[`protocol.md`](protocol.md) describes framing, cipher and packet definitions; [`packets.md`](packets.md) lists the defined packets (generated).
 
 ## Time and randomness
 
