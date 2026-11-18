@@ -4,7 +4,7 @@ How the server is built now. The reasons are in the ADRs (`docs/adr/`), the beha
 
 ## Parts and boundaries
 
-The server is one Mix project, application `:fiesta` ([ADR 0001](../../../docs/adr/0001-single-mix-project-with-checked-boundaries.md)). Each top-level namespace is a boundary, and the `boundary` compiler fails the build on a reference that the table does not allow.
+The server is one Mix project, application `:pinata` ([ADR 0001](../../../docs/adr/0001-single-mix-project-with-checked-boundaries.md)). Each top-level namespace is a boundary, and the `boundary` compiler fails the build on a reference that the table does not allow.
 
 | Boundary | Kind | What | May use |
 |---|---|---|---|
@@ -17,7 +17,7 @@ The server is one Mix project, application `:fiesta` ([ADR 0001](../../../docs/a
 | `GameData` | library | client and server data tables | `Clock`, `Random` |
 | `Clock` | library | the only reader of system time | nothing |
 | `Random` | library | the only caller of `:rand` | nothing |
-| `Fiesta.Application` | application | starts the supervision tree | the parts, `Persistence`, `Cluster` |
+| `Pinata.Application` | application | starts the supervision tree | the parts, `Persistence`, `Cluster` |
 
 A part never uses another part. All boundaries are empty for now, and the application starts no part.
 
@@ -25,7 +25,7 @@ ADR 0001 calls the protocol library `Protocol`. Elixir already has a core module
 
 ```mermaid
 flowchart TD
-    App[Fiesta.Application] --> Login & WorldManager & Zone
+    App[Pinata.Application] --> Login & WorldManager & Zone
     Login & WorldManager & Zone --> Proto & Persistence & Cluster & GameData
     Proto & Persistence & Cluster & GameData --> Clock & Random
 ```

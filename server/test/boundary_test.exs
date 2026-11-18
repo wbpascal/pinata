@@ -1,4 +1,4 @@
-defmodule Fiesta.BoundaryTest do
+defmodule Pinata.BoundaryTest do
   use ExUnit.Case, async: true
 
   @moduletag timeout: 300_000
@@ -9,7 +9,7 @@ defmodule Fiesta.BoundaryTest do
     root = Path.expand("..", __DIR__)
 
     env = [
-      {"FIESTA_BOUNDARY_PROBE", "1"},
+      {"PINATA_BOUNDARY_PROBE", "1"},
       {"MIX_ENV", "test"},
       {"MIX_BUILD_PATH", Path.join(root, "_build/boundary_probe")}
     ]

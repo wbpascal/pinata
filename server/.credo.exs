@@ -16,9 +16,9 @@
           {Credo.Check.Warning.MapGetUnsafePass, []},
           {Credo.Check.Warning.LeakyEnvironment, []},
           {Credo.Check.Warning.MixEnv, []},
-          {Fiesta.Credo.NoNilReturn, []},
-          {Fiesta.Credo.NoNamedTable, []},
-          {Fiesta.Credo.DirectTimeOrRandom, []}
+          {Pinata.Credo.NoNilReturn, []},
+          {Pinata.Credo.NoNamedTable, []},
+          {Pinata.Credo.DirectTimeOrRandom, []}
         ]
       }
     }

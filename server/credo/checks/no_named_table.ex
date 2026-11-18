@@ -1,4 +1,4 @@
-defmodule Fiesta.Credo.NoNamedTable do
+defmodule Pinata.Credo.NoNamedTable do
   @moduledoc false
 
   use Credo.Check,

@@ -17,8 +17,8 @@ defmodule ClockTest do
   end
 
   test "reads the injected source" do
-    Application.put_env(:fiesta, :clock_source, Fixed)
-    on_exit(fn -> Application.delete_env(:fiesta, :clock_source) end)
+    Application.put_env(:pinata, :clock_source, Fixed)
+    on_exit(fn -> Application.delete_env(:pinata, :clock_source) end)
 
     assert Clock.system_time(:millisecond) == 42
     assert Clock.monotonic_time(:millisecond) == 7

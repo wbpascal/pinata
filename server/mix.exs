@@ -1,9 +1,9 @@
-defmodule Fiesta.MixProject do
+defmodule Pinata.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :fiesta,
+      app: :pinata,
       version: "0.1.0",
       elixir: "~> 1.20",
       elixirc_paths: elixirc_paths(),
@@ -27,13 +27,13 @@ defmodule Fiesta.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {Fiesta.Application, []}
+      mod: {Pinata.Application, []}
     ]
   end
 
-  # FIESTA_BOUNDARY_PROBE adds a file with a forbidden part-to-part reference (test/boundary_test.exs).
+  # PINATA_BOUNDARY_PROBE adds a file with a forbidden part-to-part reference (test/boundary_test.exs).
   defp elixirc_paths do
-    if System.get_env("FIESTA_BOUNDARY_PROBE"), do: ["lib", "test/probes/boundary"], else: ["lib"]
+    if System.get_env("PINATA_BOUNDARY_PROBE"), do: ["lib", "test/probes/boundary"], else: ["lib"]
   end
 
   defp deps do

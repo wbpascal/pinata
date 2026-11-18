@@ -1,4 +1,4 @@
-defmodule Fiesta.Credo.DirectTimeOrRandom do
+defmodule Pinata.Credo.DirectTimeOrRandom do
   @moduledoc false
 
   use Credo.Check,

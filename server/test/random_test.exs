@@ -13,8 +13,8 @@ defmodule RandomTest do
   end
 
   test "draws from the injected source" do
-    Application.put_env(:fiesta, :random_source, Fixed)
-    on_exit(fn -> Application.delete_env(:fiesta, :random_source) end)
+    Application.put_env(:pinata, :random_source, Fixed)
+    on_exit(fn -> Application.delete_env(:pinata, :random_source) end)
 
     assert Random.uniform(6) == 6
   end

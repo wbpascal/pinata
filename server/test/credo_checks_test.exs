@@ -1,9 +1,9 @@
-defmodule Fiesta.CredoChecksTest do
+defmodule Pinata.CredoChecksTest do
   use Credo.Test.Case, async: true
 
-  alias Fiesta.Credo.DirectTimeOrRandom
-  alias Fiesta.Credo.NoNamedTable
-  alias Fiesta.Credo.NoNilReturn
+  alias Pinata.Credo.DirectTimeOrRandom
+  alias Pinata.Credo.NoNamedTable
+  alias Pinata.Credo.NoNilReturn
 
   defp probe(name, filename \\ "lib/probe.ex") do
     "probes/credo/#{name}.ex" |> Path.expand(__DIR__) |> File.read!() |> to_source_file(filename)

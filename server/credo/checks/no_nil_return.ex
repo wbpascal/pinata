@@ -1,4 +1,4 @@
-defmodule Fiesta.Credo.NoNilReturn do
+defmodule Pinata.Credo.NoNilReturn do
   @moduledoc false
 
   use Credo.Check,

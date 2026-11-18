@@ -1,4 +1,4 @@
-defmodule Fiesta.Application do
+defmodule Pinata.Application do
   @moduledoc false
 
   use Boundary, top_level?: true, deps: [Login, WorldManager, Zone, Persistence, Cluster]
@@ -6,6 +6,6 @@ defmodule Fiesta.Application do
 
   @impl Application
   def start(_type, _args) do
-    Supervisor.start_link([], strategy: :one_for_one, name: Fiesta.Supervisor)
+    Supervisor.start_link([], strategy: :one_for_one, name: Pinata.Supervisor)
   end
 end

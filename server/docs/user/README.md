@@ -1,6 +1,6 @@
 # User documentation
 
-For administrators: how to install, configure, run and manage the Fiesta server.
+For administrators: how to install, configure, run and manage the Pinata server.
 
 The server cannot be played on yet. `iex -S mix` in `server/` starts an application with no parts, so no port is opened.
 

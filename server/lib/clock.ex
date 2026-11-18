@@ -1,5 +1,5 @@
 defmodule Clock do
-  @moduledoc "The only way server code reads time (ADR 0008). The source is the module in `config :fiesta, :clock_source`, `Clock.System` by default."
+  @moduledoc "The only way server code reads time (ADR 0008). The source is the module in `config :pinata, :clock_source`, `Clock.System` by default."
 
   use Boundary, exports: [Source]
 
@@ -10,5 +10,5 @@ defmodule Clock do
   def monotonic_time(unit), do: source().monotonic_time(unit)
 
   @spec source() :: module()
-  defp source, do: Application.get_env(:fiesta, :clock_source, Clock.System)
+  defp source, do: Application.get_env(:pinata, :clock_source, Clock.System)
 end
