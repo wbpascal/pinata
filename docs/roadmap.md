@@ -29,7 +29,7 @@ The order in which the Elixir server is built. Terms (Milestone, Capture checkpo
 
 | # | State | Milestone | Captures recorded | Captures still to record |
 |---|---|---|---|---|
-| 1 | fixed | Login to character select: login, world select, character list / create / delete | login-logout, login-errors, create-char, 37, 37b | rest of 37 (steps 3–6) |
+| 1 | fixed | Login to character select: login, world select, character list / create / delete | login-logout, login-errors, create-char, 37, 37b | – |
 | 2 | fixed | Enter the world: map entry, walking, portals, sight of other players, NPCs standing, normal / shout / whisper chat, logout, session loss, character rename | login-logout, idle_in_world, walk-run-portals, 14, 37b, 38 | 52, 45 |
 | 3 | fixed | Items and NPC economy: inventory, equip, drop / pick-up, use, NPC menus, shop, buy-back, storage | 21 (b, c, d), 46, buy-equip-storage-sell | – |
 | 4 | fixed | Combat: mobs, spawns, attack, exp, level-up, drops, death / revive, skills, abstates, stat points, soul stones. Includes the real-client check at levels 151 and 255 | travel-attack-die-revive, 24 | 39, 51 |
