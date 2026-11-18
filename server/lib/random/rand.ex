@@ -5,4 +5,7 @@ defmodule Random.Rand do
 
   @impl Random.Source
   def uniform(n), do: :rand.uniform(n)
+
+  @impl Random.Source
+  def bytes(n), do: :crypto.strong_rand_bytes(n)
 end

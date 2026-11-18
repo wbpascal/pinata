@@ -13,7 +13,7 @@ The server is one Mix project, application `:pinata` ([ADR 0001](../../../docs/a
 | `Zone` | part | the Zone part | all libraries |
 | `Net` | library | client listener and connection process | `Proto`, `Settings`, `Clock`, `Random` |
 | `Proto` | library | framing, cipher, packet definitions | `Clock`, `Random` |
-| `Persistence` | library | database access | `Settings`, `Clock`, `Random` |
+| `Persistence` | library | database access ([`persistence.md`](persistence.md)) | `Settings`, `Clock`, `Random` |
 | `Cluster` | library | registry and the facades between parts | `Settings`, `Clock`, `Random` |
 | `GameData` | library | client and server data tables | `Clock`, `Random` |
 | `Settings` | library | the settings of the node, read once at start-up | nothing |
@@ -21,7 +21,7 @@ The server is one Mix project, application `:pinata` ([ADR 0001](../../../docs/a
 | `Random` | library | the only caller of `:rand` | nothing |
 | `Pinata.Application` | application | starts the supervision tree | the parts, `Persistence`, `Cluster`, `Settings` |
 
-A part never uses another part. `Proto` and `Net` are built; each part starts a client listener and has a stub packet handler, and the other libraries are almost empty.
+A part never uses another part. `Proto` and `Net` are built; each part starts a client listener and has a stub packet handler. `Persistence` has the accounts table; the other libraries are almost empty.
 
 ADR 0001 calls the protocol library `Protocol`. Elixir already has a core module of that name, so the module is `Proto`.
 
@@ -37,7 +37,7 @@ The diagram leaves out three sets of arrows that the table has: the parts also u
 
 ## Start-up
 
-`Pinata.Application.start/2` calls `Settings.load(System.get_env())`. On problems it prints them all to standard error and returns `{:error, :invalid_settings}`. Otherwise `Pinata.Supervisor` (`:one_for_one`) starts `Persistence.Supervisor`, `Cluster.Root`, then one supervisor per part in `PINATA_PARTS`, each with the settings as its argument. Each part supervisor starts its client listener.
+`Pinata.Application.start/2` calls `Settings.load(System.get_env())`. On problems it prints them all to standard error and returns `{:error, :invalid_settings}`. Otherwise `Pinata.Supervisor` (`:one_for_one`) starts `Persistence.Supervisor`, `Cluster.Root`, then one supervisor per part in `PINATA_PARTS`, each with the settings as its argument. `Persistence.Supervisor` starts the repo chosen by `database.url` and the migration step. Two start failures come from it: an unusable `database.url` (`{:error, :invalid_database_url}`) and, on PostgreSQL, pending migrations (`{:error, :pending_migrations}`); both print their message to standard error. Each part supervisor starts its client listener.
 
 ```mermaid
 flowchart TD
@@ -57,6 +57,10 @@ A new key goes into `Settings.Schema` and the type `Settings.t()`. Then regenera
 ## Cluster registry
 
 `Cluster.Registry` names the Login process `{:global, {:login}}` and each WorldManager `{:global, {:world_manager, world_id}}`, and keeps one `:pg` group `{:zones, world_id}` of Zone processes per world. The `:pg` scope `Cluster.Registry` is started by `Cluster.Root`. libcluster runs only when `cluster.nodes` is not empty, with `Cluster.Strategy.Epmd` and those hosts. `Cluster.Root` has that name because libcluster owns `Cluster.Supervisor`. Facade modules come with the issues that need them. See [ADR 0002](../../../docs/adr/0002-fail-simple-cluster-model.md).
+
+## Persistence
+
+Two Ecto repos (PostgreSQL, SQLite) sit behind `Persistence`; the adapter follows `database.url`. SQLite migrates itself at start-up, PostgreSQL refuses to start while migrations are pending. See [`persistence.md`](persistence.md).
 
 ## Protocol
 
