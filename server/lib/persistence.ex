@@ -44,34 +44,32 @@ defmodule Persistence do
           {:ok, pos_integer()} | {:error, :unknown | :wrong_password | :blocked | :not_login_able}
   def check_login(name, password) do
     repo = Repo.active()
-    {:ok, result} = repo.transact(fn -> {:ok, do_check_login(repo, name, password)} end)
-    result
+    {:ok, account} = repo.transact(fn -> {:ok, find(repo, name)} end)
+    # Hashing stays outside the transaction: it would hold the SQLite write lock or a pool connection.
+    verify(account, password)
   end
 
-  defp do_check_login(repo, name, password) do
-    with {:ok, key} <- Account.name_key(name),
-         %Account{} = account <- repo.one(from(a in Account, where: a.name_key == ^key)) do
-      verified? = Password.verify?(password, account.password_hash, account.password_salt, account.password_iterations)
-
-      cond do
-        not verified? -> {:error, :wrong_password}
-        account.blocked -> {:error, :blocked}
-        not account.login_able -> {:error, :not_login_able}
-        true -> {:ok, account.id}
-      end
-    else
-      _ ->
-        # An unknown name costs the same time as a known one.
-        _ =
-          Password.verify?(
-            password,
-            <<0::256>>,
-            <<0::128>>,
-            Application.get_env(:pinata, :password_iterations, 600_000)
-          )
-
-        {:error, :unknown}
+  defp find(repo, name) do
+    with {:ok, key} <- Account.name_key(name) do
+      repo.one(from(a in Account, where: a.name_key == ^key))
     end
+  end
+
+  defp verify(%Account{} = account, password) do
+    verified? = Password.verify?(password, account.password_hash, account.password_salt, account.password_iterations)
+
+    cond do
+      not verified? -> {:error, :wrong_password}
+      account.blocked -> {:error, :blocked}
+      not account.login_able -> {:error, :not_login_able}
+      true -> {:ok, account.id}
+    end
+  end
+
+  defp verify(_none, password) do
+    # An unknown name costs the same time as a known one.
+    _ = Password.verify?(password, <<0::256>>, <<0::128>>, Application.get_env(:pinata, :password_iterations, 600_000))
+    {:error, :unknown}
   end
 
   @spec set_blocked(binary(), boolean()) :: :ok | {:error, :unknown}

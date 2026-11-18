@@ -34,7 +34,7 @@ Schema and queries must run on PostgreSQL and SQLite (ADR 0004). No tool checks 
 2. Unique indexes keep Ecto's default names. Upserts always name the `conflict_target` columns.
 3. No `lock:`, no `mode:` per call, no `ilike`, no array operators, no SQL fragments outside one reviewed module.
 4. The SQLite repo runs with `default_transaction_mode: :immediate` and keeps the WAL and `foreign_keys` defaults.
-5. Every operation is one `Repo.transact` of guarded statements, each checked for its affected-row count, rows touched in key order. Leave the transaction after a failed statement.
+5. Every operation is one `Repo.transact` of guarded statements, each checked for its affected-row count, rows touched in key order. Leave the transaction after a failed statement. Slow work such as password hashing stays outside the transaction.
 6. No `modify` in migrations. Until the first release, edit the initial migrations in place.
 7. Tests that touch the database are not async and must pass on both adapters; CI runs them once per adapter.
 
