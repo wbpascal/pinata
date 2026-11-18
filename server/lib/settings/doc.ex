@@ -50,8 +50,8 @@ defmodule Settings.Doc do
 
     | Variable | Default | Meaning |
     |---|---|---|
-    | `FIESTA_CONFIG` | `fiesta.toml` in the working directory | Path of the settings file. The default file may be missing; a path set here must exist. |
-    | `FIESTA_PARTS` | `login,world_manager,zone` | The parts this node starts, separated by commas. A part that is not listed opens no port. |
+    | `PINATA_CONFIG` | `pinata.toml` in the working directory | Path of the settings file. The default file may be missing; a path set here must exist. |
+    | `PINATA_PARTS` | `login,world_manager,zone` | The parts this node starts, separated by commas. A part that is not listed opens no port. |
     | `DATABASE_URL` | not set | Overrides `database.url`, so the secret can stay out of the file. |
 
     ## Keys
@@ -76,7 +76,7 @@ defmodule Settings.Doc do
     ## Start-up errors
 
     The node checks the whole file before it starts anything. A key it does not know, a value of the wrong type, a file
-    that is not valid TOML, a `FIESTA_CONFIG` path that cannot be read and an unknown name in `FIESTA_PARTS` are all
+    that is not valid TOML, a `PINATA_CONFIG` path that cannot be read and an unknown name in `PINATA_PARTS` are all
     errors. It prints every problem at once to standard error, each with its key, its value and what was expected, and
     does not start:
 

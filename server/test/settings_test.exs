@@ -4,9 +4,9 @@ defmodule SettingsTest do
   @moduletag :tmp_dir
 
   defp load(tmp_dir, toml, env \\ %{}) do
-    path = Path.join(tmp_dir, "fiesta.toml")
+    path = Path.join(tmp_dir, "pinata.toml")
     File.write!(path, toml)
-    Settings.load(Map.merge(%{"FIESTA_CONFIG" => path}, env))
+    Settings.load(Map.merge(%{"PINATA_CONFIG" => path}, env))
   end
 
   test "defaults" do
@@ -55,15 +55,15 @@ defmodule SettingsTest do
   end
 
   test "auto_create_accounts default and override", %{tmp_dir: dir} do
-    assert {:ok, %{login: %{auto_create_accounts: false}}} = load(dir, "", %{"FIESTA_PARTS" => "login"})
+    assert {:ok, %{login: %{auto_create_accounts: false}}} = load(dir, "", %{"PINATA_PARTS" => "login"})
     assert {:ok, %{login: %{auto_create_accounts: false}}} = load(dir, "[cluster]\nnodes = [\"a@b\"]\n")
     on = "[login]\nauto_create_accounts = true\n"
-    assert {:ok, %{login: %{auto_create_accounts: true}}} = load(dir, on, %{"FIESTA_PARTS" => "login"})
+    assert {:ok, %{login: %{auto_create_accounts: true}}} = load(dir, on, %{"PINATA_PARTS" => "login"})
     assert {:ok, %{login: %{auto_create_accounts: true}}} = load(dir, on <> "[cluster]\nnodes = [\"a@b\"]\n")
   end
 
-  test "FIESTA_PARTS order" do
-    assert {:ok, %{parts: [:login, :zone]}} = Settings.load(%{"FIESTA_PARTS" => "zone,login"})
+  test "PINATA_PARTS order" do
+    assert {:ok, %{parts: [:login, :zone]}} = Settings.load(%{"PINATA_PARTS" => "zone,login"})
   end
 
   test "two errors in one file", %{tmp_dir: dir} do
@@ -84,9 +84,9 @@ defmodule SettingsTest do
     assert p =~ "login: expected a table"
     assert {:error, [p]} = load(dir, "this is not toml")
     assert p =~ "not valid TOML"
-    assert {:error, [p]} = Settings.load(%{"FIESTA_CONFIG" => Path.join(dir, "missing.toml")})
+    assert {:error, [p]} = Settings.load(%{"PINATA_CONFIG" => Path.join(dir, "missing.toml")})
     assert p =~ "cannot read the settings file"
-    assert {:error, [p]} = Settings.load(%{"FIESTA_PARTS" => "login,zon"})
+    assert {:error, [p]} = Settings.load(%{"PINATA_PARTS" => "login,zon"})
     assert p =~ "unknown part"
   end
 

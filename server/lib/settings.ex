@@ -38,11 +38,11 @@ defmodule Settings do
 
   # Only the default path may be missing: a path the administrator named must exist.
   defp read_file(env) do
-    path = Map.get(env, "FIESTA_CONFIG", "fiesta.toml")
+    path = Map.get(env, "PINATA_CONFIG", "pinata.toml")
 
     case File.read(path) do
       {:ok, text} -> decode(path, text)
-      {:error, :enoent} when not is_map_key(env, "FIESTA_CONFIG") -> {%{}, []}
+      {:error, :enoent} when not is_map_key(env, "PINATA_CONFIG") -> {%{}, []}
       {:error, reason} -> {%{}, ["#{path}: cannot read the settings file (#{:file.format_error(reason)})"]}
     end
   end
@@ -56,12 +56,12 @@ defmodule Settings do
   end
 
   defp parts(env) do
-    names = env |> Map.get("FIESTA_PARTS", "login,world_manager,zone") |> String.split(",", trim: true)
+    names = env |> Map.get("PINATA_PARTS", "login,world_manager,zone") |> String.split(",", trim: true)
     known = Map.new(@parts, &{Atom.to_string(&1), &1})
     unknown = Enum.reject(names, &is_map_key(known, &1))
 
     {for(part <- @parts, Atom.to_string(part) in names, do: part),
-     Enum.map(unknown, &"FIESTA_PARTS: unknown part #{inspect(&1)}, expected login, world_manager or zone")}
+     Enum.map(unknown, &"PINATA_PARTS: unknown part #{inspect(&1)}, expected login, world_manager or zone")}
   end
 
   defp derive(settings, env) do

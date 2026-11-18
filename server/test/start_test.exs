@@ -13,8 +13,8 @@ defmodule Pinata.StartTest do
     :ok = Application.stop(:pinata)
 
     on_exit(fn ->
-      System.delete_env("FIESTA_CONFIG")
-      System.delete_env("FIESTA_PARTS")
+      System.delete_env("PINATA_CONFIG")
+      System.delete_env("PINATA_PARTS")
       _ = Application.stop(:pinata)
       :ok = Application.start(:pinata)
     end)
@@ -23,9 +23,9 @@ defmodule Pinata.StartTest do
   defp running, do: Enum.filter(@supervisors, &Process.whereis/1)
 
   defp use_file(tmp_dir, toml) do
-    path = Path.join(tmp_dir, "fiesta.toml")
+    path = Path.join(tmp_dir, "pinata.toml")
     File.write!(path, toml)
-    System.put_env("FIESTA_CONFIG", path)
+    System.put_env("PINATA_CONFIG", path)
   end
 
   test "with no file every supervisor starts" do
@@ -49,8 +49,8 @@ defmodule Pinata.StartTest do
     assert running() == []
   end
 
-  test "FIESTA_PARTS=login starts only the Login part", %{tmp_dir: _tmp_dir} do
-    System.put_env("FIESTA_PARTS", "login")
+  test "PINATA_PARTS=login starts only the Login part", %{tmp_dir: _tmp_dir} do
+    System.put_env("PINATA_PARTS", "login")
     assert :ok = Application.start(:pinata)
     assert running() == [Persistence.Supervisor, Cluster.Root, Login.Supervisor]
   end

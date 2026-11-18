@@ -35,7 +35,7 @@ The diagram leaves out three sets of arrows that the table has: the parts also u
 
 ## Start-up
 
-`Pinata.Application.start/2` calls `Settings.load(System.get_env())`. On problems it prints them all to standard error and returns `{:error, :invalid_settings}`. Otherwise `Pinata.Supervisor` (`:one_for_one`) starts `Persistence.Supervisor`, `Cluster.Root`, then one supervisor per part in `FIESTA_PARTS`, each with the settings as its argument. The part supervisors have no children yet.
+`Pinata.Application.start/2` calls `Settings.load(System.get_env())`. On problems it prints them all to standard error and returns `{:error, :invalid_settings}`. Otherwise `Pinata.Supervisor` (`:one_for_one`) starts `Persistence.Supervisor`, `Cluster.Root`, then one supervisor per part in `PINATA_PARTS`, each with the settings as its argument. The part supervisors have no children yet.
 
 ```mermaid
 flowchart TD
