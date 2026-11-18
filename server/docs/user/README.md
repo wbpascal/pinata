@@ -2,7 +2,7 @@
 
 For administrators: how to install, configure, run and manage the Pinata server.
 
-The server cannot be played on yet. `iex -S mix` in `server/` starts all three parts in single-node mode on the default settings; the parts are still empty, so no port is opened yet. It creates the SQLite database `./data/pinata.db`.
+The server cannot be played on yet. `iex -S mix` in `server/` starts all three parts in single-node mode on the default settings; each part listens on its port (9010, 9110 and 9210 by default). A client can connect and is kept alive by the heartbeat, but cannot log in yet. It creates the SQLite database `./data/pinata.db`.
 
 ## Development tasks
 

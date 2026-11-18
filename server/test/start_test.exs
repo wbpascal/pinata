@@ -20,6 +20,18 @@ defmodule Pinata.StartTest do
     end)
   end
 
+  defp connect(port) do
+    {:ok, socket} = :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false])
+    assert {:ok, <<4, 0x07, 0x08, seed::little-16>>} = :gen_tcp.recv(socket, 5, 1000)
+    {socket, Proto.Cipher.new(seed)}
+  end
+
+  defp encrypted(cipher, body) do
+    {enc, cipher} = Proto.Cipher.crypt(cipher, body)
+    {:ok, frame} = Proto.Framing.frame(enc)
+    {frame, cipher}
+  end
+
   defp running, do: Enum.filter(@supervisors, &Process.whereis/1)
 
   defp use_file(tmp_dir, toml) do
@@ -31,6 +43,16 @@ defmodule Pinata.StartTest do
   test "with no file every supervisor starts" do
     assert :ok = Application.start(:pinata)
     assert running() == @supervisors
+
+    for port <- [9010, 9110, 9210] do
+      {socket, cipher} = connect(port)
+      # 0x0807 reaches the stub handler, which ignores it; the socket stays open.
+      {seed_packet, cipher} = encrypted(cipher, <<0x07, 0x08, 0, 0>>)
+      :ok = :gen_tcp.send(socket, seed_packet)
+      {heartbeat, _cipher} = encrypted(cipher, <<0x04, 0x08>>)
+      :ok = :gen_tcp.send(socket, heartbeat)
+      assert {:ok, <<2, 5, 8>>} = :gen_tcp.recv(socket, 3, 1000)
+    end
   end
 
   test "with a valid file every supervisor starts", %{tmp_dir: tmp_dir} do
@@ -53,5 +75,7 @@ defmodule Pinata.StartTest do
     System.put_env("PINATA_PARTS", "login")
     assert :ok = Application.start(:pinata)
     assert running() == [Persistence.Supervisor, Cluster.Root, Login.Supervisor]
+    connect(9010)
+    assert {:error, :econnrefused} = :gen_tcp.connect(~c"127.0.0.1", 9110, [:binary, active: false])
   end
 end

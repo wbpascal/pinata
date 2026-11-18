@@ -76,7 +76,7 @@ defmodule Persistence do
   @spec set_blocked(binary(), boolean()) :: :ok | {:error, :unknown}
   def set_blocked(name, value) when is_boolean(value), do: set(name, blocked: value)
 
-  @doc "Lets an account in or keeps it out without banning it. `false` gives `:not_login_able` from `check_login/2` (client: maintenance message)."
+  @doc "Lets an account in or keeps it out without banning it. `false` gives `:not_login_able` from `check_login/2` (client: \"The World Servers are down for maintenance.\")."
   @spec set_login_able(binary(), boolean()) :: :ok | {:error, :unknown}
   def set_login_able(name, value) when is_boolean(value), do: set(name, login_able: value)
 

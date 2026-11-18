@@ -71,7 +71,7 @@ The two flags are two separate outputs of the original account check and reach t
 
 Differences from the original:
 
-- There are no groups here. `login_able` is a column of the account, so closing the server to all players means setting it on each account. A later change may add groups or a server-wide switch; the two results of `check_login` stay the same either way.
+- There are no groups here. `login_able` is a column of the account, so closing the server to all players means setting it on each account. A later change may add groups or a server-wide switch ([#57](https://github.com/wbpascal/pinata/issues/57)); the two results of `check_login` stay the same either way.
 - A block here has no end date. The original cleared `bIsBlock` when the last timed block in `tUserBlock` had expired.
 
 ## Tests

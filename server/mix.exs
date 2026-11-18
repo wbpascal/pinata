@@ -41,6 +41,7 @@ defmodule Pinata.MixProject do
     [
       {:boundary, "~> 0.12.0", runtime: false},
       {:toml, "~> 0.7"},
+      {:thousand_island, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:libcluster, "~> 3.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

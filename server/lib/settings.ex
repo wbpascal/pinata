@@ -20,6 +20,7 @@ defmodule Settings do
           world: [world()],
           database: %{url: String.t()},
           cluster: %{nodes: [String.t()]},
+          connection: %{max_packets_per_second: pos_integer(), max_unsent_bytes: pos_integer()},
           data: %{strict_references: boolean()}
         }
 
