@@ -9,7 +9,18 @@ defmodule Proto.Packets do
   @packets %{
     0x0804 => Proto.Packets.MiscHeartbeatReq,
     0x0805 => Proto.Packets.MiscHeartbeatAck,
-    0x0807 => Proto.Packets.MiscSeedAck
+    0x0807 => Proto.Packets.MiscSeedAck,
+    0x0C04 => Proto.Packets.UserXtrapReq,
+    0x0C05 => Proto.Packets.UserXtrapAck,
+    0x0C09 => Proto.Packets.UserLoginfailAck,
+    0x0C0A => Proto.Packets.UserLoginAck,
+    0x0C17 => Proto.Packets.UserConnectcutCmd,
+    0x0C1B => Proto.Packets.UserWorldStatusReq,
+    0x0C1C => Proto.Packets.UserWorldStatusAck,
+    0x0C5A => Proto.Packets.UserUsLoginReq,
+    0x0C65 => Proto.Packets.UserClientVersionCheckReq,
+    0x0C66 => Proto.Packets.UserClientWrongversionCheckAck,
+    0x0C67 => Proto.Packets.UserClientRightversionCheckAck
   }
 
   @doc "The module for an opcode."

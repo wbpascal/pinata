@@ -81,6 +81,10 @@ defmodule SettingsTest do
     assert p =~ "world[0].nme: unknown key"
     assert {:error, [p]} = load(dir, "world = [{number = 1}, 5]\n")
     assert p =~ "world[1]: expected a table"
+    assert {:error, [p]} = load(dir, "[[world]]\nname = \"0123456789abcdef\"\n")
+    assert p =~ "world[0].name"
+    assert {:error, [p]} = load(dir, "[[world]]\nnumber = 256\n")
+    assert p =~ "world[0].number"
     assert {:error, [p]} = load(dir, "login = 5\n")
     assert p =~ "login: expected a table"
     assert {:error, [p]} = load(dir, "this is not toml")

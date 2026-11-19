@@ -1,7 +1,7 @@
 defmodule Net.Connection do
   @moduledoc """
   One process per client socket. It sends the seed, cuts frames, decrypts and decodes them, answers heartbeats,
-  hands every other packet to the part handler and sends what the handler returns. It closes the socket, without
+  hands every other packet to the part handler and carries out the effects it returns (send, perform, close). It closes the socket, without
   an error packet, on garbage, oversized frames and when a limit is exceeded.
   See `docs/technical/processes.md`.
   """
@@ -34,13 +34,13 @@ defmodule Net.Connection do
         }
 
   @impl ThousandIsland.Handler
-  def handle_connection(socket, %{handler: handler, limits: limits}) do
+  def handle_connection(socket, %{handler: handler, limits: limits, settings: settings}) do
     seed = Random.uniform(499) - 1
     now = Clock.monotonic_time(:millisecond)
 
     state = %__MODULE__{
       handler: handler,
-      handler_state: handler.init(),
+      handler_state: handler.init(settings),
       limits: limits,
       cipher: Proto.Cipher.new(seed),
       last_packet: now,
@@ -69,6 +69,11 @@ defmodule Net.Connection do
       true ->
         {:noreply, {socket, state}}
     end
+  end
+
+  def handle_info({:cluster, _} = message, {socket, state}) do
+    {handler_state, effects} = state.handler.handle_info(state.handler_state, message)
+    effects(socket, effects, %{state | handler_state: handler_state}) |> reply(socket)
   end
 
   defp reply({:continue, state}, socket), do: {:noreply, {socket, state}}
@@ -120,7 +125,23 @@ defmodule Net.Connection do
 
   defp packet(socket, packet, state) do
     {handler_state, effects} = state.handler.handle_packet(state.handler_state, packet)
-    send_packets(socket, Enum.map(effects, fn {:send, p} -> p end), %{state | handler_state: handler_state})
+    effects(socket, effects, %{state | handler_state: handler_state})
+  end
+
+  defp effects(_socket, [], state), do: {:continue, state}
+  defp effects(_socket, [:close | _], state), do: {:close, state}
+
+  defp effects(socket, [{:send, packet} | rest], state) do
+    case send_packets(socket, [packet], state) do
+      {:continue, state} -> effects(socket, rest, state)
+      {:close, state} -> {:close, state}
+    end
+  end
+
+  defp effects(socket, [{:perform, request} | rest], state) do
+    message = state.handler.perform(request)
+    {handler_state, more} = state.handler.handle_info(state.handler_state, message)
+    effects(socket, more ++ rest, %{state | handler_state: handler_state})
   end
 
   defp send_packets(socket, packets, state) do

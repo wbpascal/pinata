@@ -41,8 +41,13 @@ defmodule Settings.Schema do
         {:list,
          {:keyword_list,
           [
-            number: [type: :non_neg_integer, default: 0, doc: "World number."],
-            name: [type: :string, default: "INITIO", doc: "World name."]
+            number: [type: {:in, 0..255}, type_doc: "integer 0 to 255", default: 0, doc: "World number."],
+            name: [
+              type: {:custom, Settings.Schema, :world_name, []},
+              type_doc: "string, at most 15 bytes",
+              default: "INITIO",
+              doc: "World name."
+            ]
           ]}},
       default: [[number: 0, name: "INITIO"]],
       doc: "The worlds, one `[[world]]` table each."
@@ -95,6 +100,11 @@ defmodule Settings.Schema do
       ]
     ]
   ]
+
+  @doc false
+  @spec world_name(term()) :: {:ok, String.t()} | {:error, String.t()}
+  def world_name(name) when is_binary(name) and byte_size(name) in 1..15, do: {:ok, name}
+  def world_name(other), do: {:error, "expected a string of 1 to 15 bytes, got: #{inspect(other)}"}
 
   @doc "The NimbleOptions schema."
   @spec schema() :: keyword()

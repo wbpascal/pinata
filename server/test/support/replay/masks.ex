@@ -16,7 +16,12 @@ defmodule Replay.Masks do
   # uninitialised memory with its bug id) are added by the issue that defines each packet.
   @doc "Masks that apply to every replay."
   @spec global() :: [mask()]
-  def global, do: [{Proto.Packets.MiscSeedAck, :seed, "session value: the seed is drawn at random per connection"}]
+  def global,
+    do: [
+      {Proto.Packets.MiscSeedAck, :seed, "session value: the seed is drawn at random per connection"},
+      {Proto.Packets.UserClientWrongversionCheckAck, :unused,
+       "uninitialised memory (L00-B1): the original never writes this byte, the rebuild sends 0"}
+    ]
 
   # Handles (identifiers, item keys) are added by the issue that defines each packet.
   @doc "Handles that apply to every replay."
