@@ -1,13 +1,18 @@
 defmodule WorldManager.HandOffTest do
-  # Login to WorldManager, in one node (:single) and in two peer nodes (:peers); see TestPeers.
+  # Login to WorldManager and the way back to the world list, in one node (:single) and in two peer nodes (:peers);
+  # see TestPeers.
   use ExUnit.Case, async: false
 
   @moduletag capture_log: true
 
   alias Proto.Packets.{
     UserClientVersionCheckReq,
+    UserLoginWithOtpReq,
     UserLoginworldReq,
+    UserNormallogoutCmd,
     UserUsLoginReq,
+    UserWillWorldSelectAck,
+    UserWillWorldSelectReq,
     UserWorldStatusReq,
     UserWorldselectAck,
     UserWorldselectReq,
@@ -102,6 +107,34 @@ defmodule WorldManager.HandOffTest do
     end
   end
 
+  @world_list <<0x0A, 0x0C>> <> Base.decode16!("0100494e4954494f0000000000000000000006", case: :lower)
+  @refused <<0x09, 0x0C, 0x52, 0x00>>
+
+  # Asks WorldManager for a login token.
+  defp token(wm) do
+    wm = send!(wm, %UserWillWorldSelectReq{})
+    assert {:ok, %UserWillWorldSelectAck{error: 0x1E58, otp: otp}, wm} = TestClient.recv(wm)
+    assert otp =~ ~r/^[0-9a-f]{32}$/
+    {otp, wm}
+  end
+
+  defp version_checked(t) do
+    t.login |> connect() |> send!(%UserClientVersionCheckReq{version_key: @key}) |> recv!(<<0x67, 0x0C, 1, 0>>)
+  end
+
+  defp token_login(t, otp), do: t |> version_checked() |> send!(%UserLoginWithOtpReq{otp: otp})
+
+  defp token_refused(client) do
+    client = recv!(client, @refused)
+    assert {:error, :closed} = TestClient.recv_raw(client)
+  end
+
+  # Logs in at WorldManager. Returns the WorldManager client.
+  defp wm_session(t) do
+    {key, _login} = select(t)
+    t |> world_login("admin", key) |> alive()
+  end
+
   defp eventually(fun, tries \\ 100) do
     cond do
       fun.() -> :ok
@@ -148,6 +181,69 @@ defmodule WorldManager.HandOffTest do
         first = recv!(first, <<0x17, 0x0C, 0x83, 0x06>>)
         assert {:error, :closed} = TestClient.recv_raw(first)
         t |> world_login("admin", key2) |> alive()
+      end
+
+      test "a token logs in once, and the world list comes before 0x0C05", t do
+        {otp, wm} = t |> wm_session() |> token()
+        TestClient.close(wm)
+
+        client = t |> token_login(otp) |> send!(%UserXtrapReq{key_length: 0, key: ""})
+        client = client |> recv!(@world_list) |> recv!(<<0x05, 0x0C, 1>>)
+
+        client = send!(client, %UserWorldselectReq{world_no: 0})
+        assert {:ok, %UserWorldselectAck{world_status: 6, validate: key}, _client} = TestClient.recv(client)
+        t |> world_login("admin", key) |> alive()
+
+        t |> token_login(otp) |> token_refused()
+      end
+
+      test "an unknown token is refused", t do
+        t |> token_login(String.duplicate("a", 32)) |> token_refused()
+      end
+
+      test "a token older than 10 s is refused", t do
+        :ok = t.call.(:login, Application, :put_env, [:pinata, :clock_source, TestClock])
+        on_exit(fn -> t.call.(:login, Application, :delete_env, [:pinata, :clock_source]) end)
+        :ok = t.call.(:login, TestClock, :set, [0])
+        {otp, _wm} = t |> wm_session() |> token()
+        :ok = t.call.(:login, TestClock, :set, [10_000_000])
+        t |> token_login(otp) |> token_refused()
+      end
+
+      test "a 0x0C37 of the wrong length closes the socket and keeps the token", t do
+        {otp, wm} = t |> wm_session() |> token()
+        TestClient.close(wm)
+
+        {:ok, client} = TestClient.send_raw(version_checked(t), <<0x37, 0x0C, 0::248>>)
+        assert {:error, :closed} = TestClient.recv_raw(client)
+
+        client = t |> token_login(otp) |> send!(%UserXtrapReq{key_length: 0, key: ""})
+        recv!(client, @world_list)
+      end
+
+      test "a second request while a token is pending gets 0x1E5B", t do
+        {otp, wm} = t |> wm_session() |> token()
+        wm = wm |> send!(%UserWillWorldSelectReq{}) |> recv!(<<0x34, 0x0C, 0x5B, 0x1E, 0::256>>)
+        alive(wm)
+        t |> token_login(otp) |> recv!(@world_list)
+      end
+
+      test "a token login cuts the WorldManager connection that is still open", t do
+        {otp, wm} = t |> wm_session() |> token()
+        t |> token_login(otp) |> recv!(@world_list)
+        wm = recv!(wm, <<0x17, 0x0C, 0x83, 0x06>>)
+        assert {:error, :closed} = TestClient.recv_raw(wm)
+      end
+
+      test "0x0C18 closes WorldManager for type 0 only and is ignored at Login", t do
+        {key, login} = select(t)
+        alive(send!(login, %UserNormallogoutCmd{logout_type: 0}))
+
+        wm = t |> world_login("admin", key) |> alive()
+        wm = wm |> send!(%UserNormallogoutCmd{logout_type: 1}) |> alive()
+        wm = send!(wm, %UserNormallogoutCmd{logout_type: 0})
+        assert {:error, :closed} = TestClient.recv_raw(wm)
+        eventually(fn -> t.call.(:login, Cluster.Registry, :player_count, [0]) == 0 end)
       end
 
       test "the player count follows the connection", t do

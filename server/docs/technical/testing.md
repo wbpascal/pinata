@@ -86,13 +86,15 @@ client = TestClient.expect(client, %Proto.Packets.MiscHeartbeatAck{})
 | `stop:` | required: the last packet index to play, or `:end` |
 | `endpoints:` | required: connection kind (`login`, `wm`, `zone`) to `{host, port}`; use `Replay.Topology.endpoints()` |
 | `masks:`, `handles:` | per-test additions to the global lists |
+| `close_after:` | packet indices; the harness closes the connection of that packet right after it (the transcript holds no TCP close) |
+| `sync_after:` | packet indices; a heartbeat round trip after each, so the server has handled the packet before the clock moves on |
 | `timeout:` | milliseconds to wait for a server packet, default 2000 |
 
 **Pacing.** Client packets are sent in capture order. Each one is sent after all earlier server packets of the Transcript arrived. Order is compared per connection only. A connection is opened right before its first line. All connections are closed when the replay ends.
 
 **Clock.** The harness puts `TestClock` in as the clock source and sets it to the capture timestamp before each connection open and each client packet. The clock source is global, so replay tests are not async.
 
-**Stop point.** Packets with an index above `stop:` are not played. Each Replay test uses the highest index the server supports so far: `login-logout` 14 and `create-char` 22 run past the character list (`0x0C14`, issue #44; index 15 is `0x0C33` and index 23 is `0x1401`, not defined yet); the others stop at their successful `0x0C0C` (the world select, issue #42): 18 for `login-errors`, 23 for `37_login-heartbeat-refusals-delete`, 9 for `37b_char-select-rename-refusals`. `milestone1_test.exs` can replay one connection of a capture (it keeps only the packets of that `conn`, the indices stay): `login#3` up to 89 with the world closed (its WorldManager process stopped) and `login#4` up to 107 with the world full (2375 players in the `:pg` group). Index 90 and 108 are `0x0C18`, not defined yet.
+**Stop point.** Packets with an index above `stop:` are not played. Each Replay test uses the highest index the server supports so far: the way back to the world list (issue #47), past the character list `0x0C14` (issue #44): `:end` for `login-logout` and 70 for `37_login-heartbeat-refusals-delete`; `create-char` stops at 22, past its character list (index 23 is `0x1401`, not defined yet); the successful `0x0C0C` for the others (18 for `login-errors`, 9 for `37b_char-select-rename-refusals`). `milestone1_test.exs` leaves the lines of later issues out of every replay (`0x1401`, `0x1406`, `0x1407`, `0x140C`); the indices stay. `milestone1_test.exs` can replay one connection of a capture (it keeps only the packets of that `conn`, the indices stay): `login#3` up to 90 with the world closed (its WorldManager process stopped) and `login#4` up to 108 with the world full (2375 players in the `:pg` group).
 
 **Timer-driven opcodes.** `0x0804` (heartbeat) and `0x080E` (game time) come from timers. `S` lines with these opcodes are not expected, and received packets with these opcodes are dropped. Client lines are always sent, so the `0x080E` answer to the client's `0x080D` is not compared by a replay; `test/world_manager/character_list_test.exs` checks its bytes.
 
@@ -118,11 +120,11 @@ Paths resolve to byte ranges through `mod.__packet__().layout`, a list of `{name
 
 ## Handle map
 
-A handle is `{packet_module, path, namespace, reason}`: a value the server picks anew in each run (identifiers, item keys). In a server packet, the first time a captured value is seen it is bound to the received value; later the received value must equal the bound one, and one received value cannot belong to two captured values. A violation is a `:handle` failure. In a client packet the captured value is replaced by the bound one; a captured value that was never bound is a `:handle` failure. `Replay.Masks.handles/0` is the global list; it holds the validation key (namespace `:validation_key`: `validate` of `0x0C0C` and of the client's `0x0C0F`, so the client logs in to WorldManager with the key of this run; on a refusal the rebuild's zero key is bound to the uninitialised bytes of the capture, P02-B23) and the `worldmanager` session handle of `0x0C14` (namespace `:wm_session`). `TestClock.local_time/1` is UTC+1, the zone of all captures.
+A handle is `{packet_module, path, namespace, reason}`: a value the server picks anew in each run (identifiers, item keys). In a server packet, the first time a captured value is seen it is bound to the received value; later the received value must equal the bound one, and one received value cannot belong to two captured values. A violation is a `:handle` failure. In a client packet the captured value is replaced by the bound one; a captured value that was never bound is a `:handle` failure. `Replay.Masks.handles/0` is the global list: the login token (`:login_token`, `0x0C34` and `0x0C37`), the world key (`:world_key`: `validate` of `0x0C0C` and of the client's `0x0C0F`, so the client logs in to WorldManager with the key of this run; on a refusal the rebuild's zero key is bound to the uninitialised bytes of the capture, P02-B23) and the `worldmanager` session handle of `0x0C14` (`:wm_session`). `TestClock.local_time/1` is UTC+1, the zone of all captures.
 
 ## Setup functions
 
-`Replay.Setups` has one function per capture. It builds the state the capture starts from, with public `Persistence` operations where one exists, a test-only factory otherwise, never a database dump. Each one empties the accounts table and creates the account `admin` (the client sends the MD5 text of the password, as in every transcript). `login_logout/0` and `create_char/0` also create the character "Test1235" of their capture (through `Factory`, the test-only inserts of characters and equipped items in `test/support/factory.ex`); later issues add more.
+`Replay.Setups` has one function per capture. It builds the state the capture starts from, with public `Persistence` operations where one exists, a test-only factory otherwise, never a database dump. Each one empties the accounts table and creates the account `admin` (the client sends the MD5 text of the password, as in every transcript). `login_logout/0` and `create_char/0` also create the character "Test1235" of their capture, `login_heartbeat_refusals_delete/0` the characters "Test1235" and "Test2" (through `Factory`, the test-only inserts of characters and equipped items in `test/support/factory.ex`); later issues add more.
 
 ## Topology
 
@@ -137,11 +139,11 @@ A handle is `{packet_module, path, namespace, reason}`: a value the server picks
 
 ## Peer nodes
 
-`TestPeers` (`test/support/test_peers.ex`) starts two `:peer` nodes, one with `PINATA_PARTS=login` (client port 9310) and one with `world_manager` (port 9311). They share one settings file, the database of the test VM, and the cookie; they are connected to each other, not to the test VM, so the control connection is standard I/O. `TestClock` is loaded on the WorldManager peer so a test can move its clock. `test/world_manager/hand_off_test.exs` runs every test in both topologies: `:single` (the application of the test VM, ports 9010 and 9110) and `:peers`.
+`TestPeers` (`test/support/test_peers.ex`) starts two `:peer` nodes, one with `PINATA_PARTS=login` (client port 9310) and one with `world_manager` (port 9311). They share one settings file, the database of the test VM, and the cookie; they are connected to each other, not to the test VM, so the control connection is standard I/O. `TestClock` is loaded on both peers so a test can move their clocks. `test/world_manager/hand_off_test.exs` runs every test in both topologies: `:single` (the application of the test VM, ports 9010 and 9110) and `:peers`.
 
 ## Limits
 
-- Connections are closed only at the end of the replay.
+- Connections are closed at the end of the replay, or after the packets listed in `close_after:`.
 - The endpoint comes from the connection kind, not from the address the server sends.
 - A `bits` field masks its whole byte.
 - Two world-select refusals with status 0 in one replay fail the handle map: both captured keys are uninitialised memory and both would bind to the rebuild's zero key. No transcript has two.

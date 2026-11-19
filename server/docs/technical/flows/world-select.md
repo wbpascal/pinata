@@ -41,13 +41,13 @@ sequenceDiagram
 
 ## Session
 
-An accepted connection calls `Cluster.Sessions.take_over/1` (an older session gets `{:cluster, :session_replaced}` and answers `0x0C17 {0x683}`) and joins the `:pg` group `{:players, world}`. When the socket closes the process ends and the player count drops.
+An accepted connection calls `Cluster.Sessions.take_over/1` (an older session gets `{:cluster, :session_replaced}` and answers `0x0C17 {0x683}`) and joins the `:pg` group `{:players, world}`. The way back: [`return-to-world-list.md`](return-to-world-list.md). When the socket closes the process ends and the player count drops.
 
 ## Original-server bugs
 
 - W01-B1 (the name was not compared with the reservation): fixed, the name must equal the reservation's.
 - L00-B3 (a key without a reservation for a full world): fixed without changing the client bytes.
-- P02-B23 (uninitialised key bytes on a refusal): fixed, the key is zero; in the replay the key is a handle (`:validation_key`), so the bytes are not compared.
+- P02-B23 (uninitialised key bytes on a refusal): fixed, the key is zero; in the replay the key is a handle (`:world_key`), so the bytes are not compared.
 
 ## Differences from the original
 

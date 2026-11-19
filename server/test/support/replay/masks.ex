@@ -12,7 +12,7 @@ defmodule Replay.Masks do
   @type mask :: {module(), path(), reason :: String.t()}
   @type handle :: {module(), path(), namespace :: atom(), reason :: String.t()}
 
-  # The other entries of ADR 0008 (login tokens, addresses in 0x1003 / 0x180A, uninitialised memory with its bug id)
+  # The other entries of ADR 0008 (addresses in 0x1003 / 0x180A, uninitialised memory with its bug id)
   # are added by the issue that defines each packet; the 0x0C0C address and the 0x0C14 entries are masks.
   @doc "Masks that apply to every replay."
   @spec global() :: [mask()]
@@ -38,15 +38,19 @@ defmodule Replay.Masks do
     end
   end
 
-  # Handles (identifiers, item keys) are added by the issue that defines each packet; the validation key (0x0C0C / 0x0C0F) and the 0x0C14 session handle are handles.
+  # Handles (identifiers, item keys) are added by the issue that defines each packet; the login token, the world key
+  # (0x0C0C / 0x0C0F) and the 0x0C14 session handle are handles.
   @doc "Handles that apply to every replay."
   @spec handles() :: [handle()]
   def handles,
     do: [
-      {Proto.Packets.UserWorldselectAck, :validate, :validation_key,
-       "session value: the validation key is drawn at random per select and the client sends it back in 0x0C0F; on a refusal the original sends uninitialised memory (P02-B23), the rebuild sends 0"},
-      {Proto.Packets.UserLoginworldReq, :validate, :validation_key,
-       "the key of 0x0C0C, sent back by the client: replaced by the key of this run"},
+      {Proto.Packets.UserWillWorldSelectAck, :otp, :login_token,
+       "session value: the login token is drawn at random per request"},
+      {Proto.Packets.UserWorldselectAck, :validate, :world_key,
+       "session value: the key is drawn at random per select and the client sends it back in 0x0C0F; on a refusal the original sends uninitialised memory (P02-B23), the rebuild sends 0"},
+      {Proto.Packets.UserLoginworldReq, :validate, :world_key, "session value: the key of 0x0C0C"},
+      {Proto.Packets.UserLoginWithOtpReq, :otp, :login_token,
+       "session value: the client sends back the token of 0x0C34"},
       {Proto.Packets.UserLoginworldAck, :worldmanager, :wm_session,
        "session handle: the original takes it from its session pool, the rebuild counts per world"}
     ]

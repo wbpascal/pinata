@@ -50,8 +50,8 @@ A wrong `client_version_key` gets `0x0C66` (one byte, 0) and the socket is close
 | Step | Accepts | Else |
 |---|---|---|
 | `:version` | `0x0C65`: right key to `:login`, wrong key `0x0C66` and close | any other packet closes the socket without an answer |
-| `:login` | `0x0C5A` to `:open` | any other packet closes the socket without an answer |
-| `:open` | `0x0C04`, `0x0C1B` (once logged in) | every other known packet is ignored |
+| `:login` | `0x0C5A` to `:open`; `0x0C37` (token login, [`return-to-world-list.md`](return-to-world-list.md)) to `:open` | any other packet closes the socket without an answer |
+| `:open` | `0x0C04`, `0x0C1B` (once logged in) | every other known packet is ignored, `0x0C18` too |
 
 ## World status
 

@@ -6,6 +6,10 @@ defmodule WorldManager.Handler do
   The login is accepted only for a reservation with the same key and the same user name (W01-B1 fixed). An accepted
   connection becomes the session of the account and counts as a player of the world. It then gets the character list
   `0x0C14` (also on `0x0C1F`) and answers `0x080D` with `0x080E` (flow: `docs/technical/flows/character-list.md`).
+
+  `0x0C33` asks Login for a login token and answers `0x0C34` (flow: `docs/technical/flows/return-to-world-list.md`).
+  `0x0C18` with type 0 closes the connection; other types are ignored for now. A closed socket ends the process and
+  with it the session, once (W05-B25, W05-B9 and P02-B35 are link effects that do not exist here).
   """
 
   @behaviour Net.Handler
@@ -17,16 +21,20 @@ defmodule WorldManager.Handler do
   alias Proto.Packets.UserLoginworldAck
   alias Proto.Packets.UserLoginworldReq
   alias Proto.Packets.UserLoginworldfailAck
+  alias Proto.Packets.UserNormallogoutCmd
+  alias Proto.Packets.UserWillWorldSelectAck
+  alias Proto.Packets.UserWillWorldSelectReq
 
   @enforce_keys [:worlds]
-  defstruct [:worlds, :world_no, :user_no, :handle, step: :login]
+  defstruct [:worlds, :world_no, :handle, step: :login, user_no: :none, user_name: :none]
 
   @type t :: %__MODULE__{
           worlds: [Cluster.Registry.world_id()],
           world_no: Cluster.Registry.world_id() | nil,
-          user_no: pos_integer() | nil,
           handle: 0..0xFFFF | nil,
-          step: :login | :open
+          step: :login | :open,
+          user_no: :none | pos_integer(),
+          user_name: :none | String.t()
         }
 
   @impl Net.Handler
@@ -42,13 +50,25 @@ defmodule WorldManager.Handler do
     do: {state, [{:perform, {:list_characters, state.world_no, state.user_no}}]}
 
   def handle_packet(%__MODULE__{step: :open} = state, %MiscGametimeReq{}), do: {state, [{:perform, :game_time}]}
+
+  def handle_packet(%__MODULE__{step: :open, user_no: user_no} = state, %UserWillWorldSelectReq{})
+      when is_integer(user_no),
+      do: {state, [{:perform, {:create_token, user_no, state.user_name}}]}
+
+  def handle_packet(%__MODULE__{step: :open} = state, %UserNormallogoutCmd{logout_type: 0}), do: {state, [:close]}
   def handle_packet(%__MODULE__{step: :open} = state, _packet), do: {state, []}
 
   @impl Net.Handler
-  def handle_info(state, {:login_taken, {:ok, world_no, user_no, handle}}),
+  def handle_info(state, {:login_taken, {:ok, world_no, user_no, name, handle}}),
     do:
-      {%{state | step: :open, world_no: world_no, user_no: user_no, handle: handle},
+      {%{state | step: :open, world_no: world_no, user_no: user_no, user_name: name, handle: handle},
        [{:perform, {:list_characters, world_no, user_no}}]}
+
+  def handle_info(state, {:token_created, {:ok, token}}),
+    do: {state, [{:send, %UserWillWorldSelectAck{error: 0x1E58, otp: token}}]}
+
+  def handle_info(state, {:token_created, {:error, :pending}}),
+    do: {state, [{:send, %UserWillWorldSelectAck{error: 0x1E5B, otp: ""}}]}
 
   def handle_info(state, {:login_taken, :error}), do: {state, [{:send, %UserLoginworldfailAck{error: 0x44}}, :close]}
 
@@ -74,6 +94,9 @@ defmodule WorldManager.Handler do
     do: {state, [{:send, %UserConnectcutCmd{error: 0x683}}, :close]}
 
   @impl Net.Handler
+  def perform({:create_token, user_no, user_name}),
+    do: {:token_created, Cluster.Login.create_token(user_no, user_name)}
+
   def perform({:take_login, worlds, name, validate}) do
     taken =
       Enum.find_value(worlds, fn world_no ->
@@ -87,7 +110,7 @@ defmodule WorldManager.Handler do
       {world_no, user_no, handle} ->
         :ok = Cluster.Sessions.take_over(user_no)
         :ok = Cluster.Registry.join_players(world_no, self())
-        {:login_taken, {:ok, world_no, user_no, handle}}
+        {:login_taken, {:ok, world_no, user_no, name, handle}}
 
       nil ->
         {:login_taken, :error}
