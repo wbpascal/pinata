@@ -44,7 +44,7 @@ defmodule Settings.Doc do
     <!-- Generated from `Settings.Schema` by `Settings.Doc.render/0`. Do not edit by hand: see "Settings" in server/docs/technical/README.md. -->
 
     A node reads its settings once, at start-up, from one TOML file. Every key has a default, so the file is optional:
-    with no file the node starts in single-node mode.
+    with no file the node starts in single-node mode on the data directory `./data`, which must exist (see [`install.md`](install.md)).
 
     ## Environment variables
 
@@ -85,6 +85,9 @@ defmodule Settings.Doc do
       bogus: unknown key
       login.port: invalid value for :port option: expected one of 1..65535, got: 0
     ```
+
+    After the settings the node loads its game data. If `data_dir` does not exist, or a data table is damaged, it prints
+    the problems and does not start. Both cases are described in [`install.md`](install.md).
     """
   end
 end

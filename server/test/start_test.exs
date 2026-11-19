@@ -11,9 +11,10 @@ defmodule Pinata.StartTest do
 
   setup do
     :ok = Application.stop(:pinata)
+    config = System.fetch_env!("PINATA_CONFIG")
 
     on_exit(fn ->
-      System.delete_env("PINATA_CONFIG")
+      System.put_env("PINATA_CONFIG", config)
       System.delete_env("PINATA_PARTS")
       _ = Application.stop(:pinata)
       :ok = Application.start(:pinata)
@@ -36,11 +37,12 @@ defmodule Pinata.StartTest do
 
   defp use_file(tmp_dir, toml) do
     path = Path.join(tmp_dir, "pinata.toml")
-    File.write!(path, toml)
+    File.write!(path, "data_dir = #{inspect(System.fetch_env!("PINATA_TEST_DATA_DIR"))}\n" <> toml)
     System.put_env("PINATA_CONFIG", path)
   end
 
-  test "with no file every supervisor starts" do
+  test "with only data_dir set every supervisor starts", %{tmp_dir: tmp_dir} do
+    use_file(tmp_dir, "")
     assert :ok = Application.start(:pinata)
     assert running() == @supervisors
 
@@ -68,6 +70,19 @@ defmodule Pinata.StartTest do
 
     assert output =~ "bogus: unknown key"
     assert output =~ "login.port: "
+    assert running() == []
+  end
+
+  test "a missing data directory stops the start and names the import task", %{tmp_dir: tmp_dir} do
+    missing = Path.join(tmp_dir, "nope")
+    path = Path.join(tmp_dir, "pinata.toml")
+    File.write!(path, "data_dir = #{inspect(missing)}\n")
+    System.put_env("PINATA_CONFIG", path)
+
+    output = capture_io(:stderr, fn -> assert {:error, _reason} = Application.start(:pinata) end)
+
+    assert output =~ "mix pinata.import_data"
+    assert output =~ missing
     assert running() == []
   end
 

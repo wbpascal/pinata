@@ -5,7 +5,7 @@ defmodule Settings.DocTest do
 
   test "the page is current" do
     assert File.read!(@page) == Settings.Doc.render(),
-           ~s|stale: run mix run -e 'File.write!("docs/user/settings.md", Settings.Doc.render())'|
+           ~s|stale: run mix run --no-start -e 'File.write!("docs/user/settings.md", Settings.Doc.render())'|
   end
 
   test "every key is listed" do

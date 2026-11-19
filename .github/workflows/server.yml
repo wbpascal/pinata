@@ -3,9 +3,9 @@ name: server
 on:
   push:
     branches: [master]
-    paths: ["server/**", "mise.toml", ".github/workflows/server.yml"]
+    paths: ["server/**", "Files/Server/2016/9Data/**", "mise.toml", ".github/workflows/server.yml"]
   pull_request:
-    paths: ["server/**", "mise.toml", ".github/workflows/server.yml"]
+    paths: ["server/**", "Files/Server/2016/9Data/**", "mise.toml", ".github/workflows/server.yml"]
 
 permissions:
   contents: read
@@ -19,8 +19,20 @@ jobs:
     env:
       MIX_ENV: test
     steps:
-      - uses: actions/checkout@v4
-      
+      - uses: actions/checkout@v7
+
+      - name: Data set for the tests (Git LFS, 9Data only)
+        working-directory: .
+        run: git lfs ls-files -l -I "Files/Server/2016/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
+
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-9data-${{ hashFiles('.lfs-9data-ids') }}
+
+      - working-directory: .
+        run: git lfs pull -I "Files/Server/2016/9Data/**"
+
       - uses: jdx/mise-action@v5
 
       - name: Dialyzer PLT cache
@@ -53,7 +65,9 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          lfs: 'true'
       - uses: jdx/mise-action@v5
       - run: mix deps.get
       - run: mix pinata.migrate

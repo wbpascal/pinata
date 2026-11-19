@@ -4,7 +4,12 @@ defmodule Settings.Schema do
   @port [type: {:in, 1..65_535}, type_doc: "integer 1 to 65535"]
 
   @schema [
-    data_dir: [type: :string, default: "./data", doc: "The data directory."],
+    data_dir: [
+      type: :string,
+      default: "./data",
+      doc:
+        "The data directory, written by `mix pinata.import_data` (see install.md). The node does not start without it."
+    ],
     public_host: [type: :string, default: "127.0.0.1", doc: "The address the client is told to connect to."],
     client_version_key: [
       type: :string,
