@@ -14,6 +14,9 @@ defmodule Proto.Packet do
   Rules: a char field is cut at its first NUL and zero-padded on encode; lengths are strict, any other size
   gives `{:error, :bad_size}`; an array count is not a struct field.
 
+  `__packet__/0` has `layout`: `{name, offset, size, sub}` per key (byte offset in the payload; `size` nil and `offset`
+  of the count for an array; `sub` is nil, a nested module or `{:array, module, count_bytes}`), used by the replay masks.
+
   The decode is one function head with a literal binary pattern.
   """
 
@@ -53,6 +56,7 @@ defmodule Proto.Packet do
       vals: [{name, v}],
       enc: [int_seg(v, w, sign)],
       size: div(w, 8),
+      sub: nil,
       doc: [{name, Atom.to_string(type)}]
     }
   end
@@ -68,6 +72,7 @@ defmodule Proto.Packet do
       vals: [{name, quote(do: Proto.Packet.cstr(unquote(raw)))}],
       enc: [bin_seg(quote(do: Proto.Packet.pad(unquote(v), unquote(n))))],
       size: n,
+      sub: nil,
       doc: [{name, "char[#{n}]"}]
     }
   end
@@ -82,6 +87,7 @@ defmodule Proto.Packet do
       vals: [{name, v}],
       enc: [bin_seg(v, n)],
       size: n,
+      sub: nil,
       doc: [{name, "bytes[#{n}]"}]
     }
   end
@@ -97,6 +103,7 @@ defmodule Proto.Packet do
       vals: [{name, quote(do: for(<<e::little-16 <- unquote(raw)>>, do: e))}],
       enc: [bin_seg(quote(do: for(e <- unquote(v), into: <<>>, do: <<e::little-16>>)), n * 2)],
       size: n * 2,
+      sub: nil,
       doc: [{name, "u16[#{n}]"}]
     }
   end
@@ -113,6 +120,7 @@ defmodule Proto.Packet do
       vals: [{name, v}],
       enc: [bin_seg(quote(do: unquote(mod).encode(unquote(v))))],
       size: size,
+      sub: mod,
       doc: [{name, inspect(mod)}]
     }
   end
@@ -128,6 +136,7 @@ defmodule Proto.Packet do
       vals: for({{k, _}, v} <- Enum.zip(widths, vars), do: {k, v}),
       enc: segs,
       size: 1,
+      sub: nil,
       doc: for({k, w} <- widths, do: {k, "bit:#{w}"})
     }
   end
@@ -161,6 +170,7 @@ defmodule Proto.Packet do
         bin_seg(quote(do: for(e <- unquote(v), into: <<>>, do: unquote(mod).encode(e))))
       ],
       size: nil,
+      sub: {:array, mod, div(w, 8)},
       doc: [{name, "#{inspect(mod)}[count: #{count_type}]"}]
     }
   end
@@ -168,6 +178,15 @@ defmodule Proto.Packet do
   # nil when any entry is variable-sized
   defp total_size(entries) do
     if Enum.all?(entries, & &1.size), do: entries |> Enum.map(& &1.size) |> Enum.sum()
+  end
+
+  defp layout(entries) do
+    {layout, _} =
+      Enum.flat_map_reduce(entries, 0, fn e, off ->
+        {for({k, _} <- e.keys, do: {k, off, e.size, e.sub}), off + (e.size || 0)}
+      end)
+
+    layout
   end
 
   defmacro __before_compile__(env) do
@@ -180,6 +199,8 @@ defmodule Proto.Packet do
     doc_fields = Enum.flat_map(entries, & &1.doc)
     vals = Enum.flat_map(entries, & &1.vals)
     size = total_size(entries)
+
+    layout = layout(entries)
 
     body =
       {:__block__, [], Enum.flat_map(entries, & &1.pre) ++ [quote(do: {:ok, %__MODULE__{unquote_splicing(vals)}})]}
@@ -202,7 +223,8 @@ defmodule Proto.Packet do
 
       @doc false
       @spec __packet__() :: map()
-      def __packet__, do: %{size: unquote(size || :variable), fields: unquote(doc_fields)}
+      def __packet__,
+        do: %{size: unquote(size || :variable), fields: unquote(doc_fields), layout: unquote(Macro.escape(layout))}
 
       @spec decode(binary()) :: {:ok, t()} | {:error, :bad_size}
       def decode(<<unquote_splicing(Enum.flat_map(entries, & &1.pat))>>), do: unquote(body)

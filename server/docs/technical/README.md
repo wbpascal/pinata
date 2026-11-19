@@ -76,7 +76,7 @@ Server code reads time through `Clock` and random numbers through `Random`, neve
 
 ## Testing
 
-[`testing.md`](testing.md) describes the transcripts under `server/test/replay/transcripts/` and how a capture is converted into one.
+[`testing.md`](testing.md) describes the transcripts under `server/test/replay/transcripts/` and how a capture is converted into one. It also describes the test client and the replay harness in `server/test/support/`.
 
 ## The gate
 

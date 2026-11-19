@@ -12,6 +12,10 @@ defmodule ProtoTest do
     assert Proto.decode(<<0x07, 0x08, 0x6B, 0x01>>) == {:ok, %MiscSeedAck{seed: 363}}
   end
 
+  test "packet layout" do
+    assert MiscSeedAck.__packet__().layout == [{:seed, 0, 2, nil}]
+  end
+
   test "encode and framing bytes (README 1.4, 1.5)" do
     assert Proto.encode(%MiscSeedAck{seed: 363}) == <<0x07, 0x08, 0x6B, 0x01>>
     assert Proto.Framing.frame(Proto.encode(%MiscSeedAck{seed: 0x016B})) == {:ok, <<0x04, 0x07, 0x08, 0x6B, 0x01>>}

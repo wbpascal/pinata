@@ -39,4 +39,11 @@ ExUnit.after_suite(fn _result ->
   File.rm!(dir <> ".toml")
 end)
 
+# Test client and replay harness (docs/technical/testing.md).
+{:ok, _modules, _diagnostics} =
+  "support/**/*.ex"
+  |> Path.expand(__DIR__)
+  |> Path.wildcard()
+  |> Kernel.ParallelCompiler.require(return_diagnostics: true)
+
 ExUnit.start()
