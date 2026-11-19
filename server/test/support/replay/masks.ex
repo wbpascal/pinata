@@ -13,7 +13,7 @@ defmodule Replay.Masks do
   @type handle :: {module(), path(), namespace :: atom(), reason :: String.t()}
 
   # The other entries of ADR 0008 (login tokens, addresses in 0x1003 / 0x180A, uninitialised memory with its bug id)
-  # are added by the issue that defines each packet; the 0x0C0C and 0x0C14 entries exist.
+  # are added by the issue that defines each packet; the 0x0C0C address and the 0x0C14 entries are masks.
   @doc "Masks that apply to every replay."
   @spec global() :: [mask()]
   def global,
@@ -23,9 +23,7 @@ defmodule Replay.Masks do
         {Proto.Packets.UserClientWrongversionCheckAck, :unused,
          "uninitialised memory (L00-B1): the original never writes this byte, the rebuild sends 0"},
         {Proto.Packets.UserWorldselectAck, :ip,
-         "server address: the capture has the LAN address of the original server, the rebuild sends public_host"},
-        {Proto.Packets.UserWorldselectAck, :validate,
-         "session value: the validation key is drawn at random per select; on a refusal the original sends uninitialised memory (P02-B23), the rebuild sends 0"}
+         "server address: the capture has the LAN address of the original server, the rebuild sends public_host"}
       ] ++
         delinfo_masks() ++
         [
@@ -40,11 +38,15 @@ defmodule Replay.Masks do
     end
   end
 
-  # Handles (identifiers, item keys) are added by the issue that defines each packet; the 0x0C14 session handle exists.
+  # Handles (identifiers, item keys) are added by the issue that defines each packet; the validation key (0x0C0C / 0x0C0F) and the 0x0C14 session handle are handles.
   @doc "Handles that apply to every replay."
   @spec handles() :: [handle()]
   def handles,
     do: [
+      {Proto.Packets.UserWorldselectAck, :validate, :validation_key,
+       "session value: the validation key is drawn at random per select and the client sends it back in 0x0C0F; on a refusal the original sends uninitialised memory (P02-B23), the rebuild sends 0"},
+      {Proto.Packets.UserLoginworldReq, :validate, :validation_key,
+       "the key of 0x0C0C, sent back by the client: replaced by the key of this run"},
       {Proto.Packets.UserLoginworldAck, :worldmanager, :wm_session,
        "session handle: the original takes it from its session pool, the rebuild counts per world"}
     ]

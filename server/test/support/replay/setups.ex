@@ -14,7 +14,10 @@ defmodule Replay.Setups do
 
   @doc "Setup of `re-data/captures/26_11_15_login-errors.md`. The account `admin`."
   @spec login_errors() :: :ok
-  def login_errors, do: accounts() && :ok
+  def login_errors do
+    _ = accounts()
+    :ok
+  end
 
   @doc "Setup of `re-data/captures/26_11_15_create-char.md`. The account `admin` and the character `Test1235`."
   @spec create_char() :: :ok
@@ -22,11 +25,17 @@ defmodule Replay.Setups do
 
   @doc "Setup of `re-data/captures/26_11_15_37_login-heartbeat-refusals-delete.md`. The account `admin`."
   @spec login_heartbeat_refusals_delete() :: :ok
-  def login_heartbeat_refusals_delete, do: accounts() && :ok
+  def login_heartbeat_refusals_delete do
+    _ = accounts()
+    :ok
+  end
 
   @doc "Setup of `re-data/captures/26_11_16_37b_char-select-rename-refusals.md`. The account `admin`."
   @spec char_select_rename_refusals() :: :ok
-  def char_select_rename_refusals, do: accounts() && :ok
+  def char_select_rename_refusals do
+    _ = accounts()
+    :ok
+  end
 
   defp accounts do
     Persistence.Repo.active().query!("DELETE FROM accounts")

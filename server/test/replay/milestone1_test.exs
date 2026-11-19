@@ -4,8 +4,9 @@ defmodule Replay.Milestone1Test do
 
   @moduletag capture_log: true
 
-  # Each test replays its capture up to the successful world select (the S 0x0C0C line); the stop point moves
-  # forward with later issues. With `conn`, only that connection of the capture is replayed (indices stay).
+  # `login-logout` and `create-char` run past the character list (0x0C14) up to the last packet before the first
+  # opcode that is not built (0x0C33 at index 15, 0x1401 at index 23); the other tests stop at their successful world
+  # select (the S 0x0C0C line); the stop points move forward with later issues. With `conn`, only that connection of the capture is replayed (indices stay).
   defp replay(name, setup, stop, conn \\ nil) do
     apply(Replay.Setups, setup, [])
 
@@ -19,9 +20,9 @@ defmodule Replay.Milestone1Test do
 
   @heartbeat_refusals "26_11_15_37_login-heartbeat-refusals-delete"
 
-  test "26_11_15_login-logout", do: replay("26_11_15_login-logout", :login_logout, 9)
+  test "26_11_15_login-logout", do: replay("26_11_15_login-logout", :login_logout, 14)
   test "26_11_15_login-errors", do: replay("26_11_15_login-errors", :login_errors, 18)
-  test "26_11_15_create-char", do: replay("26_11_15_create-char", :create_char, 11)
+  test "26_11_15_create-char", do: replay("26_11_15_create-char", :create_char, 22)
 
   test "26_11_15_37_login-heartbeat-refusals-delete",
     do: replay(@heartbeat_refusals, :login_heartbeat_refusals_delete, 23)

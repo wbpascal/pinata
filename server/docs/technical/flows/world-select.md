@@ -47,7 +47,7 @@ An accepted connection calls `Cluster.Sessions.take_over/1` (an older session ge
 
 - W01-B1 (the name was not compared with the reservation): fixed, the name must equal the reservation's.
 - L00-B3 (a key without a reservation for a full world): fixed without changing the client bytes.
-- P02-B23 (uninitialised key bytes on a refusal): fixed, the key is zero; masked in the replay.
+- P02-B23 (uninitialised key bytes on a refusal): fixed, the key is zero; in the replay the key is a handle (`:validation_key`), so the bytes are not compared.
 
 ## Differences from the original
 
