@@ -19,7 +19,9 @@ jobs:
     env:
       MIX_ENV: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          lfs: 'true'
 
       - name: Data set for the tests (Git LFS, 9Data only)
         working-directory: .
