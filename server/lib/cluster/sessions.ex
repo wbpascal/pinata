@@ -12,4 +12,11 @@ defmodule Cluster.Sessions do
     # Two logins of one account at the same instant on two nodes can miss each other.
     if me in members, do: :ok, else: :pg.join(scope, group, me)
   end
+
+  @doc "The calling process stops being the session of the account."
+  @spec leave(pos_integer()) :: :ok
+  def leave(user_no) do
+    _ = :pg.leave(Cluster.Registry.scope(), {:session, user_no}, self())
+    :ok
+  end
 end

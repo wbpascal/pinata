@@ -1,3 +1,17 @@
+defmodule ClusterTest.FakeWorld do
+  @moduledoc false
+  use GenServer
+
+  @impl GenServer
+  def init(test), do: {:ok, test}
+
+  @impl GenServer
+  def handle_call({:expect_login, _} = message, _from, test) do
+    send(test, message)
+    {:reply, :ok, test}
+  end
+end
+
 defmodule ClusterTest do
   use ExUnit.Case, async: true
 
@@ -49,6 +63,23 @@ defmodule ClusterTest do
     assert_receive :joined, 1000
     :ok = Cluster.Sessions.take_over(904)
     assert_receive {:forwarded, {:cluster, :session_replaced}}, 1000
+  end
+
+  test "leave" do
+    :ok = Cluster.Sessions.take_over(906)
+    assert Cluster.Sessions.leave(906) == :ok
+    assert Cluster.Sessions.leave(906) == :ok
+    test = self()
+    spawn_link(fn -> send(test, {:took, Cluster.Sessions.take_over(906)}) end)
+    assert_receive {:took, :ok}, 1000
+    refute_receive {:cluster, _}, 50
+  end
+
+  test "expect_login" do
+    {:ok, _} = GenServer.start_link(ClusterTest.FakeWorld, self(), name: Registry.world_manager(905))
+    request = %{user_no: 1, user_name: "a", validate: [1]}
+    assert Cluster.WorldManager.expect_login(905, request) == :ok
+    assert_receive {:expect_login, ^request}
   end
 
   test "root children" do

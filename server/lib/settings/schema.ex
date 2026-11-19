@@ -10,7 +10,13 @@ defmodule Settings.Schema do
       doc:
         "The data directory, written by `mix pinata.import_data` (see install.md). The node does not start without it."
     ],
-    public_host: [type: :string, default: "127.0.0.1", doc: "The address the client is told to connect to."],
+    public_host: [
+      type: {:custom, Settings.Schema, :public_host, []},
+      type_doc: "string, at most 15 bytes",
+      default: "127.0.0.1",
+      doc:
+        "The address the client is told to connect to. Login sends it together with its own `world_manager.port` when a world is selected, so in multi-node mode set both on the Login node to where the WorldManager node is reached."
+    ],
     client_version_key: [
       type: :string,
       default: "20151116141627",
@@ -105,6 +111,11 @@ defmodule Settings.Schema do
   @spec world_name(term()) :: {:ok, String.t()} | {:error, String.t()}
   def world_name(name) when is_binary(name) and byte_size(name) in 1..15, do: {:ok, name}
   def world_name(other), do: {:error, "expected a string of 1 to 15 bytes, got: #{inspect(other)}"}
+
+  @doc false
+  @spec public_host(term()) :: {:ok, String.t()} | {:error, String.t()}
+  def public_host(host) when is_binary(host) and byte_size(host) in 1..15, do: {:ok, host}
+  def public_host(other), do: {:error, "expected a string of 1 to 15 bytes, got: #{inspect(other)}"}
 
   @doc "The NimbleOptions schema."
   @spec schema() :: keyword()

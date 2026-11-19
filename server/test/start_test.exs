@@ -48,8 +48,9 @@ defmodule Pinata.StartTest do
 
     for port <- [9010, 9110, 9210] do
       {socket, cipher} = connect(port)
-      # 0x0807 reaches the stub handlers, which ignore it; the socket stays open. Login closes on it: it expects 0x0C65.
-      {seed_packet, cipher} = if port == 9010, do: {<<>>, cipher}, else: encrypted(cipher, <<0x07, 0x08, 0, 0>>)
+
+      # 0x0807 reaches the Zone stub handler, which ignores it; the socket stays open. Login and WorldManager close on it: they expect 0x0C65 and 0x0C0F.
+      {seed_packet, cipher} = if port in [9010, 9110], do: {<<>>, cipher}, else: encrypted(cipher, <<0x07, 0x08, 0, 0>>)
       :ok = :gen_tcp.send(socket, seed_packet)
       {heartbeat, _cipher} = encrypted(cipher, <<0x04, 0x08>>)
       :ok = :gen_tcp.send(socket, heartbeat)

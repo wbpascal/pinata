@@ -85,6 +85,8 @@ defmodule SettingsTest do
     assert p =~ "world[0].name"
     assert {:error, [p]} = load(dir, "[[world]]\nnumber = 256\n")
     assert p =~ "world[0].number"
+    assert {:error, [p]} = load(dir, "public_host = \"0123456789abcdef\"\n")
+    assert p =~ "public_host"
     assert {:error, [p]} = load(dir, "login = 5\n")
     assert p =~ "login: expected a table"
     assert {:error, [p]} = load(dir, "this is not toml")
