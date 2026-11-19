@@ -53,7 +53,7 @@ The default is 600,000 iterations; `Application.get_env(:pinata, :password_itera
 
 ## Login results
 
-`check_login` checks in the original's order (D01 section 3.2): unknown account, wrong password, blocked, not login-able. The Login part will map unknown and wrong password to client code 0x45, blocked to 0x47, not login-able to 0x48.
+`check_login` checks in the original's order (D01 section 3.2): unknown account, wrong password, blocked, not login-able. A database failure gives `{:error, :database}` from `check_login/2` and `create_account/2`, with one `:error` log line that names the operation and the exception and never the account name or the password. The Login part maps unknown and wrong password to client code 0x45, blocked to 0x47, not login-able to 0x48.
 
 Fields of D01 section 3.2 not carried over: `bIsDelete`, `nAuthID` / `tUserAuth` (see the next section), login by e-mail, timed blocks (`tUserBlock`, `usp_User_chkBlock`), the EGPal and merge additions.
 

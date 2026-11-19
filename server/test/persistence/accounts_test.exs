@@ -36,6 +36,26 @@ defmodule Persistence.AccountsTest do
     end
   end
 
+  describe "a failing database" do
+    @secret "5ebe2294ecd0e0f08eab7690d2a6ee69"
+
+    test "check_login and create_account return :database and log without the password" do
+      repo = Persistence.Repo.active()
+      repo.query!("ALTER TABLE accounts RENAME TO accounts_off")
+      on_exit(fn -> repo.query!("ALTER TABLE accounts_off RENAME TO accounts") end)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:error, :database} = Persistence.check_login("ivy", @secret)
+          assert {:error, :database} = Persistence.create_account("ivy", @secret)
+        end)
+
+      assert log =~ "the database failed in check_login"
+      assert log =~ "the database failed in create_account"
+      refute log =~ @secret
+    end
+  end
+
   describe "check_login/2" do
     test "ok, in another case and with trailing spaces" do
       id = create!("Dave")

@@ -22,7 +22,7 @@ defmodule Login.Handler do
   alias Proto.Packets.UserXtrapReq
   alias Proto.Packets.WorldInfo
 
-  @type result :: {:ok, pos_integer()} | {:error, :unknown | :wrong_password | :blocked | :not_login_able}
+  @type result :: {:ok, pos_integer()} | {:error, :unknown | :wrong_password | :blocked | :not_login_able | :database}
 
   @enforce_keys [:version_key, :auto_create?, :worlds]
   defstruct [:version_key, :auto_create?, :worlds, step: :version, pending: :none, user_no: :none]
@@ -57,7 +57,7 @@ defmodule Login.Handler do
   def handle_packet(%__MODULE__{step: :version} = state, _packet), do: {state, [:close]}
 
   def handle_packet(%__MODULE__{step: :login} = state, %UserUsLoginReq{user_name: name, password: password}),
-    do: {%{state | step: :open}, [{:perform, {:check_login, name, password, state.auto_create?}}]}
+    do: {%{state | step: :open}, [{:perform, {:check_login, name, %Login.Secret{value: password}, state.auto_create?}}]}
 
   def handle_packet(%__MODULE__{step: :login} = state, _packet), do: {state, [:close]}
 
@@ -80,6 +80,8 @@ defmodule Login.Handler do
   defp answer({:error, :wrong_password}), do: refuse(0x45)
   defp answer({:error, :blocked}), do: refuse(0x47)
   defp answer({:error, :not_login_able}), do: refuse(0x48)
+  # The original answers a failed DB call like an unknown name (D01 section 3.2: nUserNo stays -1).
+  defp answer({:error, :database}), do: refuse(0x45)
 
   defp refuse(code), do: [{:send, %UserLoginfailAck{error: code}}, :close]
 
@@ -95,7 +97,7 @@ defmodule Login.Handler do
     do: {state, [{:send, %UserConnectcutCmd{error: 0x683}}, :close]}
 
   @impl Net.Handler
-  def perform({:check_login, name, password, auto_create?}) do
+  def perform({:check_login, name, %Login.Secret{value: password}, auto_create?}) do
     result =
       case Persistence.check_login(name, password) do
         {:error, :unknown} when auto_create? ->

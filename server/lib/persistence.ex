@@ -5,11 +5,13 @@ defmodule Persistence do
 
   import Ecto.Query
 
+  require Logger
+
   alias Persistence.Account
   alias Persistence.Password
   alias Persistence.Repo
 
-  @spec create_account(binary(), binary()) :: {:ok, pos_integer()} | {:error, :invalid_name | :name_taken}
+  @spec create_account(binary(), binary()) :: {:ok, pos_integer()} | {:error, :invalid_name | :name_taken | :database}
   def create_account(name, password) do
     with true <- Account.valid_name?(name),
          {:ok, key} <- Account.name_key(name) do
@@ -24,7 +26,7 @@ defmodule Persistence do
       ]
 
       repo = Repo.active()
-      repo.transact(fn -> insert(repo, fields) end)
+      transact(repo, "create_account", fn -> insert(repo, fields) end)
     else
       _ -> {:error, :invalid_name}
     end
@@ -41,12 +43,24 @@ defmodule Persistence do
   end
 
   @spec check_login(binary(), binary()) ::
-          {:ok, pos_integer()} | {:error, :unknown | :wrong_password | :blocked | :not_login_able}
+          {:ok, pos_integer()} | {:error, :unknown | :wrong_password | :blocked | :not_login_able | :database}
   def check_login(name, password) do
     repo = Repo.active()
-    {:ok, account} = repo.transact(fn -> {:ok, find(repo, name)} end)
-    # Hashing stays outside the transaction: it would hold the SQLite write lock or a pool connection.
-    verify(account, password)
+
+    case transact(repo, "check_login", fn -> {:ok, find(repo, name)} end) do
+      # Hashing stays outside the transaction: it would hold the SQLite write lock or a pool connection.
+      {:ok, account} -> verify(account, password)
+      {:error, :database} -> {:error, :database}
+    end
+  end
+
+  # A database failure raises inside repo.transact; callers get a value so that no caller crashes with a password in scope.
+  defp transact(repo, operation, fun) do
+    repo.transact(fun)
+  rescue
+    e in [DBConnection.ConnectionError, Postgrex.Error, Exqlite.Error] ->
+      Logger.error("Persistence: the database failed in #{operation}: #{inspect(e.__struct__)} #{Exception.message(e)}")
+      {:error, :database}
   end
 
   defp find(repo, name) do

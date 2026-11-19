@@ -40,6 +40,7 @@ Every command exits non-zero with one of these messages:
 |---|---|
 | `No password given.` | empty input or end of input at the prompt |
 | `An account named <name> exists already.` | the name is taken (case and trailing spaces ignored) |
+| `The database failed; see the log line above.` | the database could not be reached or queried |
 | `<name> is not a valid account name: ...` | breaks the name rules above |
 | `No account named <name>.` | block or unblock of a missing account |
 | `Usage: mix pinata.account.create <name>` (alike for the others) | wrong number of arguments |

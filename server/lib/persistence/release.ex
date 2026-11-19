@@ -33,6 +33,9 @@ defmodule Persistence.Release do
         {:error, :name_taken} ->
           raise "An account named #{name} exists already."
 
+        {:error, :database} ->
+          raise "The database failed; see the log line above."
+
         {:error, :invalid_name} ->
           raise "#{name} is not a valid account name: 1 to 255 printable ASCII characters, no spaces."
       end

@@ -37,9 +37,11 @@ The refusal is `0x0C09 {error}`, then the socket is closed.
 
 | Code | Cause | Client text |
 |---|---|---|
-| 0x45 | unknown name (auto-create off or the name is invalid), wrong password | Please check ID or Password. |
+| 0x45 | unknown name (auto-create off or the name is invalid), wrong password, a database failure (logged; the original answers the same, D01 section 3.2) | Please check ID or Password. |
 | 0x47 | account blocked | The ID has been blocked. |
 | 0x48 | account not login-able | The World Servers are down for maintenance. |
+
+The password travels from `handle_packet` to `perform` inside `Login.Secret`, whose `inspect` output is `#Login.Secret<...>`.
 
 A wrong `client_version_key` gets `0x0C66` (one byte, 0) and the socket is closed.
 
