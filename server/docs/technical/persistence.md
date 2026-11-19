@@ -6,7 +6,7 @@ The `Persistence` boundary is the only code that names a repo, a schema or a que
 
 | Module | What |
 |---|---|
-| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`, `create_character/1`), each one `repo.transact` |
+| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`, `create_character/1`, `delete_character/3`), each one `repo.transact` |
 | `Persistence.Supervisor` | starts the repo and the migration step |
 | `Persistence.Repo` | private: maps `database.url` to a repo module and its config; `active/0` |
 | `Persistence.Repo.Postgres`, `Persistence.Repo.SQLite` | the two Ecto repos |
@@ -95,9 +95,13 @@ Unique index `(character_id, storage, slot)`. Storage 9 is the inventory; only c
 
 `create_character/1` is one transaction of guarded statements: a check that the slot is free (`{:error, :slot_in_use}`), the insert of the character (a unique-index violation on the name is `{:error, :name_taken}`, on the slot `{:error, :slot_in_use}`, so the slot is reported before the name), then one `insert_all` for the items, the skills and the shortcuts, each matched against its row count. Any other failure is `{:error, :database}` with a logged line. A refusal leaves the transaction, so on PostgreSQL the next statement of the connection works (D02-B2 fixed). The name key is `Persistence.Character.name_key/1`; the same name is allowed in another world. `kq_date` is the creation time.
 
+## Delete
+
+`delete_character/3` is one transaction with one guarded `delete_all` on `characters` by `(world_id, account_id, slot)`. One affected row is `:ok`, none is `{:error, :not_found}`. The foreign keys of `items`, `character_skills` and `character_shortcuts` cascade, so the character is deleted with everything it owns (D02-B4 fixed: one transaction). `{:error, :guild_master}` is reserved for the guild milestone; nothing returns it yet. Any other failure is `{:error, :database}` with a logged line. Flow: [`flows/character-delete.md`](flows/character-delete.md).
+
 ### Not carried over from the original (D02 section 3.1 to 3.2)
 
-- [ ] `bDeleted` / `dDeletedDate`: issue 46 deletes rows for good, so a listed character is never deleted.
+- [ ] `bDeleted` / `dDeletedDate`: `delete_character/3` deletes rows for good, so a listed character is never deleted.
 - [ ] `nKQHandle`: no Kingdom Quest instance exists; the wire value is constant.
 - [ ] `nKQD`, `tCharacterChangeID`: no rename rights.
 - [ ] The account-wide tutorial skip of `usp_Tutorial_getIsSkip`.

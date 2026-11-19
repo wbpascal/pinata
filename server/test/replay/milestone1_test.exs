@@ -2,14 +2,7 @@ defmodule Replay.Milestone1Test do
   # The harness swaps the global clock source, so it cannot run async.
   use ExUnit.Case, async: false
 
-  import Ecto.Query
-
   @moduletag capture_log: true
-
-  # Opcodes of a later issue (character delete, issue 46). Their lines are left out of every replay; the indices
-  # stay. The heartbeat lines 0x0804 / 0x0805 stay: the client 0x0805 lines keep the WorldManager connection of
-  # capture 37 alive while the test clock jumps.
-  @not_yet [0x1407, 0x140C]
 
   # Each test replays its capture up to its stop point; the stop point moves forward with later issues. With
   # `conn`, only that connection of the capture is replayed (indices stay). `close_after` lists the packets after
@@ -18,7 +11,7 @@ defmodule Replay.Milestone1Test do
     apply(Replay.Setups, setup, [])
 
     transcript = "transcripts/#{name}.txt" |> Path.expand(__DIR__) |> Replay.Transcript.read!()
-    packets = Enum.reject(transcript.packets, &(&1.opcode in @not_yet))
+    packets = transcript.packets
     packets = if conn = opts[:conn], do: Enum.filter(packets, &(&1.conn == conn)), else: packets
 
     Replay.assert_replay(%{transcript | packets: packets},
@@ -37,11 +30,7 @@ defmodule Replay.Milestone1Test do
   test "26_11_15_create-char", do: replay("26_11_15_create-char", :create_char, :end)
 
   test "26_11_15_37_login-heartbeat-refusals-delete",
-    do:
-      replay(@heartbeat_refusals, :login_heartbeat_refusals_delete, 70,
-        close_after: [60],
-        before: %{39 => &delete_x37del/0}
-      )
+    do: replay(@heartbeat_refusals, :login_heartbeat_refusals_delete, 70, close_after: [60])
 
   test "26_11_15_37_login-heartbeat-refusals-delete: world closed" do
     child = {WorldManager.World, 0}
@@ -76,12 +65,6 @@ defmodule Replay.Milestone1Test do
 
   test "26_11_16_37b_char-select-rename-refusals",
     do: replay("26_11_16_37b_char-select-rename-refusals", :char_select_rename_refusals, 9)
-
-  # Stands in for the delete at index 37 until issue 46.
-  defp delete_x37del do
-    Persistence.Repo.active().delete_all(from(c in Persistence.Character, where: c.name == ^"X37Del"))
-    :ok
-  end
 
   defp wait_until(fun, tries \\ 50) do
     cond do

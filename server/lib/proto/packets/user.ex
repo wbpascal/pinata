@@ -128,6 +128,24 @@ defmodule Proto.Packets.AvatarCreatesuccAck do
   array :avatars, Proto.Packets.Avatar, count: :u8
 end
 
+defmodule Proto.Packets.AvatarEraseReq do
+  @moduledoc "0x1407 NC_AVATAR_ERASE_REQ, client to server (sent to WorldManager): the slot of the character to delete."
+  use Proto.Packet, opcode: 0x1407
+  field :slot, :u8
+end
+
+defmodule Proto.Packets.AvatarErasefailAck do
+  @moduledoc "0x140A NC_AVATAR_ERASEFAIL_ACK, server to client. The client knows 0xC7 (guild master) and one text for every other code."
+  use Proto.Packet, opcode: 0x140A
+  field :error, :u16
+end
+
+defmodule Proto.Packets.AvatarErasesuccAck do
+  @moduledoc "0x140C NC_AVATAR_ERASESUCC_ACK, server to client: the slot of the 0x1407."
+  use Proto.Packet, opcode: 0x140C
+  field :slot, :u8
+end
+
 defmodule Proto.Packets.UserLoginworldfailAck do
   @moduledoc "0x0C15 NC_USER_LOGINWORLDFAIL_ACK, server to client."
   use Proto.Packet, opcode: 0x0C15
