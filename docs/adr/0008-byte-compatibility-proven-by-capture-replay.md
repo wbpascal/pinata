@@ -8,7 +8,7 @@ We compare bytes, not decoded structs, because comparing structs would run both 
 
 **Values that cannot match.**
 
-- Session values (seed, validation key, login tokens), server addresses (`0x0C0C`, `0x1003`, `0x180A`) and fields the original server fills with uninitialised memory are masked. The rebuild sends zeroes for the last kind.
+- Session values (seed, validation key), server addresses (`0x0C0C`, `0x1003`, `0x180A`) and fields the original server fills with uninitialised memory are masked. The rebuild sends zeroes for the last kind. Login tokens are not masked: they go through the handle map below.
 - Handles and item keys go through a handle map: the first pairing of an original value with a new one is bound, every later occurrence must agree. This checks consistency without copying the original's allocator.
 - Clock values are compared, not masked. Server code reads time and randomness only through a `Clock` and a `Random` module; a custom Credo check in `mix check` rejects direct calls elsewhere. Before each client packet the harness moves the injected clock to that packet's capture timestamp, so replay never sleeps.
 - Random game values (damage, drops) are decided with the combat milestone.
