@@ -7,6 +7,8 @@ defmodule WorldManager.Handler do
   connection becomes the session of the account and counts as a player of the world. It then gets the character list
   `0x0C14` (also on `0x0C1F`) and answers `0x080D` with `0x080E` (flow: `docs/technical/flows/character-list.md`).
 
+  `0x1401` creates a character and answers `0x1406` or `0x1404` (flow: `docs/technical/flows/character-create.md`).
+
   `0x0C33` asks Login for a login token and answers `0x0C34` (flow: `docs/technical/flows/return-to-world-list.md`).
   `0x0C18` with type 0 closes the connection; other types are ignored for now. A closed socket ends the process and
   with it the session, once (W05-B25, W05-B9 and P02-B35 are link effects that do not exist here).
@@ -14,6 +16,9 @@ defmodule WorldManager.Handler do
 
   @behaviour Net.Handler
 
+  alias Proto.Packets.AvatarCreatefailAck
+  alias Proto.Packets.AvatarCreatesuccAck
+  alias Proto.Packets.AvatarCreateReq
   alias Proto.Packets.MiscGametimeAck
   alias Proto.Packets.MiscGametimeReq
   alias Proto.Packets.UserAvatarListReq
@@ -55,6 +60,10 @@ defmodule WorldManager.Handler do
       when is_integer(user_no),
       do: {state, [{:perform, {:create_token, user_no, state.user_name}}]}
 
+  def handle_packet(%__MODULE__{step: :open, user_no: user_no} = state, %AvatarCreateReq{} = req)
+      when is_integer(user_no),
+      do: {state, [{:perform, {:create_character, state.world_no, user_no, req}}]}
+
   def handle_packet(%__MODULE__{step: :open} = state, %UserNormallogoutCmd{logout_type: 0}), do: {state, [:close]}
   def handle_packet(%__MODULE__{step: :open} = state, _packet), do: {state, []}
 
@@ -86,6 +95,12 @@ defmodule WorldManager.Handler do
   # W05-B10 fixed: one close
   def handle_info(state, {:characters, {:error, :database}}),
     do: {state, [{:send, %UserLoginworldfailAck{error: 0x46}}, :close]}
+
+  def handle_info(state, {:character_created, {:ok, character}}),
+    do: {state, [{:send, %AvatarCreatesuccAck{avatars: [WorldManager.Avatar.created(character)]}}]}
+
+  def handle_info(state, {:character_created, {:error, reason}}),
+    do: {state, [{:send, %AvatarCreatefailAck{error: WorldManager.CharacterCreate.code(reason)}}]}
 
   def handle_info(state, {:game_time, {hour, minute, second}}),
     do: {state, [{:send, %MiscGametimeAck{hour: hour, minute: minute, second: second}}]}
@@ -119,6 +134,9 @@ defmodule WorldManager.Handler do
 
   def perform({:list_characters, world_no, user_no}),
     do: {:characters, Persistence.list_characters(world_no, user_no)}
+
+  def perform({:create_character, world_no, user_no, req}),
+    do: {:character_created, WorldManager.CharacterCreate.run(world_no, user_no, req)}
 
   def perform(:game_time) do
     {_date, time} = Clock.local_time(Clock.system_time(:second))

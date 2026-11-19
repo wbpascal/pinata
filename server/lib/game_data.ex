@@ -13,6 +13,7 @@ defmodule GameData do
     exports: [
       Schema,
       SingleData,
+      BadNameFilter,
       MapInfo,
       ItemInfo,
       HairInfo,

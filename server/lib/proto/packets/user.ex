@@ -105,6 +105,29 @@ defmodule Proto.Packets.UserLoginworldAck do
   array :avatars, Proto.Packets.Avatar, count: :u8
 end
 
+defmodule Proto.Packets.AvatarCreateReq do
+  @moduledoc "0x1401 NC_AVATAR_CREATE_REQ, client to server (sent to WorldManager): slot, name and look of the new character."
+  use Proto.Packet, opcode: 0x1401
+  field :slot, :u8
+  field :name, {:char, 20}
+  bits gender: 1, chrclass: 5, race: 2
+  field :hairtype, :u8
+  field :haircolor, :u8
+  field :faceshape, :u8
+end
+
+defmodule Proto.Packets.AvatarCreatefailAck do
+  @moduledoc "0x1404 NC_AVATAR_CREATEFAIL_ACK, server to client."
+  use Proto.Packet, opcode: 0x1404
+  field :error, :u16
+end
+
+defmodule Proto.Packets.AvatarCreatesuccAck do
+  @moduledoc "0x1406 NC_AVATAR_CREATESUCC_ACK, server to client: numofavatar (always 1) and the new AVATAR."
+  use Proto.Packet, opcode: 0x1406
+  array :avatars, Proto.Packets.Avatar, count: :u8
+end
+
 defmodule Proto.Packets.UserLoginworldfailAck do
   @moduledoc "0x0C15 NC_USER_LOGINWORLDFAIL_ACK, server to client."
   use Proto.Packet, opcode: 0x0C15

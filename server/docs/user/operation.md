@@ -6,6 +6,12 @@ Start, stop and logs are written together with the release.
 
 The in-game clock and the stored dates shown to the client (for example the Kingdom Quest date in the character list) use the time zone of the node's operating system. Set the `TZ` environment variable to change it.
 
+## Character creation
+
+A character name has 1 to 20 bytes, no space, and must pass `shn/BadNameFilter.shn` of the data directory. The Sentinel class needs a character of the level in the row `ChrLevel_CanCreateSen` of `shn/SingleData.shn` on the same account and world. The starting values (map, position, level, items, skills, shortcuts) come from `tables/DefaultCharacterData/*.csv` of the data directory. A change to these files needs a restart.
+
+A database created by an earlier build must be deleted: the initial migration gained columns and tables.
+
 ## Database and migrations
 
 `database.url` (or the environment variable `DATABASE_URL`) has two forms:

@@ -18,14 +18,31 @@ defmodule Persistence.Repo.Migrations.CreateCharacters do
     kq_x: "kq_x BETWEEN 0 AND 4294967295",
     kq_y: "kq_y BETWEEN 0 AND 4294967295",
     tutorial_state: "tutorial_state BETWEEN 0 AND 3",
-    tutorial_step: "tutorial_step BETWEEN 0 AND 255"
+    tutorial_step: "tutorial_step BETWEEN 0 AND 255",
+    exp: "exp >= 0",
+    login_x: "login_x BETWEEN 0 AND 4294967295",
+    login_y: "login_y BETWEEN 0 AND 4294967295",
+    hp: "hp >= 0",
+    sp: "sp >= 0",
+    money: "money >= 0",
+    hp_stones: "hp_stones >= 0",
+    sp_stones: "sp_stones >= 0"
   ]
 
   @items [
     storage: "storage BETWEEN 0 AND 255",
     slot: "slot BETWEEN 0 AND 255",
     item_id: "item_id BETWEEN 0 AND 65535",
-    upgrade: "upgrade BETWEEN 0 AND 255"
+    upgrade: "upgrade BETWEEN 0 AND 255",
+    lot: "lot >= 1"
+  ]
+
+  @skills [skill_id: "skill_id BETWEEN 0 AND 65535"]
+
+  @shortcuts [
+    slot: "slot >= 0",
+    code: "code >= 0",
+    value: "value >= 0"
   ]
 
   def change do
@@ -50,6 +67,14 @@ defmodule Persistence.Repo.Migrations.CreateCharacters do
       add :kq_date, :utc_datetime, null: false
       add :tutorial_state, :integer, null: false, check: check(:characters, :tutorial_state, @characters)
       add :tutorial_step, :integer, null: false, default: 0, check: check(:characters, :tutorial_step, @characters)
+      add :exp, :bigint, null: false, default: 0, check: check(:characters, :exp, @characters)
+      add :login_x, :bigint, null: false, default: 0, check: check(:characters, :login_x, @characters)
+      add :login_y, :bigint, null: false, default: 0, check: check(:characters, :login_y, @characters)
+      add :hp, :bigint, null: false, default: 0, check: check(:characters, :hp, @characters)
+      add :sp, :bigint, null: false, default: 0, check: check(:characters, :sp, @characters)
+      add :money, :bigint, null: false, default: 0, check: check(:characters, :money, @characters)
+      add :hp_stones, :integer, null: false, default: 0, check: check(:characters, :hp_stones, @characters)
+      add :sp_stones, :integer, null: false, default: 0, check: check(:characters, :sp_stones, @characters)
     end
 
     constraints(:characters, @characters)
@@ -63,11 +88,32 @@ defmodule Persistence.Repo.Migrations.CreateCharacters do
       add :slot, :integer, null: false, check: check(:items, :slot, @items)
       add :item_id, :integer, null: false, check: check(:items, :item_id, @items)
       add :upgrade, :integer, null: false, default: 0, check: check(:items, :upgrade, @items)
+      add :lot, :integer, null: false, default: 1, check: check(:items, :lot, @items)
     end
 
     constraints(:items, @items)
 
     create unique_index(:items, [:character_id, :storage, :slot])
+
+    create table(:character_skills, primary_key: false) do
+      add :character_id, references(:characters, on_delete: :delete_all), null: false
+      add :skill_id, :integer, null: false, check: check(:character_skills, :skill_id, @skills)
+    end
+
+    constraints(:character_skills, @skills)
+
+    create unique_index(:character_skills, [:character_id, :skill_id])
+
+    create table(:character_shortcuts, primary_key: false) do
+      add :character_id, references(:characters, on_delete: :delete_all), null: false
+      add :slot, :integer, null: false, check: check(:character_shortcuts, :slot, @shortcuts)
+      add :code, :integer, null: false, check: check(:character_shortcuts, :code, @shortcuts)
+      add :value, :bigint, null: false, check: check(:character_shortcuts, :value, @shortcuts)
+    end
+
+    constraints(:character_shortcuts, @shortcuts)
+
+    create unique_index(:character_shortcuts, [:character_id, :slot])
   end
 
   # SQLite takes a check only as a column option, PostgreSQL ignores that option and takes a separate constraint.

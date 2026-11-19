@@ -2,6 +2,8 @@ defmodule Proto.Packets.UserTest do
   use ExUnit.Case, async: true
 
   alias Proto.Packets.{
+    AvatarCreatesuccAck,
+    AvatarCreateReq,
     UserClientRightversionCheckAck,
     UserConnectcutCmd,
     UserLoginAck,
@@ -101,5 +103,36 @@ defmodule Proto.Packets.UserTest do
     assert %UserNormallogoutCmd{logout_type: 0} = roundtrip(UserNormallogoutCmd, <<0>>)
     assert %UserWillWorldSelectReq{} = roundtrip(UserWillWorldSelectReq, <<>>)
     assert {:error, :bad_size} = UserLoginWithOtpReq.decode(<<0::248>>)
+  end
+
+  defp captured(name, index) do
+    transcript = "test/replay/transcripts/#{name}.txt" |> Replay.Transcript.read!()
+    Enum.find(transcript.packets, &(&1.index == index)).payload
+  end
+
+  test "character create request and success" do
+    request = captured("26_11_15_create-char", 23)
+
+    assert %AvatarCreateReq{slot: 1, name: "CharCreateTest", gender: 0, chrclass: 6, race: 1} =
+             req = roundtrip(AvatarCreateReq, request)
+
+    assert {req.hairtype, req.haircolor, req.faceshape} == {1, 1, 5}
+
+    assert %AvatarCreatesuccAck{avatars: [%{name: "CharCreateTest", level: 1}]} =
+             roundtrip(AvatarCreatesuccAck, captured("26_11_15_create-char", 24))
+  end
+
+  test "a 20 byte name has no terminator and survives the codec" do
+    name = "Twenty0Bytes0Name0XY"
+    assert byte_size(name) == 20
+
+    <<head::binary-1, _::binary-20, tail::binary>> = captured("26_11_15_create-char", 23)
+    assert %{name: ^name} = roundtrip(AvatarCreateReq, head <> name <> tail)
+
+    <<head::binary-5, _::binary-20, tail::binary>> = captured("26_11_15_create-char", 24)
+    assert %{avatars: [%{name: ^name}]} = roundtrip(AvatarCreatesuccAck, head <> name <> tail)
+
+    <<head::binary-7, _::binary-20, tail::binary>> = captured("26_11_15_login-logout", 12)
+    assert %{avatars: [%{name: ^name}]} = roundtrip(Proto.Packets.UserLoginworldAck, head <> name <> tail)
   end
 end

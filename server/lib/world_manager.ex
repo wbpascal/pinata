@@ -8,6 +8,7 @@ defmodule WorldManager do
   def game_data,
     do: [
       GameData.SingleData,
+      GameData.BadNameFilter,
       GameData.MapInfo,
       GameData.ItemInfo,
       GameData.HairInfo,

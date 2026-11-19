@@ -22,7 +22,8 @@ defmodule Replay do
   `masks:` and `handles:` (per-test additions to `Replay.Masks`), `close_after:` (packet indices; the harness closes
   the connection of that packet right after it, as the client did; the transcript holds no TCP close), `sync_after:`
   (packet indices; a heartbeat round trip after each, so the server has handled the packet before the clock moves
-  on), `timeout:` (ms to wait for a packet, 2000).
+  on), `before:` (a map of packet index to a zero-arity function that runs before the harness sends that client
+  packet; for state a later issue's packets would create), `timeout:` (ms to wait for a packet, 2000).
   """
 
   alias Replay.Failure
@@ -45,6 +46,7 @@ defmodule Replay do
         handles: [],
         close_after: [],
         sync_after: [],
+        before: %{},
         timeout: 2000
       ])
 
@@ -63,6 +65,7 @@ defmodule Replay do
       handles: handles,
       close_after: opts[:close_after],
       sync_after: opts[:sync_after],
+      before: opts[:before],
       timeout: opts[:timeout]
     }
 
@@ -95,6 +98,7 @@ defmodule Replay do
 
   defp walk([packet | rest], state, ctx) do
     state = open(packet, state, ctx)
+    Map.get(ctx.before, packet.index, fn -> :ok end).()
     state = %{state | last: Map.put(state.last, packet.conn, packet.index)}
 
     case step(packet, state, ctx) do

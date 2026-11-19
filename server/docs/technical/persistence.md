@@ -65,6 +65,10 @@ The name key models SQL Server's default comparison, case-insensitive and blind 
 | `kq_date` | utc_datetime | |
 | `tutorial_state` | integer | 0 to 3 |
 | `tutorial_step` | integer, default 0 | 0 to 255 |
+| `exp` | bigint, default 0 | at least 0 |
+| `login_x`, `login_y` | bigint, default 0 | 0 to 4294967295; the position the character logs in at |
+| `hp`, `sp`, `money` | bigint, default 0 | at least 0 |
+| `hp_stones`, `sp_stones` | integer, default 0 | at least 0 |
 
 Unique indexes: `(world_id, account_id, slot)` and `(world_id, name_key)`.
 
@@ -79,8 +83,17 @@ Checks work on both adapters through one list per table in the migration: SQLite
 | `slot` | integer | 0 to 255; the `ItemEquipEnum` number for storage 8 |
 | `item_id` | integer | 0 to 65535 |
 | `upgrade` | integer, default 0 | 0 to 255 |
+| `lot` | integer, default 1 | at least 1 |
 
-Unique index `(character_id, storage, slot)`. No inventory operation exists yet.
+Unique index `(character_id, storage, slot)`. Storage 9 is the inventory; only character creation writes it so far.
+
+## The character_skills and character_shortcuts tables
+
+`character_skills`: `character_id` (references `characters`, delete cascade) and `skill_id` (0 to 65535), unique `(character_id, skill_id)`. `character_shortcuts`: `character_id`, `slot`, `code` (integer) and `value` (bigint), all at least 0, unique `(character_id, slot)`. Both are filled from the defaults at creation.
+
+## Create
+
+`create_character/1` is one transaction of guarded statements: a check that the slot is free (`{:error, :slot_in_use}`), the insert of the character (a unique-index violation on the name is `{:error, :name_taken}`, on the slot `{:error, :slot_in_use}`, so the slot is reported before the name), then one `insert_all` for the items, the skills and the shortcuts, each matched against its row count. Any other failure is `{:error, :database}` with a logged line. A refusal leaves the transaction, so on PostgreSQL the next statement of the connection works (D02-B2 fixed). The name key is `Persistence.Character.name_key/1`; the same name is allowed in another world. `kq_date` is the creation time.
 
 ### Not carried over from the original (D02 section 3.1 to 3.2)
 
@@ -88,6 +101,8 @@ Unique index `(character_id, storage, slot)`. No inventory operation exists yet.
 - [ ] `nKQHandle`: no Kingdom Quest instance exists; the wire value is constant.
 - [ ] `nKQD`, `tCharacterChangeID`: no rename rights.
 - [ ] The account-wide tutorial skip of `usp_Tutorial_getIsSkip`.
+- [ ] Quests of the defaults (the 2016 data has none; the table comes with the quest milestone), item keys and item attributes (milestone 3), `tCharacterOptions` and the key map.
+- [ ] `nAdminLevel`, `nCreateWorld`.
 
 ## Passwords
 
