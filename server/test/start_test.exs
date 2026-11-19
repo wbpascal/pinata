@@ -45,6 +45,7 @@ defmodule Pinata.StartTest do
     use_file(tmp_dir, "")
     assert :ok = Application.start(:pinata)
     assert running() == @supervisors
+    assert Process.whereis(Cluster.DataDigest) == nil
 
     for port <- [9010, 9110, 9210] do
       {socket, cipher} = connect(port)
@@ -91,6 +92,7 @@ defmodule Pinata.StartTest do
     System.put_env("PINATA_PARTS", "login")
     assert :ok = Application.start(:pinata)
     assert running() == [Persistence.Supervisor, Cluster.Root, Login.Supervisor]
+    assert is_pid(Process.whereis(Cluster.DataDigest))
     connect(9010)
     assert {:error, :econnrefused} = :gen_tcp.connect(~c"127.0.0.1", 9110, [:binary, active: false])
   end

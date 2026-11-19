@@ -55,6 +55,7 @@ jobs:
     env:
       MIX_ENV: test
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/pinata_test
+      PINATA_TEST_TOPOLOGY: multi
     services:
       postgres:
         image: postgres:18
@@ -72,3 +73,45 @@ jobs:
       - run: mix deps.get
       - run: mix pinata.migrate
       - run: mix test --warnings-as-errors
+
+  compose-smoke:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: server
+    env:
+      MIX_ENV: test
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Data set (Git LFS, 9Data only)
+        working-directory: .
+        run: git lfs ls-files -l -I "Files/Server/2016/9Data/**" | cut -d' ' -f1 | sort > .lfs-9data-ids
+
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-9data-${{ hashFiles('.lfs-9data-ids') }}
+
+      - working-directory: .
+        run: git lfs pull -I "Files/Server/2016/9Data/**"
+
+      - uses: jdx/mise-action@v5
+
+      - run: mix deps.get
+
+      - run: mix pinata.import_data ../Files/Server/2016/9Data data
+
+      - run: docker compose up -d --build
+
+      - run: printf 'smoke-password\n' | docker compose exec -T login /app/bin/pinata eval 'Persistence.Release.create_account("smoke")'
+
+      - run: mix run --no-start test/support/compose_smoke.exs
+
+      - name: Container logs
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop
+        if: always()
+        run: docker compose down -v

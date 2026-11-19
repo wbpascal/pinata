@@ -1,0 +1,70 @@
+# Multi-node example: PostgreSQL and one container per part. See docs/user/multi-node.md.
+x-node: &node
+  image: pinata:local
+  build: .
+  volumes:
+    - ./compose.toml:/etc/pinata/pinata.toml:ro
+    - ./data:/data:ro
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+
+x-env: &env
+  DATABASE_URL: postgres://pinata:pinata@postgres/pinata
+  PINATA_CONFIG: /etc/pinata/pinata.toml
+  RELEASE_DISTRIBUTION: sname
+  RELEASE_COOKIE: change-this-cookie
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: pinata
+      POSTGRES_PASSWORD: pinata
+      POSTGRES_DB: pinata
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pinata"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    <<: *node
+    environment: *env
+    command: ["eval", "Persistence.Release.migrate()"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  login:
+    <<: *node
+    hostname: login
+    environment:
+      <<: *env
+      PINATA_PARTS: login
+      RELEASE_NODE: pinata@login
+    ports: ["9010:9010"]
+
+  wm:
+    <<: *node
+    hostname: wm
+    environment:
+      <<: *env
+      PINATA_PARTS: world_manager
+      RELEASE_NODE: pinata@wm
+    ports: ["9110:9110"]
+
+  zone:
+    <<: *node
+    hostname: zone
+    environment:
+      <<: *env
+      PINATA_PARTS: zone
+      RELEASE_NODE: pinata@zone
+    ports: ["9210:9210"]
+
+volumes:
+  postgres:

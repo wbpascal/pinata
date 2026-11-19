@@ -28,6 +28,37 @@ defmodule GameData do
   require Logger
 
   @doc """
+  SHA-256 (lower-case hex) of every file of the data directory: relative path, size and content, in path order.
+  The default SQLite files `pinata.db*` at the top level are left out.
+  """
+  @spec digest(Path.t()) :: String.t()
+  def digest(data_dir) do
+    ctx =
+      data_dir
+      |> files("")
+      |> Enum.reject(&String.starts_with?(&1, "pinata.db"))
+      |> Enum.sort()
+      |> Enum.reduce(:crypto.hash_init(:sha256), fn rel, ctx ->
+        path = Path.join(data_dir, rel)
+        ctx = :crypto.hash_update(ctx, [rel, 0, <<File.stat!(path).size::64>>])
+        path |> File.stream!(1_048_576) |> Enum.reduce(ctx, &:crypto.hash_update(&2, &1))
+      end)
+
+    ctx |> :crypto.hash_final() |> Base.encode16(case: :lower)
+  end
+
+  # Relative paths of the regular files below dir/rel; the top-level filter of digest/1 matches the first segment.
+  defp files(dir, rel) do
+    dir
+    |> Path.join(rel)
+    |> File.ls!()
+    |> Enum.flat_map(fn name ->
+      child = Path.join(rel, name)
+      if File.dir?(Path.join(dir, child)), do: files(dir, child), else: [child]
+    end)
+  end
+
+  @doc """
   Loads the tables of `schemas` (and the tables they refer to) from `data_dir`. All problems come back together.
 
   With `strict_references: false` a dangling reference is a logged warning, not an error.

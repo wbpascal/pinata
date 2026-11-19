@@ -16,20 +16,9 @@ defmodule Mix.Tasks.Pinata.ImportData do
   def run([source, target]) do
     Mix.Task.run("app.config")
 
-    case GameData.Import.run(source, target) do
-      {:ok, report} ->
-        Enum.each(report.warnings, &Mix.shell().info("warning: #{&1}"))
-
-        Mix.shell().info(
-          "Imported #{source} into #{target}: #{report.tables} tables written as CSV, #{report.copied} files copied, " <>
-            "#{length(report.skipped)} files left out."
-        )
-
-        Mix.shell().info("Next: set data_dir = #{inspect(target)} in pinata.toml.")
-
-      {:error, problems} ->
-        Mix.raise(Enum.join(problems, "\n"))
-    end
+    GameData.Release.import_data(source, target)
+  rescue
+    error in RuntimeError -> Mix.raise(error.message)
   end
 
   def run(_args), do: Mix.raise("usage: mix pinata.import_data <9Data folder> <new data directory>")

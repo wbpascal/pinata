@@ -37,12 +37,16 @@ The diagram leaves out three sets of arrows that the table has: the parts also u
 
 ## Start-up
 
-`Pinata.Application.start/2` calls `Settings.load(System.get_env())`. On problems it prints them all to standard error and returns `{:error, :invalid_settings}`. Then it calls `GameData.load/3` with the tables of the parts in `PINATA_PARTS` (`game_data/0` of each part); on problems it prints them all and returns `{:error, :invalid_game_data}`. Otherwise `Pinata.Supervisor` (`:one_for_one`) starts `Persistence.Supervisor`, `Cluster.Root`, then one supervisor per part in `PINATA_PARTS`, each with the settings as its argument. `Persistence.Supervisor` starts the repo chosen by `database.url` and the migration step. Two start failures come from it: an unusable `database.url` (`{:error, :invalid_database_url}`) and, on PostgreSQL, pending migrations (`{:error, :pending_migrations}`); both print their message to standard error. Each part supervisor starts its client listener; the WorldManager supervisor first starts one `WorldManager.World` process per world.
+`Pinata.Application.start/2` calls `Settings.load(System.get_env())`. On problems it prints them all to standard error and returns `{:error, :invalid_settings}`. Then it calls `GameData.load/3` with the tables of the parts in `PINATA_PARTS` (`game_data/0` of each part); on problems it prints them all and returns `{:error, :invalid_game_data}`. Otherwise, in multi-node mode only (not all parts on the node, or `cluster.nodes` not empty; `Settings.single_node?/1`), it computes `GameData.digest/1` of the data directory, logs it and adds `Cluster.DataDigest` (see [`cluster.md`](cluster.md)); single-node mode hashes nothing. Then `Pinata.Supervisor` (`:one_for_one`) starts `Persistence.Supervisor`, `Cluster.Root`, `Cluster.DataDigest` (multi-node only), then one supervisor per part in `PINATA_PARTS`, each with the settings as its argument. `Persistence.Supervisor` starts the repo chosen by `database.url` and the migration step. Two start failures come from it: an unusable `database.url` (`{:error, :invalid_database_url}`) and, on PostgreSQL, pending migrations (`{:error, :pending_migrations}`); both print their message to standard error. Each part supervisor starts its client listener; the WorldManager supervisor first starts one `WorldManager.World` process per world.
 
 ```mermaid
 flowchart TD
     S[Pinata.Supervisor] --> P[Persistence.Supervisor] & C[Cluster.Root] & L[Login.Supervisor] & W[WorldManager.Supervisor] & Z[Zone.Supervisor]
 ```
+
+## Release, image and compose
+
+`mix.exs` defines one release, `pinata` (`releases: [pinata: [include_executables_for: [:unix]]]`); `MIX_ENV=prod mix release` builds `_build/prod/rel/pinata`. A release has no `mix`, so the operator commands are plain functions called with `bin/pinata eval`: `Persistence.Release` (migrations, accounts) and `GameData.Release.import_data/2`. `server/Dockerfile` builds the release in a `hexpm/elixir` stage and copies it into a plain Debian stage; its image tags must follow `mise.toml` (Erlang and Elixir versions). `server/compose.yaml` and `server/compose.toml` are the multi-node example (PostgreSQL, one `migrate` run, one container per part); [`multi-node.md`](../user/multi-node.md) embeds both verbatim and `test/compose_doc_test.exs` checks that. The CI job `compose-smoke` imports the data directory, starts the compose file, creates the account `smoke` and runs `test/support/compose_smoke.exs` (see [`testing.md`](testing.md)).
 
 ## Processes
 
@@ -50,7 +54,7 @@ flowchart TD
 
 ## Settings
 
-`Settings` loads the TOML file and the environment, `Settings.Schema` holds the NimbleOptions schema, `Settings.Doc` renders [`docs/user/settings.md`](../user/settings.md) from it. NimbleOptions stops at the first error, so `Settings.Schema.validate/1` walks the schema and sends each leaf through `NimbleOptions.validate/2` alone; that way every problem is reported together. There is no release config provider because a provider runs only in a release and there is none yet; `Toml.decode/1` in `start/2` behaves the same everywhere.
+`Settings` loads the TOML file and the environment, `Settings.Schema` holds the NimbleOptions schema, `Settings.Doc` renders [`docs/user/settings.md`](../user/settings.md) from it. NimbleOptions stops at the first error, so `Settings.Schema.validate/1` walks the schema and sends each leaf through `NimbleOptions.validate/2` alone; that way every problem is reported together. There is no release config provider (the release reads `PINATA_CONFIG` and the other variables at start-up through `Settings.load/1`, like `mix`); `Toml.decode/1` in `start/2` behaves the same everywhere.
 
 A new key goes into `Settings.Schema` and the type `Settings.t()`. Then regenerate the page: `mix run --no-start -e 'File.write!("docs/user/settings.md", Settings.Doc.render())'`. `server/test/settings_doc_test.exs` fails when it is stale.
 

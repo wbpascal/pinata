@@ -63,6 +63,10 @@ defmodule GameData.ImportTest do
     assert {:error, _problems} = GameData.Import.run(tmp_dir, Path.join(tmp_dir, "out"))
   end
 
+  test "GameData.Release.import_data/2 raises with the problems", %{tmp_dir: tmp_dir} do
+    assert_raise RuntimeError, ~r/Shine/, fn -> GameData.Release.import_data(tmp_dir, Path.join(tmp_dir, "out")) end
+  end
+
   test "symlinks and unreadable files in the source", %{tmp_dir: tmp_dir} do
     shine = Path.join([tmp_dir, "src", "Shine"])
     File.mkdir_p!(Path.join(shine, "World"))

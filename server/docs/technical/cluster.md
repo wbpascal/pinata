@@ -21,3 +21,27 @@ The `:pg` scope `Cluster.Registry` is started by `Cluster.Root`. libcluster runs
 ## Facades
 
 A part reaches another part only through a facade module of `Cluster` (never a direct call). `Cluster.WorldManager.expect_login/2` is a `GenServer.call` of `{:expect_login, request}` to the `WorldManager.World` of the world; the process answers `:ok` and stores the reservation. It exits when the world is not registered. Flow: [`flows/world-select.md`](flows/world-select.md). `Cluster.Login.create_token/2` is a `GenServer.call` of `{:create_token, user_no, user_name}` to `Login.Tokens`; it returns `{:ok, token}` or `{:error, :pending}` and exits when Login is not registered. Flow: [`flows/return-to-world-list.md`](flows/return-to-world-list.md).
+
+## Data directory digest
+
+`Cluster.DataDigest` (registered under its module name) runs on every node in multi-node mode and is not started in single-node mode (ADR 0006; `Pinata.Application` computes `GameData.digest/1` and passes it with `authority?: true` when the node runs the WorldManager part). It monitors node connections (`:net_kernel.monitor_nodes/1`) and sends the cast `{:digest, node, digest, authority?}` to the process of the same name on every node that is connected when it starts and on every `nodeup`. The receiver decides:
+
+| Receiver | Sender | Equal digests | Different digests |
+|---|---|---|---|
+| any | any | nothing | |
+| no WorldManager part | WorldManager node | | prints both digests to standard error ("Data directory digest mismatch, the node stops:") and calls `System.stop(1)` |
+| WorldManager part | no WorldManager part | | logs an error naming the node and both digests, answers with its own digest, so the other node stops even when it missed the first announcement |
+| same kind of node | | | nothing: two WorldManager nodes, or two Login or Zone nodes, do not check each other |
+
+```mermaid
+sequenceDiagram
+    participant Z as Zone node (other data)
+    participant W as WorldManager node
+    Z->>W: connect
+    Z-)W: {:digest, zone, digest_z, false}
+    W-)Z: {:digest, wm, digest_w, true}
+    Note over W: logs an error, answers
+    Note over Z: prints both digests, System.stop(1)
+```
+
+Limits: the check is asynchronous, so a node runs unchecked until it sees a WorldManager node; the refused node is not disconnected on the network level (it stops itself); a node that never connects to a WorldManager node is never checked. The check is not a security measure.

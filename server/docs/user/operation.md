@@ -1,6 +1,42 @@
 # Operation
 
-Start, stop and logs are written together with the release.
+## Start, stop, logs
+
+From a release (`MIX_ENV=prod mix release`, see [`install.md`](install.md)), in the release directory or with the path to `bin/pinata`:
+
+| Action | Command |
+|---|---|
+| start in the foreground | `bin/pinata start` |
+| start in the background | `bin/pinata daemon` |
+| stop | `bin/pinata stop` |
+| OS process id | `bin/pinata pid` |
+| shell into the running node | `bin/pinata remote` |
+| run a command | `bin/pinata eval '<expression>'` |
+
+The settings file defaults to `./pinata.toml` and the data directory to `./data`, both relative to the working directory the command starts in, so start from the directory that holds them or set `PINATA_CONFIG` (path of the settings file) and `data_dir`. `PINATA_PARTS` chooses the parts of the node (see [`multi-node.md`](multi-node.md) and [`settings.md`](settings.md)). From a source checkout, `iex -S mix` in `server/` starts the same node.
+
+Logs go to standard output; under Docker Compose read them with `docker compose logs`. Start-up failures are printed to standard error. A node logs at start-up the number of game tables and rows it loaded and how long it took.
+
+## Start-up failures
+
+| Message | Meaning |
+|---|---|
+| `Invalid settings, the node does not start:` followed by one line per problem | the settings file or an environment variable is wrong; every problem is listed (see [`settings.md`](settings.md)) |
+| `Invalid game data, the node does not start:` followed by one line per problem | the data directory is missing or a table is damaged (see [`install.md`](install.md)) |
+| the database messages in the next section | `database.url` is unusable or migrations are pending |
+| `Data directory digest mismatch, the node stops:` | multi-node mode: this node's data directory differs from that of the WorldManager node; the node stops with exit status 1 (see [`multi-node.md`](multi-node.md)) |
+| `Application pinata exited: ... failed to start child: Login.Supervisor ... :eaddrinuse` (also `WorldManager.Supervisor`, `Zone.Supervisor`) | the listener port of that part is already in use, for example by a node that is still running; stop it or change `login.port`, `world_manager.port` or `zone.port` |
+
+## Memory
+
+Measured on 2026-11-19: the single-node release (all three parts, SQLite, 2016 `9Data` data directory, no client connected, idle for about one minute after `bin/pinata daemon`) on macOS 27.2.1, Apple M1 Pro (arm64), Erlang/OTP 29, Elixir 1.20.5:
+
+| Measure | Value | Command |
+|---|---|---|
+| resident set size of the OS process | 202384 kB (198 MB) | `ps -o rss= -p $(bin/pinata pid)` |
+| memory the Erlang VM reports | 144122129 bytes (137 MB) | `bin/pinata rpc 'IO.inspect(:erlang.memory(:total))'` |
+
+The game data is held in memory, so the size follows the data directory.
 
 ## Time zone
 

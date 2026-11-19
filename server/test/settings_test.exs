@@ -97,6 +97,13 @@ defmodule SettingsTest do
     assert p =~ "unknown part"
   end
 
+  test "single_node?/1" do
+    assert {:ok, settings} = Settings.load(%{})
+    assert Settings.single_node?(settings)
+    assert {:ok, settings} = Settings.load(%{"PINATA_PARTS" => "zone"})
+    refute Settings.single_node?(settings)
+  end
+
   test "the schema is valid NimbleOptions" do
     NimbleOptions.new!(Settings.Schema.schema())
   end

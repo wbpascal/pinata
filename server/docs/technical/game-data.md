@@ -55,6 +55,14 @@ A `#DEFINE` that is not in the map is an error.
 
 RFC 4180 with a header row: comma separator, `"` quoting with `""`, quoted cells may hold commas, quotes, CR and LF. A cell is quoted only when it needs it. Rows end with LF when written; LF and CRLF are read. Bytes are never interpreted.
 
+## Digest (`GameData.digest/1`)
+
+SHA-256, lower-case hex, over every regular file below the data directory in sorted relative-path order. Per file the hash gets the relative path, a zero byte, the size as 64 bits and the content, so renaming, adding, removing or changing a file changes the digest. Top-level entries whose name starts with `pinata.db` (the default SQLite database and its WAL files) are left out. Only multi-node mode computes it, once at start-up (`Cluster.DataDigest`, see [`cluster.md`](cluster.md)). The imported 2016 `9Data` (222 MB) took 0.4 s on an Apple M1 Pro.
+
+## Import without Mix (`GameData.Release.import_data/2`)
+
+`bin/pinata eval 'GameData.Release.import_data("<9Data folder>", "<new data directory>")'` does what the Mix task does (the task calls it): it runs `GameData.Import.run/2`, prints each warning, the summary line and the `Next:` line with `IO.puts`, and raises `RuntimeError` with the problems joined by newlines, so the exit status is non-zero.
+
 ## Schemas
 
 One module per table, `GameData.<Name>`, implementing `GameData.Schema`: a struct with `@enforce_keys` and a `__schema__/0` map with

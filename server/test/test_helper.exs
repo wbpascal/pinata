@@ -47,4 +47,6 @@ end)
   |> Path.wildcard()
   |> Kernel.ParallelCompiler.require(return_diagnostics: true)
 
+Replay.Topology.start()
+
 ExUnit.start()

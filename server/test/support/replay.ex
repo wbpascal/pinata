@@ -23,6 +23,8 @@ defmodule Replay do
   the connection of that packet right after it, as the client did; the transcript holds no TCP close), `sync_after:`
   (packet indices; a heartbeat round trip after each, so the server has handled the packet before the clock moves
   on), `timeout:` (ms to wait for a packet, 2000).
+
+  The test clock is set on every node of the topology (`Replay.Topology.all/3`).
   """
 
   alias Replay.Failure
@@ -48,7 +50,7 @@ defmodule Replay do
         timeout: 2000
       ])
 
-    masks = Masks.global() ++ opts[:masks]
+    masks = Masks.global() ++ port_masks(opts[:endpoints]) ++ opts[:masks]
     handles = Masks.handles() ++ opts[:handles]
     :ok = Masks.validate!(masks)
     :ok = Masks.validate!(handles)
@@ -67,18 +69,27 @@ defmodule Replay do
     }
 
     previous = Application.fetch_env(:pinata, :clock_source)
-    Application.put_env(:pinata, :clock_source, TestClock)
+    Replay.Topology.all(Application, :put_env, [:pinata, :clock_source, TestClock])
     state = %{clients: %{}, order: [], bound: %{}, last: %{}}
 
     try do
       with {:ok, state} <- walk(packets, state, ctx), do: drain_all(state, ctx)
     after
       case previous do
-        {:ok, source} -> Application.put_env(:pinata, :clock_source, source)
-        :error -> Application.delete_env(:pinata, :clock_source)
+        {:ok, source} -> Replay.Topology.all(Application, :put_env, [:pinata, :clock_source, source])
+        :error -> Replay.Topology.all(Application, :delete_env, [:pinata, :clock_source])
       end
     end
   end
+
+  # The captures hold the default WorldManager port; a topology on other ports (multi) cannot reproduce it.
+  defp port_masks(%{"wm" => {_host, 9110}}), do: []
+
+  defp port_masks(_endpoints),
+    do: [
+      {Proto.Packets.UserWorldselectAck, :port,
+       "the WorldManager of this topology listens on another port than the capture's"}
+    ]
 
   @doc "Like `run/2`; fails the test with the failure message."
   @spec assert_replay(Transcript.t(), keyword()) :: :ok
@@ -151,7 +162,7 @@ defmodule Replay do
     if Map.has_key?(state.clients, conn) do
       state
     else
-      TestClock.set(packet.time)
+      Replay.Topology.all(TestClock, :set, [packet.time])
       [kind | _] = String.split(conn, "#")
       {host, port} = Map.fetch!(ctx.endpoints, kind)
       client = TestClient.connect(host, port)
@@ -189,7 +200,7 @@ defmodule Replay do
   end
 
   defp step(%{dir: :client} = packet, state, ctx) do
-    TestClock.set(packet.time)
+    Replay.Topology.all(TestClock, :set, [packet.time])
 
     with {:ok, payload} <- rewrite(packet, state.bound, ctx),
          {:ok, client} <-
