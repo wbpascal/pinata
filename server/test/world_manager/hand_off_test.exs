@@ -93,7 +93,13 @@ defmodule WorldManager.HandOffTest do
 
   defp alive(client) do
     {:ok, client} = TestClient.send_raw(client, <<0x04, 0x08>>)
-    recv!(client, <<0x05, 0x08>>)
+    # the character list 0x0C14 follows an accepted login
+    {:ok, body, client} = TestClient.recv_raw(client)
+
+    case body do
+      <<0x14, 0x0C, _::binary>> -> recv!(client, <<0x05, 0x08>>)
+      <<0x05, 0x08>> -> client
+    end
   end
 
   defp eventually(fun, tries \\ 100) do

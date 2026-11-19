@@ -13,24 +13,41 @@ defmodule Replay.Masks do
   @type handle :: {module(), path(), namespace :: atom(), reason :: String.t()}
 
   # The other entries of ADR 0008 (login tokens, addresses in 0x1003 / 0x180A, uninitialised memory with its bug id)
-  # are added by the issue that defines each packet; the 0x0C0C entries exist.
+  # are added by the issue that defines each packet; the 0x0C0C and 0x0C14 entries exist.
   @doc "Masks that apply to every replay."
   @spec global() :: [mask()]
   def global,
-    do: [
-      {Proto.Packets.MiscSeedAck, :seed, "session value: the seed is drawn at random per connection"},
-      {Proto.Packets.UserClientWrongversionCheckAck, :unused,
-       "uninitialised memory (L00-B1): the original never writes this byte, the rebuild sends 0"},
-      {Proto.Packets.UserWorldselectAck, :ip,
-       "server address: the capture has the LAN address of the original server, the rebuild sends public_host"},
-      {Proto.Packets.UserWorldselectAck, :validate,
-       "session value: the validation key is drawn at random per select; on a refusal the original sends uninitialised memory (P02-B23), the rebuild sends 0"}
-    ]
+    do:
+      [
+        {Proto.Packets.MiscSeedAck, :seed, "session value: the seed is drawn at random per connection"},
+        {Proto.Packets.UserClientWrongversionCheckAck, :unused,
+         "uninitialised memory (L00-B1): the original never writes this byte, the rebuild sends 0"},
+        {Proto.Packets.UserWorldselectAck, :ip,
+         "server address: the capture has the LAN address of the original server, the rebuild sends public_host"},
+        {Proto.Packets.UserWorldselectAck, :validate,
+         "session value: the validation key is drawn at random per select; on a refusal the original sends uninitialised memory (P02-B23), the rebuild sends 0"}
+      ] ++
+        delinfo_masks() ++
+        [
+          {Proto.Packets.UserLoginworldAck, [:avatars, :kq_date_unused],
+           "uninitialised memory (P02-B7): the two bits above the Kingdom Quest date keep old buffer bits, the rebuild sends 0; the mask covers the whole byte, so the seconds are not compared"}
+        ]
 
-  # Handles (identifiers, item keys) are added by the issue that defines each packet.
+  defp delinfo_masks do
+    for field <- [:month, :day, :hour, :min] do
+      {Proto.Packets.UserLoginworldAck, [:avatars, :delinfo, field],
+       "uninitialised memory (P02-B1): the original writes only the first delinfo byte of a character that is not deleted, the rebuild sends 0"}
+    end
+  end
+
+  # Handles (identifiers, item keys) are added by the issue that defines each packet; the 0x0C14 session handle exists.
   @doc "Handles that apply to every replay."
   @spec handles() :: [handle()]
-  def handles, do: []
+  def handles,
+    do: [
+      {Proto.Packets.UserLoginworldAck, :worldmanager, :wm_session,
+       "session handle: the original takes it from its session pool, the rebuild counts per world"}
+    ]
 
   @doc "Raises `ArgumentError` for an empty reason or a first path element that is not a field of the packet."
   @spec validate!([mask() | handle()]) :: :ok

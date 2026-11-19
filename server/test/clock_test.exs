@@ -9,11 +9,15 @@ defmodule ClockTest do
 
     @impl Clock.Source
     def monotonic_time(_unit), do: 7
+
+    @impl Clock.Source
+    def local_time(_seconds), do: {{2026, 1, 1}, {0, 0, 0}}
   end
 
   test "reads the system clock by default" do
     assert is_integer(Clock.system_time(:millisecond))
     assert is_integer(Clock.monotonic_time(:millisecond))
+    assert {{_, _, _}, {_, _, _}} = Clock.local_time(0)
   end
 
   test "reads the injected source" do
@@ -22,5 +26,6 @@ defmodule ClockTest do
 
     assert Clock.system_time(:millisecond) == 42
     assert Clock.monotonic_time(:millisecond) == 7
+    assert Clock.local_time(0) == {{2026, 1, 1}, {0, 0, 0}}
   end
 end

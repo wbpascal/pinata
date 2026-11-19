@@ -6,12 +6,13 @@ The `Persistence` boundary is the only code that names a repo, a schema or a que
 
 | Module | What |
 |---|---|
-| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`), each one `repo.transact` |
+| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`), each one `repo.transact` |
 | `Persistence.Supervisor` | starts the repo and the migration step |
 | `Persistence.Repo` | private: maps `database.url` to a repo module and its config; `active/0` |
 | `Persistence.Repo.Postgres`, `Persistence.Repo.SQLite` | the two Ecto repos |
 | `Persistence.Migrations` | private: start-up migration step |
 | `Persistence.Account` | private: schema and name rules |
+| `Persistence.Character`, `Persistence.Item` | private: schemas of `characters` and `items` |
 | `Persistence.Password` | private: PBKDF2 hashing |
 | `Persistence.Release` | operator commands without Mix; the `mix pinata.*` tasks only call it |
 
@@ -44,6 +45,49 @@ flowchart TD
 | `login_able` | boolean | the account may enter; default true |
 
 The name key models SQL Server's default comparison, case-insensitive and blind to trailing spaces of the original (*inferred*). A valid name has 1 to 255 bytes in `0x21..0x7E`; `check_login` never fails on odd bytes, such a name is `:unknown`.
+
+## The characters table
+
+| Column | Type | Check |
+|---|---|---|
+| `id` | integer, primary key | 1 to 4294967295 |
+| `world_id` | integer | 0 to 255 |
+| `account_id` | references `accounts`, delete cascade | |
+| `slot` | integer | 0 to 5 |
+| `name` | binary | 1 to 20 bytes (the original accepts any non-space bytes) |
+| `name_key` | binary | `name` with ASCII letters lower-cased |
+| `level` | integer, default 1 | 1 to 255 |
+| `login_map` | string | 1 to 12 characters |
+| `race`, `class`, `gender` | integer | 0 to 3, 0 to 31, 0 to 1 |
+| `hair`, `hair_color`, `face` | integer | 0 to 255 |
+| `kq_map` | string, default `""` | at most 12 characters |
+| `kq_x`, `kq_y` | bigint, default 0 | 0 to 4294967295 |
+| `kq_date` | utc_datetime | |
+| `tutorial_state` | integer | 0 to 3 |
+| `tutorial_step` | integer, default 0 | 0 to 255 |
+
+Unique indexes: `(world_id, account_id, slot)` and `(world_id, name_key)`.
+
+Checks work on both adapters through one list per table in the migration: SQLite takes a check only as the `check:` option of a column, PostgreSQL ignores that option and gets a `create constraint` per check when the adapter is PostgreSQL (SQLite cannot add constraints later).
+
+## The items table
+
+| Column | Type | Check |
+|---|---|---|
+| `character_id` | references `characters`, delete cascade | |
+| `storage` | integer | 0 to 255; 8 is the equipment |
+| `slot` | integer | 0 to 255; the `ItemEquipEnum` number for storage 8 |
+| `item_id` | integer | 0 to 65535 |
+| `upgrade` | integer, default 0 | 0 to 255 |
+
+Unique index `(character_id, storage, slot)`. No inventory operation exists yet.
+
+### Not carried over from the original (D02 section 3.1 to 3.2)
+
+- [ ] `bDeleted` / `dDeletedDate`: issue 46 deletes rows for good, so a listed character is never deleted.
+- [ ] `nKQHandle`: no Kingdom Quest instance exists; the wire value is constant.
+- [ ] `nKQD`, `tCharacterChangeID`: no rename rights.
+- [ ] The account-wide tutorial skip of `usp_Tutorial_getIsSkip`.
 
 ## Passwords
 

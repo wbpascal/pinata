@@ -118,11 +118,11 @@ Paths resolve to byte ranges through `mod.__packet__().layout`, a list of `{name
 
 ## Handle map
 
-A handle is `{packet_module, path, namespace, reason}`: a value the server picks anew in each run (identifiers, item keys). In a server packet, the first time a captured value is seen it is bound to the received value; later the received value must equal the bound one, and one received value cannot belong to two captured values. A violation is a `:handle` failure. In a client packet the captured value is replaced by the bound one; a captured value that was never bound is a `:handle` failure. Both lists are empty until packets with handles exist; `Replay.Masks.handles/0` is the global list.
+A handle is `{packet_module, path, namespace, reason}`: a value the server picks anew in each run (identifiers, item keys). In a server packet, the first time a captured value is seen it is bound to the received value; later the received value must equal the bound one, and one received value cannot belong to two captured values. A violation is a `:handle` failure. In a client packet the captured value is replaced by the bound one; a captured value that was never bound is a `:handle` failure. `Replay.Masks.handles/0` is the global list; it holds the `worldmanager` session handle of `0x0C14` (namespace `:wm_session`). The global masks also cover `delinfo` (P02-B1) and `kq_date_unused` (P02-B7) of the AVATAR. `TestClock.local_time/1` is UTC+1, the zone of all captures.
 
 ## Setup functions
 
-`Replay.Setups` has one function per capture. It builds the state the capture starts from, with public `Persistence` operations where one exists, a test-only factory otherwise, never a database dump. Each one empties the accounts table and creates the account `admin` (the client sends the MD5 text of the password, as in every transcript). Later issues add characters.
+`Replay.Setups` has one function per capture. It builds the state the capture starts from, with public `Persistence` operations where one exists, a test-only factory otherwise, never a database dump. Each one empties the accounts table and creates the account `admin` (the client sends the MD5 text of the password, as in every transcript). `login_logout/0` and `create_char/0` also create the character "Test1235" of their capture (through `Factory`, the test-only inserts of characters and equipped items in `test/support/factory.ex`); later issues add more.
 
 ## Topology
 

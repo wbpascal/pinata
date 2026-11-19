@@ -3,4 +3,5 @@ defmodule Clock.Source do
 
   @callback system_time(System.time_unit()) :: integer()
   @callback monotonic_time(System.time_unit()) :: integer()
+  @callback local_time(unix_seconds :: integer()) :: :calendar.datetime()
 end

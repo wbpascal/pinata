@@ -2,6 +2,10 @@
 
 Start, stop and logs are written together with the release.
 
+## Time zone
+
+The in-game clock and the stored dates shown to the client (for example the Kingdom Quest date in the character list) use the time zone of the node's operating system. Set the `TZ` environment variable to change it.
+
 ## Database and migrations
 
 `database.url` (or the environment variable `DATABASE_URL`) has two forms:

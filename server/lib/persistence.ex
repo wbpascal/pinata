@@ -8,8 +8,77 @@ defmodule Persistence do
   require Logger
 
   alias Persistence.Account
+  alias Persistence.Character
+  alias Persistence.Item
   alias Persistence.Password
   alias Persistence.Repo
+
+  @equipped 8
+
+  @type equipped :: %{slot: non_neg_integer(), item_id: non_neg_integer(), upgrade: non_neg_integer()}
+  @type character :: %{
+          id: pos_integer(),
+          slot: 0..5,
+          name: binary(),
+          level: pos_integer(),
+          login_map: String.t(),
+          race: non_neg_integer(),
+          class: non_neg_integer(),
+          gender: 0..1,
+          hair: non_neg_integer(),
+          hair_color: non_neg_integer(),
+          face: non_neg_integer(),
+          kq_map: String.t(),
+          kq_x: non_neg_integer(),
+          kq_y: non_neg_integer(),
+          kq_date: DateTime.t(),
+          tutorial_state: 0..3,
+          tutorial_step: non_neg_integer(),
+          equipment: [equipped()]
+        }
+
+  @character_keys [
+    :id,
+    :slot,
+    :name,
+    :level,
+    :login_map,
+    :race,
+    :class,
+    :gender,
+    :hair,
+    :hair_color,
+    :face,
+    :kq_map,
+    :kq_x,
+    :kq_y,
+    :kq_date,
+    :tutorial_state,
+    :tutorial_step
+  ]
+
+  @doc "The characters of an account in a world, ordered by slot, each with its equipped items."
+  @spec list_characters(non_neg_integer(), pos_integer()) :: {:ok, [character()]} | {:error, :database}
+  def list_characters(world_id, user_no) do
+    repo = Repo.active()
+
+    transact(repo, "list_characters", fn ->
+      characters =
+        repo.all(from(c in Character, where: c.world_id == ^world_id and c.account_id == ^user_no, order_by: c.slot))
+
+      items =
+        from(i in Item,
+          join: c in Character,
+          on: i.character_id == c.id,
+          where: c.world_id == ^world_id and c.account_id == ^user_no and i.storage == @equipped,
+          order_by: [i.character_id, i.slot]
+        )
+        |> repo.all()
+        |> Enum.group_by(& &1.character_id, &Map.take(&1, [:slot, :item_id, :upgrade]))
+
+      {:ok, Enum.map(characters, &(&1 |> Map.take(@character_keys) |> Map.put(:equipment, Map.get(items, &1.id, []))))}
+    end)
+  end
 
   @spec create_account(binary(), binary()) :: {:ok, pos_integer()} | {:error, :invalid_name | :name_taken | :database}
   def create_account(name, password) do
