@@ -6,7 +6,11 @@ defmodule Proto.Packets.UserTest do
     UserConnectcutCmd,
     UserLoginAck,
     UserLoginfailAck,
+    UserLoginworldReq,
+    UserLoginworldfailAck,
     UserUsLoginReq,
+    UserWorldselectAck,
+    UserWorldselectReq,
     UserXtrapAck,
     UserXtrapReq,
     WorldInfo
@@ -53,5 +57,32 @@ defmodule Proto.Packets.UserTest do
     assert packet.user_name == "admin"
     assert packet.password == "21232f297a57a5a743894a0e4a801fc3"
     assert UserUsLoginReq.decode(binary_part(payload, 0, 315)) == {:error, :bad_size}
+  end
+
+  test "world select" do
+    assert %UserWorldselectReq{world_no: 0} = roundtrip(UserWorldselectReq, <<0>>)
+
+    ack =
+      Base.decode16!(
+        "063137322e31362e34322e32313400000096239a26206c2f311372604cf83e66196b0fa4098f01b7337526cd6d8247da3f5a487014dd1039052c086948e030a52ecb372b5d0312470e066c5432377bd95da97c",
+        case: :lower
+      )
+
+    assert %UserWorldselectAck{world_status: 6, ip: "172.16.42.214", port: 9110, validate: words} =
+             roundtrip(UserWorldselectAck, ack)
+
+    assert length(words) == 32
+  end
+
+  test "login at the world" do
+    req =
+      Base.decode16!(
+        "61646d696e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009a26206c2f311372604cf83e66196b0fa4098f01b7337526cd6d8247da3f5a487014dd1039052c086948e030a52ecb372b5d0312470e066c5432377bd95da97c",
+        case: :lower
+      )
+
+    assert %UserLoginworldReq{user_name: "admin", validate: words} = roundtrip(UserLoginworldReq, req)
+    assert length(words) == 32
+    assert %UserLoginworldfailAck{error: 0x44} = roundtrip(UserLoginworldfailAck, <<0x44, 0>>)
   end
 end

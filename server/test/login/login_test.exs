@@ -7,6 +7,8 @@ defmodule Login.LoginTest do
     UserClientVersionCheckReq,
     UserUsLoginReq,
     UserWorldStatusReq,
+    UserWorldselectAck,
+    UserWorldselectReq,
     UserXtrapReq
   }
 
@@ -229,5 +231,37 @@ defmodule Login.LoginTest do
     first = recv!(first, <<0x17, 0x0C, 0x83, 0x06>>)
     closed(first)
     second |> send!(%UserWorldStatusReq{}) |> recv!(<<0x1C, 0x0C>> <> @world_list)
+  end
+
+  test "selecting a world without a WorldManager answers status 0 and keeps the session" do
+    {name, password} = account()
+    client = listen() |> connect() |> login(name, password) |> recv!(<<0x0A, 0x0C>> <> @world_list)
+
+    expected =
+      <<0x0C, 0x0C, 0>> <> "127.0.0.1" <> :binary.copy(<<0>>, 7) <> <<0x96, 0x23>> <> :binary.copy(<<0>>, 64)
+
+    client = client |> send!(%UserWorldselectReq{world_no: 77}) |> recv!(expected)
+    client |> send!(%UserWorldStatusReq{}) |> recv!(<<0x1C, 0x0C>> <> @world_list)
+  end
+
+  test "a world select before the login answer is ignored" do
+    {name, password} = account()
+    client = listen() |> connect() |> version() |> recv!(<<0x67, 0x0C, 1, 0>>) |> login_req(name, password)
+    client = client |> send!(%UserWorldselectReq{world_no: 0}) |> xtrap() |> recv!(<<0x05, 0x0C, 1>>)
+    recv!(client, <<0x0A, 0x0C>> <> @world_list)
+  end
+
+  test "a successful world select ends the session at Login" do
+    {name, password} = account()
+    client = listen() |> connect() |> login(name, password) |> recv!(<<0x0A, 0x0C>> <> @world_list)
+    client = send!(client, %UserWorldselectReq{world_no: 0})
+
+    assert {:ok, %UserWorldselectAck{world_status: 6, ip: "127.0.0.1", port: 9110, validate: key}, client} =
+             TestClient.recv(client)
+
+    assert length(key) == 32 and Enum.any?(key, &(&1 != 0))
+    client = send!(client, %UserWorldStatusReq{})
+    {:ok, client} = TestClient.send_raw(client, <<0x04, 0x08>>)
+    recv!(client, <<0x05, 0x08>>)
   end
 end

@@ -21,7 +21,7 @@ The server is one Mix project, application `:pinata` ([ADR 0001](../../../docs/a
 | `Random` | library | the only caller of `:rand` | nothing |
 | `Pinata.Application` | application | starts the supervision tree | the parts, `Persistence`, `Cluster`, `Settings`, `GameData` |
 
-A part never uses another part. `Proto` and `Net` are built; each part starts a client listener. Login handles the login path (see [`flows/login.md`](flows/login.md)); WorldManager and Zone have stub packet handlers. `Persistence` has the accounts table; the other libraries are almost empty.
+A part never uses another part. `Proto` and `Net` are built; each part starts a client listener. Login handles the login path and the world select (see [`flows/login.md`](flows/login.md), [`flows/world-select.md`](flows/world-select.md)); WorldManager handles the hand-over login `0x0C0F`; Zone has a stub packet handler. `Persistence` has the accounts table; the other libraries are almost empty.
 
 ADR 0001 calls the protocol library `Protocol`. Elixir already has a core module of that name, so the module is `Proto`.
 
@@ -60,7 +60,7 @@ A new key goes into `Settings.Schema` and the type `Settings.t()`. Then regenera
 
 ## Cluster registry
 
-`Cluster.Registry` names the Login process `{:global, {:login}}` and each WorldManager `{:global, {:world_manager, world_id}}`, and keeps one `:pg` group `{:zones, world_id}` of Zone processes per world. The `:pg` scope `Cluster.Registry` is started by `Cluster.Root`. libcluster runs only when `cluster.nodes` is not empty, with `Cluster.Strategy.Epmd` and those hosts. `Cluster.Root` has that name because libcluster owns `Cluster.Supervisor`. `Cluster.Sessions.take_over/1` makes the calling process the session of an account in the `:pg` group `{:session, user_no}` and sends every older member `{:cluster, :session_replaced}`. The `:pg` group `{:players, world_id}` holds the WorldManager sessions of a world (`Cluster.Registry.join_players/2`, `player_count/1`). The login flow is in [`flows/login.md`](flows/login.md). Other facade modules come with the issues that need them. See [ADR 0002](../../../docs/adr/0002-fail-simple-cluster-model.md).
+`Cluster.Registry` names the processes and keeps the `:pg` groups; `Cluster.Sessions` and the facade `Cluster.WorldManager` carry what one part asks of another. The detail is in [`cluster.md`](cluster.md). See [ADR 0002](../../../docs/adr/0002-fail-simple-cluster-model.md).
 
 ## Persistence
 

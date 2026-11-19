@@ -1,6 +1,6 @@
 # Flow: login
 
-From the seed to the world list (`Login.Handler`, `Net.Connection`). Selecting a world (`0x0C0B`) is not built yet.
+From the seed to the world list (`Login.Handler`, `Net.Connection`). Selecting a world (`0x0C0B`) is in [`world-select.md`](world-select.md).
 
 ```mermaid
 sequenceDiagram

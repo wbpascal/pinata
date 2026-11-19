@@ -1,7 +1,7 @@
 defmodule Login.Handler do
   @moduledoc """
-  Packet handler of the Login part: version check, account login and the world list
-  (flow: `docs/technical/flows/login.md`).
+  Packet handler of the Login part: version check, account login, the world list and the world select
+  (flows: `docs/technical/flows/login.md`, `docs/technical/flows/world-select.md`).
 
   `handle_packet/2` and `handle_info/2` are pure. Database and `Cluster` work is a `{:perform, request}` effect
   that `perform/1` carries out; its result comes back through `handle_info/2`.
@@ -18,22 +18,35 @@ defmodule Login.Handler do
   alias Proto.Packets.UserUsLoginReq
   alias Proto.Packets.UserWorldStatusAck
   alias Proto.Packets.UserWorldStatusReq
+  alias Proto.Packets.UserWorldselectAck
+  alias Proto.Packets.UserWorldselectReq
   alias Proto.Packets.UserXtrapAck
   alias Proto.Packets.UserXtrapReq
   alias Proto.Packets.WorldInfo
 
   @type result :: {:ok, pos_integer()} | {:error, :unknown | :wrong_password | :blocked | :not_login_able | :database}
 
-  @enforce_keys [:version_key, :auto_create?, :worlds]
-  defstruct [:version_key, :auto_create?, :worlds, step: :version, pending: :none, user_no: :none]
+  @enforce_keys [:version_key, :auto_create?, :worlds, :wm_address]
+  defstruct [
+    :version_key,
+    :auto_create?,
+    :worlds,
+    :wm_address,
+    step: :version,
+    pending: :none,
+    user_no: :none,
+    user_name: :none
+  ]
 
   @type t :: %__MODULE__{
           version_key: String.t(),
           auto_create?: boolean(),
           worlds: [Settings.world()],
+          wm_address: {String.t(), pos_integer()},
           step: :version | :login | :open,
           pending: :none | result(),
-          user_no: :none | pos_integer()
+          user_no: :none | pos_integer(),
+          user_name: :none | String.t()
         }
 
   @impl Net.Handler
@@ -41,7 +54,8 @@ defmodule Login.Handler do
     do: %__MODULE__{
       version_key: settings.client_version_key,
       auto_create?: settings.login.auto_create_accounts,
-      worlds: settings.world
+      worlds: settings.world,
+      wm_address: {settings.public_host, settings.world_manager.port}
     }
 
   @impl Net.Handler
@@ -57,7 +71,9 @@ defmodule Login.Handler do
   def handle_packet(%__MODULE__{step: :version} = state, _packet), do: {state, [:close]}
 
   def handle_packet(%__MODULE__{step: :login} = state, %UserUsLoginReq{user_name: name, password: password}),
-    do: {%{state | step: :open}, [{:perform, {:check_login, name, %Login.Secret{value: password}, state.auto_create?}}]}
+    do:
+      {%{state | step: :open, user_name: name},
+       [{:perform, {:check_login, name, %Login.Secret{value: password}, state.auto_create?}}]}
 
   def handle_packet(%__MODULE__{step: :login} = state, _packet), do: {state, [:close]}
 
@@ -71,6 +87,10 @@ defmodule Login.Handler do
 
   def handle_packet(%__MODULE__{step: :open} = state, %UserWorldStatusReq{}),
     do: {state, [{:perform, {:world_list, UserWorldStatusAck, state.worlds}}]}
+
+  def handle_packet(%__MODULE__{step: :open, user_no: user_no} = state, %UserWorldselectReq{world_no: world_no})
+      when is_integer(user_no),
+      do: {state, [{:perform, {:select_world, world_no, user_no, state.user_name, state.wm_address}}]}
 
   def handle_packet(%__MODULE__{step: :open} = state, _packet), do: {state, []}
 
@@ -92,6 +112,9 @@ defmodule Login.Handler do
     do: {%{state | user_no: user_no}, [{:perform, {:world_list, UserLoginAck, state.worlds}}]}
 
   def handle_info(state, {:world_list, module, infos}), do: {state, [{:send, struct!(module, worlds: infos)}]}
+
+  def handle_info(state, {:world_selected, true, ack}), do: {%{state | user_no: :none}, [{:send, ack}]}
+  def handle_info(state, {:world_selected, false, ack}), do: {state, [{:send, ack}]}
 
   def handle_info(state, {:cluster, :session_replaced}),
     do: {state, [{:send, %UserConnectcutCmd{error: 0x683}}, :close]}
@@ -121,15 +144,29 @@ defmodule Login.Handler do
   def perform({:world_list, module, worlds}) do
     infos =
       for w <- worlds do
-        registered? = match?({:ok, _}, Cluster.Registry.whereis_world_manager(w.number))
-
-        %WorldInfo{
-          world_no: w.number,
-          name: w.name,
-          status: Login.WorldStatus.status(registered?, Cluster.Registry.player_count(w.number))
-        }
+        %WorldInfo{world_no: w.number, name: w.name, status: status(w.number)}
       end
 
     {:world_list, module, infos}
+  end
+
+  def perform({:select_world, world_no, user_no, user_name, {host, port}}) do
+    status = status(world_no)
+    validate = if status == 0, do: List.duplicate(0, 32), else: for(<<word::little-16 <- Random.bytes(64)>>, do: word)
+
+    # Status 5 gets a key without a reservation (L00-B3 fixed, the client bytes stay as captured).
+    handed_off? = status in 6..10
+
+    if handed_off? do
+      :ok = Cluster.WorldManager.expect_login(world_no, %{user_no: user_no, user_name: user_name, validate: validate})
+      :ok = Cluster.Sessions.leave(user_no)
+    end
+
+    {:world_selected, handed_off?, %UserWorldselectAck{world_status: status, ip: host, port: port, validate: validate}}
+  end
+
+  defp status(world_no) do
+    registered? = match?({:ok, _}, Cluster.Registry.whereis_world_manager(world_no))
+    Login.WorldStatus.status(registered?, Cluster.Registry.player_count(world_no))
   end
 end
