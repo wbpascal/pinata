@@ -188,6 +188,28 @@ defmodule Persistence do
     match?({^n, _}, repo.insert_all(schema, list))
   end
 
+  @doc """
+  Deletes the character in a slot of an account and world, with its items, skills and shortcuts (the foreign keys
+  cascade), in one transaction (D02-B4 fixed). `:guild_master` is for the guild milestone; nothing returns it yet.
+  """
+  @spec delete_character(non_neg_integer(), pos_integer(), non_neg_integer()) ::
+          :ok | {:error, :not_found | :guild_master | :database}
+  def delete_character(world_id, account_id, slot) do
+    repo = Repo.active()
+
+    result =
+      transact(repo, "delete_character", fn ->
+        query = from(c in Character, where: c.world_id == ^world_id and c.account_id == ^account_id and c.slot == ^slot)
+
+        case repo.delete_all(query) do
+          {1, _} -> {:ok, :deleted}
+          {0, _} -> {:error, :not_found}
+        end
+      end)
+
+    with {:ok, :deleted} <- result, do: :ok
+  end
+
   @spec create_account(binary(), binary()) :: {:ok, pos_integer()} | {:error, :invalid_name | :name_taken | :database}
   def create_account(name, password) do
     with true <- Account.valid_name?(name),

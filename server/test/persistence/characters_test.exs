@@ -167,4 +167,45 @@ defmodule Persistence.CharactersTest do
       assert {:ok, [%{name: ^name}]} = Persistence.list_characters(0, id)
     end
   end
+
+  describe "delete_character/3" do
+    alias Persistence.Item
+    alias Persistence.Shortcut
+    alias Persistence.Skill
+
+    test "deletes the character with everything it owns", %{id: id} do
+      {:ok, _} = Persistence.create_character(attrs(id))
+      {:ok, _} = Persistence.create_character(attrs(id, %{slot: 1, name: "Keep"}))
+      assert {count(Item), count(Skill), count(Shortcut)} == {4, 4, 2}
+
+      assert :ok = Persistence.delete_character(0, id, 0)
+      assert {:ok, [%{name: "Keep"}]} = Persistence.list_characters(0, id)
+      assert {count(Item), count(Skill), count(Shortcut)} == {2, 2, 1}
+      refute Persistence.Repo.active().in_transaction?()
+    end
+
+    test "an empty slot, a slot out of range, another account and another world are not found", %{id: id} do
+      {:ok, other} = Persistence.create_account("other", "pw")
+      {:ok, _} = Persistence.create_character(attrs(id))
+
+      for {world, account, slot} <- [{0, id, 1}, {0, id, 6}, {0, id, 255}, {0, other, 0}, {1, id, 0}] do
+        assert {:error, :not_found} = Persistence.delete_character(world, account, slot)
+      end
+
+      assert {:ok, [%{name: "New"}]} = Persistence.list_characters(0, id)
+    end
+
+    test "the slot and the name are free at once", %{id: id} do
+      {:ok, first} = Persistence.create_character(attrs(id))
+      assert :ok = Persistence.delete_character(0, id, 0)
+      assert {:ok, second} = Persistence.create_character(attrs(id))
+      assert second.id > first.id
+    end
+
+    test "a database failure is an error value", %{id: id} do
+      Persistence.Repo.active().query!("ALTER TABLE characters RENAME TO characters_off")
+      on_exit(fn -> Persistence.Repo.active().query!("ALTER TABLE characters_off RENAME TO characters") end)
+      assert {:error, :database} = Persistence.delete_character(0, id, 0)
+    end
+  end
 end

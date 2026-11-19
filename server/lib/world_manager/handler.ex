@@ -9,6 +9,8 @@ defmodule WorldManager.Handler do
 
   `0x1401` creates a character and answers `0x1406` or `0x1404` (flow: `docs/technical/flows/character-create.md`).
 
+  `0x1407` deletes the character of a slot and answers `0x140C` or `0x140A` (flow: `docs/technical/flows/character-delete.md`).
+
   `0x0C33` asks Login for a login token and answers `0x0C34` (flow: `docs/technical/flows/return-to-world-list.md`).
   `0x0C18` with type 0 closes the connection; other types are ignored for now. A closed socket ends the process and
   with it the session, once (W05-B25, W05-B9 and P02-B35 are link effects that do not exist here).
@@ -19,6 +21,9 @@ defmodule WorldManager.Handler do
   alias Proto.Packets.AvatarCreatefailAck
   alias Proto.Packets.AvatarCreatesuccAck
   alias Proto.Packets.AvatarCreateReq
+  alias Proto.Packets.AvatarEraseReq
+  alias Proto.Packets.AvatarErasefailAck
+  alias Proto.Packets.AvatarErasesuccAck
   alias Proto.Packets.MiscGametimeAck
   alias Proto.Packets.MiscGametimeReq
   alias Proto.Packets.UserAvatarListReq
@@ -64,6 +69,10 @@ defmodule WorldManager.Handler do
       when is_integer(user_no),
       do: {state, [{:perform, {:create_character, state.world_no, user_no, req}}]}
 
+  def handle_packet(%__MODULE__{step: :open, user_no: user_no} = state, %AvatarEraseReq{slot: slot})
+      when is_integer(user_no),
+      do: {state, [{:perform, {:delete_character, state.world_no, user_no, slot}}]}
+
   def handle_packet(%__MODULE__{step: :open} = state, %UserNormallogoutCmd{logout_type: 0}), do: {state, [:close]}
   def handle_packet(%__MODULE__{step: :open} = state, _packet), do: {state, []}
 
@@ -102,6 +111,11 @@ defmodule WorldManager.Handler do
   def handle_info(state, {:character_created, {:error, reason}}),
     do: {state, [{:send, %AvatarCreatefailAck{error: WorldManager.CharacterCreate.code(reason)}}]}
 
+  def handle_info(state, {:character_deleted, slot, :ok}), do: {state, [{:send, %AvatarErasesuccAck{slot: slot}}]}
+
+  def handle_info(state, {:character_deleted, _slot, {:error, reason}}),
+    do: {state, [{:send, %AvatarErasefailAck{error: erase_code(reason)}}]}
+
   def handle_info(state, {:game_time, {hour, minute, second}}),
     do: {state, [{:send, %MiscGametimeAck{hour: hour, minute: minute, second: second}}]}
 
@@ -138,8 +152,16 @@ defmodule WorldManager.Handler do
   def perform({:create_character, world_no, user_no, req}),
     do: {:character_created, WorldManager.CharacterCreate.run(world_no, user_no, req)}
 
+  def perform({:delete_character, world_no, user_no, slot}),
+    do: {:character_deleted, slot, Persistence.delete_character(world_no, user_no, slot)}
+
   def perform(:game_time) do
     {_date, time} = Clock.local_time(Clock.system_time(:second))
     {:game_time, time}
   end
+
+  # W01-B3 and D02-B3 kept: the client has one text for every code but 0xC7, so no neutral code exists.
+  defp erase_code(:guild_master), do: 0xC7
+  defp erase_code(:not_found), do: 0xC6
+  defp erase_code(:database), do: 0xC6
 end
