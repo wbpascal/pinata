@@ -62,6 +62,41 @@ defmodule Login.LoginTest do
     {name, password}
   end
 
+  @secret "5ebe2294ecd0e0f08eab7690d2a6ee69"
+
+  defp break_database do
+    repo = Persistence.Repo.active()
+    repo.query!("ALTER TABLE accounts RENAME TO accounts_off")
+    on_exit(fn -> repo.query!("ALTER TABLE accounts_off RENAME TO accounts") end)
+  end
+
+  for {title, auto?} <- [{"", false}, {" with auto-create", true}] do
+    test "a failing database#{title}: 0x45, socket closed, no password in the log" do
+      port = listen(&put_in(&1.login.auto_create_accounts, unquote(auto?)))
+      break_database()
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          client = port |> connect() |> login("ivy", @secret) |> recv!(<<0x09, 0x0C, 0x45, 0>>)
+          closed(client)
+        end)
+
+      assert log =~ "the database failed in check_login"
+      refute log =~ @secret
+      refute log =~ "GenServer"
+      refute log =~ "terminating"
+    end
+  end
+
+  test "the password is not printed with the effect" do
+    {:ok, settings} = Settings.load(%{})
+    state = %{Login.Handler.init(settings) | step: :login}
+    packet = %UserUsLoginReq{user_name: "ivy", password: @secret, spawnapps: <<0::160>>}
+    {_state, effects} = Login.Handler.handle_packet(state, packet)
+    refute inspect(effects) =~ @secret
+    assert [{:perform, {:check_login, "ivy", %Login.Secret{value: @secret}, _}}] = effects
+  end
+
   test "wrong version key" do
     client = listen() |> connect() |> version("20140101000000")
     client = recv!(client, <<0x66, 0x0C, 0>>)
