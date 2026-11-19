@@ -20,8 +20,6 @@ jobs:
       MIX_ENV: test
     steps:
       - uses: actions/checkout@v7
-        with:
-          lfs: 'true'
 
       - name: Data set for the tests (Git LFS, 9Data only)
         working-directory: .
@@ -67,7 +65,9 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          lfs: 'true'
       - uses: jdx/mise-action@v5
       - run: mix deps.get
       - run: mix pinata.migrate
