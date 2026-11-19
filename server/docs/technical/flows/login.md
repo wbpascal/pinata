@@ -53,6 +53,8 @@ A wrong `client_version_key` gets `0x0C66` (one byte, 0) and the socket is close
 | `:login` | `0x0C5A` to `:open`; `0x0C37` (token login, [`return-to-world-list.md`](return-to-world-list.md)) to `:open` | any other packet closes the socket without an answer |
 | `:open` | `0x0C04`, `0x0C1B` (once logged in) | every other known packet is ignored, `0x0C18` too |
 
+A packet of the wrong size, for example a `0x0C5A` that is not 0x13E bytes long, never reaches the handler: `Net.Connection` drops it and the step stays, as in the original. An opcode without a packet definition closes the socket ([`processes.md`](../processes.md)).
+
 ## World status
 
 The status byte of a world: 0 when its `WorldManager.World` process is not registered under `{:global, {:world_manager, n}}`; else from the player count (size of the `:pg` group `{:players, world_id}`) against 2500 (`Login.WorldStatus`).
@@ -76,5 +78,4 @@ The status byte of a world: 0 when its `WorldManager.World` process is not regis
 ## Differences from the original
 
 - `0x0C05` comes before the login answer. The check runs at `0x0C5A`, its result is held and answered right after the `0x0C05` of the next `0x0C04` (every capture has this order). A client that never sends `0x0C04` gets no answer.
-- A `0x0C5A` of the wrong length is not dropped: `Net.Connection` closes the socket on any undecodable frame.
 - `0x0C1B` is answered only once the account is logged in; the original answers it to anyone past the version check.

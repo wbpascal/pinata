@@ -115,4 +115,4 @@ Bytes are `:erts_debug.flat_size/1` times the word size; it leaves out binaries 
 
 ## Not built yet
 
-The MD5 of the 49 checksummed client data tables, the per-node data digest for multi-node mode, loading of the geometry, and tables for everything other than character creation (ADR 0006).
+The MD5 of the 49 checksummed client data tables, loading of the geometry, and tables for everything other than character creation (ADR 0006).

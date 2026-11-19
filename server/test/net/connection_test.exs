@@ -162,18 +162,36 @@ defmodule Net.ConnectionTest do
     assert {:ok, <<2, 5, 8>>} = :gen_tcp.recv(socket, 3, 1000)
   end
 
-  test "garbage closes the socket" do
+  test "an unknown opcode closes the socket" do
     {listener, port} = listen(QuietHandler)
-    {socket, _cipher} = connect(port)
-    :ok = :gen_tcp.send(socket, <<5, 1, 2, 3, 4, 5>>)
-    closed(socket)
-
-    {socket, _cipher} = connect(port)
-    :ok = :gen_tcp.send(socket, <<1, 0xFF>>)
+    {socket, cipher} = connect(port)
+    {unknown, _cipher} = frame(cipher, <<0xFF, 0xFF, 1, 2, 3>>)
+    :ok = :gen_tcp.send(socket, unknown)
     closed(socket)
 
     assert Process.alive?(listener)
     connect(port)
+  end
+
+  test "a packet of the wrong size is dropped and is no sign of life" do
+    {listener, port} = listen(QuietHandler)
+    {socket, cipher} = connect(port)
+
+    # a seed packet with one byte too few, then a body shorter than an opcode
+    {short, cipher} = frame(cipher, <<0x07, 0x08, 1>>)
+    {tiny, cipher} = frame(cipher, <<0x07>>)
+    :ok = :gen_tcp.send(socket, [short, tiny])
+    :sys.get_state(conn_pid(listener))
+    nothing(socket)
+
+    # the heartbeat timer was not reset by them
+    set_now(30_000)
+    check(listener)
+    assert {:ok, <<2, 4, 8>>} = :gen_tcp.recv(socket, 3, 1000)
+
+    {req, _cipher} = frame(cipher, <<0x04, 0x08>>)
+    :ok = :gen_tcp.send(socket, req)
+    assert {:ok, <<2, 5, 8>>} = :gen_tcp.recv(socket, 3, 1000)
   end
 
   test "oversized frame closes the socket" do

@@ -119,10 +119,14 @@ defmodule Login.LoginTest do
     closed(client)
   end
 
-  test "login of the wrong length: no answer, socket closed" do
+  test "login of the wrong length: dropped, the next login is handled" do
+    {name, password} = account()
     client = listen() |> connect() |> version() |> recv!(<<0x67, 0x0C, 1, 0>>)
     {:ok, client} = TestClient.send_raw(client, <<0x5A, 0x0C>> <> :binary.copy(<<0>>, 315))
-    closed(client)
+    assert {:error, :timeout} = TestClient.recv_raw(client, 100)
+
+    client = client |> login_req(name, password) |> xtrap() |> recv!(<<0x05, 0x0C, 1>>)
+    assert {:ok, <<0x0A, 0x0C, _::binary>>, _client} = TestClient.recv_raw(client)
   end
 
   test "wrong password" do

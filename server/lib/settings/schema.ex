@@ -64,7 +64,7 @@ defmodule Settings.Schema do
         url: [
           type: :string,
           doc:
-            "Database URL: `sqlite:<path>` or `postgres://user:password@host/database`. Default: the SQLite file `pinata.db` in `data_dir`. The environment variable `DATABASE_URL` overrides it."
+            "Database URL: `sqlite:<path>` or `postgres://user:password@host/database`. Default: the SQLite file `pinata.db` in `data_dir`. SQLite works only in single-node mode; in multi-node mode the node does not start without a `postgres://` URL. The environment variable `DATABASE_URL` overrides it."
         ]
       ]
     ],

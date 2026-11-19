@@ -108,3 +108,28 @@ defmodule SettingsTest do
     NimbleOptions.new!(Settings.Schema.schema())
   end
 end
+
+defmodule SettingsSqliteTest do
+  # Changes the application environment (test_helper.exs allows SQLite in multi-node mode), so it cannot run async.
+  use ExUnit.Case, async: false
+
+  @moduletag :tmp_dir
+
+  test "SQLite is refused in multi-node mode", %{tmp_dir: dir} do
+    Application.put_env(:pinata, :sqlite_in_multi_node, false)
+    on_exit(fn -> Application.put_env(:pinata, :sqlite_in_multi_node, true) end)
+
+    path = Path.join(dir, "pinata.toml")
+    File.write!(path, "[cluster]\nnodes = [\"a@b\"]\n")
+    postgres = %{"DATABASE_URL" => "postgres://u:p@h/d"}
+
+    for env <- [%{"PINATA_PARTS" => "login"}, %{"PINATA_CONFIG" => path}] do
+      assert {:error, [problem]} = Settings.load(env)
+      assert problem =~ "database.url: SQLite works only in single-node mode"
+      assert {:error, [_]} = Settings.load(Map.put(env, "DATABASE_URL", "sqlite:other.db"))
+      assert {:ok, _} = Settings.load(Map.merge(env, postgres))
+    end
+
+    assert {:ok, %{database: %{url: "sqlite:" <> _}}} = Settings.load(%{})
+  end
+end

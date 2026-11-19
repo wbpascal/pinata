@@ -77,6 +77,7 @@ defmodule TestPeers do
 
     :ok = :peer.call(pid, :code, :add_paths, [:code.get_path()])
     :ok = :peer.call(pid, Application, :put_env, [:pinata, :password_iterations, 1_000])
+    :ok = :peer.call(pid, Application, :put_env, [:pinata, :sqlite_in_multi_node, true])
     {:ok, _} = :peer.call(pid, Application, :ensure_all_started, [:logger])
     :ok = :peer.call(pid, Logger, :configure, [[level: :warning]])
 

@@ -95,7 +95,17 @@ client = TestClient.expect(client, %Proto.Packets.MiscHeartbeatAck{})
 
 **Clock.** The harness puts `TestClock` in as the clock source and sets it to the capture timestamp before each connection open and each client packet. The clock source is global, so replay tests are not async.
 
-**Stop point.** Packets with an index above `stop:` are not played. Each Replay test uses the highest index the server supports so far: the way back to the world list (issue #47), past the character list `0x0C14` (issue #44): `:end` for `login-logout` and 70 for `37_login-heartbeat-refusals-delete`; `create-char` plays to `:end`, creation and delete included (issues #45, #46); `37_login-heartbeat-refusals-delete` plays both creations (indices 31/32 and 39/40) and the delete between them (issue #46); the successful `0x0C0C` for the others (18 for `login-errors`, 9 for `37b_char-select-rename-refusals`). `milestone1_test.exs` can replay one connection of a capture (it keeps only the packets of that `conn`, the indices stay): `login#3` up to 90 with the world closed (its WorldManager process stopped) and `login#4` up to 108 with the world full (2375 players in the `:pg` group).
+**Stop point.** Packets with an index above `stop:` are not played. Each Replay test plays everything of its capture that milestone 1 covers:
+
+| Capture | Played | Not played yet |
+|---|---|---|
+| `login-logout` | `:end` | – |
+| `login-errors` | `:end`, with the second login that cuts the first (`0x0C17`) | – |
+| `create-char` | `:end`, creation and delete included | – |
+| `37_login-heartbeat-refusals-delete` | 1 to 70: both creations (indices 31/32 and 39/40), the delete between them and the way back to the world list. Then one connection per test: `login#3` (71 to 90) with the world closed, `login#4` (91 to 108) with the world full, `login#5` (109 to 115) with account B blocked, `login#6` (116 to 122) with account B not login-able | – |
+| `37b_char-select-rename-refusals` | 1 to 26: the character list, the refused create (`0x1404 {0x181}`) and five heartbeats | from 27 on: rename (`0x140F`), character login and the Zone connections, milestone 2 |
+
+`milestone1_test.exs` can replay one connection of a capture (it keeps only the packets of that `conn`, the indices stay). The world is closed by stopping its WorldManager process and full with 2375 players in the `:pg` group; the flags of account B are set through `before:`. The `37b` test adds three masks of its own: the rename-right fields of `0x0C14` (`need_change_id`, `change_id_init`, `change_id_row_no`), because the rename right of `Test2` belongs to milestone 2.
 
 **Timer-driven opcodes.** `0x0804` (heartbeat) and `0x080E` (game time) come from timers. `S` lines with these opcodes are not expected, and received packets with these opcodes are dropped. Client lines are always sent, so the `0x080E` answer to the client's `0x080D` is not compared by a replay; `test/world_manager/character_list_test.exs` checks its bytes.
 
@@ -133,7 +143,7 @@ A handle is `{packet_module, path, namespace, reason}`: a value the server picks
 
 `Replay.Topology.call(part, module, function, args)` (`part` is `:login`, `:wm` or `:zone`) runs a call in this VM for `single` and on the peer for `multi`; a test that reaches into the server (the "world closed" and "world full" tests of `milestone1_test.exs`) goes through it. `Replay.Topology.all/3` calls in this VM and on every peer; the harness sets the clock source and the `TestClock` time that way, because each node has its own clock. In `multi` the world-select port of the capture (9110) cannot match, so `Replay` masks `port` of `UserWorldselectAck` for any WorldManager endpoint other than 9110.
 
-The topology runs on any database (the peers use the `DATABASE_URL` of the test VM; SQLite is a file shared by all VMs). CI runs the whole suite once single-node on SQLite (job `check`) and once `multi` on PostgreSQL (job `test-postgres`). The variable is for tests only, so it is not in the user documentation.
+The topology runs on any database (the peers use the `DATABASE_URL` of the test VM; SQLite is a file shared by all VMs; `Settings` refuses SQLite in multi-node mode, so `test_helper.exs` and `TestPeers` set `config :pinata, :sqlite_in_multi_node, true`, which nothing else may set). CI runs the whole suite once single-node on SQLite (job `check`) and once `multi` on PostgreSQL (job `test-postgres`). The variable is for tests only, so it is not in the user documentation.
 
 ## Adding a replay test
 

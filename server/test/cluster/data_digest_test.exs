@@ -31,7 +31,8 @@ defmodule Cluster.DataDigestTest do
 
     # halts itself with status 3 after 30 s if it is never refused, so the test cannot hang
     script =
-      "case Application.ensure_all_started(:pinata) do {:ok, _} -> Process.sleep(30_000); System.halt(3); _ -> System.halt(4) end"
+      "Application.put_env(:pinata, :sqlite_in_multi_node, true); " <>
+        "case Application.ensure_all_started(:pinata) do {:ok, _} -> Process.sleep(30_000); System.halt(3); _ -> System.halt(4) end"
 
     args =
       ["--name", "pinata_bad_#{System.pid()}@127.0.0.1", "--cookie", "pinata_test"] ++

@@ -43,7 +43,7 @@ The connection stays open in both cases. The session of the WorldManager connect
 
 - Valid token: the connection becomes the session of the account (`Cluster.Sessions.take_over/1`; a WorldManager connection of the account that is still open gets `0x0C17 {0x683}` and closes) and the world list `0x0C0A` is sent at once, so it arrives before the `0x0C05` of the following `0x0C04`.
 - Unknown, used or expired token: `0x0C09 {0x52}`, then the socket is closed.
-- Wrong length: the socket is closed without an answer; the token stays valid.
+- Wrong length: the packet is dropped without an answer and the connection stays in its step, as in the original; the token stays valid.
 
 ## Quit and lost connection
 
@@ -58,7 +58,6 @@ The connection stays open in both cases. The session of the WorldManager connect
 ## Differences from the original
 
 - The original's `DelByIP` (delete every pending token of the sender's IP on an unknown token) is not copied.
-- A `0x0C37` of the wrong length closes the socket (the original ignores it).
 - The token is random hex, not the MD5 text.
 - `0x0C18 {0}` closes without a logged-in character; `0x0C18 {1}` does nothing yet.
 - Login not reachable: the WorldManager connection crashes (ADR 0002).
