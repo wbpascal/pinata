@@ -33,7 +33,7 @@ sequenceDiagram
 | 0x1E58 | token made | 32 lower-case hex characters |
 | 0x1E5B | the account has a pending token | 32 zero bytes |
 
-The connection stays open in both cases. The session of the WorldManager connection ends when the client drops the socket (as captured). A `0x0C33` before the `0x0C0F` login is ignored.
+The connection stays open in both cases. The session of the WorldManager connection ends when the client drops the socket (as captured). A `0x0C33` before the `0x0C0F` login closes the socket without an answer, like any other first packet.
 
 ## The token
 
@@ -51,7 +51,7 @@ The connection stays open in both cases. The session of the WorldManager connect
 
 ## Original-server bugs
 
-- L01-B9 (expired tokens were removed only for some calls): fixed, every call removes them.
+- L01-B9 (the sweep skipped the node after a deleted head, so an expired token could still be accepted): fixed, every call removes every expired token.
 - L00-B4 (no client text for 0x52): kept by decision.
 - W05-B9, W05-B25, P02-B35 are effects on server links and do not exist here; L00-B2 does not apply (as in `login.md`).
 

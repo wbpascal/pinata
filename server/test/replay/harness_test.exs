@@ -155,6 +155,11 @@ defmodule Replay.HarnessTest do
     assert run(Stub, lines, close_after: [3]) == :ok
   end
 
+  test "sync_after: the heartbeat round trip is consumed and not reported as extra" do
+    lines = @trigger <> "0100\n" <> @reply <> "0100efbeadde0700"
+    assert run(Stub, lines, sync_after: [1]) == :ok
+  end
+
   test "timer-driven opcodes are dropped and not expected" do
     assert run(Stub, @trigger <> "0400\n" <> @reply <> "0100efbeadde0700") == :ok
     assert run(Stub, "100.100000 login#1 S 0x0804 -") == :ok

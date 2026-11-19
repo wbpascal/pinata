@@ -12,7 +12,7 @@ defmodule Replay.Masks do
   @type mask :: {module(), path(), reason :: String.t()}
   @type handle :: {module(), path(), namespace :: atom(), reason :: String.t()}
 
-  # The other entries of ADR 0008 (login tokens, addresses in 0x1003 / 0x180A, uninitialised memory with its bug id)
+  # The other entries of ADR 0008 (addresses in 0x1003 / 0x180A, uninitialised memory with its bug id)
   # are added by the issue that defines each packet; the 0x0C0C entries exist.
   @doc "Masks that apply to every replay."
   @spec global() :: [mask()]
