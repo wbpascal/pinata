@@ -94,9 +94,9 @@ client = TestClient.expect(client, %Proto.Packets.MiscHeartbeatAck{})
 
 **Clock.** The harness puts `TestClock` in as the clock source and sets it to the capture timestamp before each connection open and each client packet. The clock source is global, so replay tests are not async.
 
-**Stop point.** Packets with an index above `stop:` are not played. Each Replay test uses the highest index the server supports so far: the way back to the world list (issue #47): `:end` for `login-logout` and 70 for `37_login-heartbeat-refusals-delete`; the successful `0x0C0C` for the others (18 for `login-errors`, 11 for `create-char`, 9 for `37b_char-select-rename-refusals`). `milestone1_test.exs` leaves the lines of later issues out of every replay (`0x0C14`, `0x080D`, `0x1401`, `0x1406`, `0x1407`, `0x140C`); the indices stay. `milestone1_test.exs` can replay one connection of a capture (it keeps only the packets of that `conn`, the indices stay): `login#3` up to 90 with the world closed (its WorldManager process stopped) and `login#4` up to 108 with the world full (2375 players in the `:pg` group).
+**Stop point.** Packets with an index above `stop:` are not played. Each Replay test uses the highest index the server supports so far: the way back to the world list (issue #47), past the character list `0x0C14` (issue #44): `:end` for `login-logout` and 70 for `37_login-heartbeat-refusals-delete`; `create-char` stops at 22, past its character list (index 23 is `0x1401`, not defined yet); the successful `0x0C0C` for the others (18 for `login-errors`, 9 for `37b_char-select-rename-refusals`). `milestone1_test.exs` leaves the lines of later issues out of every replay (`0x1401`, `0x1406`, `0x1407`, `0x140C`); the indices stay. `milestone1_test.exs` can replay one connection of a capture (it keeps only the packets of that `conn`, the indices stay): `login#3` up to 90 with the world closed (its WorldManager process stopped) and `login#4` up to 108 with the world full (2375 players in the `:pg` group).
 
-**Timer-driven opcodes.** `0x0804` (heartbeat) and `0x080E` (game time) come from timers. `S` lines with these opcodes are not expected, and received packets with these opcodes are dropped. Client lines are always sent.
+**Timer-driven opcodes.** `0x0804` (heartbeat) and `0x080E` (game time) come from timers. `S` lines with these opcodes are not expected, and received packets with these opcodes are dropped. Client lines are always sent, so the `0x080E` answer to the client's `0x080D` is not compared by a replay; `test/world_manager/character_list_test.exs` checks its bytes.
 
 **Extra packets.** At the end the harness sends a client heartbeat on every open connection and reads until the `0x0805` answer. Anything else read before it is an extra packet. A connection the server closed has no extras.
 
@@ -114,17 +114,17 @@ The opcode name comes from `docs/protocol/opcodes.json`. The field lines need a 
 
 ## Masks
 
-A Mask is `{packet_module, path, reason}`. The field is zeroed in both payloads before the comparison. The reason is required: an empty reason or an unknown field raises `ArgumentError`. `Replay.Masks.global/0` is the one list of masks every replay uses (the seed, the payload byte of `0x0C66` L00-B1, and in `0x0C0C` the `ip` and the `validate` key, P02-B23); a test adds its own with `masks:`. A path is a field name or a list of names through nested structs and arrays (`[:items, :id]` is the `id` of every element).
+A Mask is `{packet_module, path, reason}`. The field is zeroed in both payloads before the comparison. The reason is required: an empty reason or an unknown field raises `ArgumentError`. `Replay.Masks.global/0` is the one list of masks every replay uses (the seed, the payload byte of `0x0C66` L00-B1, the `ip` of `0x0C0C`, and `delinfo` (P02-B1) and `kq_date_unused` (P02-B7) of the AVATAR in `0x0C14`); a test adds its own with `masks:`. A path is a field name or a list of names through nested structs and arrays (`[:items, :id]` is the `id` of every element).
 
 Paths resolve to byte ranges through `mod.__packet__().layout`, a list of `{name, offset, size, sub}` per field (offset in the payload; for an array the offset of its count and size `nil`). A `bits` field masks its whole byte.
 
 ## Handle map
 
-A handle is `{packet_module, path, namespace, reason}`: a value the server picks anew in each run (identifiers, item keys). In a server packet, the first time a captured value is seen it is bound to the received value; later the received value must equal the bound one, and one received value cannot belong to two captured values. A violation is a `:handle` failure. In a client packet the captured value is replaced by the bound one; a captured value that was never bound is a `:handle` failure. `Replay.Masks.handles/0` is the global list: the login token (`:login_token`, `0x0C34` and `0x0C37`) and the world key (`:world_key`, `0x0C0C` and `0x0C0F`).
+A handle is `{packet_module, path, namespace, reason}`: a value the server picks anew in each run (identifiers, item keys). In a server packet, the first time a captured value is seen it is bound to the received value; later the received value must equal the bound one, and one received value cannot belong to two captured values. A violation is a `:handle` failure. In a client packet the captured value is replaced by the bound one; a captured value that was never bound is a `:handle` failure. `Replay.Masks.handles/0` is the global list: the login token (`:login_token`, `0x0C34` and `0x0C37`), the world key (`:world_key`: `validate` of `0x0C0C` and of the client's `0x0C0F`, so the client logs in to WorldManager with the key of this run; on a refusal the rebuild's zero key is bound to the uninitialised bytes of the capture, P02-B23) and the `worldmanager` session handle of `0x0C14` (`:wm_session`). `TestClock.local_time/1` is UTC+1, the zone of all captures.
 
 ## Setup functions
 
-`Replay.Setups` has one function per capture. It builds the state the capture starts from, with public `Persistence` operations where one exists, a test-only factory otherwise, never a database dump. Each one empties the accounts table and creates the account `admin` (the client sends the MD5 text of the password, as in every transcript). Later issues add characters.
+`Replay.Setups` has one function per capture. It builds the state the capture starts from, with public `Persistence` operations where one exists, a test-only factory otherwise, never a database dump. Each one empties the accounts table and creates the account `admin` (the client sends the MD5 text of the password, as in every transcript). `login_logout/0` and `create_char/0` also create the character "Test1235" of their capture, `login_heartbeat_refusals_delete/0` the characters "Test1235" and "Test2" (through `Factory`, the test-only inserts of characters and equipped items in `test/support/factory.ex`); later issues add more.
 
 ## Topology
 
@@ -146,4 +146,5 @@ A handle is `{packet_module, path, namespace, reason}`: a value the server picks
 - Connections are closed at the end of the replay, or after the packets listed in `close_after:`.
 - The endpoint comes from the connection kind, not from the address the server sends.
 - A `bits` field masks its whole byte.
+- Two world-select refusals with status 0 in one replay fail the handle map: both captured keys are uninitialised memory and both would bind to the rebuild's zero key. No transcript has two.
 - The handle map has no sentinel values and random game values are not handled.

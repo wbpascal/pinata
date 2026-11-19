@@ -8,4 +8,7 @@ defmodule Clock.System do
 
   @impl Clock.Source
   def monotonic_time(unit), do: System.monotonic_time(unit)
+
+  @impl Clock.Source
+  def local_time(seconds), do: :calendar.system_time_to_local_time(seconds, :second)
 end

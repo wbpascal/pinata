@@ -53,10 +53,67 @@ defmodule Proto.Packets.UserLoginworldReq do
   field :validate, {:u16s, 32}
 end
 
+defmodule Proto.Packets.AvatarDeleteInfo do
+  @moduledoc "Delete date of a character (nested in AVATAR). Always zero here: deleted characters are never listed (P02-B1 fixed)."
+  use Proto.Packet
+  field :year, :u8
+  field :month, :u8
+  field :day, :u8
+  field :hour, :u8
+  field :min, :u8
+end
+
+defmodule Proto.Packets.Avatar do
+  @moduledoc """
+  AVATAR (PROTO_AVATARINFORMATION, 0x82 bytes): one character of the character list (nested in 0x0C14).
+
+  `kq_date` holds bits 0-23 of `SHINE_DATETIME` (year:4, month:4, day:5, hour:5, min:6, little-endian), the next byte
+  the seconds and two unused bits (P02-B7: sent as 0). `upgrade_unused` is always 0xF.
+  """
+  use Proto.Packet
+  field :chrregnum, :u32
+  field :name, {:char, 20}
+  field :level, :u16
+  field :slot, :u8
+  field :loginmap, {:char, 12}
+  field :delinfo, Proto.Packets.AvatarDeleteInfo
+  bits gender: 1, chrclass: 5, race: 2
+  field :hairtype, :u8
+  field :haircolor, :u8
+  field :faceshape, :u8
+  field :equip, {:u16s, 20}
+  bits upgrade_righthand: 4, upgrade_lefthand: 4
+  bits upgrade_leg: 4, upgrade_body: 4
+  bits upgrade_unused: 4, upgrade_shoes: 4
+  field :kq_handle, :u32
+  field :kq_map_name, {:char, 12}
+  field :kq_x, :u32
+  field :kq_y, :u32
+  field :kq_date, {:bytes, 3}
+  bits kq_date_unused: 2, kq_date_sec: 6
+  field :need_change_id, :u8
+  field :change_id_init, :u8
+  field :change_id_row_no, :u32
+  field :tutorial_state, :u32
+  field :tutorial_step, :u8
+end
+
+defmodule Proto.Packets.UserLoginworldAck do
+  @moduledoc "0x0C14 NC_USER_LOGINWORLD_ACK, server to client: the WorldManager session handle and the character list."
+  use Proto.Packet, opcode: 0x0C14
+  field :worldmanager, :u16
+  array :avatars, Proto.Packets.Avatar, count: :u8
+end
+
 defmodule Proto.Packets.UserLoginworldfailAck do
   @moduledoc "0x0C15 NC_USER_LOGINWORLDFAIL_ACK, server to client."
   use Proto.Packet, opcode: 0x0C15
   field :error, :u16
+end
+
+defmodule Proto.Packets.UserAvatarListReq do
+  @moduledoc "0x0C1F NC_USER_AVATAR_LIST_REQ, empty, client to server."
+  use Proto.Packet, opcode: 0x0C1F
 end
 
 defmodule Proto.Packets.UserConnectcutCmd do

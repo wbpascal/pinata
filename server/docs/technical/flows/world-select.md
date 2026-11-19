@@ -18,9 +18,9 @@ sequenceDiagram
     L->>C: 0x0C0C status, public_host, world_manager.port, key
     C->>M: connects, 0x0C0F user name, key
     M->>W: take_login(user name, key)
-    W-->>M: {:ok, user_no}
+    W-->>M: {:ok, user_no, handle}
     M->>K: Cluster.Sessions.take_over(user_no), join_players(world)
-    Note over M: nothing is sent on success yet
+    Note over M: the character list follows (character-list.md)
 ```
 
 ## The answer `0x0C0C`
@@ -35,7 +35,7 @@ sequenceDiagram
 
 ## `0x0C0F`
 
-- It must be the first packet; any other first packet closes the socket without an answer. After a successful one every packet is ignored.
+- It must be the first packet; any other first packet closes the socket without an answer. After a successful one the character list is sent ([`character-list.md`](character-list.md)); `take_login` also returns the session handle.
 - It is accepted when a reservation with the same key and the same user name exists, is unused and is younger than 30 s. The reservation is then deleted. A reservation with the right key and another name is refused and kept.
 - Refusal: `0x0C15 {0x44}` (client text "Authentication failed."), then the socket is closed.
 
@@ -47,7 +47,7 @@ An accepted connection calls `Cluster.Sessions.take_over/1` (an older session ge
 
 - W01-B1 (the name was not compared with the reservation): fixed, the name must equal the reservation's.
 - L00-B3 (a key without a reservation for a full world): fixed without changing the client bytes.
-- P02-B23 (uninitialised key bytes on a refusal): fixed, the key is zero; masked in the replay.
+- P02-B23 (uninitialised key bytes on a refusal): fixed, the key is zero; in the replay the key is a handle (`:world_key`), so the bytes are not compared.
 
 ## Differences from the original
 
@@ -55,4 +55,4 @@ An accepted connection calls `Cluster.Sessions.take_over/1` (an older session ge
 - The key is 32 random words without the original's check word.
 - The Login connection stops being the session at the hand-off.
 - A first packet other than `0x0C0F` closes the socket.
-- Nothing is sent after a successful `0x0C0F` until the character list issue (`0x0C14`).
+- After a successful `0x0C0F` the character list is sent: see [`character-list.md`](character-list.md).

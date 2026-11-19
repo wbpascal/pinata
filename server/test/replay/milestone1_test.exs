@@ -4,10 +4,10 @@ defmodule Replay.Milestone1Test do
 
   @moduletag capture_log: true
 
-  # Opcodes of later issues (character list, game time, character create and delete). Their lines are left out of
-  # every replay; the indices stay. The heartbeat lines 0x0804 / 0x0805 stay: the client 0x0805 lines keep the
-  # WorldManager connection of capture 37 alive while the test clock jumps.
-  @not_yet [0x0C14, 0x080D, 0x1401, 0x1406, 0x1407, 0x140C]
+  # Opcodes of later issues (character create and delete). Their lines are left out of every replay; the indices
+  # stay. The heartbeat lines 0x0804 / 0x0805 stay: the client 0x0805 lines keep the WorldManager connection of
+  # capture 37 alive while the test clock jumps.
+  @not_yet [0x1401, 0x1406, 0x1407, 0x140C]
 
   # Each test replays its capture up to its stop point; the stop point moves forward with later issues. With
   # `conn`, only that connection of the capture is replayed (indices stay). `close_after` lists the packets after
@@ -31,10 +31,10 @@ defmodule Replay.Milestone1Test do
 
   test "26_11_15_login-logout", do: replay("26_11_15_login-logout", :login_logout, :end, close_after: [16])
   test "26_11_15_login-errors", do: replay("26_11_15_login-errors", :login_errors, 18)
-  test "26_11_15_create-char", do: replay("26_11_15_create-char", :create_char, 11)
+  test "26_11_15_create-char", do: replay("26_11_15_create-char", :create_char, 22)
 
   test "26_11_15_37_login-heartbeat-refusals-delete",
-    do: replay(@heartbeat_refusals, :login_heartbeat_refusals_delete, 70, close_after: [60], sync_after: [25])
+    do: replay(@heartbeat_refusals, :login_heartbeat_refusals_delete, 70, close_after: [60])
 
   test "26_11_15_37_login-heartbeat-refusals-delete: world closed" do
     :ok = Supervisor.terminate_child(WorldManager.Supervisor, {WorldManager.World, 0})

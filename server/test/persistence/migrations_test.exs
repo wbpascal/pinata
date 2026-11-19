@@ -14,6 +14,8 @@ defmodule Persistence.MigrationsTest do
     # the restarted application compiles this migration again; unload it to avoid the redefinition warning
     :code.purge(Persistence.Repo.Migrations.CreateAccounts)
     :code.delete(Persistence.Repo.Migrations.CreateAccounts)
+    :code.purge(Persistence.Repo.Migrations.CreateCharacters)
+    :code.delete(Persistence.Repo.Migrations.CreateCharacters)
 
     on_exit(fn ->
       System.put_env("DATABASE_URL", url)
