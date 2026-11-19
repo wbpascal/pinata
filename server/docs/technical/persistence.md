@@ -6,13 +6,13 @@ The `Persistence` boundary is the only code that names a repo, a schema or a que
 
 | Module | What |
 |---|---|
-| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`), each one `repo.transact` |
+| `Persistence` | the public operations (`create_account/2`, `check_login/2`, `set_blocked/2`, `set_login_able/2`, `list_characters/2`, `create_character/1`), each one `repo.transact` |
 | `Persistence.Supervisor` | starts the repo and the migration step |
 | `Persistence.Repo` | private: maps `database.url` to a repo module and its config; `active/0` |
 | `Persistence.Repo.Postgres`, `Persistence.Repo.SQLite` | the two Ecto repos |
 | `Persistence.Migrations` | private: start-up migration step |
 | `Persistence.Account` | private: schema and name rules |
-| `Persistence.Character`, `Persistence.Item` | private: schemas of `characters` and `items` |
+| `Persistence.Character`, `Persistence.Item`, `Persistence.Skill`, `Persistence.Shortcut` | private: schemas of `characters`, `items`, `character_skills` and `character_shortcuts` |
 | `Persistence.Password` | private: PBKDF2 hashing |
 | `Persistence.Release` | operator commands without Mix; the `mix pinata.*` tasks only call it |
 
