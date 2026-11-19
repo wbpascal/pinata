@@ -88,7 +88,7 @@ client = TestClient.expect(client, %Proto.Packets.MiscHeartbeatAck{})
 | `masks:`, `handles:` | per-test additions to the global lists |
 | `close_after:` | packet indices; the harness closes the connection of that packet right after it (the transcript holds no TCP close) |
 | `sync_after:` | packet indices; a heartbeat round trip after each, so the server has handled the packet before the clock moves on |
-| `before:` | a map of packet index to a zero-arity function, run before the harness sends that client packet;; no replay uses it at present |
+| `before:` | a map of packet index to a zero-arity function, run before the harness sends that client packet; no replay uses it at present |
 | `timeout:` | milliseconds to wait for a server packet, default 2000 |
 
 **Pacing.** Client packets are sent in capture order. Each one is sent after all earlier server packets of the Transcript arrived. Order is compared per connection only. A connection is opened right before its first line. All connections are closed when the replay ends.
