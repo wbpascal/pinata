@@ -34,7 +34,8 @@ System.put_env("PINATA_CONFIG", dir <> ".toml")
 System.put_env("PINATA_TEST_DATA_DIR", dir)
 {:ok, _apps} = Application.ensure_all_started(:pinata)
 
-ExUnit.after_suite(fn _result ->
+# Not ExUnit.after_suite: it runs after every run of --repeat-until-failure, but the data is created once.
+System.at_exit(fn _status ->
   File.rm_rf!(dir)
   File.rm!(dir <> ".toml")
 end)
