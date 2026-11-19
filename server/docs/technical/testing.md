@@ -92,7 +92,7 @@ client = TestClient.expect(client, %Proto.Packets.MiscHeartbeatAck{})
 
 **Clock.** The harness puts `TestClock` in as the clock source and sets it to the capture timestamp before each connection open and each client packet. The clock source is global, so replay tests are not async.
 
-**Stop point.** Packets with an index above `stop:` are not played. Each Replay test uses the highest index the server supports so far.
+**Stop point.** Packets with an index above `stop:` are not played. Each Replay test uses the highest index the server supports so far: the packet before the first world select (`0x0C0B`), 7 for `login-logout`, 16 for `login-errors`, 9 for `create-char`, 21 for `37_login-heartbeat-refusals-delete`, 7 for `37b_char-select-rename-refusals`.
 
 **Timer-driven opcodes.** `0x0804` (heartbeat) and `0x080E` (game time) come from timers. `S` lines with these opcodes are not expected, and received packets with these opcodes are dropped. Client lines are always sent.
 
@@ -112,7 +112,7 @@ The opcode name comes from `docs/protocol/opcodes.json`. The field lines need a 
 
 ## Masks
 
-A Mask is `{packet_module, path, reason}`. The field is zeroed in both payloads before the comparison. The reason is required: an empty reason or an unknown field raises `ArgumentError`. `Replay.Masks.global/0` is the one list of masks every replay uses; a test adds its own with `masks:`. A path is a field name or a list of names through nested structs and arrays (`[:items, :id]` is the `id` of every element).
+A Mask is `{packet_module, path, reason}`. The field is zeroed in both payloads before the comparison. The reason is required: an empty reason or an unknown field raises `ArgumentError`. `Replay.Masks.global/0` is the one list of masks every replay uses (the seed, and the payload byte of `0x0C66`, L00-B1); a test adds its own with `masks:`. A path is a field name or a list of names through nested structs and arrays (`[:items, :id]` is the `id` of every element).
 
 Paths resolve to byte ranges through `mod.__packet__().layout`, a list of `{name, offset, size, sub}` per field (offset in the payload; for an array the offset of its count and size `nil`). A `bits` field masks its whole byte.
 
@@ -122,7 +122,7 @@ A handle is `{packet_module, path, namespace, reason}`: a value the server picks
 
 ## Setup functions
 
-`Replay.Setups` has one function per capture. It builds the state the capture starts from, with public `Persistence` operations where one exists, a test-only factory otherwise, never a database dump. They do nothing yet: the seed packet needs no state. Later issues fill them.
+`Replay.Setups` has one function per capture. It builds the state the capture starts from, with public `Persistence` operations where one exists, a test-only factory otherwise, never a database dump. Each one empties the accounts table and creates the account `admin` (the client sends the MD5 text of the password, as in every transcript). Later issues add characters.
 
 ## Topology
 

@@ -44,7 +44,7 @@ defmodule Replay.HarnessTest do
     @reply %Reply{code: 1, token: 0xDEADBEEF, handle: 7}
 
     @impl Net.Handler
-    def init, do: %{}
+    def init(_settings), do: %{}
 
     @impl Net.Handler
     def handle_packet(state, %MiscSeedAck{seed: 1}), do: {state, [{:send, @reply}]}
@@ -58,7 +58,7 @@ defmodule Replay.HarnessTest do
     @behaviour Net.Handler
 
     @impl Net.Handler
-    def init, do: %{}
+    def init(_settings), do: %{}
 
     @impl Net.Handler
     def handle_packet(state, %MiscSeedAck{seed: seed}), do: {state, [{:send, %Reply{code: 1, token: 0, handle: seed}}]}
@@ -69,7 +69,7 @@ defmodule Replay.HarnessTest do
     @behaviour Net.Handler
 
     @impl Net.Handler
-    def init, do: %{}
+    def init(_settings), do: %{}
 
     @impl Net.Handler
     def handle_packet(state, %MiscSeedAck{seed: seed}),

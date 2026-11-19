@@ -28,6 +28,13 @@ defmodule Cluster.Registry do
   @spec zones(world_id()) :: [pid()]
   def zones(world_id), do: :pg.get_members(scope(), {:zones, world_id})
 
+  @doc "Adds a WorldManager session process to the players of its world."
+  @spec join_players(world_id(), pid()) :: :ok
+  def join_players(world_id, pid), do: :pg.join(scope(), {:players, world_id}, pid)
+
+  @spec player_count(world_id()) :: non_neg_integer()
+  def player_count(world_id), do: length(:pg.get_members(scope(), {:players, world_id}))
+
   defp whereis(name) do
     case :global.whereis_name(name) do
       pid when is_pid(pid) -> {:ok, pid}

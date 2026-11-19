@@ -7,7 +7,7 @@ defmodule Net.Listener do
     ThousandIsland.child_spec(
       port: port,
       handler_module: Net.Connection,
-      handler_options: %{handler: handler, limits: settings.connection},
+      handler_options: %{handler: handler, limits: settings.connection, settings: settings},
       # Thousand Island's own idle timeout (60 s by default) would cut in before our heartbeat.
       read_timeout: :infinity,
       # A send blocks only above the high watermark; keep it above the limit so Net.Connection sees the queue first.

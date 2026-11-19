@@ -4,7 +4,7 @@ defmodule Zone.Handler do
   @behaviour Net.Handler
 
   @impl Net.Handler
-  def init, do: %{}
+  def init(_settings), do: %{}
 
   @impl Net.Handler
   def handle_packet(state, _packet), do: {state, []}

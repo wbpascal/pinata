@@ -11,7 +11,7 @@ One process per client socket ([ADR 0009](../../../docs/adr/0009-one-process-per
 1. `handle_connection/2` draws the seed and sends `0x0807 {seed}` right after accept.
 2. `handle_data/3` cuts frames (`Proto.Framing.split/1`), decrypts them (`Proto.Cipher.crypt/2`) and decodes them (`Proto.decode/1`).
 3. Heartbeats are answered in the process; every other packet goes to the part handler.
-4. The packets the handler returns are encoded and sent (`Proto.encode/1`, `Proto.Framing.frame/1`).
+4. The effects the handler returns are carried out in order: sends are encoded and sent (`Proto.encode/1`, `Proto.Framing.frame/1`), `:close` ends the connection, `{:perform, request}` is run (below).
 5. The heartbeat and the limits below close the socket.
 
 ```mermaid
@@ -20,13 +20,13 @@ sequenceDiagram
     Net.Connection->>Client: 0x0807 seed
     Client->>Net.Connection: encrypted packet
     Net.Connection->>Handler: handle_packet(state, packet)
-    Handler->>Net.Connection: new state, [{:send, packet}]
+    Handler->>Net.Connection: new state, effects
     Net.Connection->>Client: framed packets
 ```
 
-There is no file in `flows/`: nothing here crosses a part boundary.
+The login flow is in [`flows/login.md`](flows/login.md).
 
-**Handler contract.** `Net.Handler` has `init/0` (session state of a new connection) and `handle_packet/2` (state and packet in, new state and effects out; pure). The only effect is `{:send, packet}`. Heartbeat packets never reach the handler. `Login.Handler`, `WorldManager.Handler` and `Zone.Handler` are stubs that ignore every packet.
+**Handler contract.** `Net.Handler` has `init/1` (session state of a new connection, from the settings), `handle_packet/2` and `handle_info/2` (state and packet or message in, new state and effects out; both pure) and `perform/1` (impure). The effects are `{:send, packet}`, `:close` (close the socket; later effects are not run) and `{:perform, request}`: the connection process calls `perform/1` and hands the result to `handle_info/2`. A message `{:cluster, term}` sent to the connection process goes to `handle_info/2`. Heartbeat packets never reach the handler. `WorldManager.Handler` and `Zone.Handler` are stubs that answer nothing.
 
 **Seed.** `Random.uniform(499) - 1` per connection. The original uses a counter per process; the client cannot tell the difference and a per-connection draw needs no shared state.
 
@@ -42,3 +42,7 @@ There is no file in `flows/`: nothing here crosses a part boundary.
 | `connection.max_packets_per_second` | more frames than this in a fixed 1 s window; heartbeats count |
 | `connection.max_unsent_bytes` | the VM send queue (`send_pend` of `:inet.getstat/1`), read after every send; the listener sets `high_watermark` to twice the limit so a send never blocks before the check |
 | Failed send | the socket send returns an error |
+
+## World process
+
+`WorldManager.World` is one process per world of `settings.world`, started by `WorldManager.Supervisor` and registered under `{:global, {:world_manager, n}}`. Login reads its presence as "the world is open".

@@ -2,7 +2,7 @@
 
 For administrators: how to install, configure, run and manage the Pinata server.
 
-The server cannot be played on yet. Once you have imported a data directory (see [`install.md`](install.md)), `iex -S mix` in `server/` starts all three parts in single-node mode on the default settings; each part listens on its port (9010, 9110 and 9210 by default). A client can connect and is kept alive by the heartbeat, but cannot log in yet. It creates the SQLite database `./data/pinata.db`.
+The server cannot be played on yet. Once you have imported a data directory (see [`install.md`](install.md)), `iex -S mix` in `server/` starts all three parts in single-node mode on the default settings; each part listens on its port (9010, 9110 and 9210 by default). A client can log in and sees the world list; selecting a world does not work yet (see [`quick-start.md`](quick-start.md)). It creates the SQLite database `./data/pinata.db`.
 
 ## Tasks
 
@@ -20,6 +20,7 @@ Database and accounts (see [`operation.md`](operation.md) and [`accounts.md`](ac
 
 | Page | Content |
 |---|---|
+| [`quick-start.md`](quick-start.md) | single-node start with no configuration, pointing the client at it, logging in |
 | [`install.md`](install.md) | the data directory and its import, start-up errors (the release part is still missing) |
 | [`settings.md`](settings.md) | every setting |
 | [`accounts.md`](accounts.md) | creating, blocking and unblocking accounts |
@@ -31,7 +32,6 @@ Each page is written by the first change that builds what it describes:
 
 | Page | Content |
 |---|---|
-| `quick-start.md` | single-node start with no configuration, pointing the client at it |
 | `release.md` | building the release |
 | `multi-node.md` | PostgreSQL, the node list, which part runs where |
 | `gm-commands.md` | GM commands |

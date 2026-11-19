@@ -44,4 +44,4 @@ Every command exits non-zero with one of these messages:
 | `No account named <name>.` | block or unblock of a missing account |
 | `Usage: mix pinata.account.create <name>` (alike for the others) | wrong number of arguments |
 
-The setting `login.auto_create_accounts` exists (see [`settings.md`](settings.md)); login itself comes with a later change. There is no command for the login-able flag yet: call `Persistence.set_login_able/2` from `bin/pinata remote` or `iex`.
+The setting `login.auto_create_accounts` exists (see [`settings.md`](settings.md)); at login, an unknown name is created when it applies (it is on in single-node mode) and the stored password is the one sent at that first login; a name that is not valid gets the same refusal as a wrong password. There is no command for the login-able flag yet: call `Persistence.set_login_able/2` from `bin/pinata remote` or `iex`.

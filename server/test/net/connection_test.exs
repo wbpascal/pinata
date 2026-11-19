@@ -26,7 +26,7 @@ defmodule Net.ConnectionTest do
     @behaviour Net.Handler
 
     @impl Net.Handler
-    def init, do: %{}
+    def init(_settings), do: %{}
 
     @impl Net.Handler
     def handle_packet(state, _packet), do: {state, List.duplicate({:send, %Big{data: :binary.copy(<<0>>, 8000)}}, 4000)}
@@ -37,10 +37,31 @@ defmodule Net.ConnectionTest do
     @behaviour Net.Handler
 
     @impl Net.Handler
-    def init, do: %{}
+    def init(_settings), do: %{}
 
     @impl Net.Handler
     def handle_packet(state, _packet), do: {state, []}
+  end
+
+  defmodule EffectHandler do
+    @moduledoc false
+    @behaviour Net.Handler
+
+    alias Proto.Packets.MiscSeedAck
+
+    @impl Net.Handler
+    def init(_settings), do: %{}
+
+    @impl Net.Handler
+    def handle_packet(state, _packet),
+      do: {state, [{:send, %MiscSeedAck{seed: 1}}, {:perform, :ask}, :close, {:send, %MiscSeedAck{seed: 3}}]}
+
+    @impl Net.Handler
+    def handle_info(state, :answer), do: {state, [{:send, %MiscSeedAck{seed: 2}}]}
+    def handle_info(state, {:cluster, :x}), do: {state, [{:send, %MiscSeedAck{seed: 4}}, :close]}
+
+    @impl Net.Handler
+    def perform(:ask), do: :answer
   end
 
   @limits %{max_packets_per_second: 100, max_unsent_bytes: 1_048_576}
@@ -210,5 +231,23 @@ defmodule Net.ConnectionTest do
       {:ok, data} -> drain(socket, sum + byte_size(data))
       {:error, :closed} -> sum
     end
+  end
+
+  test "effects run in order and stop at close" do
+    {_listener, port} = listen(EffectHandler)
+    {socket, cipher} = connect(port)
+    {req, _cipher} = frame(cipher, <<0x07, 0x08, 0, 0>>)
+    :ok = :gen_tcp.send(socket, req)
+    assert {:ok, <<4, 0x07, 0x08, 1, 0>>} = :gen_tcp.recv(socket, 5, 1000)
+    assert {:ok, <<4, 0x07, 0x08, 2, 0>>} = :gen_tcp.recv(socket, 5, 1000)
+    closed(socket)
+  end
+
+  test "cluster message goes to handle_info" do
+    {listener, port} = listen(EffectHandler)
+    {socket, _cipher} = connect(port)
+    send(conn_pid(listener), {:cluster, :x})
+    assert {:ok, <<4, 0x07, 0x08, 4, 0>>} = :gen_tcp.recv(socket, 5, 1000)
+    closed(socket)
   end
 end

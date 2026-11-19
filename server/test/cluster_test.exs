@@ -21,6 +21,36 @@ defmodule ClusterTest do
     assert Registry.zones(902) == [pid]
   end
 
+  test "players group" do
+    assert Registry.player_count(903) == 0
+    pid = start_supervised!({Agent, fn -> 0 end})
+    assert Registry.join_players(903, pid) == :ok
+    assert Registry.player_count(903) == 1
+  end
+
+  test "take_over" do
+    assert Cluster.Sessions.take_over(904) == :ok
+    assert Cluster.Sessions.take_over(904) == :ok
+    refute_receive {:cluster, _}, 50
+
+    test = self()
+
+    spawn_link(fn ->
+      :ok = Cluster.Sessions.take_over(904)
+      send(test, :joined)
+
+      receive do
+        message -> send(test, {:forwarded, message})
+      end
+    end)
+
+    # The spawned process is the older session now: wait for it, then take over again.
+    assert_receive {:cluster, :session_replaced}, 1000
+    assert_receive :joined, 1000
+    :ok = Cluster.Sessions.take_over(904)
+    assert_receive {:forwarded, {:cluster, :session_replaced}}, 1000
+  end
+
   test "root children" do
     assert [%{id: :pg}] = Cluster.Root.children([])
 
