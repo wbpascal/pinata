@@ -7,7 +7,7 @@ defmodule Pinata.MixProject do
       version: "0.1.0",
       elixir: "~> 1.20",
       elixirc_paths: elixirc_paths(),
-      test_ignore_filters: [&String.starts_with?(&1, "test/probes/")],
+      test_ignore_filters: [&String.starts_with?(&1, "test/probes/"), &String.starts_with?(&1, "test/support/")],
       compilers: [:boundary] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
