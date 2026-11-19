@@ -252,23 +252,12 @@ defmodule Replay.HarnessTest do
   end
 
   describe "topology" do
-    setup do
-      previous = System.get_env("PINATA_TEST_TOPOLOGY")
-
-      on_exit(fn ->
-        if previous,
-          do: System.put_env("PINATA_TEST_TOPOLOGY", previous),
-          else: System.delete_env("PINATA_TEST_TOPOLOGY")
-      end)
-    end
-
     test "single, multi and others" do
-      System.delete_env("PINATA_TEST_TOPOLOGY")
+      assert Replay.Topology.mode(nil) == :single
+      assert Replay.Topology.mode("single") == :single
+      assert Replay.Topology.mode("multi") == :multi
+      assert_raise RuntimeError, ~r/PINATA_TEST_TOPOLOGY/, fn -> Replay.Topology.mode("bogus") end
       assert %{"login" => _, "wm" => _, "zone" => _} = Replay.Topology.endpoints()
-      System.put_env("PINATA_TEST_TOPOLOGY", "multi")
-      assert_raise RuntimeError, ~r/#48/, &Replay.Topology.endpoints/0
-      System.put_env("PINATA_TEST_TOPOLOGY", "bogus")
-      assert_raise RuntimeError, ~r/PINATA_TEST_TOPOLOGY/, &Replay.Topology.endpoints/0
     end
   end
 end

@@ -44,18 +44,33 @@ defmodule Replay.Milestone1Test do
       )
 
   test "26_11_15_37_login-heartbeat-refusals-delete: world closed" do
-    :ok = Supervisor.terminate_child(WorldManager.Supervisor, {WorldManager.World, 0})
+    child = {WorldManager.World, 0}
+    :ok = Replay.Topology.call(:wm, Supervisor, :terminate_child, [WorldManager.Supervisor, child])
 
-    on_exit(fn -> {:ok, _} = Supervisor.restart_child(WorldManager.Supervisor, {WorldManager.World, 0}) end)
+    on_exit(fn ->
+      {:ok, _} = Replay.Topology.call(:wm, Supervisor, :restart_child, [WorldManager.Supervisor, child])
+    end)
 
-    wait_until(fn -> Cluster.Registry.whereis_world_manager(0) == :error end)
+    # the Login node must see it
+    wait_until(fn -> Replay.Topology.call(:login, Cluster.Registry, :whereis_world_manager, [0]) == :error end)
     replay(@heartbeat_refusals, :login_heartbeat_refusals_delete, 90, conn: "login#3")
   end
 
   test "26_11_15_37_login-heartbeat-refusals-delete: world full" do
-    pid = spawn(fn -> Process.sleep(:infinity) end)
-    on_exit(fn -> Process.exit(pid, :kill) end)
-    :ok = :pg.join(Cluster.Registry.scope(), {:players, 0}, List.duplicate(pid, 2375))
+    # :pg.join takes local pids only, so the process lives on the WorldManager node
+    pid = Replay.Topology.call(:wm, :erlang, :spawn, [Process, :sleep, [:infinity]])
+
+    on_exit(fn ->
+      Replay.Topology.call(:wm, Process, :exit, [pid, :kill])
+      # the next test must not see the full world on the Login node
+      wait_until(fn -> Replay.Topology.call(:login, Cluster.Registry, :player_count, [0]) == 0 end)
+    end)
+
+    :ok =
+      Replay.Topology.call(:wm, :pg, :join, [Cluster.Registry.scope(), {:players, 0}, List.duplicate(pid, 2375)])
+
+    # :pg spreads between nodes asynchronously
+    wait_until(fn -> Replay.Topology.call(:login, Cluster.Registry, :player_count, [0]) >= 2375 end)
     replay(@heartbeat_refusals, :login_heartbeat_refusals_delete, 108, conn: "login#4")
   end
 

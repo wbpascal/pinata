@@ -4,6 +4,8 @@ defmodule Pinata.Application do
   use Boundary, top_level?: true, deps: [Login, WorldManager, Zone, Persistence, Cluster, Settings, GameData]
   use Application
 
+  require Logger
+
   @impl Application
   def start(_type, _args) do
     case Settings.load(System.get_env()) do
@@ -12,7 +14,7 @@ defmodule Pinata.Application do
 
         case GameData.load(settings.data_dir, tables, strict_references: settings.data.strict_references) do
           :ok ->
-            always = [{Persistence.Supervisor, settings}, {Cluster.Root, settings}]
+            always = [{Persistence.Supervisor, settings}, {Cluster.Root, settings}] ++ digest_check(settings)
             parts = Enum.map(settings.parts, &{part_supervisor(&1), settings})
             Supervisor.start_link(always ++ parts, strategy: :one_for_one, name: Pinata.Supervisor)
 
@@ -24,6 +26,17 @@ defmodule Pinata.Application do
       {:error, problems} ->
         IO.puts(:stderr, Enum.join(["Invalid settings, the node does not start:" | problems], "\n  "))
         {:error, :invalid_settings}
+    end
+  end
+
+  # Only in multi-node mode (ADR 0006): single-node mode hashes nothing.
+  defp digest_check(settings) do
+    if Settings.single_node?(settings) do
+      []
+    else
+      digest = GameData.digest(settings.data_dir)
+      Logger.info("GameData: data directory digest #{digest}")
+      [{Cluster.DataDigest, digest: digest, authority?: :world_manager in settings.parts}]
     end
   end
 

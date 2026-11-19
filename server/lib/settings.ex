@@ -65,8 +65,12 @@ defmodule Settings do
      Enum.map(unknown, &"PINATA_PARTS: unknown part #{inspect(&1)}, expected login, world_manager or zone")}
   end
 
+  @doc "True when all parts run on this node and `cluster.nodes` is empty."
+  @spec single_node?(%{:parts => [part()], :cluster => %{nodes: [String.t()]}, optional(atom()) => term()}) :: boolean()
+  def single_node?(settings), do: settings.parts == @parts and settings.cluster.nodes == []
+
   defp derive(settings, env) do
-    single_node? = settings.parts == @parts and settings.cluster.nodes == []
+    single_node? = single_node?(settings)
     default_url = "sqlite:" <> Path.join(settings.data_dir, "pinata.db")
 
     settings

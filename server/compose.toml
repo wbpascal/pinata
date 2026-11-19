@@ -1,0 +1,7 @@
+# Settings of the Docker Compose example (compose.yaml), shared by all three nodes.
+data_dir = "/data"
+# The address clients use to reach the published ports.
+public_host = "127.0.0.1"
+
+[cluster]
+nodes = ["pinata@login", "pinata@wm", "pinata@zone"]

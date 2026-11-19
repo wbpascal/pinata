@@ -49,4 +49,42 @@ defmodule GameDataTest do
     assert {:error, [message]} = GameData.load("/nonexistent/pinata", [], strict_references: true)
     assert message =~ "mix pinata.import_data"
   end
+
+  describe "digest/1" do
+    @describetag :tmp_dir
+
+    defp make(dir, files) do
+      Enum.each(files, fn {name, content} ->
+        File.mkdir_p!(Path.dirname(Path.join(dir, name)))
+        File.write!(Path.join(dir, name), content)
+      end)
+
+      dir
+    end
+
+    test "does not enter symlinked directories", %{tmp_dir: tmp} do
+      files = [{"a.txt", "one"}, {"sub/b.txt", "two"}]
+      base = GameData.digest(make(Path.join(tmp, "a"), files))
+      loop = make(Path.join(tmp, "loop"), files)
+      File.ln_s!(loop, Path.join(loop, "self"))
+      File.ln_s!(loop, Path.join(loop, "sub/up"))
+      assert GameData.digest(loop) == base
+    end
+
+    test "depends on content, names and the file set", %{tmp_dir: tmp} do
+      files = [{"a.txt", "one"}, {"sub/b.txt", "two"}]
+      base = GameData.digest(make(Path.join(tmp, "a"), files))
+      assert base =~ ~r/^[0-9a-f]{64}$/
+      assert GameData.digest(make(Path.join(tmp, "same"), files)) == base
+      refute GameData.digest(make(Path.join(tmp, "byte"), [{"a.txt", "onf"}, {"sub/b.txt", "two"}])) == base
+      refute GameData.digest(make(Path.join(tmp, "name"), [{"c.txt", "one"}, {"sub/b.txt", "two"}])) == base
+      refute GameData.digest(make(Path.join(tmp, "extra"), [{"x", ""} | files])) == base
+    end
+
+    test "leaves out the top-level SQLite files", %{tmp_dir: tmp} do
+      files = [{"a.txt", "one"}]
+      base = GameData.digest(make(Path.join(tmp, "a"), files))
+      assert GameData.digest(make(Path.join(tmp, "b"), [{"pinata.db", "x"}, {"pinata.db-wal", "y"} | files])) == base
+    end
+  end
 end

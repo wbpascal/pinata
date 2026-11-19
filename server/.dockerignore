@@ -1,0 +1,9 @@
+_build
+deps
+plts
+tmp
+data
+test
+docs
+credo
+erl_crash.dump

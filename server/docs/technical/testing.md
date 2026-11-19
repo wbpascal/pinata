@@ -129,7 +129,11 @@ A handle is `{packet_module, path, namespace, reason}`: a value the server picks
 
 ## Topology
 
-`PINATA_TEST_TOPOLOGY` selects where the replay connects. `single` (default) uses the application `test_helper.exs` starts, on ports 9010, 9110, 9210. `multi` raises, because it is completed by issue #48. Another value raises. The database follows `DATABASE_URL` as for any test. The variable is for tests only, so it is not in the user documentation.
+`PINATA_TEST_TOPOLOGY` selects where the replay connects; `Replay.Topology.start/0` reads it once from `test_helper.exs` (after the support files are compiled, before `ExUnit.start/0`) and keeps the result in `persistent_term`. `single` (default) uses the application `test_helper.exs` starts, on ports 9010, 9110, 9210. `multi` starts `TestPeers.start(9320)`: Login, WorldManager and Zone each on a `:peer` node, client ports 9320, 9321, 9322; the peers stop at exit. Another value raises. The test VM still runs its own application in `multi`, but nothing connects to it.
+
+`Replay.Topology.call(part, module, function, args)` (`part` is `:login`, `:wm` or `:zone`) runs a call in this VM for `single` and on the peer for `multi`; a test that reaches into the server (the "world closed" and "world full" tests of `milestone1_test.exs`) goes through it. `Replay.Topology.all/3` calls in this VM and on every peer; the harness sets the clock source and the `TestClock` time that way, because each node has its own clock. In `multi` the world-select port of the capture (9110) cannot match, so `Replay` masks `port` of `UserWorldselectAck` for any WorldManager endpoint other than 9110.
+
+The topology runs on any database (the peers use the `DATABASE_URL` of the test VM; SQLite is a file shared by all VMs). CI runs the whole suite once single-node on SQLite (job `check`) and once `multi` on PostgreSQL (job `test-postgres`). The variable is for tests only, so it is not in the user documentation.
 
 ## Adding a replay test
 
@@ -140,7 +144,26 @@ A handle is `{packet_module, path, namespace, reason}`: a value the server picks
 
 ## Peer nodes
 
-`TestPeers` (`test/support/test_peers.ex`) starts two `:peer` nodes, one with `PINATA_PARTS=login` (client port 9310) and one with `world_manager` (port 9311). They share one settings file, the database of the test VM, and the cookie; they are connected to each other, not to the test VM, so the control connection is standard I/O. `TestClock` is loaded on both peers so a test can move their clocks. `test/world_manager/hand_off_test.exs` runs every test in both topologies: `:single` (the application of the test VM, ports 9010 and 9110) and `:peers`.
+`TestPeers.start(base_port \\ 9310)` (`test/support/test_peers.ex`) starts three `:peer` nodes: `PINATA_PARTS=login` (client port `base`), `world_manager` (`base + 1`) and `zone` (`base + 2`). They share one settings file (`pinata-peers-<os pid>-<base>.toml`), the database of the test VM, and the cookie; Login and Zone are connected to the WorldManager node, not to the test VM, so the control connection is standard I/O. The result holds the peer pids (`login`, `wm`, `zone`), the ports (`login_port`, `wm_port`, `zone_port`) and `nodes` (the node names). `TestClock` is loaded on all peers so a test can move their clocks. `test/world_manager/hand_off_test.exs` runs every test in both topologies: `:single` (the application of the test VM, ports 9010 and 9110) and `:peers` (base 9310). The peers have no `cluster.nodes`, so they are multi-node nodes and run `Cluster.DataDigest`.
+
+One multi-mode run on SQLite once failed with "Ecto repo Persistence.Repo.SQLite not started" in every test after one point; it could not be reproduced (20 repeated runs). That error means the application of the test VM was stopped. `test/start_test.exs` and `test/persistence/migrations_test.exs` stop it and start it again in `on_exit`; if that start fails, the rest of the run fails. When it happens again, the first failure of the run settles the cause: it shows the reason `Application.start/1` returned.
+
+## Digest test
+
+`test/cluster/data_digest_test.exs` starts peers on base 9330, then a real node (`elixir --name ... -e`, the code paths of the test VM, `PINATA_PARTS=zone`, `cluster.nodes` naming the WorldManager peer) with a data directory that differs. It asserts exit status 1, the message and both digests in the output, and that the WorldManager peer is still alive. The log level of the WorldManager peer is set to `:none`, so its expected refusal error does not show in the test output. The node halts itself with status 3 after 30 seconds if it is never refused. While `Zone.game_data/0` is `[]` any different directory works; when Zone declares tables, copy the test data directory and change one file.
+
+## Compose smoke test
+
+`test/support/compose_smoke.exs` is a script, not an ExUnit test (`test_helper.exs` loads only `support/**/*.ex`). It plays login, world select and the character list against `127.0.0.1:9010` and `9110` with `TestClient`, as the account `smoke` with the password `smoke-password`, retrying up to 15 times 2 seconds apart (the nodes need a moment to connect). CI job `compose-smoke` runs it; locally, in `server/` with a data directory in `data`:
+
+```
+docker compose up -d --build
+printf 'smoke-password\n' | docker compose exec -T login /app/bin/pinata eval 'Persistence.Release.create_account("smoke")'
+MIX_ENV=test mix run --no-start test/support/compose_smoke.exs
+docker compose down -v
+```
+
+`test/compose_doc_test.exs` checks that `docs/user/multi-node.md` contains `compose.yaml` and `compose.toml` verbatim.
 
 ## Limits
 
