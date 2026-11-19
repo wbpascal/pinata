@@ -12,6 +12,8 @@ defmodule Persistence do
   alias Persistence.Item
   alias Persistence.Password
   alias Persistence.Repo
+  alias Persistence.Shortcut
+  alias Persistence.Skill
 
   @equipped 8
 
@@ -35,6 +37,35 @@ defmodule Persistence do
           tutorial_state: 0..3,
           tutorial_step: non_neg_integer(),
           equipment: [equipped()]
+        }
+
+  @type new_character :: %{
+          world_id: non_neg_integer(),
+          account_id: pos_integer(),
+          slot: 0..5,
+          name: binary(),
+          level: pos_integer(),
+          exp: non_neg_integer(),
+          login_map: String.t(),
+          login_x: non_neg_integer(),
+          login_y: non_neg_integer(),
+          hp: non_neg_integer(),
+          sp: non_neg_integer(),
+          hp_stones: non_neg_integer(),
+          sp_stones: non_neg_integer(),
+          money: non_neg_integer(),
+          race: non_neg_integer(),
+          class: non_neg_integer(),
+          gender: 0..1,
+          hair: non_neg_integer(),
+          hair_color: non_neg_integer(),
+          face: non_neg_integer(),
+          tutorial_state: 0..3,
+          items: [
+            %{storage: non_neg_integer(), slot: non_neg_integer(), item_id: non_neg_integer(), lot: pos_integer()}
+          ],
+          skills: [non_neg_integer()],
+          shortcuts: [%{slot: non_neg_integer(), code: non_neg_integer(), value: non_neg_integer()}]
         }
 
   @character_keys [
@@ -78,6 +109,83 @@ defmodule Persistence do
 
       {:ok, Enum.map(characters, &(&1 |> Map.take(@character_keys) |> Map.put(:equipment, Map.get(items, &1.id, []))))}
     end)
+  end
+
+  @doc "Creates a character with its starting items, skills and shortcuts in one transaction."
+  @spec create_character(new_character()) :: {:ok, character()} | {:error, :slot_in_use | :name_taken | :database}
+  def create_character(attrs) do
+    repo = Repo.active()
+    {related, fields} = Map.split(attrs, [:items, :skills, :shortcuts])
+
+    fields =
+      Map.merge(fields, %{
+        name_key: Character.name_key(fields.name),
+        kq_map: "",
+        kq_x: 0,
+        kq_y: 0,
+        kq_date: DateTime.from_unix!(Clock.system_time(:second)),
+        tutorial_step: 0
+      })
+
+    transact(repo, "create_character", fn ->
+      slot_taken? =
+        repo.exists?(
+          from(c in Character,
+            where: c.world_id == ^fields.world_id and c.account_id == ^fields.account_id and c.slot == ^fields.slot
+          )
+        )
+
+      if slot_taken?, do: {:error, :slot_in_use}, else: insert_character(repo, fields, related)
+    end)
+  end
+
+  defp insert_character(repo, fields, related) do
+    changeset =
+      %Character{}
+      |> Ecto.Changeset.change(fields)
+      |> Ecto.Changeset.unique_constraint(:slot, name: :characters_world_id_account_id_slot_index)
+      |> Ecto.Changeset.unique_constraint(:name_key, name: :characters_world_id_name_key_index)
+      |> Ecto.Changeset.foreign_key_constraint(:account_id)
+
+    case repo.insert(changeset) do
+      {:ok, character} -> insert_related(repo, character, related)
+      # Leaves the transaction: on PostgreSQL a failed statement aborts it (D02-B2 fixed).
+      {:error, changeset} -> {:error, insert_error(changeset)}
+    end
+  end
+
+  defp insert_error(%{errors: errors}) do
+    cond do
+      Keyword.has_key?(errors, :name_key) -> :name_taken
+      Keyword.has_key?(errors, :slot) -> :slot_in_use
+      true -> :database
+    end
+  end
+
+  defp insert_related(repo, character, related) do
+    id = character.id
+
+    rows = [
+      {Item, Enum.map(related.items, &Map.put(&1, :character_id, id))},
+      {Skill, Enum.map(related.skills, &%{character_id: id, skill_id: &1})},
+      {Shortcut, Enum.map(related.shortcuts, &Map.put(&1, :character_id, id))}
+    ]
+
+    if Enum.all?(rows, fn {schema, list} -> inserted?(repo, schema, list) end) do
+      equipment =
+        for %{storage: @equipped} = i <- related.items, do: %{slot: i.slot, item_id: i.item_id, upgrade: 0}
+
+      {:ok, character |> Map.take(@character_keys) |> Map.put(:equipment, Enum.sort_by(equipment, & &1.slot))}
+    else
+      {:error, :database}
+    end
+  end
+
+  defp inserted?(_repo, _schema, []), do: true
+
+  defp inserted?(repo, schema, list) do
+    n = length(list)
+    match?({^n, _}, repo.insert_all(schema, list))
   end
 
   @spec create_account(binary(), binary()) :: {:ok, pos_integer()} | {:error, :invalid_name | :name_taken | :database}

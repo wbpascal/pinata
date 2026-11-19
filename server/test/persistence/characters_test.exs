@@ -3,6 +3,8 @@ defmodule Persistence.CharactersTest do
 
   @moduletag capture_log: true
 
+  import Ecto.Query
+
   @keys ~w(id slot name level login_map race class gender hair hair_color face kq_map kq_x kq_y kq_date tutorial_state tutorial_step equipment)a
 
   setup do
@@ -73,6 +75,96 @@ defmodule Persistence.CharactersTest do
     test "an item with item_id 65536 is refused", %{id: id} do
       c = Factory.character(id)
       assert catch_error(Factory.item(c.id, 1, 65_536))
+    end
+  end
+
+  describe "create_character/1" do
+    alias Persistence.Item
+    alias Persistence.Shortcut
+    alias Persistence.Skill
+
+    defp attrs(id, overrides \\ %{}) do
+      Map.merge(
+        %{
+          world_id: 0,
+          account_id: id,
+          slot: 0,
+          name: "New",
+          level: 1,
+          exp: 123_456_789_012,
+          login_map: "RouN",
+          login_x: 6888,
+          login_y: 7045,
+          hp: 100,
+          sp: 50,
+          hp_stones: 3,
+          sp_stones: 4,
+          money: 5_000_000_000,
+          race: 1,
+          class: 1,
+          gender: 0,
+          hair: 1,
+          hair_color: 2,
+          face: 3,
+          tutorial_state: 0,
+          items: [%{storage: 9, slot: 0, item_id: 46_003, lot: 7}, %{storage: 8, slot: 12, item_id: 62_923, lot: 1}],
+          skills: [29_200, 29_201],
+          shortcuts: [%{slot: 1, code: 2, value: 3}]
+        },
+        overrides
+      )
+    end
+
+    defp count(schema), do: Persistence.Repo.active().aggregate(schema, :count)
+
+    test "stores the character with its items, skills and shortcuts", %{id: id} do
+      Application.put_env(:pinata, :clock_source, TestClock)
+      TestClock.set(1_794_733_600_925_868)
+      on_exit(fn -> Application.delete_env(:pinata, :clock_source) end)
+
+      assert {:ok, c} = Persistence.create_character(attrs(id))
+      assert {:ok, [^c]} = Persistence.list_characters(0, id)
+      assert c.equipment == [%{slot: 12, item_id: 62_923, upgrade: 0}]
+      assert c.kq_date == ~U[2026-11-15 09:06:40Z]
+      assert {count(Item), count(Skill), count(Shortcut)} == {2, 2, 1}
+
+      repo = Persistence.Repo.active()
+
+      assert repo.one(from(c in Persistence.Character, select: {c.exp, c.login_x, c.money})) ==
+               {123_456_789_012, 6888, 5_000_000_000}
+
+      assert repo.one(from(i in Item, where: i.storage == 9, select: i.lot)) == 7
+    end
+
+    test "slot in use wins over name taken, a name is unique per world", %{id: id} do
+      {:ok, other} = Persistence.create_account("other", "pw")
+      assert {:ok, _} = Persistence.create_character(attrs(id))
+      assert {:error, :slot_in_use} = Persistence.create_character(attrs(id, %{name: "Else"}))
+      assert {:error, :slot_in_use} = Persistence.create_character(attrs(id))
+      assert {:error, :name_taken} = Persistence.create_character(attrs(id, %{slot: 1, name: "NEW"}))
+      assert {:error, :name_taken} = Persistence.create_character(attrs(other, %{name: "nEw"}))
+      assert {:ok, _} = Persistence.create_character(attrs(id, %{slot: 1, world_id: 1}))
+    end
+
+    test "after :name_taken the repo is not in a transaction and nothing was written (D02-B2)", %{id: id} do
+      assert {:ok, _} = Persistence.create_character(attrs(id))
+      before = {count(Item), count(Skill), count(Shortcut)}
+      assert {:error, :name_taken} = Persistence.create_character(attrs(id, %{slot: 1}))
+      refute Persistence.Repo.active().in_transaction?()
+      assert {count(Item), count(Skill), count(Shortcut)} == before
+      assert {:ok, _} = Persistence.create_character(attrs(id, %{slot: 1, name: "Free"}))
+    end
+
+    test "a database failure is an error value", %{id: id} do
+      Persistence.Repo.active().query!("ALTER TABLE characters RENAME TO characters_off")
+      on_exit(fn -> Persistence.Repo.active().query!("ALTER TABLE characters_off RENAME TO characters") end)
+      assert {:error, :database} = Persistence.create_character(attrs(id))
+    end
+
+    test "a name that is not UTF-8 is created and listed unchanged", %{id: id} do
+      name = <<0xC7>> <> String.duplicate("a", 19)
+      assert {:ok, _} = Persistence.create_character(attrs(id, %{name: name}))
+      assert {:ok, [%{name: ^name}]} = Persistence.list_characters(0, id)
     end
   end
 end

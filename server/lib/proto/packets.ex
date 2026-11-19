@@ -32,7 +32,10 @@ defmodule Proto.Packets do
     0x0C5A => Proto.Packets.UserUsLoginReq,
     0x0C65 => Proto.Packets.UserClientVersionCheckReq,
     0x0C66 => Proto.Packets.UserClientWrongversionCheckAck,
-    0x0C67 => Proto.Packets.UserClientRightversionCheckAck
+    0x0C67 => Proto.Packets.UserClientRightversionCheckAck,
+    0x1401 => Proto.Packets.AvatarCreateReq,
+    0x1404 => Proto.Packets.AvatarCreatefailAck,
+    0x1406 => Proto.Packets.AvatarCreatesuccAck
   }
 
   @doc "The module for an opcode."

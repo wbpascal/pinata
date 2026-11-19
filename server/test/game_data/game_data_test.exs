@@ -5,7 +5,12 @@ defmodule GameDataTest do
 
   test "the tables of the WorldManager part load without warnings" do
     assert {:ok, tables, []} = GameData.Loader.parse(@dir, WorldManager.game_data(), true)
-    assert map_size(tables) == 11
+    assert map_size(tables) == 12
+  end
+
+  test "bad names" do
+    assert [%{bad_name: "GM"} | _] =
+             Enum.filter(GameData.lookup(GameData.BadNameFilter, :type, 1), &(&1.bad_name == "GM"))
   end
 
   test "character defaults" do

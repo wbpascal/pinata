@@ -12,5 +12,6 @@ defmodule Persistence.Item do
     field :slot, :integer
     field :item_id, :integer
     field :upgrade, :integer
+    field :lot, :integer, default: 1
   end
 end

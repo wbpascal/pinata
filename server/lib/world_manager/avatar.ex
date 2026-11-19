@@ -72,6 +72,10 @@ defmodule WorldManager.Avatar do
     }
   end
 
+  @doc "The AVATAR of 0x1406: as stored, without the two changes the character list makes (capture-validation §16.3)."
+  @spec created(Persistence.character()) :: Avatar.t()
+  def created(c), do: %{from_character(c) | loginmap: c.login_map, change_id_init: 0}
+
   defp equip_slots, do: @equip_index |> Enum.sort_by(&elem(&1, 1)) |> Enum.map(&elem(&1, 0))
 
   defp item_id(equip, slot) do
