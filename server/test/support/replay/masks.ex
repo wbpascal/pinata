@@ -30,7 +30,16 @@ defmodule Replay.Masks do
   # Handles (identifiers, item keys) are added by the issue that defines each packet.
   @doc "Handles that apply to every replay."
   @spec handles() :: [handle()]
-  def handles, do: []
+  def handles,
+    do: [
+      {Proto.Packets.UserWillWorldSelectAck, :otp, :login_token,
+       "session value: the login token is drawn at random per request"},
+      {Proto.Packets.UserWorldselectAck, :validate, :world_key,
+       "session value: the key is drawn at random per select, the client sends it back in 0x0C0F"},
+      {Proto.Packets.UserLoginworldReq, :validate, :world_key, "session value: the key of 0x0C0C"},
+      {Proto.Packets.UserLoginWithOtpReq, :otp, :login_token,
+       "session value: the client sends back the token of 0x0C34"}
+    ]
 
   @doc "Raises `ArgumentError` for an empty reason or a first path element that is not a field of the packet."
   @spec validate!([mask() | handle()]) :: :ok

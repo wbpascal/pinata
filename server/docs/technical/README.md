@@ -21,7 +21,7 @@ The server is one Mix project, application `:pinata` ([ADR 0001](../../../docs/a
 | `Random` | library | the only caller of `:rand` | nothing |
 | `Pinata.Application` | application | starts the supervision tree | the parts, `Persistence`, `Cluster`, `Settings`, `GameData` |
 
-A part never uses another part. `Proto` and `Net` are built; each part starts a client listener. Login handles the login path and the world select (see [`flows/login.md`](flows/login.md), [`flows/world-select.md`](flows/world-select.md)); WorldManager handles the hand-over login `0x0C0F`; Zone has a stub packet handler. `Persistence` has the accounts table; the other libraries are almost empty.
+A part never uses another part. `Proto` and `Net` are built; each part starts a client listener. Login handles the login path and the world select (see [`flows/login.md`](flows/login.md), [`flows/world-select.md`](flows/world-select.md)); WorldManager handles the hand-over login `0x0C0F`, `0x0C33` and `0x0C18` (see [`flows/return-to-world-list.md`](flows/return-to-world-list.md)); Zone has a stub packet handler. `Persistence` has the accounts table; the other libraries are almost empty.
 
 ADR 0001 calls the protocol library `Protocol`. Elixir already has a core module of that name, so the module is `Proto`.
 

@@ -59,8 +59,7 @@ defmodule TestPeers do
     {:ok, _} = :peer.call(pid, Application, :ensure_all_started, [:logger])
     :ok = :peer.call(pid, Logger, :configure, [[level: :warning]])
 
-    if parts == "world_manager",
-      do: _ = :peer.call(pid, Code, :require_file, [Path.expand("test_clock.ex", __DIR__)], @call_timeout)
+    _ = :peer.call(pid, Code, :require_file, [Path.expand("test_clock.ex", __DIR__)], @call_timeout)
 
     {:ok, _} = :peer.call(pid, Application, :ensure_all_started, [:pinata], @call_timeout)
     {pid, node}

@@ -41,7 +41,7 @@ sequenceDiagram
 
 ## Session
 
-An accepted connection calls `Cluster.Sessions.take_over/1` (an older session gets `{:cluster, :session_replaced}` and answers `0x0C17 {0x683}`) and joins the `:pg` group `{:players, world}`. When the socket closes the process ends and the player count drops.
+An accepted connection calls `Cluster.Sessions.take_over/1` (an older session gets `{:cluster, :session_replaced}` and answers `0x0C17 {0x683}`) and joins the `:pg` group `{:players, world}`. The way back: [`return-to-world-list.md`](return-to-world-list.md). When the socket closes the process ends and the player count drops.
 
 ## Original-server bugs
 

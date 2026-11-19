@@ -150,6 +150,11 @@ defmodule Replay.HarnessTest do
     assert {:error, %Failure{kind: :unexpected, index: 4}} = run(Stub, more, masks: [{Box, :head, "test"}])
   end
 
+  test "close_after: closes the connection of that packet, so no extra packet is drained" do
+    lines = @trigger <> "0200\n" <> @reply <> "0100efbeadde0700"
+    assert run(Stub, lines, close_after: [3]) == :ok
+  end
+
   test "timer-driven opcodes are dropped and not expected" do
     assert run(Stub, @trigger <> "0400\n" <> @reply <> "0100efbeadde0700") == :ok
     assert run(Stub, "100.100000 login#1 S 0x0804 -") == :ok
