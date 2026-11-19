@@ -29,7 +29,15 @@ defmodule Factory do
   def character(account_id, attrs \\ %{}) do
     attrs = Map.merge(@defaults, attrs)
     attrs = Map.put_new(attrs, :name_key, String.downcase(attrs.name, :ascii))
-    Persistence.Repo.active().insert!(struct!(Character, Map.put(attrs, :account_id, account_id)))
+    repo = Persistence.Repo.active()
+    character = repo.insert!(struct!(Character, Map.put(attrs, :account_id, account_id)))
+
+    # PostgreSQL does not advance the id sequence for an explicit id: a later real insert would collide.
+    if repo.__adapter__() == Ecto.Adapters.Postgres do
+      repo.query!("SELECT setval(pg_get_serial_sequence('characters', 'id'), (SELECT max(id) FROM characters))")
+    end
+
+    character
   end
 
   @doc "Inserts an equipped item (storage 8) of a character."

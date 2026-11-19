@@ -21,7 +21,7 @@ The server is one Mix project, application `:pinata` ([ADR 0001](../../../docs/a
 | `Random` | library | the only caller of `:rand` | nothing |
 | `Pinata.Application` | application | starts the supervision tree | the parts, `Persistence`, `Cluster`, `Settings`, `GameData` |
 
-A part never uses another part. `Proto` and `Net` are built; each part starts a client listener. Login handles the login path and the world select (see [`flows/login.md`](flows/login.md), [`flows/world-select.md`](flows/world-select.md)); WorldManager handles the hand-over login `0x0C0F`, sends the character list ([`flows/character-list.md`](flows/character-list.md)) and handles `0x0C33` and `0x0C18` (see [`flows/return-to-world-list.md`](flows/return-to-world-list.md)); Zone has a stub packet handler. `Persistence` has the tables `accounts`, `characters` and `items`; the other libraries are almost empty.
+A part never uses another part. `Proto` and `Net` are built; each part starts a client listener. Login handles the login path and the world select (see [`flows/login.md`](flows/login.md), [`flows/world-select.md`](flows/world-select.md)); WorldManager handles the hand-over login `0x0C0F`, sends the character list ([`flows/character-list.md`](flows/character-list.md)) and handles `0x1401`, the creation of a character ([`flows/character-create.md`](flows/character-create.md)), `0x0C33` and `0x0C18` (see [`flows/return-to-world-list.md`](flows/return-to-world-list.md)); Zone has a stub packet handler. `Persistence` has the tables `accounts`, `characters`, `items`, `character_skills` and `character_shortcuts`; the other libraries are almost empty.
 
 ADR 0001 calls the protocol library `Protocol`. Elixir already has a core module of that name, so the module is `Proto`.
 

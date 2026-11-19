@@ -150,6 +150,16 @@ defmodule Replay.HarnessTest do
     assert {:error, %Failure{kind: :unexpected, index: 4}} = run(Stub, more, masks: [{Box, :head, "test"}])
   end
 
+  test "before: the function of an index runs before that client packet is sent" do
+    me = self()
+    lines = @trigger <> "0100\n" <> @reply <> "0100efbeadde0700"
+    before = %{2 => fn -> send(me, :before_2) end, 3 => fn -> send(me, :before_3) end}
+
+    assert run(Stub, lines, masks: [{Reply, :token, "test"}], before: before) == :ok
+    assert_received :before_2
+    assert_received :before_3
+  end
+
   test "close_after: closes the connection of that packet, so no extra packet is drained" do
     lines = @trigger <> "0200\n" <> @reply <> "0100efbeadde0700"
     assert run(Stub, lines, close_after: [3]) == :ok

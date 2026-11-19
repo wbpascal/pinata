@@ -31,6 +31,8 @@ sequenceDiagram
 
 ## AVATAR (0x82 bytes)
 
+The same record is sent in `0x1406` after a creation, with two differences: see [`character-create.md`](character-create.md).
+
 | Field | Source |
 |---|---|
 | `chrregnum` | `characters.id` |

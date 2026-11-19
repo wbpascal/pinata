@@ -28,7 +28,9 @@ defmodule Replay.Masks do
         delinfo_masks() ++
         [
           {Proto.Packets.UserLoginworldAck, [:avatars, :kq_date_unused],
-           "uninitialised memory (P02-B7): the two bits above the Kingdom Quest date keep old buffer bits, the rebuild sends 0; the mask covers the whole byte, so the seconds are not compared"}
+           "uninitialised memory (P02-B7): the two bits above the Kingdom Quest date keep old buffer bits, the rebuild sends 0; the mask covers the whole byte, so the seconds are not compared"},
+          {Proto.Packets.AvatarCreatesuccAck, [:avatars, :kq_date_unused],
+           "uninitialised memory (P02-B7): the two bits above the creation date keep old buffer bits, the rebuild sends 0; the mask covers the whole byte, so the seconds are not compared (the original stores the database time, in capture 37 one second after the request)"}
         ]
 
   defp delinfo_masks do
@@ -52,7 +54,9 @@ defmodule Replay.Masks do
       {Proto.Packets.UserLoginWithOtpReq, :otp, :login_token,
        "session value: the client sends back the token of 0x0C34"},
       {Proto.Packets.UserLoginworldAck, :worldmanager, :wm_session,
-       "session handle: the original takes it from its session pool, the rebuild counts per world"}
+       "session handle: the original takes it from its session pool, the rebuild counts per world"},
+      {Proto.Packets.AvatarCreatesuccAck, [:avatars, :chrregnum], :character,
+       "identifier: the character number comes from the database sequence"}
     ]
 
   @doc "Raises `ArgumentError` for an empty reason or a first path element that is not a field of the packet."

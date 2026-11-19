@@ -73,11 +73,11 @@ One module per table, `GameData.<Name>`, implementing `GameData.Schema`: a struc
 - `indexes`: fields with a non-unique index (`GameData.lookup/3`, rows in file order),
 - `references`: `field: schema`, the value must be a key of that schema's table.
 
-A schema lists only the columns the server reads. A column of the file that it does not list is ignored; a listed column the file lacks is an error. A table without a schema is not loaded. Built so far (all read by character creation, `docs/pseudocode/db/D02-character.md` §3.3 and `docs/pseudocode/wm/W01-core.md` §4.1): `SingleData`, `MapInfo`, `ItemInfo`, `HairInfo`, `HairColorInfo`, `FaceInfo`, `CharDefault`, `CharDefaultItem`, `CharDefaultSkill`, `CharDefaultQuest`, `CharDefaultShortcut`. The references are `CharDefault.start_map` to `MapInfo` and `CharDefaultItem.item_id` to `ItemInfo`.
+A schema lists only the columns the server reads. A column of the file that it does not list is ignored; a listed column the file lacks is an error. A table without a schema is not loaded. Built so far (all read by character creation, `docs/pseudocode/db/D02-character.md` §3.3 and `docs/pseudocode/wm/W01-core.md` §4.1): `SingleData`, `MapInfo`, `ItemInfo`, `HairInfo`, `HairColorInfo`, `FaceInfo`, `CharDefault`, `CharDefaultItem`, `CharDefaultSkill`, `CharDefaultQuest`, `CharDefaultShortcut`, and `BadNameFilter` (the name filter of WorldManager, W01 §4.1). The references are `CharDefault.start_map` to `MapInfo` and `CharDefaultItem.item_id` to `ItemInfo`.
 
 ## Loading
 
-`GameData.load(data_dir, schemas, strict_references: boolean)` is called by `Pinata.Application` after the settings and before any supervisor. A part declares its tables in `game_data/0` (`Login` and `Zone` none, `WorldManager` the eleven above); the application loads the union and the schemas they refer to. A missing data directory returns the error that names `mix pinata.import_data`. `GameData.Loader.parse/3` (pure) reads every table and returns **all** problems together; any problem stops the start:
+`GameData.load(data_dir, schemas, strict_references: boolean)` is called by `Pinata.Application` after the settings and before any supervisor. A part declares its tables in `game_data/0` (`Login` and `Zone` none, `WorldManager` the twelve above); the application loads the union and the schemas they refer to. A missing data directory returns the error that names `mix pinata.import_data`. `GameData.Loader.parse/3` (pure) reads every table and returns **all** problems together; any problem stops the start:
 
 | Problem | Message (starts with the file) |
 |---|---|
@@ -103,7 +103,7 @@ All three raise when the schema's table was not loaded: the part forgot to decla
 
 ## Measured
 
-At every start the node logs `GameData: <tables> tables, <rows> rows, <ms> ms, <bytes> bytes`. The three runs of `mix run -e ':ok'` on the imported 2016 data set (2026-11-18, Apple M1 Pro, macOS 27.2.1, Elixir 1.20.5 on OTP 29, `MIX_ENV=dev`), parse of the eleven tables:
+At every start the node logs `GameData: <tables> tables, <rows> rows, <ms> ms, <bytes> bytes`. The three runs of `mix run -e ':ok'` on the imported 2016 data set (2026-11-18, Apple M1 Pro, macOS 27.2.1, Elixir 1.20.5 on OTP 29, `MIX_ENV=dev`), parse of the eleven tables (measured before `BadNameFilter` was added):
 
 ```
 GameData: 11 tables, 15846 rows, 380 ms, 2796448 bytes
